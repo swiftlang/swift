@@ -586,3 +586,65 @@ func testOptionalBlock() {
   var x = 0
   takesInoutAndOptionalBlock(&x) { x += 1 }
 }
+
+// Diagnost a conflict on a noescape closure that is conditionally passed as a function argument.
+//
+// <rdar://problem/42560459> [Exclusivity] Failure to statically diagnose a conflict when passing conditional noescape closures.
+struct S {
+  var x: Int
+
+  mutating func takeNoescapeClosure(_ f: ()->()) { f() }
+
+  mutating func testNoescapePartialApplyPhiUse(z : Bool) {
+    func f1() {
+      x = 1 // expected-note {{conflicting access is here}}
+    }
+    func f2() {
+      x = 1 // expected-note {{conflicting access is here}}
+    }
+    takeNoescapeClosure(z ? f1 : f2)
+    // expected-error@-1 2 {{overlapping accesses to 'self', but modification requires exclusive access; consider copying to a local variable}}
+  }
+}
+
+func doit(x: inout Int, _ fn: () -> ()) {}
+
+func nestedConflict(x: inout Int) {
+  doit(x: &x, x == 0 ? { x = 1 } : { x = 2})
+  // expected-error@-1 2{{overlapping accesses to 'x', but modification requires exclusive access; consider copying to a local variable}}
+  // expected-note@-2 2{{conflicting access is here}}
+}
+
+// Avoid diagnosing a conflict on disjoint struct properies when one is a `let`.
+// This requires an address projection before loading the `let` property.
+//
+// <rdar://problem/35561050> [SR-10145][Exclusivity] SILGen loads entire struct when reading captured 'let' stored property
+struct DisjointLetMember {
+  var dummy: AnyObject // Make this a nontrivial struct because the SIL is more involved.
+  mutating func get(makeValue: ()->Int) -> Int {
+    return makeValue()
+  }
+}
+
+class IntWrapper {
+  var x = 0
+}
+
+struct DisjointLet {
+  let a = 2 // Using a `let` forces a full load.
+  let b: IntWrapper
+  var cache: DisjointLetMember
+
+  init(b: IntWrapper) {
+    self.b = b
+    self.cache = DisjointLetMember(dummy: b)
+  }
+
+  mutating func testDisjointLet() -> Int {
+    // Access to inout `self` for member .cache`.
+    return cache.get {
+      // Access to captured `self` for member .cache`.
+      a + b.x
+    }
+  }
+}

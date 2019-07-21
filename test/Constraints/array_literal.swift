@@ -102,13 +102,12 @@ func longArray() {
   var _=["1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1"]
 }
 
-[1,2].map // expected-error {{expression type '((Int) throws -> _) throws -> [_]' is ambiguous without more context}}
+[1,2].map // expected-error {{generic parameter 'T' could not be inferred}}
 
 
 // <rdar://problem/25563498> Type checker crash assigning array literal to type conforming to ArrayProtocol
 func rdar25563498<T : ExpressibleByArrayLiteral>(t: T) {
-  var x: T = [1] // expected-error {{cannot convert value of type '[Int]' to specified type 'T'}}
-  // expected-warning@-1{{variable 'x' was never used; consider replacing with '_' or removing it}}
+  var x: T = [1] // expected-error {{cannot convert value of type 'Int' to expected element type 'T.ArrayLiteralElement'}}
 }
 
 func rdar25563498_ok<T : ExpressibleByArrayLiteral>(t: T) -> T
@@ -329,6 +328,7 @@ protocol P { }
 struct PArray<T> { }
 
 extension PArray : ExpressibleByArrayLiteral where T: P {
+  // expected-note@-1 {{requirement from conditional conformance of 'PArray<String>' to 'ExpressibleByArrayLiteral'}}
   typealias ArrayLiteralElement = T
 
   init(arrayLiteral elements: T...) { }
@@ -338,5 +338,21 @@ extension Int: P { }
 
 func testConditional(i: Int, s: String) {
   let _: PArray<Int> = [i, i, i]
-  let _: PArray<String> = [s, s, s] // expected-error{{cannot convert value of type '[String]' to specified type 'PArray<String>'}}
+  let _: PArray<String> = [s, s, s] // expected-error{{generic struct 'PArray' requires that 'String' conform to 'P'}}
+}
+
+
+// SR-8385
+enum SR8385: ExpressibleByStringLiteral {
+  case text(String)
+  init(stringLiteral value: String) {
+    self = .text(value)
+  }
+}
+
+func testSR8385() {
+  let _: [SR8385] = [SR8385("hello")]
+  let _: [SR8385] = [.text("hello")]
+  let _: [SR8385] = ["hello", SR8385.text("world")]
+  let _: [SR8385] = ["hello", .text("world")]
 }

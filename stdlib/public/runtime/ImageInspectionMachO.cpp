@@ -23,6 +23,7 @@
 #include "ImageInspection.h"
 #include <mach-o/dyld.h>
 #include <mach-o/getsect.h>
+#include <objc/runtime.h>
 #include <assert.h>
 #include <dlfcn.h>
 
@@ -31,16 +32,19 @@ using namespace swift;
 namespace {
 /// The Mach-O section name for the section containing protocol descriptor
 /// references. This lives within SEG_TEXT.
-constexpr const char ProtocolsSection[] = "__swift4_protos";
+constexpr const char ProtocolsSection[] = "__swift5_protos";
 /// The Mach-O section name for the section containing protocol conformances.
 /// This lives within SEG_TEXT.
-constexpr const char ProtocolConformancesSection[] = "__swift4_proto";
+constexpr const char ProtocolConformancesSection[] = "__swift5_proto";
 /// The Mach-O section name for the section containing type references.
 /// This lives within SEG_TEXT.
-constexpr const char TypeMetadataRecordSection[] = "__swift4_types";
-/// The Mach-O section name for the section containing type field references.
+constexpr const char TypeMetadataRecordSection[] = "__swift5_types";
+/// The Mach-O section name for the section containing dynamic replacements.
 /// This lives within SEG_TEXT.
-constexpr const char TypeFieldRecordSection[] = "__swift4_fieldmd";
+constexpr const char DynamicReplacementSection[] = "__swift5_replace";
+constexpr const char DynamicReplacementSomeSection[] = "__swift5_replac2";
+
+constexpr const char TextSegment[] = SEG_TEXT;
 
 #if __POINTER_WIDTH__ == 64
 using mach_header_platform = mach_header_64;
@@ -50,18 +54,18 @@ using mach_header_platform = mach_header;
 
 extern "C" void *_NSGetMachExecuteHeader();
 
-template<const char *SECTION_NAME,
+template <const char *SEGMENT_NAME, const char *SECTION_NAME,
          void CONSUME_BLOCK(const void *start, uintptr_t size)>
-void addImageCallback(const mach_header *mh, intptr_t vmaddr_slide) {
+void addImageCallback(const mach_header *mh) {
 #if __POINTER_WIDTH__ == 64
   assert(mh->magic == MH_MAGIC_64 && "loaded non-64-bit image?!");
 #endif
   
-  // Look for a __swift4_proto section.
+  // Look for a __swift5_proto section.
   unsigned long size;
   const uint8_t *section =
   getsectiondata(reinterpret_cast<const mach_header_platform *>(mh),
-                 SEG_TEXT, SECTION_NAME,
+                 SEGMENT_NAME, SECTION_NAME,
                  &size);
   
   if (!section)
@@ -69,31 +73,87 @@ void addImageCallback(const mach_header *mh, intptr_t vmaddr_slide) {
   
   CONSUME_BLOCK(section, size);
 }
+template <const char *SEGMENT_NAME, const char *SECTION_NAME,
+         void CONSUME_BLOCK(const void *start, uintptr_t size)>
+void addImageCallback(const mach_header *mh, intptr_t vmaddr_slide) {
+  addImageCallback<SEGMENT_NAME, SECTION_NAME, CONSUME_BLOCK>(mh);
+}
+
+template <const char *SEGMENT_NAME, const char *SECTION_NAME,
+          const char *SEGMENT_NAME2, const char *SECTION_NAME2,
+          void CONSUME_BLOCK(const void *start, uintptr_t size,
+                             const void *start2, uintptr_t size2)>
+void addImageCallback2Sections(const mach_header *mh) {
+#if __POINTER_WIDTH__ == 64
+  assert(mh->magic == MH_MAGIC_64 && "loaded non-64-bit image?!");
+#endif
+
+  // Look for a section.
+  unsigned long size;
+  const uint8_t *section =
+  getsectiondata(reinterpret_cast<const mach_header_platform *>(mh),
+                 SEGMENT_NAME, SECTION_NAME,
+                 &size);
+
+  if (!section)
+    return;
+
+  // Look for another section.
+  unsigned long size2;
+  const uint8_t *section2 =
+  getsectiondata(reinterpret_cast<const mach_header_platform *>(mh),
+                 SEGMENT_NAME2, SECTION_NAME2,
+                 &size2);
+  if (!section2)
+    size2 = 0;
+
+  CONSUME_BLOCK(section, size, section2, size2);
+}
+template <const char *SEGMENT_NAME, const char *SECTION_NAME,
+          const char *SEGMENT_NAME2, const char *SECTION_NAME2,
+          void CONSUME_BLOCK(const void *start, uintptr_t size,
+                             const void *start2, uintptr_t size2)>
+void addImageCallback2Sections(const mach_header *mh, intptr_t vmaddr_slide) {
+  addImageCallback2Sections<SEGMENT_NAME, SECTION_NAME,
+                            SEGMENT_NAME2, SECTION_NAME2,
+                            CONSUME_BLOCK>(mh);
+}
 
 } // end anonymous namespace
 
+#if OBJC_ADDLOADIMAGEFUNC_DEFINED
+#define REGISTER_FUNC(...)                                               \
+  if (__builtin_available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)) { \
+    objc_addLoadImageFunc(__VA_ARGS__);                                  \
+  } else {                                                               \
+    _dyld_register_func_for_add_image(__VA_ARGS__);                      \
+  }
+#else
+#define REGISTER_FUNC(...) _dyld_register_func_for_add_image(__VA_ARGS__)
+#endif
+
 void swift::initializeProtocolLookup() {
-  _dyld_register_func_for_add_image(
-    addImageCallback<ProtocolsSection,
+  REGISTER_FUNC(
+    addImageCallback<TextSegment, ProtocolsSection,
                      addImageProtocolsBlockCallback>);
 }
 
 void swift::initializeProtocolConformanceLookup() {
-  _dyld_register_func_for_add_image(
-    addImageCallback<ProtocolConformancesSection,
+  REGISTER_FUNC(
+    addImageCallback<TextSegment, ProtocolConformancesSection,
                      addImageProtocolConformanceBlockCallback>);
 }
 void swift::initializeTypeMetadataRecordLookup() {
-  _dyld_register_func_for_add_image(
-    addImageCallback<TypeMetadataRecordSection,
+  REGISTER_FUNC(
+    addImageCallback<TextSegment, TypeMetadataRecordSection,
                      addImageTypeMetadataRecordBlockCallback>);
-  
 }
 
-void swift::initializeTypeFieldLookup() {
-  _dyld_register_func_for_add_image(
-      addImageCallback<TypeFieldRecordSection,
-                       addImageTypeFieldDescriptorBlockCallback>);
+void swift::initializeDynamicReplacementLookup() {
+  REGISTER_FUNC(
+      addImageCallback2Sections<TextSegment, DynamicReplacementSection,
+                                TextSegment, DynamicReplacementSomeSection,
+                                addImageDynamicReplacementBlockCallback>);
 }
 
 int swift::lookupSymbol(const void *address, SymbolInfo *info) {
@@ -104,7 +164,7 @@ int swift::lookupSymbol(const void *address, SymbolInfo *info) {
 
   info->fileName = dlinfo.dli_fname;
   info->baseAddress = dlinfo.dli_fbase;
-  info->symbolName = dlinfo.dli_sname;
+  info->symbolName.reset(dlinfo.dli_sname);
   info->symbolAddress = dlinfo.dli_saddr;
   return 1;
 }

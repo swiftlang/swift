@@ -131,6 +131,9 @@ static void dumpSwiftHeapObjects() {
     kindDescriptor = #name;                                                    \
     break;
 #include "swift/ABI/MetadataKind.def"
+    default:
+      kindDescriptor = "unknown";
+      break;
     }
 
     if (auto *NTD =

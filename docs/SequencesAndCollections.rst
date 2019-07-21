@@ -1,6 +1,5 @@
 :orphan:
 
-.. @raise litre.TestsAreMissing
 .. default-role:: code
 
 ====================================
@@ -286,7 +285,7 @@ stable indices, the element order within the collection itself is stable; the
 order sometimes does not have a meaning and is not chosen by the code that uses
 the collection, but by the implementation details of the collection itself.)
 
-`MutableCollectionType` protocol allows the to replace a specific element,
+`MutableCollectionType` protocol allows the caller to replace a specific element,
 identified by an index, with another one in the same position.  This capability
 essentially allows to rearrange the elements inside the collection in any
 order, thus types that conform to `MutableCollectionType` can represent

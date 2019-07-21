@@ -26,13 +26,13 @@ class Expr;
 struct SILDeclRef;
 class SILLocation;
 class SILModule;
-class Substitution;
   
 namespace Lowering {
 class ManagedValue;
 class SGFContext;
 class SILGenFunction;
 class SILGenModule;
+class PreparedArguments;
 
 /// Some kind of specialized emitter for a builtin function.
 class SpecializedEmitter {
@@ -42,7 +42,7 @@ public:
   using EarlyEmitter = ManagedValue (SILGenFunction &,
                                      SILLocation,
                                      SubstitutionMap,
-                                     Expr *argument,
+                                     PreparedArguments &&args,
                                      SGFContext);
 
   /// A special function for emitting a call after the arguments

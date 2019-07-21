@@ -13,6 +13,11 @@ func testTrailingClosure() -> String {
     .filter({ $0 % 2 == 0 })
     .map({ $0 + 1 })
 }
+
+func foobar(first: String? = nil, closure: () -> Void) { fatalError() }
+func blah() {
+  _ = foobar(closure: { print("foo") })
+}
 // RUN: %empty-directory(%t.result)
 
 // RUN: %refactor -trailingclosure -source-filename %s -pos=7:3 > %t.result/L7.swift
@@ -31,4 +36,5 @@ func testTrailingClosure() -> String {
 // RUN: diff -u %S/Outputs/basic/L13.swift.expected %t.result/L13.swift
 // RUN: %refactor -trailingclosure -source-filename %s -pos=14:5 > %t.result/L14.swift
 // RUN: diff -u %S/Outputs/basic/L14.swift.expected %t.result/L14.swift
-
+// RUN: %refactor -trailingclosure -source-filename %s -pos=19:7 > %t.result/L19.swift
+// RUN: diff -u %S/Outputs/basic/L19.swift.expected %t.result/L19.swift

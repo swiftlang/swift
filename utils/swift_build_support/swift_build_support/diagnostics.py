@@ -19,10 +19,10 @@ def note(message):
     """
     note(message)
 
-    Print a diagnostic notification to the standard output.
+    Print a diagnostic notification to the standard error stream.
     """
-    print(sys.argv[0] + ": note: " + message)
-    sys.stdout.flush()
+    print(sys.argv[0] + ": note: " + message, file=sys.stderr)
+    sys.stderr.flush()
 
 
 def fatal(message):

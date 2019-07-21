@@ -16,12 +16,12 @@
 // CHECK-DWARF-NEXT: AT_name ("main")
 // CHECK-DWARF: TAG_structure_type
 // CHECK-DWARF-NEXT: AT_name ("foo")
-// CHECK-DWARF-NEXT: AT_linkage_name ("$S4main3fooCD")
+// CHECK-DWARF-NEXT: AT_linkage_name ("$s4main3fooCD")
 
 // Verify the IR interface:
 // CHECK: !DICompositeType(tag: DW_TAG_structure_type, name: "foo"
 // CHECK-SAME:             line: [[@LINE+2]]
-// CHECK-SAME:             identifier: "$S4main3fooCD"
+// CHECK-SAME:             identifier: "$s4main3fooCD"
 class foo {
 	var x : Int64 = 1
 }

@@ -12,15 +12,12 @@
 import SwiftShims
 
 extension __swift_stdlib_UErrorCode {
-  @inlinable // FIXME(sil-serialize-all)
   internal var isFailure: Bool {
     return rawValue > __swift_stdlib_U_ZERO_ERROR.rawValue
   }
-  @inlinable // FIXME(sil-serialize-all)
   internal var isWarning: Bool {
     return rawValue < __swift_stdlib_U_ZERO_ERROR.rawValue
   }
-  @inlinable // FIXME(sil-serialize-all)
   internal var isSuccess: Bool {
     return rawValue <= __swift_stdlib_U_ZERO_ERROR.rawValue
   }

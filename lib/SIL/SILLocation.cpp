@@ -20,6 +20,9 @@
 
 using namespace swift;
 
+// 64-bit is 24 bytes, 32-bit is 20 bytes.
+static_assert(sizeof(SILLocation) == sizeof(void *) + 4*sizeof(unsigned),
+              "SILLocation must stay small");
 
 SourceLoc SILLocation::getSourceLoc() const {
   if (isSILFile())
@@ -136,7 +139,7 @@ SILLocation::DebugLoc SILLocation::decode(SourceLoc Loc,
                                           const SourceManager &SM) {
   DebugLoc DL;
   if (Loc.isValid()) {
-    DL.Filename = SM.getBufferIdentifierForLoc(Loc);
+    DL.Filename = SM.getDisplayNameForLoc(Loc);
     std::tie(DL.Line, DL.Column) = SM.getLineAndColumn(Loc);
   }
   return DL;
@@ -213,6 +216,9 @@ MandatoryInlinedLocation::getMandatoryInlinedLocation(SILLocation L) {
 
   if (L.isInTopLevel())
     return MandatoryInlinedLocation::getModuleLocation(L.getSpecialFlags());
+
+  if (L.isDebugInfoLoc())
+    return MandatoryInlinedLocation(L.getDebugInfoLoc(), L.getSpecialFlags());
 
   llvm_unreachable("Cannot construct Inlined loc from the given location.");
 }

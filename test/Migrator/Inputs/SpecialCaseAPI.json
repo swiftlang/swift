@@ -13,5 +13,10 @@
     "DiffItemKind": "SpecialCaseDiffItem",
     "Usr": "s:7MySwift0A6DoubleV3absyS2dFZ",
     "SpecialCaseId": "StaticAbsToSwiftAbs"
+  },
+  {
+    "DiffItemKind": "SpecialCaseDiffItem",
+    "Usr": "s:8MyAppKit17UIApplicationMainys5Int32VAD_SpySpys4Int8VGGSSSgAItF",
+    "SpecialCaseId": "UIApplicationMain"
   }
 ]

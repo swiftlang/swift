@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 5
+// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-objc-interop
 
 // ----------------------------------------------------------------------------
 // DynamicSelf is only allowed on the return type of class and
@@ -10,23 +10,23 @@ func inFunction() {
 }
 
 struct S0 {
-  func f() -> Self { } // expected-error{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'S0'?}}{{15-19=S0}}
+  func f() -> Self { }
 
-  func g(_ ds: Self) { } // expected-error{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'S0'?}}{{16-20=S0}}
+  func g(_ ds: Self) { }
 }
 
 enum E0 {
-  func f() -> Self { } // expected-error{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'E0'?}}{{15-19=E0}}
+  func f() -> Self { }
 
-  func g(_ ds: Self) { } // expected-error{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'E0'?}}{{16-20=E0}}
+  func g(_ ds: Self) { }
 }
 
 class C0 {
   func f() -> Self { } // okay
 
-  func g(_ ds: Self) { } // expected-error{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'C0'?}}{{16-20=C0}}
+  func g(_ ds: Self) { } // expected-error{{covariant 'Self' can only appear as the type of a property, subscript or method result; did you mean 'C0'?}}
 
-  func h(_ ds: Self) -> Self { } // expected-error{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'C0'?}}{{16-20=C0}}
+  func h(_ ds: Self) -> Self { } // expected-error{{covariant 'Self' can only appear as the type of a property, subscript or method result; did you mean 'C0'?}}
 }
 
 protocol P0 {
@@ -72,8 +72,8 @@ class C1 {
     // One can use `type(of:)` to attempt to construct an object of type Self.
     if !b { return type(of: self).init(int: 5) }
 
-    // Can't utter Self within the body of a method.
-    var _: Self = self // expected-error{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'C1'?}} {{12-16=C1}}
+    // Can utter Self within the body of a method.
+    var _: Self = self
 
     // Okay to return 'self', because it has the appropriate type.
     return self // okay
@@ -85,11 +85,11 @@ class C1 {
     var x: Int = self // expected-error{{cannot convert value of type 'Self.Type' to specified type 'Int'}}
 
     // Can't utter Self within the body of a method.
-    var c1 = C1(int: 5) as Self // expected-error{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'C1'?}} {{28-32=C1}}
+    var c1 = C1(int: 5) as Self // expected-error{{'C1' is not convertible to 'Self'; did you mean to use 'as!' to force downcast?}}
 
     if b { return self.init(int: 5) }
 
-    return Self() // expected-error{{use of unresolved identifier 'Self'; did you mean 'self'?}}
+    return Self() // expected-error{{non-nominal type 'Self' does not support explicit initialization}}
   }
 
   // This used to crash because metatype construction went down a
@@ -320,18 +320,24 @@ func testOptionalSelf(_ y : Y) {
 // Conformance lookup on Self
 
 protocol Runcible {
+  associatedtype Runcer
 }
 
 extension Runcible {
   func runce() {}
+
+  func runced(_: Runcer) {}
 }
 
 func wantsRuncible<T : Runcible>(_: T) {}
 
 class Runce : Runcible {
+  typealias Runcer = Int
+
   func getRunced() -> Self {
     runce()
     wantsRuncible(self)
+    runced(3)
     return self
   }
 }
@@ -339,13 +345,14 @@ class Runce : Runcible {
 // ----------------------------------------------------------------------------
 // Forming a type with 'Self' in invariant position
 
-struct Generic<T> { init(_: T) {} }
+struct Generic<T> { init(_: T) {} } // expected-note {{arguments to generic parameter 'T' ('Self' and 'InvariantSelf') are expected to be equal}}
+// expected-note@-1 {{arguments to generic parameter 'T' ('Self' and 'FinalInvariantSelf') are expected to be equal}}
 
 class InvariantSelf {
   func me() -> Self {
     let a = Generic(self)
     let _: Generic<InvariantSelf> = a
-    // expected-error@-1 {{cannot convert value of type 'Generic<Self>' to specified type 'Generic<InvariantSelf>'}}
+    // expected-error@-1 {{cannot assign value of type 'Generic<Self>' to type 'Generic<InvariantSelf>'}}
 
     return self
   }
@@ -357,7 +364,7 @@ final class FinalInvariantSelf {
   func me() -> Self {
     let a = Generic(self)
     let _: Generic<FinalInvariantSelf> = a
-    // expected-error@-1 {{cannot convert value of type 'Generic<Self>' to specified type 'Generic<FinalInvariantSelf>'}}
+    // expected-error@-1 {{cannot assign value of type 'Generic<Self>' to type 'Generic<FinalInvariantSelf>'}}
 
     return self
   }
@@ -391,5 +398,42 @@ final class FinalFactory : FactoryPattern {
 
   convenience init(string: String) {
     self.init(factory: FinalFactory(_string: string))
+  }
+}
+
+// Operators returning Self
+
+class SelfOperator {
+  required init() {}
+
+  static func +(lhs: SelfOperator, rhs: SelfOperator) -> Self {
+    return self.init()
+  }
+
+  func double() -> Self {
+    // FIXME: Should this work?
+    return self + self // expected-error {{cannot convert return expression of type 'SelfOperator' to return type 'Self'}}
+  }
+}
+
+func useSelfOperator() {
+  let s = SelfOperator()
+  _ = s + s
+}
+
+// for ... in loops
+
+struct DummyIterator : IteratorProtocol {
+  func next() -> Int? { return nil }
+}
+
+class Iterable : Sequence {
+  func returnsSelf() -> Self {
+    for _ in self {}
+    return self
+  }
+
+  func makeIterator() -> DummyIterator {
+    return DummyIterator()
   }
 }

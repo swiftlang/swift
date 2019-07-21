@@ -329,7 +329,6 @@ struct UnaryOp_match {
     return T;                                         \
   }
 UNARY_OP_MATCH_WITH_ARG_MATCHER(AllocRefDynamicInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(LoadWeakInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(ConvertFunctionInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(UpcastInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(PointerToAddressInst)
@@ -339,10 +338,6 @@ UNARY_OP_MATCH_WITH_ARG_MATCHER(UncheckedAddrCastInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(UncheckedTrivialBitCastInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(UncheckedBitwiseCastInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(RawPointerToRefInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(RefToUnownedInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(UnownedToRefInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(RefToUnmanagedInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(UnmanagedToRefInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(ThinToThickFunctionInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(ThickToObjCMetatypeInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(ObjCToThickMetatypeInst)
@@ -380,9 +375,6 @@ UNARY_OP_MATCH_WITH_ARG_MATCHER(DeinitExistentialValueInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(ProjectBlockStorageInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(StrongRetainInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(StrongReleaseInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(StrongRetainUnownedInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(UnownedRetainInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(UnownedReleaseInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(ClassifyBridgeObjectInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(ValueToBridgeObjectInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(FixLifetimeInst)
@@ -394,6 +386,24 @@ UNARY_OP_MATCH_WITH_ARG_MATCHER(DeallocBoxInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(DestroyAddrInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(CondFailInst)
 UNARY_OP_MATCH_WITH_ARG_MATCHER(ReturnInst)
+#define LOADABLE_REF_STORAGE_HELPER(Name) \
+  UNARY_OP_MATCH_WITH_ARG_MATCHER(RefTo##Name##Inst) \
+  UNARY_OP_MATCH_WITH_ARG_MATCHER(Name##ToRefInst)
+#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  UNARY_OP_MATCH_WITH_ARG_MATCHER(Load##Name##Inst)
+#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  LOADABLE_REF_STORAGE_HELPER(Name) \
+  UNARY_OP_MATCH_WITH_ARG_MATCHER(Name##RetainInst) \
+  UNARY_OP_MATCH_WITH_ARG_MATCHER(Name##ReleaseInst) \
+  UNARY_OP_MATCH_WITH_ARG_MATCHER(StrongRetain##Name##Inst)
+#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, "...") \
+  ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, "...")
+#define UNCHECKED_REF_STORAGE(Name, ...) \
+  LOADABLE_REF_STORAGE_HELPER(Name)
+#include "swift/AST/ReferenceStorage.def"
+#undef LOADABLE_REF_STORAGE_HELPER
+
 #undef UNARY_OP_MATCH_WITH_ARG_MATCHER
 
 //===----------------------------------------------------------------------===//
@@ -457,6 +467,34 @@ tupleextract_ty<LTy> m_TupleExtractInst(const LTy &Left, unsigned Index) {
   return tupleextract_ty<LTy>(Left, Index);
 }
 
+/// Match either a tuple_extract that the index field from a tuple or the
+/// indexth destructure_tuple result.
+template <typename LTy> struct tupleextractoperation_ty {
+  LTy L;
+  unsigned index;
+  tupleextractoperation_ty(const LTy &Left, unsigned i) : L(Left), index(i) {}
+
+  template <typename ITy> bool match(ITy *V) {
+    if (auto *TEI = dyn_cast<TupleExtractInst>(V)) {
+      return TEI->getFieldNo() == index &&
+             L.match((ValueBase *)TEI->getOperand());
+    }
+
+    if (auto *DTR = dyn_cast<DestructureTupleResult>(V)) {
+      return DTR->getIndex() == index &&
+             L.match((ValueBase *)DTR->getParent()->getOperand());
+    }
+
+    return false;
+  }
+};
+
+template <typename LTy>
+tupleextractoperation_ty<LTy> m_TupleExtractOperation(const LTy &Left,
+                                                      unsigned Index) {
+  return tupleextractoperation_ty<LTy>(Left, Index);
+}
+
 //===----------------------------------------------------------------------===//
 //              Function/Builtin/Intrinsic Application Matchers
 //===----------------------------------------------------------------------===//
@@ -480,7 +518,7 @@ struct Callee_match<SILFunction &> {
     if (!AI)
       return false;
 
-    return AI->getReferencedFunction() == &Fun;
+    return AI->getReferencedFunctionOrNull() == &Fun;
   }
 };
 
@@ -704,13 +742,6 @@ using BuiltinApplyTy = typename Apply_match<BuiltinValueKind, Tys...>::Ty;
 // Convenience compound builtin instructions matchers that succeed
 // if any of the sub-matchers succeed.
 //
-
-/// Matcher for any of the builtin checked conversions.
-template <typename T0>
-inline typename OneOf_match<BuiltinApplyTy<T0>, BuiltinApplyTy<T0>>::Ty
-m_CheckedConversion(const T0 &Op0) {
-  return m_USCheckedConversion(Op0) || m_SUCheckedConversion(Op0);
-}
 
 /// Matcher for any of the builtin ExtOrBitCast instructions.
 template <typename T0>

@@ -23,10 +23,10 @@ func f2(
   _ = _endian + big + little
 #elseif _runtime(_ObjC) && _runtime(_Native)
   _ = _runtime + _ObjC + _Native
-#elseif swift(>=1.0) && _compiler_version("3.*.0")
-  _ = swift + _compiler_version
 #elseif targetEnvironment(simulator)
   _ = targetEnvironment + simulator
+#elseif swift(>=1.0) && _compiler_version("4.*.0")
+  _ = swift + _compiler_version
 #endif
 
 }
@@ -51,10 +51,10 @@ func f2() {
   _ = _endian + big + little
 #elseif _runtime(_ObjC) && _runtime(_Native)
   _ = _runtime + _ObjC + _Native
-#elseif swift(>=1.0) && _compiler_version("3.*.0")
-  _ = swift + _compiler_version
 #elseif targetEnvironment(simulator)
   _ = targetEnvironment + simulator
+#elseif swift(>=1.0) && _compiler_version("4.*.0")
+  _ = swift + _compiler_version
 #endif
 
 }
@@ -74,8 +74,8 @@ struct S {
 #elseif arch(i386) && arch(arm)
 #elseif _endian(big) && _endian(little)
 #elseif _runtime(_ObjC) && _runtime(_Native)
-#elseif swift(>=1.0) && _compiler_version("3.*.0")
 #elseif targetEnvironment(simulator)
+#elseif swift(>=1.0) && _compiler_version("4.*.0")
 #endif
 
 }

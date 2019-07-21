@@ -114,6 +114,8 @@ BUILTIN_UNARY_OPERATION(FNeg, "fneg", "n", FloatOrVector)
 // It has only an effect if the argument is a load or call.
 // TODO: consider printing a warning if it is not used on a load or call.
 BUILTIN_UNARY_OPERATION(AssumeNonNegative, "assumeNonNegative", "n", Integer)
+// It only works on i1.
+BUILTIN_UNARY_OPERATION(AssumeTrue, "assume", "", Integer)
 
 #undef BUILTIN_UNARY_OPERATION
 
@@ -165,14 +167,6 @@ BUILTIN_SIL_OPERATION(Release, "release", Special)
 
 /// autorelease: T -> ()
 BUILTIN_SIL_OPERATION(Autorelease, "autorelease", Special)
-
-// The pin operations return T only because Optional isn't intrinsic.
-
-/// tryPin: Builtin.NativeObject -> T
-BUILTIN_SIL_OPERATION(TryPin, "tryPin", Special)
-
-/// unpin: T -> ()
-BUILTIN_SIL_OPERATION(Unpin, "unpin", Special)
 
 /// Load has type (Builtin.RawPointer) -> T
 BUILTIN_SIL_OPERATION(Load, "load", Special)
@@ -322,7 +316,8 @@ BUILTIN_SIL_OPERATION(EndUnpairedAccess, "endUnpairedAccess", Special)
 
 /// condfail(Int1) -> ()
 /// Triggers a runtime failure if the condition is true.
-BUILTIN_SIL_OPERATION(CondFail, "condfail", Special)
+/// This builtin is deprecated. Use condfail_message instead.
+BUILTIN_SIL_OPERATION(LegacyCondFail, "condfail", Special)
 
 /// fixLifetime(T) -> ()
 /// Fixes the lifetime of any heap references in a value.
@@ -359,21 +354,12 @@ BUILTIN_SIL_OPERATION(FixLifetime, "fixLifetime", Special)
 /// references with a strong reference count of one.
 BUILTIN_SIL_OPERATION(IsUnique, "isUnique", Special)
 
-/// isUniqueOrPinned : <T> (inout T[?]) -> Int1
-///
-/// This builtin has the same semantics as isUnique except that it also returns
-/// true if the object is marked pinned regardless of the reference count. This
-/// allows for simultaneous non-structural modification of multiple subobjects.
-BUILTIN_SIL_OPERATION(IsUniqueOrPinned, "isUniqueOrPinned", Special)
-
 /// IsUnique_native : <T> (inout T[?]) -> Int1
 ///
 /// These variants of isUnique implicitly cast to a non-null NativeObject before
 /// checking uniqueness. This allows an object reference statically typed as
 /// BridgeObject to be treated as a native object by the runtime.
 BUILTIN_SIL_OPERATION(IsUnique_native, "isUnique_native", Special)
-BUILTIN_SIL_OPERATION(IsUniqueOrPinned_native, "isUniqueOrPinned_native",
-                      Special)
 
 /// bindMemory : <T> (Builtin.RawPointer, Builtin.Word, T.Type) -> ()
 BUILTIN_SIL_OPERATION(BindMemory, "bindMemory", Special)
@@ -399,9 +385,6 @@ BUILTIN_SIL_OPERATION(ProjectTailElems, "projectTailElems", Special)
   BUILTIN(Id, Name, Attrs)
 #endif
 
-/// willThrow: Error -> ()
-BUILTIN_RUNTIME_CALL(WillThrow, "willThrow", "n")
-
 /// unexpectedError: Error -> ()
 BUILTIN_RUNTIME_CALL(UnexpectedError, "unexpectedError", "")
 
@@ -422,6 +405,10 @@ BUILTIN_RUNTIME_CALL(IsOptionalType, "isOptional", "")
           BUILTIN(Id, Name, Attrs)
 #endif
 
+/// condfail_message(Int1, RawPointer) -> ()
+/// Triggers a runtime failure if the condition is true.
+BUILTIN_MISC_OPERATION(CondFailMessage, "condfail_message", "", Special)
+
 /// Sizeof has type T.Type -> Int
 BUILTIN_MISC_OPERATION(Sizeof, "sizeof", "n", Special)
 
@@ -431,6 +418,9 @@ BUILTIN_MISC_OPERATION(Strideof, "strideof", "n", Special)
 /// IsPOD has type T.Type -> Bool
 BUILTIN_MISC_OPERATION(IsPOD, "ispod", "n", Special)
 
+/// IsBitwiseTakable has type T.Type -> Bool
+BUILTIN_MISC_OPERATION(IsBitwiseTakable, "isbitwisetakable", "n", Special)
+
 /// IsSameMetatype has type (Any.Type, Any.Type) -> Bool
 BUILTIN_MISC_OPERATION(IsSameMetatype, "is_same_metatype", "n", Special)
 
@@ -438,9 +428,29 @@ BUILTIN_MISC_OPERATION(IsSameMetatype, "is_same_metatype", "n", Special)
 BUILTIN_MISC_OPERATION(Alignof, "alignof", "n", Special)
 
 /// AllocRaw has type (Int, Int) -> Builtin.RawPointer
+///
+/// Parameters: object size, object alignment.
+///
+/// This alignment is not a mask; the compiler decrements by one to provide
+/// a mask to the runtime.
+///
+/// If alignment == 0, then the runtime will use "aligned" allocation,
+/// and the memory will be aligned to _swift_MinAllocationAlignment.
 BUILTIN_MISC_OPERATION(AllocRaw, "allocRaw", "", Special)
 
 /// DeallocRaw has type (Builtin.RawPointer, Int, Int) -> ()
+///
+/// Parameters: object address, object size, object alignment.
+///
+/// This alignment is not a mask; the compiler decrements by one to provide
+/// a mask to the runtime.
+///
+/// If alignment == 0, then the runtime will use the "aligned" deallocation
+/// path, which assumes that "aligned" allocation was used.
+///
+/// Note that the alignment value provided to `deallocRaw` must be identical to
+/// the alignment value provided to `allocRaw` when the memory at this address
+/// was allocated.
 BUILTIN_MISC_OPERATION(DeallocRaw, "deallocRaw", "", Special)
 
 /// Fence has type () -> ().
@@ -475,6 +485,11 @@ BUILTIN_MISC_OPERATION(StaticReport, "staticReport", "", Special)
 BUILTIN_MISC_OPERATION(AssertConf, "assert_configuration", "n", Special)
 
 /// StringObjectOr has type (T,T) -> T.
+/// Sets bits in a string object. The first operand is bit-cast string literal
+/// pointer to an integer. The second operand is the bit mask to be or'd into
+/// the high bits of the pointer.
+/// It is required that the or'd bits are all 0 in the first operand. So this
+/// or-operation is actually equivalent to an addition.
 BUILTIN_MISC_OPERATION(StringObjectOr,     "stringObjectOr",      "n", Integer)
 
 /// Special truncation builtins that check for sign and overflow errors. These
@@ -487,14 +502,6 @@ BUILTIN_MISC_OPERATION(UToSCheckedTrunc, "u_to_s_checked_trunc", "n", Special)
 BUILTIN_MISC_OPERATION(SToSCheckedTrunc, "s_to_s_checked_trunc", "n", Special)
 BUILTIN_MISC_OPERATION(SToUCheckedTrunc, "s_to_u_checked_trunc", "n", Special)
 BUILTIN_MISC_OPERATION(UToUCheckedTrunc, "u_to_u_checked_trunc", "n", Special)
-
-/// Checked conversions for signed <-> unsigned integers of the same size.
-/// Returns a tuple containing the conversion result as well as
-/// the sign error / overflow bit.
-BUILTIN_MISC_OPERATION(SUCheckedConversion,
-                       "s_to_u_checked_conversion", "n", Special)
-BUILTIN_MISC_OPERATION(USCheckedConversion,
-                       "u_to_s_checked_conversion", "n", Special)
 
 /// IntToFPWithOverflow has type (Integer) -> Float
 BUILTIN_MISC_OPERATION(IntToFPWithOverflow, "itofp_with_overflow", "n", Special)
@@ -543,6 +550,26 @@ BUILTIN_MISC_OPERATION(GetObjCTypeEncoding, "getObjCTypeEncoding", "n", Special)
 // Swift3ImplicitObjCEntrypoint has type () -> ()
 BUILTIN_MISC_OPERATION(Swift3ImplicitObjCEntrypoint, "swift3ImplicitObjCEntrypoint", "", Special)
 
+/// willThrow: Error -> ()
+BUILTIN_MISC_OPERATION(WillThrow, "willThrow", "", Special)
+
+/// poundAssert has type (Builtin.Int1, Builtin.RawPointer) -> ().
+BUILTIN_MISC_OPERATION(PoundAssert, "poundAssert", "", Special)
+
+// BUILTIN_MISC_OPERATION_WITH_SILGEN - Miscellaneous operations that are
+// specially emitted during SIL generation.
+#ifndef BUILTIN_MISC_OPERATION_WITH_SILGEN
+#define BUILTIN_MISC_OPERATION_WITH_SILGEN(Id, Name, Attrs, Overload) \
+  BUILTIN_MISC_OPERATION(Id, Name, Attrs, Overload)
+#endif
+
+/// globalStringTablePointer has type String -> Builtin.RawPointer.
+/// It returns an immortal, global string table pointer for strings constructed
+/// from string literals.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(GlobalStringTablePointer, "globalStringTablePointer", "", Special)
+
+#undef BUILTIN_MISC_OPERATION_WITH_SILGEN
+
 #undef BUILTIN_MISC_OPERATION
 
 /// Builtins for instrumentation added by sanitizers during SILGen.
@@ -564,6 +591,7 @@ BUILTIN_SANITIZER_OPERATION(TSanInoutAccess, "tsanInoutAccess", "")
 BUILTIN_TYPE_CHECKER_OPERATION(TypeJoin, type_join)
 BUILTIN_TYPE_CHECKER_OPERATION(TypeJoinInout, type_join_inout)
 BUILTIN_TYPE_CHECKER_OPERATION(TypeJoinMeta, type_join_meta)
+BUILTIN_TYPE_CHECKER_OPERATION(TriggerFallbackDiagnostic, trigger_fallback_diagnostic)
 
 #undef BUILTIN_TYPE_CHECKER_OPERATION
 

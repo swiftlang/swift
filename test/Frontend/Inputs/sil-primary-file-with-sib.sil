@@ -5,7 +5,7 @@ import Swift
 import SwiftShims
 
 // test.return_a_number () -> Swift.Int64
-sil hidden @$S4test15return_a_numbers5Int64VyF: $@convention(thin) () -> Int64 {
+sil hidden @$s4test15return_a_numbers5Int64VyF: $@convention(thin) () -> Int64 {
 bb0:
   %0 = integer_literal $Builtin.Int64, 1504
   %1 = struct $Int64 (%0 : $Builtin.Int64)

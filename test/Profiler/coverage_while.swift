@@ -120,8 +120,6 @@ func goo() {
       }
     } while false // CHECK-DAG: [[@LINE]]:13 -> [[@LINE]]:18 : ([[RWS9]] - [[RET1]])
   } while false // CHECK-DAG: [[@LINE]]:11 -> [[@LINE]]:16 : ([[RWS8]] - [[RET1]])
-
-  // TODO(vsk): need tests for fail and throw statements.
 }
 
 eoo()

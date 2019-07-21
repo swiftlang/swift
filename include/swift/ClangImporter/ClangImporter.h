@@ -71,7 +71,7 @@ enum class ClangTypeKind {
   ObjCProtocol,
 };
 
-/// \brief Class that imports Clang modules into Swift, mapping directly
+/// Class that imports Clang modules into Swift, mapping directly
 /// from Clang ASTs over to Swift ASTs.
 class ClangImporter final : public ClangModuleLoader {
   friend class ClangModuleUnit;
@@ -86,7 +86,7 @@ private:
                 DependencyTracker *tracker);
 
 public:
-  /// \brief Create a new Clang importer that can import a suitable Clang
+  /// Create a new Clang importer that can import a suitable Clang
   /// module into the given ASTContext.
   ///
   /// \param ctx The ASTContext into which the module will be imported.
@@ -114,19 +114,24 @@ public:
 
   ~ClangImporter();
 
-  /// \brief Create a new clang::DependencyCollector customized to
+  /// Create a new clang::DependencyCollector customized to
   /// ClangImporter's specific uses.
   static std::shared_ptr<clang::DependencyCollector>
-  createDependencyCollector();
+  createDependencyCollector(bool TrackSystemDeps);
 
-  /// \brief Check whether the module with a given name can be imported without
+  /// Append visible module names to \p names. Note that names are possibly
+  /// duplicated, and not guaranteed to be ordered in any way.
+  void collectVisibleTopLevelModuleNames(
+      SmallVectorImpl<Identifier> &names) const override;
+
+  /// Check whether the module with a given name can be imported without
   /// importing it.
   ///
   /// Note that even if this check succeeds, errors may still occur if the
   /// module is loaded in full.
   virtual bool canImportModule(std::pair<Identifier, SourceLoc> named) override;
 
-  /// \brief Import a module with the given module path.
+  /// Import a module with the given module path.
   ///
   /// Clang modules will be imported using the Objective-C ARC dialect,
   /// with all warnings disabled.
@@ -143,7 +148,16 @@ public:
                         ArrayRef<std::pair<Identifier, SourceLoc>> path)
                       override;
 
-  /// \brief Look for declarations associated with the given name.
+  /// Determine whether \c overlayDC is within an overlay module for the
+  /// imported context enclosing \c importedDC.
+  ///
+  /// This routine is used for various hacks that are only permitted within
+  /// overlays of imported modules, e.g., Objective-C bridging conformances.
+  bool isInOverlayModuleForImportedModule(
+                                      const DeclContext *overlayDC,
+                                      const DeclContext *importedDC) override;
+
+  /// Look for declarations associated with the given name.
   ///
   /// \param name The name we're searching for.
   void lookupValue(DeclName name, VisibleDeclConsumer &consumer);
@@ -195,7 +209,7 @@ public:
                              llvm::function_ref<bool(ClangNode)> filter,
                              llvm::function_ref<void(Decl*)> receiver) const;
 
-  /// \brief Load extensions to the given nominal type.
+  /// Load extensions to the given nominal type.
   ///
   /// \param nominal The nominal type whose extensions should be loaded.
   ///
@@ -317,8 +331,6 @@ public:
   /// Writes the mangled name of \p clangDecl to \p os.
   void getMangledName(raw_ostream &os, const clang::NamedDecl *clangDecl) const;
 
-  using ClangModuleLoader::addDependency;
-
   // Print statistics from the Clang AST reader.
   void printStatistics() const override;
 
@@ -329,7 +341,7 @@ public:
   /// Calling this function does not load the module.
   void collectSubModuleNames(
       ArrayRef<std::pair<Identifier, SourceLoc>> path,
-      std::vector<std::string> &names);
+      std::vector<std::string> &names) const;
 
   /// Given a Clang module, decide whether this module is imported already.
   static bool isModuleImported(const clang::Module *M);
@@ -349,14 +361,6 @@ public:
 
 ImportDecl *createImportDecl(ASTContext &Ctx, DeclContext *DC, ClangNode ClangN,
                              ArrayRef<clang::Module *> Exported);
-
-/// Determine whether \c overlayDC is within an overlay module for the
-/// imported context enclosing \c importedDC.
-///
-/// This routine is used for various hacks that are only permitted within
-/// overlays of imported modules, e.g., Objective-C bridging conformances.
-bool isInOverlayModuleForImportedModule(const DeclContext *overlayDC,
-                                        const DeclContext *importedDC);
 
 } // end namespace swift
 

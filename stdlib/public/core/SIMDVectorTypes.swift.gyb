@@ -1,0 +1,297 @@
+//===--- SIMDVectorTypes.swift.gyb ----------------------------*- swift -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2018 - 2019 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+%{
+from SwiftIntTypes import all_integer_types
+word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
+storagescalarCounts = [2,4,8,16,32,64]
+vectorscalarCounts = storagescalarCounts + [3]
+spelledNumbers = {
+  2: 'two', 4: 'four', 8: 'eight', 16: '16', 32: '32', 64: '64',
+  3: 'three'
+}
+ordinalPositions = ['first', 'second', 'third', 'fourth']
+}%
+
+%for n in vectorscalarCounts:
+% storageN = 4 if n == 3 else n
+/// A vector of ${spelledNumbers[n]} scalar values.
+@frozen
+public struct SIMD${n}<Scalar>: SIMD where Scalar: SIMDScalar {
+
+  public var _storage: Scalar.SIMD${storageN}Storage
+
+  public typealias MaskStorage = SIMD${n}<Scalar.SIMDMaskScalar>
+
+  /// The number of scalars in the vector.
+  @_transparent
+  public var scalarCount: Int {
+    return ${n}
+  }
+
+  /// Creates a vector with zero in all lanes.
+  @_transparent
+  public init() {
+    _storage = Scalar.SIMD${storageN}Storage()
+  }
+
+  /// Accesses the scalar at the specified position.
+  public subscript(index: Int) -> Scalar {
+    @_transparent get {
+      _precondition(indices.contains(index))
+      return _storage[index]
+    }
+    @_transparent set {
+      _precondition(indices.contains(index))
+      _storage[index] = newValue
+    }
+  }
+
+  /// Creates a new vector from the given elements.
+  @_transparent
+  public init(${', '.join(['_ v' + str(i) + ': Scalar' for i in range(n)])}) {
+    self.init()
+% for i in range(n):
+    self[${i}] = v${i}
+% end
+  }
+
+% if n <= 4:
+  /// Creates a new vector from the given elements.
+  ///
+  /// - Parameters:
+%  for i in range(n):
+  ///   - ${'xyzw'[i]}: The ${ordinalPositions[i]} element of the vector.
+%  end
+  @_transparent
+  public init(${', '.join([c + ': Scalar' for c in 'xyzw'[:n]])}) {
+    self.init(${', '.join('xyzw'[:n])})
+  }
+
+%  for i in range(n):
+  /// The ${ordinalPositions[i]} element of the vector.
+  @_transparent
+  public var ${'xyzw'[i]}: Scalar {
+    @_transparent get { return self[${i}]}
+    @_transparent set { self[${i}] = newValue }
+  }
+
+%  end
+% end
+% if n >= 4:
+  /// Creates a new vector from two half-length vectors.
+  @_transparent
+  public init(lowHalf: SIMD${n/2}<Scalar>, highHalf: SIMD${n/2}<Scalar>) {
+    self.init()
+    self.lowHalf = lowHalf
+    self.highHalf = highHalf
+  }
+
+%  for (half,indx) in [('low','i'), ('high',str(n/2)+'+i'), ('even','2*i'), ('odd','2*i+1')]:
+  /// A half-length vector made up of the ${half} elements of the vector.
+  public var ${half}Half: SIMD${n/2}<Scalar> {
+    @inlinable get {
+      var result = SIMD${n/2}<Scalar>()
+      for i in result.indices { result[i] = self[${indx}] }
+      return result
+    }
+    @inlinable set {
+      for i in newValue.indices { self[${indx}] = newValue[i] }
+    }
+  }
+
+%  end
+% end
+}
+
+extension SIMD${n} where Scalar: FixedWidthInteger {
+  /// Creates a new vector from the given vector, truncating the bit patterns
+  /// of the given vector's elements if necessary.
+  ///
+  /// - Parameter other: The vector to convert.
+  @inlinable
+  public init<Other>(truncatingIfNeeded other: SIMD${n}<Other>)
+  where Other: FixedWidthInteger {
+    self.init()
+    for i in indices { self[i] = Scalar(truncatingIfNeeded: other[i]) }
+  }
+
+  /// Creates a new vector from the given vector, clamping the values of the
+  /// given vector's elements if necessary.
+  ///
+  /// - Parameter other: The vector to convert.
+  @inlinable
+  public init<Other>(clamping other: SIMD${n}<Other>)
+  where Other: FixedWidthInteger {
+    self.init()
+    for i in indices { self[i] = Scalar(clamping: other[i]) }
+  }
+
+  /// Creates a new vector from the given vector, rounding the given vector's
+  /// of elements using the specified rounding rule.
+  ///
+  /// - Parameters:
+  ///   - other: The vector to convert.
+  ///   - rule: The round rule to use when converting elements of `other.` The
+  ///     default is `.towardZero`.
+  @inlinable
+  public init<Other>(
+    _ other: SIMD${n}<Other>,
+    rounding rule: FloatingPointRoundingRule = .towardZero
+  )
+  where Other: BinaryFloatingPoint {
+    self.init()
+    // TODO: this should clamp
+    for i in indices { self[i] = Scalar(other[i].rounded(rule)) }
+  }
+}
+
+extension SIMD${n}: CustomDebugStringConvertible {
+  public var debugDescription: String {
+    return "SIMD${n}<\(Scalar.self)>(${', '.join(map(lambda c:
+                       '\\(self['+ str(c) + '])',
+                       xrange(n)))})"
+  }
+}
+
+extension SIMD${n} where Scalar: BinaryFloatingPoint {
+  /// Creates a new vector from the given vector of integers.
+  ///
+  /// - Parameter other: The vector to convert.
+  @inlinable
+  public init<Other>(_ other: SIMD${n}<Other>)
+  where Other: FixedWidthInteger {
+    self.init()
+    for i in indices { self[i] = Scalar(other[i]) }
+  }
+
+  /// Creates a new vector from the given vector of floating-point values.
+  ///
+  /// - Parameter other: The vector to convert.
+  @inlinable
+  public init<Other>(_ other: SIMD${n}<Other>)
+  where Other: BinaryFloatingPoint {
+    self.init()
+    for i in indices { self[i] = Scalar(other[i]) }
+  }
+}
+
+%end
+
+extension SIMD3 {
+  /// A three-element vector created by appending a scalar to a two-element vector.
+  @_alwaysEmitIntoClient
+  public init(_ xy: SIMD2<Scalar>, _ z: Scalar) {
+    self.init(xy.x, xy.y, z)
+  }
+}
+
+extension SIMD4 {
+  /// A four-element vector created by appending a scalar to a three-element vector.
+  @_alwaysEmitIntoClient
+  public init(_ xyz: SIMD3<Scalar>, _ w: Scalar) {
+    self.init(xyz.x, xyz.y, xyz.z, w)
+  }
+}
+
+%for self_type in all_integer_types(word_bits):
+% Self = self_type.stdlib_name
+% BuiltinName = self_type.builtin_name
+% Mask = Self if self_type.is_signed else self_type.get_opposite_signedness().stdlib_name
+extension ${Self}: SIMDScalar {
+
+  public typealias SIMDMaskScalar = ${Mask}
+
+% for n in storagescalarCounts:
+%  bytes = n * self_type.bits / 8
+  /// Storage for a vector of ${spelledNumbers[n]} integers.
+  @frozen
+  @_alignment(${bytes if bytes <= 16 else 16})
+  public struct SIMD${n}Storage: SIMDStorage {
+
+    public var _value: Builtin.Vec${n}x${BuiltinName}
+
+    @_transparent
+    public var scalarCount: Int {
+      return ${n}
+    }
+
+    @_transparent
+    public init() {
+      _value = Builtin.zeroInitializer()
+    }
+
+    public subscript(index: Int) -> ${Self} {
+      @_transparent
+      get {
+        return ${Self}(Builtin.extractelement_Vec${n}x${BuiltinName}_Int32(
+          _value, Int32(truncatingIfNeeded: index)._value
+        ))
+      }
+      @_transparent
+      set {
+        _value = Builtin.insertelement_Vec${n}x${BuiltinName}_${BuiltinName}_Int32(
+          _value, newValue._value, Int32(truncatingIfNeeded: index)._value
+        )
+      }
+    }
+  }
+
+% end
+}
+
+%end
+
+%for (Self, bits) in [('Float',32), ('Double',64)]:
+extension ${Self}: SIMDScalar {
+
+  public typealias SIMDMaskScalar = Int${bits}
+
+% for n in storagescalarCounts:
+%  bytes = n * bits / 8
+  /// Storage for a vector of ${spelledNumbers[n]} floating-point values.
+  @frozen
+  @_alignment(${bytes if bytes <= 16 else 16})
+  public struct SIMD${n}Storage: SIMDStorage {
+
+    public var _value: Builtin.Vec${n}xFPIEEE${bits}
+
+    @_transparent
+    public var scalarCount: Int {
+      return ${n}
+    }
+
+    @_transparent
+    public init() {
+      _value = Builtin.zeroInitializer()
+    }
+
+    public subscript(index: Int) -> ${Self} {
+      @_transparent
+      get {
+        return ${Self}(Builtin.extractelement_Vec${n}xFPIEEE${bits}_Int32(
+          _value, Int32(truncatingIfNeeded: index)._value
+        ))
+      }
+      @_transparent
+      set {
+        _value = Builtin.insertelement_Vec${n}xFPIEEE${bits}_FPIEEE${bits}_Int32(
+          _value, newValue._value, Int32(truncatingIfNeeded: index)._value
+        )
+      }
+    }
+  }
+
+% end
+}
+
+%end

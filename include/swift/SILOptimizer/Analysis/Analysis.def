@@ -40,8 +40,10 @@ ANALYSIS(LoopRegion)
 ANALYSIS(OptimizerStats)
 ANALYSIS(PostDominance)
 ANALYSIS(PostOrder)
+ANALYSIS(ProtocolConformance)
 ANALYSIS(RCIdentity)
 ANALYSIS(SideEffect)
 ANALYSIS(TypeExpansion)
+ANALYSIS(PassManagerVerifier)
 
 #undef ANALYSIS

@@ -64,7 +64,10 @@ static bool isLeafTypeMetadata(CanType type) {
     return true;
 
   // Type parameters are statically opaque.
-  case TypeKind::Archetype:
+  case TypeKind::PrimaryArchetype:
+  case TypeKind::OpenedArchetype:
+  case TypeKind::NestedArchetype:
+  case TypeKind::OpaqueTypeArchetype:
   case TypeKind::GenericTypeParam:
   case TypeKind::DependentMember:
     return true;
@@ -122,6 +125,14 @@ bool FulfillmentMap::searchTypeMetadata(IRGenModule &IGM, CanType type,
     if (!isLeafTypeMetadata(type)) {
       hadFulfillment |= searchTypeMetadata(IGM, type, IsInexact, metadataState,
                                            source, MetadataPath(path), keys);
+    }
+
+    // Consider its super class bound.
+    if (metadataState == MetadataState::Complete) {
+      if (auto superclassTy = keys.getSuperclassBound(type)) {
+        hadFulfillment |= searchNominalTypeMetadata(
+            IGM, superclassTy, metadataState, source, std::move(path), keys);
+      }
     }
 
     // Add the fulfillment.
@@ -209,7 +220,8 @@ bool FulfillmentMap::searchWitnessTable(
 
   bool hadFulfillment = false;
 
-  auto &pi = IGM.getProtocolInfo(protocol);
+  auto &pi = IGM.getProtocolInfo(protocol,
+                                 ProtocolInfoKind::RequirementSignature);
 
   for (auto &entry : pi.getWitnessEntries()) {
     if (!entry.isBase()) continue;
@@ -329,6 +341,7 @@ static StringRef getStateName(MetadataState state) {
   case MetadataState::LayoutComplete: return "layout-complete";
   case MetadataState::Abstract: return "abstract";
   }
+  llvm_unreachable("unhandled state");
 }
 
 void FulfillmentMap::dump() const {

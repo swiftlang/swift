@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify %s
+// RUN: %target-typecheck-verify-swift
 
 
 // Protocol requirement is witnessed from a member of a
@@ -55,7 +55,7 @@ protocol Q2 : P2 {}
 extension Q2 {
   // note: not public
   func publicRequirement() {}
-  // expected-error@-1 {{method 'publicRequirement()' must be declared public because it matches a requirement in public protocol 'P2'}}
+  // expected-note@-1 {{mark the instance method as 'public' to satisfy the requirement}} {{3-3=public }}
 }
 
-public struct T2 : Q2 {}
+public struct T2 : Q2 {} // expected-error {{method 'publicRequirement()' must be declared public because it matches a requirement in public protocol 'P2'}}

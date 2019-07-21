@@ -54,11 +54,7 @@ swift::swift_initEnumMetadataSingleCase(EnumMetadata *self,
   layout.size = payloadLayout->size;
   layout.stride = payloadLayout->stride;
   layout.flags = payloadLayout->flags.withEnumWitnesses(true);
-
-  if (payloadLayout->flags.hasExtraInhabitants()) {
-    auto ew = static_cast<ExtraInhabitantsValueWitnessTable*>(vwtable);
-    ew->extraInhabitantFlags = payloadLayout->getExtraInhabitantFlags();
-  }
+  layout.extraInhabitantCount = payloadLayout->getNumExtraInhabitants();
 
   vwtable->publishLayout(layout);
 }
@@ -81,20 +77,23 @@ swift::swift_initEnumMetadataSinglePayload(EnumMetadata *self,
     size = payloadSize;
     unusedExtraInhabitants = payloadNumExtraInhabitants - emptyCases;
   } else {
-    size = payloadSize + getNumTagBytes(payloadSize,
+    size = payloadSize + getEnumTagCounts(payloadSize,
                                       emptyCases - payloadNumExtraInhabitants,
-                                      1 /*payload case*/);
+                                        1 /*payload case*/).numTagBytes; ;
   }
 
   auto vwtable = getMutableVWTableForInit(self, layoutFlags);
   
   size_t align = payloadLayout->flags.getAlignment();
+  bool isBT = payloadLayout->flags.isBitwiseTakable();
   TypeLayout layout;
   layout.size = size;
-  layout.flags = payloadLayout->flags
-    .withExtraInhabitants(unusedExtraInhabitants > 0)
-    .withEnumWitnesses(true)
-    .withInlineStorage(ValueWitnessTable::isValueInline(size, align));
+  layout.flags =
+      payloadLayout->flags
+          .withEnumWitnesses(true)
+          .withInlineStorage(
+              ValueWitnessTable::isValueInline(isBT, size, align));
+  layout.extraInhabitantCount = unusedExtraInhabitants;
   auto rawStride = llvm::alignTo(size, align);
   layout.stride = rawStride == 0 ? 1 : rawStride;
   
@@ -125,49 +124,39 @@ swift::swift_initEnumMetadataSinglePayload(EnumMetadata *self,
   }
 #endif
 
-
-  // If the payload has extra inhabitants left over after the ones we used,
-  // forward them as our own.
-  if (unusedExtraInhabitants > 0) {
-    auto xiVWTable = static_cast<ExtraInhabitantsValueWitnessTable*>(vwtable);
-    xiVWTable->extraInhabitantFlags = ExtraInhabitantFlags()
-      .withNumExtraInhabitants(unusedExtraInhabitants);
-  }
-
   vwtable->publishLayout(layout);
 }
 
-unsigned swift::swift_getEnumCaseSinglePayload(const OpaqueValue *value,
-                                               const Metadata *payload,
-                                               unsigned emptyCases) {
-
-  auto *payloadWitnesses = payload->getValueWitnesses();
-  auto size = payloadWitnesses->getSize();
-  auto numExtraInhabitants = payloadWitnesses->getNumExtraInhabitants();
-  auto getExtraInhabitantIndex =
-      (static_cast<const ExtraInhabitantsValueWitnessTable *>(payloadWitnesses)
-           ->getExtraInhabitantIndex);
-
-  return getEnumTagSinglePayloadImpl(value, emptyCases, payload, size,
+unsigned
+swift::swift_getEnumTagSinglePayloadGeneric(const OpaqueValue *value,
+                                            unsigned emptyCases,
+                                            const Metadata *payloadType,
+                               getExtraInhabitantTag_t *getExtraInhabitantTag) {
+  auto size = payloadType->vw_size();
+  auto numExtraInhabitants = payloadType->vw_getNumExtraInhabitants();
+  return getEnumTagSinglePayloadImpl(value, emptyCases, payloadType, size,
                                      numExtraInhabitants,
-                                     getExtraInhabitantIndex);
+                                     getExtraInhabitantTag);
 }
 
-void swift::swift_storeEnumTagSinglePayload(OpaqueValue *value,
-                                            const Metadata *payload,
-                                            unsigned whichCase,
-                                            unsigned emptyCases) {
-
-  auto *payloadWitnesses = payload->getValueWitnesses();
-  auto size = payloadWitnesses->getSize();
-  auto numExtraInhabitants = payloadWitnesses->getNumExtraInhabitants();
-  auto storeExtraInhabitant =
-      (static_cast<const ExtraInhabitantsValueWitnessTable *>(payloadWitnesses)
-           ->storeExtraInhabitant);
-
-  storeEnumTagSinglePayloadImpl(value, whichCase, emptyCases, payload, size,
-                                numExtraInhabitants, storeExtraInhabitant);
+void swift::swift_storeEnumTagSinglePayloadGeneric(OpaqueValue *value,
+                                                   unsigned whichCase,
+                                                   unsigned emptyCases,
+                                                   const Metadata *payloadType,
+                           storeExtraInhabitantTag_t *storeExtraInhabitantTag) {
+  auto size = payloadType->vw_size();
+  auto numExtraInhabitants = payloadType->vw_getNumExtraInhabitants();
+  storeEnumTagSinglePayloadImpl(value, whichCase, emptyCases, payloadType, size,
+                                numExtraInhabitants, storeExtraInhabitantTag);
 }
+
+static uint32_t getMultiPayloadEnumTagSinglePayload(const OpaqueValue *value,
+                                                    uint32_t numExtraCases,
+                                                    const Metadata *enumType);
+static void storeMultiPayloadEnumTagSinglePayload(OpaqueValue *value,
+                                                  uint32_t index,
+                                                  uint32_t numExtraCases,
+                                                  const Metadata *enumType);
 
 void
 swift::swift_initEnumMetadataMultiPayload(EnumMetadata *enumType,
@@ -190,28 +179,40 @@ swift::swift_initEnumMetadataMultiPayload(EnumMetadata *enumType,
   assignUnlessEqual(enumType->getPayloadSize(), payloadSize);
   
   // The total size includes space for the tag.
-  unsigned totalSize = payloadSize + getNumTagBytes(payloadSize,
+  auto tagCounts = getEnumTagCounts(payloadSize,
                                 enumType->getDescription()->getNumEmptyCases(),
                                 numPayloads);
+  unsigned totalSize = payloadSize + tagCounts.numTagBytes;
+  
+  // See whether there are extra inhabitants in the tag.
+  unsigned numExtraInhabitants = tagCounts.numTagBytes == 4
+    ? INT_MAX
+    : (1 << (tagCounts.numTagBytes * 8)) - tagCounts.numTags;
+  numExtraInhabitants = std::min(numExtraInhabitants,
+                          unsigned(ValueWitnessFlags::MaxNumExtraInhabitants));
 
   auto vwtable = getMutableVWTableForInit(enumType, layoutFlags);
 
   // Set up the layout info in the vwtable.
-  TypeLayout layout;
-  layout.size = totalSize;
-  layout.flags = ValueWitnessFlags()
-    .withAlignmentMask(alignMask)
-    .withPOD(isPOD)
-    .withBitwiseTakable(isBT)
-    // TODO: Extra inhabitants
-    .withExtraInhabitants(false)
-    .withEnumWitnesses(true)
-    .withInlineStorage(ValueWitnessTable::isValueInline(totalSize, alignMask+1))
-    ;
   auto rawStride = (totalSize + alignMask) & ~alignMask;
-  layout.stride = rawStride == 0 ? 1 : rawStride;
-  
+  TypeLayout layout{totalSize,
+                    rawStride == 0 ? 1 : rawStride,
+                    ValueWitnessFlags()
+                     .withAlignmentMask(alignMask)
+                     .withPOD(isPOD)
+                     .withBitwiseTakable(isBT)
+                     .withEnumWitnesses(true)
+                     .withInlineStorage(ValueWitnessTable::isValueInline(
+                         isBT, totalSize, alignMask + 1)),
+                    numExtraInhabitants};
+
   installCommonValueWitnesses(layout, vwtable);
+
+  // Unconditionally overwrite the enum-tag witnesses.
+  // The compiler does not generate meaningful enum-tag witnesses for
+  // enums in this state.
+  vwtable->getEnumTagSinglePayload = getMultiPayloadEnumTagSinglePayload;
+  vwtable->storeEnumTagSinglePayload = storeMultiPayloadEnumTagSinglePayload;
 
   vwtable->publishLayout(layout);
 }
@@ -232,73 +233,79 @@ static MultiPayloadLayout getMultiPayloadLayout(const EnumMetadata *enumType) {
 static void storeMultiPayloadTag(OpaqueValue *value,
                                  MultiPayloadLayout layout,
                                  unsigned tag) {
-  auto tagBytes = reinterpret_cast<char *>(value) + layout.payloadSize;
-#if defined(__BIG_ENDIAN__)
-  small_memcpy(tagBytes,
-               reinterpret_cast<char *>(&tag) + 4 - layout.numTagBytes,
-               layout.numTagBytes);
-#else
-  small_memcpy(tagBytes, &tag, layout.numTagBytes);
-#endif
+  auto tagBytes = reinterpret_cast<uint8_t *>(value) + layout.payloadSize;
+  storeEnumElement(tagBytes, tag, layout.numTagBytes);
 }
 
 static void storeMultiPayloadValue(OpaqueValue *value,
                                    MultiPayloadLayout layout,
                                    unsigned payloadValue) {
-  auto bytes = reinterpret_cast<char *>(value);
-#if defined(__BIG_ENDIAN__)
-  unsigned numPayloadValueBytes =
-      std::min(layout.payloadSize, sizeof(payloadValue));
-  memcpy(bytes + sizeof(OpaqueValue *) - numPayloadValueBytes,
-         reinterpret_cast<char *>(&payloadValue) + 4 - numPayloadValueBytes,
-         numPayloadValueBytes);
-  if (layout.payloadSize > sizeof(payloadValue) &&
-      layout.payloadSize > sizeof(OpaqueValue *)) {
-    memset(bytes, 0,
-           sizeof(OpaqueValue *) - numPayloadValueBytes);
-    memset(bytes + sizeof(OpaqueValue *), 0,
-           layout.payloadSize - sizeof(OpaqueValue *));
-  }
-#else
-  memcpy(bytes, &payloadValue,
-         std::min(layout.payloadSize, sizeof(payloadValue)));
-
-  // If the payload is larger than the value, zero out the rest.
-  if (layout.payloadSize > sizeof(payloadValue))
-    memset(bytes + sizeof(payloadValue), 0,
-           layout.payloadSize - sizeof(payloadValue));
-#endif
+  auto bytes = reinterpret_cast<uint8_t *>(value);
+  storeEnumElement(bytes, payloadValue, layout.payloadSize);
 }
 
 static unsigned loadMultiPayloadTag(const OpaqueValue *value,
-                                    MultiPayloadLayout layout) {
-  auto tagBytes = reinterpret_cast<const char *>(value) + layout.payloadSize;
+                                    MultiPayloadLayout layout,
+                                    unsigned baseValue = 0) {
+  auto tagBytes = reinterpret_cast<const uint8_t *>(value) +
+                  layout.payloadSize;
+  auto tag = loadEnumElement(tagBytes, layout.numTagBytes);
 
-  unsigned tag = 0;
-#if defined(__BIG_ENDIAN__)
-  small_memcpy(reinterpret_cast<char *>(&tag) + 4 - layout.numTagBytes,
-               tagBytes, layout.numTagBytes);
-#else
-  small_memcpy(&tag, tagBytes, layout.numTagBytes);
-#endif
+  // The maximum number of extra tag bytes is 4.
+  // Note: return early to avoid shifting baseValue by 32 which is
+  // undefined behaviour.
+  if (layout.numTagBytes == 4) {
+    return tag;
+  }
 
-  return tag;
+  // Replace out-of-range bytes with the base value.
+  return tag | (baseValue & (~0u << (layout.numTagBytes * 8)));
 }
 
 static unsigned loadMultiPayloadValue(const OpaqueValue *value,
                                       MultiPayloadLayout layout) {
-  auto bytes = reinterpret_cast<const char *>(value);
-  unsigned payloadValue = 0;
-#if defined(__BIG_ENDIAN__)
-  unsigned numPayloadValueBytes =
-      std::min(layout.payloadSize, sizeof(payloadValue));
-  memcpy(reinterpret_cast<char *>(&payloadValue) + 4 - numPayloadValueBytes,
-         bytes + sizeof(OpaqueValue *) - numPayloadValueBytes, numPayloadValueBytes);
-#else
-  memcpy(&payloadValue, bytes,
-         std::min(layout.payloadSize, sizeof(payloadValue)));
-#endif
-  return payloadValue;
+  auto bytes = reinterpret_cast<const uint8_t *>(value);
+  return loadEnumElement(bytes, layout.payloadSize);
+}
+
+SWIFT_CC(swift)
+static unsigned getMultiPayloadExtraInhabitantTag(const OpaqueValue *value,
+                                                  unsigned enumNumXI,
+                                                  const Metadata *enumType) {
+  auto layout = getMultiPayloadLayout(cast<EnumMetadata>(enumType));
+  unsigned index = ~loadMultiPayloadTag(value, layout, ~0u);
+  
+  if (index >= enumType->getValueWitnesses()->getNumExtraInhabitants())
+    return 0;
+  return index + 1;
+}
+
+SWIFT_CC(swift)
+static void storeMultiPayloadExtraInhabitantTag(OpaqueValue *value,
+                                                unsigned tag,
+                                                unsigned enumNumXI,
+                                                const Metadata *enumType) {
+  auto layout = getMultiPayloadLayout(cast<EnumMetadata>(enumType));
+  storeMultiPayloadTag(value, layout, ~(tag - 1));
+}
+
+static uint32_t getMultiPayloadEnumTagSinglePayload(const OpaqueValue *value,
+                                                    uint32_t numExtraCases,
+                                                    const Metadata *enumType) {
+  return getEnumTagSinglePayloadImpl(value, numExtraCases, enumType,
+                                     enumType->vw_size(),
+                                     enumType->vw_getNumExtraInhabitants(),
+                                     getMultiPayloadExtraInhabitantTag);
+}
+
+static void storeMultiPayloadEnumTagSinglePayload(OpaqueValue *value,
+                                                  uint32_t index,
+                                                  uint32_t numExtraCases,
+                                                  const Metadata *enumType) {
+  storeEnumTagSinglePayloadImpl(value, index, numExtraCases, enumType,
+                                enumType->vw_size(),
+                                enumType->vw_getNumExtraInhabitants(),
+                                storeMultiPayloadExtraInhabitantTag);
 }
 
 void

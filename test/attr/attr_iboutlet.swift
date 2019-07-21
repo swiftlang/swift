@@ -135,8 +135,8 @@ class NonObjC {}
 // Check reference storage types
 @objc class RSX {
   @IBOutlet weak var rsx1: RSX?
-  @IBOutlet unowned var rsx2: RSX? // expected-error {{'unowned' variable cannot have optional type}}
-  @IBOutlet unowned(unsafe) var rsx3: RSX? // expected-error {{'unowned(unsafe)' variable cannot have optional type}}
+  @IBOutlet unowned var rsx2: RSX?
+  @IBOutlet unowned(unsafe) var rsx3: RSX?
   init() { }
 }
 
@@ -160,4 +160,13 @@ class NonObjC {}
   func testStrong() {
     if outlet4 != nil {}
   }
+}
+
+// https://bugs.swift.org/browse/SR-9889
+@objc class NonOptionalWeak {
+  // expected-error@+3 {{@IBOutlet property has non-optional type 'OX'}}
+  // expected-note @+2 {{add '?' to form the optional type 'OX?'}}
+  // expected-note @+1 {{add '!' to form an implicitly unwrapped optional}}
+  @IBOutlet weak var something: OX
+  init() { }
 }

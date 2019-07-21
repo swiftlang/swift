@@ -1,5 +1,5 @@
 // RUN: %target-typecheck-verify-swift -swift-version 4
-// RUN: %target-typecheck-verify-swift -enable-astscope-lookup -swift-version 4
+// not ready: dont_run: %target-typecheck-verify-swift -enable-astscope-lookup -swift-version 4
 
 // Types in expression contexts must be followed by a member access or
 // constructor call.
@@ -238,6 +238,7 @@ func testFunctionCollectionTypes() {
 
   _ = [1 -> Int]() // expected-error {{expected type before '->'}}
   _ = [Int -> 1]() // expected-error {{expected type after '->'}}
+    // expected-error@-1 {{single argument function types require parentheses}}
 
   // Should parse () as void type when before or after arrow
   _ = [() -> Int]()

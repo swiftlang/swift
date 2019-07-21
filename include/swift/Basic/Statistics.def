@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -80,6 +80,12 @@ DRIVER_STATISTIC(ChildrenMaxRSS)
 /// EXIT_SUCCESS.
 FRONTEND_STATISTIC(Frontend, NumProcessFailures)
 
+/// Total instructions-executed count in each frontend process.
+FRONTEND_STATISTIC(Frontend, NumInstructionsExecuted)
+
+/// Maximum number of bytes allocated via malloc.
+FRONTEND_STATISTIC(Frontend, MaxMallocUsage)
+
 /// Number of source buffers visible in the source manager.
 FRONTEND_STATISTIC(AST, NumSourceBuffers)
 
@@ -98,9 +104,6 @@ FRONTEND_STATISTIC(AST, NumLinkLibraries)
 
 /// Number of top-level modules loaded in the AST context.
 FRONTEND_STATISTIC(AST, NumLoadedModules)
-
-/// Number of external definitions imported into the AST context.
-FRONTEND_STATISTIC(AST, NumImportedExternalDefinitions)
 
 /// Number of Clang entities imported into the AST context.
 FRONTEND_STATISTIC(AST, NumTotalClangImportedEntities)
@@ -135,11 +138,11 @@ FRONTEND_STATISTIC(AST, NumPrefixOperators)
 /// Number of precedence groups in the AST context.
 FRONTEND_STATISTIC(AST, NumPrecedenceGroups)
 
-/// Number of conformances used by code processed by this frontend job.
-FRONTEND_STATISTIC(AST, NumUsedConformances)
-
 /// Number of full function bodies parsed.
 FRONTEND_STATISTIC(Parse, NumFunctionsParsed)
+
+/// Number of full braced decl list parsed.
+FRONTEND_STATISTIC(Parse, NumIterableDeclContextParsed)
 
 /// Number of conformances that were deserialized by this frontend job.
 FRONTEND_STATISTIC(Sema, NumConformancesDeserialized)
@@ -149,12 +152,32 @@ FRONTEND_STATISTIC(Sema, NumConformancesDeserialized)
 /// expression typechecker did".
 FRONTEND_STATISTIC(Sema, NumConstraintScopes)
 
+/// Number of constraint-solving scopes that were created but which
+/// did not themselves lead to the creation of further scopes, either
+/// because we successfully found a solution, or some constraint failed.
+///
+/// Note: This can vary based on the number of connected components we
+/// generate, since each connected component will itself have at least
+/// one leaf scope.
+FRONTEND_STATISTIC(Sema, NumLeafScopes)
+
+/// Number of constraints considered per attempt to
+/// contract constraint graph edges.
+/// This is a measure of complexity of the contraction algorithm.
+FRONTEND_STATISTIC(Sema, NumConstraintsConsideredForEdgeContraction)
+
 /// Number of declarations that were deserialized. A rough proxy for the amount
 /// of material loaded from other modules.
 FRONTEND_STATISTIC(Sema, NumDeclsDeserialized)
 
 /// Number of declarations validated.
 FRONTEND_STATISTIC(Sema, NumDeclsValidated)
+
+/// Number of declarations type checked.
+FRONTEND_STATISTIC(Sema, NumDeclsTypechecked)
+
+/// Number of declarations finalized.
+FRONTEND_STATISTIC(Sema, NumDeclsFinalized)
 
 /// Number of full function bodies typechecked.
 FRONTEND_STATISTIC(Sema, NumFunctionsTypechecked)
@@ -163,11 +186,17 @@ FRONTEND_STATISTIC(Sema, NumFunctionsTypechecked)
 /// amount of work the GSB does analyzing type signatures.
 FRONTEND_STATISTIC(Sema, NumGenericSignatureBuilders)
 
-/// Number of lazy generic environments built.
+/// Number of lazy generic environments registered.
 FRONTEND_STATISTIC(Sema, NumLazyGenericEnvironments)
 
 /// Number of lazy generic environments deserialized.
 FRONTEND_STATISTIC(Sema, NumLazyGenericEnvironmentsLoaded)
+
+/// Number of lazy requirement signatures registered.
+FRONTEND_STATISTIC(Sema, NumLazyRequirementSignatures)
+
+/// Number of lazy requirement signatures deserialized.
+FRONTEND_STATISTIC(Sema, NumLazyRequirementSignaturesLoaded)
 
 /// Number of lazy iterable declaration contexts constructed.
 FRONTEND_STATISTIC(Sema, NumLazyIterableDeclContexts)
@@ -189,6 +218,14 @@ FRONTEND_STATISTIC(Sema, NumTypesValidated)
 
 /// Number of lazy iterable declaration contexts left unloaded.
 FRONTEND_STATISTIC(Sema, NumUnloadedLazyIterableDeclContexts)
+
+/// All type check requests go into the Sema area.
+#define SWIFT_TYPEID(NAME) FRONTEND_STATISTIC(Sema, NAME)
+#include "swift/AST/AccessTypeIDZone.def"
+#include "swift/AST/NameLookupTypeIDZone.def"
+#include "swift/AST/TypeCheckerTypeIDZone.def"
+#include "swift/IDE/IDERequestIDZone.def"
+#undef SWIFT_TYPEID
 
 /// The next 10 statistics count 5 kinds of SIL entities present
 /// after the SILGen and SILOpt phases. The entities are functions,
@@ -224,4 +261,5 @@ FRONTEND_STATISTIC(IRModule, NumIRInsts)
 /// of the frontend job, which should be the same as the size of
 /// the .o file you find on disk after the frontend exits.
 FRONTEND_STATISTIC(LLVM, NumLLVMBytesOutput)
+
 #endif

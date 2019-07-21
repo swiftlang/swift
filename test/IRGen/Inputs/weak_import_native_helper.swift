@@ -83,13 +83,18 @@ public protocol P {
 }
 
 @_weakLinked
-public struct WeakS {}
+public struct WeakS {
+  public init() {}
+  public func weakMember() {}
+}
 
 @_weakLinked
 public enum WeakE {}
 
 @_weakLinked
-open class WeakC {}
+open class WeakC {
+  public init() {}
+}
 
 @_weakLinked
 public protocol WeakP {}
@@ -102,4 +107,33 @@ public struct GenericS<T> {}
 public enum GenericE<T> {}
 
 @_weakLinked
-open class GenericC<T> {}
+open class GenericC<T> {
+  public init() {}
+}
+
+public protocol OtherProtocol {}
+public struct ConcreteType : OtherProtocol {}
+
+public protocol ProtocolWithWeakMembers {
+  @_weakLinked associatedtype T : OtherProtocol = ConcreteType
+  @_weakLinked func f()
+}
+
+extension ProtocolWithWeakMembers {
+  @_weakLinked public func f() {}
+}
+
+public protocol BaseP {}
+@_weakLinked extension S : BaseP {}
+
+
+public func getVersion() -> Int {
+  // Used to return 0.
+  return 1
+}
+
+@_weakLinked public struct ResilientStruct {
+  public init() {}
+
+  public func fn(_ x: Int) {}
+}

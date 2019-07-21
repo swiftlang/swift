@@ -220,7 +220,7 @@ public var GenericMinimalHashableValue_equalImpl =
     fatalError("GenericMinimalHashableValue_equalImpl is not set yet")
   })
 public var GenericMinimalHashableValue_hashIntoImpl =
-  ResettableValue<(Any, inout Hasher) -> Void>({ _ in
+  ResettableValue<(Any, inout Hasher) -> Void>({ (_,_) in
     fatalError("GenericMinimalHashableValue_hashIntoImpl is not set yet")
   })
 
@@ -276,7 +276,7 @@ public var GenericMinimalHashableClass_equalImpl =
     fatalError("GenericMinimalHashableClass_equalImpl is not set yet")
   })
 public var GenericMinimalHashableClass_hashIntoImpl =
-  ResettableValue<(Any, inout Hasher) -> Void>({ _ in
+  ResettableValue<(Any, inout Hasher) -> Void>({ (_,_) in
     fatalError("GenericMinimalHashableClass_hashIntoImpl is not set yet")
   })
 
@@ -381,8 +381,3 @@ public struct MinimalStrideableValue : Equatable, Comparable, Strideable {
     return MinimalStrideableValue(self.value + n, identity: self.identity)
   }
 }
-
-
-// Local Variables:
-// eval: (read-only-mode 1)
-// End:

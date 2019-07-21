@@ -105,6 +105,7 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
     case OPT_req:
       Request = llvm::StringSwitch<SourceKitRequest>(InputArg->getValue())
         .Case("version", SourceKitRequest::ProtocolVersion)
+        .Case("compiler-version", SourceKitRequest::CompilerVersion)
         .Case("demangle", SourceKitRequest::DemangleNames)
         .Case("mangle", SourceKitRequest::MangleSimpleClasses)
         .Case("index", SourceKitRequest::Index)
@@ -114,6 +115,8 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
         .Case("complete.update", SourceKitRequest::CodeCompleteUpdate)
         .Case("complete.cache.ondisk", SourceKitRequest::CodeCompleteCacheOnDisk)
         .Case("complete.setpopularapi", SourceKitRequest::CodeCompleteSetPopularAPI)
+        .Case("typecontextinfo", SourceKitRequest::TypeContextInfo)
+        .Case("conformingmethods", SourceKitRequest::ConformingMethodList)
         .Case("cursor", SourceKitRequest::CursorInfo)
         .Case("related-idents", SourceKitRequest::RelatedIdents)
         .Case("syntax-map", SourceKitRequest::SyntaxMap)
@@ -149,6 +152,7 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
         .Case("markup-xml", SourceKitRequest::MarkupToXML)
         .Case("stats", SourceKitRequest::Statistics)
         .Case("track-compiles", SourceKitRequest::EnableCompileNotifications)
+        .Case("collect-type", SourceKitRequest::CollectExpresstionType)
         .Default(SourceKitRequest::None);
 
       if (Request == SourceKitRequest::None) {
@@ -160,7 +164,7 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
                "doc-info/sema/interface-gen/interface-gen-openfind-usr/find-interface/"
                "open/close/edit/print-annotations/print-diags/extract-comment/module-groups/"
                "range/syntactic-rename/find-rename-ranges/translate/markup-xml/stats/"
-               "track-compiles\n";
+               "track-compiles/collect-type\n";
         return true;
       }
       break;
@@ -349,6 +353,20 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
       }
       break;
 
+    case OPT_vfs_files:
+      VFSName = VFSName.getValueOr("in-memory-vfs");
+      for (const char *vfsFile : InputArg->getValues()) {
+        StringRef name, target;
+        std::tie(name, target) = StringRef(vfsFile).split('=');
+        bool passAsSourceText = target.consume_front("@");
+        VFSFiles.try_emplace(name, VFSFile(target.str(), passAsSourceText));
+      }
+      break;
+
+    case OPT_vfs_name:
+      VFSName = InputArg->getValue();
+      break;
+
     case OPT_UNKNOWN:
       llvm::errs() << "error: unknown argument: "
                    << InputArg->getAsString(ParsedArgs) << '\n'
@@ -375,6 +393,6 @@ void TestOptions::printHelp(bool ShowHidden) const {
 
   TestOptTable Table;
 
-  Table.PrintHelp(llvm::outs(), "sourcekitd-test", "SourceKit Testing Tool",
-                      ShowHidden);
+  Table.PrintHelp(llvm::outs(), "sourcekitd-test [options] <inputs>",
+                  "SourceKit Testing Tool", ShowHidden);
 }

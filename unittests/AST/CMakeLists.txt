@@ -1,4 +1,5 @@
 add_swift_unittest(SwiftASTTests
+  ArithmeticEvaluator.cpp
   DiagnosticConsumerTests.cpp
   SourceLocTests.cpp
   TestContext.cpp
@@ -12,5 +13,4 @@ target_link_libraries(SwiftASTTests
    # FIXME: Circular dependencies.
    swiftParse
    swiftSema
-   swiftSIL
 )

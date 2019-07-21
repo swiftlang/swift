@@ -115,9 +115,9 @@ let ints = Array(0..<n)
 let str = String(repeating: "A very long ASCII string.", count: n/50)
 
 func buildWorkload() {
-  _ = strings.count
-  _ = ints.count
-  _ = str.count
+  blackHole(strings)
+  blackHole(ints)
+  blackHole(str)
 }
 
 

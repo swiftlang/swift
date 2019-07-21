@@ -19,15 +19,14 @@
 #ifndef SWIFT_BASIC_LLVMINITIALIZE_H
 #define SWIFT_BASIC_LLVMINITIALIZE_H
 
+#include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/TargetSelect.h"
 
 #define PROGRAM_START(argc, argv) \
-  llvm::sys::PrintStackTraceOnErrorSignal(argv[0]); \
-  llvm::PrettyStackTraceProgram _INITIALIZE_LLVM_STACKTRACE(argc, argv); \
-  llvm::llvm_shutdown_obj _INITIALIZE_LLVM_SHUTDOWN_OBJ
+  llvm::InitLLVM _INITIALIZE_LLVM(argc, argv)
 
 #define INITIALIZE_LLVM() \
   do { \

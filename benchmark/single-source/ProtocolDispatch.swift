@@ -15,15 +15,14 @@ import TestsUtils
 public let ProtocolDispatch = BenchmarkInfo(
   name: "ProtocolDispatch",
   runFunction: run_ProtocolDispatch,
-  tags: [.validation, .abstraction, .unstable])
+  tags: [.validation, .abstraction])
 
 @inline(never)
 public func run_ProtocolDispatch(_ N: Int) {
 
   let x = someProtocolFactory()
 
-  for _ in 0...1000000 * N {
+  for _ in 0...100_000 * N {
     _ = x.getValue()
   }
 }
-

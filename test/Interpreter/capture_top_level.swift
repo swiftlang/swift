@@ -1,10 +1,12 @@
 // RUN: %target-run-simple-swift | %FileCheck %s
 
 // RUN: %target-build-swift -DVAR %s -o %t-var
+// RUN: %target-codesign %t-var
 // RUN: %target-run %t-var | %FileCheck %s
 
-// RUN: %target-build-swift -DVAR_UPDATE %s -o %t-var
-// RUN: %target-run %t-var | %FileCheck %s
+// RUN: %target-build-swift -DVAR_UPDATE %s -o %t-var2
+// RUN: %target-codesign %t-var2
+// RUN: %target-run %t-var2 | %FileCheck %s
 
 // REQUIRES: executable_test
 

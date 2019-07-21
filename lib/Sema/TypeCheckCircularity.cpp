@@ -106,9 +106,6 @@ class CircularityChecker {
   /// The maximum circularity depth.
   unsigned MaxDepth;
 
-  /// Whether we encountered an unchecked declaration.
-  bool RequireDelayedChecking = false;
-
   llvm::DenseMap<CanType, TrackingInfo> TrackingMap;
   SmallVector<WorkItem, 8> Workstack;
 
@@ -169,6 +166,8 @@ private:
   bool diagnoseInfiniteRecursion(CanType parentType, ValueDecl *member,
                                  CanType memberType);
 
+  void diagnoseNonWellFoundedEnum(EnumDecl *E);
+
   void addPathElementsTo(Path &path, CanType type);
   void addPathElement(Path &path, ValueDecl *member, CanType memberType);
 
@@ -199,12 +198,6 @@ void CircularityChecker::run() {
     } else if (expandType(item.Type, item.Depth)) {
       return;
     }
-  }
-
-  // If we didn't report an error, but we encountered a property that
-  // hadn't been type-checked, queue the type for delayed checking.
-  if (RequireDelayedChecking) {
-    TC.DelayedCircularityChecks.push_back(OriginalDecl);
   }
 }
 
@@ -252,15 +245,18 @@ bool CircularityChecker::expandStruct(CanType type, StructDecl *S,
                                       unsigned depth) {
   startExpandingType(type);
 
+  auto subMap = type->getContextSubstitutionMap(
+      S->getModuleContext(), S);
+
   for (auto field: S->getStoredProperties()) {
-    // Ignore unchecked fields, but flag that we'll need more checking later.
     if (!field->hasInterfaceType()) {
-      RequireDelayedChecking = true;
-      continue;
+      TC.validateDecl(field);
+      if (!field->hasInterfaceType())
+        continue;
     }
 
-    auto fieldType =
-      type->getTypeOfMember(S->getModuleContext(), field, nullptr);
+    auto fieldType =field->getInterfaceType().subst(
+      subMap, SubstFlags::UseErrorType);
     if (addMember(type, field, fieldType, depth))
       return true;
   }
@@ -272,32 +268,37 @@ bool CircularityChecker::expandStruct(CanType type, StructDecl *S,
 bool CircularityChecker::expandEnum(CanType type, EnumDecl *E,
                                    unsigned depth) {
   // Indirect enums are representational leaves.
-  if (E->isIndirect()) return false;
+  if (E->isIndirect()) {
+    // Diagnose whether the enum is non-well-founded before bailing
+    diagnoseNonWellFoundedEnum(E);
+    return false;
+  }
 
   startExpandingType(type);
 
-  for (auto elt: E->getAllElements()) {
-    // Ignore unchecked elements, but flag that we'll need more checking later.
-    if (!elt->hasInterfaceType()) {
-      RequireDelayedChecking = true;
-      continue;
-    }
+  auto subMap = type->getContextSubstitutionMap(
+      E->getModuleContext(), E);
 
+  for (auto elt: E->getAllElements()) {
     // Indirect elements are representational leaves.
     if (elt->isIndirect())
       continue;
 
-    // Ignore elements with no payload.
-    auto eltIfaceType = elt->getArgumentInterfaceType();
-    if (!eltIfaceType)
+    if (!elt->hasAssociatedValues())
       continue;
 
-    auto eltType =
-      type->getTypeOfMember(E->getModuleContext(), elt, eltIfaceType);
+    if (!elt->hasInterfaceType()) {
+      TC.validateDecl(elt);
+      if (!elt->hasInterfaceType())
+        continue;
+    }
 
+    auto eltType = elt->getArgumentInterfaceType().subst(
+      subMap, SubstFlags::UseErrorType);
     if (addMember(type, elt, eltType, depth))
       return true;
   }
+  diagnoseNonWellFoundedEnum(E);
 
   return false;
 }
@@ -600,4 +601,51 @@ bool CircularityChecker::diagnoseInfiniteRecursion(CanType parentType,
               pathString);
 
   return true;
+}
+
+/// Show a warning if all cases of the given enum are recursive,
+/// making it impossible to be instantiated. Such an enum is 'non-well-founded'.
+/// The outcome of this method is irrelevant.
+void CircularityChecker::diagnoseNonWellFoundedEnum(EnumDecl *E) {
+
+  auto containsType = [](TupleType *tuple, Type E) -> bool {
+    for (auto type: tuple->getElementTypes()) {
+      if (type->isEqual(E))
+        return true;
+    }
+    return false;
+  };
+
+  auto isNonWellFounded = [&]() -> bool {
+    auto elts = E->getAllElements();
+    if (elts.empty())
+      return false;
+
+    for (auto elt: elts) {
+      if (!elt->hasInterfaceType()) {
+        TC.validateDecl(elt);
+        if (!elt->hasInterfaceType())
+          return false;
+      }
+
+      if (!elt->isIndirect() && !E->isIndirect())
+        return false;
+
+      auto argTy = elt->getArgumentInterfaceType();
+      if (!argTy)
+        return false;
+
+      if (auto tuple = argTy->getAs<TupleType>()) {
+        if (!containsType(tuple, E->getSelfInterfaceType()))
+          return false;
+      } else if (auto paren = dyn_cast<ParenType>(argTy.getPointer())) {
+        if (!E->getSelfInterfaceType()->isEqual(paren->getUnderlyingType()))
+          return false;
+      }
+    }
+    return true;
+  };
+
+  if (isNonWellFounded())
+    TC.diagnose(E, diag::enum_non_well_founded);
 }

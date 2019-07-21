@@ -1,5 +1,5 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -sil-print-debuginfo -enable-sil-verify-all %s -basic-callee-printer -o /dev/null | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-NOWMO %s
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -sil-print-debuginfo -enable-sil-verify-all %s -wmo -basic-callee-printer -o /dev/null | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-WMO %s
+// RUN: %target-sil-opt -sil-print-debuginfo -enable-sil-verify-all %s -basic-callee-printer -o /dev/null | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-NOWMO %s
+// RUN: %target-sil-opt -sil-print-debuginfo -enable-sil-verify-all %s -wmo -basic-callee-printer -o /dev/null | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-WMO %s
 
 sil_stage canonical
 
@@ -637,18 +637,7 @@ bb0(%0 : $@thick SomeItem.Type, %1: $InitVal):
   %2 = class_method %0 : $@thick SomeItem.Type, #SomeItem.init!allocator.1 : (SomeItem.Type) -> (InitVal) -> SomeItem, $@convention(method) (InitVal, @thick SomeItem.Type) -> @owned SomeItem
   %3 = apply %2(%1, %0) : $@convention(method) (InitVal, @thick SomeItem.Type) -> @owned SomeItem
 
-// CHECK-LABEL: Function call site:
-// CHECK:   %4 = class_method %3 : $SomeItem, #SomeItem.init!initializer.1 : (SomeItem.Type) -> (InitVal) -> SomeItem, $@convention(method) (InitVal, @owned SomeItem) -> @owned SomeItem
-// CHECK:   %5 = apply %4(%1, %3) : $@convention(method) (InitVal, @owned SomeItem) -> @owned SomeItem
-// CHECK-NOWMO: Incomplete callee list? : Yes
-// CHECK-WMO: Incomplete callee list? : No
-// CHECK: Known callees:
-// CHECK: SomeChildItem_initializer
-// CHECK: SomeItem_initializer
-
-  %4 = class_method %3 : $SomeItem, #SomeItem.init!initializer.1 : (SomeItem.Type) -> (InitVal) -> SomeItem, $@convention(method) (InitVal, @owned SomeItem) -> @owned SomeItem
-  %5 = apply %4(%1, %3) : $@convention(method) (InitVal, @owned SomeItem) -> @owned SomeItem
-  return %5 : $SomeItem
+  return %3 : $SomeItem
 }
 
 sil @SomeItem_allocator : $@convention(method) (InitVal, @thick SomeItem.Type) -> @owned SomeItem
@@ -666,13 +655,13 @@ sil @SomeChildItem_destructor : $@convention(method) (@owned SomeChildItem) -> (
 sil_vtable SomeItem {
   #SomeItem.init!allocator.1: @SomeItem_allocator
   #SomeItem.init!initializer.1: @SomeItem_initializer
-  #SomeItem.deinit!deallocator: @SomeItem_destructor
+  #SomeItem.deinit!deallocator.1: @SomeItem_destructor
 }
 
 sil_vtable SomeChildItem {
   #SomeItem.init!allocator.1: @SomeChildItem_allocator
   #SomeItem.init!initializer.1: @SomeChildItem_initializer
-  #SomeChildItem.deinit!deallocator: @SomeChildItem_destructor
+  #SomeChildItem.deinit!deallocator.1: @SomeChildItem_destructor
 }
 
 public protocol PublicProtocol {

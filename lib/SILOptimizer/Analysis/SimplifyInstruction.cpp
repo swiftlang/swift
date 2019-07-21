@@ -2,12 +2,21 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
+//===----------------------------------------------------------------------===//
+///
+/// An SSA-peephole analysis. Given a single-value instruction, find an existing
+/// equivalent but less costly or more canonical SIL value.
+///
+/// This analysis must handle 'raw' SIL form. It should be possible to perform
+/// the substitution discovered by the analysis without interfering with
+/// subsequent diagnostic passes.
+///
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-simplify"
@@ -46,10 +55,10 @@ namespace {
     SILValue visitTupleInst(TupleInst *SI);
     SILValue visitBuiltinInst(BuiltinInst *AI);
     SILValue visitUpcastInst(UpcastInst *UI);
-    SILValue visitRefToUnownedInst(RefToUnownedInst *RUI);
-    SILValue visitUnownedToRefInst(UnownedToRefInst *URI);
-    SILValue visitRefToUnmanagedInst(RefToUnmanagedInst *RUI);
-    SILValue visitUnmanagedToRefInst(UnmanagedToRefInst *URI);
+#define LOADABLE_REF_STORAGE(Name, ...) \
+    SILValue visitRefTo##Name##Inst(RefTo##Name##Inst *I); \
+    SILValue visit##Name##ToRefInst(Name##ToRefInst *I);
+#include "swift/AST/ReferenceStorage.def"
     SILValue visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *UBCI);
     SILValue
     visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *UTBCI);
@@ -368,41 +377,22 @@ SILValue InstSimplifier::visitUpcastInst(UpcastInst *UI) {
   return SILValue();
 }
 
-SILValue
-InstSimplifier::visitRefToUnownedInst(RefToUnownedInst *RUI) {
-  if (auto *URI = dyn_cast<UnownedToRefInst>(RUI->getOperand()))
-    if (URI->getOperand()->getType() == RUI->getType())
-      return URI->getOperand();
-
-  return SILValue();
+#define LOADABLE_REF_STORAGE(Name, ...) \
+SILValue \
+InstSimplifier::visitRefTo##Name##Inst(RefTo##Name##Inst *RUI) { \
+  if (auto *URI = dyn_cast<Name##ToRefInst>(RUI->getOperand())) \
+    if (URI->getOperand()->getType() == RUI->getType()) \
+      return URI->getOperand(); \
+  return SILValue(); \
+} \
+SILValue \
+InstSimplifier::visit##Name##ToRefInst(Name##ToRefInst *URI) { \
+  if (auto *RUI = dyn_cast<RefTo##Name##Inst>(URI->getOperand())) \
+    if (RUI->getOperand()->getType() == URI->getType()) \
+      return RUI->getOperand(); \
+  return SILValue(); \
 }
-
-SILValue
-InstSimplifier::visitUnownedToRefInst(UnownedToRefInst *URI) {
-  if (auto *RUI = dyn_cast<RefToUnownedInst>(URI->getOperand()))
-    if (RUI->getOperand()->getType() == URI->getType())
-      return RUI->getOperand();
-
-  return SILValue();
-}
-
-SILValue
-InstSimplifier::visitRefToUnmanagedInst(RefToUnmanagedInst *RUI) {
-  if (auto *URI = dyn_cast<UnmanagedToRefInst>(RUI->getOperand()))
-    if (URI->getOperand()->getType() == RUI->getType())
-      return URI->getOperand();
-
-  return SILValue();
-}
-
-SILValue
-InstSimplifier::visitUnmanagedToRefInst(UnmanagedToRefInst *URI) {
-  if (auto *RUI = dyn_cast<RefToUnmanagedInst>(URI->getOperand()))
-    if (RUI->getOperand()->getType() == URI->getType())
-      return RUI->getOperand();
-
-  return SILValue();
-}
+#include "swift/AST/ReferenceStorage.def"
 
 SILValue
 InstSimplifier::
@@ -464,6 +454,19 @@ SILValue InstSimplifier::visitBeginAccessInst(BeginAccessInst *BAI) {
 }
 
 static SILValue simplifyBuiltin(BuiltinInst *BI) {
+
+  switch (BI->getBuiltinInfo().ID) {
+    case BuiltinValueKind::IntToPtr:
+      if (auto *OpBI = dyn_cast<BuiltinInst>(BI->getOperand(0))) {
+        if (OpBI->getBuiltinInfo().ID == BuiltinValueKind::PtrToInt) {
+          return OpBI->getOperand(0);
+        }
+      }
+      return SILValue();
+    default:
+      break;
+  }
+
   const IntrinsicInfo &Intrinsic = BI->getIntrinsicInfo();
 
   switch (Intrinsic.ID) {
@@ -511,18 +514,6 @@ static SILValue simplifyBuiltin(BuiltinInst *BI) {
         return Result;
     }
 
-    // trunc(tuple_extract(conversion(extOrBitCast(x))))) -> x
-    if (match(Op, m_TupleExtractInst(
-                   m_CheckedConversion(
-                     m_ExtOrBitCast(m_SILValue(Result))), 0))) {
-      // If the top bit of Result is known to be 0, then
-      // it is safe to replace the whole pattern by original bits of x
-      if (Result->getType() == BI->getType()) {
-        if (auto signBit = computeSignBit(Result))
-          if (!signBit.getValue())
-            return Result;
-      }
-    }
     return SILValue();
   }
 
@@ -569,7 +560,7 @@ SILValue InstSimplifier::visitBuiltinInst(BuiltinInst *BI) {
   return simplifyBuiltin(BI);
 }
 
-/// \brief Simplify arithmetic intrinsics with overflow and known identity
+/// Simplify arithmetic intrinsics with overflow and known identity
 /// constants such as 0 and 1.
 /// If this returns a value other than SILValue() then the instruction was
 /// simplified to a value which doesn't overflow.  The overflow case is handled
@@ -658,23 +649,6 @@ SILValue InstSimplifier::simplifyOverflowBuiltin(BuiltinInst *BI) {
   switch (Builtin.ID) {
   default: break;
 
-  case BuiltinValueKind::SUCheckedConversion:
-  case BuiltinValueKind::USCheckedConversion: {
-    OperandValueArrayRef Args = BI->getArguments();
-    const SILValue &Op = Args[0];
-    if (auto signBit = computeSignBit(Op))
-      if (!signBit.getValue())
-        return Op;
-    SILValue Result;
-    // CheckedConversion(ExtOrBitCast(x)) -> x
-    if (match(BI, m_CheckedConversion(m_ExtOrBitCast(m_SILValue(Result)))))
-      if (Result->getType() == BI->getType().getTupleElementType(0)) {
-        assert (!computeSignBit(Result).getValue() && "Sign bit should be 0");
-        return Result;
-      }
-    }
-    break;
-
   case BuiltinValueKind::UToSCheckedTrunc:
   case BuiltinValueKind::UToUCheckedTrunc:
   case BuiltinValueKind::SToUCheckedTrunc:
@@ -701,7 +675,7 @@ case BuiltinValueKind::id:
   return SILValue();
 }
 
-/// \brief Try to simplify the specified instruction, performing local
+/// Try to simplify the specified instruction, performing local
 /// analysis of the operands of the instruction, without looking at its uses
 /// (e.g. constant folding).  If a simpler result can be found, it is
 /// returned, otherwise a null SILValue is returned.
@@ -713,12 +687,17 @@ SILValue swift::simplifyInstruction(SILInstruction *I) {
 /// Replace an instruction with a simplified result, including any debug uses,
 /// and erase the instruction. If the instruction initiates a scope, do not
 /// replace the end of its scope; it will be deleted along with its parent.
-void swift::replaceAllSimplifiedUsesAndErase(
+///
+/// This is a simple transform based on the above analysis.
+///
+/// Return an iterator to the next (nondeleted) instruction.
+SILBasicBlock::iterator swift::replaceAllSimplifiedUsesAndErase(
     SILInstruction *I, SILValue result,
-    std::function<void(SILInstruction *)> eraseNotify) {
+    std::function<void(SILInstruction *)> eraseHandler) {
 
   auto *SVI = cast<SingleValueInstruction>(I);
   assert(SVI != result && "Cannot RAUW a value with itself");
+  SILBasicBlock::iterator nextii = std::next(I->getIterator());
 
   // Only SingleValueInstructions are currently simplified.
   while (!SVI->use_empty()) {
@@ -726,16 +705,22 @@ void swift::replaceAllSimplifiedUsesAndErase(
     SILInstruction *user = use->getUser();
     // Erase the end of scope marker.
     if (isEndOfScopeMarker(user)) {
-      if (eraseNotify)
-        eraseNotify(user);
-      user->eraseFromParent();
+      if (&*nextii == user)
+        ++nextii;
+      if (eraseHandler)
+        eraseHandler(user);
+      else
+        user->eraseFromParent();
       continue;
     }
     use->set(result);
   }
-  I->eraseFromParent();
-  if (eraseNotify)
-    eraseNotify(I);
+  if (eraseHandler)
+    eraseHandler(I);
+  else
+    I->eraseFromParent();
+
+  return nextii;
 }
 
 /// Simplify invocations of builtin operations that may overflow.

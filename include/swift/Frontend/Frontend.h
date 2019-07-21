@@ -31,23 +31,28 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangImporterOptions.h"
 #include "swift/Frontend/FrontendOptions.h"
+#include "swift/Frontend/ParseableInterfaceSupport.h"
 #include "swift/Migrator/MigratorOptions.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/Parser.h"
+#include "swift/Parse/SyntaxParsingCache.h"
 #include "swift/Sema/SourceLoader.h"
 #include "swift/Serialization/Validation.h"
 #include "swift/Subsystems.h"
+#include "swift/TBDGen/TBDGen.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Support/Host.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "clang/Basic/FileManager.h"
 
 #include <memory>
 
 namespace swift {
 
 class SerializedModuleLoader;
+class MemoryBufferSerializedModuleLoader;
 class SILModule;
 
 /// The abstract configuration of the compiler, including:
@@ -68,10 +73,15 @@ class CompilerInvocation {
   MigratorOptions MigratorOpts;
   SILOptions SILOpts;
   IRGenOptions IRGenOpts;
+  TBDGenOptions TBDGenOpts;
+  ParseableInterfaceOptions ParseableInterfaceOpts;
+  /// The \c SyntaxParsingCache to use when parsing the main file of this
+  /// invocation
+  SyntaxParsingCache *MainFileSyntaxParsingCache = nullptr;
 
   llvm::MemoryBuffer *CodeCompletionBuffer = nullptr;
 
-  /// \brief Code completion offset in bytes from the beginning of the main
+  /// Code completion offset in bytes from the beginning of the main
   /// source file.  Valid only if \c isCodeCompletion() == true.
   unsigned CodeCompletionOffset = ~0U;
 
@@ -117,12 +127,13 @@ public:
   serialization::Status loadFromSerializedAST(StringRef data);
 
   /// Serialize the command line arguments for emitting them
-  /// to DWARF and inject SDKPath if necessary.
-  static void buildDWARFDebugFlags(std::string &Output,
-                                   const ArrayRef<const char*> &Args,
-                                   StringRef SDKPath,
-                                   StringRef ResourceDir);
+  /// to DWARF or CodeView and inject SDKPath if necessary.
+  static void buildDebugFlags(std::string &Output,
+                              const ArrayRef<const char*> &Args,
+                              StringRef SDKPath,
+                              StringRef ResourceDir);
 
+  void setTargetTriple(const llvm::Triple &Triple);
   void setTargetTriple(StringRef Triple);
 
   StringRef getTargetTriple() const {
@@ -174,9 +185,7 @@ public:
 
   void setRuntimeResourcePath(StringRef Path);
 
-  void setSDKPath(const std::string &Path) {
-    SearchPathOpts.SDKPath = Path;
-  }
+  void setSDKPath(const std::string &Path);
 
   StringRef getSDKPath() const {
     return SearchPathOpts.SDKPath;
@@ -191,6 +200,12 @@ public:
 
   FrontendOptions &getFrontendOptions() { return FrontendOpts; }
   const FrontendOptions &getFrontendOptions() const { return FrontendOpts; }
+
+  TBDGenOptions &getTBDGenOptions() { return TBDGenOpts; }
+  const TBDGenOptions &getTBDGenOptions() const { return TBDGenOpts; }
+
+  ParseableInterfaceOptions &getParseableInterfaceOptions() { return ParseableInterfaceOpts; }
+  const ParseableInterfaceOptions &getParseableInterfaceOptions() const { return ParseableInterfaceOpts; }
 
   ClangImporterOptions &getClangImporterOptions() { return ClangImporterOpts; }
   const ClangImporterOptions &getClangImporterOptions() const {
@@ -216,6 +231,14 @@ public:
 
   IRGenOptions &getIRGenOptions() { return IRGenOpts; }
   const IRGenOptions &getIRGenOptions() const { return IRGenOpts; }
+
+  void setMainFileSyntaxParsingCache(SyntaxParsingCache *Cache) {
+    MainFileSyntaxParsingCache = Cache;
+  }
+
+  SyntaxParsingCache *getMainFileSyntaxParsingCache() const {
+    return MainFileSyntaxParsingCache;
+  }
 
   void setParseStdlib() {
     FrontendOpts.ParseStdlib = true;
@@ -280,7 +303,7 @@ public:
   std::string getPCHHash() const;
 
   SourceFile::ImplicitModuleImportKind getImplicitModuleImportKind() {
-    if (getInputKind() == InputFileKind::IFK_SIL) {
+    if (getInputKind() == InputFileKind::SIL) {
       return SourceFile::ImplicitModuleImportKind::None;
     }
     if (getParseStdlib()) {
@@ -297,7 +320,7 @@ public:
                        bool alwaysSetModuleToMain, bool bePrimary,
                        serialization::ExtendedValidationInfo &extendedInfo);
   bool hasSerializedAST() {
-    return FrontendOpts.InputKind == InputFileKind::IFK_Swift_Library;
+    return FrontendOpts.InputKind == InputFileKind::SwiftLibrary;
   }
 
   const PrimarySpecificPaths &
@@ -319,6 +342,15 @@ public:
   /// so return the TBDPath when in that mode and fail an assert
   /// if not in that mode.
   std::string getTBDPathForWholeModule() const;
+
+  /// ParseableInterfaceOutputPath only makes sense in whole module compilation
+  /// mode, so return the ParseableInterfaceOutputPath when in that mode and
+  /// fail an assert if not in that mode.
+  std::string getParseableInterfaceOutputPathForWholeModule() const;
+
+  SerializationOptions
+  computeSerializationOptions(const SupplementaryOutputPaths &outs,
+                              bool moduleIsPublic);
 };
 
 /// A class which manages the state and execution of the compiler.
@@ -336,10 +368,12 @@ class CompilerInstance {
   std::unique_ptr<ASTContext> Context;
   std::unique_ptr<SILModule> TheSILModule;
 
-  DependencyTracker *DepTracker = nullptr;
+  /// Null if no tracker.
+  std::unique_ptr<DependencyTracker> DepTracker;
 
   ModuleDecl *MainModule = nullptr;
   SerializedModuleLoader *SML = nullptr;
+  MemoryBufferSerializedModuleLoader *MemoryBufferLoader = nullptr;
 
   /// Contains buffer IDs for input source code files.
   std::vector<unsigned> InputSourceCodeBufferIDs;
@@ -396,6 +430,8 @@ public:
 
   DiagnosticEngine &getDiags() { return Diagnostics; }
 
+  llvm::vfs::FileSystem &getFileSystem() { return *SourceMgr.getFileSystem(); }
+
   ASTContext &getASTContext() {
     return *Context;
   }
@@ -408,13 +444,11 @@ public:
     Diagnostics.addConsumer(*DC);
   }
 
-  void setDependencyTracker(DependencyTracker *DT) {
+  void createDependencyTracker(bool TrackSystemDeps) {
     assert(!Context && "must be called before setup()");
-    DepTracker = DT;
+    DepTracker = llvm::make_unique<DependencyTracker>(TrackSystemDeps);
   }
-  DependencyTracker *getDependencyTracker() {
-    return DepTracker;
-  }
+  DependencyTracker *getDependencyTracker() { return DepTracker.get(); }
 
   /// Set the SIL module for this compilation instance.
   ///
@@ -425,9 +459,7 @@ public:
     return TheSILModule.get();
   }
 
-  std::unique_ptr<SILModule> takeSILModule() {
-    return std::move(TheSILModule);
-  }
+  std::unique_ptr<SILModule> takeSILModule();
 
   bool hasSILModule() {
     return static_cast<bool>(TheSILModule);
@@ -435,7 +467,10 @@ public:
 
   ModuleDecl *getMainModule();
 
-  SerializedModuleLoader *getSerializedModuleLoader() const { return SML; }
+  MemoryBufferSerializedModuleLoader *
+  getMemoryBufferSerializedModuleLoader() const {
+    return MemoryBufferLoader;
+  }
 
   ArrayRef<unsigned> getInputBufferIDs() const {
     return InputSourceCodeBufferIDs;
@@ -480,21 +515,27 @@ public:
     }
   }
 
-  /// \brief Returns true if there was an error during setup.
+  /// Returns true if there was an error during setup.
   bool setup(const CompilerInvocation &Invocation);
 
 private:
+  /// Set up the file system by loading and validating all VFS overlay YAML
+  /// files. If the process of validating VFS files failed, or the overlay
+  /// file system could not be initialized, this function returns true. Else it
+  /// returns false if setup succeeded.
+  bool setUpVirtualFileSystemOverlays();
   void setUpLLVMArguments();
   void setUpDiagnosticOptions();
   bool setUpModuleLoaders();
   bool isInputSwift() {
-    return Invocation.getInputKind() == InputFileKind::IFK_Swift;
+    return Invocation.getInputKind() == InputFileKind::Swift;
   }
   bool isInSILMode() {
-    return Invocation.getInputKind() == InputFileKind::IFK_SIL;
+    return Invocation.getInputKind() == InputFileKind::SIL;
   }
 
   bool setUpInputs();
+  bool setUpASTContextIfNeeded();
   Optional<unsigned> setUpCodeCompletionBuffer();
 
   /// Set up all state in the CompilerInstance to process the given input file.
@@ -528,9 +569,21 @@ public:
 
   /// Parses the input file but does no type-checking or module imports.
   /// Note that this only supports parsing an invocation with a single file.
+  void performParseOnly(bool EvaluateConditionals = false,
+                        bool ParseDelayedBodyOnEnd = false);
+
+  /// Parses and performs name binding on all input files.
   ///
-  ///
-  void performParseOnly(bool EvaluateConditionals = false);
+  /// Like a parse-only invocation, a single file is required. Unlike a
+  /// parse-only invocation, module imports will be processed.
+  void performParseAndResolveImportsOnly();
+
+  /// Performs mandatory, diagnostic, and optimization passes over the SIL.
+  /// \param silModule The SIL module that was generated during SILGen.
+  /// \param stats A stats reporter that will report optimization statistics.
+  /// \returns true if any errors occurred.
+  bool performSILProcessing(SILModule *silModule,
+                            UnifiedStatsReporter *stats = nullptr);
 
 private:
   SourceFile *
@@ -565,33 +618,33 @@ public: // for static functions in Frontend.cpp
 
 private:
   void createREPLFile(const ImplicitImports &implicitImports);
-  std::unique_ptr<DelayedParsingCallbacks>
-  computeDelayedParsingCallback(bool isPrimary);
+  std::unique_ptr<DelayedParsingCallbacks> computeDelayedParsingCallback();
 
   void addMainFileToModule(const ImplicitImports &implicitImports);
 
-  void parseAndCheckTypes(const ImplicitImports &implicitImports);
+  void performSemaUpTo(SourceFile::ASTStage_t LimitStage);
+  void parseAndCheckTypesUpTo(const ImplicitImports &implicitImports,
+                              SourceFile::ASTStage_t LimitStage);
 
   void parseLibraryFile(unsigned BufferID,
                         const ImplicitImports &implicitImports,
                         PersistentParserState &PersistentState,
-                        DelayedParsingCallbacks *PrimaryDelayedCB,
-                        DelayedParsingCallbacks *SecondaryDelayedCB);
+                        DelayedParsingCallbacks *DelayedCB);
 
   /// Return true if had load error
   bool
   parsePartialModulesAndLibraryFiles(const ImplicitImports &implicitImports,
                                      PersistentParserState &PersistentState,
-                                     DelayedParsingCallbacks *PrimaryDelayedCB,
-                                     DelayedParsingCallbacks *SecondaryDelayedCB);
+                                     DelayedParsingCallbacks *DelayedCB);
 
   OptionSet<TypeCheckingFlags> computeTypeCheckingOptions();
 
   void forEachFileToTypeCheck(llvm::function_ref<void(SourceFile &)> fn);
 
-  void parseAndTypeCheckMainFile(PersistentParserState &PersistentState,
-                                 DelayedParsingCallbacks *DelayedParseCB,
-                                 OptionSet<TypeCheckingFlags> TypeCheckOptions);
+  void parseAndTypeCheckMainFileUpTo(SourceFile::ASTStage_t LimitStage,
+                                     PersistentParserState &PersistentState,
+                                     DelayedParsingCallbacks *DelayedParseCB,
+                                     OptionSet<TypeCheckingFlags> TypeCheckOptions);
 
   void finishTypeChecking(OptionSet<TypeCheckingFlags> TypeCheckOptions);
 

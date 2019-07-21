@@ -1,0 +1,16 @@
+REQUIRES: sftp_server
+
+RUN: %empty-directory(%t)
+RUN: %empty-directory(%t-REMOTE)
+RUN: %debug-remote-run --output-prefix %t touch %t/output
+RUN: ls %t/ | %FileCheck %s
+RUN: ls %t-REMOTE/output/ | %FileCheck %s
+
+RUN: %empty-directory(%t)
+RUN: %empty-directory(%t/nested)
+RUN: %empty-directory(%t-REMOTE)
+RUN: %debug-remote-run --output-prefix %t touch %t/nested/output
+RUN: ls %t/nested/ | %FileCheck %s
+RUN: ls %t-REMOTE/output/nested/ | %FileCheck %s
+
+CHECK: {{^output$}}

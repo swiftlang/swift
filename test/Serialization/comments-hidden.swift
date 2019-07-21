@@ -18,10 +18,29 @@
 public class PublicClass {
   /// Public Function Documentation
   public func f_public() { }
+  /// Public Init Documentation
+  public init(_ name: String) {}
+  /// Public Subscript Documentation
+  public subscript(_ name: String) -> Int { return 0 }
   /// Internal Function Documentation NotForNormal
   internal func f_internal() { }
   /// Private Function Documentation NotForNormal NotForTesting
   private func f_private() { }
+  /// Public Filter Function Documentation NotForNormal NotForTesting
+  public func __UnderscoredPublic() {}
+  /// Public Filter Init Documentation NotForNormal NotForTesting
+  public init(__label name: String) {}
+  /// Public Filter Subscript Documentation NotForNormal NotForFiltering
+  public subscript(__label name: String) -> Int { return 0 }
+  /// Public Filter Init Documentation NotForNormal NotForTesting
+  public init(label __name: String) {}
+  /// Public Filter Subscript Documentation NotForNormal NotForTesting
+  public subscript(label __name: String) -> Int { return 0 }
+}
+
+public extension PublicClass {
+  /// Public Filter Operator Documentation NotForNormal NotForTesting
+  static func -=(__lhs: inout PublicClass, __rhs: PublicClass) {}
 }
 
 /// InternalClass Documentation NotForNormal
@@ -42,12 +61,16 @@ private class PrivateClass {
 // NORMAL-NEGATIVE-NOT: NotForTesting
 // NORMAL: PublicClass Documentation
 // NORMAL: Public Function Documentation
+// NORMAL: Public Init Documentation
+// NORMAL: Public Subscript Documentation
 
 // TESTING-NEGATIVE-NOT: NotForTesting
-// TESTING: InternalClass Documentation
-// TESTING: Internal Function Documentation
 // TESTING: PublicClass Documentation
 // TESTING: Public Function Documentation
+// TESTINH: Public Init Documentation
+// TESTING: Public Subscript Documentation
+// TESTING: Internal Function Documentation
+// TESTING: InternalClass Documentation
 // TESTING: Internal Function Documentation
 
 

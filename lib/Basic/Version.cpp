@@ -273,23 +273,23 @@ Version::preprocessorDefinition(StringRef macroName,
   return define;
 }
 
-Version::operator clang::VersionTuple() const
+Version::operator llvm::VersionTuple() const
 {
   switch (Components.size()) {
  case 0:
-   return clang::VersionTuple();
+   return llvm::VersionTuple();
  case 1:
-   return clang::VersionTuple((unsigned)Components[0]);
+   return llvm::VersionTuple((unsigned)Components[0]);
  case 2:
-   return clang::VersionTuple((unsigned)Components[0],
+   return llvm::VersionTuple((unsigned)Components[0],
                               (unsigned)Components[1]);
  case 3:
-   return clang::VersionTuple((unsigned)Components[0],
+   return llvm::VersionTuple((unsigned)Components[0],
                               (unsigned)Components[1],
                               (unsigned)Components[2]);
  case 4:
  case 5:
-   return clang::VersionTuple((unsigned)Components[0],
+   return llvm::VersionTuple((unsigned)Components[0],
                               (unsigned)Components[1],
                               (unsigned)Components[2],
                               (unsigned)Components[3]);
@@ -324,21 +324,17 @@ Optional<Version> Version::getEffectiveLanguageVersion() const {
   // set apply it to the "3" case, so that Swift 4.0.1 will automatically
   // have a compatibility mode of 3.2.1.
   switch (Components[0]) {
-  case 3:
-#ifdef SWIFT_VERSION_PATCHLEVEL
-    return Version{3, 4, SWIFT_VERSION_PATCHLEVEL};
-#else
-    return Version{3, 4};
-#endif
   case 4:
-    static_assert(SWIFT_VERSION_MAJOR == 4,
-                  "getCurrentLanguageVersion is no longer correct here");
     // Version '4' on its own implies '4.1.50'.
     if (size() == 1)
       return Version{4, 1, 50};
-    return Version::getCurrentLanguageVersion();
+    // This should be true because of the check up above.
+    assert(size() == 2 && Components[0] == 4 && Components[1] == 2);
+    return Version{4, 2};
   case 5:
-    return Version{5, 0};
+    static_assert(SWIFT_VERSION_MAJOR == 5,
+                  "getCurrentLanguageVersion is no longer correct here");
+    return Version::getCurrentLanguageVersion();
   default:
     return None;
   }
@@ -382,6 +378,11 @@ bool operator>=(const class Version &lhs,
   }
   // Equality
   return true;
+}
+
+bool operator<(const class Version &lhs, const class Version &rhs) {
+
+  return !(lhs >= rhs);
 }
 
 bool operator==(const class Version &lhs,
@@ -446,4 +447,3 @@ std::string getSwiftRevision() {
 
 } // end namespace version
 } // end namespace swift
-

@@ -28,6 +28,7 @@
 #include "Explosion.h"
 #include "GenCall.h"
 #include "GenCast.h"
+#include "GenIntegerLiteral.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "LoadableTypeInfo.h"
@@ -178,6 +179,13 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
 
+  if (Builtin.ID == BuiltinValueKind::IsBitwiseTakable) {
+    (void)args.claimAll();
+    auto valueTy = getLoweredTypeAndTypeInfo(IGF.IGM,
+                                             substitutions.getReplacementTypes()[0]);
+    out.add(valueTy.second.getIsBitwiseTakable(IGF, valueTy.first));
+    return;
+  }
 
   // addressof expects an lvalue argument.
   if (Builtin.ID == BuiltinValueKind::AddressOf) {
@@ -196,7 +204,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
 
   // Emit non-mergeable traps only.
   if (IGF.Builder.isTrapIntrinsic(IID)) {
-    IGF.Builder.CreateNonMergeableTrap(IGF.IGM);
+    IGF.Builder.CreateNonMergeableTrap(IGF.IGM, StringRef());
     return;
   }
 
@@ -206,7 +214,9 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   if (IID == llvm::Intrinsic::instrprof_increment) {
     // If we import profiling intrinsics from a swift module but profiling is
     // not enabled, ignore the increment.
-    if (!IGF.getSILModule().getOptions().GenerateProfile) {
+    SILModule &SILMod = IGF.getSILModule();
+    const auto &Opts = SILMod.getOptions();
+    if (!Opts.GenerateProfile) {
       (void)args.claimAll();
       return;
     }
@@ -246,6 +256,15 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     replacement.add(NameGEP);
     replacement.add(args.claimAll());
     args = std::move(replacement);
+
+    if (Opts.EmitProfileCoverageMapping) {
+      // Update the associated coverage mapping: it's now safe to emit, because
+      // a symtab entry for this function is guaranteed (r://39146527).
+      auto &coverageMaps = SILMod.getCoverageMaps();
+      auto CovMapIt = coverageMaps.find(PGOFuncName);
+      if (CovMapIt != coverageMaps.end())
+        CovMapIt->second->setSymtabEntryGuaranteed();
+    }
   }
 
   if (IID != llvm::Intrinsic::not_intrinsic) {
@@ -335,13 +354,66 @@ if (Builtin.ID == BuiltinValueKind::id) { \
 #define BUILTIN(ID, Name, Attrs)  // Ignore the rest.
 #include "swift/AST/Builtins.def"
 
+  if (Builtin.ID == BuiltinValueKind::GlobalStringTablePointer) {
+    // This builtin should be used only on strings constructed from a
+    // string literal. If we ever get to the point of executing this builtin
+    // at run time, it implies an incorrect use of the builtin and must result
+    // in a trap.
+    IGF.emitTrap("invalid use of globalStringTablePointer",
+                 /*Unreachable=*/false);
+    auto returnValue = llvm::UndefValue::get(IGF.IGM.Int8PtrTy);
+    // Consume the arguments of the builtin.
+    (void)args.claimAll();
+    return out.add(returnValue);
+  }
+
+  if (Builtin.ID == BuiltinValueKind::WillThrow) {
+    // willThrow is emitted like a Swift function call with the error in
+    // the error return register. We also have to pass a fake context
+    // argument due to how swiftcc works in clang.
+  
+    auto *fn = cast<llvm::Function>(IGF.IGM.getWillThrowFn());
+    auto error = args.claimNext();
+    auto errorBuffer = IGF.getErrorResultSlot(
+               SILType::getPrimitiveObjectType(IGF.IGM.Context.getErrorDecl()
+                                                  ->getDeclaredType()
+                                                  ->getCanonicalType()));
+    IGF.Builder.CreateStore(error, errorBuffer);
+    
+    auto context = llvm::UndefValue::get(IGF.IGM.Int8PtrTy);
+
+    llvm::CallInst *call = IGF.Builder.CreateCall(fn,
+                                        {context, errorBuffer.getAddress()});
+    call->setCallingConv(IGF.IGM.SwiftCC);
+    call->addAttribute(llvm::AttributeList::FunctionIndex,
+                       llvm::Attribute::NoUnwind);
+    call->addAttribute(llvm::AttributeList::FirstArgIndex + 1,
+                       llvm::Attribute::ReadOnly);
+
+    auto attrs = call->getAttributes();
+    IGF.IGM.addSwiftSelfAttributes(attrs, 0);
+    IGF.IGM.addSwiftErrorAttributes(attrs, 1);
+    call->setAttributes(attrs);
+
+    IGF.Builder.CreateStore(llvm::ConstantPointerNull::get(IGF.IGM.ErrorPtrTy),
+                            errorBuffer);
+
+    return out.add(call);
+  }
+  
   if (Builtin.ID == BuiltinValueKind::FNeg) {
     llvm::Value *rhs = args.claimNext();
     llvm::Value *lhs = llvm::ConstantFP::get(rhs->getType(), "-0.0");
     llvm::Value *v = IGF.Builder.CreateFSub(lhs, rhs);
     return out.add(v);
   }
-  
+  if (Builtin.ID == BuiltinValueKind::AssumeTrue) {
+    llvm::Value *v = args.claimNext();
+    if (v->getType() == IGF.IGM.Int1Ty) {
+      IGF.Builder.CreateIntrinsicCall(llvm::Intrinsic::ID::assume, v);
+    }
+    return;
+  }
   if (Builtin.ID == BuiltinValueKind::AssumeNonNegative) {
     llvm::Value *v = args.claimNext();
     // Set a value range on the load instruction, which must be the argument of
@@ -632,10 +704,20 @@ if (Builtin.ID == BuiltinValueKind::id) { \
   if (Builtin.ID == BuiltinValueKind::SToSCheckedTrunc ||
       Builtin.ID == BuiltinValueKind::UToUCheckedTrunc ||
       Builtin.ID == BuiltinValueKind::SToUCheckedTrunc) {
+    bool Signed = (Builtin.ID == BuiltinValueKind::SToSCheckedTrunc);
+
+    auto FromType = Builtin.Types[0]->getCanonicalType();
+    auto ToTy = cast<llvm::IntegerType>(
+      IGF.IGM.getStorageTypeForLowered(Builtin.Types[1]->getCanonicalType()));
+
+    // Handle the arbitrary-precision truncate specially.
+    if (isa<BuiltinIntegerLiteralType>(FromType)) {
+      emitIntegerLiteralCheckedTrunc(IGF, args, ToTy, Signed, out);
+      return;
+    }
+
     auto FromTy =
-      IGF.IGM.getStorageTypeForLowered(Builtin.Types[0]->getCanonicalType());
-    auto ToTy =
-      IGF.IGM.getStorageTypeForLowered(Builtin.Types[1]->getCanonicalType());
+      IGF.IGM.getStorageTypeForLowered(FromType);
 
     // Compute the result for SToSCheckedTrunc_IntFrom_IntTo(Arg):
     //   Res = trunc_IntTo(Arg)
@@ -651,7 +733,6 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     //   return (Res, OverflowFlag)
     llvm::Value *Arg = args.claimNext();
     llvm::Value *Res = IGF.Builder.CreateTrunc(Arg, ToTy);
-    bool Signed = (Builtin.ID == BuiltinValueKind::SToSCheckedTrunc);
     llvm::Value *Ext = Signed ? IGF.Builder.CreateSExt(Res, FromTy) :
                                 IGF.Builder.CreateZExt(Res, FromTy);
     llvm::Value *OverflowCond = IGF.Builder.CreateICmpEQ(Arg, Ext);
@@ -690,40 +771,15 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     return out.add(OverflowFlag);
   }
 
-  if (Builtin.ID == BuiltinValueKind::SUCheckedConversion ||
-      Builtin.ID == BuiltinValueKind::USCheckedConversion) {
-    auto Ty =
-      IGF.IGM.getStorageTypeForLowered(Builtin.Types[0]->getCanonicalType());
-
-    // Report a sign error if the input parameter is a negative number, when
-    // interpreted as signed.
-    llvm::Value *Arg = args.claimNext();
-    llvm::Value *Zero = llvm::ConstantInt::get(Ty, 0);
-    llvm::Value *OverflowFlag = IGF.Builder.CreateICmpSLT(Arg, Zero);
-
-    // Return the tuple: (the result (same as input), the overflow flag).
-    out.add(Arg);
-    return out.add(OverflowFlag);
-  }
-
   // We are currently emitting code for '_convertFromBuiltinIntegerLiteral',
   // which will call the builtin and pass it a non-compile-time-const parameter.
   if (Builtin.ID == BuiltinValueKind::IntToFPWithOverflow) {
-    auto ToTy =
+    assert(Builtin.Types[0]->is<BuiltinIntegerLiteralType>());
+    auto toType =
       IGF.IGM.getStorageTypeForLowered(Builtin.Types[1]->getCanonicalType());
-    llvm::Value *Arg = args.claimNext();
-    unsigned bitSize = Arg->getType()->getScalarSizeInBits();
-    if (bitSize > 64) {
-      // TODO: the integer literal bit size is 2048, but we only have a 64-bit
-      // conversion function available (on all platforms).
-      Arg = IGF.Builder.CreateTrunc(Arg, IGF.IGM.Int64Ty);
-    } else if (bitSize < 64) {
-      // Just for completeness. IntToFPWithOverflow is currently only used to
-      // convert 2048 bit integer literals.
-      Arg = IGF.Builder.CreateSExt(Arg, IGF.IGM.Int64Ty);
-    }
-    llvm::Value *V = IGF.Builder.CreateSIToFP(Arg, ToTy);
-    return out.add(V);
+    auto result = emitIntegerLiteralToFP(IGF, args, toType);
+    out.add(result);
+    return;
   }
 
   if (Builtin.ID == BuiltinValueKind::Once

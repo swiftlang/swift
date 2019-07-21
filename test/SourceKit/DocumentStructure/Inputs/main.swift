@@ -118,3 +118,20 @@ class C {
 var // comment
   `$` = 1
 func /* comment */`foo`(x: Int) {}
+
+// rdar://40085232
+enum MyEnum {
+  case Bar(arg: Int)
+}
+
+enum MySecondEnum {
+  case One = 1
+}
+
+func someFunc(input :Int?, completion: () throws -> Void) rethrows {}
+
+class OneMore {
+  @IBSegueAction func testAction(coder: AnyObject, _ ident: String) -> AnyObject {
+    fatalError()
+  }
+}

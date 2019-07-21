@@ -36,6 +36,7 @@ namespace swift {
   class ValueDecl;
   class SourceLoc;
   enum class tok;
+  enum class AccessorKind;
 
 /// Describes the context in which a name is being printed, which
 /// affects the keywords that need to be escaped.
@@ -44,6 +45,8 @@ enum class PrintNameContext {
   Normal,
   /// Keyword context, where no keywords are escaped.
   Keyword,
+  /// Type member context, e.g. properties or enum cases.
+  TypeMember,
   /// Generic parameter context, where 'Self' is not escaped.
   GenericParameter,
   /// Class method return type, where 'Self' is not escaped.
@@ -118,6 +121,10 @@ public:
   /// Callers should use callPrintDeclPost().
   virtual void printDeclPost(const Decl *D, Optional<BracketOptions> Bracket) {}
 
+  /// Called before printing the result type of the declaration. Printer can
+  /// replace \p TL to customize the input.
+  virtual void printDeclResultTypePre(ValueDecl *VD, TypeLoc &TL) {}
+
   /// Called before printing a type.
   virtual void printTypePre(const TypeLoc &TL) {}
   /// Called after printing a type.
@@ -186,10 +193,13 @@ public:
     return *this << StringRef(&c, 1);
   }
 
-  void printKeyword(StringRef name) {
+  void printKeyword(StringRef name, PrintOptions Opts, StringRef Suffix = "") {
+    if (Opts.SkipUnderscoredKeywords && name.startswith("_"))
+      return;
     callPrintNamePre(PrintNameContext::Keyword);
     *this << name;
     printNamePost(PrintNameContext::Keyword);
+    *this << Suffix;
   }
 
   void printAttrName(StringRef name, bool needAt = false) {
@@ -206,6 +216,8 @@ public:
     printStructurePost(PrintStructureKind::BuiltinAttribute);
     return *this;
   }
+
+  void printEscapedStringLiteral(StringRef str);
 
   void printName(Identifier Name,
                  PrintNameContext Context = PrintNameContext::Normal);
@@ -275,7 +287,6 @@ public:
 
   /// To sanitize a malformed utf8 string to a well-formed one.
   static std::string sanitizeUtf8(StringRef Text);
-  static ValueDecl* findConformancesWithDocComment(ValueDecl *VD);
 
 private:
   virtual void anchor();
@@ -326,10 +337,10 @@ void printEnumElementsAsCases(
     llvm::DenseSet<EnumElementDecl *> &UnhandledElements,
     llvm::raw_ostream &OS);
 
-void getInheritedForPrinting(const Decl *decl,
-                             llvm::function_ref<bool(const Decl*)> shouldPrint,
+void getInheritedForPrinting(const Decl *decl, const PrintOptions &options,
                              llvm::SmallVectorImpl<TypeLoc> &Results);
 
+StringRef getAccessorKindString(AccessorKind value);
 } // namespace swift
 
 #endif // LLVM_SWIFT_AST_ASTPRINTER_H

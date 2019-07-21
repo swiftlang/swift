@@ -6,8 +6,8 @@
 
 private func testParamType(_: InterestingType) {}
 
-// CHECK-OLD: sil_global hidden @$S4main1x{{[^ ]+}} : ${{(@[a-zA-Z_]+ )?}}(Int) -> ()
-// CHECK-NEW: sil_global hidden @$S4main1x{{[^ ]+}} : ${{(@[a-zA-Z_]+ )?}}(Double) -> ()
+// CHECK-OLD: sil_global hidden @$s4main1x{{[^ ]+}} : ${{(@[a-zA-Z_]+ )?}}(Int) -> ()
+// CHECK-NEW: sil_global hidden @$s4main1x{{[^ ]+}} : ${{(@[a-zA-Z_]+ )?}}(Double) -> ()
 internal var x = testParamType
 
 // CHECK-DEPS-LABEL: depends-top-level:

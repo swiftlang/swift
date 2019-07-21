@@ -13,8 +13,8 @@
 #ifndef SWIFT_DRIVER_UTIL_H
 #define SWIFT_DRIVER_UTIL_H
 
+#include "swift/Basic/FileTypes.h"
 #include "swift/Basic/LLVM.h"
-#include "swift/Frontend/FileTypes.h"
 #include "llvm/ADT/SmallVector.h"
 
 namespace llvm {
@@ -34,7 +34,8 @@ namespace driver {
   enum class LinkKind {
     None,
     Executable,
-    DynamicLibrary
+    DynamicLibrary,
+    StaticLibrary
   };
 
   /// Used by a Job to request a "filelist": a file containing a list of all

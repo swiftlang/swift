@@ -14,55 +14,12 @@
 // This file implements helpers for hashing collections.
 //
 
-/// This protocol is only used for compile-time checks that
-/// every buffer type implements all required operations.
-internal protocol _HashBuffer {
-  associatedtype Key
-  associatedtype Value
-  associatedtype Index
-  associatedtype SequenceElement
-  associatedtype SequenceElementWithoutLabels
-  var startIndex: Index { get }
-  var endIndex: Index { get }
-
-  func index(after i: Index) -> Index
-
-  func formIndex(after i: inout Index)
-
-  func index(forKey key: Key) -> Index?
-
-  func assertingGet(_ i: Index) -> SequenceElement
-
-  func assertingGet(_ key: Key) -> Value
-
-  func maybeGet(_ key: Key) -> Value?
-
-  @discardableResult
-  mutating func updateValue(_ value: Value, forKey key: Key) -> Value?
-
-  @discardableResult
-  mutating func insert(
-    _ value: Value, forKey key: Key
-  ) -> (inserted: Bool, memberAfterInsert: Value)
-
-  @discardableResult
-  mutating func remove(at index: Index) -> SequenceElement
-
-  @discardableResult
-  mutating func removeValue(forKey key: Key) -> Value?
-
-  mutating func removeAll(keepingCapacity keepCapacity: Bool)
-
-  var count: Int { get }
-
-  static func fromArray(_ elements: [SequenceElementWithoutLabels]) -> Self
-}
+import SwiftShims
 
 /// The inverse of the default hash table load factor.  Factored out so that it
 /// can be used in multiple places in the implementation and stay consistent.
 /// Should not be used outside `Dictionary` implementation.
-@inlinable // FIXME(sil-serialize-all)
-@_transparent
+@usableFromInline @_transparent
 internal var _hashContainerDefaultMaxLoadFactorInverse: Double {
   return 1.0 / 0.75
 }
@@ -72,8 +29,6 @@ internal var _hashContainerDefaultMaxLoadFactorInverse: Double {
 ///
 /// This function is part of the runtime because `Bool` type is bridged to
 /// `ObjCBool`, which is in Foundation overlay.
-/// FIXME(sil-serialize-all): this should be internal
-@usableFromInline // FIXME(sil-serialize-all)
 @_silgen_name("swift_stdlib_NSObject_isEqual")
 internal func _stdlib_NSObject_isEqual(_ lhs: AnyObject, _ rhs: AnyObject) -> Bool
 #endif
@@ -84,25 +39,19 @@ internal func _stdlib_NSObject_isEqual(_ lhs: AnyObject, _ rhs: AnyObject) -> Bo
 ///
 /// Accesses the underlying raw memory as Unmanaged<AnyObject> using untyped
 /// memory accesses. The memory remains bound to managed AnyObjects.
-@_fixed_layout // FIXME(sil-serialize-all)
-@usableFromInline // FIXME(sil-serialize-all)
 internal struct _UnmanagedAnyObjectArray {
   /// Underlying pointer.
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var value: UnsafeMutableRawPointer
 
-  @inlinable // FIXME(sil-serialize-all)
   internal init(_ up: UnsafeMutablePointer<AnyObject>) {
     self.value = UnsafeMutableRawPointer(up)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   internal init?(_ up: UnsafeMutablePointer<AnyObject>?) {
     guard let unwrapped = up else { return nil }
     self.init(unwrapped)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   internal subscript(i: Int) -> AnyObject {
     get {
       let unmanaged = value.load(
@@ -118,3 +67,94 @@ internal struct _UnmanagedAnyObjectArray {
     }
   }
 }
+
+#if _runtime(_ObjC)
+/// An NSEnumerator implementation returning zero elements. This is useful when
+/// a concrete element type is not recoverable from the empty singleton.
+// NOTE: older runtimes called this class _SwiftEmptyNSEnumerator. The two
+// must coexist without conflicting ObjC class names, so it was
+// renamed. The old name must not be used in the new runtime.
+final internal class __SwiftEmptyNSEnumerator
+  : __SwiftNativeNSEnumerator, _NSEnumerator {
+  internal override required init() { super.init() }
+
+  @objc
+  internal func nextObject() -> AnyObject? {
+    return nil
+  }
+
+  @objc(countByEnumeratingWithState:objects:count:)
+  internal func countByEnumerating(
+    with state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
+    objects: UnsafeMutablePointer<AnyObject>,
+    count: Int
+  ) -> Int {
+    // Even though we never do anything in here, we need to update the
+    // state so that callers know we actually ran.
+    var theState = state.pointee
+    if theState.state == 0 {
+      theState.state = 1 // Arbitrary non-zero value.
+      theState.itemsPtr = AutoreleasingUnsafeMutablePointer(objects)
+      theState.mutationsPtr = _fastEnumerationStorageMutationsPtr
+    }
+    state.pointee = theState
+    return 0
+  }
+}
+#endif
+
+#if _runtime(_ObjC)
+/// This is a minimal class holding a single tail-allocated flat buffer,
+/// representing hash table storage for AnyObject elements. This is used to
+/// store bridged elements in deferred bridging scenarios.
+///
+/// Using a dedicated class for this rather than a _BridgingBuffer makes it easy
+/// to recognize these in heap dumps etc.
+// NOTE: older runtimes called this class _BridgingHashBuffer.
+// The two must coexist without a conflicting ObjC class name, so it
+// was renamed. The old name must not be used in the new runtime.
+internal final class __BridgingHashBuffer
+  : ManagedBuffer<__BridgingHashBuffer.Header, AnyObject> {
+  struct Header {
+    internal var owner: AnyObject
+    internal var hashTable: _HashTable
+
+    init(owner: AnyObject, hashTable: _HashTable) {
+      self.owner = owner
+      self.hashTable = hashTable
+    }
+  }
+
+  internal static func allocate(
+    owner: AnyObject,
+    hashTable: _HashTable
+  ) -> __BridgingHashBuffer {
+    let buffer = self.create(minimumCapacity: hashTable.bucketCount) { _ in
+      Header(owner: owner, hashTable: hashTable)
+    }
+    return unsafeDowncast(buffer, to: __BridgingHashBuffer.self)
+  }
+
+  deinit {
+    for bucket in header.hashTable {
+      (firstElementAddress + bucket.offset).deinitialize(count: 1)
+    }
+    _fixLifetime(self)
+  }
+
+  internal subscript(bucket: _HashTable.Bucket) -> AnyObject {
+    @inline(__always) get {
+      _internalInvariant(header.hashTable.isOccupied(bucket))
+      defer { _fixLifetime(self) }
+      return firstElementAddress[bucket.offset]
+    }
+  }
+
+  @inline(__always)
+  internal func initialize(at bucket: _HashTable.Bucket, to object: AnyObject) {
+    _internalInvariant(header.hashTable.isOccupied(bucket))
+    (firstElementAddress + bucket.offset).initialize(to: object)
+    _fixLifetime(self)
+  }
+}
+#endif

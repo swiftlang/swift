@@ -12,13 +12,17 @@
 
 
 import SwiftPrivate
-import SwiftPrivatePthreadExtras
+import SwiftPrivateThreadExtras
 import SwiftPrivateLibcExtras
 
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+import Foundation
 import Darwin
 #elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
 import Glibc
+#elseif os(Windows)
+import MSVCRT
+import WinSDK
 #endif
 
 #if _runtime(_ObjC)
@@ -100,6 +104,26 @@ public struct SourceLocStack {
   }
 }
 
+fileprivate struct AtomicBool {
+    
+    private var _value: _stdlib_AtomicInt
+    
+    init(_ b: Bool) { self._value = _stdlib_AtomicInt(b ? 1 : 0) }
+    
+    func store(_ b: Bool) { _value.store(b ? 1 : 0) }
+    
+    func load() -> Bool { return _value.load() != 0 }
+    
+    @discardableResult
+    func orAndFetch(_ b: Bool) -> Bool {
+        return _value.orAndFetch(b ? 1 : 0) != 0
+    }
+
+    func fetchAndClear() -> Bool {
+        return _value.fetchAndAnd(0) != 0
+    }
+}
+
 func _printStackTrace(_ stackTrace: SourceLocStack?) {
   guard let s = stackTrace, !s.locs.isEmpty else { return }
   print("stacktrace:")
@@ -109,10 +133,8 @@ func _printStackTrace(_ stackTrace: SourceLocStack?) {
   }
 }
 
-// FIXME: these variables should be atomic, since multiple threads can call
-// `expect*()` functions.
-var _anyExpectFailed = false
-var _seenExpectCrash = false
+fileprivate var _anyExpectFailed = AtomicBool(false)
+fileprivate var _seenExpectCrash = AtomicBool(false)
 
 /// Run `body` and expect a failure to happen.
 ///
@@ -122,16 +144,14 @@ public func expectFailure(
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
   file: String = #file, line: UInt = #line, invoking body: () -> Void) {
-  let startAnyExpectFailed = _anyExpectFailed
-  _anyExpectFailed = false
+  let startAnyExpectFailed = _anyExpectFailed.fetchAndClear()
   body()
-  let endAnyExpectFailed = _anyExpectFailed
-  _anyExpectFailed = false
+  let endAnyExpectFailed = _anyExpectFailed.fetchAndClear()
   expectTrue(
     endAnyExpectFailed, "running `body` should produce an expected failure",
     stackTrace: stackTrace.pushIf(showFrame, file: file, line: line)
   )
-  _anyExpectFailed = _anyExpectFailed || startAnyExpectFailed
+  _anyExpectFailed.orAndFetch(startAnyExpectFailed)
 }
 
 public func identity(_ element: OpaqueValue<Int>) -> OpaqueValue<Int> {
@@ -254,7 +274,7 @@ public func expectationFailure(
   _ reason: String,
   trace message: String,
   stackTrace: SourceLocStack) {
-  _anyExpectFailed = true
+  _anyExpectFailed.store(true)
   stackTrace.print()
   print(reason, terminator: reason == "" ? "" : "\n")
   print(message, terminator: message == "" ? "" : "\n")
@@ -294,19 +314,6 @@ public func expectNotEqual<T : Equatable>(_ expected: T, _ actual: T,
   }
 }
 
-// Cannot write a sane set of overloads using generics because of:
-// <rdar://problem/17015923> Array -> NSArray implicit conversion insanity
-public func expectOptionalEqual<T : Equatable>(
-  _ expected: T, _ actual: T?,
-  _ message: @autoclosure () -> String = "",
-  stackTrace: SourceLocStack = SourceLocStack(),
-  showFrame: Bool = true,
-  file: String = #file, line: UInt = #line
-) {
-  expectOptionalEqual(expected, actual, message(),
-      stackTrace: stackTrace.pushIf(showFrame, file: file, line: line), showFrame: false) {$0 == $1}
-}
-
 public func expectOptionalEqual<T>(
   _ expected: T, _ actual: T?,
   _ message: @autoclosure () -> String = "",
@@ -322,146 +329,6 @@ public func expectOptionalEqual<T>(
       stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
   }
 }
-
-public func expectEqual<T : Equatable>(_ expected: T?, _ actual: T?,
-  _ message: @autoclosure () -> String = "",
-  stackTrace: SourceLocStack = SourceLocStack(),
-  showFrame: Bool = true,
-  file: String = #file, line: UInt = #line) {
-  if expected != actual {
-    expectationFailure(
-      "expected: \"\(expected.debugDescription)\" (of type \(String(reflecting: type(of: expected))))\n"
-      + "actual: \"\(actual.debugDescription)\" (of type \(String(reflecting: type(of: actual))))",
-      trace: message(),
-      stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
-  }
-}
-
-public func expectNotEqual<T : Equatable>(
-  _ expected: T?, _ actual: T?,
-  _ message: @autoclosure () -> String = "",
-  stackTrace: SourceLocStack = SourceLocStack(),
-  showFrame: Bool = true,
-  file: String = #file, line: UInt = #line
-) {
-  if expected == actual {
-    expectationFailure(
-      "unexpected value: \"\(actual.debugDescription)\" (of type \(String(reflecting: type(of: actual))))",
-      trace: message(),
-      stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
-  }
-}
-
-// Array<T> is not Equatable if T is.  Provide additional overloads.
-// Same for Dictionary.
-
-public func expectEqual<T : Equatable>(
-  _ expected: ContiguousArray<T>, _ actual: ContiguousArray<T>,
-  _ message: @autoclosure () -> String = "",
-  stackTrace: SourceLocStack = SourceLocStack(),
-  showFrame: Bool = true,
-  file: String = #file, line: UInt = #line
-) {
-  expectEqualTest(expected, actual, message(),
-      stackTrace: stackTrace.pushIf(showFrame, file: file, line: line), showFrame: false) { $0 == $1 }
-}
-
-public func expectOptionalEqual<T : Equatable>(
-    _ expected: ContiguousArray<T>, _ actual: ContiguousArray<T>?,
-  _ message: @autoclosure () -> String = "",
-  stackTrace: SourceLocStack = SourceLocStack(),
-  showFrame: Bool = true,
-  file: String = #file, line: UInt = #line) {
-  if (actual == nil) || expected != actual! {
-    expectationFailure(
-      "expected: \"\(expected)\" (of type \(String(reflecting: type(of: expected))))"
-      + "actual: \"\(actual.debugDescription)\" (of type \(String(reflecting: type(of: actual))))",
-      trace: message(),
-      stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
-  }
-}
-
-
-public func expectEqual<T : Equatable>(
-  _ expected: ArraySlice<T>, _ actual: ArraySlice<T>,
-  _ message: @autoclosure () -> String = "",
-  stackTrace: SourceLocStack = SourceLocStack(),
-  showFrame: Bool = true,
-  file: String = #file, line: UInt = #line
-) {
-  expectEqualTest(expected, actual, message(),
-      stackTrace: stackTrace.pushIf(showFrame, file: file, line: line), showFrame: false) { $0 == $1 }
-}
-
-public func expectOptionalEqual<T : Equatable>(
-    _ expected: ArraySlice<T>, _ actual: ArraySlice<T>?,
-  _ message: @autoclosure () -> String = "",
-  stackTrace: SourceLocStack = SourceLocStack(),
-  showFrame: Bool = true,
-  file: String = #file, line: UInt = #line) {
-  if (actual == nil) || expected != actual! {
-    expectationFailure(
-      "expected: \"\(expected)\" (of type \(String(reflecting: type(of: expected))))"
-      + "actual: \"\(actual.debugDescription)\" (of type \(String(reflecting: type(of: actual))))",
-      trace: message(),
-      stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
-  }
-}
-
-
-public func expectEqual<T : Equatable>(
-  _ expected: Array<T>, _ actual: Array<T>,
-  _ message: @autoclosure () -> String = "",
-  stackTrace: SourceLocStack = SourceLocStack(),
-  showFrame: Bool = true,
-  file: String = #file, line: UInt = #line
-) {
-  expectEqualTest(expected, actual, message(),
-      stackTrace: stackTrace.pushIf(showFrame, file: file, line: line), showFrame: false) { $0 == $1 }
-}
-
-public func expectOptionalEqual<T : Equatable>(
-    _ expected: Array<T>, _ actual: Array<T>?,
-  _ message: @autoclosure () -> String = "",
-  stackTrace: SourceLocStack = SourceLocStack(),
-  showFrame: Bool = true,
-  file: String = #file, line: UInt = #line) {
-  if (actual == nil) || expected != actual! {
-    expectationFailure(
-      "expected: \"\(expected)\" (of type \(String(reflecting: type(of: expected))))"
-      + "actual: \"\(actual.debugDescription)\" (of type \(String(reflecting: type(of: actual))))",
-      trace: message(),
-      stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
-  }
-}
-
-
-public func expectEqual<T, U : Equatable>(
-  _ expected: Dictionary<T, U>, _ actual: Dictionary<T, U>,
-  _ message: @autoclosure () -> String = "",
-  stackTrace: SourceLocStack = SourceLocStack(),
-  showFrame: Bool = true,
-  file: String = #file, line: UInt = #line
-) {
-  expectEqualTest(expected, actual, message(),
-      stackTrace: stackTrace.pushIf(showFrame, file: file, line: line), showFrame: false) { $0 == $1 }
-}
-
-public func expectOptionalEqual<T, U : Equatable>(
-    _ expected: Dictionary<T, U>, _ actual: Dictionary<T, U>?,
-  _ message: @autoclosure () -> String = "",
-  stackTrace: SourceLocStack = SourceLocStack(),
-  showFrame: Bool = true,
-  file: String = #file, line: UInt = #line) {
-  if (actual == nil) || expected != actual! {
-    expectationFailure(
-      "expected: \"\(expected)\" (of type \(String(reflecting: type(of: expected))))"
-      + "actual: \"\(actual.debugDescription)\" (of type \(String(reflecting: type(of: actual))))",
-      trace: message(),
-      stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
-  }
-}
-
 
 public func expectEqual(
   _ expected: Any.Type, _ actual: Any.Type,
@@ -482,6 +349,9 @@ public func expectLT<T : Comparable>(_ lhs: T, _ rhs: T,
   if !(lhs < rhs) {
     expectationFailure("\(lhs) < \(rhs)", trace: message(),
       stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
+  } else if !(rhs > lhs) {
+    expectationFailure("\(lhs) < \(rhs) (flipped)", trace: message(),
+      stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
   }
 }
 
@@ -492,6 +362,9 @@ public func expectLE<T : Comparable>(_ lhs: T, _ rhs: T,
   file: String = #file, line: UInt = #line) {
   if !(lhs <= rhs) {
     expectationFailure("\(lhs) <= \(rhs)", trace: message(),
+      stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
+  } else if !(rhs >= lhs) {
+    expectationFailure("\(lhs) <= \(rhs) (flipped)", trace: message(),
       stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
   }
 }
@@ -504,6 +377,9 @@ public func expectGT<T : Comparable>(_ lhs: T, _ rhs: T,
   if !(lhs > rhs) {
     expectationFailure("\(lhs) > \(rhs)", trace: message(),
       stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
+  } else if !(rhs < lhs) {
+    expectationFailure("\(lhs) > \(rhs) (flipped)", trace: message(),
+      stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
   }
 }
 
@@ -514,6 +390,9 @@ public func expectGE<T : Comparable>(_ lhs: T, _ rhs: T,
   file: String = #file, line: UInt = #line) {
   if !(lhs >= rhs) {
     expectationFailure("\(lhs) >= \(rhs)", trace: message(),
+      stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
+  } else if !(rhs <= lhs) {
+    expectationFailure("\(lhs) >= \(rhs) (flipped)", trace: message(),
       stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
   }
 }
@@ -640,8 +519,7 @@ public func expectMutableSliceType<X : MutableCollection>(
 /// to be.
 public func expectSequenceAssociatedTypes<X : Sequence>(
   sequenceType: X.Type,
-  iteratorType: X.Iterator.Type,
-  subSequenceType: X.SubSequence.Type
+  iteratorType: X.Iterator.Type
 ) {}
 
 /// Check that all associated types of a `Collection` are what we expect them
@@ -819,17 +697,17 @@ public func expectNotNil<T>(_ value: T?,
   return value
 }
 
-public func expectCrashLater() {
-  print("\(_stdlibUnittestStreamPrefix);expectCrash;\(_anyExpectFailed)")
+public func expectCrashLater(withMessage message: String = "") {
+  print("\(_stdlibUnittestStreamPrefix);expectCrash;\(_anyExpectFailed.load())")
 
   var stderr = _Stderr()
-  print("\(_stdlibUnittestStreamPrefix);expectCrash", to: &stderr)
+  print("\(_stdlibUnittestStreamPrefix);expectCrash;\(message)", to: &stderr)
 
-  _seenExpectCrash = true
+  _seenExpectCrash.store(true)
 }
 
-public func expectCrash(executing: () -> Void) -> Never {
-  expectCrashLater()
+public func expectCrash(withMessage message: String = "", executing: () -> Void) -> Never {
+  expectCrashLater(withMessage: message)
   executing()
   expectUnreachable()
   fatalError()
@@ -860,12 +738,16 @@ extension ProcessTerminationStatus {
   var isSwiftTrap: Bool {
     switch self {
     case .signal(let signal):
+#if os(Windows)
+      return CInt(signal) == SIGILL
+#else
       return CInt(signal) == SIGILL || CInt(signal) == SIGTRAP
+#endif
     default:
       // This default case is needed for standard library builds where
       // resilience is enabled.
       // FIXME: Add the .exit case when there is a way to suppress when not.
-      //   case .exit(_): return false
+      //   case .exit: return false
       return false
     }
   }
@@ -891,12 +773,21 @@ func _stdlib_getline() -> String? {
 func _printDebuggingAdvice(_ fullTestName: String) {
   print("To debug, run:")
   var invocation = [CommandLine.arguments[0]]
+#if os(Windows)
+  var buffer: UnsafeMutablePointer<CChar>?
+  var length: Int = 0
+  if _dupenv_s(&buffer, &length, "SWIFT_INTERPRETER") != 0, let buffer = buffer {
+    invocation.insert(String(cString: buffer), at: 0)
+    free(buffer)
+  }
+#else
   let interpreter = getenv("SWIFT_INTERPRETER")
   if interpreter != nil {
     if let interpreterCmd = String(validatingUTF8: interpreter!) {
         invocation.insert(interpreterCmd, at: 0)
     }
   }
+#endif
   print("$ \(invocation.joined(separator: " ")) " +
     "--stdlib-unittest-in-process --stdlib-unittest-filter \"\(fullTestName)\"")
 }
@@ -957,25 +848,35 @@ func _childProcess() {
     }
 
     let testSuite = _allTestSuites[_testSuiteNameToIndex[testSuiteName]!]
-    _anyExpectFailed = false
+    _anyExpectFailed.store(false)
     testSuite._runTest(name: testName, parameter: testParameter)
 
-    print("\(_stdlibUnittestStreamPrefix);end;\(_anyExpectFailed)")
+    print("\(_stdlibUnittestStreamPrefix);end;\(_anyExpectFailed.load())")
 
     var stderr = _Stderr()
     print("\(_stdlibUnittestStreamPrefix);end", to: &stderr)
 
-    if !testSuite._testByName(testName).canReuseChildProcessAfterTest {
+    if testSuite._shouldShutDownChildProcess(forTestNamed: testName) {
       return
     }
   }
 }
 
-struct _ParentProcess {
+class _ParentProcess {
+#if os(Windows)
+  internal var _process: HANDLE = INVALID_HANDLE_VALUE
+  internal var _childStdin: _FDOutputStream =
+      _FDOutputStream(handle: INVALID_HANDLE_VALUE)
+  internal var _childStdout: _FDInputStream =
+      _FDInputStream(handle: INVALID_HANDLE_VALUE)
+  internal var _childStderr: _FDInputStream =
+      _FDInputStream(handle: INVALID_HANDLE_VALUE)
+#else
   internal var _pid: pid_t?
   internal var _childStdin: _FDOutputStream = _FDOutputStream(fd: -1)
   internal var _childStdout: _FDInputStream = _FDInputStream(fd: -1)
   internal var _childStderr: _FDInputStream = _FDInputStream(fd: -1)
+#endif
 
   internal var _runTestsInProcess: Bool
   internal var _filter: String?
@@ -987,16 +888,32 @@ struct _ParentProcess {
     self._args = args
   }
 
-  mutating func _spawnChild() {
+  func _spawnChild() {
     let params = ["--stdlib-unittest-run-child"] + _args
+#if os(Windows)
+    let (hProcess, hStdIn, hStdOut, hStdErr) = spawnChild(params)
+    self._process = hProcess
+    self._childStdin = _FDOutputStream(handle: hStdIn)
+    self._childStdout = _FDInputStream(handle: hStdOut)
+    self._childStderr = _FDInputStream(handle: hStdErr)
+#else
     let (pid, childStdinFD, childStdoutFD, childStderrFD) = spawnChild(params)
     _pid = pid
     _childStdin = _FDOutputStream(fd: childStdinFD)
     _childStdout = _FDInputStream(fd: childStdoutFD)
     _childStderr = _FDInputStream(fd: childStderrFD)
+#endif
   }
 
-  mutating func _waitForChild() -> ProcessTerminationStatus {
+  func _waitForChild() -> ProcessTerminationStatus {
+#if os(Windows)
+    let status = waitProcess(_process)
+    _process = INVALID_HANDLE_VALUE
+
+    _childStdin.close()
+    _childStdout.close()
+    _childStderr.close()
+#else
     let status = posixWaitpid(_pid!)
     _pid = nil
     _childStdin.close()
@@ -1005,13 +922,46 @@ struct _ParentProcess {
     _childStdin = _FDOutputStream(fd: -1)
     _childStdout = _FDInputStream(fd: -1)
     _childStderr = _FDInputStream(fd: -1)
+#endif
     return status
   }
 
-  internal mutating func _readFromChild(
-    onStdoutLine: (String) -> (done: Bool, Void),
-    onStderrLine: (String) -> (done: Bool, Void)
+  internal func _readFromChild(
+    onStdoutLine: @escaping (String) -> (done: Bool, Void),
+    onStderrLine: @escaping (String) -> (done: Bool, Void)
   ) {
+#if os(Windows)
+    let (_, stdoutThread) = _stdlib_thread_create_block({
+      while !self._childStdout.isEOF {
+        self._childStdout.read()
+        while var line = self._childStdout.getline() {
+          if let cr = line.firstIndex(of: "\r") {
+            line.remove(at: cr)
+          }
+          var done: Bool
+          (done: done, ()) = onStdoutLine(line)
+          if done { return }
+        }
+      }
+    }, ())
+
+    let (_, stderrThread) = _stdlib_thread_create_block({
+      while !self._childStderr.isEOF {
+        self._childStderr.read()
+        while var line = self._childStderr.getline() {
+          if let cr = line.firstIndex(of: "\r") {
+            line.remove(at: cr)
+          }
+          var done: Bool
+          (done: done, ()) = onStderrLine(line)
+          if done { return }
+        }
+      }
+    }, ())
+
+    let (_, _) = _stdlib_thread_join(stdoutThread!, Void.self)
+    let (_, _) = _stdlib_thread_join(stderrThread!, Void.self)
+#else
     var readfds = _stdlib_fd_set()
     var writefds = _stdlib_fd_set()
     var errorfds = _stdlib_fd_set()
@@ -1049,19 +999,26 @@ struct _ParentProcess {
         continue
       }
     }
+#endif
   }
 
   /// Returns the values of the corresponding variables in the child process.
-  internal mutating func _runTestInChild(
+  internal func _runTestInChild(
     _ testSuite: TestSuite,
     _ testName: String,
     parameter: Int?
   ) -> (anyExpectFailed: Bool, seenExpectCrash: Bool,
         status: ProcessTerminationStatus?,
         crashStdout: [Substring], crashStderr: [Substring]) {
+#if os(Windows)
+    if _process == INVALID_HANDLE_VALUE {
+      _spawnChild()
+    }
+#else
     if _pid == nil {
       _spawnChild()
     }
+#endif
 
     print("\(testSuite.name);\(testName)", terminator: "", to: &_childStdin)
     if let parameter = parameter {
@@ -1080,6 +1037,7 @@ struct _ParentProcess {
 
     var stdoutSeenCrashDelimiter = false
     var stderrSeenCrashDelimiter = false
+    var expectingPreCrashMessage = ""
     var stdoutEnd = false
     var stderrEnd = false
     var capturedCrashStdout: [Substring] = []
@@ -1090,16 +1048,22 @@ struct _ParentProcess {
       var line = line[...]
       if let index = findSubstring(line, _stdlibUnittestStreamPrefix) {
         let controlMessage =
-            line[index..<line.endIndex].split(separator: ";")
+            line[index..<line.endIndex].split(separator: ";",
+                              omittingEmptySubsequences: false)
         switch controlMessage[1] {
         case "expectCrash":
+          fallthrough
+        case "expectCrash\r":
           if isStdout {
             stdoutSeenCrashDelimiter = true
             anyExpectFailedInChild = controlMessage[2] == "true"
           } else {
             stderrSeenCrashDelimiter = true
+            expectingPreCrashMessage = String(controlMessage[2])
           }
         case "end":
+          fallthrough
+        case "end\r":
           if isStdout {
             stdoutEnd = true
             anyExpectFailedInChild = controlMessage[2] == "true"
@@ -1107,12 +1071,21 @@ struct _ParentProcess {
             stderrEnd = true
           }
         default:
-          fatalError("unexpected message")
+          fatalError("unexpected message: \(controlMessage[1])")
         }
         line = line[line.startIndex..<index]
         if line.isEmpty {
+#if os(Windows)
+          return (done: isStdout ? stdoutEnd : stderrEnd, ())
+#else
           return (done: stdoutEnd && stderrEnd, ())
+#endif
         }
+      }
+      if !expectingPreCrashMessage.isEmpty
+          && findSubstring(line, expectingPreCrashMessage) != nil {
+        line = "OK: saw expected pre-crash message in \"\(line)\""[...]
+        expectingPreCrashMessage = ""
       }
       if isStdout {
         if stdoutSeenCrashDelimiter {
@@ -1122,7 +1095,16 @@ struct _ParentProcess {
         if stderrSeenCrashDelimiter {
           capturedCrashStderr.append(line)
           if findSubstring(line, _crashedPrefix) != nil {
-            line = "OK: saw expected \"\(line.lowercased())\""[...]
+            if !expectingPreCrashMessage.isEmpty {
+              line = """
+                      FAIL: saw expected "\(line.lowercased())", but without \
+                      message "\(expectingPreCrashMessage)" before it
+                      """[...]
+              anyExpectFailedInChild = true
+            }
+            else {
+              line = "OK: saw expected \"\(line.lowercased())\""[...]
+            }
           }
         }
       }
@@ -1131,7 +1113,11 @@ struct _ParentProcess {
       } else {
         print("stderr>>> \(line)")
       }
+#if os(Windows)
+      return (done: isStdout ? stdoutEnd : stderrEnd, ())
+#else
       return (done: stdoutEnd && stderrEnd, ())
+#endif
     }
 
     _readFromChild(
@@ -1141,7 +1127,7 @@ struct _ParentProcess {
     // Check if the child has sent us "end" markers for the current test.
     if stdoutEnd && stderrEnd {
       var status: ProcessTerminationStatus?
-      if !testSuite._testByName(testName).canReuseChildProcessAfterTest {
+      if testSuite._shouldShutDownChildProcess(forTestNamed: testName) {
         status = _waitForChild()
         switch status! {
         case .exit(0):
@@ -1152,8 +1138,8 @@ struct _ParentProcess {
       }
       return (
         anyExpectFailedInChild,
-        stdoutSeenCrashDelimiter || stderrSeenCrashDelimiter, status,
-        capturedCrashStdout, capturedCrashStderr)
+        stdoutSeenCrashDelimiter || stderrSeenCrashDelimiter,
+        status, capturedCrashStdout, capturedCrashStderr)
     }
 
     // We reached EOF on stdout and stderr and we did not see "end" markers, so
@@ -1163,17 +1149,29 @@ struct _ParentProcess {
     let status = _waitForChild()
     return (
       anyExpectFailedInChild,
-      stdoutSeenCrashDelimiter || stderrSeenCrashDelimiter, status,
-      capturedCrashStdout, capturedCrashStderr)
+      stdoutSeenCrashDelimiter || stderrSeenCrashDelimiter,
+      status, capturedCrashStdout, capturedCrashStderr)
   }
 
-  internal mutating func _shutdownChild() -> (failed: Bool, Void) {
+  internal func _shutdownChild() -> (failed: Bool, Void) {
+#if os(Windows)
+    if _process == INVALID_HANDLE_VALUE {
+      // The child process is not running.  Report that it didn't fail during
+      // shutdown.
+      return (failed: false, ())
+    }
+#else
     if _pid == nil {
       // The child process is not running.  Report that it didn't fail during
       // shutdown.
       return (failed: false, ())
     }
-    print("\(_stdlibUnittestStreamPrefix);shutdown", to: &_childStdin)
+#endif
+    // If the child process expects an EOF, its stdin fd has already been closed and
+    // it will shut itself down automatically.
+    if !_childStdin.isClosed {
+      print("\(_stdlibUnittestStreamPrefix);shutdown", to: &_childStdin)
+    }
 
     var childCrashed = false
 
@@ -1211,7 +1209,7 @@ struct _ParentProcess {
     case xFail
   }
 
-  internal mutating func runOneTest(
+  internal func runOneTest(
     fullTestName: String,
     testSuite: TestSuite,
     test t: TestSuite._Test,
@@ -1234,33 +1232,38 @@ struct _ParentProcess {
     if _runTestsInProcess {
       if t.stdinText != nil {
         print("The test \(fullTestName) requires stdin input and can't be run in-process, marking as failed")
-        _anyExpectFailed = true
+        _anyExpectFailed.store(true)
+      } else if t.requiresOwnProcess {
+        print("The test \(fullTestName) requires running in a child process and can't be run in-process, marking as failed.")
+        _anyExpectFailed.store(true)
       } else {
-        _anyExpectFailed = false
+        _anyExpectFailed.store(false)
         testSuite._runTest(name: t.name, parameter: testParameter)
       }
     } else {
-      (_anyExpectFailed, expectCrash, childTerminationStatus, crashStdout,
+      var anyExpectFailed = false
+      (anyExpectFailed, expectCrash, childTerminationStatus, crashStdout,
        crashStderr) =
         _runTestInChild(testSuite, t.name, parameter: testParameter)
+      _anyExpectFailed.store(anyExpectFailed)
     }
 
     // Determine if the test passed, not taking XFAILs into account.
     var testPassed = false
     switch (childTerminationStatus, expectCrash) {
     case (.none, false):
-      testPassed = !_anyExpectFailed
+      testPassed = !_anyExpectFailed.load()
 
     case (.none, true):
       testPassed = false
       print("expecting a crash, but the test did not crash")
 
-    case (.some(_), false):
+    case (.some, false):
       testPassed = false
       print("the test crashed unexpectedly")
 
-    case (.some(_), true):
-      testPassed = !_anyExpectFailed
+    case (.some, true):
+      testPassed = !_anyExpectFailed.load()
     }
     if testPassed && t.crashOutputMatches.count > 0 {
       // If we still think that the test passed, check if the crash
@@ -1268,9 +1271,6 @@ struct _ParentProcess {
       let crashOutput = crashStdout + crashStderr
       for expectedSubstring in t.crashOutputMatches {
         var found = false
-        if crashOutput.isEmpty && expectedSubstring.isEmpty {
-          found = true
-        }
         for s in crashOutput {
           if findSubstring(s, expectedSubstring) != nil {
             found = true
@@ -1300,7 +1300,7 @@ struct _ParentProcess {
     }
   }
 
-  mutating func run() {
+  func run() {
     if let filter = _filter {
       print("StdlibUnittest: using filter: \(filter)")
     }
@@ -1475,7 +1475,7 @@ public func runAllTests() {
       i += 1
     }
 
-    var parent = _ParentProcess(
+    let parent = _ParentProcess(
       runTestsInProcess: runTestsInProcess, args: args, filter: filter)
     parent.run()
   }
@@ -1493,7 +1493,7 @@ func stopTrackingObjects(_: UnsafePointer<CChar>) -> Int
 public final class TestSuite {
   public init(_ name: String) {
     self.name = name
-    _precondition(
+    precondition(
       _testNameToIndex[name] == nil,
       "test suite with the same name already exists")
     _allTestSuites.append(self)
@@ -1529,12 +1529,12 @@ public final class TestSuite {
   }
 
   public func setUp(_ code: @escaping () -> Void) {
-    _precondition(_testSetUpCode == nil, "set-up code already set")
+    precondition(_testSetUpCode == nil, "set-up code already set")
     _testSetUpCode = code
   }
 
   public func tearDown(_ code: @escaping () -> Void) {
-    _precondition(_testTearDownCode == nil, "tear-down code already set")
+    precondition(_testTearDownCode == nil, "tear-down code already set")
     _testTearDownCode = code
   }
 
@@ -1579,6 +1579,17 @@ public final class TestSuite {
     return _tests[_testNameToIndex[testName]!]
   }
 
+  /// Determines if we should shut down the current test process, i.e. if this
+  /// test or the next test requires executing in its own process.
+  func _shouldShutDownChildProcess(forTestNamed testName: String) -> Bool {
+    let index = _testNameToIndex[testName]!
+    if index == _tests.count - 1 { return false }
+    let currentTest = _tests[index]
+    let nextTest = _tests[index + 1]
+    if !currentTest.canReuseChildProcessAfterTest { return true }
+    return currentTest.requiresOwnProcess || nextTest.requiresOwnProcess
+  }
+
   internal enum _TestCode {
     case single(code: () -> Void)
     case parameterized(code: (Int) -> Void, count: Int)
@@ -1593,6 +1604,7 @@ public final class TestSuite {
     let stdinEndsWithEOF: Bool
     let crashOutputMatches: [String]
     let code: _TestCode
+    let requiresOwnProcess: Bool
 
     /// Whether the test harness should stop reusing the child process after
     /// running this test.
@@ -1630,6 +1642,7 @@ public final class TestSuite {
       var _stdinEndsWithEOF: Bool = false
       var _crashOutputMatches: [String] = []
       var _testLoc: SourceLoc?
+      var _requiresOwnProcess: Bool = false
     }
 
     init(testSuite: TestSuite, name: String, loc: SourceLoc) {
@@ -1659,6 +1672,11 @@ public final class TestSuite {
       return self
     }
 
+    public func requireOwnProcess() -> _TestBuilder {
+      _data._requiresOwnProcess = true
+      return self
+    }
+
     internal func _build(_ testCode: _TestCode) {
       _testSuite._tests.append(
         _Test(
@@ -1667,7 +1685,8 @@ public final class TestSuite {
           stdinText: _data._stdinText,
           stdinEndsWithEOF: _data._stdinEndsWithEOF,
           crashOutputMatches: _data._crashOutputMatches,
-          code: testCode))
+          code: testCode,
+          requiresOwnProcess: _data._requiresOwnProcess))
       _testSuite._testNameToIndex[_name] = _testSuite._tests.count - 1
     }
 
@@ -1699,13 +1718,8 @@ public final class TestSuite {
 }
 
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-@_silgen_name("getSystemVersionPlistProperty")
-func _getSystemVersionPlistPropertyImpl(
-  _ propertyName: UnsafePointer<CChar>) -> UnsafePointer<CChar>?
-
 func _getSystemVersionPlistProperty(_ propertyName: String) -> String? {
-  let cs = _getSystemVersionPlistPropertyImpl(propertyName)
-  return cs.map(String.init(cString:))
+  return NSDictionary(contentsOfFile: "/System/Library/CoreServices/SystemVersion.plist")?[propertyName] as? String
 }
 #endif
 
@@ -1764,7 +1778,7 @@ func _parseDottedVersion(_ s: String) -> [Int] {
 }
 
 public func _parseDottedVersionTriple(_ s: String) -> (Int, Int, Int) {
-  var array = _parseDottedVersion(s)
+  let array = _parseDottedVersion(s)
   if array.count >= 4 {
     fatalError("unexpected version")
   }
@@ -1775,15 +1789,15 @@ public func _parseDottedVersionTriple(_ s: String) -> (Int, Int, Int) {
 }
 
 func _getOSVersion() -> OSVersion {
-#if os(iOS) && (arch(i386) || arch(x86_64))
+#if os(iOS) && targetEnvironment(simulator)
   // On simulator, the plist file that we try to read turns out to be host's
   // plist file, which indicates OS X.
   //
   // FIXME: how to get the simulator version *without* UIKit?
   return .iOSSimulator
-#elseif os(tvOS) && (arch(i386) || arch(x86_64))
+#elseif os(tvOS) && targetEnvironment(simulator)
   return .tvOSSimulator
-#elseif os(watchOS) && (arch(i386) || arch(x86_64))
+#elseif os(watchOS) && targetEnvironment(simulator)
   return .watchOSSimulator
 #elseif os(Linux)
   return .linux
@@ -2306,7 +2320,7 @@ public func checkEquatable<Instances : Collection>(
   showFrame: Bool = true,
   file: String = #file, line: UInt = #line
 ) where
-  Instances.Iterator.Element : Equatable
+  Instances.Element : Equatable
 {
   let indices = Array(instances.indices)
   _checkEquatableImpl(
@@ -2349,17 +2363,22 @@ internal func _checkEquatableImpl<Instance : Equatable>(
       let isEqualXY = x == y
       expectEqual(
         predictedXY, isEqualXY,
-        (predictedXY
-           ? "expected equal, found not equal\n"
-           : "expected not equal, found equal\n") +
-        "lhs (at index \(i)): \(String(reflecting: x))\n" +
-        "rhs (at index \(j)): \(String(reflecting: y))",
+        """
+        \((predictedXY
+           ? "expected equal, found not equal"
+           : "expected not equal, found equal"))
+        lhs (at index \(i)): \(String(reflecting: x))
+        rhs (at index \(j)): \(String(reflecting: y))
+        """,
         stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
 
       // Not-equal is an inverse of equal.
       expectNotEqual(
         isEqualXY, x != y,
-        "lhs (at index \(i)): \(String(reflecting: x))\nrhs (at index \(j)): \(String(reflecting: y))",
+        """
+        lhs (at index \(i)): \(String(reflecting: x))
+        rhs (at index \(j)): \(String(reflecting: y))
+        """,
         stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
 
       if !allowBrokenTransitivity {
@@ -2401,6 +2420,10 @@ public func checkEquatable<T : Equatable>(
     showFrame: false)
 }
 
+/// Produce an integer hash value for `value` by feeding it to a dedicated
+/// `Hasher`. This is always done by calling the `hash(into:)` method.
+/// If a non-nil `seed` is given, it is used to perturb the hasher state;
+/// this is useful for resolving accidental hash collisions.
 internal func hash<H: Hashable>(_ value: H, seed: Int? = nil) -> Int {
   var hasher = Hasher()
   if let seed = seed {
@@ -2410,6 +2433,35 @@ internal func hash<H: Hashable>(_ value: H, seed: Int? = nil) -> Int {
   return hasher.finalize()
 }
 
+/// Test that the elements of `groups` consist of instances that satisfy the
+/// semantic requirements of `Hashable`, with each group defining a distinct
+/// equivalence class under `==`.
+public func checkHashableGroups<Groups: Collection>(
+  _ groups: Groups,
+  _ message: @autoclosure () -> String = "",
+  allowIncompleteHashing: Bool = false,
+  stackTrace: SourceLocStack = SourceLocStack(),
+  showFrame: Bool = true,
+  file: String = #file, line: UInt = #line
+) where Groups.Element: Collection, Groups.Element.Element: Hashable {
+  let instances = groups.flatMap { $0 }
+  // groupIndices[i] is the index of the element in groups that contains
+  // instances[i].
+  let groupIndices =
+    zip(0..., groups).flatMap { i, group in group.map { _ in i } }
+  func equalityOracle(_ lhs: Int, _ rhs: Int) -> Bool {
+    return groupIndices[lhs] == groupIndices[rhs]
+  }
+  checkHashable(
+    instances,
+    equalityOracle: equalityOracle,
+    hashEqualityOracle: equalityOracle,
+    allowBrokenTransitivity: false,
+    allowIncompleteHashing: allowIncompleteHashing,
+    stackTrace: stackTrace.pushIf(showFrame, file: file, line: line),
+    showFrame: false)
+}
+
 /// Test that the elements of `instances` satisfy the semantic requirements of
 /// `Hashable`, using `equalityOracle` to generate equality and hashing
 /// expectations from pairs of positions in `instances`.
@@ -2417,16 +2469,18 @@ public func checkHashable<Instances: Collection>(
   _ instances: Instances,
   equalityOracle: (Instances.Index, Instances.Index) -> Bool,
   allowBrokenTransitivity: Bool = false,
+  allowIncompleteHashing: Bool = false,
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
   file: String = #file, line: UInt = #line
-) where Instances.Iterator.Element: Hashable {
+) where Instances.Element: Hashable {
   checkHashable(
     instances,
     equalityOracle: equalityOracle,
     hashEqualityOracle: equalityOracle,
     allowBrokenTransitivity: allowBrokenTransitivity,
+    allowIncompleteHashing: allowIncompleteHashing,
     stackTrace: stackTrace.pushIf(showFrame, file: file, line: line),
     showFrame: false)
 }
@@ -2440,12 +2494,13 @@ public func checkHashable<Instances: Collection>(
   equalityOracle: (Instances.Index, Instances.Index) -> Bool,
   hashEqualityOracle: (Instances.Index, Instances.Index) -> Bool,
   allowBrokenTransitivity: Bool = false,
+  allowIncompleteHashing: Bool = false,
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
   file: String = #file, line: UInt = #line
 ) where
-  Instances.Iterator.Element: Hashable {
+  Instances.Element: Hashable {
   checkEquatable(
     instances,
     oracle: equalityOracle,
@@ -2490,14 +2545,14 @@ public func checkHashable<Instances: Collection>(
           """,
           stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
         expectEqual(
-          x._rawHashValue(seed: (0, 0)), y._rawHashValue(seed: (0, 0)),
+          x._rawHashValue(seed: 0), y._rawHashValue(seed: 0),
           """
-          _rawHashValue expected to match, found to differ
+          _rawHashValue(seed:) expected to match, found to differ
           lhs (at index \(i)): \(x)
           rhs (at index \(j)): \(y)
           """,
           stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
-      } else {
+      } else if !allowIncompleteHashing {
         // Try a few different seeds; at least one of them should discriminate
         // between the hashes. It is extremely unlikely this check will fail
         // all ten attempts, unless the type's hash encoding is not unique,
@@ -2511,8 +2566,8 @@ public func checkHashable<Instances: Collection>(
           """,
           stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
         expectTrue(
-          (0..<10 as Range<UInt64>).contains { i in
-            x._rawHashValue(seed: (0, i)) != y._rawHashValue(seed: (0, i))
+          (0..<10).contains { i in
+            x._rawHashValue(seed: i) != y._rawHashValue(seed: i)
           },
           """
           _rawHashValue(seed:) expected to differ, found to match
@@ -2604,7 +2659,7 @@ public func checkComparable<Instances : Collection>(
   showFrame: Bool = true,
   file: String = #file, line: UInt = #line
 ) where
-  Instances.Iterator.Element : Comparable {
+  Instances.Element : Comparable {
 
   // Also checks that equality is consistent with comparison and that
   // the oracle obeys the equality laws
@@ -2711,17 +2766,17 @@ public func checkComparable<T : Comparable>(
 public func checkStrideable<Instances : Collection, Strides : Collection>(
   _ instances: Instances, strides: Strides,
   distanceOracle:
-    (Instances.Index, Instances.Index) -> Strides.Iterator.Element,
+    (Instances.Index, Instances.Index) -> Strides.Element,
   advanceOracle:
-    (Instances.Index, Strides.Index) -> Instances.Iterator.Element,
+    (Instances.Index, Strides.Index) -> Instances.Element,
 
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
   file: String = #file, line: UInt = #line
 ) where
-  Instances.Iterator.Element : Strideable,
-  Instances.Iterator.Element.Stride == Strides.Iterator.Element {
+  Instances.Element : Strideable,
+  Instances.Element.Stride == Strides.Element {
 
   checkComparable(
     instances,
@@ -2758,7 +2813,7 @@ public func nthIndex<C: Collection>(_ x: C, _ n: Int) -> C.Index {
   return x.index(x.startIndex, offsetBy: numericCast(n))
 }
 
-public func nth<C: Collection>(_ x: C, _ n: Int) -> C.Iterator.Element {
+public func nth<C: Collection>(_ x: C, _ n: Int) -> C.Element {
   return x[nthIndex(x, n)]
 }
 
@@ -2772,8 +2827,8 @@ public func expectEqualSequence<
   showFrame: Bool = true,
   file: String = #file, line: UInt = #line
 ) where
-  Expected.Iterator.Element == Actual.Iterator.Element,
-  Expected.Iterator.Element : Equatable {
+  Expected.Element == Actual.Element,
+  Expected.Element : Equatable {
 
   expectEqualSequence(expected, actual, message(),
       stackTrace: stackTrace.pushIf(showFrame, file: file, line: line)) { $0 == $1 }
@@ -2791,8 +2846,8 @@ public func expectEqualSequence<
   showFrame: Bool = true,
   file: String = #file, line: UInt = #line
 ) where
-  Expected.Iterator.Element == Actual.Iterator.Element,
-  Expected.Iterator.Element == (T, U) {
+  Expected.Element == Actual.Element,
+  Expected.Element == (T, U) {
 
   expectEqualSequence(
     expected, actual, message(),
@@ -2811,9 +2866,9 @@ public func expectEqualSequence<
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
   file: String = #file, line: UInt = #line,
-  sameValue: (Expected.Iterator.Element, Expected.Iterator.Element) -> Bool
+  sameValue: (Expected.Element, Expected.Element) -> Bool
 ) where
-  Expected.Iterator.Element == Actual.Iterator.Element {
+  Expected.Element == Actual.Element {
 
   if !expected.elementsEqual(actual, by: sameValue) {
     expectationFailure("expected elements: \"\(expected)\"\n"
@@ -2832,14 +2887,14 @@ public func expectEqualsUnordered<
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
   file: String = #file, line: UInt = #line,
-  compare: @escaping (Expected.Iterator.Element, Expected.Iterator.Element)
+  compare: @escaping (Expected.Element, Expected.Element)
     -> ExpectedComparisonResult
 ) where
-  Expected.Iterator.Element == Actual.Iterator.Element {
+  Expected.Element == Actual.Element {
 
-  let x: [Expected.Iterator.Element] =
+  let x: [Expected.Element] =
     expected.sorted { compare($0, $1).isLT() }
-  let y: [Actual.Iterator.Element] =
+  let y: [Actual.Element] =
     actual.sorted { compare($0, $1).isLT() }
   expectEqualSequence(
     x, y, message(),
@@ -2856,8 +2911,8 @@ public func expectEqualsUnordered<
   showFrame: Bool = true,
   file: String = #file, line: UInt = #line
 ) where
-  Expected.Iterator.Element == Actual.Iterator.Element,
-  Expected.Iterator.Element : Comparable {
+  Expected.Element == Actual.Element,
+  Expected.Element : Comparable {
 
   expectEqualsUnordered(expected, actual, message(),
       stackTrace: stackTrace.pushIf(showFrame, file: file, line: line)) {
@@ -2935,8 +2990,8 @@ public func expectEqualsUnordered<
   showFrame: Bool = true,
   file: String = #file, line: UInt = #line
 ) where
-  Actual.Iterator.Element == (key: T, value: T),
-  Expected.Iterator.Element == (T, T) {
+  Actual.Element == (key: T, value: T),
+  Expected.Element == (T, T) {
 
   func comparePairLess(_ lhs: (T, T), rhs: (T, T)) -> Bool {
     return [lhs.0, lhs.1].lexicographicallyPrecedes([rhs.0, rhs.1])
@@ -2986,8 +3041,8 @@ public func expectEqualMethodsForDomain<
   }
 }
 
-public func expectEqualUnicodeScalars(
-  _ expected: [UInt32], _ actual: String,
+public func expectEqualUnicodeScalars<S: StringProtocol>(
+  _ expected: [UInt32], _ actual: S,
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
@@ -3003,7 +3058,3 @@ public func expectEqualUnicodeScalars(
       stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
   }
 }
-
-// Local Variables:
-// eval: (read-only-mode 1)
-// End:

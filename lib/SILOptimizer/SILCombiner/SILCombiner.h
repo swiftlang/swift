@@ -25,7 +25,10 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILVisitor.h"
+#include "swift/SILOptimizer/Analysis/ClassHierarchyAnalysis.h"
+#include "swift/SILOptimizer/Analysis/ProtocolConformanceAnalysis.h"
 #include "swift/SILOptimizer/Utils/CastOptimizer.h"
+#include "swift/SILOptimizer/Utils/Existential.h"
 #include "swift/SILOptimizer/Utils/Local.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
@@ -88,6 +91,11 @@ public:
       add(UI->getUser());
   }
 
+  void addUsersToWorklist(SILValue value) {
+    for (auto *use : value->getUses())
+      add(use->getUser());
+  }
+
   /// When an instruction has been simplified, add all of its users to the
   /// worklist, since additional simplifications of its users may have been
   /// exposed.
@@ -117,6 +125,14 @@ class SILCombiner :
 
   DominanceAnalysis *DA;
 
+  // Determine the set of types a protocol conforms to in whole-module
+  // compilation mode.
+  ProtocolConformanceAnalysis *PCA;
+
+  // Class hierarchy analysis needed to confirm no derived classes of a sole
+  // conforming class.
+  ClassHierarchyAnalysis *CHA;
+
   /// Worklist containing all of the instructions primed for simplification.
   SILCombineWorklist Worklist;
 
@@ -136,11 +152,18 @@ class SILCombiner :
   CastOptimizer CastOpt;
 
 public:
-  SILCombiner(SILBuilder &B, AliasAnalysis *AA, DominanceAnalysis *DA,
+  SILCombiner(SILOptFunctionBuilder &FuncBuilder, SILBuilder &B,
+              AliasAnalysis *AA, DominanceAnalysis *DA,
+              ProtocolConformanceAnalysis *PCA, ClassHierarchyAnalysis *CHA,
               bool removeCondFails)
-      : AA(AA), DA(DA), Worklist(), MadeChange(false),
+      : AA(AA), DA(DA), PCA(PCA), CHA(CHA), Worklist(), MadeChange(false),
         RemoveCondFails(removeCondFails), Iteration(0), Builder(B),
-        CastOpt(/* ReplaceInstUsesAction */
+        CastOpt(FuncBuilder, nullptr /*SILBuilderContext*/,
+                /* ReplaceValueUsesAction */
+                [&](SILValue Original, SILValue Replacement) {
+                  replaceValueUsesWith(Original, Replacement);
+                },
+                /* ReplaceInstUsesAction */
                 [&](SingleValueInstruction *I, ValueBase *V) {
                   replaceInstUsesWith(*I, V);
                 },
@@ -164,6 +187,12 @@ public:
   // to the worklist, replace all uses of I with the new value, then return I,
   // so that the combiner will know that I was modified.
   void replaceInstUsesWith(SingleValueInstruction &I, ValueBase *V);
+
+  // This method is to be used when a value is found to be dead,
+  // replaceable with another preexisting expression. Here we add all
+  // uses of oldValue to the worklist, replace all uses of oldValue
+  // with newValue.
+  void replaceValueUsesWith(SILValue oldValue, SILValue newValue);
 
   void replaceInstUsesPairwiseWith(SILInstruction *oldI, SILInstruction *newI);
 
@@ -197,13 +226,17 @@ public:
   SILInstruction *visitRetainValueAddrInst(RetainValueAddrInst *CI);
   SILInstruction *visitPartialApplyInst(PartialApplyInst *AI);
   SILInstruction *visitApplyInst(ApplyInst *AI);
+  SILInstruction *visitBeginApplyInst(BeginApplyInst *BAI);
   SILInstruction *visitTryApplyInst(TryApplyInst *AI);
+  SILInstruction *optimizeStringObject(BuiltinInst *BI);
   SILInstruction *visitBuiltinInst(BuiltinInst *BI);
   SILInstruction *visitCondFailInst(CondFailInst *CFI);
   SILInstruction *visitStrongRetainInst(StrongRetainInst *SRI);
   SILInstruction *visitRefToRawPointerInst(RefToRawPointerInst *RRPI);
   SILInstruction *visitUpcastInst(UpcastInst *UCI);
+  SILInstruction *optimizeLoadFromStringLiteral(LoadInst *LI);
   SILInstruction *visitLoadInst(LoadInst *LI);
+  SILInstruction *visitIndexAddrInst(IndexAddrInst *IA);
   SILInstruction *visitAllocStackInst(AllocStackInst *AS);
   SILInstruction *visitAllocRefInst(AllocRefInst *AR);
   SILInstruction *visitSwitchEnumAddrInst(SwitchEnumAddrInst *SEAI);
@@ -267,6 +300,10 @@ public:
 
   SILInstruction *optimizeApplyOfConvertFunctionInst(FullApplySite AI,
                                                      ConvertFunctionInst *CFI);
+
+  bool tryOptimizeKeypath(ApplyInst *AI);
+  bool tryOptimizeInoutKeypath(BeginApplyInst *AI);
+
   // Optimize concatenation of string literals.
   // Constant-fold concatenation of string literals known at compile-time.
   SILInstruction *optimizeConcatenationOfStringLiterals(ApplyInst *AI);
@@ -276,24 +313,48 @@ public:
                                        StringRef FInverseName, StringRef FName);
 
 private:
-  SILInstruction * createApplyWithConcreteType(FullApplySite AI,
-                                               SILValue NewSelf,
-                                               SILValue Self,
-                                               CanType ConcreteType,
-                                               SILValue ConcreteTypeDef,
-                                               ProtocolConformanceRef Conformance,
-                                               ArchetypeType *OpenedArchetype);
-
   FullApplySite rewriteApplyCallee(FullApplySite apply, SILValue callee);
 
-  SILInstruction *
-  propagateConcreteTypeOfInitExistential(FullApplySite AI,
-      ProtocolDecl *Protocol,
-      llvm::function_ref<void(CanType, ProtocolConformanceRef)> Propagate);
+  // Build concrete existential information using findInitExistential.
+  Optional<ConcreteOpenedExistentialInfo>
+  buildConcreteOpenedExistentialInfo(Operand &ArgOperand);
 
-  SILInstruction *propagateConcreteTypeOfInitExistential(FullApplySite AI,
-                                                         WitnessMethodInst *WMI);
-  SILInstruction *propagateConcreteTypeOfInitExistential(FullApplySite AI);
+  // Build concrete existential information using SoleConformingType.
+  Optional<ConcreteOpenedExistentialInfo>
+  buildConcreteOpenedExistentialInfoFromSoleConformingType(Operand &ArgOperand);
+
+  // Common utility function to build concrete existential information for all
+  // arguments of an apply instruction.
+  void buildConcreteOpenedExistentialInfos(
+      FullApplySite Apply,
+      llvm::SmallDenseMap<unsigned, ConcreteOpenedExistentialInfo> &COEIs,
+      SILBuilderContext &BuilderCtx,
+      SILOpenedArchetypesTracker &OpenedArchetypesTracker);
+
+  bool canReplaceArg(FullApplySite Apply, const OpenedArchetypeInfo &OAI,
+                     const ConcreteExistentialInfo &CEI, unsigned ArgIdx);
+
+  SILInstruction *createApplyWithConcreteType(
+      FullApplySite Apply,
+      const llvm::SmallDenseMap<unsigned, ConcreteOpenedExistentialInfo> &COEIs,
+      SILBuilderContext &BuilderCtx);
+
+  // Common utility function to replace the WitnessMethodInst using a
+  // BuilderCtx.
+  void replaceWitnessMethodInst(WitnessMethodInst *WMI,
+                                SILBuilderContext &BuilderCtx,
+                                CanType ConcreteType,
+                                const ProtocolConformanceRef ConformanceRef);
+
+  SILInstruction *
+  propagateConcreteTypeOfInitExistential(FullApplySite Apply,
+                                         WitnessMethodInst *WMI);
+
+  SILInstruction *propagateConcreteTypeOfInitExistential(FullApplySite Apply);
+
+  /// Propagate concrete types from ProtocolConformanceAnalysis.
+  SILInstruction *propagateSoleConformingType(FullApplySite Apply,
+                                              WitnessMethodInst *WMI);
 
   /// Perform one SILCombine iteration.
   bool doOneIteration(SILFunction &F, unsigned Iteration);
@@ -304,7 +365,7 @@ private:
 
   typedef SmallVector<SILInstruction*, 4> UserListTy;
 
-  /// \brief Returns a list of instructions that project or perform reference
+  /// Returns a list of instructions that project or perform reference
   /// counting operations on \p Value or on its uses.
   /// \return return false if \p Value has other than ARC uses.
   static bool recursivelyCollectARCUsers(UserListTy &Uses, ValueBase *Value);

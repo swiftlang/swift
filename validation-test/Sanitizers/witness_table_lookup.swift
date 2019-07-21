@@ -1,11 +1,9 @@
-// RUN: %target-build-swift -sanitize=thread -target %sanitizers-target-triple %s -o %t_binary
-// RUN: %env-TSAN_OPTIONS=ignore_interceptors_accesses=1:halt_on_error=1 %target-run %t_binary
+// RUN: %target-build-swift -sanitize=thread %import-libdispatch -target %sanitizers-target-triple %s -o %t_binary
+// RUN: %env-TSAN_OPTIONS=halt_on_error=1 %target-run %t_binary
 // REQUIRES: executable_test
 // REQUIRES: stress_test
 // REQUIRES: tsan_runtime
-
-// https://bugs.swift.org/browse/SR-6622
-// XFAIL: linux
+// UNSUPPORTED: CPU=powerpc64le
 
 // Check that TSan does not report spurious races in witness table lookup.
 
@@ -31,7 +29,7 @@ protocol P {
 struct B<T : Q> : Q, Q2 {
   static func foo() { consume(type(of: self)) }
 }
-struct A<T : Q where T : Q2> : P {
+struct A<T : Q> : P where T : Q2 {
   typealias E = B<T>
   let value: T
 }

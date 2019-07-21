@@ -41,8 +41,7 @@ LocalTypeDataKind LocalTypeDataKind::getCachingKind() const {
 
   // Map protocol conformances to their root normal conformance.
   auto conformance = getConcreteProtocolConformance();
-  return forConcreteProtocolWitnessTable(
-                                     conformance->getRootNormalConformance());
+  return forConcreteProtocolWitnessTable(conformance->getRootConformance());
 }
 
 LocalTypeDataCache &IRGenFunction::getOrCreateLocalTypeData() {
@@ -212,6 +211,9 @@ llvm::Value *IRGenFunction::tryGetLocalTypeData(LocalTypeDataKey key) {
 MetadataResponse
 LocalTypeDataCache::tryGet(IRGenFunction &IGF, LocalTypeDataKey key,
                            bool allowAbstract, DynamicMetadataRequest request) {
+  // Use the caching key.
+  key = key.getCachingKey();
+
   auto it = Map.find(key);
   if (it == Map.end()) return MetadataResponse();
   auto &chain = it->second;
@@ -317,30 +319,47 @@ LocalTypeDataCache::AbstractCacheEntry::follow(IRGenFunction &IGF,
 static void maybeEmitDebugInfoForLocalTypeData(IRGenFunction &IGF,
                                                LocalTypeDataKey key,
                                                MetadataResponse value) {
-  // Only if debug info is enabled.
-  if (!IGF.IGM.DebugInfo) return;
-
+  // FIXME: This check doesn't entirely behave correctly for non-transparent
+  // functions that were inlined into transparent functions. Correct would be to
+  // check which instruction requests the type metadata and see whether its
+  // inlined function is transparent.
+  auto * DS = IGF.getDebugScope();
+  if (DS && DS->getInlinedFunction() &&
+      DS->getInlinedFunction()->isTransparent())
+    return;
+  
   // Only for formal type metadata.
-  if (key.Kind != LocalTypeDataKind::forFormalTypeMetadata()) return;
+  if (key.Kind != LocalTypeDataKind::forFormalTypeMetadata())
+    return;
 
-  // Only for archetypes, and not for opened archetypes.
+  // Only for archetypes, and not for opened/opaque archetypes.
   auto type = dyn_cast<ArchetypeType>(key.Type);
-  if (!type) return;
-  if (type->getOpenedExistentialType()) return;
+  if (!type)
+    return;
+  if (!isa<PrimaryArchetypeType>(type))
+    return;
+
+  auto *typeParam = type->getInterfaceType()->castTo<GenericTypeParamType>();
+  auto name = typeParam->getName().str();
 
   llvm::Value *data = value.getMetadata();
 
   // At -O0, create an alloca to keep the type alive.
-  auto name = type->getFullName();
   if (!IGF.IGM.IRGen.Opts.shouldOptimize()) {
-    auto temp = IGF.createAlloca(data->getType(), IGF.IGM.getPointerAlignment(),
-                                 name);
-    IGF.Builder.CreateStore(data, temp);
-    data = temp.getAddress();
+    auto alloca =
+        IGF.createAlloca(data->getType(), IGF.IGM.getPointerAlignment(), name);
+    IGF.Builder.CreateStore(data, alloca);
+    data = alloca.getAddress();
   }
 
-  // Emit debug info for the metadata.
-  IGF.IGM.DebugInfo->emitTypeMetadata(IGF, data, name);
+  // Only if debug info is enabled.
+  if (!IGF.IGM.DebugInfo)
+    return;
+
+  IGF.IGM.DebugInfo->emitTypeMetadata(IGF, data,
+                                      typeParam->getDepth(),
+                                      typeParam->getIndex(),
+                                      name);
 }
 
 void
@@ -549,7 +568,7 @@ addAbstractForFulfillments(IRGenFunction &IGF, FulfillmentMap &&fulfillments,
     }
 
     // Find the chain for the key.
-    auto key = getKey(type, localDataKind);
+    auto key = getKey(type, localDataKind).getCachingKey();
     auto &chain = Map[key];
 
     // Check whether there's already an entry that's at least as good as the
@@ -654,6 +673,7 @@ LLVM_DUMP_METHOD void LocalTypeDataCache::dump() const {
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
 LLVM_DUMP_METHOD void LocalTypeDataKey::dump() const {
   print(llvm::errs());
+  llvm::errs() << "\n";
 }
 #endif
 
@@ -667,6 +687,7 @@ void LocalTypeDataKey::print(llvm::raw_ostream &out) const {
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
 LLVM_DUMP_METHOD void LocalTypeDataKind::dump() const {
   print(llvm::errs());
+  llvm::errs() << "\n";
 }
 #endif
 
@@ -704,7 +725,7 @@ IRGenFunction::ConditionalDominanceScope::~ConditionalDominanceScope() {
 
 void LocalTypeDataCache::eraseConditional(ArrayRef<LocalTypeDataKey> keys) {
   for (auto &key : keys) {
-    auto &chain = Map[key];
+    auto &chain = Map[key.getCachingKey()];
 
     // Our ability to simply delete the front of the chain relies on an
     // assumption that (1) conditional additions always go to the front of

@@ -5,7 +5,7 @@
 func markUsed<T>(_ t: T) {}
 
 // Int1 uses 1 bit, but is aligned at 8 bits.
-// CHECK: !DIBasicType(name: "$SBi1_D", size: 1, encoding: DW_ATE_unsigned)
+// CHECK: !DIBasicType(name: "$sBi1_D", size: 1, encoding: DW_ATE_unsigned)
 // Bool has a fixed layout with a storage size of 1 byte and 7 "spare" bits.
 // CHECK_G: !DICompositeType(tag: DW_TAG_structure_type, name: "Bool",
 // CHECK_G-SAME:             size: 8

@@ -1,10 +1,13 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -Onone -o %t/main -import-objc-header %S/Inputs/enum-nonexhaustivity.h -Xfrontend -disable-objc-attr-requires-foundation-module
+// RUN: %target-codesign %t/main
 // RUN: %target-run %t/main
-// RUN: %target-build-swift %s -O -o %t/main -import-objc-header %S/Inputs/enum-nonexhaustivity.h -Xfrontend -disable-objc-attr-requires-foundation-module
-// RUN: %target-run %t/main
-// RUN: %target-build-swift %s -Ounchecked -o %t/main -import-objc-header %S/Inputs/enum-nonexhaustivity.h -Xfrontend -disable-objc-attr-requires-foundation-module
-// RUN: %target-run %t/main
+// RUN: %target-build-swift %s -O -o %t/main2 -import-objc-header %S/Inputs/enum-nonexhaustivity.h -Xfrontend -disable-objc-attr-requires-foundation-module
+// RUN: %target-codesign %t/main2
+// RUN: %target-run %t/main2
+// RUN: %target-build-swift %s -Ounchecked -o %t/main3 -import-objc-header %S/Inputs/enum-nonexhaustivity.h -Xfrontend -disable-objc-attr-requires-foundation-module
+// RUN: %target-codesign %t/main3
+// RUN: %target-run %t/main3
 // REQUIRES: executable_test
 
 import StdlibUnittest
@@ -91,6 +94,18 @@ EnumTestSuite.test("UnexpectedOkayNested2/NonExhaustive") {
   expectTrue(gotCorrectValue)
 }
 
+EnumTestSuite.test("Equatable/NonExhaustive") {
+  expectEqual(getExpectedValue(), .B)
+  expectNotEqual(getUnexpectedValue(), .B)
+  expectNotEqual(getExpectedValue(), getUnexpectedValue())
+  expectEqual(getUnexpectedValue(), getUnexpectedValue())
+}
+
+EnumTestSuite.test("Hashable/NonExhaustive") {
+  expectEqual(getExpectedValue().hashValue, NonExhaustiveEnum.B.hashValue)
+  expectNotEqual(getUnexpectedValue().hashValue, NonExhaustiveEnum.B.hashValue)
+}
+
 
 EnumTestSuite.test("PlainOldSwitch/LyingExhaustive") {
   var gotCorrectValue = false
@@ -172,7 +187,20 @@ EnumTestSuite.test("UnexpectedOkayNested2/LyingExhaustive") {
   expectTrue(gotCorrectValue)
 }
 
+EnumTestSuite.test("Equatable/LyingExhaustive") {
+  expectEqual(getExpectedLiarValue(), .B)
+  expectNotEqual(getUnexpectedLiarValue(), .B)
+  expectNotEqual(getExpectedLiarValue(), getUnexpectedLiarValue())
+  expectEqual(getUnexpectedLiarValue(), getUnexpectedLiarValue())
+}
 
+EnumTestSuite.test("Hashable/LyingExhaustive") {
+  expectEqual(getExpectedLiarValue().hashValue, LyingExhaustiveEnum.B.hashValue)
+  expectNotEqual(getUnexpectedLiarValue().hashValue, LyingExhaustiveEnum.B.hashValue)
+}
+
+
+#if _runtime(_ObjC)
 @objc enum SwiftEnum : Int32 {
   case A, B, C
 
@@ -262,6 +290,18 @@ EnumTestSuite.test("UnexpectedOkayNested2/SwiftExhaustive") {
     expectUnreachable()
   }
   expectTrue(gotCorrectValue)
+}
+
+EnumTestSuite.test("Equatable/SwiftExhaustive") {
+  expectEqual(SwiftEnum.getExpectedValue(), .B)
+  expectNotEqual(SwiftEnum.getUnexpectedValue(), .B)
+  expectNotEqual(SwiftEnum.getExpectedValue(), SwiftEnum.getUnexpectedValue())
+  expectEqual(SwiftEnum.getUnexpectedValue(), SwiftEnum.getUnexpectedValue())
+}
+
+EnumTestSuite.test("Hashable/SwiftExhaustive") {
+  expectEqual(SwiftEnum.getExpectedValue().hashValue, SwiftEnum.B.hashValue)
+  expectNotEqual(SwiftEnum.getUnexpectedValue().hashValue, SwiftEnum.B.hashValue)
 }
 
 @inline(never)
@@ -358,5 +398,6 @@ EnumTestSuite.test("TrapOnUnexpected/NestedSwiftExhaustive")
   }
   expectUnreachable()
 }
+#endif
 
 runAllTests()

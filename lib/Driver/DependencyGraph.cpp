@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/ReferenceDependencyKeys.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Driver/DependencyGraph.h"
 #include "swift/Demangling/Demangle.h"
@@ -99,7 +100,9 @@ parseDependencyFile(llvm::MemoryBuffer &buffer,
       return LoadResult::HadError;
     StringRef keyString = key->getValue(scratch);
 
-    if (keyString == "interface-hash") {
+    using namespace reference_dependency_keys;
+
+    if (keyString == interfaceHash) {
       auto *value = dyn_cast<yaml::ScalarNode>(i->getValue());
       if (!value)
         return LoadResult::HadError;
@@ -115,31 +118,31 @@ parseDependencyFile(llvm::MemoryBuffer &buffer,
       using KindPair = std::pair<DependencyKind, DependencyDirection>;
 
       KindPair dirAndKind = llvm::StringSwitch<KindPair>(key->getValue(scratch))
-        .Case("depends-top-level",
+        .Case(dependsTopLevel,
               std::make_pair(DependencyKind::TopLevelName,
                              DependencyDirection::Depends))
-        .Case("depends-nominal",
+        .Case(dependsNominal,
               std::make_pair(DependencyKind::NominalType,
                              DependencyDirection::Depends))
-        .Case("depends-member",
+        .Case(dependsMember,
               std::make_pair(DependencyKind::NominalTypeMember,
                              DependencyDirection::Depends))
-        .Case("depends-dynamic-lookup",
+        .Case(dependsDynamicLookup,
               std::make_pair(DependencyKind::DynamicLookupName,
                              DependencyDirection::Depends))
-        .Case("depends-external",
+        .Case(dependsExternal,
               std::make_pair(DependencyKind::ExternalFile,
                              DependencyDirection::Depends))
-        .Case("provides-top-level",
+        .Case(providesTopLevel,
               std::make_pair(DependencyKind::TopLevelName,
                              DependencyDirection::Provides))
-        .Case("provides-nominal",
+        .Case(providesNominal,
               std::make_pair(DependencyKind::NominalType,
                              DependencyDirection::Provides))
-        .Case("provides-member",
+        .Case(providesMember,
               std::make_pair(DependencyKind::NominalTypeMember,
                              DependencyDirection::Provides))
-        .Case("provides-dynamic-lookup",
+        .Case(providesDynamicLookup,
               std::make_pair(DependencyKind::DynamicLookupName,
                              DependencyDirection::Provides))
         .Default(std::make_pair(DependencyKind(),

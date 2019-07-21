@@ -1,5 +1,5 @@
 // RUN: %target-typecheck-verify-swift
 
-@_frozen public enum Exhaustive {} // expected-warning {{@_frozen has no effect without -enable-resilience}} {{1-10=}}
+@frozen public enum Exhaustive {} // expected-warning {{@frozen has no effect without -enable-library-evolution}} {{1-9=}}
 
-@_frozen enum NotPublic {} // expected-warning {{@_frozen has no effect without -enable-resilience}} {{1-10=}}
+@frozen enum NotPublic {} // expected-warning {{@frozen has no effect without -enable-library-evolution}} {{1-9=}}

@@ -72,6 +72,13 @@ canDuplicateOrMoveToPreheader(SILLoop *L, SILBasicBlock *Preheader,
     else if (isa<FunctionRefInst>(Inst)) {
       Move.push_back(Inst);
       Invariant.insert(Inst);
+    } else if (isa<DynamicFunctionRefInst>(Inst)) {
+      Move.push_back(Inst);
+      Invariant.insert(Inst);
+    }
+    else if (isa<PreviousDynamicFunctionRefInst>(Inst)) {
+      Move.push_back(Inst);
+      Invariant.insert(Inst);
     } else if (isa<IntegerLiteralInst>(Inst)) {
       Move.push_back(Inst);
       Invariant.insert(Inst);
@@ -102,7 +109,7 @@ static void mapOperands(SILInstruction *I,
 }
 
 static void updateSSAForUseOfValue(
-    SILSSAUpdater &Updater, SmallVectorImpl<SILPHIArgument *> &InsertedPHIs,
+    SILSSAUpdater &Updater, SmallVectorImpl<SILPhiArgument *> &InsertedPHIs,
     const llvm::DenseMap<ValueBase *, SILValue> &ValueMap,
     SILBasicBlock *Header, SILBasicBlock *EntryCheckBlock,
     SILValue Res) {
@@ -141,7 +148,7 @@ static void updateSSAForUseOfValue(
     Updater.RewriteUse(*Use);
   }
   // Canonicalize inserted phis to avoid extra BB Args.
-  for (SILPHIArgument *Arg : InsertedPHIs) {
+  for (SILPhiArgument *Arg : InsertedPHIs) {
     if (SILValue Inst = replaceBBArgWithCast(Arg)) {
       Arg->replaceAllUsesWith(Inst);
       // DCE+SimplifyCFG runs as a post-pass cleanup.
@@ -152,7 +159,7 @@ static void updateSSAForUseOfValue(
 }
 
 static void updateSSAForUseOfInst(
-    SILSSAUpdater &Updater, SmallVectorImpl<SILPHIArgument *> &InsertedPHIs,
+    SILSSAUpdater &Updater, SmallVectorImpl<SILPhiArgument *> &InsertedPHIs,
     const llvm::DenseMap<ValueBase *, SILValue> &ValueMap,
     SILBasicBlock *Header, SILBasicBlock *EntryCheckBlock,
     SILInstruction *Inst) {
@@ -166,7 +173,7 @@ static void
 rewriteNewLoopEntryCheckBlock(SILBasicBlock *Header,
                               SILBasicBlock *EntryCheckBlock,
                         const llvm::DenseMap<ValueBase *, SILValue> &ValueMap) {
-  SmallVector<SILPHIArgument *, 4> InsertedPHIs;
+  SmallVector<SILPhiArgument *, 4> InsertedPHIs;
   SILSSAUpdater Updater(&InsertedPHIs);
 
   // Fix PHIs (incoming arguments).
@@ -205,7 +212,7 @@ static bool rotateLoopAtMostUpToLatch(SILLoop *L, DominanceInfo *DT,
                                       SILLoopInfo *LI, bool ShouldVerify) {
   auto *Latch = L->getLoopLatch();
   if (!Latch) {
-    DEBUG(llvm::dbgs() << *L << " does not have a single latch block\n");
+    LLVM_DEBUG(llvm::dbgs() << *L << " does not have a single latch block\n");
     return false;
   }
 
@@ -270,8 +277,8 @@ bool swift::rotateLoop(SILLoop *L, DominanceInfo *DT, SILLoopInfo *LI,
   // passes.
   auto *Preheader = L->getLoopPreheader();
   if (!Preheader) {
-    DEBUG(llvm::dbgs() << *L << " no preheader\n");
-    DEBUG(L->getHeader()->getParent()->dump());
+    LLVM_DEBUG(llvm::dbgs() << *L << " no preheader\n");
+    LLVM_DEBUG(L->getHeader()->getParent()->dump());
     return false;
   }
 
@@ -287,8 +294,8 @@ bool swift::rotateLoop(SILLoop *L, DominanceInfo *DT, SILLoopInfo *LI,
 
   // The header needs to exit the loop.
   if (!L->isLoopExiting(Header)) {
-    DEBUG(llvm::dbgs() << *L << " not an exiting header\n");
-    DEBUG(L->getHeader()->getParent()->dump());
+    LLVM_DEBUG(llvm::dbgs() << *L << " not an exiting header\n");
+    LLVM_DEBUG(L->getHeader()->getParent()->dump());
     return false;
   }
 
@@ -296,14 +303,15 @@ bool swift::rotateLoop(SILLoop *L, DominanceInfo *DT, SILLoopInfo *LI,
   // also the header.
   auto *Latch = L->getLoopLatch();
   if (!Latch) {
-    DEBUG(llvm::dbgs() << *L << " no single latch\n");
+    LLVM_DEBUG(llvm::dbgs() << *L << " no single latch\n");
     return false;
   }
 
   // Make sure we can duplicate the header.
   SmallVector<SILInstruction *, 8> MoveToPreheader;
   if (!canDuplicateOrMoveToPreheader(L, Preheader, Header, MoveToPreheader)) {
-    DEBUG(llvm::dbgs() << *L << " instructions in header preventing rotating\n");
+    LLVM_DEBUG(llvm::dbgs() << *L
+                            << " instructions in header preventing rotating\n");
     return false;
   }
 
@@ -325,7 +333,7 @@ bool swift::rotateLoop(SILLoop *L, DominanceInfo *DT, SILLoopInfo *LI,
   for (auto *Inst : MoveToPreheader)
     Inst->moveBefore(Preheader->getTerminator());
 
-  DEBUG(llvm::dbgs() << " Rotating " << *L);
+  LLVM_DEBUG(llvm::dbgs() << " Rotating " << *L);
 
   // Map the values for the duplicated header block. We are duplicating the
   // header instructions into the end of the preheader.
@@ -396,8 +404,8 @@ bool swift::rotateLoop(SILLoop *L, DominanceInfo *DT, SILLoopInfo *LI,
     Latch->getParent()->verify();
   }
 
-  DEBUG(llvm::dbgs() << "  to " << *L);
-  DEBUG(L->getHeader()->getParent()->dump());
+  LLVM_DEBUG(llvm::dbgs() << "  to " << *L);
+  LLVM_DEBUG(L->getHeader()->getParent()->dump());
   return true;
 }
 
@@ -413,20 +421,24 @@ class LoopRotation : public SILFunctionTransform {
 
     SILFunction *F = getFunction();
     assert(F);
+    // FIXME: Add ownership support.
+    if (F->hasOwnership())
+      return;
+
     SILLoopInfo *LI = LA->get(F);
     assert(LI);
     DominanceInfo *DT = DA->get(F);
 
     if (LI->empty()) {
-      DEBUG(llvm::dbgs() << "No loops in " << F->getName() << "\n");
+      LLVM_DEBUG(llvm::dbgs() << "No loops in " << F->getName() << "\n");
       return;
     }
     if (!ShouldRotate) {
-      DEBUG(llvm::dbgs() << "Skipping loop rotation in " << F->getName()
-            << "\n");
+      LLVM_DEBUG(llvm::dbgs() << "Skipping loop rotation in " << F->getName()
+                              << "\n");
       return;
     }
-    DEBUG(llvm::dbgs() << "Rotating loops in " << F->getName() << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "Rotating loops in " << F->getName() << "\n");
     bool ShouldVerify = getOptions().VerifyAll;
 
     bool Changed = false;

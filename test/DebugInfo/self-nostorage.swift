@@ -2,7 +2,7 @@
 
 public struct S {
   func f() {
-    // CHECK: define {{.*}}$S4main1SV1fyyF
+    // CHECK: define {{.*}}$s4main1SV1fyyF
     // CHECK: call void @llvm.dbg.value(metadata i{{.*}} 0,
     // CHECK-SAME:                      metadata ![[SELF:[0-9]+]]
     // CHECK: ![[SELF]] = !DILocalVariable(name: "self", arg: 1,

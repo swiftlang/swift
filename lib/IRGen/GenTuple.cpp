@@ -23,6 +23,7 @@
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Pattern.h"
+#include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
 #include "llvm/IR/DerivedTypes.h"
 
@@ -121,6 +122,15 @@ namespace {
 
     /// Given the address of a tuple, project out the address of a
     /// single element.
+    Address projectFieldAddress(IRGenFunction &IGF,
+                                Address addr,
+                                SILType T,
+                                const TupleFieldInfo &field) const {
+      return asImpl().projectElementAddress(IGF, addr, T, field.Index);
+    }
+
+    /// Given the address of a tuple, project out the address of a
+    /// single element.
     Address projectElementAddress(IRGenFunction &IGF,
                                   Address tuple,
                                   SILType T,
@@ -161,65 +171,6 @@ namespace {
                               Address src, SILType T,
                               bool isOutlined) const override {
       llvm_unreachable("unexploded tuple as argument?");
-    }
-
-    // For now, just use extra inhabitants from the first element.
-    // FIXME: generalize
-    bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
-      if (asImpl().getFields().empty()) return false;
-      return asImpl().getFields()[0].getTypeInfo().mayHaveExtraInhabitants(IGM);
-    }
-
-    // This is dead code in NonFixedTupleTypeInfo.
-    unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const {
-      if (asImpl().getFields().empty()) return 0;
-      auto &eltTI = cast<FixedTypeInfo>(asImpl().getFields()[0].getTypeInfo());
-      return eltTI.getFixedExtraInhabitantCount(IGM);
-    }
-
-    // This is dead code in NonFixedTupleTypeInfo.
-    APInt getFixedExtraInhabitantValue(IRGenModule &IGM,
-                                       unsigned bits,
-                                       unsigned index) const {
-      auto &eltTI = cast<FixedTypeInfo>(asImpl().getFields()[0].getTypeInfo());
-      return eltTI.getFixedExtraInhabitantValue(IGM, bits, index);
-    }
-        
-    // This is dead code in NonFixedTupleTypeInfo.
-    APInt getFixedExtraInhabitantMask(IRGenModule &IGM) const {
-      if (asImpl().getFields().empty())
-        return APInt();
-      
-      const FixedTypeInfo &fieldTI
-        = cast<FixedTypeInfo>(asImpl().getFields()[0].getTypeInfo());
-      auto size = asImpl().getFixedSize().getValueInBits();
-      
-      if (fieldTI.isKnownEmpty(ResilienceExpansion::Maximal))
-        return APInt(size, 0);
-      
-      APInt firstMask = fieldTI.getFixedExtraInhabitantMask(IGM);
-      return firstMask.zextOrTrunc(size);
-    }
-
-    llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
-                                         Address tupleAddr,
-                                         SILType tupleType) const override {
-      Address eltAddr =
-        asImpl().projectElementAddress(IGF, tupleAddr, tupleType, 0);
-      auto &elt = asImpl().getFields()[0];
-      return elt.getTypeInfo().getExtraInhabitantIndex(IGF, eltAddr,
-                                               elt.getType(IGF.IGM, tupleType));
-    }
-  
-    void storeExtraInhabitant(IRGenFunction &IGF,
-                              llvm::Value *index,
-                              Address tupleAddr,
-                              SILType tupleType) const override {
-      Address eltAddr =
-        asImpl().projectElementAddress(IGF, tupleAddr, tupleType, 0);
-      auto &elt = asImpl().getFields()[0];
-      elt.getTypeInfo().storeExtraInhabitant(IGF, index, eltAddr,
-                                             elt.getType(IGF.IGM, tupleType));
     }
     
     void verify(IRGenTypeVerifierFunction &IGF,
@@ -331,14 +282,41 @@ namespace {
                                WitnessSizedTypeInfo<NonFixedTupleTypeInfo>>
   {
   public:
-    NonFixedTupleTypeInfo(ArrayRef<TupleFieldInfo> fields, llvm::Type *T,
+    NonFixedTupleTypeInfo(ArrayRef<TupleFieldInfo> fields,
+                          FieldsAreABIAccessible_t fieldsABIAccessible,
+                          llvm::Type *T,
                           Alignment minAlign, IsPOD_t isPOD,
-                          IsBitwiseTakable_t isBT)
-      : TupleTypeInfoBase(fields, T, minAlign, isPOD, isBT) {}
+                          IsBitwiseTakable_t isBT,
+                          IsABIAccessible_t tupleAccessible)
+      : TupleTypeInfoBase(fields, fieldsABIAccessible,
+                          T, minAlign, isPOD, isBT, tupleAccessible) {}
 
     TupleNonFixedOffsets getNonFixedOffsets(IRGenFunction &IGF,
                                             SILType T) const {
       return TupleNonFixedOffsets(T);
+    }
+
+    llvm::Value *getEnumTagSinglePayload(IRGenFunction &IGF,
+                                         llvm::Value *numEmptyCases,
+                                         Address structAddr,
+                                         SILType structType,
+                                         bool isOutlined) const override {
+      // The runtime will overwrite this with a concrete implementation
+      // in the value witness table.
+      return emitGetEnumTagSinglePayloadCall(IGF, structType, numEmptyCases,
+                                             structAddr);
+    }
+
+    void storeEnumTagSinglePayload(IRGenFunction &IGF,
+                                   llvm::Value *index,
+                                   llvm::Value *numEmptyCases,
+                                   Address structAddr,
+                                   SILType structType,
+                                   bool isOutlined) const override {
+      // The runtime will overwrite this with a concrete implementation
+      // in the value witness table.
+      emitStoreEnumTagSinglePayloadCall(IGF, structType, index,
+                                        numEmptyCases, structAddr);
     }
   };
 
@@ -374,11 +352,16 @@ namespace {
     }
 
     NonFixedTupleTypeInfo *createNonFixed(ArrayRef<TupleFieldInfo> fields,
+                                     FieldsAreABIAccessible_t fieldsAccessible,
                                           StructLayout &&layout) {
-      return NonFixedTupleTypeInfo::create(fields, layout.getType(),
+      auto tupleAccessible = IsABIAccessible_t(
+        IGM.isTypeABIAccessible(TheTuple));
+      return NonFixedTupleTypeInfo::create(fields, fieldsAccessible,
+                                           layout.getType(),
                                            layout.getAlignment(),
                                            layout.isPOD(),
-                                           layout.isBitwiseTakable());
+                                           layout.isBitwiseTakable(),
+                                           tupleAccessible);
     }
 
     TupleFieldInfo getFieldInfo(unsigned index,
@@ -394,7 +377,7 @@ namespace {
     }
 
     StructLayout performLayout(ArrayRef<const TypeInfo *> fieldTypes) {
-      return StructLayout(IGM, CanType(), LayoutKind::NonHeapObject,
+      return StructLayout(IGM, /*decl=*/nullptr, LayoutKind::NonHeapObject,
                           LayoutStrategy::Universal, fieldTypes);
     }
   };

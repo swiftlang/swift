@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify %s
+// RUN: %target-typecheck-verify-swift
 
 // Check that all combinations of key paths produce the expected result type
 // and choose the expected overloads.
@@ -49,32 +49,32 @@ func mismatchedAppends<T, U, V>(readOnlyLeft: KeyPath<T, U>,
                                 readOnlyRight: KeyPath<U, V>,
                                 writableRight: WritableKeyPath<U, V>,
                                 referenceRight: ReferenceWritableKeyPath<U, V>){
-  // expected-error@+1{{}}
   _ = readOnlyRight.appending(path: readOnlyLeft)
+  // expected-error@-1 {{referencing instance method 'appending(path:)' on '_AppendKeyPath' requires the types 'KeyPath<U, V>' and 'AnyKeyPath' be equivalent}}
 
-  // expected-error@+1{{}}
   _ = readOnlyRight.appending(path: writableLeft)
+  // expected-error@-1 {{referencing instance method 'appending(path:)' on '_AppendKeyPath' requires the types 'KeyPath<U, V>' and 'AnyKeyPath' be equivalent}}
 
-  // expected-error@+1{{}}
   _ = readOnlyRight.appending(path: referenceLeft)
+  // expected-error@-1 {{referencing instance method 'appending(path:)' on '_AppendKeyPath' requires the types 'KeyPath<U, V>' and 'AnyKeyPath' be equivalent}}
 
-  // expected-error@+1{{}}
   _ = writableRight.appending(path: readOnlyLeft)
+  // expected-error@-1 {{referencing instance method 'appending(path:)' on '_AppendKeyPath' requires the types 'WritableKeyPath<U, V>' and 'AnyKeyPath' be equivalent}}
 
-  // expected-error@+1{{}}
   _ = writableRight.appending(path: writableLeft)
+  // expected-error@-1 {{referencing instance method 'appending(path:)' on '_AppendKeyPath' requires the types 'WritableKeyPath<U, V>' and 'AnyKeyPath' be equivalent}}
 
-  // expected-error@+1{{}}
   _ = writableRight.appending(path: referenceLeft)
+  // expected-error@-1 {{referencing instance method 'appending(path:)' on '_AppendKeyPath' requires the types 'WritableKeyPath<U, V>' and 'AnyKeyPath' be equivalent}}
 
-  // expected-error@+1{{}}
   _ = referenceRight.appending(path: readOnlyLeft)
+  // expected-error@-1 {{referencing instance method 'appending(path:)' on '_AppendKeyPath' requires the types 'ReferenceWritableKeyPath<U, V>' and 'AnyKeyPath' be equivalent}}
 
-  // expected-error@+1{{}}
   _ = referenceRight.appending(path: writableLeft)
+  // expected-error@-1 {{referencing instance method 'appending(path:)' on '_AppendKeyPath' requires the types 'ReferenceWritableKeyPath<U, V>' and 'AnyKeyPath' be equivalent}}
 
-  // expected-error@+1{{}}
   _ = referenceRight.appending(path: referenceLeft)
+  // expected-error@-1 {{referencing instance method 'appending(path:)' on '_AppendKeyPath' requires the types 'ReferenceWritableKeyPath<U, V>' and 'AnyKeyPath' be equivalent}}
 }
 
 func partialAppends<T, U, V>(partial: PartialKeyPath<T>,

@@ -23,6 +23,7 @@
 #define NOMINMAX
 #include <objbase.h>
 #include <string>
+#include <algorithm>
 #else
 #include <uuid/uuid.h>
 #endif
@@ -94,6 +95,7 @@ void swift::UUID::toString(llvm::SmallVectorImpl<char> &out) const {
 
   char* signedStr = reinterpret_cast<char*>(str);
   memcpy(out.data(), signedStr, StringBufferSize);
+  std::transform(std::begin(out), std::end(out), std::begin(out), toupper);
 #else
   uuid_unparse_upper(Value, out.data());
 #endif

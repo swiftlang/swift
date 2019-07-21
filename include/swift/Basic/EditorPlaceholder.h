@@ -46,6 +46,8 @@ struct EditorPlaceholderData {
 Optional<EditorPlaceholderData>
   parseEditorPlaceholder(StringRef PlaceholderText);
 
+/// Checks if an identifier with the given text is an editor placeholder
+bool isEditorPlaceholder(StringRef IdentifierText);
 } // end namespace swift
 
 #endif // SWIFT_BASIC_EDITORPLACEHOLDER_H

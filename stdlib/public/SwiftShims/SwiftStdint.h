@@ -70,8 +70,20 @@ typedef unsigned __INT8_TYPE__ __swift_uint8_t;
 #define __swift_intn_t(n) __swift_join3(__swift_int, n, _t)
 #define __swift_uintn_t(n) __swift_join3(__swift_uint, n, _t)
 
+#if defined(_MSC_VER) && !defined(__clang__)
+#if defined(_WIN32)
+typedef __swift_int32_t __swift_intptr_t;
+typedef __swift_uint32_t __swift_uintptr_t;
+#elif defined(_WIN64)
+typedef __swift_int64_t __swift_intptr_t;
+typedef __swift_uint64_t __swift_uintptr_t;
+#else
+#error unknown windows pointer width
+#endif
+#else
 typedef __swift_intn_t(__INTPTR_WIDTH__) __swift_intptr_t;
 typedef __swift_uintn_t(__INTPTR_WIDTH__) __swift_uintptr_t;
+#endif
 #endif
 
 #endif // SWIFT_STDLIB_SHIMS_SWIFT_STDINT_H

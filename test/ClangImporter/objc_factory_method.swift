@@ -22,10 +22,9 @@ func testInstanceTypeFactoryMethodInherited() {
   _ = NSObjectFactorySub() // okay, prefers init method
   _ = NSObjectFactorySub(integer: 1)
   _ = NSObjectFactorySub(double: 314159)
-  _ = NSObjectFactorySub(float: 314159) // expected-error{{argument labels '(float:)' do not match any available overloads}} 
-  // expected-note @-1 {{overloads for 'NSObjectFactorySub' exist with these partially matching parameter lists: (integer: Int), (double: Double)}}
+  _ = NSObjectFactorySub(float: 314159) // expected-error{{incorrect argument label in call (have 'float:', expected 'integer:')}}
   let a = NSObjectFactorySub(buildingWidgets: ()) // expected-error{{argument labels '(buildingWidgets:)' do not match any available overloads}}
-  // expected-note @-1 {{overloads for 'NSObjectFactorySub' exist with these partially matching parameter lists: (integer: Int), (double: Double)}}
+  // expected-note @-1 {{overloads for 'NSObjectFactorySub' exist with these partially matching parameter lists: (double: Double), (integer: Int)}}
   _ = a
 }
 
@@ -43,27 +42,27 @@ func testFactoryWithLaterIntroducedInit() {
 
   // Don't prefer more available convenience factory initializer over less
   // available designated initializer
-  _ = NSHavingConvenienceFactoryAndLaterDesignatedInit(flim:5) // expected-error {{'init(flim:)' is only available on OS X 10.52 or newer}} 
+  _ = NSHavingConvenienceFactoryAndLaterDesignatedInit(flim:5) // expected-error {{'init(flim:)' is only available in macOS 10.52 or newer}}
     // expected-note @-1 {{add 'if #available' version check}}
   
-  _ = NSHavingConvenienceFactoryAndLaterDesignatedInit(flam:5) // expected-error {{'init(flam:)' is only available on OS X 10.52 or newer}}
+  _ = NSHavingConvenienceFactoryAndLaterDesignatedInit(flam:5) // expected-error {{'init(flam:)' is only available in macOS 10.52 or newer}}
   // expected-note @-1 {{add 'if #available' version check}}  {{3-63=if #available(OSX 10.52, *) {\n      _ = NSHavingConvenienceFactoryAndLaterDesignatedInit(flam:5)\n  \} else {\n      // Fallback on earlier versions\n  \}}}
 
   
   // Don't prefer more available factory initializer over less
   // available designated initializer
-  _ = NSHavingFactoryAndLaterConvenienceInit(flim:5) // expected-error {{'init(flim:)' is only available on OS X 10.52 or newer}} 
+  _ = NSHavingFactoryAndLaterConvenienceInit(flim:5) // expected-error {{'init(flim:)' is only available in macOS 10.52 or newer}}
   // expected-note @-1 {{add 'if #available' version check}}
   
 
-  _ = NSHavingFactoryAndLaterConvenienceInit(flam:5) // expected-error {{'init(flam:)' is only available on OS X 10.52 or newer}} 
+  _ = NSHavingFactoryAndLaterConvenienceInit(flam:5) // expected-error {{'init(flam:)' is only available in macOS 10.52 or newer}}
   // expected-note @-1 {{add 'if #available' version check}}
 
 
   // When both a convenience factory and a convenience initializer have the
   // same availability, choose the convenience initializer.
-  _ = NSHavingConvenienceFactoryAndSameConvenienceInit(flim:5) // expected-warning {{'init(flim:)' was deprecated in OS X 10.51: ConvenienceInit}}
-  _ = NSHavingConvenienceFactoryAndSameConvenienceInit(flam:5) // expected-warning {{'init(flam:)' was deprecated in OS X 10.51: ConvenienceInit}}
+  _ = NSHavingConvenienceFactoryAndSameConvenienceInit(flim:5) // expected-warning {{'init(flim:)' was deprecated in macOS 10.51: ConvenienceInit}}
+  _ = NSHavingConvenienceFactoryAndSameConvenienceInit(flam:5) // expected-warning {{'init(flam:)' was deprecated in macOS 10.51: ConvenienceInit}}
 
   _ = NSHavingConvenienceFactoryAndSameConvenienceInit(flotsam:5) // expected-warning {{'init(flotsam:)' is deprecated: ConvenienceInit}}
   _ = NSHavingConvenienceFactoryAndSameConvenienceInit(jetsam:5) // expected-warning {{'init(jetsam:)' is deprecated: ConvenienceInit}}
@@ -78,7 +77,7 @@ func testNSErrorFactoryMethod(_ path: String) throws {
 
 func testNonInstanceTypeFactoryMethod(_ s: String) {
   _ = NSObjectFactory(string: s) // expected-error{{argument labels '(string:)' do not match any available overloads}}
-  // expected-note @-1 {{(integer: Int), (double: Double), (float: Float)}}
+  // expected-note @-1 {{(double: Double), (float: Float), (integer: Int)}}
 }
 
 func testUseOfFactoryMethod(_ queen: Bee) {

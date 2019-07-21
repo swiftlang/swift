@@ -18,10 +18,10 @@ public func returnGlobalVar() -> Double {
 public func returnStringGlobalVar() -> String {
   return Panda.cutenessFactor
 }
-// CHECK-LABEL: sil {{.*}}returnStringGlobalVar{{.*}} () -> @owned String {
+// CHECK-LABEL: sil [ossa] {{.*}}returnStringGlobalVar{{.*}} () -> @owned String {
 // CHECK:   %0 = global_addr @PKPandaCutenessFactor : $*NSString
 // CHECK:   [[VAL:%.*]] = load [copy] %0 : $*NSString
-// CHECK:   [[BRIDGE:%.*]] = function_ref @$SSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ
+// CHECK:   [[BRIDGE:%.*]] = function_ref @$sSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ
 // CHECK:   [[RESULT:%.*]] = apply [[BRIDGE]](
 // CHECK:   return [[RESULT]] : $String
 // CHECK-NEXT: }
@@ -29,10 +29,10 @@ public func returnStringGlobalVar() -> String {
 public func returnNullableStringGlobalVar() -> String? {
   return Panda.cuddlynessFactor
 }
-// CHECK-LABEL: sil {{.*}}returnNullableStringGlobalVar{{.*}} () -> @owned Optional<String> {
+// CHECK-LABEL: sil [ossa] {{.*}}returnNullableStringGlobalVar{{.*}} () -> @owned Optional<String> {
 // CHECK:   %0 = global_addr @PKPandaCuddlynessFactor : $*NSString
 // CHECK:   [[VAL:%.*]] = load [copy] %0 : $*NSString
-// CHECK:   [[BRIDGE:%.*]] = function_ref @$SSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ
+// CHECK:   [[BRIDGE:%.*]] = function_ref @$sSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ
 // CHECK:   [[RESULT:%.*]] = apply [[BRIDGE]](
 // CHECK:   [[SOME:%.*]] = enum $Optional<String>, #Optional.some!enumelt.1, [[RESULT]]
 // CHECK:   return [[SOME]] : $Optional<String>
@@ -48,13 +48,13 @@ public func useClass(d: Double, opts: SomeClass.Options) {
   // CHECK: [[BORROWED_OBJ:%.*]] = begin_borrow [[OBJ]]
   // CHECK: [[APPLY_FN:%[0-9]+]] = function_ref @IAMSomeClassApplyOptions : $@convention(c) (SomeClass, SomeClass.Options) -> ()
   // CHECK: apply [[APPLY_FN]]([[BORROWED_OBJ]], [[OPTS]])
-  // CHECK: end_borrow [[BORROWED_OBJ]] from [[OBJ]]
+  // CHECK: end_borrow [[BORROWED_OBJ]]
   // CHECK: destroy_value [[OBJ]]
   o.applyOptions(opts)
 }
 
 extension SomeClass {
-  // CHECK-LABEL: sil hidden @$SSo12IAMSomeClassC16import_as_memberE6doubleABSd_tcfc
+  // CHECK-LABEL: sil hidden [ossa] @$sSo12IAMSomeClassC16import_as_memberE6doubleABSd_tcfC
   // CHECK: bb0([[DOUBLE:%[0-9]+]] : $Double
   // CHECK-NOT: value_metatype
   // CHECK: [[FNREF:%[0-9]+]] = function_ref @MakeIAMSomeClass

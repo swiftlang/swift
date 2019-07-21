@@ -21,9 +21,10 @@
 #include "swift/Demangling/Demangle.h"
 #include "llvm/ADT/ArrayRef.h"
 
+namespace swift {
+
 const uint16_t SWIFT_REFLECTION_METADATA_VERSION = 3; // superclass field
 
-namespace swift {
 namespace reflection {
 
 // Field records describe the type of a single stored property or case member
@@ -84,10 +85,12 @@ public:
       (const char *)((uintptr_t)MangledTypeName.get() + Offset));
   }
 
-  StringRef getFieldName(uintptr_t Offset)  const {
-    if (FieldName)
-      return (const char *)((uintptr_t)FieldName.get() + Offset);
-    return "";
+  StringRef getFieldName(uintptr_t Offset, uintptr_t Low,
+                         uintptr_t High) const {
+    uintptr_t nameAddr = (uintptr_t)FieldName.get() + Offset;
+    if (nameAddr < Low || nameAddr > High)
+      return "";
+    return (const char *)nameAddr;
   }
 
   bool isIndirectCase() const {
@@ -401,9 +404,22 @@ class BuiltinTypeDescriptor {
 
 public:
   uint32_t Size;
-  uint32_t Alignment;
+
+  // - Least significant 16 bits are the alignment.
+  // - Bit 16 is 'bitwise takable'.
+  // - Remaining bits are reserved.
+  uint32_t AlignmentAndFlags;
+
   uint32_t Stride;
   uint32_t NumExtraInhabitants;
+
+  bool isBitwiseTakable() const {
+    return (AlignmentAndFlags >> 16) & 1;
+  }
+
+  uint32_t getAlignment() const {
+    return AlignmentAndFlags & 0xffff;
+  }
 
   bool hasMangledTypeName() const {
     return TypeName;

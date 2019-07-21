@@ -95,12 +95,12 @@
                 (inline-close . 0)
                 (class-close . 0)
                 (namespace-close . 0)
-                (case-label . -)
+                (case-label . 0)
                 (statement-case-intro . +)
                 (cpp-define-intro . +)
                 (else-clause . 0)
                 (arglist-intro . +)
-                (arglist-cont . +)
+                (arglist-cont . 0)
                 (c . c-lineup-C-comments)
                 (inher-cont . c-lineup-multi-inher)
                 (string . -1000)
@@ -114,7 +114,7 @@
 ;; project settings yet.  For example, Swift files may come up in
 ;; Fundamental mode, and C++ files won't use the swift style, unless
 ;; we do something.  This hack causes the file to be re-mode-ed.
-(set-auto-mode)
+(unless (eq major-mode 'dired-mode) (set-auto-mode))
 
 (defun swift-project-comment-end ()
   "If comment-end is non-empty returns it, stripped of leading whitespace.  Returns nil otherwise"
@@ -395,7 +395,7 @@ of arguments that are passed to swiftc when compiling it."
   (cond ((string-match-p "^stdlib/public/core/" relative-file)
          swift-project-stdlib-swiftc-args)
         ((string-match-p
-          "^stdlib/\(public/SwiftOnoneSupport\|internal\|private/SwiftPrivate\(PthreadExtras\|LibcExtras\)?\)/"
+          "^stdlib/\(public/SwiftOnoneSupport\|internal\|private/SwiftPrivate\(ThreadExtras\|LibcExtras\)?\)/"
           relative-file)
          swift-project-stdlib-aux-swiftc-args)
         (t swift-project-single-frontend-swiftc-args)))

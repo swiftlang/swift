@@ -31,7 +31,7 @@ comparableOperators = [
 /// - Parameters:
 ///   - lhs: An empty tuple.
 ///   - rhs: An empty tuple.
-@inlinable // FIXME(sil-serialize-all)
+@inlinable // trivial-implementation
 public func ==(lhs: (), rhs: ()) -> Bool {
   return true
 }
@@ -44,7 +44,7 @@ public func ==(lhs: (), rhs: ()) -> Bool {
 /// - Parameters:
 ///   - lhs: An empty tuple.
 ///   - rhs: An empty tuple.
-@inlinable // FIXME(sil-serialize-all)
+@inlinable // trivial-implementation
 public func !=(lhs: (), rhs: ()) -> Bool {
     return false
 }
@@ -58,7 +58,7 @@ public func !=(lhs: (), rhs: ()) -> Bool {
 /// - Parameters:
 ///   - lhs: An empty tuple.
 ///   - rhs: An empty tuple.
-@inlinable // FIXME(sil-serialize-all)
+@inlinable // trivial-implementation
 public func <(lhs: (), rhs: ()) -> Bool {
     return false
 }
@@ -72,7 +72,7 @@ public func <(lhs: (), rhs: ()) -> Bool {
 /// - Parameters:
 ///   - lhs: An empty tuple.
 ///   - rhs: An empty tuple.
-@inlinable // FIXME(sil-serialize-all)
+@inlinable // trivial-implementation
 public func <=(lhs: (), rhs: ()) -> Bool {
     return true
 }
@@ -86,7 +86,7 @@ public func <=(lhs: (), rhs: ()) -> Bool {
 /// - Parameters:
 ///   - lhs: An empty tuple.
 ///   - rhs: An empty tuple.
-@inlinable // FIXME(sil-serialize-all)
+@inlinable // trivial-implementation
 public func >(lhs: (), rhs: ()) -> Bool {
     return false
 }
@@ -100,7 +100,7 @@ public func >(lhs: (), rhs: ()) -> Bool {
 /// - Parameters:
 ///   - lhs: An empty tuple.
 ///   - rhs: An empty tuple.
-@inlinable // FIXME(sil-serialize-all)
+@inlinable // trivial-implementation
 public func >=(lhs: (), rhs: ()) -> Bool {
     return true
 }
@@ -108,7 +108,7 @@ public func >=(lhs: (), rhs: ()) -> Bool {
 % for arity in range(2,7):
 %   typeParams = [chr(ord("A") + i) for i in range(arity)]
 %   tupleT = "({})".format(",".join(typeParams))
-%   equatableTypeParams = ", ".join(["{} : Equatable".format(c) for c in typeParams])
+%   equatableTypeParams = ", ".join(["{}: Equatable".format(c) for c in typeParams])
 
 %   originalTuple = "(\"a\", {})".format(", ".join(map(str, range(1, arity))))
 %   greaterTuple = "(\"a\", {})".format(", ".join(map(str, range(1, arity - 1) + [arity])))
@@ -132,7 +132,7 @@ public func >=(lhs: (), rhs: ()) -> Bool {
 /// - Parameters:
 ///   - lhs: A tuple of `Equatable` elements.
 ///   - rhs: Another tuple of elements of the same type as `lhs`.
-@inlinable // FIXME(sil-serialize-all)
+@inlinable // trivial-implementation
 public func == <${equatableTypeParams}>(lhs: ${tupleT}, rhs: ${tupleT}) -> Bool {
   guard lhs.0 == rhs.0 else { return false }
   /*tail*/ return (
@@ -161,7 +161,7 @@ public func == <${equatableTypeParams}>(lhs: ${tupleT}, rhs: ${tupleT}) -> Bool 
 /// - Parameters:
 ///   - lhs: A tuple of `Equatable` elements.
 ///   - rhs: Another tuple of elements of the same type as `lhs`.
-@inlinable // FIXME(sil-serialize-all)
+@inlinable // trivial-implementation
 public func != <${equatableTypeParams}>(lhs: ${tupleT}, rhs: ${tupleT}) -> Bool {
   guard lhs.0 == rhs.0 else { return true }
   /*tail*/ return (
@@ -171,7 +171,7 @@ public func != <${equatableTypeParams}>(lhs: ${tupleT}, rhs: ${tupleT}) -> Bool 
   )
 }
 
-%   comparableTypeParams = ", ".join(["{} : Comparable".format(c) for c in typeParams])
+%   comparableTypeParams = ", ".join(["{}: Comparable".format(c) for c in typeParams])
 %   for op, phrase in comparableOperators:
 /// Returns a Boolean value indicating whether the first tuple is ordered
 /// ${phrase} the second in a lexicographical ordering.
@@ -184,7 +184,7 @@ public func != <${equatableTypeParams}>(lhs: ${tupleT}, rhs: ${tupleT}) -> Bool 
 /// - Parameters:
 ///   - lhs: A tuple of `Comparable` elements.
 ///   - rhs: Another tuple of elements of the same type as `lhs`.
-@inlinable // FIXME(sil-serialize-all)
+@inlinable // trivial-implementation
 public func ${op} <${comparableTypeParams}>(lhs: ${tupleT}, rhs: ${tupleT}) -> Bool {
   if lhs.0 != rhs.0 { return lhs.0 ${op} rhs.0 }
   /*tail*/ return (
@@ -195,3 +195,7 @@ public func ${op} <${comparableTypeParams}>(lhs: ${tupleT}, rhs: ${tupleT}) -> B
 }
 %   end
 % end
+
+// ${'Local Variables'}:
+// eval: (read-only-mode 1)
+// End:

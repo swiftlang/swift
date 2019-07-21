@@ -38,8 +38,6 @@ namespace {
 class Instrumenter : InstrumenterBase {
 private:
   std::mt19937_64 &RNG;
-  ASTContext &Context;
-  DeclContext *TypeCheckDC;
   unsigned &TmpNameIndex;
   bool HighPerformance;
 
@@ -117,7 +115,7 @@ private:
 public:
   Instrumenter(ASTContext &C, DeclContext *DC, std::mt19937_64 &RNG, bool HP,
                unsigned &TmpNameIndex)
-      : RNG(RNG), Context(C), TypeCheckDC(DC), TmpNameIndex(TmpNameIndex),
+      : InstrumenterBase(C, DC), RNG(RNG), TmpNameIndex(TmpNameIndex),
         HighPerformance(HP) {}
 
   Stmt *transformStmt(Stmt *S) {
@@ -280,7 +278,7 @@ public:
         BraceStmt *NB = transformBraceStmt(B);
         if (NB != B) {
           FD->setBody(NB);
-          TypeChecker(Context).checkFunctionErrorHandling(FD);
+          TypeChecker::createForContext(Context).checkFunctionErrorHandling(FD);
         }
       }
     } else if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
@@ -343,10 +341,6 @@ public:
     if (auto inout = dyn_cast<InOutExpr>(E)) {
       return dyn_cast<DeclRefExpr>(
           inout->getSubExpr()->getSemanticsProvidingExpr());
-
-      // Drill through tuple shuffles, ignoring non-default-argument inouts.
-    } else if (auto shuffle = dyn_cast<TupleShuffleExpr>(E)) {
-      return digForInoutDeclRef(shuffle->getSubExpr());
 
       // Try to find a unique inout argument in a tuple.
     } else if (auto tuple = dyn_cast<TupleExpr>(E)) {
@@ -705,7 +699,7 @@ public:
                          PatternBindingDecl *&ArgPattern,
                          VarDecl *&ArgVariable) {
     const char *LoggerName =
-        isDebugPrint ? "$builtin_debugPrint" : "$builtin_print";
+        isDebugPrint ? "__builtin_debugPrint" : "__builtin_print";
 
     UnresolvedDeclRefExpr *LoggerRef = new (Context) UnresolvedDeclRefExpr(
         Context.getIdentifier(LoggerName), DeclRefKind::Ordinary,
@@ -724,7 +718,7 @@ public:
   }
 
   Added<Stmt *> logPostPrint(SourceRange SR) {
-    return buildLoggerCallWithArgs("$builtin_postPrint",
+    return buildLoggerCallWithArgs("__builtin_postPrint",
                                    MutableArrayRef<Expr *>(), SR);
   }
 
@@ -749,15 +743,14 @@ public:
         new (Context) VarDecl(/*IsStatic*/false, VarDecl::Specifier::Let,
                               /*IsCaptureList*/false, SourceLoc(),
                               Context.getIdentifier(NameBuf),
-                              MaybeLoadInitExpr->getType(), TypeCheckDC);
-    VD->setInterfaceType(VD->getType()->mapTypeOutOfContext());
+                              TypeCheckDC);
+    VD->setType(MaybeLoadInitExpr->getType());
+    VD->setInterfaceType(MaybeLoadInitExpr->getType()->mapTypeOutOfContext());
     VD->setImplicit();
 
     NamedPattern *NP = new (Context) NamedPattern(VD, /*implicit*/ true);
-    PatternBindingDecl *PBD = PatternBindingDecl::create(
-        Context, SourceLoc(), StaticSpellingKind::None, SourceLoc(), NP,
-        MaybeLoadInitExpr, TypeCheckDC);
-    PBD->setImplicit();
+    PatternBindingDecl *PBD = PatternBindingDecl::createImplicit(
+        Context, StaticSpellingKind::None, NP, MaybeLoadInitExpr, TypeCheckDC);
 
     return std::make_pair(PBD, VD);
   }
@@ -771,16 +764,13 @@ public:
         new (Context) StringLiteralExpr(NameInContext->c_str(), SourceRange());
     NameExpr->setImplicit(true);
 
-    const size_t buf_size = 11;
-    char *const id_buf = (char *)Context.Allocate(buf_size, 1);
     std::uniform_int_distribution<unsigned> Distribution(0, 0x7fffffffu);
     const unsigned id_num = Distribution(RNG);
-    ::snprintf(id_buf, buf_size, "%u", id_num);
-    Expr *IDExpr = new (Context) IntegerLiteralExpr(id_buf, SourceLoc(), true);
+    Expr *IDExpr = IntegerLiteralExpr::createFromUnsigned(Context, id_num);
 
     Expr *LoggerArgExprs[] = {*E, NameExpr, IDExpr};
 
-    return buildLoggerCallWithArgs("$builtin_log_with_id",
+    return buildLoggerCallWithArgs("__builtin_log_with_id",
                                    MutableArrayRef<Expr *>(LoggerArgExprs), SR);
   }
 
@@ -794,7 +784,7 @@ public:
 
   Added<Stmt *> buildScopeCall(SourceRange SR, bool IsExit) {
     const char *LoggerName =
-        IsExit ? "$builtin_log_scope_exit" : "$builtin_log_scope_entry";
+        IsExit ? "__builtin_log_scope_exit" : "__builtin_log_scope_entry";
 
     return buildLoggerCallWithArgs(LoggerName, MutableArrayRef<Expr *>(), SR);
   }
@@ -814,30 +804,27 @@ public:
     std::pair<unsigned, unsigned> EndLC = Context.SourceMgr.getLineAndColumn(
         Lexer::getLocForEndOfToken(Context.SourceMgr, SR.End));
 
-    const size_t buf_size = 8;
+    Expr *StartLine = IntegerLiteralExpr::createFromUnsigned(Context, StartLC.first);
+    Expr *EndLine = IntegerLiteralExpr::createFromUnsigned(Context, EndLC.first);
+    Expr *StartColumn = IntegerLiteralExpr::createFromUnsigned(Context, StartLC.second);
+    Expr *EndColumn = IntegerLiteralExpr::createFromUnsigned(Context, EndLC.second);
 
-    char *start_line_buf = (char *)Context.Allocate(buf_size, 1);
-    char *end_line_buf = (char *)Context.Allocate(buf_size, 1);
-    char *start_column_buf = (char *)Context.Allocate(buf_size, 1);
-    char *end_column_buf = (char *)Context.Allocate(buf_size, 1);
+    Expr *ModuleExpr =
+        !ModuleIdentifier.empty()
+            ? (Expr *)new (Context) UnresolvedDeclRefExpr(
+                  ModuleIdentifier, DeclRefKind::Ordinary, DeclNameLoc(SR.End))
+            : (Expr *)IntegerLiteralExpr::createFromUnsigned(Context, 0);
 
-    ::snprintf(start_line_buf, buf_size, "%u", StartLC.first);
-    ::snprintf(start_column_buf, buf_size, "%u", StartLC.second);
-    ::snprintf(end_line_buf, buf_size, "%u", EndLC.first);
-    ::snprintf(end_column_buf, buf_size, "%u", EndLC.second);
-
-    Expr *StartLine =
-        new (Context) IntegerLiteralExpr(start_line_buf, SR.End, true);
-    Expr *EndLine =
-        new (Context) IntegerLiteralExpr(end_line_buf, SR.End, true);
-    Expr *StartColumn =
-        new (Context) IntegerLiteralExpr(start_column_buf, SR.End, true);
-    Expr *EndColumn =
-        new (Context) IntegerLiteralExpr(end_column_buf, SR.End, true);
+    Expr *FileExpr =
+        !FileIdentifier.empty()
+            ? (Expr *)new (Context) UnresolvedDeclRefExpr(
+                  FileIdentifier, DeclRefKind::Ordinary, DeclNameLoc(SR.End))
+            : (Expr *)IntegerLiteralExpr::createFromUnsigned(Context, 0);
 
     llvm::SmallVector<Expr *, 6> ArgsWithSourceRange(Args.begin(), Args.end());
 
-    ArgsWithSourceRange.append({StartLine, EndLine, StartColumn, EndColumn});
+    ArgsWithSourceRange.append(
+        {StartLine, EndLine, StartColumn, EndColumn, ModuleExpr, FileExpr});
 
     UnresolvedDeclRefExpr *LoggerRef = new (Context)
         UnresolvedDeclRefExpr(Context.getIdentifier(LoggerName),
@@ -845,7 +832,7 @@ public:
 
     LoggerRef->setImplicit(true);
 
-    SmallVector<Identifier, 4> ArgLabels(ArgsWithSourceRange.size(),
+    SmallVector<Identifier, 6> ArgLabels(ArgsWithSourceRange.size(),
                                          Identifier());
     ApplyExpr *LoggerCall = CallExpr::createImplicit(
         Context, LoggerRef, ArgsWithSourceRange, ArgLabels);
@@ -870,7 +857,7 @@ public:
                                   AccessSemantics::Ordinary, Apply->getType());
 
     UnresolvedDeclRefExpr *SendDataRef = new (Context)
-        UnresolvedDeclRefExpr(Context.getIdentifier("$builtin_send_data"),
+        UnresolvedDeclRefExpr(Context.getIdentifier("__builtin_send_data"),
                               DeclRefKind::Ordinary, DeclNameLoc());
 
     SendDataRef->setImplicit(true);
@@ -913,7 +900,7 @@ void swift::performPlaygroundTransform(SourceFile &SF, bool HighPerformance) {
             BraceStmt *NewBody = I.transformBraceStmt(Body);
             if (NewBody != Body) {
               FD->setBody(NewBody);
-              TypeChecker(ctx).checkFunctionErrorHandling(FD);
+              TypeChecker::createForContext(ctx).checkFunctionErrorHandling(FD);
             }
             return false;
           }
@@ -926,7 +913,8 @@ void swift::performPlaygroundTransform(SourceFile &SF, bool HighPerformance) {
             BraceStmt *NewBody = I.transformBraceStmt(Body, true);
             if (NewBody != Body) {
               TLCD->setBody(NewBody);
-              TypeChecker(ctx).checkTopLevelErrorHandling(TLCD);
+              TypeChecker::createForContext(ctx)
+                .checkTopLevelErrorHandling(TLCD);
             }
             return false;
           }

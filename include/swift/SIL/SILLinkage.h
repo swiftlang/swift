@@ -17,6 +17,8 @@
 
 namespace swift {
 
+class ValueDecl;
+
 /// Linkage for a SIL object.  This concept combines the notions
 /// of symbol linkage and visibility.
 ///
@@ -116,6 +118,10 @@ enum class SubclassScope : uint8_t {
   /// This class can only be subclassed in this module.
   Internal,
 
+  /// This class is resilient so even public methods cannot be directly
+  /// referenced from outside the module.
+  Resilient,
+
   /// There is no class to subclass, or it is final.
   NotApplicable,
 };
@@ -175,6 +181,8 @@ inline bool isPossiblyUsedExternally(SILLinkage linkage, bool wholeModule) {
   }
   return linkage <= SILLinkage::Hidden;
 }
+
+SILLinkage getDeclSILLinkage(const ValueDecl *decl);
 
 inline bool hasPublicVisibility(SILLinkage linkage) {
   switch (linkage) {
@@ -245,6 +253,11 @@ inline SILLinkage effectiveLinkageForClassMember(SILLinkage linkage,
     if (linkage == SILLinkage::Private)
       return SILLinkage::Hidden;
     break;
+
+  case SubclassScope::Resilient:
+    if (isAvailableExternally(linkage))
+      return SILLinkage::HiddenExternal;
+    return SILLinkage::Hidden;
 
   case SubclassScope::NotApplicable:
     break;

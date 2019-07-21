@@ -1,5 +1,6 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -retain-sinking -late-release-hoisting %s | %FileCheck %s
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -retain-sinking -retain-sinking -late-release-hoisting %s | %FileCheck --check-prefix=CHECK-MULTIPLE-RS-ROUNDS %s
+// RUN: %target-sil-opt -enable-sil-verify-all -retain-sinking -late-release-hoisting %s | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -release-hoisting %s | %FileCheck --check-prefix=CHECK-RELEASE-HOISTING %s
+// RUN: %target-sil-opt -enable-sil-verify-all -retain-sinking -retain-sinking -late-release-hoisting %s | %FileCheck --check-prefix=CHECK-MULTIPLE-RS-ROUNDS %s
 
 import Builtin
 import Swift
@@ -58,6 +59,10 @@ struct foo {
 enum Optional<T> {
   case none
   case some(T)
+}
+
+struct Unowned {
+  @_hasStorage unowned let x: @sil_unowned Builtin.NativeObject
 }
 
 sil @createS : $@convention(thin) () -> @owned S
@@ -124,8 +129,8 @@ bb3:
 
 // Make sure that we do not move retains over unreachable terminator.
 // CHECK-LABEL: sil @no_return_stops_codemotion : $@convention(thin) (Builtin.NativeObject) -> () {
-// CHECK: strong_retain
-// CHECK-NEXT: unreachable
+// CHECK-NOT: strong_retain
+// CHECK: } // end sil function 'no_return_stops_codemotion'
 sil @no_return_stops_codemotion : $@convention(thin) (Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject):
   %1 = alloc_ref $C
@@ -260,7 +265,7 @@ bb3:
 }
 
 final class MyArrayBuffer {
-  @sil_stored var dummyElements: Int32
+  @_hasStorage var dummyElements: Int32
   init()
 }
 
@@ -620,3 +625,136 @@ bb3(%p1: $C2, %p2: $C2):
   return %10 : $()
 }
 
+// CHECK-LABEL: sil @test_unowned
+// CHECK:      bb0(%0 : $Builtin.NativeObject):
+// CHECK-NEXT:   br bb1    
+// CHECK:      bb1:
+// CHECK-NEXT:   tuple
+// CHECK-NEXT:   return
+sil @test_unowned : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = ref_to_unowned %0 : $Builtin.NativeObject to $@sil_unowned Builtin.NativeObject
+  %2 = struct $Unowned (%1 : $@sil_unowned Builtin.NativeObject)
+  retain_value %2: $Unowned
+  br bb1
+
+bb1:
+  release_value %2: $Unowned
+  %5 = tuple()
+  return %5 : $()
+}
+
+// CHECK-RELEASE-HOISTING-LABEL: sil @dont_eliminate_strong_retain_and_unowned_release_pair
+// CHECK-RELEASE-HOISTING:       = function_ref @blocker
+// CHECK-RELEASE-HOISTING-NEXT:  apply
+// CHECK-RELEASE-HOISTING-NEXT:  strong_retain %0 : $Builtin.NativeObject
+// CHECK-RELEASE-HOISTING-NEXT:  unowned_release %1 : $@sil_unowned Builtin.NativeObject
+sil @dont_eliminate_strong_retain_and_unowned_release_pair : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = ref_to_unowned %0 : $Builtin.NativeObject to $@sil_unowned Builtin.NativeObject
+  %2 = struct $Unowned (%1 : $@sil_unowned Builtin.NativeObject)
+  retain_value %2: $Unowned
+  %b = function_ref @blocker : $@convention(thin) () -> ()
+  apply %b() : $@convention(thin) () -> ()
+  strong_retain %0: $Builtin.NativeObject
+  br bb1
+
+bb1:
+  release_value %2: $Unowned
+  apply %b() : $@convention(thin) () -> ()
+  strong_release %0: $Builtin.NativeObject
+  %5 = tuple()
+  return %5 : $()
+}
+
+sil [_semantics "programtermination_point"] @fatalError : $@convention(thin) () -> Never
+
+// This should eliminate all retains except for the first one b/c of user.
+// CHECK-LABEL: sil @eliminate_retains_on_fatalError_path_single_bb : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK: strong_retain
+// CHECK-NOT: strong_retain
+// CHECK: } // end sil function 'eliminate_retains_on_fatalError_path_single_bb'
+sil @eliminate_retains_on_fatalError_path_single_bb : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  strong_retain %0 : $Builtin.NativeObject
+  %2 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
+  apply %2(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
+  strong_retain %0 : $Builtin.NativeObject
+  %1 = function_ref @fatalError : $@convention(thin) () -> Never
+  strong_retain %0 : $Builtin.NativeObject
+  apply %1() : $@convention(thin) () -> Never
+  unreachable
+}
+
+// We should eliminate all retains except for the one that we sink into the
+// return block.
+//
+// CHECK-LABEL: sil @eliminate_retains_on_fatalError_path_diamond : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK-NOT: strong_retain
+// CHECK: bb4:
+// CHECK: strong_retain
+// CHECK-NOT: strong_retain
+// CHECK: } // end sil function 'eliminate_retains_on_fatalError_path_diamond'
+sil @eliminate_retains_on_fatalError_path_diamond : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  strong_retain %0 : $Builtin.NativeObject
+  cond_br undef, bb1, bb2
+
+bb1:
+  cond_br undef, bb3, bb4
+
+bb3:
+  strong_retain %0 : $Builtin.NativeObject
+  %1 = function_ref @fatalError : $@convention(thin) () -> Never
+  strong_retain %0 : $Builtin.NativeObject
+  apply %1() : $@convention(thin) () -> Never
+  unreachable
+
+bb4:
+  unreachable
+
+bb2:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Hoist releases above dealloc_stack
+// CHECK-LABEL: sil @testReleaseHoistDeallocStack : $@convention(thin) (AnyObject) -> () {
+// CHECK: bb0(%0 : $AnyObject):
+// CHECK-NOT:  retain
+// CHECK:      [[A:%.*]] = alloc_stack $Int64
+// CHECK-NEXT:  dealloc_stack [[A]] : $*Int64
+// CHECK-NOT:  release
+// CHECK-LABEL: } // end sil function 'testReleaseHoistDeallocStack'
+sil @testReleaseHoistDeallocStack : $@convention(thin) (AnyObject)->() {
+bb0(%0 : $AnyObject):
+  strong_retain %0 : $AnyObject
+  %alloc = alloc_stack $Int64
+  dealloc_stack %alloc : $*Int64
+  strong_release %0 : $AnyObject
+  %34 = tuple ()
+  return %34 : $()
+}
+
+// Do not hoist releases above builtins that operate on object references.
+//
+// CHECK-RELEASE-HOISTING-LABEL: sil @testCopyArray : $@convention(thin) (_ContiguousArrayBuffer<AnyObject>, Builtin.Word, Builtin.Word) -> Builtin.RawPointer {
+// CHECK-RELEASE-HOISTING: bb0(%0 : $_ContiguousArrayBuffer<AnyObject>, %1 : $Builtin.Word, %2 : $Builtin.Word):
+// CHECK-RELEASE-HOISTING:   builtin "copyArray"<AnyObject>
+// CHECK-RELEASE-HOISTING:   release_value %0 : $_ContiguousArrayBuffer<AnyObject>
+// CHECK-RELEASE-HOISTING-LABEL: } // end sil function 'testCopyArray'
+sil @testCopyArray : $@convention(thin) (_ContiguousArrayBuffer<AnyObject>, Builtin.Word, Builtin.Word) -> Builtin.RawPointer {
+bb0(%0 : $_ContiguousArrayBuffer<AnyObject>, %1 : $Builtin.Word, %2 : $Builtin.Word):
+  %eltty = metatype $@thick AnyObject.Protocol
+  %newptr = builtin "allocRaw"(%1 : $Builtin.Word, %1 : $Builtin.Word) : $Builtin.RawPointer
+  bind_memory %newptr : $Builtin.RawPointer, %1 : $Builtin.Word to $*AnyObject
+  %storage = struct_extract %0 : $_ContiguousArrayBuffer<AnyObject>, #_ContiguousArrayBuffer._storage
+  %elements = ref_tail_addr %storage : $__ContiguousArrayStorageBase, $AnyObject
+  %eltptr = address_to_pointer %elements : $*AnyObject to $Builtin.RawPointer
+  %objptr = struct $UnsafePointer<AnyObject> (%eltptr : $Builtin.RawPointer)
+  %ptrdep = mark_dependence %objptr : $UnsafePointer<AnyObject> on %storage : $__ContiguousArrayStorageBase
+  %rawptr = struct_extract %ptrdep : $UnsafePointer<AnyObject>, #UnsafePointer._rawValue
+  %copy = builtin "copyArray"<AnyObject>(%eltty : $@thick AnyObject.Protocol, %newptr : $Builtin.RawPointer, %rawptr : $Builtin.RawPointer, %1 : $Builtin.Word) : $()
+  release_value %0 : $_ContiguousArrayBuffer<AnyObject>
+  return %newptr : $Builtin.RawPointer
+}

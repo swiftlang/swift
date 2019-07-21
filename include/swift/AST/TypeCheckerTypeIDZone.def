@@ -1,0 +1,47 @@
+//===--- TypeCheckerTypeIDZone.def ------------------------------*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+//  This definition file describes the types in the type checker's
+//  TypeID zone, for use with the TypeID template.
+//
+//===----------------------------------------------------------------------===//
+SWIFT_TYPEID(InheritedTypeRequest)
+SWIFT_TYPEID(SuperclassTypeRequest)
+SWIFT_TYPEID(EnumRawTypeRequest)
+SWIFT_TYPEID(OverriddenDeclsRequest)
+SWIFT_TYPEID(IsObjCRequest)
+SWIFT_TYPEID(ProtocolRequiresClassRequest)
+SWIFT_TYPEID(ExistentialConformsToSelfRequest)
+SWIFT_TYPEID(IsFinalRequest)
+SWIFT_TYPEID(IsDynamicRequest)
+SWIFT_TYPEID(RequirementRequest)
+SWIFT_TYPEID(RequirementSignatureRequest)
+SWIFT_TYPEID(DefaultDefinitionTypeRequest)
+SWIFT_TYPEID(USRGenerationRequest)
+SWIFT_TYPEID(StructuralTypeRequest)
+SWIFT_TYPEID(DefaultTypeRequest)
+SWIFT_TYPEID(MangleLocalTypeDeclRequest)
+SWIFT_TYPEID(PropertyWrapperTypeInfoRequest)
+SWIFT_TYPEID(AttachedPropertyWrappersRequest)
+SWIFT_TYPEID(AttachedPropertyWrapperTypeRequest)
+SWIFT_TYPEID(PropertyWrapperBackingPropertyTypeRequest)
+SWIFT_TYPEID(PropertyWrapperBackingPropertyInfoRequest)
+SWIFT_TYPEID(AttachedFunctionBuilderRequest)
+SWIFT_TYPEID(FunctionBuilderTypeRequest)
+SWIFT_TYPEID(SelfAccessKindRequest)
+SWIFT_TYPEID(IsGetterMutatingRequest)
+SWIFT_TYPEID(IsSetterMutatingRequest)
+SWIFT_TYPEID(OpaqueReadOwnershipRequest)
+SWIFT_TYPEID(LazyStoragePropertyRequest)
+SWIFT_TYPEID(TypeCheckFunctionBodyUntilRequest)
+SWIFT_TYPEID(StoredPropertiesRequest)
+SWIFT_TYPEID(StoredPropertiesAndMissingMembersRequest)

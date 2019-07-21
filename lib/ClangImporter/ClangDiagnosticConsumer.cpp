@@ -66,8 +66,18 @@ namespace {
                                StringRef Message,
                                ArrayRef<clang::CharSourceRange> Ranges,
                                clang::DiagOrStoredDiag Info) override {
-      if (shouldSuppressDiagInSwiftBuffers(Info) && isInSwiftBuffers(Loc))
-        return;
+      if (isInSwiftBuffers(Loc)) {
+        // FIXME: Ideally, we'd report non-suppressed diagnostics on synthetic
+        // buffers, printing their names (eg. <swift-imported-modules>:...) but
+        // this risks printing _excerpts_ of those buffers to stderr too; at
+        // present the synthetic buffers are "large blocks of null bytes" which
+        // we definitely don't want to print out. So until we have some clever
+        // way to print the name but suppress printing excerpts, we just replace
+        // the Loc with an invalid one here, which suppresses both.
+        Loc = clang::FullSourceLoc();
+        if (shouldSuppressDiagInSwiftBuffers(Info))
+          return;
+      }
       callback(Loc, Level, Message);
     }
 
@@ -217,8 +227,8 @@ void ClangDiagnosticConsumer::HandleDiagnostic(
       diagKind = diag::note_from_clang;
       break;
     case clang::DiagnosticsEngine::Remark:
-      // FIXME: We don't handle remarks yet.
-      return;
+      diagKind = diag::remark_from_clang;
+      break;
     case clang::DiagnosticsEngine::Warning:
       diagKind = diag::warning_from_clang;
       break;

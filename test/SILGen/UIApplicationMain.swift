@@ -1,8 +1,12 @@
 // RUN: %empty-directory(%t)
 // RUN: %build-silgen-test-overlays
+// RUN: %build-silgen-test-overlays-ios
 
 // RUN: %target-swift-emit-silgen(mock-sdk: -sdk %S/Inputs -I %t) -parse-as-library %s | %FileCheck %s
 // RUN: %target-swift-emit-ir(mock-sdk: -sdk %S/Inputs -I %t) -parse-as-library %s | %FileCheck %s -check-prefix=IR
+
+// RUN: %target-swift-emit-silgen(mock-sdk: -Xcc -DSILGEN_TEST_UIAPPLICATIONMAIN_NULLABILITY -sdk %S/Inputs -I %t) -parse-as-library %s | %FileCheck %s
+// RUN: %target-swift-emit-ir(mock-sdk: -Xcc -DSILGEN_TEST_UIAPPLICATIONMAIN_NULLABILITY -sdk %S/Inputs -I %t) -parse-as-library %s | %FileCheck %s -check-prefix=IR
 
 // RUN: %target-swift-emit-silgen(mock-sdk: -sdk %S/Inputs -I %t) -parse-as-library %s -D REFERENCE | %FileCheck %s
 // RUN: %target-swift-emit-ir(mock-sdk: -sdk %S/Inputs -I %t) -parse-as-library %s -D REFERENCE | %FileCheck %s -check-prefix=IR
@@ -25,7 +29,7 @@ import UIKit
 @UIApplicationMain
 class MyDelegate : UIApplicationDelegate {}
 
-// CHECK-LABEL: sil @main
+// CHECK-LABEL: sil [ossa] @main
 // CHECK:         function_ref @UIApplicationMain
 // IR-LABEL: define{{( protected)?}} i32 @main
 // IR:            call i32 @UIApplicationMain

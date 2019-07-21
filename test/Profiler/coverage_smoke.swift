@@ -1,6 +1,10 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -profile-generate -profile-coverage-mapping -Xfrontend -disable-incremental-llvm-codegen -o %t/main
-// RUN: env LLVM_PROFILE_FILE=%t/default.profraw %target-run %t/main
+
+// This unusual use of 'sh' allows the path of the profraw file to be
+// substituted by %target-run.
+// RUN: %target-run sh -c 'env LLVM_PROFILE_FILE=$1 $2' -- %t/default.profraw %t/main
+
 // RUN: %llvm-profdata merge %t/default.profraw -o %t/default.profdata
 // RUN: %llvm-profdata show %t/default.profdata -function=f_internal | %FileCheck %s --check-prefix=CHECK-INTERNAL
 // RUN: %llvm-profdata show %t/default.profdata -function=f_private | %FileCheck %s --check-prefix=CHECK-PRIVATE
@@ -11,6 +15,7 @@
 // RUN: rm -rf %t
 
 // REQUIRES: profile_runtime
+// REQUIRES: executable_test
 // REQUIRES: OS=macosx
 
 // CHECK-INTERNAL: Functions shown: 1
@@ -128,10 +133,44 @@ extension Struct1 {
 var g2: Int = 0
 
 class Class3 {
-  var m1 = g2 == 0
-             ? "false" // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
-             : "true"; // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
+  var m1 = g2 == 0     // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}2
+             ? "false" // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}2
+             : "true"; // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}2
 }
+
+// rdar://34244637: Wrong coverage for do/catch sequence
+enum CustomError : Error {
+  case Err
+}
+func throwError(_ b: Bool) throws {
+  if b {
+    throw CustomError.Err
+  }
+}
+func catchError(_ b: Bool) -> Int {
+  do {
+    try throwError(b) // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}2
+  } catch {           // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}2
+    return 1          // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
+  }                   // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
+  let _ = 1 + 1       // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
+  return 0            // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
+}
+let _ = catchError(true)
+let _ = catchError(false)
+
+func catchError2(_ b: Bool) -> Int {
+  do {
+    throw CustomError.Err // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}2
+  } catch {
+    if b {                // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}2
+      return 1            // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
+    }
+  }
+  return 0                // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
+}
+let _ = catchError2(true)
+let _ = catchError2(false)
 
 main() // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
 foo()  // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
@@ -149,5 +188,21 @@ let _ = Class3()
 
 let _ = Struct1(field: 1)
 let _ = Struct1()
+
+struct Struct2 {
+  func visible() {
+    hidden()
+  }
+  private func hidden() {
+    var x: Int = 0 // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
+    func helper() {
+      x += 1 // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
+    }
+    helper() // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
+  }
+}
+
+var s2 = Struct2()
+s2.visible()
 
 // CHECK-REPORT: TOTAL {{.*}} 100.00% {{.*}} 100.00%

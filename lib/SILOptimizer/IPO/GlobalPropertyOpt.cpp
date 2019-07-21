@@ -128,25 +128,6 @@ class GlobalPropertyOpt {
     return false;
   }
 
-  bool isVisibleExternally(VarDecl *decl) {
-    AccessLevel access = decl->getEffectiveAccess();
-    SILLinkage linkage;
-    switch (access) {
-      case AccessLevel::Private:
-      case AccessLevel::FilePrivate:
-        linkage = SILLinkage::Private;
-        break;
-      case AccessLevel::Internal:
-        linkage = SILLinkage::Hidden;
-        break;
-      case AccessLevel::Public:
-      case AccessLevel::Open:
-        linkage = SILLinkage::Public;
-        break;
-    }
-    return isPossiblyUsedExternally(linkage, M.isWholeModule());
-  }
-  
   static bool canAddressEscape(SILValue V, bool acceptStore);
 
   /// Gets the entry for a struct or class field.
@@ -154,7 +135,7 @@ class GlobalPropertyOpt {
     Entry * &entry = FieldEntries[Field];
     if (!entry) {
       entry = new (EntryAllocator.Allocate()) Entry(SILValue(), Field);
-      if (isVisibleExternally(Field))
+      if (M.isVisibleExternally(Field))
         setAddressEscapes(entry);
     }
     return entry;
@@ -196,21 +177,21 @@ class GlobalPropertyOpt {
   }
   
   void setAddressEscapes(Entry *entry) {
-    DEBUG(llvm::dbgs() << "     address escapes: " << *entry);
+    LLVM_DEBUG(llvm::dbgs() << "     address escapes: " << *entry);
     setNotNative(entry);
   }
   
   void setNotNative(Entry *entry) {
     if (entry->isNativeTypeChecked) {
-      DEBUG(llvm::dbgs() << "      set not-native: " << *entry);
+      LLVM_DEBUG(llvm::dbgs() << "      set not-native: " << *entry);
       entry->isNativeTypeChecked = false;
       WorkList.push_back(entry);
     }
   }
   
   void addDependency(Entry *from, Entry *to) {
-    DEBUG(llvm::dbgs() << "    add dependency from: " << *from <<
-                          "      to: " << *to);
+    LLVM_DEBUG(llvm::dbgs() << "    add dependency from: " << *from
+                            << "      to: " << *to);
     from->Dependencies.push_back(to);
   }
   
@@ -293,11 +274,11 @@ void GlobalPropertyOpt::scanInstruction(swift::SILInstruction *Inst) {
       case ArrayCallKind::kMakeMutable:
         // The return value of those calls (if any) do not return a non-native
         // swift array.
-        DEBUG(llvm::dbgs() << "      array semantics call: " << *AI);
+        LLVM_DEBUG(llvm::dbgs() << "      array semantics call: " << *AI);
         return;
       case ArrayCallKind::kArrayPropsIsNativeTypeChecked:
         // Remember the property-calls for later.
-        DEBUG(llvm::dbgs() << "      property check: " << *AI);
+        LLVM_DEBUG(llvm::dbgs() << "      property check: " << *AI);
         propertyCalls.push_back(AI);
         break;
       default:
@@ -327,7 +308,8 @@ void GlobalPropertyOpt::scanInstruction(swift::SILInstruction *Inst) {
       // If the address of an array-field escapes, we give up for that field.
       if (canAddressEscape(projection, true)) {
         setAddressEscapes(getAddrEntry(projection));
-        DEBUG(llvm::dbgs() << "      field address escapes: " << *projection);
+        LLVM_DEBUG(llvm::dbgs() << "      field address escapes: "
+                                << *projection);
       }
       return;
     }
@@ -359,12 +341,11 @@ void GlobalPropertyOpt::scanInstruction(swift::SILInstruction *Inst) {
   } else if (auto *SI = dyn_cast<StructInst>(Inst)) {
     // Add dependencies from the array operands to the struct array-fields.
     StructDecl *S = SI->getStructDecl();
-    NominalTypeDecl::StoredPropertyRange Range = S->getStoredProperties();
+    auto Props = S->getStoredProperties();
     auto Operands = SI->getAllOperands();
-    unsigned Index = 0;
-    for (auto I = Range.begin(), E = Range.end(); I != E; ++I, ++Index) {
-      VarDecl *VD = *I;
-      const Operand &Op = Operands[Index];
+    for (unsigned I = 0, E = Props.size(); I < E; ++I) {
+      VarDecl *VD = Props[I];
+      const Operand &Op = Operands[I];
       if (isArrayType(Op.get()->getType())) {
         addDependency(getValueEntry(Op.get()), getFieldEntry(VD));
       }
@@ -380,8 +361,8 @@ void GlobalPropertyOpt::scanInstruction(swift::SILInstruction *Inst) {
   for (auto result : Inst->getResults()) {
     SILType Type = result->getType();
     if (isArrayType(Type) || isTupleWithArray(Type.getASTType())) {
-      DEBUG(llvm::dbgs() << "      value could be non-native array: "
-                         << *result);
+      LLVM_DEBUG(llvm::dbgs() << "      value could be non-native array: "
+                              << *result);
       setNotNative(getValueEntry(result));
     }
   }
@@ -390,9 +371,10 @@ void GlobalPropertyOpt::scanInstruction(swift::SILInstruction *Inst) {
 /// Scans all instructions of the module and builds the dependency graph.
 void GlobalPropertyOpt::scanInstructions() {
   for (auto &F : M) {
-    DEBUG(llvm::dbgs() << "  scan function " << F.getName() << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "  scan function " << F.getName() << "\n");
     for (auto &BB : F) {
-      DEBUG(llvm::dbgs() << "    scan basic block " << BB.getDebugID() << "\n");
+      LLVM_DEBUG(llvm::dbgs() << "    scan basic block " << BB.getDebugID()
+                              << "\n");
 
       // Add dependencies from predecessor's terminator operands to the block
       // arguments.
@@ -421,7 +403,7 @@ void GlobalPropertyOpt::scanInstructions() {
           if (!hasPreds) {
             // This is the case for the function entry block.
             setNotNative(getValueEntry(BBArg));
-            DEBUG(llvm::dbgs() << "    unknown entry argument " << *BBArg);
+            LLVM_DEBUG(llvm::dbgs() << "    unknown entry argument " << *BBArg);
           }
         }
         ++argIdx;
@@ -436,13 +418,13 @@ void GlobalPropertyOpt::scanInstructions() {
 
 /// Propagates the properties through the graph.
 void GlobalPropertyOpt::propagatePropertiesInGraph() {
-  DEBUG(llvm::dbgs() << "  propagate properties\n");
+  LLVM_DEBUG(llvm::dbgs() << "  propagate properties\n");
 
   setAddressEscapes(&unknownAddressEntry);
   
   while (!WorkList.empty()) {
     Entry *entry = WorkList.pop_back_val();
-    DEBUG(llvm::dbgs() << "    handle non-native entry: " << *entry);
+    LLVM_DEBUG(llvm::dbgs() << "    handle non-native entry: " << *entry);
     assert(!entry->isNativeTypeChecked);
     
     // Propagate the false-value to the dependent entries.
@@ -474,8 +456,9 @@ void GlobalPropertyOpt::replacePropertyCalls() {
         (semCall.getKind() == ArrayCallKind::kArrayPropsIsNativeTypeChecked) &&
              "invalid semantics type");
   
-      DEBUG(llvm::dbgs() << "  remove property check in function " <<
-            AI->getParent()->getParent()->getName() << ": " << *AI);
+      LLVM_DEBUG(llvm::dbgs() << "  remove property check in function "
+                              << AI->getParent()->getParent()->getName()
+                              << ": " << *AI);
       SILBuilder B(AI);
       SILType IntBoolTy = SILType::getBuiltinIntegerType(1, B.getASTContext());
       auto C1 = B.createIntegerLiteral(AI->getLoc(), IntBoolTy, 1);
@@ -517,7 +500,7 @@ class GlobalPropertyOptPass : public SILModuleTransform {
   void run() override {
     SILModule *M = getModule();
     
-    DEBUG(llvm::dbgs() << "** GlobalPropertyOpt **\n");
+    LLVM_DEBUG(llvm::dbgs() << "** GlobalPropertyOpt **\n");
     
     GlobalPropertyOpt(*M).run(this);
   }

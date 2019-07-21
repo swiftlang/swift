@@ -10,7 +10,7 @@ struct S: Hashable {
   let y: String
   var z: C
 
-  var hashValue: Int { get }
+  func hash(into hasher: inout Hasher)
   static func ==(x: S, y: S) -> Bool
 }
 class C: Hashable {
@@ -23,7 +23,7 @@ class C: Hashable {
     get set
   }
 
-  var hashValue: Int { get }
+  func hash(into hasher: inout Hasher)
   static func ==(x: C, y: C) -> Bool
 }
 
@@ -41,6 +41,13 @@ public struct External<T> {
   var ro: T
 
   subscript<U: Hashable>(ro _: U) -> T { get }
+}
+
+struct T {
+  var x: (Int, Int)
+  var y: (a: Int, b: Int, c: Int)
+  let z: (Int, Int)
+  let w: (Int, C)
 }
 
 // CHECK-LABEL: sil shared @stored_properties
@@ -65,6 +72,21 @@ entry:
   %a = keypath $WritableKeyPath<Gen<D,E,F>, D>, <G: P, H: Q, I: R> (root $Gen<G, H, I>; stored_property #Gen.x : $G) <D, E, F>
   // CHECK: keypath $KeyPath<Gen<D, E, F>, E>, <τ_0_0, τ_0_1, τ_0_2 where {{.*}}> (root $Gen<τ_0_0, τ_0_1, τ_0_2>; stored_property #Gen.y : $τ_0_1) <D, E, F>
   %b = keypath $KeyPath<Gen<D,E,F>, E>, <G: P, H: Q, I: R> (root $Gen<G, H, I>; stored_property #Gen.y : $H) <D, E, F>
+
+  return undef : $()
+}
+
+// CHECK-LABEL: sil shared @tuple_elements
+sil shared @tuple_elements : $@convention(thin) () -> () {
+entry:
+  // CHECK: keypath $WritableKeyPath<T, Int>, (root $T; stored_property #T.x : $(Int, Int); tuple_element #0 : $Int)
+  %a = keypath $WritableKeyPath<T, Int>, (root $T; stored_property #T.x : $(Int, Int); tuple_element #0 : $Int)
+  // CHECK: keypath $WritableKeyPath<T, Int>, (root $T; stored_property #T.y : $(a: Int, b: Int, c: Int); tuple_element #2 : $Int)
+  %b = keypath $WritableKeyPath<T, Int>, (root $T; stored_property #T.y : $(a: Int, b: Int, c: Int); tuple_element #2 : $Int)
+  // CHECK: keypath $KeyPath<T, Int>, (root $T; stored_property #T.z : $(Int, Int); tuple_element #1 : $Int)
+  %c = keypath $KeyPath<T, Int>, (root $T; stored_property #T.z : $(Int, Int); tuple_element #1 : $Int)
+  // CHECK: keypath $ReferenceWritableKeyPath<T, C>, (root $T; stored_property #T.w : $(Int, C); tuple_element #1 : $C)
+  %d = keypath $ReferenceWritableKeyPath<T, C>, (root $T; stored_property #T.w : $(Int, C); tuple_element #1 : $C)
 
   return undef : $()
 }
@@ -113,6 +135,17 @@ entry:
   return undef : $()
 }
 
+// CHECK-LABEL: sil shared @tuple_generic
+sil shared @ tuple_generic : $@convention(thin) <T, U> () -> () {
+entry:
+  // CHECK: keypath $WritableKeyPath<(T, U), T>, <τ_0_0, τ_0_1> (root $(τ_0_0, τ_0_1); tuple_element #0 : $τ_0_0) <T, U>
+  %a = keypath $WritableKeyPath<(T, U), T>, <τ_0_0, τ_0_1> (root $(τ_0_0, τ_0_1); tuple_element #0 : $τ_0_0) <T, U>
+  // CHECK: keypath $WritableKeyPath<(T, U), U>, <τ_0_0, τ_0_1> (root $(τ_0_0, τ_0_1); tuple_element #1 : $τ_0_1) <T, U>
+  %b = keypath $WritableKeyPath<(T, U), U>, <τ_0_0, τ_0_1> (root $(τ_0_0, τ_0_1); tuple_element #1 : $τ_0_1) <T, U>
+
+  return undef : $()
+}
+
 // CHECK-LABEL: sil @optional
 sil @optional : $@convention(thin) () -> () {
 entry:
@@ -144,28 +177,10 @@ entry(%s : $S, %c : $C):
 }
 
 // CHECK-LABEL: sil @external
-sil @external : $@convention(thin) <A, B: Hashable> (@in_guaranteed B) -> () {
-entry(%z : $*B):
-  // CHECK: %1 = keypath $KeyPath<External<Int>, Int>, (root $External<Int>; external #External.ro<Int> : $Int)
-  %a = keypath $KeyPath<External<Int>, Int>, (root $External<Int>; external #External.ro<Int> : $Int)
-
-  // CHECK: %2 = keypath $KeyPath<External<A>, A>, <τ_0_0, τ_0_1, τ_0_2> (root $External<τ_0_2>; external #External.ro<τ_0_2> : $τ_0_2) <A, A, A>
-  %b = keypath $KeyPath<External<A>, A>, <C, D, E> (root $External<E>; external #External.ro <E> : $E) <A, A, A>
-
-  // CHECK: %3 = keypath $KeyPath<External<Int>, Int>, <τ_0_0> (root $External<τ_0_0>; external #External.ro<τ_0_0> : $τ_0_0) <Int>
-  %c = keypath $KeyPath<External<Int>, Int>, <F> (root $External<F>; external #External.ro <F> : $F) <Int>
-
-  // CHECK: %4 = keypath $KeyPath<External<A>, A>, <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (
-  // CHECK-SAME: root $External<τ_0_1>;
-  // CHECK-SAME: external #External.subscript<τ_0_1, τ_0_0>[%$0 : $τ_0_0 : $*τ_0_0] : $τ_0_1,
-  // CHECK-SAME: indices_equals @equals_external_subscript
-  // CHECK-SAME: indices_hash @hash_external_subscript
-  // CHECK-SAME: ) <B, A> (%0)
-  %d = keypath $KeyPath<External<A>, A>, <G: Hashable, H> (
-    root $External<H>;
-    external #External.subscript <H, G> [%$0 : $G : $*G] : $H,
-      indices_equals @equals_external_subscript : $@convention(thin) <U: Hashable, T> (UnsafeRawPointer, UnsafeRawPointer) -> Bool,
-      indices_hash @hash_external_subscript : $@convention(thin) <U: Hashable, T> (UnsafeRawPointer) -> Int) <B, A> (%z)
+sil @external : $@convention(thin) <D: P, E: Q, F: R> () -> () {
+entry:
+  // CHECK: keypath $KeyPath<Gen<D, E, F>, D>, <τ_0_0, τ_0_1, τ_0_2 where τ_0_0 : P, τ_0_1 : Q, τ_0_2 : R> (root $Gen<τ_0_0, τ_0_1, τ_0_2>; settable_property $τ_0_0, id @id_a : $@convention(thin) () -> (), getter @get_gen_a : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2 where τ_0_0 : P, τ_0_1 : Q, τ_0_2 : R> (@in_guaranteed Gen<τ_0_0, τ_0_1, τ_0_2>) -> @out τ_0_0, setter @set_gen_a : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2 where τ_0_0 : P, τ_0_1 : Q, τ_0_2 : R> (@in_guaranteed τ_0_0, @in_guaranteed Gen<τ_0_0, τ_0_1, τ_0_2>) -> (), external #Gen.x<τ_0_0, τ_0_1, τ_0_2>) <D, E, F>
+  %a = keypath $KeyPath<Gen<D, E, F>, D>, <G: P, H: Q, I: R> (root $Gen<G, H, I>; settable_property $G, id @id_a : $@convention(thin) () -> (), getter @get_gen_a : $@convention(thin) <X3: P, Y3: Q, Z3: R> (@in_guaranteed Gen<X3, Y3, Z3>) -> @out X3, setter @set_gen_a : $@convention(thin) <X4: P, Y4: Q, Z4: R> (@in_guaranteed X4, @in_guaranteed Gen<X4, Y4, Z4>) -> (), external #Gen.x<G, H, I>) <D, E, F>
 
   return undef : $()
 }

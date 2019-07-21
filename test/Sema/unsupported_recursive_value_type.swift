@@ -42,6 +42,31 @@ enum RecursiveByGenericSubstitutionEnum<T> {
   case A(T)
 }
 
+enum InconstructibleEnum1 { // expected-warning {{enum containing only recursive cases is impossible to instantiate}}
+  indirect case A(InconstructibleEnum1)
+}
+enum InconstructibleEnum2 { // OK
+  indirect case A(InconstructibleEnum2)
+  case B(Bool)
+  indirect case C(Int, InconstructibleEnum2)
+}
+enum InconstructibleEnum3 { // expected-warning {{enum containing only recursive cases is impossible to instantiate}}
+  indirect case B(Int, InconstructibleEnum3)
+}
+indirect enum InconstructibleEnum4 {
+  // expected-warning@-1 {{enum containing only recursive cases is impossible to instantiate}}
+  case A(InconstructibleEnum4)
+}
+indirect enum InconstructibleEnum5 {
+  // expected-warning@-1 {{enum containing only recursive cases is impossible to instantiate}}
+  case B(Int, InconstructibleEnum5)
+}
+indirect enum InconstructibleEnum6 { // OK
+  case A(InconstructibleEnum6)
+  case B(Bool)
+  case C(Int, InconstructibleEnum6)
+}
+
 struct RecursiveByBeingInTupleStruct {
   let a: (Int, RecursiveByBeingInTupleStruct) // expected-error{{value type 'RecursiveByBeingInTupleStruct' cannot have a stored property that recursively contains it}}
   // expected-note@-1 {{cycle beginning here: (Int, RecursiveByBeingInTupleStruct) -> (.1: RecursiveByBeingInTupleStruct)}}

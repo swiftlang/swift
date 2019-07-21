@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -parse-as-library -swift-version 4 %s -target x86_64-apple-macosx10.50 -verify
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -parse-as-library -swift-version 4 %s -target x86_64-apple-macosx10.50 -dump-ast 2> %t.ast
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -parse-as-library -swift-version 4 %s -target x86_64-apple-macosx10.50 -dump-ast > %t.ast
 // RUN: %FileCheck %s < %t.ast
 
 // REQUIRES: objc_interop
@@ -17,6 +17,6 @@ class CodingI : NSObject, NSCoding {
 
 @available(OSX 10.51, *)
 class OuterCodingJ {
-  // CHECK-NOT: class_decl "NestedJ"{{.*}}@_staticInitializeObjCMetadata
+  // CHECK-NOT: class_decl{{.*}}"NestedJ"{{.*}}@_staticInitializeObjCMetadata
   class NestedJ : CodingI { }
 }

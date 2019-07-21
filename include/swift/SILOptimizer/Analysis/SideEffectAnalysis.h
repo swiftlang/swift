@@ -10,9 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SILOPTIMIZER_ANALYSIS_SIDEEFFECTANALYSIS_H_
-#define SWIFT_SILOPTIMIZER_ANALYSIS_SIDEEFFECTANALYSIS_H_
+#ifndef SWIFT_SILOPTIMIZER_ANALYSIS_SIDEEFFECTANALYSIS_H
+#define SWIFT_SILOPTIMIZER_ANALYSIS_SIDEEFFECTANALYSIS_H
 
+#include "swift/SIL/ApplySite.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SILOptimizer/Analysis/BottomUpIPAnalysis.h"
@@ -89,7 +90,8 @@ class GenericFunctionEffectAnalysis : public BottomUpIPAnalysis {
   BasicCalleeAnalysis *BCA;
 
 public:
-  GenericFunctionEffectAnalysis(AnalysisKind kind) : BottomUpIPAnalysis(kind) {}
+  GenericFunctionEffectAnalysis(SILAnalysisKind kind)
+      : BottomUpIPAnalysis(kind) {}
 
   const FunctionEffects &getEffects(SILFunction *F) {
     FunctionInfo *functionInfo = getFunctionInfo(F);
@@ -122,11 +124,11 @@ public:
   virtual void invalidate(SILFunction *F, InvalidationKind K) override;
 
   /// Notify the analysis about a newly created function.
-  virtual void notifyAddFunction(SILFunction *F) override {}
+  virtual void notifyAddedOrModifiedFunction(SILFunction *F) override {}
 
   /// Notify the analysis about a function which will be deleted from the
   /// module.
-  virtual void notifyDeleteFunction(SILFunction *F) override {
+  virtual void notifyWillDeleteFunction(SILFunction *F) override {
     invalidate(F, InvalidationKind::Nothing);
   }
 
@@ -406,8 +408,8 @@ public:
   }
 
 protected:
-  /// Set the side-effects of a function, which has an @effects attribute.
-  /// Returns true if \a F has an @effects attribute which could be handled.
+  /// Set the side-effects of a function, which has an @_effects attribute.
+  /// Returns true if \a F has an @_effects attribute which could be handled.
   bool setDefinedEffects(SILFunction *F);
 
   /// Set the side-effects of a semantic call.
@@ -441,13 +443,13 @@ class SideEffectAnalysis
 public:
   SideEffectAnalysis()
       : GenericFunctionEffectAnalysis<FunctionSideEffects>(
-            AnalysisKind::SideEffect) {}
+            SILAnalysisKind::SideEffect) {}
 
   static bool classof(const SILAnalysis *S) {
-    return S->getKind() == AnalysisKind::SideEffect;
+    return S->getKind() == SILAnalysisKind::SideEffect;
   }
 };
 
 } // end namespace swift
 
-#endif // SWIFT_SILOPTIMIZER_ANALYSIS_SIDEEFFECTANALYSIS_H_
+#endif // SWIFT_SILOPTIMIZER_ANALYSIS_SIDEEFFECTANALYSIS_H

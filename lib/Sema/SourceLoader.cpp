@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 ///
 /// \file
-/// \brief A simple module loader that loads .swift source files.
+/// A simple module loader that loads .swift source files.
 ///
 //===----------------------------------------------------------------------===//
 
@@ -42,7 +42,7 @@ static FileOrError findModule(ASTContext &ctx, StringRef moduleID,
     llvm::sys::path::append(inputFilename, moduleID);
     inputFilename.append(".swift");
     llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
-      llvm::MemoryBuffer::getFile(inputFilename.str());
+      ctx.SourceMgr.getFileSystem()->getBufferForFile(inputFilename.str());
 
     // Return if we loaded a file
     if (FileBufOrErr)
@@ -69,6 +69,11 @@ class SkipNonTransparentFunctions : public DelayedParsingCallbacks {
 };
 
 } // unnamed namespace
+
+void SourceLoader::collectVisibleTopLevelModuleNames(
+    SmallVectorImpl<Identifier> &names) const {
+  // TODO: Implement?
+}
 
 bool SourceLoader::canImportModule(std::pair<Identifier, SourceLoc> ID) {
   // Search the memory buffers to see if we can find this file on disk.
@@ -109,7 +114,9 @@ ModuleDecl *SourceLoader::loadModule(SourceLoc importLoc,
   std::unique_ptr<llvm::MemoryBuffer> inputFile =
     std::move(inputFileOrError.get());
 
-  addDependency(inputFile->getBufferIdentifier());
+  if (dependencyTracker)
+    dependencyTracker->addDependency(inputFile->getBufferIdentifier(),
+                                     /*isSystem=*/false);
 
   // Turn off debugging while parsing other modules.
   llvm::SaveAndRestore<bool> turnOffDebug(Ctx.LangOpts.DebugConstraintSolver,
@@ -123,7 +130,7 @@ ModuleDecl *SourceLoader::loadModule(SourceLoc importLoc,
     bufferID = Ctx.SourceMgr.addNewSourceBuffer(std::move(inputFile));
 
   auto *importMod = ModuleDecl::create(moduleID.first, Ctx);
-  if (EnableResilience)
+  if (EnableLibraryEvolution)
     importMod->setResilienceStrategy(ResilienceStrategy::Resilient);
   Ctx.LoadedModules[moduleID.first] = importMod;
 
@@ -138,7 +145,7 @@ ModuleDecl *SourceLoader::loadModule(SourceLoc importLoc,
   importMod->addFile(*importFile);
 
   bool done;
-  PersistentParserState persistentState;
+  PersistentParserState persistentState(Ctx);
   SkipNonTransparentFunctions delayCallbacks;
   parseIntoSourceFile(*importFile, bufferID, &done, nullptr, &persistentState,
                       SkipBodies ? &delayCallbacks : nullptr);

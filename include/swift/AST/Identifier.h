@@ -17,6 +17,7 @@
 #ifndef SWIFT_AST_IDENTIFIER_H
 #define SWIFT_AST_IDENTIFIER_H
 
+#include "swift/Basic/EditorPlaceholder.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -125,7 +126,7 @@ public:
   }
 
   static bool isEditorPlaceholder(StringRef name) {
-    return name.startswith("<#");
+    return swift::isEditorPlaceholder(name);
   }
 
   bool isEditorPlaceholder() const {
@@ -263,6 +264,8 @@ public:
 
   bool isSpecial() const { return getKind() != Kind::Normal; }
 
+  bool isSubscript() const { return getKind() == Kind::Subscript; }
+
   /// Return the identifier backing the name. Assumes that the name is not
   /// special.
   Identifier getIdentifier() const {
@@ -296,6 +299,7 @@ public:
     case Kind::Destructor:
       return "deinit";
     }
+    llvm_unreachable("unhandled kind");
   }
 
   int compare(DeclBaseName other) const {
@@ -590,6 +594,12 @@ public:
                             "only for use within the debugger");
 };
 
+enum class ObjCSelectorFamily : unsigned {
+  None,
+#define OBJC_SELECTOR_FAMILY(LABEL, PREFIX) LABEL,
+#include "swift/AST/ObjCSelectorFamily.def"
+};
+
 /// Represents an Objective-C selector.
 class ObjCSelector {
   /// The storage for an Objective-C selector.
@@ -653,6 +663,8 @@ public:
   ///
   /// \param scratch Scratch space to use.
   StringRef getString(llvm::SmallVectorImpl<char> &scratch) const;
+
+  ObjCSelectorFamily getSelectorFamily() const;
 
   void *getOpaqueValue() const { return Storage.getOpaqueValue(); }
   static ObjCSelector getFromOpaqueValue(void *p) {

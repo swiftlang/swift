@@ -22,7 +22,7 @@ namespace sourcekitd {
 #define KEY(NAME, CONTENT) extern SourceKit::UIdent Key##NAME;
 #include "SourceKit/Core/ProtocolUIDs.def"
 
-/// \brief Used for determining the printing order of dictionary keys.
+/// Used for determining the printing order of dictionary keys.
 bool compareDictKeys(SourceKit::UIdent LHS, SourceKit::UIdent RHS);
 
 }

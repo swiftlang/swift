@@ -9,8 +9,10 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-
-/// \file The SIL linker walks the call graph beginning at a starting function,
+///
+/// \file
+///
+/// The SIL linker walks the call graph beginning at a starting function,
 /// deserializing functions, vtables and witness tables.
 ///
 /// The behavior of the linker is controlled by a LinkMode value. The LinkMode
@@ -48,6 +50,8 @@
 /// even those with public linkage. This is not strictly necessary, since the
 /// devirtualizer deserializes vtables and witness tables as needed. However,
 /// doing so early creates more opportunities for optimization.
+///
+//===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-linker"
 #include "Linker.h"
@@ -74,8 +78,8 @@ STATISTIC(NumFuncLinked, "Number of SIL functions linked");
 void SILLinkerVisitor::addFunctionToWorklist(SILFunction *F) {
   assert(F->isExternalDeclaration());
 
-  DEBUG(llvm::dbgs() << "Imported function: "
-                     << F->getName() << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "Imported function: "
+                          << F->getName() << "\n");
   if (Mod.loadFunction(F)) {
     if (F->isExternalDeclaration())
       return;
@@ -154,28 +158,29 @@ void SILLinkerVisitor::linkInVTable(ClassDecl *D) {
 //===----------------------------------------------------------------------===//
 
 void SILLinkerVisitor::visitApplyInst(ApplyInst *AI) {
-  if (auto sig = AI->getCallee()->getType().castTo<SILFunctionType>()
-                   ->getGenericSignature()) {
-    visitApplySubstitutions(sig->getSubstitutionMap(AI->getSubstitutions()));
-  }
+  visitApplySubstitutions(AI->getSubstitutionMap());
 }
 
 void SILLinkerVisitor::visitTryApplyInst(TryApplyInst *TAI) {
-  if (auto sig = TAI->getCallee()->getType().castTo<SILFunctionType>()
-                   ->getGenericSignature()) {
-    visitApplySubstitutions(sig->getSubstitutionMap(TAI->getSubstitutions()));
-  }
+  visitApplySubstitutions(TAI->getSubstitutionMap());
 }
 
 void SILLinkerVisitor::visitPartialApplyInst(PartialApplyInst *PAI) {
-  if (auto sig = PAI->getCallee()->getType().castTo<SILFunctionType>()
-                    ->getGenericSignature()) {
-    visitApplySubstitutions(sig->getSubstitutionMap(PAI->getSubstitutions()));
-  }
+  visitApplySubstitutions(PAI->getSubstitutionMap());
 }
 
 void SILLinkerVisitor::visitFunctionRefInst(FunctionRefInst *FRI) {
-  maybeAddFunctionToWorklist(FRI->getReferencedFunction());
+  maybeAddFunctionToWorklist(FRI->getInitiallyReferencedFunction());
+}
+
+void SILLinkerVisitor::visitDynamicFunctionRefInst(
+    DynamicFunctionRefInst *FRI) {
+  maybeAddFunctionToWorklist(FRI->getInitiallyReferencedFunction());
+}
+
+void SILLinkerVisitor::visitPreviousDynamicFunctionRefInst(
+    PreviousDynamicFunctionRefInst *FRI) {
+  maybeAddFunctionToWorklist(FRI->getInitiallyReferencedFunction());
 }
 
 // Eagerly visiting all used conformances leads to a large blowup
@@ -187,7 +192,7 @@ static bool mustDeserializeProtocolConformance(SILModule &M,
                                                ProtocolConformanceRef c) {
   if (!c.isConcrete())
     return false;
-  auto conformance = c.getConcrete()->getRootNormalConformance();
+  auto conformance = c.getConcrete()->getRootConformance();
   return M.Types.protocolRequiresWitnessTable(conformance->getProtocol())
     && isa<ClangModuleUnit>(conformance->getDeclContext()
                                        ->getModuleScopeContext());
@@ -195,7 +200,7 @@ static bool mustDeserializeProtocolConformance(SILModule &M,
 
 void SILLinkerVisitor::visitProtocolConformance(
     ProtocolConformanceRef ref, const Optional<SILDeclRef> &Member) {
-  // If an abstract protocol conformance was passed in, just return false.
+  // If an abstract protocol conformance was passed in, do nothing.
   if (ref.isAbstract())
     return;
   
@@ -206,31 +211,22 @@ void SILLinkerVisitor::visitProtocolConformance(
   
   if (!VisitedConformances.insert(C).second)
     return;
-  
-  SILWitnessTable *WT = Mod.lookUpWitnessTable(C, true);
 
-  // If we don't find any witness table for the conformance, bail and return
-  // false.
-  if (!WT) {
-    Mod.createWitnessTableDeclaration(
-        C, getLinkageForProtocolConformance(
-               C->getRootNormalConformance(), NotForDefinition));
-
-    // Adding the declaration may allow us to now deserialize the body.
-    // Force the body if we must deserialize this witness table.
-    if (mustDeserialize) {
-      WT = Mod.lookUpWitnessTable(C, true);
-      assert(WT && WT->isDefinition()
-             && "unable to deserialize witness table when we must?!");
-    } else {
-      return;
-    }
-  }
+  auto *WT = Mod.lookUpWitnessTable(C, mustDeserialize);
 
   // If the looked up witness table is a declaration, there is nothing we can
-  // do here. Just bail and return false.
-  if (WT->isDeclaration())
+  // do here.
+  if (WT == nullptr || WT->isDeclaration()) {
+#ifndef NDEBUG
+    if (mustDeserialize) {
+      llvm::errs() << "SILGen failed to emit required conformance:\n";
+      ref.dump(llvm::errs());
+      llvm::errs() << "\n";
+      abort();
+    }
+#endif
     return;
+  }
 
   auto maybeVisitRelatedConformance = [&](ProtocolConformanceRef c) {
     // Formally all conformances referenced by a used conformance are used.
@@ -283,31 +279,17 @@ void SILLinkerVisitor::visitProtocolConformance(
   }
 }
 
-void SILLinkerVisitor::visitApplySubstitutions(const SubstitutionMap &subs) {
-  for (auto &reqt : subs.getGenericSignature()->getRequirements()) {
-    switch (reqt.getKind()) {
-    case RequirementKind::Conformance: {
-      auto conformance = subs.lookupConformance(
-          reqt.getFirstType()->getCanonicalType(),
-          cast<ProtocolDecl>(reqt.getSecondType()->getAnyNominal()))
-        .getValue();
-      
-      // Formally all conformances referenced in a function application are
-      // used. However, eagerly visiting them all at this point leads to a
-      // large blowup in the amount of SIL we read in, and we aren't very
-      // systematic about laziness. For optimization purposes we can defer
-      // reading in most conformances until we need them for devirtualization.
-      // However, we *must* pull in shared clang-importer-derived conformances
-      // we potentially use, since we may not otherwise have a local definition.
-      if (mustDeserializeProtocolConformance(Mod, conformance)) {
-        visitProtocolConformance(conformance, None);
-      }
-      break;
-    }
-    case RequirementKind::Layout:
-    case RequirementKind::SameType:
-    case RequirementKind::Superclass:
-      break;
+void SILLinkerVisitor::visitApplySubstitutions(SubstitutionMap subs) {
+  for (auto conformance : subs.getConformances()) {
+    // Formally all conformances referenced in a function application are
+    // used. However, eagerly visiting them all at this point leads to a
+    // large blowup in the amount of SIL we read in, and we aren't very
+    // systematic about laziness. For optimization purposes we can defer
+    // reading in most conformances until we need them for devirtualization.
+    // However, we *must* pull in shared clang-importer-derived conformances
+    // we potentially use, since we may not otherwise have a local definition.
+    if (mustDeserializeProtocolConformance(Mod, conformance)) {
+      visitProtocolConformance(conformance, None);
     }
   }
 }
@@ -383,8 +365,8 @@ void SILLinkerVisitor::process() {
       Fn->setSerialized(IsSerialized_t::IsNotSerialized);
     }
 
-    DEBUG(llvm::dbgs() << "Process imports in function: "
-                       << Fn->getName() << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "Process imports in function: "
+                            << Fn->getName() << "\n");
 
     for (auto &BB : *Fn) {
       for (auto &I : BB) {

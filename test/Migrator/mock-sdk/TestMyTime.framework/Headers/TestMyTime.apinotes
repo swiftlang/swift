@@ -6,7 +6,7 @@ Functions:
 - Name: MyTimeAdd
   SwiftName: "MyTime.add(this:that:)"
 SwiftVersions:
-- Version: 3
+- Version: 4
   Globals:
   - Name: kMyTimeZero
     SwiftName: "kMyTimeZero"

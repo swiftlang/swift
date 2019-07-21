@@ -18,14 +18,14 @@ class Foo: NSObject {
   @objc subscript(x: Int) -> Foo { return self }
   @objc subscript(x: Bar) -> Foo { return self }
 
-  dynamic var dyn: String { fatalError() }
+  @objc dynamic var dyn: String { fatalError() }
 }
 
 class Bar: NSObject {
   @objc var foo: Foo { fatalError() }
 }
 
-// CHECK-LABEL: sil hidden @$S13keypaths_objc0B8KeypathsyyF
+// CHECK-LABEL: sil hidden [ossa] @$s13keypaths_objc0B8KeypathsyyF
 func objcKeypaths() {
   // CHECK: keypath $WritableKeyPath<NonObjC, Int>, (root
   _ = \NonObjC.x
@@ -47,7 +47,7 @@ func objcKeypaths() {
   _ = \Foo.differentName
 }
 
-// CHECK-LABEL: sil hidden @$S13keypaths_objc0B18KeypathIdentifiersyyF
+// CHECK-LABEL: sil hidden [ossa] @$s13keypaths_objc0B18KeypathIdentifiersyyF
 func objcKeypathIdentifiers() {
   // CHECK: keypath $KeyPath<ObjCFoo, String>, (objc "objcProp"; {{.*}} id #ObjCFoo.objcProp!getter.1.foreign
   _ = \ObjCFoo.objcProp
@@ -65,7 +65,7 @@ extension NSObject {
     @objc dynamic var dynamic: Int { return 0 }
 }
 
-// CHECK-LABEL: sil hidden @{{.*}}nonobjcExtensionOfObjCClass
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}nonobjcExtensionOfObjCClass
 func nonobjcExtensionOfObjCClass() {
   // Should be treated as a statically-dispatch property
   // CHECK: keypath $KeyPath<NSObject, X>, ({{.*}} id @
@@ -81,10 +81,35 @@ func nonobjcExtensionOfObjCClass() {
   var objcRequirement: Int { get set }
 }
 
-// CHECK-LABEL: sil hidden @{{.*}}ProtocolRequirement
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}ProtocolRequirement
 func objcProtocolRequirement<T: ObjCProto>(_: T) {
   // CHECK: keypath {{.*}} id #ObjCProto.objcRequirement!getter.1.foreign
   _ = \T.objcRequirement
   // CHECK: keypath {{.*}} id #ObjCProto.objcRequirement!getter.1.foreign
   _ = \ObjCProto.objcRequirement
+}
+
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}externalObjCProperty
+func externalObjCProperty() {
+  // Pure ObjC-dispatched properties do not have external descriptors.
+  // CHECK: keypath $KeyPath<NSObject, String>, 
+  // CHECK-NOT: external #NSObject.description
+  _ = \NSObject.description
+}
+
+func sharedCProperty() {
+  // CHECK:  keypath $WritableKeyPath<c_union, some_struct>
+  // CHECK-NOT: external #c_union.some_field
+  let dataKeyPath: WritableKeyPath<c_union, some_struct>? = \c_union.some_field
+}
+
+class OverrideFrameworkObjCProperty: A {
+  override var counter: Int32 {
+    get { return 0 }
+    set { }
+  }
+}
+
+func overrideFrameworkObjCProperty() {
+  let _ = \OverrideFrameworkObjCProperty.counter
 }

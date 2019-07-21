@@ -99,6 +99,11 @@ public:
 
   unsigned getBindingIndex() const { return SpareBits; }
 
+  /// If this initializes a single @lazy variable, return it.
+  VarDecl *getInitializedLazyVar() const;
+
+  /// If this initializes a single @lazy variable, lazily create a self
+  /// declaration for it to refer to.
   ParamDecl *getImplicitSelfDecl();
 
   static bool classof(const DeclContext *DC) {
@@ -162,7 +167,7 @@ public:
   /// Change the parent of this context.  This is necessary because
   /// the function signature is parsed before the function
   /// declaration/expression itself is built.
-  void changeFunction(DeclContext *parent, MutableArrayRef<ParameterList *> paramLists);
+  void changeFunction(DeclContext *parent, ParameterList *paramLists);
 
   static bool classof(const DeclContext *DC) {
     if (auto init = dyn_cast<Initializer>(DC))

@@ -7,8 +7,12 @@
 // The private, unused methods are optimized away. The test calls these
 // methods anyway (since it has overridden the access control), so we
 // expect them to produce "Fatal error: Call of deleted method" when run.
+// RUN: %target-codesign %t/report_dead_method_call
 // RUN: %target-run %t/report_dead_method_call
 // REQUIRES: executable_test
+
+// UNSUPPORTED: swift_test_mode_optimize_none_with_implicit_dynamic
+// UNSUPPORTED: swift_test_mode_optimize_with_implicit_dynamic
 
 private protocol PrivateProto {
 	func abc()

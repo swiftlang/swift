@@ -16,7 +16,7 @@ protocol TypeRequestable {
     static func containerType() -> SampleType
 }
 
-struct Sample<T, C where T: ByteConvertible, C: TypeRequestable> {
+struct Sample<T, C> where T: ByteConvertible, C: TypeRequestable {
     let numberOfRecords: UInt32
     let sizeInBytes: UInt64
     var records: [T]  = [] // problem line

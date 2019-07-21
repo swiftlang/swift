@@ -1,11 +1,9 @@
 {
-  key.hash: <hash>,
   key.dependencies: [
     {
       key.kind: source.lang.swift.import.module.swift,
       key.name: "Swift",
       key.filepath: Swift.swiftmodule,
-      key.hash: <hash>,
       key.is_system: 1
     }
   ],
@@ -21,13 +19,15 @@
           key.kind: source.lang.swift.decl.function.accessor.getter,
           key.usr: "s:9big_array15gCubeVertexDataSaySfGvg",
           key.line: 1,
-          key.column: 5
+          key.column: 5,
+          key.is_implicit: 1
         },
         {
           key.kind: source.lang.swift.decl.function.accessor.setter,
           key.usr: "s:9big_array15gCubeVertexDataSaySfGvs",
           key.line: 1,
-          key.column: 5
+          key.column: 5,
+          key.is_implicit: 1
         }
       ]
     },

@@ -34,14 +34,14 @@ template <typename FunctionEffects>
 void GenericFunctionEffectAnalysis<FunctionEffects>::invalidate() {
   functionInfoMap.clear();
   allocator.DestroyAll();
-  DEBUG(llvm::dbgs() << "invalidate all\n");
+  LLVM_DEBUG(llvm::dbgs() << "invalidate all\n");
 }
 
 template <typename FunctionEffects>
 void GenericFunctionEffectAnalysis<FunctionEffects>::invalidate(
     SILFunction *F, InvalidationKind K) {
   if (FunctionInfo *FInfo = functionInfoMap.lookup(F)) {
-    DEBUG(llvm::dbgs() << "  invalidate " << FInfo->F->getName() << '\n');
+    LLVM_DEBUG(llvm::dbgs() << "  invalidate " << FInfo->F->getName() << '\n');
     invalidateIncludingAllCallers(FInfo);
   }
 }
@@ -80,7 +80,7 @@ void GenericFunctionEffectAnalysis<FunctionEffects>::analyzeFunction(
   if (functionInfo->functionEffects.summarizeFunction(F))
     return;
 
-  DEBUG(llvm::dbgs() << "  >> analyze " << F->getName() << '\n');
+  LLVM_DEBUG(llvm::dbgs() << "  >> analyze " << F->getName() << '\n');
 
   // Check all instructions of the function
   for (auto &BB : *F) {
@@ -91,7 +91,7 @@ void GenericFunctionEffectAnalysis<FunctionEffects>::analyzeFunction(
         functionInfo->functionEffects.analyzeInstruction(&I);
     }
   }
-  DEBUG(llvm::dbgs() << "  << finished " << F->getName() << '\n');
+  LLVM_DEBUG(llvm::dbgs() << "  << finished " << F->getName() << '\n');
 }
 
 template <typename FunctionEffects>
@@ -136,8 +136,8 @@ void GenericFunctionEffectAnalysis<FunctionEffects>::recompute(
     FunctionInfo *initialInfo) {
   allocNewUpdateID();
 
-  DEBUG(llvm::dbgs() << "recompute function-effect analysis with UpdateID "
-                     << getCurrentUpdateID() << '\n');
+  LLVM_DEBUG(llvm::dbgs() << "recompute function-effect analysis with UpdateID "
+                          << getCurrentUpdateID() << '\n');
 
   // Collect and analyze all functions to recompute, starting at initialInfo.
   FunctionOrder bottomUpOrder(getCurrentUpdateID());
@@ -151,15 +151,15 @@ void GenericFunctionEffectAnalysis<FunctionEffects>::recompute(
   // it stabilizes.
   bool needAnotherIteration;
   do {
-    DEBUG(llvm::dbgs() << "new iteration\n");
+    LLVM_DEBUG(llvm::dbgs() << "new iteration\n");
     needAnotherIteration = false;
 
     for (FunctionInfo *functionInfo : bottomUpOrder) {
       if (!functionInfo->needUpdateCallers)
         continue;
 
-      DEBUG(llvm::dbgs() << "  update callers of " << functionInfo->F->getName()
-                         << '\n');
+      LLVM_DEBUG(llvm::dbgs() << "  update callers of "
+                              << functionInfo->F->getName() << '\n');
       functionInfo->needUpdateCallers = false;
 
       // Propagate the function effects to all callers.
@@ -170,8 +170,8 @@ void GenericFunctionEffectAnalysis<FunctionEffects>::recompute(
         if (!bottomUpOrder.wasRecomputedWithCurrentUpdateID(E.Caller))
           continue;
 
-        DEBUG(llvm::dbgs() << "    merge into caller " << E.Caller->F->getName()
-                           << '\n');
+        LLVM_DEBUG(llvm::dbgs() << "    merge into caller "
+                                << E.Caller->F->getName() << '\n');
 
         if (E.Caller->functionEffects.mergeFromApply(
                 functionInfo->functionEffects, FullApplySite(E.FAS))) {
@@ -321,7 +321,7 @@ FunctionSideEffectFlags *FunctionSideEffects::getEffectsOn(SILValue Addr) {
 // Return true if the given function has defined effects that were successfully
 // recorded in this FunctionSideEffects object.
 bool FunctionSideEffects::setDefinedEffects(SILFunction *F) {
-  if (F->hasSemanticsAttr("arc.programtermination_point")) {
+  if (F->hasSemanticsAttr(SEMANTICS_PROGRAMTERMINATION_POINT)) {
     Traps = true;
     return true;
   }
@@ -334,7 +334,7 @@ bool FunctionSideEffects::setDefinedEffects(SILFunction *F) {
     case EffectsKind::ReadNone:
       return true;
     case EffectsKind::ReadOnly:
-      // @effects(readonly) is worthless if we have owned parameters, because
+      // @_effects(readonly) is worthless if we have owned parameters, because
       // the release inside the callee may call a deinit, which itself can do
       // anything.
       if (!F->hasOwnedParameters()) {
@@ -353,18 +353,27 @@ bool FunctionSideEffects::setDefinedEffects(SILFunction *F) {
 // FunctionSideEffects object without visiting its body.
 bool FunctionSideEffects::summarizeFunction(SILFunction *F) {
   assert(ParamEffects.empty() && "Expect uninitialized effects.");
+
+  if (F->isDynamicallyReplaceable()) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "  -- is dynamically_replaceable " << F->getName() << '\n');
+    setWorstEffects();
+    return true;
+  }
+
   if (!F->empty())
     ParamEffects.resize(F->getArguments().size());
 
-  // Handle @effects attributes
+  // Handle @_effects attributes
   if (setDefinedEffects(F)) {
-    DEBUG(llvm::dbgs() << "  -- has defined effects " << F->getName() << '\n');
+    LLVM_DEBUG(llvm::dbgs() << "  -- has defined effects " << F->getName()
+                            << '\n');
     return true;
   }
 
   if (!F->isDefinition()) {
     // We can't assume anything about external functions.
-    DEBUG(llvm::dbgs() << "  -- is external " << F->getName() << '\n');
+    LLVM_DEBUG(llvm::dbgs() << "  -- is external " << F->getName() << '\n');
     setWorstEffects();
     return true;
   }
@@ -462,8 +471,8 @@ bool FunctionSideEffects::summarizeCall(FullApplySite fullApply) {
     }
   }
 
-  if (SILFunction *SingleCallee = fullApply.getReferencedFunction()) {
-    // Does the function have any @effects?
+  if (SILFunction *SingleCallee = fullApply.getReferencedFunctionOrNull()) {
+    // Does the function have any @_effects?
     if (setDefinedEffects(SingleCallee))
       return true;
   }
@@ -481,15 +490,20 @@ void FunctionSideEffects::analyzeInstruction(SILInstruction *I) {
   case SILInstructionKind::AllocStackInst:
   case SILInstructionKind::DeallocStackInst:
     return;
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  case SILInstructionKind::Name##RetainInst: \
+  case SILInstructionKind::StrongRetain##Name##Inst: \
+  case SILInstructionKind::Copy##Name##ValueInst:
+#include "swift/AST/ReferenceStorage.def"
   case SILInstructionKind::StrongRetainInst:
-  case SILInstructionKind::StrongRetainUnownedInst:
   case SILInstructionKind::RetainValueInst:
-  case SILInstructionKind::UnownedRetainInst:
     getEffectsOn(I->getOperand(0))->Retains = true;
     return;
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  case SILInstructionKind::Name##ReleaseInst:
+#include "swift/AST/ReferenceStorage.def"
   case SILInstructionKind::StrongReleaseInst:
   case SILInstructionKind::ReleaseValueInst:
-  case SILInstructionKind::UnownedReleaseInst:
     getEffectsOn(I->getOperand(0))->Releases = true;
     return;
   case SILInstructionKind::UnconditionalCheckedCastInst:

@@ -24,6 +24,18 @@ class OtherClass {
   var computedVariable: Int {
     return 0
   }
+
+  var computedVariable2: Int {
+    get { return 0 }
+    set { }
+  }
+
+  deinit { print("deinit") }
+}
+
+enum MyEnum {
+  case foo, bar
+  case baz
 }
 
 // RUN: %empty-directory(%t.result)
@@ -46,3 +58,9 @@ class OtherClass {
 // RUN: not %refactor -move-to-extension -source-filename %s -pos=1:1 -end-pos=14:1
 // RUN: not %refactor -move-to-extension -source-filename %s -pos=14:1 -end-pos=15:1
 // RUN: not %refactor -move-to-extension -source-filename %s -pos=15:1 -end-pos=23:1
+// RUN: not %refactor -move-to-extension -source-filename %s -pos=24:29 -end-pos=27:1
+// RUN: not %refactor -move-to-extension -source-filename %s -pos=29:1 -end-pos=30:1
+// RUN: not %refactor -move-to-extension -source-filename %s -pos=30:1 -end-pos=31:1
+// RUN: not %refactor -move-to-extension -source-filename %s -pos=33:1 -end-pos=34:1
+// RUN: not %refactor -move-to-extension -source-filename %s -pos=37:1 -end-pos=37:1
+// RUN: not %refactor -move-to-extension -source-filename %s -pos=37:8 -end-pos=37:16

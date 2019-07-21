@@ -96,7 +96,7 @@ don't have a more general term for "release", which refers to any
 release_value operation.
 
 When referring to unspecified state, I will use the syntax
-``@effects(no<effectname>)``. When referring to state reachable via an
+``@_effects(no<effectname>)``. When referring to state reachable via an
 argument, ``@no<effectname> arg``.
 
 Naturally, we also need a syntax for associating effects with
@@ -110,7 +110,7 @@ effects at a call site. For now, we assume the predicate only applies
 to unspecified state and that the bridged object is always self. That
 way we can denote predicated effects as @nonbridged_effects.
 
-In examples, @effects(argonly) means that there are no effects on
+In examples, @_effects(argonly) means that there are no effects on
 unspecified state.
 
 CoW Optimization Requirements
@@ -167,7 +167,7 @@ state.
 
   Note: In terms of low-level SIL attributes such a method will be marked:::
 
-    @effects(argonly)
+    @_effects(argonly)
     @selfeffects(make_unique)
     func makeUnique() {}
 
@@ -230,7 +230,7 @@ state.
 
   Note: In terms of low-level SIL attributes such a method will be marked:::
 
-    @effects(argonly)
+    @_effects(argonly)
     @selfeffects(preserve_unique, nowrite, nocapture, norelease,
                  projects_subobject)
     func getElement(_ index: Int) -> T {}
@@ -297,7 +297,7 @@ state.
 
   Note: In terms of low-level SIL attributes such a method will be marked:::
 
-    @effects(argonly)
+    @_effects(argonly)
     @selfeffects(preserve_unique, nowrite, nocapture, norelease,
                  projects_subobject_addr)
     func getElementAddr(_ index: Int) -> T {}
@@ -320,7 +320,7 @@ state.
 
   Note: In terms of low-level SIL attributes such a method will be marked:::
 
-    @effects(argonly)
+    @_effects(argonly)
     @selfeffects(preserve_unique, nocapture, norelease)
     func appendElementAssumingUnique(@norelease @nowrite elt: T) {}
 
@@ -356,7 +356,7 @@ state.
 
   Note: In terms of low-level SIL attributes such a method will be marked:::
 
-    @effects(argonly, T.release)
+    @_effects(argonly, T.release)
     @selfeffects(preserve_unique, nocapture)
     func setElement(@nowrite e: T, index: Int) {
     }
@@ -536,15 +536,15 @@ Mostly TBD.
 
 The optimizer can only take advantage of user-specified effects before
 they have been inlined. Consequently, the optimizer initially preserves
-calls to annotated @effects() functions. After optimizing for effects
+calls to annotated @_effects() functions. After optimizing for effects
 these functions can be inlined, dropping the effects information.
 
 Without special syntax, specifying a pure function would require::
 
-  @effects(argonly)
+  @_effects(argonly)
   func foo(@noread @nowrite arg)
 
-A shorthand, such as @effects(none) could easily be
+A shorthand, such as @_effects(none) could easily be
 introduced. Typically, this shouldn't be needed because the purity of
 a function can probably be deduced from its argument types given that
 it has no effect on unspecified state. i.e. If the function does not
@@ -576,7 +576,7 @@ example. But there are two situations to be concerned about:
 Solving this requires a system for polymorphic effects. Language
 support for polymorphic effects might look something like this::
 
-  @effects(T.release)
+  @_effects(T.release)
   func foo<T>(t: T) { ... }
 
 This would mean that foo's unspecified effects are bounded by the

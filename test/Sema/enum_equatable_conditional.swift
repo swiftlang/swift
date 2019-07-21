@@ -1,13 +1,13 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -swift-version 4
 
 struct NotEquatable { }
 
-enum WithArrayOfNotEquatables : Equatable { // expected-error{{type 'WithArrayOfNotEquatables' does not conform to protocol 'Equatable'}}
-case only([NotEquatable])
+enum WithArrayOfNotEquatables : Equatable { // expected-error{{type 'WithArrayOfNotEquatables' does not conform to protocol 'Equatable'}} expected-note {{do you want to add protocol stubs?}}
+  case only([NotEquatable]) // expected-note{{associated value type '[NotEquatable]' does not conform to protocol 'Equatable', preventing synthesized conformance of 'WithArrayOfNotEquatables' to 'Equatable'}}
 }
 
-enum WithArrayOfNotEquatables2<T> : Equatable { // expected-error{{type 'WithArrayOfNotEquatables2<T>' does not conform to protocol 'Equatable'}}
-case only([T])
+enum WithArrayOfNotEquatables2<T> : Equatable { // expected-error{{type 'WithArrayOfNotEquatables2<T>' does not conform to protocol 'Equatable'}} expected-note {{do you want to add protocol stubs?}}
+  case only([T]) // expected-note{{associated value type '[T]' does not conform to protocol 'Equatable', preventing synthesized conformance of 'WithArrayOfNotEquatables2<T>' to 'Equatable'}}
 }
 
 
@@ -20,7 +20,6 @@ enum WithArrayOfEquatables2<T> {
 case only([T])
 }
 
-// No: T is Equatable here, but cannot synthesize via an extension.
-// expected-error@+1{{type 'WithArrayOfEquatables2<T>' does not conform to protocol 'Equatable'}}
+// Okay: T is Equatable here too
 extension WithArrayOfEquatables2: Equatable where T: Equatable { }
 

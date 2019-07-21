@@ -1,7 +1,8 @@
-// RUN: %target-run-simple-swift
+// RUN: %target-build-swift %s %import-libdispatch -o %t_binary
+// RUN: %target-run %t_binary
 // REQUIRES: executable_test
 // REQUIRES: stress_test
-// REQUIRES: objc_interop
+// REQUIRES: libdispatch
 
 import StdlibUnittest
 import Dispatch

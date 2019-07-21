@@ -168,7 +168,7 @@ void CalleeCache::computeWitnessMethodCalleesForWitnessTable(
         LLVM_FALLTHROUGH;
       case AccessLevel::FilePrivate:
       case AccessLevel::Private: {
-        auto Witness = Conf->getWitness(Requirement.getDecl(), nullptr);
+        auto Witness = Conf->getWitness(Requirement.getDecl());
         auto DeclRef = SILDeclRef(Witness.getDecl());
         canCallUnknown = !calleesAreStaticallyKnowable(M, DeclRef);
       }
@@ -239,7 +239,12 @@ CalleeList CalleeCache::getCalleeListForCalleeKind(SILValue Callee) const {
     return CalleeList();
 
   case ValueKind::FunctionRefInst:
-    return CalleeList(cast<FunctionRefInst>(Callee)->getReferencedFunction());
+    return CalleeList(
+        cast<FunctionRefInst>(Callee)->getInitiallyReferencedFunction());
+
+  case ValueKind::DynamicFunctionRefInst:
+  case ValueKind::PreviousDynamicFunctionRefInst:
+    return CalleeList(); // Don't know the dynamic target.
 
   case ValueKind::PartialApplyInst:
     return getCalleeListForCalleeKind(

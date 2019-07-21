@@ -1,0 +1,26 @@
+{
+  'version': 0,
+  'use-external-names': false,
+  'roots': [
+    {
+      'name': 'OUT_DIR', 'type': 'directory',
+      'contents': [
+        { 'name': 'module.map', 'type': 'file',
+          'external-contents': 'INPUT_DIR/vfs/a-modulemap'
+        },
+        { 'name': 'VFSMappedModule.h', 'type': 'file',
+          'external-contents': 'INPUT_DIR/vfs/a-header'
+        },
+        { 'name': 'VFSMappedModule.framework/Headers/VFSMappedModule.h', 'type': 'file',
+          'external-contents': 'INPUT_DIR/vfs/a-header'
+        },
+        { 'name': 'mapped-file.swift', 'type': 'file',
+          'external-contents': 'INPUT_DIR/vfs/a-swift-file'
+        },
+        { 'name': 'single-mapped-swift-file.swift', 'type': 'file',
+          'external-contents': 'OUT_DIR/double-mapped-swift-file.swift'
+        },
+      ]
+    },
+  ]
+}

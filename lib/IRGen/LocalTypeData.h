@@ -274,6 +274,8 @@ public:
   /// Add a new concrete entry to the cache at the given definition point.
   void addConcrete(DominancePoint point, bool isConditional,
                    LocalTypeDataKey key, MetadataResponse value) {
+    key = key.getCachingKey();
+
     assert((key.Kind.isAnyTypeMetadata() ||
             value.isStaticallyKnownComplete()) &&
            "only type metadata can be added in a non-complete state");

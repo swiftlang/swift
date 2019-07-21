@@ -1,18 +1,23 @@
 {
+  "id": 39,
   "kind": "SourceFile",
   "layout": [
     {
+      "id": 38,
       "kind": "CodeBlockItemList",
       "layout": [
         {
+          "id": 36,
           "kind": "CodeBlockItem",
           "layout": [
             {
+              "id": 35,
               "kind": "StructDecl",
               "layout": [
                 null,
                 null,
                 {
+                  "id": 1,
                   "tokenKind": {
                     "kind": "kw_struct"
                   },
@@ -27,7 +32,7 @@
                     },
                     {
                       "kind": "LineComment",
-                      "value": "\/\/ RUN: diff %t %S\/Inputs\/serialize_struct_decl.json"
+                      "value": "\/\/ RUN: diff %t %S\/Inputs\/serialize_struct_decl.json -u"
                     },
                     {
                       "kind": "Newline",
@@ -43,6 +48,7 @@
                   "presence": "Present"
                 },
                 {
+                  "id": 2,
                   "tokenKind": {
                     "kind": "identifier",
                     "text": "Foo"
@@ -60,9 +66,11 @@
                 null,
                 null,
                 {
+                  "id": 34,
                   "kind": "MemberDeclBlock",
                   "layout": [
                     {
+                      "id": 3,
                       "tokenKind": {
                         "kind": "l_brace"
                       },
@@ -71,17 +79,21 @@
                       "presence": "Present"
                     },
                     {
+                      "id": 32,
                       "kind": "MemberDeclList",
                       "layout": [
                         {
+                          "id": 14,
                           "kind": "MemberDeclListItem",
                           "layout": [
                             {
+                              "id": 13,
                               "kind": "VariableDecl",
                               "layout": [
                                 null,
                                 null,
                                 {
+                                  "id": 4,
                                   "tokenKind": {
                                     "kind": "kw_let"
                                   },
@@ -104,15 +116,19 @@
                                   "presence": "Present"
                                 },
                                 {
+                                  "id": 12,
                                   "kind": "PatternBindingList",
                                   "layout": [
                                     {
+                                      "id": 11,
                                       "kind": "PatternBinding",
                                       "layout": [
                                         {
+                                          "id": 6,
                                           "kind": "IdentifierPattern",
                                           "layout": [
                                             {
+                                              "id": 5,
                                               "tokenKind": {
                                                 "kind": "identifier",
                                                 "text": "bar"
@@ -130,9 +146,11 @@
                                           "presence": "Present"
                                         },
                                         {
+                                          "id": 10,
                                           "kind": "TypeAnnotation",
                                           "layout": [
                                             {
+                                              "id": 7,
                                               "tokenKind": {
                                                 "kind": "colon"
                                               },
@@ -146,9 +164,11 @@
                                               "presence": "Present"
                                             },
                                             {
+                                              "id": 9,
                                               "kind": "SimpleTypeIdentifier",
                                               "layout": [
                                                 {
+                                                  "id": 8,
                                                   "tokenKind": {
                                                     "kind": "identifier",
                                                     "text": "Int"
@@ -181,14 +201,17 @@
                           "presence": "Present"
                         },
                         {
+                          "id": 31,
                           "kind": "MemberDeclListItem",
                           "layout": [
                             {
+                              "id": 30,
                               "kind": "VariableDecl",
                               "layout": [
                                 null,
                                 null,
                                 {
+                                  "id": 15,
                                   "tokenKind": {
                                     "kind": "kw_let"
                                   },
@@ -211,15 +234,19 @@
                                   "presence": "Present"
                                 },
                                 {
+                                  "id": 29,
                                   "kind": "PatternBindingList",
                                   "layout": [
                                     {
+                                      "id": 28,
                                       "kind": "PatternBinding",
                                       "layout": [
                                         {
+                                          "id": 17,
                                           "kind": "IdentifierPattern",
                                           "layout": [
                                             {
+                                              "id": 16,
                                               "tokenKind": {
                                                 "kind": "identifier",
                                                 "text": "baz"
@@ -237,9 +264,11 @@
                                           "presence": "Present"
                                         },
                                         {
+                                          "id": 27,
                                           "kind": "TypeAnnotation",
                                           "layout": [
                                             {
+                                              "id": 7,
                                               "tokenKind": {
                                                 "kind": "colon"
                                               },
@@ -253,9 +282,11 @@
                                               "presence": "Present"
                                             },
                                             {
+                                              "id": 26,
                                               "kind": "SimpleTypeIdentifier",
                                               "layout": [
                                                 {
+                                                  "id": 18,
                                                   "tokenKind": {
                                                     "kind": "identifier",
                                                     "text": "Array"
@@ -270,9 +301,11 @@
                                                   "presence": "Present"
                                                 },
                                                 {
+                                                  "id": 25,
                                                   "kind": "GenericArgumentClause",
                                                   "layout": [
                                                     {
+                                                      "id": 19,
                                                       "tokenKind": {
                                                         "kind": "l_angle"
                                                       },
@@ -286,15 +319,19 @@
                                                       "presence": "Present"
                                                     },
                                                     {
+                                                      "id": 23,
                                                       "kind": "GenericArgumentList",
                                                       "layout": [
                                                         {
+                                                          "id": 22,
                                                           "kind": "GenericArgument",
                                                           "layout": [
                                                             {
+                                                              "id": 21,
                                                               "kind": "SimpleTypeIdentifier",
                                                               "layout": [
                                                                 {
+                                                                  "id": 20,
                                                                   "tokenKind": {
                                                                     "kind": "identifier",
                                                                     "text": "Int"
@@ -320,6 +357,7 @@
                                                       "presence": "Present"
                                                     },
                                                     {
+                                                      "id": 24,
                                                       "tokenKind": {
                                                         "kind": "r_angle"
                                                       },
@@ -356,6 +394,7 @@
                       "presence": "Present"
                     },
                     {
+                      "id": 33,
                       "tokenKind": {
                         "kind": "r_brace"
                       },
@@ -378,6 +417,7 @@
               ],
               "presence": "Present"
             },
+            null,
             null
           ],
           "presence": "Present"
@@ -386,6 +426,7 @@
       "presence": "Present"
     },
     {
+      "id": 37,
       "tokenKind": {
         "kind": "eof",
         "text": ""

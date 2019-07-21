@@ -12,25 +12,25 @@ func test(
   i: EnumByTypedef,
   j: EnumByBoth
 ) {
-  // CHECK: type: Wrapped	for 'a' mangled=$SSo7WrappedaD
+  // CHECK: type: Wrapped	for 'a' mangled=$sSo7WrappedaD
   _ = a
-  // CHECK: type: SomeStruct	for 'b' mangled=$SSo12SNSomeStructVD
+  // CHECK: type: SomeStruct	for 'b' mangled=$sSo12SNSomeStructVD
   _ = b
-  // CHECK: type: MyInt	for 'c' mangled=$SSo13SNIntegerTypeaD
+  // CHECK: type: MyInt	for 'c' mangled=$sSo13SNIntegerTypeaD
   _ = c
-  // CHECK: type: SNColorChoice	for 'd' mangled=$SSo13SNColorChoiceVD
+  // CHECK: type: SNColorChoice	for 'd' mangled=$sSo13SNColorChoiceVD
   _ = d
-  // CHECK: type: Unwrapped	for 'e' mangled=$SSo9UnwrappedaD
+  // CHECK: type: Unwrapped	for 'e' mangled=$sSo9UnwrappedaD
   _ = e
-  // CHECK: type: TTCollisionTypedef	for 'f' mangled=$SSo19TagTypedefCollisionaD
+  // CHECK: type: TTCollisionTypedef	for 'f' mangled=$sSo19TagTypedefCollisionaD
   _ = f
-  // CHECK: type: TTCollisionTag	for 'g' mangled=$SSo19TagTypedefCollisionVD
+  // CHECK: type: TTCollisionTag	for 'g' mangled=$sSo19TagTypedefCollisionVD
   _ = g
-  // CHECK: type: EnumByTag	for 'h' mangled=$SSo9EnumByTagVD
+  // CHECK: type: EnumByTag	for 'h' mangled=$sSo9EnumByTagVD
   _ = h
-  // CHECK: type: EnumByTypedef	for 'i' mangled=$SSo13EnumByTypedefaD
+  // CHECK: type: EnumByTypedef	for 'i' mangled=$sSo13EnumByTypedefaD
   _ = i
-  // CHECK: type: EnumByBoth	for 'j' mangled=$SSo10EnumByBothVD
+  // CHECK: type: EnumByBoth	for 'j' mangled=$sSo10EnumByBothVD
   _ = j
 }
 
@@ -48,27 +48,27 @@ func testObjC(
   j: SomeRenamedError,
   k: SomeRenamedError.Code
 ) {
-  // CHECK-objc: type: SomeClass	for 'a' mangled=$SSo11SNSomeClassCD
+  // CHECK-objc: type: SomeClass	for 'a' mangled=$sSo11SNSomeClassCD
   _ = a
-  // CHECK-objc: type: SomeProtocol	for 'b' mangled=$SSo14SNSomeProtocol_pD
+  // CHECK-objc: type: SomeProtocol	for 'b' mangled=$sSo14SNSomeProtocol_pD
   _ = b
-  // CHECK-objc: type: SNCollision	for 'c' mangled=$SSo11SNCollisionCD
+  // CHECK-objc: type: SNCollision	for 'c' mangled=$sSo11SNCollisionCD
   _ = c
-  // CHECK-objc: type: SNCollisionProtocol	for 'd' mangled=$SSo11SNCollision_pD
+  // CHECK-objc: type: SNCollisionProtocol	for 'd' mangled=$sSo11SNCollision_pD
   _ = d
-  // CHECK-objc: type: CFTypeRef	for 'e' mangled=$SSo9CFTypeRefaD
+  // CHECK-objc: type: CFTypeRef	for 'e' mangled=$sSo9CFTypeRefaD
   _ = e
-  // CHECK-objc: type: CCItem	for 'f' mangled=$SSo9CCItemRefaD
+  // CHECK-objc: type: CCItem	for 'f' mangled=$sSo9CCItemRefaD
   _ = f
-  // CHECK-objc: type: SomeClassAlias	for 'g' mangled=$SSo14SomeClassAliasaD
+  // CHECK-objc: type: SomeClassAlias	for 'g' mangled=$sSo14SomeClassAliasaD
   _ = g
-  // CHECK-objc: type: SomeError	for 'h' mangled=$SSC9SomeErrorLeVD
+  // CHECK-objc: type: SomeError	for 'h' mangled=$sSC9SomeErrorLeVD
   _ = h
-  // CHECK-objc: type: SomeError.Code	for 'i' mangled=$SSo9SomeErrorVD
+  // CHECK-objc: type: SomeError.Code	for 'i' mangled=$sSo9SomeErrorVD
   _ = i
-  // CHECK-objc: type: SomeRenamedError	for 'j' mangled=$SSC14SomeOtherErrorLEVD
+  // CHECK-objc: type: SomeRenamedError	for 'j' mangled=$sSC14SomeOtherErrorLEVD
   _ = j
-  // CHECK-objc: type: SomeRenamedError.Code	for 'k' mangled=$SSo14SomeOtherErroraD
+  // CHECK-objc: type: SomeRenamedError.Code	for 'k' mangled=$sSo14SomeOtherErroraD
   _ = k
 }
 #endif // _ObjC

@@ -55,6 +55,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MULTI_PATTERN_3 | %FileCheck %s -check-prefix=MULTI_PATTERN_3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MULTI_PATTERN_4 | %FileCheck %s -check-prefix=MULTI_PATTERN_4
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CC_IN_PATTERN_1 | %FileCheck %s -check-prefix=CC_IN_PATTERN_1
+
 
 //===--- Helper types that are used in this test
 
@@ -196,9 +198,9 @@ struct PatternIsGeneric2<
 
 // PATTERN_IS_GENERIC_2: Begin completions
 // Generic parameters of the struct.
-// PATTERN_IS_GENERIC_2-DAG: Decl[GenericTypeParam]/CurrNominal: StructGenericFoo[#StructGenericFoo#]{{; name=.+$}}
-// PATTERN_IS_GENERIC_2-DAG: Decl[GenericTypeParam]/CurrNominal: StructGenericBar[#StructGenericBar#]{{; name=.+$}}
-// PATTERN_IS_GENERIC_2-DAG: Decl[GenericTypeParam]/CurrNominal: StructGenericBaz[#StructGenericBaz#]{{; name=.+$}}
+// PATTERN_IS_GENERIC_2-DAG: Decl[GenericTypeParam]/Local: StructGenericFoo[#StructGenericFoo#]{{; name=.+$}}
+// PATTERN_IS_GENERIC_2-DAG: Decl[GenericTypeParam]/Local: StructGenericBar[#StructGenericBar#]{{; name=.+$}}
+// PATTERN_IS_GENERIC_2-DAG: Decl[GenericTypeParam]/Local: StructGenericBaz[#StructGenericBaz#]{{; name=.+$}}
 // Generic parameters of the function.
 // PATTERN_IS_GENERIC_2-DAG: Decl[GenericTypeParam]/Local: GenericFoo[#GenericFoo#]{{; name=.+$}}
 // PATTERN_IS_GENERIC_2-DAG: Decl[GenericTypeParam]/Local: GenericBar[#GenericBar#]{{; name=.+$}}
@@ -261,3 +263,19 @@ func test_multiple_patterns4(x: Int) {
 // MULTI_PATTERN_4-DAG: Decl[LocalVar]/Local: x[#Int#]{{; name=.+$}}
 // MULTI_PATTERN_4: End completions
 
+enum IntHolder {
+  case hold(Int)
+}
+func ident(int: Int) -> Int { return int }
+func ident(double: Double) -> Int { return Double }
+
+func test_cc_in_pattern(subject: IntHolder, i1: Int) {
+  switch subject {
+  case .hold(#^CC_IN_PATTERN_1^#):
+    ()
+  }
+}
+
+// CC_IN_PATTERN_1: Begin completions
+// CC_IN_PATTERN_1-DAG: Decl[LocalVar]/Local/TypeRelation[Identical]: i1[#Int#]; name=i1
+// CC_IN_PATTERN_1: End completions

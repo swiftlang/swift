@@ -28,7 +28,7 @@ EXPR_NODES = [
     Node('DictionaryElementList', kind='SyntaxCollection',
          element='DictionaryElement'),
 
-    Node('StringInterpolationSegments', kind='SyntaxCollection',
+    Node('StringLiteralSegments', kind='SyntaxCollection',
          element='Syntax', element_name='Segment',
          element_choices=['StringSegment', 'ExpressionSegment']),
 
@@ -62,7 +62,8 @@ EXPR_NODES = [
          traits=['Parenthesized'],
          children=[
              Child('LeftParen', kind='LeftParenToken'),
-             Child('Arguments', kind='DeclNameArgumentList'),
+             Child('Arguments', kind='DeclNameArgumentList',
+                   collection_element_name='Argument'),
              Child('RightParen', kind='RightParenToken'),
          ]),
 
@@ -108,7 +109,8 @@ EXPR_NODES = [
     # A flat list of expressions before sequence folding, e.g. 1 + 2 + 3.
     Node('SequenceExpr', kind='Expr',
          children=[
-             Child('Elements', kind='ExprList'),
+             Child('Elements', kind='ExprList',
+                   collection_element_name='Element'),
          ]),
 
     Node('ExprList', kind='SyntaxCollection',
@@ -186,7 +188,8 @@ EXPR_NODES = [
          traits=['Parenthesized'],
          children=[
              Child('LeftParen', kind='LeftParenToken'),
-             Child('ElementList', kind='TupleElementList'),
+             Child('ElementList', kind='TupleElementList',
+                   collection_element_name='Element'),
              Child('RightParen', kind='RightParenToken'),
          ]),
 
@@ -194,7 +197,8 @@ EXPR_NODES = [
     Node('ArrayExpr', kind='Expr',
          children=[
              Child('LeftSquare', kind='LeftSquareBracketToken'),
-             Child('Elements', kind='ArrayElementList'),
+             Child('Elements', kind='ArrayElementList',
+                   collection_element_name='Element'),
              Child('RightSquare', kind='RightSquareBracketToken'),
          ]),
 
@@ -208,15 +212,6 @@ EXPR_NODES = [
                        Child('Elements', kind='DictionaryElementList'),
                    ]),
              Child('RightSquare', kind='RightSquareBracketToken'),
-         ]),
-
-    # .foo
-    Node('ImplicitMemberExpr', kind='Expr',
-         children=[
-             Child("Dot", kind='PrefixPeriodToken'),
-             Child("Name", kind='Token'),
-             Child('DeclNameArguments', kind='DeclNameArguments',
-                   is_optional=True),
          ]),
 
     # function-call-argument -> label? ':'? expression ','?
@@ -272,11 +267,6 @@ EXPR_NODES = [
              Child('Digits', kind='IntegerLiteralToken'),
          ]),
 
-    Node('StringLiteralExpr', kind='Expr',
-         children=[
-             Child("StringLiteral", kind='StringLiteralToken')
-         ]),
-
     # true or false
     Node('BooleanLiteralExpr', kind='Expr',
          children=[
@@ -297,27 +287,20 @@ EXPR_NODES = [
              Child("SecondChoice", kind='Expr')
          ]),
 
-    # a.b
+    # expr?.name
     Node('MemberAccessExpr', kind='Expr',
          children=[
              # The base needs to be optional to parse expressions in key paths
              # like \.a
              Child("Base", kind='Expr', is_optional=True),
-             Child("Dot", kind='PeriodToken'),
-             Child("Name", kind='Token'),
-             Child('DeclNameArguments', kind='DeclNameArguments',
-                   is_optional=True),
-         ]),
-
-    # dot-self-expr -> expr '.' 'self'
-    Node('DotSelfExpr', kind='Expr',
-         children=[
-             Child('Expression', kind='Expr'),
-             Child('Dot', kind='Token',
+             Child("Dot", kind='Token',
                    token_choices=[
                        'PeriodToken', 'PrefixPeriodToken'
                    ]),
-             Child('SelfKeyword', kind='SelfToken'),
+             # Name could be 'self'
+             Child("Name", kind='Token'),
+             Child('DeclNameArguments', kind='DeclNameArguments',
+                   is_optional=True),
          ]),
 
     # is TypeName
@@ -349,7 +332,9 @@ EXPR_NODES = [
     Node('ClosureCaptureItem', kind='Syntax',
          traits=['WithTrailingComma'],
          children=[
-             Child("Specifier", kind='TokenList', is_optional=True),
+             # FIXME: Add a 'CaptureSpecifier' node kind for `Specifier`.
+             Child("Specifier", kind='TokenList',
+                   collection_element_name='SpecifierToken', is_optional=True),
              Child("Name", kind='IdentifierToken', is_optional=True),
              Child('AssignToken', kind='EqualToken', is_optional=True),
              Child("Expression", kind='Expr'),
@@ -362,7 +347,8 @@ EXPR_NODES = [
     Node('ClosureCaptureSignature', kind='Syntax',
          children=[
              Child('LeftSquare', kind='LeftSquareBracketToken'),
-             Child('Items', kind='ClosureCaptureItemList', is_optional=True),
+             Child('Items', kind='ClosureCaptureItemList',
+                   collection_element_name='Item', is_optional=True),
              Child('RightSquare', kind='RightSquareBracketToken'),
          ]),
 
@@ -399,7 +385,8 @@ EXPR_NODES = [
          children=[
              Child('LeftBrace', kind='LeftBraceToken'),
              Child('Signature', kind='ClosureSignature', is_optional=True),
-             Child('Statements', kind='CodeBlockItemList'),
+             Child('Statements', kind='CodeBlockItemList',
+                   collection_element_name='Statement'),
              Child('RightBrace', kind='RightBraceToken'),
          ]),
 
@@ -416,7 +403,8 @@ EXPR_NODES = [
              Child('CalledExpression', kind='Expr'),
              Child('LeftParen', kind='LeftParenToken',
                    is_optional=True),
-             Child('ArgumentList', kind='FunctionCallArgumentList'),
+             Child('ArgumentList', kind='FunctionCallArgumentList',
+                   collection_element_name='Argument'),
              Child('RightParen', kind='RightParenToken',
                    is_optional=True),
              Child('TrailingClosure', kind='ClosureExpr',
@@ -428,7 +416,8 @@ EXPR_NODES = [
          children=[
              Child('CalledExpression', kind='Expr'),
              Child('LeftBracket', kind='LeftSquareBracketToken'),
-             Child('ArgumentList', kind='FunctionCallArgumentList'),
+             Child('ArgumentList', kind='FunctionCallArgumentList',
+                   collection_element_name='Argument'),
              Child('RightBracket', kind='RightSquareBracketToken'),
              Child('TrailingClosure', kind='ClosureExpr',
                    is_optional=True),
@@ -473,42 +462,52 @@ EXPR_NODES = [
          traits=['Parenthesized'],
          children=[
              Child('Backslash', kind='BackslashToken'),
-             Child('LeftParen', kind='LeftParenToken'),
-             Child('Expression', kind='Expr'),
+             Child('Delimiter', kind='RawStringDelimiterToken', 
+                   is_optional=True),
+             Child('LeftParen', kind='LeftParenToken',
+                   classification='StringInterpolationAnchor',
+                   force_classification=True),
+             Child('Expressions', kind='FunctionCallArgumentList',
+                   collection_element_name='Expression'),
              Child('RightParen', kind='StringInterpolationAnchorToken'),
          ]),
 
     # e.g. "abc \(foo()) def"
-    Node('StringInterpolationExpr', kind='Expr',
+    Node('StringLiteralExpr', kind='Expr',
          children=[
+             Child('OpenDelimiter', kind='RawStringDelimiterToken', 
+                   is_optional=True),
              Child('OpenQuote', kind='Token',
                    token_choices=[
                        'StringQuoteToken',
                        'MultilineStringQuoteToken',
                    ]),
-             Child('Segments', kind='StringInterpolationSegments'),
+             Child('Segments', kind='StringLiteralSegments',
+                   collection_element_name='Segment'),
              Child('CloseQuote', kind='Token',
                    token_choices=[
                        'StringQuoteToken',
                        'MultilineStringQuoteToken',
                    ]),
+             Child('CloseDelimiter', kind='RawStringDelimiterToken', 
+                   is_optional=True),
          ]),
 
     # e.g. "\a.b[2].a"
     Node('KeyPathExpr', kind='Expr',
          children=[
              Child('Backslash', kind='BackslashToken'),
-             Child('RootExpr', kind='Expr', is_optional=True, 
+             Child('RootExpr', kind='Expr', is_optional=True,
                    node_choices=[
                        Child('IdentifierExpr', kind='IdentifierExpr'),
                        Child('SpecializeExpr', kind='SpecializeExpr')
-                   ]), 
+                   ]),
              Child('Expression', kind='Expr'),
          ]),
 
-    # The period in the key path serves as the base on which the 
+    # The period in the key path serves as the base on which the
     # right-hand-side of the key path is evaluated
-    Node('KeyPathBaseExpr', kind='Expr', 
+    Node('KeyPathBaseExpr', kind='Expr',
          children=[
              Child('Period', kind='PeriodToken'),
          ]),
@@ -529,7 +528,8 @@ EXPR_NODES = [
          children=[
              Child('KeyPath', kind='PoundKeyPathToken'),
              Child('LeftParen', kind='LeftParenToken'),
-             Child('Name', kind='ObjcName'),
+             Child('Name', kind='ObjcName',
+                   collection_element_name='NamePiece'),
              Child('RightParen', kind='RightParenToken'),
          ]),
 
@@ -564,7 +564,8 @@ EXPR_NODES = [
                        'PoundImageLiteralToken',
                    ]),
              Child('LeftParen', kind='LeftParenToken'),
-             Child('Arguments', kind='FunctionCallArgumentList'),
+             Child('Arguments', kind='FunctionCallArgumentList',
+                   collection_element_name='Argument'),
              Child('RightParen', kind='RightParenToken'),
          ]),
 ]

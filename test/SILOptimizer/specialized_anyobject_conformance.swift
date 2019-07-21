@@ -17,7 +17,7 @@ public func callee(_ t: C<Int32>?, _ p: P) {
   p.use(t!)
 }
 
-// CHECK-LABEL: sil @$S33specialized_anyobject_conformance7caller11pyAA1P_p_tF : $@convention(thin) (@in_guaranteed P) -> () {
+// CHECK-LABEL: sil @$s33specialized_anyobject_conformance7caller11pyAA1P_p_tF : $@convention(thin) (@in_guaranteed P) -> () {
 public func caller1(p: P) {
   callee(C<Int32>(), p)
 }

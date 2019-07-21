@@ -2,7 +2,7 @@
 // RUN: %empty-directory(%t/Test.app/Contents/MacOS)
 // RUN: cp -r %S/Inputs/object_literals-Resources %t/Test.app/Contents/Resources
 // RUN: %target-build-swift %s -o %t/Test.app/Contents/MacOS/main
-// RUN: %target-run %t/Test.app/Contents/MacOS/main
+// RUN: %target-run %t/Test.app/Contents/MacOS/main %t/Test.app/Contents/Resources/*
 
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx
@@ -21,7 +21,7 @@ LiteralsTestSuite.test("file") {
 }
 
 LiteralsTestSuite.test("image") {
-  let image = #imageLiteral(resourceName: NSImageNameComputer)
+  let image = #imageLiteral(resourceName: NSImage.Name.computer.rawValue)
   expectTrue(image.isValid)
 }
 

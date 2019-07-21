@@ -31,26 +31,27 @@ using namespace swift;
 
 static StringRef toStringRef(const SanitizerKind kind) {
   switch (kind) {
-  case SanitizerKind::Address:
-    return "address";
-  case SanitizerKind::Thread:
-    return "thread";
-  case SanitizerKind::Fuzzer:
-    return "fuzzer";
+    #define SANITIZER(_, kind, name, file) \
+        case SanitizerKind::kind: return #name;
+    #include "swift/Basic/Sanitizers.def"
   }
-  llvm_unreachable("Unsupported sanitizer");
+  llvm_unreachable("Unknown sanitizer");
 }
 
-static const char* toFileName(const SanitizerKind kind) {
+static StringRef toFileName(const SanitizerKind kind) {
   switch (kind) {
-  case SanitizerKind::Address:
-    return "asan";
-  case SanitizerKind::Thread:
-    return "tsan";
-  case SanitizerKind::Fuzzer:
-    return "fuzzer";
+    #define SANITIZER(_, kind, name, file) \
+        case SanitizerKind::kind: return #file;
+    #include "swift/Basic/Sanitizers.def"
   }
-  llvm_unreachable("Unsupported sanitizer");
+  llvm_unreachable("Unknown sanitizer");
+}
+
+static Optional<SanitizerKind> parse(const char* arg) {
+  return llvm::StringSwitch<Optional<SanitizerKind>>(arg)
+      #define SANITIZER(_, kind, name, file) .Case(#name, SanitizerKind::kind)
+      #include "swift/Basic/Sanitizers.def"
+      .Default(None);
 }
 
 llvm::SanitizerCoverageOptions swift::parseSanitizerCoverageArgValue(
@@ -129,34 +130,34 @@ OptionSet<SanitizerKind> swift::parseSanitizerArgValues(
   OptionSet<SanitizerKind> sanitizerSet;
 
   // Find the sanitizer kind.
-  for (int i = 0, n = A->getNumValues(); i != n; ++i) {
-    auto kind = llvm::StringSwitch<Optional<SanitizerKind>>(A->getValue(i))
-        .Case("address", SanitizerKind::Address)
-        .Case("thread", SanitizerKind::Thread)
-        .Case("fuzzer", SanitizerKind::Fuzzer)
-        .Default(None);
-    bool isShared = kind && *kind != SanitizerKind::Fuzzer;
-    if (!kind) {
+  for (const char *arg : A->getValues()) {
+    Optional<SanitizerKind> optKind = parse(arg);
+
+    // Unrecognized sanitizer option
+    if (!optKind.hasValue()) {
       Diags.diagnose(SourceLoc(), diag::error_unsupported_option_argument,
-          A->getOption().getPrefixedName(), A->getValue(i));
+          A->getOption().getPrefixedName(), arg);
+      continue;
+    }
+    SanitizerKind kind = optKind.getValue();
+
+    // Support is determined by existance of the sanitizer library.
+    auto fileName = toFileName(kind);
+    bool isShared = (kind != SanitizerKind::Fuzzer);
+    bool sanitizerSupported = sanitizerRuntimeLibExists(fileName, isShared);
+
+    // TSan is explicitly not supported for 32 bits.
+    if (kind == SanitizerKind::Thread && !Triple.isArch64Bit())
+      sanitizerSupported = false;
+
+    if (!sanitizerSupported) {
+      SmallString<128> b;
+      Diags.diagnose(SourceLoc(), diag::error_unsupported_opt_for_target,
+                      (A->getOption().getPrefixedName() + toStringRef(kind))
+                          .toStringRef(b),
+                      Triple.getTriple());
     } else {
-      // Support is determined by existance of the sanitizer library.
-      bool sanitizerSupported =
-          sanitizerRuntimeLibExists(toFileName(*kind), isShared);
-
-      // TSan is explicitly not supported for 32 bits.
-      if (*kind == SanitizerKind::Thread && !Triple.isArch64Bit())
-        sanitizerSupported = false;
-
-      if (!sanitizerSupported) {
-        SmallString<128> b;
-        Diags.diagnose(SourceLoc(), diag::error_unsupported_opt_for_target,
-                       (A->getOption().getPrefixedName() + toStringRef(*kind))
-                           .toStringRef(b),
-                       Triple.getTriple());
-      } else {
-        sanitizerSet |= *kind;
-      }
+      sanitizerSet |= kind;
     }
   }
 
@@ -182,4 +183,16 @@ OptionSet<SanitizerKind> swift::parseSanitizerArgValues(
   }
 
   return sanitizerSet;
+}
+
+std::string swift::getSanitizerList(const OptionSet<SanitizerKind> &Set) {
+  std::string list;
+  #define SANITIZER(_, kind, name, file) \
+      if (Set & SanitizerKind::kind) list += #name ",";
+  #include "swift/Basic/Sanitizers.def"
+
+  if (!list.empty())
+    list.pop_back(); // Remove last comma
+
+  return list;
 }

@@ -14,42 +14,14 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Lazy.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/Exclusivity.h"
 #include "swift/Runtime/Metadata.h"
+#include "ThreadLocalStorage.h"
 #include <memory>
 #include <stdio.h>
-
-// Pick an implementation strategy.
-#ifndef SWIFT_EXCLUSIVITY_USE_THREADLOCAL
-
-// If we're using Clang, and Clang claims not to support thread_local,
-// it must be because we're on a platform that doesn't support it.
-// Use pthreads.
-// Workaround: has_feature(cxx_thread_local) is wrong on two old Apple
-// simulators. clang thinks thread_local works there, but it doesn't.
-#if TARGET_OS_SIMULATOR && !TARGET_RT_64_BIT &&                      \
-  ((TARGET_OS_IOS && __IPHONE_OS_VERSION_MIN_REQUIRED__ < 100000) || \
-   (TARGET_OS_WATCH && __WATCHOS_OS_VERSION_MIN_REQUIRED__ < 30000))
-// 32-bit iOS 9 simulator or 32-bit watchOS 2 simulator - use pthreads
-# define SWIFT_EXCLUSIVITY_USE_THREADLOCAL 0
-# define SWIFT_EXCLUSIVITY_USE_PTHREAD_SPECIFIC 1
-#elif __clang__ && !__has_feature(cxx_thread_local)
-// clang without thread_local support - use pthreads
-# define SWIFT_EXCLUSIVITY_USE_THREADLOCAL 0
-# define SWIFT_EXCLUSIVITY_USE_PTHREAD_SPECIFIC 1
-#else
-// Use thread_local
-# define SWIFT_EXCLUSIVITY_USE_THREADLOCAL 1
-# define SWIFT_EXCLUSIVITY_USE_PTHREAD_SPECIFIC 0
-#endif
-
-#endif
-
-#if SWIFT_EXCLUSIVITY_USE_PTHREAD_SPECIFIC
-#include <pthread.h>
-#endif
 
 // Pick a return-address strategy
 #if __GNUC__
@@ -78,20 +50,11 @@ LLVM_ATTRIBUTE_ALWAYS_INLINE
 static void reportExclusivityConflict(ExclusivityFlags oldAction, void *oldPC,
                                       ExclusivityFlags newFlags, void *newPC,
                                       void *pointer) {
-  static std::atomic<long> reportedConflicts{0};
-  constexpr long maxReportedConflicts = 100;
-  // Don't report more that 100 conflicts. Hopefully, this will improve
-  // performance in case there are conflicts inside a tight loop.
-  if (reportedConflicts.fetch_add(1, std::memory_order_relaxed) >=
-      maxReportedConflicts) {
-    return;
-  }
-
   constexpr unsigned maxMessageLength = 100;
   constexpr unsigned maxAccessDescriptionLength = 50;
   char message[maxMessageLength];
   snprintf(message, sizeof(message),
-           "Simultaneous accesses to 0x%tx, but modification requires "
+           "Simultaneous accesses to 0x%" PRIxPTR ", but modification requires "
            "exclusive access",
            reinterpret_cast<uintptr_t>(pointer));
   fprintf(stderr, "%s.\n", message);
@@ -102,7 +65,7 @@ static void reportExclusivityConflict(ExclusivityFlags oldAction, void *oldPC,
   fprintf(stderr, "%s ", oldAccess);
   if (oldPC) {
     dumpStackTraceEntry(0, oldPC, /*shortOutput=*/true);
-    fprintf(stderr, " (0x%tx).\n", reinterpret_cast<uintptr_t>(oldPC));
+    fprintf(stderr, " (0x%" PRIxPTR ").\n", reinterpret_cast<uintptr_t>(oldPC));
   } else {
     fprintf(stderr, "<unknown>.\n");
   }
@@ -114,8 +77,6 @@ static void reportExclusivityConflict(ExclusivityFlags oldAction, void *oldPC,
   // The top frame is in swift_beginAccess, don't print it.
   constexpr unsigned framesToSkip = 1;
   printCurrentBacktrace(framesToSkip);
-
-  bool keepGoing = isWarningOnly(newFlags);
 
   RuntimeErrorDetails::Thread secondaryThread = {
     .description = oldAccess,
@@ -131,17 +92,7 @@ static void reportExclusivityConflict(ExclusivityFlags oldAction, void *oldPC,
     .numExtraThreads = 1,
     .threads = &secondaryThread
   };
-  uintptr_t flags = RuntimeErrorFlagNone;
-  if (!keepGoing)
-    flags = RuntimeErrorFlagFatal;
-  _swift_reportToDebugger(flags, message, &details);
-
-  if (keepGoing) {
-    return;
-  }
-
-  // 0 means no backtrace will be printed.
-  fatalError(0, "Fatal access conflict detected.\n");
+  _swift_reportToDebugger(RuntimeErrorFlagFatal, message, &details);
 }
 
 namespace {
@@ -228,8 +179,8 @@ public:
       reportExclusivityConflict(cur->getAccessAction(), cur->PC,
                                 flags, pc, pointer);
 
-      // If we're only warning, don't report multiple conflicts.
-      break;
+      // 0 means no backtrace will be printed.
+      fatalError(0, "Fatal access conflict detected.\n");
     }
     if (!isTracking(flags))
       return false;
@@ -272,51 +223,80 @@ public:
 #endif
 };
 
+class SwiftTLSContext {
+public:
+  /// The set of tracked accesses.
+  AccessSet accessSet;
+
+  // The "implicit" boolean parameter which is passed to a dynamically
+  // replaceable function.
+  // If true, the original function should be executed instead of the
+  // replacement function.
+  bool CallOriginalOfReplacedFunction = false;
+};
+
 } // end anonymous namespace
 
 // Each of these cases should define a function with this prototype:
 //   AccessSets &getAllSets();
 
-#if SWIFT_EXCLUSIVITY_USE_THREADLOCAL
-// Use direct language support for thread-locals.
+#if SWIFT_TLS_HAS_RESERVED_PTHREAD_SPECIFIC
+// Use the reserved TSD key if possible.
 
-static_assert(LLVM_ENABLE_THREADS, "LLVM_THREAD_LOCAL will use a global?");
-static LLVM_THREAD_LOCAL AccessSet ExclusivityAccessSet;
-
-static AccessSet &getAccessSet() {
-  return ExclusivityAccessSet;
+static SwiftTLSContext &getTLSContext() {
+  SwiftTLSContext *ctx = static_cast<SwiftTLSContext*>(
+    SWIFT_THREAD_GETSPECIFIC(SWIFT_RUNTIME_TLS_KEY));
+  if (ctx)
+    return *ctx;
+  
+  static OnceToken_t setupToken;
+  SWIFT_ONCE_F(setupToken, [](void *) {
+    pthread_key_init_np(SWIFT_RUNTIME_TLS_KEY, [](void *pointer) {
+      delete static_cast<SwiftTLSContext*>(pointer);
+    });
+  }, nullptr);
+  
+  ctx = new SwiftTLSContext();
+  SWIFT_THREAD_SETSPECIFIC(SWIFT_RUNTIME_TLS_KEY, ctx);
+  return *ctx;
 }
 
-#elif SWIFT_EXCLUSIVITY_USE_PTHREAD_SPECIFIC
-// Use pthread_getspecific.
+#elif SWIFT_TLS_HAS_THREADLOCAL
+// Second choice is direct language support for thread-locals.
 
-static pthread_key_t createAccessSetPthreadKey() {
-  pthread_key_t key;
-  int result = pthread_key_create(&key, [](void *pointer) {
-    delete static_cast<AccessSet*>(pointer);
+static LLVM_THREAD_LOCAL SwiftTLSContext TLSContext;
+
+static SwiftTLSContext &getTLSContext() {
+  return TLSContext;
+}
+
+#else
+// Use the platform thread-local data API.
+
+static __swift_thread_key_t createSwiftThreadKey() {
+  __swift_thread_key_t key;
+  int result = SWIFT_THREAD_KEY_CREATE(&key, [](void *pointer) {
+    delete static_cast<SwiftTLSContext*>(pointer);
   });
 
   if (result != 0) {
-    fatalError(0, "couldn't create pthread key for exclusivity: %s\n",
+    fatalError(0, "couldn't create thread key for exclusivity: %s\n",
                strerror(result));
   }
   return key;
 }
 
-static AccessSet &getAccessSet() {
-  static pthread_key_t key = createAccessSetPthreadKey();
+static SwiftTLSContext &getTLSContext() {
+  static __swift_thread_key_t key = createSwiftThreadKey();
 
-  AccessSet *set = static_cast<AccessSet*>(pthread_getspecific(key));
-  if (!set) {
-    set = new AccessSet();
-    pthread_setspecific(key, set);
+  SwiftTLSContext *ctx = static_cast<SwiftTLSContext*>(SWIFT_THREAD_GETSPECIFIC(key));
+  if (!ctx) {
+    ctx = new SwiftTLSContext();
+    SWIFT_THREAD_SETSPECIFIC(key, ctx);
   }
-  return *set;
+  return *ctx;
 }
 
-/** An access set accessed via pthread_get_specific. *************************/
-#else
-#error No implementation chosen for exclusivity!
 #endif
 
 /// Begin tracking a dynamic access.
@@ -341,7 +321,7 @@ void swift::swift_beginAccess(void *pointer, ValueBuffer *buffer,
   if (!pc)
     pc = get_return_address();
 
-  if (!getAccessSet().insert(access, pc, pointer, flags))
+  if (!getTLSContext().accessSet.insert(access, pc, pointer, flags))
     access->Pointer = nullptr;
 }
 
@@ -356,7 +336,25 @@ void swift::swift_endAccess(ValueBuffer *buffer) {
     return;
   }
 
-  getAccessSet().remove(access);
+  getTLSContext().accessSet.remove(access);
+}
+
+char *swift::swift_getFunctionReplacement(char **ReplFnPtr, char *CurrFn) {
+  char *ReplFn = *ReplFnPtr;
+  if (ReplFn == CurrFn)
+    return nullptr;
+  SwiftTLSContext &ctx = getTLSContext();
+  if (ctx.CallOriginalOfReplacedFunction) {
+    ctx.CallOriginalOfReplacedFunction = false;
+    return nullptr;
+  }
+  return ReplFn;
+}
+
+char *swift::swift_getOrigOfReplaceable(char **OrigFnPtr) {
+  char *OrigFn = *OrigFnPtr;
+  getTLSContext().CallOriginalOfReplacedFunction = true;
+  return OrigFn;
 }
 
 #ifndef NDEBUG
@@ -365,8 +363,8 @@ void swift::swift_endAccess(ValueBuffer *buffer) {
 //
 // This is only intended to be used in the debugger.
 void swift::swift_dumpTrackedAccesses() {
-  getAccessSet().forEach([](Access *a) {
-      fprintf(stderr, "Access. Pointer: %p. PC: %p. AccessAction: %s",
+  getTLSContext().accessSet.forEach([](Access *a) {
+      fprintf(stderr, "Access. Pointer: %p. PC: %p. AccessAction: %s\n",
               a->Pointer, a->PC, getAccessName(a->getAccessAction()));
   });
 }

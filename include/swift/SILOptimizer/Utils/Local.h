@@ -13,7 +13,6 @@
 #ifndef SWIFT_SILOPTIMIZER_UTILS_LOCAL_H
 #define SWIFT_SILOPTIMIZER_UTILS_LOCAL_H
 
-#include "swift/Basic/ArrayRefView.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/EpilogueARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ClassHierarchyAnalysis.h"
@@ -45,18 +44,18 @@ inline ValueBaseUserRange makeUserRange(
 
 using DeadInstructionSet = llvm::SmallSetVector<SILInstruction *, 8>;
 
-/// \brief Create a retain of \p Ptr before the \p InsertPt.
+/// Create a retain of \p Ptr before the \p InsertPt.
 NullablePtr<SILInstruction> createIncrementBefore(SILValue Ptr,
                                                   SILInstruction *InsertPt);
 
-/// \brief Create a release of \p Ptr before the \p InsertPt.
+/// Create a release of \p Ptr before the \p InsertPt.
 NullablePtr<SILInstruction> createDecrementBefore(SILValue Ptr,
                                                   SILInstruction *InsertPt);
 
-/// \brief For each of the given instructions, if they are dead delete them
+/// For each of the given instructions, if they are dead delete them
 /// along with their dead operands.
 ///
-/// \param I The instruction to be deleted.
+/// \param I The ArrayRef of instructions to be deleted.
 /// \param Force If Force is set, don't check if the top level instructions
 ///        are considered dead - delete them regardless.
 /// \param C a callback called whenever an instruction is deleted.
@@ -65,40 +64,38 @@ recursivelyDeleteTriviallyDeadInstructions(
   ArrayRef<SILInstruction*> I, bool Force = false,
   llvm::function_ref<void(SILInstruction *)> C = [](SILInstruction *){});
 
-/// \brief If the given instruction is dead, delete it along with its dead
+/// If the given instruction is dead, delete it along with its dead
 /// operands.
 ///
 /// \param I The instruction to be deleted.
 /// \param Force If Force is set, don't check if the top level instruction is
 ///        considered dead - delete it regardless.
 /// \param C a callback called whenever an instruction is deleted.
-void
-recursivelyDeleteTriviallyDeadInstructions(
-  SILInstruction *I,
-  bool Force = false,
-  llvm::function_ref<void(SILInstruction *)> C = [](SILInstruction *){});
+void recursivelyDeleteTriviallyDeadInstructions(
+    SILInstruction *I, bool Force = false,
+    llvm::function_ref<void(SILInstruction *)> C = [](SILInstruction *) {});
 
-/// \brief Perform a fast local check to see if the instruction is dead.
+/// Perform a fast local check to see if the instruction is dead.
 ///
 /// This routine only examines the state of the instruction at hand.
 bool isInstructionTriviallyDead(SILInstruction *I);
 
-/// \brief Return true if this is a release instruction that's not going to
+/// Return true if this is a release instruction that's not going to
 /// free the object.
 bool isIntermediateRelease(SILInstruction *I, EpilogueARCFunctionInfo *ERFI);
 
-/// \brief Recursively collect all the uses and transitive uses of the
+/// Recursively collect all the uses and transitive uses of the
 /// instruction.
 void
 collectUsesOfValue(SILValue V, llvm::SmallPtrSetImpl<SILInstruction *> &Insts);
 
-/// \brief Recursively erase all of the uses of the instruction (but not the
+/// Recursively erase all of the uses of the instruction (but not the
 /// instruction itself)
 void eraseUsesOfInstruction(
     SILInstruction *Inst,
     llvm::function_ref<void(SILInstruction *)> C = [](SILInstruction *){});
 
-/// \brief Recursively erase all of the uses of the value (but not the
+/// Recursively erase all of the uses of the value (but not the
 /// value itself)
 void eraseUsesOfValue(SILValue V);
 
@@ -113,29 +110,30 @@ SILValue castValueToABICompatibleType(SILBuilder *B, SILLocation Loc,
                                       SILValue Value,
                                       SILType SrcTy,
                                       SILType DestTy);
+/// Peek through trivial Enum initialization, typically for pointless
+/// Optionals.
+///
+/// The returned InitEnumDataAddr dominates the given
+/// UncheckedTakeEnumDataAddrInst.
+InitEnumDataAddrInst *
+findInitAddressForTrivialEnum(UncheckedTakeEnumDataAddrInst *UTEDAI);
 
 /// Returns a project_box if it is the next instruction after \p ABI and
 /// and has \p ABI as operand. Otherwise it creates a new project_box right
 /// after \p ABI and returns it.
 ProjectBoxInst *getOrCreateProjectBox(AllocBoxInst *ABI, unsigned Index);
 
-/// Replace an apply with an instruction that produces the same value,
-/// then delete the apply and the instructions that produce its callee
-/// if possible.
-void replaceDeadApply(ApplySite Old, ValueBase *New);
-
-/// \brief Return true if the substitution list contains replacement types
-/// that are dependent on the type parameters of the caller.
-bool hasArchetypes(SubstitutionList Subs);
-
-/// \brief Return true if any call inside the given function may bind dynamic
+/// Return true if any call inside the given function may bind dynamic
 /// 'Self' to a generic argument of the callee.
 bool mayBindDynamicSelf(SILFunction *F);
 
-/// \brief Move an ApplyInst's FuncRef so that it dominates the call site.
+/// Check whether the \p addr is an address of a tail-allocated array element.
+bool isAddressOfArrayElement(SILValue addr);
+
+/// Move an ApplyInst's FuncRef so that it dominates the call site.
 void placeFuncRef(ApplyInst *AI, DominanceInfo *DT);
 
-/// \brief Add an argument, \p val, to the branch-edge that is pointing into
+/// Add an argument, \p val, to the branch-edge that is pointing into
 /// block \p Dest. Return a new instruction and do not erase the old
 /// instruction.
 TermInst *addArgumentToBranch(SILValue Val, SILBasicBlock *Dest,
@@ -148,7 +146,7 @@ void removeDeadBlock(SILBasicBlock *BB);
 /// undef.
 void clearBlockBody(SILBasicBlock *BB);
 
-/// \brief Get the linkage to be used for specializations of a function with
+/// Get the linkage to be used for specializations of a function with
 /// the given linkage.
 SILLinkage getSpecializedLinkage(SILFunction *F, SILLinkage L);
 
@@ -196,6 +194,12 @@ tryDeleteDeadClosure(SingleValueInstruction *Closure,
 void releasePartialApplyCapturedArg(
     SILBuilder &Builder, SILLocation Loc, SILValue Arg, SILParameterInfo PInfo,
     InstModCallbacks Callbacks = InstModCallbacks());
+
+/// Insert destroys of captured arguments of partial_apply [stack].
+void insertDestroyOfCapturedArguments(
+    PartialApplyInst *PAI, SILBuilder &B,
+    llvm::function_ref<bool(SILValue)> shouldInsertDestroy =
+        [](SILValue arg) -> bool { return true; });
 
 /// This computes the lifetime of a single SILValue.
 ///
@@ -252,8 +256,8 @@ public:
   /// In this case, if \p mode is AllowToModifyCFG, those critical edges are
   /// split, otherwise nothing is done and the returned \p Fr is not valid.
   ///
-  /// If \p DEBlocks is provided, all dead-end blocks are ignored. This prevents
-  /// unreachable-blocks to be included in the frontier.
+  /// If \p deadEndBlocks is provided, all dead-end blocks are ignored. This
+  /// prevents unreachable-blocks to be included in the frontier.
   bool computeFrontier(Frontier &Fr, Mode mode,
                        DeadEndBlocks *DEBlocks = nullptr);
 
@@ -266,6 +270,9 @@ public:
   bool isAliveAtBeginOfBlock(SILBasicBlock *BB) {
     return LiveBlocks.count(BB) && BB != DefValue->getParent();
   }
+
+  /// Checks if there is a dealloc_ref inside the value's live range.
+  bool containsDeallocRef(const Frontier &Frontier);
 
   /// For debug dumping.
   void dump() const;
@@ -289,142 +296,85 @@ private:
   SILInstruction *findLastUserInBlock(SILBasicBlock *BB);
 };
 
-/// Base class for BB cloners.
-class BaseThreadingCloner : public SILClonerWithScopes<BaseThreadingCloner> {
-  friend class SILInstructionVisitor<BaseThreadingCloner>;
-  friend class SILCloner<BaseThreadingCloner>;
+/// Clone a single basic block and any required successor edges within the same
+/// function.
+class BasicBlockCloner : public SILCloner<BasicBlockCloner> {
+  using SuperTy = SILCloner<BasicBlockCloner>;
+  friend class SILCloner<BasicBlockCloner>;
 
-  protected:
-  SILBasicBlock *FromBB, *DestBB;
+protected:
+  /// The original block to be cloned.
+  SILBasicBlock *origBB;
 
-  public:
-  // A map of old to new available values.
-  SmallVector<std::pair<ValueBase *, SILValue>, 16> AvailVals;
+public:
+  /// An ordered list of old to new available value pairs.
+  ///
+  /// updateSSAAfterCloning() expects this public field to hold values that may
+  /// be remapped in the cloned block and live out.
+  SmallVector<std::pair<SILValue, SILValue>, 16> AvailVals;
 
-  /// If WithinFunction is true, the debug scopes of the cloned
-  /// instructions will not be updated.
-  BaseThreadingCloner(SILFunction &To, bool WithinFunction)
-      : SILClonerWithScopes(To, WithinFunction), FromBB(nullptr),
-        DestBB(nullptr) {}
+  // Clone blocks starting at `origBB`, within the same function.
+  BasicBlockCloner(SILBasicBlock *origBB)
+      : SILCloner(*origBB->getParent()), origBB(origBB) {}
 
-  BaseThreadingCloner(SILFunction &To, SILBasicBlock *From, SILBasicBlock *Dest)
-      : SILClonerWithScopes(To, From->getParent() == &To), FromBB(From),
-        DestBB(Dest) {}
+  void cloneBlock(SILBasicBlock *insertAfterBB = nullptr) {
+    SmallVector<SILBasicBlock *, 4> successorBBs;
+    successorBBs.reserve(origBB->getSuccessors().size());
+    llvm::copy(origBB->getSuccessors(), std::back_inserter(successorBBs));
+    cloneReachableBlocks(origBB, successorBBs, insertAfterBB);
+  }
 
-  void process(SILInstruction *I) { visit(I); }
+  /// Clone the given branch instruction's destination block, splitting
+  /// its successors, and rewrite the branch instruction.
+  void cloneBranchTarget(BranchInst *BI) {
+    assert(origBB == BI->getDestBB());
 
-  SILBasicBlock *remapBasicBlock(SILBasicBlock *BB) { return BB; }
+    cloneBlock(/*insertAfter*/BI->getParent());
 
-  SILValue remapValue(SILValue Value) {
-    // If this is a use of an instruction in another block, then just use it.
+    SILBuilderWithScope(BI).createBranch(BI->getLoc(), getNewBB(),
+                                         BI->getArgs());
+    BI->eraseFromParent();
+  }
+
+  /// Get the newly cloned block corresponding to `origBB`.
+  SILBasicBlock *getNewBB() {
+    return remapBasicBlock(origBB);
+  }
+
+  /// Call this after processing all instructions to fix the control flow
+  /// graph. The branch cloner may have left critical edges.
+  bool splitCriticalEdges(DominanceInfo *DT, SILLoopInfo *LI);
+
+protected:
+  // MARK: CRTP overrides.
+
+  /// Override getMappedValue to allow values defined outside the block to be
+  /// cloned to be reused in the newly cloned block.
+  SILValue getMappedValue(SILValue Value) {
     if (auto SI = Value->getDefiningInstruction()) {
-      if (SI->getParent() != FromBB)
+      if (!isBlockCloned(SI->getParent()))
         return Value;
     } else if (auto BBArg = dyn_cast<SILArgument>(Value)) {
-      if (BBArg->getParent() != FromBB)
+      if (!isBlockCloned(BBArg->getParent()))
         return Value;
     } else {
       assert(isa<SILUndef>(Value) && "Unexpected Value kind");
       return Value;
     }
-
-    return SILCloner<BaseThreadingCloner>::remapValue(Value);
+    // `value` is not defined outside the cloned block, so consult the cloner's
+    // map of cloned values.
+    return SuperTy::getMappedValue(Value);
   }
 
-  void postProcess(SILInstruction *Orig, SILInstruction *Cloned) {
-    DestBB->push_back(Cloned);
-    SILCloner<BaseThreadingCloner>::postProcess(Orig, Cloned);
-    // A terminator defines no values. Keeping terminators in the AvailVals list
-    // is problematic because terminators get replaced during SSA update.
-    auto results = Orig->getResults();
-    assert(results.size() == Cloned->getResults().size());
-    if (!results.empty()) {
-      auto clonedResults = Cloned->getResults();
-      for (size_t i = 0, e = results.size(); i != e; ++i)
-        AvailVals.push_back(std::make_pair(results[i], clonedResults[i]));
-    }
+  void mapValue(SILValue origValue, SILValue mappedValue) {
+    SuperTy::mapValue(origValue, mappedValue);
+    AvailVals.emplace_back(origValue, mappedValue);
   }
 };
 
-/// Clone a basic block to edge \p BI.
-class EdgeThreadingCloner : public BaseThreadingCloner {
-public:
-  EdgeThreadingCloner(BranchInst *BI)
-      : BaseThreadingCloner(*BI->getFunction(),
-                            BI->getDestBB(), nullptr) {
-    DestBB = createEdgeBlockAndRedirectBranch(BI);
-  }
-
-  SILBasicBlock *createEdgeBlockAndRedirectBranch(BranchInst *BI) {
-    auto *Fn = BI->getFunction();
-    auto *SrcBB = BI->getParent();
-    auto *DestBB = BI->getDestBB();
-    auto *EdgeBB = Fn->createBasicBlock(SrcBB);
-
-    // Create block arguments.
-    for (unsigned ArgIdx : range(DestBB->getNumArguments())) {
-      auto *DestPHIArg = cast<SILPHIArgument>(DestBB->getArgument(ArgIdx));
-      assert(BI->getArg(ArgIdx)->getType() == DestPHIArg->getType() &&
-             "Types must match");
-      auto *BlockArg = EdgeBB->createPHIArgument(
-          DestPHIArg->getType(), DestPHIArg->getOwnershipKind());
-      ValueMap[DestPHIArg] = SILValue(BlockArg);
-      AvailVals.push_back(std::make_pair(DestPHIArg, BlockArg));
-    }
-
-    // Redirect the branch.
-    SILBuilderWithScope(BI).createBranch(BI->getLoc(), EdgeBB, BI->getArgs());
-    BI->eraseFromParent();
-    return EdgeBB;
-  }
-
-  SILBasicBlock *getEdgeBB() {
-    // DestBB really is the edge basic block we created to clone instructions
-    // to.
-    return DestBB;
-  }
-};
-
-/// Helper class for cloning of basic blocks.
-class BasicBlockCloner : public BaseThreadingCloner {
-  public:
-    BasicBlockCloner(SILBasicBlock *From, SILBasicBlock *To = nullptr,
-                     bool WithinFunction = true)
-        : BaseThreadingCloner(To ? *To->getParent() : *From->getParent(),
-                              WithinFunction) {
-      FromBB = From;
-      if (To == nullptr) {
-        // Create a new BB that is to be used as a target
-        // for cloning.
-        To = From->getParent()->createBasicBlock();
-        To->cloneArgumentList(From);
-      }
-      DestBB = To;
-
-      // Populate the value map so that uses of the BBArgs in the SrcBB are
-      // replaced with the BBArgs of the DestBB.
-      for (unsigned i = 0, e = FromBB->args_size(); i != e; ++i) {
-        ValueMap[FromBB->getArgument(i)] = DestBB->getArgument(i);
-        AvailVals.push_back(
-            std::make_pair(FromBB->getArgument(i), DestBB->getArgument(i)));
-      }
-    }
-
-    // Clone all instructions of the FromBB into DestBB
-    void clone() {
-      for (auto &I : *FromBB)
-        process(&I);
-    }
-
-    SILBasicBlock *getDestBB() { return DestBB; }
-};
-
-/// Helper function to perform SSA updates in case of jump threading. Set
-/// 'NeedToSplitCriticalEdges' to false if all critical edges are split,
-/// otherwise this call will try to split all critical edges.
-void updateSSAAfterCloning(BaseThreadingCloner &Cloner, SILBasicBlock *SrcBB,
-                           SILBasicBlock *DestBB,
-                           bool NeedToSplitCriticalEdges = true);
+/// Helper function to perform SSA updates in case of jump threading.
+void updateSSAAfterCloning(BasicBlockCloner &Cloner, SILBasicBlock *SrcBB,
+                           SILBasicBlock *DestBB);
 
 // Helper class that provides a callback that can be used in
 // inliners/cloners for collecting new call sites.
@@ -555,11 +505,6 @@ bool simplifyUsers(SingleValueInstruction *I);
 /// without a significant increase to code size.
 bool shouldExpand(SILModule &Module, SILType Ty);
 
-/// Check if a given type is a simple type, i.e. a builtin
-/// integer or floating point type or a struct/tuple whose members
-/// are of simple types.
-bool isSimpleType(SILType SILTy, SILModule& Module);
-
 /// Check if the value of V is computed by means of a simple initialization.
 /// Store the actual SILValue into \p Val and the reversed list of instructions
 /// initializing it in \p Insns.
@@ -568,13 +513,15 @@ bool isSimpleType(SILType SILTy, SILModule& Module);
 bool analyzeStaticInitializer(SILValue V,
                               SmallVectorImpl<SILInstruction *> &Insns);
 
+/// Returns true if the below operation will succeed.
+bool canReplaceLoadSequence(SILInstruction *I);
+
 /// Replace load sequence which may contain
 /// a chain of struct_element_addr followed by a load.
 /// The sequence is traversed inside out, i.e.
 /// starting with the innermost struct_element_addr
 void replaceLoadSequence(SILInstruction *I,
-                         SILValue Value,
-                         SILBuilder &B);
+                         SILValue Value);
 
 
 /// Do we have enough information to determine all callees that could
@@ -587,28 +534,21 @@ bool calleesAreStaticallyKnowable(SILModule &M, SILDeclRef Decl);
 // can be derived e.g.:
 // - from a constructor or
 // - from a successful outcome of a checked_cast_br [exact] instruction.
-SILValue getInstanceWithExactDynamicType(SILValue S, SILModule &M,
+SILValue getInstanceWithExactDynamicType(SILValue S,
                                          ClassHierarchyAnalysis *CHA);
 
 /// Try to determine the exact dynamic type of an object.
 /// returns the exact dynamic type of the object, or an empty type if the exact
 /// type could not be determined.
-SILType getExactDynamicType(SILValue S, SILModule &M,
+SILType getExactDynamicType(SILValue S,
                             ClassHierarchyAnalysis *CHA,
                             bool ForUnderlyingObject = false);
 
 /// Try to statically determine the exact dynamic type of the underlying object.
 /// returns the exact dynamic type of the underlying object, or an empty SILType
 /// if the exact type could not be determined.
-SILType getExactDynamicTypeOfUnderlyingObject(SILValue S, SILModule &M,
+SILType getExactDynamicTypeOfUnderlyingObject(SILValue S,
                                               ClassHierarchyAnalysis *CHA);
-
-/// Hoist the address projection rooted in \p Op to \p InsertBefore.
-/// Requires the projected value to dominate the insertion point.
-///
-/// Will look through single basic block predecessor arguments.
-void hoistAddressProjections(Operand &Op, SILInstruction *InsertBefore,
-                             DominanceInfo *DomTree);
 
 /// Utility class for cloning init values into the static initializer of a
 /// SILGlobalVariable.
@@ -651,6 +591,53 @@ protected:
     return ArtificialUnreachableLocation();
   }
 };
+
+/// Move only data structure that is the result of findLocalApplySite.
+///
+/// NOTE: Generally it is not suggested to have move only types that contain
+/// small vectors. Since our small vectors contain one element or a std::vector
+/// like data structure , this is ok since we will either just copy the single
+/// element when we do the move or perform a move of the vector type.
+struct LLVM_LIBRARY_VISIBILITY FindLocalApplySitesResult {
+  /// Contains the list of local non fully applied partial apply sites that we
+  /// found.
+  SmallVector<ApplySite, 1> partialApplySites;
+
+  /// Contains the list of full apply sites that we found.
+  SmallVector<FullApplySite, 1> fullApplySites;
+
+  /// Set to true if the function_ref escapes into a use that our analysis does
+  /// not understand. Set to false if we found a use that had an actual
+  /// escape. Set to None if we did not find any call sites, but also didn't
+  /// find any "escaping uses" as well.
+  ///
+  /// The none case is so that we can distinguish in between saying that a value
+  /// did escape and saying that we did not find any conservative information.
+  bool escapes;
+
+  FindLocalApplySitesResult() = default;
+  FindLocalApplySitesResult(const FindLocalApplySitesResult &) = delete;
+  FindLocalApplySitesResult &
+  operator=(const FindLocalApplySitesResult &) = delete;
+  FindLocalApplySitesResult(FindLocalApplySitesResult &&) = default;
+  FindLocalApplySitesResult &operator=(FindLocalApplySitesResult &&) = default;
+  ~FindLocalApplySitesResult() = default;
+
+  /// Treat this function ref as escaping only if we found an actual user we
+  /// didn't understand. Do not treat it as escaping if we did not find any
+  /// users at all.
+  bool isEscaping() const { return escapes; }
+};
+
+/// Returns .some(FindLocalApplySitesResult) if we found any interesting
+/// information for the given function_ref. Otherwise, returns None.
+///
+/// We consider "interesting information" to mean inclusively that:
+///
+/// 1. We discovered that the function_ref never escapes.
+/// 2. We were able to find either a partial apply or a full apply site.
+Optional<FindLocalApplySitesResult>
+findLocalApplySites(FunctionRefBaseInst *FRI);
 
 } // end namespace swift
 

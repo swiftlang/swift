@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift
-// REQUIRES: objc_interop
+// RUN: %target-typecheck-verify-swift %import-libdispatch
+// REQUIRES: libdispatch
 
 import Dispatch
 

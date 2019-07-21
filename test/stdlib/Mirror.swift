@@ -19,8 +19,11 @@
 // RUN: else \
 // RUN:   %target-build-swift %t/main.swift %S/Inputs/Mirror/MirrorOther.swift -o %t/Mirror; \
 // RUN: fi
+// RUN: %target-codesign %t/Mirror
 // RUN: %target-run %t/Mirror
+
 // REQUIRES: executable_test
+// REQUIRES: shell
 
 import StdlibUnittest
 
@@ -1691,7 +1694,7 @@ mirrors.test("DictionaryIterator/Mirror") {
   dump(d.makeIterator(), to: &output)
 
   let expected =
-    "- Swift.DictionaryIterator<StdlibUnittest.MinimalHashableValue, StdlibUnittest.OpaqueValue<Swift.Int>>\n"
+    "- Swift.Dictionary<StdlibUnittest.MinimalHashableValue, StdlibUnittest.OpaqueValue<Swift.Int>>.Iterator\n"
 
   expectEqual(expected, output)
 }
@@ -1703,7 +1706,7 @@ mirrors.test("SetIterator/Mirror") {
   dump(s.makeIterator(), to: &output)
 
   let expected =
-    "- Swift.SetIterator<StdlibUnittest.MinimalHashableValue>\n"
+    "- Swift.Set<StdlibUnittest.MinimalHashableValue>.Iterator\n"
 
   expectEqual(expected, output)
 }
@@ -1793,5 +1796,213 @@ mirrors.test("SymbolicReferenceInsideType") {
 
   expectEqual(expected, output)
 }
+
+protocol P1 { }
+protocol P2 { }
+protocol P3 { }
+
+struct ConformsToP1: P1 { }
+struct ConformsToP2: P2 { }
+struct ConformsToP3: P3 { }
+
+struct OuterTwoParams<T: P1, U: P2> {}
+
+struct ConformsToP1AndP2 : P1, P2 { }
+
+extension OuterTwoParams where U == T {
+  struct InnerEqualParams<V: P3> {
+    var x: T
+    var y: U
+    var z: V
+  }
+}
+
+mirrors.test("GenericNestedWithSameTypeConstraints") {
+  let value = OuterTwoParams.InnerEqualParams(x: ConformsToP1AndP2(),
+                                              y: ConformsToP1AndP2(),
+                                              z: ConformsToP3())
+  var output = ""
+  dump(value, to: &output)
+
+  let expected =
+    "▿ (extension in Mirror):Mirror.OuterTwoParams<Mirror.ConformsToP1AndP2, Mirror.ConformsToP1AndP2>.InnerEqualParams<Mirror.ConformsToP3>\n" +
+    "  - x: Mirror.ConformsToP1AndP2\n" +
+    "  - y: Mirror.ConformsToP1AndP2\n" +
+    "  - z: Mirror.ConformsToP3\n"
+
+  expectEqual(expected, output)
+}
+
+@_alignment(16) struct CustomAlignment {
+  var x: Int
+  var y: Int
+}
+
+mirrors.test("CustomAlignment") {
+  let value = CustomAlignment(x: 123, y: 321)
+  var output = ""
+  dump(value, to: &output)
+
+  let expected =
+    "▿ Mirror.CustomAlignment\n" +
+    "  - x: 123\n" +
+    "  - y: 321\n"
+
+  expectEqual(expected, output)
+}
+
+protocol STSTagProtocol {}
+struct STSOuter : STSTagProtocol {}
+
+enum STSContainer<T : STSTagProtocol> {
+  class Superclass {}
+  class Subclass<U>: Superclass where T == STSOuter {
+    class ExtraNested: Superclass {}
+  }
+
+  class GenericSuperclass<U> {}
+  class Subclass2<U>: GenericSuperclass<U> where T == STSOuter {}
+
+  class Subclass3<U: Collection>: Superclass where T == U.Element {}
+
+  class MoreNesting<X> {
+    class Subclass<U>: Superclass where T == STSOuter {}
+  }
+
+  struct Fields<U> where T == STSOuter {
+    var x: T?
+    var y: U?
+  }
+
+  enum Cases<U> where T == STSOuter {
+    case a(T)
+    case b(U)
+  }
+}
+
+// A new type with an easily-recognizable, easily-strippable suffix character.
+enum STSContainer℠<T : STSTagProtocol> {
+  class Superclass {}
+  class GenericSuperclass<U> {}
+}
+extension STSContainer℠ where T == STSOuter {
+  class Subclass<U>: Superclass {
+    class ExtraNested: Superclass {}
+  }
+
+  class Subclass2<U>: GenericSuperclass<U> {}
+
+  class MoreNesting<X> {
+    class Subclass<U>: Superclass {}
+  }
+
+  struct Fields<U> {
+    var x: T?
+    var y: U?
+  }
+
+  enum Cases<U> {
+    case a(T)
+    case b(U)
+  }
+}
+
+var sameTypeSuite = TestSuite("Mirrors.SameTypeConstraints")
+
+func testSTSDump<RegularValue, ExtensionValue>(
+  _ regular: RegularValue,
+  _ ext: ExtensionValue,
+  _ expected: String
+) {
+  var output = ""
+  dump(regular, to: &output)
+  expectEqual(expected, output)
+
+  func clean(_ dumpOutput: String) -> String {
+    // This isn't efficient but it doesn't have to be.
+    var result = dumpOutput
+    result.removeAll { $0 == "℠" }
+    if let openParenIndex = result.firstIndex(of: "(") {
+      if result[openParenIndex...].hasPrefix("(extension in Mirror):") {
+        let colonIndex = result[openParenIndex...].firstIndex(of: ":")!
+        result.removeSubrange(openParenIndex...colonIndex)
+      }
+    }
+    return result
+  }
+
+  var extensionOutput = ""
+  dump(ext, to: &extensionOutput)
+  expectEqual(expected, clean(extensionOutput))
+}
+
+func testSTSDump<RegularValue>(_ regular: RegularValue, _ expected: String) {
+  var output = ""
+  dump(regular, to: &output)
+  expectEqual(expected, output)
+}
+
+
+sameTypeSuite.test("Subclass") {
+  testSTSDump(STSContainer.Subclass<Int>(),
+              STSContainer℠.Subclass<Int>(),
+              """
+    - Mirror.STSContainer<Mirror.STSOuter>.Subclass<Swift.Int> #0
+      - super: Mirror.STSContainer<Mirror.STSOuter>.Superclass\n
+    """)
+
+  testSTSDump(STSContainer.Subclass2<Int>(),
+              STSContainer℠.Subclass2<Int>(),
+              """
+    - Mirror.STSContainer<Mirror.STSOuter>.Subclass2<Swift.Int> #0
+      - super: Mirror.STSContainer<Mirror.STSOuter>.GenericSuperclass<Swift.Int>\n
+    """)
+
+  testSTSDump(STSContainer.Subclass3<[STSOuter]>(),
+              """
+    - Mirror.STSContainer<Mirror.STSOuter>.Subclass3<Swift.Array<Mirror.STSOuter>> #0
+      - super: Mirror.STSContainer<Mirror.STSOuter>.Superclass\n
+    """)
+
+  testSTSDump(STSContainer.Subclass<Int>.ExtraNested(),
+              STSContainer℠.Subclass<Int>.ExtraNested(),
+              """
+    - Mirror.STSContainer<Mirror.STSOuter>.Subclass<Swift.Int>.ExtraNested #0
+      - super: Mirror.STSContainer<Mirror.STSOuter>.Superclass\n
+    """)
+
+  testSTSDump(STSContainer.MoreNesting<Bool>.Subclass<Int>(),
+              STSContainer℠.MoreNesting<Bool>.Subclass<Int>(),
+              """
+    - Mirror.STSContainer<Mirror.STSOuter>.MoreNesting<Swift.Bool>.Subclass<Swift.Int> #0
+      - super: Mirror.STSContainer<Mirror.STSOuter>.Superclass\n
+    """)
+}
+
+sameTypeSuite.test("Fields") {
+  testSTSDump(STSContainer.Fields<Int>(),
+              STSContainer℠.Fields<Int>(),
+              """
+    ▿ Mirror.STSContainer<Mirror.STSOuter>.Fields<Swift.Int>
+      - x: nil
+      - y: nil\n
+    """)
+}
+
+sameTypeSuite.test("Cases") {
+  testSTSDump(STSContainer.Cases<Int>.a(.init()),
+              STSContainer℠.Cases<Int>.a(.init()),
+              """
+    - Mirror.STSContainer<Mirror.STSOuter>.Cases<Swift.Int>.a\n
+    """)
+
+  testSTSDump(STSContainer.Cases<Int>.b(.init()),
+              STSContainer℠.Cases<Int>.b(.init()),
+              """
+    ▿ Mirror.STSContainer<Mirror.STSOuter>.Cases<Swift.Int>.b
+      - b: 0\n
+    """)
+}
+
 
 runAllTests()

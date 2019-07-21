@@ -100,11 +100,16 @@ private:
 
   /// The entry point to the transformation.
   void run() override {
-    DEBUG(llvm::dbgs() << "** StackPromotion **\n");
+    LLVM_DEBUG(llvm::dbgs() << "** StackPromotion **\n");
 
     bool Changed = false;
 
     SILFunction *F = getFunction();
+
+    // FIXME: Add ownership support.
+    if (F->hasOwnership())
+      return;
+
     for (SILBasicBlock &BB : *F) {
       if (auto *SEI = dyn_cast<SwitchEnumInst>(BB.getTerminator())) {
         Changed |= tryOptimize(SEI);
@@ -241,7 +246,7 @@ bool ConditionForwarding::tryOptimize(SwitchEnumInst *SEI) {
       SILArgument *NewArg = nullptr;
       if (NeedEnumArg.insert(UseBlock).second) {
         // The first Enum use in this UseBlock.
-        NewArg = UseBlock->createPHIArgument(Arg->getType(),
+        NewArg = UseBlock->createPhiArgument(Arg->getType(),
                                              ValueOwnershipKind::Owned);
       } else {
         // We already inserted the Enum argument for this UseBlock.
@@ -254,7 +259,7 @@ bool ConditionForwarding::tryOptimize(SwitchEnumInst *SEI) {
     assert(ArgUser == SEI);
     // We delete the SEI later anyway. Just get rid of the Arg use.
     ArgUse->set(SILUndef::get(SEI->getOperand()->getType(),
-                              getFunction()->getModule()));
+                              *getFunction()));
   }
 
   // Redirect the predecessors of the condition's merging block to the

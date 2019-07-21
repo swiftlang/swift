@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift -typecheck %s -verify
-// RUN: %target-typecheck-verify-swift -typecheck -debug-generic-signatures %s > %t.dump 2>&1
+// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -debug-generic-signatures > %t.dump 2>&1
 // RUN: %FileCheck %s < %t.dump
 
 // CHECK-LABEL: .P1@
@@ -86,4 +86,15 @@ protocol P4 {
 // CHECK-NEXT: <Self where Self == Self.AType.BType, Self.AType : P4>
 protocol P5 {
 	associatedtype AType : P4 where AType.BType == Self
+}
+
+// SR-8119
+protocol P6 {
+  associatedtype A1: P7
+}
+
+// CHECK-DAG: .P7@
+// CHECK-NEXT: <Self where Self == Self.A2.A1, Self.A2 : P6>
+protocol P7 {
+  associatedtype A2: P6 where A2.A1 == Self
 }

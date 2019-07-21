@@ -14,13 +14,12 @@
 ///
 /// When you use this type, you become partially responsible for
 /// keeping the object alive.
-@_fixed_layout
-public struct Unmanaged<Instance : AnyObject> {
+@frozen
+public struct Unmanaged<Instance: AnyObject> {
   @usableFromInline
   internal unowned(unsafe) var _value: Instance
 
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
+  @usableFromInline @_transparent
   internal init(_private: Instance) { _value = _private }
 
   /// Unsafely turns an opaque C pointer into an unmanaged class reference.
@@ -31,7 +30,6 @@ public struct Unmanaged<Instance : AnyObject> {
   ///
   /// - Parameter value: An opaque C pointer.
   /// - Returns: An unmanaged class reference to `value`.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public static func fromOpaque(_ value: UnsafeRawPointer) -> Unmanaged {
     return Unmanaged(_private: unsafeBitCast(value, to: Instance.self))
@@ -46,7 +44,6 @@ public struct Unmanaged<Instance : AnyObject> {
   ///     let ptr = bits.toOpaque()
   ///
   /// - Returns: An opaque pointer to the value of this unmanaged reference.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public func toOpaque() -> UnsafeMutableRawPointer {
     return unsafeBitCast(_value, to: UnsafeMutableRawPointer.self)
@@ -63,7 +60,6 @@ public struct Unmanaged<Instance : AnyObject> {
   ///
   /// - Parameter value: A class instance.
   /// - Returns: An unmanaged reference to the object passed as `value`.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public static func passRetained(_ value: Instance) -> Unmanaged {
     return Unmanaged(_private: value).retain()
@@ -81,7 +77,6 @@ public struct Unmanaged<Instance : AnyObject> {
   ///
   /// - Parameter value: A class instance.
   /// - Returns: An unmanaged reference to the object passed as `value`.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public static func passUnretained(_ value: Instance) -> Unmanaged {
     return Unmanaged(_private: value)
@@ -94,7 +89,7 @@ public struct Unmanaged<Instance : AnyObject> {
   /// and you know that you're not responsible for releasing the result.
   ///
   /// - Returns: The object referenced by this `Unmanaged` instance.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // unsafe-performance
   public func takeUnretainedValue() -> Instance {
     return _value
   }
@@ -106,7 +101,7 @@ public struct Unmanaged<Instance : AnyObject> {
   /// and you know that you're responsible for releasing the result.
   ///
   /// - Returns: The object referenced by this `Unmanaged` instance.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // unsafe-performance
   public func takeRetainedValue() -> Instance {
     let result = _value
     release()
@@ -199,13 +194,13 @@ public struct Unmanaged<Instance : AnyObject> {
   ///        }
   ///    }
   ///
-  ///    func doSomething(_ u : Unmanaged<Owned>) {
+  ///    func doSomething(_ u: Unmanaged<Owned>) {
   ///      u._withUnsafeGuaranteedRef {
   ///        $0.doSomething()
   ///      }
   ///    }
   ///  }
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // unsafe-performance
   public func _withUnsafeGuaranteedRef<Result>(
     _ body: (Instance) throws -> Result
   ) rethrows -> Result {
@@ -216,7 +211,6 @@ public struct Unmanaged<Instance : AnyObject> {
   }
 
   /// Performs an unbalanced retain of the object.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public func retain() -> Unmanaged {
     Builtin.retain(_value)
@@ -224,7 +218,6 @@ public struct Unmanaged<Instance : AnyObject> {
   }
 
   /// Performs an unbalanced release of the object.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public func release() {
     Builtin.release(_value)
@@ -232,7 +225,6 @@ public struct Unmanaged<Instance : AnyObject> {
 
 #if _runtime(_ObjC)
   /// Performs an unbalanced autorelease of the object.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public func autorelease() -> Unmanaged {
     Builtin.autorelease(_value)

@@ -108,7 +108,8 @@ static RawComment toRawComment(ASTContext &Context, CharSourceRange Range) {
   unsigned Offset = SourceMgr.getLocOffsetInBuffer(Range.getStart(), BufferID);
   unsigned EndOffset = SourceMgr.getLocOffsetInBuffer(Range.getEnd(), BufferID);
   LangOptions FakeLangOpts;
-  Lexer L(FakeLangOpts, SourceMgr, BufferID, nullptr, /*InSILMode=*/false,
+  Lexer L(FakeLangOpts, SourceMgr, BufferID, nullptr, LexerMode::Swift,
+          HashbangMode::Disallowed,
           CommentRetentionMode::ReturnAsTokens,
           TriviaRetentionMode::WithoutTrivia,
           Offset, EndOffset);
@@ -163,8 +164,8 @@ static const Decl* getGroupDecl(const Decl *D) {
   // Extensions always exist in the same group with the nominal.
   if (auto ED = dyn_cast_or_null<ExtensionDecl>(D->getDeclContext()->
                                                 getInnermostTypeContext())) {
-    if (auto ExtTy = ED->getExtendedType())
-      GroupD = ExtTy->getAnyNominal();
+    if (auto ExtNominal = ED->getExtendedNominal())
+      GroupD = ExtNominal;
   }
   return GroupD;
 }
@@ -204,48 +205,6 @@ Optional<unsigned> Decl::getSourceOrder() const {
     return Unit->getSourceOrderForDecl(this);
   }
   return None;
-}
-
-static StringRef extractBriefComment(ASTContext &Context, RawComment RC,
-                                     const Decl *D) {
-  PrettyStackTraceDecl StackTrace("extracting brief comment for", D);
-
-  if (!D->canHaveComment())
-    return StringRef();
-
-  swift::markup::MarkupContext MC;
-  auto DC = getCascadingDocComment(MC, D);
-  if (!DC.hasValue())
-    return StringRef();
-
-  auto Brief = DC.getValue()->getBrief();
-  if (!Brief.hasValue())
-    return StringRef();
-
-  SmallString<256> BriefStr("");
-  llvm::raw_svector_ostream OS(BriefStr);
-  swift::markup::printInlinesUnder(Brief.getValue(), OS);
-  if (OS.str().empty())
-    return StringRef();
-
-  return Context.AllocateCopy(OS.str());
-}
-
-StringRef Decl::getBriefComment() const {
-  if (!this->canHaveComment())
-    return StringRef();
-
-  auto &Context = getASTContext();
-  if (Optional<StringRef> Comment = Context.getBriefComment(this))
-    return Comment.getValue();
-
-  StringRef Result;
-  auto RC = getRawComment();
-  if (!RC.isEmpty())
-    Result = extractBriefComment(Context, RC, this);
-
-  Context.setBriefComment(this, Result);
-  return Result;
 }
 
 CharSourceRange RawComment::getCharSourceRange() {

@@ -31,9 +31,9 @@ let RequestStringLength = "l"
 let RequestDone = "d"
 let RequestPointerSize = "p"
 
-internal func debugLog(_ message: String) {
+internal func debugLog(_ message: @autoclosure () -> String) {
 #if DEBUG_LOG
-  fputs("Child: \(message)\n", stderr)
+  fputs("Child: \(message())\n", stderr)
   fflush(stderr)
 #endif
 }
@@ -107,12 +107,12 @@ internal func getSectionInfo(_ name: String,
 ///
 /// An image of interest must have the following sections in the __DATA
 /// segment:
-/// - __swift4_fieldmd
-/// - __swift4_assocty
-/// - __swift4_builtin
-/// - __swift4_capture
-/// - __swift4_typeref
-/// - __swift4_reflstr (optional, may have been stripped out)
+/// - __swift5_fieldmd
+/// - __swift5_assocty
+/// - __swift5_builtin
+/// - __swift5_capture
+/// - __swift5_typeref
+/// - __swift5_reflstr (optional, may have been stripped out)
 ///
 /// - Parameter i: The index of the loaded image as reported by Dyld.
 /// - Returns: A `ReflectionInfo` containing the locations of all of the
@@ -123,12 +123,12 @@ internal func getReflectionInfoForImage(atIndex i: UInt32) -> ReflectionInfo? {
     to: UnsafePointer<MachHeader>.self)
 
   let imageName = _dyld_get_image_name(i)!
-  let fieldmd = getSectionInfo("__swift4_fieldmd", header)
-  let assocty = getSectionInfo("__swift4_assocty", header)
-  let builtin = getSectionInfo("__swift4_builtin", header)
-  let capture = getSectionInfo("__swift4_capture", header)
-  let typeref = getSectionInfo("__swift4_typeref", header)
-  let reflstr = getSectionInfo("__swift4_reflstr", header)
+  let fieldmd = getSectionInfo("__swift5_fieldmd", header)
+  let assocty = getSectionInfo("__swift5_assocty", header)
+  let builtin = getSectionInfo("__swift5_builtin", header)
+  let capture = getSectionInfo("__swift5_capture", header)
+  let typeref = getSectionInfo("__swift5_typeref", header)
+  let reflstr = getSectionInfo("__swift5_reflstr", header)
   return ReflectionInfo(imageName: String(validatingUTF8: imageName)!,
                         fieldmd: fieldmd,
                         assocty: assocty,
@@ -271,7 +271,10 @@ internal func sendStringLength() {
   debugLog("BEGIN \(#function)"); defer { debugLog("END \(#function)") }
   let address = readUInt()
   let cString = UnsafePointer<CChar>(bitPattern: address)!
-  let count = String(validatingUTF8: cString)!.utf8.count
+  var count = 0
+  while cString[count] != CChar(0) {
+    count = count + 1
+  }
   sendValue(count)
 }
 

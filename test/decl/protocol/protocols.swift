@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -enable-objc-interop
 protocol EmptyProtocol { }
 
 protocol DefinitionsInProtocols {
@@ -14,15 +14,18 @@ protocol Test {
   var creator: String { get }
   var major : Int { get }
   var minor : Int { get }
-  var subminor : Int  // expected-error {{property in protocol must have explicit { get } or { get set } specifier}}
-  static var staticProperty: Int // expected-error{{property in protocol must have explicit { get } or { get set } specifier}}
+  var subminor : Int  // expected-error {{property in protocol must have explicit { get } or { get set } specifier}} {{21-21= { get <#set#> \}}}
+  static var staticProperty: Int // expected-error{{property in protocol must have explicit { get } or { get set } specifier}} {{33-33= { get <#set#> \}}}
+
+  let bugfix // expected-error {{type annotation missing in pattern}} expected-error {{immutable property requirement must be declared as 'var' with a '{ get }' specifier}}
+  var comment // expected-error {{type annotation missing in pattern}} expected-error {{property in protocol must have explicit { get } or { get set } specifier}}
 }
 
 protocol Test2 {
   var property: Int { get }
 
-  var title: String = "The Art of War" { get } // expected-error{{initial value is not allowed here}} expected-error {{property in protocol must have explicit { get } or { get set } specifier}}
-  static var title2: String = "The Art of War" // expected-error{{initial value is not allowed here}} expected-error {{property in protocol must have explicit { get } or { get set } specifier}}
+  var title: String = "The Art of War" { get } // expected-error{{initial value is not allowed here}} expected-error {{property in protocol must have explicit { get } or { get set } specifier}} {{20-20= { get <#set#> \}}}
+  static var title2: String = "The Art of War" // expected-error{{initial value is not allowed here}} expected-error {{property in protocol must have explicit { get } or { get set } specifier}} {{28-28= { get <#set#> \}}}
 
   associatedtype mytype
   associatedtype mybadtype = Int
@@ -39,7 +42,7 @@ func test1() {
 }
 
 protocol Bogus : Int {}
-// expected-error@-1{{inheritance from non-protocol type 'Int'}}
+// expected-error@-1{{inheritance from non-protocol, non-class type 'Int'}}
 // expected-error@-2{{type 'Self' constrained to non-protocol, non-class type 'Int'}}
 
 // Explicit conformance checks (successful).
@@ -74,7 +77,7 @@ class NotPrintableC : CustomStringConvertible, Any {} // expected-error{{type 'N
 enum NotPrintableO : Any, CustomStringConvertible {} // expected-error{{type 'NotPrintableO' does not conform to protocol 'CustomStringConvertible'}}
 
 struct NotFormattedPrintable : FormattedPrintable { // expected-error{{type 'NotFormattedPrintable' does not conform to protocol 'CustomStringConvertible'}}
-  func print(format: TestFormat) {} // expected-note{{candidate has non-matching type '(TestFormat) -> ()'}}
+  func print(format: TestFormat) {} 
 }
 
 // Protocol compositions in inheritance clauses
@@ -98,15 +101,13 @@ struct DoesNotConform : Up {
 
 // Circular protocols
 
-protocol CircleMiddle : CircleStart { func circle_middle() } // expected-error 2 {{circular protocol inheritance CircleMiddle}}
-// expected-error@-1{{circular protocol inheritance 'CircleMiddle' -> 'CircleStart' -> 'CircleEnd' -> 'CircleMiddle'}}
-// expected-error @+1 {{circular protocol inheritance CircleStart}}
-protocol CircleStart : CircleEnd { func circle_start() } // expected-error 2{{circular protocol inheritance CircleStart}}
-// expected-note@-1{{protocol 'CircleStart' declared here}}
-protocol CircleEnd : CircleMiddle { func circle_end()} // expected-note{{protocol 'CircleEnd' declared here}}
+protocol CircleMiddle : CircleStart { func circle_middle() } // expected-error 2 {{protocol 'CircleMiddle' refines itself}}
+protocol CircleStart : CircleEnd { func circle_start() }
+// expected-note@-1 2{{protocol 'CircleStart' declared here}}
+protocol CircleEnd : CircleMiddle { func circle_end()} // expected-note 2 {{protocol 'CircleEnd' declared here}}
 
 protocol CircleEntry : CircleTrivial { }
-protocol CircleTrivial : CircleTrivial { } // expected-error 2{{circular protocol inheritance CircleTrivial}}
+protocol CircleTrivial : CircleTrivial { } // expected-error {{protocol 'CircleTrivial' refines itself}}
 
 struct Circle {
   func circle_start() {}
@@ -195,7 +196,7 @@ extension IntIterator : SequenceViaStream {
 }
 
 struct NotSequence : SequenceViaStream { // expected-error{{type 'NotSequence' does not conform to protocol 'SequenceViaStream'}}
-  typealias SequenceStreamTypeType = Int // expected-note{{possibly intended match 'SequenceStreamTypeType' (aka 'Int') does not conform to 'IteratorProtocol'}}
+  typealias SequenceStreamTypeType = Int // expected-note{{possibly intended match 'NotSequence.SequenceStreamTypeType' (aka 'Int') does not conform to 'IteratorProtocol'}}
   func makeIterator() -> Int {}
 }
 
@@ -266,7 +267,7 @@ struct WrongIsEqual : IsEqualComparable { // expected-error{{type 'WrongIsEqual'
 //===----------------------------------------------------------------------===//
 
 func existentialSequence(_ e: Sequence) { // expected-error{{has Self or associated type requirements}}
-  var x = e.makeIterator() // expected-error{{'Sequence' requires the types 'Sequence' and 'Sequence.Iterator' be equivalent to use 'makeIterator'}}
+  var x = e.makeIterator() // expected-error{{member 'makeIterator' cannot be used on value of protocol type 'Sequence'; use a generic constraint instead}}
   x.next()
   x.nonexistent()
 }
@@ -456,7 +457,7 @@ protocol ShouldntCrash {
   let fullName: String { get }  // expected-error {{'let' declarations cannot be computed properties}} {{3-6=var}}
   
   // <rdar://problem/17200672> Let in protocol causes unclear errors and crashes
-  let fullName2: String  // expected-error {{immutable property requirement must be declared as 'var' with a '{ get }' specifier}}
+  let fullName2: String  // expected-error {{immutable property requirement must be declared as 'var' with a '{ get }' specifier}} {{3-6=var}} {{24-24= { get \}}}
 
   // <rdar://problem/16789886> Assert on protocol property requirement without a type
   var propertyWithoutType { get } // expected-error {{type annotation missing in pattern}}
@@ -502,7 +503,7 @@ class C4 : P4 { // expected-error {{type 'C4' does not conform to protocol 'P4'}
 // <rdar://problem/25185722> Crash with invalid 'let' property in protocol
 protocol LetThereBeCrash {
   let x: Int
-  // expected-error@-1 {{immutable property requirement must be declared as 'var' with a '{ get }' specifier}}
+  // expected-error@-1 {{immutable property requirement must be declared as 'var' with a '{ get }' specifier}} {{13-13= { get \}}}
   // expected-note@-2 {{declared here}}
 }
 

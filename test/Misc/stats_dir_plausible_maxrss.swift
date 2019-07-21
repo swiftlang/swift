@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: touch %t/main.swift
 // RUN: %target-swiftc_driver -o %t/main -module-name main -stats-output-dir %t %t/main.swift
-// RUN: %utils/process-stats-dir.py --set-csv-baseline %t/frontend.csv %t
+// RUN: %{python} %utils/process-stats-dir.py --set-csv-baseline %t/frontend.csv %t
 // RUN: %FileCheck -input-file %t/frontend.csv %s
 
 // This test checks that we're reporting some number that's "at least 10MB" and

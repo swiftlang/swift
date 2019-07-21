@@ -19,7 +19,6 @@
 #define SWIFT_AST_WITNESS_H
 
 #include "swift/AST/ConcreteDeclRef.h"
-#include "swift/AST/SubstitutionList.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/Compiler.h"
 
@@ -116,6 +115,15 @@ public:
     // TODO: It's probably a good idea to have a separate 'opaque' bit.
     // Making req == witness is kind of a hack.
     return Witness(requirement);
+  }
+
+  /// Create a witness for the given requirement.
+  ///
+  /// Deserialized witnesses do not have a synthetic environment.
+  static Witness forDeserialized(ValueDecl *decl,
+                                 SubstitutionMap substitutions) {
+    // TODO: It's probably a good idea to have a separate 'deserialized' bit.
+    return Witness(decl, substitutions, nullptr, SubstitutionMap());
   }
 
   /// Create a witness that requires substitutions.

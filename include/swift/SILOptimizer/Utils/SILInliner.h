@@ -18,11 +18,16 @@
 #ifndef SWIFT_SIL_SILINLINER_H
 #define SWIFT_SIL_SILINLINER_H
 
+#include "swift/AST/SubstitutionMap.h"
+#include "swift/SIL/ApplySite.h"
+#include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/SILOpenedArchetypesTracker.h"
 #include "llvm/ADT/DenseMap.h"
-#include "swift/SIL/TypeSubstCloner.h"
 #include <functional>
 
 namespace swift {
+
+class SILOptFunctionBuilder;
 
 // For now Free is 0 and Expensive is 1. This can be changed in the future by
 // adding more categories.
@@ -35,101 +40,109 @@ enum class InlineCost : unsigned {
 /// disappear at the LLVM IR level are assigned a cost of 'Free'.
 InlineCost instructionInlineCost(SILInstruction &I);
 
-class SILInliner : public TypeSubstCloner<SILInliner> {
-  friend class SILInstructionVisitor<SILInliner>;
-  friend class SILCloner<SILInliner>;
-
+class SILInliner {
 public:
   enum class InlineKind { MandatoryInline, PerformanceInline };
 
+  using DeletionFuncTy = std::function<void(SILInstruction *)>;
+
 private:
+  SILOptFunctionBuilder &FuncBuilder;
   InlineKind IKind;
+  SubstitutionMap ApplySubs;
+  SILOpenedArchetypesTracker &OpenedArchetypesTracker;
 
-  SILBasicBlock *CalleeEntryBB = nullptr;
-
-  /// \brief The location representing the inlined instructions.
-  ///
-  /// This location wraps the call site AST node that is being inlined.
-  /// Alternatively, it can be the SIL file location of the call site (in case
-  /// of SIL-to-SIL transformations).
-  Optional<SILLocation> Loc;
-  const SILDebugScope *CallSiteScope = nullptr;
-  SILFunction *CalleeFunction = nullptr;
-  llvm::SmallDenseMap<const SILDebugScope *, const SILDebugScope *, 8>
-      InlinedScopeCache;
-  CloneCollector::CallbackType Callback;
+  DeletionFuncTy DeletionCallback;
 
 public:
-  SILInliner(SILFunction &To, SILFunction &From, InlineKind IKind,
-             SubstitutionList ApplySubs,
-             SILOpenedArchetypesTracker &OpenedArchetypesTracker,
-             CloneCollector::CallbackType Callback = nullptr)
-      : TypeSubstCloner<SILInliner>(To, From, ApplySubs,
-                                    OpenedArchetypesTracker, true),
-        IKind(IKind), CalleeFunction(&Original), Callback(Callback) {
-    // CalleeEntryBB is initialized later in case the callee is modified.
-  }
+  SILInliner(SILOptFunctionBuilder &FuncBuilder, InlineKind IKind,
+             SubstitutionMap ApplySubs,
+             SILOpenedArchetypesTracker &OpenedArchetypesTracker)
+      : FuncBuilder(FuncBuilder), IKind(IKind), ApplySubs(ApplySubs),
+        OpenedArchetypesTracker(OpenedArchetypesTracker) {}
 
   /// Returns true if we are able to inline \arg AI.
   ///
   /// *NOTE* This must be checked before attempting to inline \arg AI. If one
   /// attempts to inline \arg AI and this returns false, an assert will fire.
-  bool canInlineFunction(FullApplySite AI);
+  static bool canInlineApplySite(FullApplySite apply);
 
-  /// inlineFunction - This method inlines a callee function, assuming that it
-  /// is called with the given arguments, into the caller at a given instruction
-  /// (as specified by a basic block iterator), assuming that the instruction
-  /// corresponds semantically to an application of the function. It only
-  /// performs one step of inlining: it does not recursively inline functions
-  /// called by the callee.
+  /// Returns true if inlining \arg apply can result in improperly nested stack
+  /// allocations.
   ///
-  /// After completion, I now points to the first inlined instruction, or the
-  /// next instruction after the removed instruction in the original function,
-  /// in case the inlined function is completely trivial
+  /// In this case stack nesting must be corrected after inlining with the
+  /// StackNesting utility.
+  static bool needsUpdateStackNesting(FullApplySite apply) {
+    // Inlining of coroutines can result in improperly nested stack
+    // allocations.
+    return isa<BeginApplyInst>(apply);
+  }
+
+  /// Allow the client to track instructions before they are deleted. The
+  /// registered callback is called from
+  /// recursivelyDeleteTriviallyDeadInstructions.
+  ///
+  /// (This is safer than the SILModule deletion callback because the
+  /// instruction is still in a valid form and its operands can be inspected.)
+  void setDeletionCallback(DeletionFuncTy f) { DeletionCallback = f; }
+
+  /// Inline a callee function at the given apply site with the given
+  /// arguments. Delete the apply and any dead arguments. Return a valid
+  /// iterator to the first inlined instruction (or first instruction after the
+  /// call for an empty function).
+  ///
+  /// This only performs one step of inlining: it does not recursively
+  /// inline functions called by the callee.
+  ///
+  /// This may split basic blocks and delete instructions anywhere.
+  ///
+  /// All inlined instructions must be either inside the original call block or
+  /// inside new basic blocks laid out after the original call block.
+  ///
+  /// Any instructions in the original call block after the inlined call must be
+  /// in a new basic block laid out after all inlined blocks.
+  ///
+  /// The above guarantees ensure that inlining is liner in the number of
+  /// instructions and that inlined instructions are revisited exactly once.
   ///
   /// *NOTE*: This attempts to perform inlining unconditionally and thus asserts
   /// if inlining will fail. All users /must/ check that a function is allowed
-  /// to be inlined using SILInliner::canInlineFunction before calling this
+  /// to be inlined using SILInliner::canInlineApplySite before calling this
   /// function.
-  void inlineFunction(FullApplySite AI, ArrayRef<SILValue> Args);
+  ///
+  /// *NOTE*: Inlining can result in improperly nested stack allocations, which
+  /// must be corrected after inlining. See needsUpdateStackNesting().
+  ///
+  /// Returns an iterator to the first inlined instruction (or the end of the
+  /// caller block for empty functions) and the last block in function order
+  /// containing inlined instructions (the original caller block for
+  /// single-block functions).
+  std::pair<SILBasicBlock::iterator, SILBasicBlock *>
+  inlineFunction(SILFunction *calleeFunction, FullApplySite apply,
+                 ArrayRef<SILValue> appliedArgs);
 
-private:
-  SILValue borrowFunctionArgument(SILValue callArg, FullApplySite AI);
-
-  void visitDebugValueInst(DebugValueInst *Inst);
-  void visitDebugValueAddrInst(DebugValueAddrInst *Inst);
-
-  const SILDebugScope *getOrCreateInlineScope(const SILDebugScope *DS);
-
-  void postProcess(SILInstruction *Orig, SILInstruction *Cloned) {
-    // Call client-supplied callback function.
-    if (Callback)
-      Callback(Orig, Cloned);
-
-    // We just updated the debug scope information. Intentionally
-    // don't call SILClonerWithScopes<SILInliner>::postProcess().
-    SILCloner<SILInliner>::postProcess(Orig, Cloned);
-  }
-
-  SILLocation remapLocation(SILLocation InLoc) {
-    // For performance inlining return the original location.
-    if (IKind == InlineKind::PerformanceInline)
-      return InLoc;
-    // Inlined location wraps the call site that is being inlined, regardless
-    // of the input location.
-    return Loc.hasValue() ? Loc.getValue() :
-      MandatoryInlinedLocation::getMandatoryInlinedLocation((Decl*)nullptr);
-  }
-
-  const SILDebugScope *remapScope(const SILDebugScope *DS) {
-    if (IKind == InlineKind::MandatoryInline)
-      // Transparent functions are absorbed into the call
-      // site. No soup, err, debugging for you!
-      return CallSiteScope;
-    else
-      // Create an inlined version of the scope.
-      return getOrCreateInlineScope(DS);
-  }
+  /// Inline the function called by the given full apply site. This creates
+  /// an instance of SILInliner by constructing a substitution map and
+  /// OpenedArchetypesTracker from the given apply site, and invokes
+  /// `inlineFunction` method on the SILInliner instance to inline the callee.
+  /// This requires the full apply site to be a direct call i.e., the apply
+  /// instruction must have a function ref.
+  ///
+  /// *NOTE*:This attempts to perform inlining unconditionally and thus asserts
+  /// if inlining will fail. All users /must/ check that a function is allowed
+  /// to be inlined using SILInliner::canInlineApplySite before calling this
+  /// function.
+  ///
+  /// *NOTE*: Inlining can result in improperly nested stack allocations, which
+  /// must be corrected after inlining. See needsUpdateStackNesting().
+  ///
+  /// Returns an iterator to the first inlined instruction (or the end of the
+  /// caller block for empty functions) and the last block in function order
+  /// containing inlined instructions (the original caller block for
+  /// single-block functions).
+  static std::pair<SILBasicBlock::iterator, SILBasicBlock *>
+  inlineFullApply(FullApplySite apply, SILInliner::InlineKind inlineKind,
+                  SILOptFunctionBuilder &funcBuilder);
 };
 
 } // end namespace swift

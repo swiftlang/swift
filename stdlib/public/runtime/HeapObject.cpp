@@ -61,9 +61,11 @@ using namespace swift;
 /// Returns true if the pointer passed to a native retain or release is valid.
 /// If false, the operation should immediately return.
 static inline bool isValidPointerForNativeRetain(const void *p) {
-#if defined(__x86_64__) || defined(__arm64__)
-  // On these platforms, the upper half of address space is reserved for the
+#if defined(__x86_64__) || defined(__arm64__) || defined(__aarch64__) || defined(_M_ARM64) || defined(__s390x__) || (defined(__powerpc64__) && defined(__LITTLE_ENDIAN__))
+  // On these platforms, except s390x, the upper half of address space is reserved for the
   // kernel, so we can assume that pointer values in this range are invalid.
+  // On s390x it is theoretically possible to have high bit set but in practice
+  // it is unlikely.
   return (intptr_t)p > 0;
 #else
   return p != nullptr;
@@ -82,9 +84,11 @@ static HeapObject *_swift_allocObject_(HeapMetadata const *metadata,
   assert(isAlignmentMask(requiredAlignmentMask));
   auto object = reinterpret_cast<HeapObject *>(
       swift_slowAlloc(requiredSize, requiredAlignmentMask));
-  // FIXME: this should be a placement new but that adds a null check
-  object->metadata = metadata;
-  object->refCounts.init();
+
+  // NOTE: this relies on the C++17 guaranteed semantics of no null-pointer
+  // check on the placement new allocator which we have observed on Windows,
+  // Linux, and macOS.
+  new (object) HeapObject(metadata);
 
   // If leak tracking is enabled, start tracking this object.
   SWIFT_LEAKS_START_TRACKING_OBJECT(object);
@@ -115,7 +119,7 @@ struct InitStaticObjectContext {
 static void initStaticObjectWithContext(void *OpaqueCtx) {
   InitStaticObjectContext *Ctx = (InitStaticObjectContext *)OpaqueCtx;
   Ctx->object->metadata = Ctx->metadata;
-  Ctx->object->refCounts.initForNotFreeing();
+  Ctx->object->refCounts.initImmortal();
 }
 
 // TODO: We could generate inline code for the fast-path, i.e. the metadata
@@ -151,10 +155,10 @@ swift::swift_verifyEndOfLifetime(HeapObject *object) {
                       "Fatal error: Weak reference to stack object\n");
 }
 
-/// \brief Allocate a reference-counted object on the heap that
+/// Allocate a reference-counted object on the heap that
 /// occupies <size> bytes of maximally-aligned storage.  The object is
 /// uninitialized except for its header.
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
 HeapObject* swift_bufferAllocate(
   HeapMetadata const* bufferType, size_t size, size_t alignMask)
 {
@@ -365,7 +369,9 @@ void swift::swift_nonatomic_release_n(HeapObject *object, uint32_t n) {
 }
 
 size_t swift::swift_retainCount(HeapObject *object) {
-  return object->refCounts.getCount();
+  if (isValidPointerForNativeRetain(object))
+    return object->refCounts.getCount();
+  return 0;
 }
 
 size_t swift::swift_unownedRetainCount(HeapObject *object) {
@@ -476,46 +482,6 @@ void swift::swift_nonatomic_unownedRelease_n(HeapObject *object, int n) {
     swift_slowDealloc(object, classMetadata->getInstanceSize(),
                       classMetadata->getInstanceAlignMask());
   }
-}
-
-HeapObject *swift::swift_tryPin(HeapObject *object) {
-  SWIFT_RT_TRACK_INVOCATION(object, swift_tryPin);
-  assert(isValidPointerForNativeRetain(object));
-
-  // Try to set the flag.  If this succeeds, the caller will be
-  // responsible for clearing it.
-  if (object->refCounts.tryIncrementAndPin())
-    return object;
-
-  // If setting the flag failed, it's because it was already set.
-  // Return nil so that the object will be deallocated later.
-  return nullptr;
-}
-
-void swift::swift_unpin(HeapObject *object) {
-  SWIFT_RT_TRACK_INVOCATION(object, swift_unpin);
-  if (isValidPointerForNativeRetain(object))
-    object->refCounts.decrementAndUnpinAndMaybeDeinit();
-}
-
-HeapObject *swift::swift_nonatomic_tryPin(HeapObject *object) {
-  SWIFT_RT_TRACK_INVOCATION(object, swift_nonatomic_tryPin);
-  assert(object);
-
-  // Try to set the flag.  If this succeeds, the caller will be
-  // responsible for clearing it.
-  if (object->refCounts.tryIncrementAndPinNonAtomic())
-    return object;
-
-  // If setting the flag failed, it's because it was already set.
-  // Return nil so that the object will be deallocated later.
-  return nullptr;
-}
-
-void swift::swift_nonatomic_unpin(HeapObject *object) {
-  SWIFT_RT_TRACK_INVOCATION(object, swift_nonatomic_unpin);
-  if (isValidPointerForNativeRetain(object))
-    object->refCounts.decrementAndUnpinAndMaybeDeinitNonAtomic();
 }
 
 HeapObject *swift::swift_tryRetain(HeapObject *object) {

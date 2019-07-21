@@ -2,6 +2,9 @@
 
 func markUsed<T>(_ t: T) {}
 
+prefix operator ++
+public prefix func ++ <T>(rhs: inout T) -> T { fatalError() }
+
 let bad_property_1: Int {    // expected-error {{'let' declarations cannot be computed properties}} {{1-4=var}}
   get {
     return 42
@@ -229,7 +232,7 @@ func test_mutability() {
 
 func test_arguments(_ a : Int,
                     b : Int,
-                    let c : Int) { // expected-error {{'let' as a parameter attribute is not allowed}} {{21-25=}}
+                    let c : Int) { // expected-warning {{'let' in this position is interpreted as an argument label}} {{21-24=`let`}}
   var b = b
   a = 1  // expected-error {{cannot assign to value: 'a' is a 'let' constant}}
   b = 2  // ok.
@@ -246,9 +249,9 @@ protocol MutatingTestProto {
   mutating
   func mutatingfunc()
   
-  func nonmutatingfunc()  // expected-note 2 {{protocol requires}}
+  func nonmutatingfunc() // expected-note {{protocol requires}}
   __consuming
-  func consuming_nonmutating_func()  // expected-note 2 {{protocol requires}}
+  func consuming_nonmutating_func() // expected-note {{protocol requires}}
 }
 
 class TestClass : MutatingTestProto {
@@ -281,18 +284,18 @@ struct TestStruct3 : MutatingTestProto {   // expected-error {{type 'TestStruct3
   func consuming_nonmutating_func() {} // expected-note {{candidate is marked 'mutating' but protocol does not allow it}}
 }
 
-struct TestStruct4 : MutatingTestProto { // expected-error {{type 'TestStruct4' does not conform to protocol 'MutatingTestProto'}}
+struct TestStruct4 : MutatingTestProto {
   mutating
   func mutatingfunc() {}  // Ok, can be mutating.
   func nonmutatingfunc() {}
-  nonmutating func consuming_nonmutating_func() {}  // expected-note {{candidate is marked 'nonmutating' but protocol does not allow it}}
+  nonmutating func consuming_nonmutating_func() {}
 }
 
-struct TestStruct5 : MutatingTestProto { // expected-error {{type 'TestStruct5' does not conform to protocol 'MutatingTestProto'}}
+struct TestStruct5 : MutatingTestProto {
   mutating
   func mutatingfunc() {}  // Ok, can be mutating.
   __consuming
-  func nonmutatingfunc() {} // expected-note {{candidate is marked '__consuming' but protocol does not allow it}}
+  func nonmutatingfunc() {}
   __consuming func consuming_nonmutating_func() {}
 }
 
@@ -351,7 +354,7 @@ protocol SubscriptNoGetter {
   subscript (i: Int) -> Int { get }
 }
 
-func testSubscriptNoGetter(let iis: SubscriptNoGetter) { // expected-error {{'let' as a parameter attribute is not allowed}}{{28-31=}}
+func testSubscriptNoGetter(let iis: SubscriptNoGetter) { // expected-warning {{'let' in this position is interpreted as an argument label}}{{28-31=`let`}}
   var _: Int = iis[17]
 }
 
@@ -364,24 +367,30 @@ func testSelectorStyleArguments1(_ x: Int, bar y: Int) {
   _ = y
 }
 
-func testSelectorStyleArguments2(let x: Int, // expected-error {{'let' as a parameter attribute is not allowed}}{{34-37=}}
-                                 let bar y: Int) { // expected-error {{'let' as a parameter attribute is not allowed}}{{34-38=}}
-                                 
-  
+func testSelectorStyleArguments2(let x: Int, // expected-warning {{'let' in this position is interpreted as an argument label}}{{34-37=`let`}}
+                                 let bar y: Int) { // expected-warning {{'let' in this position is interpreted as an argument label}}{{34-37=`let`}}
+// expected-error @-1 {{expected ',' separator}}
+// expected-error @-2 {{parameter requires an explicit type}}
 }
 func testSelectorStyleArguments3(_ x: Int, bar y: Int) {
   ++x  // expected-error {{cannot pass immutable value to mutating operator: 'x' is a 'let' constant}}
   ++y  // expected-error {{cannot pass immutable value to mutating operator: 'y' is a 'let' constant}}
 }
 
-func invalid_inout(inout var x : Int) { // expected-error {{parameter must not have multiple '__owned', 'inout', '__shared', 'var', or 'let' specifiers}} {{26-30=}}
-// expected-error @-1 {{'inout' before a parameter name is not allowed, place it before the parameter type instead}}{{20-25=}}{{34-34=inout }}
+func invalid_inout(inout var x : Int) { // expected-warning {{'var' in this position is interpreted as an argument label}} {{26-29=`var`}}
+// expected-error @-1 {{'inout' before a parameter name is not allowed, place it before the parameter type instead}} {{20-25=}} {{34-34=inout }}
 }
-func invalid_var(var x: Int) { // expected-error {{'var' as a parameter attribute is not allowed}}
-  
+
+class VarTester {
+  init(var a: Int, var b: Int) {} // expected-warning {{'var' in this position is interpreted as an argument label}} {{8-11=`var`}}
+  // expected-warning @-1 {{'var' in this position is interpreted as an argument label}} {{20-23=`var`}}
+  func x(var b: Int) { //expected-warning {{'var' in this position is interpreted as an argument label}} {{10-13=`var`}}
+    b += 10 // expected-error {{left side of mutating operator isn't mutable: 'b' is a 'let' constant}}
+  }
 }
+
 func takesClosure(_: (Int) -> Int) {
-  takesClosure { (var d) in d } // expected-error {{'var' as a parameter attribute is not allowed}}
+  takesClosure { (var d) in d } // expected-error {{closure cannot have keyword arguments}}
 }
 
 func updateInt(_ x : inout Int) {}
@@ -498,19 +507,18 @@ struct StructWithDelegatingInit {
   init() { self.init(x: 0); self.x = 22 } // expected-error {{'let' property 'x' may not be initialized directly; use "self.init(...)" or "self = ..." instead}}
 }
 
-func test_recovery_missing_name_2(let: Int) {} // expected-error {{'let' as a parameter attribute is not allowed}}{{35-38=}} 
-// expected-error @-1 {{expected parameter name followed by ':'}}
-
 // <rdar://problem/16792027> compiler infinite loops on a really really mutating function
-struct F { // expected-note 1 {{in declaration of 'F'}}
-  mutating mutating mutating f() { // expected-error 2 {{duplicate modifier}} expected-note 2 {{modifier already specified here}} expected-error {{expected declaration}}
+struct F {
+  mutating mutating mutating f() { // expected-error 2 {{duplicate modifier}}
+                                   // expected-note@-1 2 {{modifier already specified here}}
+                                   // expected-error@-2 {{expected 'func' keyword in instance method declaration}}
   }
   
-  mutating nonmutating func g() {}  // expected-error {{method must not be declared both mutating and nonmutating}}
-  __consuming nonmutating func h() {}  // expected-error {{method must not be declared both __consuming and nonmutating}}
-  __consuming mutating func i() {}  // expected-error {{method must not be declared both __consuming and mutating}}
-  nonmutating mutating func j() {}  // expected-error {{method must not be declared both nonmutating and mutating}}
-  __consuming nonmutating mutating func k() {}  // expected-error {{method must not be declared both __consuming and mutating}} expected-error {{method must not be declared both nonmutating and mutating}}
+  mutating nonmutating func g() {}  // expected-error {{method must not be declared both 'mutating' and 'nonmutating'}}
+  __consuming nonmutating func h() {}  // expected-error {{method must not be declared both '__consuming' and 'nonmutating'}}
+  __consuming mutating func i() {}  // expected-error {{method must not be declared both '__consuming' and 'mutating'}}
+  nonmutating mutating func j() {}  // expected-error {{method must not be declared both 'nonmutating' and 'mutating'}}
+  __consuming nonmutating mutating func k() {}  // expected-error {{method must not be declared both '__consuming' and 'mutating'}} expected-error {{method must not be declared both 'nonmutating' and 'mutating'}}
 }
 
 protocol SingleIntProperty {
@@ -656,3 +664,20 @@ func sr4214() {
   }
 }
 
+struct SS {
+  var i: Int
+  let j: Float
+
+  init(i: Int, j: Float) {
+    i = i // expected-error {{cannot assign to value: 'i' is a 'let' constant}}
+    // expected-note@-1 {{add explicit 'self.' to refer to mutable property of 'SS'}}{{5-5=self.}}
+    j = j // expected-error {{cannot assign to value: 'j' is a 'let' constant}}
+    // expected-note@-1 {{add explicit 'self.' to refer to mutable property of 'SS'}}{{5-5=self.}}
+  }
+
+  mutating func foo(i: Int, j: Float) {
+    i = i // expected-error {{cannot assign to value: 'i' is a 'let' constant}}
+    // expected-note@-1 {{add explicit 'self.' to refer to mutable property of 'SS'}}{{5-5=self.}}
+    j = j // expected-error {{cannot assign to value: 'j' is a 'let' constant}}
+  }
+}

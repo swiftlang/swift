@@ -9,7 +9,7 @@ import generic_extension_1
 
 ["a", "b", "c"].wobble()
 
-// CHECK: sil @$SSa19generic_extension_1E6wobble{{[_0-9a-zA-Z]*}}F : $@convention(method) <τ_0_0> (@guaranteed Array<τ_0_0>) -> @out Optional<τ_0_0>
+// CHECK: sil @$sSa19generic_extension_1E6wobble{{[_0-9a-zA-Z]*}}F : $@convention(method) <τ_0_0> (@guaranteed Array<τ_0_0>) -> @out Optional<τ_0_0>
 
 func useP<T: P>(_ t: T) -> Int { return t.property }
 

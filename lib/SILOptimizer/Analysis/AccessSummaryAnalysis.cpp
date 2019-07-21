@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-access-summary-analysis"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SILOptimizer/Analysis/AccessSummaryAnalysis.h"
 #include "swift/SILOptimizer/Analysis/FunctionOrder.h"
@@ -31,7 +32,7 @@ void AccessSummaryAnalysis::processFunction(FunctionInfo *info,
     FunctionSummary &functionSummary = info->getSummary();
     ArgumentSummary &argSummary =
         functionSummary.getAccessForArgument(index);
-    index++;
+    ++index;
 
     auto *functionArg = cast<SILFunctionArgument>(arg);
     // Only summarize @inout_aliasable arguments.
@@ -67,13 +68,15 @@ void AccessSummaryAnalysis::processArgument(FunctionInfo *info,
     switch (user->getKind()) {
     case SILInstructionKind::BeginAccessInst: {
       auto *BAI = cast<BeginAccessInst>(user);
-      const IndexTrieNode *subPath = findSubPathAccessed(BAI);
-      summary.mergeWith(BAI->getAccessKind(), BAI->getLoc(), subPath);
-      // We don't add the users of the begin_access to the worklist because
-      // even if these users eventually begin an access to the address
-      // or a projection from it, that access can't begin more exclusive
-      // access than this access -- otherwise it will be diagnosed
-      // elsewhere.
+      if (BAI->getEnforcement() != SILAccessEnforcement::Unsafe) {
+        const IndexTrieNode *subPath = findSubPathAccessed(BAI);
+        summary.mergeWith(BAI->getAccessKind(), BAI->getLoc(), subPath);
+        // We don't add the users of the begin_access to the worklist because
+        // even if these users eventually begin an access to the address
+        // or a projection from it, that access can't begin more exclusive
+        // access than this access -- otherwise it will be diagnosed
+        // elsewhere.
+      }
       break;
     }
     case SILInstructionKind::EndUnpairedAccessInst:
@@ -133,6 +136,9 @@ static bool hasExpectedUsesOfNoEscapePartialApply(Operand *partialApplyUse) {
   switch (user->getKind()) {
   case SILInstructionKind::ApplyInst:
   case SILInstructionKind::TryApplyInst:
+    return true;
+  // partial_apply [stack] is terminated by a dealloc_stack.
+  case SILInstructionKind::DeallocStackInst:
     return true;
 
   case SILInstructionKind::ConvertFunctionInst:
@@ -224,8 +230,8 @@ void AccessSummaryAnalysis::processPartialApply(FunctionInfo *callerInfo,
 
   // Make sure the partial_apply is not calling the result of another
   // partial_apply.
-  assert(isa<FunctionRefInst>(apply->getCallee()) &&
-         "Noescape partial apply of non-functionref?");
+  assert(isa<FunctionRefBaseInst>(apply->getCallee())
+         && "Noescape partial apply of non-functionref?");
 
   assert(llvm::all_of(apply->getUses(),
                       hasExpectedUsesOfNoEscapePartialApply) &&
@@ -420,7 +426,7 @@ AccessSummaryAnalysis::ArgumentSummary::getDescription(SILType BaseType,
       os << ", ";
     }
     os << subAccess.getDescription(BaseType, M);
-    index++;
+    ++index;
   }
   os << "]";
 
@@ -463,8 +469,7 @@ AccessSummaryAnalysis::getOrCreateSummary(SILFunction *fn) {
 void AccessSummaryAnalysis::AccessSummaryAnalysis::invalidate() {
   FunctionInfos.clear();
   Allocator.DestroyAll();
-  delete SubPathTrie;
-  SubPathTrie = new IndexTrieNode();
+  SubPathTrie.reset(new IndexTrieNode());
 }
 
 void AccessSummaryAnalysis::invalidate(SILFunction *F, InvalidationKind K) {
@@ -487,6 +492,12 @@ getSingleAddressProjectionUser(SingleValueInstruction *I) {
   for (Operand *Use : I->getUses()) {
     SILInstruction *User = Use->getUser();
     if (isa<BeginAccessInst>(I) && isa<EndAccessInst>(User))
+      continue;
+
+    // Ignore sanitizer instrumentation when looking for a single projection
+    // user. This ensures that we're able to find a single projection subpath
+    // even when sanitization is enabled.
+    if (isSanitizerInstrumentation(User))
       continue;
 
     // We have more than a single user so bail.
@@ -516,7 +527,7 @@ getSingleAddressProjectionUser(SingleValueInstruction *I) {
 
 const IndexTrieNode *
 AccessSummaryAnalysis::findSubPathAccessed(BeginAccessInst *BAI) {
-  IndexTrieNode *SubPath = SubPathTrie;
+  IndexTrieNode *SubPath = getSubPathTrieRoot();
 
   // For each single-user projection of BAI, construct or get a node
   // from the trie representing the index of the field or tuple element
@@ -557,9 +568,7 @@ std::string AccessSummaryAnalysis::getSubPathDescription(
     os << ".";
 
     if (StructDecl *D = containingType.getStructOrBoundGenericStruct()) {
-      auto iter = D->getStoredProperties().begin();
-      std::advance(iter, index);
-      VarDecl *var = *iter;
+      VarDecl *var = D->getStoredProperties()[index];
       os << var->getBaseName();
       containingType = containingType.getFieldType(var, M);
       continue;
@@ -586,7 +595,7 @@ static unsigned subPathLength(const IndexTrieNode *subPath) {
 
   const IndexTrieNode *iter = subPath;
   while (iter) {
-    length++;
+    ++length;
     iter = iter->getParent();
   }
 
@@ -620,7 +629,7 @@ void AccessSummaryAnalysis::FunctionSummary::print(raw_ostream &os,
   unsigned argCount = getArgumentCount();
   os << "(";
 
-  for (unsigned i = 0; i < argCount; i++) {
+  for (unsigned i = 0; i < argCount; ++i) {
     if (i > 0) {
       os << ",  ";
     }

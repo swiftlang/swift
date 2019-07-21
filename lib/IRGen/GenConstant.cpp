@@ -17,6 +17,7 @@
 #include "llvm/IR/Constants.h"
 
 #include "GenConstant.h"
+#include "GenIntegerLiteral.h"
 #include "GenStruct.h"
 #include "GenTuple.h"
 #include "TypeInfo.h"
@@ -29,19 +30,27 @@ using namespace irgen;
 
 llvm::Constant *irgen::emitConstantInt(IRGenModule &IGM,
                                        IntegerLiteralInst *ILI) {
-  APInt value = ILI->getValue();
   BuiltinIntegerWidth width
-    = ILI->getType().castTo<BuiltinIntegerType>()->getWidth();
+    = ILI->getType().castTo<AnyBuiltinIntegerType>()->getWidth();
+
+  // Handle arbitrary-precision integers.
+  if (width.isArbitraryWidth()) {
+    auto pair = emitConstantIntegerLiteral(IGM, ILI);
+    auto type = IGM.getIntegerLiteralTy();
+    return llvm::ConstantStruct::get(type, { pair.Data, pair.Flags });
+  }
+
+  APInt value = ILI->getValue();
 
   // The value may need truncation if its type had an abstract size.
-  if (!width.isFixedWidth()) {
-    assert(width.isPointerWidth() && "impossible width value");
-
+  if (width.isPointerWidth()) {
     unsigned pointerWidth = IGM.getPointerSize().getValueInBits();
     assert(pointerWidth <= value.getBitWidth()
            && "lost precision at AST/SIL level?!");
     if (pointerWidth < value.getBitWidth())
       value = value.trunc(pointerWidth);
+  } else {
+    assert(width.isFixedWidth() && "impossible width value");
   }
 
   return llvm::ConstantInt::get(IGM.LLVMContext, value);
@@ -54,6 +63,7 @@ llvm::Constant *irgen::emitConstantFP(IRGenModule &IGM, FloatLiteralInst *FLI) {
 llvm::Constant *irgen::emitAddrOfConstantString(IRGenModule &IGM,
                                                 StringLiteralInst *SLI) {
   switch (SLI->getEncoding()) {
+  case StringLiteralInst::Encoding::Bytes:
   case StringLiteralInst::Encoding::UTF8:
     return IGM.getAddrOfGlobalString(SLI->getValue());
 
@@ -83,10 +93,42 @@ static llvm::Constant *emitConstantValue(IRGenModule &IGM, SILValue operand) {
   } else if (auto *SLI = dyn_cast<StringLiteralInst>(operand)) {
     return emitAddrOfConstantString(IGM, SLI);
   } else if (auto *BI = dyn_cast<BuiltinInst>(operand)) {
-    assert(IGM.getSILModule().getBuiltinInfo(BI->getName()).ID ==
-           BuiltinValueKind::PtrToInt);
-    llvm::Constant *ptr = emitConstantValue(IGM, BI->getArguments()[0]);
-    return llvm::ConstantExpr::getPtrToInt(ptr, IGM.IntPtrTy);
+    switch (IGM.getSILModule().getBuiltinInfo(BI->getName()).ID) {
+      case BuiltinValueKind::PtrToInt: {
+        llvm::Constant *ptr = emitConstantValue(IGM, BI->getArguments()[0]);
+        return llvm::ConstantExpr::getPtrToInt(ptr, IGM.IntPtrTy);
+      }
+      case BuiltinValueKind::ZExtOrBitCast: {
+        llvm::Constant *value = emitConstantValue(IGM, BI->getArguments()[0]);
+        return llvm::ConstantExpr::getZExtOrBitCast(value, IGM.getStorageType(BI->getType()));
+      }
+      case BuiltinValueKind::StringObjectOr: {
+        // It is a requirement that the or'd bits in the left argument are
+        // initialized with 0. Therefore the or-operation is equivalent to an
+        // addition. We need an addition to generate a valid relocation.
+        llvm::Constant *rhs = emitConstantValue(IGM, BI->getArguments()[1]);
+        if (auto *TE = dyn_cast<TupleExtractInst>(BI->getArguments()[0])) {
+          // Handle StringObjectOr(tuple_extract(usub_with_overflow(x, offset)), bits)
+          // This pattern appears in UTF8 String literal construction.
+          // Generate the equivalent: add(x, sub(bits - offset)
+          BuiltinInst *SubtrBI =
+            SILGlobalVariable::getOffsetSubtract(TE, IGM.getSILModule());
+          assert(SubtrBI && "unsupported argument of StringObjectOr");
+          auto *ptr = emitConstantValue(IGM, SubtrBI->getArguments()[0]);
+          auto *offset = emitConstantValue(IGM, SubtrBI->getArguments()[1]);
+          auto *totalOffset = llvm::ConstantExpr::getSub(rhs, offset);
+          return llvm::ConstantExpr::getAdd(ptr, totalOffset);
+        }
+        llvm::Constant *lhs = emitConstantValue(IGM, BI->getArguments()[0]);
+        return llvm::ConstantExpr::getAdd(lhs, rhs);
+      }
+      default:
+        llvm_unreachable("unsupported builtin for constant expression");
+    }
+  } else if (auto *VTBI = dyn_cast<ValueToBridgeObjectInst>(operand)) {
+    auto *val = emitConstantValue(IGM, VTBI->getOperand());
+    auto *sTy = IGM.getTypeInfo(VTBI->getType()).getStorageType();
+    return llvm::ConstantExpr::getIntToPtr(val, sTy);
   } else {
     llvm_unreachable("Unsupported SILInstruction in static initializer!");
   }

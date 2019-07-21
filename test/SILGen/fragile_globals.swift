@@ -20,11 +20,11 @@ public func sum() -> Int {
 
 // Check if all the addressors are inlined.
 
-// CHECK-LABEL: sil {{.*}}@$S15fragile_globals3sumSiyF
+// CHECK-LABEL: sil {{.*}}@$s15fragile_globals3sumSiyF
 // CHECK-DAG: global_addr @globalinit_[[T1:.*]]_token0
 // CHECK-DAG: function_ref @globalinit_[[T1]]_func0
-// CHECK-DAG: global_addr @$S15fragile_globals4myggSivp
-// CHECK-DAG: function_ref @$S7ModuleA2ggSivau
-// CHECK-DAG: function_ref @$S7ModuleB2ggSivau
+// CHECK-DAG: global_addr @$s15fragile_globals4myggSivp
+// CHECK-DAG: function_ref @$s7ModuleA2ggSivau
+// CHECK-DAG: function_ref @$s7ModuleB2ggSivau
 // CHECK: return
 

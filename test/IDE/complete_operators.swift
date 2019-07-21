@@ -119,7 +119,8 @@ func testPostfix7() {
 func testPostfix8(x: S) {
   x#^POSTFIX_8^#
 }
-// POSTFIX_8-NOT: ***
+// POSTFIX_8: Begin completions
+// POSTFIX_8: Keyword[self]/CurrNominal: .self[#S#]; name=self
 
 protocol P {
   associatedtype T
@@ -144,15 +145,20 @@ func testPostfixSpace(x: inout S) {
 
 // ===--- Infix operators
 
+precedencegroup S2PrecedenceGroup {
+  associativity: left
+  lowerThan: ComparisonPrecedence
+  higherThan: AssignmentPrecedence
+}
+precedencegroup S2AssignmentPrecedenceGroup {
+  associativity: none
+  lowerThan: ComparisonPrecedence
+  higherThan: AssignmentPrecedence
+}
+
 struct S2 {}
-infix operator ** {
-  associativity left
-  precedence 123
-}
-infix operator **= {
-  associativity none
-  precedence 123
-}
+infix operator ** : S2PrecedenceGroup
+infix operator **= : S2AssignmentPrecedenceGroup
 func +(x: S2, y: S2) -> S2 { return x }
 func **(x: S2, y: Int) -> S2 { return x }
 func **=(x: inout S2, y: Int) -> Void { return x }
@@ -209,8 +215,6 @@ func testInfix7(x: S2?) {
   x#^INFIX_7^#
 }
 // S2_INFIX_OPTIONAL: Begin completions
-// FIXME: rdar://problem/22996887 - shouldn't complete with optional LHS
-// S2_INFIX_OPTIONAL-DAG: Decl[InfixOperatorFunction]/CurrModule:   ** {#Int#}[#S2#]
 // S2_INFIX_OPTIONAL-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  != {#{{.*}}#}[#Bool#]
 // S2_INFIX_OPTIONAL-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  == {#{{.*}}#}[#Bool#]
 // S2_INFIX_OPTIONAL-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  ?? {#S2#}[#S2#]; name=?? S2
@@ -227,7 +231,6 @@ func testInfix8(x: S3?) {
 }
 // The equality operators come from equatable.
 // S3_INFIX_OPTIONAL: Begin completions
-// S3_INFIX_OPTIONAL-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  != {#S3?#}[#Bool#]
 // S3_INFIX_OPTIONAL-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  == {#S3?#}[#Bool#]
 // S3_INFIX_OPTIONAL: End completions
 
@@ -250,16 +253,20 @@ func testInfix11() {
   S2#^INFIX_11^#
 }
 
-// INFIX_11: Begin completions, 1 items
+// INFIX_11: Begin completions, 3 items
 // INFIX_11-DAG: Decl[Constructor]/CurrNominal:      ()[#S2#]; name=()
+// INFIX_11-DAG: Keyword[self]/CurrNominal:          .self[#S2.Type#]; name=self
+// INFIX_11-DAG: Keyword/CurrNominal:                .Type[#S2.Type#]; name=Type
 // INFIX_11: End completions
 
 func testInfix12() {
   P#^INFIX_12^#
 }
-// INFIX_12: Begin completions, 2 items
+// INFIX_12: Begin completions, 4 items
 // INFIX_12-NEXT: Decl[AssociatedType]/CurrNominal:   .T; name=T
-// INFIX_12-NEXT: Decl[InstanceMethod]/CurrNominal:   .foo({#self: P#})[#() -> P.T#]; name=foo(P)
+// INFIX_12-NEXT: Keyword[self]/CurrNominal:          .self[#P.Protocol#]; name=self
+// INFIX_12-NEXT: Keyword/CurrNominal:                .Protocol[#P.Protocol#]; name=Protocol
+// INFIX_12-NEXT: Keyword/CurrNominal:                .Type[#P.Type#]; name=Type
 // INFIX_12: End completions
 
 func testInfix13() {
@@ -273,17 +280,20 @@ func testInfix14() {
 func testInfix15<T: P where T.T == S2>() {
   T#^INFIX_15^#
 }
-// INFIX_15: Begin completions, 2 items
-// INFIX_15-NEXT: Decl[AssociatedType]/Super:         .T; name=T
-// INFIX_15-NEXT: Decl[InstanceMethod]/Super:         .foo({#self: P#})[#() -> S2#]; name=foo(P)
+// INFIX_15: Begin completions, 4 items
+// INFIX_15-NEXT: Decl[AssociatedType]/CurrNominal:   .T; name=T
+// INFIX_15-NEXT: Decl[InstanceMethod]/CurrNominal:   .foo({#(self): P#})[#() -> S2#]; name=foo(self: P)
+// INFIX_15-NEXT: Keyword[self]/CurrNominal:          .self[#T.Type#]; name=self
+// INFIX_15-NEXT: Keyword/CurrNominal:                .Type[#T.Type#]; name=Type
 // INFIX_15: End completions
 
 func testInfix16<T: P where T.T == S2>() {
   T.foo#^INFIX_16^#
 }
 
-// INFIX_16: Begin completions, 1 items
-// INFIX_16-NEXT: Pattern/CurrModule:               ({#(self): T#})[#() -> S2#]; name=(self: T)
+// INFIX_16: Begin completions, 2 items
+// INFIX_16-NEXT: Decl[InstanceMethod]/CurrNominal: ({#(self): P#})[#() -> S2#]; name=(self: P)
+// INFIX_16-NEXT: Keyword[self]/CurrNominal:        .self[#(T) -> () -> S2#]; name=self
 // INFIX_16: End completions
 
 func testInfix17(x: Void) {
@@ -325,7 +335,7 @@ func testInfix21() {
 func testInfix22() {
   E.B#^INFIX_22^#
 }
-// INFIX_22: Begin completions, 1 items
+// INFIX_22: Begin completions, 2 items
 // INFIX_22-NEXT: Pattern/CurrModule:               ({#S2#})[#E#]; name=(S2)
 // INFIX_22: End completions
 
@@ -362,13 +372,13 @@ func testExtInfix2(x: S4) {
   x + x == x + x#^EXT_INFIX_2^#
 }
 // S4_EXT_INFIX: Begin completions
-// S4_EXT_INFIX-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  != {#Bool#}[#Bool#]
 // S4_EXT_INFIX-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  + {#S4#}[#S4#]
-// S4_EXT_INFIX-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  == {#Bool#}[#Bool#]
 // S4_EXT_INFIX-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  && {#Bool#}[#Bool#]
 // S4_EXT_INFIX-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]:  || {#Bool#}[#Bool#]
 // S4_EXT_INFIX: End completions
 
+// S4_EXT_INFIX-NEG-NOT: !=
+// S4_EXT_INFIX-NEG-NOT: ==
 // S4_EXT_INFIX_NEG-NOT: +++
 // S4_EXT_INFIX_NEG-NOT: &&&
 

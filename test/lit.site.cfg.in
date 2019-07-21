@@ -29,12 +29,27 @@ config.variant_suffix = "@VARIANT_SUFFIX@"
 config.swiftlib_dir = "@LIT_SWIFTLIB_DIR@"
 config.swift_test_results_dir = \
     lit_config.params.get("swift_test_results_dir", "@SWIFT_TEST_RESULTS_DIR@")
-config.darwin_xcrun_toolchain = "@SWIFT_DARWIN_XCRUN_TOOLCHAIN@"
-config.android_ndk_path = "@SWIFT_ANDROID_NDK_PATH@"
-config.android_ndk_gcc_version = "@SWIFT_ANDROID_NDK_GCC_VERSION@"
 
 config.coverage_mode = "@SWIFT_ANALYZE_CODE_COVERAGE@"
 config.lldb_build_root = "@LLDB_BUILD_DIR@"
+config.libdispatch_build_path = "@SWIFT_PATH_TO_LIBDISPATCH_BUILD@"
+
+# --- Darwin ---
+config.darwin_xcrun_toolchain = "@SWIFT_DARWIN_XCRUN_TOOLCHAIN@"
+
+# --- android ---
+config.android_ndk_path = "@SWIFT_ANDROID_NDK_PATH@"
+config.android_ndk_gcc_version = "@SWIFT_ANDROID_NDK_GCC_VERSION@"
+
+# --- Windows ---
+msvc_runtime_flags = {
+  'MultiThreaded': 'MT',
+  'MultiThreadedDebug': 'MTd',
+  'MultiThreadedDLL': 'MD',
+  'MultiThreadedDebugDLL': 'MDd',
+}
+config.swift_stdlib_msvc_runtime = \
+    msvc_runtime_flags["@SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY@"]
 
 # Please remember to handle empty strings and/or unset variables correctly.
 
@@ -85,13 +100,23 @@ if "@CMAKE_GENERATOR@" == "Xcode":
 
 config.available_features.add("CMAKE_GENERATOR=@CMAKE_GENERATOR@")
 
+if "@SWIFT_BUILD_SYNTAXPARSERLIB@" == "TRUE":
+    config.available_features.add('syntax_parser_lib')
+
 if "@SWIFT_ENABLE_SOURCEKIT_TESTS@" == "TRUE":
     config.available_features.add('sourcekit')
 
-if "@SWIFT_ENABLE_GUARANTEED_NORMAL_ARGUMENTS@" == "TRUE":
-   config.available_features.add('plus_zero_runtime')
+if "@SWIFT_HAVE_LIBXML2@" == "TRUE":
+    config.available_features.add('libxml2')
+
+if "@SWIFT_ENABLE_LLD_LINKER@" == "TRUE":
+    config.android_linker_name = "lld"
 else:
-   config.available_features.add('plus_one_runtime')
+    # even if SWIFT_ENABLE_GOLD_LINKER isn't set, we cannot use BFD for Android
+    config.android_linker_name = "gold"
+
+if '@SWIFT_INCLUDE_TOOLS@' == 'TRUE':
+    config.available_features.add('swift_tools_extra')
 
 # Let the main config do the real work.
 if config.test_exec_root is None:

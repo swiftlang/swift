@@ -38,7 +38,6 @@ class ClassDecl;
 class CanType;
 class EnumDecl;
 class GenericSignature;
-class LazyResolver;
 class ModuleDecl;
 class NominalTypeDecl;
 class GenericTypeDecl;
@@ -53,8 +52,9 @@ class TypeBase;
 class Type;
 class TypeWalker;
 struct ExistentialLayout;
-
-/// \brief Type substitution mapping from substitutable types to their
+enum class ResilienceExpansion : unsigned;
+  
+/// Type substitution mapping from substitutable types to their
 /// replacements.
 typedef llvm::DenseMap<SubstitutableType *, Type> TypeSubstitutionMap;
 
@@ -88,19 +88,11 @@ struct QueryTypeSubstitutionMapOrIdentity {
   Type operator()(SubstitutableType *type) const;
 };
 
-/// A function object suitable for use as a \c TypeSubstitutionFn that
-/// queries an underlying \c SubstitutionMap.
-struct QuerySubstitutionMap {
-  const SubstitutionMap &subMap;
-
-  Type operator()(SubstitutableType *type) const;
-};
-
 /// Function used to resolve conformances.
 using GenericFunction = auto(CanType dependentType,
-  Type conformingReplacementType,
-  ProtocolType *conformedProtocol)
-  ->Optional<ProtocolConformanceRef>;
+                             Type conformingReplacementType,
+                             ProtocolDecl *conformedProtocol)
+  -> Optional<ProtocolConformanceRef>;
 using LookupConformanceFn = llvm::function_ref<GenericFunction>;
   
 /// Functor class suitable for use as a \c LookupConformanceFn to look up a
@@ -114,21 +106,7 @@ public:
   Optional<ProtocolConformanceRef>
   operator()(CanType dependentType,
              Type conformingReplacementType,
-             ProtocolType *conformedProtocol) const;
-};
-
-/// Functor class suitable for use as a \c LookupConformanceFn to look up a
-/// conformance in a \c SubstitutionMap.
-class LookUpConformanceInSubstitutionMap {
-  const SubstitutionMap &Subs;
-public:
-  explicit LookUpConformanceInSubstitutionMap(const SubstitutionMap &Subs)
-    : Subs(Subs) {}
-  
-  Optional<ProtocolConformanceRef>
-  operator()(CanType dependentType,
-             Type conformingReplacementType,
-             ProtocolType *conformedProtocol) const;
+             ProtocolDecl *conformedProtocol) const;
 };
 
 /// Functor class suitable for use as a \c LookupConformanceFn that provides
@@ -139,7 +117,7 @@ public:
   Optional<ProtocolConformanceRef>
   operator()(CanType dependentType,
              Type conformingReplacementType,
-             ProtocolType *conformedProtocol) const;
+             ProtocolDecl *conformedProtocol) const;
 };
 
 /// Functor class suitable for use as a \c LookupConformanceFn that fetches
@@ -153,7 +131,7 @@ public:
   Optional<ProtocolConformanceRef>
   operator()(CanType dependentType,
              Type conformingReplacementType,
-             ProtocolType *conformedProtocol) const;
+             ProtocolDecl *conformedProtocol) const;
 };
   
 /// Flags that can be passed when substituting into a type.
@@ -169,6 +147,8 @@ enum class SubstFlags {
   AllowLoweredTypes = 0x02,
   /// Map member types to their desugared witness type.
   DesugarMemberTypes = 0x04,
+  /// Substitute types involving opaque type archetypes.
+  SubstituteOpaqueArchetypes = 0x08,
 };
 
 /// Options for performing substitutions into a type.
@@ -314,7 +294,7 @@ public:
   /// \param options Options that affect the substitutions.
   ///
   /// \returns the substituted type, or a null type if an error occurred.
-  Type subst(const SubstitutionMap &substitutions,
+  Type subst(SubstitutionMap substitutions,
              SubstOptions options = None) const;
 
   /// Replace references to substitutable types with new, concrete types and
@@ -334,7 +314,7 @@ public:
 
   /// Replace references to substitutable types with error types.
   Type substDependentTypesWithErrorTypes() const;
-
+  
   bool isPrivateStdlibType(bool treatNonBuiltinProtocolsAsPublic = true) const;
 
   void dump() const;
@@ -417,6 +397,12 @@ public:
         fn(CanType(t));
         return false;
       });
+  }
+
+  bool findIf(llvm::function_ref<bool (CanType)> fn) const {
+    return Type::findIf([&fn](Type t) {
+      return fn(CanType(t));
+    });
   }
 
   // Provide a few optimized accessors that are really type-class queries.
@@ -608,6 +594,10 @@ public:
   GenericSignature *getPointer() const {
     return Signature;
   }
+
+  bool operator==(const swift::CanGenericSignature& other) {
+    return Signature == other.Signature;
+  }
 };
 
 template <typename T>
@@ -659,7 +649,8 @@ namespace llvm {
   template<> struct DenseMapInfo<swift::CanType>
     : public DenseMapInfo<swift::Type> {
     static swift::CanType getEmptyKey() {
-      return swift::CanType(nullptr);
+      return swift::CanType(llvm::DenseMapInfo<swift::
+                              TypeBase*>::getEmptyKey());
     }
     static swift::CanType getTombstoneKey() {
       return swift::CanType(llvm::DenseMapInfo<swift::

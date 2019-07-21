@@ -8,6 +8,6 @@ public class Base<T> {
 public class Sub<T> : Base<T> {
 }
 
-public func requestTypeThrough<T>(closure: (Sub<T>) -> (), arg: T) {
-  closure(Sub(arg))
+public func requestTypeThrough<T>(closure: ((Sub<T>, Int)) -> (), arg: T) {
+  closure((Sub(arg), 0))
 }

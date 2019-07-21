@@ -1,4 +1,4 @@
-//===--- PrettyStackTrace.cpp - Defines Driver crash prettifiers -------------===//
+//===--- PrettyStackTrace.cpp - Defines Driver crash prettifiers ----------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -11,9 +11,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Driver/PrettyStackTrace.h"
+
+#include "swift/Basic/FileTypes.h"
 #include "swift/Driver/Action.h"
 #include "swift/Driver/Job.h"
-#include "swift/Frontend/FileTypes.h"
 #include "llvm/Option/Arg.h"
 #include "llvm/Support/raw_ostream.h"
 

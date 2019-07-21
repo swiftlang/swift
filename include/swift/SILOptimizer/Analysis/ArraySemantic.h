@@ -29,7 +29,6 @@ enum class ArrayCallKind {
   kGetCount,
   kGetCapacity,
   kGetElement,
-  kGetArrayOwner,
   kGetElementAddress,
   kMakeMutable,
   kMutateUnknown,
@@ -152,10 +151,10 @@ public:
 
   /// Replace a call to append(contentsOf: ) with a series of
   /// append(element: ) calls.
-  bool replaceByAppendingValues(SILModule &M, SILFunction *AppendFn,
+  bool replaceByAppendingValues(SILFunction *AppendFn,
                                 SILFunction *ReserveFn,
                                 const llvm::SmallVectorImpl<SILValue> &Vals,
-                                ArrayRef<Substitution> Subs);
+                                SubstitutionMap Subs);
 
   /// Hoist the call to the insert point.
   void hoist(SILInstruction *InsertBefore, DominanceInfo *DT) {

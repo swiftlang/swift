@@ -26,6 +26,7 @@
 #define SWIFT_IRGEN_TYPEINFO_H
 
 #include "IRGen.h"
+#include "swift/AST/ReferenceCounting.h"
 #include "llvm/ADT/MapVector.h"
 
 namespace llvm {
@@ -92,14 +93,12 @@ class TypeInfo {
 
   friend class TypeConverter;
 
-  enum : unsigned { InvalidAlignmentShift = 63 };
-
 protected:
   union {
     uint64_t OpaqueBits;
 
     SWIFT_INLINE_BITFIELD_BASE(TypeInfo,
-                               bitmax(NumSpecialTypeInfoKindBits,8)+6+1+1+3+1,
+                               bitmax(NumSpecialTypeInfoKindBits,8)+6+1+1+3+1+1,
       /// The kind of supplemental API this type has, if any.
       Kind : bitmax(NumSpecialTypeInfoKindBits,8),
 
@@ -120,7 +119,10 @@ protected:
 
       /// Whether this type can be assumed to have a fixed size from all
       /// resilience domains.
-      AlwaysFixedSize : 1
+      AlwaysFixedSize : 1,
+
+      /// Whether this type is ABI-accessible from this SILModule.
+      ABIAccessible : 1
     );
 
     /// FixedTypeInfo will use the remaining bits for the size.
@@ -142,16 +144,18 @@ protected:
   TypeInfo(llvm::Type *Type, Alignment A, IsPOD_t pod,
            IsBitwiseTakable_t bitwiseTakable,
            IsFixedSize_t alwaysFixedSize,
+           IsABIAccessible_t abiAccessible,
            SpecialTypeInfoKind stik) : StorageType(Type) {
     assert(stik >= SpecialTypeInfoKind::Fixed || !alwaysFixedSize);
+    assert(!A.isZero() && "Invalid alignment");
     Bits.OpaqueBits = 0;
     Bits.TypeInfo.Kind = unsigned(stik);
-    Bits.TypeInfo.AlignmentShift = A.isZero() ? InvalidAlignmentShift
-                                              : llvm::Log2_32(A.getValue());
+    Bits.TypeInfo.AlignmentShift = llvm::Log2_32(A.getValue());
     Bits.TypeInfo.POD = pod;
     Bits.TypeInfo.BitwiseTakable = bitwiseTakable;
     Bits.TypeInfo.SubclassKind = InvalidSubclassKind;
     Bits.TypeInfo.AlwaysFixedSize = alwaysFixedSize;
+    Bits.TypeInfo.ABIAccessible = abiAccessible;
   }
 
   /// Change the minimum alignment of a stored value of this type.
@@ -188,13 +192,19 @@ public:
     return static_cast<const T &>(*this);
   }
 
-  /// Whether this type info has been completely converted.
-  bool isComplete() const {
-    return Bits.TypeInfo.AlignmentShift != InvalidAlignmentShift;
-  }
-
   /// Whether this type is known to be empty.
   bool isKnownEmpty(ResilienceExpansion expansion) const;
+
+  /// Whether this type is known to be ABI-accessible, i.e. whether it's
+  /// actually possible to do ABI operations on it from this current SILModule.
+  /// See SILModule::isTypeABIAccessible.
+  ///
+  /// All fixed-size types are currently ABI-accessible, although this would
+  /// not be difficult to change (e.g. if we had an archetype size constraint
+  /// that didn't say anything about triviality).
+  IsABIAccessible_t isABIAccessible() const {
+    return IsABIAccessible_t(Bits.TypeInfo.ABIAccessible);
+  }
 
   /// Whether this type is known to be POD, i.e. to not require any
   /// particular action on copy or destroy.
@@ -263,7 +273,6 @@ public:
 
   Alignment getBestKnownAlignment() const {
     auto Shift = Bits.TypeInfo.AlignmentShift;
-    assert(Shift != InvalidAlignmentShift);
     return Alignment(1ull << Shift);
   }
 
@@ -278,6 +287,7 @@ public:
   virtual llvm::Value *getAlignmentMask(IRGenFunction &IGF, SILType T) const = 0;
   virtual llvm::Value *getStride(IRGenFunction &IGF, SILType T) const = 0;
   virtual llvm::Value *getIsPOD(IRGenFunction &IGF, SILType T) const = 0;
+  virtual llvm::Value *getIsBitwiseTakable(IRGenFunction &IGF, SILType T) const = 0;
   virtual llvm::Value *isDynamicallyPackedInline(IRGenFunction &IGF,
                                                  SILType T) const = 0;
 
@@ -362,23 +372,6 @@ public:
                                                    Address srcBuffer,
                                                    SILType T) const;
 
-  /// Perform a take-initialization from the given fixed-size buffer
-  /// into an uninitialized fixed-size buffer, allocating the buffer if
-  /// necessary and deallocating the destination buffer.  Returns the
-  /// address of the value inside the destination buffer.
-  ///
-  /// This is equivalent to:
-  ///   auto srcAddress = projectBuffer(IGF, srcBuffer, T);
-  ///   initializeBufferWithTake(IGF, destBuffer, srcAddress, T);
-  ///   deallocateBuffer(IGF, srcBuffer, T);
-  /// but may be able to re-use the buffer from the source buffer, and may
-  /// be more efficient for dynamic types, since it uses a single
-  /// value witness call.
-  virtual Address initializeBufferWithTakeOfBuffer(IRGenFunction &IGF,
-                                                   Address destBuffer,
-                                                   Address srcBuffer,
-                                                   SILType T) const;
-
   /// Take-initialize an address from a parameter explosion.
   virtual void initializeFromParams(IRGenFunction &IGF, Explosion &params,
                                     Address src, SILType T,
@@ -409,41 +402,52 @@ public:
   /// Does this type statically have extra inhabitants, or may it dynamically
   /// have extra inhabitants based on type arguments?
   virtual bool mayHaveExtraInhabitants(IRGenModule &IGM) const = 0;
-  
-  /// Map an extra inhabitant representation in memory to a unique 31-bit
-  /// identifier, and map a valid representation of the type to -1.
-  ///
-  /// Calls to this witness must be dominated by a runtime check that the type
-  /// has extra inhabitants.
-  virtual llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
-                                               Address src,
-                                               SILType T) const = 0;
-  
-  /// Store the extra inhabitant representation indexed by a 31-bit identifier
-  /// to memory.
-  ///
-  /// Calls to this witness must be dominated by a runtime check that the type
-  /// has extra inhabitants.
-  virtual void storeExtraInhabitant(IRGenFunction &IGF,
-                                    llvm::Value *index,
-                                    Address dest,
-                                    SILType T) const = 0;
-  
+
   /// Get the tag of a single payload enum with a payload of this type (\p T) e.g
   /// Optional<T>.
   virtual llvm::Value *getEnumTagSinglePayload(IRGenFunction &IGF,
                                                llvm::Value *numEmptyCases,
                                                Address enumAddr,
-                                               SILType T) const = 0;
+                                               SILType T,
+                                               bool isOutlined) const = 0;
 
   /// Store the tag of a single payload enum with a payload of this type.
   virtual void storeEnumTagSinglePayload(IRGenFunction &IGF,
                                          llvm::Value *whichCase,
                                          llvm::Value *numEmptyCases,
                                          Address enumAddr,
-                                         SILType T) const = 0;
-  
+                                         SILType T,
+                                         bool isOutlined) const = 0;
+
+  /// Return an extra-inhabitant tag for the given type, which will be
+  /// 0 for a value that's not an extra inhabitant or else a value in
+  /// 1...extraInhabitantCount.  Note that the range is off by one relative
+  /// to the expectations of FixedTypeInfo::getExtraInhabitantIndex!
+  ///
+  /// Most places in IRGen shouldn't be using this.
+  ///
+  /// knownXICount can be null.
+  llvm::Value *getExtraInhabitantTagDynamic(IRGenFunction &IGF,
+                                            Address address,
+                                            SILType T,
+                                            llvm::Value *knownXICount,
+                                            bool isOutlined) const;
+
+  /// Store an extra-inhabitant tag for the given type, which is known to be
+  /// in 1...extraInhabitantCount.  Note that the range is off by one
+  /// relative to the expectations of FixedTypeInfo::storeExtraInhabitant!
+  ///
+  /// Most places in IRGen shouldn't be using this.
+  void storeExtraInhabitantTagDynamic(IRGenFunction &IGF,
+                                      llvm::Value *index,
+                                      Address address,
+                                      SILType T,
+                                      bool isOutlined) const;
+
   /// Compute the packing of values of this type into a fixed-size buffer.
+  /// A value might not be stored in the fixed-size buffer because it does not
+  /// fit or because it is not bit-wise takable. Non bit-wise takable values are
+  /// not stored inline by convention.
   FixedPacking getFixedPacking(IRGenModule &IGM) const;
   
   /// Index into an array of objects of this type.

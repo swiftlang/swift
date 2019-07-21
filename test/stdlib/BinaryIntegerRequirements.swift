@@ -1,6 +1,6 @@
-// RUN: %swift -swift-version 4 -typecheck -verify %s
+// RUN: %target-typecheck-verify-swift -swift-version 4
 
-struct MyInt: FixedWidthInteger { // expected-error {{type 'MyInt' does not conform to protocol 'BinaryInteger'}}
+struct MyInt: FixedWidthInteger { // expected-error {{type 'MyInt' does not conform to protocol 'BinaryInteger'}} expected-note 3 {{do you want to add protocol stubs?}}
   typealias IntegerLiteralType = Int
   static let isSigned = false
   init(integerLiteral value: Int) { fatalError() }
@@ -42,7 +42,7 @@ struct MyInt: FixedWidthInteger { // expected-error {{type 'MyInt' does not conf
   func quotientAndRemainder(dividingBy rhs: MyInt) -> (quotient: MyInt, remainder: MyInt) { fatalError() }
   func signum() -> MyInt { fatalError() }
 
-  var hashValue: Int { fatalError() }
+  func hash(into hasher: inout Hasher) { fatalError() }
   var byteSwapped: MyInt { fatalError() }
   static var max: MyInt { fatalError() }
   static var min: MyInt { fatalError() }

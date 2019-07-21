@@ -28,10 +28,11 @@ using namespace swift;
 ///    whose type parameters are safe types T1...Tn.
 bool DestructorAnalysis::mayStoreToMemoryOnDestruction(SILType T) {
   bool IsSafe = isSafeType(T.getASTType());
-  DEBUG(llvm::dbgs() << " DestructorAnalysis::mayStoreToMemoryOnDestruction is"
-                     << (IsSafe ? " false: " : " true: "));
-  DEBUG(T.getASTType()->print(llvm::errs()));
-  DEBUG(llvm::errs() << "\n");
+  LLVM_DEBUG(llvm::dbgs() << " DestructorAnalysis::"
+                             "mayStoreToMemoryOnDestruction is"
+                          << (IsSafe ? " false: " : " true: "));
+  LLVM_DEBUG(T.getASTType()->print(llvm::errs()));
+  LLVM_DEBUG(llvm::errs() << "\n");
   return !IsSafe;
 }
 

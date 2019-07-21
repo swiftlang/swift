@@ -94,6 +94,12 @@ void CompactArrayBuilderImpl::copyInto(char *BufPtr, size_t Length) const {
   memcpy(BufPtr, StringBuffer.data(), StringBuffer.size());
 }
 
+unsigned CompactArrayBuilderImpl::copyInto(char *BufPtr) const {
+  size_t Length = sizeInBytes();
+  copyInto(BufPtr, Length);
+  return Length;
+}
+
 bool CompactArrayBuilderImpl::empty() const {
   return EntriesBuffer.empty();
 }

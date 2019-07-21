@@ -32,6 +32,9 @@ public:
   /// \c ASTContext::addSearchPath.
   std::vector<std::string> ImportSearchPaths;
 
+  /// Path(s) to virtual filesystem overlay YAML files.
+  std::vector<std::string> VFSOverlayFiles;
+
   struct FrameworkSearchPath {
     std::string Path;
     bool IsSystem = false;
@@ -61,14 +64,15 @@ public:
   /// Path to search for compiler-relative header files.
   std::string RuntimeResourcePath;
 
-  /// Path to search for compiler-relative stdlib dylibs.
-  std::string RuntimeLibraryPath;
+  /// Paths to search for compiler-relative stdlib dylibs, in order of
+  /// preference.
+  std::vector<std::string> RuntimeLibraryPaths;
 
-  /// Path to search for compiler-relative stdlib modules.
-  std::string RuntimeLibraryImportPath;
+  /// Paths to search for stdlib modules. One of these will be compiler-relative.
+  std::vector<std::string> RuntimeLibraryImportPaths;
 
   /// Don't look in for compiler-provided modules.
-  bool SkipRuntimeLibraryImportPath = false;
+  bool SkipRuntimeLibraryImportPaths = false;
 
   /// Return a hash code of any components from these options that should
   /// contribute to a Swift Bridging PCH hash.
@@ -79,6 +83,9 @@ public:
     for (auto Import : ImportSearchPaths) {
       Code = hash_combine(Code, Import);
     }
+    for (auto VFSFile : VFSOverlayFiles) {
+      Code = hash_combine(Code, VFSFile);
+    }
     for (const auto &FrameworkPath : FrameworkSearchPaths) {
       Code = hash_combine(Code, FrameworkPath.Path);
     }
@@ -86,7 +93,9 @@ public:
       Code = hash_combine(Code, LibraryPath);
     }
     Code = hash_combine(Code, RuntimeResourcePath);
-    Code = hash_combine(Code, RuntimeLibraryImportPath);
+    for (auto RuntimeLibraryImportPath : RuntimeLibraryImportPaths) {
+      Code = hash_combine(Code, RuntimeLibraryImportPath);
+    }
     return Code;
   }
 };

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -module-name mandatory_inlining -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -mandatory-inlining | %FileCheck %s
+// RUN: %target-sil-opt -enable-objc-interop -module-name mandatory_inlining -enable-sil-verify-all %s -mandatory-inlining | %FileCheck %s
 
 import Builtin
 import Swift
@@ -17,7 +17,7 @@ extension P2 {
 
 struct L {
   var start: Int32 { get }
-  @sil_stored let o: P2
+  @_hasStorage let o: P2
   init(o: P2)
 }
 
@@ -26,6 +26,8 @@ sil @nativeobject_plus : $@convention(thin) (@owned Builtin.NativeObject, @owned
 sil @partial_apply_user : $@convention(thin) (@owned @callee_owned (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject) -> ()
 sil @fromLiteral : $@convention(thin) (Builtin.Int128, @thin Int64.Type) -> Int64
 sil @use_nativeobject : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+
+class Klass {}
 
 //////////////////////////////////////
 // Multiple Inline in a Block Tests //
@@ -353,19 +355,13 @@ sil @inline_test_control_flow : $@convention(thin) (Float) -> Float {
 
 // CHECK: [[BB5]]:
   // CHECK: [[VAL50:%.*]] = load [[PB16]]
-  // CHECK: br [[BB6:.*]]([[VAL50]]
-
-// CHECK: [[BB6]]([[VAL52:%.*]] : $Float):
   // CHECK: strong_release [[VAL16]]
   // CHECK: strong_release [[VAL15]]
-  // CHECK: br [[BB7:.*]]([[VAL52]]
-
-// CHECK: [[BB7]]([[VAL56:%.*]] : $Float):
   // CHECK: [[VAL57:%.*]] = function_ref @convertFromBuiltinFloatLiteral
   // CHECK: [[VAL58:%.*]] = metatype $@thin Float.Type
   // CHECK: [[VAL59:%.*]] = float_literal $Builtin.FPIEEE64, 0x4008000000000000
   // CHECK: [[VAL60:%.*]] = apply [[VAL57]]([[VAL59]], [[VAL58]])
-  // CHECK: [[VAL61:%.*]] = apply [[VAL3]]([[VAL56]], [[VAL60]])
+  // CHECK: [[VAL61:%.*]] = apply [[VAL3]]([[VAL50]], [[VAL60]])
   // CHECK: strong_release [[VAL1]]
   // CHECK: return [[VAL61]]
 
@@ -512,22 +508,12 @@ bb0(%0 : $@callee_owned (@owned Builtin.NativeObject) -> @owned Builtin.NativeOb
 // CHECK-LABEL: sil [transparent] @test_partial_nativeobject_foo : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
 // CHECK: bb0([[ARG:%.*]] : $Builtin.NativeObject):
 // CHECK:   [[FN:%.*]] = function_ref @test_partial_nativeobject_baz :
-// CHECK:   br bb1
-//
-// CHECK: bb1:
+// CHECK:   strong_retain [[ARG]]
 // CHECK:   strong_retain [[ARG]]
 // CHECK:   [[PAI:%.*]] = partial_apply [[FN]]([[ARG]])
-// CHECK:   br bb2
-//
-// CHECK: bb2:
 // CHECK:   strong_retain [[ARG]]
-// CHECK:   strong_retain [[PAI]]
-// CHECK:   strong_retain [[ARG]]
-// CHECK:   strong_release [[PAI]]
 // CHECK:   [[FN2:%.*]] = function_ref @nativeobject_plus :
 // CHECK:   [[RESULT:%.*]] = apply [[FN2]]([[ARG]], [[ARG]])
-//
-// CHECK: bb3:
 // CHECK:   strong_retain [[PAI]]
 // CHECK:   [[OPAQUE_FN:%.*]] = function_ref @partial_apply_user
 // CHECK:   apply [[OPAQUE_FN]]([[PAI]])
@@ -594,7 +580,7 @@ bb2:
   br bb3(%14 : $Bool)
 
 bb3(%16 : $Bool):
-  strong_release %3 : ${ var @callee_owned () -> Bool } 
+  strong_release %3 : ${ var @callee_owned () -> Bool }
   strong_release %2 : ${ var Bool }
   return %16 : $Bool
 }
@@ -611,29 +597,24 @@ bb0(%0 : ${ var Bool }):
 sil @test_short_circuit : $@convention(thin) (Bool, Bool) -> Bool {
 
 // CHECK-LABEL: sil @test_short_circuit : $@convention(thin) (Bool, Bool) -> Bool {
-
-  // CHECK: cond_br {{%.*}}, [[BB1:bb[0-9]+]], [[BB3:bb[0-9]+]]
+  // CHECK: cond_br {{%.*}}, [[BB1:bb[0-9]+]], [[BB2:bb[0-9]+]]
 
 // CHECK: bb1:
-  // CHECK: br [[BB2:.*]](
+  // CHECK: br [[BB3:.*]](
 
-// CHECK: [[BB2]](
-  // CHECK: br [[BB4:.*]](
-
-// CHECK: bb3:
+// CHECK: bb2:
   // CHECK: [[OLD_CALLEE:%.*]] = load {{%[0-9]+}} :
   // CHECK: strong_retain [[OLD_CALLEE]]
   // Separation marker
   // CHECK: integer_literal $Builtin.Int32, 3
-  // CHECK: strong_retain [[VAL4:%[0-9]*]]
-  // CHECK: strong_release [[OLD_CALLEE]]
-  // CHECK: [[ADDR4:%.*]] = project_box [[VAL4]]
+  // CHECK: [[ADDR4:%.*]] = project_box [[VAL4:%.*]] :
   // CHECK: {{%.*}} = tuple ()
   // CHECK: {{%.*}} = load [[ADDR4]]
   // CHECK: strong_release [[VAL4]]
-  // CHECK: br [[BB2]](
+  // CHECK: strong_release [[OLD_CALLEE]]
+  // CHECK: br [[BB3]](
 
-// CHECK: [[BB4]](
+// CHECK: [[BB3]](
   // CHECK: strong_release [[VAL4]]
   // CHECK: return {{.*}}
 
@@ -660,30 +641,26 @@ sil @test_short_circuit2 : $@convention(thin) (Bool, Bool) -> Bool {
 
 // CHECK-LABEL: sil @test_short_circuit2 : $@convention(thin) (Bool, Bool) -> Bool {
 
-  // CHECK: cond_br {{%.*}}, [[BB1:bb[0-9]+]], [[BB3:bb[0-9]+]]
+  // CHECK: cond_br {{%.*}}, [[BB1:bb[0-9]+]], [[BB2:bb[0-9]+]]
 
 // CHECK: bb1:
-  // CHECK: br [[BB2:.*]](
+  // CHECK: br [[BB3:.*]](
 
-// CHECK: [[BB2]](
-  // CHECK: br [[BB5:.*]](
-
-// CHECK: [[BB3]]:
+// CHECK: [[BB2]]:
   // Marker -
   // CHECK: integer_literal $Builtin.Int32, 2
   // CHECK: [[OLD_CALLEE:%.*]] = load {{%.*}}
   // CHECK: strong_retain [[OLD_CALLEE]]
   // Marker -
   // CHECK: integer_literal $Builtin.Int32, 3
-  // CHECK: strong_retain [[VAL4:%[0-9]*]]
-  // CHECK: strong_release [[OLD_CALLEE]]
-  // CHECK: [[ADDR4:%.*]] = project_box [[VAL4]]
+  // CHECK: [[ADDR4:%.*]] = project_box [[VAL4:%[0-9]+]]
   // CHECK: {{%.*}} = tuple ()
   // CHECK: {{%.*}} = load [[ADDR4]]
   // CHECK: strong_release [[VAL4]]
-  // CHECK: br [[BB2]](
+  // CHECK: strong_release [[OLD_CALLEE]]
+  // CHECK: br [[BB3]](
 
-// CHECK: [[BB5]](
+// CHECK: [[BB3]](
   // CHECK: strong_release [[VAL3]]
   // CHECK: return {{.*}}
 
@@ -710,9 +687,9 @@ bb0(%0 : $Bool, %1 : $Bool):
 
 
 
-sil [transparent] @convertFromBuiltinIntegerLiteral : $@convention(thin) (Builtin.Int2048, @thin Int64.Type) -> Int64 {
-bb0(%0 : $Builtin.Int2048, %1 : $@thin Int64.Type):
-  %3 = builtin "s_to_s_checked_trunc_Int2048_Int64"(%0 : $Builtin.Int2048) : $(Builtin.Int64, Builtin.Int1)
+sil [transparent] @convertFromBuiltinIntegerLiteral : $@convention(thin) (Builtin.IntLiteral, @thin Int64.Type) -> Int64 {
+bb0(%0 : $Builtin.IntLiteral, %1 : $@thin Int64.Type):
+  %3 = builtin "s_to_s_checked_trunc_IntLiteral_Int64"(%0 : $Builtin.IntLiteral) : $(Builtin.Int64, Builtin.Int1)
   %4 = tuple_extract %3 : $(Builtin.Int64, Builtin.Int1), 0
   %5 = struct $Int64 (%4 : $Builtin.Int64)
   return %5 : $Int64
@@ -723,10 +700,10 @@ bb0:
   %0 = tuple ()
   %1 = alloc_box ${ var Int64 }
   %1a = project_box %1 : ${ var Int64 }, 0
-  %2 = function_ref @convertFromBuiltinIntegerLiteral : $@convention(thin) (Builtin.Int2048, @thin Int64.Type) -> Int64
+  %2 = function_ref @convertFromBuiltinIntegerLiteral : $@convention(thin) (Builtin.IntLiteral, @thin Int64.Type) -> Int64
   %3 = metatype $@thin Int64.Type
-  %4 = integer_literal $Builtin.Int2048, 1
-  %5 = apply %2(%4, %3) : $@convention(thin) (Builtin.Int2048, @thin Int64.Type) -> Int64
+  %4 = integer_literal $Builtin.IntLiteral, 1
+  %5 = apply %2(%4, %3) : $@convention(thin) (Builtin.IntLiteral, @thin Int64.Type) -> Int64
   store %5 to %1a : $*Int64
   strong_release %1 : ${ var Int64 }
   %8 = tuple ()
@@ -1107,10 +1084,10 @@ bb0(%0 : $C):
 // CHECK-LABEL: sil @test_guaranteed_closure_capture
 // CHECK: bb0([[ARG:%.*]] : $C):
 // CHECK:   strong_retain [[ARG]] : $C
-// @guaranteed closure captures *don't* release the capture in the closure implementation.
-// CHECK-NOT:   strong_retain [[ARG]] : $C
+// CHECK:   strong_retain [[ARG]]
 // CHECK:   [[F:%.*]] = function_ref @use_c
 // CHECK:   apply [[F]]([[ARG]])
+// CHECK:   strong_release [[ARG]]
 // CHECK:   strong_release [[ARG]]
 // CHECK:   return
 sil @test_guaranteed_closure_capture : $@convention(thin) (@guaranteed C) -> () {
@@ -1126,12 +1103,12 @@ bb0(%0: $C):
 
 // CHECK-LABEL: sil @test_guaranteed_closure_capture2
 // CHECK: bb0([[ARG:%.*]] : $C):
-// @guaranteed closure captures *don't* release the capture in the closure implementation.
 // CHECK:   strong_retain [[ARG]] : $C
-// CHECK:   strong_release [[ARG]] : $C
+// CHECK:   strong_retain [[ARG]]
 // CHECK:   [[F:%.*]] = function_ref @use_c
 // CHECK:   apply [[F]]([[ARG]])
-// CHECK-NOT:   strong_release [[ARG]]
+// CHECK:   strong_release [[ARG]] : $C
+// CHECK:   strong_release [[ARG]] : $C
 // CHECK:   return
 sil @test_guaranteed_closure_capture2 : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0: $C):
@@ -1146,11 +1123,11 @@ bb0(%0: $C):
 // CHECK-LABEL: sil @test_unowned_closure_capture2
 // CHECK: bb0([[ARG:%.*]] : $C):
 // CHECK:   strong_retain [[ARG]]
-// CHECK:   strong_release [[ARG]]
-// CHECK-NOT: strong_release [[ARG]]
+// CHECK:   strong_retain [[ARG]]
 // CHECK:   [[F:%.*]] = function_ref @use_c_unowned
 // CHECK:   apply [[F]]([[ARG]]) : $@convention(thin) (C) -> ()
-// CHECK-NOT: strong_release [[ARG]]
+// CHECK:   strong_release [[ARG]]
+// CHECK:   strong_release [[ARG]]
 // CHECK:   return
 sil @test_unowned_closure_capture2 : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0: $C):
@@ -1195,7 +1172,7 @@ bb0:
 // CHECK-LABEL: sil @test_thin_convert_function_inline
 // CHECK-NEXT: bb0
 // CHECK-NEXT: [[RES:%.*]] = integer_literal $Builtin.Int32, 1
-// CHECK-NEXT  return [[RES]]
+// CHECK-NEXT:  return [[RES]]
 sil @test_thin_convert_function_inline : $@convention(thin) () -> Builtin.Int32 {
 bb0:
   %0 = function_ref @return_one : $@convention(thin) () -> Builtin.Int32
@@ -1203,4 +1180,163 @@ bb0:
   %2 = thin_to_thick_function %1 : $@convention(thin) @noescape () -> Builtin.Int32 to $@noescape () -> Builtin.Int32
   %3 = apply %2() : $@noescape () -> Builtin.Int32
   return %3 : $Builtin.Int32
+}
+
+// CHECK-LABEL: sil @test_guaranteed_on_stack_closure
+// CHECK:  strong_retain %0 : $C
+// CHECK:  [[F:%.*]] = function_ref @use_c : $@convention(thin) (@guaranteed C) -> ()
+// CHECK:  apply [[F]](%0) : $@convention(thin) (@guaranteed C) -> ()
+// CHECK:  strong_release %0 : $C
+// CHECK: return
+sil @test_guaranteed_on_stack_closure : $@convention(thin) (@guaranteed C) ->  () {
+bb0(%0: $C):
+  strong_retain %0 : $C
+  %closure_fun = function_ref @guaranteed_closure_func : $@convention(thin) (@guaranteed C) -> ()
+  %closure = partial_apply [on_stack] [callee_guaranteed] %closure_fun(%0) : $@convention(thin) (@guaranteed C) -> ()
+  %closure2 = mark_dependence %closure : $@noescape @callee_guaranteed () -> () on %0 : $C
+  apply %closure2() : $@noescape @callee_guaranteed () -> ()
+  strong_release %0: $C
+  dealloc_stack %closure : $@noescape @callee_guaranteed () -> ()
+  %tuple = tuple()
+  return %tuple : $()
+}
+
+// CHECK-LABEL: sil @test_apply_pai_in_loop : $@convention(thin) (@guaranteed C) ->  () {
+// CHECK: bb0([[ARG:%.*]] : $C):
+// CHECK-NEXT:   strong_retain [[ARG]]
+// CHECK-NEXT:   strong_retain [[ARG]]
+// CHECK-NEXT:   br bb1
+//
+// CHECK: bb1:
+// CHECK-NEXT:   cond_br undef, bb2, bb3
+//
+// CHECK: bb2:
+// CHECK-NEXT: function_ref use_c
+// CHECK-NEXT: [[FUNC:%.*]] = function_ref @use_c
+// CHECK-NEXT: apply [[FUNC]]([[ARG]])
+// CHECK-NEXT: tuple
+// CHECK-NEXT: br bb1
+//
+// CHECK: bb3:
+// CHECK-NEXT: strong_release [[ARG]]
+// CHECK-NEXT: strong_release [[ARG]]
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+// CHECK-NEXT: } // end sil function 'test_apply_pai_in_loop'
+sil @test_apply_pai_in_loop : $@convention(thin) (@guaranteed C) ->  () {
+bb0(%0: $C):
+  strong_retain %0 : $C
+  %closure_fun = function_ref @guaranteed_closure_func : $@convention(thin) (@guaranteed C) -> ()
+  %closure = partial_apply [callee_guaranteed] %closure_fun(%0) : $@convention(thin) (@guaranteed C) -> ()
+  br bb1
+
+bb1:
+  cond_br undef, bb2, bb3
+
+bb2:
+  apply %closure() : $@callee_guaranteed () -> ()
+  br bb1
+
+bb3:
+  strong_release %0: $C
+  %tuple = tuple()
+  return %tuple : $()
+}
+
+// CHECK-LABEL: sil @test_apply_pai_in_loop_with_diamond : $@convention(thin) (@guaranteed C) ->  () {
+// CHECK: bb0([[ARG:%.*]] : $C):
+// CHECK-NEXT:   strong_retain [[ARG]]
+// CHECK-NEXT:   strong_retain [[ARG]]
+// CHECK-NEXT:   strong_retain [[ARG]]
+// CHECK-NEXT:   cond_br undef, bb1, bb4
+//
+// CHECK: bb1:
+// CHECK-NEXT: function_ref use_c
+// CHECK-NEXT: [[FUNC:%.*]] = function_ref @use_c
+// CHECK-NEXT: apply [[FUNC]]([[ARG]])
+// CHECK-NEXT: tuple
+// CHECK-NEXT: cond_br undef, bb2, bb3
+//
+// CHECK: bb2:
+// CHECK-NEXT: function_ref use_c
+// CHECK-NEXT: [[FUNC:%.*]] = function_ref @use_c
+// CHECK-NEXT: apply [[FUNC]]([[ARG]])
+// CHECK-NEXT: tuple
+// CHECK-NEXT: br bb1
+//
+// CHECK: bb3:
+// CHECK-NEXT: br bb1
+//
+// CHECK: bb4:
+// CHECK-NEXT: strong_release [[ARG]]
+// CHECK-NEXT: strong_release [[ARG]]
+// CHECK-NEXT: strong_release [[ARG]]
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+// CHECK-NEXT: } // end sil function 'test_apply_pai_in_loop_with_diamond'
+sil @test_apply_pai_in_loop_with_diamond : $@convention(thin) (@guaranteed C) ->  () {
+bb0(%0: $C):
+  strong_retain %0 : $C
+  %closure_fun = function_ref @guaranteed_closure_func : $@convention(thin) (@guaranteed C) -> ()
+  %closure = partial_apply [callee_guaranteed] %closure_fun(%0) : $@convention(thin) (@guaranteed C) -> ()
+  cond_br undef, bb2, bb5
+
+bb2:
+  apply %closure() : $@callee_guaranteed () -> ()
+  cond_br undef, bb3, bb4
+
+bb3:
+  apply %closure() : $@callee_guaranteed () -> ()
+  br bb2
+
+bb4:
+  br bb2
+
+bb5:
+  strong_release %0: $C
+  %tuple = tuple()
+  return %tuple : $()
+}
+
+// CHECK-LABEL: sil @test_apply_pai_in_diamond : $@convention(thin) (@guaranteed C) ->  () {
+// CHECK: bb0([[ARG:%.*]] : $C):
+// CHECK-NEXT:   strong_retain [[ARG]]
+// CHECK-NEXT:   strong_retain [[ARG]]
+// CHECK-NEXT:   cond_br undef, bb1, bb2
+//
+// CHECK: bb1:
+// CHECK-NEXT: strong_release [[ARG]]
+// CHECK-NEXT: br bb3
+//
+// CHECK: bb2:
+// CHECK-NEXT: function_ref use_c
+// CHECK-NEXT: [[FUNC:%.*]] = function_ref @use_c
+// CHECK-NEXT: apply [[FUNC]]([[ARG]])
+// CHECK-NEXT: tuple
+// CHECK-NEXT: strong_release [[ARG]]
+// CHECK-NEXT: br bb3
+//
+// CHECK: bb3:
+// CHECK-NEXT: strong_release [[ARG]]
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+// CHECK-NEXT: } // end sil function 'test_apply_pai_in_diamond'
+sil @test_apply_pai_in_diamond : $@convention(thin) (@guaranteed C) ->  () {
+bb0(%0: $C):
+  strong_retain %0 : $C
+  %closure_fun = function_ref @guaranteed_closure_func : $@convention(thin) (@guaranteed C) -> ()
+  %closure = partial_apply [callee_guaranteed] %closure_fun(%0) : $@convention(thin) (@guaranteed C) -> ()
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  apply %closure() : $@callee_guaranteed () -> ()
+  br bb3
+
+bb3:
+  strong_release %0: $C
+  %tuple = tuple()
+  return %tuple : $()
 }

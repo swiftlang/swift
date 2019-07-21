@@ -8,7 +8,7 @@ public protocol P {
 // forward-declared type.
 // CHECK-GEN: ![[FWD:.*]] = !DICompositeType({{.*}}, name: "Generic",
 // CHECK-GEN-SAME:                           flags: DIFlagFwdDecl
-// CHECK-GEN: linkageName: "$S4main7GenericV3sety2ATQzF", scope: ![[FWD]],
+// CHECK-GEN: linkageName: "$s4main7GenericV3sety2ATQzF", scope: ![[FWD]],
 public struct Generic<T : P> {
   public func get() -> T.AT? {
     return nil
@@ -17,9 +17,9 @@ public struct Generic<T : P> {
 }
 
 // But only one concrete type is expected.
-// CHECK: !DISubprogram({{.*}}linkageName: "$S4main8ConcreteV3getSiSgyF",
+// CHECK: !DISubprogram({{.*}}linkageName: "$s4main8ConcreteV3getSiSgyF",
 // CHECK-SAME:          scope: ![[CONC:[0-9]+]],
-// CHECK: ![[CONC]] = !DICompositeType(tag: DW_TAG_structure_type, name: "Concrete", scope: !{{[0-9]+}}, file: !{{[0-9]+}}, line: {{[0-9]+}}, elements: !{{[0-9]+}}, runtimeLang: DW_LANG_Swift, identifier: "$S4main8ConcreteVD")
+// CHECK: ![[CONC]] = !DICompositeType(tag: DW_TAG_structure_type, name: "Concrete", scope: !{{[0-9]+}}, file: !{{[0-9]+}}, line: {{[0-9]+}}, elements: !{{[0-9]+}}, runtimeLang: DW_LANG_Swift, identifier: "$s4main8ConcreteVD")
 public struct Concrete {
   public func get() -> Int? {
     return nil

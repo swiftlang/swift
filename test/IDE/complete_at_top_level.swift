@@ -167,6 +167,11 @@ func fooFunc2(_ a: Int, _ b: Double) {}
 
 func erroneous1(_ x: Undeclared) {}
 
+// FIXME: Hides all other string interpolation completion.
+//extension DefaultStringInterpolation {
+//  mutating func appendInterpolation(interpolate: Double) {}
+//}
+
 //===--- Test code completions of expressions that can be typechecked.
 
 // Although the parser can recover in most of these test cases, we resync it
@@ -178,7 +183,8 @@ fooObject#^TYPE_CHECKED_EXPR_1^#
 // TYPE_CHECKED_EXPR_1: Begin completions
 // TYPE_CHECKED_EXPR_1-NEXT: Decl[InstanceVar]/CurrNominal:      .instanceVar[#Int#]{{; name=.+$}}
 // TYPE_CHECKED_EXPR_1-NEXT: Decl[InstanceMethod]/CurrNominal:   .instanceFunc({#(a): Int#})[#Void#]{{; name=.+$}}
-// TYPE_CHECKED_EXPR_1-NEXT:BuiltinOperator/None:                = {#FooStruct#}[#Void#]; name== FooStruct
+// TYPE_CHECKED_EXPR_1-NEXT: BuiltinOperator/None:               = {#FooStruct#}[#Void#]; name== FooStruct
+// TYPE_CHECKED_EXPR_1-NEXT: Keyword[self]/CurrNominal:          .self[#FooStruct#]; name=self
 // TYPE_CHECKED_EXPR_1-NEXT: End completions
 
 func resyncParser2() {}
@@ -191,6 +197,7 @@ fooObject#^TYPE_CHECKED_EXPR_2^#
 // TYPE_CHECKED_EXPR_2-NEXT: Decl[InstanceVar]/CurrNominal: .instanceVar[#Int#]{{; name=.+$}}
 // TYPE_CHECKED_EXPR_2-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc({#(a): Int#})[#Void#]{{; name=.+$}}
 // TYPE_CHECKED_EXPR_2-NEXT: BuiltinOperator/None:                     = {#FooStruct#}[#Void#]; name== FooStruct
+// TYPE_CHECKED_EXPR_2-NEXT: Keyword[self]/CurrNominal: .self[#FooStruct#]; name=self
 // TYPE_CHECKED_EXPR_2-NEXT: End completions
 
 func resyncParser3() {}
@@ -200,12 +207,14 @@ fooObject#^TYPE_CHECKED_EXPR_3^#.bar
 // TYPE_CHECKED_EXPR_3-NEXT: Decl[InstanceVar]/CurrNominal: .instanceVar[#Int#]{{; name=.+$}}
 // TYPE_CHECKED_EXPR_3-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc({#(a): Int#})[#Void#]{{; name=.+$}}
 // TYPE_CHECKED_EXPR_3-NEXT: BuiltinOperator/None:                     = {#FooStruct#}[#Void#]; name== FooStruct
+// TYPE_CHECKED_EXPR_3-NEXT: Keyword[self]/CurrNominal: .self[#FooStruct#]; name=self
 // TYPE_CHECKED_EXPR_3-NEXT: End completions
 
 func resyncParser4() {}
 
 fooObject.#^TYPE_CHECKED_EXPR_4^#
 // TYPE_CHECKED_EXPR_4: Begin completions
+// TYPE_CHECKED_EXPR_4-NEXT: Keyword[self]/CurrNominal: self[#FooStruct#]; name=self
 // TYPE_CHECKED_EXPR_4-NEXT: Decl[InstanceVar]/CurrNominal: instanceVar[#Int#]{{; name=.+$}}
 // TYPE_CHECKED_EXPR_4-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc({#(a): Int#})[#Void#]{{; name=.+$}}
 // TYPE_CHECKED_EXPR_4-NEXT: End completions
@@ -214,6 +223,7 @@ func resyncParser5() {}
 
 fooObject.#^TYPE_CHECKED_EXPR_5^#.bar
 // TYPE_CHECKED_EXPR_5: Begin completions
+// TYPE_CHECKED_EXPR_5-NEXT: Keyword[self]/CurrNominal: self[#FooStruct#]; name=self
 // TYPE_CHECKED_EXPR_5-NEXT: Decl[InstanceVar]/CurrNominal: instanceVar[#Int#]{{; name=.+$}}
 // TYPE_CHECKED_EXPR_5-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc({#(a): Int#})[#Void#]{{; name=.+$}}
 // TYPE_CHECKED_EXPR_5-NEXT: End completions
@@ -236,6 +246,7 @@ var fooObjectWithErrorInInit : FooStruct = unknown_var
 
 fooObjectWithErrorInInit.#^TYPE_CHECKED_EXPR_WITH_ERROR_IN_INIT_1^#
 // TYPE_CHECKED_EXPR_WITH_ERROR_IN_INIT_1: Begin completions
+// TYPE_CHECKED_EXPR_WITH_ERROR_IN_INIT_1-NEXT: Keyword[self]/CurrNominal: self[#FooStruct#]; name=self
 // TYPE_CHECKED_EXPR_WITH_ERROR_IN_INIT_1-NEXT: Decl[InstanceVar]/CurrNominal: instanceVar[#Int#]{{; name=.+$}}
 // TYPE_CHECKED_EXPR_WITH_ERROR_IN_INIT_1-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc({#(a): Int#})[#Void#]{{; name=.+$}}
 // TYPE_CHECKED_EXPR_WITH_ERROR_IN_INIT_1-NEXT: End completions
@@ -256,9 +267,12 @@ func resyncParser7() {}
 
 var topLevelVar2 = FooStruct#^TOP_LEVEL_VAR_INIT_2^#
 // TOP_LEVEL_VAR_INIT_2: Begin completions
-// TOP_LEVEL_VAR_INIT_2-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc({#self: FooStruct#})[#(Int) -> Void#]{{; name=.+$}}
+// TOP_LEVEL_VAR_INIT_2-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc({#(self): FooStruct#})[#(Int) -> Void#]{{; name=.+$}}
+// TOP_LEVEL_VAR_INIT_2-NEXT: Decl[Constructor]/CurrNominal: ()[#FooStruct#]{{; name=.+$}}
 // TOP_LEVEL_VAR_INIT_2-NEXT: Decl[Constructor]/CurrNominal: ({#instanceVar: Int#})[#FooStruct#]{{; name=.+$}}
 // TOP_LEVEL_VAR_INIT_2-NEXT: Decl[Constructor]/CurrNominal: ()[#FooStruct#]{{; name=.+$}}
+// TOP_LEVEL_VAR_INIT_2-NEXT: Keyword[self]/CurrNominal: .self[#FooStruct.Type#]; name=self
+// TOP_LEVEL_VAR_INIT_2-NEXT: Keyword/CurrNominal:       .Type[#FooStruct.Type#]; name=Type
 // TOP_LEVEL_VAR_INIT_2-NEXT: End completions
 
 func resyncParser8() {}
@@ -456,8 +470,10 @@ func resyncParserB14() {}
 var stringInterp = "\(#^STRING_INTERP_3^#)"
 _ = "" + "\(#^STRING_INTERP_4^#)" + ""
 // STRING_INTERP: Begin completions
+// STRING_INTERP-DAG: Decl[InstanceMethod]/CurrNominal:   ['(']{#(value): _#}[')'][#Void#]; name=value: _
 // STRING_INTERP-DAG: Decl[Struct]/CurrModule: FooStruct[#FooStruct#];
-// STRING_INTERP-DAG: Decl[FreeFunction]/CurrModule: fooFunc1()[#Void#];
+// STRING_INTERP-DAG: Decl[FreeFunction]/CurrModule/NotRecommended/TypeRelation[Invalid]: fooFunc1()[#Void#];
+// STRING_INTERP-DAG: Decl[FreeFunction]/CurrModule: optStr()[#String?#];
 // STRING_INTERP-DAG: Decl[GlobalVar]/Local: fooObject[#FooStruct#];
 // STRING_INTERP: End completions
 func resyncParserC1() {}

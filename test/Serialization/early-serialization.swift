@@ -6,17 +6,17 @@
 // - it happens before the performance inlining and thus preserves @_semantics functions
 // - it happens after generic specialization
 
-@_fixed_layout
+@frozen
 public struct Int {
   @inlinable
   public init() {}
 }
 
 // Check that a specialized version of a function is produced
-// CHECK: sil shared [serializable] [_semantics "array.get_capacity"] [canonical] @$SSa12_getCapacitySiyFSi_Tgq5 : $@convention(method) (Array<Int>) -> Int
+// CHECK: sil shared [serializable] [_semantics "array.get_capacity"] [canonical] @$sSa12_getCapacitySiyFSi_Tgq5 : $@convention(method) (Array<Int>) -> Int
 
 // Check that a call of a @_semantics function was not inlined if early-serialization is enabled.
-// CHECK: sil [serialized] [canonical] @$Ss28userOfSemanticsAnnotatedFuncySiSaySiGF
+// CHECK: sil [serialized] [canonical] @$ss28userOfSemanticsAnnotatedFuncySiSaySiGF
 // CHECK: function_ref
 // CHECK: apply
 @inlinable
@@ -24,13 +24,13 @@ public func userOfSemanticsAnnotatedFunc(_ a: Array<Int>) -> Int {
   return a._getCapacity()
 }
 
-@_fixed_layout
+@frozen
 public struct Array<T> {
   @inlinable
   public init() {}
 
   // Check that the generic version of a @_semantics function is preserved.
-  // CHECK: sil [serialized] [_semantics "array.get_capacity"] [canonical] @$SSa12_getCapacitySiyF : $@convention(method) <T> (Array<T>) -> Int
+  // CHECK: sil [serialized] [_semantics "array.get_capacity"] [canonical] @$sSa12_getCapacitySiyF : $@convention(method) <T> (Array<T>) -> Int
   @inlinable
   @usableFromInline
   @_semantics("array.get_capacity")

@@ -22,12 +22,13 @@
 namespace swift {
 
 enum class InputFileKind {
-  IFK_None,
-  IFK_Swift,
-  IFK_Swift_Library,
-  IFK_Swift_REPL,
-  IFK_SIL,
-  IFK_LLVM_IR
+  None,
+  Swift,
+  SwiftLibrary,
+  SwiftREPL,
+  SwiftModuleInterface,
+  SIL,
+  LLVM
 };
 
 // Inputs may include buffers that override contents, and eventually should
@@ -101,4 +102,4 @@ public:
 };
 } // namespace swift
 
-#endif /* SWIFT_FRONTEND_INPUTFILE_H */
+#endif // SWIFT_FRONTEND_INPUTFILE_H

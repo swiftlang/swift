@@ -14,12 +14,14 @@
 #define SWIFT_SERIALIZATION_VALIDATION_H
 
 #include "swift/Basic/LLVM.h"
+#include "swift/Serialization/SerializationOptions.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 
 namespace swift {
 
+class ModuleFile;
 enum class ResilienceStrategy : unsigned;
 
 namespace serialization {
@@ -41,7 +43,7 @@ enum class Status {
   MissingDependency,
 
   /// The module file is an overlay for a Clang module, which can't be found.
-  MissingShadowedModule,
+  MissingUnderlyingModule,
 
   /// The module file depends on a module that is still being loaded, i.e.
   /// there is a circular dependency.
@@ -90,7 +92,9 @@ struct ValidationInfo {
 class ExtendedValidationInfo {
   SmallVector<StringRef, 4> ExtraClangImporterOpts;
   StringRef SDKPath;
+  StringRef ParseableInterface;
   struct {
+    unsigned ArePrivateImportsEnabled : 1;
     unsigned IsSIB : 1;
     unsigned IsTestable : 1;
     unsigned ResilienceStrategy : 2;
@@ -110,10 +114,16 @@ public:
   void addExtraClangImporterOption(StringRef option) {
     ExtraClangImporterOpts.push_back(option);
   }
+  StringRef getParseableInterface() const { return ParseableInterface; }
+  void setParseableInterface(StringRef PI) { ParseableInterface = PI; }
 
   bool isSIB() const { return Bits.IsSIB; }
   void setIsSIB(bool val) {
       Bits.IsSIB = val;
+  }
+  bool arePrivateImportsEnabled() { return Bits.ArePrivateImportsEnabled; }
+  void setPrivateImportsEnabled(bool enabled) {
+    Bits.ArePrivateImportsEnabled = enabled;
   }
   bool isTestable() const { return Bits.IsTestable; }
   void setIsTestable(bool val) {
@@ -143,9 +153,30 @@ public:
 /// \param[out] extendedInfo If present, will be populated with additional
 /// compilation options serialized into the AST at build time that may be
 /// necessary to load it properly.
-ValidationInfo
-validateSerializedAST(StringRef data,
-                      ExtendedValidationInfo *extendedInfo = nullptr);
+/// \param[out] dependencies If present, will be populated with list of
+/// input files the module depends on, if present in INPUT_BLOCK.
+ValidationInfo validateSerializedAST(
+    StringRef data, ExtendedValidationInfo *extendedInfo = nullptr,
+    SmallVectorImpl<SerializationOptions::FileDependency> *dependencies =
+        nullptr);
+
+/// Emit diagnostics explaining a failure to load a serialized AST.
+///
+/// - \p Ctx is an AST context through which any diagnostics are surfaced.
+/// - \p diagLoc is the (possibly invalid) location used in the diagnostics.
+/// - \p loadInfo and \p extendedInfo describe the attempt to load an AST
+///   (\ref validateSerializedAST). Note that loadInfo.Status must not be
+///   Status::Valid.
+/// - \p moduleBufferID and \p moduleDocBufferID are the buffer identifiers
+///   of the module input and doc input buffers respectively (\ref 
+///   SerializedModuleLoader::loadAST, \ref ModuleFile::load).
+/// - \p loadedModuleFile is an invalid loaded module.
+/// - \p ModuleName is the name used to refer to the module in diagnostics.
+void diagnoseSerializedASTLoadFailure(
+    ASTContext &Ctx, SourceLoc diagLoc, const ValidationInfo &loadInfo,
+    const ExtendedValidationInfo &extendedInfo, StringRef moduleBufferID,
+    StringRef moduleDocBufferID, ModuleFile *loadedModuleFile,
+    Identifier ModuleName);
 
 } // end namespace serialization
 } // end namespace swift

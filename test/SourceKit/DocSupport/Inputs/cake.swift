@@ -9,6 +9,7 @@ public class C1 : Prot {
   public typealias Element = Int
   public var p : Int = 0
   public func foo() {}
+  public __consuming func foo1(i0: __owned Int, i1: __shared Int) {}
 
   public subscript(index: Int) -> Int { return 0 }
   public subscript(index i: Float) -> Int { return 0 }
@@ -97,3 +98,11 @@ public struct S3<Wrapped: P5>: P5 {
     public typealias Element = Wrapped.Element
 }
 extension S3: P6 where Wrapped: P6 {}
+
+/**
+some comments
+*/
+@available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
+public extension C1 {
+  func addition() {}
+}

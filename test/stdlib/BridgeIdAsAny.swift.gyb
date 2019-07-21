@@ -2,6 +2,7 @@
 //
 // RUN: %gyb %s -o %t/BridgeIdAsAny.swift
 // RUN: %target-build-swift -g -module-name a %t/BridgeIdAsAny.swift -o %t.out
+// RUN: %target-codesign %t.out
 // RUN: %target-run %t.out
 // REQUIRES: executable_test
 //
@@ -32,8 +33,9 @@ struct KnownUnbridged: Equatable, Hashable {
     return a.x === b.x && a.y === b.y
   }
 
-  public var hashValue: Int {
-    return x.hashValue ^ y.hashValue
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(x)
+    hasher.combine(y)
   }
 }
 

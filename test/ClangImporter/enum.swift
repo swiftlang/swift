@@ -228,5 +228,5 @@ let _: UnknownOptionsThanksToAPINotes = .first // expected-error {{has no member
 let _ = UnknownEnumThanksToAPINotesFirst
 let _ = UnknownOptionsThanksToAPINotesFirst
 
-// CHECK-IR: $S4enum12testMangling2e12e22e3ySo9EnumByTagV_So0gH7TypedefaSo0gH4BothVtF
+// CHECK-IR: $s4enum12testMangling2e12e22e3ySo9EnumByTagV_So0gH7TypedefaSo0gH4BothVtF
 func testMangling(e1: EnumByTag, e2: EnumByTypedef, e3: EnumByBoth) {}

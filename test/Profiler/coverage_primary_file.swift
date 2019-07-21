@@ -4,8 +4,8 @@
 // ALL: sil_coverage_map {{.*}} // closure #1 () -> Swift.Int in coverage_primary_file.Box.x.getter : Swift.Int
 // ALL: sil_coverage_map {{.*}} // coverage_primary_file.Box.init(y: Swift.Int) -> coverage_primary_file.Box
 // ALL: sil_coverage_map {{.*}} // coverage_primary_file.Box.init(z: Swift.String) -> coverage_primary_file.Box
+// ALL: sil_coverage_map {{.*}} // coverage_primary_file.Box.init() -> coverage_primary_file.Box
 // ALL: sil_coverage_map {{.*}} // coverage_primary_file.main() -> ()
-// ALL: sil_coverage_map {{.*}} // __ntd_Box
 
 // PRIMARY-NOT: sil_coverage_map
 // PRIMARY: sil_coverage_map {{.*}} // coverage_primary_file.Box.init(y: Swift.Int) -> coverage_primary_file.Box

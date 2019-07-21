@@ -70,7 +70,7 @@ enum ForDefinition_t : bool {
   ForDefinition = true
 };
 
-/// \brief A key for referencing a Swift declaration in SIL.
+/// A key for referencing a Swift declaration in SIL.
 ///
 /// This can currently be either a reference to a ValueDecl for functions,
 /// methods, constructors, and other named entities, or a reference to a
@@ -85,7 +85,7 @@ struct SILDeclRef {
   /// Represents the "kind" of the SILDeclRef. For some Swift decls there
   /// are multiple SIL entry points, and the kind is used to distinguish them.
   enum class Kind : unsigned {
-    /// \brief This constant references the FuncDecl or AbstractClosureExpr
+    /// This constant references the FuncDecl or AbstractClosureExpr
     /// in loc.
     Func,
 
@@ -252,13 +252,19 @@ struct SILDeclRef {
     return kind == Kind::IVarInitializer || kind == Kind::IVarDestroyer;
   }
 
-  /// \brief True if the function should be treated as transparent.
+  /// True if the SILDeclRef references an allocating or deallocating entry
+  /// point.
+  bool isInitializerOrDestroyer() const {
+    return kind == Kind::Initializer || kind == Kind::Destroyer;
+  }
+
+  /// True if the function should be treated as transparent.
   bool isTransparent() const;
-  /// \brief True if the function should have its body serialized.
+  /// True if the function should have its body serialized.
   IsSerialized_t isSerialized() const;
-  /// \brief True if the function has noinline attribute.
+  /// True if the function has noinline attribute.
   bool isNoinline() const;
-  /// \brief True if the function has __always inline attribute.
+  /// True if the function has __always inline attribute.
   bool isAlwaysInline() const;
   
   /// \return True if the function has an effects attribute.
@@ -267,10 +273,10 @@ struct SILDeclRef {
   /// \return the effects kind of the function.
   EffectsKind getEffectsAttribute() const;
 
-  /// \brief Return the expected linkage of this declaration.
+  /// Return the expected linkage of this declaration.
   SILLinkage getLinkage(ForDefinition_t forDefinition) const;
 
-  /// \brief Return the hash code for the SIL declaration.
+  /// Return the hash code for the SIL declaration.
   llvm::hash_code getHashCode() const {
     return llvm::hash_combine(loc.getOpaqueValue(),
                               static_cast<int>(kind),
@@ -334,6 +340,13 @@ struct SILDeclRef {
   /// entry.
   bool requiresNewVTableEntry() const;
 
+  /// True if the decl ref references a method which introduces a new witness
+  /// table entry.
+  bool requiresNewWitnessTableEntry() const;
+
+  /// True if the decl is a method which introduces a new witness table entry.
+  static bool requiresNewWitnessTableEntry(AbstractFunctionDecl *func);
+
   /// Return a SILDeclRef to the declaration overridden by this one, or
   /// a null SILDeclRef if there is no override.
   SILDeclRef getOverridden() const;
@@ -347,6 +360,15 @@ struct SILDeclRef {
   /// If the method does not override anything or no override is vtable
   /// dispatched, will return the least derived method.
   SILDeclRef getOverriddenVTableEntry() const;
+
+  /// Return the original protocol requirement that introduced the witness table
+  /// entry overridden by this method.
+  SILDeclRef getOverriddenWitnessTableEntry() const;
+
+  /// Return the original protocol requirement that introduced the witness table
+  /// entry overridden by this method.
+  static AbstractFunctionDecl *getOverriddenWitnessTableEntry(
+                                                    AbstractFunctionDecl *func);
 
   /// True if the referenced entity is some kind of thunk.
   bool isThunk() const;
@@ -367,6 +389,10 @@ struct SILDeclRef {
   /// this is not a method, there is no such class, or the class cannot be
   /// subclassed.
   SubclassScope getSubclassScope() const;
+
+  bool isDynamicallyReplaceable() const;
+
+  bool canBeDynamicReplacement() const;
 
 private:
   friend struct llvm::DenseMapInfo<swift::SILDeclRef>;

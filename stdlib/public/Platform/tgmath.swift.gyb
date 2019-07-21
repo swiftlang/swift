@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -14,8 +14,8 @@ import SwiftShims
 
 // Generic functions implementable directly on FloatingPoint.
 @_transparent
-public func fabs<T: FloatingPoint>(_ x: T) -> T
-  where T.Magnitude == T {
+@available(swift, deprecated: 4.2/*, obsoleted: 5.1*/, renamed: "abs")
+public func fabs<T: FloatingPoint>(_ x: T) -> T {
   return x.magnitude
 }
 
@@ -112,7 +112,7 @@ public func isnan<T: FloatingPoint>(_ value: T) -> Bool { fatalError() }
 @available(*, unavailable, message: "use the sign property.")
 public func signbit<T: FloatingPoint>(_ value: T) -> Int { fatalError() }
 
-@available(swift, deprecated: 4.2, message: "use the exponent property.")
+@available(swift, deprecated: 4.2/*, obsoleted: 5.1*/, message: "use the exponent property.")
 public func ilogb<T: BinaryFloatingPoint>(_ x: T) -> Int {
   return Int(x.exponent)
 }
@@ -155,43 +155,14 @@ UnaryFunctions = [
     'acos', 'asin', 'atan', 'tan',
     'acosh', 'asinh', 'atanh', 'cosh', 'sinh', 'tanh',
     'expm1',
-    'log1p', 'logb',
-    'cbrt', 'erf', 'erfc', 'tgamma',
+    'log1p',
+    'erf', 'erfc',
 ]
 
 # These functions have a corresponding LLVM intrinsic
-# We call this intrinsic via the Builtin method so keep this list in
-# sync with core/BuiltinMath.swift.gyb
 UnaryIntrinsicFunctions = [
-    'cos', 'sin',
-    'exp', 'exp2',
-    'log', 'log10', 'log2',
-    'nearbyint', 'rint',
+    'cos', 'sin', 'exp', 'exp2', 'log', 'log10', 'log2', 'nearbyint', 'rint'
 ]
-
-# (T, T) -> T
-BinaryFunctions = [
-    'atan2', 'hypot', 'pow',
-    'copysign', 'nextafter', 'fdim', 'fmax', 'fmin'
-]
-
-# These functions have special implementations.
-OtherFunctions = [
-    'scalbn', 'lgamma', 'remquo', 'nan', 'jn', 'yn'
-]
-
-# These functions are imported correctly as-is.
-OkayFunctions = ['j0', 'j1', 'y0', 'y1']
-
-# These functions are not supported for various reasons.
-UnhandledFunctions = [
-    'math_errhandling', 'scalbln',
-    'lrint', 'lround', 'llrint', 'llround', 'nexttoward',
-    'isgreater', 'isgreaterequal', 'isless', 'islessequal',
-    'islessgreater', 'isunordered', '__exp10',
-    '__sincos', '__cospi', '__sinpi', '__tanpi', '__sincospi'
-]
-
 
 def AllFloatTypes():
     for bits in allFloatBits:
@@ -222,64 +193,121 @@ def TypedBinaryFunctions():
 // Note these do not have a corresponding LLVM intrinsic
 % for T, CT, f, ufunc in TypedUnaryFunctions():
 %  if T == 'Float80':
-#if (arch(i386) || arch(x86_64)) && !os(Windows)
+#if (arch(i386) || arch(x86_64)) && !(os(Windows) || os(Android))
 %  end
 @_transparent
 public func ${ufunc}(_ x: ${T}) -> ${T} {
-  return ${T}(${ufunc}${f}(${CT}(x)))
+  return ${T}.${ufunc}(x)
 }
 %  if T == 'Float80':
 #endif
 %  end
 
 % end
+@_transparent
+public func cbrt(_ x: Float) -> Float {
+  return Float.root(x, 3)
+}
 
-#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+@available(swift, deprecated: 5.1, message: "Use `x.exponent` or `floor(log2(x))`.")
+@_transparent
+public func logb(_ x: Float) -> Float {
+  return Float.log2(x).rounded(.down)
+}
+
+@_transparent
+public func tgamma(_ x: Float) -> Float {
+  return Float.gamma(x)
+}
+
+#if (arch(i386) || arch(x86_64)) && !(os(Windows) || os(Android))
+@_transparent
+public func cbrt(_ x: Float80) -> Float80 {
+  return Float80.root(x, 3)
+}
+
+@available(swift, deprecated: 5.1, message: "Use `x.exponent` or `floor(log2(x))`.")
+@_transparent
+public func logb(_ x: Float80) -> Float80 {
+  return Float80.log2(x).rounded(.down)
+}
+
+@_transparent
+public func tgamma(_ x: Float80) -> Float80 {
+  return Float80.gamma(x)
+}
+#endif
+
 // Unary intrinsic functions
 // Note these have a corresponding LLVM intrinsic
 % for T, ufunc in TypedUnaryIntrinsicFunctions():
 %  if T == 'Float80':
-#if (arch(i386) || arch(x86_64)) && !os(Windows)
+#if (arch(i386) || arch(x86_64)) && !(os(Windows) || os(Android))
 %  end
+%  if ufunc[-3:] != 'int':
 @_transparent
 public func ${ufunc}(_ x: ${T}) -> ${T} {
-  return _${ufunc}(x)
+  return ${T}.${ufunc}(x)
 }
+%  else:
+@available(swift, deprecated: 5.1, message: "Swift does not model dynamic rounding modes, use x.rounded(.toNearestOrEven) instead.")
+@_transparent
+public func ${ufunc}(_ x: ${T}) -> ${T} {
+  return x.rounded(.toNearestOrEven)
+}
+%  end
 %  if T == 'Float80':
 #endif
 %  end
 
 % end
-#else
-// FIXME: As of now, we cannot declare 64-bit (Double/CDouble) overlays here.
-// Since CoreFoundation also exports libc functions, they will conflict with
-// Swift overlays when building Foundation. For now, just like normal
-// UnaryFunctions, we define overlays only for OverlayFloatTypes.
-% for ufunc in UnaryIntrinsicFunctions:
-%  for T, CT, f in OverlayFloatTypes():
-%   if T == 'Float80':
-#if (arch(i386) || arch(x86_64)) && !os(Windows)
-%   end
-@_transparent
-public func ${ufunc}(_ x: ${T}) -> ${T} {
-  return ${T}(${ufunc}${f}(${CT}(x)))
-}
-%   if T == 'Float80':
-#endif
-%   end
-%  end
-% end
-#endif
 
 // Binary functions
-
-% for T, CT, f, bfunc in TypedBinaryFunctions():
+% for T, CT, f in OverlayFloatTypes():
 %  if T == 'Float80':
-#if (arch(i386) || arch(x86_64)) && !os(Windows)
+#if (arch(i386) || arch(x86_64)) && !(os(Windows) || os(Android))
 %  end
 @_transparent
-public func ${bfunc}(_ lhs: ${T}, _ rhs: ${T}) -> ${T} {
-  return ${T}(${bfunc}${f}(${CT}(lhs), ${CT}(rhs)))
+public func atan2(_ y: ${T}, _ x: ${T}) -> ${T} {
+  return ${T}.atan2(y: y, x: x)
+}
+
+@_transparent
+public func hypot(_ x: ${T}, _ y: ${T}) -> ${T} {
+  return ${T}.hypot(x, y)
+}
+
+@_transparent
+public func pow(_ x: ${T}, _ y: ${T}) -> ${T} {
+  return ${T}.pow(x, y)
+}
+
+@_transparent
+public func copysign(_ x: ${T}, _ y: ${T}) -> ${T} {
+  return ${T}(signOf: y, magnitudeOf: x)
+}
+
+@_transparent
+public func fdim(_ x: ${T}, _ y: ${T}) -> ${T} {
+  return ${T}(fdim${f}(${CT}(x), ${CT}(y)))
+}
+
+@available(swift, deprecated: 5.1, message: "Use the .nextUp and .nextDown properties.")
+@_transparent
+public func nextafter(_ x: ${T}, _ y: ${T}) -> ${T} {
+  return y > x ? x.nextUp : (y < x ? x.nextDown : y)
+}
+
+@available(swift, deprecated: 5.1, message: "Use ${T}.minimum( ) or Swift.min( )")
+@_transparent
+public func fmin(_ x: ${T}, _ y: ${T}) -> ${T} {
+  return .minimum(x, y)
+}
+
+@available(swift, deprecated: 5.1, message: "Use ${T}.maximum( ) or Swift.max( )")
+@_transparent
+public func fmax(_ x: ${T}, _ y: ${T}) -> ${T} {
+  return .maximum(x, y)
 }
 %  if T == 'Float80':
 #endif
@@ -290,16 +318,14 @@ public func ${bfunc}(_ lhs: ${T}, _ rhs: ${T}) -> ${T} {
 % # This is AllFloatTypes not OverlayFloatTypes because of the tuple return.
 % for T, CT, f in AllFloatTypes():
 %  if T == 'Float80':
-#if (arch(i386) || arch(x86_64)) && !os(Windows)
+#if (arch(i386) || arch(x86_64)) && !(os(Windows) || os(Android))
 %  else:
-//  lgamma not avaialable on Windows, apparently?
-#if !os(Windows) && !os(Android)
+//  lgamma not available on Windows, apparently?
+#if !os(Windows)
 %  end
 @_transparent
 public func lgamma(_ x: ${T}) -> (${T}, Int) {
-  var sign = Int32(0)
-  let value = lgamma${f}_r(${CT}(x), &sign)
-  return (${T}(value), Int(sign))
+  return (${T}.logGamma(x), ${T}.signGamma(x) == .plus ? 1 : -1)
 }
 #endif
 
@@ -308,7 +334,7 @@ public func lgamma(_ x: ${T}) -> (${T}, Int) {
 % # This is AllFloatTypes not OverlayFloatTypes because of the tuple return.
 % for T, CT, f in AllFloatTypes():
 %  if T == 'Float80':
-#if (arch(i386) || arch(x86_64)) && !os(Windows)
+#if (arch(i386) || arch(x86_64)) && !(os(Windows) || os(Android))
 %  end
 @_transparent
 public func remquo(_ x: ${T}, _ y: ${T}) -> (${T}, Int) {
@@ -324,10 +350,10 @@ public func remquo(_ x: ${T}, _ y: ${T}) -> (${T}, Int) {
 
 % for T, CT, f in OverlayFloatTypes():
 %  if T == 'Float80':
-#if (arch(i386) || arch(x86_64)) && !os(Windows)
+#if (arch(i386) || arch(x86_64)) && !(os(Windows) || os(Android))
 %  end
-@available(*, deprecated: 4.2, message:
-           "use ${T}(nan: ${T}.RawSignificand) instead.")
+@available(swift, deprecated: 4.2/*, obsoleted: 5.1*/, message:
+           "use ${T}(nan: ${T}.RawSignificand).")
 @_transparent
 public func nan(_ tag: String) -> ${T} {
   return ${T}(nan${f}(tag))

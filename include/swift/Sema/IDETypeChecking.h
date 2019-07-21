@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 /// \file
-/// \brief Provides extra type-checking entry points for use during code
+/// Provides extra type-checking entry points for use during code
 /// completion, which happens *without* type-checking an entire file at once.
 //
 //===----------------------------------------------------------------------===//
@@ -19,6 +19,7 @@
 #ifndef SWIFT_SEMA_IDETYPECHECKING_H
 #define SWIFT_SEMA_IDETYPECHECKING_H
 
+#include "llvm/ADT/MapVector.h"
 #include "swift/Basic/SourceLoc.h"
 #include <memory>
 
@@ -26,24 +27,25 @@ namespace swift {
   class AbstractFunctionDecl;
   class Decl;
   class Expr;
-  class LazyResolver;
   class ExtensionDecl;
   class ProtocolDecl;
   class Type;
+  class TypeChecker;
   class DeclContext;
   class ConcreteDeclRef;
   class ValueDecl;
   class DeclName;
 
-  /// \brief Typecheck a declaration parsed during code completion.
-  ///
-  /// \returns true on success, false on error.
-  bool typeCheckCompletionDecl(Decl *D);
+  /// Typecheck a declaration parsed during code completion.
+  void typeCheckCompletionDecl(Decl *D);
 
-  /// \brief Check if T1 is convertible to T2.
+  /// Typecheck binding initializer at \p bindingIndex.
+  void typeCheckPatternBinding(PatternBindingDecl *PBD, unsigned bindingIndex);
+
+  /// Check if T1 is convertible to T2.
   ///
   /// \returns true on convertible, false on not.
-  bool isConvertibleTo(Type T1, Type T2, DeclContext &DC);
+  bool isConvertibleTo(Type T1, Type T2, bool openArchetypes, DeclContext &DC);
 
   bool isEqual(Type T1, Type T2, DeclContext &DC);
 
@@ -54,12 +56,6 @@ namespace swift {
   void collectDefaultImplementationForProtocolMembers(ProtocolDecl *PD,
                         llvm::SmallDenseMap<ValueDecl*, ValueDecl*> &DefaultMap);
 
-  /// \brief Given an unresolved member E and its parent P, this function tries
-  /// to infer the type of E.
-  /// \returns true on success, false on error.
-  bool typeCheckUnresolvedExpr(DeclContext &DC, Expr* E,
-                               Expr *P, SmallVectorImpl<Type> &PossibleTypes);
-
   enum InterestedMemberKind : uint8_t {
     Viable,
     Unviable,
@@ -68,10 +64,16 @@ namespace swift {
 
   struct ResolvedMemberResult {
     struct Implementation;
-    Implementation &Impl;
+    Implementation *Impl;
 
     ResolvedMemberResult();
     ~ResolvedMemberResult();
+    ResolvedMemberResult(const ResolvedMemberResult &) = delete;
+    ResolvedMemberResult & operator=(ResolvedMemberResult &) = delete;
+    ResolvedMemberResult(ResolvedMemberResult &&other) {
+      Impl = other.Impl;
+      other.Impl = nullptr;
+    }
     operator bool() const;
     bool hasBestOverload() const;
     ValueDecl* getBestOverload() const;
@@ -81,13 +83,19 @@ namespace swift {
   ResolvedMemberResult resolveValueMember(DeclContext &DC, Type BaseTy,
                                          DeclName Name);
 
-  /// \brief Given a type and an extension to the original type decl of that type,
+  /// Given a type and an extension to the original type decl of that type,
   /// decide if the extension has been applied, i.e. if the requirements of the
   /// extension have been fulfilled.
   /// \returns True on applied, false on not applied.
-  bool isExtensionApplied(DeclContext &DC, Type Ty, const ExtensionDecl *ED);
+  bool isExtensionApplied(const DeclContext *DC, Type Ty,
+                          const ExtensionDecl *ED);
 
-/// The kind of type checking to perform for code completion.
+  /// Given a type and an member value decl , decide if the decl is applied,
+  /// i.e. if the \c where requirements of the decl have been fulfilled.
+  /// \returns True on applied, false on not applied.
+  bool isMemberDeclApplied(const DeclContext *DC, Type Ty, const ValueDecl *VD);
+
+  /// The kind of type checking to perform for code completion.
   enum class CompletionTypeCheckKind {
     /// Type check the expression as normal.
     Normal,
@@ -96,7 +104,7 @@ namespace swift {
     KeyPath,
   };
 
-  /// \brief Return the type of an expression parsed during code completion, or
+  /// Return the type of an expression parsed during code completion, or
   /// None on error.
   Optional<Type> getTypeOfCompletionContextExpr(
                    ASTContext &Ctx,
@@ -105,19 +113,16 @@ namespace swift {
                    Expr *&parsedExpr,
                    ConcreteDeclRef &referencedDecl);
 
-  /// Typecheck the sequence expression \p parsedExpr for code completion.
+  /// Resolve type of operator function with \c opName appending it to \c LHS.
   ///
-  /// This requires that \p parsedExpr is a SequenceExpr and that it contains:
-  ///   * ... leading sequence  LHS
-  ///   * UnresolvedDeclRefExpr operator
-  ///   * CodeCompletionExpr    RHS
-  ///
-  /// On success, returns false, and replaces parsedExpr with the binary
-  /// expression corresponding to the operator.  The type of the operator and
-  /// RHS are also set, but the rest of the expression may not be typed
-  ///
-  /// The LHS should already be type-checked or this will be very slow.
-  bool typeCheckCompletionSequence(DeclContext *DC, Expr *&parsedExpr);
+  /// For \p refKind, use \c DeclRefKind::PostfixOperator for postfix operator,
+  /// or \c DeclRefKind::BinaryOperator for infix operator.
+  /// On success, returns resolved function type of the operator. The LHS should
+  /// already be type-checked. This function guarantees LHS not to be modified.
+  FunctionType *getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
+                                            Identifier opName,
+                                            DeclRefKind refKind,
+                                            ConcreteDeclRef &referencedDecl);
 
   /// Typecheck the given expression.
   bool typeCheckExpression(DeclContext *DC, Expr *&parsedExpr);
@@ -126,16 +131,16 @@ namespace swift {
   bool typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
                                           SourceLoc EndTypeCheckLoc);
 
-  /// \brief Typecheck top-level code parsed during code completion.
+  /// Typecheck top-level code parsed during code completion.
   ///
   /// \returns true on success, false on error.
   bool typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD);
 
-  /// A unique_ptr for LazyResolver that can perform additional cleanup.
-  using OwnedResolver = std::unique_ptr<LazyResolver, void(*)(LazyResolver*)>;
-
-  /// Creates a lazy type resolver for use in lookups.
-  OwnedResolver createLazyResolver(ASTContext &Ctx);
+  /// Creates a type checker instance on the given AST context, if it
+  /// doesn't already have one.
+  ///
+  /// \returns a reference to the type checker instance.
+  TypeChecker &createTypeChecker(ASTContext &Ctx);
 
   struct ExtensionInfo {
     // The extension with the declarations to apply.
@@ -171,6 +176,88 @@ namespace swift {
     bool shouldPrintRequirement(ExtensionDecl *ED, StringRef Req);
     bool hasMergeGroup(MergeGroupKind Kind);
   };
+
+  /// Reported type for an expression. This expression is represented by offset
+  /// length in the source buffer;
+  struct ExpressionTypeInfo {
+
+    /// The start of the expression;
+    uint32_t offset;
+
+    /// The length of the expression;
+    uint32_t length;
+
+    /// The start of the printed type in a separately given string buffer.
+    uint32_t typeOffset;
+
+    /// The length of the printed type
+    uint32_t typeLength;
+
+    /// The offsets and lengths of all protocols the type conforms to
+    std::vector<std::pair<uint32_t, uint32_t>> protocols;
+  };
+
+  /// Collect type information for every expression in \c SF; all types will
+  /// be printed to \c OS.
+  ArrayRef<ExpressionTypeInfo> collectExpressionType(SourceFile &SF,
+    ArrayRef<const char *> ExpectedProtocols,
+    std::vector<ExpressionTypeInfo> &scratch,
+    bool CanonicalType,
+    llvm::raw_ostream &OS);
+
+  /// Resolve a list of mangled names to accessible protocol decls from
+  /// the decl context.
+  bool resolveProtocolNames(DeclContext *DC, ArrayRef<const char *> names,
+                            llvm::MapVector<ProtocolDecl*, StringRef> &result);
+
+  /// FIXME: All of the below goes away once CallExpr directly stores its
+  /// arguments.
+
+  /// Return value for getOriginalArgumentList().
+  struct OriginalArgumentList {
+    SmallVector<Expr *, 4> args;
+    SmallVector<Identifier, 4> labels;
+    SmallVector<SourceLoc, 4> labelLocs;
+    SourceLoc lParenLoc;
+    SourceLoc rParenLoc;
+    bool hasTrailingClosure = false;
+  };
+
+  /// When applying a solution to a constraint system, the type checker rewrites
+  /// argument lists of calls to insert default arguments and collect varargs.
+  /// Sometimes for diagnostics we want to work on the original argument list as
+  /// written by the user; this performs the reverse transformation.
+  OriginalArgumentList getOriginalArgumentList(Expr *expr);
+
+  /// Return true if the specified type or a super-class/super-protocol has the
+  /// @dynamicMemberLookup attribute on it.
+  bool hasDynamicMemberLookupAttribute(Type type);
+
+  /// Returns the root type and result type of the keypath type in a keypath
+  /// dynamic member lookup subscript, or \c None if it cannot be determined.
+  ///
+  /// \param subscript The potential keypath dynamic member lookup subscript.
+  /// \param DC The DeclContext from which the subscript is being referenced.
+  Optional<std::pair<Type, Type>>
+  getRootAndResultTypeOfKeypathDynamicMember(SubscriptDecl *subscript,
+                                             const DeclContext *DC);
+  /// Collect all the protocol requirements that a given declaration can
+  ///   provide default implementations for. VD is a declaration in extension
+  ///   declaration. Scratch is the buffer to collect those protocol
+  ///   requirements.
+  ///
+  /// \returns the slice of Scratch
+  ArrayRef<ValueDecl*>
+  canDeclProvideDefaultImplementationFor(ValueDecl* VD);
+
+  /// Get decls that the given decl overrides, protocol requirements that
+  ///   it serves as a default implementation of, and optionally protocol
+  ///   requirements it satisfies in a conforming class
+  ArrayRef<ValueDecl*>
+  collectAllOverriddenDecls(ValueDecl *VD,
+                            bool IncludeProtocolRequirements = true,
+                            bool Transitive = false);
+
 }
 
 #endif

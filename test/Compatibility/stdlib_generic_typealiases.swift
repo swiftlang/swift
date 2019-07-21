@@ -2,8 +2,7 @@
 
 struct RequiresStrideable<T: Strideable> { }
 
-extension CountableRange { // expected-warning{{'CountableRange' is deprecated: renamed to 'Range'}}
-  // expected-note@-1{{use 'Range' instead}}{{11-25=Range}}
+extension CountableRange {
   func testStrideable() {
     _ = RequiresStrideable<Bound>()
   }
@@ -24,7 +23,5 @@ extension DictionaryIndex {
 }
 
 extension CountableRange where Element == Int {
-  // expected-warning@-1{{'CountableRange' is deprecated: renamed to 'Range'}}
-  // expected-note@-2{{use 'Range' instead}}
   func getLowerBoundAsInt() -> Int { return lowerBound }
 }

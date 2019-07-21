@@ -21,14 +21,22 @@ func testSomeClass(_ sc: SomeClass, osc: SomeClass?) {
   if sc.methodD() == nil { } // expected-warning {{comparing non-optional value of type 'Any' to 'nil' always returns false}}
 
   sc.methodE(sc)
-  sc.methodE(osc) // expected-error{{value of optional type 'SomeClass?' not unwrapped; did you mean to use '!' or '?'?}} {{17-17=!}}
+  sc.methodE(osc) // expected-error{{value of optional type 'SomeClass?' must be unwrapped}}
+  // expected-note@-1{{coalesce}}
+  // expected-note@-2{{force-unwrap}}
 
   sc.methodF(sc, second: sc)
-  sc.methodF(osc, second: sc) // expected-error{{value of optional type 'SomeClass?' not unwrapped; did you mean to use '!' or '?'?}} {{17-17=!}}
-  sc.methodF(sc, second: osc) // expected-error{{value of optional type 'SomeClass?' not unwrapped; did you mean to use '!' or '?'?}} {{29-29=!}}
+  sc.methodF(osc, second: sc) // expected-error{{value of optional type 'SomeClass?' must be unwrapped}}
+  // expected-note@-1{{coalesce}}
+  // expected-note@-2{{force-unwrap}}
+  sc.methodF(sc, second: osc) // expected-error{{value of optional type 'SomeClass?' must be unwrapped}}
+  // expected-note@-1{{coalesce}}
+  // expected-note@-2{{force-unwrap}}
 
   sc.methodG(sc, second: sc)
-  sc.methodG(osc, second: sc) // expected-error{{value of optional type 'SomeClass?' not unwrapped; did you mean to use '!' or '?'?}} {{17-17=!}}
+  sc.methodG(osc, second: sc) // expected-error{{value of optional type 'SomeClass?' must be unwrapped}}
+  // expected-note@-1{{coalesce}}
+  // expected-note@-2{{force-unwrap}}
   sc.methodG(sc, second: osc) 
 
   let ci: CInt = 1
@@ -39,7 +47,9 @@ func testSomeClass(_ sc: SomeClass, osc: SomeClass?) {
 
   let sc3 = SomeClass(double: 1.5)
   if sc3 == nil { } // okay
-  let sc3a: SomeClass = sc3 // expected-error{{value of optional type 'SomeClass?' not unwrapped}} {{28-28=!}}
+  let sc3a: SomeClass = sc3 // expected-error{{value of optional type 'SomeClass?' must be unwrapped}}
+  // expected-note@-1{{coalesce}}
+  // expected-note@-2{{force-unwrap}}
   _ = sc3a
 
   let sc4 = sc.returnMe()

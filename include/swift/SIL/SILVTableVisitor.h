@@ -86,35 +86,48 @@ template <class T> class SILVTableVisitor {
   void maybeAddMethod(FuncDecl *fd) {
     assert(!fd->hasClangNode());
 
-    SILDeclRef constant(fd, SILDeclRef::Kind::Func);
-    maybeAddEntry(constant, constant.requiresNewVTableEntry());
+    maybeAddEntry(SILDeclRef(fd, SILDeclRef::Kind::Func));
   }
 
   void maybeAddConstructor(ConstructorDecl *cd) {
     assert(!cd->hasClangNode());
 
-    // Required constructors (or overrides thereof) have their allocating entry
-    // point in the vtable.
-    if (cd->isRequired()) {
-      SILDeclRef constant(cd, SILDeclRef::Kind::Allocator);
-      maybeAddEntry(constant, constant.requiresNewVTableEntry());
-    }
-
-    // All constructors have their initializing constructor in the
-    // vtable, which can be used by a convenience initializer.
-    SILDeclRef constant(cd, SILDeclRef::Kind::Initializer);
-    maybeAddEntry(constant, constant.requiresNewVTableEntry());
+    // The allocating entry point is what is used for dynamic dispatch.
+    // The initializing entry point for designated initializers is only
+    // necessary for super.init chaining, which is sufficiently constrained
+    // to never need dynamic dispatch.
+    maybeAddEntry(SILDeclRef(cd, SILDeclRef::Kind::Allocator));
   }
 
-  void maybeAddEntry(SILDeclRef declRef, bool needsNewEntry) {
+  void maybeAddEntry(SILDeclRef declRef) {
     // Introduce a new entry if required.
-    if (needsNewEntry)
+    if (declRef.requiresNewVTableEntry())
       asDerived().addMethod(declRef);
 
     // Update any existing entries that it overrides.
     auto nextRef = declRef;
     while ((nextRef = nextRef.getNextOverriddenVTableEntry())) {
       auto baseRef = nextRef.getOverriddenVTableEntry();
+
+      // If A.f() is overridden by B.f() which is overridden by
+      // C.f(), it's possible that C.f() is not visible from C.
+      // In this case, we pretend that B.f() is the least derived
+      // method with a vtable entry in the override chain.
+      //
+      // This works because we detect the possibility of this
+      // happening when we emit B.f() and do two things:
+      // - B.f() always gets a new vtable entry, even if it is
+      //   ABI compatible with A.f()
+      // - The vtable thunk for the override of A.f() in B does a
+      //   vtable dispatch to the implementation of B.f() for the
+      //   concrete subclass, so a subclass of B only needs to
+      //   replace the vtable entry for B.f(); a call to A.f()
+      //   will correctly dispatch to the implementation of B.f()
+      //   in the subclass.
+      if (!baseRef.getDecl()->isAccessibleFrom(
+            declRef.getDecl()->getDeclContext()))
+        break;
+
       asDerived().addMethodOverride(baseRef, declRef);
       nextRef = baseRef;
     }

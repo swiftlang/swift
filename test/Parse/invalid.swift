@@ -1,20 +1,20 @@
 // RUN: %target-typecheck-verify-swift
 
 // rdar://15946844
-func test1(inout var x : Int) {}  // expected-error {{parameter must not have multiple '__owned', 'inout', '__shared', 'var', or 'let' specifiers}} {{18-22=}}
+func test1(inout var x : Int) {}  // expected-warning {{'var' in this position is interpreted as an argument label}} {{18-21=`var`}}
 // expected-error @-1 {{'inout' before a parameter name is not allowed, place it before the parameter type instead}} {{12-17=}} {{26-26=inout }}
-func test2(inout let x : Int) {}  // expected-error {{parameter must not have multiple '__owned', 'inout', '__shared', 'var', or 'let' specifiers}} {{18-22=}}
+func test2(inout let x : Int) {}  // expected-warning {{'let' in this position is interpreted as an argument label}} {{18-21=`let`}}
 // expected-error @-1 {{'inout' before a parameter name is not allowed, place it before the parameter type instead}} {{12-17=}} {{26-26=inout }}
 func test3(f : (inout _ x : Int) -> Void) {} // expected-error {{'inout' before a parameter name is not allowed, place it before the parameter type instead}}
 
-func test1s(__shared var x : Int) {}  // expected-error {{parameter must not have multiple '__owned', 'inout', '__shared', 'var', or 'let' specifiers}} {{22-26=}}
+func test1s(__shared var x : Int) {}  // expected-warning {{'var' in this position is interpreted as an argument label}} {{22-25=`var`}}
 // expected-error @-1 {{'__shared' before a parameter name is not allowed, place it before the parameter type instead}} {{13-21=}} {{30-30=__shared }}
-func test2s(__shared let x : Int) {}  // expected-error {{parameter must not have multiple '__owned', 'inout', '__shared', 'var', or 'let' specifiers}} {{22-26=}}
+func test2s(__shared let x : Int) {}  // expected-warning {{'let' in this position is interpreted as an argument label}} {{22-25=`let`}}
 // expected-error @-1 {{'__shared' before a parameter name is not allowed, place it before the parameter type instead}} {{13-21=}} {{30-30=__shared }}
 
-func test1o(__owned var x : Int) {}  // expected-error {{parameter must not have multiple '__owned', 'inout', '__shared', 'var', or 'let' specifiers}} {{21-25=}}
+func test1o(__owned var x : Int) {}  // expected-warning {{'var' in this position is interpreted as an argument label}} {{21-24=`var`}}
 // expected-error @-1 {{'__owned' before a parameter name is not allowed, place it before the parameter type instead}} {{13-20=}}
-func test2o(__owned let x : Int) {}  // expected-error {{parameter must not have multiple '__owned', 'inout', '__shared', 'var', or 'let' specifiers}} {{21-25=}}
+func test2o(__owned let x : Int) {}  // expected-warning {{'let' in this position is interpreted as an argument label}} {{21-24=`let`}}
 // expected-error @-1 {{'__owned' before a parameter name is not allowed, place it before the parameter type instead}} {{13-20=}}
 
 func test3() {
@@ -58,7 +58,7 @@ func testNotCoveredCase(x: Int) {
 // rdar://18926814
 func test4() {
   let abc = 123
-  _ = " >> \( abc } ) << " // expected-error {{expected ',' separator}} {{18-18=,}}  expected-error {{expected expression in list of expressions}}  expected-error {{extra tokens after interpolated string expression}}
+  _ = " >> \( abc } ) << " // expected-error {{expected ',' separator}} {{18-18=,}}  expected-error {{expected expression in list of expressions}}
 
 }
 
@@ -84,27 +84,15 @@ func SR698(_ a: Int, b: Int) {}
 SR698(1, b: 2,) // expected-error {{unexpected ',' separator}}
 
 // SR-979 - Two inout crash compiler
-func SR979a(a : inout inout Int) {}  // expected-error {{parameter must not have multiple '__owned', 'inout', '__shared', 'var', or 'let' specifiers}} {{17-23=}}
+func SR979a(a : inout inout Int) {}  // expected-error {{parameter must not have multiple '__owned', 'inout', or '__shared' specifiers}} {{17-23=}}
 func SR979b(inout inout b: Int) {} // expected-error {{inout' before a parameter name is not allowed, place it before the parameter type instead}} {{13-18=}} {{28-28=inout }} 
-// expected-error@-1 {{parameter must not have multiple '__owned', 'inout', '__shared', 'var', or 'let' specifiers}} {{19-25=}}
-func SR979c(let a: inout Int) {} // expected-error {{'let' as a parameter attribute is not allowed}} {{13-16=}}
-func SR979d(let let a: Int) {}  // expected-error {{'let' as a parameter attribute is not allowed}} {{13-16=}} 
-// expected-error @-1 {{parameter must not have multiple '__owned', 'inout', '__shared', 'var', or 'let' specifiers}} {{17-21=}}
-func SR979e(inout x: inout String) {} // expected-error {{parameter must not have multiple '__owned', 'inout', '__shared', 'var', or 'let' specifiers}} {{13-18=}}
-func SR979f(var inout x : Int) { // expected-error {{parameter must not have multiple '__owned', 'inout', '__shared', 'var', or 'let' specifiers}} {{17-23=}}
-// expected-error @-1 {{'var' as a parameter attribute is not allowed}}
-  x += 10     // expected-error {{left side of mutating operator isn't mutable: 'x' is a 'let' constant}}
-}
-func SR979g(inout i: inout Int) {} // expected-error {{parameter must not have multiple '__owned', 'inout', '__shared', 'var', or 'let' specifiers}} {{13-18=}}
-func SR979h(let inout x : Int) {}  // expected-error {{parameter must not have multiple '__owned', 'inout', '__shared', 'var', or 'let' specifiers}} {{17-23=}}
-// expected-error @-1 {{'let' as a parameter attribute is not allowed}}
-class VarTester {
-  init(var a: Int, var b: Int) {} // expected-error {{'var' as a parameter attribute is not allowed}}
-  // expected-error @-1 {{'var' as a parameter attribute is not allowed}}
-  func x(var b: Int) { //expected-error {{'var' as a parameter attribute is not allowed}}
-    b += 10 // expected-error {{left side of mutating operator isn't mutable: 'b' is a 'let' constant}}
-  }
-}
+// expected-error@-1 {{parameter must not have multiple '__owned', 'inout', or '__shared' specifiers}} {{19-25=}}
+func SR979d(let let a: Int) {} // expected-warning {{'let' in this position is interpreted as an argument label}} {{13-16=`let`}}
+// expected-error @-1 {{expected ',' separator}} {{20-20=,}} 
+// expected-error @-2 {{parameter requires an explicit type}}
+// expected-warning @-3 {{extraneous duplicate parameter name; 'let' already has an argument label}} {{13-17=}}
+func SR979e(inout x: inout String) {} // expected-error {{parameter must not have multiple '__owned', 'inout', or '__shared' specifiers}} {{13-18=}}
+func SR979g(inout i: inout Int) {} // expected-error {{parameter must not have multiple '__owned', 'inout', or '__shared' specifiers}} {{13-18=}}
 
 func repeat() {}
 // expected-error @-1 {{keyword 'repeat' cannot be used as an identifier here}}
@@ -140,7 +128,20 @@ struct Weak<T: class> { // expected-error {{'class' constraint can only appear o
 }
 
 let x: () = ()
-!() // expected-error {{missing argument for parameter #1 in call}}
+!() // expected-error {{cannot convert value of type '()' to expected argument type 'Bool'}}
 !(()) // expected-error {{cannot convert value of type '()' to expected argument type 'Bool'}}
 !(x) // expected-error {{cannot convert value of type '()' to expected argument type 'Bool'}}
 !x // expected-error {{cannot convert value of type '()' to expected argument type 'Bool'}}
+
+func sr8202_foo(@NSApplicationMain x: Int) {} // expected-error {{@NSApplicationMain may only be used on 'class' declarations}}
+func sr8202_bar(@available(iOS, deprecated: 0) x: Int) {} // expected-error {{'@availability' attribute cannot be applied to this declaration}}
+func sr8202_baz(@discardableResult x: Int) {} // expected-error {{'@discardableResult' attribute cannot be applied to this declaration}}
+func sr8202_qux(@objcMembers x: String) {} // expected-error {{@objcMembers may only be used on 'class' declarations}}
+func sr8202_quux(@weak x: String) {} // expected-error {{'weak' is a declaration modifier, not an attribute}} expected-error {{'weak' may only be used on 'var' declarations}}
+
+class sr8202_cls<@NSApplicationMain T: AnyObject> {} // expected-error {{@NSApplicationMain may only be used on 'class' declarations}}
+func sr8202_func<@discardableResult T>(x: T) {} // expected-error {{'@discardableResult' attribute cannot be applied to this declaration}}
+enum sr8202_enum<@indirect T> {} // expected-error {{'indirect' is a declaration modifier, not an attribute}} expected-error {{'indirect' modifier cannot be applied to this declaration}}
+protocol P {
+  @available(swift, introduced: 4.2) associatedtype Assoc // expected-error {{'@availability' attribute cannot be applied to this declaration}}
+}

@@ -15,12 +15,12 @@ var CollectionTests = TestSuite("Collection")
 
 // Test collections using value types as elements.
 CollectionTests.addBidirectionalCollectionTests(
-  makeCollection: { (elements: [OpaqueValue<Int>]) -> LazyMapCollection<MinimalBidirectionalCollection<OpaqueValue<Int>>, OpaqueValue<Int>> in
+  makeCollection: { (elements: [OpaqueValue<Int>]) -> LazyMapBidirectionalCollection<MinimalBidirectionalCollection<OpaqueValue<Int>>, OpaqueValue<Int>> in
     MinimalBidirectionalCollection(elements: elements).lazy.map(identity)
   },
   wrapValue: identity,
   extractValue: identity,
-  makeCollectionOfEquatable: { (elements: [MinimalEquatableValue]) -> LazyMapCollection<MinimalBidirectionalCollection<MinimalEquatableValue>, MinimalEquatableValue> in
+  makeCollectionOfEquatable: { (elements: [MinimalEquatableValue]) -> LazyMapBidirectionalCollection<MinimalBidirectionalCollection<MinimalEquatableValue>, MinimalEquatableValue> in
     MinimalBidirectionalCollection(elements: elements).lazy.map(identityEq)
   },
   wrapValueIntoEquatable: identityEq,
@@ -29,7 +29,7 @@ CollectionTests.addBidirectionalCollectionTests(
 
 // Test collections using reference types as elements.
 CollectionTests.addBidirectionalCollectionTests(
-  makeCollection: { (elements: [LifetimeTracked]) -> LazyMapCollection<MinimalBidirectionalCollection<LifetimeTracked>, LifetimeTracked> in
+  makeCollection: { (elements: [LifetimeTracked]) -> LazyMapBidirectionalCollection<MinimalBidirectionalCollection<LifetimeTracked>, LifetimeTracked> in
     MinimalBidirectionalCollection(elements: elements).lazy.map { $0 }
   },
   wrapValue: { (element: OpaqueValue<Int>) in
@@ -38,7 +38,7 @@ CollectionTests.addBidirectionalCollectionTests(
   extractValue: { (element: LifetimeTracked) in
     OpaqueValue(element.value, identity: element.identity)
   },
-  makeCollectionOfEquatable: { (elements: [LifetimeTracked]) -> LazyMapCollection<MinimalBidirectionalCollection<LifetimeTracked>, LifetimeTracked> in
+  makeCollectionOfEquatable: { (elements: [LifetimeTracked]) -> LazyMapBidirectionalCollection<MinimalBidirectionalCollection<LifetimeTracked>, LifetimeTracked> in
     MinimalBidirectionalCollection(elements: elements).lazy.map { $0 }
   },
   wrapValueIntoEquatable: { (element: MinimalEquatableValue) in

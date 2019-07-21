@@ -81,6 +81,7 @@ public:
   }
 
   void addRelativeAddress(llvm::Constant *target) {
+    assert(!isa<llvm::ConstantPointerNull>(target));
     addRelativeOffset(IGM().RelativeAddressTy, target);
   }
 

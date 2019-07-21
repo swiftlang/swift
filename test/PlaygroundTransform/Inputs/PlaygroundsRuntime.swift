@@ -12,50 +12,63 @@ struct SourceRange {
   }
 }
 
+struct ModuleFileIdentifier {
+  let moduleId : Int
+  let fileId : Int
+  var text : String {
+    return "[\(moduleId):\(fileId)]"
+  }
+}
+
 class LogRecord {
   let text : String
 
-  init(api : String, object : Any, name : String, id : Int, range : SourceRange) {
+  init(api : String, object : Any, name : String, id : Int, range : SourceRange, moduleFileId : ModuleFileIdentifier) {
     var object_description : String = ""
     print(object, terminator: "", to: &object_description)
-    text = range.text + " " + api + "[" + name + "='" + object_description + "']"
+    text = moduleFileId.text + " " + range.text + " " + api + "[" + name + "='" + object_description + "']"
   }
-  init(api : String, object : Any, name : String, range : SourceRange) {
+  init(api : String, object : Any, name : String, range : SourceRange, moduleFileId : ModuleFileIdentifier) {
     var object_description : String = ""
     print(object, terminator: "", to: &object_description)
-    text = range.text + " " + api + "[" + name + "='" + object_description + "']"
+    text = moduleFileId.text + " " + range.text + " " + api + "[" + name + "='" + object_description + "']"
   }
-  init(api : String, object: Any, range : SourceRange) {
+  init(api : String, object: Any, range : SourceRange, moduleFileId : ModuleFileIdentifier) {
     var object_description : String = ""
     print(object, terminator: "", to: &object_description)
-    text = range.text + " " + api + "['" + object_description + "']"
+    text = moduleFileId.text + " " + range.text + " " + api + "['" + object_description + "']"
   }
-  init(api: String, range : SourceRange) {
-    text = range.text + " " + api
+  init(api: String, range : SourceRange, moduleFileId : ModuleFileIdentifier) {
+    text = moduleFileId.text + " " + range.text + " " + api
   }
 }
 
-func $builtin_log<T>(_ object : T, _ name : String, _ sl : Int, _ el : Int, _ sc : Int, _ ec: Int) -> AnyObject? {
-  return LogRecord(api:"$builtin_log", object:object, name:name, range : SourceRange(sl:sl, el:el, sc:sc, ec:ec))
+public func __builtin_log<T>(_ object : T, _ name : String, _ sl : Int, _ el : Int, _ sc : Int, _ ec: Int, _ moduleId : Int, _ fileId : Int) -> AnyObject? {
+  let moduleFileId = ModuleFileIdentifier(moduleId:moduleId, fileId:fileId)
+  return LogRecord(api:"__builtin_log", object:object, name:name, range:SourceRange(sl:sl, el:el, sc:sc, ec:ec), moduleFileId:moduleFileId)
 }
 
-func $builtin_log_with_id<T>(_ object : T, _ name : String, _ id : Int, _ sl : Int, _ el : Int, _ sc : Int, _ ec: Int) -> AnyObject? {
-  return LogRecord(api:"$builtin_log", object:object, name:name, id:id, range : SourceRange(sl:sl, el:el, sc:sc, ec:ec))
+public func __builtin_log_with_id<T>(_ object : T, _ name : String, _ id : Int, _ sl : Int, _ el : Int, _ sc : Int, _ ec: Int, _ moduleId : Int, _ fileId : Int) -> AnyObject? {
+  let moduleFileId = ModuleFileIdentifier(moduleId:moduleId, fileId:fileId)
+  return LogRecord(api:"__builtin_log", object:object, name:name, id:id, range:SourceRange(sl:sl, el:el, sc:sc, ec:ec), moduleFileId:moduleFileId)
 }
 
-func $builtin_log_scope_entry(_ sl : Int, _ el : Int, _ sc : Int, _ ec: Int) -> AnyObject? {
-  return LogRecord(api:"$builtin_log_scope_entry", range : SourceRange(sl:sl, el:el, sc:sc, ec:ec))
+public func __builtin_log_scope_entry(_ sl : Int, _ el : Int, _ sc : Int, _ ec: Int, _ moduleId : Int, _ fileId : Int) -> AnyObject? {
+  let moduleFileId = ModuleFileIdentifier(moduleId:moduleId, fileId:fileId)
+  return LogRecord(api:"__builtin_log_scope_entry", range:SourceRange(sl:sl, el:el, sc:sc, ec:ec), moduleFileId:moduleFileId)
 }
 
-func $builtin_log_scope_exit(_ sl : Int, _ el : Int, _ sc : Int, _ ec: Int) -> AnyObject? {
-  return LogRecord(api:"$builtin_log_scope_exit", range : SourceRange(sl:sl, el:el, sc:sc, ec:ec))
+public func __builtin_log_scope_exit(_ sl : Int, _ el : Int, _ sc : Int, _ ec: Int, _ moduleId : Int, _ fileId : Int) -> AnyObject? {
+  let moduleFileId = ModuleFileIdentifier(moduleId:moduleId, fileId:fileId)
+  return LogRecord(api:"__builtin_log_scope_exit", range:SourceRange(sl:sl, el:el, sc:sc, ec:ec), moduleFileId:moduleFileId)
 }
 
-func $builtin_postPrint(_ sl : Int, _ el : Int, _ sc : Int, _ ec: Int) -> AnyObject? {
-  return LogRecord(api:"$builtin_postPrint", range : SourceRange(sl:sl, el:el, sc:sc, ec:ec))
+public func __builtin_postPrint(_ sl : Int, _ el : Int, _ sc : Int, _ ec: Int, _ moduleId : Int, _ fileId : Int) -> AnyObject? {
+  let moduleFileId = ModuleFileIdentifier(moduleId:moduleId, fileId:fileId)
+  return LogRecord(api:"__builtin_postPrint", range:SourceRange(sl:sl, el:el, sc:sc, ec:ec), moduleFileId:moduleFileId)
 }
 
-func $builtin_send_data(_ object:AnyObject?) {
+public func __builtin_send_data(_ object:AnyObject?) {
   print((object as! LogRecord).text)
 }
 

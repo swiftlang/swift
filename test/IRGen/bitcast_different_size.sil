@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir %s -verify | %FileCheck %s
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir -O %s -verify | %FileCheck %s --check-prefix=OPT
+// RUN: %target-swift-frontend -emit-ir %s -verify | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir -O %s -verify | %FileCheck %s --check-prefix=OPT
 
 // REQUIRES: CPU=i386 || CPU=x86_64
 

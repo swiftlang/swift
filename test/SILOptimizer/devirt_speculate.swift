@@ -1,6 +1,6 @@
-// RUN: %target-swift-frontend %s -parse-as-library -O -emit-sil -save-optimization-record-path %t.opt.yaml | %FileCheck %s
+// RUN: %target-swift-frontend %/s -parse-as-library -O -emit-sil -save-optimization-record-path %t.opt.yaml | %FileCheck %s
 // RUN: %FileCheck -check-prefix=YAML -input-file=%t.opt.yaml %s
-// RUN: %target-swift-frontend %s -parse-as-library -Osize -emit-sil | %FileCheck %s --check-prefix=OSIZE
+// RUN: %target-swift-frontend %/s -parse-as-library -Osize -emit-sil | %FileCheck %s --check-prefix=OSIZE
 //
 // Test speculative devirtualization.
 
@@ -31,7 +31,7 @@ class Sub6 : Base {
 class Sub7 : Base {
   override func foo() {}
 }
-// CHECK: @$S16devirt_speculate28testMaxNumSpeculativeTargetsyyAA4BaseCF
+// CHECK: @$s16devirt_speculate28testMaxNumSpeculativeTargetsyyAA4BaseCF
 // CHECK: checked_cast_br [exact] %0 : $Base to $Base
 // CHECK: checked_cast_br [exact] %0 : $Base to $Sub1
 // CHECK: checked_cast_br [exact] %0 : $Base to $Sub2
@@ -54,12 +54,12 @@ class Sub7 : Base {
 // YAML-NEXT:   - String:          'Partially devirtualized call with run-time checks for '
 // YAML-NEXT:   - NumSubTypesChecked: '6'
 // YAML-NEXT:   - String:          ' subclasses of '
-// YAML-NEXT:   - ClassType:       '$Base'
+// YAML-NEXT:   - ClassType:       Base
 // YAML-NEXT:   - String:          ', number of subclasses not devirtualized: '
 // YAML-NEXT:   - NotHandledSubsNum: '1'
 // YAML-NEXT: ...
 
-// OSIZE: @$S16devirt_speculate28testMaxNumSpeculativeTargetsyyAA4BaseCF
+// OSIZE: @$s16devirt_speculate28testMaxNumSpeculativeTargetsyyAA4BaseCF
 // OSIZE-NOT: checked_cast_br [exact] %0 : $Base to $Base
 // OSIZE-NOT: checked_cast_br [exact] %0 : $Base to $Sub
 public func testMaxNumSpeculativeTargets(_ b: Base) {

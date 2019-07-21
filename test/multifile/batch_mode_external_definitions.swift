@@ -19,8 +19,8 @@
 //
 // CHECK-FIELD1-ONLY: sil_stage canonical
 // CHECK-FIELD1-ONLY: use_extern_struct_field_1
-// CHECK-FIELD1-ONLY: sil shared{{.*}}extern_struct$field$getter
-// CHECK-FIELD1-ONLY-NOT: sil shared{{.*}}extern_struct$field$getter
+// CHECK-FIELD1-ONLY: sil shared{{.*}}@$So13extern_structV$field$getter
+// CHECK-FIELD1-ONLY-NOT: sil shared{{.*}}@$So13extern_structV$field$getter
 // CHECK-FIELD1-ONLY: sil_stage canonical
 // CHECK-FIELD1-ONLY-NOT: use_extern_struct_field_2
 // CHECK-FIELD1-ONLY-NOT: sil shared{{.*}}extern_struct$field$getter
@@ -30,33 +30,33 @@
 // CHECK-FIELD1-ONLY-REORDER-NOT: sil shared{{.*}}extern_struct$field$getter
 // CHECK-FIELD1-ONLY-REORDER: sil_stage canonical
 // CHECK-FIELD1-ONLY-REORDER: use_extern_struct_field_1
-// CHECK-FIELD1-ONLY-REORDER: sil shared{{.*}}extern_struct$field$getter
-// CHECK-FIELD1-ONLY-REORDER-NOT: sil shared{{.*}}extern_struct$field$getter
+// CHECK-FIELD1-ONLY-REORDER: sil shared{{.*}}@$So13extern_structV$field$getter
+// CHECK-FIELD1-ONLY-REORDER-NOT: sil shared{{.*}}@$So13extern_structV$field$getter
 //
 // CHECK-FIELD2-ONLY: sil_stage canonical
 // CHECK-FIELD2-ONLY-NOT: use_extern_struct_field_1
 // CHECK-FIELD2-ONLY-NOT: sil shared{{.*}}extern_struct$field$getter
 // CHECK-FIELD2-ONLY: sil_stage canonical
 // CHECK-FIELD2-ONLY: use_extern_struct_field_2
-// CHECK-FIELD2-ONLY: sil shared{{.*}}extern_struct$field$getter
-// CHECK-FIELD2-ONLY-NOT: sil shared{{.*}}extern_struct$field$getter
+// CHECK-FIELD2-ONLY: sil shared{{.*}}@$So13extern_structV$field$getter
+// CHECK-FIELD2-ONLY-NOT: sil shared{{.*}}@$So13extern_structV$field$getter
 //
 // CHECK-FIELD2-ONLY-REORDER: sil_stage canonical
 // CHECK-FIELD2-ONLY-REORDER: use_extern_struct_field_2
-// CHECK-FIELD2-ONLY-REORDER: sil shared{{.*}}extern_struct$field$getter
-// CHECK-FIELD2-ONLY-REORDER-NOT: sil shared{{.*}}extern_struct$field$getter
+// CHECK-FIELD2-ONLY-REORDER: sil shared{{.*}}@$So13extern_structV$field$getter
+// CHECK-FIELD2-ONLY-REORDER-NOT: sil shared{{.*}}@$So13extern_structV$field$getter
 // CHECK-FIELD2-ONLY-REORDER: sil_stage canonical
 // CHECK-FIELD2-ONLY-REORDER-NOT: use_extern_struct_field_1
 // CHECK-FIELD2-ONLY-REORDER-NOT: sil shared{{.*}}extern_struct$field$getter
 //
 // CHECK-BOTH-FIELDS: sil_stage canonical
 // CHECK-BOTH-FIELDS: use_extern_struct_field_1
-// CHECK-BOTH-FIELDS: sil shared{{.*}}extern_struct$field$getter
-// CHECK-BOTH-FIELDS-NOT: sil shared{{.*}}extern_struct$field$getter
+// CHECK-BOTH-FIELDS: sil shared{{.*}}@$So13extern_structV$field$getter
+// CHECK-BOTH-FIELDS-NOT: sil shared{{.*}}@$So13extern_structV$field$getter
 // CHECK-BOTH-FIELDS: sil_stage canonical
 // CHECK-BOTH-FIELDS: use_extern_struct_field_2
-// CHECK-BOTH-FIELDS: sil shared{{.*}}extern_struct$field$getter
-// CHECK-BOTH-FIELDS-NOT: sil shared{{.*}}extern_struct$field$getter
+// CHECK-BOTH-FIELDS: sil shared{{.*}}@$So13extern_structV$field$getter
+// CHECK-BOTH-FIELDS-NOT: sil shared{{.*}}@$So13extern_structV$field$getter
 //
 // CHECK-NEITHER-FIELD: sil_stage canonical
 // CHECK-NEITHER-FIELD-NOT: use_extern_struct_field_1
@@ -85,68 +85,68 @@
 //
 // CHECK-RAWREP1-ONLY: sil_stage canonical
 // CHECK-RAWREP1-ONLY: take_rawrep_1
-// CHECK-RAWREP1-ONLY: sil shared{{.*}}SSo8ext_enumVs16RawRepresentableSCsACP8rawValue0cF0QzvgTW
-// CHECK-RAWREP1-ONLY-NOT: sil shared{{.*}}SSo8ext_enumVs16RawRepresentableSCsACP8rawValue0cF0QzvgTW
+// CHECK-RAWREP1-ONLY: sil shared{{.*}}sSo8ext_enumVSYSCSY8rawValuexSg03RawD0Qz_tcfCTW
+// CHECK-RAWREP1-ONLY-NOT: sil shared{{.*}}sSo8ext_enumVSYSCsACP8rawValue0cF0QzvgTW
 // CHECK-RAWREP1-ONLY: sil_witness_table{{.*}}ext_enum: RawRepresentable
 // CHECK-RAWREP1-ONLY-NOT: sil_witness_table{{.*}}ext_enum: RawRepresentable
 // CHECK-RAWREP1-ONLY: sil_stage canonical
 // CHECK-RAWREP1-ONLY-NOT: take_rawrep_1
-// CHECK-RAWREP1-ONLY-NOT: sil shared{{.*}}SSo8ext_enumVs16RawRepresentableSCsACP8rawValue0cF0QzvgTW
+// CHECK-RAWREP1-ONLY-NOT: sil shared{{.*}}sSo8ext_enumVSYSCsACP8rawValue0cF0QzvgTW
 // CHECK-RAWREP1-ONLY-NOT: sil_witness_table{{.*}}ext_enum: RawRepresentable
 //
 // CHECK-RAWREP2-ONLY: sil_stage canonical
 // CHECK-RAWREP2-ONLY-NOT: take_rawrep_2
-// CHECK-RAWREP2-ONLY-NOT: sil shared{{.*}}SSo8ext_enumVs16RawRepresentableSCsACP8rawValue0cF0QzvgTW
+// CHECK-RAWREP2-ONLY-NOT: sil shared{{.*}}sSo8ext_enumVSYSCsACP8rawValue0cF0QzvgTW
 // CHECK-RAWREP2-ONLY-NOT: sil_witness_table{{.*}}ext_enum: RawRepresentable
 // CHECK-RAWREP2-ONLY: sil_stage canonical
 // CHECK-RAWREP2-ONLY: take_rawrep_2
-// CHECK-RAWREP2-ONLY: sil shared{{.*}}SSo8ext_enumVs16RawRepresentableSCsACP8rawValue0cF0QzvgTW
-// CHECK-RAWREP2-ONLY-NOT: sil shared{{.*}}SSo8ext_enumVs16RawRepresentableSCsACP8rawValue0cF0QzvgTW
+// CHECK-RAWREP2-ONLY: sil shared{{.*}}sSo8ext_enumVSYSCSY8rawValuexSg03RawD0Qz_tcfCTW
+// CHECK-RAWREP2-ONLY-NOT: sil shared{{.*}}sSo8ext_enumVSYSCsACP8rawValue0cF0QzvgTW
 // CHECK-RAWREP2-ONLY: sil_witness_table{{.*}}ext_enum: RawRepresentable
 // CHECK-RAWREP2-ONLY-NOT: sil_witness_table{{.*}}ext_enum: RawRepresentable
 //
 // CHECK-RAWREP1-ONLY-REORDER: sil_stage canonical
 // CHECK-RAWREP1-ONLY-REORDER-NOT: take_rawrep_1
-// CHECK-RAWREP1-ONLY-REORDER-NOT: sil shared{{.*}}SSo8ext_enumVs16RawRepresentableSCsACP8rawValue0cF0QzvgTW
+// CHECK-RAWREP1-ONLY-REORDER-NOT: sil shared{{.*}}sSo8ext_enumVSYSCsACP8rawValue0cF0QzvgTW
 // CHECK-RAWREP1-ONLY-REORDER-NOT: sil_witness_table{{.*}}ext_enum: RawRepresentable
 // CHECK-RAWREP1-ONLY-REORDER: sil_stage canonical
 // CHECK-RAWREP1-ONLY-REORDER: take_rawrep_1
-// CHECK-RAWREP1-ONLY-REORDER: sil shared{{.*}}SSo8ext_enumVs16RawRepresentableSCsACP8rawValue0cF0QzvgTW
-// CHECK-RAWREP1-ONLY-REORDER-NOT: sil shared{{.*}}SSo8ext_enumVs16RawRepresentableSCsACP8rawValue0cF0QzvgTW
+// CHECK-RAWREP1-ONLY-REORDER: sil shared{{.*}}sSo8ext_enumVSYSCSY8rawValuexSg03RawD0Qz_tcfCTW
+// CHECK-RAWREP1-ONLY-REORDER-NOT: sil shared{{.*}}sSo8ext_enumVSYSCsACP8rawValue0cF0QzvgTW
 // CHECK-RAWREP1-ONLY-REORDER: sil_witness_table{{.*}}ext_enum: RawRepresentable
 // CHECK-RAWREP1-ONLY-REORDER-NOT: sil_witness_table{{.*}}ext_enum: RawRepresentable
 //
 // CHECK-RAWREP2-ONLY-REORDER: sil_stage canonical
 // CHECK-RAWREP2-ONLY-REORDER: take_rawrep_2
-// CHECK-RAWREP2-ONLY-REORDER: sil shared{{.*}}SSo8ext_enumVs16RawRepresentableSCsACP8rawValue0cF0QzvgTW
-// CHECK-RAWREP2-ONLY-REORDER-NOT: sil shared{{.*}}SSo8ext_enumVs16RawRepresentableSCsACP8rawValue0cF0QzvgTW
+// CHECK-RAWREP2-ONLY-REORDER: sil shared{{.*}}sSo8ext_enumVSYSCSY8rawValuexSg03RawD0Qz_tcfCTW
+// CHECK-RAWREP2-ONLY-REORDER-NOT: sil shared{{.*}}sSo8ext_enumVSYSCsACP8rawValue0cF0QzvgTW
 // CHECK-RAWREP2-ONLY-REORDER: sil_witness_table{{.*}}ext_enum: RawRepresentable
 // CHECK-RAWREP2-ONLY-REORDER-NOT: sil_witness_table{{.*}}ext_enum: RawRepresentable
 // CHECK-RAWREP2-ONLY-REORDER: sil_stage canonical
 // CHECK-RAWREP2-ONLY-REORDER-NOT: take_rawrep_2
-// CHECK-RAWREP2-ONLY-REORDER-NOT: sil shared{{.*}}SSo8ext_enumVs16RawRepresentableSCsACP8rawValue0cF0QzvgTW
+// CHECK-RAWREP2-ONLY-REORDER-NOT: sil shared{{.*}}sSo8ext_enumVSYSCsACP8rawValue0cF0QzvgTW
 // CHECK-RAWREP2-ONLY-REORDER-NOT: sil_witness_table{{.*}}ext_enum: RawRepresentable
 //
 // CHECK-BOTH-RAWREPS: sil_stage canonical
 // CHECK-BOTH-RAWREPS: take_rawrep_1
-// CHECK-BOTH-RAWREPS: sil shared{{.*}}SSo8ext_enumVs16RawRepresentableSCsACP8rawValue0cF0QzvgTW
-// CHECK-BOTH-RAWREPS-NOT: sil shared{{.*}}SSo8ext_enumVs16RawRepresentableSCsACP8rawValue0cF0QzvgTW
+// CHECK-BOTH-RAWREPS: sil shared{{.*}}sSo8ext_enumVSYSCSY8rawValuexSg03RawD0Qz_tcfCTW
+// CHECK-BOTH-RAWREPS-NOT: sil shared{{.*}}sSo8ext_enumVSYSCsACP8rawValue0cF0QzvgTW
 // CHECK-BOTH-RAWREPS: sil_witness_table{{.*}}ext_enum: RawRepresentable
 // CHECK-BOTH-RAWREPS-NOT: sil_witness_table{{.*}}ext_enum: RawRepresentable
 // CHECK-BOTH-RAWREPS: sil_stage canonical
 // CHECK-BOTH-RAWREPS: take_rawrep_2
-// CHECK-BOTH-RAWREPS: sil shared{{.*}}SSo8ext_enumVs16RawRepresentableSCsACP8rawValue0cF0QzvgTW
-// CHECK-BOTH-RAWREPS-NOT: sil shared{{.*}}SSo8ext_enumVs16RawRepresentableSCsACP8rawValue0cF0QzvgTW
+// CHECK-BOTH-RAWREPS: sil shared{{.*}}sSo8ext_enumVSYSCSY8rawValuexSg03RawD0Qz_tcfCTW
+// CHECK-BOTH-RAWREPS-NOT: sil shared{{.*}}sSo8ext_enumVSYSCSY8rawValuexSg03RawD0Qz_tcfCTW
 // CHECK-BOTH-RAWREPS: sil_witness_table{{.*}}ext_enum: RawRepresentable
 // CHECK-BOTH-RAWREPS-NOT: sil_witness_table{{.*}}ext_enum: RawRepresentable
 //
 // CHECK-NEITHER-RAWREP: sil_stage canonical
 // CHECK-NEITHER-RAWREP-NOT: take_rawrep_1
-// CHECK-NEITHER-RAWREP-NOT: sil shared{{.*}}SSo8ext_enumVs16RawRepresentableSCsACP8rawValue0cF0QzvgTW
+// CHECK-NEITHER-RAWREP-NOT: sil shared{{.*}}sSo8ext_enumVSYSCsACP8rawValue0cF0QzvgTW
 // CHECK-NEITHER-RAWREP-NOT: sil_witness_table{{.*}}ext_enum: RawRepresentable
 // CHECK-NEITHER-RAWREP: sil_stage canonical
 // CHECK-NEITHER-RAWREP-NOT: take_rawrep_2
-// CHECK-NEITHER-RAWREP-NOT: sil shared{{.*}}SSo8ext_enumVs16RawRepresentableSCsACP8rawValue0cF0QzvgTW
+// CHECK-NEITHER-RAWREP-NOT: sil shared{{.*}}sSo8ext_enumVSYSCsACP8rawValue0cF0QzvgTW
 // CHECK-NEITHER-RAWREP-NOT: sil_witness_table{{.*}}ext_enum: RawRepresentable
 
 

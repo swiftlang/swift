@@ -34,13 +34,12 @@ func completeInKeyPath2() {
   _ = #keyPath(ObjCClass.#^IN_KEYPATH_2^#
 }
 
-// CHECK-AFTER_POUND: Keyword/ExprSpecific:               keyPath({#@objc property sequence#}); name=keyPath(@objc property sequence)
+// CHECK-AFTER_POUND-NOT: keyPath
 
-// CHECK-KEYPATH_ARG: Keyword/None:                       #keyPath({#@objc property sequence#}); name=#keyPath(@objc property sequence)
+// CHECK-KEYPATH_ARG: Keyword/None/TypeRelation[Identical]: #keyPath({#@objc property sequence#})[#String#]; name=#keyPath(@objc property sequence)
 
 // CHECK-IN_KEYPATH: Decl[InstanceVar]/CurrNominal:      prop1[#String#]; name=prop1
 // CHECK-IN_KEYPATH: Decl[InstanceVar]/CurrNominal:      prop2[#ObjCClass?#]; name=prop2
 // CHECK-IN_KEYPATH: Decl[InstanceVar]/Super:            hashValue[#Int#]; name=hashValue
-// CHECK-IN_KEYPATH: Decl[InstanceVar]/Super:            hash[#Int#]; name=hash
 
 

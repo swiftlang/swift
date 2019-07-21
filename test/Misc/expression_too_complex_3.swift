@@ -1,8 +1,6 @@
 // RUN: %target-typecheck-verify-swift
 // REQUIRES OS=macosx
 
-// REQUIRES: rdar32796272
-
 // This should NOT produce an expression too complex error.
 var radar32680856 = [
   Int32(bitPattern: 0x00), Int32(bitPattern: 0x01), Int32(bitPattern: 0x02), Int32(bitPattern: 0x03), Int32(bitPattern: 0x04), Int32(bitPattern: 0x05), Int32(bitPattern: 0x06), Int32(bitPattern: 0x07), Int32(bitPattern: 0x08), Int32(bitPattern: 0x09), Int32(bitPattern: 0x0A), Int32(bitPattern: 0x0B), Int32(bitPattern: 0x0C), Int32(bitPattern: 0x0D), Int32(bitPattern: 0x0E), Int32(bitPattern: 0x0F),

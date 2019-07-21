@@ -25,8 +25,10 @@ class CMakeOptions(object):
     """List like object used to define cmake options
     """
 
-    def __init__(self):
+    def __init__(self, initial_options=None):
         self._options = []
+        if initial_options is not None:
+            self.extend(initial_options)
 
     def define(self, var, value):
         """Utility to define cmake options in this object.
@@ -34,13 +36,21 @@ class CMakeOptions(object):
         opts.define("FOO", "BAR")       # -> -DFOO=BAR
         opts.define("FLAG:BOOL", True)  # -> -FLAG:BOOL=TRUE
         """
-        if var.endswith(':BOOL'):
+        if var.endswith(':BOOL') or isinstance(value, bool):
             value = self.true_false(value)
         if value is None:
             value = ""
         elif not isinstance(value, (str, Number)):
-            raise ValueError('define: invalid value: %s' % value)
+            raise ValueError('define: invalid value for key %s: %s (%s)' %
+                             (var, value, type(value)))
         self._options.append('-D%s=%s' % (var, value))
+
+    def extend(self, tuples_or_options):
+        if isinstance(tuples_or_options, CMakeOptions):
+            self += tuples_or_options
+        else:
+            for (variable, value) in tuples_or_options:
+                self.define(variable, value)
 
     @staticmethod
     def true_false(value):
@@ -57,6 +67,9 @@ class CMakeOptions(object):
 
     def __iter__(self):
         return self._options.__iter__()
+
+    def __contains__(self, item):
+        return self._options.__contains__(item)
 
     def __add__(self, other):
         ret = CMakeOptions()
@@ -104,14 +117,17 @@ class CMake(object):
             define("CMAKE_EXPORT_COMPILE_COMMANDS", "ON")
 
         if args.distcc:
-            define("CMAKE_C_COMPILER:PATH", toolchain.distcc)
-            define("CMAKE_C_COMPILER_ARG1", toolchain.cc)
-            define("CMAKE_CXX_COMPILER:PATH", toolchain.distcc)
-            define("CMAKE_CXX_COMPILER_ARG1", toolchain.cxx)
-        else:
-            define("CMAKE_C_COMPILER:PATH", toolchain.cc)
-            define("CMAKE_CXX_COMPILER:PATH", toolchain.cxx)
-            define("CMAKE_LIBTOOL:PATH", toolchain.libtool)
+            define("CMAKE_C_COMPILER_LAUNCHER:PATH", toolchain.distcc)
+            define("CMAKE_CXX_COMPILER_LAUNCHER:PATH", toolchain.distcc)
+
+        if args.cmake_c_launcher:
+            define("CMAKE_C_COMPILER_LAUNCHER:PATH", args.cmake_c_launcher)
+        if args.cmake_cxx_launcher:
+            define("CMAKE_CXX_COMPILER_LAUNCHER:PATH", args.cmake_cxx_launcher)
+
+        define("CMAKE_C_COMPILER:PATH", toolchain.cc)
+        define("CMAKE_CXX_COMPILER:PATH", toolchain.cxx)
+        define("CMAKE_LIBTOOL:PATH", toolchain.libtool)
 
         if args.cmake_generator == 'Xcode':
             define("CMAKE_CONFIGURATION_TYPES",

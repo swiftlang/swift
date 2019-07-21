@@ -8,7 +8,7 @@
 
 // RUN: cat %s > %t/combined.m
 // RUN: cat %S/Inputs/cross_language.m >> %t/combined.m
-// RUN: c-index-test core -print-source-symbols -- %t/combined.m -I %t -isysroot %S/../Inputs/clang-importer-sdk >> %t.idx.out
+// RUN: c-index-test core -print-source-symbols -- %t/combined.m -F %clang-importer-sdk-path/frameworks -I %t -isysroot %S/../Inputs/clang-importer-sdk >> %t.idx.out
 // RUN: %FileCheck %t/combined.m -input-file %t.idx.out
 
 #if SWIFT_CODE

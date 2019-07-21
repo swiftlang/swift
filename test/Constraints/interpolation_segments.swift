@@ -1,45 +1,21 @@
 // RUN: %target-typecheck-verify-swift -typecheck -debug-constraints %s > %t.dump 2>&1 
 // RUN: %FileCheck %s < %t.dump
 
-// Make sure that the interpolation segments get placed into separate connected
-// components.
-// CHECK: ---Connected components---
-// CHECK-NEXT:  0: 
-// CHECK-NEXT:  1: 
-// CHECK-NEXT:  2: 
-// CHECK-NEXT:  3: 
-// CHECK-NEXT:  4: 
-// CHECK-NEXT:  5: 
-// CHECK-NEXT:  6: 
-// CHECK-NEXT:  7: 
-// CHECK-NEXT:  8: 
-// CHECK-NEXT:  9:
+// Make sure that the type checker doesn't initially try to solve the appendLiteral and 
+// appendInterpolation calls. Specifically, we check that the string literal
+// has been assigned a type variable, but the calls inside the body have not.
 
-// CHECK: (solving component #
-// CHECK: literal=3 bindings={(subtypes of) (default from ExpressibleByStringLiteral) String})
+// CHECK: ---Initial constraints for the given expression---
+// CHECK: (interpolated_string_literal_expr type='$T
+// CHECK-NOT: (call_expr implicit type='$T
+// CHECK: ---Solution---
 
-// CHECK: (solving component #
-// CHECK: literal=3 bindings={(subtypes of) (default from ExpressibleByIntegerLiteral) Int})
+// We also check that the type checker did not need to evaluate any 
+// DefaultStringInterpolation overloads in the initial expression.
 
-// CHECK: (solving component #
-// CHECK: literal=3 bindings={(subtypes of) (default from ExpressibleByStringLiteral) String})
-
-// CHECK: (solving component #
-// CHECK: literal=3 bindings={(subtypes of) (default from ExpressibleByIntegerLiteral) Int})
-
-// CHECK: (solving component #
-// CHECK: literal=3 bindings={(subtypes of) (default from ExpressibleByStringLiteral) String})
-
-// CHECK: (solving component #
-// CHECK: literal=3 bindings={(subtypes of) (default from ExpressibleByIntegerLiteral) Int})
-
-// CHECK: (solving component #
-// CHECK: literal=3 bindings={(subtypes of) (default from ExpressibleByStringLiteral) String})
-
-// CHECK: (solving component #
-// CHECK: literal=3 bindings={(subtypes of) (default from ExpressibleByIntegerLiteral) Int})
-
-// CHECK: (solving component #
-// CHECK: literal=3 bindings={(subtypes of) (default from ExpressibleByStringLiteral) String})
+// CHECK-NOT: ---Solution---
+// CHECK: Overload choices:
+// CHECK-NOT: Swift.(file).DefaultStringInterpolation.append
+// CHECK: Constraint restrictions:
 
 _ = "\(1), \(2), \(3), \(4)"

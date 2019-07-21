@@ -1,4 +1,6 @@
 
+/* Generic Signature Changes */
+
 /* RawRepresentable Changes */
 APINotesTest(APINotesTest.h): TypeAlias AnimalAttributeName(NSString) is now String representable
 
@@ -7,6 +9,7 @@ APINotesTest(APINotesTest.h): TypeAlias AnimalAttributeName(NSString) is now Str
 /* Moved Decls */
 
 /* Renamed Decls */
+APINotesTest(APINotesTest.h): Var globalAttributeName has been renamed to Var AnimalAttributeName.globalAttributeName
 
 /* Type Changes */
 APINotesTest(APINotesTest.h): Func AnimalStatusDescriptor.addingAttributes(_:) has parameter 0 type change from [String : Any] to [AnimalAttributeName : Any]

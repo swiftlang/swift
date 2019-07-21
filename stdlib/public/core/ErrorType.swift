@@ -127,7 +127,6 @@ public protocol Error {
 #if _runtime(_ObjC)
 extension Error {
   /// Default implementation: there is no embedded NSError.
-  @inlinable // FIXME(sil-serialize-all)
   public func _getEmbeddedNSError() -> AnyObject? { return nil }
 }
 #endif
@@ -136,33 +135,32 @@ extension Error {
 // Helper functions for the C++ runtime to have easy access to embedded error,
 // domain, code, and userInfo as Objective-C values.
 @_silgen_name("")
-internal func _getErrorDomainNSString<T : Error>(_ x: UnsafePointer<T>)
+internal func _getErrorDomainNSString<T: Error>(_ x: UnsafePointer<T>)
 -> AnyObject {
   return x.pointee._domain._bridgeToObjectiveCImpl()
 }
 
 @_silgen_name("")
-internal func _getErrorCode<T : Error>(_ x: UnsafePointer<T>) -> Int {
+internal func _getErrorCode<T: Error>(_ x: UnsafePointer<T>) -> Int {
   return x.pointee._code
 }
 
 @_silgen_name("")
-internal func _getErrorUserInfoNSDictionary<T : Error>(_ x: UnsafePointer<T>)
+internal func _getErrorUserInfoNSDictionary<T: Error>(_ x: UnsafePointer<T>)
 -> AnyObject? {
   return x.pointee._userInfo.map { $0 as AnyObject }
 }
 
 // Called by the casting machinery to extract an NSError from an Error value.
 @_silgen_name("")
-internal func _getErrorEmbeddedNSErrorIndirect<T : Error>(
+internal func _getErrorEmbeddedNSErrorIndirect<T: Error>(
     _ x: UnsafePointer<T>) -> AnyObject? {
   return x.pointee._getEmbeddedNSError()
 }
 
 /// Called by compiler-generated code to extract an NSError from an Error value.
-@inlinable // FIXME(sil-serialize-all)
 public // COMPILER_INTRINSIC
-func _getErrorEmbeddedNSError<T : Error>(_ x: T)
+func _getErrorEmbeddedNSError<T: Error>(_ x: T)
 -> AnyObject? {
   return x._getEmbeddedNSError()
 }
@@ -179,14 +177,24 @@ public func _bridgeErrorToNSError(_ error: __owned Error) -> AnyObject
 
 /// Invoked by the compiler when the subexpression of a `try!` expression
 /// throws an error.
-@inlinable // FIXME(sil-serialize-all)
 @_silgen_name("swift_unexpectedError")
-public func _unexpectedError(_ error: Error) {
-  preconditionFailure("'try!' expression unexpectedly raised an error: \(String(reflecting: error))")
+public func _unexpectedError(
+  _ error: __owned Error,
+  filenameStart: Builtin.RawPointer,
+  filenameLength: Builtin.Word,
+  filenameIsASCII: Builtin.Int1,
+  line: Builtin.Word
+) {
+  preconditionFailure(
+    "'try!' expression unexpectedly raised an error: \(String(reflecting: error))",
+    file: StaticString(
+      _start: filenameStart,
+      utf8CodeUnitCount: filenameLength,
+      isASCII: filenameIsASCII),
+    line: UInt(line))
 }
 
 /// Invoked by the compiler when code at top level throws an uncaught error.
-@inlinable // FIXME(sil-serialize-all)
 @_silgen_name("swift_errorInMain")
 public func _errorInMain(_ error: Error) {
   fatalError("Error raised at top level: \(String(reflecting: error))")
@@ -195,15 +203,13 @@ public func _errorInMain(_ error: Error) {
 /// Runtime function to determine the default code for an Error-conforming type.
 /// Called by the Foundation overlay.
 @_silgen_name("_swift_stdlib_getDefaultErrorCode")
-public func _getDefaultErrorCode<T : Error>(_ error: T) -> Int
+public func _getDefaultErrorCode<T: Error>(_ error: T) -> Int
 
 extension Error {
-  @inlinable // FIXME(sil-serialize-all)
   public var _code: Int {
     return _getDefaultErrorCode(self)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   public var _domain: String {
     return String(reflecting: type(of: self))
   }
@@ -217,18 +223,14 @@ extension Error {
   }
 }
 
-extension Error where Self: RawRepresentable, Self.RawValue: SignedInteger {
+extension Error where Self: RawRepresentable, Self.RawValue: FixedWidthInteger {
   // The error code of Error with integral raw values is the raw value.
-  @inlinable // FIXME(sil-serialize-all)
   public var _code: Int {
-    return numericCast(self.rawValue)
-  }
-}
+    if Self.RawValue.isSigned {
+      return numericCast(self.rawValue)
+    }
 
-extension Error where Self: RawRepresentable, Self.RawValue: UnsignedInteger {
-  // The error code of Error with integral raw values is the raw value.
-  @inlinable // FIXME(sil-serialize-all)
-  public var _code: Int {
-    return numericCast(self.rawValue)
+    let uintValue: UInt = numericCast(self.rawValue)
+    return Int(bitPattern: uintValue)
   }
 }

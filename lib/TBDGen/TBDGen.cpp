@@ -16,6 +16,7 @@
 
 #include "swift/TBDGen/TBDGen.h"
 
+#include "swift/AST/Availability.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Module.h"
@@ -24,34 +25,38 @@
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/SILDeclRef.h"
-#include "swift/SIL/SILWitnessTable.h"
+#include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILVTableVisitor.h"
+#include "swift/SIL/SILWitnessTable.h"
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/StringSet.h"
+#include "llvm/Support/Error.h"
+#include "llvm/Support/YAMLTraits.h"
 
 #include "TBDGenVisitor.h"
+#include "tapi/Architecture.h"
+#include "tapi/InterfaceFile.h"
+#include "tapi/Platform.h"
+#include "tapi/TextStub_v3.h"
+#include "tapi/YAMLReaderWriter.h"
 
 using namespace swift;
 using namespace swift::irgen;
 using namespace swift::tbdgen;
 using StringSet = llvm::StringSet<>;
+using SymbolKind = tapi::internal::SymbolKind;
 
 static bool isGlobalOrStaticVar(VarDecl *VD) {
   return VD->isStatic() || VD->getDeclContext()->isModuleScopeContext();
 }
 
-void TBDGenVisitor::visitPatternBindingDecl(PatternBindingDecl *PBD) {
-  for (auto &entry : PBD->getPatternList()) {
-    auto *var = entry.getAnchoringVarDecl();
+void TBDGenVisitor::addSymbol(StringRef name, SymbolKind kind) {
+  Symbols.addSymbol(kind, name, Archs);
 
-    // Non-global variables might have an explicit initializer symbol.
-    if (entry.getInit() && !isGlobalOrStaticVar(var)) {
-      auto declRef =
-          SILDeclRef(var, SILDeclRef::Kind::StoredPropertyInitializer);
-      // Stored property initializers for public properties are currently
-      // public.
-      addSymbol(declRef);
-    }
+  if (StringSymbols && kind == SymbolKind::GlobalSymbol) {
+    auto isNewValue = StringSymbols->insert(name).second;
+    (void)isNewValue;
+    assert(isNewValue && "symbol appears twice");
   }
 }
 
@@ -63,95 +68,250 @@ void TBDGenVisitor::addSymbol(SILDeclRef declRef) {
     addSymbol(declRef.mangle());
 }
 
+void TBDGenVisitor::addSymbol(LinkEntity entity) {
+  auto linkage =
+      LinkInfo::get(UniversalLinkInfo, SwiftModule, AvailCtx,
+                    entity, ForDefinition);
+
+  auto externallyVisible =
+      llvm::GlobalValue::isExternalLinkage(linkage.getLinkage()) &&
+      linkage.getVisibility() != llvm::GlobalValue::HiddenVisibility;
+
+  if (externallyVisible)
+    addSymbol(linkage.getName());
+}
+
 void TBDGenVisitor::addDispatchThunk(SILDeclRef declRef) {
   auto entity = LinkEntity::forDispatchThunk(declRef);
   addSymbol(entity);
 }
 
+void TBDGenVisitor::addMethodDescriptor(SILDeclRef declRef) {
+  auto entity = LinkEntity::forMethodDescriptor(declRef);
+  addSymbol(entity);
+}
+
+void TBDGenVisitor::addProtocolRequirementsBaseDescriptor(ProtocolDecl *proto) {
+  auto entity = LinkEntity::forProtocolRequirementsBaseDescriptor(proto);
+  addSymbol(entity);
+}
+
+void TBDGenVisitor::addAssociatedTypeDescriptor(AssociatedTypeDecl *assocType) {
+  auto entity = LinkEntity::forAssociatedTypeDescriptor(assocType);
+  addSymbol(entity);
+}
+
+void TBDGenVisitor::addAssociatedConformanceDescriptor(
+                                           AssociatedConformance conformance) {
+  auto entity = LinkEntity::forAssociatedConformanceDescriptor(conformance);
+  addSymbol(entity);
+}
+
+void TBDGenVisitor::addBaseConformanceDescriptor(
+                                           BaseConformance conformance) {
+  auto entity = LinkEntity::forBaseConformanceDescriptor(conformance);
+  addSymbol(entity);
+}
+
 void TBDGenVisitor::addConformances(DeclContext *DC) {
-  for (auto conformance : DC->getLocalConformances()) {
+  for (auto conformance : DC->getLocalConformances(
+                            ConformanceLookupKind::NonInherited)) {
     auto protocol = conformance->getProtocol();
     auto needsWTable =
         Lowering::TypeConverter::protocolRequiresWitnessTable(protocol);
     if (!needsWTable)
       continue;
 
-    // Only normal conformances get symbols; the others get any public symbols
-    // from their parent normal conformance.
-    auto normalConformance = dyn_cast<NormalProtocolConformance>(conformance);
-    if (!normalConformance)
+    // Only root conformances get symbols; the others get any public symbols
+    // from their parent conformances.
+    auto rootConformance = dyn_cast<RootProtocolConformance>(conformance);
+    if (!rootConformance) {
       continue;
+    }
 
-    addSymbol(LinkEntity::forDirectProtocolWitnessTable(normalConformance));
-    addSymbol(
-        LinkEntity::forProtocolWitnessTableAccessFunction(normalConformance));
-    addSymbol(LinkEntity::forProtocolConformanceDescriptor(normalConformance));
+    addSymbol(LinkEntity::forProtocolWitnessTable(rootConformance));
+    addSymbol(LinkEntity::forProtocolConformanceDescriptor(rootConformance));
 
     // FIXME: the logic around visibility in extensions is confusing, and
     // sometimes witness thunks need to be manually made public.
 
     auto conformanceIsFixed = SILWitnessTable::conformanceIsSerialized(
-        normalConformance);
-    auto addSymbolIfNecessary = [&](SILDeclRef declRef) {
-      auto witnessLinkage = declRef.getLinkage(ForDefinition);
+        rootConformance);
+    auto addSymbolIfNecessary = [&](ValueDecl *requirementDecl,
+                                    ValueDecl *witnessDecl) {
+      auto witnessLinkage = SILDeclRef(witnessDecl).getLinkage(ForDefinition);
       if (conformanceIsFixed &&
-          fixmeWitnessHasLinkageThatNeedsToBePublic(witnessLinkage)) {
+          (isa<SelfProtocolConformance>(rootConformance) ||
+           fixmeWitnessHasLinkageThatNeedsToBePublic(witnessLinkage))) {
         Mangle::ASTMangler Mangler;
-        addSymbol(Mangler.mangleWitnessThunk(normalConformance,
-                                             declRef.getDecl()));
+        addSymbol(
+            Mangler.mangleWitnessThunk(rootConformance, requirementDecl));
       }
     };
-    normalConformance->forEachValueWitness(nullptr, [&](ValueDecl *valueReq,
-                                                        Witness witness) {
-      if (isa<AbstractFunctionDecl>(valueReq)) {
-        addSymbolIfNecessary(SILDeclRef(valueReq));
-      } else if (auto *storage = dyn_cast<AbstractStorageDecl>(valueReq)) {
-        if (auto *getter = storage->getGetter())
-          addSymbolIfNecessary(SILDeclRef(getter));
-        if (auto *setter = storage->getGetter())
-          addSymbolIfNecessary(SILDeclRef(setter));
-        if (auto *materializeForSet = storage->getMaterializeForSetFunc())
-          addSymbolIfNecessary(SILDeclRef(materializeForSet));
-      }
-    });
+
+    rootConformance->forEachValueWitness(
+        [&](ValueDecl *valueReq, Witness witness) {
+          auto witnessDecl = witness.getDecl();
+          if (isa<AbstractFunctionDecl>(valueReq)) {
+            addSymbolIfNecessary(valueReq, witnessDecl);
+          } else if (auto *storage = dyn_cast<AbstractStorageDecl>(valueReq)) {
+            auto witnessStorage = cast<AbstractStorageDecl>(witnessDecl);
+            storage->visitOpaqueAccessors([&](AccessorDecl *reqtAccessor) {
+              auto witnessAccessor =
+                witnessStorage->getAccessor(reqtAccessor->getAccessorKind());
+              assert(witnessAccessor && "no corresponding witness accessor?");
+              addSymbolIfNecessary(reqtAccessor, witnessAccessor);
+            });
+          }
+        });
   }
 }
 
+/// Determine whether dynamic replacement should be emitted for the allocator or
+/// the initializer given a decl.
+/// The rule is that structs and convenience init of classes emit a
+/// dynamic replacement for the allocator.
+/// Designated init of classes emit a dynamic replacement for the intializer.
+/// This is because the super class init call is emitted to the initializer and
+/// needs to be dynamic.
+static bool shouldUseAllocatorMangling(const AbstractFunctionDecl *afd) {
+  auto constructor = dyn_cast<ConstructorDecl>(afd);
+  if (!constructor)
+    return false;
+  return constructor->getParent()->getSelfClassDecl() == nullptr ||
+         constructor->isConvenienceInit();
+}
+
 void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
+  // A @_silgen_name("...") function without a body only exists
+  // to forward-declare a symbol from another library.
+  if (!AFD->hasBody() && AFD->getAttrs().hasAttribute<SILGenNameAttr>()) {
+    return;
+  }
+
   addSymbol(SILDeclRef(AFD));
 
-  if (!SwiftModule->getASTContext().isSwiftVersion3())
+  // Add the global function pointer for a dynamically replaceable function.
+  if (AFD->isNativeDynamic()) {
+    bool useAllocator = shouldUseAllocatorMangling(AFD);
+    addSymbol(LinkEntity::forDynamicallyReplaceableFunctionVariable(
+        AFD, useAllocator));
+    addSymbol(
+        LinkEntity::forDynamicallyReplaceableFunctionKey(AFD, useAllocator));
+
+  }
+  if (AFD->getAttrs().hasAttribute<DynamicReplacementAttr>()) {
+    bool useAllocator = shouldUseAllocatorMangling(AFD);
+    addSymbol(LinkEntity::forDynamicallyReplaceableFunctionVariable(
+        AFD, useAllocator));
+    addSymbol(
+        LinkEntity::forDynamicallyReplaceableFunctionImpl(AFD, useAllocator));
+  }
+
+  if (AFD->getAttrs().hasAttribute<CDeclAttr>()) {
+    // A @_cdecl("...") function has an extra symbol, with the name from the
+    // attribute.
+    addSymbol(SILDeclRef(AFD).asForeign());
+  }
+
+  auto publicDefaultArgGenerators = SwiftModule->isTestingEnabled() ||
+                                    SwiftModule->arePrivateImportsEnabled();
+  if (!publicDefaultArgGenerators)
     return;
 
-  // In Swift 3, default arguments (of public functions) are public symbols,
-  // as the default values are computed at the call site.
+  // In Swift 3 (or under -enable-testing), default arguments (of public
+  // functions) are public symbols, as the default values are computed at the
+  // call site.
   auto index = 0;
-  auto paramLists = AFD->getParameterLists();
-  // Skip the first arguments, which contains Self (etc.), can't be defaulted,
-  // and are ignored for the purposes of default argument indices.
-  if (AFD->getDeclContext()->isTypeContext())
-    paramLists = paramLists.slice(1);
-  for (auto *paramList : paramLists) {
-    for (auto *param : *paramList) {
-      if (param->getDefaultValue())
-        addSymbol(SILDeclRef::getDefaultArgGenerator(AFD, index));
-      index++;
+  for (auto *param : *AFD->getParameters()) {
+    if (param->isDefaultArgument())
+      addSymbol(SILDeclRef::getDefaultArgGenerator(AFD, index));
+    index++;
+  }
+}
+
+void TBDGenVisitor::visitFuncDecl(FuncDecl *FD) {
+  // If there's an opaque return type, its descriptor is exported.
+  if (auto opaqueResult = FD->getOpaqueResultTypeDecl()) {
+    addSymbol(LinkEntity::forOpaqueTypeDescriptor(opaqueResult));
+    assert(opaqueResult->getNamingDecl() == FD);
+    if (FD->isNativeDynamic()) {
+      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessor(opaqueResult));
+      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorImpl(opaqueResult));
+      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorKey(opaqueResult));
+      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorVar(opaqueResult));
     }
+    if (FD->getAttrs().hasAttribute<DynamicReplacementAttr>()) {
+      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessor(opaqueResult));
+      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorVar(opaqueResult));
+    }
+  }
+  visitAbstractFunctionDecl(FD);
+}
+
+void TBDGenVisitor::visitAccessorDecl(AccessorDecl *AD) {
+  // Do nothing: accessors are always nested within the storage decl, but
+  // sometimes appear outside it too. To avoid double-walking them, we
+  // explicitly visit them as members of the storage and ignore them when we
+  // visit them as part of the main walk, here.
+}
+
+void TBDGenVisitor::visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
+  // Add the property descriptor if the decl needs it.
+  if (ASD->exportsPropertyDescriptor()) {
+    addSymbol(LinkEntity::forPropertyDescriptor(ASD));
+  }
+  
+  // ...and the opaque result decl if it has one.
+  if (auto opaqueResult = ASD->getOpaqueResultTypeDecl()) {
+    addSymbol(LinkEntity::forOpaqueTypeDescriptor(opaqueResult));
+    assert(opaqueResult->getNamingDecl() == ASD);
+    if (ASD->hasAnyNativeDynamicAccessors()) {
+      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessor(opaqueResult));
+      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorImpl(opaqueResult));
+      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorKey(opaqueResult));
+      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorVar(opaqueResult));
+    }
+    if (ASD->hasAnyDynamicReplacementAccessors()) {
+      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessor(opaqueResult));
+      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorVar(opaqueResult));
+    }
+  }
+
+  // Explicitly look at each accessor here: see visitAccessorDecl.
+  for (auto accessor : ASD->getAllAccessors()) {
+    visitAbstractFunctionDecl(accessor);
   }
 }
 
 void TBDGenVisitor::visitVarDecl(VarDecl *VD) {
-  // statically/globally stored variables have some special handling.
-  if (VD->hasStorage() && isGlobalOrStaticVar(VD)) {
-    // The actual variable has a symbol.
-    Mangle::ASTMangler mangler;
-    addSymbol(mangler.mangleEntity(VD, false));
+  // Variables inside non-resilient modules have some additional symbols.
+  if (!VD->isResilient()) {
+    // Non-global variables might have an explicit initializer symbol, in
+    // non-resilient modules.
+    if (VD->getAttrs().hasAttribute<HasInitialValueAttr>() &&
+        !isGlobalOrStaticVar(VD)) {
+      auto declRef = SILDeclRef(VD, SILDeclRef::Kind::StoredPropertyInitializer);
+      // Stored property initializers for public properties are currently
+      // public.
+      addSymbol(declRef);
+    }
 
-    // Top-level variables (*not* statics) in the main file don't get accessors,
-    // despite otherwise looking like globals.
-    if (!FileHasEntryPoint || VD->isStatic())
-      addSymbol(SILDeclRef(VD, SILDeclRef::Kind::GlobalAccessor));
+    // statically/globally stored variables have some special handling.
+    if (VD->hasStorage() &&
+        isGlobalOrStaticVar(VD)) {
+      if (getDeclLinkage(VD) == FormalLinkage::PublicUnique) {
+        // The actual variable has a symbol.
+        Mangle::ASTMangler mangler;
+        addSymbol(mangler.mangleEntity(VD, false));
+      }
+
+      if (VD->isLazilyInitializedGlobal())
+        addSymbol(SILDeclRef(VD, SILDeclRef::Kind::GlobalAccessor));
+    }
   }
+
+  visitAbstractStorageDecl(VD);
 }
 
 void TBDGenVisitor::visitNominalTypeDecl(NominalTypeDecl *NTD) {
@@ -185,13 +345,22 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
   // Metaclasses and ObjC class (duh) are a ObjC thing, and so are not needed in
   // build artifacts/for classes which can't touch ObjC.
   if (objCCompatible) {
-    if (isObjC)
+    bool addObjCClass = false;
+    if (isObjC) {
+      addObjCClass = true;
       addSymbol(LinkEntity::forObjCClass(CD));
+    }
 
-    if (CD->getMetaclassKind() == ClassDecl::MetaclassKind::ObjC)
+    if (CD->getMetaclassKind() == ClassDecl::MetaclassKind::ObjC) {
+      addObjCClass = true;
       addSymbol(LinkEntity::forObjCMetaclass(CD));
-    else
+    } else
       addSymbol(LinkEntity::forSwiftMetaclassStub(CD));
+
+    if (addObjCClass) {
+      SmallString<128> buffer;
+      addSymbol(CD->getObjCRuntimeName(buffer), SymbolKind::ObjectiveCClass);
+    }
   }
 
   // Some members of classes get extra handling, beyond members of struct/enums,
@@ -205,35 +374,51 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
     auto hasFieldOffset = var && var->hasStorage() && !var->isStatic();
     if (hasFieldOffset)
       addSymbol(LinkEntity::forFieldOffset(var));
-
-    // The non-allocating forms of the destructors.
-    if (auto dtor = dyn_cast<DestructorDecl>(value)) {
-      // ObjC classes don't have a symbol for their destructor.
-      if (!isObjC)
-        addSymbol(SILDeclRef(dtor, SILDeclRef::Kind::Destroyer));
-    }
   }
 
   visitNominalTypeDecl(CD);
 
-  // The below symbols are only emitted if the class is resilient.
-  if (!CD->isResilient())
-    return;
+  bool resilientAncestry = CD->checkAncestry(AncestryFlags::ResilientOther);
 
-  addSymbol(LinkEntity::forClassMetadataBaseOffset(CD));
+  // Types with resilient superclasses have some extra symbols.
+  if (resilientAncestry || CD->hasResilientMetadata()) {
+    addSymbol(LinkEntity::forClassMetadataBaseOffset(CD));
+  }
+
+  auto &Ctx = CD->getASTContext();
+  if (Ctx.LangOpts.EnableObjCInterop) {
+    if (resilientAncestry) {
+      addSymbol(LinkEntity::forObjCResilientClassStub(
+          CD, TypeMetadataAddress::AddressPoint));
+    }
+  }
 
   // Emit dispatch thunks for every new vtable entry.
   struct VTableVisitor : public SILVTableVisitor<VTableVisitor> {
     TBDGenVisitor &TBD;
     ClassDecl *CD;
+    bool FirstTime = true;
 
   public:
     VTableVisitor(TBDGenVisitor &TBD, ClassDecl *CD)
         : TBD(TBD), CD(CD) {}
 
     void addMethod(SILDeclRef method) {
-      if (method.getDecl()->getDeclContext() == CD)
+      assert(method.getDecl()->getDeclContext() == CD);
+
+      if (CD->hasResilientMetadata()) {
+        if (FirstTime) {
+          FirstTime = false;
+
+          // If the class is itself resilient and has at least one vtable entry,
+          // it has a method lookup function.
+          TBD.addSymbol(LinkEntity::forMethodLookupFunction(CD));
+        }
+
         TBD.addDispatchThunk(method);
+      }
+
+      TBD.addMethodDescriptor(method);
     }
 
     void addMethodOverride(SILDeclRef baseRef, SILDeclRef derivedRef) {}
@@ -249,7 +434,7 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
 }
 
 void TBDGenVisitor::visitConstructorDecl(ConstructorDecl *CD) {
-  if (CD->getParent()->getAsClassOrClassExtensionContext()) {
+  if (CD->getParent()->getSelfClassDecl()) {
     // Class constructors come in two forms, allocating and non-allocating. The
     // default ValueDecl handling gives the allocating one, so we have to
     // manually include the non-allocating one.
@@ -258,8 +443,21 @@ void TBDGenVisitor::visitConstructorDecl(ConstructorDecl *CD) {
   visitAbstractFunctionDecl(CD);
 }
 
+void TBDGenVisitor::visitDestructorDecl(DestructorDecl *DD) {
+  // Class destructors come in two forms (deallocating and non-deallocating),
+  // like constructors above. This is the deallocating one:
+  visitAbstractFunctionDecl(DD);
+
+  auto parentClass = DD->getParent()->getSelfClassDecl();
+
+  // But the non-deallocating one doesn't apply to some @objc classes.
+  if (!Lowering::usesObjCAllocator(parentClass)) {
+    addSymbol(SILDeclRef(DD, SILDeclRef::Kind::Destroyer));
+  }
+}
+
 void TBDGenVisitor::visitExtensionDecl(ExtensionDecl *ED) {
-  if (!ED->getExtendedType()->isExistentialType()) {
+  if (!isa<ProtocolDecl>(ED->getExtendedNominal())) {
     addConformances(ED);
   }
 
@@ -267,20 +465,113 @@ void TBDGenVisitor::visitExtensionDecl(ExtensionDecl *ED) {
     visit(member);
 }
 
+/// Determine whether the protocol descriptor for the given protocol will
+/// contain any protocol requirements.
+static bool protocolDescriptorHasRequirements(ProtocolDecl *proto) {
+  if (!proto->getRequirementSignature().empty())
+    return true;
+
+  for (auto *member : proto->getMembers()) {
+    if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
+      if (SILDeclRef::requiresNewWitnessTableEntry(func))
+        return true;
+    }
+
+    if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
+      if (assocType->getOverriddenDecls().empty()) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+#ifndef NDEBUG
+static bool isValidProtocolMemberForTBDGen(const Decl *D) {
+  switch (D->getKind()) {
+  case DeclKind::TypeAlias:
+  case DeclKind::AssociatedType:
+  case DeclKind::Var:
+  case DeclKind::Subscript:
+  case DeclKind::PatternBinding:
+  case DeclKind::Func:
+  case DeclKind::Accessor:
+  case DeclKind::Constructor:
+  case DeclKind::Destructor:
+  case DeclKind::IfConfig:
+  case DeclKind::PoundDiagnostic:
+    return true;
+  case DeclKind::OpaqueType:
+  case DeclKind::Enum:
+  case DeclKind::Struct:
+  case DeclKind::Class:
+  case DeclKind::Protocol:
+  case DeclKind::GenericTypeParam:
+  case DeclKind::Module:
+  case DeclKind::Param:
+  case DeclKind::EnumElement:
+  case DeclKind::Extension:
+  case DeclKind::TopLevelCode:
+  case DeclKind::Import:
+  case DeclKind::PrecedenceGroup:
+  case DeclKind::MissingMember:
+  case DeclKind::EnumCase:
+  case DeclKind::InfixOperator:
+  case DeclKind::PrefixOperator:
+  case DeclKind::PostfixOperator:
+    return false;
+  }
+  llvm_unreachable("covered switch");
+}
+#endif
+
 void TBDGenVisitor::visitProtocolDecl(ProtocolDecl *PD) {
   if (!PD->isObjC()) {
     addSymbol(LinkEntity::forProtocolDescriptor(PD));
 
-    if (PD->isResilient()) {
-      for (auto *member : PD->getMembers()) {
-        if (auto *funcDecl = dyn_cast<FuncDecl>(member)) {
-          addDispatchThunk(SILDeclRef(funcDecl));
-        }
-        if (auto *ctorDecl = dyn_cast<ConstructorDecl>(member)) {
-          addDispatchThunk(SILDeclRef(ctorDecl, SILDeclRef::Kind::Allocator));
-        }
+    // If there are any requirements, emit a requirements base descriptor.
+    if (protocolDescriptorHasRequirements(PD))
+      addProtocolRequirementsBaseDescriptor(PD);
+
+    for (const auto &req : PD->getRequirementSignature()) {
+      if (req.getKind() != RequirementKind::Conformance)
+        continue;
+
+      if (req.getFirstType()->isEqual(PD->getSelfInterfaceType())) {
+        BaseConformance conformance(
+          PD,
+          req.getSecondType()->castTo<ProtocolType>()->getDecl());
+        addBaseConformanceDescriptor(conformance);
+      } else {
+        AssociatedConformance conformance(
+          PD,
+          req.getFirstType()->getCanonicalType(),
+          req.getSecondType()->castTo<ProtocolType>()->getDecl());
+        addAssociatedConformanceDescriptor(conformance);
       }
     }
+
+    for (auto *member : PD->getMembers()) {
+      if (PD->isResilient()) {
+        if (auto *funcDecl = dyn_cast<AbstractFunctionDecl>(member)) {
+          if (SILDeclRef::requiresNewWitnessTableEntry(funcDecl)) {
+            addDispatchThunk(SILDeclRef(funcDecl));
+            addMethodDescriptor(SILDeclRef(funcDecl));
+          }
+        }
+      }
+
+      // Always produce associated type descriptors, because they can
+      // be referenced by generic signatures.
+      if (auto *assocType = dyn_cast<AssociatedTypeDecl>(member)) {
+        if (assocType->getOverriddenDecls().empty())
+          addAssociatedTypeDescriptor(assocType);
+      }
+    }
+
+    // Include the self-conformance.
+    addConformances(PD);
   }
 
 #ifndef NDEBUG
@@ -289,17 +580,15 @@ void TBDGenVisitor::visitProtocolDecl(ProtocolDecl *PD) {
   // (NB. anything within an active IfConfigDecls also appears outside). Let's
   // assert this fact:
   for (auto *member : PD->getMembers()) {
-    auto isExpectedKind =
-        isa<TypeAliasDecl>(member) || isa<AssociatedTypeDecl>(member) ||
-        isa<AbstractStorageDecl>(member) || isa<PatternBindingDecl>(member) ||
-        isa<AbstractFunctionDecl>(member) || isa<IfConfigDecl>(member);
-    assert(isExpectedKind &&
+    assert(isValidProtocolMemberForTBDGen(member) &&
            "unexpected member of protocol during TBD generation");
   }
 #endif
 }
 
 void TBDGenVisitor::visitEnumDecl(EnumDecl *ED) {
+  visitNominalTypeDecl(ED);
+
   if (!ED->isResilient())
     return;
 
@@ -310,22 +599,65 @@ void TBDGenVisitor::visitEnumDecl(EnumDecl *ED) {
   }
 }
 
-static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
-                                           StringSet &symbols,
-                                           bool hasMultipleIGMs,
-                                           llvm::raw_ostream *os,
-                                           StringRef installName) {
-  auto isWholeModule = singleFile == nullptr;
-  const auto &target = M->getASTContext().LangOpts.Target;
-  UniversalLinkageInfo linkInfo(target, hasMultipleIGMs, isWholeModule);
+void TBDGenVisitor::addFirstFileSymbols() {
+  if (!Opts.ModuleLinkName.empty()) {
+    SmallString<32> buf;
+    addSymbol(irgen::encodeForceLoadSymbolName(buf, Opts.ModuleLinkName));
+  }
+}
 
-  TBDGenVisitor visitor(symbols, target, linkInfo, M, installName);
+/// Converts a version tuple into a packed version, ignoring components beyond
+/// major, minor, and subminor.
+static tapi::internal::PackedVersion
+convertToPacked(const version::Version &version) {
+  // FIXME: Warn if version is greater than 3 components?
+  unsigned major = 0, minor = 0, subminor = 0;
+  if (version.size() > 0) major = version[0];
+  if (version.size() > 1) minor = version[1];
+  if (version.size() > 2) subminor = version[2];
+  return tapi::internal::PackedVersion(major, minor, subminor);
+}
+
+static bool isApplicationExtensionSafe(const LangOptions &LangOpts) {
+  return LangOpts.EnableAppExtensionRestrictions;
+}
+
+static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
+                                           StringSet *symbols,
+                                           llvm::raw_ostream *os,
+                                           const TBDGenOptions &opts) {
+  auto &ctx = M->getASTContext();
+  auto isWholeModule = singleFile == nullptr;
+  const auto &target = ctx.LangOpts.Target;
+  UniversalLinkageInfo linkInfo(target, opts.HasMultipleIGMs, false,
+                                isWholeModule);
+  auto availCtx = AvailabilityContext::forDeploymentTarget(ctx);
+
+  tapi::internal::InterfaceFile file;
+  file.setFileType(tapi::internal::FileType::TBD_V3);
+  file.setApplicationExtensionSafe(
+    isApplicationExtensionSafe(M->getASTContext().LangOpts));
+  file.setInstallName(opts.InstallName);
+  file.setCurrentVersion(convertToPacked(opts.CurrentVersion));
+  file.setCompatibilityVersion(convertToPacked(opts.CompatibilityVersion));
+  file.setTwoLevelNamespace();
+  file.setSwiftABIVersion(TAPI_SWIFT_ABI_VERSION);
+  file.setPlatform(tapi::internal::mapToSinglePlatform(target));
+  auto arch = tapi::internal::getArchType(target.getArchName());
+  file.setArch(arch);
+  file.setInstallAPI();
+
+  TBDGenVisitor visitor(file, arch, symbols, linkInfo, M, availCtx, opts);
 
   auto visitFile = [&](FileUnit *file) {
+    if (file == M->getFiles()[0]) {
+      visitor.addFirstFileSymbols();
+    }
+
     SmallVector<Decl *, 16> decls;
     file->getTopLevelDecls(decls);
 
-    visitor.setFileHasEntryPoint(file->hasEntryPoint());
+    visitor.addMainIfNecessary(file);
 
     for (auto d : decls)
       visitor.visit(d);
@@ -341,31 +673,27 @@ static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
   }
 
   if (os) {
-    // The correct TBD formatting code is temporarily non-open source, so this
-    // is just a list of the symbols.
-    std::vector<StringRef> sorted;
-    for (auto &symbol : symbols)
-      sorted.push_back(symbol.getKey());
-    std::sort(sorted.begin(), sorted.end());
-    for (const auto &symbol : sorted) {
-      *os << symbol << "\n";
-    }
+    tapi::internal::YAMLWriter writer;
+    writer.add(
+        llvm::make_unique<tapi::internal::stub::v3::YAMLDocumentHandler>());
+
+    assert(writer.canWrite(&file) &&
+           "YAML writer should be able to write TBD v3");
+    llvm::cantFail(writer.writeFile(*os, &file),
+                   "YAML writing should be error-free");
   }
 }
 
 void swift::enumeratePublicSymbols(FileUnit *file, StringSet &symbols,
-                                   bool hasMultipleIGMs) {
-  enumeratePublicSymbolsAndWrite(file->getParentModule(), file, symbols,
-                                 hasMultipleIGMs, nullptr, StringRef());
+                                   const TBDGenOptions &opts) {
+  enumeratePublicSymbolsAndWrite(file->getParentModule(), file, &symbols,
+                                 nullptr, opts);
 }
 void swift::enumeratePublicSymbols(ModuleDecl *M, StringSet &symbols,
-                                   bool hasMultipleIGMs) {
-  enumeratePublicSymbolsAndWrite(M, nullptr, symbols, hasMultipleIGMs, nullptr,
-                                 StringRef());
+                                   const TBDGenOptions &opts) {
+  enumeratePublicSymbolsAndWrite(M, nullptr, &symbols, nullptr, opts);
 }
 void swift::writeTBDFile(ModuleDecl *M, llvm::raw_ostream &os,
-                         bool hasMultipleIGMs, StringRef installName) {
-  StringSet symbols;
-  enumeratePublicSymbolsAndWrite(M, nullptr, symbols, hasMultipleIGMs, &os,
-                                 installName);
+                         const TBDGenOptions &opts) {
+  enumeratePublicSymbolsAndWrite(M, nullptr, nullptr, &os, opts);
 }

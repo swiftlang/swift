@@ -19,7 +19,6 @@
 #define CLANG_ADAPTER_H
 
 #include "swift/Basic/StringExtras.h"
-#include "swift/Serialization/ModuleFormat.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "clang/Basic/Specifiers.h"
@@ -83,7 +82,7 @@ clang::SwiftNewtypeAttr *getSwiftNewtypeAttr(const clang::TypedefNameDecl *decl,
 
 /// Retrieve a bit vector containing the non-null argument
 /// annotations for the given declaration.
-llvm::SmallBitVector
+SmallBitVector
 getNonNullArgs(const clang::Decl *decl,
                ArrayRef<const clang::ParmVarDecl *> params);
 

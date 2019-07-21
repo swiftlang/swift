@@ -21,7 +21,7 @@ extension C {
 }
 // The integer argument is truly dead, but the C.Type metadata argument may not be removed.
 // function signature specialization <Arg[0] = Dead> of static functionsigopts_self.C.factory (functionsigopts_self.C.Type)(Swift.Int) -> Self
-// CHECK-LABEL: sil shared @$S20functionsigopts_self1CC7factory{{[_0-9a-zA-Z]*}}FZTf4dn_n : $@convention(method) (@thick C.Type) -> @owned C
+// CHECK-LABEL: sil shared @$s20functionsigopts_self1CC7factory{{[_0-9a-zA-Z]*}}FZTf4dn_n : $@convention(method) (@thick C.Type) -> @owned C
 // CHECK: bb0(%0 : $@thick C.Type):
 // CHECK: function_ref functionsigopts_self.gen<A>() -> A
 // CHECK: apply %{{[0-9]+}}<@dynamic_self C>

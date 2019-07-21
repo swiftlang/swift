@@ -42,6 +42,15 @@ class Platform(object):
         # By default, we don't support benchmarks on most platforms.
         return False
 
+    @property
+    def uses_host_tests(self):
+        """
+        Check if this is a Darwin platform that needs a connected device
+        for tests.
+        """
+        # By default, we don't use connected devices on most platforms.
+        return False
+
     def contains(self, target_name):
         """
         Returns True if the given target name belongs to a one of this
@@ -68,6 +77,24 @@ class DarwinPlatform(Platform):
         # By default, on Darwin we support benchmarks on all non-simulator
         # platforms.
         return not self.is_simulator
+
+    @property
+    def uses_host_tests(self):
+        """
+        Check if this is a Darwin platform that needs a connected device
+        for tests.
+        """
+        return self.is_embedded and not self.is_simulator
+
+
+class AndroidPlatform(Platform):
+    @property
+    def uses_host_tests(self):
+        """
+        Check if this is a Darwin platform that needs a connected device
+        for tests.
+        """
+        return True
 
 
 class Target(object):
@@ -113,6 +140,7 @@ class StdlibDeploymentTarget(object):
 
     Linux = Platform("linux", archs=[
         "x86_64",
+        "i686",
         "armv6",
         "armv7",
         "aarch64",
@@ -124,7 +152,7 @@ class StdlibDeploymentTarget(object):
 
     Cygwin = Platform("cygwin", archs=["x86_64"])
 
-    Android = Platform("android", archs=["armv7"])
+    Android = AndroidPlatform("android", archs=["armv7", "aarch64"])
 
     Windows = Platform("windows", archs=["x86_64"])
 
@@ -160,6 +188,8 @@ class StdlibDeploymentTarget(object):
         if system == 'Linux':
             if machine == 'x86_64':
                 return StdlibDeploymentTarget.Linux.x86_64
+            elif machine == 'i686':
+                return StdlibDeploymentTarget.Linux.i686
             elif machine.startswith('armv7'):
                 # linux-armv7* is canonicalized to 'linux-armv7'
                 return StdlibDeploymentTarget.Linux.armv7
@@ -227,6 +257,10 @@ class StdlibDeploymentTarget(object):
     @classmethod
     def get_target_for_name(cls, name):
         return cls._targets_by_name.get(name)
+
+    @classmethod
+    def get_targets_by_name(cls, names):
+        return [cls.get_target_for_name(name) for name in names]
 
 
 def install_prefix():

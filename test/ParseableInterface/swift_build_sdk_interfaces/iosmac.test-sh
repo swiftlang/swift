@@ -1,0 +1,14 @@
+RUN: %swift_build_sdk_interfaces -sdk %S/Inputs/iosmac-sdk/MacOSX.sdk/ -Fsystem-iosmac SECRET_SEARCH_PATH -v -n -o %t/output > %t.txt
+RUN: %FileCheck %s < %t.txt
+RUN: %FileCheck -check-prefix NEGATIVE %s < %t.txt
+
+CHECK-DAG: MacOSX.sdk/System/Library/Frameworks{{\\|/}}FMWK.framework{{\\|/}}Modules{{\\|/}}FMWK.swiftmodule{{\\|/}}x86_64.swiftinterface -o {{.+}}/output{{\\|/}}FMWK.swiftmodule{{\\|/}}x86_64-apple-macos.swiftmodule
+CHECK-DAG: -Fsystem SECRET_SEARCH_PATH -Fsystem {{.+}}MacOSX.sdk/System{{\\|/}}iOSSupport{{\\|/}}System{{\\|/}}Library{{\\|/}}Frameworks {{.+}}MacOSX.sdk/System/iOSSupport/System/Library/Frameworks{{\\|/}}FMWK.framework{{\\|/}}Modules{{\\|/}}FMWK.swiftmodule{{\\|/}}x86_64.swiftinterface -o {{.+}}/output{{\\|/}}FMWK.swiftmodule{{\\|/}}x86_64-apple-ios-macabi.swiftmodule
+CHECK-DAG: MacOSX.sdk/usr/lib/swift{{\\|/}}Foo.swiftmodule{{\\|/}}x86_64.swiftinterface -o {{.+}}output{{\\|/}}Foo.swiftmodule{{\\|/}}x86_64-apple-macos.swiftmodule
+CHECK-DAG: -Fsystem SECRET_SEARCH_PATH -Fsystem {{.+}}MacOSX.sdk/System{{\\|/}}iOSSupport{{\\|/}}System{{\\|/}}Library{{\\|/}}Frameworks {{.+}}MacOSX.sdk/System/iOSSupport/usr/lib/swift{{\\|/}}Foo.swiftmodule{{\\|/}}x86_64.swiftinterface -o {{.+}}output{{\\|/}}Foo.swiftmodule{{\\|/}}x86_64-apple-ios-macabi.swiftmodule
+CHECK-DAG: MacOSX.sdk/System/Library/Frameworks{{\\|/}}Zippered.framework{{\\|/}}Modules{{\\|/}}Zippered.swiftmodule{{\\|/}}x86_64.swiftinterface -o {{.+}}/output{{\\|/}}Zippered.swiftmodule{{\\|/}}x86_64-apple-macos.swiftmodule
+CHECK-DAG: MacOSX.sdk/System/Library/Frameworks{{\\|/}}Zippered.framework{{\\|/}}Modules{{\\|/}}Zippered.swiftmodule{{\\|/}}x86_64-apple-macos.swiftinterface -o {{.+}}/output{{\\|/}}Zippered.swiftmodule{{\\|/}}x86_64-apple-macos.swiftmodule
+CHECK-DAG: -Fsystem SECRET_SEARCH_PATH -Fsystem {{.+}}MacOSX.sdk/System{{\\|/}}iOSSupport{{\\|/}}System{{\\|/}}Library{{\\|/}}Frameworks {{.+}}MacOSX.sdk/System/Library/Frameworks{{\\|/}}Zippered.framework{{\\|/}}Modules{{\\|/}}Zippered.swiftmodule{{\\|/}}x86_64-apple-ios-macabi.swiftinterface -o {{.+}}/output{{\\|/}}Zippered.swiftmodule{{\\|/}}x86_64-apple-ios-macabi.swiftmodule
+
+NEGATIVE-NOT: iOSSupport{{.+}}{{macos|x86_64}}.swiftmodule
+NEGATIVE-NOT: SECRET_SEARCH_PATH{{.+}}{{macos|x86_64}}.swiftmodule

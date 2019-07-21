@@ -38,8 +38,8 @@ class Devirtualizer : public SILFunctionTransform {
   void run() override {
     SILFunction &F = *getFunction();
     ClassHierarchyAnalysis *CHA = PM->getAnalysis<ClassHierarchyAnalysis>();
-    DEBUG(llvm::dbgs() << "***** Devirtualizer on function:" << F.getName()
-                       << " *****\n");
+    LLVM_DEBUG(llvm::dbgs() << "***** Devirtualizer on function:" << F.getName()
+                            << " *****\n");
 
     if (devirtualizeAppliesInFunction(F, CHA))
       invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
@@ -69,14 +69,14 @@ bool Devirtualizer::devirtualizeAppliesInFunction(SILFunction &F,
    }
   }
   for (auto Apply : Applies) {
-    auto NewInstPair = tryDevirtualizeApply(Apply, CHA, &ORE);
-    if (!NewInstPair.second)
+    auto NewInst = tryDevirtualizeApply(Apply, CHA, &ORE);
+    if (!NewInst)
       continue;
 
     Changed = true;
 
-    replaceDeadApply(Apply, NewInstPair.first);
-    NewApplies.push_back(NewInstPair.second);
+    deleteDevirtualizedApply(Apply);
+    NewApplies.push_back(NewInst);
   }
 
   // For each new apply, attempt to link in function bodies if we do
@@ -89,7 +89,7 @@ bool Devirtualizer::devirtualizeAppliesInFunction(SILFunction &F,
   while (!NewApplies.empty()) {
     auto Apply = NewApplies.pop_back_val();
 
-    auto *CalleeFn = Apply.getReferencedFunction();
+    auto *CalleeFn = Apply.getInitiallyReferencedFunction();
     assert(CalleeFn && "Expected devirtualized callee!");
 
     // We need to ensure that we link after devirtualizing in order to pull in
@@ -103,7 +103,7 @@ bool Devirtualizer::devirtualizeAppliesInFunction(SILFunction &F,
     // be beneficial to rerun some earlier passes on the current
     // function now that we've made these direct references visible.
     if (CalleeFn->isDefinition() && CalleeFn->shouldOptimize())
-      notifyAddFunction(CalleeFn, nullptr);
+      addFunctionToPassManagerWorklist(CalleeFn, nullptr);
   }
 
   return Changed;

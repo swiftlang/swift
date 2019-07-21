@@ -11,7 +11,7 @@
 #if os(macOS)
 import AppKit
 
-print(NSButtonType(rawValue: 20721)!.rawValue)
+print(NSButton.ButtonType(rawValue: 20721)!.rawValue)
 #endif
 
 #if os(iOS)

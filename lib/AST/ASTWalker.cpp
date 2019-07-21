@@ -37,7 +37,7 @@
 //      Note that semantic components will generally preserve the
 //      syntactic order of their children because doing something else
 //      could illegally change order of evaluation.  This is why, for
-//      example, shuffling a TupleExpr creates a TupleShuffleExpr
+//      example, shuffling a TupleExpr creates a DestructureTupleExpr
 //      instead of just making a new TupleExpr with the elements in
 //      different order.
 //
@@ -75,7 +75,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
 
   ASTWalker &Walker;
   
-  /// \brief RAII object that sets the parent of the walk context 
+  /// RAII object that sets the parent of the walk context 
   /// appropriately.
   class SetParentRAII {
     ASTWalker &Walker;
@@ -121,7 +121,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   bool visit(ParameterList *PL) {
     return inherited::visit(PL);
   }
-  
+
   //===--------------------------------------------------------------------===//
   //                                 Decls
   //===--------------------------------------------------------------------===//
@@ -151,6 +151,13 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   bool visitPatternBindingDecl(PatternBindingDecl *PBD) {
+    // If there is a single variable, walk it's attributes.
+    bool isPropertyWrapperBackingProperty = false;
+    if (auto singleVar = PBD->getSingleVar()) {
+      isPropertyWrapperBackingProperty =
+        singleVar->getOriginalWrappedProperty() != nullptr;
+    }
+
     unsigned idx = 0U-1;
     for (auto entry : PBD->getPatternList()) {
       ++idx;
@@ -158,7 +165,10 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
         PBD->setPattern(idx, Pat, entry.getInitContext());
       else
         return true;
-      if (entry.getInit()) {
+      if (entry.getInit() &&
+          !isPropertyWrapperBackingProperty &&
+          (!entry.isInitializerSubsumed() ||
+           Walker.shouldWalkIntoLazyInitializers())) {
 #ifndef NDEBUG
         PrettyStackTraceDecl debugStack("walking into initializer for", PBD);
 #endif
@@ -210,6 +220,15 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     }
 
     return doIt(TAD->getUnderlyingTypeLoc());
+  }
+  
+  bool visitOpaqueTypeDecl(OpaqueTypeDecl *OTD) {
+    if (OTD->getGenericParams() &&
+        Walker.shouldWalkIntoGenericParams()) {
+      if (visitGenericParamList(OTD->getGenericParams()))
+        return true;
+    }
+    return false;
   }
 
   bool visitAbstractTypeParamDecl(AbstractTypeParamDecl *TPD) {
@@ -311,9 +330,9 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       visitGenericParamList(AFD->getGenericParams());
     }
 
-    for (auto PL : AFD->getParameterLists()) {
-      visit(PL);
-    }
+    if (auto *PD = AFD->getImplicitSelfDecl(/*createIfNeeded=*/false))
+      visit(PD);
+    visit(AFD->getParameters());
 
     if (auto *FD = dyn_cast<FuncDecl>(AFD))
       if (!isa<AccessorDecl>(FD))
@@ -441,12 +460,21 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
 
   Expr *visitOpaqueValueExpr(OpaqueValueExpr *E) { return E; }
 
-  Expr *visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E) {
-    HANDLE_SEMANTIC_EXPR(E);
+  Expr *visitDefaultArgumentExpr(DefaultArgumentExpr *E) { return E; }
 
-    for (auto &Segment : E->getSegments()) {
-      if (Expr *Seg = doIt(Segment))
-        Segment = Seg;
+  Expr *visitCallerDefaultArgumentExpr(CallerDefaultArgumentExpr *E) {
+    if (auto subExpr = doIt(E->getSubExpr())) {
+      E->setSubExpr(subExpr);
+      return E;
+    }
+
+    return nullptr;
+  }
+
+  Expr *visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E) {
+    if (auto oldAppendingExpr = E->getAppendingExpr()) {
+      if (auto appendingExpr = doIt(oldAppendingExpr))
+        E->setAppendingExpr(dyn_cast<TapExpr>(appendingExpr));
       else
         return nullptr;
     }
@@ -454,8 +482,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   Expr *visitObjectLiteralExpr(ObjectLiteralExpr *E) {
-    HANDLE_SEMANTIC_EXPR(E);
-
     if (Expr *arg = E->getArg()) {
       if (Expr *arg2 = doIt(arg)) {
         E->setArg(arg2);
@@ -467,8 +493,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   Expr *visitCollectionExpr(CollectionExpr *E) {
-    HANDLE_SEMANTIC_EXPR(E);
-
     for (auto &elt : E->getElements())
       if (Expr *Sub = doIt(elt))
         elt = Sub;
@@ -637,18 +661,17 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return E;
   }
   
-  Expr *visitTupleShuffleExpr(TupleShuffleExpr *E) {
-    if (Expr *E2 = doIt(E->getSubExpr())) {
-      E->setSubExpr(E2);
+  Expr *visitDestructureTupleExpr(DestructureTupleExpr *E) {
+    if (auto *src = doIt(E->getSubExpr())) {
+      E->setSubExpr(src);
     } else {
       return nullptr;
     }
 
-    for (auto &defaultArg : E->getCallerDefaultArgs()) {
-      if (Expr *newDefaultArg = doIt(defaultArg))
-        defaultArg = newDefaultArg;
-      else
-        return nullptr;
+    if (auto *dst = doIt(E->getResultExpr())) {
+      E->setResultExpr(dst);
+    } else {
+      return nullptr;
     }
 
     return E;
@@ -686,6 +709,14 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return nullptr;
   }
   
+  Expr *visitVarargExpansionExpr(VarargExpansionExpr *E) {
+    if (Expr *E2 = doIt(E->getSubExpr())) {
+      E->setSubExpr(E2);
+      return E;
+    }
+    return nullptr;
+  }
+
   Expr *visitSequenceExpr(SequenceExpr *E) {
     for (unsigned i = 0, e = E->getNumElements(); i != e; ++i)
       if (Expr *Elt = doIt(E->getElement(i)))
@@ -734,6 +765,9 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       }
       return nullptr;
     }
+
+    if (!Walker.shouldWalkIntoNonSingleExpressionClosure())
+      return expr;
 
     // Handle other closures.
     if (BraceStmt *body = cast_or_null<BraceStmt>(doIt(expr->getBody()))) {
@@ -942,6 +976,11 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return E;
   }
 
+  Expr *visitLazyInitializerExpr(LazyInitializerExpr *E) {
+    // Initializer is totally opaque for most visitation purposes.
+    return E;
+  }
+
   Expr *visitObjCSelectorExpr(ObjCSelectorExpr *E) {
     Expr *sub = doIt(E->getSubExpr());
     if (!sub) return nullptr;
@@ -957,7 +996,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       Expr *sub = doIt(objcStringLiteral);
       if (!sub) return nullptr;
       E->setObjCStringLiteralExpr(sub);
-      return E;
     }
 
     auto components = E->getComponents();
@@ -1019,6 +1057,8 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       case KeyPathExpr::Component::Kind::Property:
       case KeyPathExpr::Component::Kind::UnresolvedProperty:
       case KeyPathExpr::Component::Kind::Invalid:
+      case KeyPathExpr::Component::Kind::Identity:
+      case KeyPathExpr::Component::Kind::TupleElement:
         // No subexpr to visit.
         break;
       }
@@ -1034,6 +1074,30 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   Expr *visitKeyPathDotExpr(KeyPathDotExpr *E) { return E; }
+
+  Expr *visitTapExpr(TapExpr *E) {
+    if (auto oldSubExpr = E->getSubExpr()) {
+      if (auto subExpr = doIt(oldSubExpr)) {
+        E->setSubExpr(subExpr);
+      } else {
+        return nullptr;
+      }
+    }
+
+    if (!Walker.shouldWalkIntoNonSingleExpressionClosure())
+      return E;
+
+    if (auto oldBody = E->getBody()) {
+      if (auto body = doIt(oldBody)) {
+        E->setBody(dyn_cast<BraceStmt>(body));
+      }
+      else {
+        return nullptr;
+      }
+    }
+
+    return E;
+  }
 
   //===--------------------------------------------------------------------===//
   //                           Everything Else
@@ -1056,20 +1120,20 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       // Walk each parameter's decl and typeloc and default value.
       if (doIt(P))
         return true;
-      
+
       // Don't walk into the type if the decl is implicit, or if the type is
       // implicit.
       if (!P->isImplicit() && !P->isTypeLocImplicit() &&
           doIt(P->getTypeLoc()))
         return true;
-      
+
       if (auto *E = P->getDefaultValue()) {
         auto res = doIt(E);
         if (!res) return true;
         P->setDefaultValue(res);
       }
     }
-    
+
     return Walker.walkToParameterListPost(PL);
   }
   
@@ -1158,7 +1222,7 @@ public:
 
     return P;
   }
-  
+
   bool doIt(const StmtCondition &C) {
     for (auto &elt : C) {
       switch (elt.getKind()) {
@@ -1262,6 +1326,14 @@ Stmt *Traversal::visitThrowStmt(ThrowStmt *TS) {
   return nullptr;
 }
 
+Stmt *Traversal::visitPoundAssertStmt(PoundAssertStmt *S) {
+  if (auto *condition = doIt(S->getCondition())) {
+    S->setCondition(condition);
+  } else {
+    return nullptr;
+  }
+  return S;
+}
 
 Stmt *Traversal::visitBraceStmt(BraceStmt *BS) {
   for (auto &Elem : BS->getElements()) {
@@ -1296,6 +1368,16 @@ Stmt *Traversal::visitReturnStmt(ReturnStmt *RS) {
   else
     return nullptr;
   return RS;
+}
+
+Stmt *Traversal::visitYieldStmt(YieldStmt *YS) {
+  for (auto &yield : YS->getMutableYields()) {
+    if (Expr *E = doIt(yield))
+      yield = E;
+    else
+      return nullptr;
+  }
+  return YS;
 }
 
 Stmt *Traversal::visitDeferStmt(DeferStmt *DS) {
@@ -1436,20 +1518,28 @@ Stmt *Traversal::visitForEachStmt(ForEachStmt *S) {
 
   // The iterator decl is built directly on top of the sequence
   // expression, so don't visit both.
-  if (PatternBindingDecl *Iterator = S->getIterator()) {
-    if (doIt(Iterator))
-      return nullptr;
-
-  } else if (Expr *Sequence = S->getSequence()) {
+  if (Expr *Sequence = S->getSequence()) {
     if ((Sequence = doIt(Sequence)))
       S->setSequence(Sequence);
     else
       return nullptr;
   }
 
-  if (auto IteratorNext = S->getIteratorNext()) {
+  if (auto IteratorNext = S->getConvertElementExpr()) {
     if ((IteratorNext = doIt(IteratorNext)))
-      S->setIteratorNext(IteratorNext);
+      S->setConvertElementExpr(IteratorNext);
+    else
+      return nullptr;
+  }
+
+  if (auto IteratorVar = S->getIteratorVar()) {
+    if (doIt(IteratorVar))
+      return nullptr;
+  }
+
+  if (auto IteratorVarRef = S->getIteratorVarRef()) {
+    if ((IteratorVarRef = doIt(IteratorVarRef)))
+      S->setIteratorVarRef(IteratorVarRef);
     else
       return nullptr;
   }
@@ -1546,8 +1636,9 @@ Pattern *Traversal::visitTypedPattern(TypedPattern *P) {
   else
     return nullptr;
   if (!P->isImplicit())
-    if (doIt(P->getTypeLoc()))
-      return nullptr;
+    if (auto *TR = P->getTypeRepr())
+      if (doIt(TR))
+        return nullptr;
   return P;
 }
 
@@ -1566,6 +1657,10 @@ Pattern *Traversal::visitIsPattern(IsPattern *P) {
 }
 
 Pattern *Traversal::visitEnumElementPattern(EnumElementPattern *P) {
+  if (!P->isParentTypeImplicit())
+    if (doIt(P->getParentType()))
+      return nullptr;
+
   if (!P->hasSubPattern())
     return P;
 
@@ -1697,6 +1792,10 @@ bool Traversal::visitSharedTypeRepr(SharedTypeRepr *T) {
 
 bool Traversal::visitOwnedTypeRepr(OwnedTypeRepr *T) {
   return doIt(T->getBase());
+}
+
+bool Traversal::visitOpaqueReturnTypeRepr(OpaqueReturnTypeRepr *T) {
+  return doIt(T->getConstraint());
 }
 
 bool Traversal::visitFixedTypeRepr(FixedTypeRepr *T) {

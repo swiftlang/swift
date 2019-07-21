@@ -1,14 +1,10 @@
 // RUN: %empty-directory(%t)
 //
 // RUN: %gyb %s -o %t/main.swift
-// RUN: if [ %target-runtime == "objc" ]; then \
-// RUN:   %target-clang -fobjc-arc %S/Inputs/SlurpFastEnumeration/SlurpFastEnumeration.m -c -o %t/SlurpFastEnumeration.o; \
-// RUN:   %line-directive %t/main.swift -- %target-build-swift %t/main.swift %S/Inputs/ArrayTypesAndHelpers.swift -I %S/Inputs/SlurpFastEnumeration/ -Xlinker %t/SlurpFastEnumeration.o -o %t/Arrays -Xfrontend -disable-access-control; \
-// RUN: else \
-// RUN:   %line-directive %t/main.swift -- %target-build-swift %S/Inputs/ArrayTypesAndHelpers.swift %t/main.swift -o %t/Arrays -Xfrontend -disable-access-control; \
-// RUN: fi
+// RUN: %target-clang -fobjc-arc %S/Inputs/SlurpFastEnumeration/SlurpFastEnumeration.m -c -o %t/SlurpFastEnumeration.o
+// RUN: %line-directive %t/main.swift -- %target-build-swift %t/main.swift %S/Inputs/ArrayTypesAndHelpers.swift -I %S/Inputs/SlurpFastEnumeration/ -Xlinker %t/SlurpFastEnumeration.o -o %t/Arrays -Xfrontend -disable-access-control
 //
-// RUN: %line-directive %t/main.swift -- %target-run %t/Arrays
+// RUN: %target-codesign %t/Arrays && %line-directive %t/main.swift -- %target-run %t/Arrays
 // REQUIRES: executable_test
 
 import Swift
@@ -68,7 +64,8 @@ CopyToNativeArrayBufferTests.test("Collection._copyToContiguousArray()") {
     expectEqual(0, c.timesMakeIteratorCalled.value)
     expectEqual(0, c.timesStartIndexCalled.value)
     let copy = c._copyToContiguousArray()
-    expectEqual(0, c.timesMakeIteratorCalled.value)
+    // _copyToContiguousArray calls Sequence._copyContents, which makes an iterator.
+    expectEqual(1, c.timesMakeIteratorCalled.value)
     expectNotEqual(0, c.timesStartIndexCalled.value)
     expectEqualSequence(
       Array(10..<27),
@@ -82,7 +79,8 @@ CopyToNativeArrayBufferTests.test("Collection._copyToContiguousArray()") {
     expectEqual(0, wrapped.timesMakeIteratorCalled.value)
     expectEqual(0, wrapped.timesStartIndexCalled.value)
     let copy = s._copyToContiguousArray()
-    expectEqual(0, wrapped.timesMakeIteratorCalled.value)
+    // _copyToContiguousArray calls Sequence._copyContents, which makes an iterator.
+    expectEqual(1, wrapped.timesMakeIteratorCalled.value)
     expectNotEqual(0, wrapped.timesStartIndexCalled.value)
 
     expectEqualSequence(
@@ -2418,10 +2416,9 @@ for (step, evilBoundsCheck) in [ (1, true), (-1, false), (-1, true) ] {
     ? evilBoundsError
     : "invalid Collection: count differed in successive traversals"
 
-  let constructionMessage =
-    /*_isStdlibInternalChecksEnabled() && !evilBoundsCheck && step <= 0
-      ? "_UnsafePartiallyInitializedContiguousArrayBuffer has no more capacity"
-      :*/ message
+  let constructionMessage = step < 0
+    ? "invalid Collection: less than 'count' elements in collection"
+    : "invalid Collection: more than 'count' elements in collection"
 
   // The invalid Collection error is a _debugPreconditon that will only fire
   // in a Debug assert configuration.
@@ -2472,7 +2469,7 @@ for (step, evilBoundsCheck) in [ (1, true), (-1, false), (-1, true) ] {
   .code {
     let evil = EvilCollection(step, boundsChecked: evilBoundsCheck)
 
-    if expectedToFail {
+    if step < 0 || _isDebugAssertConfiguration() {
       expectCrashLater()
     }
 

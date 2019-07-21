@@ -15,6 +15,7 @@
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Optional.h"
+#include "llvm/ADT/StringMap.h"
 #include <string>
 
 namespace sourcekitd_test {
@@ -22,6 +23,7 @@ namespace sourcekitd_test {
 enum class SourceKitRequest {
   None,
   ProtocolVersion,
+  CompilerVersion,
   DemangleNames,
   MangleSimpleClasses,
   Index,
@@ -31,6 +33,8 @@ enum class SourceKitRequest {
   CodeCompleteUpdate,
   CodeCompleteCacheOnDisk,
   CodeCompleteSetPopularAPI,
+  TypeContextInfo,
+  ConformingMethodList,
   CursorInfo,
   RangeInfo,
   RelatedIdents,
@@ -59,6 +63,7 @@ enum class SourceKitRequest {
   Statistics,
   SyntaxTree,
   EnableCompileNotifications,
+  CollectExpresstionType,
 #define SEMANTIC_REFACTORING(KIND, NAME, ID) KIND,
 #include "swift/IDE/RefactoringKinds.def"
 };
@@ -106,6 +111,14 @@ struct TestOptions {
   bool isAsyncRequest = false;
   bool timeRequest = false;
   unsigned repeatRequest = 1;
+  struct VFSFile {
+    std::string path;
+    bool passAsSourceText;
+    VFSFile(std::string path, bool passAsSourceText)
+        : path(std::move(path)), passAsSourceText(passAsSourceText) {}
+  };
+  llvm::StringMap<VFSFile> VFSFiles;
+  llvm::Optional<std::string> VFSName;
   llvm::Optional<bool> CancelOnSubsequentRequest;
   bool parseArgs(llvm::ArrayRef<const char *> Args);
   void printHelp(bool ShowHidden) const;

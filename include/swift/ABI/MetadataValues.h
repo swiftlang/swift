@@ -47,6 +47,21 @@ struct InProcess;
 template <typename Runtime> struct TargetMetadata;
 using Metadata = TargetMetadata<InProcess>;
 
+/// Non-type metadata kinds have this bit set.
+const unsigned MetadataKindIsNonType = 0x400;
+
+/// Non-heap metadata kinds have this bit set.
+const unsigned MetadataKindIsNonHeap = 0x200;
+
+// The above two flags are negative because the "class" kind has to be zero,
+// and class metadata is both type and heap metadata.
+
+/// Runtime-private metadata has this bit set. The compiler must not statically
+/// generate metadata objects with these kinds, and external tools should not
+/// rely on the stability of these values or the precise binary layout of
+/// their associated data structures.
+const unsigned MetadataKindIsRuntimePrivate = 0x100;
+
 /// Kinds of Swift metadata records.  Some of these are types, some
 /// aren't.
 enum class MetadataKind : uint32_t {
@@ -54,9 +69,30 @@ enum class MetadataKind : uint32_t {
 #define ABSTRACTMETADATAKIND(name, start, end)                                 \
   name##_Start = start, name##_End = end,
 #include "MetadataKind.def"
+  
+  /// The largest possible non-isa-pointer metadata kind value.
+  ///
+  /// This is included in the enumeration to prevent against attempts to
+  /// exhaustively match metadata kinds. Future Swift runtimes or compilers
+  /// may introduce new metadata kinds, so for forward compatibility, the
+  /// runtime must tolerate metadata with unknown kinds.
+  /// This specific value is not mapped to a valid metadata kind at this time,
+  /// however.
+  LastEnumerated = 0x7FF,
 };
 
-const unsigned LastEnumeratedMetadataKind = 2047;
+const unsigned LastEnumeratedMetadataKind =
+  (unsigned)MetadataKind::LastEnumerated;
+
+inline bool isHeapMetadataKind(MetadataKind k) {
+  return !((uint32_t)k & MetadataKindIsNonHeap);
+}
+inline bool isTypeMetadataKind(MetadataKind k) {
+  return !((uint32_t)k & MetadataKindIsNonType);
+}
+inline bool isRuntimePrivateMetadataKind(MetadataKind k) {
+  return (uint32_t)k & MetadataKindIsRuntimePrivate;
+}
 
 /// Try to translate the 'isa' value of a type/heap metadata into a value
 /// of the MetadataKind enum.
@@ -74,6 +110,9 @@ enum class NominalTypeKind : uint32_t {
 #include "MetadataKind.def"
 };
 
+/// The maximum supported type alignment.
+const size_t MaximumAlignment = 16;
+
 /// Flags stored in the value-witness table.
 template <typename int_type>
 class TargetValueWitnessFlags {
@@ -82,24 +121,27 @@ public:
   // flags of the field types can be mostly bitwise-or'ed together to derive the
   // flags for the struct. (The "non-inline" and "has-extra-inhabitants" bits
   // still require additional fixup.)
-  enum : int_type {
-    AlignmentMask =       0x0000FFFF,
+  enum : uint32_t {
+    AlignmentMask =       0x000000FF,
+    // unused             0x0000FF00,
     IsNonPOD =            0x00010000,
     IsNonInline =         0x00020000,
-    HasExtraInhabitants = 0x00040000,
+    // unused             0x00040000,
     HasSpareBits =        0x00080000,
     IsNonBitwiseTakable = 0x00100000,
     HasEnumWitnesses =    0x00200000,
     Incomplete =          0x00400000,
-
-    // Everything else is reserved.
+    // unused             0xFF800000,
   };
 
+  static constexpr const uint32_t MaxNumExtraInhabitants = 0x7FFFFFFF;
+
 private:
-  int_type Data;
+  uint32_t Data;
+
+  explicit constexpr TargetValueWitnessFlags(uint32_t data) : Data(data) {}
 
 public:
-  explicit constexpr TargetValueWitnessFlags(int_type data) : Data(data) {}
   constexpr TargetValueWitnessFlags() : Data(0) {}
 
   /// The required alignment of the first byte of an object of this
@@ -127,6 +169,8 @@ public:
   }
 
   /// True if the type requires out-of-line allocation of its storage.
+  /// This can be the case because the value requires more storage or if it is
+  /// not bitwise takable.
   bool isInlineStorage() const { return !(Data & IsNonInline); }
   constexpr TargetValueWitnessFlags withInlineStorage(bool isInline) const {
     return TargetValueWitnessFlags((Data & ~IsNonInline) |
@@ -151,21 +195,11 @@ public:
     return TargetValueWitnessFlags((Data & ~IsNonBitwiseTakable) |
                                    (isBT ? 0 : IsNonBitwiseTakable));
   }
-  /// True if this type's binary representation has extra inhabitants, that is,
-  /// bit patterns that do not form valid values of the type.
-  ///
-  /// If true, then the extra inhabitant value witness table entries are
-  /// available in this type's value witness table.
-  bool hasExtraInhabitants() const { return Data & HasExtraInhabitants; }
+
   /// True if this type's binary representation is that of an enum, and the
   /// enum value witness table entries are available in this type's value
   /// witness table.
   bool hasEnumWitnesses() const { return Data & HasEnumWitnesses; }
-  constexpr TargetValueWitnessFlags
-  withExtraInhabitants(bool hasExtraInhabitants) const {
-    return TargetValueWitnessFlags((Data & ~HasExtraInhabitants) |
-                               (hasExtraInhabitants ? HasExtraInhabitants : 0));
-  }
   constexpr TargetValueWitnessFlags
   withEnumWitnesses(bool hasEnumWitnesses) const {
     return TargetValueWitnessFlags((Data & ~HasEnumWitnesses) |
@@ -182,44 +216,11 @@ public:
                                    (isIncomplete ? Incomplete : 0));
   }
 
-  constexpr int_type getOpaqueValue() const { return Data; }
-  static constexpr TargetValueWitnessFlags getFromOpaqueValue(int_type data) {
-    return TargetValueWitnessFlags(data);
+  constexpr uint32_t getOpaqueValue() const {
+    return Data;
   }
 };
 using ValueWitnessFlags = TargetValueWitnessFlags<size_t>;
-
-/// Flags stored in a value-witness table with extra inhabitants.
-template <typename int_type>
-class TargetExtraInhabitantFlags {
-public:
-  enum : int_type {
-    NumExtraInhabitantsMask = 0x7FFFFFFFU,
-    ExtraInhabitantFlags
-  };
-  int_type Data;
-
-  constexpr TargetExtraInhabitantFlags(int_type data) : Data(data) {}
-
-public:
-  constexpr TargetExtraInhabitantFlags() : Data(0) {}
-
-  /// The number of extra inhabitants in the type's representation.
-  int getNumExtraInhabitants() const { return Data & NumExtraInhabitantsMask; }
-
-  constexpr TargetExtraInhabitantFlags
-  withNumExtraInhabitants(unsigned numExtraInhabitants) const {
-    return TargetExtraInhabitantFlags((Data & ~NumExtraInhabitantsMask) |
-                                      numExtraInhabitants);
-  }
-
-  constexpr int_type getOpaqueValue() const { return Data; }
-  static constexpr TargetExtraInhabitantFlags getFromOpaqueValue(int_type data){
-    return TargetExtraInhabitantFlags(data);
-  }
-};
-using ExtraInhabitantFlags =
-  TargetExtraInhabitantFlags<size_t>;
 
 /// Flags for dynamic-cast operations.
 enum class DynamicCastFlags : size_t {
@@ -284,7 +285,8 @@ public:
     Init,
     Getter,
     Setter,
-    MaterializeForSet,
+    ModifyCoroutine,
+    ReadCoroutine,
   };
 
 private:
@@ -337,18 +339,19 @@ enum : unsigned {
 };
 
 /// Kinds of type metadata/protocol conformance records.
-enum class TypeMetadataRecordKind : unsigned {
+enum class TypeReferenceKind : unsigned {
   /// The conformance is for a nominal type referenced directly;
-  /// getNominalTypeDescriptor() points to the nominal type descriptor.
-  DirectNominalTypeDescriptor = 0x00,
+  /// getTypeDescriptor() points to the type context descriptor.
+  DirectTypeDescriptor = 0x00,
 
   /// The conformance is for a nominal type referenced indirectly;
-  /// getNominalTypeDescriptor() points to the nominal type descriptor.
-  IndirectNominalTypeDescriptor = 0x01,
+  /// getTypeDescriptor() points to the type context descriptor.
+  IndirectTypeDescriptor = 0x01,
 
-  /// Reserved for future use.
-  Reserved = 0x02,
-  
+  /// The conformance is for an Objective-C class that should be looked up
+  /// by class name.
+  DirectObjCClassName = 0x02,
+
   /// The conformance is for an Objective-C class that has no nominal type
   /// descriptor.
   /// getIndirectObjCClass() points to a variable that contains the pointer to
@@ -358,7 +361,9 @@ enum class TypeMetadataRecordKind : unsigned {
   /// unused.
   IndirectObjCClass = 0x03,
 
-  First_Kind = DirectNominalTypeDescriptor,
+  // We only reserve three bits for this in the various places we store it.
+
+  First_Kind = DirectTypeDescriptor,
   Last_Kind = IndirectObjCClass,
 };
 
@@ -501,7 +506,8 @@ public:
     Init,
     Getter,
     Setter,
-    MaterializeForSet,
+    ReadCoroutine,
+    ModifyCoroutine,
     AssociatedTypeAccessFunction,
     AssociatedConformanceAccessFunction,
   };
@@ -535,6 +541,19 @@ public:
   bool isInstance() const { return Value & IsInstanceMask; }
 
   int_type getIntValue() const { return Value; }
+
+  enum : uintptr_t {
+    /// Bit used to indicate that an associated type witness is a pointer to
+    /// a mangled name (vs. a pointer to metadata).
+    AssociatedTypeMangledNameBit = 0x01,
+  };
+
+  enum : uint8_t {
+    /// Prefix byte used to identify an associated type whose mangled name
+    /// is relative to the protocol's context rather than the conforming
+    /// type's context.
+    AssociatedTypeInProtocolContextByte = 0xFF
+  };
 };
 
 /// Flags that go in a TargetConformanceDescriptor structure.
@@ -542,24 +561,9 @@ class ConformanceFlags {
 public:
   typedef uint32_t int_type;
 
-  enum class ConformanceKind {
-    /// A direct reference to a protocol witness table.
-    WitnessTable,
-    /// A function pointer that can be called to access the protocol witness
-    /// table.
-    WitnessTableAccessor,
-    /// A function pointer that can be called to access the protocol witness
-    /// table whose conformance is conditional on additional requirements that
-    /// must first be evaluated and then provided to the accessor function.
-    ConditionalWitnessTableAccessor,
-
-    First_Kind = WitnessTable,
-    Last_Kind = ConditionalWitnessTableAccessor,
-  };
-
 private:
   enum : int_type {
-    ConformanceKindMask = 0x07,      // 8 conformance kinds
+    UnusedLowBits = 0x07,      // historical conformance kind
 
     TypeMetadataKindMask = 0x7 << 3, // 8 type reference kinds
     TypeMetadataKindShift = 3,
@@ -569,6 +573,9 @@ private:
 
     NumConditionalRequirementsMask = 0xFF << 8,
     NumConditionalRequirementsShift = 8,
+
+    HasResilientWitnessesMask = 0x01 << 16,
+    HasGenericWitnessTableMask = 0x01 << 17,
   };
 
   int_type Value;
@@ -576,11 +583,7 @@ private:
 public:
   ConformanceFlags(int_type value = 0) : Value(value) {}
 
-  ConformanceFlags withConformanceKind(ConformanceKind kind) const {
-    return ConformanceFlags((Value & ~ConformanceKindMask) | int_type(kind));
-  }
-
-  ConformanceFlags withTypeReferenceKind(TypeMetadataRecordKind kind) const {
+  ConformanceFlags withTypeReferenceKind(TypeReferenceKind kind) const {
     return ConformanceFlags((Value & ~TypeMetadataKindMask)
                             | (int_type(kind) << TypeMetadataKindShift));
   }
@@ -602,14 +605,23 @@ public:
                             | (n << NumConditionalRequirementsShift));
   }
 
-  /// Retrieve the conformance kind.
-  ConformanceKind getConformanceKind() const {
-    return ConformanceKind(Value & ConformanceKindMask);
+  ConformanceFlags withHasResilientWitnesses(bool hasResilientWitnesses) const {
+    return ConformanceFlags((Value & ~HasResilientWitnessesMask)
+                            | (hasResilientWitnesses? HasResilientWitnessesMask
+                                                    : 0));
+  }
+
+  ConformanceFlags withHasGenericWitnessTable(
+                                           bool hasGenericWitnessTable) const {
+    return ConformanceFlags((Value & ~HasGenericWitnessTableMask)
+                            | (hasGenericWitnessTable
+                                 ? HasGenericWitnessTableMask
+                                 : 0));
   }
 
   /// Retrieve the type reference kind kind.
-  TypeMetadataRecordKind getTypeReferenceKind() const {
-    return TypeMetadataRecordKind(
+  TypeReferenceKind getTypeReferenceKind() const {
+    return TypeReferenceKind(
                       (Value & TypeMetadataKindMask) >> TypeMetadataKindShift);
   }
 
@@ -638,12 +650,26 @@ public:
               >> NumConditionalRequirementsShift;
   }
 
+  /// Whether this conformance has any resilient witnesses.
+  bool hasResilientWitnesses() const {
+    return Value & HasResilientWitnessesMask;
+  }
+
+  /// Whether this conformance has a generic witness table that may need to
+  /// be instantiated.
+  bool hasGenericWitnessTable() const {
+    return Value & HasGenericWitnessTableMask;
+  }
+
   int_type getIntValue() const { return Value; }
 };
 
 /// Flags in an existential type metadata record.
 class ExistentialTypeFlags {
-  typedef size_t int_type;
+public:
+  typedef uint32_t int_type;
+
+private:
   enum : int_type {
     NumWitnessTablesMask  = 0x00FFFFFFU,
     ClassConstraintMask   = 0x80000000U,
@@ -791,7 +817,11 @@ using FunctionTypeFlags = TargetFunctionTypeFlags<size_t>;
 
 template <typename int_type>
 class TargetParameterTypeFlags {
-  enum : int_type { ValueOwnershipMask = 0x7F, VariadicMask = 0x80 };
+  enum : int_type {
+    ValueOwnershipMask = 0x7F,
+    VariadicMask       = 0x80,
+    AutoClosureMask    = 0x100,
+  };
   int_type Data;
 
   constexpr TargetParameterTypeFlags(int_type Data) : Data(Data) {}
@@ -811,8 +841,15 @@ public:
                                               (isVariadic ? VariadicMask : 0));
   }
 
+  constexpr TargetParameterTypeFlags<int_type>
+  withAutoClosure(bool isAutoClosure) const {
+    return TargetParameterTypeFlags<int_type>(
+        (Data & ~AutoClosureMask) | (isAutoClosure ? AutoClosureMask : 0));
+  }
+
   bool isNone() const { return Data == 0; }
   bool isVariadic() const { return Data & VariadicMask; }
+  bool isAutoClosure() const { return Data & AutoClosureMask; }
 
   ValueOwnership getValueOwnership() const {
     return (ValueOwnership)(Data & ValueOwnershipMask);
@@ -936,8 +973,6 @@ enum class ExclusivityFlags : uintptr_t {
   // Read or Modify).
   ActionMask       = 0x1,
 
-  // Downgrade exclusivity failures to a warning.
-  WarningOnly      = 0x10,
   // The runtime should track this access to check against subsequent accesses.
   Tracking         = 0x20
 };
@@ -952,9 +987,6 @@ static inline ExclusivityFlags &operator|=(ExclusivityFlags &lhs,
 static inline ExclusivityFlags getAccessAction(ExclusivityFlags flags) {
   return ExclusivityFlags(uintptr_t(flags)
                         & uintptr_t(ExclusivityFlags::ActionMask));
-}
-static inline bool isWarningOnly(ExclusivityFlags flags) {
-  return uintptr_t(flags) & uintptr_t(ExclusivityFlags::WarningOnly);
 }
 static inline bool isTracking(ExclusivityFlags flags) {
   return uintptr_t(flags) & uintptr_t(ExclusivityFlags::Tracking);
@@ -995,6 +1027,12 @@ enum class ClassLayoutFlags : uintptr_t {
 
   /// The ABI baseline algorithm, i.e. the algorithm implemented in Swift 5.
   Swift5Algorithm   = 0x00,
+
+  /// If true, the vtable for this class and all of its superclasses was emitted
+  /// statically in the class metadata. If false, the superclass vtable is
+  /// copied from superclass metadata, and the immediate class vtable is
+  /// initialized from the type context descriptor.
+  HasStaticVTable   = 0x100,
 };
 static inline ClassLayoutFlags operator|(ClassLayoutFlags lhs,
                                          ClassLayoutFlags rhs) {
@@ -1007,6 +1045,9 @@ static inline ClassLayoutFlags &operator|=(ClassLayoutFlags &lhs,
 static inline ClassLayoutFlags getLayoutAlgorithm(ClassLayoutFlags flags) {
   return ClassLayoutFlags(uintptr_t(flags)
                              & uintptr_t(ClassLayoutFlags::AlgorithmMask));
+}
+static inline bool hasStaticVTable(ClassLayoutFlags flags) {
+  return uintptr_t(flags) & uintptr_t(ClassLayoutFlags::HasStaticVTable);
 }
 
 /// Flags for enum layout.
@@ -1058,7 +1099,13 @@ enum class ContextDescriptorKind : uint8_t {
   /// This context descriptor represents an anonymous possibly-generic context
   /// such as a function body.
   Anonymous = 2,
+
+  /// This context descriptor represents a protocol context.
+  Protocol = 3,
   
+  /// This context descriptor represents an opaque type alias.
+  OpaqueType = 4,
+
   /// First kind that represents a type of any sort.
   Type_First = 16,
   
@@ -1161,56 +1208,96 @@ class TypeContextDescriptorFlags : public FlagSet<uint16_t> {
     // Generic flags build upwards from 0.
     // Type-specific flags build downwards from 15.
 
-    /// Set if the type represents an imported C tag type.
+    /// Whether there's something unusual about how the metadata is
+    /// initialized.
     ///
     /// Meaningful for all type-descriptor kinds.
-    IsCTag = 0,
+    MetadataInitialization = 0,
+    MetadataInitialization_width = 2,
 
-    /// Set if the type represents an imported C typedef type.
+    /// Set if the type has extended import information.
+    ///
+    /// If true, a sequence of strings follow the null terminator in the
+    /// descriptor, terminated by an empty string (i.e. by two null
+    /// terminators in a row).  See TypeImportInfo for the details of
+    /// these strings and the order in which they appear.
     ///
     /// Meaningful for all type-descriptor kinds.
-    IsCTypedef = 1,
+    HasImportInfo = 2,
 
-    /// Set if the type supports reflection.  C and Objective-C enums
-    /// currently don't.
-    ///
-    /// Meaningful for all type-descriptor kinds.
-    IsReflectable = 2,
+    // Type-specific flags:
 
-    /// Set if the context descriptor is includes metadata for dynamically
-    /// constructing a class's vtables at metadata instantiation time.
+    /// The kind of reference that this class makes to its resilient superclass
+    /// descriptor.  A TypeReferenceKind.
     ///
     /// Only meaningful for class descriptors.
-    Class_HasVTable = 15,
+    Class_ResilientSuperclassReferenceKind = 9,
+    Class_ResilientSuperclassReferenceKind_width = 3,
+
+    /// Whether the immediate class members in this metadata are allocated
+    /// at negative offsets.  For now, we don't use this.
+    Class_AreImmediateMembersNegative = 12,
 
     /// Set if the context descriptor is for a class with resilient ancestry.
     ///
     /// Only meaningful for class descriptors.
-    Class_HasResilientSuperclass = 14,
+    Class_HasResilientSuperclass = 13,
 
-    /// The kind of reference that this class makes to its superclass
-    /// descriptor.  A TypeMetadataRecordKind.
+    /// Set if the context descriptor includes metadata for dynamically
+    /// installing method overrides at metadata instantiation time.
+    Class_HasOverrideTable = 14,
+
+    /// Set if the context descriptor includes metadata for dynamically
+    /// constructing a class's vtables at metadata instantiation time.
     ///
     /// Only meaningful for class descriptors.
-    Class_SuperclassReferenceKind = 12,
-    Class_SuperclassReferenceKind_width = 2,
-
-    /// Whether the immediate class members in this metadata are allocated
-    /// at negative offsets.  For now, we don't use this.
-    Class_AreImmediateMembersNegative = 11,
+    Class_HasVTable = 15,
   };
 
 public:
   explicit TypeContextDescriptorFlags(uint16_t bits) : FlagSet(bits) {}
   constexpr TypeContextDescriptorFlags() {}
 
-  FLAGSET_DEFINE_FLAG_ACCESSORS(IsCTag, isCTag, setIsCTag)
-  FLAGSET_DEFINE_FLAG_ACCESSORS(IsCTypedef, isCTypedef, setIsCTypedef)
-  FLAGSET_DEFINE_FLAG_ACCESSORS(IsReflectable, isReflectable, setIsReflectable)
+  enum MetadataInitializationKind {
+    /// There are either no special rules for initializing the metadata
+    /// or the metadata is generic.  (Genericity is set in the
+    /// non-kind-specific descriptor flags.)
+    NoMetadataInitialization = 0,
+
+    /// The type requires non-trivial singleton initialization using the
+    /// "in-place" code pattern.
+    SingletonMetadataInitialization = 1,
+
+    /// The type requires non-trivial singleton initialization using the
+    /// "foreign" code pattern.
+    ForeignMetadataInitialization = 2,
+
+    // We only have two bits here, so if you add a third special kind,
+    // include more flag bits in its out-of-line storage.
+  };
+
+  FLAGSET_DEFINE_FIELD_ACCESSORS(MetadataInitialization,
+                                 MetadataInitialization_width,
+                                 MetadataInitializationKind,
+                                 getMetadataInitialization,
+                                 setMetadataInitialization)
+
+  bool hasSingletonMetadataInitialization() const {
+    return getMetadataInitialization() == SingletonMetadataInitialization;
+  }
+
+  bool hasForeignMetadataInitialization() const {
+    return getMetadataInitialization() == ForeignMetadataInitialization;
+  }
+
+  FLAGSET_DEFINE_FLAG_ACCESSORS(HasImportInfo, hasImportInfo, setHasImportInfo)
 
   FLAGSET_DEFINE_FLAG_ACCESSORS(Class_HasVTable,
                                 class_hasVTable,
                                 class_setHasVTable)
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Class_HasOverrideTable,
+                                class_hasOverrideTable,
+                                class_setHasOverrideTable)
   FLAGSET_DEFINE_FLAG_ACCESSORS(Class_HasResilientSuperclass,
                                 class_hasResilientSuperclass,
                                 class_setHasResilientSuperclass)
@@ -1218,11 +1305,85 @@ public:
                                 class_areImmediateMembersNegative,
                                 class_setAreImmediateMembersNegative)
 
-  FLAGSET_DEFINE_FIELD_ACCESSORS(Class_SuperclassReferenceKind,
-                                 Class_SuperclassReferenceKind_width,
-                                 TypeMetadataRecordKind,
-                                 class_getSuperclassReferenceKind,
-                                 class_setSuperclassReferenceKind)
+  FLAGSET_DEFINE_FIELD_ACCESSORS(Class_ResilientSuperclassReferenceKind,
+                                 Class_ResilientSuperclassReferenceKind_width,
+                                 TypeReferenceKind,
+                                 class_getResilientSuperclassReferenceKind,
+                                 class_setResilientSuperclassReferenceKind)
+};
+
+/// Extra flags for resilient classes, since we need more than 16 bits of
+/// flags there.
+class ExtraClassDescriptorFlags : public FlagSet<uint32_t> {
+  enum {
+    /// Set if the context descriptor includes a pointer to an Objective-C
+    /// resilient class stub structure. See the description of
+    /// TargetObjCResilientClassStubInfo in Metadata.h for details.
+    ///
+    /// Only meaningful for class descriptors when Objective-C interop is
+    /// enabled.
+    HasObjCResilientClassStub = 0,
+  };
+
+public:
+  explicit ExtraClassDescriptorFlags(uint32_t bits) : FlagSet(bits) {}
+  constexpr ExtraClassDescriptorFlags() {}
+
+  FLAGSET_DEFINE_FLAG_ACCESSORS(HasObjCResilientClassStub,
+                                hasObjCResilientClassStub,
+                                setObjCResilientClassStub)
+};
+
+/// Flags for protocol context descriptors. These values are used as the
+/// kindSpecificFlags of the ContextDescriptorFlags for the protocol.
+class ProtocolContextDescriptorFlags : public FlagSet<uint16_t> {
+  enum {
+    /// Whether this protocol is class-constrained.
+    HasClassConstraint = 0,
+    HasClassConstraint_width = 1,
+
+    /// Whether this protocol is resilient.
+    IsResilient = 1,
+
+    /// Special protocol value.
+    SpecialProtocolKind = 2,
+    SpecialProtocolKind_width = 6,
+  };
+
+public:
+  explicit ProtocolContextDescriptorFlags(uint16_t bits) : FlagSet(bits) {}
+  constexpr ProtocolContextDescriptorFlags() {}
+
+  FLAGSET_DEFINE_FLAG_ACCESSORS(IsResilient, isResilient, setIsResilient)
+
+  FLAGSET_DEFINE_FIELD_ACCESSORS(HasClassConstraint,
+                                 HasClassConstraint_width,
+                                 ProtocolClassConstraint,
+                                 getClassConstraint,
+                                 setClassConstraint)
+
+  FLAGSET_DEFINE_FIELD_ACCESSORS(SpecialProtocolKind,
+                                 SpecialProtocolKind_width,
+                                 SpecialProtocol,
+                                 getSpecialProtocol,
+                                 setSpecialProtocol)
+};
+
+/// Flags for anonymous type context descriptors. These values are used as the
+/// kindSpecificFlags of the ContextDescriptorFlags for the anonymous context.
+class AnonymousContextDescriptorFlags : public FlagSet<uint16_t> {
+  enum {
+    /// Whether this anonymous context descriptor is followed by its
+    /// mangled name, which can be used to match the descriptor at runtime.
+    HasMangledName = 0,
+  };
+
+public:
+  explicit AnonymousContextDescriptorFlags(uint16_t bits) : FlagSet(bits) {}
+  constexpr AnonymousContextDescriptorFlags() {}
+
+  FLAGSET_DEFINE_FLAG_ACCESSORS(HasMangledName, hasMangledName,
+                                setHasMangledName)
 };
 
 enum class GenericParamKind : uint8_t {
@@ -1348,6 +1509,45 @@ public:
 enum class GenericRequirementLayoutKind : uint32_t {
   // A class constraint.
   Class = 0,
+};
+
+class GenericEnvironmentFlags {
+  uint32_t Value;
+
+  enum : uint32_t {
+    NumGenericParameterLevelsMask = 0xFFF,
+    NumGenericRequirementsShift = 12,
+    NumGenericRequirementsMask = 0xFFFF << NumGenericRequirementsShift,
+  };
+
+  constexpr explicit GenericEnvironmentFlags(uint32_t value) : Value(value) { }
+
+public:
+  constexpr GenericEnvironmentFlags() : Value(0) { }
+
+  constexpr GenericEnvironmentFlags
+  withNumGenericParameterLevels(uint16_t numGenericParameterLevels) const {
+    return GenericEnvironmentFlags((Value &~ NumGenericParameterLevelsMask)
+                                   | numGenericParameterLevels);
+  }
+
+  constexpr GenericEnvironmentFlags
+  withNumGenericRequirements(uint16_t numGenericRequirements) const {
+    return GenericEnvironmentFlags((Value &~ NumGenericRequirementsMask)
+             | (numGenericRequirements << NumGenericRequirementsShift));
+  }
+
+  constexpr unsigned getNumGenericParameterLevels() const {
+    return Value & NumGenericParameterLevelsMask;
+  }
+
+  constexpr unsigned getNumGenericRequirements() const {
+    return (Value & NumGenericRequirementsMask) >> NumGenericRequirementsShift;
+  }
+
+  constexpr uint32_t getIntValue() const {
+    return Value;
+  }
 };
 
 /// Flags used by generic metadata patterns.
@@ -1516,6 +1716,40 @@ public:
   }
 };
 
+/// Flags for Builtin.IntegerLiteral values.
+class IntegerLiteralFlags {
+public:
+  enum : size_t {
+    IsNegativeFlag = 0x1,
+
+    // Save some space for other flags.
+
+    BitWidthShift = 8,
+  };
+
+private:
+  size_t Data;
+
+  explicit IntegerLiteralFlags(size_t data) : Data(data) {}
+
+public:
+  constexpr IntegerLiteralFlags(size_t bitWidth, bool isNegative)
+    : Data((bitWidth << BitWidthShift)
+           | (isNegative ? IsNegativeFlag : 0)) {}
+
+  /// Return true if the value is negative.
+  bool isNegative() const { return Data & IsNegativeFlag; }
+
+  /// Return the minimum number of bits necessary to store the value in
+  /// two's complement, including a leading sign bit.
+  unsigned getBitWidth() const { return Data >> BitWidthShift; }
+
+  size_t getOpaqueValue() const { return Data; }
+  static IntegerLiteralFlags getFromOpaqueValue(size_t value) {
+    return IntegerLiteralFlags(value);
+  }
+};
+
 } // end namespace swift
 
-#endif /* SWIFT_ABI_METADATAVALUES_H */
+#endif // SWIFT_ABI_METADATAVALUES_H

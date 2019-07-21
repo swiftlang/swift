@@ -2,10 +2,10 @@
 
 // Make sure we generate the outer metadata.
 
-// CHECK-DAG: @"$S4test5OuterVMf" = internal constant {{.*}} @"$SytWV"{{.*}}@"$S4test5OuterVMn"
-// CHECK-DAG: @"$S4test6Outer2VMf" = internal constant {{.*}} @"$SytWV"{{.*}}@"$S4test6Outer2VMn"
-// CHECK-DAG: @"$S4test6Outer3VMf" = internal constant {{.*}} @"$SytWV"{{.*}}@"$S4test6Outer3VMn"
-// CHECK-DAG: @"$S4test6Outer4VMf" = internal constant {{.*}} @"$SytWV"{{.*}}@"$S4test6Outer4VMn"
+// CHECK-DAG: @"$s4test5OuterVMf" = internal constant {{.*}} {{@"\$sytWV"|i8\*\* getelementptr inbounds \(%swift.vwtable, %swift.vwtable\* @"\$s4test5OuterVWV", i32 0, i32 0\)}}, {{.*}} @"$s4test5OuterVMn"
+// CHECK-DAG: @"$s4test6Outer2VMf" = internal constant {{.*}} {{@"\$sytWV"|i8\*\* getelementptr inbounds \(%swift.vwtable, %swift.vwtable\* @"\$s4test6Outer2VWV", i32 0, i32 0\)}}, {{.*}} @"$s4test6Outer2VMn"
+// CHECK-DAG: @"$s4test6Outer3VMf" = internal constant {{.*}} {{@"\$sytWV"|i8\*\* getelementptr inbounds \(%swift.vwtable, %swift.vwtable\* @"\$s4test6Outer3VWV", i32 0, i32 0\)}}, {{.*}} @"$s4test6Outer3VMn"
+// CHECK-DAG: @"$s4test6Outer4VMf" = internal constant {{.*}} {{@"\$sytWV"|i8\*\* getelementptr inbounds \(%swift.vwtable, %swift.vwtable\* @"\$s4test6Outer4VWV", i32 0, i32 0\)}}, {{.*}} @"$s4test6Outer4VMn"
 
 class C<T> { }
 

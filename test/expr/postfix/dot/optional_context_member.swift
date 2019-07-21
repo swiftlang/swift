@@ -13,14 +13,20 @@ func nonOptContext() -> Foo {
   case ():
     return .someVar
   case (): // expected-warning {{case is already handled by previous patterns; consider removing it}}
-    return .someOptVar // expected-error 2 {{value of optional type 'Foo' not unwrapped; did you mean to use '!' or '?'?}} {{23-23=!}}
+    return .someOptVar
+    // expected-error@-1 {{value of optional type 'Foo?' must be unwrapped to a value of type 'Foo'}}
+    // expected-note@-2 {{coalesce}}
+    // expected-note@-3 {{force-unwrap}}
   // TODO
   //case ():
   //  return .someOptVar!
   case (): // expected-warning {{case is already handled by previous patterns; consider removing it}}
     return .someFunc()
   case (): // expected-warning {{case is already handled by previous patterns; consider removing it}}
-    return .someOptFunc() // expected-error{{}} {{26-26=!}}
+    return .someOptFunc()
+    // expected-error@-1 {{value of optional type 'Foo?' must be unwrapped to a value of type 'Foo'}}
+    // expected-note@-2 {{coalesce}}
+    // expected-note@-3 {{force-unwrap}}
   // TODO
   //case ():
   //  return .someOptFunc()!

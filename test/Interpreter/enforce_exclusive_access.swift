@@ -1,13 +1,14 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -swift-version 4 %s -o %t/a.out -enforce-exclusivity=checked -Onone
+// RUN: %target-build-swift  -swift-version 4 %s -o %t/a.out -enforce-exclusivity=checked -Onone
 //
+// RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out
 // REQUIRES: executable_test
 
 // Tests for traps at run time when enforcing exclusive access.
 
 import StdlibUnittest
-import SwiftPrivatePthreadExtras
+import SwiftPrivateThreadExtras
 
 struct X {
   var i = 7
@@ -22,6 +23,11 @@ func readAndPerform<T>(_ _: UnsafePointer<T>, closure: () ->()) {
 
 /// Begin a modify access to the first parameter and call the closure inside it.
 func modifyAndPerform<T>(_ _: UnsafeMutablePointer<T>, closure: () ->()) {
+  closure()
+}
+
+/// Begin a modify access to the first parameter and call the escaping closure inside it.
+func modifyAndPerformEscaping<T>(_ _: UnsafeMutablePointer<T>, closure: () ->()) {
   closure()
 }
 
@@ -114,12 +120,12 @@ ExclusiveAccessTestSuite.test("ClosureCaptureReadRead") {
 // have overlapping accesses
 ExclusiveAccessTestSuite.test("PerThreadEnforcement") {
   modifyAndPerform(&globalX) {
-    let (_, otherThread) = _stdlib_pthread_create_block(nil, { (_ : Void) -> () in
+    let (_, otherThread) = _stdlib_thread_create_block({ (_ : Void) -> () in
       globalX.i = 12 // no-trap
       return ()
     }, ())
 
-    _ = _stdlib_pthread_join(otherThread!, Void.self)
+    _ = _stdlib_thread_join(otherThread!, Void.self)
   }
 }
 
@@ -305,31 +311,73 @@ ExclusiveAccessTestSuite.test("SequentialKeyPathWritesDontOverlap") {
 
   c[keyPath: getF] = 7
   c[keyPath: getF] = 8 // no-trap
-  c[keyPath: getF] += c[keyPath: getF] + 1 // no-trap
+  c[keyPath: getF] += c[keyPath: getF] // no-trap
 }
 
-// This does not trap, for now, because the standard library (and thus KeyPath) is
-// compiled in Swift 3 mode and we currently log rather than trap in Swift mode.
 ExclusiveAccessTestSuite.test("KeyPathInoutKeyPathWriteClassStoredProp")
+  .skip(.custom(
+    { _isFastAssertConfiguration() },
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
+  .crashOutputMatches("Previous access (a modification) started at")
+  .crashOutputMatches("Current access (a modification) started at")
+  .code
 {
   let getF = \ClassWithStoredProperty.f
   let c = ClassWithStoredProperty()
 
+  expectCrashLater()
   modifyAndPerform(&c[keyPath: getF]) {
     c[keyPath: getF] = 12
   }
 }
 
-// This does not currently trap because the standard library is compiled in Swift 3 mode,
-// which logs.
-ExclusiveAccessTestSuite.test("KeyPathInoutKeyPathReadClassStoredProp") {
+ExclusiveAccessTestSuite.test("KeyPathInoutKeyPathReadClassStoredProp")
+  .skip(.custom(
+    { _isFastAssertConfiguration() },
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
+  .crashOutputMatches("Previous access (a modification) started at")
+  .crashOutputMatches("Current access (a read) started at")
+  .code
+{
   let getF = \ClassWithStoredProperty.f
   let c = ClassWithStoredProperty()
 
+  expectCrashLater()
   modifyAndPerform(&c[keyPath: getF]) {
     let y = c[keyPath: getF]
     _blackHole(y)
   }
+}
+
+// <rdar://problem/43076947> [Exclusivity] improve diagnostics for
+// withoutActuallyEscaping.
+ExclusiveAccessTestSuite.test("withoutActuallyEscapingConflict") {
+  var localVal = 0
+  let nestedModify = { localVal = 3 }
+  withoutActuallyEscaping(nestedModify) {
+    expectCrashLater()
+    modifyAndPerform(&localVal, closure: $0)
+  }
+}
+
+ExclusiveAccessTestSuite.test("directlyAppliedConflict") {
+  var localVal = 0
+  let nestedModify = { localVal = 3 }
+  expectCrashLater()
+  _ = {
+    modifyAndPerform(&localVal, closure: nestedModify)
+  }()
+}
+
+// <rdar://problem/43122715> [Exclusivity] failure to diagnose
+// escaping closures called within directly applied noescape closures.
+ExclusiveAccessTestSuite.test("directlyAppliedEscapingConflict") {
+  var localVal = 0
+  let nestedModify = { localVal = 3 }
+  expectCrashLater()
+  _ = {
+    modifyAndPerformEscaping(&localVal, closure: nestedModify)
+  }()
 }
 
 runAllTests()

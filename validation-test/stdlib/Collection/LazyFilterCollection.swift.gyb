@@ -2,6 +2,11 @@
 // RUN: %target-run-simple-swiftgyb
 // REQUIRES: executable_test
 
+// FIXME: the test is too slow when the standard library is not optimized.
+// rdar://problem/46878013
+// REQUIRES: optimized_stdlib
+// REQUIRES: long_test
+
 import SwiftPrivate
 import StdlibUnittest
 import StdlibCollectionUnittest
@@ -98,7 +103,8 @@ CollectionTests.test("LazyFilterCollection instances (${traversal}${kind})") {
   do {
     let predicate: (Int) -> Bool = { $0 % 3 == 0 || $0 % 5 == 0 }
 
-    let base = randArray(500)
+    let count = 500
+    let base = (0 ..< count).map { _ in Int.random(in: .min ... .max) }
     var expected : [Int] = []
     for element in base where predicate(element) {
       expected.append(element)

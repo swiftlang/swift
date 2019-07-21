@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify %s
+// RUN: %target-typecheck-verify-swift
 protocol Foo {
   associatedtype Flim
   associatedtype Flam

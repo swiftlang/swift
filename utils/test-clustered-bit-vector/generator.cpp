@@ -175,26 +175,6 @@ static void run() {
     // Validate that everything's still okay.
     for (auto i = 0; i != NV; ++i) {
       checkConsistency("cbvs[" + Twine(i) + "]", cbvs[i], vecs[i], 1);
-
-      auto enumerator = cbvs[i].enumerateSetBits();
-      auto nextIndex = enumerator.findNext();
-      for (unsigned j = 0, je = cbvs[i].size(); j != je; ++j) {
-        assert((!nextIndex || nextIndex.getValue() >= j) && "going in reverse?");
-        if (cbvs[i][j]) {
-          if (!nextIndex || nextIndex.getValue() != j) {
-            llvm::outs() << "  cbvs[" << i << "][" << j
-                         << "] is set but was not found by enumerator\n";
-            abort();
-          }
-          nextIndex = enumerator.findNext();
-        } else {
-          if (nextIndex && nextIndex.getValue() == j) {
-            llvm::outs() << "  cbvs[" << i << "][" << j
-                         << "] is not set but was found by enumerator\n";
-            abort();
-          }
-        }
-      }
     }
   }
 }

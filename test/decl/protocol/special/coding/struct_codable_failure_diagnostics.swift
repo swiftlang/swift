@@ -90,8 +90,12 @@ struct S5 : Codable {
   }
 }
 
-// Structs cannot yet synthesize Encodable or Decodable in extensions.
-struct S6 {}
-extension S6 : Codable {}
-// expected-error@-1 {{implementation of 'Decodable' cannot be automatically synthesized in an extension}}
-// expected-error@-2 {{implementation of 'Encodable' cannot be automatically synthesized in an extension}}
+struct NotCodable {}
+struct S6 {
+    var x: NotCodable = NotCodable()
+    // expected-note@-1 {{cannot automatically synthesize 'Encodable' because 'NotCodable' does not conform to 'Encodable'}}
+    // expected-note@-2 {{cannot automatically synthesize 'Decodable' because 'NotCodable' does not conform to 'Decodable'}}
+}
+extension S6: Codable {}
+// expected-error@-1 {{type 'S6' does not conform to protocol 'Encodable'}}
+// expected-error@-2 {{type 'S6' does not conform to protocol 'Decodable'}}

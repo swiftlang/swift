@@ -20,7 +20,7 @@
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/AST/PlatformKind.h"
-#include "clang/Basic/VersionTuple.h"
+#include "llvm/Support/VersionTuple.h"
 
 namespace swift {
 class ASTContext;
@@ -37,6 +37,9 @@ enum class AvailabilitySpecKind {
 
     /// A language-version constraint of the form "swift X.Y.Z"
     LanguageVersionConstraint,
+
+    /// A PackageDescription version constraint of the form "_PackageDescription X.Y.Z"
+    PackageDescriptionVersionConstraint,
 };
 
 /// The root class for specifications of API availability in availability
@@ -58,19 +61,19 @@ public:
   void operator delete(void *Data) throw() = delete;
 };
 
-/// \brief An availability specification that guards execution based on the
+/// An availability specification that guards execution based on the
 /// run-time platform and version, e.g., OS X >= 10.10.
 class PlatformVersionConstraintAvailabilitySpec : public AvailabilitySpec {
   PlatformKind Platform;
   SourceLoc PlatformLoc;
 
-  clang::VersionTuple Version;
+  llvm::VersionTuple Version;
   SourceRange VersionSrcRange;
 
 public:
   PlatformVersionConstraintAvailabilitySpec(PlatformKind Platform,
                                             SourceLoc PlatformLoc,
-                                            clang::VersionTuple Version,
+                                            llvm::VersionTuple Version,
                                             SourceRange VersionSrcRange)
     : AvailabilitySpec(AvailabilitySpecKind::PlatformVersionConstraint),
       Platform(Platform),
@@ -80,9 +83,14 @@ public:
   /// The required platform.
   PlatformKind getPlatform() const { return Platform; }
   SourceLoc getPlatformLoc() const { return PlatformLoc; }
-  
+
+  /// Returns true when the constraint is for a platform that was not
+  /// recognized. This enables better recovery during parsing but should never
+  /// be true after parsing is completed.
+  bool isUnrecognizedPlatform() const { return Platform == PlatformKind::none; }
+
   // The platform version to compare against.
-  clang::VersionTuple getVersion() const { return Version; }
+  llvm::VersionTuple getVersion() const { return Version; }
   SourceRange getVersionSrcRange() const { return VersionSrcRange; }
 
   SourceRange getSourceRange() const;
@@ -100,39 +108,49 @@ public:
   }
 };
 
-/// \brief An availability specification that guards execution based on the
-/// compile-time language version, e.g., swift >= 3.0.1.
-class LanguageVersionConstraintAvailabilitySpec : public AvailabilitySpec {
-  SourceLoc SwiftLoc;
+/// An availability specification that guards execution based on the
+/// compile-time platform agnostic version, e.g., swift >= 3.0.1,
+/// package-description >= 4.0.
+class PlatformAgnosticVersionConstraintAvailabilitySpec : public AvailabilitySpec {
+  SourceLoc PlatformAgnosticNameLoc;
 
-  clang::VersionTuple Version;
+  llvm::VersionTuple Version;
   SourceRange VersionSrcRange;
 
 public:
-  LanguageVersionConstraintAvailabilitySpec(SourceLoc SwiftLoc,
-                                            clang::VersionTuple Version,
-                                            SourceRange VersionSrcRange)
-    : AvailabilitySpec(AvailabilitySpecKind::LanguageVersionConstraint),
-      SwiftLoc(SwiftLoc), Version(Version),
-      VersionSrcRange(VersionSrcRange) {}
+  PlatformAgnosticVersionConstraintAvailabilitySpec(
+      AvailabilitySpecKind AvailabilitySpecKind,
+      SourceLoc PlatformAgnosticNameLoc, llvm::VersionTuple Version,
+      SourceRange VersionSrcRange)
+      : AvailabilitySpec(AvailabilitySpecKind),
+        PlatformAgnosticNameLoc(PlatformAgnosticNameLoc), Version(Version),
+        VersionSrcRange(VersionSrcRange) {
+    assert(AvailabilitySpecKind == AvailabilitySpecKind::LanguageVersionConstraint ||
+           AvailabilitySpecKind == AvailabilitySpecKind::PackageDescriptionVersionConstraint);
+  }
 
-  SourceLoc getSwiftLoc() const { return SwiftLoc; }
+  SourceLoc getPlatformAgnosticNameLoc() const { return PlatformAgnosticNameLoc; }
 
   // The platform version to compare against.
-  clang::VersionTuple getVersion() const { return Version; }
+  llvm::VersionTuple getVersion() const { return Version; }
   SourceRange getVersionSrcRange() const { return VersionSrcRange; }
 
   SourceRange getSourceRange() const;
 
+  bool isLanguageVersionSpecific() const {
+      return getKind() == AvailabilitySpecKind::LanguageVersionConstraint;
+  }
+
   void print(raw_ostream &OS, unsigned Indent) const;
 
   static bool classof(const AvailabilitySpec *Spec) {
-    return Spec->getKind() == AvailabilitySpecKind::LanguageVersionConstraint;
+    return Spec->getKind() == AvailabilitySpecKind::LanguageVersionConstraint ||
+      Spec->getKind() == AvailabilitySpecKind::PackageDescriptionVersionConstraint;
   }
 
   void *
   operator new(size_t Bytes, ASTContext &C,
-               unsigned Alignment = alignof(LanguageVersionConstraintAvailabilitySpec)){
+               unsigned Alignment = alignof(PlatformAgnosticVersionConstraintAvailabilitySpec)){
     return AvailabilitySpec::operator new(Bytes, C, Alignment);
   }
 };

@@ -6,10 +6,10 @@ public func foo<
   Expected : Sequence,
   Actual : Sequence,
   T : Comparable
+>(_ expected: Expected, _ actual: Actual)
   where
   Expected.Iterator.Element == Actual.Iterator.Element,
-  Expected.Iterator.Element == (T, T)
->(_ expected: Expected, _ actual: Actual) {}
+  Expected.Iterator.Element == (T, T) {}
 
 func f() {
   foo(

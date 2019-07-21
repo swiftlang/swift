@@ -42,7 +42,7 @@ struct SyntaxVisitor {
 
   virtual void visitPre(Syntax node) {}
   virtual void visitPost(Syntax node) {}
-  void visit(Syntax node);
+  virtual void visit(Syntax node);
 
   void visitChildren(Syntax node) {
     for (unsigned i = 0, e = node.getNumChildren(); i != e; ++i) {

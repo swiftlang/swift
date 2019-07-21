@@ -115,7 +115,7 @@ public class AnyKeyPath: Hashable {
   // Prevent normal initialization. We use tail allocation via
   // allocWithTailElems().
   internal init() {
-    _sanityCheckFailure("use _create(...)")
+    assertionFailure("use _create(...)")
   }
   
   public // @testable
@@ -123,7 +123,7 @@ public class AnyKeyPath: Hashable {
     capacityInBytes bytes: Int,
     initializedBy body: (UnsafeMutableRawBufferPointer) -> Void
   ) -> Self {
-    _sanityCheck(bytes > 0 && bytes % 4 == 0,
+    assert(bytes > 0 && bytes % 4 == 0,
                  "capacity must be multiple of 4 bytes")
     let result = Builtin.allocWithTailElems_1(self, (bytes/4)._builtinWordValue,
                                               Int32.self)
@@ -190,7 +190,7 @@ public class KeyPath<Root, Value>: PartialKeyPath<Root>, _KeyPath {
           var destBuffer = $0
           
           func pushRaw(_ count: Int) {
-            _sanityCheck(destBuffer.count >= count)
+            assert(destBuffer.count >= count)
             destBuffer = UnsafeMutableRawBufferPointer(
               start: destBuffer.baseAddress.unsafelyUnwrapped + count,
               count: destBuffer.count - count
@@ -198,7 +198,7 @@ public class KeyPath<Root, Value>: PartialKeyPath<Root>, _KeyPath {
           }
           func pushType(_ type: Any.Type) {
             let intSize = MemoryLayout<Int>.size
-            _sanityCheck(destBuffer.count >= intSize)
+            assert(destBuffer.count >= intSize)
             if intSize == 8 {
               let words = unsafeBitCast(type, to: (UInt32, UInt32).self)
               destBuffer.storeBytes(of: words.0,
@@ -208,7 +208,7 @@ public class KeyPath<Root, Value>: PartialKeyPath<Root>, _KeyPath {
             } else if intSize == 4 {
               destBuffer.storeBytes(of: type, as: Any.Type.self)
             } else {
-              _sanityCheckFailure("unsupported architecture")
+              assertFailure("unsupported architecture")
             }
             pushRaw(intSize)
           }
@@ -271,7 +271,7 @@ public class KeyPath<Root, Value>: PartialKeyPath<Root>, _KeyPath {
             }
           }
           
-          _sanityCheck(destBuffer.count == 0,
+          assert(destBuffer.count == 0,
                        "did not fill entire result buffer")
         }
       }
@@ -359,7 +359,7 @@ public class KeyPath<Root, Value>: PartialKeyPath<Root>, _KeyPath {
           func project2<NewValue>(_: NewValue.Type) -> Value? {
             let newBase: NewValue = rawComponent.projectReadOnly(base)
             if isLast {
-              _sanityCheck(NewValue.self == Value.self,
+              assert(NewValue.self == Value.self,
                            "key path does not terminate in correct type")
               return unsafeBitCast(newBase, to: Value.self)
             } else {
@@ -408,7 +408,7 @@ public class WritableKeyPath<Root, Value>: KeyPath<Root, Value> {
     return withBuffer {
       var buffer = $0
       
-      _sanityCheck(!buffer.hasReferencePrefix,
+      assert(!buffer.hasReferencePrefix,
                    "WritableKeyPath should not have a reference prefix")
       
       while true {
@@ -472,7 +472,7 @@ public class ReferenceWritableKeyPath<Root, Value>: WritableKeyPath<Root, Value>
       var base: Any = origBase
       while buffer.hasReferencePrefix {
         let (rawComponent, optNextType) = buffer.next()
-        _sanityCheck(optNextType != nil,
+        assert(optNextType != nil,
                      "reference prefix should not go to end of buffer")
         let nextType = optNextType.unsafelyUnwrapped
         
@@ -625,7 +625,7 @@ struct RawKeyPathComponent {
     var payload: Int {
       get { return Int(_value) & Header.payloadMask }
       set {
-        _sanityCheck(newValue & Header.payloadMask == newValue,
+        assert(newValue & Header.payloadMask == newValue,
                      "payload too big")
         let shortMask = UInt32(Header.payloadMask)
         _value = _value & ~shortMask | UInt32(newValue)
@@ -658,7 +658,7 @@ struct RawKeyPathComponent {
       case (3, 2):
         return .optionalForce
       default:
-        _sanityCheckFailure("invalid header")
+        assertFailure("invalid header")
       }
     }
     
@@ -681,13 +681,13 @@ struct RawKeyPathComponent {
   }
 
   var _structOrClassOffset: Int {
-    _sanityCheck(header.kind == .struct || header.kind == .class,
+    assert(header.kind == .struct || header.kind == .class,
                  "no offset for this kind")
     // An offset too large to fit inline is represented by a signal and stored
     // in the body.
     if header.payload == Header.payloadMask {
       // Offset overflowed into body
-      _sanityCheck(body.count >= MemoryLayout<UInt32>.size,
+      assert(body.count >= MemoryLayout<UInt32>.size,
                    "component not big enough")
       return Int(body.load(as: UInt32.self))
     }
@@ -742,7 +742,7 @@ struct RawKeyPathComponent {
          .optionalWrap:
       break
     }
-    _sanityCheck(buffer.count >= componentSize)
+    assert(buffer.count >= componentSize)
     buffer = UnsafeMutableRawBufferPointer(
       start: buffer.baseAddress.unsafelyUnwrapped + componentSize,
       count: buffer.count - componentSize
@@ -761,7 +761,7 @@ struct RawKeyPathComponent {
       }
     
     case .class(let offset):
-      _sanityCheck(CurValue.self is AnyObject.Type,
+      assert(CurValue.self is AnyObject.Type,
                    "base is not a class")
       let baseObj = unsafeBitCast(base, to: AnyObject.self)
       let basePtr = UnsafeRawPointer(Builtin.bridgeToRawPointer(baseObj))
@@ -794,7 +794,7 @@ struct RawKeyPathComponent {
     case .class(let offset):
       // A class dereference should only occur at the root of a mutation,
       // since otherwise it would be part of the reference prefix.
-      _sanityCheck(isRoot,
+      assert(isRoot,
                  "class component should not appear in the middle of mutation")
       // AnyObject memory can alias any class reference memory, so we can
       // assume type here
@@ -808,7 +808,7 @@ struct RawKeyPathComponent {
       fatalError("TODO")
     
     case .optionalChain, .optionalWrap:
-      _sanityCheckFailure("not a mutable key path component")
+      assertFailure("not a mutable key path component")
     }
   }
 }
@@ -822,7 +822,7 @@ internal struct KeyPathBuffer {
     var _value: UInt32
     
     init(size: Int, trivial: Bool, hasReferencePrefix: Bool) {
-      _sanityCheck(size <= 0x3FFF_FFFF, "key path too big")
+      assert(size <= 0x3FFF_FFFF, "key path too big")
       _value = UInt32(size)
         | (trivial ? 0x8000_0000 : 0)
         | (hasReferencePrefix ? 0x4000_0000 : 0)
@@ -852,7 +852,7 @@ internal struct KeyPathBuffer {
     let header = pop(RawKeyPathComponent.Header.self)
     // Track if this is the last component of the reference prefix.
     if header.endOfReferencePrefix {
-      _sanityCheck(self.hasReferencePrefix,
+      assert(self.hasReferencePrefix,
                    "beginMutation marker in non-reference-writable key path?")
       self.hasReferencePrefix = false
     }
@@ -878,7 +878,7 @@ internal struct KeyPathBuffer {
       } else if MemoryLayout<Any.Type>.size == 4 {
         nextType = pop(Any.Type.self)
       } else {
-        _sanityCheckFailure("unexpected word size")
+        assertFailure("unexpected word size")
       }
     }
     return (component, nextType)
@@ -889,7 +889,7 @@ internal struct KeyPathBuffer {
     return raw.load(as: type)
   }
   mutating func popRaw(_ size: Int) -> UnsafeRawBufferPointer {
-    _sanityCheck(data.count >= size,
+    assert(data.count >= size,
                  "not enough space for next component?")
     let result = UnsafeRawBufferPointer(start: data.baseAddress, count: size)
     data = UnsafeRawBufferPointer(

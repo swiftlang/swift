@@ -2,7 +2,7 @@
   func doSomething()
 }
 
-@objc public class ObjCClass {
+@objc @objcMembers public class ObjCClass {
   public dynamic class func classMethod() {}
   public dynamic func implicitlyObjC() {}
 
@@ -10,7 +10,7 @@
   @IBAction public func performAction(_: AnyObject?) {}
 }
 
-public class NonObjCClass : ObjCProto {
+@objcMembers public class NonObjCClass : ObjCProto {
   public dynamic func doSomething() {}
 
   dynamic public func objcMethod() {}

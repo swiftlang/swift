@@ -3,6 +3,7 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -primary-file %t/main.swift -emit-reference-dependencies-path - > %t.swiftdeps
 // RUN: %FileCheck %s < %t.swiftdeps
 // RUN: %FileCheck -check-prefix=NEGATIVE %s < %t.swiftdeps
+// RUN: %FileCheck -check-prefix=DUPLICATE %s < %t.swiftdeps
 
 // Check that the output is deterministic.
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -primary-file %t/main.swift -emit-reference-dependencies-path - > %t-2.swiftdeps
@@ -13,16 +14,17 @@
 import Foundation
 
 // CHECK-LABEL: provides-dynamic-lookup:
+// DUPLICATE-LABEL: provides-dynamic-lookup:
 
-@objc class Base : NSObject {
+@objc @objcMembers class Base : NSObject {
   // CHECK-DAG: - "foo"
   func foo() {}
 
   // CHECK-DAG: - "bar"
+  // DUPLICATE-NOT: "bar"
+  // DUPLICATE: - "bar"
+  // DUPLICATE-NOT: "bar"
   func bar(_ x: Int, y: Int) {}
-  
-  // FIXME: We don't really need this twice, but de-duplicating is effort.
-  // CHECK-DAG: - "bar"
   func bar(_ str: String) {}
     
   // CHECK-DAG: - "prop"
@@ -37,6 +39,7 @@ import Foundation
 
 func getAnyObject() -> AnyObject? { return nil }
 
+// DUPLICATE: {{^(provides|depends).+:$}}
 // CHECK-LABEL: depends-dynamic-lookup:
 
 func testDynamicLookup(_ obj: AnyObject) {

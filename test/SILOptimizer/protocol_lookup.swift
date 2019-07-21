@@ -10,7 +10,7 @@ protocol StaticFoo {
 
 class StaticBar {
   // Check that the cast is not folded as a failing cast.
-  // CHECK-LABEL: sil hidden [noinline] @$S15protocol_lookup9StaticBarC12mightHaveFoo{{[_0-9a-zA-Z]*}}FZ
+  // CHECK-LABEL: sil hidden [noinline] @$s15protocol_lookup9StaticBarC12mightHaveFoo{{[_0-9a-zA-Z]*}}FZ
   // Check that the cast was not eliminated.
   // CHECK: checked_cast_br
   @inline(never)

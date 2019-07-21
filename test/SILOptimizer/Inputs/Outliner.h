@@ -22,3 +22,9 @@
 - (NSString*) doSomething;
 - (id) doSomething2 : (NSArray<NSString*>*) arr;
 @end
+
+NS_ASSUME_NONNULL_BEGIN
+@protocol Treeish <NSObject>
+- (nullable NSArray *) treeishChildren;
+@end
+NS_ASSUME_NONNULL_END

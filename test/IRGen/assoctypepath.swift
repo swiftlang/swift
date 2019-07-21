@@ -17,7 +17,7 @@ protocol P {
 protocol Q: P where A: Z {}
 protocol R: Q where A.ZZ: Y {}
 
-// CHECK: define {{.*}} @"$S13assoctypepath1SVyxGAA1RAA1A_2ZZAA1YPWT"
+// CHECK: define {{.*}} @"$s13assoctypepath1SVyxGAA1RAA1A_2ZZAA1YPWT"
 
 struct S<T>: R where T: Z, T.ZZ: Y {
 	typealias A = T

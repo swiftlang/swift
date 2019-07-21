@@ -1,8 +1,8 @@
 // Please keep this file in alphabetical order!
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t %s -disable-objc-attr-requires-foundation-module
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse-as-library %t/extensions.swiftmodule -typecheck -emit-objc-header-path %t/extensions.h -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -disable-sil-ownership-verifier -emit-module -o %t %s -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -disable-sil-ownership-verifier -parse-as-library %t/extensions.swiftmodule -typecheck -emit-objc-header-path %t/extensions.h -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module
 // RUN: %FileCheck %s < %t/extensions.h
 // RUN: %FileCheck --check-prefix=NEGATIVE %s < %t/extensions.h
 // RUN: %check-in-clang %t/extensions.h
@@ -18,7 +18,7 @@ import objc_generics
 // CHECK-LABEL: @interface A1{{$}}
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
-@objc class A1 {}
+@objc @objcMembers class A1 {}
 
 // NEGATIVE-NOT: @interface A1 (SWIFT_EXTENSION(extensions))
 extension A1 {}
@@ -32,12 +32,12 @@ extension A1 {}
 extension A2 {
   @objc var some: Int { return 1 }
 }
-@objc class A2 {}
+@objc @objcMembers class A2 {}
 
 // CHECK-LABEL: @interface A3{{$}}
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
-@objc class A3 {}
+@objc @objcMembers class A3 {}
 
 // CHECK-LABEL: @interface A3 (SWIFT_EXTENSION(extensions))
 // CHECK-DAG: @interface A3 (SWIFT_EXTENSION(extensions))
@@ -55,7 +55,7 @@ extension A3 {
 // CHECK-LABEL: @interface A4{{$}}
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
-@objc class A4 {}
+@objc @objcMembers class A4 {}
 
 // CHECK-LABEL: @interface A4 (SWIFT_EXTENSION(extensions))
 // CHECK-NEXT: @end
@@ -63,13 +63,13 @@ extension A4 {
   // CHECK-LABEL: @interface Inner
   // CHECK-NEXT: init
   // CHECK-NEXT: @end
-  @objc class Inner {}
+  @objc @objcMembers class Inner {}
 }
 
 // CHECK-LABEL: @interface A5{{$}}
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
-@objc class A5 {}
+@objc @objcMembers class A5 {}
 
 // NEGATIVE-NOT: @interface A5 (SWIFT_EXTENSION(extensions))
 extension A5 {
@@ -80,6 +80,7 @@ extension A5 {
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc(CustomName)
+@objcMembers
 class ClassWithCustomName {
 }
 

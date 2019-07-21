@@ -36,7 +36,12 @@ void OutliningMetadataCollector::collectTypeMetadataForLayout(SILType type) {
   }
 
   auto formalType = type.getASTType();
-  if (isa<FixedTypeInfo>(IGF.IGM.getTypeInfoForLowered(formalType))) {
+  auto &ti = IGF.IGM.getTypeInfoForLowered(formalType);
+
+  // We don't need the metadata for fixed size types or types that are not ABI
+  // accessible. Outlining will call the value witness of the enclosing type of
+  // non ABI accessible field/element types.
+  if (isa<FixedTypeInfo>(ti) || !ti.isABIAccessible()) {
     return;
   }
 
@@ -105,7 +110,10 @@ irgen::getTypeAndGenericSignatureForManglingOutlineFunction(SILType type) {
     GenericEnvironment *env = nullptr;
     loweredType.findIf([&env](Type t) -> bool {
         if (auto arch = t->getAs<ArchetypeType>()) {
-          env = arch->getGenericEnvironment();
+          auto root = arch->getRoot();
+          if (!isa<PrimaryArchetypeType>(root))
+            return false;
+          env = root->getGenericEnvironment();
           return true;
         }
         return false;

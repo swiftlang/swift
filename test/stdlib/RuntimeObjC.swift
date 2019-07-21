@@ -2,6 +2,7 @@
 //
 // RUN: %target-clang %S/Inputs/Mirror/Mirror.mm -c -o %t/Mirror.mm.o -g
 // RUN: %target-build-swift -parse-stdlib -Xfrontend -disable-access-control -module-name a -I %S/Inputs/Mirror/ -Xlinker %t/Mirror.mm.o %s -o %t.out
+// RUN: %target-codesign %t.out
 // RUN: %target-run %t.out
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
@@ -292,13 +293,13 @@ Runtime.test("forceBridgeFromObjectiveC") {
 
 
 Runtime.test("isBridgedToObjectiveC") {
-  expectTrue(_isBridgedToObjectiveC(BridgedValueType))
-  expectTrue(_isBridgedToObjectiveC(BridgedVerbatimRefType))
+  expectTrue(_isBridgedToObjectiveC(BridgedValueType.self))
+  expectTrue(_isBridgedToObjectiveC(BridgedVerbatimRefType.self))
 }
 
 Runtime.test("isBridgedVerbatimToObjectiveC") {
-  expectFalse(_isBridgedVerbatimToObjectiveC(BridgedValueType))
-  expectTrue(_isBridgedVerbatimToObjectiveC(BridgedVerbatimRefType))
+  expectFalse(_isBridgedVerbatimToObjectiveC(BridgedValueType.self))
+  expectTrue(_isBridgedVerbatimToObjectiveC(BridgedVerbatimRefType.self))
 }
 
 //===----------------------------------------------------------------------===//
@@ -332,6 +333,33 @@ enum PlainEnum {}
 
 protocol ProtocolA {}
 protocol ProtocolB {}
+
+class OuterClass {
+    
+    private class PrivateGeneric<T, U> {
+      class InnerGeneric<X> {
+        class Inner { }
+      }
+    }
+    
+    static func getPrivateGenericName() -> String {
+      return NSStringFromClass(OuterClass.PrivateGeneric<Int, Bool>.self)
+    }
+    static func getInnerGenericName() -> String {
+      return NSStringFromClass(OuterClass.PrivateGeneric<Int, Bool>.InnerGeneric<Float>.self)
+    }
+    static func getInnerName() -> String {
+      return NSStringFromClass(OuterClass.PrivateGeneric<Int, Bool>.InnerGeneric<Float>.Inner.self)
+    }
+}
+
+// The private discriminator is not deterministic.
+// Replace it with a constant string.
+func removePrivateDiscriminator(_ symbol: String) -> String {
+  let regexp = try! NSRegularExpression(pattern: "P[0-9]+\\$[0-9a-f]+")
+  let range = NSRange(0..<symbol.count)
+  return regexp.stringByReplacingMatches(in: symbol, range: range, withTemplate: "XXX")
+}
 
 Runtime.test("Generic class ObjC runtime names") {
   expectEqual("_TtGC1a12GenericClassSi_",
@@ -384,6 +412,13 @@ Runtime.test("Generic class ObjC runtime names") {
   expectEqual("_TtGC1a17MultiGenericClassGVS_13GenericStructSi_GOS_11GenericEnumGS2_Si___",
               NSStringFromClass(MultiGenericClass<GenericStruct<Int>,
                                                   GenericEnum<GenericEnum<Int>>>.self))
+  
+  expectEqual("_TtGCC1a10OuterClassXXXPrivateGeneric_SiSb_",
+              removePrivateDiscriminator(OuterClass.getPrivateGenericName()))
+  expectEqual("_TtGCCC1a10OuterClassXXXPrivateGeneric12InnerGeneric_SiSb_Sf_",
+              removePrivateDiscriminator(OuterClass.getInnerGenericName()))
+  expectEqual("_TtGCCCC1a10OuterClassXXXPrivateGeneric12InnerGeneric5Inner_SiSb_Sf__",
+              removePrivateDiscriminator(OuterClass.getInnerName()))
 }
 
 @objc protocol P {}
@@ -468,26 +503,6 @@ var nsStringCanaryCount = 0
   @objc override func character(at index: Int) -> unichar {
     fatalError("out-of-bounds access")
   }
-}
-
-RuntimeFoundationWrappers.test("_stdlib_NSStringLowercaseString/NoLeak") {
-  nsStringCanaryCount = 0
-  autoreleasepool {
-    let a = NSStringCanary()
-    expectEqual(1, nsStringCanaryCount)
-    _stdlib_NSStringLowercaseString(a)
-  }
-  expectEqual(0, nsStringCanaryCount)
-}
-
-RuntimeFoundationWrappers.test("_stdlib_NSStringUppercaseString/NoLeak") {
-  nsStringCanaryCount = 0
-  autoreleasepool {
-    let a = NSStringCanary()
-    expectEqual(1, nsStringCanaryCount)
-    _stdlib_NSStringUppercaseString(a)
-  }
-  expectEqual(0, nsStringCanaryCount)
 }
 
 RuntimeFoundationWrappers.test("_stdlib_CFStringCreateCopy/NoLeak") {
@@ -700,7 +715,7 @@ Reflection.test("TupleMirror/NoLeak") {
   }
 }
 
-class TestArtificialSubclass: NSObject {
+@objc @objcMembers class TestArtificialSubclass: NSObject {
   dynamic var foo = "foo"
 }
 
@@ -779,10 +794,9 @@ RuntimeClassNamesTestSuite.test("private class nested in same-type-constrained e
   let util = base.asInner
 
   let clas = unsafeBitCast(type(of: util), to: NSObject.self)
-  // Name should look like _TtC1aP.*Inner
   let desc = clas.description
-  expectEqual(desc.prefix(7), "_TtC1aP")
-  expectEqual(desc.suffix(5), "Inner")
+  expectEqual("_TtCE1a", desc.prefix(7))
+  expectEqual("Inner", desc.suffix(5))
 }
 
 runAllTests()

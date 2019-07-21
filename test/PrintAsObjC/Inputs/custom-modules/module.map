@@ -42,3 +42,13 @@ module VersionedFMWK {
   header "VersionedFMWK.h"
   export *
 }
+
+module resilient_objc_class {
+  header "resilient_objc_class.h"
+  export *
+}
+
+module MiserablePileOfSecrets {
+  header "MiserablePileOfSecrets.h"
+  export *
+}

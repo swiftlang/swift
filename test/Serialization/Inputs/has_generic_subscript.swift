@@ -8,6 +8,7 @@ public struct GenericSubscript {
     set { }
   }
 }
+extension GenericSubscript: GenericSubscriptProto {}
 
 public struct Outer<T> {
   public struct Inner<U> {

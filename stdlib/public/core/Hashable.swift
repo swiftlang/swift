@@ -40,9 +40,9 @@
 /// from the `Equatable` protocol, so you must also satisfy that protocol's
 /// requirements.
 ///
-/// A custom type's `Hashable` and `Equatable` requirements are automatically
-/// synthesized by the compiler when you declare `Hashable` conformance in the
-/// type's original declaration and your type meets these criteria:
+/// The compiler automatically synthesizes your custom type's `Hashable` and
+/// requirements when you declare `Hashable` conformance in the type's original
+/// declaration and your type meets these criteria:
 ///
 /// - For a `struct`, all its stored properties must conform to `Hashable`.
 /// - For an `enum`, all its associated values must conform to `Hashable`. (An
@@ -51,10 +51,14 @@
 ///
 /// To customize your type's `Hashable` conformance, to adopt `Hashable` in a
 /// type that doesn't meet the criteria listed above, or to extend an existing
-/// type to conform to `Hashable`, implement the `hash(into:)` function in your
-/// custom type. To ensure that your type meets the semantic requirements of the
-/// `Hashable` and `Equatable` protocols, it's a good idea to also customize
-/// your type's `Equatable` conformance to match the `hash(into:)` definition.
+/// type to conform to `Hashable`, implement the `hash(into:)` method in your
+/// custom type.
+///
+/// In your `hash(into:)` implementation, call `combine(_:)` on the provided
+/// `Hasher` instance with the essential components of your type. To ensure
+/// that your type meets the semantic requirements of the `Hashable` and
+/// `Equatable` protocols, it's a good idea to also customize your type's
+/// `Equatable` conformance to match.
 ///
 /// As an example, consider a `GridPoint` type that describes a location in a
 /// grid of buttons. Here's the initial declaration of the `GridPoint` type:
@@ -67,8 +71,8 @@
 ///
 /// You'd like to create a set of the grid points where a user has already
 /// tapped. Because the `GridPoint` type is not hashable yet, it can't be used
-/// as the `Element` type for a set. To add `Hashable` conformance, provide an
-/// `==` operator function and a `hash(into:)` method.
+/// in a set. To add `Hashable` conformance, provide an `==` operator function
+/// and implement the `hash(into:)` method.
 ///
 ///     extension GridPoint: Hashable {
 ///         static func == (lhs: GridPoint, rhs: GridPoint) -> Bool {
@@ -81,12 +85,9 @@
 ///         }
 ///     }
 ///
-/// The `hash(into:)` method in this example feeds the properties `x` and `y`
-/// to the supplied hasher; these are the same properties compared by the
-/// implementation of the `==` operator function.
-///
-/// (Because `x` and `y` are both `Hashable` themselves, you could've also let
-/// the compiler synthesize these implementations for you.)
+/// The `hash(into:)` method in this example feeds the grid point's `x` and `y`
+/// properties into the provided hasher. These properties are the same ones
+/// used to test for equality in the `==` operator function.
 ///
 /// Now that `GridPoint` conforms to the `Hashable` protocol, you can create a
 /// set of previously tapped grid points.
@@ -100,39 +101,41 @@
 ///         print("New tap detected at (\(nextTap.x), \(nextTap.y)).")
 ///     }
 ///     // Prints "New tap detected at (0, 1).")
-public protocol Hashable : Equatable {
+public protocol Hashable: Equatable {
   /// The hash value.
   ///
   /// Hash values are not guaranteed to be equal across different executions of
   /// your program. Do not save hash values to use during a future execution.
+  ///
+  /// - Important: `hashValue` is deprecated as a `Hashable` requirement. To
+  ///   conform to `Hashable`, implement the `hash(into:)` requirement instead.
   var hashValue: Int { get }
 
-  /// Hash the essential components of this value into the hash function
-  /// represented by `hasher`, by feeding them into it using its `combine`
-  /// methods.
+  /// Hashes the essential components of this value by feeding them into the
+  /// given hasher.
   ///
-  /// Essential components are precisely those that are compared in the type's
-  /// implementation of `Equatable`.
+  /// Implement this method to conform to the `Hashable` protocol. The
+  /// components used for hashing must be the same as the components compared
+  /// in your type's `==` operator implementation. Call `hasher.combine(_:)`
+  /// with each of these components.
   ///
-  /// Note that `hash(into:)` doesn't own the hasher passed into it, so it must
-  /// not call `finalize()` on it. Doing so may become a compile-time error in
-  /// the future.
+  /// - Important: Never call `finalize()` on `hasher`. Doing so may become a
+  ///   compile-time error in the future.
+  ///
+  /// - Parameter hasher: The hasher to use when combining the components
+  ///   of this instance.
   func hash(into hasher: inout Hasher)
 
   // Raw top-level hashing interface. Some standard library types (mostly
   // primitives) specialize this to eliminate small resiliency overheads. (This
   // only matters for tiny keys.)
-  //
-  // FIXME(hasher): Change to take a Hasher instead. To achieve the same
-  // performance, this requires Set and Dictionary to store their fully
-  // initialized local hashers, not just their seeds.
-  func _rawHashValue(seed: (UInt64, UInt64)) -> Int
+  func _rawHashValue(seed: Int) -> Int
 }
 
 extension Hashable {
   @inlinable
   @inline(__always)
-  public func _rawHashValue(seed: (UInt64, UInt64)) -> Int {
+  public func _rawHashValue(seed: Int) -> Int {
     var hasher = Hasher(_seed: seed)
     hasher.combine(self)
     return hasher._finalize()
@@ -143,12 +146,12 @@ extension Hashable {
 @inlinable
 @inline(__always)
 public func _hashValue<H: Hashable>(for value: H) -> Int {
-  return value._rawHashValue(seed: Hasher._seed)
+  return value._rawHashValue(seed: 0)
 }
 
 // Called by the SwiftValue implementation.
 @_silgen_name("_swift_stdlib_Hashable_isEqual_indirect")
-internal func Hashable_isEqual_indirect<T : Hashable>(
+internal func Hashable_isEqual_indirect<T: Hashable>(
   _ lhs: UnsafePointer<T>,
   _ rhs: UnsafePointer<T>
 ) -> Bool {
@@ -157,7 +160,7 @@ internal func Hashable_isEqual_indirect<T : Hashable>(
 
 // Called by the SwiftValue implementation.
 @_silgen_name("_swift_stdlib_Hashable_hashValue_indirect")
-internal func Hashable_hashValue_indirect<T : Hashable>(
+internal func Hashable_hashValue_indirect<T: Hashable>(
   _ value: UnsafePointer<T>
 ) -> Int {
   return value.pointee.hashValue

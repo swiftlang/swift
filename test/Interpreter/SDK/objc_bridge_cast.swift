@@ -254,15 +254,16 @@ func testValueToObjectBridgingInSwitch() {
     }
   }
 
-#if arch(i386) || arch(arm)
-#else
-  // Small strings should be immortal
-  autoreleasepool {
-    let string = "hello"
-    let nsString = string as NSString
-    objc_setAssociatedObject(
-      nsString, &ImmortalCanaryAssocObjectHandle, ImmortalCanary(),
-      .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+#if !(arch(i386) || arch(arm))
+  // Small strings should be immortal on new enough 64-bit Apple platforms.
+  if #available(macOS 10.10, *) {
+    autoreleasepool {
+      let string = "hello"
+      let nsString = string as NSString
+      objc_setAssociatedObject(
+        nsString, &ImmortalCanaryAssocObjectHandle, ImmortalCanary(),
+        .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+    }
   }
 #endif // 64-bit
   print("Done")

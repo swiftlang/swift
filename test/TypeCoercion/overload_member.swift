@@ -69,7 +69,7 @@ func test_static_method_value_coerce(_ a: A) {
 func test_mixed_overload(_ a: A, x: X, y: Y) {
   var x1 = a.mixed(x: x)
   x1 = x
-  var y1 = a.mixed(y: y) // expected-error{{incorrect argument label in call (have 'y:', expected 'x:')}}
+  var y1 = a.mixed(y: y) // expected-error {{static member 'mixed' cannot be used on instance of type 'A'}} {{12-12=A.}}
   
   A.mixed(x) // expected-error{{missing argument label 'y:' in call}}
   var x2 = A.mixed(a)(x: x)
@@ -89,7 +89,7 @@ func test_mixed_overload_coerce(_ a: A, x: inout X, y: Y, z: Z) {
 func test_mixed_method_value_coerce(_ a: A) {
   var _ : (X) -> X = a.mixed
   var _ : (Y) -> Y = A.mixed
-  var _ : (Y) -> Y = a.mixed; // expected-error{{cannot convert value of type '(X) -> X' to specified type '(Y) -> Y'}}
+  var _ : (Y) -> Y = a.mixed; // expected-error {{static member 'mixed' cannot be used on instance of type 'A'}} {{22-22=A.}}
   var _ : (A) -> (X) -> X = A.mixed
 }
 
@@ -130,8 +130,8 @@ extension A {
 
   func test_mixed_method_value_coerce() {
     var _ : (X) -> X = mixed
-    var _ : (Y) -> Y = mixed; // expected-error{{cannot convert value of type '(X) -> X' to specified type '(Y) -> Y'}}
-    var _ : (Y) -> Y = mixed; // expected-error{{cannot convert value of type '(X) -> X' to specified type '(Y) -> Y'}}
+    var _ : (Y) -> Y = mixed; // expected-error {{static member 'mixed' cannot be used on instance of type 'A'}} {{24-24=A.}}
+    var _ : (Y) -> Y = mixed; // expected-error {{static member 'mixed' cannot be used on instance of type 'A'}} {{24-24=A.}}
     var _ : (A) -> (X) -> X = A.mixed
   }
 

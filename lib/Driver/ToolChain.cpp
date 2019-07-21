@@ -62,6 +62,27 @@ ToolChain::JobContext::getTemporaryFilePath(const llvm::Twine &name,
   return C.getArgs().MakeArgString(buffer.str());
 }
 
+Optional<Job::ResponseFileInfo>
+ToolChain::getResponseFileInfo(const Compilation &C, const char *executablePath,
+                               const ToolChain::InvocationInfo &invocationInfo,
+                               const ToolChain::JobContext &context) const {
+  const bool forceResponseFiles =
+      C.getArgs().hasArg(options::OPT_driver_force_response_files);
+  assert((invocationInfo.allowsResponseFiles || !forceResponseFiles) &&
+         "Cannot force response file if platform does not allow it");
+
+  if (forceResponseFiles || (invocationInfo.allowsResponseFiles &&
+                             !llvm::sys::commandLineFitsWithinSystemLimits(
+                                 executablePath, invocationInfo.Arguments))) {
+    const char *responseFilePath =
+        context.getTemporaryFilePath("arguments", "resp");
+    const char *responseFileArg =
+        C.getArgs().MakeArgString(Twine("@") + responseFilePath);
+    return {{responseFilePath, responseFileArg}};
+  }
+  return None;
+}
+
 std::unique_ptr<Job> ToolChain::constructJob(
     const JobAction &JA, Compilation &C, SmallVectorImpl<const Job *> &&inputs,
     ArrayRef<const Action *> inputActions,
@@ -78,7 +99,8 @@ std::unique_ptr<Job> ToolChain::constructJob(
       CASE(BackendJob)
       CASE(MergeModuleJob)
       CASE(ModuleWrapJob)
-      CASE(LinkJob)
+      CASE(DynamicLinkJob)
+      CASE(StaticLinkJob)
       CASE(GenerateDSYMJob)
       CASE(VerifyDebugInfoJob)
       CASE(GeneratePCHJob)
@@ -114,11 +136,16 @@ std::unique_ptr<Job> ToolChain::constructJob(
     }
   }
 
-  return llvm::make_unique<Job>(JA, std::move(inputs), std::move(output),
-                                executablePath,
-                                std::move(invocationInfo.Arguments),
-                                std::move(invocationInfo.ExtraEnvironment),
-                                std::move(invocationInfo.FilelistInfos));
+  // Determine if the argument list is so long that it needs to be written into
+  // a response file.
+  auto responseFileInfo =
+      getResponseFileInfo(C, executablePath, invocationInfo, context);
+
+  return llvm::make_unique<Job>(
+      JA, std::move(inputs), std::move(output), executablePath,
+      std::move(invocationInfo.Arguments),
+      std::move(invocationInfo.ExtraEnvironment),
+      std::move(invocationInfo.FilelistInfos), responseFileInfo);
 }
 
 std::string
@@ -279,13 +306,14 @@ static void
 sortJobsToMatchCompilationInputs(ArrayRef<const Job *> unsortedJobs,
                                  SmallVectorImpl<const Job *> &sortedJobs,
                                  Compilation &C) {
-  llvm::StringMap<const Job *> jobsByInput;
+  llvm::DenseMap<StringRef, const Job *> jobsByInput;
   for (const Job *J : unsortedJobs) {
     const CompileJobAction *CJA = cast<CompileJobAction>(&J->getSource());
     const InputAction *IA = findSingleSwiftInput(CJA);
     auto R =
         jobsByInput.insert(std::make_pair(IA->getInputArg().getValue(), J));
     assert(R.second);
+    (void)R;
   }
   for (const InputPair &P : C.getInputFiles()) {
     auto I = jobsByInput.find(P.second->getValue());
@@ -300,6 +328,7 @@ sortJobsToMatchCompilationInputs(ArrayRef<const Job *> unsortedJobs,
 /// on \p BatchJob, to build the \c InvocationInfo.
 std::unique_ptr<Job>
 ToolChain::constructBatchJob(ArrayRef<const Job *> unsortedJobs,
+                             Job::PID &NextQuasiPID,
                              Compilation &C) const {
   if (unsortedJobs.empty())
     return nullptr;
@@ -325,9 +354,27 @@ ToolChain::constructBatchJob(ArrayRef<const Job *> unsortedJobs,
   JobContext context{C, inputJobs.getArrayRef(), inputActions.getArrayRef(),
                      *output, OI};
   auto invocationInfo = constructInvocation(*batchCJA, context);
+  // Batch mode can produce quite long command lines; in almost every case these
+  // will trigger use of supplementary output file maps. However, if the driver
+  // command line is long for reasons unrelated to the number of input files,
+  // such as passing a large number of flags, then the individual batch jobs are
+  // also likely to overflow. We have to check for that explicitly here, because
+  // the BatchJob created here does not go through the same code path in
+  // constructJob above.
+  //
+  // The `allowsResponseFiles` flag on the `invocationInfo` we have here exists
+  // only to model external tools that don't know about response files, such as
+  // platform linkers; when talking to the frontend (which we control!) it
+  // should always be true. But double check with an assert here in case someone
+  // failed to set it in `constructInvocation`.
+  assert(invocationInfo.allowsResponseFiles);
+  auto responseFileInfo =
+      getResponseFileInfo(C, executablePath, invocationInfo, context);
+
   return llvm::make_unique<BatchJob>(
       *batchCJA, inputJobs.takeVector(), std::move(output), executablePath,
       std::move(invocationInfo.Arguments),
       std::move(invocationInfo.ExtraEnvironment),
-      std::move(invocationInfo.FilelistInfos), sortedJobs);
+      std::move(invocationInfo.FilelistInfos), sortedJobs, NextQuasiPID,
+      responseFileInfo);
 }

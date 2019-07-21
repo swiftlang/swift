@@ -13,10 +13,10 @@
 #ifndef SWIFT_DRIVER_TOOLCHAIN_H
 #define SWIFT_DRIVER_TOOLCHAIN_H
 
+#include "swift/Basic/FileTypes.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Driver/Action.h"
 #include "swift/Driver/Job.h"
-#include "swift/Frontend/FileTypes.h"
 #include "swift/Option/Options.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/Option/Option.h"
@@ -24,6 +24,8 @@
 #include <memory>
 
 namespace swift {
+class DiagnosticEngine;
+
 namespace driver {
 class CommandOutput;
 class Compilation;
@@ -122,6 +124,12 @@ protected:
     std::vector<std::pair<const char *, const char *>> ExtraEnvironment;
     std::vector<FilelistInfo> FilelistInfos;
 
+    // Not all platforms and jobs support the use of response files, so assume
+    // "false" by default. If the executable specified in the InvocationInfo
+    // constructor supports response files, this can be overridden and set to
+    // "true".
+    bool allowsResponseFiles = false;
+
     InvocationInfo(const char *name, llvm::opt::ArgStringList args = {},
                    decltype(ExtraEnvironment) extraEnv = {})
         : ExecutableName(name), Arguments(std::move(args)),
@@ -152,7 +160,10 @@ protected:
   virtual InvocationInfo
   constructInvocation(const AutolinkExtractJobAction &job,
                       const JobContext &context) const;
-  virtual InvocationInfo constructInvocation(const LinkJobAction &job,
+  virtual InvocationInfo constructInvocation(const DynamicLinkJobAction &job,
+                                             const JobContext &context) const;
+
+  virtual InvocationInfo constructInvocation(const StaticLinkJobAction &job,
                                              const JobContext &context) const;
 
   /// Searches for the given executable in appropriate paths relative to the
@@ -185,17 +196,37 @@ protected:
                               file_types::ID InputType,
                               const char *PrefixArgument = nullptr) const;
 
-  /// Get the runtime library link path, which is platform-specific and found
+  /// Get the resource dir link path, which is platform-specific and found
   /// relative to the compiler.
-  void getRuntimeLibraryPath(SmallVectorImpl<char> &runtimeLibPath,
-                             const llvm::opt::ArgList &args, bool shared) const;
+  void getResourceDirPath(SmallVectorImpl<char> &runtimeLibPath,
+                          const llvm::opt::ArgList &args, bool shared) const;
+
+  /// Get the runtime library link paths, which typically include the resource
+  /// dir path and the SDK.
+  void getRuntimeLibraryPaths(SmallVectorImpl<std::string> &runtimeLibPaths,
+                              const llvm::opt::ArgList &args,
+                              StringRef SDKPath, bool shared) const;
 
   void addPathEnvironmentVariableIfNeeded(Job::EnvironmentVector &env,
                                           const char *name,
                                           const char *separator,
                                           options::ID optionID,
                                           const llvm::opt::ArgList &args,
-                                          StringRef extraEntry = "") const;
+                                          ArrayRef<std::string> extraEntries = {}) const;
+
+  /// Specific toolchains should override this to provide additional conditions
+  /// under which the compiler invocation should be written into debug info. For
+  /// example, Darwin does this if the RC_DEBUG_OPTIONS environment variable is
+  /// set to match the behavior of Clang.
+  virtual bool shouldStoreInvocationInDebugInfo() const { return false; }
+
+  /// Gets the response file path and command line argument for an invocation
+  /// if the tool supports response files and if the command line length would
+  /// exceed system limits.
+  Optional<Job::ResponseFileInfo>
+  getResponseFileInfo(const Compilation &C, const char *executablePath,
+                      const InvocationInfo &invocationInfo,
+                      const JobContext &context) const;
 
 public:
   virtual ~ToolChain() = default;
@@ -234,8 +265,11 @@ public:
   /// Construct a \c BatchJob that subsumes the work of a set of Jobs. Any pair
   /// of elements in \p Jobs are assumed to satisfy the equivalence relation \c
   /// jobsAreBatchCombinable, i.e. they should all be "the same" job in in all
-  /// ways other than their choices of inputs.
+  /// ways other than their choices of inputs. The provided \p NextQuasiPID
+  /// should be a negative number that persists between calls; this method will
+  /// decrement it to assign quasi-PIDs to each of the \p Jobs passed.
   std::unique_ptr<Job> constructBatchJob(ArrayRef<const Job *> Jobs,
+                                         int64_t &NextQuasiPID,
                                          Compilation &C) const;
 
   /// Return the default language type to use for the given extension.
@@ -270,6 +304,13 @@ public:
   void addLinkRuntimeLib(const llvm::opt::ArgList &Args,
                          llvm::opt::ArgStringList &Arguments,
                          StringRef LibName) const;
+    
+  /// Validates arguments passed to the toolchain.
+  ///
+  /// An override point for platform-specific subclasses to customize the
+  /// validations that should be performed.
+  virtual void validateArguments(DiagnosticEngine &diags,
+                                 const llvm::opt::ArgList &args) const {}
 };
 } // end namespace driver
 } // end namespace swift

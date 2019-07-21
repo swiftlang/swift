@@ -15,7 +15,7 @@ Typedefs:
 - Name: IncompleteImportTargetName
   SwiftName: IncompleteImportTarget.Name
 SwiftVersions:
-- Version: 3
+- Version: 4
   Globals:
   - Name: IAMStruct1APINoteVar
     SwiftName: Struct1.oldApiNoteVar

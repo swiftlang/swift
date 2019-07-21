@@ -184,10 +184,10 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
     addPlatformConditionValue(PlatformConditionKind::OS, "Linux");
   else if (Target.isOSFreeBSD())
     addPlatformConditionValue(PlatformConditionKind::OS, "FreeBSD");
-  else if (Target.isOSWindows())
-    addPlatformConditionValue(PlatformConditionKind::OS, "Windows");
   else if (Target.isWindowsCygwinEnvironment())
     addPlatformConditionValue(PlatformConditionKind::OS, "Cygwin");
+  else if (Target.isOSWindows())
+    addPlatformConditionValue(PlatformConditionKind::OS, "Windows");
   else if (Target.isPS4())
     addPlatformConditionValue(PlatformConditionKind::OS, "PS4");
   else if (Target.isOSHaiku())
@@ -274,4 +274,34 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
   // in the common case.
 
   return { false, false };
+}
+
+bool LangOptions::doesTargetSupportObjCMetadataUpdateCallback() const {
+  if (Target.isMacOSX())
+    return !Target.isMacOSXVersionLT(10, 14, 4);
+  if (Target.isiOS()) // also returns true on tvOS
+    return !Target.isOSVersionLT(12, 2);
+  if (Target.isWatchOS())
+    return !Target.isOSVersionLT(5, 2);
+
+  // Don't assert if we're running on a non-Apple platform; we still
+  // want to allow running tests that -enable-objc-interop.
+  return false;
+}
+
+bool LangOptions::doesTargetSupportObjCGetClassHook() const {
+  return doesTargetSupportObjCMetadataUpdateCallback();
+}
+
+bool LangOptions::doesTargetSupportObjCClassStubs() const {
+  if (Target.isMacOSX())
+    return !Target.isMacOSXVersionLT(10, 15);
+  if (Target.isiOS()) // also returns true on tvOS
+    return !Target.isOSVersionLT(13);
+  if (Target.isWatchOS())
+    return !Target.isOSVersionLT(6);
+
+  // Don't assert if we're running on a non-Apple platform; we still
+  // want to allow running tests that -enable-objc-interop.
+  return false;
 }

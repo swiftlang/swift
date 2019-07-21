@@ -19,8 +19,8 @@ namespace swift {
 namespace driver {
 namespace compilation_record {
 
-/// Compilation record files (.swiftdeps files) are YAML files composed of these
-/// top-level keys.
+/// Compilation record files (-master.swiftdeps files) are YAML files composed
+/// of these top-level keys.
 enum class TopLevelKey {
   /// The key for the Swift compiler version used to produce the compilation
   /// record.

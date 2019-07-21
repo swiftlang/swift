@@ -12,29 +12,11 @@
 
 // namespace
 public enum SwiftRuntime {
-  public enum MetadataKind : Int {
-    case `class` = 0
-    case `struct` = 1
-    case `enum` = 2
-    case optional = 3
-    case opaque = 8
-    case tuple = 9
-    case function = 10
-    case existential = 12
-    case metatype = 13
-    case objCClassWrapper = 14
-    case existentialMetatype = 15
-    case foreignClass = 16
-    case heapLocalVariable = 64
-    case heapGenericLocalVariable = 65
-    case errorObject = 128
-  }
-
   @_silgen_name("getMetadataKindOf")
-  private static func _metadataKind<T>(of value: T) -> UInt32
+  private static func _metadataKind<T>(of value: T) -> UnsafePointer<CChar>
 
-  public static func metadataKind<T>(of value: T) -> MetadataKind {
-    return MetadataKind(rawValue: Int(_metadataKind(of: value)))!
+  public static func metadataKind<T>(of value: T) -> String {
+    return String(validatingUTF8: _metadataKind(of: value))!
   }
 }
 

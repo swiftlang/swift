@@ -133,6 +133,35 @@ FailableCastResult irgen::emitClassIdenticalCast(IRGenFunction &IGF,
   return {cond, from};
 }
 
+/// Returns an ArrayRef with the set of arguments to pass to a dynamic cast call.
+///
+/// `argsBuf` should be passed in as a reference to an array with three nullptr
+/// values at the end. These will be dropped from the return ArrayRef for a
+/// conditional cast, or filled in with source location arguments for an
+/// unconditional cast.
+template<unsigned n>
+static ArrayRef<llvm::Value*>
+getDynamicCastArguments(IRGenFunction &IGF,
+                        llvm::Value *(&argsBuf)[n], CheckedCastMode mode
+                        /*TODO , SILLocation location*/)
+{
+  switch (mode) {
+  case CheckedCastMode::Unconditional:
+    // TODO: Pass along location info if available for unconditional casts, so
+    // that the runtime error for a failed cast can report the source of the
+    // error from user code.
+    argsBuf[n-3] = llvm::ConstantPointerNull::get(IGF.IGM.Int8PtrTy);
+    argsBuf[n-2] = llvm::ConstantInt::get(IGF.IGM.Int32Ty, 0);
+    argsBuf[n-1] = llvm::ConstantInt::get(IGF.IGM.Int32Ty, 0);
+    return argsBuf;
+      
+  case CheckedCastMode::Conditional:
+    return llvm::makeArrayRef(argsBuf, n-3);
+    break;
+  }
+  llvm_unreachable("covered switch");
+}
+
 /// Emit a checked unconditional downcast of a class value.
 llvm::Value *irgen::emitClassDowncast(IRGenFunction &IGF, llvm::Value *from,
                                       SILType toType, CheckedCastMode mode) {
@@ -206,9 +235,17 @@ llvm::Value *irgen::emitClassDowncast(IRGenFunction &IGF, llvm::Value *from,
   if (auto fun = dyn_cast<llvm::Function>(castFn))
     cc = fun->getCallingConv();
 
+  llvm::Value *argsBuf[] = {
+    from,
+    metadataRef,
+    nullptr,
+    nullptr,
+    nullptr,
+  };
+
   auto call
-    = IGF.Builder.CreateCall(castFn, {from, metadataRef});
-  // FIXME: Eventually, we may want to throw.
+    = IGF.Builder.CreateCall(castFn,
+                             getDynamicCastArguments(IGF, argsBuf, mode));
   call->setCallingConv(cc);
   call->setDoesNotThrow();
 
@@ -267,8 +304,17 @@ void irgen::emitMetatypeDowncast(IRGenFunction &IGF,
   auto cc = IGF.IGM.DefaultCC;
   if (auto fun = dyn_cast<llvm::Function>(castFn))
     cc = fun->getCallingConv();
+  
+  llvm::Value *argsBuf[] = {
+    metatype,
+    toMetadata,
+    nullptr,
+    nullptr,
+    nullptr,
+  };
 
-  auto call = IGF.Builder.CreateCall(castFn, {metatype, toMetadata});
+  auto call = IGF.Builder.CreateCall(castFn,
+                                   getDynamicCastArguments(IGF, argsBuf, mode));
   call->setCallingConv(cc);
   call->setDoesNotThrow();
   ex.add(call);
@@ -423,7 +469,7 @@ emitExistentialScalarCastFn(IRGenModule &IGM,
   }
 
   case CheckedCastMode::Unconditional: {
-    IGF.emitTrap(/*EmitUnreachable=*/true);
+    IGF.emitTrap("type cast failed", /*EmitUnreachable=*/true);
     break;
   }
   }
@@ -486,8 +532,16 @@ llvm::Value *irgen::emitMetatypeToAnyObjectDowncast(IRGenFunction &IGF,
     auto cc = IGF.IGM.DefaultCC;
     if (auto fun = dyn_cast<llvm::Function>(castFn))
       cc = fun->getCallingConv();
+    
+    llvm::Value *argsBuf[] = {
+      metatypeValue,
+      nullptr,
+      nullptr,
+      nullptr,
+    };
 
-    auto call = IGF.Builder.CreateCall(castFn, metatypeValue);
+    auto call = IGF.Builder.CreateCall(castFn,
+                                   getDynamicCastArguments(IGF, argsBuf, mode));
     call->setCallingConv(cc);
     return call;
   }
@@ -522,7 +576,7 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
   bool hasClassConstraint = layout.requiresClass();
   bool hasClassConstraintByProtocol = false;
 
-  bool hasSuperclassConstraint = bool(layout.superclass);
+  bool hasSuperclassConstraint = bool(layout.explicitSuperclass);
 
   for (auto protoTy : layout.getProtocols()) {
     auto *protoDecl = protoTy->getDecl();
@@ -535,7 +589,7 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
     }
 
     if (Lowering::TypeConverter::protocolRequiresWitnessTable(protoDecl)) {
-      auto descriptor = emitProtocolDescriptorRef(IGF, protoDecl);
+      auto descriptor = IGF.IGM.getAddrOfProtocolDescriptor(protoDecl);
       witnessTableProtos.push_back(descriptor);
     }
 
@@ -563,7 +617,7 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
   // The source of a scalar cast is statically known to be a class or a
   // metatype, so we only have to check the class constraint in two cases:
   //
-  // 1) The destination type has an explicit superclass constraint that is
+  // 1) The destination type has a superclass constraint that is
   //    more derived than what the source type is known to be.
   //
   // 2) We are casting between metatypes, in which case the source might
@@ -581,9 +635,17 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
   // Note that destInstanceType is always an existential type, so calling
   // getSuperclass() returns the superclass constraint of the existential,
   // not the superclass of some concrete class.
-  bool checkSuperclassConstraint =
-    hasSuperclassConstraint &&
-    !destInstanceType->getSuperclass()->isExactSuperclassOf(srcInstanceType);
+  bool checkSuperclassConstraint = false;
+  if (hasSuperclassConstraint) {
+    Type srcSuperclassType = srcInstanceType;
+    if (srcSuperclassType->isExistentialType())
+      srcSuperclassType = srcSuperclassType->getSuperclass();
+    if (srcSuperclassType) {
+      checkSuperclassConstraint =
+        !destInstanceType->getSuperclass()->isExactSuperclassOf(
+          srcSuperclassType);
+    }
+  }
 
   if (checkSuperclassConstraint)
     checkClassConstraint = true;
@@ -664,11 +726,18 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
     if (auto fun = dyn_cast<llvm::Function>(castFn))
       cc = fun->getCallingConv();
 
+    llvm::Value *argsBuf[] = {
+      objcCastObject,
+      IGF.IGM.getSize(Size(objcProtos.size())),
+      protoRefsBuf.getAddress(),
+      nullptr,
+      nullptr,
+      nullptr,
+    };
 
     auto call = IGF.Builder.CreateCall(
-        castFn,
-        {objcCastObject, IGF.IGM.getSize(Size(objcProtos.size())),
-         protoRefsBuf.getAddress()});
+      castFn,
+      getDynamicCastArguments(IGF, argsBuf, mode));
     call->setCallingConv(cc);
     objcCast = call;
     resultValue = IGF.Builder.CreateBitCast(objcCast, resultType);
@@ -739,7 +808,7 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
   args.push_back(metadataValue);
 
   if (checkSuperclassConstraint)
-    args.push_back(IGF.emitTypeMetadataRef(CanType(layout.superclass)));
+    args.push_back(IGF.emitTypeMetadataRef(CanType(layout.explicitSuperclass)));
 
   for (auto proto : witnessTableProtos)
     args.push_back(proto);

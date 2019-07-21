@@ -16,12 +16,14 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "swift/Basic/JSONSerialization.h"
 #include "swift/IDE/APIDigesterData.h"
+#include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/DiagnosticsDriver.h"
 
 using namespace swift;
 using namespace ide;
 using namespace api;
 
-inline raw_ostream &swift::ide::api::
+raw_ostream &swift::ide::api::
 operator<<(raw_ostream &Out, const SDKNodeKind Value) {
   switch (Value) {
 #define NODE_KIND(Name, Value) case SDKNodeKind::Name: return Out << #Value;
@@ -30,17 +32,31 @@ operator<<(raw_ostream &Out, const SDKNodeKind Value) {
   llvm_unreachable("Undefined SDK node kind.");
 }
 
-inline raw_ostream &swift::ide::api::
+raw_ostream &swift::ide::api::
 operator<<(raw_ostream &Out, const NodeAnnotation Value) {
 #define NODE_ANNOTATION(X) if (Value == NodeAnnotation::X) { return Out << #X; }
 #include "swift/IDE/DigesterEnums.def"
   llvm_unreachable("Undefined SDK node kind.");
 }
 
-SDKNodeKind swift::ide::api::parseSDKNodeKind(StringRef Content) {
-  return llvm::StringSwitch<SDKNodeKind>(Content)
+StringRef swift::ide::api::getDeclKindStr(const DeclKind Value)  {
+  switch (Value) {
+#define DECL(X, PARENT) case DeclKind::X: return #X;
+#include "swift/AST/DeclNodes.def"
+  } 
+  llvm_unreachable("Unhandled DeclKind in switch.");
+}
+
+raw_ostream &swift::ide::api::operator<<(raw_ostream &Out,
+    const DeclKind Value) {
+  return Out << getDeclKindStr(Value);
+}
+
+Optional<SDKNodeKind> swift::ide::api::parseSDKNodeKind(StringRef Content) {
+  return llvm::StringSwitch<Optional<SDKNodeKind>>(Content)
 #define NODE_KIND(NAME, VALUE) .Case(#VALUE, SDKNodeKind::NAME)
 #include "swift/IDE/DigesterEnums.def"
+    .Default(None)
   ;
 }
 
@@ -148,9 +164,10 @@ swift::ide::api::TypeMemberDiffItem::getSubKind() const {
     assert(OldName.argSize() == 0);
     assert(!removedIndex);
     return TypeMemberDiffItemSubKind::GlobalFuncToStaticProperty;
-  } else if (oldTypeName.empty()){
+  } else if (oldTypeName.empty()) {
+    // we can handle this as a simple function rename.
     assert(NewName.argSize() == OldName.argSize());
-    return TypeMemberDiffItemSubKind::SimpleReplacement;
+    return TypeMemberDiffItemSubKind::FuncRename;
   } else {
     assert(NewName.argSize() == OldName.argSize());
     return TypeMemberDiffItemSubKind::QualifiedReplacement;
@@ -265,6 +282,7 @@ bool APIDiffItem::operator==(const APIDiffItem &Other) const {
   case APIDiffItemKind::ADK_SpecialCaseDiffItem:
     return true;
   }
+  llvm_unreachable("unhandled kind");
 }
 
 namespace {
@@ -278,6 +296,7 @@ static const char* getKeyContent(DiffItemKeyKind KK) {
 #define DIFF_ITEM_KEY_KIND(NAME) case DiffItemKeyKind::KK_##NAME: return #NAME;
 #include "swift/IDE/DigesterEnums.def"
   }
+  llvm_unreachable("unhandled kind");
 }
 
 static DiffItemKeyKind parseKeyKind(StringRef Content) {
@@ -323,7 +342,7 @@ serializeDiffItem(llvm::BumpPtrAllocator &Alloc,
   switch (parseDiffItemKind(DiffItemKind)) {
   case APIDiffItemKind::ADK_CommonDiffItem: {
     return new (Alloc.Allocate<CommonDiffItem>())
-      CommonDiffItem(parseSDKNodeKind(NodeKind),
+      CommonDiffItem(*parseSDKNodeKind(NodeKind),
                      parseSDKNodeAnnotation(NodeAnnotation), ChildIndex,
                      LeftUsr, RightUsr, LeftComment, RightComment, ModuleName);
   }
@@ -350,6 +369,7 @@ serializeDiffItem(llvm::BumpPtrAllocator &Alloc,
       SpecialCaseDiffItem(Usr, SpecialCaseId);
   }
   }
+  llvm_unreachable("unhandled kind");
 }
 } // end anonymous namespace
 
@@ -480,6 +500,7 @@ serialize(llvm::raw_ostream &os, ArrayRef<NameCorrectionInfo> Items) {
 
 struct swift::ide::api::APIDiffItemStore::Implementation {
 private:
+  DiagnosticEngine &Diags;
   llvm::SmallVector<std::unique_ptr<llvm::MemoryBuffer>, 2> AllBuffer;
   llvm::BumpPtrAllocator Allocator;
 
@@ -487,11 +508,19 @@ private:
     if (auto *CI = dyn_cast<CommonDiffItem>(Item)) {
       if (CI->rightCommentUnderscored())
         return false;
+
+      // Ignore constructor's return value rewritten.
+      if (CI->DiffKind == NodeAnnotation::TypeRewritten &&
+          CI->NodeKind == SDKNodeKind::DeclConstructor &&
+          CI->getChildIndices().front() == 0) {
+        return false;
+      }
     }
     return true;
   }
 
 public:
+  Implementation(DiagnosticEngine &Diags): Diags(Diags) {}
   llvm::StringMap<std::vector<APIDiffItem*>> Data;
   bool PrintUsr;
   std::vector<APIDiffItem*> AllItems;
@@ -501,7 +530,9 @@ public:
     {
       auto FileBufOrErr = llvm::MemoryBuffer::getFileOrSTDIN(FileName);
       if (!FileBufOrErr) {
-        llvm_unreachable("Failed to read JSON file");
+        Diags.diagnose(SourceLoc(), diag::cannot_find_migration_script,
+          FileName);
+        return;
       }
       pMemBuffer = FileBufOrErr->get();
       AllBuffer.push_back(std::move(FileBufOrErr.get()));
@@ -538,8 +569,8 @@ getDiffItems(StringRef Key) const {
 ArrayRef<APIDiffItem*> swift::ide::api::APIDiffItemStore::
 getAllDiffItems() const { return Impl.AllItems; }
 
-swift::ide::api::APIDiffItemStore::APIDiffItemStore() :
-  Impl(*new Implementation()) {}
+swift::ide::api::APIDiffItemStore::APIDiffItemStore(DiagnosticEngine &Diags) :
+  Impl(*new Implementation(Diags)) {}
 
 swift::ide::api::APIDiffItemStore::~APIDiffItemStore() { delete &Impl; }
 

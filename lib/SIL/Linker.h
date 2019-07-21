@@ -66,9 +66,11 @@ public:
   void visitTryApplyInst(TryApplyInst *TAI);
   void visitPartialApplyInst(PartialApplyInst *PAI);
   void visitFunctionRefInst(FunctionRefInst *FRI);
+  void visitDynamicFunctionRefInst(DynamicFunctionRefInst *FRI);
+  void visitPreviousDynamicFunctionRefInst(PreviousDynamicFunctionRefInst *FRI);
   void visitProtocolConformance(ProtocolConformanceRef C,
                                 const Optional<SILDeclRef> &Member);
-  void visitApplySubstitutions(const SubstitutionMap &subs);
+  void visitApplySubstitutions(SubstitutionMap subs);
   void visitWitnessMethodInst(WitnessMethodInst *WMI) {
     visitProtocolConformance(WMI->getConformance(), WMI->getMember());
   }

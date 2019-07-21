@@ -104,6 +104,10 @@ public:
   bool
   forEachPrimaryInput(llvm::function_ref<bool(const InputFile &)> fn) const;
 
+  /// If \p fn returns true, exit early and return true.
+  bool
+  forEachNonPrimaryInput(llvm::function_ref<bool(const InputFile &)> fn) const;
+
   unsigned primaryInputCount() const { return PrimaryInputsInOrder.size(); }
 
   // Primary count readers:
@@ -148,6 +152,7 @@ public:
   // treat the input as LLVM_IR.
   bool shouldTreatAsLLVM() const;
   bool shouldTreatAsSIL() const;
+  bool shouldTreatAsModuleInterface() const;
 
   bool areAllNonPrimariesSIB() const;
 
@@ -168,7 +173,7 @@ public:
 
 private:
   friend class ArgsToFrontendOptionsConverter;
-
+  friend class ParseableInterfaceBuilder;
   void setMainAndSupplementaryOutputs(
       ArrayRef<std::string> outputFiles,
       ArrayRef<SupplementaryOutputPaths> supplementaryOutputs);
@@ -230,6 +235,7 @@ public:
   bool hasLoadedModuleTracePath() const;
   bool hasModuleOutputPath() const;
   bool hasModuleDocOutputPath() const;
+  bool hasParseableInterfaceOutputPath() const;
   bool hasTBDPath() const;
 
   bool hasDependencyTrackerPath() const;
@@ -237,4 +243,4 @@ public:
 
 } // namespace swift
 
-#endif /* SWIFT_FRONTEND_FRONTENDINPUTS_H */
+#endif // SWIFT_FRONTEND_FRONTENDINPUTS_H

@@ -146,7 +146,7 @@ public:
     /// Information where the node's value is used in its function.
     /// Each bit corresponds to an argument/instruction where the value is used.
     /// The UsePoints on demand when calling ConnectionGraph::getUsePoints().
-    llvm::SmallBitVector UsePoints;
+    SmallBitVector UsePoints;
 
     /// The actual result of the escape analysis. It tells if and how (global or
     /// through arguments) the value escapes.
@@ -750,7 +750,7 @@ public:
   EscapeAnalysis(SILModule *M);
 
   static bool classof(const SILAnalysis *S) {
-    return S->getKind() == AnalysisKind::Escape;
+    return S->getKind() == SILAnalysisKind::Escape;
   }
 
   virtual void initialize(SILPassManager *PM) override;
@@ -802,11 +802,11 @@ public:
   virtual void invalidate(SILFunction *F, InvalidationKind K) override;
 
   /// Notify the analysis about a newly created function.
-  virtual void notifyAddFunction(SILFunction *F) override { }
+  virtual void notifyAddedOrModifiedFunction(SILFunction *F) override {}
 
   /// Notify the analysis about a function which will be deleted from the
   /// module.
-  virtual void notifyDeleteFunction(SILFunction *F) override {
+  virtual void notifyWillDeleteFunction(SILFunction *F) override {
     invalidate(F, InvalidationKind::Nothing);
   }
 

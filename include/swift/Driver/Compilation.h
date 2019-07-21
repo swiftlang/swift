@@ -19,11 +19,11 @@
 
 #include "swift/Basic/ArrayRefView.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/OutputFileMap.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Driver/Driver.h"
 #include "swift/Driver/Job.h"
 #include "swift/Driver/Util.h"
-#include "swift/Frontend/OutputFileMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Chrono.h"
@@ -40,6 +40,9 @@ namespace opt {
 
 namespace swift {
   class DiagnosticEngine;
+  namespace sys {
+    class TaskQueue;
+  }
 
 namespace driver {
   class Driver;
@@ -71,7 +74,6 @@ enum class PreserveOnSignal : bool {
 };
 
 class Compilation {
-  friend class PerformJobsState;
 public:
   /// The filelist threshold value to pass to ensure file lists are never used
   static const size_t NEVER_USE_FILELIST = SIZE_MAX;
@@ -145,17 +147,6 @@ private:
   /// If unknown, this will be some time in the past.
   llvm::sys::TimePoint<> LastBuildTime = llvm::sys::TimePoint<>::min();
 
-  /// The number of commands which this compilation should attempt to run in
-  /// parallel.
-  const unsigned NumberOfParallelCommands;
-
-  /// Indicates whether this Compilation should use skip execution of
-  /// subtasks during performJobs() by using a dummy TaskQueue.
-  ///
-  /// \note For testing purposes only; similar user-facing features should be
-  /// implemented separately, as the dummy TaskQueue may provide faked output.
-  const bool SkipTaskExecution;
-
   /// Indicates whether this Compilation should continue execution of subtasks
   /// even if they returned an error status.
   bool ContinueBuildingAfterErrors = false;
@@ -181,9 +172,13 @@ private:
   /// Provides a randomization seed to batch-mode partitioning, for debugging.
   const unsigned BatchSeed;
 
-  /// In order to test repartitioning, set to true if
-  /// -driver-force-one-batch-repartition is present.
-  const bool ForceOneBatchRepartition = false;
+  /// Overrides parallelism level and \c BatchSizeLimit, sets exact
+  /// count of batches, if in batch-mode.
+  const Optional<unsigned> BatchCount;
+
+  /// Overrides maximum batch size, if in batch-mode and not overridden
+  /// by \c BatchCount.
+  const Optional<unsigned> BatchSizeLimit;
 
   /// True if temporary files should not be deleted.
   const bool SaveTemps;
@@ -211,6 +206,20 @@ private:
   /// limit filelists will be used.
   size_t FilelistThreshold;
 
+  /// Scaffolding to permit experimentation with finer-grained dependencies and
+  /// faster rebuilds.
+  const bool EnableExperimentalDependencies;
+
+  /// Helpful for debugging, but slows down the driver. So, only turn on when
+  /// needed.
+  const bool VerifyExperimentalDependencyGraphAfterEveryImport;
+  /// Helpful for debugging, but slows down the driver. So, only turn on when
+  /// needed.
+  const bool EmitExperimentalDependencyDotFileAfterEveryImport;
+
+  /// Experiment with inter-file dependencies
+  const bool ExperimentalDependenciesIncludeIntrafileOnes;
+
   template <typename T>
   static T *unwrap(const std::unique_ptr<T> &p) {
     return p.get();
@@ -221,6 +230,7 @@ private:
       ArrayRefView<std::unique_ptr<T>, T *, Compilation::unwrap<T>>;
 
 public:
+  // clang-format off
   Compilation(DiagnosticEngine &Diags, const ToolChain &TC,
               OutputInfo const &OI,
               OutputLevel Level,
@@ -232,15 +242,19 @@ public:
               StringRef ArgsHash, llvm::sys::TimePoint<> StartTime,
               llvm::sys::TimePoint<> LastBuildTime,
               size_t FilelistThreshold,
-              unsigned NumberOfParallelCommands = 1,
               bool EnableIncrementalBuild = false,
               bool EnableBatchMode = false,
               unsigned BatchSeed = 0,
-              bool ForceOneBatchRepartition = false,
-              bool SkipTaskExecution = false,
+              Optional<unsigned> BatchCount = None,
+              Optional<unsigned> BatchSizeLimit = None,
               bool SaveTemps = false,
               bool ShowDriverTimeCompilation = false,
-              std::unique_ptr<UnifiedStatsReporter> Stats = nullptr);
+              std::unique_ptr<UnifiedStatsReporter> Stats = nullptr,
+              bool EnableExperimentalDependencies = false,
+              bool VerifyExperimentalDependencyGraphAfterEveryImport = false,
+              bool EmitExperimentalDependencyDotFileAfterEveryImport = false,
+              bool ExperimentalDependenciesIncludeIntrafileOnes = false);
+  // clang-format on
   ~Compilation();
 
   ToolChain const &getToolChain() const {
@@ -249,6 +263,10 @@ public:
 
   OutputInfo const &getOutputInfo() const {
     return TheOutputInfo;
+  }
+
+  DiagnosticEngine &getDiags() const {
+    return Diags;
   }
 
   UnwrappedArrayView<const Action> getActions() const {
@@ -284,10 +302,6 @@ public:
     return DerivedOutputFileMap;
   }
 
-  unsigned getNumberOfParallelCommands() const {
-    return NumberOfParallelCommands;
-  }
-
   bool getIncrementalBuildEnabled() const {
     return EnableIncrementalBuild;
   }
@@ -295,11 +309,25 @@ public:
     EnableIncrementalBuild = false;
   }
 
+  bool getEnableExperimentalDependencies() const {
+    return EnableExperimentalDependencies;
+  }
+
+  bool getVerifyExperimentalDependencyGraphAfterEveryImport() const {
+    return VerifyExperimentalDependencyGraphAfterEveryImport;
+  }
+
+  bool getEmitExperimentalDependencyDotFileAfterEveryImport() const {
+    return EmitExperimentalDependencyDotFileAfterEveryImport;
+  }
+
+  bool getExperimentalDependenciesIncludeIntrafileOnes() const {
+    return ExperimentalDependenciesIncludeIntrafileOnes;
+  }
+
   bool getBatchModeEnabled() const {
     return EnableBatchMode;
   }
-
-  bool getForceOneBatchRepartition() const { return ForceOneBatchRepartition; }
 
   bool getContinueBuildingAfterErrors() const {
     return ContinueBuildingAfterErrors;
@@ -308,16 +336,56 @@ public:
     ContinueBuildingAfterErrors = Value;
   }
 
-  void setShowsIncrementalBuildDecisions(bool value = true) {
+  bool getShowIncrementalBuildDecisions() const {
+    return ShowIncrementalBuildDecisions;
+  }
+  void setShowIncrementalBuildDecisions(bool value = true) {
     ShowIncrementalBuildDecisions = value;
   }
 
+  bool getShowJobLifecycle() const {
+    return ShowJobLifecycle;
+  }
   void setShowJobLifecycle(bool value = true) {
     ShowJobLifecycle = value;
   }
 
+  bool getShowDriverTimeCompilation() const {
+    return ShowDriverTimeCompilation;
+  }
+
   size_t getFilelistThreshold() const {
     return FilelistThreshold;
+  }
+
+  UnifiedStatsReporter *getStatsReporter() const {
+    return Stats.get();
+  }
+
+  /// True if extra work has to be done when tracing through the dependency
+  /// graph, either in order to print dependencies or to collect statistics.
+  bool getTraceDependencies() const {
+    return getShowIncrementalBuildDecisions() || getStatsReporter();
+  }
+
+  OutputLevel getOutputLevel() const {
+    return Level;
+  }
+
+  unsigned getBatchSeed() const {
+    return BatchSeed;
+  }
+
+  llvm::sys::TimePoint<> getLastBuildTime() const {
+    return LastBuildTime;
+  }
+
+  Optional<unsigned> getBatchCount() const {
+    return BatchCount;
+  }
+
+  Optional<unsigned> getBatchSizeLimit() const {
+    return BatchSizeLimit;
   }
 
   /// Requests the path to a file containing all input source files. This can
@@ -330,9 +398,12 @@ public:
   const char *getAllSourcesPath() const;
 
   /// Asks the Compilation to perform the Jobs which it knows about.
+  ///
+  /// \param TQ The TaskQueue used to schedule jobs for execution.
+  ///
   /// \returns result code for the Compilation's Jobs; 0 indicates success and
   /// -2 indicates that one of the Compilation's Jobs crashed during execution
-  int performJobs();
+  int performJobs(std::unique_ptr<sys::TaskQueue> &&TQ);
 
   /// Returns whether the callee is permitted to pass -emit-loaded-module-trace
   /// to a frontend job.
@@ -351,16 +422,17 @@ public:
   }
 
 private:
-  /// \brief Perform all jobs.
+  /// Perform all jobs.
   ///
   /// \param[out] abnormalExit Set to true if any job exits abnormally (i.e.
   /// crashes).
+  /// \param TQ The task queue on which jobs will be scheduled.
   ///
   /// \returns exit code of the first failed Job, or 0 on success. If a Job
   /// crashes during execution, a negative value will be returned.
-  int performJobsImpl(bool &abnormalExit);
+  int performJobsImpl(bool &abnormalExit, std::unique_ptr<sys::TaskQueue> &&TQ);
 
-  /// \brief Performs a single Job by executing in place, if possible.
+  /// Performs a single Job by executing in place, if possible.
   ///
   /// \param Cmd the Job which should be performed.
   ///

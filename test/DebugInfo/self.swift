@@ -13,7 +13,7 @@ public func f() {
 // is constructed in an alloca. The debug info for the alloca should not
 // describe a reference type as we would normally do with inout arguments.
 //
-// CHECK: define {{.*}} @"$S4self11stuffStructVACycfC"(
+// CHECK: define {{.*}} @"$s4self11stuffStructVACycfC"(
 // CHECK-NEXT: entry:
 // CHECK: %[[ALLOCA:.*]] = alloca %T4self11stuffStructV, align {{(4|8)}}
 // CHECK: call void @llvm.dbg.declare(metadata %T4self11stuffStructV* %[[ALLOCA]],
