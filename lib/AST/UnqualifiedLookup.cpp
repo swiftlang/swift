@@ -739,7 +739,7 @@ void UnqualifiedLookupFactory::lookupNamesIntroducedByClosure(
         finishLookingInContext(
           AddGenericParameters::Yes,
           CE->getParent(),
-          ResultFinderForTypeContext(CE, parentCtx),
+          ResultFinderForTypeContext(this, CE, parentCtx),
           resolveIsCascadingUse(ACE, isCascadingUse,
                                 /*onlyCareAboutFunctionBody=*/false));
         // clang-format on
