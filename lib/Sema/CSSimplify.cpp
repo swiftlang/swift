@@ -110,7 +110,8 @@ bool constraints::doesMemberRefApplyCurriedSelf(Type baseTy,
   // curried self.
   if (decl->isInstanceMember()) {
     assert(baseTy);
-    if (isa<AbstractFunctionDecl>(decl) && baseTy->is<AnyMetatypeType>())
+    if (isa<AbstractFunctionDecl>(decl) &&
+        baseTy->getRValueType()->is<AnyMetatypeType>())
       return false;
   }
 
@@ -118,28 +119,22 @@ bool constraints::doesMemberRefApplyCurriedSelf(Type baseTy,
   return true;
 }
 
-bool constraints::areConservativelyCompatibleArgumentLabels(
-                                               OverloadChoice choice,
-                                               ArrayRef<Identifier> labels,
-                                               bool hasTrailingClosure) {
+static bool
+areConservativelyCompatibleArgumentLabels(OverloadChoice choice,
+                                          ArrayRef<FunctionType::Param> args,
+                                          bool hasTrailingClosure) {
   ValueDecl *decl = nullptr;
-  Type baseType;
   switch (choice.getKind()) {
   case OverloadChoiceKind::Decl:
   case OverloadChoiceKind::DeclViaBridge:
   case OverloadChoiceKind::DeclViaDynamic:
   case OverloadChoiceKind::DeclViaUnwrappedOptional:
     decl = choice.getDecl();
-    baseType = choice.getBaseType();
-    if (baseType)
-      baseType = baseType->getRValueType();
     break;
 
-  case OverloadChoiceKind::KeyPathApplication:
-    // Key path applications are written as if subscript[keyPath:].
-    return !hasTrailingClosure && labels.size() == 1 && labels[0].is("keyPath");
-
   case OverloadChoiceKind::BaseType:
+  // KeyPath application is not filtered in `performMemberLookup`.
+  case OverloadChoiceKind::KeyPathApplication:
   case OverloadChoiceKind::DynamicMemberLookup:
   case OverloadChoiceKind::KeyPathDynamicMemberLookup:
   case OverloadChoiceKind::TupleIndex:
@@ -149,17 +144,13 @@ bool constraints::areConservativelyCompatibleArgumentLabels(
   if (!decl->hasParameterList())
     return true;
 
-  SmallVector<AnyFunctionType::Param, 8> argInfos;
-  for (auto argLabel : labels) {
-    argInfos.push_back(AnyFunctionType::Param(Type(), argLabel, {}));
-  }
-
   // This is a member lookup, which generally means that the call arguments
   // (if we have any) will apply to the second level of parameters, with
   // the member lookup applying the curried self at the first level. But there
   // are cases where we can get an unapplied declaration reference back.
   auto hasAppliedSelf =
-      decl->hasCurriedSelf() && doesMemberRefApplyCurriedSelf(baseType, decl);
+      decl->hasCurriedSelf() &&
+      doesMemberRefApplyCurriedSelf(choice.getBaseType(), decl);
 
   auto *fnType = decl->getInterfaceType()->castTo<AnyFunctionType>();
   if (hasAppliedSelf) {
@@ -173,10 +164,9 @@ bool constraints::areConservativelyCompatibleArgumentLabels(
   MatchCallArgumentListener listener;
   SmallVector<ParamBinding, 8> unusedParamBindings;
 
-  return !matchCallArguments(argInfos, params, paramInfo,
-                             hasTrailingClosure,
-                             /*allow fixes*/ false,
-                             listener, unusedParamBindings);
+  return !matchCallArguments(args, params, paramInfo, hasTrailingClosure,
+                             /*allow fixes*/ false, listener,
+                             unusedParamBindings);
 }
 
 Expr *constraints::getArgumentLabelTargetExpr(Expr *fn) {
@@ -5838,7 +5828,6 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
 Type ConstraintSystem::simplifyAppliedOverloads(
                                 TypeVariableType *fnTypeVar,
                                 const FunctionType *argFnType,
-                                Optional<ArgumentLabelState> argumentLabels,
                                 ConstraintLocatorBuilder locator) {
   Type fnType(fnTypeVar);
 
@@ -5879,6 +5868,8 @@ Type ConstraintSystem::simplifyAppliedOverloads(
       return markFailure();
   };
 
+  auto argumentInfo = getArgumentLabels(*this, locator);
+
   // Consider each of the constraints in the disjunction.
 retry_after_fail:
   bool hasUnhandledConstraints = false;
@@ -5892,12 +5883,18 @@ retry_after_fail:
 
         // Determine whether the argument labels we have conflict with those of
         // this overload choice.
-        if (argumentLabels &&
-            !areConservativelyCompatibleArgumentLabels(
-                choice, argumentLabels->Labels,
-                argumentLabels->HasTrailingClosure)) {
-          labelMismatch = true;
-          return false;
+        if (argumentInfo) {
+          auto args = argFnType->getParams();
+
+          SmallVector<FunctionType::Param, 8> argsWithLabels;
+          argsWithLabels.append(args.begin(), args.end());
+          FunctionType::relabelParams(argsWithLabels, argumentInfo->Labels);
+
+          if (!areConservativelyCompatibleArgumentLabels(
+                  choice, argsWithLabels, argumentInfo->HasTrailingClosure)) {
+            labelMismatch = true;
+            return false;
+          }
         }
 
         // Determine the type that this choice will have.
@@ -5924,7 +5921,7 @@ retry_after_fail:
   switch (filterResult) {
   case SolutionKind::Error:
     if (labelMismatch && shouldAttemptFixes()) {
-      argumentLabels = None;
+      argumentInfo.reset();
       goto retry_after_fail;
     }
 
@@ -6040,9 +6037,7 @@ ConstraintSystem::simplifyApplicableFnConstraint(
   // If the right-hand side is a type variable, try to simplify the overload
   // set.
   if (auto typeVar = desugar2->getAs<TypeVariableType>()) {
-    auto argumentLabels = getArgumentLabels(*this, locator);
-    Type newType2 =
-        simplifyAppliedOverloads(typeVar, func1, argumentLabels, locator);
+    Type newType2 = simplifyAppliedOverloads(typeVar, func1, locator);
     if (!newType2)
       return SolutionKind::Error;
 
