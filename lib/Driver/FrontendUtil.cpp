@@ -34,7 +34,7 @@ bool swift::driver::getSingleFrontendInvocationFromDriverArguments(
   // frontend command.
   Args.push_back("-force-single-frontend-invocation");
 
-  // Explictly disable batch mode to avoid a spurious warning when combining
+  // Explicitly disable batch mode to avoid a spurious warning when combining
   // -enable-batch-mode with -force-single-frontend-invocation.  This is an
   // implementation detail.
   Args.push_back("-disable-batch-mode");

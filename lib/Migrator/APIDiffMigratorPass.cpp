@@ -1181,7 +1181,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     return true;
   }
 
-  static void collectParamters(AbstractFunctionDecl *AFD,
+  static void collectParameters(AbstractFunctionDecl *AFD,
                                SmallVectorImpl<ParamDecl*> &Results) {
     for (auto PD : *AFD->getParameters()) {
       Results.push_back(PD);
@@ -1197,7 +1197,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
         Editor.replace(NameRange, View.base());
       unsigned Index = 0;
       SmallVector<ParamDecl*, 4> Params;
-      collectParamters(AFD, Params);
+      collectParameters(AFD, Params);
       for (auto *PD: Params) {
         if (Index == View.argSize())
           break;
@@ -1322,11 +1322,11 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
       return;
     Idx --;
     SmallVector<ParamDecl*, 4> Params;
-    collectParamters(AFD, Params);
+    collectParameters(AFD, Params);
     if (Params.size() <= Idx)
       return;
 
-    // Get the internal name of the changed paramter.
+    // Get the internal name of the changed parameter.
     auto VariableName = Params[Idx]->getParameterName().str();
 
     // Insert the helper function to convert the type back to raw types.
@@ -1459,7 +1459,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     if (auto *VD = dyn_cast<VarDecl>(D)) {
       for (auto *Item: getRelatedDiffItems(VD)) {
         if (auto *CD = dyn_cast<CommonDiffItem>(Item)) {
-          // If the overriden property has been renamed, we should rename
+          // If the overridden property has been renamed, we should rename
           // this property decl as well.
           if (CD->isRename() && VD->getNameLoc().isValid()) {
             Editor.replaceToken(VD->getNameLoc(), CD->getNewName());

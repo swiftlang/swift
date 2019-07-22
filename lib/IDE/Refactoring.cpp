@@ -854,7 +854,7 @@ public:
 ExtractCheckResult checkExtractConditions(ResolvedRangeInfo &RangeInfo,
                                           DiagnosticEngine &DiagEngine) {
   llvm::SmallVector<CannotExtractReason, 2> AllReasons;
-  // If any declared declaration is refered out of the given range, return false.
+  // If any declared declaration is referred out of the given range, return false.
   auto Declared = RangeInfo.DeclaredDecls;
   auto It = std::find_if(Declared.begin(), Declared.end(),
                          [](DeclaredDecl DD) { return DD.ReferredAfterRange; });
@@ -1133,7 +1133,7 @@ bool RefactoringActionExtractFunction::performChange() {
   // Correct the given name if collision happens.
   PreferredName = correctNewDeclName(InsertToDC, PreferredName);
 
-  // Collect the paramters to pass down to the new function.
+  // Collect the parameters to pass down to the new function.
   std::vector<ReferencedDecl> Parameters;
   for (auto &RD: RangeInfo.ReferencedDecls) {
     // If the referenced decl is declared elsewhere, no need to pass as parameter
@@ -3006,7 +3006,7 @@ bool RefactoringActionSimplifyNumberLiteral::performChange() {
 static CallExpr *findTrailingClosureTarget(SourceManager &SM,
                                            ResolvedCursorInfo CursorInfo) {
   if (CursorInfo.Kind == CursorInfoKind::StmtStart)
-    // StmtStart postion can't be a part of CallExpr.
+    // StmtStart position can't be a part of CallExpr.
     return nullptr;
 
   // Find inner most CallExpr
@@ -3025,7 +3025,7 @@ static CallExpr *findTrailingClosureTarget(SourceManager &SM,
     // Call expression already has a trailing closure.
     return nullptr;
 
-  // The last arugment is a closure?
+  // The last argument is a closure?
   Expr *Args = CE->getArg();
   if (!Args)
     return nullptr;

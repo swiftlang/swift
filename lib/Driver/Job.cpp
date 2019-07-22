@@ -153,7 +153,7 @@ void CommandOutput::addPrimaryOutput(CommandInputPair Input,
     return;
   }
   // The invariant holds in the non-TY_Nothing case before an input is added and
-  // _after the corresponding output is added_, but not inbetween. Don't try to
+  // _after the corresponding output is added_, but not in-between. Don't try to
   // merge these two cases, they're different.
   CommandOutputInvariantChecker Check(*this);
   Inputs.push_back(Input);

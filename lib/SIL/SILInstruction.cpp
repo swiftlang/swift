@@ -1300,7 +1300,7 @@ SILInstructionResultArray::SILInstructionResultArray(
   auto *Value = static_cast<const ValueBase *>(SVI);
   assert(uintptr_t(Value) != uintptr_t(SVI) &&
          "Expected value to be offset from SVI since it is not the first "
-         "multi-inheritence parent");
+         "multi-inheritance parent");
   Pointer = reinterpret_cast<const uint8_t *>(Value);
 
 #ifndef NDEBUG

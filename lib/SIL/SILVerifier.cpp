@@ -4447,7 +4447,7 @@ public:
     require(IEC->getVerificationType() == IsEscapingClosureInst::ObjCEscaping ||
                 IEC->getVerificationType() ==
                     IsEscapingClosureInst::WithoutActuallyEscaping,
-            "unknown verfication type");
+            "unknown verification type");
   }
 
   // This verifies that the entry block of a SIL function doesn't have

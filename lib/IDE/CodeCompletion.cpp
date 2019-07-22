@@ -4329,7 +4329,7 @@ public:
       return;
 
     if (D->isFinal() ||
-        // A 'class' member with an initial value cannot be overriden either.
+        // A 'class' member with an initial value cannot be overridden either.
         (D->isStatic() && D->getAttrs().hasAttribute<HasInitialValueAttr>()))
       return;
 

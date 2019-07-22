@@ -435,7 +435,7 @@ namespace driver {
           // recompiled. (Only non-private entities are output as provides.) In
           // other words, this Job "cascades"; the need to recompile it causes
           // other recompilations. It is possible that the current code marks
-          // things that do not need to be marked. Unecessary compilation would
+          // things that do not need to be marked. Unnecessary compilation would
           // result if that were the case.
           bool wasCascading = DepGraph.isMarked(FinishedCmd);
 

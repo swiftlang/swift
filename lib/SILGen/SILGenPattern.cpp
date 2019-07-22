@@ -2633,7 +2633,7 @@ static void switchCaseStmtSuccessCallback(SILGenFunction &SGF,
   }
 
   // Ok, at this point we know that we have a multiple entrance block. Grab our
-  // shared destination in preperation for branching to it.
+  // shared destination in preparation for branching to it.
   //
   // NOTE: We do not emit anything yet, since we will emit the shared block
   // later.
