@@ -34,7 +34,7 @@ report_bad_alloc_error(const char *Reason, bool GenCrashDiag) {}
 
 // The same for SmallVector: provide the grow_pod implementation (the only
 // SmallVector function which is not inlined) as we don't link LLVM.
-// TODO: This is a hack. This implementaiton is copied from LLVM and has to stay
+// TODO: This is a hack. This implementation is copied from LLVM and has to stay
 // in sync with it.
 
 /// grow_pod - This is an implementation of the grow() method which only works

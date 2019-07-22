@@ -1158,7 +1158,7 @@ extension IteratorSequence: IteratorProtocol, Sequence {
   }
 }
 
-/* FIXME: ideally for compatability we would declare
+/* FIXME: ideally for compatibility we would declare
 extension Sequence {
   @available(swift, deprecated: 5, message: "")
   public typealias SubSequence = AnySequence<Element>

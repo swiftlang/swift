@@ -71,7 +71,7 @@ extension _StringGuts {
     self.grow(n)
   }
 
-  // Grow to accomodate at least `n` code units
+  // Grow to accommodate at least `n` code units
   @usableFromInline
   internal mutating func grow(_ n: Int) {
     defer { self._invariantCheck() }
@@ -118,7 +118,7 @@ extension _StringGuts {
         "growth should produce enough capacity")
     }
 
-    // See if we can accomodate without growing or copying. If we have
+    // See if we can accommodate without growing or copying. If we have
     // sufficient capacity, we do not need to grow, and we can skip the copy if
     // unique. Otherwise, growth is required.
     let sufficientCapacity: Bool

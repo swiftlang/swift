@@ -187,7 +187,7 @@ extension LazyFilterCollection: Collection {
   internal func _ensureBidirectional(step: Int) {
     // FIXME: This seems to be the best way of checking whether _base is
     // forward only without adding an extra protocol requirement.
-    // index(_:offsetBy:limitedBy:) is chosen becuase it is supposed to return
+    // index(_:offsetBy:limitedBy:) is chosen because it is supposed to return
     // nil when the resulting index lands outside the collection boundaries,
     // and therefore likely does not trap in these cases.
     if step < 0 {

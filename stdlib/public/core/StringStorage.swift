@@ -328,7 +328,7 @@ final internal class __StringStorage
 }
 
 // Determine the actual number of code unit capacity to request from malloc. We
-// round up the nearest multiple of 8 that isn't a mulitple of 16, to fully
+// round up the nearest multiple of 8 that isn't a multiple of 16, to fully
 // utilize malloc's small buckets while accounting for the trailing
 // _StringBreadCrumbs.
 //

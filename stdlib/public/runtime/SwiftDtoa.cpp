@@ -324,7 +324,7 @@ int swift_decompose_double(double d,
     // bias.  That's because they treat the significand as a
     // fixed-point number with one bit (the hidden bit) integer
     // portion.  The logic here reconstructs the significand as a
-    // pure fraction, so we need to accomodate that when
+    // pure fraction, so we need to accommodate that when
     // reconstructing the binary exponent.
     static const int64_t exponentBias = (1 << (exponentBitCount - 1)) - 2; // 1022
 
@@ -1336,7 +1336,7 @@ size_t swift_format_decimal(char *dest, size_t length,
 // low-order part (rounding).  So most of the arithmetic helpers here
 // are for multiplication.
 
-// Note: With 64-bit GCC and Clang, we get a noticable performance
+// Note: With 64-bit GCC and Clang, we get a noticeable performance
 // gain by using `__uint128_t`.  Otherwise, we have to break things
 // down into 32-bit chunks so we don't overflow 64-bit temporaries.
 
