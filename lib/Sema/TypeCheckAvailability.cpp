@@ -2202,7 +2202,7 @@ bool swift::diagnoseExplicitUnavailability(
       attachRenameFixIts(diag);
     }
   } else if (isSubscriptReturningString(D, ctx)) {
-    diags.diagnose(Loc, diag::availabilty_string_subscript_migration)
+    diags.diagnose(Loc, diag::availability_string_subscript_migration)
       .highlight(R)
       .fixItInsert(R.Start, "String(")
       .fixItInsertAfter(R.End, ")");

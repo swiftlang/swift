@@ -26,11 +26,11 @@ REFACTORING(GlobalRename, "Global Rename", rename.global)
 /// (syntactically).
 REFACTORING(FindGlobalRenameRanges, "Find Global Rename Ranges", rename.global.find-ranges)
 
-/// Find and categorize all occurences of the file-local symbol at a given
+/// Find and categorize all occurrences of the file-local symbol at a given
 /// location.
 REFACTORING(FindLocalRenameRanges, "Find Local Rename Ranges", rename.local.find-ranges)
 
-/// Find and rename all occurences of the file-local symbol at a given
+/// Find and rename all occurrences of the file-local symbol at a given
 /// location.
 CURSOR_REFACTORING(LocalRename, "Local Rename", rename.local)
 

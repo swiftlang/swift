@@ -249,10 +249,10 @@ public:
     return findAndErase(k1, k2);
   }
   /// Return the submap for a given Key1. May create one, after the fashion of
-  /// the standard libary.
+  /// the standard library.
   const Key2Map &operator[](const Key1 &k1) { return map1[k1]; }
   /// Return the submap for a given Key2. May create one, after the fashion of
-  /// the standard libary.
+  /// the standard library.
   const Key1Map &operator[](const Key2 &k2) { return map2[k2]; }
 
   /// Invoke \p fn on each Key2 and Value matching (\p k1, *)

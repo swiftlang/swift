@@ -889,7 +889,7 @@ ERROR(did_not_call_method,none,
 
 ERROR(init_not_instance_member_use_assignment,none,
       "'init' is a member of the type; use assignment "
-      "to initalize the value instead", ())
+      "to initialize the value instead", ())
 
 ERROR(init_not_instance_member,none,
       "'init' is a member of the type; use 'type(of: ...)' to initialize "
@@ -4200,7 +4200,7 @@ WARNING(public_decl_needs_availability, none,
 // This doesn't display as an availability diagnostic, but it's
 // implemented there and fires when these subscripts are marked
 // unavailable, so it seems appropriate to put it here.
-ERROR(availabilty_string_subscript_migration, none,
+ERROR(availability_string_subscript_migration, none,
       "subscripts returning String were obsoleted in Swift 4; explicitly construct a String from subscripted result", ())
 
 //------------------------------------------------------------------------------

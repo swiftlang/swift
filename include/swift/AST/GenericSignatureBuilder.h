@@ -770,7 +770,7 @@ public:
   /// \param resolutionKind How to perform the resolution.
   ///
   /// \param wantExactPotentialArchetype Whether to return the precise
-  /// potential archetype described by the type (vs. just the equivalance
+  /// potential archetype described by the type (vs. just the equivalence
   /// class and resolved type).
   ResolvedType maybeResolveEquivalenceClass(
                                       Type type,
@@ -814,7 +814,7 @@ public:
   static void verifyGenericSignature(ASTContext &context,
                                      GenericSignature *sig);
 
-  /// Verify all of the generic sigantures in the given module.
+  /// Verify all of the generic signatures in the given module.
   static void verifyGenericSignaturesInModule(ModuleDecl *module);
 
   /// Dump all of the requirements, both specified and inferred.
