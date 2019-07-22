@@ -94,7 +94,9 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
 
   auto &CGO = Importer->getClangCodeGenOpts();
   CGO.OptimizationLevel = Opts.shouldOptimize() ? 3 : 0;
-  CGO.DisableFPElim = Opts.DisableFPElim;
+  CGO.setFramePointer(Opts.DisableFPElim
+                          ? clang::CodeGenOptions::FramePointerKind::All
+                          : clang::CodeGenOptions::FramePointerKind::None);
   CGO.DiscardValueNames = !Opts.shouldProvideValueNames();
   switch (Opts.DebugInfoLevel) {
   case IRGenDebugInfoLevel::None:
