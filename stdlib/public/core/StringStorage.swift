@@ -126,7 +126,7 @@ extension _AbstractStringStorage {
     if !tagged {
       // Handle the case where both strings were bridged from Swift.
       // We can't use String.== because it doesn't match NSString semantics.
-      let cls = unsafeBitCast(_swift_classOfObjCHeapObject(str), to: UInt.self)
+      let cls = unsafeBitCast(_swift_classOfObjCHeapObject(other), to: UInt.self)
       if cls == unsafeBitCast(__StringStorage.self, to: UInt.self) {
         return _nativeIsEqual(
           _unsafeUncheckedDowncast(other, to: __StringStorage.self))
