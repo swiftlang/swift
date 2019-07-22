@@ -149,18 +149,33 @@ extension _AbstractStringStorage {
     if _isNSString(other) != 1 {
       return 0
     }
+    
     // At this point we've proven that it is an NSString of some sort, but not
     // a Swift one.
+    
+    defer { _fixLifetime(other) }
+
+    let otherUTF16Length = _stdlib_binary_CFStringGetLength(other)
+    
     if length != _stdlib_binary_CFStringGetLength(other) {
       return 0
     }
-    defer { _fixLifetime(other) }
+    
     // CFString will only give us ASCII bytes here, but that's fine.
     // We already handled non-ASCII UTF8 strings earlier since they're Swift.
     if let otherStart = _cocoaUTF8Pointer(other) {
+      //We know that otherUTF16Length is also its byte count at this point
+      if count != otherUTF16Length {
+        return 0
+      }
       return (start == otherStart ||
         (memcmp(start, otherStart, count) == 0)) ? 1 : 0
     }
+    
+    if UTF16Length != otherUTF16Length {
+      return 0
+    }
+    
     /*
      The abstract implementation of -isEqualToString: falls back to -compare:
      immediately, so when we run out of fast options to try, do the same.
