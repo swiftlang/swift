@@ -224,6 +224,27 @@ static bool wantsObjCRuntime(const llvm::Triple &triple) {
   llvm_unreachable("unknown Darwin OS");
 }
 
+static void findARCLiteLibPath(const toolchains::Darwin &TC,
+                               llvm::SmallVectorImpl<char> &ARCLiteLib) {
+  auto& D = TC.getDriver();
+  llvm::sys::path::append(ARCLiteLib, D.getSwiftProgramPath());
+  
+  llvm::sys::path::remove_filename(ARCLiteLib); // 'swift'
+  llvm::sys::path::remove_filename(ARCLiteLib); // 'bin'
+  llvm::sys::path::append(ARCLiteLib, "lib", "arc");
+
+  if (!llvm::sys::fs::is_directory(ARCLiteLib)) {
+    // If we don't have a 'lib/arc/' directory, find the "arclite" library
+    // relative to the Clang in the active Xcode.
+    ARCLiteLib.clear();
+    if (findXcodeClangPath(ARCLiteLib)) {
+      llvm::sys::path::remove_filename(ARCLiteLib); // 'clang'
+      llvm::sys::path::remove_filename(ARCLiteLib); // 'bin'
+      llvm::sys::path::append(ARCLiteLib, "lib", "arc");
+    }
+  }
+}
+
 ToolChain::InvocationInfo
 toolchains::Darwin::constructInvocation(const DynamicLinkJobAction &job,
                                         const JobContext &context) const {
@@ -235,7 +256,6 @@ toolchains::Darwin::constructInvocation(const DynamicLinkJobAction &job,
     llvm::report_fatal_error("-static-executable is not supported on Darwin");
   }
 
-  const Driver &D = getDriver();
   const llvm::Triple &Triple = getTriple();
 
   // Configure the toolchain.
@@ -313,37 +333,19 @@ toolchains::Darwin::constructInvocation(const DynamicLinkJobAction &job,
   if (context.Args.hasFlag(options::OPT_link_objc_runtime,
                            options::OPT_no_link_objc_runtime,
                            /*Default=*/wantsObjCRuntime(Triple))) {
-    llvm::SmallString<128> ARCLiteLib(D.getSwiftProgramPath());
-    llvm::sys::path::remove_filename(ARCLiteLib); // 'swift'
-    llvm::sys::path::remove_filename(ARCLiteLib); // 'bin'
-    llvm::sys::path::append(ARCLiteLib, "lib", "arc");
+    llvm::SmallString<128> ARCLiteLib;
+    findARCLiteLibPath(*this, ARCLiteLib);
 
-    if (!llvm::sys::fs::is_directory(ARCLiteLib)) {
-      // If we don't have a 'lib/arc/' directory, find the "arclite" library
-      // relative to the Clang in the active Xcode.
-      ARCLiteLib.clear();
-      if (findXcodeClangPath(ARCLiteLib)) {
-        llvm::sys::path::remove_filename(ARCLiteLib); // 'clang'
-        llvm::sys::path::remove_filename(ARCLiteLib); // 'bin'
-        llvm::sys::path::append(ARCLiteLib, "lib", "arc");
-      }
-    }
-
-    if (!ARCLiteLib.empty()) {
-      llvm::sys::path::append(ARCLiteLib, "libarclite_");
-      ARCLiteLib += getPlatformNameForTriple(Triple);
-      ARCLiteLib += ".a";
-
-      Arguments.push_back("-force_load");
-      Arguments.push_back(context.Args.MakeArgString(ARCLiteLib));
-
-      // Arclite depends on CoreFoundation.
-      Arguments.push_back("-framework");
-      Arguments.push_back("CoreFoundation");
-    } else {
-      // FIXME: We should probably diagnose this, but this is not a place where
-      // we can emit diagnostics. Silently ignore it for now.
-    }
+    llvm::sys::path::append(ARCLiteLib, "libarclite_");
+    ARCLiteLib += getPlatformNameForTriple(Triple);
+    ARCLiteLib += ".a";
+    
+    Arguments.push_back("-force_load");
+    Arguments.push_back(context.Args.MakeArgString(ARCLiteLib));
+    
+    // Arclite depends on CoreFoundation.
+    Arguments.push_back("-framework");
+    Arguments.push_back("CoreFoundation");
   }
 
   for (const Arg *arg :
@@ -585,6 +587,23 @@ bool toolchains::Darwin::shouldStoreInvocationInDebugInfo() const {
   return false;
 }
 
+static void validateLinkObjcRuntimeARCLiteLib(const toolchains::Darwin &TC,
+                                              DiagnosticEngine &diags,
+                                              const llvm::opt::ArgList &args) {
+  auto Triple = TC.getTriple();
+  if (args.hasFlag(options::OPT_link_objc_runtime,
+                   options::OPT_no_link_objc_runtime,
+                   /*Default=*/wantsObjCRuntime(Triple))) {
+    llvm::SmallString<128> ARCLiteLib;
+    findARCLiteLibPath(TC, ARCLiteLib);
+    
+    if (ARCLiteLib.empty()) {
+      diags.diagnose(SourceLoc(),
+                     diag::error_arclite_not_found_when_link_objc_runtime);
+    }
+  }
+}
+
 static void validateDeploymentTarget(const toolchains::Darwin &TC,
                                      DiagnosticEngine &diags,
                                      const llvm::opt::ArgList &args) {
@@ -621,6 +640,9 @@ static void validateDeploymentTarget(const toolchains::Darwin &TC,
 void 
 toolchains::Darwin::validateArguments(DiagnosticEngine &diags,
                                       const llvm::opt::ArgList &args) const {
+  // Validating arclite library path when link-objc-runtime.
+  validateLinkObjcRuntimeARCLiteLib(*this, diags, args);
+  
   // Validating apple platforms deployment targets.
   validateDeploymentTarget(*this, diags, args);
     

@@ -114,6 +114,9 @@ ERROR(error_sdk_too_old,none,
 ERROR(error_ios_maximum_deployment_32,none,
       "iOS %0 does not support 32-bit programs", (unsigned))
 
+ERROR(error_arclite_not_found_when_link_objc_runtime,none,
+"unable to find the 'arclite' library", ())
+
 ERROR(error_two_files_same_name,none,
       "filename \"%0\" used twice: '%1' and '%2'",
       (StringRef, StringRef, StringRef))
