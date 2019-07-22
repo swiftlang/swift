@@ -314,14 +314,17 @@ public:
     {
       assert(numNumericValuesInPathElement(kind) == 1 &&
              "Path element kind does not require 1 value");
+      assert(value == getValue(0) && "value truncated");
     }
 
-    PathElement(PathElementKind kind, unsigned value1, unsigned value2)
-      : storage(encodeStorage(kind, value1 << 16 | value2)),
+    PathElement(PathElementKind kind, unsigned value0, unsigned value1)
+      : storage(encodeStorage(kind, value0 << 16 | value1)),
         storedKind(StoredKindAndValue)
     {
       assert(numNumericValuesInPathElement(kind) == 2 &&
              "Path element kind does not require 2 values");
+      assert(value0 == getValue(0) && "value0 truncated");
+      assert(value1 == getValue(1) && "value1 truncated");
     }
 
     PathElement(GenericSignature *sig)
