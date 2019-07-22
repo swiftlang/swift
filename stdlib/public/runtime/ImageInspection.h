@@ -76,10 +76,15 @@ void initializeDynamicReplacementLookup();
 
 // Callbacks to register metadata from an image to the runtime.
 void addImageProtocolsBlockCallback(const void *start, uintptr_t size);
+void addImageProtocolsBlockCallbackUnsafe(const void *start, uintptr_t size);
 void addImageProtocolConformanceBlockCallback(const void *start,
                                               uintptr_t size);
+void addImageProtocolConformanceBlockCallbackUnsafe(const void *start,
+                                                    uintptr_t size);
 void addImageTypeMetadataRecordBlockCallback(const void *start,
                                              uintptr_t size);
+void addImageTypeMetadataRecordBlockCallbackUnsafe(const void *start,
+                                                   uintptr_t size);
 void addImageDynamicReplacementBlockCallback(const void *start, uintptr_t size,
                                              const void *start2,
                                              uintptr_t size2);
