@@ -70,7 +70,7 @@ class Mock(object):
     def expect(self, call_args, response):
         """Expect invocation of tested method with given arguments.
 
-        Stores the canned reponse in the `respond` dictionary.
+        Stores the canned response in the `respond` dictionary.
         """
         call_args = tuple(call_args)
         self.expected.append(call_args)
@@ -83,7 +83,7 @@ class Mock(object):
             'Expected: {0} in Called: {1}'.format(expected_args, self.calls))
 
     def assert_called_all_expected(self):
-        """Verify that all expeced invocations of tested method were called."""
+        """Verify that all expected invocations of tested method were called."""
         assert self.calls == self.expected, (
             '\nExpected: {0}, \n  Called: {1}'.format(
                 self.expected, self.calls))
