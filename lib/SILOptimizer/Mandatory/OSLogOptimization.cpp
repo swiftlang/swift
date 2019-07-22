@@ -117,7 +117,7 @@ static SILFunction *getStringMakeUTF8Init(SILInstruction *inst) {
 }
 
 // A cache of string-related, SIL information that is needed to create and
-// initalize strings from raw string literals. This information is
+// initialize strings from raw string literals. This information is
 // extracted from instructions while they are constant evaluated. Though the
 // information contained here can be constructed from scratch, extracting it
 // from existing instructions is more efficient.
@@ -176,7 +176,7 @@ public:
 
   /// Instructions that mark the end points of folding. No folded SIL value must
   /// be usable beyond these instructions (in the control-flow order). These
-  /// instructions are also used to emit destory instructions for non-trivial,
+  /// instructions are also used to emit destroy instructions for non-trivial,
   /// SIL values emitted during folding.
   SmallSetVector<SILInstruction *, 2> endInstructions;
 
@@ -460,7 +460,7 @@ static void getLifetimeEndInstructionsOfSILValue(
 /// Emit instructions to destroy the folded value at the end of its use, if
 /// required. Since this pass folds only integers or strings and since the
 /// former is a trivial type, we only have to destroy strings that are folded.
-/// For strings, a release_value (or a destory_value instruction in ownership
+/// For strings, a release_value (or a destroy_value instruction in ownership
 /// SIL) has to be emitted if it is not already present.
 static void
 destroyFoldedValueAtEndOfUse(SILValue foldedVal, SILValue originalVal,
@@ -584,7 +584,7 @@ static bool detectAndDiagnoseErrors(Optional<SymbolicValue> errorInfo,
     return true;
   }
 
-  // Check if every proprety of the OSLogInterpolation instance that is a
+  // Check if every property of the OSLogInterpolation instance that is a
   // string or integer has a constant value. If this is violated this could
   // be an indication of an error in the usage of the API. Diagnostics emitted
   // here are for the users of the os log APIs.
@@ -652,7 +652,7 @@ static void constantFold(SILInstruction *start,
 
 /// Given a call to the initializer of OSLogMessage, which conforms to
 /// 'ExpressibleByStringInterpolation', find the first instruction, if any,
-/// that marks the begining of the string interpolation that is used to
+/// that marks the beginning of the string interpolation that is used to
 /// create an OSLogMessage instance. Normally, this instruction is the
 /// alloc_stack of the string interpolation type: 'OSLogInterpolation'.
 /// Constant evaluation and folding must begin from this instruction.

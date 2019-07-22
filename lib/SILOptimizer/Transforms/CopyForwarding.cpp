@@ -838,7 +838,7 @@ bool CopyForwarding::doesCopyDominateDestUsers(
 }
 
 // Add all recognized users of storedValue to StoredValueUserInsts. Return true
-// if all users were recgonized.
+// if all users were recognized.
 //
 // To find all SSA users of storedValue, we first find the RC root, then search
 // past any instructions that may propagate the reference.

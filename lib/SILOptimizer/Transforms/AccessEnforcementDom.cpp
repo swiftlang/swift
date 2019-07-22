@@ -135,7 +135,7 @@ public:
 
 private:
   // The data flow state for each block. It is only valid between the time at
-  // least one predecesor block has been finished and before its own block
+  // least one predecessor block has been finished and before its own block
   // has been finished.
   //
   // The isBottom flag allows the analysis to avoid quadratic behavior where
@@ -389,7 +389,7 @@ void DominatedAccessRemoval::visitBeginAccess(BeginAccessInst *BAI) {
 }
 
 // Track this identifiable dynamic access in storageToDomMap, and optimize it if
-// possible. Return true if the optimization suceeds.
+// possible. Return true if the optimization succeeds.
 bool DominatedAccessRemoval::checkDominatedAccess(
     BeginAccessInst *BAI, DomAccessedStorage currDomStorage) {
   // Attempt to add this access to storageToDomMap using its base storage

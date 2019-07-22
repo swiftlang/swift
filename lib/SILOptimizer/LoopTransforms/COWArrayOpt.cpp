@@ -1069,7 +1069,7 @@ bool COWArrayOpt::hoistMakeMutable(ArraySemanticsCall MakeMutable,
     StructUses.collectUses(ArrayContainer, AccessPath);
   } else {
     // There are some unsafe operations in the loop. If the array is uniquely
-    // identifyable and not escaping, then we are good if all the array uses
+    // identifiable and not escaping, then we are good if all the array uses
     // are safe.
     if (!arrayContainerIsUnique) {
       LLVM_DEBUG(llvm::dbgs() << "    Skipping Array: is not unique!\n");
