@@ -45,7 +45,7 @@
 using namespace swift;
 
 /// Pattern match and remove "retain(self), apply(self), release(self)" calls
-/// inbetween unsafeGuaranteed pairs and remove the retain/release pairs.
+/// in-between unsafeGuaranteed pairs and remove the retain/release pairs.
 static void tryRemoveRetainReleasePairsBetween(
     RCIdentityFunctionInfo &RCFI, SILInstruction *UnsafeGuaranteedI,
     SILInstruction *Retain, SILInstruction *Release,
@@ -133,7 +133,7 @@ static bool removeGuaranteedRetainReleasePairs(SILFunction &F,
       }
 
       // This code is very conservative. Check that there is a matching retain
-      // before the unsafeGuaranteed builtin with only retains inbetween.
+      // before the unsafeGuaranteed builtin with only retains in-between.
       auto *LastRetainInst = LastRetain[RCIdOpd];
       auto NextInstIter = std::next(SILBasicBlock::iterator(LastRetainInst));
       while (NextInstIter != BB.end() && &*NextInstIter != CurInst &&

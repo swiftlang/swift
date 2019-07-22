@@ -104,7 +104,7 @@ protected:
     auto structTy = getOpType(Inst->getType());
     auto *structDecl = structTy.getStructOrBoundGenericStruct();
     unsigned idx = 0;
-    // Adjust field types if neccessary.
+    // Adjust field types if necessary.
     for (VarDecl *field : structDecl->getStoredProperties()) {
       SILType loweredType = structTy.getFieldType(
           field, getBuilder().getFunction().getModule());
@@ -440,7 +440,7 @@ void OpaqueSpecializerCloner::clone() {
 }
 
 /// Update address uses of the opaque type archetype with the concrete type.
-/// This is neccessary for apply instructions.
+/// This is necessary for apply instructions.
 void OpaqueSpecializerCloner::insertOpaqueToConcreteAddressCasts(
     SILInstruction *orig, SILInstruction *cloned) {
 

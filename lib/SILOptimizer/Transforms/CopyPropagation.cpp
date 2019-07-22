@@ -36,7 +36,7 @@
 /// where needed.
 ///
 /// The state used by this pass is encapsulated in CopyPropagationState, simply
-/// refered to as `pass`:
+/// referred to as `pass`:
 ///
 /// - Step 1 initializes `pass.currDef`.
 ///

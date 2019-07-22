@@ -574,7 +574,7 @@ ConstraintSystem::TypeMatchResult ConstraintSystem::applyFunctionBuilder(
     assert(!builderType->hasTypeParameter());
   }
 
-  // If we are performing code-completion inside the closure body, supress
+  // If we are performing code-completion inside the closure body, suppress
   // diagnostics to workaround typechecking performance problems.
   if (getASTContext().SourceMgr.rangeContainsCodeCompletionLoc(
           closure->getSourceRange()))

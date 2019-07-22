@@ -299,7 +299,7 @@ Type RequirementFailure::getOwnerType() const {
   auto *anchor = getRawAnchor();
 
   // If diagnostic is anchored at assignment expression
-  // it means that requirement failure happend while trying
+  // it means that requirement failure happened while trying
   // to convert source to destination, which means that
   // owner type is actually not an assignment expression
   // itself but its source.
@@ -1639,7 +1639,7 @@ AssignmentFailure::resolveImmutableBase(Expr *expr) const {
 
         if (auto bgt = indexType->getAs<BoundGenericType>()) {
           // In Swift versions lower than 5, this check will fail as read only
-          // key paths can masquerade as writable for compatibilty reasons.
+          // key paths can masquerade as writable for compatibility reasons.
           // This is fine as in this case we just fall back on old diagnostics.
           if (bgt->getDecl() == getASTContext().getKeyPathDecl()) {
             return {expr, member};

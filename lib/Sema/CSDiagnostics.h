@@ -572,7 +572,7 @@ public:
 };
 
 /// Diagnose failures related attempt to implicitly convert types which
-/// do not support such implicit converstion.
+/// do not support such implicit conversion.
 /// "as" or "as!" has to be specified explicitly in cases like that.
 class MissingExplicitConversionFailure final : public FailureDiagnostic {
   Type ConvertingTo;
@@ -1046,7 +1046,7 @@ public:
 };
 
 /// Diagnose an attempt to construct an instance using non-constant
-/// metatype base without explictly specifying `init`:
+/// metatype base without explicitly specifying `init`:
 ///
 /// ```swift
 /// let foo = Int.self

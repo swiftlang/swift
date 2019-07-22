@@ -51,7 +51,7 @@ findInitExistentialFromGlobalAddr(GlobalAddrInst *GAI, SILInstruction *Insn) {
   if (IEUses.empty())
     return nullptr;
 
-  /// Walk backwards from Insn instruction till the begining of the basic block
+  /// Walk backwards from Insn instruction till the beginning of the basic block
   /// looking for an InitExistential.
   InitExistentialAddrInst *SingleIE = nullptr;
   for (auto II = Insn->getIterator().getReverse(),

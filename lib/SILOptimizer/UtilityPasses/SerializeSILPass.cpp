@@ -54,7 +54,7 @@ public:
     M.serialize();
 
     // If we are not optimizing, do not strip the [serialized] flag. We *could*
-    // do this since after serializing [serialized] is irrelevent. But this
+    // do this since after serializing [serialized] is irrelevant. But this
     // would incur an unnecessary compile time cost since if we are not
     // optimizing we are not going to perform any sort of DFE.
     if (!getOptions().shouldOptimize())
