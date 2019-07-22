@@ -178,7 +178,7 @@ protocol RefinesP : BaseP {}
 // CHECK-DAG-LABEL: @"$s25weak_import_native_helper1SVAA5BasePAAWP" = extern_weak global i8*
 extension S : RefinesP {}
 
-// We should not hoist the metadata accessor accross the version check.
+// We should not hoist the metadata accessor across the version check.
 
 // CHECK-LABEL: define{{.*}} void @"$s18weak_import_native28test_not_hoist_weakly_linkedyyF"()
 // CHECK-NOT: 15ResilientStructVMa

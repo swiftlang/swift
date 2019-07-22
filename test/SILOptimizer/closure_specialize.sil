@@ -741,7 +741,7 @@ bb0(%0 : $Int):
   return %empty : $()
 }
 
-// Only support the ulitmate partial_apply.
+// Only support the ultimate partial_apply.
 sil [reabstraction_thunk] @reabstractionThunk2 : $@convention(thin) (@guaranteed @callee_guaranteed () -> Int) -> @out Int
 
 // CHECK-LABEL: sil @reabstractionTest3 : $@convention(thin) (Int) -> () {
