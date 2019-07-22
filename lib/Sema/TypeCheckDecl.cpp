@@ -3275,7 +3275,7 @@ public:
     // Explicitly calculate this bit.
     (void) PD->existentialTypeSupported();
 
-    // Explicity compute the requirement signature to detect errors.
+    // Explicitly compute the requirement signature to detect errors.
     (void) PD->getRequirementSignature();
 
     checkExplicitAvailability(PD);

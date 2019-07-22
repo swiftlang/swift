@@ -1083,7 +1083,7 @@ namespace {
       // attempt to type-check whole expression `s.bar()` - is going
       // to have a base which points directly to declaration of `S`.
       // But when diagnostics attempts to type-check `s.bar()` standalone
-      // its base would be tranformed into `InOutExpr -> DeclRefExr`,
+      // its base would be transformed into `InOutExpr -> DeclRefExr`,
       // and `InOutType` is going to be recorded in constraint system.
       // One possible way to fix this (if diagnostics still use typecheck)
       // might be to make it so self is not wrapped into `InOutExpr`
@@ -3422,7 +3422,7 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc,
   ConstraintSystem cs(*this, dc, ConstraintSystemFlags::AllowFixes);
     
   // Cache the expression type on the system to ensure it is available
-  // on diagnostics if the convertion fails.
+  // on diagnostics if the conversion fails.
   cs.cacheExprTypes(expr);
 
   // If there is a type that we're expected to convert to, add the conversion

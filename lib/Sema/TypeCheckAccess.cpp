@@ -1471,7 +1471,7 @@ class ExportabilityChecker : public DeclVisitor<ExportabilityChecker> {
     bool foundAnyIssues = false;
 
     // Check the TypeRepr first (if present), because that will give us a
-    // better diagonstic.
+    // better diagnostic.
     if (typeRepr) {
       const_cast<TypeRepr *>(typeRepr)->walk(TypeReprIdentFinder(
           [&](const ComponentIdentTypeRepr *component) {

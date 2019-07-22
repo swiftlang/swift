@@ -2332,7 +2332,7 @@ ValueDecl *TypeChecker::findReplacedDynamicFunction(const ValueDecl *vd) {
 
   auto *afd = dyn_cast<AbstractFunctionDecl>(vd);
   if (afd) {
-    // When we pass nullptr as the type checker argument attr is truely const.
+    // When we pass nullptr as the type checker argument attr is truly const.
     return findReplacedFunction(attr->getReplacedFunctionName(), afd,
                                 const_cast<DynamicReplacementAttr *>(attr),
                                 nullptr);

@@ -373,7 +373,7 @@ bool DerivedConformance::checkAndDiagnoseDisallowedContext(
     return true;
   }
 
-  // A non-final class can't have an protocol-witnesss initializer in an
+  // A non-final class can't have an protocol-witnesses initializer in an
   // extension.
   if (auto CD = dyn_cast<ClassDecl>(Nominal)) {
     if (!CD->isFinal() && isa<ConstructorDecl>(synthesizing) &&

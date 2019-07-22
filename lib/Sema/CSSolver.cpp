@@ -1342,7 +1342,7 @@ void ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions) {
       auto result = advance(step.get(), prevFailed);
       switch (result.getKind()) {
       // It was impossible to solve this step, let's note that
-      // for followup steps, to propogate the error.
+      // for followup steps, to propagate the error.
       case SolutionKind::Error:
         LLVM_FALLTHROUGH;
 

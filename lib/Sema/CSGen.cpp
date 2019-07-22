@@ -3263,7 +3263,7 @@ namespace {
           }
         }
 
-        // Substitute OpaqueValue with its representing existental.
+        // Substitute OpaqueValue with its representing existential.
         if (auto OVE = dyn_cast<OpaqueValueExpr>(expr)) {
           auto value = OpenExistentials.find(OVE);
 

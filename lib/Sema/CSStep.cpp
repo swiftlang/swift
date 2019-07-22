@@ -282,7 +282,7 @@ StepResult ComponentStep::take(bool prevFailed) {
     // Let's see if all of the free type variables are associated with
     // generic parameters and if so, let's default them to `Any` and continue
     // solving so we can properly diagnose the problem later by suggesting
-    // to explictly specify them.
+    // to explicitly specify them.
 
     llvm::SmallDenseMap<ConstraintLocator *,
                         llvm::SmallVector<GenericTypeParamType *, 4>>
