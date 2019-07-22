@@ -481,8 +481,8 @@ bool DisjunctionStep::shouldSkip(const DisjunctionChoice &choice) const {
   auto &ctx = CS.getASTContext();
 
   bool attemptFixes = CS.shouldAttemptFixes();
-  // Enable "fixed" overload choices in "diagnostic" mode.
-  if (!(attemptFixes && choice.hasFix()) && choice.isDisabled()) {
+  // Enable all disabled choices in "diagnostic" mode.
+  if (!attemptFixes && choice.isDisabled()) {
     if (isDebugMode()) {
       auto &log = getDebugLogger();
       log << "(skipping ";
