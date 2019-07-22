@@ -5024,14 +5024,6 @@ static StorageImplInfo classifyWithHasStorageAttr(
     return false;
   };
 
-  // Determines if the storage had a private setter, i.e. it's not a 'let' and
-  // it had a setter.
-  auto isPrivateSet = [&]() {
-    if (auto varDecl = dyn_cast<VarDecl>(storage))
-      return !varDecl->isLet() && accessors.Set == nullptr;
-    return false;
-  };
-
   // Default to stored writes.
   WriteImplKind writeImpl = WriteImplKind::Stored;
   ReadWriteImplKind readWriteImpl = ReadWriteImplKind::Stored;
@@ -5046,14 +5038,6 @@ static StorageImplInfo classifyWithHasStorageAttr(
   } else if (isImmutable()) {
     writeImpl = WriteImplKind::Immutable;
     readWriteImpl = ReadWriteImplKind::Immutable;
-  }
-
-  if (isPrivateSet()) {
-    // If we saw a 'var' with no setter, that means it was
-    // private/internal(set). Honor that with a synthesized attribute.
-    storage->getAttrs().add(
-      new (ctx) SetterAccessAttr(
-        SourceLoc(), SourceLoc(), AccessLevel::Private, /*implicit: */true));
   }
 
   // Always force Stored reads if @_hasStorage is present.
