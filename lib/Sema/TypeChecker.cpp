@@ -564,6 +564,9 @@ void swift::checkInconsistentImplementationOnlyImports(ModuleDecl *MainModule) {
         continue;
 
       ModuleDecl *module = nextImport->getModule();
+      if (!module)
+        continue;
+
       if (nextImport->getAttrs().hasAttribute<ImplementationOnlyAttr>()) {
         // We saw an implementation-only import.
         bool isNew =
