@@ -476,7 +476,7 @@ extension String {
   ///       - buffer: A buffer covering uninitialized memory with room for the
   ///           specified number of UTF-8 code units.
   @inline(__always)
-  internal init(
+  public init(
     uninitializedCapacity capacity: Int,
     initializingUTF8With initializer: (
       _ buffer: UnsafeMutableBufferPointer<UInt8>

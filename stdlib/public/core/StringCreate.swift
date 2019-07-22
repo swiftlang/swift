@@ -87,6 +87,7 @@ extension String {
     }
   }
   
+  @usableFromInline
   internal static func _fromLargeUTF8Repairing(
     uninitializedCapacity capacity: Int,
     initializingWith initializer: (

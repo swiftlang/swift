@@ -108,9 +108,10 @@ extension String : _ObjectiveCBridgeable {
     _ len: Int
   ) -> String? {
     assert(len != 0)
-    let result = String(
-      unsafeUninitializedCapacity: _estimatedSmallStringCutoff()
-    ) { (ptr, outCount) in
+    let result = String(uninitializedCapacity:
+      _estimatedSmallStringCutoff()
+    ) { ptr in
+      var outCount: Int = 0
       let converted = _getBytes(
         source,
         CFRange(location: 0, length: len),
@@ -121,8 +122,9 @@ extension String : _ObjectiveCBridgeable {
         &outCount
       )
       if _slowPath(converted != len) {
-        outCount = 0 //truncated, so produce an empty String instead
+        return 0 //truncated, so produce an empty String instead
       }
+      return outCount
     }
     if _slowPath(result.isEmpty) {
       return nil
