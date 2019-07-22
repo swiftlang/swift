@@ -2329,7 +2329,7 @@ public:
 
       auto *subExpr = E->getSubExpr();
       if (isa<ParenExpr>(subExpr) || isa<ForceValueExpr>(subExpr)) {
-        Out << "Immediate ParenExpr/ForceValueExpr should preceed a LoadExpr\n";
+        Out << "Immediate ParenExpr/ForceValueExpr should precede a LoadExpr\n";
         E->dump(Out);
         Out << "\n";
         abort();

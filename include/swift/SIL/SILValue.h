@@ -180,7 +180,7 @@ struct ValueOwnershipKind {
   /// Returns true if \p Other can be merged successfully with this, implying
   /// that the two ownership kinds are "compatible".
   ///
-  /// The reason why we do not compare directy is to allow for
+  /// The reason why we do not compare directly is to allow for
   /// ValueOwnershipKind::Any to merge into other forms of ValueOwnershipKind.
   bool isCompatibleWith(ValueOwnershipKind other) const {
     return merge(other).hasValue();

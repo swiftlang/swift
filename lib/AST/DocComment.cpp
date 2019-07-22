@@ -459,8 +459,8 @@ const Decl *swift::getDocCommentProvidingDecl(const Decl *D) {
   if (!VD)
     return nullptr;
 
-  if (auto *overriden = findOverriddenDeclWithDocComment(VD))
-    return overriden;
+  if (auto *overridden = findOverriddenDeclWithDocComment(VD))
+    return overridden;
 
   if (auto *requirement = findDefaultProvidedDeclWithDocComment(VD))
     return requirement;

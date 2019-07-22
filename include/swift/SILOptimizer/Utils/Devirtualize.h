@@ -53,7 +53,7 @@ void getAllSubclasses(ClassHierarchyAnalysis *CHA,
 /// to the witness method.
 ///
 /// \p Module SILModule
-/// \p AI ApplySite that applies a procotol method
+/// \p AI ApplySite that applies a protocol method
 /// \p F SILFunction with convention @convention(witness_method)
 /// \p CRef a concrete ProtocolConformanceRef
 SubstitutionMap getWitnessMethodSubstitutions(SILModule &Module, ApplySite AI,

@@ -935,7 +935,7 @@ public:
   /// Retrieve the NSCopying protocol type.
   Type getNSCopyingType();
 
-  /// Retrieve a sugared referenece to the given (imported) type.
+  /// Retrieve a sugared reference to the given (imported) type.
   Type getSugaredTypeReference(TypeDecl *type);
 
   /// Determines whether the given type matches an implicit type

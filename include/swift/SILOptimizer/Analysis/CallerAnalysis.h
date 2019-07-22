@@ -143,7 +143,7 @@ private:
   void invalidateKnownCallees(SILFunction *f);
 
   /// Using the passed in caller info and caller function, eliminate the edge
-  /// inbetween the caller and its callees.
+  /// in-between the caller and its callees.
   ///
   /// NOTE: This does not remove the "book keeping" backedges from the caller
   /// function to its own set of callers. This must be invalidated by using
@@ -187,7 +187,7 @@ private:
   void verify(SILFunction *caller, const FunctionInfo &callerInfo) const;
 };
 
-/// Auxillary information that we store about a specific caller.
+/// Auxiliary information that we store about a specific caller.
 struct CallerAnalysis::CallerInfo {
   /// Given a SILFunction F that contains at least one partial apply of the
   /// given function, map F to the minimum number of partial applied

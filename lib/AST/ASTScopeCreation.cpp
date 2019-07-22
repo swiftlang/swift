@@ -84,7 +84,7 @@ public:
   ASTScopeImpl *createScopeFor(ASTNode, ASTScopeImpl *parent);
 
   bool shouldCreateScope(ASTNode n) const {
-    // Cannot ignore implicit statements because implict return can contain
+    // Cannot ignore implicit statements because implicit return can contain
     // scopes in the expression, such as closures.
     if (!n)
       return false;

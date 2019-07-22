@@ -319,7 +319,7 @@ class RawSyntax final
 public:
   ~RawSyntax();
 
-  // This is a copy-pased implementation of llvm::ThreadSafeRefCountedBase with
+  // This is a copy-paste implementation of llvm::ThreadSafeRefCountedBase with
   // the difference that we do not delete the RawSyntax node's memory if the
   // node was allocated within a SyntaxArena and thus doesn't own its memory.
   void Retain() const { RefCount.fetch_add(1, std::memory_order_relaxed); }

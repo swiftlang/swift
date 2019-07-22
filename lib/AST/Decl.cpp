@@ -5355,7 +5355,7 @@ static bool isBackingStorageForDeclaredProperty(const VarDecl *var) {
   return false;
 }
 
-/// Whether the given variable is a delcared property that has separate backing storage.
+/// Whether the given variable is a declared property that has separate backing storage.
 static bool isDeclaredPropertyWithBackingStorage(const VarDecl *var) {
   if (var->getAttrs().hasAttribute<LazyAttr>())
     return true;
