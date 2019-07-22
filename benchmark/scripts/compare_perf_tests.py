@@ -286,7 +286,7 @@ class PerformanceTestResult(object):
         """Merge two results.
 
         Recomputes min, max and mean statistics. If all `samples` are
-        avaliable, it recomputes all the statistics.
+        available, it recomputes all the statistics.
         The use case here is comparing test results parsed from concatenated
         log files from multiple runs of benchmark driver.
         """
@@ -532,7 +532,7 @@ class TestComparator(object):
 
 
 class ReportFormatter(object):
-    """Creates the report from perfromance test comparison in specified format.
+    """Creates the report from performance test comparison in specified format.
 
     `ReportFormatter` formats the `PerformanceTestResult`s and
     `ResultComparison`s provided by `TestComparator` into report table.
