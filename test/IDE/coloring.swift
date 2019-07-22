@@ -18,6 +18,15 @@ struct S {
   var a, b : Int
 }
 
+enum EnumWhereCaseHasADefaultedFunctionTypeParam {
+// CHECK: <kw>enum</kw> EnumWhereCaseHasADefaultedFunctionTypeParam {
+  case foo(x: () -> () = {
+  // CHECK: <kw>case</kw> foo(x: () -> () = {
+    func inner(x: S) {}
+    // CHECK: <kw>func</kw> inner(x: <type>S</type>) {}
+  })
+}
+
 enum EnumWithDerivedEquatableConformance : Int {
 // CHECK-LABEL: <kw>enum</kw> EnumWithDerivedEquatableConformance : {{(<type>)}}Int{{(</type>)?}} {
   case CaseA
