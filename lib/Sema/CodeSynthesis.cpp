@@ -2025,31 +2025,19 @@ void swift::triggerAccessorSynthesis(TypeChecker &TC,
   });
 }
 
-static StorageImplInfo getProtocolStorageImpl(AbstractStorageDecl *storage) {
-  auto protocol = cast<ProtocolDecl>(storage->getDeclContext());
-  if (protocol->isObjC()) {
-    return StorageImplInfo::getComputed(storage->supportsMutation());
-  } else {
-    return StorageImplInfo::getOpaque(storage->supportsMutation(),
-                                      storage->getOpaqueReadOwnership());
-  }
-}
-
 /// Given a storage declaration in a protocol, set it up with the right
 /// StorageImpl and add the right set of opaque accessors.
-static void finishProtocolStorageImplInfo(AbstractStorageDecl *storage) {
+static void finishProtocolStorageImplInfo(AbstractStorageDecl *storage,
+                                          StorageImplInfo &info) {
   if (auto *var = dyn_cast<VarDecl>(storage)) {
-    if (var->hasStorage()) {
-      auto &ctx = var->getASTContext();
+    if (info.hasStorage()) {
       // Protocols cannot have stored properties.
       if (var->isLet()) {
-        ctx.Diags.diagnose(var->getLoc(),
-                           diag::protocol_property_must_be_computed_var)
+        var->diagnose(diag::protocol_property_must_be_computed_var)
           .fixItReplace(var->getParentPatternBinding()->getLoc(), "var")
           .fixItInsertAfter(var->getTypeLoc().getLoc(), " { get }");
       } else {
-        auto diag = ctx.Diags.diagnose(var->getLoc(),
-                                       diag::protocol_property_must_be_computed);
+        auto diag = var->diagnose(diag::protocol_property_must_be_computed);
         auto braces = var->getBracesRange();
 
         if (braces.isValid())
@@ -2060,15 +2048,59 @@ static void finishProtocolStorageImplInfo(AbstractStorageDecl *storage) {
     }
   }
 
-  storage->setImplInfo(getProtocolStorageImpl(storage));
+  auto protocol = cast<ProtocolDecl>(storage->getDeclContext());
+  if (protocol->isObjC()) {
+    info = StorageImplInfo::getComputed(info.supportsMutation());
+  } else {
+    info = StorageImplInfo::getOpaque(info.supportsMutation(),
+                                      storage->getOpaqueReadOwnership());
+  }
 }
 
-static void finishLazyVariableImplInfo(VarDecl *var) {
-  // If there are already accessors, something is invalid; bail out.
-  if (!var->getImplInfo().isSimpleStored())
-    return;
+/// This emits a diagnostic with a fixit to remove the attribute.
+template<typename ...ArgTypes>
+void diagnoseAndRemoveAttr(Decl *D, DeclAttribute *attr,
+                           ArgTypes &&...Args) {
+  auto &ctx = D->getASTContext();
+  ctx.Diags.diagnose(attr->getLocation(), std::forward<ArgTypes>(Args)...)
+    .fixItRemove(attr->getRangeWithAt());
+}
 
-  var->setImplInfo(StorageImplInfo::getMutableComputed());
+static void finishLazyVariableImplInfo(VarDecl *var,
+                                       StorageImplInfo &info) {
+  auto *attr = var->getAttrs().getAttribute<LazyAttr>();
+
+  // It cannot currently be used on let's since we don't have a mutability model
+  // that supports it.
+  if (var->isLet())
+    diagnoseAndRemoveAttr(var, attr, diag::lazy_not_on_let);
+
+  // lazy must have an initializer.
+  if (!var->getParentInitializer())
+    diagnoseAndRemoveAttr(var, attr, diag::lazy_requires_initializer);
+
+  bool invalid = false;
+
+  if (isa<ProtocolDecl>(var->getDeclContext())) {
+    diagnoseAndRemoveAttr(var, attr, diag::lazy_not_in_protocol);
+    invalid = true;
+  }
+
+  // Lazy properties must be written as stored properties in the source.
+  if (!info.isSimpleStored()) {
+    diagnoseAndRemoveAttr(var, attr,
+                          info.hasStorage()
+                          ? diag::lazy_not_observable
+                          : diag::lazy_not_on_computed);
+    invalid = true;
+  }
+
+  // The pattern binding must only bind a single variable.
+  if (!var->getParentPatternBinding()->getSingleVar())
+    diagnoseAndRemoveAttr(var, attr, diag::lazy_requires_single_var);
+
+  if (!invalid)
+    info = StorageImplInfo::getMutableComputed();
 }
 
 /// Determine whether all of the wrapped-value setters for the property
@@ -2090,8 +2122,21 @@ static bool allPropertyWrapperValueSettersAreAccessible(VarDecl *var) {
   return true;
 }
 
-static void finishPropertyWrapperImplInfo(VarDecl *var) {
+static void finishPropertyWrapperImplInfo(VarDecl *var,
+                                          StorageImplInfo &info) {
   auto parentSF = var->getDeclContext()->getParentSourceFile();
+  if (!parentSF)
+    return;
+
+  // Properties with wrappers must not declare a getter or setter.
+  if (!info.hasStorage() && parentSF->Kind != SourceFileKind::Interface) {
+    auto &ctx = parentSF->getASTContext();
+    for (auto attr : var->getAttrs().getAttributes<CustomAttr>())
+      ctx.Diags.diagnose(attr->getLocation(), diag::property_wrapper_computed);
+
+    return;
+  }
+
   bool wrapperSetterIsUsable =
     var->getSetter() ||
     (parentSF &&
@@ -2100,36 +2145,68 @@ static void finishPropertyWrapperImplInfo(VarDecl *var) {
      allPropertyWrapperValueSettersAreAccessible(var));
 
   if (wrapperSetterIsUsable)
-    var->setImplInfo(StorageImplInfo::getMutableComputed());
+    info = StorageImplInfo::getMutableComputed();
   else
-    var->setImplInfo(StorageImplInfo::getImmutableComputed());
+    info = StorageImplInfo::getImmutableComputed();
 }
 
-static void finishNSManagedImplInfo(VarDecl *VD) {
-  // If it's not still stored, just bail out.
-  if (!VD->getImplInfo().isSimpleStored())
-    return;
+static void finishNSManagedImplInfo(VarDecl *var,
+                                    StorageImplInfo &info) {
+  auto *attr = var->getAttrs().getAttribute<NSManagedAttr>();
 
-  VD->setImplInfo(StorageImplInfo::getMutableComputed());
+  if (var->isLet())
+    diagnoseAndRemoveAttr(var, attr, diag::attr_NSManaged_let_property);
+
+  auto diagnoseNotStored = [&](unsigned kind) {
+    diagnoseAndRemoveAttr(var, attr, diag::attr_NSManaged_not_stored, kind);
+  };
+
+  // @NSManaged properties must be written as stored.
+  if (info.isSimpleStored()) {
+    // @NSManaged properties end up being computed; complain if there is
+    // an initializer.
+    if (var->getParentInitializer()) {
+      auto &Diags = var->getASTContext().Diags;
+      Diags.diagnose(attr->getLocation(), diag::attr_NSManaged_initial_value)
+           .highlight(var->getParentInitializer()->getSourceRange());
+    }
+
+    // Otherwise, ok.
+    info = StorageImplInfo::getMutableComputed();
+
+  } else if (info.getReadImpl() == ReadImplKind::Address ||
+             info.getWriteImpl() == WriteImplKind::MutableAddress) {
+    diagnoseNotStored(/*addressed*/ 2);
+  } else if (info.getWriteImpl() == WriteImplKind::StoredWithObservers ||
+             info.getWriteImpl() == WriteImplKind::InheritedWithObservers) {
+    diagnoseNotStored(/*observing*/ 1);
+  } else {
+    diagnoseNotStored(/*computed*/ 0);
+  }
 }
 
-static void finishStorageImplInfo(AbstractStorageDecl *storage) {
-  if (isa<ProtocolDecl>(storage->getDeclContext())) {
-    finishProtocolStorageImplInfo(storage);
-    return;
+static void finishStorageImplInfo(AbstractStorageDecl *storage,
+                                  StorageImplInfo &info) {
+  if (auto var = dyn_cast<VarDecl>(storage)) {
+    if (!info.hasStorage()) {
+      if (auto *init = var->getParentInitializer()) {
+        auto &Diags = var->getASTContext().Diags;
+        Diags.diagnose(init->getLoc(), diag::getset_init)
+             .highlight(init->getSourceRange());
+      }
+    }
+
+    if (var->getAttrs().hasAttribute<LazyAttr>()) {
+      finishLazyVariableImplInfo(var, info);
+    } else if (var->getAttrs().hasAttribute<NSManagedAttr>()) {
+      finishNSManagedImplInfo(var, info);
+    } else if (var->hasAttachedPropertyWrapper()) {
+      finishPropertyWrapperImplInfo(var, info);
+    }
   }
 
-  auto var = dyn_cast<VarDecl>(storage);
-  if (var == nullptr)
-    return;
-
-  if (var->getAttrs().hasAttribute<LazyAttr>()) {
-    finishLazyVariableImplInfo(var);
-  } else if (var->getAttrs().hasAttribute<NSManagedAttr>()) {
-    finishNSManagedImplInfo(var);
-  } else if (var->hasAttachedPropertyWrapper()) {
-    finishPropertyWrapperImplInfo(var);
-  }
+  if (isa<ProtocolDecl>(storage->getDeclContext()))
+    finishProtocolStorageImplInfo(storage, info);
 }
 
 static bool hasParsedAccessor(AbstractStorageDecl *storage, AccessorKind kind) {
@@ -2284,14 +2361,15 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
     readWriteImpl = ReadWriteImplKind::Immutable;
   }
 
-  return StorageImplInfo(readImpl, writeImpl, readWriteImpl);
+  StorageImplInfo info(readImpl, writeImpl, readWriteImpl);
+  finishStorageImplInfo(storage, info);
+
+  return info;
 }
 
 /// Try to add the appropriate accessors required a storage declaration.
 /// This needs to be idempotent.
 void swift::maybeAddAccessorsToStorage(AbstractStorageDecl *storage) {
-  finishStorageImplInfo(storage);
-
   // Implicit properties don't get accessors.
   if (storage->isImplicit() &&
       !(isa<VarDecl>(storage) &&

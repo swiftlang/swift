@@ -2224,6 +2224,15 @@ IsGetterMutatingRequest::evaluate(Evaluator &evaluator,
     }
   }
 
+  // Protocol requirements are always written as '{ get }' or '{ get set }';
+  // the @_borrowed attribute determines if getReadImpl() becomes Get or Read.
+  if (isa<ProtocolDecl>(storage->getDeclContext())) {
+    if (!storage->getGetter())
+      return false;
+
+    return storage->getGetter()->isMutating();
+  }
+
   switch (storage->getReadImpl()) {
   case ReadImplKind::Stored:
   case ReadImplKind::Inherited:

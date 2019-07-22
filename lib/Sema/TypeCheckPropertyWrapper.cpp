@@ -456,12 +456,6 @@ AttachedPropertyWrappersRequest::evaluate(Evaluator &evaluator,
         continue;
       }
     }
-
-    // Properties with wrappers must not declare a getter or setter.
-    if (!var->hasStorage() && sourceFile->Kind != SourceFileKind::Interface) {
-      ctx.Diags.diagnose(attr->getLocation(), diag::property_wrapper_computed);
-      continue;
-    }
     
     result.push_back(mutableAttr);
   }

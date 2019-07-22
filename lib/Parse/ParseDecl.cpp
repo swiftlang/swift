@@ -5282,12 +5282,6 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
                              PatternInit != nullptr, Attributes, Decls);
       if (boundVar.hasCodeCompletion())
         return makeResult(makeParserCodeCompletionStatus());
-      if (PatternInit && boundVar.isNonNull() &&
-          !boundVar.get()->hasStorage()) {
-        diagnose(pattern->getLoc(), diag::getset_init)
-            .highlight(PatternInit->getSourceRange());
-        PatternInit = nullptr;
-      }
     }
     
     // Add all parsed vardecls to this scope.
