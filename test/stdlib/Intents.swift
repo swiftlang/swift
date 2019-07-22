@@ -125,7 +125,7 @@ if #available(iOS 12.0, watchOS 5.0, *) {
 
   // Make sure the shortcut property of INVoiceShortcut is imported as the overlay enum type
   IntentsTestSuite.test("INShortcutOverlay/INVoiceShortcut propertyIsEnum/\(swiftVersion)") {
-    // NOTE: we can't actually run this one becuase we can't easily create an INVoiceShortcut, but at least type-check it
+    // NOTE: we can't actually run this one because we can't easily create an INVoiceShortcut, but at least type-check it
     func f(voiceShortcut: INVoiceShortcut) {
       switch voiceShortcut.shortcut {
       case .intent(let intent):

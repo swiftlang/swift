@@ -1,7 +1,7 @@
 // RUN: %target-run-stdlib-swift
 // REQUIRES: executable_test,optimized_stdlib
 
-// Some targetted tests for the breadcrumbs path. There is some overlap with
+// Some targeted tests for the breadcrumbs path. There is some overlap with
 // UTF16View tests for huge strings, but we want a simpler suite that targets
 // some corner cases specifically.
 
