@@ -2490,8 +2490,29 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
                   diag::could_not_find_subscript_member_did_you_mean,
                   getType(UDE->getBase()));
     } else {
-      TC.diagnose(commonAnchor->getLoc(), diag::ambiguous_reference_to_decl,
-                  decl->getDescriptiveKind(), decl->getFullName());
+      auto name = decl->getFullName();
+      // Three choices here:
+      // 1. If this is a special name avoid printing it because
+      //    printing kind is sufficient;
+      // 2. If all of the labels match, print a full name;
+      // 3. If labels in different choices are different, it means
+      //    that we can only print a base name.
+      if (name.isSpecial()) {
+        TC.diagnose(commonAnchor->getLoc(),
+                    diag::no_overloads_match_exactly_in_call_special,
+                    decl->getDescriptiveKind());
+      } else if (llvm::all_of(distinctChoices,
+                              [&name](const ValueDecl *choice) {
+                                return choice->getFullName() == name;
+                              })) {
+        TC.diagnose(commonAnchor->getLoc(),
+                    diag::no_overloads_match_exactly_in_call,
+                    decl->getDescriptiveKind(), name);
+      } else {
+        TC.diagnose(commonAnchor->getLoc(),
+                    diag::no_overloads_match_exactly_in_call_no_labels,
+                    decl->getDescriptiveKind(), name.getBaseName());
+      }
     }
 
     for (const auto &viable : viableSolutions) {
