@@ -32,13 +32,6 @@ private func _isNSString(_ str:AnyObject) -> UInt8 {
   return _swift_stdlib_isNSString(str)
 }
 
-@_effects(releasenone)
-private func _unsafeAddressOfCocoaStringClass(
-  _ str: _CocoaString
-) -> UInt {
-  return _swift_stdlib_unsafeAddressOfClass(str)
-}
-
 #else
 
 internal protocol _AbstractStringStorage {
@@ -133,7 +126,7 @@ extension _AbstractStringStorage {
     if !tagged {
       // Handle the case where both strings were bridged from Swift.
       // We can't use String.== because it doesn't match NSString semantics.
-      let cls = _unsafeAddressOfCocoaStringClass(other)
+      let cls = unsafeBitCast(_swift_classOfObjCHeapObject(str), to: UInt.self)
       if cls == unsafeBitCast(__StringStorage.self, to: UInt.self) {
         return _nativeIsEqual(
           _unsafeUncheckedDowncast(other, to: __StringStorage.self))
