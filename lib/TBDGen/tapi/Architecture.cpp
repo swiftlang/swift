@@ -53,7 +53,7 @@ StringRef getArchName(Architecture arch) {
   case Architecture::unknown:
     return "unknown";
   }
-  llvm_unreachable("unknown architecutre");
+  llvm_unreachable("unknown architecture");
 }
 
 std::pair<uint32_t, uint32_t> getCPUType(Architecture arch) {

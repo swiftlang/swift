@@ -705,7 +705,7 @@ extension ContiguousArray: RangeReplaceableCollection {
 
     // Due to make_mutable hoisting the situation can arise where we hoist
     // _makeMutableAndUnique out of loop and use it to replace
-    // _makeUniqueAndReserveCapacityIfNotUnique that preceeds this call. If the
+    // _makeUniqueAndReserveCapacityIfNotUnique that precedes this call. If the
     // array was empty _makeMutableAndUnique does not replace the empty array
     // buffer by a unique buffer (it just replaces it by the empty array
     // singleton).

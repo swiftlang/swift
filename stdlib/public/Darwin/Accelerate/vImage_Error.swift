@@ -59,7 +59,7 @@ extension vImage {
         /// The flag is not recognized.
         case unknownFlagsBit              =    -21775
         
-        /// A serious error occured inside vImage, which prevented vImage
+        /// A serious error occurred inside vImage, which prevented vImage
         /// from continuing.
         case internalError                =    -21776
         

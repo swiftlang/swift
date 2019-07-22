@@ -106,7 +106,7 @@ _os_log_encode(char buf[OS_LOG_FMT_BUF_SIZE], const char *format, va_list args,
   }})
 
 // clang inconsistency: static precision counts are still marked with the
-// privacy bits of the command they preceed
+// privacy bits of the command they precede
 #define encode_precision(type) ({ \
   if (prect != T_C_NONE) { \
     cmd.cmd_type = type; \

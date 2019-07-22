@@ -192,7 +192,7 @@ public:
   /// Check if we should prefer the text-based stub file.
   ///
   /// \param[in] path full path to the text-based stub file.
-  /// \returns true if the tex-based stub file should be prefered over any
+  /// \returns true if the tex-based stub file should be preferred over any
   ///          dynamic library.
   /// \since 1.0
   ///

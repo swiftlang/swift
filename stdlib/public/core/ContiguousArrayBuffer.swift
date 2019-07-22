@@ -674,7 +674,7 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
       p = newResult.firstElementAddress + result.capacity
       remainingCapacity = newResult.capacity - result.capacity
       if !result.isEmpty {
-        // This check prevents a data race writting to _swiftEmptyArrayStorage
+        // This check prevents a data race writing to _swiftEmptyArrayStorage
         // Since count is always 0 there, this code does nothing anyway
         newResult.firstElementAddress.moveInitialize(
           from: result.firstElementAddress, count: result.capacity)

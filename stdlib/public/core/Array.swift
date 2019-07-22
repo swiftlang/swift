@@ -1066,7 +1066,7 @@ extension Array: RangeReplaceableCollection {
 
     // Due to make_mutable hoisting the situation can arise where we hoist
     // _makeMutableAndUnique out of loop and use it to replace
-    // _makeUniqueAndReserveCapacityIfNotUnique that preceeds this call. If the
+    // _makeUniqueAndReserveCapacityIfNotUnique that precedes this call. If the
     // array was empty _makeMutableAndUnique does not replace the empty array
     // buffer by a unique buffer (it just replaces it by the empty array
     // singleton).
@@ -1162,7 +1162,7 @@ extension Array: RangeReplaceableCollection {
       "newElements.underestimatedCount was an overestimate")
     // can't check for overflow as sequences can underestimate
 
-    // This check prevents a data race writting to _swiftEmptyArrayStorage
+    // This check prevents a data race writing to _swiftEmptyArrayStorage
     if writtenCount > 0 {
       _buffer.count += writtenCount
     }

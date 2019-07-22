@@ -145,7 +145,7 @@ extension Character :
 
   /// Creates a character with the specified value.
   ///
-  /// Do not call this initalizer directly. It is used by the compiler when
+  /// Do not call this initializer directly. It is used by the compiler when
   /// you use a string literal to initialize a `Character` instance. For
   /// example:
   ///
