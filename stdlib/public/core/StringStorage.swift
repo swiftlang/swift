@@ -150,10 +150,6 @@ extension _AbstractStringStorage {
 
     let otherUTF16Length = _stdlib_binary_CFStringGetLength(other)
     
-    if length != _stdlib_binary_CFStringGetLength(other) {
-      return 0
-    }
-    
     // CFString will only give us ASCII bytes here, but that's fine.
     // We already handled non-ASCII UTF8 strings earlier since they're Swift.
     if let otherStart = _cocoaUTF8Pointer(other) {
