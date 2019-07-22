@@ -1298,6 +1298,38 @@ ExistentialConformsToSelfRequest::evaluate(Evaluator &evaluator,
 }
 
 llvm::Expected<bool>
+ExistentialTypeSupportedRequest::evaluate(Evaluator &evaluator,
+                                          ProtocolDecl *decl) const {
+  // ObjC protocols can always be existential.
+  if (decl->isObjC())
+    return true;
+
+  for (auto member : decl->getMembers()) {
+    // Existential types cannot be used if the protocol has an associated type.
+    if (isa<AssociatedTypeDecl>(member))
+      return false;
+
+    // For value members, look at their type signatures.
+    if (auto valueMember = dyn_cast<ValueDecl>(member)) {
+      if (!valueMember->hasInterfaceType())
+        if (auto *resolver = decl->getASTContext().getLazyResolver())
+          resolver->resolveDeclSignature(valueMember);
+
+      if (!decl->isAvailableInExistential(valueMember))
+        return false;
+    }
+  }
+
+  // Check whether all of the inherited protocols support existential types.
+  for (auto proto : decl->getInheritedProtocols()) {
+    if (!proto->existentialTypeSupported())
+      return false;
+  }
+
+  return true;
+}
+
+llvm::Expected<bool>
 IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   if (isa<ClassDecl>(decl))
     return decl->getAttrs().hasAttribute<FinalAttr>();

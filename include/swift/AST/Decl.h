@@ -4135,7 +4135,20 @@ class ProtocolDecl final : public NominalTypeDecl {
     Bits.ProtocolDecl.ExistentialConformsToSelf = result;
   }
 
-  bool existentialTypeSupportedSlow();
+  /// Returns the cached result of \c existentialTypeSupported or \c None if it
+  /// hasn't yet been computed.
+  Optional<bool> getCachedExistentialTypeSupported() {
+    if (Bits.ProtocolDecl.ExistentialTypeSupportedValid)
+      return Bits.ProtocolDecl.ExistentialTypeSupported;
+
+    return None;
+  }
+
+  /// Caches the result of \c existentialTypeSupported
+  void setCachedExistentialTypeSupported(bool supported) {
+    Bits.ProtocolDecl.ExistentialTypeSupportedValid = true;
+    Bits.ProtocolDecl.ExistentialTypeSupported = supported;
+  }
 
   ArrayRef<ProtocolDecl *> getInheritedProtocolsSlow();
 
@@ -4148,6 +4161,7 @@ class ProtocolDecl final : public NominalTypeDecl {
   friend class RequirementSignatureRequest;
   friend class ProtocolRequiresClassRequest;
   friend class ExistentialConformsToSelfRequest;
+  friend class ExistentialTypeSupportedRequest;
   friend class TypeChecker;
 
 public:
@@ -4245,21 +4259,7 @@ public:
   /// conforming to this protocol. This is only permitted if the types of
   /// all the members do not contain any associated types, and do not
   /// contain 'Self' in 'parameter' or 'other' position.
-  bool existentialTypeSupported() const {
-    if (Bits.ProtocolDecl.ExistentialTypeSupportedValid)
-      return Bits.ProtocolDecl.ExistentialTypeSupported;
-
-    return const_cast<ProtocolDecl *>(this)
-             ->existentialTypeSupportedSlow();
-  }
-
-  /// Explicitly set the existentialTypeSupported flag, without computing
-  /// it from members. Only called from deserialization, where the flag
-  /// was stored in the serialized record.
-  void setExistentialTypeSupported(bool supported) {
-    Bits.ProtocolDecl.ExistentialTypeSupported = supported;
-    Bits.ProtocolDecl.ExistentialTypeSupportedValid = true;
-  }
+  bool existentialTypeSupported() const;
 
 private:
   void computeKnownProtocolKind() const;
