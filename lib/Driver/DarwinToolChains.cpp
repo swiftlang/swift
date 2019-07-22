@@ -336,16 +336,18 @@ toolchains::Darwin::constructInvocation(const DynamicLinkJobAction &job,
     llvm::SmallString<128> ARCLiteLib;
     findARCLiteLibPath(*this, ARCLiteLib);
 
-    llvm::sys::path::append(ARCLiteLib, "libarclite_");
-    ARCLiteLib += getPlatformNameForTriple(Triple);
-    ARCLiteLib += ".a";
-    
-    Arguments.push_back("-force_load");
-    Arguments.push_back(context.Args.MakeArgString(ARCLiteLib));
-    
-    // Arclite depends on CoreFoundation.
-    Arguments.push_back("-framework");
-    Arguments.push_back("CoreFoundation");
+    if (!ARCLiteLib.empty()) {
+      llvm::sys::path::append(ARCLiteLib, "libarclite_");
+      ARCLiteLib += getPlatformNameForTriple(Triple);
+      ARCLiteLib += ".a";
+
+      Arguments.push_back("-force_load");
+      Arguments.push_back(context.Args.MakeArgString(ARCLiteLib));
+
+      // Arclite depends on CoreFoundation.
+      Arguments.push_back("-framework");
+      Arguments.push_back("CoreFoundation");
+    }
   }
 
   for (const Arg *arg :
@@ -599,7 +601,7 @@ static void validateLinkObjcRuntimeARCLiteLib(const toolchains::Darwin &TC,
     
     if (ARCLiteLib.empty()) {
       diags.diagnose(SourceLoc(),
-                     diag::error_arclite_not_found_when_link_objc_runtime);
+                     diag::warn_arclite_not_found_when_link_objc_runtime);
     }
   }
 }
