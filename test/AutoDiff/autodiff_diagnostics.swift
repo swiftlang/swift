@@ -175,7 +175,10 @@ struct TF_305 : Differentiable {
 //===----------------------------------------------------------------------===//
 
 class Foo {
-  // @differentiable cannot be put here. It's rejected by Sema already.
+  // FIXME: Figure out why diagnostics for direct references end up here, and
+  // why they are duplicated.
+  // expected-error @+2 2 {{expression is not differentiable}}
+  // expected-note @+1 2 {{differentiating class members is not yet supported}}
   func class_method(_ x: Float) -> Float {
     return x
   }
@@ -189,9 +192,7 @@ func triesToDifferentiateClassMethod(x: Float) -> Float {
   return Foo().class_method(x)
 }
 
-// expected-error @+2 {{function is not differentiable}}
-// expected-note @+1 {{opaque non-'@differentiable' function is not differentiable}}
-_ = gradient(at: .zero, in: Foo().class_method)
+let _: @differentiable (Float) -> Float = Foo().class_method
 
 //===----------------------------------------------------------------------===//
 // Unreachable
