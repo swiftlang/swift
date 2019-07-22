@@ -699,33 +699,10 @@ public:
   }
 };
 
-bool swift::resolveProtocolNames(DeclContext *DC,
-                                 ArrayRef<const char *> names,
-                          llvm::MapVector<ProtocolDecl*, StringRef> &result) {
-  assert(result.empty());
-  auto &ctx = DC->getASTContext();
-  for (auto name : names) {
-    // First try to solve by usr
-    ProtocolDecl *pd = dyn_cast_or_null<ProtocolDecl>(Demangle::
-      getTypeDeclForUSR(ctx, name));
-    if (!pd) {
-      // Second try to solve by mangled symbol name
-      pd = dyn_cast_or_null<ProtocolDecl>(Demangle::getTypeDeclForMangling(ctx, name));
-    }
-    if (!pd) {
-      // Thirdly try to solve by mangled type name
-      if (auto ty = Demangle::getTypeForMangling(ctx, name)) {
-        pd = dyn_cast_or_null<ProtocolDecl>(ty->getAnyGeneric());
-      }
-    }
-    if (pd) {
-      result.insert({pd, name});
-    }
-  }
-  if (names.size() == result.size())
-    return false;
-  // If we resolved none but the given names are not empty, return true for failure.
-  return result.size() == 0;
+ProtocolDecl* swift::resolveProtocolName(DeclContext *dc, StringRef name) {
+  return evaluateOrDefault(dc->getASTContext().evaluator,
+                           ResolveProtocolNameRequest(ProtocolNameOwner(dc, name)),
+                           nullptr);
 }
 
 ArrayRef<ExpressionTypeInfo>
@@ -735,8 +712,13 @@ swift::collectExpressionType(SourceFile &SF,
                              bool CanonicalType,
                              llvm::raw_ostream &OS) {
   llvm::MapVector<ProtocolDecl*, StringRef> InterestedProtocols;
-  if (resolveProtocolNames(&SF, ExpectedProtocols, InterestedProtocols))
-    return {};
+  for (auto Name: ExpectedProtocols) {
+    if (auto *pd = resolveProtocolName(&SF, Name)) {
+      InterestedProtocols.insert({pd, Name});
+    } else {
+      return {};
+    }
+  }
   ExpressionTypeCollector Walker(SF, InterestedProtocols, Scratch,
     CanonicalType, OS);
   Walker.walk(SF);
