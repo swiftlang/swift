@@ -46,6 +46,8 @@
             "remote": { "id": "apple/indexstore-db" } },
         "sourcekit-lsp": {
             "remote": { "id": "apple/sourcekit-lsp" } },
+        "swift-format": {
+            "remote": { "id": "apple/swift-format" } },
         "llvm-project": {
             "remote": { "id": "apple/llvm-project-v1" } }
     },
@@ -74,7 +76,8 @@
                 "clang-tools-extra": "stable",
                 "libcxx": "stable",
                 "indexstore-db": "master",
-                "sourcekit-lsp": "master"
+                "sourcekit-lsp": "master",
+                "swift-format": "master"
             }
         },
         "master-llvm-monorepo": {
