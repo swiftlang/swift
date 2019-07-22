@@ -49,7 +49,7 @@ inline bool accessKindMayConflict(SILAccessKind a, SILAccessKind b) {
 /// AccessedStorage is always valid.
 ///
 /// Note that the SILValue that represents a storage object is not
-/// necessarilly an address type. It may instead be a SILBoxType.
+/// necessarily an address type. It may instead be a SILBoxType.
 ///
 /// AccessedStorage hashing and comparison (via DenseMapInfo) is used to
 /// determine when two 'begin_access' instructions access the same or disjoint

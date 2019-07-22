@@ -46,7 +46,7 @@ class SILBuilderContext {
 
   SILModule &Module;
 
-  /// Allow the SIL module conventions to be overriden within the builder.
+  /// Allow the SIL module conventions to be overridden within the builder.
   /// This supports passes that lower SIL to a new stage.
   SILModuleConventions silConv = SILModuleConventions(Module);
 

@@ -385,7 +385,7 @@ public:
   /// Does the given kind of node inherit from multiple multiple SILNode base
   /// classes?
   ///
-  /// This enables one to know if their is a diamond in the inheritence
+  /// This enables one to know if their is a diamond in the inheritance
   /// hierarchy for this SILNode.
   static bool hasMultipleSILNodeBases(SILNodeKind kind) {
     // Currently only SingleValueInstructions.  Note that multi-result

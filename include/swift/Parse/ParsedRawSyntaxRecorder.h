@@ -62,7 +62,7 @@ public:
   ParsedRawSyntaxNode recordRawSyntax(syntax::SyntaxKind kind,
                                      ArrayRef<ParsedRawSyntaxNode> elements);
 
-  /// Record a raw syntax collecton without eny elements. \p loc can be invalid
+  /// Record a raw syntax collection without eny elements. \p loc can be invalid
   /// or an approximate location of where an element of the collection would be
   /// if not missing.
   ParsedRawSyntaxNode recordEmptyRawSyntaxCollection(syntax::SyntaxKind kind,

@@ -316,7 +316,7 @@ public:
     return bbIter->second != OrigBB;
   }
 
-  /// Return the new block within the cloned region analagous to the given
+  /// Return the new block within the cloned region analogous to the given
   /// original block.
   ///
   /// Assumes that `isBlockCloned` is true.

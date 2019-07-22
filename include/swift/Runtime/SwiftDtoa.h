@@ -51,7 +51,7 @@ extern "C" {
 // * `digits` is an array of `digits_length`
 // * `decimalExponent` is a pointer to an `int`
 //
-// Ouput:
+// Output:
 // * `digits` will receive the decimal digits
 // * `decimalExponent` will receive the decimal exponent
 // * function returns the number of digits generated
@@ -74,7 +74,7 @@ extern "C" {
 // Notes:
 //
 // If the input value is infinity or NaN, or `digits_length < 17`, the
-// function returns zero and generates no ouput.
+// function returns zero and generates no output.
 //
 // If the input value is zero, it will return `decimalExponent = 0` and
 // a single digit of value zero.

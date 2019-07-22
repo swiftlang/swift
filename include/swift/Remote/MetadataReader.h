@@ -318,7 +318,7 @@ public:
     return start;
   }
 
-  /// Given a pointer to an address, attemp to read the pointer value.
+  /// Given a pointer to an address, attempt to read the pointer value.
   Optional<StoredPointer> readPointerValue(StoredPointer Address) {
     StoredPointer PointerVal;
     if (!Reader->readInteger(RemoteAddress(Address), &PointerVal))
@@ -429,7 +429,7 @@ public:
         isBridged);
   }
 
-  /// Given a known-opaque existential, attemp to discover the pointer to its
+  /// Given a known-opaque existential, attempt to discover the pointer to its
   /// metadata address and its value.
   Optional<RemoteExistential>
   readMetadataAndValueOpaqueExistential(RemoteAddress ExistentialAddress) {
