@@ -127,7 +127,7 @@ class Hash {
 final
 class MD5 : Hash {
   // Integer part of the sines of integers (in radians) * 2^32.
-  var k : [UInt32] = [0xd76aa478, 0xe8c7b756, 0x242070db, 0xc1bdceee ,
+  let k : [UInt32] = [0xd76aa478, 0xe8c7b756, 0x242070db, 0xc1bdceee ,
                       0xf57c0faf, 0x4787c62a, 0xa8304613, 0xfd469501 ,
                       0x698098d8, 0x8b44f7af, 0xffff5bb1, 0x895cd7be ,
                       0x6b901122, 0xfd987193, 0xa679438e, 0x49b40821 ,
@@ -145,7 +145,7 @@ class MD5 : Hash {
                       0xf7537e82, 0xbd3af235, 0x2ad7d2bb, 0xeb86d391 ]
 
   // Per-round shift amounts
-  var r : [UInt32] = [7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22,
+  let r : [UInt32] = [7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22,
                       5,  9, 14, 20, 5,  9, 14, 20, 5,  9, 14, 20, 5,  9, 14, 20,
                       4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23,
                       6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21]
@@ -433,7 +433,7 @@ class SHA256 :  Hash {
   var h6: UInt32 = 0
   var h7: UInt32 = 0
 
-  var k : [UInt32] = [
+  let k : [UInt32] = [
    0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
    0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
    0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,

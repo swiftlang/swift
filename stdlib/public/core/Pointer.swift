@@ -32,7 +32,7 @@ extension _Pointer {
   ///
   /// - Parameter from: The opaque pointer to convert to a typed pointer.
   @_transparent
-  public init(_ from : OpaquePointer) {
+  public init(_ from: OpaquePointer) {
     self.init(from._rawValue)
   }
 
@@ -41,7 +41,7 @@ extension _Pointer {
   /// - Parameter from: The opaque pointer to convert to a typed pointer. If
   ///   `from` is `nil`, the result of this initializer is `nil`.
   @_transparent
-  public init?(_ from : OpaquePointer?) {
+  public init?(_ from: OpaquePointer?) {
     guard let unwrapped = from else { return nil }
     self.init(unwrapped)
   }
@@ -265,7 +265,7 @@ extension UInt {
 }
 
 // Pointer arithmetic operators (formerly via Strideable)
-extension Strideable where Self : _Pointer {
+extension Strideable where Self: _Pointer {
   @_transparent
   public static func + (lhs: Self, rhs: Self.Stride) -> Self {
     return lhs.advanced(by: rhs)
@@ -301,8 +301,8 @@ extension Strideable where Self : _Pointer {
 @_transparent
 public // COMPILER_INTRINSIC
 func _convertPointerToPointerArgument<
-  FromPointer : _Pointer,
-  ToPointer : _Pointer
+  FromPointer: _Pointer,
+  ToPointer: _Pointer
 >(_ from: FromPointer) -> ToPointer {
   return ToPointer(from._rawValue)
 }
@@ -311,7 +311,7 @@ func _convertPointerToPointerArgument<
 @_transparent
 public // COMPILER_INTRINSIC
 func _convertInOutToPointerArgument<
-  ToPointer : _Pointer
+  ToPointer: _Pointer
 >(_ from: Builtin.RawPointer) -> ToPointer {
   return ToPointer(from)
 }
@@ -346,7 +346,7 @@ func _convertConstArrayToPointerArgument<
 public // COMPILER_INTRINSIC
 func _convertMutableArrayToPointerArgument<
   FromElement,
-  ToPointer : _Pointer
+  ToPointer: _Pointer
 >(_ a: inout [FromElement]) -> (AnyObject?, ToPointer) {
   // TODO: Putting a canary at the end of the array in checked builds might
   // be a good idea
@@ -361,7 +361,7 @@ func _convertMutableArrayToPointerArgument<
 /// Derive a UTF-8 pointer argument from a value string parameter.
 public // COMPILER_INTRINSIC
 func _convertConstStringToUTF8PointerArgument<
-  ToPointer : _Pointer
+  ToPointer: _Pointer
 >(_ str: String) -> (AnyObject?, ToPointer) {
   let utf8 = Array(str.utf8CString)
   return _convertConstArrayToPointerArgument(utf8)

@@ -242,9 +242,10 @@ private:
   /// Field metadata records that have already been lazily emitted, or are
   /// queued up.
   llvm::SmallPtrSet<NominalTypeDecl *, 4> LazilyEmittedFieldMetadata;
+
   struct LazyOpaqueInfo {
-    bool IsLazy = false;
     bool IsDescriptorUsed = false;
+    bool IsDescriptorEmitted = false;
   };
   /// The set of opaque types enqueued for lazy emission.
   llvm::DenseMap<OpaqueTypeDecl*, LazyOpaqueInfo> LazyOpaqueTypes;
@@ -579,6 +580,7 @@ public:
   };
   llvm::StructType *OffsetPairTy;      /// { iSize, iSize }
   llvm::StructType *FullTypeLayoutTy;  /// %swift.full_type_layout = { ... }
+  llvm::StructType *TypeLayoutTy;  /// %swift.type_layout = { ... }
   llvm::PointerType *TupleTypeMetadataPtrTy; /// %swift.tuple_type*
   llvm::StructType *FullHeapMetadataStructTy; /// %swift.full_heapmetadata = type { ... }
   llvm::PointerType *FullHeapMetadataPtrTy;/// %swift.full_heapmetadata*
@@ -993,8 +995,8 @@ private:
   SmallVector<ProtocolDecl *, 4> SwiftProtocols;
   /// List of protocol conformances to generate descriptors for.
   std::vector<ConformanceDescription> ProtocolConformances;
-  /// List of nominal types to generate type metadata records for.
-  SmallVector<NominalTypeDecl *, 4> RuntimeResolvableTypes;
+  /// List of types to generate runtime-resolvable metadata records for.
+  SmallVector<GenericTypeDecl *, 4> RuntimeResolvableTypes;
   /// List of ExtensionDecls corresponding to the generated
   /// categories.
   SmallVector<ExtensionDecl*, 4> ObjCCategoryDecls;
@@ -1057,6 +1059,8 @@ public:
   /// reflection metadata.
   llvm::SetVector<CanType> BuiltinTypes;
 
+  llvm::Constant *getTypeRef(Type type, GenericSignature *genericSig,
+                             MangledTypeRefRole role);
   llvm::Constant *getTypeRef(CanType type, MangledTypeRefRole role);
   llvm::Constant *emitWitnessTableRefString(CanType type,
                                             ProtocolConformanceRef conformance,
@@ -1098,8 +1102,7 @@ public:
   llvm::Constant *getAddrOfBoxDescriptor(CanType boxedType);
 
   /// Produce an associated type witness that refers to the given type.
-  llvm::Constant *getAssociatedTypeWitness(CanType type,
-                                           bool inProtocolContext);
+  llvm::Constant *getAssociatedTypeWitness(Type type, bool inProtocolContext);
 
   void emitAssociatedTypeMetadataRecord(const RootProtocolConformance *C);
   void emitFieldDescriptor(const NominalTypeDecl *Decl);
@@ -1203,8 +1206,6 @@ public:
   void emitStructDecl(StructDecl *D);
   void emitClassDecl(ClassDecl *D);
   void emitExtension(ExtensionDecl *D);
-  void emitFuncDecl(FuncDecl *D);
-  void emitAbstractStorageDecl(AbstractStorageDecl *D);
   void emitOpaqueTypeDecl(OpaqueTypeDecl *D);
   void emitSILGlobalVariable(SILGlobalVariable *gv);
   void emitCoverageMapping();
@@ -1268,7 +1269,7 @@ public:
                                         ConstantInitFuture init,
                                         llvm::StringRef section = {});
 
-  TypeEntityReference getTypeEntityReference(NominalTypeDecl *D);
+  TypeEntityReference getTypeEntityReference(GenericTypeDecl *D);
 
   llvm::Constant *getAddrOfTypeMetadata(CanType concreteType);
   ConstantReference getAddrOfTypeMetadata(CanType concreteType,
@@ -1300,8 +1301,9 @@ public:
   llvm::Constant *getAddrOfTypeContextDescriptor(NominalTypeDecl *D,
                                       RequireMetadata_t requireMetadata,
                                       ConstantInit definition = ConstantInit());
-  llvm::Constant *getAddrOfAnonymousContextDescriptor(DeclContext *DC,
-                                      ConstantInit definition = ConstantInit());
+  llvm::Constant *getAddrOfAnonymousContextDescriptor(
+                          PointerUnion<DeclContext *, VarDecl *> Name,
+                          ConstantInit definition = ConstantInit());
   llvm::Constant *getAddrOfExtensionContextDescriptor(ExtensionDecl *ED,
                                       ConstantInit definition = ConstantInit());
   llvm::Constant *getAddrOfModuleContextDescriptor(ModuleDecl *D,
@@ -1433,6 +1435,13 @@ public:
   getGlobalForDynamicallyReplaceableThunk(LinkEntity &entity, llvm::Type *type,
                                           ForDefinition_t forDefinition);
 
+  llvm::Function *getAddrOfOpaqueTypeDescriptorAccessFunction(
+      OpaqueTypeDecl *decl, ForDefinition_t forDefinition, bool implementation);
+
+  void createReplaceableProlog(IRGenFunction &IGF, SILFunction *f);
+
+  void emitOpaqueTypeDescriptorAccessor(OpaqueTypeDecl *);
+
 private:
   llvm::Constant *
   getAddrOfSharedContextDescriptor(LinkEntity entity,
@@ -1453,7 +1462,8 @@ private:
                                         llvm::Type *overrideDeclType = nullptr);
 
   void emitLazyPrivateDefinitions();
-  void addRuntimeResolvableType(NominalTypeDecl *nominal);
+  void addRuntimeResolvableType(GenericTypeDecl *nominal);
+  void maybeEmitOpaqueTypeDecl(OpaqueTypeDecl *opaque);
 
   /// Add all conformances of the given \c DeclContext LazyWitnessTables.
   void addLazyConformances(DeclContext *dc);

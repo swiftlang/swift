@@ -19,7 +19,6 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
-#include "swift/AST/ASTScope.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/DiagnosticsSema.h"
@@ -116,6 +115,8 @@ BuiltinUnit::BuiltinUnit(ModuleDecl &M)
 //===----------------------------------------------------------------------===//
 // Normal Module Name Lookup
 //===----------------------------------------------------------------------===//
+
+SourceFile::~SourceFile() = default;
 
 class SourceFile::LookupCache {
   /// A lookup map for value decls. When declarations are added they are added
@@ -298,7 +299,8 @@ void SourceLookupCache::lookupClassMembers(AccessPathTy accessPath,
       for (ValueDecl *vd : member.second) {
         auto *nominal = vd->getDeclContext()->getSelfNominalTypeDecl();
         if (nominal && nominal->getName() == accessPath.front().first)
-          consumer.foundDecl(vd, DeclVisibilityKind::DynamicLookup);
+          consumer.foundDecl(vd, DeclVisibilityKind::DynamicLookup,
+                             DynamicLookupInfo::AnyObject);
       }
     }
     return;
@@ -311,7 +313,8 @@ void SourceLookupCache::lookupClassMembers(AccessPathTy accessPath,
       continue;
 
     for (ValueDecl *vd : member.second)
-      consumer.foundDecl(vd, DeclVisibilityKind::DynamicLookup);
+      consumer.foundDecl(vd, DeclVisibilityKind::DynamicLookup,
+                         DynamicLookupInfo::AnyObject);
   }
 }
 
@@ -1281,16 +1284,6 @@ bool ModuleDecl::registerEntryPointFile(FileUnit *file, SourceLoc diagLoc,
   return true;
 }
 
-bool ModuleDecl::isSystemModule() const {
-  if (isStdlibModule())
-    return true;
-  for (auto F : getFiles()) {
-    if (auto LF = dyn_cast<LoadedFile>(F))
-      return LF->isSystemModule();
-  }
-  return false;
-}
-
 template<bool respectVisibility>
 static bool
 forAllImportedModules(ModuleDecl *topLevel, ModuleDecl::AccessPathTy thisPath,
@@ -1705,9 +1698,11 @@ StringRef SourceFile::getFilename() const {
 }
 
 ASTScope &SourceFile::getScope() {
-  if (!Scope) Scope = ASTScope::createRoot(this);
-  return *Scope;
+  if (!Scope)
+    Scope = std::unique_ptr<ASTScope>(new (getASTContext()) ASTScope(this));
+  return *Scope.get();
 }
+
 
 Identifier
 SourceFile::getDiscriminatorForPrivateValue(const ValueDecl *D) const {
@@ -1792,8 +1787,11 @@ SourceFile::lookupOpaqueResultType(StringRef MangledName,
 void SourceFile::markDeclWithOpaqueResultTypeAsValidated(ValueDecl *vd) {
   UnvalidatedDeclsWithOpaqueReturnTypes.erase(vd);
   if (auto opaqueDecl = vd->getOpaqueResultTypeDecl()) {
-    ValidatedOpaqueReturnTypes.insert(
+    auto inserted = ValidatedOpaqueReturnTypes.insert(
               {opaqueDecl->getOpaqueReturnTypeIdentifier().str(), opaqueDecl});
+    if (inserted.second) {
+      OpaqueReturnTypes.push_back(opaqueDecl);
+    }
   }
 }
 

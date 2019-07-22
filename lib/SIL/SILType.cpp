@@ -13,6 +13,8 @@
 #include "swift/SIL/SILType.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/Module.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/Type.h"
 #include "swift/SIL/AbstractionPattern.h"
 #include "swift/SIL/SILFunctionConventions.h"
@@ -81,9 +83,7 @@ SILType SILType::getSILTokenType(const ASTContext &C) {
 }
 
 bool SILType::isTrivial(const SILFunction &F) const {
-  // FIXME: Should just call F.getTypeLowering()
-  return F.getModule().Types.getTypeLowering(*this,
-                                      ResilienceExpansion::Minimal).isTrivial();
+  return F.getTypeLowering(*this).isTrivial();
 }
 
 bool SILType::isReferenceCounted(SILModule &M) const {
@@ -97,6 +97,11 @@ bool SILType::isNoReturnFunction() const {
     return funcTy->isNoReturnFunction();
 
   return false;
+}
+
+std::string SILType::getMangledName() const {
+  Mangle::ASTMangler mangler(false/*use dwarf mangling*/);
+  return mangler.mangleTypeWithoutPrefix(getASTType());
 }
 
 std::string SILType::getAsString() const {
@@ -177,28 +182,13 @@ SILType SILType::getEnumElementType(EnumElementDecl *elt, SILModule &M) const {
   return SILType(loweredTy, getCategory());
 }
 
-bool SILType::isLoadableOrOpaque(SILModule &M) const {
-  return isLoadable(M) || !SILModuleConventions(M).useLoweredAddresses();
-}
-
 bool SILType::isLoadableOrOpaque(const SILFunction &F) const {
   SILModule &M = F.getModule();
-  return isLoadable(F) ||
-         !SILModuleConventions(M).useLoweredAddresses();
-}
-
-/// True if the type, or the referenced type of an address type, is
-/// address-only. For example, it could be a resilient struct or something of
-/// unknown size.
-bool SILType::isAddressOnly(SILModule &M) const {
-  return M.Types.getTypeLowering(*this, ResilienceExpansion::Minimal)
-    .isAddressOnly();
+  return isLoadable(F) || !SILModuleConventions(M).useLoweredAddresses();
 }
 
 bool SILType::isAddressOnly(const SILFunction &F) const {
-  // FIXME: Should just call F.getTypeLowering()
-  return F.getModule().Types.getTypeLowering(*this,
-                                   F.getResilienceExpansion()).isAddressOnly();
+  return F.getTypeLowering(*this).isAddressOnly();
 }
 
 SILType SILType::substGenericArgs(SILModule &M,

@@ -747,26 +747,50 @@ emitKeyPathComponent(IRGenModule &IGM,
       fields.addInt32(fieldOffset.getValue());
       break;
     }
-    
+
+    auto *classDecl = baseTy->getClassOrBoundGenericClass();
+    auto loweredClassTy = loweredBaseTy;
+
+    // Recover class decl from superclass constraint
+    if (!classDecl && genericEnv) {
+      auto ty = genericEnv->mapTypeIntoContext(baseTy)->getCanonicalType();
+      auto archetype = dyn_cast<ArchetypeType>(ty);
+      if (archetype && archetype->requiresClass()) {
+        auto superClassTy = ty->getSuperclass(false)->getCanonicalType();
+        classDecl = superClassTy->getClassOrBoundGenericClass();
+        loweredClassTy =
+            IGM.getLoweredType(AbstractionPattern::getOpaque(),
+                               superClassTy->getWithoutSpecifierType());
+      }
+    }
+
     // For a class, we may know the fixed offset of a field at compile time,
     // or we may need to fetch it at instantiation time. Depending on the
     // ObjC-ness and resilience of the class hierarchy, there might be a few
     // different ways we need to go about this.
-    if (loweredBaseTy.getClassOrBoundGenericClass()) {
+    if (loweredClassTy.getClassOrBoundGenericClass()) {
 
       // Use the property's class type to determine the field access.
       auto propertyBaseDecl = property->getDeclContext()->getSelfClassDecl();
       auto currentBaseTy =
-          loweredBaseTy.getASTType()->getSuperclassForDecl(propertyBaseDecl);
+          loweredClassTy.getASTType()->getSuperclassForDecl(propertyBaseDecl);
       assert(currentBaseTy->getClassOrBoundGenericClass() == propertyBaseDecl);
-      loweredBaseTy =
+      loweredClassTy =
           IGM.getLoweredType(AbstractionPattern::getOpaque(), currentBaseTy);
 
-      switch (getClassFieldAccess(IGM, loweredBaseTy, property)) {
+      auto loweredBaseContextTy =
+          SILType::getPrimitiveObjectType(loweredClassTy.getASTType());
+      if (!loweredClassTy.getASTType()->hasArchetype())
+        loweredBaseContextTy = SILType::getPrimitiveObjectType(
+            GenericEnvironment::mapTypeIntoContext(genericEnv,
+                                                   loweredClassTy.getASTType())
+                ->getCanonicalType());
+
+      switch (getClassFieldAccess(IGM, loweredBaseContextTy, property)) {
       case FieldAccess::ConstantDirect: {
         // Known constant fixed offset.
         auto offset = tryEmitConstantClassFragilePhysicalMemberOffset(IGM,
-                                                                loweredBaseTy,
+                                                                loweredClassTy,
                                                                 property);
         assert(offset && "no constant offset for ConstantDirect field?!");
         addFixedOffset(/*struct*/ false, property->isLet(), offset);
@@ -789,10 +813,8 @@ emitKeyPathComponent(IRGenModule &IGM,
         auto header = KeyPathComponentHeader
           ::forClassComponentWithUnresolvedFieldOffset(property->isLet());
         fields.addInt32(header.getData());
-        auto fieldOffset =
-          getClassFieldOffsetOffset(IGM,
-                                    loweredBaseTy.getClassOrBoundGenericClass(),
-                                    property);
+        auto fieldOffset = getClassFieldOffsetOffset(
+            IGM, loweredClassTy.getClassOrBoundGenericClass(), property);
         fields.addInt32(fieldOffset.getValue());
         break;
       }
@@ -955,6 +977,20 @@ emitKeyPathComponent(IRGenModule &IGM,
       // the property.
       auto property = id.getProperty();
       idKind = KeyPathComponentHeader::StoredPropertyIndex;
+      auto *classDecl = baseTy->getClassOrBoundGenericClass();
+      auto loweredClassTy = loweredBaseTy;
+      // Recover class decl from superclass constraint
+      if (!classDecl && genericEnv) {
+        auto ty = genericEnv->mapTypeIntoContext(baseTy)->getCanonicalType();
+        auto archetype = dyn_cast<ArchetypeType>(ty);
+        if (archetype && archetype->requiresClass()) {
+          auto superClassTy = ty->getSuperclass(false)->getCanonicalType();
+          classDecl = superClassTy->getClassOrBoundGenericClass();
+          loweredClassTy =
+              IGM.getLoweredType(AbstractionPattern::getOpaque(),
+                                 superClassTy->getWithoutSpecifierType());
+        }
+      }
       if (auto struc = baseTy->getStructOrBoundGenericStruct()) {
         // Scan the stored properties of the struct to find the index. We should
         // only ever use a struct field as a uniquing key from inside the
@@ -971,12 +1007,12 @@ emitKeyPathComponent(IRGenModule &IGM,
         }
         assert(structIdx && "not a stored property of the struct?!");
         idValue = llvm::ConstantInt::get(IGM.SizeTy, structIdx.getValue());
-      } else if (auto *classDecl = baseTy->getClassOrBoundGenericClass()) {
+      } else if (classDecl) {
         // TODO: This field index would require runtime resolution with Swift
         // native class resilience. We never directly access ObjC-imported
         // ivars so we can disregard ObjC ivar resilience for this computation
         // and start counting at the Swift native root.
-        switch (getClassFieldAccess(IGM, loweredBaseTy, property)) {
+        switch (getClassFieldAccess(IGM, loweredClassTy, property)) {
         case FieldAccess::ConstantDirect:
         case FieldAccess::ConstantIndirect:
         case FieldAccess::NonConstantDirect:

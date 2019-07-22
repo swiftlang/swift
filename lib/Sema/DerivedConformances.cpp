@@ -137,8 +137,23 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
   return false;
 }
 
-ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
-                                                       NominalTypeDecl *nominal,
+void DerivedConformance::tryDiagnoseFailedDerivation(DeclContext *DC,
+                                                     NominalTypeDecl *nominal,
+                                                     ProtocolDecl *protocol) {
+  auto knownProtocol = protocol->getKnownProtocolKind();
+  if (!knownProtocol)
+    return;
+
+  if (*knownProtocol == KnownProtocolKind::Equatable) {
+    tryDiagnoseFailedEquatableDerivation(DC, nominal);
+  }
+
+  if (*knownProtocol == KnownProtocolKind::Hashable) {
+    tryDiagnoseFailedHashableDerivation(DC, nominal);
+  }
+}
+
+ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
                                                        ValueDecl *requirement) {
   // Note: whenever you update this function, also update
   // TypeChecker::deriveProtocolRequirement.
@@ -152,7 +167,7 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
     auto proto = ctx.getProtocol(kind);
     if (!proto) return nullptr;
 
-    if (auto conformance = tc.conformsToProtocol(
+    if (auto conformance = TypeChecker::conformsToProtocol(
             nominal->getDeclaredInterfaceType(), proto, nominal,
             ConformanceCheckFlags::SkipConditionalRequirements)) {
       auto DC = conformance->getConcrete()->getDeclContext();
@@ -263,11 +278,10 @@ DerivedConformance::createSelfDeclRef(AbstractFunctionDecl *fn) {
 }
 
 AccessorDecl *DerivedConformance::
-addGetterToReadOnlyDerivedProperty(TypeChecker &tc,
-                                   VarDecl *property,
+addGetterToReadOnlyDerivedProperty(VarDecl *property,
                                    Type propertyContextType) {
   auto getter =
-    declareDerivedPropertyGetter(tc, property, propertyContextType);
+    declareDerivedPropertyGetter(property, propertyContextType);
 
   property->setAccessors(StorageImplInfo::getImmutableComputed(),
                          SourceLoc(), {getter}, SourceLoc());
@@ -276,12 +290,11 @@ addGetterToReadOnlyDerivedProperty(TypeChecker &tc,
 }
 
 AccessorDecl *
-DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
-                                                 VarDecl *property,
+DerivedConformance::declareDerivedPropertyGetter(VarDecl *property,
                                                  Type propertyContextType) {
   bool isStatic = property->isStatic();
 
-  auto &C = tc.Context;
+  auto &C = property->getASTContext();
   auto parentDC = property->getDeclContext();
   ParameterList *params = ParameterList::createEmpty(C);
 
@@ -305,7 +318,7 @@ DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
   getterDecl->copyFormalAccessFrom(property);
   getterDecl->setValidationToChecked();
 
-  tc.Context.addSynthesizedDecl(getterDecl);
+  C.addSynthesizedDecl(getterDecl);
 
   return getterDecl;
 }

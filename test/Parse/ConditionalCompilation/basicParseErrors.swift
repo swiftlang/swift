@@ -138,3 +138,14 @@ fn_k()
 func undefinedFunc() // ignored.
 #endif
 undefinedFunc() // expected-error {{use of unresolved identifier 'undefinedFunc'}}
+
+#if FOO
+#else if BAR
+// expected-error@-1 {{unexpected 'if' keyword following '#else' conditional compilation directive; did you mean '#elseif'?}} {{1-9=#elseif}}
+#else
+#endif
+
+#if FOO
+#else
+if true {}
+#endif // OK

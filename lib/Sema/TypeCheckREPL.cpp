@@ -453,9 +453,9 @@ void TypeChecker::processREPLTopLevel(SourceFile &SF, TopLevelContext &TLC,
     else if (auto *D = Entry.dyn_cast<Decl*>())
       if (auto *PBD = dyn_cast<PatternBindingDecl>(D))
         RC.processREPLTopLevelPatternBinding(PBD);
+
+    contextualizeTopLevelCode(TLC, TLCD);
   }
 
-  contextualizeTopLevelCode(TLC, llvm::makeArrayRef(SF.Decls).slice(FirstDecl));
   SF.clearLookupCache();
 }
-

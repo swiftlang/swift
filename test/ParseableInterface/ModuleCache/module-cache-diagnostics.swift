@@ -29,7 +29,7 @@
 // RUN: %{python} %S/Inputs/make-old.py %t/modulecache/OtherModule-*.swiftmodule
 //
 //
-// Actual test: add an inlinable func with an unused var to LeafModule.swiftinterface (which should emit a warning); check we do get a rebuild, but no warning.
+// Actual test: add an inlinable func with an unused var to LeafModule.swiftinterface (which should emit a warning); check we do get a rebuild, but no warning. (For astooscopelookup testing, must filter out that warning; see the sed command below.)
 //
 // RUN: %{python} %S/Inputs/check-is-old.py %t/OtherModule.swiftinterface %t/LeafModule.swiftinterface
 // RUN: %{python} %S/Inputs/check-is-old.py %t/modulecache/OtherModule-*.swiftmodule %t/modulecache/LeafModule-*.swiftmodule
@@ -38,7 +38,7 @@
 // RUN: %{python} %S/Inputs/make-old.py %t/LeafModule.swiftinterface
 // RUN: %{python} %S/Inputs/check-is-old.py %t/LeafModule.swiftinterface
 // RUN: rm %t/TestModule.swiftmodule
-// RUN: %target-swift-frontend -I %t -module-cache-path %t/modulecache -emit-module -o %t/TestModule.swiftmodule -module-name TestModule %s >%t/warn.txt 2>&1
+// RUN: %target-swift-frontend -I %t -module-cache-path %t/modulecache -emit-module -o %t/TestModule.swiftmodule -module-name TestModule %s  2>&1 | sed '/WARNING: TRYING Scope exclusively/d' >%t/warn.txt
 // RUN: %{python} %S/Inputs/check-is-new.py %t/modulecache/OtherModule-*.swiftmodule %t/modulecache/LeafModule-*.swiftmodule
 // "check warn.txt exists and is empty"
 // RUN: test -e %t/warn.txt -a ! -s %t/warn.txt
@@ -57,7 +57,9 @@
 // RUN: %{python} %S/Inputs/check-is-old.py %t/modulecache/OtherModule-*.swiftmodule %t/modulecache/LeafModule-*.swiftmodule
 // RUN: %FileCheck %s -check-prefix=CHECK-ERROR <%t/err.txt
 // CHECK-ERROR: LeafModule.swiftinterface:7:8: error: no such module 'NotAModule'
-// CHECK-ERROR: OtherModule.swiftinterface:4:8: error: no such module 'LeafModule'
+// CHECK-ERROR: OtherModule.swiftinterface:4:8: error: failed to load module 'LeafModule'
+// CHECK-ERROR: module-cache-diagnostics.swift:{{[0-9]+}}:8: error: failed to load module 'OtherModule'
+// CHECK-ERROR-NOT: error:
 //
 //
 // Next test: same as above, but with a .dia file
@@ -80,7 +82,9 @@
 // RUN: %{python} %S/Inputs/check-is-old.py %t/modulecache/OtherModule-*.swiftmodule %t/modulecache/LeafModule-*.swiftmodule
 // RUN: %FileCheck %s -check-prefix=CHECK-ERROR-INLINE <%t/err-inline.txt
 // CHECK-ERROR-INLINE: LeafModule.swiftinterface:6:33: error: use of unresolved identifier 'unresolved'
-// CHECK-ERROR-INLINE: OtherModule.swiftinterface:4:8: error: no such module 'LeafModule'
+// CHECK-ERROR-INLINE: OtherModule.swiftinterface:4:8: error: failed to load module 'LeafModule'
+// CHECK-ERROR-INLINE: module-cache-diagnostics.swift:{{[0-9]+}}:8: error: failed to load module 'OtherModule'
+// CHECK-ERROR-INLINE-NOT: error:
 //
 //
 // Next test: same as above, but with a .dia file

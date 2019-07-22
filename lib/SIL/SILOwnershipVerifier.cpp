@@ -331,7 +331,7 @@ bool SILValueOwnershipChecker::gatherUsers(
         for (unsigned i : indices(nonLifetimeEndingUsers)) {
           if (auto *bbi = dyn_cast<BeginBorrowInst>(
                   nonLifetimeEndingUsers[i].getInst())) {
-            copy(makeEndBorrowRange(bbi),
+            copy(bbi->getEndBorrows(),
                  std::back_inserter(implicitRegularUsers));
           }
         }

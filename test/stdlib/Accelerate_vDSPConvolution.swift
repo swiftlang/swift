@@ -2,6 +2,7 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
+// REQUIRES: rdar50301438
 // REQUIRES: objc_interop
 // UNSUPPORTED: OS=watchos
 
@@ -16,7 +17,7 @@ var Accelerate_vDSPConvolutionTests = TestSuite("Accelerate_vDSPConvolution")
 //
 //===----------------------------------------------------------------------===//
 
-if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
+if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
     
     let count = 256
     let n = vDSP_Length(256)
@@ -82,7 +83,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
 //
 //===----------------------------------------------------------------------===//
 
-if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
+if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
     
     let count = 256
     let n = vDSP_Length(256)
@@ -148,7 +149,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
 //
 //===----------------------------------------------------------------------===//
 
-if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
+if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
     
     let width = 512
     let height = 128
@@ -251,7 +252,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
 //
 //===----------------------------------------------------------------------===//
 
-if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
+if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
     
     let width = 512
     let height = 128

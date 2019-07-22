@@ -1,11 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: if [ %target-runtime == "objc" ]; \
-// RUN: then \
-// RUN:   %target-clang -fobjc-arc %S/Inputs/NSSlowString/NSSlowString.m -c -o %t/NSSlowString.o && \
-// RUN:   %target-build-swift -I %S/Inputs/NSSlowString/ %t/NSSlowString.o %s -o %t/String; \
-// RUN: else \
-// RUN:   %target-build-swift %s -o %t/String; \
-// RUN: fi
+// RUN: %target-clang -fobjc-arc %S/Inputs/NSSlowString/NSSlowString.m -c -o %t/NSSlowString.o
+// RUN: %target-build-swift -I %S/Inputs/NSSlowString/ %t/NSSlowString.o %s -o %t/String
 
 // RUN: %target-codesign %t/String
 // RUN: %target-run %t/String
@@ -14,6 +9,7 @@
 
 import StdlibUnittest
 import StdlibCollectionUnittest
+import StdlibUnicodeUnittest
 
 #if _runtime(_ObjC)
 import NSSlowString
@@ -49,6 +45,35 @@ var strings: Array<String> = [
 
 let kCFStringEncodingASCII: UInt32 = 0x0600
 
+#if _runtime(_ObjC)
+
+var utf16ByteSequences = utf16Tests.flatMap { $0.value }.map { $0.encoded }
+
+private func testForeignContiguous(slowString: NSSlowString, string: String) {
+  // Lazily bridged strings are not contiguous UTF-8
+  var slowString = NSSlowString(string: string) as String
+  expectFalse(slowString.isFastUTF8)
+  expectEqualSequence(string.utf8, slowString.utf8)
+  
+  // They become fast when mutated
+  slowString.makeNative()
+  expectTrue(slowString.isFastUTF8)
+  expectEqualSequence(
+    string.utf8, slowString.withFastUTF8IfAvailable(Array.init)!)
+  
+  // Contiguous ASCII CFStrings provide access, even if lazily bridged
+  if string.isASCII {
+    let cfString = string.withCString {
+      CFStringCreateWithCString(nil, $0, kCFStringEncodingASCII)!
+      } as String
+    expectTrue(cfString.isFastUTF8)
+    expectEqualSequence(
+      string.utf8, cfString.withFastUTF8IfAvailable(Array.init)!)
+  }
+}
+
+#endif
+
 UTF8Tests.test("Contiguous Access") {
   for string in strings {
     print(string)
@@ -70,28 +95,20 @@ UTF8Tests.test("Contiguous Access") {
     // expectTrue(((copy as NSString) as String).isFastUTF8)
 
 #if _runtime(_ObjC)
-    // Lazily bridged strings are not contiguous UTF-8
-    var slowString = NSSlowString(string: string) as String
-    expectFalse(slowString.isFastUTF8)
-    expectEqualSequence(string.utf8, slowString.utf8)
-
-    // They become fast when mutated
-    slowString.makeNative()
-    expectTrue(slowString.isFastUTF8)
-    expectEqualSequence(
-      string.utf8, slowString.withFastUTF8IfAvailable(Array.init)!)
-
-    // Contiguous ASCII CFStrings provide access, even if lazily bridged
-    if string.isASCII {
-      let cfString = string.withCString {
-        CFStringCreateWithCString(nil, $0, kCFStringEncodingASCII)!
-      } as String
-      expectTrue(cfString.isFastUTF8)
-      expectEqualSequence(
-        string.utf8, cfString.withFastUTF8IfAvailable(Array.init)!)
-    }
+    testForeignContiguous(slowString: NSSlowString(string: string),
+                          string: string)
 #endif
   }
+#if _runtime(_ObjC)
+  for bytes in utf16ByteSequences {
+    bytes.withContiguousStorageIfAvailable {
+      let slowString = NSSlowString(characters: $0.baseAddress!,
+                                    length: UInt($0.count))
+      let string = String(decoding: $0, as: UTF16.self)
+      testForeignContiguous(slowString: slowString, string: string)
+    }
+  }
+#endif
 }
 
 runAllTests()

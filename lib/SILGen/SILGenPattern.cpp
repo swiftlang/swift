@@ -757,7 +757,7 @@ forwardIntoSubtree(SILGenFunction &SGF, SILLocation loc,
   }
 
   // Only address only values use TakeOnSuccess.
-  assert(outerMV.getType().isAddressOnly(SGF.getModule()) &&
+  assert(outerMV.getType().isAddressOnly(SGF.F) &&
          "TakeOnSuccess can only be used with address only values");
 
   assert((consumptionKind == CastConsumptionKind::TakeAlways ||
@@ -1193,12 +1193,11 @@ void PatternMatchEmission::bindVariable(Pattern *pattern, VarDecl *var,
 
   // Initialize the variable value.
   InitializationPtr init = SGF.emitInitializationForVarDecl(var, immutable);
-  CanType formalValueType = pattern->getType()->getCanonicalType();
-  RValue rv(SGF, pattern, formalValueType, value.getFinalManagedValue());
+  auto mv = value.getFinalManagedValue();
   if (shouldTake(value, isIrrefutable)) {
-    std::move(rv).forwardInto(SGF, pattern, init.get());
+    mv.forwardInto(SGF, pattern, init.get());
   } else {
-    std::move(rv).copyInto(SGF, pattern, init.get());
+    mv.copyInto(SGF, pattern, init.get());
   }
 }
 
@@ -1371,6 +1370,7 @@ getManagedSubobject(SILGenFunction &SGF, SILValue value,
   case CastConsumptionKind::TakeOnSuccess:
     return {SGF.emitManagedRValueWithCleanup(value, valueTL), consumption};
   }
+  llvm_unreachable("covered switch");
 }
 
 static ConsumableManagedValue
@@ -1434,7 +1434,7 @@ emitTupleDispatch(ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
   SILLocation loc = firstPat;
 
   // If our source is an address that is loadable, perform a load_borrow.
-  if (src.getType().isAddress() && src.getType().isLoadable(SGF.getModule())) {
+  if (src.getType().isAddress() && src.getType().isLoadable(SGF.F)) {
     // We should only see take_on_success if we have a base type that is address
     // only.
     assert(src.getFinalConsumption() != CastConsumptionKind::TakeOnSuccess &&
@@ -1476,7 +1476,7 @@ emitTupleDispatch(ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
   // At this point we know that we must have an address only type, since we
   // would have loaded it earlier.
   SILValue v = src.getFinalManagedValue().forward(SGF);
-  assert(v->getType().isAddressOnly(SGF.getModule()) &&
+  assert(v->getType().isAddressOnly(SGF.F) &&
          "Loadable values were handled earlier");
 
   // The destructured tuple that we pass off to our sub pattern. This may
@@ -1540,6 +1540,7 @@ emitTupleDispatch(ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
             "Borrow always can only occur along object only code paths");
       }
       }
+      llvm_unreachable("covered switch");
     }());
 
     // If we aren't loadable, add to the unforward array.
@@ -1609,7 +1610,7 @@ emitCastOperand(SILGenFunction &SGF, SILLocation loc,
   // We know that we must have a loadable type at this point since address only
   // types do not need reabstraction and are addresses. So we should have exited
   // above already.
-  assert(src.getType().isLoadable(SGF.getModule()) &&
+  assert(src.getType().isLoadable(SGF.F) &&
          "Should have a loadable value at this point");
 
   // Since our finalValue is loadable, we could not have had a take_on_success
@@ -1988,7 +1989,7 @@ void PatternMatchEmission::emitEnumElementDispatch(
   loc.setDebugLoc(rows[0].Pattern);
 
   // If our source is an address that is loadable, perform a load_borrow.
-  if (src.getType().isAddress() && src.getType().isLoadable(SGF.getModule())) {
+  if (src.getType().isAddress() && src.getType().isLoadable(SGF.F)) {
     assert(src.getFinalConsumption() != CastConsumptionKind::TakeOnSuccess &&
            "Can only have take_on_success with address only values");
     src = {SGF.B.createLoadBorrow(loc, src.getFinalManagedValue()),
@@ -2008,7 +2009,7 @@ void PatternMatchEmission::emitEnumElementDispatch(
   }
 
   // After this point we now that we must have an address only type.
-  assert(src.getType().isAddressOnly(SGF.getModule()) &&
+  assert(src.getType().isAddressOnly(SGF.F) &&
          "Should have an address only type here");
 
   CanType sourceType = rows[0].Pattern->getType()->getCanonicalType();
@@ -2339,8 +2340,8 @@ void PatternMatchEmission::initSharedCaseBlockDest(CaseStmt *caseBlock,
 
     // We don't pass address-only values in basic block arguments.
     SILType ty = SGF.getLoweredType(vd->getType());
-    if (ty.isAddressOnly(SGF.F.getModule()))
-      continue;
+    if (ty.isAddressOnly(SGF.F))
+      return;
     block->createPhiArgument(ty, ValueOwnershipKind::Owned, vd);
   }
 }
@@ -2369,7 +2370,7 @@ void PatternMatchEmission::emitAddressOnlyAllocations() {
         continue;
 
       SILType ty = SGF.getLoweredType(vd->getType());
-      if (!ty.isAddressOnly(SGF.F.getModule()))
+      if (!ty.isAddressOnly(SGF.F))
         continue;
       assert(!Temporaries[vd]);
       Temporaries[vd] = SGF.emitTemporaryAllocation(vd, ty);
@@ -2448,7 +2449,7 @@ void PatternMatchEmission::emitSharedCaseBlocks() {
       // Initialize mv at +1. We always pass values in at +1 for today into
       // shared blocks.
       ManagedValue mv;
-      if (ty.isAddressOnly(SGF.F.getModule())) {
+      if (ty.isAddressOnly(SGF.F)) {
         // There's no basic block argument, since we don't allow basic blocks
         // to have address arguments.
         //
@@ -2654,7 +2655,6 @@ static void switchCaseStmtSuccessCallback(SILGenFunction &SGF,
   // are threaded through here messily, but the explicit retains here counteract
   // them, and then the retain/release pair gets optimized out.)
   SmallVector<SILValue, 4> args;
-  SILModule &M = SGF.F.getModule();
   SmallVector<VarDecl *, 4> patternVars;
   row.getCasePattern()->collectVariables(patternVars);
   for (auto *expected : caseBlock->getCaseBodyVariables()) {
@@ -2670,7 +2670,7 @@ static void switchCaseStmtSuccessCallback(SILGenFunction &SGF,
       // If we have an address-only type, initialize the temporary
       // allocation. We're not going to pass the address as a block
       // argument.
-      if (type.isAddressOnly(M)) {
+      if (type.isAddressOnly(SGF.F)) {
         emission.emitAddressOnlyInitialization(expected, value);
         break;
       }
@@ -2764,7 +2764,7 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
     if (subjectMV.isPlusOne(*this)) {
       // And we have an address that is loadable, perform a load [take].
       if (subjectMV.getType().isAddress() &&
-          subjectMV.getType().isLoadable(getModule())) {
+          subjectMV.getType().isLoadable(F)) {
         subjectMV = B.createLoadTake(S, subjectMV);
       }
       return {subjectMV, CastConsumptionKind::TakeAlways};
@@ -2772,7 +2772,7 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
 
     // If we have a loadable address and +0, perform a load borrow.
     if (subjectMV.getType().isAddress() &&
-        subjectMV.getType().isLoadable(getModule())) {
+        subjectMV.getType().isLoadable(F)) {
       subjectMV = B.createLoadBorrow(S, subjectMV);
     }
 
@@ -2880,7 +2880,6 @@ void SILGenFunction::emitSwitchFallthrough(FallthroughStmt *S) {
   }
 
   // Generate branch args to pass along current vars to fallthrough case.
-  SILModule &M = F.getModule();
   SmallVector<SILValue, 4> args;
   CaseStmt *fallthroughSourceStmt = S->getFallthroughSource();
 
@@ -2898,7 +2897,7 @@ void SILGenFunction::emitSwitchFallthrough(FallthroughStmt *S) {
       auto varLoc = VarLocs[var];
       SILValue value = varLoc.value;
 
-      if (value->getType().isAddressOnly(M)) {
+      if (value->getType().isAddressOnly(F)) {
         context->Emission.emitAddressOnlyInitialization(expected, value);
         break;
       }

@@ -56,7 +56,6 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
   std::vector<SyntaxNode> Nodes;
   SourceLoc AttrLoc;
   SourceLoc UnaryMinusLoc;
-  auto LiteralStartLoc = Optional<SourceLoc>();
   for (unsigned I = 0, E = Tokens.size(); I != E; ++I) {
     auto &Tok = Tokens[I];
     // Ignore empty string literals between interpolations, e.g. "\(1)\(2)"
@@ -85,16 +84,6 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
       Loc = Tok.getLoc();
       Length = Tok.getLength();
 
-      if (LiteralStartLoc.hasValue() && Length.hasValue()) {
-        if (Tok.getKind() != tok::r_paren)
-          continue;
-        Kind = SyntaxNodeKind::ObjectLiteral;
-        Nodes.emplace_back(Kind, CharSourceRange(SM, LiteralStartLoc.getValue(),
-                                                 Tok.getRange().getEnd()));
-        LiteralStartLoc = Optional<SourceLoc>();
-        continue;
-      }
-
       switch(Tok.getKind()) {
 #define KEYWORD(X) case tok::kw_##X:
 #include "swift/Syntax/TokenKinds.def"
@@ -105,8 +94,8 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
 
 #define POUND_OBJECT_LITERAL(Name, Desc, Proto) case tok::pound_##Name:
 #include "swift/Syntax/TokenKinds.def"
-        LiteralStartLoc = Loc;
-        continue;
+        Kind = SyntaxNodeKind::Keyword;
+        break;
 
 #define POUND_COND_DIRECTIVE_KEYWORD(Name) case tok::pound_##Name:
 #include "swift/Syntax/TokenKinds.def"
@@ -260,6 +249,9 @@ class ModelASTWalker : public ASTWalker {
   Optional<SyntaxNode> parseFieldNode(StringRef Text, StringRef OrigText,
                                       SourceLoc OrigLoc);
   llvm::DenseSet<ASTNode> VisitedNodesInsideIfConfig;
+  /// When non-zero, we should avoid passing tokens as syntax nodes since a parent of several tokens
+  /// is considered as one, e.g. object literal expression.
+  uint8_t AvoidPassingSyntaxToken = 0;
 
 public:
   SyntaxModelWalker &Walker;
@@ -494,8 +486,9 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
     SN.NameRange = CharSourceRange(SM, NRStart, NREnd);
     SN.BodyRange =
       innerCharSourceRangeFromSourceRange(SM, ObjectE->getSourceRange());
+    // Consider the object literal as a single syntax token for highlighting.
+    passNonTokenNode({SyntaxNodeKind::ObjectLiteral, SN.Range});
     pushStructureNode(SN, E);
-
   } else if (auto *ArrayE = dyn_cast<ArrayExpr>(E)) {
     SyntaxStructureNode SN;
     SN.Kind = SyntaxStructureKind::ArrayExpression;
@@ -1033,22 +1026,28 @@ bool ModelASTWalker::handleSpecialDeclAttribute(const DeclAttribute *D,
                                                 ArrayRef<Token> Toks) {
   if (!D)
     return false;
-  if (isa<AvailableAttr>(D)) {
-    unsigned I = 0;
-    for (; I < TokenNodes.size(); ++ I) {
-      auto Node = TokenNodes[I];
-      if (SM.isBeforeInBuffer(D->getRange().End, Node.Range.getStart()))
-        break;
-      if (Node.Range.contains(D->AtLoc)) {
-        if (!passNode({SyntaxNodeKind::AttributeBuiltin, Node.Range}))
-          break;
-        continue;
+  if (isa<CustomAttr>(D) || isa<AvailableAttr>(D)) {
+    if (!passTokenNodesUntil(D->getRangeWithAt().Start,
+                        PassNodesBehavior::ExcludeNodeAtLocation))
+      return false;
+    if (auto *CA = dyn_cast<CustomAttr>(D)) {
+      if (auto *Repr = CA->getTypeLoc().getTypeRepr()) {
+        if (!Repr->walk(*this))
+          return false;
       }
-
-      if (!passNode(Node))
-        break;
+      if (auto *Arg = CA->getArg()) {
+        if (!Arg->walk(*this))
+          return false;
+      }
+    } else {
+      auto Next = TokenNodes.front();
+      TokenNodes = TokenNodes.drop_front();
+      assert(Next.Range.getStart() == D->getRangeWithAt().Start);
+      if (!passNode({SyntaxNodeKind::AttributeBuiltin, Next.Range}))
+        return false;
     }
-    TokenNodes = TokenNodes.slice(I);
+    if (!passTokenNodesUntil(D->getRange().End, PassNodesBehavior::IncludeNodeAtLocation))
+      return false;
     return true;
   }
   if (isa<RethrowsAttr>(D))
@@ -1081,10 +1080,20 @@ bool ModelASTWalker::handleAttrRanges(ArrayRef<DeclAttributeAndRange> DeclRanges
 
   SmallVector<DeclAttributeAndRange, 4> SortedRanges(DeclRanges.begin(),
                                                      DeclRanges.end());
-  std::sort(SortedRanges.begin(), SortedRanges.end(),
-            [&](DeclAttributeAndRange LHS, DeclAttributeAndRange RHS) {
-    return SM.isBeforeInBuffer(LHS.second.Start, RHS.second.End);
-  });
+  std::sort(
+      SortedRanges.begin(), SortedRanges.end(),
+      [&](DeclAttributeAndRange LHS, DeclAttributeAndRange RHS) {
+        // Since attributes don't overlap it's safe to compare just by the
+        // range's Start
+        return SM.isBeforeInBuffer(LHS.second.Start, RHS.second.Start);
+      });
+  // Handle duplicate synthesized attributes due to * in @available
+  auto NewEnd = std::unique(SortedRanges.begin(), SortedRanges.end(),
+                            [&](DeclAttributeAndRange LHS, DeclAttributeAndRange RHS) {
+                              return LHS.second == RHS.second;
+                            });
+  if (NewEnd != SortedRanges.end())
+    SortedRanges.erase(NewEnd, SortedRanges.end());
   DeclRanges = SortedRanges;
 
   SourceLoc BeginLoc = DeclRanges.front().second.Start;
@@ -1152,8 +1161,10 @@ bool ModelASTWalker::passTokenNodesUntil(SourceLoc Loc,
       }
       break;
     }
-    if (!passNode(TokenNodes[I]))
-      return false;
+    if (!AvoidPassingSyntaxToken) {
+      if (!passNode(TokenNodes[I]))
+        return false;
+    }
   }
 
   TokenNodes = TokenNodes.slice(I);
@@ -1200,9 +1211,15 @@ bool ModelASTWalker::passNode(const SyntaxNode &Node) {
   return Walker.walkToNodePost(Node);
 }
 
+static bool shouldAvoidPssingSyntaxToken(const SyntaxStructureNode &Node) {
+  return Node.Kind == SyntaxStructureKind::ObjectLiteralExpression;
+}
+
 bool ModelASTWalker::pushStructureNode(const SyntaxStructureNode &Node,
                                        const ASTNodeType& ASTNode) {
   SubStructureStack.emplace_back(Node, ASTNode);
+  if (shouldAvoidPssingSyntaxToken(Node))
+    AvoidPassingSyntaxToken ++;
 
   if (!passTokenNodesUntil(Node.Range.getStart(), ExcludeNodeAtLocation))
     return false;
@@ -1215,6 +1232,12 @@ bool ModelASTWalker::pushStructureNode(const SyntaxStructureNode &Node,
 bool ModelASTWalker::popStructureNode() {
   assert(!SubStructureStack.empty());
   SyntaxStructureNode Node = SubStructureStack.back().StructureNode;
+  SWIFT_DEFER {
+    if (shouldAvoidPssingSyntaxToken(Node)) {
+      assert(AvoidPassingSyntaxToken);
+      AvoidPassingSyntaxToken --;
+    }
+  };
   SubStructureStack.pop_back();
 
   // VarDecls are popped before we see their TypeRepr, so if we pass the token
@@ -1265,6 +1288,10 @@ bool ModelASTWalker::processComment(CharSourceRange Range) {
   if (NewLinePos != StringRef::npos) {
     Text = Text.substr(0, NewLinePos);
   }
+  if (Text.endswith("*/")) {
+    Text = Text.drop_back(2);
+  }
+  Text = Text.rtrim();
 
   CharSourceRange BeforeMarker{ SM, Range.getStart(), Loc };
   CharSourceRange Marker(Loc, Text.size());

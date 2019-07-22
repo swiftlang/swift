@@ -134,6 +134,10 @@ bool isSanitizerInstrumentation(SILInstruction *Instruction);
 /// argument of the partial apply if it is.
 SILValue isPartialApplyOfReabstractionThunk(PartialApplyInst *PAI);
 
+/// Returns true if \p PAI is only used by an assign_by_wrapper instruction as
+/// init or set function.
+bool onlyUsedByAssignByWrapper(PartialApplyInst *PAI);
+
 /// If V is a function closure, return the reaching set of partial_apply's.
 void findClosuresForFunctionValue(SILValue V,
                                   TinyPtrVector<PartialApplyInst *> &results);

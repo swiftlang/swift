@@ -119,6 +119,11 @@ public:
   static std::shared_ptr<clang::DependencyCollector>
   createDependencyCollector(bool TrackSystemDeps);
 
+  /// Append visible module names to \p names. Note that names are possibly
+  /// duplicated, and not guaranteed to be ordered in any way.
+  void collectVisibleTopLevelModuleNames(
+      SmallVectorImpl<Identifier> &names) const override;
+
   /// Check whether the module with a given name can be imported without
   /// importing it.
   ///
@@ -336,7 +341,7 @@ public:
   /// Calling this function does not load the module.
   void collectSubModuleNames(
       ArrayRef<std::pair<Identifier, SourceLoc>> path,
-      std::vector<std::string> &names);
+      std::vector<std::string> &names) const;
 
   /// Given a Clang module, decide whether this module is imported already.
   static bool isModuleImported(const clang::Module *M);

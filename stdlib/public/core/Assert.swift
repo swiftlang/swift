@@ -93,7 +93,8 @@ public func precondition(
     }
   } else if _isReleaseAssertConfiguration() {
     let error = !condition()
-    Builtin.condfail(error._value)
+    Builtin.condfail_message(error._value,
+      StaticString("precondition failure").unsafeRawPointer)
   }
 }
 
@@ -171,7 +172,8 @@ public func preconditionFailure(
     _assertionFailure("Fatal error", message(), file: file, line: line,
       flags: _fatalErrorFlags())
   } else if _isReleaseAssertConfiguration() {
-    Builtin.int_trap()
+    Builtin.condfail_message(true._value,
+      StaticString("precondition failure").unsafeRawPointer)
   }
   _conditionallyUnreachable()
 }
@@ -207,12 +209,12 @@ internal func _precondition(
   // Only check in debug and release mode. In release mode just trap.
   if _isDebugAssertConfiguration() {
     if !_fastPath(condition()) {
-      _fatalErrorMessage("Fatal error", message, file: file, line: line,
+      _assertionFailure("Fatal error", message, file: file, line: line,
         flags: _fatalErrorFlags())
     }
   } else if _isReleaseAssertConfiguration() {
     let error = !condition()
-    Builtin.condfail(error._value)
+    Builtin.condfail_message(error._value, message.unsafeRawPointer)
   }
 }
 
@@ -236,11 +238,12 @@ public func _overflowChecked<T>(
   let (result, error) = args
   if _isDebugAssertConfiguration() {
     if _slowPath(error) {
-      _fatalErrorMessage("Fatal error", "Overflow/underflow", 
+      _fatalErrorMessage("Fatal error", "Overflow/underflow",
         file: file, line: line, flags: _fatalErrorFlags())
     }
   } else {
-    Builtin.condfail(error._value)
+    Builtin.condfail_message(error._value,
+      StaticString("_overflowChecked failure").unsafeRawPointer)
   }
   return result
 }
@@ -294,6 +297,22 @@ internal func _internalInvariant(
     _fatalErrorMessage("Fatal error", message, file: file, line: line,
       flags: _fatalErrorFlags())
   }
+#endif
+}
+
+// Only perform the invariant check on Swift 5.1 and later
+@_alwaysEmitIntoClient // Swift 5.1
+@_transparent
+internal func _internalInvariant_5_1(
+  _ condition: @autoclosure () -> Bool, _ message: StaticString = StaticString(),
+  file: StaticString = #file, line: UInt = #line
+) {
+#if INTERNAL_CHECKS_ENABLED
+  // FIXME: The below won't run the assert on 5.1 stdlib if testing on older
+  // OSes, which means that testing may not test the assertion. We need a real
+  // solution to this.
+  guard #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) else { return }
+  _internalInvariant(condition(), message, file: file, line: line)
 #endif
 }
 

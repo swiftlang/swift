@@ -312,6 +312,12 @@ public:
   /// generic parameters to themselves.
   SubstitutionMap getIdentitySubstitutionMap() const;
 
+  /// Whether this generic signature involves a type variable.
+  bool hasTypeVariable() const;
+
+  /// Whether the given set of requirements involves a type variable.
+  static bool hasTypeVariable(ArrayRef<Requirement> requirements);
+
   static void Profile(llvm::FoldingSetNodeID &ID,
                       TypeArrayView<GenericTypeParamType> genericParams,
                       ArrayRef<Requirement> requirements);

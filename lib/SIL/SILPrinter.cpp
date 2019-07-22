@@ -834,15 +834,15 @@ public:
   void print(const SILInstruction *I) {
     if (auto *FRI = dyn_cast<FunctionRefInst>(I))
       *this << "  // function_ref "
-            << demangleSymbol(FRI->getReferencedFunction()->getName())
+            << demangleSymbol(FRI->getInitiallyReferencedFunction()->getName())
             << "\n";
     else if (auto *FRI = dyn_cast<DynamicFunctionRefInst>(I))
       *this << "  // dynamic_function_ref "
-            << demangleSymbol(FRI->getReferencedFunction()->getName())
+            << demangleSymbol(FRI->getInitiallyReferencedFunction()->getName())
             << "\n";
     else if (auto *FRI = dyn_cast<PreviousDynamicFunctionRefInst>(I))
       *this << "  // prev_dynamic_function_ref "
-            << demangleSymbol(FRI->getReferencedFunction()->getName())
+            << demangleSymbol(FRI->getInitiallyReferencedFunction()->getName())
             << "\n";
 
     *this << "  ";
@@ -1141,16 +1141,16 @@ public:
   }
 
   void visitFunctionRefInst(FunctionRefInst *FRI) {
-    FRI->getReferencedFunction()->printName(PrintState.OS);
+    FRI->getInitiallyReferencedFunction()->printName(PrintState.OS);
     *this << " : " << FRI->getType();
   }
   void visitDynamicFunctionRefInst(DynamicFunctionRefInst *FRI) {
-    FRI->getReferencedFunction()->printName(PrintState.OS);
+    FRI->getInitiallyReferencedFunction()->printName(PrintState.OS);
     *this << " : " << FRI->getType();
   }
   void
   visitPreviousDynamicFunctionRefInst(PreviousDynamicFunctionRefInst *FRI) {
-    FRI->getReferencedFunction()->printName(PrintState.OS);
+    FRI->getInitiallyReferencedFunction()->printName(PrintState.OS);
     *this << " : " << FRI->getType();
   }
 
@@ -1307,6 +1307,14 @@ public:
     *this << Ctx.getID(AI->getSrc()) << " to ";
     printAssignOwnershipQualifier(AI->getOwnershipQualifier());
     *this << getIDAndType(AI->getDest());
+  }
+
+  void visitAssignByWrapperInst(AssignByWrapperInst *AI) {
+    *this << getIDAndType(AI->getSrc()) << " to ";
+    printAssignOwnershipQualifier(AI->getOwnershipQualifier());
+    *this << getIDAndType(AI->getDest())
+          << ", init " << getIDAndType(AI->getInitializer())
+          << ", set " << getIDAndType(AI->getSetter());
   }
 
   void visitMarkUninitializedInst(MarkUninitializedInst *MU) {
@@ -1858,7 +1866,8 @@ public:
   }
 
   void visitCondFailInst(CondFailInst *FI) {
-    *this << getIDAndType(FI->getOperand());
+    *this << getIDAndType(FI->getOperand()) << ", "
+          << QuotedString(FI->getMessage());
   }
   
   void visitIndexAddrInst(IndexAddrInst *IAI) {
@@ -2783,10 +2792,6 @@ void SILVTable::print(llvm::raw_ostream &OS, bool Verbose) const {
                                                        QualifiedSILTypeOptions);
       OS << " : ";
     }
-    if (entry.Linkage !=
-        stripExternalFromLinkage(entry.Implementation->getLinkage())) {
-      OS << getLinkageString(entry.Linkage);
-    }
     OS << '@' << entry.Implementation->getName();
     switch (entry.TheKind) {
     case SILVTable::Entry::Kind::Normal:
@@ -3001,6 +3006,12 @@ void SILDebugScope::dump(SourceManager &SM, llvm::raw_ostream &OS,
   }
   OS << "}\n";
 }
+
+void SILDebugScope::dump(SILModule &Mod) const {
+  // We just use the default indent and llvm::errs().
+  dump(Mod.getASTContext().SourceMgr);
+}
+
 #endif
 
 void SILSpecializeAttr::print(llvm::raw_ostream &OS) const {

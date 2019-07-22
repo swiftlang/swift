@@ -242,15 +242,21 @@ swift::swift_registerTypeMetadataRecords(const TypeMetadataRecord *begin,
 }
 
 static const ContextDescriptor *
-_findNominalTypeDescriptor(Demangle::NodePointer node,
+_findContextDescriptor(Demangle::NodePointer node,
                            Demangle::Demangler &Dem);
 
 /// Find the context descriptor for the type extended by the given extension.
+///
+/// If \p maybeExtension isn't actually an extension context, returns nullptr.
 static const ContextDescriptor *
-_findExtendedTypeContextDescriptor(const ExtensionContextDescriptor *extension,
+_findExtendedTypeContextDescriptor(const ContextDescriptor *maybeExtension,
                                    Demangler &demangler,
                                    Demangle::NodePointer *demangledNode
                                      = nullptr) {
+  auto extension = dyn_cast<ExtensionContextDescriptor>(maybeExtension);
+  if (!extension)
+    return nullptr;
+
   Demangle::NodePointer localNode;
   Demangle::NodePointer &node = demangledNode ? *demangledNode : localNode;
 
@@ -267,7 +273,7 @@ _findExtendedTypeContextDescriptor(const ExtensionContextDescriptor *extension,
     node = Demangle::getUnspecialized(node, demangler);
   }
 
-  return _findNominalTypeDescriptor(node, demangler);
+  return _findContextDescriptor(node, demangler);
 }
 
 /// Recognize imported tag types, which have a special mangling rule.
@@ -438,7 +444,7 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
       DemanglerForRuntimeTypeResolution<> demangler;
 
       auto extendedDescriptorFromNode =
-        _findNominalTypeDescriptor(extendedContextNode, demangler);
+        _findContextDescriptor(extendedContextNode, demangler);
 
       Demangle::NodePointer extendedContextDemangled;
       auto extendedDescriptorFromDemangled =
@@ -581,14 +587,14 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
 }
 
 // returns the nominal type descriptor for the type named by typeName
-static const TypeContextDescriptor *
+static const ContextDescriptor *
 _searchTypeMetadataRecords(TypeMetadataPrivateState &T,
                            Demangle::NodePointer node) {
   for (auto &section : T.SectionsToScan.snapshot()) {
     for (const auto &record : section) {
-      if (auto ntd = record.getTypeContextDescriptor()) {
-        if (_contextDescriptorMatchesMangling(ntd, node)) {
-          return ntd;
+      if (auto context = record.getContextDescriptor()) {
+        if (_contextDescriptorMatchesMangling(context, node)) {
+          return context;
         }
       }
     }
@@ -598,9 +604,9 @@ _searchTypeMetadataRecords(TypeMetadataPrivateState &T,
 }
 
 static const ContextDescriptor *
-_findNominalTypeDescriptor(Demangle::NodePointer node,
+_findContextDescriptor(Demangle::NodePointer node,
                            Demangle::Demangler &Dem) {
-  const ContextDescriptor *foundNominal = nullptr;
+  const ContextDescriptor *foundContext = nullptr;
   auto &T = TypeMetadataRecords.get();
 
   // If we have a symbolic reference to a context, resolve it immediately.
@@ -620,18 +626,18 @@ _findNominalTypeDescriptor(Demangle::NodePointer node,
     return Value->getDescription();
 
   // Check type metadata records
-  foundNominal = _searchTypeMetadataRecords(T, node);
+  foundContext = _searchTypeMetadataRecords(T, node);
 
   // Check protocol conformances table. Note that this has no support for
   // resolving generic types yet.
-  if (!foundNominal)
-    foundNominal = _searchConformancesByMangledTypeName(node);
+  if (!foundContext)
+    foundContext = _searchConformancesByMangledTypeName(node);
 
-  if (foundNominal) {
-    T.NominalCache.getOrInsert(mangledName, foundNominal);
+  if (foundContext) {
+    T.NominalCache.getOrInsert(mangledName, foundContext);
   }
 
-  return foundNominal;
+  return foundContext;
 }
 
 #pragma mark Protocol descriptor cache
@@ -844,28 +850,26 @@ bool swift::_gatherGenericParameterCounts(
   DemanglerForRuntimeTypeResolution<> demangler;
   demangler.providePreallocatedMemory(BorrowFrom);
 
-  if (auto extension = dyn_cast<ExtensionContextDescriptor>(descriptor)) {
-    // If we have an nominal type extension descriptor, extract the extended type
+  if (auto extension = _findExtendedTypeContextDescriptor(descriptor,
+                                                          demangler)) {
+    // If we have a nominal type extension descriptor, extract the extended type
     // and use that. If the extension is not nominal, then we can use the
     // extension's own signature.
-    if (auto extendedType =
-          _findExtendedTypeContextDescriptor(extension, demangler)) {
-      descriptor = extendedType;
-    }
+    descriptor = extension;
   }
 
   // Once we hit a non-generic descriptor, we're done.
   if (!descriptor->isGeneric()) return false;
 
   // Recurse to record the parent context's generic parameters.
-  if (auto parent = descriptor->Parent.get())
-    (void)_gatherGenericParameterCounts(parent, genericParamCounts, demangler);
+  auto parent = descriptor->Parent.get();
+  (void)_gatherGenericParameterCounts(parent, genericParamCounts, demangler);
 
   // Record a new level of generic parameters if the count exceeds the
   // previous count.
-  auto myCount =
-    descriptor->getGenericContext()->getGenericContextHeader().NumParams;
-  if (genericParamCounts.empty() || myCount > genericParamCounts.back()) {
+  unsigned parentCount = parent->getNumGenericParams();
+  unsigned myCount = descriptor->getNumGenericParams();
+  if (myCount > parentCount) {
     genericParamCounts.push_back(myCount);
     return true;
   }
@@ -1028,6 +1032,35 @@ Optional<const ProtocolRequirement *> findAssociatedTypeByName(
   swift_runtime_unreachable("associated type names don't line up");
 }
 
+namespace {
+  static Lazy<Mutex> DynamicReplacementLock;
+}
+
+namespace {
+struct OpaqueTypeMappings {
+  llvm::DenseMap<const OpaqueTypeDescriptor *, const OpaqueTypeDescriptor *>
+      descriptorMapping;
+  const OpaqueTypeDescriptor* find(const OpaqueTypeDescriptor *orig) {
+    const OpaqueTypeDescriptor *replacement = nullptr;
+    DynamicReplacementLock.get().withLock([&] {
+      auto entry = descriptorMapping.find(orig);
+      if (entry != descriptorMapping.end())
+        replacement = entry->second;
+    });
+    return replacement;
+  }
+
+  // We take a mutex argument to make sure someone is holding the lock.
+  void insert(const OpaqueTypeDescriptor *orig,
+              const OpaqueTypeDescriptor *replacement, const Mutex &) {
+    descriptorMapping[orig] = replacement;
+  }
+};
+} // end unnamed namespace
+
+static Lazy<OpaqueTypeMappings> opaqueTypeMappings;
+
+
 static const OpaqueTypeDescriptor *
 _findOpaqueTypeDescriptor(NodePointer demangleNode,
                           Demangler &dem) {
@@ -1035,7 +1068,11 @@ _findOpaqueTypeDescriptor(NodePointer demangleNode,
   if (demangleNode->getKind()
         == Node::Kind::OpaqueTypeDescriptorSymbolicReference) {
     auto context = (const ContextDescriptor *)demangleNode->getIndex();
-    return cast<OpaqueTypeDescriptor>(context);
+    auto *orig = cast<OpaqueTypeDescriptor>(context);
+    if (auto *entry = opaqueTypeMappings.get().find(orig)) {
+      return entry;
+    }
+    return orig;
   }
   
   // TODO: Find non-symbolic-referenced opaque decls.
@@ -1073,19 +1110,24 @@ public:
   Demangle::NodeFactory &getNodeFactory() { return demangler; }
 
   BuiltType resolveOpaqueType(NodePointer opaqueDecl,
-                              ArrayRef<BuiltType> genericArgs,
+                              ArrayRef<ArrayRef<BuiltType>> genericArgs,
                               unsigned ordinal) {
     auto descriptor = _findOpaqueTypeDescriptor(opaqueDecl, demangler);
     if (!descriptor)
       return BuiltType();
     auto outerContext = descriptor->Parent.get();
     
+    SmallVector<BuiltType, 8> allGenericArgs;
+    for (auto argSet : genericArgs) {
+      allGenericArgs.append(argSet.begin(), argSet.end());
+    }
+    
     // Gather the generic parameters we need to parameterize the opaque decl.
     SmallVector<unsigned, 8> genericParamCounts;
     SmallVector<const void *, 8> allGenericArgsVec;
     
     if (!_gatherGenericParameters(outerContext,
-                                  genericArgs,
+                                  allGenericArgs,
                                   BuiltType(), /* no parent */
                                   genericParamCounts, allGenericArgsVec,
                                   demangler))
@@ -1107,7 +1149,7 @@ public:
   BuiltTypeDecl createTypeDecl(NodePointer node,
                                bool &typeAlias) const {
     // Look for a nominal type descriptor based on its mangled name.
-    return _findNominalTypeDescriptor(node, demangler);
+    return _findContextDescriptor(node, demangler);
   }
 
   BuiltProtocolDecl createProtocolDecl(NodePointer node) const {
@@ -1620,23 +1662,41 @@ static void installGetClassHook() {
 #endif
 
 unsigned SubstGenericParametersFromMetadata::
-buildDescriptorPath(const ContextDescriptor *context) const {
+buildDescriptorPath(const ContextDescriptor *context,
+                    Demangler &borrowFrom) const {
+  assert(sourceIsMetadata);
+
   // Terminating condition: we don't have a context.
   if (!context)
     return 0;
 
+  DemanglerForRuntimeTypeResolution<> demangler;
+  demangler.providePreallocatedMemory(borrowFrom);
+
+  if (auto extension = _findExtendedTypeContextDescriptor(context, demangler)) {
+    // If we have a nominal type extension descriptor, extract the extended type
+    // and use that. If the extension is not nominal, then we can use the
+    // extension's own signature.
+    context = extension;
+  }
+
   // Add the parent's contribution to the descriptor path.
-  unsigned numKeyGenericParamsInParent =
-    buildDescriptorPath(context->Parent.get());
+  const ContextDescriptor *parent = context->Parent.get();
+  unsigned numKeyGenericParamsInParent = buildDescriptorPath(parent, demangler);
 
   // If this context is non-generic, we're done.
   if (!context->isGeneric())
     return numKeyGenericParamsInParent;
 
   // Count the number of key generic params at this level.
+  auto allGenericParams = baseContext->getGenericContext()->getGenericParams();
+  unsigned parentCount = parent->getNumGenericParams();
+  unsigned localCount = context->getNumGenericParams();
+  auto localGenericParams = allGenericParams.slice(parentCount,
+                                                   localCount - parentCount);
+
   unsigned numKeyGenericParamsHere = 0;
   bool hasNonKeyGenericParams = false;
-  auto localGenericParams = getLocalGenericParams(context);
   for (const auto &genericParam : localGenericParams) {
     if (genericParam.hasKeyArgument())
       ++numKeyGenericParamsHere;
@@ -1644,12 +1704,13 @@ buildDescriptorPath(const ContextDescriptor *context) const {
       hasNonKeyGenericParams = true;
   }
 
-  // Form the path element.
-  descriptorPath.push_back(PathElement{localGenericParams,
-                                       context->getNumGenericParams(),
-                                       numKeyGenericParamsInParent,
-                                       numKeyGenericParamsHere,
-                                       hasNonKeyGenericParams});
+  // Form the path element if there are any new generic parameters.
+  if (localCount > parentCount)
+    descriptorPath.push_back(PathElement{localGenericParams,
+                                         context->getNumGenericParams(),
+                                         numKeyGenericParamsInParent,
+                                         numKeyGenericParamsHere,
+                                         hasNonKeyGenericParams});
   return numKeyGenericParamsInParent + numKeyGenericParamsHere;
 }
 
@@ -1699,7 +1760,8 @@ void SubstGenericParametersFromMetadata::setup() const {
     return;
 
   if (sourceIsMetadata && baseContext) {
-    numKeyGenericParameters = buildDescriptorPath(baseContext);
+    DemanglerForRuntimeTypeResolution<StackAllocatedDemangler<2048>> demangler;
+    numKeyGenericParameters = buildDescriptorPath(baseContext, demangler);
     return;
   }
 
@@ -1976,6 +2038,7 @@ void DynamicReplacementDescriptor::disableReplacement() const {
 }
 
 /// An automatic dymamic replacement entry.
+namespace {
 class AutomaticDynamicReplacementEntry {
   RelativeDirectPointer<DynamicReplacementScope, false> replacementScope;
   uint32_t flags;
@@ -2010,18 +2073,105 @@ public:
     for (auto &replacementEntry : getReplacementEntries())
       replacementEntry.enable();
   }
+
+  uint32_t getNumScopes() const { return numScopes; }
 };
 
-namespace {
-  static Lazy<Mutex> DynamicReplacementLock;
-}
+/// A map from original to replaced opaque type descriptor of a some type.
+class DynamicReplacementSomeDescriptor {
+  RelativeIndirectablePointer<const OpaqueTypeDescriptor, false>
+      originalOpaqueTypeDesc;
+  RelativeDirectPointer<const OpaqueTypeDescriptor, false>
+      replacementOpaqueTypeDesc;
+
+public:
+  void enable(const Mutex &lock) const {
+    opaqueTypeMappings.get().insert(originalOpaqueTypeDesc.get(),
+                                    replacementOpaqueTypeDesc.get(), lock);
+  }
+};
+
+/// A list of dynamic replacements of some types.
+class AutomaticDynamicReplacementsSome
+    : private swift::ABI::TrailingObjects<AutomaticDynamicReplacementsSome,
+                                          DynamicReplacementSomeDescriptor> {
+  uint32_t flags;
+  uint32_t numEntries;
+  using TrailingObjects =
+      swift::ABI::TrailingObjects<AutomaticDynamicReplacementsSome,
+                                  DynamicReplacementSomeDescriptor>;
+  friend TrailingObjects;
+
+
+  ArrayRef<DynamicReplacementSomeDescriptor> getReplacementEntries() const {
+    return {
+        this->template getTrailingObjects<DynamicReplacementSomeDescriptor>(),
+        numEntries};
+  }
+
+public:
+  void enableReplacements(const Mutex &lock) const {
+    for (auto &replacementEntry : getReplacementEntries())
+      replacementEntry.enable(lock);
+  }
+  uint32_t getNumEntries() const { return numEntries; }
+};
+
+} // anonymous namespace
 
 void swift::addImageDynamicReplacementBlockCallback(
-    const void *replacements, uintptr_t replacementsSize) {
+    const void *replacements, uintptr_t replacementsSize,
+    const void *replacementsSome, uintptr_t replacementsSomeSize) {
+
   auto *automaticReplacements =
       reinterpret_cast<const AutomaticDynamicReplacements *>(replacements);
-  DynamicReplacementLock.get().withLock(
-      [&] { automaticReplacements->enableReplacements(); });
+
+  const AutomaticDynamicReplacementsSome *someReplacements = nullptr;
+  if (replacementsSomeSize) {
+    someReplacements =
+        reinterpret_cast<const AutomaticDynamicReplacementsSome *>(
+            replacementsSome);
+  }
+
+  auto sizeOfCurrentEntry = sizeof(AutomaticDynamicReplacements) +
+                            (automaticReplacements->getNumScopes() *
+                             sizeof(AutomaticDynamicReplacementEntry));
+  auto sizeOfCurrentSomeEntry =
+      replacementsSomeSize == 0
+          ? 0
+          : sizeof(AutomaticDynamicReplacementsSome) +
+                (someReplacements->getNumEntries() *
+                 sizeof(DynamicReplacementSomeDescriptor));
+
+  auto &lock = DynamicReplacementLock.get();
+  lock.withLock([&] {
+    auto endOfAutomaticReplacements =
+        ((const char *)automaticReplacements) + replacementsSize;
+    while (((const char *)automaticReplacements) < endOfAutomaticReplacements) {
+      automaticReplacements->enableReplacements();
+      automaticReplacements =
+          reinterpret_cast<const AutomaticDynamicReplacements *>(
+              ((const char *)automaticReplacements) + sizeOfCurrentEntry);
+      if ((const char*)automaticReplacements <  endOfAutomaticReplacements)
+        sizeOfCurrentEntry = sizeof(AutomaticDynamicReplacements) +
+                             (automaticReplacements->getNumScopes() *
+                              sizeof(AutomaticDynamicReplacementEntry));
+    }
+    if (!replacementsSomeSize)
+      return;
+    auto endOfSomeReplacements =
+        ((const char *)someReplacements) + replacementsSomeSize;
+    while (((const char *)someReplacements) < endOfSomeReplacements) {
+      someReplacements->enableReplacements(lock);
+      someReplacements =
+          reinterpret_cast<const AutomaticDynamicReplacementsSome *>(
+              ((const char *)someReplacements) + sizeOfCurrentSomeEntry);
+      if  ((const char*) someReplacements < endOfSomeReplacements)
+        sizeOfCurrentSomeEntry = sizeof(AutomaticDynamicReplacementsSome) +
+                                 (someReplacements->getNumEntries() *
+                                  sizeof(DynamicReplacementSomeDescriptor));
+    }
+  });
 }
 
 void swift::swift_enableDynamicReplacementScope(

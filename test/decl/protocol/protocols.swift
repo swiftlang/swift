@@ -101,10 +101,10 @@ struct DoesNotConform : Up {
 
 // Circular protocols
 
-protocol CircleMiddle : CircleStart { func circle_middle() } // expected-error {{protocol 'CircleMiddle' refines itself}}
+protocol CircleMiddle : CircleStart { func circle_middle() } // expected-error 2 {{protocol 'CircleMiddle' refines itself}}
 protocol CircleStart : CircleEnd { func circle_start() }
-// expected-note@-1{{protocol 'CircleStart' declared here}}
-protocol CircleEnd : CircleMiddle { func circle_end()} // expected-note{{protocol 'CircleEnd' declared here}}
+// expected-note@-1 2{{protocol 'CircleStart' declared here}}
+protocol CircleEnd : CircleMiddle { func circle_end()} // expected-note 2 {{protocol 'CircleEnd' declared here}}
 
 protocol CircleEntry : CircleTrivial { }
 protocol CircleTrivial : CircleTrivial { } // expected-error {{protocol 'CircleTrivial' refines itself}}
@@ -267,7 +267,7 @@ struct WrongIsEqual : IsEqualComparable { // expected-error{{type 'WrongIsEqual'
 //===----------------------------------------------------------------------===//
 
 func existentialSequence(_ e: Sequence) { // expected-error{{has Self or associated type requirements}}
-  var x = e.makeIterator() // expected-error{{value of type 'Sequence' has no member 'makeIterator'}}
+  var x = e.makeIterator() // expected-error{{member 'makeIterator' cannot be used on value of protocol type 'Sequence'; use a generic constraint instead}}
   x.next()
   x.nonexistent()
 }

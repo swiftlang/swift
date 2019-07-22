@@ -87,23 +87,22 @@ extension String {
     }
   }
   
-  @_effects(releasenone)
-  @usableFromInline
-  internal static func _fromUTF8Repairing(
-    unsafeUninitializedCapacity capacity: Int,
+  internal static func _fromLargeUTF8Repairing(
+    uninitializedCapacity capacity: Int,
     initializingWith initializer: (
-      _ buffer: UnsafeMutableBufferPointer<UInt8>,
-      _ initializedCount: inout Int
-    ) throws -> Void
+      _ buffer: UnsafeMutableBufferPointer<UInt8>
+    ) throws -> Int
   ) rethrows -> String {
     let result = try __StringStorage.create(
-      unsafeUninitializedCapacity: capacity,
+      uninitializedCapacity: capacity,
       initializingUncheckedUTF8With: initializer)
     
     switch validateUTF8(result.codeUnits) {
     case .success(let info):
-      result.forceSetIsASCII(info.isASCII)
-      result._invariantCheck()
+      result._updateCountAndFlags(
+        newCount: result.count,
+        newIsASCII: info.isASCII
+      )
       return result.asString
     case .error(let initialRange):
       //This could be optimized to use excess tail capacity

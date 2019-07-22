@@ -547,15 +547,6 @@ class ReportFormatter(object):
         self.changes_only = changes_only
         self.single_table = single_table
 
-    MARKDOWN_DETAIL = """
-<details {3}>
-  <summary>{0} ({1})</summary>
-  {2}
-</details>
-"""
-    GIT_DETAIL = """
-{0} ({1}): {2}"""
-
     PERFORMANCE_TEST_RESULT_HEADER = ('TEST', 'MIN', 'MAX', 'MEAN', 'MAX_RSS')
     RESULT_COMPARISON_HEADER = ('TEST', 'OLD', 'NEW', 'DELTA', 'RATIO')
 
@@ -589,16 +580,26 @@ class ReportFormatter(object):
     def markdown(self):
         """Report results of benchmark comparisons in Markdown format."""
         return self._formatted_text(
-            ROW='{0} | {1} | {2} | {3} | {4} \n',
-            HEADER_SEPARATOR='---',
-            DETAIL=self.MARKDOWN_DETAIL)
+            label_formatter=lambda s: ('**' + s + '**'),
+            COLUMN_SEPARATOR=' | ',
+            DELIMITER_ROW=([':---'] + ['---:'] * 4),
+            SEPARATOR='&nbsp; | | | | \n',
+            SECTION="""
+<details {3}>
+  <summary>{0} ({1})</summary>
+  {2}
+</details>
+""")
 
     def git(self):
         """Report results of benchmark comparisons in 'git' format."""
         return self._formatted_text(
-            ROW='{0}   {1}   {2}   {3}   {4} \n',
-            HEADER_SEPARATOR='   ',
-            DETAIL=self.GIT_DETAIL)
+            label_formatter=lambda s: s.upper(),
+            COLUMN_SEPARATOR='   ',
+            DELIMITER_ROW=None,
+            SEPARATOR='\n',
+            SECTION="""
+{0} ({1}): \n{2}""")
 
     def _column_widths(self):
         changed = self.comparator.decreased + self.comparator.increased
@@ -614,53 +615,49 @@ class ReportFormatter(object):
         ]
 
         def max_widths(maximum, widths):
-            return tuple(map(max, zip(maximum, widths)))
+            return map(max, zip(maximum, widths))
 
-        return reduce(max_widths, widths, tuple([0] * 5))
+        return reduce(max_widths, widths, [0] * 5)
 
-    def _formatted_text(self, ROW, HEADER_SEPARATOR, DETAIL):
+    def _formatted_text(self, label_formatter, COLUMN_SEPARATOR,
+                        DELIMITER_ROW, SEPARATOR, SECTION):
         widths = self._column_widths()
         self.header_printed = False
 
         def justify_columns(contents):
-            return tuple([c.ljust(w) for w, c in zip(widths, contents)])
+            return [c.ljust(w) for w, c in zip(widths, contents)]
 
         def row(contents):
-            return ROW.format(*justify_columns(contents))
+            return ('' if not contents else
+                    COLUMN_SEPARATOR.join(justify_columns(contents)) + '\n')
 
-        def header(header):
-            return '\n' + row(header) + row(tuple([HEADER_SEPARATOR] * 5))
+        def header(title, column_labels):
+            labels = (column_labels if not self.single_table else
+                      map(label_formatter, (title, ) + column_labels[1:]))
+            h = (('' if not self.header_printed else SEPARATOR) +
+                 row(labels) +
+                 (row(DELIMITER_ROW) if not self.header_printed else ''))
+            if self.single_table and not self.header_printed:
+                self.header_printed = True
+            return h
 
-        def format_columns(r, strong):
-            return (r if not strong else
-                    r[:-1] + ('**{0}**'.format(r[-1]), ))
+        def format_columns(r, is_strong):
+            return (r if not is_strong else
+                    r[:-1] + ('**' + r[-1] + '**', ))
 
         def table(title, results, is_strong=False, is_open=False):
-            rows = [
-                row(format_columns(ReportFormatter.values(r), is_strong))
-                for r in results
-            ]
-            if not rows:
+            if not results:
                 return ''
+            rows = [row(format_columns(ReportFormatter.values(r), is_strong))
+                    for r in results]
+            table = (header(title if self.single_table else '',
+                            ReportFormatter.header_for(results[0])) +
+                     ''.join(rows))
+            return (table if self.single_table else
+                    SECTION.format(
+                        title, len(results), table, 'open' if is_open else ''))
 
-            if self.single_table:
-                t = ''
-                if not self.header_printed:
-                    t += header(ReportFormatter.header_for(results[0]))
-                    self.header_printed = True
-                t += row(('**' + title + '**', '', '', '', ''))
-                t += ''.join(rows)
-                return t
-
-            return DETAIL.format(
-                *[
-                    title, len(results),
-                    (header(ReportFormatter.header_for(results[0])) +
-                     ''.join(rows)),
-                    ('open' if is_open else '')
-                ])
-
-        return ''.join([
+        return '\n' + ''.join([
             table('Regression', self.comparator.decreased, True, True),
             table('Improvement', self.comparator.increased, True),
             ('' if self.changes_only else

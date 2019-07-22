@@ -70,7 +70,9 @@ static ParserStatus parseDefaultArgument(
     Parser::ParameterContextKind paramContext) {
   SyntaxParsingContext DefaultArgContext(P.SyntaxContext,
                                          SyntaxKind::InitializerClause);
-  SourceLoc equalLoc = P.consumeToken(tok::equal);
+  assert(P.Tok.is(tok::equal) ||
+       (P.Tok.isBinaryOperator() && P.Tok.getText() == "=="));
+  SourceLoc equalLoc = P.consumeToken();
 
   if (P.SF.Kind == SourceFileKind::Interface) {
     // Swift module interfaces don't synthesize inherited intializers and
@@ -219,20 +221,18 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
     unsigned defaultArgIndex = defaultArgs ? defaultArgs->NextIndex++ : 0;
 
     // Attributes.
-    bool FoundCCToken = false;
-    if (paramContext != ParameterContextKind::EnumElement)
-      parseDeclAttributeList(param.Attrs, FoundCCToken);
-    if (FoundCCToken) {
-      if (CodeCompletion) {
-        CodeCompletion->completeDeclAttrKeyword(nullptr, isInSILMode(), true);
-      } else {
-        status |= makeParserCodeCompletionStatus();
+    if (paramContext != ParameterContextKind::EnumElement) {
+      auto AttrStatus = parseDeclAttributeList(param.Attrs);
+      if (AttrStatus.hasCodeCompletion()) {
+        if (CodeCompletion)
+          CodeCompletion->setAttrTargetDeclKind(DeclKind::Param);
+        status.setHasCodeCompletion();
       }
     }
     
-    // ('inout' | 'let' | 'var' | '__shared' | '__owned')?
+    // ('inout' | '__shared' | '__owned')?
     bool hasSpecifier = false;
-    while (Tok.isAny(tok::kw_inout, tok::kw_let, tok::kw_var) ||
+    while (Tok.is(tok::kw_inout) ||
            (Tok.is(tok::identifier) &&
             (Tok.getRawText().equals("__shared") ||
              Tok.getRawText().equals("__owned")))) {
@@ -254,10 +254,6 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
           // better fixits.
           param.SpecifierKind = VarDecl::Specifier::Owned;
           param.SpecifierLoc = consumeToken();
-        } else {
-          diagnose(Tok, diag::parameter_let_var_as_attr, Tok.getText())
-            .fixItRemove(Tok.getLoc());
-          consumeToken();
         }
         hasSpecifier = true;
       } else {
@@ -268,7 +264,14 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         consumeToken();
       }
     }
-
+    
+    // If let or var is being used as an argument label, allow it but
+    // generate a warning.
+    if (!isClosure && Tok.isAny(tok::kw_let, tok::kw_var)) {
+      diagnose(Tok, diag::parameter_let_var_as_attr, Tok.getText())
+        .fixItReplace(Tok.getLoc(), "`" + Tok.getText().str() + "`");
+    }
+    
     if (startsParameterName(*this, isClosure)) {
       // identifier-or-none for the first name
       param.FirstNameLoc = consumeArgumentLabel(param.FirstName);
@@ -380,13 +383,20 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
       param.EllipsisLoc = consumeToken();
     }
 
-    // ('=' expr)?
-    if (Tok.is(tok::equal)) {
+    // ('=' expr) or ('==' expr)?
+    bool isEqualBinaryOperator =
+        Tok.isBinaryOperator() && Tok.getText() == "==";
+    if (Tok.is(tok::equal) || isEqualBinaryOperator) {
       SourceLoc EqualLoc = Tok.getLoc();
-      status |= parseDefaultArgument(*this, defaultArgs, defaultArgIndex,
-                                     param.DefaultArg,
-                                     param.hasInheritedDefaultArg,
-                                     paramContext);
+
+      if (isEqualBinaryOperator) {
+        diagnose(Tok, diag::expected_assignment_instead_of_comparison_operator)
+            .fixItReplace(EqualLoc, "=");
+      }
+
+      status |= parseDefaultArgument(
+          *this, defaultArgs, defaultArgIndex, param.DefaultArg,
+          param.hasInheritedDefaultArg, paramContext);
 
       if (param.EllipsisLoc.isValid() && param.DefaultArg) {
         // The range of the complete default argument.

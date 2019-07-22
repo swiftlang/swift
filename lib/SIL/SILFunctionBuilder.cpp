@@ -92,7 +92,11 @@ void SILFunctionBuilder::addFunctionAttributes(SILFunction *F,
   SILDeclRef declRef(replacedDecl, constant.kind, false);
   auto *replacedFunc =
       getOrCreateFunction(replacedDecl, declRef, NotForDefinition);
-  assert(replacedFunc->getLoweredFunctionType() == F->getLoweredFunctionType());
+
+  assert(replacedFunc->getLoweredFunctionType() ==
+             F->getLoweredFunctionType() ||
+         replacedFunc->getLoweredFunctionType()->hasOpaqueArchetype());
+
   F->setDynamicallyReplacedFunction(replacedFunc);
 }
 

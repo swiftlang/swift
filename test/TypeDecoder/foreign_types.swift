@@ -26,6 +26,8 @@ do {
     let x3 = MyError.Code.good
     let x4 = RenamedError.good
     let x5 = RenamedError.Code.good
+    let x5b = Wrapper.MemberError.A
+    let x5c = Wrapper.MemberError.Code.A
     let x6 = Wrapper.MemberEnum.A
     let x7 = WrapperByAttribute(0)
     let x8 = IceCube(width: 0, height: 0, depth: 0)
@@ -38,6 +40,8 @@ do {
     let x3 = MyError.Code.self
     let x4 = RenamedError.self
     let x5 = RenamedError.Code.self
+    let x5b = Wrapper.MemberError.self
+    let x5c = Wrapper.MemberError.Code.self
     let x6 = Wrapper.MemberEnum.self
     let x7 = WrapperByAttribute.self
     let x8 = IceCube.self
@@ -50,6 +54,8 @@ do {
 // DEMANGLE-TYPE: $sSo7MyErrorLeVD
 // DEMANGLE-TYPE: $sSo14MyRenamedErrorVD
 // DEMANGLE-TYPE: $sSo14MyRenamedErrorLeVD
+// DEMANGLE-TYPE: $sSo13MyMemberErrorVD
+// DEMANGLE-TYPE: $sSo13MyMemberErrorLeVD
 // DEMANGLE-TYPE: $sSo12MyMemberEnumVD
 // DEMANGLE-TYPE: $sSo18WrapperByAttributeaD
 // DEMANGLE-TYPE: $sSo7IceCubeVD
@@ -62,6 +68,8 @@ do {
 // CHECK-TYPE: MyError
 // CHECK-TYPE: RenamedError.Code
 // CHECK-TYPE: RenamedError
+// CHECK-TYPE: Wrapper.MemberError.Code
+// CHECK-TYPE: Wrapper.MemberError
 // CHECK-TYPE: Wrapper.MemberEnum
 // CHECK-TYPE: WrapperByAttribute
 // CHECK-TYPE: IceCube
@@ -74,6 +82,8 @@ do {
 // DEMANGLE-TYPE: $sSC7MyErrorLeVmD
 // DEMANGLE-TYPE: $sSo14MyRenamedErrorVmD
 // DEMANGLE-TYPE: $sSC14MyRenamedErrorLeVmD
+// DEMANGLE-TYPE: $sSo13MyMemberErrorVmD
+// DEMANGLE-TYPE: $sSC13MyMemberErrorLeVmD
 // DEMANGLE-TYPE: $sSo12MyMemberEnumVmD
 // DEMANGLE-TYPE: $sSo18WrapperByAttributeamD
 // DEMANGLE-TYPE: $sSo7IceCubeVmD
@@ -86,6 +96,8 @@ do {
 // CHECK-TYPE: MyError.Type
 // CHECK-TYPE: RenamedError.Code.Type
 // CHECK-TYPE: RenamedError.Type
+// CHECK-TYPE: Wrapper.MemberError.Code.Type
+// CHECK-TYPE: Wrapper.MemberError.Type
 // CHECK-TYPE: Wrapper.MemberEnum.Type
 // CHECK-TYPE: WrapperByAttribute.Type
 // CHECK-TYPE: IceCube.Type
@@ -98,6 +110,8 @@ do {
 // DEMANGLE-DECL: $sSo7MyErrorLeV
 // DEMANGLE-DECL: $sSo14MyRenamedErrorV
 // DEMANGLE-DECL: $sSo14MyRenamedErrorLeV
+// DEMANGLE-DECL: $sSo13MyMemberErrorV
+// DEMANGLE-DECL: $sSo13MyMemberErrorLeV
 // DEMANGLE-DECL: $sSo12MyMemberEnumV
 // DEMANGLE-DECL: $sSo18WrapperByAttributea
 // DEMANGLE-DECL: $sSo7IceCubeV
@@ -110,6 +124,8 @@ do {
 // CHECK-DECL: ErrorEnums.(file).MyError.Code
 // CHECK-DECL: ErrorEnums.(file).RenamedError.Code
 // CHECK-DECL: ErrorEnums.(file).RenamedError.Code
+// CHECK-DECL: ErrorEnums.(file).Wrapper extension.MemberError.Code
+// CHECK-DECL: ErrorEnums.(file).Wrapper extension.MemberError.Code
 // CHECK-DECL: ErrorEnums.(file).Wrapper extension.MemberEnum
 // CHECK-DECL: ErrorEnums.(file).WrapperByAttribute
 // CHECK-DECL: CoreCooling.(file).IceCube

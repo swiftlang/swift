@@ -326,13 +326,22 @@ class ClassConformingToProtocol: Protocol {}
 class ClassConformingToRefinedProtocol: RefinedProtocol {}
 
 struct GenSubscriptFixitTest {
-  subscript<T>(_ arg: T) -> Bool { return true } // expected-note {{declared here}}
+  subscript<T>(_ arg: T) -> Bool { return true } // expected-note 3 {{declared here}}
 }
 
 func testGenSubscriptFixit(_ s0: GenSubscriptFixitTest) {
 
   _ = s0.subscript("hello")
   // expected-error@-1 {{value of type 'GenSubscriptFixitTest' has no property or method named 'subscript'; did you mean to use the subscript operator?}} {{9-10=}} {{10-19=}} {{19-20=[}} {{27-28=]}}
+}
+
+func testUnresolvedMemberSubscriptFixit(_ s0: GenSubscriptFixitTest) {
+
+  _ = s0.subscript
+  // expected-error@-1 {{value of type 'GenSubscriptFixitTest' has no property or method named 'subscript'; did you mean to use the subscript operator?}} {{9-19=[<#index#>]}}
+
+  s0.subscript = true
+  // expected-error@-1 {{value of type 'GenSubscriptFixitTest' has no property or method named 'subscript'; did you mean to use the subscript operator?}} {{5-15=[<#index#>]}}
 }
 
 struct SubscriptTest1 {
@@ -412,7 +421,7 @@ class Foo {
     }
     
     subscript(key: String) -> String { // expected-error {{invalid redeclaration of 'subscript(_:)'}}
-        get { a } // expected-error {{use of unresolved identifier 'a'}}
+        get { _ = 0; a } // expected-error {{use of unresolved identifier 'a'}}
         set { b } // expected-error {{use of unresolved identifier 'b'}}
     }
 }

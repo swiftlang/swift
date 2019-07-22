@@ -20,9 +20,9 @@
 //===----------------------------------------------------------------------===//
 
 extension Hasher {
-  // FIXME: Remove @usableFromInline and @_fixed_layout once Hasher is resilient.
+  // FIXME: Remove @usableFromInline and @frozen once Hasher is resilient.
   // rdar://problem/38549901
-  @usableFromInline @_fixed_layout
+  @usableFromInline @frozen
   internal struct _State {
     // "somepseudorandomlygeneratedbytes"
     private var v0: UInt64 = 0x736f6d6570736575

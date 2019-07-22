@@ -969,7 +969,7 @@ public:
     ASTContext &Ctx = CI.getASTContext();
     Ctx.LangOpts.EnableAccessControl = false;
     if (!ParseStdlib) {
-      if (!loadSwiftRuntime(Ctx.SearchPathOpts.RuntimeLibraryPath)) {
+      if (!loadSwiftRuntime(Ctx.SearchPathOpts.RuntimeLibraryPaths)) {
         CI.getDiags().diagnose(SourceLoc(),
                                diag::error_immediate_mode_missing_stdlib);
         return;

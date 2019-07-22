@@ -72,9 +72,9 @@ namespace {
     llvm::SmallDenseMap<SILBasicBlock*, unsigned, 32> WorklistMap;
     // Keep track of loop headers - we don't want to jump-thread through them.
     SmallPtrSet<SILBasicBlock *, 32> LoopHeaders;
-    // The number of times jump threading was done through a block.
-    // Used to prevent infinite jump threading loops.
-    llvm::SmallDenseMap<SILBasicBlock*, unsigned, 8> JumpThreadedBlocks;
+    // The cost (~ number of copied instructions) of jump threading per basic
+    // block. Used to prevent infinite jump threading loops.
+    llvm::SmallDenseMap<SILBasicBlock *, int, 8> JumpThreadingCost;
 
     // Dominance and post-dominance info for the current function
     DominanceInfo *DT = nullptr;
@@ -1014,15 +1014,19 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
     }
   }
 
+  ThreadingBudget -= JumpThreadingCost[SrcBB];
+  ThreadingBudget -= JumpThreadingCost[DestBB];
+
   // If we don't have anything that we can simplify, don't do it.
-  if (ThreadingBudget == 0)
+  if (ThreadingBudget <= 0)
     return false;
 
   // If it looks potentially interesting, decide whether we *can* do the
   // operation and whether the block is small enough to be worth duplicating.
+  int copyCosts = 0;
   for (auto &Inst : *DestBB) {
-    ThreadingBudget -= getThreadingCost(&Inst);
-    if (ThreadingBudget <= 0)
+    copyCosts += getThreadingCost(&Inst);
+    if (ThreadingBudget <= copyCosts)
       return false;
 
     // We need to update ssa if a value is used outside the duplicated block.
@@ -1044,14 +1048,10 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
       return false;
   }
 
-  // Limit the number we jump-thread through a block.
-  // Otherwise we may end up with jump-threading indefinitely.
-  unsigned &NumThreaded = JumpThreadedBlocks[DestBB];
-  if (++NumThreaded > 16)
-    return false;
-
   LLVM_DEBUG(llvm::dbgs() << "jump thread from bb" << SrcBB->getDebugID()
                           << " to bb" << DestBB->getDebugID() << '\n');
+
+  JumpThreadingCost[DestBB] += copyCosts;
 
   // Okay, it looks like we want to do this and we can.  Duplicate the
   // destination block into this one, rewriting uses of the BBArgs to use the
@@ -1267,6 +1267,12 @@ bool SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
     if (LoopHeaders.count(DestBB))
       LoopHeaders.insert(BB);
 
+    auto Iter = JumpThreadingCost.find(DestBB);
+    if (Iter != JumpThreadingCost.end()) {
+      int costs = Iter->second;
+      JumpThreadingCost[BB] += costs;
+    }
+
     removeFromWorklist(DestBB);
     DestBB->eraseFromParent();
     ++NumBlocksMerged;
@@ -1393,9 +1399,9 @@ static CondFailInst *getUnConditionalFail(SILBasicBlock *BB, SILValue Cond,
 
 /// Creates a new cond_fail instruction, optionally with an xor inverted
 /// condition.
-static void createCondFail(CondFailInst *Orig, SILValue Cond, bool inverted,
-                           SILBuilder &Builder) {
-  Builder.createCondFail(Orig->getLoc(), Cond, inverted);
+static void createCondFail(CondFailInst *Orig, SILValue Cond, StringRef Message,
+                           bool inverted, SILBuilder &Builder) {
+  Builder.createCondFail(Orig->getLoc(), Cond, Message, inverted);
 }
 
 /// Inverts the expected value of 'PotentialExpect' (if it is an expect
@@ -1637,7 +1643,7 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
   if (auto *TrueCFI = getUnConditionalFail(TrueSide, CFCondition, false)) {
     LLVM_DEBUG(llvm::dbgs() << "replace with cond_fail:" << *BI);
     SILBuilderWithScope Builder(BI);
-    createCondFail(TrueCFI, CFCondition, false, Builder);
+    createCondFail(TrueCFI, CFCondition, TrueCFI->getMessage(), false, Builder);
     SILBuilderWithScope(BI).createBranch(BI->getLoc(), FalseSide, FalseArgs);
 
     BI->eraseFromParent();
@@ -1649,7 +1655,7 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
   if (auto *FalseCFI = getUnConditionalFail(FalseSide, CFCondition, true)) {
     LLVM_DEBUG(llvm::dbgs() << "replace with inverted cond_fail:" << *BI);
     SILBuilderWithScope Builder(BI);
-    createCondFail(FalseCFI, CFCondition, true, Builder);
+    createCondFail(FalseCFI, CFCondition, FalseCFI->getMessage(), true, Builder);
     SILBuilderWithScope(BI).createBranch(BI->getLoc(), TrueSide, TrueArgs);
     
     BI->eraseFromParent();
@@ -2491,7 +2497,7 @@ static bool tryMoveCondFailToPreds(SILBasicBlock *BB) {
     SILValue incoming = condArg->getIncomingPhiValue(Pred);
     SILBuilderWithScope Builder(Pred->getTerminator());
     
-    createCondFail(CFI, incoming, inverted, Builder);
+    createCondFail(CFI, incoming, CFI->getMessage(), inverted, Builder);
   }
   CFI->eraseFromParent();
   return true;
@@ -2704,84 +2710,6 @@ bool SimplifyCFG::tailDuplicateObjCMethodCallSuccessorBlocks() {
   }
 
   return Changed;
-}
-
-static void
-deleteTriviallyDeadOperandsOfDeadArgument(MutableArrayRef<Operand> TermOperands,
-                                          unsigned DeadArgIndex) {
-  Operand &Op = TermOperands[DeadArgIndex];
-  auto *I = Op.get()->getDefiningInstruction();
-  if (!I)
-    return;
-  Op.set(SILUndef::get(Op.get()->getType(), *I->getFunction()));
-  recursivelyDeleteTriviallyDeadInstructions(I);
-}
-
-static void removeArgumentFromTerminator(SILBasicBlock *BB, SILBasicBlock *Dest,
-                                         int idx) {
-  TermInst *Branch = BB->getTerminator();
-  SILBuilderWithScope Builder(Branch);
-  LLVM_DEBUG(llvm::dbgs() << "remove dead argument " << idx << " from "
-                          << *Branch);
-
-  if (auto *CBI = dyn_cast<CondBranchInst>(Branch)) {
-    SmallVector<SILValue, 8> TrueArgs;
-    SmallVector<SILValue, 8> FalseArgs;
-
-    for (auto A : CBI->getTrueArgs())
-      TrueArgs.push_back(A);
-
-    for (auto A : CBI->getFalseArgs())
-      FalseArgs.push_back(A);
-
-    if (Dest == CBI->getTrueBB()) {
-      deleteTriviallyDeadOperandsOfDeadArgument(CBI->getTrueOperands(), idx);
-      TrueArgs.erase(TrueArgs.begin() + idx);
-    }
-
-    if (Dest == CBI->getFalseBB()) {
-      deleteTriviallyDeadOperandsOfDeadArgument(CBI->getFalseOperands(), idx);
-      FalseArgs.erase(FalseArgs.begin() + idx);
-    }
-
-    Builder.createCondBranch(CBI->getLoc(), CBI->getCondition(),
-                             CBI->getTrueBB(), TrueArgs, CBI->getFalseBB(),
-                             FalseArgs, CBI->getTrueBBCount(),
-                             CBI->getFalseBBCount());
-    Branch->eraseFromParent();
-    return;
-  }
-
-  if (auto *BI = dyn_cast<BranchInst>(Branch)) {
-    SmallVector<SILValue, 8> Args;
-
-    for (auto A : BI->getArgs())
-      Args.push_back(A);
-
-    deleteTriviallyDeadOperandsOfDeadArgument(BI->getAllOperands(), idx);
-    Args.erase(Args.begin() + idx);
-    Builder.createBranch(BI->getLoc(), BI->getDestBB(), Args);
-    Branch->eraseFromParent();
-    return;
-  }
-  llvm_unreachable("unsupported terminator");
-}
-
-static void removeArgument(SILBasicBlock *BB, unsigned i) {
-  NumDeadArguments++;
-  BB->eraseArgument(i);
-
-  // Determine the set of predecessors in case any predecessor has
-  // two edges to this block (e.g. a conditional branch where both
-  // sides reach this block).
-  llvm::SetVector<SILBasicBlock *,SmallVector<SILBasicBlock *, 8>,
-                  SmallPtrSet<SILBasicBlock *, 8>> PredBBs;
-
-  for (auto *Pred : BB->getPredecessorBlocks())
-    PredBBs.insert(Pred);
-
-  for (auto *Pred : PredBBs)
-    removeArgumentFromTerminator(Pred, BB, i);
 }
 
 namespace {
@@ -3020,7 +2948,8 @@ bool ArgumentSplitter::split() {
       Worklist.push_back(A);
       continue;
     }
-    removeArgument(ParentBB, i);
+    erasePhiArgument(ParentBB, i);
+    ++NumDeadArguments;
   }
 
   return true;
@@ -3760,7 +3689,8 @@ bool SimplifyCFG::simplifyArgs(SILBasicBlock *BB) {
       continue;
     }
 
-    removeArgument(BB, i);
+    erasePhiArgument(BB, i);
+    ++NumDeadArguments;
     Changed = true;
   }
 

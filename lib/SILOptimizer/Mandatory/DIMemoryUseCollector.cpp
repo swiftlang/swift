@@ -356,7 +356,12 @@ DIMemoryObjectInfo::getPathStringToElement(unsigned Element,
             getElementCountRec(Module, FieldType, false);
         if (Element < NumFieldElements) {
           Result += '.';
-          Result += VD->getName().str();
+          auto originalProperty = VD->getOriginalWrappedProperty();
+          if (originalProperty) {
+            Result += originalProperty->getName().str();
+          } else {
+            Result += VD->getName().str();
+          }
           getPathStringToElementRec(Module, FieldType, Element, Result);
           return VD;
         }
@@ -415,9 +420,14 @@ bool DIMemoryObjectInfo::isElementLetProperty(unsigned Element) const {
 //===----------------------------------------------------------------------===//
 
 /// onlyTouchesTrivialElements - Return true if all of the accessed elements
-/// have trivial type.
+/// have trivial type and the access itself is a trivial instruction.
 bool DIMemoryUse::onlyTouchesTrivialElements(
     const DIMemoryObjectInfo &MI) const {
+  // assign_by_wrapper calls functions to assign a value. This is not
+  // considered as trivial.
+  if (isa<AssignByWrapperInst>(Inst))
+    return false;
+
   auto *F = Inst->getFunction();
 
   for (unsigned i = FirstElement, e = i + NumElements; i != e; ++i) {
@@ -741,9 +751,12 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
 #include "swift/AST/ReferenceStorage.def"
 
     // Stores *to* the allocation are writes.
-    if ((isa<StoreInst>(User) || isa<AssignInst>(User)) &&
+    if ((isa<StoreInst>(User) || isa<AssignInst>(User) ||
+         isa<AssignByWrapperInst>(User)) &&
         Op->getOperandNumber() == 1) {
       if (PointeeType.is<TupleType>()) {
+        assert(!isa<AssignByWrapperInst>(User) &&
+               "cannot assign a typle with assign_by_wrapper");
         UsesToScalarize.push_back(User);
         continue;
       }
@@ -753,7 +766,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       DIUseKind Kind;
       if (InStructSubElement)
         Kind = DIUseKind::PartialStore;
-      else if (isa<AssignInst>(User))
+      else if (isa<AssignInst>(User) || isa<AssignByWrapperInst>(User))
         Kind = DIUseKind::InitOrAssign;
       else if (PointeeType.isTrivial(*User->getFunction()))
         Kind = DIUseKind::InitOrAssign;
@@ -990,6 +1003,11 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       continue;
     }
 
+    if (auto *PAI = dyn_cast<PartialApplyInst>(User)) {
+      if (onlyUsedByAssignByWrapper(PAI))
+        continue;
+    }
+
     // Sanitizer instrumentation is not user visible, so it should not
     // count as a use and must not affect compile-time diagnostics.
     if (isSanitizerInstrumentation(User))
@@ -1211,7 +1229,7 @@ static bool isSuperInitUse(SILInstruction *User) {
     // super.init call as a hack to allow us to write testcases.
     auto *AI = dyn_cast<ApplyInst>(User);
     if (AI && AI->getLoc().isSILFile())
-      if (auto *Fn = AI->getReferencedFunction())
+      if (auto *Fn = AI->getReferencedFunctionOrNull())
         if (Fn->getName() == "superinit")
           return true;
     return false;
@@ -1293,7 +1311,7 @@ static bool isSelfInitUse(SILInstruction *I) {
   // self.init call as a hack to allow us to write testcases.
   if (I->getLoc().isSILFile()) {
     if (auto *AI = dyn_cast<ApplyInst>(I))
-      if (auto *Fn = AI->getReferencedFunction())
+      if (auto *Fn = AI->getReferencedFunctionOrNull())
         if (Fn->getName().startswith("selfinit"))
           return true;
 
@@ -1466,8 +1484,11 @@ void ElementUseCollector::collectClassSelfUses(
 
     // If this is a partial application of self, then this is an escape point
     // for it.
-    if (isa<PartialApplyInst>(User))
+    if (auto *PAI = dyn_cast<PartialApplyInst>(User)) {
+      if (onlyUsedByAssignByWrapper(PAI))
+        continue;
       Kind = DIUseKind::Escape;
+    }
 
     trackUse(DIMemoryUse(User, Kind, 0, TheMemory.NumElements));
   }
@@ -1547,11 +1568,15 @@ collectDelegatingInitUses(const DIMemoryObjectInfo &TheMemory,
     // be an end_borrow use in addition to the value_metatype.
     if (isa<LoadBorrowInst>(User)) {
       auto UserVal = cast<SingleValueInstruction>(User);
-      bool onlyUseIsValueMetatype = true;
+      bool onlyUseIsValueMetatype = false;
       for (auto use : UserVal->getUses()) {
-        if (isa<EndBorrowInst>(use->getUser())
-            || isa<ValueMetatypeInst>(use->getUser()))
+        auto *user = use->getUser();
+        if (isa<EndBorrowInst>(user))
           continue;
+        if (isa<ValueMetatypeInst>(user)) {
+          onlyUseIsValueMetatype = true;
+          continue;
+        }
         onlyUseIsValueMetatype = false;
         break;
       }

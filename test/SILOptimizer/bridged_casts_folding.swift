@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -O -emit-sil -enforce-exclusivity=unchecked %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-ownership-stripping-after-serialization -O -emit-sil -enforce-exclusivity=unchecked %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 

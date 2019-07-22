@@ -25,19 +25,20 @@
 #include "ConstraintLocator.h"
 #include "OverloadChoice.h"
 #include "TypeChecker.h"
-#include "swift/Basic/LLVM.h"
-#include "swift/Basic/OptionSet.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/NameLookup.h"
-#include "swift/AST/Types.h"
+#include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/TypeCheckerDebugConsumer.h"
-#include "llvm/ADT/ilist.h"
+#include "swift/AST/Types.h"
+#include "swift/Basic/LLVM.h"
+#include "swift/Basic/OptionSet.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetOperations.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
-#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/ilist.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/Timer.h"
 #include "llvm/Support/raw_ostream.h"
@@ -191,6 +192,10 @@ class TypeVariableType::Implementation {
   /// The corresponding node in the constraint graph.
   constraints::ConstraintGraphNode *GraphNode = nullptr;
 
+  ///  Index into the list of type variables, as used by the
+  ///  constraint graph.
+  unsigned GraphIndex;
+
   friend class constraints::SavedTypeVariableBinding;
 
 public:
@@ -249,12 +254,12 @@ public:
   /// Retrieve the index into the constraint graph's list of type variables.
   unsigned getGraphIndex() const { 
     assert(GraphNode && "Graph node isn't set");
-    return getTypeVariable()->Bits.TypeVariableType.GraphIndex; 
+    return GraphIndex;
   }
 
   /// Set the index into the constraint graph's list of type variables.
   void setGraphIndex(unsigned newIndex) {
-    getTypeVariable()->Bits.TypeVariableType.GraphIndex = newIndex;
+    GraphIndex = newIndex;
   }
   
   /// Check whether this type variable either has a representative that
@@ -470,6 +475,8 @@ enum ScoreKind {
   SK_Fix,
   /// A reference to an @unavailable declaration.
   SK_Unavailable,
+  /// A use of a disfavored overload.
+  SK_DisfavoredOverload,
   /// An implicit force of an implicitly unwrapped optional value.
   SK_ForceUnchecked,
   /// A user-defined conversion.
@@ -568,6 +575,11 @@ struct Score {
 
 };
 
+/// An AST node that can gain type information while solving.
+using TypedNode =
+    llvm::PointerUnion3<const Expr *, const TypeLoc *,
+                        const ParamDecl *>;
+
 /// Display a score.
 llvm::raw_ostream &operator<<(llvm::raw_ostream &out, const Score &score);
 
@@ -609,14 +621,14 @@ public:
   ConstraintSystem &getConstraintSystem() const { return *constraintSystem; }
 
   /// The set of type bindings.
-  llvm::SmallDenseMap<TypeVariableType *, Type> typeBindings;
+  llvm::DenseMap<TypeVariableType *, Type> typeBindings;
   
   /// The set of overload choices along with their types.
-  llvm::SmallDenseMap<ConstraintLocator *, SelectedOverload> overloadChoices;
+  llvm::DenseMap<ConstraintLocator *, SelectedOverload> overloadChoices;
 
   /// The set of constraint restrictions used to arrive at this restriction,
   /// which informs constraint application.
-  llvm::SmallDenseMap<std::pair<CanType, CanType>, ConversionRestrictionKind>
+  llvm::DenseMap<std::pair<CanType, CanType>, ConversionRestrictionKind>
     ConstraintRestrictions;
 
   /// The list of fixes that need to be applied to the initial expression
@@ -628,20 +640,27 @@ public:
 
   /// The set of disjunction choices used to arrive at this solution,
   /// which informs constraint application.
-  llvm::SmallDenseMap<ConstraintLocator *, unsigned> DisjunctionChoices;
+  llvm::DenseMap<ConstraintLocator *, unsigned> DisjunctionChoices;
 
   /// The set of opened types for a given locator.
-  llvm::SmallDenseMap<ConstraintLocator *, ArrayRef<OpenedType>> OpenedTypes;
+  llvm::DenseMap<ConstraintLocator *, ArrayRef<OpenedType>> OpenedTypes;
 
   /// The opened existential type for a given locator.
-  llvm::SmallDenseMap<ConstraintLocator *, OpenedArchetypeType *>
+  llvm::DenseMap<ConstraintLocator *, OpenedArchetypeType *>
     OpenedExistentialTypes;
 
   /// The locators of \c Defaultable constraints whose defaults were used.
-  llvm::SmallPtrSet<ConstraintLocator *, 8> DefaultedConstraints;
+  llvm::SmallPtrSet<ConstraintLocator *, 2> DefaultedConstraints;
 
-  llvm::SmallVector<std::pair<ConstraintLocator *, ProtocolConformanceRef>, 8>
+  /// The node -> type mappings introduced by this solution.
+  llvm::SmallVector<std::pair<TypedNode, Type>, 8> addedNodeTypes;
+
+  std::vector<std::pair<ConstraintLocator *, ProtocolConformanceRef>>
       Conformances;
+
+  /// The set of closures that have been transformed by a function builder.
+  llvm::MapVector<ClosureExpr *, std::pair<Type, Expr *>>
+      builderTransformedClosures;
 
   /// Simplify the given type by substituting all occurrences of
   /// type variables for their fixed types.
@@ -667,20 +686,6 @@ public:
                      ConstraintLocator *locator,
                      bool ignoreTopLevelInjection = false,
                      Optional<Pattern*> typeFromPattern = None) const;
-
-  /// Convert the given optional-producing expression to a Bool
-  /// indicating whether the optional has a value.
-  ///
-  /// This operation cannot fail.
-  ///
-  /// \param expr The expression to coerce. The type of this expression
-  /// must be T?.
-  ///
-  /// \param locator Locator used to describe the location of this expression.
-  ///
-  /// \returns a Bool expression indicating whether the optional
-  /// contains a value.
-  Expr *convertOptionalToBool(Expr *expr, ConstraintLocator *locator) const;
 
   /// Compute the set of substitutions for a generic signature opened at the
   /// given locator.
@@ -725,16 +730,6 @@ public:
     if (known != overloadChoices.end())
       return known->second;
     return None;
-  }
-
-  /// Retrieve overload choices associated with given expression.
-  void getOverloadChoices(Expr *anchor,
-                          SmallVectorImpl<SelectedOverload> &overloads) const {
-    for (auto &e : overloadChoices) {
-      auto *locator = e.first;
-      if (locator->getAnchor() == anchor)
-        overloads.push_back(e.second);
-    }
   }
 
   LLVM_ATTRIBUTE_DEPRECATED(
@@ -850,6 +845,14 @@ enum class ConstraintSystemFlags {
   /// If set, the top-level expression may be able to provide an underlying
   /// type for the contextual opaque archetype.
   UnderlyingTypeForOpaqueReturnType = 0x40,
+
+  /// FIXME(diagnostics): Once diagnostics are completely switched to new
+  /// framework, this flag could be removed as obsolete.
+  ///
+  /// If set, this identifies constraint system as being used to re-typecheck
+  /// one of the sub-expressions as part of the expression diagnostics, which
+  /// is attempting to narrow down failure location.
+  SubExpressionDiagnostics = 0x80,
 };
 
 /// Options that affect the constraint system as a whole.
@@ -1055,7 +1058,7 @@ private:
   /// solution it represents.
   Score CurrentScore;
 
-  SmallVector<TypeVariableType *, 16> TypeVariables;
+  std::vector<TypeVariableType *> TypeVariables;
 
   /// Maps expressions to types for choosing a favored overload
   /// type in a disjunction constraint.
@@ -1090,7 +1093,7 @@ private:
   /// there are multiple ways in which one type could convert to another, e.g.,
   /// given class types A and B, the solver might choose either a superclass
   /// conversion or a user-defined conversion.
-  SmallVector<std::tuple<Type, Type, ConversionRestrictionKind>, 32>
+  std::vector<std::tuple<Type, Type, ConversionRestrictionKind>>
       ConstraintRestrictions;
 
   /// The set of fixes applied to make the solution work.
@@ -1100,7 +1103,7 @@ private:
 
   /// The set of remembered disjunction choices used to reach
   /// the current constraint system.
-  SmallVector<std::pair<ConstraintLocator*, unsigned>, 32>
+  std::vector<std::pair<ConstraintLocator*, unsigned>>
       DisjunctionChoices;
 
   /// The worklist of "active" constraints that should be revisited
@@ -1124,12 +1127,19 @@ private:
   SmallVector<std::pair<ConstraintLocator *, OpenedArchetypeType *>, 4>
     OpenedExistentialTypes;
 
-  SmallVector<std::pair<ConstraintLocator *, ProtocolConformanceRef>, 8>
+  /// The node -> type mappings introduced by generating constraints.
+  llvm::SmallVector<std::pair<TypedNode, Type>, 8> addedNodeTypes;
+
+  std::vector<std::pair<ConstraintLocator *, ProtocolConformanceRef>>
       CheckedConformances;
+
+  /// The set of closures that have been transformed by a function builder.
+  SmallVector<std::tuple<ClosureExpr *, Type, Expr *>, 4>
+      builderTransformedClosures;
 
 public:
   /// The locators of \c Defaultable constraints whose defaults were used.
-  SmallVector<ConstraintLocator *, 8> DefaultedConstraints;
+  std::vector<ConstraintLocator *> DefaultedConstraints;
 
   /// A cache that stores the @dynamicCallable required methods implemented by
   /// types.
@@ -1556,6 +1566,16 @@ public:
     return resolvedOverloadSets;
   }
 
+  ResolvedOverloadSetListItem *findSelectedOverloadFor(Expr *expr) const {
+    auto resolvedOverload = getResolvedOverloadSets();
+    while (resolvedOverload) {
+      if (resolvedOverload->Locator->getAnchor() == expr)
+        return resolvedOverload;
+      resolvedOverload = resolvedOverload->Previous;
+    }
+    return nullptr;
+  }
+
 private:
   unsigned assignTypeVariableID() {
     return TypeCounter++;
@@ -1600,6 +1620,8 @@ public:
     /// The length of \c DefaultedConstraints.
     unsigned numDefaultedConstraints;
 
+    unsigned numAddedNodeTypes;
+
     unsigned numCheckedConformances;
 
     unsigned numMissingMembers;
@@ -1607,6 +1629,8 @@ public:
     unsigned numDisabledConstraints;
 
     unsigned numFavoredConstraints;
+
+    unsigned numBuilderTransformedClosures;
 
     /// The previous score.
     Score PreviousScore;
@@ -1748,33 +1772,48 @@ public:
     this->FavoredTypes[E] = T;
   }
 
+  /// Set the type in our type map for the given node.
+  ///
+  /// The side tables are used through the expression type checker to avoid mutating nodes until
+  /// we know we have successfully type-checked them.
+  void setType(TypedNode node, Type type) {
+    assert(!node.isNull() && "Cannot set type information on null node");
+    assert(type && "Expected non-null type");
+
+    // Record the type.
+    if (auto expr = node.dyn_cast<const Expr *>()) {
+      ExprTypes[expr] = type.getPointer();
+    } else if (auto typeLoc = node.dyn_cast<const TypeLoc *>()) {
+      TypeLocTypes[typeLoc] = type.getPointer();
+    } else {
+      auto param = node.get<const ParamDecl *>();
+      ParamTypes[param] = type.getPointer();
+    }
+
+    // Record the fact that we ascribed a type to this node.
+    if (solverState && solverState->depth > 0) {
+      addedNodeTypes.push_back({node, type});
+    }
+  }
+
   /// Set the type in our type map for a given expression. The side
   /// map is used throughout the expression type checker in order to
   /// avoid mutating expressions until we know we have successfully
   /// type-checked them.
-  void setType(Expr *E, Type T) {
-    assert(E != nullptr && "Expected non-null expression!");
-    assert(T && "Expected non-null type!");
-
-    // FIXME: We sometimes set the type and then later set it to a
-    //        value that is slightly different, e.g. not an lvalue.
-    // assert((ExprTypes.find(E) == ExprTypes.end() ||
-    //         ExprTypes.find(E)->second->isEqual(T) ||
-    //         ExprTypes.find(E)->second->hasTypeVariable()) &&
-    //        "Expected type to be invariant!");
-
-    ExprTypes[E] = T.getPointer();
-  }
-
   void setType(TypeLoc &L, Type T) {
-    assert(T && "Expected non-null type!");
-    TypeLocTypes[&L] = T.getPointer();
+    setType(TypedNode(&L), T);
   }
 
-  void setType(ParamDecl *P, Type T) {
-    assert(P && "Expected non-null parameter!");
-    assert(T && "Expected non-null type!");
-    ParamTypes[P] = T.getPointer();
+  /// Erase the type for the given node.
+  void eraseType(TypedNode node) {
+    if (auto expr = node.dyn_cast<const Expr *>()) {
+      ExprTypes.erase(expr);
+    } else if (auto typeLoc = node.dyn_cast<const TypeLoc *>()) {
+      TypeLocTypes.erase(typeLoc);
+    } else {
+      auto param = node.get<const ParamDecl *>();
+      ParamTypes.erase(param);
+    }
   }
 
   void setType(KeyPathExpr *KP, unsigned I, Type T) {
@@ -1790,12 +1829,20 @@ public:
   }
 
   bool hasType(const TypeLoc &L) const {
-    return TypeLocTypes.find(&L) != TypeLocTypes.end();
+    return hasType(TypedNode(&L));
   }
 
-  bool hasType(const ParamDecl *P) const {
-    assert(P != nullptr && "Expected non-null parameter!");
-    return ParamTypes.find(P) != ParamTypes.end();
+  /// Check to see if we have a type for a node.
+  bool hasType(TypedNode node) const {
+    assert(!node.isNull() && "Expected non-null node");
+    if (auto expr = node.dyn_cast<const Expr *>()) {
+      return ExprTypes.find(expr) != ExprTypes.end();
+    } else if (auto typeLoc = node.dyn_cast<const TypeLoc *>()) {
+      return TypeLocTypes.find(typeLoc) != TypeLocTypes.end();
+    } else {
+      auto param = node.get<const ParamDecl *>();
+      return ParamTypes.find(param) != ParamTypes.end();
+    }
   }
 
   bool hasType(const KeyPathExpr *KP, unsigned I) const {
@@ -1822,14 +1869,6 @@ public:
   Type getType(const ParamDecl *P) const {
     assert(hasType(P) && "Expected type to have been set!");
     return ParamTypes.find(P)->second;
-  }
-
-  Type getType(const VarDecl *D, bool wantInterfaceType = true) const {
-    if (auto *P = dyn_cast<ParamDecl>(D))
-      return getType(P);
-
-    assert(D->hasValidSignature());
-    return wantInterfaceType ? D->getInterfaceType() : D->getType();
   }
 
   Type getType(const KeyPathExpr *KP, unsigned I) const {
@@ -1889,6 +1928,12 @@ public:
                        ArrayRef<ConstraintLocator::PathElement> path,
                        unsigned summaryFlags);
 
+  /// Retrive the constraint locator for the given anchor and
+  /// path, uniqued and automatically infer the summary flags
+  ConstraintLocator *
+  getConstraintLocator(Expr *anchor,
+                       ArrayRef<ConstraintLocator::PathElement> path);
+
   /// Retrieve the constraint locator for the given anchor and
   /// an empty path, uniqued.
   ConstraintLocator *getConstraintLocator(Expr *anchor) {
@@ -1927,6 +1972,11 @@ public:
     auto e = ExprWeights.find(expr);
     return e != ExprWeights.end() ? e->second.second : nullptr;
   }
+
+  /// Returns a locator describing the callee for a given expression. For
+  /// a function application, this is a locator describing the function expr.
+  /// For an unresolved dot/member, this is a locator to the member.
+  ConstraintLocator *getCalleeLocator(Expr *expr);
 
 public:
 
@@ -2207,6 +2257,69 @@ public:
     return typeVar->getImpl().getRepresentative(getSavedBindings());
   }
 
+  /// Gets the VarDecl associateed with resolvedOverload, and the type of the
+  /// storage wrapper if the decl has an associated storage wrapper.
+  Optional<std::pair<VarDecl *, Type>>
+  getStorageWrapperInformation(ResolvedOverloadSetListItem *resolvedOverload) {
+    assert(resolvedOverload);
+    if (resolvedOverload->Choice.isDecl()) {
+      if (auto *decl = dyn_cast<VarDecl>(resolvedOverload->Choice.getDecl())) {
+        if (decl->hasAttachedPropertyWrapper()) {
+          if (auto storageWrapper = decl->getPropertyWrapperStorageWrapper()) {
+            Type type = storageWrapper->getInterfaceType();
+            if (Type baseType = resolvedOverload->Choice.getBaseType()) {
+              type = baseType->getTypeOfMember(DC->getParentModule(),
+                                               storageWrapper, type);
+            }
+            return std::make_pair(decl, type);
+          }
+        }
+      }
+    }
+    return None;
+  }
+
+  /// Gets the VarDecl associateed with resolvedOverload, and the type of the
+  /// backing storage if the decl has an associated property wrapper.
+  Optional<std::pair<VarDecl *, Type>>
+  getPropertyWrapperInformation(ResolvedOverloadSetListItem *resolvedOverload) {
+    assert(resolvedOverload);
+    if (resolvedOverload->Choice.isDecl()) {
+      if (auto *decl = dyn_cast<VarDecl>(resolvedOverload->Choice.getDecl())) {
+        if (decl->hasAttachedPropertyWrapper()) {
+          auto wrapperTy = decl->getPropertyWrapperBackingPropertyType();
+          if (Type baseType = resolvedOverload->Choice.getBaseType()) {
+            wrapperTy = baseType->getTypeOfMember(DC->getParentModule(),
+                                                  decl, wrapperTy);
+          }
+          return std::make_pair(decl, wrapperTy);
+        }
+      }
+    }
+    return None;
+  }
+
+  /// Gets the VarDecl, and the type of the type property that it wraps if
+  /// resolved overload has a decl which is the backing storage for a
+  /// property wrapper.
+  Optional<std::pair<VarDecl *, Type>>
+  getWrappedPropertyInformation(ResolvedOverloadSetListItem *resolvedOverload) {
+    assert(resolvedOverload);
+    if (resolvedOverload->Choice.isDecl()) {
+      if (auto *decl = dyn_cast<VarDecl>(resolvedOverload->Choice.getDecl())) {
+        if (auto wrapped = decl->getOriginalWrappedProperty()) {
+          Type type = wrapped->getInterfaceType();
+          if (Type baseType = resolvedOverload->Choice.getBaseType()) {
+            type = baseType->getTypeOfMember(DC->getParentModule(),
+                                             wrapped, type);
+          }
+          return std::make_pair(decl, type);
+        }
+      }
+    }
+    return None;
+  }
+
   /// Merge the equivalence sets of the two type variables.
   ///
   /// Note that both \c typeVar1 and \c typeVar2 must be the
@@ -2386,31 +2499,27 @@ public:
   /// \param replacements The mapping from opened types to the type
   /// variables to which they were opened.
   ///
-  /// \param innerDC The generic context from which the type originates.
-  ///
   /// \param outerDC The generic context containing the declaration.
   ///
-  /// \param skipProtocolSelfConstraint Whether to skip the constraint on a
-  /// protocol's 'Self' type.
-  ///
   /// \returns The opened type, or \c type if there are no archetypes in it.
-  Type openFunctionType(
-      AnyFunctionType *funcType,
-      unsigned numArgumentLabelsToRemove,
-      ConstraintLocatorBuilder locator,
-      OpenedTypeMap &replacements,
-      DeclContext *innerDC,
-      DeclContext *outerDC,
-      bool skipProtocolSelfConstraint);
+  FunctionType *openFunctionType(AnyFunctionType *funcType,
+                                 ConstraintLocatorBuilder locator,
+                                 OpenedTypeMap &replacements,
+                                 DeclContext *outerDC);
 
-  /// Open the generic parameter list and its requirements, creating
-  /// type variables for each of the type parameters.
-  void openGeneric(DeclContext *innerDC,
-                   DeclContext *outerDC,
+  /// Open the generic parameter list and its requirements,
+  /// creating type variables for each of the type parameters.
+  void openGeneric(DeclContext *outerDC,
                    GenericSignature *signature,
-                   bool skipProtocolSelfConstraint,
                    ConstraintLocatorBuilder locator,
                    OpenedTypeMap &replacements);
+
+  /// Open the generic parameter list creating type variables for each of the
+  /// type parameters.
+  void openGenericParameters(DeclContext *outerDC,
+                             GenericSignature *signature,
+                             OpenedTypeMap &replacements,
+                             ConstraintLocatorBuilder locator);
 
   /// Given generic signature open its generic requirements,
   /// using substitution function, and record them in the
@@ -2540,7 +2649,7 @@ public:
   /// Generate constraints for the given (unchecked) expression.
   ///
   /// \returns a possibly-sanitized expression, or null if an error occurred.
-  Expr *generateConstraints(Expr *E);
+  Expr *generateConstraints(Expr *E, DeclContext *dc = nullptr);
 
   /// Generate constraints for binding the given pattern to the
   /// value of the given expression.
@@ -2623,6 +2732,13 @@ public:
   private:
     TypeMatchResult(SolutionKind result) : Kind(result) {}
   };
+
+  /// Attempt to repair typing failures and record fixes if needed.
+  /// \return true if at least some of the failures has been repaired
+  /// successfully, which allows type matcher to continue.
+  bool repairFailures(Type lhs, Type rhs,
+                      SmallVectorImpl<RestrictionOrFix> &conversionsOrFixes,
+                      ConstraintLocatorBuilder locator);
 
   /// Subroutine of \c matchTypes(), which matches up two tuple types.
   ///
@@ -3019,6 +3135,11 @@ public:
   SolutionKind simplifyConstraint(const Constraint &constraint);
   /// Simplify the given disjunction choice.
   void simplifyDisjunctionChoice(Constraint *choice);
+
+  /// Apply the given function builder to the closure expression.
+  TypeMatchResult applyFunctionBuilder(ClosureExpr *closure, Type builderType,
+                                       ConstraintLocator *calleeLocator,
+                                       ConstraintLocatorBuilder locator);
 
 private:
   /// The kind of bindings that are permitted.
@@ -3700,6 +3821,13 @@ public:
   /// \returns true to indicate that this should cause a failure, false
   /// otherwise.
   virtual bool relabelArguments(ArrayRef<Identifier> newNames);
+
+  /// Indicates that the trailing closure argument at the given \c argIdx
+  /// cannot be passed to the last parameter at \c paramIdx.
+  ///
+  /// \returns true to indicate that this should cause a failure, false
+  /// otherwise.
+  virtual bool trailingClosureMismatch(unsigned paramIdx, unsigned argIdx);
 };
 
 /// Match the call arguments (as described by the given argument type) to
@@ -3707,7 +3835,7 @@ public:
 ///
 /// \param args The arguments.
 /// \param params The parameters.
-/// \param defaultMap A map indicating if the parameter at that index has a default value.
+/// \param paramInfo Declaration-level information about the parameters.
 /// \param hasTrailingClosure Whether the last argument is a trailing closure.
 /// \param allowFixes Whether to allow fixes when matching arguments.
 ///
@@ -3719,7 +3847,7 @@ public:
 /// \returns true if the call arguments could not be matched to the parameters.
 bool matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
                         ArrayRef<AnyFunctionType::Param> params,
-                        const SmallBitVector &defaultMap,
+                        const ParameterListInfo &paramInfo,
                         bool hasTrailingClosure,
                         bool allowFixes,
                         MatchCallArgumentListener &listener,
@@ -3729,11 +3857,20 @@ ConstraintSystem::TypeMatchResult
 matchCallArguments(ConstraintSystem &cs,
                    ArrayRef<AnyFunctionType::Param> args,
                    ArrayRef<AnyFunctionType::Param> params,
+                   ConstraintKind subKind,
                    ConstraintLocatorBuilder locator);
 
 /// Given an expression that is the target of argument labels (for a call,
 /// subscript, etc.), find the underlying target expression.
 Expr *getArgumentLabelTargetExpr(Expr *fn);
+
+/// Returns true if a reference to a member on a given base type will apply its
+/// curried self parameter, assuming it has one.
+///
+/// This is true for most member references, however isn't true for things like
+/// an instance member being referenced on a metatype, where the curried self
+/// parameter remains unapplied.
+bool doesMemberRefApplyCurriedSelf(Type baseTy, const ValueDecl *decl);
 
 /// Attempt to prove that arguments with the given labels at the
 /// given parameter depth cannot be used with the given value.
@@ -3778,6 +3915,17 @@ Expr *simplifyLocatorToAnchor(ConstraintSystem &cs, ConstraintLocator *locator);
 /// \returns argument expression or `nullptr` if given "base" expression
 /// wasn't of one of the kinds listed above.
 Expr *getArgumentExpr(Expr *expr, unsigned index);
+
+// Check whether argument of the call at given position refers to
+// parameter marked as `@autoclosure`. This function is used to
+// maintain source compatibility with Swift versions < 5,
+// previously examples like following used to type-check:
+//
+// func foo(_ x: @autoclosure () -> Int) {}
+// func bar(_ y: @autoclosure () -> Int) {
+//   foo(y)
+// }
+bool isAutoClosureArgument(Expr *argExpr);
 
 class DisjunctionChoice {
   unsigned Index;
@@ -4010,6 +4158,14 @@ public:
                              IsExplicitConversion, isBeginningOfPartition);
   }
 };
+
+/// Determine whether given type is a known one
+/// for a key path `{Writable, ReferenceWritable}KeyPath`.
+bool isKnownKeyPathType(Type type);
+
+/// Determine whether given declaration is one for a key path
+/// `{Writable, ReferenceWritable}KeyPath`.
+bool isKnownKeyPathDecl(ASTContext &ctx, ValueDecl *decl);
 } // end namespace constraints
 
 template<typename ...Args>
@@ -4073,7 +4229,7 @@ public:
 /// in the custom function when necessary.
 class InputMatcher {
   size_t NumSkippedParameters;
-  const SmallBitVector DefaultValueMap;
+  const ParameterListInfo &ParamInfo;
   const ArrayRef<AnyFunctionType::Param> Params;
 
 public:
@@ -4089,7 +4245,7 @@ public:
   };
 
   InputMatcher(const ArrayRef<AnyFunctionType::Param> params,
-               const SmallBitVector &defaultValueMap);
+               const ParameterListInfo &paramInfo);
 
   /// Matching a given array of inputs.
   ///
@@ -4102,14 +4258,6 @@ public:
 
   size_t getNumSkippedParameters() const { return NumSkippedParameters; }
 };
-
-/// Diagnose an attempt to recover from a member access into a value of
-/// optional type which needed to be unwrapped for the member to be found.
-///
-/// \returns true if a diagnostic was produced.
-bool diagnoseBaseUnwrapForMemberAccess(Expr *baseExpr, Type baseType,
-                                       DeclName memberName, bool resultOptional,
-                                       SourceRange memberRange);
 
 // Return true if, when replacing "<expr>" with "<expr> ?? T", parentheses need
 // to be added around <expr> first in order to maintain the correct precedence.

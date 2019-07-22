@@ -53,7 +53,7 @@ static void lifetimeExtendAddressOnlyRValueSubValues(
     }
 
     // Otherwise, create the box and move the address only value into the box.
-    assert(v->getType().isAddressOnly(SGF.getModule()) &&
+    assert(v->getType().isAddressOnly(SGF.F) &&
            "RValue invariants imply that all RValue subtypes that are "
            "addresses must be address only.");
     auto boxTy = SILBoxType::get(v->getType().getASTType());

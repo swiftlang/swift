@@ -33,35 +33,30 @@ SILGenModule &SILGenBuilder::getSILGenModule() const { return SGF.SGM; }
 //===----------------------------------------------------------------------===//
 
 SILGenBuilder::SILGenBuilder(SILGenFunction &SGF)
-    : SILGenSILBuilder(SGF), SGF(SGF) {}
+    : SILBuilder(SGF.F), SGF(SGF) {}
 
 SILGenBuilder::SILGenBuilder(SILGenFunction &SGF, SILBasicBlock *insertBB,
                              SmallVectorImpl<SILInstruction *> *insertedInsts)
-    : SILGenSILBuilder(SGF, insertBB, insertedInsts), SGF(SGF) {}
+    : SILBuilder(insertBB, insertedInsts), SGF(SGF) {}
 
 SILGenBuilder::SILGenBuilder(SILGenFunction &SGF, SILBasicBlock *insertBB,
                              SILBasicBlock::iterator insertInst)
-    : SILGenSILBuilder(SGF, insertBB, insertInst), SGF(SGF) {}
+    : SILBuilder(insertBB, insertInst), SGF(SGF) {}
 
 //===----------------------------------------------------------------------===//
 //                             Managed Value APIs
 //===----------------------------------------------------------------------===//
-//
-// *NOTE* Please use SILGenBuilder SILValue APIs below. Otherwise, we
-// potentially do not get all of the conformances that we need.
-//
 
 ManagedValue SILGenBuilder::createPartialApply(SILLocation loc, SILValue fn,
-                                               SILType substFnTy,
                                                SubstitutionMap subs,
                                                ArrayRef<ManagedValue> args,
-                                               SILType closureTy) {
+                                               ParameterConvention calleeConvention) {
   llvm::SmallVector<SILValue, 8> values;
   transform(args, std::back_inserter(values), [&](ManagedValue mv) -> SILValue {
     return mv.forward(getSILGenFunction());
   });
   SILValue result =
-      createPartialApply(loc, fn, substFnTy, subs, values, closureTy);
+      createPartialApply(loc, fn, subs, values, calleeConvention);
   // Partial apply instructions create a box, so we need to put on a cleanup.
   return getSILGenFunction().emitManagedRValueWithCleanup(result);
 }
@@ -557,7 +552,8 @@ ManagedValue SILGenBuilder::createOptionalSome(SILLocation loc,
 
 ManagedValue SILGenBuilder::createManagedOptionalNone(SILLocation loc,
                                                       SILType type) {
-  if (!type.isAddressOnly(getModule()) || !SGF.silConv.useLoweredAddresses()) {
+  if (!type.isAddressOnly(getFunction()) ||
+      !SGF.silConv.useLoweredAddresses()) {
     SILValue noneValue = createOptionalNone(loc, type);
     return ManagedValue::forUnmanaged(noneValue);
   }
@@ -824,10 +820,21 @@ void SILGenBuilder::emitDestructureValueOperation(
     SILLocation loc, ManagedValue value,
     llvm::function_ref<void(unsigned, ManagedValue)> func) {
   CleanupCloner cloner(*this, value);
-  emitDestructureValueOperation(loc, value.forward(SGF),
-                                [&](unsigned index, SILValue subValue) {
-                                  return func(index, cloner.clone(subValue));
-                                });
+
+  // NOTE: We can not directly use SILBuilder::emitDestructureValueOperation()
+  // here since we need to create all of our cleanups before invoking \p
+  // func. This is necessary since our func may want to emit conditional code
+  // with an early exit, emitting unused cleanups from the current scope via the
+  // function emitBranchAndCleanups(). If we have not yet created those
+  // cleanups, we will introduce a leak along that path.
+  SmallVector<ManagedValue, 8> destructuredValues;
+  emitDestructureValueOperation(
+      loc, value.forward(SGF), [&](unsigned index, SILValue subValue) {
+        destructuredValues.push_back(cloner.clone(subValue));
+      });
+  for (auto p : llvm::enumerate(destructuredValues)) {
+    func(p.index(), p.value());
+  }
 }
 
 ManagedValue SILGenBuilder::createProjectBox(SILLocation loc, ManagedValue mv,

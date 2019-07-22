@@ -3604,7 +3604,8 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
   {
     key.kind: source.lang.swift.ref.module,
     key.offset: 53,
-    key.length: 17
+    key.length: 17,
+    key.is_system: 1
   },
   {
     key.kind: source.lang.swift.ref.protocol,

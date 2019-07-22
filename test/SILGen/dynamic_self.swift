@@ -117,13 +117,11 @@ class ObjCInit {
   @objc dynamic required init() { }
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s12dynamic_self12testObjCInit{{[_0-9a-zA-Z]*}}F : $@convention(thin) (@thick ObjCInit.Type) -> ()
+// CHECK-LABEL: sil hidden [ossa] @$s12dynamic_self12testObjCInit4metayAA0dE0Cm_tF : $@convention(thin) (@thick ObjCInit.Type) -> ()
 func testObjCInit(meta: ObjCInit.Type) {
 // CHECK: bb0([[THICK_META:%[0-9]+]] : $@thick ObjCInit.Type):
-// CHECK:   [[OBJC_META:%[0-9]+]] = thick_to_objc_metatype [[THICK_META]] : $@thick ObjCInit.Type to $@objc_metatype ObjCInit.Type
-// CHECK:   [[OBJ:%[0-9]+]] = alloc_ref_dynamic [objc] [[OBJC_META]] : $@objc_metatype ObjCInit.Type, $ObjCInit
-// CHECK:   [[INIT:%[0-9]+]] = objc_method [[OBJ]] : $ObjCInit, #ObjCInit.init!initializer.1.foreign : (ObjCInit.Type) -> () -> ObjCInit, $@convention(objc_method) (@owned ObjCInit) -> @owned ObjCInit
-// CHECK:   [[RESULT_OBJ:%[0-9]+]] = apply [[INIT]]([[OBJ]]) : $@convention(objc_method) (@owned ObjCInit) -> @owned ObjCInit
+// CHECK:   [[INIT:%[0-9]+]] = function_ref @$s12dynamic_self8ObjCInitCACycfC : $@convention(method) (@thick ObjCInit.Type) -> @owned ObjCInit
+// CHECK:   [[RESULT_OBJ:%[0-9]+]] = apply [[INIT]]([[THICK_META]]) : $@convention(method) (@thick ObjCInit.Type) -> @owned ObjCInit
 // CHECK:   [[RESULT:%[0-9]+]] = tuple ()
 // CHECK:   return [[RESULT]] : $()
   _ = meta.init()
@@ -351,7 +349,7 @@ class Derived : Base {
   }
 
   // CHECK-LABEL: sil hidden [ossa] @$s12dynamic_self7DerivedC38superCallFromMethodReturningSelfStaticACXDyFZ : $@convention(method) (@thick Derived.Type) -> @owned Derived
-  // CHECK; [[DYNAMIC_SELF:%.*]] = unchecked_trivial_bit_cast %0 : $@thick Derived.Type to $@thick @synamic_self Derived.Type
+  // CHECK: [[DYNAMIC_SELF:%.*]] = unchecked_trivial_bit_cast %0 : $@thick Derived.Type to $@thick @dynamic_self Derived.Type
   // CHECK: [[SUPER:%.*]] = upcast [[DYNAMIC_SELF]] : $@thick @dynamic_self Derived.Type to $@thick Base.Type
   // CHECK: [[METHOD:%.*]] = function_ref @$s12dynamic_self4BaseC17returnsSelfStaticACXDyFZ
   // CHECK: apply [[METHOD]]([[SUPER]])

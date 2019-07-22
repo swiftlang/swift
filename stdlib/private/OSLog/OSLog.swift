@@ -18,6 +18,7 @@
 
 @available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
 public struct Logger {
+  @usableFromInline
   internal let logObject: OSLog
 
   /// Create a custom OS log object.
@@ -30,8 +31,15 @@ public struct Logger {
     logObject = OSLog.default
   }
 
+  // Functions defined below are marked @_optimize(none) to prevent inlining
+  // of string internals (such as String._StringGuts) which will interfere with
+  // constant evaluation and folding. Note that these functions will be inlined,
+  // constant evaluated/folded and optimized in the context of a caller.
+
   /// Log a string interpolation at a given level. The level is `default` if
   /// it is not specified.
+  @_transparent
+  @_optimize(none)
   public func log(level: OSLogType = .default, _ message: OSLogMessage) {
     osLog(logObject, level, message)
   }
@@ -44,27 +52,44 @@ public struct Logger {
 /// extract the format string, serialize the arguments to a byte buffer,
 /// and pass them to the OS logging system.
 @available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
+@usableFromInline
+@_transparent
+@_optimize(none)
 internal func osLog(
   _ logObject: OSLog,
   _ logLevel: OSLogType,
   _ message: OSLogMessage
 ) {
+  // Compute static constants first so that they can be folded by
+  // OSLogOptimization pass.
+  let formatString = message.interpolation.formatString
+  let preamble = message.interpolation.preamble
+  let argumentCount = message.interpolation.argumentCount
+  let bufferSize = message.bufferSize
+  let formatStringPointer = _getGlobalStringTablePointer(formatString)
+
+  // Code that will execute at runtime.
   guard logObject.isEnabled(type: logLevel) else { return }
 
-  let bufferSize = message.bufferSize
-  let bufferMemory = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
+  let arguments = message.interpolation.arguments
+
+  // Ideally, we could stack allocate the buffer as it is local to this
+  // function and also its size is a compile-time constant.
+  let bufferMemory =
+    UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
   var builder = OSLogByteBufferBuilder(bufferMemory)
 
-  message.serializeArguments(into: &builder)
+  builder.serialize(preamble)
+  builder.serialize(argumentCount)
+  arguments.serialize(into: &builder)
 
-  message.formatString.withCString { cFormatString in
-    ___os_log_impl(UnsafeMutableRawPointer(mutating: #dsohandle),
-                   logObject,
-                   logLevel,
-                   cFormatString,
-                   bufferMemory,
-                   UInt32(bufferSize))
-  }
+  ___os_log_impl(UnsafeMutableRawPointer(mutating: #dsohandle),
+                 logObject,
+                 logLevel,
+                 formatStringPointer,
+                 bufferMemory,
+                 UInt32(bufferSize))
+
   bufferMemory.deallocate()
 }
 
@@ -76,18 +101,30 @@ internal func osLog(
 ///   - message: An instance of `OSLogMessage` created from string interpolation
 ///   - assertion: A closure that takes a format string and a pointer to a
 ///     byte buffer and asserts a condition.
+@_transparent
+@_optimize(none)
 public // @testable
 func _checkFormatStringAndBuffer(
   _ message: OSLogMessage,
   with assertion: (String, UnsafeBufferPointer<UInt8>) -> Void
 ) {
+  // Compute static constants first so that they can be folded by
+  // OSLogOptimization pass.
+  let formatString = message.interpolation.formatString
+  let preamble = message.interpolation.preamble
+  let argumentCount = message.interpolation.argumentCount
   let bufferSize = message.bufferSize
+
+  // Code that will execute at runtime.
   let bufferMemory = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
   var builder = OSLogByteBufferBuilder(bufferMemory)
-  message.serializeArguments(into: &builder)
+
+  builder.serialize(preamble)
+  builder.serialize(argumentCount)
+  message.interpolation.arguments.serialize(into: &builder)
 
   assertion(
-    message.formatString,
+    formatString,
     UnsafeBufferPointer(start: UnsafePointer(bufferMemory), count: bufferSize))
 
   bufferMemory.deallocate()

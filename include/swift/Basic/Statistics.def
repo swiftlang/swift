@@ -105,9 +105,6 @@ FRONTEND_STATISTIC(AST, NumLinkLibraries)
 /// Number of top-level modules loaded in the AST context.
 FRONTEND_STATISTIC(AST, NumLoadedModules)
 
-/// Number of external definitions imported into the AST context.
-FRONTEND_STATISTIC(AST, NumImportedExternalDefinitions)
-
 /// Number of Clang entities imported into the AST context.
 FRONTEND_STATISTIC(AST, NumTotalClangImportedEntities)
 
@@ -140,9 +137,6 @@ FRONTEND_STATISTIC(AST, NumPrefixOperators)
 
 /// Number of precedence groups in the AST context.
 FRONTEND_STATISTIC(AST, NumPrecedenceGroups)
-
-/// Number of conformances used by code processed by this frontend job.
-FRONTEND_STATISTIC(AST, NumUsedConformances)
 
 /// Number of full function bodies parsed.
 FRONTEND_STATISTIC(Parse, NumFunctionsParsed)
@@ -192,11 +186,17 @@ FRONTEND_STATISTIC(Sema, NumFunctionsTypechecked)
 /// amount of work the GSB does analyzing type signatures.
 FRONTEND_STATISTIC(Sema, NumGenericSignatureBuilders)
 
-/// Number of lazy generic environments built.
+/// Number of lazy generic environments registered.
 FRONTEND_STATISTIC(Sema, NumLazyGenericEnvironments)
 
 /// Number of lazy generic environments deserialized.
 FRONTEND_STATISTIC(Sema, NumLazyGenericEnvironmentsLoaded)
+
+/// Number of lazy requirement signatures registered.
+FRONTEND_STATISTIC(Sema, NumLazyRequirementSignatures)
+
+/// Number of lazy requirement signatures deserialized.
+FRONTEND_STATISTIC(Sema, NumLazyRequirementSignaturesLoaded)
 
 /// Number of lazy iterable declaration contexts constructed.
 FRONTEND_STATISTIC(Sema, NumLazyIterableDeclContexts)
@@ -224,6 +224,8 @@ FRONTEND_STATISTIC(Sema, NumUnloadedLazyIterableDeclContexts)
 #include "swift/AST/AccessTypeIDZone.def"
 #include "swift/AST/NameLookupTypeIDZone.def"
 #include "swift/AST/TypeCheckerTypeIDZone.def"
+#include "swift/Sema/IDETypeCheckingRequestIDZone.def"
+#include "swift/IDE/IDERequestIDZone.def"
 #undef SWIFT_TYPEID
 
 /// The next 10 statistics count 5 kinds of SIL entities present

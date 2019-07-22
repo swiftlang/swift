@@ -249,7 +249,7 @@ diagnoseGenericArgumentsExportability(SourceLoc loc,
     ASTContext &ctx = M->getASTContext();
     ctx.Diags.diagnose(loc, diag::conformance_from_implementation_only_module,
                        rootConf->getType(),
-                       rootConf->getProtocol()->getFullName(), M->getName());
+                       rootConf->getProtocol()->getFullName(), 0, M->getName());
     hadAnyIssues = true;
   }
   return hadAnyIssues;

@@ -492,16 +492,32 @@ void Demangler::clear() {
   NodeFactory::clear();
 }
 
-void Demangler::init(StringRef MangledName) {
-  NodeStack.init(*this, 16);
-  Substitutions.init(*this, 16);
-  NumWords = 0;
-  Text = MangledName;
-  Pos = 0;
+Demangler::DemangleInitRAII::DemangleInitRAII(Demangler &Dem,
+                                              StringRef MangledName)
+// Save the current demangler state so we can restore it.
+  : Dem(Dem),
+    NodeStack(Dem.NodeStack), Substitutions(Dem.Substitutions),
+    NumWords(Dem.NumWords), Text(Dem.Text), Pos(Dem.Pos)
+{
+  // Reset the demangler state for a nested job.
+  Dem.NodeStack.init(Dem, 16);
+  Dem.Substitutions.init(Dem, 16);
+  Dem.NumWords = 0;
+  Dem.Text = MangledName;
+  Dem.Pos = 0;
 }
-  
+
+Demangler::DemangleInitRAII::~DemangleInitRAII() {
+  // Restore the saved state.
+  Dem.NodeStack = NodeStack;
+  Dem.Substitutions = Substitutions;
+  Dem.NumWords = NumWords;
+  Dem.Text = Text;
+  Dem.Pos = Pos;
+}
+
 NodePointer Demangler::demangleSymbol(StringRef MangledName) {
-  init(MangledName);
+  DemangleInitRAII state(*this, MangledName);
 
   // Demangle old-style class and protocol names, which are still used in the
   // ObjC metadata.
@@ -546,7 +562,7 @@ NodePointer Demangler::demangleSymbol(StringRef MangledName) {
 }
 
 NodePointer Demangler::demangleType(StringRef MangledName) {
-  init(MangledName);
+  DemangleInitRAII state(*this, MangledName);
 
   parseAndPushNodes();
 
@@ -690,7 +706,8 @@ NodePointer Demangler::demangleSymbolicReference(unsigned char rawKind,
     return nullptr;
   
   // Types register as substitutions even when symbolically referenced.
-  if (kind == SymbolicReferenceKind::Context)
+  if (kind == SymbolicReferenceKind::Context &&
+      resolved->getKind() != Node::Kind::OpaqueTypeDescriptorSymbolicReference)
     addSubstitution(resolved);
   return resolved;
 }
@@ -1130,7 +1147,8 @@ NodePointer Demangler::demangleBuiltinType() {
       name.append(BUILTIN_TYPE_NAME_VEC, *this);
       name.append(elts, *this);
       name.push_back('x', *this);
-      name.append(EltType->getText().substr(strlen(BUILTIN_TYPE_NAME_PREFIX)), *this);
+      name.append(EltType->getText().substr(BUILTIN_TYPE_NAME_PREFIX.size()),
+                  *this);
       Ty = createNode(Node::Kind::BuiltinTypeName, name);
       break;
     }
@@ -1446,44 +1464,19 @@ NodePointer Demangler::popDependentProtocolConformance() {
 }
 
 NodePointer Demangler::demangleDependentProtocolConformanceRoot() {
-  int index = demangleIndex();
-  NodePointer conformance =
-    index > 0 ? createNode(Node::Kind::DependentProtocolConformanceRoot,
-                           index - 1)
-              : createNode(Node::Kind::DependentProtocolConformanceRoot);
-
-  if (NodePointer protocol = popProtocol())
-    conformance->addChild(protocol, *this);
-  else
-    return nullptr;
-
-  if (NodePointer dependentType = popNode(Node::Kind::Type))
-    conformance->addChild(dependentType, *this);
-  else
-    return nullptr;
-
-  return conformance;
+  NodePointer index = demangleDependentConformanceIndex();
+  NodePointer protocol = popProtocol();
+  NodePointer dependentType = popNode(Node::Kind::Type);
+  return createWithChildren(Node::Kind::DependentProtocolConformanceRoot,
+                            dependentType, protocol, index);
 }
 
 NodePointer Demangler::demangleDependentProtocolConformanceInherited() {
-  int index = demangleIndex();
-  NodePointer conformance =
-    index > 0 ? createNode(Node::Kind::DependentProtocolConformanceInherited,
-                           index - 1)
-              : createNode(Node::Kind::DependentProtocolConformanceInherited);
-
-  if (NodePointer protocol = popProtocol())
-    conformance->addChild(protocol, *this);
-  else
-    return nullptr;
-
-  if (auto nested = popDependentProtocolConformance())
-    conformance->addChild(nested, *this);
-  else
-    return nullptr;
-
-  conformance->reverseChildren();
-  return conformance;
+  NodePointer index = demangleDependentConformanceIndex();
+  NodePointer protocol = popProtocol();
+  NodePointer nested = popDependentProtocolConformance();
+  return createWithChildren(Node::Kind::DependentProtocolConformanceInherited,
+                            nested, protocol, index);
 }
 
 NodePointer Demangler::popDependentAssociatedConformance() {
@@ -1494,25 +1487,24 @@ NodePointer Demangler::popDependentAssociatedConformance() {
 }
 
 NodePointer Demangler::demangleDependentProtocolConformanceAssociated() {
+  NodePointer index = demangleDependentConformanceIndex();
+  NodePointer associatedConformance = popDependentAssociatedConformance();
+  NodePointer nested = popDependentProtocolConformance();
+  return createWithChildren(Node::Kind::DependentProtocolConformanceAssociated,
+                            nested, associatedConformance, index);
+}
+
+NodePointer Demangler::demangleDependentConformanceIndex() {
   int index = demangleIndex();
-  NodePointer conformance =
-    index > 0 ? createNode(Node::Kind::DependentProtocolConformanceRoot,
-                           index - 1)
-              : createNode(Node::Kind::DependentProtocolConformanceRoot);
+  // index < 0 indicates a demangling error.
+  // index == 0 is ill-formed by the (originally buggy) use of this production.
+  if (index <= 0) return nullptr;
 
-  if (NodePointer associatedConformance = popDependentAssociatedConformance())
-    conformance->addChild(associatedConformance, *this);
-  else
-    return nullptr;
+  // index == 1 indicates an unknown index.
+  if (index == 1) return createNode(Node::Kind::UnknownIndex);
 
-  if (auto nested = popDependentProtocolConformance())
-    conformance->addChild(nested, *this);
-  else
-    return nullptr;
-
-  conformance->reverseChildren();
-
-  return conformance;
+  // Remove the index adjustment.
+  return createNode(Node::Kind::Index, unsigned(index) - 2);
 }
 
 NodePointer Demangler::demangleRetroactiveConformance() {
@@ -1805,6 +1797,18 @@ NodePointer Demangler::demangleMetatype() {
       return createWithPoppedType(Node::Kind::GenericTypeMetadataPattern);
     case 'a':
       return createWithPoppedType(Node::Kind::TypeMetadataAccessFunction);
+    case 'g':
+      return createWithChild(Node::Kind::OpaqueTypeDescriptorAccessor,
+                             popNode());
+    case 'h':
+      return createWithChild(Node::Kind::OpaqueTypeDescriptorAccessorImpl,
+                             popNode());
+    case 'j':
+      return createWithChild(Node::Kind::OpaqueTypeDescriptorAccessorKey,
+                             popNode());
+    case 'k':
+      return createWithChild(Node::Kind::OpaqueTypeDescriptorAccessorVar,
+                             popNode());
     case 'I':
       return createWithPoppedType(Node::Kind::TypeMetadataInstantiationCache);
     case 'i':
@@ -2696,6 +2700,8 @@ NodePointer Demangler::demangleSpecialType() {
       return popFunctionType(Node::Kind::AutoClosureType);
     case 'U':
       return popFunctionType(Node::Kind::UncurriedFunctionType);
+    case 'L':
+      return popFunctionType(Node::Kind::EscapingObjCBlock);
     case 'B':
       return popFunctionType(Node::Kind::ObjCBlock);
     case 'C':

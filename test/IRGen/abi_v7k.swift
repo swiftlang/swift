@@ -6,7 +6,7 @@
 
 // CHECK-LABEL: define hidden swiftcc float @"$s8test_v7k9addFloats{{.*}}"(float, float)
 // CHECK: fadd float %0, %1
-// CHECK ret float
+// CHECK: ret float
 // V7K-LABEL: _$s8test_v7k9addFloats{{.*}}
 // V7K: vadd.f32 s0, s0, s1
 func addFloats(x: Float, y : Float) -> Float {
@@ -142,7 +142,7 @@ func testClike8(t: Int, x: CLike8) -> Int {
 // assigned values in the data area of the enum in declaration order
 // CHECK-LABEL: define hidden swiftcc double @"$s8test_v7k0A7SingleP{{.*}}"(i32, i32, i8)
 // CHECK: br i1
-// CHECK: switch i32 [[ID:%[0-9]+]]
+// CHECK: switch i64 [[ID:%[0-9]+]]
 // CHECK: [[FIRST:%[0-9]+]] = zext i32 %0 to i64
 // CHECK: [[SECOND:%[0-9]+]] = zext i32 %1 to i64
 // CHECK: [[TEMP:%[0-9]+]] = shl i64 [[SECOND]], 32

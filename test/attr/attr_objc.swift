@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -disable-objc-attr-requires-foundation-module -typecheck -verify %s -swift-version 4 -enable-source-import -I %S/Inputs -enable-swift3-objc-inference
+// RUN: %target-swift-frontend -disable-objc-attr-requires-foundation-module -typecheck -verify -verify-ignore-unknown %s -swift-version 4 -enable-source-import -I %S/Inputs -enable-swift3-objc-inference
 // RUN: %target-swift-ide-test -skip-deinit=false -print-ast-typechecked -source-filename %s -function-definitions=true -prefer-type-repr=false -print-implicit-attrs=true -explode-pattern-binding-decls=true -disable-objc-attr-requires-foundation-module -swift-version 4 -enable-source-import -I %S/Inputs -enable-swift3-objc-inference | %FileCheck %s
 // RUN: not %target-swift-frontend -typecheck -dump-ast -disable-objc-attr-requires-foundation-module %s -swift-version 4 -enable-source-import -I %S/Inputs -enable-swift3-objc-inference > %t.ast
 // RUN: %FileCheck -check-prefix CHECK-DUMP %s < %t.ast
@@ -1649,6 +1649,7 @@ class C {
   // Don't crash.
   @objc func foo(x: Undeclared) {} // expected-error {{use of undeclared type 'Undeclared'}}
   @IBAction func myAction(sender: Undeclared) {} // expected-error {{use of undeclared type 'Undeclared'}}
+  @IBSegueAction func myAction(coder: Undeclared, sender: Undeclared) -> Undeclared {fatalError()} // expected-error {{use of undeclared type 'Undeclared'}} expected-error {{use of undeclared type 'Undeclared'}} expected-error {{use of undeclared type 'Undeclared'}}
 }
 
 //===---
@@ -1681,7 +1682,20 @@ class HasIBAction {
   // CHECK: {{^}}  @objc @IBAction func goodAction(_ sender: AnyObject?) {
 
   @IBAction func badAction(_ sender: PlainStruct?) { }
-  // expected-error@-1{{argument to @IBAction method cannot have non-object type 'PlainStruct?'}}
+  // expected-error@-1{{method cannot be marked @IBAction because the type of the parameter cannot be represented in Objective-C}}
+}
+
+//===---
+//===--- @IBSegueAction implies @objc
+//===---
+
+// CHECK-LABEL: {{^}}class HasIBSegueAction {
+class HasIBSegueAction {
+  @IBSegueAction func goodSegueAction(_ coder: AnyObject) -> AnyObject {fatalError()}
+  // CHECK: {{^}}  @objc @IBSegueAction func goodSegueAction(_ coder: AnyObject) -> AnyObject {
+
+  @IBSegueAction func badSegueAction(_ coder: PlainStruct?) -> Int? {fatalError()}
+  // expected-error@-1{{method cannot be marked @IBSegueAction because the type of the parameter cannot be represented in Objective-C}}
 }
 
 //===---
@@ -1724,8 +1738,7 @@ class HasNSManaged {
   var badManaged: PlainStruct
   // expected-error@-1 {{property cannot be marked @NSManaged because its type cannot be represented in Objective-C}}
   // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
-  // expected-error@-3{{'dynamic' property 'badManaged' must also be '@objc'}}
-  // CHECK-LABEL: {{^}}  @NSManaged var badManaged: PlainStruct {
+  // CHECK-LABEL: {{^}}  @NSManaged dynamic var badManaged: PlainStruct {
   // CHECK-NEXT: {{^}} get
   // CHECK-NEXT: {{^}} set
   // CHECK-NEXT: {{^}} }
@@ -2347,3 +2360,12 @@ extension MyObjCClass {
   private func notExposedToObjC() {}
 }
 
+// SR-9035
+
+class SR_9035_C {}
+
+@objc protocol SR_9035_P {
+  func throwingMethod1() throws -> Unmanaged<CFArray> // Ok
+  func throwingMethod2() throws -> Unmanaged<SR_9035_C> // expected-error {{method cannot be a member of an @objc protocol because its result type cannot be represented in Objective-C}}
+  // expected-note@-1 {{inferring '@objc' because the declaration is a member of an '@objc' protocol}}
+}

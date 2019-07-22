@@ -110,7 +110,7 @@ getPartialApplyOfDynamicMethodFormalType(SILGenModule &SGM, SILDeclRef member,
   // Adjust the result type to replace dynamic-self with AnyObject.
   CanType resultType = completeMethodTy.getResult();
   if (auto fnDecl = dyn_cast<FuncDecl>(member.getDecl())) {
-    if (fnDecl->hasDynamicSelf()) {
+    if (fnDecl->hasDynamicSelfResult()) {
       auto anyObjectTy = SGM.getASTContext().getAnyObjectType();
       resultType = resultType->replaceCovariantResultType(anyObjectTy, 0)
                              ->getCanonicalType();
@@ -1019,6 +1019,12 @@ public:
       if (!ctor->isRequired())
         return false;
 
+      // @objc dynamic initializers are statically dispatched (we're
+      // calling the allocating entry point, which is a thunk that
+      // does the dynamic dispatch for us).
+      if (ctor->isObjCDynamic())
+        return false;
+
       // Required constructors are statically dispatched when the 'self'
       // value is statically derived.
       ApplyExpr *thisCallSite = callSites.back();
@@ -1032,49 +1038,21 @@ public:
   }
 
   void processClassMethod(DeclRefExpr *e, AbstractFunctionDecl *afd) {
-    SILDeclRef::Kind kind;
-    bool requiresAllocRefDynamic = false;
-
-    if (isa<FuncDecl>(afd)) {
-      kind = SILDeclRef::Kind::Func;
-    } else {
-      if (requiresForeignEntryPoint(afd)) {
-        // When we're performing Objective-C dispatch, we don't have an
-        // allocating constructor to call. So, perform an alloc_ref_dynamic
-        // and pass that along to the initializer.
-        requiresAllocRefDynamic = true;
-        kind = SILDeclRef::Kind::Initializer;
-      } else {
-        kind = SILDeclRef::Kind::Allocator;
-      }
-    }
-
     ApplyExpr *thisCallSite = callSites.back();
     callSites.pop_back();
 
-    // If we require a dynamic allocation of the object here, do so now.
-    if (requiresAllocRefDynamic) {
-      SILLocation loc = thisCallSite->getArg();
-      RValue selfMetatype = SGF.emitRValue(thisCallSite->getArg());
-      auto selfValue =
-          allocateObject(std::move(selfMetatype).getAsSingleValue(SGF, loc),
-                         loc, /*objc*/ true);
-      RValue self = RValue(SGF, loc, selfValue.getType().getASTType(),
-                           selfValue);
-      ArgumentSource selfArgSource(thisCallSite->getArg(), std::move(self));
-      setSelfParam(std::move(selfArgSource), thisCallSite);
-    } else {
-      ArgumentSource selfArgSource(thisCallSite->getArg());
-      setSelfParam(std::move(selfArgSource), thisCallSite);
-    }
+    ArgumentSource selfArgSource(thisCallSite->getArg());
+    setSelfParam(std::move(selfArgSource), thisCallSite);
 
     // Directly dispatch to calls of the replaced function inside of
     // '@_dynamicReplacement(for:)' methods.
     bool isObjCReplacementCall = false;
-    if (isCallToReplacedInDynamicReplacement(SGF, afd, isObjCReplacementCall) &&
+    if (SGF.getOptions()
+            .EnableDynamicReplacementCanCallPreviousImplementation &&
+        isCallToReplacedInDynamicReplacement(SGF, afd, isObjCReplacementCall) &&
         thisCallSite->getArg()->isSelfExprOf(
             cast<AbstractFunctionDecl>(SGF.FunctionDC->getAsDecl()), false)) {
-      auto constant = SILDeclRef(afd, kind).asForeign(
+      auto constant = SILDeclRef(afd).asForeign(
           !isObjCReplacementCall && requiresForeignEntryPoint(e->getDecl()));
       auto subs = e->getDeclRef().getSubstitutions();
       if (isObjCReplacementCall)
@@ -1082,14 +1060,12 @@ public:
       else
         setCallee(Callee::forDirect(
             SGF,
-            SILDeclRef(cast<AbstractFunctionDecl>(SGF.FunctionDC->getAsDecl()),
-                       kind),
+            SILDeclRef(cast<AbstractFunctionDecl>(SGF.FunctionDC->getAsDecl())),
             subs, e, true));
       return;
     }
 
-    auto constant = SILDeclRef(afd, kind)
-                        .asForeign(requiresForeignEntryPoint(afd));
+    auto constant = SILDeclRef(afd).asForeign(requiresForeignEntryPoint(afd));
 
     auto subs = e->getDeclRef().getSubstitutions();
     setCallee(Callee::forClassMethod(SGF, constant, subs, e));
@@ -1144,6 +1120,8 @@ public:
     ApplyExpr *thisCallSite = callSites.back();
     bool isObjCReplacementSelfCall = false;
     bool isSelfCallToReplacedInDynamicReplacement =
+        SGF.getOptions()
+            .EnableDynamicReplacementCanCallPreviousImplementation &&
         isCallToReplacedInDynamicReplacement(
             SGF, cast<AbstractFunctionDecl>(constant.getDecl()),
             isObjCReplacementSelfCall) &&
@@ -1478,6 +1456,8 @@ public:
 
     bool isObjCReplacementSelfCall = false;
     bool isSelfCallToReplacedInDynamicReplacement =
+        SGF.getOptions()
+            .EnableDynamicReplacementCanCallPreviousImplementation &&
         isCallToReplacedInDynamicReplacement(
             SGF, cast<AbstractFunctionDecl>(constant.getDecl()),
             isObjCReplacementSelfCall) &&
@@ -1781,7 +1761,6 @@ static void emitRawApply(SILGenFunction &SGF,
   }
 
   auto resultType = substFnConv.getSILResultType();
-  auto calleeType = SILType::getPrimitiveObjectType(substFnType);
 
   // If the function is a coroutine, we need to use 'begin_apply'.
   if (substFnType->isCoroutine()) {
@@ -1794,8 +1773,7 @@ static void emitRawApply(SILGenFunction &SGF,
 
   // If we don't have an error result, we can make a simple 'apply'.
   if (!substFnType->hasErrorResult()) {
-    auto result = SGF.B.createApply(loc, fnValue, calleeType,
-                                    resultType, subs, argValues);
+    auto result = SGF.B.createApply(loc, fnValue, subs, argValues);
     rawResults.push_back(result);
 
   // Otherwise, we need to create a try_apply.
@@ -1809,7 +1787,7 @@ static void emitRawApply(SILGenFunction &SGF,
       SGF.getTryApplyErrorDest(loc, substFnType->getErrorResult(),
                                options & ApplyOptions::DoesNotThrow);
 
-    SGF.B.createTryApply(loc, fnValue, calleeType, subs, argValues,
+    SGF.B.createTryApply(loc, fnValue, subs, argValues,
                          normalBB, errorBB);
     SGF.B.emitBlock(normalBB);
   }
@@ -4007,19 +3985,10 @@ CallEmission::applyPartiallyAppliedSuperMethod(SGFContext C) {
     S.pop();
   }
   auto calleeConvention = ParameterConvention::Direct_Guaranteed;
-  auto closureTy = SILGenBuilder::getPartialApplyResultType(
-      constantInfo.getSILType(), 1, SGF.B.getModule(), subs, calleeConvention);
 
-  auto &module = SGF.getFunction().getModule();
-
-  auto partialApplyTy = functionTy;
-  if (constantInfo.SILFnType->isPolymorphic() && !subs.empty())
-    partialApplyTy = partialApplyTy.substGenericArgs(module, subs);
-
-  ManagedValue pa = SGF.B.createPartialApply(loc, superMethod, partialApplyTy,
+  ManagedValue pa = SGF.B.createPartialApply(loc, superMethod,
                                              subs, {upcastedSelf},
-                                             closureTy);
-  assert(!closureTy.castTo<SILFunctionType>()->isNoEscape());
+                                             calleeConvention);
   firstLevelResult.value = RValue(SGF, loc, formalApplyType.getResult(), pa);
   return firstLevelResult;
 }
@@ -4088,12 +4057,14 @@ CallEmission::applySpecializedEmitter(SpecializedEmitter &specializedEmitter,
     return firstLevelResult;
   }
 
-  // Builtins.
+  // Named Builtins.
   assert(specializedEmitter.isNamedBuiltin());
   auto builtinName = specializedEmitter.getBuiltinName();
   SmallVector<SILValue, 4> consumedArgs;
   for (auto arg : uncurriedArgs) {
-    // Builtins have a special convention that takes everything at +1.
+    // Named builtins are by default assumed to take all arguments at +1 i.e.,
+    // as Owned or Trivial. Named builtins that don't follow this convention
+    // must use a specialized emitter.
     auto maybePlusOne = arg.ensurePlusOne(SGF, uncurriedLoc.getValue());
     consumedArgs.push_back(maybePlusOne.forward(SGF));
   }
@@ -4544,12 +4515,12 @@ SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc, SILValue fn,
   SILType resultType = fnConv.getSILResultType();
 
   if (!silFnType->hasErrorResult()) {
-    return B.createApply(loc, fn, substFnType, resultType, subs, args);
+    return B.createApply(loc, fn, subs, args);
   }
 
   SILBasicBlock *errorBB = createBasicBlock();
   SILBasicBlock *normalBB = createBasicBlock();
-  B.createTryApply(loc, fn, substFnType, subs, args, normalBB, errorBB);
+  B.createTryApply(loc, fn, subs, args, normalBB, errorBB);
 
   // Emit the rethrow logic.
   {
@@ -4680,7 +4651,7 @@ ManagedValue SILGenFunction::emitInjectEnum(SILLocation loc,
                                             SGFContext C) {
   // Easy case -- no payload
   if (!payload) {
-    if (enumTy.isLoadable(SGM.M) || !silConv.useLoweredAddresses()) {
+    if (enumTy.isLoadable(F) || !silConv.useLoweredAddresses()) {
       return emitManagedRValueWithCleanup(
           B.createEnum(loc, SILValue(), element, enumTy.getObjectType()));
     }
@@ -4725,7 +4696,7 @@ ManagedValue SILGenFunction::emitInjectEnum(SILLocation loc,
   }
 
   // Loadable with payload
-  if (enumTy.isLoadable(SGM.M) || !silConv.useLoweredAddresses()) {
+  if (enumTy.isLoadable(F) || !silConv.useLoweredAddresses()) {
     if (!payloadMV) {
       // If the payload was indirect, we already evaluated it and
       // have a single value. Otherwise, evaluate the payload.
@@ -4930,6 +4901,84 @@ RValue SILGenFunction::emitApplyAllocatingInitializer(SILLocation loc,
   return result;
 }
 
+/// Emit an application of the given method.
+RValue SILGenFunction::emitApplyMethod(SILLocation loc, ConcreteDeclRef declRef,
+                                       ArgumentSource &&self,
+                                       PreparedArguments &&args, SGFContext C) {
+  auto *call = cast<AbstractFunctionDecl>(declRef.getDecl());
+
+  // Form the reference to the method.
+  auto callRef = SILDeclRef(call, SILDeclRef::Kind::Func)
+                     .asForeign(requiresForeignEntryPoint(declRef.getDecl()));
+  auto declRefConstant = getConstantInfo(callRef);
+  auto subs = declRef.getSubstitutions();
+
+  // Scope any further writeback just within this operation.
+  FormalEvaluationScope writebackScope(*this);
+
+  // Form the metatype argument.
+  ManagedValue selfMetaVal;
+  SILType selfMetaTy;
+  {
+    // Determine the self metatype type.
+    CanSILFunctionType substFnType =
+        declRefConstant.SILFnType->substGenericArgs(SGM.M, subs);
+    SILType selfParamMetaTy = getSILType(substFnType->getSelfParameter());
+    selfMetaTy = selfParamMetaTy;
+  }
+
+  // Form the callee.
+  Optional<Callee> callee;
+  if (isa<ProtocolDecl>(call->getDeclContext())) {
+    callee.emplace(Callee::forWitnessMethod(*this, selfMetaTy.getASTType(),
+                                            callRef, subs, loc));
+  } else if (getMethodDispatch(call) == MethodDispatch::Class) {
+    callee.emplace(Callee::forClassMethod(*this, callRef, subs, loc));
+  } else {
+    callee.emplace(Callee::forDirect(*this, callRef, subs, loc));
+  }
+
+  auto substFormalType = callee->getSubstFormalType();
+
+  // Form the call emission.
+  CallEmission emission(*this, std::move(*callee), std::move(writebackScope));
+
+  auto methodType = cast<FunctionType>(substFormalType.getResult());
+  auto resultType = methodType.getResult();
+
+  emission.addSelfParam(loc, std::move(self), substFormalType.getParams()[0],
+                        methodType);
+
+  // Arguments.
+  emission.addCallSite(loc, std::move(args), resultType, /*throws*/ false);
+
+  return emission.apply(C);
+}
+
+RValue SILGenFunction::emitApplyPropertyWrapperAllocator(SILLocation loc,
+                                                          SubstitutionMap subs,
+                                                          SILDeclRef ctorRef,
+                                                          Type wrapperTy,
+                                                    CanAnyFunctionType funcTy) {
+  Callee callee = Callee::forDirect(*this, ctorRef, subs, loc);
+
+  MetatypeType *MTty = MetatypeType::get(wrapperTy);
+  auto metatypeVal = B.createMetatype(loc, getLoweredType(MTty));
+  ManagedValue mtManagedVal = ManagedValue::forUnmanaged(metatypeVal);
+  RValue metatypeRVal(*this, loc, MTty->getCanonicalType(), mtManagedVal);
+
+  ArgumentSource ArgSrc(loc, std::move(metatypeRVal));
+  FormalEvaluationScope writebacks(*this);
+  CallEmission emission(*this, std::move(callee), std::move(writebacks));
+
+  AnyFunctionType::Param selfParam((Type(MTty)), Identifier(),
+                                   ParameterTypeFlags());
+  emission.addSelfParam(loc, std::move(ArgSrc), selfParam, funcTy.getResult());
+
+  RValue RV = emission.apply();
+  return RV;
+}
+
 /// Emit a literal that applies the various initializers.
 RValue SILGenFunction::emitLiteral(LiteralExpr *literal, SGFContext C) {
   ConcreteDeclRef builtinInit;
@@ -5132,8 +5181,11 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &SGF,
   auto *decl = cast<AbstractFunctionDecl>(constant.getDecl());
 
   bool isObjCReplacementSelfCall = false;
-  if (isOnSelfParameter && isCallToReplacedInDynamicReplacement(
-                               SGF, decl, isObjCReplacementSelfCall)) {
+  if (isOnSelfParameter &&
+      SGF.getOptions()
+          .EnableDynamicReplacementCanCallPreviousImplementation &&
+      isCallToReplacedInDynamicReplacement(SGF, decl,
+                                           isObjCReplacementSelfCall)) {
     return Callee::forDirect(
         SGF,
         SILDeclRef(cast<AbstractFunctionDecl>(SGF.FunctionDC->getAsDecl()),
@@ -5291,7 +5343,7 @@ ArgumentSource AccessorBaseArgPreparer::prepareAccessorAddressBaseArg() {
   // If the base is currently an address, we may have to copy it.
   if (shouldLoadBaseAddress()) {
     if (selfParam.isConsumed() ||
-        base.getType().isAddressOnly(SGF.getModule())) {
+        base.getType().isAddressOnly(SGF.F)) {
       // The load can only be a take if the base is a +1 rvalue.
       auto shouldTake = IsTake_t(base.hasCleanup());
 
@@ -5638,9 +5690,8 @@ ManagedValue SILGenFunction::emitAddressorAccessor(
   auto pointerType =
     pointer->getType().castTo<BoundGenericStructType>()->getDecl();
   auto props = pointerType->getStoredProperties();
-  assert(props.begin() != props.end());
-  assert(std::next(props.begin()) == props.end());
-  VarDecl *rawPointerField = *props.begin();
+  assert(props.size() == 1);
+  VarDecl *rawPointerField = props[0];
   pointer = B.createStructExtract(loc, pointer, rawPointerField,
                                   SILType::getRawPointerType(getASTContext()));
 
@@ -5704,26 +5755,20 @@ static ManagedValue emitDynamicPartialApply(SILGenFunction &SGF,
                                          CanAnyFunctionType nativeFormalType) {
   auto calleeConvention = ParameterConvention::Direct_Guaranteed;
 
-  auto partialApplyTy =
-      SILBuilder::getPartialApplyResultType(method->getType(),
-                                            /*argCount*/ 1, SGF.SGM.M,
-                                            /*subs*/ {}, calleeConvention);
-
   // Retain 'self' because the partial apply will take ownership.
   // We can't simply forward 'self' because the partial apply is conditional.
   if (!self->getType().isAddress())
     self = SGF.B.emitCopyValueOperation(loc, self);
 
   SILValue resultValue =
-    SGF.B.createPartialApply(loc, method, method->getType(), {},
-                             self, partialApplyTy);
+    SGF.B.createPartialApply(loc, method, {}, self, calleeConvention);
   ManagedValue result = SGF.emitManagedRValueWithCleanup(resultValue);
 
   // If necessary, thunk to the native ownership conventions and bridged types.
   auto nativeTy =
     SGF.getLoweredLoadableType(nativeFormalType).castTo<SILFunctionType>();
 
-  if (nativeTy != partialApplyTy.getASTType()) {
+  if (nativeTy != resultValue->getType().getASTType()) {
     result = SGF.emitBlockToFunc(loc, result, foreignFormalType,
                                  nativeFormalType, nativeTy);
   }

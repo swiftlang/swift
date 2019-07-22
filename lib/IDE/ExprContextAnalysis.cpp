@@ -20,6 +20,7 @@
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Type.h"
@@ -56,14 +57,15 @@ void typeCheckContextImpl(DeclContext *DC, SourceLoc Loc) {
 
   case DeclContextKind::Initializer:
     if (auto *patternInit = dyn_cast<PatternBindingInitializer>(DC)) {
-      auto *PBD = patternInit->getBinding();
-      auto i = patternInit->getBindingIndex();
-      if (PBD->getInit(i)) {
-        PBD->getPattern(i)->forEachVariable([](VarDecl *VD) {
-          typeCheckCompletionDecl(VD);
-        });
-        if (!PBD->isInitializerChecked(i))
-          typeCheckPatternBinding(PBD, i);
+      if (auto *PBD = patternInit->getBinding()) {
+        auto i = patternInit->getBindingIndex();
+        if (PBD->getInit(i)) {
+          PBD->getPattern(i)->forEachVariable([](VarDecl *VD) {
+            typeCheckCompletionDecl(VD);
+          });
+          if (!PBD->isInitializerChecked(i))
+            typeCheckPatternBinding(PBD, i);
+        }
       }
     }
     break;
@@ -289,7 +291,9 @@ static void collectPossibleCalleesByQualifiedLookup(
     Type declaredMemberType = VD->getInterfaceType();
     if (VD->getDeclContext()->isTypeContext()) {
       if (isa<FuncDecl>(VD)) {
-        if (!isOnMetaType)
+        if (!isOnMetaType && VD->isStatic())
+          continue;
+        if (isOnMetaType == VD->isStatic())
           declaredMemberType =
               declaredMemberType->castTo<AnyFunctionType>()->getResult();
       } else if (isa<ConstructorDecl>(VD)) {
@@ -303,9 +307,10 @@ static void collectPossibleCalleesByQualifiedLookup(
       }
     }
 
-    auto fnType = baseTy->getMetatypeInstanceType()->getTypeOfMember(
-        DC.getParentModule(), VD, declaredMemberType);
-
+    auto subs = baseTy->getMetatypeInstanceType()->getMemberSubstitutionMap(
+        DC.getParentModule(), VD,
+        VD->getInnermostDeclContext()->getGenericEnvironmentOfContext());
+    auto fnType = declaredMemberType.subst(subs, SubstFlags::UseErrorType);
     if (!fnType)
       continue;
 
@@ -349,19 +354,29 @@ static bool collectPossibleCalleesForApply(
   auto *fnExpr = callExpr->getFn();
 
   if (auto type = fnExpr->getType()) {
-    if (auto *funcType = type->getAs<AnyFunctionType>())
-      candidates.emplace_back(funcType, fnExpr->getReferencedDecl().getDecl());
-  } else if (auto *DRE = dyn_cast<DeclRefExpr>(fnExpr)) {
+    if (!type->hasUnresolvedType() && !type->hasError()) {
+      if (auto *funcType = type->getAs<AnyFunctionType>()) {
+        auto refDecl = fnExpr->getReferencedDecl();
+        if (!refDecl)
+          if (auto apply = dyn_cast<ApplyExpr>(fnExpr))
+            refDecl = apply->getFn()->getReferencedDecl();
+        candidates.emplace_back(funcType, refDecl.getDecl());
+        return true;
+      }
+    }
+  }
+
+  if (auto *DRE = dyn_cast<DeclRefExpr>(fnExpr)) {
     if (auto *decl = DRE->getDecl()) {
-      auto declType = decl->getInterfaceType();
-      if (auto *funcType = declType->getAs<AnyFunctionType>())
-        candidates.emplace_back(funcType, decl);
+      if (decl->hasInterfaceType())
+        if (auto *funcType = decl->getInterfaceType()->getAs<AnyFunctionType>())
+          candidates.emplace_back(funcType, decl);
     }
   } else if (auto *OSRE = dyn_cast<OverloadSetRefExpr>(fnExpr)) {
     for (auto *decl : OSRE->getDecls()) {
-      auto declType = decl->getInterfaceType();
-      if (auto *funcType = declType->getAs<AnyFunctionType>())
-        candidates.emplace_back(funcType, decl);
+      if (decl->hasInterfaceType())
+        if (auto *funcType = decl->getInterfaceType()->getAs<AnyFunctionType>())
+          candidates.emplace_back(funcType, decl);
     }
   } else if (auto *UDE = dyn_cast<UnresolvedDotExpr>(fnExpr)) {
     collectPossibleCalleesByQualifiedLookup(
@@ -396,6 +411,7 @@ static bool collectPossibleCalleesForSubscript(
   if (subscriptExpr->hasDecl()) {
     if (auto SD = dyn_cast<SubscriptDecl>(subscriptExpr->getDecl().getDecl())) {
       auto declType = SD->getInterfaceType();
+      declType = declType.subst(subscriptExpr->getDecl().getSubstitutions());
       if (auto *funcType = declType->getAs<AnyFunctionType>())
         candidates.emplace_back(funcType, SD);
     }
@@ -403,6 +419,31 @@ static bool collectPossibleCalleesForSubscript(
     collectPossibleCalleesByQualifiedLookup(DC, subscriptExpr->getBase(),
                                             DeclBaseName::createSubscript(),
                                             candidates);
+  }
+  return !candidates.empty();
+}
+
+/// For the given \p unresolvedMemberExpr, collect possible callee types and
+/// declarations.
+static bool collectPossibleCalleesForUnresolvedMember(
+    DeclContext &DC, UnresolvedMemberExpr *unresolvedMemberExpr,
+    SmallVectorImpl<FunctionTypeAndDecl> &candidates) {
+  auto currModule = DC.getParentModule();
+  auto baseName = unresolvedMemberExpr->getName().getBaseName();
+
+  // Get the context of the expression itself.
+  ExprContextInfo contextInfo(&DC, unresolvedMemberExpr);
+  for (auto expectedTy : contextInfo.getPossibleTypes()) {
+    if (!expectedTy->mayHaveMembers())
+      continue;
+    SmallVector<FunctionTypeAndDecl, 2> members;
+    collectPossibleCalleesByQualifiedLookup(DC, MetatypeType::get(expectedTy),
+                                            baseName, members);
+    for (auto member : members) {
+      if (isReferenceableByImplicitMemberExpr(currModule, &DC, expectedTy,
+                                              member.second))
+        candidates.push_back(member);
+    }
   }
   return !candidates.empty();
 }
@@ -470,6 +511,11 @@ class ExprContextAnalyzer {
       if (!collectPossibleCalleesForSubscript(*DC, subscriptExpr, Candidates))
         return false;
       Arg = subscriptExpr->getIndex();
+    } else if (auto *unresolvedMemberExpr = dyn_cast<UnresolvedMemberExpr>(E)) {
+      if (!collectPossibleCalleesForUnresolvedMember(*DC, unresolvedMemberExpr,
+                                                     Candidates))
+        return false;
+      Arg = unresolvedMemberExpr->getArgument();
     } else {
       llvm_unreachable("unexpected expression kind");
     }
@@ -484,7 +530,8 @@ class ExprContextAnalyzer {
     // Collect possible types (or labels) at the position.
     {
       bool MayNeedName = !HasName && !E->isImplicit() &&
-                         (isa<CallExpr>(E) | isa<SubscriptExpr>(E));
+                         (isa<CallExpr>(E) | isa<SubscriptExpr>(E) ||
+                          isa<UnresolvedMemberExpr>(E));
       SmallPtrSet<TypeBase *, 4> seenTypes;
       SmallPtrSet<Identifier, 4> seenNames;
       for (auto &typeAndDecl : Candidates) {
@@ -493,18 +540,30 @@ class ExprContextAnalyzer {
           memberDC = typeAndDecl.second->getInnermostDeclContext();
 
         auto Params = typeAndDecl.first->getParams();
-        if (Position >= Params.size())
-          continue;
-        const auto &Param = Params[Position];
-        if (Param.hasLabel() && MayNeedName) {
-          if (seenNames.insert(Param.getLabel()).second)
-            recordPossibleName(Param.getLabel().str());
-        } else {
-          Type ty = Param.getOldType();
-          if (memberDC && ty->hasTypeParameter())
-            ty = memberDC->mapTypeIntoContext(ty);
-          if (seenTypes.insert(ty.getPointer()).second)
-            recordPossibleType(ty);
+        ParameterList *paramList = nullptr;
+        if (auto VD = typeAndDecl.second) {
+          if (auto FD = dyn_cast<AbstractFunctionDecl>(VD))
+            paramList = FD->getParameters();
+          else if (auto SD = dyn_cast<SubscriptDecl>(VD))
+            paramList = SD->getIndices();
+          if (paramList && paramList->size() != Params.size())
+            paramList = nullptr;
+        }
+        for (auto Pos = Position; Pos < Params.size(); ++Pos) {
+          const auto &Param = Params[Pos];
+          if (Param.hasLabel() && MayNeedName) {
+            if (seenNames.insert(Param.getLabel()).second)
+              recordPossibleName(Param.getLabel().str());
+            if (paramList && paramList->get(Position)->isDefaultArgument())
+              continue;
+          } else {
+            Type ty = Param.getOldType();
+            if (memberDC && ty->hasTypeParameter())
+              ty = memberDC->mapTypeIntoContext(ty);
+            if (seenTypes.insert(ty.getPointer()).second)
+              recordPossibleType(ty);
+          }
+          break;
         }
       }
     }
@@ -515,6 +574,7 @@ class ExprContextAnalyzer {
     switch (Parent->getKind()) {
     case ExprKind::Call:
     case ExprKind::Subscript:
+    case ExprKind::UnresolvedMember:
     case ExprKind::Binary:
     case ExprKind::PrefixUnary: {
       analyzeApplyExpr(Parent);
@@ -523,6 +583,15 @@ class ExprContextAnalyzer {
     case ExprKind::Array: {
       if (auto type = ParsedExpr->getType()) {
         recordPossibleType(type);
+        break;
+      }
+
+      // Check context types of the array literal expression.
+      ExprContextInfo arrayCtxtInfo(DC, Parent);
+      for (auto arrayT : arrayCtxtInfo.getPossibleTypes()) {
+        if (auto boundGenericT = arrayT->getAs<BoundGenericType>())
+          if (boundGenericT->getDecl() == Context.getArrayDecl())
+            recordPossibleType(boundGenericT->getGenericArgs()[0]);
       }
       break;
     }
@@ -633,6 +702,12 @@ class ExprContextAnalyzer {
       break;
     }
     default:
+      if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
+        assert(isSingleExpressionBodyForCodeCompletion(AFD->getBody()));
+        singleExpressionBody = true;
+        recordPossibleType(getReturnTypeFromContext(AFD));
+        break;
+      }
       llvm_unreachable("Unhandled decl kind.");
     }
   }
@@ -653,6 +728,39 @@ class ExprContextAnalyzer {
     }
   }
 
+  void analyzeInitializer(Initializer *initDC) {
+    switch (initDC->getInitializerKind()) {
+    case swift::InitializerKind::PatternBinding: {
+      auto initDC = cast<PatternBindingInitializer>(DC);
+      auto PBD = initDC->getBinding();
+      if (!PBD)
+        break;
+      auto pat = PBD->getPattern(initDC->getBindingIndex());
+      if (pat->hasType())
+        recordPossibleType(pat->getType());
+      break;
+    }
+    case InitializerKind::DefaultArgument: {
+      auto initDC = cast<DefaultArgumentInitializer>(DC);
+      auto AFD = dyn_cast<AbstractFunctionDecl>(initDC->getParent());
+      if (!AFD)
+        return;
+      auto param = AFD->getParameters()->get(initDC->getIndex());
+      if (param->hasInterfaceType())
+        recordPossibleType(AFD->mapTypeIntoContext(param->getInterfaceType()));
+      break;
+    }
+    }
+  }
+
+  /// Whether the given \c BraceStmt, which must be the body of a function or
+  /// closure, should be treated as a single-expression return for the purposes
+  /// of code-completion.
+  ///
+  /// We cannot use hasSingleExpressionBody, because we explicitly do not use
+  /// the single-expression-body when there is code-completion in the expression
+  /// in order to avoid a base expression affecting the type. However, now that
+  /// we've typechecked, we will take the context type into account.
   static bool isSingleExpressionBodyForCodeCompletion(BraceStmt *body) {
     return body->getNumElements() == 1 && body->getElements()[0].is<Expr *>();
   }
@@ -692,21 +800,18 @@ public:
         case ExprKind::Assign:
         case ExprKind::Array:
           return true;
+        case ExprKind::UnresolvedMember:
+          return true;
         case ExprKind::Tuple: {
           auto ParentE = Parent.getAsExpr();
           return !ParentE ||
                  (!isa<CallExpr>(ParentE) && !isa<SubscriptExpr>(ParentE) &&
-                  !isa<BinaryExpr>(ParentE));
+                  !isa<BinaryExpr>(ParentE) &&
+                  !isa<UnresolvedMemberExpr>(ParentE));
         }
-        case ExprKind::Closure: {
-          // Note: we cannot use hasSingleExpressionBody, because we explicitly
-          // do not use the single-expression-body when there is code-completion
-          // in the expression in order to avoid a base expression affecting
-          // the type. However, now that we've typechecked, we will take the
-          // context type into account.
+        case ExprKind::Closure:
           return isSingleExpressionBodyForCodeCompletion(
               cast<ClosureExpr>(E)->getBody());
-        }
         default:
           return false;
         }
@@ -727,6 +832,9 @@ public:
         case DeclKind::PatternBinding:
           return true;
         default:
+          if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D))
+            if (auto *body = AFD->getBody())
+              return isSingleExpressionBodyForCodeCompletion(body);
           return false;
         }
       } else if (auto P = Node.getAsPattern()) {
@@ -740,13 +848,17 @@ public:
         return false;
     });
 
-    // For 'Initializer' context, we need to look into its parent because it
-    // might constrain the initializer's type.
+    // For 'Initializer' context, we need to look into its parent.
     auto analyzeDC = isa<Initializer>(DC) ? DC->getParent() : DC;
     analyzeDC->walkContext(Finder);
 
-    if (Finder.Ancestors.empty())
+    if (Finder.Ancestors.empty()) {
+      // There's no parent context in DC. But still, the parent of the
+      // initializer might constrain the initializer's type.
+      if (auto initDC = dyn_cast<Initializer>(DC))
+        analyzeInitializer(initDC);
       return;
+    }
 
     auto &P = Finder.Ancestors.back();
     if (auto Parent = P.getAsExpr()) {
@@ -767,4 +879,83 @@ ExprContextInfo::ExprContextInfo(DeclContext *DC, Expr *TargetExpr) {
   ExprContextAnalyzer Analyzer(DC, TargetExpr, PossibleTypes, PossibleNames,
                                PossibleCallees, singleExpressionBody);
   Analyzer.Analyze();
+}
+
+//===----------------------------------------------------------------------===//
+// isReferenceableByImplicitMemberExpr(ModuleD, DeclContext, Type, ValueDecl)
+//===----------------------------------------------------------------------===//
+
+bool swift::ide::isReferenceableByImplicitMemberExpr(
+        ModuleDecl *CurrModule, DeclContext *DC, Type T, ValueDecl *VD) {
+
+  if (VD->isOperator())
+    return false;
+
+  if (!VD->hasInterfaceType())
+    return false;
+
+  if (T->getOptionalObjectType() &&
+      VD->getModuleContext()->isStdlibModule()) {
+    // In optional context, ignore '.init(<some>)', 'init(nilLiteral:)',
+    if (isa<ConstructorDecl>(VD))
+      return false;
+    // TODO: Ignore '.some(<Wrapped>)' and '.none' too *in expression
+    // context*. They are useful in pattern context though.
+  }
+
+  // Enum element decls can always be referenced by implicit member
+  // expression.
+  if (isa<EnumElementDecl>(VD))
+    return true;
+
+  // Only non-failable constructors are implicitly referenceable.
+  if (auto CD = dyn_cast<ConstructorDecl>(VD)) {
+    switch (CD->getFailability()) {
+      case OTK_None:
+      case OTK_ImplicitlyUnwrappedOptional:
+        return true;
+      case OTK_Optional:
+        return false;
+    }
+  }
+
+  // Otherwise, check the result type matches the contextual type.
+  auto declTy = T->getTypeOfMember(CurrModule, VD);
+  if (declTy->is<ErrorType>())
+    return false;
+
+  // Member types can also be implicitly referenceable as long as it's
+  // convertible to the contextual type.
+  if (auto CD = dyn_cast<TypeDecl>(VD)) {
+    declTy = declTy->getMetatypeInstanceType();
+
+    // Emit construction for the same type via typealias doesn't make sense
+    // because we are emitting all `.init()`s.
+    if (declTy->isEqual(T))
+      return false;
+
+    // Only non-protocol nominal type can be instantiated.
+    auto nominal = declTy->getAnyNominal();
+    if (!nominal || isa<ProtocolDecl>(nominal))
+      return false;
+
+    return swift::isConvertibleTo(declTy, T, /*openArchetypes=*/true, *DC);
+  }
+
+  // Only static member can be referenced.
+  if (!VD->isStatic())
+    return false;
+
+  if (isa<FuncDecl>(VD)) {
+    // Strip '(Self.Type) ->' and parameters.
+    declTy = declTy->castTo<AnyFunctionType>()->getResult();
+    declTy = declTy->castTo<AnyFunctionType>()->getResult();
+  } else if (auto FT = declTy->getAs<AnyFunctionType>()) {
+    // The compiler accepts 'static var factory: () -> T' for implicit
+    // member expression.
+    // FIXME: This emits just 'factory'. We should emit 'factory()' instead.
+    declTy = FT->getResult();
+  }
+  return declTy->isEqual(T) ||
+         swift::isConvertibleTo(declTy, T, /*openArchetypes=*/true, *DC);
 }

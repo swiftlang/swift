@@ -151,9 +151,10 @@ SILFunction::~SILFunction() {
          "Function cannot be deleted while function_ref's still exist");
 }
 
-void SILFunction::createProfiler(ASTNode Root, ForDefinition_t forDefinition) {
+void SILFunction::createProfiler(ASTNode Root, SILDeclRef forDecl,
+                                 ForDefinition_t forDefinition) {
   assert(!Profiler && "Function already has a profiler");
-  Profiler = SILProfiler::create(Module, forDefinition, Root);
+  Profiler = SILProfiler::create(Module, forDefinition, Root, forDecl);
 }
 
 bool SILFunction::hasForeignBody() const {
@@ -228,45 +229,34 @@ bool SILFunction::isNoReturnFunction() const {
 
 const TypeLowering &
 SILFunction::getTypeLowering(AbstractionPattern orig, Type subst) {
-  // FIXME: Expansion
   return getModule().Types.getTypeLowering(orig, subst,
-                                            ResilienceExpansion::Minimal);
+                                           getResilienceExpansion());
 }
 
 const TypeLowering &SILFunction::getTypeLowering(Type t) const {
-  // FIXME: Expansion
-  return getModule().Types.getTypeLowering(t, ResilienceExpansion::Minimal);
+  return getModule().Types.getTypeLowering(t, getResilienceExpansion());
 }
 
 SILType
 SILFunction::getLoweredType(AbstractionPattern orig, Type subst) const {
-  // FIXME: Expansion
   return getModule().Types.getLoweredType(orig, subst,
-                                          ResilienceExpansion::Minimal);
+                                          getResilienceExpansion());
 }
 
 SILType SILFunction::getLoweredType(Type t) const {
-  // FIXME: Expansion
-  return getModule().Types.getLoweredType(t,
-                                          ResilienceExpansion::Minimal);
+  return getModule().Types.getLoweredType(t, getResilienceExpansion());
 }
 
 SILType SILFunction::getLoweredLoadableType(Type t) const {
-  // FIXME: Expansion
-  return getModule().Types.getLoweredLoadableType(t,
-                                                  ResilienceExpansion::Minimal);
+  return getModule().Types.getLoweredLoadableType(t, getResilienceExpansion());
 }
 
 const TypeLowering &SILFunction::getTypeLowering(SILType type) const {
-  // FIXME: Expansion
-  return getModule().Types.getTypeLowering(type,
-                                           ResilienceExpansion::Minimal);
+  return getModule().Types.getTypeLowering(type, getResilienceExpansion());
 }
 
 bool SILFunction::isTypeABIAccessible(SILType type) const {
-  // FIXME: Expansion
-  return getModule().isTypeABIAccessible(type,
-                                         ResilienceExpansion::Minimal);
+  return getModule().isTypeABIAccessible(type, getResilienceExpansion());
 }
 
 SILBasicBlock *SILFunction::createBasicBlock() {

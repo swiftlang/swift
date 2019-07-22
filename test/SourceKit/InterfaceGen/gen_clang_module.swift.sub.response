@@ -264,7 +264,8 @@ public var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.module,
     key.offset: 35,
-    key.length: 17
+    key.length: 17,
+    key.is_system: 1
   },
   {
     key.kind: source.lang.swift.ref.struct,

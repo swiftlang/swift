@@ -115,12 +115,14 @@
         {
           "kind": "Conformance",
           "name": "ObjcProt",
-          "printedName": "ObjcProt"
+          "printedName": "ObjcProt",
+          "usr": "c:objc(pl)ObjcProt"
         },
         {
           "kind": "Conformance",
           "name": "NSObjectProtocol",
-          "printedName": "NSObjectProtocol"
+          "printedName": "NSObjectProtocol",
+          "usr": "c:objc(pl)NSObject"
         }
       ]
     },

@@ -31,6 +31,7 @@ import BinaryFloatingPointConversionFromBinaryInteger
 import BinaryFloatingPointProperties
 import BitCount
 import Breadcrumbs
+import BucketSort
 import ByteSwap
 import COWTree
 import COWArrayGuaranteedParameterOverhead
@@ -65,6 +66,8 @@ import DictionaryOfAnyHashableStrings
 import DictionaryRemove
 import DictionarySubscriptDefault
 import DictionarySwap
+import Diffing
+import DiffingMyers
 import DropFirst
 import DropLast
 import DropWhile
@@ -73,11 +76,13 @@ import Exclusivity
 import ExistentialPerformance
 import Fibonacci
 import FlattenList
+import FloatingPointParsing
 import FloatingPointPrinting
 import Hanoi
 import Hash
 import Histogram
 import InsertCharacter
+import IntegerParsing
 import Integrate
 import IterateData
 import Join
@@ -90,6 +95,7 @@ import Memset
 import MonteCarloE
 import MonteCarloPi
 import NibbleSort
+import NIOChannelPipeline
 import NSDictionaryCastToSwift
 import NSError
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
@@ -198,13 +204,12 @@ registerBenchmark(BinaryFloatingPointPropertiesNextUp)
 registerBenchmark(BinaryFloatingPointPropertiesUlp)
 registerBenchmark(BitCount)
 registerBenchmark(Breadcrumbs)
+registerBenchmark(BucketSort)
 registerBenchmark(ByteSwap)
 registerBenchmark(COWTree)
 registerBenchmark(COWArrayGuaranteedParameterOverhead)
 registerBenchmark(CString)
 registerBenchmark(CSVParsing)
-registerBenchmark(CSVParsingAlt)
-registerBenchmark(CSVParsingAltIndices)
 registerBenchmark(Calculator)
 registerBenchmark(CaptureProp)
 registerBenchmark(ChainedFilterMap)
@@ -237,6 +242,8 @@ registerBenchmark(DictionaryOfAnyHashableStrings)
 registerBenchmark(DictionaryRemove)
 registerBenchmark(DictionarySubscriptDefault)
 registerBenchmark(DictionarySwap)
+registerBenchmark(Diffing)
+registerBenchmark(DiffingMyers)
 registerBenchmark(DropFirst)
 registerBenchmark(DropLast)
 registerBenchmark(DropWhile)
@@ -246,11 +253,13 @@ registerBenchmark(ExistentialPerformance)
 registerBenchmark(Fibonacci)
 registerBenchmark(FlattenListLoop)
 registerBenchmark(FlattenListFlatMap)
+registerBenchmark(FloatingPointParsing)
 registerBenchmark(FloatingPointPrinting)
 registerBenchmark(Hanoi)
 registerBenchmark(HashTest)
 registerBenchmark(Histogram)
 registerBenchmark(InsertCharacter)
+registerBenchmark(IntegerParsing)
 registerBenchmark(IntegrateTest)
 registerBenchmark(IterateData)
 registerBenchmark(Join)
@@ -268,6 +277,7 @@ registerBenchmark(NSErrorTest)
 registerBenchmark(NSStringConversion)
 #endif
 registerBenchmark(NibbleSort)
+registerBenchmark(NIOChannelPipeline)
 registerBenchmark(NopDeinit)
 registerBenchmark(ObjectAllocation)
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)

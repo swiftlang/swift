@@ -26,8 +26,7 @@ struct X {
 }
 
 func testSubscript(x: X, i: Int) {
-  // CHECK: disabled disjunction term {{.*}} bound to key path application
-  // CHECK-NEXT: disabled disjunction term {{.*}}X.subscript(_:)
+  // CHECK: disabled disjunction term {{.*}}X.subscript(_:)
   // CHECK-NEXT: disabled disjunction term {{.*}}X.subscript(_:_:_:)
   // CHECK-NEXT: introducing single enabled disjunction term {{.*}} bound to decl overload_filtering.(file).X.subscript(_:_:)
   _ = x[i, i]
@@ -38,4 +37,15 @@ func testUnresolvedMember(i: Int) -> X {
   // CHECK-NEXT: disabled disjunction term {{.*}} bound to decl overload_filtering.(file).X.init(_:_:_:)
   // CHECK-NEXT: introducing single enabled disjunction term {{.*}} bound to decl overload_filtering.(file).X.init(_:_:)
   return .init(i, i)
+}
+
+func trailing(x: Int = 0, y: () -> Void) { }
+func trailing(x: Int = 0, z: Float) { }
+
+func testTrailing() {
+  // CHECK: disabled disjunction term {{.*}} bound to decl overload_filtering.(file).trailing(x:z:)
+  trailing() { }
+
+  // CHECK: disabled disjunction term {{.*}} bound to decl overload_filtering.(file).trailing(x:z:)
+  trailing(x: 5) { }
 }

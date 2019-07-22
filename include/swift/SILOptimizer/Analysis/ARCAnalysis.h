@@ -72,12 +72,13 @@ bool mustGuaranteedUseValue(SILInstruction *User, SILValue Ptr,
 /// Returns true if \p Inst can never conservatively decrement reference counts.
 bool canNeverDecrementRefCounts(SILInstruction *Inst);
 
-/// \returns True if \p User can never use a value in a way that requires the
-/// value to be alive.
+/// Returns true if \p Inst may access any indirect object either via an address
+/// or reference.
 ///
-/// This is purposefully a negative query to contrast with canUseValue which is
-/// about a specific value while this is about general values.
-bool canNeverUseValues(SILInstruction *User);
+/// If false is returned and \p Inst has an address or reference type operand,
+/// then \p Inst only operates on the value of the address itself, not the
+/// memory. i.e. it does not dereference the address.
+bool canUseObject(SILInstruction *Inst);
 
 /// \returns true if the user \p User may use \p Ptr in a manner that requires
 /// Ptr's life to be guaranteed to exist at this point.

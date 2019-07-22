@@ -77,7 +77,7 @@ static bool expandCopyAddr(CopyAddrInst *CA) {
 
   // If we have an address only type don't do anything.
   SILType SrcType = Source->getType();
-  if (SrcType.isAddressOnly(M))
+  if (SrcType.isAddressOnly(*F))
     return false;
 
   bool expand = shouldExpand(M, SrcType.getObjectType());
@@ -147,7 +147,7 @@ static bool expandDestroyAddr(DestroyAddrInst *DA) {
 
   // If we have an address only type, do nothing.
   SILType Type = Addr->getType();
-  if (Type.isAddressOnly(Module))
+  if (Type.isAddressOnly(*F))
     return false;
 
   bool expand = shouldExpand(Module, Type.getObjectType());
@@ -180,7 +180,7 @@ static bool expandReleaseValue(ReleaseValueInst *DV) {
   // If we have an address only type, do nothing.
   SILType Type = Value->getType();
   assert(!SILModuleConventions(Module).useLoweredAddresses()
-         || Type.isLoadable(Module) &&
+         || Type.isLoadable(*F) &&
          "release_value should never be called on a non-loadable type.");
 
   if (!shouldExpand(Module, Type.getObjectType()))
@@ -208,7 +208,7 @@ static bool expandRetainValue(RetainValueInst *CV) {
   // If we have an address only type, do nothing.
   SILType Type = Value->getType();
   assert(!SILModuleConventions(Module).useLoweredAddresses()
-         || Type.isLoadable(Module) &&
+         || Type.isLoadable(*F) &&
          "Copy Value can only be called on loadable types.");
 
   if (!shouldExpand(Module, Type.getObjectType()))

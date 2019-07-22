@@ -468,9 +468,9 @@ namespace {
     }
     
     void addExtendedContext() {
-      auto string = IGM.getTypeRef(
-          E->getSelfInterfaceType()->getCanonicalType(),
-          MangledTypeRefRole::Metadata);
+      auto string = IGM.getTypeRef(E->getSelfInterfaceType(),
+                                   E->getGenericSignature(),
+                                   MangledTypeRefRole::Metadata);
       B.addRelativeAddress(string);
     }
     
@@ -512,11 +512,22 @@ namespace {
     
     using super = ContextDescriptorBuilderBase;
     
-    DeclContext *DC;
+    PointerUnion<DeclContext *, VarDecl *> Name;
   
+    DeclContext *getInnermostDeclContext() {
+      if (auto DC = Name.dyn_cast<DeclContext *>()) {
+        return DC;
+      }
+      if (auto VD = Name.dyn_cast<VarDecl *>()) {
+        return VD->getInnermostDeclContext();
+      }
+      llvm_unreachable("unknown name kind");
+    }
+      
   public:
-    AnonymousContextDescriptorBuilder(IRGenModule &IGM, DeclContext *DC)
-      : super(IGM), DC(DC)
+    AnonymousContextDescriptorBuilder(IRGenModule &IGM,
+                                    PointerUnion<DeclContext *, VarDecl *> Name)
+      : super(IGM), Name(Name)
     {
     }
     
@@ -528,7 +539,7 @@ namespace {
   
     ConstantReference getParent() {
       return IGM.getAddrOfParentContextDescriptor(
-               DC, /*fromAnonymousContext=*/true);
+               getInnermostDeclContext(), /*fromAnonymousContext=*/true);
     }
     
     ContextDescriptorKind getContextKind() {
@@ -536,7 +547,7 @@ namespace {
     }
     
     GenericSignature *getGenericSignature() {
-      return DC->getGenericSignatureOfContext();
+      return getInnermostDeclContext()->getGenericSignatureOfContext();
     }
     
     bool isUniqueDescriptor() {
@@ -556,7 +567,7 @@ namespace {
         return;
 
       IRGenMangler mangler;
-      auto mangledName = mangler.mangleContext(DC);
+      auto mangledName = mangler.mangleAnonymousDescriptorName(Name);
       auto mangledNameConstant =
         IGM.getAddrOfGlobalString(mangledName,
                                   /*willBeRelativelyAddressed*/ true);
@@ -565,7 +576,7 @@ namespace {
 
     void emit() {
       asImpl().layout();
-      auto addr = IGM.getAddrOfAnonymousContextDescriptor(DC,
+      auto addr = IGM.getAddrOfAnonymousContextDescriptor(Name,
                                                      B.finishAndCreateFuture());
       auto var = cast<llvm::GlobalVariable>(addr);
       
@@ -810,8 +821,7 @@ namespace {
           continue;
 
         auto witness =
-          entry.getAssociatedTypeWitness().Witness->mapTypeOutOfContext()
-            ->getCanonicalType();
+            entry.getAssociatedTypeWitness().Witness->mapTypeOutOfContext();
         return IGM.getAssociatedTypeWitness(witness,
                                             /*inProtocolContext=*/true);
       }
@@ -1241,7 +1251,7 @@ namespace {
       auto properties = getType()->getStoredProperties();
 
       // uint32_t NumFields;
-      B.addInt32(std::distance(properties.begin(), properties.end()));
+      B.addInt32(properties.size());
 
       // uint32_t FieldOffsetVectorOffset;
       B.addInt32(FieldVectorOffset / IGM.getPointerSize());
@@ -1581,7 +1591,9 @@ namespace {
 
       // TargetRelativeDirectPointer<Runtime, const char> SuperclassType;
       if (auto superclassType = getType()->getSuperclass()) {
+        GenericSignature *genericSig = getType()->getGenericSignature();
         B.addRelativeAddress(IGM.getTypeRef(superclassType->getCanonicalType(),
+                                            genericSig,
                                             MangledTypeRefRole::Metadata));
       } else {
         B.addInt32(0);
@@ -1628,7 +1640,7 @@ namespace {
       B.addInt32(numImmediateMembers);
 
       // uint32_t NumFields;
-      B.addInt32(std::distance(properties.begin(), properties.end()));
+      B.addInt32(properties.size());
 
       // uint32_t FieldOffsetVectorOffset;
       B.addInt32(getFieldVectorOffset() / IGM.getPointerSize());
@@ -1671,14 +1683,12 @@ namespace {
       auto underlyingType = Type(O->getUnderlyingInterfaceType())
         .subst(*O->getUnderlyingTypeSubstitutions())
         ->getCanonicalType(O->getOpaqueInterfaceGenericSignature());
-      
+
       B.addRelativeAddress(IGM.getTypeRef(underlyingType,
                                           MangledTypeRefRole::Metadata));
       
       auto opaqueType = O->getDeclaredInterfaceType()
                          ->castTo<OpaqueTypeArchetypeType>();
-      
-      
       
       for (auto proto : opaqueType->getConformsTo()) {
         auto conformance = ProtocolConformanceRef(proto);
@@ -1710,6 +1720,7 @@ namespace {
       case SILLinkage::PublicNonABI:
         return false;
       }
+      llvm_unreachable("covered switch");
     }
     
     GenericSignature *getGenericSignature() {
@@ -1717,6 +1728,16 @@ namespace {
     }
     
     ConstantReference getParent() {
+      // VarDecls aren't normally contexts, but we still want to mangle
+      // an anonymous context for one.
+      if (IGM.IRGen.Opts.EnableAnonymousContextMangledNames) {
+        if (auto namingVar = dyn_cast<VarDecl>(O->getNamingDecl())) {
+          return ConstantReference(
+                           IGM.getAddrOfAnonymousContextDescriptor(namingVar),
+                           ConstantReference::Direct);
+        }
+      }
+      
       DeclContext *parent = O->getNamingDecl()->getInnermostDeclContext();
 
       // If we have debug mangled names enabled for anonymous contexts, nest
@@ -1747,6 +1768,7 @@ namespace {
       
       var->setConstant(true);
       IGM.setTrueConstGlobal(var);
+      IGM.emitOpaqueTypeDescriptorAccessor(O);
     }
     
     uint16_t getKindSpecificFlags() {
@@ -1871,8 +1893,9 @@ IRGenModule::getAddrOfExtensionContextDescriptor(ExtensionDecl *ED,
 }
 
 llvm::Constant *
-IRGenModule::getAddrOfAnonymousContextDescriptor(DeclContext *DC,
-                                                 ConstantInit definition) {
+IRGenModule::getAddrOfAnonymousContextDescriptor(
+                                     PointerUnion<DeclContext *, VarDecl *> DC,
+                                     ConstantInit definition) {
   auto entity = LinkEntity::forAnonymousDescriptor(DC);
   return getAddrOfSharedContextDescriptor(entity, definition,
     [&]{ AnonymousContextDescriptorBuilder(*this, DC).emit(); });
@@ -4243,7 +4266,7 @@ static void addGenericRequirement(IRGenModule &IGM, ConstantStructBuilder &B,
 
   B.addInt(IGM.Int32Ty, flags.getIntValue());
   auto typeName =
-    IGM.getTypeRef(paramType->getCanonicalType(), MangledTypeRefRole::Metadata);
+      IGM.getTypeRef(paramType, nullptr, MangledTypeRefRole::Metadata);
   B.addRelativeAddress(typeName);
   addReference();
 }
@@ -4310,8 +4333,8 @@ GenericRequirementsMetadata irgen::addGenericRequirements(
 
       auto flags = GenericRequirementFlags(abiKind, false, false);
       auto typeName =
-        IGM.getTypeRef(requirement.getSecondType()->getCanonicalType(),
-                       MangledTypeRefRole::Metadata);
+          IGM.getTypeRef(requirement.getSecondType(), nullptr,
+                         MangledTypeRefRole::Metadata);
 
       addGenericRequirement(IGM, B, metadata, sig, flags,
                             requirement.getFirstType(),

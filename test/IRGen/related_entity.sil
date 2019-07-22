@@ -13,6 +13,18 @@ sil @use_metatypes : $@convention(thin) () -> () {
 bb0:
   %take = function_ref @take_metatype : $@convention(thin) <T> (@thick T.Type) -> ()
 
+// CHECK:         [[NestedTypedefErrorCode_NAME:@[0-9]+]] = private constant [29 x i8] c"Code\00NNestedTypedefError\00St\00\00"
+// CHECK:         @"$sSo18NestedTypedefErroraMn" = linkonce_odr hidden constant
+// CHECK-SAME:    <i32 0x0006_0012>
+// CHECK-SAME:    @"$sSoMXM"
+// CHECK-SAME:    [29 x i8]* [[NestedTypedefErrorCode_NAME]]
+
+// CHECK:         [[NestedTagError_NAME:@[0-9]+]] = private constant [29 x i8] c"TagError\00NNestedTagError\00Re\00\00"
+// CHECK:         @"$sSC14NestedTagErrorLeVMn" = linkonce_odr hidden constant
+// CHECK-SAME:    <i32 0x0006_0011>
+// CHECK-SAME:    @"$sSCMXM"
+// CHECK-SAME:    [29 x i8]* [[NestedTagError_NAME]]
+
 // CHECK:         [[TypedefError2Code_NAME:@[0-9]+]] = private constant [24 x i8] c"Code\00NTypedefError2\00St\00\00"
 // CHECK:         @"$sSo13TypedefError2aMn" = linkonce_odr hidden constant
 // CHECK-SAME:    <i32 0x0006_0012>
@@ -48,6 +60,12 @@ bb0:
 
   %3 = metatype $@thick TypedefError2.Code.Type
   apply %take<TypedefError2.Code>(%3) : $@convention(thin) <T> (@thick T.Type) -> ()
+
+  %4 = metatype $@thick Nested.TagError.Type
+  apply %take<Nested.TagError>(%4) : $@convention(thin) <T> (@thick T.Type) -> ()
+
+  %5 = metatype $@thick Nested.TypedefError.Code.Type
+  apply %take<Nested.TypedefError.Code>(%5) : $@convention(thin) <T> (@thick T.Type) -> ()
 
   %ret = tuple ()
   return %ret : $()

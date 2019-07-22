@@ -145,10 +145,12 @@ struct CheckerOptions {
   bool AbortOnModuleLoadFailure;
   bool PrintModule;
   bool SwiftOnly;
+  bool SkipOSCheck;
   StringRef LocationFilter;
 };
 
 class SDKContext {
+  std::vector<std::unique_ptr<CompilerInstance>> CIs;
   llvm::StringSet<> TextData;
   llvm::BumpPtrAllocator Allocator;
   SourceManager SourceMgr;
@@ -160,11 +162,14 @@ class SDKContext {
 
   CheckerOptions Opts;
   std::vector<BreakingAttributeInfo> BreakingAttrs;
-  /// This is to cache the equal comparison results between nodes.
-  llvm::DenseMap<const SDKNode*, llvm::DenseMap<const SDKNode*, bool>> EqualCache;
 
 public:
+  // Define the set of known identifiers.
+#define IDENTIFIER_WITH_NAME(Name, IdStr) StringRef Id_##Name = IdStr;
+#include "swift/AST/KnownIdentifiers.def"
+
   SDKContext(CheckerOptions Options);
+
   llvm::BumpPtrAllocator &allocator() {
     return Allocator;
   }
@@ -189,6 +194,8 @@ public:
   DiagnosticEngine &getDiags() {
     return Diags;
   }
+  StringRef getPlatformIntroVersion(Decl *D, PlatformKind Kind);
+  StringRef getLanguageIntroVersion(Decl *D);
   bool isEqual(const SDKNode &Left, const SDKNode &Right);
   bool checkingABI() const { return Opts.ABI; }
   AccessLevel getAccessLevel(const ValueDecl *VD) const;
@@ -196,6 +203,11 @@ public:
   bool shouldIgnore(Decl *D, const Decl* Parent = nullptr) const;
   ArrayRef<BreakingAttributeInfo> getBreakingAttributeInfo() const { return BreakingAttrs; }
   Optional<uint8_t> getFixedBinaryOrder(ValueDecl *VD) const;
+
+  CompilerInstance &newCompilerInstance() {
+    CIs.emplace_back(new CompilerInstance());
+    return *CIs.back();
+  }
 
   template<class YAMLNodeTy, typename ...ArgTypes>
   void diagnose(YAMLNodeTy node, Diag<ArgTypes...> ID,
@@ -287,6 +299,17 @@ public:
   }
 };
 
+struct PlatformIntroVersion {
+  StringRef macos;
+  StringRef ios;
+  StringRef tvos;
+  StringRef watchos;
+  StringRef swift;
+  bool hasOSAvailability() const {
+    return !macos.empty() || !ios.empty() || !tvos.empty() || !watchos.empty();
+  }
+};
+
 class SDKNodeDecl: public SDKNode {
   DeclKind DKind;
   StringRef Usr;
@@ -304,6 +327,7 @@ class SDKNodeDecl: public SDKNode {
   uint8_t ReferenceOwnership;
   StringRef GenericSig;
   Optional<uint8_t> FixedBinaryOrder;
+  PlatformIntroVersion introVersions;
 
 protected:
   SDKNodeDecl(SDKNodeInitInfo Info, SDKNodeKind Kind);
@@ -338,6 +362,7 @@ public:
   StringRef getScreenInfo() const;
   bool hasFixedBinaryOrder() const { return FixedBinaryOrder.hasValue(); }
   uint8_t getFixedBinaryOrder() const { return *FixedBinaryOrder; }
+  PlatformIntroVersion getIntroducingVersion() const { return introVersions; }
   virtual void jsonize(json::Output &Out) override;
   virtual void diagnose(SDKNode *Right) override;
 
@@ -460,6 +485,9 @@ class SDKNodeDeclType: public SDKNodeDecl {
   std::vector<StringRef> SuperclassNames;
   std::vector<SDKNode*> Conformances;
   StringRef EnumRawTypeName;
+  // Check whether the type declaration is pulled from an external module so we
+  // can incorporate extensions in the interested module.
+  bool IsExternal;
 public:
   SDKNodeDeclType(SDKNodeInitInfo Info);
   static bool classof(const SDKNode *N);
@@ -468,6 +496,7 @@ public:
   void addConformance(SDKNode *Conf);
   ArrayRef<SDKNode*> getConformances() const { return Conformances; }
   NodeVector getConformances() { return Conformances; }
+  bool isExternal() const { return IsExternal; }
   StringRef getSuperClassName() const {
     return SuperclassNames.empty() ? StringRef() : SuperclassNames.front();
   };
@@ -499,11 +528,13 @@ public:
 /// The SDKNode part of the conformance node is constructed using the protocol
 /// in the conformance, thus getName() will give us the name of the protocol.
 class SDKNodeConformance: public SDKNode {
+  StringRef Usr;
   SDKNodeDeclType *TypeDecl;
   friend class SDKNodeDeclType;
   bool IsABIPlaceholder;
 public:
   SDKNodeConformance(SDKNodeInitInfo Info);
+  StringRef getUsr() const { return Usr; }
   ArrayRef<SDKNode*> getTypeWitnesses() const { return Children; }
   SDKNodeDeclType *getNominalTypeDecl() const { return TypeDecl; }
   bool isABIPlaceholder() const { return IsABIPlaceholder; }
@@ -549,23 +580,22 @@ public:
   static bool classof(const SDKNode *N);
 };
 
+class SDKNodeDeclAccessor;
 class SDKNodeDeclVar : public SDKNodeDecl {
   bool IsLet;
   bool HasStorage;
-  bool HasDidSet;
-  bool HasWillSet;
+  std::vector<SDKNode*> Accessors;
 public:
   SDKNodeDeclVar(SDKNodeInitInfo Info);
   static bool classof(const SDKNode *N);
-  SDKNodeDeclGetter *getGetter() const;
-  SDKNodeDeclSetter *getSetter() const;
+  SDKNodeDeclAccessor *getAccessor(AccessorKind Kind) const;
+  ArrayRef<SDKNode*> getAllAccessors() const { return Accessors; }
   SDKNodeType *getType() const;
   bool isLet() const { return IsLet; }
   void jsonize(json::Output &Out) override;
   void diagnose(SDKNode *Right) override;
   bool hasStorage() const { return HasStorage; }
-  bool hasDidSet() const { return HasDidSet; }
-  bool hasWillSet() const { return HasWillSet; }
+  void addAccessor(SDKNode* AC);
 };
 
 class SDKNodeDeclAbstractFunc : public SDKNodeDecl {
@@ -589,19 +619,16 @@ public:
 };
 
 class SDKNodeDeclSubscript: public SDKNodeDeclAbstractFunc {
-  bool HasSetter;
   bool HasStorage;
-  bool HasDidSet;
-  bool HasWillSet;
+  std::vector<SDKNode*> Accessors;
 public:
   SDKNodeDeclSubscript(SDKNodeInitInfo Info);
   static bool classof(const SDKNode *N);
-  bool hasSetter() const { return HasSetter; }
   bool hasStorage() const { return HasStorage; }
+  SDKNodeDeclAccessor *getAccessor(AccessorKind Kind) const;
+  ArrayRef<SDKNode*> getAllAccessors() const { return Accessors; }
   void jsonize(json::Output &Out) override;
-  void diagnose(SDKNode *Right) override;
-  bool hasDidSet() const { return HasDidSet; }
-  bool hasWillSet() const { return HasWillSet; }
+  void addAccessor(SDKNode* AC);
 };
 
 class SDKNodeDeclFunction: public SDKNodeDeclAbstractFunc {
@@ -621,16 +648,17 @@ public:
   static bool classof(const SDKNode *N);
 };
 
-class SDKNodeDeclGetter: public SDKNodeDeclAbstractFunc {
+class SDKNodeDeclAccessor: public SDKNodeDeclAbstractFunc {
+  SDKNodeDecl *Owner;
+  AccessorKind AccKind;
+  friend class SDKNodeDeclVar;
+  friend class SDKNodeDeclSubscript;
 public:
-  SDKNodeDeclGetter(SDKNodeInitInfo Info);
+  SDKNodeDeclAccessor(SDKNodeInitInfo Info);
+  AccessorKind getAccessorKind() const { return AccKind; }
   static bool classof(const SDKNode *N);
-};
-
-class SDKNodeDeclSetter: public SDKNodeDeclAbstractFunc {
-public:
-  SDKNodeDeclSetter(SDKNodeInitInfo Info);
-  static bool classof(const SDKNode *N);
+  SDKNodeDecl* getStorage() const { return Owner; }
+  void jsonize(json::Output &Out) override;
 };
 
 // The additional information we need for a type node in the digest.
@@ -663,6 +691,7 @@ public:
 
   // Serialize the content of all roots to a given file using JSON format.
   void serialize(StringRef Filename);
+  static void serialize(StringRef Filename, SDKNode *Root);
 
   // After collecting decls, either from imported modules or from a previously
   // serialized JSON file, using this function to get the root of the SDK.
@@ -690,7 +719,8 @@ public:
   std::vector<SDKNode*> createParameterNodes(ParameterList *PL);
   SDKNode *constructTypeNode(Type T, TypeInitInfo Info = TypeInitInfo());
   void processValueDecl(ValueDecl *VD);
-  void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override;
+  void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason,
+                 DynamicLookupInfo dynamicLookupInfo = {}) override;
   void processDecl(Decl *D);
 public:
   void lookupVisibleDecls(ArrayRef<ModuleDecl *> Modules);
@@ -701,6 +731,11 @@ int dumpSwiftModules(const CompilerInvocation &InitInvok,
                      StringRef OutputDir,
                      const std::vector<std::string> PrintApis,
                      CheckerOptions Opts);
+
+SDKNodeRoot *getSDKNodeRoot(SDKContext &SDKCtx,
+                            const CompilerInvocation &InitInvok,
+                            const llvm::StringSet<> &ModuleNames,
+                            CheckerOptions Opts);
 
 int dumpSDKContent(const CompilerInvocation &InitInvok,
                    const llvm::StringSet<> &ModuleNames,
@@ -716,7 +751,6 @@ int findDeclUsr(StringRef dumpPath, CheckerOptions Opts);
 
 void nodeSetDifference(ArrayRef<SDKNode*> Left, ArrayRef<SDKNode*> Right,
   NodeVector &LeftMinusRight, NodeVector &RightMinusLeft);
-
 } // end of abi namespace
 } // end of ide namespace
 } // end of Swift namespace

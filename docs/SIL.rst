@@ -2333,6 +2333,32 @@ with a sequence that also correctly destroys the current value.
 This instruction is only valid in Raw SIL and is rewritten as appropriate
 by the definitive initialization pass.
 
+assign_by_wrapper
+``````````````````
+::
+
+  sil-instruction ::= 'assign_by_wrapper' sil-operand 'to' sil-operand ',' 'init' sil-operand ',' 'set' sil-operand
+
+  assign_by_wrapper %0 : $S to %1 : $*T, init %2 : $F, set %3 : $G
+  // $S can be a value or address type
+  // $T must be the type of a property wrapper.
+  // $F must be a function type, taking $S as a single argument and returning $T
+  // $G must be a function type, taking $S as a single argument and with not return value
+
+Similar to the ``assign`` instruction, but the assignment is done via a
+delegate.
+
+In case of an initialization, the function ``%2`` is called with ``%0`` as
+argument. The result is stored to ``%1``. In case ``%2`` is an address type,
+it is simply passed as a first out-argument to ``%2``.
+
+In case of a re-assignment, the function ``%3`` is called with ``%0`` as
+argument. As ``%3`` is a setter (e.g. for the property in the containing
+nominal type), the destination address ``%1`` is not used in this case.
+
+This instruction is only valid in Raw SIL and is rewritten as appropriate
+by the definitive initialization pass.
+
 mark_uninitialized
 ``````````````````
 ::
@@ -3026,6 +3052,73 @@ function_ref
   // %1 has type $T -> U
 
 Creates a reference to a SIL function.
+
+dynamic_function_ref
+````````````````````
+::
+
+  sil-instruction ::= 'dynamic_function_ref' sil-function-name ':' sil-type
+
+  %1 = dynamic_function_ref @function : $@convention(thin) T -> U
+  // $@convention(thin) T -> U must be a thin function type
+  // %1 has type $T -> U
+
+Creates a reference to a `dynamically_replacable` SIL function. A
+`dynamically_replacable` SIL function can be replaced at runtime.
+
+For the following Swift code::
+
+  dynamic func test_dynamically_replaceable() {}
+
+  func test_dynamic_call() {
+    test_dynamically_replaceable()
+  }
+
+We will generate::
+
+  sil [dynamically_replacable] @test_dynamically_replaceable : $@convention(thin) () -> () {
+  bb0:
+    %0 = tuple ()
+    return %0 : $()
+  }
+
+  sil @test_dynamic_call : $@convention(thin) () -> () {
+  bb0:
+    %0 = dynamic_function_ref @test_dynamically_replaceable : $@convention(thin) () -> ()
+    %1 = apply %0() : $@convention(thin) () -> ()
+    %2 = tuple ()
+    return %2 : $()
+  }
+
+prev_dynamic_function_ref
+`````````````````````````
+::
+
+  sil-instruction ::= 'prev_dynamic_function_ref' sil-function-name ':' sil-type
+
+  %1 = prev_dynamic_function_ref @function : $@convention(thin) T -> U
+  // $@convention(thin) T -> U must be a thin function type
+  // %1 has type $T -> U
+
+Creates a reference to a previous implemenation of a `dynamic_replacement` SIL
+function.
+
+For the following Swift code::
+
+  @_dynamicReplacement(for: test_dynamically_replaceable())
+  func test_replacement() {
+    test_dynamically_replaceable() // calls previous implementation
+  }
+
+We  will generate::
+
+  sil [dynamic_replacement_for "test_dynamically_replaceable"] @test_replacement : $@convention(thin) () -> () {
+  bb0:
+    %0 = prev_dynamic_function_ref @test_replacement : $@convention(thin) () -> ()
+    %1 = apply %0() : $@convention(thin) () -> ()
+    %2 = tuple ()
+    return %2 : $()
+  }
 
 global_addr
 ```````````
@@ -5017,13 +5110,15 @@ cond_fail
 `````````
 ::
 
-  sil-instruction ::= 'cond_fail' sil-operand
+  sil-instruction ::= 'cond_fail' sil-operand, string-literal
 
-  cond_fail %0 : $Builtin.Int1
+  cond_fail %0 : $Builtin.Int1, "failure reason"
   // %0 must be of type $Builtin.Int1
 
 This instruction produces a `runtime failure`_ if the operand is one.
 Execution proceeds normally if the operand is zero.
+The second operand is a static failure message, which is displayed by the
+debugger in case the failure is triggered.
 
 Terminators
 ~~~~~~~~~~~

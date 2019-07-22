@@ -173,8 +173,8 @@ public:
       return true;
     }
 
-    // 'let', 'var', and 'inout' cannot be argument labels.
-    if (isAny(tok::kw_let, tok::kw_var, tok::kw_inout))
+    // inout cannot be used as an argument label.
+    if (is(tok::kw_inout))
       return false;
 
     // All other keywords can be argument labels.

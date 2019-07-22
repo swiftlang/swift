@@ -10,7 +10,7 @@ public class MyObjCClass {
     // CHECK: }
     get { return 4 }
 
-    // CHECK-LABEL sil [thunk] [ossa] @$s17dynamic_accessors11MyObjCClassC1aSivsTo : $@convention(objc_method) (Int, MyObjCClass) -> () {
+    // CHECK-LABEL: sil [thunk] [ossa] @$s17dynamic_accessors11MyObjCClassC1aSivsTo : $@convention(objc_method) (Int, MyObjCClass) -> () {
     // CHECK: function_ref @$s17dynamic_accessors11MyObjCClassC1aSivs
     // CHECK: }
     set {}

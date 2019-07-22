@@ -485,8 +485,6 @@ enum class CompletionKind {
   PostfixExprBeginning,
   PostfixExpr,
   PostfixExprParen,
-  SuperExpr,
-  SuperExprDot,
   KeyPathExprObjC,
   KeyPathExprSwift,
   TypeDeclResultBeginning,
@@ -495,7 +493,6 @@ enum class CompletionKind {
   TypeIdentifierWithoutDot,
   CaseStmtKeyword,
   CaseStmtBeginning,
-  CaseStmtDotPrefix,
   NominalMemberBeginning,
   AccessorBeginning,
   AttributeBegin,
@@ -806,7 +803,21 @@ class CodeCompletionContext {
 public:
   CodeCompletionCache &Cache;
   CompletionKind CodeCompletionKind = CompletionKind::None;
-  bool HasExpectedTypeRelation = false;
+
+  enum class TypeContextKind {
+    /// There is no known contextual type. All types are equally good.
+    None,
+
+    /// There is a contextual type from a single-expression closure/function
+    /// body. The context is a hint, and enables unresolved member completion,
+    /// but should not hide any results.
+    SingleExpressionBody,
+
+    /// There are known contextual types.
+    Required,
+  };
+
+  TypeContextKind typeContextKind = TypeContextKind::None;
 
   /// Whether there may be members that can use implicit member syntax,
   /// e.g. `x = .foo`.

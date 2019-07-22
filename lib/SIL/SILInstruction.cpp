@@ -158,7 +158,7 @@ void SILInstruction::dropAllReferences() {
   // If we have a function ref inst, we need to especially drop its function
   // argument so that it gets a proper ref decrement.
   if (auto *FRI = dyn_cast<FunctionRefBaseInst>(this)) {
-    if (!FRI->getReferencedFunction())
+    if (!FRI->getInitiallyReferencedFunction())
       return;
     FRI->dropReferencedFunction();
     return;
@@ -277,6 +277,20 @@ void SILInstruction::replaceAllUsesPairwiseWith(
            "Can only replace results with new values of the same type");
     Results[i]->replaceAllUsesWith(NewValues[i]);
   }
+}
+
+Operand *BeginBorrowInst::getSingleNonEndingUse() const {
+  Operand *singleUse = nullptr;
+  for (auto *use : getUses()) {
+    if (isa<EndBorrowInst>(use->getUser()))
+      continue;
+
+    if (singleUse)
+      return nullptr;
+
+    singleUse = use;
+  }
+  return singleUse;
 }
 
 namespace {
@@ -451,16 +465,19 @@ namespace {
 
     bool visitFunctionRefInst(const FunctionRefInst *RHS) {
       auto *X = cast<FunctionRefInst>(LHS);
-      return X->getReferencedFunction() == RHS->getReferencedFunction();
+      return X->getInitiallyReferencedFunction() ==
+             RHS->getInitiallyReferencedFunction();
     }
     bool visitDynamicFunctionRefInst(const DynamicFunctionRefInst *RHS) {
       auto *X = cast<DynamicFunctionRefInst>(LHS);
-      return X->getReferencedFunction() == RHS->getReferencedFunction();
+      return X->getInitiallyReferencedFunction() ==
+             RHS->getInitiallyReferencedFunction();
     }
     bool visitPreviousDynamicFunctionRefInst(
         const PreviousDynamicFunctionRefInst *RHS) {
       auto *X = cast<PreviousDynamicFunctionRefInst>(LHS);
-      return X->getReferencedFunction() == RHS->getReferencedFunction();
+      return X->getInitiallyReferencedFunction() ==
+             RHS->getInitiallyReferencedFunction();
     }
 
     bool visitAllocGlobalInst(const AllocGlobalInst *RHS) {

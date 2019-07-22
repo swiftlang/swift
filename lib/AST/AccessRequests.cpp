@@ -123,18 +123,6 @@ AccessLevelRequest::evaluate(Evaluator &evaluator, ValueDecl *D) const {
   llvm_unreachable("unhandled kind");
 }
 
-void AccessLevelRequest::diagnoseCycle(DiagnosticEngine &diags) const {
-  // FIXME: Improve this diagnostic.
-  auto valueDecl = std::get<0>(getStorage());
-  diags.diagnose(valueDecl, diag::circular_reference);
-}
-
-void AccessLevelRequest::noteCycleStep(DiagnosticEngine &diags) const {
-  auto valueDecl = std::get<0>(getStorage());
-  // FIXME: Customize this further.
-  diags.diagnose(valueDecl, diag::circular_reference_through);
-}
-
 Optional<AccessLevel> AccessLevelRequest::getCachedResult() const {
   auto valueDecl = std::get<0>(getStorage());
   if (valueDecl->hasAccess())
@@ -167,18 +155,6 @@ SetterAccessLevelRequest::evaluate(Evaluator &evaluator,
   if (auto *AA = ASD->getAttrs().getAttribute<SetterAccessAttr>())
     return AA->getAccess();
   return ASD->getFormalAccess();
-}
-
-void SetterAccessLevelRequest::diagnoseCycle(DiagnosticEngine &diags) const {
-  // FIXME: Improve this diagnostic.
-  auto abstractStorageDecl = std::get<0>(getStorage());
-  diags.diagnose(abstractStorageDecl, diag::circular_reference);
-}
-
-void SetterAccessLevelRequest::noteCycleStep(DiagnosticEngine &diags) const {
-  auto abstractStorageDecl = std::get<0>(getStorage());
-  // FIXME: Customize this further.
-  diags.diagnose(abstractStorageDecl, diag::circular_reference_through);
 }
 
 Optional<AccessLevel> SetterAccessLevelRequest::getCachedResult() const {
@@ -271,18 +247,6 @@ DefaultAndMaxAccessLevelRequest::evaluate(Evaluator &evaluator,
     maxAccess = AccessLevel::Public;
 
   return std::make_pair(defaultAccess, maxAccess);
-}
-
-void DefaultAndMaxAccessLevelRequest::diagnoseCycle(DiagnosticEngine &diags) const {
-  // FIXME: Improve this diagnostic.
-  auto extensionDecl = std::get<0>(getStorage());
-  diags.diagnose(extensionDecl, diag::circular_reference);
-}
-
-void DefaultAndMaxAccessLevelRequest::noteCycleStep(DiagnosticEngine &diags) const {
-  auto extensionDecl = std::get<0>(getStorage());
-  // FIXME: Customize this further.
-  diags.diagnose(extensionDecl, diag::circular_reference_through);
 }
 
 // Default and Max access levels are stored combined as a 3-bit bitset. The Bits

@@ -114,7 +114,8 @@ void TBDGenVisitor::addBaseConformanceDescriptor(
 }
 
 void TBDGenVisitor::addConformances(DeclContext *DC) {
-  for (auto conformance : DC->getLocalConformances()) {
+  for (auto conformance : DC->getLocalConformances(
+                            ConformanceLookupKind::NonInherited)) {
     auto protocol = conformance->getProtocol();
     auto needsWTable =
         Lowering::TypeConverter::protocolRequiresWitnessTable(protocol);
@@ -149,7 +150,7 @@ void TBDGenVisitor::addConformances(DeclContext *DC) {
     };
 
     rootConformance->forEachValueWitness(
-        nullptr, [&](ValueDecl *valueReq, Witness witness) {
+        [&](ValueDecl *valueReq, Witness witness) {
           auto witnessDecl = witness.getDecl();
           if (isa<AbstractFunctionDecl>(valueReq)) {
             addSymbolIfNecessary(valueReq, witnessDecl);
@@ -196,9 +197,8 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
     addSymbol(LinkEntity::forDynamicallyReplaceableFunctionVariable(
         AFD, useAllocator));
     addSymbol(
-        LinkEntity::forDynamicallyReplaceableFunctionImpl(AFD, useAllocator));
-    addSymbol(
         LinkEntity::forDynamicallyReplaceableFunctionKey(AFD, useAllocator));
+
   }
   if (AFD->getAttrs().hasAttribute<DynamicReplacementAttr>()) {
     bool useAllocator = shouldUseAllocatorMangling(AFD);
@@ -234,6 +234,17 @@ void TBDGenVisitor::visitFuncDecl(FuncDecl *FD) {
   // If there's an opaque return type, its descriptor is exported.
   if (auto opaqueResult = FD->getOpaqueResultTypeDecl()) {
     addSymbol(LinkEntity::forOpaqueTypeDescriptor(opaqueResult));
+    assert(opaqueResult->getNamingDecl() == FD);
+    if (FD->isNativeDynamic()) {
+      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessor(opaqueResult));
+      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorImpl(opaqueResult));
+      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorKey(opaqueResult));
+      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorVar(opaqueResult));
+    }
+    if (FD->getAttrs().hasAttribute<DynamicReplacementAttr>()) {
+      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessor(opaqueResult));
+      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorVar(opaqueResult));
+    }
   }
   visitAbstractFunctionDecl(FD);
 }
@@ -254,6 +265,17 @@ void TBDGenVisitor::visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
   // ...and the opaque result decl if it has one.
   if (auto opaqueResult = ASD->getOpaqueResultTypeDecl()) {
     addSymbol(LinkEntity::forOpaqueTypeDescriptor(opaqueResult));
+    assert(opaqueResult->getNamingDecl() == ASD);
+    if (ASD->hasAnyNativeDynamicAccessors()) {
+      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessor(opaqueResult));
+      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorImpl(opaqueResult));
+      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorKey(opaqueResult));
+      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorVar(opaqueResult));
+    }
+    if (ASD->hasAnyDynamicReplacementAccessors()) {
+      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessor(opaqueResult));
+      addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorVar(opaqueResult));
+    }
   }
 
   // Explicitly look at each accessor here: see visitAccessorDecl.
@@ -356,13 +378,16 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
 
   visitNominalTypeDecl(CD);
 
-  // Types with resilient superclasses have some extra symbols.
-  if (CD->checkAncestry(AncestryFlags::ResilientOther) ||
-      CD->hasResilientMetadata()) {
-    addSymbol(LinkEntity::forClassMetadataBaseOffset(CD));
+  bool resilientAncestry = CD->checkAncestry(AncestryFlags::ResilientOther);
 
-    auto &Ctx = CD->getASTContext();
-    if (Ctx.LangOpts.EnableObjCResilientClassStubs) {
+  // Types with resilient superclasses have some extra symbols.
+  if (resilientAncestry || CD->hasResilientMetadata()) {
+    addSymbol(LinkEntity::forClassMetadataBaseOffset(CD));
+  }
+
+  auto &Ctx = CD->getASTContext();
+  if (Ctx.LangOpts.EnableObjCInterop) {
+    if (resilientAncestry) {
       addSymbol(LinkEntity::forObjCResilientClassStub(
           CD, TypeMetadataAddress::AddressPoint));
     }
@@ -497,6 +522,7 @@ static bool isValidProtocolMemberForTBDGen(const Decl *D) {
   case DeclKind::PostfixOperator:
     return false;
   }
+  llvm_unreachable("covered switch");
 }
 #endif
 

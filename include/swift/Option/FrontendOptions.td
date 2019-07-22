@@ -121,9 +121,9 @@ def enable_target_os_checking :
 def disable_target_os_checking :
   Flag<["-"], "disable-target-os-checking">,
   HelpText<"Disable checking the target OS of serialized modules">;
-
-def enable_astscope_lookup : Flag<["-"], "enable-astscope-lookup">,
-  HelpText<"Enable ASTScope-based unqualified name lookup">;
+  
+def compare_to_astscope_lookup : Flag<["-"], "compare-to-astscope-lookup">,
+  HelpText<"Compare legacy to ASTScope-based unqualified name lookup (for debugging)">;
 
 def print_clang_stats : Flag<["-"], "print-clang-stats">,
   HelpText<"Print Clang importer statistics">;
@@ -185,6 +185,12 @@ def debug_constraints : Flag<["-"], "debug-constraints">,
 
 def debug_constraints_attempt : Separate<["-"], "debug-constraints-attempt">,
   HelpText<"Debug the constraint solver at a given attempt">;
+
+def debug_constraints_on_line : Separate<["-"], "debug-constraints-on-line">,
+  HelpText<"Debug the constraint solver for expressions on <line>">,
+  MetaVarName<"<line>">;
+def debug_constraints_on_line_EQ : Joined<["-"], "debug-constraints-on-line=">,
+  Alias<debug_constraints_on_line>;
 
 def disable_named_lazy_member_loading : Flag<["-"], "disable-named-lazy-member-loading">,
   HelpText<"Disable per-name lazy member loading">;
@@ -351,6 +357,11 @@ def enable_implicit_dynamic : Flag<["-"], "enable-implicit-dynamic">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
   HelpText<"Add 'dynamic' to all declarations">;
 
+def disable_previous_implementation_calls_in_dynamic_replacements :
+  Flag<["-"], "disable-previous-implementation-calls-in-dynamic-replacements">,
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
+  HelpText<"Disable calling the previous implementation in dynamic replacements">;
+
 def enable_dynamic_replacement_chaining :
   Flag<["-"], "enable-dynamic-replacement-chaining">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
@@ -382,6 +393,9 @@ def warn_long_expression_type_checking : Separate<["-"], "warn-long-expression-t
 def warn_long_expression_type_checking_EQ : Joined<["-"], "warn-long-expression-type-checking=">,
   Alias<warn_long_expression_type_checking>;
 
+def Rmodule_interface_rebuild : Flag<["-"], "Rmodule-interface-rebuild">,
+  HelpText<"Emits a remark if an imported module needs to be re-compiled from its module interface">;
+
 def solver_expression_time_threshold_EQ : Joined<["-"], "solver-expression-time-threshold=">;
 
 def solver_disable_shrink :
@@ -398,10 +412,6 @@ def enable_operator_designated_types :
 def solver_enable_operator_designated_types :
   Flag<["-"], "solver-enable-operator-designated-types">,
   HelpText<"Enable operator designated types in constraint solver">;
-
-def enable_opaque_result_types :
-  Flag<["-"], "enable-opaque-result-types">,
-  HelpText<"Enable experimental opaque result types feature">;
 
 def switch_checking_invocation_threshold_EQ : Joined<["-"],
     "switch-checking-invocation-threshold=">;
@@ -458,9 +468,6 @@ def sil_unroll_threshold : Separate<["-"], "sil-unroll-threshold">,
   MetaVarName<"<250>">,
   HelpText<"Controls the aggressiveness of loop unrolling">;
 
-def sil_existential_specializer : Flag<["-"], "sil-existential-specializer">,
-  HelpText<"Enable SIL existential specializer optimization">;
-
 def sil_merge_partial_modules : Flag<["-"], "sil-merge-partial-modules">,
   HelpText<"Merge SIL from all partial swiftmodules into the final module">;
 
@@ -493,6 +500,11 @@ def emit_sorted_sil : Flag<["-"], "emit-sorted-sil">,
 def emit_syntax : Flag<["-"], "emit-syntax">,
   HelpText<"Parse input file(s) and emit the Syntax tree(s) as JSON">, ModeOpt;
 
+def enable_cxx_interop :
+  Flag<["-"], "enable-cxx-interop">,
+  HelpText<"Enable C++ interop code generation and config directives">,
+  Flags<[FrontendOption, HelpHidden]>;
+
 def use_malloc : Flag<["-"], "use-malloc">,
   HelpText<"Allocate internal data structures using malloc "
            "(for memory debugging)">;
@@ -523,6 +535,11 @@ def build_module_from_parseable_interface :
   Flag<["-"], "build-module-from-parseable-interface">,
   Alias<compile_module_from_interface>,
   ModeOpt;
+
+def module_interface_preserve_types_as_written :
+  Flag<["-"], "module-interface-preserve-types-as-written">,
+  HelpText<"When emitting a module interface, preserve types as they were "
+           "written in the source">;
 
 def prebuilt_module_cache_path :
   Separate<["-"], "prebuilt-module-cache-path">,
@@ -565,9 +582,5 @@ def read_legacy_type_info_path_EQ : Joined<["-"], "read-legacy-type-info-path=">
 def type_info_dump_filter_EQ : Joined<["-"], "type-info-dump-filter=">,
   Flags<[FrontendOption]>,
   HelpText<"One of 'all', 'resilient' or 'fragile'">;
-
-def enable_objc_resilient_class_stubs : Flag<["-"], "enable-resilient-objc-class-stubs">,
-  HelpText<"Emit Objective-C resilient class stubs for classes with "
-           "resiliently-sized metadata">;
 
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

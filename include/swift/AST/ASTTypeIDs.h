@@ -20,9 +20,14 @@
 #include "swift/Basic/TypeID.h"
 namespace swift {
 
+class CustomAttr;
 class NominalTypeDecl;
-struct PropertyBehaviorTypeInfo;
+struct PropertyWrapperBackingPropertyInfo;
+struct PropertyWrapperTypeInfo;
+class Type;
 class VarDecl;
+class TypeAliasDecl;
+class Type;
 
 #define SWIFT_AST_TYPEID_ZONE 1
 
@@ -33,4 +38,4 @@ class VarDecl;
 
 } // end namespace swift
 
-#endif /* SWIFT_AST_ASTTYPEIDS_H */
+#endif // SWIFT_AST_ASTTYPEIDS_H

@@ -341,12 +341,11 @@ void GlobalPropertyOpt::scanInstruction(swift::SILInstruction *Inst) {
   } else if (auto *SI = dyn_cast<StructInst>(Inst)) {
     // Add dependencies from the array operands to the struct array-fields.
     StructDecl *S = SI->getStructDecl();
-    NominalTypeDecl::StoredPropertyRange Range = S->getStoredProperties();
+    auto Props = S->getStoredProperties();
     auto Operands = SI->getAllOperands();
-    unsigned Index = 0;
-    for (auto I = Range.begin(), E = Range.end(); I != E; ++I, ++Index) {
-      VarDecl *VD = *I;
-      const Operand &Op = Operands[Index];
+    for (unsigned I = 0, E = Props.size(); I < E; ++I) {
+      VarDecl *VD = Props[I];
+      const Operand &Op = Operands[I];
       if (isArrayType(Op.get()->getType())) {
         addDependency(getValueEntry(Op.get()), getFieldEntry(VD));
       }

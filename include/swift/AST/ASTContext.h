@@ -50,8 +50,10 @@ namespace clang {
 namespace swift {
   class ASTContext;
   enum class Associativity : unsigned char;
+  class AvailabilityContext;
   class BoundGenericType;
   class ClangNode;
+  class ConcreteDeclRef;
   class ConstructorDecl;
   class Decl;
   class DeclContext;
@@ -252,13 +254,6 @@ public:
   // Define the set of known identifiers.
 #define IDENTIFIER_WITH_NAME(Name, IdStr) Identifier Id_##Name;
 #include "swift/AST/KnownIdentifiers.def"
-
-  /// The list of external definitions imported by this context.
-  llvm::SetVector<Decl *> ExternalDefinitions;
-
-  /// FIXME: HACK HACK HACK
-  /// This state should be tracked somewhere else.
-  unsigned LastCheckedExternalDefinition = 0;
 
   /// A consumer of type checker debug output.
   std::unique_ptr<TypeCheckerDebugConsumer> TypeCheckerDebug;
@@ -513,7 +508,20 @@ public:
   bool hasArrayLiteralIntrinsics() const;
 
   /// Retrieve the declaration of Swift.Bool.init(_builtinBooleanLiteral:)
-  ConstructorDecl *getBoolBuiltinInitDecl() const;
+  ConcreteDeclRef getBoolBuiltinInitDecl() const;
+
+  /// Retrieve the witness for init(_builtinIntegerLiteral:).
+  ConcreteDeclRef getIntBuiltinInitDecl(NominalTypeDecl *intDecl) const;
+
+  /// Retrieve the witness for init(_builtinFloatLiteral:).
+  ConcreteDeclRef getFloatBuiltinInitDecl(NominalTypeDecl *floatDecl) const;
+
+  /// Retrieve the witness for (_builtinStringLiteral:utf8CodeUnitCount:isASCII:).
+  ConcreteDeclRef getStringBuiltinInitDecl(NominalTypeDecl *stringDecl) const;
+
+  ConcreteDeclRef getBuiltinInitDecl(NominalTypeDecl *decl,
+                                     KnownProtocolKind builtinProtocol,
+                llvm::function_ref<DeclName (ASTContext &ctx)> initName) const;
 
   /// Retrieve the declaration of Swift.==(Int, Int) -> Bool.
   FuncDecl *getEqualIntDecl() const;
@@ -565,14 +573,8 @@ public:
                                ForeignLanguage language,
                                const DeclContext *dc);
 
-  /// Add a declaration to a list of declarations that need to be emitted
-  /// as part of the current module or source file, but are otherwise not
-  /// nested within it.
-  void addExternalDecl(Decl *decl);
-
   /// Add a declaration that was synthesized to a per-source file list if
-  /// if is part of a source file, or the external declarations list if
-  /// it is part of an imported type context.
+  /// if is part of a source file.
   void addSynthesizedDecl(Decl *decl);
 
   /// Add a cleanup function to be called when the ASTContext is deallocated.
@@ -584,6 +586,13 @@ public:
   void addDestructorCleanup(T &object) {
     addCleanup([&object]{ object.~T(); });
   }
+  
+  /// Get the runtime availability of the opaque types language feature for the target platform.
+  AvailabilityContext getOpaqueTypeAvailability();
+
+  /// Get the runtime availability of features introduced in the Swift 5.1
+  /// compiler for the target platform.
+  AvailabilityContext getSwift51Availability();
 
   //===--------------------------------------------------------------------===//
   // Diagnostics Helper functions
@@ -833,45 +842,18 @@ public:
                                               const IterableDeclContext *idc,
                                               LazyMemberLoader *lazyLoader);
 
+  /// Access the side cache for property wrapper backing property types,
+  /// used because TypeChecker::typeCheckBinding() needs somewhere to stash
+  /// the backing property type.
+  Type getSideCachedPropertyWrapperBackingPropertyType(VarDecl *var) const;
+  void setSideCachedPropertyWrapperBackingPropertyType(VarDecl *var,
+                                                        Type type);
+  
   /// Returns memory usage of this ASTContext.
   size_t getTotalMemory() const;
   
   /// Returns memory used exclusively by constraint solver.
   size_t getSolverMemory() const;
-
-  /// Complain if @objc or dynamic is used without importing Foundation.
-  void diagnoseAttrsRequiringFoundation(SourceFile &SF);
-
-  /// Note that the given method produces an Objective-C method.
-  void recordObjCMethod(AbstractFunctionDecl *method);
-
-  /// Diagnose any Objective-C method overrides that aren't reflected
-  /// as overrides in Swift.
-  bool diagnoseUnintendedObjCMethodOverrides(SourceFile &sf);
-
-  /// Note that there is a conflict between different definitions that
-  /// produce the same Objective-C method.
-  void recordObjCMethodConflict(ClassDecl *classDecl, ObjCSelector selector,
-                                bool isInstance);
-
-  /// Diagnose all conflicts between members that have the same
-  /// Objective-C selector in the same class.
-  ///
-  /// \param sf The source file for which we are diagnosing conflicts.
-  ///
-  /// \returns true if there were any conflicts diagnosed.
-  bool diagnoseObjCMethodConflicts(SourceFile &sf);
-
-  /// Note that an optional @objc requirement has gone unsatisfied by
-  /// a conformance to its protocol.
-  ///
-  /// \param dc The declaration context in which the conformance occurs.
-  /// \param req The optional requirement.
-  void recordObjCUnsatisfiedOptReq(DeclContext *dc, AbstractFunctionDecl *req);
-
-  /// Diagnose any unsatisfied @objc optional requirements of
-  /// protocols that conflict with methods.
-  bool diagnoseObjCUnsatisfiedOptReqConflicts(SourceFile &sf);
 
   /// Retrieve the Swift name for the given Foundation entity, where
   /// "NS" prefix stripping will apply under omit-needless-words.
@@ -883,9 +865,9 @@ public:
     return getIdentifier(getSwiftName(kind));
   }
 
-  /// Collect visible clang modules from the ClangModuleLoader. These modules are
-  /// not necessarily loaded.
-  void getVisibleTopLevelClangModules(SmallVectorImpl<clang::Module*> &Modules) const;
+  /// Populate \p names with visible top level module names.
+  /// This guarantees that resulted \p names doesn't have duplicated names.
+  void getVisibleTopLevelModuleNames(SmallVectorImpl<Identifier> &names) const;
 
 private:
   /// Register the given generic signature builder to be used as the canonical
@@ -950,31 +932,6 @@ private:
   friend SILLayout;
   friend SILBoxType;
 };
-
-/// Retrieve information about the given Objective-C method for
-/// diagnostic purposes, to be used with OBJC_DIAG_SELECT in
-/// DiagnosticsSema.def.
-std::pair<unsigned, DeclName> getObjCMethodDiagInfo(
-                                AbstractFunctionDecl *method);
-
-/// Attach Fix-Its to the given diagnostic that updates the name of the
-/// given declaration to the desired target name.
-///
-/// \returns false if the name could not be fixed.
-bool fixDeclarationName(InFlightDiagnostic &diag, ValueDecl *decl,
-                        DeclName targetName);
-
-/// Fix the Objective-C name of the given declaration to match the provided
-/// Objective-C selector.
-///
-/// \param ignoreImpliedName When true, ignore the implied name of the
-/// given declaration, because it no longer applies.
-///
-/// For properties, the selector should be a zero-parameter selector of the
-/// given property's name.
-bool fixDeclarationObjCName(InFlightDiagnostic &diag, ValueDecl *decl,
-                            Optional<ObjCSelector> targetNameOpt,
-                            bool ignoreImpliedName = false);
 
 } // end namespace swift
 

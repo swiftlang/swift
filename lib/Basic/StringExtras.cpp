@@ -30,8 +30,6 @@ using namespace camel_case;
 
 bool swift::canBeArgumentLabel(StringRef identifier) {
   return llvm::StringSwitch<bool>(identifier)
-    .Case("var", false)
-    .Case("let", false)
     .Case("inout", false)
     .Case("$", false)
     .Default(true);

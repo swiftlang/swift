@@ -2046,24 +2046,8 @@ TypeDecl *EquivalenceClass::lookupNestedType(
         continue;
       }
 
-      // If this is another type declaration, determine whether we should
-      // record it.
+      // If this is another type declaration, record it.
       if (auto type = dyn_cast<TypeDecl>(member)) {
-        // FIXME: Filter out type declarations that aren't in the same
-        // module as the protocol itself. This is an unprincipled hack, but
-        // provides consistent lookup semantics for the generic signature
-        // builder in all contents.
-        if (type->getDeclContext()->getParentModule()
-              != proto->getParentModule())
-          continue;
-
-        // Resolve the signature of this type.
-        if (!type->hasInterfaceType()) {
-          type->getASTContext().getLazyResolver()->resolveDeclSignature(type);
-          if (!type->hasInterfaceType())
-            continue;
-        }
-
         concreteDecls.push_back(type);
         continue;
       }
@@ -2632,8 +2616,7 @@ static void maybeAddSameTypeRequirementForNestedType(
 
   // Dig out the type witness.
   auto superConformance = superSource->getProtocolConformance().getConcrete();
-  auto concreteType =
-    superConformance->getTypeWitness(assocType, builder.getLazyResolver());
+  auto concreteType = superConformance->getTypeWitness(assocType);
   if (!concreteType) return;
 
   // We should only have interface types here.
@@ -2800,8 +2783,7 @@ static void concretizeNestedTypeFromConcreteParent(
   Type witnessType;
   if (conformance.isConcrete()) {
     witnessType =
-      conformance.getConcrete()
-        ->getTypeWitness(assocType, builder.getLazyResolver());
+      conformance.getConcrete()->getTypeWitness(assocType);
     if (!witnessType || witnessType->hasError())
       return; // FIXME: should we delay here?
   } else if (auto archetype = concreteParent->getAs<ArchetypeType>()) {
@@ -3737,12 +3719,8 @@ GenericSignatureBuilder::lookupConformance(CanType dependentType,
   // FIXME: When lookupConformance() starts respecting modules, we'll need
   // to do some filtering here.
   ModuleDecl *searchModule = conformedProtocol->getParentModule();
-  auto result = searchModule->lookupConformance(conformingReplacementType,
-                                                conformedProtocol);
-  if (result && getLazyResolver())
-    getLazyResolver()->markConformanceUsed(*result, searchModule);
-
-  return result;
+  return searchModule->lookupConformance(conformingReplacementType,
+                                         conformedProtocol);
 }
 
 LazyResolver *GenericSignatureBuilder::getLazyResolver() const { 
@@ -3805,13 +3783,12 @@ PotentialArchetype *GenericSignatureBuilder::realizePotentialArchetype(
   return pa;
 }
 
-static Type getStructuralType(TypeDecl *typeDecl, LazyResolver *resolver) {
+static Type getStructuralType(TypeDecl *typeDecl) {
   if (auto typealias = dyn_cast<TypeAliasDecl>(typeDecl)) {
-    // Resolve the underlying type, if we haven't done so yet.
-    if (!typealias->hasInterfaceType())
-      resolver->resolveDeclSignature(typealias);
+    if (auto resolved = typealias->getUnderlyingTypeLoc().getType())
+      return resolved;
 
-    return typealias->getUnderlyingTypeLoc().getType();
+    return typealias->getStructuralType();
   }
 
   return typeDecl->getDeclaredInterfaceType();
@@ -3826,7 +3803,7 @@ static Type substituteConcreteType(GenericSignatureBuilder &builder,
 
   // Form an unsubstituted type referring to the given type declaration,
   // for use in an inferred same-type requirement.
-  auto type = getStructuralType(concreteDecl, builder.getLazyResolver());
+  auto type = getStructuralType(concreteDecl);
   if (!type)
     return Type();
 
@@ -4108,7 +4085,7 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
   // Use the requirement signature to avoid rewalking the entire protocol.  This
   // cannot compute the requirement signature directly, because that may be
   // infinitely recursive: this code is also used to construct it.
-  if (proto->isRequirementSignatureComputed()) {
+  if (!proto->isComputingRequirementSignature()) {
     auto innerSource =
       FloatingRequirementSource::viaProtocolRequirement(source, proto,
                                                         /*inferred=*/false);
@@ -4164,8 +4141,14 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
       if (inheritedProto == proto) return TypeWalker::Action::Continue;
 
       for (auto req : inheritedProto->getMembers()) {
-        if (auto typeReq = dyn_cast<TypeDecl>(req))
+        if (auto typeReq = dyn_cast<TypeDecl>(req)) {
+          // Ignore generic types
+          if (auto genReq = dyn_cast<GenericTypeDecl>(req))
+            if (genReq->getGenericParams())
+              continue;
+
           inheritedTypeDecls[typeReq->getFullName()].push_back(typeReq);
+        }
       }
       return TypeWalker::Action::Continue;
     });
@@ -4228,10 +4211,10 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
   // An inferred same-type requirement between the two type declarations
   // within this protocol or a protocol it inherits.
   auto addInferredSameTypeReq = [&](TypeDecl *first, TypeDecl *second) {
-    Type firstType = getStructuralType(first, getLazyResolver());
+    Type firstType = getStructuralType(first);
     if (!firstType) return;
 
-    Type secondType = getStructuralType(second, getLazyResolver());
+    Type secondType = getStructuralType(second);
     if (!secondType) return;
 
     auto inferredSameTypeSource =
@@ -4244,92 +4227,90 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
   };
 
   // Add requirements for each of the associated types.
-  for (auto Member : proto->getMembers()) {
-    if (auto assocTypeDecl = dyn_cast<AssociatedTypeDecl>(Member)) {
-      // Add requirements placed directly on this associated type.
-      Type assocType =
-        DependentMemberType::get(selfType.getDependentType(*this), assocTypeDecl);
-      if (!onlySameTypeConstraints) {
-        auto assocResult =
-          addInheritedRequirements(assocTypeDecl, assocType, source,
-                                   /*inferForModule=*/nullptr);
-        if (isErrorResult(assocResult))
-          return assocResult;
-      }
-
-      // Add requirements from this associated type's where clause.
-      RequirementRequest::visitRequirements(assocTypeDecl,
-                                            TypeResolutionStage::Structural,
-          [&](const Requirement &req, RequirementRepr *reqRepr) {
-            // If we're only looking at same-type constraints, skip everything else.
-            if (onlySameTypeConstraints &&
-                req.getKind() != RequirementKind::SameType)
-              return false;
-
-            auto innerSource = FloatingRequirementSource::viaProtocolRequirement(
-                source, proto, reqRepr, /*inferred=*/false);
-            addRequirement(req, reqRepr, innerSource, &protocolSubMap,
-                           /*inferForModule=*/nullptr);
-            return false;
-          });
-
-      // Check whether we inherited any types with the same name.
-      auto knownInherited =
-        inheritedTypeDecls.find(assocTypeDecl->getFullName());
-      if (knownInherited == inheritedTypeDecls.end()) continue;
-
-      bool shouldWarnAboutRedeclaration =
-        source->kind == RequirementSource::RequirementSignatureSelf &&
-        !assocTypeDecl->getAttrs().hasAttribute<NonOverrideAttr>() &&
-        !assocTypeDecl->getAttrs().hasAttribute<OverrideAttr>() &&
-        assocTypeDecl->getDefaultDefinitionLoc().isNull() &&
-        (!assocTypeDecl->getInherited().empty() ||
-         assocTypeDecl->getTrailingWhereClause() ||
-         getASTContext().LangOpts.WarnImplicitOverrides);
-      for (auto inheritedType : knownInherited->second) {
-        // If we have inherited associated type...
-        if (auto inheritedAssocTypeDecl =
-              dyn_cast<AssociatedTypeDecl>(inheritedType)) {
-          // Complain about the first redeclaration.
-          if (shouldWarnAboutRedeclaration) {
-            auto inheritedFromProto = inheritedAssocTypeDecl->getProtocol();
-            auto fixItWhere = getProtocolWhereLoc();
-            Diags.diagnose(assocTypeDecl,
-                           diag::inherited_associated_type_redecl,
-                           assocTypeDecl->getFullName(),
-                           inheritedFromProto->getDeclaredInterfaceType())
-              .fixItInsertAfter(
-                       fixItWhere.first,
-                       getAssociatedTypeReqs(assocTypeDecl, fixItWhere.second))
-              .fixItRemove(assocTypeDecl->getSourceRange());
-
-            Diags.diagnose(inheritedAssocTypeDecl, diag::decl_declared_here,
-                           inheritedAssocTypeDecl->getFullName());
-
-            shouldWarnAboutRedeclaration = false;
-          }
-
-          continue;
-        }
-
-        // We inherited a type; this associated type will be identical
-        // to that typealias.
-        if (source->kind == RequirementSource::RequirementSignatureSelf) {
-          auto inheritedOwningDecl =
-              inheritedType->getDeclContext()->getSelfNominalTypeDecl();
-          Diags.diagnose(assocTypeDecl,
-                         diag::associated_type_override_typealias,
-                         assocTypeDecl->getFullName(),
-                         inheritedOwningDecl->getDescriptiveKind(),
-                         inheritedOwningDecl->getDeclaredInterfaceType());
-        }
-
-        addInferredSameTypeReq(assocTypeDecl, inheritedType);
-      }
-
-      inheritedTypeDecls.erase(knownInherited);
-      continue;
+  for (auto assocTypeDecl : proto->getAssociatedTypeMembers()) {
+    // Add requirements placed directly on this associated type.
+    Type assocType =
+      DependentMemberType::get(selfType.getDependentType(*this), assocTypeDecl);
+    if (!onlySameTypeConstraints) {
+      auto assocResult =
+        addInheritedRequirements(assocTypeDecl, assocType, source,
+                                 /*inferForModule=*/nullptr);
+      if (isErrorResult(assocResult))
+        return assocResult;
     }
+
+    // Add requirements from this associated type's where clause.
+    RequirementRequest::visitRequirements(assocTypeDecl,
+                                          TypeResolutionStage::Structural,
+        [&](const Requirement &req, RequirementRepr *reqRepr) {
+          // If we're only looking at same-type constraints, skip everything else.
+          if (onlySameTypeConstraints &&
+              req.getKind() != RequirementKind::SameType)
+            return false;
+
+          auto innerSource = FloatingRequirementSource::viaProtocolRequirement(
+              source, proto, reqRepr, /*inferred=*/false);
+          addRequirement(req, reqRepr, innerSource, &protocolSubMap,
+                         /*inferForModule=*/nullptr);
+          return false;
+        });
+
+    // Check whether we inherited any types with the same name.
+    auto knownInherited =
+      inheritedTypeDecls.find(assocTypeDecl->getFullName());
+    if (knownInherited == inheritedTypeDecls.end()) continue;
+
+    bool shouldWarnAboutRedeclaration =
+      source->kind == RequirementSource::RequirementSignatureSelf &&
+      !assocTypeDecl->getAttrs().hasAttribute<NonOverrideAttr>() &&
+      !assocTypeDecl->getAttrs().hasAttribute<OverrideAttr>() &&
+      !assocTypeDecl->hasDefaultDefinitionType() &&
+      (!assocTypeDecl->getInherited().empty() ||
+        assocTypeDecl->getTrailingWhereClause() ||
+        getASTContext().LangOpts.WarnImplicitOverrides);
+    for (auto inheritedType : knownInherited->second) {
+      // If we have inherited associated type...
+      if (auto inheritedAssocTypeDecl =
+            dyn_cast<AssociatedTypeDecl>(inheritedType)) {
+        // Complain about the first redeclaration.
+        if (shouldWarnAboutRedeclaration) {
+          auto inheritedFromProto = inheritedAssocTypeDecl->getProtocol();
+          auto fixItWhere = getProtocolWhereLoc();
+          Diags.diagnose(assocTypeDecl,
+                         diag::inherited_associated_type_redecl,
+                         assocTypeDecl->getFullName(),
+                         inheritedFromProto->getDeclaredInterfaceType())
+            .fixItInsertAfter(
+                      fixItWhere.first,
+                      getAssociatedTypeReqs(assocTypeDecl, fixItWhere.second))
+            .fixItRemove(assocTypeDecl->getSourceRange());
+
+          Diags.diagnose(inheritedAssocTypeDecl, diag::decl_declared_here,
+                         inheritedAssocTypeDecl->getFullName());
+
+          shouldWarnAboutRedeclaration = false;
+        }
+
+        continue;
+      }
+
+      // We inherited a type; this associated type will be identical
+      // to that typealias.
+      if (source->kind == RequirementSource::RequirementSignatureSelf) {
+        auto inheritedOwningDecl =
+            inheritedType->getDeclContext()->getSelfNominalTypeDecl();
+        Diags.diagnose(assocTypeDecl,
+                       diag::associated_type_override_typealias,
+                       assocTypeDecl->getFullName(),
+                       inheritedOwningDecl->getDescriptiveKind(),
+                       inheritedOwningDecl->getDeclaredInterfaceType());
+      }
+
+      addInferredSameTypeReq(assocTypeDecl, inheritedType);
+    }
+
+    inheritedTypeDecls.erase(knownInherited);
+    continue;
   }
 
   // Check all remaining inherited type declarations to determine if
@@ -5399,9 +5380,15 @@ namespace {
                             ArrayRef<Constraint<T>> constraints,
                             llvm::function_ref<bool(const Constraint<T> &)>
                                                    isSuitableRepresentative) {
+    Optional<Constraint<T>> fallbackConstraint;
+
     // Find a representative constraint.
     Optional<Constraint<T>> representativeConstraint;
     for (const auto &constraint : constraints) {
+      // Make sure we have a constraint to fall back on.
+      if (!fallbackConstraint)
+        fallbackConstraint = constraint;
+
       // If this isn't a suitable representative constraint, ignore it.
       if (!isSuitableRepresentative(constraint))
         continue;
@@ -5452,7 +5439,8 @@ namespace {
         representativeConstraint = constraint;
     }
 
-    return representativeConstraint;
+    return representativeConstraint ? representativeConstraint
+                                    : fallbackConstraint;
   }
 } // end anonymous namespace
 
@@ -6991,9 +6979,11 @@ void GenericSignatureBuilder::checkConcreteTypeConstraints(
       if (concreteType->isEqual(equivClass->concreteType))
         return ConstraintRelation::Redundant;
 
-      // If either has a type parameter, call them unrelated.
+      // If either has a type parameter or type variable, call them unrelated.
       if (concreteType->hasTypeParameter() ||
-          equivClass->concreteType->hasTypeParameter())
+          equivClass->concreteType->hasTypeParameter() ||
+          concreteType->hasTypeVariable() ||
+          equivClass->concreteType->hasTypeVariable())
         return ConstraintRelation::Unrelated;
 
       return ConstraintRelation::Conflicting;
@@ -7433,34 +7423,6 @@ GenericSignature *GenericSignatureBuilder::computeGenericSignature(
   return sig;
 }
 
-GenericSignature *GenericSignatureBuilder::computeRequirementSignature(
-                                                     ProtocolDecl *proto) {
-  GenericSignatureBuilder builder(proto->getASTContext());
-
-  // Add all of the generic parameters.
-  proto->createGenericParamsIfMissing();
-  for (auto gp : *proto->getGenericParams())
-    builder.addGenericParameter(gp);
-
-  // Add the conformance of 'self' to the protocol.
-  auto selfType =
-    proto->getSelfInterfaceType()->castTo<GenericTypeParamType>();
-  auto requirement =
-    Requirement(RequirementKind::Conformance, selfType,
-                proto->getDeclaredInterfaceType());
-
-  builder.addRequirement(
-                 requirement,
-                 RequirementSource::forRequirementSignature(builder, selfType,
-                                                            proto),
-                 nullptr);
-
-  return std::move(builder).computeGenericSignature(
-           SourceLoc(),
-           /*allowConcreteGenericPArams=*/false,
-           /*allowBuilderToMove=*/false);
-}
-
 #pragma mark Generic signature verification
 
 void GenericSignatureBuilder::verifyGenericSignature(ASTContext &context,
@@ -7469,9 +7431,46 @@ void GenericSignatureBuilder::verifyGenericSignature(ASTContext &context,
   sig->print(llvm::errs());
   llvm::errs() << "\n";
 
-  // Try removing each requirement in turn.
+  // Try building a new signature having the same requirements.
   auto genericParams = sig->getGenericParams();
   auto requirements = sig->getRequirements();
+
+  {
+    PrettyStackTraceGenericSignature debugStack("verifying", sig);
+
+    // Form a new generic signature builder.
+    GenericSignatureBuilder builder(context);
+
+    // Add the generic parameters.
+    for (auto gp : genericParams)
+      builder.addGenericParameter(gp);
+
+    // Add the requirements.
+    auto source = FloatingRequirementSource::forAbstract();
+    for (auto req : requirements)
+      builder.addRequirement(req, source, nullptr);
+
+    // If there were any errors, the signature was invalid.
+    if (builder.Impl->HadAnyError) {
+      context.Diags.diagnose(SourceLoc(), diag::generic_signature_not_valid,
+                             sig->getAsString());
+    }
+
+    // Form a generic signature from the result.
+    auto newSig =
+      std::move(builder).computeGenericSignature(
+                                      SourceLoc(),
+                                      /*allowConcreteGenericParams=*/true,
+                                      /*allowBuilderToMove=*/true);
+
+    // The new signature should be equal.
+    if (newSig->getCanonicalSignature() != sig->getCanonicalSignature()) {
+      context.Diags.diagnose(SourceLoc(), diag::generic_signature_not_equal,
+                             sig->getAsString(), newSig->getAsString());
+    }
+  }
+
+  // Try removing each requirement in turn.
   for (unsigned victimIndex : indices(requirements)) {
     PrettyStackTraceGenericSignature debugStack("verifying", sig, victimIndex);
 
@@ -7489,8 +7488,8 @@ void GenericSignatureBuilder::verifyGenericSignature(ASTContext &context,
         builder.addRequirement(requirements[i], source, nullptr);
     }
 
-    // Finalize the generic signature. If there were any errors, we formed
-    // an invalid signature, so just continue.
+    // If there were any errors, we formed an invalid signature, so
+    // just continue.
     if (builder.Impl->HadAnyError) continue;
 
     // Form a generic signature from the result.

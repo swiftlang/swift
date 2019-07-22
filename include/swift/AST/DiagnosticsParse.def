@@ -68,6 +68,10 @@ ERROR(extra_tokens_conditional_compilation_directive,none,
       "extra tokens following conditional compilation directive", ())
 ERROR(unexpected_rbrace_in_conditional_compilation_block,none,
       "unexpected '}' in conditional compilation block", ())
+ERROR(unexpected_if_following_else_compilation_directive,none,
+      "unexpected 'if' keyword following '#else' conditional compilation "
+      "directive; did you mean '#elseif'?",
+      ())
 
 ERROR(pound_diagnostic_expected_string,none,
       "expected string literal in %select{#warning|#error}0 directive",(bool))
@@ -212,6 +216,8 @@ ERROR(expected_decl,none,
       "expected declaration", ())
 ERROR(expected_identifier_in_decl,none,
       "expected identifier in %0 declaration", (StringRef))
+ERROR(expected_keyword_in_decl,none,
+      "expected '%0' keyword in %1 declaration", (StringRef, DescriptiveDeclKind))
 ERROR(number_cant_start_decl_name,none,
       "%0 name can only start with a letter or underscore, not a number",
       (StringRef))
@@ -731,6 +737,8 @@ ERROR(expected_type_after_arrow,none,
 ERROR(function_type_argument_label,none,
       "function types cannot have argument labels; use '_' before %0",
       (Identifier))
+ERROR(expected_dynamic_func_attr,none,
+      "expected a dynamically_replaceable function", ())
 
 // Enum Types
 ERROR(expected_expr_enum_case_raw_value,PointsToFirstBadToken,
@@ -750,6 +758,17 @@ ERROR(expected_dictionary_value_type,PointsToFirstBadToken,
       "expected dictionary value type", ())
 ERROR(expected_rbracket_dictionary_type,PointsToFirstBadToken,
       "expected ']' in dictionary type", ())
+ERROR(extra_rbracket,PointsToFirstBadToken,
+      "unexpected ']' in type; did you mean to write an array type?", ())
+ERROR(extra_colon,PointsToFirstBadToken,
+      "unexpected ':' in type; did you mean to write a dictionary type?", ())
+WARNING(subscript_array_element, none,
+        "unexpected subscript in array literal; did you mean to write two "
+        "separate elements instead?", ())
+NOTE(subscript_array_element_fix_it_add_comma, none, "add a separator between "
+     "the elements", ())
+NOTE(subscript_array_element_fix_it_remove_space, none,
+     "remove the space between the elements to silence this warning", ())
 
 // Tuple Types
 ERROR(expected_rparen_tuple_type_list,none,
@@ -842,6 +861,8 @@ ERROR(expected_parameter_name,PointsToFirstBadToken,
       "expected parameter name followed by ':'", ())
 ERROR(expected_parameter_colon,PointsToFirstBadToken,
       "expected ':' following argument label and parameter name", ())
+ERROR(expected_assignment_instead_of_comparison_operator,none,
+      "expected '=' instead of '==' to assign default value for parameter", ())
 ERROR(missing_parameter_type,PointsToFirstBadToken,
       "parameter requires an explicit type", ())
 ERROR(multiple_parameter_ellipsis,none,
@@ -852,10 +873,9 @@ ERROR(parameter_specifier_as_attr_disallowed,none,
       "'%0' before a parameter name is not allowed, place it before the parameter type instead",
       (StringRef))
 ERROR(parameter_specifier_repeated,none,
-      "parameter must not have multiple '__owned', 'inout', '__shared',"
-      " 'var', or 'let' specifiers", ())
-ERROR(parameter_let_var_as_attr,none,
-      "'%0' as a parameter attribute is not allowed",
+      "parameter must not have multiple '__owned', 'inout', or '__shared' specifiers", ())
+WARNING(parameter_let_var_as_attr,none,
+      "'%0' in this position is interpreted as an argument label",
       (StringRef))
 
 
@@ -1099,14 +1119,15 @@ ERROR(invalid_postfix_operator,none,
 
 ERROR(expected_member_name,PointsToFirstBadToken,
       "expected member name following '.'", ())
-ERROR(expected_dollar_numeric,none,
-      "expected numeric value following '$'", ())
 ERROR(dollar_numeric_too_large,none,
       "numeric value following '$' is too large", ())
 ERROR(numeric_literal_numeric_member,none,
       "expected named member of numeric literal", ())
 ERROR(standalone_dollar_identifier,none,
      "'$' is not an identifier; use backticks to escape it", ())
+ERROR(dollar_identifier_decl,none,
+     "cannot declare entity named %0; the '$' prefix is reserved for "
+     "implicitly-synthesized declarations", (Identifier))
 
 ERROR(anon_closure_arg_not_in_closure,none,
       "anonymous closure argument not contained in a closure", ())
@@ -1325,6 +1346,9 @@ ERROR(objc_runtime_name_must_be_identifier,none,
 
 ERROR(attr_only_at_non_local_scope, none,
       "attribute '%0' can only be used in a non-local scope", (StringRef))
+
+ERROR(projection_value_property_not_identifier,none,
+      "@_projectedValueProperty name must be an identifier", ())
 
 // Access control
 ERROR(attr_access_expected_set,none,
@@ -1569,8 +1593,8 @@ ERROR(avail_query_expected_version_number,PointsToFirstBadToken,
 ERROR(avail_query_expected_rparen,PointsToFirstBadToken,
       "expected ')' in availability query", ())
 
-ERROR(avail_query_unrecognized_platform_name,
-      PointsToFirstBadToken, "unrecognized platform name %0", (Identifier))
+WARNING(avail_query_unrecognized_platform_name,
+        PointsToFirstBadToken, "unrecognized platform name %0", (Identifier))
 
 ERROR(avail_query_disallowed_operator, PointsToFirstBadToken,
       "'%0' cannot be used in an availability condition", (StringRef))

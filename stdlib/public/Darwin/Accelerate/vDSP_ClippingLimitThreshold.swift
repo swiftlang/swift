@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 extension vDSP {
     
     // MARK: Clip
@@ -19,8 +20,7 @@ extension vDSP {
     /// - Parameter vector: Source vector.
     /// - Parameter bounds: Clipping threshold.
     /// - Returns: The clipped result.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func clip<U>(_ vector: U,
                                to bounds: ClosedRange<Float>) -> [Float]
         where
@@ -45,8 +45,7 @@ extension vDSP {
     /// - Parameter vector: Source vector.
     /// - Parameter bounds: Clipping threshold.
     /// - Parameter result: The clipped result.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func clip<U, V>(_ vector: U,
                                   to bounds: ClosedRange<Float>,
                                   result: inout V)
@@ -78,8 +77,7 @@ extension vDSP {
     /// - Parameter vector: Source vector.
     /// - Parameter bounds: Clipping threshold.
     /// - Returns: The clipped result.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func clip<U>(_ vector: U,
                                to bounds: ClosedRange<Double>) -> [Double]
         where
@@ -104,8 +102,7 @@ extension vDSP {
     /// - Parameter vector: Source vector.
     /// - Parameter bounds: Clipping threshold.
     /// - Parameter result: The clipped result.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func clip<U, V>(_ vector: U,
                                   to bounds: ClosedRange<Double>,
                                   result: inout V)
@@ -152,8 +149,7 @@ extension vDSP {
     ///         D[n] = *C;
     /// }
     /// ```
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func invertedClip<U>(_ vector: U,
                                        to bounds: ClosedRange<Float>) -> [Float]
         where
@@ -191,8 +187,7 @@ extension vDSP {
     ///         D[n] = *C;
     /// }
     /// ```
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func invertedClip<U, V>(_ vector: U,
                                           to bounds: ClosedRange<Float>,
                                           result: inout V)
@@ -237,8 +232,7 @@ extension vDSP {
     ///         D[n] = *C;
     /// }
     /// ```
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func invertedClip<U>(_ vector: U,
                                        to bounds: ClosedRange<Double>) -> [Double]
         where
@@ -276,8 +270,7 @@ extension vDSP {
     ///         D[n] = *C;
     /// }
     /// ```
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func invertedClip<U, V>(_ vector: U,
                                           to bounds: ClosedRange<Double>,
                                           result: inout V)
@@ -305,7 +298,7 @@ extension vDSP {
     }
     
     // MARK: Vector threshold.
-    
+  
     public enum ThresholdRule<T: BinaryFloatingPoint> {
         /// Returns threshold if input is less than threshold; otherwise input value.
         case clampToThreshold
@@ -320,8 +313,7 @@ extension vDSP {
     /// - Parameter vector: Source vector.
     /// - Parameter bounds: Clipping threshold.
     /// - Returns: The clipped result.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func threshold<U>(_ vector: U,
                                     to lowerBound: Float,
                                     with rule: ThresholdRule<Float>) -> [Float]
@@ -355,8 +347,6 @@ extension vDSP {
     /// - Parameter lowerBound: Low clipping threshold.
     /// - Parameter rule: The thresholding rule.
     /// - Parameter result: The threshold result.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func threshold<U, V>(_ vector: U,
                                        to lowerBound: Float,
                                        with rule: ThresholdRule<Float>,
@@ -401,8 +391,7 @@ extension vDSP {
     /// - Parameter vector: Source vector.
     /// - Parameter bounds: Clipping threshold.
     /// - Returns: The clipped result.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func threshold<U>(_ vector: U,
                                     to lowerBound: Double,
                                     with rule: ThresholdRule<Double>) -> [Double]
@@ -436,8 +425,6 @@ extension vDSP {
     /// - Parameter lowerBound: Low clipping threshold.
     /// - Parameter rule: The thresholding rule.
     /// - Parameter result: The threshold result.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func threshold<U, V>(_ vector: U,
                                        to lowerBound: Double,
                                        with rule: ThresholdRule<Double>,
@@ -487,8 +474,7 @@ extension vDSP {
     /// - Parameter limit: Limit.
     /// - Parameter x: Value written to result.
     /// - Returns: The clipped result.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func limit<U>(_ vector: U,
                                 limit: Float,
                                 withOutputConstant outputConstant: Float) -> [Float]
@@ -518,8 +504,7 @@ extension vDSP {
     /// - Parameter limit: Limit.
     /// - Parameter x: Value written to result.
     /// - Parameter result: The clipped result.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func limit<U, V>(_ vector: U,
                                    limit: Float,
                                    withOutputConstant outputConstant: Float,
@@ -555,8 +540,7 @@ extension vDSP {
     /// - Parameter limit: Limit.
     /// - Parameter x: Value written to result.
     /// - Returns: The clipped result.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func limit<U>(_ vector: U,
                                 limit: Double,
                                 withOutputConstant outputConstant: Double) -> [Double]
@@ -586,8 +570,7 @@ extension vDSP {
     /// - Parameter limit: Limit.
     /// - Parameter x: Value written to result.
     /// - Parameter result: The clipped result.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func limit<U, V>(_ vector: U,
                                    limit: Double,
                                    withOutputConstant outputConstant: Double,

@@ -15,6 +15,7 @@
 #include "SwiftLangSupport.h"
 #include "SourceKit/Core/Context.h"
 #include "SourceKit/Core/NotificationCenter.h"
+#include "SourceKit/Support/FileSystemProvider.h"
 #include "SourceKit/Support/ImmutableTextBuffer.h"
 #include "SourceKit/Support/Logging.h"
 #include "SourceKit/Support/Tracing.h"
@@ -600,6 +601,7 @@ class SwiftDocumentSemanticInfo :
   std::weak_ptr<SwiftASTManager> ASTMgr;
   std::shared_ptr<NotificationCenter> NotificationCtr;
   ThreadSafeRefCntPtr<SwiftInvocation> InvokRef;
+  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fileSystem;
   std::string CompilerArgsError;
 
   uint64_t ASTGeneration = 0;
@@ -612,20 +614,27 @@ class SwiftDocumentSemanticInfo :
   mutable llvm::sys::Mutex Mtx;
 
 public:
-  SwiftDocumentSemanticInfo(StringRef Filename,
-                            std::weak_ptr<SwiftASTManager> ASTMgr,
-                            std::shared_ptr<NotificationCenter> NotificationCtr)
-      : Filename(Filename), ASTMgr(ASTMgr), NotificationCtr(NotificationCtr) {}
+  SwiftDocumentSemanticInfo(
+      StringRef Filename, std::weak_ptr<SwiftASTManager> ASTMgr,
+      std::shared_ptr<NotificationCenter> NotificationCtr,
+      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fileSystem)
+      : Filename(Filename), ASTMgr(ASTMgr), NotificationCtr(NotificationCtr),
+        fileSystem(fileSystem) {}
 
   SwiftInvocationRef getInvocation() const {
     return InvokRef;
+  }
+
+  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> getFileSystem() const {
+    return fileSystem;
   }
 
   uint64_t getASTGeneration() const;
 
   void setCompilerArgs(ArrayRef<const char *> Args) {
     if (auto ASTMgr = this->ASTMgr.lock()) {
-      InvokRef = ASTMgr->getInvocation(Args, Filename, CompilerArgsError);
+      InvokRef =
+          ASTMgr->getInvocation(Args, Filename, CompilerArgsError);
     }
   }
 
@@ -1034,7 +1043,8 @@ void SwiftDocumentSemanticInfo::processLatestSnapshotAsync(
   // SwiftDocumentSemanticInfo pointer so use that for the token.
   const void *OncePerASTToken = SemaInfoRef.get();
   if (auto ASTMgr = this->ASTMgr.lock()) {
-    ASTMgr->processASTAsync(Invok, std::move(Consumer), OncePerASTToken);
+    ASTMgr->processASTAsync(Invok, std::move(Consumer), OncePerASTToken,
+                            fileSystem);
   }
 }
 
@@ -1068,12 +1078,17 @@ struct SwiftEditorDocument::Implementation {
   llvm::sys::Mutex AccessMtx;
 
   Implementation(StringRef FilePath, SwiftLangSupport &LangSupport,
-                 CodeFormatOptions options)
+                 CodeFormatOptions options,
+                 llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fileSystem)
       : ASTMgr(LangSupport.getASTManager()),
         NotificationCtr(LangSupport.getNotificationCenter()),
         FilePath(FilePath), FormatOptions(options) {
-    SemanticInfo =
-        new SwiftDocumentSemanticInfo(FilePath, ASTMgr, NotificationCtr);
+    assert(fileSystem);
+    // This instance of semantic info is used if a document is opened with
+    // `key.syntactic_only: 1`, but subsequently a semantic request such as
+    // cursor_info is made.
+    SemanticInfo = new SwiftDocumentSemanticInfo(
+        FilePath, ASTMgr, NotificationCtr, fileSystem);
   }
 };
 
@@ -1274,9 +1289,10 @@ public:
   }
 
   StringRef getObjCSelectorName(const Decl *D, SmallString<64> &Buf) {
-    // We only vend the selector name for @IBAction methods.
+    // We only vend the selector name for @IBAction and @IBSegueAction methods.
     if (auto FuncD = dyn_cast_or_null<FuncDecl>(D)) {
-      if (FuncD->getAttrs().hasAttribute<IBActionAttr>())
+      if (FuncD->getAttrs().hasAttribute<IBActionAttr>() ||
+          FuncD->getAttrs().hasAttribute<IBSegueActionAttr>())
         return FuncD->getObjCSelector().getString(Buf);
     }
     return StringRef();
@@ -1408,6 +1424,22 @@ private:
       }
       return { true, E };
     }
+
+    bool walkToDeclPre(Decl *D) override {
+      if (auto *ICD = dyn_cast<IfConfigDecl>(D)) {
+        // The base walker assumes the content of active IfConfigDecl clauses
+        // has been injected into the parent context and will be walked there.
+        // This doesn't hold for pre-typechecked ASTs and we need to find
+        // placeholders in inactive clauses anyway, so walk them here.
+        for (auto Clause: ICD->getClauses()) {
+          for (auto Elem: Clause.Elements) {
+            Elem.walk(*this);
+          }
+        }
+        return false;
+      }
+      return true;
+    }
   };
 
   class ClosureTypeWalker: public ASTWalker {
@@ -1516,8 +1548,26 @@ private:
       bool walkToExprPre(Expr *E) override {
         auto SR = E->getSourceRange();
         if (SR.isValid() && SM.rangeContainsTokenLoc(SR, TargetLoc)) {
-          if (!checkCallExpr(E) && !EnclosingCallAndArg.first)
+          if (auto closure = dyn_cast<ClosureExpr>(E)) {
+            if (closure->hasSingleExpressionBody()) {
+              // Treat a single-expression body like a brace statement and reset
+              // the enclosing context. Note: when the placeholder is the whole
+              // body it is handled specially as wrapped in braces by
+              // shouldUseTrailingClosureInTuple().
+              auto SR = closure->getSingleExpressionBody()->getSourceRange();
+              if (SR.isValid() && SR.Start != TargetLoc &&
+                  SM.rangeContainsTokenLoc(SR, TargetLoc)) {
+                OuterStmt = nullptr;
+                OuterExpr = nullptr;
+                EnclosingCallAndArg = {nullptr, nullptr};
+                return true;
+              }
+            }
+          }
+
+          if (!checkCallExpr(E) && !EnclosingCallAndArg.first) {
             OuterExpr = E;
+          }
         }
         return true;
       }
@@ -1531,16 +1581,28 @@ private:
       bool walkToStmtPre(Stmt *S) override {
         auto SR = S->getSourceRange();
         if (SR.isValid() && SM.rangeContainsTokenLoc(SR, TargetLoc)) {
-          if (!EnclosingCallAndArg.first) {
-            if (isa<BraceStmt>(S))
-              // In case OuterStmt is already set, we should clear it to nullptr.
-              OuterStmt = nullptr;
-            else
-              OuterStmt = S;
+          // A statement inside an expression - e.g. `foo({ if ... })` - resets
+          // the enclosing context.
+          OuterExpr = nullptr;
+          EnclosingCallAndArg = {nullptr, nullptr};
+
+          switch (S->getKind()) {
+          case StmtKind::Brace:
+          case StmtKind::Return:
+          case StmtKind::Yield:
+          case StmtKind::Throw:
+            // A trailing closure is allowed in these statements.
+            OuterStmt = nullptr;
+            break;
+          default:
+            OuterStmt = S;
+            break;
           }
         }
         return true;
       }
+
+      bool shouldWalkInactiveConfigRegion() override { return true; }
 
       Expr *findEnclosingCallArg(SourceFile &SF, SourceLoc SL) {
         EnclosingCallAndArg = {nullptr, nullptr};
@@ -1566,16 +1628,29 @@ private:
   }
 
   bool shouldUseTrailingClosureInTuple(TupleExpr *TE,
-                                       SourceLoc PlaceHolderStartLoc) {
-    if (!TE->getElements().empty()) {
-      for (unsigned I = 0, N = TE->getNumElements(); I < N; ++ I) {
-        bool IsLast = I == N - 1;
-        Expr *E = TE->getElement(I);
-        if (IsLast) {
-          return E->getStartLoc() == PlaceHolderStartLoc;
-        } else if (containClosure(E)) {
-          return false;
+                                       SourceLoc PlaceHolderStartLoc,
+                                       bool &isWrappedWithBraces) {
+    if (TE->getElements().empty())
+      return false;
+
+    for (unsigned I = 0, N = TE->getNumElements(); I < N; ++ I) {
+      bool IsLast = I == N - 1;
+      Expr *E = TE->getElement(I);
+
+      // Placeholders wrapped in braces {<#T##() -> Int#>} can also
+      // be valid for trailing syntax.
+      if (auto CE = dyn_cast<ClosureExpr>(E)) {
+        if (CE->hasSingleExpressionBody() &&
+            CE->getSingleExpressionBody()->getStartLoc()
+              == PlaceHolderStartLoc) {
+          // We found the placeholder.
+          isWrappedWithBraces = true;
+          return IsLast;
         }
+      } else if (IsLast) {
+        return E->getStartLoc() == PlaceHolderStartLoc;
+      } else if (containClosure(E)) {
+        return false;
       }
     }
     return false;
@@ -1590,6 +1665,7 @@ public:
   bool scan(SourceFile &SF, unsigned BufID, unsigned Offset,
              unsigned Length, std::function<void(Expr *Args,
                                                  bool UseTrailingClosure,
+                                                 bool isWrappedWithBraces,
                                                  ArrayRef<Param>,
                                                  CharSourceRange)> Callback,
             std::function<bool(EditorPlaceholderExpr*)> NonClosureCallback) {
@@ -1606,18 +1682,21 @@ public:
     // and if the call parens can be removed in that case.
     // We'll first find the enclosing CallExpr, and then do further analysis.
     bool UseTrailingClosure = false;
+    bool isWrappedWithBraces = false;
     auto ECE = enclosingCallExprArg(SF, PlaceholderStartLoc);
     Expr *Args = ECE.first;
     if (Args && ECE.second) {
       if (isa<ParenExpr>(Args)) {
         UseTrailingClosure = true;
       } else if (auto *TE = dyn_cast<TupleExpr>(Args)) {
-        UseTrailingClosure = shouldUseTrailingClosureInTuple(TE,
-                                                          PlaceholderStartLoc);
+        UseTrailingClosure = shouldUseTrailingClosureInTuple(
+                               TE, PlaceholderStartLoc,
+                               isWrappedWithBraces);
       }
     }
 
-    Callback(Args, UseTrailingClosure, TargetClosureInfo.Params,
+    Callback(Args, UseTrailingClosure, isWrappedWithBraces,
+             TargetClosureInfo.Params,
              TargetClosureInfo.ReturnTypeRange);
     return true;
   }
@@ -1626,9 +1705,11 @@ public:
 
 } // anonymous namespace
 
-SwiftEditorDocument::SwiftEditorDocument(StringRef FilePath,
-    SwiftLangSupport &LangSupport, CodeFormatOptions Options)
-  :Impl(*new Implementation(FilePath, LangSupport, Options)) { }
+SwiftEditorDocument::SwiftEditorDocument(
+    StringRef FilePath, SwiftLangSupport &LangSupport,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fileSystem,
+    CodeFormatOptions Options)
+  :Impl(*new Implementation(FilePath, LangSupport, Options, fileSystem)) { }
 
 SwiftEditorDocument::~SwiftEditorDocument()
 {
@@ -1637,8 +1718,8 @@ SwiftEditorDocument::~SwiftEditorDocument()
 
 ImmutableTextSnapshotRef SwiftEditorDocument::initializeText(
     llvm::MemoryBuffer *Buf, ArrayRef<const char *> Args,
-    bool ProvideSemanticInfo) {
-
+    bool ProvideSemanticInfo,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fileSystem) {
   llvm::sys::ScopedLock L(Impl.AccessMtx);
 
   Impl.Edited = false;
@@ -1652,8 +1733,8 @@ ImmutableTextSnapshotRef SwiftEditorDocument::initializeText(
   // Try to create a compiler invocation object if needing semantic info
   // or it's syntactic-only but with passed-in compiler arguments.
   if (ProvideSemanticInfo || !Args.empty()) {
-    Impl.SemanticInfo = new SwiftDocumentSemanticInfo(Impl.FilePath, Impl.ASTMgr,
-                                                      Impl.NotificationCtr);
+    Impl.SemanticInfo = new SwiftDocumentSemanticInfo(
+        Impl.FilePath, Impl.ASTMgr, Impl.NotificationCtr, fileSystem);
     Impl.SemanticInfo->setCompilerArgs(Args);
   }
   return Impl.EditableBuffer->getSnapshot();
@@ -1859,10 +1940,12 @@ void SwiftEditorDocument::applyFormatOptions(OptionsDictionary &FmtOptions) {
   static UIdent KeyUseTabs("key.editor.format.usetabs");
   static UIdent KeyIndentWidth("key.editor.format.indentwidth");
   static UIdent KeyTabWidth("key.editor.format.tabwidth");
+  static UIdent KeyIndentSwitchCase("key.editor.format.indent_switch_case");
 
   FmtOptions.valueForOption(KeyUseTabs, Impl.FormatOptions.UseTabs);
   FmtOptions.valueForOption(KeyIndentWidth, Impl.FormatOptions.IndentWidth);
   FmtOptions.valueForOption(KeyTabWidth, Impl.FormatOptions.TabWidth);
+  FmtOptions.valueForOption(KeyIndentSwitchCase, Impl.FormatOptions.IndentSwitchCase);
 }
 
 const CodeFormatOptions &SwiftEditorDocument::getFormatOptions() {
@@ -1878,6 +1961,13 @@ std::string SwiftEditorDocument::getFilePath() const { return Impl.FilePath; }
 
 bool SwiftEditorDocument::hasUpToDateAST() const {
   return Impl.SyntaxInfo->hasUpToDateAST();
+}
+
+llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>
+SwiftEditorDocument::getFileSystem() const {
+  llvm::sys::ScopedLock L(Impl.AccessMtx);
+  return Impl.SemanticInfo ? Impl.SemanticInfo->getFileSystem()
+                           : llvm::vfs::getRealFileSystem();
 }
 
 void SwiftEditorDocument::formatText(unsigned Line, unsigned Length,
@@ -1922,7 +2012,7 @@ void SwiftEditorDocument::expandPlaceholder(unsigned Offset, unsigned Length,
 
   Scanner.scan(SF, BufID, Offset, Length,
           [&](Expr *Args,
-              bool UseTrailingClosure,
+              bool UseTrailingClosure, bool isWrappedWithBraces,
               ArrayRef<PlaceholderExpansionScanner::Param> ClosureParams,
               CharSourceRange ClosureReturnTypeRange) {
 
@@ -1966,8 +2056,10 @@ void SwiftEditorDocument::expandPlaceholder(unsigned Offset, unsigned Length,
           unsigned End = SM.getLocOffsetInBuffer(Args->getEndLoc(), BufID);
           EffectiveLength = (End + 1) - EffectiveOffset;
         }
-
-        OS << "{ ";
+        // Trailing closure syntax handling will replace braces anyway.
+        bool printBraces = !isWrappedWithBraces || UseTrailingClosure;
+        if (printBraces)
+          OS << "{ ";
 
         bool ReturningVoid = isReturningVoid(SM, ClosureReturnTypeRange);
 
@@ -2009,7 +2101,8 @@ void SwiftEditorDocument::expandPlaceholder(unsigned Offset, unsigned Length,
         if (HasSignature)
           OS << "in";
         OS << "\n" << getCodePlaceholder() << "\n";
-        OS << "}";
+        if (printBraces)
+          OS << "}";
       }
       Consumer.handleSourceText(ExpansionStr);
       Consumer.recordAffectedRange(EffectiveOffset, EffectiveLength);
@@ -2046,15 +2139,23 @@ void SwiftEditorDocument::reportDocumentStructure(SourceFile &SrcFile,
 // EditorOpen
 //===----------------------------------------------------------------------===//
 
-void SwiftLangSupport::editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
-                                  EditorConsumer &Consumer,
-                                  ArrayRef<const char *> Args) {
+void SwiftLangSupport::editorOpen(
+    StringRef Name, llvm::MemoryBuffer *Buf, EditorConsumer &Consumer,
+    ArrayRef<const char *> Args, Optional<VFSOptions> vfsOptions) {
+
+  std::string error;
+  // Do not provide primaryFile so that opening an existing document will
+  // reinitialize the filesystem instead of keeping the old one.
+  auto fileSystem = getFileSystem(vfsOptions, /*primaryFile=*/None, error);
+  if (!fileSystem)
+    return Consumer.handleRequestError(error.c_str());
 
   ImmutableTextSnapshotRef Snapshot = nullptr;
   auto EditorDoc = EditorDocuments->getByUnresolvedName(Name);
   if (!EditorDoc) {
-    EditorDoc = new SwiftEditorDocument(Name, *this);
-    Snapshot = EditorDoc->initializeText(Buf, Args, Consumer.needsSemanticInfo());
+    EditorDoc = new SwiftEditorDocument(Name, *this, fileSystem);
+    Snapshot = EditorDoc->initializeText(
+        Buf, Args, Consumer.needsSemanticInfo(), fileSystem);
     EditorDoc->parse(Snapshot, *this, Consumer.syntaxTreeEnabled());
     if (EditorDocuments->getOrUpdate(Name, *this, EditorDoc)) {
       // Document already exists, re-initialize it. This should only happen
@@ -2067,7 +2168,8 @@ void SwiftLangSupport::editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
   }
 
   if (!Snapshot) {
-    Snapshot = EditorDoc->initializeText(Buf, Args, Consumer.needsSemanticInfo());
+    Snapshot = EditorDoc->initializeText(
+        Buf, Args, Consumer.needsSemanticInfo(), fileSystem);
     EditorDoc->parse(Snapshot, *this, Consumer.syntaxTreeEnabled());
   }
 
@@ -2085,7 +2187,6 @@ void SwiftLangSupport::editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
                               ReusedNodeIds);
   }
 }
-
 
 //===----------------------------------------------------------------------===//
 // EditorClose

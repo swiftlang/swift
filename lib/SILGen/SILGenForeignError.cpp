@@ -112,8 +112,8 @@ static SILValue emitIntValue(SILGenFunction &SGF, SILLocation loc,
                              SILType type, unsigned value) {
   if (auto structDecl = type.getStructOrBoundGenericStruct()) {
     auto properties = structDecl->getStoredProperties();
-    assert(std::next(properties.begin()) == properties.end());
-    SILType fieldType = type.getFieldType(*properties.begin(), SGF.SGM.M);
+    assert(properties.size() == 1);
+    SILType fieldType = type.getFieldType(properties[0], SGF.SGM.M);
     SILValue fieldValue = emitIntValue(SGF, loc, fieldType, value);
     return SGF.B.createStruct(loc, type, fieldValue);
   }

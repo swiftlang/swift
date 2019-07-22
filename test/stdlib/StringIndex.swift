@@ -99,12 +99,7 @@ StringIndexTests.test("interchange") {
   // Basic index alignment
 
   func validateIndices(_ s: String) {
-    let utf8Indices = s.utf8.indices
-    let utf16Indices = s.utf16.indices
-    let unicodeScalarIndices = s.unicodeScalars.indices
-    let characterIndices = s.indices
-
-    for idx in utf8Indices {
+    for idx in s.utf8.indices {
       let char = s.utf8[idx]
 
       // ASCII or leading code unit in the scalar
@@ -193,7 +188,7 @@ StringIndexTests.test("Scalar Align UTF-8 indices") {
   expectEqual(1, roundedIdx.utf16Offset(in: str))
 
   let roundedIdx2 = str.utf8[...subScalarIdx].lastIndex { $0 & 0xC0 != 0x80 }
-  expectEqual(roundedIdx, roundedIdx)
+  expectEqual(roundedIdx, roundedIdx2)
 
   var roundedIdx3 = subScalarIdx
   while roundedIdx3.samePosition(in: str.unicodeScalars) == nil {
@@ -205,7 +200,7 @@ StringIndexTests.test("Scalar Align UTF-8 indices") {
 #if _runtime(_ObjC)
 import Foundation
 StringIndexTests.test("String.Index(_:within) / Range<String.Index>(_:in:)") {
-  guard #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) else {
+  guard #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) else {
     return
   }
 
@@ -232,21 +227,238 @@ StringIndexTests.test("String.Index(_:within) / Range<String.Index>(_:in:)") {
       expectEqual(strLB, substrLB)
       expectEqual(strUB, substrUB)
 
-      if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
-        let nsRange = NSRange(location: location, length: length)
-        let strRange = Range<String.Index>(nsRange, in: str)
-        let substrRange = Range<String.Index>(nsRange, in: substr)
+      let nsRange = NSRange(location: location, length: length)
+      let strRange = Range<String.Index>(nsRange, in: str)
+      let substrRange = Range<String.Index>(nsRange, in: substr)
 
-        expectEqual(strRange, substrRange)
-        guard strLB != nil && strUB != nil else {
-          expectNil(strRange)
-          continue
-        }
-        expectEqual(strRange, Range(uncheckedBounds: (strLB!, strUB!)))
+      expectEqual(strRange, substrRange)
+      guard strLB != nil && strUB != nil else {
+        expectNil(strRange)
+        continue
       }
+      expectEqual(strRange, Range(uncheckedBounds: (strLB!, strUB!)))
     }
   }
 }
+
+StringIndexTests.test("Misaligned") {
+  func doIt(_ str: String) {
+    let characterIndices = Array(str.indices)
+    let scalarIndices = Array(str.unicodeScalars.indices) + [str.endIndex]
+    let utf8Indices = Array(str.utf8.indices)
+
+    var lastScalarI = 0
+    for i in 1..<utf8Indices.count {
+      let idx = utf8Indices[i]
+
+      // Skip aligned indices
+      guard idx < scalarIndices[lastScalarI + 1] else {
+        assert(idx == scalarIndices[lastScalarI + 1])
+        lastScalarI += 1
+        continue
+      }
+      expectTrue(UTF8.isContinuation(str.utf8[idx]))
+
+      let lastScalarIdx = scalarIndices[lastScalarI]
+
+      // Check aligning-down
+      expectEqual(str[lastScalarIdx], str[idx])
+      expectEqual(str.utf16[lastScalarIdx], str.utf16[idx])
+      expectEqual(str.unicodeScalars[lastScalarIdx], str.unicodeScalars[idx])
+
+      // Check distance
+      let (start, end) = (str.startIndex, str.endIndex)
+      if characterIndices.contains(lastScalarIdx) {
+        expectEqual(0, str.distance(from: lastScalarIdx, to: idx))
+        expectEqual(str[..<idx].count, str.distance(from: start, to: idx))
+        expectEqual(str[idx...].count, str.distance(from: idx, to: end))
+      }
+      expectEqual(
+        0, str.unicodeScalars.distance(from: lastScalarIdx, to: idx))
+      expectEqual(
+        str.unicodeScalars[..<idx].count,
+        str.unicodeScalars.distance(from: start, to: idx))
+      expectEqual(
+        str.unicodeScalars[idx...].count,
+        str.unicodeScalars.distance(from: idx, to: end))
+
+      expectEqual(0, str.utf16.distance(from: lastScalarIdx, to: idx))
+      expectEqual(
+        str.utf16[..<idx].count, str.utf16.distance(from: start, to: idx))
+      expectEqual(
+        str.utf16[idx...].count, str.utf16.distance(from: idx, to: end))
+    }
+  }
+
+  let nsstring: NSString = "aодиde\u{301}日🧟‍♀️"
+  doIt(nsstring as String)
+
+  let string = "aодиde\u{301}日🧟‍♀️"
+  doIt(string)
+}
+
 #endif // _runtime(_ObjC)
+
+StringIndexTests.test("Exhaustive Index Interchange") {
+  // Exhaustively test aspects of string index interchange
+  func testInterchange(
+    _ str: String,
+    stackTrace: SourceLocStack = SourceLocStack(),
+    showFrame: Bool = true,
+    file: String = #file,
+    line: UInt = #line
+  ) {
+    guard #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) else {
+      return
+    }
+
+    let stackTrace = stackTrace.pushIf(showFrame, file: file, line: line)
+    func expect(
+      _ condition: @autoclosure () -> Bool,
+      _ message: String = "",
+      file: String = #file,
+      line: UInt = #line
+    ) {
+      expectTrue(condition(), message,
+        stackTrace: stackTrace, showFrame: showFrame,
+        file: file, line: line)
+    }
+
+    var curCharIdx = str.startIndex
+    var curScalarIdx = str.startIndex
+    var curUTF8Idx = str.startIndex
+    var curUTF16Idx = str.startIndex
+
+    while curCharIdx < str.endIndex {
+      let curChar = str[curCharIdx]
+      expect(curChar == str[curScalarIdx])
+      expect(curChar == str[curUTF8Idx])
+      expect(curChar == str[curUTF16Idx])
+
+      // Advance the character index once and have the scalar index catch up
+      str.formIndex(after: &curCharIdx)
+
+      let scalarStartIdx = curScalarIdx
+      defer {
+        let sub = str[scalarStartIdx..<curScalarIdx]
+        expect(sub.count == 1)
+        expect(sub.first! == curChar)
+        expect(str.distance(from: scalarStartIdx, to: curScalarIdx) == 1)
+      }
+
+      while curScalarIdx < curCharIdx {
+        let scalarStartIdx = curScalarIdx
+        let curScalar = str.unicodeScalars[curScalarIdx]
+        let curSubChar = str[curScalarIdx]
+
+        // If there is a Character prior to this scalar, remember it and check
+        // that misalignd code unit indices also produce it.
+        let scalarPriorCharacter: Character?
+        if scalarStartIdx == str.startIndex {
+          scalarPriorCharacter = nil
+        } else {
+          scalarPriorCharacter = str[str.index(before: scalarStartIdx)]
+        }
+
+        // Advance the scalar index once and have the code unit indices catch up
+        str.unicodeScalars.formIndex(after: &curScalarIdx)
+
+
+        let utf8StartIdx = curUTF8Idx
+        defer {
+          let sub = str.unicodeScalars[utf8StartIdx..<curUTF8Idx]
+          expect(sub.count == 1)
+          expect(sub.first! == curScalar)
+          expect(str.unicodeScalars.distance(
+            from: utf8StartIdx, to: curUTF8Idx) == 1)
+          expect(str.utf8.distance(
+            from: utf8StartIdx, to: curUTF8Idx) == curScalar.utf8.count)
+        }
+
+        while curUTF8Idx < curScalarIdx {
+          expect(curScalar == str.unicodeScalars[curUTF8Idx])
+          expect(curSubChar == str[curUTF8Idx])
+          expect(!UTF16.isTrailSurrogate(str.utf16[curUTF8Idx]))
+          expect(utf8StartIdx == str[curUTF8Idx...].startIndex)
+          expect(str[utf8StartIdx..<curUTF8Idx].isEmpty)
+          expect(0 == str.utf16.distance(from: utf8StartIdx, to: curUTF8Idx))
+
+          if let scalarPrior = scalarPriorCharacter {
+            expect(scalarPrior == str[str.index(before: curUTF8Idx)])
+          }
+
+          str.utf8.formIndex(after: &curUTF8Idx)
+        }
+        expect(curUTF8Idx == curScalarIdx)
+
+        var utf8RevIdx = curUTF8Idx
+        while utf8RevIdx > utf8StartIdx {
+          str.utf8.formIndex(before: &utf8RevIdx)
+
+          expect(curScalar == str.unicodeScalars[utf8RevIdx])
+          expect(curSubChar == str[utf8RevIdx])
+          expect(!UTF16.isTrailSurrogate(str.utf16[utf8RevIdx]))
+          expect(utf8StartIdx == str[utf8RevIdx...].startIndex)
+          expect(str[utf8StartIdx..<utf8RevIdx].isEmpty)
+          expect(0 == str.utf16.distance(from: utf8StartIdx, to: utf8RevIdx))
+        }
+        expect(utf8RevIdx == utf8StartIdx)
+
+        let utf16StartIdx = curUTF16Idx
+        defer {
+          let sub = str.unicodeScalars[utf16StartIdx..<curUTF16Idx]
+          expect(sub.count == 1)
+          expect(sub.first! == curScalar)
+          expect(str.unicodeScalars.distance(
+            from: utf16StartIdx, to: curUTF16Idx) == 1)
+          expect(str.utf16.distance(
+            from: utf16StartIdx, to: curUTF16Idx) == curScalar.utf16.count)
+        }
+
+        while curUTF16Idx < curScalarIdx {
+          expect(curScalar == str.unicodeScalars[curUTF16Idx])
+          expect(curSubChar == str[curUTF16Idx])
+          expect(!UTF8.isContinuation(str.utf8[curUTF16Idx]))
+          expect(utf16StartIdx == str[curUTF16Idx...].startIndex)
+          expect(str[utf16StartIdx..<curUTF16Idx].isEmpty)
+          expect(0 == str.utf8.distance(from: utf16StartIdx, to: curUTF16Idx))
+
+          if let scalarPrior = scalarPriorCharacter {
+            expect(scalarPrior == str[str.index(before: curUTF16Idx)])
+          }
+
+          str.utf16.formIndex(after: &curUTF16Idx)
+        }
+        expect(curUTF16Idx == curScalarIdx)
+
+        var utf16RevIdx = curUTF16Idx
+        while utf16RevIdx > utf16StartIdx {
+          str.utf16.formIndex(before: &utf16RevIdx)
+
+          expect(curScalar == str.unicodeScalars[utf16RevIdx])
+          expect(curSubChar == str[utf16RevIdx])
+          expect(!UTF8.isContinuation(str.utf8[utf16RevIdx]))
+          expect(utf16StartIdx == str[utf16RevIdx...].startIndex)
+          expect(str[utf16StartIdx..<utf16RevIdx].isEmpty)
+          expect(0 == str.utf8.distance(from: utf16StartIdx, to: utf16RevIdx))
+        }
+        expect(utf16RevIdx == utf16StartIdx)
+
+      }
+    }
+  }
+
+  testInterchange("abc\r\ndefg")
+
+#if _runtime(_ObjC)
+  testInterchange(("abc\r\ndefg" as NSString) as String)
+#endif // _runtime(_ObjC)
+
+  testInterchange("ab\r\ncдe\u{301}日🧟‍♀️x🧟x🏳️‍🌈🇺🇸🇨🇦")
+
+#if _runtime(_ObjC)
+  testInterchange(("ab\r\ncдe\u{301}日🧟‍♀️x🧟x🏳️‍🌈🇺🇸🇨🇦" as NSString) as String)
+#endif // _runtime(_ObjC)
+}
 
 runAllTests()

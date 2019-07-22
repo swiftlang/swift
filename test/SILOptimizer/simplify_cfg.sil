@@ -128,7 +128,7 @@ bb3(%6 : $Builtin.Int32):
 // CHECK: bb0([[ARG:%.*]] : $Builtin.Int1):
 // CHECK:   [[ZERO:%.*]] =  integer_literal $Builtin.Int1, 0
 // CHECK:   [[EXPECT:%.*]] = builtin "int_expect_Int1"([[ARG]] : $Builtin.Int1, [[ZERO]]
-// CHECK    cond_br [[EXPECT]], bb2, bb1
+// CHECK:    cond_br [[EXPECT]], bb2, bb1
 // CHECK: bb1:
 // CHECK:   integer_literal {{.*}} 2
 // CHECK:   br

@@ -16,12 +16,12 @@ import SwiftShims
 // want.
 #if _runtime(_ObjC)
 
-internal protocol _AbstractStringStorage : _NSCopying {
+internal protocol _AbstractStringStorage: _NSCopying {
   var asString: String { get }
   var count: Int { get }
   var isASCII: Bool { get }
   var start: UnsafePointer<UInt8> { get }
-  var length: Int { get } // In UTF16 code units.
+  var UTF16Length: Int { get }
 }
 
 internal let _cocoaASCIIEncoding:UInt = 1 /* NSASCIIStringEncoding */
@@ -79,9 +79,8 @@ extension _AbstractStringStorage {
     _ outputPtr: UnsafeMutablePointer<UInt8>, _ maxLength: Int, _ encoding: UInt
   ) -> Int8 {
     switch (encoding, isASCII) {
-    case (_cocoaASCIIEncoding, true):
-      fallthrough
-    case (_cocoaUTF8Encoding, _):
+    case (_cocoaASCIIEncoding, true),
+         (_cocoaUTF8Encoding, _):
       guard maxLength >= count + 1 else { return 0 }
       outputPtr.initialize(from: start, count: count)
       outputPtr[count] = 0
@@ -95,9 +94,8 @@ extension _AbstractStringStorage {
   @_effects(readonly)
   internal func _cString(encoding: UInt) -> UnsafePointer<UInt8>? {
     switch (encoding, isASCII) {
-    case (_cocoaASCIIEncoding, true):
-      fallthrough
-    case (_cocoaUTF8Encoding, _):
+    case (_cocoaASCIIEncoding, true),
+         (_cocoaUTF8Encoding, _):
       return start
     default:
       return _cocoaCStringUsingEncodingTrampoline(self, encoding)
@@ -239,7 +237,7 @@ final internal class __StringStorage
 #if _runtime(_ObjC)
 
   @objc(length)
-  final internal var length: Int {
+  final internal var UTF16Length: Int {
     @_effects(readonly) @inline(__always) get {
       return asString.utf16.count // UTF16View special-cases ASCII for us.
     }
@@ -411,13 +409,11 @@ extension __StringStorage {
   
   // The caller is expected to check UTF8 validity and ASCII-ness and update
   // the resulting StringStorage accordingly
-  @_effects(releasenone)
   internal static func create(
-    unsafeUninitializedCapacity capacity: Int,
+    uninitializedCapacity capacity: Int,
     initializingUncheckedUTF8With initializer: (
-      _ buffer: UnsafeMutableBufferPointer<UInt8>,
-      _ initializedCount: inout Int
-    ) throws -> Void
+      _ buffer: UnsafeMutableBufferPointer<UInt8>
+    ) throws -> Int
   ) rethrows -> __StringStorage {
     let storage = __StringStorage.create(
       capacity: capacity,
@@ -425,9 +421,17 @@ extension __StringStorage {
     )
     let buffer = UnsafeMutableBufferPointer(start: storage.mutableStart,
                                             count: capacity)
-    var count = 0
-    try initializer(buffer, &count)
-    storage._countAndFlags = CountAndFlags(mortalCount: count, isASCII: false)
+    let count = try initializer(buffer)
+    
+    let countAndFlags = CountAndFlags(mortalCount: count, isASCII: false)
+    #if arch(i386) || arch(arm)
+    storage._count = countAndFlags.count
+    storage._flags = countAndFlags.flags
+    #else
+    storage._countAndFlags = countAndFlags
+    #endif
+    
+    storage.terminator.pointee = 0 // nul-terminated
     return storage
   }
 
@@ -550,7 +554,7 @@ extension __StringStorage {
 extension __StringStorage {
   // Perform common post-RRC adjustments and invariant enforcement.
   @_effects(releasenone)
-  private func _postRRCAdjust(newCount: Int, newIsASCII: Bool) {
+  internal func _updateCountAndFlags(newCount: Int, newIsASCII: Bool) {
     let countAndFlags = CountAndFlags(
       mortalCount: newCount, isASCII: newIsASCII)
 #if arch(i386) || arch(arm)
@@ -572,7 +576,7 @@ extension __StringStorage {
     appendedCount: Int, appendedIsASCII isASCII: Bool
   ) {
     let oldTerminator = self.terminator
-    _postRRCAdjust(
+    _updateCountAndFlags(
       newCount: self.count + appendedCount, newIsASCII: self.isASCII && isASCII)
     _internalInvariant(oldTerminator + appendedCount == self.terminator)
   }
@@ -602,7 +606,7 @@ extension __StringStorage {
   }
 
   internal func clear() {
-    _postRRCAdjust(newCount: 0, newIsASCII: true)
+    _updateCountAndFlags(newCount: 0, newIsASCII: true)
   }
 }
 
@@ -617,7 +621,7 @@ extension __StringStorage {
     let tailCount = mutableEnd - upperPtr
     lowerPtr.moveInitialize(from: upperPtr, count: tailCount)
 
-    _postRRCAdjust(
+    _updateCountAndFlags(
       newCount: self.count &- (upper &- lower), newIsASCII: self.isASCII)
   }
 
@@ -654,7 +658,7 @@ extension __StringStorage {
       count: replCount)
 
     let isASCII = self.isASCII && _allASCII(replacement)
-    _postRRCAdjust(newCount: lower + replCount + tailCount, newIsASCII: isASCII)
+    _updateCountAndFlags(newCount: lower + replCount + tailCount, newIsASCII: isASCII)
   }
 
 
@@ -683,7 +687,7 @@ extension __StringStorage {
     }
     _internalInvariant(srcCount == replCount)
 
-    _postRRCAdjust(
+    _updateCountAndFlags(
       newCount: lower + replCount + tailCount, newIsASCII: isASCII)
   }
 }
@@ -743,7 +747,7 @@ final internal class __SharedStringStorage
 #if _runtime(_ObjC)
 
   @objc(length)
-  final internal var length: Int {
+  final internal var UTF16Length: Int {
     @_effects(readonly) get {
       return asString.utf16.count // UTF16View special-cases ASCII for us.
     }

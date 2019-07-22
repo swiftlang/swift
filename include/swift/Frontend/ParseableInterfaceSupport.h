@@ -18,7 +18,7 @@
 #include "llvm/Support/Regex.h"
 
 #define SWIFT_INTERFACE_FORMAT_VERSION_KEY "swift-interface-format-version"
-#define SWIFT_TOOLS_VERSION_KEY "swift-tools-version"
+#define SWIFT_COMPILER_VERSION_KEY "swift-compiler-version"
 #define SWIFT_MODULE_FLAGS_KEY "swift-module-flags"
 
 namespace swift {
@@ -27,6 +27,10 @@ class ModuleDecl;
 
 /// Options for controlling the generation of the .swiftinterface output.
 struct ParseableInterfaceOptions {
+  /// Should we prefer printing TypeReprs when writing out types in a module
+  /// interface, or should we fully-qualify them?
+  bool PreserveTypesAsWritten = false;
+
   /// Copy of all the command-line flags passed at .swiftinterface
   /// generation time, re-applied to CompilerInvocation when reading
   /// back .swiftinterface and reconstructing .swiftmodule.

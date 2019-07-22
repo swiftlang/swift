@@ -26,6 +26,8 @@
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/PropertyWrappers.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/PrettyStackTrace.h"
@@ -1291,6 +1293,35 @@ namespace {
     {
     }
 
+    bool hasPropertyWrapper() const {
+      if (auto *VD = dyn_cast<VarDecl>(Storage)) {
+        // FIXME: Handle composition of property wrappers.
+        if (VD->getAttachedPropertyWrappers().size() == 1) {
+          auto wrapperInfo = VD->getAttachedPropertyWrapperTypeInfo(0);
+          
+          // If there is no init(wrapperValue:), we cannot rewrite an
+          // assignment into an initialization.
+          if (!wrapperInfo.wrappedValueInit)
+            return false;
+
+          // If we have a nonmutating setter on a value type, the call
+          // captures all of 'self' and we cannot rewrite an assignment
+          // into an initialization.
+          auto setter = VD->getSetter();
+          if (setter->isNonMutating() &&
+              setter->getDeclContext()->getSelfNominalTypeDecl() &&
+              setter->isInstanceMember() &&
+              !setter->getDeclContext()->getDeclaredInterfaceType()
+                  ->hasReferenceSemantics()) {
+            return false;
+          }
+
+          return true;
+        }
+      }
+      return false;
+    }
+
     void emitAssignWithSetter(SILGenFunction &SGF, SILLocation loc,
                               LValue &&dest, ArgumentSource &&value) {
       assert(getAccessorDecl()->isSetter());
@@ -1343,6 +1374,86 @@ namespace {
              ArgumentSource &&value, ManagedValue base) && override {
       assert(getAccessorDecl()->isSetter());
       SILDeclRef setter = Accessor;
+
+      if (hasPropertyWrapper() && IsOnSelfParameter) {
+        // This is wrapped property. Instead of emitting a setter, emit an
+        // assign_by_wrapper with the allocating initializer function and the
+        // setter function as arguments. DefiniteInitializtion will then decide
+        // between the two functions, depending if it's an initialization or a
+        // re-assignment.
+        //
+        VarDecl *field = dyn_cast<VarDecl>(Storage);
+        VarDecl *backingVar = field->getPropertyWrapperBackingProperty();
+        assert(backingVar);
+        CanType ValType = backingVar->getType()->getCanonicalType();
+        SILType varStorageType =
+          SGF.SGM.Types.getSubstitutedStorageType(backingVar, ValType);
+        auto typeData =
+          getLogicalStorageTypeData(SGF.SGM, getTypeData().AccessKind, ValType);
+
+        // Get the address of the storage property.
+        ManagedValue proj;
+        if (BaseFormalType->mayHaveSuperclass()) {
+          RefElementComponent REC(backingVar, LValueOptions(), varStorageType,
+                                  typeData);
+          proj = std::move(REC).project(SGF, loc, base);
+        } else {
+          assert(BaseFormalType->getStructOrBoundGenericStruct());
+          StructElementComponent SEC(backingVar, varStorageType, typeData);
+          proj = std::move(SEC).project(SGF, loc, base);
+        }
+
+        // Create the allocating initializer function. It captures the metadata.
+        // FIXME: Composition.
+        assert(field->getAttachedPropertyWrappers().size() == 1);
+        auto wrapperInfo = field->getAttachedPropertyWrapperTypeInfo(0);
+        auto ctor = wrapperInfo.wrappedValueInit;
+        SubstitutionMap subs = backingVar->getType()->getMemberSubstitutionMap(
+                        SGF.getModule().getSwiftModule(), ctor);
+
+        Type ity = ctor->getInterfaceType();
+        AnyFunctionType *substIty =
+          ity.subst(subs)->getCanonicalType()->castTo<AnyFunctionType>();
+
+        auto initRef = SILDeclRef(ctor, SILDeclRef::Kind::Allocator)
+          .asForeign(requiresForeignEntryPoint(ctor));
+        RValue initFuncRV =
+          SGF.emitApplyPropertyWrapperAllocator(loc, subs,initRef,
+                                                 backingVar->getType(),
+                                                 CanAnyFunctionType(substIty));
+        ManagedValue initFn = std::move(initFuncRV).getAsSingleValue(SGF, loc);
+
+        // Create the allocating setter function. It captures the base address.
+        auto setterInfo = SGF.getConstantInfo(setter);
+        SILValue setterFRef = SGF.emitGlobalFunctionRef(loc, setter, setterInfo);
+        auto setterSubs = SGF.getFunction().getForwardingSubstitutionMap();
+
+        CanSILFunctionType setterTy = setterFRef->getType().castTo<SILFunctionType>();
+        SILFunctionConventions setterConv(setterTy, SGF.SGM.M);
+
+        SILValue capturedBase;
+        unsigned argIdx = setterConv.getNumSILArguments() - 1;
+        if (setterConv.getSILArgumentConvention(argIdx).isInoutConvention()) {
+          capturedBase = base.getValue();
+        } else {
+          capturedBase = base.copy(SGF, loc).forward(SGF);
+        }
+
+        PartialApplyInst *setterPAI =
+          SGF.B.createPartialApply(loc, setterFRef,
+                                   setterSubs, { capturedBase },
+                                   ParameterConvention::Direct_Guaranteed);
+        ManagedValue setterFn = SGF.emitManagedRValueWithCleanup(setterPAI);
+
+        // Create the assign_by_wrapper with the allocator and setter.
+        assert(value.isRValue());
+        ManagedValue Mval = std::move(value).asKnownRValue(SGF).
+                              getAsSingleValue(SGF, loc);
+        SGF.B.createAssignByWrapper(loc, Mval.forward(SGF), proj.forward(SGF),
+                                     initFn.getValue(), setterFn.getValue(),
+                                     AssignOwnershipQualifier::Unknown);
+        return;
+      }
 
       FormalEvaluationScope scope(SGF);
       // Pass in just the setter.
@@ -1708,7 +1819,7 @@ makeBaseConsumableMaterializedRValue(SILGenFunction &SGF,
   if (!base.getType().isAddress() || isBorrowed) {
     auto tmp = SGF.emitTemporaryAllocation(loc, base.getType());
     if (isBorrowed)
-      base.copyInto(SGF, tmp, loc);
+      base.copyInto(SGF, loc, tmp);
     else
       base.forwardInto(SGF, loc, tmp);
     return SGF.emitManagedBufferWithCleanup(tmp);
@@ -4126,6 +4237,8 @@ static bool trySetterPeephole(SILGenFunction &SGF, SILLocation loc,
   }
 
   auto &setterComponent = static_cast<GetterSetterComponent&>(component);
+  if (setterComponent.hasPropertyWrapper())
+    return false;
   setterComponent.emitAssignWithSetter(SGF, loc, std::move(dest),
                                        std::move(src));
   return true;;

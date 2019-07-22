@@ -200,6 +200,24 @@ class LinkEntity {
     /// The pointer is an OpaqueTypeDecl*.
     OpaqueTypeDescriptor,
 
+    /// The descriptor accessor for an opaque type used for dynamic functions.
+    /// The pointer is an OpaqueTypeDecl*.
+    OpaqueTypeDescriptorAccessor,
+
+    /// The descriptor accessor implementation for an opaque type used for
+    /// dynamic functions.
+    /// The pointer is an OpaqueTypeDecl*.
+    OpaqueTypeDescriptorAccessorImpl,
+
+    /// The descriptor accessor key of dynamic replacements for an opaque type.
+    /// The pointer is an OpaqueTypeDecl*.
+    OpaqueTypeDescriptorAccessorKey,
+
+    /// The descriptor accessor variable of dynamic replacements for an opaque
+    /// type.
+    /// The pointer is an OpaqueTypeDecl*.
+    OpaqueTypeDescriptorAccessorVar,
+
     /// The metadata pattern for a generic nominal type.
     /// The pointer is a NominalTypeDecl*.
     TypeMetadataPattern,
@@ -450,11 +468,12 @@ class LinkEntity {
   // in order to avoid bloating LinkEntity out to three key pointers.
   static unsigned getAssociatedTypeIndex(const ProtocolConformance *conformance,
                                          AssociatedTypeDecl *associate) {
-    assert(conformance->getProtocol() == associate->getProtocol());
+    auto *proto = associate->getProtocol();
+    assert(conformance->getProtocol() == proto);
     unsigned result = 0;
-    for (auto requirement : associate->getProtocol()->getMembers()) {
+    for (auto requirement : proto->getAssociatedTypeMembers()) {
       if (requirement == associate) return result;
-      if (isa<AssociatedTypeDecl>(requirement)) result++;
+      result++;
     }
     llvm_unreachable("didn't find associated type in protocol?");
   }
@@ -462,11 +481,9 @@ class LinkEntity {
   static AssociatedTypeDecl *
   getAssociatedTypeByIndex(const ProtocolConformance *conformance,
                            unsigned index) {
-    for (auto requirement : conformance->getProtocol()->getMembers()) {
-      if (auto associate = dyn_cast<AssociatedTypeDecl>(requirement)) {
-        if (index == 0) return associate;
-        index--;
-      }
+    for (auto associate : conformance->getProtocol()->getAssociatedTypeMembers()) {
+      if (index == 0) return associate;
+      index--;
     }
     llvm_unreachable("didn't find associated type in protocol?");
   }
@@ -706,6 +723,30 @@ public:
     return entity;
   }
 
+  static LinkEntity forOpaqueTypeDescriptorAccessor(OpaqueTypeDecl *decl) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::OpaqueTypeDescriptorAccessor, decl);
+    return entity;
+  }
+
+  static LinkEntity forOpaqueTypeDescriptorAccessorImpl(OpaqueTypeDecl *decl) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::OpaqueTypeDescriptorAccessorImpl, decl);
+    return entity;
+  }
+
+  static LinkEntity forOpaqueTypeDescriptorAccessorKey(OpaqueTypeDecl *decl) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::OpaqueTypeDescriptorAccessorKey, decl);
+    return entity;
+  }
+
+  static LinkEntity forOpaqueTypeDescriptorAccessorVar(OpaqueTypeDecl *decl) {
+    LinkEntity entity;
+    entity.setForDecl(Kind::OpaqueTypeDescriptorAccessorVar, decl);
+    return entity;
+  }
+
   static LinkEntity forPropertyDescriptor(AbstractStorageDecl *decl) {
     assert(decl->exportsPropertyDescriptor());
     LinkEntity entity;
@@ -728,9 +769,10 @@ public:
     return entity;
   }
 
-  static LinkEntity forAnonymousDescriptor(DeclContext *dc) {
+  static LinkEntity forAnonymousDescriptor(
+                                    PointerUnion<DeclContext *, VarDecl *> dc) {
     LinkEntity entity;
-    entity.Pointer = const_cast<void*>(static_cast<const void*>(dc));
+    entity.Pointer = dc.getOpaqueValue();
     entity.SecondaryPointer = nullptr;
     entity.Data =
       LINKENTITY_SET_FIELD(Kind, unsigned(Kind::AnonymousDescriptor));
@@ -973,9 +1015,10 @@ public:
     return reinterpret_cast<ExtensionDecl*>(Pointer);
   }
 
-  const DeclContext *getDeclContext() const {
+  const PointerUnion<DeclContext *, VarDecl *> getAnonymousDeclContext() const {
     assert(getKind() == Kind::AnonymousDescriptor);
-    return reinterpret_cast<DeclContext*>(Pointer);
+    return PointerUnion<DeclContext *, VarDecl *>
+      ::getFromOpaqueValue(reinterpret_cast<void*>(Pointer));
   }
 
   SILFunction *getSILFunction() const {
@@ -1085,6 +1128,7 @@ struct IRLinkage {
   static const IRLinkage Internal;
 
   static const IRLinkage ExternalImport;
+  static const IRLinkage ExternalWeakImport;
   static const IRLinkage ExternalExport;
 };
 

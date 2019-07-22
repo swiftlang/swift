@@ -217,9 +217,19 @@ public:
         CodeCompletionString::Chunk::ChunkKind::RightParen, ")");
   }
 
+  void addAnnotatedLeftBracket() {
+    addLeftBracket();
+    getLastChunk().setIsAnnotation();
+  }
+
   void addLeftBracket() {
     addChunkWithTextNoCopy(
         CodeCompletionString::Chunk::ChunkKind::LeftBracket, "[");
+  }
+
+  void addAnnotatedRightBracket() {
+    addRightBracket();
+    getLastChunk().setIsAnnotation();
   }
 
   void addRightBracket() {

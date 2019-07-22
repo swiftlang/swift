@@ -799,8 +799,10 @@ void ASTMangler::appendType(Type type, const ValueDecl *forDecl) {
     case TypeKind::BuiltinVector:
       appendType(cast<BuiltinVectorType>(tybase)->getElementType(),
                  forDecl);
+      // The mangling calls for using the actual element count, which we have
+      // to adjust by 1 in order to mangle it as an index.
       return appendOperator("Bv",
-                            cast<BuiltinVectorType>(tybase)->getNumElements());
+                  Index(cast<BuiltinVectorType>(tybase)->getNumElements() + 1));
     case TypeKind::TypeAlias: {
       assert(DWARFMangling && "sugared types are only legal for the debugger");
       auto aliasTy = cast<TypeAliasType>(tybase);
@@ -973,9 +975,8 @@ void ASTMangler::appendType(Type type, const ValueDecl *forDecl) {
       auto opaqueType = cast<OpaqueTypeArchetypeType>(tybase);
       auto opaqueDecl = opaqueType->getDecl();
       if (opaqueDecl->getNamingDecl() == forDecl) {
-        if (opaqueType->getSubstitutions().isIdentity()) {
-          return appendOperator("Qr");
-        }
+        assert(opaqueType->getSubstitutions().isIdentity());
+        return appendOperator("Qr");
       }
       
       // Otherwise, try to substitute it.
@@ -985,7 +986,7 @@ void ASTMangler::appendType(Type type, const ValueDecl *forDecl) {
       // Use the fully elaborated explicit mangling.
       appendOpaqueDeclName(opaqueDecl);
       bool isFirstArgList = true;
-      appendBoundGenericArgs(opaqueDecl->getInnermostDeclContext(),
+      appendBoundGenericArgs(opaqueDecl,
                              opaqueType->getSubstitutions(),
                              isFirstArgList);
       appendRetroactiveConformances(opaqueType->getSubstitutions(),
@@ -1168,7 +1169,9 @@ unsigned ASTMangler::appendBoundGenericArgs(DeclContext *dc,
   auto decl = dc->getInnermostDeclarationDeclContext();
   if (!decl) return 0;
 
-  // For an extension declaration, use the nominal type declaration instead.
+  // For a non-protocol extension declaration, use the nominal type declaration
+  // instead.
+  //
   // This is important when extending a nested type, because the generic
   // parameters will line up with the (semantic) nesting of the nominal type.
   if (auto ext = dyn_cast<ExtensionDecl>(decl))
@@ -1490,6 +1493,12 @@ ASTMangler::getSpecialManglingContext(const ValueDecl *decl,
       }
     }
   }
+
+  // Importer-synthesized types should always be mangled in the
+  // ClangImporterContext, even if an __attribute__((swift_name())) nests them
+  // inside a Swift type syntactically.
+  if (decl->getAttrs().hasAttribute<ClangImporterSynthesizedTypeAttr>())
+    return ASTMangler::ClangImporterContext;
 
   return None;
 }
@@ -1903,6 +1912,10 @@ void ASTMangler::appendFunctionType(AnyFunctionType *fn, bool isAutoClosure,
   // changes to better support thin functions.
   switch (fn->getRepresentation()) {
   case AnyFunctionType::Representation::Block:
+    // We distinguish escaping and non-escaping blocks, but only in the DWARF
+    // mangling, because the ABI is already set.
+    if (!fn->isNoEscape() && DWARFMangling)
+      return appendOperator("XL");
     return appendOperator("XB");
   case AnyFunctionType::Representation::Thin:
     return appendOperator("Xf");
@@ -2545,7 +2558,8 @@ void ASTMangler::appendDependentProtocolConformance(
       auto index =
         conformanceRequirementIndex(entry,
                                     CurGenericSignature->getRequirements());
-      appendOperator("HD", index + 1);
+      // This is never an unknown index and so must be adjusted by 2 per ABI.
+      appendOperator("HD", Index(index + 2));
       continue;
     }
 
@@ -2560,7 +2574,8 @@ void ASTMangler::appendDependentProtocolConformance(
       entry.first->isEqual(currentProtocol->getProtocolSelfType());
     if (isInheritedConformance) {
       appendProtocolName(entry.second);
-      appendOperator("HI", index + 1);
+      // For now, this is never an unknown index and so must be adjusted by 2.
+      appendOperator("HI", Index(index + 2));
       continue;
     }
 
@@ -2569,10 +2584,11 @@ void ASTMangler::appendDependentProtocolConformance(
     appendType(entry.first);
     appendProtocolName(entry.second);
 
-    // For non-resilient protocols, encode the index.
+    // For resilient protocols, the index is unknown, so we use the special
+    // value 1; otherwise we adjust by 2.
     bool isResilient =
       currentProtocol->isResilient(Mod, ResilienceExpansion::Maximal);
-    appendOperator("HA", isResilient ? 0 : index + 1);
+    appendOperator("HA", Index(isResilient ? 1 : index + 2));
   }
 }
 
@@ -2611,6 +2627,20 @@ void ASTMangler::appendConcreteProtocolConformance(
         auto conformanceAccessPath =
           CurGenericSignature->getConformanceAccessPath(type, proto);
         appendDependentProtocolConformance(conformanceAccessPath);
+      } else if (auto opaqueType = canType->getAs<OpaqueTypeArchetypeType>()) {
+        GenericSignature *opaqueSignature = opaqueType->getBoundSignature();
+        GenericTypeParamType *opaqueTypeParam = opaqueSignature->getGenericParams().back();
+        ConformanceAccessPath conformanceAccessPath =
+            opaqueSignature->getConformanceAccessPath(opaqueTypeParam, proto);
+
+        // Append the conformance access path with the signature of the opaque type.
+        CanGenericSignature savedSignature = CurGenericSignature;
+        CurGenericSignature = opaqueSignature->getCanonicalSignature();
+        appendDependentProtocolConformance(conformanceAccessPath);
+        CurGenericSignature = savedSignature;
+
+        appendType(canType);
+        appendOperator("HO");
       } else {
         auto conditionalConf = module->lookupConformance(canType, proto);
         appendConcreteProtocolConformance(conditionalConf->getConcrete());
@@ -2662,4 +2692,11 @@ void ASTMangler::appendOpParamForLayoutConstraint(LayoutConstraint layout) {
                           Index(layout->getAlignmentInBits()));
     break;
   }
+}
+
+std::string ASTMangler::mangleOpaqueTypeDescriptor(const OpaqueTypeDecl *decl) {
+  beginMangling();
+  appendOpaqueDeclName(decl);
+  appendOperator("MQ");
+  return finalize();
 }

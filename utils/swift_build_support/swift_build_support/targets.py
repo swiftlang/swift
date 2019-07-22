@@ -258,6 +258,10 @@ class StdlibDeploymentTarget(object):
     def get_target_for_name(cls, name):
         return cls._targets_by_name.get(name)
 
+    @classmethod
+    def get_targets_by_name(cls, names):
+        return [cls.get_target_for_name(name) for name in names]
+
 
 def install_prefix():
     """

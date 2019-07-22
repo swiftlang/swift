@@ -577,8 +577,7 @@ void EagerDispatch::emitRefCountedObjectCheck(SILBasicBlock *FailedTypeCheckBB,
 
   auto *FRI = Builder.createFunctionRef(Loc, IsClassF);
   auto IsClassRuntimeCheck = Builder.createApply(Loc, FRI, SubMap,
-                                                 {GenericMT},
-                                                 /* isNonThrowing */ false);
+                                                 {GenericMT});
   // Extract the i1 from the Bool struct.
   StructDecl *BoolStruct = cast<StructDecl>(Ctx.getBoolDecl());
   auto Members = BoolStruct->lookupDirect(Ctx.Id_value_);

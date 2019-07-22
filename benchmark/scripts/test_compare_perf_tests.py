@@ -759,7 +759,7 @@ class TestReportFormatter(OldAndNewLog):
         )
         self.assert_markdown_contains([
             'TEST                  | OLD    | NEW    | DELTA   | RATIO',
-            '---                   | ---    | ---    | ---     | ---    ',
+            ':---                  | ---:   | ---:   | ---:    | ---:   ',
             'TEST                  | MIN    | MAX    | MEAN    | MAX_RSS'])
         self.assert_git_contains([
             'TEST                    OLD      NEW      DELTA     RATIO',
@@ -854,6 +854,36 @@ class TestReportFormatter(OldAndNewLog):
         self.assertNotIn('AngryPhonebook', git)
         self.assertNotIn('No Changes', html)
         self.assertNotIn('AngryPhonebook', html)
+
+    def test_single_table_report(self):
+        """Single table report has inline headers and no elaborate sections."""
+        self.tc.removed = []  # test handling empty section
+        rf = ReportFormatter(self.tc, changes_only=True, single_table=True)
+        markdown = rf.markdown()
+        self.assertNotIn('<details', markdown)  # no sections
+        self.assertNotIn('\n\n', markdown)  # table must not be broken
+        self.assertNotIn('Removed', markdown)
+        self.assert_report_contains([
+            '\n**Regression** ',
+            '| **OLD**', '| **NEW**', '| **DELTA**', '| **RATIO**',
+            '\n**Added** ',
+            '| **MIN**', '| **MAX**', '| **MEAN**', '| **MAX_RSS**'
+        ], markdown)
+        # Single delimiter row:
+        self.assertIn('\n:---', markdown)  # first column is left aligned
+        self.assertEqual(markdown.count('| ---:'), 4)  # other, right aligned
+        # Separator before every inline header (new section):
+        self.assertEqual(markdown.count('&nbsp; | | | | '), 2)
+
+        git = rf.git()
+        self.assertNotIn('): \n', git)  # no sections
+        self.assertNotIn('REMOVED', git)
+        self.assert_report_contains([
+            '\nREGRESSION ', ' OLD ', ' NEW ', ' DELTA ', ' RATIO ',
+            '\n\nADDED ', ' MIN ', ' MAX ', ' MEAN ', ' MAX_RSS '
+        ], git)
+        # Separator before every inline header (new section):
+        self.assertEqual(git.count('\n\n'), 2)
 
 
 class Test_parse_args(unittest.TestCase):

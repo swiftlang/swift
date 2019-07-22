@@ -356,7 +356,9 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
 
     // If the previous statement didn't have a semicolon and this new
     // statement doesn't start a line, complain.
-    if (!PreviousHadSemi && !Tok.isAtStartOfLine()) {
+    const bool IsAtStartOfLineOrPreviousHadSemi =
+        PreviousHadSemi || Tok.isAtStartOfLine();
+    if (!IsAtStartOfLineOrPreviousHadSemi) {
       SourceLoc EndOfPreviousLoc = getEndOfPreviousLoc();
       diagnose(EndOfPreviousLoc, diag::statement_same_line_without_semi)
         .fixItInsert(EndOfPreviousLoc, ";");
@@ -410,6 +412,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
       SmallVector<Decl*, 8> TmpDecls;
       ParserResult<Decl> DeclResult = 
           parseDecl(IsTopLevel ? PD_AllowTopLevel : PD_Default,
+                    IsAtStartOfLineOrPreviousHadSemi,
                     [&](Decl *D) {TmpDecls.push_back(D);});
       BraceItemsStatus |= DeclResult;
       if (DeclResult.isParseError()) {
@@ -966,7 +969,7 @@ ParserResult<Stmt> Parser::parseStmtDefer() {
                        StaticSpellingKind::None,
                        /*FuncLoc=*/ SourceLoc(),
                        name,
-                       /*NameLoc=*/ SourceLoc(),
+                       /*NameLoc=*/ PreviousLoc,
                        /*Throws=*/ false, /*ThrowsLoc=*/ SourceLoc(),
                        /*generic params*/ nullptr,
                        params,
@@ -985,10 +988,10 @@ ParserResult<Stmt> Parser::parseStmtDefer() {
     if (Body.isNull())
       return nullptr;
     Status |= Body;
-    tempDecl->setBody(Body.get());
+    tempDecl->setBodyParsed(Body.get());
   }
   
-  SourceLoc loc = tempDecl->getBody()->getStartLoc();
+  SourceLoc loc = tempDecl->getBodySourceRange().Start;
 
   // Form the call, which will be emitted on any path that needs to run the
   // code.
@@ -1081,29 +1084,19 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
 
   // Do some special-case code completion for the start of the pattern.
   if (P.Tok.is(tok::code_complete)) {
+    auto CCE = new (P.Context) CodeCompletionExpr(P.Tok.getLoc());
+    result.ThePattern = new (P.Context) ExprPattern(CCE);
     if (P.CodeCompletion) {
       switch (parsingContext) {
       case GuardedPatternContext::Case:
-        P.CodeCompletion->completeCaseStmtBeginning();
+        P.CodeCompletion->completeCaseStmtBeginning(CCE);
         break;
       case GuardedPatternContext::Catch:
-        P.CodeCompletion->completePostfixExprBeginning(nullptr);
+        P.CodeCompletion->completePostfixExprBeginning(CCE);
         break;
       }
     }
-    auto loc = P.consumeToken(tok::code_complete);
-    result.ThePattern = new (P.Context) AnyPattern(loc);
-    status.setHasCodeCompletion();
-    return;
-  }
-  if (parsingContext == GuardedPatternContext::Case &&
-      P.Tok.isAny(tok::period_prefix, tok::period) &&
-      P.peekToken().is(tok::code_complete)) {
-    P.consumeToken();
-    if (P.CodeCompletion)
-      P.CodeCompletion->completeCaseStmtDotPrefix();
-    auto loc = P.consumeToken(tok::code_complete);
-    result.ThePattern = new (P.Context) AnyPattern(loc);
+    P.consumeToken(tok::code_complete);
     status.setHasCodeCompletion();
     return;
   }
@@ -1214,9 +1207,10 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
   }
 }
 
-/// Validate availability spec list, emitting diagnostics if necessary.
+/// Validate availability spec list, emitting diagnostics if necessary and removing
+/// specs for unrecognized platforms.
 static void validateAvailabilitySpecList(Parser &P,
-                                         ArrayRef<AvailabilitySpec *> Specs) {
+    SmallVectorImpl<AvailabilitySpec *> &Specs) {
   llvm::SmallSet<PlatformKind, 4> Platforms;
   bool HasOtherPlatformSpec = false;
 
@@ -1228,7 +1222,9 @@ static void validateAvailabilitySpecList(Parser &P,
     return;
   }
 
+  SmallVector<AvailabilitySpec *, 5> RecognizedSpecs;
   for (auto *Spec : Specs) {
+    RecognizedSpecs.push_back(Spec);
     if (isa<OtherPlatformAvailabilitySpec>(Spec)) {
       HasOtherPlatformSpec = true;
       continue;
@@ -1243,6 +1239,13 @@ static void validateAvailabilitySpecList(Parser &P,
     }
 
     auto *VersionSpec = cast<PlatformVersionConstraintAvailabilitySpec>(Spec);
+    // We keep specs for unrecognized platforms around for error recovery
+    // during parsing but remove them once parsing is completed.
+    if (VersionSpec->isUnrecognizedPlatform()) {
+      RecognizedSpecs.pop_back();
+      continue;
+    }
+
     bool Inserted = Platforms.insert(VersionSpec->getPlatform()).second;
     if (!Inserted) {
       // Rule out multiple version specs referring to the same platform.
@@ -1260,6 +1263,8 @@ static void validateAvailabilitySpecList(Parser &P,
     P.diagnose(InsertWildcardLoc, diag::availability_query_wildcard_required)
         .fixItInsertAfter(InsertWildcardLoc, ", *");
   }
+
+  Specs = RecognizedSpecs;
 }
 
 // #available(...)

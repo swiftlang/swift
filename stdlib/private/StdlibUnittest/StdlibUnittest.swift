@@ -16,6 +16,7 @@ import SwiftPrivateThreadExtras
 import SwiftPrivateLibcExtras
 
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+import Foundation
 import Darwin
 #elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
 import Glibc
@@ -117,6 +118,10 @@ fileprivate struct AtomicBool {
     func orAndFetch(_ b: Bool) -> Bool {
         return _value.orAndFetch(b ? 1 : 0) != 0
     }
+
+    func fetchAndClear() -> Bool {
+        return _value.fetchAndAnd(0) != 0
+    }
 }
 
 func _printStackTrace(_ stackTrace: SourceLocStack?) {
@@ -139,11 +144,9 @@ public func expectFailure(
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
   file: String = #file, line: UInt = #line, invoking body: () -> Void) {
-  let startAnyExpectFailed = _anyExpectFailed.load()
-  _anyExpectFailed.store(false)
+  let startAnyExpectFailed = _anyExpectFailed.fetchAndClear()
   body()
-  let endAnyExpectFailed = _anyExpectFailed.load()
-  _anyExpectFailed.store(false)
+  let endAnyExpectFailed = _anyExpectFailed.fetchAndClear()
   expectTrue(
     endAnyExpectFailed, "running `body` should produce an expected failure",
     stackTrace: stackTrace.pushIf(showFrame, file: file, line: line)
@@ -931,7 +934,10 @@ class _ParentProcess {
     let (_, stdoutThread) = _stdlib_thread_create_block({
       while !self._childStdout.isEOF {
         self._childStdout.read()
-        while let line = self._childStdout.getline() {
+        while var line = self._childStdout.getline() {
+          if let cr = line.firstIndex(of: "\r") {
+            line.remove(at: cr)
+          }
           var done: Bool
           (done: done, ()) = onStdoutLine(line)
           if done { return }
@@ -1712,13 +1718,8 @@ public final class TestSuite {
 }
 
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-@_silgen_name("getSystemVersionPlistProperty")
-func _getSystemVersionPlistPropertyImpl(
-  _ propertyName: UnsafePointer<CChar>) -> UnsafePointer<CChar>?
-
 func _getSystemVersionPlistProperty(_ propertyName: String) -> String? {
-  let cs = _getSystemVersionPlistPropertyImpl(propertyName)
-  return cs.map(String.init(cString:))
+  return NSDictionary(contentsOfFile: "/System/Library/CoreServices/SystemVersion.plist")?[propertyName] as? String
 }
 #endif
 
@@ -2362,17 +2363,22 @@ internal func _checkEquatableImpl<Instance : Equatable>(
       let isEqualXY = x == y
       expectEqual(
         predictedXY, isEqualXY,
-        (predictedXY
-           ? "expected equal, found not equal\n"
-           : "expected not equal, found equal\n") +
-        "lhs (at index \(i)): \(String(reflecting: x))\n" +
-        "rhs (at index \(j)): \(String(reflecting: y))",
+        """
+        \((predictedXY
+           ? "expected equal, found not equal"
+           : "expected not equal, found equal"))
+        lhs (at index \(i)): \(String(reflecting: x))
+        rhs (at index \(j)): \(String(reflecting: y))
+        """,
         stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
 
       // Not-equal is an inverse of equal.
       expectNotEqual(
         isEqualXY, x != y,
-        "lhs (at index \(i)): \(String(reflecting: x))\nrhs (at index \(j)): \(String(reflecting: y))",
+        """
+        lhs (at index \(i)): \(String(reflecting: x))
+        rhs (at index \(j)): \(String(reflecting: y))
+        """,
         stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
 
       if !allowBrokenTransitivity {
@@ -2414,6 +2420,10 @@ public func checkEquatable<T : Equatable>(
     showFrame: false)
 }
 
+/// Produce an integer hash value for `value` by feeding it to a dedicated
+/// `Hasher`. This is always done by calling the `hash(into:)` method.
+/// If a non-nil `seed` is given, it is used to perturb the hasher state;
+/// this is useful for resolving accidental hash collisions.
 internal func hash<H: Hashable>(_ value: H, seed: Int? = nil) -> Int {
   var hasher = Hasher()
   if let seed = seed {
@@ -2429,6 +2439,7 @@ internal func hash<H: Hashable>(_ value: H, seed: Int? = nil) -> Int {
 public func checkHashableGroups<Groups: Collection>(
   _ groups: Groups,
   _ message: @autoclosure () -> String = "",
+  allowIncompleteHashing: Bool = false,
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
   file: String = #file, line: UInt = #line
@@ -2446,6 +2457,7 @@ public func checkHashableGroups<Groups: Collection>(
     equalityOracle: equalityOracle,
     hashEqualityOracle: equalityOracle,
     allowBrokenTransitivity: false,
+    allowIncompleteHashing: allowIncompleteHashing,
     stackTrace: stackTrace.pushIf(showFrame, file: file, line: line),
     showFrame: false)
 }
@@ -2457,6 +2469,7 @@ public func checkHashable<Instances: Collection>(
   _ instances: Instances,
   equalityOracle: (Instances.Index, Instances.Index) -> Bool,
   allowBrokenTransitivity: Bool = false,
+  allowIncompleteHashing: Bool = false,
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
@@ -2467,6 +2480,7 @@ public func checkHashable<Instances: Collection>(
     equalityOracle: equalityOracle,
     hashEqualityOracle: equalityOracle,
     allowBrokenTransitivity: allowBrokenTransitivity,
+    allowIncompleteHashing: allowIncompleteHashing,
     stackTrace: stackTrace.pushIf(showFrame, file: file, line: line),
     showFrame: false)
 }
@@ -2480,6 +2494,7 @@ public func checkHashable<Instances: Collection>(
   equalityOracle: (Instances.Index, Instances.Index) -> Bool,
   hashEqualityOracle: (Instances.Index, Instances.Index) -> Bool,
   allowBrokenTransitivity: Bool = false,
+  allowIncompleteHashing: Bool = false,
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
@@ -2532,12 +2547,12 @@ public func checkHashable<Instances: Collection>(
         expectEqual(
           x._rawHashValue(seed: 0), y._rawHashValue(seed: 0),
           """
-          _rawHashValue expected to match, found to differ
+          _rawHashValue(seed:) expected to match, found to differ
           lhs (at index \(i)): \(x)
           rhs (at index \(j)): \(y)
           """,
           stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
-      } else {
+      } else if !allowIncompleteHashing {
         // Try a few different seeds; at least one of them should discriminate
         // between the hashes. It is extremely unlikely this check will fail
         // all ten attempts, unless the type's hash encoding is not unique,

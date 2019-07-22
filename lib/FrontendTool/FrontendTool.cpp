@@ -26,13 +26,13 @@
 #include "TBD.h"
 
 #include "swift/Subsystems.h"
-#include "swift/AST/ASTScope.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExperimentalDependencies.h"
 #include "swift/AST/FileSystem.h"
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/IRGenOptions.h"
+#include "swift/AST/NameLookup.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ReferencedNameTracker.h"
 #include "swift/AST/TypeRefinementContext.h"
@@ -358,12 +358,26 @@ static bool printAsObjCIfNeeded(StringRef outputPath, ModuleDecl *M,
 /// \returns true if there were any errors
 ///
 /// \see swift::emitParseableInterface
-static bool printParseableInterfaceIfNeeded(StringRef outputPath,
-                                            ParseableInterfaceOptions const &Opts,
-                                            ModuleDecl *M) {
+static bool
+printParseableInterfaceIfNeeded(StringRef outputPath,
+                                ParseableInterfaceOptions const &Opts,
+                                LangOptions const &LangOpts,
+                                ModuleDecl *M) {
   if (outputPath.empty())
     return false;
-  return withOutputFile(M->getDiags(), outputPath,
+
+  DiagnosticEngine &diags = M->getDiags();
+  if (!LangOpts.isSwiftVersionAtLeast(5)) {
+    assert(LangOpts.isSwiftVersionAtLeast(4));
+    diags.diagnose(SourceLoc(),
+                   diag::warn_unsupported_module_interface_swift_version,
+                   LangOpts.isSwiftVersionAtLeast(4, 2) ? "4.2" : "4");
+  }
+  if (M->getResilienceStrategy() != ResilienceStrategy::Resilient) {
+    diags.diagnose(SourceLoc(),
+                   diag::warn_unsupported_module_interface_library_evolution);
+  }
+  return withOutputFile(diags, outputPath,
                         [M, Opts](raw_ostream &out) -> bool {
     return swift::emitParseableInterface(out, Opts, M);
   });
@@ -478,7 +492,6 @@ static void countStatsOfSourceFile(UnifiedStatsReporter &Stats,
   C.NumPostfixOperators += SF->PostfixOperators.size();
   C.NumPrefixOperators += SF->PrefixOperators.size();
   C.NumPrecedenceGroups += SF->PrecedenceGroups.size();
-  C.NumUsedConformances += SF->getUsedConformances().size();
 
   auto bufID = SF->getBufferID();
   if (bufID.hasValue()) {
@@ -496,7 +509,6 @@ static void countStatsPostSema(UnifiedStatsReporter &Stats,
 
   auto const &AST = Instance.getASTContext();
   C.NumLoadedModules = AST.LoadedModules.size();
-  C.NumImportedExternalDefinitions = AST.ExternalDefinitions.size();
 
   if (auto *D = Instance.getDependencyTracker()) {
     C.NumDependencies = D->getDependencies().size();
@@ -585,11 +597,13 @@ static bool buildModuleFromParseableInterface(CompilerInvocation &Invocation,
   StringRef InputPath = FEOpts.InputsAndOutputs.getFilenameOfFirstInput();
   StringRef PrebuiltCachePath = FEOpts.PrebuiltModuleCachePath;
   return ParseableInterfaceModuleLoader::buildSwiftModuleFromSwiftInterface(
-      Instance.getASTContext(), Invocation.getClangModuleCachePath(),
+      Instance.getSourceMgr(), Instance.getDiags(),
+      Invocation.getSearchPathOptions(), Invocation.getLangOptions(),
+      Invocation.getClangModuleCachePath(),
       PrebuiltCachePath, Invocation.getModuleName(), InputPath,
       Invocation.getOutputFilename(),
       FEOpts.SerializeModuleInterfaceDependencyHashes,
-      FEOpts.TrackSystemDeps);
+      FEOpts.TrackSystemDeps, FEOpts.RemarkOnRebuildFromModuleInterface);
 }
 
 static bool compileLLVMIR(CompilerInvocation &Invocation,
@@ -649,52 +663,19 @@ static void verifyGenericSignaturesIfNeeded(CompilerInvocation &Invocation,
     GenericSignatureBuilder::verifyGenericSignaturesInModule(module);
 }
 
-static void dumpOneScopeMapLocation(unsigned bufferID,
-                                    std::pair<unsigned, unsigned> lineColumn,
-                                    SourceManager &sourceMgr, ASTScope &scope) {
-  SourceLoc loc =
-      sourceMgr.getLocForLineCol(bufferID, lineColumn.first, lineColumn.second);
-  if (loc.isInvalid())
-    return;
-
-  llvm::errs() << "***Scope at " << lineColumn.first << ":" << lineColumn.second
-               << "***\n";
-  auto locScope = scope.findInnermostEnclosingScope(loc);
-  locScope->print(llvm::errs(), 0, false, false);
-
-  // Dump the AST context, too.
-  if (auto dc = locScope->getDeclContext()) {
-    dc->printContext(llvm::errs());
-  }
-
-  // Grab the local bindings introduced by this scope.
-  auto localBindings = locScope->getLocalBindings();
-  if (!localBindings.empty()) {
-    llvm::errs() << "Local bindings: ";
-    interleave(localBindings.begin(), localBindings.end(),
-               [&](ValueDecl *value) { llvm::errs() << value->getFullName(); },
-               [&]() { llvm::errs() << " "; });
-    llvm::errs() << "\n";
-  }
-}
-
 static void dumpAndPrintScopeMap(CompilerInvocation &Invocation,
                                  CompilerInstance &Instance, SourceFile *SF) {
-  ASTScope &scope = SF->getScope();
+  const ASTScope &scope = SF->getScope();
 
   if (Invocation.getFrontendOptions().DumpScopeMapLocations.empty()) {
-    scope.expandAll();
-  } else if (auto bufferID = SF->getBufferID()) {
-    SourceManager &sourceMgr = Instance.getSourceMgr();
-    // Probe each of the locations, and dump what we find.
-    for (auto lineColumn :
-         Invocation.getFrontendOptions().DumpScopeMapLocations)
-      dumpOneScopeMapLocation(*bufferID, lineColumn, sourceMgr, scope);
-
     llvm::errs() << "***Complete scope map***\n";
+    scope.print(llvm::errs());
+    return;
   }
-  // Print the resulting map.
-  scope.print(llvm::errs());
+  // Probe each of the locations, and dump what we find.
+  for (auto lineColumn :
+       Invocation.getFrontendOptions().DumpScopeMapLocations)
+    scope.dumpOneScopeMapLocation(lineColumn);
 }
 
 static SourceFile *getPrimaryOrMainSourceFile(CompilerInvocation &Invocation,
@@ -922,6 +903,7 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
     hadAnyError |= printParseableInterfaceIfNeeded(
         Invocation.getParseableInterfaceOutputPathForWholeModule(),
         Invocation.getParseableInterfaceOptions(),
+        Invocation.getLangOptions(),
         Instance.getMainModule());
   }
 
@@ -990,6 +972,9 @@ static bool performCompile(CompilerInstance &Instance,
 
   if (Action == FrontendOptions::ActionType::ResolveImports)
     return Context.hadError();
+
+  if (observer)
+    observer->performedSemanticAnalysis(Instance);
 
   if (Stats)
     countStatsPostSema(*Stats, Instance);
@@ -1224,6 +1209,9 @@ static bool performCompileStepsPostSILGen(
   if (auto *SF = MSF.dyn_cast<SourceFile *>())
     ricd.emplace(*SF);
 
+  if (observer)
+    observer->performedSILGeneration(*SM);
+
   if (Stats)
     countStatsPostSILGen(*Stats, *SM);
 
@@ -1269,6 +1257,9 @@ static bool performCompileStepsPostSILGen(
   // Perform optimizations and mandatory/diagnostic passes.
   if (Instance.performSILProcessing(SM.get(), Stats))
     return true;
+
+  if (observer)
+    observer->performedSILProcessing(*SM);
 
   emitAnyWholeModulePostTypeCheckSupplementaryOutputs(Instance, Invocation,
                                                       moduleIsPublic);
@@ -1833,3 +1824,6 @@ int swift::performFrontend(ArrayRef<const char *> Args,
 
 void FrontendObserver::parsedArgs(CompilerInvocation &invocation) {}
 void FrontendObserver::configuredCompiler(CompilerInstance &instance) {}
+void FrontendObserver::performedSemanticAnalysis(CompilerInstance &instance) {}
+void FrontendObserver::performedSILGeneration(SILModule &module) {}
+void FrontendObserver::performedSILProcessing(SILModule &module) {}

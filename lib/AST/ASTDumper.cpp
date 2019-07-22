@@ -310,16 +310,6 @@ static StringRef getDefaultArgumentKindString(DefaultArgumentKind value) {
 
   llvm_unreachable("Unhandled DefaultArgumentKind in switch.");
 }
-static StringRef getAccessorKindString(AccessorKind value) {
-  switch (value) {
-#define ACCESSOR(ID)
-#define SINGLETON_ACCESSOR(ID, KEYWORD) \
-  case AccessorKind::ID: return #KEYWORD;
-#include "swift/AST/AccessorKinds.def"
-  }
-
-  llvm_unreachable("Unhandled AccessorKind in switch.");
-}
 static StringRef
 getMagicIdentifierLiteralExprKindString(MagicIdentifierLiteralExpr::Kind value) {
   switch (value) {
@@ -1070,7 +1060,10 @@ namespace {
           Indent -= 2;
         }
       }
-      if (auto Body = D->getBody(/*canSynthesize=*/false)) {
+      if (D->hasSingleExpressionBody()) {
+        OS << '\n';
+        printRec(D->getSingleExpressionBody());
+      } else if (auto Body = D->getBody(/*canSynthesize=*/false)) {
         OS << '\n';
         printRec(Body, D->getASTContext());
       }
@@ -1600,7 +1593,14 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   void visitForEachStmt(ForEachStmt *S) {
-    printCommon(S, "for_each_stmt") << '\n';
+    printCommon(S, "for_each_stmt");
+    PrintWithColorRAII(OS, LiteralValueColor) << " make_generator=";
+    S->getMakeIterator().dump(
+        PrintWithColorRAII(OS, LiteralValueColor).getOS());
+    PrintWithColorRAII(OS, LiteralValueColor) << " next=";
+    S->getIteratorNext().dump(
+        PrintWithColorRAII(OS, LiteralValueColor).getOS());
+    OS << '\n';
     printRec(S->getPattern());
     OS << '\n';
     if (S->getWhere()) {
@@ -1614,12 +1614,20 @@ public:
     OS << '\n';
     printRec(S->getSequence());
     OS << '\n';
-    if (S->getIterator()) {
-      printRec(S->getIterator());
+    if (S->getIteratorVar()) {
+      printRec(S->getIteratorVar());
       OS << '\n';
     }
-    if (S->getIteratorNext()) {
-      printRec(S->getIteratorNext());
+    if (S->getIteratorVarRef()) {
+      printRec(S->getIteratorVarRef());
+      OS << '\n';
+    }
+    if (S->getConvertElementExpr()) {
+      printRec(S->getConvertElementExpr());
+      OS << '\n';
+    }
+    if (S->getElementExpr()) {
+      printRec(S->getElementExpr());
       OS << '\n';
     }
     printRec(S->getBody());
@@ -1927,11 +1935,27 @@ public:
   }
   void visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E) {
     printCommon(E, "interpolated_string_literal_expr");
-    PrintWithColorRAII(OS, LiteralValueColor) << " literal_capacity=" 
+    
+    // Print the trailing quote location
+    if (auto Ty = GetTypeOfExpr(E)) {
+      auto &Ctx = Ty->getASTContext();
+      auto TQL = E->getTrailingQuoteLoc();
+      if (TQL.isValid()) {
+        PrintWithColorRAII(OS, LocationColor) << " trailing_quote_loc=";
+        TQL.print(PrintWithColorRAII(OS, LocationColor).getOS(),
+                  Ctx.SourceMgr);
+      }
+    }
+    PrintWithColorRAII(OS, LiteralValueColor)
+      << " literal_capacity="
       << E->getLiteralCapacity() << " interpolation_count="
-      << E->getInterpolationCount() << '\n';
+      << E->getInterpolationCount();
+    PrintWithColorRAII(OS, LiteralValueColor) << " builder_init=";
+    E->getBuilderInit().dump(PrintWithColorRAII(OS, LiteralValueColor).getOS());
+    PrintWithColorRAII(OS, LiteralValueColor) << " result_init=";
+    E->getResultInit().dump(PrintWithColorRAII(OS, LiteralValueColor).getOS());
+    OS << "\n";
     printRec(E->getAppendingExpr());
-    printSemanticExpr(E->getSemanticExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   void visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E) {
@@ -1952,10 +1976,11 @@ public:
   void visitObjectLiteralExpr(ObjectLiteralExpr *E) {
     printCommon(E, "object_literal") 
       << " kind='" << E->getLiteralKindPlainName() << "'";
+    PrintWithColorRAII(OS, LiteralValueColor) << " initializer=";
+    E->getInitializer().dump(PrintWithColorRAII(OS, LiteralValueColor).getOS());
     printArgumentLabels(E->getArgumentLabels());
     OS << "\n";
     printRec(E->getArg());
-    printSemanticExpr(E->getSemanticExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
@@ -2110,16 +2135,16 @@ public:
       OS << '\n';
       printRec(elt);
     }
-    printSemanticExpr(E->getSemanticExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   void visitDictionaryExpr(DictionaryExpr *E) {
     printCommon(E, "dictionary_expr");
+    PrintWithColorRAII(OS, LiteralValueColor) << " initializer=";
+    E->getInitializer().dump(PrintWithColorRAII(OS, LiteralValueColor).getOS());
     for (auto elt : E->getElements()) {
       OS << '\n';
       printRec(elt);
     }
-    printSemanticExpr(E->getSemanticExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   void visitSubscriptExpr(SubscriptExpr *E) {
@@ -2620,7 +2645,19 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   void visitEditorPlaceholderExpr(EditorPlaceholderExpr *E) {
-    printCommon(E, "editor_placeholder_expr") << '\n';
+    printCommon(E, "editor_placeholder_expr") << ' ';
+
+    // Print the trailing angle bracket location
+    if (auto Ty = GetTypeOfExpr(E)) {
+      auto &Ctx = Ty->getASTContext();
+      auto TABL = E->getTrailingAngleBracketLoc();
+      if (TABL.isValid()) {
+        PrintWithColorRAII(OS, LocationColor) << " trailing_angle_bracket_loc=";
+        TABL.print(PrintWithColorRAII(OS, LocationColor).getOS(),
+                   Ctx.SourceMgr);
+      }
+    }
+    OS << '\n';
     auto *TyR = E->getTypeLoc().getTypeRepr();
     auto *ExpTyR = E->getTypeForExpansion();
     if (TyR)
@@ -3015,7 +3052,6 @@ static void dumpProtocolConformanceRec(
       out << " lazy";
     } else {
       normal->forEachTypeWitness(
-          nullptr,
           [&](const AssociatedTypeDecl *req, Type ty,
               const TypeDecl *) -> bool {
             out << '\n';
@@ -3026,8 +3062,8 @@ static void dumpProtocolConformanceRec(
             PrintWithColorRAII(out, ParenthesisColor) << ')';
             return false;
           });
-      normal->forEachValueWitness(nullptr, [&](const ValueDecl *req,
-                                               Witness witness) {
+      normal->forEachValueWitness([&](const ValueDecl *req,
+                                      Witness witness) {
         out << '\n';
         out.indent(indent + 2);
         PrintWithColorRAII(out, ParenthesisColor) << '(';
@@ -3729,4 +3765,15 @@ void GenericEnvironment::dump(raw_ostream &os) const {
 
 void GenericEnvironment::dump() const {
   dump(llvm::errs());
+}
+
+StringRef swift::getAccessorKindString(AccessorKind value) {
+  switch (value) {
+#define ACCESSOR(ID)
+#define SINGLETON_ACCESSOR(ID, KEYWORD) \
+  case AccessorKind::ID: return #KEYWORD;
+#include "swift/AST/AccessorKinds.def"
+  }
+
+  llvm_unreachable("Unhandled AccessorKind in switch.");
 }

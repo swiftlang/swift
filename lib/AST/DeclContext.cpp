@@ -90,6 +90,7 @@ GenericTypeParamType *DeclContext::getProtocolSelfType() const {
 
   GenericParamList *genericParams;
   if (auto proto = dyn_cast<ProtocolDecl>(this)) {
+    const_cast<ProtocolDecl*>(proto)->createGenericParamsIfMissing();
     genericParams = proto->getGenericParams();
   } else {
     genericParams = cast<ExtensionDecl>(this)->getGenericParams();
@@ -316,14 +317,8 @@ ResilienceExpansion DeclContext::getResilienceExpansion() const {
     if (isa<DefaultArgumentInitializer>(dc)) {
       dc = dc->getParent();
 
-      const ValueDecl *VD;
-      if (auto *FD = dyn_cast<AbstractFunctionDecl>(dc)) {
-        VD = FD;
-      } else if (auto *EED = dyn_cast<EnumElementDecl>(dc)) {
-        VD = EED;
-      } else {
-        VD = cast<SubscriptDecl>(dc);
-      }
+      auto *VD = cast<ValueDecl>(dc->getAsDecl());
+      assert(VD->hasParameterList());
 
       auto access =
         VD->getFormalAccessScope(/*useDC=*/nullptr,
@@ -972,6 +967,33 @@ DeclContextKind DeclContext::getContextKind() const {
   }
   }
   llvm_unreachable("Unhandled DeclContext ASTHierarchy");
+}
+
+SourceLoc swift::extractNearestSourceLoc(const DeclContext *dc) {
+  switch (dc->getContextKind()) {
+  case DeclContextKind::AbstractFunctionDecl:
+  case DeclContextKind::EnumElementDecl:
+  case DeclContextKind::ExtensionDecl:
+  case DeclContextKind::GenericTypeDecl:
+  case DeclContextKind::Module:
+  case DeclContextKind::SubscriptDecl:
+  case DeclContextKind::TopLevelCodeDecl:
+    return extractNearestSourceLoc(dc->getAsDecl());
+
+  case DeclContextKind::AbstractClosureExpr: {
+    SourceLoc loc = cast<AbstractClosureExpr>(dc)->getLoc();
+    if (loc.isValid())
+      return loc;
+    return extractNearestSourceLoc(dc->getParent());
+  }
+
+  case DeclContextKind::FileUnit:
+    return SourceLoc();
+
+  case DeclContextKind::Initializer:
+  case DeclContextKind::SerializedLocal:
+    return extractNearestSourceLoc(dc->getParent());
+  }
 }
 
 #define DECL(Id, Parent) \

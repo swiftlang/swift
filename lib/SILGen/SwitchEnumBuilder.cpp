@@ -67,7 +67,7 @@ void SwitchCaseFullExpr::unreachableExit() {
 //===----------------------------------------------------------------------===//
 
 void SwitchEnumBuilder::emit() && {
-  bool isAddressOnly = optional.getType().isAddressOnly(builder.getModule()) &&
+  bool isAddressOnly = optional.getType().isAddressOnly(builder.getFunction()) &&
                        getSGF().silConv.useLoweredAddresses();
   using DeclBlockPair = std::pair<EnumElementDecl *, SILBasicBlock *>;
   {

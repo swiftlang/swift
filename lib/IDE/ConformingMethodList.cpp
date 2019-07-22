@@ -87,6 +87,10 @@ void ConformingMethodListCallbacks::doneParsing() {
   if (!T || T->is<ErrorType>() || T->is<UnresolvedType>())
     return;
 
+  T = T->getRValueType();
+  if (T->hasArchetype())
+    T = T->mapTypeOutOfContext();
+
   llvm::MapVector<ProtocolDecl*, StringRef> expectedProtocols;
   resolveProtocolNames(CurDeclContext, ExpectedTypeNames, expectedProtocols);
 
@@ -147,7 +151,8 @@ void ConformingMethodListCallbacks::getMatchingMethods(
         : CurModule(DC->getParentModule()), T(T), ExpectedTypes(expectedTypes),
           Result(result) {}
 
-    void foundDecl(ValueDecl *VD, DeclVisibilityKind reason) {
+    void foundDecl(ValueDecl *VD, DeclVisibilityKind reason,
+                   DynamicLookupInfo) {
       if (isMatchingMethod(VD) && !VD->shouldHideFromEditor())
         Result.push_back(VD);
     }

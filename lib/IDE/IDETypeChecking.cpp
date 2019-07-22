@@ -24,7 +24,9 @@
 #include "swift/AST/ASTDemangler.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Sema/IDETypeChecking.h"
+#include "swift/Sema/IDETypeCheckingRequests.h"
 #include "swift/IDE/SourceEntityWalker.h"
+#include "swift/IDE/IDERequests.h"
 #include "swift/Parse/Lexer.h"
 
 using namespace swift;
@@ -38,6 +40,9 @@ static bool shouldPrintAsFavorable(const Decl *D, const PrintOptions &Options) {
   auto BaseTy = Options.TransformContext->getBaseType();
   const auto *FD = dyn_cast<FuncDecl>(D);
   if (!FD)
+    return true;
+  // Don't check overload choices for accessor decls.
+  if (isa<AccessorDecl>(FD))
     return true;
   ResolvedMemberResult Result =
       resolveValueMember(*DC, BaseTy, FD->getEffectiveFullName());
@@ -267,8 +272,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
 
   unsigned countInherits(ExtensionDecl *ED) {
     SmallVector<TypeLoc, 4> Results;
-    getInheritedForPrinting(
-        ED, [&](const Decl *D) { return Options.shouldPrint(D); }, Results);
+    getInheritedForPrinting(ED, Options, Results);
     return Results.size();
   }
 
@@ -325,7 +329,8 @@ struct SynthesizedExtensionAnalyzer::Implementation {
           // conformance instead of subtyping
           if (!canPossiblyConvertTo(First, Second, *DC))
             return true;
-          else if (!isConvertibleTo(First, Second, *DC))
+          else if (!isConvertibleTo(First, Second, /*openArchetypes=*/false,
+                                    *DC))
             MergeInfo.addRequirement(GenericSig, First, Second, Kind);
           break;
 
@@ -601,6 +606,9 @@ class ExpressionTypeCollector: public SourceEntityWalker {
   // these protocols.
   llvm::MapVector<ProtocolDecl*, StringRef> &InterestedProtocols;
 
+  // Specified by the client whether we should canonicalize types before printing
+  const bool CanonicalType;
+
   bool shouldReport(unsigned Offset, unsigned Length, Expr *E,
                     std::vector<StringRef> &Conformances) {
     assert(Conformances.empty());
@@ -647,11 +655,13 @@ public:
   ExpressionTypeCollector(SourceFile &SF,
               llvm::MapVector<ProtocolDecl*, StringRef> &InterestedProtocols,
                           std::vector<ExpressionTypeInfo> &Results,
+                          bool CanonicalType,
                           llvm::raw_ostream &OS): Module(*SF.getParentModule()),
                             SM(SF.getASTContext().SourceMgr),
                             BufferId(*SF.getBufferID()),
                             Results(Results), OS(OS),
-                            InterestedProtocols(InterestedProtocols) {}
+                            InterestedProtocols(InterestedProtocols),
+                            CanonicalType(CanonicalType) {}
   bool walkToExprPre(Expr *E) override {
     if (E->getSourceRange().isInvalid())
       return true;
@@ -666,7 +676,12 @@ public:
     SmallString<64> Buffer;
     {
       llvm::raw_svector_ostream OS(Buffer);
-      E->getType()->getRValueType()->reconstituteSugar(true)->print(OS);
+      auto Ty = E->getType()->getRValueType();
+      if (CanonicalType) {
+        Ty->getCanonicalType()->print(OS);
+      } else {
+        Ty->reconstituteSugar(true)->print(OS);
+      }
     }
     auto Ty = getTypeOffsets(Buffer.str());
     // Add the type information to the result list.
@@ -717,11 +732,40 @@ ArrayRef<ExpressionTypeInfo>
 swift::collectExpressionType(SourceFile &SF,
                              ArrayRef<const char *> ExpectedProtocols,
                              std::vector<ExpressionTypeInfo> &Scratch,
+                             bool CanonicalType,
                              llvm::raw_ostream &OS) {
   llvm::MapVector<ProtocolDecl*, StringRef> InterestedProtocols;
   if (resolveProtocolNames(&SF, ExpectedProtocols, InterestedProtocols))
     return {};
-  ExpressionTypeCollector Walker(SF, InterestedProtocols, Scratch, OS);
+  ExpressionTypeCollector Walker(SF, InterestedProtocols, Scratch,
+    CanonicalType, OS);
   Walker.walk(SF);
   return Scratch;
+}
+
+ArrayRef<ValueDecl*> swift::
+canDeclProvideDefaultImplementationFor(ValueDecl* VD) {
+  return evaluateOrDefault(VD->getASTContext().evaluator,
+                           ProvideDefaultImplForRequest(VD),
+                           ArrayRef<ValueDecl*>());
+}
+
+ArrayRef<ValueDecl*> swift::
+collectAllOverriddenDecls(ValueDecl *VD, bool IncludeProtocolRequirements,
+                          bool Transitive) {
+  return evaluateOrDefault(VD->getASTContext().evaluator,
+    CollectOverriddenDeclsRequest(OverridenDeclsOwner(VD,
+      IncludeProtocolRequirements, Transitive)), ArrayRef<ValueDecl*>());
+}
+
+bool swift::isExtensionApplied(const DeclContext *DC, Type BaseTy,
+                               const ExtensionDecl *ED) {
+  return evaluateOrDefault(DC->getASTContext().evaluator,
+    IsDeclApplicableRequest(DeclApplicabilityOwner(DC, BaseTy, ED)), false);
+}
+
+bool swift::isMemberDeclApplied(const DeclContext *DC, Type BaseTy,
+                                const ValueDecl *VD) {
+  return evaluateOrDefault(DC->getASTContext().evaluator,
+    IsDeclApplicableRequest(DeclApplicabilityOwner(DC, BaseTy, VD)), false);
 }

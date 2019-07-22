@@ -32,15 +32,21 @@
 
 using namespace swift;
 
-/// Returns true if, for every element of the given enum, it either has no
-/// associated values or all of them conform to a protocol.
+enum NonconformingMemberKind {
+  AssociatedValue,
+  StoredProperty
+};
+
+/// Returns the ParamDecl for each associated value of the given enum whose type
+/// does not conform to a protocol
 /// \p theEnum The enum whose elements and associated values should be checked.
 /// \p protocol The protocol being requested.
-/// \return True if all associated values of all elements of the enum conform.
-static bool allAssociatedValuesConformToProtocol(DeclContext *DC,
-                                                 EnumDecl *theEnum,
-                                                 ProtocolDecl *protocol) {
+/// \return The ParamDecl of each associated value whose type does not conform.
+static SmallVector<ParamDecl *, 3>
+associatedValuesNotConformingToProtocol(DeclContext *DC, EnumDecl *theEnum,
+                                        ProtocolDecl *protocol) {
   auto lazyResolver = DC->getASTContext().getLazyResolver();
+  SmallVector<ParamDecl *, 3> nonconformingAssociatedValues;
   for (auto elt : theEnum->getAllElements()) {
     if (!elt->hasInterfaceType())
       lazyResolver->resolveDeclSignature(elt);
@@ -50,15 +56,55 @@ static bool allAssociatedValuesConformToProtocol(DeclContext *DC,
       continue;
 
     for (auto param : *PL) {
-      auto type = param->getType()->mapTypeOutOfContext();
+      auto type = param->getInterfaceType();
       if (!TypeChecker::conformsToProtocol(DC->mapTypeIntoContext(type),
-                                           protocol, DC,
-                                           ConformanceCheckFlags::Used)) {
-        return false;
+                                           protocol, DC, None)) {
+        nonconformingAssociatedValues.push_back(param);
       }
     }
   }
-  return true;
+  return nonconformingAssociatedValues;
+}
+
+/// Returns true if, for every element of the given enum, it either has no
+/// associated values or all of them conform to a protocol.
+/// \p theEnum The enum whose elements and associated values should be checked.
+/// \p protocol The protocol being requested.
+/// \return True if all associated values of all elements of the enum conform.
+static bool allAssociatedValuesConformToProtocol(DeclContext *DC,
+                                                 EnumDecl *theEnum,
+                                                 ProtocolDecl *protocol) {
+  return associatedValuesNotConformingToProtocol(DC, theEnum, protocol).empty();
+}
+
+/// Returns the VarDecl of each stored property in the given struct whose type
+/// does not conform to a protocol.
+/// \p theStruct The struct whose stored properties should be checked.
+/// \p protocol The protocol being requested.
+/// \return The VarDecl of each stored property whose type does not conform.
+static SmallVector<VarDecl *, 3>
+storedPropertiesNotConformingToProtocol(DeclContext *DC, StructDecl *theStruct,
+                                        ProtocolDecl *protocol) {
+  auto lazyResolver = DC->getASTContext().getLazyResolver();
+  auto storedProperties = theStruct->getStoredProperties();
+  SmallVector<VarDecl *, 3> nonconformingProperties;
+  for (auto propertyDecl : storedProperties) {
+    if (!propertyDecl->isUserAccessible())
+      continue;
+
+    if (!propertyDecl->hasInterfaceType())
+      lazyResolver->resolveDeclSignature(propertyDecl);
+    if (!propertyDecl->hasInterfaceType())
+      nonconformingProperties.push_back(propertyDecl);
+
+    auto type = propertyDecl->getValueInterfaceType();
+
+    if (!TypeChecker::conformsToProtocol(DC->mapTypeIntoContext(type), protocol,
+                                         DC, None)) {
+      nonconformingProperties.push_back(propertyDecl);
+    }
+  }
+  return nonconformingProperties;
 }
 
 /// Returns true if every stored property in the given struct conforms to the
@@ -69,24 +115,8 @@ static bool allAssociatedValuesConformToProtocol(DeclContext *DC,
 static bool allStoredPropertiesConformToProtocol(DeclContext *DC,
                                                  StructDecl *theStruct,
                                                  ProtocolDecl *protocol) {
-  auto lazyResolver = DC->getASTContext().getLazyResolver();
-  auto storedProperties =
-    theStruct->getStoredProperties(/*skipInaccessible=*/true);
-  for (auto propertyDecl : storedProperties) {
-    if (!propertyDecl->hasType())
-      lazyResolver->resolveDeclSignature(propertyDecl);
-    if (!propertyDecl->hasType())
-      return false;
-
-    auto type = propertyDecl->getValueInterfaceType();
-
-    if (!TypeChecker::conformsToProtocol(DC->mapTypeIntoContext(type),
-                                         protocol, DC,
-                                         ConformanceCheckFlags::Used)) {
-      return false;
-    }
-  }
-  return true;
+  return storedPropertiesNotConformingToProtocol(DC, theStruct, protocol)
+      .empty();
 }
 
 /// Common preconditions for Equatable and Hashable.
@@ -106,6 +136,39 @@ static bool canDeriveConformance(DeclContext *DC,
   }
 
   return false;
+}
+
+/// Diagnose failed conformance synthesis caused by a member type not conforming
+/// to the same protocol
+void diagnoseFailedDerivation(DeclContext *DC, NominalTypeDecl *nominal,
+                              ProtocolDecl *protocol) {
+  ASTContext &ctx = DC->getASTContext();
+
+  if (auto *enumDecl = dyn_cast<EnumDecl>(nominal)) {
+    auto nonconformingAssociatedTypes =
+        associatedValuesNotConformingToProtocol(DC, enumDecl, protocol);
+    for (auto *typeToDiagnose : nonconformingAssociatedTypes) {
+      ctx.Diags.diagnose(
+          typeToDiagnose->getTypeLoc().getLoc(),
+          diag::missing_member_type_conformance_prevents_synthesis,
+          NonconformingMemberKind::AssociatedValue,
+          typeToDiagnose->getInterfaceType(), protocol->getDeclaredType(),
+          nominal->getDeclaredInterfaceType());
+    }
+  }
+
+  if (auto *structDecl = dyn_cast<StructDecl>(nominal)) {
+    auto nonconformingStoredProperties =
+        storedPropertiesNotConformingToProtocol(DC, structDecl, protocol);
+    for (auto *propertyToDiagnose : nonconformingStoredProperties) {
+      ctx.Diags.diagnose(
+          propertyToDiagnose->getLoc(),
+          diag::missing_member_type_conformance_prevents_synthesis,
+          NonconformingMemberKind::StoredProperty,
+          propertyToDiagnose->getInterfaceType(), protocol->getDeclaredType(),
+          nominal->getDeclaredInterfaceType());
+    }
+  }
 }
 
 /// Creates a named variable based on a prefix character and a numeric index.
@@ -303,7 +366,7 @@ static GuardStmt *returnIfNotEqualGuard(ASTContext &C,
   return new (C) GuardStmt(SourceLoc(), C.AllocateCopy(conditions), body);
 }
 
-static void
+static std::pair<BraceStmt *, bool>
 deriveBodyEquatable_enum_uninhabited_eq(AbstractFunctionDecl *eqDecl, void *) {
   auto parentDC = eqDecl->getDeclContext();
   ASTContext &C = parentDC->getASTContext();
@@ -328,13 +391,13 @@ deriveBodyEquatable_enum_uninhabited_eq(AbstractFunctionDecl *eqDecl, void *) {
   statements.push_back(switchStmt);
 
   auto body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
-  eqDecl->setBody(body);
+  return { body, /*isTypeChecked=*/false };
 }
 
 /// Derive the body for an '==' operator for an enum that has no associated
 /// values. This generates code that converts each value to its integer ordinal
 /// and compares them, which produces an optimal single icmp instruction.
-static void
+static std::pair<BraceStmt *, bool>
 deriveBodyEquatable_enum_noAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
                                                void *) {
   auto parentDC = eqDecl->getDeclContext();
@@ -385,12 +448,12 @@ deriveBodyEquatable_enum_noAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
   statements.push_back(new (C) ReturnStmt(SourceLoc(), cmpExpr));
 
   BraceStmt *body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
-  eqDecl->setBody(body);
+  return { body, /*isTypeChecked=*/false };
 }
 
 /// Derive the body for an '==' operator for an enum where at least one of the
 /// cases has associated values.
-static void
+static std::pair<BraceStmt *, bool>
 deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
                                                 void *) {
   auto parentDC = eqDecl->getDeclContext();
@@ -518,12 +581,12 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
   statements.push_back(switchStmt);
 
   auto body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
-  eqDecl->setBody(body);
+  return { body, /*isTypeChecked=*/false };
 }
 
 /// Derive the body for an '==' operator for a struct.
-static void deriveBodyEquatable_struct_eq(AbstractFunctionDecl *eqDecl,
-                                          void *) {
+static std::pair<BraceStmt *, bool>
+deriveBodyEquatable_struct_eq(AbstractFunctionDecl *eqDecl, void *) {
   auto parentDC = eqDecl->getDeclContext();
   ASTContext &C = parentDC->getASTContext();
 
@@ -535,12 +598,14 @@ static void deriveBodyEquatable_struct_eq(AbstractFunctionDecl *eqDecl,
 
   SmallVector<ASTNode, 6> statements;
 
-  auto storedProperties =
-    structDecl->getStoredProperties(/*skipInaccessible=*/true);
+  auto storedProperties = structDecl->getStoredProperties();
 
   // For each stored property element, generate a guard statement that returns
   // false if a property is not pairwise-equal.
   for (auto propertyDecl : storedProperties) {
+    if (!propertyDecl->isUserAccessible())
+      continue;
+
     auto aPropertyRef = new (C) DeclRefExpr(propertyDecl, DeclNameLoc(),
                                             /*implicit*/ true);
     auto aParamRef = new (C) DeclRefExpr(aParam, DeclNameLoc(),
@@ -568,13 +633,15 @@ static void deriveBodyEquatable_struct_eq(AbstractFunctionDecl *eqDecl,
   statements.push_back(returnStmt);
 
   auto body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
-  eqDecl->setBody(body);
+  return { body, /*isTypeChecked=*/false };
 }
 
 /// Derive an '==' operator implementation for an enum or a struct.
 static ValueDecl *
-deriveEquatable_eq(DerivedConformance &derived,
-                   void (*bodySynthesizer)(AbstractFunctionDecl *, void *)) {
+deriveEquatable_eq(
+    DerivedConformance &derived,
+    std::pair<BraceStmt *, bool> (*bodySynthesizer)(AbstractFunctionDecl *,
+                                                    void *)) {
   // enum SomeEnum<T...> {
   //   case A, B(Int), C(String, Int)
   //
@@ -724,6 +791,13 @@ ValueDecl *DerivedConformance::deriveEquatable(ValueDecl *requirement) {
   return nullptr;
 }
 
+void DerivedConformance::tryDiagnoseFailedEquatableDerivation(
+    DeclContext *DC, NominalTypeDecl *nominal) {
+  ASTContext &ctx = DC->getASTContext();
+  auto *equatableProto = ctx.getProtocol(KnownProtocolKind::Equatable);
+  diagnoseFailedDerivation(DC, nominal, equatableProto);
+}
+
 /// Returns a new \c CallExpr representing
 ///
 ///   hasher.combine(hashable)
@@ -749,9 +823,10 @@ static CallExpr *createHasherCombineCall(ASTContext &C,
 }
 
 static FuncDecl *
-deriveHashable_hashInto(DerivedConformance &derived,
-                        void (*bodySynthesizer)(AbstractFunctionDecl *,
-                                                void *)) {
+deriveHashable_hashInto(
+    DerivedConformance &derived,
+    std::pair<BraceStmt *, bool> (*bodySynthesizer)(AbstractFunctionDecl *,
+                                                    void *)) {
   // @derived func hash(into hasher: inout Hasher)
 
   ASTContext &C = derived.TC.Context;
@@ -811,7 +886,7 @@ deriveHashable_hashInto(DerivedConformance &derived,
 
 /// Derive the body for the hash(into:) method when hashValue has a
 /// user-supplied implementation.
-static void
+static std::pair<BraceStmt *, bool>
 deriveBodyHashable_compat_hashInto(AbstractFunctionDecl *hashIntoDecl, void *) {
   // func hash(into hasher: inout Hasher) {
   //   hasher.combine(self.hashValue)
@@ -830,12 +905,12 @@ deriveBodyHashable_compat_hashInto(AbstractFunctionDecl *hashIntoDecl, void *) {
 
   auto body = BraceStmt::create(C, SourceLoc(), {ASTNode(hasherExpr)},
                                 SourceLoc(), /*implicit*/ true);
-  hashIntoDecl->setBody(body);
+  return { body, /*isTypeChecked=*/false };
 }
 
 /// Derive the body for the 'hash(into:)' method for an enum by using its raw
 /// value.
-static void
+static std::pair<BraceStmt *, bool>
 deriveBodyHashable_enum_rawValue_hashInto(
   AbstractFunctionDecl *hashIntoDecl, void *) {
   // enum SomeEnum: Int {
@@ -858,12 +933,12 @@ deriveBodyHashable_enum_rawValue_hashInto(
 
   auto body = BraceStmt::create(C, SourceLoc(), combineStmt, SourceLoc(),
                                 /*implicit*/ true);
-  hashIntoDecl->setBody(body);
+  return { body, /*isTypeChecked=*/false };
 }
 
 /// Derive the body for the 'hash(into:)' method for an enum without associated
 /// values.
-static void
+static std::pair<BraceStmt *, bool>
 deriveBodyHashable_enum_noAssociatedValues_hashInto(
   AbstractFunctionDecl *hashIntoDecl, void *) {
   // enum SomeEnum {
@@ -899,12 +974,12 @@ deriveBodyHashable_enum_noAssociatedValues_hashInto(
 
   auto body = BraceStmt::create(C, SourceLoc(), stmts, SourceLoc(),
                                 /*implicit*/ true);
-  hashIntoDecl->setBody(body);
+  return { body, /*isTypeChecked=*/false };
 }
 
 /// Derive the body for the 'hash(into:)' method for an enum with associated
 /// values.
-static void
+static std::pair<BraceStmt *, bool>
 deriveBodyHashable_enum_hasAssociatedValues_hashInto(
   AbstractFunctionDecl *hashIntoDecl, void *) {
   // enum SomeEnumWithAssociatedValues {
@@ -1004,11 +1079,11 @@ deriveBodyHashable_enum_hasAssociatedValues_hashInto(
 
   auto body = BraceStmt::create(C, SourceLoc(), {ASTNode(switchStmt)},
                                 SourceLoc());
-  hashIntoDecl->setBody(body);
+  return { body, /*isTypeChecked=*/false };
 }
 
 /// Derive the body for the 'hash(into:)' method for a struct.
-static void
+static std::pair<BraceStmt *, bool>
 deriveBodyHashable_struct_hashInto(AbstractFunctionDecl *hashIntoDecl, void *) {
   // struct SomeStruct {
   //   var x: Int
@@ -1028,11 +1103,13 @@ deriveBodyHashable_struct_hashInto(AbstractFunctionDecl *hashIntoDecl, void *) {
   // Extract the decl for the hasher parameter.
   auto hasherParam = hashIntoDecl->getParameters()->get(0);
 
-  auto storedProperties =
-    structDecl->getStoredProperties(/*skipInaccessible=*/true);
+  auto storedProperties = structDecl->getStoredProperties();
 
   // Feed each stored property into the hasher.
   for (auto propertyDecl : storedProperties) {
+    if (!propertyDecl->isUserAccessible())
+      continue;
+
     auto propertyRef = new (C) DeclRefExpr(propertyDecl, DeclNameLoc(),
                                            /*implicit*/ true);
     auto selfRef = new (C) DeclRefExpr(selfDecl, DeclNameLoc(),
@@ -1046,11 +1123,11 @@ deriveBodyHashable_struct_hashInto(AbstractFunctionDecl *hashIntoDecl, void *) {
 
   auto body = BraceStmt::create(C, SourceLoc(), statements,
                                 SourceLoc(), /*implicit*/ true);
-  hashIntoDecl->setBody(body);
+  return { body, /*isTypeChecked=*/false };
 }
 
 /// Derive the body for the 'hashValue' getter.
-static void
+static std::pair<BraceStmt *, bool>
 deriveBodyHashable_hashValue(AbstractFunctionDecl *hashValueDecl, void *) {
   auto parentDC = hashValueDecl->getDeclContext();
   ASTContext &C = parentDC->getASTContext();
@@ -1068,7 +1145,7 @@ deriveBodyHashable_hashValue(AbstractFunctionDecl *hashValueDecl, void *) {
 
   auto body = BraceStmt::create(C, SourceLoc(), {returnStmt}, SourceLoc(),
                                 /*implicit*/ true);
-  hashValueDecl->setBody(body);
+  return { body, /*isTypeChecked=*/false };
 }
 
 /// Derive a 'hashValue' implementation.
@@ -1084,18 +1161,19 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
 
   // We can't form a Hashable conformance if Int isn't Hashable or
   // ExpressibleByIntegerLiteral.
-  if (!tc.conformsToProtocol(intType,
-                             C.getProtocol(KnownProtocolKind::Hashable),
-                             parentDC, None)) {
-    tc.diagnose(derived.ConformanceDecl, diag::broken_int_hashable_conformance);
+  if (!TypeChecker::conformsToProtocol(intType,
+                                       C.getProtocol(KnownProtocolKind::Hashable),
+                                       parentDC, None)) {
+    derived.ConformanceDecl->diagnose(diag::broken_int_hashable_conformance);
     return nullptr;
   }
 
   ProtocolDecl *intLiteralProto =
       C.getProtocol(KnownProtocolKind::ExpressibleByIntegerLiteral);
-  if (!tc.conformsToProtocol(intType, intLiteralProto, parentDC, None)) {
-    tc.diagnose(derived.ConformanceDecl,
-                diag::broken_int_integer_literal_convertible_conformance);
+  if (!TypeChecker::conformsToProtocol(intType, intLiteralProto,
+                                       parentDC, None)) {
+    derived.ConformanceDecl->diagnose(
+      diag::broken_int_integer_literal_convertible_conformance);
     return nullptr;
   }
 
@@ -1186,6 +1264,13 @@ bool DerivedConformance::canDeriveHashable(NominalTypeDecl *type) {
   return true;
 }
 
+void DerivedConformance::tryDiagnoseFailedHashableDerivation(
+    DeclContext *DC, NominalTypeDecl *nominal) {
+  ASTContext &ctx = DC->getASTContext();
+  auto *hashableProto = ctx.getProtocol(KnownProtocolKind::Hashable);
+  diagnoseFailedDerivation(DC, nominal, hashableProto);
+}
+
 ValueDecl *DerivedConformance::deriveHashable(ValueDecl *requirement) {
   ASTContext &C = ConformanceDecl->getASTContext();
 
@@ -1201,7 +1286,7 @@ ValueDecl *DerivedConformance::deriveHashable(ValueDecl *requirement) {
     // Start by resolving hashValue conformance.
     auto hashValueReq = getHashValueRequirement(C);
     auto conformance = getHashableConformance(ConformanceDecl);
-    auto hashValueDecl = conformance->getWitnessDecl(hashValueReq, &TC);
+    auto hashValueDecl = conformance->getWitnessDecl(hashValueReq);
     if (!hashValueDecl) {
       // We won't derive hash(into:) if hashValue cannot be resolved.
       // The hashValue failure will produce a diagnostic elsewhere.
@@ -1219,6 +1304,13 @@ ValueDecl *DerivedConformance::deriveHashable(ValueDecl *requirement) {
         ConformanceDecl->diagnose(diag::type_does_not_conform,
                                   Nominal->getDeclaredType(),
                                   hashableProto->getDeclaredType());
+        // Ideally, this would be diagnosed in
+        // ConformanceChecker::resolveWitnessViaLookup. That doesn't work for
+        // Hashable because DerivedConformance::canDeriveHashable returns true
+        // even if the conformance can't be derived. See the note there for
+        // details.
+        auto *dc = ConformanceDecl->getDeclContext();
+        tryDiagnoseFailedHashableDerivation(dc, Nominal);
         return nullptr;
       }
 
@@ -1226,7 +1318,8 @@ ValueDecl *DerivedConformance::deriveHashable(ValueDecl *requirement) {
         return nullptr;
 
       if (auto ED = dyn_cast<EnumDecl>(Nominal)) {
-        void (*bodySynthesizer)(AbstractFunctionDecl *, void *);
+        std::pair<BraceStmt *, bool> (*bodySynthesizer)(
+            AbstractFunctionDecl *, void *);
         if (ED->isObjC())
           bodySynthesizer = deriveBodyHashable_enum_rawValue_hashInto;
         else if (ED->hasOnlyCasesWithoutAssociatedValues())

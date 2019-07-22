@@ -39,10 +39,32 @@ public struct Notification : ReferenceConvertible, Equatable, Hashable {
         self.userInfo = userInfo
     }
 
-    public var hashValue: Int {
-        return name.rawValue.hash
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(name)
+
+        // FIXME: We should feed `object` to the hasher, too. However, this
+        // cannot be safely done if its value happens not to be Hashable.
+
+        // FIXME: == compares `userInfo` by bridging it to NSDictionary, so its
+        // contents should be fully hashed here.  However, to prevent stability
+        // issues with userInfo dictionaries that include non-Hashable values,
+        // we only feed the keys to the hasher here.
+        //
+        // FIXME: This makes for weak hashes. We really should hash everything
+        // that's compared in ==.
+        //
+        // The algorithm below is the same as the one used by Dictionary.
+        var commutativeKeyHash = 0
+        if let userInfo = userInfo {
+            for (k, _) in userInfo {
+                var nestedHasher = hasher
+                nestedHasher.combine(k)
+                commutativeKeyHash ^= nestedHasher.finalize()
+            }
+        }
+        hasher.combine(commutativeKeyHash)
     }
-    
+
     public var description: String {
         return "name = \(name.rawValue), object = \(String(describing: object)), userInfo = \(String(describing: userInfo))"
     }
@@ -61,6 +83,10 @@ public struct Notification : ReferenceConvertible, Equatable, Hashable {
         }
         if let lhsObj = lhs.object {
             if let rhsObj = rhs.object {
+                // FIXME: Converting an arbitrary value to AnyObject won't use a
+                // stable address when the value needs to be boxed.  Therefore,
+                // this comparison makes == non-reflexive, violating Equatable
+                // requirements. (rdar://problem/49797185)
                 if lhsObj as AnyObject !== rhsObj as AnyObject {
                     return false
                 }
@@ -73,6 +99,9 @@ public struct Notification : ReferenceConvertible, Equatable, Hashable {
         if lhs.userInfo != nil {
             if rhs.userInfo != nil {
                 // user info must be compared in the object form since the userInfo in swift is not comparable
+
+                // FIXME: This violates reflexivity when userInfo contains any
+                // non-Hashable values, for the same reason as described above.
                 return lhs._bridgeToObjectiveC() == rhs._bridgeToObjectiveC()
             } else {
                 return false

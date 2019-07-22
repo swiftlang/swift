@@ -71,10 +71,8 @@ namespace {
       /// The source type is 'void'.
       Void,
 
-      /// The source type is 'BOOL'.
-      BOOL,
-
-      /// The source type is 'Boolean'.
+      /// The source type is 'BOOL' or 'Boolean' -- a type mapped to Swift's
+      /// 'Bool'.
       Boolean,
 
       /// The source type is an Objective-C class type bridged to a Swift
@@ -129,7 +127,6 @@ namespace {
     // See also ClangImporter.cpp's canImportAsOptional.
     switch (hint) {
     case ImportHint::None:
-    case ImportHint::BOOL:
     case ImportHint::Boolean:
     case ImportHint::NSUInteger:
     case ImportHint::Void:
@@ -667,24 +664,40 @@ namespace {
       if (!decl) return Visit(type->desugar());
 
       Type mappedType = getAdjustedTypeDeclReferenceType(decl);
-      ImportHint hint = ImportHint::None;
 
       if (getSwiftNewtypeAttr(type->getDecl(), Impl.CurrentVersion)) {
         if (isCFTypeDecl(type->getDecl())) {
-          hint = ImportHint::SwiftNewtypeFromCFPointer;
-        } else {
-          // If the underlying type was bridged, the wrapper type is
-          // only useful in bridged cases.
-          auto underlying = Visit(type->getDecl()->getUnderlyingType());
-          if (underlying.Hint == ImportHint::ObjCBridged) {
-            return { underlying.AbstractType,
-                     ImportHint(ImportHint::ObjCBridged, mappedType) };
-          }
-          hint = underlying.Hint;
+          return {mappedType, ImportHint::SwiftNewtypeFromCFPointer};
         }
 
+        auto underlying = Visit(type->getDecl()->getUnderlyingType());
+        switch (underlying.Hint) {
+        case ImportHint::None:
+        case ImportHint::Void:
+        case ImportHint::Block:
+        case ImportHint::CFPointer:
+        case ImportHint::ObjCPointer:
+        case ImportHint::CFunctionPointer:
+        case ImportHint::OtherPointer:
+        case ImportHint::SwiftNewtypeFromCFPointer:
+          return {mappedType, underlying.Hint};
+
+        case ImportHint::Boolean:
+        case ImportHint::NSUInteger:
+          // Toss out the special rules for these types; we still want to
+          // import as a wrapper.
+          return {mappedType, ImportHint::None};
+
+        case ImportHint::ObjCBridged:
+          // If the underlying type was bridged, the wrapper type is
+          // only useful in bridged cases. Exit early.
+          return { underlying.AbstractType,
+                   ImportHint(ImportHint::ObjCBridged, mappedType) };
+        }
+      }
+
       // For certain special typedefs, we don't want to use the imported type.
-      } else if (auto specialKind = Impl.getSpecialTypedefKind(type->getDecl())) {
+      if (auto specialKind = Impl.getSpecialTypedefKind(type->getDecl())) {
         switch (specialKind.getValue()) {
         case MappedTypeNameKind::DoNothing:
         case MappedTypeNameKind::DefineAndUse:
@@ -696,8 +709,9 @@ namespace {
           break;
         }
 
+        ImportHint hint = ImportHint::None;
         if (type->getDecl()->getName() == "BOOL") {
-          hint = ImportHint::BOOL;
+          hint = ImportHint::Boolean;
         } else if (type->getDecl()->getName() == "Boolean") {
           // FIXME: Darwin only?
           hint = ImportHint::Boolean;
@@ -711,64 +725,62 @@ namespace {
           hint = ImportHint::OtherPointer;
         }
         // Any other interesting mapped types should be hinted here.
+        return { mappedType, hint };
+      }
 
       // Otherwise, recurse on the underlying type.  We need to recompute
       // the hint, and if the typedef uses different bridgeability than the
       // context then we may also need to bypass the typedef.
-      } else {
-        auto underlyingType = type->desugar();
+      auto underlyingType = type->desugar();
 
-        // Figure out the bridgeability we would normally use for this typedef.
-        auto typedefBridgeability =
+      // Figure out the bridgeability we would normally use for this typedef.
+      auto typedefBridgeability =
           getTypedefBridgeability(type->getDecl(), underlyingType);
 
-        // Figure out the typedef we should actually use.
-        auto underlyingBridgeability = Bridging;
-        SwiftTypeConverter innerConverter(Impl, AllowNSUIntegerAsInt,
-                                          underlyingBridgeability);
-        auto underlyingResult = innerConverter.Visit(underlyingType);
+      // Figure out the typedef we should actually use.
+      auto underlyingBridgeability = Bridging;
+      SwiftTypeConverter innerConverter(Impl, AllowNSUIntegerAsInt,
+                                        underlyingBridgeability);
+      auto underlyingResult = innerConverter.Visit(underlyingType);
 
-        // If we used different bridgeability than this typedef normally
-        // would because we're in a non-bridgeable context, and therefore
-        // the underlying type is different from the mapping of the typedef,
-        // use the underlying type.
-        if (underlyingBridgeability != typedefBridgeability &&
-            !underlyingResult.AbstractType->isEqual(mappedType)) {
-          return underlyingResult;
-        }
-
-#ifndef NDEBUG
-        switch (underlyingResult.Hint) {
-        case ImportHint::Block:
-        case ImportHint::ObjCBridged:
-          // Bridging is fine for Objective-C and blocks.
-          break;
-        case ImportHint::NSUInteger:
-          // NSUInteger might be imported as Int rather than UInt depending
-          // on where the import lives.
-          if (underlyingResult.AbstractType->getAnyNominal() ==
-              Impl.SwiftContext.getIntDecl())
-            break;
-          LLVM_FALLTHROUGH;
-        default:
-          if (!underlyingResult.AbstractType->isEqual(mappedType)) {
-            underlyingResult.AbstractType->dump();
-            mappedType->dump();
-          }
-          assert(underlyingResult.AbstractType->isEqual(mappedType) &&
-                 "typedef without special typedef kind was mapped "
-                 "differently from its underlying type?");
-        }
-#endif
-        hint = underlyingResult.Hint;
-
-        // If the imported typealias is unavailable, return the
-        // underlying type.
-        if (decl->getAttrs().isUnavailable(Impl.SwiftContext))
-          mappedType = underlyingResult.AbstractType;
+      // If we used different bridgeability than this typedef normally
+      // would because we're in a non-bridgeable context, and therefore
+      // the underlying type is different from the mapping of the typedef,
+      // use the underlying type.
+      if (underlyingBridgeability != typedefBridgeability &&
+          !underlyingResult.AbstractType->isEqual(mappedType)) {
+        return underlyingResult;
       }
 
-      return { mappedType, hint };
+#ifndef NDEBUG
+      switch (underlyingResult.Hint) {
+      case ImportHint::Block:
+      case ImportHint::ObjCBridged:
+        // Bridging is fine for Objective-C and blocks.
+        break;
+      case ImportHint::NSUInteger:
+        // NSUInteger might be imported as Int rather than UInt depending
+        // on where the import lives.
+        if (underlyingResult.AbstractType->getAnyNominal() ==
+            Impl.SwiftContext.getIntDecl())
+          break;
+        LLVM_FALLTHROUGH;
+      default:
+        if (!underlyingResult.AbstractType->isEqual(mappedType)) {
+          underlyingResult.AbstractType->dump();
+          mappedType->dump();
+        }
+        assert(underlyingResult.AbstractType->isEqual(mappedType) &&
+               "typedef without special typedef kind was mapped "
+               "differently from its underlying type?");
+      }
+#endif
+
+      // If the imported typealias is unavailable, return the underlying type.
+      if (decl->getAttrs().isUnavailable(Impl.SwiftContext))
+        return underlyingResult;
+
+      return { mappedType, underlyingResult.Hint };
     }
 
 #define SUGAR_TYPE(KIND)                                            \
@@ -1365,8 +1377,8 @@ static ImportedType adjustTypeForConcreteImport(
 
   // Turn BOOL and DarwinBoolean into Bool in contexts that can bridge types
   // losslessly.
-  if ((hint == ImportHint::BOOL || hint == ImportHint::Boolean) &&
-      bridging == Bridgeability::Full && canBridgeTypes(importKind)) {
+  if (hint == ImportHint::Boolean && bridging == Bridgeability::Full &&
+      canBridgeTypes(importKind)) {
     return {impl.SwiftContext.getBoolDecl()->getDeclaredType(), false};
   }
 
@@ -2342,7 +2354,7 @@ Type ClangImporter::Implementation::getNamedSwiftType(ModuleDecl *module,
     if (auto clangUnit = dyn_cast<ClangModuleUnit>(file)) {
       // If we have an overlay, look in the overlay. Otherwise, skip
       // the lookup to avoid infinite recursion.
-      if (auto module = clangUnit->getAdapterModule())
+      if (auto module = clangUnit->getOverlayModule())
         module->lookupValue({ }, identifier,
                           NLKind::UnqualifiedLookup, results);
     } else {

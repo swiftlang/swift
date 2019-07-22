@@ -12,8 +12,8 @@
 
 /// A sequence that presents the elements of a base sequence of sequences
 /// concatenated using a given separator.
-@_fixed_layout // lazy-performance
-public struct JoinedSequence<Base : Sequence> where Base.Element : Sequence {
+@frozen // lazy-performance
+public struct JoinedSequence<Base: Sequence> where Base.Element: Sequence {
 
   public typealias Element = Base.Element.Element
   
@@ -27,7 +27,7 @@ public struct JoinedSequence<Base : Sequence> where Base.Element : Sequence {
   ///
   /// - Complexity: O(`separator.count`).
   @inlinable // lazy-performance
-  public init<Separator : Sequence>(base: Base, separator: Separator)
+  public init<Separator: Sequence>(base: Base, separator: Separator)
     where Separator.Element == Element {
     self._base = base
     self._separator = ContiguousArray(separator)
@@ -37,7 +37,7 @@ public struct JoinedSequence<Base : Sequence> where Base.Element : Sequence {
 extension JoinedSequence {
   /// An iterator that presents the elements of the sequences traversed
   /// by a base iterator, concatenated using a given separator.
-  @_fixed_layout // lazy-performance
+  @frozen // lazy-performance
   public struct Iterator {
     @usableFromInline // lazy-performance
     internal var _base: Base.Iterator
@@ -48,7 +48,7 @@ extension JoinedSequence {
     @usableFromInline // lazy-performance
     internal var _separator: ContiguousArray<Element>.Iterator?
     
-    @_frozen // lazy-performance
+    @frozen // lazy-performance
     @usableFromInline // lazy-performance
     internal enum _JoinIteratorState {
       case start
@@ -155,7 +155,7 @@ extension JoinedSequence: Sequence {
   }
 }
   
-extension Sequence where Element : Sequence {
+extension Sequence where Element: Sequence {
   /// Returns the concatenated elements of this sequence of sequences,
   /// inserting the given separator between each element.
   ///
@@ -171,7 +171,7 @@ extension Sequence where Element : Sequence {
   ///   sequence's elements.
   /// - Returns: The joined sequence of elements.
   @inlinable // lazy-performance
-  public __consuming func joined<Separator : Sequence>(
+  public __consuming func joined<Separator: Sequence>(
     separator: Separator
   ) -> JoinedSequence<Self>
     where Separator.Element == Element.Element {

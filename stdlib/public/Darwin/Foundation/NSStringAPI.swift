@@ -800,9 +800,14 @@ extension StringProtocol where Index == String.Index {
     using encoding: String.Encoding,
     allowLossyConversion: Bool = false
   ) -> Data? {
-    return _ns.data(
-      using: encoding.rawValue,
-      allowLossyConversion: allowLossyConversion)
+    switch encoding {
+    case .utf8:
+      return Data(self.utf8)
+    default:
+      return _ns.data(
+        using: encoding.rawValue,
+        allowLossyConversion: allowLossyConversion)
+    }
   }
 
   // @property NSString* decomposedStringWithCanonicalMapping;

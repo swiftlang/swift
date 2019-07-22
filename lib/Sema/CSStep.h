@@ -291,7 +291,7 @@ class ComponentStep final : public SolverStep {
     ConstraintSystem &CS;
     ConstraintSystem::SolverScope *SolverScope;
 
-    SmallVector<TypeVariableType *, 16> TypeVars;
+    std::vector<TypeVariableType *> TypeVars;
     ConstraintSystem::SolverScope *PrevPartialScope = nullptr;
 
     // The component this scope is associated with.
@@ -336,7 +336,7 @@ class ComponentStep final : public SolverStep {
   std::unique_ptr<Scope> ComponentScope = nullptr;
 
   /// Type variables and constraints "in scope" of this step.
-  SmallVector<TypeVariableType *, 16> TypeVars;
+  std::vector<TypeVariableType *> TypeVars;
   /// Constraints "in scope" of this step.
   ConstraintList *Constraints;
 
@@ -374,7 +374,8 @@ public:
   }
 
   StepResult take(bool prevFailed) override;
-  StepResult resume(bool prevFailed) override;
+
+  StepResult resume(bool prevFailed) override { return finalize(!prevFailed); }
 
   // The number of disjunction constraints associated with this component.
   unsigned disjunctionCount() const { return NumDisjunctions; }
@@ -398,6 +399,10 @@ private:
     // let's return it to the graph.
     CS.CG.setOrphanedConstraint(OrphanedConstraint);
   }
+
+  /// Finalize current component by either cleanup if sub-tasks
+  /// have failed, or solution generation and minimization.
+  StepResult finalize(bool isSuccess);
 };
 
 template <typename P> class BindingStep : public SolverStep {

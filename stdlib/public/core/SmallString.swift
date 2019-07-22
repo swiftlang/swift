@@ -23,7 +23,7 @@
 //  ↑                             ↑
 //  first (leftmost) code unit    discriminator (incl. count)
 //
-@_fixed_layout @usableFromInline
+@frozen @usableFromInline
 internal struct _SmallString {
   @usableFromInline
   internal typealias RawBitPattern = (UInt64, UInt64)
@@ -268,15 +268,12 @@ extension _SmallString {
   @inlinable @inline(__always)
   internal init(
     initializingUTF8With initializer: (
-      _ buffer: UnsafeMutableBufferPointer<UInt8>,
-      _ initializedCount: inout Int
-    ) throws -> Void
+      _ buffer: UnsafeMutableBufferPointer<UInt8>
+    ) throws -> Int
   ) rethrows {
     self.init()
     try self.withMutableCapacity {
-      var count = 0
-      try initializer($0, &count)
-      return count
+      return try initializer($0)
     }
     self._invariantCheck()
   }

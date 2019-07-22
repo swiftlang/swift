@@ -364,10 +364,11 @@ SIMPLE_DECL_ATTR(_weakLinked, WeakLinked,
   OnNominalType | OnAssociatedType | OnFunc | OnAccessor | OnVar |
   OnSubscript | OnConstructor | OnEnumElement | OnExtension | UserInaccessible,
   75)
-SIMPLE_DECL_ATTR(_frozen, Frozen,
-  OnEnum |
+SIMPLE_DECL_ATTR(frozen, Frozen,
+  OnEnum | OnStruct |
   UserInaccessible,
   76)
+DECL_ATTR_ALIAS(_frozen, Frozen)
 SIMPLE_DECL_ATTR(_forbidSerializingReference, ForbidSerializingReference,
   OnAnyDecl |
   LongAttribute | RejectByParser | UserInaccessible | NotSerialized,
@@ -393,12 +394,29 @@ DECL_ATTR(_private, PrivateImport,
 SIMPLE_DECL_ATTR(_alwaysEmitIntoClient, AlwaysEmitIntoClient,
   OnVar | OnSubscript | OnAbstractFunction | UserInaccessible,
   83)
+
 SIMPLE_DECL_ATTR(_implementationOnly, ImplementationOnly,
-  OnImport | UserInaccessible,
+  OnImport | OnFunc | OnConstructor | OnVar | OnSubscript | UserInaccessible,
   84)
 DECL_ATTR(_custom, Custom,
   OnAnyDecl | UserInaccessible,
   85)
+SIMPLE_DECL_ATTR(propertyWrapper, PropertyWrapper,
+  OnStruct | OnClass | OnEnum,
+  86)
+SIMPLE_DECL_ATTR(_disfavoredOverload, DisfavoredOverload,
+  OnAbstractFunction | OnVar | OnSubscript | UserInaccessible,
+  87)
+SIMPLE_DECL_ATTR(_functionBuilder, FunctionBuilder,
+  OnNominalType,
+  88)
+DECL_ATTR(_projectedValueProperty, ProjectedValueProperty,
+  OnVar | UserInaccessible,
+  89)
+
+SIMPLE_DECL_ATTR(IBSegueAction, IBSegueAction,
+  OnFunc,
+  95)
 
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS

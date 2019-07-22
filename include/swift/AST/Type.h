@@ -38,7 +38,6 @@ class ClassDecl;
 class CanType;
 class EnumDecl;
 class GenericSignature;
-class LazyResolver;
 class ModuleDecl;
 class NominalTypeDecl;
 class GenericTypeDecl;
@@ -316,10 +315,6 @@ public:
   /// Replace references to substitutable types with error types.
   Type substDependentTypesWithErrorTypes() const;
   
-  /// Replace opaque types with their underlying types when visible at the given
-  /// resilience expansion.
-  Type substOpaqueTypesWithUnderlyingTypes() const;
-
   bool isPrivateStdlibType(bool treatNonBuiltinProtocolsAsPublic = true) const;
 
   void dump() const;
@@ -616,7 +611,6 @@ inline T *staticCastHelper(const Type &Ty) {
 template <typename T>
 using TypeArrayView = ArrayRefView<Type, T*, staticCastHelper,
                                    /*AllowOrigAccess*/true>;
-
 } // end namespace swift
 
 namespace llvm {

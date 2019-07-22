@@ -4,13 +4,18 @@
 # generated.
 
 # RUN: %empty-directory(%t)
-# RUN: ${python} %s %target-os %target-cpu %platform-sdk-overlay-dir %t \
+# RUN: %{python} %s %target-os %target-cpu %platform-sdk-overlay-dir %t \
 # RUN:   %target-swift-frontend -build-module-from-parseable-interface \
-# RUN:     -Fsystem %sdk/System/Library/PrivateFrameworks/ >> %t/failures.txt
+# RUN:     -Fsystem %sdk/System/Library/PrivateFrameworks/ \
+# RUN:     | sort > %t/failures.txt
+# RUN: grep '# %target-os:' %s > %t/filter.txt || true
 # RUN: test ! -e %t/failures.txt || \
-# RUN:   diff <(grep '# %target-os:' %s) <(sort -f %t/failures.txt)
+# RUN:   diff %t/filter.txt %t/failures.txt
 
 # REQUIRES: nonexecutable_test
+
+# rdar://problem/50648519
+# XFAIL: asan
 
 # Expected failures by platform
 # -----------------------------

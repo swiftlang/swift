@@ -1,4 +1,8 @@
-// RUN: %target-run-simple-swift | %FileCheck %s
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift %s -o %t/a.out
+// RUN: %target-codesign %t/a.out
+// RUN: %target-run %t/a.out | grep 'check-prefix' > %t/prefix-option
+// RUN: %target-run %t/a.out | %FileCheck -check-prefix=CHECK `cat %t/prefix-option` %s
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
@@ -117,6 +121,16 @@ print("target removed")
 // Test NSKeyValueObservingCustomization issue with observing from the callbacks
 //===----------------------------------------------------------------------===//
 
+// The following tests are only expected to pass when running with the
+// Swift 5.1 and later libraries.
+if #available(iOS 13, macOS 10.15, tvOS 13, watchOS 6, *) {
+  print("-check-prefix=CHECK-51")
+} else {
+  print("-check-prefix=DONT-CHECK")
+  // Need at least one check, otherwise FileCheck will complain.
+  // DONT-CHECK: {{.}}
+}
+
 class Target2 : NSObject, NSKeyValueObservingCustomization {
     @objc dynamic var name: String?
 
@@ -151,10 +165,10 @@ withExtendedLifetime(Target2()) { (target) in
 }
 print("observer removed")
 
-// CHECK-LABEL: registering observer for Target2
-// CHECK-DAG: keyPathsAffectingValue: key == \.name: true
-// CHECK-DAG: automaticallyNotifiesObservers: key == \.name: true
-// CHECK-NEXT: observer removed
+// CHECK-51-LABEL: registering observer for Target2
+// CHECK-51-DAG: keyPathsAffectingValue: key == \.name: true
+// CHECK-51-DAG: automaticallyNotifiesObservers: key == \.name: true
+// CHECK-51-NEXT: observer removed
 
 //===----------------------------------------------------------------------===//
 // Test NSSortDescriptor keyPath support
@@ -175,5 +189,5 @@ let descriptor = NSSortDescriptor(keyPath: \Sortable1.name, ascending: true)
 _ = NSSortDescriptor(keyPath: \Sortable2.name, ascending: true)
 print("keyPath == \\Sortable1.name:", descriptor.keyPath == \Sortable1.name)
 
-// CHECK-LABEL: creating NSSortDescriptor
-// CHECK-NEXT: keyPath == \Sortable1.name: true
+// CHECK-51-LABEL: creating NSSortDescriptor
+// CHECK-51-NEXT: keyPath == \Sortable1.name: true

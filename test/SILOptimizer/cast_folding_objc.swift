@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend -O -Xllvm -sil-disable-pass=FunctionSignatureOpts -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -O -Xllvm -sil-disable-pass=FunctionSignatureOpts -Xllvm -sil-disable-pass=PerfInliner -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -O -Xllvm -sil-disable-pass=FunctionSignatureOpts -Xllvm -sil-disable-pass=PerfInliner -enable-ownership-stripping-after-serialization -emit-sil %s | %FileCheck %s
+
 // We want to check two things here:
 // - Correctness
 // - That certain "is" checks are eliminated based on static analysis at compile-time
@@ -351,4 +353,9 @@ public func testConditionalBridgedCastFromSwiftToNSObjectDerivedClass(_ s: Strin
 @inline(never)
 public func testForcedBridgedCastFromSwiftToNSObjectDerivedClass(_ s: String) -> MyString {
     return s as! MyString
+}
+
+// rdar://problem/51078136
+func foo(x: CFMutableDictionary) -> [AnyHashable:AnyObject]? {
+  return x as? [AnyHashable:AnyObject]
 }

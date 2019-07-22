@@ -74,6 +74,8 @@ public:
     return SC.getCloned();
   }
 
+  void fixUp(SILFunction *calleeFunction);
+
 protected:
   void visitTerminator(SILBasicBlock *BB);
 

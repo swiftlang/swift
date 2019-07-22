@@ -16,11 +16,11 @@
 
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/ASTScope.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/DebuggerClient.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookupRequests.h"
@@ -63,14 +63,25 @@ ValueDecl *LookupResultEntry::getBaseDecl() const {
 
 void DebuggerClient::anchor() {}
 
-void AccessFilteringDeclConsumer::foundDecl(ValueDecl *D,
-                                            DeclVisibilityKind reason) {
+void AccessFilteringDeclConsumer::foundDecl(
+    ValueDecl *D, DeclVisibilityKind reason,
+    DynamicLookupInfo dynamicLookupInfo) {
   if (D->isInvalid())
     return;
   if (!D->isAccessibleFrom(DC))
     return;
 
-  ChainedConsumer.foundDecl(D, reason);
+  ChainedConsumer.foundDecl(D, reason, dynamicLookupInfo);
+}
+
+void LookupResultEntry::print(llvm::raw_ostream& out) const {
+  getValueDecl()->print(out);
+  if (auto dc = getBaseDecl()) {
+    out << "\nbase: ";
+    dc->print(out);
+    out << "\n";
+  } else
+    out << "\n(no-base)\n";
 }
 
 
@@ -1257,21 +1268,19 @@ void ClassDecl::recordObjCMethod(AbstractFunctionDecl *method,
   bool isInstanceMethod = method->isObjCInstanceMethod();
   auto &vec = (*ObjCMethodLookup)[{selector, isInstanceMethod}].Methods;
 
-  // In a non-empty vector, we could have duplicates or conflicts.
-  if (!vec.empty()) {
-    // Check whether we have a duplicate. This only checks more than one
-    // element in ill-formed code, so the linear search is acceptable.
-    if (std::find(vec.begin(), vec.end(), method) != vec.end())
-      return;
+  // Check whether we have a duplicate. This only checks more than one
+  // element in ill-formed code, so the linear search is acceptable.
+  if (std::find(vec.begin(), vec.end(), method) != vec.end())
+    return;
 
+  if (auto *sf = method->getParentSourceFile()) {
     if (vec.size() == 1) {
       // We have a conflict.
-      getASTContext().recordObjCMethodConflict(this, selector,
-                                               isInstanceMethod);
+      sf->ObjCMethodConflicts.push_back(std::make_tuple(this, selector,
+                                                        isInstanceMethod));
+    } if (vec.empty()) {
+      sf->ObjCMethodList.push_back(method);
     }
-  } else {
-    // Record the first method that has this selector.
-    getASTContext().recordObjCMethod(method);
   }
 
   vec.push_back(method);
@@ -1522,7 +1531,7 @@ bool DeclContext::lookupQualified(ArrayRef<NominalTypeDecl *> typeDecls,
       // object initializers.
       bool visitSuperclass = true;
       if (member.getBaseName() == DeclBaseName::createConstructor()) {
-        if (classDecl->inheritsSuperclassInitializers(typeResolver))
+        if (classDecl->inheritsSuperclassInitializers())
           onlyCompleteObjectInits = true;
         else
           visitSuperclass = false;
@@ -1725,12 +1734,17 @@ resolveTypeDeclsToNominal(Evaluator &evaluator,
                           SmallVectorImpl<ModuleDecl *> &modulesFound,
                           bool &anyObject,
                           llvm::SmallPtrSetImpl<TypeAliasDecl *> &typealiases) {
+  SmallPtrSet<NominalTypeDecl *, 4> knownNominalDecls;
   TinyPtrVector<NominalTypeDecl *> nominalDecls;
+  auto addNominalDecl = [&](NominalTypeDecl *nominal) {
+    if (knownNominalDecls.insert(nominal).second)
+      nominalDecls.push_back(nominal);
+  };
 
   for (auto typeDecl : typeDecls) {
     // Nominal type declarations get copied directly.
     if (auto nominalDecl = dyn_cast<NominalTypeDecl>(typeDecl)) {
-      nominalDecls.push_back(nominalDecl);
+      addNominalDecl(nominalDecl);
       continue;
     }
 
@@ -1747,9 +1761,9 @@ resolveTypeDeclsToNominal(Evaluator &evaluator,
       auto underlyingNominalReferences
         = resolveTypeDeclsToNominal(evaluator, ctx, underlyingTypeReferences,
                                     modulesFound, anyObject, typealiases);
-      nominalDecls.insert(nominalDecls.end(),
-                          underlyingNominalReferences.begin(),
-                          underlyingNominalReferences.end());
+      std::for_each(underlyingNominalReferences.begin(),
+                    underlyingNominalReferences.end(),
+                    addNominalDecl);
 
       // Recognize Swift.AnyObject directly.
       if (typealias->getName().is("AnyObject")) {
@@ -2052,6 +2066,25 @@ SuperclassDeclRequest::evaluate(Evaluator &evaluator,
                                 NominalTypeDecl *subject) const {
   auto &Ctx = subject->getASTContext();
 
+  // Protocols may get their superclass bound from a `where Self : Superclass`
+  // clause.
+  if (auto *proto = dyn_cast<ProtocolDecl>(subject)) {
+    // If the protocol came from a serialized module, compute the superclass via
+    // its generic signature.
+    if (proto->wasDeserialized()) {
+      auto superTy = proto->getGenericSignature()
+          ->getSuperclassBound(proto->getSelfInterfaceType());
+      if (superTy)
+        return superTy->getClassOrBoundGenericClass();
+    }
+
+    // Otherwise check the where clause.
+    auto selfBounds = getSelfBoundsFromWhereClause(proto);
+    for (auto inheritedNominal : selfBounds.decls)
+      if (auto classDecl = dyn_cast<ClassDecl>(inheritedNominal))
+        return classDecl;
+  }
+
   for (unsigned i : indices(subject->getInherited())) {
     // Find the inherited declarations referenced at this position.
     auto inheritedTypes = evaluateOrDefault(evaluator,
@@ -2071,15 +2104,6 @@ SuperclassDeclRequest::evaluate(Evaluator &evaluator,
     }
   }
 
-  // Protocols also support '... where Self : Superclass'.
-  auto *proto = dyn_cast<ProtocolDecl>(subject);
-  if (proto == nullptr)
-    return nullptr;
-
-  auto selfBounds = getSelfBoundsFromWhereClause(proto);
-  for (auto inheritedNominal : selfBounds.decls)
-    if (auto classDecl = dyn_cast<ClassDecl>(inheritedNominal))
-      return classDecl;
 
   return nullptr;
 }

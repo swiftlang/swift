@@ -1428,6 +1428,7 @@ class CustomAttr final : public DeclAttribute,
   TypeLoc type;
   Expr *arg;
   PatternBindingInitializer *initContext;
+  Expr *semanticInit = nullptr;
 
   unsigned hasArgLabelLocs : 1;
   unsigned numArgLabels : 16;
@@ -1463,10 +1464,38 @@ public:
   Expr *getArg() const { return arg; }
   void setArg(Expr *newArg) { arg = newArg; }
 
+  Expr *getSemanticInit() const { return semanticInit; }
+  void setSemanticInit(Expr *expr) { semanticInit = expr; }
+
   PatternBindingInitializer *getInitContext() const { return initContext; }
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Custom;
+  }
+};
+
+/// Relates a property to its projection value property, as described by a property wrapper. For
+/// example, given
+/// \code
+/// @A var foo: Int
+/// \endcode
+///
+/// Where \c A is a property wrapper that has a \c projectedValue property, the compiler
+/// synthesizes a declaration $foo an attaches the attribute
+/// \c _projectedValuePropertyAttr($foo) to \c foo to record the link.
+class ProjectedValuePropertyAttr : public DeclAttribute {
+public:
+  ProjectedValuePropertyAttr(Identifier PropertyName,
+                              SourceLoc AtLoc, SourceRange Range,
+                              bool Implicit)
+    : DeclAttribute(DAK_ProjectedValueProperty, AtLoc, Range, Implicit),
+      ProjectionPropertyName(PropertyName) {}
+
+  // The projection property name.
+  const Identifier ProjectionPropertyName;
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_ProjectedValueProperty;
   }
 };
 
@@ -1524,6 +1553,9 @@ public:
   void dump(const Decl *D = nullptr) const;
   void print(ASTPrinter &Printer, const PrintOptions &Options,
              const Decl *D = nullptr) const;
+  static void print(ASTPrinter &Printer, const PrintOptions &Options,
+                    ArrayRef<const DeclAttribute *> FlattenedAttrs,
+                    const Decl *D = nullptr);
 
   template <typename T, typename DERIVED>
   class iterator_base : public std::iterator<std::forward_iterator_tag, T *> {
@@ -1647,6 +1679,10 @@ public:
 };
 
 void simple_display(llvm::raw_ostream &out, const DeclAttribute *attr);
+
+inline SourceLoc extractNearestSourceLoc(const DeclAttribute *attr) {
+  return attr->getLocation();
+}
 
 } // end namespace swift
 

@@ -462,4 +462,33 @@ ResilientEnumTestSuite.test("ResilientPrivateEnumMember") {
   _ = Container()
 }
 
+struct Nested {
+  var str: String
+  var r: ResilientInt
+}
+
+enum SingleCase {
+  case only(nested: Nested)
+}
+
+struct Status {
+  let fst: SingleCase
+  let snd: Bool
+}
+
+func getOptional<T>(_ t: T) -> T? {
+  return t
+}
+
+func test<T>(_ t: T) {
+  let o = getOptional(t)
+  if let c = o {
+    print("success")
+  }
+}
+
+ResilientEnumTestSuite.test("ResilientEnumSingleCase") {
+  // This used to crash.
+  test(Status(fst: .only(nested: Nested(str: "foobar", r: ResilientInt(i: 1))), snd: false))
+}
 runAllTests()

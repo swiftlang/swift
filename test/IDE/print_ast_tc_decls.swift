@@ -538,6 +538,9 @@ class d0170_TestAvailability {
   @IBAction func anAction(_: AnyObject) {}
 // PASS_COMMON-NEXT: {{^}}  @objc @IBAction func anAction(_: AnyObject){{$}}
 
+  @IBSegueAction func aSegueAction(_ coder: AnyObject, sender: AnyObject, identifier: AnyObject?) -> Any? { fatalError() }
+// PASS_COMMON-NEXT: {{^}}  @objc @IBSegueAction func aSegueAction(_ coder: AnyObject, sender: AnyObject, identifier: AnyObject?) -> Any?{{$}}
+
   @IBDesignable
   class ADesignableClass {}
 // PASS_COMMON-NEXT: {{^}}  @IBDesignable class ADesignableClass {{{$}}
@@ -622,7 +625,7 @@ struct d0200_EscapedIdentifiers {
 // PASS_COMMON-NEXT: {{^}}  @_hasInitialValue var `var`: {{(d0200_EscapedIdentifiers.)?}}`struct`{{$}}
 
   var tupleType: (`var`: Int, `let`: `struct`)
-// PASS_COMMON-NEXT: {{^}}  var tupleType: (`var`: Int, `let`: {{(d0200_EscapedIdentifiers.)?}}`struct`){{$}}
+// PASS_COMMON-NEXT: {{^}}  var tupleType: (var: Int, let: {{(d0200_EscapedIdentifiers.)?}}`struct`){{$}}
 
   var accessors1: Int {
     get { return 0 }
@@ -633,7 +636,7 @@ struct d0200_EscapedIdentifiers {
   static func `static`(protocol: Int) {}
 // PASS_COMMON-NEXT: {{^}}  static func `static`(protocol: Int){{$}}
 
-// PASS_COMMON-NEXT: {{^}}  init(`var`: {{(d0200_EscapedIdentifiers.)?}}`struct` = {{(d0200_EscapedIdentifiers.)?}}`struct`(), tupleType: (`var`: Int, `let`: {{(d0200_EscapedIdentifiers.)?}}`struct`)){{$}}
+// PASS_COMMON-NEXT: {{^}}  init(var: {{(d0200_EscapedIdentifiers.)?}}`struct` = {{(d0200_EscapedIdentifiers.)?}}`struct`(), tupleType: (var: Int, let: {{(d0200_EscapedIdentifiers.)?}}`struct`)){{$}}
 // PASS_COMMON-NEXT: {{^}}}{{$}}
 }
 

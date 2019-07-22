@@ -79,7 +79,7 @@
 ///   collection type, don't use `Slice` as its subsequence type. Instead,
 ///   define your own subsequence type that takes your index invalidation
 ///   requirements into account.
-@_fixed_layout // generic-performance
+@frozen // generic-performance
 public struct Slice<Base: Collection> {
   public var _startIndex: Base.Index
   public var _endIndex: Base.Index
@@ -289,7 +289,7 @@ extension Slice: RangeReplaceableCollection
   @inlinable // generic-performance
   public mutating func replaceSubrange<C>(
     _ subRange: Range<Index>, with newElements: C
-  ) where C : Collection, C.Element == Base.Element {
+  ) where C: Collection, C.Element == Base.Element {
 
     // FIXME: swift-3-indexing-model: range check.
     let sliceOffset =
@@ -354,7 +354,7 @@ extension Slice
   @inlinable // generic-performance
   public mutating func replaceSubrange<C>(
     _ subRange: Range<Index>, with newElements: C
-  ) where C : Collection, C.Element == Base.Element {
+  ) where C: Collection, C.Element == Base.Element {
     // FIXME: swift-3-indexing-model: range check.
     if subRange.lowerBound == _base.startIndex {
       let newSliceCount =
@@ -400,7 +400,7 @@ extension Slice
 
   @inlinable // generic-performance
   public mutating func insert<S>(contentsOf newElements: S, at i: Index)
-  where S : Collection, S.Element == Base.Element {
+  where S: Collection, S.Element == Base.Element {
     // FIXME: swift-3-indexing-model: range check.
     if i == _base.startIndex {
       let newSliceCount = count + numericCast(newElements.count)

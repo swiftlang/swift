@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift | %FileCheck %s
+// RUN: %target-run-simple-swift(-Onone) | %FileCheck %s
 // RUN: %target-run-simple-swift(-O) | %FileCheck -check-prefix=CHECK-OPT %s
 
 // NOTE: We use FileCheck for the crashing test cases to make sure we crash for

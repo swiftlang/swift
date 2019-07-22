@@ -110,6 +110,8 @@ PASS(ComputeLoopInfo, "compute-loop-info",
      "Compute Loop Information for Testing")
 PASS(ConditionForwarding, "condition-forwarding",
      "Conditional Branch Forwarding to Fold SIL switch_enum")
+PASS(ConstantEvaluatorTester, "test-constant-evaluator",
+      "Test constant evaluator")
 PASS(CopyForwarding, "copy-forwarding",
      "Copy Forwarding to Remove Redundant Copies")
 PASS(CopyPropagation, "copy-propagation",
@@ -224,6 +226,8 @@ PASS(NoReturnFolding, "noreturn-folding",
      "Prune Control Flow at No-Return Calls Using SIL unreachable")
 PASS(ObjectOutliner, "object-outliner",
      "Outlining of Global Objects")
+PASS(OpaqueArchetypeSpecializer, "opaque-archetype-specializer",
+     "Opaque archetype specializer")
 PASS(Outliner, "outliner",
      "Function Outlining Optimization")
 PASS(OwnershipModelEliminator, "ownership-model-eliminator",
@@ -263,6 +267,8 @@ PASS(SideEffectsDumper, "side-effects-dump",
      "Print Side-Effect Information for all Functions")
 PASS(IRGenPrepare, "irgen-prepare",
      "Cleanup SIL in preparation for IRGen")
+PASS(SILGenCleanup, "silgen-cleanup",
+     "Cleanup SIL in preparation for diagnostics")
 PASS(SILCombine, "sil-combine",
      "Combine SIL Instructions via Peephole Optimization")
 PASS(SILDebugInfoGenerator, "sil-debuginfo-gen",
@@ -303,6 +309,7 @@ PASS(SerializeSILPass, "serialize-sil",
      "Utility pass. Serializes the current SILModule")
 PASS(YieldOnceCheck, "yield-once-check",
     "Check correct usage of yields in yield-once coroutines")
+PASS(OSLogOptimization, "os-log-optimization", "Optimize os log calls")
 PASS(BugReducerTester, "bug-reducer-tester",
      "sil-bug-reducer Tool Testing by Asserting on a Sentinel Function")
 PASS_RANGE(AllPasses, AADumper, BugReducerTester)

@@ -43,6 +43,7 @@ set(SWIFT_BENCH_MODULES
     single-source/BinaryFloatingPointProperties
     single-source/BitCount
     single-source/Breadcrumbs
+    single-source/BucketSort
     single-source/ByteSwap
     single-source/COWTree
     single-source/COWArrayGuaranteedParameterOverhead
@@ -77,6 +78,8 @@ set(SWIFT_BENCH_MODULES
     single-source/DictionaryRemove
     single-source/DictionarySubscriptDefault
     single-source/DictionarySwap
+    single-source/Diffing
+    single-source/DiffingMyers
     single-source/DropFirst
     single-source/DropLast
     single-source/DropWhile
@@ -85,11 +88,13 @@ set(SWIFT_BENCH_MODULES
     single-source/ExistentialPerformance
     single-source/Fibonacci
     single-source/FlattenList
+    single-source/FloatingPointParsing
     single-source/FloatingPointPrinting
     single-source/Hanoi
     single-source/Hash
     single-source/Histogram
     single-source/InsertCharacter  
+    single-source/IntegerParsing
     single-source/Integrate
     single-source/IterateData
     single-source/Join
@@ -105,6 +110,7 @@ set(SWIFT_BENCH_MODULES
     single-source/NSError
     single-source/NSStringConversion
     single-source/NibbleSort
+    single-source/NIOChannelPipeline
     single-source/NopDeinit
     single-source/ObjectAllocation
     single-source/ObjectiveCBridging

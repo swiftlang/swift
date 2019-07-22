@@ -52,6 +52,7 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
     case ApplyArgument:
     case ApplyFunction:
     case FunctionArgument:
+    case DefaultArgument:
     case FunctionResult:
     case OptionalPayload:
     case Member:
@@ -63,9 +64,9 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
     case RValueAdjustment:
     case ClosureResult:
     case ParentType:
+    case ExistentialSuperclassType:
     case InstanceType:
-    case SequenceIteratorProtocol:
-    case GeneratorElementType:
+    case SequenceElementType:
     case AutoclosureResult:
     case GenericArgument:
     case NamedTupleElement:
@@ -79,6 +80,7 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
     case DynamicLookupResult:
     case ContextualType:
     case SynthesizedArgument:
+    case KeyPathType:
     case KeyPathRoot:
     case KeyPathValue:
     case KeyPathComponentResult:
@@ -102,6 +104,15 @@ bool ConstraintLocator::isSubscriptMemberRef() const {
     return false;
 
   return path.back().getKind() == ConstraintLocator::SubscriptMember;
+}
+
+bool ConstraintLocator::isKeyPathType() const {
+  auto *anchor = getAnchor();
+  auto path = getPath();
+  // The format of locator should be `<keypath expr> -> key path type`
+  if (!anchor || !isa<KeyPathExpr>(anchor) || path.size() != 1)
+    return false;
+  return path.back().getKind() == ConstraintLocator::KeyPathType;
 }
 
 bool ConstraintLocator::isKeyPathRoot() const {
@@ -148,10 +159,39 @@ bool ConstraintLocator::isKeyPathSubscriptComponent() const {
   });
 }
 
+bool ConstraintLocator::isForKeyPathDynamicMemberLookup() const {
+  auto path = getPath();
+  return !path.empty() && path.back().isKeyPathDynamicMember();
+}
+
 bool ConstraintLocator::isForKeyPathComponent() const {
   return llvm::any_of(getPath(), [&](const LocatorPathElt &elt) {
     return elt.isKeyPathComponent();
   });
+}
+
+static bool isLastElement(const ConstraintLocator *locator,
+                          ConstraintLocator::PathElementKind expectedKind) {
+  auto path = locator->getPath();
+  return !path.empty() && path.back().getKind() == expectedKind;
+}
+
+bool ConstraintLocator::isForGenericParameter() const {
+  return isLastElement(this, ConstraintLocator::GenericParameter);
+}
+
+bool ConstraintLocator::isForSequenceElementType() const {
+  return isLastElement(this, ConstraintLocator::SequenceElementType);
+}
+
+bool ConstraintLocator::isForContextualType() const {
+  return isLastElement(this, ConstraintLocator::ContextualType);
+}
+
+GenericTypeParamType *ConstraintLocator::getGenericParameter() const {
+  assert(isForGenericParameter());
+  auto path = getPath();
+  return path.back().getGenericParameter();
 }
 
 void ConstraintLocator::dump(SourceManager *sm) {
@@ -231,12 +271,16 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
       out << "function argument";
       break;
 
+    case DefaultArgument:
+      out << "default argument";
+      break;
+
     case FunctionResult:
       out << "function result";
       break;
 
-    case GeneratorElementType:
-      out << "generator element type";
+    case SequenceElementType:
+      out << "sequence element type";
       break;
 
     case GenericArgument:
@@ -271,16 +315,16 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
       out << "parent type";
       break;
 
+    case ExistentialSuperclassType:
+      out << "existential superclass type";
+      break;
+
     case LValueConversion:
       out << "@lvalue-to-inout conversion";
       break;
 
     case RValueAdjustment:
       out << "rvalue adjustment";
-      break;
-
-    case SequenceIteratorProtocol:
-      out << "sequence iterator type";
       break;
 
     case SubscriptMember:
@@ -329,7 +373,10 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
       break;
 
     case ContextualType:
-      out << "contextual type";
+      if (elt.isResultOfSingleExprFunction())
+        out << "expected result type of the function with a single expression";
+      else
+        out << "contextual type";
       break;
 
     case SynthesizedArgument:
@@ -338,6 +385,10 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
 
     case KeyPathDynamicMember:
       out << "key path dynamic member lookup";
+      break;
+
+    case KeyPathType:
+      out << "key path type";
       break;
 
     case KeyPathRoot:
@@ -353,6 +404,5 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
       break;
     }
   }
-
   out << ']';
 }

@@ -1617,6 +1617,13 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                                             encoding.getValue());
     break;
   }
+  case SILInstructionKind::CondFailInst: {
+    SILValue Op = getLocalValue(ValID, getSILType(MF->getType(TyID),                        \
+                               (SILValueCategory)TyCategory));
+    StringRef StringVal = MF->getIdentifierText(ValID2);
+    ResultVal = Builder.createCondFail(Loc, Op, StringVal);
+    break;
+  }
   case SILInstructionKind::MarkFunctionEscapeInst: {
     // Format: a list of typed values. A typed value is expressed by 4 IDs:
     // TypeID, TypeCategory, ValueID, ValueResultNumber.
@@ -1664,7 +1671,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   REFCOUNTING_INSTRUCTION(StrongRetain##Name) \
   UNARY_INSTRUCTION(Copy##Name##Value)
 #include "swift/AST/ReferenceStorage.def"
-  UNARY_INSTRUCTION(CondFail)
   REFCOUNTING_INSTRUCTION(RetainValue)
   REFCOUNTING_INSTRUCTION(RetainValueAddr)
   REFCOUNTING_INSTRUCTION(UnmanagedRetainValue)
@@ -1852,6 +1858,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                     qualifier);
     break;
   }
+  case SILInstructionKind::AssignByWrapperInst:
+    llvm_unreachable("not supported");
   case SILInstructionKind::BindMemoryInst: {
     assert(RecordKind == SIL_ONE_TYPE_VALUES &&
            "Layout should be OneTypeValues.");
@@ -2731,17 +2739,8 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
            "Content of Vtable should be in SIL_VTABLE_ENTRY.");
     ArrayRef<uint64_t> ListOfValues;
     DeclID NameID;
-    unsigned RawLinkage;
     unsigned RawEntryKind;
-    VTableEntryLayout::readRecord(scratch, NameID, RawEntryKind, RawLinkage, ListOfValues);
-
-    auto Linkage = fromStableSILLinkage(RawLinkage);
-    if (!Linkage) {
-      LLVM_DEBUG(llvm::dbgs() << "invalid linkage code " << RawLinkage
-                              << " for VTable Entry\n");
-      MF->error();
-      return nullptr;
-    }
+    VTableEntryLayout::readRecord(scratch, NameID, RawEntryKind, ListOfValues);
 
     auto EntryKind = fromStableVTableEntryKind(RawEntryKind);
 
@@ -2749,7 +2748,7 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
     if (Func) {
       unsigned NextValueIndex = 0;
       vtableEntries.emplace_back(getSILDeclRef(MF, ListOfValues, NextValueIndex),
-                                 Func, EntryKind.getValue(), Linkage.getValue());
+                                 Func, EntryKind.getValue());
     }
 
     // Fetch the next record.
@@ -2777,10 +2776,10 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
   return vT;
 }
 
-SILVTable *SILDeserializer::lookupVTable(Identifier Name) {
+SILVTable *SILDeserializer::lookupVTable(StringRef MangledClassName) {
   if (!VTableList)
     return nullptr;
-  auto iter = VTableList->find(Name.str());
+  auto iter = VTableList->find(MangledClassName);
   if (iter == VTableList->end())
     return nullptr;
 

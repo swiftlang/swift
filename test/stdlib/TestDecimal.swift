@@ -303,6 +303,7 @@ class TestDecimal : TestDecimalSuper {
         expectEqual(Decimal(68040), Decimal(386).advanced(by: Decimal(67654)))
         expectEqual(Decimal(1.234), abs(Decimal(1.234)))
         expectEqual(Decimal(1.234), abs(Decimal(-1.234)))
+        expectTrue(Decimal.nan.magnitude.isNaN)
         var a = Decimal(1234)
         var r = a
         expectEqual(.noError, NSDecimalMultiplyByPowerOf10(&r, &a, 1, .plain))
@@ -334,6 +335,7 @@ class TestDecimal : TestDecimalSuper {
                 expectEqual(.noError, NSDecimalPower(&result, &actual, j, .plain))
                 let expected = Decimal(pow(Double(i), Double(j)))
                 expectEqual(expected, result, "\(result) == \(i)^\(j)")
+                expectEqual(expected, pow(actual, j))
             }
         }
     }

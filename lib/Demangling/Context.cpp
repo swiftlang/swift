@@ -68,8 +68,24 @@ std::string Context::demangleTypeAsString(llvm::StringRef MangledName,
   return demangling;
 }
 
+// Removes a '.<n>' suffix from \p Name. <n> is either a number or a combination of
+// '.<other-text>.<n>'.
+// Such symbols are produced in IRGen or in LLVM optimizations.
+static llvm::StringRef stripSuffix(llvm::StringRef Name) {
+  // A suffix always ends with a digit. Do this quick check to avoid scanning through the whole
+  // symbol name if the symbol has no suffix (= the common case).
+  if (isdigit(Name.back())) {
+    size_t dotPos = Name.find('.');
+    if (dotPos != StringRef::npos) {
+      Name = Name.substr(0, dotPos);
+    }
+  }
+  return Name;
+}
+
 bool Context::isThunkSymbol(llvm::StringRef MangledName) {
   if (isMangledName(MangledName)) {
+    MangledName = stripSuffix(MangledName);
     // First do a quick check
     if (MangledName.endswith("TA") ||  // partial application forwarder
         MangledName.endswith("Ta") ||  // ObjC partial application forwarder
@@ -121,6 +137,10 @@ std::string Context::getThunkTarget(llvm::StringRef MangledName) {
     return std::string();
 
   if (isMangledName(MangledName)) {
+    // If the symbol has a suffix we cannot derive the target.
+    if (stripSuffix(MangledName) != MangledName)
+      return std::string();
+
     // The targets of those thunks not derivable from the mangling.
     if (MangledName.endswith("TR") ||
         MangledName.endswith("Tr") ||

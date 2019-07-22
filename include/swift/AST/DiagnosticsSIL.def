@@ -113,8 +113,22 @@ ERROR(unsupported_c_function_pointer_conversion,none,
       "C function pointer signature %0 is not compatible with expected type %1",
       (Type, Type))
 
+ERROR(c_function_pointer_from_function_with_context,none,
+      "a C function pointer cannot be formed from a "
+      "%select{local function|closure}0 that captures "
+      "%select{context|generic parameters|dynamic Self type|<<error>}1",
+      (bool, unsigned))
+
 ERROR(objc_selector_malformed,none,"the type ObjectiveC.Selector is malformed",
       ())
+
+// Capture before declaration diagnostics.
+ERROR(capture_before_declaration,none,
+      "closure captures %0 before it is declared", (Identifier))
+ERROR(capture_before_declaration_defer,none,
+      "'defer' block captures %0 before it is declared", (Identifier))
+NOTE(captured_value_declared_here,none,
+     "captured value declared here", ())
 
 // Invalid escaping capture diagnostics.
 ERROR(escaping_inout_capture,none,
@@ -248,6 +262,10 @@ NOTE(designated_init_c_struct_fix,none,
 ERROR(missing_return,none,
       "missing return in a %select{function|closure}1 expected to return %0",
       (Type, unsigned))
+ERROR(missing_return_last_expr,none,
+      "missing return in a %select{function|closure}1 expected to return %0; "
+      "did you mean to return the last expression?",
+      (Type, unsigned))
 ERROR(missing_never_call,none,
       "%select{function|closure}1 with uninhabited return type %0 is missing "
       "call to another never-returning function on all paths",
@@ -339,16 +357,64 @@ ERROR(pound_assert_condition_not_constant,none,
 ERROR(pound_assert_failure,none,
        "%0", (StringRef))
 
-NOTE(constexpr_unknown_reason_default,none, "could not fold operation", ())
+NOTE(constexpr_unknown_reason_default,none,
+    "cannot evaluate expression as constant here", ())
+NOTE(constexpr_unevaluable_operation,none,
+    "cannot constant evaluate operation", ())
+
 NOTE(constexpr_too_many_instructions,none,
-     "exceeded instruction limit: %0 when evaluating the expression at compile "
-     "time", (unsigned))
-NOTE(constexpr_loop,none, "control flow loop found", ())
+     "exceeded instruction limit: %0 when evaluating the expression "
+     "at compile time", (unsigned))
+NOTE(constexpr_limit_exceeding_instruction,none, "limit exceeded here", ())
+
+NOTE(constexpr_loop_found_note,none,
+    "control-flow loop found during evaluation ", ())
+NOTE(constexpr_loop_instruction,none, "found loop here", ())
+
 NOTE(constexpr_overflow,none, "integer overflow detected", ())
+NOTE(constexpr_overflow_operation,none, "operation overflows", ())
+
 NOTE(constexpr_trap,none, "trap detected", ())
-NOTE(constexpr_called_from,none, "when called from here", ())
-NOTE(constexpr_not_evaluable,none,
-     "expression not evaluable as constant here", ())
+NOTE(constexpr_trap_operation,none, "operation traps", ())
+
+NOTE(constexpr_invalid_operand_seen, none,
+    "operation with invalid operands encountered during evaluation",())
+NOTE(constexpr_operand_invalid_here, none,
+    "operation with invalid operands encountered here",())
+
+NOTE(constexpr_value_unknown_at_top_level,none,
+    "cannot evaluate top-level value as constant here",())
+NOTE(constexpr_multiple_writers_found_at_top_level,none,
+     "top-level value has multiple assignments",())
+
+NOTE(constexpr_unsupported_instruction_found, none,
+    "encountered operation not supported by the evaluator", ())
+NOTE(constexpr_unsupported_instruction_found_here,none,
+    "operation not supported by the evaluator", ())
+
+NOTE(constexpr_unknown_function_called, none,
+    "encountered call to a function whose body is not available", ())
+NOTE(constexpr_unknown_function_called_here, none,
+    "call to a function whose body is not available", ())
+
+NOTE(constexpr_untracked_sil_value_use_found, none,
+    "encountered use of a variable not tracked by the evaluator", ())
+NOTE(constexpr_untracked_sil_value_used_here, none,
+    "untracked variable used here", ())
+
+NOTE(constexpr_witness_call_with_no_conformance_found, none,
+    "cannot find concrete conformance for a witness method call", ())
+NOTE(constexpr_witness_call_with_no_target_found, none,
+    "cannot resolve a witness method call to a concrete function", ())
+NOTE(constexpr_witness_call_found_here, none,
+    "witness method call found here", ())
+
+NOTE(constexpr_unknown_control_flow_due_to_skip,none, "branch depends on "
+     "non-constant value produced by an unevaluated instructions", ())
+NOTE(constexpr_returned_by_unevaluated_instruction,none,
+     "return value of an unevaluated instruction is not a constant", ())
+NOTE(constexpr_mutated_by_unevaluated_instruction,none, "value mutable by an "
+    "unevaluated instruction is not a constant", ())
 
 ERROR(non_physical_addressof,none,
       "addressof only works with purely physical lvalues; "
@@ -417,6 +483,30 @@ NOTE(switch_value_case_doesnt_yield, none, "missing yield in the %0 case",
 
 NOTE(try_branch_doesnt_yield, none, "missing yield when error is "
      "%select{not |}0thrown", (bool))
+
+// OS log optimization diagnostics.
+
+ERROR(oslog_message_argument_not_found, none, "no argument of type %0 in "
+  " the os log call", (Identifier))
+
+ERROR(oslog_dynamic_message, none, "os log methods must be passed a string "
+      "interpolation literal. 'OSLogMessage' must not be constructed explicitly",
+      ())
+
+ERROR(oslog_const_evaluation_error, none, "constant evaluating 'OSLogMessage'"
+  "implementation failed.", ())
+
+ERROR(oslog_non_constant_message, none, "'OSLogMessage' struct is "
+      "unoptimizable: 'init' is not constant evaluable", ())
+
+ERROR(oslog_non_constant_interpolation, none, "'OSLogInterpolation' struct is "
+      "unoptimizable: 'init' is not constant evaluable", ())
+
+ERROR(oslog_property_not_constant, none, "'OSLogInterpolation.%0' is not a "
+      "constant: formatting and privacy options must be literals", (StringRef))
+
+ERROR(global_string_pointer_on_non_constant, none, "globalStringTablePointer "
+      "builtin must used only on string literals", ())
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

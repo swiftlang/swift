@@ -88,7 +88,7 @@ TEST(DeclSyntaxTests, TypealiasMakeAPIs) {
     auto GenericParams = GenericParameterClauseSyntaxBuilder()
       .useLeftAngleBracket(LeftAngle)
       .useRightAngleBracket(RightAngle)
-      .addGenericParameterListMember(ElementParam)
+      .addGenericParameter(ElementParam)
       .build();
     auto Assignment = SyntaxFactory::makeEqualToken({}, { Trivia::spaces(1) });
     auto ElementType = SyntaxFactory::makeTypeIdentifier("Element", {}, {});
@@ -97,7 +97,7 @@ TEST(DeclSyntaxTests, TypealiasMakeAPIs) {
     auto GenericArgs = GenericArgumentClauseSyntaxBuilder()
       .useLeftAngleBracket(LeftAngle)
       .useRightAngleBracket(SyntaxFactory::makeRightAngleToken({}, {}))
-      .addArgumentsMember(ElementArg)
+      .addArgument(ElementArg)
       .build();
 
     auto Array = SyntaxFactory::makeIdentifier("Array", {}, {});
@@ -126,7 +126,7 @@ TEST(DeclSyntaxTests, TypealiasWithAPIs) {
   auto GenericParams = GenericParameterClauseSyntaxBuilder()
     .useLeftAngleBracket(LeftAngle)
     .useRightAngleBracket(RightAngle)
-    .addGenericParameterListMember(ElementParam)
+    .addGenericParameter(ElementParam)
     .build();
   auto Equal = SyntaxFactory::makeEqualToken({}, { Trivia::spaces(1) });
 
@@ -135,7 +135,7 @@ TEST(DeclSyntaxTests, TypealiasWithAPIs) {
   auto GenericArgs = GenericArgumentClauseSyntaxBuilder()
     .useLeftAngleBracket(LeftAngle)
     .useRightAngleBracket(SyntaxFactory::makeRightAngleToken({}, {}))
-    .addArgumentsMember(ElementArg)
+    .addArgument(ElementArg)
     .build();
 
   auto Array = SyntaxFactory::makeIdentifier("Array", {}, {});
@@ -170,7 +170,7 @@ TEST(DeclSyntaxTests, TypealiasBuilderAPIs) {
   auto GenericParams = GenericParameterClauseSyntaxBuilder()
     .useLeftAngleBracket(LeftAngle)
     .useRightAngleBracket(RightAngle)
-    .addGenericParameterListMember(ElementParam)
+    .addGenericParameter(ElementParam)
     .build();
   auto Equal =
     SyntaxFactory::makeEqualToken({}, { Trivia::spaces(1) });
@@ -181,7 +181,7 @@ TEST(DeclSyntaxTests, TypealiasBuilderAPIs) {
   auto GenericArgs = GenericArgumentClauseSyntaxBuilder()
     .useLeftAngleBracket(LeftAngle)
     .useRightAngleBracket(SyntaxFactory::makeRightAngleToken({}, {}))
-    .addArgumentsMember(ElementArg)
+    .addArgument(ElementArg)
     .build();
 
   auto Array = SyntaxFactory::makeIdentifier("Array", {}, {});
@@ -519,8 +519,8 @@ GenericParameterClauseSyntax getCannedGenericParams() {
   auto T = SyntaxFactory::makeGenericParameter(TType, Comma);
   auto U = SyntaxFactory::makeGenericParameter(UType, None);
 
-  GB.addGenericParameterListMember(T);
-  GB.addGenericParameterListMember(U);
+  GB.addGenericParameter(T);
+  GB.addGenericParameter(U);
   GB.useLeftAngleBracket(LAngle);
   GB.useRightAngleBracket(RAngle);
 

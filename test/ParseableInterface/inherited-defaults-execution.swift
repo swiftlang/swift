@@ -1,6 +1,9 @@
 // REQUIRES: executable_test
 // RUN: %empty-directory(%t)
 
+// UNSUPPORTED: swift_test_mode_optimize_none_with_implicit_dynamic
+// UNSUPPORTED: swift_test_mode_optimize_with_implicit_dynamic
+
 // 1) Build the 'Inherited' library and its interface from this file
 //
 // RUN: %target-build-swift-dylib(%t/%target-library-name(Inherited)) -emit-module-path %t/Inherited.swiftmodule -emit-parseable-module-interface-path %t/Inherited.swiftinterface -module-name Inherited %s

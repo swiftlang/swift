@@ -137,7 +137,7 @@ private:
                          SILType TBAAType2 = SILType());  
 
   /// Returns True if memory of type \p T1 and \p T2 may alias.
-  bool typesMayAlias(SILType T1, SILType T2);
+  bool typesMayAlias(SILType T1, SILType T2, const SILFunction &F);
 
   virtual void handleDeleteNotification(SILNode *node) override {
     assert(node->isRepresentativeSILNodeInObject());

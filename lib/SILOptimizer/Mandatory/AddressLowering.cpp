@@ -346,7 +346,7 @@ void OpaqueValueVisitor::visitApply(ApplySite applySite) {
 /// If `value` is address-only add it to the `valueStorageMap`.
 void OpaqueValueVisitor::visitValue(SILValue value) {
   if (value->getType().isObject()
-      && value->getType().isAddressOnly(pass.F->getModule())) {
+      && value->getType().isAddressOnly(*pass.F)) {
     if (pass.valueStorageMap.contains(value)) {
       assert(isa<SILFunctionArgument>(
           pass.valueStorageMap.getStorage(value).storageAddress));
@@ -443,7 +443,7 @@ void OpaqueStorageAllocation::convertIndirectFunctionArgs() {
 
       loadArg->setOperand(arg);
 
-      if (addrType.isAddressOnly(pass.F->getModule()))
+      if (addrType.isAddressOnly(*pass.F))
         pass.valueStorageMap.insertValue(loadArg).storageAddress = arg;
     }
     ++argIdx;
@@ -619,7 +619,7 @@ protected:
 SILValue AddressMaterialization::initializeOperandMem(Operand *operand) {
   SILValue def = operand->get();
   SILValue destAddr;
-  if (operand->get()->getType().isAddressOnly(pass.F->getModule())) {
+  if (operand->get()->getType().isAddressOnly(*pass.F)) {
     ValueStorage &storage = pass.valueStorageMap.getStorage(def);
     // Source value should already be rewritten.
     assert(storage.isRewritten());
@@ -789,7 +789,7 @@ static void insertStackDeallocationAtCall(AllocStackInst *allocInst,
 void ApplyRewriter::rewriteIndirectParameter(Operand *operand) {
   SILValue argValue = operand->get();
 
-  if (argValue->getType().isAddressOnly(pass.F->getModule())) {
+  if (argValue->getType().isAddressOnly(*pass.F)) {
     ValueStorage &storage = pass.valueStorageMap.getStorage(argValue);
     // Source value should already be rewritten.
     assert(storage.isRewritten());
@@ -857,7 +857,7 @@ SILValue ApplyRewriter::materializeIndirectResultAddress(
     SingleValueInstruction *origDirectResultVal, SILType argTy) {
 
   if (origDirectResultVal
-      && origDirectResultVal->getType().isAddressOnly(pass.F->getModule())) {
+      && origDirectResultVal->getType().isAddressOnly(*pass.F)) {
     auto &storage = pass.valueStorageMap.getStorage(origDirectResultVal);
     storage.markRewritten();
     // Pass the local storage address as the indirect result address.
@@ -982,7 +982,7 @@ void ApplyRewriter::convertApplyWithIndirectResults() {
   case SILInstructionKind::ApplyInst:
     newCallInst = callBuilder.createApply(
         loc, apply.getCallee(), apply.getSubstitutionMap(), newCallArgs,
-        cast<ApplyInst>(origCallInst)->isNonThrowing(), nullptr);
+        cast<ApplyInst>(origCallInst)->isNonThrowing());
     break;
   case SILInstructionKind::TryApplyInst:
     // TODO: insert dealloc in the catch block.
@@ -1012,7 +1012,7 @@ void ApplyRewriter::convertApplyWithIndirectResults() {
     unsigned origResultIdx = extractInst->getFieldNo();
     auto resultInfo = origFnConv.getResults()[origResultIdx];
 
-    if (extractInst->getType().isAddressOnly(pass.F->getModule())) {
+    if (extractInst->getType().isAddressOnly(*pass.F)) {
       // Uses of indirect results will be rewritten by AddressOnlyUseRewriter.
       assert(loweredCalleeConv.isSILIndirect(resultInfo));
       assert(pass.valueStorageMap.contains(extractInst));
@@ -1109,7 +1109,7 @@ void ReturnRewriter::rewriteReturn(ReturnInst *returnInst) {
 
           SILArgument *resultArg = B.getFunction().getArgument(newResultArgIdx);
           SILType resultTy = origDirectResultVal->getType();
-          if (resultTy.isAddressOnly(pass.F->getModule())) {
+          if (resultTy.isAddressOnly(*pass.F)) {
             ValueStorage &storage =
                 pass.valueStorageMap.getStorage(origDirectResultVal);
             assert(storage.isRewritten());
@@ -1402,7 +1402,7 @@ protected:
     unsigned eltIdx = 0;
     for (Operand &operand : tupleInst->getAllOperands()) {
       SILType eltTy = operand.get()->getType();
-      if (eltTy.isAddressOnly(pass.F->getModule()))
+      if (eltTy.isAddressOnly(*pass.F))
         addrMat.initializeOperandMem(&operand);
       else {
         auto *elementAddr = B.createTupleElementAddr(
@@ -1453,7 +1453,7 @@ static void rewriteFunction(AddressLoweringState &pass) {
     if (apply.getSubstCalleeType()->hasIndirectFormalResults()) {
       bool isRewritten = false;
       visitCallResults(apply, [&](SILValue result) {
-        if (result->getType().isAddressOnly(pass.F->getModule())) {
+        if (result->getType().isAddressOnly(*pass.F)) {
           assert(pass.valueStorageMap.getStorage(result).isRewritten());
           isRewritten = true;
           return false;

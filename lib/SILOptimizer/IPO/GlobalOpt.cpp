@@ -199,7 +199,7 @@ public:
 
 // If this is a call to a global initializer, map it.
 void SILGlobalOpt::collectGlobalInitCall(ApplyInst *AI) {
-  SILFunction *F = AI->getReferencedFunction();
+  SILFunction *F = AI->getReferencedFunctionOrNull();
   if (!F || !F->isGlobalInit() || !ApplySite(AI).canOptimize())
     return;
 
@@ -413,7 +413,7 @@ static bool isAvailabilityCheck(SILBasicBlock *BB) {
   if (!AI)
     return false;
 
-  SILFunction *F = AI->getReferencedFunction();
+  SILFunction *F = AI->getReferencedFunctionOrNull();
   if (!F || !F->hasSemanticsAttrs())
     return false;
 
@@ -454,10 +454,9 @@ ApplyInst *SILGlobalOpt::getHoistedApplyForInitializer(
   // Found a replacement for this init call. Ensure the replacement dominates
   // the original call site.
   ApplyInst *CommonAI = PFI->second;
-  assert(
-      cast<FunctionRefInst>(CommonAI->getCallee())->getReferencedFunction() ==
-          InitF &&
-      "ill-formed global init call");
+  assert(cast<FunctionRefInst>(CommonAI->getCallee())
+                 ->getReferencedFunctionOrNull() == InitF &&
+         "ill-formed global init call");
   SILBasicBlock *DomBB =
       DT->findNearestCommonDominator(AI->getParent(), CommonAI->getParent());
 
@@ -496,8 +495,10 @@ void SILGlobalOpt::placeInitializers(SILFunction *InitF,
   llvm::DenseMap<SILFunction *, ApplyInst *> ParentFuncs;
   for (auto *AI : Calls) {
     assert(AI->getNumArguments() == 0 && "ill-formed global init call");
-    assert(cast<FunctionRefInst>(AI->getCallee())->getReferencedFunction()
-           == InitF && "wrong init call");
+    assert(
+        cast<FunctionRefInst>(AI->getCallee())->getReferencedFunctionOrNull() ==
+            InitF &&
+        "wrong init call");
     SILFunction *ParentF = AI->getFunction();
     DominanceInfo *DT = DA->get(ParentF);
     ApplyInst *HoistAI =
@@ -688,7 +689,8 @@ replaceLoadsByKnownValue(BuiltinInst *CallToOnce, SILFunction *AddrF,
     SILBuilderWithScope B(Call);
     SmallVector<SILValue, 1> Args;
     auto *GetterRef = B.createFunctionRef(Call->getLoc(), GetterF);
-    auto *NewAI = B.createApply(Call->getLoc(), GetterRef, Args, false);
+    auto *NewAI = B.createApply(Call->getLoc(), GetterRef,
+                                SubstitutionMap(), Args);
 
     // FIXME: This is asserting that a specific SIL sequence follows an
     // addressor! SIL passes should never do this without first specifying a
@@ -904,7 +906,8 @@ void SILGlobalOpt::optimizeGlobalAccess(SILGlobalVariable *SILG,
   for (auto *Load : GlobalLoadMap[SILG]) {
     SILBuilderWithScope B(Load);
     auto *GetterRef = B.createFunctionRef(Load->getLoc(), GetterF);
-    auto *Value = B.createApply(Load->getLoc(), GetterRef, {}, false);
+    auto *Value = B.createApply(Load->getLoc(), GetterRef,
+                                SubstitutionMap(), {});
 
     convertLoadSequence(Load, Value, B);
     HasChanged = true;

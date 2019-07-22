@@ -489,6 +489,10 @@ extension _BridgedStoredNSError {
   public func hash(into hasher: inout Hasher) {
     hasher.combine(_nsError)
   }
+
+  @_alwaysEmitIntoClient public var hashValue: Int {
+    return _nsError.hashValue
+  }
 }
 
 /// Describes the code of an error.
@@ -563,6 +567,10 @@ public struct CocoaError : _BridgedStoredNSError {
   }
 
   public static var errorDomain: String { return NSCocoaErrorDomain }
+
+  public var hashValue: Int {
+    return _nsError.hashValue
+  }
 
   /// The error code itself.
   public struct Code : RawRepresentable, Hashable, _ErrorCodeProtocol {
@@ -1791,6 +1799,10 @@ public struct URLError : _BridgedStoredNSError {
 
   public static var errorDomain: String { return NSURLErrorDomain }
 
+  public var hashValue: Int {
+    return _nsError.hashValue
+  }
+
   /// The error code itself.
   public struct Code : RawRepresentable, Hashable, _ErrorCodeProtocol {
     public typealias _ErrorType = URLError
@@ -2447,6 +2459,10 @@ public struct POSIXError : _BridgedStoredNSError {
 
   public static var errorDomain: String { return NSPOSIXErrorDomain }
 
+  public var hashValue: Int {
+    return _nsError.hashValue
+  }
+
   public typealias Code = POSIXErrorCode
 }
 
@@ -2932,6 +2948,10 @@ public struct MachError : _BridgedStoredNSError {
   }
 
   public static var errorDomain: String { return NSMachErrorDomain }
+
+  public var hashValue: Int {
+    return _nsError.hashValue
+  }
 
   public typealias Code = MachErrorCode
 }

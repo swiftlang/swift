@@ -170,16 +170,8 @@ namespace {
   using CallbackTy = llvm::function_ref<void(SILInstruction *)>;
 } // end anonymous namespace
 
-void swift::
-recursivelyDeleteTriviallyDeadInstructions(ArrayRef<SILInstruction *> IA,
-                                           bool Force, CallbackTy Callback) {
-  SILBasicBlock::iterator instIter;
-  recursivelyDeleteTriviallyDeadInstructions(IA, instIter, Force, Callback);
-}
-
 void swift::recursivelyDeleteTriviallyDeadInstructions(
-    ArrayRef<SILInstruction *> IA, SILBasicBlock::iterator &InstIter,
-    bool Force, CallbackTy Callback) {
+    ArrayRef<SILInstruction *> IA, bool Force, CallbackTy Callback) {
   // Delete these instruction and others that become dead after it's deleted.
   llvm::SmallPtrSet<SILInstruction *, 8> DeadInsts;
   for (auto I : IA) {
@@ -216,21 +208,21 @@ void swift::recursivelyDeleteTriviallyDeadInstructions(
       // If we have a function ref inst, we need to especially drop its function
       // argument so that it gets a proper ref decrement.
       auto *FRI = dyn_cast<FunctionRefInst>(I);
-      if (FRI && FRI->getReferencedFunction())
+      if (FRI && FRI->getInitiallyReferencedFunction())
         FRI->dropReferencedFunction();
 
       auto *DFRI = dyn_cast<DynamicFunctionRefInst>(I);
-      if (DFRI && DFRI->getReferencedFunction())
+      if (DFRI && DFRI->getInitiallyReferencedFunction())
         DFRI->dropReferencedFunction();
 
       auto *PFRI = dyn_cast<PreviousDynamicFunctionRefInst>(I);
-      if (PFRI && PFRI->getReferencedFunction())
+      if (PFRI && PFRI->getInitiallyReferencedFunction())
         PFRI->dropReferencedFunction();
     }
 
     for (auto I : DeadInsts) {
       // This will remove this instruction and all its uses.
-      eraseFromParentWithDebugInsts(I, InstIter);
+      eraseFromParentWithDebugInsts(I, Callback);
     }
 
     NextInsts.swap(DeadInsts);
@@ -244,13 +236,11 @@ void swift::recursivelyDeleteTriviallyDeadInstructions(
 /// \param I The instruction to be deleted.
 /// \param Force If Force is set, don't check if the top level instruction is
 ///        considered dead - delete it regardless.
-SILBasicBlock::iterator
-swift::recursivelyDeleteTriviallyDeadInstructions(SILInstruction *I, bool Force,
-                                                  CallbackTy Callback) {
-  SILBasicBlock::iterator nextI = std::next(I->getIterator());
+void swift::recursivelyDeleteTriviallyDeadInstructions(SILInstruction *I,
+                                                       bool Force,
+                                                       CallbackTy Callback) {
   ArrayRef<SILInstruction *> AI = ArrayRef<SILInstruction *>(I);
-  recursivelyDeleteTriviallyDeadInstructions(AI, nextI, Force, Callback);
-  return nextI;
+  recursivelyDeleteTriviallyDeadInstructions(AI, Force, Callback);
 }
 
 void swift::eraseUsesOfInstruction(SILInstruction *Inst,
@@ -750,7 +740,7 @@ public:
 /// Returns false if optimization is not possible.
 /// Returns true and initializes internal fields if optimization is possible.
 bool StringConcatenationOptimizer::extractStringConcatOperands() {
-  auto *Fn = AI->getReferencedFunction();
+  auto *Fn = AI->getReferencedFunctionOrNull();
   if (!Fn)
     return false;
 
@@ -770,8 +760,8 @@ bool StringConcatenationOptimizer::extractStringConcatOperands() {
   if (!FRILeft || !FRIRight)
     return false;
 
-  auto *FRILeftFun = FRILeft->getReferencedFunction();
-  auto *FRIRightFun = FRIRight->getReferencedFunction();
+  auto *FRILeftFun = FRILeft->getReferencedFunctionOrNull();
+  auto *FRIRightFun = FRIRight->getReferencedFunctionOrNull();
 
   if (FRILeftFun->getEffectsKind() >= EffectsKind::ReleaseNone ||
       FRIRightFun->getEffectsKind() >= EffectsKind::ReleaseNone)
@@ -928,8 +918,7 @@ SingleValueInstruction *StringConcatenationOptimizer::optimize() {
   Arguments.push_back(FuncResultType);
 
   return Builder.createApply(AI->getLoc(), FRIConvertFromBuiltin,
-                             SubstitutionMap(), Arguments,
-                             false);
+                             SubstitutionMap(), Arguments);
 }
 
 /// Top level entry point
@@ -942,6 +931,9 @@ swift::tryToConcatenateStrings(ApplyInst *AI, SILBuilder &B) {
 //                              Closure Deletion
 //===----------------------------------------------------------------------===//
 
+/// NOTE: Instructions with transitive ownership kind are assumed to not keep
+/// the underlying closure alive as well. This is meant for instructions only
+/// with non-transitive users.
 static bool useDoesNotKeepClosureAlive(const SILInstruction *I) {
   switch (I->getKind()) {
   case SILInstructionKind::StrongRetainInst:
@@ -950,6 +942,7 @@ static bool useDoesNotKeepClosureAlive(const SILInstruction *I) {
   case SILInstructionKind::RetainValueInst:
   case SILInstructionKind::ReleaseValueInst:
   case SILInstructionKind::DebugValueInst:
+  case SILInstructionKind::EndBorrowInst:
     return true;
   default:
     return false;
@@ -962,9 +955,9 @@ static bool useHasTransitiveOwnership(const SILInstruction *I) {
   if (isa<ConvertEscapeToNoEscapeInst>(I))
     return true;
 
-  // Look through copy_value. It is inert for our purposes, but we need to look
-  // through it.
-  return isa<CopyValueInst>(I);
+  // Look through copy_value, begin_borrow. They are inert for our purposes, but
+  // we need to look through it.
+  return isa<CopyValueInst>(I) || isa<BeginBorrowInst>(I);
 }
 
 static SILValue createLifetimeExtendedAllocStack(
@@ -1500,23 +1493,20 @@ bool swift::simplifyUsers(SingleValueInstruction *I) {
   return Changed;
 }
 
-/// True if a type can be expanded
-/// without a significant increase to code size.
+/// True if a type can be expanded without a significant increase to code size.
 bool swift::shouldExpand(SILModule &Module, SILType Ty) {
-  if (Ty.isAddressOnly(Module)) {
+  // FIXME: Expansion
+  auto Expansion = ResilienceExpansion::Minimal;
+
+  if (Module.Types.getTypeLowering(Ty, Expansion).isAddressOnly()) {
     return false;
   }
   if (EnableExpandAll) {
     return true;
   }
 
-  // FIXME: Expansion
-  unsigned numFields =
-    Module.Types.countNumberOfFields(Ty, ResilienceExpansion::Minimal);
-  if (numFields > 6) {
-    return false;
-  }
-  return true;
+  unsigned NumFields = Module.Types.countNumberOfFields(Ty, Expansion);
+  return (NumFields <= 6);
 }
 
 /// Some support functions for the global-opt and let-properties-opts

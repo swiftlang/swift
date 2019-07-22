@@ -1,5 +1,6 @@
 // RUN: %target-swift-frontend -enable-experimental-static-assert -emit-sil %s -verify
 
+// REQUIRES: optimized_stdlib
 // REQUIRES: asserts
 
 //===----------------------------------------------------------------------===//
@@ -22,20 +23,22 @@ func test_assertionFailure() {
 
 func test_nonConstant() {
   #assert(isOne(Int(readLine()!)!)) // expected-error{{#assert condition not constant}}
+    // expected-note@-1 {{cannot evaluate expression as constant here}}
   #assert(isOne(Int(readLine()!)!), "input is not 1") // expected-error{{#assert condition not constant}}
+    // expected-note@-1 {{cannot evaluate expression as constant here}}
 }
 
 func loops1(a: Int) -> Int {
   var x = 42
   while x <= 42 {
     x += a
-  } // expected-note {{control flow loop found}}
+  } // expected-note {{found loop here}}
   return x
 }
 
 func loops2(a: Int) -> Int {
   var x = 42
-  // expected-note @+1 {{could not fold operation}}
+  // expected-note @+1 {{operation not supported by the evaluator}}
   for i in 0 ... a {
     x += i
   }
@@ -44,7 +47,7 @@ func loops2(a: Int) -> Int {
 
 func infiniteLoop() -> Int {
   // expected-note @+2 {{condition always evaluates to true}}
-  // expected-note @+1 {{control flow loop found}}
+  // expected-note @+1 {{found loop here}}
   while true {}
   // expected-warning @+1 {{will never be executed}}
   return 1
@@ -52,25 +55,26 @@ func infiniteLoop() -> Int {
 
 func test_loops() {
   // expected-error @+2 {{#assert condition not constant}}
-  // expected-note @+1 {{when called from here}}
+  // expected-note @+1 {{control-flow loop found during evaluation}}
   #assert(loops1(a: 20000) > 42)
 
   // expected-error @+2 {{#assert condition not constant}}
-  // expected-note @+1 {{when called from here}}
+  // expected-note @+1 {{encountered operation not supported by the evaluator}}
   #assert(loops2(a: 20000) > 42)
 
   // expected-error @+2 {{#assert condition not constant}}
-  // expected-note @+1 {{when called from here}}
+  // expected-note @+1 {{control-flow loop found during evaluation}}
   #assert(infiniteLoop() == 1)
 }
 
 func recursive(a: Int) -> Int {
-   // expected-note@+1 {{exceeded instruction limit: 512 when evaluating the expression at compile time}}
+   // expected-note@+1 {{limit exceeded here}}
   return a == 0 ? 0 : recursive(a: a-1)
 }
 
 func test_recursive() {
-  // expected-error @+1 {{#assert condition not constant}}
+  // expected-error @+2 {{#assert condition not constant}}
+  // expected-note @+1 {{exceeded instruction limit: 512 when evaluating the expression at compile time}}
   #assert(recursive(a: 20000) > 42)
 }
 
@@ -105,7 +109,7 @@ func test_topLevelEvaluation(topLevelArgument: Int) {
   var topLevelVar = 1 // expected-warning {{never mutated}}
   #assert(topLevelVar == 1)
 
-  // expected-note @+1 {{could not fold operation}}
+  // expected-note @+1 {{cannot evaluate top-level value as constant here}}
   var topLevelVarConditionallyMutated = 1
   if topLevelVarConditionallyMutated < 0 {
     topLevelVarConditionallyMutated += 1
@@ -115,6 +119,7 @@ func test_topLevelEvaluation(topLevelArgument: Int) {
 
   // expected-error @+1 {{#assert condition not constant}}
   #assert(topLevelArgument == 1)
+    // expected-note@-1 {{cannot evaluate expression as constant here}}
 }
 
 //===----------------------------------------------------------------------===//
@@ -453,7 +458,7 @@ struct SPsimp : ProtoSimple {
 func testStructPassedAsProtocols() {
   let s = SPsimp()
   #assert(callProtoSimpleMethod(s) == 0) // expected-error {{#assert condition not constant}}
-    // expected-note@-1 {{could not fold operation}}
+    // expected-note@-1 {{cannot evaluate top-level value as constant here}}
 }
 
 //===----------------------------------------------------------------------===//
@@ -520,7 +525,10 @@ func testStringAppendTopLevel() {
   var a = "a"
   a += "b"
   #assert(a == "ab")  // expected-error {{#assert condition not constant}}
-                      // expected-note@-1 {{could not fold operation}}
+                      // expected-note@-1 {{operation with invalid operands encountered during evaluation}}
+  // Note: the operands to the equals operation are invalid as the variable
+  // `a` is uninitialized when the call is made. This is due to imprecision
+  // in the top-level evaluation mode.
 }
 
 func appendedAsciiString() -> String {
@@ -639,13 +647,13 @@ func evaluate(intExpr: IntExpr) -> Int {
 
 // TODO: The constant evaluator can't handle indirect enums yet.
 // expected-error @+2 {{#assert condition not constant}}
-// expected-note @+1 {{could not fold operation}}
+// expected-note @+1 {{encountered operation not supported by the evaluator}}
 #assert(evaluate(intExpr: .int(5)) == 5)
 // expected-error @+2 {{#assert condition not constant}}
-// expected-note @+1 {{could not fold operation}}
+// expected-note @+1 {{encountered operation not supported by the evaluator}}
 #assert(evaluate(intExpr: .add(.int(5), .int(6))) == 11)
 // expected-error @+2 {{#assert condition not constant}}
-// expected-note @+1 {{could not fold operation}}
+// expected-note @+1 {{encountered operation not supported by the evaluator}}
 #assert(evaluate(intExpr: .add(.multiply(.int(2), .int(2)), .int(3))) == 7)
 
 // Test address-only enums.

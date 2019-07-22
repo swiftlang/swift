@@ -1021,7 +1021,7 @@ static bool linkBBArgs(SILBasicBlock *BB) {
 
 /// Returns true if the type \p Ty is a reference or may transitively contains
 /// a reference, i.e. if it is a "pointer" type.
-static bool mayContainReference(SILType Ty, SILModule *Mod) {
+static bool mayContainReference(SILType Ty, const SILFunction &F) {
   // Opaque types may contain a reference. Speculatively track them too.
   //
   // 1. It may be possible to optimize opaque values based on known mutation
@@ -1032,25 +1032,27 @@ static bool mayContainReference(SILType Ty, SILModule *Mod) {
   //
   // 3. A generic function may call a specialized function taking a concrete
   // reference type via devirtualization.
-  if (Ty.isAddressOnly(*Mod))
+  if (Ty.isAddressOnly(F))
     return true;
 
   if (Ty.hasReferenceSemantics())
     return true;
 
-  if (Ty.getASTType() == Mod->getASTContext().TheRawPointerType)
+  auto &Mod = F.getModule();
+
+  if (Ty.getASTType() == Mod.getASTContext().TheRawPointerType)
     return true;
 
   if (auto *Str = Ty.getStructOrBoundGenericStruct()) {
     for (auto *Field : Str->getStoredProperties()) {
-      if (mayContainReference(Ty.getFieldType(Field, *Mod), Mod))
+      if (mayContainReference(Ty.getFieldType(Field, Mod), F))
         return true;
     }
     return false;
   }
   if (auto TT = Ty.getAs<TupleType>()) {
     for (unsigned i = 0, e = TT->getNumElements(); i != e; ++i) {
-      if (mayContainReference(Ty.getTupleElementType(i), Mod))
+      if (mayContainReference(Ty.getTupleElementType(i), F))
         return true;
     }
     return false;
@@ -1058,7 +1060,7 @@ static bool mayContainReference(SILType Ty, SILModule *Mod) {
   if (auto En = Ty.getEnumOrBoundGenericEnum()) {
     for (auto *ElemDecl : En->getAllElements()) {
       if (ElemDecl->hasAssociatedValues()
-          && mayContainReference(Ty.getEnumElementType(ElemDecl, *Mod), Mod))
+          && mayContainReference(Ty.getEnumElementType(ElemDecl, Mod), F))
         return true;
     }
     return false;
@@ -1067,12 +1069,18 @@ static bool mayContainReference(SILType Ty, SILModule *Mod) {
 }
 
 bool EscapeAnalysis::isPointer(ValueBase *V) {
+  auto *F = V->getFunction();
+
+  // The function can be null, e.g. if V is an undef.
+  if (!F)
+    return false;
+
   SILType Ty = V->getType();
   auto Iter = isPointerCache.find(Ty);
   if (Iter != isPointerCache.end())
     return Iter->second;
 
-  bool IP = (Ty.isAddress() || mayContainReference(Ty, M));
+  bool IP = (Ty.isAddress() || mayContainReference(Ty, *F));
   isPointerCache[Ty] = IP;
   return IP;
 }
@@ -1297,12 +1305,12 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
         break;
     }
 
-    if (FAS.getReferencedFunction()
-        && FAS.getReferencedFunction()->hasSemanticsAttr(
-               "self_no_escaping_closure")
-        && ((FAS.hasIndirectSILResults() && FAS.getNumArguments() == 3)
-            || (!FAS.hasIndirectSILResults() && FAS.getNumArguments() == 2))
-        && FAS.hasSelfArgument()) {
+    if (FAS.getReferencedFunctionOrNull() &&
+        FAS.getReferencedFunctionOrNull()->hasSemanticsAttr(
+            "self_no_escaping_closure") &&
+        ((FAS.hasIndirectSILResults() && FAS.getNumArguments() == 3) ||
+         (!FAS.hasIndirectSILResults() && FAS.getNumArguments() == 2)) &&
+        FAS.hasSelfArgument()) {
       // The programmer has guaranteed that the closure will not capture the
       // self pointer passed to it or anything that is transitively reachable
       // from the pointer.
@@ -1312,12 +1320,12 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
       return;
     }
 
-    if (FAS.getReferencedFunction()
-        && FAS.getReferencedFunction()->hasSemanticsAttr(
-               "pair_no_escaping_closure")
-        && ((FAS.hasIndirectSILResults() && FAS.getNumArguments() == 4)
-            || (!FAS.hasIndirectSILResults() && FAS.getNumArguments() == 3))
-        && FAS.hasSelfArgument()) {
+    if (FAS.getReferencedFunctionOrNull() &&
+        FAS.getReferencedFunctionOrNull()->hasSemanticsAttr(
+            "pair_no_escaping_closure") &&
+        ((FAS.hasIndirectSILResults() && FAS.getNumArguments() == 4) ||
+         (!FAS.hasIndirectSILResults() && FAS.getNumArguments() == 3)) &&
+        FAS.hasSelfArgument()) {
       // The programmer has guaranteed that the closure will not capture the
       // self pointer passed to it or anything that is transitively reachable
       // from the pointer.
@@ -1334,7 +1342,7 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
         return;
     }
 
-    if (auto *Fn = FAS.getReferencedFunction()) {
+    if (auto *Fn = FAS.getReferencedFunctionOrNull()) {
       if (Fn->getName() == "swift_bufferAllocate")
         // The call is a buffer allocation, e.g. for Array.
         return;

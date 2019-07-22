@@ -1484,6 +1484,7 @@ void irgen::emitCacheAccessFunction(IRGenModule &IGM,
 
   // If the load yielded null, emit the type metadata.
   IGF.Builder.emitBlock(isNullBB);
+  
   MetadataResponse response = getValue(IGF, parameters);
 
   // Ensure that we have a dynamically-correct state value.

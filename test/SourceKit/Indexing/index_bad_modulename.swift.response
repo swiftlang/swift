@@ -1,18 +1,15 @@
 {
-  key.hash: <hash>,
   key.dependencies: [
     {
       key.kind: source.lang.swift.import.module.swift,
       key.name: "Swift",
       key.filepath: Swift.swiftmodule,
-      key.hash: <hash>,
       key.is_system: 1
     },
     {
       key.kind: source.lang.swift.import.module.swift,
       key.name: "ObjectiveC",
       key.filepath: ObjectiveC.swiftmodule,
-      key.hash: <hash>,
       key.is_system: 1,
       key.dependencies: [
         {
@@ -25,20 +22,18 @@
           key.kind: source.lang.swift.import.module.swift,
           key.name: "Swift",
           key.filepath: Swift.swiftmodule,
-          key.hash: <hash>,
           key.is_system: 1
         },
         {
           key.kind: source.lang.swift.import.module.swift,
           key.name: "SwiftOnoneSupport",
           key.filepath: SwiftOnoneSupport.swiftmodule,
-          key.hash: <hash>,
+          key.is_system: 1,
           key.dependencies: [
             {
               key.kind: source.lang.swift.import.module.swift,
               key.name: "Swift",
               key.filepath: Swift.swiftmodule,
-              key.hash: <hash>,
               key.is_system: 1
             }
           ]

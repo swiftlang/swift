@@ -37,16 +37,15 @@ public:
 
   void completePostfixExprBeginning(CodeCompletionExpr *E) override;
   void completeForEachSequenceBeginning(CodeCompletionExpr *E) override;
-  void completeCaseStmtBeginning() override;
+  void completeCaseStmtBeginning(CodeCompletionExpr *E) override;
 
-  void completeCallArg(CodeCompletionExpr *E) override;
+  void completeCallArg(CodeCompletionExpr *E, bool isFirst) override;
   void completeReturnStmt(CodeCompletionExpr *E) override;
   void completeYieldStmt(CodeCompletionExpr *E,
                          Optional<unsigned> yieldIndex) override;
 
   void completeUnresolvedMember(CodeCompletionExpr *E,
                                 SourceLoc DotLoc) override;
-  void completeCaseStmtDotPrefix() override;
 
   void doneParsing() override;
 };
@@ -61,7 +60,8 @@ void ContextInfoCallbacks::completeForEachSequenceBeginning(
   CurDeclContext = P.CurDeclContext;
   ParsedExpr = E;
 }
-void ContextInfoCallbacks::completeCallArg(CodeCompletionExpr *E) {
+void ContextInfoCallbacks::completeCallArg(CodeCompletionExpr *E,
+                                           bool isFirst) {
   CurDeclContext = P.CurDeclContext;
   ParsedExpr = E;
 }
@@ -80,10 +80,7 @@ void ContextInfoCallbacks::completeUnresolvedMember(CodeCompletionExpr *E,
   ParsedExpr = E;
 }
 
-void ContextInfoCallbacks::completeCaseStmtBeginning() {
-  // TODO: Implement?
-}
-void ContextInfoCallbacks::completeCaseStmtDotPrefix() {
+void ContextInfoCallbacks::completeCaseStmtBeginning(CodeCompletionExpr *E) {
   // TODO: Implement?
 }
 
@@ -103,11 +100,16 @@ void ContextInfoCallbacks::doneParsing() {
   for (auto T : Info.getPossibleTypes()) {
     if (T->is<ErrorType>() || T->is<UnresolvedType>())
       continue;
-    if (auto env = CurDeclContext->getGenericEnvironmentOfContext())
-      T = env->mapTypeIntoContext(T);
+
+    T = T->getRValueType();
+    if (T->hasArchetype())
+      T = T->mapTypeOutOfContext();
 
     // TODO: Do we need '.none' for Optionals?
     auto objT = T->lookThroughAllOptionalTypes();
+
+    if (auto env = CurDeclContext->getGenericEnvironmentOfContext())
+      objT = env->mapTypeIntoContext(T);
 
     if (!seenTypes.insert(objT->getCanonicalType()).second)
       continue;
@@ -151,7 +153,8 @@ void ContextInfoCallbacks::getImplicitMembers(
       // Static properties which is convertible to 'Self'.
       if (isa<VarDecl>(VD) && VD->isStatic()) {
         auto declTy = T->getTypeOfMember(CurModule, VD);
-        if (declTy->isEqual(T) || swift::isConvertibleTo(declTy, T, *DC))
+        if (declTy->isEqual(T) ||
+            swift::isConvertibleTo(declTy, T, /*openArchetypes=*/true, *DC))
           return true;
       }
 
@@ -163,7 +166,8 @@ void ContextInfoCallbacks::getImplicitMembers(
         : DC(DC), TypeResolver(DC->getASTContext().getLazyResolver()),
           CurModule(DC->getParentModule()), T(T), Result(Result) {}
 
-    void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) {
+    void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason,
+                   DynamicLookupInfo) {
       if (canBeImplictMember(VD) && !VD->shouldHideFromEditor())
         Result.push_back(VD);
     }

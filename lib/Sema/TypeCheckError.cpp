@@ -55,7 +55,7 @@ public:
   explicit AbstractFunction(AbstractFunctionDecl *fn)
     : TheKind(Kind::Function),
       IsRethrows(fn->getAttrs().hasAttribute<RethrowsAttr>()),
-      ParamCount(fn->hasImplicitSelfDecl() ? 2 : 1) {
+      ParamCount(fn->getNumCurryLevels()) {
     TheFunction = fn;
   }
 
@@ -685,8 +685,13 @@ private:
                                     PotentialReason::forDefaultArgument());
     }
 
-    // If this argument is `nil` literal or `.none`,
-    // it doesn't cause the call to throw.
+    // If this argument is `nil` literal, it doesn't cause the call to throw.
+    if (isa<NilLiteralExpr>(arg)) {
+      if (arg->getType()->getOptionalObjectType())
+        return Classification();
+    }
+
+    // Neither does 'Optional<T>.none'.
     if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(arg)) {
       if (auto *DE = dyn_cast<DeclRefExpr>(DSCE->getFn())) {
         auto &ctx = paramType->getASTContext();
@@ -891,7 +896,7 @@ public:
     }
 
     return Context(getKindForFunctionBody(
-        D->getInterfaceType(), D->hasImplicitSelfDecl() ? 2 : 1));
+        D->getInterfaceType(), D->getNumCurryLevels()));
   }
 
   static Context forDeferBody() {
@@ -932,6 +937,10 @@ public:
 
   static Context forCatchGuard(CatchStmt *S) {
     return Context(Kind::CatchGuard);
+  }
+
+  static Context forPatternBinding(PatternBindingDecl *binding) {
+    return getContextForPatternBinding(binding);
   }
 
   Context withInterpolatedString(InterpolatedStringLiteralExpr *E) const {
@@ -1463,8 +1472,8 @@ private:
   ShouldRecurse_t
   checkInterpolatedStringLiteral(InterpolatedStringLiteralExpr *E) {
     ContextScope scope(*this, CurContext.withInterpolatedString(E));
-    if (E->getSemanticExpr())
-      E->getSemanticExpr()->walk(*this);
+    if (E->getAppendingExpr())
+      E->getAppendingExpr()->walk(*this);
     scope.preserveCoverageFromInterpolatedString();
     return ShouldNotRecurse;
   }
@@ -1658,4 +1667,10 @@ void TypeChecker::checkEnumElementErrorHandling(EnumElementDecl *elt) {
     CheckErrorCoverage checker(*this, Context::forEnumElementInitializer(elt));
     init->walk(checker);
   }
+}
+
+void TypeChecker::checkPropertyWrapperErrorHandling(
+    PatternBindingDecl *binding, Expr *expr) {
+  CheckErrorCoverage checker(*this, Context::forPatternBinding(binding));
+  expr->walk(checker);
 }

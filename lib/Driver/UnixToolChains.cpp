@@ -51,13 +51,13 @@ toolchains::GenericUnix::constructInvocation(const InterpretJobAction &job,
                                              const JobContext &context) const {
   InvocationInfo II = ToolChain::constructInvocation(job, context);
 
-  SmallString<128> runtimeLibraryPath;
-  getRuntimeLibraryPath(runtimeLibraryPath, context.Args,
-                        /*Shared=*/true);
+  SmallVector<std::string, 4> runtimeLibraryPaths;
+  getRuntimeLibraryPaths(runtimeLibraryPaths, context.Args, context.OI.SDKPath,
+                         /*Shared=*/true);
 
   addPathEnvironmentVariableIfNeeded(II.ExtraEnvironment, "LD_LIBRARY_PATH",
                                      ":", options::OPT_L, context.Args,
-                                     runtimeLibraryPath);
+                                     runtimeLibraryPaths);
   return II;
 }
 
@@ -114,7 +114,7 @@ bool toolchains::GenericUnix::shouldProvideRPathToLinker() const {
 }
 
 ToolChain::InvocationInfo
-toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
+toolchains::GenericUnix::constructInvocation(const DynamicLinkJobAction &job,
                                              const JobContext &context) const {
   assert(context.Output.getPrimaryOutputType() == file_types::TY_Image &&
          "Invalid linker output type.");
@@ -130,6 +130,8 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
   case LinkKind::DynamicLibrary:
     Arguments.push_back("-shared");
     break;
+  case LinkKind::StaticLibrary:
+    llvm_unreachable("the dynamic linker cannot build static libraries");
   }
 
   // Select the linker to use.
@@ -188,24 +190,25 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
     staticStdlib = true;
   }
 
-  SmallString<128> SharedRuntimeLibPath;
-  getRuntimeLibraryPath(SharedRuntimeLibPath, context.Args, /*Shared=*/true);
+  SmallVector<std::string, 4> RuntimeLibPaths;
+  getRuntimeLibraryPaths(RuntimeLibPaths, context.Args, context.OI.SDKPath,
+                         /*Shared=*/!(staticExecutable || staticStdlib));
 
-  SmallString<128> StaticRuntimeLibPath;
-  getRuntimeLibraryPath(StaticRuntimeLibPath, context.Args, /*Shared=*/false);
-
-  // Add the runtime library link path, which is platform-specific and found
-  // relative to the compiler.
   if (!(staticExecutable || staticStdlib) && shouldProvideRPathToLinker()) {
     // FIXME: We probably shouldn't be adding an rpath here unless we know
     //        ahead of time the standard library won't be copied.
-    Arguments.push_back("-Xlinker");
-    Arguments.push_back("-rpath");
-    Arguments.push_back("-Xlinker");
-    Arguments.push_back(context.Args.MakeArgString(SharedRuntimeLibPath));
+    for (auto path : RuntimeLibPaths) {
+      Arguments.push_back("-Xlinker");
+      Arguments.push_back("-rpath");
+      Arguments.push_back("-Xlinker");
+      Arguments.push_back(context.Args.MakeArgString(path));
+    }
   }
 
-  SmallString<128> swiftrtPath = SharedRuntimeLibPath;
+  SmallString<128> SharedResourceDirPath;
+  getResourceDirPath(SharedResourceDirPath, context.Args, /*Shared=*/true);
+
+  SmallString<128> swiftrtPath = SharedResourceDirPath;
   llvm::sys::path::append(swiftrtPath,
                           swift::getMajorArchitectureName(getTriple()));
   llvm::sys::path::append(swiftrtPath, "swiftrt.o");
@@ -237,36 +240,34 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
           Twine("@") + OutputInfo.getPrimaryOutputFilename()));
   }
 
-  // Link the standard library.
-  Arguments.push_back("-L");
+  // Add the runtime library link paths.
+  for (auto path : RuntimeLibPaths) {
+    Arguments.push_back("-L");
+    Arguments.push_back(context.Args.MakeArgString(path));
+  }
+
+  // Link the standard library. In two paths, we do this using a .lnk file;
+  // if we're going that route, we'll set `linkFilePath` to the path to that
+  // file.
+  SmallString<128> linkFilePath;
+  getResourceDirPath(linkFilePath, context.Args, /*Shared=*/false);
 
   if (staticExecutable) {
-    Arguments.push_back(context.Args.MakeArgString(StaticRuntimeLibPath));
-
-    SmallString<128> linkFilePath = StaticRuntimeLibPath;
     llvm::sys::path::append(linkFilePath, "static-executable-args.lnk");
-    auto linkFile = linkFilePath.str();
-
-    if (llvm::sys::fs::is_regular_file(linkFile)) {
-      Arguments.push_back(context.Args.MakeArgString(Twine("@") + linkFile));
-    } else {
-      llvm::report_fatal_error(
-          "-static-executable not supported on this platform");
-    }
   } else if (staticStdlib) {
-    Arguments.push_back(context.Args.MakeArgString(StaticRuntimeLibPath));
-
-    SmallString<128> linkFilePath = StaticRuntimeLibPath;
     llvm::sys::path::append(linkFilePath, "static-stdlib-args.lnk");
+  } else {
+    linkFilePath.clear();
+    Arguments.push_back("-lswiftCore");
+  }
+
+  if (!linkFilePath.empty()) {
     auto linkFile = linkFilePath.str();
     if (llvm::sys::fs::is_regular_file(linkFile)) {
       Arguments.push_back(context.Args.MakeArgString(Twine("@") + linkFile));
     } else {
       llvm::report_fatal_error(linkFile + " not found");
     }
-  } else {
-    Arguments.push_back(context.Args.MakeArgString(SharedRuntimeLibPath));
-    Arguments.push_back("-lswiftCore");
   }
 
   // Explicitly pass the target to the linker
@@ -287,7 +288,7 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
   }
 
   if (context.Args.hasArg(options::OPT_profile_generate)) {
-    SmallString<128> LibProfile(SharedRuntimeLibPath);
+    SmallString<128> LibProfile(SharedResourceDirPath);
     llvm::sys::path::remove_filename(LibProfile); // remove platform name
     llvm::sys::path::append(LibProfile, "clang", "lib");
 
@@ -316,6 +317,31 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
 
   InvocationInfo II{Clang, Arguments};
   II.allowsResponseFiles = true;
+
+  return II;
+}
+
+
+ToolChain::InvocationInfo
+toolchains::GenericUnix::constructInvocation(const StaticLinkJobAction &job,
+                               const JobContext &context) const {
+   assert(context.Output.getPrimaryOutputType() == file_types::TY_Image &&
+         "Invalid linker output type.");
+
+  ArgStringList Arguments;
+
+  // Configure the toolchain.
+  const char *AR = "ar";
+  Arguments.push_back("crs");
+
+  Arguments.push_back(
+      context.Args.MakeArgString(context.Output.getPrimaryOutputFilename()));
+
+  addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
+                         file_types::TY_Object);
+  addInputsOfType(Arguments, context.InputActions, file_types::TY_Object);
+
+  InvocationInfo II{AR, Arguments};
 
   return II;
 }

@@ -12,6 +12,8 @@
 
 #if os(Linux)
 import Glibc
+#elseif os(Windows)
+import MSVCRT
 #else
 import Darwin
 #endif
@@ -151,6 +153,21 @@ public struct BenchmarkInfo {
     return _tearDownFunction
   }
 
+  /// DON'T USE ON NEW BENCHMARKS!
+  /// Optional `legacyFactor` is a multiplication constant applied to runtime
+  /// statistics reported in the benchmark summary (it doesn’t affect the
+  /// individual sample times reported in `--verbose` mode).
+  ///
+  /// It enables the migration of benchmark suite to smaller workloads (< 1 ms),
+  /// which are more robust to measurement errors from system under load,
+  /// while maintaining the continuity of longterm benchmark tracking.
+  ///
+  /// Most legacy benchmarks had workloads artificially inflated in their main
+  /// `for` loops with a constant integer factor and the migration consisted of
+  /// dividing it so that the optimized runtime (-O) was less than 1000 μs and
+  /// storing the divisor in `legacyFactor`. This effectively only increases the
+  /// frequency of measurement, gathering more samples that are much less likely
+  /// to be interrupted by a context switch.
   public var legacyFactor: Int?
 
   public init(name: String, runFunction: @escaping (Int) -> (), tags: [BenchmarkCategory],
@@ -219,6 +236,29 @@ public func SRand() {
 
 public func Random() -> Int64 {
   return lfsrRandomGenerator.randInt()
+}
+
+// This is a fixed-increment version of Java 8's SplittableRandom generator.
+// It is a very fast generator passing BigCrush, with 64 bits of state.
+// See http://dx.doi.org/10.1145/2714064.2660195 and
+// http://docs.oracle.com/javase/8/docs/api/java/util/SplittableRandom.html
+//
+// Derived from public domain C implementation by Sebastiano Vigna
+// See http://xoshiro.di.unimi.it/splitmix64.c
+public struct SplitMix64: RandomNumberGenerator {
+    private var state: UInt64
+
+    public init(seed: UInt64) {
+        self.state = seed
+    }
+
+    public mutating func next() -> UInt64 {
+        self.state &+= 0x9e3779b97f4a7c15
+        var z: UInt64 = self.state
+        z = (z ^ (z &>> 30)) &* 0xbf58476d1ce4e5b9
+        z = (z ^ (z &>> 27)) &* 0x94d049bb133111eb
+        return z ^ (z &>> 31)
+    }
 }
 
 @inlinable // FIXME(inline-always)
