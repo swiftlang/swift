@@ -224,6 +224,7 @@ FRONTEND_STATISTIC(Sema, NumUnloadedLazyIterableDeclContexts)
 #include "swift/AST/AccessTypeIDZone.def"
 #include "swift/AST/NameLookupTypeIDZone.def"
 #include "swift/AST/TypeCheckerTypeIDZone.def"
+#include "swift/Sema/IDETypeCheckingRequestIDZone.def"
 #include "swift/IDE/IDERequestIDZone.def"
 #undef SWIFT_TYPEID
 

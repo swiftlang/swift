@@ -81,6 +81,7 @@ static bool swiftConformingMethodListImpl(
     // FIXME: error?
     return true;
   }
+  registerIDETypeCheckRequestFunctions(CI.getASTContext().evaluator);
   CI.performSema();
 
   return true;

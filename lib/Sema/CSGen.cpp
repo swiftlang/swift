@@ -3742,7 +3742,7 @@ void ConstraintSystem::optimizeConstraints(Expr *e) {
   e->walk(optimizer);
 }
 
-static bool areGenericRequirementsSatisfied(
+bool swift::areGenericRequirementsSatisfied(
     const DeclContext *DC, const GenericSignature *sig,
     const SubstitutionMap &Substitutions, bool isExtension) {
 
@@ -3764,48 +3764,6 @@ static bool areGenericRequirementsSatisfied(
 
   // Having a solution implies the requirements have been fulfilled.
   return CS.solveSingle().hasValue();
-}
-
-bool swift::isExtensionApplied(const DeclContext *DC, Type BaseTy,
-                               const ExtensionDecl *ED) {
-  // We can't do anything if the base type has unbound generic parameters.
-  // We can't leak type variables into another constraint system.
-  if (BaseTy->hasTypeVariable() || BaseTy->hasUnboundGenericType() ||
-      BaseTy->hasUnresolvedType() || BaseTy->hasError())
-    return true;
-
-  if (!ED->isConstrainedExtension())
-    return true;
-
-  TypeChecker *TC = &createTypeChecker(DC->getASTContext());
-  TC->validateExtension(const_cast<ExtensionDecl *>(ED));
-
-  GenericSignature *genericSig = ED->getGenericSignature();
-  SubstitutionMap substMap = BaseTy->getContextSubstitutionMap(
-      DC->getParentModule(), ED->getExtendedNominal());
-  return areGenericRequirementsSatisfied(DC, genericSig, substMap,
-                                         /*isExtension=*/true);
-}
-
-bool swift::isMemberDeclApplied(const DeclContext *DC, Type BaseTy,
-                                const ValueDecl *VD) {
-  // We can't leak type variables into another constraint system.
-  // We can't do anything if the base type has unbound generic parameters.
-  if (BaseTy->hasTypeVariable() || BaseTy->hasUnboundGenericType()||
-      BaseTy->hasUnresolvedType() || BaseTy->hasError())
-    return true;
-
-  const GenericContext *genericDecl = VD->getAsGenericContext();
-  if (!genericDecl)
-    return true;
-  const GenericSignature *genericSig = genericDecl->getGenericSignature();
-  if (!genericSig)
-    return true;
-
-  SubstitutionMap substMap = BaseTy->getContextSubstitutionMap(
-      DC->getParentModule(), VD->getDeclContext());
-  return areGenericRequirementsSatisfied(DC, genericSig, substMap,
-                                         /*isExtension=*/false);
 }
 
 static bool canSatisfy(Type type1, Type type2, bool openArchetypes,

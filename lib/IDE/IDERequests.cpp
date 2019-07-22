@@ -46,6 +46,7 @@ reinterpret_cast<AbstractRequestFunction *>(&Name::evaluateRequest),
 void swift::registerIDERequestFunctions(Evaluator &evaluator) {
   evaluator.registerRequestFunctions(SWIFT_IDE_REQUESTS_TYPEID_ZONE,
                                      ideRequestFunctions);
+  registerIDETypeCheckRequestFunctions(evaluator);
 }
 
 //----------------------------------------------------------------------------//

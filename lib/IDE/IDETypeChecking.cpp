@@ -24,6 +24,7 @@
 #include "swift/AST/ASTDemangler.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Sema/IDETypeChecking.h"
+#include "swift/Sema/IDETypeCheckingRequests.h"
 #include "swift/IDE/SourceEntityWalker.h"
 #include "swift/IDE/IDERequests.h"
 #include "swift/Parse/Lexer.h"
@@ -755,4 +756,16 @@ collectAllOverriddenDecls(ValueDecl *VD, bool IncludeProtocolRequirements,
   return evaluateOrDefault(VD->getASTContext().evaluator,
     CollectOverriddenDeclsRequest(OverridenDeclsOwner(VD,
       IncludeProtocolRequirements, Transitive)), ArrayRef<ValueDecl*>());
+}
+
+bool swift::isExtensionApplied(const DeclContext *DC, Type BaseTy,
+                               const ExtensionDecl *ED) {
+  return evaluateOrDefault(DC->getASTContext().evaluator,
+    IsDeclApplicableRequest(DeclApplicabilityOwner(DC, BaseTy, ED)), false);
+}
+
+bool swift::isMemberDeclApplied(const DeclContext *DC, Type BaseTy,
+                                const ValueDecl *VD) {
+  return evaluateOrDefault(DC->getASTContext().evaluator,
+    IsDeclApplicableRequest(DeclApplicabilityOwner(DC, BaseTy, VD)), false);
 }
