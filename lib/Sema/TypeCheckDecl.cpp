@@ -3642,18 +3642,16 @@ void bindFuncDeclToOperator(TypeChecker &TC, FuncDecl *FD) {
 
   if (!op) {
     SourceLoc insertionLoc;
-    if (dyn_cast<SourceFile>(FD->getParent())) {
+    if (isa<SourceFile>(FD->getParent())) {
       // Parent context is SourceFile, insertion location is start of func declaration
       // or unary operator
       insertionLoc = FD->isUnaryOperator() ? FD->getAttrs().getStartLoc() : FD->getStartLoc();
     } else {
       // Finding top-level decl context before SourceFile and inserting before it
       for (DeclContext *CurContext = FD->getLocalContext();
-           CurContext;
+           !isa<SourceFile>(CurContext);
            CurContext = CurContext->getParent()) {
         insertionLoc = CurContext->getAsDecl()->getStartLoc();
-        if (dyn_cast<SourceFile>(CurContext->getParent()))
-          break;
       }
     }
 
@@ -3670,8 +3668,9 @@ void bindFuncDeclToOperator(TypeChecker &TC, FuncDecl *FD) {
 
     insertion += operatorName.str();
     insertion += " : <# Precedence Group #>\n";
-    TC.diagnose(FD, diag::declared_operator_without_operator_decl)
-    .fixItInsert(insertionLoc, insertion);
+    InFlightDiagnostic opDiagnostic = TC.diagnose(FD, diag::declared_operator_without_operator_decl);
+    if (insertionLoc.isValid())
+      opDiagnostic.fixItInsert(insertionLoc, insertion);
     return;
   }
 
