@@ -583,8 +583,6 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
     Opts.BridgingHeader = A->getValue();
   Opts.DisableSwiftBridgeAttr |= Args.hasArg(OPT_disable_swift_bridge_attr);
 
-  Opts.DisableModulesValidateSystemHeaders |= Args.hasArg(OPT_disable_modules_validate_system_headers);
-
   Opts.DisableOverlayModules |= Args.hasArg(OPT_emit_imported_modules);
 
   if (const Arg *A = Args.getLastArg(OPT_pch_output_dir)) {
@@ -636,6 +634,9 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts,
     Opts.RuntimeResourcePath = A->getValue();
 
   Opts.SkipRuntimeLibraryImportPaths |= Args.hasArg(OPT_nostdimport);
+
+  Opts.DisableModulesValidateSystemDependencies |=
+      Args.hasArg(OPT_disable_modules_validate_system_headers);
 
   // Opts.RuntimeIncludePath is set by calls to
   // setRuntimeIncludePath() or setMainExecutablePath().
