@@ -136,8 +136,8 @@ class BuildScriptInvocation(object):
     def apply_default_arguments(toolchain, args):
         # Infer if ninja is required
         ninja_required = (
-            args.cmake_generator == 'Ninja' or args.build_foundation
-            or args.build_sourcekitlsp or args.build_indexstoredb)
+            args.cmake_generator == 'Ninja' or args.build_foundation or
+            args.build_sourcekitlsp or args.build_indexstoredb)
         if ninja_required and toolchain.ninja is None:
             args.build_ninja = True
 
