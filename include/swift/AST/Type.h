@@ -611,7 +611,6 @@ inline T *staticCastHelper(const Type &Ty) {
 template <typename T>
 using TypeArrayView = ArrayRefView<Type, T*, staticCastHelper,
                                    /*AllowOrigAccess*/true>;
-
 } // end namespace swift
 
 namespace llvm {

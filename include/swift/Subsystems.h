@@ -401,6 +401,12 @@ namespace swift {
   /// The ASTContext will automatically call these upon construction.
   void registerIDERequestFunctions(Evaluator &evaluator);
 
+  /// Register type check request functions for IDE's usage with the evaluator.
+  ///
+  /// The ASTContext will automatically call these upon construction.
+  /// Calling registerIDERequestFunctions will invoke this function as well.
+  void registerIDETypeCheckRequestFunctions(Evaluator &evaluator);
+
 } // end namespace swift
 
 #endif // SWIFT_SUBSYSTEMS_H

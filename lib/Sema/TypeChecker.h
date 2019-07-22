@@ -2144,6 +2144,11 @@ bool fixDeclarationObjCName(InFlightDiagnostic &diag, ValueDecl *decl,
                             Optional<ObjCSelector> targetNameOpt,
                             bool ignoreImpliedName = false);
 
+bool areGenericRequirementsSatisfied(const DeclContext *DC,
+                                     const GenericSignature *sig,
+                                     const SubstitutionMap &Substitutions,
+                                     bool isExtension);
+
 } // end namespace swift
 
 #endif

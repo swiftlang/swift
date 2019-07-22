@@ -189,9 +189,10 @@ bool CompilerInstance::setUpASTContextIfNeeded() {
                                 Diagnostics));
   registerTypeCheckerRequestFunctions(Context->evaluator);
 
-  // Migrator and indexing need some IDE requests.
+  // Migrator, indexing and typo correction need some IDE requests.
   if (Invocation.getMigratorOptions().shouldRunMigrator() ||
-      !Invocation.getFrontendOptions().IndexStorePath.empty()) {
+      !Invocation.getFrontendOptions().IndexStorePath.empty() ||
+      Invocation.getLangOptions().TypoCorrectionLimit) {
     registerIDERequestFunctions(Context->evaluator);
   }
   if (setUpModuleLoaders())

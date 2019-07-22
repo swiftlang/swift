@@ -211,6 +211,7 @@ static bool swiftCodeCompleteImpl(
       *CI.getASTContext().getClangModuleLoader());
   SwiftConsumer.setContext(&CI.getASTContext(), &Invocation,
                            &CompletionContext);
+  registerIDETypeCheckRequestFunctions(CI.getASTContext().evaluator);
   CI.performSema();
   SwiftConsumer.clearContext();
 
