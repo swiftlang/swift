@@ -4659,6 +4659,14 @@ void ProtocolDecl::computeKnownProtocolKind() const {
   const_cast<ProtocolDecl *>(this)->Bits.ProtocolDecl.KnownProtocol = value;
 }
 
+
+StorageImplInfo AbstractStorageDecl::getImplInfo() const {
+  ASTContext &ctx = getASTContext();
+  return evaluateOrDefault(ctx.evaluator,
+    StorageImplInfoRequest{const_cast<AbstractStorageDecl *>(this)},
+    StorageImplInfo::getSimpleStored(StorageIsMutable));
+}
+
 bool AbstractStorageDecl::hasPrivateAccessor() const {
   for (auto accessor : getAllAccessors()) {
     if (hasPrivateOrFilePrivateFormalAccess(accessor))
