@@ -52,5 +52,6 @@ def run_build_script_helper(action, host_target, product, args):
         '--build-path', product.build_dir,
         '--configuration', configuration,
         '--toolchain', toolchain_path,
+        '--ninja-bin', product.toolchain.ninja,
     ]
     shell.call(helper_cmd)
