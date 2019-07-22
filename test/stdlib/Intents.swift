@@ -75,10 +75,10 @@ if #available(iOS 12.0, watchOS 5.0, *) {
     case .userActivity:
       expectUnreachable()
     }
-    // test convenince properties
+    // test convenience properties
     expectEqual(shortcutWithIntent.intent, originalIntent)
     expectEqual(shortcutWithIntent.userActivity, nil)
-    // test convenince init
+    // test convenience init
     expectEqual(INShortcut(intent: originalIntent), shortcutWithIntent)
 
     // NSUserActivity
@@ -90,10 +90,10 @@ if #available(iOS 12.0, watchOS 5.0, *) {
     case .userActivity(let userActivity):
       expectEqual(userActivity, originalUserActivity)
     }
-    // test convenince properties
+    // test convenience properties
     expectEqual(shortcutWithNSUA.intent, nil)
     expectEqual(shortcutWithNSUA.userActivity, originalUserActivity)
-    // test convenince init
+    // test convenience init
     expectEqual(INShortcut(userActivity: originalUserActivity), shortcutWithNSUA)
   }
 

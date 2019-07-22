@@ -675,7 +675,7 @@ bb0(%0 : $FakeStaticString, %1 : $FakeString, %2 : $FakeStaticString):
 }
 
 // This test makes sure that we handle cases where the callee has field uses
-// that are processed in a different order than the fields are layed out in the
+// that are processed in a different order than the fields are laid out in the
 // structure.
 // CHECK-LABEL: sil [serialized] [signature_optimized_thunk] [always_inline] @check_out_of_order_uses_callee : $@convention(thin) (S1) -> () {
 // CHECK: bb0([[IN:%.*]] : $S1):
