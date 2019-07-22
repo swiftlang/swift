@@ -84,11 +84,9 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
     case KeyPathRoot:
     case KeyPathValue:
     case KeyPathComponentResult:
-      if (unsigned numValues = numNumericValuesInPathElement(elt.getKind())) {
-        id.AddInteger(elt.getValue());
-        if (numValues > 1)
-          id.AddInteger(elt.getValue2());
-      }
+      auto numValues = numNumericValuesInPathElement(elt.getKind());
+      for (unsigned i = 0; i < numValues; ++i)
+        id.AddInteger(elt.getValue(i));
       break;
     }
   }
@@ -152,7 +150,7 @@ bool ConstraintLocator::isKeyPathSubscriptComponent() const {
     if (!elt.isKeyPathComponent())
       return false;
 
-    auto index = elt.getValue();
+    auto index = elt.getKeyPathComponentIdx();
     auto &component = KPE->getComponents()[index];
     return component.getKind() == ComponentKind::Subscript ||
            component.getKind() == ComponentKind::UnresolvedSubscript;
@@ -255,8 +253,8 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
       break;
 
     case ApplyArgToParam:
-      out << "comparing call argument #" << llvm::utostr(elt.getValue())
-          << " to parameter #" << llvm::utostr(elt.getValue2());
+      out << "comparing call argument #" << llvm::utostr(elt.getArgIdx())
+          << " to parameter #" << llvm::utostr(elt.getParamIdx());
       break;
         
     case ClosureResult:
@@ -284,7 +282,7 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
       break;
 
     case GenericArgument:
-      out << "generic argument #" << llvm::utostr(elt.getValue());
+      out << "generic argument #" << llvm::utostr(elt.getGenericArgIdx());
       break;
 
     case InstanceType:
@@ -304,7 +302,7 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
       break;
 
     case NamedTupleElement:
-      out << "named tuple element #" << llvm::utostr(elt.getValue());
+      out << "named tuple element #" << llvm::utostr(elt.getTupleElementIdx());
       break;
 
     case UnresolvedMember:
@@ -332,11 +330,12 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
       break;
 
     case TupleElement:
-      out << "tuple element #" << llvm::utostr(elt.getValue());
+      out << "tuple element #" << llvm::utostr(elt.getTupleElementIdx());
       break;
 
     case KeyPathComponent:
-      out << "key path component #" << llvm::utostr(elt.getValue());
+      out << "key path component #"
+          << llvm::utostr(elt.getKeyPathComponentIdx());
       break;
 
     case Requirement:
@@ -354,13 +353,15 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
       break;
 
     case ConditionalRequirement:
-      out << "conditional requirement #" << llvm::utostr(elt.getValue());
-      dumpReqKind(static_cast<RequirementKind>(elt.getValue2()));
+      out << "conditional requirement #"
+          << llvm::utostr(elt.getRequirementIdx());
+      dumpReqKind(elt.getRequirementKind());
       break;
 
     case TypeParameterRequirement: {
-      out << "type parameter requirement #" << llvm::utostr(elt.getValue());
-      dumpReqKind(static_cast<RequirementKind>(elt.getValue2()));
+      out << "type parameter requirement #"
+          << llvm::utostr(elt.getRequirementIdx());
+      dumpReqKind(elt.getRequirementKind());
       break;
     }
 
@@ -380,7 +381,7 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
       break;
 
     case SynthesizedArgument:
-      out << "synthesized argument #" << llvm::utostr(elt.getValue());
+      out << "synthesized argument #" << llvm::utostr(elt.getArgIdx());
       break;
 
     case KeyPathDynamicMember:

@@ -243,7 +243,7 @@ public:
     auto &last = path.back();
     assert(last.isTypeParameterRequirement() ||
            last.isConditionalRequirement());
-    assert(static_cast<RequirementKind>(last.getValue2()) == kind);
+    assert(last.getRequirementKind() == kind);
 
     // It's possible sometimes not to have no base expression.
     if (!expr)
@@ -258,9 +258,7 @@ public:
     assert(!path.empty());
 
     auto &requirementLoc = path.back();
-    assert(requirementLoc.isTypeParameterRequirement() ||
-           requirementLoc.isConditionalRequirement());
-    return requirementLoc.getValue();
+    return requirementLoc.getRequirementIdx();
   }
 
   /// The generic base type where failing requirement comes from.

@@ -1549,7 +1549,7 @@ namespace {
           [](ConstraintLocator *locator) -> unsigned {
         for (const auto &elt : locator->getPath()) {
           if (elt.getKind() == ConstraintLocator::KeyPathComponent)
-            return elt.getValue();
+            return elt.getKeyPathComponentIdx();
         }
         llvm_unreachable("no keypath component node");
       };

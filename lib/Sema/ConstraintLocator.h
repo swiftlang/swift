@@ -296,6 +296,19 @@ public:
       return { (PathElementKind)((unsigned)storage & 0xFF), storage >> 8 };
     }
 
+    /// Retrieve a value associated with the path element.
+    unsigned getValue(unsigned index) const {
+      unsigned numValues = numNumericValuesInPathElement(getKind());
+      assert(index < numValues && "Index out of range for path element value");
+
+      // We pack values into 16 bit components of the storage, with value0
+      // being stored in the upper bits, valueN in the lower bits. Therefore we
+      // need to shift out any extra values in the lower bits.
+      auto extraValues = numValues - index - 1;
+      auto value = decodeStorage(storage).second >> (extraValues * 16);
+      return value & 0xFFFF;
+    }
+
     PathElement(PathElementKind kind, unsigned value)
       : storage(encodeStorage(kind, value)), storedKind(StoredKindAndValue)
     {
@@ -431,29 +444,50 @@ public:
       llvm_unreachable("Unhandled StoredKind in switch.");
     }
 
-    /// Retrieve the value associated with this path element,
-    /// if it has one.
-    unsigned getValue() const {
-      unsigned numValues = numNumericValuesInPathElement(getKind());
-      assert(numValues > 0 && "No value in path element!");
-
-      auto value = decodeStorage(storage).second;
-      if (numValues == 1) {
-        return value;
-      }
-
-      return value >> 16;
+    /// Retrieve the index for a function argument path element.
+    unsigned getArgIdx() const {
+      assert((getKind() == ApplyArgToParam || isSynthesizedArgument()) &&
+             "Not an argument path element");
+      return getValue(0);
     }
 
-    /// Retrieve the second value associated with this path element,
-    /// if it has one.
-    unsigned getValue2() const {
-      unsigned numValues = numNumericValuesInPathElement(getKind());
-      (void)numValues;
-      assert(numValues == 2 && "No second value in path element!");
+    /// Retrieve the parameter index for an apply-arg-to-param path element.
+    unsigned getParamIdx() const {
+      assert(getKind() == ApplyArgToParam && "Not a parameter application");
+      return getValue(1);
+    }
 
-      auto value = decodeStorage(storage).second;
-      return value & 0x00FFFF;
+    /// Retrieve the index for a tuple element.
+    unsigned getTupleElementIdx() const {
+      assert((getKind() == TupleElement || getKind() == NamedTupleElement) &&
+             "Not a tuple element");
+      return getValue(0);
+    }
+
+    /// Retrieve the index for a key path component path element.
+    unsigned getKeyPathComponentIdx() const {
+      assert(isKeyPathComponent() && "Not a key path component");
+      return getValue(0);
+    }
+
+    /// Retrieve the index for a generic argument path element.
+    unsigned getGenericArgIdx() const {
+      assert(getKind() == GenericArgument && "Not a generic argument");
+      return getValue(0);
+    }
+
+    /// Retrieve the index for a generic requirement path element.
+    unsigned getRequirementIdx() const {
+      assert((isTypeParameterRequirement() || isConditionalRequirement()) &&
+             "Not a requirement");
+      return getValue(0);
+    }
+
+    /// Retrieve the kind of generic requirement path element.
+    RequirementKind getRequirementKind() const {
+      assert((isTypeParameterRequirement() || isConditionalRequirement()) &&
+             "Not a requirement");
+      return static_cast<RequirementKind>(getValue(1));
     }
 
     /// Retrieve the declaration for a witness path element.
@@ -522,7 +556,7 @@ public:
     /// Determine whether this element points to the contextual type
     /// associated with result of a single expression function.
     bool isResultOfSingleExprFunction() const {
-      return getKind() == PathElementKind::ContextualType ? bool(getValue())
+      return getKind() == PathElementKind::ContextualType ? bool(getValue(0))
                                                           : false;
     }
   };

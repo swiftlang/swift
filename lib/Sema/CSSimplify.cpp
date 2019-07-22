@@ -769,7 +769,7 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
       return std::make_tuple(nullptr, /*hasAppliedSelf=*/false, argLabels,
                              hasTrailingClosure, nullptr);
 
-    auto componentIndex = path[0].getValue();
+    auto componentIndex = path[0].getKeyPathComponentIdx();
     if (componentIndex >= keyPath->getComponents().size())
       return std::make_tuple(nullptr, /*hasAppliedSelf=*/false, argLabels,
                              hasTrailingClosure, nullptr);
@@ -2106,8 +2106,7 @@ static ConstraintFix *fixRequirementFailure(ConstraintSystem &cs, Type type1,
 
   auto *reqLoc = cs.getConstraintLocator(anchor, path);
 
-  auto reqKind = static_cast<RequirementKind>(req.getValue2());
-  switch (reqKind) {
+  switch (req.getRequirementKind()) {
   case RequirementKind::SameType: {
     return SkipSameTypeRequirement::create(cs, type1, type2, reqLoc);
   }
@@ -5692,7 +5691,8 @@ ConstraintSystem::simplifyKeyPathConstraint(Type keyPathTy,
     if (locator->getAnchor() == keyPath
         && locator->getPath().size() <= 2
         && locator->getPath()[0].getKind() == ConstraintLocator::KeyPathComponent) {
-      choices[locator->getPath()[0].getValue()] = resolvedItem->Choice;
+      auto idx = locator->getPath()[0].getKeyPathComponentIdx();
+      choices[idx] = resolvedItem->Choice;
     }
   }
 

@@ -175,7 +175,7 @@ void constraints::simplifyLocator(Expr *&anchor,
     case ConstraintLocator::NamedTupleElement:
     case ConstraintLocator::TupleElement: {
       // Extract tuple element.
-      unsigned index = path[0].getValue();
+      unsigned index = path[0].getTupleElementIdx();
       if (auto tupleExpr = dyn_cast<TupleExpr>(anchor)) {
         if (index < tupleExpr->getNumElements()) {
           anchor = tupleExpr->getElement(index);
@@ -197,7 +197,7 @@ void constraints::simplifyLocator(Expr *&anchor,
     case ConstraintLocator::ApplyArgToParam:
       // Extract tuple element.
       if (auto tupleExpr = dyn_cast<TupleExpr>(anchor)) {
-        unsigned index = path[0].getValue();
+        unsigned index = path[0].getArgIdx();
         if (index < tupleExpr->getNumElements()) {
           anchor = tupleExpr->getElement(index);
           path = path.slice(1);
@@ -207,7 +207,7 @@ void constraints::simplifyLocator(Expr *&anchor,
 
       // Extract subexpression in parentheses.
       if (auto parenExpr = dyn_cast<ParenExpr>(anchor)) {
-        assert(path[0].getValue() == 0);
+        assert(path[0].getArgIdx() == 0);
 
         anchor = parenExpr->getSubExpr();
         path = path.slice(1);
@@ -901,7 +901,7 @@ diagnoseUnresolvedDotExprTypeRequirementFailure(ConstraintSystem &cs,
 
   auto req = member->getAsGenericContext()
                  ->getGenericSignature()
-                 ->getRequirements()[last.getValue()];
+                 ->getRequirements()[last.getRequirementIdx()];
 
   Diag<Type, Type, Type, Type, StringRef> note;
   switch (req.getKind()) {

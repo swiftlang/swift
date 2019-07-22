@@ -271,8 +271,8 @@ FailureDiagnostic::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
     fnInterfaceType = resolveInterfaceType(rawFnType);
   }
 
-  auto argIdx = applyArgElt->getValue();
-  auto paramIdx = applyArgElt->getValue2();
+  auto argIdx = applyArgElt->getArgIdx();
+  auto paramIdx = applyArgElt->getParamIdx();
 
   return FunctionArgApplyInfo(argExpr, argIdx, getType(argExpr), paramIdx,
                               fnInterfaceType, fnType, callee);
@@ -1263,7 +1263,7 @@ bool RValueTreatedAsLValueFailure::diagnoseAsError() {
       subElementDiagID = diag::cannot_pass_rvalue_inout_subelement;
       rvalueDiagID = diag::cannot_pass_rvalue_inout;
       if (auto argTuple = dyn_cast<TupleExpr>(argExpr))
-        diagExpr = argTuple->getElement(lastPathElement.getValue());
+        diagExpr = argTuple->getElement(lastPathElement.getArgIdx());
       else if (auto parens = dyn_cast<ParenExpr>(argExpr))
         diagExpr = parens->getSubExpr();
     } else {
@@ -2417,7 +2417,7 @@ bool AutoClosureForwardingFailure::diagnoseAsError() {
 
   // We need a raw anchor here because `getAnchor()` is simplified
   // to the argument expression.
-  auto *argExpr = getArgumentExpr(getRawAnchor(), last.getValue());
+  auto *argExpr = getArgumentExpr(getRawAnchor(), last.getArgIdx());
   emitDiagnostic(argExpr->getLoc(), diag::invalid_autoclosure_forwarding)
       .highlight(argExpr->getSourceRange())
       .fixItInsertAfter(argExpr->getEndLoc(), "()");
@@ -3578,7 +3578,7 @@ bool KeyPathSubscriptIndexHashableFailure::diagnoseAsError() {
     auto *KPE = cast<KeyPathExpr>(anchor);
     for (auto &elt : locator->getPath()) {
       if (elt.isKeyPathComponent()) {
-        loc = KPE->getComponents()[elt.getValue()].getLoc();
+        loc = KPE->getComponents()[elt.getKeyPathComponentIdx()].getLoc();
         break;
       }
     }
@@ -3600,7 +3600,7 @@ SourceLoc InvalidMemberRefInKeyPath::getLoc() const {
         });
 
     assert(component != locator->getPath().end());
-    return KPE->getComponents()[component->getValue()].getLoc();
+    return KPE->getComponents()[component->getKeyPathComponentIdx()].getLoc();
   }
 
   return anchor->getLoc();
@@ -3689,7 +3689,7 @@ bool CollectionElementContextualFailure::diagnoseAsError() {
   if (isa<DictionaryExpr>(getRawAnchor())) {
     const auto &eltLoc = locator->getPath().back();
 
-    switch (eltLoc.getValue()) {
+    switch (eltLoc.getTupleElementIdx()) {
     case 0: // key
       diagnostic.emplace(emitDiagnostic(anchor->getLoc(),
                                         diag::cannot_convert_dict_key, eltType,
