@@ -654,6 +654,8 @@ Expr *swift::buildPropertyWrapperInitialValueCall(
         wrapperAttrs[i]->getTypeLoc().getLoc(),
         wrapperType, ctx);
 
+    SourceLoc startLoc = wrapperAttrs[i]->getTypeLoc().getSourceRange().Start;
+
     // If there were no arguments provided for the attribute at this level,
     // call `init(wrappedValue:)` directly.
     auto attr = wrapperAttrs[i];
@@ -664,8 +666,10 @@ Expr *swift::buildPropertyWrapperInitialValueCall(
         argName = init->getFullName().getArgumentNames()[0];
       }
 
-      initializer = CallExpr::createImplicit(
-          ctx, typeExpr, {initializer}, {argName});
+      initializer = CallExpr::create(
+         ctx, typeExpr, startLoc, {initializer}, {argName},
+         {initializer->getStartLoc()}, initializer->getEndLoc(),
+         nullptr, /*implicit=*/true);
       continue;
     }
 
@@ -675,7 +679,7 @@ Expr *swift::buildPropertyWrapperInitialValueCall(
     SmallVector<SourceLoc, 4> elementLocs;
     elements.push_back(initializer);
     elementNames.push_back(ctx.Id_wrappedValue);
-    elementLocs.push_back(SourceLoc());
+    elementLocs.push_back(initializer->getStartLoc());
 
     if (auto tuple = dyn_cast<TupleExpr>(attr->getArg())) {
       for (unsigned i : range(tuple->getNumElements())) {
@@ -690,8 +694,9 @@ Expr *swift::buildPropertyWrapperInitialValueCall(
       elementLocs.push_back(SourceLoc());
     }
 
-    initializer = CallExpr::createImplicit(
-        ctx, typeExpr, elements, elementNames);
+    initializer = CallExpr::create(
+        ctx, typeExpr, startLoc, elements, elementNames, elementLocs,
+        attr->getArg()->getEndLoc(), nullptr, /*implicit=*/true);
   }
   
   return initializer;

@@ -1147,7 +1147,8 @@ NodePointer Demangler::demangleBuiltinType() {
       name.append(BUILTIN_TYPE_NAME_VEC, *this);
       name.append(elts, *this);
       name.push_back('x', *this);
-      name.append(EltType->getText().substr(strlen(BUILTIN_TYPE_NAME_PREFIX)), *this);
+      name.append(EltType->getText().substr(BUILTIN_TYPE_NAME_PREFIX.size()),
+                  *this);
       Ty = createNode(Node::Kind::BuiltinTypeName, name);
       break;
     }

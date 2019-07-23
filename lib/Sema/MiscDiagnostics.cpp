@@ -2235,6 +2235,7 @@ class OpaqueUnderlyingTypeChecker : public ASTWalker {
   TypeChecker &TC;
   AbstractFunctionDecl *Implementation;
   OpaqueTypeDecl *OpaqueDecl;
+  BraceStmt *Body;
   SmallVector<std::pair<Expr*, Type>, 4> Candidates;
 
   bool HasInvalidReturn = false;
@@ -2242,16 +2243,18 @@ class OpaqueUnderlyingTypeChecker : public ASTWalker {
 public:
   OpaqueUnderlyingTypeChecker(TypeChecker &TC,
                               AbstractFunctionDecl *Implementation,
-                              OpaqueTypeDecl *OpaqueDecl)
+                              OpaqueTypeDecl *OpaqueDecl,
+                              BraceStmt *Body)
     : TC(TC),
       Implementation(Implementation),
-      OpaqueDecl(OpaqueDecl)
+      OpaqueDecl(OpaqueDecl),
+      Body(Body)
   {
     
   }
   
   void check() {
-    Implementation->getBody()->walk(*this);
+    Body->walk(*this);
 
     // If given function has any invalid returns in the body
     // let's not try to validate the types, since it wouldn't
@@ -2835,8 +2838,9 @@ performTopLevelDeclDiagnostics(TypeChecker &TC, TopLevelCodeDecl *TLCD) {
 
 /// Perform diagnostics for func/init/deinit declarations.
 void swift::performAbstractFuncDeclDiagnostics(TypeChecker &TC,
-                                               AbstractFunctionDecl *AFD) {
-  assert(AFD->getBody() && "Need a body to check");
+                                               AbstractFunctionDecl *AFD,
+                                               BraceStmt *body) {
+  assert(body && "Need a body to check");
   
   // Don't produce these diagnostics for implicitly generated code.
   if (AFD->getLoc().isInvalid() || AFD->isImplicit() || AFD->isInvalid())
@@ -2844,17 +2848,17 @@ void swift::performAbstractFuncDeclDiagnostics(TypeChecker &TC,
   
   // Check for unused variables, as well as variables that are could be
   // declared as constants.
-  AFD->getBody()->walk(VarDeclUsageChecker(TC, AFD));
+  body->walk(VarDeclUsageChecker(TC, AFD));
   
   // If the function has an opaque return type, check the return expressions
   // to determine the underlying type.
   if (auto opaqueResultTy = AFD->getOpaqueResultTypeDecl()) {
-    OpaqueUnderlyingTypeChecker(TC, AFD, opaqueResultTy).check();
+    OpaqueUnderlyingTypeChecker(TC, AFD, opaqueResultTy, body).check();
   } else if (auto accessor = dyn_cast<AccessorDecl>(AFD)) {
     if (accessor->isGetter()) {
       if (auto opaqueResultTy
                           = accessor->getStorage()->getOpaqueResultTypeDecl()) {
-        OpaqueUnderlyingTypeChecker(TC, AFD, opaqueResultTy).check();
+        OpaqueUnderlyingTypeChecker(TC, AFD, opaqueResultTy, body).check();
       }
     }
   }

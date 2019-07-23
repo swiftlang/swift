@@ -102,7 +102,7 @@ ASTBuilder::createBuiltinType(StringRef builtinName,
 
     ModuleDecl::AccessPathTy accessPath;
     StringRef strippedName =
-          builtinName.drop_front(strlen(BUILTIN_TYPE_NAME_PREFIX));
+        builtinName.drop_front(BUILTIN_TYPE_NAME_PREFIX.size());
     Ctx.TheBuiltinModule->lookupValue(accessPath,
                                       Ctx.getIdentifier(strippedName),
                                       NLKind::QualifiedLookup,

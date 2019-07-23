@@ -316,7 +316,8 @@ BUILTIN_SIL_OPERATION(EndUnpairedAccess, "endUnpairedAccess", Special)
 
 /// condfail(Int1) -> ()
 /// Triggers a runtime failure if the condition is true.
-BUILTIN_SIL_OPERATION(CondFail, "condfail", Special)
+/// This builtin is deprecated. Use condfail_message instead.
+BUILTIN_SIL_OPERATION(LegacyCondFail, "condfail", Special)
 
 /// fixLifetime(T) -> ()
 /// Fixes the lifetime of any heap references in a value.
@@ -407,6 +408,10 @@ BUILTIN_RUNTIME_CALL(IsOptionalType, "isOptional", "")
 #define BUILTIN_MISC_OPERATION(Id, Name, Attrs, Overload) \
           BUILTIN(Id, Name, Attrs)
 #endif
+
+/// condfail_message(Int1, RawPointer) -> ()
+/// Triggers a runtime failure if the condition is true.
+BUILTIN_MISC_OPERATION(CondFailMessage, "condfail_message", "", Special)
 
 /// Sizeof has type T.Type -> Int
 BUILTIN_MISC_OPERATION(Sizeof, "sizeof", "n", Special)

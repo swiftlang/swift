@@ -21,6 +21,7 @@
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/LazyResolver.h"
 #include "swift/AST/LinkLibrary.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
@@ -3556,6 +3557,17 @@ public:
   }
 
   void visitAccessorDecl(const AccessorDecl *fn) {
+    // Accessor synthesis and type checking is now sufficiently lazy that
+    // we might have unvalidated accessors in a primary file.
+    //
+    // FIXME: Once accessor synthesis and getInterfaceType() itself are
+    // request-ified this goes away.
+    if (!fn->hasValidSignature()) {
+      assert(fn->isImplicit());
+      S.M->getASTContext().getLazyResolver()->resolveDeclSignature(
+          const_cast<AccessorDecl *>(fn));
+    }
+
     using namespace decls_block;
     verifyAttrSerializable(fn);
 

@@ -112,6 +112,7 @@ public:
   llvm::IntrusiveRefCntPtr<clang::InMemoryOutputFileSystem>
       InMemoryOutputFileSystem;
 
+
   /// Return a hash code of any components from these options that should
   /// contribute to a Swift Bridging PCH hash.
   llvm::hash_code getPCHHashComponents() const {

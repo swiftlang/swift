@@ -25,6 +25,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/IDE/SourceEntityWalker.h"
+#include "swift/IDE/IDERequests.h"
 #include "swift/Parse/Lexer.h"
 
 using namespace swift;
@@ -739,4 +740,19 @@ swift::collectExpressionType(SourceFile &SF,
     CanonicalType, OS);
   Walker.walk(SF);
   return Scratch;
+}
+
+ArrayRef<ValueDecl*> swift::
+canDeclProvideDefaultImplementationFor(ValueDecl* VD) {
+  return evaluateOrDefault(VD->getASTContext().evaluator,
+                           ProvideDefaultImplForRequest(VD),
+                           ArrayRef<ValueDecl*>());
+}
+
+ArrayRef<ValueDecl*> swift::
+collectAllOverriddenDecls(ValueDecl *VD, bool IncludeProtocolRequirements,
+                          bool Transitive) {
+  return evaluateOrDefault(VD->getASTContext().evaluator,
+    CollectOverriddenDeclsRequest(OverridenDeclsOwner(VD,
+      IncludeProtocolRequirements, Transitive)), ArrayRef<ValueDecl*>());
 }

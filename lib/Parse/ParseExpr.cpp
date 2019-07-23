@@ -3447,8 +3447,10 @@ Parser::parseExprCollectionElement(Optional<bool> &isDictionary) {
   if (!isDictionary.hasValue())
     isDictionary = Tok.is(tok::colon);
 
-  if (!*isDictionary)
+  if (!*isDictionary) {
+    validateCollectionElement(Element);
     return Element;
+  }
 
   if (Element.isNull())
     return Element;
@@ -3469,6 +3471,43 @@ Parser::parseExprCollectionElement(Optional<bool> &isDictionary) {
   return makeParserResult(
       ParserStatus(Element) | ParserStatus(Value),
       TupleExpr::createImplicit(Context, {Element.get(), Value.get()}, {}));
+}
+
+/// validateCollectionElement - Check if a given collection element is valid.
+///
+/// At the moment, this checks whether a given collection element is a subscript
+/// expression and whether we're subscripting into an array. If we are, then it
+/// we emit a diagnostic in case it was not something that the user was
+/// expecting.
+///
+/// For example: `let array [ [0, 1] [42] ]`
+void Parser::validateCollectionElement(ParserResult<Expr> element) {
+  if (element.isNull())
+    return;
+
+  auto elementExpr = element.get();
+  if (!isa<SubscriptExpr>(elementExpr))
+    return;
+
+  auto subscriptExpr = cast<SubscriptExpr>(elementExpr);
+  if (!isa<ArrayExpr>(subscriptExpr->getBase()))
+    return;
+
+  auto arrayExpr = cast<ArrayExpr>(subscriptExpr->getBase());
+
+  auto startLocOfSubscript = subscriptExpr->getIndex()->getStartLoc();
+  auto endLocOfArray = arrayExpr->getEndLoc();
+  auto locForEndOfTokenArray = L->getLocForEndOfToken(SourceMgr, endLocOfArray);
+
+  if (locForEndOfTokenArray != startLocOfSubscript) {
+    auto subscriptLoc = subscriptExpr->getLoc();
+    diagnose(subscriptLoc, diag::subscript_array_element)
+        .highlight(subscriptExpr->getSourceRange());
+    diagnose(subscriptLoc, diag::subscript_array_element_fix_it_add_comma)
+        .fixItInsertAfter(endLocOfArray, ",");
+    diagnose(subscriptLoc, diag::subscript_array_element_fix_it_remove_space)
+        .fixItRemoveChars(locForEndOfTokenArray, startLocOfSubscript);
+  }
 }
 
 void Parser::addPatternVariablesToScope(ArrayRef<Pattern *> Patterns) {

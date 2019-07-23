@@ -4,8 +4,7 @@
 // RUN: %FileCheck %s < %t.simple.txt
 // RUN: %FileCheck -check-prefix SIMPLE %s < %t.simple.txt
 
-// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -static-stdlib %s 2>&1 > %t.simple.txt
-// RUN: %FileCheck -check-prefix SIMPLE_STATIC -implicit-check-not -rpath %s < %t.simple.txt
+// RUN: not %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -static-stdlib %s 2>&1 | %FileCheck -check-prefix=SIMPLE_STATIC %s
 
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-ios7.1 %s 2>&1 > %t.simple.txt
 // RUN: %FileCheck -check-prefix IOS_SIMPLE %s < %t.simple.txt
@@ -106,21 +105,7 @@
 // SIMPLE: -o linker
 
 
-// SIMPLE_STATIC: swift
-// SIMPLE_STATIC: -o [[OBJECTFILE:.*]]
-
-// SIMPLE_STATIC-NEXT: {{(bin/)?}}ld{{"? }}
-// SIMPLE_STATIC: [[OBJECTFILE]]
-// SIMPLE_STATIC: -lobjc
-// SIMPLE_STATIC: -lSystem
-// SIMPLE_STATIC: -arch x86_64
-// SIMPLE_STATIC: -L [[STDLIB_PATH:[^ ]+(/|\\\\)lib(/|\\\\)swift_static(/|\\\\)macosx]]
-// SIMPLE_STATIC: -lc++
-// SIMPLE_STATIC: -framework Foundation
-// SIMPLE_STATIC: -force_load_swift_libs
-// SIMPLE_STATIC: -macosx_version_min 10.{{[0-9]+}}.{{[0-9]+}}
-// SIMPLE_STATIC: -no_objc_category_merging
-// SIMPLE_STATIC: -o linker
+// SIMPLE_STATIC: error: -static-stdlib is no longer supported on Apple platforms
 
 
 // IOS_SIMPLE: swift

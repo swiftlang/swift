@@ -15,7 +15,7 @@
 /// When you use this type, you become partially responsible for
 /// keeping the object alive.
 @frozen
-public struct Unmanaged<Instance : AnyObject> {
+public struct Unmanaged<Instance: AnyObject> {
   @usableFromInline
   internal unowned(unsafe) var _value: Instance
 
@@ -194,7 +194,7 @@ public struct Unmanaged<Instance : AnyObject> {
   ///        }
   ///    }
   ///
-  ///    func doSomething(_ u : Unmanaged<Owned>) {
+  ///    func doSomething(_ u: Unmanaged<Owned>) {
   ///      u._withUnsafeGuaranteedRef {
   ///        $0.doSomething()
   ///      }

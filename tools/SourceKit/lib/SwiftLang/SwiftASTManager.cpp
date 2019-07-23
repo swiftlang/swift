@@ -946,7 +946,6 @@ ASTUnitRef ASTProducer::createASTUnit(
   auto &Consumer = ASTRef->Impl.CollectDiagConsumer;
   // Display diagnostics to stderr.
   CompIns.addDiagnosticConsumer(&Consumer);
-
   trace::TracedOperation TracedOp(trace::OperationKind::PerformSema);
   trace::SwiftInvocation TraceInfo;
   if (TracedOp.enabled()) {
@@ -975,7 +974,7 @@ ASTUnitRef ASTProducer::createASTUnit(
     Error = "compilation setup failed";
     return nullptr;
   }
-
+  registerIDERequestFunctions(CompIns.getASTContext().evaluator);
   if (TracedOp.enabled()) {
     TracedOp.start(TraceInfo);
   }

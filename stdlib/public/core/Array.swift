@@ -1899,7 +1899,7 @@ internal struct _ArrayAnyHashableBox<Element: Hashable>
     return hasher._finalize()
   }
 
-  internal func _unbox<T : Hashable>() -> T? {
+  internal func _unbox<T: Hashable>() -> T? {
     return _value as? T
   }
 

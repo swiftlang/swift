@@ -3785,24 +3785,25 @@ for host in "${ALL_HOSTS[@]}"; do
                     echo "--install-destdir is required to install products."
                     exit 1
                 fi
-
-                case ${host} in
-                    linux-*)
+                if [[ "$using_xcodebuild" == "TRUE" ]] ; then
+                    case ${host} in
+                        linux-*)
                         ;;
-                    freebsd-*)
+                        freebsd-*)
                         ;;
-                    cygwin-*)
+                        cygwin-*)
                         ;;
-                    haiku-*)
+                        haiku-*)
                         ;;
-                    macosx-*)
-                        set_lldb_xcodebuild_options
-                        set_lldb_build_mode
-                        with_pushd ${LLDB_SOURCE_DIR} \
-                            call xcodebuild -target toolchain -configuration ${LLDB_BUILD_MODE} install "${lldb_xcodebuild_options[@]}" DSTROOT="${host_install_destdir}" LLDB_TOOLCHAIN_PREFIX="${TOOLCHAIN_PREFIX}"
+                        macosx-*)
+                            set_lldb_xcodebuild_options
+                            set_lldb_build_mode
+                            with_pushd ${LLDB_SOURCE_DIR} \
+                                       call xcodebuild -target toolchain -configuration ${LLDB_BUILD_MODE} install "${lldb_xcodebuild_options[@]}" DSTROOT="${host_install_destdir}" LLDB_TOOLCHAIN_PREFIX="${TOOLCHAIN_PREFIX}"
                         continue
                         ;;
-                esac
+                    esac
+                fi
                 ;;
             swiftpm)
                 if [[ -z "${INSTALL_SWIFTPM}" ]] ; then
