@@ -83,6 +83,18 @@ ConstraintGraph::lookupNode(TypeVariableType *typeVar) {
   return { *nodePtr, index };
 }
 
+llvm::TinyPtrVector<TypeVariableType *>
+ConstraintGraphNode::getFixedAdjacencies() const {
+  llvm::TinyPtrVector<TypeVariableType *> results;
+  for (auto adj : getAdjacencies()) {
+    auto adjInfo = AdjacencyInfo.find(adj);
+    assert(adjInfo != AdjacencyInfo.end());
+    if (adjInfo->second.FixedBinding)
+      results.push_back(adj);
+  }
+  return results;
+}
+
 ArrayRef<TypeVariableType *> ConstraintGraphNode::getEquivalenceClass() const{
   assert(TypeVar == TypeVar->getImpl().getRepresentative(nullptr) &&
          "Can't request equivalence class from non-representative type var");
@@ -525,40 +537,62 @@ void ConstraintGraph::gatherConstraints(
 #pragma mark Algorithms
 
 /// Depth-first search for connected components
-static void connectedComponentsDFS(ConstraintGraph &cg,
-                                   ConstraintGraphNode &node,
-                                   unsigned component,
-                                   std::vector<unsigned> &components) {
-  // Local function that recurses on the given set of type variables.
-  auto visitAdjacencies = [&](ArrayRef<TypeVariableType *> typeVars) {
-    for (auto adj : typeVars) {
-      auto nodeAndIndex = cg.lookupNode(adj);
-      // If we've already seen this node in this component, we're done.
-      unsigned &curComponent = components[nodeAndIndex.second];
-      if (curComponent == component)
+static void connectedComponentsDFS(
+    ConstraintGraph &cg,
+    ConstraintGraphNode &node,
+    unsigned nodeIndex,
+    unsigned component,
+    std::vector<unsigned> &components,
+    llvm::DenseSet<Constraint *> &visitedConstraints) {
+  // If we have already seen this node, we're done.
+  unsigned &nodeComponent = components[nodeIndex];
+  if (nodeComponent == component)
+    return;
+
+  assert(nodeComponent == components.size() && "Already in a component?");
+  nodeComponent = component;
+
+  // Local function to visit adjacent type variables.
+  auto visitAdjacencies = [&](ArrayRef<TypeVariableType *> adjTypeVars) {
+    for (auto adj : adjTypeVars) {
+      if (adj == node.getTypeVariable())
         continue;
 
-      // Mark this node as part of this connected component, then recurse.
-      assert(curComponent == components.size() && "Already in a component?");
-      curComponent = component;
-      connectedComponentsDFS(cg, nodeAndIndex.first, component, components);
+      auto adjNodeAndIndex = cg.lookupNode(adj);
+
+      // Visit the next node.
+      connectedComponentsDFS(cg, adjNodeAndIndex.first, adjNodeAndIndex.second,
+                             component, components, visitedConstraints);
     }
   };
 
-  // Recurse to mark adjacent nodes as part of this connected component.
-  visitAdjacencies(node.getAdjacencies());
+  // Walk all of the constraints associated with this node to find related
+  // nodes.
+  for (auto constraint : node.getConstraints()) {
+    // If we've already seen this constraint, skip it.
+    if (!visitedConstraints.insert(constraint).second)
+      continue;
 
-  // Figure out the representative for this type variable.
-  auto &cs = cg.getConstraintSystem();
-  auto typeVarRep = cs.getRepresentative(node.getTypeVariable());
-  if (typeVarRep == node.getTypeVariable()) {
-    // This type variable is the representative of its set; visit all of the
-    // other type variables in the same equivalence class.
-    visitAdjacencies(node.getEquivalenceClass().slice(1));
-  } else {
-    // Otherwise, visit the representative of the set.
-    visitAdjacencies(typeVarRep);
+    visitAdjacencies(constraint->getTypeVariables());
   }
+
+  // Walk any type variables related via fixed bindings.
+  visitAdjacencies(node.getFixedAdjacencies());
+
+  // Visit all of the other nodes in the equivalence class.
+  auto nodeTypeVar = node.getTypeVariable();
+  auto repTypeVar = cg.getConstraintSystem().getRepresentative(nodeTypeVar);
+  if (nodeTypeVar != repTypeVar) {
+    // We are not the representative; visit the representative to be sure.
+    auto repNodeAndIndex = cg.lookupNode(repTypeVar);
+    connectedComponentsDFS(cg, repNodeAndIndex.first, repNodeAndIndex.second,
+                           component, components, visitedConstraints);
+    return;
+  }
+
+  // We are the representative, so visit all of the other type variables
+  // in this equivalence class.
+  visitAdjacencies(node.getEquivalenceClass());
 }
 
 unsigned ConstraintGraph::computeConnectedComponents(
@@ -570,12 +604,14 @@ unsigned ConstraintGraph::computeConnectedComponents(
   typeVars.clear();
 
   // Initialize the components with component == # of type variables,
-  // a sentinel value indicating
+  // a sentinel value indicating that we have yet to assign a component to
+  // that particular type variable.
   unsigned numTypeVariables = TypeVariables.size();
   components.assign(numTypeVariables, numTypeVariables);
 
   // Perform a depth-first search from each type variable to identify
   // what component it is in.
+  llvm::DenseSet<Constraint *> visitedConstraints;
   unsigned numComponents = 0;
   for (unsigned i = 0; i != numTypeVariables; ++i) {
     auto typeVar = TypeVariables[i];
@@ -592,8 +628,8 @@ unsigned ConstraintGraph::computeConnectedComponents(
     unsigned component = numComponents++;
 
     // Note that this node is part of this component, then visit it.
-    curComponent = component;
-    connectedComponentsDFS(*this, nodeAndIndex.first, component, components);
+    connectedComponentsDFS(*this, nodeAndIndex.first, nodeAndIndex.second,
+                           component, components, visitedConstraints);
   }
 
   // Figure out which components have unbound type variables; these
