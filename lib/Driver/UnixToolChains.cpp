@@ -362,12 +362,22 @@ toolchains::GenericUnix::constructInvocation(const StaticLinkJobAction &job,
 
 std::string toolchains::Android::getTargetForLinker() const {
   const llvm::Triple &T = getTriple();
-  if (T.getArch() == llvm::Triple::arm &&
-      T.getSubArch() == llvm::Triple::SubArchType::ARMSubArch_v7)
-    // Explicitly set the linker target to "androideabi", as opposed to the
-    // llvm::Triple representation of "armv7-none-linux-android".
-    return "armv7-none-linux-androideabi";
-  return T.str();
+  switch (T.getArch()) {
+  default:
+    // FIXME: we should just abort on an unsupported target
+    return T.str();
+  case llvm::Triple::arm:
+  case llvm::Triple::thumb:
+    // Current Android NDK versions only support ARMv7+.  Always assume ARMv7+
+    // for the arm/thumb target.
+    return "armv7-unknown-linux-androideabi";
+  case llvm::Triple::aarch64:
+    return "aarch64-unknown-linux-android";
+  case llvm::Triple::x86:
+    return "i686-unknown-linux-android";
+  case llvm::Triple::x86_64:
+    return "x86_64-unknown-linux-android";
+  }
 }
 
 bool toolchains::Android::shouldProvideRPathToLinker() const { return false; }
