@@ -536,21 +536,30 @@ void ConstraintGraph::gatherConstraints(
 
 #pragma mark Algorithms
 
-/// Depth-first search for connected components
-static void connectedComponentsDFS(
+/// Perform a depth-first search.
+///
+/// \param cg The constraint graph.
+/// \param node The current constraint graph node.
+/// \param nodeIndex The index of the current constraint graph node.
+/// \param visitFixedBindings Whether to visit the nodes by following
+/// fixed bindings.
+/// \param preVisitNode Called before traversing a node. Must return \c
+/// false when the node has already been visited.
+/// \param visitConstraint Called before considering a constraint. If it
+/// returns \c false, that constraint will be skipped.
+/// \param visitedConstraints Set of already-visited constraints, used
+/// internally to avoid duplicated work.
+static void depthFirstSearch(
     ConstraintGraph &cg,
     ConstraintGraphNode &node,
     unsigned nodeIndex,
-    unsigned component,
-    std::vector<unsigned> &components,
+    bool visitFixedBindings,
+    llvm::function_ref<bool(unsigned)> preVisitNode,
+    llvm::function_ref<bool(Constraint *)> visitConstraint,
     llvm::DenseSet<Constraint *> &visitedConstraints) {
-  // If we have already seen this node, we're done.
-  unsigned &nodeComponent = components[nodeIndex];
-  if (nodeComponent == component)
+  // Visit this node. If we've already seen it, bail out.
+  if (!preVisitNode(nodeIndex))
     return;
-
-  assert(nodeComponent == components.size() && "Already in a component?");
-  nodeComponent = component;
 
   // Local function to visit adjacent type variables.
   auto visitAdjacencies = [&](ArrayRef<TypeVariableType *> adjTypeVars) {
@@ -560,9 +569,10 @@ static void connectedComponentsDFS(
 
       auto adjNodeAndIndex = cg.lookupNode(adj);
 
-      // Visit the next node.
-      connectedComponentsDFS(cg, adjNodeAndIndex.first, adjNodeAndIndex.second,
-                             component, components, visitedConstraints);
+      // Recurse into this node.
+      depthFirstSearch(cg, adjNodeAndIndex.first, adjNodeAndIndex.second,
+                       visitFixedBindings, preVisitNode, visitConstraint,
+                       visitedConstraints);
     }
   };
 
@@ -573,26 +583,49 @@ static void connectedComponentsDFS(
     if (!visitedConstraints.insert(constraint).second)
       continue;
 
-    visitAdjacencies(constraint->getTypeVariables());
+    if (visitConstraint(constraint))
+      visitAdjacencies(constraint->getTypeVariables());
   }
-
-  // Walk any type variables related via fixed bindings.
-  visitAdjacencies(node.getFixedAdjacencies());
 
   // Visit all of the other nodes in the equivalence class.
   auto nodeTypeVar = node.getTypeVariable();
   auto repTypeVar = cg.getConstraintSystem().getRepresentative(nodeTypeVar);
-  if (nodeTypeVar != repTypeVar) {
-    // We are not the representative; visit the representative to be sure.
-    auto repNodeAndIndex = cg.lookupNode(repTypeVar);
-    connectedComponentsDFS(cg, repNodeAndIndex.first, repNodeAndIndex.second,
-                           component, components, visitedConstraints);
-    return;
+  if (nodeTypeVar == repTypeVar) {
+    // We are the representative, so visit all of the other type variables
+    // in this equivalence class.
+    visitAdjacencies(node.getEquivalenceClass());
+  } else {
+    // We are not the representative; visit the representative.
+    visitAdjacencies(repTypeVar);
   }
 
-  // We are the representative, so visit all of the other type variables
-  // in this equivalence class.
-  visitAdjacencies(node.getEquivalenceClass());
+  if (visitFixedBindings) {
+    // Walk any type variables related via fixed bindings.
+    visitAdjacencies(node.getFixedAdjacencies());
+  }
+}
+
+/// Perform a depth-first search.
+///
+/// \param cg The constraint graph.
+/// \param node The current constraint graph node.
+/// \param nodeIndex The index of the current constraint graph node.
+/// \param visitFixedBindings Whether to visit the nodes by following
+/// fixed bindings.
+/// \param preVisitNode Called before traversing a node. Must return \c
+/// false when the node has already been visited.
+/// \param visitConstraint Called before considering a constraint. If it
+/// returns \c false, that constraint will be skipped.
+static void depthFirstSearch(
+    ConstraintGraph &cg,
+    ConstraintGraphNode &node,
+    unsigned nodeIndex,
+    bool visitFixedBindings,
+    llvm::function_ref<bool(unsigned)> preVisitNode,
+    llvm::function_ref<bool(Constraint *)> visitConstraint) {
+  llvm::DenseSet<Constraint *> visitedConstraints;
+  depthFirstSearch(cg, node, nodeIndex, visitFixedBindings, preVisitNode,
+                   visitConstraint, visitedConstraints);
 }
 
 unsigned ConstraintGraph::computeConnectedComponents(
@@ -628,8 +661,23 @@ unsigned ConstraintGraph::computeConnectedComponents(
     unsigned component = numComponents++;
 
     // Note that this node is part of this component, then visit it.
-    connectedComponentsDFS(*this, nodeAndIndex.first, nodeAndIndex.second,
-                           component, components, visitedConstraints);
+    depthFirstSearch(
+        *this, nodeAndIndex.first, nodeAndIndex.second,
+        /*visitFixedBindings=*/true,
+        [&](unsigned nodeIndex) {
+          // If we have already seen this node, we're done.
+          unsigned &nodeComponent = components[nodeIndex];
+          if (nodeComponent == component)
+            return false;
+
+          assert(nodeComponent == components.size() &&
+                 "Already in a component?");
+          nodeComponent = component;
+          return true;
+        },
+        [&](Constraint *constraint) {
+          return true;
+        });
   }
 
   // Figure out which components have unbound type variables; these
