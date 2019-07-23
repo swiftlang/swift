@@ -4408,7 +4408,7 @@ public:
     // Copy them to adjoint indirect results.
     assert(indParamAdjoints.size() == adjoint.getIndirectResults().size() &&
            "Indirect parameter adjoint count mismatch");
-    for (auto pair : zip(indParamAdjoints, pullback.getIndirectResults())) {
+    for (auto pair : zip(indParamAdjoints, adjoint.getIndirectResults())) {
       auto source = std::get<0>(pair);
       auto *dest = std::get<1>(pair);
       builder.createCopyAddr(adjLoc, source, dest, IsTake, IsInitialization);
