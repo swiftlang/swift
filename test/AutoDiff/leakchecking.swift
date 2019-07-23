@@ -161,6 +161,51 @@ LeakCheckingTests.test("NestedVarTuples") {
   }
 }
 
+// Tests class method differentiation and JVP/VJP vtable entry thunks.
+LeakCheckingTests.test("ClassMethods") {
+  testWithLeakChecking {
+    class Super {
+      @differentiable(wrt: x, jvp: jvpf, vjp: vjpf)
+      func f(_ x: Float) -> Float {
+        return 2 * x
+      }
+      final func jvpf(_ x: Float) -> (Float, (Float) -> Float) {
+        return (f(x), { v in 2 * v })
+      }
+      final func vjpf(_ x: Float) -> (Float, (Float) -> Float) {
+        return (f(x), { v in 2 * v })
+      }
+    }
+
+    class SubOverride : Super {
+      @differentiable(wrt: x)
+      override func f(_ x: Float) -> Float {
+        return 3 * x
+      }
+    }
+
+    class SubOverrideCustomDerivatives : Super {
+      @differentiable(wrt: x, jvp: jvpf2, vjp: vjpf2)
+      override func f(_ x: Float) -> Float {
+        return 3 * x
+      }
+      final func jvpf2(_ x: Float) -> (Float, (Float) -> Float) {
+        return (f(x), { v in 3 * v })
+      }
+      final func vjpf2(_ x: Float) -> (Float, (Float) -> Float) {
+        return (f(x), { v in 3 * v })
+      }
+    }
+
+    func classValueWithGradient(_ c: Super) -> (Float, Float) {
+      return valueWithGradient(at: 1) { c.f($0) }
+    }
+    expectEqual((2, 2), classValueWithGradient(Super()))
+    expectEqual((3, 3), classValueWithGradient(SubOverride()))
+    expectEqual((3, 3), classValueWithGradient(SubOverrideCustomDerivatives()))
+  }
+}
+
 LeakCheckingTests.test("ClosureCaptureLeakChecking") {
   testWithLeakChecking {
     var model = ExampleLeakModel()
