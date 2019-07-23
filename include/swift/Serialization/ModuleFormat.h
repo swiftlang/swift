@@ -52,7 +52,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 501; // cond_fail messages
+const uint16_t SWIFTMODULE_VERSION_MINOR = 502; // move specifier down to ParamDecl
 
 using DeclIDField = BCFixed<31>;
 
@@ -247,14 +247,21 @@ using CtorInitializerKindField = BCFixed<2>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
-enum class VarDeclSpecifier : uint8_t {
-  Let = 0,
-  Var,
-  InOut,
-  Shared,
-  Owned,
+enum class ParamDeclSpecifier : uint8_t {
+  Default = 0,
+  InOut = 1,
+  Shared = 2,
+  Owned = 3,
 };
-using VarDeclSpecifierField = BCFixed<3>;
+using ParamDeclSpecifierField = BCFixed<2>;
+
+// These IDs must \em not be renumbered or reordered without incrementing
+// the module version.
+enum class VarDeclIntroducer : uint8_t {
+  Let = 0,
+  Var = 1
+};
+using VarDeclIntroducerField = BCFixed<1>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
@@ -1041,7 +1048,7 @@ namespace decls_block {
     BCFixed<1>,   // implicit?
     BCFixed<1>,   // explicitly objc?
     BCFixed<1>,   // static?
-    VarDeclSpecifierField,   // specifier
+    VarDeclIntroducerField,   // introducer
     BCFixed<1>,   // HasNonPatternBindingInit?
     BCFixed<1>,   // is getter mutating?
     BCFixed<1>,   // is setter mutating?
@@ -1063,15 +1070,15 @@ namespace decls_block {
 
   using ParamLayout = BCRecordLayout<
     PARAM_DECL,
-    IdentifierIDField,     // argument name
-    IdentifierIDField,     // parameter name
-    DeclContextIDField,    // context decl
-    VarDeclSpecifierField, // specifier
-    TypeIDField,           // interface type
-    BCFixed<1>,            // isVariadic?
-    BCFixed<1>,            // isAutoClosure?
-    DefaultArgumentField,  // default argument kind
-    BCBlob                 // default argument text
+    IdentifierIDField,       // argument name
+    IdentifierIDField,       // parameter name
+    DeclContextIDField,      // context decl
+    ParamDeclSpecifierField, // specifier
+    TypeIDField,             // interface type
+    BCFixed<1>,              // isVariadic?
+    BCFixed<1>,              // isAutoClosure?
+    DefaultArgumentField,    // default argument kind
+    BCBlob                   // default argument text
   >;
 
   using FuncLayout = BCRecordLayout<

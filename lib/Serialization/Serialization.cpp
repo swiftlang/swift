@@ -2212,20 +2212,28 @@ static ForeignErrorConventionKind getRawStableForeignErrorConventionKind(
 
 /// Translate from the AST VarDeclSpecifier enum to the
 /// Serialization enum values, which are guaranteed to be stable.
-static uint8_t getRawStableVarDeclSpecifier(swift::VarDecl::Specifier sf) {
+static uint8_t getRawStableParamDeclSpecifier(swift::ParamDecl::Specifier sf) {
   switch (sf) {
-  case swift::VarDecl::Specifier::Let:
-    return uint8_t(serialization::VarDeclSpecifier::Let);
-  case swift::VarDecl::Specifier::Var:
-    return uint8_t(serialization::VarDeclSpecifier::Var);
-  case swift::VarDecl::Specifier::InOut:
-    return uint8_t(serialization::VarDeclSpecifier::InOut);
-  case swift::VarDecl::Specifier::Shared:
-    return uint8_t(serialization::VarDeclSpecifier::Shared);
-  case swift::VarDecl::Specifier::Owned:
-    return uint8_t(serialization::VarDeclSpecifier::Owned);
+  case swift::ParamDecl::Specifier::Default:
+    return uint8_t(serialization::ParamDeclSpecifier::Default);
+  case swift::ParamDecl::Specifier::InOut:
+    return uint8_t(serialization::ParamDeclSpecifier::InOut);
+  case swift::ParamDecl::Specifier::Shared:
+    return uint8_t(serialization::ParamDeclSpecifier::Shared);
+  case swift::ParamDecl::Specifier::Owned:
+    return uint8_t(serialization::ParamDeclSpecifier::Owned);
   }
-  llvm_unreachable("bad variable decl specifier kind");
+  llvm_unreachable("bad param decl specifier kind");
+}
+
+static uint8_t getRawStableVarDeclIntroducer(swift::VarDecl::Introducer intr) {
+  switch (intr) {
+  case swift::VarDecl::Introducer::Let:
+    return uint8_t(serialization::VarDeclIntroducer::Let);
+  case swift::VarDecl::Introducer::Var:
+    return uint8_t(serialization::VarDeclIntroducer::Var);
+  }
+  llvm_unreachable("bad variable decl introducer kind");
 }
 
 /// Returns true if the declaration of \p decl depends on \p problemContext
@@ -3359,6 +3367,8 @@ public:
     if (var->getAttrs().hasAttribute<LazyAttr>())
       lazyStorage = var->getLazyStorageProperty();
 
+    auto rawIntroducer = getRawStableVarDeclIntroducer(var->getIntroducer());
+
     unsigned abbrCode = S.DeclTypeAbbrCodes[VarLayout::Code];
     VarLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                           S.addDeclBaseNameRef(var->getName()),
@@ -3366,7 +3376,7 @@ public:
                           var->isImplicit(),
                           var->isObjC(),
                           var->isStatic(),
-                          getRawStableVarDeclSpecifier(var->getSpecifier()),
+                          rawIntroducer,
                           var->hasNonPatternBindingInit(),
                           var->isGetterMutating(),
                           var->isSetterMutating(),
@@ -3407,7 +3417,7 @@ public:
         S.addDeclBaseNameRef(param->getArgumentName()),
         S.addDeclBaseNameRef(param->getName()),
         contextID,
-        getRawStableVarDeclSpecifier(param->getSpecifier()),
+        getRawStableParamDeclSpecifier(param->getSpecifier()),
         S.addTypeRef(interfaceType),
         param->isVariadic(),
         param->isAutoClosure(),

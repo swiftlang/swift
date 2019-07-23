@@ -789,8 +789,9 @@ public:
       name += "$generator";
 
       iterator = new (TC.Context) VarDecl(
-          /*IsStatic*/ false, VarDecl::Specifier::Var, /*IsCaptureList*/ false,
-          S->getInLoc(), TC.Context.getIdentifier(name), DC);
+          /*IsStatic*/ false, VarDecl::Introducer::Var,
+          /*IsCaptureList*/ false, S->getInLoc(),
+          TC.Context.getIdentifier(name), DC);
       iterator->setType(iteratorTy);
       iterator->setInterfaceType(iteratorTy->mapTypeOutOfContext());
       iterator->setImplicit();

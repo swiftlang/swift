@@ -344,16 +344,7 @@ protected:
     IsUserAccessible : 1
   );
 
-  SWIFT_INLINE_BITFIELD(AbstractStorageDecl, ValueDecl, 1+1+2+1+1+1,
-    /// Whether this represents physical storage.
-    HasStorage : 1,
-
-    /// Whether this storage supports semantic mutation in some way.
-    SupportsMutation : 1,
-
-    /// Whether an opaque read of this storage produces an owned value.
-    OpaqueReadOwnership : 2,
-
+  SWIFT_INLINE_BITFIELD(AbstractStorageDecl, ValueDecl, 1+1+1,
     /// Whether a keypath component can directly reference this storage,
     /// or if it must use the overridden declaration instead.
     HasComputedValidKeyPathComponent : 1,
@@ -364,10 +355,9 @@ protected:
     IsStatic : 1
   );
 
-  SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 4+1+1+1+1+1,
-    /// The specifier associated with this variable or parameter.  This
-    /// determines the storage semantics of the value e.g. mutability.
-    Specifier : 4,
+  SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 1+1+1+1+1+1,
+    /// Encodes whether this is a 'let' binding.
+    Introducer : 1,
 
     /// Whether this declaration was an element of a capture list.
     IsCaptureList : 1,
@@ -388,7 +378,11 @@ protected:
     IsPropertyWrapperBackingProperty : 1
   );
 
-  SWIFT_INLINE_BITFIELD(ParamDecl, VarDecl, 1 + NumDefaultArgumentKindBits,
+  SWIFT_INLINE_BITFIELD(ParamDecl, VarDecl, 2+1+NumDefaultArgumentKindBits,
+    /// The specifier associated with this parameter.  This determines
+    /// the storage semantics of the value e.g. mutability.
+    Specifier : 2,
+
     /// True if the type is implicitly specified in the source, but this has an
     /// apparently valid typeRepr.  This is used in accessors, which look like:
     ///    set (value) {
@@ -4413,10 +4407,6 @@ private:
     /// The range of the braces around the accessor clause.
     SourceRange Braces;
 
-    /// The implementation info for the accessors.  If there's no
-    /// AccessorRecord for a storage decl, the decl is just stored.
-    StorageImplInfo ImplInfo;
-
     /// The number of accessors currently stored in this record.
     AccessorIndex NumAccessors;
 
@@ -4430,18 +4420,14 @@ private:
     /// or the index+1 of the accessor in the accessors array.
     AccessorIndex AccessorIndices[NumAccessorKinds];
 
-    AccessorRecord(SourceRange braces, StorageImplInfo implInfo,
+    AccessorRecord(SourceRange braces,
                    ArrayRef<AccessorDecl*> accessors,
                    AccessorIndex accessorsCapacity);
   public:
     static AccessorRecord *create(ASTContext &ctx, SourceRange braces,
-                                  StorageImplInfo implInfo,
                                   ArrayRef<AccessorDecl*> accessors);
 
     SourceRange getBracesRange() const { return Braces; }
-
-    const StorageImplInfo &getImplInfo() const { return ImplInfo; }
-    void overwriteImplInfo(StorageImplInfo newInfo) { ImplInfo = newInfo; }
 
     inline AccessorDecl *getAccessor(AccessorKind kind) const;
 
@@ -4461,11 +4447,6 @@ private:
 
   llvm::PointerIntPair<AccessorRecord*, 3, OptionalEnum<AccessLevel>> Accessors;
 
-  void setFieldsFromImplInfo(StorageImplInfo implInfo) {
-    Bits.AbstractStorageDecl.HasStorage = implInfo.hasStorage();
-    Bits.AbstractStorageDecl.SupportsMutation = implInfo.supportsMutation();
-  }
-
   struct {
     unsigned IsGetterMutatingComputed : 1;
     unsigned IsGetterMutating : 1;
@@ -4473,26 +4454,19 @@ private:
     unsigned IsSetterMutating : 1;
     unsigned OpaqueReadOwnershipComputed : 1;
     unsigned OpaqueReadOwnership : 2;
+    unsigned ImplInfoComputed : 1;
   } LazySemanticInfo = { };
+
+  /// The implementation info for the accessors.
+  StorageImplInfo ImplInfo;
 
 protected:
   AbstractStorageDecl(DeclKind Kind, bool IsStatic, DeclContext *DC,
                       DeclName Name, SourceLoc NameLoc,
                       StorageIsMutable_t supportsMutation)
-    : ValueDecl(Kind, DC, Name, NameLoc) {
-    Bits.AbstractStorageDecl.HasStorage = true;
-    Bits.AbstractStorageDecl.SupportsMutation = supportsMutation;
+    : ValueDecl(Kind, DC, Name, NameLoc),
+      ImplInfo(StorageImplInfo::getSimpleStored(supportsMutation)) {
     Bits.AbstractStorageDecl.IsStatic = IsStatic;
-  }
-
-  void setSupportsMutationIfStillStored(StorageIsMutable_t supportsMutation) {
-    if (auto ptr = Accessors.getPointer()) {
-      auto impl = ptr->getImplInfo();
-      if (!impl.isSimpleStored()) return;
-      impl = StorageImplInfo::getSimpleStored(supportsMutation);
-      ptr->overwriteImplInfo(impl);
-    }
-    Bits.AbstractStorageDecl.SupportsMutation = supportsMutation;
   }
 
   void computeIsValidKeyPathComponent();
@@ -4520,10 +4494,13 @@ public:
   Type getValueInterfaceType() const;
 
   /// Determine how this storage is implemented.
-  StorageImplInfo getImplInfo() const {
-    if (auto ptr = Accessors.getPointer())
-      return ptr->getImplInfo();
-    return StorageImplInfo::getSimpleStored(supportsMutation());
+  StorageImplInfo getImplInfo() const { return ImplInfo; }
+
+  /// Overwrite the registered implementation-info.  This should be
+  /// used carefully.
+  void setImplInfo(StorageImplInfo implInfo) {
+    LazySemanticInfo.ImplInfoComputed = 1;
+    ImplInfo = implInfo;
   }
 
   ReadImplKind getReadImpl() const {
@@ -4536,14 +4513,11 @@ public:
     return getImplInfo().getReadWriteImpl();
   }
 
-  /// Overwrite the registered implementation-info.  This should be
-  /// used carefully.
-  void overwriteImplInfo(StorageImplInfo implInfo);
 
   /// Return true if this is a VarDecl that has storage associated with
   /// it.
   bool hasStorage() const {
-    return Bits.AbstractStorageDecl.HasStorage;
+    return getImplInfo().hasStorage();
   }
 
   /// Return true if this storage has the basic accessors/capability
@@ -4556,7 +4530,7 @@ public:
   /// can't mutate things that do support mutation (e.g. because their
   /// setter is private).
   StorageIsMutable_t supportsMutation() const {
-    return StorageIsMutable_t(Bits.AbstractStorageDecl.SupportsMutation);
+    return getImplInfo().supportsMutation();
   }
 
   /// Are there any accessors for this declaration, including implicit ones?
@@ -4606,8 +4580,7 @@ public:
   /// Visit all the opaque accessors of this storage declaration.
   void visitOpaqueAccessors(llvm::function_ref<void (AccessorDecl*)>) const;
 
-  void setAccessors(StorageImplInfo storageImpl,
-                    SourceLoc lbraceLoc, ArrayRef<AccessorDecl*> accessors,
+  void setAccessors(SourceLoc lbraceLoc, ArrayRef<AccessorDecl*> accessors,
                     SourceLoc rbraceLoc);
 
   /// Add a setter to an existing Computed var.
@@ -4813,35 +4786,17 @@ enum class PropertyWrapperSynthesizedPropertyKind {
 /// VarDecl - 'var' and 'let' declarations.
 class VarDecl : public AbstractStorageDecl {
 public:
-  enum class Specifier : uint8_t {
-    // For Var Decls
-
+  enum class Introducer : uint8_t {
     Let = 0,
-    Var = 1,
-
-    // For Param Decls
-
-    Default = Let,
-    InOut = 2,
-    Shared = 3,
-    Owned = 4,
+    Var = 1
   };
 
 protected:
   PointerUnion3<PatternBindingDecl *, Stmt *, VarDecl *> Parent;
 
-  VarDecl(DeclKind Kind, bool IsStatic, Specifier Sp, bool IsCaptureList,
-          SourceLoc NameLoc, Identifier Name, DeclContext *DC)
-    : AbstractStorageDecl(Kind, IsStatic, DC, Name, NameLoc,
-                          StorageIsMutable_t(!isImmutableSpecifier(Sp)))
-  {
-    Bits.VarDecl.Specifier = static_cast<unsigned>(Sp);
-    Bits.VarDecl.IsCaptureList = IsCaptureList;
-    Bits.VarDecl.IsDebuggerVar = false;
-    Bits.VarDecl.IsLazyStorageProperty = false;
-    Bits.VarDecl.HasNonPatternBindingInit = false;
-    Bits.VarDecl.IsPropertyWrapperBackingProperty = false;
-  }
+  VarDecl(DeclKind kind, bool isStatic, Introducer introducer,
+          bool issCaptureList, SourceLoc nameLoc, Identifier name,
+          DeclContext *dc, StorageIsMutable_t supportsMutation);
 
   /// This is the type specified, including location information.
   TypeLoc typeLoc;
@@ -4849,9 +4804,10 @@ protected:
   Type typeInContext;
 
 public:
-  VarDecl(bool IsStatic, Specifier Sp, bool IsCaptureList, SourceLoc NameLoc,
-          Identifier Name, DeclContext *DC)
-    : VarDecl(DeclKind::Var, IsStatic, Sp, IsCaptureList, NameLoc, Name, DC) {}
+  VarDecl(bool isStatic, Introducer introducer, bool isCaptureList,
+          SourceLoc nameLoc, Identifier name, DeclContext *dc)
+    : VarDecl(DeclKind::Var, isStatic, introducer, isCaptureList, nameLoc,
+              name, dc, StorageIsMutable_t(introducer == Introducer::Var)) {}
 
   SourceRange getSourceRange() const;
 
@@ -5025,81 +4981,19 @@ public:
   VarDecl *getOverriddenDecl() const {
     return cast_or_null<VarDecl>(AbstractStorageDecl::getOverriddenDecl());
   }
-
-  /// Determine whether this declaration is an anonymous closure parameter.
-  bool isAnonClosureParam() const;
-
-  /// Return the raw specifier value for this property or parameter.
-  Specifier getSpecifier() const {
-    return static_cast<Specifier>(Bits.VarDecl.Specifier);
-  }
-  void setSpecifier(Specifier Spec);
   
-  /// Is the type of this parameter 'inout'?
-  ///
-  /// FIXME(Remove InOut): This is only valid on ParamDecls but multiple parts
-  /// of the compiler check ParamDecls and VarDecls along the same paths.
-  bool isInOut() const {
-    // FIXME: Re-enable this assertion and fix callers.
-//    assert((getKind() == DeclKind::Param) && "querying 'inout' on var decl?");
-    return getSpecifier() == Specifier::InOut;
-  }
-  
-  bool isImmutable() const {
-    return isImmutableSpecifier(getSpecifier());
-  }
-  static bool isImmutableSpecifier(Specifier sp) {
-    switch (sp) {
-    case Specifier::Let:
-    case Specifier::Shared:
-    case Specifier::Owned:
-      return true;
-    case Specifier::Var:
-    case Specifier::InOut:
-      return false;
-    }
-    llvm_unreachable("unhandled specifier");
-  }
   /// Is this an immutable 'let' property?
-  bool isLet() const { return getSpecifier() == Specifier::Let; }
-  /// Is this an immutable 'shared' property?
-  bool isShared() const { return getSpecifier() == Specifier::Shared; }
-  /// Is this an immutable 'owned' property?
-  bool isOwned() const { return getSpecifier() == Specifier::Owned; }
+  ///
+  /// If this is a ParamDecl, isLet() is true iff
+  /// getSpecifier() == Specifier::Default.
+  bool isLet() const { return getIntroducer() == Introducer::Let; }
 
-  ValueOwnership getValueOwnership() const {
-    return getValueOwnershipForSpecifier(getSpecifier());
+  Introducer getIntroducer() const {
+    return Introducer(Bits.VarDecl.Introducer);
   }
 
-  static ValueOwnership getValueOwnershipForSpecifier(Specifier specifier) {
-    switch (specifier) {
-    case Specifier::Let:
-      return ValueOwnership::Default;
-    case Specifier::Var:
-      return ValueOwnership::Default;
-    case Specifier::InOut:
-      return ValueOwnership::InOut;
-    case Specifier::Shared:
-      return ValueOwnership::Shared;
-    case Specifier::Owned:
-      return ValueOwnership::Owned;
-    }
-    llvm_unreachable("unhandled specifier");
-  }
-
-  static Specifier
-  getParameterSpecifierForValueOwnership(ValueOwnership ownership) {
-    switch (ownership) {
-    case ValueOwnership::Default:
-      return Specifier::Let;
-    case ValueOwnership::Shared:
-      return Specifier::Shared;
-    case ValueOwnership::InOut:
-      return Specifier::InOut;
-    case ValueOwnership::Owned:
-      return Specifier::Owned;
-    }
-    llvm_unreachable("unhandled ownership");
+  void setIntroducer(Introducer value) {
+    Bits.VarDecl.Introducer = uint8_t(value);
   }
 
   /// Is this an element in a capture list?
@@ -5281,7 +5175,14 @@ class ParamDecl : public VarDecl {
       DefaultValueAndFlags;
 
 public:
-  ParamDecl(VarDecl::Specifier specifier,
+  enum class Specifier : uint8_t {
+    Default = 0,
+    InOut = 1,
+    Shared = 2,
+    Owned = 3,
+  };
+
+  ParamDecl(Specifier specifier,
             SourceLoc specifierLoc, SourceLoc argumentNameLoc,
             Identifier argumentName, SourceLoc parameterNameLoc,
             Identifier parameterName, DeclContext *dc);
@@ -5398,6 +5299,70 @@ public:
   Type getVarargBaseTy() const {
     assert(isVariadic());
     return getVarargBaseTy(getInterfaceType());
+  }
+
+  /// Determine whether this declaration is an anonymous closure parameter.
+  bool isAnonClosureParam() const;
+
+  /// Return the raw specifier value for this parameter.
+  Specifier getSpecifier() const {
+    return static_cast<Specifier>(Bits.ParamDecl.Specifier);
+  }
+  void setSpecifier(Specifier Spec);
+
+  /// Is the type of this parameter 'inout'?
+  bool isInOut() const { return getSpecifier() == Specifier::InOut; }
+  /// Is this an immutable 'shared' property?
+  bool isShared() const { return getSpecifier() == Specifier::Shared; }
+  /// Is this an immutable 'owned' property?
+  bool isOwned() const { return getSpecifier() == Specifier::Owned; }
+
+  bool isImmutable() const {
+    return isImmutableSpecifier(getSpecifier());
+  }
+  static bool isImmutableSpecifier(Specifier sp) {
+    switch (sp) {
+    case Specifier::Default:
+    case Specifier::Shared:
+    case Specifier::Owned:
+      return true;
+    case Specifier::InOut:
+      return false;
+    }
+    llvm_unreachable("unhandled specifier");
+  }
+
+  ValueOwnership getValueOwnership() const {
+    return getValueOwnershipForSpecifier(getSpecifier());
+  }
+
+  static ValueOwnership getValueOwnershipForSpecifier(Specifier specifier) {
+    switch (specifier) {
+    case Specifier::Default:
+      return ValueOwnership::Default;
+    case Specifier::InOut:
+      return ValueOwnership::InOut;
+    case Specifier::Shared:
+      return ValueOwnership::Shared;
+    case Specifier::Owned:
+      return ValueOwnership::Owned;
+    }
+    llvm_unreachable("unhandled specifier");
+  }
+
+  static Specifier
+  getParameterSpecifierForValueOwnership(ValueOwnership ownership) {
+    switch (ownership) {
+    case ValueOwnership::Default:
+      return Specifier::Default;
+    case ValueOwnership::Shared:
+      return Specifier::Shared;
+    case ValueOwnership::InOut:
+      return Specifier::InOut;
+    case ValueOwnership::Owned:
+      return Specifier::Owned;
+    }
+    llvm_unreachable("unhandled ownership");
   }
 
   SourceRange getSourceRange() const;

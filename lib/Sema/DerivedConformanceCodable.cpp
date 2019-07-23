@@ -443,17 +443,18 @@ static EnumDecl *lookupEvaluatedCodingKeysEnum(ASTContext &C,
 ///
 /// \param keyType The key type to bind to the container type.
 ///
-/// \param spec Whether to declare the variable as immutable.
+/// \param introducer Whether to declare the variable as immutable.
 static VarDecl *createKeyedContainer(ASTContext &C, DeclContext *DC,
                                      NominalTypeDecl *keyedContainerDecl,
-                                     Type keyType, VarDecl::Specifier spec) {
+                                     Type keyType,
+                                     VarDecl::Introducer introducer) {
   // Bind Keyed*Container to Keyed*Container<KeyType>
   Type boundType[1] = {keyType};
   auto containerType = BoundGenericType::get(keyedContainerDecl, Type(),
                                              C.AllocateCopy(boundType));
 
   // let container : Keyed*Container<KeyType>
-  auto *containerDecl = new (C) VarDecl(/*IsStatic=*/false, spec,
+  auto *containerDecl = new (C) VarDecl(/*IsStatic=*/false, introducer,
                                         /*IsCaptureList=*/false, SourceLoc(),
                                         C.Id_container, DC);
   containerDecl->setImplicit();
@@ -479,7 +480,7 @@ static CallExpr *createContainerKeyedByCall(ASTContext &C, DeclContext *DC,
                                             NominalTypeDecl *param) {
   // (keyedBy:)
   auto *keyedByDecl = new (C)
-      ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+      ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(),
                 C.Id_keyedBy, SourceLoc(), C.Id_keyedBy, DC);
   keyedByDecl->setImplicit();
   keyedByDecl->setInterfaceType(returnType);
@@ -597,7 +598,7 @@ deriveBodyEncodable_encode(AbstractFunctionDecl *encodeDecl, void *) {
   auto *containerDecl = createKeyedContainer(C, funcDC,
                                              C.getKeyedEncodingContainerDecl(),
                                              codingKeysType,
-                                             VarDecl::Specifier::Var);
+                                             VarDecl::Introducer::Var);
 
   auto *containerExpr = new (C) DeclRefExpr(ConcreteDeclRef(containerDecl),
                                             DeclNameLoc(), /*Implicit=*/true,
@@ -737,7 +738,7 @@ static FuncDecl *deriveEncodable_encode(DerivedConformance &derived) {
 
   // Params: (Encoder)
   auto *encoderParam = new (C)
-      ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(), C.Id_to,
+      ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(), C.Id_to,
                 SourceLoc(), C.Id_encoder, conformanceDC);
   encoderParam->setInterfaceType(encoderType);
 
@@ -821,7 +822,7 @@ deriveBodyDecodable_init(AbstractFunctionDecl *initDecl, void *) {
   auto *containerDecl = createKeyedContainer(C, funcDC,
                                              C.getKeyedDecodingContainerDecl(),
                                              codingKeysType,
-                                             VarDecl::Specifier::Let);
+                                             VarDecl::Introducer::Let);
 
   auto *containerExpr = new (C) DeclRefExpr(ConcreteDeclRef(containerDecl),
                                             DeclNameLoc(), /*Implicit=*/true,
@@ -1018,7 +1019,7 @@ static ValueDecl *deriveDecodable_init(DerivedConformance &derived) {
   // Params: (Decoder)
   auto decoderType = C.getDecoderDecl()->getDeclaredInterfaceType();
   auto *decoderParamDecl = new (C) ParamDecl(
-      VarDecl::Specifier::Default, SourceLoc(), SourceLoc(), C.Id_from,
+      ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(), C.Id_from,
       SourceLoc(), C.Id_decoder, conformanceDC);
   decoderParamDecl->setImplicit();
   decoderParamDecl->setInterfaceType(decoderType);
