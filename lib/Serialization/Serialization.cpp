@@ -3266,7 +3266,6 @@ public:
                             contextID,
                             theClass->isImplicit(),
                             theClass->isObjC(),
-                            theClass->requiresStoredPropertyInits(),
                             inheritsSuperclassInitializers,
                             S.addGenericEnvironmentRef(
                                              theClass->getGenericEnvironment()),
