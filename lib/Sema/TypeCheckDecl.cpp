@@ -2204,15 +2204,12 @@ IsGetterMutatingRequest::evaluate(Evaluator &evaluator,
     return result;
   }
 
-  // If we have an attached property wrapper, the getter is mutating if
-  // the "value" property of the outermost wrapper type is mutating and we're
-  // in a context that has value semantics.
+  // If we have an attached property wrapper, the getter's mutating-ness
+  // depends on the composition of the wrappers.
   if (auto var = dyn_cast<VarDecl>(storage)) {
-    if (auto wrapperInfo = var->getAttachedPropertyWrapperTypeInfo(0)) {
-      if (wrapperInfo.valueVar &&
-          (!storage->getGetter() || storage->getGetter()->isImplicit())) {
-        return wrapperInfo.valueVar->isGetterMutating() && result;
-      }
+    if (auto mut = var->getPropertyWrapperMutability()) {
+      return mut->Getter == PropertyWrapperMutability::Mutating
+        && result;
     }
   }
 
@@ -2254,15 +2251,12 @@ IsSetterMutatingRequest::evaluate(Evaluator &evaluator,
   bool result = (!storage->isStatic() &&
                  doesContextHaveValueSemantics(storage->getDeclContext()));
 
-  // If we have an attached property wrapper, the setter is mutating if
-  // the "value" property of the outermost wrapper type is mutating and we're
-  // in a context that has value semantics.
+  // If we have an attached property wrapper, the setter is mutating
+  // or not based on the composition of the wrappers.
   if (auto var = dyn_cast<VarDecl>(storage)) {
-    if (auto wrapperInfo = var->getAttachedPropertyWrapperTypeInfo(0)) {
-      if (wrapperInfo.valueVar &&
-          (!storage->getSetter() || storage->getSetter()->isImplicit())) {
-        return wrapperInfo.valueVar->isSetterMutating() && result;
-      }
+    if (auto mut = var->getPropertyWrapperMutability()) {
+      return mut->Setter == PropertyWrapperMutability::Mutating
+        && result;
     }
   }
 

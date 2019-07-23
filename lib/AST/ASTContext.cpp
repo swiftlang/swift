@@ -3611,10 +3611,11 @@ OpaqueTypeArchetypeType::get(OpaqueTypeDecl *Decl,
     }
   }
 #else
-  // Assert that there are no same type constraints on the underlying type.
+  // Assert that there are no same type constraints on the underlying type
   // or its associated types.
   //
-  // This should not be possible until we add where clause support.
+  // This should not be possible until we add where clause support, with the
+  // exception of generic base class constraints (handled below).
 # ifndef NDEBUG
   for (auto reqt :
                 Decl->getOpaqueInterfaceGenericSignature()->getRequirements()) {

@@ -5488,6 +5488,16 @@ VarDecl::getPropertyWrapperBackingPropertyInfo() const {
       PropertyWrapperBackingPropertyInfo());
 }
 
+Optional<PropertyWrapperMutability>
+VarDecl::getPropertyWrapperMutability() const {
+  auto &ctx = getASTContext();
+  auto mutableThis = const_cast<VarDecl *>(this);
+  return evaluateOrDefault(
+      ctx.evaluator,
+      PropertyWrapperMutabilityRequest{mutableThis},
+      None);
+}
+
 VarDecl *VarDecl::getPropertyWrapperBackingProperty() const {
   return getPropertyWrapperBackingPropertyInfo().backingVar;
 }

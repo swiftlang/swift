@@ -77,6 +77,47 @@ struct PropertyWrapperTypeInfo {
   }
 };
 
+/// Describes the mutability of the operations on a property wrapper or composition.
+struct PropertyWrapperMutability {
+  enum Value: uint8_t {
+    Nonmutating = 0,
+    Mutating = 1,
+    DoesntExist = 2,
+  };
+  
+  Value Getter, Setter;
+  
+  /// Get the mutability of a composed access chained after accessing a wrapper with `this`
+  /// getter and setter mutability.
+  Value composeWith(Value x) {
+    switch (x) {
+    case DoesntExist:
+      return DoesntExist;
+    
+    // If an operation is nonmutating, then its input relies only on the
+    // mutating-ness of the outer wrapper's get operation.
+    case Nonmutating:
+      return Getter;
+        
+    // If it's mutating, then it relies
+    // on a) the outer wrapper having a setter to exist at all, and b) the
+    // mutating-ness of either the getter or setter, since we need both to
+    // perform a writeback cycle.
+    case Mutating:
+      if (Setter == DoesntExist) {
+        return DoesntExist;
+      }
+      return std::max(Getter, Setter);
+    }
+  }
+  
+  bool operator==(PropertyWrapperMutability other) const {
+    return Getter == other.Getter && Setter == other.Setter;
+  }
+};
+
+void simple_display(llvm::raw_ostream &os, PropertyWrapperMutability m);
+
 /// Describes the backing property of a property that has an attached wrapper.
 struct PropertyWrapperBackingPropertyInfo {
   /// The backing property.
