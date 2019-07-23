@@ -229,6 +229,58 @@ public:
   SourceLoc getNearestLoc() const { return SourceLoc(); };
 };
 
+//----------------------------------------------------------------------------//
+// ResolveProtocolNameRequest
+//----------------------------------------------------------------------------//
+struct ProtocolNameOwner {
+  DeclContext *DC;
+  StringRef Name;
+  ProtocolNameOwner(DeclContext *DC, StringRef Name): DC(DC), Name(Name) {}
+
+  friend llvm::hash_code hash_value(const ProtocolNameOwner &CI) {
+    return hash_value(CI.Name);
+  }
+
+  friend bool operator==(const ProtocolNameOwner &lhs,
+                         const ProtocolNameOwner &rhs) {
+    return lhs.Name == rhs.Name;
+  }
+
+  friend bool operator!=(const ProtocolNameOwner &lhs,
+                         const ProtocolNameOwner &rhs) {
+    return !(lhs == rhs);
+  }
+
+  friend void simple_display(llvm::raw_ostream &out,
+                             const ProtocolNameOwner &owner) {
+    out << "Resolve " << owner.Name << " from ";
+    simple_display(out, owner.DC);
+  }
+};
+
+/// Resolve a protocol name to the protocol decl pointer inside the ASTContext
+class ResolveProtocolNameRequest:
+    public SimpleRequest<ResolveProtocolNameRequest,
+                         ProtocolDecl*(ProtocolNameOwner),
+                         CacheKind::Cached>
+{
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<ProtocolDecl*> evaluate(Evaluator &evaluator,
+    ProtocolNameOwner Input) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+  // Source location
+  SourceLoc getNearestLoc() const { return SourceLoc(); };
+};
+
 /// The zone number for the IDE.
 #define SWIFT_IDE_REQUESTS_TYPEID_ZONE 137
 #define SWIFT_TYPEID_ZONE SWIFT_IDE_REQUESTS_TYPEID_ZONE
