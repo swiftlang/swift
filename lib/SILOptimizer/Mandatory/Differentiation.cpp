@@ -1903,7 +1903,6 @@ reapplyFunctionConversion(SILValue newFunc, SILValue oldFunc,
     auto thickTy = operandFnTy->getWithRepresentation(
         SILFunctionTypeRepresentation::Thick);
     auto silTy = SILType::getPrimitiveObjectType(thickTy);
-
     return builder.createThinToThickFunction(loc, innerNewFunc, silTy);
   }
   // partial_apply
@@ -1942,7 +1941,7 @@ reapplyFunctionConversion(SILValue newFunc, SILValue oldFunc,
     auto innerNewFunc = reapplyFunctionConversion(newFunc, oldFunc,
                                                   cfi->getOperand(), builder,
                                                   loc, newFuncGenSig);
-    // Match a conversion from escaping to `@noescape`
+    // Match conversion from escaping to `@noescape`.
     CanSILFunctionType targetType;
     if (!origSourceFnTy->isNoEscape() && origTargetFnTy->isNoEscape() &&
         origSourceFnTy == origTargetFnTy->getWithExtInfo(
@@ -1956,7 +1955,7 @@ reapplyFunctionConversion(SILValue newFunc, SILValue oldFunc,
     return builder.createConvertFunction(loc, innerNewFunc, silTy,
                                          cfi->withoutActuallyEscaping());
   }
-  llvm_unreachable("Unhandled function convertion instruction");
+  llvm_unreachable("Unhandled function conversion instruction");
 }
 
 static SubstitutionMap getSubstitutionMap(
@@ -4695,7 +4694,7 @@ public:
       for (auto temp : blockTemporaries[&bb]) {
         if (blockTemporarySet.count(temp)) {
           LLVM_DEBUG(getADDebugStream() << "Found temporary not cleaned up:\n"
-                     << temp);
+                                        << temp);
           llvm_unreachable("Temporary not cleaned up!");
         }
       }
@@ -4706,7 +4705,7 @@ public:
     }));
 #endif
 
-    LLVM_DEBUG(getADDebugStream() << "Generated adjoint for "
+    LLVM_DEBUG(getADDebugStream() << "Generated pullback for "
                                   << original.getName() << ":\n" << pullback);
     return errorOccurred;
   }
@@ -4738,18 +4737,18 @@ public:
   }
 
   AllocStackInst *
-  emitDifferentiableViewSubscript(ApplyInst *ai, SILType elType,
+  emitDifferentiableViewSubscript(ApplyInst *ai, SILType eltType,
                                   SILValue adjointArray, SILValue fnRef,
                                   CanGenericSignature genericSig, int index) {
     auto &ctx = builder.getASTContext();
-    auto astType = elType.getASTType();
+    auto astType = eltType.getASTType();
     auto literal = builder.createIntegerLiteral(
         ai->getLoc(), SILType::getBuiltinIntegerType(64, ctx), index);
     auto intType = SILType::getPrimitiveObjectType(
         ctx.getIntDecl()->getDeclaredType()->getCanonicalType());
     auto intStruct = builder.createStruct(ai->getLoc(), intType, {literal});
     AllocStackInst *subscriptBuffer =
-        builder.createAllocStack(ai->getLoc(), elType);
+        builder.createAllocStack(ai->getLoc(), eltType);
     auto swiftModule = getModule().getSwiftModule();
     auto diffProto = ctx.getProtocol(KnownProtocolKind::Differentiable);
     auto diffConf = swiftModule->lookupConformance(astType, diffProto);
@@ -4766,10 +4765,10 @@ public:
   }
 
   void
-  accumulateDifferentiableViewSubscriptDirect(ApplyInst *ai, SILType elType,
+  accumulateDifferentiableViewSubscriptDirect(ApplyInst *ai, SILType eltType,
                                               StoreInst *si,
                                               AllocStackInst *subscriptBuffer) {
-    auto astType = elType.getASTType();
+    auto astType = eltType.getASTType();
     auto newAdjValue = builder.createLoad(ai->getLoc(), subscriptBuffer,
                                           getBufferLOQ(astType, getPullback()));
     addAdjointValue(si->getParent(), si->getSrc(),
@@ -4865,6 +4864,7 @@ public:
   }
 
   void visitApplyInst(ApplyInst *ai) {
+    // Handle array uninitialized allocation intrinsic specially.
     if (ai->hasSemantics("array.uninitialized_intrinsic"))
       return visitArrayInitialization(ai);
     // Replace a call to a function with a call to its pullback.
@@ -6034,9 +6034,9 @@ ADContext::getOrCreateSubsetParametersThunkForLinearMap(
     SILFunction *parentThunk, CanSILFunctionType linearMapType,
     CanSILFunctionType targetType, AutoDiffAssociatedFunctionKind kind,
     SILAutoDiffIndices desiredIndices, SILAutoDiffIndices actualIndices) {
-  LLVM_DEBUG(getADDebugStream() << "Getting a subset parameters thunk for " <<
-             linearMapType << " from " << actualIndices << " to " <<
-             desiredIndices << '\n');
+  LLVM_DEBUG(getADDebugStream()
+             << "Getting a subset parameters thunk for " << linearMapType
+             << " from " << actualIndices << " to " << desiredIndices << '\n');
 
   SubstitutionMap interfaceSubs = parentThunk->getForwardingSubstitutionMap();
   GenericEnvironment *genericEnv = parentThunk->getGenericEnvironment();
@@ -6264,10 +6264,10 @@ ADContext::getOrCreateSubsetParametersThunkForAssociatedFunction(
     SILValue origFnOperand, SILValue assocFn,
     AutoDiffAssociatedFunctionKind kind, SILAutoDiffIndices desiredIndices,
     SILAutoDiffIndices actualIndices) {
-  LLVM_DEBUG(getADDebugStream() << "Getting a subset parameters thunk for "
-             "associated function " << assocFn << " of the original function "
-             << origFnOperand << " from " << actualIndices << " to " <<
-             desiredIndices << '\n');
+  LLVM_DEBUG(getADDebugStream()
+             << "Getting a subset parameters thunk for associated function "
+             << assocFn << " of the original function " << origFnOperand
+             << " from " << actualIndices << " to " << desiredIndices << '\n');
 
   auto origFnType = origFnOperand->getType().castTo<SILFunctionType>();
   auto &module = getModule();
@@ -6423,7 +6423,7 @@ SILValue ADContext::promoteToDifferentiableFunction(
       SILAutoDiffIndices desiredIndices(resultIndex, parameterIndices);
       auto *thunk = thunkRef->getReferencedFunctionOrNull();
       auto newThunkName = "AD__" + thunk->getName().str() +
-          "__cloned_curry_thunk_" + desiredIndices.mangle();
+          "__differentiable_curry_thunk_" + desiredIndices.mangle();
 
       auto thunkTy = thunk->getLoweredFunctionType();
       auto thunkResult = thunkTy->getSingleResult();
@@ -6439,7 +6439,7 @@ SILValue ADContext::promoteToDifferentiableFunction(
             thunkTy->getParameters(), {}, {newThunkResult}, {},
             thunkTy->getASTContext());
 
-        // Construct new curry think.
+        // Construct new curry thunk, returning a `@differentiable` function.
         SILOptFunctionBuilder fb(transform);
         auto *newThunk = fb.getOrCreateFunction(
             loc, newThunkName,
