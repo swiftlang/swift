@@ -4037,8 +4037,15 @@ private:
   }
 
   //--------------------------------------------------------------------------//
-  // Type transformer
+  // Differential type calculations
   //--------------------------------------------------------------------------//
+
+  /// Remap any archetypes into the differential function's context.
+  SILType remapTypeInDifferential(SILType ty) {
+    if (ty.hasArchetype())
+      return getDifferential().mapTypeIntoContext(ty.mapTypeOutOfContext());
+    return getDifferential().mapTypeIntoContext(ty);
+  }
 
   Optional<VectorSpace> getTangentSpace(CanType type) {
     return type->getAutoDiffAssociatedTangentSpace(
@@ -4049,7 +4056,8 @@ private:
   /// returns the associated tangent space type.
   SILType getRemappedTangentType(SILType type) {
     return SILType::getPrimitiveType(
-        getTangentSpace(remapType(type).getASTType())->getCanonicalType(),
+        getTangentSpace(remapTypeInDifferential(type).getASTType())
+             ->getCanonicalType(),
         type.getCategory());
   }
 
@@ -4058,7 +4066,7 @@ private:
   //--------------------------------------------------------------------------//
 
   AdjointValue makeZeroTangentValue(SILType type) {
-    return AdjointValue::createZero(allocator, remapType(type));
+    return AdjointValue::createZero(allocator, remapTypeInDifferential(type));
   }
 
   /// Initializes an original value's corresponding tangent value. Its tangent
@@ -4215,7 +4223,7 @@ private:
            "differentiated; activity analysis should not marked as varied");
 
     auto diffBuilder = getDifferentialBuilder();
-    auto structTy = remapType(sei->getOperand()->getType()).getASTType();
+    auto structTy = remapTypeInDifferential(sei->getOperand()->getType()).getASTType();
     auto tangentVectorTy =
         getTangentSpace(structTy)->getType()->getCanonicalType();
     assert(!getModule().Types.getTypeLowering(
@@ -4467,6 +4475,11 @@ public:
     auto *entry = jvp->createBasicBlock();
     createEntryArguments(jvp);
 
+    auto *diffGenEnv = getDifferential().getGenericEnvironment();
+    auto diffGenSig = diffGenEnv
+        ? diffGenEnv->getGenericSignature()->getCanonicalSignature()
+        : nullptr;
+
     // Create differential blocks and arguments.
     // TODO: Consider visiting original blocks in pre-order (dominance) order.
     auto &differential = getDifferential();
@@ -4474,17 +4487,25 @@ public:
     for (auto &origBB : *original) {
       auto *diffBB = differential.createBasicBlock();
       diffBBMap.insert({&origBB, diffBB});
-      auto diffStructLoweredType =
-          remapType(differentialInfo.getLinearMapStructLoweredType(&origBB));
-      // If the BB is the original entry, then the differential block that we
-      // just created must be the differential function's entry. Create
-      // differential entry arguments and continue.
-      if (&origBB == origEntry) {
-        assert(diffBB->isEntry());
-        createEntryArguments(&differential);
-        auto *lastArg = diffBB->getArguments().back();
-        assert(lastArg->getType() == diffStructLoweredType);
-        differentialStructArguments[&origBB] = lastArg;
+      {
+        Lowering::GenericContextScope genericContextScope(
+            context.getTypeConverter(), diffGenSig);
+        auto diffStructLoweredType =
+            remapTypeInDifferential(differentialInfo.getLinearMapStructLoweredType(&origBB));
+        // If the BB is the original entry, then the differential block that we
+        // just created must be the differential function's entry. Create
+        // differential entry arguments and continue.
+        if (&origBB == origEntry) {
+          assert(diffBB->isEntry());
+          createEntryArguments(&differential);
+          auto *lastArg = diffBB->getArguments().back();
+          lastArg->getType().dump();
+          diffStructLoweredType.dump();
+          assert(lastArg->getType() == diffStructLoweredType);
+          // auto remappedDiffStructType = differential.mapTypeIntoContext(lastArg->getType());
+          // assert(remappedDiffStructType == diffStructLoweredType);
+          differentialStructArguments[&origBB] = lastArg;
+        }
       }
 
       LLVM_DEBUG({
