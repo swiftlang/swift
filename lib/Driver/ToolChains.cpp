@@ -147,7 +147,10 @@ static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
   case OutputInfo::Mode::SingleCompile:
   case OutputInfo::Mode::BatchModeCompile:
     arguments.push_back("-target");
-    arguments.push_back(inputArgs.MakeArgString(Triple.str()));
+    // The NDK toolchain produces triples with API_LEVEL at the end, like
+    // "armv7-none-linux-android21", but swiftc doesn't recognise them.
+    std::string triple = Triple.str();
+    arguments.push_back(inputArgs.MakeArgString(triple.substr(0, triple.find_last_not_of("0123456789") + 1)));
     break;
   }
 
