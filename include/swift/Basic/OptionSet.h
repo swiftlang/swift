@@ -87,6 +87,15 @@ public:
     return !static_cast<bool>(set - *this);
   }
 
+  /// Check if this option set contains the exact same options as the given set.
+  bool containsOnly(OptionSet set) {
+    return Storage == set.Storage;
+  }
+
+  // '==' and '!=' are deliberately not defined because they provide a pitfall
+  // where someone might use '==' but really want 'contains'. If you actually
+  // want '==' behavior, use 'containsOnly'.
+
   /// Produce the union of two option sets.
   friend OptionSet operator|(OptionSet lhs, OptionSet rhs) {
     return OptionSet(lhs.Storage | rhs.Storage);
@@ -114,7 +123,7 @@ public:
     return OptionSet(lhs.Storage & ~rhs.Storage);
   }
 
-  /// Produce the intersection of two option sets.
+  /// Produce the difference of two option sets.
   friend OptionSet &operator-=(OptionSet &lhs, OptionSet rhs) {
     lhs.Storage &= ~rhs.Storage;
     return lhs;

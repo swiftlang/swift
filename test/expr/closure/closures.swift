@@ -15,13 +15,12 @@ var closure3b : (Int,Int) -> (Int) -> (Int,Int) = {{ (4, 2) }} // expected-error
 var closure4 : (Int,Int) -> Int = { $0 + $1 }
 var closure5 : (Double) -> Int = {
        $0 + 1.0
-       // expected-error@+1 {{cannot convert value of type 'Double' to closure result type 'Int'}}
+       // expected-error@-1 {{cannot convert value of type 'Double' to closure result type 'Int'}}
 }
 
 var closure6 = $0  // expected-error {{anonymous closure argument not contained in a closure}}
 
-var closure7 : Int =
-   { 4 }  // expected-error {{function produces expected type 'Int'; did you mean to call it with '()'?}} {{9-9=()}}
+var closure7 : Int = { 4 }  // expected-error {{function produces expected type 'Int'; did you mean to call it with '()'?}} {{27-27=()}} // expected-note {{Remove '=' to make 'closure7' a computed property}}{{20-22=}}
 
 var capturedVariable = 1
 var closure8 = { [capturedVariable] in
@@ -252,6 +251,7 @@ func rdar19179412() -> (Int) -> Int {
     class A {
       let d : Int = 0
     }
+    return 0
   }
 }
 
@@ -334,10 +334,10 @@ func r21375863() {
 //   Don't crash if we infer a closure argument to have a tuple type containing inouts.
 func r25993258_helper(_ fn: (inout Int, Int) -> ()) {}
 func r25993258a() {
-  r25993258_helper { x in () } // expected-error {{named parameter has type '(inout Int, Int)' which includes nested inout parameters}}
+  r25993258_helper { x in () } // expected-error {{contextual closure type '(inout Int, Int) -> ()' expects 2 arguments, but 1 was used in closure body}}
 }
 func r25993258b() {
-  r25993258_helper { _ in () }
+  r25993258_helper { _ in () } // expected-error {{contextual closure type '(inout Int, Int) -> ()' expects 2 arguments, but 1 was used in closure body}}
 }
 
 // We have to map the captured var type into the right generic environment.

@@ -1,12 +1,12 @@
 @objc public class Foo_TopLevelObjcClass {
-  public func foo_TopLevelObjcClass_InstanceFunc1() {}
-  public class func foo_TopLevelObjcClass_ClassFunc1() {}
-  public subscript(i: Int32) -> Int {
+  @objc public func foo_TopLevelObjcClass_InstanceFunc1() {}
+  @objc public class func foo_TopLevelObjcClass_ClassFunc1() {}
+  @objc public subscript(i: Int32) -> Int {
     get {
       return 0
     }
   }
-  public var foo_TopLevelObjcClass_Property1: Int = 0
+  @objc public var foo_TopLevelObjcClass_Property1: Int = 0
 
   internal func foo_TopLevelObjcClass_internalFunc_ERROR() {}
   private func foo_TopLevelObjcClass_privateFunc_ERROR() {}
@@ -24,10 +24,10 @@ public class Foo_TopLevelClass {
 }
 
 @objc public protocol Foo_TopLevelObjcProtocol {
-  func foo_TopLevelObjcProtocol_InstanceFunc1()
-  static func foo_TopLevelObjcProtocol_ClassFunc1()
-  subscript(i: Foo_TopLevelObjcProtocol) -> Int { get set }
-  var foo_TopLevelObjcProtocol_Property1: Int { get }
+  @objc func foo_TopLevelObjcProtocol_InstanceFunc1()
+  @objc static func foo_TopLevelObjcProtocol_ClassFunc1()
+  @objc subscript(i: Foo_TopLevelObjcProtocol) -> Int { get set }
+  @objc var foo_TopLevelObjcProtocol_Property1: Int { get }
 }
 
 public class Foo_ContainerForNestedClass1 {

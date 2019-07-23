@@ -88,11 +88,6 @@ static llvm::cl::opt<std::string>
 static llvm::cl::opt<bool>
     PerformWMO("wmo", llvm::cl::desc("Enable whole-module optimizations"));
 
-static llvm::cl::opt<bool> AssumeUnqualifiedOwnershipWhenParsing(
-    "assume-parsing-unqualified-ownership-sil", llvm::cl::Hidden,
-    llvm::cl::init(false),
-    llvm::cl::desc("Assume all parsed functions have unqualified ownership"));
-
 static llvm::cl::opt<IRGenOutputKind>
     OutputKind("output-kind", llvm::cl::desc("Type of output to produce"),
                llvm::cl::values(clEnumValN(IRGenOutputKind::LLVMAssembly,
@@ -105,6 +100,10 @@ static llvm::cl::opt<IRGenOutputKind>
                                            "object", "Emit an object file")),
                llvm::cl::init(IRGenOutputKind::ObjectFile));
 
+static llvm::cl::opt<bool>
+    DisableLegacyTypeInfo("disable-legacy-type-info",
+        llvm::cl::desc("Don't try to load backward deployment layouts"));
+
 // This function isn't referenced outside its translation unit, but it
 // can't use the "static" keyword because its address is used for
 // getMainExecutable (since some platforms don't support taking the
@@ -113,7 +112,8 @@ static llvm::cl::opt<IRGenOutputKind>
 void anchorForGetMainExecutable() {}
 
 int main(int argc, char **argv) {
-  INITIALIZE_LLVM(argc, argv);
+  PROGRAM_START(argc, argv);
+  INITIALIZE_LLVM();
 
   llvm::cl::ParseCommandLineOptions(argc, argv, "Swift LLVM IR Generator\n");
 
@@ -156,16 +156,10 @@ int main(int argc, char **argv) {
   LangOpts.EnableObjCAttrRequiresFoundation = false;
   LangOpts.EnableObjCInterop = LangOpts.Target.isOSDarwin();
 
-  // Setup the SIL Options.
-  SILOptions &SILOpts = Invocation.getSILOptions();
-  SILOpts.AssumeUnqualifiedOwnershipWhenParsing =
-      AssumeUnqualifiedOwnershipWhenParsing;
-
   // Setup the IRGen Options.
   IRGenOptions &Opts = Invocation.getIRGenOptions();
-  Opts.MainInputFilename = InputFilename;
-  Opts.OutputFilenames.push_back(OutputFilename);
   Opts.OutputKind = OutputKind;
+  Opts.DisableLegacyTypeInfo = DisableLegacyTypeInfo;
 
   serialization::ExtendedValidationInfo extendedInfo;
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
@@ -206,8 +200,11 @@ int main(int argc, char **argv) {
       SL->getAll();
   }
 
-  std::unique_ptr<llvm::Module> Mod = performIRGeneration(
-      Opts, CI.getMainModule(), CI.takeSILModule(),
-      CI.getMainModule()->getName().str(), getGlobalLLVMContext());
+  const PrimarySpecificPaths PSPs(OutputFilename, InputFilename);
+  std::unique_ptr<llvm::Module> Mod =
+      performIRGeneration(Opts, CI.getMainModule(), CI.takeSILModule(),
+                          CI.getMainModule()->getName().str(),
+                          PSPs,
+                          getGlobalLLVMContext(), ArrayRef<std::string>());
   return CI.getASTContext().hadError();
 }

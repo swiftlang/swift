@@ -47,6 +47,7 @@ public:
   bool isPublic() const { return !Value.getPointer(); }
   bool isPrivate() const { return Value.getInt(); }
   bool isFileScope() const;
+  bool isInternal() const;
 
   /// Returns true if this is a child scope of the specified other access scope.
   ///
@@ -86,6 +87,7 @@ public:
     return None;
   }
 
+  void dump() const;
 };
 
 } // end namespace swift

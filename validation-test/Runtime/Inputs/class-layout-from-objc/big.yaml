@@ -1,0 +1,8 @@
+---
+Name:            Resilient
+Decls:           
+  - Name:            9Resilient12GrowsToInt64V
+    Size:            8
+    Alignment:       8
+    ExtraInhabitants: 0
+...

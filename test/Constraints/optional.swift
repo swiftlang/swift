@@ -94,7 +94,7 @@ func test9(_ i: Int, io: Int?) {
   let _: Double = result2
 
   let result3 = test9_helper2(i)
-  var _: Double = result3
+  var _: Int = result3
   let result4 = test9_helper2(io)
   let _: Double = result4
 }
@@ -209,7 +209,7 @@ func sr2752(x: String?, y: String?) {
 var sr3248 : ((Int) -> ())!
 sr3248?(a: 2) // expected-error {{extraneous argument label 'a:' in call}}
 sr3248!(a: 2) // expected-error {{extraneous argument label 'a:' in call}}
-sr3248(a: 2)  // expected-error {{cannot call value of non-function type '((Int) -> ())?'}}
+sr3248(a: 2)  // expected-error {{extraneous argument label 'a:' in call}}
 
 struct SR_3248 {
     var callback: (([AnyObject]) -> Void)!
@@ -265,5 +265,95 @@ class Bar {
   init() {
     let result = b ? nil : xOpt
     let _: Int = result // expected-error{{cannot convert value of type 'X?' to specified type 'Int'}}
+  }
+}
+
+// rdar://problem/37508855
+func rdar37508855(_ e1: X?, _ e2: X?) -> [X] {
+  return [e1, e2].filter { $0 == nil }.map { $0! }
+}
+
+func se0213() {
+  struct Q: ExpressibleByStringLiteral {
+    typealias StringLiteralType =  String
+
+    var foo: String
+
+    init?(_ possibleQ: StringLiteralType) {
+      return nil
+    }
+
+    init(stringLiteral str: StringLiteralType) {
+      self.foo = str
+    }
+  }
+
+  _ = Q("why")?.foo // Ok
+  _ = Q("who")!.foo // Ok
+  _ = Q?("how") // Ok
+}
+
+func rdar45218255(_ i: Int) {
+  struct S<T> {
+    init(_:[T]) {}
+  }
+
+  _ = i!           // expected-error {{cannot force unwrap value of non-optional type 'Int'}} {{8-9=}}
+  _ = [i!]         // expected-error {{cannot force unwrap value of non-optional type 'Int'}} {{9-10=}}
+  _ = S<Int>([i!]) // expected-error {{cannot force unwrap value of non-optional type 'Int'}} {{16-17=}}
+}
+
+// rdar://problem/47967277 - cannot assign through '!': '$0' is immutable
+func sr_9893_1() {
+  func foo<T : Equatable>(_: @autoclosure () throws -> T,
+                          _: @autoclosure () throws -> T) {}
+
+  class A {
+    var bar: String?
+  }
+
+  let r1 = A()
+  let r2 = A()
+
+  let arr1: [A] = []
+  foo(Set(arr1.map { $0.bar! }), Set([r1, r2].map { $0.bar! })) // Ok
+}
+
+func sr_9893_2(cString: UnsafePointer<CChar>) {
+  struct S {
+    var a: Int32 = 0
+    var b = ContiguousArray<CChar>(repeating: 0, count: 10)
+  }
+
+  var s = S()
+
+  withUnsafeMutablePointer(to: &s.a) { ptrA in
+    s.b.withUnsafeMutableBufferPointer { bufferB in
+      withVaList([ptrA, bufferB.baseAddress!]) { ptr in } // Ok
+    }
+  }
+}
+
+// rdar://problem/47776586 - Diagnostic refers to '&' which is not present in the source code
+func rdar47776586() {
+  func foo(_: inout Int) {}
+  var x: Int? = 0
+  foo(&x) // expected-error {{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
+  // expected-note@-1 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}} {{7-7=(}} {{9-9=)!}}
+
+  var dict = [1: 2]
+  dict[1] += 1 // expected-error {{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
+  // expected-note@-1 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}} {{10-10=!}}
+}
+
+struct S {
+  var foo: Optional<() -> Int?> = nil
+  var bar: Optional<() -> Int?> = nil
+
+  mutating func test(_ clj: @escaping () -> Int) {
+    if let fn = foo {
+      bar = fn  // Ok
+      bar = clj // Ok
+    }
   }
 }

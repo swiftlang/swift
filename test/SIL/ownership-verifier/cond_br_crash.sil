@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-ownership -sil-ownership-verifier-enable-testing  -enable-sil-verify-all=0 %s -o /dev/null 2>&1 | %FileCheck %s
+// RUN: %target-sil-opt -sil-ownership-verifier-enable-testing  -enable-sil-verify-all=0 %s -o /dev/null 2>&1 | %FileCheck %s
 // REQUIRES: asserts
 
 sil_stage canonical
@@ -20,7 +20,7 @@ import Builtin
 // CHECK: Value:   %0 = argument of bb0 : $Builtin.NativeObject
 // CHECK: User:   cond_br undef, bb1(%0 : $Builtin.NativeObject), bb2
 // CHECK: Block: bb0
-sil @test1 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+sil [ossa] @test1 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
   destroy_value %0 : $Builtin.NativeObject
   cond_br undef, bb1(%0 : $Builtin.NativeObject), bb2
@@ -41,7 +41,7 @@ bb2:
 // CHECK: Value:   %0 = argument of bb0 : $Builtin.NativeObject
 // CHECK: User:   destroy_value %0 : $Builtin.NativeObject
 // CHECK: Block: bb1
-sil @test2 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+sil [ossa] @test2 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
   cond_br undef, bb1(%0 : $Builtin.NativeObject), bb2
 
@@ -61,15 +61,15 @@ bb2:
 // CHECK: Found use after free?!
 // CHECK: Value:   %0 = argument of bb0 : $Builtin.NativeObject
 // CHECK: Consuming User:   cond_br undef, bb1(%0 : $Builtin.NativeObject), bb2
-// CHECK: Non Consuming User:   end_borrow %3 from %0 : $Builtin.NativeObject, $Builtin.NativeObject
+// CHECK: Non Consuming User:   end_borrow %3 : $Builtin.NativeObject
 // CHECK: Block: bb1
-sil @test3 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+sil [ossa] @test3 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
   cond_br undef, bb1(%0 : $Builtin.NativeObject), bb2
 
 bb1(%1 : @owned $Builtin.NativeObject):
   %2 = begin_borrow %0 : $Builtin.NativeObject
-  end_borrow %2 from %0 : $Builtin.NativeObject, $Builtin.NativeObject
+  end_borrow %2 : $Builtin.NativeObject
   destroy_value %1 : $Builtin.NativeObject
   br bb2
 

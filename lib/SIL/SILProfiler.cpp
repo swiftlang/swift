@@ -13,7 +13,11 @@
 #include "swift/SIL/SILProfiler.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/Expr.h"
+#include "swift/AST/Module.h"
+#include "swift/AST/Stmt.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/IR/GlobalValue.h"
 #include "llvm/IR/Intrinsics.h"
@@ -23,155 +27,236 @@
 
 #include <forward_list>
 
+#define DEBUG_TYPE "SILProfiler"
+
 using namespace swift;
 
+/// Check if a closure has a body.
+static bool doesClosureHaveBody(AbstractClosureExpr *ACE) {
+  if (auto *CE = dyn_cast<ClosureExpr>(ACE))
+    return CE->getBody();
+  if (auto *autoCE = dyn_cast<AutoClosureExpr>(ACE))
+    return autoCE->getBody();
+  return false;
+}
+
+/// Check whether a root AST node is unmapped, i.e not profiled.
 static bool isUnmapped(ASTNode N) {
+  // Do not map AST nodes with invalid source locations.
+  if (N.getStartLoc().isInvalid() || N.getEndLoc().isInvalid()) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "Skipping ASTNode: invalid start/end locations\n");
+    return true;
+  }
+
   if (auto *E = N.dyn_cast<Expr *>()) {
-    auto *CE = dyn_cast<ClosureExpr>(E);
-    return !CE || CE->isImplicit() || !CE->getBody();
+    if (isa<LiteralExpr>(E)) {
+      LLVM_DEBUG(llvm::dbgs() << "Skipping ASTNode: literal expr\n");
+      return true;
+    }
+
+    if (auto *CE = dyn_cast<AbstractClosureExpr>(E)) {
+      // Only map closure expressions with bodies.
+      if (!doesClosureHaveBody(CE)) {
+        LLVM_DEBUG(llvm::dbgs() << "Skipping ASTNode: closure without body\n");
+        return true;
+      }
+
+      // Don't map implicit closures, unless they're autoclosures.
+      if (!isa<AutoClosureExpr>(CE) && CE->isImplicit()) {
+        LLVM_DEBUG(llvm::dbgs() << "Skipping ASTNode: implicit closure expr\n");
+        return true;
+      }
+    }
+
+    // Map all other kinds of expressions.
+    return false;
   }
 
   auto *D = N.get<Decl *>();
   if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
-    if (!AFD->getBody())
+    // Don't map functions without bodies.
+    if (!AFD->hasBody()) {
+      LLVM_DEBUG(llvm::dbgs() << "Skipping ASTNode: function without body\n");
       return true;
+    }
 
+    // Map implicit getters.
     if (auto *accessor = dyn_cast<AccessorDecl>(AFD))
       if (accessor->isImplicit() && accessor->isGetter())
         return false;
   }
 
-  if (isa<ConstructorDecl>(D) || isa<DestructorDecl>(D))
-    return false;
-
-  return D->isImplicit() || isa<EnumCaseDecl>(D);
-}
-
-/// A simple heuristic to determine whether \p E contains a definition of a
-/// closure. This is not complete, but it suffices to cheaply filter away some
-/// redundant coverage mappings.
-static bool containsClosure(Expr *E) {
-  Expr *candidateExpr = E;
-  if (auto *ce = dyn_cast<CallExpr>(E))
-    candidateExpr = ce->getDirectCallee();
-  return dyn_cast_or_null<AbstractClosureExpr>(candidateExpr);
-}
-
-/// Walk the non-static initializers in \p PBD.
-static void walkPatternForProfiling(PatternBindingDecl *PBD, ASTWalker &Walker,
-                                    bool AllowClosures = true) {
-  if (PBD && !PBD->isStatic())
-    for (auto E : PBD->getPatternList())
-      if (E.getInit())
-        if (AllowClosures || !containsClosure(E.getInit()))
-          E.getInit()->walk(Walker);
-}
-
-/// Walk the AST of \c Root and related nodes that are relevant for profiling.
-static void walkFunctionForProfiling(AbstractFunctionDecl *Root,
-                                     ASTWalker &Walker) {
-  Root->walk(Walker);
-
-  // We treat non-closure member initializers as part of the constructor for
-  // profiling.
-  if (auto *CD = dyn_cast<ConstructorDecl>(Root)) {
-    auto *NominalType =
-        CD->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
-    for (auto *Member : NominalType->getMembers()) {
-      // Find pattern binding declarations that have initializers.
-      if (auto *PBD = dyn_cast<PatternBindingDecl>(Member))
-        walkPatternForProfiling(PBD, Walker, /*AllowClosures=*/false);
-    }
+  // Skip any remaining implicit, or otherwise unsupported decls.
+  if (D->isImplicit() || isa<EnumCaseDecl>(D)) {
+    LLVM_DEBUG(llvm::dbgs() << "Skipping ASTNode: implicit/unsupported decl\n");
+    return true;
   }
+
+  return false;
 }
 
-/// Walk \p D for profiling.
-static void walkForProfiling(ASTNode N, ASTWalker &Walker) {
+namespace swift {
+bool doesASTRequireProfiling(SILModule &M, ASTNode N) {
+  return M.getOptions().GenerateProfile && !isUnmapped(N);
+}
+} // namespace swift
+
+/// Get the DeclContext for the decl referenced by \p forDecl.
+DeclContext *getProfilerContextForDecl(ASTNode N, SILDeclRef forDecl) {
+  if (auto *D = N.dyn_cast<Decl *>())
+    if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D))
+      return TLCD;
+  assert(!forDecl.isNull() && "Expected a nonnull SILDeclRef");
+  if (auto *ACE = forDecl.getAbstractClosureExpr())
+    return ACE;
+  return forDecl.getDecl()->getDeclContext();
+}
+
+/// Check that the input AST has at least been type-checked.
+LLVM_ATTRIBUTE_UNUSED
+static bool hasASTBeenTypeChecked(ASTNode N, SILDeclRef forDecl) {
+  DeclContext *DC = getProfilerContextForDecl(N, forDecl);
+  SourceFile *SF = DC->getParentSourceFile();
+  return !SF || SF->ASTStage >= SourceFile::TypeChecked;
+}
+
+/// Check whether a mapped AST node requires a new profiler.
+static bool canCreateProfilerForAST(ASTNode N, SILDeclRef forDecl) {
+  assert(hasASTBeenTypeChecked(N, forDecl) &&
+         "Cannot use this AST for profiling");
+
   if (auto *D = N.dyn_cast<Decl *>()) {
-    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D))
-      walkFunctionForProfiling(AFD, Walker);
-    else if (auto *PBD = dyn_cast<PatternBindingDecl>(D))
-      walkPatternForProfiling(PBD, Walker);
-    else if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D))
-      TLCD->walk(Walker);
-  } else if (auto *E = N.dyn_cast<Expr *>()) {
-    cast<ClosureExpr>(E)->walk(Walker);
+    if (isa<AbstractFunctionDecl>(D))
+      return true;
+
+    if (isa<TopLevelCodeDecl>(D))
+      return true;
+  } else if (auto *E = N.get<Expr *>()) {
+    if (forDecl.isStoredPropertyInitializer() ||
+        forDecl.getAbstractClosureExpr())
+      return true;
   }
+  return false;
 }
 
-SILProfiler *SILProfiler::create(SILModule &M, ASTNode N) {
-  if (auto *D = N.dyn_cast<Decl *>()) {
-    assert(isa<AbstractFunctionDecl>(D) ||
-           isa<TopLevelCodeDecl>(D) && "Cannot create profiler");
-  } else if (auto *E = N.dyn_cast<Expr *>()) {
-    assert(isa<AbstractClosureExpr>(E) && "Cannot create profiler");
-  } else {
-    llvm_unreachable("Invalid AST node for profiling");
-  }
-
-  const auto &Opts = M.getOptions();
-  if ((!Opts.GenerateProfile && Opts.UseProfile.empty()) || isUnmapped(N))
+SILProfiler *SILProfiler::create(SILModule &M, ForDefinition_t forDefinition,
+                                 ASTNode N, SILDeclRef forDecl) {
+  // Avoid generating profiling state for declarations.
+  if (!forDefinition)
     return nullptr;
 
+  const auto &Opts = M.getOptions();
+  if (!doesASTRequireProfiling(M, N) && Opts.UseProfile.empty())
+    return nullptr;
+
+  if (!canCreateProfilerForAST(N, forDecl))
+    llvm_unreachable("Invalid AST node for profiling");
+
   auto *Buf = M.allocate<SILProfiler>(1);
-  auto *SP = ::new (Buf) SILProfiler(M, N, Opts.EmitProfileCoverageMapping);
+  auto *SP =
+      ::new (Buf) SILProfiler(M, N, forDecl, Opts.EmitProfileCoverageMapping);
   SP->assignRegionCounters();
   return SP;
 }
 
 namespace {
 
+/// Special logic for handling function visitation.
+///
+/// To avoid creating duplicate mappings, a function decl is only profiled if
+/// it hasn't been reached via recursive walk.
+///
+/// Apply \p Func if the function can be visited.
+template <typename F>
+bool visitFunctionDecl(ASTWalker &Walker, AbstractFunctionDecl *AFD, F Func) {
+  bool continueWalk = Walker.Parent.isNull();
+  if (continueWalk)
+    Func();
+  return continueWalk;
+}
+
 /// An ASTWalker that maps ASTNodes to profiling counters.
 struct MapRegionCounters : public ASTWalker {
   /// The next counter value to assign.
-  unsigned NextCounter;
+  unsigned NextCounter = 0;
 
   /// The map of statements to counters.
   llvm::DenseMap<ASTNode, unsigned> &CounterMap;
 
   MapRegionCounters(llvm::DenseMap<ASTNode, unsigned> &CounterMap)
-      : NextCounter(0), CounterMap(CounterMap) {}
+      : CounterMap(CounterMap) {}
+
+  void mapRegion(ASTNode N) {
+    CounterMap[N] = NextCounter;
+
+    LLVM_DEBUG({
+      llvm::dbgs() << "Assigned counter #" << NextCounter << " to: ";
+      auto *E = N.dyn_cast<Expr *>();
+      if (E)
+        llvm::dbgs() << Expr::getKindName(E->getKind()) << "\n";
+      auto *S = N.dyn_cast<Stmt *>();
+      if (S)
+        llvm::dbgs() << Stmt::getKindName(S->getKind()) << "\n";
+    });
+
+    ++NextCounter;
+  }
 
   bool walkToDeclPre(Decl *D) override {
     if (isUnmapped(D))
       return false;
-    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D))
-      CounterMap[AFD->getBody()] = NextCounter++;
-    if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D))
-      CounterMap[TLCD->getBody()] = NextCounter++;
+
+    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
+      return visitFunctionDecl(*this, AFD, [&] { mapRegion(AFD->getBody()); });
+    } else if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
+      mapRegion(TLCD->getBody());
+    }
     return true;
   }
 
   std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
     if (auto *IS = dyn_cast<IfStmt>(S)) {
-      CounterMap[IS->getThenStmt()] = NextCounter++;
+      mapRegion(IS->getThenStmt());
     } else if (auto *US = dyn_cast<GuardStmt>(S)) {
-      CounterMap[US->getBody()] = NextCounter++;
+      mapRegion(US->getBody());
     } else if (auto *WS = dyn_cast<WhileStmt>(S)) {
-      CounterMap[WS->getBody()] = NextCounter++;
+      mapRegion(WS->getBody());
     } else if (auto *RWS = dyn_cast<RepeatWhileStmt>(S)) {
-      CounterMap[RWS->getBody()] = NextCounter++;
+      mapRegion(RWS->getBody());
     } else if (auto *FES = dyn_cast<ForEachStmt>(S)) {
-      CounterMap[FES->getBody()] = NextCounter++;
-      walkPatternForProfiling(FES->getIterator(), *this);
+      mapRegion(FES->getBody());
     } else if (auto *SS = dyn_cast<SwitchStmt>(S)) {
-      CounterMap[SS] = NextCounter++;
+      mapRegion(SS);
     } else if (auto *CS = dyn_cast<CaseStmt>(S)) {
-      CounterMap[CS] = NextCounter++;
-    } else if (auto *DCS = dyn_cast<DoCatchStmt>(S)) {
-      CounterMap[DCS] = NextCounter++;
+      mapRegion(CS);
     } else if (auto *CS = dyn_cast<CatchStmt>(S)) {
-      CounterMap[CS->getBody()] = NextCounter++;
+      mapRegion(CS->getBody());
     }
     return {true, S};
   }
 
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-    if (auto *IE = dyn_cast<IfExpr>(E)) {
-      CounterMap[IE->getThenExpr()] = NextCounter++;
-    } else if (isa<AutoClosureExpr>(E) || isa<ClosureExpr>(E)) {
-      CounterMap[E] = NextCounter++;
+    // If AST visitation begins with an expression, the counter map must be
+    // empty. Set up a counter for the root.
+    if (Parent.isNull()) {
+      assert(CounterMap.empty() && "Mapped a region before visiting the root?");
+      mapRegion(E);
     }
+
+    if (auto *IE = dyn_cast<IfExpr>(E)) {
+      mapRegion(IE->getThenExpr());
+    }
+
+    // rdar://42792053
+    // TODO: There's an outstanding issue here with LazyInitializerExpr. A LIE
+    // is copied into the body of a property getter after type-checking (before
+    // coverage). ASTWalker only visits this expression once via the property's
+    // VarDecl, and does not visit it again within the getter. This results in
+    // missing coverage. SILGen treats the init expr as part of the getter, but
+    // its SILProfiler has no information about the init because the LIE isn't
+    // visited here.
+
     return {true, E};
   }
 };
@@ -254,24 +339,56 @@ public:
 
     llvm_unreachable("Unhandled Kind in switch.");
   }
+
+  void print(raw_ostream &OS) const {
+    switch (K) {
+    case Kind::Zero:
+      OS << "zero";
+      return;
+    case Kind::Node:
+      OS << "node(" << Node.getOpaqueValue() << ")";
+      return;
+    case Kind::Add:
+    case Kind::Sub:
+      LHS->print(OS);
+      OS << ' ' << ((K == Kind::Add) ? '+' : '-') << ' ';
+      RHS->print(OS);
+      return;
+    case Kind::Ref:
+      OS << "ref(";
+      LHS->print(OS);
+      OS << ")";
+      return;
+    }
+    llvm_unreachable("Unhandled Kind in switch.");
+  }
+
+#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+  LLVM_DUMP_METHOD void dump() const { print(llvm::errs()); }
+#endif
 };
 
-/// \brief A region of source code that can be mapped to a counter.
+/// A region of source code that can be mapped to a counter.
 class SourceMappingRegion {
   ASTNode Node;
 
   CounterExpr *Count;
 
-  /// \brief The region's starting location.
+  /// The region's starting location.
   Optional<SourceLoc> StartLoc;
 
-  /// \brief The region's ending location.
+  /// The region's ending location.
   Optional<SourceLoc> EndLoc;
 
 public:
   SourceMappingRegion(ASTNode Node, CounterExpr &Count,
                       Optional<SourceLoc> StartLoc, Optional<SourceLoc> EndLoc)
-      : Node(Node), Count(&Count), StartLoc(StartLoc), EndLoc(EndLoc) {}
+      : Node(Node), Count(&Count), StartLoc(StartLoc), EndLoc(EndLoc) {
+    assert((!StartLoc || StartLoc->isValid()) &&
+           "Expected start location to be valid");
+    assert((!EndLoc || EndLoc->isValid()) &&
+           "Expected end location to be valid");
+  }
 
   SourceMappingRegion(SourceMappingRegion &&Region) = default;
   SourceMappingRegion &operator=(SourceMappingRegion &&RHS) = default;
@@ -360,10 +477,12 @@ struct PGOMapping : public ASTWalker {
     if (isUnmapped(D))
       return false;
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
-      auto node = AFD->getBody();
-      CounterMap[node] = NextCounter++;
-      auto count = loadExecutionCount(node);
-      LoadedCounterMap[node] = count;
+      return visitFunctionDecl(*this, AFD, [&] {
+        auto node = AFD->getBody();
+        CounterMap[node] = NextCounter++;
+        auto count = loadExecutionCount(node);
+        LoadedCounterMap[node] = count;
+      });
     }
     if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
       auto node = TLCD->getBody();
@@ -435,7 +554,6 @@ struct PGOMapping : public ASTWalker {
       CounterMap[FES] = parent;
       auto count = loadExecutionCount(FES);
       LoadedCounterMap[FES] = count;
-      walkPatternForProfiling(FES->getIterator(), *this);
     } else if (auto *SS = dyn_cast<SwitchStmt>(S)) {
       CounterMap[SS] = NextCounter++;
       auto ssCount = loadExecutionCount(SS);
@@ -444,10 +562,6 @@ struct PGOMapping : public ASTWalker {
       CounterMap[CS] = NextCounter++;
       auto csCount = loadExecutionCount(CS);
       LoadedCounterMap[CS] = csCount;
-    } else if (auto *DCS = dyn_cast<DoCatchStmt>(S)) {
-      CounterMap[DCS] = NextCounter++;
-      auto dcsCount = loadExecutionCount(DCS);
-      LoadedCounterMap[DCS] = dcsCount;
     } else if (auto *CS = dyn_cast<CatchStmt>(S)) {
       auto csBody = CS->getBody();
       CounterMap[csBody] = NextCounter++;
@@ -459,30 +573,33 @@ struct PGOMapping : public ASTWalker {
 
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
     unsigned parent = getParentCounter();
+
+    if (Parent.isNull()) {
+      CounterMap[E] = NextCounter++;
+      auto eCount = loadExecutionCount(E);
+      LoadedCounterMap[E] = eCount;
+    }
+
     if (auto *IE = dyn_cast<IfExpr>(E)) {
       auto thenExpr = IE->getThenExpr();
       CounterMap[thenExpr] = NextCounter++;
       auto thenCount = loadExecutionCount(thenExpr);
       LoadedCounterMap[thenExpr] = thenCount;
-      if (auto elseExpr = IE->getElseExpr()) {
-        CounterMap[elseExpr] = parent;
-        auto count = loadExecutionCount(elseExpr);
-        if (!parent) {
-          auto thenVal = thenCount.getValue();
-          for (auto pCount = NextCounter - 1; pCount > 0; --pCount) {
-            auto cCount = LoadedCounts->Counts[pCount];
-            if (cCount > thenVal) {
-              count = cCount;
-              break;
-            }
+      auto elseExpr = IE->getElseExpr();
+      assert(elseExpr && "An if-expr must have an else subexpression");
+      CounterMap[elseExpr] = parent;
+      auto count = loadExecutionCount(elseExpr);
+      if (!parent) {
+        auto thenVal = thenCount.getValue();
+        for (auto pCount = NextCounter - 1; pCount > 0; --pCount) {
+          auto cCount = LoadedCounts->Counts[pCount];
+          if (cCount > thenVal) {
+            count = cCount;
+            break;
           }
         }
-        LoadedCounterMap[elseExpr] = subtract(count, thenCount);
       }
-    } else if (isa<AutoClosureExpr>(E) || isa<ClosureExpr>(E)) {
-      CounterMap[E] = NextCounter++;
-      auto eCount = loadExecutionCount(E);
-      LoadedCounterMap[E] = eCount;
+      LoadedCounterMap[elseExpr] = subtract(count, thenCount);
     }
     return {true, E};
   }
@@ -492,27 +609,32 @@ struct CoverageMapping : public ASTWalker {
 private:
   const SourceManager &SM;
 
-  /// \brief Storage for counter expressions.
+  /// Storage for counter expressions.
   std::forward_list<CounterExpr> Exprs;
 
-  /// \brief The map of statements to counter expressions.
+  /// The map of statements to counter expressions.
   llvm::DenseMap<ASTNode, CounterExpr *> CounterMap;
 
-  /// \brief The source mapping regions for this function.
+  /// The source mapping regions for this function.
   std::vector<SourceMappingRegion> SourceRegions;
 
-  /// \brief A stack of currently live regions.
+  /// A stack of currently live regions.
   std::vector<SourceMappingRegion> RegionStack;
 
-  /// \brief A stack of active repeat-while loops.
+  /// A stack of active repeat-while loops.
   std::vector<RepeatWhileStmt *> RepeatWhileStack;
 
-  CounterExpr *ExitCounter;
+  /// A stack of active do-catch statements.
+  std::vector<DoCatchStmt *> DoCatchStack;
 
-  /// \brief Return true if \c Node has an associated counter.
+  CounterExpr *ExitCounter = nullptr;
+
+  Stmt *ImplicitTopLevelBody = nullptr;
+
+  /// Return true if \c Node has an associated counter.
   bool hasCounter(ASTNode Node) { return CounterMap.count(Node); }
 
-  /// \brief Return the region counter for \c Node.
+  /// Return the region counter for \c Node.
   ///
   /// This should only be called on statements that have a dedicated counter.
   CounterExpr &getCounter(ASTNode Node) {
@@ -520,13 +642,13 @@ private:
     return *CounterMap[Node];
   }
 
-  /// \brief Create a counter expression.
+  /// Create a counter expression.
   CounterExpr &createCounter(CounterExpr &&Expr) {
     Exprs.push_front(std::move(Expr));
     return Exprs.front();
   }
 
-  /// \brief Create a counter expression for \c Node and add it to the map.
+  /// Create a counter expression for \c Node and add it to the map.
   CounterExpr &assignCounter(ASTNode Node, CounterExpr &&Expr) {
     assert(Node && "Assigning counter expression to non-existent AST node");
     CounterExpr &Result = createCounter(std::move(Expr));
@@ -534,12 +656,12 @@ private:
     return Result;
   }
 
-  /// \brief Create a counter expression referencing \c Node's own counter.
+  /// Create a counter expression referencing \c Node's own counter.
   CounterExpr &assignCounter(ASTNode Node) {
     return assignCounter(Node, CounterExpr::Leaf(Node));
   }
 
-  /// \brief Add \c Expr to \c Node's counter.
+  /// Add \c Expr to \c Node's counter.
   void addToCounter(ASTNode Node, CounterExpr &Expr) {
     CounterExpr &Counter = getCounter(Node);
     if (const CounterExpr *ReferencedCounter = Counter.getReferencedNode())
@@ -550,7 +672,7 @@ private:
       Counter = CounterExpr::Add(createCounter(std::move(Counter)), Expr);
   }
 
-  /// \brief Subtract \c Expr from \c Node's counter.
+  /// Subtract \c Expr from \c Node's counter.
   void subtractFromCounter(ASTNode Node, CounterExpr &Expr) {
     CounterExpr &Counter = getCounter(Node);
     assert(!Counter.isZero() && "Cannot create a negative counter");
@@ -560,16 +682,16 @@ private:
       Counter = CounterExpr::Sub(createCounter(std::move(Counter)), Expr);
   }
 
-  /// \brief Return the current region's counter.
+  /// Return the current region's counter.
   CounterExpr &getCurrentCounter() { return getRegion().getCounter(); }
 
-  /// \brief Get the counter from the end of the most recent scope.
+  /// Get the counter from the end of the most recent scope.
   CounterExpr &getExitCounter() {
     assert(ExitCounter && "no exit counter available");
     return *ExitCounter;
   }
 
-  /// \brief Set the exit count so we can leave the scope related to \c Node
+  /// Set the exit count so we can leave the scope related to \c Node
   ///
   /// Returns the delta of the count on entering \c Node and exiting, or null if
   /// there was no change.
@@ -580,7 +702,7 @@ private:
     return nullptr;
   }
 
-  /// \brief Adjust the count for control flow when exiting a scope.
+  /// Adjust the count for control flow when exiting a scope.
   void adjustForNonLocalExits(ASTNode Scope, CounterExpr *ControlFlowAdjust) {
     if (Parent.getAsDecl())
       return;
@@ -609,24 +731,24 @@ private:
     RegionStack.emplace_back(ASTNode(), *Count, getEndLoc(Scope), None);
   }
 
-  /// \brief Push a region covering \c Node onto the stack.
+  /// Push a region covering \c Node onto the stack.
   void pushRegion(ASTNode Node) {
     RegionStack.emplace_back(Node, getCounter(Node), Node.getStartLoc(),
                              getEndLoc(Node));
   }
 
-  /// \brief Replace the current region's count by pushing an incomplete region.
+  /// Replace the current region's count by pushing an incomplete region.
   void replaceCount(CounterExpr &&Expr, Optional<SourceLoc> Start = None) {
     CounterExpr &Counter = createCounter(std::move(Expr));
     RegionStack.emplace_back(ASTNode(), Counter, Start, None);
   }
 
-  /// \brief Get the location for the end of the last token in \c Node.
+  /// Get the location for the end of the last token in \c Node.
   SourceLoc getEndLoc(ASTNode Node) {
     return Lexer::getLocForEndOfToken(SM, Node.getEndLoc());
   }
 
-  /// \brief Pop regions from the stack into the function's list of regions.
+  /// Pop regions from the stack into the function's list of regions.
   ///
   /// Adds all regions from \c ParentNode to the top of the stack to the
   /// function's \c SourceRegions.
@@ -651,13 +773,13 @@ private:
     RegionStack.erase(ParentIt, E);
   }
 
-  /// \brief Return the currently active region.
+  /// Return the currently active region.
   SourceMappingRegion &getRegion() {
     assert(!RegionStack.empty() && "statement has no region");
     return RegionStack.back();
   }
 
-  /// \brief Ensure that \c S is included in the current region.
+  /// Ensure that \c S is included in the current region.
   void extendRegion(ASTNode S) {
     SourceMappingRegion &Region = getRegion();
     SourceLoc StartLoc = S.getStartLoc();
@@ -665,7 +787,7 @@ private:
       Region.setStartLoc(StartLoc);
   }
 
-  /// \brief Mark \c S as a terminator, starting a zero region.
+  /// Mark \c S as a terminator, starting a zero region.
   void terminateRegion(ASTNode S) {
     SourceMappingRegion &Region = getRegion();
     if (!Region.hasEndLoc())
@@ -681,7 +803,7 @@ private:
 public:
   CoverageMapping(const SourceManager &SM) : SM(SM) {}
 
-  /// \brief Generate the coverage counter mapping regions from collected
+  /// Generate the coverage counter mapping regions from collected
   /// source regions.
   SILCoverageMap *emitSourceRegions(
       SILModule &M, StringRef Name, StringRef PGOFuncName, uint64_t Hash,
@@ -709,15 +831,26 @@ public:
   bool walkToDeclPre(Decl *D) override {
     if (isUnmapped(D))
       return false;
-    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D))
-      assignCounter(AFD->getBody());
-    else if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D))
+
+    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
+      return visitFunctionDecl(*this, AFD, [&] {
+        assignCounter(AFD->getBody());
+      });
+    } else if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
       assignCounter(TLCD->getBody());
+      ImplicitTopLevelBody = TLCD->getBody();
+    }
+    return true;
+  }
+
+  bool walkToDeclPost(Decl *D) override {
+    if (isa<TopLevelCodeDecl>(D))
+      ImplicitTopLevelBody = nullptr;
     return true;
   }
 
   std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
-    if (S->isImplicit())
+    if (S->isImplicit() && S != ImplicitTopLevelBody)
       return {true, S};
 
     if (!RegionStack.empty())
@@ -752,7 +885,6 @@ public:
     } else if (auto *FES = dyn_cast<ForEachStmt>(S)) {
       assignCounter(FES, CounterExpr::Zero());
       assignCounter(FES->getBody());
-      walkPatternForProfiling(FES->getIterator(), *this);
 
     } else if (auto *SS = dyn_cast<SwitchStmt>(S)) {
       assignCounter(SS);
@@ -768,17 +900,23 @@ public:
       assignCounter(DS);
 
     } else if (auto *DCS = dyn_cast<DoCatchStmt>(S)) {
+      // The do-catch body is visited the same number of times as its parent.
       assignCounter(DCS->getBody(), CounterExpr::Ref(getCurrentCounter()));
-      assignCounter(DCS);
+
+      // Initialize the exit count of the do-catch to the entry count, then
+      // subtract off non-local exits as they are visited.
+      assignCounter(DCS, CounterExpr::Ref(getCurrentCounter()));
+      DoCatchStack.push_back(DCS);
 
     } else if (auto *CS = dyn_cast<CatchStmt>(S)) {
+      assert(DoCatchStack.size() && "catch stmt with no parent");
       assignCounter(CS->getBody());
     }
     return {true, S};
   }
 
   Stmt *walkToStmtPost(Stmt *S) override {
-    if (S->isImplicit())
+    if (S->isImplicit() && S != ImplicitTopLevelBody)
       return S;
 
     if (isa<BraceStmt>(S)) {
@@ -810,11 +948,17 @@ public:
 
     } else if (auto *BS = dyn_cast<BreakStmt>(S)) {
       // When we break from a loop, we need to adjust the exit count.
-      if (auto *RWS = dyn_cast<RepeatWhileStmt>(BS->getTarget())) {
+      Stmt *BreakTarget = BS->getTarget();
+      if (auto *RWS = dyn_cast<RepeatWhileStmt>(BreakTarget)) {
         subtractFromCounter(RWS->getCond(), getCurrentCounter());
-      } else if (!isa<SwitchStmt>(BS->getTarget())) {
+      } else if (!isa<SwitchStmt>(BreakTarget)) {
         addToCounter(BS->getTarget(), getCurrentCounter());
       }
+
+      // The break also affects the exit counts of active do-catch statements.
+      for (auto *DCS : DoCatchStack)
+        subtractFromCounter(DCS, getCurrentCounter());
+
       terminateRegion(S);
 
     } else if (auto *FS = dyn_cast<FallthroughStmt>(S)) {
@@ -827,13 +971,23 @@ public:
     } else if (isa<CaseStmt>(S)) {
       popRegions(S);
 
-    } else if (isa<DoCatchStmt>(S)) {
+    } else if (auto *DCS = dyn_cast<DoCatchStmt>(S)) {
+      assert(DoCatchStack.back() == DCS && "Malformed do-catch stack");
+      DoCatchStack.pop_back();
       replaceCount(CounterExpr::Ref(getCounter(S)), getEndLoc(S));
 
+    } else if (isa<CatchStmt>(S)) {
+      assert(DoCatchStack.size() && "catch stmt with no parent");
+
     } else if (isa<ReturnStmt>(S) || isa<FailStmt>(S) || isa<ThrowStmt>(S)) {
-      // When we return, we may need to adjust some loop condition counts.
-      for (auto *RWS : RepeatWhileStack)
-        subtractFromCounter(RWS->getCond(), getCurrentCounter());
+      // When we return, adjust loop condition counts and do-catch exit counts
+      // to reflect the early exit.
+      if (isa<ReturnStmt>(S) || isa<FailStmt>(S)) {
+        for (auto *RWS : RepeatWhileStack)
+          subtractFromCounter(RWS->getCond(), getCurrentCounter());
+        for (auto *DCS : DoCatchStack)
+          subtractFromCounter(DCS, getCurrentCounter());
+      }
 
       terminateRegion(S);
     }
@@ -844,26 +998,22 @@ public:
     if (!RegionStack.empty())
       extendRegion(E);
 
-    if (isa<AutoClosureExpr>(E)) {
-      // Autoclosures look strange if there isn't a region, since it looks like
-      // control flow starts partway through an expression. For now we skip
-      // these so we don't get odd behavior in default arguments and the like,
-      // but in the future we should consider creating appropriate regions for
-      // those expressions.
-      if (!RegionStack.empty())
-        assignCounter(E);
-    } else if (isa<ClosureExpr>(E)) {
+    // If AST visitation begins with an expression, the region stack must be
+    // empty. Set up a region for the root.
+    if (Parent.isNull()) {
+      assert(RegionStack.empty() &&
+             "Mapped a region before visiting the root?");
       assignCounter(E);
-    } else if (auto *IE = dyn_cast<IfExpr>(E)) {
-      CounterExpr &ThenCounter = assignCounter(IE->getThenExpr());
-      if (RegionStack.empty())
-        assignCounter(IE->getElseExpr());
-      else
-        assignCounter(IE->getElseExpr(),
-                      CounterExpr::Sub(getCurrentCounter(), ThenCounter));
+      pushRegion(E);
     }
 
-    if (hasCounter(E))
+    if (auto *IE = dyn_cast<IfExpr>(E)) {
+      CounterExpr &ThenCounter = assignCounter(IE->getThenExpr());
+      assignCounter(IE->getElseExpr(),
+                    CounterExpr::Sub(getCurrentCounter(), ThenCounter));
+    }
+
+    if (hasCounter(E) && !Parent.isNull())
       pushRegion(E);
     return {true, E};
   }
@@ -886,7 +1036,6 @@ getEquivalentPGOLinkage(FormalLinkage Linkage) {
     return llvm::GlobalValue::ExternalLinkage;
 
   case FormalLinkage::HiddenUnique:
-  case FormalLinkage::HiddenNonUnique:
   case FormalLinkage::Private:
     return llvm::GlobalValue::PrivateLinkage;
   }
@@ -894,8 +1043,8 @@ getEquivalentPGOLinkage(FormalLinkage Linkage) {
   llvm_unreachable("Unhandled FormalLinkage in switch.");
 }
 
-static StringRef getCurrentFileName(ASTNode Root) {
-  DeclContext *Ctx = Root.getAsDeclContext();
+static StringRef getCurrentFileName(ASTNode N, SILDeclRef forDecl) {
+  DeclContext *Ctx = getProfilerContextForDecl(N, forDecl);
   if (auto *ParentFile = Ctx->getParentSourceFile())
     return ParentFile->getFilename();
   return {};
@@ -904,7 +1053,7 @@ static StringRef getCurrentFileName(ASTNode Root) {
 void SILProfiler::assignRegionCounters() {
   const auto &SM = M.getASTContext().SourceMgr;
 
-  CurrentFileName = getCurrentFileName(Root);
+  CurrentFileName = getCurrentFileName(Root, forDecl);
 
   MapRegionCounters Mapper(RegionCounterMap);
 
@@ -912,31 +1061,27 @@ void SILProfiler::assignRegionCounters() {
   FormalLinkage CurrentFuncLinkage;
   if (auto *D = Root.dyn_cast<Decl *>()) {
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
-      CurrentFuncName = SILDeclRef(AFD).mangle();
+      CurrentFuncName = forDecl.mangle();
       CurrentFuncLinkage = getDeclLinkage(AFD);
-    } else if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
+    } else {
+      auto *TLCD = cast<TopLevelCodeDecl>(D);
       llvm::raw_string_ostream OS{CurrentFuncName};
       OS << "__tlcd_";
       TLCD->getStartLoc().printLineAndColumn(OS, SM);
       CurrentFuncLinkage = FormalLinkage::HiddenUnique;
-    } else {
-      llvm_unreachable("Unsupported decl");
     }
   } else {
-    auto *E = Root.get<Expr *>();
-    if (auto *CE = dyn_cast<ClosureExpr>(E)) {
-      CurrentFuncName = SILDeclRef(CE).mangle();
-      CurrentFuncLinkage = FormalLinkage::HiddenUnique;
-    } else {
-      llvm_unreachable("Unsupported expr");
-    }
+    CurrentFuncName = forDecl.mangle();
+    CurrentFuncLinkage = FormalLinkage::HiddenUnique;
   }
 
   PGOFuncName = llvm::getPGOFuncName(
       CurrentFuncName, getEquivalentPGOLinkage(CurrentFuncLinkage),
       CurrentFileName);
 
-  walkForProfiling(Root, Mapper);
+  LLVM_DEBUG(llvm::dbgs() << "Assigning counters to: " << CurrentFuncName
+                          << "\n");
+  Root.walk(Mapper);
 
   NumRegionCounters = Mapper.NextCounter;
   // TODO: Mapper needs to calculate a function hash as it goes.
@@ -944,7 +1089,7 @@ void SILProfiler::assignRegionCounters() {
 
   if (EmitCoverageMapping) {
     CoverageMapping Coverage(SM);
-    walkForProfiling(Root, Coverage);
+    Root.walk(Coverage);
     CovMap =
         Coverage.emitSourceRegions(M, CurrentFuncName, PGOFuncName, PGOFuncHash,
                                    RegionCounterMap, CurrentFileName);
@@ -962,7 +1107,7 @@ void SILProfiler::assignRegionCounters() {
     }
     PGOMapping pgoMapper(RegionLoadedCounterMap, LoadedCounts,
                          RegionCondToParentMap);
-    walkForProfiling(Root, pgoMapper);
+    Root.walk(pgoMapper);
   }
 }
 
@@ -986,11 +1131,4 @@ Optional<ASTNode> SILProfiler::getPGOParent(ASTNode Node) {
     return None;
   }
   return it->getSecond();
-}
-
-void SILProfiler::recordCounterUpdate() {
-  // If a counter update is recorded, the profile symbol table is guaranteed
-  // to have name data needed by the coverage mapping.
-  if (CovMap)
-    CovMap->setSymtabEntryGuaranteed();
 }

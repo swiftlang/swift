@@ -76,8 +76,7 @@
                   'words) . font-lock-keyword-face)
 
    ;; SIL Instructions - Borrowing
-   `(,(regexp-opt '("load_borrow" "begin_borrow" "store_borrow" "end_borrow_argument") 'words) . font-lock-keyword-face)
-   '("\\(end_borrow\\) %[[:alnum:]]+ \\(from\\)" (1 font-lock-keyword-face) (2 font-lock-keyword-face))
+   `(,(regexp-opt '("load_borrow" "begin_borrow" "store_borrow" "end_borrow") 'words) . font-lock-keyword-face)
 
    ;; SIL Instructions - Exclusivity
    `(,(regexp-opt '("begin_access" "end_access") 'words) . font-lock-keyword-face)
@@ -93,9 +92,11 @@
                     "load_unowned" "store_unowned"
                     "fix_lifetime" "mark_dependence"
                     "end_lifetime"
-                    "is_unique" "is_unique_or_pinned"
+                    "is_unique"
+                    "is_escaping_closure"
                     "copy_block"
-                    "strong_unpin" "strong_pin" "is_unique" "is_unique_or_pinned")
+                    "copy_block_without_escaping"
+                    "is_unique")
                   'words) . font-lock-keyword-face)
    ;; Literals
    `(,(regexp-opt '("function_ref"
@@ -151,7 +152,7 @@
                     "unchecked_bitwise_cast"
                     "ref_to_raw_pointer" "raw_pointer_to_ref"
                     "unowned_to_ref" "ref_to_unowned"
-                    "convert_function"
+                    "convert_function" "convert_escape_to_noescape"
                     "ref_to_unmanaged" "unmanaged_to_ref"
                     "thin_function_to_pointer" "pointer_to_thin_function"
                     "ref_to_bridge_object"

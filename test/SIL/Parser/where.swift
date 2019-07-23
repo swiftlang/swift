@@ -4,6 +4,6 @@ import Swift
 protocol P {
   associatedtype CodeUnit
   mutating func decode<
-    G : IteratorProtocol where G.Element == CodeUnit
-  >(next: inout G) -> Int
+    G : IteratorProtocol
+  >(next: inout G) -> Int where G.Element == CodeUnit
 }

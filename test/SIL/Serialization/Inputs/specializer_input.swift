@@ -1,13 +1,13 @@
 
 public typealias Int = Builtin.Int32
 
-@_fixed_layout
+@frozen
 public struct Container<V> {
-  @_inlineable
+  @inlinable
   @inline(never)
   public func doSomething() {}
 
-  @_inlineable
+  @inlinable
   @inline(never)
   public init() {}
 }

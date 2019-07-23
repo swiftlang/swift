@@ -1,3 +1,5 @@
+// ln doesn't create a proper symlink on Windows
+// XFAIL: windows
 // RUN: %empty-directory(%t.dir)
 // RUN: echo "let foo = 0" > %t.dir/real.swift
 // RUN: ln -s %t.dir/real.swift %t.dir/linked.swift

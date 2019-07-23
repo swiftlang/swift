@@ -8,17 +8,16 @@ else()
   set(SOURCEKITD_TEST_LINK_LIBS sourcekitd)
 endif()
 
-if(SOURCEKIT_NEED_EXPLICIT_LIBDISPATCH)
-  set(SOURCEKITD_TEST_LINK_LIBS ${SOURCEKITD_TEST_LINK_LIBS} dispatch)
-endif()
-
 add_sourcekit_executable(sourcekitd-test
   sourcekitd-test.cpp
   TestOptions.cpp
   LINK_LIBS ${SOURCEKITD_TEST_LINK_LIBS} SourceKitSupport
     clangRewrite clangLex clangBasic
-  LLVM_COMPONENT_DEPENDS core support option coverage lto
+  LLVM_LINK_COMPONENTS core support option coverage lto
 )
+if(SWIFT_NEED_EXPLICIT_LIBDISPATCH)
+  target_link_libraries(sourcekitd-test PRIVATE dispatch BlocksRuntime)
+endif()
 
 add_dependencies(sourcekitd-test sourcekitdTestOptionsTableGen)
 
@@ -33,6 +32,7 @@ if(SWIFT_ANALYZE_CODE_COVERAGE)
     LINK_FLAGS " -fprofile-instr-generate -fcoverage-mapping")
 endif()
 
-swift_install_in_component(tools
-    TARGETS sourcekitd-test
-    RUNTIME DESTINATION bin)
+swift_install_in_component(TARGETS sourcekitd-test
+                           RUNTIME
+                             DESTINATION bin
+                             COMPONENT tools)

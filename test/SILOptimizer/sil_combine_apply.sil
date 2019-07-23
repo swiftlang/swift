@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -sil-combine -verify-skip-unreachable-must-be-last -sil-combine-disable-alloc-stack-opts | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -sil-combine -verify-skip-unreachable-must-be-last -sil-combine-disable-alloc-stack-opts | %FileCheck %s
 
 import Builtin
 
@@ -14,6 +14,8 @@ protocol Error {}
 protocol SwiftP {
   func foo()
 }
+
+class Klass {}
 
 /////////////////////////////////
 // Tests for SILCombinerApply. //
@@ -202,6 +204,7 @@ sil @try_apply_func : $@convention(thin) () -> (Builtin.Int32, @error Error)
 // CHECK-NEXT: dealloc_stack [[NEW_ALLOC_STACK]]
 // CHECK-NEXT: return
 // CHECK: bb6(
+// CHECK-NEXT: builtin "willThrow"
 // CHECK-NEXT: dealloc_stack [[NEW_ALLOC_STACK]]
 // CHECK-NEXT: throw
 // CHECK: } // end sil function 'sil_combine_dead_partial_apply_try_apply'
@@ -368,9 +371,8 @@ sil @helperForOptimizeApplyOfConvertFunction : $@convention(thin) (@in Builtin.I
 // CHECK-LABEL: sil @testOptimizeApplyOfConvertFunction : $@convention(thin) (@in Builtin.Int8) -> @out Builtin.Int32 {
 // CHECK: bb0(%0 : $*Builtin.Int32, %1 : $*Builtin.Int8):
 // CHECK:   [[FN:%.*]] = function_ref @helperForOptimizeApplyOfConvertFunction : $@convention(thin) (@in Builtin.Int8) -> @out Builtin.Int32
-// CHECK:   [[TTF:%.*]] = thin_to_thick_function [[FN]] : $@convention(thin) (@in Builtin.Int8) -> @out Builtin.Int32 to $@callee_owned (@in Builtin.Int8) -> @out Builtin.Int32
-// CHECK:   [[CVF:%.*]] = convert_function [[TTF]] : $@callee_owned (@in Builtin.Int8) -> @out Builtin.Int32 to $@noescape @callee_owned (@in Builtin.Int8) -> @out Builtin.Int32
-// CHECK:   %{{.*}} = apply [[CVF]](%0, %1) : $@noescape @callee_owned (@in Builtin.Int8) -> @out Builtin.Int32
+// CHECK:   [[TTF:%.*]] = thin_to_thick_function [[FN]] : $@convention(thin) (@in Builtin.Int8) -> @out Builtin.Int32 to $@noescape @callee_owned (@in Builtin.Int8) -> @out Builtin.Int32
+// CHECK:   %{{.*}} = apply [[TTF]](%0, %1) : $@noescape @callee_owned (@in Builtin.Int8) -> @out Builtin.Int32
 // CHECK:   %{{.*}} = tuple ()
 // CHECK:   return %{{.*}} : $()
 // CHECK-LABEL: } // end sil function 'testOptimizeApplyOfConvertFunction'
@@ -378,9 +380,8 @@ sil @testOptimizeApplyOfConvertFunction : $@convention(thin) (@in Builtin.Int8) 
 bb0(%0 : $*Builtin.Int32, %1 : $*Builtin.Int8):
   %2 = function_ref @helperForOptimizeApplyOfConvertFunction : $@convention(thin) (@in Builtin.Int8) -> @out Builtin.Int32
   %3 = thin_to_thick_function %2 : $@convention(thin) (@in Builtin.Int8) -> @out Builtin.Int32 to $@callee_owned (@in Builtin.Int8) -> @out Builtin.Int32
-  %4 = convert_function %3 : $@callee_owned (@in Builtin.Int8) -> @out Builtin.Int32 to $@noescape @callee_owned (@in Builtin.Int8) -> @out Builtin.Int32
+  %4 = convert_escape_to_noescape %3 : $@callee_owned (@in Builtin.Int8) -> @out Builtin.Int32 to $@noescape @callee_owned (@in Builtin.Int8) -> @out Builtin.Int32
 
-  strong_retain %4 : $@noescape @callee_owned (@in Builtin.Int8) -> @out Builtin.Int32
   %18 = apply %4(%0, %1) : $@noescape @callee_owned (@in Builtin.Int8) -> @out Builtin.Int32
 
   %29 = tuple ()
@@ -401,7 +402,7 @@ sil @testCombineClosureNoescape : $(Builtin.Int32) -> () {
 bb0(%0 : $Builtin.Int32):
   %49 = function_ref @testCombineClosureHelper : $@convention(thin) (Builtin.Int32) -> ()
   %50 = partial_apply %49(%0) : $@convention(thin) (Builtin.Int32) -> ()
-  %51 = convert_function %50 : $@callee_owned () -> () to $@noescape @callee_owned () -> ()
+  %51 = convert_escape_to_noescape %50 : $@callee_owned () -> () to $@noescape @callee_owned () -> ()
   apply %51() : $@noescape @callee_owned () -> ()
   %empty = tuple ()
   return %empty : $()
@@ -415,7 +416,7 @@ bb0(%0 : $Builtin.Int32):
 // CHECK: bb0(%0 : $Builtin.Int32):
 // CHECK:  [[F:%.*]] = function_ref @testCombineClosureHelper : $@convention(thin) (Builtin.Int32) -> ()
 // CHECK:  [[PA:%.*]] = partial_apply [[F]](%0) : $@convention(thin) (Builtin.Int32) -> ()
-// CHECK:  [[CVT1:%.*]] = convert_function [[PA]] : $@callee_owned () -> () to $@noescape @callee_owned () -> ()
+// CHECK:  [[CVT1:%.*]] = convert_escape_to_noescape [[PA]] : $@callee_owned () -> () to $@noescape @callee_owned () -> ()
 // CHECK:  [[CVT2:%.*]] = convert_function [[CVT1]] : $@noescape @callee_owned () -> () to $@noescape @callee_owned () -> @error Error
 // CHECK:  try_apply [[CVT2]]() : $@noescape @callee_owned () -> @error Error, normal bb1, error bb2
 // CHECK-LABEL: } // end sil function 'testCombineClosureConvert'
@@ -423,7 +424,7 @@ sil @testCombineClosureConvert : $(Builtin.Int32) -> () {
 bb0(%0 : $Builtin.Int32):
   %49 = function_ref @testCombineClosureHelper : $@convention(thin) (Builtin.Int32) -> ()
   %50 = partial_apply %49(%0) : $@convention(thin) (Builtin.Int32) -> ()
-  %51 = convert_function %50 : $@callee_owned () -> () to $@noescape @callee_owned () -> ()
+  %51 = convert_escape_to_noescape %50 : $@callee_owned () -> () to $@noescape @callee_owned () -> ()
   %52 = convert_function %51 : $@noescape @callee_owned () -> () to $@noescape @callee_owned () -> @error Error
   try_apply %52() : $@noescape @callee_owned () -> @error Error, normal bb7, error bb11
 
@@ -518,4 +519,156 @@ bb0:
   %result = apply %converted(%metatype) : $@convention(thin) (@thick Derived.Type) -> ()
   %return = tuple ()
   return %return : $()
+}
+
+sil shared [transparent] [thunk] @genericClosure : $@convention(thin) <T> (@in T) -> @out T {
+bb0(%0 : $*T, %1 : $*T):
+  %12 = tuple ()
+  return %12 : $()
+}
+
+// CHECK-LABEL: sil shared @genericThinToThick : $@convention(thin) () -> ()
+// CHECK: [[F:%.*]] = function_ref @genericClosure : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out τ_0_0
+// CHECK: apply [[F]]<Builtin.Int64>(%{{.*}}, %{{.*}}) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out τ_0_0
+// CHECK-LABEL: } // end sil function 'genericThinToThick'
+sil shared @genericThinToThick : $@convention(thin) () -> () {
+bb0:
+  %fn = function_ref @genericClosure : $@convention(thin) <T> (@in T) -> @out T
+  %thick = thin_to_thick_function %fn : $@convention(thin) <T> (@in T) -> @out T to $@noescape @callee_guaranteed <T> (@in T) -> @out T
+  %in = alloc_stack $Builtin.Int64
+  %out = alloc_stack $Builtin.Int64
+  %c3 = integer_literal $Builtin.Int64, 3
+  store %c3 to %in : $*Builtin.Int64
+  %call = apply %thick<Builtin.Int64>(%out, %in) : $@noescape @callee_guaranteed <T> (@in T) -> @out T
+  dealloc_stack %out : $*Builtin.Int64
+  dealloc_stack %in : $*Builtin.Int64
+  %999 = tuple ()
+  return %999 : $()
+}
+
+sil shared [transparent] [thunk] @indirectClosure : $@convention(thin) (@in Builtin.Int64) -> @out Builtin.Int64 {
+bb0(%0 : $*Builtin.Int64, %1 : $*Builtin.Int64):
+  %val = load %1 : $*Builtin.Int64
+  store %val to %0 : $*Builtin.Int64
+  %999 = tuple ()
+  return %999 : $()
+}
+
+// CHECK-LABEL: sil shared @appliedEscapeToNoEscape : $@convention(thin) () -> () {
+// CHECK: [[F:%.*]] = function_ref @indirectClosure : $@convention(thin) (@in Builtin.Int64) -> @out Builtin.Int64 // user: %5
+// CHECK: apply [[F]](%{{.*}}, %{{.*}}) : $@convention(thin) (@in Builtin.Int64) -> @out Builtin.Int64
+sil shared @appliedEscapeToNoEscape : $@convention(thin) () -> () {
+bb0:
+  %fn = function_ref @indirectClosure : $@convention(thin) (@in Builtin.Int64) -> @out Builtin.Int64
+  %pa = partial_apply [callee_guaranteed] %fn() : $@convention(thin) (@in Builtin.Int64) -> @out Builtin.Int64
+  %cvt = convert_escape_to_noescape %pa : $@callee_guaranteed (@in Builtin.Int64) -> @out Builtin.Int64 to $@noescape @callee_guaranteed (@in Builtin.Int64) -> @out Builtin.Int64
+  %out = alloc_stack $Builtin.Int64
+  %in = alloc_stack $Builtin.Int64
+  %c3 = integer_literal $Builtin.Int64, 3
+  store %c3 to %in : $*Builtin.Int64
+  %call = apply %cvt(%out, %in) : $@noescape @callee_guaranteed (@in Builtin.Int64) -> @out Builtin.Int64
+  dealloc_stack %in : $*Builtin.Int64
+  dealloc_stack %out : $*Builtin.Int64
+  strong_release %pa : $@callee_guaranteed (@in Builtin.Int64) -> @out Builtin.Int64
+  %999 = tuple ()
+  return %999 : $()
+}
+
+// CHECK-LABEL: sil shared @applied_on_stack : $@convention(thin) () -> () {
+// CHECK: bb0:
+// CHECK:   [[F:%.*]] = function_ref @indirectClosure : $@convention(thin) (@in Builtin.Int64) -> @out Builtin.Int64
+// CHECK:   [[STK:%.*]] = alloc_stack $Builtin.Int64
+// CHECK:   [[STK2:%.*]] = alloc_stack $Builtin.Int64
+// CHECK:   [[I:%.*]] = integer_literal $Builtin.Int64, 3
+// CHECK:   store [[I]] to [[STK2]] : $*Builtin.Int64
+// CHECK:   apply [[F]]([[STK]], [[STK2]]) : $@convention(thin) (@in Builtin.Int64) -> @out Builtin.Int64
+// CHECK:   dealloc_stack [[STK2]] : $*Builtin.Int64
+// CHECK:   dealloc_stack [[STK]] : $*Builtin.Int64
+// CHECK:   return %8 : $()
+
+sil shared @applied_on_stack : $@convention(thin) () -> () {
+bb0:
+  %fn = function_ref @indirectClosure : $@convention(thin) (@in Builtin.Int64) -> @out Builtin.Int64
+  %pa = partial_apply [callee_guaranteed] [on_stack] %fn() : $@convention(thin) (@in Builtin.Int64) -> @out Builtin.Int64
+  %out = alloc_stack $Builtin.Int64
+  %in = alloc_stack $Builtin.Int64
+  %c3 = integer_literal $Builtin.Int64, 3
+  store %c3 to %in : $*Builtin.Int64
+  %call = apply %pa(%out, %in) : $@noescape @callee_guaranteed (@in Builtin.Int64) -> @out Builtin.Int64
+  dealloc_stack %in : $*Builtin.Int64
+  dealloc_stack %out : $*Builtin.Int64
+  dealloc_stack %pa : $@noescape @callee_guaranteed (@in Builtin.Int64) -> @out Builtin.Int64
+  %999 = tuple ()
+  return %999 : $()
+}
+
+sil @guaranteed_closure_throws2 : $@convention(thin) (Builtin.Int32, @guaranteed C) -> @error Error
+
+// CHECK-LABEL: sil @test_guaranteed_closure_try_apply_on_stack
+// CHECK: bb0
+// CHECK: strong_retain
+// CHECK: strong_retain
+// CHECK: try_apply
+// CHECK: bb1
+// CHECK: strong_release
+// CHECK: strong_release
+// CHECK: br bb3
+// CHECK: bb2
+// CHECK: strong_release
+// CHECK: strong_release
+// CHECK: br bb3
+sil @test_guaranteed_closure_try_apply_on_stack : $@convention(thin) (@guaranteed C, Builtin.Int32) ->  () {
+bb0(%0: $C, %1: $Builtin.Int32):
+  strong_retain %0 : $C
+  %closure_fun = function_ref @guaranteed_closure_throws2 : $@convention(thin) (Builtin.Int32, @guaranteed C) -> @error Error
+  %closure = partial_apply [callee_guaranteed] [on_stack] %closure_fun(%0) : $@convention(thin) (Builtin.Int32, @guaranteed C) -> @error Error
+  try_apply %closure(%1) : $@noescape @callee_guaranteed (Builtin.Int32) -> @error Error, normal bb7, error bb11
+
+bb7(%callret : $()):
+	dealloc_stack %closure : $@noescape @callee_guaranteed (Builtin.Int32) -> @error Error
+	strong_release %0: $C
+  br bb99
+
+bb11(%128 : $Error):
+	dealloc_stack %closure : $@noescape @callee_guaranteed (Builtin.Int32) -> @error Error
+	strong_release %0: $C
+  br bb99
+
+bb99:
+  %t = tuple()
+  return %t : $()
+}
+
+sil @convert_function_simplification_callee : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : $Klass):
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil @convert_function_simplification_callee_with_error : $@convention(thin) (@guaranteed Klass) -> @error Error {
+bb0(%0 : $Klass):
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @convert_function_simplification_caller : $@convention(thin) (@guaranteed Klass) -> () {
+// CHECK:   [[FUNC:%.*]] = function_ref @convert_function_simplification_callee : $@convention(thin) (@guaranteed Klass) -> ()
+// CHECK:   apply [[FUNC]]({{.*}}) : $@convention(thin) (@guaranteed Klass) -> ()
+// CHECK:   [[FUNC:%.*]] = function_ref @convert_function_simplification_callee_with_error : $@convention(thin) (@guaranteed Klass) -> @error Error
+// CHECK:   apply [nothrow] [[FUNC]]({{.*}}) : $@convention(thin) (@guaranteed Klass) -> @error Error
+// CHECK: } // end sil function 'convert_function_simplification_caller'
+sil @convert_function_simplification_caller : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : $Klass):
+  %1 = function_ref @convert_function_simplification_callee : $@convention(thin) (@guaranteed Klass) -> ()
+  %2 = thin_to_thick_function %1 : $@convention(thin) (@guaranteed Klass) -> () to $@callee_guaranteed (@guaranteed Klass) -> ()
+  %3 = convert_function %2 : $@callee_guaranteed (@guaranteed Klass) -> () to $@callee_guaranteed (@guaranteed Klass) -> @error Error
+  %4 = apply [nothrow] %3(%0) : $@callee_guaranteed (@guaranteed Klass) -> @error Error
+
+  %5 = function_ref @convert_function_simplification_callee_with_error : $@convention(thin) (@guaranteed Klass) -> @error Error
+  %6 = thin_to_thick_function %5 : $@convention(thin) (@guaranteed Klass) -> @error Error to $@callee_guaranteed (@guaranteed Klass) -> @error Error
+  %7 = convert_function %6 : $@callee_guaranteed (@guaranteed Klass) -> @error Error to $@callee_guaranteed (@guaranteed Klass) -> @error Error
+  %8 = apply [nothrow] %7(%0) : $@callee_guaranteed (@guaranteed Klass) -> @error Error
+
+  %9999 = tuple()
+  return %9999 : $()
 }

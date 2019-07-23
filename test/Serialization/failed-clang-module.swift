@@ -15,8 +15,6 @@
 // RUN: %target-swift-frontend -typecheck %s -I %t -module-cache-path %t/mcp
 // RUN: %target-swift-frontend -typecheck %s -Xcc -DFAIL -I %t -module-cache-path %t/mcp -show-diagnostics-after-fatal -verify -verify-ignore-unknown
 
-// XFAIL: linux
-
 import SwiftModB // expected-error {{missing required module}}
 _ = TyB() // expected-error {{use of unresolved identifier 'TyB'}}
 

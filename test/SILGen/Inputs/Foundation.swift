@@ -3,43 +3,6 @@
 @_exported import ObjectiveC
 @_exported import Foundation // clang module
 
-@_silgen_name("swift_StringToNSString")
-func _convertStringToNSString(string: String) -> NSString
-
-@_silgen_name("swift_NSStringToString")
-func _convertNSStringToString(nsstring: NSString?) -> String
-
-// NSArray bridging entry points
-func _convertNSArrayToArray<T>(nsarr: NSArray?) -> [T] {
-  return [T]()
-}
-
-func _convertArrayToNSArray<T>(arr: [T]) -> NSArray {
-  return NSArray()
-}
-
-// NSDictionary bridging entry points
-func _convertDictionaryToNSDictionary<Key, Value>(
-    d: Dictionary<Key, Value>
-) -> NSDictionary {
-  return NSDictionary()
-}
-
-func _convertNSDictionaryToDictionary<K: NSObject, V: AnyObject>(
-       d: NSDictionary?
-     ) -> Dictionary<K, V> {
-  return Dictionary<K, V>()
-}
-
-// NSSet bridging entry points
-func _convertSetToNSSet<T>(s: Set<T>) -> NSSet {
-  return NSSet()
-}
-
-func _convertNSSetToSet<T>(s: NSSet?) -> Set<T> {
-  return Set<T>()
-}
-
 extension String : _ObjectiveCBridgeable {
   public func _bridgeToObjectiveC() -> NSString {
     return NSString()
@@ -149,12 +112,6 @@ extension Set : _ObjectiveCBridgeable {
     return Set()
   }
 }
-
-extension NSObject : Hashable {
-  public var hashValue: Int { return 0 }
-}
-
-public func == (x: NSObject, y: NSObject) -> Bool { return true }
 
 extension NSError : Error {
   public var _domain: String { return domain }

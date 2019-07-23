@@ -7,7 +7,7 @@ private let c = 0
 extension Foo {
   public static func a() {}
   internal static func b() {}
-  private static func c() {}  // expected-note {{'c' declared here}}
+  private static func c() {}  // expected-note {{'c()' declared here}}
 }
 
 struct PrivateInit {
@@ -26,4 +26,4 @@ extension OriginallyEmpty {
 
 private func privateInBothFiles() {}
 func privateInPrimaryFile() {} // expected-note {{previously declared here}}
-private func privateInOtherFile() {} // expected-error {{invalid redeclaration}}
+private func privateInOtherFile() {}

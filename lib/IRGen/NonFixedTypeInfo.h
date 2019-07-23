@@ -30,30 +30,21 @@
 namespace swift {
 namespace irgen {
 
-/// Emits the generic implementation for getEnumTagSinglePayload.
-llvm::Value *emitGetEnumTagSinglePayload(IRGenFunction &IGF,
-                                         llvm::Value *numEmptyCases,
-                                         Address enumAddr, SILType T);
-
-/// Emits the generic implementation for storeEnumTagSinglePayload.
-void emitStoreEnumTagSinglePayload(IRGenFunction &IGF, llvm::Value *whichCase,
-                                   llvm::Value *numEmptyCases, Address enumAddr,
-                                   SILType T);
-
 /// An abstract CRTP class designed for types whose storage size,
 /// alignment, and stride need to be fetched from the value witness
 /// table for the type.
 template <class Impl>
 class WitnessSizedTypeInfo : public IndirectTypeInfo<Impl, TypeInfo> {
 private:
-  typedef IndirectTypeInfo<Impl, TypeInfo> super;
+  using super = IndirectTypeInfo<Impl, TypeInfo>;
 
 protected:
   const Impl &asImpl() const { return static_cast<const Impl &>(*this); }
 
   WitnessSizedTypeInfo(llvm::Type *type, Alignment align, IsPOD_t pod,
-                       IsBitwiseTakable_t bt)
-    : super(type, align, pod, bt, IsNotFixedSize, TypeInfo::STIK_None) {}
+                       IsBitwiseTakable_t bt, IsABIAccessible_t abi)
+    : super(type, align, pod, bt, IsNotFixedSize, abi,
+            SpecialTypeInfoKind::None) {}
 
 private:
   /// Bit-cast the given pointer to the right type and assume it as an
@@ -109,22 +100,16 @@ public:
     return emitLoadOfIsPOD(IGF, T);
   }
 
+  llvm::Value *getIsBitwiseTakable(IRGenFunction &IGF, SILType T) const override {
+    return emitLoadOfIsBitwiseTakable(IGF, T);
+  }
+
   llvm::Value *isDynamicallyPackedInline(IRGenFunction &IGF,
                                          SILType T) const override {
     return emitLoadOfIsInline(IGF, T);
   }
 
-  /// FIXME: Dynamic extra inhabitant lookup.
-  bool mayHaveExtraInhabitants(IRGenModule &) const override { return false; }
-  llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
-                                       Address src, SILType T) const override {
-    llvm_unreachable("dynamic extra inhabitants not supported");
-  }
-  void storeExtraInhabitant(IRGenFunction &IGF,
-                            llvm::Value *index,
-                            Address dest, SILType T) const override {
-    llvm_unreachable("dynamic extra inhabitants not supported");
-  }
+  bool mayHaveExtraInhabitants(IRGenModule &) const override { return true; }
 
   llvm::Constant *getStaticSize(IRGenModule &IGM) const override {
     return nullptr;
@@ -134,19 +119,6 @@ public:
   }
   llvm::Constant *getStaticStride(IRGenModule &IGM) const override {
     return nullptr;
-  }
-
-  llvm::Value *getEnumTagSinglePayload(IRGenFunction &IGF,
-                                       llvm::Value *numEmptyCases,
-                                       Address enumAddr,
-                                       SILType T) const override {
-    return emitGetEnumTagSinglePayload(IGF, numEmptyCases, enumAddr, T);
-  }
-
-  void storeEnumTagSinglePayload(IRGenFunction &IGF, llvm::Value *whichCase,
-                                 llvm::Value *numEmptyCases, Address enumAddr,
-                                 SILType T) const override {
-    emitStoreEnumTagSinglePayload(IGF, whichCase, numEmptyCases, enumAddr, T);
   }
 };
 }

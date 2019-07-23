@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 /// \file
-/// \brief This file defines diagnostics for lexing and parsing.
+/// This file defines diagnostics for lexing and parsing.
 //
 //===----------------------------------------------------------------------===//
 

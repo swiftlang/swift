@@ -10,7 +10,7 @@
 // REQUIRES: PTRSIZE=64
 
 // Clear the temporary directory
-// RUN: rm -rfv %t && mkdir -p %t
+// RUN: %empty-directory(%t)
 
 // We use a driver file to ensure that we are not dependent on how main/start
 // are setup on our platform. The c function interface that we use is very

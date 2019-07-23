@@ -9,7 +9,7 @@
 // checking cannot be tested. The standard library always compiles with debug
 // checking enabled, so the behavior of the optimized test depends on whether
 // the inlining heuristics decide to inline these methods. To fix this, we need
-// a way to force @_inlineable UnsafeBufferPointer methods to be emitted inside
+// a way to force @inlinable UnsafeBufferPointer methods to be emitted inside
 // the client code, and thereby subject the stdlib implementation to the test
 // case's compile options.
 //
@@ -37,6 +37,38 @@ UnsafeRawBufferPointerTestSuite.test("initFromValue") {
     }
   }
   expectEqual(value2, value1)
+}
+
+UnsafeRawBufferPointerTestSuite.test("initFromNilBuffer") {
+  let urbp1 =
+    UnsafeRawBufferPointer(UnsafeBufferPointer<Int>(start: nil, count: 0))
+  expectEqual(urbp1.baseAddress, nil)
+
+  let urbp2 =
+    UnsafeRawBufferPointer(UnsafeMutableBufferPointer<Int>(start: nil, count: 0))
+  expectEqual(urbp2.baseAddress, nil)
+
+  let umrbp =
+    UnsafeMutableRawBufferPointer(
+      UnsafeMutableBufferPointer<Int>(start: nil, count: 0))
+  expectEqual(umrbp.baseAddress, nil)
+}
+
+UnsafeRawBufferPointerTestSuite.test("initFromNilSlice") {
+  let urbp1 =
+    UnsafeRawBufferPointer(
+      rebasing: UnsafeRawBufferPointer(start: nil, count: 0)[...])
+  expectEqual(urbp1.baseAddress, nil)
+
+  let urbp2 =
+    UnsafeRawBufferPointer(
+      rebasing: UnsafeMutableRawBufferPointer(start: nil, count: 0)[...])
+  expectEqual(urbp2.baseAddress, nil)
+
+  let umrbp =
+    UnsafeMutableRawBufferPointer(
+      rebasing: UnsafeMutableRawBufferPointer(start: nil, count: 0)[...])
+  expectEqual(umrbp.baseAddress, nil)
 }
 
 // Test mutability and subscript getter/setters.

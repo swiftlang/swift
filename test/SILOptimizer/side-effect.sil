@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil %s -module-name Swift -side-effects-dump -o /dev/null | %FileCheck %s
+// RUN: %target-sil-opt %s -module-name Swift -side-effects-dump -o /dev/null | %FileCheck %s
 
 // REQUIRES: asserts
 
@@ -27,14 +27,15 @@ struct UnsafeMutablePointer<T> {
 }
 
 class X {
-  @sil_stored var a: Int32
-  @sil_stored var x: X
+  @_hasStorage var a: Int32
+  @_hasStorage var x: X
 
   init()
 }
 
-sil [_semantics "arc.programtermination_point"] @exitfunc : $@convention(thin) () -> Never
+sil [_semantics "programtermination_point"] @exitfunc : $@convention(thin) () -> Never
 sil [readnone] @pure_func : $@convention(thin) () -> ()
+sil [releasenone] @releasenone_func : $@convention(thin) () -> ()
 sil [readonly] @readonly_owned : $@convention(thin) (@owned X) -> ()
 sil [readonly] @readonly_guaranteed : $@convention(thin) (@guaranteed X) -> ()
 
@@ -449,6 +450,17 @@ bb0:
   return %r : $()
 }
 
+// CHECK-LABEL: sil @call_releasenone
+// CHECK: <func=rw>
+sil @call_releasenone : $@convention(thin) () -> () {
+bb0:
+  %u = function_ref @releasenone_func : $@convention(thin) () -> ()
+  %a = apply %u() : $@convention(thin) () -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+
 // CHECK-LABEL: sil @call_readonly_owned
 // CHECK: <func=rw+-,param0=;alloc;trap;readrc>
 sil @call_readonly_owned : $@convention(thin) (@owned X) -> () {
@@ -501,6 +513,22 @@ bb0:
 sil @call_public_external_func : $@convention(thin) () -> () {
 bb0:
   %u = function_ref @public_external_func : $@convention(thin) () -> ()
+  %a = apply %u() : $@convention(thin) () -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+sil shared_external @shared_external_func : $@convention(thin) () -> () {
+bb0:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @call_shared_external_func
+// CHECK-NEXT: <func=>
+sil @call_shared_external_func : $@convention(thin) () -> () {
+bb0:
+  %u = function_ref @shared_external_func : $@convention(thin) () -> ()
   %a = apply %u() : $@convention(thin) () -> ()
   %r = tuple ()
   return %r : $()

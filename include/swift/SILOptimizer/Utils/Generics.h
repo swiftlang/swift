@@ -28,6 +28,7 @@
 namespace swift {
 
 class FunctionSignaturePartialSpecializer;
+class SILOptFunctionBuilder;
 
 namespace OptRemark {
 class Emitter;
@@ -41,6 +42,7 @@ class Emitter;
 ///
 /// This is the top-level entry point for specializing an existing call site.
 void trySpecializeApplyOfGeneric(
+    SILOptFunctionBuilder &FunctionBuilder,
     ApplySite Apply, DeadInstructionSet &DeadApplies,
     llvm::SmallVectorImpl<SILFunction *> &NewFunctions,
     OptRemark::Emitter &ORE);
@@ -53,7 +55,7 @@ void trySpecializeApplyOfGeneric(
 class ReabstractionInfo {
   /// A 1-bit means that this parameter/return value is converted from indirect
   /// to direct.
-  llvm::SmallBitVector Conversions;
+  SmallBitVector Conversions;
 
   /// If set, indirect to direct conversions should be performed by the generic
   /// specializer.
@@ -82,21 +84,18 @@ class ReabstractionInfo {
   // any transformations performed by the generic specializer.
   //
   // Maps callee's generic parameters to caller's archetypes.
-  SubstitutionList CalleeParamSubs;
+  SubstitutionMap CalleeParamSubMap;
 
   // Set of substitutions to be used to invoke a specialized function.
   //
   // Maps generic parameters of the specialized callee function to caller's
   // archetypes.
-  SubstitutionList CallerParamSubs;
+  SubstitutionMap CallerParamSubMap;
 
   // Replaces archetypes of the original callee with archetypes
   // or concrete types, if they were made concrete) of the specialized
   // callee.
-  //
-  // Maps original callee's generic parameters to specialized
-  // callee archetypes.
-  SubstitutionList ClonerParamSubs;
+  SubstitutionMap ClonerParamSubMap;
 
   // Reference to the original generic non-specialized callee function.
   SILFunction *Callee;
@@ -115,20 +114,23 @@ class ReabstractionInfo {
   // It uses interface types.
   SubstitutionMap CallerInterfaceSubs;
 
+  // Is the generated specialization going to be serialized?
+  IsSerialized_t Serialized;
+
   // Create a new substituted type with the updated signature.
   CanSILFunctionType createSubstitutedType(SILFunction *OrigF,
-                                           const SubstitutionMap &SubstMap,
+                                           SubstitutionMap SubstMap,
                                            bool HasUnboundGenericParams);
 
   void createSubstitutedAndSpecializedTypes();
   bool prepareAndCheck(ApplySite Apply, SILFunction *Callee,
-                       SubstitutionList ParamSubs,
+                       SubstitutionMap ParamSubs,
                        OptRemark::Emitter *ORE = nullptr);
   void performFullSpecializationPreparation(SILFunction *Callee,
-                                            SubstitutionList ParamSubs);
+                                            SubstitutionMap ParamSubs);
   void performPartialSpecializationPreparation(SILFunction *Caller,
                                                SILFunction *Callee,
-                                               SubstitutionList ParamSubs);
+                                               SubstitutionMap ParamSubs);
   void finishPartialSpecializationPreparation(
       FunctionSignaturePartialSpecializer &FSPS);
 
@@ -139,7 +141,8 @@ public:
   /// If specialization is not possible getSpecializedType() will return an
   /// invalid type.
   ReabstractionInfo(ApplySite Apply, SILFunction *Callee,
-                    SubstitutionList ParamSubs,
+                    SubstitutionMap ParamSubs,
+                    IsSerialized_t Serialized,
                     bool ConvertIndirectToDirect = true,
                     OptRemark::Emitter *ORE = nullptr);
 
@@ -147,6 +150,16 @@ public:
   /// additional requirements. Requirements may contain new layout,
   /// conformances or same concrete type requirements.
   ReabstractionInfo(SILFunction *Callee, ArrayRef<Requirement> Requirements);
+
+  IsSerialized_t isSerialized() const {
+    return Serialized;
+  }
+
+  ResilienceExpansion getResilienceExpansion() const {
+    return (Serialized
+            ? ResilienceExpansion::Minimal
+            : ResilienceExpansion::Maximal);
+  }
 
   /// Returns true if the \p ParamIdx'th (non-result) formal parameter is
   /// converted from indirect to direct.
@@ -209,16 +222,16 @@ public:
     return SpecializedGenericSig;
   }
 
-  SubstitutionList getCallerParamSubstitutions() const {
-    return CallerParamSubs;
+  SubstitutionMap getCallerParamSubstitutionMap() const {
+    return CallerParamSubMap;
   }
 
-  SubstitutionList getClonerParamSubstitutions() const {
-    return ClonerParamSubs;
+  SubstitutionMap getClonerParamSubstitutionMap() const {
+    return ClonerParamSubMap;
   }
 
-  SubstitutionList getCalleeParamSubstitutions() const {
-    return CalleeParamSubs;
+  SubstitutionMap getCalleeParamSubstitutionMap() const {
+    return CalleeParamSubMap;
   }
 
   /// Create a specialized function type for a specific substituted type \p
@@ -247,7 +260,7 @@ public:
 
   /// Returns true if a given apply can be specialized.
   static bool canBeSpecialized(ApplySite Apply, SILFunction *Callee,
-                               SubstitutionList ParamSubs);
+                               SubstitutionMap ParamSubs);
 
   /// Returns the apply site for the current generic specialization.
   ApplySite getApply() const {
@@ -260,19 +273,19 @@ public:
 /// Helper class for specializing a generic function given a list of
 /// substitutions.
 class GenericFuncSpecializer {
+  SILOptFunctionBuilder &FuncBuilder;
   SILModule &M;
   SILFunction *GenericFunc;
-  SubstitutionList ParamSubs;
-  IsSerialized_t Serialized;
+  SubstitutionMap ParamSubs;
   const ReabstractionInfo &ReInfo;
 
   SubstitutionMap ContextSubs;
   std::string ClonedName;
 
 public:
-  GenericFuncSpecializer(SILFunction *GenericFunc,
-                         SubstitutionList ParamSubs,
-                         IsSerialized_t Serialized,
+  GenericFuncSpecializer(SILOptFunctionBuilder &FuncBuilder,
+                         SILFunction *GenericFunc,
+                         SubstitutionMap ParamSubs,
                          const ReabstractionInfo &ReInfo);
 
   /// If we already have this specialization, reuse it.
@@ -306,6 +319,12 @@ public:
 /// Checks if a given mangled name could be a name of a known
 /// prespecialization for -Onone support.
 bool isKnownPrespecialization(StringRef SpecName);
+
+/// Checks if all OnoneSupport pre-specializations are included in the module
+/// as public functions.
+///
+/// Issues errors for all missing functions.
+void checkCompletenessOfPrespecializations(SILModule &M);
 
 /// Create a new apply based on an old one, but with a different
 /// function being applied.

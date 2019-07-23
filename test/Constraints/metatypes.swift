@@ -15,5 +15,9 @@ let test5 : S.Type = S.self
 let test6 : AnyClass = S.self // expected-error {{cannot convert value of type 'S.Type' to specified type 'AnyClass' (aka 'AnyObject.Type')}}
 
 func acceptMeta<T>(_ meta: T.Type) { }
-acceptMeta(A) // expected-warning{{missing '.self' for reference to metatype of type 'A'}}{{13-13=.self}}
-acceptMeta((A) -> Void) // expected-warning{{missing '.self' for reference to metatype of type '(A) -> Void'}} {{12-12=(}} {{23-23=).self}}
+acceptMeta(A) // expected-error {{expected member name or constructor call after type name}}
+// expected-note@-1 {{add arguments after the type to construct a value of the type}}
+// expected-note@-2 {{use '.self' to reference the type object}}
+
+acceptMeta((A) -> Void) // expected-error {{expected member name or constructor call after type name}}
+// expected-note@-1 {{use '.self' to reference the type object}}

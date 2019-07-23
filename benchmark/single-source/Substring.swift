@@ -21,7 +21,8 @@ public let SubstringTest = [
   BenchmarkInfo(name: "LessSubstringSubstringGenericComparable", runFunction: run_LessSubstringSubstringGenericComparable, tags: [.validation, .api, .String]),
   BenchmarkInfo(name: "StringFromLongWholeSubstring", runFunction: run_StringFromLongWholeSubstring, tags: [.validation, .api, .String]),
   BenchmarkInfo(name: "StringFromLongWholeSubstringGeneric", runFunction: run_StringFromLongWholeSubstringGeneric, tags: [.validation, .api, .String]),
-  BenchmarkInfo(name: "SubstringComparable", runFunction: run_SubstringComparable, tags: [.validation, .api, .String]),
+  BenchmarkInfo(name: "SubstringComparable", runFunction: run_SubstringComparable, tags: [.validation, .api, .String],
+    setUpFunction: { blackHole(_comparison) }),
   BenchmarkInfo(name: "SubstringEqualString", runFunction: run_SubstringEqualString, tags: [.validation, .api, .String]),
   BenchmarkInfo(name: "SubstringEquatable", runFunction: run_SubstringEquatable, tags: [.validation, .api, .String]),
   BenchmarkInfo(name: "SubstringFromLongString", runFunction: run_SubstringFromLongString, tags: [.validation, .api, .String]),
@@ -30,6 +31,8 @@ public let SubstringTest = [
 
 // A string that doesn't fit in small string storage and doesn't fit in Latin-1
 let longWide = "fὢasὢodὢijὢadὢolὢsjὢalὢsdὢjlὢasὢdfὢijὢliὢsdὢjøὢslὢdiὢalὢiὢ"
+let (s1, ss1) = equivalentWithDistinctBuffers()
+let (s2, ss2) = equivalentWithDistinctBuffers()
 
 @inline(never)
 public func run_SubstringFromLongString(_ N: Int) {
@@ -42,7 +45,7 @@ public func run_SubstringFromLongString(_ N: Int) {
 
 func create<T : RangeReplaceableCollection, U : Collection>(
   _: T.Type, from source: U
-) where T.Iterator.Element == U.Iterator.Element {
+) where T.Element == U.Element {
   blackHole(T(source))
 }
 
@@ -79,7 +82,7 @@ private func equivalentWithDistinctBuffers() -> (String, Substring) {
   var s0 = longWide
   withUnsafeMutablePointer(to: &s0) { blackHole($0) }
   s0 += "!"
-  
+
   // These two should be equal but with distinct buffers, both refcounted.
   let a = Substring(s0).dropFirst()
   let b = String(a)
@@ -88,7 +91,7 @@ private func equivalentWithDistinctBuffers() -> (String, Substring) {
 
 @inline(never)
 public func run_EqualStringSubstring(_ N: Int) {
-  let (a, b) = equivalentWithDistinctBuffers()
+  let (a, b) = (s1, ss1)
   for _ in 1...N*500 {
     blackHole(a == b)
   }
@@ -96,7 +99,7 @@ public func run_EqualStringSubstring(_ N: Int) {
 
 @inline(never)
 public func run_EqualSubstringString(_ N: Int) {
-  let (a, b) = equivalentWithDistinctBuffers()
+  let (a, b) = (s1, ss1)
   for _ in 1...N*500 {
     blackHole(b == a)
   }
@@ -104,8 +107,8 @@ public func run_EqualSubstringString(_ N: Int) {
 
 @inline(never)
 public func run_EqualSubstringSubstring(_ N: Int) {
-  let (_, a) = equivalentWithDistinctBuffers()
-  let (_, b) = equivalentWithDistinctBuffers()
+  let (_, a) = (s1, ss1)
+  let (_, b) = (s2, ss2)
   for _ in 1...N*500 {
     blackHole(a == b)
   }
@@ -113,8 +116,8 @@ public func run_EqualSubstringSubstring(_ N: Int) {
 
 @inline(never)
 public func run_EqualSubstringSubstringGenericEquatable(_ N: Int) {
-  let (_, a) = equivalentWithDistinctBuffers()
-  let (_, b) = equivalentWithDistinctBuffers()
+  let (_, a) = (s1, ss1)
+  let (_, b) = (s2, ss2)
   func check<T>(_ x: T, _ y: T) where T : Equatable {
     blackHole(x == y)
   }
@@ -131,7 +134,7 @@ where T : StringProtocol, U : StringProtocol {
 
 @inline(never)
 public func run _EqualStringSubstringGenericStringProtocol(_ N: Int) {
-  let (a, b) = equivalentWithDistinctBuffers()
+  let (a, b) = (s1, ss1)
   for _ in 1...N*500 {
     checkEqual(a, b)
   }
@@ -139,7 +142,7 @@ public func run _EqualStringSubstringGenericStringProtocol(_ N: Int) {
 
 @inline(never)
 public func run _EqualSubstringStringGenericStringProtocol(_ N: Int) {
-  let (a, b) = equivalentWithDistinctBuffers()
+  let (a, b) = (s1, ss1)
   for _ in 1...N*500 {
     checkEqual(b, a)
   }
@@ -147,8 +150,8 @@ public func run _EqualSubstringStringGenericStringProtocol(_ N: Int) {
 
 @inline(never)
 public func run _EqualSubstringSubstringGenericStringProtocol(_ N: Int) {
-  let (_, a) = equivalentWithDistinctBuffers()
-  let (_, b) = equivalentWithDistinctBuffers()
+  let (_, a) = (s1, ss1)
+  let (_, b) = (s2, ss2)
   for _ in 1...N*500 {
     checkEqual(a, b)
   }
@@ -160,7 +163,7 @@ public func run _EqualSubstringSubstringGenericStringProtocol(_ N: Int) {
 /*
 @inline(never)
 public func run _LessStringSubstring(_ N: Int) {
-  let (a, b) = equivalentWithDistinctBuffers()
+  let (a, b) = (s1, ss1)
   for _ in 1...N*500 {
     blackHole(a < b)
   }
@@ -168,7 +171,7 @@ public func run _LessStringSubstring(_ N: Int) {
 
 @inline(never)
 public func run _LessSubstringString(_ N: Int) {
-  let (a, b) = equivalentWithDistinctBuffers()
+  let (a, b) = (s1, ss1)
   for _ in 1...N*500 {
     blackHole(b < a)
   }
@@ -177,8 +180,8 @@ public func run _LessSubstringString(_ N: Int) {
 
 @inline(never)
 public func run_LessSubstringSubstring(_ N: Int) {
-  let (_, a) = equivalentWithDistinctBuffers()
-  let (_, b) = equivalentWithDistinctBuffers()
+  let (_, a) = (s1, ss1)
+  let (_, b) = (s2, ss2)
   for _ in 1...N*500 {
     blackHole(a < b)
   }
@@ -186,8 +189,8 @@ public func run_LessSubstringSubstring(_ N: Int) {
 
 @inline(never)
 public func run_LessSubstringSubstringGenericComparable(_ N: Int) {
-  let (_, a) = equivalentWithDistinctBuffers()
-  let (_, b) = equivalentWithDistinctBuffers()
+  let (_, a) = (s1, ss1)
+  let (_, b) = (s2, ss2)
   func check<T>(_ x: T, _ y: T) where T : Comparable {
     blackHole(x < y)
   }
@@ -226,12 +229,13 @@ public func run_SubstringEqualString(_ N: Int) {
   CheckResults(count == 2*N*500)
 }
 
+let _substrings = "pen,pineapple,apple,pen,✒️,🍍,🍏,✒️".split(separator: ",")
+let _comparison = _substrings + ["PPAP"]
+
 @inline(never)
 public func run_SubstringComparable(_ N: Int) {
-	var string = "pen,pineapple,apple,pen"
-	string += ",✒️,🍍,🍏,✒️"
-	let substrings = string.split(separator: ",")
-	let comparison = substrings + ["PPAP"]
+	let substrings = _substrings // without this alias, there was 25% slowdown
+	let comparison = _comparison // due to increased retain/release traffic 🤷‍‍
 	var count = 0
 	for _ in 1...N*500 {
 		if substrings.lexicographicallyPrecedes(comparison) {
@@ -249,7 +253,7 @@ where T : StringProtocol, U : StringProtocol {
 
 @inline(never)
 public func run _LessStringSubstringGenericStringProtocol(_ N: Int) {
-  let (a, b) = equivalentWithDistinctBuffers()
+  let (a, b) = (s1, ss1)
   for _ in 1...N*500 {
     checkLess(a, b)
   }
@@ -257,7 +261,7 @@ public func run _LessStringSubstringGenericStringProtocol(_ N: Int) {
 
 @inline(never)
 public func run _LessSubstringStringGenericStringProtocol(_ N: Int) {
-  let (a, b) = equivalentWithDistinctBuffers()
+  let (a, b) = (s1, ss1)
   for _ in 1...N*500 {
     checkLess(b, a)
   }
@@ -265,8 +269,8 @@ public func run _LessSubstringStringGenericStringProtocol(_ N: Int) {
 
 @inline(never)
 public func run _LessSubstringSubstringGenericStringProtocol(_ N: Int) {
-  let (_, a) = equivalentWithDistinctBuffers()
-  let (_, b) = equivalentWithDistinctBuffers()
+  let (_, a) = (s1, ss1)
+  let (_, b) = (s2, ss2)
   for _ in 1...N*500 {
     checkLess(a, b)
   }

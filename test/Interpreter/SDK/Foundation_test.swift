@@ -163,8 +163,8 @@ FoundationTestSuite.test("RangeConversion") {
   expectEqual("{0, 5}", NSStringFromRange(nsrFromPartial))
 
   let s = "Hello, 🌎!"
-  let b = s.index(of: ",")!
-  let e = s.index(of: "!")!
+  let b = s.firstIndex(of: ",")!
+  let e = s.firstIndex(of: "!")!
   let nsr = NSRange(b..<e, in: s)
   expectEqual(nsr.location, 5)
   expectEqual(nsr.length, 4)
@@ -252,7 +252,7 @@ FoundationTestSuite.test("DarwinBoolean smoke test") {
   let _: CFArrayEqualCallBack = { DarwinBoolean($0 == $1) }
 }
 
-#if os(OSX)
+#if os(macOS)
 FoundationTestSuite.test("NSRectEdge/constants") {
   // Check that the following constants have the correct type and value.
   //
@@ -408,7 +408,7 @@ if #available(OSX 10.11, iOS 9.0, *) {
 
     // confirm the that class function works
     do {
-      let decoded = try NSKeyedUnarchiver.unarchiveTopLevelObjectWithData(data) as? NSPredicate
+      let decoded = try NSKeyedUnarchiver.unarchiveTopLevelObjectWithData(data as Data) as? NSPredicate
       expectEqual(obj, decoded)
     }
     catch {
@@ -432,6 +432,36 @@ if #available(OSX 10.11, iOS 9.0, *) {
     }
 
     KU.finishDecoding()
+  }
+
+  FoundationTestSuite.test("NSKeyedUnarchiver/CycleWithConvenienceInit") {
+    @objc(HasACyclicReference)
+    class HasACyclicReference: NSObject, NSCoding {
+      var ref: AnyObject?
+      override init() {
+        super.init()
+        ref = self
+      }
+
+      required convenience init?(coder: NSCoder) {
+        let decodedRef = coder.decodeObject(forKey: "ref") as AnyObject?
+        self.init(ref: decodedRef)
+      }
+      @objc init(ref: AnyObject?) {
+        self.ref = ref
+        super.init()
+      }
+
+      func encode(with coder: NSCoder) {
+        coder.encode(ref, forKey: "ref")
+      }
+    }
+
+    let data = NSKeyedArchiver.archivedData(withRootObject: HasACyclicReference())
+    let decodedObj = NSKeyedUnarchiver.unarchiveObject(with: data) as! HasACyclicReference
+
+    expectEqual(ObjectIdentifier(decodedObj), ObjectIdentifier(decodedObj.ref!),
+                "cycle was not preserved (due to object replacement?)")
   }
 }
 

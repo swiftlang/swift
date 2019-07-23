@@ -34,6 +34,8 @@ namespace options {
     AutolinkExtractOption = (1 << 9),
     ModuleWrapOption = (1 << 10),
     SwiftFormatOption = (1 << 11),
+    ArgumentIsPath = (1 << 12),
+    ModuleInterfaceOption = (1 << 13),
   };
 
   enum ID {

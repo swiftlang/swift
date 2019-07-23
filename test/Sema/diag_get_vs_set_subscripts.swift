@@ -2,13 +2,13 @@
 
 enum Key: Int {
   case aKey
-  case anotherKey // expected-note {{did you mean 'anotherKey'?}}
+  case anotherKey // expected-note {{'anotherKey' declared here}}
 }
  
 class sr6175 {
   var dict: [Key: String] = [:]
   func what() -> Void {
-    dict[.notAKey] = "something" // expected-error {{type 'Key' has no member 'notAKey'}}
+    dict[.notAKey] = "something" // expected-error {{type 'Key' has no member 'notAKey'; did you mean 'anotherKey'?}}
   }
   
   subscript(i: Int) -> Int {

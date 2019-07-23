@@ -18,10 +18,10 @@
 // by the linker.  Otherwise, we may end up with undefined symbol references as
 // the linker table section was never constructed.
 
-#define DECLARE_SWIFT_SECTION(name)                                            \
-  __asm__("\t.section " #name ",\"a\"\n");                                     \
-  __attribute__((__visibility__("hidden"))) extern const char __start_##name;  \
-  __attribute__((__visibility__("hidden"))) extern const char __stop_##name;
+#define DECLARE_SWIFT_SECTION(name)                                                          \
+  __asm__("\t.section " #name ",\"a\"\n");                                                   \
+  __attribute__((__visibility__("hidden"),__aligned__(1))) extern const char __start_##name; \
+  __attribute__((__visibility__("hidden"),__aligned__(1))) extern const char __stop_##name;
 
 extern "C" {
 DECLARE_SWIFT_SECTION(swift5_protocols)
@@ -32,6 +32,8 @@ DECLARE_SWIFT_SECTION(swift5_typeref)
 DECLARE_SWIFT_SECTION(swift5_reflstr)
 DECLARE_SWIFT_SECTION(swift5_fieldmd)
 DECLARE_SWIFT_SECTION(swift5_assocty)
+DECLARE_SWIFT_SECTION(swift5_replace)
+DECLARE_SWIFT_SECTION(swift5_replac2)
 }
 
 #undef DECLARE_SWIFT_SECTION
@@ -61,6 +63,8 @@ static void swift_image_constructor() {
       SWIFT_SECTION_RANGE(swift5_reflstr),
       SWIFT_SECTION_RANGE(swift5_fieldmd),
       SWIFT_SECTION_RANGE(swift5_assocty),
+      SWIFT_SECTION_RANGE(swift5_replace),
+      SWIFT_SECTION_RANGE(swift5_replac2),
   };
 
 #undef SWIFT_SECTION_RANGE

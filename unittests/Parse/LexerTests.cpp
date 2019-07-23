@@ -1,12 +1,25 @@
+#include "swift/AST/DiagnosticConsumer.h"
+#include "swift/AST/DiagnosticEngine.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Syntax/Trivia.h"
 #include "swift/Subsystems.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/Process.h"
 #include "gtest/gtest.h"
+
+#if __has_include(<sys/mman.h>)
+# include <sys/mman.h>
+# define HAS_MMAP 1
+#else
+# define HAS_MMAP 0
+#endif
 
 using namespace swift;
 using namespace llvm;
+using syntax::TriviaKind;
 
 // The test fixture.
 class LexerTest : public ::testing::Test {
@@ -16,7 +29,7 @@ public:
 
   std::vector<Token> tokenizeAndKeepEOF(unsigned BufferID) {
     Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr,
-            /*InSILMode=*/false);
+            LexerMode::Swift);
     std::vector<Token> Tokens;
     do {
       Tokens.emplace_back();
@@ -35,7 +48,7 @@ public:
     if (KeepEOF)
       Toks = tokenizeAndKeepEOF(BufID);
     else
-      Toks = tokenize(LangOpts, SourceMgr, BufID, 0, 0, KeepComments);
+      Toks = tokenize(LangOpts, SourceMgr, BufID, 0, 0, /*Diags=*/nullptr, KeepComments);
     EXPECT_EQ(ExpectedTokens.size(), Toks.size());
     for (unsigned i = 0, e = ExpectedTokens.size(); i != e; ++i) {
       EXPECT_EQ(ExpectedTokens[i], Toks[i].getKind()) << "i = " << i;
@@ -118,7 +131,7 @@ TEST_F(LexerTest, ContentStartHashbangSkip) {
   SourceManager SourceMgr;
   unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source));
   
-  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false);
+  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, LexerMode::Swift);
   
   Token Tok;
   
@@ -135,7 +148,7 @@ TEST_F(LexerTest, ContentStartHashbangSkipUTF8BOM) {
   SourceManager SourceMgr;
   unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source));
   
-  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false);
+  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, LexerMode::Swift);
   
   Token Tok;
   
@@ -152,7 +165,7 @@ TEST_F(LexerTest, ContentStartOperatorLeftBound) {
   SourceManager SourceMgr;
   unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source));
   
-  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false);
+  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, LexerMode::Swift);
   
   Token Tok;
   
@@ -169,7 +182,7 @@ TEST_F(LexerTest, ContentStartOperatorLeftBoundUTF8BOM) {
   SourceManager SourceMgr;
   unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source));
   
-  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false);
+  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, LexerMode::Swift);
   
   Token Tok;
   
@@ -192,7 +205,7 @@ TEST_F(LexerTest, ContentStartConflictMarker) {
   SourceManager SourceMgr;
   unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source));
   
-  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false);
+  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, LexerMode::Swift);
   
   Token Tok;
   
@@ -215,7 +228,7 @@ TEST_F(LexerTest, ContentStartConflictMarkerUTF8BOM) {
   SourceManager SourceMgr;
   unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source));
   
-  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false);
+  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, LexerMode::Swift);
   
   Token Tok;
   
@@ -231,7 +244,7 @@ TEST_F(LexerTest, ContentStartTokenIsStartOfLine) {
   SourceManager SourceMgr;
   unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source));
   
-  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false);
+  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, LexerMode::Swift);
   
   Token Tok;
   
@@ -249,7 +262,7 @@ TEST_F(LexerTest, ContentStartTokenIsStartOfLineUTF8BOM) {
   SourceManager SourceMgr;
   unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source));
   
-  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false);
+  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, LexerMode::Swift);
   
   Token Tok;
   
@@ -267,11 +280,12 @@ TEST_F(LexerTest, BOMNoCommentNoTrivia) {
   SourceManager SourceMgr;
   unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source));
   
-  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false,
-          CommentRetentionMode::None, TriviaRetentionMode::WithoutTrivia);
+  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, LexerMode::Swift,
+          HashbangMode::Disallowed, CommentRetentionMode::None,
+          TriviaRetentionMode::WithoutTrivia);
   
   Token Tok;
-  syntax::Trivia LeadingTrivia, TrailingTrivia;
+  ParsedTrivia LeadingTrivia, TrailingTrivia;
   
   L.lex(Tok, LeadingTrivia, TrailingTrivia);
   ASSERT_EQ(tok::identifier, Tok.getKind());
@@ -279,16 +293,16 @@ TEST_F(LexerTest, BOMNoCommentNoTrivia) {
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 14), Tok.getLoc());
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 14), Tok.getCommentRange().getStart());
   ASSERT_EQ(0u, Tok.getCommentRange().getByteLength());
-  ASSERT_EQ((syntax::Trivia{{}}), LeadingTrivia);
-  ASSERT_EQ((syntax::Trivia{{}}), TrailingTrivia);
+  ASSERT_EQ((ParsedTrivia{{}}), LeadingTrivia);
+  ASSERT_EQ((ParsedTrivia{{}}), TrailingTrivia);
   
   L.lex(Tok, LeadingTrivia, TrailingTrivia);
   ASSERT_EQ(tok::eof, Tok.getKind());
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 31), Tok.getLoc());
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 31), Tok.getCommentRange().getStart());
   ASSERT_EQ(0u, Tok.getCommentRange().getByteLength());
-  ASSERT_EQ((syntax::Trivia{{}}), LeadingTrivia);
-  ASSERT_EQ((syntax::Trivia{{}}), TrailingTrivia);
+  ASSERT_EQ((ParsedTrivia{{}}), LeadingTrivia);
+  ASSERT_EQ((ParsedTrivia{{}}), TrailingTrivia);
 }
 
 TEST_F(LexerTest, BOMTokenCommentNoTrivia) {
@@ -298,11 +312,12 @@ TEST_F(LexerTest, BOMTokenCommentNoTrivia) {
   SourceManager SourceMgr;
   unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source));
   
-  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false,
-          CommentRetentionMode::ReturnAsTokens, TriviaRetentionMode::WithoutTrivia);
+  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, LexerMode::Swift,
+          HashbangMode::Disallowed, CommentRetentionMode::ReturnAsTokens,
+          TriviaRetentionMode::WithoutTrivia);
   
   Token Tok;
-  syntax::Trivia LeadingTrivia, TrailingTrivia;
+  ParsedTrivia LeadingTrivia, TrailingTrivia;
   
   L.lex(Tok, LeadingTrivia, TrailingTrivia);
   ASSERT_EQ(tok::comment, Tok.getKind());
@@ -310,8 +325,8 @@ TEST_F(LexerTest, BOMTokenCommentNoTrivia) {
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 3), Tok.getLoc());
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 3), Tok.getCommentRange().getStart());
   ASSERT_EQ(0u, Tok.getCommentRange().getByteLength());
-  ASSERT_EQ((syntax::Trivia{{}}), LeadingTrivia);
-  ASSERT_EQ((syntax::Trivia{{}}), TrailingTrivia);
+  ASSERT_EQ((ParsedTrivia{{}}), LeadingTrivia);
+  ASSERT_EQ((ParsedTrivia{{}}), TrailingTrivia);
   
   L.lex(Tok, LeadingTrivia, TrailingTrivia);
   ASSERT_EQ(tok::identifier, Tok.getKind());
@@ -319,8 +334,8 @@ TEST_F(LexerTest, BOMTokenCommentNoTrivia) {
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 14), Tok.getLoc());
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 14), Tok.getCommentRange().getStart());
   ASSERT_EQ(0u, Tok.getCommentRange().getByteLength());
-  ASSERT_EQ((syntax::Trivia{{}}), LeadingTrivia);
-  ASSERT_EQ((syntax::Trivia{{}}), TrailingTrivia);
+  ASSERT_EQ((ParsedTrivia{{}}), LeadingTrivia);
+  ASSERT_EQ((ParsedTrivia{{}}), TrailingTrivia);
   
   L.lex(Tok, LeadingTrivia, TrailingTrivia);
   ASSERT_EQ(tok::comment, Tok.getKind());
@@ -328,8 +343,8 @@ TEST_F(LexerTest, BOMTokenCommentNoTrivia) {
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 18), Tok.getLoc());
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 18), Tok.getCommentRange().getStart());
   ASSERT_EQ(0u, Tok.getCommentRange().getByteLength());
-  ASSERT_EQ((syntax::Trivia{{}}), LeadingTrivia);
-  ASSERT_EQ((syntax::Trivia{{}}), TrailingTrivia);
+  ASSERT_EQ((ParsedTrivia{{}}), LeadingTrivia);
+  ASSERT_EQ((ParsedTrivia{{}}), TrailingTrivia);
   
   L.lex(Tok, LeadingTrivia, TrailingTrivia);
   ASSERT_EQ(tok::comment, Tok.getKind());
@@ -337,16 +352,16 @@ TEST_F(LexerTest, BOMTokenCommentNoTrivia) {
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 24), Tok.getLoc());
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 24), Tok.getCommentRange().getStart());
   ASSERT_EQ(0u, Tok.getCommentRange().getByteLength());
-  ASSERT_EQ((syntax::Trivia{{}}), LeadingTrivia);
-  ASSERT_EQ((syntax::Trivia{{}}), TrailingTrivia);
+  ASSERT_EQ((ParsedTrivia{{}}), LeadingTrivia);
+  ASSERT_EQ((ParsedTrivia{{}}), TrailingTrivia);
   
   L.lex(Tok, LeadingTrivia, TrailingTrivia);
   ASSERT_EQ(tok::eof, Tok.getKind());
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 31), Tok.getLoc());
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 31), Tok.getCommentRange().getStart());
   ASSERT_EQ(0u, Tok.getCommentRange().getByteLength());
-  ASSERT_EQ((syntax::Trivia{{}}), LeadingTrivia);
-  ASSERT_EQ((syntax::Trivia{{}}), TrailingTrivia);
+  ASSERT_EQ((ParsedTrivia{{}}), LeadingTrivia);
+  ASSERT_EQ((ParsedTrivia{{}}), TrailingTrivia);
 }
 
 TEST_F(LexerTest, BOMAttachCommentNoTrivia) {
@@ -356,11 +371,12 @@ TEST_F(LexerTest, BOMAttachCommentNoTrivia) {
   SourceManager SourceMgr;
   unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source));
   
-  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false,
-          CommentRetentionMode::AttachToNextToken, TriviaRetentionMode::WithoutTrivia);
+  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, LexerMode::Swift,
+          HashbangMode::Disallowed, CommentRetentionMode::AttachToNextToken,
+          TriviaRetentionMode::WithoutTrivia);
   
   Token Tok;
-  syntax::Trivia LeadingTrivia, TrailingTrivia;
+  ParsedTrivia LeadingTrivia, TrailingTrivia;
   
   L.lex(Tok, LeadingTrivia, TrailingTrivia);
   ASSERT_EQ(tok::identifier, Tok.getKind());
@@ -368,16 +384,16 @@ TEST_F(LexerTest, BOMAttachCommentNoTrivia) {
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 14), Tok.getLoc());
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 3), Tok.getCommentRange().getStart());
   ASSERT_EQ(10u, Tok.getCommentRange().getByteLength());
-  ASSERT_EQ((syntax::Trivia{{}}), LeadingTrivia);
-  ASSERT_EQ((syntax::Trivia{{}}), TrailingTrivia);
+  ASSERT_EQ((ParsedTrivia{{}}), LeadingTrivia);
+  ASSERT_EQ((ParsedTrivia{{}}), TrailingTrivia);
   
   L.lex(Tok, LeadingTrivia, TrailingTrivia);
   ASSERT_EQ(tok::eof, Tok.getKind());
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 31), Tok.getLoc());
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 18), Tok.getCommentRange().getStart());
   ASSERT_EQ(13u, Tok.getCommentRange().getByteLength());
-  ASSERT_EQ((syntax::Trivia{{}}), LeadingTrivia);
-  ASSERT_EQ((syntax::Trivia{{}}), TrailingTrivia);
+  ASSERT_EQ((ParsedTrivia{{}}), LeadingTrivia);
+  ASSERT_EQ((ParsedTrivia{{}}), TrailingTrivia);
 }
 
 TEST_F(LexerTest, BOMNoCommentTrivia) {
@@ -387,11 +403,12 @@ TEST_F(LexerTest, BOMNoCommentTrivia) {
   SourceManager SourceMgr;
   unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source));
   
-  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false,
-          CommentRetentionMode::None, TriviaRetentionMode::WithTrivia);
+  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, LexerMode::Swift,
+          HashbangMode::Disallowed, CommentRetentionMode::None,
+          TriviaRetentionMode::WithTrivia);
   
   Token Tok;
-  syntax::Trivia LeadingTrivia, TrailingTrivia;
+  ParsedTrivia LeadingTrivia, TrailingTrivia;
   
   L.lex(Tok, LeadingTrivia, TrailingTrivia);
   ASSERT_EQ(tok::identifier, Tok.getKind());
@@ -399,13 +416,13 @@ TEST_F(LexerTest, BOMNoCommentTrivia) {
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 14), Tok.getLoc());
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 14), Tok.getCommentRange().getStart());
   ASSERT_EQ(0u, Tok.getCommentRange().getByteLength());
-  ASSERT_EQ((syntax::Trivia{{
-    syntax::TriviaPiece::garbageText("\xEF\xBB\xBF"),
-    syntax::TriviaPiece::lineComment("// comment"),
-    syntax::TriviaPiece::newlines(1)
+  ASSERT_EQ((ParsedTrivia{{
+    ParsedTriviaPiece(TriviaKind::GarbageText, strlen("\xEF\xBB\xBF")),
+    ParsedTriviaPiece(TriviaKind::LineComment, strlen("// comment")),
+    ParsedTriviaPiece(TriviaKind::Newline, 1)
   }}), LeadingTrivia);
-  ASSERT_EQ((syntax::Trivia{{
-    syntax::TriviaPiece::spaces(1)
+  ASSERT_EQ((ParsedTrivia{{
+    ParsedTriviaPiece(TriviaKind::Space, 1)
   }}), TrailingTrivia);
   
   L.lex(Tok, LeadingTrivia, TrailingTrivia);
@@ -413,12 +430,12 @@ TEST_F(LexerTest, BOMNoCommentTrivia) {
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 31), Tok.getLoc());
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 31), Tok.getCommentRange().getStart());
   ASSERT_EQ(0u, Tok.getCommentRange().getByteLength());
-  ASSERT_EQ((syntax::Trivia{{
-    syntax::TriviaPiece::lineComment("//xx "),
-    syntax::TriviaPiece::newlines(1),
-    syntax::TriviaPiece::blockComment("/* x */")
+  ASSERT_EQ((ParsedTrivia{{
+    ParsedTriviaPiece(TriviaKind::LineComment, strlen("//xx ")),
+    ParsedTriviaPiece(TriviaKind::Newline, 1),
+    ParsedTriviaPiece(TriviaKind::BlockComment, strlen("/* x */"))
   }}), LeadingTrivia);
-  ASSERT_EQ((syntax::Trivia{{}}), TrailingTrivia);
+  ASSERT_EQ((ParsedTrivia{{}}), TrailingTrivia);
 }
 
 TEST_F(LexerTest, BOMAttachCommentTrivia) {
@@ -428,11 +445,12 @@ TEST_F(LexerTest, BOMAttachCommentTrivia) {
   SourceManager SourceMgr;
   unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source));
   
-  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false,
-          CommentRetentionMode::AttachToNextToken, TriviaRetentionMode::WithTrivia);
+  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, LexerMode::Swift,
+          HashbangMode::Disallowed, CommentRetentionMode::AttachToNextToken,
+          TriviaRetentionMode::WithTrivia);
   
   Token Tok;
-  syntax::Trivia LeadingTrivia, TrailingTrivia;
+  ParsedTrivia LeadingTrivia, TrailingTrivia;
   
   L.lex(Tok, LeadingTrivia, TrailingTrivia);
   ASSERT_EQ(tok::identifier, Tok.getKind());
@@ -440,13 +458,13 @@ TEST_F(LexerTest, BOMAttachCommentTrivia) {
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 14), Tok.getLoc());
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 3), Tok.getCommentRange().getStart());
   ASSERT_EQ(10u, Tok.getCommentRange().getByteLength());
-  ASSERT_EQ((syntax::Trivia{{
-    syntax::TriviaPiece::garbageText("\xEF\xBB\xBF"),
-    syntax::TriviaPiece::lineComment("// comment"),
-    syntax::TriviaPiece::newlines(1)
+  ASSERT_EQ((ParsedTrivia{{
+    ParsedTriviaPiece(TriviaKind::GarbageText, strlen("\xEF\xBB\xBF")),
+    ParsedTriviaPiece(TriviaKind::LineComment, strlen("// comment")),
+    ParsedTriviaPiece(TriviaKind::Newline, 1)
   }}), LeadingTrivia);
-  ASSERT_EQ((syntax::Trivia{{
-    syntax::TriviaPiece::spaces(1)
+  ASSERT_EQ((ParsedTrivia{{
+    ParsedTriviaPiece(TriviaKind::Space, 1)
   }}), TrailingTrivia);
   
   L.lex(Tok, LeadingTrivia, TrailingTrivia);
@@ -454,12 +472,12 @@ TEST_F(LexerTest, BOMAttachCommentTrivia) {
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 31), Tok.getLoc());
   ASSERT_EQ(SourceMgr.getLocForOffset(BufferID, 18), Tok.getCommentRange().getStart());
   ASSERT_EQ(13u, Tok.getCommentRange().getByteLength());
-  ASSERT_EQ((syntax::Trivia{{
-    syntax::TriviaPiece::lineComment("//xx "),
-    syntax::TriviaPiece::newlines(1),
-    syntax::TriviaPiece::blockComment("/* x */")
+  ASSERT_EQ((ParsedTrivia{{
+    ParsedTriviaPiece(TriviaKind::LineComment, strlen("//xx ")),
+    ParsedTriviaPiece(TriviaKind::Newline, 1),
+    ParsedTriviaPiece(TriviaKind::BlockComment, strlen("/* x */"))
   }}), LeadingTrivia);
-  ASSERT_EQ((syntax::Trivia{{}}), TrailingTrivia);
+  ASSERT_EQ((ParsedTrivia{{}}), TrailingTrivia);
 }
 
 TEST_F(LexerTest, RestoreBasic) {
@@ -469,7 +487,7 @@ TEST_F(LexerTest, RestoreBasic) {
   SourceManager SourceMgr;
   unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source, 14));
 
-  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false);
+  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, LexerMode::Swift);
 
   Token Tok;
 
@@ -516,7 +534,7 @@ TEST_F(LexerTest, RestoreNewlineFlag) {
   SourceManager SourceMgr;
   unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source, 16));
 
-  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false);
+  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, LexerMode::Swift);
 
   Token Tok;
 
@@ -564,7 +582,7 @@ TEST_F(LexerTest, RestoreStopAtCodeCompletion) {
   unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source, 16));
   SourceMgr.setCodeCompletionPoint(BufferID, 6);
 
-  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, /*InSILMode=*/false);
+  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, LexerMode::Swift);
 
   Token Tok;
 
@@ -628,13 +646,36 @@ TEST_F(LexerTest, getLocForStartOfToken) {
   }
 }
 
+TEST_F(LexerTest, getLocForStartOfTokenWithCustomSourceLocation) {
+  const char *Source =
+      "aaa \n"
+      // This next line is exactly 50 bytes to make it easy to compare with the
+      // previous test.
+      "#sourceLocation(file: \"custom-50.swuft\", line: 9)\n"
+      " \tbbb \"hello\" \"-\\(val)-\"";
+
+  unsigned BufferID = SourceMgr.addMemBufferCopy(Source);
+
+  // First is character offset, second is its token offset.
+  unsigned Offs[][2] =
+    { {1, 0}, {2, 0}, {3, 3}, {4, 4},
+      {56, 56}, {59, 57}, {64, 61},
+      // interpolated string
+      {70, 69}, {73, 73}, {74, 73}, {75, 73}, {76, 76}, {77, 69} };
+
+  for (auto Pair : Offs) {
+    ASSERT_EQ(Lexer::getLocForStartOfToken(SourceMgr, BufferID, Pair[0]),
+              SourceMgr.getLocForOffset(BufferID, Pair[1]));
+  }
+}
+
 TEST_F(LexerTest, NestedSubLexers) {
   const char *Source = "aaa0 bbb1 ccc2 ddd3 eee4 fff5 ggg6";
 
   unsigned BufferID = SourceMgr.addMemBufferCopy(Source);
 
   Lexer Primary(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr,
-                /*InSILMode=*/false);
+                LexerMode::Swift);
   std::vector<Token> TokensPrimary;
   do {
     TokensPrimary.emplace_back();
@@ -685,7 +726,7 @@ TEST_F(LexerTest, TokenizePlaceholder) {
 TEST_F(LexerTest, NoPlaceholder) {
   auto checkTok = [&](StringRef Source) {
     unsigned BufID = SourceMgr.addMemBufferCopy(Source);
-    std::vector<Token> Toks = tokenize(LangOpts, SourceMgr, BufID, 0, 0, false);
+    std::vector<Token> Toks = tokenize(LangOpts, SourceMgr, BufID, 0, 0, /*Diags=*/nullptr, false);
     ASSERT_FALSE(Toks.empty());
     EXPECT_NE(tok::identifier, Toks[0].getKind());
   };
@@ -703,3 +744,112 @@ TEST_F(LexerTest, NestedPlaceholder) {
   std::vector<Token> Toks = checkLex(Source, ExpectedTokens);
   EXPECT_EQ("<#aa#>", Toks[2].getText());
 }
+
+class StringCaptureDiagnosticConsumer : public DiagnosticConsumer {
+public:
+  virtual void
+  handleDiagnostic(SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
+                   StringRef FormatString,
+                   ArrayRef<DiagnosticArgument> FormatArgs,
+                   const swift::DiagnosticInfo &Info,
+                   SourceLoc bufferIndirectlyCausingDiagnostic) override {
+    std::string DiagMsg;
+    llvm::raw_string_ostream DiagOS(DiagMsg);
+    DiagnosticEngine::formatDiagnosticText(DiagOS, FormatString, FormatArgs);
+    auto LC = SM.getLineAndColumn(Loc);
+    std::ostringstream StrOS;
+    StrOS << LC.first << ", " << LC.second << ": " << DiagOS.str();
+    messages.push_back(StrOS.str());
+  }
+
+  std::vector<std::string> messages;
+};
+
+bool containsPrefix(const std::vector<std::string> &strs,
+                    const std::string &prefix) {
+  for (auto &str : strs) {
+    if (StringRef(str).startswith(StringRef(prefix))) {
+      return true;
+    }
+  }
+  return false;
+}
+
+TEST_F(LexerTest, DiagnoseEmbeddedNul) {
+  const char Source[] = " \0 \0 aaa \0 \0 bbb";
+  size_t SourceLen = sizeof(Source) - 1;
+
+  LangOptions LangOpts;
+  SourceManager SourceMgr;
+  unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source, SourceLen));
+
+  StringCaptureDiagnosticConsumer DiagConsumer;
+  DiagnosticEngine Diags(SourceMgr);
+  Diags.addConsumer(DiagConsumer);
+
+  Lexer L(LangOpts, SourceMgr, BufferID, &Diags,
+          LexerMode::Swift, HashbangMode::Disallowed,
+          CommentRetentionMode::None, TriviaRetentionMode::WithTrivia);
+
+  ASSERT_TRUE(containsPrefix(DiagConsumer.messages,
+                             "1, 2: nul character embedded in middle of file"));
+  ASSERT_TRUE(containsPrefix(DiagConsumer.messages,
+                             "1, 4: nul character embedded in middle of file"));
+}
+
+TEST_F(LexerTest, DiagnoseEmbeddedNulOffset) {
+  const char Source[] = " \0 \0 aaa \0 \0 bbb";
+  size_t SourceLen = sizeof(Source) - 1;
+
+  LangOptions LangOpts;
+  SourceManager SourceMgr;
+  unsigned BufferID = SourceMgr.addMemBufferCopy(StringRef(Source, SourceLen));
+
+  StringCaptureDiagnosticConsumer DiagConsumer;
+  DiagnosticEngine Diags(SourceMgr);
+  Diags.addConsumer(DiagConsumer);
+
+  Lexer L(LangOpts, SourceMgr, BufferID, &Diags,
+          LexerMode::Swift, HashbangMode::Disallowed,
+          CommentRetentionMode::None, TriviaRetentionMode::WithTrivia,
+          /*Offset=*/5, /*EndOffset=*/SourceLen);
+
+  ASSERT_FALSE(containsPrefix(
+      DiagConsumer.messages, "1, 2: nul character embedded in middle of file"));
+  ASSERT_FALSE(containsPrefix(
+      DiagConsumer.messages, "1, 4: nul character embedded in middle of file"));
+}
+
+#if HAS_MMAP
+
+// This test requires mmap because llvm::sys::Memory doesn't support protecting
+// pages to have no permissions.
+TEST_F(LexerTest, EncodedStringSegmentPastTheEnd) {
+  size_t PageSize = llvm::sys::Process::getPageSize();
+
+  void *FirstPage = mmap(/*addr*/nullptr, PageSize * 2, PROT_NONE,
+                         MAP_PRIVATE | MAP_ANON, /*fd*/-1, /*offset*/0);
+  SWIFT_DEFER { (void)munmap(FirstPage, PageSize * 2); };
+  ASSERT_NE(FirstPage, MAP_FAILED);
+  int ProtectResult = mprotect(FirstPage, PageSize, PROT_READ | PROT_WRITE);
+  ASSERT_EQ(ProtectResult, 0);
+
+  auto check = [FirstPage, PageSize](StringRef Input, StringRef Expected) {
+    char *StartPtr = static_cast<char *>(FirstPage) + PageSize - Input.size();
+    memcpy(StartPtr, Input.data(), Input.size());
+
+    SmallString<64> Buffer;
+    StringRef Escaped = Lexer::getEncodedStringSegment({StartPtr, Input.size()},
+                                                       Buffer);
+    EXPECT_EQ(Escaped, Expected);
+  };
+
+  check("needs escaping\\r",
+        "needs escaping\r");
+  check("does not need escaping",
+        "does not need escaping");
+  check("invalid escape at the end \\",
+        "invalid escape at the end ");
+}
+
+#endif // HAS_MMAP

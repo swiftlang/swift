@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O  -Xllvm -sil-inline-generics=false -Xllvm -sil-partial-specialization=false -primary-file %s -emit-sil -o - | %FileCheck %s
+// RUN: %target-swift-emit-sil -O  -Xllvm -sil-inline-generics=false -Xllvm -sil-partial-specialization=false -primary-file %s -o - | %FileCheck %s
 
 // check if the compiler does not crash if a function is specialized
 // which contains a collection cast
@@ -6,7 +6,7 @@
 class MyClass {}
 
 class KeyClass : Hashable {
-	var hashValue : Int { return 0 }
+  func hash(into hasher: inout Hasher) {}
 }
 func ==(lhs: KeyClass, rhs: KeyClass) -> Bool { return true }
 

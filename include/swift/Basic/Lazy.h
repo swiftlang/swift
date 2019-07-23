@@ -45,9 +45,9 @@ namespace swift {
 /// A template for lazily-constructed, zero-initialized, leaked-on-exit
 /// global objects.
 template <class T> class Lazy {
-  typename std::aligned_storage<sizeof(T), alignof(T)>::type Value;
+  alignas(T) char Value[sizeof(T)] = { 0 };
 
-  OnceToken_t OnceToken;
+  OnceToken_t OnceToken = {};
 
   static void defaultInitCallback(void *ValueAddr) {
     ::new (ValueAddr) T();
@@ -57,6 +57,9 @@ public:
   using Type = T;
   
   T &get(void (*initCallback)(void *) = defaultInitCallback);
+
+  template<typename Arg1>
+  T &getWithInit(Arg1 &&arg1);
 
   /// Get the value, assuming it must have already been initialized by this
   /// point.
@@ -77,6 +80,22 @@ template <typename T> inline T &Lazy<T>::get(void (*initCallback)(void*)) {
                 "Lazy<T> must be a literal type");
 
   SWIFT_ONCE_F(OnceToken, initCallback, &Value);
+  return unsafeGetAlreadyInitialized();
+}
+
+template <typename T>
+template <typename Arg1> inline T &Lazy<T>::getWithInit(Arg1 &&arg1) {
+  struct Data {
+    void *address;
+    Arg1 &&arg1;
+
+    static void init(void *context) {
+      Data *data = static_cast<Data *>(context);
+      ::new (data->address) T(static_cast<Arg1&&>(data->arg1));
+    }
+  } data{&Value, static_cast<Arg1&&>(arg1)};
+
+  SWIFT_ONCE_F(OnceToken, &Data::init, &data);
   return unsafeGetAlreadyInitialized();
 }
 

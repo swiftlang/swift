@@ -3,5 +3,6 @@ add_swift_unittest(SwiftIDETests
   Placeholders.cpp
   )
 target_link_libraries(SwiftIDETests
+  PRIVATE
   swiftIDE
 )

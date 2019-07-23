@@ -10,11 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/SIL/SILModule.h"
-#include "swift/SIL/SILFunction.h"
-#include "swift/SIL/SILBasicBlock.h"
-#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILArgument.h"
+#include "swift/SIL/SILBasicBlock.h"
+#include "swift/SIL/SILFunction.h"
+#include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/SILModule.h"
+#include "swift/SIL/SILProfiler.h"
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -55,14 +56,16 @@ void SILFunction::addSpecializeAttr(SILSpecializeAttr *Attr) {
   }
 }
 
-SILFunction *SILFunction::create(
-    SILModule &M, SILLinkage linkage, StringRef name,
-    CanSILFunctionType loweredType, GenericEnvironment *genericEnv,
-    Optional<SILLocation> loc, IsBare_t isBareSILFunction,
-    IsTransparent_t isTrans, IsSerialized_t isSerialized,
-    ProfileCounter entryCount, IsThunk_t isThunk,
-    SubclassScope classSubclassScope, Inline_t inlineStrategy, EffectsKind E,
-    SILFunction *insertBefore, const SILDebugScope *debugScope) {
+SILFunction *
+SILFunction::create(SILModule &M, SILLinkage linkage, StringRef name,
+                    CanSILFunctionType loweredType,
+                    GenericEnvironment *genericEnv, Optional<SILLocation> loc,
+                    IsBare_t isBareSILFunction, IsTransparent_t isTrans,
+                    IsSerialized_t isSerialized, ProfileCounter entryCount,
+                    IsDynamicallyReplaceable_t isDynamic, IsThunk_t isThunk,
+                    SubclassScope classSubclassScope, Inline_t inlineStrategy,
+                    EffectsKind E, SILFunction *insertBefore,
+                    const SILDebugScope *debugScope) {
   // Get a StringMapEntry for the function.  As a sop to error cases,
   // allow the name to have an empty string.
   llvm::StringMapEntry<SILFunction*> *entry = nullptr;
@@ -76,7 +79,7 @@ SILFunction *SILFunction::create(
   auto fn = new (M) SILFunction(M, linkage, name, loweredType, genericEnv, loc,
                                 isBareSILFunction, isTrans, isSerialized,
                                 entryCount, isThunk, classSubclassScope,
-                                inlineStrategy, E, insertBefore, debugScope);
+                                inlineStrategy, E, insertBefore, debugScope, isDynamic);
 
   if (entry) entry->setValue(fn);
   return fn;
@@ -91,16 +94,20 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage, StringRef Name,
                          SubclassScope classSubclassScope,
                          Inline_t inlineStrategy, EffectsKind E,
                          SILFunction *InsertBefore,
-                         const SILDebugScope *DebugScope)
+                         const SILDebugScope *DebugScope,
+                         IsDynamicallyReplaceable_t isDynamic)
     : Module(Module), Name(Name), LoweredType(LoweredType),
       GenericEnv(genericEnv), SpecializationInfo(nullptr),
       DebugScope(DebugScope), Bare(isBareSILFunction), Transparent(isTrans),
       Serialized(isSerialized), Thunk(isThunk),
       ClassSubclassScope(unsigned(classSubclassScope)), GlobalInitFlag(false),
       InlineStrategy(inlineStrategy), Linkage(unsigned(Linkage)),
-      HasCReferences(false),
-      OptMode(OptimizationMode::NotSet), EffectsKindAttr(E),
-      EntryCount(entryCount) {
+      HasCReferences(false), IsWeakLinked(false),
+      IsDynamicReplaceable(isDynamic), OptMode(OptimizationMode::NotSet),
+      EffectsKindAttr(E), EntryCount(entryCount) {
+  assert(!Transparent || !IsDynamicReplaceable);
+  validateSubclassScope(classSubclassScope, isThunk, nullptr);
+
   if (InsertBefore)
     Module.functions.insert(SILModule::iterator(InsertBefore), this);
   else
@@ -121,6 +128,11 @@ SILFunction::~SILFunction() {
   // an allocator that may recycle freed memory.
   dropAllReferences();
 
+  if (ReplacedFunction) {
+    ReplacedFunction->decrementRefCount();
+    ReplacedFunction = nullptr;
+  }
+
   auto &M = getModule();
   for (auto &BB : *this) {
     for (auto I = BB.begin(), E = BB.end(); I != E;) {
@@ -137,6 +149,12 @@ SILFunction::~SILFunction() {
 
   assert(RefCount == 0 &&
          "Function cannot be deleted while function_ref's still exist");
+}
+
+void SILFunction::createProfiler(ASTNode Root, SILDeclRef forDecl,
+                                 ForDefinition_t forDefinition) {
+  assert(!Profiler && "Function already has a profiler");
+  Profiler = SILProfiler::create(Module, forDefinition, Root, forDecl);
 }
 
 bool SILFunction::hasForeignBody() const {
@@ -209,12 +227,50 @@ bool SILFunction::isNoReturnFunction() const {
       .isNoReturnFunction();
 }
 
-SILBasicBlock *SILFunction::createBasicBlock() {
-  return new (getModule()) SILBasicBlock(this);
+const TypeLowering &
+SILFunction::getTypeLowering(AbstractionPattern orig, Type subst) {
+  return getModule().Types.getTypeLowering(orig, subst,
+                                           getResilienceExpansion());
 }
 
-SILBasicBlock *SILFunction::createBasicBlock(SILBasicBlock *AfterBlock) {
-  return new (getModule()) SILBasicBlock(this, AfterBlock);
+const TypeLowering &SILFunction::getTypeLowering(Type t) const {
+  return getModule().Types.getTypeLowering(t, getResilienceExpansion());
+}
+
+SILType
+SILFunction::getLoweredType(AbstractionPattern orig, Type subst) const {
+  return getModule().Types.getLoweredType(orig, subst,
+                                          getResilienceExpansion());
+}
+
+SILType SILFunction::getLoweredType(Type t) const {
+  return getModule().Types.getLoweredType(t, getResilienceExpansion());
+}
+
+SILType SILFunction::getLoweredLoadableType(Type t) const {
+  return getModule().Types.getLoweredLoadableType(t, getResilienceExpansion());
+}
+
+const TypeLowering &SILFunction::getTypeLowering(SILType type) const {
+  return getModule().Types.getTypeLowering(type, getResilienceExpansion());
+}
+
+bool SILFunction::isTypeABIAccessible(SILType type) const {
+  return getModule().isTypeABIAccessible(type, getResilienceExpansion());
+}
+
+SILBasicBlock *SILFunction::createBasicBlock() {
+  return new (getModule()) SILBasicBlock(this, nullptr, false);
+}
+
+SILBasicBlock *SILFunction::createBasicBlockAfter(SILBasicBlock *afterBB) {
+  assert(afterBB);
+  return new (getModule()) SILBasicBlock(this, afterBB, /*after*/ true);
+}
+
+SILBasicBlock *SILFunction::createBasicBlockBefore(SILBasicBlock *beforeBB) {
+  assert(beforeBB);
+  return new (getModule()) SILBasicBlock(this, beforeBB, /*after*/ false);
 }
 
 //===----------------------------------------------------------------------===//
@@ -397,17 +453,26 @@ TargetFunction("view-cfg-only-for-function", llvm::cl::init(""),
                llvm::cl::desc("Only print out the cfg for this function"));
 #endif
 
-
-void SILFunction::viewCFG() const {
+static void viewCFGHelper(const SILFunction* f, bool skipBBContents) {
 /// When asserts are disabled, this should be a NoOp.
 #ifndef NDEBUG
     // If we have a target function, only print that function out.
-    if (!TargetFunction.empty() && !(getName().str() == TargetFunction))
+    if (!TargetFunction.empty() && !(f->getName().str() == TargetFunction))
       return;
 
-  ViewGraph(const_cast<SILFunction *>(this), "cfg" + getName().str());
+    ViewGraph(const_cast<SILFunction *>(f), "cfg" + f->getName().str(),
+              /*shortNames=*/skipBBContents);
 #endif
 }
+
+void SILFunction::viewCFG() const {
+  viewCFGHelper(this, /*skipBBContents=*/false);
+}
+
+void SILFunction::viewCFGOnly() const {
+  viewCFGHelper(this, /*skipBBContents=*/true);
+}
+
 
 bool SILFunction::hasSelfMetadataParam() const {
   auto paramTypes = getConventions().getParameterSILTypes();
@@ -418,7 +483,7 @@ bool SILFunction::hasSelfMetadataParam() const {
   if (!silTy.isObject())
     return false;
 
-  auto selfTy = silTy.getSwiftRValueType();
+  auto selfTy = silTy.getASTType();
 
   if (auto metaTy = dyn_cast<MetatypeType>(selfTy)) {
     selfTy = metaTy.getInstanceType();
@@ -445,10 +510,16 @@ bool SILFunction::hasValidLinkageForFragileRef() const {
   if (hasValidLinkageForFragileInline())
     return true;
 
-  // If the containing module has been serialized
-  if (getModule().isSerialized()) {
+  // If the containing module has been serialized already, we no longer
+  // enforce any invariants.
+  if (getModule().isSerialized())
     return true;
-  }
+
+  // If the function has a subclass scope that limits its visibility outside
+  // the module despite its linkage, we cannot reference it.
+  if (getClassSubclassScope() == SubclassScope::Resilient &&
+      isAvailableExternally())
+    return false;
 
   // Otherwise, only public functions can be referenced.
   return hasPublicVisibility(getLinkage());
@@ -460,6 +531,9 @@ SILFunction::isPossiblyUsedExternally() const {
 
   // Hidden functions may be referenced by other C code in the linkage unit.
   if (linkage == SILLinkage::Hidden && hasCReferences())
+    return true;
+
+  if (ReplacedFunction)
     return true;
 
   return swift::isPossiblyUsedExternally(linkage, getModule().isWholeModule());
@@ -476,20 +550,36 @@ void SILFunction::convertToDeclaration() {
   getBlocks().clear();
 }
 
-SubstitutionList SILFunction::getForwardingSubstitutions() {
-  if (ForwardingSubs)
-    return *ForwardingSubs;
+SubstitutionMap SILFunction::getForwardingSubstitutionMap() {
+  if (ForwardingSubMap)
+    return ForwardingSubMap;
 
-  auto *env = getGenericEnvironment();
-  if (!env)
-    return {};
+  if (auto *env = getGenericEnvironment())
+    ForwardingSubMap = env->getForwardingSubstitutionMap();
 
-  ForwardingSubs = env->getForwardingSubstitutions();
-  return *ForwardingSubs;
+  return ForwardingSubMap;
 }
 
 bool SILFunction::shouldVerifyOwnership() const {
   return !hasSemanticsAttr("verify.ownership.sil.never");
+}
+
+static Identifier getIdentifierForObjCSelector(ObjCSelector selector, ASTContext &Ctxt) {
+  SmallVector<char, 64> buffer;
+  auto str = selector.getString(buffer);
+  return Ctxt.getIdentifier(str);
+}
+
+void SILFunction::setObjCReplacement(AbstractFunctionDecl *replacedFunc) {
+  assert(ReplacedFunction == nullptr && ObjCReplacementFor.empty());
+  assert(replacedFunc != nullptr);
+  ObjCReplacementFor = getIdentifierForObjCSelector(
+      replacedFunc->getObjCSelector(), getASTContext());
+}
+
+void SILFunction::setObjCReplacement(Identifier replacedFunc) {
+  assert(ReplacedFunction == nullptr && ObjCReplacementFor.empty());
+  ObjCReplacementFor = replacedFunc;
 }
 
 // See swift/Basic/Statistic.h for declaration: this enables tracing
@@ -501,7 +591,7 @@ struct SILFunctionTraceFormatter : public UnifiedStatsReporter::TraceFormatter {
     if (!Entity)
       return;
     const SILFunction *F = static_cast<const SILFunction *>(Entity);
-    OS << F->getName();
+    F->printName(OS);
   }
 
   void traceLoc(const void *Entity, SourceManager *SM,
@@ -509,19 +599,16 @@ struct SILFunctionTraceFormatter : public UnifiedStatsReporter::TraceFormatter {
     if (!Entity)
       return;
     const SILFunction *F = static_cast<const SILFunction *>(Entity);
+    if (!F->hasLocation())
+      return;
     F->getLocation().getSourceRange().print(OS, *SM, false);
   }
 };
 
 static SILFunctionTraceFormatter TF;
 
-UnifiedStatsReporter::FrontendStatsTracer
-UnifiedStatsReporter::getStatsTracer(StringRef EventName,
-                                     const SILFunction *F) {
-  if (LastTracedFrontendCounters)
-    // Return live tracer object.
-    return FrontendStatsTracer(EventName, F, &TF, this);
-  else
-    // Return inert tracer object.
-    return FrontendStatsTracer();
+template<>
+const UnifiedStatsReporter::TraceFormatter*
+FrontendStatsTracer::getTraceFormatter<const SILFunction *>() {
+  return &TF;
 }

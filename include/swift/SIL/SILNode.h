@@ -96,6 +96,7 @@ public:
   enum { NumVOKindBits = 3 };
   enum { NumStoreOwnershipQualifierBits = 2 };
   enum { NumLoadOwnershipQualifierBits = 2 };
+  enum { NumAssignOwnershipQualifierBits = 2 };
   enum { NumSILAccessKindBits = 2 };
   enum { NumSILAccessEnforcementBits = 2 };
 
@@ -162,11 +163,6 @@ protected:
   // Ensure that TupleInst bitfield does not overflow.
   IBWTO_BITFIELD_EMPTY(TupleInst, SingleValueInstruction);
 
-  IBWTO_BITFIELD(BuiltinInst, SingleValueInstruction,
-                             32-NumSingleValueInstructionBits,
-    NumSubstitutions : 32-NumSingleValueInstructionBits
-  );
-
   IBWTO_BITFIELD(ObjectInst, SingleValueInstruction,
                              32-NumSingleValueInstructionBits,
     NumBaseElements : 32-NumSingleValueInstructionBits
@@ -188,12 +184,6 @@ protected:
 
   SWIFT_INLINE_BITFIELD_FULL(StringLiteralInst, LiteralInst, 2+32,
     TheEncoding : 2,
-    : NumPadBits,
-    Length : 32
-  );
-
-  SWIFT_INLINE_BITFIELD_FULL(ConstStringLiteralInst, LiteralInst, 1+32,
-    TheEncoding : 1,
     : NumPadBits,
     Length : 32
   );
@@ -224,9 +214,6 @@ protected:
 
   SWIFT_INLINE_BITFIELD_EMPTY(NonValueInstruction, SILInstruction);
   SWIFT_INLINE_BITFIELD(RefCountingInst, NonValueInstruction, 1,
-      atomicity : 1
-  );
-  SWIFT_INLINE_BITFIELD(StrongPinInst, SingleValueInstruction, 1,
       atomicity : 1
   );
 
@@ -262,14 +249,29 @@ protected:
   );
 
   SWIFT_INLINE_BITFIELD(BeginAccessInst, SingleValueInstruction,
-                        NumSILAccessKindBits+NumSILAccessEnforcementBits,
+                        NumSILAccessKindBits+NumSILAccessEnforcementBits
+                        + 1 + 1,
     AccessKind : NumSILAccessKindBits,
-    Enforcement : NumSILAccessEnforcementBits
+    Enforcement : NumSILAccessEnforcementBits,
+    NoNestedConflict : 1,
+    FromBuiltin : 1
   );
+  SWIFT_INLINE_BITFIELD(BeginUnpairedAccessInst, NonValueInstruction,
+                        NumSILAccessKindBits + NumSILAccessEnforcementBits
+                        + 1 + 1,
+                        AccessKind : NumSILAccessKindBits,
+                        Enforcement : NumSILAccessEnforcementBits,
+                        NoNestedConflict : 1,
+                        FromBuiltin : 1);
 
   SWIFT_INLINE_BITFIELD(EndAccessInst, NonValueInstruction, 1,
     Aborting : 1
   );
+  SWIFT_INLINE_BITFIELD(EndUnpairedAccessInst, NonValueInstruction,
+                        NumSILAccessEnforcementBits + 1 + 1,
+                        Enforcement : NumSILAccessEnforcementBits,
+                        Aborting : 1,
+                        FromBuiltin : 1);
 
   SWIFT_INLINE_BITFIELD(StoreInst, NonValueInstruction,
                         NumStoreOwnershipQualifierBits,
@@ -278,6 +280,14 @@ protected:
   SWIFT_INLINE_BITFIELD(LoadInst, SingleValueInstruction,
                         NumLoadOwnershipQualifierBits,
     OwnershipQualifier : NumLoadOwnershipQualifierBits
+  );
+  SWIFT_INLINE_BITFIELD(AssignInst, NonValueInstruction,
+                        NumAssignOwnershipQualifierBits,
+    OwnershipQualifier : NumAssignOwnershipQualifierBits
+  );
+  SWIFT_INLINE_BITFIELD(AssignByWrapperInst, NonValueInstruction,
+                        NumAssignOwnershipQualifierBits,
+    OwnershipQualifier : NumAssignOwnershipQualifierBits
   );
 
   SWIFT_INLINE_BITFIELD(UncheckedOwnershipConversionInst,SingleValueInstruction,
@@ -294,6 +304,10 @@ protected:
     FieldNo : 32
   );
 
+  SWIFT_INLINE_BITFIELD_FULL(FieldIndexCacheBase, SingleValueInstruction, 32,
+                             : NumPadBits,
+                             FieldIndex : 32);
+
   SWIFT_INLINE_BITFIELD_EMPTY(MethodInst, SingleValueInstruction);
   // Ensure that WitnessMethodInst bitfield does not overflow.
   IBWTO_BITFIELD_EMPTY(WitnessMethodInst, MethodInst);
@@ -305,7 +319,8 @@ protected:
     IsInvariant : 1
   );
 
-  UIWTDOB_BITFIELD_EMPTY(ConvertFunctionInst, ConversionInst);
+  UIWTDOB_BITFIELD(ConvertFunctionInst, ConversionInst, 1,
+                   WithoutActuallyEscaping : 1);
   UIWTDOB_BITFIELD_EMPTY(PointerToThinFunctionInst, ConversionInst);
   UIWTDOB_BITFIELD_EMPTY(UnconditionalCheckedCastInst, ConversionInst);
   UIWTDOB_BITFIELD_EMPTY(UpcastInst, ConversionInst);
@@ -544,7 +559,7 @@ struct cast_convert_val<To, const swift::SILNode, From>;
 /// ValueBase * is always at least eight-byte aligned; make the three tag bits
 /// available through PointerLikeTypeTraits.
 template<>
-class PointerLikeTypeTraits<swift::SILNode *> {
+struct PointerLikeTypeTraits<swift::SILNode *> {
 public:
   static inline void *getAsVoidPointer(swift::SILNode *I) {
     return (void*)I;

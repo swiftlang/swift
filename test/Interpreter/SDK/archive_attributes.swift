@@ -1,17 +1,20 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -module-name=test -DENCODE -o %t/encode
-// RUN: %target-build-swift %s -module-name=test -o %t/decode
 // RUN: %target-run %t/encode %t/test.arc
 // RUN: plutil -p %t/test.arc | %FileCheck -check-prefix=CHECK-ARCHIVE %s
-// RUN: %target-run %t/decode %t/test.arc | %FileCheck %s
+
+// RUN: %target-build-swift %s -module-name=test -o %t/decode
+// RUN: %target-run %t/decode %t/test.arc --stdlib-unittest-in-process
 
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 // REQUIRES: CPU=i386 || CPU=x86_64
-// UNSUPPORTED: OS=tvos
-// UNSUPPORTED: OS=watchos
+
+// See also archive_attributes_stable_abi.swift, for the stable ABI
+// deployment target test.
 
 import Foundation
+import StdlibUnittest
 
 struct ABC {
   // CHECK-ARCHIVE-DAG: "$classname" => "nested_class_coding"
@@ -132,47 +135,37 @@ class TopLevel : NSObject, NSCoding {
   }
 }
 
-func main() {
-
-  let args = CommandLine.arguments
-
 #if ENCODE
-  let c = TopLevel(27)
-  c.nested = ABC.NestedClass(28)
-  c.priv = PrivateClass(29)
-  c.intc = IntClass(ii: 42)
-  c.doublec = DoubleClass(dd: 3.14)
+let c = TopLevel(27)
+c.nested = ABC.NestedClass(28)
+c.priv = PrivateClass(29)
+c.intc = IntClass(ii: 42)
+c.doublec = DoubleClass(dd: 3.14)
 
-  NSKeyedArchiver.archiveRootObject(c, toFile: args[1])
+NSKeyedArchiver.archiveRootObject(c, toFile: CommandLine.arguments[1])
 #else
-  if let u = NSKeyedUnarchiver.unarchiveObject(withFile: args[1]) {
-    if let x = u as? TopLevel {
-      // CHECK: top-level: 27
-      print("top-level: \(x.tli)")
-      if let n = x.nested {
-        // CHECK: nested: 28
-        print("nested: \(n.i)")
-      }
-      if let p = x.priv {
-        // CHECK: private: 29
-        print("private: \(p.pi)")
-      }
-      if let g = x.intc {
-        // CHECK: int: 42
-        print("int: \(g.gi!)")
-      }
-      if let d = x.doublec {
-        // CHECK: double: 3.14
-        print("double: \(d.gi!)")
-      }
-    } else {
-      print(u)
-    }
-  } else {
-    print("nil")
+var DecodeTestSuite = TestSuite("Decode")
+
+DecodeTestSuite.test("Decode") {
+  func doIt() {
+    let u = NSKeyedUnarchiver.unarchiveObject(withFile: CommandLine.arguments[1])!
+    let x = u as! TopLevel
+    expectEqual(27, x.tli)
+    expectEqual(28, x.nested!.i)
+    expectEqual(29, x.priv!.pi)
+    expectEqual(42, x.intc!.gi!)
+    expectEqual(3.14, x.doublec!.gi!)
   }
-#endif
+
+  if CommandLine.arguments[2] == "NEW" {
+    if #available(macOS 10.14.4, iOS 12.2, tvOS 12.2, watchOS 5.2, *) {
+      doIt()
+    }
+    return
+  }
+
+  doIt()
 }
 
-main()
-
+runAllTests()
+#endif

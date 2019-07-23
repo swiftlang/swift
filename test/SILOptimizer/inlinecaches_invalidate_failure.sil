@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -inline -specdevirt -code-sinking  -sil-verify-without-invalidation
+// RUN: %target-sil-opt -enable-sil-verify-all %s -inline -specdevirt -code-sinking  -sil-verify-without-invalidation
 
 sil_stage canonical
 
@@ -104,5 +104,5 @@ bb0(%0 : $Foo):
 sil_vtable Foo2 {
   #Foo.doSomething!1: @_TFC4test4Foo211doSomethingfS0_FT_CS_3Foo	// test.Foo2.doSomething (test.Foo2)() -> test.Foo
   #Foo.init!initializer.1: @_TFC4test4Foo2cfMS0_FT_S0_	// test.Foo2.init (test.Foo2.Type)() -> test.Foo2
-  #Foo2.deinit!deallocator: @_TFC4test4Foo2D	// test.Foo2.__deallocating_deinit
+  #Foo2.deinit!deallocator.1: @_TFC4test4Foo2D	// test.Foo2.__deallocating_deinit
 }

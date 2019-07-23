@@ -52,16 +52,12 @@ enum class DefaultArgumentKind : uint8_t {
   EmptyArray,
   /// An empty dictionary literal.
   EmptyDictionary,
+  /// A reference to the stored property. This is a special default argument
+  /// kind for the synthesized memberwise constructor to emit a call to the
+  // property's initializer.
+  StoredProperty,
 };
 enum { NumDefaultArgumentKindBits = 4 };
-
-/// Retrieve the spelling of this default argument in source code, or
-/// an empty string if it has none.
-llvm::StringRef getDefaultArgumentSpelling(DefaultArgumentKind kind);
-
-/// Infer a default argument kind from an expression, if the
-/// expression is the canonical way to spell that default argument.
-DefaultArgumentKind inferDefaultArgumentKind(Expr *expr);
 
 } // end namespace swift
 

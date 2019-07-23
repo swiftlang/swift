@@ -34,6 +34,9 @@ docs/_build
 # Finder metadata
 .DS_Store
 
+# Visual Studio metadata
+.vs
+
 #==============================================================================#
 # Ignore CMake temporary files
 #==============================================================================#
@@ -53,3 +56,4 @@ compile_commands.json
 SortedCFDatabase.def
 htmlcov
 .coverage
+/benchmark/scripts/Benchmark_Driverc

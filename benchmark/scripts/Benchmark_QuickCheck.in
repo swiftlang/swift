@@ -1,0 +1,121 @@
+#!/usr/bin/env python
+
+# ===--- Benchmark_QuickCheck.in -----------------------------------------===//
+#
+#  This source file is part of the Swift.org open source project
+#
+#  Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+#  Licensed under Apache License v2.0 with Runtime Library Exception
+#
+#  See https://swift.org/LICENSE.txt for license information
+#  See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+#
+# ===---------------------------------------------------------------------===//
+
+import json
+import os
+import subprocess
+import sys
+
+sys.path.append("@PATH_TO_DRIVER_LIBRARY@")
+
+import perf_test_driver  # noqa (E402 module level import not at top of file)
+
+# This is a hacked up XFAIL list. It should really be a json file, but it will
+# work for now. Add in the exact name of the pass to XFAIL.
+XFAIL_LIST = [
+]
+
+
+class QuickCheckResult(perf_test_driver.Result):
+
+    def __init__(self, name, success):
+        assert(isinstance(success, bool))
+        did_fail = not success
+        perf_test_driver.Result.__init__(self, name, did_fail, "", XFAIL_LIST)
+
+    def print_data(self, max_test_len):
+        fmt = '{:<%d}{:<10}' % (max_test_len + 5)
+        print(fmt.format(self.get_name(), self.get_result()))
+
+
+class QuickCheckBenchmarkDriver(perf_test_driver.BenchmarkDriver):
+
+    def __init__(self, binary, xfail_list, num_iters, opt_levels):
+        perf_test_driver.BenchmarkDriver.__init__(
+            self, binary, xfail_list,
+            enable_parallel=True,
+            opt_levels=opt_levels)
+        self.num_iters = num_iters
+
+    def print_data_header(self, max_test_len):
+        fmt = '{:<%d}{:<10}' % (max_test_len + 5)
+        print(fmt.format('Name', 'Result'))
+
+    # Propagate any data from this class that is needed for individual
+    # tests. The reason this is needed is to avoid issues with attempting to
+    # access a value in a different process.
+    def prepare_input(self, name):
+        return {'num_samples': 1, 'num_iters': self.num_iters}
+
+    def run_test_inner(self, data, num_iters):
+        p = subprocess.Popen([
+            data['path'],
+            "--num-samples={}".format(data['num_samples']),
+            "--num-iters={}".format(num_iters), data['test_name']],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        error_out = p.communicate()[1].split("\n")
+        result = p.returncode
+        if result is None:
+            raise RuntimeError("Expected one line of output")
+        if result != 0:
+            raise RuntimeError("Process segfaulted")
+        return error_out
+
+    def run_test(self, data, num_iters):
+        try:
+            args = [data, num_iters]
+            result = perf_test_driver.run_with_timeout(self.run_test_inner,
+                                                       args)
+        except Exception, e:
+            sys.stderr.write("Child Process Failed! (%s,%s). Error: %s\n" % (
+                data['path'], data['test_name'], e))
+            sys.stderr.flush()
+            return None
+        return True
+
+    def process_input(self, data):
+        test_name = '({},{})'.format(data['opt'], data['test_name'])
+        print("Running {}...".format(test_name))
+        sys.stdout.flush()
+        if self.run_test(data, data['num_iters']) is None:
+            return QuickCheckResult(test_name, success=False)
+        return QuickCheckResult(test_name, success=True)
+
+
+SWIFT_BIN_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
+def parse_args():
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '--filter', type=str, default=None,
+        help='Filter out any test that does not match the given regex')
+    parser.add_argument('--num-iters', type=int, default=2)
+    default_opt_levels = perf_test_driver.BenchmarkDriver_OptLevels
+    parser.add_argument('--opt-level', choices=default_opt_levels)
+    return parser.parse_args()
+
+
+if __name__ == "__main__":
+    args = parse_args()
+    opt_levels = perf_test_driver.BenchmarkDriver_OptLevels
+    if args.opt_level is not None:
+        opt_levels = [args.opt_level]
+    l = QuickCheckBenchmarkDriver(SWIFT_BIN_DIR, XFAIL_LIST, args.num_iters,
+                                  opt_levels)
+    if l.run(args.filter):
+        sys.exit(0)
+    else:
+        sys.exit(-1)

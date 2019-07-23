@@ -23,6 +23,7 @@
 #define SWIFT_BASIC_DIVERSESTACK_H
 
 #include "swift/Basic/Malloc.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/PointerLikeTypeTraits.h"
 #include <cassert>
 #include <cstring>
@@ -293,6 +294,15 @@ public:
     return stable_iterator(End - it.Ptr);
   } 
 
+  T &findAndAdvance(stable_iterator &i) {
+    auto unstable_i = find(i);
+    assert(unstable_i != end());
+    T &value = *unstable_i;
+    ++unstable_i;
+    i = stabilize(unstable_i);
+    return value;
+  }
+
   class const_iterator {
     const char *Ptr;
     friend class DiverseStackImpl;
@@ -366,11 +376,31 @@ public:
   void pop(stable_iterator stable_iter) {
     iterator iter = find(stable_iter);
     checkIterator(iter);
+#ifndef NDEBUG
     while (Begin != iter.Ptr) {
       pop();
       checkIterator(iter);
     }
+#else
+    Begin = iter.Ptr;
+#endif
   }
+};
+
+/// A helper class for copying value off a DiverseStack.
+template <class T>
+class DiverseValueBuffer {
+  llvm::SmallVector<char, sizeof(T) + 10 * sizeof(void*)> data;
+
+public:
+  DiverseValueBuffer(const T &value) {
+    size_t size = value.allocated_size();
+    data.reserve(size);
+    data.set_size(size);
+    memcpy(data.data(), reinterpret_cast<const void *>(&value), size);
+  }
+
+  T &getCopy() { return *reinterpret_cast<T *>(data.data()); }
 };
 
 } // end namespace swift
@@ -378,7 +408,7 @@ public:
 /// Allow stable_iterators to be put in things like TinyPtrVectors.
 namespace llvm {
   template <>
-  class PointerLikeTypeTraits<
+  struct PointerLikeTypeTraits<
                       swift::DiverseStackBase::stable_iterator::AsPointer> {
     using AsPointer = swift::DiverseStackBase::stable_iterator::AsPointer;
   public:

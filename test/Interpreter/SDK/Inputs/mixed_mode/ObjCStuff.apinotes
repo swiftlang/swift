@@ -1,10 +1,10 @@
 Name: ObjCStuff
 SwiftVersions:
-- Version: 4
+- Version: 5
   Typedefs:
    - Name: OJCCloudButt
      SwiftName: OJCCloud.Butt
-- Version: 3
+- Version: 4
   Typedefs:
    - Name: OJCCloudButt
      SwiftWrapper: none

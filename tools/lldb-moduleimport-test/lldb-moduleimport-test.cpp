@@ -16,6 +16,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/ASTDemangler.h"
+#include "swift/AST/PrintOptions.h"
 #include "swift/ASTSectionImporter/ASTSectionImporter.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
@@ -23,6 +25,7 @@
 #include "swift/Basic/Dwarf.h"
 #include "llvm/Object/ELFObjectFile.h"
 #include "swift/Basic/LLVMInitialize.h"
+#include "llvm/Object/COFF.h"
 #include "llvm/Object/MachO.h"
 #include "llvm/Object/ObjectFile.h"
 #include "llvm/Support/CommandLine.h"
@@ -41,65 +44,233 @@ void anchorForGetMainExecutable() {}
 
 using namespace llvm::MachO;
 
-static void printValidationInfo(llvm::StringRef data) {
-  swift::serialization::ExtendedValidationInfo extendedInfo;
-  swift::serialization::ValidationInfo info =
-      swift::serialization::validateSerializedAST(data, &extendedInfo);
-  if (info.status != swift::serialization::Status::Valid)
-    return;
+static bool
+validateModule(llvm::StringRef data, bool Verbose,
+               swift::serialization::ValidationInfo &info,
+               swift::serialization::ExtendedValidationInfo &extendedInfo) {
+  info = swift::serialization::validateSerializedAST(data, &extendedInfo);
+  if (info.status != swift::serialization::Status::Valid) {
+    llvm::outs() << "error: validateSerializedAST() failed\n";
+    return false;
+  }
 
-  if (!info.shortVersion.empty())
-    llvm::outs() << "- Swift Version: " << info.shortVersion << "\n";
-  llvm::outs() << "- Target: " << info.targetTriple << "\n";
-  if (!extendedInfo.getSDKPath().empty())
-    llvm::outs() << "- SDK path: " << extendedInfo.getSDKPath() << "\n";
-  if (!extendedInfo.getExtraClangImporterOptions().empty()) {
-    llvm::outs() << "- -Xcc options:";
-    for (llvm::StringRef option : extendedInfo.getExtraClangImporterOptions())
-      llvm::outs() << " " << option;
-    llvm::outs() << "\n";
+  swift::CompilerInvocation CI;
+  if (CI.loadFromSerializedAST(data) != swift::serialization::Status::Valid) {
+    llvm::outs() << "error: loadFromSerializedAST() failed\n";
+    return false;
+  }
+
+  if (Verbose) {
+    if (!info.shortVersion.empty())
+      llvm::outs() << "- Swift Version: " << info.shortVersion << "\n";
+    llvm::outs() << "- Compatibility Version: "
+                 << CI.getLangOptions()
+                        .EffectiveLanguageVersion.asAPINotesVersionString()
+                 << "\n";
+    llvm::outs() << "- Target: " << info.targetTriple << "\n";
+    if (!extendedInfo.getSDKPath().empty())
+      llvm::outs() << "- SDK path: " << extendedInfo.getSDKPath() << "\n";
+    if (!extendedInfo.getExtraClangImporterOptions().empty()) {
+      llvm::outs() << "- -Xcc options:";
+      for (llvm::StringRef option : extendedInfo.getExtraClangImporterOptions())
+        llvm::outs() << " " << option;
+      llvm::outs() << "\n";
+    }
+  }
+
+  return true;
+}
+
+static void resolveDeclFromMangledNameList(
+    swift::ASTContext &Ctx, llvm::ArrayRef<std::string> MangledNames) {
+  for (auto &Mangled : MangledNames) {
+    swift::TypeDecl *ResolvedDecl =
+        swift::Demangle::getTypeDeclForMangling(Ctx, Mangled);
+    if (!ResolvedDecl) {
+      llvm::errs() << "Can't resolve decl of " << Mangled << "\n";
+    } else {
+      ResolvedDecl->dumpRef(llvm::outs());
+      llvm::outs() << "\n";
+    }
   }
 }
 
+static void resolveTypeFromMangledNameList(
+    swift::ASTContext &Ctx, llvm::ArrayRef<std::string> MangledNames) {
+  for (auto &Mangled : MangledNames) {
+    swift::Type ResolvedType =
+        swift::Demangle::getTypeForMangling(Ctx, Mangled);
+    if (!ResolvedType) {
+      llvm::outs() << "Can't resolve type of " << Mangled << "\n";
+    } else {
+      swift::PrintOptions PO;
+      PO.PrintStorageRepresentationAttrs = true;
+      ResolvedType->print(llvm::outs(), PO);
+      llvm::outs() << "\n";
+    }
+  }
+}
+
+static void
+collectMangledNames(const std::string &FilePath,
+                    llvm::SmallVectorImpl<std::string> &MangledNames) {
+  std::string Name;
+  std::ifstream InputStream(FilePath);
+  while (std::getline(InputStream, Name)) {
+    if (Name.empty())
+      continue;
+    MangledNames.push_back(Name);
+  }
+}
+
+llvm::BumpPtrAllocator Alloc;
+
+static bool
+collectASTModules(llvm::cl::list<std::string> &InputNames,
+                  llvm::SmallVectorImpl<std::pair<char *, uint64_t>> &Modules) {
+  for (auto &name : InputNames) {
+    auto OF = llvm::object::ObjectFile::createObjectFile(name);
+    if (!OF) {
+      llvm::outs() << "error: " << name << " "
+                   << errorToErrorCode(OF.takeError()).message() << "\n";
+      return false;
+    }
+    auto *Obj = OF->getBinary();
+    auto *MachO = llvm::dyn_cast<llvm::object::MachOObjectFile>(Obj);
+    auto *ELF = llvm::dyn_cast<llvm::object::ELFObjectFileBase>(Obj);
+    auto *COFF = llvm::dyn_cast<llvm::object::COFFObjectFile>(Obj);
+
+    if (MachO) {
+      for (auto &Symbol : Obj->symbols()) {
+        auto RawSym = Symbol.getRawDataRefImpl();
+        llvm::MachO::nlist nlist = MachO->getSymbolTableEntry(RawSym);
+        if (nlist.n_type != N_AST)
+          continue;
+        auto Path = MachO->getSymbolName(RawSym);
+        if (!Path) {
+          llvm::outs() << "Cannot get symbol name\n;";
+          return false;
+        }
+
+        auto fileBuf = llvm::MemoryBuffer::getFile(*Path);
+        if (!fileBuf) {
+          llvm::outs() << "Cannot read from '" << *Path
+                       << "': " << fileBuf.getError().message();
+          return false;
+        }
+
+        uint64_t Size = fileBuf.get()->getBufferSize();
+        char *Module = Alloc.Allocate<char>(Size);
+        std::memcpy(Module, (void *)fileBuf.get()->getBufferStart(), Size);
+        Modules.push_back({Module, Size});
+      }
+    }
+
+    for (auto &Section : Obj->sections()) {
+      llvm::StringRef Name;
+      Section.getName(Name);
+      if ((MachO && Name == swift::MachOASTSectionName) ||
+          (ELF && Name == swift::ELFASTSectionName) ||
+          (COFF && Name == swift::COFFASTSectionName)) {
+        uint64_t Size = Section.getSize();
+        StringRef ContentsReference;
+        Section.getContents(ContentsReference);
+        char *Module = Alloc.Allocate<char>(Size);
+        std::memcpy(Module, (void *)ContentsReference.begin(), Size);
+        Modules.push_back({Module, Size});
+      }
+    }
+  }
+  return true;
+}
+
 int main(int argc, char **argv) {
-  INITIALIZE_LLVM(argc, argv);
+  PROGRAM_START(argc, argv);
+  INITIALIZE_LLVM();
 
   // Command line handling.
-  llvm::cl::list<std::string> InputNames(
-    llvm::cl::Positional, llvm::cl::desc("compiled_swift_file1.o ..."),
-    llvm::cl::OneOrMore);
+  using namespace llvm::cl;
+  static OptionCategory Visible("Specific Options");
+  HideUnrelatedOptions({&Visible});
 
-  llvm::cl::opt<std::string> SDK(
-    "sdk", llvm::cl::desc("path to the SDK to build against"));
+  list<std::string> InputNames(Positional, desc("compiled_swift_file1.o ..."),
+                               OneOrMore, cat(Visible));
 
-  llvm::cl::opt<bool> DumpModule(
-    "dump-module", llvm::cl::desc(
-      "Dump the imported module after checking it imports just fine"));
+  opt<bool> DumpModule(
+      "dump-module",
+      desc("Dump the imported module after checking it imports just fine"),
+      cat(Visible));
 
-  llvm::cl::opt<std::string> ModuleCachePath(
-    "module-cache-path", llvm::cl::desc("Clang module cache path"));
+  opt<bool> Verbose("verbose", desc("Dump informations on the loaded module"),
+                    cat(Visible));
 
-  llvm::cl::list<std::string> ImportPaths(
-    "I", llvm::cl::desc("add a directory to the import search path"));
+  opt<std::string> ModuleCachePath(
+      "module-cache-path", desc("Clang module cache path"), cat(Visible));
 
-  llvm::cl::list<std::string> FrameworkPaths(
-    "F", llvm::cl::desc("add a directory to the framework search path"));
+  opt<std::string> DumpDeclFromMangled(
+      "decl-from-mangled", desc("dump decl from mangled names list"),
+      cat(Visible));
 
-  llvm::cl::ParseCommandLineOptions(argc, argv);
+  opt<std::string> DumpTypeFromMangled(
+      "type-from-mangled", desc("dump type from mangled names list"),
+      cat(Visible));
+
+  opt<std::string> ResourceDir(
+      "resource-dir",
+      desc("The directory that holds the compiler resource files"),
+      cat(Visible));
+
+  opt<bool> EnableDWARFImporter(
+      "enable-dwarf-importer",
+      desc("Import with LangOptions.EnableDWARFImporter = true"), cat(Visible));
+
+  ParseCommandLineOptions(argc, argv);
+
   // Unregister our options so they don't interfere with the command line
   // parsing in CodeGen/BackendUtil.cpp.
-  FrameworkPaths.removeArgument();
-  ImportPaths.removeArgument();
   ModuleCachePath.removeArgument();
   DumpModule.removeArgument();
-  SDK.removeArgument();
+  DumpTypeFromMangled.removeArgument();
   InputNames.removeArgument();
 
-  // If no SDK was specified via -sdk, check environment variable SDKROOT.
-  if (SDK.getNumOccurrences() == 0) {
-    const char *SDKROOT = getenv("SDKROOT");
-    if (SDKROOT)
-      SDK = SDKROOT;
+  auto validateInputFile = [](std::string Filename) {
+    if (Filename.empty())
+      return true;
+    if (!llvm::sys::fs::exists(llvm::Twine(Filename))) {
+      llvm::errs() << Filename << " does not exist, exiting.\n";
+      return false;
+    }
+    if (!llvm::sys::fs::is_regular_file(llvm::Twine(Filename))) {
+      llvm::errs() << Filename << " is not a regular file, exiting.\n";
+      return false;
+    }
+    return true;
+  };
+
+  if (!validateInputFile(DumpTypeFromMangled))
+    return 1;
+  if (!validateInputFile(DumpDeclFromMangled))
+    return 1;
+
+  // Fetch the serialized module bitstreams from the Mach-O files and
+  // register them with the module loader.
+  llvm::SmallVector<std::pair<char *, uint64_t>, 8> Modules;
+  if (!collectASTModules(InputNames, Modules))
+    return 1;
+
+  if (Modules.empty())
+    return 0;
+
+  swift::serialization::ValidationInfo info;
+  swift::serialization::ExtendedValidationInfo extendedInfo;
+  for (auto &Module : Modules) {
+    info = {};
+    extendedInfo = {};
+    if (!validateModule(StringRef(Module.first, Module.second), Verbose, info,
+                        extendedInfo)) {
+      llvm::errs() << "Malformed module!\n";
+      return 1;
+    }
   }
 
   // Create a Swift compiler.
@@ -111,89 +282,36 @@ int main(int argc, char **argv) {
       llvm::sys::fs::getMainExecutable(argv[0],
           reinterpret_cast<void *>(&anchorForGetMainExecutable)));
 
-  Invocation.setSDKPath(SDK);
-  Invocation.setTargetTriple(llvm::sys::getDefaultTargetTriple());
+  // Infer SDK and Target triple from the module.
+  if (!extendedInfo.getSDKPath().empty())
+    Invocation.setSDKPath(extendedInfo.getSDKPath());
+  Invocation.setTargetTriple(info.targetTriple);
+
   Invocation.setModuleName("lldbtest");
   Invocation.getClangImporterOptions().ModuleCachePath = ModuleCachePath;
-  Invocation.setImportSearchPaths(ImportPaths);
-  std::vector<swift::SearchPathOptions::FrameworkSearchPath> FramePaths;
-  for (const auto &path : FrameworkPaths) {
-    FramePaths.push_back({path, /*isSystem=*/false});
-  }
-  Invocation.setFrameworkSearchPaths(FramePaths);
+  Invocation.getLangOptions().EnableMemoryBufferImporter = true;
+  Invocation.getLangOptions().EnableDWARFImporter = EnableDWARFImporter;
 
-  if (CI.setup(Invocation))
+  if (!ResourceDir.empty()) {
+    Invocation.setRuntimeResourcePath(ResourceDir);
+  }
+
+  if (CI.setup(Invocation)) {
+    llvm::errs() << "error: Failed setup invocation!\n";
     return 1;
-
-  std::vector<llvm::object::OwningBinary<llvm::object::ObjectFile>> ObjFiles;
-
-  // Fetch the serialized module bitstreams from the Mach-O files and
-  // register them with the module loader.
-  for (std::string name : InputNames) {
-    auto OF = llvm::object::ObjectFile::createObjectFile(name);
-    if (!OF) {
-      llvm::outs() << name << " is not an object file.\n";
-      exit(1);
-    }
-    auto *Obj = OF->getBinary();
-    auto *MachO = llvm::dyn_cast<llvm::object::MachOObjectFile>(Obj);
-    auto *ELF   = llvm::dyn_cast<llvm::object::ELFObjectFileBase>(Obj);
-    if (MachO) {
-      for (auto &Symbol : Obj->symbols()) {
-        auto RawSym = Symbol.getRawDataRefImpl();
-        llvm::MachO::nlist nlist = MachO->getSymbolTableEntry(RawSym);
-        if (nlist.n_type == N_AST) {
-          auto Path = MachO->getSymbolName(RawSym);
-          if (!Path) {
-            llvm::outs() << "Cannot get symbol name\n;";
-            exit(1);
-          }
-
-          auto fileBuf = llvm::MemoryBuffer::getFile(*Path);
-          if (!fileBuf) {
-            llvm::outs() << "Cannot read from '" << *Path
-                         << "': " << fileBuf.getError().message();
-            exit(1);
-          }
-
-          if (!parseASTSection(CI.getSerializedModuleLoader(),
-                               fileBuf.get()->getBuffer(), modules)) {
-            exit(1);
-          }
-
-          for (auto path : modules)
-            llvm::outs() << "Loaded module " << path << " from " << name
-                         << "\n";
-          printValidationInfo(fileBuf.get()->getBuffer());
-
-          // Deliberately leak the llvm::MemoryBuffer. We can't delete it
-          // while it's in use anyway.
-          fileBuf.get().release();
-        }
-      }
-    }
-    for (auto &Section : Obj->sections()) {
-      llvm::StringRef Name;
-      Section.getName(Name);
-      if ((MachO && Name == swift::MachOASTSectionName) ||
-          (ELF   && Name == swift::ELFASTSectionName)) {
-        llvm::StringRef Buf;
-        Section.getContents(Buf);
-        if (!parseASTSection(CI.getSerializedModuleLoader(), Buf, modules))
-          exit(1);
-
-        for (auto path : modules)
-          llvm::outs() << "Loaded module " << path << " from " << name
-                       << "\n";
-        printValidationInfo(Buf);
-      }
-    }
-    ObjFiles.push_back(std::move(*OF));
   }
+
+  for (auto &Module : Modules)
+    if (!parseASTSection(*CI.getMemoryBufferSerializedModuleLoader(),
+                         StringRef(Module.first, Module.second), modules)) {
+      llvm::errs() << "error: Failed to parse AST section!\n";
+      return 1;
+    }
 
   // Attempt to import all modules we found.
   for (auto path : modules) {
-    llvm::outs() << "Importing " << path << "... ";
+    if (Verbose)
+      llvm::outs() << "Importing " << path << "... ";
 
 #ifdef SWIFT_SUPPORTS_SUBMODULES
     std::vector<std::pair<swift::Identifier, swift::SourceLoc> > AccessPath;
@@ -210,16 +328,28 @@ int main(int argc, char **argv) {
 
     auto Module = CI.getASTContext().getModule(AccessPath);
     if (!Module) {
-      llvm::errs() << "FAIL!\n";
+      if (Verbose)
+        llvm::errs() << "FAIL!\n";
       return 1;
     }
-    llvm::outs() << "ok!\n";
+    if (Verbose)
+      llvm::outs() << "ok!\n";
     if (DumpModule) {
       llvm::SmallVector<swift::Decl*, 10> Decls;
       Module->getTopLevelDecls(Decls);
       for (auto Decl : Decls) {
         Decl->dump(llvm::outs());
       }
+    }
+    if (!DumpTypeFromMangled.empty()) {
+      llvm::SmallVector<std::string, 8> MangledNames;
+      collectMangledNames(DumpTypeFromMangled, MangledNames);
+      resolveTypeFromMangledNameList(CI.getASTContext(), MangledNames);
+    }
+    if (!DumpDeclFromMangled.empty()) {
+      llvm::SmallVector<std::string, 8> MangledNames;
+      collectMangledNames(DumpDeclFromMangled, MangledNames);
+      resolveDeclFromMangledNameList(CI.getASTContext(), MangledNames);
     }
   }
   return 0;

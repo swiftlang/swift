@@ -148,9 +148,9 @@ public protocol RawRepresentable {
 /// - Parameters:
 ///   - lhs: A raw-representable instance.
 ///   - rhs: A second raw-representable instance.
-@_inlineable // FIXME(sil-serialize-all)
-public func == <T : RawRepresentable>(lhs: T, rhs: T) -> Bool
-  where T.RawValue : Equatable {
+@inlinable // trivial-implementation
+public func == <T: RawRepresentable>(lhs: T, rhs: T) -> Bool
+  where T.RawValue: Equatable {
   return lhs.rawValue == rhs.rawValue
 }
 
@@ -159,23 +159,101 @@ public func == <T : RawRepresentable>(lhs: T, rhs: T) -> Bool
 /// - Parameters:
 ///   - lhs: A raw-representable instance.
 ///   - rhs: A second raw-representable instance.
-@_inlineable // FIXME(sil-serialize-all)
-public func != <T : RawRepresentable>(lhs: T, rhs: T) -> Bool
-  where T.RawValue : Equatable {
+@inlinable // trivial-implementation
+public func != <T: RawRepresentable>(lhs: T, rhs: T) -> Bool
+  where T.RawValue: Equatable {
   return lhs.rawValue != rhs.rawValue
 }
 
 // This overload is needed for ambiguity resolution against the
-// implementation of != for T : Equatable
+// implementation of != for T: Equatable
 /// Returns a Boolean value indicating whether the two arguments are not equal.
 ///
 /// - Parameters:
 ///   - lhs: A raw-representable instance.
 ///   - rhs: A second raw-representable instance.
-@_inlineable // FIXME(sil-serialize-all)
-public func != <T : Equatable>(lhs: T, rhs: T) -> Bool
-  where T : RawRepresentable, T.RawValue : Equatable {
+@inlinable // trivial-implementation
+public func != <T: Equatable>(lhs: T, rhs: T) -> Bool
+  where T: RawRepresentable, T.RawValue: Equatable {
   return lhs.rawValue != rhs.rawValue
+}
+
+// Ensure that any RawRepresentable types that conform to Hashable without
+// providing explicit implementations get hashing that's consistent with the ==
+// definition above. (Compiler-synthesized hashing is based on stored properties
+// rather than rawValue; the difference is subtle, but it can be fatal.)
+extension RawRepresentable where RawValue: Hashable, Self: Hashable {
+  @inlinable // trivial
+  public var hashValue: Int {
+    return rawValue.hashValue
+  }
+
+  @inlinable // trivial
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(rawValue)
+  }
+
+  @inlinable // trivial
+  public func _rawHashValue(seed: Int) -> Int {
+    // In 5.0, this used to return rawValue._rawHashValue(seed: seed).  This was
+    // slightly faster, but it interfered with conforming types' ability to
+    // customize their hashing. The current definition is equivalent to the
+    // default implementation; however, we need to keep the definition to remain
+    // ABI compatible with code compiled on 5.0.
+    //
+    // Note that unless a type provides a custom hash(into:) implementation,
+    // this new version returns the same values as the original 5.0 definition,
+    // so code that used to work in 5.0 remains working whether or not the
+    // original definition was inlined.
+    //
+    // See https://bugs.swift.org/browse/SR-10734
+    var hasher = Hasher(_seed: seed)
+    self.hash(into: &hasher)
+    return hasher._finalize()
+  }
+}
+
+/// A type that provides a collection of all of its values.
+///
+/// Types that conform to the `CaseIterable` protocol are typically
+/// enumerations without associated values. When using a `CaseIterable` type,
+/// you can access a collection of all of the type's cases by using the type's
+/// `allCases` property.
+///
+/// For example, the `CompassDirection` enumeration declared in this example
+/// conforms to `CaseIterable`. You access the number of cases and the cases
+/// themselves through `CompassDirection.allCases`.
+///
+///     enum CompassDirection: CaseIterable {
+///         case north, south, east, west
+///     }
+///
+///     print("There are \(CompassDirection.allCases.count) directions.")
+///     // Prints "There are 4 directions."
+///     let caseList = CompassDirection.allCases
+///                                    .map({ "\($0)" })
+///                                    .joined(separator: ", ")
+///     // caseList == "north, south, east, west"
+///
+/// Conforming to the CaseIterable Protocol
+/// =======================================
+///
+/// The compiler can automatically provide an implementation of the
+/// `CaseIterable` requirements for any enumeration without associated values
+/// or `@available` attributes on its cases. The synthesized `allCases`
+/// collection provides the cases in order of their declaration.
+///
+/// You can take advantage of this compiler support when defining your own
+/// custom enumeration by declaring conformance to `CaseIterable` in the
+/// enumeration's original declaration. The `CompassDirection` example above
+/// demonstrates this automatic implementation.
+public protocol CaseIterable {
+  /// A type that can represent a collection of all values of this type.
+  associatedtype AllCases: Collection
+    where AllCases.Element == Self
+  
+  /// A collection of all values of this type.
+  static var allCases: AllCases { get }
 }
 
 /// A type that can be initialized using the nil literal, `nil`.
@@ -190,7 +268,7 @@ public protocol ExpressibleByNilLiteral {
 }
 
 public protocol _ExpressibleByBuiltinIntegerLiteral {
-  init(_builtinIntegerLiteral value: _MaxBuiltinIntegerType)
+  init(_builtinIntegerLiteral value: Builtin.IntLiteral)
 }
 
 /// A type that can be initialized with an integer literal.
@@ -220,7 +298,7 @@ public protocol ExpressibleByIntegerLiteral {
   ///
   /// The standard library integer and floating-point types are all valid types
   /// for `IntegerLiteralType`.
-  associatedtype IntegerLiteralType : _ExpressibleByBuiltinIntegerLiteral
+  associatedtype IntegerLiteralType: _ExpressibleByBuiltinIntegerLiteral
 
   /// Creates an instance initialized to the specified integer value.
   ///
@@ -263,7 +341,7 @@ public protocol ExpressibleByFloatLiteral {
   ///
   /// Valid types for `FloatLiteralType` are `Float`, `Double`, and `Float80`
   /// where available.
-  associatedtype FloatLiteralType : _ExpressibleByBuiltinFloatLiteral
+  associatedtype FloatLiteralType: _ExpressibleByBuiltinFloatLiteral
   
   /// Creates an instance initialized to the specified floating-point value.
   ///
@@ -286,16 +364,16 @@ public protocol _ExpressibleByBuiltinBooleanLiteral {
 /// A type that can be initialized with the Boolean literals `true` and
 /// `false`.
 ///
-/// Only three types provided by Swift---`Bool`, `DarwinBoolean`, and
-/// `ObjCBool`---are treated as Boolean values. Expanding this set to include
-/// types that represent more than simple Boolean values is discouraged.
+/// `Bool`, `DarwinBoolean`, `ObjCBool`, and `WindowsBool` are treated as
+/// Boolean values. Expanding this set to include types that represent more than
+/// simple Boolean values is discouraged.
 ///
 /// To add `ExpressibleByBooleanLiteral` conformance to your custom type,
 /// implement the `init(booleanLiteral:)` initializer that creates an instance
 /// of your type with the given Boolean value.
 public protocol ExpressibleByBooleanLiteral {
   /// A type that represents a Boolean literal, such as `Bool`.
-  associatedtype BooleanLiteralType : _ExpressibleByBuiltinBooleanLiteral
+  associatedtype BooleanLiteralType: _ExpressibleByBuiltinBooleanLiteral
 
   /// Creates an instance initialized to the given Boolean value.
   ///
@@ -338,20 +416,12 @@ public protocol ExpressibleByUnicodeScalarLiteral {
   ///
   /// Valid types for `UnicodeScalarLiteralType` are `Unicode.Scalar`,
   /// `Character`, `String`, and `StaticString`.
-  associatedtype UnicodeScalarLiteralType : _ExpressibleByBuiltinUnicodeScalarLiteral
+  associatedtype UnicodeScalarLiteralType: _ExpressibleByBuiltinUnicodeScalarLiteral
 
   /// Creates an instance initialized to the given value.
   ///
   /// - Parameter value: The value of the new instance.
   init(unicodeScalarLiteral value: UnicodeScalarLiteralType)
-}
-
-public protocol _ExpressibleByBuiltinUTF16ExtendedGraphemeClusterLiteral
-  : _ExpressibleByBuiltinExtendedGraphemeClusterLiteral {
-
-  init(
-    _builtinExtendedGraphemeClusterLiteral start: Builtin.RawPointer,
-    utf16CodeUnitCount: Builtin.Word)
 }
 
 public protocol _ExpressibleByBuiltinExtendedGraphemeClusterLiteral
@@ -405,7 +475,6 @@ public protocol ExpressibleByExtendedGraphemeClusterLiteral
 extension ExpressibleByExtendedGraphemeClusterLiteral
   where ExtendedGraphemeClusterLiteralType == UnicodeScalarLiteralType {
 
-  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public init(unicodeScalarLiteral value: ExtendedGraphemeClusterLiteralType) {
     self.init(extendedGraphemeClusterLiteral: value)
@@ -419,26 +488,6 @@ public protocol _ExpressibleByBuiltinStringLiteral
     _builtinStringLiteral start: Builtin.RawPointer,
     utf8CodeUnitCount: Builtin.Word,
     isASCII: Builtin.Int1)
-}
-
-public protocol _ExpressibleByBuiltinUTF16StringLiteral
-  : _ExpressibleByBuiltinStringLiteral {
-
-  init(
-    _builtinUTF16StringLiteral start: Builtin.RawPointer,
-    utf16CodeUnitCount: Builtin.Word)
-}
-
-public protocol _ExpressibleByBuiltinConstStringLiteral
-  : _ExpressibleByBuiltinExtendedGraphemeClusterLiteral {
-
-  init(_builtinConstStringLiteral constantString: Builtin.RawPointer)
-}
-
-public protocol _ExpressibleByBuiltinConstUTF16StringLiteral
-  : _ExpressibleByBuiltinConstStringLiteral {
-
-  init(_builtinConstUTF16StringLiteral constantUTF16String: Builtin.RawPointer)
 }
 
 /// A type that can be initialized with a string literal.
@@ -460,7 +509,7 @@ public protocol ExpressibleByStringLiteral
   /// A type that represents a string literal.
   ///
   /// Valid types for `StringLiteralType` are `String` and `StaticString`.
-  associatedtype StringLiteralType : _ExpressibleByBuiltinStringLiteral
+  associatedtype StringLiteralType: _ExpressibleByBuiltinStringLiteral
   
   /// Creates an instance initialized to the given string value.
   ///
@@ -471,7 +520,6 @@ public protocol ExpressibleByStringLiteral
 extension ExpressibleByStringLiteral
   where StringLiteralType == ExtendedGraphemeClusterLiteralType {
 
-  @_inlineable // FIXME(sil-serialize-all)
   @_transparent
   public init(extendedGraphemeClusterLiteral value: StringLiteralType) {
     self.init(stringLiteral: value)
@@ -619,10 +667,10 @@ public protocol ExpressibleByArrayLiteral {
 ///     print(frequencies.count)
 ///     // Prints "0"
 ///
-/// - Note: A dictionary literal is *not* the same as an instance of
-///   `Dictionary` or the similarly named `DictionaryLiteral` type. You can't
-///   initialize a type that conforms to `ExpressibleByDictionaryLiteral` simply
-///   by assigning an instance of one of these types.
+/// - Note:
+///   A dictionary literal is *not* the same as an instance of `Dictionary`.
+///   You can't initialize a type that conforms to `ExpressibleByDictionaryLiteral`
+///   simply by assigning an instance of `Dictionary`, `KeyValuePairs`, or similar.
 ///
 /// Conforming to the ExpressibleByDictionaryLiteral Protocol
 /// =========================================================
@@ -674,49 +722,205 @@ public protocol ExpressibleByDictionaryLiteral {
 ///     let message = "One cookie: $\(price), \(number) cookies: $\(price * number)."
 ///     print(message)
 ///     // Prints "One cookie: $2, 3 cookies: $6."
+/// 
+/// Extending the Default Interpolation Behavior
+/// ============================================
+/// 
+/// Add new interpolation behavior to existing types by extending
+/// `DefaultStringInterpolation`, the type that implements interpolation for
+/// types like `String` and `Substring`, to add an overload of
+/// `appendInterpolation(_:)` with their new behavior.
 ///
-/// Conforming to the ExpressibleByStringInterpolation Protocol
-/// ===========================================================
+/// For more information, see the `DefaultStringInterpolation` and
+/// `StringInterpolationProtocol` documentation.
+/// 
+/// Creating a Type That Supports the Default String Interpolation
+/// ==============================================================
+/// 
+/// To create a new type that supports string literals and interpolation, but
+/// that doesn't need any custom behavior, conform the type to
+/// `ExpressibleByStringInterpolation` and implement the
+/// `init(stringLiteral: String)` initializer declared by the
+/// `ExpressibleByStringLiteral` protocol. Swift will automatically use
+/// `DefaultStringInterpolation` as the interpolation type and provide an
+/// implementation for `init(stringInterpolation:)` that passes the
+/// interpolated literal's contents to `init(stringLiteral:)`, so you don't
+/// need to implement anything specific to this protocol.
 ///
-/// The `ExpressibleByStringInterpolation` protocol is deprecated. Do not add
-/// new conformances to the protocol.
-@available(*, deprecated, message: "it will be replaced or redesigned in Swift 4.0.  Instead of conforming to 'ExpressibleByStringInterpolation', consider adding an 'init(_:String)'")
-public typealias ExpressibleByStringInterpolation = _ExpressibleByStringInterpolation
-public protocol _ExpressibleByStringInterpolation {
-  /// Creates an instance by concatenating the given values.
-  ///
-  /// Do not call this initializer directly. It is used by the compiler when
-  /// you use string interpolation. For example:
-  ///
-  ///     let s = "\(5) x \(2) = \(5 * 2)"
-  ///     print(s)
-  ///     // Prints "5 x 2 = 10"
-  ///
-  /// After calling `init(stringInterpolationSegment:)` with each segment of
-  /// the string literal, this initializer is called with their string
-  /// representations.
-  ///
-  /// - Parameter strings: An array of instances of the conforming type.
-  init(stringInterpolation strings: Self...)
+/// Creating a Type That Supports Custom String Interpolation
+/// =========================================================
+///
+/// If you want a conforming type to differentiate between literal and
+/// interpolated segments, restrict the types that can be interpolated,
+/// support different interpolators from the ones on `String`, or avoid
+/// constructing a `String` containing the data, the type must specify a custom
+/// `StringInterpolation` associated type. This type must conform to
+/// `StringInterpolationProtocol` and have a matching `StringLiteralType`.
+///
+/// For more information, see the `StringInterpolationProtocol` documentation.
+public protocol ExpressibleByStringInterpolation
+  : ExpressibleByStringLiteral {
   
-  /// Creates an instance containing the appropriate representation for the
-  /// given value.
+  /// The type each segment of a string literal containing interpolations
+  /// should be appended to.
   ///
-  /// Do not call this initializer directly. It is used by the compiler for
-  /// each string interpolation segment when you use string interpolation. For
-  /// example:
+  /// The `StringLiteralType` of an interpolation type must match the
+  /// `StringLiteralType` of the conforming type.
+  associatedtype StringInterpolation: StringInterpolationProtocol
+    = DefaultStringInterpolation
+    where StringInterpolation.StringLiteralType == StringLiteralType
+
+  /// Creates an instance from a string interpolation.
+  /// 
+  /// Most `StringInterpolation` types will store information about the
+  /// literals and interpolations appended to them in one or more properties.
+  /// `init(stringInterpolation:)` should use these properties to initialize
+  /// the instance.
+  /// 
+  /// - Parameter stringInterpolation: An instance of `StringInterpolation`
+  ///             which has had each segment of the string literal appended
+  ///             to it.
+  init(stringInterpolation: StringInterpolation)
+}
+
+extension ExpressibleByStringInterpolation
+  where StringInterpolation == DefaultStringInterpolation {
+  
+  /// Creates a new instance from an interpolated string literal.
+  /// 
+  /// Don't call this initializer directly. It's used by the compiler when
+  /// you create a string using string interpolation. Instead, use string
+  /// interpolation to create a new string by including values, literals,
+  /// variables, or expressions enclosed in parentheses, prefixed by a
+  /// backslash (`\(`...`)`).
   ///
-  ///     let s = "\(5) x \(2) = \(5 * 2)"
-  ///     print(s)
-  ///     // Prints "5 x 2 = 10"
-  ///
-  /// This initializer is called five times when processing the string literal
-  /// in the example above; once each for the following: the integer `5`, the
-  /// string `" x "`, the integer `2`, the string `" = "`, and the result of
-  /// the expression `5 * 2`.
-  ///
-  /// - Parameter expr: The expression to represent.
-  init<T>(stringInterpolationSegment expr: T)
+  ///     let price = 2
+  ///     let number = 3
+  ///     let message = """
+  ///                   If one cookie costs \(price) dollars, \
+  ///                   \(number) cookies cost \(price * number) dollars.
+  ///                   """
+  ///     // message == "If one cookie costs 2 dollars, 3 cookies cost 6 dollars."
+  public init(stringInterpolation: DefaultStringInterpolation) {
+    self.init(stringLiteral: stringInterpolation.make())
+  }
+}
+
+/// Represents the contents of a string literal with interpolations while it's
+/// being built up.
+/// 
+/// Each `ExpressibleByStringInterpolation` type has an associated
+/// `StringInterpolation` type which conforms to `StringInterpolationProtocol`.
+/// Swift converts an expression like `"The time is \(time)." as MyString` into
+/// a series of statements similar to:
+/// 
+///     var interpolation = MyString.StringInterpolation(literalCapacity: 13, 
+///                                                      interpolationCount: 1)
+/// 
+///     interpolation.appendLiteral("The time is ")
+///     interpolation.appendInterpolation(time)
+///     interpolation.appendLiteral(".")
+///
+///     MyString(stringInterpolation: interpolation)
+/// 
+/// The `StringInterpolation` type is responsible for collecting the segments
+/// passed to its `appendLiteral(_:)` and `appendInterpolation` methods and
+/// assembling them into a whole, converting as necessary. Once all of the
+/// segments are appended, the interpolation is passed to an
+/// `init(stringInterpolation:)` initializer on the type being created, which
+/// must extract the accumulated data from the `StringInterpolation`.
+/// 
+/// In simple cases, you can use `DefaultStringInterpolation` as the
+/// interpolation type for types that conform to the
+/// `ExpressibleByStringLiteral` protocol. To use the default interpolation,
+/// conform a type to `ExpressibleByStringInterpolation` and implement
+/// `init(stringLiteral: String)`. Values in interpolations are converted to
+/// strings, and then passed to that initializer just like any other string
+/// literal.
+/// 
+/// Handling String Interpolations
+/// ==============================
+///
+/// With a custom interpolation type, each interpolated segment is translated
+/// into a call to a special `appendInterpolation` method. The contents of
+/// the interpolation's parentheses are treated as the call's argument list.
+/// That argument list can include multiple arguments and argument labels.
+///
+/// The following examples show how string interpolations are translated into
+/// calls to `appendInterpolation`:
+///
+/// - `\(x)` translates to `appendInterpolation(x)`
+/// - `\(x, y)` translates to `appendInterpolation(x, y)`
+/// - `\(foo: x)` translates to `appendInterpolation(foo: x)`
+/// - `\(x, foo: y)` translates to `appendInterpolation(x, foo: y)`
+///
+/// The `appendInterpolation` methods in your custom type must be mutating
+/// instance methods that return `Void`. This code shows a custom interpolation
+/// type's declaration of an `appendInterpolation` method that provides special
+/// validation for user input:
+///
+///     extension MyString.StringInterpolation {
+///         mutating func appendInterpolation(validating input: String) {
+///             // Perform validation of `input` and store for later use
+///         }
+///     }
+///
+/// To use this interpolation method, create a string literal with an
+/// interpolation using the `validating` parameter label.
+///
+///     let userInput = readLine() ?? ""
+///     let myString = "The user typed '\(validating: userInput)'." as MyString
+///
+/// `appendInterpolation` methods support virtually all features of methods:
+/// they can have any number of parameters, can specify labels for any or all
+/// of their parameters, can provide default values, can have variadic
+/// parameters, and can have parameters with generic types. Most importantly,
+/// they can be overloaded, so a type that conforms to
+/// `StringInterpolationProtocol` can provide several different
+/// `appendInterpolation` methods with different behaviors. An
+/// `appendInterpolation` method can also throw; when a user writes a literal
+/// with one of these interpolations, they must mark the string literal with
+/// `try` or one of its variants.
+public protocol StringInterpolationProtocol {
+  /// The type that should be used for literal segments.
+  associatedtype StringLiteralType: _ExpressibleByBuiltinStringLiteral
+
+  /// Creates an empty instance ready to be filled with string literal content.
+  /// 
+  /// Don't call this initializer directly. Instead, initialize a variable or
+  /// constant using a string literal with interpolated expressions.
+  /// 
+  /// Swift passes this initializer a pair of arguments specifying the size of
+  /// the literal segments and the number of interpolated segments. Use this
+  /// information to estimate the amount of storage you will need.
+  /// 
+  /// - Parameter literalCapacity: The approximate size of all literal segments
+  ///   combined. This is meant to be passed to `String.reserveCapacity(_:)`;
+  ///   it may be slightly larger or smaller than the sum of the counts of each
+  ///   literal segment.
+  /// - Parameter interpolationCount: The number of interpolations which will be
+  ///   appended. Use this value to estimate how much additional capacity will
+  ///   be needed for the interpolated segments.
+  init(literalCapacity: Int, interpolationCount: Int)
+
+  /// Appends a literal segment to the interpolation.
+  /// 
+  /// Don't call this method directly. Instead, initialize a variable or
+  /// constant using a string literal with interpolated expressions.
+  /// 
+  /// Interpolated expressions don't pass through this method; instead, Swift
+  /// selects an overload of `appendInterpolation`. For more information, see
+  /// the top-level `StringInterpolationProtocol` documentation.
+  /// 
+  /// - Parameter literal: A string literal containing the characters
+  ///   that appear next in the string literal.
+  mutating func appendLiteral(_ literal: StringLiteralType)
+
+  // Informal requirement: Any desired appendInterpolation overloads, e.g.:
+  // 
+  //   mutating func appendInterpolation<T>(_: T)
+  //   mutating func appendInterpolation(_: Int, radix: Int)
+  //   mutating func appendInterpolation<T: Encodable>(json: T) throws
 }
 
 /// A type that can be initialized using a color literal (e.g.
@@ -728,18 +932,6 @@ public protocol _ExpressibleByColorLiteral {
   /// Do not call this initializer directly. Instead, initialize a variable or
   /// constant using a color literal.
   init(_colorLiteralRed red: Float, green: Float, blue: Float, alpha: Float)
-}
-
-extension _ExpressibleByColorLiteral {
-  @_inlineable // FIXME(sil-serialize-all)
-  @available(swift, deprecated: 3.2, obsoleted: 4.0,
-    message: "This initializer is only meant to be used by color literals")
-  public init(
-    colorLiteralRed red: Float, green: Float, blue: Float, alpha: Float
-  ) {
-    self.init(
-      _colorLiteralRed: red, green: green, blue: blue, alpha: alpha)
-  }
 }
 
 /// A type that can be initialized using an image literal (e.g.
@@ -776,67 +968,3 @@ public protocol _ExpressibleByFileReferenceLiteral {
 /// then Array would no longer be a _DestructorSafeContainer.
 public protocol _DestructorSafeContainer {
 }
-
-// Deprecated by SE-0115.
-
-@available(*, deprecated, renamed: "ExpressibleByNilLiteral")
-public typealias NilLiteralConvertible
-  = ExpressibleByNilLiteral
-@available(*, deprecated, renamed: "_ExpressibleByBuiltinIntegerLiteral")
-public typealias _BuiltinIntegerLiteralConvertible
-  = _ExpressibleByBuiltinIntegerLiteral
-@available(*, deprecated, renamed: "ExpressibleByIntegerLiteral")
-public typealias IntegerLiteralConvertible
-  = ExpressibleByIntegerLiteral
-@available(*, deprecated, renamed: "_ExpressibleByBuiltinFloatLiteral")
-public typealias _BuiltinFloatLiteralConvertible
-  = _ExpressibleByBuiltinFloatLiteral
-@available(*, deprecated, renamed: "ExpressibleByFloatLiteral")
-public typealias FloatLiteralConvertible
-  = ExpressibleByFloatLiteral
-@available(*, deprecated, renamed: "_ExpressibleByBuiltinBooleanLiteral")
-public typealias _BuiltinBooleanLiteralConvertible
-  = _ExpressibleByBuiltinBooleanLiteral
-@available(*, deprecated, renamed: "ExpressibleByBooleanLiteral")
-public typealias BooleanLiteralConvertible
-  = ExpressibleByBooleanLiteral
-@available(*, deprecated, renamed: "_ExpressibleByBuiltinUnicodeScalarLiteral")
-public typealias _BuiltinUnicodeScalarLiteralConvertible
-  = _ExpressibleByBuiltinUnicodeScalarLiteral
-@available(*, deprecated, renamed: "ExpressibleByUnicodeScalarLiteral")
-public typealias UnicodeScalarLiteralConvertible
-  = ExpressibleByUnicodeScalarLiteral
-@available(*, deprecated, renamed: "_ExpressibleByBuiltinExtendedGraphemeClusterLiteral")
-public typealias _BuiltinExtendedGraphemeClusterLiteralConvertible
-  = _ExpressibleByBuiltinExtendedGraphemeClusterLiteral
-@available(*, deprecated, renamed: "ExpressibleByExtendedGraphemeClusterLiteral")
-public typealias ExtendedGraphemeClusterLiteralConvertible
-  = ExpressibleByExtendedGraphemeClusterLiteral
-@available(*, deprecated, renamed: "_ExpressibleByBuiltinStringLiteral")
-public typealias _BuiltinStringLiteralConvertible
-  = _ExpressibleByBuiltinStringLiteral
-@available(*, deprecated, renamed: "_ExpressibleByBuiltinUTF16StringLiteral")
-public typealias _BuiltinUTF16StringLiteralConvertible
-  = _ExpressibleByBuiltinUTF16StringLiteral
-@available(*, deprecated, renamed: "ExpressibleByStringLiteral")
-public typealias StringLiteralConvertible
-  = ExpressibleByStringLiteral
-@available(*, deprecated, renamed: "ExpressibleByArrayLiteral")
-public typealias ArrayLiteralConvertible
-  = ExpressibleByArrayLiteral
-@available(*, deprecated, renamed: "ExpressibleByDictionaryLiteral")
-public typealias DictionaryLiteralConvertible
-  = ExpressibleByDictionaryLiteral
-@available(*, deprecated, message: "it will be replaced or redesigned in Swift 4.0.  Instead of conforming to 'StringInterpolationConvertible', consider adding an 'init(_:String)'")
-public typealias StringInterpolationConvertible
-  = ExpressibleByStringInterpolation
-@available(*, deprecated, renamed: "_ExpressibleByColorLiteral")
-public typealias _ColorLiteralConvertible
-  = _ExpressibleByColorLiteral
-@available(*, deprecated, renamed: "_ExpressibleByImageLiteral")
-public typealias _ImageLiteralConvertible
-  = _ExpressibleByImageLiteral
-@available(*, deprecated, renamed: "_ExpressibleByFileReferenceLiteral")
-public typealias _FileReferenceLiteralConvertible
-  = _ExpressibleByFileReferenceLiteral
-

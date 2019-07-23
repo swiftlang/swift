@@ -27,7 +27,22 @@ using namespace swift;
 // break between them. That is, whether we're overriding the behavior of the
 // hard coded Unicode 8 rules surrounding ZWJ and emoji modifiers.
 static inline bool graphemeBreakOverride(llvm::UTF32 lhs, llvm::UTF32 rhs) {
-  return lhs == 0x200D || (rhs >= 0x1F3FB && rhs <= 0x1F3FF);
+  // Assume ZWJ sequences produce new emoji
+  if (lhs == 0x200D) {
+    return true;
+  }
+
+  // Permit continuing regional indicators
+  if (rhs >= 0x1F3FB && rhs <= 0x1F3FF) {
+    return true;
+  }
+
+  // Permit emoji tag sequences
+  if (rhs >= 0xE0020 && rhs <= 0xE007F) {
+    return true;
+  }
+
+  return false;
 }
 
 StringRef swift::unicode::extractFirstExtendedGraphemeCluster(StringRef S) {
@@ -52,9 +67,6 @@ StringRef swift::unicode::extractFirstExtendedGraphemeCluster(StringRef S) {
 
   GraphemeClusterBreakProperty GCBForC0 = getGraphemeClusterBreakProperty(C[0]);
   while (true) {
-    if (isExtendedGraphemeClusterBoundaryAfter(GCBForC0))
-      return S.slice(0, SourceNext - SourceStart);
-
     size_t C1Offset = SourceNext - SourceStart;
     ConvertUTF8toUTF32(&SourceNext, SourceStart + S.size(), &TargetStart, C + 2,
                        llvm::lenientConversion);

@@ -15,6 +15,7 @@ func unicode_test_1() {
   Unicode1().#^UNICODE_1^#
 }
 // UNICODE_1: Begin completions
+// UNICODE_1-NEXT: Keyword[self]/CurrNominal: self[#Unicode1#]; name=self
 // UNICODE_1-NEXT: Decl[InstanceMethod]/CurrNominal: Идентификаторы_с_кириллицей_допустимы()[#Void#]{{; name=.+$}}
 // UNICODE_1-NEXT: Decl[InstanceMethod]/CurrNominal: Ідентіфікатори_українською_також_працюють()[#Void#]{{; name=.+$}}
 // UNICODE_1-NEXT: Decl[InstanceMethod]/CurrNominal: 識別子は()[#Void#]{{; name=.+$}}

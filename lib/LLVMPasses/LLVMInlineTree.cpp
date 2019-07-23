@@ -65,8 +65,8 @@ namespace {
 class InlineTree {
   struct Node;
 
-  typedef DenseMap<StringRef, Node *> NodeMap;
-  typedef SmallVector<Node *, 8> NodeList;
+  using NodeMap = DenseMap<StringRef, Node *>;
+  using NodeList = SmallVector<Node *, 8>;
 
   /// Defines a unique inline location.
   /// Used to distinguish between different instances of an inlined function.
@@ -117,7 +117,7 @@ class InlineTree {
     bool isTopLevel = false;
 
     const NodeList &getChildren() {
-      if (SortedChildren.size() == 0 && UnsortedChildren.size() > 0)
+      if (SortedChildren.empty() && !UnsortedChildren.empty())
         sortNodes(UnsortedChildren, SortedChildren);
       return SortedChildren;
     }
@@ -207,11 +207,11 @@ void InlineTree::buildTree(Function *F) {
   Node *rootNode = getNode(F->getName(), Functions2Nodes);
   rootNode->isTopLevel = true;
 
-  DEBUG(dbgs() << "\nFunction " << F->getName() << '\n');
+  LLVM_DEBUG(dbgs() << "\nFunction " << F->getName() << '\n');
   for (BasicBlock &BB : *F) {
     for (Instruction &I : BB) {
 
-      DEBUG(dbgs() << I << '\n');
+      LLVM_DEBUG(dbgs() << I << '\n');
 
       totalNumberOfInstructions++;
       SmallVector<DILocation *, 8> InlineChain;
@@ -228,14 +228,14 @@ void InlineTree::buildTree(Function *F) {
         DILocalScope *Sc = DL->getScope();
         DISubprogram *SP = Sc->getSubprogram();
         assert(SP);
-        DEBUG(dbgs() << "    f=" << SP->getLinkageName());
+        LLVM_DEBUG(dbgs() << "    f=" << SP->getLinkageName());
         if (Nd) {
           Nd = getNode(SP->getLinkageName(), Nd->UnsortedChildren);
           Nd->UniqueLocations.insert(LocationKey(PrevDL));
-          DEBUG(dbgs() << ", loc="; PrevDL->print(dbgs()); dbgs() << '\n');
+          LLVM_DEBUG(dbgs() << ", loc="; PrevDL->print(dbgs()); dbgs() << '\n');
         } else {
           Nd = rootNode;
-          DEBUG(dbgs() << ", root\n");
+          LLVM_DEBUG(dbgs() << ", root\n");
         }
         Nd->numTotalInsts++;
         PrevDL = DL;
@@ -274,7 +274,7 @@ void InlineTree::printNode(Node *Nd, int indent, raw_ostream &os) {
 void InlineTree::build(Module *M) {
   // Build the trees for all top-level functions.
   for (Function &F : *M) {
-    if (F.size() == 0)
+    if (F.empty())
       continue;
     buildTree(&F);
   }

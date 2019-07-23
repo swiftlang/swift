@@ -26,6 +26,8 @@ import bug_reducer.swift_tools as swift_tools
                      'func_bug_reducer is only available on Darwin for now')
 class FuncBugReducerTestCase(unittest.TestCase):
 
+    verbose = False
+
     def setUp(self):
         self.file_dir = os.path.dirname(os.path.abspath(__file__))
         self.reducer = os.path.join(os.path.dirname(self.file_dir),
@@ -73,7 +75,23 @@ class FuncBugReducerTestCase(unittest.TestCase):
                 '-resource-dir', os.path.join(self.build_dir, 'lib', 'swift'),
                 '-o', sib_path,
                 input_file_path]
-        return subprocess.check_call(args)
+        return self.run_check_call(args)
+
+    def run_check_call(self, args):
+        if FuncBugReducerTestCase.verbose:
+            print('Cmd: {}'.format(' '.join(args)))
+        result_code = subprocess.check_call(args)
+        if FuncBugReducerTestCase.verbose:
+            print('Result Code: {}'.format(result_code))
+        return result_code
+
+    def run_check_output(self, args):
+        if FuncBugReducerTestCase.verbose:
+            print('Cmd: {}'.format(' '.join(args)))
+        raw_output = subprocess.check_output(args)
+        if FuncBugReducerTestCase.verbose:
+            print('Raw Output: {}'.format(raw_output))
+        return raw_output
 
     def test_basic(self):
         name = 'testbasic'
@@ -93,19 +111,20 @@ class FuncBugReducerTestCase(unittest.TestCase):
             '--extra-silopt-arg=-bug-reducer-tester-failure-kind=opt-crasher'
         ]
         args.extend(self.passes)
-        output = subprocess.check_output(args).split("\n")
+        output = self.run_check_output(args).split("\n")
         self.assertTrue("*** Successfully Reduced file!" in output)
-        self.assertTrue("*** Final Functions: _TF9testbasic6foo413FT_T_")
+        self.assertTrue("*** Final Functions: " +
+                        "$s9testbasic6foo413yyF" in output)
         re_end = 'testfuncbugreducer_testbasic_'
-        re_end += 'c36efe1eb0993b53c570bfed38933af8.sib'
-        output_file_re = re.compile('\*\*\* Final File: .*' + re_end)
+        re_end += '92196894259b5d6c98d1b77f19240904.sib'
+        output_file_re = re.compile(r'\*\*\* Final File: .*' + re_end)
         output_matches = [
             1 for o in output if output_file_re.match(o) is not None]
-        self.assertEquals(sum(output_matches), 1)
+        self.assertEqual(sum(output_matches), 1)
         # Make sure our final output command does not have -emit-sib in
         # the output. We want users to get sil output when they type in
         # the relevant command.
-        self.assertEquals([], [o for o in output if '-emit-sib' in o])
+        self.assertEqual([], [o for o in output if '-emit-sib' in o])
 
 
 if __name__ == '__main__':

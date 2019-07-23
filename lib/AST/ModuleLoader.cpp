@@ -20,13 +20,13 @@
 
 namespace swift {
 
-DependencyTracker::DependencyTracker()
+DependencyTracker::DependencyTracker(bool TrackSystemDeps)
   // NB: The ClangImporter believes it's responsible for the construction of
   // this instance, and it static_cast<>s the instance pointer to its own
   // subclass based on that belief. If you change this to be some other
   // instance, you will need to change ClangImporter's code to handle the
   // difference.
-  : clangCollector(ClangImporter::createDependencyCollector())
+  : clangCollector(ClangImporter::createDependencyCollector(TrackSystemDeps))
 {
 }
 
@@ -34,9 +34,8 @@ void
 DependencyTracker::addDependency(StringRef File, bool IsSystem) {
   // DependencyTracker exposes an interface that (intentionally) does not talk
   // about clang at all, nor about missing deps. It does expose an IsSystem
-  // dimension, though it is presently always false, we accept it and pass it
-  // along to the clang DependencyCollector in case Swift callers start setting
-  // it to true someday.
+  // dimension, which we accept and pass along to the clang DependencyCollector.
+  // along to the clang DependencyCollector.
   clangCollector->maybeAddDependency(File, /*FromModule=*/false,
                                      IsSystem, /*IsModuleFile=*/false,
                                      /*IsMissing=*/false);

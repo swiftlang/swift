@@ -25,6 +25,8 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
     list(APPEND PLATFORM_TARGET_LINK_LIBRARIES
       ${EXECINFO_LIBRARY}
       )
+  elseif(SWIFT_HOST_VARIANT STREQUAL windows)
+    list(APPEND PLATFORM_TARGET_LINK_LIBRARIES DbgHelp)
   endif()
 
   add_swift_unittest(SwiftRuntimeLongTests
@@ -38,8 +40,17 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
     $<TARGET_OBJECTS:swiftRuntime${SWIFT_PRIMARY_VARIANT_SUFFIX}>
     )
 
+  # The local stdlib implementation provides definitions of the swiftCore
+  # interfaes to avoid pulling in swiftCore itself.  Build the
+  # SwiftRuntimeLongTests with swiftCore_EXPORTS to permit exporting the stdlib
+  # interfaces.
+  target_compile_definitions(SwiftRuntimeLongTests
+                             PRIVATE
+                               swiftCore_EXPORTS)
+
   # FIXME: cross-compile for all variants.
   target_link_libraries(SwiftRuntimeLongTests
+    PRIVATE
     swiftCore${SWIFT_PRIMARY_VARIANT_SUFFIX}
     ${PLATFORM_TARGET_LINK_LIBRARIES}
     ${swift_runtime_test_extra_libraries}

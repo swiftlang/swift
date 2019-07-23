@@ -136,3 +136,17 @@ func non_fully_covered_switch(x: Int) -> Int {
   }
   return x
 }
+
+// Do not crash if another switch statement follows a fallthrough.
+func fallthrough_not_last(i: Int) {
+  switch i {
+  case 1:
+    fallthrough
+    switch i {
+    case 1: break
+    default: break
+    }
+  default:
+    break
+  }
+}

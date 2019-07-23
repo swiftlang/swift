@@ -1,28 +1,31 @@
-// RUN: rm -rf %t  &&  mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-build-swift -swift-version 4 -Xfrontend -enable-swift3-objc-inference %s -o %t/a.out
 // RUN: %target-run %t/a.out 2>&1 | %FileCheck %s -check-prefix=CHECK_WARNINGS
-// RUN: env SWIFT_DEBUG_IMPLICIT_OBJC_ENTRYPOINT=0 SIMCTL_CHILD_SWIFT_DEBUG_IMPLICIT_OBJC_ENTRYPOINT=0 %target-run %t/a.out 2>&1 | %FileCheck %s -check-prefix=CHECK_NOTHING
+// RUN: env %env-SWIFT_DEBUG_IMPLICIT_OBJC_ENTRYPOINT=0 %target-run %t/a.out 2>&1 | %FileCheck %s -check-prefix=CHECK_NOTHING
 
-// RUN: env SWIFT_DEBUG_IMPLICIT_OBJC_ENTRYPOINT=1 SIMCTL_CHILD_SWIFT_DEBUG_IMPLICIT_OBJC_ENTRYPOINT=2 %target-run %t/a.out > %t/level1.log 2>&1
+// RUN: env %env-SWIFT_DEBUG_IMPLICIT_OBJC_ENTRYPOINT=1 %target-run %t/a.out > %t/level1.log 2>&1
 // RUN: %FileCheck %s -check-prefix=CHECK_WARNINGS < %t/level1.log
 
-// RUN: env SWIFT_DEBUG_IMPLICIT_OBJC_ENTRYPOINT=2 SIMCTL_CHILD_SWIFT_DEBUG_IMPLICIT_OBJC_ENTRYPOINT=2 %target-run %t/a.out > %t/level2.log 2>&1
+// RUN: env %env-SWIFT_DEBUG_IMPLICIT_OBJC_ENTRYPOINT=2 %target-run %t/a.out > %t/level2.log 2>&1
 // RUN: %FileCheck %s -check-prefix=CHECK_WARNINGS < %t/level2.log
 
-// RUN: SWIFT_DEBUG_IMPLICIT_OBJC_ENTRYPOINT=3 SIMCTL_CHILD_SWIFT_DEBUG_IMPLICIT_OBJC_ENTRYPOINT=3 %target-run %t/a.out -expect-crash > %t/level3.log 2>&1
+// RUN: env %env-SWIFT_DEBUG_IMPLICIT_OBJC_ENTRYPOINT=3 %target-run %t/a.out -expect-crash > %t/level3.log 2>&1
 // RUN: %FileCheck %s -check-prefix=CHECK_CRASH < %t/level3.log
 
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
-// REQUIRES: OS=macosx
+
+// Requires explicit swift-version 4.
+// UNSUPPORTED: swift_test_mode_optimize_none_with_implicit_dynamic
 
 import StdlibUnittest
 import Foundation
-import Darwin
 
 var DeprecatedObjCInferenceTestSuite = TestSuite("DeprecatedObjCInferenceTestSuite")
 
 class MyClass : NSObject {
+  // The line numbers of the next two methods are mentioned in the CHECK lines
+  // below. Please keep them as 29 and 30.
   func foo() { }
   class func bar() { }
 }
@@ -42,15 +45,15 @@ DeprecatedObjCInferenceTestSuite.test("messagingObjCInference") {
 	// CHECK_CRASH: ---Begin 
 	fputs("---Begin\n", stderr)
 
-	// CHECK_WARNINGS: .swift:26:3: implicit Objective-C entrypoint -[a.MyClass foo]
-	// CHECK_CRASH: .swift:26:3: implicit Objective-C entrypoint -[a.MyClass foo]
+	// CHECK_WARNINGS: .swift:29:3: implicit Objective-C entrypoint -[a.MyClass foo]
+	// CHECK_CRASH: .swift:29:3: implicit Objective-C entrypoint -[a.MyClass foo]
 	x.perform(Selector(fooSel))
-	// CHECK_WARNINGS-NOT: .swift:26:3: implicit Objective-C entrypoint -[a.MyClass foo]
+	// CHECK_WARNINGS-NOT: .swift:29:3: implicit Objective-C entrypoint -[a.MyClass foo]
 	x.perform(Selector(fooSel))
 
-	// CHECK_WARNINGS: .swift:27:3: implicit Objective-C entrypoint +[a.MyClass bar]
+	// CHECK_WARNINGS: .swift:30:3: implicit Objective-C entrypoint +[a.MyClass bar]
 	type(of: x).perform(Selector(barSel))
-	// CHECK_WARNINGS-NOT: .swift:27:3: implicit Objective-C entrypoint +[a.MyClass bar]
+	// CHECK_WARNINGS-NOT: .swift:30:3: implicit Objective-C entrypoint +[a.MyClass bar]
 	type(of: x).perform(Selector(barSel))
 
 	// CHECK_NOTHING-NEXT: ---End 

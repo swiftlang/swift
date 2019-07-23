@@ -13,9 +13,10 @@
 #ifndef SWIFT_FRONTENDTOOL_REFERENCEDEPENDENCIES_H
 #define SWIFT_FRONTENDTOOL_REFERENCEDEPENDENCIES_H
 
+#include "swift/Basic/LLVM.h"
 #include "llvm/ADT/ArrayRef.h"
-#include <vector>
 #include <string>
+#include <vector>
 
 namespace swift {
 
@@ -31,10 +32,9 @@ std::vector<std::string>
 reversePathSortedFilenames(const llvm::ArrayRef<std::string> paths);
 
 /// Emit a Swift-style dependencies file for \p SF.
-bool emitReferenceDependencies(DiagnosticEngine &diags,
-                               SourceFile *SF,
-                               DependencyTracker &depTracker,
-                               const FrontendOptions &opts);
+bool emitReferenceDependencies(DiagnosticEngine &diags, SourceFile *SF,
+                               const DependencyTracker &depTracker,
+                               StringRef outputPath);
 } // end namespace swift
 
 #endif

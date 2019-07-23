@@ -16,15 +16,11 @@
 #import <Foundation/Foundation.h>
 
 SWIFT_CC(swift)
-SWIFT_RUNTIME_STDLIB_INTERFACE
+SWIFT_RUNTIME_STDLIB_API
 bool _swift_stdlib_NSObject_isKindOfClass(
-    id SWIFT_NS_RELEASES_ARGUMENT _Nonnull object,
-    NSString *SWIFT_NS_RELEASES_ARGUMENT _Nonnull className) {
-  bool result = [object isKindOfClass:NSClassFromString(className)];
-  SWIFT_CC_PLUSONE_GUARD([object release]);
-  SWIFT_CC_PLUSONE_GUARD([className release]);
-
-  return result;
+    id _Nonnull object,
+    NSString * _Nonnull className) {
+  return [object isKindOfClass:NSClassFromString(className)];
 }
 #endif
 

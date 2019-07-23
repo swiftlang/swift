@@ -11,7 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SILOptimizer/Utils/PerformanceInlinerUtils.h"
-#include "swift/Strings.h"
+#include "swift/AST/Module.h"
+#include "swift/SILOptimizer/Utils/Local.h"
 
 //===----------------------------------------------------------------------===//
 //                               ConstantTracker
@@ -129,6 +130,9 @@ SILInstruction *ConstantTracker::getDef(SILValue val,
         continue;
       } else if (auto cfi = dyn_cast<ConvertFunctionInst>(inst)) {
         val = cfi->getOperand();
+        continue;
+      } else if (auto cvt = dyn_cast<ConvertEscapeToNoEscapeInst>(inst)) {
+        val = cvt->getOperand();
         continue;
       }
       return inst;
@@ -414,6 +418,10 @@ ShortestPathAnalysis::Weight ShortestPathAnalysis::
 getWeight(SILBasicBlock *BB, Weight CallerWeight) {
   assert(BB->getParent() == F);
 
+  // Return a conservative default if the analysis was not done due to a high number of blocks.
+  if (BlockInfos.empty())
+    return Weight(CallerWeight.ScopeLength + ColdBlockLength, CallerWeight.LoopWeight);
+
   SILLoop *Loop = LI->getLoopFor(BB);
   if (!Loop) {
     // We are not in a loop. So just account the length of our function scope
@@ -543,7 +551,7 @@ static bool calleeIsSelfRecursive(SILFunction *Callee) {
   for (auto &BB : *Callee)
     for (auto &I : BB)
       if (auto Apply = FullApplySite::isa(&I))
-        if (Apply.getReferencedFunction() == Callee)
+        if (Apply.getReferencedFunctionOrNull() == Callee)
           return true;
   return false;
 }
@@ -555,13 +563,15 @@ static bool calleeHasPartialApplyWithOpenedExistentials(FullApplySite AI) {
   if (!AI.hasSubstitutions())
     return false;
 
-  SILFunction *Callee = AI.getReferencedFunction();
-  auto Subs = AI.getSubstitutions();
+  SILFunction *Callee = AI.getReferencedFunctionOrNull();
+  assert(Callee && "Trying to optimize a dynamic function?!");
+
+  auto SubsMap = AI.getSubstitutionMap();
 
   // Bail if there are no open existentials in the list of substitutions.
   bool HasNoOpenedExistentials = true;
-  for (auto Sub : Subs) {
-    if (Sub.getReplacement()->hasOpenedExistential()) {
+  for (auto Replacement : SubsMap.getReplacementTypes()) {
+    if (Replacement->hasOpenedExistential()) {
       HasNoOpenedExistentials = false;
       break;
     }
@@ -570,20 +580,15 @@ static bool calleeHasPartialApplyWithOpenedExistentials(FullApplySite AI) {
   if (HasNoOpenedExistentials)
     return false;
 
-  auto SubsMap = Callee->getLoweredFunctionType()
-    ->getGenericSignature()->getSubstitutionMap(Subs);
-
   for (auto &BB : *Callee) {
     for (auto &I : BB) {
       if (auto PAI = dyn_cast<PartialApplyInst>(&I)) {
-        auto PAISubs = PAI->getSubstitutions();
-        if (PAISubs.empty())
+        if (!PAI->hasSubstitutions())
           continue;
 
         // Check if any of substitutions would contain open existentials
         // after inlining.
-        auto PAISubMap = PAI->getOrigCalleeType()
-          ->getGenericSignature()->getSubstitutionMap(PAISubs);
+        auto PAISubMap = PAI->getSubstitutionMap();
         PAISubMap = PAISubMap.subst(SubsMap);
         if (PAISubMap.hasOpenedExistential())
           return true;
@@ -607,7 +612,7 @@ static bool shouldSkipApplyDuringEarlyInlining(FullApplySite AI) {
   if (ASC && !ASC.canInlineEarly())
     return true;
 
-  SILFunction *Callee = AI.getReferencedFunction();
+  SILFunction *Callee = AI.getReferencedFunctionOrNull();
   if (!Callee)
     return false;
 
@@ -625,12 +630,19 @@ static bool shouldSkipApplyDuringEarlyInlining(FullApplySite AI) {
 
 /// Checks if a generic callee and caller have compatible layout constraints.
 static bool isCallerAndCalleeLayoutConstraintsCompatible(FullApplySite AI) {
-  SILFunction *Callee = AI.getReferencedFunction();
+  SILFunction *Callee = AI.getReferencedFunctionOrNull();
+  assert(Callee && "Trying to optimize a dynamic function!?");
+
   auto CalleeSig = Callee->getLoweredFunctionType()->getGenericSignature();
-  auto SubstParams = CalleeSig->getSubstitutableParams();
-  auto AISubs = AI.getSubstitutions();
-  for (auto idx : indices(SubstParams)) {
-    auto Param = SubstParams[idx];
+  auto AISubs = AI.getSubstitutionMap();
+
+  SmallVector<GenericTypeParamType *, 4> SubstParams;
+  CalleeSig->forEachParam([&](GenericTypeParamType *Param, bool Canonical) {
+    if (Canonical)
+      SubstParams.push_back(Param);
+  });
+
+  for (auto Param : SubstParams) {
     // Map the parameter into context
     auto ContextTy = Callee->mapTypeIntoContext(Param->getCanonicalType());
     auto Archetype = ContextTy->getAs<ArchetypeType>();
@@ -641,7 +653,7 @@ static bool isCallerAndCalleeLayoutConstraintsCompatible(FullApplySite AI) {
       continue;
     // The generic parameter has a layout constraint.
     // Check that the substitution has the same constraint.
-    auto AIReplacement = AISubs[idx].getReplacement();
+    auto AIReplacement = Type(Param).subst(AISubs);
     auto AIArchetype = AIReplacement->getAs<ArchetypeType>();
     if (!AIArchetype)
       return false;
@@ -654,23 +666,24 @@ static bool isCallerAndCalleeLayoutConstraintsCompatible(FullApplySite AI) {
   return true;
 }
 
-// Returns the callee of an apply_inst if it is basically inlineable.
+// Returns the callee of an apply_inst if it is basically inlinable.
 SILFunction *swift::getEligibleFunction(FullApplySite AI,
                                         InlineSelection WhatToInline) {
-  // For now, we cannot inline begin_apply at all.
-  if (isa<BeginApplyInst>(AI))
-    return nullptr;
-
-  SILFunction *Callee = AI.getReferencedFunction();
-  SILFunction *EligibleCallee = nullptr;
+  SILFunction *Callee = AI.getReferencedFunctionOrNull();
 
   if (!Callee) {
     return nullptr;
   }
-  auto ModuleName = Callee->getModule().getSwiftModule()->getName().str();
-  bool IsInStdlib = (ModuleName == STDLIB_NAME || ModuleName == SWIFT_ONONE_SUPPORT);
 
-  // Don't inline functions that are marked with the @_semantics or @effects
+  // Not all apply sites can be inlined, even if they're direct.
+  if (!SILInliner::canInlineApplySite(AI))
+    return nullptr;
+
+  ModuleDecl *SwiftModule = Callee->getModule().getSwiftModule();
+  bool IsInStdlib = (SwiftModule->isStdlibModule() ||
+                     SwiftModule->isOnoneSupportModule());
+
+  // Don't inline functions that are marked with the @_semantics or @_effects
   // attribute if the inliner is asked not to inline them.
   if (Callee->hasSemanticsAttrs() || Callee->hasEffectsKind()) {
     if (WhatToInline == InlineSelection::NoSemanticsAndGlobalInit) {
@@ -777,8 +790,7 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
     return nullptr;
   }
 
-  EligibleCallee = Callee;
-  return EligibleCallee;
+  return Callee;
 }
 
 /// Returns true if the instruction \I has any interesting side effects which
@@ -849,8 +861,8 @@ bool swift::isPureCall(FullApplySite AI, SideEffectAnalysis *SEA) {
   // If a call has only constant arguments and the call is pure, i.e. has
   // no side effects, then we should always inline it.
   // This includes arguments which are objects initialized with constant values.
-  SideEffectAnalysis::FunctionEffects ApplyEffects;
-  SEA->getEffects(ApplyEffects, AI);
+  FunctionSideEffects ApplyEffects;
+  SEA->getCalleeEffects(ApplyEffects, AI);
   auto GE = ApplyEffects.getGlobalEffects();
   if (GE.mayRead() || GE.mayWrite() || GE.mayRetain() || GE.mayRelease())
     return false;

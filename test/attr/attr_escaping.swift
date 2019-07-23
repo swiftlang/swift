@@ -5,17 +5,17 @@ func paramDeclEscaping(@escaping fn: (Int) -> Void) {} // expected-error {{attri
 
 func wrongParamType(a: @escaping Int) {} // expected-error {{@escaping attribute only applies to function types}}
 
-func conflictingAttrs(_ fn: @noescape @escaping () -> Int) {} // expected-error {{@escaping conflicts with @noescape}}
- // expected-error@-1{{@noescape is the default and has been removed}} {{29-39=}}
+func conflictingAttrs(_ fn: @noescape @escaping () -> Int) {} // expected-error {{unknown attribute 'noescape'}}
 
 func takesEscaping(_ fn: @escaping () -> Int) {} // ok
 
 func callEscapingWithNoEscape(_ fn: () -> Int) {
   // expected-note@-1{{parameter 'fn' is implicitly non-escaping}} {{37-37=@escaping }}
-  // expected-note@-2{{parameter 'fn' is implicitly non-escaping}} {{37-37=@escaping }}
 
   takesEscaping(fn) // expected-error{{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
-  let _ = fn // expected-error{{non-escaping parameter 'fn' may only be called}}
+
+  // This is a non-escaping use:
+  let _ = fn
 }
 
 typealias IntSugar = Int
@@ -39,6 +39,11 @@ struct StoresClosure {
     return [fn] // expected-error{{using non-escaping parameter 'fn' in a context expecting an @escaping closure}}
   }
 
+  func dictPack(_ fn: () -> Int) -> [String: () -> Int] {
+    // expected-note@-1{{parameter 'fn' is implicitly non-escaping}} {{23-23=@escaping }}
+    return ["ultimate answer": fn] // expected-error{{using non-escaping parameter 'fn' in a context expecting an @escaping closure}}
+  }
+
   func arrayPack(_ fn: @escaping () -> Int, _ fn2 : () -> Int) -> [() -> Int] {
     // expected-note@-1{{parameter 'fn2' is implicitly non-escaping}} {{53-53=@escaping }}
 
@@ -59,16 +64,6 @@ func takesEscapingAutoclosure(_ fn: @autoclosure @escaping () -> Int) {}
 
 func callEscapingAutoclosureWithNoEscape(_ fn: () -> Int) {
   takesEscapingAutoclosure(1+1)
-}
-func callEscapingAutoclosureWithNoEscape_2(_ fn: () -> Int) {
-  // expected-note@-1{{parameter 'fn' is implicitly non-escaping}}
-
-  takesEscapingAutoclosure(fn()) // expected-error{{closure use of non-escaping parameter 'fn' may allow it to escape}}
-}
-func callEscapingAutoclosureWithNoEscape_3(_ fn: @autoclosure () -> Int) {
-  // expected-note@-1{{parameter 'fn' is implicitly non-escaping}}
-
-  takesEscapingAutoclosure(fn()) // expected-error{{closure use of non-escaping parameter 'fn' may allow it to escape}}
 }
 
 let foo: @escaping (Int) -> Int // expected-error{{@escaping attribute may only be used in function parameter position}} {{10-20=}}
@@ -157,7 +152,8 @@ class FooClass {
   }
   var computedEscaping : (@escaping ()->Int)->Void {
     get { return stored! }
-    set(newValue) { stored = newValue } // expected-error{{cannot assign value of type '(@escaping () -> Int) -> Void' to type 'Optional<(() -> Int) -> Void>'}}
+    set(newValue) { stored = newValue } // expected-error{{assigning non-escaping parameter 'newValue' to an @escaping closure}}
+    // expected-note@-1 {{parameter 'newValue' is implicitly non-escaping}}
   }
 }
 
@@ -216,4 +212,17 @@ class HasIVarCaptures {
       x += 1 // no-error
     })()
   }
+}
+
+// https://bugs.swift.org/browse/SR-9760
+protocol SR_9760 {
+  typealias F = () -> Void
+  typealias G<T> = (T) -> Void
+  func foo<T>(_: T, _: @escaping F) // Ok
+  func bar<T>(_: @escaping G<T>) // Ok
+}
+
+extension SR_9760 {
+  func fiz<T>(_: T, _: @escaping F) {} // Ok
+  func baz<T>(_: @escaping G<T>) {} // Ok
 }

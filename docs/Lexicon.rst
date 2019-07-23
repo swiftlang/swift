@@ -3,8 +3,6 @@
 .. title:: Lexicon
 .. default-role:: term
 
-.. @raise litre.TestsAreMissing
-
 This file defines several terms used by the Swift compiler and standard library
 source code, tests, and commit messages. See also the `LLVM lexicon`_.
 
@@ -26,7 +24,7 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
       struct Foo<T> {
         var value: T
         // Foo.value has abstraction pattern <T> T
-    
+      }
       struct Bar<T, U> {
         var value: (T) -> U
         // Bar.value has abstraction pattern <T, U> (T) -> U
@@ -97,12 +95,21 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
        context. This type may contain `archetypes <archetype>` and cannot be
        used directly from outside the context. Compare with `interface type`.
 
+  customization point
+    Informal term for a protocol requirement that has a default implementation,
+    i.e. one that conforming types don't *have* to implement but have the option
+    to "customize".
+
   DI (definite initialization / definitive initialization)
     The feature that no uninitialized variables, constants, or properties will
     be read by a program, or the analysis pass that operates on SIL to
     guarantee this. This was `discussed on Apple's Swift blog`__.
 
     __ https://developer.apple.com/swift/blog/?id=28
+
+  DNM
+    "Do not merge". Placed in PR titles where discussion or analysis is still
+    ongoing.
 
   dup
     From "duplicate". As a noun, refers to another filed issue that describes
@@ -339,6 +346,10 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
 
   script mode
     The parsing mode that allows top-level imperative code in a source file.
+    
+  Sema
+    Short for 'Semantic Analysis', the compiler pass that performs type checking,
+    validation, and expression rewriting before SILGen.
 
   SIL
     "Swift Intermediate Language". A high-level IR used by the Swift compiler
@@ -397,6 +408,10 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
     overridable method in the class. Unlike an Objective-C method table,
     vtable keys are just offsets, making lookup much simpler at the cost of
     dynamism and duplicated information about *non*-overridden methods.
+
+  WIP
+    "Work-in-progress". Placed in PR titles to indicate that the PR is not ready
+    for review or merging.
 
   witness
     The value or type that satisfies a protocol requirement.

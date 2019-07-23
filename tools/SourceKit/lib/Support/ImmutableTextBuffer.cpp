@@ -83,6 +83,10 @@ ImmutableTextBufferRef ImmutableTextSnapshot::getBuffer() const {
   return EditableBuf->getBufferForSnapshot(*this);
 }
 
+size_t ImmutableTextSnapshot::getSize() const {
+  return EditableBuf->getSizeForSnapshot(*this);
+}
+
 bool ImmutableTextSnapshot::precedesOrSame(ImmutableTextSnapshotRef Other) {
   assert(Other);
 
@@ -177,7 +181,8 @@ getMemBufferFromRope(StringRef Filename, const RewriteRope &Rope) {
     Length += I.piece().size();
   }
 
-  auto MemBuf = llvm::MemoryBuffer::getNewUninitMemBuffer(Length, Filename);
+  auto MemBuf =
+    llvm::WritableMemoryBuffer::getNewUninitMemBuffer(Length, Filename);
   char *Ptr = (char*)MemBuf->getBufferStart();
   for (RewriteRope::iterator I = Rope.begin(), E = Rope.end(); I != E;
        I.MoveToNextPiece()) {
@@ -186,7 +191,7 @@ getMemBufferFromRope(StringRef Filename, const RewriteRope &Rope) {
     Ptr += Text.size();
   }
 
-  return MemBuf;
+  return std::move(MemBuf);
 }
 
 ImmutableTextBufferRef EditableTextBuffer::getBufferForSnapshot(
@@ -236,6 +241,36 @@ ImmutableTextBufferRef EditableTextBuffer::getBufferForSnapshot(
     refresh();
   }
   return ImmBuf;
+}
+
+size_t EditableTextBuffer::getSizeForSnapshot(
+    const ImmutableTextSnapshot &Snap) const {
+  if (auto Buf = dyn_cast<ImmutableTextBuffer>(Snap.DiffEnd))
+    return Buf->getText().size();
+  ImmutableTextUpdateRef Next = Snap.DiffEnd->Next;
+  // FIXME: dyn_cast_null does not work with IntrusiveRefCntPtr.
+  if (Next)
+    if (auto Buf = dyn_cast<ImmutableTextBuffer>(Next))
+      return Buf->getText().size();
+
+  ImmutableTextBufferRef StartBuf = Snap.BufferStart;
+
+  // Find the last ImmutableTextBuffer.
+  ImmutableTextUpdateRef Upd = StartBuf;
+  while (Upd != Snap.DiffEnd) {
+    Upd = Upd->Next;
+    if (auto Buf = dyn_cast<ImmutableTextBuffer>(Upd))
+      StartBuf = Buf;
+  }
+
+  size_t Length = StartBuf->getText().size();
+  Upd = StartBuf;
+  while (Upd != Snap.DiffEnd) {
+    Upd = Upd->Next;
+    auto Edit = cast<ReplaceImmutableTextUpdate>(Upd);
+    Length = Length - Edit->getLength() + Edit->getText().size();
+  }
+  return Length;
 }
 
 // This should always be called under the mutex lock.

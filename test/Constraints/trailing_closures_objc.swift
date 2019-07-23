@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify %s
+// RUN: %target-typecheck-verify-swift
 
 // REQUIRES: objc_interop
 // REQUIRES: OS=macosx
@@ -17,8 +17,6 @@ func foo(options: [AVMediaSelectionOption]) {
 func rdar28004686(a: [IndexPath]) {
   _ = a.sorted { (lhs: NSIndexPath, rhs: NSIndexPath) -> Bool in true }
   // expected-error@-1 {{'NSIndexPath' is not convertible to 'IndexPath'}}
-  // expected-error@-2 {{call can throw, but it is not marked with 'try' and the error is not handled}}
-  // The second error is erroneous: rdar://36744895
 }
 
 class Test: NSObject {

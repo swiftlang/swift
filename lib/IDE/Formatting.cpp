@@ -29,17 +29,38 @@ struct SiblingAlignInfo {
 };
 
 struct TokenInfo {
-  const Token *StartOfLineTarget;
-  const Token *StartOfLineBeforeTarget;
-  TokenInfo(const Token *StartOfLineTarget,
-            const Token *StartOfLineBeforeTarget) :
-    StartOfLineTarget(StartOfLineTarget),
-    StartOfLineBeforeTarget(StartOfLineBeforeTarget) {}
-  TokenInfo() : TokenInfo(nullptr, nullptr) {}
-  operator bool() { return StartOfLineTarget && StartOfLineBeforeTarget; }
+  // The tokens appearing at the start of lines, from the first line to the
+  // line under indentation.
+  std::vector<const Token*> LineStarts;
+  const Token *getLineStarter(unsigned idx = 0) const {
+    auto it = LineStarts.rbegin() + idx;
+    return it < LineStarts.rend() ? *it : nullptr;
+  }
+  operator bool() { return LineStarts.size() > 1; }
+  bool isRBraceDotsPattern() const {
+    for (auto It = LineStarts.rbegin(), end = LineStarts.rend();
+         It + 1 < end; ++It) {
+      auto* CurrentLine = *It;
+      auto* PreviousLine = *(It + 1);
+      if (CurrentLine->getKind() == tok::period &&
+          PreviousLine->getKind() == tok::period) {
+        // If the previous line starts with dot too, move further up.
+        continue;
+      } else if (CurrentLine->getKind() == tok::period &&
+                 PreviousLine->getKind() == tok::r_brace &&
+                 PreviousLine + 1 == CurrentLine) {
+        // Check if the previous line starts with '}' and the period of the
+        // current line is immediately after the '}'
+        return true;
+      } else {
+        return false;
+      }
+    }
+    return false;
+  }
 };
 
-typedef llvm::SmallString<64> StringBuilder;
+using StringBuilder = llvm::SmallString<64>;
 
 static SourceLoc getVarDeclInitEnd(VarDecl *VD) {
   return VD->getBracesRange().isValid()
@@ -285,10 +306,18 @@ public:
       return false;
 
     if (TInfo) {
-      if (TInfo.StartOfLineTarget->getKind() == tok::l_brace &&
-          isKeywordPossibleDeclStart(*TInfo.StartOfLineBeforeTarget) &&
-          TInfo.StartOfLineBeforeTarget->isKeyword())
+      if (TInfo.getLineStarter()->getKind() == tok::l_brace &&
+          isKeywordPossibleDeclStart(*TInfo.getLineStarter(1)) &&
+          TInfo.getLineStarter(1)->isKeyword())
         return false;
+      // VStack {
+      //   ...
+      // }
+      // .onAppear { <---- No indentation here.
+      // .onAppear1 { <---- No indentation here.
+      if (TInfo.isRBraceDotsPattern()) {
+        return false;
+      }
     }
 
     // Handle switch / case, indent unless at a case label.
@@ -341,9 +370,23 @@ public:
     //  }
     if (auto FD = dyn_cast_or_null<AccessorDecl>(Start.getAsDecl())) {
       if (FD->isGetter() && FD->getAccessorKeywordLoc().isInvalid()) {
-        if (SM.getLineNumber(FD->getBody()->getLBraceLoc()) == Line)
+        if (SM.getLineNumber(FD->getBodySourceRange().Start) == Line)
           return false;
       }
+    }
+
+    // func foo(a: Int,
+    //          b: Int
+    // ) {} <- Avoid adding indentation here
+    SourceLoc SignatureEnd;
+    if (auto *AFD = dyn_cast_or_null<AbstractFunctionDecl>(Cursor->getAsDecl())) {
+      SignatureEnd = AFD->getSignatureSourceRange().End;
+    } else if (auto *SD = dyn_cast_or_null<SubscriptDecl>(Cursor->getAsDecl())) {
+      SignatureEnd = SD->getSignatureSourceRange().End;
+    }
+    if (SignatureEnd.isValid() && TInfo &&
+        TInfo.getLineStarter()->getLoc() == SignatureEnd) {
+      return false;
     }
 
     // If we're at the beginning of a brace on a separate line in the context
@@ -456,7 +499,9 @@ public:
     auto AtCursorExpr = Cursor->getAsExpr();
     if (AtExprEnd && AtCursorExpr && (isa<ParenExpr>(AtCursorExpr) ||
                                       isa<TupleExpr>(AtCursorExpr))) {
-      if (isa<CallExpr>(AtExprEnd)) {
+      if (isa<CallExpr>(AtExprEnd) ||
+          isa<ArrayExpr>(AtExprEnd) ||
+          isa<DictionaryExpr>(AtExprEnd)) {
         if (exprEndAtLine(AtExprEnd, Line) &&
             exprEndAtLine(AtCursorExpr, Line)) {
           return false;
@@ -479,13 +524,32 @@ public:
       }
     }
 
+    // Chained trailing closures shouldn't require additional indentation.
+    // a.map {
+    //  ...
+    // }.filter { <--- No indentation here.
+    //  ...
+    // }.map { <--- No indentation here.
+    //  ...
+    // }
+    if (AtExprEnd && AtCursorExpr &&
+        (isa<CallExpr>(AtExprEnd) || isa<SubscriptExpr>(AtExprEnd))) {
+      if (auto *UDE = dyn_cast<UnresolvedDotExpr>(AtCursorExpr)) {
+        if (auto *Base = UDE->getBase()) {
+          if (exprEndAtLine(Base, Line))
+            return false;
+        }
+      }
+    }
+
+
     // Indent another level from the outer context by default.
     return true;
   }
 };
 
 class FormatWalker : public SourceEntityWalker {
-  typedef ArrayRef<Token>::iterator TokenIt;
+  using TokenIt = ArrayRef<Token>::iterator;
   class SiblingCollector {
     SourceLoc FoundSibling;
     SourceManager &SM;
@@ -575,8 +639,12 @@ class FormatWalker : public SourceEntityWalker {
       };
 
       if (auto AE = dyn_cast_or_null<ApplyExpr>(Node.dyn_cast<Expr *>())) {
-        collect(AE->getArg());
-        return;
+        // PrefixUnaryExpr shouldn't be syntactically considered as a function call
+        // for sibling alignment.
+        if (!isa<PrefixUnaryExpr>(AE)) {
+          collect(AE->getArg());
+          return;
+        }
       }
 
       if (auto PE = dyn_cast_or_null<ParenExpr>(Node.dyn_cast<Expr *>())) {
@@ -601,12 +669,9 @@ class FormatWalker : public SourceEntityWalker {
 
       if (auto AFD = dyn_cast_or_null<AbstractFunctionDecl>(Node.dyn_cast<Decl*>())) {
         // Function parameters are siblings.
-        for (auto P : AFD->getParameterLists()) {
-          for (ParamDecl* param : *P) {
-            if (!param->isSelfParameter())
-              addPair(param->getEndLoc(), FindAlignLoc(param->getStartLoc()),
-                      tok::comma);
-          }
+        for (auto *param : *AFD->getParameters()) {
+          addPair(param->getEndLoc(), FindAlignLoc(param->getStartLoc()),
+                  tok::comma);
         }
       }
 
@@ -668,7 +733,7 @@ class FormatWalker : public SourceEntityWalker {
   SiblingCollector SCollector;
 
   /// Sometimes, target is a part of "parent", for instance, "#else" is a part
-  /// of an ifconfigstmt, so that ifconfigstmt is not really the parent of "#else".
+  /// of an IfConfigDecl, so that IfConfigDecl is not really the parent of "#else".
   bool isTargetPartOf(swift::ASTWalker::ParentTy Parent) {
     if (auto Conf = dyn_cast_or_null<IfConfigDecl>(Parent.getAsDecl())) {
       for (auto Clause : Conf->getClauses()) {
@@ -816,7 +881,9 @@ public:
                                            StringRef Text, TokenInfo ToInfo) {
 
     // If having sibling locs to align with, respect siblings.
-    if (FC.HasSibling()) {
+    auto isClosingSquare =
+      ToInfo && ToInfo.getLineStarter()->getKind() == tok::r_square;
+    if (!isClosingSquare && FC.HasSibling()) {
       StringRef Line = swift::ide::getTextForLine(LineIndex, Text, /*Trim*/true);
       StringBuilder Builder;
       FC.padToSiblingColumn(Builder, FmtOptions);
@@ -843,6 +910,9 @@ public:
     auto AddIndentFunc = [&] () {
       auto Width = FmtOptions.UseTabs ? FmtOptions.TabWidth
                                       : FmtOptions.IndentWidth;
+      // We don't need to add additional indentation if Width is zero.
+      if (!Width)
+        return;
       // Increment indent.
       ExpandedIndent += Width;
       // Normalize indent to align on proper column indent width.
@@ -890,33 +960,37 @@ class TokenInfoCollector {
   SourceManager &SM;
   ArrayRef<Token> Tokens;
   unsigned Line;
-
-  struct Comparator {
-    SourceManager &SM;
-    Comparator(SourceManager &SM) : SM(SM) {}
-    bool operator()(const Token &T, unsigned Line) const {
-      return SM.getLineNumber(T.getLoc()) < Line;
-    }
-    bool operator()(unsigned Line, const Token &T) const {
-      return Line < SM.getLineNumber(T.getLoc());
-    }
-  };
-
+  // The location of the end of the line under indentation, we don't need to
+  // collect tokens after this location.
+  SourceLoc EndLimit;
 public:
-  TokenInfoCollector(SourceManager &SM, ArrayRef<Token> Tokens,
-         unsigned Line) : SM(SM), Tokens(Tokens), Line(Line) {}
+  TokenInfoCollector(SourceManager &SM,
+                     unsigned BufferId,
+                     ArrayRef<Token> Tokens, unsigned Line):
+                     SM(SM), Tokens(Tokens), Line(Line) {
+    if (auto Offset = SM.resolveOffsetForEndOfLine(BufferId, Line)) {
+      EndLimit = SM.getLocForOffset(BufferId, *Offset);
+    }
+  }
 
   TokenInfo collect() {
-    if (Line == 0)
+    if (EndLimit.isInvalid()) {
       return TokenInfo();
-    Comparator Comp(SM);
-    auto LineMatch = [this] (const Token* T, unsigned Line) {
-      return T != Tokens.end() && SM.getLineNumber(T->getLoc()) == Line;
-    };
-    auto TargetIt = std::lower_bound(Tokens.begin(), Tokens.end(), Line, Comp);
-    auto LineBefore = std::lower_bound(Tokens.begin(), TargetIt, Line - 1, Comp);
-    if (LineMatch(TargetIt, Line) && LineMatch(LineBefore, Line - 1))
-      return TokenInfo(TargetIt, LineBefore);
+    }
+    TokenInfo Result;
+    for(auto &T: Tokens) {
+      if (!T.isAtStartOfLine())
+        continue;
+      if (SM.isBeforeInBuffer(EndLimit, T.getLoc())) {
+        if (!Result.LineStarts.empty()) {
+          if (SM.getLineNumber(Result.getLineStarter()->getLoc()) == Line) {
+            return Result;
+          }
+        }
+        return TokenInfo();
+      }
+      Result.LineStarts.push_back(&T);
+    }
     return TokenInfo();
   }
 };
@@ -982,6 +1056,15 @@ std::pair<LineRange, std::string> swift::ide::reformat(LineRange Range,
                                                        CodeFormatOptions Options,
                                                        SourceManager &SM,
                                                        SourceFile &SF) {
+  // Sanitize 0-width tab
+  if (Options.UseTabs && !Options.TabWidth) {
+    // If IndentWidth is specified, use it as the tab width.
+    if (Options.IndentWidth)
+      Options.TabWidth = Options.IndentWidth;
+    // Otherwise, use the default value,
+    else
+      Options.TabWidth = 4;
+  }
   FormatWalker walker(SF, SM);
   auto SourceBufferID = SF.getBufferID().getValue();
   StringRef Text = SM.getLLVMSourceMgr()
@@ -992,7 +1075,8 @@ std::pair<LineRange, std::string> swift::ide::reformat(LineRange Range,
   FormatContext FC = walker.walkToLocation(Loc);
   CodeFormatter CF(Options);
   unsigned Line = Range.startLine();
-  return CF.indent(Line, FC, Text, TokenInfoCollector(SM, walker.getTokens(),
+  return CF.indent(Line, FC, Text, TokenInfoCollector(SM, SourceBufferID,
+                                                      walker.getTokens(),
                                                       Line).collect());
 }
 

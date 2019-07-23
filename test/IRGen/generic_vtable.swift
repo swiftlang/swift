@@ -1,8 +1,6 @@
-// RUN: rm -rf %t && mkdir -p %t
-// RUN: %utils/chex.py < %s > %t/generic_vtable.swift
-// RUN: %target-swift-frontend %t/generic_vtable.swift -emit-ir | %FileCheck %t/generic_vtable.swift --check-prefix=CHECK
-
-// REQUIRES: CPU=x86_64
+// RUN: %empty-directory(%t)
+// RUN: %{python} %utils/chex.py < %s > %t/generic_vtable.swift
+// RUN: %target-swift-frontend %t/generic_vtable.swift -emit-ir | %FileCheck %t/generic_vtable.swift --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize -DINT=i%target-ptrsize -check-prefix CHECK-%target-import-type -check-prefix CHECK-%target-abi
 
 public class Base {
   public func m1() {}
@@ -20,122 +18,162 @@ public class Concrete : Derived<Int> {
 }
 
 
-//// Nominal type descriptor for 'Base' does not have any method descriptors.
+//// Nominal type descriptor for 'Base' with method descriptors.
 
-// CHECK-LABEL: @"$S14generic_vtable4BaseCMn" = {{(protected )?}}constant
+// CHECK-LABEL: @"$s14generic_vtable4BaseCMn" = {{(dllexport )?}}{{(protected )?}}constant
 // -- flags: has vtable, is class, is unique
-// CHECK-SAME: <i32 0x8000_0050>,
+// CHECK-DIRECT-SAME: <i32 0x8000_0050>,
+// CHECK-INDIRECT-SAME: <i32 0x8001_0050>,
 // -- vtable offset
-// CHECK-SAME: i32 10,
+// CHECK-32-SAME: i32 16,
+// CHECK-64-SAME: i32 10,
 // -- vtable size
-// CHECK-SAME: i32 3
-// -- no method descriptors -- class is fully concrete
+// CHECK-SAME: i32 3,
+// -- vtable entry for m1()
+// CHECK-SAME: void (%T14generic_vtable4BaseC*)* @"$s14generic_vtable4BaseC2m1yyF"
+// -- vtable entry for m2()
+// CHECK-SAME: void (%T14generic_vtable4BaseC*)* @"$s14generic_vtable4BaseC2m2yyF"
+// --
 // CHECK-SAME: section "{{.*}}", align 4
 
 //// Type metadata for 'Base' has a static vtable.
 
-// CHECK-LABEL: @"$S14generic_vtable4BaseCMf" = internal global
+// CHECK-LABEL: @"$s14generic_vtable4BaseCMf" = internal global
+// -- destructor
+// CHECK-SAME: void (%T14generic_vtable4BaseC*)* @"$s14generic_vtable4BaseCfD"
+// -- value witness table
+// CHECK-SAME: i8** {{@"\$sBoWV"|null}}
 // -- vtable entry for 'm1()'
-// CHECK-SAME: void (%T14generic_vtable4BaseC*)* @"$S14generic_vtable4BaseC2m1yyF"
+// CHECK-SAME: void (%T14generic_vtable4BaseC*)* @"$s14generic_vtable4BaseC2m1yyF"
 // -- vtable entry for 'm2()'
-// CHECK-SAME: void (%T14generic_vtable4BaseC*)* @"$S14generic_vtable4BaseC2m2yyF"
+// CHECK-SAME: void (%T14generic_vtable4BaseC*)* @"$s14generic_vtable4BaseC2m2yyF"
 // -- vtable entry for 'init()'
-// CHECK-SAME: %T14generic_vtable4BaseC* (%T14generic_vtable4BaseC*)* @"$S14generic_vtable4BaseCACycfc"
+// CHECK-SAME: %T14generic_vtable4BaseC* (%swift.type*)* @"$s14generic_vtable4BaseCACycfC"
 // --
-// CHECK-SAME: , align 8
+// CHECK-SAME: , align
 
 
-//// Nominal type descriptor for 'Derived' has method descriptors.
+//// Nominal type descriptor for 'Derived' with method descriptors.
 
-// CHECK-LABEL: @"$S14generic_vtable7DerivedCMn" = {{(protected )?}}constant
-// -- flags: has vtable, is class, is unique, is generic
-// CHECK-SAME: <i32 0x8000_00D0>,
+// CHECK-LABEL: @"$s14generic_vtable7DerivedCMn" = {{(dllexport )?}}{{(protected )?}}constant
+// -- flags: has vtable, has override table, is class, is unique, is generic
+// CHECK-SAME: <i32 0xC000_00D0>,
 // -- vtable offset
-// CHECK-SAME: i32 14,
+// CHECK-32-SAME: i32 17,
+// CHECK-64-SAME: i32 14,
 // -- vtable size
 // CHECK-SAME: i32 1,
 // -- vtable entry for m3()
-// CHECK-SAME: void (%T14generic_vtable7DerivedC*)* @"$S14generic_vtable7DerivedC2m3yyF"
-// --
+// CHECK-SAME: void (%T14generic_vtable7DerivedC*)* @"$s14generic_vtable7DerivedC2m3yyF"
+// -- override table size
+// CHECK-SAME: i32 2,
+// -- override for m2()
+// CHECK-SAME: @"$s14generic_vtable4BaseCMn"
+// CHECK-SYSV-SAME: @"$s14generic_vtable4BaseCMn", i32 0, i32 14
+// CHECK-WIN-SAME: @"$s14generic_vtable4BaseCMn", i32 0, i32 17
+// CHECK-SAME: @"$s14generic_vtable7DerivedC2m2yyF"
+// -- override for constructor
+// CHECK-SAME: @"$s14generic_vtable4BaseCMn"
+// CHECK-SYSV-SAME: @"$s14generic_vtable4BaseCMn", i32 0, i32 15
+// CHECK-WIN-SAME: @"$s14generic_vtable4BaseCMn", i32 0, i32 18
+// CHECK-SAME: @"$s14generic_vtable7DerivedCACyxGycfC"
 // CHECK-SAME: section "{{.*}}", align 4
 
 //// Type metadata pattern for 'Derived' has an empty vtable, filled in at
 //// instantiation time.
 
-// CHECK-LABEL: @"$S14generic_vtable7DerivedCMP" = internal global <{{.*}}> <{
-// -- nominal type descriptor
-// CHECK-SAME: @"$S14generic_vtable7DerivedCMn",
+// CHECK-LABEL: @"$s14generic_vtable7DerivedCMP" = internal constant <{{.*}}> <{
 // -- ivar destroyer
-// CHECK-SAME: i8* null
+// CHECK-SAME: i32 0
 // --
-// CHECK-SAME: }>, align 8
+// CHECK-SAME: }>, align
 
 
-//// Nominal type descriptor for 'Concrete' has method descriptors.
+//// Nominal type descriptor for 'Concrete' with method descriptors.
 
-// CHECK-LABEL: @"$S14generic_vtable8ConcreteCMn" = {{(protected )?}}constant
-// -- flags: has vtable, is class, is unique
-// CHECK-SAME: <i32 0x8000_0050>,
+// CHECK-LABEL: @"$s14generic_vtable8ConcreteCMn" = {{(dllexport )?}}{{(protected )?}}constant
+// -- flags: has vtable, has override table, in-place initialization, is class, is unique
+// CHECK-SAME: <i32 0xC001_0050>,
 // -- vtable offset
-// CHECK-SAME: i32 15,
+// CHECK-32-SAME: i32 19,
+// CHECK-64-SAME: i32 15,
 // -- vtable size
 // CHECK-SAME: i32 1,
 // -- vtable entry for m4()
-// CHECK-SAME: void (%T14generic_vtable8ConcreteC*)* @"$S14generic_vtable8ConcreteC2m4yyF"
+// CHECK-SAME: void (%T14generic_vtable8ConcreteC*)* @"$s14generic_vtable8ConcreteC2m4yyF"
+// -- override table size
+// CHECK-SAME: i32 2,
+// -- override for m3()
+// CHECK-SAME: @"$s14generic_vtable7DerivedCMn"
+// CHECK-SAME: @"$s14generic_vtable7DerivedCMn", i32 0, i32 23
+// CHECK-SAME: @"$s14generic_vtable8ConcreteC2m3yyF"
+// -- override for constructor
+// CHECK-SAME: @"$s14generic_vtable4BaseCMn"
+// CHECK-SYSV-SAME: @"$s14generic_vtable4BaseCMn", i32 0, i32 15
+// CHECK-WIN-SAME: @"$s14generic_vtable4BaseCMn", i32 0, i32 18
+// CHECK-SAME: @"$s14generic_vtable8ConcreteCACycfC"
 // --
 // CHECK-SAME: section "{{.*}}", align 4
 
-//// Type metadata for 'Concrete' does not have any vtable entries; the vtable is
-//// filled in at initialization time.
+//// Type metadata for 'Concrete' has a static vtable.
 
-// CHECK-LABEL: @"$S14generic_vtable8ConcreteCMf" = internal global <{{.*}}> <{
+// CHECK-LABEL: @"$s14generic_vtable8ConcreteCMf" = internal global <{{.*}}> <{
+// -- destructor
+// CHECK-SAME: void (%T14generic_vtable8ConcreteC*)* @"$s14generic_vtable8ConcreteCfD",
+// -- value witness table is filled in at runtime
+// CHECK-SAME: i8** null,
 // -- nominal type descriptor
-// CHECK-SAME: @"$S14generic_vtable8ConcreteCMn",
-// -- ivar destroyer
-// CHECK-SAME: i8* null
+// CHECK-SAME: @"$s14generic_vtable8ConcreteCMn",
+// -- vtable entry for 'm1()'
+// CHECK-SAME: void (%T14generic_vtable4BaseC*)* @"$s14generic_vtable4BaseC2m1yyF"
+// -- vtable entry for 'm2()'
+// CHECK-SAME: void (%T14generic_vtable7DerivedC*)* @"$s14generic_vtable7DerivedC2m2yyF"
+// -- vtable entry for 'init()'
+// CHECK-SAME: %T14generic_vtable8ConcreteC* (%swift.type*)* @"$s14generic_vtable8ConcreteCACycfC"
+// -- vtable entry for 'm3()'
+// CHECK-SAME: void (%T14generic_vtable8ConcreteC*)* @"$s14generic_vtable8ConcreteC2m3yyF"
+// -- vtable entry for 'm4()'
+// CHECK-SAME: void (%T14generic_vtable8ConcreteC*)* @"$s14generic_vtable8ConcreteC2m4yyF"
 // --
-// CHECK-SAME: }>, align 8
+// CHECK-SAME: }>, align
+
+
+//// Method descriptors
+
+// CHECK-LABEL: @"$s14generic_vtable4BaseC2m1yyFTq" ={{( dllexport)?}}{{( protected)?}} alias %swift.method_descriptor, getelementptr inbounds (<{{.*}}>* @"$s14generic_vtable4BaseCMn", i32 0, i32 {{(13|16)}})
+// CHECK-LABEL: @"$s14generic_vtable4BaseC2m2yyFTq" ={{( dllexport)?}}{{( protected)?}} alias %swift.method_descriptor, getelementptr inbounds (<{{.*}}* @"$s14generic_vtable4BaseCMn", i32 0, i32 {{(14|17)}})
+// CHECK-LABEL: @"$s14generic_vtable4BaseCACycfCTq" = hidden alias %swift.method_descriptor, getelementptr inbounds (<{{.*}}* @"$s14generic_vtable4BaseCMn", i32 0, i32 {{(15|18)}})
+
+// CHECK-LABEL: @"$s14generic_vtable7DerivedC2m3yyFTq" ={{( dllexport)?}}{{( protected)?}} alias %swift.method_descriptor, getelementptr inbounds (<{{.*}}>* @"$s14generic_vtable7DerivedCMn", i32 0, i32 23)
+
+// CHECK-LABEL: @"$s14generic_vtable8ConcreteC2m4yyFTq" ={{( dllexport)?}}{{( protected)?}} alias %swift.method_descriptor, getelementptr inbounds (<{{.*}}>* @"$s14generic_vtable8ConcreteCMn", i32 0, i32 16)
 
 
 //// Metadata initialization function for 'Derived' copies superclass vtable
 //// and installs overrides for 'm2()' and 'init()'.
 
-// CHECK-LABEL: define private %swift.type* @create_generic_metadata_Derived(%swift.type_pattern*, i8**)
+// CHECK-LABEL: define internal %swift.type* @"$s14generic_vtable7DerivedCMi"(%swift.type_descriptor*, i8**, i8*)
 
 // - 2 immediate members:
 //   - type metadata for generic parameter T,
 //   - and vtable entry for 'm3()'
-// CHECK: [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_pattern* %0, i8** %1, {{.*}}, i64 2)
-
-// CHECK: call void @swift_initClassMetadata_UniversalStrategy(%swift.type* [[METADATA]], i64 0, {{.*}})
-
-// -- method override for 'm2()'
-// CHECK: [[WORDS:%.*]] = bitcast %swift.type* [[METADATA]] to i8**
-// CHECK: [[VTABLE0:%.*]] = getelementptr inbounds i8*, i8** [[WORDS]], i64 11
-// CHECK: store i8* bitcast (void (%T14generic_vtable7DerivedC*)* @"$S14generic_vtable7DerivedC2m2yyF" to i8*), i8** [[VTABLE0]], align 8
-
-// -- method override for 'init()'
-// CHECK: [[WORDS:%.*]] = bitcast %swift.type* [[METADATA]] to i8**
-// CHECK: [[VTABLE1:%.*]] = getelementptr inbounds i8*, i8** [[WORDS]], i64 12
-// CHECK: store i8* bitcast (%T14generic_vtable7DerivedC* (%T14generic_vtable7DerivedC*)* @"$S14generic_vtable7DerivedCACyxGycfc" to i8*), i8** [[VTABLE1]], align 8
-
+// CHECK: [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_descriptor* %0, i8** %1, i8* %2)
 // CHECK: ret %swift.type* [[METADATA]]
 
+// CHECK-LABEL: define internal swiftcc %swift.metadata_response @"$s14generic_vtable7DerivedCMr"
+// CHECK-SAME:    (%swift.type* [[METADATA:%.*]], i8*, i8**) {{.*}} {
+// CHECK: call swiftcc %swift.metadata_response @swift_initClassMetadata2(%swift.type* [[METADATA]], [[INT]] 0, {{.*}})
 
-//// Metadata initialization function for 'Concrete' copies superclass vtable
-//// and installs overrides for 'init()' and 'm3()'.
+// CHECK: ret %swift.metadata_response
 
-// CHECK-LABEL: define private void @initialize_metadata_Concrete(i8*)
-// CHECK: [[SUPERCLASS:%.*]] = call %swift.type* @"$S14generic_vtable7DerivedCySiGMa"()
-// CHECK: store %swift.type* [[SUPERCLASS]], %swift.type** getelementptr inbounds {{.*}} @"$S14generic_vtable8ConcreteCMf"
-// CHECK: [[METADATA:%.*]] = call %swift.type* @swift_relocateClassMetadata({{.*}}, i64 96, i64 1)
-// CHECK: call void @swift_initClassMetadata_UniversalStrategy(%swift.type* [[METADATA]], i64 0, {{.*}})
 
-// -- method override for 'init()'
-// CHECK: store i8* bitcast (%T14generic_vtable8ConcreteC* (%T14generic_vtable8ConcreteC*)* @"$S14generic_vtable8ConcreteCACycfc" to i8*), i8**
+// CHECK-LABEL: define {{(dllexport )?}}{{(protected )?}}swiftcc %swift.metadata_response @"$s14generic_vtable8ConcreteCMa"
+// CHECK: call swiftcc %swift.metadata_response @swift_getSingletonMetadata([[INT]] %0, %swift.type_descriptor* bitcast ({{.*}} @"$s14generic_vtable8ConcreteCMn" to {{.*}}))
+// CHECK: ret
 
-// -- method override for 'm3()'
-// CHECK: store i8* bitcast (void (%T14generic_vtable8ConcreteC*)* @"$S14generic_vtable8ConcreteC2m3yyF" to i8*), i8**
+//// Metadata response function for 'Concrete' is fairly simple.
 
-// CHECK: store atomic %swift.type* [[METADATA]], %swift.type** @"$S14generic_vtable8ConcreteCML" release, align 8
-// CHECK: ret void
+// CHECK-LABEL: define internal swiftcc %swift.metadata_response @"$s14generic_vtable8ConcreteCMr"(%swift.type*, i8*, i8**)
+// -- ClassLayoutFlags is 256 / 0x100, HasStaticVTable
+// CHECK: call swiftcc %swift.metadata_response @swift_initClassMetadata2(%swift.type* %0, [[INT]] 256, {{.*}})
+// CHECK: ret %swift.metadata_response

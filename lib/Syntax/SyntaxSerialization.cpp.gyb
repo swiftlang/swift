@@ -1,0 +1,64 @@
+%{
+  from gyb_syntax_support import *
+  # Ignore the following admonition; it applies to the resulting .cpp file only
+}%
+//// Automatically Generated From SyntaxSerialization.cpp.gyb.
+//// Do Not Edit Directly!
+//===---------------------- SytnaxSerialization.cpp -----------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+#include "swift/Syntax/Serialization/SyntaxSerialization.h"
+
+namespace swift {
+namespace byteTree {
+void ObjectTraits<ArrayRef<RC<syntax::RawSyntax>>>::write(
+    ByteTreeWriter &Writer, const ArrayRef<RC<syntax::RawSyntax>> &Layout,
+    UserInfoMap &UserInfo) {
+  for (unsigned I = 0, E = Layout.size(); I < E; ++I) {
+    if (Layout[I]) {
+      Writer.write(*Layout[I], /*Index=*/I);
+    } else {
+      Writer.write(llvm::None, /*Index=*/I);
+    }
+  }
+}
+
+uint8_t WrapperTypeTraits<tok>::numericValue(const tok &Value) {
+  switch (Value) {
+    case tok::eof: return 0;
+
+% for token in SYNTAX_TOKENS:
+    case tok::${token.kind}: return ${token.serialization_code};
+% end
+  
+    case tok::kw_undef:
+    case tok::kw_sil:
+    case tok::kw_sil_stage:
+    case tok::kw_sil_property:
+    case tok::kw_sil_vtable:
+    case tok::kw_sil_global:
+    case tok::kw_sil_witness_table:
+    case tok::kw_sil_default_witness_table:
+    case tok::kw_sil_coverage_map:
+    case tok::kw_sil_scope:
+    case tok::sil_dollar:
+    case tok::sil_exclamation:
+    case tok::code_complete:
+    case tok::sil_local_name:
+    case tok::comment:
+    case tok::NUM_TOKENS:
+      llvm_unreachable("Should not get serialized in a syntax tree");
+  }
+  llvm_unreachable("unhandled token");
+}
+} // namespace byteTree
+} // namespace swift

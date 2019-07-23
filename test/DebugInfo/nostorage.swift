@@ -15,7 +15,7 @@ public class Foo {
       // CHECK1-SAME:                         type: ![[METAFOO:[0-9]+]]
       // CHECK1: ![[METAFOO]] = !DICompositeType(tag: DW_TAG_structure_type,
       // CHECK1-SAME:                            flags:
-            let type = type(of: self)
+            let type = Swift.type(of: self)
             used(type)
         }()
     }
@@ -25,8 +25,8 @@ struct AStruct {}
 
 // CHECK2: define{{.*}}app
 public func app() {
-  // No members? No storage! Emitted as a constant 0, because.
-  // CHECK2: call void @llvm.dbg.value(metadata i{{.*}} 0,
+  // No members? No storage!
+  // CHECK2: call void @llvm.dbg.value(metadata {{.*}}* undef,
   // CHECK2-SAME:                      metadata ![[AT:.*]], metadata
   // CHECK2: ![[AT]] = !DILocalVariable(name: "at",{{.*}}line: [[@LINE+1]]
   var at = AStruct()

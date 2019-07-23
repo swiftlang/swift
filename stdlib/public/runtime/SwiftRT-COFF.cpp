@@ -27,10 +27,12 @@
 #define DECLARE_SWIFT_SECTION(name)                                            \
   PRAGMA(section("." #name "$A", long, read))                                  \
   __declspec(allocate("." #name "$A"))                                         \
+  __declspec(align(1))                                                         \
   static uintptr_t __start_##name = 0;                                         \
                                                                                \
   PRAGMA(section("." #name "$C", long, read))                                  \
   __declspec(allocate("." #name "$C"))                                         \
+  __declspec(align(1))                                                         \
   static uintptr_t __stop_##name = 0;
 
 extern "C" {
@@ -42,6 +44,8 @@ DECLARE_SWIFT_SECTION(sw5tyrf)
 DECLARE_SWIFT_SECTION(sw5rfst)
 DECLARE_SWIFT_SECTION(sw5flmd)
 DECLARE_SWIFT_SECTION(sw5asty)
+DECLARE_SWIFT_SECTION(sw5repl)
+DECLARE_SWIFT_SECTION(sw5reps)
 }
 
 namespace {
@@ -68,6 +72,8 @@ static void swift_image_constructor() {
       SWIFT_SECTION_RANGE(sw5rfst),
       SWIFT_SECTION_RANGE(sw5flmd),
       SWIFT_SECTION_RANGE(sw5asty),
+      SWIFT_SECTION_RANGE(sw5repl),
+      SWIFT_SECTION_RANGE(sw5reps),
   };
 
 #undef SWIFT_SECTION_RANGE

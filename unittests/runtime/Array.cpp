@@ -20,7 +20,8 @@
 using namespace swift;
 
 namespace swift {
-  void installCommonValueWitnesses(ValueWitnessTable *vwtable);
+  void installCommonValueWitnesses(const TypeLayout &layout,
+                                   ValueWitnessTable *vwtable);
 } // namespace swift
 
 
@@ -33,7 +34,7 @@ static void initialize_pod_witness_table_size_uint32_t_stride_uint64_t(
     .withBitwiseTakable(true)
     .withInlineStorage(true);
   testTable.stride = sizeof(uint64_t);
-  installCommonValueWitnesses(&testTable);
+  installCommonValueWitnesses(*testTable.getTypeLayout(), &testTable);
 }
 
 extern "C" void swift_arrayInitWithCopy(OpaqueValue *dest,
@@ -80,8 +81,7 @@ static SWIFT_CC(swift) void destroyTestObject(SWIFT_CONTEXT HeapObject *_object)
 
 static const FullMetadata<ClassMetadata> TestClassObjectMetadata = {
   { { &destroyTestObject }, { &VALUE_WITNESS_SYM(Bo) } },
-  { { { MetadataKind::Class } }, 0, SWIFT_CLASS_IS_SWIFT_MASK,
-  ClassFlags::UsesSwiftRefcounting, 0, 0, 0, 0, 0, 0 }
+  { { nullptr }, ClassFlags::UsesSwiftRefcounting, 0, 0, 0, 0, 0, 0 }
 };
 
 /// Create an object that, when deallocated, stores the given value to

@@ -83,9 +83,12 @@ struct SerializedSwiftName {
       return Name;
     case DeclBaseName::Kind::Subscript:
       return "subscript";
+    case DeclBaseName::Kind::Constructor:
+      return "init";
     case DeclBaseName::Kind::Destructor:
       return "deinit";
     }
+    llvm_unreachable("unhandled kind");
   }
 
   bool operator<(SerializedSwiftName RHS) const {
@@ -193,6 +196,8 @@ public:
       DC = omDecl->getCanonicalDecl();
     } else if (auto fDecl = dyn_cast<clang::FunctionDecl>(dc)) {
       DC = fDecl->getCanonicalDecl();
+    } else if (auto nsDecl = dyn_cast<clang::NamespaceDecl>(dc)) {
+      DC = nsDecl->getCanonicalDecl();
     } else {
       assert(isa<clang::TranslationUnitDecl>(dc) ||
              isa<clang::ObjCContainerDecl>(dc) &&
@@ -253,6 +258,7 @@ public:
     case UnresolvedContext:
       return getUnresolvedName() == other.getUnresolvedName();
     }
+    llvm_unreachable("unhandled kind");
   }
 };
 

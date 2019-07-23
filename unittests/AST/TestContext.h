@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/ASTScope.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/Module.h"
 #include "swift/Basic/LangOptions.h"
@@ -46,7 +45,7 @@ class TestContext : public TestContextBase {
   SourceFile *FileForLookups;
 
 public:
-  ASTContext Ctx;
+  ASTContext &Ctx;
 
   TestContext(ShouldDeclareOptionalTypes optionals = DoNotDeclareOptionalTypes);
 

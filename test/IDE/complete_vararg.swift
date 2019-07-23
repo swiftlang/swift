@@ -54,10 +54,10 @@ func testFreeFunc() {
   freeFunc2(#^FREE_FUNC_2^#
 }
 // FREE_FUNC_1: Begin completions, 1 items
-// FREE_FUNC_1: Pattern/CurrModule:               ['(']{#x: Int...#}[')'][#Void#]{{; name=.+$}}
+// FREE_FUNC_1: Decl[FreeFunction]/CurrModule: ['(']{#x: Int...#}[')'][#Void#]{{; name=.+$}}
 // FREE_FUNC_1: End completions
 // FREE_FUNC_2: Begin completions, 1 items
-// FREE_FUNC_2: Pattern/CurrModule:               ['(']{#x: Int#}, {#y: Int...#}[')'][#Void#]{{; name=.+$}}
+// FREE_FUNC_2: Decl[FreeFunction]/CurrModule: ['(']{#x: Int#}, {#y: Int...#}[')'][#Void#]{{; name=.+$}}
 // FREE_FUNC_2: End completions
 
 func testInit() {
@@ -72,24 +72,24 @@ func testMethod() {
   obj.method2(#^METHOD_2^#
 }
 // METHOD_1: Begin completions, 1 items
-// METHOD_1: Pattern/CurrModule:               ['(']{#x: Int...#}[')'][#Void#]{{; name=.+$}}
+// METHOD_1: Decl[InstanceMethod]/CurrNominal: ['(']{#x: Int...#}[')'][#Void#]{{; name=.+$}}
 // METHOD_1: End completions
 // METHOD_2: Begin completions, 1 items
-// METHOD_2: Pattern/CurrModule:               ['(']{#x: Int#}, {#y: Int...#}[')'][#Void#]{{; name=.+$}}
+// METHOD_2: Decl[InstanceMethod]/CurrNominal: ['(']{#x: Int#}, {#y: Int...#}[')'][#Void#]{{; name=.+$}}
 // METHOD_2: End completions
 
 func testSubscript() {
   obj#^SUBSCRIPT_1^#
 }
 // SUBSCRIPT_1: Begin completions
-// SUBSCRIPT_1: Decl[Subscript]/CurrNominal:        [{#Int...#}][#Int#]{{; name=.+$}}
+// SUBSCRIPT_1: Decl[Subscript]/CurrNominal:        [{#(i): Int...#}][#Int#]{{; name=.+$}}
 // SUBSCRIPT_1: End completions
 
 func testGenericFreeFunc() {
   genericFreeFunc1(#^GENERIC_FREE_FUNC_1^#
 }
 // GENERIC_FREE_FUNC_1: Begin completions, 1 items
-// GENERIC_FREE_FUNC_1: Pattern/CurrModule:               ['(']{#t: _...#}[')'][#Void#]{{; name=.+$}}
+// GENERIC_FREE_FUNC_1: Decl[FreeFunction]/CurrModule: ['(']{#t: _...#}[')'][#Void#]{{; name=.+$}}
 // GENERIC_FREE_FUNC_1: End completions
 
 
@@ -97,5 +97,5 @@ func testInterestingType() {
   interestingType1(#^INTERESTING_TYPE_1^#
 }
 // INTERESTING_TYPE_1: Begin completions, 1 items
-// INTERESTING_TYPE_1: Pattern/CurrModule:               ['(']{#x: (Int, (Int, String))...#}[')'][#Void#]{{; name=.+$}}
+// INTERESTING_TYPE_1: Decl[FreeFunction]/CurrModule: ['(']{#x: (Int, (Int, String))...#}[')'][#Void#]{{; name=.+$}}
 // INTERESTING_TYPE_1: End completions

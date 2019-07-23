@@ -107,8 +107,7 @@ namespace {
   template <class Impl, class Base, class FieldInfoType = StructFieldInfo>
   class StructTypeInfoBase :
      public RecordTypeInfo<Impl, Base, FieldInfoType> {
-    typedef RecordTypeInfo<Impl, Base, FieldInfoType> super;
-
+    using super = RecordTypeInfo<Impl, Base, FieldInfoType>;
   protected:
     template <class... As>
     StructTypeInfoBase(StructTypeInfoKind kind, As &&...args)
@@ -144,9 +143,18 @@ namespace {
       auto elements = in.getRange(fieldRange.first, fieldRange.second);
       out.add(elements);
     }
+       
+    /// Given the address of a struct value, project out the address of a
+    /// single field.
+    Address projectFieldAddress(IRGenFunction &IGF,
+                                Address addr,
+                                SILType T,
+                                const FieldInfoType &field) const {
+      return asImpl().projectFieldAddress(IGF, addr, T, field.Field);
+    }
 
-    /// Given the address of a tuple, project out the address of a
-    /// single element.
+    /// Given the address of a struct value, project out the address of a
+    /// single field.
     Address projectFieldAddress(IRGenFunction &IGF,
                                 Address addr,
                                 SILType T,
@@ -158,15 +166,15 @@ namespace {
       auto offsets = asImpl().getNonFixedOffsets(IGF, T);
       return fieldInfo.projectAddress(IGF, addr, offsets);
     }
-       
-    /// Return the constant offset of a field as a SizeTy, or nullptr if the
+
+    /// Return the constant offset of a field as a Int32Ty, or nullptr if the
     /// field is not at a fixed offset.
     llvm::Constant *getConstantFieldOffset(IRGenModule &IGM,
                                            VarDecl *field) const {
       auto &fieldInfo = getFieldInfo(field);
-      if (fieldInfo.getKind() == ElementLayout::Kind::Fixed) {
-        return llvm::ConstantInt::get(IGM.SizeTy,
-                                    fieldInfo.getFixedByteOffset().getValue());
+      if (fieldInfo.hasFixedByteOffset()) {
+        return llvm::ConstantInt::get(
+            IGM.Int32Ty, fieldInfo.getFixedByteOffset().getValue());
       }
       return nullptr;
     }
@@ -200,67 +208,12 @@ namespace {
       return fieldInfo.getStructIndex();
     }
 
-    // For now, just use extra inhabitants from the first field.
-    // FIXME: generalize
-    bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
-      if (asImpl().getFields().empty()) return false;
-      return asImpl().getFields()[0].getTypeInfo().mayHaveExtraInhabitants(IGM);
-    }
-
-    // This is dead code in NonFixedStructTypeInfo.
-    unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const {
-      if (asImpl().getFields().empty()) return 0;
-      auto &fieldTI = cast<FixedTypeInfo>(asImpl().getFields()[0].getTypeInfo());
-      return fieldTI.getFixedExtraInhabitantCount(IGM);
-    }
-
-    // This is dead code in NonFixedStructTypeInfo.
-    APInt getFixedExtraInhabitantValue(IRGenModule &IGM,
-                                       unsigned bits,
-                                       unsigned index) const {
-      auto &fieldTI = cast<FixedTypeInfo>(asImpl().getFields()[0].getTypeInfo());
-      return fieldTI.getFixedExtraInhabitantValue(IGM, bits, index);
-    }
-
-    // This is dead code in NonFixedStructTypeInfo.
-    APInt getFixedExtraInhabitantMask(IRGenModule &IGM) const {
-      if (asImpl().getFields().empty())
-        return APInt();
-      
-      // Currently we only use the first field's extra inhabitants. The other
-      // fields can be ignored.
-      const FixedTypeInfo &fieldTI
-        = cast<FixedTypeInfo>(asImpl().getFields()[0].getTypeInfo());
-      auto targetSize = asImpl().getFixedSize().getValueInBits();
-      
-      if (fieldTI.isKnownEmpty(ResilienceExpansion::Maximal))
-        return APInt(targetSize, 0);
-      
-      APInt fieldMask = fieldTI.getFixedExtraInhabitantMask(IGM);
-      if (targetSize > fieldMask.getBitWidth())
-        fieldMask = fieldMask.zext(targetSize);
-      return fieldMask;
-    }
-
-    llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
-                                         Address structAddr,
-                                         SILType structType) const override {
-      auto &field = asImpl().getFields()[0];
-      Address fieldAddr =
-        asImpl().projectFieldAddress(IGF, structAddr, structType, field.Field);
-      return field.getTypeInfo().getExtraInhabitantIndex(IGF, fieldAddr,
-                                          field.getType(IGF.IGM, structType));
-    }
-
-    void storeExtraInhabitant(IRGenFunction &IGF,
-                              llvm::Value *index,
-                              Address structAddr,
-                              SILType structType) const override {
-      auto &field = asImpl().getFields()[0];
-      Address fieldAddr =
-        asImpl().projectFieldAddress(IGF, structAddr, structType, field.Field);
-      field.getTypeInfo().storeExtraInhabitant(IGF, index, fieldAddr,
-                                          field.getType(IGF.IGM, structType));
+    bool isSingleRetainablePointer(ResilienceExpansion expansion,
+                                   ReferenceCounting *rc) const override {
+      auto fields = asImpl().getFields();
+      if (fields.size() != 1)
+        return false;
+      return fields[0].getTypeInfo().isSingleRetainablePointer(expansion, rc);
     }
     
     void verify(IRGenTypeVerifierFunction &IGF,
@@ -276,28 +229,32 @@ namespace {
             : public StructMetadataScanner<FindOffsetOfFieldOffsetVector> {
           public:
             VarDecl *FieldToFind;
+            Size AddressPoint = Size::invalid();
             Size FieldOffset = Size::invalid();
 
-            using super = StructMetadataScanner<FindOffsetOfFieldOffsetVector>;
+            FindOffsetOfFieldOffsetVector(IRGenModule &IGM, VarDecl *Field)
+                : StructMetadataScanner<FindOffsetOfFieldOffsetVector>(
+                      IGM, cast<StructDecl>(Field->getDeclContext())),
+                  FieldToFind(Field) {}
 
-            FindOffsetOfFieldOffsetVector(IRGenModule &IGM,
-                                          VarDecl *Field)
-              : super(IGM, cast<StructDecl>(Field->getDeclContext())),
-                FieldToFind(Field)
-            {}
-              
+            void noteAddressPoint() {
+              AddressPoint = this->NextOffset;
+            }
+
             void addFieldOffset(VarDecl *Field) {
               if (Field == FieldToFind) {
                 FieldOffset = this->NextOffset;
               }
-              super::addFieldOffset(Field);
+              StructMetadataScanner<
+                  FindOffsetOfFieldOffsetVector>::addFieldOffset(Field);
             }
           };
           
           FindOffsetOfFieldOffsetVector scanner(IGF.IGM, field.Field);
           scanner.layout();
           
-          if (scanner.FieldOffset == Size::invalid())
+          if (scanner.FieldOffset == Size::invalid()
+              || scanner.AddressPoint == Size::invalid())
             continue;
           
           // Load the offset from the field offset vector and ensure it matches
@@ -306,13 +263,14 @@ namespace {
             IGF.Builder.CreateBitCast(metadata, IGF.IGM.Int8PtrTy);
           auto fieldOffsetPtr =
             IGF.Builder.CreateInBoundsGEP(metadataBytes,
-                                          IGF.IGM.getSize(scanner.FieldOffset));
+                  IGF.IGM.getSize(scanner.FieldOffset - scanner.AddressPoint));
           fieldOffsetPtr =
             IGF.Builder.CreateBitCast(fieldOffsetPtr,
-                                      IGF.IGM.SizeTy->getPointerTo());
-          auto fieldOffset =
-            IGF.Builder.CreateLoad(fieldOffsetPtr,
-                                   IGF.IGM.getPointerAlignment());
+                                      IGF.IGM.Int32Ty->getPointerTo());
+          llvm::Value *fieldOffset =
+            IGF.Builder.CreateLoad(fieldOffsetPtr, Alignment(4));
+          fieldOffset = IGF.Builder.CreateZExtOrBitCast(fieldOffset,
+                                                        IGF.IGM.SizeTy);
           
           IGF.verifyValues(metadata, fieldOffset,
                        IGF.IGM.getSize(field.getFixedByteOffset()),
@@ -327,7 +285,7 @@ namespace {
       }
     }
   };
-
+  
   /// A type implementation for loadable record types imported from Clang.
   class ClangRecordTypeInfo final :
     public StructTypeInfoBase<ClangRecordTypeInfo, LoadableTypeInfo,
@@ -343,7 +301,8 @@ namespace {
                            fields, explosionSize,
                            storageType, size, std::move(spareBits),
                            align, IsPOD, IsFixedSize),
-        ClangDecl(clangDecl) {
+        ClangDecl(clangDecl)
+    {
     }
 
     void initializeFromParams(IRGenFunction &IGF, Explosion &params,
@@ -374,7 +333,6 @@ namespace {
   class LoadableStructTypeInfo final
       : public StructTypeInfoBase<LoadableStructTypeInfo, LoadableTypeInfo> {
   public:
-    // FIXME: Spare bits between struct members.
     LoadableStructTypeInfo(ArrayRef<StructFieldInfo> fields,
                            unsigned explosionSize,
                            llvm::Type *storageType, Size size,
@@ -485,11 +443,15 @@ namespace {
                                   WitnessSizedTypeInfo<NonFixedStructTypeInfo>>
   {
   public:
-    NonFixedStructTypeInfo(ArrayRef<StructFieldInfo> fields, llvm::Type *T,
+    NonFixedStructTypeInfo(ArrayRef<StructFieldInfo> fields,
+                           FieldsAreABIAccessible_t fieldsAccessible,
+                           llvm::Type *T,
                            Alignment align,
-                           IsPOD_t isPOD, IsBitwiseTakable_t isBT)
+                           IsPOD_t isPOD, IsBitwiseTakable_t isBT,
+                           IsABIAccessible_t structAccessible)
       : StructTypeInfoBase(StructTypeInfoKind::NonFixedStructTypeInfo,
-                           fields, T, align, isPOD, isBT) {
+                           fields, fieldsAccessible,
+                           T, align, isPOD, isBT, structAccessible) {
     }
 
     // We have an indirect schema.
@@ -510,11 +472,65 @@ namespace {
                                               field.getNonFixedElementIndex());
     }
 
-    void initializeMetadata(IRGenFunction &IGF,
-                            llvm::Value *metadata,
-                            bool isVWTMutable,
-                            SILType T) const override {
-      emitInitializeFieldOffsetVector(IGF, T, metadata, isVWTMutable);
+    llvm::Value *getEnumTagSinglePayload(IRGenFunction &IGF,
+                                         llvm::Value *numEmptyCases,
+                                         Address structAddr,
+                                         SILType structType,
+                                         bool isOutlined) const override {
+      // If we're not emitting the value witness table's implementation,
+      // just call that.
+      if (!isOutlined) {
+        return emitGetEnumTagSinglePayloadCall(IGF, structType, numEmptyCases,
+                                               structAddr);
+      }
+
+      return emitGetEnumTagSinglePayloadGenericCall(IGF, structType, *this,
+                                                    numEmptyCases, structAddr,
+        [this,structType](IRGenFunction &IGF, Address structAddr,
+                          llvm::Value *structNumXI) {
+          return withExtraInhabitantProvidingField(IGF, structAddr, structType,
+                                                   structNumXI, IGF.IGM.Int32Ty,
+            [&](const FieldImpl &field, llvm::Value *numXI) -> llvm::Value* {
+              Address fieldAddr = asImpl().projectFieldAddress(
+                                           IGF, structAddr, structType, field);
+              auto fieldTy = field.getType(IGF.IGM, structType);
+              return field.getTypeInfo()
+                          .getExtraInhabitantTagDynamic(IGF, fieldAddr, fieldTy,
+                                                     numXI, /*outlined*/ false);
+            });
+        });
+    }
+
+    void storeEnumTagSinglePayload(IRGenFunction &IGF,
+                                   llvm::Value *whichCase,
+                                   llvm::Value *numEmptyCases,
+                                   Address structAddr,
+                                   SILType structType,
+                                   bool isOutlined) const override {
+      // If we're not emitting the value witness table's implementation,
+      // just call that.
+      if (!isOutlined) {
+        return emitStoreEnumTagSinglePayloadCall(IGF, structType, whichCase,
+                                                 numEmptyCases, structAddr);
+      }
+
+      emitStoreEnumTagSinglePayloadGenericCall(IGF, structType, *this,
+                                               whichCase, numEmptyCases,
+                                               structAddr,
+        [this,structType](IRGenFunction &IGF, Address structAddr,
+                          llvm::Value *tag, llvm::Value *structNumXI) {
+          withExtraInhabitantProvidingField(IGF, structAddr, structType,
+                                            structNumXI, IGF.IGM.VoidTy,
+            [&](const FieldImpl &field, llvm::Value *numXI) -> llvm::Value* {
+              Address fieldAddr = asImpl().projectFieldAddress(
+                                           IGF, structAddr, structType, field);
+              auto fieldTy = field.getType(IGF.IGM, structType);
+              field.getTypeInfo()
+                   .storeExtraInhabitantTagDynamic(IGF, tag, fieldAddr, fieldTy,
+                                                   /*outlined*/ false);
+              return nullptr;
+            });
+        });
     }
   };
 
@@ -554,11 +570,16 @@ namespace {
     }
 
     NonFixedStructTypeInfo *createNonFixed(ArrayRef<StructFieldInfo> fields,
+                                     FieldsAreABIAccessible_t fieldsAccessible,
                                            StructLayout &&layout) {
-      return NonFixedStructTypeInfo::create(fields, layout.getType(),
+      auto structAccessible = IsABIAccessible_t(
+        IGM.getSILModule().isTypeMetadataAccessible(TheStruct));
+      return NonFixedStructTypeInfo::create(fields, fieldsAccessible,
+                                            layout.getType(),
                                             layout.getAlignment(),
                                             layout.isPOD(),
-                                            layout.isBitwiseTakable());
+                                            layout.isBitwiseTakable(),
+                                            structAccessible);
     }
 
     StructFieldInfo getFieldInfo(unsigned index,
@@ -573,7 +594,8 @@ namespace {
     }
 
     StructLayout performLayout(ArrayRef<const TypeInfo *> fieldTypes) {
-      return StructLayout(IGM, TheStruct, LayoutKind::NonHeapObject,
+      return StructLayout(IGM, TheStruct->getAnyNominal(),
+                          LayoutKind::NonHeapObject,
                           LayoutStrategy::Optimal, fieldTypes, StructTy);
     }
   };
@@ -602,8 +624,8 @@ public:
       ClangDecl(clangDecl), ClangContext(clangDecl->getASTContext()),
       ClangLayout(ClangContext.getASTRecordLayout(clangDecl)),
       TotalStride(Size(ClangLayout.getSize().getQuantity())),
-      TotalAlignment(Alignment(ClangLayout.getAlignment().getQuantity())) {
-    SpareBits.reserve(TotalStride.getValue() * 8);
+      TotalAlignment(IGM.getCappedAlignment(
+                                       Alignment(ClangLayout.getAlignment()))) {
   }
 
   void collectRecordFields() {
@@ -765,14 +787,21 @@ private:
     unsigned explosionEnd = NextExplosionIndex;
 
     ElementLayout layout = ElementLayout::getIncomplete(fieldType);
-    layout.completeFixed(fieldType.isPOD(ResilienceExpansion::Maximal),
-                         NextOffset, LLVMFields.size());
+    auto isEmpty = fieldType.isKnownEmpty(ResilienceExpansion::Maximal);
+    if (isEmpty)
+      layout.completeEmpty(fieldType.isPOD(ResilienceExpansion::Maximal));
+    else
+      layout.completeFixed(fieldType.isPOD(ResilienceExpansion::Maximal),
+                           NextOffset, LLVMFields.size());
 
     FieldInfos.push_back(
            ClangFieldInfo(swiftField, layout, explosionBegin, explosionEnd));
-    LLVMFields.push_back(fieldType.getStorageType());
-    NextOffset += fieldType.getFixedSize();
-    SpareBits.append(fieldType.getSpareBits());
+    
+    if (!isEmpty) {
+      LLVMFields.push_back(fieldType.getStorageType());
+      NextOffset += fieldType.getFixedSize();
+      SpareBits.append(fieldType.getSpareBits());
+    }
   }
 
   /// Add padding to get up to the given offset.
@@ -841,17 +870,27 @@ Optional<unsigned> irgen::getPhysicalStructFieldIndex(IRGenModule &IGM,
 }
 
 void IRGenModule::emitStructDecl(StructDecl *st) {
-  if (!IRGen.tryEnableLazyTypeMetadata(st))
+  if (!IRGen.hasLazyMetadata(st)) {
     emitStructMetadata(*this, st);
-
-  emitNestedTypeDecls(st->getMembers());
-
-  if (shouldEmitOpaqueTypeMetadataRecord(st)) {
-    emitOpaqueTypeMetadataRecord(st);
-    return;
+    emitFieldDescriptor(st);
   }
 
-  emitFieldMetadataRecord(st);
+  emitNestedTypeDecls(st->getMembers());
+}
+
+void IRGenModule::maybeEmitOpaqueTypeDecl(OpaqueTypeDecl *opaque) {
+  if (IRGen.Opts.EnableAnonymousContextMangledNames) {
+    // If we're emitting anonymous context mangled names for debuggability,
+    // then emit all opaque type descriptors and make them runtime-discoverable
+    // so that remote ast/mirror can recover them.
+    addRuntimeResolvableType(opaque);
+    if (IRGen.hasLazyMetadata(opaque))
+      IRGen.noteUseOfOpaqueTypeDescriptor(opaque);
+    else
+      emitOpaqueTypeDecl(opaque);
+  } else if (!IRGen.hasLazyMetadata(opaque)) {
+    emitOpaqueTypeDecl(opaque);
+  }
 }
 
 namespace {
@@ -862,30 +901,35 @@ namespace {
       : public ResilientTypeInfo<ResilientStructTypeInfo>
   {
   public:
-    ResilientStructTypeInfo(llvm::Type *T)
-      : ResilientTypeInfo(T) {
+    ResilientStructTypeInfo(llvm::Type *T, IsABIAccessible_t abiAccessible)
+      : ResilientTypeInfo(T, abiAccessible) {
       setSubclassKind((unsigned) StructTypeInfoKind::ResilientStructTypeInfo);
     }
   };
 } // end anonymous namespace
 
-const TypeInfo *TypeConverter::convertResilientStruct() {
+const TypeInfo *
+TypeConverter::convertResilientStruct(IsABIAccessible_t abiAccessible) {
   llvm::Type *storageType = IGM.OpaquePtrTy->getElementType();
-  return new ResilientStructTypeInfo(storageType);
+  return new ResilientStructTypeInfo(storageType, abiAccessible);
 }
 
 const TypeInfo *TypeConverter::convertStructType(TypeBase *key, CanType type,
-                                                 StructDecl *D) {
+                                                 StructDecl *D){
   // All resilient structs have the same opaque lowering, since they are
-  // indistinguishable as values.
-  if (IGM.isResilient(D, ResilienceExpansion::Maximal))
-    return &getResilientStructTypeInfo();
+  // indistinguishable as values --- except that we have to track
+  // ABI-accessibility.
+  if (IGM.isResilient(D, ResilienceExpansion::Maximal)) {
+    auto structAccessible =
+      IsABIAccessible_t(IGM.getSILModule().isTypeMetadataAccessible(type));
+    return &getResilientStructTypeInfo(structAccessible);
+  }
 
   // Create the struct type.
   auto ty = IGM.createNominalType(type);
 
   // Register a forward declaration before we look at any of the child types.
-  addForwardDecl(key, ty);
+  addForwardDecl(key);
 
   // Use different rules for types imported from C.
   if (D->hasClangNode()) {
@@ -900,14 +944,12 @@ const TypeInfo *TypeConverter::convertStructType(TypeBase *key, CanType type,
 
     } else if (isa<clang::EnumDecl>(clangDecl)) {
       // Fall back to Swift lowering for the enum's representation as a struct.
-      assert(std::distance(D->getStoredProperties().begin(),
-                           D->getStoredProperties().end()) == 1 &&
+      assert(D->getStoredProperties().size() == 1 &&
              "Struct representation of a Clang enum should wrap one value");
     } else if (clangDecl->hasAttr<clang::SwiftNewtypeAttr>()) {
       // Fall back to Swift lowering for the underlying type's
       // representation as a struct member.
-      assert(std::distance(D->getStoredProperties().begin(),
-                           D->getStoredProperties().end()) == 1 &&
+      assert(D->getStoredProperties().size() == 1 &&
              "Struct representation of a swift_newtype should wrap one value");
     } else {
       llvm_unreachable("Swift struct represents unexpected imported type");

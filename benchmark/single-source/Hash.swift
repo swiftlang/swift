@@ -18,10 +18,11 @@ import TestsUtils
 public let HashTest = BenchmarkInfo(
   name: "HashTest",
   runFunction: run_HashTest,
-  tags: [.validation, .algorithm])
+  tags: [.validation, .algorithm],
+  legacyFactor: 10)
 
 class Hash {
-  /// \brief C'tor.
+  /// C'tor.
   init(_ bs: Int) {
     blocksize = bs
     messageLength = 0
@@ -29,7 +30,7 @@ class Hash {
     assert(blocksize <= 64, "Invalid block size")
   }
 
-  /// \brief Add the bytes in \p Msg to the hash.
+  /// Add the bytes in \p Msg to the hash.
   func update(_ Msg: String) {
     for c in Msg.unicodeScalars {
       data[dataLength] = UInt8(ascii: c)
@@ -39,7 +40,7 @@ class Hash {
     }
   }
 
-  /// \brief Add the bytes in \p Msg to the hash.
+  /// Add the bytes in \p Msg to the hash.
   func update(_ Msg: [UInt8]) {
     for c in Msg {
       data[dataLength] = c
@@ -65,7 +66,7 @@ class Hash {
   final var data = [UInt8](repeating: 0, count: 64)
   final var blocksize: Int
 
-  /// \brief Hash the internal data.
+  /// Hash the internal data.
   func hash() {
     fatalError("Pure virtual")
   }
@@ -78,7 +79,7 @@ class Hash {
     fatalError("Pure virtual")
   }
 
-  /// \brief Blow the data to fill the block.
+  /// Blow the data to fill the block.
   func fillBlock() {
     fatalError("Pure virtual")
   }
@@ -87,7 +88,7 @@ class Hash {
   final
   var HexTblFast : [UInt8] = [48,49,50,51,52,53,54,55,56,57,97,98,99,100,101,102]
 
-  /// \brief Convert a 4-byte integer to a hex string.
+  /// Convert a 4-byte integer to a hex string.
   final
   func toHex(_ In: UInt32) -> String {
     var In = In
@@ -110,29 +111,23 @@ class Hash {
     }
   }
 
-  /// \brief Left-rotate \p x by \p c.
+  /// Left-rotate \p x by \p c.
   final
   func rol(_ x: UInt32, _ c: UInt32) -> UInt32 {
-    // TODO: use the &>> operator.
-    let a = UInt32(truncatingBitPattern: Int64(x) << Int64(c))
-    let b = UInt32(truncatingBitPattern: Int64(x) >> (32 - Int64(c)))
-    return a|b
+    return x &<< c | x &>> (32 &- c)
   }
 
-  /// \brief Right-rotate \p x by \p c.
+  /// Right-rotate \p x by \p c.
   final
   func ror(_ x: UInt32, _ c: UInt32) -> UInt32 {
-    // TODO: use the &>> operator.
-    let a = UInt32(truncatingBitPattern: Int64(x) >> Int64(c))
-    let b = UInt32(truncatingBitPattern: Int64(x) << (32 - Int64(c)))
-    return a|b
+    return x &>> c | x &<< (32 &- c)
   }
 }
 
 final
 class MD5 : Hash {
   // Integer part of the sines of integers (in radians) * 2^32.
-  var k : [UInt32] = [0xd76aa478, 0xe8c7b756, 0x242070db, 0xc1bdceee ,
+  let k : [UInt32] = [0xd76aa478, 0xe8c7b756, 0x242070db, 0xc1bdceee ,
                       0xf57c0faf, 0x4787c62a, 0xa8304613, 0xfd469501 ,
                       0x698098d8, 0x8b44f7af, 0xffff5bb1, 0x895cd7be ,
                       0x6b901122, 0xfd987193, 0xa679438e, 0x49b40821 ,
@@ -150,7 +145,7 @@ class MD5 : Hash {
                       0xf7537e82, 0xbd3af235, 0x2ad7d2bb, 0xeb86d391 ]
 
   // Per-round shift amounts
-  var r : [UInt32] = [7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22,
+  let r : [UInt32] = [7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22,
                       5,  9, 14, 20, 5,  9, 14, 20, 5,  9, 14, 20, 5,  9, 14, 20,
                       4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23,
                       6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21]
@@ -177,10 +172,10 @@ class MD5 : Hash {
   }
 
   func appendBytes(_ Val: Int, _ Message: inout Array<UInt8>, _ Offset : Int) {
-    Message[Offset] = UInt8(truncatingBitPattern: Val)
-    Message[Offset + 1] = UInt8(truncatingBitPattern: Val >> 8)
-    Message[Offset + 2] = UInt8(truncatingBitPattern: Val >> 16)
-    Message[Offset + 3] = UInt8(truncatingBitPattern: Val >> 24)
+    Message[Offset] = UInt8(truncatingIfNeeded: Val)
+    Message[Offset + 1] = UInt8(truncatingIfNeeded: Val >> 8)
+    Message[Offset + 2] = UInt8(truncatingIfNeeded: Val >> 16)
+    Message[Offset + 3] = UInt8(truncatingIfNeeded: Val >> 24)
   }
 
   override
@@ -438,7 +433,7 @@ class SHA256 :  Hash {
   var h6: UInt32 = 0
   var h7: UInt32 = 0
 
-  var k : [UInt32] = [
+  let k : [UInt32] = [
    0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
    0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
    0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
@@ -587,7 +582,7 @@ public func run_HashTest(_ N: Int) {
     "The quick brown fox jumps over the lazy dog." : "ef537f25c895bfa782526529a9b63d97aa631564d5d789c2b765448c8635fb6c"]
   let size = 50
 
-  for _ in 1...10*N {
+  for _ in 1...N {
     // Check for precomputed values.
     let MD = MD5()
     for (K, V) in TestMD5 {

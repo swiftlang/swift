@@ -20,7 +20,7 @@ class Canary {
 }
 
 extension NSDate {
-  convenience init?(b: Bool) {
+  @objc convenience init?(b: Bool) {
     guard b else { return nil }
     self.init()
   }

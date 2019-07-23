@@ -24,15 +24,16 @@ import Darwin
 let RequestInstanceKind = "k"
 let RequestInstanceAddress = "i"
 let RequestReflectionInfos = "r"
+let RequestImages = "m"
 let RequestReadBytes = "b"
 let RequestSymbolAddress = "s"
 let RequestStringLength = "l"
 let RequestDone = "d"
 let RequestPointerSize = "p"
 
-internal func debugLog(_ message: String) {
+internal func debugLog(_ message: @autoclosure () -> String) {
 #if DEBUG_LOG
-  fputs("Child: \(message)\n", stderr)
+  fputs("Child: \(message())\n", stderr)
   fflush(stderr)
 #endif
 }
@@ -137,6 +138,21 @@ internal func getReflectionInfoForImage(atIndex i: UInt32) -> ReflectionInfo? {
                         reflstr: reflstr)
 }
 
+/// Get the TEXT segment location and size for a loaded image.
+///
+/// - Parameter i: The index of the loaded image as reported by Dyld.
+/// - Returns: The image name, address, and size.
+internal func getAddressInfoForImage(atIndex i: UInt32) ->
+  (name: String, address: UnsafeMutablePointer<UInt8>?, size: UInt) {
+  debugLog("BEGIN \(#function)"); defer { debugLog("END \(#function)") }
+  let header = unsafeBitCast(_dyld_get_image_header(i),
+    to: UnsafePointer<MachHeader>.self)
+  let name = String(validatingUTF8: _dyld_get_image_name(i)!)!
+  var size: UInt = 0
+  let address = getsegmentdata(header, "__TEXT", &size)
+  return (name, address, size)
+}
+
 internal func sendBytes<T>(from address: UnsafePointer<T>, count: Int) {
   var source = address
   var bytesLeft = count
@@ -194,6 +210,21 @@ internal func sendReflectionInfos() {
   }
 }
 
+/// Send all loadedimages loaded in the current process.
+internal func sendImages() {
+  debugLog("BEGIN \(#function)"); defer { debugLog("END \(#function)") }
+  let infos = (0..<_dyld_image_count()).map(getAddressInfoForImage)
+
+  debugLog("\(infos.count) reflection info bundles.")
+  precondition(infos.count >= 1)
+  sendValue(infos.count)
+  for (name, address, size) in infos {
+    debugLog("Sending info for \(name)")
+    sendValue(address)
+    sendValue(size)
+  }
+}
+
 internal func printErrnoAndExit() {
   debugLog("BEGIN \(#function)"); defer { debugLog("END \(#function)") }
   let errorCString = strerror(errno)!
@@ -240,7 +271,10 @@ internal func sendStringLength() {
   debugLog("BEGIN \(#function)"); defer { debugLog("END \(#function)") }
   let address = readUInt()
   let cString = UnsafePointer<CChar>(bitPattern: address)!
-  let count = String(validatingUTF8: cString)!.utf8.count
+  var count = 0
+  while cString[count] != CChar(0) {
+    count = count + 1
+  }
   sendValue(count)
 }
 
@@ -256,8 +290,7 @@ internal func sendPointerSize() {
 /// This is the main "run loop" of the test harness.
 ///
 /// The parent will necessarily need to:
-/// - Get the addresses of all of the reflection sections for any swift dylibs
-///   that are loaded, where applicable.
+/// - Get the addresses of any swift dylibs that are loaded, where applicable.
 /// - Get the address of the `instance`
 /// - Get the pointer size of this process, which affects assumptions about the
 ///   the layout of runtime structures with pointer-sized fields.
@@ -275,6 +308,8 @@ internal func reflect(instanceAddress: UInt, kind: InstanceKind) {
       sendValue(instanceAddress)
     case String(validatingUTF8: RequestReflectionInfos)!:
       sendReflectionInfos()
+    case String(validatingUTF8: RequestImages)!:
+      sendImages()
     case String(validatingUTF8: RequestReadBytes)!:
       sendBytes()
     case String(validatingUTF8: RequestSymbolAddress)!:

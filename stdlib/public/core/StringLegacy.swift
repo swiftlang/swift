@@ -12,25 +12,6 @@
 
 import SwiftShims
 
-extension _StringVariant {
-  @_versioned
-  func _repeated(_ count: Int) -> _SwiftStringStorage<CodeUnit> {
-    _sanityCheck(count > 0)
-    let c = self.count
-    let storage = _copyToNativeStorage(
-      of: CodeUnit.self,
-      unusedCapacity: (count - 1) * c)
-    var p = storage.start + c
-    for _ in 1 ..< count {
-      p.initialize(from: storage.start, count: c)
-      p += c
-    }
-    _sanityCheck(p == storage.start + count * c)
-    storage.count = p - storage.start
-    return storage
-  }
-}
-
 extension String {
   /// Creates a new string representing the given string repeated the specified
   /// number of times.
@@ -46,73 +27,30 @@ extension String {
   ///   - repeatedValue: The string to repeat.
   ///   - count: The number of times to repeat `repeatedValue` in the resulting
   ///     string.
-  @_inlineable // FIXME(sil-serialize-all)
   public init(repeating repeatedValue: String, count: Int) {
-    if count == 0 {
-      self = ""
-    } else if count == 1 {
-      self = repeatedValue
-    } else {
-      precondition(count > 0, "Negative count not allowed")
-      defer { _fixLifetime(repeatedValue) }
-      if _slowPath(repeatedValue._guts._isOpaque) {
-        let opaque = repeatedValue._guts._asOpaque()
-        self.init(_StringGuts(opaque._repeated(count)))
-      } else if repeatedValue._guts.isASCII {
-        let ascii = repeatedValue._guts._unmanagedASCIIView
-        self.init(_StringGuts(ascii._repeated(count)))
-      } else {
-        let utf16 = repeatedValue._guts._unmanagedUTF16View
-        self.init(_StringGuts(utf16._repeated(count)))
-      }
+    precondition(count >= 0, "Negative count not allowed")
+    guard count > 1 else {
+      self = count == 0 ? "" : repeatedValue
+      return
     }
+
+    // TODO(String performance): We can directly call appendInPlace
+    var result = String()
+    result.reserveCapacity(repeatedValue._guts.count &* count)
+    for _ in 0..<count {
+      result += repeatedValue
+    }
+    self = result
   }
 
   /// A Boolean value indicating whether a string has no characters.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable
   public var isEmpty: Bool {
-    return _guts.count == 0
+    @inline(__always) get { return _guts.isEmpty }
   }
 }
 
-extension String {
-  @_inlineable // FIXME(sil-serialize-all)
-  public init(_ _c: Unicode.Scalar) {
-    self = String._fromWellFormedCodeUnitSequence(
-      UTF32.self,
-      input: repeatElement(_c.value, count: 1))
-  }
-}
-
-#if _runtime(_ObjC)
-/// Determines if `theString` starts with `prefix` comparing the strings under
-/// canonical equivalence.
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned // FIXME(sil-serialize-all)
-@_silgen_name("swift_stdlib_NSStringHasPrefixNFD")
-internal func _stdlib_NSStringHasPrefixNFD(
-  _ theString: AnyObject, _ prefix: AnyObject) -> Bool
-
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned // FIXME(sil-serialize-all)
-@_silgen_name("swift_stdlib_NSStringHasPrefixNFDPointer")
-internal func _stdlib_NSStringHasPrefixNFDPointer(
-  _ theString: OpaquePointer, _ prefix: OpaquePointer) -> Bool
-
-/// Determines if `theString` ends with `suffix` comparing the strings under
-/// canonical equivalence.
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned // FIXME(sil-serialize-all)
-@_silgen_name("swift_stdlib_NSStringHasSuffixNFD")
-internal func _stdlib_NSStringHasSuffixNFD(
-  _ theString: AnyObject, _ suffix: AnyObject) -> Bool
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned // FIXME(sil-serialize-all)
-@_silgen_name("swift_stdlib_NSStringHasSuffixNFDPointer")
-internal func _stdlib_NSStringHasSuffixNFDPointer(
-  _ theString: OpaquePointer, _ suffix: OpaquePointer) -> Bool
-
-extension String {
+extension StringProtocol {
   /// Returns a Boolean value indicating whether the string begins with the
   /// specified prefix.
   ///
@@ -126,10 +64,10 @@ extension String {
   ///     print(cafe.hasPrefix("café"))
   ///     // Prints "false"
   ///
-  /// The Unicode-safe comparison matches Unicode scalar values rather than the
-  /// code points used to compose them. The example below uses two strings
-  /// with different forms of the `"é"` character---the first uses the composed
-  /// form and the second uses the decomposed form.
+  /// The Unicode-safe comparison matches Unicode extended grapheme clusters
+  /// rather than the code points used to compose them. The example below uses
+  /// two strings with different forms of the `"é"` character---the first uses
+  /// the composed form and the second uses the decomposed form.
   ///
   ///     // Unicode safe
   ///     let composedCafe = "Café"
@@ -142,40 +80,9 @@ extension String {
   ///
   /// - Parameter prefix: A possible prefix to test against this string.
   /// - Returns: `true` if the string begins with `prefix`; otherwise, `false`.
-  @_inlineable // FIXME(sil-serialize-all)
-  public func hasPrefix(_ prefix: String) -> Bool {
-    let prefixCount = prefix._guts.count
-    if prefixCount == 0 {
-      return true
-    }
-    if _fastPath(!self._guts._isOpaque && !prefix._guts._isOpaque) {
-      let result: Bool
-      if self._guts.isASCII && prefix._guts.isASCII {
-        let selfASCII = self._guts._unmanagedASCIIView
-        let prefixASCII = prefix._guts._unmanagedASCIIView
-        if prefixASCII.count > selfASCII.count {
-          // Prefix is longer than self.
-          result = false
-        } else {
-          result = (0 as CInt) == _stdlib_memcmp(
-            selfASCII.rawStart,
-            prefixASCII.rawStart,
-            prefixASCII.count)
-        }
-      } else {
-        let lhsStr = _NSContiguousString(_unmanaged: self._guts)
-        let rhsStr = _NSContiguousString(_unmanaged: prefix._guts)
-        result = lhsStr._unsafeWithNotEscapedSelfPointerPair(rhsStr) {
-          return _stdlib_NSStringHasPrefixNFDPointer($0, $1)
-        }
-      }
-      _fixLifetime(self)
-      _fixLifetime(prefix)
-      return result
-    }
-    return _stdlib_NSStringHasPrefixNFD(
-      self._bridgeToObjectiveCImpl(),
-      prefix._bridgeToObjectiveCImpl())
+  @inlinable
+  public func hasPrefix<Prefix: StringProtocol>(_ prefix: Prefix) -> Bool {
+    return self.starts(with: prefix)
   }
 
   /// Returns a Boolean value indicating whether the string ends with the
@@ -191,10 +98,10 @@ extension String {
   ///     print(plans.hasSuffix("Café"))
   ///     // Prints "false"
   ///
-  /// The Unicode-safe comparison matches Unicode scalar values rather than the
-  /// code points used to compose them. The example below uses two strings
-  /// with different forms of the `"é"` character---the first uses the composed
-  /// form and the second uses the decomposed form.
+  /// The Unicode-safe comparison matches Unicode extended grapheme clusters
+  /// rather than the code points used to compose them. The example below uses
+  /// two strings with different forms of the `"é"` character---the first uses
+  /// the composed form and the second uses the decomposed form.
   ///
   ///     // Unicode safe
   ///     let composedCafe = "café"
@@ -207,46 +114,41 @@ extension String {
   ///
   /// - Parameter suffix: A possible suffix to test against this string.
   /// - Returns: `true` if the string ends with `suffix`; otherwise, `false`.
-  @_inlineable // FIXME(sil-serialize-all)
-  public func hasSuffix(_ suffix: String) -> Bool {
-    let suffixCount = suffix._guts.count
-    if suffixCount == 0 {
-      return true
-    }
-    if _fastPath(!self._guts._isOpaque && !suffix._guts._isOpaque) {
-      let result: Bool
-      if self._guts.isASCII && suffix._guts.isASCII {
-        let selfASCII = self._guts._unmanagedASCIIView
-        let suffixASCII = suffix._guts._unmanagedASCIIView
-        if suffixASCII.count > self._guts.count {
-          // Suffix is longer than self.
-          result = false
-        } else {
-          result = (0 as CInt) == _stdlib_memcmp(
-            selfASCII.rawStart + (selfASCII.count - suffixASCII.count),
-            suffixASCII.rawStart,
-            suffixASCII.count)
-        }
-      } else {
-        let lhsStr = _NSContiguousString(_unmanaged: self._guts)
-        let rhsStr = _NSContiguousString(_unmanaged: suffix._guts)
-        result = lhsStr._unsafeWithNotEscapedSelfPointerPair(rhsStr) {
-          return _stdlib_NSStringHasSuffixNFDPointer($0, $1)
-        }
-      }
-      _fixLifetime(self)
-      _fixLifetime(suffix)
-      return result
-    }
-    return _stdlib_NSStringHasSuffixNFD(
-      self._bridgeToObjectiveCImpl(),
-      suffix._bridgeToObjectiveCImpl())
+  @inlinable
+  public func hasSuffix<Suffix: StringProtocol>(_ suffix: Suffix) -> Bool {
+    return self.reversed().starts(with: suffix.reversed())
   }
 }
-#else
-// FIXME: Implement hasPrefix and hasSuffix without objc
-// rdar://problem/18878343
-#endif
+
+extension String {
+  public func hasPrefix(_ prefix: String) -> Bool {
+    if _fastPath(self._guts.isNFCFastUTF8 && prefix._guts.isNFCFastUTF8) {
+      guard prefix._guts.count <= self._guts.count else { return false }
+      return prefix._guts.withFastUTF8 { nfcPrefix in
+        let prefixEnd = nfcPrefix.count
+        return self._guts.withFastUTF8(range: 0..<prefixEnd) { nfcSlicedSelf in
+          return _binaryCompare(nfcSlicedSelf, nfcPrefix) == 0
+        }
+      }
+    }
+
+    return starts(with: prefix)
+  }
+
+  public func hasSuffix(_ suffix: String) -> Bool {
+    if _fastPath(self._guts.isNFCFastUTF8 && suffix._guts.isNFCFastUTF8) {
+      guard suffix._guts.count <= self._guts.count else { return false }
+      return suffix._guts.withFastUTF8 { nfcSuffix in
+        let suffixStart = self._guts.count - nfcSuffix.count
+        return self._guts.withFastUTF8(range: suffixStart..<self._guts.count) {
+          nfcSlicedSelf in return _binaryCompare(nfcSlicedSelf, nfcSuffix) == 0
+        }
+      }
+    }
+
+    return self.reversed().starts(with: suffix.reversed())
+  }
+}
 
 // Conversions to string from other types.
 extension String {
@@ -279,8 +181,7 @@ extension String {
   ///   - uppercase: Pass `true` to use uppercase letters to represent numerals
   ///     greater than 9, or `false` to use lowercase letters. The default is
   ///     `false`.
-  @_inlineable // FIXME(sil-serialize-all)
-  public init<T : BinaryInteger>(
+  public init<T: BinaryInteger>(
     _ value: T, radix: Int = 10, uppercase: Bool = false
   ) {
     self = value._description(radix: radix, uppercase: uppercase)

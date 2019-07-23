@@ -9,122 +9,124 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-//
-// Some data structures emitted by the Swift compiler use relative indirect
-// addresses in order to minimize startup cost for a process. By referring to
-// the offset of the global offset table entry for a symbol, instead of directly
-// referring to the symbol, compiler-emitted data structures avoid requiring
-// unnecessary relocation at dynamic linking time. This header contains types
-// to help dereference these relative addresses.
-//
-// Theory of references to objects
-// -------------------------------
-//
-// A reference can be absolute or relative:
-//
-//   - An absolute reference is a pointer to the object.
-//
-//   - A relative reference is a (signed) offset from the address of the
-//     reference to the address of its direct referent.
-//
-// A relative reference can be direct, indirect, or symbolic.
-//
-// In a direct reference, the direct referent is simply the target object.
-// Generally, a statically-emitted relative reference can only be direct
-// if it can be resolved to a constant offset by the linker, because loaders
-// do not support forming relative references.  This means that either the
-// reference and object must lie within the same linkage unit or the
-// difference must be computed at runtime by code.
-//
-// In a symbolic reference, the direct referent is a string holding the symbol
-// name of the object.  A relative reference can only be symbolic if the
-// object actually has a symbol at runtime, which may require exporting
-// many internal symbols that would otherwise be strippable.
-//
-// In an indirect reference, the direct referent is a variable holding an
-// absolute reference to the object.  An indirect relative reference may
-// refer to an arbitrary symbol, be it anonymous within the linkage unit
-// or completely external to it, but it requires the introduction of an
-// intermediate absolute reference that requires load-time initialization.
-// However, this initialization can be shared among all indirect references
-// within the linkage unit, and the linker will generally place all such
-// references adjacent to one another to improve load-time locality.
-//
-// A reference can be made a dynamic union of more than one of these options.
-// This allows the compiler/linker to use a direct reference when possible
-// and a less-efficient option where required.  However, it also requires
-// the cases to be dynamically distinguished.  This can be done by setting
-// a low bit of the offset, as long as the difference between the direct
-// referent's address and the reference is a multiple of 2.  This works well
-// for "indirectable" references because most objects are known to be
-// well-aligned, and the cases that aren't (chiefly functions and strings)
-// rarely need the flexibility of this kind of reference.  It does not
-// work quite as well for "possibly symbolic" references because C strings
-// are not naturally aligned, and making them aligned generally requires
-// moving them out of the linker's ordinary string section; however, it's
-// still workable.
-//
-// Finally, a relative reference can be near or far.  A near reference
-// is potentially smaller, but it requires the direct referent to lie
-// within a certain distance of the reference, even if dynamically
-// initialized.
-//
-// In Swift, we always prefer to use a near direct relative reference
-// when it is possible to do so: that is, when the relationship is always
-// between two global objects emitted in the same linkage unit, and there
-// is no compatibility constraint requiring the use of an absolute reference.
-//
-// When more flexibility is required, there are several options:
-// 
-//   1. Use an absolute reference.  Size penalty on 64-bit.  Requires
-//      load-time work.
-//
-//   2. Use a far direct relative reference.  Size penalty on 64-bit.
-//      Requires load-time work when object is outside linkage unit.
-//      Generally not directly supported by loaders.
-//
-//   3. Use an always-indirect relative reference.  Size penalty of one
-//      pointer (shared).  Requires load-time work even when object is
-//      within linkage unit.
-//
-//   4. Use a near indirectable relative reference.  Size penalty of one
-//      pointer (shared) when reference exceeds range.  Runtime / code-size
-//      penalty on access.  Requires load-time work (shared) only when
-//      object is outside linkage unit.
-//
-//   5. Use a far indirectable relative reference.  Size penalty on 64-bit.
-//      Size penalty of one pointer (shared) when reference exceeds range
-//      and is initialized statically.  Runtime / code-size penalty on access.
-//      Requires load-time work (shared) only when object is outside linkage
-//      unit.
-//
-//   6. Use a near or far symbolic relative reference.  No load-time work.
-//      Severe runtime penalty on access.  Requires custom logic to statically
-//      optimize.  Requires emission of symbol for target even if private
-//      to linkage unit.
-//
-//   7. Use a near or far direct-or-symbolic relative reference.  No
-//      load-time work.  Severe runtime penalty on access if object is
-//      outside of linkage unit.  Requires custom logic to statically optimize.
-//
-// In general, it's our preference in Swift to use option #4 when there
-// is no possibility of initializing the reference dynamically and option #5
-// when there is.  This is because it is infeasible to actually share the
-// memory for the intermediate absolute reference when it must be allocated
-// dynamically.
-//
-// Symbolic references are an interesting idea that we have not yet made
-// use of.  They may be acceptable in reflective metadata cases where it
-// is desirable to heavily bias towards never using the metadata.  However,
-// they're only profitable if there wasn't any other indirect reference
-// to the target, and it is likely that their optimal use requires a more
-// intelligent toolchain from top to bottom.
-//
-// Note that the cost of load-time work also includes a binary-size penalty
-// to store the loader metadata necessary to perform that work.  Therefore
-// it is better to avoid it even when there are dynamic optimizations in
-// place to skip the work itself.
-//
+///
+/// \file
+///
+/// Some data structures emitted by the Swift compiler use relative indirect
+/// addresses in order to minimize startup cost for a process. By referring to
+/// the offset of the global offset table entry for a symbol, instead of
+/// directly referring to the symbol, compiler-emitted data structures avoid
+/// requiring unnecessary relocation at dynamic linking time. This header
+/// contains types to help dereference these relative addresses.
+///
+/// Theory of references to objects
+/// -------------------------------
+///
+/// A reference can be absolute or relative:
+///
+///   - An absolute reference is a pointer to the object.
+///
+///   - A relative reference is a (signed) offset from the address of the
+///     reference to the address of its direct referent.
+///
+/// A relative reference can be direct, indirect, or symbolic.
+///
+/// In a direct reference, the direct referent is simply the target object.
+/// Generally, a statically-emitted relative reference can only be direct
+/// if it can be resolved to a constant offset by the linker, because loaders
+/// do not support forming relative references.  This means that either the
+/// reference and object must lie within the same linkage unit or the
+/// difference must be computed at runtime by code.
+///
+/// In a symbolic reference, the direct referent is a string holding the symbol
+/// name of the object.  A relative reference can only be symbolic if the
+/// object actually has a symbol at runtime, which may require exporting
+/// many internal symbols that would otherwise be strippable.
+///
+/// In an indirect reference, the direct referent is a variable holding an
+/// absolute reference to the object.  An indirect relative reference may
+/// refer to an arbitrary symbol, be it anonymous within the linkage unit
+/// or completely external to it, but it requires the introduction of an
+/// intermediate absolute reference that requires load-time initialization.
+/// However, this initialization can be shared among all indirect references
+/// within the linkage unit, and the linker will generally place all such
+/// references adjacent to one another to improve load-time locality.
+///
+/// A reference can be made a dynamic union of more than one of these options.
+/// This allows the compiler/linker to use a direct reference when possible
+/// and a less-efficient option where required.  However, it also requires
+/// the cases to be dynamically distinguished.  This can be done by setting
+/// a low bit of the offset, as long as the difference between the direct
+/// referent's address and the reference is a multiple of 2.  This works well
+/// for "indirectable" references because most objects are known to be
+/// well-aligned, and the cases that aren't (chiefly functions and strings)
+/// rarely need the flexibility of this kind of reference.  It does not
+/// work quite as well for "possibly symbolic" references because C strings
+/// are not naturally aligned, and making them aligned generally requires
+/// moving them out of the linker's ordinary string section; however, it's
+/// still workable.
+///
+/// Finally, a relative reference can be near or far.  A near reference
+/// is potentially smaller, but it requires the direct referent to lie
+/// within a certain distance of the reference, even if dynamically
+/// initialized.
+///
+/// In Swift, we always prefer to use a near direct relative reference
+/// when it is possible to do so: that is, when the relationship is always
+/// between two global objects emitted in the same linkage unit, and there
+/// is no compatibility constraint requiring the use of an absolute reference.
+///
+/// When more flexibility is required, there are several options:
+///
+///   1. Use an absolute reference.  Size penalty on 64-bit.  Requires
+///      load-time work.
+///
+///   2. Use a far direct relative reference.  Size penalty on 64-bit.
+///      Requires load-time work when object is outside linkage unit.
+///      Generally not directly supported by loaders.
+///
+///   3. Use an always-indirect relative reference.  Size penalty of one
+///      pointer (shared).  Requires load-time work even when object is
+///      within linkage unit.
+///
+///   4. Use a near indirectable relative reference.  Size penalty of one
+///      pointer (shared) when reference exceeds range.  Runtime / code-size
+///      penalty on access.  Requires load-time work (shared) only when
+///      object is outside linkage unit.
+///
+///   5. Use a far indirectable relative reference.  Size penalty on 64-bit.
+///      Size penalty of one pointer (shared) when reference exceeds range
+///      and is initialized statically.  Runtime / code-size penalty on access.
+///      Requires load-time work (shared) only when object is outside linkage
+///      unit.
+///
+///   6. Use a near or far symbolic relative reference.  No load-time work.
+///      Severe runtime penalty on access.  Requires custom logic to statically
+///      optimize.  Requires emission of symbol for target even if private
+///      to linkage unit.
+///
+///   7. Use a near or far direct-or-symbolic relative reference.  No
+///      load-time work.  Severe runtime penalty on access if object is
+///      outside of linkage unit.  Requires custom logic to statically optimize.
+///
+/// In general, it's our preference in Swift to use option #4 when there
+/// is no possibility of initializing the reference dynamically and option #5
+/// when there is.  This is because it is infeasible to actually share the
+/// memory for the intermediate absolute reference when it must be allocated
+/// dynamically.
+///
+/// Symbolic references are an interesting idea that we have not yet made
+/// use of.  They may be acceptable in reflective metadata cases where it
+/// is desirable to heavily bias towards never using the metadata.  However,
+/// they're only profitable if there wasn't any other indirect reference
+/// to the target, and it is likely that their optimal use requires a more
+/// intelligent toolchain from top to bottom.
+///
+/// Note that the cost of load-time work also includes a binary-size penalty
+/// to store the loader metadata necessary to perform that work.  Therefore
+/// it is better to avoid it even when there are dynamic optimizations in
+/// place to skip the work itself.
+///
 //===----------------------------------------------------------------------===//
 
 #ifndef SWIFT_BASIC_RELATIVEPOINTER_H
@@ -174,6 +176,54 @@ static inline Offset measureRelativeOffset(A *referent, B *base) {
 }
 
 } // namespace detail
+
+/// A relative reference to an object stored in memory. The reference may be
+/// direct or indirect, and uses the low bit of the (assumed at least
+/// 2-byte-aligned) pointer to differentiate.
+template<typename ValueTy, bool Nullable = false, typename Offset = int32_t>
+class RelativeIndirectPointer {
+private:
+  static_assert(std::is_integral<Offset>::value &&
+                std::is_signed<Offset>::value,
+                "offset type should be signed integer");
+
+  /// The relative offset of the pointer's memory from the `this` pointer.
+  /// This is an indirect reference.
+  Offset RelativeOffset;
+
+  /// RelativePointers should appear in statically-generated metadata. They
+  /// shouldn't be constructed or copied.
+  RelativeIndirectPointer() = delete;
+  RelativeIndirectPointer(RelativeIndirectPointer &&) = delete;
+  RelativeIndirectPointer(const RelativeIndirectPointer &) = delete;
+  RelativeIndirectPointer &operator=(RelativeIndirectPointer &&)
+    = delete;
+  RelativeIndirectPointer &operator=(const RelativeIndirectPointer &)
+    = delete;
+
+public:
+  const ValueTy *get() const & {
+    // Check for null.
+    if (Nullable && RelativeOffset == 0)
+      return nullptr;
+
+    uintptr_t address = detail::applyRelativeOffset(this, RelativeOffset);
+    return *reinterpret_cast<const ValueTy * const *>(address);
+  }
+
+  /// A zero relative offset encodes a null reference.
+  bool isNull() const & {
+    return RelativeOffset == 0;
+  }
+
+  operator const ValueTy* () const & {
+    return get();
+  }
+
+  const ValueTy *operator->() const & {
+    return get();
+  }
+};
 
 /// A relative reference to an object stored in memory. The reference may be
 /// direct or indirect, and uses the low bit of the (assumed at least
@@ -443,7 +493,7 @@ public:
     return this->get();
   }
 
-  RetTy operator()(ArgTy...arg) {
+  RetTy operator()(ArgTy...arg) const {
     return this->get()(std::forward<ArgTy>(arg)...);
   }
 

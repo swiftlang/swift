@@ -64,45 +64,13 @@ FilterTests.test("single-count") {
   }
     
   let f0 = (0..<30).makeIterator().lazy.filter(mod7AndCount)
-  let a0 = Array(f0)
+  _ = Array(f0)
   expectEqual(30, count)
 
   count = 0
   let f1 = LazyFilterCollection(_base: 0..<30, mod7AndCount)
-  let a1 = Array(f1)
+  _ = Array(f1)
   expectEqual(30, count)
-}
-
-FilterTests.test("Double filter type/Sequence") {
-  func foldingLevels<S : Sequence>(_ xs: S) {
-    var result = xs.lazy.filter { _ in true }.filter { _ in true }
-    expectType(LazyFilterSequence<S>.self, &result)
-  }
-  foldingLevels(Array(0..<10))
-
-  func backwardCompatible<S : Sequence>(_ xs: S) {
-    typealias ExpectedType = LazyFilterSequence<LazyFilterSequence<S>>
-    var result: ExpectedType = xs.lazy
-      .filter { _ in true }.filter { _ in true }
-    expectType(ExpectedType.self, &result)
-  }
-  backwardCompatible(Array(0..<10))
-}
-
-FilterTests.test("Double filter type/Collection") {
-  func foldingLevels<C : Collection>(_ xs: C) {
-    var result = xs.lazy.filter { _ in true }.filter { _ in true }
-    expectType(LazyFilterCollection<C>.self, &result)
-  }
-  foldingLevels(Array(0..<10))
-
-  func backwardCompatible<C : Collection>(_ xs: C) {
-    typealias ExpectedType = LazyFilterCollection<LazyFilterCollection<C>>
-    var result: ExpectedType = xs.lazy
-      .filter { _ in true }.filter { _ in true }
-    expectType(ExpectedType.self, &result)
-  }
-  backwardCompatible(Array(0..<10))
 }
 
 runAllTests()

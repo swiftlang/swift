@@ -1,0 +1,40 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -parse-sil -module-name OMEStripDeserializationInput %S/Inputs/ome_strip_deserialize_input.sil -emit-module -o %t/OMEStripDeserializationInput.swiftmodule
+// RUN: %target-sil-opt -non-transparent-func-ownership-model-eliminator -performance-linker -I %t %s | %FileCheck %s
+// RUN: %target-sil-opt -ownership-model-eliminator -performance-linker -I %t %s | %FileCheck --check-prefix=CHECK-STRIP-ALL %s
+
+sil_stage canonical
+
+import OMEStripDeserializationInput
+
+// Make sure that we properly set the deserialization call back for stripping
+// ownership SIL.
+
+// CHECK-LABEL: sil public_external [serialized] @bar : $@convention(thin) () -> ()
+// CHECK: } // end sil function 'bar'
+
+// CHECK-STRIP-ALL-LABEL: sil public_external [serialized] @bar : $@convention(thin) () -> ()
+// CHECK-STRIP-ALL: } // end sil function 'bar'
+sil [ossa] @bar : $@convention(thin) () -> ()
+
+// CHECK-LABEL: sil public_external [transparent] [serialized] [ossa] @transparent_bar : $@convention(thin) () -> ()
+// CHECK: } // end sil function 'transparent_bar'
+
+// CHECK-STRIP-ALL-LABEL: sil public_external [transparent] [serialized] @transparent_bar : $@convention(thin) () -> ()
+// CHECK-STRIP-ALL: } // end sil function 'transparent_bar'
+
+sil [transparent] [ossa] @transparent_bar : $@convention(thin) () -> ()
+
+// CHECK-LABEL: sil @foo : $@convention(thin) () -> () {
+// CHECK: } // end sil function 'foo'
+sil [ossa] @foo : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @bar : $@convention(thin) () -> ()
+  apply %0() : $@convention(thin) () -> ()
+
+  %1 = function_ref @transparent_bar : $@convention(thin) () -> ()
+  apply %1() : $@convention(thin) () -> ()
+
+  %9999 = tuple()
+  return %9999 : $()
+}

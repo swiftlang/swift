@@ -16,18 +16,73 @@ import Foundation
 import ObjectiveCTests
 #endif
 
+let t: [BenchmarkCategory] = [.validation, .bridging]
+let ts: [BenchmarkCategory] = [.validation, .String, .bridging]
+
 public let ObjectiveCBridgingStubs = [
-  BenchmarkInfo(name: "ObjectiveCBridgeStubDataAppend", runFunction: run_ObjectiveCBridgeStubDataAppend, tags: [.validation, .bridging]),
-  BenchmarkInfo(name: "ObjectiveCBridgeStubDateAccess", runFunction: run_ObjectiveCBridgeStubDateAccess, tags: [.validation, .bridging, .unstable]),
-  BenchmarkInfo(name: "ObjectiveCBridgeStubDateMutation", runFunction: run_ObjectiveCBridgeStubDateMutation, tags: [.validation, .bridging]),
-  BenchmarkInfo(name: "ObjectiveCBridgeStubFromArrayOfNSString", runFunction: run_ObjectiveCBridgeStubFromArrayOfNSString, tags: [.validation, .bridging]),
-  BenchmarkInfo(name: "ObjectiveCBridgeStubFromNSDate", runFunction: run_ObjectiveCBridgeStubFromNSDate, tags: [.validation, .bridging]),
-  BenchmarkInfo(name: "ObjectiveCBridgeStubFromNSString", runFunction: run_ObjectiveCBridgeStubFromNSString, tags: [.validation, .bridging]),
-  BenchmarkInfo(name: "ObjectiveCBridgeStubToArrayOfNSString", runFunction: run_ObjectiveCBridgeStubToArrayOfNSString, tags: [.validation, .bridging]),
-  BenchmarkInfo(name: "ObjectiveCBridgeStubToNSDate", runFunction: run_ObjectiveCBridgeStubToNSDate, tags: [.validation, .bridging]),
-  BenchmarkInfo(name: "ObjectiveCBridgeStubToNSString", runFunction: run_ObjectiveCBridgeStubToNSString, tags: [.validation, .bridging]),
-  BenchmarkInfo(name: "ObjectiveCBridgeStubURLAppendPath", runFunction: run_ObjectiveCBridgeStubURLAppendPath, tags: [.validation, .bridging]),
+  BenchmarkInfo(name: "ObjectiveCBridgeStubDataAppend",
+    runFunction: run_ObjectiveCBridgeStubDataAppend, tags: t,
+    legacyFactor: 20),
+  BenchmarkInfo(name: "ObjectiveCBridgeStubDateAccess",
+    runFunction: run_ObjectiveCBridgeStubDateAccess, tags: t),
+  BenchmarkInfo(name: "ObjectiveCBridgeStubDateMutation",
+    runFunction: run_ObjectiveCBridgeStubDateMutation, tags: t),
+  BenchmarkInfo(name: "ObjectiveCBridgeStubFromArrayOfNSString2",
+    runFunction: run_ObjectiveCBridgeStubFromArrayOfNSString, tags: t,
+    legacyFactor: 10),
+  BenchmarkInfo(name: "ObjectiveCBridgeStubFromNSDate",
+    runFunction: run_ObjectiveCBridgeStubFromNSDate, tags: t,
+    legacyFactor: 10),
+  BenchmarkInfo(name: "ObjectiveCBridgeStubFromNSString",
+    runFunction: run_ObjectiveCBridgeStubFromNSString, tags: t),
+  BenchmarkInfo(name: "ObjectiveCBridgeStubToArrayOfNSString2",
+    runFunction: run_ObjectiveCBridgeStubToArrayOfNSString, tags: t,
+    legacyFactor: 20),
+  BenchmarkInfo(name: "ObjectiveCBridgeStubToNSDate2",
+    runFunction: run_ObjectiveCBridgeStubToNSDate, tags: t,
+    legacyFactor: 10),
+  BenchmarkInfo(name: "ObjectiveCBridgeStubToNSString",
+    runFunction: run_ObjectiveCBridgeStubToNSString, tags: t,
+    legacyFactor: 10),
+  BenchmarkInfo(name: "ObjectiveCBridgeStubURLAppendPath2",
+    runFunction: run_ObjectiveCBridgeStubURLAppendPath, tags: t,
+    legacyFactor: 10),
+  BenchmarkInfo(name: "ObjectiveCBridgeStringIsEqual",
+    runFunction: run_ObjectiveCBridgeStringIsEqual, tags: ts,
+    setUpFunction: setup_StringBridgeBenchmark),
+  BenchmarkInfo(name: "ObjectiveCBridgeStringIsEqual2",
+    runFunction: run_ObjectiveCBridgeStringIsEqual2, tags: ts,
+    setUpFunction: setup_StringBridgeBenchmark),
+  BenchmarkInfo(name: "ObjectiveCBridgeStringIsEqualAllSwift",
+    runFunction: run_ObjectiveCBridgeStringIsEqualAllSwift, tags: ts,
+    setUpFunction: setup_StringBridgeBenchmark),
+  BenchmarkInfo(name: "ObjectiveCBridgeStringCompare",
+    runFunction: run_ObjectiveCBridgeStringCompare, tags: ts,
+    setUpFunction: setup_StringBridgeBenchmark),
+  BenchmarkInfo(name: "ObjectiveCBridgeStringCompare2",
+    runFunction: run_ObjectiveCBridgeStringCompare2, tags: ts,
+    setUpFunction: setup_StringBridgeBenchmark),
+  BenchmarkInfo(name: "ObjectiveCBridgeStringGetASCIIContents",
+    runFunction: run_ObjectiveCBridgeStringGetASCIIContents, tags: ts,
+    setUpFunction: setup_StringBridgeBenchmark),
+  BenchmarkInfo(name: "ObjectiveCBridgeStringGetUTF8Contents",
+    runFunction: run_ObjectiveCBridgeStringGetUTF8Contents, tags: ts,
+    setUpFunction: setup_StringBridgeBenchmark),
+  BenchmarkInfo(name: "ObjectiveCBridgeStringRangeOfString",
+    runFunction: run_ObjectiveCBridgeStringRangeOfString, tags: ts,
+    setUpFunction: setup_StringBridgeBenchmark),
+  BenchmarkInfo(name: "ObjectiveCBridgeStringHash",
+    runFunction: run_ObjectiveCBridgeStringHash, tags: ts,
+    setUpFunction: setup_StringBridgeBenchmark),
+  BenchmarkInfo(name: "ObjectiveCBridgeStringUTF8String",
+    runFunction: run_ObjectiveCBridgeStringUTF8String, tags: ts,
+    setUpFunction: setup_StringBridgeBenchmark),
+  BenchmarkInfo(name: "ObjectiveCBridgeStringCStringUsingEncoding",
+    runFunction: run_ObjectiveCBridgeStringCStringUsingEncoding, tags: ts,
+    setUpFunction: setup_StringBridgeBenchmark),
 ]
+
+var b:BridgeTester! = nil
 
 #if _runtime(_ObjC)
 @inline(never)
@@ -58,7 +113,7 @@ public func run_ObjectiveCBridgeStubFromNSString(_ N: Int) {
 func testObjectiveCBridgeStubToNSString() {
    let b = BridgeTester()
    let str = "hello world"
-   for _ in 0 ..< 10_000 {
+   for _ in 0 ..< 1_000 {
      b.test(from: str)
    }
 }
@@ -80,7 +135,7 @@ func testObjectiveCBridgeStubFromArrayOfNSString() {
    let b = BridgeTester()
    var arr : [String] = []
    var str = ""
-   for _ in 0 ..< 10_000 {
+   for _ in 0 ..< 100 {
      arr = b.testToArrayOfStrings()
      str = arr[0]
    }
@@ -104,7 +159,7 @@ func testObjectiveCBridgeStubToArrayOfNSString() {
    let b = BridgeTester()
    let str = "hello world"
    let arr = [str, str, str, str, str, str, str, str, str, str]
-   for _ in 0 ..< 10_000 {
+   for _ in 0 ..< 50 {
      b.test(fromArrayOf: arr)
    }
 }
@@ -126,7 +181,7 @@ public func run_ObjectiveCBridgeStubToArrayOfNSString(_ N: Int) {
 func testObjectiveCBridgeStubFromNSDate() {
   let b = BridgeTester()
 
-  for _ in 0 ..< 100_000 {
+  for _ in 0 ..< 10_000 {
     let bridgedBegin = b.beginDate()
     let bridgedEnd = b.endDate()
     let _ = bridgedEnd.timeIntervalSince(bridgedBegin)
@@ -150,7 +205,7 @@ public func run_ObjectiveCBridgeStubFromNSDate(N: Int) {
 public func testObjectiveCBridgeStubToNSDate() {
   let b = BridgeTester()
   let d = Date()
-  for _ in 0 ..< 100_000 {
+  for _ in 0 ..< 1_000 {
     b.use(d)
   }
 }
@@ -214,7 +269,7 @@ public func run_ObjectiveCBridgeStubDateMutation(N: Int) {
 @inline(never)
 func testObjectiveCBridgeStubURLAppendPath() {
   let startUrl = URL(string: "/")!
-  for _ in 0 ..< 10_000 {
+  for _ in 0 ..< 10 {
     var url = startUrl
     for _ in 0 ..< 10 {
       url.appendPathComponent("foo")
@@ -239,7 +294,7 @@ public func run_ObjectiveCBridgeStubURLAppendPath(N: Int) {
 func testObjectiveCBridgeStubDataAppend() {
   let proto = Data()
   var value: UInt8 = 1
-  for _ in 0 ..< 1_000 {
+  for _ in 0 ..< 50 {
     var d = proto
     for _ in 0 ..< 100 {
        d.append(&value, count: 1)
@@ -256,5 +311,140 @@ public func run_ObjectiveCBridgeStubDataAppend(N: Int) {
       testObjectiveCBridgeStubDataAppend()
     }
   }
+#endif
+}
+
+@inline(never)
+internal func getStringsToBridge() -> [String] {
+  let strings1 = ["hello", "the quick brown fox jumps over the lazy dog", "the quick brown fox jumps over the lazy dög"]
+  return strings1 + strings1.map { $0 + $0 } //mix of literals and non-literals
+}
+
+@inline(never)
+public func run_ObjectiveCBridgeStringIsEqual(N: Int) {
+  #if _runtime(_ObjC)
+  for _ in 0 ..< N {
+    autoreleasepool {
+      b.testIsEqualToString()
+    }
+  }
+  #endif
+}
+
+@inline(never)
+public func run_ObjectiveCBridgeStringIsEqual2(N: Int) {
+  #if _runtime(_ObjC)
+  for _ in 0 ..< N {
+    autoreleasepool {
+      b.testIsEqualToString2()
+    }
+  }
+  #endif
+}
+
+@inline(never)
+public func run_ObjectiveCBridgeStringIsEqualAllSwift(N: Int) {
+  #if _runtime(_ObjC)
+  for _ in 0 ..< N {
+    autoreleasepool {
+      b.testIsEqualToStringAllSwift()
+    }
+  }
+  #endif
+}
+
+@inline(never)
+public func run_ObjectiveCBridgeStringCompare(N: Int) {
+  #if _runtime(_ObjC)
+  for _ in 0 ..< N {
+    autoreleasepool {
+      b.testCompare()
+    }
+  }
+  #endif
+}
+
+@inline(never)
+public func run_ObjectiveCBridgeStringCompare2(N: Int) {
+  #if _runtime(_ObjC)
+  for _ in 0 ..< N {
+    autoreleasepool {
+      b.testCompare2()
+    }
+  }
+  #endif
+}
+
+@inline(never)
+public func run_ObjectiveCBridgeStringGetASCIIContents(N: Int) {
+  #if _runtime(_ObjC)
+  for _ in 0 ..< N {
+    autoreleasepool {
+      b.testGetASCIIContents()
+    }
+  }
+  #endif
+}
+
+@inline(never)
+public func run_ObjectiveCBridgeStringGetUTF8Contents(N: Int) {
+  #if _runtime(_ObjC)
+  for _ in 0 ..< N {
+    autoreleasepool {
+      b.testGetUTF8Contents()
+    }
+  }
+  #endif
+}
+
+@inline(never)
+public func run_ObjectiveCBridgeStringRangeOfString(N: Int) {
+  #if _runtime(_ObjC)
+  for _ in 0 ..< N {
+    autoreleasepool {
+      b.testRangeOfString()
+    }
+  }
+  #endif
+}
+
+@inline(never)
+public func run_ObjectiveCBridgeStringHash(N: Int) {
+  #if _runtime(_ObjC)
+  for _ in 0 ..< N {
+    autoreleasepool {
+      b.testHash()
+    }
+  }
+  #endif
+}
+
+@inline(never)
+public func run_ObjectiveCBridgeStringUTF8String(N: Int) {
+  #if _runtime(_ObjC)
+  for _ in 0 ..< N {
+    autoreleasepool {
+      b.testUTF8String()
+    }
+  }
+  #endif
+}
+
+@inline(never)
+public func run_ObjectiveCBridgeStringCStringUsingEncoding(N: Int) {
+  #if _runtime(_ObjC)
+  for _ in 0 ..< N {
+    autoreleasepool {
+      b.testCStringUsingEncoding()
+    }
+  }
+  #endif
+}
+
+@inline(never)
+public func setup_StringBridgeBenchmark() {
+#if _runtime(_ObjC)
+  b = BridgeTester()
+  b.setUpStringTests(getStringsToBridge())
 #endif
 }

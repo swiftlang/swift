@@ -1,5 +1,4 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %gyb %s -o %t/bridging-nsnumber-and-nsvalue.swift
 // RUN: %target-swift-frontend -typecheck -verify %t/bridging-nsnumber-and-nsvalue.swift -swift-version 4
 
@@ -39,7 +38,12 @@ extension Equatable {
     fatalError("hella cray")
   }
 }
-extension Hashable { public var hashValue: Int { fatalError("trill hiphy") } }
+extension Hashable {
+  public func hash(into hasher: inout Hasher) {
+    fatalError("trill hiphy")
+  }
+}
+
 extension CGSize: Hashable {}
 extension CGPoint: Hashable {}
 extension CGRect: Hashable {}

@@ -94,14 +94,19 @@ __attribute__((availability(ios,introduced=8.0)))
 
 /// Aaa.  NSArray.  Bbb.
 @interface NSArray<ObjectType> : NSObject
+- (instancetype)initWithObjects:(const ObjectType _Nonnull [_Nullable])objects
+                          count:(NSUInteger)cnt NS_DESIGNATED_INITIALIZER;
 - (nonnull ObjectType)objectAtIndexedSubscript:(NSUInteger)idx;
 - description;
-+ (instancetype)arrayWithObjects:(const ObjectType _Nonnull[_Nullable])objects
-                           count:(NSUInteger)count;
 - (void)makeObjectsPerformSelector:(nonnull SEL)aSelector;
 - (void)makeObjectsPerformSelector:(nonnull SEL)aSelector withObject:(nullable ObjectType)anObject;
 - (void)makeObjectsPerformSelector:(nonnull SEL)aSelector withObject:(nullable ObjectType)anObject withObject:(nullable ObjectType)anotherObject;
 - (nonnull NSMutableArray<ObjectType> *)mutableCopy;
+@end
+
+@interface NSArray<ObjectType>(NSArrayCreation)
++ (instancetype)arrayWithObjects:(const ObjectType _Nonnull [_Nullable])objects
+                           count:(NSUInteger)cnt;
 @end
 
 @interface NSArray (AddingObject)
@@ -150,7 +155,7 @@ __attribute__((availability(ios,introduced=8.0)))
 - (id)copyWithZone:(nullable NSZone *)zone;
 @end
 
-@interface NSDictionary<KeyType : id<NSCopying>, ObjectType> : NSObject /*<NSCopying, NSMutableCopying, NSSecureCoding, NSFastEnumeration>*/
+@interface NSDictionary<KeyType, ObjectType> : NSObject /*<NSCopying, NSMutableCopying, NSSecureCoding, NSFastEnumeration>*/
 @property (readonly) NSUInteger count;
 - (nullable ObjectType)objectForKey:(nonnull KeyType)aKey;
 - (nonnull NSEnumerator *)keyEnumerator;
@@ -274,6 +279,10 @@ __attribute__((warn_unused_result)) NSString *NSStringToNSString(NSString *str);
 - (BOOL)getResourceValue:(out id _Nullable *)value
                   forKey:(NSString *)key
                    error:(out NSError *_Nullable *)error;
+@end
+
+// An all-initials name like NSURL or NSUUID, but one that isn't bridged.
+@interface NSGUID : NSObject
 @end
 
 @interface NSAttributedString : NSString
@@ -764,6 +773,8 @@ NSSet *setToSet(NSSet *dict);
 
 @interface NSExtensionContext : NSObject
 - (void)openURL:(NSURL *)URL completionHandler:(void (^)(BOOL success))completionHandler;
+// Fake API, for testing initialisms.
+- (void)openGUID:(NSGUID *)GUID completionHandler:(void (^)(BOOL success))completionHandler;
 @end
 
 @interface NSProcessInfo : NSObject
@@ -868,6 +879,7 @@ typedef struct NonNilableReferences {
 @protocol NSProtocolWithOptionalRequirement
 @optional
 -(void)optionalRequirement;
+-(DummyClass *)optionalRequirementMethodWithIUOResult;
 @end
 
 @interface NSClassWithMethodFromNSProtocolWithOptionalRequirement
@@ -956,12 +968,19 @@ __attribute__((availability(macosx, introduced = 10.52)))
 - (nonnull NSString *)stringByAppendingString:(nonnull NSString *)string;
 - (nonnull NSString *)stringWithString:(nonnull NSString *)string;
 - (nullable NSURL *)URLWithAddedString:(nonnull NSString *)string;
+// Fake API for testing initialisms.
+- (nullable NSGUID *)GUIDWithAddedString:(nonnull NSString *)string;
 - (NSString *)stringForCalendarUnits:(NSCalendarUnit)units;
 @end
 
 @interface NSURL (Properties)
 @property (readonly, nullable) NSURL *URLByDeletingLastPathComponent;
 @property (readonly, nonnull) NSURL *URLWithHTTPS;
+@end
+
+@interface NSGUID (Properties)
+@property (readonly, nullable) NSGUID *GUIDByCanonicalizing;
+@property (readonly, nonnull) NSGUID *GUIDWithContext;
 @end
 
 typedef NS_OPTIONS(NSUInteger, NSEnumerationOptions) {
@@ -1048,6 +1067,7 @@ extern NSString *NSHTTPRequestKey;
 
 @interface NSString (URLExtraction)
 @property (nonnull,copy,readonly) NSArray<NSURL *> *URLsInText;
+@property (nonnull,copy,readonly) NSArray<NSGUID *> *GUIDsInText;
 @end
 
 @interface NSObject (Selectors)
@@ -1073,6 +1093,10 @@ extern NSString *NSHTTPRequestKey;
 
 @property (strong) id propertyOfId;
 
+@end
+
+@protocol NSIdLoving
+- (void)takesIdViaProtocol:(id _Nonnull)x;
 @end
 
 #define NSTimeIntervalSince1970 978307200.0
@@ -1142,5 +1166,18 @@ void install_global_event_handler(_Nullable event_handler handler);
          context: (void*) options;
 @end
 
-__nullable id returnNullableId(void);
-void takeNullableId(__nullable id);
+_Nullable id returnNullableId(void);
+void takeNullableId(_Nullable id);
+
+@interface I
+@end
+
+@protocol OptionalRequirements
+@optional
+- (Coat *)optional;
+@property NSString *name;
+@end
+
+@interface IUOProperty
+@property (readonly) id<OptionalRequirements> iuo;
+@end

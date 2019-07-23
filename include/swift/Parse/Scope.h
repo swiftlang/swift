@@ -33,11 +33,11 @@ namespace swift {
 class ScopeInfo {
   friend class Scope;
 public:
-  typedef std::pair<unsigned, ValueDecl*> ValueScopeEntry;
-  
-  typedef TreeScopedHashTable<DeclName, ValueScopeEntry> ScopedHTTy;
-  typedef ScopedHTTy::ScopeTy ScopedHTScopeTy;
-  typedef ScopedHTTy::DetachedScopeTy ScopedHTDetachedScopeTy;
+  using ValueScopeEntry = std::pair<unsigned, ValueDecl *>;
+
+  using ScopedHTTy = TreeScopedHashTable<DeclName, ValueScopeEntry>;
+  using ScopedHTScopeTy = ScopedHTTy::ScopeTy;
+  using ScopedHTDetachedScopeTy = ScopedHTTy::DetachedScopeTy;
 
 private:
   ScopedHTTy HT;
@@ -52,11 +52,15 @@ public:
 
   /// addToScope - Register the specified decl as being in the current lexical
   /// scope.
-  void addToScope(ValueDecl *D, Parser &TheParser);
+  void addToScope(ValueDecl *D, Parser &TheParser,
+                  bool diagnoseRedefinitions = true);
 
   bool isInactiveConfigBlock() const;
   
   SavedScope saveCurrentScope();
+
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
+                            "Only for use in the debugger");
 };
 
 enum class ScopeKind {
@@ -67,13 +71,10 @@ enum class ScopeKind {
   StructBody,
   ClassBody,
   ProtocolBody,
-  ConstructorBody,
-  DestructorBody,
   InheritanceClause,
 
   Brace,
   TopLevel,
-  ForVars,
   ForeachVars,
   CaseVars,
   CatchVars,
@@ -83,7 +84,7 @@ enum class ScopeKind {
   ClosureParams,
 };
 
-/// \brief An opaque object that owns the scope frame.  The scope frame can be
+/// An opaque object that owns the scope frame.  The scope frame can be
 /// re-entered later.
 class SavedScope {
   friend class Scope;
@@ -127,7 +128,7 @@ class Scope {
   ScopeKind Kind;
   bool IsInactiveConfigBlock;
 
-  /// \brief Save this scope so that it can be re-entered later.  Transfers the
+  /// Save this scope so that it can be re-entered later.  Transfers the
   /// ownership of the scope frame to returned object.
   SavedScope saveScope() {
     return SavedScope(HTScope.detach(), Depth, Kind, IsInactiveConfigBlock);
@@ -140,10 +141,10 @@ class Scope {
   bool isResolvable() const;
 
 public:
-  /// \brief Create a lexical scope of the specified kind.
+  /// Create a lexical scope of the specified kind.
   Scope(Parser *P, ScopeKind SC, bool isInactiveConfigBlock = false);
 
-  /// \brief Re-enter the specified scope, transferring the ownership of the
+  /// Re-enter the specified scope, transferring the ownership of the
   /// scope frame to the new object.
   Scope(Parser *P, SavedScope &&SS);
 

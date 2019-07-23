@@ -21,8 +21,8 @@ ManagedValue Scope::popPreservingValue(ManagedValue mv) {
   // that we want to make sure that we are not forwarding a cleanup for a
   // stack location that will be destroyed by this scope.
   assert(mv && mv.getType().isObject() &&
-         (mv.getType().isTrivial(cleanups.SGF.getModule()) ||
-          mv.getOwnershipKind() == ValueOwnershipKind::Trivial ||
+         (mv.getType().isTrivial(cleanups.SGF.F) ||
+          mv.getOwnershipKind() == ValueOwnershipKind::Any ||
           mv.hasCleanup()));
   CleanupCloner cloner(cleanups.SGF, mv);
   SILValue value = mv.forward(cleanups.SGF);
@@ -53,10 +53,10 @@ static void lifetimeExtendAddressOnlyRValueSubValues(
     }
 
     // Otherwise, create the box and move the address only value into the box.
-    assert(v->getType().isAddressOnly(SGF.getModule()) &&
+    assert(v->getType().isAddressOnly(SGF.F) &&
            "RValue invariants imply that all RValue subtypes that are "
            "addresses must be address only.");
-    auto boxTy = SILBoxType::get(v->getType().getSwiftRValueType());
+    auto boxTy = SILBoxType::get(v->getType().getASTType());
     SILValue box = SGF.B.createAllocBox(loc, boxTy);
     SILValue addr = SGF.B.createProjectBox(loc, box, 0);
     SGF.B.createCopyAddr(loc, v, addr, IsTake, IsInitialization);
@@ -120,12 +120,16 @@ RValue Scope::popPreservingValue(RValue &&rv) {
 }
 
 void Scope::popImpl() {
-  cleanups.stack.checkIterator(depth);
-  cleanups.stack.checkIterator(cleanups.innermostScope);
-  assert(cleanups.innermostScope == depth && "popping scopes out of order");
-
+  verify();
   cleanups.innermostScope = savedInnermostScope;
   cleanups.endScope(depth, loc);
-  cleanups.stack.checkIterator(cleanups.innermostScope);
-  cleanups.popTopDeadCleanups(cleanups.innermostScope);
+  if (cleanups.innermostScope)
+    cleanups.stack.checkIterator(cleanups.innermostScope->depth);
+  cleanups.popTopDeadCleanups();
+}
+
+void Scope::verify() {
+  assert(cleanups.innermostScope == this && "popping scopes out of order");
+  assert(depth.isValid());
+  cleanups.stack.checkIterator(depth);
 }

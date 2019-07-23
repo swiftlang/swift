@@ -33,9 +33,9 @@ using Param = remote::FunctionParam<const TypeRef *>;
 TEST(TypeRefTest, UniqueBuiltinTypeRef) {
   TypeRefBuilder Builder;
 
-  auto BI1 = Builder.createBuiltinType(ABC);
-  auto BI2 = Builder.createBuiltinType(ABC);
-  auto BI3 = Builder.createBuiltinType(ABCD);
+  auto BI1 = Builder.createBuiltinType(ABC, ABC);
+  auto BI2 = Builder.createBuiltinType(ABC, ABC);
+  auto BI3 = Builder.createBuiltinType(ABCD, ABCD);
 
   EXPECT_EQ(BI1, BI2);
   EXPECT_NE(BI2, BI3);
@@ -148,9 +148,10 @@ TEST(TypeRefTest, UniqueFunctionTypeRef) {
 
   // Test parameter with and without inout/shared/variadic and/or label.
   ParameterFlags paramFlags;
-  auto inoutFlags = paramFlags.withInOut(true);
+  auto inoutFlags = paramFlags.withValueOwnership(ValueOwnership::InOut);
   auto variadicFlags = paramFlags.withVariadic(true);
-  auto sharedFlags = paramFlags.withShared(true);
+  auto sharedFlags = paramFlags.withValueOwnership(ValueOwnership::Shared);
+  auto ownedFlags = paramFlags.withValueOwnership(ValueOwnership::Owned);
 
   auto F6 = Builder.createFunctionType({Param1.withFlags(inoutFlags)}, Result,
                                        FunctionTypeFlags());
@@ -170,17 +171,27 @@ TEST(TypeRefTest, UniqueFunctionTypeRef) {
                                          Result, FunctionTypeFlags());
   EXPECT_EQ(F8, F8_1);
 
-  auto F9 = Builder.createFunctionType({Param1}, Result, FunctionTypeFlags());
-  auto F9_1 = Builder.createFunctionType({Param1.withLabel("foo")}, Result,
+  auto F9 = Builder.createFunctionType({Param1.withFlags(ownedFlags)}, Result,
+                                       FunctionTypeFlags());
+  auto F9_1 = Builder.createFunctionType({Param1.withFlags(ownedFlags)},
+                                         Result, FunctionTypeFlags());
+  EXPECT_EQ(F9, F9_1);
+
+  auto F10 = Builder.createFunctionType({Param1}, Result, FunctionTypeFlags());
+  auto F10_1 = Builder.createFunctionType({Param1.withLabel("foo")}, Result,
                                          FunctionTypeFlags());
-  EXPECT_NE(F9, F9_1);
+  EXPECT_NE(F10, F10_1);
 
   EXPECT_NE(F6, F7);
   EXPECT_NE(F6, F8);
   EXPECT_NE(F6, F9);
+  EXPECT_NE(F6, F10);
   EXPECT_NE(F7, F8);
   EXPECT_NE(F7, F9);
+  EXPECT_NE(F7, F10);
   EXPECT_NE(F8, F9);
+  EXPECT_NE(F8, F10);
+  EXPECT_NE(F9, F10);
 
   auto VoidVoid1 =
       Builder.createFunctionType(VoidParams, VoidResult, FunctionTypeFlags());
@@ -191,23 +202,23 @@ TEST(TypeRefTest, UniqueFunctionTypeRef) {
   EXPECT_NE(VoidVoid1, F1);
 
   // Test escaping.
-  auto F10 = Builder.createFunctionType(Parameters1, Result,
-                                        FunctionTypeFlags().withEscaping(true));
   auto F11 = Builder.createFunctionType(Parameters1, Result,
                                         FunctionTypeFlags().withEscaping(true));
-  auto F12 = Builder.createFunctionType(
+  auto F12 = Builder.createFunctionType(Parameters1, Result,
+                                        FunctionTypeFlags().withEscaping(true));
+  auto F13 = Builder.createFunctionType(
       Parameters1, Result, FunctionTypeFlags().withEscaping(false));
-  EXPECT_EQ(F10, F11);
-  EXPECT_NE(F10, F12);
+  EXPECT_EQ(F11, F12);
+  EXPECT_NE(F11, F13);
 }
 
 TEST(TypeRefTest, UniqueProtocolTypeRef) {
   TypeRefBuilder Builder;
 
-  Optional<std::string> P1 = ABC;
-  Optional<std::string> P2 = ABC;
-  Optional<std::string> P3 = ABCD;
-  Optional<std::string> P4 = XYZ;
+  TypeRefBuilder::BuiltProtocolDecl P1 = std::make_pair(ABC, false);
+  TypeRefBuilder::BuiltProtocolDecl P2 = std::make_pair(ABC, false);
+  TypeRefBuilder::BuiltProtocolDecl P3 = std::make_pair(ABCD, false);
+  TypeRefBuilder::BuiltProtocolDecl P4 = std::make_pair(XYZ, false);
 
   EXPECT_EQ(P1, P2);
   EXPECT_NE(P2, P3);
@@ -229,10 +240,10 @@ TEST(TypeRefTest, UniqueMetatypeTypeRef) {
   TypeRefBuilder Builder;
 
   auto N1 = Builder.createNominalType(ABC, nullptr);
-  auto M1 = Builder.createMetatypeType(N1, false);
-  auto M2 = Builder.createMetatypeType(N1, false);
-  auto MM3 = Builder.createMetatypeType(M1, false);
-  auto M4 = Builder.createMetatypeType(N1, true);
+  auto M1 = Builder.createMetatypeType(N1, None);
+  auto M2 = Builder.createMetatypeType(N1, None);
+  auto MM3 = Builder.createMetatypeType(M1, None);
+  auto M4 = Builder.createMetatypeType(N1, Demangle::ImplMetatypeRepresentation::Thick);
 
   EXPECT_EQ(M1, M2);
   EXPECT_NE(M2, MM3);
@@ -269,8 +280,8 @@ TEST(TypeRefTest, UniqueDependentMemberTypeRef) {
 
   auto N1 = Builder.createNominalType(ABC, nullptr);
   auto N2 = Builder.createNominalType(XYZ, nullptr);
-  Optional<std::string> P1 = ABC;
-  Optional<std::string> P2 = ABCD;
+  TypeRefBuilder::BuiltProtocolDecl P1 = std::make_pair(ABC, false);
+  TypeRefBuilder::BuiltProtocolDecl P2 = std::make_pair(ABCD, false);
 
   auto DM1 = Builder.createDependentMemberType("Index", N1, P1);
   auto DM2 = Builder.createDependentMemberType("Index", N1, P1);

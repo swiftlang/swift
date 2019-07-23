@@ -37,20 +37,14 @@ namespace immediate {
 /// Returns a handle to the runtime suitable for other \c dlsym or \c dlclose
 /// calls or \c null if an error occurred.
 ///
-/// \param runtimeLibPath Path to search for compiler-relative stdlib dylibs.
-void *loadSwiftRuntime(StringRef runtimeLibPath);
+/// \param runtimeLibPaths Paths to search for stdlib dylibs.
+void *loadSwiftRuntime(ArrayRef<std::string> runtimeLibPaths);
 bool tryLoadLibraries(ArrayRef<LinkLibrary> LinkLibraries,
                       SearchPathOptions SearchPathOpts,
                       DiagnosticEngine &Diags);
 bool linkLLVMModules(llvm::Module *Module,
                      std::unique_ptr<llvm::Module> SubModule);
-bool IRGenImportedModules(
-    CompilerInstance &CI,
-    llvm::Module &Module,
-    llvm::SmallPtrSet<swift::ModuleDecl *, 8> &ImportedModules,
-    SmallVectorImpl<llvm::Function*> &InitFns,
-    IRGenOptions &IRGenOpts,
-    const SILOptions &SILOpts);
+bool autolinkImportedModules(ModuleDecl *M, IRGenOptions &IRGenOpts);
 
 } // end namespace immediate
 } // end namespace swift

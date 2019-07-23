@@ -1,0 +1,4 @@
+"main.swift":
+  object: "main.o"
+  dependencies: "main.d"
+  diagnostics: "main.dia"

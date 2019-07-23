@@ -131,7 +131,7 @@ func overloaded_identity(_ b : Float) -> Float {}
 
 func test_contextual_result_1() {
   return overloaded_identity()  // expected-error {{cannot invoke 'overloaded_identity' with no arguments}}
-  // expected-note @-1 {{overloads for 'overloaded_identity' exist with these partially matching parameter lists: (Int), (Float)}}
+  // expected-note @-1 {{overloads for 'overloaded_identity' exist with these partially matching parameter lists: (Float), (Int)}}
 }
 
 func test_contextual_result_2() {
@@ -153,7 +153,9 @@ struct X1 {
 }
 
 let x1 = X1(Int.self)
-let x1check: X1 = x1 // expected-error{{value of optional type 'X1?' not unwrapped; did you mean to use '!' or '?'?}}
+let x1check: X1 = x1 // expected-error{{value of optional type 'X1?' must be unwrapped}}
+  // expected-note@-1{{coalesce}}
+  // expected-note@-2{{force-unwrap}}
 
 
 struct X2 {
@@ -164,7 +166,9 @@ struct X2 {
 }
 
 let x2 = X2(Int.self)
-let x2check: X2 = x2 // expected-error{{value of optional type 'X2?' not unwrapped; did you mean to use '!' or '?'?}}
+let x2check: X2 = x2 // expected-error{{value of optional type 'X2?' must be unwrapped}}
+  // expected-note@-1{{coalesce}}
+  // expected-note@-2{{force-unwrap}}
 
 // rdar://problem/28051973
 struct R_28051973 {

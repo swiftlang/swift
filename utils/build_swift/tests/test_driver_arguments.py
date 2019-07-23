@@ -8,6 +8,7 @@
 
 
 import os
+import platform
 import sys
 import unittest
 from contextlib import contextmanager
@@ -344,7 +345,10 @@ class TestDriverArgumentParserMeta(type):
     def generate_preset_test(cls, preset_name, preset_args):
         def test(self):
             try:
-                self.parse_default_args(preset_args, check_impl_args=True)
+                # Windows cannot run build-script-impl to check the impl args.
+                is_windows = platform.system() == 'Windows'
+                self.parse_default_args(preset_args,
+                                        check_impl_args=not is_windows)
             except ParserError as e:
                 self.fail('failed to parse preset "{}": {}'.format(
                     preset_name, e))
@@ -561,14 +565,14 @@ class TestDriverArgumentParser(unittest.TestCase):
         with self.assertNotRaises(ParserError):
             namespace = self.parse_default_args(['--debug'])
 
-            self.assertEquals(namespace.cmark_build_variant, 'Debug')
-            self.assertEquals(namespace.foundation_build_variant, 'Debug')
-            self.assertEquals(namespace.libdispatch_build_variant, 'Debug')
-            self.assertEquals(namespace.libicu_build_variant, 'Debug')
-            self.assertEquals(namespace.lldb_build_variant, 'Debug')
-            self.assertEquals(namespace.llvm_build_variant, 'Debug')
-            self.assertEquals(namespace.swift_build_variant, 'Debug')
-            self.assertEquals(namespace.swift_stdlib_build_variant, 'Debug')
+            self.assertEqual(namespace.cmark_build_variant, 'Debug')
+            self.assertEqual(namespace.foundation_build_variant, 'Debug')
+            self.assertEqual(namespace.libdispatch_build_variant, 'Debug')
+            self.assertEqual(namespace.libicu_build_variant, 'Debug')
+            self.assertEqual(namespace.lldb_build_variant, 'Debug')
+            self.assertEqual(namespace.llvm_build_variant, 'Debug')
+            self.assertEqual(namespace.swift_build_variant, 'Debug')
+            self.assertEqual(namespace.swift_stdlib_build_variant, 'Debug')
 
     def test_implied_defaults_skip_build(self):
         with self.assertNotRaises(ParserError):
@@ -590,6 +594,7 @@ class TestDriverArgumentParser(unittest.TestCase):
             self.assertFalse(namespace.build_libicu)
             self.assertFalse(namespace.build_lldb)
             self.assertFalse(namespace.build_llbuild)
+            self.assertFalse(namespace.build_libcxx)
             self.assertFalse(namespace.build_playgroundsupport)
             self.assertFalse(namespace.build_swiftpm)
             self.assertFalse(namespace.build_xctest)
@@ -639,12 +644,19 @@ class TestDriverArgumentParser(unittest.TestCase):
             namespace = self.parse_default_args(['--test-optimize-for-size'])
             self.assertTrue(namespace.test)
 
+    def test_implied_defaults_test_optimize_none_with_implicit_dynamic(self):
+        with self.assertNotRaises(ParserError):
+            namespace = self.parse_default_args(
+                ['--test-optimize-none-with-implicit-dynamic'])
+            self.assertTrue(namespace.test)
+
     def test_implied_defaults_skip_all_tests(self):
         with self.assertNotRaises(ParserError):
             namespace = self.parse_default_args([
                 '--test', '0',
                 '--validation-test', '0',
                 '--long-test', '0',
+                '--stress-test', '0',
             ])
 
             self.assertFalse(namespace.test_linux)
@@ -689,6 +701,12 @@ class TestDriverArgumentParser(unittest.TestCase):
             self.assertFalse(namespace.test_tvos_host)
             self.assertFalse(namespace.test_watchos_host)
             self.assertFalse(namespace.test_android_host)
+            self.assertFalse(namespace.build_libparser_only)
+
+    def test_build_lib_swiftsyntaxparser_only(self):
+        with self.assertNotRaises(ParserError):
+            namespace = self.parse_default_args(['--build-libparser-only'])
+            self.assertTrue(namespace.build_libparser_only)
 
 
 if __name__ == '__main__':

@@ -1,0 +1,3 @@
+module cake {
+  header "Cake.h"
+}

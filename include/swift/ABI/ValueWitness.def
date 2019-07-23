@@ -23,7 +23,6 @@
 #if defined(WANT_ALL_VALUE_WITNESSES)
 #undef WANT_ALL_VALUE_WITNESSES
 #define WANT_REQUIRED_VALUE_WITNESSES         1
-#define WANT_EXTRA_INHABITANT_VALUE_WITNESSES 1
 #define WANT_ENUM_VALUE_WITNESSES             1
 
 /// WANT_ONLY_REQUIRED_VALUE_WITNESSES
@@ -31,15 +30,6 @@
 #elif defined(WANT_ONLY_REQUIRED_VALUE_WITNESSES)
 #undef WANT_ONLY_REQUIRED_VALUE_WITNESSES
 #define WANT_REQUIRED_VALUE_WITNESSES         1
-#define WANT_EXTRA_INHABITANT_VALUE_WITNESSES 0
-#define WANT_ENUM_VALUE_WITNESSES             0
-
-/// WANT_ONLY_EXTRA_INHABITANT_VALUE_WITNESSES
-///   Define this to expand only the extra-inhabitant value witnesses.
-#elif defined(WANT_ONLY_EXTRA_INHABITANT_VALUE_WITNESSES)
-#undef WANT_ONLY_EXTRA_INHABITANT_VALUE_WITNESSES
-#define WANT_REQUIRED_VALUE_WITNESSES         0
-#define WANT_EXTRA_INHABITANT_VALUE_WITNESSES 1
 #define WANT_ENUM_VALUE_WITNESSES             0
 
 /// WANT_ONLY_ENUM_VALUE_WITNESSES
@@ -47,15 +37,13 @@
 #elif  defined(WANT_ONLY_ENUM_VALUE_WITNESSES)
 #undef  WANT_ONLY_ENUM_VALUE_WITNESSES
 #define WANT_REQUIRED_VALUE_WITNESSES         0
-#define WANT_EXTRA_INHABITANT_VALUE_WITNESSES 0
 #define WANT_ENUM_VALUE_WITNESSES             1
 
 /// WANT_REQUIRED_VALUE_WITNESSES
-/// WANT_EXTRA_INHABITANT_VALUE_WITNESSES
 /// WANT_ENUM_VALUE_WITNESSES
 ///   Define all of these to control exactly what to expand.
 #else
-#if !defined(WANT_REQUIRED_VALUE_WITNESSES) ||  !defined(WANT_EXTRA_INHABITANT_VALUE_WITNESSES) || !defined(WANT_ENUM_VALUE_WITNESSES)
+#if !defined(WANT_REQUIRED_VALUE_WITNESSES) || !defined(WANT_ENUM_VALUE_WITNESSES)
 #error failed to define a WANT macro; possible typo?
 #endif
 #endif
@@ -72,7 +60,7 @@
 ///     MUTABLE_BUFFER_TYPE - a pointer to a fixed-size value buffer
 ///     IMMUTABLE_BUFFER_TYPE - a pointer to an immutable fixed-size buffer
 ///     TYPE_TYPE - a pointer to type metadata
-///     SIZE_TYPE - size_t
+///     SIZE_TYPE - StoredSize
 ///     INT_TYPE - int
 ///     UINT_TYPE - unsigned int
 ///     VOID_TYPE - void
@@ -172,23 +160,15 @@ FUNCTION_VALUE_WITNESS(assignWithTake,
                        MUTABLE_VALUE_TYPE,
                        (MUTABLE_VALUE_TYPE, MUTABLE_VALUE_TYPE, TYPE_TYPE))
 
-///   T *(*initializeBufferWithTakeOfBuffer)(B *dest, B *src, M *self);
-/// Given an invalid buffer, initialize it by taking the value out of
-/// the source buffer.
-FUNCTION_VALUE_WITNESS(initializeBufferWithTakeOfBuffer,
-                       InitializeBufferWithTakeOfBuffer,
-                       MUTABLE_VALUE_TYPE,
-                       (MUTABLE_BUFFER_TYPE, MUTABLE_BUFFER_TYPE, TYPE_TYPE))
-
-/// int (*getEnumTagSinglePayload)(const T* enum, UINT_TYPE emptyCases)
+/// unsigned (*getEnumTagSinglePayload)(const T* enum, UINT_TYPE emptyCases)
 /// Given an instance of valid single payload enum with a payload of this
 /// witness table's type (e.g Optional<ThisType>) , get the tag of the enum.
 FUNCTION_VALUE_WITNESS(getEnumTagSinglePayload,
                        GetEnumTagSinglePayload,
-                       INT_TYPE,
+                       UINT_TYPE,
                        (IMMUTABLE_VALUE_TYPE, UINT_TYPE, TYPE_TYPE))
 
-/// void (*storeEnumTagSinglePayload)(T* enum, INT_TYPE whichCase,
+/// void (*storeEnumTagSinglePayload)(T* enum, UINT_TYPE whichCase,
 ///                                   UINT_TYPE emptyCases)
 /// Given uninitialized memory for an instance of a single payload enum with a
 /// payload of this witness table's type (e.g Optional<ThisType>), store the
@@ -196,12 +176,12 @@ FUNCTION_VALUE_WITNESS(getEnumTagSinglePayload,
 FUNCTION_VALUE_WITNESS(storeEnumTagSinglePayload,
                        StoreEnumTagSinglePayload,
                        VOID_TYPE,
-                       (MUTABLE_VALUE_TYPE, INT_TYPE, UINT_TYPE, TYPE_TYPE))
+                       (MUTABLE_VALUE_TYPE, UINT_TYPE, UINT_TYPE, TYPE_TYPE))
 
 END_VALUE_WITNESS_RANGE(RequiredValueWitnessFunction,
                         StoreEnumTagSinglePayload)
 
-///   size_t size;
+///   SIZE_TYPE size;
 ///
 /// The required storage size of a single object of this type.
 DATA_VALUE_WITNESS(size,
@@ -214,7 +194,16 @@ BEGIN_VALUE_WITNESS_RANGE(TypeLayoutWitness,
 BEGIN_VALUE_WITNESS_RANGE(RequiredTypeLayoutWitness,
                           Size)
 
-///   size_t flags;
+///   SIZE_TYPE stride;
+///
+/// The required size per element of an array of this type. It is at least
+/// one, even for zero-sized types, like the empty tuple.
+DATA_VALUE_WITNESS(stride,
+                   Stride,
+                   SIZE_TYPE)
+
+
+///   UINT_TYPE flags;
 ///
 /// The ValueWitnessAlignmentMask bits represent the required
 /// alignment of the first byte of an object of this type, expressed
@@ -228,12 +217,11 @@ BEGIN_VALUE_WITNESS_RANGE(RequiredTypeLayoutWitness,
 /// The ValueWitnessIsNonPOD bit is set if the type is not POD.
 ///
 /// The ValueWitnessIsNonInline bit is set if the type cannot be
-/// represented in a fixed-size buffer.
+/// represented in a fixed-size buffer or if it is not bitwise takable.
 ///
-/// The Enum_HasExtraInhabitants bit is set if the type's binary
-/// representation has "extra inhabitants" that do not form valid values of
-/// the type, and the value witness table contains the ExtraInhabitantWitness
-/// entries.
+/// The ExtraInhabitantsMask bits represent the number of "extra inhabitants"
+/// of the bit representation of the value that do not form valid values of
+/// the type.
 ///
 /// The Enum_HasSpareBits bit is set if the type's binary representation
 /// has unused bits.
@@ -241,97 +229,36 @@ BEGIN_VALUE_WITNESS_RANGE(RequiredTypeLayoutWitness,
 /// The HasEnumWitnesses bit is set if the type is an enum type.
 DATA_VALUE_WITNESS(flags,
                    Flags,
-                   SIZE_TYPE)
+                   UINT_TYPE)
 
-///   size_t stride;
+///   UINT_TYPE extraInhabitantCount;
 ///
-/// The required size per element of an array of this type. It is at least
-/// one, even for zero-sized types, like the empty tuple.
-DATA_VALUE_WITNESS(stride,
-                   Stride,
-                   SIZE_TYPE)
+/// The number of extra inhabitants in the type.
+DATA_VALUE_WITNESS(extraInhabitantCount,
+                   ExtraInhabitantCount,
+                   UINT_TYPE)
 
 END_VALUE_WITNESS_RANGE(RequiredTypeLayoutWitness,
-                        Stride)
+                        ExtraInhabitantCount)
 
 END_VALUE_WITNESS_RANGE(RequiredValueWitness,
-                        Stride)
-
-#endif /* WANT_REQUIRED_VALUE_WITNESSES */
-
-#if WANT_EXTRA_INHABITANT_VALUE_WITNESSES
-
-// The following value witnesses are conditionally present based on
-// the Enum_HasExtraInhabitants bit of the flags.
-
-///   size_t extraInhabitantFlags;
-///
-/// These bits are always present if the extra inhabitants witnesses are:
-///
-/// - The NumExtraInhabitantsMask bits contain the number of extra
-///   inhabitants of the type representation.
-///
-/// If the Enum_HasSpareBits flag is set in the value witness flags, these
-/// additional flags are available:
-///
-/// - The NumSpareBitsMask bits contain the number of (host-endian) contiguous
-///   spare bits in the type representation.
-/// - The SpareBitsShiftMask bits contain the (host-endian) bit offset of the
-///   lowest spare bit.
-DATA_VALUE_WITNESS(extraInhabitantFlags,
-                   ExtraInhabitantFlags,
-                   SIZE_TYPE)
-
-BEGIN_VALUE_WITNESS_RANGE(ExtraInhabitantValueWitness,
-                          ExtraInhabitantFlags)
+                        ExtraInhabitantCount)
 
 END_VALUE_WITNESS_RANGE(TypeLayoutWitness,
-                        ExtraInhabitantFlags)
+                        ExtraInhabitantCount)
 
-///   void (*storeExtraInhabitant)(T *obj, int index, M *self);
-///
-/// Given an invalid object of this type, store the representation of an
-/// extra inhabitant of the type. The object will remain invalid, because
-/// an extra inhabitant is by definition an invalid representation of the
-/// type. index must be less than numExtraInhabitants.
-FUNCTION_VALUE_WITNESS(storeExtraInhabitant,
-                       StoreExtraInhabitant,
-                       VOID_TYPE,
-                       (MUTABLE_VALUE_TYPE, INT_TYPE, TYPE_TYPE))
-
-BEGIN_VALUE_WITNESS_RANGE(ExtraInhabitantValueWitnessFunction,
-                          StoreExtraInhabitant)
-
-///   int (*getExtraInhabitantIndex)(T *obj, M *self);
-///
-/// Given an invalid object of this type with an extra inhabitant
-/// representation, returns the index of the extra inhabitant representation.
-/// Returns -1 if the object is a valid value of the type. If non-negative,
-/// the return value is the same index that can be passed to
-/// storeExtraInhabitant to reproduce the representation.
-FUNCTION_VALUE_WITNESS(getExtraInhabitantIndex,
-                       GetExtraInhabitantIndex,
-                       INT_TYPE,
-                       (IMMUTABLE_VALUE_TYPE, TYPE_TYPE))
-
-END_VALUE_WITNESS_RANGE(ExtraInhabitantValueWitnessFunction,
-                        GetExtraInhabitantIndex)
-
-END_VALUE_WITNESS_RANGE(ExtraInhabitantValueWitness,
-                        GetExtraInhabitantIndex)
-
-#endif /* WANT_EXTRA_INHABITANT_VALUE_WITNESSES */
+#endif /* WANT_REQUIRED_VALUE_WITNESSES */
 
 #if WANT_ENUM_VALUE_WITNESSES
 
 // The following value witnesses are conditionally present if the witnessed
 // type is an enum.
 
-///   int (*getEnumTag)(T *obj, M *self);
+///   unsigned (*getEnumTag)(T *obj, M *self);
 ///
 /// Given a valid object of this enum type, extracts the tag value indicating
 /// which case of the enum is inhabited. Returned values are in the range
-/// [-ElementsWithPayload..ElementsWithNoPayload-1].
+/// [0..NumElements-1].
 FUNCTION_VALUE_WITNESS(getEnumTag,
                        GetEnumTag,
                        INT_TYPE,
@@ -348,14 +275,14 @@ FUNCTION_VALUE_WITNESS(destructiveProjectEnumData,
                        VOID_TYPE,
                        (MUTABLE_VALUE_TYPE, TYPE_TYPE))
 
-///   void (*destructiveInjectEnumTag)(T *obj, int tag, M *self);
+///   void (*destructiveInjectEnumTag)(T *obj, unsigned tag, M *self);
 /// Given an enum case tag and a valid object of case's payload type,
 /// destructively inserts the tag into the payload. The given tag value
 /// must be in the range [-ElementsWithPayload..ElementsWithNoPayload-1].
 FUNCTION_VALUE_WITNESS(destructiveInjectEnumTag,
                        DestructiveInjectEnumTag,
                        VOID_TYPE,
-                       (MUTABLE_VALUE_TYPE, INT_TYPE, TYPE_TYPE))
+                       (MUTABLE_VALUE_TYPE, UINT_TYPE, TYPE_TYPE))
 
 END_VALUE_WITNESS_RANGE(EnumValueWitness,
                         DestructiveInjectEnumTag)
@@ -380,9 +307,7 @@ END_VALUE_WITNESS_RANGE(ValueWitness,
 #undef FUNCTION_VALUE_WITNESS
 #undef VALUE_WITNESS
 #undef ENUM_VALUE_WITNESS
-#undef EXTRA_INHABITANT_VALUE_WITNESS
 #undef NON_REQUIRED_VALUE_WITNESS
 #undef REQUIRED_VALUE_WITNESS
 #undef WANT_ENUM_VALUE_WITNESSES
-#undef WANT_EXTRA_INHABITANT_VALUE_WITNESSES
 #undef WANT_REQUIRED_VALUE_WITNESSES

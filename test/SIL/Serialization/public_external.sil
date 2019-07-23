@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -parse-sil -emit-module -module-name Swift -module-link-name swiftCore -parse-stdlib -parse-as-library -o - | %target-sil-opt -assume-parsing-unqualified-ownership-sil -module-name Swift -emit-sorted-sil | %FileCheck %s
+// RUN: %target-swift-frontend %s -parse-sil -emit-module -module-name Swift -module-link-name swiftCore -parse-stdlib -parse-as-library -o - | %target-sil-opt -module-name Swift -emit-sorted-sil | %FileCheck %s
 
 sil_stage raw
 import Builtin

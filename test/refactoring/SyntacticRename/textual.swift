@@ -36,11 +36,11 @@ _ = /*MyClass:unknown*/Mismatch()
 _ = /*MyClass:unknown*/MyClass()
 #endif
 
-// RUN: rm -rf %t.result && mkdir -p %t.result
+// RUN: %empty-directory(%t.result)
 // RUN: %refactor -syntactic-rename -source-filename %s -pos="foo" -is-function-like -old-name "foo" -new-name "bar" >> %t.result/textual_foo.swift
 // RUN: diff -u %S/Outputs/textual/foo.swift.expected %t.result/textual_foo.swift
 // RUN: %refactor -syntactic-rename -source-filename %s -pos="MyClass" -is-non-protocol-type -old-name "MyClass" -new-name "YourClass" >> %t.result/textual_MyClass.swift
 // RUN: diff -u %S/Outputs/textual/MyClass.swift.expected %t.result/textual_MyClass.swift
-// RUN: rm -rf %t.ranges && mkdir -p %t.ranges
+// RUN: %empty-directory(%t.ranges)
 // RUN: %refactor -find-rename-ranges -source-filename %s -pos="foo" -is-function-like -old-name "foo" >> %t.ranges/textual_foo.swift
 // RUN: diff -u %S/FindRangeOutputs/textual/foo.swift.expected %t.ranges/textual_foo.swift

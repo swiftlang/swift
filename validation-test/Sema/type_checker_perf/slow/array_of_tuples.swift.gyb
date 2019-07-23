@@ -1,9 +1,0 @@
-// RUN: %scale-test --invert-result --begin 1 --end 5 --step 1 --select incrementScopeCounter %s
-// REQUIRES: OS=macosx
-// REQUIRES: asserts
-
-let a = [
-%for i in range(0, N):
-  (1, 1),
-%end
-]

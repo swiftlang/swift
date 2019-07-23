@@ -23,9 +23,9 @@ func foo2(_ e : MyEnum) -> Int {
   }
 }
 
-// RUN: rm -rf %t.result && mkdir -p %t.result
+// RUN: %empty-directory(%t.result)
 // RUN: %refactor -extract-function -source-filename %s -pos=8:1 -end-pos=15:4 >> %t.result/Void.swift
 // RUN: diff -u %S/Outputs/extract_switch/Void.swift.expected %t.result/Void.swift
-// RUN: rm -rf %t.result && mkdir -p %t.result
+// RUN: %empty-directory(%t.result)
 // RUN: %refactor -extract-function -source-filename %s -pos=16:1 -end-pos=23:4 >> %t.result/Int.swift
 // RUN: diff -u %S/Outputs/extract_switch/Int.swift.expected %t.result/Int.swift

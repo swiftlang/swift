@@ -259,16 +259,6 @@ class TrailingObjects : private trailing_objects_internal::TrailingObjectsImpl<
 
   using ParentType::getTrailingObjectsImpl;
 
-  // This function contains only a static_assert BaseTy is final. The
-  // static_assert must be in a function, and not at class-level
-  // because BaseTy isn't complete at class instantiation time, but
-  // will be by the time this function is instantiated.
-  static void verifyTrailingObjectsAssertions() {
-#ifdef LLVM_IS_FINAL
-    static_assert(LLVM_IS_FINAL(BaseTy), "BaseTy must be final.");
-#endif
-  }
-
   // These two methods are the base of the recursion for this method.
   static const BaseTy *
   getTrailingObjectsImpl(const BaseTy *Obj,
@@ -316,7 +306,6 @@ public:
   /// (which must be one of those specified in the class template). The
   /// array may have zero or more elements in it.
   template <typename T> const T *getTrailingObjects() const {
-    verifyTrailingObjectsAssertions();
     // Forwards to an impl function with overloads, since member
     // function templates can't be specialized.
     return this->getTrailingObjectsImpl(
@@ -328,7 +317,6 @@ public:
   /// (which must be one of those specified in the class template). The
   /// array may have zero or more elements in it.
   template <typename T> T *getTrailingObjects() {
-    verifyTrailingObjectsAssertions();
     // Forwards to an impl function with overloads, since member
     // function templates can't be specialized.
     return this->getTrailingObjectsImpl(

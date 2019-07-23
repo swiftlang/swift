@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify %s
+// RUN: %target-typecheck-verify-swift
 
 // rdar://problem/29954938 -- A bug in associated type inference exposed an
 // order dependency where, if a type conformed to Collection in one extension

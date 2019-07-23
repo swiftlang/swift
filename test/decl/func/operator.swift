@@ -142,6 +142,9 @@ func test_14705150() {
 
 }
 
+postfix operator ++
+prefix operator ++
+
 prefix postfix func ++(x: Int) {} // expected-error {{'postfix' contradicts previous modifier 'prefix'}} {{8-16=}}
 postfix prefix func ++(x: Float) {} // expected-error {{'prefix' contradicts previous modifier 'postfix'}} {{9-16=}}
 postfix prefix infix func ++(x: Double) {} // expected-error {{'prefix' contradicts previous modifier 'postfix'}} {{9-16=}} expected-error {{'infix' contradicts previous modifier 'postfix'}} {{16-22=}}
@@ -204,7 +207,7 @@ protocol P0 {
 }
 
 protocol P1 {
-  func %%%(lhs: Self, rhs: Self) -> Self // expected-warning{{operator '%%%' declared in protocol must be 'static'}}{{3-3=static }}
+  func %%%(lhs: Self, rhs: Self) -> Self // expected-error{{operator '%%%' declared in protocol must be 'static'}}{{3-3=static }}
 }
 
 struct S0 {
@@ -352,6 +355,46 @@ class C6 {
   static func == (lhs: C6, rhs: C6) -> Bool { return false }
 
   func test1(x: C6) {
-    if x == x && x = x { } // expected-error{{cannot assign to value: '&&' returns immutable value}}
+    // FIXME: Better would be: use of '=' in a boolean context, did you mean '=='?
+    if x == x && x = x { } // expected-error{{cannot convert value of type 'C6' to expected argument type 'Bool'}}
   }
+}
+
+prefix operator ∫
+
+prefix func ∫(arg: (Int, Int)) {}
+
+func testPrefixOperatorOnTuple() {
+
+  let foo = (1, 2)
+  _ = ∫foo
+  _ = (∫)foo
+  // expected-error@-1 {{consecutive statements on a line must be separated by ';'}}
+  // expected-warning@-2 {{expression of type '(Int, Int)' is unused}}
+  _ = (∫)(foo)
+  _ = ∫(1, 2)
+  _ = (∫)(1, 2) // expected-error {{operator function '∫' expects a single parameter of type '(Int, Int)'}}
+  _ = (∫)((1, 2))
+}
+
+postfix operator §
+
+postfix func §<T, U>(arg: (T, (U, U), T)) {} // expected-note {{in call to operator '§'}}
+
+func testPostfixOperatorOnTuple<A, B>(a: A, b: B) {
+
+  let foo = (a, (b, b), a)
+  _ = foo§
+
+  // FIX-ME: "...could not be inferred" is irrelevant
+  _ = (§)foo
+  // expected-error@-1 {{consecutive statements on a line must be separated by ';'}}
+  // expected-error@-2 {{generic parameter 'T' could not be inferred}}
+  // expected-error@-3 {{generic parameter 'U' could not be inferred}}
+  // expected-warning@-4 {{expression of type '(A, (B, B), A)' is unused}}
+  _ = (§)(foo)
+  _ = (a, (b, b), a)§
+  _ = (§)(a, (b, b), a) // expected-error {{operator function '§' expects a single parameter of type '(T, (U, U), T)'}}
+  _ = (§)((a, (b, b), a))
+  _ = (a, ((), (b, (a, a), b)§), a)§
 }

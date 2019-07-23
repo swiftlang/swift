@@ -5,30 +5,30 @@ public enum Optional<T> {
   case some(T)
 }
 
-@_fixed_layout
+@frozen
 public struct B {
-  @_inlineable
+  @inlinable
   public func amIConfused() {}
-  @_inlineable
+  @inlinable
   public init() {}
 }
 
-@_fixed_layout
+@frozen
 public struct A {
   public var b : B
 
-  @_inlineable
+  @inlinable
   public init() {
     b = B()
   }
 
-  @_inlineable
+  @inlinable
   public func isBConfused() {
     b.amIConfused()
   }
 }
 
-@_inlineable
+@inlinable
 public func doSomething() -> A {
   var a = A()
   return a

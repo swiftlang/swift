@@ -25,10 +25,9 @@
 ///   - maxItems: The maximum number of elements for which to write the full
 ///     contents. The default is `Int.max`.
 /// - Returns: The instance passed as `value`.
-@_inlineable // FIXME(sil-serialize-all)
 @discardableResult
 @_semantics("optimize.sil.specialize.generic.never")
-public func dump<T, TargetStream : TextOutputStream>(
+public func dump<T, TargetStream: TextOutputStream>(
   _ value: T,
   to target: inout TargetStream,
   name: String? = nil,
@@ -37,7 +36,7 @@ public func dump<T, TargetStream : TextOutputStream>(
   maxItems: Int = .max
 ) -> T {
   var maxItemCounter = maxItems
-  var visitedItems = [ObjectIdentifier : Int]()
+  var visitedItems = [ObjectIdentifier: Int]()
   target._lock()
   defer { target._unlock() }
   _dump_unlocked(
@@ -64,7 +63,6 @@ public func dump<T, TargetStream : TextOutputStream>(
 ///   - maxItems: The maximum number of elements for which to write the full
 ///     contents. The default is `Int.max`.
 /// - Returns: The instance passed as `value`.
-@_inlineable // FIXME(sil-serialize-all)
 @discardableResult
 @_semantics("optimize.sil.specialize.generic.never")
 public func dump<T>(
@@ -85,17 +83,15 @@ public func dump<T>(
 }
 
 /// Dump an object's contents. User code should use dump().
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned // FIXME(sil-serialize-all)
 @_semantics("optimize.sil.specialize.generic.never")
-internal func _dump_unlocked<TargetStream : TextOutputStream>(
+internal func _dump_unlocked<TargetStream: TextOutputStream>(
   _ value: Any,
   to target: inout TargetStream,
   name: String?,
   indent: Int,
   maxDepth: Int,
   maxItemCounter: inout Int,
-  visitedItems: inout [ObjectIdentifier : Int]
+  visitedItems: inout [ObjectIdentifier: Int]
 ) {
   guard maxItemCounter > 0 else { return }
   maxItemCounter -= 1
@@ -186,16 +182,14 @@ internal func _dump_unlocked<TargetStream : TextOutputStream>(
 
 /// Dump information about an object's superclass, given a mirror reflecting
 /// that superclass.
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned // FIXME(sil-serialize-all)
 @_semantics("optimize.sil.specialize.generic.never")
-internal func _dumpSuperclass_unlocked<TargetStream : TextOutputStream>(
+internal func _dumpSuperclass_unlocked<TargetStream: TextOutputStream>(
   mirror: Mirror,
   to target: inout TargetStream,
   indent: Int,
   maxDepth: Int,
   maxItemCounter: inout Int,
-  visitedItems: inout [ObjectIdentifier : Int]
+  visitedItems: inout [ObjectIdentifier: Int]
 ) {
   guard maxItemCounter > 0 else { return }
   maxItemCounter -= 1

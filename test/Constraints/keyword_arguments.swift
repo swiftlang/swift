@@ -8,7 +8,9 @@ struct X1 {
   init(_ a: Int) { }
   func f1(_ a: Int) {}
 }
-X1(a: 5).f1(b: 5) // expected-error{{extraneous argument label 'a:' in call}}{{4-7=}}
+X1(a: 5).f1(b: 5) 
+// expected-error@-1 {{extraneous argument label 'a:' in call}} {{4-7=}}
+// expected-error@-2 {{extraneous argument label 'b:' in call}} {{13-16=}}
 
 // <rdar://problem/16801056>
 enum Policy {
@@ -33,7 +35,9 @@ struct X2 {
   init(a: Int) { }
   func f2(b: Int) { }
 }
-X2(5).f2(5) // expected-error{{missing argument label 'a:' in call}}{{4-4=a: }}
+X2(5).f2(5)
+// expected-error@-1 {{missing argument label 'a:' in call}} {{4-4=a: }}
+// expected-error@-2 {{missing argument label 'b:' in call}} {{10-10=b: }}
 
 
 // -------------------------------------------
@@ -135,7 +139,7 @@ variadics1(x: 1, y: 2, 1, 2)
 variadics1(x: 1, y: 2, 1, 2, 3)
 
 // Using various (out-of-order)
-variadics1(1, 2, 3, 4, 5, x: 6, y: 7) // expected-error{{argument 'x' must precede unnamed argument #1}} {{12-12=x: 6, }} {{25-31=}}
+variadics1(1, 2, 3, 4, 5, x: 6, y: 7) // expected-error {{incorrect argument labels in call (have '_:_:_:_:_:x:y:', expected 'x:y:_:')}} {{12-12=x: }} {{15-15=y: }} {{27-30=}} {{33-36=}}
 
 func variadics2(x: Int, y: Int = 2, z: Int...) { } // expected-note {{'variadics2(x:y:z:)' declared here}}
 
@@ -197,10 +201,10 @@ variadics4(x: 1)
 variadics4()
 
 // Using variadics (in-order, some missing)
-variadics4(y: 0, x: 1, 2, 3) // expected-error{{extra argument in call}}
+variadics4(y: 0, x: 1, 2, 3) // expected-error{{argument 'x' must precede argument 'y'}} {{12-12=x: 1, 2, 3, }} {{16-28=}}
 variadics4(z: 1, x: 1) // expected-error{{argument 'x' must precede argument 'z'}} {{12-12=x: 1, }} {{16-22=}}
 
-func variadics5(_ x: Int, y: Int, _ z: Int...) { } // expected-note {{'variadics5(_:y:_:)' declared here}}
+func variadics5(_ x: Int, y: Int, _ z: Int...) { } // expected-note {{declared here}}
 
 // Using variadics (in-order, complete)
 variadics5(1, y: 2)
@@ -264,9 +268,9 @@ extraargs1(x: 1, 2, 3) // expected-error{{extra argument in call}}
 
 func mismatch1(thisFoo: Int = 0, bar: Int = 0, wibble: Int = 0) { }
 
-mismatch1(foo: 5) // expected-error{{incorrect argument label in call (have 'foo:', expected 'thisFoo:')}} {{11-14=thisFoo}}
+mismatch1(foo: 5) // expected-error {{extra argument 'foo' in call}}
 mismatch1(baz: 1, wobble: 2) // expected-error{{incorrect argument labels in call (have 'baz:wobble:', expected 'bar:wibble:')}} {{11-14=bar}} {{19-25=wibble}}
-mismatch1(food: 1, zap: 2) // expected-error{{incorrect argument labels in call (have 'food:zap:', expected 'thisFoo:bar:')}} {{11-15=thisFoo}} {{20-23=bar}}
+mismatch1(food: 1, zap: 2) // expected-error{{extra argument 'food' in call}}
 
 // -------------------------------------------
 // Subscript keyword arguments
@@ -291,7 +295,7 @@ struct Sub2 {
 
 var sub2 = Sub2()
 var d: Double = 0.0
-d = sub2[d] // expected-error{{missing argument label 'd:' in subscript}} {{9-9=d: }}
+d = sub2[d] // expected-error{{missing argument label 'd:' in subscript}} {{10-10=d: }}
 d = sub2[d: d]
 d = sub2[f: d] // expected-error{{incorrect argument label in subscript (have 'f:', expected 'd:')}} {{10-11=d}}
 
@@ -313,7 +317,7 @@ func testClosures() {
 
 func acceptAutoclosure(f: @autoclosure () -> Int) { }
 func produceInt() -> Int { }
-acceptAutoclosure(f: produceInt) // expected-error{{function produces expected type 'Int'; did you mean to call it with '()'?}} {{32-32=()}}
+acceptAutoclosure(f: produceInt) // expected-error{{add () to forward @autoclosure parameter}} {{32-32=()}}
 
 // -------------------------------------------
 // Trailing closures
@@ -343,7 +347,9 @@ func trailingClosure5<T>(_ file: String = #file, line: UInt = #line, expression:
 func trailingClosure6<T>(value: Int, expression: () -> T?) { }
 
 trailingClosure5(file: "hello", line: 17) { return Optional.Some(5) } // expected-error{{extraneous argument label 'file:' in call}}{{18-24=}}
+// expected-error@-1 {{enum type 'Optional<Any>' has no case 'Some'; did you mean 'some'}} {{61-65=some}}
 trailingClosure6(5) { return Optional.Some(5) } // expected-error{{missing argument label 'value:' in call}}{{18-18=value: }}
+// expected-error@-1 {{enum type 'Optional<Any>' has no case 'Some'; did you mean 'some'}} {{39-43=some}}
 
 class MismatchOverloaded1 {
   func method1(_ x: Int!, arg: ((Int) -> Int)!) { }
@@ -393,7 +399,7 @@ func acceptTuple1<T>(_ x: (T, Bool)) { }
 
 acceptTuple1(produceTuple1())
 acceptTuple1((1, false))
-acceptTuple1(1, false) // expected-error {{global function 'acceptTuple1' expects a single parameter of type '(T, Bool)'}} {{14-14=(}} {{22-22=)}}
+acceptTuple1(1, false) // expected-error {{global function 'acceptTuple1' expects a single parameter of type '(T, Bool)' [with T = Int]}} {{14-14=(}} {{22-22=)}}
 
 func acceptTuple2<T>(_ input : T) -> T { return input }
 var tuple1 = (1, "hello")
@@ -401,3 +407,8 @@ _ = acceptTuple2(tuple1)
 _ = acceptTuple2((1, "hello", 3.14159))
 
 
+func generic_and_missing_label(x: Int) {}
+func generic_and_missing_label<T>(x: T) {}
+
+generic_and_missing_label(42)
+// expected-error@-1 {{missing argument label 'x:' in call}} {{27-27=x: }}

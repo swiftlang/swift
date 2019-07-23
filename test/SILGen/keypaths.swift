@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -parse-stdlib -module-name keypaths %s | %FileCheck %s
+
+import Swift
 
 struct S<T> {
   var x: T
@@ -22,6 +24,10 @@ class C<T> {
   init() { fatalError() }
 }
 
+extension C {
+  var `extension`: S<T> { fatalError() }
+}
+
 protocol P {
   var x: Int { get }
   var y: String { get set }
@@ -37,7 +43,18 @@ extension P {
   }
 }
 
-// CHECK-LABEL: sil hidden @{{.*}}storedProperties
+struct T {
+  var a: (Int, String)
+  let b: (f: String, g: Int)
+  let c: (x: C<Int>, y: C<String>)
+}
+
+/* TODO: When we support superclass requirements on protocols, we should test
+ * this case as well.
+protocol PoC : C<Int> {}
+*/
+
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}storedProperties
 func storedProperties<T>(_: T) {
   // CHECK: keypath $WritableKeyPath<S<T>, T>, <τ_0_0> (root $S<τ_0_0>; stored_property #S.x : $τ_0_0) <T>
   _ = \S<T>.x
@@ -55,14 +72,14 @@ func storedProperties<T>(_: T) {
   _ = \C<T>.z.z.y
 }
 
-// CHECK-LABEL: sil hidden @{{.*}}computedProperties
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}computedProperties
 func computedProperties<T: P>(_: T) {
   // CHECK: keypath $ReferenceWritableKeyPath<C<T>, S<T>>, <τ_0_0 where τ_0_0 : P> (
   // CHECK-SAME: root $C<τ_0_0>;
   // CHECK-SAME: settable_property $S<τ_0_0>, 
   // CHECK-SAME:   id #C.nonfinal!getter.1 : <T> (C<T>) -> () -> S<T>,
-  // CHECK-SAME:   getter @$S8keypaths1CC8nonfinalAA1SVyxGvpAA1PRzlACyxGTK : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in C<τ_0_0>) -> @out S<τ_0_0>,
-  // CHECK-SAME:   setter @$S8keypaths1CC8nonfinalAA1SVyxGvpAA1PRzlACyxGTk : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in S<τ_0_0>, @in C<τ_0_0>) -> ()
+  // CHECK-SAME:   getter @$s8keypaths1CC8nonfinalAA1SVyxGvpAA1PRzlACyxGTK : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed C<τ_0_0>) -> @out S<τ_0_0>,
+  // CHECK-SAME:   setter @$s8keypaths1CC8nonfinalAA1SVyxGvpAA1PRzlACyxGTk : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed S<τ_0_0>, @in_guaranteed C<τ_0_0>) -> ()
   // CHECK-SAME: ) <T>
   _ = \C<T>.nonfinal
 
@@ -70,7 +87,7 @@ func computedProperties<T: P>(_: T) {
   // CHECK-SAME: root $C<τ_0_0>;
   // CHECK-SAME: gettable_property $S<τ_0_0>,
   // CHECK-SAME:   id #C.computed!getter.1 : <T> (C<T>) -> () -> S<T>,
-  // CHECK-SAME:   getter @$S8keypaths1CC8computedAA1SVyxGvpAA1PRzlACyxGTK : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in C<τ_0_0>) -> @out S<τ_0_0>
+  // CHECK-SAME:   getter @$s8keypaths1CC8computedAA1SVyxGvpAA1PRzlACyxGTK : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed C<τ_0_0>) -> @out S<τ_0_0>
   // CHECK-SAME: ) <T>
   _ = \C<T>.computed
 
@@ -78,8 +95,8 @@ func computedProperties<T: P>(_: T) {
   // CHECK-SAME: root $C<τ_0_0>;
   // CHECK-SAME: settable_property $S<τ_0_0>, 
   // CHECK-SAME:   id #C.observed!getter.1 : <T> (C<T>) -> () -> S<T>,
-  // CHECK-SAME:   getter @$S8keypaths1CC8observedAA1SVyxGvpAA1PRzlACyxGTK : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in C<τ_0_0>) -> @out S<τ_0_0>,
-  // CHECK-SAME:   setter @$S8keypaths1CC8observedAA1SVyxGvpAA1PRzlACyxGTk : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in S<τ_0_0>, @in C<τ_0_0>) -> ()
+  // CHECK-SAME:   getter @$s8keypaths1CC8observedAA1SVyxGvpAA1PRzlACyxGTK : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed C<τ_0_0>) -> @out S<τ_0_0>,
+  // CHECK-SAME:   setter @$s8keypaths1CC8observedAA1SVyxGvpAA1PRzlACyxGTk : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed S<τ_0_0>, @in_guaranteed C<τ_0_0>) -> ()
   // CHECK-SAME: ) <T>
   _ = \C<T>.observed
 
@@ -94,24 +111,24 @@ func computedProperties<T: P>(_: T) {
   // CHECK-SAME: root $C<τ_0_0>;
   // CHECK-SAME: settable_property $() -> (), 
   // CHECK-SAME:   id ##C.reabstracted,
-  // CHECK-SAME:   getter @$S8keypaths1CC12reabstractedyycvpAA1PRzlACyxGTK : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in C<τ_0_0>) -> @out @callee_guaranteed (@in ()) -> @out (),
-  // CHECK-SAME:   setter @$S8keypaths1CC12reabstractedyycvpAA1PRzlACyxGTk : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in @callee_guaranteed (@in ()) -> @out (), @in C<τ_0_0>) -> ()
+  // CHECK-SAME:   getter @$s8keypaths1CC12reabstractedyycvpAA1PRzlACyxGTK : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed C<τ_0_0>) -> @out @callee_guaranteed () -> @out (),
+  // CHECK-SAME:   setter @$s8keypaths1CC12reabstractedyycvpAA1PRzlACyxGTk : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed @callee_guaranteed () -> @out (), @in_guaranteed C<τ_0_0>) -> ()
   // CHECK-SAME: ) <T>
   _ = \C<T>.reabstracted
 
   // CHECK: keypath $KeyPath<S<T>, C<T>>, <τ_0_0 where τ_0_0 : P> (
   // CHECK-SAME: root $S<τ_0_0>; gettable_property $C<τ_0_0>,
-  // CHECK-SAME: id @$S8keypaths1SV8computedAA1CCyxGvg : $@convention(method) <τ_0_0> (@in_guaranteed S<τ_0_0>) -> @owned C<τ_0_0>,
-  // CHECK-SAME:   getter @$S8keypaths1SV8computedAA1CCyxGvpAA1PRzlACyxGTK : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in S<τ_0_0>) -> @out C<τ_0_0>
+  // CHECK-SAME: id @$s8keypaths1SV8computedAA1CCyxGvg : $@convention(method) <τ_0_0> (@in_guaranteed S<τ_0_0>) -> @owned C<τ_0_0>,
+  // CHECK-SAME:   getter @$s8keypaths1SV8computedAA1CCyxGvpAA1PRzlACyxGTK : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed S<τ_0_0>) -> @out C<τ_0_0>
   // CHECK-SAME: ) <T>
   _ = \S<T>.computed
 
   // CHECK: keypath $WritableKeyPath<S<T>, C<T>>, <τ_0_0 where τ_0_0 : P> (
   // CHECK-SAME: root $S<τ_0_0>;
   // CHECK-SAME: settable_property $C<τ_0_0>,
-  // CHECK-SAME:   id @$S8keypaths1SV8observedAA1CCyxGvg : $@convention(method) <τ_0_0> (@in_guaranteed S<τ_0_0>) -> @owned C<τ_0_0>,
-  // CHECK-SAME:   getter @$S8keypaths1SV8observedAA1CCyxGvpAA1PRzlACyxGTK : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in S<τ_0_0>) -> @out C<τ_0_0>,
-  // CHECK-SAME:   setter @$S8keypaths1SV8observedAA1CCyxGvpAA1PRzlACyxGTk : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in C<τ_0_0>, @inout S<τ_0_0>) -> ()
+  // CHECK-SAME:   id @$s8keypaths1SV8observedAA1CCyxGvg : $@convention(method) <τ_0_0> (@in_guaranteed S<τ_0_0>) -> @owned C<τ_0_0>,
+  // CHECK-SAME:   getter @$s8keypaths1SV8observedAA1CCyxGvpAA1PRzlACyxGTK : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed S<τ_0_0>) -> @out C<τ_0_0>,
+  // CHECK-SAME:   setter @$s8keypaths1SV8observedAA1CCyxGvpAA1PRzlACyxGTk : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed C<τ_0_0>, @inout S<τ_0_0>) -> ()
   // CHECK-SAME: ) <T>
   _ = \S<T>.observed
   _ = \S<T>.z.nonfinal
@@ -123,8 +140,8 @@ func computedProperties<T: P>(_: T) {
   // CHECK-SAME:  root $S<τ_0_0>;
   // CHECK-SAME:  settable_property $() -> (),
   // CHECK-SAME:    id ##S.reabstracted,
-  // CHECK-SAME:    getter @$S8keypaths1SV12reabstractedyycvpAA1PRzlACyxGTK : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in S<τ_0_0>) -> @out @callee_guaranteed (@in ()) -> @out (),
-  // CHECK-SAME:    setter @$S8keypaths1SV12reabstractedyycvpAA1PRzlACyxGTk : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in @callee_guaranteed (@in ()) -> @out (), @inout S<τ_0_0>) -> ()
+  // CHECK-SAME:    getter @$s8keypaths1SV12reabstractedyycvpAA1PRzlACyxGTK : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed S<τ_0_0>) -> @out @callee_guaranteed () -> @out (),
+  // CHECK-SAME:    setter @$s8keypaths1SV12reabstractedyycvpAA1PRzlACyxGTk : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed @callee_guaranteed () -> @out (), @inout S<τ_0_0>) -> ()
   // CHECK-SAME: ) <T>
   _ = \S<T>.reabstracted
 
@@ -132,22 +149,22 @@ func computedProperties<T: P>(_: T) {
   // CHECK-SAME: root $τ_0_0;
   // CHECK-SAME: gettable_property $Int, 
   // CHECK-SAME:   id #P.x!getter.1 : <Self where Self : P> (Self) -> () -> Int,
-  // CHECK-SAME:   getter @$S8keypaths1PP1xSivpAaBRzlxTK : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in τ_0_0) -> @out Int
+  // CHECK-SAME:   getter @$s8keypaths1PP1xSivpAaBRzlxTK : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out Int
   // CHECK-SAME: ) <T>
   _ = \T.x
   // CHECK: keypath $WritableKeyPath<T, String>, <τ_0_0 where τ_0_0 : P> (
   // CHECK-SAME: root $τ_0_0;
   // CHECK-SAME: settable_property $String,
   // CHECK-SAME:   id #P.y!getter.1 : <Self where Self : P> (Self) -> () -> String,
-  // CHECK-SAME:   getter @$S8keypaths1PP1ySSvpAaBRzlxTK : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in τ_0_0) -> @out String,
-  // CHECK-SAME:   setter @$S8keypaths1PP1ySSvpAaBRzlxTk : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in String, @inout τ_0_0) -> ()
+  // CHECK-SAME:   getter @$s8keypaths1PP1ySSvpAaBRzlxTK : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out String,
+  // CHECK-SAME:   setter @$s8keypaths1PP1ySSvpAaBRzlxTk : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed String, @inout τ_0_0) -> ()
   // CHECK-SAME: ) <T>
   _ = \T.y
 
   // CHECK: keypath $KeyPath<T, String>, <τ_0_0 where τ_0_0 : P> (
   // CHECK-SAME: root $τ_0_0;
   // CHECK-SAME: gettable_property $String,
-  // CHECK-SAME:   id @$S8keypaths1PPAAE1zSSvg
+  // CHECK-SAME:   id @$s8keypaths1PPAAE1zSSvg
   _ = \T.z
 }
 
@@ -156,12 +173,12 @@ struct Concrete: P {
   var y: String
 }
 
-// CHECK-LABEL: sil hidden @$S8keypaths35keyPathsWithSpecificGenericInstanceyyF
+// CHECK-LABEL: sil hidden [ossa] @$s8keypaths35keyPathsWithSpecificGenericInstanceyyF
 func keyPathsWithSpecificGenericInstance() {
   // CHECK: keypath $KeyPath<Concrete, String>, (
   // CHECK-SAME: gettable_property $String,
-  // CHECK-SAME:   id @$S8keypaths1PPAAE1zSSvg
-  // CHECK-SAME:   getter @$S8keypaths1PPAAE1zSSvpAA8ConcreteVTK : $@convention(thin) (@in Concrete) -> @out String
+  // CHECK-SAME:   id @$s8keypaths1PPAAE1zSSvg
+  // CHECK-SAME:   getter @$s8keypaths1PPAAE1zSSvpAA8ConcreteVTK : $@convention(thin) (@in_guaranteed Concrete) -> @out String
   _ = \Concrete.z
   _ = \S<Concrete>.computed
 }
@@ -190,7 +207,7 @@ struct OptionalFields2 {
   var y: OptionalFields?
 }
 
-// CHECK-LABEL: sil hidden @$S8keypaths18keyPathForOptionalyyF
+// CHECK-LABEL: sil hidden [ossa] @$s8keypaths18keyPathForOptionalyyF
 func keyPathForOptional() {
   // CHECK: keypath $WritableKeyPath<OptionalFields, S<Int>>, (
   // CHECK-SAME:   stored_property #OptionalFields.x : $Optional<S<Int>>;
@@ -224,7 +241,7 @@ final class FinalStorageQualified {
   init() { fatalError() }
 }
 
-// CHECK-LABEL: sil hidden @{{.*}}keyPathForStorageQualified
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}keyPathForStorageQualified
 func keyPathForStorageQualified() {
   // CHECK: = keypath $ReferenceWritableKeyPath<StorageQualified, Optional<StorageQualified>>,
   // CHECK-SAME: settable_property $Optional<StorageQualified>, id #StorageQualified.tooWeak!getter.1
@@ -253,7 +270,7 @@ struct IUOBlob {
   }
 }
 
-// CHECK-LABEL: sil hidden @{{.*}}11iuoKeyPaths
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}11iuoKeyPaths
 func iuoKeyPaths() {
   // CHECK: = keypath $WritableKeyPath<IUOProperty, Int>,
   // CHECK-SAME: stored_property #IUOProperty.iuo
@@ -269,7 +286,7 @@ func iuoKeyPaths() {
 
 class Bass: Hashable {
   static func ==(_: Bass, _: Bass) -> Bool { return false }
-  var hashValue: Int { return 0 }
+  func hash(into hasher: inout Hasher) {}
 }
 
 class Treble: Bass { }
@@ -305,7 +322,7 @@ struct Subscripts<T> {
   }
 }
 
-// CHECK-LABEL: sil hidden @{{.*}}10subscripts
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}10subscripts
 func subscripts<T: Hashable, U: Hashable>(x: T, y: U, s: String) {
   _ = \Subscripts<T>.[]
   _ = \Subscripts<T>.[generic: x]
@@ -335,4 +352,87 @@ func subscripts<T: Hashable, U: Hashable>(x: T, y: U, s: String) {
 
   _ = \Subscripts<T>.[Bass()]
   _ = \Subscripts<T>.[Treble()]
+}
+
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}subclass_generics
+func subclass_generics<T: C<Int>, U: C<V>, V/*: PoC*/>(_: T, _: U, _: V) {
+  _ = \T.x
+  _ = \T.z
+  _ = \T.computed
+  _ = \T.extension
+
+  _ = \U.x
+  _ = \U.z
+  _ = \U.computed
+  _ = \U.extension
+
+/*
+  _ = \V.x
+  _ = \V.z
+  _ = \V.computed
+  _ = \V.extension
+ */
+
+  _ = \(C<Int> & P).x
+  _ = \(C<Int> & P).z
+  _ = \(C<Int> & P).computed
+  _ = \(C<Int> & P).extension
+
+  _ = \(C<V> & P).x
+  _ = \(C<V> & P).z
+  _ = \(C<V> & P).computed
+  _ = \(C<V> & P).extension
+
+/* TODO: When we support superclass requirements on protocols, we should test
+ * this case as well.
+  _ = \PoC.x
+  _ = \PoC.z
+  _ = \PoC.computed
+  _ = \PoC.extension
+ */
+}
+
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}identity
+func identity<T>(_: T) {
+  // CHECK: keypath $WritableKeyPath<T, T>, <τ_0_0> ({{.*}}root $τ_0_0) <T>
+  let _: WritableKeyPath<T, T> = \T.self
+  // CHECK: keypath $WritableKeyPath<Array<T>, Array<T>>, <τ_0_0> ({{.*}}root $Array<τ_0_0>) <T>
+  let _: WritableKeyPath<[T], [T]> = \[T].self
+  // CHECK: keypath $WritableKeyPath<String, String>, ({{.*}}root $String)
+  let _: WritableKeyPath<String, String> = \String.self
+}
+
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}tuples
+func tuples(_: T) {
+  // CHECK: keypath $WritableKeyPath<T, Int>, (root $T; stored_property #T.a : $(Int, String); tuple_element #0 : $Int)
+  let _: WritableKeyPath<T, Int> = \T.a.0
+  // CHECK: keypath $WritableKeyPath<T, String>, (root $T; stored_property #T.a : $(Int, String); tuple_element #1 : $String)
+  let _: WritableKeyPath<T, String> = \T.a.1
+  // CHECK: keypath $KeyPath<T, String>, (root $T; stored_property #T.b : $(f: String, g: Int); tuple_element #0 : $String)
+  let _: KeyPath<T, String> = \T.b.f
+  // CHECK: keypath $KeyPath<T, Int>, (root $T; stored_property #T.b : $(f: String, g: Int); tuple_element #1 : $Int)
+  let _: KeyPath<T, Int> = \T.b.g
+  // CHECK: keypath $KeyPath<T, C<Int>>, (root $T; stored_property #T.c : $(x: C<Int>, y: C<String>); tuple_element #0 : $C<Int>)
+  let _: KeyPath<T, C<Int>> = \T.c.x
+  // CHECK: keypath $KeyPath<T, C<String>>, (root $T; stored_property #T.c : $(x: C<Int>, y: C<String>); tuple_element #1 : $C<String>)
+  let _: KeyPath<T, C<String>> = \T.c.y
+
+  // CHECK: keypath $ReferenceWritableKeyPath<T, Int>, (root $T; stored_property #T.c : $(x: C<Int>, y: C<String>); tuple_element #0 : $C<Int>; stored_property #C.x : $Int)
+  let _: ReferenceWritableKeyPath<T, Int> = \T.c.x.x
+  // CHECK: keypath $KeyPath<T, String>, (root $T; stored_property #T.c : $(x: C<Int>, y: C<String>); tuple_element #0 : $C<Int>; stored_property #C.y : $String)
+  let _: KeyPath<T, String> = \T.c.x.y
+}
+
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}tuples_generic
+func tuples_generic<T, U, V>(_: T, _: U, _: V) {
+  typealias TUC = (T, U, C<V>)
+
+  // CHECK: keypath $WritableKeyPath<(T, U, C<V>), T>, <τ_0_0, τ_0_1, τ_0_2> (root $(τ_0_0, τ_0_1, C<τ_0_2>); tuple_element #0 : $τ_0_0) <T, U, V>
+  let _: WritableKeyPath<TUC, T> = \TUC.0
+  // CHECK: keypath $WritableKeyPath<(T, U, C<V>), U>, <τ_0_0, τ_0_1, τ_0_2> (root $(τ_0_0, τ_0_1, C<τ_0_2>); tuple_element #1 : $τ_0_1) <T, U, V>
+  let _: WritableKeyPath<TUC, U> = \TUC.1
+  // CHECK: keypath $ReferenceWritableKeyPath<(T, U, C<V>), V>, <τ_0_0, τ_0_1, τ_0_2> (root $(τ_0_0, τ_0_1, C<τ_0_2>); tuple_element #2 : $C<τ_0_2>; stored_property #C.x : $τ_0_2) <T, U, V>
+  let _: ReferenceWritableKeyPath<TUC, V> = \TUC.2.x
+  // CHECK: keypath $KeyPath<(T, U, C<V>), String>, <τ_0_0, τ_0_1, τ_0_2> (root $(τ_0_0, τ_0_1, C<τ_0_2>); tuple_element #2 : $C<τ_0_2>; stored_property #C.y : $String) <T, U, V>
+  let _: KeyPath<TUC, String> = \TUC.2.y
 }

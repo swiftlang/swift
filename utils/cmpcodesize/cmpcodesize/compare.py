@@ -21,7 +21,7 @@ categories = [
     ["CPP", re.compile('^(__Z|_+swift)')],
 
     # Objective-C
-    ["ObjC", re.compile('^[+-]\[')],
+    ["ObjC", re.compile(r'^[+-]\[')],
 
     # Swift
     ["Partial Apply", re.compile('^__(TPA|T0.*T[aA]$)')],
@@ -80,7 +80,7 @@ def read_sizes(sizes, file_name, function_details, group_by_prefix):
     architectures = subprocess.check_output(
         ["otool", "-V", "-f", file_name]).split("\n")
     arch = None
-    arch_pattern = re.compile('architecture ([\S]+)')
+    arch_pattern = re.compile(r'architecture ([\S]+)')
     for architecture in architectures:
         arch_match = arch_pattern.match(architecture)
         if arch_match:
@@ -115,10 +115,10 @@ def read_sizes(sizes, file_name, function_details, group_by_prefix):
     start_addr = None
     end_addr = None
 
-    section_pattern = re.compile(' +sectname ([\S]+)')
-    size_pattern = re.compile(' +size ([\da-fx]+)')
-    asmline_pattern = re.compile('^([0-9a-fA-F]+)\s')
-    label_pattern = re.compile('^((\-*\[[^\]]*\])|[^\/\s]+):$')
+    section_pattern = re.compile(r' +sectname ([\S]+)')
+    size_pattern = re.compile(r' +size ([\da-fx]+)')
+    asmline_pattern = re.compile(r'^([0-9a-fA-F]+)\s')
+    label_pattern = re.compile(r'^((\-*\[[^\]]*\])|[^\/\s]+):$')
 
     for line in content:
         asmline_match = asmline_pattern.match(line)
@@ -169,7 +169,7 @@ def compare_sizes(old_sizes, new_sizes, name_key, title, total_size_key="",
 
         if total_size_key:
             if csv:
-                csv.writerow([title, name_key, 
+                csv.writerow([title, name_key,
                               old_size, old_size * 100.0 / old_total_size,
                               new_size, new_size * 100.0 / new_total_size,
                               perc])
@@ -190,7 +190,7 @@ def compare_sizes(old_sizes, new_sizes, name_key, title, total_size_key="",
                       (title, name_key, old_size, new_size, perc))
 
 
-def compare_sizes_of_file(old_files, new_files, all_sections, list_categories, 
+def compare_sizes_of_file(old_files, new_files, all_sections, list_categories,
                           csv=None):
     old_sizes = collections.defaultdict(int)
     new_sizes = collections.defaultdict(int)
@@ -214,13 +214,13 @@ def compare_sizes_of_file(old_files, new_files, all_sections, list_categories,
     if list_categories:
         for cat in categories:
             cat_name = cat[0]
-            compare_sizes(old_sizes, new_sizes, cat_name, "", "__text", 
+            compare_sizes(old_sizes, new_sizes, cat_name, "", "__text",
                           csv=csv)
 
     if all_sections:
         section_title = "    section"
 
-        compare_sizes(old_sizes, new_sizes, "__textcoal_nt", section_title, 
+        compare_sizes(old_sizes, new_sizes, "__textcoal_nt", section_title,
                       csv=csv)
         compare_sizes(old_sizes, new_sizes, "__stubs", section_title, csv=csv)
         compare_sizes(old_sizes, new_sizes, "__const", section_title, csv=csv)

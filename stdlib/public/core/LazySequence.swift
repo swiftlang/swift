@@ -60,7 +60,7 @@
 /// we can build a sequence that lazily computes the elements in the
 /// result of `scan`:
 ///
-///     struct LazyScanIterator<Base : IteratorProtocol, ResultElement>
+///     struct LazyScanIterator<Base: IteratorProtocol, ResultElement>
 ///       : IteratorProtocol {
 ///       mutating func next() -> ResultElement? {
 ///         return nextElement.map { result in
@@ -68,9 +68,9 @@
 ///           return result
 ///         }
 ///       }
-///       private var nextElement: ResultElement? // The next result of next().
-///       private var base: Base                  // The underlying iterator.
-///       private let nextPartialResult: (ResultElement, Base.Element) -> ResultElement
+///       var nextElement: ResultElement? // The next result of next().
+///       var base: Base                  // The underlying iterator.
+///       let nextPartialResult: (ResultElement, Base.Element) -> ResultElement
 ///     }
 ///     
 ///     struct LazyScanSequence<Base: Sequence, ResultElement>
@@ -78,11 +78,12 @@
 ///     {
 ///       func makeIterator() -> LazyScanIterator<Base.Iterator, ResultElement> {
 ///         return LazyScanIterator(
-///           nextElement: initial, base: base.makeIterator(), nextPartialResult)
+///           nextElement: initial, base: base.makeIterator(),
+///           nextPartialResult: nextPartialResult)
 ///       }
-///       private let initial: ResultElement
-///       private let base: Base
-///       private let nextPartialResult:
+///       let initial: ResultElement
+///       let base: Base
+///       let nextPartialResult:
 ///         (ResultElement, Base.Element) -> ResultElement
 ///     }
 ///
@@ -101,14 +102,14 @@
 ///       /// - Complexity: O(1)
 ///       func scan<ResultElement>(
 ///         _ initial: ResultElement,
-///         _ nextPartialResult: (ResultElement, Element) -> ResultElement
+///         _ nextPartialResult: @escaping (ResultElement, Element) -> ResultElement
 ///       ) -> LazyScanSequence<Self, ResultElement> {
 ///         return LazyScanSequence(
-///           initial: initial, base: self, nextPartialResult)
+///           initial: initial, base: self, nextPartialResult: nextPartialResult)
 ///       }
 ///     }
 ///
-/// - See also: `LazySequence`, `LazyCollectionProtocol`, `LazyCollection`
+/// - See also: `LazySequence`
 ///
 /// - Note: The explicit permission to implement further operations
 ///   lazily applies only in contexts where the sequence is statically
@@ -127,13 +128,12 @@
 ///   [We don't recommend that you use `map` this way, because it
 ///   creates and discards an array. `sum` would be better implemented
 ///   using `reduce`].
-public protocol LazySequenceProtocol : Sequence {
+public protocol LazySequenceProtocol: Sequence {
   /// A `Sequence` that can contain the same elements as this one,
   /// possibly with a simpler type.
   ///
   /// - See also: `elements`
-  associatedtype Elements : Sequence = Self
-  where Elements.Iterator.Element == Iterator.Element
+  associatedtype Elements: Sequence = Self where Elements.Element == Element
 
   /// A sequence containing the same elements as this one, possibly with
   /// a simpler type.
@@ -154,19 +154,19 @@ public protocol LazySequenceProtocol : Sequence {
 /// property is provided.
 extension LazySequenceProtocol where Elements == Self {
   /// Identical to `self`.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // protocol-only
   public var elements: Self { return self }
 }
 
 extension LazySequenceProtocol {
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // protocol-only
   public var lazy: LazySequence<Elements> {
     return elements.lazy
   }
 }
 
 extension LazySequenceProtocol where Elements: LazySequenceProtocol {
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // protocol-only
   public var lazy: Elements {
     return elements
   }
@@ -177,17 +177,50 @@ extension LazySequenceProtocol where Elements: LazySequenceProtocol {
 /// implemented lazily.
 ///
 /// - See also: `LazySequenceProtocol`
-@_fixed_layout // FIXME(sil-serialize-all)
-public struct LazySequence<Base : Sequence>: _SequenceWrapper {
-  public var _base: Base
+@frozen // lazy-performance
+public struct LazySequence<Base: Sequence> {
+  @usableFromInline
+  internal var _base: Base
 
   /// Creates a sequence that has the same elements as `base`, but on
   /// which some operations such as `map` and `filter` are implemented
   /// lazily.
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned // FIXME(sil-serialize-all)
+  @inlinable // lazy-performance
   internal init(_base: Base) {
     self._base = _base
+  }
+}
+
+extension LazySequence: Sequence {
+  public typealias Element = Base.Element
+  public typealias Iterator = Base.Iterator
+
+  @inlinable
+  public __consuming func makeIterator() -> Iterator {
+    return _base.makeIterator()
+  }
+  
+  @inlinable // lazy-performance
+  public var underestimatedCount: Int {
+    return _base.underestimatedCount
+  }
+
+  @inlinable // lazy-performance
+  @discardableResult
+  public __consuming func _copyContents(
+    initializing buf: UnsafeMutableBufferPointer<Element>
+  ) -> (Iterator, UnsafeMutableBufferPointer<Element>.Index) {
+    return _base._copyContents(initializing: buf)
+  }
+
+  @inlinable // lazy-performance
+  public func _customContainsEquatableElement(_ element: Element) -> Bool? { 
+    return _base._customContainsEquatableElement(element)
+  }
+  
+  @inlinable // generic-performance
+  public __consuming func _copyToContiguousArray() -> ContiguousArray<Element> {
+    return _base._copyToContiguousArray()
   }
 }
 
@@ -195,7 +228,7 @@ extension LazySequence: LazySequenceProtocol {
   public typealias Elements = Base
 
   /// The `Base` (presumably non-lazy) sequence from which `self` was created.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // lazy-performance
   public var elements: Elements { return _base }
 }
 
@@ -203,7 +236,7 @@ extension Sequence {
   /// A sequence containing the same elements as this sequence,
   /// but on which some operations, such as `map` and `filter`, are
   /// implemented lazily.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // protocol-only
   public var lazy: LazySequence<Self> {
     return LazySequence(_base: self)
   }

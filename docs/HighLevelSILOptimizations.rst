@@ -117,13 +117,13 @@ Cloning code from the standard library
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The Swift compiler can copy code from the standard library into the
-application for functions marked @_inlineable. This allows the optimizer to
+application for functions marked @inlinable. This allows the optimizer to
 inline calls from the stdlib and improve the performance of code that uses
 common operators such as '+=' or basic containers such as Array. However,
 importing code from the standard library can increase the binary size.
 
 To prevent copying of functions from the standard library into the user
-program, make sure the function in question is not marked @_inlineable.
+program, make sure the function in question is not marked @inlinable.
 
 Array
 ~~~~~
@@ -313,19 +313,19 @@ Dictionary
 ~~~~~~~~~~
 TBD.
 
-@effects attribute
+@_effects attribute
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The @effects attribute describes how a function affects "the state of the world".
+The @_effects attribute describes how a function affects "the state of the world".
 More practically how the optimizer can modify the program based on information
 that is provided by the attribute.
 
 Usage:
 
-  @effects(readonly) func foo() { .. }
+  @_effects(readonly) func foo() { .. }
 
 
-The @effects attribute supports the following tags:
+The @_effects attribute supports the following tags:
 
 readnone
 
@@ -340,6 +340,49 @@ readonly
   state of the program. Calls to readonly functions can be
   eliminated, but cannot be reordered or folded in a way that would
   move calls to the readnone function across side effects.
+
+releasenone
+
+  function has side effects, it can read or write global state, or state
+  reachable from its arguments. It can however be assumed that no externally
+  visible release has happened (i.e it is allowed for a ``releasenone``
+  function to allocate and destruct an object in its implementation as long as
+  this is does not cause an release of an object visible outside of the
+  implementation). Here are some examples::
+
+    class SomeObject {
+      final var x: Int = 3
+    }
+
+    var global = SomeObject()
+
+    class SomeOtherObject {
+      var x: Int = 2
+      deinit {
+        global = SomeObject()
+      }
+    }
+
+    @_effects(releasenone)
+    func validReleaseNoneFunction(x: Int) -> Int {
+      global.x = 5
+      return x + 2
+    }
+
+    @_effects(releasenone)
+    func validReleaseNoneFunction(x: Int) -> Int {
+      var notExternallyVisibleObject = SomeObject()
+      return x +  notExternallyVisibleObject.x
+    }
+
+    func notAReleaseNoneFunction(x: Int, y: SomeObject) -> Int {
+      return x + y.x
+    }
+
+    func notAReleaseNoneFunction(x: Int) -> Int {
+      var releaseExternallyVisible = SomeOtherObject()
+      return x + releaseExternallyVisible.x
+    }
 
 readwrite
 

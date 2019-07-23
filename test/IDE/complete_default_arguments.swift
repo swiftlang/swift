@@ -18,9 +18,9 @@
 // RUN: %FileCheck %s -check-prefix=NEGATIVE_DEFAULT_ARGS_9 < %t
 //
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARG_INIT_1 | %FileCheck %s -check-prefix=DEFAULT_ARG_INIT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARG_INIT_2 | %FileCheck %s -check-prefix=DEFAULT_ARG_INIT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARG_INIT_2 | %FileCheck %s -check-prefix=DEFAULT_ARG_INIT_INTCONTEXT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARG_INIT_3 | %FileCheck %s -check-prefix=DEFAULT_ARG_INIT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARG_INIT_4 | %FileCheck %s -check-prefix=DEFAULT_ARG_INIT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARG_INIT_4 | %FileCheck %s -check-prefix=DEFAULT_ARG_INIT_INTCONTEXT
 
 func freeFuncWithDefaultArgs1(
     _ a: Int, b: Int = 42, file: String = #file, line: Int = #line,
@@ -67,16 +67,16 @@ func testDefaultArgs2() {
   freeFuncWithDefaultArgs1#^DEFAULT_ARGS_2^#
 }
 // DEFAULT_ARGS_2: Begin completions
-// DEFAULT_ARGS_2-DAG: Pattern/CurrModule:      ({#(a): Int#})[#Void#]{{; name=.+$}}
-// DEFAULT_ARGS_2-DAG: Pattern/CurrModule:      ({#(a): Int#}, {#b: Int#})[#Void#]{{; name=.+$}}
+// DEFAULT_ARGS_2-DAG: Decl[FreeFunction]/CurrModule:      ({#(a): Int#})[#Void#]{{; name=.+$}}
+// DEFAULT_ARGS_2-DAG: Decl[FreeFunction]/CurrModule:      ({#(a): Int#}, {#b: Int#})[#Void#]{{; name=.+$}}
 // DEFAULT_ARGS_2: End completions
 
 func testDefaultArgs3() {
   freeFuncWithDefaultArgs3#^DEFAULT_ARGS_3^#
 }
 // DEFAULT_ARGS_3: Begin completions
-// DEFAULT_ARGS_3-DAG: Pattern/CurrModule:      ()[#Void#]{{; name=.+$}}
-// DEFAULT_ARGS_3-DAG: Pattern/CurrModule:      ({#a: Int#})[#Void#]{{; name=.+$}}
+// DEFAULT_ARGS_3-DAG: Decl[FreeFunction]/CurrModule:      ()[#Void#]{{; name=.+$}}
+// DEFAULT_ARGS_3-DAG: Decl[FreeFunction]/CurrModule:      ({#a: Int#})[#Void#]{{; name=.+$}}
 // DEFAULT_ARGS_3: End completions
 
 func testDefaultArgs4(_ x: A) {
@@ -91,8 +91,8 @@ func testDefaultArgs5(_ x: A) {
   x.methodWithDefaultArgs1#^DEFAULT_ARGS_5^#
 }
 // DEFAULT_ARGS_5: Begin completions
-// DEFAULT_ARGS_5-DAG: Pattern/CurrModule:      ()[#Void#]{{; name=.+$}}
-// DEFAULT_ARGS_5-DAG: Pattern/CurrModule:      ({#a: Int#})[#Void#]{{; name=.+$}}
+// DEFAULT_ARGS_5-DAG: Decl[InstanceMethod]/CurrNominal:      ()[#Void#]{{; name=.+$}}
+// DEFAULT_ARGS_5-DAG: Decl[InstanceMethod]/CurrNominal:      ({#a: Int#})[#Void#]{{; name=.+$}}
 // DEFAULT_ARGS_5: End completions
 
 func testDefaultArgs6() {
@@ -101,7 +101,7 @@ func testDefaultArgs6() {
 // DEFAULT_ARGS_6: Begin completions
 // DEFAULT_ARGS_6-DAG: Decl[StaticMethod]/CurrNominal:      staticMethodWithDefaultArgs1()[#Void#]{{; name=.+$}}
 // DEFAULT_ARGS_6-DAG: Decl[StaticMethod]/CurrNominal:      staticMethodWithDefaultArgs1({#a: Int#})[#Void#]{{; name=.+$}}
-// DEFAULT_ARGS_6-DAG: Decl[InstanceMethod]/CurrNominal:   methodWithDefaultArgs1({#self: A#})[#(a: Int) -> Void#]{{; name=.+$}}
+// DEFAULT_ARGS_6-DAG: Decl[InstanceMethod]/CurrNominal:   methodWithDefaultArgs1({#(self): A#})[#(a: Int) -> Void#]{{; name=.+$}}
 // DEFAULT_ARGS_6: End completions
 
 func testDefaultArgs7() {
@@ -140,3 +140,7 @@ func testDefaultArgInit4(_ x: Int = #^DEFAULT_ARG_INIT_4^#) { }
 // DEFAULT_ARG_INIT: Begin completions
 // DEFAULT_ARG_INIT: Decl[GlobalVar]/CurrModule:         globalVar[#Int#]{{; name=.+$}}
 // DEFAULT_ARG_INIT: End completions
+
+// DEFAULT_ARG_INIT_INTCONTEXT: Begin completions
+// DEFAULT_ARG_INIT_INTCONTEXT: Decl[GlobalVar]/CurrModule/TypeRelation[Identical]: globalVar[#Int#]{{; name=.+$}}
+// DEFAULT_ARG_INIT_INTCONTEXT: End completions

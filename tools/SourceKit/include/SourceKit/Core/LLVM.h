@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 /// \file
-/// \brief Forward declares and imports various common LLVM datatypes.
+/// Forward declares and imports various common LLVM datatypes.
 ///
 //===----------------------------------------------------------------------===//
 

@@ -10,44 +10,113 @@
 # See https://swift.org/LICENSE.txt for license information
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-cd "$(dirname $0)/.." || exit
-SRC_DIR=$PWD
+function usage() {
+  echo "$0 <bundle_prefix> [OPTIONS]"
+  echo ""
+  echo "<bundle_prefix> - Prefix to use for bundle name"
+  echo ""
+  echo "OPTIONS"
+  echo ""
+  echo "-h --help"
+  echo "Show help information."
+  echo ""
+  echo "-n --dry-run"
+  echo "Do a dry run."
+  echo ""
+  echo "-t --test"
+  echo "Run tests."
+  echo ""
+  echo "--distcc"
+  echo "Build with distcc to speed up the toolchain build"
+  echo ""
+}
 
+RESULT_DIR=$PWD
+cd "$(dirname $0)/.." || exit
+
+# Set defaults
+DISTCC_FLAG=
 DRY_RUN=
-if [[ "$2" == "-n" || "$2" == "--dry-run" ]] ; then
-    DRY_RUN="-n"
-    shift
+BUNDLE_PREFIX=
+case $(uname -s) in
+  Darwin)
+    SWIFT_PACKAGE=buildbot_osx_package,no_test
+    OS_SUFFIX=osx
+  ;;
+  Linux)
+    SWIFT_PACKAGE=buildbot_linux,no_test
+    OS_SUFFIX=linux
+  ;;
+  *)
+    echo "Unrecognised platform $(uname -s)"
+    exit 1
+  ;;
+esac
+
+# Process command line arguments
+FIRST_ARG_PROCESSED=0
+while [ $# -ne 0 ]; do
+  case "$1" in
+    -n|--dry-run)
+      DRY_RUN="-n"
+  ;;
+    -t|--test)
+      if [ "$(uname -s)" == "Linux" ]; then
+        SWIFT_PACKAGE=buildbot_linux
+      else
+        SWIFT_PACKAGE=buildbot_osx_package
+      fi
+  ;;
+    --distcc)
+      DISTCC_FLAG="--distcc"
+  ;;
+  -h|--help)
+    usage
+    exit 0
+  ;;
+  *)
+    if [ ${FIRST_ARG_PROCESSED} -eq 0 ]; then
+      # This is the bundle prefix
+      BUNDLE_PREFIX="$1"
+    else
+      echo "Unrecognised argument \"$1\""
+      exit 1
+    fi
+  ;;
+  esac
+  FIRST_ARG_PROCESSED=1
+  shift
+done
+
+if [ -z "${BUNDLE_PREFIX}" ]; then
+  echo "Bundle prefix cannot be empty. See $0 --help"
+  exit 1
 fi
 
+# Report the commands being run
+set -x
 YEAR=$(date +"%Y")
 MONTH=$(date +"%m")
 DAY=$(date +"%d")
 TOOLCHAIN_VERSION="swift-LOCAL-${YEAR}-${MONTH}-${DAY}-a"
-ARCHIVE="${TOOLCHAIN_VERSION}-osx.tar.gz"
-SYM_ARCHIVE="${TOOLCHAIN_VERSION}-osx-symbols.tar.gz"
-BUNDLE_PREFIX=${1:?Please specify bundle prefix e.g. $0 local.swift}
+DARWIN_TOOLCHAIN_VERSION="0.0.${YEAR}${MONTH}${DAY}"
+ARCHIVE="${TOOLCHAIN_VERSION}-${OS_SUFFIX}.tar.gz"
+SYM_ARCHIVE="${TOOLCHAIN_VERSION}-${OS_SUFFIX}-symbols.tar.gz"
+BUNDLE_PREFIX=${BUNDLE_PREFIX:?Please specify a bundle prefix}
 BUNDLE_IDENTIFIER="${BUNDLE_PREFIX}.${YEAR}${MONTH}${DAY}"
 DISPLAY_NAME_SHORT="Local Swift Development Snapshot"
 DISPLAY_NAME="${DISPLAY_NAME_SHORT} ${YEAR}-${MONTH}-${DAY}"
 TOOLCHAIN_NAME="${TOOLCHAIN_VERSION}"
 
-SWIFT_INSTALLABLE_PACKAGE="${SRC_DIR}/${ARCHIVE}"
-SWIFT_INSTALL_DIR="${SRC_DIR}/swift-nightly-install"
-SWIFT_INSTALL_SYMROOT="${SRC_DIR}/swift-nightly-symroot"
+SWIFT_INSTALLABLE_PACKAGE="${RESULT_DIR}/${ARCHIVE}"
+SWIFT_INSTALL_DIR="${RESULT_DIR}/swift-nightly-install"
+SWIFT_INSTALL_SYMROOT="${RESULT_DIR}/swift-nightly-symroot"
 SWIFT_TOOLCHAIN_DIR="/Library/Developer/Toolchains/${TOOLCHAIN_NAME}.xctoolchain"
-SYMBOLS_PACKAGE="${SRC_DIR}/${SYM_ARCHIVE}"
+SYMBOLS_PACKAGE="${RESULT_DIR}/${SYM_ARCHIVE}"
+DRY_RUN="${DRY_RUN}"
+DISTCC_FLAG="${DISTCC_FLAG}"
 
-if [[ "$(uname -s)" == "Darwin" ]] ; then
-    SWIFT_PACKAGE=buildbot_osx_package
-else
-    if [[ "$2" == "-t" || "$2" == "--test" ]] ; then
-        SWIFT_PACKAGE=buildbot_linux
-    else
-        SWIFT_PACKAGE=buildbot_linux,no_test
-    fi
-fi
-
-./utils/build-script ${DRY_RUN} --preset="${SWIFT_PACKAGE}" \
+./utils/build-script ${DRY_RUN} ${DISTCC_FLAG} --preset="${SWIFT_PACKAGE}" \
         install_destdir="${SWIFT_INSTALL_DIR}" \
         installable_package="${SWIFT_INSTALLABLE_PACKAGE}" \
         install_toolchain_dir="${SWIFT_TOOLCHAIN_DIR}" \
@@ -57,5 +126,5 @@ fi
         darwin_toolchain_display_name="${DISPLAY_NAME}" \
         darwin_toolchain_display_name_short="${DISPLAY_NAME_SHORT}" \
         darwin_toolchain_xctoolchain_name="${TOOLCHAIN_NAME}" \
-        darwin_toolchain_version="${TOOLCHAIN_VERSION}" \
+        darwin_toolchain_version="${DARWIN_TOOLCHAIN_VERSION}" \
         darwin_toolchain_alias="Local"

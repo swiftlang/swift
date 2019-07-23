@@ -50,8 +50,15 @@ public:
     // serialized functions or anything referenced from them. Therefore,
     // to avoid linker errors, the object file of the current module should
     // contain all the symbols which were alive at the time of serialization.
-    DEBUG(llvm::dbgs() << "Serializing SILModule in SerializeSILPass\n");
-    getModule()->serialize();
+    LLVM_DEBUG(llvm::dbgs() << "Serializing SILModule in SerializeSILPass\n");
+    M.serialize();
+
+    // If we are not optimizing, do not strip the [serialized] flag. We *could*
+    // do this since after serializing [serialized] is irrelevent. But this
+    // would incur an unnecessary compile time cost since if we are not
+    // optimizing we are not going to perform any sort of DFE.
+    if (!getOptions().shouldOptimize())
+      return;
     removeSerializedFlagFromAllFunctions(M);
   }
 };

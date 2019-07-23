@@ -13,6 +13,7 @@ add_swift_unittest(SwiftBasicTests
   DiverseStackTest.cpp
   EditorPlaceholderTest.cpp
   EncodedSequenceTest.cpp
+  ExponentialGrowthAppendingBinaryByteStreamTests.cpp
   FileSystemTest.cpp
   ImmutablePointerSetTest.cpp
   JSONSerialization.cpp
@@ -22,6 +23,7 @@ add_swift_unittest(SwiftBasicTests
   PrefixMapTest.cpp
   RangeTest.cpp
   SourceManagerTest.cpp
+  STLExtrasTest.cpp
   StringExtrasTest.cpp
   SuccessorMapTest.cpp
   ThreadSafeRefCntPointerTest.cpp
@@ -35,6 +37,8 @@ add_swift_unittest(SwiftBasicTests
 add_dependencies(SwiftBasicTests "${gyb_dependency_targets}")
 
 target_link_libraries(SwiftBasicTests
+  PRIVATE
   swiftBasic
   clangBasic
+  LLVMTestingSupport
   )

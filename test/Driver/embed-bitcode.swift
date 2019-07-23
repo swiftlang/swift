@@ -2,6 +2,9 @@
 // CHECK-macho: "swift", inputs: ["{{.*}}embed-bitcode.swift"], output: {llvm-bc: "[[BC:.*\.bc]]"}
 // CHECK-macho: "swift", inputs: ["[[BC]]"], output: {object: "[[OBJECT:.*\.o]]"}
 // CHECK-macho: "ld", inputs: ["[[OBJECT]]"], output: {image: "embed-bitcode"}
+// CHECK-coff: "swiftc.EXE", inputs: ["{{.*}}embed-bitcode.swift"], output: {llvm-bc: "[[BC:.*\.bc]]"}
+// CHECK-coff: "swiftc.EXE", inputs: ["[[BC]]"], output: {object: "[[OBJECT:.*\.o]]"}
+// CHECK-coff: "clang++.exe", inputs: ["[[OBJECT]]"], output: {image: "embed-bitcode"}
 
 // CHECK-elf: "swift", inputs: ["{{.*}}embed-bitcode.swift"], output: {llvm-bc: "[[BC:.*\.bc]]"}
 // CHECK-elf: "swift", inputs: ["[[BC]]"], output: {object: "[[OBJECT:.*\.o]]"}
@@ -90,23 +93,23 @@
 // CHECK-LIB-WMO: -parse-stdlib
 
 // RUN: %target-swiftc_driver -embed-bitcode -c -parse-as-library -emit-module %s %S/../Inputs/empty.swift -module-name ABC 2>&1 -### | %FileCheck %s -check-prefix=CHECK-LIB
-// CHECK-LIB: swift -frontend
+// CHECK-LIB: swift{{c?(\.EXE)?"?}} -frontend
 // CHECK-LIB: -emit-bc
 // CHECK-LIB: -primary-file
-// CHECK-LIB: swift -frontend
+// CHECK-LIB: swift{{c?(\.EXE)?"?}} -frontend
 // CHECK-LIB: -emit-bc
 // CHECK-LIB: -primary-file
-// CHECK-LIB: swift -frontend
+// CHECK-LIB: swift{{c?(\.EXE)?"?}} -frontend
+// CHECK-LIB: -c
+// CHECK-LIB: -embed-bitcode
+// CHECK-LIB: -disable-llvm-optzns
+// CHECK-LIB: swift{{c?(\.EXE)?"?}} -frontend
+// CHECK-LIB: -c
+// CHECK-LIB: -embed-bitcode
+// CHECK-LIB: -disable-llvm-optzns
+// CHECK-LIB: swift{{c?(\.EXE)?"?}} -frontend
 // CHECK-LIB: -emit-module
-// CHECK-LIB: swift -frontend
-// CHECK-LIB: -c
-// CHECK-LIB: -embed-bitcode
-// CHECK-LIB: -disable-llvm-optzns
-// CHECK-LIB: swift -frontend
-// CHECK-LIB: -c
-// CHECK-LIB: -embed-bitcode
-// CHECK-LIB: -disable-llvm-optzns
-// CHECK-LIB-NOT: swift -frontend
+// CHECK-LIB-NOT: swift{{c?(\.EXE)?"?}} -frontend
 
 // RUN: %target-swiftc_driver -embed-bitcode -emit-module %s 2>&1 -### | %FileCheck %s -check-prefix=WARN-EMBED-BITCODE
 // RUN: %target-swiftc_driver -embed-bitcode -emit-module-path a.swiftmodule %s 2>&1 -### | %FileCheck %s -check-prefix=WARN-EMBED-BITCODE
@@ -119,3 +122,15 @@
 // RUN: %target-swiftc_driver -embed-bitcode -emit-assembly %s 2>&1 -### | %FileCheck %s -check-prefix=WARN-EMBED-BITCODE
 // WARN-EMBED-BITCODE: warning: ignoring -embed-bitcode since no object file is being generated
 // WARN-EMBED-BITCODE-NOT: -embed-bitcode
+
+// RUN: %target-swiftc_driver -embed-bitcode-marker -emit-module %s 2>&1 -### | %FileCheck %s -check-prefix=WARN-EMBED-BITCODE-MARKER
+// RUN: %target-swiftc_driver -embed-bitcode-marker -emit-module-path a.swiftmodule %s 2>&1 -### | %FileCheck %s -check-prefix=WARN-EMBED-BITCODE-MARKER
+// RUN: %target-swiftc_driver -embed-bitcode-marker -emit-sib %s 2>&1 -### | %FileCheck %s -check-prefix=WARN-EMBED-BITCODE-MARKER
+// RUN: %target-swiftc_driver -embed-bitcode-marker -emit-sibgen %s 2>&1 -### | %FileCheck %s -check-prefix=WARN-EMBED-BITCODE-MARKER
+// RUN: %target-swiftc_driver -embed-bitcode-marker -emit-sil %s 2>&1 -### | %FileCheck %s -check-prefix=WARN-EMBED-BITCODE-MARKER
+// RUN: %target-swiftc_driver -embed-bitcode-marker -emit-silgen %s 2>&1 -### | %FileCheck %s -check-prefix=WARN-EMBED-BITCODE-MARKER
+// RUN: %target-swiftc_driver -embed-bitcode-marker -emit-ir %s 2>&1 -### | %FileCheck %s -check-prefix=WARN-EMBED-BITCODE-MARKER
+// RUN: %target-swiftc_driver -embed-bitcode-marker -emit-bc %s 2>&1 -### | %FileCheck %s -check-prefix=WARN-EMBED-BITCODE-MARKER
+// RUN: %target-swiftc_driver -embed-bitcode-marker -emit-assembly %s 2>&1 -### | %FileCheck %s -check-prefix=WARN-EMBED-BITCODE-MARKER
+// WARN-EMBED-BITCODE-MARKER: warning: ignoring -embed-bitcode-marker since no object file is being generated
+// WARN-EMBED-BITCODE-MARKER-NOT: -embed-bitcode-marker

@@ -21,12 +21,39 @@ enum E {
 }
 
 class C {
-  init(i: Int) { } // expected-note{{selected non-required initializer 'init(i:)'}}
+  init(i: Int) { } // expected-note 4{{selected non-required initializer 'init(i:)'}}
 
   required init(d: Double) { }
 
   class Inner {
     init(i: Int) { }
+  }
+
+  static func makeCBad() -> C {
+    return self.init(i: 0)
+    // expected-error@-1 {{constructing an object of class type 'C' with a metatype value must use a 'required' initializer}}
+  }
+
+  static func makeCGood() -> C {
+    return self.init(d: 0)
+  }
+
+  static func makeSelfBad() -> Self {
+    return self.init(i: 0)
+    // expected-error@-1 {{constructing an object of class type 'Self' with a metatype value must use a 'required' initializer}}
+  }
+
+  static func makeSelfGood() -> Self {
+    return self.init(d: 0)
+  }
+
+  static func makeSelfImplicitBaseBad() -> Self {
+    return .init(i: 0)
+    // expected-error@-1 {{constructing an object of class type 'Self' with a metatype value must use a 'required' initializer}}
+  }
+
+  static func makeSelfImplicitBaseGood() -> Self {
+    return .init(d: 0)
   }
 }
 

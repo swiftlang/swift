@@ -2,6 +2,7 @@
 // RUN: %swiftc_driver -driver-print-jobs -sanitize-coverage=func -sanitize=address %s | %FileCheck -check-prefix=SANCOV_FUNC %s
 // RUN: %swiftc_driver -driver-print-jobs -sanitize-coverage=bb -sanitize=address %s | %FileCheck -check-prefix=SANCOV_BB %s
 // RUN: %swiftc_driver -driver-print-jobs -sanitize-coverage=edge -sanitize=address %s | %FileCheck -check-prefix=SANCOV_EDGE %s
+// REQUIRES: asan_runtime
 
 // Try some options
 // RUN: %swiftc_driver -driver-print-jobs -sanitize-coverage=edge,indirect-calls,trace-bb,trace-cmp,8bit-counters  -sanitize=address %s | %FileCheck -check-prefix=SANCOV_EDGE_WITH_OPTIONS %s

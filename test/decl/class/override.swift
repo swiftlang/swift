@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -parse-as-library
+// RUN: %target-typecheck-verify-swift -parse-as-library -enable-objc-interop
 
 class A {
   func ret_sametype() -> Int { return 0 }
@@ -161,23 +161,23 @@ class H : G {
 }
 
 @objc class IUOTestBaseClass {
-  func none() {}
+  @objc func none() {}
 
-  func oneA(_: AnyObject) {}
-  func oneB(x: AnyObject) {}
-  func oneC(_ x: AnyObject) {}
+  @objc func oneA(_: AnyObject) {}
+  @objc func oneB(x: AnyObject) {}
+  @objc func oneC(_ x: AnyObject) {}
 
-  func manyA(_: AnyObject, _: AnyObject) {}
-  func manyB(_ a: AnyObject, b: AnyObject) {}
-  func manyC(var a: AnyObject,  // expected-error {{'var' as a parameter attribute is not allowed}}
-             var b: AnyObject) {} // expected-error {{'var' as a parameter attribute is not allowed}}
+  @objc func manyA(_: AnyObject, _: AnyObject) {}
+  @objc func manyB(_ a: AnyObject, b: AnyObject) {}
+  @objc func manyC(var a: AnyObject,  // expected-warning {{'var' in this position is interpreted as an argument label}} {{20-23=`var`}}
+                   var b: AnyObject) {} // expected-warning {{'var' in this position is interpreted as an argument label}} {{20-23=`var`}}
 
-  func result() -> AnyObject? { return nil }
-  func both(_ x: AnyObject) -> AnyObject? { return x }
+  @objc func result() -> AnyObject? { return nil }
+  @objc func both(_ x: AnyObject) -> AnyObject? { return x }
 
-  init(_: AnyObject) {}
-  init(one: AnyObject) {}
-  init(a: AnyObject, b: AnyObject) {}
+  @objc init(_: AnyObject) {}
+  @objc init(one: AnyObject) {}
+  @objc init(a: AnyObject, b: AnyObject) {}
 }
 
 class IUOTestSubclass : IUOTestBaseClass {
@@ -265,8 +265,8 @@ class Base24646184 {
   func foo(ok: SubTy) { }
 }
 class Derived24646184 : Base24646184 {
-  override init(_: Ty) { } // expected-note {{'init' previously overridden here}}
-  override init(_: SubTy) { } // expected-error {{'init' has already been overridden}}
+  override init(_: Ty) { } // expected-error {{'init(_:)' has already been overridden}}
+  override init(_: SubTy) { } // expected-note {{'init(_:)' previously overridden here}}
   override func foo(_: Ty) { } // expected-note {{'foo' previously overridden here}}
   override func foo(_: SubTy) { } // expected-error {{'foo' has already been overridden}}
 
@@ -276,6 +276,17 @@ class Derived24646184 : Base24646184 {
   override func foo(ok: SubTy) { }
 }
 
+
+// Subscripts
+
+class SubscriptBase {
+  subscript(a a: Int) -> Int { return a }
+}
+
+class SubscriptDerived : SubscriptBase {
+  override subscript(a: Int) -> Int { return a }
+  // expected-error@-1 {{argument labels for method 'subscript(_:)' do not match those of overridden method 'subscript(a:)'}}
+}
 
 // Generic subscripts
 
@@ -305,7 +316,6 @@ class GenericSubscriptDerived : GenericSubscriptBase {
 
 
 // @escaping
-
 class CallbackBase {
   func perform(handler: @escaping () -> Void) {} // expected-note * {{here}}
   func perform(optHandler: (() -> Void)?) {} // expected-note * {{here}}
@@ -326,6 +336,31 @@ class CallbackSubC : CallbackBase {
   override func perform(handler: @escaping () -> Void) {}
   override func perform(optHandler: @escaping () -> Void) {} // expected-error {{cannot override instance method parameter of type '(() -> Void)?' with non-optional type '() -> Void'}}
   override func perform(nonescapingHandler: @escaping () -> Void) {} // expected-error {{method does not override any method from its superclass}}
+}
+
+// inout, varargs
+class HasFlagsBase {
+  func modify(x: inout B) {} // expected-note 2{{potential overridden instance method 'modify(x:)' here}}
+  func tweak(x: inout A) {} // expected-note 2{{potential overridden instance method 'tweak(x:)' here}}
+  func collect(x: B...) {} // expected-note 2{{potential overridden instance method 'collect(x:)' here}}
+}
+
+class HasFlagsDerivedGood : HasFlagsBase {
+  override func modify(x: inout B) {}
+  override func tweak(x: inout A) {}
+  override func collect(x: B...) {}
+}
+
+class HasFlagsDerivedBad1 : HasFlagsBase {
+  override func modify(x: inout A) {} // expected-error {{method does not override any method from its superclass}}
+  override func tweak(x: inout B) {} // expected-error {{method does not override any method from its superclass}}
+  override func collect(x: A...) {} // expected-error {{method does not override any method from its superclass}}
+}
+
+class HasFlagsDerivedBad2 : HasFlagsBase {
+  override func modify(x: B) {} // expected-error {{method does not override any method from its superclass}}
+  override func tweak(x: A) {} // expected-error {{method does not override any method from its superclass}}
+  override func collect(x: [B]) {} // expected-error {{method does not override any method from its superclass}}
 }
 
 // Issues with overrides of internal(set) and fileprivate(set) members
@@ -349,4 +384,33 @@ class DerivedWithFilePrivateSetter: BaseWithFilePrivateSetter {
         get { return 0 }
         set { }
     }
+}
+
+open class OpenBase {
+  open func instanceMethod() {}
+  open class func classMethod() {}
+}
+
+public class PublicDerived : OpenBase {
+  override public func instanceMethod() {}
+  override public class func classMethod() {}
+}
+
+open class OpenDerived : OpenBase {
+  override open func instanceMethod() {}
+  override open class func classMethod() {}
+}
+
+open class OpenDerivedPublic : OpenBase {
+  override public func instanceMethod() {} // Ok
+  override public class func classMethod() {} // Ok
+}
+
+open class OpenDerivedFinal : OpenBase {
+  override public final func instanceMethod() {}
+  override public class final func classMethod() {}
+}
+
+open class OpenDerivedStatic : OpenBase {
+  override public static func classMethod() {}
 }

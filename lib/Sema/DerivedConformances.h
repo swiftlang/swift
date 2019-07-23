@@ -21,175 +21,198 @@
 #include <utility>
 
 namespace swift {
-  class Decl;
-  class DeclRefExpr;
-  class AccessorDecl;
-  class NominalTypeDecl;
-  class PatternBindingDecl;
-  class Type;
-  class TypeChecker;
-  class ValueDecl;
-  class VarDecl;
-  
-namespace DerivedConformance {
+class Decl;
+class DeclRefExpr;
+class AccessorDecl;
+class NominalTypeDecl;
+class PatternBindingDecl;
+class Type;
+class TypeChecker;
+class ValueDecl;
+class VarDecl;
 
-/// True if the type can implicitly derive a conformance for the given protocol.
-///
-/// If true, explicit conformance checking will synthesize implicit declarations
-/// for requirements of the protocol that are not satisfied by the type's
-/// explicit members.
-///
-/// \param tc The type checker.
-///
-/// \param nominal The nominal type for which we are determining whether to
-/// derive a witness.
-///
-/// \param protocol The protocol whose requirements are being derived.
-///
-/// \return True if the type can implicitly derive a conformance for the given
-/// protocol.
-bool derivesProtocolConformance(TypeChecker &tc,
-                                NominalTypeDecl *nominal,
-                                ProtocolDecl *protocol);
+class DerivedConformance {
+public:
+  TypeChecker &TC;
+  Decl *ConformanceDecl;
+  NominalTypeDecl *Nominal;
+  ProtocolDecl *Protocol;
 
-/// Determine the derivable requirement that would satisfy the given
-/// requirement, if there is one.
-///
-/// \param tc The type checker.
-///
-/// \param nominal The nominal type for which we are determining whether to
-/// derive a witness.
-///
-/// \param requirement The requirement for which we are checking for a
-/// derivation. This requirement need not be within a derivable protocol,
-/// because derivable requirements can get restated in inherited unrelated or
-/// unrelated protocols.
-///
-/// \returns The requirement whose witness could be derived to potentially
-/// satisfy this given requirement, or NULL if there is no such requirement.
-ValueDecl *getDerivableRequirement(TypeChecker &tc,
-                                   NominalTypeDecl *nominal,
-                                   ValueDecl *requirement);
+  DerivedConformance(TypeChecker &tc, Decl *conformanceDecl,
+                     NominalTypeDecl *nominal, ProtocolDecl *protocol);
 
-/// Derive a RawRepresentable requirement for an enum, if it has a valid
-/// raw type and raw values for all of its cases.
-///
-/// \returns the derived member, which will also be added to the type.
-ValueDecl *deriveRawRepresentable(TypeChecker &tc,
-                                  Decl *parentDecl,
-                                  NominalTypeDecl *type,
-                                  ValueDecl *requirement);
+  /// Retrieve the context in which the conformance is declared (either the
+  /// nominal type, or an extension of it) as a \c DeclContext.
+  DeclContext *getConformanceContext() const;
 
-/// Derive a RawRepresentable type witness for an enum, if it has a valid
-/// raw type and raw values for all of its cases.
-///
-/// \returns the derived member, which will also be added to the type.
-Type deriveRawRepresentable(TypeChecker &tc,
-                            Decl *parentDecl,
-                            NominalTypeDecl *type,
-                            AssociatedTypeDecl *assocType);
+  /// Add \c children as members of the context that declares the conformance.
+  void addMembersToConformanceContext(ArrayRef<Decl *> children);
 
-/// Determine if an Equatable requirement can be derived for a type.
-///
-/// This is implemented for enums without associated values or all-Equatable
-/// associated values, and for structs with all-Equatable stored properties.
-///
-/// \returns True if the requirement can be derived.
-bool canDeriveEquatable(TypeChecker &tc,
-                        NominalTypeDecl *type,
-                        ValueDecl *requirement);
+  /// Get the declared type of the protocol that this is conformance is for.
+  Type getProtocolType() const;
 
-/// Derive an Equatable requirement for a type.
-///
-/// This is implemented for enums without associated values or all-Equatable
-/// associated values, and for structs with all-Equatable stored properties.
-///
-/// \returns the derived member, which will also be added to the type.
-ValueDecl *deriveEquatable(TypeChecker &tc,
-                           Decl *parentDecl,
-                           NominalTypeDecl *type,
-                           ValueDecl *requirement);
+  /// True if the type can implicitly derive a conformance for the given
+  /// protocol.
+  ///
+  /// If true, explicit conformance checking will synthesize implicit
+  /// declarations for requirements of the protocol that are not satisfied by
+  /// the type's explicit members.
+  ///
+  /// \param nominal The nominal type for which we are determining whether to
+  /// derive a witness.
+  ///
+  /// \param protocol The protocol whose requirements are being derived.
+  ///
+  /// \return True if the type can implicitly derive a conformance for the
+  /// given protocol.
+  static bool derivesProtocolConformance(DeclContext *DC,
+                                         NominalTypeDecl *nominal,
+                                         ProtocolDecl *protocol);
 
-/// Determine if a Hashable requirement can be derived for a type.
-///
-/// This is implemented for enums without associated values or all-Hashable
-/// associated values, and for structs with all-Hashable stored properties.
-///
-/// \returns True if the requirement can be derived.
-bool canDeriveHashable(TypeChecker &tc,
-                       NominalTypeDecl *type,
-                       ValueDecl *requirement);
-  
-/// Derive a Hashable requirement for a type.
-///
-/// This is implemented for enums without associated values or all-Hashable
-/// associated values, and for structs with all-Hashable stored properties.
-///
-/// \returns the derived member, which will also be added to the type.
-ValueDecl *deriveHashable(TypeChecker &tc,
-                          Decl *parentDecl,
-                          NominalTypeDecl *type,
-                          ValueDecl *requirement);
+  /// Diagnose problems, if any, preventing automatic derivation of protocol
+  /// requirements
+  ///
+  /// \param nominal The nominal type for which we would like to diagnose
+  /// derivation failures
+  ///
+  /// \param protocol The protocol with requirements we would like to diagnose
+  /// derivation failures for
+  static void tryDiagnoseFailedDerivation(DeclContext *DC,
+                                          NominalTypeDecl *nominal,
+                                          ProtocolDecl *protocol);
 
-/// Derive a _BridgedNSError requirement for an @objc enum type.
-///
-/// \returns the derived member, which will also be added to the type.
-ValueDecl *deriveBridgedNSError(TypeChecker &tc,
-                                Decl *parentDecl,
-                                NominalTypeDecl *type,
-                                ValueDecl *requirement);
+  /// Determine the derivable requirement that would satisfy the given
+  /// requirement, if there is one.
+  ///
+  /// \param nominal The nominal type for which we are determining whether to
+  /// derive a witness.
+  ///
+  /// \param requirement The requirement for which we are checking for a
+  /// derivation. This requirement need not be within a derivable protocol,
+  /// because derivable requirements can get restated in inherited unrelated
+  /// or unrelated protocols.
+  ///
+  /// \returns The requirement whose witness could be derived to potentially
+  /// satisfy this given requirement, or NULL if there is no such requirement.
+  static ValueDecl *getDerivableRequirement(NominalTypeDecl *nominal,
+                                            ValueDecl *requirement);
 
-/// Derive a CodingKey requirement for an enum type.
-///
-/// \returns the derived member, which will also be added to the type.
-ValueDecl *deriveCodingKey(TypeChecker &tc,
-                           Decl *parentDecl,
-                           NominalTypeDecl *type,
-                           ValueDecl *requirement);
+  /// Derive a CaseIterable requirement for an enum if it has no associated
+  /// values for any of its cases.
+  ///
+  /// \returns the derived member, which will also be added to the type.
+  ValueDecl *deriveCaseIterable(ValueDecl *requirement);
 
-/// Derive an Encodable requirement for a struct type.
-///
-/// \returns the derived member, which will also be added to the type.
-ValueDecl *deriveEncodable(TypeChecker &tc,
-                           Decl *parentDecl,
-                           NominalTypeDecl *type,
-                           ValueDecl *requirement);
+  /// Derive a CaseIterable type witness for an enum if it has no associated
+  /// values for any of its cases.
+  ///
+  /// \returns the derived member, which will also be added to the type.
+  Type deriveCaseIterable(AssociatedTypeDecl *assocType);
 
-/// Derive a Decodable requirement for a struct type.
-///
-/// \returns the derived member, which will also be added to the type.
-ValueDecl *deriveDecodable(TypeChecker &tc,
-                           Decl *parentDecl,
-                           NominalTypeDecl *type,
-                           ValueDecl *requirement);
+  /// Derive a RawRepresentable requirement for an enum, if it has a valid
+  /// raw type and raw values for all of its cases.
+  ///
+  /// \returns the derived member, which will also be added to the type.
+  ValueDecl *deriveRawRepresentable(ValueDecl *requirement);
 
-/// Declare a read-only property.
-std::pair<VarDecl *, PatternBindingDecl *>
-declareDerivedProperty(TypeChecker &tc,
-                       Decl *parentDecl,
-                       NominalTypeDecl *typeDecl,
-                       Identifier name,
-                       Type propertyInterfaceType,
-                       Type propertyContextType,
-                       bool isStatic,
-                       bool isFinal);
+  /// Derive a RawRepresentable type witness for an enum, if it has a valid
+  /// raw type and raw values for all of its cases.
+  ///
+  /// \returns the derived member, which will also be added to the type.
+  Type deriveRawRepresentable(AssociatedTypeDecl *assocType);
 
-/// Add a getter to a derived property.  The property becomes read-only.
-AccessorDecl *addGetterToReadOnlyDerivedProperty(TypeChecker &tc,
-                                                 VarDecl *property,
-                                                 Type propertyContextType);
+  /// Determine if an Equatable requirement can be derived for a type.
+  ///
+  /// This is implemented for enums without associated values or all-Equatable
+  /// associated values, and for structs with all-Equatable stored properties.
+  ///
+  /// \returns True if the requirement can be derived.
+  static bool canDeriveEquatable(DeclContext *DC, NominalTypeDecl *type);
 
-/// Declare a getter for a derived property.
-/// The getter will not be added to the property yet.
-AccessorDecl *declareDerivedPropertyGetter(TypeChecker &tc,
-                                           VarDecl *property,
-                                           Type propertyContextType);
+  /// Derive an Equatable requirement for a type.
+  ///
+  /// This is implemented for enums without associated values or all-Equatable
+  /// associated values, and for structs with all-Equatable stored properties.
+  ///
+  /// \returns the derived member, which will also be added to the type.
+  ValueDecl *deriveEquatable(ValueDecl *requirement);
 
-/// Build a reference to the 'self' decl of a derived function.
-DeclRefExpr *createSelfDeclRef(AbstractFunctionDecl *fn);
+  /// Diagnose problems, if any, preventing automatic derivation of Equatable
+  /// requirements
+  ///
+  /// \param nominal The nominal type for which we would like to diagnose
+  /// derivation failures
+  static void tryDiagnoseFailedEquatableDerivation(DeclContext *DC,
+                                                   NominalTypeDecl *nominal);
 
-}
-  
+  /// Determine if a Hashable requirement can be derived for a type.
+  ///
+  /// This is implemented for enums without associated values or all-Hashable
+  /// associated values, and for structs with all-Hashable stored properties.
+  ///
+  /// \returns True if the requirement can be derived.
+  static bool canDeriveHashable(NominalTypeDecl *type);
+
+  /// Derive a Hashable requirement for a type.
+  ///
+  /// This is implemented for enums without associated values or all-Hashable
+  /// associated values, and for structs with all-Hashable stored properties.
+  ///
+  /// \returns the derived member, which will also be added to the type.
+  ValueDecl *deriveHashable(ValueDecl *requirement);
+
+  /// Diagnose problems, if any, preventing automatic derivation of Hashable
+  /// requirements
+  ///
+  /// \param nominal The nominal type for which we would like to diagnose
+  /// derivation failures
+  static void tryDiagnoseFailedHashableDerivation(DeclContext *DC,
+                                                  NominalTypeDecl *nominal);
+
+  /// Derive a _BridgedNSError requirement for an @objc enum type.
+  ///
+  /// \returns the derived member, which will also be added to the type.
+  ValueDecl *deriveBridgedNSError(ValueDecl *requirement);
+
+  /// Derive a CodingKey requirement for an enum type.
+  ///
+  /// \returns the derived member, which will also be added to the type.
+  ValueDecl *deriveCodingKey(ValueDecl *requirement);
+
+  /// Derive an Encodable requirement for a struct type.
+  ///
+  /// \returns the derived member, which will also be added to the type.
+  ValueDecl *deriveEncodable(ValueDecl *requirement);
+
+  /// Derive a Decodable requirement for a struct type.
+  ///
+  /// \returns the derived member, which will also be added to the type.
+  ValueDecl *deriveDecodable(ValueDecl *requirement);
+
+  /// Declare a read-only property.
+  std::pair<VarDecl *, PatternBindingDecl *>
+  declareDerivedProperty(Identifier name, Type propertyInterfaceType,
+                         Type propertyContextType, bool isStatic, bool isFinal);
+
+  /// Add a getter to a derived property.  The property becomes read-only.
+  static AccessorDecl *
+  addGetterToReadOnlyDerivedProperty(VarDecl *property,
+                                     Type propertyContextType);
+
+  /// Declare a getter for a derived property.
+  /// The getter will not be added to the property yet.
+  static AccessorDecl *declareDerivedPropertyGetter(VarDecl *property,
+                                                    Type propertyContextType);
+
+  /// Build a reference to the 'self' decl of a derived function.
+  static DeclRefExpr *createSelfDeclRef(AbstractFunctionDecl *fn);
+
+  /// Returns true if this derivation is trying to use a context that isn't
+  /// appropriate for deriving.
+  ///
+  /// \param synthesizing The decl that is being synthesized.
+  bool checkAndDiagnoseDisallowedContext(ValueDecl *synthesizing) const;
+};
 }
 
 #endif

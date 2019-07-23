@@ -82,6 +82,10 @@ getClangBuiltinTypeFromKind(const clang::ASTContext &context,
   case clang::BuiltinType::Id:                                                 \
     return context.SingletonId;
 #include "clang/Basic/OpenCLImageTypes.def"
+#define EXT_OPAQUE_TYPE(ExtType, Id, Ext)                                      \
+  case clang::BuiltinType::Id:                                                 \
+    return context.Id##Ty;
+#include "clang/Basic/OpenCLExtensionTypes.def"
   }
 
   llvm_unreachable("Not a valid BuiltinType.");
@@ -216,6 +220,7 @@ clang::CanQualType GenClangType::visitStructType(CanStructType type) {
   CHECK_NAMED_TYPE(swiftDecl->getASTContext().getSwiftName(
                      KnownFoundationEntity::NSZone),
                    ctx.VoidPtrTy);
+  CHECK_NAMED_TYPE("WindowsBool", ctx.IntTy);
   CHECK_NAMED_TYPE("ObjCBool", ctx.ObjCBuiltinBoolTy);
   CHECK_NAMED_TYPE("Selector", getClangSelectorType(ctx));
   CHECK_NAMED_TYPE("UnsafeRawPointer", ctx.VoidPtrTy);
@@ -314,6 +319,21 @@ ClangTypeConverter::reverseBuiltinTypeMapping(IRGenModule &IGM,
 #define MAP_BUILTIN_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME)          \
   cacheStdlibType(#SWIFT_TYPE_NAME, clang::BuiltinType::CLANG_BUILTIN_KIND);
 #include "swift/ClangImporter/BuiltinMappedTypes.def"
+
+  // On 64-bit Windows, no C type is imported as an Int or UInt; CLong is
+  // imported as an Int32 and CLongLong as an Int64. Therefore, manually
+  // add mappings to C for Int and UInt.
+  if (IGM.Triple.isOSWindows() && IGM.Triple.isArch64Bit()) {
+    // Map UInt to uintptr_t
+    auto swiftUIntType = getNamedSwiftType(stdlib, "UInt");
+    auto clangUIntPtrType = ctx.getCanonicalType(ctx.getUIntPtrType());
+    Cache.insert({swiftUIntType, clangUIntPtrType});
+    
+    // Map Int to intptr_t
+    auto swiftIntType = getNamedSwiftType(stdlib, "Int");
+    auto clangIntPtrType = ctx.getCanonicalType(ctx.getIntPtrType());
+    Cache.insert({swiftIntType, clangIntPtrType});
+  }
 
   // The above code sets up a bunch of mappings in the cache; just
   // assume that we hit one of them.
@@ -426,7 +446,7 @@ GenClangType::visitBoundGenericType(CanBoundGenericType type) {
           SILType::getPrimitiveObjectType(type).getOptionalObjectType()) {
     // The underlying type could be a bridged type, which makes any
     // sort of casual assertion here difficult.
-    return Converter.convert(IGM, underlyingTy.getSwiftRValueType());
+    return Converter.convert(IGM, underlyingTy.getASTType());
   }
 
   auto swiftStructDecl = type->getDecl();
@@ -438,6 +458,7 @@ GenClangType::visitBoundGenericType(CanBoundGenericType type) {
     AutoreleasingUnsafeMutablePointer,
     Unmanaged,
     CFunctionPointer,
+    SIMD,
   } kind = llvm::StringSwitch<StructKind>(swiftStructDecl->getName().str())
     .Case("UnsafeMutablePointer", StructKind::UnsafeMutablePointer)
     .Case("UnsafePointer", StructKind::UnsafePointer)
@@ -446,18 +467,19 @@ GenClangType::visitBoundGenericType(CanBoundGenericType type) {
         StructKind::AutoreleasingUnsafeMutablePointer)
     .Case("Unmanaged", StructKind::Unmanaged)
     .Case("CFunctionPointer", StructKind::CFunctionPointer)
+    .StartsWith("SIMD", StructKind::SIMD)
     .Default(StructKind::Invalid);
   
   auto args = type.getGenericArgs();
   assert(args.size() == 1 &&
          "should have a single generic argument!");
-  auto loweredArgTy = IGM.getLoweredType(args[0]).getSwiftRValueType();
+  auto loweredArgTy = IGM.getLoweredType(args[0]).getASTType();
 
   switch (kind) {
   case StructKind::Invalid:
     llvm_unreachable("Unexpected non-pointer generic struct type in imported"
                      " Clang module!");
-      
+    
   case StructKind::UnsafeMutablePointer:
   case StructKind::Unmanaged:
   case StructKind::AutoreleasingUnsafeMutablePointer: {
@@ -483,6 +505,19 @@ GenClangType::visitBoundGenericType(CanBoundGenericType type) {
     }
     auto fnPtrTy = clangCtx.getPointerType(functionTy);
     return getCanonicalType(fnPtrTy);
+  }
+    
+  case StructKind::SIMD: {
+    clang::QualType scalarTy = Converter.convert(IGM, loweredArgTy);
+    auto numEltsString = swiftStructDecl->getName().str();
+    numEltsString.consume_front("SIMD");
+    unsigned numElts;
+    bool failedParse = numEltsString.getAsInteger<unsigned>(10, numElts);
+    assert(!failedParse && "SIMD type name didn't end in count?");
+    (void) failedParse;
+    auto vectorTy = getClangASTContext().getVectorType(scalarTy, numElts,
+      clang::VectorType::VectorKind::GenericVector);
+    return getCanonicalType(vectorTy);
   }
   }
 
@@ -608,10 +643,10 @@ clang::CanQualType GenClangType::visitProtocolCompositionType(
     return getClangIdType(getClangASTContext());
 
   auto superclassTy = clangCtx.ObjCBuiltinIdTy;
-  if (layout.superclass) {
+  if (auto layoutSuperclassTy = layout.getSuperclass()) {
     superclassTy = clangCtx.getCanonicalType(
       cast<clang::ObjCObjectPointerType>(
-        Converter.convert(IGM, CanType(layout.superclass)))
+        Converter.convert(IGM, CanType(layoutSuperclassTy)))
         ->getPointeeType());
   }
 
@@ -741,7 +776,7 @@ clang::CanQualType IRGenModule::getClangType(CanType type) {
 }
 
 clang::CanQualType IRGenModule::getClangType(SILType type) {
-  return getClangType(type.getSwiftRValueType());
+  return getClangType(type.getASTType());
 }
 
 clang::CanQualType IRGenModule::getClangType(SILParameterInfo params) {

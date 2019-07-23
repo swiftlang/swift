@@ -1,21 +1,10 @@
 // RUN: %target-swift-ide-test -syntax-coloring -source-filename %s | %FileCheck %s
 // RUN: %target-swift-ide-test -syntax-coloring -typecheck -source-filename %s | %FileCheck %s
-// XFAIL: broken_std_regex
-
-#line 17 "abc.swift"
-// CHECK: <kw>#line</kw> <int>17</int> <str>"abc.swift"</str>
-
-@available(iOS 8.0, OSX 10.10, *)
-// CHECK: <attr-builtin>@available</attr-builtin>(<kw>iOS</kw> <float>8.0</float>, <kw>OSX</kw> <float>10.10</float>, *)
-func foo() {
-// CHECK: <kw>if</kw> <kw>#available</kw> (<kw>OSX</kw> <float>10.10</float>, <kw>iOS</kw> <float>8.01</float>, *) {<kw>let</kw> <kw>_</kw> = <str>"iOS"</str>}
-  if #available (OSX 10.10, iOS 8.01, *) {let _ = "iOS"}
-}
 
 enum List<T> {
   case Nil
   // rdar://21927124
-  // CHECK: <attr-builtin>indirect</attr-builtin> <kw>case</kw> Cons(T, List)
+  // CHECK: <attr-builtin>indirect</attr-builtin> <kw>case</kw> Cons(<type>T</type>, <type>List</type>)
   indirect case Cons(T, List)
 }
 
@@ -91,13 +80,13 @@ class Attributes {
 // CHECK: <attr-builtin>@IBOutlet</attr-builtin> <kw>var</kw> v0: <type>Int</type>
   @IBOutlet var v0: Int
 
-// CHECK: <attr-builtin>@IBOutlet</attr-builtin> <attr-id>@IBOutlet</attr-id> <kw>var</kw> {{(<attr-builtin>)?}}v1{{(</attr-builtin>)?}}: <type>String</type>
+// CHECK: <attr-builtin>@IBOutlet</attr-builtin> <attr-id>@IBOutlet</attr-id> <kw>var</kw> v1: <type>String</type>
   @IBOutlet @IBOutlet var v1: String
 
-// CHECK: <attr-builtin>@objc</attr-builtin> <attr-builtin>@IBOutlet</attr-builtin> <kw>var</kw> {{(<attr-builtin>)?}}v2{{(</attr-builtin>)?}}: <type>String</type>
+// CHECK: <attr-builtin>@objc</attr-builtin> <attr-builtin>@IBOutlet</attr-builtin> <kw>var</kw> v2: <type>String</type>
   @objc @IBOutlet var v2: String
 
-// CHECK: <attr-builtin>@IBOutlet</attr-builtin> <attr-builtin>@objc</attr-builtin> <kw>var</kw> {{(<attr-builtin>)?}}v3{{(</attr-builtin>)?}}: <type>String</type>
+// CHECK: <attr-builtin>@IBOutlet</attr-builtin> <attr-builtin>@objc</attr-builtin> <kw>var</kw> v3: <type>String</type>
   @IBOutlet @objc var v3: String
 
 // CHECK: <attr-builtin>@available</attr-builtin>(*, unavailable) <kw>func</kw> f1() {}
@@ -140,8 +129,6 @@ var globComp : Int {
   }
 }
 
-// CHECK: <comment-block>/* foo is the best */</comment-block>
-/* foo is the best */
 // CHECK: <kw>func</kw> foo(n: <type>Float</type>) -> <type>Int</type> {
 func foo(n: Float) -> Int {
     // CHECK: <kw>var</kw> fnComp : <type>Int</type>
@@ -162,19 +149,7 @@ func foo(n: Float) -> Int {
     return 100009
 }
 
-///- returns: single-line, no space
-// CHECK: ///- <doc-comment-field>returns</doc-comment-field>: single-line, no space
-
-/// - returns: single-line, 1 space
-// CHECK: /// - <doc-comment-field>returns</doc-comment-field>: single-line, 1 space
-
-///  - returns: single-line, 2 spaces
-// CHECK: ///  - <doc-comment-field>returns</doc-comment-field>: single-line, 2 spaces
-
-///       - returns: single-line, more spaces
-// CHECK: ///       - <doc-comment-field>returns</doc-comment-field>: single-line, more spaces
-
-// CHECK: <kw>protocol</kw> Prot {
+// CHECK: <kw>protocol</kw> Prot
 protocol Prot {
   // CHECK: <kw>typealias</kw> Blarg
   typealias Blarg
@@ -190,7 +165,7 @@ protocol Prot {
 infix operator *-* : FunnyPrecedence
 
 // CHECK: <kw>precedencegroup</kw> FunnyPrecedence
-// CHECK-NEXT: <kw>associativity</kw>: left{{$}}
+// CHECK-NEXT: <kw>associativity</kw>: <kw>left</kw>{{$}}
 // CHECK-NEXT: <kw>higherThan</kw>: MultiplicationPrecedence
 precedencegroup FunnyPrecedence {
   associativity: left
@@ -222,8 +197,25 @@ class SubCls : MyCls, Prot {}
 func genFn<T : Prot where T.Blarg : Prot2>(_: T) -> Int {}
 
 func f(x: Int) -> Int {
-  // CHECK: <comment-line>// string interpolation is the best</comment-line>
-  // string interpolation is the best
+
+  // CHECK: <str>#"This is a raw string"#</str>
+  #"This is a raw string"#
+
+  // CHECK: <str>##"This is also a raw string"##</str>
+  ##"This is also a raw string"##
+
+  // CHECK: <str>###"This is an unterminated raw string"</str>
+  ###"This is an unterminated raw string"
+
+  // CHECK: <str>#"""This is a multiline raw string"""#</str>
+  #"""This is a multiline raw string"""#
+
+  // CHECK: <str>#"This is an </str>\#<anchor>(</anchor>interpolated<anchor>)</anchor><str> raw string"#</str>
+  #"This is an \#(interpolated) raw string"#
+
+  // CHECK: <str>#"This is a raw string with an invalid \##() interpolation"#</str>
+  #"This is a raw string with an invalid \##() interpolation"#
+
   // CHECK: <str>"This is string </str>\<anchor>(</anchor>genFn({(a:<type>Int</type> -> <type>Int</type>) <kw>in</kw> a})<anchor>)</anchor><str> interpolation"</str>
   "This is string \(genFn({(a:Int -> Int) in a})) interpolation"
 
@@ -270,6 +262,9 @@ func bar(x: Int) -> (Int, Float) {
   foo(Float())
 }
 
+// CHECK: <object-literal>#colorLiteral(red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0)</object-literal>
+#colorLiteral(red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0)
+
 class GenC<T1,T2> {}
 
 func test() {
@@ -284,6 +279,9 @@ func test2(x: Int) {
   // CHECK: <str>"</str>\<anchor>(</anchor>x<anchor>)</anchor><str>"</str>
   "\(x)"
 }
+
+// CHECK: <kw>#colorLiteral</kw>
+#colorLiteral
 
 // CHECK: <kw>class</kw> Observers {
 class Observers {
@@ -305,17 +303,8 @@ class Observers {
 
 // CHECK: <kw>func</kw> test3(o: <type>AnyObject</type>) {
 func test3(o: AnyObject) {
-  // CHECK: <kw>let</kw> x = o <kw>as</kw>! <type>MyCls</type>
-  let x = o as! MyCls
-}
-
-// CHECK: <kw>func</kw> test4(<kw>inout</kw> a: <type>Int</type>) {{{$}}
-func test4(inout a: Int) {
-  // CHECK: <kw>if</kw> <kw>#available</kw> (<kw>OSX</kw> >= <float>10.10</float>, <kw>iOS</kw> >= <float>8.01</float>) {<kw>let</kw> OSX = <str>"iOS"</str>}}{{$}}
-  if #available (OSX >= 10.10, iOS >= 8.01) {let OSX = "iOS"}}
-
-// CHECK: <kw>func</kw> test4b(a: <kw>inout</kw> <type>Int</type>) {{{$}}
-func test4b(a: inout Int) {
+  // CHECK: <kw>_</kw> = o <kw>is</kw> <type>MyCls</type> ? o <kw>as</kw> <type>MyCls</type> : o <kw>as</kw>! <type>MyCls</type> <kw>as</kw> <type>MyCls</type> + <int>1</int>
+  _ = o is MyCls ? o as MyCls : o as! MyCls as MyCls + 1
 }
 
 // CHECK: <kw>class</kw> MySubClass : <type>MyCls</type> {
@@ -344,193 +333,11 @@ func test_defer() {
   }
 }
 
-// FIXME: blah.
-//    FIXME:   blah blah
-// Something something, FIXME: blah
-
-// CHECK: <comment-line>// <comment-marker>FIXME: blah.</comment-marker></comment-line>
-// CHECK: <comment-line>//    <comment-marker>FIXME:   blah blah</comment-marker></comment-line>
-// CHECK: <comment-line>// Something something, <comment-marker>FIXME: blah</comment-marker></comment-line>
-
-/* FIXME: blah*/
-
-// CHECK: <comment-block>/* <comment-marker>FIXME: blah*/</comment-marker></comment-block>
-
-/*
- * FIXME: blah
- * Blah, blah.
- */
-
-// CHECK: <comment-block>/*
-// CHECK:  * <comment-marker>FIXME: blah</comment-marker>
-// CHECK:  * Blah, blah.
-// CHECK:  */</comment-block>
-
-// TODO: blah.
-// TTODO: blah.
-// MARK: blah.
-
-// CHECK: <comment-line>// <comment-marker>TODO: blah.</comment-marker></comment-line>
-// CHECK: <comment-line>// T<comment-marker>TODO: blah.</comment-marker></comment-line>
-// CHECK: <comment-line>// <comment-marker>MARK: blah.</comment-marker></comment-line>
-
-// CHECK: <kw>func</kw> test5() -> <type>Int</type> {
-func test5() -> Int {
-  // CHECK: <comment-line>// <comment-marker>TODO: something, something.</comment-marker></comment-line>
-  // TODO: something, something.
-  // CHECK: <kw>return</kw> <int>0</int>
-  return 0
-}
-
 func test6<T : Prot>(x: T) {}
 // CHECK: <kw>func</kw> test6<T : <type>Prot</type>>(x: <type>T</type>) {}{{$}}
 
-// http://whatever.com?ee=2&yy=1 and radar://123456
-/* http://whatever.com FIXME: see in http://whatever.com/fixme
-  http://whatever.com */
-
-// CHECK: <comment-line>// <comment-url>http://whatever.com?ee=2&yy=1</comment-url> and <comment-url>radar://123456</comment-url></comment-line>
-// CHECK: <comment-block>/* <comment-url>http://whatever.com</comment-url> <comment-marker>FIXME: see in <comment-url>http://whatever.com/fixme</comment-url></comment-marker>
-// CHECK:  <comment-url>http://whatever.com</comment-url> */</comment-block>
-
-// CHECK: <comment-line>// <comment-url>http://whatever.com/what-ever</comment-url></comment-line>
-// http://whatever.com/what-ever
-
 // CHECK: <kw>func</kw> <placeholder><#test1#></placeholder> () {}
 func <#test1#> () {}
-
-/// Brief.
-///
-/// Simple case.
-///
-/// - parameter x: A number
-/// - parameter y: Another number
-/// - PaRamEteR z-hyphen-q: Another number
-/// - parameter : A strange number...
-/// - parameternope1: Another number
-/// - parameter nope2
-/// - parameter: nope3
-/// -parameter nope4: Another number
-/// * parameter nope5: Another number
-///  - parameter nope6: Another number
-///  - Parameters: nope7
-/// - seealso: yes
-///   - seealso: yes
-/// - seealso:
-/// -seealso: nope
-/// - seealso : nope
-/// - seealso nope
-/// - returns: `x + y`
-func foo(x: Int, y: Int) -> Int { return x + y }
-// CHECK: <doc-comment-line>/// Brief.
-// CHECK: </doc-comment-line><doc-comment-line>///
-// CHECK: </doc-comment-line><doc-comment-line>/// Simple case.
-// CHECK: </doc-comment-line><doc-comment-line>///
-// CHECK: </doc-comment-line><doc-comment-line>/// - <doc-comment-field>parameter</doc-comment-field> x: A number
-// CHECK: </doc-comment-line><doc-comment-line>/// - <doc-comment-field>parameter</doc-comment-field> y: Another number
-// CHECK: </doc-comment-line><doc-comment-line>/// - <doc-comment-field>PaRamEteR</doc-comment-field> z-hyphen-q: Another number
-// CHECK: </doc-comment-line><doc-comment-line>/// - <doc-comment-field>parameter</doc-comment-field> : A strange number...
-// CHECK: </doc-comment-line><doc-comment-line>/// - parameternope1: Another number
-// CHECK: </doc-comment-line><doc-comment-line>/// - parameter nope2
-// CHECK: </doc-comment-line><doc-comment-line>/// - parameter: nope3
-// CHECK: </doc-comment-line><doc-comment-line>/// -parameter nope4: Another number
-// CHECK: </doc-comment-line><doc-comment-line>/// * parameter nope5: Another number
-// CHECK: </doc-comment-line><doc-comment-line>///  - parameter nope6: Another number
-// CHECK: </doc-comment-line><doc-comment-line>///  - Parameters: nope7
-// CHECK: </doc-comment-line><doc-comment-line>/// - <doc-comment-field>seealso</doc-comment-field>: yes
-// CHECK: </doc-comment-line><doc-comment-line>///   - <doc-comment-field>seealso</doc-comment-field>: yes
-// CHECK: </doc-comment-line><doc-comment-line>/// - <doc-comment-field>seealso</doc-comment-field>:
-// CHECK: </doc-comment-line><doc-comment-line>/// -seealso: nope
-// CHECK: </doc-comment-line><doc-comment-line>/// - seealso : nope
-// CHECK: </doc-comment-line><doc-comment-line>/// - seealso nope
-// CHECK: </doc-comment-line><doc-comment-line>/// - <doc-comment-field>returns</doc-comment-field>: `x + y`
-// CHECK: </doc-comment-line><kw>func</kw> foo(x: <type>Int</type>, y: <type>Int</type>) -> <type>Int</type> { <kw>return</kw> x + y }
-
-
-/// Brief.
-///
-/// Simple case.
-///
-/// - Parameters:
-///   - x: A number
-///   - y: Another number
-///
-///- note: NOTE1
-///
-/// - NOTE: NOTE2
-///   - note: Not a Note field (not at top level)
-/// - returns: `x + y`
-func bar(x: Int, y: Int) -> Int { return x + y }
-// CHECK: <doc-comment-line>/// Brief.
-// CHECK: </doc-comment-line><doc-comment-line>///
-// CHECK: </doc-comment-line><doc-comment-line>/// Simple case.
-// CHECK: </doc-comment-line><doc-comment-line>///
-// CHECK: </doc-comment-line><doc-comment-line>/// - <doc-comment-field>Parameters</doc-comment-field>:
-// CHECK: </doc-comment-line><doc-comment-line>/// - x: A number
-// CHECK: </doc-comment-line><doc-comment-line>/// - y: Another number
-// CHECK: </doc-comment-line><doc-comment-line>/// - <doc-comment-field>returns</doc-comment-field>: `x + y`
-// CHECK: </doc-comment-line><kw>func</kw> bar(x: <type>Int</type>, y: <type>Int</type>) -> <type>Int</type> { <kw>return</kw> x + y }
-
-/**
-  Does pretty much nothing.
-
-  Not a parameter list: improper indentation.
-    - Parameters: sdfadsf
-
-  - WARNING: - WARNING: Should only have one field
-
-  - $$$: Not a field.
-
-  Empty field, OK:
-*/
-func baz() {}
-// CHECK: <doc-comment-block>/**
-// CHECK:   Does pretty much nothing.
-// CHECK:   Not a parameter list: improper indentation.
-// CHECK:     - Parameters: sdfadsf
-// CHECK:   - <doc-comment-field>WARNING</doc-comment-field>: - WARNING: Should only have one field
-// CHECK:   - $$$: Not a field.
-// CHECK:   Empty field, OK:
-// CHECK: */</doc-comment-block>
-// CHECK: <kw>func</kw> baz() {}
-
-/***/
-func emptyDocBlockComment() {}
-// CHECK: <doc-comment-block>/***/</doc-comment-block>
-// CHECK: <kw>func</kw> emptyDocBlockComment() {}
-
-/**
-*/
-func emptyDocBlockComment2() {}
-// CHECK: <doc-comment-block>/**
-// CHECK: */
-// CHECK: <kw>func</kw> emptyDocBlockComment2() {}
-
-/**          */
-func emptyDocBlockComment3() {}
-// CHECK: <doc-comment-block>/**          */
-// CHECK: <kw>func</kw> emptyDocBlockComment3() {}
-
-
-/**/
-func malformedBlockComment(f : () throws -> ()) rethrows {}
-// CHECK: <doc-comment-block>/**/</doc-comment-block>
-// CHECK: <kw>func</kw> malformedBlockComment(f : () <kw>throws</kw> -> ()) <attr-builtin>rethrows</attr-builtin> {}
-
-//: playground doc comment line
-func playgroundCommentLine(f : () throws -> ()) rethrows {}
-// CHECK: <comment-line>//: playground doc comment line</comment-line>
-
-/*:
-  playground doc comment multi-line
-*/
-func playgroundCommentMultiLine(f : () throws -> ()) rethrows {}
-// CHECK: <comment-block>/*:
-// CHECK: playground doc comment multi-line
-// CHECK: */</comment-block>
-
-/// [strict weak ordering](http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings)
-// CHECK: <doc-comment-line>/// [strict weak ordering](<comment-url>http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings</comment-url>
 
 func funcTakingFor(for internalName: Int) {}
 // CHECK: <kw>func</kw> funcTakingFor(for internalName: <type>Int</type>) {}
@@ -549,35 +356,6 @@ _ = -0x123
 _ = -3.1e-5
 // CHECK: <float>-3.1e-5</float>
 
-/** aaa
-
- - returns: something
- */
-// CHECK:  - <doc-comment-field>returns</doc-comment-field>: something
-
-let filename = #file
-// CHECK: <kw>let</kw> filename = <kw>#file</kw>
-let line = #line
-// CHECK: <kw>let</kw> line = <kw>#line</kw>
-let column = #column
-// CHECK: <kw>let</kw> column = <kw>#column</kw>
-let function = #function
-// CHECK: <kw>let</kw> function = <kw>#function</kw>
-
-let image = #imageLiteral(resourceName: "cloud.png")
-// CHECK: <kw>let</kw> image = <object-literal>#imageLiteral(resourceName: "cloud.png")</object-literal>
-let file = #fileLiteral(resourceName: "cloud.png")
-// CHECK: <kw>let</kw> file = <object-literal>#fileLiteral(resourceName: "cloud.png")</object-literal>
-let black = #colorLiteral(red: 0, green: 0, blue: 0, alpha: 1)
-// CHECK: <kw>let</kw> black = <object-literal>#colorLiteral(red: 0, green: 0, blue: 0, alpha: 1)</object-literal>
-
-let rgb = [#colorLiteral(red: 1, green: 0, blue: 0, alpha: 1),
-           #colorLiteral(red: 0, green: 1, blue: 0, alpha: 1),
-           #colorLiteral(red: 0, green: 0, blue: 1, alpha: 1)]
-// CHECK: <kw>let</kw> rgb = [<object-literal>#colorLiteral(red: 1, green: 0, blue: 0, alpha: 1)</object-literal>,
-// CHECK:                     <object-literal>#colorLiteral(red: 0, green: 1, blue: 0, alpha: 1)</object-literal>,
-// CHECK:                     <object-literal>#colorLiteral(red: 0, green: 0, blue: 1, alpha: 1)</object-literal>]
-
 "--\"\(x) --"
 // CHECK: <str>"--\"</str>\<anchor>(</anchor>x<anchor>)</anchor><str> --"</str>
 
@@ -591,8 +369,8 @@ func keywordAsLabel4(_: Int) {}
 // CHECK: <kw>func</kw> keywordAsLabel4(<kw>_</kw>: <type>Int</type>) {}
 func keywordAsLabel5(_: Int, for: Int) {}
 // CHECK: <kw>func</kw> keywordAsLabel5(<kw>_</kw>: <type>Int</type>, for: <type>Int</type>) {}
-func keywordAsLabel6(if let: Int) {}
-// CHECK: <kw>func</kw> keywordAsLabel6(if <kw>let</kw>: <type>Int</type>) {}
+func keywordAsLabel6(if func: Int) {}
+// CHECK: <kw>func</kw> keywordAsLabel6(if func: <type>Int</type>) {}
 
 func foo1() {
 // CHECK: <kw>func</kw> foo1() {
@@ -624,19 +402,46 @@ func keywordInCaseAndLocalArgLabel(_ for: Int, for in: Int, class _: Int) {
   case (let x, let y):
 // CHECK: <kw>case</kw> (<kw>let</kw> x, <kw>let</kw> y):
     print(x, y)
+  @unknown default:
+// CHECK: <attr-id>@unknown</attr-id> <kw>default</kw>:
+    ()
   }
 }
 
-#if os(macOS)
-#endif
-// CHECK: <#kw>#if</#kw> <#id>os</#id>(<#id>macOS</#id>)
+// CHECK: <kw>class</kw> Ownership {
+class Ownership {
+  // CHECK: <attr-builtin>weak</attr-builtin> <kw>var</kw> w
+  weak var w
+  // CHECK: <attr-builtin>unowned</attr-builtin> <kw>var</kw> u
+  unowned var u
+  // CHECK: <attr-builtin>unowned(unsafe)</attr-builtin> <kw>var</kw> uu
+  unowned(unsafe) var uu
+}
+// CHECK: <kw>let</kw> closure = { [<attr-builtin>weak</attr-builtin> x=bindtox, <attr-builtin>unowned</attr-builtin> y=bindtoy, <attr-builtin>unowned(unsafe)</attr-builtin> z=bindtoz] <kw>in</kw> }
+let closure = { [weak x=bindtox, unowned y=bindtoy, unowned(unsafe) z=bindtoz] in }
 
-// Keep this as the last test
-/**
-  Trailing off ...
-func unterminatedBlockComment() {}
-// CHECK: <comment-line>// Keep this as the last test</comment-line>
-// CHECK: <doc-comment-block>/**
-// CHECK:  Trailing off ...
-// CHECK:  func unterminatedBlockComment() {}
-// CHECK:  </doc-comment-block>
+protocol FakeClassRestrictedProtocol : `class` {}
+// CHECK: <kw>protocol</kw> FakeClassRestrictedProtocol : <type>`class`</type> {}
+// FIXME: rdar://42801404: OLD and NEW should be the same '<type>`class`</type>'.
+
+// CHECK: <kw>func</kw> foo() -> <kw>some</kw> <type>P</type> {}
+func foo() -> some P {}
+
+// CHECK: <kw>func</kw> foo() -> <kw>some</kw> <type>P</type> & <type>Q</type> {}
+func foo() -> some P & Q {}
+
+// CHECK: <kw>class</kw> PropertyDelgate {
+class PropertyDelgate {
+  // CHECK: @<type>MyDelegate</type>(<int>1</int>, receiveClosure {
+  @MyDelegate(1, receiveClosure {
+    // CHECK: <kw>var</kw> x = <int>1</int>; x
+    var x = 1; x
+  })
+  var something
+}
+
+// CHECK: <kw>func</kw> acceptBuilder<T>(
+func acceptBuilder<T>(
+  // CHECK: @<type>SomeBuilder</type><<type>Element</type>> label param: () -> <type>T</type>
+  @SomeBuilder<Element> label param: () -> T
+) {}

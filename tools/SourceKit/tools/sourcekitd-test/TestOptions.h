@@ -15,6 +15,7 @@
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Optional.h"
+#include "llvm/ADT/StringMap.h"
 #include <string>
 
 namespace sourcekitd_test {
@@ -22,6 +23,7 @@ namespace sourcekitd_test {
 enum class SourceKitRequest {
   None,
   ProtocolVersion,
+  CompilerVersion,
   DemangleNames,
   MangleSimpleClasses,
   Index,
@@ -31,6 +33,8 @@ enum class SourceKitRequest {
   CodeCompleteUpdate,
   CodeCompleteCacheOnDisk,
   CodeCompleteSetPopularAPI,
+  TypeContextInfo,
+  ConformingMethodList,
   CursorInfo,
   RangeInfo,
   RelatedIdents,
@@ -58,6 +62,8 @@ enum class SourceKitRequest {
   MarkupToXML,
   Statistics,
   SyntaxTree,
+  EnableCompileNotifications,
+  CollectExpresstionType,
 #define SEMANTIC_REFACTORING(KIND, NAME, ID) KIND,
 #include "swift/IDE/RefactoringKinds.def"
 };
@@ -78,7 +84,8 @@ struct TestOptions {
   unsigned EndCol = 0;
   unsigned Offset = 0;
   unsigned Length = 0;
-  llvm::Optional<unsigned> SwiftVersion;
+  std::string SwiftVersion;
+  bool PassVersionAsString = false;
   llvm::Optional<std::string> ReplaceText;
   std::string ModuleName;
   std::string HeaderPath;
@@ -97,10 +104,21 @@ struct TestOptions {
   bool PrintRequest = true;
   bool PrintResponseAsJSON = false;
   bool PrintRawResponse = false;
+  bool PrintResponse = true;
   bool SimplifiedDemangling = false;
   bool SynthesizedExtensions = false;
   bool CollectActionables = false;
   bool isAsyncRequest = false;
+  bool timeRequest = false;
+  unsigned repeatRequest = 1;
+  struct VFSFile {
+    std::string path;
+    bool passAsSourceText;
+    VFSFile(std::string path, bool passAsSourceText)
+        : path(std::move(path)), passAsSourceText(passAsSourceText) {}
+  };
+  llvm::StringMap<VFSFile> VFSFiles;
+  llvm::Optional<std::string> VFSName;
   llvm::Optional<bool> CancelOnSubsequentRequest;
   bool parseArgs(llvm::ArrayRef<const char *> Args);
   void printHelp(bool ShowHidden) const;

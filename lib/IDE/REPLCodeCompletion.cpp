@@ -16,6 +16,7 @@
 
 #include "swift/IDE/REPLCodeCompletion.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/DiagnosticSuppression.h"
 #include "swift/AST/Module.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceManager.h"
@@ -193,7 +194,7 @@ doCodeCompletion(SourceFile &SF, StringRef EnteredCode, unsigned *BufferID,
                  CodeCompletionCallbacksFactory *CompletionCallbacksFactory) {
   // Temporarily disable printing the diagnostics.
   ASTContext &Ctx = SF.getASTContext();
-  auto DiagnosticConsumers = Ctx.Diags.takeConsumers();
+  DiagnosticSuppression SuppressedDiags(Ctx.Diags);
 
   std::string AugmentedCode = EnteredCode.str();
   AugmentedCode += '\0';
@@ -206,18 +207,16 @@ doCodeCompletion(SourceFile &SF, StringRef EnteredCode, unsigned *BufferID,
   // Parse, typecheck and temporarily insert the incomplete code into the AST.
   const unsigned OriginalDeclCount = SF.Decls.size();
 
-  unsigned CurElem = OriginalDeclCount;
-  PersistentParserState PersistentState;
+  PersistentParserState PersistentState(Ctx);
   std::unique_ptr<DelayedParsingCallbacks> DelayedCB(
       new CodeCompleteDelayedCallbacks(Ctx.SourceMgr.getCodeCompletionLoc()));
   bool Done;
   do {
     parseIntoSourceFile(SF, *BufferID, &Done, nullptr, &PersistentState,
                         DelayedCB.get());
-    performTypeChecking(SF, PersistentState.getTopLevelContext(), None, 
-                        CurElem);
-    CurElem = SF.Decls.size();
   } while (!Done);
+  performTypeChecking(SF, PersistentState.getTopLevelContext(), None,
+                      OriginalDeclCount);
 
   performDelayedParsing(&SF, PersistentState, CompletionCallbacksFactory);
 
@@ -225,10 +224,8 @@ doCodeCompletion(SourceFile &SF, StringRef EnteredCode, unsigned *BufferID,
   // temporarily inserted.
   SF.Decls.resize(OriginalDeclCount);
 
-  // Add the diagnostic consumers back.
-  for (auto DC : DiagnosticConsumers)
-    Ctx.Diags.addConsumer(*DC);
-
+  // Reset the error state because it's only relevant to the code that we just
+  // processed, which now gets thrown away.
   Ctx.Diags.resetHadAnyError();
 }
 

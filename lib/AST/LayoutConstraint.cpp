@@ -334,6 +334,7 @@ LayoutConstraint::getLayoutConstraint(LayoutConstraintKind Kind) {
   case LayoutConstraintKind::TrivialOfExactSize:
     llvm_unreachable("Wrong layout constraint kind");
   }
+  llvm_unreachable("unhandled kind");
 }
 
 LayoutConstraint LayoutConstraint::getUnknownLayout() {

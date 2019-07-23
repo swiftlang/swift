@@ -38,7 +38,7 @@ struct S {
 	}()
 }
 
-// RUN: rm -rf %t.result && mkdir -p %t.result
+// RUN: %empty-directory(%t.result)
 // RUN: %refactor -syntactic-rename -source-filename %s -pos="var-y" -old-name "y" -new-name "yack" >> %t.result/variables_var-y.swift
 // RUN: diff -u %S/Outputs/variables/var-y.swift.expected %t.result/variables_var-y.swift
 // RUN: %refactor -syntactic-rename -source-filename %s -pos="ivar-x" -old-name "x" -new-name "fox" >> %t.result/variables_ivar-x.swift

@@ -14,37 +14,60 @@
 
 import TestsUtils
 
+let t: [BenchmarkCategory] = [.validation, .api, .Array]
 public let ArrayAppend = [
-  BenchmarkInfo(name: "ArrayAppend", runFunction: run_ArrayAppend, tags: [.validation, .api, .Array]),
-  BenchmarkInfo(name: "ArrayAppendArrayOfInt", runFunction: run_ArrayAppendArrayOfInt, tags: [.validation, .api, .Array]),
-  BenchmarkInfo(name: "ArrayAppendAscii", runFunction: run_ArrayAppendAscii, tags: [.validation, .api, .Array]),
-  BenchmarkInfo(name: "ArrayAppendFromGeneric", runFunction: run_ArrayAppendFromGeneric, tags: [.validation, .api, .Array]),
-  BenchmarkInfo(name: "ArrayAppendGenericStructs", runFunction: run_ArrayAppendGenericStructs, tags: [.validation, .api, .Array]),
-  BenchmarkInfo(name: "ArrayAppendLatin1", runFunction: run_ArrayAppendLatin1, tags: [.validation, .api, .Array]),
-  BenchmarkInfo(name: "ArrayAppendLazyMap", runFunction: run_ArrayAppendLazyMap, tags: [.validation, .api, .Array]),
-  BenchmarkInfo(name: "ArrayAppendOptionals", runFunction: run_ArrayAppendOptionals, tags: [.validation, .api, .Array]),
-  BenchmarkInfo(name: "ArrayAppendRepeatCol", runFunction: run_ArrayAppendRepeatCol, tags: [.validation, .api, .Array]),
-  BenchmarkInfo(name: "ArrayAppendReserved", runFunction: run_ArrayAppendReserved, tags: [.validation, .api, .Array]),
-  BenchmarkInfo(name: "ArrayAppendSequence", runFunction: run_ArrayAppendSequence, tags: [.validation, .api, .Array]),
-  BenchmarkInfo(name: "ArrayAppendStrings", runFunction: run_ArrayAppendStrings, tags: [.validation, .api, .Array]),
-  BenchmarkInfo(name: "ArrayAppendToFromGeneric", runFunction: run_ArrayAppendToFromGeneric, tags: [.validation, .api, .Array]),
-  BenchmarkInfo(name: "ArrayAppendToGeneric", runFunction: run_ArrayAppendToGeneric, tags: [.validation, .api, .Array]),
-  BenchmarkInfo(name: "ArrayAppendUTF16", runFunction: run_ArrayAppendUTF16, tags: [.validation, .api, .Array]),
-  BenchmarkInfo(name: "ArrayPlusEqualArrayOfInt", runFunction: run_ArrayPlusEqualArrayOfInt, tags: [.validation, .api, .Array]),
-  BenchmarkInfo(name: "ArrayPlusEqualFiveElementCollection", runFunction: run_ArrayPlusEqualFiveElementCollection, tags: [.validation, .api, .Array]),
-  BenchmarkInfo(name: "ArrayPlusEqualSingleElementCollection", runFunction: run_ArrayPlusEqualSingleElementCollection, tags: [.validation, .api, .Array]),
-  BenchmarkInfo(name: "ArrayPlusEqualThreeElements", runFunction: run_ArrayPlusEqualThreeElements, tags: [.validation, .api, .Array]),
+  BenchmarkInfo(name: "ArrayAppend", runFunction: run_ArrayAppend, tags: t, legacyFactor: 10),
+  BenchmarkInfo(name: "ArrayAppendArrayOfInt", runFunction: run_ArrayAppendArrayOfInt, tags: t,
+    setUpFunction: ones, tearDownFunction: releaseOnes, legacyFactor: 10),
+  BenchmarkInfo(name: "ArrayAppendAscii", runFunction: run_ArrayAppendAscii, tags: t, legacyFactor: 34),
+  BenchmarkInfo(name: "ArrayAppendAsciiSubstring", runFunction: run_ArrayAppendAsciiSubstring, tags: t, legacyFactor: 36),
+  BenchmarkInfo(name: "ArrayAppendFromGeneric", runFunction: run_ArrayAppendFromGeneric, tags: t,
+    setUpFunction: ones, tearDownFunction: releaseOnes, legacyFactor: 10),
+  BenchmarkInfo(name: "ArrayAppendGenericStructs", runFunction: run_ArrayAppendGenericStructs, tags: t,
+    setUpFunction: { otherStructs = Array(repeating: S(x: 3, y: 4.2), count: 10_000) },
+    tearDownFunction: {  otherStructs = nil }, legacyFactor: 10),
+  BenchmarkInfo(name: "ArrayAppendLatin1", runFunction: run_ArrayAppendLatin1, tags: t, legacyFactor: 34),
+  BenchmarkInfo(name: "ArrayAppendLatin1Substring", runFunction: run_ArrayAppendLatin1Substring, tags: t, legacyFactor: 36),
+  BenchmarkInfo(name: "ArrayAppendLazyMap", runFunction: run_ArrayAppendLazyMap, tags: t,
+    setUpFunction: { blackHole(array) }, legacyFactor: 10),
+  BenchmarkInfo(name: "ArrayAppendOptionals", runFunction: run_ArrayAppendOptionals, tags: t,
+    setUpFunction: { otherOptionalOnes = Array(repeating: 1, count: 10_000) },
+    tearDownFunction: {  otherOptionalOnes = nil }, legacyFactor: 10),
+  BenchmarkInfo(name: "ArrayAppendRepeatCol", runFunction: run_ArrayAppendRepeatCol, tags: t, legacyFactor: 10),
+  BenchmarkInfo(name: "ArrayAppendReserved", runFunction: run_ArrayAppendReserved, tags: t, legacyFactor: 10),
+  BenchmarkInfo(name: "ArrayAppendSequence", runFunction: run_ArrayAppendSequence, tags: t, legacyFactor: 10),
+  BenchmarkInfo(name: "ArrayAppendStrings", runFunction: run_ArrayAppendStrings, tags: t,
+    setUpFunction: { otherStrings = stride(from: 0, to: 10_000, by: 1).map { "\($0)" } },
+    tearDownFunction: {  otherStrings = nil }, legacyFactor: 10),
+  BenchmarkInfo(name: "ArrayAppendToFromGeneric", runFunction: run_ArrayAppendToFromGeneric, tags: t,
+    setUpFunction: ones, tearDownFunction: releaseOnes, legacyFactor: 10),
+  BenchmarkInfo(name: "ArrayAppendToGeneric", runFunction: run_ArrayAppendToGeneric, tags: t,
+    setUpFunction: ones, tearDownFunction: releaseOnes, legacyFactor: 10),
+  BenchmarkInfo(name: "ArrayAppendUTF16", runFunction: run_ArrayAppendUTF16, tags: t, legacyFactor: 34),
+  BenchmarkInfo(name: "ArrayAppendUTF16Substring", runFunction: run_ArrayAppendUTF16Substring, tags: t, legacyFactor: 36),
+  BenchmarkInfo(name: "ArrayPlusEqualArrayOfInt", runFunction: run_ArrayPlusEqualArrayOfInt, tags: t,
+    setUpFunction: ones, tearDownFunction: releaseOnes, legacyFactor: 10),
+  BenchmarkInfo(name: "ArrayPlusEqualFiveElementCollection", runFunction: run_ArrayPlusEqualFiveElementCollection, tags: t, legacyFactor: 37),
+  BenchmarkInfo(name: "ArrayPlusEqualSingleElementCollection", runFunction: run_ArrayPlusEqualSingleElementCollection, tags: t, legacyFactor: 47),
+  BenchmarkInfo(name: "ArrayPlusEqualThreeElements", runFunction: run_ArrayPlusEqualThreeElements, tags: t, legacyFactor: 10),
 ]
+
+var otherOnes: [Int]!
+var otherOptionalOnes: [Int?]!
+var otherStrings: [String]!
+var otherStructs: [S<Int, Double>]!
+let array = Array(0..<10_000)
+
+func ones() { otherOnes = Array(repeating: 1, count: 10_000) }
+func releaseOnes() { otherOnes = nil }
 
 // Append single element
 @inline(never)
 public func run_ArrayAppend(_ N: Int) {
   for _ in 0..<N {
-    for _ in 0..<10 {
-       var nums = [Int]()
-       for _ in 0..<40000 {
-         nums.append(1)
-       }
+    var nums = [Int]()
+    for _ in 0..<40000 {
+      nums.append(1)
     }
   }
 }
@@ -53,27 +76,24 @@ public func run_ArrayAppend(_ N: Int) {
 @inline(never)
 public func run_ArrayAppendReserved(_ N: Int) {
   for _ in 0..<N {
-    for _ in 0..<10 {
-       var nums = [Int]()
-       nums.reserveCapacity(40000)
-       for _ in 0..<40000 {
-         nums.append(1)
-       }
+    var nums = [Int]()
+    nums.reserveCapacity(40000)
+    for _ in 0..<40000 {
+      nums.append(1)
     }
   }
 }
 
 // Append a sequence. Length of sequence unknown so
-// can't pre-reserve capacity. 
+// can't pre-reserve capacity.
 @inline(never)
 public func run_ArrayAppendSequence(_ N: Int) {
   let seq = stride(from: 0, to: 10_000, by: 1)
+
   for _ in 0..<N {
-    for _ in 0..<10 {
-      var nums = [Int]()
-      for _ in 0..<8 {
-        nums.append(contentsOf: seq)
-      }
+    var nums = [Int]()
+    for _ in 0..<8 {
+      nums.append(contentsOf: seq)
     }
   }
 }
@@ -82,13 +102,12 @@ public func run_ArrayAppendSequence(_ N: Int) {
 // can pre-reserve capacity.
 @inline(never)
 public func run_ArrayAppendArrayOfInt(_ N: Int) {
-  let other = Array(repeating: 1, count: 10_000)
+  let other: [Int] = otherOnes
+
   for _ in 0..<N {
-    for _ in 0..<10 {
-      var nums = [Int]()
-      for _ in 0..<8 {
-        nums.append(contentsOf: other)
-      }
+    var nums = [Int]()
+    for _ in 0..<8 {
+      nums.append(contentsOf: other)
     }
   }
 }
@@ -97,13 +116,12 @@ public func run_ArrayAppendArrayOfInt(_ N: Int) {
 // except +=, to check equally performant.
 @inline(never)
 public func run_ArrayPlusEqualArrayOfInt(_ N: Int) {
-  let other = Array(repeating: 1, count: 10_000)
+  let other: [Int] = otherOnes
+
   for _ in 0..<N {
-    for _ in 0..<10 {
-      var nums = [Int]()
-      for _ in 0..<8 {
-        nums += other
-      }
+    var nums = [Int]()
+    for _ in 0..<8 {
+      nums += other
     }
   }
 }
@@ -112,14 +130,13 @@ public func run_ArrayPlusEqualArrayOfInt(_ N: Int) {
 // can pre-reserve capacity.
 @inline(never)
 public func run_ArrayAppendStrings(_ N: Int) {
-  let other = stride(from: 0, to: 10_000, by: 1).map { "\($0)" }
+  let other: [String] = otherStrings
+
   for _ in 0..<N {
-    for _ in 0..<10 {
-      var nums = [String]()
-      // lower inner count due to string slowness
-      for _ in 0..<4 {
-        nums += other
-      }
+    var nums = [String]()
+    // lower inner count due to string slowness
+    for _ in 0..<4 {
+      nums += other
     }
   }
 }
@@ -133,13 +150,12 @@ struct S<T,U> {
 // can pre-reserve capacity.
 @inline(never)
 public func run_ArrayAppendGenericStructs(_ N: Int) {
-  let other = Array(repeating: S(x: 3, y: 4.2), count: 10_000)
+  let other: [S<Int, Double>] = otherStructs
+
   for _ in 0..<N {
-    for _ in 0..<10 {
-      var nums = [S<Int,Double>]()
-      for _ in 0..<8 {
-        nums += other
-      }
+    var nums = [S<Int,Double>]()
+    for _ in 0..<8 {
+      nums += other
     }
   }
 }
@@ -148,14 +164,12 @@ public func run_ArrayAppendGenericStructs(_ N: Int) {
 // can pre-reserve capacity.
 @inline(never)
 public func run_ArrayAppendOptionals(_ N: Int) {
-  let other: [Int?] = Array(repeating: 1, count: 10_000)
+  let other: [Int?] = otherOptionalOnes
 
   for _ in 0..<N {
-    for _ in 0..<10 {
-      var nums = [Int?]()
-      for _ in 0..<8 {
-        nums += other
-      }
+    var nums = [Int?]()
+    for _ in 0..<8 {
+      nums += other
     }
   }
 }
@@ -165,14 +179,12 @@ public func run_ArrayAppendOptionals(_ N: Int) {
 // can pre-reserve capacity, but no optimization points used.
 @inline(never)
 public func run_ArrayAppendLazyMap(_ N: Int) {
-  let other = Array(0..<10_000).lazy.map { $0 * 2 }
+  let other = array.lazy.map { $0 * 2 }
 
   for _ in 0..<N {
-    for _ in 0..<10 {
-      var nums = [Int]()
-      for _ in 0..<8 {
-        nums += other
-      }
+    var nums = [Int]()
+    for _ in 0..<8 {
+      nums += other
     }
   }
 }
@@ -185,11 +197,9 @@ public func run_ArrayAppendRepeatCol(_ N: Int) {
   let other = repeatElement(1, count: 10_000)
 
   for _ in 0..<N {
-    for _ in 0..<10 {
-      var nums = [Int]()
-      for _ in 0..<8 {
-        nums += other
-      }
+    var nums = [Int]()
+    for _ in 0..<8 {
+      nums += other
     }
   }
 }
@@ -199,20 +209,18 @@ public func run_ArrayAppendRepeatCol(_ N: Int) {
 @inline(never)
 public func appendFromGeneric<
   S: Sequence
->(array: inout [S.Iterator.Element], sequence: S) {
+>(array: inout [S.Element], sequence: S) {
   array.append(contentsOf: sequence)
 }
 
 @inline(never)
 public func run_ArrayAppendFromGeneric(_ N: Int) {
-  let other = Array(repeating: 1, count: 10_000)
+  let other: [Int] = otherOnes
 
   for _ in 0..<N {
-    for _ in 0..<10 {
-      var nums = [Int]()
-      for _ in 0..<8 {
-        appendFromGeneric(array: &nums, sequence: other)
-      }
+    var nums = [Int]()
+    for _ in 0..<8 {
+      appendFromGeneric(array: &nums, sequence: other)
     }
   }
 }
@@ -221,20 +229,18 @@ public func run_ArrayAppendFromGeneric(_ N: Int) {
 @inline(never)
 public func appendToGeneric<
   R: RangeReplaceableCollection
->(collection: inout R, array: [R.Iterator.Element]) {
+>(collection: inout R, array: [R.Element]) {
   collection.append(contentsOf: array)
 }
 
 @inline(never)
 public func run_ArrayAppendToGeneric(_ N: Int) {
-  let other = Array(repeating: 1, count: 10_000)
+  let other: [Int] = otherOnes
 
   for _ in 0..<N {
-    for _ in 0..<10 {
-      var nums = [Int]()
-      for _ in 0..<8 {
-        appendToGeneric(collection: &nums, array: other)
-      }
+    var nums = [Int]()
+    for _ in 0..<8 {
+      appendToGeneric(collection: &nums, array: other)
     }
   }
 }
@@ -244,21 +250,19 @@ public func run_ArrayAppendToGeneric(_ N: Int) {
 @inline(never)
 public func appendToFromGeneric<
   R: RangeReplaceableCollection, S: Sequence
->(collection: inout R, sequence: S) 
-where R.Iterator.Element == S.Iterator.Element {
+>(collection: inout R, sequence: S)
+where R.Element == S.Element {
   collection.append(contentsOf: sequence)
 }
 
 @inline(never)
 public func run_ArrayAppendToFromGeneric(_ N: Int) {
-  let other = Array(repeating: 1, count: 10_000)
+  let other: [Int] = otherOnes
 
   for _ in 0..<N {
-    for _ in 0..<10 {
-      var nums = [Int]()
-      for _ in 0..<8 {
-        appendToFromGeneric(collection: &nums, sequence: other)
-      }
+    var nums = [Int]()
+    for _ in 0..<8 {
+      appendToFromGeneric(collection: &nums, sequence: other)
     }
   }
 }
@@ -267,11 +271,9 @@ public func run_ArrayAppendToFromGeneric(_ N: Int) {
 @inline(never)
 public func run_ArrayPlusEqualSingleElementCollection(_ N: Int) {
   for _ in 0..<N {
-    for _ in 0..<10 {
-       var nums = [Int]()
-       for _ in 0..<40_000 {
-         nums += [1]
-       }
+    var nums = [Int]()
+    for _ in 0..<10_000 {
+      nums += [1]
     }
   }
 }
@@ -280,11 +282,9 @@ public func run_ArrayPlusEqualSingleElementCollection(_ N: Int) {
 @inline(never)
 public func run_ArrayPlusEqualFiveElementCollection(_ N: Int) {
   for _ in 0..<N {
-    for _ in 0..<10 {
-       var nums = [Int]()
-       for _ in 0..<40_000 {
-         nums += [1, 2, 3, 4, 5]
-       }
+    var nums = [Int]()
+    for _ in 0..<10_000 {
+      nums += [1, 2, 3, 4, 5]
     }
   }
 }
@@ -296,7 +296,7 @@ public func appendThreeElements(_ a: inout [Int]) {
 
 @inline(never)
 public func run_ArrayPlusEqualThreeElements(_ N: Int) {
-  for _ in 0..<(10_000 * N) {
+  for _ in 0..<(1_000 * N) {
     var a: [Int] = []
     appendThreeElements(&a)
   }
@@ -307,40 +307,69 @@ public func run_ArrayPlusEqualThreeElements(_ N: Int) {
 public func run_ArrayAppendAscii(_ N: Int) {
   let s = "the quick brown fox jumps over the lazy dog!"
   for _ in 0..<N {
-    for _ in 0..<10 {
-       var nums = [UInt8]()
-       for _ in 0..<10_000 {
-         nums += s.utf8
-       }
+    var nums = [UInt8]()
+    for _ in 0..<3_000 {
+      nums += getString(s).utf8
     }
   }
 }
 
-// Append the utf8 elements of an ascii string to a [UInt8]
+// Append the utf8 elements of a latin1 string to a [UInt8]
 @inline(never)
 public func run_ArrayAppendLatin1(_ N: Int) {
   let s = "the quick brown fox jumps over the lazy dog\u{00A1}"
   for _ in 0..<N {
-    for _ in 0..<10 {
-       var nums = [UInt8]()
-       for _ in 0..<10_000 {
-         nums += s.utf8
-       }
+    var nums = [UInt8]()
+    for _ in 0..<3_000 {
+      nums += getString(s).utf8
     }
   }
 }
 
-// Append the utf8 elements of an ascii string to a [UInt8]
+// Append the utf8 elements of an utf16 string to a [UInt8]
 @inline(never)
 public func run_ArrayAppendUTF16(_ N: Int) {
   let s = "the quick brown 🦊 jumps over the lazy dog"
   for _ in 0..<N {
-    for _ in 0..<10 {
-       var nums = [UInt8]()
-       for _ in 0..<10_000 {
-         nums += s.utf8
-       }
+    var nums = [UInt8]()
+    for _ in 0..<3_000 {
+      nums += getString(s).utf8
     }
   }
 }
 
+// Append the utf8 elements of an ascii substring to a [UInt8]
+@inline(never)
+public func run_ArrayAppendAsciiSubstring(_ N: Int) {
+  let s = "the quick brown fox jumps over the lazy dog!"[...]
+  for _ in 0..<N {
+    var nums = [UInt8]()
+    for _ in 0..<3_000 {
+      nums += getSubstring(s).utf8
+    }
+  }
+}
+
+// Append the utf8 elements of a latin1 substring to a [UInt8]
+@inline(never)
+public func run_ArrayAppendLatin1Substring(_ N: Int) {
+  let s = "the quick brown fox jumps over the lazy dog\u{00A1}"[...]
+  for _ in 0..<N {
+    var nums = [UInt8]()
+    for _ in 0..<3_000 {
+      nums += getSubstring(s).utf8
+    }
+  }
+}
+
+// Append the utf8 elements of an utf16 substring to a [UInt8]
+@inline(never)
+public func run_ArrayAppendUTF16Substring(_ N: Int) {
+  let s = "the quick brown 🦊 jumps over the lazy dog"[...]
+  for _ in 0..<N {
+    var nums = [UInt8]()
+    for _ in 0..<3_000 {
+      nums += getSubstring(s).utf8
+    }
+  }
+}

@@ -39,6 +39,27 @@ SourceLoc SourceManager::getCodeCompletionLoc() const {
       .getAdvancedLoc(CodeCompletionOffset);
 }
 
+StringRef SourceManager::getDisplayNameForLoc(SourceLoc Loc) const {
+  // Respect #line first
+  if (auto VFile = getVirtualFile(Loc))
+    return VFile->Name;
+
+  // Next, try the stat cache
+  auto Ident = getIdentifierForBuffer(findBufferContainingLoc(Loc));
+  auto found = StatusCache.find(Ident);
+  if (found != StatusCache.end()) {
+    return found->second.getName();
+  }
+
+  // Populate the cache with a (virtual) stat.
+  if (auto Status = FileSystem->status(Ident)) {
+    return (StatusCache[Ident] = Status.get()).getName();
+  }
+
+  // Finally, fall back to the buffer identifier.
+  return Ident;
+}
+
 unsigned
 SourceManager::addNewSourceBuffer(std::unique_ptr<llvm::MemoryBuffer> Buffer) {
   assert(Buffer);
@@ -212,14 +233,14 @@ void SourceRange::widen(SourceRange Other) {
     End = Other.End;
 }
 
-void SourceLoc::printLineAndColumn(raw_ostream &OS,
-                                   const SourceManager &SM) const {
+void SourceLoc::printLineAndColumn(raw_ostream &OS, const SourceManager &SM,
+                                   unsigned BufferID) const {
   if (isInvalid()) {
     OS << "<invalid loc>";
     return;
   }
 
-  auto LineAndCol = SM.getLineAndColumn(*this);
+  auto LineAndCol = SM.getLineAndColumn(*this, BufferID);
   OS << "line:" << LineAndCol.first << ':' << LineAndCol.second;
 }
 
@@ -281,15 +302,18 @@ void CharSourceRange::print(raw_ostream &OS, const SourceManager &SM,
     return;
 
   if (PrintText) {
-    OS << " RangeText=\""
-       << StringRef(Start.Value.getPointer(),
-                    getEnd().Value.getPointer() - Start.Value.getPointer() + 1)
-       << '"';
+    OS << " RangeText=\"" << SM.extractText(*this) << '"';
   }
 }
 
 void CharSourceRange::dump(const SourceManager &SM) const {
   print(llvm::errs(), SM);
+}
+
+llvm::Optional<unsigned>
+SourceManager::resolveOffsetForEndOfLine(unsigned BufferId,
+                                         unsigned Line) const {
+  return resolveFromLineCol(BufferId, Line, ~0u);
 }
 
 llvm::Optional<unsigned> SourceManager::resolveFromLineCol(unsigned BufferId,
@@ -298,15 +322,15 @@ llvm::Optional<unsigned> SourceManager::resolveFromLineCol(unsigned BufferId,
   if (Line == 0 || Col == 0) {
     return None;
   }
+  const bool LineEnd = Col == ~0u;
   auto InputBuf = getLLVMSourceMgr().getMemoryBuffer(BufferId);
   const char *Ptr = InputBuf->getBufferStart();
   const char *End = InputBuf->getBufferEnd();
   const char *LineStart = Ptr;
-  for (; Ptr < End; ++Ptr) {
+  --Line;
+  for (; Line && (Ptr < End); ++Ptr) {
     if (*Ptr == '\n') {
       --Line;
-      if (Line == 0)
-        break;
       LineStart = Ptr+1;
     }
   }
@@ -314,12 +338,18 @@ llvm::Optional<unsigned> SourceManager::resolveFromLineCol(unsigned BufferId,
     return None;
   }
   Ptr = LineStart;
-  for (; Ptr < End; ++Ptr) {
+  // The <= here is to allow for non-inclusive range end positions at EOF
+  for (; ; ++Ptr) {
     --Col;
     if (Col == 0)
       return Ptr - InputBuf->getBufferStart();
-    if (*Ptr == '\n')
-      break;
+    if (*Ptr == '\n' || Ptr == End) {
+      if (LineEnd) {
+        return Ptr - InputBuf->getBufferStart();
+      } else {
+        break;
+      }
+    }
   }
   return None;
 }

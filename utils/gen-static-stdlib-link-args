@@ -2,7 +2,7 @@
 
 #
 # Generate the static-stdlib-args.lnk used by the -static-stdlib option for
-# 'GenericUnix' (eg linux) plaforms. Tries to find static .a files for libs
+# 'GenericUnix' (eg linux) platforms. Tries to find static .a files for libs
 # not normally installed by default (currently libicu)
 # If libicu is built locally then include libicudata
 #
@@ -46,9 +46,9 @@ EOF
 # If libicu was compiled as part of the swift build then link the libs as normal
 function use_local_iculibs {
    read -d '' ICU_LIBS <<EOF
--licui18n
--licuuc
--licudata
+-licui18nswift
+-licuucswift
+-licudataswift
 EOF
 }
 

@@ -17,9 +17,9 @@
 #ifndef SWIFT_AST_GENERIC_SIGNATURE_H
 #define SWIFT_AST_GENERIC_SIGNATURE_H
 
+#include "swift/AST/PrintOptions.h"
 #include "swift/AST/Requirement.h"
-#include "swift/AST/SubstitutionList.h"
-#include "swift/AST/Types.h"
+#include "swift/AST/Type.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/SmallVector.h"
@@ -31,7 +31,6 @@ namespace swift {
 class GenericSignatureBuilder;
 class ProtocolConformanceRef;
 class ProtocolType;
-class Substitution;
 class SubstitutionMap;
 
 /// An access path used to find a particular protocol conformance within
@@ -73,13 +72,15 @@ public:
   typedef std::pair<Type, ProtocolDecl *> Entry;
 
 private:
-  llvm::SmallVector<Entry, 2> path;
+  ArrayRef<Entry> path;
+
+  ConformanceAccessPath(ArrayRef<Entry> path) : path(path) {}
 
   friend class GenericSignature;
 
 public:
-  typedef llvm::SmallVector<Entry, 2>::const_iterator iterator;
-  typedef llvm::SmallVector<Entry, 2>::const_iterator const_iterator;
+  typedef const Entry *const_iterator;
+  typedef const_iterator iterator;
 
   const_iterator begin() const { return path.begin(); }
   const_iterator end() const { return path.end(); }
@@ -134,6 +135,13 @@ class alignas(1 << TypeAlignInBits) GenericSignature final
   /// Retrieve the generic signature builder for the given generic signature.
   GenericSignatureBuilder *getGenericSignatureBuilder();
 
+  void buildConformanceAccessPath(
+      SmallVectorImpl<ConformanceAccessPath::Entry> &path,
+      ArrayRef<Requirement> reqs,
+      const void /*GenericSignatureBuilder::RequirementSource*/ *source,
+      ProtocolDecl *conformingProto, Type rootType,
+      ProtocolDecl *requirementSignatureProto);
+
   friend class ArchetypeType;
 
 public:
@@ -176,63 +184,29 @@ public:
     return Mem;
   }
 
-  /// Build an interface type substitution map from a vector of Substitutions
-  /// that correspond to the generic parameters in this generic signature.
-  SubstitutionMap getSubstitutionMap(SubstitutionList args) const;
-
-  /// Build an interface type substitution map from a type substitution function
-  /// and conformance lookup function.
-  SubstitutionMap
-  getSubstitutionMap(TypeSubstitutionFn subs,
-                     LookupConformanceFn lookupConformance) const;
-
   /// Look up a stored conformance in the generic signature. These are formed
   /// from same-type constraints placed on associated types of generic
   /// parameters which have conformance constraints on them.
   Optional<ProtocolConformanceRef>
   lookupConformance(CanType depTy, ProtocolDecl *proto) const;
 
-  /// Build an array of substitutions from an interface type substitution map,
-  /// using the given function to look up conformances.
-  void getSubstitutions(const SubstitutionMap &subMap,
-                        SmallVectorImpl<Substitution> &result) const;
-
-  /// Enumerate all of the dependent types in the type signature that will
-  /// occur in substitution lists (in order), along with the set of
-  /// conformance requirements placed on that dependent type.
-  ///
-  /// \param fn Callback function that will receive each (type, requirements)
-  /// pair, in the order they occur within a list of substitutions. If this
-  /// returns \c true, the enumeration will be aborted.
-  ///
-  /// \returns true if any call to \c fn returned \c true, otherwise \c false.
-  bool enumeratePairedRequirements(
-         llvm::function_ref<bool(Type, ArrayRef<Requirement>)> fn) const;
-
-  /// Return a vector of all generic parameters that are not subject to
-  /// a concrete same-type constraint.
-  SmallVector<GenericTypeParamType *, 2> getSubstitutableParams() const;
+  /// Iterate over all generic parameters, passing a flag to the callback
+  /// indicating if the generic parameter is canonical or not.
+  void forEachParam(
+    llvm::function_ref<void(GenericTypeParamType *, bool)> callback) const;
 
   /// Check if the generic signature makes all generic parameters
   /// concrete.
-  bool areAllParamsConcrete() const {
-    return !enumeratePairedRequirements(
-      [](Type, ArrayRef<Requirement>) -> bool {
-        return true;
-      });
-  }
+  bool areAllParamsConcrete() const;
 
-  /// Return the size of a SubstitutionList built from this signature.
-  ///
-  /// Don't add new calls of this -- the representation of SubstitutionList
-  /// will be changing soon.
-  unsigned getSubstitutionListSize() const {
+  /// Compute the number of conformance requirements in this signature.
+  unsigned getNumConformanceRequirements() const {
     unsigned result = 0;
-    enumeratePairedRequirements(
-      [&](Type, ArrayRef<Requirement>) -> bool {
-        result++;
-        return false;
-      });
+    for (const auto &req : getRequirements()) {
+      if (req.getKind() == RequirementKind::Conformance)
+        ++result;
+    }
+
     return result;
   }
 
@@ -333,12 +307,23 @@ public:
   ///   <t_0_0, t_0_1, t_1_0>
   /// then this will return 0 for t_0_0, 1 for t_0_1, and 2 for t_1_0.
   unsigned getGenericParamOrdinal(GenericTypeParamType *param);
+      
+  /// Get a substitution map that maps all of the generic signature's
+  /// generic parameters to themselves.
+  SubstitutionMap getIdentitySubstitutionMap() const;
+
+  /// Whether this generic signature involves a type variable.
+  bool hasTypeVariable() const;
+
+  /// Whether the given set of requirements involves a type variable.
+  static bool hasTypeVariable(ArrayRef<Requirement> requirements);
 
   static void Profile(llvm::FoldingSetNodeID &ID,
                       TypeArrayView<GenericTypeParamType> genericParams,
                       ArrayRef<Requirement> requirements);
   
-  void print(raw_ostream &OS) const;
+  void print(raw_ostream &OS, PrintOptions Options = PrintOptions()) const;
+  void print(ASTPrinter &Printer, PrintOptions Opts = PrintOptions()) const;
   void dump() const;
   std::string getAsString() const;
 };
@@ -348,14 +333,6 @@ CanGenericSignature::CanGenericSignature(GenericSignature *Signature)
   : Signature(Signature)
 {
   assert(!Signature || Signature->isCanonical());
-}
-  
-inline ArrayRef<CanTypeWrapper<GenericTypeParamType>>
-CanGenericSignature::getGenericParams() const{
-  auto params = Signature->getGenericParams().getOriginalArray();
-  auto base = static_cast<const CanTypeWrapper<GenericTypeParamType>*>(
-                                                                 params.data());
-  return {base, params.size()};
 }
 
 } // end namespace swift

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify %s
+// RUN: %target-typecheck-verify-swift
 enum MSV : Error {
   case Foo, Bar, Baz
 
@@ -163,5 +163,63 @@ func thirteen() {
       try thrower()
     } catch a {
     }
+  }
+}
+
+// SR 6400
+
+enum SR_6400_E: Error {
+  case castError
+}
+
+struct SR_6400_S_1 {}
+struct SR_6400_S_2: Error {}
+
+protocol SR_6400_FakeApplicationDelegate: AnyObject {}
+class SR_6400_FakeViewController {}
+
+func sr_6400() throws {
+  do {
+    throw SR_6400_E.castError
+  } catch is SR_6400_S_1 { // expected-warning {{cast from 'Error' to unrelated type 'SR_6400_S_1' always fails}}
+    print("Caught error")
+  }
+  
+  do {
+    throw SR_6400_E.castError
+  } catch is SR_6400_S_2 {
+    print("Caught error") // Ok
+  }
+}
+
+func sr_6400_1<T>(error: Error, as type: T.Type) -> Bool {
+  return (error as? T) != nil // Ok
+}
+
+func sr_6400_2(error: Error) {
+  _ = error as? (SR_6400_FakeViewController & Error) // Ok
+}
+func sr_6400_3(error: Error) {
+  _ = error as? (Error & SR_6400_FakeApplicationDelegate) // Ok
+}
+
+class SR_6400_A {}
+class SR_6400_B: SR_6400_FakeApplicationDelegate & Error {}
+
+func sr_6400_4() {
+  do {
+    throw SR_6400_E.castError
+  } catch let error as SR_6400_A { // expected-warning {{cast from 'Error' to unrelated type 'SR_6400_A' always fails}} // expected-warning {{immutable value 'error' was never used; consider replacing with '_' or removing it}}
+    print("Foo")
+  } catch {
+    print("Bar")
+  }
+  
+  do {
+    throw SR_6400_E.castError
+  } catch let error as SR_6400_B { // expected-warning {{immutable value 'error' was never used; consider replacing with '_' or removing it}}
+    print("Foo")
+  } catch {
+    print("Bar")
   }
 }

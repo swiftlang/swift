@@ -9,10 +9,21 @@
 // TODO: rdar://problem/33388782
 // REQUIRES: CPU=x86_64
 
-#if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
   import Darwin
-#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android)
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
   import Glibc
+#elseif os(Windows)
+  import MSVCRT
+
+  let S_IRUSR: Int32 = ucrt._S_IREAD
+  let S_IWUSR: Int32 = 0
+  let S_IXUSR: Int32 = 0
+
+  let S_IRGRP: Int32 = 0o0040
+  let S_IROTH: Int32 = 0o0004
+#else
+#error("Unsupported platform")
 #endif
 
 let sourcePath = CommandLine.arguments[1]
@@ -45,7 +56,7 @@ if errFile != -1 {
 }
 
 // CHECK-NOT: error
-// CHECK: created mode *33216* *33216*
+// CHECK: created mode *{{33216|33060}}* *{{33216|33060}}*
 let tempFile = 
   open(tempPath, O_RDWR | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR | S_IXUSR)
 if tempFile == -1 {
@@ -80,6 +91,10 @@ if err != 0 {
 
 print("created mode *\(statbuf1.st_mode)* *\(statbuf2.st_mode)*")
 
+#if os(Windows)
+assert(statbuf1.st_mode == S_IFREG | S_IRUSR | S_IRGRP | S_IROTH)
+#else
 assert(statbuf1.st_mode == S_IFREG | S_IRUSR | S_IWUSR | S_IXUSR)
+#endif
 assert(statbuf1.st_mode == statbuf2.st_mode)
 

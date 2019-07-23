@@ -12,7 +12,7 @@
 
 #include "SILGenFunction.h"
 #include "RValue.h"
-#include "Scope.h"
+#include "ArgumentScope.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/SIL/TypeLowering.h"
@@ -68,28 +68,25 @@ void SILGenFunction::emitDestroyingDestructor(DestructorDecl *dd) {
     std::tie(dtorValue, dtorTy)
       = emitSiblingMethodRef(cleanupLoc, baseSelf, dtorConstant, subMap);
 
-    SmallVector<Substitution, 4> subs;
-    if (auto *genericSig = superclass->getGenericSignature())
-      genericSig->getSubstitutions(subMap, subs);
     resultSelfValue = B.createApply(cleanupLoc, dtorValue.forward(*this),
-                                    dtorTy, objectPtrTy, subs, baseSelf);
+                                    subMap, baseSelf);
   } else {
     resultSelfValue = selfValue;
   }
 
-  {
-    Scope S(Cleanups, cleanupLoc);
-    ManagedValue borrowedValue =
-        ManagedValue::forUnmanaged(resultSelfValue).borrow(*this, cleanupLoc);
+  ArgumentScope S(*this, Loc);
+  ManagedValue borrowedValue =
+      ManagedValue::forUnmanaged(resultSelfValue).borrow(*this, cleanupLoc);
 
-    if (classTy != borrowedValue.getType()) {
-      borrowedValue =
-          B.createUncheckedRefCast(cleanupLoc, borrowedValue, classTy);
-    }
-
-    // Release our members.
-    emitClassMemberDestruction(borrowedValue, cd, cleanupLoc);
+  if (classTy != borrowedValue.getType()) {
+    borrowedValue =
+        B.createUncheckedRefCast(cleanupLoc, borrowedValue, classTy);
   }
+
+  // Release our members.
+  emitClassMemberDestruction(borrowedValue, cd, cleanupLoc);
+
+  S.pop();
 
   if (resultSelfValue->getType() != objectPtrTy) {
     resultSelfValue =
@@ -117,27 +114,21 @@ void SILGenFunction::emitDeallocatingDestructor(DestructorDecl *dd) {
   // Form a reference to the destroying destructor.
   SILDeclRef dtorConstant(dd, SILDeclRef::Kind::Destroyer);
   auto classTy = initialSelfValue->getType();
-  auto classDecl = classTy.getSwiftRValueType()->getAnyNominal();
+  auto classDecl = classTy.getASTType()->getAnyNominal();
   ManagedValue dtorValue;
   SILType dtorTy;
-  auto subMap = classTy.getSwiftRValueType()
+  auto subMap = classTy.getASTType()
     ->getContextSubstitutionMap(SGM.M.getSwiftModule(),
                                 classDecl);
   std::tie(dtorValue, dtorTy)
     = emitSiblingMethodRef(loc, initialSelfValue, dtorConstant, subMap);
-
-  SmallVector<Substitution, 4> subs;
-  if (auto *genericSig = classDecl->getGenericSignature())
-    genericSig->getSubstitutions(subMap, subs);
 
   // Call the destroying destructor.
   SILValue selfForDealloc;
   {
     FullExpr CleanupScope(Cleanups, CleanupLocation::get(loc));
     ManagedValue borrowedSelf = emitManagedBeginBorrow(loc, initialSelfValue);
-    SILType objectPtrTy = SILType::getNativeObjectType(F.getASTContext());
-    selfForDealloc = B.createApply(loc, dtorValue.forward(*this),
-                                   dtorTy, objectPtrTy, subs,
+    selfForDealloc = B.createApply(loc, dtorValue.forward(*this), subMap,
                                    borrowedSelf.getUnmanagedValue());
   }
 
@@ -255,19 +246,7 @@ void SILGenFunction::emitObjCDestructor(SILDeclRef dtor) {
     = superclassTy->getContextSubstitutionMap(SGM.M.getSwiftModule(),
                                               superclass);
 
-  auto substDtorType = superclassDtorType.substGenericArgs(SGM.M, subMap);
-  CanSILFunctionType substFnType = substDtorType.castTo<SILFunctionType>();
-  SILFunctionConventions dtorConv(substFnType, SGM.M);
-  assert(substFnType->getSelfParameter().getConvention() ==
-             ParameterConvention::Direct_Unowned &&
-         "Objective C deinitializing destructor takes self as unowned");
-
-  SmallVector<Substitution, 4> subs;
-    if (auto *genericSig = superclass->getGenericSignature())
-      genericSig->getSubstitutions(subMap, subs);
-
-  B.createApply(cleanupLoc, superclassDtorValue, substDtorType,
-                dtorConv.getSILResultType(), subs, superSelf);
+  B.createApply(cleanupLoc, superclassDtorValue, subMap, superSelf);
 
   // We know that the givne value came in at +1, but we pass the relevant value
   // as unowned to the destructor. Create a fake balance for the verifier to be

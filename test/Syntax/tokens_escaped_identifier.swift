@@ -4,7 +4,7 @@ print(/*leading trivia*/ `if` )
 
 // CHECK-LABEL: 2:25
 // CHECK-NEXT:(Token identifier
-// CHECK-NEXT: (trivia block_comment /*leading trivia*/)
+// CHECK-NEXT: (trivia blockComment /*leading trivia*/)
 // CHECK-NEXT: (trivia space 1)
 // CHECK-NEXT: (trivia backtick 1)
 // CHECK-NEXT: (text="if")
@@ -13,7 +13,7 @@ print(/*leading trivia*/ `if` )
 
 // CHECK-LABEL: 3:27
 // CHECK-NEXT:(Token identifier
-// CHECK-NEXT: (trivia block_comment /*leading trivia*/)
+// CHECK-NEXT: (trivia blockComment /*leading trivia*/)
 // CHECK-NEXT: (trivia space 1)
 // CHECK-NEXT: (trivia backtick 1)
 // CHECK-NEXT: (text="if")

@@ -20,6 +20,7 @@
 
 #include "llvm/Support/PrettyStackTrace.h"
 #include "swift/Basic/SourceLoc.h"
+#include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
 
 namespace swift {
@@ -32,7 +33,7 @@ namespace swift {
   class TypeRepr;
 
 void printSourceLocDescription(llvm::raw_ostream &out, SourceLoc loc,
-                               ASTContext &Context);
+                               ASTContext &Context, bool addNewline = true);
 
 /// PrettyStackTraceLocation - Observe that we are doing some
 /// processing starting at a fixed location.
@@ -47,7 +48,7 @@ public:
 };
 
 void printDeclDescription(llvm::raw_ostream &out, const Decl *D,
-                          ASTContext &Context);
+                          ASTContext &Context, bool addNewline = true);
 
 /// PrettyStackTraceDecl - Observe that we are processing a specific
 /// declaration.
@@ -61,7 +62,7 @@ public:
 };
 
 void printExprDescription(llvm::raw_ostream &out, Expr *E,
-                          ASTContext &Context);
+                          ASTContext &Context, bool addNewline = true);
 
 /// PrettyStackTraceExpr - Observe that we are processing a specific
 /// expression.
@@ -76,7 +77,7 @@ public:
 };
 
 void printStmtDescription(llvm::raw_ostream &out, Stmt *S,
-                          ASTContext &Context);
+                          ASTContext &Context, bool addNewline = true);
 
 /// PrettyStackTraceStmt - Observe that we are processing a specific
 /// statement.
@@ -91,7 +92,7 @@ public:
 };
 
 void printPatternDescription(llvm::raw_ostream &out, Pattern *P,
-                             ASTContext &Context);
+                             ASTContext &Context, bool addNewline = true);
 
 /// PrettyStackTracePattern - Observe that we are processing a
 /// specific pattern.
@@ -106,7 +107,7 @@ public:
 };
 
 void printTypeDescription(llvm::raw_ostream &out, Type T,
-                          ASTContext &Context);
+                          ASTContext &Context, bool addNewline = true);
 
 /// PrettyStackTraceType - Observe that we are processing a specific type.
 class PrettyStackTraceType : public llvm::PrettyStackTraceEntry {
@@ -130,6 +131,23 @@ public:
   virtual void print(llvm::raw_ostream &OS) const;
 };
 
+/// PrettyStackTraceConformance - Observe that we are processing a
+/// specific protocol conformance.
+class PrettyStackTraceConformance : public llvm::PrettyStackTraceEntry {
+  ASTContext &Context;
+  const ProtocolConformance *Conformance;
+  const char *Action;
+public:
+  PrettyStackTraceConformance(ASTContext &C, const char *action,
+                              const ProtocolConformance *conformance)
+    : Context(C), Conformance(conformance), Action(action) {}
+  virtual void print(llvm::raw_ostream &OS) const;
+};
+
+void printConformanceDescription(llvm::raw_ostream &out,
+                                 const ProtocolConformance *conformance,
+                                 ASTContext &Context, bool addNewline = true);
+
 class PrettyStackTraceGenericSignature : public llvm::PrettyStackTraceEntry {
   const char *Action;
   GenericSignature *GenericSig;
@@ -146,6 +164,15 @@ public:
   }
 
   void print(llvm::raw_ostream &out) const override;
+};
+
+class PrettyStackTraceSelector : public llvm::PrettyStackTraceEntry {
+  ObjCSelector Selector;
+  const char *Action;
+public:
+  PrettyStackTraceSelector(const char *action, ObjCSelector S)
+    : Selector(S), Action(action) {}
+  void print(llvm::raw_ostream &OS) const override;
 };
 
 } // end namespace swift

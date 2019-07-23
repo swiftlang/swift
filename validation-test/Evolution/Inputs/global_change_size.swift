@@ -83,7 +83,7 @@ public struct ChangeSize {
 // Test internal global variable hidden behind a public transparent
 // interface
 
-@_versioned var versionedGlobal: ChangeSize = ChangeSize()
+@usableFromInline var versionedGlobal: ChangeSize = ChangeSize()
 
 @_transparent public func getVersionedGlobal() -> ChangeSize {
   return versionedGlobal

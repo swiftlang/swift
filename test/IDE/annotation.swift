@@ -85,9 +85,9 @@ class SubCls : MyCls, Prot {
 func genFn<T : Prot where T.Blarg : Prot2>(_ p : T) -> Int {}
 
 func test(_ x: Int) {
-  // CHECK: <Func@[[@LINE-3]]:6>genFn</Func>(<Ctor@[[@LINE-11]]:28-Class@[[@LINE-11]]:7>SubCls</Ctor>())
+  // CHECK: <Func@[[@LINE-3]]:6>genFn</Func>(<Class@[[@LINE-11]]:7>SubCls</Class>())
   genFn(SubCls())
-  // CHECK: "This is string \(<Func@[[@LINE-5]]:6>genFn</Func>({(<Param>a</Param>:<iStruct@>Int</iStruct>) in <Ctor@[[@LINE-13]]:28-Class@[[@LINE-13]]:7>SubCls</Ctor>()}(<Param@[[@LINE-3]]:13>x</Param>))) interpolation"
+  // CHECK: "This is string \(<Func@[[@LINE-5]]:6>genFn</Func>({(<Param>a</Param>:<iStruct@>Int</iStruct>) in <Class@[[@LINE-13]]:7>SubCls</Class>()}(<Param@[[@LINE-3]]:13>x</Param>))) interpolation"
   "This is string \(genFn({(a:Int) in SubCls()}(x))) interpolation"
 }
 
@@ -339,3 +339,30 @@ test_arg_tuple2(p1:0,0)
 test_arg_tuple3(0,p2:0)
 // CHECK: <Func@[[@LINE-7]]:6>test_arg_tuple4</Func>(<Func@[[@LINE-7]]:6#p1>p1</Func>:0,<Func@[[@LINE-7]]:6#p2>p2</Func>:0)
 test_arg_tuple4(p1:0,p2:0)
+
+
+@dynamicMemberLookup
+struct Lens<T> {
+  var obj: T
+  init(_ obj: T) {
+    self.obj = obj
+  }
+  subscript<U>(dynamicMember member: WritableKeyPath<T, U>) -> Lens<U> {
+    get { return Lens<U>(obj[keyPath: member]) }
+    set { obj[keyPath: member] = newValue.obj }
+  }
+}
+struct Point {
+  var x: Int
+  var y: Int
+}
+struct Rectangle {
+  var topLeft: Point
+  var bottomRight: Point
+}
+func testDynamicMemberLookup(r: Lens<Rectangle>) {
+  _ = r.topLeft
+  // CHECK: _ = <Param@[[@LINE-2]]:30>r</Param>.<Var@[[@LINE-5]]:7>topLeft</Var>
+  _ = r.bottomRight.y
+  // CHECK: _ = <Param@[[@LINE-4]]:30>r</Param>.<Var@[[@LINE-6]]:7>bottomRight</Var>.<Var@[[@LINE-10]]:7>y</Var>
+}

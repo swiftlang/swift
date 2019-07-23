@@ -36,15 +36,14 @@
 using namespace swift;
 using namespace irgen;
 
-static SILType applyContextArchetypes(IRGenFunction &IGF,
+static SILType applyPrimaryArchetypes(IRGenFunction &IGF,
                                       SILType type) {
   if (!type.hasTypeParameter()) {
     return type;
   }
 
   auto substType =
-    IGF.IGM.getGenericEnvironment()->mapTypeIntoContext(
-        type.getSwiftRValueType())
+    IGF.IGM.getGenericEnvironment()->mapTypeIntoContext(type.getASTType())
       ->getCanonicalType();
   return SILType::getPrimitiveType(substType, type.getCategory());
 }
@@ -59,11 +58,18 @@ static SILType applyContextArchetypes(IRGenFunction &IGF,
 void irgen::reemitAsUnsubstituted(IRGenFunction &IGF,
                                   SILType expectedTy, SILType substTy,
                                   Explosion &in, Explosion &out) {
-  expectedTy = applyContextArchetypes(IGF, expectedTy);
+  expectedTy = applyPrimaryArchetypes(IGF, expectedTy);
 
-  ExplosionSchema expectedSchema = IGF.IGM.getSchema(expectedTy);
+  ExplosionSchema expectedSchema;
+  cast<LoadableTypeInfo>(IGF.IGM.getTypeInfo(expectedTy))
+    .getSchema(expectedSchema);
+
+#ifndef NDEBUG
+  auto &substTI = IGF.IGM.getTypeInfo(applyPrimaryArchetypes(IGF, substTy));
   assert(expectedSchema.size() ==
-         IGF.IGM.getExplosionSize(applyContextArchetypes(IGF, substTy)));
+         cast<LoadableTypeInfo>(substTI).getExplosionSize());
+#endif
+
   for (ExplosionSchema::Element &elt : expectedSchema) {
     llvm::Value *value = in.claimNext();
     assert(elt.isScalar());

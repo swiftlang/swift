@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift %s
+// RUN: %swift -swift-version 4 -typecheck -verify  %s
 
 func flatMapOnSequence<
   S : Sequence

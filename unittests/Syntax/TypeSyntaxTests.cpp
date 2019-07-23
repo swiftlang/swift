@@ -32,14 +32,14 @@ TEST(TypeSyntaxTests, TypeAttributeWithAPIs) {
     auto Convention = SyntaxFactory::makeBlankAttribute()
       .withAtSignToken(At)
       .withAttributeName(conventionID)
-      .withBalancedTokens(SyntaxFactory::makeTokenList({LeftParen, RightParen}));
+      .withLeftParen(LeftParen)
+      .withRightParen(RightParen);
 
     {
       SmallString<48> Scratch;
       llvm::raw_svector_ostream OS { Scratch };
       auto cID = SyntaxFactory::makeIdentifier("c", {}, {});
-      auto cArgs = SyntaxFactory::makeTokenList({LeftParen, cID, RightParen});
-      Convention.withBalancedTokens(cArgs).print(OS);
+      Convention.withArgument(cID).print(OS);
       ASSERT_EQ(OS.str().str(), "@convention(c)");
     }
 
@@ -48,7 +48,7 @@ TEST(TypeSyntaxTests, TypeAttributeWithAPIs) {
       llvm::raw_svector_ostream OS { Scratch };
       auto swiftID = SyntaxFactory::makeIdentifier("swift", {}, {});
       auto swiftArgs = SyntaxFactory::makeTokenList({LeftParen, swiftID, RightParen});
-      Convention.withBalancedTokens(swiftArgs).print(OS);
+      Convention.withArgument(swiftID).print(OS);
       ASSERT_EQ(OS.str().str(), "@convention(swift)");
     }
 
@@ -57,7 +57,7 @@ TEST(TypeSyntaxTests, TypeAttributeWithAPIs) {
       llvm::raw_svector_ostream OS { Scratch };
       auto blockID = SyntaxFactory::makeIdentifier("block", {}, {});
       auto blockArgs = SyntaxFactory::makeTokenList({LeftParen, blockID, RightParen});
-      Convention.withBalancedTokens(blockArgs).print(OS);
+      Convention.withArgument(blockID).print(OS);
       ASSERT_EQ(OS.str().str(), "@convention(block)");
     }
   }
@@ -96,9 +96,9 @@ TEST(TypeSyntaxTests, TypeAttributeMakeAPIs) {
       SmallString<48> Scratch;
       llvm::raw_svector_ostream OS { Scratch };
       auto cID = SyntaxFactory::makeIdentifier("c", {}, {});
-      auto cArgs = SyntaxFactory::makeTokenList({LeftParen, cID, RightParen});
-      SyntaxFactory::makeAttribute(At, conventionID, cArgs)
-        .print(OS);
+      SyntaxFactory::makeAttribute(At, conventionID, LeftParen, cID, RightParen,
+                                   llvm::None)
+          .print(OS);
       ASSERT_EQ(OS.str().str(), "@convention(c)");
     }
 
@@ -106,10 +106,9 @@ TEST(TypeSyntaxTests, TypeAttributeMakeAPIs) {
       SmallString<48> Scratch;
       llvm::raw_svector_ostream OS { Scratch };
       auto swiftID = SyntaxFactory::makeIdentifier("swift", {}, {});
-      auto swiftArgs = SyntaxFactory::makeTokenList({LeftParen, swiftID,
-        RightParen});
-      SyntaxFactory::makeAttribute(At, conventionID, swiftArgs)
-        .print(OS);
+      SyntaxFactory::makeAttribute(At, conventionID, LeftParen, swiftID,
+                                   RightParen, llvm::None)
+          .print(OS);
       ASSERT_EQ(OS.str().str(), "@convention(swift)");
     }
 
@@ -117,10 +116,9 @@ TEST(TypeSyntaxTests, TypeAttributeMakeAPIs) {
       SmallString<48> Scratch;
       llvm::raw_svector_ostream OS { Scratch };
       auto blockID = SyntaxFactory::makeIdentifier("block", {}, {});
-      auto blockArgs = SyntaxFactory::makeTokenList({LeftParen, blockID,
-        RightParen});
-      SyntaxFactory::makeAttribute(At, conventionID, blockArgs)
-        .print(OS);
+      SyntaxFactory::makeAttribute(At, conventionID, LeftParen, blockID,
+                                   RightParen, llvm::None)
+          .print(OS);
       ASSERT_EQ(OS.str().str(), "@convention(block)");
     }
   }
@@ -204,9 +202,9 @@ TEST(TypeSyntaxTests, TupleBuilderAPIs) {
     auto StringId = SyntaxFactory::makeIdentifier("String", {}, {});
     auto StringType = SyntaxFactory::makeSimpleTypeIdentifier(StringId, None);
     auto String = SyntaxFactory::makeTupleTypeElement(StringType, Comma);
-    Builder.addTupleTypeElement(IntWithComma);
-    Builder.addTupleTypeElement(String);
-    Builder.addTupleTypeElement(Int);
+    Builder.addElement(IntWithComma);
+    Builder.addElement(String);
+    Builder.addElement(Int);
     Builder.useRightParen(SyntaxFactory::makeRightParenToken({}, {}));
 
     auto TupleType = Builder.build();
@@ -231,8 +229,8 @@ TEST(TypeSyntaxTests, TupleBuilderAPIs) {
     auto yTypeElt = SyntaxFactory::makeTupleTypeElement(yLabel, Colon,
                                                         Int)
       .withInOut(inout);
-    Builder.addTupleTypeElement(xTypeElt);
-    Builder.addTupleTypeElement(yTypeElt);
+    Builder.addElement(xTypeElt);
+    Builder.addElement(yTypeElt);
     Builder.useRightParen(SyntaxFactory::makeRightParenToken({}, {}));
 
     auto TupleType = Builder.build();
@@ -564,8 +562,8 @@ TEST(TypeSyntaxTests, FunctionTypeWithAPIs) {
 
     SyntaxFactory::makeBlankFunctionType()
       .withLeftParen(LeftParen)
-      .addTupleTypeElement(xArg)
-      .addTupleTypeElement(yArg)
+      .addArgument(xArg)
+      .addArgument(yArg)
       .withRightParen(RightParen)
       .withThrowsOrRethrowsKeyword(Throws)
       .withArrow(Arrow)
@@ -582,8 +580,8 @@ TEST(TypeSyntaxTests, FunctionTypeWithAPIs) {
     SyntaxFactory::makeBlankFunctionType()
       .withLeftParen(LeftParen)
       .withRightParen(RightParen)
-      .addTupleTypeElement(IntArg.withTrailingComma(Comma))
-      .addTupleTypeElement(IntArg)
+      .addArgument(IntArg.withTrailingComma(Comma))
+      .addArgument(IntArg)
       .withThrowsOrRethrowsKeyword(Rethrows)
       .withArrow(Arrow)
       .withReturnType(Int)
@@ -630,8 +628,8 @@ TEST(TypeSyntaxTests, FunctionTypeBuilderAPIs) {
 
     Builder.useLeftParen(LeftParen)
       .useRightParen(RightParen)
-      .addTupleTypeElement(xArg)
-      .addTupleTypeElement(yArg)
+      .addArgument(xArg)
+      .addArgument(yArg)
       .useThrowsOrRethrowsKeyword(Throws)
       .useArrow(Arrow)
       .useReturnType(Int);
@@ -648,8 +646,8 @@ TEST(TypeSyntaxTests, FunctionTypeBuilderAPIs) {
                                                       Int, None, None, None);
     Builder.useLeftParen(LeftParen)
       .useRightParen(RightParen)
-      .addTupleTypeElement(IntArg.withTrailingComma(Comma))
-      .addTupleTypeElement(IntArg)
+      .addArgument(IntArg.withTrailingComma(Comma))
+      .addArgument(IntArg)
       .useThrowsOrRethrowsKeyword(Rethrows)
       .useArrow(Arrow)
       .useReturnType(Int);

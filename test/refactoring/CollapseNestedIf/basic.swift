@@ -22,7 +22,7 @@ func testCaseLetNestedIf() {
     if b != 5 {}
   }
 }
-// RUN: rm -rf %t.result && mkdir -p %t.result
+// RUN: %empty-directory(%t.result)
 // RUN: %refactor -collapse-nested-if -source-filename %s -pos=3:3 > %t.result/L3-3.swift
 // RUN: diff -u %S/Outputs/basic/L3-3.swift.expected %t.result/L3-3.swift
 // RUN: %refactor -collapse-nested-if -source-filename %s -pos=9:3 > %t.result/L9-3.swift

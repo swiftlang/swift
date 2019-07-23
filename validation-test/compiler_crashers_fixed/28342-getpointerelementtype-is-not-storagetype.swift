@@ -14,9 +14,9 @@ struct C<T: A> {
 }
 protocol E {
     associatedtype F
-    func g<T where F == T.B>(_: C<T>)
+    func g<T>(_: C<T>) where F == T.B
 }
 struct H: E {
     typealias F = Void
-    func g<T where F == T.B>(_: C<T>) {}
+    func g<T>(_: C<T>) where F == T.B {}
 }

@@ -3,7 +3,7 @@
 // Make sure that we can dig all the way through the class hierarchy and
 // protocol conformances.
 
-// CHECK-LABEL: sil hidden @$S25devirt_contravariant_args6driveryyF : $@convention(thin) () -> () {
+// CHECK-LABEL: sil hidden @$s25devirt_contravariant_args6driveryyF : $@convention(thin) () -> () {
 // CHECK: function_ref unknownC2
 // CHECK: function_ref unknownC1
 // CHECK: function_ref unknownC0

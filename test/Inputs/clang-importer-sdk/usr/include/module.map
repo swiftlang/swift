@@ -126,3 +126,13 @@ module OtherSubscripts {
   header "OtherSubscripts.h"
   export *
 }
+
+module bridged_typedef {
+  header "bridged_typedef.h"
+  export *
+}
+
+module WinBOOL {
+  header "winbool.h"
+  export *
+}

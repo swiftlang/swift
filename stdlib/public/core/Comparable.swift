@@ -135,7 +135,7 @@
 ///   (`FloatingPoint.nan`) compares as neither less than, greater than, nor
 ///   equal to any normal floating-point value. Exceptional values need not
 ///   take part in the strict total order.
-public protocol Comparable : Equatable {
+public protocol Comparable: Equatable {
   /// Returns a Boolean value indicating whether the value of the first
   /// argument is less than that of the second argument.
   ///
@@ -183,7 +183,7 @@ extension Comparable {
   /// - Parameters:
   ///   - lhs: A value to compare.
   ///   - rhs: Another value to compare.
-  @_inlineable
+  @inlinable
   public static func > (lhs: Self, rhs: Self) -> Bool {
     return rhs < lhs
   }
@@ -197,7 +197,7 @@ extension Comparable {
   /// - Parameters:
   ///   - lhs: A value to compare.
   ///   - rhs: Another value to compare.
-  @_inlineable
+  @inlinable
   public static func <= (lhs: Self, rhs: Self) -> Bool {
     return !(rhs < lhs)
   }
@@ -213,7 +213,7 @@ extension Comparable {
   ///   - rhs: Another value to compare.
   /// - Returns: `true` if `lhs` is greater than or equal to `rhs`; otherwise,
   ///   `false`.
-  @_inlineable
+  @inlinable
   public static func >= (lhs: Self, rhs: Self) -> Bool {
     return !(lhs < rhs)
   }

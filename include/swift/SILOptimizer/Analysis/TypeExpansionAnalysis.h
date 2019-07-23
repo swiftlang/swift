@@ -25,10 +25,10 @@ class TypeExpansionAnalysis : public SILAnalysis {
   llvm::DenseMap<SILType, ProjectionPathList> ExpansionCache;
 public:
   TypeExpansionAnalysis(SILModule *M)
-      : SILAnalysis(AnalysisKind::TypeExpansion) {}
+      : SILAnalysis(SILAnalysisKind::TypeExpansion) {}
 
   static bool classof(const SILAnalysis *S) {
-    return S->getKind() == AnalysisKind::TypeExpansion;
+    return S->getKind() == SILAnalysisKind::TypeExpansion;
   }
 
   /// Return ProjectionPath to every leaf or intermediate node of the given type.
@@ -44,11 +44,11 @@ public:
   virtual void invalidate(SILFunction *F, InvalidationKind K)  override { }
 
   /// Notify the analysis about a newly created function.
-  virtual void notifyAddFunction(SILFunction *F) override { }
+  virtual void notifyAddedOrModifiedFunction(SILFunction *F) override {}
 
   /// Notify the analysis about a function which will be deleted from the
   /// module.
-  virtual void notifyDeleteFunction(SILFunction *F) override { }
+  virtual void notifyWillDeleteFunction(SILFunction *F) override {}
 
   /// Notify the analysis about changed witness or vtables.
   virtual void invalidateFunctionTables() override { }

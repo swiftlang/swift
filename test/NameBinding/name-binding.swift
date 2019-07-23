@@ -1,3 +1,4 @@
+// XFAIL: enable-astscope-lookup
 // RUN: %target-swift-frontend -typecheck %s -module-name themodule -enable-source-import -I %S/../decl/enum -sdk "" -verify -show-diagnostics-after-fatal -verify-ignore-unknown
 
 // -verify-ignore-unknown is for
@@ -195,16 +196,16 @@ test+++
 //===----------------------------------------------------------------------===//
 
 func forwardReference() {
-  x = 0 // expected-error{{use of local variable 'x' before its declaration}}
-  var x: Float = 0.0 // expected-note{{'x' declared here}}
+  v = 0 // expected-error{{use of local variable 'v' before its declaration}}
+  var v: Float = 0.0 // expected-note{{'v' declared here}}
 }
 
 class ForwardReference {
   var x: Int = 0
 
   func test() {
-    x = 0 // expected-error{{use of local variable 'x' before its declaration}}
-    var x: Float = 0.0 // expected-note{{'x' declared here}}
+    x = 0
+    var x: Float = 0.0 // expected-warning{{variable 'x' was never used; consider replacing with '_' or removing it}}
   }
 }
 

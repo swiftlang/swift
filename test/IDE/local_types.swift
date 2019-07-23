@@ -1,8 +1,8 @@
 // Tests lookup and mangling of local types
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swiftc_driver -swift-version 3 -v -emit-module -module-name LocalTypes -o %t/LocalTypes.swiftmodule %s
-// RUN: %target-swift-ide-test -swift-version 3 -print-local-types -I %t -module-to-print LocalTypes -source-filename %s > %t.dump
+// RUN: %target-swiftc_driver -v -emit-module -module-name LocalTypes -o %t/LocalTypes.swiftmodule %s
+// RUN: %target-swift-ide-test -print-local-types -I %t -module-to-print LocalTypes -source-filename %s > %t.dump
 // RUN: %FileCheck %s < %t.dump
 // RUN: %FileCheck -check-prefix=NEGATIVE %s < %t.dump
 
@@ -38,11 +38,12 @@ public func singleFunc() {
     case sfgei(Int)
   }
 
-  // We'll need to handle this if we start saving alias types.
-  // NEGATIVE-NOT: AliasAAA
+  // CHECK-DAG: AliasAAA
   typealias SingleFuncAliasAAA = Int
+  // We don't handle generic typealiases correctly quite yet.
+  // Re-enable this when <rdar://problem/43110802> is fixed.
   // NEGATIVE-NOT: AliasGGG
-  typealias GenericAliasGGG<T> = (T, T)
+  //typealias GenericAliasGGG<T> = (T, T)
 }
 
 public func singleFuncWithDuplicates(_ fake: Bool) {
@@ -118,7 +119,8 @@ public var singlePattern: Int {
   return 2
 }
 
-public func singleDefaultArgument(i: Int = {
+// Cannot be public, because inlinable default arguments cannot contain local types
+func singleDefaultArgument(i: Int = {
   //CHECK-DAG: 10LocalTypes21singleDefaultArgument1iySi_tFfA_SiycfU_06SingledE6StructL_V
   struct SingleDefaultArgumentStruct {
     let sdasi: Int

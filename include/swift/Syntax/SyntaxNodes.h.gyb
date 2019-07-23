@@ -49,6 +49,9 @@ using ${node.name} =
 % for node in SYNTAX_NODES:
 %   if not node.is_syntax_collection():
 %     qualifier = "" if node.is_base() else "final"
+%     for line in dedented_lines(node.description):
+/// ${line}
+%     end
 class ${node.name} ${qualifier} : public ${node.base_type} {
 %     if node.is_buildable():
       friend class ${node.name}Builder;
@@ -74,6 +77,9 @@ public:
     }
 
 %     for child in node.children:
+%       for line in dedented_lines(child.description):
+  /// ${line}
+%       end
 %       if child.is_optional:
   llvm::Optional<${child.type_name}> get${child.name}();
 %       else:
@@ -82,10 +88,23 @@ public:
 
 %       child_node = NODE_MAP.get(child.syntax_kind)
 %       if child_node and child_node.is_syntax_collection():
-%         child_elt = child_node.collection_element_name
+%         child_elt = child.collection_element_name
 %         child_elt_type = child_node.collection_element_type
+%         if not child_elt:
+%           raise Exception("'collection_element_name' should be set for '%s' of '%s'" % (child.name, node.name))
+%         end
+  /// Adds the provided `${child_elt}` to the node's `${child.name}`
+  /// collection.
+  /// - param element: The new `${child_elt}` to add to the node's
+  ///                  `${child.name}` collection.
+  /// - returns: A copy of the receiver with the provided `${child_elt}`
+  ///            appended to its `${child.name}` collection.
   ${node.name} add${child_elt}(${child_elt_type} ${child_elt});
 %       end
+
+  /// Returns a copy of the receiver with its `${child.name}` replaced.
+  /// - param newChild: The new `${child.name}` to replace the node's
+  ///                   current `${child.name}`, if present.
   ${node.name}
   with${child.name}(llvm::Optional<${child.type_name}> New${child.type_name});
 
@@ -106,6 +125,10 @@ public:
 
 %   end
 % end
+
+/// Calculating an identifier for all syntax nodes' structures for verification
+/// purposes.
+const char* getSyntaxStructureVersioningIdentifier();
 }
 }
 

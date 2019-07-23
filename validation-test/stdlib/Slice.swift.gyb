@@ -69,7 +69,7 @@ SliceTests.test("${Collection}.Slice/AssociatedTypes") {
   func checkStaticTypealiases2<
     Base : MutableCollection
   >(_: Base) {
-    expectEqualType(Base.Index.self, MutableSlice<Base>.Index.self)
+    expectEqualType(Base.Index.self, Slice<Base>.Index.self)
   }
 }
 

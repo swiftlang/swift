@@ -10,34 +10,38 @@
 //
 //===----------------------------------------------------------------------===//
 extension Unicode {
-  @_fixed_layout
+  @frozen
   public enum ASCII {}
 }
 
-extension Unicode.ASCII : Unicode.Encoding {
+extension Unicode.ASCII: Unicode.Encoding {
   public typealias CodeUnit = UInt8
   public typealias EncodedScalar = CollectionOfOne<CodeUnit>
 
-  @_inlineable // FIXME(sil-serialize-all)
-  public static var encodedReplacementCharacter : EncodedScalar {
+  @inlinable
+  public static var encodedReplacementCharacter: EncodedScalar {
     return EncodedScalar(0x1a) // U+001A SUBSTITUTE; best we can do for ASCII
   }
 
+  /// Returns whether the given code unit represents an ASCII scalar
+  @_alwaysEmitIntoClient
+  public static func isASCII(_ x: CodeUnit) -> Bool { return UTF8.isASCII(x) }
+
   @inline(__always)
-  @_inlineable
+  @inlinable
   public static func _isScalar(_ x: CodeUnit) -> Bool {
     return true
   }
 
   @inline(__always)
-  @_inlineable
+  @inlinable
   public static func decode(_ source: EncodedScalar) -> Unicode.Scalar {
     return Unicode.Scalar(_unchecked: UInt32(
         source.first._unsafelyUnwrappedUnchecked))
   }
   
   @inline(__always)
-  @_inlineable
+  @inlinable
   public static func encode(
     _ source: Unicode.Scalar
   ) -> EncodedScalar? {
@@ -46,8 +50,8 @@ extension Unicode.ASCII : Unicode.Encoding {
   }
 
   @inline(__always)
-  @_inlineable // FIXME(sil-serialize-all)
-  public static func transcode<FromEncoding : Unicode.Encoding>(
+  @inlinable
+  public static func transcode<FromEncoding: Unicode.Encoding>(
     _ content: FromEncoding.EncodedScalar, from _: FromEncoding.Type
   ) -> EncodedScalar? {
     if _fastPath(FromEncoding.self == UTF16.self) {
@@ -64,9 +68,9 @@ extension Unicode.ASCII : Unicode.Encoding {
     return encode(FromEncoding.decode(content))
   }
 
-  @_fixed_layout // FIXME(sil-serialize-all)
+  @frozen
   public struct Parser {
-    @_inlineable // FIXME(sil-serialize-all)
+    @inlinable
     public init() { }
   }
   
@@ -74,12 +78,12 @@ extension Unicode.ASCII : Unicode.Encoding {
   public typealias ReverseParser = Parser
 }
 
-extension Unicode.ASCII.Parser : Unicode.Parser {
+extension Unicode.ASCII.Parser: Unicode.Parser {
   public typealias Encoding = Unicode.ASCII
 
   /// Parses a single Unicode scalar value from `input`.
-  @_inlineable // FIXME(sil-serialize-all)
-  public mutating func parseScalar<I : IteratorProtocol>(
+  @inlinable
+  public mutating func parseScalar<I: IteratorProtocol>(
     from input: inout I
   ) -> Unicode.ParseResult<Encoding.EncodedScalar>
   where I.Element == Encoding.CodeUnit {

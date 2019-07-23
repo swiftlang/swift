@@ -1,24 +1,24 @@
 // RUN: %target-typecheck-verify-swift
 
-prefix operator +++ {} // expected-warning {{operator should no longer be declared with body}} {{20-23=}}
-postfix operator +++ {} // expected-warning {{operator should no longer be declared with body}} {{21-24=}}
-infix operator +++ {} // expected-warning {{operator should no longer be declared with body}} {{19-22=}}
-infix operator +++* { // expected-warning {{operator should no longer be declared with body; use a precedence group instead}} {{none}}
+prefix operator +++ {} // expected-error {{operator should no longer be declared with body}} {{20-23=}}
+postfix operator +++ {} // expected-error {{operator should no longer be declared with body}} {{21-24=}}
+infix operator +++ {} // expected-error {{operator should no longer be declared with body}} {{19-22=}}
+infix operator +++* { // expected-error {{operator should no longer be declared with body; use a precedence group instead}} {{none}}
   associativity right
 }
-infix operator +++*+ : A { } // expected-warning {{operator should no longer be declared with body}} {{25-29=}}
+infix operator +++*+ : A { } // expected-error {{operator should no longer be declared with body}} {{25-29=}}
 
 
 prefix operator +++** : A { }
 // expected-error@-1 {{only infix operators may declare a precedence}} {{23-27=}}
-// expected-warning@-2 {{operator should no longer be declared with body}} {{26-30=}}
+// expected-error@-2 {{operator should no longer be declared with body}} {{26-30=}}
 
 prefix operator ++*++ : A
 // expected-error@-1 {{only infix operators may declare a precedence}} {{23-26=}}
 
 postfix operator ++*+* : A { }
 // expected-error@-1 {{only infix operators may declare a precedence}} {{24-28=}}
-// expected-warning@-2 {{operator should no longer be declared with body}} {{27-31=}}
+// expected-error@-2 {{operator should no longer be declared with body}} {{27-31=}}
 
 postfix operator ++**+ : A
 // expected-error@-1 {{only infix operators may declare a precedence}} {{24-27=}}
@@ -28,11 +28,11 @@ operator ++*** : A
 
 operator +*+++ { }
 // expected-error@-1 {{operator must be declared as 'prefix', 'postfix', or 'infix'}}
-// expected-warning@-2 {{operator should no longer be declared with body}} {{15-19=}}
+// expected-error@-2 {{operator should no longer be declared with body}} {{15-19=}}
 
 operator +*++* : A { }
 // expected-error@-1 {{operator must be declared as 'prefix', 'postfix', or 'infix'}}
-// expected-warning@-2 {{operator should no longer be declared with body}} {{19-23=}}
+// expected-error@-2 {{operator should no longer be declared with body}} {{19-23=}}
 
 prefix operator // expected-error {{expected operator name in operator declaration}}
 
@@ -85,3 +85,11 @@ precedencegroup CaretCaretCaret {
 class Foo {
   infix operator ||| // expected-error{{'operator' may only be declared at file scope}}
 }
+
+infix operator **<< : UndeclaredPrecedenceGroup
+// expected-error@-1 {{unknown precedence group 'UndeclaredPrecedenceGroup'}}
+
+protocol Proto {}
+infix operator *<*< : F, Proto
+// expected-error@-1 {{consecutive statements on a line must be separated by ';'}}
+// expected-error@-2 {{expected expression}}

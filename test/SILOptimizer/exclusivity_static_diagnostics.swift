@@ -100,7 +100,7 @@ struct StructWithTwoStoredProp {
 // Take an unsafe pointer to a stored property while accessing another stored property.
 func violationWithUnsafePointer(_ s: inout StructWithTwoStoredProp) {
   withUnsafePointer(to: &s.f1) { (ptr) in
-    // expected-warning@-1 {{overlapping accesses to 's.f1', but modification requires exclusive access; consider copying to a local variable}}
+    // expected-error@-1 {{overlapping accesses to 's.f1', but modification requires exclusive access; consider copying to a local variable}}
     _ = s.f1
     // expected-note@-1 {{conflicting access is here}}
   }
@@ -194,6 +194,18 @@ func callsTakesInoutAndNoEscapeClosure() {
   takesInoutAndNoEscapeClosure(&local) { // expected-error {{overlapping accesses to 'local', but modification requires exclusive access; consider copying to a local variable}}
     local = 8  // expected-note {{conflicting access is here}}
   }
+}
+
+func inoutReadWriteInout(x: inout Int) {
+  // expected-error@+2{{overlapping accesses to 'x', but modification requires exclusive access; consider copying to a local variable}}
+  // expected-note@+1{{conflicting access is here}}
+  takesInoutAndNoEscapeClosure(&x, { _ = x })
+}
+
+func inoutWriteWriteInout(x: inout Int) {
+  // expected-error@+2{{overlapping accesses to 'x', but modification requires exclusive access; consider copying to a local variable}}
+  // expected-note@+1{{conflicting access is here}}
+  takesInoutAndNoEscapeClosure(&x, { x = 42 })
 }
 
 func callsTakesInoutAndNoEscapeClosureWithRead() {
@@ -338,7 +350,7 @@ func testReabstractionThunk(p1: inout ParameterizedStruct<Int>,
   // This tests that we still detect access violations for closures passed
   // using a reabstraction thunk.
   p1.takesFunctionWithGenericReturnType { _ in
-    // expected-warning@-1 {{overlapping accesses to 'p1', but modification requires exclusive access; consider copying to a local variable}}
+    // expected-error@-1 {{overlapping accesses to 'p1', but modification requires exclusive access; consider copying to a local variable}}
     p2 = p1
     // expected-note@-1 {{conflicting access is here}}
     return 3
@@ -359,8 +371,17 @@ func takesEscapingBlockClosure
 func testCallNoEscapeBlockClosure() {
   var i = 7
   takesNoEscapeBlockClosure(&i) {
-    // expected-warning@-1 {{overlapping accesses to 'i', but modification requires exclusive access; consider copying to a local variable}}
+    // expected-error@-1 {{overlapping accesses to 'i', but modification requires exclusive access; consider copying to a local variable}}
     i = 7
+    // expected-note@-1 {{conflicting access is here}}
+  }
+}
+
+func testCallNoEscapeBlockClosureRead() {
+  var i = 7
+  takesNoEscapeBlockClosure(&i) {
+    // expected-error@-1 {{overlapping accesses to 'i', but modification requires exclusive access; consider copying to a local variable}}
+    _ = i
     // expected-note@-1 {{conflicting access is here}}
   }
 }
@@ -388,7 +409,7 @@ func takesInoutAndClosureWithGenericArg<T>(_ p: inout Int, _ c: (T) -> Int) { }
 func callsTakesInoutAndClosureWithGenericArg() {
   var i = 7
   takesInoutAndClosureWithGenericArg(&i) { (p: Int) in
-    // expected-warning@-1 {{overlapping accesses to 'i', but modification requires exclusive access; consider copying to a local variable}}
+    // expected-error@-1 {{overlapping accesses to 'i', but modification requires exclusive access; consider copying to a local variable}}
     return i + p
     // expected-note@-1 {{conflicting access is here}}
   }
@@ -399,12 +420,25 @@ func callsTakesInoutAndClosureTakingNonOptionalWithClosureTakingOptional() {
   var i = 7
   // Test for the thunk converting an (Int?) -> () to an (Int) -> ()
   takesInoutAndClosureTakingNonOptional(&i) { (p: Int?) in
-    // expected-warning@-1 {{overlapping accesses to 'i', but modification requires exclusive access; consider copying to a local variable}}
+    // expected-error@-1 {{overlapping accesses to 'i', but modification requires exclusive access; consider copying to a local variable}}
     i = 8
     // expected-note@-1 {{conflicting access is here}}
   }
 }
 
+// Helper.
+func doOne(_ f: () -> ()) {
+  f()
+}
+
+func noEscapeBlock() {
+  var x = 3
+  doOne {
+    // expected-error@+2{{overlapping accesses to 'x', but modification requires exclusive access; consider copying to a local variable}}
+    // expected-note@+1{{conflicting access is here}}
+    takesInoutAndNoEscapeClosure(&x, { _ = x })
+  }
+}
 
 func inoutSeparateStructStoredProperties() {
   var s = StructWithTwoStoredProp()
@@ -551,4 +585,66 @@ func takesInoutAndOptionalBlock(_: inout Int, _ f: (@convention(block) ()->())?)
 func testOptionalBlock() {
   var x = 0
   takesInoutAndOptionalBlock(&x) { x += 1 }
+}
+
+// Diagnost a conflict on a noescape closure that is conditionally passed as a function argument.
+//
+// <rdar://problem/42560459> [Exclusivity] Failure to statically diagnose a conflict when passing conditional noescape closures.
+struct S {
+  var x: Int
+
+  mutating func takeNoescapeClosure(_ f: ()->()) { f() }
+
+  mutating func testNoescapePartialApplyPhiUse(z : Bool) {
+    func f1() {
+      x = 1 // expected-note {{conflicting access is here}}
+    }
+    func f2() {
+      x = 1 // expected-note {{conflicting access is here}}
+    }
+    takeNoescapeClosure(z ? f1 : f2)
+    // expected-error@-1 2 {{overlapping accesses to 'self', but modification requires exclusive access; consider copying to a local variable}}
+  }
+}
+
+func doit(x: inout Int, _ fn: () -> ()) {}
+
+func nestedConflict(x: inout Int) {
+  doit(x: &x, x == 0 ? { x = 1 } : { x = 2})
+  // expected-error@-1 2{{overlapping accesses to 'x', but modification requires exclusive access; consider copying to a local variable}}
+  // expected-note@-2 2{{conflicting access is here}}
+}
+
+// Avoid diagnosing a conflict on disjoint struct properies when one is a `let`.
+// This requires an address projection before loading the `let` property.
+//
+// <rdar://problem/35561050> [SR-10145][Exclusivity] SILGen loads entire struct when reading captured 'let' stored property
+struct DisjointLetMember {
+  var dummy: AnyObject // Make this a nontrivial struct because the SIL is more involved.
+  mutating func get(makeValue: ()->Int) -> Int {
+    return makeValue()
+  }
+}
+
+class IntWrapper {
+  var x = 0
+}
+
+struct DisjointLet {
+  let a = 2 // Using a `let` forces a full load.
+  let b: IntWrapper
+  var cache: DisjointLetMember
+
+  init(b: IntWrapper) {
+    self.b = b
+    self.cache = DisjointLetMember(dummy: b)
+  }
+
+  mutating func testDisjointLet() -> Int {
+    // Access to inout `self` for member .cache`.
+    return cache.get {
+      // Access to captured `self` for member .cache`.
+      a + b.x
+    }
+  }
 }

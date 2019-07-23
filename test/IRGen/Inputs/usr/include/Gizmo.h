@@ -93,6 +93,12 @@ NSString *NSStringFromRect(struct NSRect r);
 - (void)foo;
 @end
 
+@protocol NSFungingAndRuncing <NSRuncing, NSFunging>
+@end
+
+@protocol NSDoubleInheritedFunging <NSFungingAndRuncing, NSFunging>
+@end
+
 typedef NS_ENUM(unsigned short, NSRuncingOptions) {
   NSRuncingMince = 123,
   NSRuncingQuinceSliced = 4567,
@@ -123,11 +129,19 @@ typedef NS_ENUM(unsigned, NeverActuallyMentionedByName) {
 - (NeverActuallyMentionedByName)getValue;
 @end
 
+#if defined(_WIN32)
+enum RawEnumInGizmo : unsigned {
+  InGizmoOne=0x7FFFFFFF,
+  InGizmoTwo,
+  InGizmoThree
+};
+#else
 enum RawEnumInGizmo {
   InGizmoOne=0x7FFFFFFF,
   InGizmoTwo,
   InGizmoThree
 };
+#endif
 
 struct StructOfNSStrings {
   __unsafe_unretained NSString *a;

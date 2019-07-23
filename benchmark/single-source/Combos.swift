@@ -33,7 +33,7 @@ public func run_Combos(_ N: Int) {
 func combinations
 <First: Sequence, Second: Collection>
 (_ first: First, _ second: Second)
--> AnyIterator<(First.Iterator.Element, Second.Iterator.Element)> {
+-> AnyIterator<(First.Element, Second.Element)> {
   var first_gen = first.makeIterator()
   var second_gen = second.makeIterator()
   var current_first = first_gen.next()

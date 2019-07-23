@@ -42,6 +42,7 @@ TEST_SUBSETS = [
     'all',
     'only_validation',
     'only_long',
+    'only_stress',
 ]
 
 SWIFT_SOURCE_DIR = os.path.join(SWIFT_SOURCE_ROOT, 'swift')
@@ -201,7 +202,8 @@ def main():
         upload_stdlib_targets = []
         need_validation = any('/validation-test-' in path for path in paths)
         for target in targets:
-            upload_stdlib_targets += ["upload-stdlib-%s" % target]
+            if args.mode != 'only_non_executable':
+                upload_stdlib_targets += ["upload-stdlib-%s" % target]
             if need_validation:
                 dependency_targets += ["swift-stdlib-%s" % target]
             else:

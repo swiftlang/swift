@@ -26,35 +26,12 @@
 // can be reflected as source-breaking changes for API users. If they are,
 // the output of api-digester will include such changes.
 
-#include "clang/AST/ASTContext.h"
-#include "clang/AST/DeclObjC.h"
-#include "clang/Lex/Preprocessor.h"
-#include "clang/Sema/Lookup.h"
-#include "clang/Sema/Sema.h"
-#include "llvm/ADT/TinyPtrVector.h"
-#include "llvm/Support/CommandLine.h"
-#include "llvm/Support/Compiler.h"
-#include "llvm/Support/FileSystem.h"
-#include "llvm/Support/MemoryBuffer.h"
-#include "llvm/Support/Path.h"
-#include "llvm/Support/Signals.h"
-#include "llvm/Support/YAMLParser.h"
-#include "llvm/Support/YAMLTraits.h"
-#include "swift/AST/Decl.h"
-#include "swift/AST/NameLookup.h"
-#include "swift/AST/PrettyStackTrace.h"
-#include "swift/AST/USRGeneration.h"
-#include "swift/Basic/ColorUtils.h"
-#include "swift/Basic/JSONSerialization.h"
-#include "swift/Basic/LLVMInitialize.h"
-#include "swift/Basic/STLExtras.h"
-#include "swift/Basic/Version.h"
-#include "swift/ClangImporter/ClangImporter.h"
-#include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
-#include "swift/IDE/Utils.h"
+#include "swift/AST/DiagnosticsModuleDiffer.h"
 #include "swift/IDE/APIDigesterData.h"
 #include <functional>
+#include "ModuleAnalyzerNodes.h"
+#include "ModuleDiagsConsumer.h"
 
 using namespace swift;
 using namespace ide;
@@ -64,102 +41,200 @@ namespace  {
   enum class ActionType {
     None,
     DumpSDK,
-    DumpSwiftModules,
-    CompareSDKs,
+    MigratorGen,
     DiagnoseSDKs,
+    // The following two are for testing purposes
     DeserializeDiffItems,
+    DeserializeSDK,
+    GenerateNameCorrectionTemplate,
+    FindUsr,
   };
 } // end anonymous namespace
 
 namespace options {
 
+static llvm::cl::OptionCategory Category("swift-api-digester Options");
+
 static llvm::cl::opt<bool>
-IncludeAllModules("include-all", llvm::cl::desc("Include all modules from the SDK"));
+IncludeAllModules("include-all",
+                  llvm::cl::desc("Include all modules from the SDK"),
+                  llvm::cl::cat(Category));
 
 static llvm::cl::list<std::string>
-ModuleNames("module", llvm::cl::ZeroOrMore, llvm::cl::desc("Names of modules"));
+ModuleNames("module", llvm::cl::ZeroOrMore, llvm::cl::desc("Names of modules"),
+            llvm::cl::cat(Category));
 
 static llvm::cl::opt<std::string>
 ModuleList("module-list-file",
-           llvm::cl::desc("File containing a new-line separated list of modules"));
+           llvm::cl::desc("File containing a new-line separated list of modules"),
+           llvm::cl::cat(Category));
 
 static llvm::cl::opt<std::string>
-OutputFile("o", llvm::cl::desc("Output file"));
+ProtReqWhiteList("protocol-requirement-white-list",
+           llvm::cl::desc("File containing a new-line separated list of protocol names"),
+           llvm::cl::cat(Category));
 
 static llvm::cl::opt<std::string>
-SDK("sdk", llvm::cl::desc("path to the SDK to build against"));
+OutputFile("o", llvm::cl::desc("Output file"),
+           llvm::cl::cat(Category));
 
 static llvm::cl::opt<std::string>
-Triple("target", llvm::cl::desc("target triple"));
+SDK("sdk", llvm::cl::desc("path to the SDK to build against"),
+    llvm::cl::cat(Category));
 
 static llvm::cl::opt<std::string>
-ModuleCachePath("module-cache-path", llvm::cl::desc("Clang module cache path"));
+BaselineSDK("bsdk", llvm::cl::desc("path to the baseline SDK to import frameworks"),
+    llvm::cl::cat(Category));
+
+static llvm::cl::opt<std::string>
+Triple("target", llvm::cl::desc("target triple"),
+       llvm::cl::cat(Category));
+
+static llvm::cl::opt<std::string>
+ModuleCachePath("module-cache-path", llvm::cl::desc("Clang module cache path"),
+                llvm::cl::cat(Category));
 
 static llvm::cl::opt<std::string>
 ResourceDir("resource-dir",
-            llvm::cl::desc("The directory that holds the compiler resource files"));
+            llvm::cl::desc("The directory that holds the compiler resource files"),
+            llvm::cl::cat(Category));
 
 static llvm::cl::list<std::string>
-FrameworkPaths("F", llvm::cl::desc("add a directory to the framework search path"));
+FrameworkPaths("F", llvm::cl::desc("add a directory to the framework search path"),
+               llvm::cl::cat(Category));
 
 static llvm::cl::list<std::string>
-ModuleInputPaths("I", llvm::cl::desc("add a module for input"));
+BaselineFrameworkPaths("BF", llvm::cl::desc("add a directory to the baseline framework search path"),
+                       llvm::cl::cat(Category));
 
 static llvm::cl::list<std::string>
-CCSystemFrameworkPaths("iframework", llvm::cl::desc("add a directory to the clang importer system framework search path"));
+BaselineModuleInputPaths("BI", llvm::cl::desc("add a module for baseline input"),
+                         llvm::cl::cat(Category));
+
+static llvm::cl::list<std::string>
+ModuleInputPaths("I", llvm::cl::desc("add a module for input"),
+                 llvm::cl::cat(Category));
+
+static llvm::cl::list<std::string>
+CCSystemFrameworkPaths("iframework",
+  llvm::cl::desc("add a directory to the clang importer system framework search path"),
+  llvm::cl::cat(Category));
 
 static llvm::cl::opt<bool>
 AbortOnModuleLoadFailure("abort-on-module-fail",
-                        llvm::cl::desc("Abort if a module failed to load"));
+                        llvm::cl::desc("Abort if a module failed to load"),
+                        llvm::cl::cat(Category));
 
 static llvm::cl::opt<bool>
-Verbose("v", llvm::cl::desc("Verbose"));
+Verbose("v", llvm::cl::desc("Verbose"),
+        llvm::cl::cat(Category));
 
 static llvm::cl::opt<bool>
-PrintModule("print-module", llvm::cl::desc("Print module names in diagnostics"));
+Abi("abi", llvm::cl::desc("Dumping ABI interface"),  llvm::cl::init(false),
+    llvm::cl::cat(Category));
+
+static llvm::cl::opt<bool>
+SwiftOnly("swift-only",
+          llvm::cl::desc("Only include APIs defined from Swift source"),
+          llvm::cl::init(false),
+          llvm::cl::cat(Category));
+
+static llvm::cl::opt<bool>
+DisableOSChecks("disable-os-checks",
+                llvm::cl::desc("Skip OS related diagnostics"),
+                llvm::cl::init(false),
+                llvm::cl::cat(Category));
+
+static llvm::cl::opt<bool>
+PrintModule("print-module", llvm::cl::desc("Print module names in diagnostics"),
+            llvm::cl::cat(Category));
 
 static llvm::cl::opt<ActionType>
 Action(llvm::cl::desc("Mode:"), llvm::cl::init(ActionType::None),
+      llvm::cl::cat(Category),
       llvm::cl::values(
           clEnumValN(ActionType::DumpSDK,
                      "dump-sdk",
                      "Dump SDK content to JSON file"),
-          clEnumValN(ActionType::DumpSwiftModules,
-                     "dump-swift",
-                     "dump swift modules in SDK"),
-          clEnumValN(ActionType::CompareSDKs,
-                     "compare-sdk",
-                     "Compare SDK content in JSON file"),
+          clEnumValN(ActionType::MigratorGen,
+                     "generate-migration-script",
+                     "Compare SDK content in JSON file and generate migration script"),
           clEnumValN(ActionType::DiagnoseSDKs,
                      "diagnose-sdk",
                      "Diagnose SDK content in JSON file"),
           clEnumValN(ActionType::DeserializeDiffItems,
                      "deserialize-diff",
-                     "Deserialize diff items in a JSON file")));
+                     "Deserialize diff items in a JSON file"),
+          clEnumValN(ActionType::DeserializeSDK,
+                     "deserialize-sdk",
+                     "Deserialize sdk digester in a JSON file"),
+          clEnumValN(ActionType::FindUsr,
+                     "find-usr",
+                     "Find USR for decls by given condition"),
+          clEnumValN(ActionType::GenerateNameCorrectionTemplate,
+                     "generate-name-correction",
+                     "Generate name correction template")));
 
 static llvm::cl::list<std::string>
 SDKJsonPaths("input-paths",
-            llvm::cl::desc("The SDK contents under comparison"));
+            llvm::cl::desc("The SDK contents under comparison"),
+            llvm::cl::cat(Category));
 
 static llvm::cl::list<std::string>
 ApisPrintUsrs("api-usrs",
               llvm::cl::desc("The name of APIs to print their usrs, "
-                             "e.g. Type::Function"));
+                             "e.g. Type::Function"),
+              llvm::cl::cat(Category));
 
 static llvm::cl::opt<std::string>
 IgnoreRemovedDeclUSRs("ignored-usrs",
                       llvm::cl::desc("the file containing USRs of removed decls "
-                                     "that the digester should ignore"));
+                                     "that the digester should ignore"),
+                      llvm::cl::cat(Category));
 
 static llvm::cl::opt<std::string>
 SwiftVersion("swift-version",
-             llvm::cl::desc("The Swift compiler version to invoke"));
+             llvm::cl::desc("The Swift compiler version to invoke"),
+             llvm::cl::cat(Category));
 
 static llvm::cl::opt<bool>
-OutputInJson("json", llvm::cl::desc("Print output in JSON format."));
+OutputInJson("json", llvm::cl::desc("Print output in JSON format."),
+             llvm::cl::cat(Category));
+
+static llvm::cl::opt<bool>
+AvoidLocation("avoid-location",
+              llvm::cl::desc("Avoid serializing the file paths of SDK nodes."),
+              llvm::cl::cat(Category));
+
+static llvm::cl::opt<std::string>
+LocationFilter("location",
+              llvm::cl::desc("Filter nodes with the given location."),
+              llvm::cl::cat(Category));
+
+static llvm::cl::opt<bool>
+CompilerStyleDiags("compiler-style-diags",
+                   llvm::cl::desc("Print compiler style diagnostics to stderr."),
+                   llvm::cl::cat(Category));
 } // namespace options
 
 namespace {
+
+using swift::ide::api::KnownProtocolKind;
+
+// A node matcher will traverse two trees of SDKNode and find matched nodes
+struct NodeMatcher {
+  virtual void match() = 0;
+  virtual ~NodeMatcher() = default;
+};
+
+// During the matching phase, any matched node will be reported using this API.
+// For update Node left = {Node before change} Right = {Node after change};
+// For added Node left = {NilNode} Right = {Node after change};
+// For removed Node left = {Node before change} Right = {NilNode}
+struct MatchedNodeListener {
+  virtual void foundMatch(NodePtr Left, NodePtr Right, NodeMatchReason Reason) = 0;
+  virtual ~MatchedNodeListener() = default;
+};
 
 template<typename T>
 bool contains(std::vector<T*> &container, T *instance) {
@@ -171,1491 +246,20 @@ bool contains(ArrayRef<T> container, T instance) {
   return std::find(container.begin(), container.end(), instance) != container.end();
 }
 
-class SDKNode;
-typedef SDKNode* NodePtr;
-typedef std::map<NodePtr, NodePtr> ParentMap;
-typedef std::vector<NodePtr> NodeVector;
-
-// The interface used to visit the SDK tree.
-class SDKNodeVisitor {
-  friend SDKNode;
-protected:
-  NodeVector Ancestors;
-  virtual void visit(NodePtr Node) = 0;
-
-  NodePtr parent() {
-    if (Ancestors.empty())
-      return nullptr;
-    return Ancestors.back();
-  }
-
-  int depth() {
-    return Ancestors.size() + 1;
-  }
-public:
-  virtual ~SDKNodeVisitor() = default;
-};
-
-// During the matching phase, any matched node will be reported using this API.
-// For update Node left = {Node before change} Right = {Node after change};
-// For added Node left = {NilNode} Right = {Node after change};
-// For removed Node left = {Node before change} Right = {NilNode}
-struct MatchedNodeListener {
-  virtual void foundMatch(NodePtr Left, NodePtr Right) = 0;
-  virtual void foundRemoveAddMatch(NodePtr Removed, NodePtr Added) {}
-  virtual ~MatchedNodeListener() = default;
-};
-
-using NodePairVector = llvm::MapVector<NodePtr, NodePtr>;
-
-// This map keeps track of updated nodes; thus we can conveniently find out what
-// is the counterpart of a node before or after being updated.
-class UpdatedNodesMap : public MatchedNodeListener {
-  NodePairVector MapImpl;
-  UpdatedNodesMap(const UpdatedNodesMap& that) = delete;
-public:
-  UpdatedNodesMap() = default;
-  NodePtr findUpdateCounterpart(const SDKNode *Node) const;
-  void foundMatch(NodePtr Left, NodePtr Right) override {
-    assert(Left && Right && "Not update operation.");
-    MapImpl.insert({Left, Right});
-  }
-};
-
-class SDKContext {
-  llvm::StringSet<> TextData;
-  llvm::BumpPtrAllocator Allocator;
-  UpdatedNodesMap UpdateMap;
-
-public:
-  llvm::BumpPtrAllocator &allocator() {
-    return Allocator;
-  }
-  StringRef buffer(StringRef Text) {
-    return TextData.insert(Text).first->getKey();
-  }
-  UpdatedNodesMap &getNodeUpdateMap() {
-    return UpdateMap;
-  }
-};
-
-// A node matcher will traverse two trees of SDKNode and find matched nodes
-struct NodeMatcher {
-  virtual void match() = 0;
-  virtual ~NodeMatcher() = default;
-};
-
-enum class KeyKind {
-#define KEY(NAME) KK_##NAME,
-#include "swift/IDE/DigesterEnums.def"
-};
-
-static KeyKind parseKeyKind(StringRef Content) {
-  return llvm::StringSwitch<KeyKind>(Content)
-#define KEY(NAME) .Case(#NAME, KeyKind::KK_##NAME)
-#include "swift/IDE/DigesterEnums.def"
-  ;
-}
-
-static StringRef getKeyContent(SDKContext &Ctx, KeyKind Kind) {
-  switch (Kind) {
-#define KEY(NAME) case KeyKind::KK_##NAME: return Ctx.buffer(#NAME);
-#include "swift/IDE/DigesterEnums.def"
-  }
-
-  llvm_unreachable("Unhandled KeyKind in switch.");
-}
-
-enum class KnownTypeKind: uint8_t {
-#define KNOWN_TYPE(NAME) NAME,
-#include "swift/IDE/DigesterEnums.def"
-  Unknown,
-};
-
-enum class SDKDeclAttrKind: uint8_t {
-#define DECL_ATTR(Name) DAK_##Name,
-#include "swift/IDE/DigesterEnums.def"
-};
-
-  // Redefine << so that we can output the name of decl kind.
-static raw_ostream &operator<<(raw_ostream &Out, const DeclKind Value) {
-  switch (Value) {
-#define DECL(X, PARENT) case DeclKind::X: return Out << #X;
-#include "swift/AST/DeclNodes.def"
-  }
-
-  llvm_unreachable("Unhandled DeclKind in switch.");
-}
-
-struct SDKNodeInitInfo {
-  SDKContext &Ctx;
-  StringRef Name;
-  StringRef PrintedName;
-  DeclKind DKind;
-  StringRef USR;
-  StringRef Location;
-  StringRef ModuleName;
-  bool IsThrowing = false;
-  bool IsMutating = false;
-  bool IsStatic = false;
-  Optional<uint8_t> SelfIndex;
-  Ownership Ownership = Ownership::Strong;
-  std::vector<SDKDeclAttrKind> DeclAttrs;
-  std::vector<TypeAttrKind> TypeAttrs;
-  StringRef SuperclassUsr;
-  SDKNodeInitInfo(SDKContext &Ctx) : Ctx(Ctx) {}
-  SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD);
-  SDKNodeInitInfo(SDKContext &Ctx, Type Ty,
-                  bool IsImplicitlyUnwrappedOptional =false);
-  SDKNode* createSDKNode(SDKNodeKind Kind);
-};
-
-class SDKNodeRoot;
-
-class SDKNode {
-  typedef std::vector<SDKNode*>::iterator ChildIt;
-  SDKContext &Ctx;
-  StringRef Name;
-  StringRef PrintedName;
-  unsigned TheKind : 4;
-  NodeVector Children;
-  std::set<NodeAnnotation> Annotations;
-  std::map<NodeAnnotation, StringRef> AnnotateComments;
-  NodePtr Parent = nullptr;
-
-protected:
-  SDKNode(SDKNodeInitInfo Info, SDKNodeKind Kind) : Ctx(Info.Ctx), Name(Info.Name),
-    PrintedName(Info.PrintedName), TheKind(unsigned(Kind)) {}
-
-public:
-  static SDKNode *constructSDKNode(SDKContext &Ctx, llvm::yaml::MappingNode *Node);
-  static void preorderVisit(NodePtr Root, SDKNodeVisitor &Visitor);
-  static void postorderVisit(NodePtr Root, SDKNodeVisitor &Visitor);
-
-  bool operator==(const SDKNode &Other) const;
-  bool operator!=(const SDKNode &Other) const { return !((*this) == Other); }
-
-  ArrayRef<NodeAnnotation>
-    getAnnotations(std::vector<NodeAnnotation> &Scratch) const;
-  bool isLeaf() const { return Children.empty(); }
-  SDKNodeKind getKind() const { return SDKNodeKind(TheKind); }
-  StringRef getName() const { return Name; }
-  bool isNameValid() const { return Name != "_"; }
-  StringRef getPrintedName() const { return PrintedName; }
-  void removeChild(ChildIt CI) { Children.erase(CI); }
-  ChildIt getChildBegin() { return Children.begin(); }
-  void annotate(NodeAnnotation Anno) { Annotations.insert(Anno); }
-  NodePtr getParent() const { return Parent; };
-  unsigned getChildrenCount() const { return Children.size(); }
-  NodePtr childAt(unsigned I) const;
-  void removeChild(NodePtr C);
-  void addAnnotateComment(NodeAnnotation Anno, StringRef Comment);
-  StringRef getAnnotateComment(NodeAnnotation Anno) const;
-  bool isAnnotatedAs(NodeAnnotation Anno) const;
-  void addChild(SDKNode *Child);
-  ArrayRef<SDKNode*> getChildren() const;
-  bool hasSameChildren(const SDKNode &Other) const;
-  unsigned getChildIndex(NodePtr Child) const;
-  const SDKNode* getOnlyChild() const;
-  SDKContext &getSDKContext() const { return Ctx; }
-  SDKNodeRoot *getRootNode() const;
-  template <typename T> const T *getAs() const;
-  template <typename T> T *getAs();
-};
-
-class SDKNodeDecl : public SDKNode {
-  DeclKind DKind;
-  StringRef Usr;
-  StringRef Location;
-  StringRef ModuleName;
-  std::vector<SDKDeclAttrKind> DeclAttributes;
-  bool IsStatic;
-  uint8_t Ownership;
-  bool hasDeclAttribute(SDKDeclAttrKind DAKind) const;
-
-protected:
-  SDKNodeDecl(SDKNodeInitInfo Info, SDKNodeKind Kind) : SDKNode(Info, Kind),
-    DKind(Info.DKind), Usr(Info.USR), Location(Info.Location),
-    ModuleName(Info.ModuleName), DeclAttributes(Info.DeclAttrs),
-    IsStatic(Info.IsStatic), Ownership(uint8_t(Info.Ownership)) {}
-
-public:
-  StringRef getUsr() const { return Usr; }
-  StringRef getLocation() const { return Location; }
-  StringRef getModuleName() const {return ModuleName;}
-  void addDeclAttribute(SDKDeclAttrKind DAKind);
-  ArrayRef<SDKDeclAttrKind> getDeclAttributes() const;
-  swift::Ownership getOwnership() const { return swift::Ownership(Ownership); }
-  bool isObjc() const { return Usr.startswith("c:"); }
-  static bool classof(const SDKNode *N);
-  DeclKind getDeclKind() const { return DKind; }
-  void printFullyQualifiedName(llvm::raw_ostream &OS) const;
-  StringRef getFullyQualifiedName() const;
-  bool isSDKPrivate() const;
-  bool isDeprecated() const;
-  bool isStatic() const { return IsStatic; };
-};
-
-class SDKNodeRoot :public SDKNode {
-  /// This keeps track of all decl descendants with USRs.
-  llvm::StringMap<llvm::SmallSetVector<SDKNodeDecl*, 2>> DescendantDeclTable;
-
-public:
-  SDKNodeRoot(SDKNodeInitInfo Info) : SDKNode(Info, SDKNodeKind::Root) {}
-  static SDKNode *getInstance(SDKContext &Ctx);
-  static bool classof(const SDKNode *N);
-  void registerDescendant(SDKNode *D) {
-    if (auto DD = dyn_cast<SDKNodeDecl>(D)) {
-      assert(!DD->getUsr().empty());
-      DescendantDeclTable[DD->getUsr()].insert(DD);
-    }
-  }
-  ArrayRef<SDKNodeDecl*> getDescendantsByUsr(StringRef Usr) {
-    return DescendantDeclTable[Usr].getArrayRef();
-  }
-};
-
-NodePtr UpdatedNodesMap::findUpdateCounterpart(const SDKNode *Node) const {
-  assert(Node->isAnnotatedAs(NodeAnnotation::Updated) && "Not update operation.");
-  auto FoundPair = std::find_if(MapImpl.begin(), MapImpl.end(),
-                      [&](std::pair<NodePtr, NodePtr> Pair) {
-    return Pair.second == Node || Pair.first == Node;
-  });
-  assert(FoundPair != MapImpl.end() && "Cannot find update counterpart.");
-  return Node == FoundPair->first ? FoundPair->second : FoundPair->first;
-}
-
-class SDKNodeType : public SDKNode {
-  std::vector<TypeAttrKind> TypeAttributes;
-
-protected:
-  bool hasTypeAttribute(TypeAttrKind DAKind) const;
-  SDKNodeType(SDKNodeInitInfo Info, SDKNodeKind Kind) : SDKNode(Info, Kind),
-    TypeAttributes(Info.TypeAttrs) {}
-
-public:
-  KnownTypeKind getTypeKind() const;
-  void addTypeAttribute(TypeAttrKind AttrKind);
-  ArrayRef<TypeAttrKind> getTypeAttributes() const;
-  SDKNodeDecl *getClosestParentDecl() const;
-  static bool classof(const SDKNode *N);
-};
-
-bool SDKNodeType::classof(const SDKNode *N) {
-  switch (N->getKind()) {
-  case SDKNodeKind::TypeNominal:
-  case SDKNodeKind::TypeFunc:
-  case SDKNodeKind::TypeNameAlias:
-    return true;
-  default:
-    return false;
-  }
-}
-
-class SDKNodeTypeNominal : public SDKNodeType {
-public:
-  SDKNodeTypeNominal(SDKNodeInitInfo Info) : SDKNodeType(Info,
-    SDKNodeKind::TypeNominal) {}
-  static bool classof(const SDKNode *N);
-};
-
-class SDKNodeTypeFunc : public SDKNodeType {
-public:
-  SDKNodeTypeFunc(SDKNodeInitInfo Info) : SDKNodeType(Info, SDKNodeKind::TypeFunc) {}
-  bool isEscaping() const { return !hasTypeAttribute(TypeAttrKind::TAK_noescape); }
-  static bool classof(const SDKNode *N);
-};
-
-class SDKNodeTypeNameAlias : public SDKNodeType {
-public:
-  SDKNodeTypeNameAlias(SDKNodeInitInfo Info) : SDKNodeType(Info,
-                                                  SDKNodeKind::TypeNameAlias) {}
-  const SDKNodeType *getUnderlyingType() const;
-  static bool classof(const SDKNode *N);
-};
-
-const SDKNodeType *SDKNodeTypeNameAlias::getUnderlyingType() const {
-  return getOnlyChild()->getAs<SDKNodeType>();
-}
-
-template <typename T> const T *
-SDKNode::getAs() const {
-  if (T::classof(this))
-    return static_cast<const T*>(this);
-  llvm_unreachable("incompatible types");
-}
-
-template <typename T> T *
-SDKNode::getAs() {
-  if (T::classof(this))
-    return static_cast<T*>(this);
-  llvm_unreachable("incompatible types");
-}
-
-unsigned SDKNode::getChildIndex(NodePtr Child) const {
-  return std::find(Children.begin(), Children.end(), Child) - Children.begin();
-}
-
-const SDKNode* SDKNode::getOnlyChild() const {
-  assert(Children.size() == 1 && "more that one child.");
-  return *Children.begin();
-}
-
-SDKNodeRoot *SDKNode::getRootNode() const {
-  for (auto *Root = const_cast<SDKNode*>(this); ; Root = Root->getParent()) {
-    if (auto Result = dyn_cast<SDKNodeRoot>(Root))
-      return Result;
-  }
-  llvm_unreachable("Unhandled SDKNodeKind in switch.");
-}
-
-void SDKNode::addChild(SDKNode *Child) {
-  Child->Parent = this;
-  Children.push_back(Child);
-  if (auto *Root = dyn_cast<SDKNodeRoot>(this)) {
-    struct DeclCollector: public SDKNodeVisitor {
-      SDKNodeRoot &Root;
-      DeclCollector(SDKNodeRoot &Root): Root(Root) {}
-      void visit(NodePtr Node) override {
-        Root.registerDescendant(Node);
-      }
-    } Collector(*Root);
-    SDKNode::preorderVisit(Child, Collector);
-  }
-}
-
-ArrayRef<SDKNode*> SDKNode::getChildren() const {
-  return llvm::makeArrayRef(Children);
-}
-
-NodePtr SDKNode::childAt(unsigned I) const {
-  assert(I < getChildrenCount());
-  return getChildren()[I];
-}
-
-void SDKNode::removeChild(NodePtr C) {
-  Children.erase(std::find(Children.begin(), Children.end(), C));
-}
-
-void SDKNode::addAnnotateComment(NodeAnnotation Anno, StringRef Comment) {
-  assert(isAnnotatedAs(Anno) && "Cannot find annotation");
-  AnnotateComments[Anno] = Comment;
-}
-
-StringRef SDKNode::getAnnotateComment(NodeAnnotation Anno) const {
-  return AnnotateComments.find(Anno)->second;
-}
-
-ArrayRef<NodeAnnotation> SDKNode::
-getAnnotations(std::vector<NodeAnnotation> &Scratch) const {
-  for (auto Ann : Annotations)
-    Scratch.push_back(Ann);
-  return llvm::makeArrayRef(Scratch);
-}
-
-bool SDKNode::isAnnotatedAs(NodeAnnotation Anno) const {
-  return Annotations.find(Anno) != Annotations.end();;
-}
-
-void SDKNode::preorderVisit(NodePtr Root, SDKNodeVisitor &Visitor) {
-  Visitor.visit(Root);
-  Visitor.Ancestors.push_back(Root);
-  for (auto Child : Root->Children)
-    preorderVisit(Child, Visitor);
-  Visitor.Ancestors.pop_back();
-}
-
-void SDKNode::postorderVisit(NodePtr Root, SDKNodeVisitor &Visitor) {
-  Visitor.Ancestors.push_back(Root);
-  for (auto Child : Root->Children)
-    postorderVisit(Child, Visitor);
-  Visitor.Ancestors.pop_back();
-  Visitor.visit(Root);
-}
-
-class SDKNodeVectorViewer {
-  ArrayRef<SDKNode*> Collection;
-  llvm::function_ref<bool(NodePtr)> Selector;
-  typedef ArrayRef<SDKNode*>::iterator VectorIt;
-  VectorIt getNext(VectorIt Start);
-  class ViewerIterator;
-
-public:
-  SDKNodeVectorViewer(ArrayRef<SDKNode*> Collection,
-                      llvm::function_ref<bool(NodePtr)> Selector) :
-                        Collection(Collection),
-                        Selector(Selector) {}
-  ViewerIterator begin();
-  ViewerIterator end();
-};
-
-class SDKNodeVectorViewer::ViewerIterator :
-    public std::iterator<std::input_iterator_tag, VectorIt> {
-  SDKNodeVectorViewer &Viewer;
-  VectorIt P;
-public:
-  ViewerIterator(SDKNodeVectorViewer &Viewer, VectorIt P) : Viewer(Viewer), P(P) {}
-  ViewerIterator(const ViewerIterator& mit) : Viewer(mit.Viewer), P(mit.P) {}
-  ViewerIterator& operator++();
-  ViewerIterator operator++(int) {ViewerIterator tmp(*this); operator++(); return tmp;}
-  bool operator==(const ViewerIterator& rhs) {return P==rhs.P;}
-  bool operator!=(const ViewerIterator& rhs) {return P!=rhs.P;}
-  const NodePtr& operator*() {return *P;}
-};
-
-SDKNodeVectorViewer::VectorIt
-SDKNodeVectorViewer::getNext(VectorIt Start) {
-  for (auto It = Start; It != Collection.end(); ++ It)
-    if (Selector(*It))
-      return It;
-  return Collection.end();
-}
-
-SDKNodeVectorViewer::ViewerIterator&
-SDKNodeVectorViewer::ViewerIterator::operator++() {
-  P = Viewer.getNext(P + 1);
-  return *this;
-}
-
-SDKNodeVectorViewer::ViewerIterator SDKNodeVectorViewer::begin() {
-  return ViewerIterator(*this, getNext(Collection.begin()));
-}
-
-SDKNodeVectorViewer::ViewerIterator SDKNodeVectorViewer::end() {
-  return ViewerIterator(*this, Collection.end());
-}
-
-class SDKNodeDecl;
-
-KnownTypeKind SDKNodeType::getTypeKind() const {
-#define KNOWN_TYPE(NAME) if (getName() == #NAME) return KnownTypeKind::NAME;
-#include "swift/IDE/DigesterEnums.def"
-  return KnownTypeKind::Unknown;
-}
-
-ArrayRef<TypeAttrKind> SDKNodeType::getTypeAttributes() const {
-  return llvm::makeArrayRef(TypeAttributes.data(), TypeAttributes.size());
-}
-
-void SDKNodeType::addTypeAttribute(TypeAttrKind AttrKind) {
-  TypeAttributes.push_back(AttrKind);
-}
-
-bool SDKNodeType::hasTypeAttribute(TypeAttrKind DAKind) const {
-  return std::find(TypeAttributes.begin(), TypeAttributes.end(), DAKind) !=
-    TypeAttributes.end();
-}
-
-SDKNode *SDKNodeRoot::getInstance(SDKContext &Ctx) {
-  SDKNodeInitInfo Info(Ctx);
-  Info.Name = Ctx.buffer("TopLevel");
-  Info.PrintedName = Ctx.buffer("TopLevel");
-  return Info.createSDKNode(SDKNodeKind::Root);
-}
-
-bool SDKNodeDecl::isDeprecated() const {
-  return hasDeclAttribute(SDKDeclAttrKind::DAK_deprecated);
-}
-
-bool SDKNodeDecl::isSDKPrivate() const {
-  if (getName().startswith("__"))
-    return true;
-  if (auto *PD = dyn_cast<SDKNodeDecl>(getParent()))
-    return PD->isSDKPrivate();
-  return false;
-}
-
-void SDKNodeDecl::printFullyQualifiedName(llvm::raw_ostream &OS) const {
-  std::vector<NodePtr> Parent;
-  for (auto *P = getParent(); isa<SDKNodeDecl>(P); P = P->getParent())
-    Parent.push_back(P);
-  for (auto It = Parent.rbegin(); It != Parent.rend(); ++ It)
-    OS << (*It)->getPrintedName() << ".";
-  OS << getPrintedName();
-}
-
-StringRef SDKNodeDecl::getFullyQualifiedName() const {
-  llvm::SmallString<32> Buffer;
-  llvm::raw_svector_ostream OS(Buffer);
-  printFullyQualifiedName(OS);
-  return getSDKContext().buffer(OS.str());
-}
-
-bool SDKNodeDecl::classof(const SDKNode *N) {
-  switch (N->getKind()) {
-    case SDKNodeKind::Constructor:
-    case SDKNodeKind::Function:
-    case SDKNodeKind::Getter:
-    case SDKNodeKind::Setter:
-    case SDKNodeKind::TypeAlias:
-    case SDKNodeKind::TypeDecl:
-    case SDKNodeKind::Var:
-      return true;
-    case SDKNodeKind::Root:
-    case SDKNodeKind::TypeNominal:
-    case SDKNodeKind::TypeFunc:
-    case SDKNodeKind::TypeNameAlias:
-      return false;
-  }
-
-  llvm_unreachable("Unhandled SDKNodeKind in switch.");
-}
-
-void SDKNodeDecl::addDeclAttribute(SDKDeclAttrKind DAKind) {
-  DeclAttributes.push_back(DAKind);
-}
-
-bool SDKNodeDecl::hasDeclAttribute(SDKDeclAttrKind DAKind) const {
-  return std::find(DeclAttributes.begin(), DeclAttributes.end(), DAKind) !=
-    DeclAttributes.end();
-}
-
-ArrayRef<SDKDeclAttrKind> SDKNodeDecl::getDeclAttributes() const {
-  return llvm::makeArrayRef(DeclAttributes.data(), DeclAttributes.size());
-}
-
-SDKNodeDecl *SDKNodeType::getClosestParentDecl() const {
-  auto *Result = getParent();
-  for (; !isa<SDKNodeDecl>(Result); Result = Result->getParent());
-  return Result->getAs<SDKNodeDecl>();
-}
-
-class SDKNodeTypeDecl : public SDKNodeDecl {
-  StringRef SuperclassUsr;
-public:
-  SDKNodeTypeDecl(SDKNodeInitInfo Info) : SDKNodeDecl(Info, SDKNodeKind::TypeDecl),
-                                          SuperclassUsr(Info.SuperclassUsr) {}
-  static bool classof(const SDKNode *N);
-  StringRef getSuperClassUsr() const { return SuperclassUsr; }
-
-  Optional<SDKNodeTypeDecl*> getSuperclass() const {
-    if (SuperclassUsr.empty())
-      return None;
-    auto Descendants = getRootNode()->getDescendantsByUsr(SuperclassUsr);
-    if (!Descendants.empty()) {
-      return Descendants.front()->getAs<SDKNodeTypeDecl>();
-    }
-    return None;
-  }
-
-  /// Finding the node through all children, including the inheritted ones,
-  /// whose printed name matches with the given name.
-  Optional<SDKNodeDecl*> lookupChildByPrintedName(StringRef Name) const {
-    for (auto C : getChildren()) {
-      if (C->getPrintedName() == Name)
-        return C->getAs<SDKNodeDecl>();
-    }
-    // Finding from the inheritance chain.
-    if (auto Super = getSuperclass()) {
-      return (*Super)->lookupChildByPrintedName(Name);
-    }
-    return None;
-  }
-};
-
-class SDKNodeTypeAlias : public SDKNodeDecl {
-public:
-  SDKNodeTypeAlias(SDKNodeInitInfo Info) : SDKNodeDecl(Info,
-                                                       SDKNodeKind::TypeAlias) {}
-  static bool classof(const SDKNode *N);
-};
-
-class SDKNodeVar : public SDKNodeDecl {
-public:
-  SDKNodeVar(SDKNodeInitInfo Info) : SDKNodeDecl(Info, SDKNodeKind::Var) {}
-  static bool classof(const SDKNode *N);
-};
-
-class SDKNodeAbstractFunc : public SDKNodeDecl {
-  const bool IsThrowing;
-  const bool IsMutating;
-  const Optional<uint8_t> SelfIndex;
-
-protected:
-  SDKNodeAbstractFunc(SDKNodeInitInfo Info, SDKNodeKind Kind) :
-                                                    SDKNodeDecl(Info, Kind),
-                                                    IsThrowing(Info.IsThrowing),
-                                                    IsMutating(Info.IsMutating),
-                                                    SelfIndex(Info.SelfIndex){}
-public:
-  bool isThrowing() const { return IsThrowing; }
-  bool isMutating() const { return IsMutating; }
-  uint8_t getSelfIndex() const { return SelfIndex.getValue(); }
-  Optional<uint8_t> getSelfIndexOptional() const { return SelfIndex; }
-  bool hasSelfIndex() const { return SelfIndex.hasValue(); }
-  static bool classof(const SDKNode *N);
-  static StringRef getTypeRoleDescription(SDKContext &Ctx, unsigned Index);
-};
-
-bool SDKNodeAbstractFunc::classof(const SDKNode *N) {
-  switch (N->getKind()) {
-    case SDKNodeKind::Function:
-    case SDKNodeKind::Setter:
-    case SDKNodeKind::Getter:
-    case SDKNodeKind::Constructor:
-      return true;
-
-    default:
-      return false;
-  }
-}
-
-class SDKNodeFunction : public SDKNodeAbstractFunc {
-public:
-  SDKNodeFunction(SDKNodeInitInfo Info) : SDKNodeAbstractFunc(Info,
-                                                       SDKNodeKind::Function) {}
-  SDKNode *getReturnType() { return *getChildBegin(); }
-  static bool classof(const SDKNode *N);
-};
-
-StringRef SDKNodeAbstractFunc::getTypeRoleDescription(SDKContext &Ctx,
-                                                      unsigned Index) {
-  if (Index == 0) {
-    return Ctx.buffer("return");
-  } else {
-    llvm::SmallString<4> Buffer;
-    Buffer += "parameter ";
-    Buffer += std::to_string(Index - 1);
-    return Ctx.buffer(Buffer.str());
-  }
-}
-
-class SDKNodeConstructor : public SDKNodeAbstractFunc {
-public:
-  SDKNodeConstructor(SDKNodeInitInfo Info) : SDKNodeAbstractFunc(Info,
-                                                    SDKNodeKind::Constructor) {}
-  static bool classof(const SDKNode *N);
-};
-
-class SDKNodeGetter : public SDKNodeAbstractFunc {
-public:
-  SDKNodeGetter(SDKNodeInitInfo Info) : SDKNodeAbstractFunc(Info,
-                                                         SDKNodeKind::Getter) {}
-  static bool classof(const SDKNode *N);
-};
-
-class SDKNodeSetter : public SDKNodeAbstractFunc {
-public:
-  SDKNodeSetter(SDKNodeInitInfo Info) : SDKNodeAbstractFunc(Info,
-                                                         SDKNodeKind::Setter) {}
-  static bool classof(const SDKNode *N);
-};
-
-#define NODE_KIND(X)                                                       \
-  bool SDKNode##X::classof(const SDKNode *N) {                             \
-    return N->getKind() == SDKNodeKind::X;                                 \
-  }
-#include "swift/IDE/DigesterEnums.def"
-
-
-SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
-                                   llvm::yaml::MappingNode *Node) {
-  static auto GetScalarString = [&](llvm::yaml::Node *N) -> StringRef {
-    auto WithQuote = cast<llvm::yaml::ScalarNode>(N)->getRawValue();
-    return WithQuote.substr(1, WithQuote.size() - 2);
-  };
-
-  static auto getAsInt = [&](llvm::yaml::Node *N) -> int {
-    return std::stoi(cast<llvm::yaml::ScalarNode>(N)->getRawValue());
-  };
-  SDKNodeKind Kind;
-  SDKNodeInitInfo Info(Ctx);
-  NodeVector Children;
-
-  for (auto Pair : *Node) {
-    switch(parseKeyKind(GetScalarString(Pair.getKey()))) {
-    case KeyKind::KK_kind:
-      Kind = parseSDKNodeKind(GetScalarString(Pair.getValue()));
-      break;
-    case KeyKind::KK_name:
-      Info.Name = GetScalarString(Pair.getValue());
-      break;
-    case KeyKind::KK_selfIndex:
-      Info.SelfIndex = getAsInt(Pair.getValue());
-      break;
-    case KeyKind::KK_usr:
-      Info.USR = GetScalarString(Pair.getValue());
-      break;
-
-    case KeyKind::KK_location:
-      Info.Location = GetScalarString(Pair.getValue());
-      break;
-    case KeyKind::KK_children:
-      for (auto &Mapping : *cast<llvm::yaml::SequenceNode>(Pair.getValue())) {
-        Children.push_back(constructSDKNode(Ctx,
-                                      cast<llvm::yaml::MappingNode>(&Mapping)));
-      }
-      break;
-    case KeyKind::KK_printedName:
-      Info.PrintedName = GetScalarString(Pair.getValue());
-      break;
-    case KeyKind::KK_moduleName:
-      Info.ModuleName = GetScalarString(Pair.getValue());
-      break;
-    case KeyKind::KK_superclassUsr:
-      Info.SuperclassUsr = GetScalarString(Pair.getValue());
-      break;
-    case KeyKind::KK_throwing:
-      Info.IsThrowing = true;
-      break;
-    case KeyKind::KK_mutating:
-      Info.IsMutating = true;
-      break;
-    case KeyKind::KK_static:
-      Info.IsStatic = true;
-      break;
-    case KeyKind::KK_ownership:
-      Info.Ownership = swift::Ownership(getAsInt(Pair.getValue()));
-      assert(Info.Ownership != swift::Ownership::Strong &&
-             "Strong is implied.");
-      break;
-
-    case KeyKind::KK_typeAttributes: {
-      auto *Seq = cast<llvm::yaml::SequenceNode>(Pair.getValue());
-      for (auto It = Seq->begin(); It != Seq->end(); ++ It) {
-        Info.TypeAttrs.push_back(
-          llvm::StringSwitch<TypeAttrKind>(GetScalarString(&*It))
-#define TYPE_ATTR(X) .Case(#X, TypeAttrKind::TAK_##X)
-#include "swift/AST/Attr.def"
-          .Case("Count", TypeAttrKind::TAK_Count));
-      }
-      break;
-    }
-    case KeyKind::KK_declAttributes: {
-      auto *Seq = cast<llvm::yaml::SequenceNode>(Pair.getValue());
-      for (auto It = Seq->begin(); It != Seq->end(); ++ It) {
-        Info.DeclAttrs.push_back(
-          llvm::StringSwitch<SDKDeclAttrKind>(GetScalarString(&*It))
-#define DECL_ATTR(X) .Case(#X, SDKDeclAttrKind::DAK_##X)
-#include "swift/IDE/DigesterEnums.def"
-          );
-      }
-      break;
-    }
-    case KeyKind::KK_declKind:
-      Info.DKind = llvm::StringSwitch<DeclKind>(GetScalarString(Pair.getValue()))
-#define DECL(X, PARENT) .Case(#X, DeclKind::X)
-#include "swift/AST/DeclNodes.def"
-      ;
-      break;
-    }
-  };
-  SDKNode *Result = Info.createSDKNode(Kind);
-  for (auto C : Children) {
-    Result->addChild(C);
-  }
-  return Result;
-}
-
-bool SDKNode::hasSameChildren(const SDKNode &Other) const {
-  if (Children.size() != Other.Children.size())
-    return false;
-  for (unsigned I = 0; I < Children.size(); ++ I) {
-    if (*Children[I] != *Other.Children[I])
-      return false;
-  }
-  return true;
-}
-
-bool SDKNode::operator==(const SDKNode &Other) const {
-  auto *LeftAlias = dyn_cast<SDKNodeTypeNameAlias>(this);
-  auto *RightAlias = dyn_cast<SDKNodeTypeNameAlias>(&Other);
-  if (LeftAlias || RightAlias) {
-    // Comparing the underlying types if any of the inputs are alias.
-    const SDKNode *Left = LeftAlias ? LeftAlias->getUnderlyingType() : this;
-    const SDKNode *Right = RightAlias ? RightAlias->getUnderlyingType() : &Other;
-    return *Left == *Right;
-  }
-
-  if (getKind() != Other.getKind())
-    return false;
-
-  switch(getKind()) {
-    case SDKNodeKind::TypeNameAlias:
-      llvm_unreachable("Should be handled above.");
-    case SDKNodeKind::TypeNominal:
-    case SDKNodeKind::TypeFunc: {
-      auto Left = this->getAs<SDKNodeType>();
-      auto Right = (&Other)->getAs<SDKNodeType>();
-      if (!Left->getTypeAttributes().equals(Right->getTypeAttributes()))
-        return false;
-      if (Left->getPrintedName() == Right->getPrintedName())
-        return true;
-      return Left->getName() == Right->getName() &&
-        Left->hasSameChildren(*Right);
-    }
-
-    case SDKNodeKind::Function:
-    case SDKNodeKind::Constructor:
-    case SDKNodeKind::Getter:
-    case SDKNodeKind::Setter: {
-      auto Left = this->getAs<SDKNodeAbstractFunc>();
-      auto Right = (&Other)->getAs<SDKNodeAbstractFunc>();
-      if (Left->isMutating() ^ Right->isMutating())
-        return false;
-      if (Left->isThrowing() ^ Right->isThrowing())
-        return false;
-      LLVM_FALLTHROUGH;
-    }
-    case SDKNodeKind::TypeDecl:
-    case SDKNodeKind::Var:
-    case SDKNodeKind::TypeAlias: {
-      auto Left = this->getAs<SDKNodeDecl>();
-      auto Right = (&Other)->getAs<SDKNodeDecl>();
-      if (Left->isStatic() ^ Right->isStatic())
-        return false;
-      if (Left->getOwnership() != Right->getOwnership())
-        return false;
-      LLVM_FALLTHROUGH;
-    }
-    case SDKNodeKind::Root: {
-      return getPrintedName() == Other.getPrintedName() &&
-        hasSameChildren(Other);
-    }
-  }
-
-  llvm_unreachable("Unhanlded SDKNodeKind in switch.");
-}
-
-// The pretty printer of a tree of SDKNode
-class SDKNodeDumpVisitor : public SDKNodeVisitor {
-  void dumpSpace(int Num) {
-    while (Num != 0) {
-      llvm::outs() << "\t";
-      Num --;
-    }
-  }
-  void visit(NodePtr Node) override {
-    dumpSpace(depth());
-    llvm::outs() << "[" << Node->getKind() << "]" << Node->getName() << "\n";
-  }
-public:
-  SDKNodeDumpVisitor() {};
-};
-
-static StringRef getPrintedName(SDKContext &Ctx, Type Ty,
-                                bool IsImplicitlyUnwrappedOptional) {
-  std::string S;
-  llvm::raw_string_ostream OS(S);
-  PrintOptions PO;
-  PO.SkipAttributes = true;
-  if (IsImplicitlyUnwrappedOptional)
-    PO.PrintOptionalAsImplicitlyUnwrapped = true;
-
-  Ty.print(OS, PO);
-  return Ctx.buffer(OS.str());
-}
-
-static StringRef getTypeName(SDKContext &Ctx, Type Ty,
-                             bool IsImplicitlyUnwrappedOptional) {
-  if (Ty->getKind() == TypeKind::Paren) {
-    return Ctx.buffer("Paren");
-  }
-  if (Ty->isVoid()) {
-    return Ctx.buffer("Void");
-  }
-  if (auto *NAT = dyn_cast<NameAliasType>(Ty.getPointer())) {
-    return NAT->getDecl()->getNameStr();
-  }
-  if (Ty->getAnyNominal()) {
-    if (IsImplicitlyUnwrappedOptional) {
-      assert(Ty->getOptionalObjectType());
-      return StringRef("ImplicitlyUnwrappedOptional");
-    }
-    return Ty->getAnyNominal()->getNameStr();
-  }
-#define TYPE(id, parent)                                                      \
-  if (Ty->getKind() == TypeKind::id) {                                        \
-    return Ctx.buffer(#id);                                                   \
-  }
-#include "swift/AST/TypeNodes.def"
-  llvm_unreachable("Unhandled type name.");
-}
-
-static StringRef calculateUsr(SDKContext &Ctx, ValueDecl *VD) {
-  llvm::SmallString<64> SS;
-  llvm::raw_svector_ostream OS(SS);
-  if (!ide::printDeclUSR(VD, OS)) {
-    return Ctx.buffer(SS.str());
-  }
-  return StringRef();
-}
-
-static StringRef calculateLocation(SDKContext &SDKCtx, ValueDecl *VD) {
-  auto &Ctx = VD->getASTContext();
-  auto &Importer = static_cast<ClangImporter &>(*Ctx.getClangModuleLoader());
-
-  clang::SourceManager &SM = Importer.getClangPreprocessor().getSourceManager();
-  if (ClangNode CN = VD->getClangNode()) {
-    clang::SourceLocation Loc = CN.getLocation();
-    Loc = SM.getFileLoc(Loc);
-    if (Loc.isValid())
-      return SDKCtx.buffer(Loc.printToString(SM));
-  }
-
-  return StringRef();
-}
-
-static bool isFunctionTypeNoEscape(Type Ty) {
-  if (auto *AFT = Ty->getAs<AnyFunctionType>()) {
-    return AFT->getExtInfo().isNoEscape();
-  }
-  return false;
-}
-
-/// Converts a DeclBaseName to a string by assigning special names strings and
-/// escaping identifiers that would clash with these strings using '`'
-static StringRef getEscapedName(DeclBaseName name) {
-  switch (name.getKind()) {
-  case DeclBaseName::Kind::Subscript:
-    return "subscript";
-  case DeclBaseName::Kind::Destructor:
-    return "deinit";
-  case DeclBaseName::Kind::Normal:
-    return llvm::StringSwitch<StringRef>(name.getIdentifier().str())
-        .Case("subscript", "`subscript`")
-        .Case("deinit", "`deinit`")
-        .Default(name.getIdentifier().str());
-  }
-}
-
-static StringRef getPrintedName(SDKContext &Ctx, ValueDecl *VD) {
-  llvm::SmallString<32> Result;
-  if (auto FD = dyn_cast<AbstractFunctionDecl>(VD)) {
-    auto DM = FD->getFullName();
-
-    if (DM.getBaseName().empty()) {
-      Result.append("_");
-    } else {
-      Result.append(getEscapedName(DM.getBaseName()));
-    }
-
-    Result.append("(");
-    for (auto Arg : DM.getArgumentNames()) {
-      Result.append(Arg.empty() ? "_" : Arg.str());
-      Result.append(":");
-    }
-    Result.append(")");
-    return Ctx.buffer(Result.str());
-  }
-  auto DM = VD->getFullName();
-  Result.append(getEscapedName(DM.getBaseName()));
-  return Ctx.buffer(Result.str());
-}
-
-static bool isFuncThrowing(ValueDecl *VD) {
-  if (auto AF = dyn_cast<AbstractFunctionDecl>(VD)) {
-    return AF->hasThrows();
-  }
-  return false;
-}
-
-static bool isFuncMutating(ValueDecl *VD) {
-  if (auto AF = dyn_cast<FuncDecl>(VD)) {
-    return AF->isMutating();
-  }
-  return false;
-}
-
-static Optional<uint8_t> getSelfIndex(ValueDecl *VD) {
-  if (auto AF = dyn_cast<AbstractFunctionDecl>(VD)) {
-    if (AF->isImportAsInstanceMember())
-      return AF->getSelfIndex();
-  }
-  return None;
-}
-
-static Ownership getOwnership(ValueDecl *VD) {
-  if (auto OA = VD->getAttrs().getAttribute<OwnershipAttr>()) {
-    return OA->get();
-  }
-  return Ownership::Strong;
-}
-
-SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Type Ty,
-                                 bool IsImplicitlyUnwrappedOptional) :
-    Ctx(Ctx), Name(getTypeName(Ctx, Ty, IsImplicitlyUnwrappedOptional)),
-    PrintedName(getPrintedName(Ctx, Ty, IsImplicitlyUnwrappedOptional)) {
-  if (isFunctionTypeNoEscape(Ty))
-    TypeAttrs.push_back(TypeAttrKind::TAK_noescape);
-}
-
-SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD) : Ctx(Ctx),
-    Name(VD->hasName() ? getEscapedName(VD->getBaseName()) : Ctx.buffer("_")),
-    PrintedName(getPrintedName(Ctx, VD)), DKind(VD->getKind()),
-    USR(calculateUsr(Ctx, VD)), Location(calculateLocation(Ctx, VD)),
-    ModuleName(VD->getModuleContext()->getName().str()),
-    IsThrowing(isFuncThrowing(VD)), IsMutating(isFuncMutating(VD)),
-    IsStatic(VD->isStatic()), SelfIndex(getSelfIndex(VD)),
-    Ownership(getOwnership(VD)) {
-
-  // Calculate usr for its super class.
-  if (auto *CD = dyn_cast_or_null<ClassDecl>(VD)) {
-    if (auto *Super = CD->getSuperclassDecl())
-      SuperclassUsr = calculateUsr(Ctx, Super);
-  }
-  if (VD->getAttrs().getDeprecated(VD->getASTContext()))
-    DeclAttrs.push_back(SDKDeclAttrKind::DAK_deprecated);
-}
-
-SDKNode *SDKNodeInitInfo::createSDKNode(SDKNodeKind Kind) {
-  switch(Kind) {
-#define NODE_KIND(X)                                                           \
-case SDKNodeKind::X:                                                           \
-  return static_cast<SDKNode*>(new (Ctx.allocator().Allocate<SDKNode##X>())    \
-    SDKNode##X(*this));                                                        \
-  break;
-#include "swift/IDE/DigesterEnums.def"
-  }
-}
-
-// Recursively construct a node that represents a type, for instance,
-// representing the return value type of a function decl.
-static SDKNode *constructTypeNode(SDKContext &Ctx, Type T,
-                                  bool IsImplicitlyUnwrappedOptional =false) {
-  SDKNode* Root = SDKNodeInitInfo(Ctx, T, IsImplicitlyUnwrappedOptional)
-    .createSDKNode(SDKNodeKind::TypeNominal);
-
-  if (auto NAT = dyn_cast<NameAliasType>(T.getPointer())) {
-    SDKNode* Root = SDKNodeInitInfo(Ctx, T).createSDKNode(SDKNodeKind::TypeNameAlias);
-    Root->addChild(constructTypeNode(Ctx, NAT->getCanonicalType()));
-    return Root;
-  }
-
-  if (auto Fun = T->getAs<AnyFunctionType>()) {
-    SDKNode* Root = SDKNodeInitInfo(Ctx, T).createSDKNode(SDKNodeKind::TypeFunc);
-
-    // Still, return type first
-    Root->addChild(constructTypeNode(Ctx, Fun->getResult()));
-    Root->addChild(constructTypeNode(Ctx, Fun->getInput()));
-    return Root;
-  }
-
-  // Keep paren type as a stand-alone level.
-  if (auto *PT = dyn_cast<ParenType>(T.getPointer())) {
-    Root->addChild(constructTypeNode(Ctx, PT->getSinglyDesugaredType()));
-    return Root;
-  }
-
-  // Handle the case where Type has sub-types.
-  if (auto BGT = T->getAs<BoundGenericType>()) {
-    for (auto Arg : BGT->getGenericArgs()) {
-      Root->addChild(constructTypeNode(Ctx, Arg));
-    }
-  } else if (auto Tup = T->getAs<TupleType>()) {
-    for (auto Elt : Tup->getElementTypes())
-      Root->addChild(constructTypeNode(Ctx, Elt));
-  } else if (auto MTT = T->getAs<AnyMetatypeType>()) {
-    Root->addChild(constructTypeNode(Ctx, MTT->getInstanceType()));
-  } else if (auto ATT = T->getAs<ArchetypeType>()) {
-    for (auto Pro : ATT->getConformsTo()) {
-      Root->addChild(constructTypeNode(Ctx, Pro->getDeclaredType()));
-    }
-  }
-  return Root;
-}
-
-// Construct a node for a function decl. The first child of the function decl
-// is guaranteed to be the return value type of this function.
-// We sometimes skip the first parameter because it can be metatype of dynamic
-// this if the function is a member function.
-static SDKNode *constructFunctionNode(SDKContext &Ctx, FuncDecl* FD,
-                                      SDKNodeKind Kind) {
-  auto Func = SDKNodeInitInfo(Ctx, FD).createSDKNode(Kind);
-  bool resultIsImplicitlyUnwrappedOptional = false;
-  if (FD->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
-    resultIsImplicitlyUnwrappedOptional = true;
-  Func->addChild(constructTypeNode(Ctx, FD->getResultInterfaceType(),
-                                   resultIsImplicitlyUnwrappedOptional));
-  for (auto *paramList : FD->getParameterLists()) {
-    for (auto param : *paramList) {
-      bool paramIsImplicitlyUnwrappedOptional = false;
-      if (param->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
-        paramIsImplicitlyUnwrappedOptional = true;
-
-      if (!param->isSelfParameter())
-        Func->addChild(constructTypeNode(Ctx, param->getInterfaceType(),
-                                         paramIsImplicitlyUnwrappedOptional));
-    }
-  }
-  return Func;
-}
-
-static SDKNode* constructInitNode(SDKContext &Ctx, ConstructorDecl *CD) {
-  auto Func = SDKNodeInitInfo(Ctx, CD).createSDKNode(SDKNodeKind::Constructor);
-  Func->addChild(constructTypeNode(Ctx, CD->getResultInterfaceType()));
-  for (auto *paramList : CD->getParameterLists()) {
-    for (auto param : *paramList)
-      Func->addChild(constructTypeNode(Ctx, param->getInterfaceType()));
-  }
-
-  // Always remove the first parameter in init.
-  Func->removeChild(Func->getChildBegin() + 1);
-  return Func;
-}
-
-static bool shouldIgnore(Decl *D) {
-  if (D->isPrivateStdlibDecl(false))
-    return true;
-  if (AvailableAttr::isUnavailable(D))
-    return true;
-  if (isa<ConstructorDecl>(D))
-    return false;
-  if (isa<OperatorDecl>(D))
-    return true;
-  if (auto VD = dyn_cast<ValueDecl>(D)) {
-    if (VD->isOperator())
-      return true;
-    if (VD->getBaseName().empty())
-      return true;
-    // This shouldn't happen, being forgiving here.
-    if (!VD->hasAccess())
-      return true;
-    switch (VD->getFormalAccess()) {
-    case AccessLevel::Internal:
-    case AccessLevel::Private:
-    case AccessLevel::FilePrivate:
-      return true;
-    case AccessLevel::Public:
-    case AccessLevel::Open:
-      break;
-    }
-  }
-
-  if (auto *ClangD = D->getClangDecl()) {
-    if (isa<clang::ObjCIvarDecl>(ClangD))
-      return true;
-    if (isa<clang::FieldDecl>(ClangD))
-      return true;
-    if (ClangD->hasAttr<clang::SwiftPrivateAttr>())
-      return true;
-  }
-  return false;
-}
-
-static void addMembersToRoot(SDKContext &Ctx, SDKNode *Root,
-                             IterableDeclContext *Context);
-
-static SDKNode *constructTypeDeclNode(SDKContext &Ctx, NominalTypeDecl *NTD) {
-  auto TypeNode = SDKNodeInitInfo(Ctx, NTD).createSDKNode(SDKNodeKind::TypeDecl);
-  addMembersToRoot(Ctx, TypeNode, NTD);
-  for (auto Ext : NTD->getExtensions()) {
-    addMembersToRoot(Ctx, TypeNode, Ext);
-  }
-  return TypeNode;
-}
-
-static SDKNode *constructVarNode(SDKContext &Ctx, ValueDecl *VD) {
-  auto Var = SDKNodeInitInfo(Ctx, VD).createSDKNode(SDKNodeKind::Var);
-  auto isImplicitlyUnwrappedOptional = false;
-  if (VD->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
-    isImplicitlyUnwrappedOptional = true;
-  Var->addChild(constructTypeNode(Ctx, VD->getInterfaceType(),
-                                  isImplicitlyUnwrappedOptional));
-  if (auto VAD = dyn_cast<AbstractStorageDecl>(VD)) {
-    if (auto Getter = VAD->getGetter())
-      Var->addChild(constructFunctionNode(Ctx, Getter, SDKNodeKind::Getter));
-    if (auto Setter = VAD->getSetter())
-      Var->addChild(constructFunctionNode(Ctx, Setter, SDKNodeKind::Setter));
-  }
-  return Var;
-}
-
-static SDKNode *constructTypeAliasNode(SDKContext &Ctx,TypeAliasDecl *TAD) {
-  auto Alias = SDKNodeInitInfo(Ctx, TAD).createSDKNode(SDKNodeKind::TypeAlias);
-  Alias->addChild(constructTypeNode(Ctx, TAD->getUnderlyingTypeLoc().getType()));
-  return Alias;
-}
-
-static void addMembersToRoot(SDKContext &Ctx, SDKNode *Root,
-                             IterableDeclContext *Context) {
-  for (auto *Member : Context->getMembers()) {
-    if (shouldIgnore(Member))
-      continue;
-    if (auto Func = dyn_cast<FuncDecl>(Member)) {
-      Root->addChild(constructFunctionNode(Ctx, Func, SDKNodeKind::Function));
-    } else if (auto CD = dyn_cast<ConstructorDecl>(Member)) {
-      Root->addChild(constructInitNode(Ctx, CD));
-    } else if (auto VD = dyn_cast<VarDecl>(Member)) {
-      Root->addChild(constructVarNode(Ctx, VD));
-    } else if (auto TAD = dyn_cast<TypeAliasDecl>(Member)) {
-      Root->addChild(constructTypeAliasNode(Ctx, TAD));
-    } else if (auto EED = dyn_cast<EnumElementDecl>(Member)) {
-      Root->addChild(constructVarNode(Ctx, EED));
-    } else if (auto NTD = dyn_cast<NominalTypeDecl>(Member)) {
-      Root->addChild(constructTypeDeclNode(Ctx, NTD));
-    }
-  }
-}
-
-static void emitSDKNodeRoot(raw_ostream&, SDKNode *&);
-
-static std::pair<std::unique_ptr<llvm::MemoryBuffer>, SDKNode *>
-parseJsonEmit(SDKContext &Ctx, StringRef);
-
-class SwiftDeclCollector : public VisibleDeclConsumer {
-  SDKContext &Ctx;
-  std::vector<std::unique_ptr<llvm::MemoryBuffer>> OwnedBuffers;
-  SDKNode *RootNode;
-  llvm::DenseSet<ValueDecl*> KnownDecls;
-  // Collected and sorted after we get all of them.
-  std::vector<ValueDecl *> ClangMacros;
-
-public:
-  void visitAllRoots(SDKNodeVisitor &Visitor) {
-    SDKNode::preorderVisit(RootNode, Visitor);
-  }
-  SwiftDeclCollector(SDKContext &Ctx) : Ctx(Ctx),
-    RootNode(SDKNodeRoot::getInstance(Ctx)) {}
-
-  // Construct all roots vector from a given file where a forest was
-  // previously dumped.
-  void deSerialize(StringRef Filename) {
-    auto Pair = parseJsonEmit(Ctx, Filename);
-    OwnedBuffers.push_back(std::move(Pair.first));
-    RootNode = std::move(Pair.second);
-  }
-
-  // Serialize the content of all roots to a given file using JSON format.
-  void serialize(StringRef Filename) {
-    std::error_code EC;
-    llvm::raw_fd_ostream fs(Filename, EC, llvm::sys::fs::F_None);
-    emitSDKNodeRoot(fs, RootNode);
-  }
-
-  // After collecting decls, either from imported modules or from a previously
-  // serialized JSON file, using this function to get the root of the SDK.
-  NodePtr getSDKRoot() {
-    return RootNode;
-  }
-
-  void printTopLevelNames() {
-    for (auto &Node : RootNode->getChildren()) {
-      llvm::outs() << Node->getKind() << ": " << Node->getName() << '\n';
-    }
-  }
-
-public:
-  void lookupVisibleDecls(ArrayRef<ModuleDecl *> Modules) {
-    for (auto M : Modules) {
-      llvm::SmallVector<Decl*, 512> Decls;
-      M->getDisplayDecls(Decls);
-      for (auto D : Decls) {
-        if (auto VD = dyn_cast<ValueDecl>(D))
-          foundDecl(VD, DeclVisibilityKind::DynamicLookup);
-      }
-    }
-
-    // Now sort the macros before processing so that we can have deterministic
-    // output.
-    llvm::array_pod_sort(ClangMacros.begin(), ClangMacros.end(),
-       [](ValueDecl * const *lhs,
-          ValueDecl * const *rhs) -> int {
-         return (*lhs)->getBaseName().userFacingName().compare(
-                  (*rhs)->getBaseName().userFacingName());
-       });
-
-    for (auto *VD : ClangMacros)
-      processDecl(VD);
-  }
-
-  void processDecl(ValueDecl *VD) {
-    if (shouldIgnore(VD))
-      return;
-
-    if (auto FD = dyn_cast<FuncDecl>(VD)) {
-      RootNode->addChild(constructFunctionNode(Ctx, FD, SDKNodeKind::Function));
-    } else if (auto NTD = dyn_cast<NominalTypeDecl>(VD)) {
-      RootNode->addChild(constructTypeDeclNode(Ctx, NTD));
-    }
-    if (auto VAD = dyn_cast<VarDecl>(VD)) {
-      RootNode->addChild(constructVarNode(Ctx, VAD));
-    }
-    if (auto TAD = dyn_cast<TypeAliasDecl>(VD)) {
-      RootNode->addChild(constructTypeAliasNode(Ctx, TAD));
-    }
-  }
-
-  void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
-    if (KnownDecls.count(VD))
-      return;
-    KnownDecls.insert(VD);
-
-    if (VD->getClangMacro()) {
-      // Collect macros, we will sort them afterwards.
-      ClangMacros.push_back(VD);
-      return;
-    }
-
-    processDecl(VD);
-  }
-};
-} // end anonymous namespace
-
-
-namespace swift {
-  namespace json {
-  // In the namespace of swift::json, we define several functions so that the
-  // JSON serializer will know how to interpret and dump types defined in this
-  // file.
-    template<>
-    struct ScalarEnumerationTraits<TypeAttrKind> {
-      static void enumeration(Output &out, TypeAttrKind &value) {
-#define TYPE_ATTR(X) out.enumCase(value, #X, TypeAttrKind::TAK_##X);
-#include "swift/AST/Attr.def"
-        out.enumCase(value, "Count", TypeAttrKind::TAK_Count);
-      }
-    };
-
-    template<>
-    struct ScalarEnumerationTraits<SDKDeclAttrKind> {
-      static void enumeration(Output &out, SDKDeclAttrKind &value) {
-#define DECL_ATTR(X) out.enumCase(value, #X, SDKDeclAttrKind::DAK_##X);
-#include "swift/IDE/DigesterEnums.def"
-      }
-    };
-
-    template<>
-    struct ScalarEnumerationTraits<DeclKind> {
-      static void enumeration(Output &out, DeclKind &value) {
-#define DECL(X, PARENT) out.enumCase(value, #X, DeclKind::X);
-#include "swift/AST/DeclNodes.def"
-      }
-    };
-
-    template<>
-    struct ObjectTraits<SDKNode *> {
-      static void mapping(Output &out, SDKNode *&value) {
-        auto Kind = value->getKind();
-        auto Name = value->getName();
-        auto PrintedName = value->getPrintedName();
-        auto &Ctx = value->getSDKContext();
-        out.mapRequired(getKeyContent(Ctx, KeyKind::KK_kind).data(), Kind);
-        out.mapRequired(getKeyContent(Ctx, KeyKind::KK_name).data(), Name);
-        out.mapRequired(getKeyContent(Ctx, KeyKind::KK_printedName).data(),
-                        PrintedName);
-
-        if (auto D = dyn_cast<SDKNodeDecl>(value)) {
-          DeclKind DK = D->getDeclKind();
-          StringRef Usr = D->getUsr();
-          StringRef Location = D->getLocation();
-          StringRef ModuleName = D->getModuleName();
-
-          out.mapRequired(getKeyContent(Ctx, KeyKind::KK_declKind).data(), DK);
-          out.mapRequired(getKeyContent(Ctx, KeyKind::KK_usr).data(), Usr);
-          out.mapRequired(getKeyContent(Ctx, KeyKind::KK_location).data(), Location);
-          out.mapRequired(getKeyContent(Ctx, KeyKind::KK_moduleName).data(),
-                          ModuleName);
-          if (auto isStatic = D->isStatic())
-            out.mapRequired(getKeyContent(Ctx, KeyKind::KK_static).data(), isStatic);
-
-          if (auto F = dyn_cast<SDKNodeAbstractFunc>(value)) {
-            if (bool isThrowing = F->isThrowing())
-              out.mapRequired(getKeyContent(Ctx, KeyKind::KK_throwing).data(),
-                              isThrowing);
-            if (bool isMutating = F->isMutating())
-              out.mapRequired(getKeyContent(Ctx, KeyKind::KK_mutating).data(),
-                              isMutating);
-            if (F->hasSelfIndex()) {
-              auto Index = F->getSelfIndex();
-              out.mapRequired(getKeyContent(Ctx, KeyKind::KK_selfIndex).data(),
-                              Index);
-            }
-          }
-          if (auto *TD = dyn_cast<SDKNodeTypeDecl>(value)) {
-            auto Super = TD->getSuperClassUsr();
-            if (!Super.empty()) {
-              out.mapRequired(getKeyContent(Ctx, KeyKind::KK_superclassUsr).data(),
-                              Super);
-            }
-          }
-          auto Attributes = D->getDeclAttributes();
-          if (!Attributes.empty())
-            out.mapRequired(getKeyContent(Ctx, KeyKind::KK_declAttributes).data(),
-                            Attributes);
-          // Strong reference is implied, no need for serialization.
-          if (D->getOwnership() != Ownership::Strong) {
-            uint8_t Raw = uint8_t(D->getOwnership());
-            out.mapRequired(getKeyContent(Ctx, KeyKind::KK_ownership).data(), Raw);
-          }
-        } else if (auto T = dyn_cast<SDKNodeType>(value)) {
-          auto Attributes = T->getTypeAttributes();
-          if (!Attributes.empty())
-            out.mapRequired(getKeyContent(Ctx, KeyKind::KK_typeAttributes).data(),
-                            Attributes);
-        }
-        if (!value->isLeaf()) {
-          ArrayRef<SDKNode *> Children = value->getChildren();
-          out.mapRequired(getKeyContent(Ctx, KeyKind::KK_children).data(), Children);
-        }
-      }
-    };
-
-    template<>
-    struct ArrayTraits<ArrayRef<SDKNode*>> {
-      static size_t size(Output &out, ArrayRef<SDKNode *> &seq) {
-        return seq.size();
-      }
-      static SDKNode *&element(Output &, ArrayRef<SDKNode *> &seq,
-                                    size_t index) {
-        return const_cast<SDKNode *&>(seq[index]);
-      }
-    };
-
-    template<>
-    struct ArrayTraits<ArrayRef<TypeAttrKind>> {
-      static size_t size(Output &out, ArrayRef<TypeAttrKind> &seq) {
-        return seq.size();
-      }
-      static TypeAttrKind& element(Output &, ArrayRef<TypeAttrKind> &seq,
-                                   size_t index) {
-        return const_cast<TypeAttrKind&>(seq[index]);
-      }
-    };
-
-    template<>
-    struct ArrayTraits<ArrayRef<SDKDeclAttrKind>> {
-      static size_t size(Output &out, ArrayRef<SDKDeclAttrKind> &seq) {
-        return seq.size();
-      }
-      static SDKDeclAttrKind& element(Output &, ArrayRef<SDKDeclAttrKind> &seq,
-                                   size_t index) {
-        return const_cast<SDKDeclAttrKind&>(seq[index]);
-      }
-    };
-  } // namespace json
-} // namespace swift
-
-namespace  {// Anonymous namespace resumes.
-
-// Serialize a forest of SDKNode trees to the given stream.
-static void emitSDKNodeRoot(llvm::raw_ostream &os, SDKNode *&Root) {
-  json::Output yout(os);
-  yout << Root;
-}
-
-// Deserialize an SDKNode tree.
-std::pair<std::unique_ptr<llvm::MemoryBuffer>, SDKNode*>
-parseJsonEmit(SDKContext &Ctx, StringRef FileName) {
-  namespace yaml = llvm::yaml;
-
-  // Load the input file.
-  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
-  llvm::MemoryBuffer::getFileOrSTDIN(FileName);
-  if (!FileBufOrErr) {
-    llvm_unreachable("Failed to read JSON file");
-  }
-  StringRef Buffer = FileBufOrErr->get()->getBuffer();
-  llvm::SourceMgr SM;
-  yaml::Stream Stream(Buffer, SM);
-  SDKNode *Result = nullptr;
-  for (auto DI = Stream.begin(); DI != Stream.end(); ++ DI) {
-    assert(DI != Stream.end() && "Failed to read a document");
-    yaml::Node *N = DI->getRoot();
-    assert(N && "Failed to find a root");
-    Result = SDKNode::constructSDKNode(Ctx, cast<yaml::MappingNode>(N));
-  }
-  return {std::move(FileBufOrErr.get()), Result};
+static
+void singleMatch(SDKNode* Left, SDKNode *Right, MatchedNodeListener &Listener) {
+
+  // Both null, be forgiving.
+  if (!Left && !Right)
+    return;
+  // If both are valid and identical to each other, we don't need to match them.
+  if (Left && Right && *Left == *Right)
+    return;
+  if (!Left || !Right)
+    Listener.foundMatch(Left, Right,
+                        Left ? NodeMatchReason::Removed : NodeMatchReason::Added);
+  else
+    Listener.foundMatch(Left, Right, NodeMatchReason::Sequential);
 }
 
 // Given two NodeVector, this matches SDKNode by the order of their appearance
@@ -1675,15 +279,11 @@ public:
     for (unsigned long i = 0; i < std::max(Left.size(), Right.size()); i ++) {
       auto L = i < Left.size() ? Left[i] : nullptr;
       auto R = i < Right.size() ? Right[i] : nullptr;
-      if (L && R && *L == *R)
-        continue;
-      if (!L || !R)
-        Listener.foundRemoveAddMatch(L, R);
-      else
-        Listener.foundMatch(L, R);
+      singleMatch(L, R, Listener);
     }
   }
 };
+
 struct NodeMatch {
   NodePtr Left;
   NodePtr Right;
@@ -1694,6 +294,7 @@ class BestMatchMatcher : public NodeMatcher {
   NodeVector &Right;
   llvm::function_ref<bool(NodePtr, NodePtr)> CanMatch;
   llvm::function_ref<bool(NodeMatch, NodeMatch)> IsFirstMatchBetter;
+  NodeMatchReason Reason;
   MatchedNodeListener &Listener;
   llvm::SmallPtrSet<NodePtr, 16> MatchedRight;
 
@@ -1717,16 +318,17 @@ public:
   BestMatchMatcher(NodeVector &Left, NodeVector &Right,
                    llvm::function_ref<bool(NodePtr, NodePtr)> CanMatch,
                    llvm::function_ref<bool(NodeMatch, NodeMatch)> IsFirstMatchBetter,
+                   NodeMatchReason Reason,
                    MatchedNodeListener &Listener) : Left(Left), Right(Right),
   CanMatch(CanMatch),
-  IsFirstMatchBetter(IsFirstMatchBetter),
+  IsFirstMatchBetter(IsFirstMatchBetter), Reason(Reason),
   Listener(Listener){}
 
   void match() override {
     for (auto L : Left) {
       if (auto Best = findBestMatch(L, Right)) {
         MatchedRight.insert(Best.getValue());
-        Listener.foundMatch(L, Best.getValue());
+        Listener.foundMatch(L, Best.getValue(), Reason);
       }
     }
   }
@@ -1745,15 +347,15 @@ class RemovedAddedNodeMatcher : public NodeMatcher, public MatchedNodeListener {
       if (contains(Matched, A))
         continue;
       if (Left)
-        Listener.foundRemoveAddMatch(A, nullptr);
+        Listener.foundMatch(A, nullptr, NodeMatchReason::Removed);
       else
-        Listener.foundRemoveAddMatch(nullptr, A);
+        Listener.foundMatch(nullptr, A, NodeMatchReason::Added);
     }
   }
 
   bool detectFuncToProperty(SDKNode *R, SDKNode *A) {
-    if (R->getKind() == SDKNodeKind::Function) {
-      if (A->getKind() == SDKNodeKind::Var) {
+    if (R->getKind() == SDKNodeKind::DeclFunction) {
+      if (A->getKind() == SDKNodeKind::DeclVar) {
         if (A->getName().compare_lower(R->getName()) == 0) {
           R->annotate(NodeAnnotation::GetterToProperty);
         } else if (R->getName().startswith("get") &&
@@ -1765,9 +367,8 @@ class RemovedAddedNodeMatcher : public NodeMatcher, public MatchedNodeListener {
         } else {
           return false;
         }
-        R->annotate(NodeAnnotation::PropertyName);
-        R->addAnnotateComment(NodeAnnotation::PropertyName, A->getPrintedName());
-        foundMatch(R, A);
+        R->annotate(NodeAnnotation::PropertyName, A->getPrintedName());
+        foundMatch(R, A, NodeMatchReason::FuncToProperty);
         return true;
       }
     }
@@ -1775,12 +376,12 @@ class RemovedAddedNodeMatcher : public NodeMatcher, public MatchedNodeListener {
   }
 
   static bool isAnonymousEnum(SDKNodeDecl *N) {
-    return N->getKind() == SDKNodeKind::Var &&
+    return N->getKind() == SDKNodeKind::DeclVar &&
       N->getUsr().startswith("c:@Ea@");
   }
 
   static bool isNominalEnum(SDKNodeDecl *N) {
-    return N->getKind() == SDKNodeKind::TypeDecl &&
+    return N->getKind() == SDKNodeKind::DeclType &&
     N->getUsr().startswith("c:@E@");
   }
 
@@ -1789,6 +390,18 @@ class RemovedAddedNodeMatcher : public NodeMatcher, public MatchedNodeListener {
     if (LastPartIndex == StringRef::npos)
       return None;
     return N->getUsr().substr(LastPartIndex + 1);
+  }
+
+  bool detectTypeAliasChange(SDKNodeDecl *R, SDKNodeDecl *A) {
+    if (R->getPrintedName() != A->getPrintedName())
+      return false;
+    if (R->getKind() == SDKNodeKind::DeclType &&
+        A->getKind() == SDKNodeKind::DeclTypeAlias) {
+      foundMatch(R, A, NodeMatchReason::TypeToTypeAlias);
+      return true;
+    } else {
+      return false;
+    }
   }
 
   bool detectModernizeEnum(SDKNodeDecl *R, SDKNodeDecl *A) {
@@ -1800,15 +413,14 @@ class RemovedAddedNodeMatcher : public NodeMatcher, public MatchedNodeListener {
       return false;
 
     for (auto Child : A->getChildren()) {
-      if (auto VC = dyn_cast<SDKNodeVar>(Child)) {
+      if (auto VC = dyn_cast<SDKNodeDeclVar>(Child)) {
       auto LastPartOfA = getLastPartOfUsr(VC);
         if (LastPartOfA && LastPartOfR.getValue() == LastPartOfA.getValue()) {
-          R->annotate(NodeAnnotation::ModernizeEnum);
           std::string FullName = (llvm::Twine(A->getName()) + "." +
             Child->getName()).str();
-          R->addAnnotateComment(NodeAnnotation::ModernizeEnum,
-                                R->getSDKContext().buffer(FullName));
-          foundMatch(R, A);
+          R->annotate(NodeAnnotation::ModernizeEnum,
+                      R->getSDKContext().buffer(FullName));
+          foundMatch(R, A, NodeMatchReason::ModernizeEnum);
           return true;
         }
       }
@@ -1822,7 +434,7 @@ class RemovedAddedNodeMatcher : public NodeMatcher, public MatchedNodeListener {
     auto LastR = getLastPartOfUsr(R);
     auto LastA = getLastPartOfUsr(A);
     if (LastR && LastA && LastR.getValue() == LastA.getValue()) {
-      foundMatch(R, A);
+      foundMatch(R, A, NodeMatchReason::Name);
       return true;
     }
     return false;
@@ -1863,7 +475,7 @@ class RemovedAddedNodeMatcher : public NodeMatcher, public MatchedNodeListener {
   static bool isRename(NodePtr L, NodePtr R) {
     if (L->getKind() != R->getKind())
       return false;
-    if (isa<SDKNodeConstructor>(L))
+    if (isa<SDKNodeDeclConstructor>(L))
       return false;
     if (auto LD = dyn_cast<SDKNodeDecl>(L)) {
       auto *RD = R->getAs<SDKNodeDecl>();
@@ -1900,8 +512,8 @@ class RemovedAddedNodeMatcher : public NodeMatcher, public MatchedNodeListener {
 #undef DIST
   }
 
-  void foundMatch(NodePtr R, NodePtr A) override {
-    Listener.foundRemoveAddMatch(R, A);
+  void foundMatch(NodePtr R, NodePtr A, NodeMatchReason Reason) override {
+    Listener.foundMatch(R, A, Reason);
     RemovedMatched.push_back(R);
     AddedMatched.push_back(A);
   }
@@ -1918,7 +530,7 @@ public:
         auto RD = R->getAs<SDKNodeDecl>();
         auto AD = A->getAs<SDKNodeDecl>();
         if (detectFuncToProperty(RD, AD) || detectModernizeEnum(RD, AD) ||
-            detectSameAnonymousEnum(RD, AD)) {
+            detectSameAnonymousEnum(RD, AD) || detectTypeAliasChange(RD, AD)) {
           break;
         }
       }
@@ -1927,7 +539,6 @@ public:
     // Rename detection starts.
     NodeVector RenameLeft;
     NodeVector RenameRight;
-
 
     for (auto Remain : Removed) {
       if (!contains(RemovedMatched, Remain))
@@ -1940,7 +551,7 @@ public:
     }
 
     BestMatchMatcher RenameMatcher(RenameLeft, RenameRight, isRename,
-                                   isBetterMatch, *this);
+                                   isBetterMatch, NodeMatchReason::Name, *this);
     RenameMatcher.match();
     // Rename detection ends.
 
@@ -1963,15 +574,20 @@ class SameNameNodeMatcher : public NodeMatcher {
     PrintedNameAndUSR,
   };
 
+  static bool isUSRSame(SDKNode *L, SDKNode *R) {
+    auto *LD = dyn_cast<SDKNodeDecl>(L);
+    auto *RD = dyn_cast<SDKNodeDecl>(R);
+    if (!LD || !RD)
+      return false;
+    return LD->getUsr() == RD->getUsr();
+  }
+
   // Given two SDK nodes, figure out the reason for why they have the same name.
   Optional<NameMatchKind> getNameMatchKind(SDKNode *L, SDKNode *R) {
     if (L->getKind() != R->getKind())
       return None;
-    auto *LD = L->getAs<SDKNodeDecl>();
-    auto *RD = R->getAs<SDKNodeDecl>();
-    assert(LD && RD);
-    auto NameEqual = LD->getPrintedName() == RD->getPrintedName();
-    auto UsrEqual = LD->getUsr() == RD->getUsr();
+    auto NameEqual = L->getPrintedName() == R->getPrintedName();
+    auto UsrEqual = isUSRSame(L, R);
     if (NameEqual && UsrEqual)
       return NameMatchKind::PrintedNameAndUSR;
     else if (NameEqual)
@@ -1990,7 +606,7 @@ class SameNameNodeMatcher : public NodeMatcher {
   // Get the priority for the favored name match kind. Favored name match kind
   // locats before less favored ones.
   ArrayRef<NameMatchKind> getNameMatchKindPriority(SDKNodeKind Kind) {
-    if (Kind == SDKNodeKind::Function) {
+    if (Kind == SDKNodeKind::DeclFunction) {
       static NameMatchKind FuncPriority[] = { NameMatchKind::PrintedNameAndUSR,
                                               NameMatchKind::USR,
                                               NameMatchKind::PrintedName };
@@ -2044,7 +660,7 @@ void SameNameNodeMatcher::match() {
     // match kind list.
     if (auto Match = findBestNameMatch(Candidates,
                                     getNameMatchKindPriority(LN->getKind()))) {
-      Listener.foundMatch(LN, Match);
+      Listener.foundMatch(LN, Match, NodeMatchReason::Name);
       MatchedRight.push_back(Match);
     } else {
       Removed.push_back(LN);
@@ -2067,7 +683,7 @@ class SequentialRecursiveMatcher : public NodeMatcher {
   MatchedNodeListener &Listener;
 
   void matchInternal(NodePtr L, NodePtr R) {
-    Listener.foundMatch(L, R);
+    Listener.foundMatch(L, R, NodeMatchReason::Sequential);
     if (!L || !R)
       return;
     for (unsigned I = 0; I < std::max(L->getChildrenCount(),
@@ -2095,88 +711,400 @@ public:
   virtual ~SDKTreeDiffPass() {}
 };
 
-static void detectFuncDeclChange(NodePtr L, NodePtr R) {
-  assert(L->getKind() == R->getKind());
-  if (auto LF = dyn_cast<SDKNodeAbstractFunc>(L)) {
-    auto RF = R->getAs<SDKNodeAbstractFunc>();
-    if (!LF->isThrowing() && RF->isThrowing()) {
-      LF->annotate(NodeAnnotation::NowThrowing);
-    }
-    if (!LF->isMutating() && RF->isMutating()) {
-      LF->annotate(NodeAnnotation::NowMutating);
-    }
-  }
-}
-
-static void detectRename(NodePtr L, NodePtr R) {
-  assert(L->getKind() == R->getKind());
-  if (isa<SDKNodeDecl>(L) && L->getPrintedName() != R->getPrintedName()) {
+static void detectRename(SDKNode *L, SDKNode *R) {
+  if (L->getKind() == R->getKind() && isa<SDKNodeDecl>(L) &&
+      L->getPrintedName() != R->getPrintedName()) {
     L->annotate(NodeAnnotation::Rename);
-    L->annotate(NodeAnnotation::RenameOldName);
-    L->addAnnotateComment(NodeAnnotation::RenameOldName, L->getPrintedName());
-    L->annotate(NodeAnnotation::RenameNewName);
-    L->addAnnotateComment(NodeAnnotation::RenameNewName, R->getPrintedName());
+    L->annotate(NodeAnnotation::RenameOldName, L->getPrintedName());
+    L->annotate(NodeAnnotation::RenameNewName, R->getPrintedName());
   }
 }
 
-static void detectDeclChange(NodePtr L, NodePtr R) {
-  assert(L->getKind() == R->getKind());
-  if (auto LD = dyn_cast<SDKNodeDecl>(L)) {
-    auto *RD = R->getAs<SDKNodeDecl>();
-    if (LD->isStatic() ^ RD->isStatic())
-      L->annotate(NodeAnnotation::StaticChange);
-    if (LD->getOwnership() != RD->getOwnership())
-      L->annotate(NodeAnnotation::OwnershipChange);
-    detectRename(L, R);
+static bool isOwnershipEquivalent(ReferenceOwnership Left,
+                                  ReferenceOwnership Right) {
+  if (Left == Right)
+    return true;
+  if (Left == ReferenceOwnership::Unowned && Right == ReferenceOwnership::Weak)
+    return true;
+  if (Left == ReferenceOwnership::Weak && Right == ReferenceOwnership::Unowned)
+    return true;
+  return false;
+}
+}// End of anonymous namespace
+
+void swift::ide::api::SDKNodeDeclType::diagnose(SDKNode *Right) {
+  SDKNodeDecl::diagnose(Right);
+  auto *R = dyn_cast<SDKNodeDeclType>(Right);
+  if (!R)
+    return;
+
+  if (getDeclKind() != R->getDeclKind()) {
+    emitDiag(diag::decl_kind_changed, getDeclKindStr(R->getDeclKind()));
+    return;
+  }
+
+  assert(getDeclKind() == R->getDeclKind());
+  auto DKind = getDeclKind();
+  switch (DKind) {
+  case DeclKind::Class: {
+    auto LSuperClass = getSuperClassName();
+    auto RSuperClass = R->getSuperClassName();
+    if (!LSuperClass.empty() && LSuperClass != RSuperClass) {
+      if (RSuperClass.empty()) {
+        emitDiag(diag::super_class_removed, LSuperClass);
+      } else if (!contains(R->getClassInheritanceChain(), LSuperClass)) {
+        emitDiag(diag::super_class_changed, LSuperClass, RSuperClass);
+      }
+    }
+    break;
+  }
+  default:
+    break;
   }
 }
 
+void swift::ide::api::SDKNodeDeclAbstractFunc::diagnose(SDKNode *Right) {
+  SDKNodeDecl::diagnose(Right);
+  auto *R = dyn_cast<SDKNodeDeclAbstractFunc>(Right);
+  if (!R)
+    return;
+
+  if (!isThrowing() && R->isThrowing()) {
+    emitDiag(diag::decl_new_attr, Ctx.buffer("throwing"));
+  }
+  if (Ctx.checkingABI()) {
+    if (reqNewWitnessTableEntry() != R->reqNewWitnessTableEntry()) {
+      emitDiag(diag::decl_new_witness_table_entry, reqNewWitnessTableEntry());
+    }
+  }
+}
+
+void swift::ide::api::SDKNodeDeclFunction::diagnose(SDKNode *Right) {
+  SDKNodeDeclAbstractFunc::diagnose(Right);
+  auto *R = dyn_cast<SDKNodeDeclFunction>(Right);
+  if (!R)
+    return;
+  if (getSelfAccessKind() != R->getSelfAccessKind()) {
+    emitDiag(diag::func_self_access_change, getSelfAccessKind(),
+             R->getSelfAccessKind());
+  }
+  if (Ctx.checkingABI()) {
+    if (hasFixedBinaryOrder() != R->hasFixedBinaryOrder()) {
+      emitDiag(diag::func_has_fixed_order_change, hasFixedBinaryOrder());
+    }
+  }
+}
+
+void swift::ide::api::SDKNodeDecl::diagnose(SDKNode *Right) {
+  SDKNode::diagnose(Right);
+  auto *RD = dyn_cast<SDKNodeDecl>(Right);
+  if (!RD)
+    return;
+  detectRename(this, RD);
+  if (isOpen() && !RD->isOpen()) {
+    emitDiag(diag::no_longer_open);
+  }
+
+  // Diagnose static attribute change.
+  if (isStatic() ^ RD->isStatic()) {
+    emitDiag(diag::decl_new_attr, Ctx.buffer(isStatic() ? "not static" :
+                                             "static"));
+  }
+
+  // Diagnose ownership change.
+  if (!isOwnershipEquivalent(getReferenceOwnership(),
+                             RD->getReferenceOwnership())) {
+    auto getOwnershipDescription = [&](swift::ReferenceOwnership O) {
+      if (O == ReferenceOwnership::Strong)
+        return Ctx.buffer("strong");
+      return keywordOf(O);
+    };
+    emitDiag(diag::decl_attr_change,
+             getOwnershipDescription(getReferenceOwnership()),
+             getOwnershipDescription(RD->getReferenceOwnership()));
+  }
+  // Diagnose generic signature change
+  if (getGenericSignature() != RD->getGenericSignature()) {
+    emitDiag(diag::generic_sig_change,
+             getGenericSignature(), RD->getGenericSignature());
+  }
+  if (isOptional() != RD->isOptional()) {
+    if (Ctx.checkingABI()) {
+      // Both adding/removing optional is ABI-breaking.
+      emitDiag(diag::optional_req_changed, isOptional());
+    } else if (isOptional()) {
+      // Removing optional is source-breaking.
+      emitDiag(diag::optional_req_changed, isOptional());
+    }
+  }
+
+  // Check if some attributes with ABI/API-impact have been added/removed.
+  for (auto &Info: Ctx.getBreakingAttributeInfo()) {
+    if (hasDeclAttribute(Info.Kind) != RD->hasDeclAttribute(Info.Kind)) {
+      auto Desc = hasDeclAttribute(Info.Kind) ?
+      Ctx.buffer((llvm::Twine("without ") + Info.Content).str()):
+      Ctx.buffer((llvm::Twine("with ") + Info.Content).str());
+      emitDiag(diag::decl_new_attr, Desc);
+    }
+  }
+
+  if (Ctx.checkingABI()) {
+    if (hasFixedBinaryOrder() && RD->hasFixedBinaryOrder() &&
+        getFixedBinaryOrder() != RD->getFixedBinaryOrder()) {
+      emitDiag(diag::decl_reorder, getFixedBinaryOrder(),
+               RD->getFixedBinaryOrder());
+    }
+  }
+}
+
+void swift::ide::api::SDKNodeDeclOperator::diagnose(SDKNode *Right) {
+  SDKNodeDecl::diagnose(Right);
+  auto *RO = dyn_cast<SDKNodeDeclOperator>(Right);
+  if (!RO)
+    return;
+  if (getDeclKind() != RO->getDeclKind()) {
+    emitDiag(diag::decl_kind_changed, getDeclKindStr(RO->getDeclKind()));
+  }
+}
+
+void swift::ide::api::SDKNodeDeclVar::diagnose(SDKNode *Right) {
+  SDKNodeDecl::diagnose(Right);
+  auto *RV = dyn_cast<SDKNodeDeclVar>(Right);
+  if (!RV)
+    return;
+  if (Ctx.checkingABI()) {
+    if (hasFixedBinaryOrder() != RV->hasFixedBinaryOrder()) {
+      emitDiag(diag::var_has_fixed_order_change, hasFixedBinaryOrder());
+    }
+    if (isLet() != RV->isLet()) {
+      emitDiag(diag::var_let_changed, isLet());
+    }
+  }
+}
+
+static bool shouldDiagnoseType(SDKNodeType *T) {
+  return T->isTopLevelType();
+}
+
+void swift::ide::api::SDKNodeType::diagnose(SDKNode *Right) {
+  SDKNode::diagnose(Right);
+  auto *RT = dyn_cast<SDKNodeType>(Right);
+  if (!RT || !shouldDiagnoseType(this))
+    return;
+  assert(isTopLevelType());
+
+  // Diagnose type witness changes when diagnosing ABI breakages.
+  if (auto *Wit = dyn_cast<SDKNodeTypeWitness>(getParent())) {
+    auto *Conform = Wit->getParent()->getAs<SDKNodeConformance>();
+    if (Ctx.checkingABI() && getPrintedName() != RT->getPrintedName()) {
+      Conform->getNominalTypeDecl()->emitDiag(diag::type_witness_change,
+                                              Wit->getWitnessedTypeName(),
+                                              getPrintedName(),
+                                              RT->getPrintedName());
+    }
+    return;
+  }
+
+  StringRef Descriptor = getTypeRoleDescription();
+  assert(isa<SDKNodeDecl>(getParent()));
+  auto LParent = cast<SDKNodeDecl>(getParent());
+  assert(LParent->getKind() == RT->getParent()->getAs<SDKNodeDecl>()->getKind());
+
+  if (getPrintedName() != RT->getPrintedName()) {
+    LParent->emitDiag(diag::decl_type_change,
+                      Descriptor, getPrintedName(), RT->getPrintedName());
+  }
+
+  if (hasDefaultArgument() && !RT->hasDefaultArgument()) {
+    LParent->emitDiag(diag::default_arg_removed, Descriptor);
+  }
+  if (getParamValueOwnership() != RT->getParamValueOwnership()) {
+    getParent()->getAs<SDKNodeDecl>()->emitDiag(diag::param_ownership_change,
+                                                getTypeRoleDescription(),
+                                                getParamValueOwnership(),
+                                                RT->getParamValueOwnership());
+  }
+}
+
+void swift::ide::api::SDKNodeTypeFunc::diagnose(SDKNode *Right) {
+  SDKNode::diagnose(Right);
+  auto *RT = dyn_cast<SDKNodeTypeFunc>(Right);
+  if (!RT || !shouldDiagnoseType(this))
+    return;
+  assert(isTopLevelType());
+  if (Ctx.checkingABI() && isEscaping() != RT->isEscaping()) {
+    getParent()->getAs<SDKNodeDecl>()->emitDiag(diag::func_type_escaping_changed,
+                                                getTypeRoleDescription(),
+                                                isEscaping());
+  }
+}
+
+namespace {
 // This is first pass on two given SDKNode trees. This pass removes the common part
 // of two versions of SDK, leaving only the changed part.
 class PrunePass : public MatchedNodeListener, public SDKTreeDiffPass {
-  static void removeCommonChildren(NodePtr Left, NodePtr Right) {
-    llvm::SmallPtrSet<NodePtr, 16> LeftToRemove;
-    llvm::SmallPtrSet<NodePtr, 16> RightToRemove;
-    for (auto LC : Left->getChildren()) {
-      for (auto RC : Right->getChildren()) {
-        if (*LC == *RC) {
-          LeftToRemove.insert(LC);
-          RightToRemove.insert(RC);
-          break;
-        }
-      }
-    }
-    for (NodePtr L : LeftToRemove)
-      Left->removeChild(L);
-    for (NodePtr R : RightToRemove)
-      Right->removeChild(R);
+
+  static void removeCommon(NodeVector &Left, NodeVector &Right) {
+    NodeVector LeftMinusRight, RightMinusLeft;
+    nodeSetDifference(Left, Right, LeftMinusRight, RightMinusLeft);
+    Left = LeftMinusRight;
+    Right = RightMinusLeft;
   }
 
+  static void removeCommonChildren(NodePtr Left, NodePtr Right) {
+    removeCommon(Left->getChildren(), Right->getChildren());
+  }
+
+  SDKContext &Ctx;
   UpdatedNodesMap &UpdateMap;
+  llvm::StringSet<> ProtocolReqWhitelist;
+  SDKNodeRoot *LeftRoot;
+  SDKNodeRoot *RightRoot;
+
+  static void printSpaces(llvm::raw_ostream &OS, SDKNode *N) {
+    assert(N);
+    StringRef Space = "        ";
+    // Accessor doesn't have parent.
+    if (auto *AC = dyn_cast<SDKNodeDeclAccessor>(N)) {
+      OS << Space;
+      printSpaces(OS, AC->getStorage());
+      return;
+    }
+    for (auto P = N; !isa<SDKNodeRoot>(P); P = P->getParent())
+      OS << Space;
+  }
+
+  static void debugMatch(SDKNode *Left, SDKNode *Right, NodeMatchReason Reason,
+                         llvm::raw_ostream &OS) {
+    if (Left && !isa<SDKNodeDecl>(Left))
+      return;
+    if (Right && !isa<SDKNodeDecl>(Right))
+      return;
+    StringRef Arrow = "  <-------->  ";
+    switch (Reason) {
+    case NodeMatchReason::Added:
+      printSpaces(OS, Right);
+      OS << "<NULL>" << Arrow << Right->getPrintedName() << "\n";
+      return;
+    case NodeMatchReason::Removed:
+      printSpaces(OS, Left);
+      OS << Left->getPrintedName() << Arrow << "<NULL>\n";
+      return;
+    default:
+      printSpaces(OS, Left);
+      OS << Left->getPrintedName() << Arrow << Right->getPrintedName() << "\n";
+      return;
+    }
+  }
+
+  static StringRef getParentProtocolName(SDKNode *Node) {
+    if (auto *Acc = dyn_cast<SDKNodeDeclAccessor>(Node)) {
+      Node = Acc->getStorage();
+    }
+    return Node->getParent()->getAs<SDKNodeDecl>()->getFullyQualifiedName();
+  }
 
 public:
-  PrunePass(UpdatedNodesMap &UpdateMap) : UpdateMap(UpdateMap) {}
+  PrunePass(SDKContext &Ctx): Ctx(Ctx), UpdateMap(Ctx.getNodeUpdateMap()) {}
+  PrunePass(SDKContext &Ctx, llvm::StringSet<> prWhitelist):
+    Ctx(Ctx),
+    UpdateMap(Ctx.getNodeUpdateMap()),
+    ProtocolReqWhitelist(std::move(prWhitelist)) {}
 
-  void foundRemoveAddMatch(NodePtr Left, NodePtr Right) override {
-    if (!Left)
+  void foundMatch(NodePtr Left, NodePtr Right, NodeMatchReason Reason) override {
+    if (options::Verbose)
+      debugMatch(Left, Right, Reason, llvm::errs());
+    switch (Reason) {
+    case NodeMatchReason::Added:
+      assert(!Left);
       Right->annotate(NodeAnnotation::Added);
-    else if (!Right) {
+      if (Ctx.checkingABI()) {
+        // Any order-important decl added to a non-resilient type breaks ABI.
+        if (auto *D = dyn_cast<SDKNodeDecl>(Right)) {
+          if (D->hasFixedBinaryOrder()) {
+            D->emitDiag(diag::decl_added);
+          }
+          // Diagnose the missing of @available attributes.
+          // Decls with @_alwaysEmitIntoClient aren't required to have an
+          // @available attribute.
+          if (!Ctx.getOpts().SkipOSCheck &&
+              !D->getIntroducingVersion().hasOSAvailability() &&
+              !D->hasDeclAttribute(DeclAttrKind::DAK_AlwaysEmitIntoClient)) {
+            D->emitDiag(diag::new_decl_without_intro);
+          }
+        }
+      }
+      // Complain about added protocol requirements
+      if (auto *D = dyn_cast<SDKNodeDecl>(Right)) {
+        if (D->isNonOptionalProtocolRequirement()) {
+          bool ShouldComplain = !D->isOverriding();
+          // We should allow added associated types with default.
+          if (auto ATD = dyn_cast<SDKNodeDeclAssociatedType>(D)) {
+            if (ATD->getDefault())
+              ShouldComplain = false;
+          }
+          if (ShouldComplain &&
+              ProtocolReqWhitelist.count(getParentProtocolName(D))) {
+            // Ignore protocol requirement additions if the protocol has been added
+            // to the whitelist.
+            ShouldComplain = false;
+          }
+          if (ShouldComplain)
+            D->emitDiag(diag::protocol_req_added);
+        }
+      }
+      // Diagnose an inherited protocol has been added.
+      if (auto *Conf = dyn_cast<SDKNodeConformance>(Right)) {
+        auto *TD = Conf->getNominalTypeDecl();
+        if (TD->isProtocol()) {
+          TD->emitDiag(diag::conformance_added, Conf->getName());
+        } else {
+          // Adding conformance to an existing type can be ABI breaking.
+          if (Ctx.checkingABI() &&
+              !LeftRoot->getDescendantsByUsr(Conf->getUsr()).empty()) {
+            TD->emitDiag(diag::existing_conformance_added, Conf->getName());
+          }
+        }
+      }
+      return;
+    case NodeMatchReason::Removed:
+      assert(!Right);
       Left->annotate(NodeAnnotation::Removed);
-    } else if (Right->getKind() == Left->getKind()) {
-      foundMatch(Left, Right);
-    } else {
+      if (auto *LT = dyn_cast<SDKNodeType>(Left)) {
+        if (auto *AT = dyn_cast<SDKNodeDeclAssociatedType>(LT->getParent())) {
+          AT->emitDiag(diag::default_associated_type_removed,
+                       LT->getPrintedName());
+        }
+      }
+      // Diagnose a protocol conformance has been removed.
+      if (auto *Conf = dyn_cast<SDKNodeConformance>(Left)) {
+        auto *TD = Conf->getNominalTypeDecl();
+        TD->emitDiag(diag::conformance_removed,
+                     Conf->getName(),
+                     TD->isProtocol());
+      }
+      if (auto *Acc = dyn_cast<SDKNodeDeclAccessor>(Left)) {
+        Acc->emitDiag(diag::removed_decl, Acc->isDeprecated());
+      }
+      return;
+    case NodeMatchReason::FuncToProperty:
+    case NodeMatchReason::ModernizeEnum:
+    case NodeMatchReason::TypeToTypeAlias:
       Left->annotate(NodeAnnotation::Removed);
       Right->annotate(NodeAnnotation::Added);
+      return;
+    case NodeMatchReason::Root:
+    case NodeMatchReason::Name:
+    case NodeMatchReason::Sequential:
+      break;
     }
-  }
-
-  void foundMatch(NodePtr Left, NodePtr Right) override {
     assert(Left && Right);
     Left->annotate(NodeAnnotation::Updated);
     Right->annotate(NodeAnnotation::Updated);
     // Push the updated node to the map for future reference.
-    UpdateMap.foundMatch(Left, Right);
+    UpdateMap.insert(Left, Right);
 
+    Left->diagnose(Right);
     if (Left->getKind() != Right->getKind()) {
       assert(isa<SDKNodeType>(Left) && isa<SDKNodeType>(Right) &&
         "only type nodes can match across kinds.");
@@ -2185,13 +1113,17 @@ public:
     assert(Left->getKind() == Right->getKind());
     SDKNodeKind Kind = Left->getKind();
     assert(Kind == SDKNodeKind::Root || *Left != *Right);
-
-    detectDeclChange(Left, Right);
-    detectFuncDeclChange(Left, Right);
-
     switch(Kind) {
-    case SDKNodeKind::Root:
-    case SDKNodeKind::TypeDecl: {
+    case SDKNodeKind::DeclType: {
+      // Remove common conformances and diagnose conformance changes.
+      auto LConf = cast<SDKNodeDeclType>(Left)->getConformances();
+      auto RConf = cast<SDKNodeDeclType>(Right)->getConformances();
+      removeCommon(LConf, RConf);
+      SameNameNodeMatcher(LConf, RConf, *this).match();
+      LLVM_FALLTHROUGH;
+    }
+    case SDKNodeKind::Conformance:
+    case SDKNodeKind::Root: {
       // If the matched nodes are both modules, remove the contained
       // type decls that are identical. If the matched nodes are both type decls,
       // remove the contained function decls that are identical.
@@ -2200,15 +1132,16 @@ public:
       SNMatcher.match();
       break;
     }
-
-    case SDKNodeKind::Function:
-    case SDKNodeKind::Setter:
-    case SDKNodeKind::Getter:
-    case SDKNodeKind::Constructor:
-    case SDKNodeKind::TypeAlias:
+    case SDKNodeKind::TypeWitness:
+    case SDKNodeKind::DeclOperator:
+    case SDKNodeKind::DeclAssociatedType:
+    case SDKNodeKind::DeclFunction:
+    case SDKNodeKind::DeclAccessor:
+    case SDKNodeKind::DeclConstructor:
+    case SDKNodeKind::DeclTypeAlias:
     case SDKNodeKind::TypeFunc:
     case SDKNodeKind::TypeNominal:
-    case SDKNodeKind::TypeNameAlias: {
+    case SDKNodeKind::TypeAlias: {
       // If matched nodes are both function/var/TypeAlias decls, mapping their
       // parameters sequentially.
       SequentialNodeMatcher SNMatcher(Left->getChildren(), Right->getChildren(),
@@ -2216,19 +1149,34 @@ public:
       SNMatcher.match();
       break;
     }
-
-    case SDKNodeKind::Var: {
-      auto LC = Left->getChildren()[0];
-      auto RC = Right->getChildren()[0];
-      if (!(*LC == *RC))
-        foundMatch(LC, RC);
+    case SDKNodeKind::DeclSubscript: {
+      auto *LSub = dyn_cast<SDKNodeDeclSubscript>(Left);
+      auto *RSub = dyn_cast<SDKNodeDeclSubscript>(Right);
+      SequentialNodeMatcher(LSub->getChildren(), RSub->getChildren(), *this).match();
+#define ACCESSOR(ID)                                                          \
+      singleMatch(LSub->getAccessor(AccessorKind::ID),                        \
+                  RSub->getAccessor(AccessorKind::ID), *this);
+#include "swift/AST/AccessorKinds.def"
+      break;
+    }
+    case SDKNodeKind::DeclVar: {
+      auto *LVar = dyn_cast<SDKNodeDeclVar>(Left);
+      auto *RVar = dyn_cast<SDKNodeDeclVar>(Right);
+      // Match property type.
+      singleMatch(LVar->getType(), RVar->getType(), *this);
+#define ACCESSOR(ID)                                                          \
+      singleMatch(LVar->getAccessor(AccessorKind::ID),                        \
+                  RVar->getAccessor(AccessorKind::ID), *this);
+#include "swift/AST/AccessorKinds.def"
       break;
     }
     }
   }
 
   void pass(NodePtr Left, NodePtr Right) override {
-    foundMatch(Left, Right);
+    LeftRoot = Left->getAs<SDKNodeRoot>();
+    RightRoot = Right->getAs<SDKNodeRoot>();
+    foundMatch(Left, Right, NodeMatchReason::Root);
   }
 };
 
@@ -2272,25 +1220,29 @@ class TypeMemberDiffFinder : public SDKNodeVisitor {
     assert(nodeParent && diffParent && "trying to check Root?");
 
     // Move from global variable to a member variable.
-    if (nodeParent->getKind() == SDKNodeKind::TypeDecl &&
+    if (nodeParent->getKind() == SDKNodeKind::DeclType &&
         diffParent->getKind() == SDKNodeKind::Root)
       TypeMemberDiffs.insert({diffNode, node});
+
+    // Move from a member variable to global variable.
+    if (nodeParent->getKind() == SDKNodeKind::Root &&
+        diffParent->getKind() == SDKNodeKind::DeclType)
+      TypeMemberDiffs.insert({diffNode, node});
+
     // Move from a member variable to another member variable
-    if (nodeParent->getKind() == SDKNodeKind::TypeDecl &&
-        diffParent->getKind() == SDKNodeKind::TypeDecl &&
+    if (nodeParent->getKind() == SDKNodeKind::DeclType &&
+        diffParent->getKind() == SDKNodeKind::DeclType &&
         declNode->isStatic())
       TypeMemberDiffs.insert({diffNode, node});
     // Move from a getter/setter function to a property
-    else if (node->getKind() == SDKNodeKind::Getter &&
-             diffNode->getKind() == SDKNodeKind::Function &&
+    else if (node->getKind() == SDKNodeKind::DeclAccessor &&
+             diffNode->getKind() == SDKNodeKind::DeclFunction &&
              node->isNameValid()) {
       diffNode->annotate(NodeAnnotation::Rename);
-      diffNode->annotate(NodeAnnotation::RenameOldName);
-      diffNode->addAnnotateComment(NodeAnnotation::RenameOldName,
-                                   diffNode->getPrintedName());
-      diffNode->annotate(NodeAnnotation::RenameNewName);
-      diffNode->addAnnotateComment(NodeAnnotation::RenameNewName,
-                                   node->getParent()->getPrintedName());
+      diffNode->annotate(NodeAnnotation::RenameOldName,
+                         diffNode->getPrintedName());
+      diffNode->annotate(NodeAnnotation::RenameNewName,
+                         node->getParent()->getPrintedName());
     }
   }
 
@@ -2313,6 +1265,57 @@ private:
 
 };
 
+/// This is to find type alias of raw types being changed to RawRepresentable.
+/// e.g. AttributeName was a typealias of String in the old SDK however it becomes
+/// a RawRepresentable struct in the new SDK.
+/// This happens typically when we use apinotes to preserve API stability by
+/// using SwiftWrapper:none in the old SDK.
+class TypeAliasDiffFinder: public SDKNodeVisitor {
+  SDKNodeRoot *leftRoot;
+  SDKNodeRoot *rightRoot;
+  NodeMap &result;
+
+  static bool checkTypeMatch(const SDKNodeType* aliasType,
+      const SDKNodeType* rawType) {
+    StringRef Left = aliasType->getPrintedName();
+    StringRef Right = rawType->getPrintedName();
+    if (Left == "NSString" && Right == "String")
+      return true;
+    if (Left == "String" && Right == "String")
+      return true;
+    if (Left == "Int" && Right == "Int")
+      return true;
+    if (Left == "UInt" && Right == "UInt")
+      return true;
+    return false;
+  }
+
+  void visit(NodePtr node) override {
+    auto alias = dyn_cast<SDKNodeDeclTypeAlias>(node);
+    if (!alias)
+      return;
+    const SDKNodeType* aliasType = alias->getUnderlyingType();
+    for (auto *counter: rightRoot->getDescendantsByUsr(alias->getUsr())) {
+      if (auto DT = dyn_cast<SDKNodeDeclType>(counter)) {
+        if (auto *rawType = DT->getRawValueType()) {
+          if (checkTypeMatch(aliasType, rawType)) {
+            result.insert({alias, DT});
+            return;
+          }
+        }
+      }
+    }
+  }
+public:
+  TypeAliasDiffFinder(SDKNodeRoot *leftRoot, SDKNodeRoot *rightRoot,
+    NodeMap &result): leftRoot(leftRoot), rightRoot(rightRoot),
+      result(result) {}
+
+  void search() {
+    SDKNode::preorderVisit(leftRoot, *this);
+  }
+};
+
 // Given a condition, search whether a node satisfies that condition exists
 // in a tree.
 class SearchVisitor : public SDKNodeVisitor {
@@ -2333,9 +1336,8 @@ public:
   }
 };
 
-class ChangeRefinementPass : public SDKTreeDiffPass, public SDKNodeVisitor {
+class InterfaceTypeChangeDetector {
   bool IsVisitingLeft;
-  UpdatedNodesMap &UpdateMap;
 
 #define ANNOTATE(Node, Counter, X, Y)                                          \
   auto ToAnnotate = IsVisitingLeft ? Node : Counter;                           \
@@ -2392,67 +1394,272 @@ class ChangeRefinementPass : public SDKTreeDiffPass, public SDKNodeVisitor {
 
   bool detectTypeRewritten(SDKNodeType *Node, SDKNodeType *Counter) {
     if (IsVisitingLeft &&
-        (Node->getName() != Counter->getName()||
-        Node->getChildrenCount() != Counter->getChildrenCount())) {
+        Node->getPrintedName() != Counter->getPrintedName() &&
+        (Node->getName() != Counter->getName() ||
+         Node->getChildrenCount() != Counter->getChildrenCount())) {
       Node->annotate(NodeAnnotation::TypeRewritten);
-      Node->annotate(NodeAnnotation::TypeRewrittenLeft);
-      Node->annotate(NodeAnnotation::TypeRewrittenRight);
-      Node->addAnnotateComment(NodeAnnotation::TypeRewrittenLeft,
-                               Node->getPrintedName());
-      Node->addAnnotateComment(NodeAnnotation::TypeRewrittenRight,
-                               Counter->getPrintedName());
+      Node->annotate(NodeAnnotation::TypeRewrittenLeft, Node->getPrintedName());
+      Node->annotate(NodeAnnotation::TypeRewrittenRight, 
+                     Counter->getPrintedName());
       return true;
     }
     return false;
   }
 
-  bool isUnhandledCase(SDKNodeType *Node) {
-    auto Counter = UpdateMap.findUpdateCounterpart(Node)->getAs<SDKNodeType>();
+  static bool isRawType(const SDKNodeType *T, StringRef &Raw) {
+    if (auto Alias = dyn_cast<SDKNodeTypeAlias>(T)) {
+      // In case this type is an alias of the raw type.
+      return isRawType(Alias->getUnderlyingType(), Raw);
+    }
+    switch(T->getTypeKind()) {
+    case KnownTypeKind::String:
+    case KnownTypeKind::Int:
+      Raw = T->getName();
+      return true;
+    default:
+      return false;
+    }
+  }
+
+  static StringRef getStringRepresentableChange(SDKNode *L, SDKNode *R,
+                                                StringRef &Raw) {
+    if (!isRawType(L->getAs<SDKNodeType>(), Raw))
+      return StringRef();
+    auto* RKey = dyn_cast<SDKNodeTypeNominal>(R);
+    if (!RKey)
+      return StringRef();
+    if (Raw.empty())
+      return StringRef();
+    auto Results = RKey->getRootNode()->getDescendantsByUsr(RKey->getUsr());
+    if (Results.empty())
+      return StringRef();
+    if (auto DT = dyn_cast<SDKNodeDeclType>(Results.front())) {
+      if (DT->isConformingTo(KnownProtocolKind::RawRepresentable)) {
+        return DT->getFullyQualifiedName();
+      }
+    }
+    return StringRef();
+  }
+
+  static StringRef detectDictionaryKeyChangeInternal(SDKNodeType *L,
+                                                     SDKNodeType *R,
+                                                     StringRef &Raw) {
+    if (L->getTypeKind() != KnownTypeKind::Dictionary ||
+        R->getTypeKind() != KnownTypeKind::Dictionary)
+      return StringRef();
+    auto *Left = dyn_cast<SDKNodeTypeNominal>(L);
+    auto *Right = dyn_cast<SDKNodeTypeNominal>(R);
+    assert(Left && Right);
+    assert(Left->getChildrenCount() == 2);
+    assert(Right->getChildrenCount() == 2);
+    return getStringRepresentableChange(*Left->getChildBegin(),
+      *Right->getChildBegin(), Raw);
+  }
+
+  bool detectDictionaryKeyChange(SDKNodeType *L, SDKNodeType *R) {
+    // We only care if this the top-level type node.
+    if (!L->isTopLevelType() || !R->isTopLevelType())
+      return false;
+    StringRef Raw;
+    StringRef KeyChangedTo;
+    bool HasOptional = L->getTypeKind() == KnownTypeKind::Optional &&
+      R->getTypeKind() == KnownTypeKind::Optional;
+    if (HasOptional) {
+      // Detect [String: Any]? to [StringRepresentableStruct: Any]? Chnage
+      KeyChangedTo =
+        detectDictionaryKeyChangeInternal(L->getOnlyChild()->getAs<SDKNodeType>(),
+                                          R->getOnlyChild()->getAs<SDKNodeType>(),
+                                          Raw);
+    } else {
+      // Detect [String: Any] to [StringRepresentableStruct: Any] Chnage
+      KeyChangedTo = detectDictionaryKeyChangeInternal(L, R, Raw);
+    }
+    if (!KeyChangedTo.empty()) {
+      if (IsVisitingLeft) {
+        L->annotate(HasOptional ?
+                    NodeAnnotation::OptionalDictionaryKeyUpdate :
+                    NodeAnnotation::DictionaryKeyUpdate);
+        L->annotate(NodeAnnotation::RawTypeLeft, Raw);
+        L->annotate(NodeAnnotation::RawTypeRight, KeyChangedTo);
+      } else {
+        R->annotate(HasOptional ?
+                    NodeAnnotation::RevertOptionalDictionaryKeyUpdate :
+                    NodeAnnotation::RevertDictionaryKeyUpdate);
+        R->annotate(NodeAnnotation::RawTypeLeft, KeyChangedTo);
+        R->annotate(NodeAnnotation::RawTypeRight, Raw);
+      }
+      return true;
+    }
+    return false;
+  }
+
+  static StringRef detectArrayMemberChangeInternal(SDKNodeType *L,
+      SDKNodeType *R, StringRef &Raw) {
+    if (L->getTypeKind() != KnownTypeKind::Array ||
+        R->getTypeKind() != KnownTypeKind::Array)
+      return StringRef();
+    auto *Left = dyn_cast<SDKNodeTypeNominal>(L);
+    auto *Right = dyn_cast<SDKNodeTypeNominal>(R);
+    assert(Left && Right);
+    assert(Left->getChildrenCount() == 1);
+    assert(Right->getChildrenCount() == 1);
+    return getStringRepresentableChange(Left->getOnlyChild(),
+      Right->getOnlyChild(), Raw);
+  }
+
+  bool detectArrayMemberChange(SDKNodeType* L, SDKNodeType *R) {
+    // We only care if this the top-level type node.
+    if (!L->isTopLevelType() || !R->isTopLevelType())
+      return false;
+    StringRef Raw;
+    StringRef KeyChangedTo;
+    bool HasOptional = L->getTypeKind() == KnownTypeKind::Optional &&
+      R->getTypeKind() == KnownTypeKind::Optional;
+    if (HasOptional) {
+      // Detect [String]? to [StringRepresentableStruct]? Chnage
+      KeyChangedTo =
+        detectArrayMemberChangeInternal(L->getOnlyChild()->getAs<SDKNodeType>(),
+                                        R->getOnlyChild()->getAs<SDKNodeType>(),
+                                        Raw);
+    } else {
+      // Detect [String] to [StringRepresentableStruct] Chnage
+      KeyChangedTo = detectArrayMemberChangeInternal(L, R, Raw);
+    }
+    if (!KeyChangedTo.empty()) {
+      if (IsVisitingLeft) {
+        L->annotate(HasOptional ?
+                    NodeAnnotation::OptionalArrayMemberUpdate :
+                    NodeAnnotation::ArrayMemberUpdate);
+        L->annotate(NodeAnnotation::RawTypeLeft, Raw);
+        L->annotate(NodeAnnotation::RawTypeRight, KeyChangedTo);
+      } else {
+        R->annotate(HasOptional ?
+                    NodeAnnotation::RevertOptionalArrayMemberUpdate :
+                    NodeAnnotation::RevertArrayMemberUpdate);
+        R->annotate(NodeAnnotation::RawTypeLeft, KeyChangedTo);
+        R->annotate(NodeAnnotation::RawTypeRight, Raw);
+      }
+      return true;
+    }
+    return false;
+  }
+
+  bool detectSimpleStringRepresentableUpdate(SDKNodeType *L, SDKNodeType *R) {
+    if (!L->isTopLevelType() || !R->isTopLevelType())
+      return false;
+    StringRef KeyChangedTo;
+    StringRef Raw;
+    bool HasOptional = L->getTypeKind() == KnownTypeKind::Optional &&
+        R->getTypeKind() == KnownTypeKind::Optional;
+    if (HasOptional) {
+      // Detect String? changes to StringRepresentableStruct? change.
+      KeyChangedTo =
+        getStringRepresentableChange(L->getOnlyChild()->getAs<SDKNodeType>(),
+                                     R->getOnlyChild()->getAs<SDKNodeType>(),
+                                     Raw);
+    } else {
+      // Detect String changes to StringRepresentableStruct change.
+      KeyChangedTo = getStringRepresentableChange(L, R, Raw);
+    }
+    if (!KeyChangedTo.empty()) {
+      if (IsVisitingLeft) {
+        L->annotate(NodeAnnotation::RawTypeLeft, Raw);
+        L->annotate(NodeAnnotation::RawTypeRight, KeyChangedTo);
+        L->annotate(HasOptional ?
+                    NodeAnnotation::SimpleOptionalStringRepresentableUpdate:
+                    NodeAnnotation::SimpleStringRepresentableUpdate);
+      } else {
+        R->annotate(NodeAnnotation::RawTypeLeft, KeyChangedTo);
+        R->annotate(NodeAnnotation::RawTypeRight, Raw);
+        R->annotate(HasOptional ?
+                    NodeAnnotation::RevertSimpleOptionalStringRepresentableUpdate:
+                    NodeAnnotation::RevertSimpleStringRepresentableUpdate);
+      }
+      return true;
+    }
+    return false;
+  }
+
+  bool isUnhandledCase(SDKNodeType *Node, SDKNodeType *Counter) {
     return Node->getTypeKind() == KnownTypeKind::Void ||
            Counter->getTypeKind() == KnownTypeKind::Void;
   }
 
-public:
-  ChangeRefinementPass(UpdatedNodesMap &UpdateMap) : UpdateMap(UpdateMap) {}
-
-  void pass(NodePtr Left, NodePtr Right) override {
-
-    // Post-order visit is necessary since we propagate annotations bottom-up
-    IsVisitingLeft = true;
-    SDKNode::postorderVisit(Left, *this);
-    IsVisitingLeft = false;
-    SDKNode::postorderVisit(Right, *this);
+  static void clearTypeRewritten(SDKNode *N) {
+    if (!N->isAnnotatedAs(NodeAnnotation::TypeRewritten))
+      return;
+    N->removeAnnotate(NodeAnnotation::TypeRewritten);
+    N->removeAnnotate(NodeAnnotation::TypeRewrittenLeft);
+    N->removeAnnotate(NodeAnnotation::TypeRewrittenRight);
   }
 
-  void visit(NodePtr N) override {
-    auto Node = dyn_cast<SDKNodeType>(N);
-    if (!Node || !Node->isAnnotatedAs(NodeAnnotation::Updated) ||
-        isUnhandledCase(Node))
+public:
+  InterfaceTypeChangeDetector(bool IsVisitingLeft):
+    IsVisitingLeft(IsVisitingLeft) {}
+  void detect(SDKNode *Left, SDKNode *Right) {
+    auto *Node = dyn_cast<SDKNodeType>(Left);
+    auto *Counter = dyn_cast<SDKNodeType>(Right);
+    if (!Node || !Counter || isUnhandledCase(Node, Counter))
       return;
-    auto Counter = const_cast<SDKNodeType*>(UpdateMap.
-      findUpdateCounterpart(Node)->getAs<SDKNodeType>());
+    if (detectWrapOptional(Node, Counter) ||
+        detectOptionalUpdate(Node, Counter) ||
+        detectWrapImplicitOptional(Node, Counter) ||
+        detectUnmanagedUpdate(Node, Counter)) {
 
-    bool Result = detectWrapOptional(Node, Counter)||
-                  detectOptionalUpdate(Node, Counter)||
-                  detectWrapImplicitOptional(Node, Counter)||
-                  detectUnmanagedUpdate(Node, Counter)||
-                  detectTypeRewritten(Node, Counter);
+      // we may have detected type rewritten before (when visiting left),
+      // so clear the annotation here.
+      clearTypeRewritten(Node);
+      clearTypeRewritten(Counter);
+    } else {
+      // Detect type re-written then.
+      detectTypeRewritten(Node, Counter);
+    }
+    // The raw representable changes can co-exist with above attributes.
+    auto Result = detectDictionaryKeyChange(Node, Counter) ||
+      detectArrayMemberChange(Node, Counter) ||
+      detectSimpleStringRepresentableUpdate(Node, Counter);
     (void) Result;
     return;
   }
 };
 
-typedef std::vector<CommonDiffItem> DiffVector;
+class ChangeRefinementPass : public SDKTreeDiffPass, public SDKNodeVisitor {
+  UpdatedNodesMap &UpdateMap;
+  InterfaceTypeChangeDetector LeftDetector;
+  InterfaceTypeChangeDetector RightDetector;
+  InterfaceTypeChangeDetector *Detector;
 
-typedef std::vector<TypeMemberDiffItem> TypeMemberDiffVector;
+public:
+  ChangeRefinementPass(UpdatedNodesMap &UpdateMap) : UpdateMap(UpdateMap),
+    LeftDetector(true), RightDetector(false), Detector(nullptr) {}
 
+  void pass(NodePtr Left, NodePtr Right) override {
+
+    // Post-order visit is necessary since we propagate annotations bottom-up
+    Detector = &LeftDetector;
+    SDKNode::postorderVisit(Left, *this);
+    Detector = &RightDetector;
+    SDKNode::postorderVisit(Right, *this);
+  }
+
+  void visit(NodePtr Node) override {
+    assert(Detector);
+    if (!Node || !Node->isAnnotatedAs(NodeAnnotation::Updated))
+      return;
+    auto *Counter = UpdateMap.findUpdateCounterpart(Node);
+    Detector->detect(Node, Counter);
+    return;
+  }
+};
 } // end anonymous namespace
 
+static void findTypeMemberDiffs(NodePtr leftSDKRoot, NodePtr rightSDKRoot,
+                                TypeMemberDiffVector &out);
 
 static void printNode(llvm::raw_ostream &os, NodePtr node) {
   os << "{" << node->getName() << " " << node->getKind() << " "
             << node->getPrintedName();
-  if (auto F = dyn_cast<SDKNodeAbstractFunc>(node)) {
+  if (auto F = dyn_cast<SDKNodeDeclAbstractFunc>(node)) {
     if (F->hasSelfIndex()) {
       os << " selfIndex: ";
       os << F->getSelfIndex();
@@ -2477,8 +1684,8 @@ void TypeMemberDiffFinder::dump(llvm::raw_ostream &os) const {
 }
 
 namespace {
-template<typename T>
 
+template<typename T>
 void removeRedundantAndSort(std::vector<T> &Diffs) {
   std::set<T> DiffSet(Diffs.begin(), Diffs.end());
   Diffs.assign(DiffSet.begin(), DiffSet.end());
@@ -2487,7 +1694,6 @@ void removeRedundantAndSort(std::vector<T> &Diffs) {
 
 template<typename T>
 void serializeDiffs(llvm::raw_ostream &Fs, std::vector<T> &Diffs) {
-  removeRedundantAndSort(Diffs);
   if (Diffs.empty())
     return;
   Fs << "\n";
@@ -2502,8 +1708,8 @@ void serializeDiffs(llvm::raw_ostream &Fs, std::vector<T> &Diffs) {
 
 static bool isTypeChangeInterestedFuncNode(NodePtr Decl) {
   switch(Decl->getKind()) {
-    case SDKNodeKind::Constructor:
-    case SDKNodeKind::Function:
+    case SDKNodeKind::DeclConstructor:
+    case SDKNodeKind::DeclFunction:
       return true;
     default:
       return false;
@@ -2522,7 +1728,7 @@ class DiffItemEmitter : public SDKNodeVisitor {
       case NodeAnnotation::UnwrapUnmanaged:
       case NodeAnnotation::TypeRewritten:
         return isTypeChangeInterestedFuncNode(Decl) &&
-        Decl->getParent()->getKind() == SDKNodeKind::TypeDecl;
+        Decl->getParent()->getKind() == SDKNodeKind::DeclType;
       default:
         return true;
     }
@@ -2536,6 +1742,19 @@ class DiffItemEmitter : public SDKNodeVisitor {
 
   static StringRef getLeftComment(NodePtr Node, NodeAnnotation Anno) {
     switch(Anno) {
+      case NodeAnnotation::ArrayMemberUpdate:
+      case NodeAnnotation::OptionalArrayMemberUpdate:
+      case NodeAnnotation::DictionaryKeyUpdate:
+      case NodeAnnotation::OptionalDictionaryKeyUpdate:
+      case NodeAnnotation::SimpleStringRepresentableUpdate:
+      case NodeAnnotation::SimpleOptionalStringRepresentableUpdate:
+      case NodeAnnotation::RevertArrayMemberUpdate:
+      case NodeAnnotation::RevertOptionalArrayMemberUpdate:
+      case NodeAnnotation::RevertDictionaryKeyUpdate:
+      case NodeAnnotation::RevertOptionalDictionaryKeyUpdate:
+      case NodeAnnotation::RevertSimpleStringRepresentableUpdate:
+      case NodeAnnotation::RevertSimpleOptionalStringRepresentableUpdate:
+        return Node->getAnnotateComment(NodeAnnotation::RawTypeLeft);
       case NodeAnnotation::TypeRewritten:
         return Node->getAnnotateComment(NodeAnnotation::TypeRewrittenLeft);
       case NodeAnnotation::Rename:
@@ -2547,6 +1766,19 @@ class DiffItemEmitter : public SDKNodeVisitor {
 
   static StringRef getRightComment(NodePtr Node, NodeAnnotation Anno) {
     switch (Anno) {
+      case NodeAnnotation::ArrayMemberUpdate:
+      case NodeAnnotation::OptionalArrayMemberUpdate:
+      case NodeAnnotation::DictionaryKeyUpdate:
+      case NodeAnnotation::OptionalDictionaryKeyUpdate:
+      case NodeAnnotation::SimpleStringRepresentableUpdate:
+      case NodeAnnotation::SimpleOptionalStringRepresentableUpdate:
+      case NodeAnnotation::RevertArrayMemberUpdate:
+      case NodeAnnotation::RevertOptionalArrayMemberUpdate:
+      case NodeAnnotation::RevertDictionaryKeyUpdate:
+      case NodeAnnotation::RevertOptionalDictionaryKeyUpdate:
+      case NodeAnnotation::RevertSimpleStringRepresentableUpdate:
+      case NodeAnnotation::RevertSimpleOptionalStringRepresentableUpdate:
+        return Node->getAnnotateComment(NodeAnnotation::RawTypeRight);
       case NodeAnnotation::TypeRewritten:
         return Node->getAnnotateComment(NodeAnnotation::TypeRewrittenRight);
       case NodeAnnotation::ModernizeEnum:
@@ -2563,16 +1795,14 @@ class DiffItemEmitter : public SDKNodeVisitor {
 
   void handleAnnotations(NodePtr Node, SDKNodeDecl *NonTypeParent,
                          StringRef Index, ArrayRef<NodeAnnotation> Annotations) {
-    for (auto Annotation: Annotations) {
-      if (isInterested(NonTypeParent, Annotation) &&
-          Node->isAnnotatedAs(Annotation)) {
+    for (auto Anno: Annotations) {
+      if (isInterested(NonTypeParent, Anno) && Node->isAnnotatedAs(Anno)) {
         auto Kind = NonTypeParent->getKind();
-        StringRef LC = getLeftComment(Node, Annotation);
-        StringRef RC = getRightComment(Node, Annotation);
-        AllItems.emplace_back(Kind, Annotation, Index,
+        StringRef LC = getLeftComment(Node, Anno);
+        StringRef RC = getRightComment(Node, Anno);
+        AllItems.emplace_back(Kind, Anno, Index,
                               NonTypeParent->getUsr(), StringRef(), LC, RC,
                               NonTypeParent->getModuleName());
-        return;
       }
     }
   }
@@ -2593,17 +1823,8 @@ class DiffItemEmitter : public SDKNodeVisitor {
     handleAnnotations(Node, Parent,
                       isa<SDKNodeType>(Node) ? getIndexString(Node) : "0",
                       {
-                        NodeAnnotation::WrapOptional,
-                        NodeAnnotation::UnwrapOptional,
-                        NodeAnnotation::ImplicitOptionalToOptional,
-                        NodeAnnotation::OptionalToImplicitOptional,
-                        NodeAnnotation::UnwrapUnmanaged,
-                        NodeAnnotation::TypeRewritten,
-                        NodeAnnotation::SetterToProperty,
-                        NodeAnnotation::GetterToProperty,
-                        NodeAnnotation::ModernizeEnum,
-                        NodeAnnotation::Rename,
-                        NodeAnnotation::NowThrowing
+#define NODE_ANNOTATION_CHANGE_KIND(NAME) NodeAnnotation::NAME,
+#include "swift/IDE/DigesterEnums.def"
                       });
   }
 
@@ -2641,128 +1862,25 @@ public:
 
 class DiagnosisEmitter : public SDKNodeVisitor {
   void handle(const SDKNodeDecl *D, NodeAnnotation Anno);
-  void visitType(SDKNodeType *T);
   void visitDecl(SDKNodeDecl *D);
   void visit(NodePtr Node) override;
   SDKNodeDecl *findAddedDecl(const SDKNodeDecl *Node);
   bool findTypeAliasDecl(const SDKNodeDecl *Node);
-  static StringRef printName(StringRef Name);
-  static StringRef printDiagKeyword(StringRef Name);
   static void collectAddedDecls(NodePtr Root, std::set<SDKNodeDecl*> &Results);
 
-  template<typename T>
-  struct DiagBag {
-    std::vector<T> Diags;
-    ~DiagBag() {
-      llvm::outs() << "\n/* ";
-      T::theme(llvm::outs());
-      llvm::outs() << " */\n";
-      removeRedundantAndSort(Diags);
-      std::for_each(Diags.begin(), Diags.end(), [](T &Diag) {
-        Diag.outputModule();
-        Diag.output();
-      });
-    }
-  };
-
-  struct DiagBase {
-    StringRef ModuleName;
-    DiagBase(StringRef ModuleName): ModuleName(ModuleName) {}
-    virtual ~DiagBase() = default;
-    void outputModule() const {
-      if (options::PrintModule)
-        llvm::outs() << ModuleName << ": ";
-    }
-    virtual void output() const = 0;
-  };
-
-  struct RemovedDeclDiag: public DiagBase  {
-    DeclKind Kind;
-    StringRef Name;
-    bool IsDeprecated;
-    RemovedDeclDiag(StringRef ModuleName, DeclKind Kind, StringRef Name,
-                    bool IsDeprecated): DiagBase(ModuleName), Kind(Kind),
-                                        Name(Name), IsDeprecated(IsDeprecated) {}
-    bool operator<(RemovedDeclDiag Other) const;
-    void output() const override;
-    static void theme(raw_ostream &OS) { OS << "Removed Decls"; };
-  };
-
-  struct MovedDeclDiag: public DiagBase {
-    DeclKind RemovedKind;
-    DeclKind AddedKind;
-    StringRef RemovedName;
-    StringRef AddedName;
-    MovedDeclDiag(StringRef ModuleName, DeclKind RemovedKind, DeclKind AddedKind,
-                  StringRef RemovedName, StringRef AddedName):
-      DiagBase(ModuleName), RemovedKind(RemovedKind), AddedKind(AddedKind),
-      RemovedName(RemovedName), AddedName(AddedName) {}
-    bool operator<(MovedDeclDiag other) const;
-    void output() const override;
-    static void theme(raw_ostream &OS) { OS << "Moved Decls"; };
-  };
-
-  struct RenamedDeclDiag: public DiagBase  {
-    DeclKind KindBefore;
-    DeclKind KindAfter;
-    StringRef NameBefore;
-    StringRef NameAfter;
-    RenamedDeclDiag(StringRef ModuleName, DeclKind KindBefore, DeclKind KindAfter,
-                    StringRef NameBefore, StringRef NameAfter):
-                      DiagBase(ModuleName),
-                      KindBefore(KindBefore), KindAfter(KindAfter),
-                      NameBefore(NameBefore), NameAfter(NameAfter) {}
-    bool operator<(RenamedDeclDiag Other) const;
-    void output() const override;
-    static void theme(raw_ostream &OS) { OS << "Renamed Decls"; };
-  };
-
-  struct DeclAttrDiag: public DiagBase {
-    DeclKind Kind;
-    StringRef DeclName;
-    StringRef AttrBefore;
-    StringRef AttrAfter;
-    DeclAttrDiag(StringRef ModuleName, DeclKind Kind, StringRef DeclName,
-                 StringRef AttrBefore, StringRef AttrAfter):
-                   DiagBase(ModuleName), Kind(Kind), DeclName(DeclName),
-                   AttrBefore(AttrBefore), AttrAfter(AttrAfter) {}
-    DeclAttrDiag(StringRef ModuleName, DeclKind Kind, StringRef DeclName,
-                 StringRef AttrAfter): DeclAttrDiag(ModuleName, Kind, DeclName,
-                                                    StringRef(), AttrAfter) {}
-
-    bool operator<(DeclAttrDiag Other) const;
-    void output() const override;
-    static void theme(raw_ostream &OS) { OS << "Decl Attribute changes"; };
-  };
-
-  struct DeclTypeChangeDiag: public DiagBase {
-    DeclKind Kind;
-    StringRef DeclName;
-    StringRef TypeNameBefore;
-    StringRef TypeNameAfter;
-    StringRef Description;
-    DeclTypeChangeDiag(StringRef ModuleName, DeclKind Kind, StringRef DeclName,
-                       StringRef TypeNameBefore, StringRef TypeNameAfter,
-                       StringRef Description): DiagBase(ModuleName),
-      Kind(Kind), DeclName(DeclName), TypeNameBefore(TypeNameBefore),
-      TypeNameAfter(TypeNameAfter), Description(Description) {}
-    bool operator<(DeclTypeChangeDiag Other) const;
-    void output() const override;
-    static void theme(raw_ostream &OS) { OS << "Type Changes"; };
-  };
-
   std::set<SDKNodeDecl*> AddedDecls;
-  DiagBag<DeclAttrDiag> AttrChangedDecls;
-  DiagBag<DeclTypeChangeDiag> TypeChangedDecls;
-  DiagBag<RenamedDeclDiag> RenamedDecls;
-  DiagBag<MovedDeclDiag> MovedDecls;
-  DiagBag<RemovedDeclDiag> RemovedDecls;
 
   UpdatedNodesMap &UpdateMap;
-  DiagnosisEmitter(UpdatedNodesMap &UpdateMap) : UpdateMap(UpdateMap) {}
+  NodeMap &TypeAliasUpdateMap;
+  TypeMemberDiffVector &MemberChanges;
+  DiagnosisEmitter(SDKContext &Ctx):
+    UpdateMap(Ctx.getNodeUpdateMap()),
+    TypeAliasUpdateMap(Ctx.getTypeAliasUpdateMap()),
+    MemberChanges(Ctx.getTypeMemberDiffs()) {}
+
 public:
   static void diagnosis(NodePtr LeftRoot, NodePtr RightRoot,
-                        UpdatedNodesMap &UpdateMap);
+                        SDKContext &Ctx);
 };
 
 void DiagnosisEmitter::collectAddedDecls(NodePtr Root,
@@ -2786,101 +1904,18 @@ SDKNodeDecl *DiagnosisEmitter::findAddedDecl(const SDKNodeDecl *Root) {
 }
 
 bool DiagnosisEmitter::findTypeAliasDecl(const SDKNodeDecl *Node) {
-  if (Node->getKind() != SDKNodeKind::TypeDecl)
+  if (Node->getKind() != SDKNodeKind::DeclType)
     return false;
   return std::any_of(AddedDecls.begin(), AddedDecls.end(),
       [&](SDKNodeDecl *Added) {
-    return Added->getKind() == SDKNodeKind::TypeAlias &&
+    return Added->getKind() == SDKNodeKind::DeclTypeAlias &&
            Added->getPrintedName() == Node->getPrintedName();
   });
 }
 
-StringRef DiagnosisEmitter::printName(StringRef Name) {
-  OSColor Color(llvm::outs(), llvm::raw_ostream::CYAN);
-  Color << Name;
-  return StringRef();
-}
-
-StringRef DiagnosisEmitter::printDiagKeyword(StringRef Name) {
-  OSColor Color(llvm::outs(), llvm::raw_ostream::YELLOW);
-  Color << Name;
-  return StringRef();
-}
-
-bool DiagnosisEmitter::RemovedDeclDiag::
-operator<(RemovedDeclDiag Other) const {
-  if (Kind != Other.Kind)
-    return Kind < Other.Kind;
-  return Name.compare(Other.Name) < 0;
-}
-
-void DiagnosisEmitter::RemovedDeclDiag::output() const {
-  llvm::outs() << Kind << " " << printName(Name) << " has been "
-    << printDiagKeyword("removed");
-  if (IsDeprecated)
-    llvm::outs() << " (deprecated)";
-  llvm::outs() << "\n";
-}
-
-bool DiagnosisEmitter::MovedDeclDiag::
-operator<(MovedDeclDiag Other) const {
-  if (RemovedKind != Other.RemovedKind)
-    return RemovedKind < Other.RemovedKind;
-  return RemovedName.compare(Other.RemovedName) < 0;
-}
-
-void DiagnosisEmitter::MovedDeclDiag::output() const {
-  llvm::outs() << RemovedKind << " " << printName(RemovedName) << " has been "
-    << printDiagKeyword("moved") << " to " << AddedKind << " "
-    << printName(AddedName) << "\n";
-}
-
-bool DiagnosisEmitter::RenamedDeclDiag::
-operator<(RenamedDeclDiag Other) const {
-  if (KindBefore != Other.KindBefore)
-    return KindBefore < Other.KindBefore;
-  return NameBefore.compare(Other.NameBefore) < 0;
-}
-
-void DiagnosisEmitter::RenamedDeclDiag::output() const {
-  llvm::outs() << KindBefore << " " << printName(NameBefore)
-               << " has been " << printDiagKeyword("renamed") << " to "
-               << KindAfter << " " << printName(NameAfter) << "\n";
-}
-
-bool DiagnosisEmitter::DeclTypeChangeDiag::
-operator<(DeclTypeChangeDiag Other) const {
-  if (Kind != Other.Kind)
-    return Kind < Other.Kind;
-  return DeclName.compare(Other.DeclName) < 0;
-}
-
-void DiagnosisEmitter::DeclTypeChangeDiag::output() const {
-  llvm::outs() << Kind << " " << printName(DeclName) << " has "
-               << Description << " type change from "
-               << printName(TypeNameBefore) << " to "
-               << printName(TypeNameAfter) << "\n";
-}
-
-
-bool DiagnosisEmitter::DeclAttrDiag::operator<(DeclAttrDiag Other) const {
-  if (Kind != Other.Kind)
-    return Kind < Other.Kind;
-  return DeclName.compare_lower(Other.DeclName);
-}
-
-void DiagnosisEmitter::DeclAttrDiag::output() const {
-  if (AttrBefore.empty())
-    llvm::outs() << Kind << " " << printName(DeclName) << " is now " <<
-      printDiagKeyword(AttrAfter)<< "\n";
-  else
-    llvm::outs() << Kind << " " << printName(DeclName) << " changes from " <<
-      printDiagKeyword(AttrBefore) << " to "<< printDiagKeyword(AttrAfter)<< "\n";
-}
-
 void DiagnosisEmitter::diagnosis(NodePtr LeftRoot, NodePtr RightRoot,
-                                 UpdatedNodesMap &UpdateMap) {
-  DiagnosisEmitter Emitter(UpdateMap);
+                                 SDKContext &Ctx) {
+  DiagnosisEmitter Emitter(Ctx);
   collectAddedDecls(RightRoot, Emitter.AddedDecls);
   SDKNode::postorderVisit(LeftRoot, Emitter);
 }
@@ -2896,13 +1931,34 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
       return;
     if (auto *Added = findAddedDecl(Node)) {
       if (Node->getDeclKind() != DeclKind::Constructor) {
-        MovedDecls.Diags.emplace_back(Node->getModuleName(),
-                                      Node->getDeclKind(),
-                                      Added->getDeclKind(),
-                                      Node->getFullyQualifiedName(),
-                                      Added->getFullyQualifiedName());
+        Node->emitDiag(diag::moved_decl,
+          Ctx.buffer((Twine(getDeclKindStr(Added->getDeclKind())) + " " +
+            Added->getFullyQualifiedName()).str()));
         return;
       }
+    }
+
+    // If we can find a hoisted member for this removed delcaration, we
+    // emit the diagnostics as rename instead of removal.
+    auto It = std::find_if(MemberChanges.begin(), MemberChanges.end(),
+      [&](TypeMemberDiffItem &Item) { return Item.usr == Node->getUsr(); });
+    if (It != MemberChanges.end()) {
+      Node->emitDiag(diag::renamed_decl,
+        Ctx.buffer((Twine(getDeclKindStr(Node->getDeclKind())) + " " +
+          It->newTypeName + "." + It->newPrintedName).str()));
+      return;
+    }
+
+    // If a type alias of a raw type has been changed to a struct/enum that
+    // conforms to RawRepresentable in the later version of SDK, we show the
+    // refine diagnostics message instead of showing the type alias has been
+    // removed.
+    if (TypeAliasUpdateMap.find((SDKNode*)Node) != TypeAliasUpdateMap.end()) {
+      Node->emitDiag(diag::raw_type_change,
+        Node->getAs<SDKNodeDeclTypeAlias>()->getUnderlyingType()->getPrintedName(),
+        TypeAliasUpdateMap[(SDKNode*)Node]->getAs<SDKNodeDeclType>()->
+          getRawValueType()->getPrintedName());
+      return;
     }
 
     // We should exlude those declarations that are pulled up to the super classes.
@@ -2910,7 +1966,7 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
     if (auto PD = dyn_cast<SDKNodeDecl>(Node->getParent())) {
       if (PD->isAnnotatedAs(NodeAnnotation::Updated)) {
         // Get the updated counterpart of the parent decl.
-        if (auto RTD = dyn_cast<SDKNodeTypeDecl>(UpdateMap.
+        if (auto RTD = dyn_cast<SDKNodeDeclType>(UpdateMap.
             findUpdateCounterpart(PD))) {
           // Look up by the printed name in the counterpart.
           FoundInSuperclass =
@@ -2920,58 +1976,25 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
     }
     if (FoundInSuperclass)
       return;
-    RemovedDecls.Diags.emplace_back(Node->getModuleName(),
-                                    Node->getDeclKind(),
-                                    Node->getFullyQualifiedName(),
-                                    Node->isDeprecated());
+
+    // When diagnosing API changes, avoid complaining the removal of these
+    // synthesized functions since they are compiler implementation details.
+    // If an enum is no longer equatable, another diagnostic about removing
+    // conforming protocol will be emitted.
+    if (!Ctx.checkingABI()) {
+      if (Node->getName() == Ctx.Id_derived_struct_equals ||
+          Node->getName() == Ctx.Id_derived_enum_equals) {
+        return;
+      }
+    }
+
+    Node->emitDiag(diag::removed_decl, Node->isDeprecated());
     return;
   }
   case NodeAnnotation::Rename: {
-    auto *Count = UpdateMap.findUpdateCounterpart(Node)->getAs<SDKNodeDecl>();
-    RenamedDecls.Diags.emplace_back(Node->getModuleName(),
-                                    Node->getDeclKind(), Count->getDeclKind(),
-                                    Node->getFullyQualifiedName(),
-                                    Count->getFullyQualifiedName());
-    return;
-  }
-  case NodeAnnotation::NowMutating: {
-    AttrChangedDecls.Diags.emplace_back(Node->getModuleName(),
-                                        Node->getDeclKind(),
-                                        Node->getFullyQualifiedName(),
-                                        Ctx.buffer("mutating"));
-    return;
-  }
-  case NodeAnnotation::NowThrowing: {
-    AttrChangedDecls.Diags.emplace_back(Node->getModuleName(),
-                                        Node->getDeclKind(),
-                                        Node->getFullyQualifiedName(),
-                                        Ctx.buffer("throwing"));
-    return;
-  }
-  case NodeAnnotation::StaticChange: {
-    AttrChangedDecls.Diags.emplace_back(Node->getModuleName(),
-                                        Node->getDeclKind(),
-                                        Node->getFullyQualifiedName(),
-                        Ctx.buffer(Node->isStatic() ? "not static" : "static"));
-    return;
-  }
-  case NodeAnnotation::OwnershipChange: {
-    auto getOwnershipDescription = [&](swift::Ownership O) {
-      switch (O) {
-      case Ownership::Strong:    return Ctx.buffer("strong");
-      case Ownership::Weak:      return Ctx.buffer("weak");
-      case Ownership::Unowned:   return Ctx.buffer("unowned");
-      case Ownership::Unmanaged: return Ctx.buffer("unowned(unsafe)");
-      }
-
-      llvm_unreachable("Unhandled Ownership in switch.");
-    };
-    auto *Count = UpdateMap.findUpdateCounterpart(Node)->getAs<SDKNodeDecl>();
-    AttrChangedDecls.Diags.emplace_back(Node->getModuleName(),
-                                        Node->getDeclKind(),
-                                        Node->getFullyQualifiedName(),
-                                  getOwnershipDescription(Node->getOwnership()),
-                                getOwnershipDescription(Count->getOwnership()));
+    Node->emitDiag(diag::renamed_decl,
+        Ctx.buffer((Twine(getDeclKindStr(Node->getDeclKind())) + " " +
+          Node->getAnnotateComment(NodeAnnotation::RenameNewName)).str()));
     return;
   }
   default:
@@ -2980,52 +2003,18 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
 }
 
 void DiagnosisEmitter::visitDecl(SDKNodeDecl *Node) {
-  if (Node->isSDKPrivate())
-    return;
   std::vector<NodeAnnotation> Scratch;
   for (auto Anno : Node->getAnnotations(Scratch))
     handle(Node, Anno);
-}
-
-void DiagnosisEmitter::visitType(SDKNodeType *Node) {
-  auto *Parent = dyn_cast<SDKNodeDecl>(Node->getParent());
-  if (!Parent || Parent->isSDKPrivate())
-    return;
-  SDKContext &Ctx = Node->getSDKContext();
-  if (Node->isAnnotatedAs(NodeAnnotation::Updated)) {
-    auto *Count = UpdateMap.findUpdateCounterpart(Node)->getAs<SDKNodeType>();
-    StringRef Descriptor;
-    switch (Parent->getKind()) {
-    case SDKNodeKind::Constructor:
-    case SDKNodeKind::Function:
-    case SDKNodeKind::Var:
-      Descriptor = isa<SDKNodeAbstractFunc>(Parent) ?
-        SDKNodeAbstractFunc::getTypeRoleDescription(Ctx, Parent->getChildIndex(Node)) :
-        Ctx.buffer("declared");
-      if (Node->getPrintedName() != Count->getPrintedName())
-        TypeChangedDecls.Diags.emplace_back(Parent->getModuleName(),
-                                            Parent->getDeclKind(),
-                                            Parent->getFullyQualifiedName(),
-                                            Node->getPrintedName(),
-                                            Count->getPrintedName(),
-                                            Descriptor);
-      break;
-    default:
-      break;
-    }
-  }
 }
 
 void DiagnosisEmitter::visit(NodePtr Node) {
   if (auto *DNode = dyn_cast<SDKNodeDecl>(Node)) {
     visitDecl(DNode);
   }
-  if (auto *TNode = dyn_cast<SDKNodeType>(Node)) {
-    visitType(TNode);
-  }
 }
 
-  typedef std::vector<NoEscapeFuncParam> NoEscapeFuncParamVector;
+typedef std::vector<NoEscapeFuncParam> NoEscapeFuncParamVector;
 
 class NoEscapingFuncEmitter : public SDKNodeVisitor {
   NoEscapeFuncParamVector &AllItems;
@@ -3037,7 +2026,7 @@ class NoEscapingFuncEmitter : public SDKNodeVisitor {
     if (Node->getAs<SDKNodeTypeFunc>()->isEscaping())
       return;
     auto Parent = Node->getParent();
-    if (auto ParentFunc = dyn_cast<SDKNodeAbstractFunc>(Parent)) {
+    if (auto ParentFunc = dyn_cast<SDKNodeDeclAbstractFunc>(Parent)) {
       if (ParentFunc->isObjc()) {
         unsigned Index = ParentFunc->getChildIndex(Node);
         AllItems.emplace_back(ParentFunc->getUsr(), Index);
@@ -3051,72 +2040,45 @@ public:
     SDKNode::postorderVisit(Root, Emitter);
   }
 };
-
-class OverloadMemberFunctionEmitter : public SDKNodeVisitor {
-
-  std::vector<OverloadedFuncInfo> &AllItems;
-
-  void visit(NodePtr Node) override {
-    if (Node->getKind() != SDKNodeKind::Function)
-      return;
-    auto Parent = Node->getParent();
-    if (Parent->getKind() != SDKNodeKind::TypeDecl)
-      return;
-    DeclNameViewer CurrentViewer(Node->getPrintedName());
-    if (CurrentViewer.args().empty())
-      return;
-    for (auto &C : Parent->getChildren()) {
-      if (C == Node)
-        continue;
-      if (C->getKind() != SDKNodeKind::Function)
-        continue;
-      DeclNameViewer ChildViewer(C->getPrintedName());
-      if (ChildViewer.args().empty())
-        continue;
-      if (CurrentViewer.commonPartsCount(ChildViewer) >=
-          CurrentViewer.partsCount() - 1) {
-        AllItems.emplace_back(Node->getAs<SDKNodeDecl>()->getUsr());
-        return;
-      }
-    }
-  }
-
-  OverloadMemberFunctionEmitter(std::vector<OverloadedFuncInfo> &AllItems) :
-    AllItems(AllItems) {}
-
-public:
-  static void collectDiffItems(NodePtr Root,
-                               std::vector<OverloadedFuncInfo> &AllItems) {
-    OverloadMemberFunctionEmitter Emitter(AllItems);
-    SDKNode::postorderVisit(Root, Emitter);
-  }
-};
-
 } // end anonymous namespace
 
 namespace fs = llvm::sys::fs;
 namespace path = llvm::sys::path;
 
-struct RenameDetectorForMemberDiff : public MatchedNodeListener {
-  void foundMatch(NodePtr Left, NodePtr Right) override {
+class RenameDetectorForMemberDiff : public MatchedNodeListener {
+  InterfaceTypeChangeDetector LeftDetector;
+  InterfaceTypeChangeDetector RightDetector;
+public:
+  RenameDetectorForMemberDiff(): LeftDetector(true), RightDetector(false) {}
+  void foundMatch(NodePtr Left, NodePtr Right, NodeMatchReason Reason) override {
+    if (!Left || !Right)
+      return;
     detectRename(Left, Right);
+    LeftDetector.detect(Left, Right);
+    RightDetector.detect(Right, Left);
   }
   void workOn(NodePtr Left, NodePtr Right) {
     if (Left->getKind() == Right->getKind() &&
-        Left->getKind() == SDKNodeKind::TypeDecl) {
+        Left->getKind() == SDKNodeKind::DeclType) {
       SameNameNodeMatcher SNMatcher(Left->getChildren(), Right->getChildren(),
                                     *this);
       SNMatcher.match();
+    }
+    if (Left->getKind() == Right->getKind() &&
+        Left->getKind() == SDKNodeKind::DeclVar) {
+      SequentialNodeMatcher Matcher(Left->getChildren(),
+                                    Right->getChildren(), *this);
+      Matcher.match();
     }
   }
 };
 
 static Optional<uint8_t> findSelfIndex(SDKNode* Node) {
-  if (auto func = dyn_cast<SDKNodeAbstractFunc>(Node)) {
+  if (auto func = dyn_cast<SDKNodeDeclAbstractFunc>(Node)) {
     return func->getSelfIndexOptional();
-  } else if (auto vd = dyn_cast<SDKNodeVar>(Node)) {
+  } else if (auto vd = dyn_cast<SDKNodeDeclVar>(Node)) {
     for (auto &C : vd->getChildren()) {
-      if (isa<SDKNodeAbstractFunc>(C)) {
+      if (isa<SDKNodeDeclAbstractFunc>(C)) {
         if (auto Result = findSelfIndex(C))
           return Result;
       }
@@ -3141,7 +2103,8 @@ static void findTypeMemberDiffs(NodePtr leftSDKRoot, NodePtr rightSDKRoot,
     // index, old printed name)
     TypeMemberDiffItem item = {
         right->getAs<SDKNodeDecl>()->getUsr(),
-        rightParent->getAs<SDKNodeDecl>()->getFullyQualifiedName(),
+        rightParent->getKind() == SDKNodeKind::Root ?
+          StringRef() : rightParent->getAs<SDKNodeDecl>()->getFullyQualifiedName(),
         right->getPrintedName(), findSelfIndex(right), None,
         leftParent->getKind() == SDKNodeKind::Root ?
           StringRef() : leftParent->getAs<SDKNodeDecl>()->getFullyQualifiedName(),
@@ -3152,7 +2115,43 @@ static void findTypeMemberDiffs(NodePtr leftSDKRoot, NodePtr rightSDKRoot,
   }
 }
 
-static int diagnoseModuleChange(StringRef LeftPath, StringRef RightPath) {
+static int diagnoseModuleChange(SDKContext &Ctx, SDKNodeRoot *LeftModule,
+                             SDKNodeRoot *RightModule, StringRef OutputPath,
+                             llvm::StringSet<> ProtocolReqWhitelist) {
+  assert(LeftModule);
+  assert(RightModule);
+  llvm::raw_ostream *OS = &llvm::errs();
+  if (!LeftModule || !RightModule) {
+    *OS << "Cannot diagnose null SDKNodeRoot";
+    exit(1);
+  }
+  std::unique_ptr<llvm::raw_ostream> FileOS;
+  if (!OutputPath.empty()) {
+    std::error_code EC;
+    FileOS.reset(new llvm::raw_fd_ostream(OutputPath, EC, llvm::sys::fs::F_None));
+    OS = FileOS.get();
+  }
+  std::unique_ptr<DiagnosticConsumer> pConsumer = options::CompilerStyleDiags ?
+    llvm::make_unique<PrintingDiagnosticConsumer>():
+    llvm::make_unique<ModuleDifferDiagsConsumer>(true, *OS);
+
+  Ctx.getDiags().addConsumer(*pConsumer);
+  TypeAliasDiffFinder(LeftModule, RightModule,
+                      Ctx.getTypeAliasUpdateMap()).search();
+  PrunePass Prune(Ctx, std::move(ProtocolReqWhitelist));
+  Prune.pass(LeftModule, RightModule);
+  ChangeRefinementPass RefinementPass(Ctx.getNodeUpdateMap());
+  RefinementPass.pass(LeftModule, RightModule);
+  // Find member hoist changes to help refine diagnostics.
+  findTypeMemberDiffs(LeftModule, RightModule, Ctx.getTypeMemberDiffs());
+  DiagnosisEmitter::diagnosis(LeftModule, RightModule, Ctx);
+  return 0;
+}
+
+static int diagnoseModuleChange(StringRef LeftPath, StringRef RightPath,
+                                StringRef OutputPath,
+                                CheckerOptions Opts,
+                                llvm::StringSet<> ProtocolReqWhitelist) {
   if (!fs::exists(LeftPath)) {
     llvm::errs() << LeftPath << " does not exist\n";
     return 1;
@@ -3161,24 +2160,41 @@ static int diagnoseModuleChange(StringRef LeftPath, StringRef RightPath) {
     llvm::errs() << RightPath << " does not exist\n";
     return 1;
   }
-  SDKContext Ctx;
+  SDKContext Ctx(Opts);
   SwiftDeclCollector LeftCollector(Ctx);
   LeftCollector.deSerialize(LeftPath);
   SwiftDeclCollector RightCollector(Ctx);
   RightCollector.deSerialize(RightPath);
-  auto LeftModule = LeftCollector.getSDKRoot();
-  auto RightModule = RightCollector.getSDKRoot();
-  PrunePass Prune(Ctx.getNodeUpdateMap());
-  Prune.pass(LeftModule, RightModule);
-  ChangeRefinementPass RefinementPass(Ctx.getNodeUpdateMap());
-  RefinementPass.pass(LeftModule, RightModule);
-  DiagnosisEmitter::diagnosis(LeftModule, RightModule, Ctx.getNodeUpdateMap());
+  diagnoseModuleChange(Ctx, LeftCollector.getSDKRoot(), RightCollector.getSDKRoot(),
+                       OutputPath, std::move(ProtocolReqWhitelist));
   return 0;
 }
 
-static int compareSDKs(StringRef LeftPath, StringRef RightPath,
-                       StringRef DiffPath,
-                       llvm::StringSet<> &IgnoredRemoveUsrs) {
+static void populateAliasChanges(NodeMap &AliasMap, DiffVector &AllItems,
+    const bool isRevert) {
+  for (auto Pair: AliasMap) {
+    auto UnderlyingType = Pair.first->getAs<SDKNodeDeclTypeAlias>()->
+      getUnderlyingType()->getPrintedName();
+    auto RawType = AliasMap[(SDKNode*)Pair.first]->getAs<SDKNodeDeclType>()->
+      getRawValueType()->getPrintedName();
+    if (isRevert) {
+      auto *D = Pair.second->getAs<SDKNodeDecl>();
+      AllItems.emplace_back(SDKNodeKind::DeclType,
+        NodeAnnotation::RevertTypeAliasDeclToRawRepresentable, "0",
+        D->getUsr(), "", RawType, UnderlyingType, D->getModuleName());
+    } else {
+      auto *D = Pair.first->getAs<SDKNodeDecl>();
+      AllItems.emplace_back(SDKNodeKind::DeclTypeAlias,
+        NodeAnnotation::TypeAliasDeclToRawRepresentable, "0",
+        D->getUsr(), "", UnderlyingType, RawType, D->getModuleName());
+    }
+  }
+}
+
+static int generateMigrationScript(StringRef LeftPath, StringRef RightPath,
+                                   StringRef DiffPath,
+                                   llvm::StringSet<> &IgnoredRemoveUsrs,
+                                   CheckerOptions Opts) {
   if (!fs::exists(LeftPath)) {
     llvm::errs() << LeftPath << " does not exist\n";
     return 1;
@@ -3188,7 +2204,12 @@ static int compareSDKs(StringRef LeftPath, StringRef RightPath,
     return 1;
   }
   llvm::errs() << "Diffing: " << LeftPath << " and " << RightPath << "\n";
-  SDKContext Ctx;
+  std::unique_ptr<DiagnosticConsumer> pConsumer = options::CompilerStyleDiags ?
+    llvm::make_unique<PrintingDiagnosticConsumer>():
+    llvm::make_unique<ModuleDifferDiagsConsumer>(false);
+  SDKContext Ctx(Opts);
+  Ctx.getDiags().addConsumer(*pConsumer);
+
   SwiftDeclCollector LeftCollector(Ctx);
   LeftCollector.deSerialize(LeftPath);
   SwiftDeclCollector RightCollector(Ctx);
@@ -3200,16 +2221,26 @@ static int compareSDKs(StringRef LeftPath, StringRef RightPath,
   // Structural diffs: not merely name changes but changes in SDK tree
   // structure.
   llvm::errs() << "Detecting type member diffs" << "\n";
-  TypeMemberDiffVector typeMemberDiffs;
-  findTypeMemberDiffs(LeftModule, RightModule, typeMemberDiffs);
+  findTypeMemberDiffs(LeftModule, RightModule, Ctx.getTypeMemberDiffs());
 
-  PrunePass Prune(Ctx.getNodeUpdateMap());
+  PrunePass Prune(Ctx);
   Prune.pass(LeftModule, RightModule);
   llvm::errs() << "Finished pruning" << "\n";
   ChangeRefinementPass RefinementPass(Ctx.getNodeUpdateMap());
   RefinementPass.pass(LeftModule, RightModule);
   DiffVector AllItems;
   DiffItemEmitter::collectDiffItems(LeftModule, AllItems);
+
+  // Find type alias change first.
+  auto &AliasMap = Ctx.getTypeAliasUpdateMap();
+  TypeAliasDiffFinder(LeftModule, RightModule, AliasMap).search();
+  populateAliasChanges(AliasMap, AllItems, /*IsRevert*/false);
+
+  // Find type alias revert change.
+  auto &RevertAliasMap = Ctx.getRevertTypeAliasUpdateMap();
+  TypeAliasDiffFinder(RightModule, LeftModule, RevertAliasMap).search();
+  populateAliasChanges(RevertAliasMap, AllItems, /*IsRevert*/true);
+
   AllItems.erase(std::remove_if(AllItems.begin(), AllItems.end(),
                                 [&](CommonDiffItem &Item) {
     return Item.DiffKind == NodeAnnotation::RemovedDecl &&
@@ -3221,10 +2252,15 @@ static int compareSDKs(StringRef LeftPath, StringRef RightPath,
 
   llvm::errs() << "Dumping diff to " << DiffPath << '\n';
   std::vector<OverloadedFuncInfo> Overloads;
-  OverloadMemberFunctionEmitter::collectDiffItems(RightModule, Overloads);
+  // OverloadMemberFunctionEmitter::collectDiffItems(RightModule, Overloads);
 
+  auto &typeMemberDiffs = Ctx.getTypeMemberDiffs();
   std::error_code EC;
   llvm::raw_fd_ostream Fs(DiffPath, EC, llvm::sys::fs::F_None);
+  removeRedundantAndSort(AllItems);
+  removeRedundantAndSort(typeMemberDiffs);
+  removeRedundantAndSort(AllNoEscapingFuncs);
+  removeRedundantAndSort(Overloads);
   if (options::OutputInJson) {
     std::vector<APIDiffItem*> TotalItems;
     std::transform(AllItems.begin(), AllItems.end(),
@@ -3249,126 +2285,10 @@ static int compareSDKs(StringRef LeftPath, StringRef RightPath,
   return 0;
 }
 
-static std::string getDumpFilePath(StringRef OutputDir, StringRef FileName) {
-  std::string Path = OutputDir;
-  Path += "/";
-  Path += FileName;
-  int Suffix = 0;
-  auto ConstructPath = [&]() {
-    return Path + (Suffix == 0 ? "" : std::to_string(Suffix)) + ".js";
-  };
-  for (; fs::exists(ConstructPath()); Suffix ++);
-  return ConstructPath();
-}
-
-static int dumpSwiftModules(const CompilerInvocation &InitInvok,
-                            const llvm::StringSet<> &ModuleNames,
-                            StringRef OutputDir,
-                            const std::vector<std::string> PrintApis) {
-  if (!fs::exists(OutputDir)) {
-    llvm::errs() << "Output directory '" << OutputDir << "' does not exist.\n";
-    return 1;
-  }
-
-  std::vector<ModuleDecl*> Modules;
-  CompilerInvocation Invocation(InitInvok);
-  CompilerInstance CI;
-  // Display diagnostics to stderr.
-  PrintingDiagnosticConsumer PrintDiags;
-  CI.addDiagnosticConsumer(&PrintDiags);
-  if (CI.setup(Invocation)) {
-    llvm::errs() << "Failed to setup the compiler instance\n";
-    return 1;
-  }
-
-  auto &Context = CI.getASTContext();
-
-  for (auto &Entry : ModuleNames) {
-    StringRef Name = Entry.first();
-    if (options::Verbose)
-      llvm::errs() << "Loading module: " << Name << "...\n";
-    auto *M = Context.getModuleByName(Name);
-    if (!M) {
-      if (options::Verbose)
-        llvm::errs() << "Failed to load module: " << Name << '\n';
-      if (options::AbortOnModuleLoadFailure)
-        return 1;
-    }
-    Modules.push_back(M);
-  }
-
-  SDKContext Ctx;
-  for (auto M : Modules) {
-    SwiftDeclCollector Collector(Ctx);
-    SmallVector<Decl*, 256> Decls;
-    M->getTopLevelDecls(Decls);
-    for (auto D : Decls) {
-      if (auto VD = dyn_cast<ValueDecl>(D))
-        Collector.foundDecl(VD, DeclVisibilityKind::VisibleAtTopLevel);
-    }
-    std::string Path = getDumpFilePath(OutputDir, M->getName().str());
-    Collector.serialize(Path);
-    if (options::Verbose)
-      llvm::errs() << "Dumped to "<< Path << "\n";
-  }
-  return 0;
-}
-
-static int dumpSDKContent(const CompilerInvocation &InitInvok,
-                          const llvm::StringSet<> &ModuleNames,
-                          StringRef OutputFile) {
-  CompilerInvocation Invocation(InitInvok);
-
-  CompilerInstance CI;
-  // Display diagnostics to stderr.
-  PrintingDiagnosticConsumer PrintDiags;
-  CI.addDiagnosticConsumer(&PrintDiags);
-  if (CI.setup(Invocation)) {
-    llvm::errs() << "Failed to setup the compiler instance\n";
-    return 1;
-  }
-
-  auto &Ctx = CI.getASTContext();
-
-
-  // Load standard library so that Clang importer can use it.
-  auto *Stdlib = Ctx.getStdlibModule(/*loadIfAbsent=*/true);
-  if (!Stdlib) {
-    llvm::errs() << "Failed to load Swift stdlib\n";
-    return 1;
-  }
-
-  std::vector<ModuleDecl *> Modules;
-  for (auto &Entry : ModuleNames) {
-    StringRef Name = Entry.getKey();
-    if (options::Verbose)
-      llvm::errs() << "Loading module: " << Name << "...\n";
-    auto *M = Ctx.getModuleByName(Name);
-    if (!M) {
-      llvm::errs() << "Failed to load module: " << Name << '\n';
-      if (options::AbortOnModuleLoadFailure)
-        return 1;
-    } else {
-      Modules.push_back(M);
-    }
-  }
-  if (options::Verbose)
-    llvm::errs() << "Scanning symbols...\n";
-  SDKContext SDKCtx;
-  SwiftDeclCollector Collector(SDKCtx);
-  Collector.lookupVisibleDecls(Modules);
-  if (options::Verbose)
-    llvm::errs() << "Dumping SDK...\n";
-  Collector.serialize(OutputFile);
-  if (options::Verbose)
-    llvm::errs() << "Dumped to "<< OutputFile << "\n";
-  return 0;
-}
-
 static int readFileLineByLine(StringRef Path, llvm::StringSet<> &Lines) {
   auto FileBufOrErr = llvm::MemoryBuffer::getFile(Path);
   if (!FileBufOrErr) {
-    llvm::errs() << "error opening file: "
+    llvm::errs() << "error opening file '" << Path << "': "
       << FileBufOrErr.getError().message() << '\n';
     return 1;
   }
@@ -3378,8 +2298,11 @@ static int readFileLineByLine(StringRef Path, llvm::StringSet<> &Lines) {
     StringRef Line;
     std::tie(Line, BufferText) = BufferText.split('\n');
     Line = Line.trim();
-    if (!Line.empty())
-      Lines.insert(Line);
+    if (Line.empty())
+      continue;
+    if (Line.startswith("// ")) // comment.
+      continue;
+    Lines.insert(Line);
   }
   return 0;
 }
@@ -3391,24 +2314,41 @@ static int readFileLineByLine(StringRef Path, llvm::StringSet<> &Lines) {
 // without being given the address of a function in the main executable).
 void anchorForGetMainExecutable() {}
 
+static void setSDKPath(CompilerInvocation &InitInvok, bool IsBaseline) {
+  if (IsBaseline) {
+    // Set baseline SDK
+    if (!options::BaselineSDK.empty()) {
+      InitInvok.setSDKPath(options::BaselineSDK);
+    }
+  } else {
+    // Set current SDK
+    if (!options::SDK.empty()) {
+      InitInvok.setSDKPath(options::SDK);
+    } else if (const char *SDKROOT = getenv("SDKROOT")) {
+      InitInvok.setSDKPath(SDKROOT);
+    } else {
+      llvm::errs() << "Provide '-sdk <path>' option or run with 'xcrun -sdk <..>\
+      swift-api-digester'\n";
+      exit(1);
+    }
+  }
+}
+
 static int prepareForDump(const char *Main,
                           CompilerInvocation &InitInvok,
-                          llvm::StringSet<> &Modules) {
+                          llvm::StringSet<> &Modules,
+                          bool IsBaseline = false) {
   InitInvok.setMainExecutablePath(fs::getMainExecutable(Main,
     reinterpret_cast<void *>(&anchorForGetMainExecutable)));
   InitInvok.setModuleName("swift_ide_test");
-  if (!options::SDK.empty()) {
-    InitInvok.setSDKPath(options::SDK);
-  } else if (const char *SDKROOT = getenv("SDKROOT")) {
-    InitInvok.setSDKPath(SDKROOT);
-  } else {
-    llvm::errs() << "Provide '-sdk <path>' option or run with 'xcrun -sdk <..>\
-    swift-api-digester'\n";
-    return 1;
-  }
+  setSDKPath(InitInvok, IsBaseline);
 
   if (!options::Triple.empty())
     InitInvok.setTargetTriple(options::Triple);
+
+  // Ensure the tool works on linux properly
+  InitInvok.getLangOptions().EnableObjCInterop =
+    InitInvok.getLangOptions().Target.isOSDarwin();
   InitInvok.getClangImporterOptions().ModuleCachePath =
   options::ModuleCachePath;
 
@@ -3424,7 +2364,7 @@ static int prepareForDump(const char *Main,
     }
     if (!isValid) {
       llvm::errs() << "Unsupported Swift Version.\n";
-      return 1;
+      exit(1);
     }
   }
 
@@ -3432,27 +2372,31 @@ static int prepareForDump(const char *Main,
     InitInvok.setRuntimeResourcePath(options::ResourceDir);
   }
   std::vector<SearchPathOptions::FrameworkSearchPath> FramePaths;
-  for (const auto &path : options::FrameworkPaths) {
-    FramePaths.push_back({path, /*isSystem=*/false});
-  }
   for (const auto &path : options::CCSystemFrameworkPaths) {
     FramePaths.push_back({path, /*isSystem=*/true});
   }
+  if (IsBaseline) {
+    for (const auto &path : options::BaselineFrameworkPaths) {
+      FramePaths.push_back({path, /*isSystem=*/false});
+    }
+    InitInvok.setImportSearchPaths(options::BaselineModuleInputPaths);
+  } else {
+    for (const auto &path : options::FrameworkPaths) {
+      FramePaths.push_back({path, /*isSystem=*/false});
+    }
+    InitInvok.setImportSearchPaths(options::ModuleInputPaths);
+  }
   InitInvok.setFrameworkSearchPaths(FramePaths);
-  InitInvok.setImportSearchPaths(options::ModuleInputPaths);
-
   if (!options::ModuleList.empty()) {
     if (readFileLineByLine(options::ModuleList, Modules))
-        return 1;
+      exit(1);
   }
-
   for (auto M : options::ModuleNames) {
     Modules.insert(M);
   }
-
   if (Modules.empty()) {
     llvm::errs() << "Need to specify -include-all or -module <name>\n";
-    return 1;
+    exit(1);
   }
   return 0;
 }
@@ -3468,8 +2412,8 @@ static void readIgnoredUsrs(llvm::StringSet<> &IgnoredUsrs) {
   readFileLineByLine(Path, IgnoredUsrs);
 }
 
-static int deserializeDiffItems(StringRef DiffPath, StringRef OutputPath) {
-  APIDiffItemStore Store;
+static int deserializeDiffItems(APIDiffItemStore &Store, StringRef DiffPath,
+    StringRef OutputPath) {
   Store.addStorePath(DiffPath);
   std::error_code EC;
   llvm::raw_fd_ostream FS(OutputPath, EC, llvm::sys::fs::F_None);
@@ -3477,47 +2421,134 @@ static int deserializeDiffItems(StringRef DiffPath, StringRef OutputPath) {
   return 0;
 }
 
-int main(int argc, char *argv[]) {
-  INITIALIZE_LLVM(argc, argv);
+static int deserializeNameCorrection(APIDiffItemStore &Store,
+                                     StringRef OutputPath) {
+  std::error_code EC;
+  llvm::raw_fd_ostream FS(OutputPath, EC, llvm::sys::fs::F_None);
+  std::set<NameCorrectionInfo> Result;
+  for (auto *Item: Store.getAllDiffItems()) {
+    if (auto *CI = dyn_cast<CommonDiffItem>(Item)) {
+      if (CI->DiffKind == NodeAnnotation::Rename) {
+        auto NewName = CI->getNewName();
+        auto Module = CI->ModuleName;
+        if (CI->rightCommentUnderscored()) {
+          Result.insert(NameCorrectionInfo(NewName, NewName, Module));
+        }
+      }
+    }
+  }
+  std::vector<NameCorrectionInfo> Vec;
+  Vec.insert(Vec.end(), Result.begin(), Result.end());
+  APIDiffItemStore::serialize(FS, Vec);
+  return EC.value();
+}
 
+static CheckerOptions getCheckOpts() {
+  CheckerOptions Opts;
+  Opts.AvoidLocation = options::AvoidLocation;
+  Opts.ABI = options::Abi;
+  Opts.Verbose = options::Verbose;
+  Opts.AbortOnModuleLoadFailure = options::AbortOnModuleLoadFailure;
+  Opts.LocationFilter = options::LocationFilter;
+  Opts.PrintModule = options::PrintModule;
+  Opts.SwiftOnly = options::SwiftOnly;
+  Opts.SkipOSCheck = options::DisableOSChecks;
+  return Opts;
+}
+
+static SDKNodeRoot *getSDKRoot(const char *Main, SDKContext &Ctx,
+                            CheckerOptions Opts, bool IsBaseline) {
+  CompilerInvocation Invok;
+  llvm::StringSet<> Modules;
+  if (prepareForDump(Main, Invok, Modules, IsBaseline))
+    return nullptr;
+  return getSDKNodeRoot(Ctx, Invok, Modules, Opts);
+}
+
+static bool hasBaselineInput() {
+  return !options::BaselineModuleInputPaths.empty() ||
+    !options::BaselineFrameworkPaths.empty() || !options::BaselineSDK.empty();
+}
+
+int main(int argc, char *argv[]) {
+  PROGRAM_START(argc, argv);
+  INITIALIZE_LLVM();
+
+  llvm::cl::HideUnrelatedOptions(options::Category);
   llvm::cl::ParseCommandLineOptions(argc, argv, "Swift SDK Digester\n");
   CompilerInvocation InitInvok;
-
-  ClangImporterOptions &ImporterOpts = InitInvok.getClangImporterOptions();
-  ImporterOpts.DetailedPreprocessingRecord = true;
 
   llvm::StringSet<> Modules;
   std::vector<std::string> PrintApis;
   llvm::StringSet<> IgnoredUsrs;
   readIgnoredUsrs(IgnoredUsrs);
+  CheckerOptions Opts = getCheckOpts();
   for (auto Name : options::ApisPrintUsrs)
     PrintApis.push_back(Name);
   switch (options::Action) {
-  case ActionType::DumpSwiftModules:
-    return (prepareForDump(argv[0], InitInvok, Modules)) ? 1 :
-      dumpSwiftModules(InitInvok, Modules, options::OutputFile, PrintApis);
   case ActionType::DumpSDK:
     return (prepareForDump(argv[0], InitInvok, Modules)) ? 1 :
-      dumpSDKContent(InitInvok, Modules, options::OutputFile);
-  case ActionType::CompareSDKs:
-  case ActionType::DiagnoseSDKs:
-    if (options::SDKJsonPaths.size() != 2) {
+      dumpSDKContent(InitInvok, Modules, options::OutputFile, Opts);
+  case ActionType::MigratorGen:
+  case ActionType::DiagnoseSDKs: {
+    bool CompareJson = options::SDKJsonPaths.size() == 2;
+    if (!CompareJson && !hasBaselineInput()) {
       llvm::errs() << "Only two SDK versions can be compared\n";
       llvm::cl::PrintHelpMessage();
       return 1;
     }
-    if (options::Action == ActionType::CompareSDKs)
-      return compareSDKs(options::SDKJsonPaths[0], options::SDKJsonPaths[1],
-                         options::OutputFile, IgnoredUsrs);
-    else
+    llvm::StringSet<> protocolWhitelist;
+    if (!options::ProtReqWhiteList.empty()) {
+      if (readFileLineByLine(options::ProtReqWhiteList, protocolWhitelist))
+          return 1;
+    }
+    if (options::Action == ActionType::MigratorGen)
+      return generateMigrationScript(options::SDKJsonPaths[0],
+                                     options::SDKJsonPaths[1],
+                                     options::OutputFile, IgnoredUsrs, Opts);
+    else if (CompareJson)
       return diagnoseModuleChange(options::SDKJsonPaths[0],
-                                  options::SDKJsonPaths[1]);
+                                  options::SDKJsonPaths[1],
+                                  options::OutputFile, Opts,
+                                  std::move(protocolWhitelist));
+    else {
+      SDKContext Ctx(Opts);
+      return diagnoseModuleChange(Ctx, getSDKRoot(argv[0], Ctx, Opts, true),
+                                  getSDKRoot(argv[0], Ctx, Opts, false),
+                                  options::OutputFile,
+                                  std::move(protocolWhitelist));
+    }
+  }
+  case ActionType::DeserializeSDK:
   case ActionType::DeserializeDiffItems: {
     if (options::SDKJsonPaths.size() != 1) {
       llvm::cl::PrintHelpMessage();
       return 1;
     }
-    return deserializeDiffItems(options::SDKJsonPaths[0], options::OutputFile);
+    if (options::Action == ActionType::DeserializeDiffItems) {
+      CompilerInstance CI;
+      APIDiffItemStore Store(CI.getDiags());
+      return deserializeDiffItems(Store, options::SDKJsonPaths[0],
+        options::OutputFile);
+    } else {
+      return deserializeSDKDump(options::SDKJsonPaths[0], options::OutputFile,
+        Opts);
+    }
+  }
+  case ActionType::GenerateNameCorrectionTemplate: {
+    CompilerInstance CI;
+    APIDiffItemStore Store(CI.getDiags());
+    auto &Paths = options::SDKJsonPaths;
+    for (unsigned I = 0; I < Paths.size(); I ++)
+      Store.addStorePath(Paths[I]);
+    return deserializeNameCorrection(Store, options::OutputFile);
+  }
+  case ActionType::FindUsr: {
+    if (options::SDKJsonPaths.size() != 1) {
+      llvm::cl::PrintHelpMessage();
+      return 1;
+    }
+    return findDeclUsr(options::SDKJsonPaths[0], Opts);
   }
   case ActionType::None:
     llvm::errs() << "Action required\n";

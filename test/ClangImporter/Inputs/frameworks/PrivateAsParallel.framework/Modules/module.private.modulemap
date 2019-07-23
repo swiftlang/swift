@@ -1,0 +1,7 @@
+framework module PrivateAsParallel_Private {
+  umbrella header "PrivateAsParallel_Priv.h"
+  export *
+  module * {
+    export *
+  }
+}

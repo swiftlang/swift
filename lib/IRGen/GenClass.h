@@ -17,6 +17,7 @@
 #ifndef SWIFT_IRGEN_GENCLASS_H
 #define SWIFT_IRGEN_GENCLASS_H
 
+#include "swift/AST/Types.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/ArrayRef.h"
 
@@ -27,16 +28,16 @@ namespace llvm {
 }
 
 namespace swift {
-  class CanType;
   class ClassDecl;
   class ExtensionDecl;
   class ProtocolDecl;
+  struct SILDeclRef;
   class SILType;
-  class Type;
   class VarDecl;
 
 namespace irgen {
   class ConstantStructBuilder;
+  class FunctionPointer;
   class HeapLayout;
   class IRGenFunction;
   class IRGenModule;
@@ -47,8 +48,6 @@ namespace irgen {
   class StructLayout;
   class TypeInfo;
   
-  enum class ReferenceCounting : unsigned char;
-  enum class IsaEncoding : unsigned char;
   enum class ClassDeallocationKind : unsigned char;
   enum class FieldAccess : uint8_t;
   
@@ -69,6 +68,50 @@ namespace irgen {
   enum ForMetaClass_t : bool {
     ForClass = false,
     ForMetaClass = true
+  };
+
+  enum HasUpdateCallback_t : bool {
+    DoesNotHaveUpdateCallback = false,
+    HasUpdateCallback = true
+  };
+
+  /// Creates a layout for the class \p classType with allocated tail elements
+  /// \p tailTypes.
+  ///
+  /// The caller is responsible for deleting the returned StructLayout.
+  StructLayout *getClassLayoutWithTailElems(IRGenModule &IGM, SILType classType,
+                                            llvm::ArrayRef<SILType> tailTypes);
+
+  ClassDecl *getRootClassForMetaclass(IRGenModule &IGM, ClassDecl *theClass);
+
+  enum class ClassMetadataStrategy {
+    /// Does the given class have resilient ancestry, or is the class itself
+    /// generic?
+    Resilient,
+
+    /// Does the class require at in-place initialization because of
+    /// non-fixed size properties or generic ancestry? The class does not
+    /// export a static symbol visible to Objective-C code.
+    Singleton,
+
+    /// A more restricted case of the above. Does the class require at in-place
+    /// initialization because of non-fixed size properties, while exporting a
+    /// static symbol visible to Objective-C code? The Objective-C runtime is
+    /// able to initialize the metadata by calling the update callback stored
+    /// in rodata. This strategy can only be used if the class availability
+    /// restricts its use to newer Objective-C runtimes that support this
+    /// feature.
+    Update,
+
+    /// An even more restricted case of the above. The class requires in-place
+    /// initialization on newer Objective-C runtimes, but the metadata is
+    /// statically valid on older runtimes because field offsets were computed
+    /// assuming type layouts loaded from a legacy type info YAML file.
+    FixedOrUpdate,
+
+    /// The class metadata is completely static and only Objective-C runtime
+    /// realization (and possibly field offset sliding) must be performed.
+    Fixed
   };
 
   std::pair<Size,Size>
@@ -92,13 +135,15 @@ namespace irgen {
   Address emitTailProjection(IRGenFunction &IGF, llvm::Value *Base,
                                   SILType ClassType, SILType TailType);
 
-  typedef llvm::ArrayRef<std::pair<SILType, llvm::Value *>> TailArraysRef;
+  using TailArraysRef = llvm::ArrayRef<std::pair<SILType, llvm::Value *>>;
 
   /// Adds the size for tail allocated arrays to \p size and returns the new
-  /// size value.
-  llvm::Value *appendSizeForTailAllocatedArrays(IRGenFunction &IGF,
-                                                llvm::Value *size,
-                                                TailArraysRef TailArrays);
+  /// size value. Also updades the alignment mask to represent the alignment of
+  /// the largest element.
+  std::pair<llvm::Value *, llvm::Value *>
+  appendSizeForTailAllocatedArrays(IRGenFunction &IGF,
+                                   llvm::Value *size, llvm::Value *alignMask,
+                                   TailArraysRef TailArrays);
 
   /// Emit an allocation of a class.
   /// The \p StackAllocSize is an in- and out-parameter. The passed value
@@ -125,16 +170,14 @@ namespace irgen {
                                     llvm::Value *selfValue,
                                     llvm::Value *metadataValue);
 
-  /// Emit the constant fragile instance size of the class, or null if the class
-  /// does not have fixed layout. For resilient classes this does not
-  /// correspond to the runtime alignment of instances of the class.
-  llvm::Constant *tryEmitClassConstantFragileInstanceSize(IRGenModule &IGM,
-                                                   ClassDecl *theClass);
-  /// Emit the constant fragile instance alignment mask of the class, or null if
-  /// the class does not have fixed layout. For resilient classes this does not
-  /// correspond to the runtime alignment of instances of the class.
-  llvm::Constant *tryEmitClassConstantFragileInstanceAlignMask(IRGenModule &IGM,
-                                                        ClassDecl *theClass);
+  /// We emit Objective-C class stubs for non-generic classes with resilient
+  /// ancestry. This lets us attach categories to the class even though it
+  /// does not have statically-emitted metadata.
+  bool hasObjCResilientClassStub(IRGenModule &IGM, ClassDecl *D);
+
+  /// Emit a resilient class stub.
+  void emitObjCResilientClassStub(IRGenModule &IGM, ClassDecl *D);
+
   /// Emit the constant fragile offset of the given property inside an instance
   /// of the class.
   llvm::Constant *
@@ -142,42 +185,48 @@ namespace irgen {
                                                   SILType baseType,
                                                   VarDecl *field);
                                                   
-  unsigned getClassFieldIndex(IRGenModule &IGM,
-                              SILType baseType,
-                              VarDecl *field);
-    
   FieldAccess getClassFieldAccess(IRGenModule &IGM,
                                   SILType baseType,
                                   VarDecl *field);
 
-  /// Creates a layout for the class \p classType with allocated tail elements
-  /// \p tailTypes.
-  ///
-  /// The caller is responsible for deleting the returned StructLayout.
-  StructLayout *getClassLayoutWithTailElems(IRGenModule &IGM, SILType classType,
-                                            llvm::ArrayRef<SILType> tailTypes);
+  Size getClassFieldOffset(IRGenModule &IGM,
+                           SILType baseType,
+                           VarDecl *field);
 
-  /// What reference counting mechanism does a class-like type use?
-  ReferenceCounting getReferenceCountingForType(IRGenModule &IGM,
-                                                CanType type);
+  /// Load the instance size and alignment mask from a reference to
+  /// class type metadata of the given type.
+  std::pair<llvm::Value *, llvm::Value *>
+  emitClassResilientInstanceSizeAndAlignMask(IRGenFunction &IGF,
+                                             ClassDecl *theClass,
+                                             llvm::Value *metadata);
 
-  /// What isa-encoding mechanism does a type use?
-  IsaEncoding getIsaEncodingForType(IRGenModule &IGM, CanType type);
-  
-  ClassDecl *getRootClassForMetaclass(IRGenModule &IGM, ClassDecl *theClass);
+  /// Given a metadata pointer, emit the callee for the given method.
+  FunctionPointer emitVirtualMethodValue(IRGenFunction &IGF,
+                                         llvm::Value *metadata,
+                                         SILDeclRef method,
+                                         CanSILFunctionType methodType);
 
-  /// Does the class metadata for the given class require dynamic
-  /// initialization beyond what can be achieved automatically by
-  /// the runtime?
-  bool doesClassMetadataRequireDynamicInitialization(IRGenModule &IGM,
-                                                     ClassDecl *theClass);
-    
-  /// If the superclass came from another module, we may have dropped
-  /// stored properties due to the Swift language version availability of
-  /// their types. In these cases we can't precisely lay out the ivars in
-  /// the class object at compile time so we need to do runtime layout.
-  bool classHasIncompleteLayout(IRGenModule &IGM,
-                                ClassDecl *theClass);
+  /// Given an instance pointer (or, for a static method, a class
+  /// pointer), emit the callee for the given method.
+  FunctionPointer emitVirtualMethodValue(IRGenFunction &IGF,
+                                         llvm::Value *base,
+                                         SILType baseType,
+                                         SILDeclRef method,
+                                         CanSILFunctionType methodType,
+                                         bool useSuperVTable);
+
+  /// Is the given class known to have Swift-compatible metadata?
+  bool hasKnownSwiftMetadata(IRGenModule &IGM, ClassDecl *theClass);
+
+  inline bool isKnownNotTaggedPointer(IRGenModule &IGM, ClassDecl *theClass) {
+    // For now, assume any class type defined in Clang might be tagged.
+    return hasKnownSwiftMetadata(IGM, theClass);
+  }
+
+  /// Is the given class-like type known to have Swift-compatible
+  /// metadata?
+  bool hasKnownSwiftMetadata(IRGenModule &IGM, CanType theType);
+
 } // end namespace irgen
 } // end namespace swift
 

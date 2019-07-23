@@ -58,9 +58,14 @@ Argument::Argument(StringRef Key, SILFunction *F)
         Loc = F->getLocation().getSourceLoc();
 }
 
-Argument::Argument(StringRef Key, SILType *Ty) : Key(Key) {
+Argument::Argument(StringRef Key, SILType Ty) : Key(Key) {
   llvm::raw_string_ostream OS(Val);
-  Ty->print(OS);
+  Ty.print(OS);
+}
+
+Argument::Argument(StringRef Key, CanType Ty) : Key(Key) {
+  llvm::raw_string_ostream OS(Val);
+  Ty.print(OS);
 }
 
 template <typename DerivedT> std::string Remark<DerivedT>::getMsg() const {
@@ -162,10 +167,9 @@ template <> struct MappingTraits<SourceLoc> {
     assert(io.outputting() && "input not yet implemented");
 
     SourceManager *SM = static_cast<SourceManager *>(io.getContext());
-    unsigned BufferID = SM->findBufferContainingLoc(Loc);
-    StringRef File = SM->getIdentifierForBuffer(BufferID);
+    StringRef File = SM->getDisplayNameForLoc(Loc);
     unsigned Line, Col;
-    std::tie(Line, Col) = SM->getLineAndColumn(Loc, BufferID);
+    std::tie(Line, Col) = SM->getLineAndColumn(Loc);
 
     io.mapRequired("File", File);
     io.mapRequired("Line", Line);

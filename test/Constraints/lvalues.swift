@@ -76,14 +76,14 @@ f2(&non_settable_x) // expected-error{{cannot pass immutable value as inout argu
 f1(&non_settable_x) // expected-error{{cannot pass immutable value as inout argument: 'non_settable_x' is a get-only property}}
 // - inout assignment
 non_settable_x += x // expected-error{{left side of mutating operator isn't mutable: 'non_settable_x' is a get-only property}}
-+++non_settable_x // expected-error{{cannot pass immutable value as inout argument: 'non_settable_x' is a get-only property}}
++++non_settable_x // expected-error{{cannot pass immutable value to mutating operator: 'non_settable_x' is a get-only property}}
 
 // non-settable property is non-settable:
 z.non_settable_x = x // expected-error{{cannot assign to property: 'non_settable_x' is a get-only property}}
 f2(&z.non_settable_x) // expected-error{{cannot pass immutable value as inout argument: 'non_settable_x' is a get-only property}}
 f1(&z.non_settable_x) // expected-error{{cannot pass immutable value as inout argument: 'non_settable_x' is a get-only property}}
 z.non_settable_x += x // expected-error{{left side of mutating operator isn't mutable: 'non_settable_x' is a get-only property}}
-+++z.non_settable_x // expected-error{{cannot pass immutable value as inout argument: 'non_settable_x' is a get-only property}}
++++z.non_settable_x // expected-error{{cannot pass immutable value to mutating operator: 'non_settable_x' is a get-only property}}
 
 // non-settable subscript is non-settable:
 z[0] = 0.0 // expected-error{{cannot assign through subscript: subscript is get-only}}
@@ -97,7 +97,7 @@ fz().settable_x = x // expected-error{{cannot assign to property: 'fz' returns i
 f2(&fz().settable_x) // expected-error{{cannot pass immutable value as inout argument: 'fz' returns immutable value}}
 f1(&fz().settable_x) // expected-error{{cannot pass immutable value as inout argument: 'fz' returns immutable value}}
 fz().settable_x += x // expected-error{{left side of mutating operator isn't mutable: 'fz' returns immutable value}}
-+++fz().settable_x // expected-error{{cannot pass immutable value as inout argument: 'fz' returns immutable value}}
++++fz().settable_x // expected-error{{cannot pass immutable value to mutating operator: 'fz' returns immutable value}}
 
 // settable property of an rvalue reference type IS SETTABLE:
 fref().property = 0.0
@@ -158,10 +158,8 @@ func testInOut(_ arg: inout Int) {
 }
 
 // Don't infer inout types.
-var ir = &i // expected-error{{variable has type 'inout Int' which includes nested inout parameters}} \
-            // expected-error{{'&' can only appear immediately in a call argument list}}
-var ir2 = ((&i)) // expected-error{{variable has type 'inout Int' which includes nested inout parameters}} \
-                 // expected-error{{'&' can only appear immediately in a call argument list}}
+var ir = &i // expected-error {{use of extraneous '&'}}
+var ir2 = ((&i)) // expected-error {{use of extraneous '&'}}
 
 // <rdar://problem/17133089>
 func takeArrayRef(_ x: inout Array<String>) { }
@@ -235,7 +233,7 @@ r23331567 { $0 += 1 }
 // <rdar://problem/30685195> Compiler crash with invalid assignment
 struct G<T> {
   subscript(x: Int) -> T { get { } nonmutating set { } }
-  // expected-note@-1 {{'subscript' declared here}}
+  // expected-note@-1 {{'subscript(_:)' declared here}}
 }
 
 func wump<T>(to: T, _ body: (G<T>) -> ()) {}

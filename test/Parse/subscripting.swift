@@ -57,6 +57,32 @@ struct X4 {
   }
 }
 
+struct X5 {
+  static var stored: Int = 1
+  
+  static subscript(i: Int) -> Int {
+    get {
+      return stored + i
+    }
+    set {
+      stored = newValue - i
+    }
+  }
+}
+
+class X6 {
+  static var stored: Int = 1
+  
+  class subscript(i: Int) -> Int {
+    get {
+      return stored + i
+    }
+    set {
+      stored = newValue - i
+    }
+  }
+}
+
 struct Y1 {
   var stored: Int
   subscript(_: i, j: Int) -> Int { // expected-error {{use of undeclared type 'i'}}
@@ -155,15 +181,15 @@ struct A6 {
 }
 
 struct A7 {
-  static subscript(a: Int) -> Int { // expected-error {{subscript cannot be marked 'static'}} {{3-10=}}
+  class subscript(a: Float) -> Int { // expected-error {{class subscripts are only allowed within classes; use 'static' to declare a static subscript}} {{3-8=static}}
     get {
       return 42
     }
   }
 }
 
-struct A7b {
-  class subscript(a: Float) -> Int { // expected-error {{subscript cannot be marked 'class'}} {{3-9=}}
+class A7b {
+  class static subscript(a: Float) -> Int { // expected-error {{'static' specified twice}} {{9-16=}}
     get {
       return 42
     }
@@ -188,6 +214,9 @@ struct A9 {
 
 struct A10 {
   subscript x(i: Int) -> Int { // expected-error {{subscripts cannot have a name}} {{13-14=}}
+    return 0
+  }
+  subscript x<T>(i: T) -> Int { // expected-error {{subscripts cannot have a name}} {{13-14=}}
     return 0
   }
 }

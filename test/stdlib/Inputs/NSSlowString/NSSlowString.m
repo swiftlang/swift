@@ -1,3 +1,6 @@
+
+#if __has_include(<Foundation/Foundation.h>)
+
 #import "NSSlowString.h"
 
 
@@ -18,6 +21,12 @@
 	return self;
 }
 
+- (instancetype)initWithCharacters:(const unichar * _Nonnull)chars length:(NSUInteger)count {
+  NSString *str = [[NSString alloc] initWithCharacters: chars length: count];
+  self = [self initWithString: str];
+  return self;
+}
+
 - (NSUInteger)length {
     return self.stringHolder.length;
 }
@@ -35,3 +44,6 @@
 }
 
 @end
+
+#endif
+

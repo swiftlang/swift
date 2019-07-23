@@ -1,0 +1,3 @@
+// RUN: not %target-sil-opt %s
+
+sil_default_witness_table

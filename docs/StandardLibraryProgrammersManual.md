@@ -12,7 +12,7 @@ TODO: Should this subsume or link to [AccessControlInStdlib.rst](https://github.
 1. Library Organization
     1. What files are where
         1. Brief about CMakeLists
-	1. Brief about GroupInfo.json
+        1. Brief about GroupInfo.json
     1. What tests are where
         1. Furthermore, should there be a split between whitebox tests and blackbox tests?
     1. What benchmarks are where
@@ -23,8 +23,8 @@ TODO: Should this subsume or link to [AccessControlInStdlib.rst](https://github.
     1. Protocol hierarchy
         1. Customization hooks
     1. Use of classes, COW implementation, buffers, etc
-    1. Compatiblity, `@available`, etc.
-    1. Resilience, ABI stability, `@_inlineable`, `@_versioned`, etc
+    1. Compatibility, `@available`, etc.
+    1. Resilience, ABI stability, `@inlinable`, `@usableFromInline`, etc
     1. Strings and ICU
     1. Lifetimes
         1. withExtendedLifetime, withUnsafe...,
@@ -37,7 +37,7 @@ TODO: Should this subsume or link to [AccessControlInStdlib.rst](https://github.
     1. `@inline(__always)` and `@inline(never)`
     1. `@semantics(...)`
     1. Builtins
-        1. Builtin.addressof, _isUnique, _isUniqueOrPinned, etc
+        1. Builtin.addressof, _isUnique, etc
 1. Dirty hacks
     1. Why all the underscores and extra protocols?
     1. How does the `...` ranges work?
@@ -50,10 +50,23 @@ TODO: Should this subsume or link to [AccessControlInStdlib.rst](https://github.
 
 Optionals can be unwrapped with `!`, which triggers a trap on nil. Alternatively, they can be `.unsafelyUnwrapped()`, which will check and trap in debug builds of user code. Internal to the standard library is `._unsafelyUnwrappedUnchecked()` which will only check and trap in debug builds of the standard library itself. These correspond directly with `_precondition`, `_debugPrecondition`, and `_sanityCheck`. See [that section](#precondition) for details.
 
+#### UnsafeBitCast and Casting References
+
+In general `unsafeBitCast` should be avoided because it's correctness relies on subtle assumptions that will never be enforced, and it indicates a bug in Swift's type system that should be fixed. It's less bad for non-pointer trivial types. Pointer casting should go through one of the memory binding API instead as a last resort.
+
+Reference casting is more interesting. References casting can include converting to an Optional reference and converting from a class constrained existential.
+
+The regular `as` operator should be able to convert between reference types with full dynamic checking.
+
+`unsafeDownCast` is just as capable, but is only dynamically checked in debug mode or if the cast requires runtime support.
+
+`_unsafeUncheckedDowncast` is the same but is only dynamically checked in the stdlib asserts build, or if the cast requires runtime support.
+
+`_unsafeReferenceCast` is only dynamically checked if the cast requires runtime support. Additionally, it does not impose any static `AnyObject` constraint on the incoming reference. This is useful in a generic context where the object-ness can be determined dynamically, as done in some bridged containers.
 
 ### Builtins
 
-#### `_fastPath` and `_slowPath` (also, `_branchHint`)
+#### `_fastPath` and `_slowPath`
 
 `_fastPath` returns its argument, wrapped in a Builtin.expect. This informs the optimizer that the vast majority of the time, the branch will be taken (i.e. the then branch is “hot”). The SIL optimizer may alter heuristics for anything dominated by the then branch. But the real performance impact comes from the fact that the SIL optimizer will consider anything dominated by the else branch to be infrequently executed (i.e. “cold”). This means that transformations that may increase code size have very conservative heuristics to keep the rarely executed code small.
 
@@ -61,7 +74,7 @@ The probabilities are passed through to LLVM as branch weight metadata, to lever
 
 `_fastPath` probabilities are compounding, see the example below. For this reason, it can actually degrade performance in non-intuitive ways as it marks all other code (including subsequent `_fastPath`s) as being cold. Consider `_fastPath` as basically spraying the rest of the code with a Mr. Freeze-style ice gun.
 
-`_slowPath` is the same as `_fastPath`, just with the branches swapped. Both are just wrappers around `_branchHint`, which is otherwise never called directly.
+`_slowPath` is the same as `_fastPath`, just with the branches swapped.
 
 *Example:*
 
@@ -75,8 +88,8 @@ if _fastPath(...) {
 ...
 if _fastPath(...) {
   // 9% of the time we execute this: very conservative inlining
-	...
-	return
+    ...
+    return
 }
 
 // 1% of the time we execute this: very conservative inlining
@@ -84,21 +97,19 @@ if _fastPath(...) {
 return
 ```
 
-*NOTE: these are due for a rename and possibly a redesign. They conflate multiple notions that don’t match the average standard library programmer’s intuition.*
 
-
-#### `_onFastPath` 
+#### `_onFastPath`
 
 This should be rarely used. It informs the SIL optimizer that any code dominated by it should be treated as the innermost loop of a performance critical section of code. It cranks optimizer heuristics to 11. Injudicious use of this will degrade performance and bloat binary size.
 
 
-#### <a name="precondition"></a>`_precondition`, `_debugPrecondition`, and `_sanityCheck`
+#### <a name="precondition"></a>`_precondition`, `_debugPrecondition`, and `_internalInvariant`
 
 These three functions are assertions that will trigger a run time trap if violated.
 
 * `_precondition` executes in all build configurations. Use this for invariant enforcement in all user code build configurations
 * `_debugPrecondition` will execute when **user code** is built with assertions enabled. Use this for invariant enforcement that's useful while debugging, but might be prohibitively expensive when user code is configured without assertions.
-* `_sanityCheck` will execute when **standard library code** is built with assertions enabled. Use this for internal only invariant checks that useful for debugging the standard library itself.
+* `_internalInvariant` will execute when **standard library code** is built with assertions enabled. Use this for internal only invariant checks that useful for debugging the standard library itself.
 
 #### `_fixLifetime`
 
@@ -172,3 +183,80 @@ The standard library utilizes thread local storage (TLS) to cache expensive comp
 See [ThreadLocalStorage.swift](https://github.com/apple/swift/blob/master/stdlib/public/core/ThreadLocalStorage.swift) for more details.
 
 
+## Working with Resilience
+
+Maintaining ABI compatibility with previously released versions of the standard library makes things more complicated. This section details some of the extra rules to remember and patterns to use.
+
+### The Curiously Recursive Inlinable Switch Pattern (CRISP)
+
+When inlinable code switches over a non-frozen enum, it has to handle possible future cases (since it will be inlined into a module outside the standard library). You can see this in action with the implementation of `round(_:)` in FloatingPointTypes.swift.gyb, which takes a FloatingPointRoundingRule. It looks something like this:
+
+```swift
+@_transparent
+public mutating func round(_ rule: FloatingPointRoundingRule) {
+  switch rule {
+  case .toNearestOrAwayFromZero:
+    _value = Builtin.int_round_FPIEEE${bits}(_value)
+  case .toNearestOrEven:
+    _value = Builtin.int_rint_FPIEEE${bits}(_value)
+  // ...
+  @unknown default:
+    self._roundSlowPath(rule)
+  }
+}
+```
+
+Making `round(_:)` inlinable but still have a default case is an attempt to get the best of both worlds: if the rounding rule is known at compile time, the call will compile down to a single instruction in optimized builds; and if it dynamically turns out to be a new kind of rounding rule added in Swift 25 (e.g. `.towardFortyTwo`), there's a fallback function, `_roundSlowPath(_:)`, that can handle it.
+
+So what does `_roundSlowPath(_:)` look like? Well, it can't be inlinable, because that would defeat the purpose. It *could* just look like this:
+
+```swift
+@usableFromInline
+internal mutating func _roundSlowPath(_ rule: FloatingPointRoundingRule) {
+  switch rule {
+  case .toNearestOrAwayFromZero:
+    _value = Builtin.int_round_FPIEEE${bits}(_value)
+  case .toNearestOrEven:
+    _value = Builtin.int_rint_FPIEEE${bits}(_value)
+  // ...
+  }
+}
+```
+
+...i.e. exactly the same as `round(_:)` but with no `default` case. That's guaranteed to be up to date if any new cases are added in the future. But it seems a little silly, since it's duplicating code that's in `round(_:)`. We *could* omit cases that have always existed, but there's a better answer:
+
+```swift
+// Slow path for new cases that might have been inlined into an old
+// ABI-stable version of round(_:) called from a newer version. If this is
+// the case, this non-inlinable function will call into the _newer_ version
+// which _will_ support this rounding rule.
+@usableFromInline
+internal mutating func _roundSlowPath(_ rule: FloatingPointRoundingRule) {
+  self.round(rule)
+}
+```
+
+Because `_roundSlowPath(_:)` isn't inlinable, the version of `round(_:)` that gets called at run time will always be the version implemented in the standard library dylib. And since FloatingPointRoundingRule is *also* defined in the standard library, we know it'll never be out of sync with this version of `round(_:)`.
+
+Maybe some day we'll have special syntax in the language to say "call this method without allowing inlining" to get the same effect, but for now, this Curiously Recursive Inlinable Switch Pattern allows for safe inlining of switches over non-frozen enums with less boilerplate than you might otherwise have. Not none, but less.
+
+
+## Productivity Hacks
+
+### Be a Ninja
+
+To *be* a productivity ninja, one must *use* `ninja`. `ninja` can be invoked inside the swift build directory, e.g. `<path>/build/Ninja-ReleaseAssert/swift-macosx-x86_64/`. Running `ninja` (which is equivalent to `ninja all`) will build the local swift, stdlib and overlays. It doesn’t necessarily build all the testing infrastructure, benchmarks, etc.
+
+`ninja -t targets` gives a list of all possible targets to pass to ninja. This is useful for grepping.
+
+For this example, we will figure out how to quickly iterate on a change to the standard library to fix 32-bit build errors while building on a 64-bit host, suppressing warnings along the way.
+
+`ninja -t targets | grep stdlib | grep i386` will output many targets, but at the bottom we see `swift-stdlib-iphonesimulator-i386`, which looks like a good first step. This target will just build i386 parts and not waste our time also building the 64-bit stdlib, overlays, etc.
+
+Going further, ninja can spawn a web browser for you to navigate dependencies and rules. `ninja -t browse swift-stdlib-iphonesimulator-i386`  will open a webpage with hyperlinks for all related targets. “target is built using” lists all this target’s dependencies, while “dependent edges build” list all the targets that depend directly on this.
+
+Clicking around a little bit, we can find `lib/swift/iphonesimulator/i386/libswiftCore.dylib` as a commonly-depended-upon target. This will perform just what is needed to compile the standard library for i386 and nothing else.
+
+Going further, for various reasons the standard library has lots of warnings. This is actively being addressed, but fixing all of them may require language features, etc. In the mean time, let’s suppress warnings in our build so that we just see the errors. `ninja -nv lib/swift/iphonesimulator/i386/libswiftCore.dylib` will show us the actual commands ninja will issue to build the i386 stdlib. (You’ll notice that an incremental build here is merely 3 commands as opposed to ~150 for `swift-stdlib-iphonesimulator-i386`).
+
+Copy the invocation that has  ` -o <build-path>/swift-macosx-x86_64/stdlib/public/core/iphonesimulator/i386/Swift.o`, so that we can perform the actual call to swiftc ourselves. Tack on `-suppress-warnings` at the end, and now we have the command to just build `Swift.o` for i386 while only displaying the actual errors.

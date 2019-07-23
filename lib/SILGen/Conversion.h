@@ -33,6 +33,8 @@ public:
     BridgeToObjC,
 
     /// A bridging conversion to a foreign type following a force.
+    /// Although it's not reflected in the name, this is always an
+    /// implicit force cast.
     ForceAndBridgeToObjC,
 
     /// A bridging conversion from a foreign type.

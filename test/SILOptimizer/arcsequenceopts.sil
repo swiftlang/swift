@@ -1,6 +1,6 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -enable-loop-arc=0 -arc-sequence-opts %s | %FileCheck %s
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -enable-loop-arc=1 -arc-sequence-opts %s | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-LOOP %s
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -arc-loop-opts  %s | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-LOOP %s
+// RUN: %target-sil-opt -enable-sil-verify-all -enable-loop-arc=0 -arc-sequence-opts %s | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -enable-loop-arc=1 -arc-sequence-opts %s | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-LOOP %s
+// RUN: %target-sil-opt -enable-sil-verify-all -arc-loop-opts  %s | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-LOOP %s
 
 sil_stage canonical
 
@@ -50,7 +50,7 @@ class C {
 sil @cls_use : $@convention(thin) (@owned Cls) -> ()
 
 class Container {
-  @sil_stored var c : Cls
+  @_hasStorage var c : Cls
   init()
 }
 
@@ -1553,7 +1553,7 @@ bb0(%0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>):
   return %2 : $()
 }
 
-sil [_semantics "arc.programtermination_point"] @fatalError : $@convention(thin) (StaticString, StaticString, StaticString) -> Never
+sil [_semantics "programtermination_point"] @fatalError : $@convention(thin) (StaticString, StaticString, StaticString) -> Never
 
 // CHECK-LABEL: sil @ignore_fatalErrorMsgBB : $@convention(thin) (Builtin.NativeObject) -> () {
 // CHECK-NOT: strong_retain
@@ -2145,4 +2145,71 @@ bb0(%0 : $*Builtin.NativeObject):
   apply %2(%1) : $@convention(thin) (Builtin.NativeObject) -> ()
   strong_release %1 : $Builtin.NativeObject
   return undef : $()
+}
+
+// Make sure that we treat applications of callee_guaranteed functions as a
+// guaranteed use of the function object.
+//
+// CHECK-LABEL: sil @test_callee_guaranteed_is_treated_as_guaranteed : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> () {
+// CHECK: strong_retain
+// CHECK: apply
+// CHECK: strong_release
+// CHECK: } // end sil function 'test_callee_guaranteed_is_treated_as_guaranteed'
+sil @test_callee_guaranteed_is_treated_as_guaranteed : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> () {
+bb0(%0 : $@callee_guaranteed () -> ()):
+  strong_retain %0 : $@callee_guaranteed () -> ()
+  apply %0() : $@callee_guaranteed () -> ()
+  strong_release %0 : $@callee_guaranteed () -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Make sure we can move a release across a releasenone functions.
+//
+// CHECK-LABEL: sil @testReleaseNoneAttribute
+// CHECK-NOT: strong_retain
+// CHECK: [[RELEASENONE:%.*]] = function_ref @releaseNone
+// CHECK-NOT: strong_retain
+// CHECK: apply [[RELEASENONE]]
+// CHECK-NOT: strong_retain
+// CHECK: [[MAYRELEASE:%.*]] = function_ref @mayRelease
+// CHECK-NOT: strong_retain
+// CHECK: apply [[MAYRELEASE]]
+// CHECK-NOT: strong_retain
+// CHECK: return
+// CHECK: } // end sil function 'testReleaseNoneAttribute'
+sil [releasenone] @releaseNone : $@convention(thin) () -> ()
+sil @mayRelease : $@convention(thin) () -> ()
+
+sil @testReleaseNoneAttribute : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = function_ref @releaseNone : $@convention(thin) () -> ()
+  strong_retain %0 : $Builtin.NativeObject
+  %2 = apply %1() : $@convention(thin) () -> ()
+  %3 = function_ref @mayRelease : $@convention(thin) () -> ()
+  %4 = apply %3() : $@convention(thin) () -> ()
+  strong_release %0 : $Builtin.NativeObject
+  %10 = tuple()
+  return %10 : $()
+}
+
+// Make sure that we elimiante the inner retain/release pair on the
+// partial_apply by treating it as an entrance.
+// CHECK-LABEL: sil @test_strong_entrance_partial_apply : $@convention(thin) () -> () {
+// CHECK: partial_apply
+// CHECK-NOT: strong_retain
+// CHECK: apply
+// CHECK: strong_release
+// CHECK-NOT: strong_release
+// CHECK: } // end sil function 'test_strong_entrance_partial_apply'
+sil @test_strong_entrance_partial_apply : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @mayRelease : $@convention(thin) () -> ()
+  %1 = partial_apply [callee_guaranteed] %0() : $@convention(thin) () -> ()
+  strong_retain %1 : $@callee_guaranteed () -> ()
+  apply %1() : $@callee_guaranteed () -> ()
+  strong_release %1 : $@callee_guaranteed () -> ()
+  strong_release %1 : $@callee_guaranteed () -> ()
+  %9999 = tuple()
+  return %9999 : $()
 }

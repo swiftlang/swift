@@ -8,3 +8,11 @@ let c = #column
 
 if #available(iOS 9.0, *) {}
 
+#if false
+#error("Error")
+#elseif true
+#warning("Warning")
+#else
+#sourceLocation(file: "here.swift", line:100)
+#sourceLocation()
+#endif

@@ -317,8 +317,7 @@ void CommentToXMLConverter::visitDocComment(const DocComment *DC) {
     auto Loc = D->getLoc();
     if (Loc.isValid()) {
       const auto &SM = D->getASTContext().SourceMgr;
-      unsigned BufferID = SM.findBufferContainingLoc(Loc);
-      StringRef FileName = SM.getIdentifierForBuffer(BufferID);
+      StringRef FileName = SM.getDisplayNameForLoc(Loc);
       auto LineAndColumn = SM.getLineAndColumn(Loc);
       OS << " file=\"";
       appendWithXMLEscaping(OS, FileName);
@@ -461,11 +460,11 @@ bool ide::getDocumentationCommentAsXML(const Decl *D, raw_ostream &OS) {
 
   swift::markup::MarkupContext MC;
   auto DC = getCascadingDocComment(MC, D);
-  if (!DC.hasValue())
+  if (!DC)
     return false;
 
   CommentToXMLConverter Converter(OS);
-  Converter.visitDocComment(DC.getValue());
+  Converter.visitDocComment(DC);
 
   OS.flush();
   return true;
@@ -474,10 +473,10 @@ bool ide::getDocumentationCommentAsXML(const Decl *D, raw_ostream &OS) {
 bool ide::getLocalizationKey(const Decl *D, raw_ostream &OS) {
   swift::markup::MarkupContext MC;
   auto DC = getCascadingDocComment(MC, D);
-  if (!DC.hasValue())
+  if (!DC)
     return false;
 
-  if (const auto LKF = DC.getValue()->getLocalizationKeyField()) {
+  if (const auto LKF = DC->getLocalizationKeyField()) {
     printInlinesUnder(LKF.getValue(), OS);
     return true;
   }

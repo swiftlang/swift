@@ -1,8 +1,14 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir -O %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir -O %s | %FileCheck %s -check-prefix CHECK -check-prefix CHECK-%target-os
 
-// XFAIL: linux
-
-import Darwin
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+  import Darwin
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
+  import Glibc
+#elseif os(Windows)
+  import MSVCRT
+#else
+#error("Unsupported platform")
+#endif
 
 // Make sure we use an intrinsic for functions such as exp.
 
@@ -17,24 +23,26 @@ public func test1(f : Float) -> Float {
 // CHECK: call double @llvm.exp.f64
 
 public func test2(f : Double) -> Double {
-  return _exp(f)
+  return .exp(f)
 }
-
-// LLVM's sqrt intrinsic does not have the same semantics as libm's sqrt.
-// In particular, llvm.sqrt(negative) is documented as being undef, but
-// we want sqrt(negative) to be defined to be NaN for IEEE 754 conformance.
 
 // CHECK-LABEL: define {{.*}}test3
 // CHECK: call double @sqrt
 
 public func test3(d : Double) -> Double {
+  // This call uses the sqrt function imported from C.
   return sqrt(d)
 }
 
 // CHECK-LABEL: define {{.*}}test4
-// CHECK: call float @sqrtf
+// CHECK-LINUX: call float @llvm.sqrt.f32
+// CHECK-WINDOWS: call float @llvm.sqrt.f32
 
 public func test4(f : Float) -> Float {
+  // This call does not match the signature for the C sqrt function
+  // (as opposed to sqrtf) so instead it gets compiled using the generic
+  // sqrt function from the stdlib's tgmath.swift. That translates to
+  // _stdlib_squareRootf and then to __builtin_sqrtf via SwiftShims.
   return sqrt(f)
 }
 

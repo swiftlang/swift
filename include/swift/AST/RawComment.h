@@ -26,13 +26,13 @@ struct SingleRawComment {
     BlockDoc,      ///< \code /** stuff */ \endcode
   };
 
-  const CharSourceRange Range;
-  const StringRef RawText;
+  CharSourceRange Range;
+  StringRef RawText;
 
   unsigned Kind : 8;
   unsigned StartColumn : 16;
   unsigned StartLine;
-  const unsigned EndLine;
+  unsigned EndLine;
 
   SingleRawComment(CharSourceRange Range, const SourceManager &SourceMgr);
   SingleRawComment(StringRef RawText, unsigned StartColumn);

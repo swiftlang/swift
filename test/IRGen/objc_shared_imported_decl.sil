@@ -1,8 +1,7 @@
 // RUN: %target-swift-frontend -primary-file %s -import-objc-header %S/Inputs/usr/include/NSOption.h -emit-ir | %FileCheck %s
 
-// UNSUPPORTED: resilient_stdlib
-
 // REQUIRES: objc_interop
+// XFAIL: *
 
 import Swift
 
@@ -15,4 +14,4 @@ sil public @use_witness : $@convention(thin) () -> () {
 // We used to emit linkonce_odr llvm linkage for this declaration.
 sil_witness_table shared SomeOptions : Equatable module __C_Synthesized
 
-// CHECK: @"$SSo11SomeOptionsVs9EquatableSCWP" = external hidden global
+// CHECK: @"$sSo11SomeOptionsVs9EquatableSCWP" = external hidden global

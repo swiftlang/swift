@@ -13,14 +13,17 @@
 // This test checks performance of generic binary floating-point conversion from
 // a binary integer.
 
-import Foundation
 import TestsUtils
 
+#if swift(>=4.2)
 public let BinaryFloatingPointConversionFromBinaryInteger = BenchmarkInfo(
   name: "BinaryFloatingPointConversionFromBinaryInteger",
   runFunction: run_BinaryFloatingPointConversionFromBinaryInteger,
   tags: [.validation, .algorithm]
 )
+#else
+public let BinaryFloatingPointConversionFromBinaryInteger: [BenchmarkInfo] = []
+#endif
 
 struct MockBinaryInteger<T : BinaryInteger> {
   var _value: T
@@ -55,8 +58,8 @@ extension MockBinaryInteger : Comparable {
 }
 
 extension MockBinaryInteger : Hashable {
-  var hashValue: Int {
-    return _value.hashValue
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(_value)
   }
 }
 
@@ -105,6 +108,10 @@ extension MockBinaryInteger : BinaryInteger {
 
   var trailingZeroBitCount: Int {
     return _value.trailingZeroBitCount
+  }
+
+  func isMultiple(of other: MockBinaryInteger<T>) -> Bool {
+    return _value.isMultiple(of: other._value)
   }
 
   static func + (
@@ -186,6 +193,8 @@ extension MockBinaryInteger : BinaryInteger {
   }
 }
 
+#if swift(>=4.2)
+
 @inline(never)
 public func run_BinaryFloatingPointConversionFromBinaryInteger(_ N: Int) {
   var xs = [Double]()
@@ -199,3 +208,5 @@ public func run_BinaryFloatingPointConversionFromBinaryInteger(_ N: Int) {
   }
   CheckResults(xs[getInt(0)] == 1999000)
 }
+
+#endif

@@ -5,7 +5,7 @@ TYPE_NODES = [
     # simple-type-identifier -> identifier generic-argument-clause?
     Node('SimpleTypeIdentifier', kind='Type',
          children=[
-             Child('Name', kind='Token',
+             Child('Name', kind='Token', classification='TypeIdentifier',
                    token_choices=[
                        'IdentifierToken',
                        'CapitalSelfToken',
@@ -24,7 +24,7 @@ TYPE_NODES = [
                        'PeriodToken',
                        'PrefixPeriodToken',
                    ]),
-             Child('Name', kind='Token',
+             Child('Name', kind='Token', classification='TypeIdentifier',
                    token_choices=[
                        'IdentifierToken',
                        'CapitalSelfToken',
@@ -34,6 +34,11 @@ TYPE_NODES = [
                    is_optional=True),
          ]),
 
+    # class-restriction-type -> 'class'
+    Node('ClassRestrictionType', kind='Type',
+         children=[
+             Child('ClassKeyword', kind='ClassToken'),
+         ]),
     # array-type -> '[' type ']'
     Node('ArrayType', kind='Type',
          children=[
@@ -72,6 +77,15 @@ TYPE_NODES = [
              Child('QuestionMark', kind='PostfixQuestionMarkToken'),
          ]),
 
+    # some type -> some 'type'
+    Node('SomeType', kind='Type',
+         children=[
+             Child('SomeSpecifier', kind='IdentifierToken',
+                   classification='Keyword',
+                   text_choices=['some']),
+             Child('BaseType', kind='Type'),
+         ]),
+
     # implicitly-unwrapped-optional-type -> type '!'
     Node('ImplicitlyUnwrappedOptionalType', kind='Type',
          children=[
@@ -96,13 +110,15 @@ TYPE_NODES = [
     # composition-type -> composition-type-element-list
     Node('CompositionType', kind='Type',
          children=[
-             Child('Elements', kind='CompositionTypeElementList'),
+             Child('Elements', kind='CompositionTypeElementList',
+                   collection_element_name='Element'),
          ]),
 
     # tuple-type-element -> identifier? ':'? type-annotation ','?
     Node('TupleTypeElement', kind='Syntax',
+         traits=['WithTrailingComma'],
          children=[
-             Child('InOut', kind='InOutToken',
+             Child('InOut', kind='InoutToken',
                    is_optional=True),
              Child('Name', kind='Token',
                    is_optional=True,
@@ -119,7 +135,7 @@ TYPE_NODES = [
              Child('Colon', kind='ColonToken',
                    is_optional=True),
              Child('Type', kind='Type'),
-             Child('Ellipsis', kind='Token',
+             Child('Ellipsis', kind='EllipsisToken',
                    is_optional=True),
              Child('Initializer', kind='InitializerClause',
                    is_optional=True),
@@ -133,9 +149,11 @@ TYPE_NODES = [
 
     # tuple-type -> '(' tuple-type-element-list ')'
     Node('TupleType', kind='Type',
+         traits=['Parenthesized'],
          children=[
              Child('LeftParen', kind='LeftParenToken'),
-             Child('Elements', kind='TupleTypeElementList'),
+             Child('Elements', kind='TupleTypeElementList',
+                   collection_element_name='Element'),
              Child('RightParen', kind='RightParenToken'),
          ]),
 
@@ -143,9 +161,11 @@ TYPE_NODES = [
     # function-type -> attribute-list '(' function-type-argument-list ')'
     #   throwing-specifier? '->'? type?
     Node('FunctionType', kind='Type',
+         traits=['Parenthesized'],
          children=[
              Child('LeftParen', kind='LeftParenToken'),
-             Child('Arguments', kind='TupleTypeElementList'),
+             Child('Arguments', kind='TupleTypeElementList',
+                   collection_element_name='Argument'),
              Child('RightParen', kind='RightParenToken'),
              Child('ThrowsOrRethrowsKeyword', kind='Token',
                    is_optional=True,
@@ -166,7 +186,7 @@ TYPE_NODES = [
                    text_choices=['inout', '__shared', '__owned'],
                    is_optional=True),
              Child('Attributes', kind='AttributeList',
-                   is_optional=True),
+                   collection_element_name='Attribute', is_optional=True),
              Child('BaseType', kind='Type'),
          ]),
 
@@ -178,6 +198,7 @@ TYPE_NODES = [
     # Dictionary<Int, String>
     #            ^~~~ ^~~~~~
     Node('GenericArgument', kind='Syntax',
+         traits=['WithTrailingComma'],
          children=[
              Child('ArgumentType', kind='Type'),
              Child('TrailingComma', kind='CommaToken',
@@ -188,7 +209,8 @@ TYPE_NODES = [
     Node('GenericArgumentClause', kind='Syntax',
          children=[
              Child('LeftAngleBracket', kind='LeftAngleToken'),
-             Child('Arguments', kind='GenericArgumentList'),
+             Child('Arguments', kind='GenericArgumentList',
+                   collection_element_name='Argument'),
              Child('RightAngleBracket', kind='RightAngleToken'),
          ]),
 ]

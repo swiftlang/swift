@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -enable-objc-interop
 
 @unknown func f0() {} // expected-error{{unknown attribute 'unknown'}}
 @unknown(x,y) func f1() {} // expected-error{{unknown attribute 'unknown'}}
@@ -159,7 +159,15 @@ unowned
 var weak7 : Int // expected-error {{'unowned' may only be applied to class and class-bound protocol types, not 'Int'}}
 weak
 var weak8 : Class? = Ty0()
+// expected-warning@-1 {{instance will be immediately deallocated because variable 'weak8' is 'weak'}}
+// expected-note@-2 {{a strong reference is required to prevent the instance from being deallocated}}
+// expected-note@-3 {{'weak8' declared here}}
+
 unowned var weak9 : Class = Ty0()
+// expected-warning@-1 {{instance will be immediately deallocated because variable 'weak9' is 'unowned'}}
+// expected-note@-2 {{a strong reference is required to prevent the instance from being deallocated}}
+// expected-note@-3 {{'weak9' declared here}}
+
 weak
 var weak10 : NonClass? = Ty0() // expected-error {{'weak' must not be applied to non-class-bound 'NonClass'; consider adding a protocol conformance that has a class bound}}
 unowned
@@ -202,16 +210,17 @@ func func_with_unknown_attr7(x: @unknown (Int) () -> Int) {} // expected-error {
 
 func func_type_attribute_with_space(x: @convention (c) () -> Int) {} // OK. Known attributes can have space before its paren.
 
-// @thin is not supported except in SIL.
-var thinFunc : @thin () -> () // expected-error {{attribute is not supported}}
+// @thin and @pseudogeneric are not supported except in SIL.
+var thinFunc : @thin () -> () // expected-error {{unknown attribute 'thin'}}
+var pseudoGenericFunc : @pseudogeneric () -> () // expected-error {{unknown attribute 'pseudogeneric'}}
 
 @inline(never) func nolineFunc() {}
-@inline(never) var noinlineVar : Int // expected-error {{'@inline(never)' attribute cannot be applied to this declaration}} {{1-16=}}
+@inline(never) var noinlineVar : Int { return 0 }
 @inline(never) class FooClass { // expected-error {{'@inline(never)' attribute cannot be applied to this declaration}} {{1-16=}}
 }
 
 @inline(__always) func AlwaysInlineFunc() {}
-@inline(__always) var alwaysInlineVar : Int // expected-error {{'@inline(__always)' attribute cannot be applied to this declaration}} {{1-19=}}
+@inline(__always) var alwaysInlineVar : Int { return 0 }
 @inline(__always) class FooClass2 { // expected-error {{'@inline(__always)' attribute cannot be applied to this declaration}} {{1-19=}}
 }
 
@@ -254,9 +263,23 @@ class C {
   @_optimize(size) var c : Int // expected-error {{'@_optimize(size)' attribute cannot be applied to stored properties}}
 }
 
-class SILStored {
-  @sil_stored var x : Int = 42  // expected-error {{'sil_stored' only allowed in SIL modules}}
+class HasStorage {
+  @_hasStorage var x : Int = 42  // ok, _hasStorage is allowed here
 }
 
 @_show_in_interface protocol _underscored {}
 @_show_in_interface class _notapplicable {} // expected-error {{may only be used on 'protocol' declarations}}
+
+// Error recovery after one invalid attribute
+@_invalid_attribute_ // expected-error {{unknown attribute '_invalid_attribute_'}}
+@inline(__always)
+public func sillyFunction() {}
+
+// rdar://problem/45732251: unowned/unowned(unsafe) optional lets are permitted
+func unownedOptionals(x: C) {
+  unowned let y: C? = x
+  unowned(unsafe) let y2: C? = x
+
+  _ = y
+  _ = y2
+}

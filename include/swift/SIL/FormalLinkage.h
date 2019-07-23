@@ -16,7 +16,7 @@
 namespace swift {
 
 class CanType;
-class NormalProtocolConformance;
+class RootProtocolConformance;
 class ValueDecl;
 enum class SILLinkage : unsigned char;
 enum ForDefinition_t : bool;
@@ -37,10 +37,6 @@ enum class FormalLinkage {
   /// unique file that is known to define it.
   HiddenUnique,
 
-  /// This entity is visible in only a single Swift module but does not
-  /// have a unique file that is known to define it.
-  HiddenNonUnique,
-
   /// This entity is visible in only a single Swift file. These are by
   /// definition unique.
   Private,
@@ -50,7 +46,7 @@ FormalLinkage getDeclLinkage(const ValueDecl *decl);
 SILLinkage getSILLinkage(FormalLinkage linkage,
                          ForDefinition_t forDefinition);
 SILLinkage
-getLinkageForProtocolConformance(const NormalProtocolConformance *C,
+getLinkageForProtocolConformance(const RootProtocolConformance *C,
                                  ForDefinition_t definition);
 
 } // end swift namespace

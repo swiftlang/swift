@@ -86,20 +86,6 @@ func testAutoclosures() throws {
   takesThrowingAutoclosure(genNoError())
 }
 
-struct IllegalContext {
-  var x: Int = genError() // expected-error {{call can throw, but errors cannot be thrown out of a property initializer}}
-
-  func foo(_ x: Int = genError()) {} // expected-error {{call can throw, but errors cannot be thrown out of a default argument}}
-
-  func catcher() throws {
-    do {
-      _ = try genError()
-    } catch MSV.CarriesInt(genError()) { // expected-error {{call can throw, but errors cannot be thrown out of a catch pattern}}
-    } catch MSV.CarriesInt(let i) where i == genError() { // expected-error {{call can throw, but errors cannot be thrown out of a catch guard expression}}
-    }
-  }
-}
-
 func illformed() throws {
     do {
       _ = try genError()
@@ -139,3 +125,5 @@ func fixitThrow2() throws {
   throw MSV.Foo
   var _: (Int) throw -> Int // expected-error{{expected throwing specifier; did you mean 'throws'?}} {{16-21=throws}}
 }
+
+let fn: () -> throws Void  // expected-error{{'throws' may only occur before '->'}} {{12-12=throws }} {{15-22=}}

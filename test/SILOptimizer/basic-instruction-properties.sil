@@ -1,12 +1,12 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil %s -basic-instruction-property-dump -o /dev/null | %FileCheck %s
+// RUN: %target-sil-opt %s -basic-instruction-property-dump -o /dev/null | %FileCheck %s
 
 // REQUIRES: asserts
 
 import Builtin
 
 class X {
-  @sil_stored var a: Builtin.Int32
-  @sil_stored var x: X
+  @_hasStorage var a: Builtin.Int32
+  @_hasStorage var x: X
 
   init()
   func foo()

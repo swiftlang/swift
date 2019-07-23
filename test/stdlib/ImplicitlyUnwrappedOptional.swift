@@ -49,13 +49,26 @@ ImplicitlyUnwrappedOptionalTests.test("flatMap") {
   // let half: Int32 -> Int16! =
   //   { if $0 % 2 == 0 { return Int16($0 / 2) } else { return .none } }
 
-  // expectOptionalEqual(2 as Int16, half(4))
+  // expectEqual(2 as Int16, half(4))
   // expectNil(half(3))
 
   // expectNil((.none as Int!).flatMap(half))
-  // expectOptionalEqual(2 as Int16, (4 as Int!).flatMap(half))
+  // expectEqual(2 as Int16, (4 as Int!).flatMap(half))
   // expectNil((3 as Int!).flatMap(half))
 }
 
-runAllTests()
+infix operator *^* : ComparisonPrecedence
 
+func *^*(lhs: Int?, rhs: Int?) -> Bool { return true }
+func *^*(lhs: Int, rhs: Int) -> Bool { return true }
+
+ImplicitlyUnwrappedOptionalTests.test("preferOptional") {
+  let i: Int! = nil
+  let j: Int = 1
+  if i != j {} // we should choose != for Optionals rather than forcing i
+  if i == j {} // we should choose == for Optionals rather than forcing i
+  // FIXME: https://bugs.swift.org/browse/SR-6988
+  //  if i *^* j {} // we should choose *^* for Optionals rather than forcing i
+}
+
+runAllTests()

@@ -43,12 +43,42 @@ CastsTests.test("No overrelease of existential boxes in failed casts") {
             }
         }
     }
-    
+
     let err: Error = ErrClass()
     bar(err)
 }
 
 extension Int : P {}
+
+// Test for SR-7664: Inconsistent optional casting behaviour with generics
+// Runtime failed to unwrap multiple levels of Optional when casting.
+CastsTests.test("Multi-level optionals can be casted") {
+  func testSuccess<From, To>(_ x: From, from: From.Type, to: To.Type) {
+    expectNotNil(x as? To)
+  }
+  func testFailure<From, To>(_ x: From, from: From.Type, to: To.Type) {
+    expectNil(x as? To)
+  }
+  testSuccess(42, from: Int?.self, to: Int.self)
+  testSuccess(42, from: Int??.self, to: Int.self)
+  testSuccess(42, from: Int???.self, to: Int.self)
+  testSuccess(42, from: Int???.self, to: Int?.self)
+  testSuccess(42, from: Int???.self, to: Int??.self)
+  testSuccess(42, from: Int???.self, to: Int???.self)
+  testFailure(42, from: Int?.self, to: String.self)
+  testFailure(42, from: Int??.self, to: String.self)
+  testFailure(42, from: Int???.self, to: String.self)
+}
+
+// Test for SR-9837: Optional<T>.none not casting to Optional<U>.none in generic context
+CastsTests.test("Optional<T>.none can be casted to Optional<U>.none in generic context") {
+  func test<T>(_ type: T.Type) -> T? {
+    return Any?.none as? T
+  }
+
+  expectEqual(type(of: test(Bool.self)), Bool?.self)
+  expectEqual(type(of: test(Bool?.self)), Bool??.self)
+}
 
 #if _runtime(_ObjC)
 extension CFBitVector : P {

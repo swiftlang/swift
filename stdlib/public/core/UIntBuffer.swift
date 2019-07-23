@@ -14,22 +14,20 @@
 //  255 elements.
 //
 //===----------------------------------------------------------------------===//
-@_fixed_layout
-public struct _UIntBuffer<
-  Storage: UnsignedInteger & FixedWidthInteger, 
-  Element: UnsignedInteger & FixedWidthInteger
-> {
+@frozen
+public struct _UIntBuffer<Element: UnsignedInteger & FixedWidthInteger> {
+  public typealias Storage = UInt32
   public var _storage: Storage
   public var _bitCount: UInt8
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable
   @inline(__always)
   public init(_storage: Storage, _bitCount: UInt8) {
     self._storage = _storage
     self._bitCount = _bitCount
   }
   
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable
   @inline(__always)
   public init(containing e: Element) {
     _storage = Storage(truncatingIfNeeded: e)
@@ -37,16 +35,16 @@ public struct _UIntBuffer<
   }
 }
 
-extension _UIntBuffer : Sequence {
+extension _UIntBuffer: Sequence {
   public typealias SubSequence = Slice<_UIntBuffer>
   
-  @_fixed_layout
-  public struct Iterator : IteratorProtocol, Sequence {
-    @_inlineable // FIXME(sil-serialize-all)
+  @frozen
+  public struct Iterator: IteratorProtocol, Sequence {
+    @inlinable
     @inline(__always)
     public init(_ x: _UIntBuffer) { _impl = x }
     
-    @_inlineable // FIXME(sil-serialize-all)
+    @inlinable
     @inline(__always)
     public mutating func next() -> Element? {
       if _impl._bitCount == 0 { return nil }
@@ -60,58 +58,56 @@ extension _UIntBuffer : Sequence {
     var _impl: _UIntBuffer
   }
   
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable
   @inline(__always)
   public func makeIterator() -> Iterator {
     return Iterator(self)
   }
 }
 
-extension _UIntBuffer : Collection {  
-  @_fixed_layout // FIXME(sil-serialize-all)
-  public struct Index : Comparable {
-    @_versioned
+extension _UIntBuffer: Collection {
+  @frozen
+  public struct Index: Comparable {
+    @usableFromInline
     internal var bitOffset: UInt8
     
-    @_inlineable // FIXME(sil-serialize-all)
-    @_versioned
+    @inlinable
     internal init(bitOffset: UInt8) { self.bitOffset = bitOffset }
     
-    @_inlineable // FIXME(sil-serialize-all)
+    @inlinable
     public static func == (lhs: Index, rhs: Index) -> Bool {
       return lhs.bitOffset == rhs.bitOffset
     }
-    @_inlineable // FIXME(sil-serialize-all)
+    @inlinable
     public static func < (lhs: Index, rhs: Index) -> Bool {
       return lhs.bitOffset < rhs.bitOffset
     }
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  public var startIndex : Index {
+  @inlinable
+  public var startIndex: Index {
     @inline(__always)
     get { return Index(bitOffset: 0) }
   }
   
-  @_inlineable // FIXME(sil-serialize-all)
-  public var endIndex : Index {
+  @inlinable
+  public var endIndex: Index {
     @inline(__always)
     get { return Index(bitOffset: _bitCount) }
   }
   
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable
   @inline(__always)
   public func index(after i: Index) -> Index {
     return Index(bitOffset: i.bitOffset &+ _elementWidth)
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned
-  internal var _elementWidth : UInt8 {
+  @inlinable
+  internal var _elementWidth: UInt8 {
     return UInt8(truncatingIfNeeded: Element.bitWidth)
   }
   
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable
   public subscript(i: Index) -> Element {
     @inline(__always)
     get {
@@ -120,25 +116,25 @@ extension _UIntBuffer : Collection {
   }
 }
 
-extension _UIntBuffer : BidirectionalCollection {
-  @_inlineable // FIXME(sil-serialize-all)
+extension _UIntBuffer: BidirectionalCollection {
+  @inlinable
   @inline(__always)
   public func index(before i: Index) -> Index {
     return Index(bitOffset: i.bitOffset &- _elementWidth)
   }
 }
 
-extension _UIntBuffer : RandomAccessCollection {
+extension _UIntBuffer: RandomAccessCollection {
   public typealias Indices = DefaultIndices<_UIntBuffer>
   
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable
   @inline(__always)
   public func index(_ i: Index, offsetBy n: Int) -> Index {
     let x = Int(i.bitOffset) &+ n &* Element.bitWidth
     return Index(bitOffset: UInt8(truncatingIfNeeded: x))
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable
   @inline(__always)
   public func distance(from i: Index, to j: Index) -> Int {
     return (Int(j.bitOffset) &- Int(i.bitOffset)) / Element.bitWidth
@@ -147,20 +143,17 @@ extension _UIntBuffer : RandomAccessCollection {
 
 extension FixedWidthInteger {
   @inline(__always)
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned
+  @inlinable
   internal func _fullShiftLeft<N: FixedWidthInteger>(_ n: N) -> Self {
     return (self &<< ((n &+ 1) &>> 1)) &<< (n &>> 1)
   }
   @inline(__always)
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned
+  @inlinable
   internal func _fullShiftRight<N: FixedWidthInteger>(_ n: N) -> Self {
     return (self &>> ((n &+ 1) &>> 1)) &>> (n &>> 1)
   }
   @inline(__always)
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned
+  @inlinable
   internal static func _lowBits<N: FixedWidthInteger>(_ n: N) -> Self {
     return ~((~0 as Self)._fullShiftLeft(n))
   }
@@ -168,35 +161,35 @@ extension FixedWidthInteger {
 
 extension Range {
   @inline(__always)
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned
+  @inlinable
   internal func _contains_(_ other: Range) -> Bool {
     return other.clamped(to: self) == other
   }
 }
 
-extension _UIntBuffer : RangeReplaceableCollection {
-  @_inlineable // FIXME(sil-serialize-all)
+extension _UIntBuffer: RangeReplaceableCollection {
+  @inlinable
   @inline(__always)
   public init() {
     _storage = 0
     _bitCount = 0
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable
   public var capacity: Int {
     return Storage.bitWidth / Element.bitWidth
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable
   @inline(__always)
   public mutating func append(_ newElement: Element) {
     _debugPrecondition(count + 1 <= capacity)
+    _storage &= ~(Storage(Element.max) &<< _bitCount)
     _storage |= Storage(newElement) &<< _bitCount
     _bitCount = _bitCount &+ _elementWidth
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable
   @inline(__always)
   @discardableResult
   public mutating func removeFirst() -> Element {
@@ -207,7 +200,7 @@ extension _UIntBuffer : RangeReplaceableCollection {
     return result
   }
   
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable
   @inline(__always)
   public mutating func replaceSubrange<C: Collection>(
     _ target: Range<Index>, with replacement: C

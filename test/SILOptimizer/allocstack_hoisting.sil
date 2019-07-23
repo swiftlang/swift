@@ -1,5 +1,5 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -alloc-stack-hoisting | %FileCheck %s
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -alloc-stack-hoisting -sil-merge-stack-slots=false | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -alloc-stack-hoisting | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -alloc-stack-hoisting -sil-merge-stack-slots=false | %FileCheck %s
 sil_stage canonical
 
 import Builtin
@@ -125,7 +125,7 @@ bb3:
 // CHECK-NOT: dealloc_stack
 // CHECK: bb2
 // CHECK: bb3:
-// CHECK  dealloc_stack [[FIXED]]
+// CHECK:  dealloc_stack [[FIXED]]
 // CHECK: dealloc_stack [[AS2]]
 // CHECK: dealloc_stack [[AS]]
 // CHECK:   return

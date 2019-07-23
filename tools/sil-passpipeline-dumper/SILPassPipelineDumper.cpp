@@ -44,7 +44,8 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os, PassPipelineKind Kind) {
 } // namespace llvm
 
 int main(int argc, char **argv) {
-  INITIALIZE_LLVM(argc, argv);
+  PROGRAM_START(argc, argv);
+  INITIALIZE_LLVM();
 
   llvm::cl::ParseCommandLineOptions(argc, argv,
                                     "Swift SIL Pass Pipeline Dumper\n");
@@ -54,11 +55,6 @@ int main(int argc, char **argv) {
 
   switch (PipelineKind) {
 #define PASSPIPELINE(NAME, DESCRIPTION)                                        \
-  case PassPipelineKind::NAME: {                                               \
-    SILPassPipelinePlan::get##NAME##PassPipeline().print(llvm::outs());        \
-    break;                                                                     \
-  }
-#define PASSPIPELINE_WITH_OPTIONS(NAME, DESCRIPTION)                           \
   case PassPipelineKind::NAME: {                                               \
     SILPassPipelinePlan::get##NAME##PassPipeline(Opt).print(llvm::outs());     \
     break;                                                                     \

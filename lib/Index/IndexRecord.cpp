@@ -23,7 +23,6 @@
 #include "swift/AST/ModuleLoader.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Index/Index.h"
-#include "swift/Strings.h"
 #include "clang/Basic/FileManager.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Index/IndexingAction.h"
@@ -165,9 +164,7 @@ public:
     // FIXME: expose errors?
   }
 
-  bool recordHash(StringRef hash, bool isKnown) override { return true; }
-  bool startDependency(StringRef name, StringRef path, bool isClangModule,
-                       bool isSystem, StringRef hash) override {
+  bool startDependency(StringRef name, StringRef path, bool isClangModule, bool isSystem) override {
     return true;
   }
   bool finishDependency(bool isClangModule) override { return true; }
@@ -204,9 +201,7 @@ public:
     // FIXME: expose errors?
   }
 
-  bool recordHash(StringRef hash, bool isKnown) override { return true; }
-  bool startDependency(StringRef name, StringRef path, bool isClangModule,
-                       bool isSystem, StringRef hash) override {
+  bool startDependency(StringRef name, StringRef path, bool isClangModule, bool isSystem) override {
     return true;
   }
   bool finishDependency(bool isClangModule) override { return true; }
@@ -343,7 +338,7 @@ recordSourceFile(SourceFile *SF, StringRef indexStorePath,
   bool failed = false;
   auto consumer = makeRecordingConsumer(SF->getFilename(), indexStorePath,
                                         &diags, &recordFile, &failed);
-  indexSourceFile(SF, /*Hash=*/"", *consumer);
+  indexSourceFile(SF, *consumer);
 
   if (!failed && !recordFile.empty())
     callback(recordFile, SF->getFilename());
@@ -357,18 +352,12 @@ recordSourceFile(SourceFile *SF, StringRef indexStorePath,
 // Used to get std::string pointers to pass as writer::OpaqueModule.
 namespace {
 class StringScratchSpace {
-  std::vector<const std::string *> StrsCreated;
+  std::vector<std::unique_ptr<std::string>> StrsCreated;
 
 public:
   const std::string *createString(StringRef str) {
-    auto *s = new std::string(str);
-    StrsCreated.push_back(s);
-    return s;
-  }
-
-  ~StringScratchSpace() {
-    for (auto *str : StrsCreated)
-      delete str;
+    StrsCreated.emplace_back(llvm::make_unique<std::string>(str));
+    return StrsCreated.back().get();
   }
 };
 }
@@ -402,7 +391,7 @@ static void addModuleDependencies(ArrayRef<ModuleDecl::ImportedModule> imports,
 
   for (auto &import : imports) {
     ModuleDecl *mod = import.second;
-    if (mod->getNameStr() == SWIFT_ONONE_SUPPORT)
+    if (mod->isOnoneSupportModule())
       continue; // ignore the Onone support library.
     if (mod->isSwiftShimsModule())
       continue;
@@ -410,10 +399,10 @@ static void addModuleDependencies(ArrayRef<ModuleDecl::ImportedModule> imports,
     for (auto *FU : mod->getFiles()) {
       switch (FU->getKind()) {
       case FileUnitKind::Source:
-      case FileUnitKind::Derived:
       case FileUnitKind::Builtin:
         break;
       case FileUnitKind::SerializedAST:
+      case FileUnitKind::DWARFModule:
       case FileUnitKind::ClangModule: {
         auto *LFU = cast<LoadedFile>(FU);
         if (auto *F = fileMgr.getFile(LFU->getFilename())) {
@@ -489,7 +478,7 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
     bool failed = false;
     auto consumer = makeRecordingConsumer(filename, indexStorePath,
                                           &diags, &recordFile, &failed);
-    indexModule(module, /*Hash=*/"", *consumer);
+    indexModule(module, *consumer);
 
     if (failed)
       return true;
@@ -538,7 +527,7 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
       records.emplace_back(outRecordFile, moduleName.str());
       return true;
     });
-    indexModule(module, /*Hash=*/"", groupIndexConsumer);
+    indexModule(module, groupIndexConsumer);
     if (failed)
       return true;
   }
@@ -569,8 +558,11 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
     unitWriter.addRecordFile(recordFile, FE, isSystemModule, mod);
   }
 
+  ModuleDecl::ImportFilter importFilter;
+  importFilter |= ModuleDecl::ImportFilterKind::Public;
+  importFilter |= ModuleDecl::ImportFilterKind::Private;
   SmallVector<ModuleDecl::ImportedModule, 8> imports;
-  module->getImportedModules(imports, ModuleDecl::ImportFilter::All);
+  module->getImportedModules(imports, importFilter);
   StringScratchSpace moduleNameScratch;
   addModuleDependencies(imports, indexStorePath, indexSystemModules,
                         targetTriple, clangCI, diags, unitWriter, moduleNameScratch);
@@ -604,8 +596,12 @@ recordSourceFileUnit(SourceFile *primarySourceFile, StringRef indexUnitToken,
     targetTriple, sysrootPath, getModuleInfoFromOpaqueModule);
 
   // Module dependencies.
+  ModuleDecl::ImportFilter importFilter;
+  importFilter |= ModuleDecl::ImportFilterKind::Public;
+  importFilter |= ModuleDecl::ImportFilterKind::Private;
+  importFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
   SmallVector<ModuleDecl::ImportedModule, 8> imports;
-  primarySourceFile->getImportedModules(imports, ModuleDecl::ImportFilter::All);
+  primarySourceFile->getImportedModules(imports, importFilter);
   StringScratchSpace moduleNameScratch;
   addModuleDependencies(imports, indexStorePath, indexSystemModules,
                         targetTriple, clangCI, diags, unitWriter, moduleNameScratch);

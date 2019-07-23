@@ -55,7 +55,7 @@ case is B,
      is D,
      is S:
   ()
-case is E:
+case is E: // expected-warning {{cast from 'P' to unrelated type 'E' always fails}}
   ()
 default:
   ()
@@ -69,7 +69,7 @@ case let d as D:
   d.d()
 case let s as S:
   s.s()
-case let e as E:
+case let e as E: // expected-warning {{cast from 'P' to unrelated type 'E' always fails}}
   e.e()
 default:
   ()
@@ -120,10 +120,9 @@ case iPadHair<E>.HairForceOne:
   ()
 case iPadHair.HairForceOne: // expected-error{{generic enum type 'iPadHair' is ambiguous without explicit generic parameters when matching value of type 'HairType'}}
   ()
-case Watch.Edition: // TODO: should warn that cast can't succeed with currently known conformances
+case Watch.Edition: // expected-warning {{cast from 'HairType' to unrelated type 'Watch' always fails}}
   ()
-// TODO: Bad error message
-case .HairForceOne: // expected-error{{cannot convert}}
+case .HairForceOne: // expected-error{{type 'HairType' has no member 'HairForceOne'}}
   ()
 default:
   break
@@ -255,7 +254,7 @@ enum SR2057 {
 }
 
 let sr2057: SR2057?
-if case .foo = sr2057 { } // expected-error{{enum case 'foo' not found in type 'SR2057?'}}
+if case .foo = sr2057 { } // Ok
 
 
 // Invalid 'is' pattern
@@ -292,7 +291,9 @@ switch staticMembers {
   case .init(0): break
   case .init(_): break // expected-error{{'_' can only appear in a pattern}}
   case .init(let x): break // expected-error{{cannot appear in an expression}}
-  case .init(opt: 0): break // expected-error{{not unwrapped}}
+case .init(opt: 0): break // expected-error{{value of optional type 'StaticMembers?' must be unwrapped to a value of type 'StaticMembers'}}
+  // expected-note@-1{{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+  // expected-note@-2{{coalesce using '??' to provide a default when the optional value contains 'nil'}}
 
   case .prop: break
   // TODO: repeated error message
@@ -309,7 +310,10 @@ switch staticMembers {
   case .method(withLabel: let x): break // expected-error{{cannot appear in an expression}}
 
   case .optMethod: break // expected-error{{cannot match}}
-  case .optMethod(0): break // expected-error{{not unwrapped}}
+  case .optMethod(0): break
+  // expected-error@-1 {{value of optional type 'StaticMembers?' must be unwrapped to a value of type 'StaticMembers'}}
+  // expected-note@-2 {{coalesce}}
+  // expected-note@-3 {{force-unwrap}}
 }
 
 _ = 0
@@ -328,10 +332,10 @@ struct S_32241441 {
 func rdar32241441() {
   let s: S_32241441? = S_32241441()
 
-  switch s?.type {
-  case .foo: // expected-error {{enum case 'foo' not found in type 'S_32241441.E_32241441?'}} {{12-12=?}}
+  switch s?.type { // expected-error {{switch must be exhaustive}} expected-note {{add missing case: '.none'}}
+  case .foo: // Ok
     break;
-  case .bar: // expected-error {{enum case 'bar' not found in type 'S_32241441.E_32241441?'}} {{12-12=?}}
+  case .bar: // Ok
     break;
   }
 }
@@ -351,3 +355,79 @@ func testOne() {
     if case One.E.SomeError = error {} // expected-error{{generic enum type 'One.E' is ambiguous without explicit generic parameters when matching value of type 'Error'}}
   }
 }
+
+// SR-8347
+// constrain initializer expressions of optional some pattern bindings to be optional
+func test8347() -> String {
+  struct C {
+    subscript (s: String) -> String? {
+      return ""
+    }
+    subscript (s: String) -> [String] {
+      return [""]
+    }
+
+    func f() -> String? {
+      return ""
+    }
+    func f() -> Int {
+      return 3
+    }
+
+    func g() -> String {
+      return ""
+    }
+
+    func h() -> String { // expected-note {{found this candidate}}
+      return ""
+    }
+    func h() -> Double { // expected-note {{found this candidate}}
+      return 3.0
+    }
+    func h() -> Int? { //expected-note{{found this candidate}}
+      return 2
+    }
+    func h() -> Float? { //expected-note{{found this candidate}}
+      return nil
+    }
+
+  }
+
+  let c = C()
+  if let s = c[""] {
+    return s
+  }
+  if let s = c.f() {
+    return s
+  }
+  if let s = c.g() { //expected-error{{initializer for conditional binding must have Optional type, not 'String'}}
+    return s
+  }
+  if let s = c.h() { //expected-error{{ambiguous use of 'h()'}}
+    return s
+  }
+}
+
+enum SR_7799 {
+ case baz
+ case bar
+}
+
+let sr7799: SR_7799? = .bar
+
+switch sr7799 {
+ case .bar?: break // Ok
+ case .baz: break // Ok
+ default: break
+}
+
+let sr7799_1: SR_7799?? = .baz
+
+switch sr7799_1 {
+ case .bar?: break // Ok
+ case .baz: break // Ok
+ default: break
+}
+
+if case .baz = sr7799_1 {} // Ok
+if case .bar? = sr7799_1 {} // Ok

@@ -31,35 +31,40 @@ class ValueDecl;
 namespace constraints {
   class ConstraintSystem;
 
-/// \brief The kind of overload choice.
+/// The kind of overload choice.
 enum class OverloadChoiceKind : int {
-  /// \brief The overload choice selects a particular declaration from a
+  /// The overload choice selects a particular declaration from a
   /// set of declarations.
   Decl,
-  /// \brief The overload choice selects a particular declaration that was
+  /// The overload choice selects a particular declaration that was
   /// found via dynamic lookup and, therefore, might not actually be
   /// available at runtime.
   DeclViaDynamic,
-  /// \brief The overload choice equates the member type with the
+  /// The overload choice equates the member type with the
   /// base type. Used for unresolved member expressions like ".none" that
   /// refer to enum members with unit type.
   BaseType,
-  /// \brief The overload choice selects a key path subscripting operation.
+  /// The overload choice selects a key path subscripting operation.
   KeyPathApplication,
-  /// \brief The overload choice selects a particular declaration that
+  /// The member is looked up using @dynamicMemberLookup.
+  DynamicMemberLookup,
+  /// The member with KeyPath parameter is looked up using
+  /// @dynamicMemberLookup.
+  KeyPathDynamicMemberLookup,
+  /// The overload choice selects a particular declaration that
   /// was found by bridging the base value type to its Objective-C
   /// class type.
   DeclViaBridge,
-  /// \brief The overload choice selects a particular declaration that
+  /// The overload choice selects a particular declaration that
   /// was found by unwrapping an optional context type.
   DeclViaUnwrappedOptional,
-  /// \brief The overload choice indexes into a tuple. Index zero will
+  /// The overload choice indexes into a tuple. Index zero will
   /// have the value of this enumerator, index one will have the value of this
   /// enumerator + 1, and so on. Thus, this enumerator must always be last.
   TupleIndex,
 };
 
-/// \brief Describes a particular choice within an overload set.
+/// Describes a particular choice within an overload set.
 ///
 class OverloadChoice {
   enum : unsigned {
@@ -77,27 +82,38 @@ class OverloadChoice {
     IsDeclViaDynamic = 0x03,
   };
 
-  /// \brief The base type to be used when referencing the declaration
+  /// The base type to be used when referencing the declaration
   /// along with the three bits above.
   llvm::PointerIntPair<Type, 3, unsigned> BaseAndDeclKind;
 
   /// We mash together OverloadChoiceKind with tuple indices into a single
   /// integer representation.
-  typedef llvm::PointerEmbeddedInt<uint32_t, 29>
-    OverloadChoiceKindWithTupleIndex;
-  
-  /// \brief Either the declaration pointer or the overload choice kind.  The
-  /// second case is represented as an OverloadChoiceKind, but has additional
-  /// values at the top end that represent the tuple index.
+  using OverloadChoiceKindWithTupleIndex =
+      llvm::PointerEmbeddedInt<uint32_t, 29>;
+
+  /// Depending on the OverloadChoiceKind, this could be one of two cases:
+  /// 1) A ValueDecl for the cases that match to a Decl.  The exactly kind of
+  ///    decl reference is disambiguated with the DeclKind bits in
+  ///    BaseAndDeclKind.
+  /// 2) An OverloadChoiceKindWithTupleIndex if this is an overload kind without
+  ///    a decl (e.g., a BaseType, keypath, tuple, etc).
+  ///
   llvm::PointerUnion<ValueDecl*, OverloadChoiceKindWithTupleIndex> DeclOrKind;
 
-  /// The kind of function reference.
+  /// If this OverloadChoice represents a DynamicMemberLookup result,
+  /// then this holds the identifier for the original member being
+  /// looked up, as well as 1 bit tag which identifies whether this
+  /// choice represents a key-path based dynamic lookup.
+  llvm::PointerIntPair<Identifier, 1, unsigned> DynamicMember;
+
+  /// This holds the kind of function reference (Unapplied, SingleApply,
+  /// DoubleApply, Compound).
   /// FIXME: This needs two bits. Can we pack them somewhere?
   FunctionRefKind TheFunctionRefKind;
 
 public:
   OverloadChoice()
-    : BaseAndDeclKind(nullptr, 0), DeclOrKind(0),
+    : BaseAndDeclKind(nullptr, 0), DeclOrKind(),
       TheFunctionRefKind(FunctionRefKind::Unapplied) {}
 
   OverloadChoice(Type base, ValueDecl *value,
@@ -173,14 +189,35 @@ public:
     result.TheFunctionRefKind = functionRefKind;
     return result;
   }
+  
+  /// Retrieve an overload choice for a declaration that was found via
+  /// dynamic member lookup. The `ValueDecl` is a `subscript(dynamicMember:)`
+  /// method.
+  static OverloadChoice getDynamicMemberLookup(Type base, ValueDecl *value,
+                                               Identifier name,
+                                               bool isKeyPathBased) {
+    OverloadChoice result;
+    result.BaseAndDeclKind.setPointer(base);
+    result.DeclOrKind = value;
+    result.DynamicMember.setPointer(name);
+    result.DynamicMember.setInt(isKeyPathBased);
+    result.TheFunctionRefKind = FunctionRefKind::SingleApply;
+    return result;
+  }
 
-  /// \brief Retrieve the base type used to refer to the declaration.
+  /// Retrieve the base type used to refer to the declaration.
   Type getBaseType() const {
     return BaseAndDeclKind.getPointer();
   }
   
-  /// \brief Determines the kind of overload choice this is.
+  /// Determines the kind of overload choice this is.
   OverloadChoiceKind getKind() const {
+    if (!DynamicMember.getPointer().empty()) {
+      return DynamicMember.getInt()
+                 ? OverloadChoiceKind::KeyPathDynamicMemberLookup
+                 : OverloadChoiceKind::DynamicMemberLookup;
+    }
+    
     if (DeclOrKind.is<ValueDecl*>()) {
       switch (BaseAndDeclKind.getInt()) {
       case IsDeclViaBridge: return OverloadChoiceKind::DeclViaBridge;
@@ -190,7 +227,6 @@ public:
       default: return OverloadChoiceKind::Decl;
       }
     }
-
     uint32_t kind = DeclOrKind.get<OverloadChoiceKindWithTupleIndex>();
     if (kind >= (uint32_t)OverloadChoiceKind::TupleIndex)
       return OverloadChoiceKind::TupleIndex;
@@ -203,9 +239,15 @@ public:
     return DeclOrKind.is<ValueDecl*>();
   }
 
-  /// \brief Retrieve the declaration that corresponds to this overload choice.
+  /// Retrieve the declaration that corresponds to this overload choice.
   ValueDecl *getDecl() const {
     return DeclOrKind.get<ValueDecl*>();
+  }
+
+  /// Retrieves the declaration that corresponds to this overload choice, or
+  /// \c nullptr if this choice is not for a declaration.
+  ValueDecl *getDeclOrNull() const {
+    return isDecl() ? getDecl() : nullptr;
   }
 
   /// Returns true if this is either a decl for an optional that was
@@ -214,10 +256,14 @@ public:
   /// unwrapped.
   bool isImplicitlyUnwrappedValueOrReturnValue() const;
 
+  bool isKeyPathDynamicMemberLookup() const {
+    return getKind() == OverloadChoiceKind::KeyPathDynamicMemberLookup;
+  }
+
   /// Get the name of the overload choice.
   DeclName getName() const;
 
-  /// \brief Retrieve the tuple index that corresponds to this overload
+  /// Retrieve the tuple index that corresponds to this overload
   /// choice.
   unsigned getTupleIndex() const {
     assert(getKind() == OverloadChoiceKind::TupleIndex);
@@ -225,7 +271,7 @@ public:
     return kind-(uint32_t)OverloadChoiceKind::TupleIndex;
   }
 
-  /// \brief Retrieves an opaque choice that ignores the base type.
+  /// Retrieves an opaque choice that ignores the base type.
   void *getOpaqueChoiceSimple() const {
     return DeclOrKind.getOpaqueValue();
   }

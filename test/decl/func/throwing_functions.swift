@@ -69,7 +69,8 @@ func fooT(_ callback: () throws -> Bool) {} //OK
 func fooT(_ callback: () -> Bool) {}
 
 // Throwing and non-throwing types are not equivalent.
-struct X<T> { }
+struct X<T> { } // expected-note {{arguments to generic parameter 'T' ('(String) -> Int' and '(String) throws -> Int') are expected to be equal}}
+// expected-note@-1 {{arguments to generic parameter 'T' ('(String) throws -> Int' and '(String) -> Int') are expected to be equal}}
 func specializedOnFuncType1(_ x: X<(String) throws -> Int>) { }
 func specializedOnFuncType2(_ x: X<(String) -> Int>) { }
 func testSpecializedOnFuncType(_ xThrows: X<(String) throws -> Int>,
@@ -153,3 +154,128 @@ let _ = rdar33040113() // expected-error {{call can throw but is not marked with
 // expected-note@-1 {{did you mean to use 'try'?}} {{9-9=try }}
 // expected-note@-2 {{did you mean to handle error as optional value?}} {{9-9=try? }}
 // expected-note@-3 {{did you mean to disable error propagation?}} {{9-9=try! }}
+
+enum MSV : Error {
+  case Foo, Bar, Baz
+  case CarriesInt(Int)
+}
+
+func genError() throws -> Int { throw MSV.Foo }
+
+struct IllegalContext {
+  var x1: Int = genError() // expected-error {{call can throw, but errors cannot be thrown out of a property initializer}}
+
+  let x2 = genError() // expected-error {{call can throw, but errors cannot be thrown out of a property initializer}}
+
+  var x3 = try genError() // expected-error {{call can throw, but errors cannot be thrown out of a property initializer}}
+
+  let x4: Int = try genError() // expected-error {{call can throw, but errors cannot be thrown out of a property initializer}}
+
+  var x5 = B() // expected-error {{call can throw, but errors cannot be thrown out of a property initializer}}
+
+  var x6 = try B() // expected-error {{call can throw, but errors cannot be thrown out of a property initializer}}
+
+  var x7 = { // expected-error {{call can throw, but errors cannot be thrown out of a property initializer}}
+    return try genError()
+  }()
+
+  var x8: Int = {
+    do {
+      return genError() // expected-error {{call can throw but is not marked with 'try'}}
+      // expected-note@-1 {{did you mean to use 'try'?}}
+      // expected-note@-2 {{did you mean to handle error as optional value?}}
+      // expected-note@-3 {{did you mean to disable error propagation?}}
+    } catch {
+      return 0
+    }
+  }()
+
+  var x9: Int = {
+    do {
+      return try genError()
+    } catch {
+      return 0
+    }
+  }()
+
+  var x10: B = {
+    do {
+      return try B()
+    } catch {
+      return B(foo: 0)
+    }
+  }()
+
+  lazy var y1: Int = genError() // expected-error {{call can throw, but errors cannot be thrown out of a property initializer}}
+
+  lazy var y2 = genError() // expected-error {{call can throw, but errors cannot be thrown out of a property initializer}}
+
+  lazy var y3 = try genError() // expected-error {{call can throw, but errors cannot be thrown out of a property initializer}}
+
+  lazy var y4: Int = try genError() // expected-error {{call can throw, but errors cannot be thrown out of a property initializer}}
+
+  lazy var y5 = B() // expected-error {{call can throw, but errors cannot be thrown out of a property initializer}}
+
+  lazy var y6 = try B() // expected-error {{call can throw, but errors cannot be thrown out of a property initializer}}
+
+  lazy var y7 = { // expected-error {{call can throw, but errors cannot be thrown out of a property initializer}}
+    return try genError()
+  }()
+
+  lazy var y8: Int = {
+    do {
+      return genError() // expected-error {{call can throw but is not marked with 'try'}}
+      // expected-note@-1 {{did you mean to use 'try'?}}
+      // expected-note@-2 {{did you mean to handle error as optional value?}}
+      // expected-note@-3 {{did you mean to disable error propagation?}}
+    } catch {
+      return 0
+    }
+  }()
+
+  lazy var y9: Int = {
+    do {
+      return try genError()
+    } catch {
+      return 0
+    }
+  }()
+
+  lazy var y10: B = {
+    do {
+      return try B()
+    } catch {
+      return B(foo: 0)
+    }
+  }()
+
+  func foo(_ x: Int = genError()) {} // expected-error {{call can throw, but errors cannot be thrown out of a default argument}}
+
+  func catcher() throws {
+    do {
+      _ = try genError()
+    } catch MSV.CarriesInt(genError()) { // expected-error {{call can throw, but errors cannot be thrown out of a catch pattern}}
+    } catch MSV.CarriesInt(let i) where i == genError() { // expected-error {{call can throw, but errors cannot be thrown out of a catch guard expression}}
+    }
+  }
+}
+
+// Crash in 'uncovered try' diagnostic when calling a function value - rdar://46973064
+struct FunctionHolder {
+  let fn: () throws -> ()
+  func receive() {
+    do {
+      _ = fn()
+      // expected-error@-1 {{call can throw but is not marked with 'try'}}
+      // expected-note@-2 {{did you mean to use 'try'?}}
+      // expected-note@-3 {{did you mean to handle error as optional value?}}
+      // expected-note@-4 {{did you mean to disable error propagation?}}
+      _ = "\(fn())"
+      // expected-error@-1 {{call can throw but is not marked with 'try'}}
+      // expected-note@-2 {{did you mean to use 'try'?}}
+      // expected-note@-3 {{did you mean to handle error as optional value?}}
+      // expected-note@-4 {{did you mean to disable error propagation?}}
+    } catch {}
+  }
+}
+

@@ -1,11 +1,9 @@
 {
-  key.hash: <hash>,
   key.dependencies: [
     {
       key.kind: source.lang.swift.import.module.swift,
       key.name: "Swift",
       key.filepath: Swift.swiftmodule,
-      key.hash: <hash>,
       key.is_system: 1
     }
   ],
@@ -35,7 +33,8 @@
           key.kind: source.lang.swift.decl.function.constructor,
           key.usr: "s:23index_is_test_candidate8MyStructVACycfc",
           key.line: 12,
-          key.column: 8
+          key.column: 8,
+          key.is_implicit: 1
         }
       ]
     },
@@ -50,7 +49,8 @@
           key.kind: source.lang.swift.decl.function.constructor,
           key.usr: "s:23index_is_test_candidate10XCTestCaseCACycfc",
           key.line: 15,
-          key.column: 7
+          key.column: 7,
+          key.is_implicit: 1
         }
       ]
     },
@@ -90,6 +90,7 @@
           key.usr: "s:23index_is_test_candidate14MyPrivateClass33_E06F4E7BC5F577AB6E2EC6D3ECA1C8B9LLCADycfc",
           key.line: 16,
           key.column: 43,
+          key.is_implicit: 1,
           key.related: [
             {
               key.kind: source.lang.swift.ref.function.constructor,
@@ -212,6 +213,7 @@
           key.usr: "s:23index_is_test_candidate7MyClassCACycfc",
           key.line: 20,
           key.column: 35,
+          key.is_implicit: 1,
           key.related: [
             {
               key.kind: source.lang.swift.ref.function.constructor,

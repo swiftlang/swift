@@ -14,31 +14,33 @@
 #define SWIFT_DRIVER_FRONTENDUTIL_H
 
 #include "swift/Basic/LLVM.h"
+#include "llvm/ADT/STLExtras.h"
 
 #include <memory>
 
 namespace swift {
 
-class CompilerInvocation;
 class DiagnosticEngine;
 
 namespace driver {
 
-/// \brief Creates a CompilerInvocation from the given driver arguments.
+/// Generates the list of arguments that would be passed to the compiler
+/// frontend from the given driver arguments.
 ///
-/// \param ArgList The driver arguments for which a CompilerInvocation
-/// should be created.
-/// \param Diags The DiagnosticEngine which should be used for parsing arguments
+/// \param ArgList The driver arguments (i.e. normal arguments for \c swiftc).
+/// \param Diags The DiagnosticEngine used to report any errors parsing the
+/// arguments.
+/// \param Action Called with the list of frontend arguments if there were no
+/// errors in processing \p ArgList. This is a callback rather than a return
+/// value to avoid copying the arguments more than necessary.
 ///
-/// \returns A fully-formed CompilerInvocation, or nullptr if one couldn't be
-/// created.
+/// \returns True on error, or if \p Action returns true.
 ///
-/// \note This function is not intended to create CompilerInvocation instances
-/// which are suitable for use in REPL or immediate modes, since it will have
-/// the effect of overriding the frontend's requested action to
-/// FrontendOptions::ActionType::Parse.
-std::unique_ptr<CompilerInvocation> createCompilerInvocation(
-    ArrayRef<const char *> ArgList, DiagnosticEngine &Diags);
+/// \note This function is not intended to create invocations which are
+/// suitable for use in REPL or immediate modes.
+bool getSingleFrontendInvocationFromDriverArguments(
+    ArrayRef<const char *> ArgList, DiagnosticEngine &Diags,
+    llvm::function_ref<bool(ArrayRef<const char *> FrontendArgs)> Action);
 
 } // end namespace driver
 } // end namespace swift

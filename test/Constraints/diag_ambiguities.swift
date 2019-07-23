@@ -27,7 +27,7 @@ func g(_ x: Int, _ y: Int) -> () {} // expected-note{{found this candidate}}
 C(g) // expected-error{{ambiguous use of 'g'}}
 
 func h<T>(_ x: T) -> () {}
-C(h) // expected-error{{ambiguous use of 'init'}}
+C(h) // expected-error{{ambiguous use of 'init(_:)'}}
 
 func rdar29691909_callee(_ o: AnyObject?) -> Any? { return o } // expected-note {{found this candidate}}
 func rdar29691909_callee(_ o: AnyObject) -> Any { return o } // expected-note {{found this candidate}}
@@ -51,10 +51,7 @@ struct SR3715 {
   func take(_ a: [Any]) {}
 
   func test() {
-    take([overloaded]) // expected-warning {{expression implicitly coerced from 'Int?' to 'Any'}}
-  // expected-note@-1 {{force-unwrap the value to avoid this warning}}
-  // expected-note@-2 {{provide a default value to avoid this warning}}
-  // expected-note@-3 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}
+    take([overloaded])
   }
 }
 

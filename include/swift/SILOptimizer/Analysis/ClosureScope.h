@@ -120,7 +120,7 @@ public:
   ~ClosureScopeAnalysis();
 
   static bool classof(const SILAnalysis *S) {
-    return S->getKind() == AnalysisKind::ClosureScope;
+    return S->getKind() == SILAnalysisKind::ClosureScope;
   }
 
   SILModule *getModule() const { return M; }
@@ -144,14 +144,14 @@ public:
   }
 
   /// Notify the analysis about a newly created function.
-  virtual void notifyAddFunction(SILFunction *F) override {
+  virtual void notifyAddedOrModifiedFunction(SILFunction *F) override {
     // Nothing to be done because the analysis does not cache anything
     // per call-site in functions.
   }
 
   /// Notify the analysis about a function which will be deleted from the
   /// module.
-  virtual void notifyDeleteFunction(SILFunction *F) override;
+  virtual void notifyWillDeleteFunction(SILFunction *F) override;
 
   /// Notify the analysis about changed witness or vtables.
   virtual void invalidateFunctionTables() override {
@@ -177,7 +177,7 @@ public:
   // Visit all functions in a module, visiting each closure scope function
   // before
   // the closure function itself.
-  void visitFunctions(std::function<void(SILFunction *)> visitor);
+  void visitFunctions(llvm::function_ref<void(SILFunction *)> visitor);
 };
 
 } // end namespace swift

@@ -80,11 +80,6 @@ static llvm::cl::opt<std::string>
 static llvm::cl::opt<std::string> Triple("target",
                                          llvm::cl::desc("target triple"));
 
-static llvm::cl::opt<bool> AssumeUnqualifiedOwnershipWhenParsing(
-    "assume-parsing-unqualified-ownership-sil", llvm::cl::Hidden,
-    llvm::cl::init(false),
-    llvm::cl::desc("Assume all parsed functions have unqualified ownership"));
-
 // This function isn't referenced outside its translation unit, but it
 // can't use the "static" keyword because its address is used for
 // getMainExecutable (since some platforms don't support taking the
@@ -139,7 +134,8 @@ static void nmModule(SILModule *M) {
 }
 
 int main(int argc, char **argv) {
-  INITIALIZE_LLVM(argc, argv);
+  PROGRAM_START(argc, argv);
+  INITIALIZE_LLVM();
 
   llvm::cl::ParseCommandLineOptions(argc, argv, "SIL NM\n");
 
@@ -177,10 +173,6 @@ int main(int argc, char **argv) {
     fprintf(stderr, "Error! Failed to open file: %s\n", InputFilename.c_str());
     exit(-1);
   }
-
-  SILOptions &SILOpts = Invocation.getSILOptions();
-  SILOpts.AssumeUnqualifiedOwnershipWhenParsing =
-      AssumeUnqualifiedOwnershipWhenParsing;
 
   CompilerInstance CI;
   PrintingDiagnosticConsumer PrintDiags;

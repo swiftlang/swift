@@ -1,0 +1,17 @@
+set(TAPI_SOURCES
+  tapi/Architecture.cpp
+  tapi/ArchitectureSet.cpp
+  tapi/ArchitectureSupport.cpp
+  tapi/AvailabilityInfo.cpp
+  tapi/ExtendedInterfaceFile.cpp
+  tapi/InterfaceFile.cpp
+  tapi/InterfaceFileBase.cpp
+  tapi/Platform.cpp
+  tapi/Registry.cpp
+  tapi/TapiError.cpp
+  tapi/TextStub_v3.cpp
+  tapi/XPI.cpp
+  tapi/XPISet.cpp
+  tapi/YAML.cpp
+  tapi/YAMLReaderWriter.cpp
+  PARENT_SCOPE)

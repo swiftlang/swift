@@ -1,0 +1,19 @@
+// RUN: %empty-directory(%t)
+// RUN: touch %t/empty.swift
+// RUN: %target-swift-frontend -emit-module -module-name TestModule %t/empty.swift -o %t
+// RUN: %target-sil-opt %s -I=%t | %FileCheck %s
+
+sil_stage raw
+
+import Builtin
+import Swift
+
+import TestModule
+
+func foo() {}
+
+// CHECK: import Builtin
+// CHECK: import Swift
+// CHECK-NOT: import Builtin
+// CHECK-NOT: import Swift{{$}}
+// CHECK: import TestModule

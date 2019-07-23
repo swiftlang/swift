@@ -22,6 +22,7 @@
 #include "swift/Syntax/TokenKinds.h"
 #include "swift/Config.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/StringSwitch.h"
 
 namespace swift {
 
@@ -35,19 +36,22 @@ class Token {
   ///
   tok Kind;
 
-  /// \brief Whether this token is the first token on the line.
+  /// Whether this token is the first token on the line.
   unsigned AtStartOfLine : 1;
 
-  /// \brief The length of the comment that precedes the token.
-  ///
-  /// Hopefully 128 Mib is enough.
-  unsigned CommentLength : 27;
-  
-  /// \brief Whether this token is an escaped `identifier` token.
+  /// Whether this token is an escaped `identifier` token.
   unsigned EscapedIdentifier : 1;
   
   /// Modifiers for string literals
   unsigned MultilineString : 1;
+
+  /// Length of custom delimiter of "raw" string literals
+  unsigned CustomDelimiterLen : 8;
+
+  // Padding bits == 32 - 11;
+
+  /// The length of the comment that precedes the token.
+  unsigned CommentLength;
 
   /// Text - The actual string covered by the token in the source buffer.
   StringRef Text;
@@ -59,15 +63,12 @@ class Token {
   }
 
 public:
-  Token() : Kind(tok::NUM_TOKENS), AtStartOfLine(false), CommentLength(0),
-            EscapedIdentifier(false) {}
+  Token(tok Kind, StringRef Text, unsigned CommentLength = 0)
+          : Kind(Kind), AtStartOfLine(false), EscapedIdentifier(false),
+            MultilineString(false), CustomDelimiterLen(0),
+            CommentLength(CommentLength), Text(Text) {}
 
-  Token(tok Kind, StringRef Text, unsigned CommentLength)
-          : Kind(Kind), AtStartOfLine(false), CommentLength(CommentLength),
-            EscapedIdentifier(false), MultilineString(false),
-            Text(Text) {}
-
-  Token(tok Kind, StringRef Text): Token(Kind, Text, 0) {};
+  Token() : Token(tok::NUM_TOKENS, {}, 0) {}
 
   tok getKind() const { return Kind; }
   void setKind(tok K) { Kind = K; }
@@ -113,15 +114,15 @@ public:
     return !isEllipsis();
   }
 
-  /// \brief Determine whether this token occurred at the start of a line.
+  /// Determine whether this token occurred at the start of a line.
   bool isAtStartOfLine() const { return AtStartOfLine; }
 
-  /// \brief Set whether this token occurred at the start of a line.
+  /// Set whether this token occurred at the start of a line.
   void setAtStartOfLine(bool value) { AtStartOfLine = value; }
   
-  /// \brief True if this token is an escaped identifier token.
+  /// True if this token is an escaped identifier token.
   bool isEscapedIdentifier() const { return EscapedIdentifier; }
-  /// \brief Set whether this token is an escaped identifier token.
+  /// Set whether this token is an escaped identifier token.
   void setEscapedIdentifier(bool value) {
     assert((!value || Kind == tok::identifier) &&
            "only identifiers can be escaped identifiers");
@@ -139,34 +140,14 @@ public:
     if (isNot(tok::identifier) || isEscapedIdentifier() || Text.empty())
       return false;
 
-    switch (Text[0]) {
-    case 'c':
-      return Text == "convenience";
-    case 'd':
-      return Text == "dynamic";
-    case 'f':
-      return Text == "final";
-    case 'i':
-      return Text == "indirect" || Text == "infix";
-    case 'l':
-      return Text == "lazy";
-    case 'm':
-      return Text == "mutating";
-    case 'n':
-      return Text == "nonmutating";
-    case 'o':
-      return Text == "open" || Text == "override" || Text == "optional";
-    case 'p':
-      return Text == "prefix" || Text == "postfix";
-    case 'r':
-      return Text == "required";
-    case 'u':
-      return Text == "unowned";
-    case 'w':
-      return Text == "weak";
-    default:
-      return false;
-    }
+    return llvm::StringSwitch<bool>(Text)
+#define CONTEXTUAL_CASE(KW) .Case(#KW, true)
+#define CONTEXTUAL_DECL_ATTR(KW, ...) CONTEXTUAL_CASE(KW)
+#define CONTEXTUAL_DECL_ATTR_ALIAS(KW, ...) CONTEXTUAL_CASE(KW)
+#define CONTEXTUAL_SIMPLE_DECL_ATTR(KW, ...) CONTEXTUAL_CASE(KW)
+#include "swift/AST/Attr.def"
+#undef CONTEXTUAL_CASE
+      .Default(false);
   }
 
   bool isContextualPunctuator(StringRef ContextPunc) const {
@@ -184,12 +165,16 @@ public:
       if (getRawText().equals("__shared") ||
           getRawText().equals("__owned"))
         return false;
+      
+/*      // ...or some
+      if (getRawText().equals("some"))
+        return false;*/
 
       return true;
     }
 
-    // 'let', 'var', and 'inout' cannot be argument labels.
-    if (isAny(tok::kw_let, tok::kw_var, tok::kw_inout))
+    // inout cannot be used as an argument label.
+    if (is(tok::kw_inout))
       return false;
 
     // All other keywords can be argument labels.
@@ -239,6 +224,21 @@ public:
     default: return false;
     }
   }
+
+  /// True if the string literal token is multiline.
+  bool isMultilineString() const {
+    return MultilineString;
+  }
+  /// Count of extending escaping '#'.
+  unsigned getCustomDelimiterLen() const {
+    return CustomDelimiterLen;
+  }
+  /// Set characteristics of string literal token.
+  void setStringLiteral(bool IsMultilineString, unsigned CustomDelimiterLen) {
+    assert(Kind == tok::string_literal);
+    this->MultilineString = IsMultilineString;
+    this->CustomDelimiterLen = CustomDelimiterLen;
+  }
   
   /// getLoc - Return a source location identifier for the specified
   /// offset in the current file.
@@ -250,6 +250,17 @@ public:
 
   CharSourceRange getRange() const {
     return CharSourceRange(getLoc(), getLength());
+  }
+
+  CharSourceRange getRangeWithoutBackticks() const {
+    SourceLoc TokLoc = getLoc();
+    unsigned TokLength = getLength();
+    if (isEscapedIdentifier()) {
+      // Adjust to account for the backticks.
+      TokLoc = TokLoc.getAdvancedLoc(1);
+      TokLength -= 2;
+    }
+    return CharSourceRange(TokLoc, TokLength);
   }
 
   bool hasComment() const {
@@ -286,18 +297,16 @@ public:
 
   void setText(StringRef T) { Text = T; }
 
-  /// \brief Set the token to the specified kind and source range.
-  void setToken(tok K, StringRef T, unsigned CommentLength = 0,
-                bool MultilineString = false) {
+  /// Set the token to the specified kind and source range.
+  void setToken(tok K, StringRef T, unsigned CommentLength = 0) {
     Kind = K;
     Text = T;
     this->CommentLength = CommentLength;
     EscapedIdentifier = false;
-    this->MultilineString = MultilineString;
-  }
-
-  bool IsMultilineString() const {
-    return MultilineString;
+    this->MultilineString = false;
+    this->CustomDelimiterLen = 0;
+    assert(this->CustomDelimiterLen == CustomDelimiterLen &&
+           "custom string delimiter length > 255");
   }
 };
   

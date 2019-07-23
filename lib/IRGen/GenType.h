@@ -22,8 +22,10 @@
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/ilist.h"
 #include "llvm/ADT/ilist_node.h"
+#include "llvm/ADT/StringMap.h"
 #include "IRGenModule.h"
 #include "IRGenFunction.h"
+#include "LegacyLayoutFormat.h"
 
 namespace swift {
   class GenericSignatureBuilder;
@@ -56,31 +58,51 @@ namespace irgen {
   class FixedTypeInfo;
   class LoadableTypeInfo;
   class TypeInfo;
-  class UnownedTypeInfo;
-  class WeakTypeInfo;
   
-/// Either a type or a forward-declaration.
-typedef llvm::PointerUnion<const TypeInfo*, llvm::Type*> TypeCacheEntry;
-
 /// The helper class for generating types.
 class TypeConverter {
 public:
+  enum class Mode : unsigned {
+    /// Normal type lowering mode where resilient types are opaque.
+    Normal,
+
+    /// Used for computing backward deployment class layouts, where we emit a
+    /// static class metadata layout using known sizes and alignments of any
+    /// resiliently-typed fields from a previous Swift version. On newer Swift
+    /// versions we use a runtime mechanism to re-initialize the class metadata
+    /// in-place with the current known layout.
+    Legacy,
+
+    /// A temporary hack for lldb where all resilient types are transparent and
+    /// treated like fixed-size (but still lowered in a way that matches the
+    /// runtime layout produced for resilient types, which is important for some
+    /// types like enums where enabling resilience changes the layout).
+    CompletelyFragile
+
+    /// When adding or removing fields, remember to update NumLoweringModes below.
+  };
+
+  static unsigned const NumLoweringModes = 3;
+
   IRGenModule &IGM;
 private:
-  llvm::DenseMap<ProtocolDecl*, const ProtocolInfo*> Protocols;
+  Mode LoweringMode = Mode::Normal;
+
+  llvm::DenseMap<ProtocolDecl*, std::unique_ptr<const ProtocolInfo>> Protocols;
   const TypeInfo *FirstType;
   
-  const ProtocolInfo *FirstProtocol;
   const LoadableTypeInfo *NativeObjectTI = nullptr;
   const LoadableTypeInfo *UnknownObjectTI = nullptr;
   const LoadableTypeInfo *BridgeObjectTI = nullptr;
   const LoadableTypeInfo *RawPointerTI = nullptr;
   const LoadableTypeInfo *WitnessTablePtrTI = nullptr;
-  const LoadableTypeInfo *TypeMetadataPtrTI = nullptr;
-  const LoadableTypeInfo *ObjCClassPtrTI = nullptr;
+  const TypeInfo *TypeMetadataPtrTI = nullptr;
+  const TypeInfo *ObjCClassPtrTI = nullptr;
   const LoadableTypeInfo *EmptyTI = nullptr;
+  const LoadableTypeInfo *IntegerLiteralTI = nullptr;
 
-  const TypeInfo *ResilientStructTI = nullptr;
+  const TypeInfo *AccessibleResilientStructTI = nullptr;
+  const TypeInfo *InaccessibleResilientStructTI = nullptr;
   
   llvm::DenseMap<std::pair<unsigned, unsigned>, const LoadableTypeInfo *>
     OpaqueStorageTypes;
@@ -90,7 +112,10 @@ private:
   llvm::DenseMap<std::pair<unsigned, unsigned>, const LoadableTypeInfo *>
     PODBoxTI;
   const LoadableTypeInfo *SwiftRetainablePointerBoxTI = nullptr,
-                         *UnknownRetainablePointerBoxTI = nullptr;
+                         *UnknownObjectRetainablePointerBoxTI = nullptr;
+
+  llvm::StringMap<YAMLTypeInfoNode> LegacyTypeInfos;
+  llvm::DenseMap<NominalTypeDecl *, std::string> DeclMangledNames;
 
   const LoadableTypeInfo *createPrimitive(llvm::Type *T,
                                           Size size, Alignment align);
@@ -100,10 +125,10 @@ private:
   const FixedTypeInfo *createImmovable(llvm::Type *T,
                                        Size size, Alignment align);
 
-  void addForwardDecl(TypeBase *key, llvm::Type *type);
+  void addForwardDecl(TypeBase *key);
 
-  TypeCacheEntry convertType(CanType T);
-  TypeCacheEntry convertAnyNominalType(CanType T, NominalTypeDecl *D);
+  const TypeInfo *convertType(CanType T);
+  const TypeInfo *convertAnyNominalType(CanType T, NominalTypeDecl *D);
   const TypeInfo *convertTupleType(TupleType *T);
   const TypeInfo *convertClassType(CanType type, ClassDecl *D);
   const TypeInfo *convertEnumType(TypeBase *key, CanType type, EnumDecl *D);
@@ -121,37 +146,41 @@ private:
   const LoadableTypeInfo *convertBuiltinNativeObject();
   const LoadableTypeInfo *convertBuiltinUnknownObject();
   const LoadableTypeInfo *convertBuiltinBridgeObject();
-  const TypeInfo *convertResilientStruct();
-  const TypeInfo *convertUnmanagedStorageType(UnmanagedStorageType *T);
-  const TypeInfo *convertUnownedStorageType(UnownedStorageType *T);
-  const TypeInfo *convertWeakStorageType(WeakStorageType *T);
+  const TypeInfo *convertResilientStruct(IsABIAccessible_t abiAccessible);
+#define REF_STORAGE(Name, ...) \
+  const TypeInfo *convert##Name##StorageType(Name##StorageType *T);
+#include "swift/AST/ReferenceStorage.def"
   
 public:
   TypeConverter(IRGenModule &IGM);
   ~TypeConverter();
 
-  TypeCacheEntry getTypeEntry(CanType type);
+  Mode getLoweringMode() const {
+    return LoweringMode;
+  }
+
+  const TypeInfo *getTypeEntry(CanType type);
   const TypeInfo &getCompleteTypeInfo(CanType type);
-  const TypeInfo *tryGetCompleteTypeInfo(CanType type);
   const LoadableTypeInfo &getNativeObjectTypeInfo();
   const LoadableTypeInfo &getUnknownObjectTypeInfo();
   const LoadableTypeInfo &getBridgeObjectTypeInfo();
   const LoadableTypeInfo &getRawPointerTypeInfo();
-  const LoadableTypeInfo &getTypeMetadataPtrTypeInfo();
-  const LoadableTypeInfo &getObjCClassPtrTypeInfo();
+  const TypeInfo &getTypeMetadataPtrTypeInfo();
+  const TypeInfo &getObjCClassPtrTypeInfo();
   const LoadableTypeInfo &getWitnessTablePtrTypeInfo();
   const LoadableTypeInfo &getEmptyTypeInfo();
-  const TypeInfo &getResilientStructTypeInfo();
-  const ProtocolInfo &getProtocolInfo(ProtocolDecl *P);
+  const LoadableTypeInfo &getIntegerLiteralTypeInfo();
+  const TypeInfo &getResilientStructTypeInfo(IsABIAccessible_t abiAccessible);
+  const ProtocolInfo &getProtocolInfo(ProtocolDecl *P, ProtocolInfoKind kind);
   const LoadableTypeInfo &getOpaqueStorageTypeInfo(Size storageSize,
                                                    Alignment storageAlign);
-  const LoadableTypeInfo &getMetatypeTypeInfo(MetatypeRepresentation representation);
+  const TypeInfo &getMetatypeTypeInfo(MetatypeRepresentation representation);
 
-  const WeakTypeInfo *createWeakStorageType(llvm::Type *valueType,
-                                            ReferenceCounting style);
-  const TypeInfo *createUnownedStorageType(llvm::Type *valueType,
-                                           ReferenceCounting style);
-  const LoadableTypeInfo *createUnmanagedStorageType(llvm::Type *valueType);
+#define REF_STORAGE(Name, ...) \
+  const TypeInfo *create##Name##StorageType(llvm::Type *valueType, \
+                                            ReferenceCounting style, \
+                                            bool isOptional);
+#include "swift/AST/ReferenceStorage.def"
 
   /// Enter a generic context for lowering the parameters of a generic function
   /// type.
@@ -166,34 +195,33 @@ public:
   GenericEnvironment *getGenericEnvironment();
 
 private:
+  friend class LoweringModeScope;
+
+  void setLoweringMode(Mode mode) {
+    LoweringMode = mode;
+  }
+
+  /// Read a YAML legacy type layout dump. Returns false on success, true on
+  /// error.
+  bool readLegacyTypeInfo(StringRef path);
+
+  Optional<YAMLTypeInfoNode> getLegacyTypeInfo(NominalTypeDecl *decl) const;
+
   // Debugging aids.
 #ifndef NDEBUG
   bool isExemplarArchetype(ArchetypeType *arch) const;
-
-  LLVM_ATTRIBUTE_DEPRECATED(
-    CanType getTypeThatLoweredTo(llvm::Type *t) const LLVM_ATTRIBUTE_USED,
-    "only for use within the debugger");
 #endif
 
   ArchetypeType *getExemplarArchetype(ArchetypeType *t);
   CanType getExemplarType(CanType t);
   
   class Types_t {
-    llvm::DenseMap<TypeBase*, TypeCacheEntry> IndependentCache;
-    llvm::DenseMap<TypeBase*, TypeCacheEntry> DependentCache;
-    llvm::DenseMap<TypeBase*, TypeCacheEntry> &getCacheFor(TypeBase *t);
+    llvm::DenseMap<TypeBase *, const TypeInfo *> IndependentCache[NumLoweringModes];
+    llvm::DenseMap<TypeBase *, const TypeInfo *> DependentCache[NumLoweringModes];
 
-    friend TypeCacheEntry TypeConverter::getTypeEntry(CanType T);
-    friend TypeCacheEntry TypeConverter::convertAnyNominalType(CanType Type,
-                                                           NominalTypeDecl *D);
-    friend void TypeConverter::addForwardDecl(TypeBase*, llvm::Type*);
-    friend ArchetypeType *TypeConverter::getExemplarArchetype(ArchetypeType *t);
-    friend void TypeConverter::popGenericContext(CanGenericSignature signature);
-    
-#ifndef NDEBUG
-    friend CanType TypeConverter::getTypeThatLoweredTo(llvm::Type *t) const;
-    friend bool TypeConverter::isExemplarArchetype(ArchetypeType *arch) const;
-#endif
+  public:
+    llvm::DenseMap<TypeBase *, const TypeInfo *> &getCacheFor(bool isDependent,
+                                                              Mode mode);
   };
   Types_t Types;
 };
@@ -216,6 +244,25 @@ public:
   
   ~GenericContextScope() {
     TC.popGenericContext(sig);
+  }
+};
+
+/// An RAII interface for forcing types to be lowered bypassing resilience.
+class LoweringModeScope {
+  TypeConverter::Mode OldLoweringMode;
+  TypeConverter &TC;
+public:
+  LoweringModeScope(TypeConverter &TC, TypeConverter::Mode LoweringMode)
+      : TC(TC) {
+    OldLoweringMode = TC.getLoweringMode();
+    TC.setLoweringMode(LoweringMode);
+  }
+
+  LoweringModeScope(IRGenModule &IGM, TypeConverter::Mode LoweringMode)
+      : LoweringModeScope(IGM.Types, LoweringMode) {}
+
+  ~LoweringModeScope() {
+    TC.setLoweringMode(OldLoweringMode);
   }
 };
 

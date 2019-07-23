@@ -1,24 +1,26 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-build-swift-dylib(%t/libresilient_struct.%target-dylib-extension) -Xfrontend -enable-resilience %S/../Inputs/resilient_struct.swift -emit-module -emit-module-path %t/resilient_struct.swiftmodule -module-name resilient_struct
-// RUN: %target-codesign %t/libresilient_struct.%target-dylib-extension
+// RUN: %target-build-swift-dylib(%t/%target-library-name(resilient_struct)) -enable-library-evolution %S/../Inputs/resilient_struct.swift -emit-module -emit-module-path %t/resilient_struct.swiftmodule -module-name resilient_struct
+// RUN: %target-codesign %t/%target-library-name(resilient_struct)
 
-// RUN: %target-build-swift-dylib(%t/libresilient_enum.%target-dylib-extension) -Xfrontend -enable-resilience %S/../Inputs/resilient_enum.swift -emit-module -emit-module-path %t/resilient_enum.swiftmodule -module-name resilient_enum -I%t -L%t -lresilient_struct
-// RUN: %target-codesign %t/libresilient_enum.%target-dylib-extension
+// RUN: %target-build-swift-dylib(%t/%target-library-name(resilient_enum)) -enable-library-evolution %S/../Inputs/resilient_enum.swift -emit-module -emit-module-path %t/resilient_enum.swiftmodule -module-name resilient_enum -I%t -L%t -lresilient_struct
+// RUN: %target-codesign %t/%target-library-name(resilient_enum)
 
-// RUN: %target-build-swift %s -L %t -I %t -lresilient_struct -lresilient_enum -o %t/main -Xlinker -rpath -Xlinker %t
+// RUN: %target-build-swift %s -L %t -I %t -lresilient_struct -lresilient_enum -o %t/main %target-rpath(%t)
+// RUN: %target-codesign %t/main
 
-// RUN: %target-run %t/main %t/libresilient_struct.%target-dylib-extension %t/libresilient_enum.%target-dylib-extension
+// RUN: %target-run %t/main %t/%target-library-name(resilient_struct) %t/%target-library-name(resilient_enum)
 
-// RUN: %target-build-swift-dylib(%t/libresilient_struct_wmo.%target-dylib-extension) -Xfrontend -enable-resilience %S/../Inputs/resilient_struct.swift -emit-module -emit-module-path %t/resilient_struct.swiftmodule -module-name resilient_struct -whole-module-optimization
-// RUN: %target-codesign %t/libresilient_struct_wmo.%target-dylib-extension
+// RUN: %target-build-swift-dylib(%t/%target-library-name(resilient_struct_wmo)) -enable-library-evolution %S/../Inputs/resilient_struct.swift -emit-module -emit-module-path %t/resilient_struct.swiftmodule -module-name resilient_struct -whole-module-optimization
+// RUN: %target-codesign %t/%target-library-name(resilient_struct_wmo)
 
-// RUN: %target-build-swift-dylib(%t/libresilient_enum_wmo.%target-dylib-extension) -Xfrontend -enable-resilience %S/../Inputs/resilient_enum.swift -emit-module -emit-module-path %t/resilient_enum.swiftmodule -module-name resilient_enum -I%t -L%t -lresilient_struct_wmo -whole-module-optimization
-// RUN: %target-codesign %t/libresilient_enum_wmo.%target-dylib-extension
+// RUN: %target-build-swift-dylib(%t/%target-library-name(resilient_enum_wmo)) -enable-library-evolution %S/../Inputs/resilient_enum.swift -emit-module -emit-module-path %t/resilient_enum.swiftmodule -module-name resilient_enum -I%t -L%t -lresilient_struct_wmo -whole-module-optimization
+// RUN: %target-codesign %t/%target-library-name(resilient_enum_wmo)
 
-// RUN: %target-build-swift %s -L %t -I %t -lresilient_struct_wmo -lresilient_enum_wmo -o %t/main -Xlinker -rpath -Xlinker %t
+// RUN: %target-build-swift %s -L %t -I %t -lresilient_struct_wmo -lresilient_enum_wmo -o %t/main2 %target-rpath(%t)
+// RUN: %target-codesign %t/main2
 
-// RUN: %target-run %t/main %t/libresilient_struct_wmo.%target-dylib-extension %t/libresilient_enum_wmo.%target-dylib-extension
+// RUN: %target-run %t/main2 %t/%target-library-name(resilient_struct_wmo) %t/%target-library-name(resilient_enum_wmo)
 
 // REQUIRES: executable_test
 
@@ -436,4 +438,57 @@ ResilientEnumTestSuite.test("ResilientEnumExtension") {
   expectEqual(Base.self, ResilientMultiPayloadGenericEnumFixedSize<Base>.A.getTypeParameter())
 }
 
+public class Container {
+  private enum Multi {
+    case none
+    case some(Container)
+    case other(ResilientRef)
+  }
+  private var m: Multi
+  var i: Int
+  init() {
+    m = .none
+    i = 0
+    switch self.m {
+      case .none:
+        print("success")
+      case .some(_), .other(_):
+        assert(false, "noooo!")
+    }
+  }
+}
+
+ResilientEnumTestSuite.test("ResilientPrivateEnumMember") {
+  _ = Container()
+}
+
+struct Nested {
+  var str: String
+  var r: ResilientInt
+}
+
+enum SingleCase {
+  case only(nested: Nested)
+}
+
+struct Status {
+  let fst: SingleCase
+  let snd: Bool
+}
+
+func getOptional<T>(_ t: T) -> T? {
+  return t
+}
+
+func test<T>(_ t: T) {
+  let o = getOptional(t)
+  if let c = o {
+    print("success")
+  }
+}
+
+ResilientEnumTestSuite.test("ResilientEnumSingleCase") {
+  // This used to crash.
+  test(Status(fst: .only(nested: Nested(str: "foobar", r: ResilientInt(i: 1))), snd: false))
+}
 runAllTests()

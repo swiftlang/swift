@@ -15,20 +15,21 @@ import TestsUtils
 public let MonteCarloPi = BenchmarkInfo(
   name: "MonteCarloPi",
   runFunction: run_MonteCarloPi,
-  tags: [.validation, .algorithm])
+  tags: [.validation, .algorithm],
+  legacyFactor: 125)
 
 public func run_MonteCarloPi(scale: Int) {
   var pointsInside = 0
   let r = 10000
-  let N = 500000*scale
+  let N = 4_000*scale
   for _ in 1...N {
-    let x = Int(truncatingBitPattern: Random())%r
-    let y = Int(truncatingBitPattern: Random())%r
+    let x = Int(truncatingIfNeeded: Random())%r
+    let y = Int(truncatingIfNeeded: Random())%r
     if x*x + y*y < r*r {
       pointsInside += 1
     }
   }
   let pi_estimate: Double = Double(pointsInside)*4.0/Double(N)
   let pi = 3.1415
-  CheckResults(abs(pi_estimate - pi) < 0.1)
+  CheckResults(abs(pi_estimate - pi) < 0.2)
 }

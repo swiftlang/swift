@@ -37,10 +37,6 @@ function(handle_gyb_source_single dependency_out_var_name)
       GYB_SINGLE # prefix
       "${options}" "${single_value_args}" "${multi_value_args}" ${ARGN})
 
-  set(gyb_flags
-      ${SWIFT_GYB_FLAGS}
-      ${GYB_SINGLE_FLAGS})
-
   set(gyb_tool "${SWIFT_SOURCE_DIR}/utils/gyb")
   set(gyb_tool_source "${gyb_tool}" "${gyb_tool}.py")
 
@@ -62,11 +58,9 @@ function(handle_gyb_source_single dependency_out_var_name)
       COMMAND
           "${CMAKE_COMMAND}" -E make_directory "${dir}"
       COMMAND
-          "${PYTHON_EXECUTABLE}" "${gyb_tool}" "${gyb_flags}"
-          -o "${GYB_SINGLE_OUTPUT}.tmp" "${GYB_SINGLE_SOURCE}"
+          "${PYTHON_EXECUTABLE}" "${gyb_tool}" ${SWIFT_GYB_FLAGS} ${GYB_SINGLE_FLAGS} -o "${GYB_SINGLE_OUTPUT}.tmp" "${GYB_SINGLE_SOURCE}"
       COMMAND
-          "${CMAKE_COMMAND}" -E copy_if_different
-          "${GYB_SINGLE_OUTPUT}.tmp" "${GYB_SINGLE_OUTPUT}"
+          "${CMAKE_COMMAND}" -E copy_if_different "${GYB_SINGLE_OUTPUT}.tmp" "${GYB_SINGLE_OUTPUT}"
       COMMAND
           "${CMAKE_COMMAND}" -E remove "${GYB_SINGLE_OUTPUT}.tmp"
       OUTPUT "${GYB_SINGLE_OUTPUT}"
@@ -117,12 +111,12 @@ function(handle_gyb_sources dependency_out_var_name sources_var_name arch)
       "${SWIFT_SOURCE_DIR}/utils/UnicodeData/GraphemeBreakProperty.txt"
       "${SWIFT_SOURCE_DIR}/utils/UnicodeData/GraphemeBreakTest.txt"
       "${SWIFT_SOURCE_DIR}/utils/gyb_stdlib_support.py"
-      "${SWIFT_SOURCE_DIR}/utils/gyb_stdlib_unittest_support.py"
       "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/__init__.py"
       "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/Child.py"
       "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/kinds.py"
       "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/Node.py"
       "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/AttributeNodes.py"
+      "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/AvailabilityNodes.py"
       "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/CommonNodes.py"
       "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/DeclNodes.py"
       "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/ExprNodes.py"
@@ -130,38 +124,38 @@ function(handle_gyb_sources dependency_out_var_name sources_var_name arch)
       "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/PatternNodes.py"
       "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/StmtNodes.py"
       "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/TypeNodes.py"
-      "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/Token.py")
+      "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/Token.py"
+      "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/Trivia.py"
+      "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/Traits.py"
+      "${SWIFT_SOURCE_DIR}/utils/gyb_sourcekit_support/__init__.py"
+      "${SWIFT_SOURCE_DIR}/utils/gyb_sourcekit_support/UIDs.py")
 
   foreach (src ${${sources_var_name}})
-    string(REGEX REPLACE "[.]gyb$" "" src_sans_gyb "${src}")
-    if(src STREQUAL src_sans_gyb)
-      list(APPEND de_gybbed_sources "${src}")
+    # On Windows (using Visual Studio), the generated project files assume that the
+    # generated GYB files will be in the source, not binary directory.
+    # We can work around this by modifying the root directory when generating VS projects.
+    if ("${CMAKE_GENERATOR_PLATFORM}" MATCHES "Visual Studio")
+      set(dir_root ${CMAKE_CURRENT_SOURCE_DIR})
     else()
-
-      # On Windows (using Visual Studio), the generated project files assume that the
-      # generated GYB files will be in the source, not binary directory.
-      # We can work around this by modifying the root directory when generating VS projects.
-      if ("${CMAKE_GENERATOR_PLATFORM}" MATCHES "Visual Studio")
-        set(dir_root ${CMAKE_CURRENT_SOURCE_DIR})
-      else()
-        set(dir_root ${CMAKE_CURRENT_BINARY_DIR})
-      endif()
-      
-      if (arch)
-        set(dir "${dir_root}/${ptr_size}")
-      else()
-        set(dir "${dir_root}")
-      endif()
-      set(output_file_name "${dir}/${src_sans_gyb}")
-      list(APPEND de_gybbed_sources "${output_file_name}")
-      handle_gyb_source_single(dependency_target
-          SOURCE "${src}"
-          OUTPUT "${output_file_name}"
-          FLAGS ${extra_gyb_flags}
-          DEPENDS "${gyb_extra_sources}"
-          COMMENT "with ptr size = ${ptr_size}")
-      list(APPEND dependency_targets "${dependency_target}")
+      set(dir_root ${CMAKE_CURRENT_BINARY_DIR})
     endif()
+
+    if (arch)
+      set(dir "${dir_root}/${ptr_size}")
+    else()
+      set(dir "${dir_root}")
+    endif()
+    # get_filename_component(src_sans_gyb ${src} NAME_WLE)
+    string(REGEX REPLACE "\.gyb$" "" src_sans_gyb ${src})
+    set(output_file_name "${dir}/${src_sans_gyb}")
+    list(APPEND de_gybbed_sources "${output_file_name}")
+    handle_gyb_source_single(dependency_target
+        SOURCE "${src}"
+        OUTPUT "${output_file_name}"
+        FLAGS ${extra_gyb_flags}
+        DEPENDS "${gyb_extra_sources}"
+        COMMENT "with ptr size = ${ptr_size}")
+    list(APPEND dependency_targets "${dependency_target}")
   endforeach()
   set("${dependency_out_var_name}" "${dependency_targets}" PARENT_SCOPE)
   set("${sources_var_name}" "${de_gybbed_sources}" PARENT_SCOPE)

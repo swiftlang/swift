@@ -169,7 +169,7 @@ class diff_match_patch {
     Patch() : start1(0), start2(0), length1(0), length2(0) {}
 
     bool isNull() const {
-      return start1 == 0 && start2 == 0 && length1 == 0 && length2 == 0 && diffs.size() == 0;
+      return start1 == 0 && start2 == 0 && length1 == 0 && length2 == 0 && diffs.empty();
     }
 
     /**

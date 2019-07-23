@@ -16,7 +16,7 @@
 
 #ifndef SWIFT_RUNTIME_PORTABILITY_H
 #define SWIFT_RUNTIME_PORTABILITY_H
-#include <stddef.h>
+#include <cstddef>
 
 size_t _swift_strlcpy(char *dst, const char *src, size_t maxlen);
 

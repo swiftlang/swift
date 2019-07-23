@@ -190,8 +190,8 @@ static bool aliasUnequalObjects(SILValue O1, SILValue O2) {
   // If O1 and O2 do not equal and they are both values that can be statically
   // and uniquely identified, they cannot alias.
   if (areDistinctIdentifiableObjects(O1, O2)) {
-    DEBUG(llvm::dbgs() << "            Found two unequal identified "
-          "objects.\n");
+    LLVM_DEBUG(llvm::dbgs() << "            Found two unequal identified "
+               "objects.\n");
     return true;
   }
 
@@ -204,8 +204,8 @@ static bool aliasUnequalObjects(SILValue O1, SILValue O2) {
   // @owned object.
   if ((isFunctionArgument(O1) && isIdentifiedFunctionLocal(O2)) ||
       (isFunctionArgument(O2) && isIdentifiedFunctionLocal(O1))) {
-    DEBUG(llvm::dbgs() << "            Found unequal function arg and "
-          "identified function local!\n");
+    LLVM_DEBUG(llvm::dbgs() << "            Found unequal function arg and "
+               "identified function local!\n");
     return true;
   }
 
@@ -377,8 +377,7 @@ SILType swift::computeTBAAType(SILValue V) {
   return SILType();
 }
 
-static bool typedAccessTBAABuiltinTypesMayAlias(SILType LTy, SILType RTy,
-                                                SILModule &Mod) {
+static bool typedAccessTBAABuiltinTypesMayAlias(SILType LTy, SILType RTy) {
   assert(LTy != RTy && "LTy should have already been shown to not equal RTy to "
          "call this function.");
 
@@ -407,11 +406,12 @@ static bool typedAccessTBAABuiltinTypesMayAlias(SILType LTy, SILType RTy,
   return false;
 }
 
-/// \brief return True if the types \p LTy and \p RTy may alias.
+/// return True if the types \p LTy and \p RTy may alias.
 ///
 /// Currently this only implements typed access based TBAA. See the TBAA section
 /// in the SIL reference manual.
-static bool typedAccessTBAAMayAlias(SILType LTy, SILType RTy, SILModule &Mod) {
+static bool typedAccessTBAAMayAlias(SILType LTy, SILType RTy,
+                                    const SILFunction &F) {
 #ifndef NDEBUG
   if (!shouldRunTypedAccessTBAA())
     return true;
@@ -443,12 +443,12 @@ static bool typedAccessTBAAMayAlias(SILType LTy, SILType RTy, SILModule &Mod) {
     return true;
 
   // If either type is an address only type, bail so we are conservative.
-  if (LTy.isAddressOnly(Mod) || RTy.isAddressOnly(Mod))
+  if (LTy.isAddressOnly(F) || RTy.isAddressOnly(F))
     return true;
 
   // If both types are builtin types, handle them separately.
   if (LTy.is<BuiltinType>() && RTy.is<BuiltinType>())
-    return typedAccessTBAABuiltinTypesMayAlias(LTy, RTy, Mod);
+    return typedAccessTBAABuiltinTypesMayAlias(LTy, RTy);
 
   // Otherwise, we know that at least one of our types is not a builtin
   // type. If we have a builtin type, canonicalize it on the right.
@@ -469,6 +469,8 @@ static bool typedAccessTBAAMayAlias(SILType LTy, SILType RTy, SILModule &Mod) {
       return true;
     }
   }
+
+  auto &Mod = F.getModule();
 
   // If one type is an aggregate and it contains the other type then the record
   // reference may alias the aggregate reference.
@@ -511,7 +513,8 @@ static bool typedAccessTBAAMayAlias(SILType LTy, SILType RTy, SILModule &Mod) {
   return true;
 }
 
-bool AliasAnalysis::typesMayAlias(SILType T1, SILType T2) {
+bool AliasAnalysis::typesMayAlias(SILType T1, SILType T2,
+                                  const SILFunction &F) {
   // Both types need to be valid.
   if (!T2 || !T1)
     return true;
@@ -523,7 +526,7 @@ bool AliasAnalysis::typesMayAlias(SILType T1, SILType T2) {
     return Res->second;
   }
 
-  bool MA = typedAccessTBAAMayAlias(T1, T2, *Mod);
+  bool MA = typedAccessTBAAMayAlias(T1, T2, F);
   TypesMayAliasCache[Key] = MA;
   return MA;
 }
@@ -574,12 +577,16 @@ AliasResult AliasAnalysis::aliasInner(SILValue V1, SILValue V2,
   if (isSameValueOrGlobal(V1, V2))
     return AliasResult::MustAlias;
 
-  DEBUG(llvm::dbgs() << "ALIAS ANALYSIS:\n    V1: " << *V1
-        << "    V2: " << *V2);
+  LLVM_DEBUG(llvm::dbgs() << "ALIAS ANALYSIS:\n    V1: " << *V1
+             << "    V2: " << *V2);
+
+  // If this is SILUndef, return may alias.
+  if (!V1->getFunction())
+    return AliasResult::MayAlias;
 
   // Pass in both the TBAA types so we can perform typed access TBAA and the
   // actual types of V1, V2 so we can perform class based TBAA.
-  if (!typesMayAlias(TBAAType1, TBAAType2))
+  if (!typesMayAlias(TBAAType1, TBAAType2, *V1->getFunction()))
     return AliasResult::NoAlias;
 
 #ifndef NDEBUG
@@ -590,15 +597,15 @@ AliasResult AliasAnalysis::aliasInner(SILValue V1, SILValue V2,
   // Strip off any casts on V1, V2.
   V1 = stripCasts(V1);
   V2 = stripCasts(V2);
-  DEBUG(llvm::dbgs() << "        After Cast Stripping V1:" << *V1);
-  DEBUG(llvm::dbgs() << "        After Cast Stripping V2:" << *V2);
+  LLVM_DEBUG(llvm::dbgs() << "        After Cast Stripping V1:" << *V1);
+  LLVM_DEBUG(llvm::dbgs() << "        After Cast Stripping V2:" << *V2);
 
   // Ok, we need to actually compute an Alias Analysis result for V1, V2. Begin
   // by finding the "base" of V1, V2 by stripping off all casts and GEPs.
   SILValue O1 = getUnderlyingObject(V1);
   SILValue O2 = getUnderlyingObject(V2);
-  DEBUG(llvm::dbgs() << "        Underlying V1:" << *O1);
-  DEBUG(llvm::dbgs() << "        Underlying V2:" << *O2);
+  LLVM_DEBUG(llvm::dbgs() << "        Underlying V1:" << *O1);
+  LLVM_DEBUG(llvm::dbgs() << "        Underlying V2:" << *O2);
 
   // If O1 and O2 do not equal, see if we can prove that they cannot be the
   // same object. If we can, return No Alias.
@@ -614,8 +621,8 @@ AliasResult AliasAnalysis::aliasInner(SILValue V1, SILValue V2,
   // Note that escape analysis must work with the original pointers and not the
   // underlying objects because it treats projections differently.
   if (!EA->canPointToSameMemory(V1, V2)) {
-    DEBUG(llvm::dbgs() << "            Found not-aliased objects based on"
-                                      "escape analysis\n");
+    LLVM_DEBUG(llvm::dbgs() << "            Found not-aliased objects based on "
+                               "escape analysis\n");
     return AliasResult::NoAlias;
   }
 
@@ -652,8 +659,8 @@ bool AliasAnalysis::canApplyDecrementRefCount(FullApplySite FAS, SILValue Ptr) {
   if (!EA->canEscapeTo(Ptr, FAS))
     return false;
 
-  SideEffectAnalysis::FunctionEffects ApplyEffects;
-  SEA->getEffects(ApplyEffects, FAS);
+  FunctionSideEffects ApplyEffects;
+  SEA->getCalleeEffects(ApplyEffects, FAS);
 
   auto &GlobalEffects = ApplyEffects.getGlobalEffects();
   if (ApplyEffects.mayReadRC() || GlobalEffects.mayRelease())

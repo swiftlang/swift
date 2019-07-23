@@ -51,7 +51,7 @@ class BlotSetVector {
   MapT Map;
 
 public:
-  /// \brief Construct an empty BlotSetVector.
+  /// Construct an empty BlotSetVector.
   BlotSetVector() {}
 
   bool empty() const { return Vector.empty(); }
@@ -120,7 +120,7 @@ public:
     if (Iter == Map.end())
       return false;
     unsigned Index = Iter->second;
-    Map.erase(V);
+    Map.erase(Iter);
     Vector[Index] = None;
     return true;
   }

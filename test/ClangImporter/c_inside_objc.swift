@@ -1,12 +1,10 @@
-// RUN: %target-swift-ide-test -print-module -module-to-print CInsideObjC -I %S/Inputs/custom-modules -source-filename %s -Xcc -DCLASS | %FileCheck %s
-// RUN: %target-swift-ide-test -print-module -module-to-print CInsideObjC -I %S/Inputs/custom-modules -source-filename %s -Xcc -DCATEGORY | %FileCheck %s
-// RUN: %target-swift-ide-test -print-module -module-to-print CInsideObjC -I %S/Inputs/custom-modules -source-filename %s -Xcc -DPROTOCOL | %FileCheck %s
+// RUN: %target-swift-ide-test -enable-objc-interop -print-module -module-to-print CInsideObjC -I %S/Inputs/custom-modules -source-filename %s -Xcc -DCLASS | %FileCheck %s
+// RUN: %target-swift-ide-test -enable-objc-interop -print-module -module-to-print CInsideObjC -I %S/Inputs/custom-modules -source-filename %s -Xcc -DCATEGORY | %FileCheck %s
+// RUN: %target-swift-ide-test -enable-objc-interop -print-module -module-to-print CInsideObjC -I %S/Inputs/custom-modules -source-filename %s -Xcc -DPROTOCOL | %FileCheck %s
 
-// RUN: %target-swift-frontend -typecheck %s -I %S/Inputs/custom-modules -verify -Xcc -DCLASS
-// RUN: %target-swift-frontend -typecheck %s -I %S/Inputs/custom-modules -verify -Xcc -DCATEGORY
-// RUN: %target-swift-frontend -typecheck %s -I %S/Inputs/custom-modules -verify -Xcc -DPROTOCOL
-
-// REQUIRES: objc_interop
+// RUN: %target-swift-frontend -enable-objc-interop -typecheck %s -I %S/Inputs/custom-modules -verify -Xcc -DCLASS
+// RUN: %target-swift-frontend -enable-objc-interop -typecheck %s -I %S/Inputs/custom-modules -verify -Xcc -DCATEGORY
+// RUN: %target-swift-frontend -enable-objc-interop -typecheck %s -I %S/Inputs/custom-modules -verify -Xcc -DPROTOCOL
 
 // CHECK-LABEL: struct AlreadyDeclaredStruct {
 

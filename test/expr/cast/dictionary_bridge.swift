@@ -12,10 +12,8 @@ public extension _ObjectiveCBridgeable {
   }
 }
 
-class Root : Hashable { 
-  var hashValue: Int {
-    return 0
-  }
+class Root : Hashable {
+  func hash(into hasher: inout Hasher) {}
 }
 
 func ==(x: Root, y: Root) -> Bool { return true }
@@ -42,9 +40,7 @@ struct BridgedToObjC : Hashable, _ObjectiveCBridgeable {
     return true
   }
 
-  var hashValue: Int {
-    return 0
-  }
+  func hash(into hasher: inout Hasher) {}
 }
 
 func ==(x: BridgedToObjC, y: BridgedToObjC) -> Bool { return true }
@@ -87,8 +83,14 @@ func testUpcastBridge() {
   dictBB = dictOB // expected-error{{cannot assign value of type '[ObjC : BridgedToObjC]' to type '[BridgedToObjC : BridgedToObjC]'}}
 
   dictDO = dictBB // expected-error{{cannot assign value of type '[BridgedToObjC : BridgedToObjC]' to type '[DerivesObjC : ObjC]'}}
-  dictOD = dictBB // expected-error{{cannot assign value of type '[BridgedToObjC : BridgedToObjC]' to type '[ObjC : DerivesObjC]'}}
-  dictDD = dictBB // expected-error{{cannot assign value of type '[BridgedToObjC : BridgedToObjC]' to type '[DerivesObjC : DerivesObjC]'}}
+  //expected-note@-1 {{arguments to generic parameter 'Key' ('BridgedToObjC' and 'DerivesObjC') are expected to be equal}}
+  //expected-note@-2 {{arguments to generic parameter 'Value' ('BridgedToObjC' and 'ObjC') are expected to be equal}}
+  dictOD = dictBB // expected-error {{cannot assign value of type '[BridgedToObjC : BridgedToObjC]' to type '[ObjC : DerivesObjC]'}}
+  //expected-note@-1 {{arguments to generic parameter 'Key' ('BridgedToObjC' and 'ObjC') are expected to be equal}}
+  //expected-note@-2 {{arguments to generic parameter 'Value' ('BridgedToObjC' and 'DerivesObjC') are expected to be equal}}
+  dictDD = dictBB // expected-error {{cannot assign value of type '[BridgedToObjC : BridgedToObjC]' to type '[DerivesObjC : DerivesObjC]'}}
+  //expected-note@-1 {{arguments to generic parameter 'Key' ('BridgedToObjC' and 'DerivesObjC') are expected to be equal}}
+  //expected-note@-2 {{arguments to generic parameter 'Value' ('BridgedToObjC' and 'DerivesObjC') are expected to be equal}}
   
   _ = dictDD; _ = dictDO; _ = dictOD; _ = dictOO; _ = dictOR; _ = dictOR; _ = dictRR; _ = dictRO
 }

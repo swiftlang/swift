@@ -4,6 +4,7 @@
 #ifndef __COREFOUNDATION__
 #include <CoreFoundation.h>
 #endif
+#include <MacTypes.h>
 
 extern Boolean 
 CSBackupIsItemExcluded(

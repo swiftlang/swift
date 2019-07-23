@@ -112,6 +112,15 @@
     },
     {
       key.kind: source.lang.swift.keyword,
+      key.name: "indirect",
+      key.sourcetext: "indirect",
+      key.description: "indirect",
+      key.typename: "",
+      key.context: source.codecompletion.context.none,
+      key.num_bytes_to_erase: 0
+    },
+    {
+      key.kind: source.lang.swift.keyword,
       key.name: "infix",
       key.sourcetext: "infix",
       key.description: "infix",
@@ -189,6 +198,15 @@
       key.name: "nonmutating",
       key.sourcetext: "nonmutating",
       key.description: "nonmutating",
+      key.typename: "",
+      key.context: source.codecompletion.context.none,
+      key.num_bytes_to_erase: 0
+    },
+    {
+      key.kind: source.lang.swift.keyword,
+      key.name: "open",
+      key.sourcetext: "open",
+      key.description: "open",
       key.typename: "",
       key.context: source.codecompletion.context.none,
       key.num_bytes_to_erase: 0

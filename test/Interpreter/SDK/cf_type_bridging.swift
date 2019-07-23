@@ -3,7 +3,7 @@
 
 // REQUIRES: objc_interop
 
-#if os(OSX)
+#if os(macOS)
 import AppKit
 #endif
 #if os(iOS) || os(tvOS) || os(watchOS)

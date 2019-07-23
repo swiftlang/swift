@@ -15,30 +15,66 @@
 
 #include "swift/RemoteAST/RemoteAST.h"
 #include "swift/Remote/InProcessMemoryReader.h"
+#include "swift/Remote/MetadataReader.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/FrontendTool/FrontendTool.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/LLVMInitialize.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/Format.h"
 #include "llvm/Support/raw_ostream.h"
 #include <cassert>
+
+#if defined(__ELF__)
+#define SWIFT_REMOTEAST_TEST_ABI __attribute__((__visibility__("default")))
+#elif defined(__MACH__)
+#define SWIFT_REMOTEAST_TEST_ABI __attribute__((__visibility__("default")))
+#else
+#define SWIFT_REMOTEAST_TEST_ABI __declspec(dllexport)
+#endif
 
 using namespace swift;
 using namespace swift::remote;
 using namespace swift::remoteAST;
 
+#if defined(__APPLE__) && defined(__MACH__)
+#include <dlfcn.h>
+static unsigned long long computeClassIsSwiftMask(void) {
+  uintptr_t *objc_debug_swift_stable_abi_bit_ptr =
+    (uintptr_t *)dlsym(RTLD_DEFAULT, "objc_debug_swift_stable_abi_bit");
+  return objc_debug_swift_stable_abi_bit_ptr ?
+           *objc_debug_swift_stable_abi_bit_ptr : 1;
+}
+#else
+static unsigned long long computeClassIsSwiftMask(void) {
+  return 1;
+}
+#endif
+
+extern "C" unsigned long long _swift_classIsSwiftMask =
+  computeClassIsSwiftMask();
+
 /// The context for the code we're running.  Set by the observer.
-static ASTContext *Context = nullptr;
+static ASTContext *context = nullptr;
+
+/// The RemoteAST for the code we're running.
+std::unique_ptr<RemoteASTContext> remoteContext;
+
+static RemoteASTContext &getRemoteASTContext() {
+  if (remoteContext)
+    return *remoteContext;
+
+  std::shared_ptr<MemoryReader> reader(new InProcessMemoryReader());
+  remoteContext.reset(new RemoteASTContext(*context, std::move(reader)));
+  return *remoteContext;
+}
 
 // FIXME: swiftcall
 /// func printType(forMetadata: Any.Type)
-LLVM_ATTRIBUTE_USED
-extern "C" void printMetadataType(const Metadata *typeMetadata) {
-  assert(Context && "context was not set");
-
-  std::shared_ptr<MemoryReader> reader(new InProcessMemoryReader());
-  RemoteASTContext remoteAST(*Context, std::move(reader));
-
+LLVM_ATTRIBUTE_USED extern "C" void SWIFT_REMOTEAST_TEST_ABI
+printMetadataType(const Metadata *typeMetadata) {
+  auto &remoteAST = getRemoteASTContext();
   auto &out = llvm::outs();
 
   auto result =
@@ -54,13 +90,9 @@ extern "C" void printMetadataType(const Metadata *typeMetadata) {
 
 // FIXME: swiftcall
 /// func printDynamicType(_: AnyObject)
-LLVM_ATTRIBUTE_USED
-extern "C" void printHeapMetadataType(void *object) {
-  assert(Context && "context was not set");
-
-  std::shared_ptr<MemoryReader> reader(new InProcessMemoryReader());
-  RemoteASTContext remoteAST(*Context, std::move(reader));
-
+LLVM_ATTRIBUTE_USED extern "C" void SWIFT_REMOTEAST_TEST_ABI
+printHeapMetadataType(void *object) {
+  auto &remoteAST = getRemoteASTContext();
   auto &out = llvm::outs();
 
   auto metadataResult =
@@ -84,11 +116,7 @@ extern "C" void printHeapMetadataType(void *object) {
 
 static void printMemberOffset(const Metadata *typeMetadata,
                               StringRef memberName, bool passMetadata) {
-  assert(Context && "context was not set");
-
-  std::shared_ptr<MemoryReader> reader(new InProcessMemoryReader());
-  RemoteASTContext remoteAST(*Context, std::move(reader));
-
+  auto &remoteAST = getRemoteASTContext();
   auto &out = llvm::outs();
 
   // The first thing we have to do is get the type.
@@ -117,8 +145,8 @@ static void printMemberOffset(const Metadata *typeMetadata,
 
 // FIXME: swiftcall
 /// func printTypeMemberOffset(forType: Any.Type, memberName: StaticString)
-LLVM_ATTRIBUTE_USED
-extern "C" void printTypeMemberOffset(const Metadata *typeMetadata,
+LLVM_ATTRIBUTE_USED extern "C" void SWIFT_REMOTEAST_TEST_ABI
+printTypeMemberOffset(const Metadata *typeMetadata,
                                       const char *memberName) {
   printMemberOffset(typeMetadata, memberName, /*pass metadata*/ false);
 }
@@ -126,23 +154,63 @@ extern "C" void printTypeMemberOffset(const Metadata *typeMetadata,
 // FIXME: swiftcall
 /// func printTypeMetadataMemberOffset(forType: Any.Type,
 ///                                    memberName: StaticString)
-LLVM_ATTRIBUTE_USED
-extern "C" void printTypeMetadataMemberOffset(const Metadata *typeMetadata,
-                                              const char *memberName) {
+LLVM_ATTRIBUTE_USED extern "C" void SWIFT_REMOTEAST_TEST_ABI
+printTypeMetadataMemberOffset(const Metadata *typeMetadata,
+                              const char *memberName) {
   printMemberOffset(typeMetadata, memberName, /*pass metadata*/ true);
+}
+
+// FIXME: swiftcall
+/// func printDynamicTypeAndAddressForExistential<T>(_: T)
+LLVM_ATTRIBUTE_USED extern "C" void SWIFT_REMOTEAST_TEST_ABI
+printDynamicTypeAndAddressForExistential(void *object,
+                                         const Metadata *typeMetadata) {
+  auto &remoteAST = getRemoteASTContext();
+  auto &out = llvm::outs();
+
+  // First, retrieve the static type of the existential, so we can understand
+  // which kind of existential this is.
+  auto staticTypeResult =
+      remoteAST.getTypeForRemoteTypeMetadata(RemoteAddress(typeMetadata));
+  if (!staticTypeResult) {
+    out << "failed to resolve static type: "
+        << staticTypeResult.getFailure().render() << '\n';
+    return;
+  }
+
+  // OK, we can reconstruct the dynamic type and the address now.
+  auto result = remoteAST.getDynamicTypeAndAddressForExistential(
+      RemoteAddress(object), staticTypeResult.getValue());
+  if (result) {
+    out << "found type: ";
+    result.getValue().InstanceType.print(out);
+    out << "\n";
+  } else {
+    out << result.getFailure().render() << '\n';
+  }
+}
+
+// FIXME: swiftcall
+/// func stopRemoteAST(_: AnyObject)
+LLVM_ATTRIBUTE_USED extern "C" void SWIFT_REMOTEAST_TEST_ABI
+stopRemoteAST() {
+  if (remoteContext)
+    remoteContext.reset();
 }
 
 namespace {
 
 struct Observer : public FrontendObserver {
-  void aboutToRunImmediately(CompilerInstance &instance) override {
-    Context = &instance.getASTContext();
+  void configuredCompiler(CompilerInstance &instance) override {
+    context = &instance.getASTContext();
   }
 };
 
 } // end anonymous namespace
 
 int main(int argc, const char *argv[]) {
+  PROGRAM_START(argc, argv);
+
   unsigned numForwardedArgs = argc
       - 1  // we drop argv[0]
       + 1; // -interpret

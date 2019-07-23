@@ -15,7 +15,7 @@ protocol ParentProtocol1 {
 
   /// ParentProtocol.AssocType
   associatedtype AssocType
-  // CHECK: AssociatedType/ParentProtocol1.AssocType {{.*}} DocCommentAsXML=[<Other file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>AssocType</Name><USR>s:14swift_ide_test15ParentProtocol1P9AssocType</USR><Declaration>associatedtype AssocType</Declaration><CommentParts><Abstract><Para>ParentProtocol.AssocType</Para></Abstract></CommentParts></Other>]
+  // CHECK: AssociatedType/ParentProtocol1.AssocType {{.*}} DocCommentAsXML=[<Other file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>AssocType</Name><USR>s:14swift_ide_test15ParentProtocol1P9AssocTypeQa</USR><Declaration>associatedtype AssocType</Declaration><CommentParts><Abstract><Para>ParentProtocol.AssocType</Para></Abstract></CommentParts></Other>]
 
   /// ParentProtocol1.commonParentRequirement()
   func commonParentRequirement()
@@ -63,23 +63,23 @@ protocol ChildProtocol : ParentProtocol1, ParentProtocol2 {
 extension ChildProtocol {
   // Should come from ParentProtocol1.
   func onlyParent1() {}
-  // CHECK: Func/onlyParent1 {{.*}} DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>onlyParent1()</Name><USR>s:14swift_ide_test15ParentProtocol1P11onlyParent1yyF</USR><Declaration>func onlyParent1()</Declaration><CommentParts><Abstract><Para>ParentProtocol1.onlyParent1()</Para></Abstract></CommentParts></Function>]
+  // CHECK: Func/onlyParent1 {{.*}} DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>onlyParent1()</Name><USR>s:14swift_ide_test15ParentProtocol1P11onlyParent1yyF</USR><Declaration>func onlyParent1()</Declaration><CommentParts><Abstract><Para>ParentProtocol1.onlyParent1()</Para></Abstract><Discussion><Note><Para>This documentation comment was inherited from <codeVoice>ParentProtocol1</codeVoice>.</Para></Note></Discussion></CommentParts></Function>]
 
   // Should come from ParentProtocol1.
   var onlyParent1Var: Int { return 0 }
-  // CHECK: Var/onlyParent1Var {{.*}} DocCommentAsXML=[<Other file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>onlyParent1Var</Name><USR>s:14swift_ide_test15ParentProtocol1P14onlyParent1VarSivp</USR><Declaration>var onlyParent1Var: Int { get }</Declaration><CommentParts><Abstract><Para>ParentProtocol.onlyParent1Var</Para></Abstract></CommentParts></Other>]
+  // CHECK: Var/onlyParent1Var {{.*}} DocCommentAsXML=[<Other file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>onlyParent1Var</Name><USR>s:14swift_ide_test15ParentProtocol1P14onlyParent1VarSivp</USR><Declaration>var onlyParent1Var: Int { get }</Declaration><CommentParts><Abstract><Para>ParentProtocol.onlyParent1Var</Para></Abstract><Discussion><Note><Para>This documentation comment was inherited from <codeVoice>ParentProtocol1</codeVoice>.</Para></Note></Discussion></CommentParts></Other>]
 
   // Should come from ParentProtocol1.
   subscript(index: Int) -> Int { return 0 }
-  // CHECK: Subscript/subscript {{.*}} DocCommentAsXML=[<Other file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>subscript(_:)</Name><USR>{{.*}}</USR><Declaration>subscript(index: Int) -&gt; Int { get }</Declaration><CommentParts><Abstract><Para>ParentProtocol.subscript(index:)</Para></Abstract></CommentParts></Other>]
+  // CHECK: Subscript/subscript {{.*}} DocCommentAsXML=[<Other file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>subscript(_:)</Name><USR>{{.*}}</USR><Declaration>subscript(index: Int) -&gt; Int { get }</Declaration><CommentParts><Abstract><Para>ParentProtocol.subscript(index:)</Para></Abstract><Discussion><Note><Para>This documentation comment was inherited from <codeVoice>ParentProtocol1</codeVoice>.</Para></Note></Discussion></CommentParts></Other>]
 
   // Should come from ParentProtocol1.
   typealias AssocType = Int
-  // CHECK: TypeAlias/AssocType {{.*}} DocCommentAsXML=[<Other file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>AssocType</Name><USR>s:14swift_ide_test15ParentProtocol1P9AssocType</USR><Declaration>associatedtype AssocType</Declaration><CommentParts><Abstract><Para>ParentProtocol.AssocType</Para></Abstract></CommentParts></Other>]
+  // CHECK: TypeAlias/AssocType {{.*}} DocCommentAsXML=[<Other file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>AssocType</Name><USR>s:14swift_ide_test15ParentProtocol1P9AssocTypeQa</USR><Declaration>associatedtype AssocType</Declaration><CommentParts><Abstract><Para>ParentProtocol.AssocType</Para></Abstract><Discussion><Note><Para>This documentation comment was inherited from <codeVoice>ParentProtocol1</codeVoice>.</Para></Note></Discussion></CommentParts></Other>]
 
   // Should come from ParentProtocol2.
   func onlyParent2() {}
-  // CHECK: Func/onlyParent2 {{.*}} DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>onlyParent2()</Name><USR>s:14swift_ide_test15ParentProtocol2P11onlyParent2yyF</USR><Declaration>func onlyParent2()</Declaration><CommentParts><Abstract><Para>ParentProtocol2.onlyParent2()</Para></Abstract></CommentParts></Function>]
+  // CHECK: Func/onlyParent2 {{.*}} DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>onlyParent2()</Name><USR>s:14swift_ide_test15ParentProtocol2P11onlyParent2yyF</USR><Declaration>func onlyParent2()</Declaration><CommentParts><Abstract><Para>ParentProtocol2.onlyParent2()</Para></Abstract><Discussion><Note><Para>This documentation comment was inherited from <codeVoice>ParentProtocol2</codeVoice>.</Para></Note></Discussion></CommentParts></Function>]
 
   // Should show nothing because the requirement is in both parents.
   func commonParentRequirement() {}

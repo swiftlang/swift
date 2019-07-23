@@ -38,8 +38,8 @@ function(manpage)
       DEPENDS "${MP_SOURCE}"
       ALL)
 
-  swift_install_in_component("${MP_INSTALL_IN_COMPONENT}"
-      FILES "${output_file_name}"
-      DESTINATION "share/man/man${MP_MAN_SECTION}")
+  swift_install_in_component(FILES "${output_file_name}"
+                             DESTINATION "share/man/man${MP_MAN_SECTION}"
+                             COMPONENT "${MP_INSTALL_IN_COMPONENT}")
 endfunction()
 

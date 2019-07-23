@@ -9,9 +9,10 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// RUN: rm -rf %t  &&  mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %gyb %s -o %t/NSValueBridging.swift
 // RUN: %target-build-swift -g -module-name a %t/NSValueBridging.swift -o %t.out
+// RUN: %target-codesign %t.out
 // RUN: %target-run %t.out
 // REQUIRES: executable_test
 //
@@ -59,7 +60,7 @@ ${ testCase("NSRange", "NSRange(location: 17, length: 38)", "range", "rangesEqua
 // For historic reasons, macOS has different NSValue methods for the
 // CoreGraphics types from other Apple platforms.
 
-#if os(OSX)
+#if os(macOS)
 
 ${ testCase("CGRect",            "CGRect(x: 17, y: 38, width: 6, height: 79)", "rect",  "(==)") }
 ${ testCase("CGPoint",           "CGPoint(x: 17, y: 38)",                      "point", "(==)") }
@@ -88,6 +89,35 @@ nsValueBridging.test("NSValue can only be cast back to its original type") {
 
   expectCrashLater()
   _ = rangeObject as! CGRect
+}
+
+nsValueBridging.test("NSValue fetching method should be able to convert constructed values safely") {
+  guard #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) else { return }
+
+  let range = NSRange(location: 17, length: 38)
+  let value = NSValue(range: range)
+  expectEqual(value.value(of: NSRange.self)?.location, range.location)
+  expectEqual(value.value(of: NSRange.self)?.length, range.length)
+  expectEqual(value.value(of: CGRect.self), .none)
+  expectEqual(value.value(of: String.self), .none)
+  expectTrue(value.value(of: AnyObject.self) == nil)
+
+
+  class GenericThingNotRootedInObjC<T> {
+    init() { }
+  }
+
+  let obj = GenericThingNotRootedInObjC<String>()
+  // extend the lifetime to ensure that the non retained pointer is valid for the test duration
+  withExtendedLifetime(obj) { () -> Void in
+    let value = NSValue(nonretainedObject: obj)
+    let resString = value.value(of: GenericThingNotRootedInObjC<String>.self)
+    expectEqual(resString === obj, true) // ensure the value is exactly the same
+    
+    let resInt = value.value(of: GenericThingNotRootedInObjC<Int>.self)
+    expectTrue(resInt == nil)
+  }
+
 }
 
 runAllTests()

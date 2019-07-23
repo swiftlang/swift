@@ -31,6 +31,10 @@
 using namespace swift;
 using namespace irgen;
 
+static llvm::cl::opt<bool> EnableTrapDebugInfo(
+    "enable-trap-debug-info", llvm::cl::Hidden,
+    llvm::cl::desc("Generate failure-message functions in the debug info"));
+
 IRGenFunction::IRGenFunction(IRGenModule &IGM, llvm::Function *Fn,
                              OptimizationMode OptMode,
                              const SILDebugScope *DbgScope,
@@ -98,7 +102,7 @@ void IRGenFunction::emitMemCpy(llvm::Value *dest, llvm::Value *src,
 
 void IRGenFunction::emitMemCpy(llvm::Value *dest, llvm::Value *src,
                                llvm::Value *size, Alignment align) {
-  Builder.CreateMemCpy(dest, src, size, align.getValue(), false);
+  Builder.CreateMemCpy(dest, align.getValue(), src, align.getValue(), size);
 }
 
 void IRGenFunction::emitMemCpy(Address dest, Address src, Size size) {
@@ -430,4 +434,39 @@ Address IRGenFunction::emitAddressAtOffset(llvm::Value *base, Offset offset,
   auto offsetValue = offset.getAsValue(*this);
   auto slotPtr = emitByteOffsetGEP(base, offsetValue, objectTy);
   return Address(slotPtr, objectAlignment);
+}
+
+llvm::CallInst *IRBuilder::CreateNonMergeableTrap(IRGenModule &IGM,
+                                                  StringRef failureMsg) {
+  if (IGM.IRGen.Opts.shouldOptimize()) {
+    // Emit unique side-effecting inline asm calls in order to eliminate
+    // the possibility that an LLVM optimization or code generation pass
+    // will merge these blocks back together again. We emit an empty asm
+    // string with the side-effect flag set, and with a unique integer
+    // argument for each cond_fail we see in the function.
+    llvm::IntegerType *asmArgTy = IGM.Int32Ty;
+    llvm::Type *argTys = {asmArgTy};
+    llvm::FunctionType *asmFnTy =
+        llvm::FunctionType::get(IGM.VoidTy, argTys, false /* = isVarArg */);
+    llvm::InlineAsm *inlineAsm =
+        llvm::InlineAsm::get(asmFnTy, "", "n", true /* = SideEffects */);
+    CreateAsmCall(inlineAsm,
+                  llvm::ConstantInt::get(asmArgTy, NumTrapBarriers++));
+  }
+
+  // Emit the trap instruction.
+  llvm::Function *trapIntrinsic =
+      llvm::Intrinsic::getDeclaration(&IGM.Module, llvm::Intrinsic::ID::trap);
+  if (EnableTrapDebugInfo && IGM.DebugInfo && !failureMsg.empty()) {
+    IGM.DebugInfo->addFailureMessageToCurrentLoc(*this, failureMsg);
+  }
+  auto Call = IRBuilderBase::CreateCall(trapIntrinsic, {});
+  setCallingConvUsingCallee(Call);
+  return Call;
+}
+
+void IRGenFunction::emitTrap(StringRef failureMessage, bool EmitUnreachable) {
+  Builder.CreateNonMergeableTrap(IGM, failureMessage);
+  if (EmitUnreachable)
+    Builder.CreateUnreachable();
 }

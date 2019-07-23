@@ -20,7 +20,7 @@ SymbolicReferenceExprSyntax getCannedSymbolicRef() {
   ArgBuilder
     .useLeftAngleBracket(SyntaxFactory::makeLeftAngleToken({}, {}))
     .useRightAngleBracket(SyntaxFactory::makeRightAngleToken({}, {}))
-    .addGenericArgument(IntArg);
+    .addArgumentsMember(IntArg);
 
   return SyntaxFactory::makeSymbolicReferenceExpr(Array, ArgBuilder.build());
 }

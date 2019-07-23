@@ -19,15 +19,17 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-combine"
-#include "swift/SILOptimizer/PassManager/Passes.h"
 #include "SILCombiner.h"
+#include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
-#include "swift/SIL/DebugUtils.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
+#include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/CanonicalizeInstruction.h"
 #include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
@@ -35,7 +37,6 @@
 
 using namespace swift;
 
-STATISTIC(NumSimplified, "Number of instructions simplified");
 STATISTIC(NumCombined, "Number of instructions combined");
 STATISTIC(NumDeadInst, "Number of dead insts eliminated");
 
@@ -69,7 +70,7 @@ void SILCombiner::addReachableCodeToWorklist(SILBasicBlock *BB) {
       // DCE instruction if trivially dead.
       if (isInstructionTriviallyDead(Inst)) {
         ++NumDeadInst;
-        DEBUG(llvm::dbgs() << "SC: DCE: " << *Inst << '\n');
+        LLVM_DEBUG(llvm::dbgs() << "SC: DCE: " << *Inst << '\n');
 
         // We pass in false here since we need to signal to
         // eraseInstFromFunction to not add this instruction's operands to the
@@ -100,6 +101,28 @@ void SILCombiner::addReachableCodeToWorklist(SILBasicBlock *BB) {
   addInitialGroup(InstrsForSILCombineWorklist);
 }
 
+static void eraseSingleInstFromFunction(SILInstruction &I,
+                                        SILCombineWorklist &Worklist,
+                                        bool AddOperandsToWorklist) {
+  LLVM_DEBUG(llvm::dbgs() << "SC: ERASE " << I << '\n');
+
+  assert(!I.hasUsesOfAnyResult() && "Cannot erase instruction that is used!");
+
+  // Make sure that we reprocess all operands now that we reduced their
+  // use counts.
+  if (I.getNumOperands() < 8 && AddOperandsToWorklist) {
+    for (auto &OpI : I.getAllOperands()) {
+      if (auto *Op = OpI.get()->getDefiningInstruction()) {
+        LLVM_DEBUG(llvm::dbgs() << "SC: add op " << *Op
+                                << " from erased inst to worklist\n");
+        Worklist.add(Op);
+      }
+    }
+  }
+  Worklist.remove(&I);
+  I.eraseFromParent();
+}
+
 //===----------------------------------------------------------------------===//
 //                               Implementation
 //===----------------------------------------------------------------------===//
@@ -108,18 +131,55 @@ void SILCombineWorklist::add(SILInstruction *I) {
   if (!WorklistMap.insert(std::make_pair(I, Worklist.size())).second)
     return;
 
-  DEBUG(llvm::dbgs() << "SC: ADD: " << *I << '\n');
+  LLVM_DEBUG(llvm::dbgs() << "SC: ADD: " << *I << '\n');
   Worklist.push_back(I);
 }
+
+// Define a CanonicalizeInstruction subclass for use in SILCombine.
+class SILCombineCanonicalize final : CanonicalizeInstruction {
+  SILCombineWorklist &Worklist;
+  bool changed = false;
+
+public:
+  SILCombineCanonicalize(SILCombineWorklist &Worklist)
+      : CanonicalizeInstruction(DEBUG_TYPE), Worklist(Worklist) {}
+
+  void notifyNewInstruction(SILInstruction *inst) override {
+    Worklist.add(inst);
+    Worklist.addUsersOfAllResultsToWorklist(inst);
+    changed = true;
+  }
+
+  // Just delete the given 'inst' and record its operands. The callback isn't
+  // allowed to mutate any other instructions.
+  void killInstruction(SILInstruction *inst) override {
+    eraseSingleInstFromFunction(*inst, Worklist,
+                                /*AddOperandsToWorklist*/ true);
+    changed = true;
+  }
+
+  void notifyHasNewUsers(SILValue value) override {
+    Worklist.addUsersToWorklist(value);
+    changed = true;
+  }
+
+  bool tryCanonicalize(SILInstruction *inst) {
+    changed = false;
+    canonicalize(inst);
+    return changed;
+  }
+};
 
 bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
   MadeChange = false;
 
-  DEBUG(llvm::dbgs() << "\n\nSILCOMBINE ITERATION #" << Iteration << " on "
-                     << F.getName() << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "\n\nSILCOMBINE ITERATION #" << Iteration << " on "
+                          << F.getName() << "\n");
 
   // Add reachable instructions to our worklist.
   addReachableCodeToWorklist(&*F.begin());
+
+  SILCombineCanonicalize scCanonicalize(Worklist);
 
   // Process until we run out of items in our worklist.
   while (!Worklist.isEmpty()) {
@@ -135,27 +195,15 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
 
     // Check to see if we can DCE the instruction.
     if (isInstructionTriviallyDead(I)) {
-      DEBUG(llvm::dbgs() << "SC: DCE: " << *I << '\n');
+      LLVM_DEBUG(llvm::dbgs() << "SC: DCE: " << *I << '\n');
       eraseInstFromFunction(*I);
       ++NumDeadInst;
       MadeChange = true;
       continue;
     }
 
-    // Check to see if we can instsimplify the instruction.
-    if (SILValue Result = simplifyInstruction(I)) {
-      ++NumSimplified;
-
-      DEBUG(llvm::dbgs() << "SC: Simplify Old = " << *I << '\n'
-                         << "    New = " << *Result << '\n');
-
-      // Everything uses the new instruction now.
-      replaceInstUsesWith(*cast<SingleValueInstruction>(I), Result);
-
-      // Push the new instruction and any users onto the worklist.
-      Worklist.addUsersToWorklist(Result);
-
-      eraseInstFromFunction(*I);
+    // Canonicalize the instruction.
+    if (scCanonicalize.tryCanonicalize(I)) {
       MadeChange = true;
       continue;
     }
@@ -167,8 +215,9 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
 #ifndef NDEBUG
     std::string OrigI;
 #endif
-    DEBUG(llvm::raw_string_ostream SS(OrigI); I->print(SS); OrigI = SS.str(););
-    DEBUG(llvm::dbgs() << "SC: Visiting: " << OrigI << '\n');
+    LLVM_DEBUG(llvm::raw_string_ostream SS(OrigI); I->print(SS);
+               OrigI = SS.str(););
+    LLVM_DEBUG(llvm::dbgs() << "SC: Visiting: " << OrigI << '\n');
 
     if (SILInstruction *Result = visit(I)) {
       ++NumCombined;
@@ -177,8 +226,8 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
         assert(&*std::prev(SILBasicBlock::iterator(I)) == Result &&
               "Expected new instruction inserted before existing instruction!");
 
-        DEBUG(llvm::dbgs() << "SC: Old = " << *I << '\n'
-                           << "    New = " << *Result << '\n');
+        LLVM_DEBUG(llvm::dbgs() << "SC: Old = " << *I << '\n'
+                                << "    New = " << *Result << '\n');
 
         // Everything uses the new instruction now.
         replaceInstUsesPairwiseWith(I, Result);
@@ -189,8 +238,8 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
 
         eraseInstFromFunction(*I);
       } else {
-        DEBUG(llvm::dbgs() << "SC: Mod = " << OrigI << '\n'
-                     << "    New = " << *I << '\n');
+        LLVM_DEBUG(llvm::dbgs() << "SC: Mod = " << OrigI << '\n'
+                                << "    New = " << *I << '\n');
 
         // If the instruction was modified, it's possible that it is now dead.
         // if so, remove it.
@@ -210,8 +259,8 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
     // the next iteration.
     auto &TrackingList = *Builder.getTrackingList();
     for (SILInstruction *I : TrackingList) {
-      DEBUG(llvm::dbgs() << "SC: add " << *I <<
-            " from tracking list to worklist\n");
+      LLVM_DEBUG(llvm::dbgs() << "SC: add " << *I
+                              << " from tracking list to worklist\n");
       Worklist.add(I);
     }
     TrackingList.clear();
@@ -225,8 +274,8 @@ void SILCombineWorklist::addInitialGroup(ArrayRef<SILInstruction *> List) {
   assert(Worklist.empty() && "Worklist must be empty to add initial group");
   Worklist.reserve(List.size()+16);
   WorklistMap.reserve(List.size());
-  DEBUG(llvm::dbgs() << "SC: ADDING: " << List.size()
-        << " instrs to worklist\n");
+  LLVM_DEBUG(llvm::dbgs() << "SC: ADDING: " << List.size()
+                          << " instrs to worklist\n");
   while (!List.empty()) {
     SILInstruction *I = List.back();
     List = List.slice(0, List.size()-1);    
@@ -268,18 +317,27 @@ SILInstruction *SILCombiner::insertNewInstBefore(SILInstruction *New,
 void SILCombiner::replaceInstUsesWith(SingleValueInstruction &I, ValueBase *V) {
   Worklist.addUsersToWorklist(&I);   // Add all modified instrs to worklist.
 
-  DEBUG(llvm::dbgs() << "SC: Replacing " << I << "\n"
-        "    with " << *V << '\n');
+  LLVM_DEBUG(llvm::dbgs() << "SC: Replacing " << I << "\n"
+                          << "    with " << *V << '\n');
 
   I.replaceAllUsesWith(V);
+}
+
+void SILCombiner::replaceValueUsesWith(SILValue oldValue, SILValue newValue) {
+  Worklist.addUsersToWorklist(oldValue); // Add all modified instrs to worklist.
+
+  LLVM_DEBUG(llvm::dbgs() << "SC: Replacing " << oldValue << "\n"
+                          << "    with " << newValue << '\n');
+
+  oldValue->replaceAllUsesWith(newValue);
 }
 
 /// Replace all of the results of the old instruction with the
 /// corresponding results of the new instruction.
 void SILCombiner::replaceInstUsesPairwiseWith(SILInstruction *oldI,
                                               SILInstruction *newI) {
-  DEBUG(llvm::dbgs() << "SC: Replacing " << *oldI << "\n"
-        "    with " << *newI << '\n');
+  LLVM_DEBUG(llvm::dbgs() << "SC: Replacing " << *oldI << "\n"
+                          << "    with " << *newI << '\n');
 
   auto oldResults = oldI->getResults();
   auto newResults = newI->getResults();
@@ -298,34 +356,28 @@ void SILCombiner::replaceInstUsesPairwiseWith(SILInstruction *oldI,
 // instruction, visit methods should use this method to delete the given
 // instruction and upon completion of their peephole return the value returned
 // by this method.
-SILInstruction *SILCombiner::eraseInstFromFunction(SILInstruction &I,
-                                            SILBasicBlock::iterator &InstIter,
-                                            bool AddOperandsToWorklist) {
-  DEBUG(llvm::dbgs() << "SC: ERASE " << I << '\n');
-
-  assert(onlyHaveDebugUsesOfAllResults(&I) &&
-         "Cannot erase instruction that is used!");
-
-  // Make sure that we reprocess all operands now that we reduced their
-  // use counts.
-  if (I.getNumOperands() < 8 && AddOperandsToWorklist) {
-    for (auto &OpI : I.getAllOperands()) {
-      if (auto *Op = OpI.get()->getDefiningInstruction()) {
-        DEBUG(llvm::dbgs() << "SC: add op " << *Op <<
-              " from erased inst to worklist\n");
-        Worklist.add(Op);
-      }
+SILInstruction *
+SILCombiner::eraseInstFromFunction(SILInstruction &I,
+                                   SILBasicBlock::iterator &InstIter,
+                                   bool AddOperandsToWorklist) {
+  // Delete any debug users first.
+  for (auto result : I.getResults()) {
+    while (!result->use_empty()) {
+      auto *user = result->use_begin()->getUser();
+      assert(user->isDebugInstruction());
+      if (InstIter == user->getIterator())
+        ++InstIter;
+      Worklist.remove(user);
+      user->eraseFromParent();
     }
   }
+  if (InstIter == I.getIterator())
+    ++InstIter;
 
-  for (auto result : I.getResults())
-    for (Operand *DU : getDebugUses(result))
-      Worklist.remove(DU->getUser());
-
-  Worklist.remove(&I);
-  eraseFromParentWithDebugInsts(&I, InstIter);
+  eraseSingleInstFromFunction(I, Worklist, AddOperandsToWorklist);
   MadeChange = true;
-  return nullptr;  // Don't do anything with I
+  // Dummy return, so the caller doesn't need to explicitly return nullptr.
+  return nullptr;
 }
 
 //===----------------------------------------------------------------------===//
@@ -340,13 +392,21 @@ class SILCombine : public SILFunctionTransform {
   
   /// The entry point to the transformation.
   void run() override {
+    // FIXME: We should be able to handle ownership.
+    if (getFunction()->hasOwnership())
+      return;
+
     auto *AA = PM->getAnalysis<AliasAnalysis>();
     auto *DA = PM->getAnalysis<DominanceAnalysis>();
+    auto *PCA = PM->getAnalysis<ProtocolConformanceAnalysis>();
+    auto *CHA = PM->getAnalysis<ClassHierarchyAnalysis>();
 
+    SILOptFunctionBuilder FuncBuilder(*this);
     // Create a SILBuilder with a tracking list for newly added
     // instructions, which we will periodically move to our worklist.
     SILBuilder B(*getFunction(), &TrackingList);
-    SILCombiner Combiner(B, AA, DA, getOptions().RemoveRuntimeAsserts);
+    SILCombiner Combiner(FuncBuilder, B, AA, DA, PCA, CHA,
+                         getOptions().RemoveRuntimeAsserts);
     bool Changed = Combiner.runOnFunction(*getFunction());
     assert(TrackingList.empty() &&
            "TrackingList should be fully processed by SILCombiner");

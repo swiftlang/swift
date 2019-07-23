@@ -86,6 +86,9 @@ void swift::initializeTypeMetadataRecordLookup() {
   }
 }
 
+void swift::initializeDynamicReplacementLookup() {
+}
+
 // As ELF images are loaded, ImageInspectionInit:sectionDataInit() will call
 // addNewDSOImage() with an address in the image that can later be used via
 // dladdr() to dlopen() the image after the appropriate initialize*Lookup()
@@ -97,7 +100,7 @@ void swift_addNewDSOImage(const void *addr) {
 
   record(sections);
 
-  const auto &protocols_section = sections->swift5_protocol_conformances;
+  const auto &protocols_section = sections->swift5_protocols;
   const void *protocols =
       reinterpret_cast<void *>(protocols_section.start);
   if (protocols_section.length)
@@ -114,6 +117,18 @@ void swift_addNewDSOImage(const void *addr) {
   const void *metadata = reinterpret_cast<void *>(type_metadata.start);
   if (type_metadata.length)
     addImageTypeMetadataRecordBlockCallback(metadata, type_metadata.length);
+
+  const auto &dynamic_replacements = sections->swift5_replace;
+  const auto *replacements =
+      reinterpret_cast<void *>(dynamic_replacements.start);
+  if (dynamic_replacements.length) {
+    const auto &dynamic_replacements_some = sections->swift5_replac2;
+    const auto *replacements_some =
+      reinterpret_cast<void *>(dynamic_replacements_some.start);
+    addImageDynamicReplacementBlockCallback(
+        replacements, dynamic_replacements.length, replacements_some,
+        dynamic_replacements_some.length);
+  }
 }
 
 int swift::lookupSymbol(const void *address, SymbolInfo *info) {
@@ -124,9 +139,15 @@ int swift::lookupSymbol(const void *address, SymbolInfo *info) {
 
   info->fileName = dlinfo.dli_fname;
   info->baseAddress = dlinfo.dli_fbase;
-  info->symbolName = dlinfo.dli_sname;
+  info->symbolName.reset(dlinfo.dli_sname);
   info->symbolAddress = dlinfo.dli_saddr;
   return 1;
+}
+
+// This is only used for backward deployment hooks, which we currently only support for
+// MachO. Add a stub here to make sure it still compiles.
+void *swift::lookupSection(const char *segment, const char *section, size_t *outSize) {
+  return nullptr;
 }
 
 #endif // defined(__ELF__)
