@@ -14,10 +14,9 @@
 # Utility code for later in this template
 #
 
-from SwiftIntTypes import all_integer_types, int_max_bits, should_define_truncating_bit_pattern_init
-from SwiftFloatingPointTypes import getFtoIBounds
+import SwiftIntTypes
+import SwiftFloatingPointTypes 
 
-from string import maketrans, capitalize
 from itertools import chain
 
 # Number of bits in the Builtin.Word type
@@ -1064,7 +1063,7 @@ def unsafeOperationComment(operator):
 //===--- Concrete FixedWidthIntegers --------------------------------------===//
 //===----------------------------------------------------------------------===//
 
-% for self_type in all_integer_types(word_bits):
+% for self_type in SwiftIntTypes.all_integer_types(word_bits):
 %   bits = self_type.bits
 %   signed = self_type.is_signed
 %   BuiltinName = self_type.builtin_name
@@ -1125,7 +1124,7 @@ public struct ${Self}
 
 %   for (FloatType, FloatBits) in [
 %     ('Float', 32), ('Double', 64), ('Float80', 80)]:
-%     (lower, upper) = getFtoIBounds(floatBits=FloatBits, intBits=int(bits), signed=signed)
+%     (lower, upper) = SwiftFloatingPointTypes.getFtoIBounds(floatBits=FloatBits, intBits=int(bits), signed=signed)
 
 %     if FloatType == 'Float80':
 #if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
@@ -1648,7 +1647,7 @@ extension ${Self}: Hashable {
     return Hasher._hash(
       seed: seed,
       bytes: UInt64(truncatingIfNeeded: ${U}${Self}(_value)),
-      count: ${bits / 8})
+      count: ${bits // 8})
     % end
   }
 }

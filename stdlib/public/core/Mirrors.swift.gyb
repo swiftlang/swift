@@ -12,7 +12,7 @@
 
 %{
 
-from SwiftIntTypes import all_integer_types
+import SwiftIntTypes
 
 # Number of bits in the Builtin.Word type
 word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
@@ -26,7 +26,7 @@ Types = [
     ('Unicode.Scalar', '.uInt', 'UInt64(self)'),
 ]
 
-for self_ty in all_integer_types(word_bits):
+for self_ty in SwiftIntTypes.all_integer_types(word_bits):
   Self = self_ty.stdlib_name
   if self_ty.is_signed:
     Types.append( (Self, '.int', 'Int64(self)') )

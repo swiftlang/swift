@@ -1,19 +1,19 @@
 import textwrap
-from AttributeNodes import ATTRIBUTE_NODES  # noqa: I201
-from AvailabilityNodes import AVAILABILITY_NODES  # noqa: I201
-import Classification  # noqa: I201
-from CommonNodes import COMMON_NODES  # noqa: I201
-from DeclNodes import DECL_NODES  # noqa: I201
-from ExprNodes import EXPR_NODES  # noqa: I201
-from GenericNodes import GENERIC_NODES  # noqa: I201
-from NodeSerializationCodes import SYNTAX_NODE_SERIALIZATION_CODES, \
+from .AttributeNodes import ATTRIBUTE_NODES  # noqa: I201
+from .AvailabilityNodes import AVAILABILITY_NODES  # noqa: I201
+from . import Classification  # noqa: I201
+from .CommonNodes import COMMON_NODES  # noqa: I201
+from .DeclNodes import DECL_NODES  # noqa: I201
+from .ExprNodes import EXPR_NODES  # noqa: I201
+from .GenericNodes import GENERIC_NODES  # noqa: I201
+from .NodeSerializationCodes import SYNTAX_NODE_SERIALIZATION_CODES, \
     get_serialization_code, \
     verify_syntax_node_serialization_codes
 
-from PatternNodes import PATTERN_NODES  # noqa: I201
-from StmtNodes import STMT_NODES  # noqa: I201
-import Token
-from TypeNodes import TYPE_NODES  # noqa: I201
+from .PatternNodes import PATTERN_NODES  # noqa: I201
+from .StmtNodes import STMT_NODES  # noqa: I201
+from . import Token
+from .TypeNodes import TYPE_NODES  # noqa: I201
 
 
 # Re-export global constants

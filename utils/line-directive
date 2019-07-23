@@ -61,7 +61,7 @@ line_pattern = re.compile(
 
 def _make_line_map(target_filename, stream=None):
     """
-    >>> from StringIO import StringIO
+    >>> from io import StringIO
     >>> _make_line_map('box',
     ... StringIO('''// ###sourceLocation(file: "foo.bar", line: 3)
     ... line 2
@@ -95,7 +95,7 @@ def fline_map(target_filename):
 
 def map_line_to_source_file(target_filename, target_line_num):
     """
-    >>> from tempfile import *
+    >>> from .tempfile import *
     >>> # On Windows, the name of a NamedTemporaryFile cannot be used to open
     >>> # the file for a second time if delete=True. Therefore, we have to
     >>> # manually handle closing and deleting this file to allow us to open
@@ -145,7 +145,7 @@ def map_line_to_source_file(target_filename, target_line_num):
 def map_line_from_source_file(source_filename, source_line_num,
                               target_filename):
     """
-    >>> from tempfile import *
+    >>> from .tempfile import *
     >>> # On Windows, the name of a NamedTemporaryFile cannot be used to open
     >>> # the file for a second time if delete=True. Therefore, we have to
     >>> # manually handle closing and deleting this file to allow us to open
@@ -231,7 +231,7 @@ def expand_response_files(files):
 def run():
     """Simulate a couple of gyb-generated files
 
-    >>> from tempfile import *
+    >>> from .tempfile import *
     >>> # On Windows, the name of a NamedTemporaryFile cannot be used to open
     >>> # the file for a second time if delete=True. Therefore, we have to
     >>> # manually handle closing and deleting this file to allow us to open

@@ -13,8 +13,8 @@
 import SwiftShims
 
 %{
-from SwiftIntTypes import all_integer_types
-from SwiftFloatingPointTypes import all_floating_point_types
+import SwiftIntTypes 
+import SwiftFloatingPointTypes
 
 #
 # Utility code for later in this template
@@ -27,7 +27,7 @@ word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
 builtinIntLiteralBits = 2048
 }%
 
-% for self_type in all_floating_point_types():
+% for self_type in SwiftFloatingPointTypes.all_floating_point_types():
 %{
 Self = self_type.stdlib_name
 bits = self_type.bits
@@ -1659,7 +1659,7 @@ extension ${Self} {
     }
   }
 
-% for src_type in all_floating_point_types():
+% for src_type in SwiftFloatingPointTypes.all_floating_point_types():
 %   srcBits = src_type.bits
 %   That = src_type.stdlib_name
 
