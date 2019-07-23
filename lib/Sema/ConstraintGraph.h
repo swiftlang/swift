@@ -19,6 +19,7 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/Identifier.h"
+#include "swift/AST/Type.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/DenseMap.h"
@@ -79,6 +80,10 @@ public:
   ArrayRef<TypeVariableType *> getAdjacencies() const {
     return Adjacencies;
   }
+
+  /// Retrieve the set of type variables that are adjacent due to fixed
+  /// bindings.
+  llvm::TinyPtrVector<TypeVariableType *> getFixedAdjacencies() const;
 
   /// Retrieve all of the type variables in the same equivalence class
   /// as this type variable.
