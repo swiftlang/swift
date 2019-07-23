@@ -4581,7 +4581,6 @@ namespace {
         auto a = new (Impl.SwiftContext)
           RequiresStoredPropertyInitsAttr(/*IsImplicit=*/true);
         decl->getAttrs().add(a);
-        cast<ClassDecl>(decl)->setRequiresStoredPropertyInits(true);
       }
     }
 

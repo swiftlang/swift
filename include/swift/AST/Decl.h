@@ -543,11 +543,7 @@ protected:
     NumRequirementsInSignature : 16
   );
 
-  SWIFT_INLINE_BITFIELD(ClassDecl, NominalTypeDecl, 1+2+1+2+1+6+1+1+1+1,
-    /// Whether this class requires all of its instance variables to
-    /// have in-class initializers.
-    RequiresStoredPropertyInits : 1,
-
+  SWIFT_INLINE_BITFIELD(ClassDecl, NominalTypeDecl, 2+1+2+1+7+1+1+1+1,
     /// The stage of the inheritance circularity check for this class.
     Circularity : 2,
 
@@ -565,7 +561,7 @@ protected:
     HasDestructorDecl : 1,
 
     /// Information about the class's ancestry.
-    Ancestry : 6,
+    Ancestry : 7,
 
     /// Whether we have computed the above field or not.
     AncestryComputed : 1,
@@ -3713,6 +3709,9 @@ enum class AncestryFlags : uint8_t {
 
   /// The class or one of its superclasses is imported from Clang.
   ClangImported = (1<<5),
+
+  /// The class or one of its superclasses requires stored property initializers.
+  RequiresStoredPropertyInits = (1<<6),
 };
 
 /// Return type of ClassDecl::checkAncestry(). Describes a set of interesting
@@ -3810,14 +3809,8 @@ public:
 
   //// Whether this class requires all of its stored properties to
   //// have initializers in the class definition.
-  bool requiresStoredPropertyInits() const { 
-    return Bits.ClassDecl.RequiresStoredPropertyInits;
-  }
-
-  /// Set whether this class requires all of its stored properties to
-  /// have initializers in the class definition.
-  void setRequiresStoredPropertyInits(bool requiresInits) {
-    Bits.ClassDecl.RequiresStoredPropertyInits = requiresInits;
+  bool requiresStoredPropertyInits() const {
+    return checkAncestry(AncestryFlags::RequiresStoredPropertyInits);
   }
 
   /// \see getForeignClassKind

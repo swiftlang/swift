@@ -3516,7 +3516,7 @@ public:
                                     StringRef blobData) {
     IdentifierID nameID;
     DeclContextID contextID;
-    bool isImplicit, isObjC, requiresStoredPropertyInits;
+    bool isImplicit, isObjC;
     bool inheritsSuperclassInitializers;
     GenericEnvironmentID genericEnvID;
     TypeID superclassID;
@@ -3525,7 +3525,6 @@ public:
     ArrayRef<uint64_t> rawInheritedAndDependencyIDs;
     decls_block::ClassLayout::readRecord(scratch, nameID, contextID,
                                          isImplicit, isObjC,
-                                         requiresStoredPropertyInits,
                                          inheritsSuperclassInitializers,
                                          genericEnvID, superclassID,
                                          rawAccessLevel, numConformances,
@@ -3569,8 +3568,6 @@ public:
       theClass->setImplicit();
     theClass->setIsObjC(isObjC);
     theClass->setSuperclass(MF.getType(superclassID));
-    if (requiresStoredPropertyInits)
-      theClass->setRequiresStoredPropertyInits(true);
     if (inheritsSuperclassInitializers)
       theClass->setInheritsSuperclassInitializers();
 
