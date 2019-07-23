@@ -2837,7 +2837,9 @@ void swift::checkExplicitAvailability(Decl *decl) {
   // Warn on decls without an introduction version.
   auto &ctx = decl->getASTContext();
   auto safeRangeUnderApprox = AvailabilityInference::availableRange(decl, ctx);
-  if (!safeRangeUnderApprox.getOSVersion().hasLowerEndpoint()) {
+  if (!safeRangeUnderApprox.getOSVersion().hasLowerEndpoint() &&
+      !decl->getAttrs().isUnavailable(ctx)) {
+
     auto diag = decl->diagnose(diag::public_decl_needs_availability);
 
     auto suggestPlatform = decl->getASTContext().LangOpts.RequireExplicitAvailabilityTarget;

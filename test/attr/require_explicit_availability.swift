@@ -13,8 +13,14 @@ func bar() { } // expected-warning {{public declarations should have an availabi
 @available(macOS 10.1, *)
 public func ok() { }
 
+@available(macOS, unavailable)
+public func unavailableOk() { }
+
 @available(macOS, deprecated: 10.10)
 public func missingIntro() { } // expected-warning {{public declarations should have an availability attribute with -require-explicit-availability}} {{1-1=@available(macOS 10.10, *)\n}}
+
+@available(iOS 9.0, *)
+public func missingTargetPlatform() { } // expected-warning {{public declarations should have an availability attribute with -require-explicit-availability}} {{1-1=@available(macOS 10.10, *)\n}}
 
 func privateFunc() { }
 
