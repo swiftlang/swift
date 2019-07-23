@@ -130,20 +130,22 @@ extension RandomNumberGenerator {
 ///     let y = Int.random(in: 1...100, using: &g)
 ///
 /// `SystemRandomNumberGenerator` is automatically seeded, is safe to use in
-/// multiple threads, and uses a cryptographically secure algorithm whenever
-/// possible.
+/// multiple threads, and uses a cryptographically secure algorithm on all
+/// platforms where it is implemented.
 ///
 /// Platform Implementation of `SystemRandomNumberGenerator`
 /// ========================================================
 ///
 /// While the system generator is automatically seeded and thread-safe on every
 /// platform, the cryptographic quality of the stream of random data produced by
-/// the generator may vary. For more detail, see the documentation for the APIs
-/// used by each platform.
+/// the generator may vary. Despite this, all implementations are suitable for
+/// cryptographic use-cases. For more detail, see the documentation for the
+/// APIs used by each platform.
 ///
 /// - Apple platforms use `arc4random_buf(3)`.
 /// - Linux platforms use `getrandom(2)` when available; otherwise, they read
 ///   from `/dev/urandom`.
+/// - Windows uses `BCryptGenRandom`.
 @frozen
 public struct SystemRandomNumberGenerator: RandomNumberGenerator {
   /// Creates a new instance of the system's default random number generator.
