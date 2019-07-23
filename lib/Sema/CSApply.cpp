@@ -6893,7 +6893,6 @@ static Expr *finishApplyDynamicCallable(ExprRewriter &rewriter,
   auto params = methodType->getParams();
   assert(params.size() == 1 &&
          "Expected 'dynamicallyCall' method with one parameter");
-  auto argumentType = params[0].getParameterType();
   auto argumentLabel = params[0].getLabel();
   assert((argumentLabel == ctx.Id_withArguments ||
           argumentLabel == ctx.Id_withKeywordArguments) &&
