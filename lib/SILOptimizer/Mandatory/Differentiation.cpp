@@ -4393,7 +4393,7 @@ public:
         auto adjBuf = getAdjointBuffer(origEntry, origParam);
         if (errorOccurred)
           return;
-        if (adjBuf->getType().isLoadable(pullback))
+        if (adjBuf->getType().isLoadable(adjoint))
           builder.createRetainValueAddr(adjLoc, adjBuf,
                                         builder.getDefaultAtomicity());
         indParamAdjoints.push_back(adjBuf);
