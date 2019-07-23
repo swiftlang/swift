@@ -76,6 +76,7 @@ func testDiags() {
   tuplify(true) { _ in
     17
     for c in name { // expected-error{{closure containing control flow statement cannot be used with function builder 'TupleBuilder'}}
+    // expected-error@-1 {{use of unresolved identifier 'name'}}
     }
   }
 
@@ -97,11 +98,11 @@ func testDiags() {
 struct A { }
 struct B { }
 
-func overloadedTuplify<T>(_ cond: Bool, @TupleBuilder body: (Bool) -> T) -> A {
+func overloadedTuplify<T>(_ cond: Bool, @TupleBuilder body: (Bool) -> T) -> A { // expected-note {{found this candidate}}
   return A()
 }
 
-func overloadedTuplify<T>(_ cond: Bool, @TupleBuilderWithoutIf body: (Bool) -> T) -> B {
+func overloadedTuplify<T>(_ cond: Bool, @TupleBuilderWithoutIf body: (Bool) -> T) -> B { // expected-note {{found this candidate}}
   return B()
 }
 
@@ -114,7 +115,7 @@ func testOverloading(name: String) {
 
   let _: A = a1
 
-  _ = overloadedTuplify(true) { b in
+  _ = overloadedTuplify(true) { b in // expected-error {{ambiguous use of 'overloadedTuplify(_:body:)'}}
     b ? "Hello, \(name)" : "Goodbye"
     42
     overloadedTuplify(false) {
