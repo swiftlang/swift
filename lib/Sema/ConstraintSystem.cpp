@@ -1494,10 +1494,18 @@ Type ConstraintSystem::getEffectiveOverloadType(const OverloadChoice &overload,
             return Type();
 
           if (!overload.getBaseType()->getOptionalObjectType()) {
-            Type selfType = overload.getBaseType()->getRValueType()
-                ->getMetatypeInstanceType()
-                ->lookThroughAllOptionalTypes();
-            type = type->replaceCovariantResultType(selfType, 2);
+            Type selfType = overload.getBaseType()
+                                ->getRValueType()
+                                ->getMetatypeInstanceType();
+
+            // `Int??(0)` if we look through all optional types for `Self`
+            // we'll end up with incorrect type `Int?` for result because
+            // the actual result type is `Int??`.
+            if (isa<ConstructorDecl>(decl) && selfType->getOptionalObjectType())
+              return Type();
+
+            type = type->replaceCovariantResultType(
+                selfType->lookThroughAllOptionalTypes(), 2);
           }
         }
       }
