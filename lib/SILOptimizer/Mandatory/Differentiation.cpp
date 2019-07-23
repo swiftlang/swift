@@ -4127,7 +4127,7 @@ public:
           auto *adjointArg = adjointBB->createPhiArgument(
               getRemappedTangentType(activeValue->getType()),
               ValueOwnershipKind::Guaranteed);
-          activeValuePullbackBBArgumentMap[{origBB, activeValue}] = adjointArg;
+          activeValueAdjointBBArgumentMap[{origBB, activeValue}] = adjointArg;
           recordTemporary(adjointArg);
         }
       }
@@ -4302,7 +4302,7 @@ public:
               // remove the `hasAdjointValue` check.
               if (!hasAdjointValue(predBB, activeValue)) {
                 auto *adjointBBArg =
-                    getActiveValuePullbackBlockArgument(predBB, activeValue);
+                    getActiveValueAdjointBlockArgument(predBB, activeValue);
                 auto forwardedArgAdj = makeConcreteAdjointValue(adjointBBArg);
                 initializeAdjointValue(predBB, activeValue, forwardedArgAdj);
               }
@@ -4403,7 +4403,7 @@ public:
     for (auto i : getIndices().parameters->getIndices())
       addRetElt(i);
     // Emit cleanups for all local values.
-    cleanUpTemporariesForBlock(pbExit, adjLoc);
+    cleanUpTemporariesForBlock(adjExit, adjLoc);
 
     // Copy them to adjoint indirect results.
     assert(indParamAdjoints.size() == adjoint.getIndirectResults().size() &&
@@ -5103,28 +5103,10 @@ SILValue AdjointEmitter::emitZeroDirect(CanType type, SILLocation loc) {
   return loaded;
 }
 
-void AdjointEmitter::emitCleanupForAdjointValue(AdjointValue value) {
-  switch (value.getKind()) {
-  case AdjointValueKind::Zero: return;
-  case AdjointValueKind::Aggregate:
-    for (auto element : value.getAggregateElements())
-      emitCleanupForAdjointValue(element);
-    break;
-  case AdjointValueKind::Concrete: {
-    auto concrete = value.getConcreteValue();
-    auto *cleanup = concrete.getCleanup();
-    LLVM_DEBUG(getADDebugStream() << "Applying "
-               << cleanup->getNumChildren() << " for value "
-               << concrete.getValue() << " child cleanups\n");
-    cleanup->applyRecursively(builder, concrete.getLoc());
-    break;
-  }
-  }
-}
-
 AdjointValue
 AdjointEmitter::accumulateAdjointsDirect(AdjointValue lhs,
-                                         AdjointValue rhs) {
+                                         AdjointValue rhs,
+                                         SILLocation loc) {
   LLVM_DEBUG(getADDebugStream()
              << "Materializing adjoint directly.\nLHS: " << lhs
              << "\nRHS: " << rhs << '\n');
