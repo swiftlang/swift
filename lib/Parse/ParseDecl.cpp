@@ -4896,15 +4896,6 @@ Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
     Invalid = true;
   }
 
-  // Lazy var should not have explicit getter/setter.
-  // For error-recovery, we mark them as invalid.
-  if (Attributes.hasAttribute<LazyAttr>()){
-    if (accessors.Get)
-      accessors.Get->setInvalid();
-    if (accessors.Set)
-      accessors.Set->setInvalid();
-  }
-
   accessors.record(*this, PrimaryVar, Invalid, Decls);
 
   return makeParserResult(PrimaryVar);
@@ -5255,11 +5246,6 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
       // If we set up an initialization context for a property or module-level
       // global, record it.
       PBDEntries.back().setInitContext(initContext);
-
-      // If the attributes include @lazy, flag that on each initializer.
-      if (Attributes.hasAttribute<LazyAttr>()) {
-        PBDEntries.back().setInitializerSubsumed();
-      }
 
       if (init.hasCodeCompletion()) {
         Status |= init;

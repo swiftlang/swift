@@ -1625,7 +1625,7 @@ synthesizeLazyGetterBody(AccessorDecl *Get, VarDecl *VD, VarDecl *Storage,
   auto *InitValue = VD->getParentInitializer();
   auto PBD = VD->getParentPatternBinding();
   unsigned entryIndex = PBD->getPatternEntryIndexForVarDecl(VD);
-  assert(PBD->isInitializerSubsumed(entryIndex));
+  PBD->setInitializerSubsumed(entryIndex);
 
   if (!PBD->isInitializerChecked(entryIndex))
     TC.typeCheckPatternBinding(PBD, entryIndex);
