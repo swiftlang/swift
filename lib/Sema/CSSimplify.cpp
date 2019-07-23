@@ -2382,6 +2382,13 @@ bool ConstraintSystem::repairFailures(
                                              getConstraintLocator(locator));
       conversionsOrFixes.push_back(fix);
     }
+
+    if (purpose == CTP_Initialization && lhs->is<TupleType>() &&
+        rhs->is<TupleType>()) {
+      auto *fix = AllowTupleTypeMismatch::create(*this, lhs, rhs,
+                                                 getConstraintLocator(locator));
+      conversionsOrFixes.push_back(fix);
+    }
     break;
   }
 
@@ -2412,6 +2419,11 @@ bool ConstraintSystem::repairFailures(
 
       conversionsOrFixes.push_back(CollectionElementContextualMismatch::create(
           *this, lhs, rhs, getConstraintLocator(locator)));
+    }
+    if (lhs->is<TupleType>() && rhs->is<TupleType>()) {
+      auto *fix = AllowTupleTypeMismatch::create(*this, lhs, rhs,
+                                                 getConstraintLocator(locator));
+      conversionsOrFixes.push_back(fix);
     }
     break;
   }
@@ -6949,6 +6961,32 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     if (recordFix(fix))
       return SolutionKind::Error;
     return matchTypes(type1, type2, matchKind, subflags, locator);
+  }
+
+  case FixKind::AllowTupleTypeMismatch: {
+    auto lhs = dyn_cast<TupleType>(type1.getPointer());
+    auto rhs = dyn_cast<TupleType>(type2.getPointer());
+    auto lhsLarger = lhs->getElements().size() >= rhs->getElements().size();
+    auto larger = lhsLarger ? lhs : rhs;
+    auto smaller = lhsLarger ? rhs : lhs;
+    if (lhs && rhs && getContextualTypePurpose() == CTP_Initialization) {
+      // Match up the tuple type elements, and match any
+      for (unsigned i = 0; i < larger->getElements().size(); ++i) {
+        auto largerTy = larger->getElement(i).getType();
+        if (i < smaller->getElements().size()) {
+          auto smallerTy = smaller->getElement(i).getType();
+          if (smallerTy->isTypeVariableOrMember() ||
+              largerTy->isTypeVariableOrMember())
+            addConstraint(ConstraintKind::Bind, largerTy, smallerTy,
+                          getConstraintLocator(locator));
+        } else {
+          addConstraint(ConstraintKind::Defaultable, largerTy,
+                        getASTContext().TheAnyType,
+                        getConstraintLocator(locator));
+        }
+      }
+    }
+    return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
 
   case FixKind::InsertCall:

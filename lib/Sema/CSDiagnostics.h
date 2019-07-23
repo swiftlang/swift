@@ -759,6 +759,23 @@ private:
   void tryComputedPropertyFixIts(Expr *expr) const;
 };
 
+/// Diagnose mismatches relating to tuple destructuring.
+class TupleContextualFailure final : public ContextualFailure {
+public:
+  TupleContextualFailure(Expr *root, ConstraintSystem &cs, Type lhs, Type rhs,
+                         ConstraintLocator *locator)
+      : ContextualFailure(root, cs, lhs, rhs, locator) {}
+
+  bool diagnoseAsError() override;
+
+  bool isNumElementsMismatch() const {
+    auto lhsTy = dyn_cast<TupleType>(getFromType().getPointer());
+    auto rhsTy = dyn_cast<TupleType>(getToType().getPointer());
+    assert(lhsTy && rhsTy);
+    return lhsTy->getElements().size() != rhsTy->getElements().size();
+  }
+};
+
 /// Diagnose situations when @autoclosure argument is passed to @autoclosure
 /// parameter directly without calling it first.
 class AutoClosureForwardingFailure final : public FailureDiagnostic {

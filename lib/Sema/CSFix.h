@@ -136,6 +136,10 @@ enum class FixKind : uint8_t {
   /// referenced constructor must be required.
   AllowInvalidInitRef,
 
+  /// Allow a tuple to be destructured with a mismatched number of
+  /// elements, or mismatched types.
+  AllowTupleTypeMismatch,
+
   /// Allow an invalid member access on a value of protocol type as if
   /// that protocol type were a generic constraint requiring conformance
   /// to that protocol.
@@ -860,6 +864,25 @@ private:
                                      bool isStaticallyDerived,
                                      SourceRange baseRange,
                                      ConstraintLocator *locator);
+};
+
+class AllowTupleTypeMismatch final : public ConstraintFix {
+  Type LHS, RHS;
+
+  AllowTupleTypeMismatch(ConstraintSystem &cs, Type lhs, Type rhs,
+                         ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AllowTupleTypeMismatch, locator), LHS(lhs),
+        RHS(rhs) {}
+
+public:
+  static AllowTupleTypeMismatch *create(ConstraintSystem &cs, Type lhs,
+                                        Type rhs, ConstraintLocator *locator);
+
+  std::string getName() const override {
+    return "allow invalid tuple destructuring";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
 };
 
 class AllowMutatingMemberOnRValueBase final : public AllowInvalidMemberRef {
