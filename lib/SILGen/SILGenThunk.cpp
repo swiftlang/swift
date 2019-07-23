@@ -69,6 +69,51 @@ SILFunction *SILGenModule::getDynamicThunk(SILDeclRef constant,
   return F;
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+SILFunction *SILGenModule::getAutoDiffThunk(SILDeclRef constant,
+                                            CanSILFunctionType constantTy) {
+  auto *autoDiffFuncId = constant.autoDiffAssociatedFunctionIdentifier;
+  assert(autoDiffFuncId);
+
+  SILGenFunctionBuilder builder(*this);
+  auto originalFn = constant.asAutoDiffOriginalFunction();
+  auto originalLinkage = originalFn.getLinkage(ForDefinition);
+  auto linkage = autodiff::getAutoDiffAssociatedFunctionLinkage(
+      originalLinkage, /*isAssocFnExported*/ true);
+  auto name = constant.mangle() + "_thunk";
+  auto *F = builder.getOrCreateFunction(
+      constant.getDecl(), name, linkage, constantTy, IsBare,
+      IsTransparent, constant.isSerialized(), IsNotDynamic, ProfileCounter(),
+      IsThunk);
+
+  if (F->empty()) {
+    if (auto genSig = constantTy->getGenericSignature())
+      F->setGenericEnvironment(genSig->createGenericEnvironment());
+    SILGenFunction SGF(*this, *F, SwiftModule);
+    SmallVector<ManagedValue, 4> params;
+    auto loc = constant.getAsRegularLocation();
+    SGF.collectThunkParams(loc, params);
+    auto originalFnRef = SGF.emitGlobalFunctionRef(loc, originalFn);
+    auto loweredIndices = autoDiffFuncId->getParameterIndices()->getLowered(
+        SGF.getASTContext(),
+        constant.getDecl()->getInterfaceType()->castTo<AnyFunctionType>());
+    auto autoDiffFn = SGF.B.createAutoDiffFunction(
+        loc, loweredIndices, /*differentiationOrder*/ 1, originalFnRef);
+    auto autoDiffAssocFn = SGF.B.createAutoDiffFunctionExtract(
+        loc, AutoDiffFunctionExtractInst::Extractee(autoDiffFuncId->getKind()),
+        /*differentiationOrder*/ 1, autoDiffFn);
+    auto autoDiffAssocFnSILTy = SILType::getPrimitiveObjectType(constantTy);
+    SmallVector<SILValue, 4> args(F->getArguments().begin(),
+                                  F->getArguments().end());
+    auto apply = SGF.emitApplyWithRethrow(
+        loc, autoDiffAssocFn, autoDiffAssocFnSILTy,
+        SGF.getForwardingSubstitutionMap(), args);
+    SGF.B.createReturn(loc, apply);
+  }
+
+  return F;
+}
+
 ManagedValue
 SILGenFunction::emitDynamicMethodRef(SILLocation loc, SILDeclRef constant,
                                      CanSILFunctionType constantTy) {

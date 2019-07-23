@@ -2695,8 +2695,8 @@ TypeChecker::inferDifferentiableParameters(
       paramType = derivativeGenEnv->mapTypeIntoContext(paramType);
     else
       paramType = AFD->mapTypeIntoContext(paramType);
-    // Return false for class/existential types.
-    if (paramType->isAnyClassReferenceType() || paramType->isExistentialType())
+    // Return false for existential types.
+    if (paramType->isExistentialType())
       return false;
     // Return false for function types.
     if (paramType->is<AnyFunctionType>())
@@ -2803,6 +2803,14 @@ static FuncDecl *resolveAutoDiffAssociatedFunction(
 
   if (checkAccessControl(candidate))
     return nullptr;
+
+  // Derivatives of class members must be final.
+  if (original->getDeclContext()->getSelfClassDecl() &&
+      !candidate->isFinal()) {
+    TC.diagnose(nameLoc,
+                diag::differentiable_attr_class_derivative_not_final);
+    return nullptr;
+  }
 
   return candidate;
 }
@@ -3135,13 +3143,10 @@ static bool checkDifferentiationParameters(
           derivativeGenEnv->mapTypeIntoContext(wrtParamType);
     else
       wrtParamType = AFD->mapTypeIntoContext(wrtParamType);
-    // Parameter cannot have a class or existential type.
-    if ((!wrtParamType->hasTypeParameter() &&
-         wrtParamType->isAnyClassReferenceType()) ||
-        wrtParamType->isExistentialType()) {
+    // Parameter cannot have an existential type.
+    if (wrtParamType->isExistentialType()) {
       TC.diagnose(
-           loc,
-           diag::diff_params_clause_cannot_diff_wrt_objects_or_existentials,
+           loc, diag::diff_params_clause_cannot_diff_wrt_existentials,
            wrtParamType);
       return true;
     }
@@ -3183,13 +3188,10 @@ static bool checkTransposingParameters(
     SourceLoc loc = parsedWrtParams.empty()
         ? attrLoc
         : parsedWrtParams[i].getLoc();
-    // Parameter cannot have a class or existential type.
-    if ((!wrtParamType->hasTypeParameter() &&
-         wrtParamType->isAnyClassReferenceType()) ||
-         wrtParamType->isExistentialType()) {
-      TC.diagnose(
-          loc, diag::diff_params_clause_cannot_diff_wrt_objects_or_existentials,
-          wrtParamType);
+    // Parameter cannot have an existential type.
+    if (wrtParamType->isExistentialType()) {
+      TC.diagnose(loc, diag::diff_params_clause_cannot_diff_wrt_existentials,
+                  wrtParamType);
       return true;
     }
     // Parameter cannot have a function type.
@@ -3252,13 +3254,6 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     return;
   }
 
-  // Class members are not supported by differentiation yet.
-  if (original->getInnermostTypeContext() &&
-      isa<ClassDecl>(original->getInnermostTypeContext())) {
-    diagnoseAndRemoveAttr(attr, diag::differentiable_attr_class_unsupported);
-    return;
-  }
-
   TC.resolveDeclSignature(original);
   auto *originalFnTy = original->getInterfaceType()->castTo<AnyFunctionType>();
   bool isMethod = original->hasImplicitSelfDecl();
@@ -3276,14 +3271,41 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     return;
   }
 
-  // Start type-checking the arguments of the @differentiable attribute. This
-  // covers 'wrt:', 'jvp:', 'vjp:', and 'where', all of which are optional.
-
-  // `@differentiable` attributes on protocol requirements do not support
-  // JVP/VJP or 'where' clauses.
   bool isOriginalProtocolRequirement =
       isa<ProtocolDecl>(original->getDeclContext()) &&
       original->isProtocolRequirement();
+
+  bool isOriginalClassMember =
+      original->getDeclContext() &&
+      original->getDeclContext()->getSelfClassDecl();
+
+  // Diagnose invalid class conditions.
+  if (isOriginalClassMember) {
+    // Class methods returning dynamic `Self` are not supported.
+    // (For class methods, dynamic `Self` is supported only as the single
+    //  result - JVPs/VJPs would not type-check.
+    if (auto *originalFn = dyn_cast<FuncDecl>(original)) {
+      if (originalFn->hasDynamicSelfResult()) {
+        TC.diagnose(attr->getLocation(),
+                    diag::differentiable_attr_class_member_no_dynamic_self);
+        attr->setInvalid();
+        return;
+      }
+    }
+
+    // TODO(TF-654): Class initializers are not yet supported.
+    // Extra JVP/VJP type calculation logic is necessary because classes have
+    // both allocators and initializers.
+    if (auto *initDecl = dyn_cast<ConstructorDecl>(original)) {
+      TC.diagnose(attr->getLocation(),
+                  diag::differentiable_attr_class_init_not_yet_supported);
+      attr->setInvalid();
+      return;
+    }
+  }
+
+  // Start type-checking the arguments of the @differentiable attribute. This
+  // covers 'wrt:', 'jvp:', 'vjp:', and 'where', all of which are optional.
 
   // Handle 'where' clause, if it exists.
   // - Resolve attribute where clause requirements and store in the attribute

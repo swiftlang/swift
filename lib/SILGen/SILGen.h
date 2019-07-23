@@ -147,6 +147,12 @@ public:
   SILFunction *getDynamicThunk(SILDeclRef constant,
                                CanSILFunctionType constantTy);
 
+  // SWIFT_ENABLE_TENSORFLOW
+  /// Get the autodiff associated function thunk for a JVP/VJP SILDeclRef.
+  /// Currently used only for JVP/VJP vtable entries.
+  SILFunction *getAutoDiffThunk(SILDeclRef constant,
+                                CanSILFunctionType constantTy);
+
   /// Emit a vtable thunk for a derived method if its natural abstraction level
   /// diverges from the overridden base method. If no thunking is needed,
   /// returns a static reference to the derived method.

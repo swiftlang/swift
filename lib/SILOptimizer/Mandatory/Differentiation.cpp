@@ -1156,6 +1156,11 @@ ADContext::emitNondifferentiabilityError(SILInstruction *inst,
     getADDebugStream() << "With invoker:\n" << invoker << '\n';
   });
   auto instLoc = inst->getLoc().getSourceLoc();
+  // If instruction does not have a valid location, use the function location
+  // as a fallback. Improves diagnostics for `ref_element_addr` generated in
+  // synthesized stored property getters.
+  if (instLoc.isInvalid())
+    instLoc = inst->getFunction()->getLocation().getSourceLoc();
   return emitNondifferentiabilityError(instLoc, invoker, diag,
                                        std::forward<U>(args)...);
 }
@@ -1566,8 +1571,10 @@ void DifferentiableActivityInfo::analyze(DominanceInfo *di,
   assert(usefulValueSets.empty());
   for (auto output : outputValues) {
     usefulValueSets.push_back({});
-    // If the output has an address type, propagate usefulness recursively.
-    if (output->getType().isAddress())
+    // If the output has an address or class type, propagate usefulness
+    // recursively.
+    if (output->getType().isAddress() ||
+        output->getType().isClassOrClassMetatype())
       propagateUsefulThroughBuffer(output, usefulValueSets.size() - 1);
     // Otherwise, just mark the output as useful.
     else
@@ -1702,7 +1709,8 @@ void DifferentiableActivityInfo::recursivelySetVaried(
 
 void DifferentiableActivityInfo::propagateUsefulThroughBuffer(
     SILValue value, unsigned dependentVariableIndex) {
-  assert(value->getType().isAddress());
+  assert(value->getType().isAddress() ||
+         value->getType().isClassOrClassMetatype());
   // Check whether value is already useful to prevent infinite recursion.
   if (isUseful(value, dependentVariableIndex))
     return;
@@ -2141,7 +2149,7 @@ emitAssociatedFunctionReference(
         /*differentiationOrder*/ 1, kind, builder.getModule(),
         LookUpConformanceInModule(builder.getModule().getSwiftModule()));
 
-    // Emit a witness_method instruction pointing at the associated function.
+    // Emit a `witness_method` instruction for the associated function.
     auto *autoDiffFuncId = AutoDiffAssociatedFunctionIdentifier::get(
         kind, /*differentiationOrder*/ 1, requirementParameterIndices,
         context.getASTContext());
@@ -2154,12 +2162,57 @@ emitAssociatedFunctionReference(
     return std::make_pair(convertedRef, requirementIndices);
   }
 
-  // Reject class methods.
-  if (auto *classMethod =
+  // Find class method.
+  if (auto *classMethodInst =
           peerThroughFunctionConversions<ClassMethodInst>(original)) {
-    context.emitNondifferentiabilityError(original, invoker,
-        diag::autodiff_class_member_not_supported);
-    return None;
+    auto loc = classMethodInst->getLoc();
+    auto methodRef = classMethodInst->getMember();
+    auto *methodDecl = methodRef.getDecl();
+    auto *diffAttr = methodDecl->getAttrs().getAttribute<DifferentiableAttr>();
+    if (!diffAttr) {
+      context.emitNondifferentiabilityError(
+          original, invoker,
+          diag::autodiff_class_member_not_differentiable);
+      return None;
+    }
+
+    auto *methodParameterIndices = diffAttr->getParameterIndices();
+    auto loweredMethodIndices = methodParameterIndices->getLowered(
+        context.getASTContext(),
+        methodDecl->getInterfaceType()->castTo<AnyFunctionType>());
+    SILAutoDiffIndices methodIndices(/*source*/ 0, loweredMethodIndices);
+
+    // NOTE: We need to extend the capacity of desired parameter indices to
+    // requirement parameter indices, because there's an argument count
+    // mismatch. When `@differentiable` partial apply is supported, this problem
+    // will go away.
+    if (desiredIndices.source != methodIndices.source ||
+        !desiredIndices.parameters->extendingCapacity(
+            context.getASTContext(),
+            methodIndices.parameters->getCapacity())
+                ->isSubsetOf(methodIndices.parameters)) {
+      context.emitNondifferentiabilityError(original, invoker,
+          diag::autodiff_protocol_member_subset_indices_not_differentiable);
+      return None;
+    }
+
+    auto originalType = classMethodInst->getType().castTo<SILFunctionType>();
+    auto assocType = originalType->getAutoDiffAssociatedFunctionType(
+        methodIndices.parameters, methodIndices.source,
+        /*differentiationOrder*/ 1, kind, builder.getModule(),
+        LookUpConformanceInModule(builder.getModule().getSwiftModule()));
+
+    // Emit a `class_method` instruction for the associated function.
+    auto *autoDiffFuncId = AutoDiffAssociatedFunctionIdentifier::get(
+        kind, /*differentiationOrder*/ 1, methodParameterIndices,
+        context.getASTContext());
+    auto *ref = builder.createClassMethod(
+        loc, classMethodInst->getOperand(),
+        methodRef.asAutoDiffAssociatedFunction(autoDiffFuncId),
+        SILType::getPrimitiveObjectType(assocType));
+    auto convertedRef =
+        reapplyFunctionConversion(ref, classMethodInst, original, builder, loc);
+    return std::make_pair(convertedRef, methodIndices);
   }
 
   // Emit the general opaque function error.
@@ -5285,10 +5338,11 @@ public:
 #define NOT_DIFFERENTIABLE(INST, DIAG) \
   void visit##INST##Inst(INST##Inst *inst) { \
     getContext().emitNondifferentiabilityError( \
-        inst, getInvoker(), DIAG); \
+        inst, getInvoker(), diag::DIAG); \
     errorOccurred = true; \
     return; \
   }
+  NOT_DIFFERENTIABLE(RefElementAddr, autodiff_class_property_not_supported)
 #undef NOT_DIFFERENTIABLE
 
 #define NO_ADJOINT(INST) \
@@ -6337,6 +6391,14 @@ ADContext::getOrCreateSubsetParametersThunkForAssociatedFunction(
     assocRef = builder.createWitnessMethod(
         loc, assocMethodInst->getLookupType(),
         assocMethodInst->getConformance(), assocMethodInst->getMember(),
+        thunk->mapTypeIntoContext(assocMethodInst->getType()));
+  } else if (auto *assocMethodInst =
+                 peerThroughFunctionConversions<ClassMethodInst>(assocFn)) {
+    auto classOperand = thunk->getArgumentsWithoutIndirectResults().back();
+    auto classOperandType = assocMethodInst->getOperand()->getType();
+    assert(classOperand->getType() == classOperandType);
+    assocRef = builder.createClassMethod(
+        loc, classOperand, assocMethodInst->getMember(),
         thunk->mapTypeIntoContext(assocMethodInst->getType()));
   }
   assert(assocRef && "Expected associated function to be resolved");
