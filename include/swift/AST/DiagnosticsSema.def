@@ -4476,6 +4476,9 @@ ERROR(property_wrapper_attribute_not_on_property, none,
 NOTE(property_wrapper_declared_here,none,
      "property wrapper type %0 declared here", (DeclName))
 
+ERROR(property_wrapper_composition_not_implemented, none,
+      "multiple property wrappers are not supported", ())
+
 ERROR(property_wrapper_local,none,
       "property wrappers are not yet supported on local properties", ())
 ERROR(property_wrapper_top_level,none,
