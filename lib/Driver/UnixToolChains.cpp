@@ -353,7 +353,11 @@ std::string toolchains::Android::getTargetForLinker() const {
     // Explicitly set the linker target to "androideabi", as opposed to the
     // llvm::Triple representation of "armv7-none-linux-android".
     return "armv7-none-linux-androideabi";
-  return T.str();
+  
+  // The NDK toolchain produces triples with API_LEVEL at the end, like
+  // "armv7-none-linux-android21", but swiftc doesn't recognise them.
+  std::string triple = T.str();
+  return triple.substr(0, triple.find_last_not_of("0123456789") + 1);
 }
 
 bool toolchains::Android::shouldProvideRPathToLinker() const { return false; }
