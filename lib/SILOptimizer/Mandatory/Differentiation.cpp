@@ -4302,6 +4302,13 @@ private:
   ///   Original: copy_addr x to y
   ///    Tangent: copy_addr tan[x] to tan[y]
   void visitCopyAddrInstDifferential(CopyAddrInst *cai) {
+    auto *diffGenEnv = getDifferential().getGenericEnvironment();
+    auto diffGenSig = diffGenEnv
+        ? diffGenEnv->getGenericSignature()->getCanonicalSignature()
+        : nullptr;
+    Lowering::GenericContextScope genericContextScope(
+        context.getTypeConverter(), diffGenSig);
+
     auto diffBuilder = getDifferentialBuilder();
     auto *bb = cai->getParent();
     auto &adjDest = getTangentBuffer(bb, cai->getDest());
@@ -4368,6 +4375,23 @@ private:
                                                tangentElements);
 
     addTangentValue(bb, si, makeConcreteTangentValue(tanExtract));
+  }
+
+  void visitTupleInstDifferential(TupleInst *ti) {
+    auto *bb = ti->getParent();
+    auto loc = ti->getLoc();
+    auto diffBuilder = getDifferentialBuilder();
+
+    // Get the tangents of all the tuple elements.
+    SmallVector<SILValue, 8> tangentTupleElements;
+    for (auto elem : ti->getElements()) {
+      tangentTupleElements.push_back(
+          materializeTangent(getTangentValue(elem), loc));
+    }
+
+    // Emit the instruction and add the tangent mapping.
+    auto tanTuple = diffBuilder.createTuple(ti->getLoc(), tangentTupleElements);
+    addTangentValue(bb, ti, makeConcreteTangentValue(tanTuple));
   }
 
 public:
@@ -4558,19 +4582,20 @@ public:
       auto diffParam = diffParamArgs[index];
       auto origParam = origParamArgs[index];
 
-      if (diffParam->getType().isAddress()) {
-        // Create a local copy so that it can be written to by later adjoint
-        // zero'ing logic.
-        auto *diffBufCopy =
-            diffBuilder.createAllocStack(diffLoc, diffParam->getType());
-        diffBuilder.createCopyAddr(diffLoc, diffParam, diffBufCopy, IsNotTake,
-                                   IsInitialization);
-        if (diffParam->getType().isLoadable(diffBuilder.getFunction()))
-          diffBuilder.createRetainValueAddr(diffLoc, diffBufCopy,
-                                            diffBuilder.getDefaultAtomicity());
-        setTangentBuffer(origEntry, origParam, diffBufCopy);
-        differentialLocalAllocations.push_back(diffBufCopy);
-      } else {
+//      if (diffParam->getType().isAddress()) {
+//        // Create a local copy so that it can be written to by later adjoint
+//        // zero'ing logic.
+//        auto *diffBufCopy =
+//            diffBuilder.createAllocStack(diffLoc, diffParam->getType());
+//        diffBuilder.createCopyAddr(diffLoc, diffParam, diffBufCopy, IsNotTake,
+//                                   IsInitialization);
+//        if (diffParam->getType().isLoadable(diffBuilder.getFunction()))
+//          diffBuilder.createRetainValueAddr(diffLoc, diffBufCopy,
+//                                            diffBuilder.getDefaultAtomicity());
+//        setTangentBuffer(origEntry, origParam, diffBufCopy);
+//        differentialLocalAllocations.push_back(diffBufCopy);
+//      } else {
+      if (!diffParam->getType().isAddress()) {
         diffBuilder.createRetainValue(diffLoc, diffParam,
                                       diffBuilder.getDefaultAtomicity());
         initializeTangentValue(
@@ -4942,11 +4967,17 @@ public:
     llvm_unreachable("Unsupported SIL instruction.");
   }
 
-  void visitTupleInst(TupleInst *ai) {
-    llvm_unreachable("Unsupported SIL instruction.");
+  /// Handle `tuple` instruction.
+  ///   Original: y = tuple (x0, x1, x2, ...)
+  ///    Tangent: tan[y] = tuple (tan[x0], tan[x1], tan[x2], ...)
+  ///
+  void visitTupleInst(TupleInst *ti) {
+    TypeSubstCloner::visitTupleInst(ti);
+    if (shouldBeDifferentiated(ti, getIndices()))
+      visitTupleInstDifferential(ti);
   }
 
-  void visitTupleExtractInst(TupleExtractInst *ai) {
+  void visitTupleExtractInst(TupleExtractInst *tei) {
     llvm_unreachable("Unsupported SIL instruction.");
   }
 
@@ -4954,9 +4985,9 @@ public:
     llvm_unreachable("Unsupported SIL instruction.");
   }
 
-   void visitCondBranchInst(CondBranchInst *cbi) {
-     llvm_unreachable("Unsupported SIL instruction.");
-   }
+  void visitCondBranchInst(CondBranchInst *cbi) {
+    llvm_unreachable("Unsupported SIL instruction.");
+  }
 
   void visitSwitchEnumInst(SwitchEnumInst *sei) {
     llvm_unreachable("Unsupported SIL instruction.");
