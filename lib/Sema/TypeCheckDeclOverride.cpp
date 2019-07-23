@@ -931,98 +931,6 @@ static void checkOverrideAccessControl(ValueDecl *baseDecl, ValueDecl *decl,
   }
 }
 
-static GenericSignature *getOverrideGenericSignature(ValueDecl *base,
-                                                     ValueDecl *derived) {
-  auto baseGenericCtx = base->getAsGenericContext();
-  auto &ctx = base->getASTContext();
-
-  if (!baseGenericCtx) {
-    return nullptr;
-  }
-
-  auto baseClass = base->getDeclContext()->getSelfClassDecl();
-
-  if (!baseClass) {
-    return nullptr;
-  }
-
-  auto derivedClass = derived->getDeclContext()->getSelfClassDecl();
-  auto *baseClassSig = baseClass->getGenericSignature();
-
-  if (!derivedClass) {
-    return nullptr;
-  }
-
-  if (derivedClass->getSuperclass().isNull()) {
-    return nullptr;
-  }
-
-  if (derivedClass->getGenericSignature() == nullptr &&
-      !baseGenericCtx->isGeneric()) {
-    return nullptr;
-  }
-
-  auto subMap = derivedClass->getSuperclass()->getContextSubstitutionMap(
-      derivedClass->getModuleContext(), baseClass);
-
-  if (baseGenericCtx->getGenericSignature() == nullptr) {
-    return nullptr;
-  }
-  unsigned derivedDepth = 0;
-
-  if (auto *derivedSig = derivedClass->getGenericSignature())
-    derivedDepth = derivedSig->getGenericParams().back()->getDepth() + 1;
-
-  GenericSignatureBuilder builder(ctx);
-  builder.addGenericSignature(derivedClass->getGenericSignature());
-
-  if (auto derivedGenericCtx = derived->getAsGenericContext()) {
-    if (derivedGenericCtx->isGeneric()) {
-      for (auto param : *derivedGenericCtx->getGenericParams()) {
-        builder.addGenericParameter(param);
-      }
-    }
-  }
-
-  auto source =
-      GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
-
-  unsigned baseDepth = 0;
-
-  if (baseClassSig) {
-    baseDepth = baseClassSig->getGenericParams().back()->getDepth() + 1;
-  }
-
-  auto substFn = [&](SubstitutableType *type) -> Type {
-    auto *gp = cast<GenericTypeParamType>(type);
-
-    if (gp->getDepth() < baseDepth) {
-      return Type(gp).subst(subMap);
-    }
-
-    return CanGenericTypeParamType::get(
-        gp->getDepth() - baseDepth + derivedDepth, gp->getIndex(), ctx);
-  };
-
-  auto lookupConformanceFn =
-      [&](CanType depTy, Type substTy,
-          ProtocolDecl *proto) -> Optional<ProtocolConformanceRef> {
-    if (auto conf = subMap.lookupConformance(depTy, proto))
-      return conf;
-
-    return ProtocolConformanceRef(proto);
-  };
-
-  for (auto reqt : baseGenericCtx->getGenericSignature()->getRequirements()) {
-    if (auto substReqt = reqt.subst(substFn, lookupConformanceFn)) {
-      builder.addRequirement(*substReqt, source, nullptr);
-    }
-  }
-
-  auto *genericSig = std::move(builder).computeGenericSignature(SourceLoc());
-  return genericSig;
-}
-
 bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
                                     OverrideCheckingAttempt attempt) {
   auto &diags = ctx.Diags;
@@ -1045,7 +953,7 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
 
   if (baseGenericCtx && derivedGenericCtx) {
     // If the generic signatures are different, then complain
-    if (auto newSig = getOverrideGenericSignature(baseDecl, decl)) {
+    if (auto newSig = ctx.getOverrideGenericSignature(baseDecl, decl)) {
       if (auto derivedSig = derivedGenericCtx->getGenericSignature()) {
         auto requirementsSatisfied =
             derivedSig->requirementsNotSatisfiedBy(newSig).empty();
