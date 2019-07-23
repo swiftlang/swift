@@ -538,6 +538,17 @@ enum class CheckedCastContextKind {
   EnumElementPattern,
 };
 
+enum class FunctionBuilderClosurePreCheck : uint8_t {
+  /// There were no problems pre-checking the closure.
+  Okay,
+
+  /// There was an error pre-checking the closure.
+  Error,
+
+  /// The closure has a return statement.
+  HasReturnStmt,
+};
+
 /// The Swift type checker, which takes a parsed AST and performs name binding,
 /// type checking, and semantic analysis to produce a type-annotated AST.
 class TypeChecker final : public LazyResolver {
@@ -669,8 +680,10 @@ private:
   /// when executing scripts.
   bool InImmediateMode = false;
 
-  /// Closure expressions that have already been prechecked.
-  llvm::SmallPtrSet<ClosureExpr *, 2> precheckedClosures;
+  /// Closure expressions whose bodies have already been prechecked as
+  /// part of trying to apply a function builder.
+  llvm::DenseMap<ClosureExpr *, FunctionBuilderClosurePreCheck>
+    precheckedFunctionBuilderClosures;
 
   /// A helper to construct and typecheck call to super.init().
   ///
@@ -1228,6 +1241,16 @@ public:
   /// Pre-check the expression, validating any types that occur in the
   /// expression and folding sequence expressions.
   bool preCheckExpression(Expr *&expr, DeclContext *dc);
+
+  /// Pre-check the body of the given closure, which we are about to
+  /// generate constraints for.
+  ///
+  /// This mutates the body of the closure, but only in ways that should be
+  /// valid even if we end up not actually applying the function-builder
+  /// transform: it just does a normal pre-check of all the expressions in
+  /// the closure.
+  FunctionBuilderClosurePreCheck
+  preCheckFunctionBuilderClosureBody(ClosureExpr *closure);
 
   /// \name Name lookup
   ///
