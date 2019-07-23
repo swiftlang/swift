@@ -1039,12 +1039,13 @@ bool ModelASTWalker::handleSpecialDeclAttribute(const DeclAttribute *D,
         if (!Arg->walk(*this))
           return false;
       }
-    } else {
+    } else if (!TokenNodes.empty()) {
       auto Next = TokenNodes.front();
-      TokenNodes = TokenNodes.drop_front();
-      assert(Next.Range.getStart() == D->getRangeWithAt().Start);
-      if (!passNode({SyntaxNodeKind::AttributeBuiltin, Next.Range}))
-        return false;
+      if (Next.Range.getStart() == D->getRangeWithAt().Start) {
+        TokenNodes = TokenNodes.drop_front();
+        if (!passNode({SyntaxNodeKind::AttributeBuiltin, Next.Range}))
+          return false;
+      }
     }
     if (!passTokenNodesUntil(D->getRange().End, PassNodesBehavior::IncludeNodeAtLocation))
       return false;
