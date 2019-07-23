@@ -3301,7 +3301,6 @@ void Serializer::writeDecl(const Decl *D) {
                             contextID,
                             theClass->isImplicit(),
                             theClass->isObjC(),
-                            theClass->requiresStoredPropertyInits(),
                             inheritsSuperclassInitializers,
                             addGenericEnvironmentRef(
                                              theClass->getGenericEnvironment()),
