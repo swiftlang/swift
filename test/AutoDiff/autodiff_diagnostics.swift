@@ -170,6 +170,33 @@ struct TF_305 : Differentiable {
   }
 }
 
+// TF-676: Test differentiation of protocol requirement with multiple
+// `@differentiable` attributes.
+protocol MultipleDiffAttrsProto : Differentiable {
+  @differentiable(wrt: (self, x))
+  @differentiable(wrt: x)
+  func f(_ x: Float) -> Float
+}
+func testMultipleDiffAttrsProto<P: MultipleDiffAttrsProto>(_ p: P, _ x: Float) {
+  _ = gradient(at: p, x) { p, x in p.f(x) }
+  _ = gradient(at: x) { x in p.f(x) }
+}
+
+// TF-676: Test differentiation of class method with multiple `@differentiable`
+// attributes.
+class MultipleDiffAttrsClass : Differentiable {
+  @differentiable(wrt: (self, x))
+  @differentiable(wrt: x)
+  func f(_ x: Float) -> Float { x }
+}
+func testMultipleDiffAttrsClass<C: MultipleDiffAttrsClass>(_ c: C, _ x: Float) {
+  // TODO(TF-647): Handle differentiation of `upcast` instruction.
+  // expected-error @+2 {{function is not differentiable}}
+  // expected-note @+1 {{expression is not differentiable}}
+  _ = gradient(at: c, x) { c, x in c.f(x) }
+  _ = gradient(at: x) { x in c.f(x) }
+}
+
 //===----------------------------------------------------------------------===//
 // Classes
 //===----------------------------------------------------------------------===//
