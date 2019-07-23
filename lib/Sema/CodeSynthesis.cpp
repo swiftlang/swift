@@ -234,6 +234,9 @@ static AccessorDecl *createGetterPrototype(AbstractStorageDecl *storage,
   // Always add the getter to the context immediately after the storage.
   addMemberToContextIfNeeded(getter, storage->getDeclContext(), storage);
 
+  if (ctx.Stats)
+    ctx.Stats->getFrontendCounters().NumAccessorsSynthesized++;
+
   return getter;
 }
 
@@ -284,6 +287,9 @@ static AccessorDecl *createSetterPrototype(AbstractStorageDecl *storage,
   if (!getter) getter = storage->getReadCoroutine();
   assert(getter && "always synthesize setter prototype after get/read");
   addMemberToContextIfNeeded(setter, storage->getDeclContext(), getter);
+
+  if (ctx.Stats)
+    ctx.Stats->getFrontendCounters().NumAccessorsSynthesized++;
 
   return setter;
 }
@@ -482,6 +488,9 @@ createCoroutineAccessorPrototype(AbstractStorageDecl *storage,
   }
 
   addMemberToContextIfNeeded(accessor, dc, afterDecl);
+
+  if (ctx.Stats)
+    ctx.Stats->getFrontendCounters().NumAccessorsSynthesized++;
 
   return accessor;
 }
@@ -2274,6 +2283,9 @@ std::pair<BraceStmt *, bool>
 synthesizeAccessorBody(AbstractFunctionDecl *fn, void *) {
   auto *accessor = cast<AccessorDecl>(fn);
   auto &ctx = accessor->getASTContext();
+
+  if (ctx.Stats)
+    ctx.Stats->getFrontendCounters().NumAccessorBodiesSynthesized++;
 
   if (accessor->isInvalid() || ctx.hadError())
     return { nullptr, true };
