@@ -223,14 +223,7 @@ final internal class __StringStorage
 #endif
 
   @inline(__always)
-  final internal var isASCII: Bool {
-    return _countAndFlags.isASCII
-  }
-  
-  internal func forceSetIsASCII(_ value: Bool) {
-    _countAndFlags = CountAndFlags(mortalCount: count, isASCII: value)
-    _invariantCheck()
-  }
+  final internal var isASCII: Bool { return _countAndFlags.isASCII }
 
   final internal var asString: String {
     @_effects(readonly) @inline(__always) get {
@@ -738,9 +731,7 @@ final internal class __SharedStringStorage
   }
 
   @inline(__always)
-  final internal var isASCII: Bool {
-    return _countAndFlags.isASCII
-  }
+  final internal var isASCII: Bool { return _countAndFlags.isASCII }
 
   final internal var asString: String {
     @_effects(readonly) @inline(__always) get {
