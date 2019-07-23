@@ -1930,31 +1930,6 @@ reapplyFunctionConversion(SILValue newFunc, SILValue oldFunc,
     return builder.createPartialApply(loc, innerNewFunc, substMap, newArgs,
                                       ParameterConvention::Direct_Guaranteed);
   }
-  // convert_function
-  if (auto *cfi = dyn_cast<ConvertFunctionInst>(oldConvertedFunc)) {
-    // `convert_function` does not have a fixed typing rule because it can
-    // convert between function types as long as they are ABI-compatible. Here
-    // we match specific patterns.
-    auto origTargetFnTy = cfi->getType().castTo<SILFunctionType>();
-    auto origSourceFnTy =
-        cfi->getOperand()->getType().castTo<SILFunctionType>();
-    auto innerNewFunc = reapplyFunctionConversion(newFunc, oldFunc,
-                                                  cfi->getOperand(), builder,
-                                                  loc, newFuncGenSig);
-    // Match conversion from escaping to `@noescape`.
-    CanSILFunctionType targetType;
-    if (!origSourceFnTy->isNoEscape() && origTargetFnTy->isNoEscape() &&
-        origSourceFnTy == origTargetFnTy->getWithExtInfo(
-            origTargetFnTy->getExtInfo().withNoEscape(false))) {
-      auto operandFnTy = innerNewFunc->getType().castTo<SILFunctionType>();
-      targetType = operandFnTy->getWithExtInfo(
-          operandFnTy->getExtInfo().withNoEscape(true));
-    }
-    assert(targetType && "Unhandled convert_function pattern");
-    auto silTy = SILType::getPrimitiveObjectType(targetType);
-    return builder.createConvertFunction(loc, innerNewFunc, silTy,
-                                         cfi->withoutActuallyEscaping());
-  }
   llvm_unreachable("Unhandled function conversion instruction");
 }
 
@@ -6530,7 +6505,8 @@ SILValue ADContext::promoteToDifferentiableFunction(
       if (didPartiallyApplyArguments(origFnOperand)) {
         emitNondifferentiabilityError(
             origFnOperand, invoker,
-            diag::autodiff_cannot_index_subset_thunk_partial_applied_orig_fn);
+            diag::
+                autodiff_cannot_param_subset_thunk_partially_applied_orig_fn);
         return nullptr;
       }
       // Create the parameter subset thunk.

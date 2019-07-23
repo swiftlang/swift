@@ -171,7 +171,7 @@ struct TF_305 : Differentiable {
 }
 
 //===----------------------------------------------------------------------===//
-// Classes and existentials (not yet supported)
+// Classes (not yet supported)
 //===----------------------------------------------------------------------===//
 
 class Foo {
@@ -260,3 +260,14 @@ func nondiff(_ f: @differentiable (Float, @nondiff Float) -> Float) -> Float {
   // expected-error @+1 {{function is not differentiable}}
   return gradient(at: 2) { x in f(x * x, x) }
 }
+
+// Test parameter subset thunk + partially-applied original function.
+struct TF_675 : Differentiable {
+  @differentiable
+  // expected-note @+1 {{cannot convert a direct method reference to a '@differentiable' function; use an explicit closure instead}}
+  func method(_ x: Float) -> Float {
+    return x
+  }
+}
+// expected-error @+1 {{function is not differentiable}}
+let _: @differentiable (Float) -> Float = TF_675().method

@@ -478,9 +478,9 @@ NOTE(autodiff_class_member_not_supported,none,
      "differentiating class members is not yet supported", ())
 // TODO(TF-642): Remove when `partial_apply` works with `@differentiable`
 // functions.
-NOTE(autodiff_cannot_index_subset_thunk_partial_applied_orig_fn,none,
-     "cannot convert a direct method reference to a `@differentiable` "
-     "function; please use an explicit closure instead", ())
+NOTE(autodiff_cannot_param_subset_thunk_partially_applied_orig_fn,none,
+     "cannot convert a direct method reference to a '@differentiable' "
+     "function; use an explicit closure instead", ())
 NOTE(autodiff_control_flow_not_supported,none,
      "cannot differentiate unsupported control flow", ())
 NOTE(autodiff_missing_return,none,
