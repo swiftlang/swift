@@ -5397,9 +5397,6 @@ public:
   NO_ADJOINT(StrongRetainUnowned)
   NO_ADJOINT(DestroyValue)
   NO_ADJOINT(DestroyAddr)
-
-  // Class-related instructions.
-  NO_ADJOINT(ClassMethod) // Active only because it takes a class operand.
 #undef NO_DERIVATIVE
 };
 } // end anonymous namespace
