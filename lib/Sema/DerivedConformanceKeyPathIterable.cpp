@@ -73,7 +73,7 @@ static void maybeMarkAsInlinable(DerivedConformance &derived, ValueDecl *decl) {
 }
 
 // Synthesize body for the `allKeyPaths` computed property getter.
-static void
+static std::pair<BraceStmt *, bool>
 deriveBodyKeyPathIterable_allKeyPaths(AbstractFunctionDecl *funcDecl, void *) {
   auto *parentDC = funcDecl->getDeclContext();
   auto *nominal = parentDC->getSelfNominalTypeDecl();
@@ -111,8 +111,9 @@ deriveBodyKeyPathIterable_allKeyPaths(AbstractFunctionDecl *funcDecl, void *) {
   auto *returnStmt = new (C) ReturnStmt(SourceLoc(), keyPathsArrayExpr);
   auto *body = BraceStmt::create(C, SourceLoc(), {returnStmt}, SourceLoc(),
                                  /*Implicit*/ true);
-  funcDecl->setBody(BraceStmt::create(C, SourceLoc(), {body}, SourceLoc(),
-                                      /*Implicit*/ true));
+  auto *braceStmt = BraceStmt::create(C, SourceLoc(), {body}, SourceLoc(),
+                                      /*Implicit*/ true);
+  return std::pair<BraceStmt *, bool>(braceStmt, false);
 }
 
 // Synthesize the `allKeyPaths` computed property declaration.

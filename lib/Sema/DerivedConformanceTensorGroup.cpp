@@ -66,8 +66,8 @@ static ValueDecl *getProtocolRequirement(ProtocolDecl *proto, DeclName name) {
 }
 
 /// Derive the body for the '_typeList' getter.
-static void deriveBodyTensorGroup_typeList(AbstractFunctionDecl *funcDecl,
-                                           void *) {
+static std::pair<BraceStmt *, bool>
+deriveBodyTensorGroup_typeList(AbstractFunctionDecl *funcDecl, void *) {
   auto *parentDC = funcDecl->getParent();
   auto *nominal = funcDecl->getDeclContext()->getSelfNominalTypeDecl();
   auto &C = nominal->getASTContext();
@@ -108,8 +108,9 @@ static void deriveBodyTensorGroup_typeList(AbstractFunctionDecl *funcDecl,
   auto *returnStmt = new (C) ReturnStmt(SourceLoc(), typeListExpr);
   auto *body = BraceStmt::create(C, SourceLoc(), {returnStmt}, SourceLoc(),
                                  /*Implicit*/ true);
-  funcDecl->setBody(BraceStmt::create(C, SourceLoc(), {body}, SourceLoc(),
-                                      /*Implicit*/ true));
+  auto *braceStmt = BraceStmt::create(C, SourceLoc(), {body}, SourceLoc(),
+                                      /*Implicit*/ true);
+  return std::pair<BraceStmt *, bool>(braceStmt, false);
 }
 
 /// Derive a '_typeList' implementation.
@@ -147,7 +148,8 @@ static ValueDecl *deriveTensorGroup_typeList(DerivedConformance &derived) {
 }
 
 // Synthesize body for `init(_owning:)`.
-static void deriveBodyTensorGroup_init(AbstractFunctionDecl *funcDecl, void *) {
+static std::pair<BraceStmt *, bool>
+deriveBodyTensorGroup_init(AbstractFunctionDecl *funcDecl, void *) {
   auto *parentDC = funcDecl->getParent();
   auto *nominal = parentDC->getSelfNominalTypeDecl();
   auto &C = nominal->getASTContext();
@@ -309,8 +311,9 @@ static void deriveBodyTensorGroup_init(AbstractFunctionDecl *funcDecl, void *) {
              /*Cond*/ C.AllocateCopy(cond), /*Then*/ thenBody,
              /*ElseLoc*/ SourceLoc(), /*Else*/ elseBody, /*implicit*/ true);
 
-  funcDecl->setBody(BraceStmt::create(C, SourceLoc(), {ifStmt}, SourceLoc(),
-                                      /*implicit*/ true));
+  auto *braceStmt = BraceStmt::create(C, SourceLoc(), {ifStmt}, SourceLoc(),
+                                      /*implicit*/ true);
+  return std::pair<BraceStmt *, bool>(braceStmt, false);
 }
 
 // Synthesize a constructor declaration for a `TensorGroup` method requirement.
