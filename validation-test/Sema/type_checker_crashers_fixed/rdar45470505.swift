@@ -4,7 +4,7 @@ extension BinaryInteger {
   init(bytes: [UInt8]) { fatalError() }
 
   init<S: Sequence>(bytes: S) where S.Iterator.Element == UInt8 {
-    self.init(bytes // expected-error {{no exact matches in call to initializer}}
+    self.init(bytes // expected-error {{missing argument label 'integerLiteral:' in call}}
     // expected-note@-1 {{}}
 
 extension
