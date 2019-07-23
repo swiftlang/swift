@@ -1176,6 +1176,14 @@ func sr10301_as(_ foo: SR10301<String,(Int,Error)>) {
   }
 }
 
+func sr11160() {
+    switch Optional<(Int, Int)>((5, 6)) { // expected-error {{switch must be exhaustive}}
+        // expected-note@-1 {{add missing case: '.some(_, _)'}}
+    case let b?: print(b)
+    case nil:    print(0)
+    }
+}
+
 // SR-11212 tests: Some of the tests here rely on compiler bugs related to
 // implicit (un)tupling in patterns. When you add a warning for the erroneous
 // cases, feel free to add expected notes as appropriate.
