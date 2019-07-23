@@ -207,8 +207,7 @@ namespace swift {
 
   /// Resolve a list of mangled names to accessible protocol decls from
   /// the decl context.
-  bool resolveProtocolNames(DeclContext *DC, ArrayRef<const char *> names,
-                            llvm::MapVector<ProtocolDecl*, StringRef> &result);
+  ProtocolDecl *resolveProtocolName(DeclContext *dc, StringRef Name);
 
   /// FIXME: All of the below goes away once CallExpr directly stores its
   /// arguments.
