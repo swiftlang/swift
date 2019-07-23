@@ -6424,8 +6424,8 @@ SILValue ADContext::promoteToDifferentiableFunction(
             thunk->isBare(), thunk->isTransparent(), thunk->isSerialized(),
             thunk->isDynamicallyReplaceable(), ProfileCounter(),
             thunk->isThunk());
-        // If new thunk does not exist: clone the old thunk body, wrap the
-        // returned function value with an `autodiff_function` instructions,
+        // If new thunk is newly created: clone the old thunk body, wrap the
+        // returned function value with an `autodiff_function` instruction,
         // and process the `autodiff_function` instruction.
         if (newThunk->empty()) {
           newThunk->setOwnershipEliminated();
@@ -6498,15 +6498,14 @@ SILValue ADContext::promoteToDifferentiableFunction(
                    peerThroughFunctionConversions<PartialApplyInst>(original)) {
           if (pai->getNumArguments() > 0)
             return true;
-          original = pai->getOperand(0);
+          original = pai->getCallee();
         }
         return false;
       };
       if (didPartiallyApplyArguments(origFnOperand)) {
         emitNondifferentiabilityError(
             origFnOperand, invoker,
-            diag::
-                autodiff_cannot_param_subset_thunk_partially_applied_orig_fn);
+            diag::autodiff_cannot_param_subset_thunk_partially_applied_orig_fn);
         return nullptr;
       }
       // Create the parameter subset thunk.
@@ -6613,10 +6612,10 @@ bool ADContext::processAutoDiffFunctionInst(AutoDiffFunctionInst *adfi) {
 
   auto differentiableFnValue =
       promoteToDifferentiableFunction(adfi, builder, loc, adfi);
+  // Mark `adfi` as processed so that it won't be reprocessed after deletion.
   processedAutoDiffFunctionInsts.insert(adfi);
   if (!differentiableFnValue)
     return true;
-  // Mark `adfi` as processed so that it won't be reprocessed after deletion.
   // Replace all uses of `adfi`.
   adfi->replaceAllUsesWith(differentiableFnValue);
   adfi->eraseFromParent();
