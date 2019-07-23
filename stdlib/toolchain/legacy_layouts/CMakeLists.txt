@@ -4,7 +4,7 @@ foreach(sdk ${SWIFT_SDKS})
   foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
     set(platform "${SWIFT_SDK_${sdk}_LIB_SUBDIR}")
 
-    set(input "${SWIFT_SOURCE_DIR}/stdlib/public/legacy_layouts/${platform}/layouts-${arch}.yaml")
+    set(input "${SWIFT_SOURCE_DIR}/stdlib/toolchain/legacy_layouts/${platform}/layouts-${arch}.yaml")
     set(output "${SWIFTLIB_DIR}/${platform}/layouts-${arch}.yaml")
 
     set(copy_target "copy-legacy-layouts-${platform}-${arch}")
