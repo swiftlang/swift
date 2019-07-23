@@ -23,8 +23,8 @@ public func closureCaptureMutable() {
 }
 
 // CHECK-LABEL: @AD__{{.*}}closureCaptureMutable{{.*}}___vjp_src_0_wrt_0
-// CHECK: bb0({{%.*}} : $Float, [[INOUT_ARG:%.*]] : $*Float):
-// CHECK:   [[ADJOINT:%.*]] = function_ref @AD__{{.*}}closureCaptureMutabley{{.*}}___pullback_src_0_wrt_0
+// CHECK: bb0({{%.*}} : $Float, [[INOUT_ARG:%.*]] : ${ var Float }):
+// CHECK:   [[ADJOINT:%.*]] = function_ref @AD__{{.*}}closureCaptureMutabley{{.*}}___adjoint_src_0_wrt_0
 // CHECK:   {{.*}} = partial_apply [callee_guaranteed] [[ADJOINT]]({{.*}})
 
 // TF-30: VJP return value should match the return type.
