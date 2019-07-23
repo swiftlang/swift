@@ -1,3 +1,4 @@
+// To ensure walking the long chained call expression doesn't take long time to finish
 // RUN: %target-swift-ide-test -syntax-coloring -source-filename %s | %FileCheck %s
 // RUN: %target-swift-ide-test -syntax-coloring -typecheck -source-filename %s | %FileCheck %s
 
