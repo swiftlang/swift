@@ -951,7 +951,7 @@ public:
   bool parseVersionTuple(llvm::VersionTuple &Version, SourceRange &Range,
                          const Diagnostic &D);
 
-  bool parseTypeAttributeList(VarDecl::Specifier &Specifier,
+  bool parseTypeAttributeList(ParamDecl::Specifier &Specifier,
                               SourceLoc &SpecifierLoc,
                               TypeAttributes &Attributes) {
     if (Tok.isAny(tok::at_sign, tok::kw_inout) ||
@@ -961,7 +961,7 @@ public:
       return parseTypeAttributeListPresent(Specifier, SpecifierLoc, Attributes);
     return false;
   }
-  bool parseTypeAttributeListPresent(VarDecl::Specifier &Specifier,
+  bool parseTypeAttributeListPresent(ParamDecl::Specifier &Specifier,
                                      SourceLoc &SpecifierLoc,
                                      TypeAttributes &Attributes);
   bool parseTypeAttribute(TypeAttributes &Attributes,
@@ -1103,7 +1103,7 @@ public:
   SourceLoc consumeImplicitlyUnwrappedOptionalToken();
 
   TypeRepr *applyAttributeToType(TypeRepr *Ty, const TypeAttributes &Attr,
-                                 VarDecl::Specifier Specifier,
+                                 ParamDecl::Specifier Specifier,
                                  SourceLoc SpecifierLoc);
 
   //===--------------------------------------------------------------------===//
@@ -1142,7 +1142,7 @@ public:
     SourceLoc SpecifierLoc;
     
     /// The parsed specifier kind, if present.
-    VarDecl::Specifier SpecifierKind = VarDecl::Specifier::Default;
+    ParamDecl::Specifier SpecifierKind = ParamDecl::Specifier::Default;
 
     /// The location of the first name.
     ///
@@ -1260,7 +1260,7 @@ public:
   
 
   Pattern *createBindingFromPattern(SourceLoc loc, Identifier name,
-                                    VarDecl::Specifier specifier);
+                                    VarDecl::Introducer introducer);
   
 
   /// Determine whether this token can only start a matching pattern

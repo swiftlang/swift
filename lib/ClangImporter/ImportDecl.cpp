@@ -125,13 +125,11 @@ static Pattern *createTypedNamedPattern(VarDecl *decl) {
 /// it as a member
 static std::pair<VarDecl *, PatternBindingDecl *>
 createVarWithPattern(ASTContext &ctx, DeclContext *dc, Identifier name, Type ty,
-                     VarDecl::Specifier specifier, bool isImplicit,
-                     AccessLevel access,
+                     VarDecl::Introducer introducer, bool isImplicit, AccessLevel access,
                      AccessLevel setterAccess) {
   // Create a variable to store the underlying value.
   auto var = new (ctx) VarDecl(
-      /*IsStatic*/false,
-      specifier,
+      /*IsStatic*/false, introducer,
       /*IsCaptureList*/false,
       SourceLoc(), name, dc);
   if (isImplicit)
@@ -189,11 +187,11 @@ static void makeComputed(AbstractStorageDecl *storage,
                          AccessorDecl *getter, AccessorDecl *setter) {
   assert(getter);
   if (setter) {
-    storage->setAccessors(StorageImplInfo::getMutableComputed(),
-                          SourceLoc(), {getter, setter}, SourceLoc());
+    storage->setImplInfo(StorageImplInfo::getMutableComputed());
+    storage->setAccessors(SourceLoc(), {getter, setter}, SourceLoc());
   } else {
-    storage->setAccessors(StorageImplInfo::getImmutableComputed(),
-                          SourceLoc(), {getter}, SourceLoc());
+    storage->setImplInfo(StorageImplInfo::getImmutableComputed());
+    storage->setAccessors(SourceLoc(), {getter}, SourceLoc());
   }
 }
 
@@ -523,7 +521,7 @@ makeEnumRawValueConstructor(ClangImporter::Implementation &Impl,
   ASTContext &C = Impl.SwiftContext;
   auto rawTy = enumDecl->getRawType();
 
-  auto param = new (C) ParamDecl(VarDecl::Specifier::Default, SourceLoc(),
+  auto param = new (C) ParamDecl(ParamDecl::Specifier::Default, SourceLoc(),
                                  SourceLoc(), C.Id_rawValue,
                                  SourceLoc(), C.Id_rawValue,
                                  enumDecl);
@@ -743,7 +741,7 @@ static AccessorDecl *makeFieldSetterDecl(ClangImporter::Implementation &Impl,
                                          VarDecl *importedFieldDecl,
                                          ClangNode clangNode = ClangNode()) {
   auto &C = Impl.SwiftContext;
-  auto newValueDecl = new (C) ParamDecl(VarDecl::Specifier::Default,
+  auto newValueDecl = new (C) ParamDecl(ParamDecl::Specifier::Default,
                                         SourceLoc(), SourceLoc(),
                                         Identifier(), SourceLoc(), C.Id_value,
                                         importedDecl);
@@ -1427,7 +1425,7 @@ createValueConstructor(ClangImporter::Implementation &Impl,
 
     Identifier argName = generateParamName ? var->getName() : Identifier();
     auto param = new (context)
-        ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(), argName,
+        ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(), argName,
                   SourceLoc(), var->getName(), structDecl);
     param->setInterfaceType(var->getInterfaceType());
     param->setValidationToChecked();
@@ -1520,12 +1518,11 @@ static void makeStructRawValued(
   // Create a variable to store the underlying value.
   VarDecl *var;
   PatternBindingDecl *patternBinding;
-  auto specifier = options.contains(MakeStructRawValuedFlags::IsLet)
-                 ? VarDecl::Specifier::Let
-                 : VarDecl::Specifier::Var;
+  auto introducer = (options.contains(MakeStructRawValuedFlags::IsLet)
+                     ? VarDecl::Introducer::Let
+                     : VarDecl::Introducer::Var);
   std::tie(var, patternBinding) = createVarWithPattern(
-      ctx, structDecl, ctx.Id_rawValue, underlyingType,
-      specifier,
+      ctx, structDecl, ctx.Id_rawValue, underlyingType, introducer,
       options.contains(MakeStructRawValuedFlags::IsImplicit),
       AccessLevel::Public,
       setterAccess);
@@ -1660,13 +1657,13 @@ static void makeStructRawValuedWithBridge(
   PatternBindingDecl *storedPatternBinding;
   std::tie(storedVar, storedPatternBinding) = createVarWithPattern(
       ctx, structDecl, storedVarName, storedUnderlyingType,
-      VarDecl::Specifier::Var, /*isImplicit=*/true,
+      VarDecl::Introducer::Var, /*isImplicit=*/true,
       AccessLevel::Private,
       AccessLevel::Private);
 
   // Create a computed value variable.
   auto computedVar = new (ctx) VarDecl(
-      /*IsStatic*/false, VarDecl::Specifier::Var, /*IsCaptureList*/false,
+      /*IsStatic*/false, VarDecl::Introducer::Var, /*IsCaptureList*/false,
       SourceLoc(), computedVarName, structDecl);
   computedVar->setInterfaceType(bridgedType);
   computedVar->setImplicit();
@@ -1768,7 +1765,7 @@ buildSubscriptSetterDecl(ClangImporter::Implementation &Impl,
   auto valueIndex = setter->getParameters();
 
   auto paramVarDecl =
-      new (C) ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+      new (C) ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(),
                         Identifier(), loc, valueIndex->get(0)->getName(), dc);
   paramVarDecl->setInterfaceType(elementInterfaceTy);
   paramVarDecl->setValidationToChecked();
@@ -1957,7 +1954,7 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
 
   // Make the property decl
   auto errorDomainPropertyDecl = new (C) VarDecl(
-      /*IsStatic*/isStatic, VarDecl::Specifier::Var, /*IsCaptureList*/false,
+      /*IsStatic*/isStatic, VarDecl::Introducer::Var, /*IsCaptureList*/false,
       SourceLoc(), C.Id_errorDomain, swiftDecl);
   errorDomainPropertyDecl->setInterfaceType(stringTy);
   errorDomainPropertyDecl->setValidationToChecked();
@@ -2818,7 +2815,7 @@ namespace {
           //   public let _nsError: NSError
           auto nsErrorType = nsErrorDecl->getDeclaredInterfaceType();
           auto nsErrorProp = new (C) VarDecl(/*IsStatic*/false,
-                                             VarDecl::Specifier::Let,
+                                             VarDecl::Introducer::Let,
                                              /*IsCaptureList*/false,
                                              loc, C.Id_nsError,
                                              errorWrapper);
@@ -2899,7 +2896,7 @@ namespace {
 
         auto varName = C.Id_rawValue;
         auto rawValue = new (C) VarDecl(/*IsStatic*/false,
-                                        VarDecl::Specifier::Var,
+                                        VarDecl::Introducer::Var,
                                         /*IsCaptureList*/false,
                                         SourceLoc(), varName,
                                         enumDecl);
@@ -3537,7 +3534,7 @@ namespace {
       auto result = Impl.createDeclWithClangNode<VarDecl>(decl,
                        AccessLevel::Public,
                        /*IsStatic*/false,
-                       VarDecl::Specifier::Var,
+                       VarDecl::Introducer::Var,
                        /*IsCaptureList*/false,
                        Impl.importSourceLoc(decl->getBeginLoc()),
                        name, dc);
@@ -3760,7 +3757,7 @@ namespace {
       auto result =
         Impl.createDeclWithClangNode<VarDecl>(decl, AccessLevel::Public,
                               /*IsStatic*/ false,
-                              VarDecl::Specifier::Var,
+                              VarDecl::Introducer::Var,
                               /*IsCaptureList*/false,
                               Impl.importSourceLoc(decl->getLocation()),
                               name, dc);
@@ -3841,13 +3838,12 @@ namespace {
       if (dc->isTypeContext())
         isStatic = true;
 
-      auto specifier = Impl.shouldImportGlobalAsLet(decl->getType())
-                     ? VarDecl::Specifier::Let
-                     : VarDecl::Specifier::Var;
+      auto introducer = Impl.shouldImportGlobalAsLet(decl->getType())
+                        ? VarDecl::Introducer::Let
+                        : VarDecl::Introducer::Var;
       auto result = Impl.createDeclWithClangNode<VarDecl>(decl,
                        AccessLevel::Public,
-                       /*IsStatic*/isStatic,
-                       specifier,
+                       /*IsStatic*/isStatic, introducer,
                        /*IsCaptureList*/false,
                        Impl.importSourceLoc(decl->getLocation()),
                        name, dc);
@@ -4933,7 +4929,7 @@ namespace {
       auto type = importedType.getType();
       auto result = Impl.createDeclWithClangNode<VarDecl>(decl,
           getOverridableAccessLevel(dc),
-          /*IsStatic*/decl->isClassProperty(), VarDecl::Specifier::Var,
+          /*IsStatic*/decl->isClassProperty(), VarDecl::Introducer::Var,
           /*IsCaptureList*/false, Impl.importSourceLoc(decl->getLocation()),
           name, dc);
       result->setInterfaceType(type);
@@ -5668,7 +5664,7 @@ Decl *SwiftDeclConverter::importGlobalAsInitializer(
     // argument label
     auto *paramDecl =
         new (Impl.SwiftContext) ParamDecl(
-            VarDecl::Specifier::Default, SourceLoc(), SourceLoc(), argNames.front(),
+            ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(), argNames.front(),
             SourceLoc(), argNames.front(), dc);
     paramDecl->setInterfaceType(Impl.SwiftContext.TheEmptyTupleType);
     paramDecl->setValidationToChecked();
@@ -5946,7 +5942,7 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
 
   auto property = Impl.createDeclWithClangNode<VarDecl>(
       getter, AccessLevel::Public, /*IsStatic*/isStatic,
-      VarDecl::Specifier::Var, /*IsCaptureList*/false, SourceLoc(),
+      VarDecl::Introducer::Var, /*IsCaptureList*/false, SourceLoc(),
       propertyName, dc);
   property->setInterfaceType(swiftPropertyType);
   property->setIsObjC(false);
@@ -8335,13 +8331,14 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
   VarDecl *var = nullptr;
   if (ClangN) {
     var = createDeclWithClangNode<VarDecl>(ClangN, AccessLevel::Public,
-                                           /*IsStatic*/isStatic, VarDecl::Specifier::Var,
+                                           /*IsStatic*/isStatic,
+                                           VarDecl::Introducer::Var,
                                            /*IsCaptureList*/false, SourceLoc(),
                                            name, dc);
   } else {
     var = new (SwiftContext)
-        VarDecl(/*IsStatic*/isStatic, VarDecl::Specifier::Var, /*IsCaptureList*/false,
-                SourceLoc(), name, dc);
+        VarDecl(/*IsStatic*/isStatic, VarDecl::Introducer::Var,
+                /*IsCaptureList*/false, SourceLoc(), name, dc);
     var->setValidationToChecked();
   }
 
@@ -8406,7 +8403,7 @@ createUnavailableDecl(Identifier name, DeclContext *dc, Type type,
   // Create a new VarDecl with dummy type.
   auto var = createDeclWithClangNode<VarDecl>(ClangN, AccessLevel::Public,
                                               /*IsStatic*/isStatic,
-                                              VarDecl::Specifier::Var,
+                                              VarDecl::Introducer::Var,
                                               /*IsCaptureList*/false,
                                               SourceLoc(), name, dc);
   var->setIsObjC(false);

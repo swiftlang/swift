@@ -2135,10 +2135,12 @@ public:
 
     // Add a type annotation.
     Type VarType = getTypeOfMember(VD, dynamicLookupInfo);
-    if (Name != Ctx.Id_self && VD->isInOut()) {
-      // It is useful to show inout for function parameters.
-      // But for 'self' it is just noise.
-      VarType = InOutType::get(VarType);
+    if (auto *PD = dyn_cast<ParamDecl>(VD)) {
+      if (Name != Ctx.Id_self && PD->isInOut()) {
+        // It is useful to show inout for function parameters.
+        // But for 'self' it is just noise.
+        VarType = InOutType::get(VarType);
+      }
     }
     auto DynamicOrOptional =
         IsDynamicLookup || VD->getAttrs().hasAttribute<OptionalAttr>();

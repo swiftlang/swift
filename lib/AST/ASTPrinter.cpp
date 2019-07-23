@@ -2500,17 +2500,11 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
         || Options.PrintParameterSpecifiers) {
       // Map all non-let specifiers to 'var'.  This is not correct, but
       // SourceKit relies on this for info about parameter decls.
-      switch (decl->getSpecifier()) {
-      case VarDecl::Specifier::Let:
+      if (decl->isLet())
         Printer << tok::kw_let;
-        break;
-      case VarDecl::Specifier::Var:
-      case VarDecl::Specifier::InOut:
-      case VarDecl::Specifier::Shared:
-      case VarDecl::Specifier::Owned:
+      else
         Printer << tok::kw_var;
-        break;
-      }
+
       Printer << " ";
     }
   }

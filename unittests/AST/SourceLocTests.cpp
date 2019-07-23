@@ -153,7 +153,7 @@ TEST(SourceLoc, StmtConditionElement) {
   SourceLoc start = C.Ctx.SourceMgr.getLocForBufferStart(bufferID);
   
   auto vardecl = new (C.Ctx) VarDecl(/*IsStatic*/false,
-                                     VarDecl::Specifier::Let,
+                                     VarDecl::Introducer::Let,
                                      /*IsCaptureList*/false,
                                      start.getAdvancedLoc(7)
                                     , C.Ctx.getIdentifier("x")
