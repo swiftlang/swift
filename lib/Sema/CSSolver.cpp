@@ -2027,15 +2027,26 @@ static Constraint *tryOptimizeGenericDisjunction(
                                           TypeChecker &tc,
                                           DeclContext *dc,
                                           ArrayRef<Constraint *> constraints) {
-  if (constraints.size() != 2 ||
-      constraints[0]->getKind() != ConstraintKind::BindOverload ||
-      constraints[1]->getKind() != ConstraintKind::BindOverload ||
-      constraints[0]->isFavored() ||
-      constraints[1]->isFavored())
+  llvm::SmallVector<Constraint *, 4> choices;
+  for (auto *choice : constraints) {
+    if (choices.size() > 2)
+      return nullptr;
+
+    if (!choice->isDisabled())
+      choices.push_back(choice);
+  }
+
+  if (choices.size() != 2)
     return nullptr;
 
-  OverloadChoice choiceA = constraints[0]->getOverloadChoice();
-  OverloadChoice choiceB = constraints[1]->getOverloadChoice();
+  if (choices[0]->getKind() != ConstraintKind::BindOverload ||
+      choices[1]->getKind() != ConstraintKind::BindOverload ||
+      choices[0]->isFavored() ||
+      choices[1]->isFavored())
+    return nullptr;
+
+  OverloadChoice choiceA = choices[0]->getOverloadChoice();
+  OverloadChoice choiceB = choices[1]->getOverloadChoice();
 
   if (!choiceA.isDecl() || !choiceB.isDecl())
     return nullptr;
@@ -2072,10 +2083,10 @@ static Constraint *tryOptimizeGenericDisjunction(
 
   switch (tc.compareDeclarations(dc, declA, declB)) {
   case Comparison::Better:
-    return constraints[0];
+    return choices[0];
 
   case Comparison::Worse:
-    return constraints[1];
+    return choices[1];
 
   case Comparison::Unordered:
     return nullptr;
