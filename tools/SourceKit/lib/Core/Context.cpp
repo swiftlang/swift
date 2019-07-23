@@ -13,7 +13,6 @@
 #include "SourceKit/Core/Context.h"
 #include "SourceKit/Core/LangSupport.h"
 #include "SourceKit/Core/NotificationCenter.h"
-#include "SourceKit/Support/FileSystemProvider.h"
 
 using namespace SourceKit;
 
@@ -27,18 +26,4 @@ SourceKit::Context::Context(StringRef RuntimeLibPath,
 }
 
 SourceKit::Context::~Context() {
-}
-
-FileSystemProvider *SourceKit::Context::getFileSystemProvider(StringRef Name) {
-  auto It = FileSystemProviders.find(Name);
-  if (It == FileSystemProviders.end())
-    return nullptr;
-  return It->second;
-}
-
-void SourceKit::Context::setFileSystemProvider(
-    StringRef Name, FileSystemProvider *FileSystemProvider) {
-  assert(FileSystemProvider);
-  auto Result = FileSystemProviders.try_emplace(Name, FileSystemProvider);
-  assert(Result.second && "tried to set existing FileSystemProvider");
 }

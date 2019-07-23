@@ -116,11 +116,12 @@ public:
   /// \param OncePerASTToken if non-null, a previous query with the same value
   /// token, that is enqueued waiting to be executed on the same AST, will be
   /// cancelled.
-  void processASTAsync(SwiftInvocationRef Invok,
-                       SwiftASTConsumerRef ASTConsumer,
-                       const void *OncePerASTToken,
-                       ArrayRef<ImmutableTextSnapshotRef> Snapshots =
-                           ArrayRef<ImmutableTextSnapshotRef>());
+  void
+  processASTAsync(SwiftInvocationRef Invok, SwiftASTConsumerRef ASTConsumer,
+                  const void *OncePerASTToken,
+                  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fileSystem,
+                  ArrayRef<ImmutableTextSnapshotRef> Snapshots =
+                      ArrayRef<ImmutableTextSnapshotRef>());
 
   std::unique_ptr<llvm::MemoryBuffer> getMemoryBuffer(StringRef Filename,
                                                       std::string &Error);

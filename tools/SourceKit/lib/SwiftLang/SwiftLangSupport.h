@@ -67,6 +67,7 @@ namespace ide {
 }
 
 namespace SourceKit {
+  class FileSystemProvider;
   class ImmutableTextSnapshot;
   typedef RefPtr<ImmutableTextSnapshot> ImmutableTextSnapshotRef;
   class SwiftASTManager;
@@ -85,13 +86,14 @@ class SwiftEditorDocument :
 public:
 
   SwiftEditorDocument(StringRef FilePath, SwiftLangSupport &LangSupport,
+       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fileSystem,
        swift::ide::CodeFormatOptions Options = swift::ide::CodeFormatOptions());
   ~SwiftEditorDocument();
 
   ImmutableTextSnapshotRef
   initializeText(llvm::MemoryBuffer *Buf, ArrayRef<const char *> Args,
                  bool ProvideSemanticInfo,
-                 llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem);
+                 llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fileSystem);
   ImmutableTextSnapshotRef replaceText(unsigned Offset, unsigned Length,
                                        llvm::MemoryBuffer *Buf,
                                        bool ProvideSemanticInfo,
@@ -126,6 +128,9 @@ public:
   /// Whether or not the AST stored for this document is up-to-date or just an
   /// artifact of incremental syntax parsing
   bool hasUpToDateAST() const;
+
+  /// Returns the virtual filesystem associated with this document.
+  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> getFileSystem() const;
 };
 
 typedef IntrusiveRefCntPtr<SwiftEditorDocument> SwiftEditorDocumentRef;
@@ -162,6 +167,7 @@ namespace CodeCompletion {
 class SessionCache : public ThreadSafeRefCountedBase<SessionCache> {
   std::unique_ptr<llvm::MemoryBuffer> buffer;
   std::vector<std::string> args;
+  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fileSystem;
   CompletionSink sink;
   std::vector<Completion *> sortedCompletions;
   CompletionKind completionKind;
@@ -173,10 +179,13 @@ class SessionCache : public ThreadSafeRefCountedBase<SessionCache> {
 public:
   SessionCache(CompletionSink &&sink,
                std::unique_ptr<llvm::MemoryBuffer> &&buffer,
-               std::vector<std::string> &&args, CompletionKind completionKind,
+               std::vector<std::string> &&args,
+               llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fileSystem,
+               CompletionKind completionKind,
                TypeContextKind typeContextKind, bool mayUseImplicitMemberExpr,
                FilterRules filterRules)
-      : buffer(std::move(buffer)), args(std::move(args)), sink(std::move(sink)),
+      : buffer(std::move(buffer)), args(std::move(args)),
+        fileSystem(std::move(fileSystem)), sink(std::move(sink)),
         completionKind(completionKind), typeContextKind(typeContextKind),
         completionMayUseImplicitMemberExpr(mayUseImplicitMemberExpr),
         filterRules(std::move(filterRules)) {}
@@ -184,6 +193,7 @@ public:
   ArrayRef<Completion *> getSortedCompletions();
   llvm::MemoryBuffer *getBuffer();
   ArrayRef<std::string> getCompilerArgs();
+  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> getFileSystem();
   const FilterRules &getFilterRules();
   CompletionKind getCompletionKind();
   TypeContextKind getCompletionTypeContextKind();
@@ -291,6 +301,7 @@ class SwiftLangSupport : public LangSupport {
   CodeCompletion::SessionCacheMap CCSessions;
   ThreadSafeRefCntPtr<SwiftCustomCompletions> CustomCompletions;
   std::shared_ptr<SwiftStatistics> Stats;
+  llvm::StringMap<std::unique_ptr<FileSystemProvider>> FileSystemProviders;
 
 public:
   explicit SwiftLangSupport(SourceKit::Context &SKCtx);
@@ -313,6 +324,35 @@ public:
   IntrusiveRefCntPtr<SwiftCompletionCache> getCodeCompletionCache() {
     return CCCache;
   }
+
+  /// Returns the FileSystemProvider registered under Name, or nullptr if not
+  /// found.
+  FileSystemProvider *getFileSystemProvider(StringRef Name);
+
+  /// Registers the given FileSystemProvider under Name. The caller is
+  /// responsible for keeping FileSystemProvider alive at least as long as
+  /// this Context.
+  /// This should only be called during setup because it is not synchronized.
+  /// \param FileSystemProvider must be non-null
+  void setFileSystemProvider(StringRef Name, std::unique_ptr<FileSystemProvider> FileSystemProvider);
+
+  /// Returns the filesystem appropriate to use in a request with the given
+  /// \p vfsOptions and \p primaryFile.
+  ///
+  /// If \p vfsOptions is provided, returns a virtual filesystem created from
+  /// a registered FileSystemProvider, or nullptr if there is an error.
+  ///
+  /// If \p vfsOptions is None and \p primaryFile is provided, returns the
+  /// virtual filesystem associated with that editor document, if any.
+  ///
+  /// Otherwise, returns the real filesystem.
+  ///
+  /// \param vfsOptions Options to select and initialize the VFS, or None to
+  ///                   get the real file system.
+  /// \param error Set to a description of the error, if appropriate.
+  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>
+  getFileSystem(const Optional<VFSOptions> &vfsOptions,
+                Optional<StringRef> primaryFile, std::string &error);
 
   /// Copy a memory buffer inserting '0' at the position of \c origBuf.
   // TODO: Share with code completion.
@@ -419,13 +459,14 @@ public:
   void codeComplete(
       llvm::MemoryBuffer *InputBuf, unsigned Offset,
       SourceKit::CodeCompletionConsumer &Consumer, ArrayRef<const char *> Args,
-      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem) override;
+      Optional<VFSOptions> vfsOptions) override;
 
   void codeCompleteOpen(StringRef name, llvm::MemoryBuffer *inputBuf,
                         unsigned offset, OptionsDictionary *options,
                         ArrayRef<FilterRule> rawFilterRules,
                         GroupedCodeCompletionConsumer &consumer,
-                        ArrayRef<const char *> args) override;
+                        ArrayRef<const char *> args,
+                        Optional<VFSOptions> vfsOptions) override;
 
   void codeCompleteClose(StringRef name, unsigned offset,
                          GroupedCodeCompletionConsumer &consumer) override;
@@ -444,8 +485,7 @@ public:
 
   void editorOpen(
       StringRef Name, llvm::MemoryBuffer *Buf, EditorConsumer &Consumer,
-      ArrayRef<const char *> Args,
-      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem) override;
+      ArrayRef<const char *> Args, Optional<VFSOptions> vfsOptions) override;
 
   void editorOpenInterface(EditorConsumer &Consumer,
                            StringRef Name,
@@ -496,9 +536,8 @@ public:
   void
   getCursorInfo(StringRef Filename, unsigned Offset, unsigned Length,
                 bool Actionables, bool CancelOnSubsequentRequest,
-                ArrayRef<const char *> Args,
-                llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
-                 std::function<void(const RequestResult<CursorInfoData> &)> Receiver) override;
+                ArrayRef<const char *> Args, Optional<VFSOptions> vfsOptions,
+                std::function<void(const RequestResult<CursorInfoData> &)> Receiver) override;
 
   void getNameInfo(StringRef Filename, unsigned Offset,
                    NameTranslatingInfo &Input,
@@ -511,8 +550,7 @@ public:
 
   void getCursorInfoFromUSR(
       StringRef Filename, StringRef USR, bool CancelOnSubsequentRequest,
-      ArrayRef<const char *> Args,
-      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+      ArrayRef<const char *> Args, Optional<VFSOptions> vfsOptions,
       std::function<void(const RequestResult<CursorInfoData> &)> Receiver) override;
 
   void findRelatedIdentifiersInFile(StringRef Filename, unsigned Offset,
@@ -567,6 +605,16 @@ public:
                                ConformingMethodListConsumer &Consumer) override;
 
   void getStatistics(StatisticsReceiver) override;
+
+  // SWIFT_ENABLE_TENSORFLOW
+  void
+  codeComplete(llvm::MemoryBuffer *InputBuf, unsigned Offset,
+               CodeCompletionConsumer &Consumer, ArrayRef<const char *> Args,
+               llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS) override;
+
+  void editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
+                  EditorConsumer &Consumer, ArrayRef<const char *> Args,
+                  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS) override;
 
 private:
   swift::SourceFile *getSyntacticSourceFile(llvm::MemoryBuffer *InputBuf,

@@ -14,6 +14,7 @@
 #include "SwiftASTManager.h"
 #include "SwiftLangSupport.h"
 #include "SwiftEditorDiagConsumer.h"
+#include "SourceKit/Support/FileSystemProvider.h"
 #include "SourceKit/Support/Logging.h"
 #include "SourceKit/Support/UIdent.h"
 
@@ -124,6 +125,7 @@ static bool swiftCodeCompleteImpl(
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     std::string &Error) {
   assert(FileSystem);
+
   // Resolve symlinks for the input file; we resolve them for the input files
   // in the arguments as well.
   // FIXME: We need the Swift equivalent of Clang's FileEntry.
@@ -196,7 +198,11 @@ static bool swiftCodeCompleteImpl(
   // FIXME: We need to be passing the buffers from the open documents.
   // It is not a huge problem in practice because Xcode auto-saves constantly.
 
-  CI.getSourceMgr().setFileSystem(FileSystem);
+  if (FileSystem != llvm::vfs::getRealFileSystem()) {
+    CI.getSourceMgr().setFileSystem(FileSystem);
+    Invocation.getClangImporterOptions().ForceUseSwiftVirtualFileSystem = true;
+  }
+
   if (CI.setup(Invocation)) {
     // FIXME: error?
     return true;
@@ -215,8 +221,15 @@ static bool swiftCodeCompleteImpl(
 void SwiftLangSupport::codeComplete(
     llvm::MemoryBuffer *UnresolvedInputFile, unsigned Offset,
     SourceKit::CodeCompletionConsumer &SKConsumer, ArrayRef<const char *> Args,
-    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem) {
-  assert(FileSystem);
+    Optional<VFSOptions> vfsOptions) {
+
+  std::string error;
+  // FIXME: the use of None as primary file is to match the fact we do not read
+  // the document contents using the editor documents infrastructure.
+  auto fileSystem = getFileSystem(vfsOptions, /*primaryFile=*/None, error);
+  if (!fileSystem)
+    return SKConsumer.failed(error);
+
   SwiftCodeCompletionConsumer SwiftConsumer([&](
       MutableArrayRef<CodeCompletionResult *> Results,
       SwiftCompletionInfo &info) {
@@ -254,7 +267,7 @@ void SwiftLangSupport::codeComplete(
 
   std::string Error;
   if (!swiftCodeCompleteImpl(*this, UnresolvedInputFile, Offset, SwiftConsumer,
-                             Args, FileSystem, Error)) {
+                             Args, fileSystem, Error)) {
     SKConsumer.failed(Error);
   }
 }
@@ -725,6 +738,10 @@ ArrayRef<std::string> CodeCompletion::SessionCache::getCompilerArgs() {
   llvm::sys::ScopedLock L(mtx);
   return args;
 }
+llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> CodeCompletion::SessionCache::getFileSystem() {
+  llvm::sys::ScopedLock L(mtx);
+  return fileSystem;
+}
 CompletionKind CodeCompletion::SessionCache::getCompletionKind() {
   llvm::sys::ScopedLock L(mtx);
   return completionKind;
@@ -1118,7 +1135,7 @@ static void transformAndForwardResults(
       cargs.push_back(arg.c_str());
     std::string error;
     if (!swiftCodeCompleteImpl(lang, buffer.get(), str.size(), swiftConsumer,
-                               cargs, llvm::vfs::getRealFileSystem(), error)) {
+                               cargs, session->getFileSystem(), error)) {
       consumer.failed(error);
       return;
     }
@@ -1157,7 +1174,7 @@ static void transformAndForwardResults(
 void SwiftLangSupport::codeCompleteOpen(
     StringRef name, llvm::MemoryBuffer *inputBuf, unsigned offset,
     OptionsDictionary *options, ArrayRef<FilterRule> rawFilterRules,
-    GroupedCodeCompletionConsumer &consumer, ArrayRef<const char *> args) {
+    GroupedCodeCompletionConsumer &consumer, ArrayRef<const char *> args, Optional<VFSOptions> vfsOptions) {
   StringRef filterText;
   unsigned resultOffset = 0;
   unsigned maxResults = 0;
@@ -1165,6 +1182,13 @@ void SwiftLangSupport::codeCompleteOpen(
   if (options)
     translateCodeCompletionOptions(*options, CCOpts, filterText, resultOffset,
                                    maxResults);
+
+  std::string error;
+  // FIXME: the use of None as primary file is to match the fact we do not read
+  // the document contents using the editor documents infrastructure.
+  auto fileSystem = getFileSystem(vfsOptions, /*primaryFile=*/None, error);
+  if (!fileSystem)
+    return consumer.failed(error);
 
   CodeCompletion::FilterRules filterRules;
   translateFilterRules(rawFilterRules, filterRules);
@@ -1207,10 +1231,8 @@ void SwiftLangSupport::codeCompleteOpen(
   }
 
   // Invoke completion.
-  std::string error;
   if (!swiftCodeCompleteImpl(*this, inputBuf, offset, swiftConsumer,
-                             extendedArgs, llvm::vfs::getRealFileSystem(),
-                             error)) {
+                             extendedArgs, fileSystem, error)) {
     consumer.failed(error);
     return;
   }
@@ -1230,7 +1252,7 @@ void SwiftLangSupport::codeCompleteOpen(
       inputBuf->getBuffer(), inputBuf->getBufferIdentifier());
   std::vector<std::string> argsCopy(extendedArgs.begin(), extendedArgs.end());
   SessionCacheRef session{new SessionCache(
-      std::move(sink), std::move(bufferCopy), std::move(argsCopy),
+      std::move(sink), std::move(bufferCopy), std::move(argsCopy), fileSystem,
       completionKind, typeContextKind, mayUseImplicitMemberExpr,
       std::move(filterRules))};
   session->setSortedCompletions(std::move(completions));
