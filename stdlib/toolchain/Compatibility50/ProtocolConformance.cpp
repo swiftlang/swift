@@ -18,7 +18,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "Overrides.h"
-#include "../runtime/Private.h"
+#include "../../public/runtime/Private.h"
 #include "swift/Basic/Lazy.h"
 #include <objc/runtime.h>
 
