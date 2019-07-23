@@ -462,8 +462,15 @@ AttachedPropertyWrappersRequest::evaluate(Evaluator &evaluator,
       ctx.Diags.diagnose(attr->getLocation(), diag::property_wrapper_computed);
       continue;
     }
-
+    
     result.push_back(mutableAttr);
+  }
+
+  // TODO: Property wrapper compositions do not yet compose correctly
+  // in all situtaions.
+  if (result.size() > 1) {
+    ctx.Diags.diagnose(result[result.size() - 2]->getLocation(),
+                       diag::property_wrapper_composition_not_implemented);
   }
 
   // Attributes are stored in reverse order in the AST, but we want them in
