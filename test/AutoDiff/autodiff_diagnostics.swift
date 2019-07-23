@@ -177,8 +177,7 @@ struct TF_305 : Differentiable {
 class Foo {
   // FIXME: Figure out why diagnostics for direct references end up here, and
   // why they are duplicated.
-  // expected-error @+2 2 {{expression is not differentiable}}
-  // expected-note @+1 2 {{differentiating class members is not yet supported}}
+  // expected-note @+1 {{differentiating class members is not yet supported}}
   func class_method(_ x: Float) -> Float {
     return x
   }
@@ -193,6 +192,9 @@ func triesToDifferentiateClassMethod(x: Float) -> Float {
 }
 
 let _: @differentiable (Float) -> Float = Foo().class_method
+
+// expected-error @+1 {{function is not differentiable}}
+_ = gradient(at: .zero, in: Foo().class_method)
 
 //===----------------------------------------------------------------------===//
 // Unreachable
