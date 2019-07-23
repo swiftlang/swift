@@ -171,14 +171,13 @@ struct TF_305 : Differentiable {
 }
 
 //===----------------------------------------------------------------------===//
-// Classes and existentials (not yet supported)
+// Classes (not yet supported)
 //===----------------------------------------------------------------------===//
 
 class Foo {
   // FIXME: Figure out why diagnostics for direct references end up here, and
   // why they are duplicated.
-  // expected-error @+2 2 {{expression is not differentiable}}
-  // expected-note @+1 2 {{differentiating class members is not yet supported}}
+  // expected-note @+1 {{differentiating class members is not yet supported}}
   func class_method(_ x: Float) -> Float {
     return x
   }
@@ -193,6 +192,9 @@ func triesToDifferentiateClassMethod(x: Float) -> Float {
 }
 
 let _: @differentiable (Float) -> Float = Foo().class_method
+
+// expected-error @+1 {{function is not differentiable}}
+_ = gradient(at: .zero, in: Foo().class_method)
 
 //===----------------------------------------------------------------------===//
 // Unreachable
@@ -258,3 +260,14 @@ func nondiff(_ f: @differentiable (Float, @nondiff Float) -> Float) -> Float {
   // expected-error @+1 {{function is not differentiable}}
   return gradient(at: 2) { x in f(x * x, x) }
 }
+
+// Test parameter subset thunk + partially-applied original function.
+struct TF_675 : Differentiable {
+  @differentiable
+  // expected-note @+1 {{cannot convert a direct method reference to a '@differentiable' function; use an explicit closure instead}}
+  func method(_ x: Float) -> Float {
+    return x
+  }
+}
+// expected-error @+1 {{function is not differentiable}}
+let _: @differentiable (Float) -> Float = TF_675().method

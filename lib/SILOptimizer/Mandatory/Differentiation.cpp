@@ -1930,31 +1930,6 @@ reapplyFunctionConversion(SILValue newFunc, SILValue oldFunc,
     return builder.createPartialApply(loc, innerNewFunc, substMap, newArgs,
                                       ParameterConvention::Direct_Guaranteed);
   }
-  // convert_function
-  if (auto *cfi = dyn_cast<ConvertFunctionInst>(oldConvertedFunc)) {
-    // `convert_function` does not have a fixed typing rule because it can
-    // convert between function types as long as they are ABI-compatible. Here
-    // we match specific patterns.
-    auto origTargetFnTy = cfi->getType().castTo<SILFunctionType>();
-    auto origSourceFnTy =
-        cfi->getOperand()->getType().castTo<SILFunctionType>();
-    auto innerNewFunc = reapplyFunctionConversion(newFunc, oldFunc,
-                                                  cfi->getOperand(), builder,
-                                                  loc, newFuncGenSig);
-    // Match conversion from escaping to `@noescape`.
-    CanSILFunctionType targetType;
-    if (!origSourceFnTy->isNoEscape() && origTargetFnTy->isNoEscape() &&
-        origSourceFnTy == origTargetFnTy->getWithExtInfo(
-            origTargetFnTy->getExtInfo().withNoEscape(false))) {
-      auto operandFnTy = innerNewFunc->getType().castTo<SILFunctionType>();
-      targetType = operandFnTy->getWithExtInfo(
-          operandFnTy->getExtInfo().withNoEscape(true));
-    }
-    assert(targetType && "Unhandled convert_function pattern");
-    auto silTy = SILType::getPrimitiveObjectType(targetType);
-    return builder.createConvertFunction(loc, innerNewFunc, silTy,
-                                         cfi->withoutActuallyEscaping());
-  }
   llvm_unreachable("Unhandled function conversion instruction");
 }
 
@@ -6328,7 +6303,7 @@ ADContext::getOrCreateSubsetParametersThunkForAssociatedFunction(
           thunkType, fromInterfaceType, toInterfaceType, dynamicSelfType,
           module.getSwiftModule()) + "_" + desiredIndices.mangle() + "_" +
           thunkName;
-  thunkName += "_thunk";
+  thunkName += "_subset_parameters_thunk";
 
   auto loc = origFnOperand.getLoc();
   SILOptFunctionBuilder fb(getTransform());
@@ -6371,6 +6346,8 @@ ADContext::getOrCreateSubsetParametersThunkForAssociatedFunction(
 
   SmallVector<SILValue, 4> arguments;
   arguments.append(thunk->getArguments().begin(), thunk->getArguments().end());
+  assert(arguments.size() == assocFnType->getNumParameters() +
+                                 assocFnType->getNumIndirectFormalResults());
   auto *apply = builder.createApply(
       loc, assocRef, assocSubstMap, arguments, /*isNonThrowing*/ false);
 
@@ -6447,29 +6424,31 @@ SILValue ADContext::promoteToDifferentiableFunction(
             thunk->isBare(), thunk->isTransparent(), thunk->isSerialized(),
             thunk->isDynamicallyReplaceable(), ProfileCounter(),
             thunk->isThunk());
+        // If new thunk is newly created: clone the old thunk body, wrap the
+        // returned function value with an `autodiff_function` instruction,
+        // and process the `autodiff_function` instruction.
         if (newThunk->empty()) {
           newThunk->setOwnershipEliminated();
           SILFunctionCloner cloner(newThunk);
           cloner.cloneFunction(thunk);
-        }
 
-        auto *retInst =
-            cast<ReturnInst>(newThunk->findReturnBB()->getTerminator());
-        AutoDiffFunctionInst *adfi;
-        {
-          SILBuilder builder(retInst);
-          adfi = createAutoDiffFunction(builder, loc, parameterIndices,
-                                        differentiationOrder,
-                                        retInst->getOperand());
+          auto *retInst =
+              cast<ReturnInst>(newThunk->findReturnBB()->getTerminator());
+          SILBuilder thunkBuilder(retInst);
+          auto *adfi = createAutoDiffFunction(thunkBuilder, loc,
+                                              parameterIndices,
+                                              differentiationOrder,
+                                              retInst->getOperand());
           resultIndices[adfi] = resultIndex;
-          builder.createReturn(loc, adfi);
+          thunkBuilder.createReturn(loc, adfi);
+          retInst->eraseFromParent();
+
+          getAutoDiffFunctionInsts().push_back(adfi);
+          if (processAutoDiffFunctionInst(adfi))
+            return nullptr;
         }
-        retInst->eraseFromParent();
 
-        getAutoDiffFunctionInsts().push_back(adfi);
-        if (processAutoDiffFunctionInst(adfi))
-          return nullptr;
-
+        // Apply the new curry thunk.
         auto *newThunkRef = builder.createFunctionRef(loc, newThunk);
         SmallVector<SILValue, 8> arguments(ai->getArguments().begin(),
                                            ai->getArguments().end());
@@ -6506,11 +6485,31 @@ SILValue ADContext::promoteToDifferentiableFunction(
     // have smaller capacity than `actualIndices`. We expect this logic to go
     // away when we support `@differentiable` partial apply.
     // if (actualIndices != desiredIndices) { // TODO: Re-enable.
+    auto extendedDesiredIndices = desiredIndices.parameters->extendingCapacity(
+        getASTContext(), actualIndices.parameters->getCapacity());
     if (actualIndices.source != desiredIndices.source ||
-        !actualIndices.parameters->equals(
-            desiredIndices.parameters->extendingCapacity(getASTContext(),
-                actualIndices.parameters->getCapacity()))) {
-      assert(actualIndices.parameters->isSupersetOf(desiredIndices.parameters));
+        !actualIndices.parameters->equals(extendedDesiredIndices)) {
+      // Check if underlying original function reference has been partially
+      // applied with arguments. If so, produce an error: parameter subset
+      // thunks do not yet support this case because partially applied arguments
+      // cannot be propagated to parameter subset thunks.
+      auto didPartiallyApplyArguments = [](SILValue original) {
+        while (auto *pai =
+                   peerThroughFunctionConversions<PartialApplyInst>(original)) {
+          if (pai->getNumArguments() > 0)
+            return true;
+          original = pai->getCallee();
+        }
+        return false;
+      };
+      if (didPartiallyApplyArguments(origFnOperand)) {
+        emitNondifferentiabilityError(
+            origFnOperand, invoker,
+            diag::autodiff_cannot_param_subset_thunk_partially_applied_orig_fn);
+        return nullptr;
+      }
+      // Create the parameter subset thunk.
+      assert(actualIndices.parameters->isSupersetOf(extendedDesiredIndices));
       SILFunction *thunk;
       SubstitutionMap interfaceSubs;
       std::tie(thunk, interfaceSubs) =
@@ -6608,15 +6607,15 @@ bool ADContext::processAutoDiffFunctionInst(AutoDiffFunctionInst *adfi) {
          "some functions are already filled in but not all of them");
 
   SILFunction *parent = adfi->getFunction();
-  auto loc = parent->getLocation();
+  auto loc = adfi->getLoc();
   SILBuilder builder(adfi);
 
   auto differentiableFnValue =
       promoteToDifferentiableFunction(adfi, builder, loc, adfi);
-  if (!differentiableFnValue)
-    return true;
   // Mark `adfi` as processed so that it won't be reprocessed after deletion.
   processedAutoDiffFunctionInsts.insert(adfi);
+  if (!differentiableFnValue)
+    return true;
   // Replace all uses of `adfi`.
   adfi->replaceAllUsesWith(differentiableFnValue);
   adfi->eraseFromParent();
