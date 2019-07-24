@@ -92,6 +92,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_ARRAY_2_SKIPPED | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_SKIPPED
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARCHETYPE_GENERIC_1 | %FileCheck %s -check-prefix=ARCHETYPE_GENERIC_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PARAM_WITH_ERROR_AUTOCLOSURE| %FileCheck %s -check-prefix=PARAM_WITH_ERROR_AUTOCLOSURE
 
 var i1 = 1
 var i2 = 2
@@ -737,4 +738,16 @@ func testGenricMethodOnGenericOfArchetype<Wrapped>(value: Wrap<Wrapped>) {
   value.method(#^ARCHETYPE_GENERIC_1^#)
 // ARCHETYPE_GENERIC_1: Begin completions
 // ARCHETYPE_GENERIC_1: Decl[InstanceMethod]/CurrNominal:   ['(']{#(fn): (Wrapped) -> _##(Wrapped) -> _#}[')'][#Wrap<_>#];
+}
+
+struct TestHasErrorAutoclosureParam {
+  func hasErrorAutoclosureParam(value: @autoclosure () -> Value) {
+    fatalError()
+  }
+  func test() {
+    hasErrorAutoclosureParam(#^PARAM_WITH_ERROR_AUTOCLOSURE^#
+// PARAM_WITH_ERROR_AUTOCLOSURE: Begin completions, 1 items
+// PARAM_WITH_ERROR_AUTOCLOSURE: Decl[InstanceMethod]/CurrNominal:   ['(']{#value: <<error type>>#}[')'][#Void#];
+// PARAM_WITH_ERROR_AUTOCLOSURE: End completions
+  }
 }
