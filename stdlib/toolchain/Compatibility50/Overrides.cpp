@@ -15,7 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "Overrides.h"
-#include "../runtime/CompatibilityOverride.h"
+#include "../../public/runtime/CompatibilityOverride.h"
 
 using namespace swift;
 
@@ -23,7 +23,7 @@ struct OverrideSection {
   uintptr_t version;
 #define OVERRIDE(name, ret, attrs, ccAttrs, namespace, typedArgs, namedArgs) \
   Override_ ## name name;
-#include "../runtime/CompatibilityOverride.def"
+#include "../../public/runtime/CompatibilityOverride.def"
 };
   
 OverrideSection Overrides
