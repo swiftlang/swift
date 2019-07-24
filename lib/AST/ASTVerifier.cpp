@@ -2865,6 +2865,16 @@ public:
       verifyParsedBase(UED);
     }
 
+    void verifyParsed(EnumCaseDecl *D) {
+      PrettyStackTraceDecl debugStack("verifying EnumCaseDecl", D);
+      if (!D->getAttrs().isEmpty()) {
+        Out << "EnumCaseDecl should not have attributes";
+        abort();
+      }
+
+      verifyParsedBase(D);
+    }
+
     void verifyParsed(AbstractFunctionDecl *AFD) {
       PrettyStackTraceDecl debugStack("verifying AbstractFunctionDecl", AFD);
 
