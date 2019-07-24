@@ -1722,11 +1722,6 @@ function(add_swift_target_library name)
   if(SWIFTLIB_IS_SDK_OVERLAY)
     set(SWIFTLIB_HAS_SWIFT_CONTENT TRUE)
     set(SWIFTLIB_IS_STDLIB TRUE)
-
-    # Install to sdk-overlay by default, but don't hardcode it
-    if(NOT SWIFTLIB_INSTALL_IN_COMPONENT)
-      set(SWIFTLIB_INSTALL_IN_COMPONENT sdk-overlay)
-    endif()
   endif()
 
   # Standard library is always a target library.
