@@ -19,7 +19,7 @@
 
 #include "swift/Runtime/Once.h"
 #include "swift/Runtime/Exclusivity.h"
-#include "../runtime/ThreadLocalStorage.h"
+#include "../../public/runtime/ThreadLocalStorage.h"
 
 using namespace swift;
 
