@@ -1741,10 +1741,6 @@ function(add_swift_target_library name)
     set(SWIFTLIB_TARGET_LIBRARY TRUE)
   endif()
 
-  if(NOT SWIFTLIB_TARGET_LIBRARY)
-    set(SWIFTLIB_INSTALL_IN_COMPONENT dev)
-  endif()
-
   # If target SDKs are not specified, build for all known SDKs.
   if("${SWIFTLIB_TARGET_SDKS}" STREQUAL "")
     set(SWIFTLIB_TARGET_SDKS ${SWIFT_SDKS})
