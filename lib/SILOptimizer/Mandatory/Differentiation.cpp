@@ -64,8 +64,7 @@ static llvm::cl::opt<bool> SkipFoldingAutoDiffFunctionExtraction(
     "differentiation-skip-folding-autodiff-function-extraction",
     llvm::cl::init(true));
 
-/// This flag is used to disable `autodiff_function_extract` instruction folding
-/// for SIL testing purposes.
+/// This flag is used to enable full JVP generation.
 static llvm::cl::opt<bool> RunJVPGeneration(
     "run-jvp-generation",
     llvm::cl::init(false));
@@ -410,7 +409,7 @@ private:
   /// Mapping from original basic blocks to linear map enums. If 'kind' is 'VJP',
   /// then it's the predecessor enums. If 'kind' is 'JVP', then it's the
   /// successor enums.
-  DenseMap<SILBasicBlock *, EnumDecl *> linearMapEnums;
+  DenseMap<SILBasicBlock *, EnumDecl *> branchingTraceDecls;
 
   /// Mapping from `apply` and `struct_extract` instructions in the original
   /// function to the corresponding linear map declaration in the linear map
@@ -420,7 +419,7 @@ private:
   /// Mapping from predecessor+succcessor basic block pairs in original function
   /// to the corresponding enum case.
   DenseMap<std::pair<SILBasicBlock *, SILBasicBlock *>, EnumElementDecl *>
-      enumCases;
+      branchingTraceEnumCases;
 
   /// Mapping from linear map structs to their predecessor enum fields.
   DenseMap<StructDecl *, VarDecl *> linearMapStructEnumFields;
@@ -492,49 +491,49 @@ private:
   }
 
   /// Creates an enum declaration with the given VJP/JVP generic signature, whose
-  /// cases represent the predecessors of the given original block.
+  /// cases represent the predecessors/successors of the given original block.
   EnumDecl *
-  createBasicBlockEnum(SILBasicBlock *originalBB,
-                       SILAutoDiffIndices indices,
-                       CanGenericSignature genericSig) {
+  createBranchingTraceDecl(SILBasicBlock *originalBB,
+                           SILAutoDiffIndices indices,
+                           CanGenericSignature genericSig) {
     assert(originalBB->getParent() == original);
     auto *moduleDecl = original->getModule().getSwiftModule();
     auto &astCtx = original->getASTContext();
     auto &file = getDeclarationFileUnit();
-    // Create a predecessor/successor enum.
+    // Create a branching trace enum.
     std::string enumName;
     switch (kind) {
-      case swift::AutoDiffAssociatedFunctionKind::JVP:
-        enumName =
-            "_AD__" + original->getName().str() +
-            "_bb" + std::to_string(originalBB->getDebugID()) +
-            "__Succ__" + indices.mangle();
-        break;
-      case swift::AutoDiffAssociatedFunctionKind::VJP:
-        enumName =
-            "_AD__" + original->getName().str() +
-            "_bb" + std::to_string(originalBB->getDebugID()) +
-            "__Pred__" + indices.mangle();
-        break;
+    case swift::AutoDiffAssociatedFunctionKind::JVP:
+      enumName =
+          "_AD__" + original->getName().str() +
+          "_bb" + std::to_string(originalBB->getDebugID()) +
+          "__Succ__" + indices.mangle();
+      break;
+    case swift::AutoDiffAssociatedFunctionKind::VJP:
+      enumName =
+          "_AD__" + original->getName().str() +
+          "_bb" + std::to_string(originalBB->getDebugID()) +
+          "__Pred__" + indices.mangle();
+      break;
     }
     auto enumId = astCtx.getIdentifier(enumName);
     auto loc = original->getLocation().getSourceLoc();
-    auto *linearMapEnum = new (astCtx) EnumDecl(
+    auto *branchingTraceDecl = new (astCtx) EnumDecl(
         /*EnumLoc*/ loc, /*Name*/ enumId, /*NameLoc*/ loc, /*Inherited*/ {},
         /*GenericParams*/ /*set later*/ nullptr, /*DC*/ &file);
     if (genericSig) {
       auto *genericParams =
-          cloneGenericParameters(astCtx, linearMapEnum, genericSig);
-      linearMapEnum->setGenericParams(genericParams);
-      linearMapEnum->setGenericEnvironment(
+          cloneGenericParameters(astCtx, branchingTraceDecl, genericSig);
+      branchingTraceDecl->setGenericParams(genericParams);
+      branchingTraceDecl->setGenericEnvironment(
           genericSig->createGenericEnvironment());
     }
-    linearMapEnum->setBraces(loc);
-    computeAccessLevel(linearMapEnum, original->getEffectiveSymbolLinkage());
-    linearMapEnum->computeType();
-    assert(linearMapEnum->hasInterfaceType());
-    file.addVisibleDecl(linearMapEnum);
-    // Add predecessor block enum cases.
+    branchingTraceDecl->setBraces(loc);
+    computeAccessLevel(branchingTraceDecl, original->getEffectiveSymbolLinkage());
+    branchingTraceDecl->computeType();
+    assert(branchingTraceDecl->hasInterfaceType());
+    file.addVisibleDecl(branchingTraceDecl);
+    // Add basic block enum cases.
     for (auto *predBB : originalBB->getPredecessorBlocks()) {
       auto bbId = "bb" + std::to_string(predBB->getDebugID());
       auto *predLinearMapStruct = getLinearMapStruct(predBB);
@@ -554,16 +553,16 @@ private:
       auto *paramList = ParameterList::create(astCtx, {decl});
       auto *enumEltDecl = new (astCtx) EnumElementDecl(
           /*IdentifierLoc*/ loc, DeclName(astCtx.getIdentifier(bbId)),
-          paramList, loc, /*RawValueExpr*/ nullptr, linearMapEnum);
+          paramList, loc, /*RawValueExpr*/ nullptr, branchingTraceDecl);
       enumEltDecl->setImplicit();
       enumEltDecl->computeType();
       auto *enumCaseDecl = EnumCaseDecl::create(
-          /*CaseLoc*/ loc, {enumEltDecl}, linearMapEnum);
+          /*CaseLoc*/ loc, {enumEltDecl}, branchingTraceDecl);
       enumCaseDecl->setImplicit();
-      linearMapEnum->addMember(enumEltDecl);
-      linearMapEnum->addMember(enumCaseDecl);
+      branchingTraceDecl->addMember(enumEltDecl);
+      branchingTraceDecl->addMember(enumCaseDecl);
       // Cache predecessor/successor enum element declarations.
-      enumCases.insert({{predBB, originalBB}, enumEltDecl});
+      branchingTraceEnumCases.insert({{predBB, originalBB}, enumEltDecl});
     }
     LLVM_DEBUG({
       auto &s = getADDebugStream();
@@ -576,12 +575,12 @@ private:
         enumName = "Successor";
         break;
       }
-      s << enumName << " enum created for function @"
+      s << enumName << " branch tracing decl created for function @"
         << original->getName() << " bb" << originalBB->getDebugID() << '\n';
-      linearMapEnum->print(s);
+      branchingTraceDecl->print(s);
       s << '\n';
     });
-    return linearMapEnum;
+    return branchingTraceDecl;
   }
 
   /// Creates a struct declaration with the given VJP/JVP generic signature, for
@@ -589,7 +588,7 @@ private:
   /// original block.
   StructDecl *
   createLinearMapStruct(SILBasicBlock *originalBB, SILAutoDiffIndices indices,
-                       CanGenericSignature genericSig) {
+                        CanGenericSignature genericSig) {
     auto *original = originalBB->getParent();
     auto &astCtx = original->getASTContext();
     auto &file = getDeclarationFileUnit();
@@ -650,10 +649,10 @@ public:
   LinearMapInfo(const LinearMapInfo &) = delete;
   LinearMapInfo &operator=(const LinearMapInfo &) = delete;
 
-  explicit LinearMapInfo(
-      ADContext &context, AutoDiffAssociatedFunctionKind kind,
-      SILFunction *original, SILFunction *assocFn,
-      const SILAutoDiffIndices &indices);
+  explicit LinearMapInfo(ADContext &context,
+                         AutoDiffAssociatedFunctionKind kind,
+                         SILFunction *original, SILFunction *assocFn,
+                         const SILAutoDiffIndices &indices);
 
   /// Returns the linear map struct associated with the given original block.
   StructDecl *getLinearMapStruct(SILBasicBlock *origBB) const {
@@ -671,14 +670,14 @@ public:
   }
 
   /// Returns the linear map enum associated with the given original block.
-  EnumDecl *getLinearMapEnum(SILBasicBlock *origBB) const {
-    return linearMapEnums.lookup(origBB);
+  EnumDecl *getBranchingTraceDecl(SILBasicBlock *origBB) const {
+    return branchingTraceDecls.lookup(origBB);
   }
 
   /// Returns the lowered SIL type of the linear map enum associated with the
   /// given original block.
   SILType getLinearMapEnumLoweredType(SILBasicBlock *origBB) const {
-    auto *linMapEnum = getLinearMapEnum(origBB);
+    auto *linMapEnum = getBranchingTraceDecl(origBB);
     auto linMapEnumType =
         linMapEnum->getDeclaredInterfaceType()->getCanonicalType();
     return typeConverter.getLoweredType(linMapEnumType,
@@ -690,7 +689,7 @@ public:
   EnumElementDecl *lookUpLinearMapEnumElement(SILBasicBlock *origPredBB,
                                               SILBasicBlock *origSuccBB) const {
     assert(origPredBB->getParent() == original);
-    return enumCases.lookup({origPredBB, origSuccBB});
+    return branchingTraceEnumCases.lookup({origPredBB, origSuccBB});
   }
 
   /// Returns the mapping from linear map structs to their linear map enum
@@ -1290,9 +1289,9 @@ ADContext::emitNondifferentiabilityError(SourceLoc loc,
 }
 
 LinearMapInfo::LinearMapInfo(ADContext &context,
-                            AutoDiffAssociatedFunctionKind kind,
-                            SILFunction *original, SILFunction *assocFn,
-                            const SILAutoDiffIndices &indices)
+                             AutoDiffAssociatedFunctionKind kind,
+                             SILFunction *original, SILFunction *assocFn,
+                             const SILAutoDiffIndices &indices)
     : kind(kind), original(original), typeConverter(context.getTypeConverter())
 {
   auto &astCtx = original->getASTContext();
@@ -1310,11 +1309,11 @@ LinearMapInfo::LinearMapInfo(ADContext &context,
   for (auto &origBB : *original) {
     auto *linearMapStruct = getLinearMapStruct(&origBB);
     auto *linearMapEnum =
-        createBasicBlockEnum(&origBB, indices, assocFnGenSig);
+        createBranchingTraceDecl(&origBB, indices, assocFnGenSig);
     // If original block is in a loop, mark predecessor enum as indirect.
     if (loopInfo->getLoopFor(&origBB))
       linearMapEnum->getAttrs().add(new (astCtx) IndirectAttr(/*Implicit*/ true));
-    linearMapEnums.insert({&origBB, linearMapEnum});
+    branchingTraceDecls.insert({&origBB, linearMapEnum});
     if (origBB.isEntry())
       continue;
     auto *linearMapEnumField =
@@ -3016,7 +3015,7 @@ public:
     if (errorOccurred || remappedBasicBlocks.count(bb))
       return vjpBB;
     // Add predecessor enum argument to the remapped block.
-    auto *predEnum = linearMapInfo.getLinearMapEnum(bb);
+    auto *predEnum = linearMapInfo.getBranchingTraceDecl(bb);
     auto enumTy = getOpASTType(predEnum->getDeclaredInterfaceType()
                                  ->getCanonicalType());
     auto enumLoweredTy = context.getTypeConverter().getLoweredType(
@@ -3074,7 +3073,7 @@ private:
                                       SILBasicBlock *succBB,
                                       StructInst *pbStructVal) {
     auto loc = pbStructVal->getLoc();
-    auto *succEnum = linearMapInfo.getLinearMapEnum(succBB);
+    auto *succEnum = linearMapInfo.getBranchingTraceDecl(succBB);
     auto enumLoweredTy = getNominalDeclLoweredType(succEnum);
     auto *enumEltDecl =
         linearMapInfo.lookUpLinearMapEnumElement(predBB, succBB);
@@ -3473,7 +3472,7 @@ public:
   void visitAutoDiffFunctionInst(AutoDiffFunctionInst *adfi) {
     // Clone `autodiff_function` from original to VJP, then add the cloned
     // instruction to the `autodiff_function` worklist.
-    SILClonerWithScopes::visitAutoDiffFunctionInst(adfi);
+    TypeSubstCloner::visitAutoDiffFunctionInst(adfi);
     auto *newADFI = cast<AutoDiffFunctionInst>(getOpValue(adfi));
     context.getAutoDiffFunctionInsts().push_back(newADFI);
   }
@@ -3772,10 +3771,6 @@ private:
     return it;
   }
 
-  AdjointValue makeConcreteTangentValue(SILValue value) {
-    return AdjointValue::createConcrete(allocator, value);
-  }
-
   /// Get the lowered SIL type of the given nominal type declaration.
   SILType getNominalDeclLoweredType(NominalTypeDecl *nominal) {
     auto nomType = getOpASTType(
@@ -3840,6 +3835,18 @@ private:
   }
 
   //--------------------------------------------------------------------------//
+  // Tangent value factory methods
+  //--------------------------------------------------------------------------//
+
+  AdjointValue makeZeroTangentValue(SILType type) {
+    return AdjointValue::createZero(allocator, remapType(type));
+  }
+
+  AdjointValue makeConcreteTangentValue(SILValue value) {
+    return AdjointValue::createConcrete(allocator, value);
+  }
+
+  //--------------------------------------------------------------------------//
   // Tangent materialization
   //--------------------------------------------------------------------------//
 
@@ -3870,22 +3877,14 @@ private:
   }
 
   SILValue emitZeroDirect(CanType type, SILLocation loc) {
-    auto builder = getDifferentialBuilder();
+    auto diffBuilder = getDifferentialBuilder();
     auto silType = getModule().Types.getLoweredLoadableType(
         type, ResilienceExpansion::Minimal);
-    auto *buffer = builder.createAllocStack(loc, silType);
-    auto *initAccess = builder.createBeginAccess(
-        loc, buffer, SILAccessKind::Init, SILAccessEnforcement::Static,
-        /*noNestedConflict*/ true, /*fromBuiltin*/ false);
-    emitZeroIndirect(type, initAccess, loc);
-    builder.createEndAccess(loc, initAccess, /*aborted*/ false);
-    auto readAccess = builder.createBeginAccess(
-        loc, buffer, SILAccessKind::Read, SILAccessEnforcement::Static,
-        /*noNestedConflict*/ true, /*fromBuiltin*/ false);
-    auto *loaded = builder.createLoad(
-        loc, readAccess, getBufferLOQ(type, getDifferential()));
-    builder.createEndAccess(loc, readAccess, /*aborted*/ false);
-    builder.createDeallocStack(loc, buffer);
+    auto *buffer = diffBuilder.createAllocStack(loc, silType);
+    emitZeroIndirect(type, buffer, loc);
+    auto *loaded = diffBuilder.createLoad(
+        loc, buffer, getBufferLOQ(type, getDifferential()));
+    diffBuilder.createDeallocStack(loc, buffer);
     return loaded;
   }
 
@@ -3894,20 +3893,17 @@ private:
     assert(val.getType().isObject());
     LLVM_DEBUG(getADDebugStream() <<
                "Materializing tangents for " << val << '\n');
-    assert(val.getKind() != AdjointValueKind::Aggregate
-           && "Tangent values cannot be aggregated in forward mode.");
     switch (val.getKind()) {
-      case AdjointValueKind::Zero: {
-        auto zeroVal = emitZeroDirect(val.getSwiftType(), loc);
-        return zeroVal;
-      }
-      // Aggregate case here is necessary until we update 'AdjointValue' to be
-      // 'TangentValue'. An assertion is made above to make sure we
-      // never see an Aggregate in forward mode until this change is made.
-      case AdjointValueKind::Aggregate:
-      case AdjointValueKind::Concrete:
-        return val.getConcreteValue();
+    case AdjointValueKind::Zero: {
+      auto zeroVal = emitZeroDirect(val.getSwiftType(), loc);
+      return zeroVal;
     }
+    case AdjointValueKind::Aggregate:
+      llvm_unreachable(
+          "Tuples and structs are not supported in forward mode yet.");
+    case AdjointValueKind::Concrete:
+      return val.getConcreteValue();
+  }
   }
 
   SILValue materializeTangent(AdjointValue val, SILLocation loc) {
@@ -3978,8 +3974,7 @@ private:
     return SILValue();
   }
 
-  SILValue &getTangentBuffer(SILBasicBlock *origBB,
-                             SILValue originalBuffer) {
+  SILValue &getTangentBuffer(SILBasicBlock *origBB, SILValue originalBuffer) {
     auto diffBuilder = getDifferentialBuilder();
     assert(originalBuffer->getType().isAddress());
     assert(originalBuffer->getFunction() == original);
@@ -4011,25 +4006,20 @@ private:
     diffLocalAllocBuilder.setInsertionPoint(
         getDifferential().getEntryBlock(),
         getNextDifferentialLocalAllocationInsertionPoint());
+
     // Allocate local buffer and initialize to zero.
+    auto bufObjectType = getRemappedTangentType(originalBuffer->getType());
     auto *newBuf = diffLocalAllocBuilder.createAllocStack(
-        originalBuffer.getLoc(),
-        getRemappedTangentType(originalBuffer->getType()));
-    auto *access = diffLocalAllocBuilder.createBeginAccess(
-        newBuf->getLoc(), newBuf, SILAccessKind::Init,
-        SILAccessEnforcement::Static, /*noNestedConflict*/ true,
-        /*fromBuiltin*/ false);
+        originalBuffer.getLoc(), bufObjectType);
 
     // Temporarily change global builder insertion point and emit zero into the
     // local buffer.
-    auto insertionPoint = diffBuilder.getInsertionBB();
+    auto insertionPoint = diffLocalAllocBuilder.getInsertionBB();
     diffBuilder.setInsertionPoint(
-                              diffLocalAllocBuilder.getInsertionBB(),
-                              diffLocalAllocBuilder.getInsertionPoint());
-    emitZeroIndirect(access->getType().getASTType(), access, access->getLoc());
+        diffLocalAllocBuilder.getInsertionBB(),
+        diffLocalAllocBuilder.getInsertionPoint());
+    emitZeroIndirect(bufObjectType.getASTType(), newBuf, newBuf->getLoc());
     diffBuilder.setInsertionPoint(insertionPoint);
-    diffLocalAllocBuilder.createEndAccess(
-        access->getLoc(), access, /*aborted*/ false);
 
     // Create cleanup for local buffer.
     differentialLocalAllocations.push_back(newBuf);
@@ -4065,10 +4055,6 @@ private:
   // Managed tangent value mapping
   //--------------------------------------------------------------------------//
 
-  AdjointValue makeZeroTangentValue(SILType type) {
-    return AdjointValue::createZero(allocator, remapTypeInDifferential(type));
-  }
-
   /// Initializes an original value's corresponding tangent value. Its tangent
   /// value must not be present before this function is called.
   void initializeTangentValue(SILBasicBlock *origBB, SILValue originalValue,
@@ -4101,7 +4087,7 @@ private:
   }
 
   /// Add a tangent value for the given original value.
-  void addTangentValue(SILBasicBlock *origBB, SILValue originalValue,
+  void setTangentValue(SILBasicBlock *origBB, SILValue originalValue,
                        AdjointValue newTangentValue) {
     assert(originalValue->getType().isObject());
     assert(newTangentValue.getType().isObject());
@@ -4118,10 +4104,10 @@ private:
   }
 
   //--------------------------------------------------------------------------//
-  // Differential generation helpers
+  // Tangent emission helpers
   //--------------------------------------------------------------------------//
 
-  void visitReturnInstDifferential(ReturnInst *ri) {
+  void emitTangentForReturnInst(ReturnInst *ri) {
     auto loc = ri->getOperand().getLoc();
     auto diffBuilder = getDifferentialBuilder();
     // This vector will contain all the materialized return elements.
@@ -4198,7 +4184,7 @@ private:
 
     // Add tangent for original result.
     assert(indices.source == 0 && "Expected result index to be first.");
-    addTangentValue(bb, origResult,
+    setTangentValue(bb, origResult,
                     makeConcreteTangentValue(differentialResult));
 
     // TODO: handle indirect
@@ -4266,7 +4252,7 @@ private:
 
     // Add tangent for original result into value mapping.
     auto tangentResult =  makeConcreteTangentValue(tangentExtractInst);
-    addTangentValue(sei->getParent(), sei, tangentResult);
+    setTangentValue(sei->getParent(), sei, tangentResult);
   }
 
   /// Handle `load` instruction.
@@ -4280,7 +4266,7 @@ private:
     auto *tanValDest = diffBuilder.createLoad(li->getLoc(), tanValSrc,
                            getBufferLOQ(li->getType().getASTType(),
                                         getDifferential()));
-    addTangentValue(bb, li, makeConcreteTangentValue(
+    setTangentValue(bb, li, makeConcreteTangentValue(
         tanValDest));
   }
 
@@ -4374,7 +4360,7 @@ private:
     auto tanExtract = diffBuilder.createStruct(loc, si->getType(),
                                                tangentElements);
 
-    addTangentValue(bb, si, makeConcreteTangentValue(tanExtract));
+    setTangentValue(bb, si, makeConcreteTangentValue(tanExtract));
   }
 
   void visitTupleInstDifferential(TupleInst *ti) {
@@ -4391,7 +4377,7 @@ private:
 
     // Emit the instruction and add the tangent mapping.
     auto tanTuple = diffBuilder.createTuple(ti->getLoc(), tangentTupleElements);
-    addTangentValue(bb, ti, makeConcreteTangentValue(tanTuple));
+    setTangentValue(bb, ti, makeConcreteTangentValue(tanTuple));
   }
 
 public:
@@ -4912,7 +4898,7 @@ public:
 
     // Differential emission.
     if (shouldBeDifferentiated(ri, getIndices()))
-      visitReturnInstDifferential(ri);
+      emitTangentForReturnInst(ri);
   }
 
   void visitLoadInst(LoadInst *li) {
@@ -5378,8 +5364,7 @@ private:
     // rather than after ensures that allocation and zero initialization
     // instructions are grouped together.
     auto lastLocalAlloc = functionLocalAllocations.back();
-    auto it = lastLocalAlloc->getDefiningInstruction()->getIterator();
-    return it;
+    return lastLocalAlloc->getDefiningInstruction()->getIterator();
   }
 
   SILValue &getAdjointBuffer(SILBasicBlock *origBB, SILValue originalBuffer) {
@@ -5667,8 +5652,7 @@ public:
       auto startLoc = origResult.getLoc().getStartSourceLoc();
       auto endLoc = origResult.getLoc().getEndSourceLoc();
       if (startLoc.isValid() && endLoc.isValid()) {
-        getContext()
-            .diagnose(startLoc, diag::autodiff_nonvaried_result_fixit)
+        getContext().diagnose(startLoc, diag::autodiff_nonvaried_result_fixit)
             .fixItInsert(startLoc, "withoutDerivative(at:")
             .fixItInsertAfter(endLoc, ")");
       }
@@ -5730,7 +5714,7 @@ public:
       // 1. Get the pullback struct pullback block argument.
       // 2. Extract the predecessor enum value from the pullback struct value.
       auto *pbStructVal = getPullbackBlockPullbackStructArgument(bb);
-      auto *predEnum = getPullbackInfo().getLinearMapEnum(bb);
+      auto *predEnum = getPullbackInfo().getBranchingTraceDecl(bb);
       auto *predEnumField =
       getPullbackInfo().lookUpLinearMapStructEnumField(bb);
       auto *predEnumVal =
@@ -7178,22 +7162,6 @@ bool ADContext::processDifferentiableAttribute(
           original, attr, vjpName, AutoDiffAssociatedFunctionKind::VJP);
     attr->setVJPName(vjpName);
   }
-
-  // If the JVP doesn't exist, need to synthesize it.
-  if (!vjp) {
-    // Diagnose:
-    // - Functions with no return.
-    // - Functions with unsupported control flow.
-    if (diagnoseNoReturn(*this, original, invoker) ||
-        diagnoseUnsupportedControlFlow(*this, original, invoker))
-      return true;
-
-    vjp = createEmptyVJP(*this, original, attr, isAssocFnExported);
-    getGeneratedFunctions().push_back(vjp);
-    VJPEmitter emitter(*this, original, attr, vjp, invoker);
-    if (emitter.run())
-      return true;
-  }
       
   // If the JVP doesn't exist, need to synthesize it.
   if (!jvp) {
@@ -7209,7 +7177,8 @@ bool ADContext::processDifferentiableAttribute(
 
     if (RunJVPGeneration) {
       JVPEmitter emitter(*this, original, attr, jvp, invoker);
-      return emitter.run();
+      if (emitter.run())
+        return true;
     } else {
       LLVM_DEBUG(getADDebugStream()
                  << "Generating empty JVP for original @"
@@ -7222,11 +7191,25 @@ bool ADContext::processDifferentiableAttribute(
       SILBuilder builder(entry);
       auto loc = jvp->getLocation();
       builder.createReturn(loc, SILUndef::get(
-          jvp->mapTypeIntoContext(diffConv.getSILResultType()),
-          *jvp));
+          jvp->mapTypeIntoContext(diffConv.getSILResultType()), *jvp));
       LLVM_DEBUG(getADDebugStream() << "Generated empty JVP for "
                  << original->getName() << ":\n" << *jvp);
     }
+  }
+
+  // If the VJP doesn't exist, need to synthesize it.
+  if (!vjp) {
+    // Diagnose:
+    // - Functions with no return.
+    // - Functions with unsupported control flow.
+    if (diagnoseNoReturn(*this, original, invoker) ||
+        diagnoseUnsupportedControlFlow(*this, original, invoker))
+      return true;
+
+    vjp = createEmptyVJP(*this, original, attr, isAssocFnExported);
+    getGeneratedFunctions().push_back(vjp);
+    VJPEmitter emitter(*this, original, attr, vjp, invoker);
+    return emitter.run();
   }
 
   return false;

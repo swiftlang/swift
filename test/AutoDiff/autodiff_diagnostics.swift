@@ -226,7 +226,6 @@ func activeInoutArg(_ x: Float) -> Float {
 // expected-error @+1 {{function is not differentiable}}
 _ = pullback(at: .zero, in: activeInoutArg(_:))
 
-
 func activeInoutArgTuple(_ x: Float) -> Float {
   var tuple = (x, x)
   // expected-note @+1 {{cannot differentiate through 'inout' arguments}}
