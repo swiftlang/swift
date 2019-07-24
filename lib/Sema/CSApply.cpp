@@ -6818,8 +6818,10 @@ ExprRewriter::finishApplyDynamicCallable(const Solution &solution,
       cs.setType(labelExpr, keyType);
       handleStringLiteralExpr(cast<LiteralExpr>(labelExpr));
 
-      Expr *pair =
-        TupleExpr::createImplicit(ctx, { labelExpr, arg->getElement(i) }, {});
+      Expr *valueExpr = coerceToType(arg->getElement(i), valueType, loc);
+      if (!valueExpr)
+        return nullptr;
+      Expr *pair = TupleExpr::createImplicit(ctx, {labelExpr, valueExpr}, {});
       auto eltTypes = { TupleTypeElt(keyType), TupleTypeElt(valueType) };
       cs.setType(pair, TupleType::get(eltTypes, ctx));
       dictElements.push_back(pair);
