@@ -428,6 +428,13 @@ ERROR(non_borrowed_indirect_addressof,none,
 REMARK(opt_remark_passed, none, "%0", (StringRef))
 REMARK(opt_remark_missed, none, "%0", (StringRef))
 
+ERROR(out_of_bounds_subscript_access_literal, none,
+      "out of bounds access to array %0 of size '%1' at index '%2'",
+      (DeclBaseName, StringRef, StringRef))
+ERROR(out_of_bounds_subscript_access_literal_no_name, none,
+      "out of bounds access to array of size '%0' at index '%1'",
+      (StringRef, StringRef))
+
 // Float-point to integer conversions
 ERROR(float_to_int_overflow, none,
   "invalid%select{| implicit}2 conversion: '%0' overflows %1", (StringRef, Type, bool))

@@ -1316,6 +1316,52 @@ case BuiltinValueKind::id:
   return nullptr;
 }
 
+static void
+diagnosePotentialOutOfBoundsArrayLiteralSubscript(FullApplySite AI) {
+  using namespace swift::PatternMatch;
+
+  IntegerLiteralInst *Capacity;
+  IntegerLiteralInst *Index;
+
+  if (!match(AI,
+             m_ApplyInst(m_SemanticsCallee("subscript.get"),
+                         m_StructExtractInst(m_IntegerLiteralInst(Index)),
+                         m_StructInst(m_TupleExtract(
+                             m_ApplyInst(m_SemanticsCallee(
+                                             "array.uninitialized_intrinsic"),
+                                         m_IntegerLiteralInst(Capacity)),
+                             2))))) {
+    return;
+  }
+
+  if (!Index || !Capacity) {
+    return;
+  }
+
+  auto Node = AI.getLoc().getAsASTNode<Expr>();
+  auto Subscript = dyn_cast<SubscriptExpr>(Node);
+
+  auto Name = DeclBaseName();
+  if (auto SubscriptBaseDecl = Subscript->getBase()->getReferencedDecl()) {
+    Name = SubscriptBaseDecl.getDecl()->getBaseName();
+  }
+
+  auto IndexStr = Index->getValue().toString(10, false);
+  auto CapacityStr = Capacity->getValue().toString(10, false);
+
+  if (Index->getValue().uge(Capacity->getValue())) {
+    if (Name.empty()) {
+      diagnose(AI.getModule().getASTContext(), AI.getLoc().getSourceLoc(),
+               diag::out_of_bounds_subscript_access_literal_no_name, IndexStr,
+               CapacityStr);
+    } else {
+      diagnose(AI.getModule().getASTContext(), AI.getLoc().getSourceLoc(),
+               diag::out_of_bounds_subscript_access_literal, Name, IndexStr,
+               CapacityStr);
+    }
+  }
+}
+
 /// On success this places a new value for each result of Op->getUser() into
 /// Results. Results is guaranteed on success to have the same number of entries
 /// as results of User. If we could only simplify /some/ of an instruction's
@@ -1324,6 +1370,11 @@ case BuiltinValueKind::id:
 static bool constantFoldInstruction(Operand *Op, Optional<bool> &ResultsInError,
                                     SmallVectorImpl<SILValue> &Results) {
   auto *User = Op->getUser();
+
+  // Diagnose potentially out of bounds subscript access
+  if (auto *AI = dyn_cast<ApplyInst>(User)) {
+    diagnosePotentialOutOfBoundsArrayLiteralSubscript(FullApplySite(AI));
+  }
 
   // Constant fold builtin invocations.
   if (auto *BI = dyn_cast<BuiltinInst>(User)) {
