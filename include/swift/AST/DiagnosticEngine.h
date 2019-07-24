@@ -22,6 +22,8 @@
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/DeclNameLoc.h"
 #include "swift/AST/DiagnosticConsumer.h"
+#include "llvm/ADT/StringMap.h"
+#include "llvm/Support/Allocator.h"
 
 namespace swift {
   class Decl;
@@ -323,6 +325,8 @@ namespace swift {
     SourceLoc Loc;
     const Decl *Decl = nullptr;
 
+    friend DiagnosticEngine;
+
   public:
     // All constructors are intentionally implicit.
     template<typename ...ArgTypes>
@@ -564,6 +568,12 @@ namespace swift {
     /// results that we can point to on the command line.
     llvm::DenseMap<const Decl *, SourceLoc> PrettyPrintedDeclarations;
 
+    llvm::BumpPtrAllocator TransactionAllocator;
+    /// A set of all strings involved in current transactional chain.
+    /// This is required because diagnostics are not directly emitted
+    /// but rather stored until all transactions complete.
+    llvm::StringMap<char, llvm::BumpPtrAllocator &> TransactionStrings;
+
     /// The number of open diagnostic transactions. Diagnostics are only
     /// emitted once all transactions have closed.
     unsigned TransactionCount = 0;
@@ -579,8 +589,8 @@ namespace swift {
     
   public:
     explicit DiagnosticEngine(SourceManager &SourceMgr)
-      : SourceMgr(SourceMgr), ActiveDiagnostic() {
-    }
+        : SourceMgr(SourceMgr), ActiveDiagnostic(),
+          TransactionStrings(TransactionAllocator) {}
 
     /// hadAnyError - return true if any *error* diagnostics have been emitted.
     bool hadAnyError() const { return state.hadAnyError(); }
@@ -797,6 +807,11 @@ namespace swift {
         DiagnosticFormatOptions FormatOpts = DiagnosticFormatOptions());
 
   private:
+    /// Called when tentative diagnostic is about to be flushed,
+    /// to apply any required transformations e.g. copy string arguments
+    /// to extend their lifetime.
+    void onTentativeDiagnosticFlush(Diagnostic &diagnostic);
+
     /// Flush the active diagnostic.
     void flushActiveDiagnostic();
     
@@ -869,6 +884,11 @@ namespace swift {
     ~DiagnosticTransaction() {
       if (IsOpen) {
         commit();
+      }
+
+      if (Depth == 0) {
+        Engine.TransactionStrings.clear();
+        Engine.TransactionAllocator.Reset();
       }
     }
 

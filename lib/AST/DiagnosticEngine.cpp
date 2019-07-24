@@ -754,6 +754,7 @@ void DiagnosticEngine::flushActiveDiagnostic() {
   if (TransactionCount == 0) {
     emitDiagnostic(*ActiveDiagnostic);
   } else {
+    onTentativeDiagnosticFlush(*ActiveDiagnostic);
     TentativeDiagnostics.emplace_back(std::move(*ActiveDiagnostic));
   }
   ActiveDiagnostic.reset();
@@ -939,4 +940,20 @@ BufferIndirectlyCausingDiagnosticRAII::BufferIndirectlyCausingDiagnosticRAII(
   auto loc = SF.getASTContext().SourceMgr.getLocForBufferStart(*id);
   if (loc.isValid())
     Diags.setBufferIndirectlyCausingDiagnosticToInput(loc);
+}
+
+void DiagnosticEngine::onTentativeDiagnosticFlush(Diagnostic &diagnostic) {
+  for (auto curr = diagnostic.Args.begin(), last = diagnostic.Args.end();
+       curr != last; ++curr) {
+    auto &arg = *curr;
+    if (arg.getKind() != DiagnosticArgumentKind::String)
+      continue;
+
+    auto str = arg.getAsString();
+    if (str.empty())
+      continue;
+
+    auto I = TransactionStrings.insert(std::make_pair(str, char())).first;
+    *curr = DiagnosticArgument(StringRef(I->getKeyData()));
+  }
 }
