@@ -1,7 +1,14 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module-interface-path %t/Lib.swiftinterface -typecheck -enable-library-evolution -enable-objc-interop -disable-objc-attr-requires-foundation-module -swift-version 5 %S/Inputs/enums-layout-helper.swift -module-name Lib
+// RUN: %target-build-swift -emit-module-interface-path %t/Lib.swiftinterface -emit-module -o %t/unused.swiftmodule -enable-library-evolution -Xfrontend -enable-objc-interop -Xfrontend -disable-objc-attr-requires-foundation-module -swift-version 5 %S/Inputs/enums-layout-helper.swift -module-name Lib
 // RUN: %FileCheck %S/Inputs/enums-layout-helper.swift < %t/Lib.swiftinterface
 // RUN: %target-swift-frontend -enable-objc-interop -O -emit-ir -primary-file %s -I %t -Xllvm -swiftmergefunc-threshold=0 | %FileCheck %s
+
+// Try again using a single-frontend build.
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift -force-single-frontend-invocation -emit-module-interface-path %t/Lib.swiftinterface -emit-module -o %t/unused.swiftmodule -enable-library-evolution -Xfrontend -enable-objc-interop -Xfrontend -disable-objc-attr-requires-foundation-module -swift-version 5 %S/Inputs/enums-layout-helper.swift -module-name Lib
+// RUN: %FileCheck %S/Inputs/enums-layout-helper.swift < %t/Lib.swiftinterface
+// RUN: %target-swift-frontend -enable-objc-interop -O -emit-ir -primary-file %s -I %t -Xllvm -swiftmergefunc-threshold=0 | %FileCheck %s
+
 
 import Lib
 
