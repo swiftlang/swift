@@ -3684,7 +3684,7 @@ public:
     DeclName compoundName(ctx, baseName, argNames);
     DeclName name = argNames.empty() ? baseName : compoundName;
 
-    for (TypeID dependencyID : argNameAndDependencyIDs.slice(numArgNames+1)) {
+    for (TypeID dependencyID : argNameAndDependencyIDs.slice(numArgNames)) {
       auto dependency = MF.getTypeChecked(dependencyID);
       if (!dependency) {
         return llvm::make_error<TypeError>(
