@@ -1269,18 +1269,20 @@
               key.offset: 2011,
               key.length: 13,
               key.nameoffset: 2011,
-              key.namelength: 13
+              key.namelength: 13,
+              key.substructure: [
+                {
+                  key.kind: source.lang.swift.decl.var.parameter,
+                  key.name: "arg",
+                  key.offset: 2015,
+                  key.length: 8,
+                  key.typename: "Int",
+                  key.nameoffset: 2015,
+                  key.namelength: 3
+                }
+              ]
             }
           ]
-        },
-        {
-          key.kind: source.lang.swift.decl.var.parameter,
-          key.name: "arg",
-          key.offset: 2015,
-          key.length: 8,
-          key.typename: "Int",
-          key.nameoffset: 2015,
-          key.namelength: 3
         }
       ]
     },
