@@ -2169,7 +2169,7 @@ bool fixDeclarationObjCName(InFlightDiagnostic &diag, ValueDecl *decl,
 
 bool areGenericRequirementsSatisfied(const DeclContext *DC,
                                      const GenericSignature *sig,
-                                     const SubstitutionMap &Substitutions,
+                                     SubstitutionMap Substitutions,
                                      bool isExtension);
 
 } // end namespace swift
