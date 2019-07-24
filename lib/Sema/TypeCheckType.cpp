@@ -979,9 +979,18 @@ static Type resolveTypeDecl(TypeDecl *typeDecl, SourceLoc loc,
   auto &diags = ctx.Diags;
   auto lazyResolver = ctx.getLazyResolver();
 
+  Type type = Type();
+
+  // Use only the structural type of an alias decl in structural mode
+  auto aliasDecl = dyn_cast<TypeAliasDecl>(typeDecl);
+  if (resolution.getStage() == TypeResolutionStage::Structural &&
+      aliasDecl && !aliasDecl->getGenericParams() &&
+      !aliasDecl->getUnderlyingTypeLoc().wasValidated()) {
+    type = aliasDecl->getStructuralType();
+
   // Don't validate nominal type declarations during extension binding.
-  if (!options.is(TypeResolverContext::ExtensionBinding) ||
-      !isa<NominalTypeDecl>(typeDecl)) {
+  } else if (!options.is(TypeResolverContext::ExtensionBinding) ||
+             !isa<NominalTypeDecl>(typeDecl)) {
     // Validate the declaration.
     if (lazyResolver)
       lazyResolver->resolveDeclSignature(typeDecl);
@@ -998,9 +1007,10 @@ static Type resolveTypeDecl(TypeDecl *typeDecl, SourceLoc loc,
 
   // Resolve the type declaration to a specific type. How this occurs
   // depends on the current context and where the type was found.
-  Type type =
-    TypeChecker::resolveTypeInContext(typeDecl, foundDC, resolution, options,
-                                      generic);
+  if (!type)
+    type =
+      TypeChecker::resolveTypeInContext(typeDecl, foundDC, resolution,
+                                        options, generic);
 
   if (type->is<UnboundGenericType>() && !generic &&
       !options.is(TypeResolverContext::TypeAliasDecl) &&
