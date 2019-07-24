@@ -4187,6 +4187,20 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
   if (!instanceTy->mayHaveMembers())
     return result;
 
+  // If we have a simple name, determine whether there are argument
+  // labels we can use to restrict the set of lookup results.
+  if (baseObjTy->isAnyObject() && memberName.isSimpleName()) {
+    // If we're referencing AnyObject and we have argument labels, put
+    // the argument labels into the name: we don't want to look for
+    // anything else, because the cost of the general search is so
+    // high.
+    if (auto argumentLabels =
+            getArgumentLabels(*this, ConstraintLocatorBuilder(memberLocator))) {
+      memberName = DeclName(TC.Context, memberName.getBaseName(),
+                            argumentLabels->Labels);
+    }
+  }
+
   // Look for members within the base.
   LookupResult &lookup = lookupMember(instanceTy, memberName);
 
