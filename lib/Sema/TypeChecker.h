@@ -2172,6 +2172,8 @@ bool areGenericRequirementsSatisfied(const DeclContext *DC,
                                      const SubstitutionMap &Substitutions,
                                      bool isExtension);
 
+bool canSatisfy(Type type1, Type type2, bool openArchetypes,
+                constraints::ConstraintKind kind, DeclContext *dc);
 } // end namespace swift
 
 #endif

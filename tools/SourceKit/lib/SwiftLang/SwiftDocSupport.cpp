@@ -969,6 +969,7 @@ static bool reportModuleDocInfo(CompilerInvocation Invocation,
     return true;
 
   ASTContext &Ctx = CI.getASTContext();
+  registerIDERequestFunctions(Ctx.evaluator);
   (void)createTypeChecker(Ctx);
 
   SourceTextInfo IFaceInfo;

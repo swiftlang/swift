@@ -18,6 +18,8 @@
 #include "swift/Sema/IDETypeCheckingRequests.h"
 #include "swift/Subsystems.h"
 #include "TypeChecker.h"
+#include "ConstraintGraph.h"
+#include "ConstraintSystem.h"
 
 using namespace swift;
 
@@ -95,4 +97,23 @@ IsDeclApplicableRequest::evaluate(Evaluator &evaluator,
   } else {
     llvm_unreachable("unhandled decl kind");
   }
+}
+
+llvm::Expected<bool>
+TypeRelationCheckRequest::evaluate(Evaluator &evaluator,
+                                   TypeRelationCheckInput Owner) const {
+  Optional<constraints::ConstraintKind> CKind;
+  switch (Owner.Relation) {
+  case TypeRelation::EqualTo:
+    return Owner.FirstType->isEqual(Owner.SecondType);
+  case TypeRelation::PossiblyEqualTo:
+    CKind = constraints::ConstraintKind::Bind;
+    break;
+  case TypeRelation::ConvertTo:
+    CKind = constraints::ConstraintKind::Conversion;
+    break;
+  }
+  assert(CKind.hasValue());
+  return canSatisfy(Owner.FirstType, Owner.SecondType, Owner.OpenArchetypes,
+                    *CKind, Owner.DC);
 }

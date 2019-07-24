@@ -327,7 +327,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
         case RequirementKind::Superclass:
           // FIXME: This could be more accurate; check
           // conformance instead of subtyping
-          if (!canPossiblyConvertTo(First, Second, *DC))
+          if (!isConvertibleTo(First, Second, /*openArchetypes=*/true, *DC))
             return true;
           else if (!isConvertibleTo(First, Second, /*openArchetypes=*/false,
                                     *DC))
@@ -750,4 +750,24 @@ bool swift::isMemberDeclApplied(const DeclContext *DC, Type BaseTy,
                                 const ValueDecl *VD) {
   return evaluateOrDefault(DC->getASTContext().evaluator,
     IsDeclApplicableRequest(DeclApplicabilityOwner(DC, BaseTy, VD)), false);
+}
+
+bool swift::canPossiblyEqual(Type T1, Type T2, DeclContext &DC) {
+   return evaluateOrDefault(DC.getASTContext().evaluator,
+     TypeRelationCheckRequest(TypeRelationCheckInput(&DC, T1, T2,
+       TypeRelation::PossiblyEqualTo, true)), false);
+}
+
+
+bool swift::isEqual(Type T1, Type T2, DeclContext &DC) {
+  return evaluateOrDefault(DC.getASTContext().evaluator,
+    TypeRelationCheckRequest(TypeRelationCheckInput(&DC, T1, T2,
+      TypeRelation::EqualTo, true)), false);
+}
+
+bool swift::isConvertibleTo(Type T1, Type T2, bool openArchetypes,
+                            DeclContext &DC) {
+  return evaluateOrDefault(DC.getASTContext().evaluator,
+    TypeRelationCheckRequest(TypeRelationCheckInput(&DC, T1, T2,
+      TypeRelation::ConvertTo, openArchetypes)), false);
 }
