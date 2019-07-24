@@ -143,7 +143,7 @@ private:
   void invalidateKnownCallees(SILFunction *f);
 
   /// Using the passed in caller info and caller function, eliminate the edge
-  /// in-between the caller and its callees.
+  /// in between the caller and its callees.
   ///
   /// NOTE: This does not remove the "book keeping" backedges from the caller
   /// function to its own set of callers. This must be invalidated by using
