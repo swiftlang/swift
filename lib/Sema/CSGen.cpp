@@ -3754,7 +3754,9 @@ bool swift::areGenericRequirementsSatisfied(
 
   // For every requirement, add a constraint.
   for (auto Req : sig->getRequirements()) {
-    if (auto resolved = Req.subst(Substitutions)) {
+    if (auto resolved = Req.subst(
+          QuerySubstitutionMap{Substitutions},
+          LookUpConformanceInModule(DC->getParentModule()))) {
       CS.addConstraint(*resolved, Loc);
     } else if (isExtension) {
       return false;
