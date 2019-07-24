@@ -51,8 +51,6 @@ namespace swift {
 
   bool canPossiblyEqual(Type T1, Type T2, DeclContext &DC);
 
-  bool canPossiblyConvertTo(Type T1, Type T2, DeclContext &DC);
-
   void collectDefaultImplementationForProtocolMembers(ProtocolDecl *PD,
                         llvm::SmallDenseMap<ValueDecl*, ValueDecl*> &DefaultMap);
 
