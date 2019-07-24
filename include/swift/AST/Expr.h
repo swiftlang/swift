@@ -2422,8 +2422,9 @@ public:
   }
 
   SourceLoc getStartLoc() const {
-    if (SubExpr->getStartLoc().isValid())
-      return SubExpr->getStartLoc();
+    auto SubLoc = SubExpr->getStartLoc();
+    if (SubLoc.isValid())
+      return SubLoc;
     else if (DotLoc.isValid())
       return DotLoc;
     else
