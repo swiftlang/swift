@@ -26,17 +26,17 @@ extension String {
   }
 }
 
-@_effects(releasenone)
+@_effects(readonly)
 private func _getClass(_ obj: NSString) -> AnyClass {
   return object_getClass(obj)!
 }
 
-@_effects(releasenone)
+@_effects(readonly)
 private func _length(_ obj: NSString) -> Int {
   return CFStringGetLength(obj as CFString)
 }
 
-@_effects(releasenone)
+@_effects(readonly)
 private func _copyString(_ obj: NSString) -> NSString {
   return CFStringCreateCopy(kCFAllocatorSystemDefault, obj as CFString)
 }
@@ -101,7 +101,7 @@ extension String : _ObjectiveCBridgeable {
     return result != nil
   }
 
-  @_effects(releasenone)
+  @_effects(readonly)
   @inline(__always)
   private static func _bridgeToSmall(
     _ source: NSString,
@@ -132,7 +132,7 @@ extension String : _ObjectiveCBridgeable {
     return result
   }
   
-  @_effects(releasenone)
+  @_effects(readonly)
   private static func _unconditionallyBridgeFromObjectiveC_nonTagged(
     _ source: NSString
   ) -> String {
@@ -164,7 +164,7 @@ extension String : _ObjectiveCBridgeable {
     return _bridgeCocoaStringLazily(immutableCopy, sourceClass, len)
   }
 
-  @_effects(releasenone)
+  @_effects(readonly)
   public static func _unconditionallyBridgeFromObjectiveC(
     _ source: NSString?
   ) -> String {
