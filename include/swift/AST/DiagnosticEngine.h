@@ -871,6 +871,9 @@ namespace swift {
     bool IsOpen = true;
 
   public:
+    DiagnosticTransaction(const DiagnosticTransaction &) = delete;
+    DiagnosticTransaction &operator=(const DiagnosticTransaction &) = delete;
+
     explicit DiagnosticTransaction(DiagnosticEngine &engine)
       : Engine(engine),
         PrevDiagnostics(Engine.TentativeDiagnostics.size()),

@@ -1179,7 +1179,7 @@ ValueDecl *DerivedConformance::deriveEncodable(ValueDecl *requirement) {
   // diagnostics, then potentially collect notes. If we succeed in
   // synthesizing Encodable, we can cancel the transaction and get rid of the
   // fake failures.
-  auto diagnosticTransaction = DiagnosticTransaction(TC.Context.Diags);
+  DiagnosticTransaction diagnosticTransaction(TC.Context.Diags);
   TC.diagnose(ConformanceDecl, diag::type_does_not_conform,
               Nominal->getDeclaredType(), getProtocolType());
   TC.diagnose(requirement, diag::no_witnesses, diag::RequirementKind::Func,
@@ -1215,7 +1215,7 @@ ValueDecl *DerivedConformance::deriveDecodable(ValueDecl *requirement) {
   // diagnostics produced by canSynthesize and deriveDecodable_init to produce
   // them in the right order -- see the comment in deriveEncodable for
   // background on this transaction.
-  auto diagnosticTransaction = DiagnosticTransaction(TC.Context.Diags);
+  DiagnosticTransaction diagnosticTransaction(TC.Context.Diags);
   TC.diagnose(ConformanceDecl->getLoc(), diag::type_does_not_conform,
               Nominal->getDeclaredType(), getProtocolType());
   TC.diagnose(requirement, diag::no_witnesses,
