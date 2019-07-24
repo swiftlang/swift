@@ -99,6 +99,17 @@ template <class T> class SILVTableVisitor {
     maybeAddEntry(SILDeclRef(cd, SILDeclRef::Kind::Allocator));
   }
 
+  void maybeAddAccessors(AbstractStorageDecl *asd) {
+    // FIXME: This should not be necessary once visitOpaqueAccessors()
+    // incorporates the logic currently in maybeAddAccessorsToStorage().
+    if (!asd->hasAnyAccessors())
+      return;
+
+    asd->visitOpaqueAccessors([&](AccessorDecl *accessor) {
+      maybeAddMethod(accessor);
+    });
+  }
+
   void maybeAddEntry(SILDeclRef declRef) {
     // Introduce a new entry if required.
     if (declRef.requiresNewVTableEntry())
@@ -134,10 +145,14 @@ template <class T> class SILVTableVisitor {
   }
 
   void maybeAddMember(Decl *member) {
-    if (auto *fd = dyn_cast<FuncDecl>(member))
+    if (auto *ad = dyn_cast<AccessorDecl>(member))
+      /* handled as part of its storage */;
+    else if (auto *fd = dyn_cast<FuncDecl>(member))
       maybeAddMethod(fd);
     else if (auto *cd = dyn_cast<ConstructorDecl>(member))
       maybeAddConstructor(cd);
+    else if (auto *asd = dyn_cast<AbstractStorageDecl>(member))
+      maybeAddAccessors(asd);
     else if (auto *placeholder = dyn_cast<MissingMemberDecl>(member))
       asDerived().addPlaceholder(placeholder);
   }
