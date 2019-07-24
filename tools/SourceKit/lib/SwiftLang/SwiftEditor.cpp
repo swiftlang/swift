@@ -706,6 +706,8 @@ public:
                      CompInv.getMainFileSyntaxParsingCache())
     );
 
+    registerTypeCheckerRequestFunctions(
+        Parser->getParser().Context.evaluator);
     Parser->getDiagnosticEngine().addConsumer(DiagConsumer);
 
     // Collecting syntactic information shouldn't evaluate # conditions.

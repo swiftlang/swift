@@ -4385,6 +4385,7 @@ class AbstractStorageDecl : public ValueDecl {
   friend class IsGetterMutatingRequest;
   friend class IsSetterMutatingRequest;
   friend class OpaqueReadOwnershipRequest;
+  friend class StorageImplInfoRequest;
 
 public:
   static const size_t MaxNumAccessors = 255;
@@ -4487,7 +4488,7 @@ public:
   Type getValueInterfaceType() const;
 
   /// Determine how this storage is implemented.
-  StorageImplInfo getImplInfo() const { return ImplInfo; }
+  StorageImplInfo getImplInfo() const;
 
   /// Overwrite the registered implementation-info.  This should be
   /// used carefully.

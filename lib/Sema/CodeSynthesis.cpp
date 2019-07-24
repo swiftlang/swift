@@ -234,6 +234,9 @@ static AccessorDecl *createGetterPrototype(AbstractStorageDecl *storage,
   // Always add the getter to the context immediately after the storage.
   addMemberToContextIfNeeded(getter, storage->getDeclContext(), storage);
 
+  if (ctx.Stats)
+    ctx.Stats->getFrontendCounters().NumAccessorsSynthesized++;
+
   return getter;
 }
 
@@ -284,6 +287,9 @@ static AccessorDecl *createSetterPrototype(AbstractStorageDecl *storage,
   if (!getter) getter = storage->getReadCoroutine();
   assert(getter && "always synthesize setter prototype after get/read");
   addMemberToContextIfNeeded(setter, storage->getDeclContext(), getter);
+
+  if (ctx.Stats)
+    ctx.Stats->getFrontendCounters().NumAccessorsSynthesized++;
 
   return setter;
 }
@@ -482,6 +488,9 @@ createCoroutineAccessorPrototype(AbstractStorageDecl *storage,
   }
 
   addMemberToContextIfNeeded(accessor, dc, afterDecl);
+
+  if (ctx.Stats)
+    ctx.Stats->getFrontendCounters().NumAccessorsSynthesized++;
 
   return accessor;
 }
@@ -2123,6 +2132,161 @@ static void finishStorageImplInfo(AbstractStorageDecl *storage) {
   }
 }
 
+static bool hasParsedAccessor(AbstractStorageDecl *storage, AccessorKind kind) {
+  auto *accessor = storage->getAccessor(kind);
+  return (accessor && !accessor->isImplicit());
+}
+
+/// Gets the storage info of the provided storage decl if it has the
+/// @_hasStorage attribute and it's not in SIL mode.
+///
+/// In this case, we say the decl is:
+///
+/// Read:
+///   - Stored, always
+/// Write:
+///   - Stored, if the decl is a 'var'.
+///   - StoredWithObservers, if the decl has a setter
+///     - This indicates that the original decl had a 'didSet' and/or 'willSet'
+///   - InheritedWithObservers, if the decl has a setter and is an overridde.
+///   - Immutable, if the decl is a 'let' or it does not have a setter.
+/// ReadWrite:
+///   - Stored, if the decl has no accessors listed.
+///   - Immutable, if the decl is a 'let' or it does not have a setter.
+///   - MaterializeToTemporary, if the decl has a setter.
+static StorageImplInfo classifyWithHasStorageAttr(VarDecl *var) {
+  WriteImplKind writeImpl;
+  ReadWriteImplKind readWriteImpl;
+
+  if (hasParsedAccessor(var, AccessorKind::Get) &&
+      hasParsedAccessor(var, AccessorKind::Set)) {
+    // If we see `@_hasStorage var x: T { get set }`, then our property has
+    // willSet/didSet observers.
+    writeImpl = var->getAttrs().hasAttribute<OverrideAttr>() ?
+      WriteImplKind::InheritedWithObservers :
+      WriteImplKind::StoredWithObservers;
+    readWriteImpl = ReadWriteImplKind::MaterializeToTemporary;
+  } else if (var->isLet()) {
+    writeImpl = WriteImplKind::Immutable;
+    readWriteImpl = ReadWriteImplKind::Immutable;
+  } else {
+    // Default to stored writes.
+    writeImpl = WriteImplKind::Stored;
+    readWriteImpl = ReadWriteImplKind::Stored;
+  }
+
+  // Always force Stored reads if @_hasStorage is present.
+  return StorageImplInfo(ReadImplKind::Stored, writeImpl, readWriteImpl);
+}
+
+llvm::Expected<StorageImplInfo>
+StorageImplInfoRequest::evaluate(Evaluator &evaluator,
+                                 AbstractStorageDecl *storage) const {
+  if (auto *var = dyn_cast<VarDecl>(storage)) {
+    // Allow the @_hasStorage attribute to override all the accessors we parsed
+    // when making the final classification.
+    if (var->getAttrs().hasAttribute<HasStorageAttr>()) {
+      // The SIL rules for @_hasStorage are slightly different from the non-SIL
+      // rules. In SIL mode, @_hasStorage marks that the type is simply stored,
+      // and the only thing that determines mutability is the existence of the
+      // setter.
+      //
+      // FIXME: SIL should not be special cased here. The behavior should be
+      //        consistent between SIL and non-SIL.
+      //        The strategy here should be to keep track of all opaque accessors
+      //        along with enough information to access the storage trivially
+      //        if allowed. This could be a representational change to
+      //        StorageImplInfo such that it keeps a bitset of listed accessors
+      //        and dynamically determines the access strategy from that.
+      auto *SF = storage->getDeclContext()->getParentSourceFile();
+      if (SF && SF->Kind == SourceFileKind::SIL)
+        return StorageImplInfo::getSimpleStored(
+          StorageIsMutable_t(hasParsedAccessor(var, AccessorKind::Set)));
+
+      return classifyWithHasStorageAttr(var);
+    }
+  }
+
+  bool hasWillSet = hasParsedAccessor(storage, AccessorKind::WillSet);
+  bool hasDidSet = hasParsedAccessor(storage, AccessorKind::DidSet);
+  bool hasSetter = hasParsedAccessor(storage, AccessorKind::Set);
+  bool hasModify = hasParsedAccessor(storage, AccessorKind::Modify);
+  bool hasMutableAddress = hasParsedAccessor(storage, AccessorKind::MutableAddress);
+
+  // 'get', 'read', and a non-mutable addressor are all exclusive.
+  ReadImplKind readImpl;
+  if (hasParsedAccessor(storage, AccessorKind::Get)) {
+    readImpl = ReadImplKind::Get;
+  } else if (hasParsedAccessor(storage, AccessorKind::Read)) {
+    readImpl = ReadImplKind::Read;
+  } else if (hasParsedAccessor(storage, AccessorKind::Address)) {
+    readImpl = ReadImplKind::Address;
+
+  // If there's a writing accessor of any sort, there must also be a
+  // reading accessor.
+  } else if (hasSetter || hasModify || hasMutableAddress) {
+    readImpl = ReadImplKind::Get;
+
+  // Subscripts always have to have some sort of accessor; they can't be
+  // purely stored.
+  } else if (isa<SubscriptDecl>(storage)) {
+    readImpl = ReadImplKind::Get;
+
+  // Check if we have observers.
+  } else if (hasWillSet || hasDidSet) {
+    if (storage->getAttrs().hasAttribute<OverrideAttr>()) {
+      readImpl = ReadImplKind::Inherited;
+    } else {
+      readImpl = ReadImplKind::Stored;
+    }
+
+  // Otherwise, it's stored.
+  } else {
+    readImpl = ReadImplKind::Stored;
+  }
+
+  // Prefer using 'set' and 'modify' over a mutable addressor.
+  WriteImplKind writeImpl;
+  ReadWriteImplKind readWriteImpl;
+  if (hasSetter) {
+    writeImpl = WriteImplKind::Set;
+    if (hasModify) {
+      readWriteImpl = ReadWriteImplKind::Modify;
+    } else {
+      readWriteImpl = ReadWriteImplKind::MaterializeToTemporary;
+    }
+  } else if (hasModify) {
+    writeImpl = WriteImplKind::Modify;
+    readWriteImpl = ReadWriteImplKind::Modify;
+  } else if (hasMutableAddress) {
+    writeImpl = WriteImplKind::MutableAddress;
+    readWriteImpl = ReadWriteImplKind::MutableAddress;
+
+  // Check if we have observers.
+  } else if (readImpl == ReadImplKind::Inherited) {
+    writeImpl = WriteImplKind::InheritedWithObservers;
+    readWriteImpl = ReadWriteImplKind::MaterializeToTemporary;
+
+  // Otherwise, it's stored.
+  } else if (readImpl == ReadImplKind::Stored &&
+             !cast<VarDecl>(storage)->isLet()) {
+    if (hasWillSet || hasDidSet) {
+      writeImpl = WriteImplKind::StoredWithObservers;
+      readWriteImpl = ReadWriteImplKind::MaterializeToTemporary;
+    } else {
+      writeImpl = WriteImplKind::Stored;
+      readWriteImpl = ReadWriteImplKind::Stored;
+    }
+
+  // Otherwise, it's immutable.
+  } else {
+    writeImpl = WriteImplKind::Immutable;
+    readWriteImpl = ReadWriteImplKind::Immutable;
+  }
+
+  return StorageImplInfo(readImpl, writeImpl, readWriteImpl);
+}
+
 /// Try to add the appropriate accessors required a storage declaration.
 /// This needs to be idempotent.
 void swift::maybeAddAccessorsToStorage(AbstractStorageDecl *storage) {
@@ -2274,6 +2438,9 @@ std::pair<BraceStmt *, bool>
 synthesizeAccessorBody(AbstractFunctionDecl *fn, void *) {
   auto *accessor = cast<AccessorDecl>(fn);
   auto &ctx = accessor->getASTContext();
+
+  if (ctx.Stats)
+    ctx.Stats->getFrontendCounters().NumAccessorBodiesSynthesized++;
 
   if (accessor->isInvalid() || ctx.hadError())
     return { nullptr, true };
