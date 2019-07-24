@@ -11,3 +11,7 @@ struct Basic {
 };
 
 Basic makeA();
+
+ns::T* makeT();
+void useT(ns::T* v);
+using namespacedT = ns::T;

@@ -2372,8 +2372,25 @@ namespace {
     }
 
     Decl *VisitNamespaceDecl(const clang::NamespaceDecl *decl) {
-      // FIXME: Implement once Swift has namespaces.
-      return nullptr;
+      // If we have a name for this declaration, use it.
+      Optional<ImportedName> correctSwiftName;
+      auto importedName = importFullName(decl, correctSwiftName);
+      if (!importedName) return nullptr;
+
+      auto dc =
+          Impl.importDeclContextOf(decl, importedName.getEffectiveContext());
+      if (!dc)
+        return nullptr;
+
+      SourceLoc loc = Impl.importSourceLoc(decl->getBeginLoc());
+
+      // FIXME: If Swift gets namespaces, import as a namespace.
+      auto enumDecl = Impl.createDeclWithClangNode<EnumDecl>(
+          decl, AccessLevel::Public, loc,
+          importedName.getDeclName().getBaseIdentifier(),
+          Impl.importSourceLoc(decl->getLocation()), None, nullptr, dc);
+      enumDecl->computeType();
+      return enumDecl;
     }
 
     Decl *VisitUsingDirectiveDecl(const clang::UsingDirectiveDecl *decl) {
