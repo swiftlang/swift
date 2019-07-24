@@ -1,0 +1,57 @@
+// RUN: %target-sil-opt %s -diagnostic-constant-propagation -o /dev/null -verify
+sil_stage raw
+
+import Builtin
+import Swift
+import SwiftShims
+
+func test() -> Int
+
+// test()
+sil hidden [ossa] @$s53diagnostic_constant_propagation_oob_subscript_literal4testSiyF : $@convention(thin) () -> Int {
+bb0:
+  %0 = integer_literal $Builtin.Word, 3
+  %1 = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
+  %2 = apply %1<Int>(%0) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
+  (%3, %4) = destructure_tuple %2 : $(Array<Int>, Builtin.RawPointer)
+  %5 = pointer_to_address %4 : $Builtin.RawPointer to [strict] $*Int
+  %6 = integer_literal $Builtin.IntLiteral, 1
+  %7 = metatype $@thin Int.Type
+  %8 = function_ref @$sSi22_builtinIntegerLiteralSiBI_tcfC : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
+  %9 = apply %8(%6, %7) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
+  store %9 to [trivial] %5 : $*Int
+  %11 = integer_literal $Builtin.Word, 1
+  %12 = index_addr %5 : $*Int, %11 : $Builtin.Word
+  %13 = integer_literal $Builtin.IntLiteral, 2
+  %14 = metatype $@thin Int.Type
+  %15 = function_ref @$sSi22_builtinIntegerLiteralSiBI_tcfC : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
+  %16 = apply %15(%13, %14) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
+  store %16 to [trivial] %12 : $*Int
+  %18 = integer_literal $Builtin.Word, 2
+  %19 = index_addr %5 : $*Int, %18 : $Builtin.Word
+  %20 = integer_literal $Builtin.IntLiteral, 3
+  %21 = metatype $@thin Int.Type
+  %22 = function_ref @$sSi22_builtinIntegerLiteralSiBI_tcfC : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
+  %23 = apply %22(%20, %21) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
+  store %23 to [trivial] %19 : $*Int
+  debug_value %3 : $Array<Int>, let, name "a"
+  %26 = begin_borrow %3 : $Array<Int>
+  %27 = integer_literal $Builtin.IntLiteral, 3
+  %28 = metatype $@thin Int.Type
+  %29 = function_ref @$sSi22_builtinIntegerLiteralSiBI_tcfC : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
+  %30 = apply %29(%27, %28) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
+  %31 = alloc_stack $Int
+  %32 = function_ref @$sSayxSicig : $@convention(method) <τ_0_0> (Int, @guaranteed Array<τ_0_0>) -> @out τ_0_0
+  %33 = apply %32<Int>(%31, %30, %26) : $@convention(method) <τ_0_0> (Int, @guaranteed Array<τ_0_0>) -> @out τ_0_0 // expected-error {{out of bounds access to array 'a' of size '3' at index '3'}}
+  %34 = load [trivial] %31 : $*Int
+  dealloc_stack %31 : $*Int
+  end_borrow %26 : $Array<Int>
+  destroy_value %3 : $Array<Int>
+  return %34 : $Int
+}
+
+sil [serialized] [always_inline] [_semantics "array.uninitialized_intrinsic"] @$ss27_allocateUninitializedArrayySayxG_BptBwlF : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
+
+sil [transparent] [serialized] @$sSi22_builtinIntegerLiteralSiBI_tcfC : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
+
+sil [serialized] @$sSayxSicig : $@convention(method) <τ_0_0> (Int, @guaranteed Array<τ_0_0>) -> @out τ_0_0
