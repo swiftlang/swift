@@ -585,7 +585,7 @@ tests.test("index-mapping/utf16-to-character/\(id)") {
       "🏂",
 
       // Prior to UTF-8 String, this tested for empty array in "legacy mode" or
-      // the replacements character otherwise. However, SE-0180 (String Index
+      // the replacement character otherwise. However, SE-0180 (String Index
       // Overhaul) dictates subscript behavior should treat it as emergent
       // behavior from its encoded offset, hence we should get the same 3 code
       // units as prior for non-scalar-aligned UTF-16 offsets applied to the
