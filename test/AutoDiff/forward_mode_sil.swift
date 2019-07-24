@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -Xllvm -run-jvp-generation -verify %s | %FileCheck %s -check-prefix=CHECK-DATA-STRUCTURES
+// RUN: %target-swift-frontend -emit-sil -Xllvm -run-jvp-generation  -verify %s | %FileCheck %s -check-prefix=CHECK-DATA-STRUCTURES
 // RUN: %target-swift-frontend -emit-sil -verify -Xllvm -sil-print-after=differentiation -Xllvm -run-jvp-generation -o /dev/null 2>&1 %s | %FileCheck %s -check-prefix=CHECK-SIL
 
 
@@ -25,7 +25,8 @@ func unary(_ x: Float) -> Float {
 // CHECK-SIL:   [[MULT_FUNC_JVP_1:%.*]] = function_ref @$sSf12_jvpMultiply3lhs3rhsSf5value_S2f_Sftc12differentialtSf_SftFZ : $@convention(method) (Float, Float, @thin Float.Type) -> (Float, @owned @callee_guaranteed (Float, Float) -> Float)
 // CHECK-SIL:   [[MULT_FUNC_VJP_1:%.*]] = function_ref @$sSf12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZ : $@convention(method) (Float, Float, @thin Float.Type) -> (Float, @owned @callee_guaranteed (Float) -> (Float, Float))
 // CHECK-SIL:   [[AUTODIFF_INST_1:%.*]] = autodiff_function [wrt 0 1] [order 1] [[MULT_FUNC_1]] : $@convention(method) (Float, Float, @thin Float.Type) -> Float with {[[MULT_FUNC_JVP_1]] : $@convention(method) (Float, Float, @thin Float.Type) -> (Float, @owned @callee_guaranteed (Float, Float) -> Float), [[MULT_FUNC_VJP_1]] : $@convention(method) (Float, Float, @thin Float.Type) -> (Float, @owned @callee_guaranteed (Float) -> (Float, Float))}
-// CHECK-SIL:   [[MULT_JVP_APPLY_TUPLE_1:%.*]] = apply [[MULT_FUNC_JVP_1]]([[X_ARG]], [[X_ARG]], %3) : $@convention(method) (Float, Float, @thin Float.Type) -> (Float, @owned @callee_guaranteed (Float, Float) -> Float)
+// CHECK-SIL:   [[AUTODIFF_EXTRACT_INST_1:%.*]] = autodiff_function_extract [jvp] [order 1] [[AUTODIFF_INST_1]] : $@differentiable @convention(method) (Float, Float, @nondiff @thin Float.Type) -> Float
+// CHECK-SIL:   [[MULT_JVP_APPLY_TUPLE_1:%.*]] = apply [[AUTODIFF_EXTRACT_INST_1]]([[X_ARG]], [[X_ARG]], %3) : $@convention(method) (Float, Float, @thin Float.Type) -> (Float, @owned @callee_guaranteed (Float, Float) -> Float)
 // CHECK-SIL:   release_value [[AUTODIFF_INST_1]] : $@differentiable @convention(method) (Float, Float, @nondiff @thin Float.Type) -> Float
 // CHECK-SIL:   [[ORIGINAL_VAL_1:%.*]] = tuple_extract [[MULT_JVP_APPLY_TUPLE_1]] : $(Float, @callee_guaranteed (Float, Float) -> Float), 0
 // CHECK-SIL:   [[MULT_DIFFERENTIAL_1:%.*]] = tuple_extract [[MULT_JVP_APPLY_TUPLE_1]] : $(Float, @callee_guaranteed (Float, Float) -> Float), 1
@@ -34,7 +35,9 @@ func unary(_ x: Float) -> Float {
 // CHECK-SIL:   [[MULT_FUNC_JVP_2:%.*]] = function_ref @$sSf12_jvpMultiply3lhs3rhsSf5value_S2f_Sftc12differentialtSf_SftFZ : $@convention(method) (Float, Float, @thin Float.Type) -> (Float, @owned @callee_guaranteed (Float, Float) -> Float)
 // CHECK-SIL:   [[MULT_FUNC_VJP_2:%.*]] = function_ref @$sSf12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZ : $@convention(method) (Float, Float, @thin Float.Type) -> (Float, @owned @callee_guaranteed (Float) -> (Float, Float))
 // CHECK-SIL:   [[AUTODIFF_INST_2:%.*]] = autodiff_function [wrt 0 1] [order 1] [[MULT_FUNC_2]] : $@convention(method) (Float, Float, @thin Float.Type) -> Float with {[[MULT_FUNC_JVP_2]] : $@convention(method) (Float, Float, @thin Float.Type) -> (Float, @owned @callee_guaranteed (Float, Float) -> Float), [[MULT_FUNC_VJP_2]] : $@convention(method) (Float, Float, @thin Float.Type) -> (Float, @owned @callee_guaranteed (Float) -> (Float, Float))}
-// CHECK-SIL:   [[MULT_JVP_APPLY_TUPLE_2:%.*]] = apply [[MULT_FUNC_JVP_2]]([[ORIGINAL_VAL_1]], [[X_ARG]], %2) : $@convention(method) (Float, Float, @thin Float.Type) -> (Float, @owned @callee_guaranteed (Float, Float) -> Float)
+// CHECK-SIL:   [[AUTODIFF_EXTRACT_INST_2:%.*]] = autodiff_function_extract [jvp] [order 1] [[AUTODIFF_INST_2]] : $@differentiable @convention(method) (Float, Float, @nondiff @thin Float.Type) -> Float
+// CHECK-SIL:   [[MULT_JVP_APPLY_TUPLE_2:%.*]] = apply [[AUTODIFF_EXTRACT_INST_2]]([[ORIGINAL_VAL_1]], [[X_ARG]], %2) : $@convention(method) (Float, Float, @thin Float.Type) -> (Float, @owned @callee_guaranteed (Float, Float) -> Float)
+// CHECK-SIL:   release_value [[AUTODIFF_INST_2]] : $@differentiable @convention(method) (Float, Float, @nondiff @thin Float.Type) -> Float
 // CHECK-SIL:   release_value [[AUTODIFF_INST_2]] : $@differentiable @convention(method) (Float, Float, @nondiff @thin Float.Type) -> Float
 // CHECK-SIL:   [[ORIGINAL_VAL_2:%.*]] = tuple_extract [[MULT_JVP_APPLY_TUPLE_2]] : $(Float, @callee_guaranteed (Float, Float) -> Float), 0
 // CHECK-SIL:   [[MULT_DIFFERENTIAL_2:%.*]] = tuple_extract [[MULT_JVP_APPLY_TUPLE_2]] : $(Float, @callee_guaranteed (Float, Float) -> Float), 1
