@@ -3785,9 +3785,6 @@ PotentialArchetype *GenericSignatureBuilder::realizePotentialArchetype(
 
 static Type getStructuralType(TypeDecl *typeDecl) {
   if (auto typealias = dyn_cast<TypeAliasDecl>(typeDecl)) {
-    if (auto resolved = typealias->getUnderlyingTypeLoc().getType())
-      return resolved;
-
     return typealias->getStructuralType();
   }
 
