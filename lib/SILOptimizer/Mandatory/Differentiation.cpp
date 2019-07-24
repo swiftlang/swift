@@ -65,6 +65,7 @@ static llvm::cl::opt<bool> SkipFoldingAutoDiffFunctionExtraction(
     llvm::cl::init(true));
 
 /// This flag is used to enable full JVP generation.
+/// It will be removed when JVP/differential generation is robust.
 static llvm::cl::opt<bool> RunJVPGeneration(
     "run-jvp-generation",
     llvm::cl::init(false));
@@ -406,9 +407,9 @@ private:
   /// Mapping from original basic blocks to linear map structs.
   DenseMap<SILBasicBlock *, StructDecl *> linearMapStructs;
 
-  /// Mapping from original basic blocks to linear map enums. If 'kind' is 'VJP',
-  /// then it's the predecessor enums. If 'kind' is 'JVP', then it's the
-  /// successor enums.
+  /// Mapping from original basic blocks to branching trace enums.
+  /// For pullbacks: these are predecessor enums.
+  /// For differentials: these are successor enums.
   DenseMap<SILBasicBlock *, EnumDecl *> branchingTraceDecls;
 
   /// Mapping from `apply` and `struct_extract` instructions in the original
@@ -421,7 +422,7 @@ private:
   DenseMap<std::pair<SILBasicBlock *, SILBasicBlock *>, EnumElementDecl *>
       branchingTraceEnumCases;
 
-  /// Mapping from linear map structs to their predecessor enum fields.
+  /// Mapping from linear map structs to their branching trace enum fields.
   DenseMap<StructDecl *, VarDecl *> linearMapStructEnumFields;
 
   /// A type converter, used to compute struct/enum SIL types.
@@ -492,10 +493,9 @@ private:
 
   /// Creates an enum declaration with the given VJP/JVP generic signature, whose
   /// cases represent the predecessors/successors of the given original block.
-  EnumDecl *
-  createBranchingTraceDecl(SILBasicBlock *originalBB,
-                           SILAutoDiffIndices indices,
-                           CanGenericSignature genericSig) {
+  EnumDecl *createBranchingTraceDecl(SILBasicBlock *originalBB,
+                                     SILAutoDiffIndices indices,
+                                     CanGenericSignature genericSig) {
     assert(originalBB->getParent() == original);
     auto *moduleDecl = original->getModule().getSwiftModule();
     auto &astCtx = original->getASTContext();
@@ -548,7 +548,6 @@ private:
         decl->setInterfaceType(predLinearMapStructTy->mapTypeOutOfContext());
       else
         decl->setInterfaceType(predLinearMapStructTy);
-
       // Create enum element and enum case declarations.
       auto *paramList = ParameterList::create(astCtx, {decl});
       auto *enumEltDecl = new (astCtx) EnumElementDecl(
@@ -561,7 +560,7 @@ private:
       enumCaseDecl->setImplicit();
       branchingTraceDecl->addMember(enumEltDecl);
       branchingTraceDecl->addMember(enumCaseDecl);
-      // Cache predecessor/successor enum element declarations.
+      // Record enum element declaration.
       branchingTraceEnumCases.insert({{predBB, originalBB}, enumEltDecl});
     }
     LLVM_DEBUG({
@@ -575,7 +574,7 @@ private:
         enumName = "Successor";
         break;
       }
-      s << enumName << " branch tracing decl created for function @"
+      s << enumName << " branching trace enum created for function @"
         << original->getName() << " bb" << originalBB->getDebugID() << '\n';
       branchingTraceDecl->print(s);
       s << '\n';
@@ -637,8 +636,8 @@ private:
         structName = "Pullback";
         break;
       }
-      s << structName << " struct created for function @" << original->getName()
-        << " bb" << originalBB->getDebugID() << '\n';
+      s << structName << " struct declaration created for function @"
+	<< original->getName() << " bb" << originalBB->getDebugID() << '\n';
       linearMapStruct->print(s);
       s << '\n';
     });
@@ -669,14 +668,14 @@ public:
                                         ResilienceExpansion::Minimal);
   }
 
-  /// Returns the linear map enum associated with the given original block.
+  /// Returns the branching trace enum associated with the given original block.
   EnumDecl *getBranchingTraceDecl(SILBasicBlock *origBB) const {
     return branchingTraceDecls.lookup(origBB);
   }
 
-  /// Returns the lowered SIL type of the linear map enum associated with the
-  /// given original block.
-  SILType getLinearMapEnumLoweredType(SILBasicBlock *origBB) const {
+  /// Returns the lowered SIL type of the branching trace enum associated with
+  /// the given original block.
+  SILType getBranchingTraceEnumLoweredType(SILBasicBlock *origBB) const {
     auto *linMapEnum = getBranchingTraceDecl(origBB);
     auto linMapEnumType =
         linMapEnum->getDeclaredInterfaceType()->getCanonicalType();
@@ -684,22 +683,23 @@ public:
                                         ResilienceExpansion::Minimal);
   }
 
-  /// Returns the enum element in the given successor block's linear map enum
-  /// corresponding to the given linear map block.
-  EnumElementDecl *lookUpLinearMapEnumElement(SILBasicBlock *origPredBB,
-                                              SILBasicBlock *origSuccBB) const {
+  /// Returns the enum element in the given successor block's branching trace
+  /// enum corresponding to the given predecessor block.
+  EnumElementDecl *
+  lookUpBranchingTraceEnumElement(SILBasicBlock *origPredBB,
+                                  SILBasicBlock *origSuccBB) const {
     assert(origPredBB->getParent() == original);
     return branchingTraceEnumCases.lookup({origPredBB, origSuccBB});
   }
 
-  /// Returns the mapping from linear map structs to their linear map enum
+  /// Returns the mapping from linear map structs to their branching trace enum
   /// fields.
   DenseMap<StructDecl *, VarDecl *> &getLinearMapStructEnumFields() {
     return linearMapStructEnumFields;
   }
 
-  /// Returns the linear map enum field for the linear map struct of the given
-  /// original block.
+  /// Returns the branching trace enum field for the linear map struct of the
+  /// given original block.
   VarDecl *lookUpLinearMapStructEnumField(SILBasicBlock *origBB) {
     auto *linearMapStruct = getLinearMapStruct(origBB);
     return linearMapStructEnumFields.lookup(linearMapStruct);
@@ -742,8 +742,7 @@ public:
   /// `struct_extract` in the original function.
   VarDecl *lookUpLinearMapDecl(SILInstruction *inst) {
     auto lookup = linearMapValueMap.find(inst);
-    return lookup == linearMapValueMap.end() ? nullptr
-                                             : lookup->getSecond();
+    return lookup == linearMapValueMap.end() ? nullptr : lookup->getSecond();
   }
 };
 
@@ -3076,7 +3075,7 @@ private:
     auto *succEnum = linearMapInfo.getBranchingTraceDecl(succBB);
     auto enumLoweredTy = getNominalDeclLoweredType(succEnum);
     auto *enumEltDecl =
-        linearMapInfo.lookUpLinearMapEnumElement(predBB, succBB);
+        linearMapInfo.lookUpBranchingTraceEnumElement(predBB, succBB);
     auto enumEltType = getOpType(
         enumLoweredTy.getEnumElementType(enumEltDecl, getModule()));
     // If the enum element type does not have a box type (i.e. the enum case is
@@ -5183,9 +5182,9 @@ public:
         // Get the enum element type (i.e. the pullback struct type). The enum
         // element type may be boxed if the enum is indirect.
         auto enumLoweredTy =
-            getPullbackInfo().getLinearMapEnumLoweredType(succBB);
+            getPullbackInfo().getBranchingTraceEnumLoweredType(succBB);
         auto *enumEltDecl =
-            getPullbackInfo().lookUpLinearMapEnumElement(origBB, succBB);
+            getPullbackInfo().lookUpBranchingTraceEnumElement(origBB, succBB);
         auto enumEltType = remapType(
             enumLoweredTy.getEnumElementType(enumEltDecl, getModule()));
         pullbackTrampolineBB->createPhiArgument(enumEltType,
@@ -5371,7 +5370,7 @@ public:
                                                    trampolineArguments);
         }
         auto *enumEltDecl =
-            getPullbackInfo().lookUpLinearMapEnumElement(predBB, bb);
+            getPullbackInfo().lookUpBranchingTraceEnumElement(predBB, bb);
         pullbackSuccessorCases.push_back({enumEltDecl, pullbackSuccBB});
       }
       // Emit cleanups for all block-local temporaries.
