@@ -37,3 +37,43 @@ public enum FutureproofEnum: Int {
   // CHECK-NEXT: case c = 100{{$}}
   case c = 100
 }
+
+// CHECK-LABEL: indirect public enum FutureproofIndirectEnum
+public indirect enum FutureproofIndirectEnum {
+  // CHECK-NEXT: case a{{$}}
+  case a
+  // CHECK-NEXT: case b(Swift.Int){{$}}
+  case b(Int)
+  // CHECK-NEXT: case c{{$}}
+  case c
+}
+
+// CHECK-LABEL: indirect public enum FrozenIndirectEnum
+@_frozen public indirect enum FrozenIndirectEnum {
+  // CHECK-NEXT: case a{{$}}
+  case a
+  // CHECK-NEXT: case b(Swift.Int){{$}}
+  case b(Int)
+  // CHECK-NEXT: case c{{$}}
+  case c
+}
+
+// CHECK-LABEL: public enum FutureproofIndirectCaseEnum
+public enum FutureproofIndirectCaseEnum {
+  // CHECK-NEXT: {{^}} case a{{$}}
+  case a
+  // CHECK-NEXT: indirect case b(Swift.Int){{$}}
+  indirect case b(Int)
+  // CHECK-NEXT: {{^}} case c{{$}}
+  case c
+}
+
+// CHECK-LABEL: public enum FrozenIndirectCaseEnum
+@_frozen public enum FrozenIndirectCaseEnum {
+  // CHECK-NEXT: {{^}} case a{{$}}
+  case a
+  // CHECK-NEXT: indirect case b(Swift.Int){{$}}
+  indirect case b(Int)
+  // CHECK-NEXT: {{^}} case c{{$}}
+  case c
+}
