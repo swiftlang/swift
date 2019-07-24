@@ -102,6 +102,9 @@ ERROR(line_directive_line_zero,none,
 WARNING(escaped_parameter_name,none,
         "keyword '%0' does not need to be escaped in argument list",
         (StringRef))
+WARNING(redundant_escaped_identifier,none,
+        "identifier '%0' does not need to be escaped",
+        (StringRef))
 
 ERROR(forbidden_interpolated_string,none,
       "%0 cannot be an interpolated string literal", (StringRef))

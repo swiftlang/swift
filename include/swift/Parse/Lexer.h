@@ -356,7 +356,9 @@ public:
   /// Determines if the given string is a valid non-operator
   /// identifier, without escaping characters.
   static bool isIdentifier(StringRef identifier);
-
+  
+  static bool isAccessor(StringRef identifier);
+  
   /// Determine the token kind of the string, given that it is a valid
   /// non-operator identifier. Return tok::identifier if the string is not a
   /// reserved word.

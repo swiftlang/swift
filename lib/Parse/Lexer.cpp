@@ -636,6 +636,14 @@ bool Lexer::isIdentifier(StringRef string) {
   return p == end;
 }
 
+bool Lexer::isAccessor(StringRef string) {
+#define SUPPRESS_ARTIFICIAL_ACCESSORS 1
+#define ACCESSOR_KEYWORD(KEYWORD)
+#define SINGLETON_ACCESSOR(ID, KEYWORD) if (string == #KEYWORD) return true;
+#include "swift/AST/AccessorKinds.def"
+return false;
+}
+
 /// Determines if the given string is a valid operator identifier,
 /// without escaping characters.
 bool Lexer::isOperator(StringRef string) {
@@ -1959,6 +1967,16 @@ void Lexer::lexEscapedIdentifier() {
     if (*CurPtr == '`') {
       ++CurPtr;
       formEscapedIdentifierToken(Quote);
+
+      // Warn users if using backtics with non keyword
+      if (!isAccessor(NextToken.getText()) &&
+          (kindOfIdentifier(NextToken.getText(),
+                            LexMode == LexerMode::SIL) == tok::identifier)) {
+        diagnose(IdentifierStart-1, diag::redundant_escaped_identifier,
+                 NextToken.getText())
+          .fixItReplace(NextToken.getLoc(), NextToken.getText().str());;
+      }
+
       return;
     }
   }
