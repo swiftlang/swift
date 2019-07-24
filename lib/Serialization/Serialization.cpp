@@ -3586,15 +3586,16 @@ public:
 
     // We only serialize the raw values of @objc enums, because they're part
     // of the ABI. That isn't the case for Swift enums.
-    auto RawValueKind = EnumElementRawValueKind::None;
-    bool Negative = false;
+    auto rawValueKind = EnumElementRawValueKind::None;
+    bool isNegative = false, isRawValueImplicit = false;
     StringRef RawValueText;
     if (elem->getParentEnum()->isObjC()) {
       // Currently ObjC enums always have integer raw values.
-      RawValueKind = EnumElementRawValueKind::IntegerLiteral;
+      rawValueKind = EnumElementRawValueKind::IntegerLiteral;
       auto ILE = cast<IntegerLiteralExpr>(elem->getRawValueExpr());
       RawValueText = ILE->getDigitsText();
-      Negative = ILE->isNegative();
+      isNegative = ILE->isNegative();
+      isRawValueImplicit = ILE->isImplicit();
     }
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[EnumElementLayout::Code];
@@ -3602,8 +3603,9 @@ public:
                                   contextID,
                                   elem->isImplicit(),
                                   elem->hasAssociatedValues(),
-                                  (unsigned)RawValueKind,
-                                  Negative,
+                                  (unsigned)rawValueKind,
+                                  isRawValueImplicit,
+                                  isNegative,
                                   S.addUniquedStringRef(RawValueText),
                                   elem->getFullName().getArgumentNames().size()+1,
                                   nameComponentsAndDependencies);
