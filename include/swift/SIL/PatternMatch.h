@@ -21,6 +21,7 @@
 #ifndef SWIFT_SIL_PATTERNMATCH_H
 #define SWIFT_SIL_PATTERNMATCH_H
 
+#include "swift/SIL/ApplySite.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILUndef.h"
 namespace swift {
@@ -500,25 +501,88 @@ tupleextractoperation_ty<LTy> m_TupleExtractOperation(const LTy &Left,
 //===----------------------------------------------------------------------===//
 
 //===
+// Semantics matcher.
+//
+// Meant to be passed to a callee matcher. I.e.:
+//
+// m_Callee(m_SemanticsExact("foo bar baz"))
+//
+
+struct Semantics_exactmatch {
+  StringRef innerString;
+
+  explicit Semantics_exactmatch(StringRef innerString)
+      : innerString(innerString) {}
+};
+
+inline Semantics_exactmatch m_SemanticsExact(StringRef exactStr) {
+  return Semantics_exactmatch(exactStr);
+}
+
+struct Semantics_prefixmatch {
+  StringRef prefixString;
+
+  explicit Semantics_prefixmatch(StringRef prefixString)
+      : prefixString(prefixString) {}
+};
+
+inline Semantics_prefixmatch m_SemanticsPrefix(StringRef prefixString) {
+  return Semantics_prefixmatch(prefixString);
+}
+
+//===
 // Callee matcher.
 //
 
 template <typename CalleeTy>
 struct Callee_match;
 
-template<>
-struct Callee_match<SILFunction &> {
-  const SILFunction &Fun;
+template <> struct Callee_match<Semantics_exactmatch> {
+  Semantics_exactmatch match_;
 
-  Callee_match(const SILFunction &F) : Fun(F) {}
+  Callee_match(Semantics_exactmatch match) : match_(match) {}
 
-  template <typename ITy>
-  bool match(ITy *V) {
-    auto *AI = dyn_cast<ApplyInst>(V);
-    if (!AI)
+  template <typename ITy> bool match(ITy *v) {
+    FullApplySite fas(v);
+    if (!fas)
       return false;
 
-    return AI->getReferencedFunctionOrNull() == &Fun;
+    auto *f = fas.getReferencedFunctionOrNull();
+    if (!f)
+      return false;
+
+    return f->hasSemanticsAttr(match_.innerString);
+  }
+};
+
+template <> struct Callee_match<Semantics_prefixmatch> {
+  Semantics_prefixmatch match_;
+
+  Callee_match(Semantics_prefixmatch match) : match_(match) {}
+
+  template <typename ITy> bool match(ITy *v) {
+    FullApplySite fas(v);
+    if (!fas)
+      return false;
+
+    auto *f = fas.getReferencedFunctionOrNull();
+    if (!f)
+      return false;
+
+    return f->hasSemanticsAttrThatStartsWith(match_.prefixString);
+  }
+};
+
+template <> struct Callee_match<SILFunction &> {
+  const SILFunction &fun;
+
+  Callee_match(const SILFunction &f) : fun(f) {}
+
+  template <typename ITy> bool match(ITy *v) {
+    FullApplySite fas(v);
+    if (!fas)
+      return false;
+    return fas.getReferencedFunctionOrNull() == &fun;
   }
 };
 
@@ -562,6 +626,10 @@ struct Callee_match<llvm::Intrinsic::ID> {
 template<typename CalleeTy>
 inline Callee_match<CalleeTy> m_Callee(CalleeTy Callee) {
   return Callee;
+}
+
+inline Callee_match<Semantics_exactmatch> m_SemanticsCallee(StringRef name) {
+  return m_Callee(Semantics_exactmatch(name));
 }
 
 //===
