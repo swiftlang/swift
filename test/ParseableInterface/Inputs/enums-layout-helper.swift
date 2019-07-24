@@ -6,6 +6,8 @@ public enum FutureproofEnum: Int {
   case b = 10
   // CHECK-NEXT: case c{{$}}
   case c = 100
+  // CHECK-NEXT: case d{{$}}
+  case d
 }
 
 // CHECK-LABEL: public enum FrozenEnum : Swift.Int
@@ -16,6 +18,8 @@ public enum FutureproofEnum: Int {
   case b = 10
   // CHECK-NEXT: case c{{$}}
   case c = 100
+  // CHECK-NEXT: case d{{$}}
+  case d
 }
 
 // CHECK-LABEL: public enum FutureproofObjCEnum : Swift.Int32
@@ -26,6 +30,8 @@ public enum FutureproofEnum: Int {
   case b = 10
   // CHECK-NEXT: case c = 100{{$}}
   case c = 100
+  // CHECK-NEXT: case d{{$}}
+  case d
 }
 
 // CHECK-LABEL: public enum FrozenObjCEnum : Swift.Int32
@@ -36,6 +42,8 @@ public enum FutureproofEnum: Int {
   case b = 10
   // CHECK-NEXT: case c = 100{{$}}
   case c = 100
+  // CHECK-NEXT: case d{{$}}
+  case d
 }
 
 // CHECK-LABEL: indirect public enum FutureproofIndirectEnum

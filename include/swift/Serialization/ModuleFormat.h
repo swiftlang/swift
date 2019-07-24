@@ -52,7 +52,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 503; // remove 'requires stored property inits'
+const uint16_t SWIFTMODULE_VERSION_MINOR = 504; // distinguish implicit raw values for enum cases
 
 using DeclIDField = BCFixed<31>;
 
@@ -1194,6 +1194,7 @@ namespace decls_block {
     BCFixed<1>,  // implicit?
     BCFixed<1>,  // has payload?
     EnumElementRawValueKindField,  // raw value kind
+    BCFixed<1>,  // implicit raw value?
     BCFixed<1>,  // negative raw value?
     IdentifierIDField, // raw value
     BCVBR<5>, // number of parameter name components
