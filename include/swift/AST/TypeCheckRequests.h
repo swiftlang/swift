@@ -29,6 +29,7 @@
 
 namespace swift {
 
+class AbstractStorageDecl;
 class GenericParamList;
 struct PropertyWrapperBackingPropertyInfo;
 class RequirementRepr;
@@ -834,6 +835,27 @@ private:
 
 public:
   bool isCached() const { return true; }
+};
+
+class StorageImplInfoRequest :
+    public SimpleRequest<StorageImplInfoRequest,
+                         StorageImplInfo(AbstractStorageDecl *),
+                         CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<StorageImplInfo>
+  evaluate(Evaluator &evaluator, AbstractStorageDecl *decl) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<StorageImplInfo> getCachedResult() const;
+  void cacheResult(StorageImplInfo value) const;
 };
 
 // Allow AnyValue to compare two Type values, even though Type doesn't

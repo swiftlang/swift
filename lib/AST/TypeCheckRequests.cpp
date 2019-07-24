@@ -659,3 +659,20 @@ void OpaqueReadOwnershipRequest::cacheResult(OpaqueReadOwnership value) const {
   auto *storage = std::get<0>(getStorage());
   storage->setOpaqueReadOwnership(value);
 }
+
+//----------------------------------------------------------------------------//
+// StorageImplInfoRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<StorageImplInfo>
+StorageImplInfoRequest::getCachedResult() const {
+  auto *storage = std::get<0>(getStorage());
+  if (storage->LazySemanticInfo.ImplInfoComputed)
+    return storage->ImplInfo;
+  return None;
+}
+
+void StorageImplInfoRequest::cacheResult(StorageImplInfo value) const {
+  auto *storage = std::get<0>(getStorage());
+  storage->setImplInfo(value);
+}
