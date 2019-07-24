@@ -83,6 +83,83 @@ public:
   SourceLoc getNearestLoc() const { return SourceLoc(); };
 };
 
+//----------------------------------------------------------------------------//
+// Type relation checking
+//----------------------------------------------------------------------------//
+enum class TypeRelation: uint8_t {
+  EqualTo,
+  PossiblyEqualTo,
+  ConvertTo,
+};
+
+struct TypeRelationCheckInput {
+  DeclContext *DC;
+  Type FirstType;
+  Type SecondType;
+  TypeRelation Relation;
+  bool OpenArchetypes;
+
+  TypeRelationCheckInput(DeclContext *DC, Type FirstType, Type SecondType,
+                         TypeRelation Relation, bool OpenArchetypes = true):
+    DC(DC), FirstType(FirstType), SecondType(SecondType), Relation(Relation),
+    OpenArchetypes(OpenArchetypes) {}
+
+  friend llvm::hash_code hash_value(const TypeRelationCheckInput &TI) {
+    return hash_combine(hash_value(TI.FirstType.getPointer()),
+                        hash_value(TI.SecondType.getPointer()),
+                        hash_value(TI.Relation),
+                        hash_value(TI.OpenArchetypes));
+  }
+
+  friend bool operator==(const TypeRelationCheckInput &lhs,
+                         const TypeRelationCheckInput &rhs) {
+    return lhs.FirstType.getPointer() == rhs.FirstType.getPointer() &&
+      lhs.SecondType.getPointer() == rhs.SecondType.getPointer() &&
+      lhs.Relation == rhs.Relation &&
+      lhs.OpenArchetypes == rhs.OpenArchetypes;
+  }
+
+  friend bool operator!=(const TypeRelationCheckInput &lhs,
+                         const TypeRelationCheckInput &rhs) {
+    return !(lhs == rhs);
+  }
+
+  friend void simple_display(llvm::raw_ostream &out,
+                               const TypeRelationCheckInput &owner) {
+    out << "Check if ";
+    simple_display(out, owner.FirstType);
+    out << " is ";
+    switch(owner.Relation) {
+#define CASE(NAME) case TypeRelation::NAME: out << #NAME << " "; break;
+    CASE(EqualTo)
+    CASE(PossiblyEqualTo)
+    CASE(ConvertTo)
+#undef CASE
+    }
+    simple_display(out, owner.SecondType);
+  }
+};
+
+class TypeRelationCheckRequest:
+    public SimpleRequest<TypeRelationCheckRequest,
+                         bool(TypeRelationCheckInput),
+                         CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool> evaluate(Evaluator &evaluator,
+                                TypeRelationCheckInput Owner) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+  // Source location
+  SourceLoc getNearestLoc() const { return SourceLoc(); };
+};
 
 /// The zone number for the IDE.
 #define SWIFT_IDE_TYPE_CHECK_REQUESTS_TYPEID_ZONE 97
