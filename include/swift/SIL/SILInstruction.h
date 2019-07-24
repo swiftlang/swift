@@ -7850,7 +7850,7 @@ SILFunction *ApplyInstBase<Impl, Base, false>::getCalleeFunction() const {
   SILValue Callee = getCalleeOrigin();
 
   while (true) {
-    // Intentionally don't lookup thought dynamic_function_ref and
+    // Intentionally don't lookup through dynamic_function_ref and
     // previous_dynamic_function_ref as the target of those functions is not
     // statically known.
     if (auto *FRI = dyn_cast<FunctionRefInst>(Callee))
