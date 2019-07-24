@@ -18,7 +18,7 @@ ForwardModeTests.test("Binary") {
   func func_to_diff(x: Float, y: Float) -> Float {
     return x * y
   }
-  let (y, differential) =  valueWithDifferential(at: 4, 5, in: func_to_diff)
+  let (y, differential) = valueWithDifferential(at: 4, 5, in: func_to_diff)
   expectEqual(20, y)
   expectEqual(9, differential(1, 1))
 }
@@ -29,7 +29,7 @@ ForwardModeTests.test("BinaryWithLets") {
     let b = a
     return b * -y
   }
-  let (y, differential) =  valueWithDifferential(at: 4, 5, in: func_to_diff)
+  let (y, differential) = valueWithDifferential(at: 4, 5, in: func_to_diff)
   expectEqual(-45, y)
   expectEqual(-19, differential(1, 1))
 }
