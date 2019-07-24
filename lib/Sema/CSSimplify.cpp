@@ -6072,14 +6072,20 @@ ConstraintSystem::simplifyApplicableFnConstraint(
 
   };
 
-  // If the right-hand side is a type variable, try to simplify the overload
-  // set.
-  if (auto typeVar = desugar2->getAs<TypeVariableType>()) {
-    Type newType2 = simplifyAppliedOverloads(typeVar, func1, locator);
-    if (!newType2)
-      return SolutionKind::Error;
+  // Don't attempt this optimization in "diagnostic mode" because
+  // in such mode we'd like to attempt all of the available
+  // overloads regardless of of problems related to missing or
+  // extraneous labels and/or arguments.
+  if (!(solverState && shouldAttemptFixes())) {
+    // If the right-hand side is a type variable,
+    // try to simplify the overload set.
+    if (auto typeVar = desugar2->getAs<TypeVariableType>()) {
+      Type newType2 = simplifyAppliedOverloads(typeVar, func1, locator);
+      if (!newType2)
+        return SolutionKind::Error;
 
-    desugar2 = newType2->getDesugaredType();
+      desugar2 = newType2->getDesugaredType();
+    }
   }
 
   // If right-hand side is a type variable, the constraint is unsolved.
