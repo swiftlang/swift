@@ -3745,7 +3745,7 @@ void ConstraintSystem::optimizeConstraints(Expr *e) {
 
 bool swift::areGenericRequirementsSatisfied(
     const DeclContext *DC, const GenericSignature *sig,
-    const SubstitutionMap &Substitutions, bool isExtension) {
+    SubstitutionMap Substitutions, bool isExtension) {
 
   TypeChecker &TC = createTypeChecker(DC->getASTContext());
   ConstraintSystemOptions Options;
