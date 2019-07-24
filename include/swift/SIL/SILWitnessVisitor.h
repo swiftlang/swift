@@ -38,10 +38,12 @@ namespace swift {
 /// physical projection (if we decide to support that).
 ///
 /// You must override the following methods:
+/// - addProtocolConformanceDescriptor()
 /// - addOutOfLineBaseProtocol()
-/// - addMethod()
-/// - addConstructor()
 /// - addAssociatedType()
+/// - addAssociatedConformance()
+/// - addMethod()
+/// - addPlaceholder()
 
 template <class T> class SILWitnessVisitor : public ASTVisitor<T> {
   T &asDerived() { return *static_cast<T*>(this); }
