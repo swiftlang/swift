@@ -1029,9 +1029,9 @@ public:
           // fewer parameters than before
           (minimalIndexSet->isEmpty() ||
            daIndexSet->getNumIndices() < minimalIndexSet->getNumIndices())) {
-            minimalAttr = da;
-            minimalIndexSet = daIndexSet;
-          }
+        minimalAttr = da;
+        minimalIndexSet = daIndexSet;
+      }
     }
     return std::make_pair(minimalAttr, minimalIndexSet);
   }
