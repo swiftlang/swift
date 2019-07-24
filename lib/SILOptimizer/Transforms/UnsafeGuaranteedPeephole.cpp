@@ -45,7 +45,7 @@
 using namespace swift;
 
 /// Pattern match and remove "retain(self), apply(self), release(self)" calls
-/// in-between unsafeGuaranteed pairs and remove the retain/release pairs.
+/// in between unsafeGuaranteed pairs and remove the retain/release pairs.
 static void tryRemoveRetainReleasePairsBetween(
     RCIdentityFunctionInfo &RCFI, SILInstruction *UnsafeGuaranteedI,
     SILInstruction *Retain, SILInstruction *Release,
