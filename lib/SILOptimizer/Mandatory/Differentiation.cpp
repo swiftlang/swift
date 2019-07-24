@@ -409,7 +409,7 @@ private:
   /// Mapping from original basic blocks to linear map enums. If 'kind' is 'VJP',
   /// then it's the predecessor enums. If 'kind' is 'JVP', then it's the
   /// successor enums.
-  DenseMap<SILBasicBlock *, EnumDecl *> branchingTraces;
+  DenseMap<SILBasicBlock *, EnumDecl *> branchingTraceDecls;
 
   /// Mapping from `apply` and `struct_extract` instructions in the original
   /// function to the corresponding linear map declaration in the linear map
@@ -670,14 +670,14 @@ public:
   }
 
   /// Returns the linear map enum associated with the given original block.
-  EnumDecl *getLinearMapEnum(SILBasicBlock *origBB) const {
-    return branchingTraces.lookup(origBB);
+  EnumDecl *getBranchingTraceDecl(SILBasicBlock *origBB) const {
+    return branchingTraceDecls.lookup(origBB);
   }
 
   /// Returns the lowered SIL type of the linear map enum associated with the
   /// given original block.
   SILType getLinearMapEnumLoweredType(SILBasicBlock *origBB) const {
-    auto *linMapEnum = getLinearMapEnum(origBB);
+    auto *linMapEnum = getBranchingTraceDecl(origBB);
     auto linMapEnumType =
         linMapEnum->getDeclaredInterfaceType()->getCanonicalType();
     return typeConverter.getLoweredType(linMapEnumType,
@@ -1289,9 +1289,9 @@ ADContext::emitNondifferentiabilityError(SourceLoc loc,
 }
 
 LinearMapInfo::LinearMapInfo(ADContext &context,
-                            AutoDiffAssociatedFunctionKind kind,
-                            SILFunction *original, SILFunction *assocFn,
-                            const SILAutoDiffIndices &indices)
+                             AutoDiffAssociatedFunctionKind kind,
+                             SILFunction *original, SILFunction *assocFn,
+                             const SILAutoDiffIndices &indices)
     : kind(kind), original(original), typeConverter(context.getTypeConverter())
 {
   auto &astCtx = original->getASTContext();
@@ -1313,7 +1313,7 @@ LinearMapInfo::LinearMapInfo(ADContext &context,
     // If original block is in a loop, mark predecessor enum as indirect.
     if (loopInfo->getLoopFor(&origBB))
       linearMapEnum->getAttrs().add(new (astCtx) IndirectAttr(/*Implicit*/ true));
-    branchingTraces.insert({&origBB, linearMapEnum});
+    branchingTraceDecls.insert({&origBB, linearMapEnum});
     if (origBB.isEntry())
       continue;
     auto *linearMapEnumField =
@@ -3015,7 +3015,7 @@ public:
     if (errorOccurred || remappedBasicBlocks.count(bb))
       return vjpBB;
     // Add predecessor enum argument to the remapped block.
-    auto *predEnum = linearMapInfo.getLinearMapEnum(bb);
+    auto *predEnum = linearMapInfo.getBranchingTraceDecl(bb);
     auto enumTy = getOpASTType(predEnum->getDeclaredInterfaceType()
                                  ->getCanonicalType());
     auto enumLoweredTy = context.getTypeConverter().getLoweredType(
@@ -3073,7 +3073,7 @@ private:
                                       SILBasicBlock *succBB,
                                       StructInst *pbStructVal) {
     auto loc = pbStructVal->getLoc();
-    auto *succEnum = linearMapInfo.getLinearMapEnum(succBB);
+    auto *succEnum = linearMapInfo.getBranchingTraceDecl(succBB);
     auto enumLoweredTy = getNominalDeclLoweredType(succEnum);
     auto *enumEltDecl =
         linearMapInfo.lookUpLinearMapEnumElement(predBB, succBB);
@@ -3885,8 +3885,7 @@ private:
     assert(insertion.second); (void)insertion;
   }
 
-  SILValue &getTangentBuffer(SILBasicBlock *origBB,
-                             SILValue originalBuffer) {
+  SILValue &getTangentBuffer(SILBasicBlock *origBB, SILValue originalBuffer) {
     auto diffBuilder = getDifferentialBuilder();
     assert(originalBuffer->getType().isAddress());
     assert(originalBuffer->getFunction() == original);
@@ -3907,18 +3906,18 @@ private:
     auto *newBuf = diffLocalAllocBuilder.createAllocStack(
         originalBuffer.getLoc(), bufObjectType);
 
-     // Temporarily change global builder insertion point and emit zero into the
-     // local buffer.
-     auto insertionPoint = diffLocalAllocBuilder.getInsertionBB();
-     diffBuilder.setInsertionPoint(
-                               diffLocalAllocBuilder.getInsertionBB(),
-                               diffLocalAllocBuilder.getInsertionPoint());
-     emitZeroIndirect(bufObjectType.getASTType(), newBuf, newBuf->getLoc());
-     diffBuilder.setInsertionPoint(insertionPoint);
+    // Temporarily change global builder insertion point and emit zero into the
+    // local buffer.
+    auto insertionPoint = diffLocalAllocBuilder.getInsertionBB();
+    diffBuilder.setInsertionPoint(
+        diffLocalAllocBuilder.getInsertionBB(),
+        diffLocalAllocBuilder.getInsertionPoint());
+    emitZeroIndirect(bufObjectType.getASTType(), newBuf, newBuf->getLoc());
+    diffBuilder.setInsertionPoint(insertionPoint);
 
-     // Create cleanup for local buffer.
-     differentialLocalAllocations.push_back(newBuf);
-     return (insertion.first->getSecond() = newBuf);
+    // Create cleanup for local buffer.
+    differentialLocalAllocations.push_back(newBuf);
+    return (insertion.first->getSecond() = newBuf);
   }
 
   //--------------------------------------------------------------------------//
@@ -4428,8 +4427,8 @@ public:
 
     // Check and diagnose non-differentiable results.
     if (!originalFnTy->getResults()[indices.source]
-        .getSILStorageType()
-        .isDifferentiable(getModule())) {
+            .getSILStorageType()
+            .isDifferentiable(getModule())) {
       context.emitNondifferentiabilityError(
           original, invoker, diag::autodiff_nondifferentiable_result);
       errorOccurred = true;
@@ -4518,8 +4517,8 @@ public:
     auto originalDirectResults =
         ArrayRef<SILValue>(jvpDirectResults).drop_back(1);
     auto originalDirectResult = joinElements(originalDirectResults,
-                                                 getBuilder(),
-                                                 jvpCall->getLoc());
+                                             getBuilder(),
+                                             jvpCall->getLoc());
 
     mapValue(ai, originalDirectResult);
 
@@ -5273,7 +5272,7 @@ public:
       // 1. Get the pullback struct pullback block argument.
       // 2. Extract the predecessor enum value from the pullback struct value.
       auto *pbStructVal = getPullbackBlockPullbackStructArgument(bb);
-      auto *predEnum = getPullbackInfo().getLinearMapEnum(bb);
+      auto *predEnum = getPullbackInfo().getBranchingTraceDecl(bb);
       auto *predEnumField =
       getPullbackInfo().lookUpLinearMapStructEnumField(bb);
       auto *predEnumVal =
