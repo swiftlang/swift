@@ -1078,7 +1078,7 @@ endif()
 if(SWIFT_BUILD_STDLIB)
   add_subdirectory(stdlib)
 else()
-  add_subdirectory(stdlib/public/legacy_layouts)
+  add_subdirectory(stdlib/toolchain)
 
   # Some tools (e.g. swift-reflection-dump) rely on a host swiftReflection, so
   # ensure we build that when building tools.
