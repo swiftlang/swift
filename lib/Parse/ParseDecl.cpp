@@ -4896,15 +4896,6 @@ Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
     Invalid = true;
   }
 
-  // Lazy var should not have explicit getter/setter.
-  // For error-recovery, we mark them as invalid.
-  if (Attributes.hasAttribute<LazyAttr>()){
-    if (accessors.Get)
-      accessors.Get->setInvalid();
-    if (accessors.Set)
-      accessors.Set->setInvalid();
-  }
-
   accessors.record(*this, PrimaryVar, Invalid, Decls);
 
   return makeParserResult(PrimaryVar);
@@ -5256,11 +5247,6 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
       // global, record it.
       PBDEntries.back().setInitContext(initContext);
 
-      // If the attributes include @lazy, flag that on each initializer.
-      if (Attributes.hasAttribute<LazyAttr>()) {
-        PBDEntries.back().setInitializerSubsumed();
-      }
-
       if (init.hasCodeCompletion()) {
         Status |= init;
         // If we are doing second pass of code completion, we don't want to
@@ -5282,12 +5268,6 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
                              PatternInit != nullptr, Attributes, Decls);
       if (boundVar.hasCodeCompletion())
         return makeResult(makeParserCodeCompletionStatus());
-      if (PatternInit && boundVar.isNonNull() &&
-          !boundVar.get()->hasStorage()) {
-        diagnose(pattern->getLoc(), diag::getset_init)
-            .highlight(PatternInit->getSourceRange());
-        PatternInit = nullptr;
-      }
     }
     
     // Add all parsed vardecls to this scope.
