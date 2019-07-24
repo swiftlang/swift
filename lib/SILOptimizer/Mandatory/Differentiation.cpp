@@ -64,8 +64,7 @@ static llvm::cl::opt<bool> SkipFoldingAutoDiffFunctionExtraction(
     "differentiation-skip-folding-autodiff-function-extraction",
     llvm::cl::init(true));
 
-/// This flag is used to disable `autodiff_function_extract` instruction folding
-/// for SIL testing purposes.
+/// This flag is used to enable full JVP generation.
 static llvm::cl::opt<bool> RunJVPGeneration(
     "run-jvp-generation",
     llvm::cl::init(false));
@@ -410,7 +409,7 @@ private:
   /// Mapping from original basic blocks to linear map enums. If 'kind' is 'VJP',
   /// then it's the predecessor enums. If 'kind' is 'JVP', then it's the
   /// successor enums.
-  DenseMap<SILBasicBlock *, EnumDecl *> branchingTrace;
+  DenseMap<SILBasicBlock *, EnumDecl *> branchingTraces;
 
   /// Mapping from `apply` and `struct_extract` instructions in the original
   /// function to the corresponding linear map declaration in the linear map
@@ -672,7 +671,7 @@ public:
 
   /// Returns the linear map enum associated with the given original block.
   EnumDecl *getLinearMapEnum(SILBasicBlock *origBB) const {
-    return branchingTrace.lookup(origBB);
+    return branchingTraces.lookup(origBB);
   }
 
   /// Returns the lowered SIL type of the linear map enum associated with the
@@ -1314,7 +1313,7 @@ LinearMapInfo::LinearMapInfo(ADContext &context,
     // If original block is in a loop, mark predecessor enum as indirect.
     if (loopInfo->getLoopFor(&origBB))
       linearMapEnum->getAttrs().add(new (astCtx) IndirectAttr(/*Implicit*/ true));
-    branchingTrace.insert({&origBB, linearMapEnum});
+    branchingTraces.insert({&origBB, linearMapEnum});
     if (origBB.isEntry())
       continue;
     auto *linearMapEnumField =
@@ -3834,22 +3833,14 @@ private:
   }
 
   SILValue emitZeroDirect(CanType type, SILLocation loc) {
-    auto builder = getDifferentialBuilder();
+    auto diffBuilder = getDifferentialBuilder();
     auto silType = getModule().Types.getLoweredLoadableType(
         type, ResilienceExpansion::Minimal);
-    auto *buffer = builder.createAllocStack(loc, silType);
-    auto *initAccess = builder.createBeginAccess(
-        loc, buffer, SILAccessKind::Init, SILAccessEnforcement::Static,
-        /*noNestedConflict*/ true, /*fromBuiltin*/ false);
-    emitZeroIndirect(type, initAccess, loc);
-    builder.createEndAccess(loc, initAccess, /*aborted*/ false);
-    auto readAccess = builder.createBeginAccess(
-        loc, buffer, SILAccessKind::Read, SILAccessEnforcement::Static,
-        /*noNestedConflict*/ true, /*fromBuiltin*/ false);
-    auto *loaded = builder.createLoad(
-        loc, readAccess, getBufferLOQ(type, getDifferential()));
-    builder.createEndAccess(loc, readAccess, /*aborted*/ false);
-    builder.createDeallocStack(loc, buffer);
+    auto *buffer = diffBuilder.createAllocStack(loc, silType);
+    emitZeroIndirect(type, buffer, loc);
+    auto *loaded = diffBuilder.createLoad(
+        loc, buffer, getBufferLOQ(type, getDifferential()));
+    diffBuilder.createDeallocStack(loc, buffer);
     return loaded;
   }
 
@@ -3858,17 +3849,14 @@ private:
     assert(val.getType().isObject());
     LLVM_DEBUG(getADDebugStream() <<
                "Materializing tangents for " << val << '\n');
-    assert(val.getKind() != AdjointValueKind::Aggregate
-           && "Tangent values cannot be aggregated in forward mode.");
     switch (val.getKind()) {
       case AdjointValueKind::Zero: {
         auto zeroVal = emitZeroDirect(val.getSwiftType(), loc);
         return zeroVal;
       }
-      // Aggregate case here is necessary until we update 'AdjointValue' to be
-      // 'TangentValue'. An assertion is made above to make sure we
-      // never see an Aggregate in forward mode until this change is made.
       case AdjointValueKind::Aggregate:
+        llvm_unreachable(
+            "Tuples and structs are not supported in forward mode yet.");
       case AdjointValueKind::Concrete:
         return val.getConcreteValue();
     }
@@ -3913,29 +3901,24 @@ private:
     diffLocalAllocBuilder.setInsertionPoint(
         getDifferential().getEntryBlock(),
         getNextDifferentialLocalAllocationInsertionPoint());
+
     // Allocate local buffer and initialize to zero.
+    auto bufObjectType = getRemappedTangentType(originalBuffer->getType());
     auto *newBuf = diffLocalAllocBuilder.createAllocStack(
-        originalBuffer.getLoc(),
-        getRemappedTangentType(originalBuffer->getType()));
-    auto *access = diffLocalAllocBuilder.createBeginAccess(
-        newBuf->getLoc(), newBuf, SILAccessKind::Init,
-        SILAccessEnforcement::Static, /*noNestedConflict*/ true,
-        /*fromBuiltin*/ false);
+        originalBuffer.getLoc(), bufObjectType);
 
-    // Temporarily change global builder insertion point and emit zero into the
-    // local buffer.
-    auto insertionPoint = diffBuilder.getInsertionBB();
-    diffBuilder.setInsertionPoint(
-                              diffLocalAllocBuilder.getInsertionBB(),
-                              diffLocalAllocBuilder.getInsertionPoint());
-    emitZeroIndirect(access->getType().getASTType(), access, access->getLoc());
-    diffBuilder.setInsertionPoint(insertionPoint);
-    diffLocalAllocBuilder.createEndAccess(
-        access->getLoc(), access, /*aborted*/ false);
+     // Temporarily change global builder insertion point and emit zero into the
+     // local buffer.
+     auto insertionPoint = diffLocalAllocBuilder.getInsertionBB();
+     diffBuilder.setInsertionPoint(
+                               diffLocalAllocBuilder.getInsertionBB(),
+                               diffLocalAllocBuilder.getInsertionPoint());
+     emitZeroIndirect(bufObjectType.getASTType(), newBuf, newBuf->getLoc());
+     diffBuilder.setInsertionPoint(insertionPoint);
 
-    // Create cleanup for local buffer.
-    differentialLocalAllocations.push_back(newBuf);
-    return (insertion.first->getSecond() = newBuf);
+     // Create cleanup for local buffer.
+     differentialLocalAllocations.push_back(newBuf);
+     return (insertion.first->getSecond() = newBuf);
   }
 
   //--------------------------------------------------------------------------//
@@ -4158,9 +4141,9 @@ public:
     dfParams.push_back({dfStructType, ParameterConvention::Direct_Guaranteed});
 
     auto diffName = original->getASTContext()
-                        .getIdentifier("AD__" + original->getName().str() +
-                                       "__differential_" + indices.mangle())
-                        .str();
+        .getIdentifier("AD__" + original->getName().str() +
+                       "__differential_" + indices.mangle())
+        .str();
     auto diffGenericSig = getAssociatedFunctionGenericSignature(attr, original);
     auto *diffGenericEnv =
         diffGenericSig ? diffGenericSig->createGenericEnvironment() : nullptr;
@@ -4202,7 +4185,7 @@ public:
       auto *diffBB = differential.createBasicBlock();
       diffBBMap.insert({&origBB, diffBB});
       auto diffStructLoweredType =
-      remapType(differentialInfo.getLinearMapStructLoweredType(&origBB));
+          remapType(differentialInfo.getLinearMapStructLoweredType(&origBB));
       // If the BB is the original exit, then the differential block that we just
       // created must be the differential function's entry. Create differential
       // entry arguments and continue.
@@ -4237,9 +4220,9 @@ public:
       auto endLoc = origResult.getLoc().getEndSourceLoc();
       if (startLoc.isValid() && endLoc.isValid()) {
         context
-          .diagnose(startLoc, diag::autodiff_nonvaried_result_fixit)
-          .fixItInsert(startLoc, "withoutDerivative(at:")
-          .fixItInsertAfter(endLoc, ")");
+            .diagnose(startLoc, diag::autodiff_nonvaried_result_fixit)
+            .fixItInsert(startLoc, "withoutDerivative(at:")
+            .fixItInsertAfter(endLoc, ")");
       }
     }
 
