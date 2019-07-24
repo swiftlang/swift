@@ -1377,6 +1377,9 @@ WARNING(enum_frozen_nonpublic,none,
         "%0 has no effect on non-public enums", (DeclAttribute))
 
 // Variables (var and let).
+ERROR(getset_init,none,
+      "variable with getter/setter cannot have an initial value", ())
+
 ERROR(unimplemented_static_var,none,
       "%select{ERROR|static|class}1 stored properties not supported"
       "%select{ in this context| in generic types| in classes| in protocol extensions}0"

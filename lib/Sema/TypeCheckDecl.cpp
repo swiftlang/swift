@@ -946,56 +946,44 @@ static bool contextAllowsPatternBindingWithoutVariables(DeclContext *dc) {
   return true;
 }
 
-static VarDecl *getStoredPropertyFor(VarDecl *var) {
-  if (var->isStatic())
-    return nullptr;
+static bool hasStoredProperties(NominalTypeDecl *decl) {
+  return (isa<StructDecl>(decl) ||
+          (isa<ClassDecl>(decl) && !decl->hasClangNode()));
+}
 
-  if (var->isLazyStorageProperty())
-    return nullptr;
+static void computeLoweredStoredProperties(NominalTypeDecl *decl) {
+  // Just walk over the members of the type, forcing backing storage
+  // for lazy properties and property wrappers to be synthesized.
+  for (auto *member : decl->getMembers()) {
+    auto *var = dyn_cast<VarDecl>(member);
+    if (!var || var->isStatic())
+      continue;
 
-  if (var->getOriginalWrappedProperty())
-    return nullptr;
+    if (var->getAttrs().hasAttribute<LazyAttr>())
+      (void) var->getLazyStorageProperty();
 
-  if (var->getAttrs().hasAttribute<LazyAttr>()) {
-    if (auto *storage = var->getLazyStorageProperty()) {
-      assert(storage->hasStorage());
-      return storage;
-    }
-
-    return nullptr;
+    if (var->hasAttachedPropertyWrapper())
+      (void) var->getPropertyWrapperBackingProperty();
   }
-
-  if (var->hasAttachedPropertyWrapper()) {
-    if (auto *storage = var->getPropertyWrapperBackingProperty()) {
-      assert(storage->hasStorage());
-      return storage;
-    }
-
-    return nullptr;
-  }
-
-  if (var->getAttrs().hasAttribute<NSManagedAttr>())
-    return nullptr;
-
-  if (!var->hasStorage())
-    return nullptr;
-
-  return var;
 }
 
 llvm::Expected<ArrayRef<VarDecl *>>
 StoredPropertiesRequest::evaluate(Evaluator &evaluator,
                                   NominalTypeDecl *decl) const {
-  if (isa<EnumDecl>(decl) ||
-      isa<ProtocolDecl>(decl) ||
-      (isa<ClassDecl>(decl) && decl->hasClangNode()))
+  if (!hasStoredProperties(decl))
     return ArrayRef<VarDecl *>();
 
   SmallVector<VarDecl *, 4> results;
+
+  // Unless we're in a source file we don't have to do anything
+  // special to lower lazy properties and property wrappers.
+  if (isa<SourceFile>(decl->getModuleScopeContext()))
+    computeLoweredStoredProperties(decl);
+
   for (auto *member : decl->getMembers()) {
     if (auto *var = dyn_cast<VarDecl>(member))
-      if (auto *storage = getStoredPropertyFor(var))
-        results.push_back(storage);
+      if (!var->isStatic() && var->hasStorage())
+        results.push_back(var);
   }
 
   return decl->getASTContext().AllocateCopy(results);
@@ -1004,16 +992,20 @@ StoredPropertiesRequest::evaluate(Evaluator &evaluator,
 llvm::Expected<ArrayRef<Decl *>>
 StoredPropertiesAndMissingMembersRequest::evaluate(Evaluator &evaluator,
                                                    NominalTypeDecl *decl) const {
-  if (isa<EnumDecl>(decl) ||
-      isa<ProtocolDecl>(decl) ||
-      (isa<ClassDecl>(decl) && decl->hasClangNode()))
+  if (!hasStoredProperties(decl))
     return ArrayRef<Decl *>();
 
   SmallVector<Decl *, 4> results;
+
+  // Unless we're in a source file we don't have to do anything
+  // special to lower lazy properties and property wrappers.
+  if (isa<SourceFile>(decl->getModuleScopeContext()))
+    computeLoweredStoredProperties(decl);
+
   for (auto *member : decl->getMembers()) {
     if (auto *var = dyn_cast<VarDecl>(member))
-      if (auto *storage = getStoredPropertyFor(var))
-        results.push_back(storage);
+      if (!var->isStatic() && var->hasStorage())
+        results.push_back(var);
 
     if (auto missing = dyn_cast<MissingMemberDecl>(member))
       if (missing->getNumberOfFieldOffsetVectorEntries() > 0)
@@ -2222,6 +2214,15 @@ IsGetterMutatingRequest::evaluate(Evaluator &evaluator,
         return wrapperInfo.valueVar->isGetterMutating() && result;
       }
     }
+  }
+
+  // Protocol requirements are always written as '{ get }' or '{ get set }';
+  // the @_borrowed attribute determines if getReadImpl() becomes Get or Read.
+  if (isa<ProtocolDecl>(storage->getDeclContext())) {
+    if (!storage->getGetter())
+      return false;
+
+    return storage->getGetter()->isMutating();
   }
 
   switch (storage->getReadImpl()) {
