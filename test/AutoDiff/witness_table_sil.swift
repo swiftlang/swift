@@ -12,16 +12,10 @@ protocol Proto : Differentiable {
 }
 
 struct S : Proto, VectorProtocol {
-  static var zero: S { return S(p: 0) }
   typealias Scalar = Float
-  static func + (lhs: S, rhs: S) -> S { return S(p: lhs.p + rhs.p) }
-  static func - (lhs: S, rhs: S) -> S { return S(p: lhs.p - rhs.p) }
-  static func * (lhs: Float, rhs: S) -> S { return S(p: lhs * rhs.p) }
-
-  typealias TangentVector = S
 
   @differentiable
-  let p: Float
+  var p: Float
 
   @differentiable(wrt: (x, y))
   func function1(_ x: Float, _ y: Double) -> Float {
@@ -87,8 +81,8 @@ struct S : Proto, VectorProtocol {
   // CHECK: } // end sil function 'AD__{{.*}}function3{{.*}}_vjp_USU'
 }
 
-// CHECK-LABEL: sil_witness_table hidden S: Proto module witness_table_silgen {
-// CHECK-NEXT:  base_protocol Differentiable: S: Differentiable module witness_table_silgen
+// CHECK-LABEL: sil_witness_table hidden S: Proto module witness_table_sil {
+// CHECK-NEXT:  base_protocol Differentiable: S: Differentiable module witness_table_sil
 // CHECK-NEXT:  method #Proto.function1!1: <Self where Self : Proto> (Self) -> (Float, Double) -> Float : @{{.*}}function1
 // CHECK-NEXT:  method #Proto.function1!1.jvp.1.SSU: <Self where Self : Proto> (Self) -> (Float, Double) -> Float : @AD__{{.*}}function1{{.*}}_jvp_SSU
 // CHECK-NEXT:  method #Proto.function1!1.vjp.1.SSU: <Self where Self : Proto> (Self) -> (Float, Double) -> Float : @AD__{{.*}}function1{{.*}}_vjp_SSU

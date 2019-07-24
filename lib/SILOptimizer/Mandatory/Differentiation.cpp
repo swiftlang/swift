@@ -954,8 +954,8 @@ public:
   //--------------------------------------------------------------------------//
 
   /// Finds the `[differentiable]` attribute on the specified original function
-  /// corresponding to the specified parameter indices. Returns nullptr if it
-  /// does not exist.
+  /// with the exact specified parameter indices. Returns nullptr if no such
+  /// attribute exists.
   SILDifferentiableAttr *lookUpDifferentiableAttr(
       SILFunction *original, const SILAutoDiffIndices &indices) const {
     for (auto *attr : original->getDifferentiableAttrs())
@@ -965,39 +965,75 @@ public:
   }
 
   /// Finds the `[differentiable]` attribute on the specified original function
-  /// corresponding to the specified parameter indices. Returns nullptr if it
-  /// does not exist.
+  /// whose parameter indices are a minimal superset of the specified parameter
+  /// indices. Returns nullptr if no such attribute exists.
   SILDifferentiableAttr *lookUpMinimalDifferentiableAttr(
       SILFunction *original, const SILAutoDiffIndices &indices) const {
-    auto *superset = AutoDiffIndexSubset::getDefault(
+    auto *minimalIndexSet = AutoDiffIndexSubset::getDefault(
         getASTContext(),
         original->getLoweredFunctionType()->getNumParameters(), false);
     auto *indexSet = indices.parameters;
     if (auto *exactAttr = lookUpDifferentiableAttr(original, indices))
       return exactAttr;
     SILDifferentiableAttr *minimalAttr = nullptr;
-    for (auto *rda : original->getDifferentiableAttrs()) {
-      if (rda->getIndices().source != indices.source)
+    for (auto *da : original->getDifferentiableAttrs()) {
+      if (da->getIndices().source != indices.source)
         continue;
-      auto *rdaIndexSet = rda->getIndices().parameters;
-      // If all indices in `indexSet` are in `rdaIndexSet`, and it has fewer
-      // indices than our current candidate and a primitive VJP, then `rda` is
+      auto *daIndexSet = da->getIndices().parameters;
+      // If all indices in `indexSet` are in `daIndexSet`, and it has fewer
+      // indices than our current candidate and a primitive VJP, then `da` is
       // our new candidate.
       //
-      // NOTE: `rda` may come from a un-partial-applied function and have larger
-      // capacity than the desired indices. We expect this logic to go away when
-      // we support `@differentiable` partial apply.
-      if (rdaIndexSet->isSupersetOf(
-              indexSet->extendingCapacity(getASTContext(),
-                                          rdaIndexSet->getCapacity())) &&
+      // NOTE(TF-642): `da` may come from a un-partial-applied function and
+      // have larger capacity than the desired indices. We expect this logic to
+      // go away when `partial_apply` supports `@differentiable` callees.
+      if (daIndexSet->isSupersetOf(indexSet->extendingCapacity(
+              getASTContext(), daIndexSet->getCapacity())) &&
           // fewer parameters than before
-          (superset->isEmpty() ||
-           rdaIndexSet->getNumIndices() < superset->getNumIndices())) {
-        superset = rda->getIndices().parameters;
-        minimalAttr = rda;
+          (minimalIndexSet->isEmpty() ||
+           daIndexSet->getNumIndices() < minimalIndexSet->getNumIndices())) {
+        minimalAttr = da;
+        minimalIndexSet = daIndexSet;
       }
     }
     return minimalAttr;
+  }
+
+  /// Finds the `@differentiable` attribute (and its parameter indices) on the
+  /// specified original function whose parameter indices are a minimal
+  /// superset of the specified parameter indices. Returns nullptr if no such
+  /// attribute exists.
+  std::pair<const DifferentiableAttr *, AutoDiffIndexSubset *>
+  lookUpMinimalASTDifferentiableAttrAndIndexSubset(
+      SILDeclRef originalDeclRef, CanSILFunctionType originalFnType,
+      const SILAutoDiffIndices &indices) {
+    auto *original = originalDeclRef.getDecl();
+    const DifferentiableAttr *minimalAttr = nullptr;
+    auto *minimalIndexSet = AutoDiffIndexSubset::getDefault(
+        getASTContext(), originalFnType->getNumParameters(), false);
+    auto *indexSet = indices.parameters;
+    for (auto *da : original->getAttrs().getAttributes<DifferentiableAttr>()) {
+      auto *daParamIndices = da->getParameterIndices();
+      auto *daIndexSet = daParamIndices->getLowered(
+          getASTContext(),
+          original->getInterfaceType()->castTo<AnyFunctionType>());
+      // If all indices in `indexSet` are in `daIndexSet`, and it has fewer
+      // indices than our current candidate and a primitive VJP, then `da` is
+      // our new candidate.
+      //
+      // NOTE(TF-642): `da` may come from a un-partial-applied function and
+      // have larger capacity than the desired indices. We expect this logic to
+      // go away when `partial_apply` supports `@differentiable` callees.
+      if (daIndexSet->isSupersetOf(indexSet->extendingCapacity(getASTContext(),
+              daIndexSet->getCapacity())) &&
+          // fewer parameters than before
+          (minimalIndexSet->isEmpty() ||
+           daIndexSet->getNumIndices() < minimalIndexSet->getNumIndices())) {
+        minimalAttr = da;
+        minimalIndexSet = daIndexSet;
+      }
+    }
+    return std::make_pair(minimalAttr, minimalIndexSet);
   }
 
   /// Creates a `[differentiable]` attribute on the specified original function
@@ -2111,108 +2147,94 @@ emitAssociatedFunctionReference(
   if (auto *witnessMethod =
           peerThroughFunctionConversions<WitnessMethodInst>(original)) {
     auto loc = witnessMethod->getLoc();
-    auto requirement = witnessMethod->getMember();
-    auto *requirementDecl = requirement.getDecl();
-    auto *diffAttr =
-        requirementDecl->getAttrs().getAttribute<DifferentiableAttr>();
-    if (!diffAttr) {
-      context.emitNondifferentiabilityError(original, invoker,
-          diag::autodiff_protocol_member_not_differentiable);
+    auto requirementDeclRef = witnessMethod->getMember();
+    auto *requirementDecl = requirementDeclRef.getDecl();
+    auto witnessMethodType = witnessMethod->getType().castTo<SILFunctionType>();
+    // If requirement declaration does not have any `@differentiable`
+    // attributes, produce an error.
+    if (!requirementDecl->getAttrs().hasAttribute<DifferentiableAttr>()) {
+      context.emitNondifferentiabilityError(
+          original, invoker, diag::autodiff_protocol_member_not_differentiable);
       return None;
     }
-
-    // Check that the requirement indices are the same as the desired indices.
-    auto *requirementParameterIndices = diffAttr->getParameterIndices();
-    auto loweredRequirementIndices = requirementParameterIndices->getLowered(
-        context.getASTContext(),
-        requirementDecl->getInterfaceType()->castTo<AnyFunctionType>());
-    SILAutoDiffIndices requirementIndices(/*source*/ 0,
-                                          loweredRequirementIndices);
-
-    // NOTE: We need to extend the capacity of desired parameter indices to
-    // requirement parameter indices, because there's an argument count
-    // mismatch. When `partial_apply` supports `@differentiable` values, this
-    // problem will go away.
-    if (desiredIndices.source != requirementIndices.source ||
-        !desiredIndices.parameters->extendingCapacity(
-            context.getASTContext(),
-            requirementIndices.parameters->getCapacity())
-                ->isSubsetOf(requirementIndices.parameters)) {
-      context.emitNondifferentiabilityError(original, invoker,
-          diag::autodiff_protocol_member_subset_indices_not_differentiable);
+    // Get the minimal `@differentiable` attribute and parameter index subset.
+    const DifferentiableAttr *minimalAttr;
+    AutoDiffIndexSubset *minimalParamIndexSet;
+    std::tie(minimalAttr, minimalParamIndexSet) =
+        context.lookUpMinimalASTDifferentiableAttrAndIndexSubset(
+            requirementDeclRef, witnessMethodType, desiredIndices);
+    SILAutoDiffIndices minimalIndices(/*source*/ 0, minimalParamIndexSet);
+    // If minimal `@differentiable` attribute does not exist, then no attribute
+    // exists with a superset of the desired indices. Produce an error.
+    if (!minimalAttr) {
+      context.emitNondifferentiabilityError(
+          original, invoker,
+          diag::autodiff_member_subset_indices_not_differentiable);
       return None;
     }
-
+    // Emit a `witness_method` instruction for the associated function.
     auto originalType = witnessMethod->getType().castTo<SILFunctionType>();
     auto assocType = originalType->getAutoDiffAssociatedFunctionType(
-        requirementIndices.parameters, requirementIndices.source,
+        minimalIndices.parameters, minimalIndices.source,
         /*differentiationOrder*/ 1, kind, builder.getModule(),
         LookUpConformanceInModule(builder.getModule().getSwiftModule()));
-
-    // Emit a `witness_method` instruction for the associated function.
     auto *autoDiffFuncId = AutoDiffAssociatedFunctionIdentifier::get(
-        kind, /*differentiationOrder*/ 1, requirementParameterIndices,
+        kind, /*differentiationOrder*/ 1, minimalAttr->getParameterIndices(),
         context.getASTContext());
     auto *ref = builder.createWitnessMethod(
         loc, witnessMethod->getLookupType(), witnessMethod->getConformance(),
-        requirement.asAutoDiffAssociatedFunction(autoDiffFuncId),
+        requirementDeclRef.asAutoDiffAssociatedFunction(autoDiffFuncId),
         SILType::getPrimitiveObjectType(assocType));
     auto convertedRef =
         reapplyFunctionConversion(ref, witnessMethod, original, builder, loc);
-    return std::make_pair(convertedRef, requirementIndices);
+    return std::make_pair(convertedRef, minimalIndices);
   }
 
   // Find class method.
   if (auto *classMethodInst =
           peerThroughFunctionConversions<ClassMethodInst>(original)) {
     auto loc = classMethodInst->getLoc();
-    auto methodRef = classMethodInst->getMember();
-    auto *methodDecl = methodRef.getDecl();
-    auto *diffAttr = methodDecl->getAttrs().getAttribute<DifferentiableAttr>();
-    if (!diffAttr) {
+    auto methodDeclRef = classMethodInst->getMember();
+    auto *methodDecl = methodDeclRef.getDecl();
+    auto classMethodType = classMethodInst->getType().castTo<SILFunctionType>();
+    // If method declaration does not have any `@differentiable` attributes,
+    // produce an error.
+    if (!methodDecl->getAttrs().hasAttribute<DifferentiableAttr>()) {
+      context.emitNondifferentiabilityError(
+          original, invoker, diag::autodiff_class_member_not_differentiable);
+      return None;
+    }
+    // Get the minimal `@differentiable` attribute and parameter index subset.
+    const DifferentiableAttr *minimalAttr;
+    AutoDiffIndexSubset *minimalParamIndexSet;
+    std::tie(minimalAttr, minimalParamIndexSet) =
+        context.lookUpMinimalASTDifferentiableAttrAndIndexSubset(
+            methodDeclRef, classMethodType, desiredIndices);
+    SILAutoDiffIndices minimalIndices(/*source*/ 0, minimalParamIndexSet);
+    // If minimal `@differentiable` attribute does not exist, then no attribute
+    // exists with a superset of the desired indices. Produce an error.
+    if (!minimalAttr) {
       context.emitNondifferentiabilityError(
           original, invoker,
-          diag::autodiff_class_member_not_differentiable);
+          diag::autodiff_member_subset_indices_not_differentiable);
       return None;
     }
-
-    auto *methodParameterIndices = diffAttr->getParameterIndices();
-    auto loweredMethodIndices = methodParameterIndices->getLowered(
-        context.getASTContext(),
-        methodDecl->getInterfaceType()->castTo<AnyFunctionType>());
-    SILAutoDiffIndices methodIndices(/*source*/ 0, loweredMethodIndices);
-
-    // NOTE: We need to extend the capacity of desired parameter indices to
-    // requirement parameter indices, because there's an argument count
-    // mismatch. When `@differentiable` partial apply is supported, this problem
-    // will go away.
-    if (desiredIndices.source != methodIndices.source ||
-        !desiredIndices.parameters->extendingCapacity(
-            context.getASTContext(),
-            methodIndices.parameters->getCapacity())
-                ->isSubsetOf(methodIndices.parameters)) {
-      context.emitNondifferentiabilityError(original, invoker,
-          diag::autodiff_protocol_member_subset_indices_not_differentiable);
-      return None;
-    }
-
+    // Emit a `class_method` instruction for the associated function.
     auto originalType = classMethodInst->getType().castTo<SILFunctionType>();
     auto assocType = originalType->getAutoDiffAssociatedFunctionType(
-        methodIndices.parameters, methodIndices.source,
+        minimalIndices.parameters, minimalIndices.source,
         /*differentiationOrder*/ 1, kind, builder.getModule(),
         LookUpConformanceInModule(builder.getModule().getSwiftModule()));
-
-    // Emit a `class_method` instruction for the associated function.
     auto *autoDiffFuncId = AutoDiffAssociatedFunctionIdentifier::get(
-        kind, /*differentiationOrder*/ 1, methodParameterIndices,
+        kind, /*differentiationOrder*/ 1, minimalAttr->getParameterIndices(),
         context.getASTContext());
     auto *ref = builder.createClassMethod(
         loc, classMethodInst->getOperand(),
-        methodRef.asAutoDiffAssociatedFunction(autoDiffFuncId),
+        methodDeclRef.asAutoDiffAssociatedFunction(autoDiffFuncId),
         SILType::getPrimitiveObjectType(assocType));
     auto convertedRef =
         reapplyFunctionConversion(ref, classMethodInst, original, builder, loc);
-    return std::make_pair(convertedRef, methodIndices);
+    return std::make_pair(convertedRef, minimalIndices);
   }
 
   // Emit the general opaque function error.

@@ -119,12 +119,17 @@ ClassMethodTests.test("SimpleWrtSelf") {
   expectEqual(100, pullback(at: 1337) { x in SubOverrideCustomDerivatives(base: x) }(v))
   */
 
-  func classValueWithGradient(_ c: Super) -> (Float, Float) {
-    return valueWithGradient(at: 1) { c.f($0) }
+  // `valueWithGradient` is not used because nested tuples cannot be compared
+  // with `expectEqual`.
+  func classGradient(_ c: Super) -> (Super.TangentVector, Float) {
+    return gradient(at: c, 10) { c, x in c.f(x) }
   }
-  expectEqual((2, 2), classValueWithGradient(Super(base: 2)))
-  expectEqual((3, 3), classValueWithGradient(SubOverride(base: 2)))
-  expectEqual((3, 3), classValueWithGradient(SubOverrideCustomDerivatives(base: 2)))
+  expectEqual((Super.TangentVector(base: 10, _nontrivial: []), 2),
+              classGradient(Super(base: 2)))
+  expectEqual((Super.TangentVector(base: 0, _nontrivial: []), 3),
+              classGradient(SubOverride(base: 2)))
+  expectEqual((Super.TangentVector(base: 0, _nontrivial: []), 3),
+              classGradient(SubOverrideCustomDerivatives(base: 2)))
 }
 
 ClassMethodTests.test("Generics") {
