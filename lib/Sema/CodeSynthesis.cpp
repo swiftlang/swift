@@ -1912,6 +1912,18 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
   // Take the initializer from the original property.
   auto parentPBD = var->getParentPatternBinding();
   unsigned patternNumber = parentPBD->getPatternEntryIndexForVarDecl(var);
+  
+  // Force the default initializer to come into existence, if there is one,
+  // and the wrapper doesn't provide its own.
+  if (!parentPBD->isInitialized(patternNumber)
+      && parentPBD->isDefaultInitializable(patternNumber)
+      && !wrapperInfo.defaultInit) {
+    auto &tc = *static_cast<TypeChecker *>(ctx.getLazyResolver());
+    auto ty = parentPBD->getPattern(patternNumber)->getType();
+    if (auto defaultInit = tc.buildDefaultInitializer(ty))
+      parentPBD->setInit(patternNumber, defaultInit);
+  }
+  
   if (parentPBD->isInitialized(patternNumber) &&
       !parentPBD->isInitializerChecked(patternNumber)) {
     auto &tc = *static_cast<TypeChecker *>(ctx.getLazyResolver());
@@ -2558,7 +2570,12 @@ static void maybeAddMemberwiseDefaultArg(ParamDecl *arg, VarDecl *var,
     return;
 
   // Whether we have explicit initialization.
-  bool isExplicitlyInitialized = var->isParentInitialized();
+  bool isExplicitlyInitialized = false;
+  if (auto pbd = var->getParentPatternBinding()) {
+    auto &entry = pbd->getPatternEntryForVarDecl(var);
+    isExplicitlyInitialized =
+      entry.isInitialized() && entry.getEqualLoc().isValid();
+  }
 
   // Whether we can default-initialize this property.
   auto binding = var->getParentPatternBinding();

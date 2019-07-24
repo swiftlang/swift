@@ -642,10 +642,10 @@ TypeChecker::handleSILGenericParams(GenericParamList *genericParams,
 }
 
 /// Build a default initializer for the given type.
-static Expr *buildDefaultInitializer(TypeChecker &tc, Type type) {
+Expr *TypeChecker::buildDefaultInitializer(Type type) {
   // Default-initialize optional types and weak values to 'nil'.
   if (type->getReferenceStorageReferent()->getOptionalObjectType())
-    return new (tc.Context) NilLiteralExpr(SourceLoc(), /*Implicit=*/true);
+    return new (Context) NilLiteralExpr(SourceLoc(), /*Implicit=*/true);
 
   // Build tuple literals for tuple types.
   if (auto tupleType = type->getAs<TupleType>()) {
@@ -654,14 +654,14 @@ static Expr *buildDefaultInitializer(TypeChecker &tc, Type type) {
       if (elt.isVararg())
         return nullptr;
 
-      auto eltInit = buildDefaultInitializer(tc, elt.getType());
+      auto eltInit = buildDefaultInitializer(elt.getType());
       if (!eltInit)
         return nullptr;
 
       inits.push_back(eltInit);
     }
 
-    return TupleExpr::createImplicit(tc.Context, inits, { });
+    return TupleExpr::createImplicit(Context, inits, { });
   }
 
   // We don't default-initialize anything else.
@@ -2629,7 +2629,7 @@ public:
           PBD->getPattern(i)->hasStorage() &&
           !PBD->getPattern(i)->getType()->hasError()) {
         auto type = PBD->getPattern(i)->getType();
-        if (auto defaultInit = buildDefaultInitializer(TC, type)) {
+        if (auto defaultInit = TC.buildDefaultInitializer(type)) {
           // If we got a default initializer, install it and re-type-check it
           // to make sure it is properly coerced to the pattern type.
           PBD->setInit(i, defaultInit);

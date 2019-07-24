@@ -5821,7 +5821,8 @@ Expr *swift::findOriginalPropertyWrapperInitialValue(VarDecl *var,
     return nullptr;
 
   // If there is no '=' on the pattern, there was no initial value.
-  if (PBD->getPatternList()[0].getEqualLoc().isInvalid())
+  if (PBD->getPatternList()[0].getEqualLoc().isInvalid()
+      && !PBD->isDefaultInitializable())
     return nullptr;
 
   ASTContext &ctx = var->getASTContext();

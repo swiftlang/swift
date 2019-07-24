@@ -360,7 +360,24 @@ func testOptIntStruct() {
   print("\n## OptIntStruct")
 
   let use = OptIntStruct()
-  // CHECK-NEXT:   .. init Optional(42)
+  // CHECK-NEXT:   .. init nil
+  // CHECK-NEXT:   .. set Optional(42)
+}
+
+// rdar://problem/53504653
+
+struct DefaultNilOptIntStruct {
+  @Wrapper var wrapped: Int?
+
+  init() {
+  }
+}
+func testDefaultNilOptIntStruct() {
+  // CHECK: ## DefaultNilOptIntStruct
+  print("\n## DefaultNilOptIntStruct")
+
+  let use = DefaultNilOptIntStruct()
+  // CHECK-NEXT:   .. init nil
 }
 
 testIntStruct()
@@ -369,3 +386,4 @@ testRefStruct()
 testGenericClass()
 testDefaultInit()
 testOptIntStruct()
+testDefaultNilOptIntStruct()
