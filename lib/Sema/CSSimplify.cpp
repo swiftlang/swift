@@ -863,14 +863,19 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
 
 class ArgumentFailureTracker : public MatchCallArgumentListener {
   ConstraintSystem &CS;
+  ArrayRef<AnyFunctionType::Param> Arguments;
+  ArrayRef<AnyFunctionType::Param> Parameters;
   SmallVectorImpl<ParamBinding> &Bindings;
   ConstraintLocatorBuilder Locator;
 
 public:
   ArgumentFailureTracker(ConstraintSystem &cs,
+                         ArrayRef<AnyFunctionType::Param> args,
+                         ArrayRef<AnyFunctionType::Param> params,
                          SmallVectorImpl<ParamBinding> &bindings,
                          ConstraintLocatorBuilder locator)
-      : CS(cs), Bindings(bindings), Locator(locator) {}
+      : CS(cs), Arguments(args), Parameters(params), Bindings(bindings),
+        Locator(locator) {}
 
   bool missingLabel(unsigned paramIndex) override {
     return !CS.shouldAttemptFixes();
@@ -902,9 +907,27 @@ public:
     if (!anchor)
       return true;
 
+    unsigned numExtraneous = 0;
+    for (unsigned paramIdx = 0, n = Bindings.size(); paramIdx != n;
+         ++paramIdx) {
+      if (Bindings[paramIdx].empty())
+        continue;
+
+      const auto paramLabel = Parameters[paramIdx].getLabel();
+      for (auto argIdx : Bindings[paramIdx]) {
+        auto argLabel = Arguments[argIdx].getLabel();
+        if (paramLabel.empty() && !argLabel.empty())
+          ++numExtraneous;
+      }
+    }
+
     auto *locator = CS.getConstraintLocator(anchor);
     auto *fix = RelabelArguments::create(CS, newLabels, locator);
     CS.recordFix(fix);
+    // Re-labeling fixes with extraneous labels should take
+    // lower priority vs. other fixes on same/different
+    // overload(s) where labels did line up correctly.
+    CS.increaseScore(ScoreKind::SK_Fix, numExtraneous);
     return false;
   }
 };
@@ -934,7 +957,8 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
 
   // Match up the call arguments to the parameters.
   SmallVector<ParamBinding, 4> parameterBindings;
-  ArgumentFailureTracker listener(cs, parameterBindings, locator);
+  ArgumentFailureTracker listener(cs, argsWithLabels, params, parameterBindings,
+                                  locator);
   if (constraints::matchCallArguments(argsWithLabels, params,
                                       paramInfo,
                                       hasTrailingClosure,
