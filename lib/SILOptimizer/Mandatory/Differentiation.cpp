@@ -418,7 +418,7 @@ private:
   DenseMap<SILInstruction *, VarDecl *> linearMapValueMap;
 
   /// Mapping from predecessor+succcessor basic block pairs in original function
-  /// to the corresponding enum case.
+  /// to the corresponding branching trace enum case.
   DenseMap<std::pair<SILBasicBlock *, SILBasicBlock *>, EnumElementDecl *>
       branchingTraceEnumCases;
 
@@ -462,7 +462,7 @@ private:
     llvm_unreachable("No files?");
   }
 
-  /// Compute and set the access level for the given linear map data structure,
+  /// Compute and set the access level for the given branching trace or linear map data structure,
   /// given the original function linkage.
   void computeAccessLevel(
       NominalTypeDecl *nominal, SILLinkage originalLinkage) {
@@ -536,18 +536,18 @@ private:
     // Add basic block enum cases.
     for (auto *predBB : originalBB->getPredecessorBlocks()) {
       auto bbId = "bb" + std::to_string(predBB->getDebugID());
-      auto *predLinearMapStruct = getLinearMapStruct(predBB);
-      assert(predLinearMapStruct);
-      auto predLinearMapStructTy =
-          predLinearMapStruct->getDeclaredInterfaceType()->getCanonicalType();
+      auto *linearMapStruct = getLinearMapStruct(predBB);
+      assert(linearMapStruct);
+      auto linearMapStructTy =
+          linearMapStruct->getDeclaredInterfaceType()->getCanonicalType();
       // Create dummy declaration representing enum case parameter.
       auto *decl = new (astCtx)
           ParamDecl(VarDecl::Specifier::Default, loc, loc, Identifier(), loc,
                     Identifier(), moduleDecl);
-      if (predLinearMapStructTy->hasArchetype())
-        decl->setInterfaceType(predLinearMapStructTy->mapTypeOutOfContext());
+      if (linearMapStructTy->hasArchetype())
+        decl->setInterfaceType(linearMapStructTy->mapTypeOutOfContext());
       else
-        decl->setInterfaceType(predLinearMapStructTy);
+        decl->setInterfaceType(linearMapStructTy);
       // Create enum element and enum case declarations.
       auto *paramList = ParameterList::create(astCtx, {decl});
       auto *enumEltDecl = new (astCtx) EnumElementDecl(
@@ -583,15 +583,15 @@ private:
   }
 
   /// Creates a struct declaration with the given VJP/JVP generic signature, for
-  /// storing the linear map values and predecessor/successor of the given
-  /// original block.
+  /// storing the linear map values and predecessor/successor basic block of the
+  /// given original block.
   StructDecl *
   createLinearMapStruct(SILBasicBlock *originalBB, SILAutoDiffIndices indices,
                         CanGenericSignature genericSig) {
     auto *original = originalBB->getParent();
     auto &astCtx = original->getASTContext();
     auto &file = getDeclarationFileUnit();
-    // Create a differential/pullback struct.
+
     std::string structName;
     switch (kind) {
     case swift::AutoDiffAssociatedFunctionKind::JVP:
@@ -607,6 +607,7 @@ private:
           "__PB__" + indices.mangle();
       break;
     }
+
     auto structId = astCtx.getIdentifier(structName);
     SourceLoc loc = original->getLocation().getSourceLoc();
     auto *linearMapStruct = new (astCtx) StructDecl(
@@ -637,7 +638,7 @@ private:
         break;
       }
       s << structName << " struct declaration created for function @"
-	<< original->getName() << " bb" << originalBB->getDebugID() << '\n';
+        << original->getName() << " bb" << originalBB->getDebugID() << '\n';
       linearMapStruct->print(s);
       s << '\n';
     });
@@ -1296,11 +1297,11 @@ LinearMapInfo::LinearMapInfo(ADContext &context,
   auto &astCtx = original->getASTContext();
   auto *loopAnalysis = context.getPassManager().getAnalysis<SILLoopAnalysis>();
   auto *loopInfo = loopAnalysis->get(original);
-  // Get associated function generic signature.
+  // Get the associated function generic signature.
   CanGenericSignature assocFnGenSig = nullptr;
   if (auto *assocFnGenEnv = assocFn->getGenericEnvironment())
     assocFnGenSig = assocFnGenEnv->getGenericSignature()->getCanonicalSignature();
-  // Create predecessor enum and pullback struct for each original block.
+  // Create branching trace enum and pullback struct for each original block.
   for (auto &origBB : *original) {
     auto *linearMapStruct = createLinearMapStruct(&origBB, indices, assocFnGenSig);
     linearMapStructs.insert({&origBB, linearMapStruct});
@@ -1309,7 +1310,7 @@ LinearMapInfo::LinearMapInfo(ADContext &context,
     auto *linearMapStruct = getLinearMapStruct(&origBB);
     auto *traceEnum =
         createBranchingTraceDecl(&origBB, indices, assocFnGenSig);
-    // If original block is in a loop, mark predecessor enum as indirect.
+    // If original block is in a loop, mark branching trace enum as indirect.
     if (loopInfo->getLoopFor(&origBB))
       traceEnum->getAttrs().add(new (astCtx) IndirectAttr(/*Implicit*/ true));
     branchingTraceDecls.insert({&origBB, traceEnum});
@@ -3759,7 +3760,8 @@ private:
   //--------------------------------------------------------------------------//
 
   SILBasicBlock::iterator getNextDifferentialLocalAllocationInsertionPoint() {
-    // If there are no local allocations, insert at the tangent entry beginning.
+    // If there are no local allocations, insert at the beginning of the tangent
+    // entry.
     if (differentialLocalAllocations.empty())
       return getDifferential().getEntryBlock()->begin();
     // Otherwise, insert before the last local allocation. Inserting before
@@ -3819,23 +3821,23 @@ private:
     auto tangentSpace = getTangentSpace(type);
     assert(tangentSpace && "No tangent space for this type");
     switch (tangentSpace->getKind()) {
-      case VectorSpace::Kind::Vector:
-        emitZeroIntoBuffer(builder, type, bufferAccess, loc);
-        return;
-      case VectorSpace::Kind::Tuple: {
-        auto tupleType = tangentSpace->getTuple();
-        SmallVector<SILValue, 8> zeroElements;
-        for (unsigned i : range(tupleType->getNumElements())) {
-          auto eltAddr = builder.createTupleElementAddr(loc, bufferAccess, i);
-          emitZeroIndirect(tupleType->getElementType(i)->getCanonicalType(),
-                           eltAddr, loc);
-        }
-        return;
+    case VectorSpace::Kind::Vector:
+      emitZeroIntoBuffer(builder, type, bufferAccess, loc);
+      return;
+    case VectorSpace::Kind::Tuple: {
+      auto tupleType = tangentSpace->getTuple();
+      SmallVector<SILValue, 8> zeroElements;
+      for (unsigned i : range(tupleType->getNumElements())) {
+        auto eltAddr = builder.createTupleElementAddr(loc, bufferAccess, i);
+        emitZeroIndirect(tupleType->getElementType(i)->getCanonicalType(),
+                         eltAddr, loc);
       }
-      case VectorSpace::Kind::Function: {
-        llvm_unreachable(
-            "Unimplemented: Emit thunks for abstracting zero initialization");
-      }
+      return;
+    }
+    case VectorSpace::Kind::Function: {
+      llvm_unreachable(
+          "Unimplemented: Emit thunks for abstracting zero initialization");
+    }
     }
   }
 
@@ -3902,7 +3904,7 @@ private:
       return insertion.first->getSecond();
 
     // Set insertion point for local allocation builder: before the last local
-    // allocation, or at the start of the adjoint function's entry if no local
+    // allocation, or at the start of the tangent function's entry if no local
     // allocations exist yet.
     diffLocalAllocBuilder.setInsertionPoint(
         getDifferential().getEntryBlock(),
@@ -4309,7 +4311,7 @@ public:
         loc, differentialRef, jvpSubstMap, {diffStructVal},
         ParameterConvention::Direct_Guaranteed);
 
-    // Return a tuple of the original result and pullback.
+    // Return a tuple of the original result and differential.
     SmallVector<SILValue, 8> directResults;
     directResults.append(origResults.begin(), origResults.end());
     directResults.push_back(differentialPartialApply);
