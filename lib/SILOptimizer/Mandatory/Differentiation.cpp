@@ -4546,9 +4546,6 @@ public:
         auto adjBuf = getAdjointBuffer(origEntry, origParam);
         if (errorOccurred)
           return;
-        if (adjBuf->getType().isLoadable(getPullback()))
-          builder.createRetainValueAddr(pbLoc, adjBuf,
-                                        builder.getDefaultAtomicity());
         indParamAdjoints.push_back(adjBuf);
       }
     };
