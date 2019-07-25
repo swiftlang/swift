@@ -32,6 +32,7 @@ public struct Tracked<T> {
   private var handle: Box
 
   @differentiable(
+    jvp: _jvpInit,
     vjp: _vjpInit
     where T : Differentiable, T == T.AllDifferentiableVariables,
           T == T.TangentVector
@@ -41,6 +42,7 @@ public struct Tracked<T> {
   }
 
   @differentiable(
+    jvp: _jvpValue,
     vjp: _vjpValue
     where T : Differentiable, T == T.AllDifferentiableVariables,
           T == T.TangentVector
@@ -161,8 +163,19 @@ extension Tracked where T : Differentiable, T == T.AllDifferentiableVariables,
   }
 
   @usableFromInline
+  internal static func _jvpInit(_ value: __owned T)
+      -> (value: Self, differential: (T.TangentVector) -> (Self.TangentVector)) {
+    return (Tracked(value), { v in Tracked(v) })
+  }
+
+  @usableFromInline
   internal func _vjpValue() -> (T, (T.TangentVector) -> Self.TangentVector) {
     return (value, { v in Tracked(v) })
+  }
+
+  @usableFromInline
+  internal func _jvpValue() -> (T, (Self.TangentVector) -> T.TangentVector) {
+    return (value, { v in v.value })
   }
 }
 
@@ -182,6 +195,20 @@ extension Tracked where T : Differentiable, T == T.AllDifferentiableVariables,
       -> (value: Self, pullback: (Self) -> (Self, Self)) {
     return (lhs - rhs, { v in (v, .zero - v) })
   }
+
+  @usableFromInline
+  @differentiating(+)
+  internal static func _vjpAdd(lhs: Self, rhs: Self)
+      -> (value: Self, differential: (Self, Self) -> (Self)) {
+    return (lhs + rhs, { (dx, dy) in dx + dy })
+  }
+
+  @usableFromInline
+  @differentiating(-)
+  internal static func _vjpSubtract(lhs: Self, rhs: Self)
+      -> (value: Self, differential: (Self, Self) -> (Self)) {
+    return (lhs - rhs, { (dx, dy) in dx - dy })
+  }
 }
 
 extension Tracked where T : Differentiable & SignedNumeric, T == T.Magnitude,
@@ -192,6 +219,13 @@ extension Tracked where T : Differentiable & SignedNumeric, T == T.Magnitude,
       -> (value: Self, pullback: (Self) -> (Self, Self)) {
     return (lhs * rhs, { v in (v * rhs, v * lhs) })
   }
+
+  @usableFromInline
+  @differentiating(*)
+  internal static func _vjpMultiply(lhs: Self, rhs: Self)
+      -> (value: Self, differential: (Self, Self) -> (Self)) {
+    return (lhs * rhs, { (dx, dy) in dx * rhs + dy * lhs })
+  }
 }
 
 extension Tracked where T : Differentiable & FloatingPoint,
@@ -201,6 +235,13 @@ extension Tracked where T : Differentiable & FloatingPoint,
   internal static func _vjpDivide(lhs: Self, rhs: Self)
       -> (value: Self, pullback: (Self) -> (Self, Self)) {
     return (lhs / rhs, { v in (v / rhs, -lhs / (rhs * rhs) * v) })
+  }
+
+  @usableFromInline
+  @differentiating(/)
+  internal static func _vjpDivide(lhs: Self, rhs: Self)
+      -> (value: Self, differential: (Self, Self) -> (Self)) {
+    return (lhs / rhs, { (dx, dy) in dx / rhs - lhs / (rhs * rhs) * dy })
   }
 }
 
