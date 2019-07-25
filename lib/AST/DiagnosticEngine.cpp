@@ -943,17 +943,15 @@ BufferIndirectlyCausingDiagnosticRAII::BufferIndirectlyCausingDiagnosticRAII(
 }
 
 void DiagnosticEngine::onTentativeDiagnosticFlush(Diagnostic &diagnostic) {
-  for (auto curr = diagnostic.Args.begin(), last = diagnostic.Args.end();
-       curr != last; ++curr) {
-    auto &arg = *curr;
-    if (arg.getKind() != DiagnosticArgumentKind::String)
+  for (auto &argument : diagnostic.Args) {
+    if (argument.getKind() != DiagnosticArgumentKind::String)
       continue;
 
-    auto str = arg.getAsString();
-    if (str.empty())
+    auto content = argument.getAsString();
+    if (content.empty())
       continue;
 
-    auto I = TransactionStrings.insert(std::make_pair(str, char())).first;
-    *curr = DiagnosticArgument(StringRef(I->getKeyData()));
+    auto I = TransactionStrings.insert(std::make_pair(content, char())).first;
+    argument = DiagnosticArgument(StringRef(I->getKeyData()));
   }
 }
