@@ -2057,7 +2057,7 @@ emitAssociatedFunctionReference(
     auto substMap = getSubstitutionMap(original);
     // Attempt to look up a `[differentiable]` attribute that minimally
     // satisfies the specified indices.
-    // TODO(TF-482): Change `lookupMinimalDifferentiableAttr` to additionally
+    // TODO(TF-482): Change `lookUpMinimalDifferentiableAttr` to additionally
     // check whether `[differentiable]` attribute generic requirements are
     // satisfied.
     auto *minimalAttr =
@@ -2112,7 +2112,7 @@ emitAssociatedFunctionReference(
     }
     assert(minimalAttr);
     // TODO(TF-482): Move generic requirement checking logic to
-    // `lookupMinimalDifferentiableAttr`.
+    // `lookUpMinimalDifferentiableAttr`.
     if (!checkRequirementsSatisfied(
             minimalAttr->getRequirements(),
             substMap, originalFn, context.getModule().getSwiftModule())) {
@@ -2959,10 +2959,11 @@ public:
               ->getCanonicalType(), origParam.getConvention()));
     }
 
-    auto pbName = original->getASTContext()
-                       .getIdentifier("AD__" + original->getName().str() +
-                                      "__pullback_" + indices.mangle())
-                       .str();
+    Mangle::ASTMangler mangler;
+    auto pbName = original->getASTContext().getIdentifier(
+        mangler.mangleAutoDiffAssociatedFunctionHelper(
+            original->getName(), AutoDiffAssociatedFunctionKind::VJP,
+            indices, /*isLinearMap*/ true)).str();
     auto pbGenericSig = getAssociatedFunctionGenericSignature(attr, original);
     auto *pbGenericEnv = pbGenericSig
         ? pbGenericSig->createGenericEnvironment()
@@ -3460,7 +3461,7 @@ public:
   void visitAutoDiffFunctionInst(AutoDiffFunctionInst *adfi) {
     // Clone `autodiff_function` from original to VJP, then add the cloned
     // instruction to the `autodiff_function` worklist.
-    SILClonerWithScopes::visitAutoDiffFunctionInst(adfi);
+    TypeSubstCloner::visitAutoDiffFunctionInst(adfi);
     auto *newADFI = cast<AutoDiffFunctionInst>(getOpValue(adfi));
     context.getAutoDiffFunctionInsts().push_back(newADFI);
   }
@@ -3550,11 +3551,11 @@ public:
               ->getAutoDiffAssociatedTangentSpace(lookupConformance)
               ->getCanonicalType(), origParam.getConvention()));
     }
-
-    auto diffName = original->getASTContext()
-        .getIdentifier("AD__" + original->getName().str() + "__differential_" +
-                       indices.mangle())
-        .str();
+    Mangle::ASTMangler mangler;
+    auto diffName = original->getASTContext().getIdentifier(
+        mangler.mangleAutoDiffAssociatedFunctionHelper(
+            original->getName(), AutoDiffAssociatedFunctionKind::JVP,
+            indices, /*isLinearMap*/ true)).str();
     auto diffGenericSig = getAssociatedFunctionGenericSignature(attr, original);
     auto *diffGenericEnv = diffGenericSig
         ? diffGenericSig->createGenericEnvironment()
@@ -5918,10 +5919,11 @@ static SILFunction *createEmptyVJP(
   auto indices = attr->getIndices();
 
   // === Create an empty VJP. ===
-  auto vjpName = original->getASTContext()
-                     .getIdentifier("AD__" + original->getName().str() +
-                                    "__vjp_" + indices.mangle())
-                     .str();
+  Mangle::ASTMangler mangler;
+  auto vjpName = original->getASTContext().getIdentifier(
+      mangler.mangleAutoDiffAssociatedFunctionHelper(
+          original->getName(), AutoDiffAssociatedFunctionKind::VJP, indices))
+              .str();
   auto vjpGenericSig = getAssociatedFunctionGenericSignature(attr, original);
 
   // RAII that pushes the original function's generic signature to
@@ -5968,10 +5970,11 @@ static SILFunction *createEmptyJVP(
   auto indices = attr->getIndices();
 
   // === Create an empty JVP. ===
-  auto jvpName = original->getASTContext()
-      .getIdentifier("AD__" + original->getName().str() +
-                     "__jvp_" + indices.mangle())
-      .str();
+  Mangle::ASTMangler mangler;
+  auto jvpName = original->getASTContext().getIdentifier(
+      mangler.mangleAutoDiffAssociatedFunctionHelper(
+          original->getName(), AutoDiffAssociatedFunctionKind::JVP, indices))
+              .str();
   auto jvpGenericSig = getAssociatedFunctionGenericSignature(attr, original);
 
   // RAII that pushes the original function's generic signature to
@@ -6017,10 +6020,11 @@ bool ADContext::processDifferentiableAttribute(
   if (attr->hasJVP()) {
     jvpName = attr->getJVPName();
   } else if (original->isExternalDeclaration()) {
-    jvpName = original->getASTContext()
-                  .getIdentifier("AD__" + original->getName().str() +
-                                 "__jvp_" + attr->getIndices().mangle())
-                  .str();
+    Mangle::ASTMangler mangler;
+    jvpName = original->getASTContext().getIdentifier(
+        mangler.mangleAutoDiffAssociatedFunctionHelper(
+            original->getName(), AutoDiffAssociatedFunctionKind::JVP,
+            attr->getIndices())).str();
   }
   if (!jvpName.empty()) {
     jvp = module.lookUpFunction(jvpName);
@@ -6044,10 +6048,11 @@ bool ADContext::processDifferentiableAttribute(
   if (attr->hasVJP()) {
     vjpName = attr->getVJPName();
   } else if (original->isExternalDeclaration()) {
-    vjpName = original->getASTContext()
-                  .getIdentifier("AD__" + original->getName().str() +
-				                         "__vjp_" + attr->getIndices().mangle())
-                  .str();
+    Mangle::ASTMangler mangler;
+    vjpName = original->getASTContext().getIdentifier(
+        mangler.mangleAutoDiffAssociatedFunctionHelper(
+            original->getName(), AutoDiffAssociatedFunctionKind::VJP,
+            attr->getIndices())).str();
   }
   if (!vjpName.empty()) {
     vjp = module.lookUpFunction(vjpName);

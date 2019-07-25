@@ -369,6 +369,37 @@ std::string ASTMangler::mangleReabstractionThunkHelper(
   return finalize();
 }
 
+std::string ASTMangler::mangleAutoDiffAssociatedFunctionHelper(
+    StringRef name, AutoDiffAssociatedFunctionKind kind,
+    const SILAutoDiffIndices &indices, bool isLinearMap) {
+  // TODO(TF-20): Make the mangling scheme robust.
+  // TODO(TF-680): Mangle `@differentiable` atttribute requirements as well.
+  beginManglingWithoutPrefix();
+
+  Buffer << "AD__";
+  Buffer << name;
+  Buffer << '_';
+  switch (kind) {
+  case AutoDiffAssociatedFunctionKind::JVP:
+    if (isLinearMap)
+      Buffer << "_differential_";
+    else
+      Buffer << "_jvp_";
+    break;
+  case AutoDiffAssociatedFunctionKind::VJP:
+    if (isLinearMap)
+      Buffer << "_pullback_";
+    else
+      Buffer << "_vjp_";
+    break;
+  }
+  Buffer << indices.mangle();
+
+  auto result = Storage.str().str();
+  Storage.clear();
+  return result;
+}
+
 std::string ASTMangler::mangleTypeForDebugger(Type Ty, const DeclContext *DC) {
   PrettyStackTraceType prettyStackTrace(Ty->getASTContext(),
                                         "mangling type for debugger", Ty);

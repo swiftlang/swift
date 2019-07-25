@@ -13,6 +13,8 @@
 #include "swift/SIL/SILFunctionBuilder.h"
 #include "swift/AST/Availability.h"
 #include "swift/AST/Decl.h"
+// SWIFT_ENABLE_TENSORFLOW
+#include "swift/AST/ASTMangler.h"
 using namespace swift;
 
 SILFunction *SILFunctionBuilder::getOrCreateFunction(
@@ -104,12 +106,19 @@ void SILFunctionBuilder::addFunctionAttributes(SILFunction *F,
           indices.parameters->getNumIndices() > 1;
       if (isSelfReorderedMethod) {
         auto &ctx = F->getASTContext();
-        if (A->getJVPFunction())
+        if (A->getJVPFunction()) {
+          Mangle::ASTMangler mangler;
           jvpName = ctx.getIdentifier(
-              "AD__" + constant.mangle() + "__jvp_" + indices.mangle()).str();
+              mangler.mangleAutoDiffAssociatedFunctionHelper(
+                  constant.mangle(), AutoDiffAssociatedFunctionKind::JVP,
+                  indices)).str();
+        }
         if (A->getVJPFunction()) {
+          Mangle::ASTMangler mangler;
           vjpName = ctx.getIdentifier(
-              "AD__" + constant.mangle() + "__vjp_" + indices.mangle()).str();
+              mangler.mangleAutoDiffAssociatedFunctionHelper(
+                  constant.mangle(), AutoDiffAssociatedFunctionKind::VJP,
+                  indices)).str();
         }
       } else {
         if (auto *jvpFn = A->getJVPFunction())

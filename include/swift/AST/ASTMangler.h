@@ -151,7 +151,17 @@ public:
                                              Type FromType, Type ToType,
                                              Type SelfType,
                                              ModuleDecl *Module);
-  
+
+  // SWIFT_ENABLE_TENSORFLOW
+  // Mangle the autodiff associated function with the given:
+  // - Mangled original function name.
+  // - Associated function kind.
+  // - Parameter/result indices.
+  // - Flag representing whether the function is a differential/pullback.
+  std::string mangleAutoDiffAssociatedFunctionHelper(
+      StringRef name, AutoDiffAssociatedFunctionKind kind,
+      const SILAutoDiffIndices &indices, bool isLinearMap = false);
+
   std::string mangleKeyPathGetterThunkHelper(const AbstractStorageDecl *property,
                                              GenericSignature *signature,
                                              CanType baseType,

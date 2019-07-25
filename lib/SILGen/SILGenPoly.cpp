@@ -3508,18 +3508,10 @@ SILGenModule::getOrCreateAutoDiffAssociatedFunctionReorderingThunk(
     IsSerialized_t isSerialized) {
   auto assocFnType = assocFn->getLoweredFunctionType();
 
-  std::string name;
-  switch (assocFnKind) {
-  case AutoDiffAssociatedFunctionKind::JVP:
-    name = "jvp";
-    break;
-  case AutoDiffAssociatedFunctionKind::VJP:
-    name = "vjp";
-    break;
-  }
-  name = getASTContext().getIdentifier(
-      "AD__" + original->getName().str() + "__" + name + "_" +
-      indices.mangle()).str();
+  Mangle::ASTMangler mangler;
+  auto name = getASTContext().getIdentifier(
+      mangler.mangleAutoDiffAssociatedFunctionHelper(
+          original->getName(), assocFnKind, indices)).str();
 
   Lowering::GenericContextScope genericContextScope(
       Types, assocFnType->getGenericSignature());

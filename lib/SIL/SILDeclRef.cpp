@@ -677,6 +677,9 @@ static void mangleClangDecl(raw_ostream &buffer,
 }
 
 std::string SILDeclRef::mangle(ManglingKind MKind) const {
+  using namespace Mangle;
+  ASTMangler mangler;
+
   // SWIFT_ENABLE_TENSORFLOW
   if (autoDiffAssociatedFunctionIdentifier) {
     std::string originalMangled = asAutoDiffOriginalFunction().mangle(MKind);
@@ -686,21 +689,10 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
         autoDiffAssociatedFunctionIdentifier->getParameterIndices()->getLowered(
             functionTy->getASTContext(), functionTy);
     SILAutoDiffIndices indices(/*source*/ 0, silParameterIndices);
-    std::string mangledKind;
-    switch (autoDiffAssociatedFunctionIdentifier->getKind()) {
-    case AutoDiffAssociatedFunctionKind::JVP:
-      mangledKind = "jvp";
-      break;
-    case AutoDiffAssociatedFunctionKind::VJP:
-      mangledKind = "vjp";
-      break;
-    }
-    return "AD__" + originalMangled + "__" + mangledKind + "_" +
-           indices.mangle();
+    auto assocFnKind = autoDiffAssociatedFunctionIdentifier->getKind();
+    return mangler.mangleAutoDiffAssociatedFunctionHelper(
+        originalMangled, assocFnKind, indices);
   }
-
-  using namespace Mangle;
-  ASTMangler mangler;
 
   // As a special case, Clang functions and globals don't get mangled at all.
   if (hasDecl()) {
