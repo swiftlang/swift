@@ -217,7 +217,7 @@ struct BadCombinations {
 
 struct MultipleWrappers {
   @Wrapper(stored: 17)
-  @WrapperWithInitialValue // expected-error{{extra argument 'wrappedValue' in call}} expected-error{{multiple property wrappers are not supported}}
+  @WrapperWithInitialValue // expected-error{{extra argument 'wrappedValue' in call}}
   var x: Int = 17
 
   @WrapperWithInitialValue // expected-error 2{{property wrapper can only apply to a single variable}}
@@ -959,11 +959,11 @@ struct WrapperE<Value> {
 }
 
 struct TestComposition {
-  @WrapperA @WrapperB @WrapperC var p1: Int? // expected-error{{multiple property wrappers are not supported}}
-  @WrapperA @WrapperB @WrapperC var p2 = "Hello" // expected-error{{multiple property wrappers are not supported}}
-  @WrapperD<WrapperE, Int, String> @WrapperE var p3: Int? // expected-error{{multiple property wrappers are not supported}}
-  @WrapperD<WrapperC, Int, String> @WrapperC var p4: Int? // expected-error{{multiple property wrappers are not supported}}
-  @WrapperD<WrapperC, Int, String> @WrapperE var p5: Int // expected-error{{property type 'Int' does not match that of the 'wrappedValue' property of its wrapper type 'WrapperD<WrapperC, Int, String>'}} // expected-error{{multiple property wrappers are not supported}}
+  @WrapperA @WrapperB @WrapperC var p1: Int?
+  @WrapperA @WrapperB @WrapperC var p2 = "Hello"
+  @WrapperD<WrapperE, Int, String> @WrapperE var p3: Int?
+  @WrapperD<WrapperC, Int, String> @WrapperC var p4: Int?
+  @WrapperD<WrapperC, Int, String> @WrapperE var p5: Int // expected-error{{property type 'Int' does not match that of the 'wrappedValue' property of its wrapper type 'WrapperD<WrapperC, Int, String>'}}
 
 	func triggerErrors(d: Double) {
 		p1 = d // expected-error{{cannot assign value of type 'Double' to type 'Int?'}}
