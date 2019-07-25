@@ -1916,14 +1916,6 @@ static SILValue joinElements(ArrayRef<SILValue> elements, SILBuilder &builder,
   return builder.createTuple(loc, elements);
 }
 
-// Emits a release based on the value's type category (address or object).
-static void emitCleanup(SILBuilder &builder, SILLocation loc, SILValue v) {
-  if (v->getType().isAddress())
-    builder.createDestroyAddr(loc, v);
-  else
-    builder.createReleaseValue(loc, v, builder.getDefaultAtomicity());
-}
-
 /// When a function value is used in an instruction (usually `apply`), there's
 /// some conversion instruction in between, e.g. `thin_to_thick_function`. Given
 /// a new function value and an old function value, this helper function
@@ -1953,14 +1945,26 @@ reapplyFunctionConversion(SILValue newFunc, SILValue oldFunc,
   if (auto *pai = dyn_cast<PartialApplyInst>(oldConvertedFunc)) {
     SmallVector<SILValue, 8> newArgs;
     newArgs.reserve(pai->getNumArguments());
+    SmallVector<AllocStackInst *, 1> copiedIndirectParams;
+    SWIFT_DEFER {
+      for (auto *alloc : reversed(copiedIndirectParams))
+        builder.createDeallocStack(loc, alloc);
+    };
     for (auto arg : pai->getArguments()) {
       // Retain the argument since it's to be owned by the newly created
       // closure.
-      if (arg->getType().isObject())
+      if (arg->getType().isObject()) {
         builder.createRetainValue(loc, arg, builder.getDefaultAtomicity());
-      else if (arg->getType().isLoadable(builder.getFunction()))
+        newArgs.push_back(arg);
+      } else if (arg->getType().isLoadable(builder.getFunction())) {
         builder.createRetainValueAddr(loc, arg, builder.getDefaultAtomicity());
-      newArgs.push_back(arg);
+        newArgs.push_back(arg);
+      } else {
+        auto *argCopy = builder.createAllocStack(loc, arg->getType());
+        copiedIndirectParams.push_back(argCopy);
+        builder.createCopyAddr(loc, arg, argCopy, IsNotTake, IsInitialization);
+        newArgs.push_back(argCopy);
+      }
     }
     auto innerNewFunc = reapplyFunctionConversion(
         newFunc, oldFunc, pai->getCallee(), builder, loc, newFuncGenSig);
@@ -3395,8 +3399,7 @@ public:
 
     // Release the differentiable function.
     if (differentiableFunc)
-      builder.createReleaseValue(loc, differentiableFunc,
-                                 builder.getDefaultAtomicity());
+      builder.emitReleaseValueAndFold(loc, differentiableFunc);
 
     // Get the VJP results (original results and pullback).
     SmallVector<SILValue, 8> vjpDirectResults;
@@ -3962,7 +3965,7 @@ private:
     LLVM_DEBUG(getADDebugStream() << "Cleaning up temporaries for bb"
                << bb->getDebugID() << '\n');
     for (auto temp : blockTemporaries[bb]) {
-      emitCleanup(builder, loc, temp);
+      builder.emitReleaseValueAndFold(loc, temp);
       blockTemporarySet.erase(temp);
     }
   }
@@ -4534,9 +4537,6 @@ public:
         auto adjBuf = getAdjointBuffer(origEntry, origParam);
         if (errorOccurred)
           return;
-        if (adjBuf->getType().isLoadable(getPullback()))
-          builder.createRetainValueAddr(pbLoc, adjBuf,
-                                        builder.getDefaultAtomicity());
         indParamAdjoints.push_back(adjBuf);
       }
     };
@@ -4837,7 +4837,7 @@ public:
       ApplyInst *ai, CopyAddrInst *cai, AllocStackInst *subscriptBuffer) {
     addToAdjointBuffer(cai->getParent(), cai->getSrc(), subscriptBuffer,
                        cai->getLoc());
-    emitCleanup(builder, cai->getLoc(), subscriptBuffer);
+    builder.emitDestroyAddrAndFold(cai->getLoc(), subscriptBuffer);
     builder.createDeallocStack(ai->getLoc(), subscriptBuffer);
   }
 
@@ -5033,7 +5033,7 @@ public:
       auto tan = *allResultsIt++;
       if (tan->getType().isAddress()) {
         addToAdjointBuffer(bb, origArg, tan, loc);
-        emitCleanup(builder, loc, tan);
+        builder.emitDestroyAddrAndFold(loc, tan);
       } else {
         if (origArg->getType().isAddress()) {
           if (errorOccurred)
@@ -5042,7 +5042,7 @@ public:
           builder.createStore(loc, tan, tmpBuf,
               getBufferSOQ(tmpBuf->getType().getASTType(), getPullback()));
           addToAdjointBuffer(bb, origArg, tmpBuf, loc);
-          emitCleanup(builder, loc, tmpBuf);
+          builder.emitDestroyAddrAndFold(loc, tmpBuf);
           builder.createDeallocStack(loc, tmpBuf);
         }
         else {
@@ -5338,7 +5338,7 @@ public:
       return;
     auto destType = remapType(adjDest->getType());
     addToAdjointBuffer(bb, cai->getSrc(), adjDest, cai->getLoc());
-    emitCleanup(builder, cai->getLoc(), adjDest);
+    builder.emitDestroyAddrAndFold(cai->getLoc(), adjDest);
     emitZeroIndirect(destType.getASTType(), adjDest, cai->getLoc());
   }
 
@@ -6297,13 +6297,15 @@ ADContext::getOrCreateSubsetParametersThunkForLinearMap(
     // - Push it to `results` if result is direct.
     auto result = allResults[mapOriginalParameterIndex(i)];
     if (desiredIndices.isWrtParameter(i)) {
-      if (result->getType().isAddress())
-        continue;
-      results.push_back(result);
+      if (result->getType().isObject())
+        results.push_back(result);
     }
     // Otherwise, cleanup the unused results.
     else {
-      emitCleanup(builder, loc, result);
+      if (result->getType().isAddress())
+        builder.emitDestroyAddrAndFold(loc, result);
+      else
+        builder.emitReleaseValueAndFold(loc, result);
     }
   }
   // Deallocate local allocations and return final direct result.
@@ -6676,7 +6678,7 @@ void ADContext::foldAutoDiffFunctionExtraction(AutoDiffFunctionInst *source) {
   if (isInstructionTriviallyDead(source)) {
     SILBuilder builder(source);
     for (auto &assocFn : source->getAssociatedFunctions())
-      emitCleanup(builder, source->getLoc(), assocFn.get());
+      builder.emitDestroyAddrAndFold(source->getLoc(), assocFn.get());
     source->eraseFromParent();
   }
   // Mark `source` as processed so that it won't be reprocessed after deletion.
