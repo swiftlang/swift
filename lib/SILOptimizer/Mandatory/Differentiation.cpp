@@ -6298,7 +6298,7 @@ ADContext::getOrCreateSubsetParametersThunkForLinearMap(
     auto result = allResults[mapOriginalParameterIndex(i)];
     if (desiredIndices.isWrtParameter(i)) {
       if (result->getType().isObject())
-         results.push_back(result);
+        results.push_back(result);
     }
     // Otherwise, cleanup the unused results.
     else {
