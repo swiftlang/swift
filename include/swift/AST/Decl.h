@@ -5853,10 +5853,6 @@ public:
     return cast_or_null<AbstractFunctionDecl>(ValueDecl::getOverriddenDecl());
   }
 
-  /// Returns true if a function declaration overrides a given
-  /// method from its direct or indirect superclass.
-  bool isOverridingDecl(const AbstractFunctionDecl *method) const;
-
   /// Whether the declaration is later overridden in the module
   ///
   /// Overrides are resolved during type checking; only query this field after

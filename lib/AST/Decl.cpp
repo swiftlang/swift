@@ -3998,47 +3998,56 @@ ArtificialMainKind ClassDecl::getArtificialMainKind() const {
   llvm_unreachable("class has no @ApplicationMain attr?!");
 }
 
-AbstractFunctionDecl *
-ClassDecl::findOverridingDecl(const AbstractFunctionDecl *Method) const {
-  auto Members = getMembers();
-  for (auto M : Members) {
-    auto *CurMethod = dyn_cast<AbstractFunctionDecl>(M);
-    if (!CurMethod)
-      continue;
-    if (CurMethod->isOverridingDecl(Method)) {
-      return CurMethod;
-    }
-  }
-  return nullptr;
-}
-
-bool AbstractFunctionDecl::isOverridingDecl(
-    const AbstractFunctionDecl *Method) const {
-  const AbstractFunctionDecl *CurMethod = this;
-  while (CurMethod) {
-    if (CurMethod == Method)
+static bool isOverridingDecl(const ValueDecl *Derived,
+                             const ValueDecl *Base) {
+  while (Derived) {
+    if (Derived == Base)
       return true;
-    CurMethod = CurMethod->getOverriddenDecl();
+    Derived = Derived->getOverriddenDecl();
   }
   return false;
 }
 
+static ValueDecl *findOverridingDecl(const ClassDecl *C,
+                                     const ValueDecl *Base) {
+  // FIXME: This is extremely inefficient. The SILOptimizer should build a
+  // reverse lookup table to answer these types of queries.
+  for (auto M : C->getMembers()) {
+    if (auto *Derived = dyn_cast<ValueDecl>(M))
+      if (::isOverridingDecl(Derived, Base))
+        return Derived;
+  }
+
+  return nullptr;
+}
+
+AbstractFunctionDecl *
+ClassDecl::findOverridingDecl(const AbstractFunctionDecl *Method) const {
+  if (auto *Accessor = dyn_cast<AccessorDecl>(Method)) {
+    auto *Storage = Accessor->getStorage();
+    if (auto *Derived = ::findOverridingDecl(this, Storage)) {
+      auto *DerivedStorage = cast<AbstractStorageDecl>(Derived);
+      return DerivedStorage->getAccessor(Accessor->getAccessorKind());
+    }
+
+    return nullptr;
+  }
+
+  return cast_or_null<AbstractFunctionDecl>(::findOverridingDecl(this, Method));
+}
+
 AbstractFunctionDecl *
 ClassDecl::findImplementingMethod(const AbstractFunctionDecl *Method) const {
+  // FIXME: This is extremely inefficient. The SILOptimizer should build a
+  // reverse lookup table to answer these types of queries.
   const ClassDecl *C = this;
   while (C) {
-    auto Members = C->getMembers();
-    for (auto M : Members) {
-      auto *CurMethod = dyn_cast<AbstractFunctionDecl>(M);
-      if (!CurMethod)
-        continue;
-      if (Method == CurMethod)
-        return CurMethod;
-      if (CurMethod->isOverridingDecl(Method)) {
-        // This class implements a method
-        return CurMethod;
-      }
-    }
+    if (C == Method->getDeclContext())
+      return const_cast<AbstractFunctionDecl *>(Method);
+
+    if (auto *Derived = C->findOverridingDecl(Method))
+      return Derived;
+
     // Check the superclass
     C = C->getSuperclassDecl();
   }
