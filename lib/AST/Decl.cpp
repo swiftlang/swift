@@ -1366,9 +1366,11 @@ ParamDecl *PatternBindingInitializer::getImplicitSelfDecl() {
 }
 
 VarDecl *PatternBindingInitializer::getInitializedLazyVar() const {
-  if (auto var = getBinding()->getSingleVar()) {
-    if (var->getAttrs().hasAttribute<LazyAttr>())
-      return var;
+  if (auto binding = getBinding()) {
+    if (auto var = binding->getSingleVar()) {
+      if (var->getAttrs().hasAttribute<LazyAttr>())
+        return var;
+    }
   }
   return nullptr;
 }
