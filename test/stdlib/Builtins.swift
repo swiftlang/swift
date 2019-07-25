@@ -293,4 +293,17 @@ tests.test("_isOptional") {
   expectFalse(_isOptional(P.self))
 }
 
+tests.test("_isConcrete") {
+  @_transparent
+  func isConcrete_true<T>(_ type: T.Type) -> Bool {
+    return _isConcrete(type)
+  }
+  func isConcrete_false<T>(_ type: T.Type) -> Bool {
+    return _isConcrete(type)
+  }
+  expectTrue(_isConcrete(Int.self))
+  expectTrue(isConcrete_true(Int.self))
+  expectFalse(isConcrete_false(Int.self))
+}
+
 runAllTests()

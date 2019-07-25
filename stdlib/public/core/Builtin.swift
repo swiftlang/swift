@@ -691,6 +691,13 @@ func _isPOD<T>(_ type: T.Type) -> Bool {
   return Bool(Builtin.ispod(type))
 }
 
+/// Returns `true` if `type` is known to refer to a concrete type during IRGen.
+@_alwaysEmitIntoClient
+public // @testable
+func _isConcrete<T>(_ type: T.Type) -> Bool {
+  return Bool(Builtin.isConcrete(type))
+}
+
 /// Returns `true` if type is a bitwise takable. A bitwise takable type can
 /// just be moved to a different address in memory.
 @_transparent
