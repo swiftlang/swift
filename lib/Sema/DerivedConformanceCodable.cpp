@@ -162,9 +162,8 @@ static bool validateCodingKeysEnum(DerivedConformance &derived,
   // Here we'll hold on to properties by name -- when we've validated a property
   // against its CodingKey entry, it will get removed.
   llvm::SmallDenseMap<Identifier, VarDecl *, 8> properties;
-  for (auto *varDecl :
-       derived.Nominal->getStoredProperties(/*skipInaccessible=*/true)) {
-    if (varDecl->getAttrs().hasAttribute<LazyAttr>())
+  for (auto *varDecl : derived.Nominal->getStoredProperties()) {
+    if (!varDecl->isUserAccessible())
       continue;
 
     properties[getVarNameForCoding(varDecl)] = varDecl;
@@ -357,8 +356,8 @@ static EnumDecl *synthesizeCodingKeysEnum(DerivedConformance &derived) {
   // Each of these vars needs a case in the enum. For each var decl, if the type
   // conforms to {En,De}codable, add it to the enum.
   bool allConform = true;
-  for (auto *varDecl : target->getStoredProperties(/*skipInaccessible=*/true)) {
-    if (varDecl->getAttrs().hasAttribute<LazyAttr>())
+  for (auto *varDecl : target->getStoredProperties()) {
+    if (!varDecl->isUserAccessible())
       continue;
 
     // Despite creating the enum in the context of the type, we're
@@ -553,7 +552,8 @@ lookupVarDeclForCodingKeysCase(DeclContext *conformanceDC,
 /// Synthesizes the body for `func encode(to encoder: Encoder) throws`.
 ///
 /// \param encodeDecl The function decl whose body to synthesize.
-static void deriveBodyEncodable_encode(AbstractFunctionDecl *encodeDecl, void *) {
+static std::pair<BraceStmt *, bool>
+deriveBodyEncodable_encode(AbstractFunctionDecl *encodeDecl, void *) {
   // struct Foo : Codable {
   //   var x: Int
   //   var y: String
@@ -712,7 +712,7 @@ static void deriveBodyEncodable_encode(AbstractFunctionDecl *encodeDecl, void *)
 
   auto *body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc(),
                                  /*implicit=*/true);
-  encodeDecl->setBody(body);
+  return { body, /*isTypeChecked=*/false };
 }
 
 /// Synthesizes a function declaration for `encode(to: Encoder) throws` with a
@@ -778,7 +778,8 @@ static FuncDecl *deriveEncodable_encode(DerivedConformance &derived) {
 /// Synthesizes the body for `init(from decoder: Decoder) throws`.
 ///
 /// \param initDecl The function decl whose body to synthesize.
-static void deriveBodyDecodable_init(AbstractFunctionDecl *initDecl, void *) {
+static std::pair<BraceStmt *, bool>
+deriveBodyDecodable_init(AbstractFunctionDecl *initDecl, void *) {
   // struct Foo : Codable {
   //   var x: Int
   //   var y: String
@@ -992,7 +993,7 @@ static void deriveBodyDecodable_init(AbstractFunctionDecl *initDecl, void *) {
 
   auto *body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc(),
                                  /*implicit=*/true);
-  initDecl->setBody(body);
+  return { body, /*isTypeChecked=*/false };
 }
 
 /// Synthesizes a function declaration for `init(from: Decoder) throws` with a

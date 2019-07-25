@@ -1057,6 +1057,7 @@ void SwiftLangSupport::editorOpen(
   provider->removeFileSystem(options);
 }
 
+
 FileSystemProvider *SwiftLangSupport::getFileSystemProvider(StringRef Name) {
   auto It = FileSystemProviders.find(Name);
   if (It == FileSystemProviders.end())

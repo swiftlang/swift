@@ -43,7 +43,7 @@ internal func _isspace_clocale(_ u: UTF16.CodeUnit) -> Bool {
 % end
 
 //===--- Parsing ----------------------------------------------------------===//
-extension ${Self} : LosslessStringConvertible {
+extension ${Self}: LosslessStringConvertible {
   /// Creates a new instance from the given string.
   ///
   /// The string passed as `text` can represent a real number in decimal or
@@ -128,7 +128,7 @@ extension ${Self} : LosslessStringConvertible {
   public init?<S: StringProtocol>(_ text: S) {
     let u8 = text.utf8
 
-    let (result, n) : (${Self}, Int) = text.withCString { chars in
+    let (result, n): (${Self}, Int) = text.withCString { chars in
       var result: ${Self} = 0
       let endPtr = withUnsafeMutablePointer(to: &result) {
         _swift_stdlib_strto${cFuncSuffix2[bits]}_clocale(chars, $0)

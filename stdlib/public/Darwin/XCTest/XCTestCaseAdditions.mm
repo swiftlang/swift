@@ -73,7 +73,8 @@ static bool demangleSimpleClass(const char *mangledName,
 
     // Module name
     if (strncmp(m, "Ss", 2) == 0) {
-      moduleName = strdup(swift::STDLIB_NAME);
+      moduleName =
+          strndup(swift::STDLIB_NAME.data(), swift::STDLIB_NAME.size());
       assert(moduleName);
       m += 2;
     } else {

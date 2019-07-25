@@ -374,7 +374,8 @@ public:
   }
 
   StepResult take(bool prevFailed) override;
-  StepResult resume(bool prevFailed) override;
+
+  StepResult resume(bool prevFailed) override { return finalize(!prevFailed); }
 
   // The number of disjunction constraints associated with this component.
   unsigned disjunctionCount() const { return NumDisjunctions; }
@@ -398,6 +399,10 @@ private:
     // let's return it to the graph.
     CS.CG.setOrphanedConstraint(OrphanedConstraint);
   }
+
+  /// Finalize current component by either cleanup if sub-tasks
+  /// have failed, or solution generation and minimization.
+  StepResult finalize(bool isSuccess);
 };
 
 template <typename P> class BindingStep : public SolverStep {

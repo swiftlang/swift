@@ -407,7 +407,7 @@ extension String.UTF16View.Index {
 }
 
 // Reflection
-extension String.UTF16View : CustomReflectable {
+extension String.UTF16View: CustomReflectable {
   /// Returns a mirror that reflects the UTF-16 view of a string.
   public var customMirror: Mirror {
     return Mirror(self, unlabeledChildren: self)

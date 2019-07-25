@@ -1176,14 +1176,7 @@ namespace {
                        interpolationProto->getDeclaredType(),
                        locator);
 
-      if (auto semanticExpr = expr->getSemanticExpr()) {
-        // The semanticExpr must have the same type as this node.
-        auto semanticTV = CS.getType(semanticExpr);
-        auto semanticLocator = CS.getConstraintLocator(semanticExpr);
-        CS.addConstraint(ConstraintKind::Bind, tv, semanticTV,
-                         semanticLocator);
-      }
-      else if (auto appendingExpr = expr->getAppendingExpr()) {
+      if (auto appendingExpr = expr->getAppendingExpr()) {
         auto associatedTypeArray = 
           interpolationProto->lookupDirect(tc.Context.Id_StringInterpolation);
         if (associatedTypeArray.empty()) {
@@ -3260,6 +3253,16 @@ namespace {
           return { false, OOE->getSubExpr()->walk(*this) };
         }
 
+        // Hacky, this behaves just like an OpenedExistential in that it changes
+        // the expr tree.
+        if (auto ISLE = dyn_cast<InterpolatedStringLiteralExpr>(expr)) {
+          if (auto subExpr = ISLE->getAppendingExpr()->getSubExpr()) {
+            if (auto opaqueValue = dyn_cast<OpaqueValueExpr>(subExpr)) {
+              ISLE->getAppendingExpr()->setSubExpr(nullptr);
+            }
+          }
+        }
+
         // Substitute OpaqueValue with its representing existental.
         if (auto OVE = dyn_cast<OpaqueValueExpr>(expr)) {
           auto value = OpenExistentials.find(OVE);
@@ -3297,11 +3300,7 @@ namespace {
         }
 
         // Remove any semantic expression injected by typechecking.
-        if (auto ISLE = dyn_cast<InterpolatedStringLiteralExpr>(expr)) {
-          ISLE->setSemanticExpr(nullptr);
-        } else if (auto OLE = dyn_cast<ObjectLiteralExpr>(expr)) {
-          OLE->setSemanticExpr(nullptr);
-        } else if (auto EPE = dyn_cast<EditorPlaceholderExpr>(expr)) {
+        if (auto EPE = dyn_cast<EditorPlaceholderExpr>(expr)) {
           EPE->setSemanticExpr(nullptr);
         }
 

@@ -73,7 +73,7 @@
 ///     print(pairs.elements)
 ///     // Prints "[(1, 2), (1, 1), (3, 4), (2, 1)]"
 @frozen // trivial-implementation
-public struct KeyValuePairs<Key, Value> : ExpressibleByDictionaryLiteral {
+public struct KeyValuePairs<Key, Value>: ExpressibleByDictionaryLiteral {
   @usableFromInline // trivial-implementation
   internal let _elements: [(Key, Value)]
 
@@ -90,7 +90,7 @@ public struct KeyValuePairs<Key, Value> : ExpressibleByDictionaryLiteral {
 
 /// `Collection` conformance that allows `KeyValuePairs` to
 /// interoperate with the rest of the standard library.
-extension KeyValuePairs : RandomAccessCollection {
+extension KeyValuePairs: RandomAccessCollection {
   /// The element type of a `KeyValuePairs`: a tuple containing an
   /// individual key-value pair.
   public typealias Element = (key: Key, value: Value)

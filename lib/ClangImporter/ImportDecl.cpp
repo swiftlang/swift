@@ -18,6 +18,7 @@
 #include "ImporterImpl.h"
 #include "swift/Strings.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Builtins.h"
@@ -459,6 +460,55 @@ static bool isNSDictionaryMethod(const clang::ObjCMethodDecl *MD,
   return true;
 }
 
+/// Synthesize the body of \c init?(rawValue:RawType) for an imported enum.
+static std::pair<BraceStmt *, bool>
+synthesizeEnumRawValueConstructorBody(AbstractFunctionDecl *afd,
+                                      void *context) {
+  ASTContext &ctx = afd->getASTContext();
+  auto ctorDecl = cast<ConstructorDecl>(afd);
+  auto enumDecl = static_cast<EnumDecl *>(context);
+  auto selfDecl = ctorDecl->getImplicitSelfDecl();
+  auto selfRef = new (ctx) DeclRefExpr(selfDecl, DeclNameLoc(),
+  /*implicit*/true);
+  selfRef->setType(LValueType::get(selfDecl->getType()));
+
+  auto param = ctorDecl->getParameters()->get(0);
+  auto paramRef = new (ctx) DeclRefExpr(param, DeclNameLoc(),
+                                        /*implicit*/ true);
+  paramRef->setType(param->getType());
+
+  auto reinterpretCast
+    = cast<FuncDecl>(
+        getBuiltinValueDecl(ctx, ctx.getIdentifier("reinterpretCast")));
+  auto rawTy = enumDecl->getRawType();
+  auto enumTy = enumDecl->getDeclaredInterfaceType();
+  SubstitutionMap subMap =
+    SubstitutionMap::get(reinterpretCast->getGenericSignature(),
+                         { rawTy, enumTy }, { });
+  ConcreteDeclRef concreteDeclRef(reinterpretCast, subMap);
+  auto reinterpretCastRef
+    = new (ctx) DeclRefExpr(concreteDeclRef, DeclNameLoc(), /*implicit*/ true);
+  reinterpretCastRef->setType(FunctionType::get({FunctionType::Param(rawTy)},
+                                                enumTy));
+
+  auto reinterpreted = CallExpr::createImplicit(ctx, reinterpretCastRef,
+                                                { paramRef }, { Identifier() });
+  reinterpreted->setType(enumTy);
+  reinterpreted->setThrows(false);
+
+  auto assign = new (ctx) AssignExpr(selfRef, SourceLoc(), reinterpreted,
+                                     /*implicit*/ true);
+  assign->setType(TupleType::getEmpty(ctx));
+
+  auto result = TupleExpr::createEmpty(ctx, SourceLoc(), SourceLoc(),
+                                       /*Implicit=*/true);
+  auto ret = new (ctx) ReturnStmt(SourceLoc(), result, /*Implicit=*/true);
+
+  auto body = BraceStmt::create(ctx, SourceLoc(), {assign, ret}, SourceLoc(),
+                                /*implicit*/ true);
+  return { body, /*isTypeChecked=*/true };
+}
+
 // Build the init(rawValue:) initializer for an imported NS_ENUM.
 //   enum NSSomeEnum: RawType {
 //     init?(rawValue: RawType) {
@@ -472,8 +522,7 @@ makeEnumRawValueConstructor(ClangImporter::Implementation &Impl,
                             EnumDecl *enumDecl) {
   ASTContext &C = Impl.SwiftContext;
   auto rawTy = enumDecl->getRawType();
-  auto enumTy = enumDecl->getDeclaredInterfaceType();
-  
+
   auto param = new (C) ParamDecl(VarDecl::Specifier::Default, SourceLoc(),
                                  SourceLoc(), C.Id_rawValue,
                                  SourceLoc(), C.Id_rawValue,
@@ -495,51 +544,46 @@ makeEnumRawValueConstructor(ClangImporter::Implementation &Impl,
 
   ctorDecl->computeType();
   ctorDecl->setValidationToChecked();
+  ctorDecl->setBodySynthesizer(synthesizeEnumRawValueConstructorBody, enumDecl);
+  return ctorDecl;
+}
 
-  // Don't bother synthesizing the body if we've already finished type-checking.
-  if (Impl.hasFinishedTypeChecking())
-    return ctorDecl;
+/// Synthesizer callback for an enum's rawValue getter.
+static std::pair<BraceStmt *, bool>
+synthesizeEnumRawValueGetterBody(AbstractFunctionDecl *afd, void *context) {
+  auto getterDecl = cast<AccessorDecl>(afd);
+  auto enumDecl = static_cast<EnumDecl *>(context);
+  auto rawTy = enumDecl->getRawType();
+  auto enumTy = enumDecl->getDeclaredType();
 
-  auto selfDecl = ctorDecl->getImplicitSelfDecl();
-  auto selfRef = new (C) DeclRefExpr(selfDecl, DeclNameLoc(), /*implicit*/true);
-  selfRef->setType(LValueType::get(selfDecl->getType()));
-
-  auto paramRef = new (C) DeclRefExpr(param, DeclNameLoc(),
-                                      /*implicit*/ true);
-  paramRef->setType(param->getType());
+  ASTContext &ctx = getterDecl->getASTContext();
+  auto *selfDecl = getterDecl->getImplicitSelfDecl();
+  auto selfRef = new (ctx) DeclRefExpr(selfDecl, DeclNameLoc(),
+                                       /*implicit*/true);
+  selfRef->setType(selfDecl->getType());
 
   auto reinterpretCast
     = cast<FuncDecl>(
-        getBuiltinValueDecl(C, C.getIdentifier("reinterpretCast")));
+        getBuiltinValueDecl(ctx, ctx.getIdentifier("reinterpretCast")));
   SubstitutionMap subMap =
     SubstitutionMap::get(reinterpretCast->getGenericSignature(),
-                         { rawTy, enumTy }, { });
+                         { enumTy, rawTy }, { });
   ConcreteDeclRef concreteDeclRef(reinterpretCast, subMap);
-  auto reinterpretCastRef
-    = new (C) DeclRefExpr(concreteDeclRef, DeclNameLoc(), /*implicit*/ true);
-  reinterpretCastRef->setType(FunctionType::get({FunctionType::Param(rawTy)},
-                                                enumTy));
 
-  auto reinterpreted = CallExpr::createImplicit(C, reinterpretCastRef,
-                                                { paramRef }, { Identifier() });
-  reinterpreted->setType(enumTy);
+  auto reinterpretCastRef
+    = new (ctx) DeclRefExpr(concreteDeclRef, DeclNameLoc(), /*implicit*/ true);
+  reinterpretCastRef->setType(FunctionType::get({FunctionType::Param(enumTy)},
+                                                rawTy));
+
+  auto reinterpreted = CallExpr::createImplicit(ctx, reinterpretCastRef,
+                                                { selfRef }, { Identifier() });
+  reinterpreted->setType(rawTy);
   reinterpreted->setThrows(false);
 
-  auto assign = new (C) AssignExpr(selfRef, SourceLoc(), reinterpreted,
-                                   /*implicit*/ true);
-  assign->setType(TupleType::getEmpty(C));
-
-  auto result = TupleExpr::createEmpty(C, SourceLoc(), SourceLoc(),
-                                       /*Implicit=*/true);
-  auto ret = new (C) ReturnStmt(SourceLoc(), result, /*Implicit=*/true);
-
-  auto body = BraceStmt::create(C, SourceLoc(), {assign, ret}, SourceLoc(),
+  auto ret = new (ctx) ReturnStmt(SourceLoc(), reinterpreted);
+  auto body = BraceStmt::create(ctx, SourceLoc(), ASTNode(ret), SourceLoc(),
                                 /*implicit*/ true);
-  
-  ctorDecl->setBody(body);
-  ctorDecl->setBodyTypeCheckedIfPresent();
-
-  return ctorDecl;
+  return { body, /*isTypeChecked=*/true };
 }
 
 // Build the rawValue getter for an imported NS_ENUM.
@@ -556,7 +600,6 @@ static AccessorDecl *makeEnumRawValueGetter(ClangImporter::Implementation &Impl,
   ASTContext &C = Impl.SwiftContext;
 
   auto rawTy = enumDecl->getRawType();
-  auto enumTy = enumDecl->getDeclaredType();
 
   auto *params = ParameterList::createEmpty(C);
 
@@ -579,43 +622,46 @@ static AccessorDecl *makeEnumRawValueGetter(ClangImporter::Implementation &Impl,
   getterDecl->setValidationToChecked();
 
   getterDecl->setAccess(AccessLevel::Public);
-
+  getterDecl->setBodySynthesizer(synthesizeEnumRawValueGetterBody, enumDecl);
   makeComputed(rawValueDecl, getterDecl, nullptr);
+  return getterDecl;
+}
 
-  // Don't bother synthesizing the body if we've already finished type-checking.
-  if (Impl.hasFinishedTypeChecking())
-    return getterDecl;
+/// Synthesizer for the rawValue getter for an imported struct.
+static std::pair<BraceStmt *, bool>
+synthesizeStructRawValueGetterBody(AbstractFunctionDecl *afd, void *context) {
+  auto getterDecl = cast<AccessorDecl>(afd);
+  VarDecl *storedVar = static_cast<VarDecl *>(context);
 
+  ASTContext &ctx = getterDecl->getASTContext();
   auto *selfDecl = getterDecl->getImplicitSelfDecl();
-  auto selfRef = new (C) DeclRefExpr(selfDecl, DeclNameLoc(), /*implicit*/true);
+  auto selfRef = new (ctx) DeclRefExpr(selfDecl, DeclNameLoc(),
+                                       /*implicit*/true);
   selfRef->setType(selfDecl->getType());
 
-  auto reinterpretCast
-    = cast<FuncDecl>(
-        getBuiltinValueDecl(C, C.getIdentifier("reinterpretCast")));
-  SubstitutionMap subMap =
-    SubstitutionMap::get(reinterpretCast->getGenericSignature(),
-                         { enumTy, rawTy }, { });
-  ConcreteDeclRef concreteDeclRef(reinterpretCast, subMap);
+  auto storedType = storedVar->getInterfaceType();
+  auto storedRef = new (ctx) MemberRefExpr(selfRef, SourceLoc(), storedVar,
+                                           DeclNameLoc(), /*Implicit=*/true,
+                                           AccessSemantics::DirectToStorage);
+  storedRef->setType(storedType);
 
-  auto reinterpretCastRef
-    = new (C) DeclRefExpr(concreteDeclRef, DeclNameLoc(), /*implicit*/ true);
-  reinterpretCastRef->setType(FunctionType::get({FunctionType::Param(enumTy)},
-                                                rawTy));
+  Expr *result = storedRef;
 
-  auto reinterpreted = CallExpr::createImplicit(C, reinterpretCastRef,
-                                                { selfRef }, { Identifier() });
-  reinterpreted->setType(rawTy);
-  reinterpreted->setThrows(false);
+  Type computedType = getterDecl->getResultInterfaceType();
+  if (!computedType->isEqual(storedType)) {
+    auto bridge = new (ctx) BridgeFromObjCExpr(storedRef, computedType);
+    bridge->setType(computedType);
 
-  auto ret = new (C) ReturnStmt(SourceLoc(), reinterpreted);
-  auto body = BraceStmt::create(C, SourceLoc(), ASTNode(ret), SourceLoc(),
+    auto coerce = new (ctx) CoerceExpr(bridge, {}, {nullptr, computedType});
+    coerce->setType(computedType);
+
+    result = coerce;
+  }
+
+  auto ret = new (ctx) ReturnStmt(SourceLoc(), result);
+  auto body = BraceStmt::create(ctx, SourceLoc(), ASTNode(ret), SourceLoc(),
                                 /*implicit*/ true);
-  
-  getterDecl->setBody(body);
-  getterDecl->setBodyTypeCheckedIfPresent();
-
-  return getterDecl;
+  return { body, /*isTypeChecked=*/true };
 }
 
 // Build the rawValue getter for a struct type.
@@ -638,7 +684,6 @@ static AccessorDecl *makeStructRawValueGetter(
   auto *params = ParameterList::createEmpty(C);
 
   auto computedType = computedVar->getInterfaceType();
-  auto storedType = storedVar->getInterfaceType();
 
   auto getterDecl = AccessorDecl::create(C,
                      /*FuncLoc=*/SourceLoc(),
@@ -659,39 +704,7 @@ static AccessorDecl *makeStructRawValueGetter(
   getterDecl->setValidationToChecked();
 
   getterDecl->setAccess(AccessLevel::Public);
-
-  // Don't bother synthesizing the body if we've already finished type-checking.
-  if (Impl.hasFinishedTypeChecking())
-    return getterDecl;
-
-  auto *selfDecl = getterDecl->getImplicitSelfDecl();
-  auto selfRef = new (C) DeclRefExpr(selfDecl, DeclNameLoc(), /*implicit*/true);
-  selfRef->setType(selfDecl->getType());
-
-  auto storedRef = new (C) MemberRefExpr(selfRef, SourceLoc(), storedVar,
-                                         DeclNameLoc(), /*Implicit=*/true,
-                                         AccessSemantics::DirectToStorage);
-  storedRef->setType(storedType);
-
-  Expr *result = storedRef;
-
-  if (!computedType->isEqual(storedType)) {
-    auto bridge = new (C) BridgeFromObjCExpr(storedRef, computedType);
-    bridge->setType(computedType);
-
-    auto coerce = new (C) CoerceExpr(bridge, {}, {nullptr, computedType});
-    coerce->setType(computedType);
-
-    result = coerce;
-  }
-
-  auto ret = new (C) ReturnStmt(SourceLoc(), result);
-  auto body = BraceStmt::create(C, SourceLoc(), ASTNode(ret), SourceLoc(),
-                                /*implicit*/ true);
-  
-  getterDecl->setBody(body);
-  getterDecl->setBodyTypeCheckedIfPresent();
-
+  getterDecl->setBodySynthesizer(synthesizeStructRawValueGetterBody, storedVar);
   return getterDecl;
 }
 
@@ -762,6 +775,91 @@ static AccessorDecl *makeFieldSetterDecl(ClangImporter::Implementation &Impl,
   return setterDecl;
 }
 
+/// Find the anonymous inner field declaration for the given anonymous field.
+static VarDecl *findAnonymousInnerFieldDecl(VarDecl *importedFieldDecl,
+                                            VarDecl *anonymousFieldDecl) {
+  auto anonymousFieldType = anonymousFieldDecl->getInterfaceType();
+  auto anonymousFieldTypeDecl
+      = anonymousFieldType->getStructOrBoundGenericStruct();
+
+  auto lookupFlags = NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
+  for (auto decl : anonymousFieldTypeDecl->lookupDirect(
+                       importedFieldDecl->getName(), lookupFlags)) {
+    if (isa<VarDecl>(decl)) {
+      return cast<VarDecl>(decl);
+    }
+  }
+
+  llvm_unreachable("couldn't find anonymous inner field decl");
+}
+
+/// Synthesize the getter body for an indirect field.
+static std::pair<BraceStmt *, bool>
+synthesizeIndirectFieldGetterBody(AbstractFunctionDecl *afd, void *context) {
+  auto getterDecl = cast<AccessorDecl>(afd);
+  auto anonymousFieldDecl = static_cast<VarDecl *>(context);
+
+  ASTContext &ctx = getterDecl->getASTContext();
+  auto selfDecl = getterDecl->getImplicitSelfDecl();
+  Expr *expr = new (ctx) DeclRefExpr(selfDecl, DeclNameLoc(),
+                                     /*implicit*/true);
+  expr->setType(selfDecl->getInterfaceType());
+
+  expr = new (ctx) MemberRefExpr(expr, SourceLoc(), anonymousFieldDecl,
+                                 DeclNameLoc(), /*implicit*/true);
+  expr->setType(anonymousFieldDecl->getInterfaceType());
+
+  auto importedFieldDecl = cast<VarDecl>(getterDecl->getStorage());
+  auto anonymousInnerFieldDecl =
+      findAnonymousInnerFieldDecl(importedFieldDecl, anonymousFieldDecl);
+  expr = new (ctx) MemberRefExpr(expr, SourceLoc(), anonymousInnerFieldDecl,
+                                 DeclNameLoc(), /*implicit*/true);
+  expr->setType(anonymousInnerFieldDecl->getInterfaceType());
+
+  auto ret = new (ctx) ReturnStmt(SourceLoc(), expr);
+  auto body = BraceStmt::create(ctx, SourceLoc(), ASTNode(ret), SourceLoc(),
+                                /*implicit*/ true);
+  return { body, /*isTypeChecked=*/true };
+}
+
+/// Synthesize the setter body for an indirect field.
+static std::pair<BraceStmt *, bool>
+synthesizeIndirectFieldSetterBody(AbstractFunctionDecl *afd, void *context) {
+  auto setterDecl = cast<AccessorDecl>(afd);
+  auto anonymousFieldDecl = static_cast<VarDecl *>(context);
+
+  ASTContext &ctx = setterDecl->getASTContext();
+  auto selfDecl = setterDecl->getImplicitSelfDecl();
+  Expr *lhs = new (ctx) DeclRefExpr(selfDecl, DeclNameLoc(),
+                                   /*implicit*/true);
+  lhs->setType(LValueType::get(selfDecl->getInterfaceType()));
+
+  lhs = new (ctx) MemberRefExpr(lhs, SourceLoc(), anonymousFieldDecl,
+                                DeclNameLoc(), /*implicit*/true);
+  lhs->setType(LValueType::get(anonymousFieldDecl->getInterfaceType()));
+
+  auto importedFieldDecl = cast<VarDecl>(setterDecl->getStorage());
+  auto anonymousInnerFieldDecl =
+      findAnonymousInnerFieldDecl(importedFieldDecl, anonymousFieldDecl);
+
+  lhs = new (ctx) MemberRefExpr(lhs, SourceLoc(), anonymousInnerFieldDecl,
+                                DeclNameLoc(), /*implicit*/true);
+  lhs->setType(LValueType::get(anonymousInnerFieldDecl->getInterfaceType()));
+
+  auto newValueDecl = setterDecl->getParameters()->get(0);
+
+  auto rhs = new (ctx) DeclRefExpr(newValueDecl, DeclNameLoc(),
+                                  /*implicit*/ true);
+  rhs->setType(newValueDecl->getInterfaceType());
+
+  auto assign = new (ctx) AssignExpr(lhs, SourceLoc(), rhs, /*implicit*/true);
+  assign->setType(TupleType::getEmpty(ctx));
+
+  auto body = BraceStmt::create(ctx, SourceLoc(), { assign }, SourceLoc(),
+                                /*implicit*/ true);
+  return { body, /*isTypeChecked=*/true };
+}
+
 /// Build the indirect field getter and setter.
 ///
 /// \code
@@ -793,10 +891,12 @@ makeIndirectFieldAccessors(ClangImporter::Implementation &Impl,
   auto getterDecl = makeFieldGetterDecl(Impl,
                                         importedStructDecl,
                                         importedFieldDecl);
+  getterDecl->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
 
   auto setterDecl = makeFieldSetterDecl(Impl,
                                         importedStructDecl,
                                         importedFieldDecl);
+  setterDecl->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
 
   makeComputed(importedFieldDecl, getterDecl, setterDecl);
 
@@ -813,78 +913,118 @@ makeIndirectFieldAccessors(ClangImporter::Implementation &Impl,
     }
   }
   assert (anonymousFieldDecl && "anonymous field not generated");
-
-  auto anonymousFieldType = anonymousFieldDecl->getInterfaceType();
-  auto anonymousFieldTypeDecl = anonymousFieldType->getStructOrBoundGenericStruct();
-
-  VarDecl *anonymousInnerFieldDecl = nullptr;
-  for (auto decl : anonymousFieldTypeDecl->lookupDirect(importedFieldDecl->getName())) {
-    if (isa<VarDecl>(decl)) {
-      anonymousInnerFieldDecl = cast<VarDecl>(decl);
-      break;
-    }
-  }
-  assert (anonymousInnerFieldDecl && "cannot find field in anonymous generated structure");
-
-  // Don't bother synthesizing the body if we've already finished type-checking.
-  if (Impl.hasFinishedTypeChecking())
-    return { getterDecl, setterDecl };
-
-  // Synthesize the getter body
-  {
-    auto selfDecl = getterDecl->getImplicitSelfDecl();
-    Expr *expr = new (C) DeclRefExpr(selfDecl, DeclNameLoc(),
-                                     /*implicit*/true);
-    expr->setType(selfDecl->getInterfaceType());
-
-    expr = new (C) MemberRefExpr(expr, SourceLoc(), anonymousFieldDecl,
-                                 DeclNameLoc(), /*implicit*/true);
-    expr->setType(anonymousFieldDecl->getInterfaceType());
-
-    expr = new (C) MemberRefExpr(expr, SourceLoc(), anonymousInnerFieldDecl,
-                                 DeclNameLoc(), /*implicit*/true);
-    expr->setType(anonymousInnerFieldDecl->getInterfaceType());
-
-    auto ret = new (C) ReturnStmt(SourceLoc(), expr);
-    auto body = BraceStmt::create(C, SourceLoc(), ASTNode(ret), SourceLoc(),
-                                  /*implicit*/ true);
-    getterDecl->setBody(body);
-    getterDecl->setBodyTypeCheckedIfPresent();
-    getterDecl->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
-  }
-
-  // Synthesize the setter body
-  {
-    auto selfDecl = setterDecl->getImplicitSelfDecl();
-    Expr *lhs = new (C) DeclRefExpr(selfDecl, DeclNameLoc(),
-                                     /*implicit*/true);
-    lhs->setType(LValueType::get(selfDecl->getInterfaceType()));
-
-    lhs = new (C) MemberRefExpr(lhs, SourceLoc(), anonymousFieldDecl,
-                                DeclNameLoc(), /*implicit*/true);
-    lhs->setType(LValueType::get(anonymousFieldDecl->getInterfaceType()));
-
-    lhs = new (C) MemberRefExpr(lhs, SourceLoc(), anonymousInnerFieldDecl,
-                                DeclNameLoc(), /*implicit*/true);
-    lhs->setType(LValueType::get(anonymousInnerFieldDecl->getInterfaceType()));
-
-    auto newValueDecl = setterDecl->getParameters()->get(0);
-
-    auto rhs = new (C) DeclRefExpr(newValueDecl, DeclNameLoc(),
-                                   /*implicit*/ true);
-    rhs->setType(newValueDecl->getInterfaceType());
-
-    auto assign = new (C) AssignExpr(lhs, SourceLoc(), rhs, /*implicit*/true);
-    assign->setType(TupleType::getEmpty(C));
-
-    auto body = BraceStmt::create(C, SourceLoc(), { assign }, SourceLoc(),
-                                  /*implicit*/ true);
-    setterDecl->setBody(body);
-    setterDecl->setBodyTypeCheckedIfPresent();
-    setterDecl->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
-  }
+  getterDecl->setBodySynthesizer(synthesizeIndirectFieldGetterBody,
+                                 anonymousFieldDecl);
+  setterDecl->setBodySynthesizer(synthesizeIndirectFieldSetterBody,
+                                 anonymousFieldDecl);
 
   return { getterDecl, setterDecl };
+}
+
+/// Synthesizer for the body of a union field getter.
+static std::pair<BraceStmt *, bool>
+synthesizeUnionFieldGetterBody(AbstractFunctionDecl *afd, void *context) {
+  auto getterDecl = cast<AccessorDecl>(afd);
+  ASTContext &ctx = getterDecl->getASTContext();
+  auto importedFieldDecl = static_cast<VarDecl *>(context);
+
+  auto selfDecl = getterDecl->getImplicitSelfDecl();
+
+  auto selfRef = new (ctx) DeclRefExpr(selfDecl, DeclNameLoc(),
+                                       /*implicit*/ true);
+  selfRef->setType(selfDecl->getInterfaceType());
+
+  auto reinterpretCast = cast<FuncDecl>(getBuiltinValueDecl(
+      ctx, ctx.getIdentifier("reinterpretCast")));
+
+  ConcreteDeclRef reinterpretCastRef(
+    reinterpretCast,
+    SubstitutionMap::get(reinterpretCast->getGenericSignature(),
+                         {selfDecl->getInterfaceType(),
+                          importedFieldDecl->getInterfaceType()},
+                         ArrayRef<ProtocolConformanceRef>()));
+  auto reinterpretCastRefExpr
+    = new (ctx) DeclRefExpr(reinterpretCastRef, DeclNameLoc(),
+                          /*implicit*/ true);
+  reinterpretCastRefExpr->setType(
+    FunctionType::get(
+      AnyFunctionType::Param(selfDecl->getInterfaceType()),
+      importedFieldDecl->getInterfaceType()));
+
+  auto reinterpreted = CallExpr::createImplicit(ctx, reinterpretCastRefExpr,
+                                                { selfRef },
+                                                { Identifier() });
+  reinterpreted->setType(importedFieldDecl->getInterfaceType());
+  reinterpreted->setThrows(false);
+  auto ret = new (ctx) ReturnStmt(SourceLoc(), reinterpreted);
+  auto body = BraceStmt::create(ctx, SourceLoc(), ASTNode(ret), SourceLoc(),
+                                /*implicit*/ true);
+  return { body, /*isTypeChecked=*/true };
+}
+
+/// Synthesizer for the body of a union field setter.
+static std::pair<BraceStmt *, bool>
+synthesizeUnionFieldSetterBody(AbstractFunctionDecl *afd, void *context) {
+  auto setterDecl = cast<AccessorDecl>(afd);
+  ASTContext &ctx = setterDecl->getASTContext();
+
+  auto inoutSelfDecl = setterDecl->getImplicitSelfDecl();
+
+  auto inoutSelfRef = new (ctx) DeclRefExpr(inoutSelfDecl, DeclNameLoc(),
+                                            /*implicit*/ true);
+  inoutSelfRef->setType(LValueType::get(inoutSelfDecl->getInterfaceType()));
+  auto inoutSelf = new (ctx) InOutExpr(SourceLoc(), inoutSelfRef,
+      setterDecl->mapTypeIntoContext(inoutSelfDecl->getValueInterfaceType()),
+      /*implicit*/ true);
+  inoutSelf->setType(InOutType::get(inoutSelfDecl->getInterfaceType()));
+
+  auto newValueDecl = setterDecl->getParameters()->get(0);
+
+  auto newValueRef = new (ctx) DeclRefExpr(newValueDecl, DeclNameLoc(),
+                                           /*implicit*/ true);
+  newValueRef->setType(newValueDecl->getInterfaceType());
+
+  auto addressofFn = cast<FuncDecl>(getBuiltinValueDecl(
+    ctx, ctx.getIdentifier("addressof")));
+  ConcreteDeclRef addressofFnRef(addressofFn,
+      SubstitutionMap::get(addressofFn->getGenericSignature(),
+                           {inoutSelfDecl->getInterfaceType()},
+                           ArrayRef<ProtocolConformanceRef>()));
+  auto addressofFnRefExpr
+    = new (ctx) DeclRefExpr(addressofFnRef, DeclNameLoc(), /*implicit*/ true);
+  addressofFnRefExpr->setType(
+    FunctionType::get(
+      AnyFunctionType::Param(inoutSelfDecl->getInterfaceType(),
+                             Identifier(),
+                             ParameterTypeFlags().withInOut(true)),
+      ctx.TheRawPointerType));
+  auto selfPointer = CallExpr::createImplicit(ctx, addressofFnRefExpr,
+                                              { inoutSelf },
+                                              { Identifier() });
+  selfPointer->setType(ctx.TheRawPointerType);
+  selfPointer->setThrows(false);
+
+  auto initializeFn = cast<FuncDecl>(getBuiltinValueDecl(
+    ctx, ctx.getIdentifier("initialize")));
+  ConcreteDeclRef initializeFnRef(initializeFn,
+      SubstitutionMap::get(initializeFn->getGenericSignature(),
+                           {newValueDecl->getInterfaceType()},
+                           ArrayRef<ProtocolConformanceRef>()));
+  auto initializeFnRefExpr
+    = new (ctx) DeclRefExpr(initializeFnRef, DeclNameLoc(), /*implicit*/ true);
+  initializeFnRefExpr->setType(
+      FunctionType::get({AnyFunctionType::Param(newValueDecl->getInterfaceType()),
+                         AnyFunctionType::Param(ctx.TheRawPointerType)},
+                        TupleType::getEmpty(ctx)));
+  auto initialize = CallExpr::createImplicit(ctx, initializeFnRefExpr,
+                                             { newValueRef, selfPointer },
+                                             { Identifier(), Identifier() });
+  initialize->setType(TupleType::getEmpty(ctx));
+  initialize->setThrows(false);
+
+  auto body = BraceStmt::create(ctx, SourceLoc(), { initialize }, SourceLoc(),
+                                /*implicit*/ true);
+  return { body, /*isTypeChecked=*/true };
 }
 
 /// Build the union field getter and setter.
@@ -912,116 +1052,18 @@ makeUnionFieldAccessors(ClangImporter::Implementation &Impl,
   auto getterDecl = makeFieldGetterDecl(Impl,
                                         importedUnionDecl,
                                         importedFieldDecl);
+  getterDecl->setBodySynthesizer(synthesizeUnionFieldGetterBody,
+                                 importedFieldDecl);
+  getterDecl->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
 
   auto setterDecl = makeFieldSetterDecl(Impl,
                                         importedUnionDecl,
                                         importedFieldDecl);
+  setterDecl->setBodySynthesizer(synthesizeUnionFieldSetterBody,
+                                 importedFieldDecl);
+  setterDecl->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
 
   makeComputed(importedFieldDecl, getterDecl, setterDecl);
-
-  // Don't bother synthesizing the body if we've already finished type-checking.
-  if (Impl.hasFinishedTypeChecking())
-    return { getterDecl, setterDecl };
-
-  // Synthesize the getter body
-  {
-    auto selfDecl = getterDecl->getImplicitSelfDecl();
-
-    auto selfRef = new (C) DeclRefExpr(selfDecl, DeclNameLoc(),
-                                       /*implicit*/ true);
-    selfRef->setType(selfDecl->getInterfaceType());
-
-    auto reinterpretCast = cast<FuncDecl>(getBuiltinValueDecl(
-        C, C.getIdentifier("reinterpretCast")));
-
-    ConcreteDeclRef reinterpretCastRef(
-      reinterpretCast,
-      SubstitutionMap::get(reinterpretCast->getGenericSignature(),
-                           {selfDecl->getInterfaceType(),
-                            importedFieldDecl->getInterfaceType()},
-                           ArrayRef<ProtocolConformanceRef>()));
-    auto reinterpretCastRefExpr
-      = new (C) DeclRefExpr(reinterpretCastRef, DeclNameLoc(),
-                            /*implicit*/ true);
-    reinterpretCastRefExpr->setType(
-      FunctionType::get(
-        AnyFunctionType::Param(selfDecl->getInterfaceType()),
-        importedFieldDecl->getInterfaceType()));
-  
-    auto reinterpreted = CallExpr::createImplicit(C, reinterpretCastRefExpr,
-                                                  { selfRef },
-                                                  { Identifier() });
-    reinterpreted->setType(importedFieldDecl->getInterfaceType());
-    reinterpreted->setThrows(false);
-    auto ret = new (C) ReturnStmt(SourceLoc(), reinterpreted);
-    auto body = BraceStmt::create(C, SourceLoc(), ASTNode(ret), SourceLoc(),
-                                  /*implicit*/ true);
-    getterDecl->setBody(body);
-    getterDecl->setBodyTypeCheckedIfPresent();
-    getterDecl->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
-  }
-
-  // Synthesize the setter body
-  {
-    auto inoutSelfDecl = setterDecl->getImplicitSelfDecl();
-
-    auto inoutSelfRef = new (C) DeclRefExpr(inoutSelfDecl, DeclNameLoc(),
-                                            /*implicit*/ true);
-    inoutSelfRef->setType(LValueType::get(inoutSelfDecl->getInterfaceType()));
-    auto inoutSelf = new (C) InOutExpr(SourceLoc(), inoutSelfRef,
-      importedUnionDecl->getDeclaredType(), /*implicit*/ true);
-    inoutSelf->setType(InOutType::get(inoutSelfDecl->getInterfaceType()));
-
-    auto newValueDecl = setterDecl->getParameters()->get(0);
-
-    auto newValueRef = new (C) DeclRefExpr(newValueDecl, DeclNameLoc(),
-                                           /*implicit*/ true);
-    newValueRef->setType(newValueDecl->getInterfaceType());
-
-    auto addressofFn = cast<FuncDecl>(getBuiltinValueDecl(
-      C, C.getIdentifier("addressof")));
-    ConcreteDeclRef addressofFnRef(addressofFn,
-        SubstitutionMap::get(addressofFn->getGenericSignature(),
-                             {inoutSelfDecl->getInterfaceType()},
-                             ArrayRef<ProtocolConformanceRef>()));
-    auto addressofFnRefExpr
-      = new (C) DeclRefExpr(addressofFnRef, DeclNameLoc(), /*implicit*/ true);
-    addressofFnRefExpr->setType(
-      FunctionType::get(AnyFunctionType::Param(inoutSelfDecl->getInterfaceType(),
-                                               Identifier(),
-                                               ParameterTypeFlags().withInOut(true)),
-                        C.TheRawPointerType));
-    auto selfPointer = CallExpr::createImplicit(C, addressofFnRefExpr,
-                                                { inoutSelf },
-                                                { Identifier() });
-    selfPointer->setType(C.TheRawPointerType);
-    selfPointer->setThrows(false);
-
-    auto initializeFn = cast<FuncDecl>(getBuiltinValueDecl(
-      C, C.getIdentifier("initialize")));
-    ConcreteDeclRef initializeFnRef(initializeFn,
-        SubstitutionMap::get(initializeFn->getGenericSignature(),
-                             {newValueDecl->getInterfaceType()},
-                             ArrayRef<ProtocolConformanceRef>()));
-    auto initializeFnRefExpr
-      = new (C) DeclRefExpr(initializeFnRef, DeclNameLoc(), /*implicit*/ true);
-    initializeFnRefExpr->setType(
-        FunctionType::get({AnyFunctionType::Param(newValueDecl->getInterfaceType()),
-                           AnyFunctionType::Param(C.TheRawPointerType)},
-                          TupleType::getEmpty(C)));
-    auto initialize = CallExpr::createImplicit(C, initializeFnRefExpr,
-                                               { newValueRef, selfPointer },
-                                               { Identifier(), Identifier() });
-    initialize->setType(TupleType::getEmpty(C));
-    initialize->setThrows(false);
-
-    auto body = BraceStmt::create(C, SourceLoc(), { initialize }, SourceLoc(),
-                                  /*implicit*/ true);
-    setterDecl->setBody(body);
-    setterDecl->setBodyTypeCheckedIfPresent();
-    setterDecl->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
-  }
-
   return { getterDecl, setterDecl };
 }
 
@@ -1032,7 +1074,8 @@ getAccessorDeclarationName(clang::ASTContext &Ctx,
                            const char *suffix) {
   std::string id;
   llvm::raw_string_ostream IdStream(id);
-  IdStream << "$" << structDecl->getName()
+  Mangle::ASTMangler mangler;
+  IdStream << "$" << mangler.mangleDeclAsUSR(structDecl, "")
            << "$" << fieldDecl->getName()
            << "$" << suffix;
 
@@ -1118,10 +1161,6 @@ makeBitFieldAccessors(ClangImporter::Implementation &Impl,
 
   makeComputed(importedFieldDecl, getterDecl, setterDecl);
 
-  // Don't bother synthesizing the body if we've already finished type-checking.
-  if (Impl.hasFinishedTypeChecking())
-    return { getterDecl, setterDecl };
-  
   // Synthesize the getter body
   {
     auto cGetterSelfId = nullptr;
@@ -1214,6 +1253,54 @@ makeBitFieldAccessors(ClangImporter::Implementation &Impl,
   return { getterDecl, setterDecl };
 }
 
+/// Synthesize the body for an struct default initializer.
+static std::pair<BraceStmt *, bool>
+synthesizeStructDefaultConstructorBody(AbstractFunctionDecl *afd,
+                                       void *context) {
+  auto constructor = cast<ConstructorDecl>(afd);
+  ASTContext &ctx = constructor->getASTContext();
+  auto structDecl = static_cast<StructDecl *>(context);
+
+  // Use a builtin to produce a zero initializer, and assign it to self.
+
+  // Construct the left-hand reference to self.
+  auto *selfDecl = constructor->getImplicitSelfDecl();
+  Expr *lhs = new (ctx) DeclRefExpr(selfDecl, DeclNameLoc(), /*Implicit=*/true);
+  auto selfType = structDecl->getDeclaredInterfaceType();
+  lhs->setType(LValueType::get(selfType));
+
+  auto emptyTuple = TupleType::getEmpty(ctx);
+
+  // Construct the right-hand call to Builtin.zeroInitializer.
+  Identifier zeroInitID = ctx.getIdentifier("zeroInitializer");
+  auto zeroInitializerFunc =
+    cast<FuncDecl>(getBuiltinValueDecl(ctx, zeroInitID));
+  SubstitutionMap subMap =
+    SubstitutionMap::get(zeroInitializerFunc->getGenericSignature(),
+                         llvm::makeArrayRef(selfType), { });
+  ConcreteDeclRef concreteDeclRef(zeroInitializerFunc, subMap);
+  auto zeroInitializerRef =
+    new (ctx) DeclRefExpr(concreteDeclRef, DeclNameLoc(), /*implicit*/ true);
+  zeroInitializerRef->setType(FunctionType::get({}, selfType));
+
+  auto call = CallExpr::createImplicit(ctx, zeroInitializerRef, {}, {});
+  call->setType(selfType);
+  call->setThrows(false);
+
+  auto assign = new (ctx) AssignExpr(lhs, SourceLoc(), call, /*implicit*/ true);
+  assign->setType(emptyTuple);
+
+  auto result = TupleExpr::createEmpty(ctx, SourceLoc(), SourceLoc(),
+                                       /*Implicit=*/true);
+  result->setType(emptyTuple);
+
+  auto ret = new (ctx) ReturnStmt(SourceLoc(), result, /*Implicit=*/true);
+
+  // Create the function body.
+  auto body = BraceStmt::create(ctx, SourceLoc(), {assign, ret}, SourceLoc());
+  return { body, /*isTypeChecked=*/true };
+}
+
 /// Create a default constructor that initializes a struct to zero.
 static ConstructorDecl *
 createDefaultConstructor(ClangImporter::Implementation &Impl,
@@ -1238,55 +1325,82 @@ createDefaultConstructor(ClangImporter::Implementation &Impl,
   // Mark the constructor transparent so that we inline it away completely.
   constructor->getAttrs().add(new (context) TransparentAttr(/*implicit*/ true));
 
-  if (Impl.hasFinishedTypeChecking())
-    return constructor;
-
-  // Use a builtin to produce a zero initializer, and assign it to self.
-
-  // Construct the left-hand reference to self.
-  auto *selfDecl = constructor->getImplicitSelfDecl();
-  Expr *lhs = new (context) DeclRefExpr(selfDecl,
-                                        DeclNameLoc(), /*Implicit=*/true);
-  auto selfType = structDecl->getDeclaredInterfaceType();
-  lhs->setType(LValueType::get(selfType));
-
-  auto emptyTuple = TupleType::getEmpty(context);
-
-  // Construct the right-hand call to Builtin.zeroInitializer.
-  Identifier zeroInitID = context.getIdentifier("zeroInitializer");
-  auto zeroInitializerFunc =
-    cast<FuncDecl>(getBuiltinValueDecl(context, zeroInitID));
-  SubstitutionMap subMap =
-    SubstitutionMap::get(zeroInitializerFunc->getGenericSignature(),
-                         llvm::makeArrayRef(selfType), { });
-  ConcreteDeclRef concreteDeclRef(zeroInitializerFunc, subMap);
-  auto zeroInitializerRef =
-    new (context) DeclRefExpr(concreteDeclRef, DeclNameLoc(),
-                              /*implicit*/ true);
-  zeroInitializerRef->setType(FunctionType::get({}, selfType));
-
-  auto call = CallExpr::createImplicit(context, zeroInitializerRef, {}, {});
-  call->setType(selfType);
-  call->setThrows(false);
-
-  auto assign = new (context) AssignExpr(lhs, SourceLoc(), call,
-                                         /*implicit*/ true);
-  assign->setType(emptyTuple);
-
-  auto result = TupleExpr::createEmpty(context, SourceLoc(), SourceLoc(),
-                                       /*Implicit=*/true);
-  result->setType(emptyTuple);
-
-  auto ret = new (context) ReturnStmt(SourceLoc(), result, /*Implicit=*/true);
-
-  // Create the function body.
-  auto body = BraceStmt::create(context, SourceLoc(), {assign, ret},
-                                SourceLoc());
-  constructor->setBody(body);
-  constructor->setBodyTypeCheckedIfPresent();
+  constructor->setBodySynthesizer(synthesizeStructDefaultConstructorBody,
+                                  structDecl);
 
   // We're done.
   return constructor;
+}
+
+/// Synthesizer callback for the body of a struct value constructor.
+static std::pair<BraceStmt *, bool>
+synthesizeValueConstructorBody(AbstractFunctionDecl *afd, void *context) {
+  auto constructor = cast<ConstructorDecl>(afd);
+  ArrayRef<VarDecl *> members(static_cast<VarDecl **>(context) + 1,
+                              static_cast<uintptr_t*>(context)[0]);
+
+  ASTContext &ctx = constructor->getASTContext();
+
+  // Assign all of the member variables appropriately.
+  SmallVector<ASTNode, 4> stmts;
+
+  auto *selfDecl = constructor->getImplicitSelfDecl();
+
+  // To keep DI happy, initialize stored properties before computed.
+  auto parameters = constructor->getParameters();
+  for (unsigned pass = 0; pass < 2; pass++) {
+    unsigned paramPos = 0;
+
+    for (unsigned i = 0, e = members.size(); i < e; i++) {
+      auto var = members[i];
+
+      if (var->hasClangNode() &&
+          isa<clang::IndirectFieldDecl>(var->getClangDecl()))
+        continue;
+
+      if (var->hasStorage() == (pass != 0)) {
+        paramPos++;
+        continue;
+      }
+
+      // Construct left-hand side.
+      Expr *lhs = new (ctx) DeclRefExpr(selfDecl, DeclNameLoc(),
+                                        /*Implicit=*/true);
+      lhs->setType(LValueType::get(selfDecl->getType()));
+
+      auto semantics = (var->hasStorage()
+                        ? AccessSemantics::DirectToStorage
+                        : AccessSemantics::Ordinary);
+
+      lhs = new (ctx) MemberRefExpr(lhs, SourceLoc(), var, DeclNameLoc(),
+                                    /*Implicit=*/true, semantics);
+      lhs->setType(LValueType::get(var->getType()));
+
+      // Construct right-hand side.
+      auto rhs = new (ctx) DeclRefExpr(parameters->get(paramPos),
+                                       DeclNameLoc(), /*Implicit=*/true);
+      rhs->setType(parameters->get(paramPos)->getType());
+
+      // Add assignment.
+      auto assign = new (ctx) AssignExpr(lhs, SourceLoc(), rhs,
+                                         /*Implicit=*/true);
+      assign->setType(TupleType::getEmpty(ctx));
+
+      stmts.push_back(assign);
+      paramPos++;
+    }
+  }
+
+  auto result = TupleExpr::createEmpty(ctx, SourceLoc(), SourceLoc(),
+                                       /*Implicit=*/true);
+  result->setType(TupleType::getEmpty(ctx));
+
+  auto ret = new (ctx) ReturnStmt(SourceLoc(), result, /*Implicit=*/true);
+  stmts.push_back(ret);
+
+  // Create the function body.
+  auto body = BraceStmt::create(ctx, SourceLoc(), stmts, SourceLoc());
+  return { body, /*isTypeChecked=*/true };
 }
 
 /// Create a constructor that initializes a struct from its members.
@@ -1342,67 +1456,14 @@ createValueConstructor(ClangImporter::Implementation &Impl,
   constructor->getAttrs().add(new (context) TransparentAttr(/*implicit*/ true));
 
   if (wantBody) {
-    // Assign all of the member variables appropriately.
-    SmallVector<ASTNode, 4> stmts;
-
-    auto *selfDecl = constructor->getImplicitSelfDecl();
-
-    // To keep DI happy, initialize stored properties before computed.
-    for (unsigned pass = 0; pass < 2; pass++) {
-      unsigned paramPos = 0;
-
-      for (unsigned i = 0, e = members.size(); i < e; i++) {
-        auto var = members[i];
-
-        if (var->hasClangNode() && isa<clang::IndirectFieldDecl>(var->getClangDecl()))
-          continue;
-
-        if (var->hasStorage() == (pass != 0)) {
-          paramPos++;
-          continue;
-        }
-
-        // Construct left-hand side.
-        Expr *lhs = new (context) DeclRefExpr(selfDecl, DeclNameLoc(),
-                                              /*Implicit=*/true);
-        lhs->setType(LValueType::get(selfDecl->getType()));
-
-        auto semantics = (var->hasStorage()
-                          ? AccessSemantics::DirectToStorage
-                          : AccessSemantics::Ordinary);
-
-        lhs = new (context) MemberRefExpr(lhs, SourceLoc(), var, DeclNameLoc(),
-                                          /*Implicit=*/true,
-                                          semantics);
-        lhs->setType(LValueType::get(var->getType()));
-
-        // Construct right-hand side.
-        auto rhs = new (context) DeclRefExpr(valueParameters[paramPos],
-                                             DeclNameLoc(),
-                                             /*Implicit=*/true);
-        rhs->setType(valueParameters[paramPos]->getType());
-
-        // Add assignment.
-        auto assign = new (context) AssignExpr(lhs, SourceLoc(), rhs,
-                                               /*Implicit=*/true);
-        assign->setType(TupleType::getEmpty(context));
-
-        stmts.push_back(assign);
-        paramPos++;
-      }
+    auto memberMemory =
+        context.AllocateUninitialized<uintptr_t>(members.size() + 1);
+    memberMemory[0] = members.size();
+    for (unsigned i : indices(members)) {
+      memberMemory[i+1] = reinterpret_cast<uintptr_t>(members[i]);
     }
-
-    auto result = TupleExpr::createEmpty(context, SourceLoc(), SourceLoc(),
-                                         /*Implicit=*/true);
-    result->setType(TupleType::getEmpty(context));
-
-    auto ret = new (context) ReturnStmt(SourceLoc(), result, /*Implicit=*/true);
-    stmts.push_back(ret);
-
-    // Create the function body.
-    auto body = BraceStmt::create(context, SourceLoc(), stmts, SourceLoc());
-    constructor->setBody(body);
-    constructor->setBodyTypeCheckedIfPresent();
+    constructor->setBodySynthesizer(synthesizeValueConstructorBody,
+                                    memberMemory.data());
   }
 
   // We're done.
@@ -1483,12 +1544,12 @@ static void makeStructRawValued(
     structDecl->addMember(
         createValueConstructor(Impl, structDecl, var,
                                /*wantCtorParamNames=*/false,
-                               /*wantBody=*/!Impl.hasFinishedTypeChecking()));
+                               /*wantBody=*/true));
 
   auto *initRawValue =
       createValueConstructor(Impl, structDecl, var,
                              /*wantCtorParamNames=*/true,
-                             /*wantBody=*/!Impl.hasFinishedTypeChecking());
+                             /*wantBody=*/true);
   structDecl->addMember(initRawValue);
   structDecl->addMember(patternBinding);
   structDecl->addMember(var);
@@ -1496,7 +1557,60 @@ static void makeStructRawValued(
 
   addSynthesizedTypealias(structDecl, ctx.Id_RawValue, underlyingType);
   Impl.RawTypes[structDecl] = underlyingType;
-  Impl.RawInits[structDecl] = initRawValue;
+}
+
+/// Synthesizer callback for a raw value bridging constructor body.
+static std::pair<BraceStmt *, bool>
+synthesizeRawValueBridgingConstructorBody(AbstractFunctionDecl *afd,
+                                          void *context) {
+  auto init = cast<ConstructorDecl>(afd);
+  VarDecl *storedRawValue = static_cast<VarDecl *>(context);
+
+  ASTContext &ctx = init->getASTContext();
+
+  auto selfDecl = init->getImplicitSelfDecl();
+  auto storedType = storedRawValue->getInterfaceType();
+
+  // Construct left-hand side.
+  Expr *lhs = new (ctx) DeclRefExpr(selfDecl, DeclNameLoc(),
+                                    /*Implicit=*/true);
+  lhs->setType(LValueType::get(selfDecl->getType()));
+
+  lhs = new (ctx) MemberRefExpr(lhs, SourceLoc(), storedRawValue,
+                                DeclNameLoc(), /*Implicit=*/true,
+                                AccessSemantics::DirectToStorage);
+  lhs->setType(LValueType::get(storedType));
+
+  // Construct right-hand side.
+  // FIXME: get the parameter from the init, and plug it in here.
+  auto *paramDecl = init->getParameters()->get(0);
+  auto *paramRef = new (ctx) DeclRefExpr(
+      paramDecl, DeclNameLoc(), /*Implicit=*/true);
+  paramRef->setType(paramDecl->getType());
+
+  Expr *rhs = paramRef;
+  if (!storedRawValue->getInterfaceType()->isEqual(paramDecl->getType())) {
+    auto bridge = new (ctx) BridgeToObjCExpr(paramRef, storedType);
+    bridge->setType(storedType);
+
+    auto coerce = new (ctx) CoerceExpr(bridge, SourceLoc(),
+                                       {nullptr, storedType});
+    coerce->setType(storedType);
+
+    rhs = coerce;
+  }
+
+  // Add assignment.
+  auto assign = new (ctx) AssignExpr(lhs, SourceLoc(), rhs,
+                                     /*Implicit=*/true);
+  assign->setType(TupleType::getEmpty(ctx));
+
+  auto result = TupleExpr::createEmpty(ctx, SourceLoc(), SourceLoc(),
+                                       /*Implicit=*/true);
+  auto ret = new (ctx) ReturnStmt(SourceLoc(), result, /*Implicit=*/true);
+
+  auto body = BraceStmt::create(ctx, SourceLoc(), {assign, ret}, SourceLoc());
+  return { body, /*isTypeChecked=*/true };
 }
 
 /// Create a rawValue-ed constructor that bridges to its underlying storage.
@@ -1504,56 +1618,13 @@ static ConstructorDecl *createRawValueBridgingConstructor(
     ClangImporter::Implementation &Impl, StructDecl *structDecl,
     VarDecl *computedRawValue, VarDecl *storedRawValue, bool wantLabel,
     bool wantBody) {
-  auto &ctx = Impl.SwiftContext;
   auto init = createValueConstructor(Impl, structDecl, computedRawValue,
                                      /*wantCtorParamNames=*/wantLabel,
                                      /*wantBody=*/false);
   // Insert our custom init body
   if (wantBody) {
-    auto selfDecl = init->getImplicitSelfDecl();
-    auto storedType = storedRawValue->getInterfaceType();
-
-    // Construct left-hand side.
-    Expr *lhs = new (ctx) DeclRefExpr(selfDecl, DeclNameLoc(),
-                                      /*Implicit=*/true);
-    lhs->setType(LValueType::get(selfDecl->getType()));
-
-    lhs = new (ctx) MemberRefExpr(lhs, SourceLoc(), storedRawValue,
-                                  DeclNameLoc(), /*Implicit=*/true,
-                                  AccessSemantics::DirectToStorage);
-    lhs->setType(LValueType::get(storedType));
-
-    // Construct right-hand side.
-    // FIXME: get the parameter from the init, and plug it in here.
-    auto *paramDecl = init->getParameters()->get(0);
-    auto *paramRef = new (ctx) DeclRefExpr(
-        paramDecl, DeclNameLoc(), /*Implicit=*/true);
-    paramRef->setType(paramDecl->getType());
-
-    Expr *rhs = paramRef;
-    if (!storedRawValue->getInterfaceType()->isEqual(paramDecl->getType())) {
-      auto bridge = new (ctx) BridgeToObjCExpr(paramRef, storedType);
-      bridge->setType(storedType);
-
-      auto coerce = new (ctx) CoerceExpr(bridge, SourceLoc(),
-                                         {nullptr, storedType});
-      coerce->setType(storedType);
-
-      rhs = coerce;
-    }
-
-    // Add assignment.
-    auto assign = new (ctx) AssignExpr(lhs, SourceLoc(), rhs,
-                                       /*Implicit=*/true);
-    assign->setType(TupleType::getEmpty(ctx));
-
-    auto result = TupleExpr::createEmpty(ctx, SourceLoc(), SourceLoc(),
-                                         /*Implicit=*/true);
-    auto ret = new (ctx) ReturnStmt(SourceLoc(), result, /*Implicit=*/true);
-
-    auto body = BraceStmt::create(ctx, SourceLoc(), {assign, ret}, SourceLoc());
-    init->setBody(body);
-    init->setBodyTypeCheckedIfPresent();
+    init->setBodySynthesizer(synthesizeRawValueBridgingConstructorBody,
+                             storedRawValue);
   }
 
   return init;
@@ -1615,19 +1686,16 @@ static void makeStructRawValuedWithBridge(
       ctx, StaticSpellingKind::None, computedVarPattern, /*InitExpr*/ nullptr,
       structDecl);
 
-  // Don't bother synthesizing the body if we've already finished
-  // type-checking.
-  bool wantBody = !Impl.hasFinishedTypeChecking();
-
   auto init = createRawValueBridgingConstructor(Impl, structDecl, computedVar,
                                                 storedVar,
-                                                /*wantLabel*/ true, wantBody);
+                                                /*wantLabel*/ true,
+                                                /*wantBody*/ true);
 
   ConstructorDecl *unlabeledCtor = nullptr;
   if (makeUnlabeledValueInit)
     unlabeledCtor = createRawValueBridgingConstructor(
         Impl, structDecl, computedVar, storedVar,
-        /*wantLabel*/ false, wantBody);
+        /*wantLabel*/ false, /*wantBody*/true);
 
   if (unlabeledCtor)
     structDecl->addMember(unlabeledCtor);
@@ -1640,7 +1708,6 @@ static void makeStructRawValuedWithBridge(
 
   addSynthesizedTypealias(structDecl, ctx.Id_RawValue, bridgedType);
   Impl.RawTypes[structDecl] = bridgedType;
-  Impl.RawInits[structDecl] = init;
 }
 
 /// Build a declaration for an Objective-C subscript getter.
@@ -1850,6 +1917,26 @@ static void inferProtocolMemberAvailability(ClangImporter::Implementation &impl,
   applyAvailableAttribute(valueDecl, requiredRange, C);
 }
 
+/// Synthesizer callback for the error domain property getter.
+static std::pair<BraceStmt *, bool>
+synthesizeErrorDomainGetterBody(AbstractFunctionDecl *afd, void *context) {
+  auto getterDecl = cast<AccessorDecl>(afd);
+  ASTContext &ctx = getterDecl->getASTContext();
+
+  auto contextData =
+      llvm::PointerIntPair<ValueDecl *, 1, bool>::getFromOpaqueValue(context);
+  auto swiftValueDecl = contextData.getPointer();
+  bool isImplicit = contextData.getInt();
+  DeclRefExpr *domainDeclRef = new (ctx)
+      DeclRefExpr(ConcreteDeclRef(swiftValueDecl), {}, isImplicit);
+  domainDeclRef->setType(
+    getterDecl->mapTypeIntoContext(swiftValueDecl->getInterfaceType()));
+
+  auto ret = new (ctx) ReturnStmt(SourceLoc(), domainDeclRef);
+  return { BraceStmt::create(ctx, SourceLoc(), {ret}, SourceLoc(), isImplicit),
+           /*isTypeChecked=*/true };
+}
+
 /// Add a domain error member, as required by conformance to
 /// _BridgedStoredNSError.
 /// \returns true on success, false on failure
@@ -1876,10 +1963,6 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
   errorDomainPropertyDecl->setInterfaceType(stringTy);
   errorDomainPropertyDecl->setValidationToChecked();
   errorDomainPropertyDecl->setAccess(AccessLevel::Public);
-
-  DeclRefExpr *domainDeclRef = new (C)
-      DeclRefExpr(ConcreteDeclRef(swiftValueDecl), {}, isImplicit);
-  domainDeclRef->setType(swiftValueDecl->getInterfaceType());
 
   auto *params = ParameterList::createEmpty(C);
 
@@ -1909,10 +1992,10 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
   getterDecl->setStatic(isStatic);
   getterDecl->setAccess(AccessLevel::Public);
 
-  auto ret = new (C) ReturnStmt(SourceLoc(), domainDeclRef);
-  getterDecl->setBody(
-      BraceStmt::create(C, SourceLoc(), {ret}, SourceLoc(), isImplicit));
-  getterDecl->setBodyTypeCheckedIfPresent();
+  llvm::PointerIntPair<ValueDecl *, 1, bool> contextData(swiftValueDecl,
+                                                         isImplicit);
+  getterDecl->setBodySynthesizer(synthesizeErrorDomainGetterBody,
+                                 contextData.getOpaqueValue());
 
   return true;
 }
@@ -2843,7 +2926,6 @@ namespace {
 
         addSynthesizedTypealias(enumDecl, C.Id_RawValue, underlyingType);
         Impl.RawTypes[enumDecl] = underlyingType;
-        Impl.RawInits[enumDecl] = rawValueConstructor;
 
         // If we have an error wrapper, finish it up now that its
         // nested enum has been constructed.
@@ -3269,7 +3351,7 @@ namespace {
           auto valueCtor =
               createValueConstructor(Impl, result, VD,
                                      /*want param names*/true,
-                                     /*wantBody=*/!Impl.hasFinishedTypeChecking());
+                                     /*wantBody=*/true);
           ctors.push_back(valueCtor);
         }
       }
@@ -3288,11 +3370,10 @@ namespace {
         //
         // If we can completely represent the struct in SIL, leave the body
         // implicit, otherwise synthesize one to call property setters.
-        bool wantBody = (hasUnreferenceableStorage &&
-                         !Impl.hasFinishedTypeChecking());
-        auto valueCtor = createValueConstructor(Impl, result, members,
-                                                /*want param names*/true,
-                                                /*want body*/wantBody);
+        auto valueCtor = createValueConstructor(
+            Impl, result, members,
+            /*want param names*/true,
+            /*want body*/hasUnreferenceableStorage);
         if (!hasUnreferenceableStorage)
           valueCtor->setIsMemberwiseInitializer();
 
@@ -8167,6 +8248,86 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
   return createConstant(name, dc, type, expr, convertKind, isStatic, ClangN);
 }
 
+namespace {
+  using ConstantGetterBodyContextData =
+      llvm::PointerIntPair<Expr *, 2, ConstantConvertKind>;
+}
+
+/// Synthesizer callback to synthesize the getter for a constant value.
+static std::pair<BraceStmt *, bool>
+synthesizeConstantGetterBody(AbstractFunctionDecl *afd, void *voidContext) {
+  ASTContext &ctx = afd->getASTContext();
+  auto func = cast<AccessorDecl>(afd);
+  VarDecl *constantVar = cast<VarDecl>(func->getStorage());
+  Type type = func->mapTypeIntoContext(constantVar->getValueInterfaceType());
+
+  auto contextData = ConstantGetterBodyContextData::getFromOpaqueValue(
+      voidContext);
+  Expr *expr = contextData.getPointer();
+  ConstantConvertKind convertKind = contextData.getInt();
+
+  // If we need a conversion, add one now.
+  switch (convertKind) {
+  case ConstantConvertKind::None:
+    break;
+
+  case ConstantConvertKind::Construction:
+  case ConstantConvertKind::ConstructionWithUnwrap: {
+    auto typeRef = TypeExpr::createImplicit(type, ctx);
+
+    // Reference init(rawValue: T)
+    ConstructorDecl *init = nullptr;
+    DeclName initName = DeclName(ctx, DeclBaseName::createConstructor(),
+                                 { ctx.Id_rawValue });
+    auto nominal = type->getAnyNominal();
+    auto lookupFlags = NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
+    for (auto found : nominal->lookupDirect(initName, lookupFlags)) {
+      init = dyn_cast<ConstructorDecl>(found);
+      if (init && init->getDeclContext() == nominal)
+        break;
+    }
+    assert(init && "did not find init(rawValue:)");
+
+    auto initTy = init->getInterfaceType()->removeArgumentLabels(1);
+    auto declRef =
+        new (ctx) DeclRefExpr(init, DeclNameLoc(), /*Implicit=*/true,
+                              AccessSemantics::Ordinary, initTy);
+
+    // (Self) -> ...
+    initTy = initTy->castTo<FunctionType>()->getResult();
+    auto initRef = new (ctx) DotSyntaxCallExpr(declRef, SourceLoc(),
+                                               typeRef, initTy);
+    initRef->setThrows(false);
+
+    // (rawValue: T) -> ...
+    initTy = initTy->castTo<FunctionType>()->getResult();
+
+    auto initCall = CallExpr::createImplicit(ctx, initRef, { expr },
+                                             { ctx.Id_rawValue });
+    initCall->setType(initTy);
+    initCall->setThrows(false);
+
+    expr = initCall;
+
+    // Force unwrap if our init(rawValue:) is failable, which is currently
+    // the case with enums.
+    if (convertKind == ConstantConvertKind::ConstructionWithUnwrap) {
+      initTy = initTy->getOptionalObjectType();
+      expr = new (ctx) ForceValueExpr(expr, SourceLoc());
+      expr->setType(initTy);
+    }
+
+    assert(initTy->isEqual(type));
+    break;
+  }
+  }
+
+  // Create the return statement.
+  auto ret = new (ctx) ReturnStmt(SourceLoc(), expr);
+
+  return { BraceStmt::create(ctx, SourceLoc(), ASTNode(ret), SourceLoc()),
+           /*isTypeChecked=*/true };
+}
 
 ValueDecl *
 ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
@@ -8216,67 +8377,9 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
   func->setIsObjC(false);
   func->setIsDynamic(false);
 
-  // If we're not done type checking, build the getter body.
-  if (!hasFinishedTypeChecking()) {
-    auto expr = valueExpr;
-
-    // If we need a conversion, add one now.
-    switch (convertKind) {
-    case ConstantConvertKind::None:
-      break;
-
-    case ConstantConvertKind::Construction:
-    case ConstantConvertKind::ConstructionWithUnwrap: {
-      auto typeRef = TypeExpr::createImplicit(type, C);
-
-      // Reference init(rawValue: T)
-      auto found = RawInits.find(type->getAnyNominal());
-      assert(found != RawInits.end());
-
-      auto *init = found->second;
-      auto initTy = init->getInterfaceType()->removeArgumentLabels(1);
-      auto declRef =
-          new (C) DeclRefExpr(init, DeclNameLoc(), /*Implicit=*/true,
-                              AccessSemantics::Ordinary, initTy);
-
-      // (Self) -> ...
-      initTy = initTy->castTo<FunctionType>()->getResult();
-      auto initRef = new (C) DotSyntaxCallExpr(declRef, SourceLoc(),
-                                               typeRef, initTy);
-      initRef->setThrows(false);
-
-      // (rawValue: T) -> ...
-      initTy = initTy->castTo<FunctionType>()->getResult();
-
-      auto initCall = CallExpr::createImplicit(C, initRef, { expr },
-                                               { C.Id_rawValue });
-      initCall->setType(initTy);
-      initCall->setThrows(false);
-
-      expr = initCall;
-
-      // Force unwrap if our init(rawValue:) is failable, which is currently
-      // the case with enums.
-      if (convertKind == ConstantConvertKind::ConstructionWithUnwrap) {
-        initTy = initTy->getOptionalObjectType();
-        expr = new (C) ForceValueExpr(expr, SourceLoc());
-        expr->setType(initTy);
-      }
-
-      assert(initTy->isEqual(type));
-      break;
-    }
-    }
-
-    // Create the return statement.
-    auto ret = new (C) ReturnStmt(SourceLoc(), expr);
-
-    // Finally, set the body.
-    func->setBody(BraceStmt::create(C, SourceLoc(),
-                                    ASTNode(ret),
-                                    SourceLoc()));
-    func->setBodyTypeCheckedIfPresent();
-  }
+  func->setBodySynthesizer(synthesizeConstantGetterBody,
+                           ConstantGetterBodyContextData(valueExpr, convertKind)
+                               .getOpaqueValue());
 
   // Mark the function transparent so that we inline it away completely.
   func->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));

@@ -209,9 +209,10 @@ bool DerivedConformance::canDeriveDifferentiable(NominalTypeDecl *nominal,
 }
 
 // Synthesize body for a `Differentiable` method requirement.
-static void deriveBodyDifferentiable_method(AbstractFunctionDecl *funcDecl,
-                                            Identifier methodName,
-                                            Identifier methodParamLabel) {
+static std::pair<BraceStmt *, bool>
+deriveBodyDifferentiable_method(AbstractFunctionDecl *funcDecl,
+                                Identifier methodName,
+                                Identifier methodParamLabel) {
   auto *parentDC = funcDecl->getParent();
   auto *nominal = parentDC->getSelfNominalTypeDecl();
   auto &C = nominal->getASTContext();
@@ -289,16 +290,17 @@ static void deriveBodyDifferentiable_method(AbstractFunctionDecl *funcDecl,
     memberMethodCallExprs.push_back(createMemberMethodCallExpr(member));
     memberNames.push_back(member->getName());
   }
-  funcDecl->setBody(BraceStmt::create(
-      C, SourceLoc(), memberMethodCallExprs, SourceLoc(), true));
+  auto *braceStmt = BraceStmt::create(C, SourceLoc(), memberMethodCallExprs,
+                                      SourceLoc(), true);
+  return std::pair<BraceStmt *, bool>(braceStmt, false);
 }
 
 // Synthesize body for `move(along:)`.
-static void deriveBodyDifferentiable_move(AbstractFunctionDecl *funcDecl,
-                                           void *) {
+static std::pair<BraceStmt *, bool>
+deriveBodyDifferentiable_move(AbstractFunctionDecl *funcDecl, void *) {
   auto &C = funcDecl->getASTContext();
-  deriveBodyDifferentiable_method(funcDecl, C.Id_move,
-                                  C.getIdentifier("along"));
+  return deriveBodyDifferentiable_method(funcDecl, C.Id_move,
+                                         C.getIdentifier("along"));
 }
 
 // Synthesize function declaration for a `Differentiable` method requirement.
@@ -379,8 +381,9 @@ static ValueDecl *getUnderlyingAllDiffableVariables(DeclContext *DC,
 }
 
 // Synthesize getter body for `allDifferentiableVariables` computed property.
-static void derivedBody_allDifferentiableVariablesGetter(
-    AbstractFunctionDecl *getterDecl, void *) {
+static std::pair<BraceStmt *, bool>
+derivedBody_allDifferentiableVariablesGetter(AbstractFunctionDecl *getterDecl,
+                                             void *) {
   auto *parentDC = getterDecl->getParent();
   auto *nominal = parentDC->getSelfNominalTypeDecl();
   auto &C = nominal->getASTContext();
@@ -434,13 +437,15 @@ static void derivedBody_allDifferentiableVariablesGetter(
   Expr *callExpr = CallExpr::createImplicit(C, initExpr, members, memberNames);
 
   ASTNode returnStmt = new (C) ReturnStmt(SourceLoc(), callExpr, true);
-  getterDecl->setBody(
-      BraceStmt::create(C, SourceLoc(), returnStmt, SourceLoc(), true));
+  auto *braceStmt =
+      BraceStmt::create(C, SourceLoc(), returnStmt, SourceLoc(), true);
+  return std::pair<BraceStmt *, bool>(braceStmt, false);
 }
 
 // Synthesize setter body for `allDifferentiableVariables` computed property.
-static void derivedBody_allDifferentiableVariablesSetter(
-    AbstractFunctionDecl *setterDecl, void *) {
+static std::pair<BraceStmt *, bool>
+derivedBody_allDifferentiableVariablesSetter(AbstractFunctionDecl *setterDecl,
+                                             void *) {
   auto *parentDC = setterDecl->getParent();
   auto *nominal = parentDC->getSelfNominalTypeDecl();
   auto &C = nominal->getASTContext();
@@ -491,8 +496,9 @@ static void derivedBody_allDifferentiableVariablesSetter(
     assignExprs.push_back(assignExpr);
   }
 
-  setterDecl->setBody(
-      BraceStmt::create(C, SourceLoc(), assignExprs, SourceLoc(), true));
+  auto *braceStmt =
+      BraceStmt::create(C, SourceLoc(), assignExprs, SourceLoc(), true);
+  return std::pair<BraceStmt *, bool>(braceStmt, false);
 }
 
 // Synthesize `allDifferentiableVariables` computed property declaration.

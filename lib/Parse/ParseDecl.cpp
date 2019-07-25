@@ -5233,9 +5233,9 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags,
                 Indices, ElementTy, StaticLoc, Flags, AccessorKind::Get,
                 storage, this, /*AccessorKeywordLoc*/ SourceLoc());
             CCE = new (Context) CodeCompletionExpr(Tok.getLoc());
-            getter->setBody(BraceStmt::create(Context, Tok.getLoc(),
-                                              ASTNode(CCE), Tok.getLoc(),
-                                              /*implicit*/ true));
+            getter->setBodyParsed(BraceStmt::create(Context, Tok.getLoc(),
+                                                    ASTNode(CCE), Tok.getLoc(),
+                                                    /*implicit*/ true));
             accessors.add(getter);
             CodeCompletion->setParsedDecl(getter);
           } else {
@@ -6360,7 +6360,7 @@ void Parser::parseAbstractFunctionBody(AbstractFunctionDecl *AFD) {
   ParserResult<BraceStmt> Body = parseBraceItemList(diag::invalid_diagnostic);
   if (!Body.isNull()) {
     BraceStmt * BS = Body.get();
-    AFD->setBody(BS);
+    AFD->setBodyParsed(BS);
 
     // If the body consists of a single expression, turn it into a return
     // statement.
@@ -6450,7 +6450,7 @@ bool Parser::parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD) {
     // FIXME: Should do some sort of error recovery here?
     return true;
   } else {
-    AFD->setBody(Body.get());
+    AFD->setBodyParsed(Body.get());
   }
 
   return false;

@@ -468,6 +468,13 @@ static void formatDiagnosticArgument(StringRef Modifier,
     
     // Strip extraneous parentheses; they add no value.
     auto type = Arg.getAsType()->getWithoutParens();
+
+    // If a type has an unresolved type, print it with syntax sugar removed for
+    // clarity. For example, print `Array<_>` instead of `[_]`.
+    if (type->hasUnresolvedType()) {
+      type = type->getWithoutSyntaxSugar();
+    }
+
     bool isAmbiguous = typeSpellingIsAmbiguous(type, Args);
 
     if (isAmbiguous && isa<OpaqueTypeArchetypeType>(type.getPointer())) {

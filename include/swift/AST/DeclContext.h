@@ -787,6 +787,9 @@ void simple_display(llvm::raw_ostream &out, const ParamT *dc) {
     out << "(null)";
 }
 
+/// Extract the source location from the given declaration context.
+SourceLoc extractNearestSourceLoc(const DeclContext *dc);
+
 } // end namespace swift
 
 namespace llvm {

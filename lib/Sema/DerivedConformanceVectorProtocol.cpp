@@ -118,9 +118,10 @@ bool DerivedConformance::canDeriveVectorProtocol(NominalTypeDecl *nominal,
 }
 
 // Synthesize body for a `VectorProtocol` method requirement.
-static void deriveBodyVectorProtocol_method(AbstractFunctionDecl *funcDecl,
-                                            Identifier methodName,
-                                            Identifier methodParamLabel) {
+static std::pair<BraceStmt *, bool>
+deriveBodyVectorProtocol_method(AbstractFunctionDecl *funcDecl,
+                                Identifier methodName,
+                                Identifier methodParamLabel) {
   auto *parentDC = funcDecl->getParent();
   auto *nominal = parentDC->getSelfNominalTypeDecl();
   auto &C = nominal->getASTContext();
@@ -197,8 +198,9 @@ static void deriveBodyVectorProtocol_method(AbstractFunctionDecl *funcDecl,
   auto *callExpr =
       CallExpr::createImplicit(C, initExpr, memberMethodCallExprs, memberNames);
   ASTNode returnStmt = new (C) ReturnStmt(SourceLoc(), callExpr, true);
-  funcDecl->setBody(
-      BraceStmt::create(C, SourceLoc(), returnStmt, SourceLoc(), true));
+  auto *braceStmt =
+      BraceStmt::create(C, SourceLoc(), returnStmt, SourceLoc(), true);
+  return std::pair<BraceStmt *, bool>(braceStmt, false);
 }
 
 // Synthesize function declaration for a `VectorProtocol` method requirement.
@@ -265,9 +267,10 @@ static ValueDecl *deriveVectorProtocol_unaryMethodOnScalar(
   auto scalarType = deriveVectorProtocol_VectorSpaceScalar(nominal, parentDC)
       ->mapTypeOutOfContext();
 
-  auto bodySynthesizer = [](AbstractFunctionDecl *funcDecl, void *ctx) {
+  auto bodySynthesizer = [](AbstractFunctionDecl *funcDecl,
+                            void *ctx) -> std::pair<BraceStmt *, bool> {
     auto methodNameAndLabel = reinterpret_cast<Identifier *>(ctx);
-    deriveBodyVectorProtocol_method(
+    return deriveBodyVectorProtocol_method(
         funcDecl, methodNameAndLabel[0], methodNameAndLabel[1]);
   };
   Identifier baseNameAndLabel[2] = {methodBaseName, argumentLabel};

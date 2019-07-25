@@ -354,3 +354,8 @@ public func testConditionalBridgedCastFromSwiftToNSObjectDerivedClass(_ s: Strin
 public func testForcedBridgedCastFromSwiftToNSObjectDerivedClass(_ s: String) -> MyString {
     return s as! MyString
 }
+
+// rdar://problem/51078136
+func foo(x: CFMutableDictionary) -> [AnyHashable:AnyObject]? {
+  return x as? [AnyHashable:AnyObject]
+}

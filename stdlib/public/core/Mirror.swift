@@ -212,7 +212,7 @@ public struct Mirror {
   ///   - ancestorRepresentation: The means of generating the subject's
   ///     ancestor representation. `ancestorRepresentation` is ignored if
   ///     `subject` is not a class instance. The default is `.generated`.
-  public init<Subject, C : Collection>(
+  public init<Subject, C: Collection>(
     _ subject: Subject,
     children: C,
     displayStyle: DisplayStyle? = nil,
@@ -256,7 +256,7 @@ public struct Mirror {
   ///   - ancestorRepresentation: The means of generating the subject's
   ///     ancestor representation. `ancestorRepresentation` is ignored if
   ///     `subject` is not a class instance. The default is `.generated`.
-  public init<Subject, C : Collection>(
+  public init<Subject, C: Collection>(
     _ subject: Subject,
     unlabeledChildren: C,
     displayStyle: DisplayStyle? = nil,
@@ -361,7 +361,7 @@ public protocol CustomReflectable {
 /// A type that explicitly supplies its own mirror, but whose
 /// descendant classes are not represented in the mirror unless they
 /// also override `customMirror`.
-public protocol CustomLeafReflectable : CustomReflectable {}
+public protocol CustomLeafReflectable: CustomReflectable {}
 
 //===--- Addressing -------------------------------------------------------===//
 
@@ -374,11 +374,11 @@ public protocol MirrorPath {
   // FIXME(ABI)#49 (Sealed Protocols): this protocol should be "non-open" and
   // you shouldn't be able to create conformances.
 }
-extension Int : MirrorPath {}
-extension String : MirrorPath {}
+extension Int: MirrorPath {}
+extension String: MirrorPath {}
 
 extension Mirror {
-  internal struct _Dummy : CustomReflectable {
+  internal struct _Dummy: CustomReflectable {
       internal init(mirror: Mirror) {
       self.mirror = mirror
     }
@@ -694,13 +694,13 @@ extension String {
 }
 
 /// Reflection for `Mirror` itself.
-extension Mirror : CustomStringConvertible {
+extension Mirror: CustomStringConvertible {
   public var description: String {
     return "Mirror for \(self.subjectType)"
   }
 }
 
-extension Mirror : CustomReflectable {
+extension Mirror: CustomReflectable {
   public var customMirror: Mirror {
     return Mirror(self, children: [:])
   }

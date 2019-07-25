@@ -24,6 +24,7 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeMemberVisitor.h"
 #include "swift/SIL/FormalLinkage.h"
@@ -457,6 +458,10 @@ public:
     if (!Conformance)
       return nullptr;
 
+    PrettyStackTraceConformance trace(SGM.getASTContext(),
+                                      "generating SIL witness table",
+                                      Conformance);
+
     auto *proto = Conformance->getProtocol();
     visitProtocolDecl(proto);
 
@@ -836,6 +841,10 @@ public:
   }
 
   void emit() {
+    PrettyStackTraceConformance trace(SGM.getASTContext(),
+                                      "generating SIL witness table",
+                                      conformance);
+
     // Add entries for all the requirements.
     visitProtocolDecl(conformance->getProtocol());
 

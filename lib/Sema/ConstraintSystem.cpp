@@ -433,7 +433,7 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(Expr *expr) {
                                   ConstraintLocator::ConstructorMember);
     }
     // Otherwise fall through and look for locators anchored on the fn expr.
-    expr = fnExpr;
+    expr = fnExpr->getSemanticsProvidingExpr();
   }
 
   auto *locator = getConstraintLocator(expr);

@@ -30,7 +30,7 @@ Please make sure you use Python 2.x. Python 3.x is not supported currently.
 
 #### macOS
 
-To build for macOS, you need [Xcode 11 beta](https://developer.apple.com/xcode/downloads/).
+To build for macOS, you need [Xcode 11 beta 4](https://developer.apple.com/xcode/downloads/).
 The required version of Xcode changes frequently, and is often a beta release.
 Check this document for the current required version.
 

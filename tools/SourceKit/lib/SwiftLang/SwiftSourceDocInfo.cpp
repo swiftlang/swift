@@ -31,6 +31,7 @@
 #include "swift/IDE/SourceEntityWalker.h"
 #include "swift/IDE/Utils.h"
 #include "swift/IDE/Refactoring.h"
+#include "swift/IDE/IDERequests.h"
 #include "swift/Markup/XMLUtils.h"
 #include "swift/Sema/IDETypeChecking.h"
 
@@ -1316,8 +1317,12 @@ static void resolveCursor(
         // info request to get the available rename kinds.
       }
 
-      CursorInfoResolver Resolver(AstUnit->getPrimarySourceFile());
-      ResolvedCursorInfo CursorInfo = Resolver.resolve(Loc);
+      auto *File = &AstUnit->getPrimarySourceFile();
+      ResolvedCursorInfo CursorInfo =
+        evaluateOrDefault(File->getASTContext().evaluator,
+                          CursorInfoRequest{CursorInfoOwner(File, Loc)},
+                          ResolvedCursorInfo());
+
       if (CursorInfo.isInvalid()) {
         CursorInfoData Info;
         Info.InternalDiagnostic = "Unable to resolve cursor info.";
@@ -1463,8 +1468,11 @@ static void resolveName(SwiftLangSupport &Lang, StringRef InputFile,
         return;
       }
 
-      CursorInfoResolver Resolver(AstUnit->getPrimarySourceFile());
-      ResolvedCursorInfo CursorInfo = Resolver.resolve(Loc);
+      auto *File = &AstUnit->getPrimarySourceFile();
+      ResolvedCursorInfo CursorInfo =
+        evaluateOrDefault(File->getASTContext().evaluator,
+                          CursorInfoRequest{CursorInfoOwner(File, Loc)},
+                          ResolvedCursorInfo());
       if (CursorInfo.isInvalid()) {
         NameTranslatingInfo Info;
         Info.InternalDiagnostic = "Unable to resolve cursor info.";
@@ -1547,8 +1555,10 @@ static void resolveRange(SwiftLangSupport &Lang,
 
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
       // FIXME: Implement tracing
-      RangeResolver Resolver(AstUnit->getPrimarySourceFile(), Offset, Length);
-      ResolvedRangeInfo Info = Resolver.resolve();
+      auto *File = &AstUnit->getPrimarySourceFile();
+      ResolvedRangeInfo Info = evaluateOrDefault(File->getASTContext().evaluator,
+        RangeInfoRequest(RangeInfoOwner({File, Offset, Length})),
+                                                 ResolvedRangeInfo());
 
       CompilerInvocation CompInvok;
       ASTInvok->applyTo(CompInvok);
@@ -2034,8 +2044,10 @@ void SwiftLangSupport::findRelatedIdentifiersInFile(
         if (Loc.isInvalid())
           return;
 
-        CursorInfoResolver Resolver(SrcFile);
-        ResolvedCursorInfo CursorInfo = Resolver.resolve(Loc);
+        ResolvedCursorInfo CursorInfo =
+          evaluateOrDefault(SrcFile.getASTContext().evaluator,
+                            CursorInfoRequest{CursorInfoOwner(&SrcFile, Loc)},
+                            ResolvedCursorInfo());
         if (CursorInfo.isInvalid())
           return;
         if (CursorInfo.IsKeywordArgument)

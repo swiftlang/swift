@@ -1,7 +1,7 @@
 @propertyWrapper
 struct Wrapper<T> {
   var wrappedValue: T
-  init(initialValue: T) {
+  init(wrappedValue initialValue: T) {
     wrappedValue = initialValue
   }
   var projectedValue: Projection<T> {
@@ -26,7 +26,7 @@ struct Projection<T> {
 
 // Split between custom attr and initializer
 extension Wrapper {
-    init(initialValue: T, fieldNumber: Int, special: Bool = false) {
+    init(wrappedValue initialValue: T, fieldNumber: Int, special: Bool = false) {
         wrappedValue = initialValue
     }
 }

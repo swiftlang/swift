@@ -140,8 +140,9 @@ bool DerivedConformance::canDeriveElementaryFunctions(NominalTypeDecl *nominal,
 }
 
 // Synthesize body for the given `ElementaryFunction` protocol requirement.
-static void deriveBodyElementaryFunction(AbstractFunctionDecl *funcDecl,
-                                         ElementaryFunction op) {
+static std::pair<BraceStmt *, bool>
+deriveBodyElementaryFunction(AbstractFunctionDecl *funcDecl,
+                             ElementaryFunction op) {
   auto *parentDC = funcDecl->getParent();
   auto *nominal = parentDC->getSelfNominalTypeDecl();
   auto &C = nominal->getASTContext();
@@ -230,14 +231,14 @@ static void deriveBodyElementaryFunction(AbstractFunctionDecl *funcDecl,
   auto *callExpr =
       CallExpr::createImplicit(C, initExpr, memberOpCallExprs, memberNames);
   ASTNode returnStmt = new (C) ReturnStmt(SourceLoc(), callExpr, true);
-  funcDecl->setBody(
-      BraceStmt::create(C, SourceLoc(), returnStmt, SourceLoc(), true));
+  auto* braceStmt = BraceStmt::create(C, SourceLoc(), returnStmt, SourceLoc(), true);
+  return std::pair<BraceStmt *, bool>(braceStmt, false);
 }
 
-#define ELEMENTARY_FUNCTION(ID, NAME)                                          \
-static void deriveBodyElementaryFunctions_##ID(AbstractFunctionDecl *funcDecl, \
-                                               void *) {                       \
-  deriveBodyElementaryFunction(funcDecl, ID);                                  \
+#define ELEMENTARY_FUNCTION(ID, NAME)                                   \
+static std::pair<BraceStmt *, bool> deriveBodyElementaryFunctions_##ID( \
+  AbstractFunctionDecl *funcDecl, void *) {                             \
+  return deriveBodyElementaryFunction(funcDecl, ID);                    \
 }
 #include "DerivedConformanceElementaryFunctions.def"
 #undef ELEMENTARY_FUNCTION

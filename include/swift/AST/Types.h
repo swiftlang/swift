@@ -43,56 +43,62 @@
 #include "llvm/Support/TrailingObjects.h"
 
 namespace llvm {
-  struct fltSemantics;
-}
-namespace swift {
-  enum class AllocationArena;
-  class ArchetypeType;
-  class AssociatedTypeDecl;
-  class ASTContext;
-  class ClassDecl;
-  class DependentMemberType;
-  class GenericTypeParamDecl;
-  class GenericTypeParamType;
-  class GenericParamList;
-  class GenericSignature;
-  class GenericSignatureBuilder;
-  class Identifier;
-  class InOutType;
-  class OpaqueTypeDecl;
-  class OpenedArchetypeType;
-  enum class ReferenceCounting : uint8_t;
-  enum class ResilienceExpansion : unsigned;
-  class SILModule;
-  class SILType;
-  class TypeAliasDecl;
-  class TypeDecl;
-  class NominalTypeDecl;
-  class GenericTypeDecl;
-  class EnumDecl;
-  class EnumElementDecl;
-  class StructDecl;
-  class ProtocolDecl;
-  class TypeVariableType;
-  class ValueDecl;
-  class ModuleDecl;
-  class ModuleType;
-  class ProtocolConformance;
-  enum PointerTypeKind : unsigned;
-  struct ValueOwnershipKind;
-  // SWIFT_ENABLE_TENSORFLOW
-  struct SILAutoDiffConfig;
+struct fltSemantics;
+} // namespace llvm
 
-  enum class TypeKind : uint8_t {
+namespace swift {
+
+enum class AllocationArena;
+class ArchetypeType;
+class AssociatedTypeDecl;
+class ASTContext;
+class ClassDecl;
+class DependentMemberType;
+class GenericTypeParamDecl;
+class GenericTypeParamType;
+class GenericParamList;
+class GenericSignature;
+class GenericSignatureBuilder;
+class Identifier;
+class InOutType;
+class OpaqueTypeDecl;
+class OpenedArchetypeType;
+enum class ReferenceCounting : uint8_t;
+enum class ResilienceExpansion : unsigned;
+class SILModule;
+class SILType;
+class TypeAliasDecl;
+class TypeDecl;
+class NominalTypeDecl;
+class GenericTypeDecl;
+class EnumDecl;
+class EnumElementDecl;
+class StructDecl;
+class ProtocolDecl;
+class TypeVariableType;
+class ValueDecl;
+class ModuleDecl;
+class ModuleType;
+class ProtocolConformance;
+enum PointerTypeKind : unsigned;
+struct ValueOwnershipKind;
+// SWIFT_ENABLE_TENSORFLOW
+struct SILAutoDiffConfig;
+
+enum class TypeKind : uint8_t {
 #define TYPE(id, parent) id,
 #define LAST_TYPE(id) Last_Type = id,
 #define TYPE_RANGE(Id, FirstId, LastId) \
   First_##Id##Type = FirstId, Last_##Id##Type = LastId,
 #include "swift/AST/TypeNodes.def"
-  };
-  enum : unsigned { NumTypeKindBits =
-    countBitsUsed(static_cast<unsigned>(TypeKind::Last_Type)) };
-  
+};
+
+enum : unsigned {
+  NumTypeKindBits = countBitsUsed(static_cast<unsigned>(TypeKind::Last_Type))
+};
+
+enum class BuiltinTypeKind : std::underlying_type<TypeKind>::type;
+
 /// Various properties of types that are primarily defined recursively
 /// on structural types.
 class RecursiveTypeProperties {
@@ -460,6 +466,10 @@ public:
   /// Reconstitute type sugar, e.g., for array types, dictionary
   /// types, optionals, etc.
   TypeBase *reconstituteSugar(bool Recursive);
+
+  // If this type is a syntax sugar type, desugar it. Also desugar any nested
+  // syntax sugar types.
+  TypeBase *getWithoutSyntaxSugar();
 
   /// getASTContext - Return the ASTContext that this type belongs to.
   ASTContext &getASTContext() {
@@ -1263,6 +1273,19 @@ public:
     return T->getKind() >= TypeKind::First_BuiltinType &&
            T->getKind() <= TypeKind::Last_BuiltinType;
   }
+
+  /// Return the "canonical" name for this builtin. E.x.:
+  ///
+  ///   BuiltinRawPointerType -> BUILTIN_TYPE_NAME_RAWPOINTER ->
+  ///   Builtin.RawPointer.
+  ///
+  /// If \p prependBuiltinNamespace is set to true, "Builtin." is left as a
+  /// prefix on the name. This is the default behavior. If the user asks, we
+  /// strip off the builtin prefix.
+  StringRef getTypeName(SmallVectorImpl<char> &result,
+                        bool prependBuiltinNamespace = true) const;
+
+  BuiltinTypeKind getBuiltinTypeKind() const;
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinType, Type)
 
@@ -5314,6 +5337,10 @@ public:
   /// non-dependent. Returns null if the member could not be found in the new
   /// base.
   Type substBaseType(Type base, LookupConformanceFn lookupConformance);
+
+  /// Substitute the root generic type, looking up the chain of associated types.
+  /// Returns null if the member could not be found in the new root.
+  Type substRootParam(Type newRoot, LookupConformanceFn lookupConformance);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
