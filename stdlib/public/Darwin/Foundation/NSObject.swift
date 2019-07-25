@@ -233,6 +233,17 @@ public class NSKeyValueObservation : NSObject {
     }
 }
 
+// Used for type-erase Optional type
+private protocol _OptionalForKVO {
+    static func _castForKVO(_ value: Any) -> Any?
+}
+
+extension Optional: _OptionalForKVO {
+    static func _castForKVO(_ value: Any) -> Any? {
+        return value as? Wrapped
+    }
+}
+
 extension _KeyValueCodingAndObserving {
     
     ///when the returned NSKeyValueObservation is deinited or invalidated, it will stop observing
@@ -242,9 +253,30 @@ extension _KeyValueCodingAndObserving {
             changeHandler: @escaping (Self, NSKeyValueObservedChange<Value>) -> Void)
         -> NSKeyValueObservation {
         return NSKeyValueObservation(object: self as! NSObject, keyPath: keyPath, options: options) { (obj, change) in
+            
+            let converter = { (changeValue: Any?) -> Value? in
+                if let optionalType = Value.self as? _OptionalForKVO.Type {
+                    // Special logic for keyPath having a optional target value. When the keyPath referencing a nil value, the newValue/oldValue should be in the form .some(nil) instead of .none
+                    // Solve https://bugs.swift.org/browse/SR-6066
+                    
+                    // NSNull is used by KVO to signal that the keyPath value is nil.
+                    // If Value == Optional<T>.self, We will get nil instead of .some(nil) when casting Optional(<null>) directly.
+                    // To fix this behavior, we will eliminate NSNull first, then cast the transformed value.
+                    
+                    if let unwrapped = changeValue {
+                        // We use _castForKVO to cast first.
+                        // If Value != Optional<NSNull>.self, the NSNull value will be eliminated.
+                        let nullEliminatedValue = optionalType._castForKVO(unwrapped) as Any
+                        let transformedOptional: Any? = nullEliminatedValue
+                        return transformedOptional as? Value
+                    }
+                }
+                return changeValue as? Value
+            }
+            
             let notification = NSKeyValueObservedChange(kind: change.kind,
-                                                        newValue: change.newValue as? Value,
-                                                        oldValue: change.oldValue as? Value,
+                                                        newValue: converter(change.newValue),
+                                                        oldValue: converter(change.oldValue),
                                                         indexes: change.indexes,
                                                         isPrior: change.isPrior)
             changeHandler(obj as! Self, notification)
