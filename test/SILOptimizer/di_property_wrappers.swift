@@ -360,7 +360,8 @@ func testOptIntStruct() {
   print("\n## OptIntStruct")
 
   let use = OptIntStruct()
-  // CHECK-NEXT:   .. init Optional(42)
+  // CHECK-NEXT:   .. init nil
+  // CHECK-NEXT:   .. set Optional(42)
 }
 
 testIntStruct()

@@ -672,10 +672,14 @@ Expr *swift::buildPropertyWrapperInitialValueCall(
               = var->getAttachedPropertyWrapperTypeInfo(i).wrappedValueInit) {
         argName = init->getFullName().getArgumentNames()[0];
       }
+      
+      auto endLoc = initializer->getEndLoc();
+      if (endLoc.isInvalid() && startLoc.isValid())
+        endLoc = wrapperAttrs[i]->getTypeLoc().getSourceRange().End;
 
       initializer = CallExpr::create(
          ctx, typeExpr, startLoc, {initializer}, {argName},
-         {initializer->getStartLoc()}, initializer->getEndLoc(),
+         {initializer->getStartLoc()}, endLoc,
          nullptr, /*implicit=*/true);
       continue;
     }
@@ -700,10 +704,14 @@ Expr *swift::buildPropertyWrapperInitialValueCall(
       elementNames.push_back(Identifier());
       elementLocs.push_back(SourceLoc());
     }
+    
+    auto endLoc = attr->getArg()->getEndLoc();
+    if (endLoc.isInvalid() && startLoc.isValid())
+      endLoc = wrapperAttrs[i]->getTypeLoc().getSourceRange().End;
 
     initializer = CallExpr::create(
         ctx, typeExpr, startLoc, elements, elementNames, elementLocs,
-        attr->getArg()->getEndLoc(), nullptr, /*implicit=*/true);
+        endLoc, nullptr, /*implicit=*/true);
   }
   
   return initializer;
