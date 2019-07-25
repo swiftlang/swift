@@ -4599,6 +4599,90 @@ public:
     return errorOccurred;
   }
 
+  /// Determine the pullback successor block for a given original block and one
+  /// of its predecessors. When a trampoline block is necessary, emit code into
+  /// the trampoline block to trampoline the original block's active value's
+  /// adjoint values. A dense map `trampolineArgs` will be populated to keep
+  /// track of which pullback successor blocks each active value's adjoint value
+  /// is used, so that we can release those values in pullback successor blocks
+  /// that are not using them.
+  SILBasicBlock *buildPullbackSuccessor(
+      SILBasicBlock *origBB, SILBasicBlock *origPredBB,
+      SmallDenseMap<SILValue, SmallPtrSet<SILBasicBlock *, 4>>
+          &adjointTrampolineBlockMap) {
+    // Get the pullback block and optional pullback trampoline block of the
+    // predecessor block.
+    auto *pullbackBB = getPullbackBlock(origPredBB);
+    auto *pullbackTrampolineBB = getPullbackTrampolineBlock(origPredBB, origBB);
+    // If the predecessor block does not have a corresponding pullback
+    // trampoline block, then the pullback successor is the pullback block.
+    if (!pullbackTrampolineBB)
+      return pullbackBB;
+
+    // Otherwise, the pullback successor is the pullback trampoline block,
+    // which branches to the pullback block and propagates adjoint values of
+    // active values.
+    assert(pullbackTrampolineBB->getNumArguments() == 1);
+    auto loc = origBB->getParent()->getLocation();
+    SmallVector<SILValue, 8> trampolineArguments;
+    // Propagate adjoint values/buffers of active values/buffers to
+    // predecessor blocks.
+    auto &predBBActiveValues = activeValues[origPredBB];
+    for (auto activeValue : predBBActiveValues) {
+      LLVM_DEBUG(getADDebugStream() << "Propagating active adjoint "
+                 << activeValue << " to predecessors' pullback blocks\n");
+      if (activeValue->getType().isObject()) {
+        auto activeValueAdj = getAdjointValue(origBB, activeValue);
+        auto concreteActiveValueAdj =
+            materializeAdjointDirect(activeValueAdj, loc);
+        trampolineArguments.push_back(concreteActiveValueAdj);
+        auto insertion = adjointTrampolineBlockMap.try_emplace(
+            concreteActiveValueAdj, SmallPtrSet<SILBasicBlock *, 4>());
+        auto &trampolineSet = insertion.first->getSecond();
+        trampolineSet.insert(pullbackTrampolineBB);
+        if (insertion.second)
+          builder.createRetainValue(loc, concreteActiveValueAdj,
+                                    builder.getDefaultAtomicity());
+        // If the pullback block does not yet have a registered adjoint
+        // value for the active value, set the adjoint value to the
+        // forwarded adjoint value argument.
+        // TODO: Hoist this logic out of loop over predecessor blocks to
+        // remove the `hasAdjointValue` check.
+        if (!hasAdjointValue(origPredBB, activeValue)) {
+          auto *pullbackBBArg =
+              getActiveValuePullbackBlockArgument(origPredBB, activeValue);
+          auto forwardedArgAdj = makeConcreteAdjointValue(pullbackBBArg);
+          initializeAdjointValue(origPredBB, activeValue, forwardedArgAdj);
+        }
+      } else {
+        // Propagate adjoint buffers using `copy_addr`.
+        auto adjBuf = getAdjointBuffer(origBB, activeValue);
+        auto predAdjBuf = getAdjointBuffer(origPredBB, activeValue);
+        builder.createCopyAddr(
+            loc, adjBuf, predAdjBuf, IsNotTake, IsNotInitialization);
+      }
+    }
+    // Propagate pullback struct argument.
+    SILBuilder pullbackTrampolineBBBuilder(pullbackTrampolineBB);
+    auto *predPBStructVal = pullbackTrampolineBB->getArguments().front();
+    auto boxType =
+        dyn_cast<SILBoxType>(predPBStructVal->getType().getASTType());
+    if (!boxType) {
+      trampolineArguments.push_back(predPBStructVal);
+    } else {
+      auto *projectBox = pullbackTrampolineBBBuilder.createProjectBox(
+          loc, predPBStructVal, /*index*/ 0);
+      auto *loadInst = pullbackTrampolineBBBuilder.createLoad(
+          loc, projectBox,
+          getBufferLOQ(projectBox->getType().getASTType(), getPullback()));
+      trampolineArguments.push_back(loadInst);
+    }
+    // Branch from pullback trampoline block to pullback block.
+    pullbackTrampolineBBBuilder.createBranch(loc, pullbackBB,
+                                             trampolineArguments);
+    return pullbackTrampolineBB;
+  }
+
   /// Emit pullback code in the corresponding pullback block.
   void visitSILBasicBlock(SILBasicBlock *bb) {
     auto pbLoc = getPullback().getLocation();
@@ -4667,78 +4751,34 @@ public:
     //    of the current block.
     SmallVector<std::pair<EnumElementDecl *, SILBasicBlock *>, 4>
         pullbackSuccessorCases;
+    // A map from active values' adjoint values to the trampoline blocks that
+    // are using them.
+    SmallDenseMap<SILValue, SmallPtrSet<SILBasicBlock *, 4>>
+        adjontTrampolineBlockMap;
+    SmallVector<SILBasicBlock *, 8> pullbackSuccBBs;
     for (auto *predBB : bb->getPredecessorBlocks()) {
-      // Get the pullback block and optional pullback trampoline block of the
-      // predecessor block.
-      auto *pullbackBB = getPullbackBlock(predBB);
-      auto *pullbackTrampolineBB = getPullbackTrampolineBlock(predBB, bb);
-      SILBasicBlock *pullbackSuccBB = nullptr;
-      // If the predecessor block does not have a corresponding pullback
-      // trampoline block, then the pullback successor is the pullback block.
-      if (!pullbackTrampolineBB) {
-        pullbackSuccBB = pullbackBB;
-      }
-      // Otherwise, the pullback successor is the pullback trampoline block,
-      // which branches to the pullback block and propagates adjoint values of
-      // active values.
-      else {
-        pullbackSuccBB = pullbackTrampolineBB;
-        assert(pullbackSuccBB && pullbackSuccBB->getNumArguments() == 1);
-        SILBuilder pullbackTrampolineBBBuilder(pullbackSuccBB);
-        SmallVector<SILValue, 8> trampolineArguments;
-        // Propagate adjoint values/buffers of active values/buffers to
-        // predecessor blocks.
-        auto &predBBActiveValues = activeValues[predBB];
-        for (auto activeValue : predBBActiveValues) {
-          LLVM_DEBUG(getADDebugStream() << "Propagating active adjoint "
-                     << activeValue << " to predecessors' pullback blocks\n");
-          if (activeValue->getType().isObject()) {
-            auto activeValueAdj = getAdjointValue(bb, activeValue);
-            auto concreteActiveValueAdj =
-                materializeAdjointDirect(activeValueAdj, pbLoc);
-            trampolineArguments.push_back(concreteActiveValueAdj);
-            builder.createRetainValue(pbLoc, concreteActiveValueAdj,
-                                      builder.getDefaultAtomicity());
-            // If the pullback block does not yet have a registered adjoint
-            // value for the active value, set the adjoint value to the
-            // forwarded adjoint value argument.
-            // TODO: Hoist this logic out of loop over predecessor blocks to
-            // remove the `hasAdjointValue` check.
-            if (!hasAdjointValue(predBB, activeValue)) {
-              auto *pullbackBBArg =
-                  getActiveValuePullbackBlockArgument(predBB, activeValue);
-              auto forwardedArgAdj = makeConcreteAdjointValue(pullbackBBArg);
-              initializeAdjointValue(predBB, activeValue, forwardedArgAdj);
-            }
-          } else {
-            // Propagate adjoint buffers using `copy_addr`.
-            auto adjBuf = getAdjointBuffer(bb, activeValue);
-            auto predAdjBuf = getAdjointBuffer(predBB, activeValue);
-            builder.createCopyAddr(
-                pbLoc, adjBuf, predAdjBuf, IsNotTake, IsNotInitialization);
-          }
-        }
-        // Propagate pullback struct argument.
-        auto *predPBStructVal = pullbackTrampolineBB->getArguments().front();
-        auto boxType =
-            dyn_cast<SILBoxType>(predPBStructVal->getType().getASTType());
-        if (!boxType) {
-          trampolineArguments.push_back(predPBStructVal);
-        } else {
-          auto *projectBox = pullbackTrampolineBBBuilder.createProjectBox(
-              pbLoc, predPBStructVal, /*index*/ 0);
-          auto *loadInst = pullbackTrampolineBBBuilder.createLoad(
-              pbLoc, projectBox,
-              getBufferLOQ(projectBox->getType().getASTType(), getPullback()));
-          trampolineArguments.push_back(loadInst);
-        }
-        // Branch from pullback trampoline block to pullback block.
-        pullbackTrampolineBBBuilder.createBranch(pbLoc, pullbackBB,
-                                                 trampolineArguments);
-      }
+      auto *pullbackSuccBB = buildPullbackSuccessor(bb, predBB,
+                                                    adjontTrampolineBlockMap);
+      pullbackSuccBBs.push_back(pullbackSuccBB);
       auto *enumEltDecl =
           getPullbackInfo().lookUpPredecessorEnumElement(predBB, bb);
       pullbackSuccessorCases.push_back({enumEltDecl, pullbackSuccBB});
+    }
+    // Values are trampolined by only a subset of pullback successor blocks.
+    // Other successors blocks should destroy the value to balance the reference
+    // count.
+    for (auto pair : adjontTrampolineBlockMap) {
+      auto value = pair.getFirst();
+      // The set of trampoline BBs that are users of `value`.
+      auto &userTrampolineBBSet = pair.getSecond();
+      // For each pullback successor block that does not trampoline the value,
+      // release the value.
+      for (auto *pullbackSuccBB : pullbackSuccBBs) {
+        if (userTrampolineBBSet.count(pullbackSuccBB))
+          continue;
+        SILBuilder builder(pullbackSuccBB->begin());
+        builder.emitReleaseValueAndFold(pbLoc, value);
+      }
     }
     // Emit cleanups for all block-local temporaries.
     cleanUpTemporariesForBlock(pbBB, pbLoc);
