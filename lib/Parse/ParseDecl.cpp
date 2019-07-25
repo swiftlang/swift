@@ -3256,9 +3256,17 @@ void Parser::parseDeclDelayed() {
       } else if (auto *ED = dyn_cast<ExtensionDecl>(parent)) {
         ED->addMember(D);
       } else if (auto *SF = dyn_cast<SourceFile>(parent)) {
-        // FIXME: unify notification to ASTSourceFileScope with addMember
-        // mechanism used above
         SF->Decls.push_back(D);
+      } else if (auto *CE = dyn_cast<ClosureExpr>(parent)) {
+        // Replace the closure body with one including the new Decl.
+        auto *body = CE->getBody();
+        SmallVector<ASTNode, 8> Elts(body->getElements().begin(),
+                                     body->getElements().end());
+        Elts.push_back(ASTNode(D));
+        auto *newBody =
+            BraceStmt::create(Context, body->getLBraceLoc(), Elts,
+                              body->getRBraceLoc(), body->isImplicit());
+        CE->setBody(newBody, false);
       }
     }
   });
