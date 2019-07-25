@@ -676,10 +676,10 @@ public:
   /// Returns the lowered SIL type of the branching trace enum associated with
   /// the given original block.
   SILType getBranchingTraceEnumLoweredType(SILBasicBlock *origBB) const {
-    auto *linMapEnum = getBranchingTraceDecl(origBB);
-    auto linMapEnumType =
-        linMapEnum->getDeclaredInterfaceType()->getCanonicalType();
-    return typeConverter.getLoweredType(linMapEnumType,
+    auto *traceDecl = getBranchingTraceDecl(origBB);
+    auto traceDeclType =
+        traceDecl->getDeclaredInterfaceType()->getCanonicalType();
+    return typeConverter.getLoweredType(traceDeclType,
                                         ResilienceExpansion::Minimal);
   }
 
@@ -1307,18 +1307,18 @@ LinearMapInfo::LinearMapInfo(ADContext &context,
   }
   for (auto &origBB : *original) {
     auto *linearMapStruct = getLinearMapStruct(&origBB);
-    auto *linearMapEnum =
+    auto *traceEnum =
         createBranchingTraceDecl(&origBB, indices, assocFnGenSig);
     // If original block is in a loop, mark predecessor enum as indirect.
     if (loopInfo->getLoopFor(&origBB))
-      linearMapEnum->getAttrs().add(new (astCtx) IndirectAttr(/*Implicit*/ true));
-    branchingTraceDecls.insert({&origBB, linearMapEnum});
+      traceEnum->getAttrs().add(new (astCtx) IndirectAttr(/*Implicit*/ true));
+    branchingTraceDecls.insert({&origBB, traceEnum});
     if (origBB.isEntry())
       continue;
-    auto *linearMapEnumField =
+    auto *traceEnumField =
         addVarDecl(linearMapStruct, astCtx.getIdentifier("predecessor").str(),
-                   linearMapEnum->getDeclaredInterfaceType());
-    linearMapStructEnumFields.insert({linearMapStruct, linearMapEnumField});
+                   traceEnum->getDeclaredInterfaceType());
+    linearMapStructEnumFields.insert({linearMapStruct, traceEnumField});
   }
 }
 
@@ -2881,7 +2881,7 @@ public:
     auto lookupConformance = LookUpConformanceInModule(module.getSwiftModule());
 
     // RAII that pushes the original function's generic signature to
-    // `module.Types` so that the calls `module.Types.getTypeLowering()` below
+    // `module.Types` so that calls to `module.Types.getTypeLowering()` below
     // will know the original function's generic parameter types.
     Lowering::GenericContextScope genericContextScope(
         module.Types, origTy->getGenericSignature());
@@ -4073,6 +4073,75 @@ private:
     //      ;
   }
 
+  void startDifferentialGeneration() {
+    // Create differential blocks and arguments.
+    // TODO: Consider visiting original blocks in pre-order (dominance) order.
+    SmallVector<SILBasicBlock *, 8> preOrderDomOrder;
+    auto &differential = getDifferential();
+    auto *origEntry = original->getEntryBlock();
+    for (auto &origBB : *original) {
+      auto *diffBB = differential.createBasicBlock();
+      diffBBMap.insert({&origBB, diffBB});
+      auto diffStructLoweredType =
+          remapType(differentialInfo.getLinearMapStructLoweredType(&origBB));
+      // If the BB is the original exit, then the differential block that we just
+      // created must be the differential function's entry. Create differential
+      // entry arguments and continue.
+      if (&origBB == origEntry) {
+        assert(diffBB->isEntry());
+        createEntryArguments(&differential);
+        auto *lastArg = diffBB->getArguments().back();
+        assert(lastArg->getType() == diffStructLoweredType);
+        differentialStructArguments[&origBB] = lastArg;
+      }
+    }
+    assert(diffBBMap.size() == 1 &&
+           "Can only currently handle single basic block functions");
+
+    // The differential function has type:
+    // (arg0', ..., argn', exit_diffs) -> result'.
+    auto &diffBuilder = getDifferentialBuilder();
+    auto diffParamArgs =
+        differential.getArgumentsWithoutIndirectResults().drop_back();
+    assert(diffParamArgs.size() == attr->getIndices().parameters->getCapacity());
+    auto origParamArgs = original->getArgumentsWithoutIndirectResults();
+
+    // Check if result is not varied.
+    SmallVector<SILValue, 8> origFormalResults;
+    collectAllFormalResultsInTypeOrder(*original, origFormalResults);
+    auto origResult = origFormalResults[getIndices().source];
+    // Emit warning if original result is not varied, because it will always
+    // have a zero derivative.
+    if (!activityInfo.isVaried(origResult, getIndices().parameters)) {
+      // Emit fixit if original result has a valid source location.
+      auto startLoc = origResult.getLoc().getStartSourceLoc();
+      auto endLoc = origResult.getLoc().getEndSourceLoc();
+      if (startLoc.isValid() && endLoc.isValid()) {
+        context
+            .diagnose(startLoc, diag::autodiff_nonvaried_result_fixit)
+            .fixItInsert(startLoc, "withoutDerivative(at:")
+            .fixItInsertAfter(endLoc, ")");
+      }
+    }
+
+    auto *diffEntry = getDifferential().getEntryBlock();
+    auto diffLoc = getDifferential().getLocation();
+    diffBuilder.setInsertionPoint(
+        diffEntry, getNextDifferentialLocalAllocationInsertionPoint());
+
+    for (auto index : *getIndices().parameters) {
+      auto diffParam = diffParamArgs[index];
+      auto origParam = origParamArgs[index];
+      diffBuilder.createRetainValue(diffLoc, diffParam,
+                                    diffBuilder.getDefaultAtomicity());
+      setTangentValue(
+          origEntry, origParam, makeConcreteTangentValue(diffParam));
+      LLVM_DEBUG(getADDebugStream()
+                 << "Assigned parameter " << *diffParam
+                 << " as the tangent of original result " << origParam);
+    }
+  }
+
 public:
   explicit JVPEmitter(ADContext &context, SILFunction *original,
                       SILDifferentiableAttr *attr, SILFunction *jvp,
@@ -4102,7 +4171,7 @@ public:
     auto lookupConformance = LookUpConformanceInModule(module.getSwiftModule());
 
     // RAII that pushes the original function's generic signature to
-    // `module.Types` so that the calls `module.Types.getTypeLowering()` below
+    // `module.Types` so that calls to `module.Types.getTypeLowering()` below
     // will know the original function's generic parameter types.
     Lowering::GenericContextScope genericContextScope(
         module.Types, origTy->getGenericSignature());
@@ -4174,79 +4243,10 @@ public:
     LLVM_DEBUG(getADDebugStream()
                << "Cloning original @" << original->getName()
                << " to jvp @" << jvp->getName() << '\n');
-    // Create JVP entry and arguments.
+    // Create JVP and differential entry and arguments.
     auto *entry = jvp->createBasicBlock();
     createEntryArguments(jvp);
-
-    // Create differential blocks and arguments.
-    // TODO: Consider visiting original blocks in pre-order (dominance) order.
-    SmallVector<SILBasicBlock *, 8> preOrderDomOrder;
-    auto &differential = getDifferential();
-    auto *origEntry = original->getEntryBlock();
-    for (auto &origBB : *original) {
-      auto *diffBB = differential.createBasicBlock();
-      diffBBMap.insert({&origBB, diffBB});
-      auto diffStructLoweredType =
-          remapType(differentialInfo.getLinearMapStructLoweredType(&origBB));
-      // If the BB is the original exit, then the differential block that we just
-      // created must be the differential function's entry. Create differential
-      // entry arguments and continue.
-      if (&origBB == origEntry) {
-        assert(diffBB->isEntry());
-        createEntryArguments(&differential);
-        auto *lastArg = diffBB->getArguments().back();
-        assert(lastArg->getType() == diffStructLoweredType);
-        differentialStructArguments[&origBB] = lastArg;
-      }
-    }
-    assert(diffBBMap.size() == 1 &&
-           "Can only currently handle single basic block functions");
-
-    // The differential function has type:
-    // (arg0', ..., argn', exit_diffs) -> result'.
-    auto &diffBuilder = getDifferentialBuilder();
-    auto diffParamArgs =
-        differential.getArgumentsWithoutIndirectResults().drop_back();
-    assert(diffParamArgs.size() == attr->getIndices().parameters->getCapacity());
-    auto origParamArgs = original->getArgumentsWithoutIndirectResults();
-
-    // Check if result is not varied.
-    SmallVector<SILValue, 8> origFormalResults;
-    collectAllFormalResultsInTypeOrder(*original, origFormalResults);
-    auto origResult = origFormalResults[getIndices().source];
-    // Emit warning if original result is not varied, because it will always
-    // have a zero derivative.
-    if (!activityInfo.isVaried(origResult, getIndices().parameters)) {
-      // Emit fixit if original result has a valid source location.
-      auto startLoc = origResult.getLoc().getStartSourceLoc();
-      auto endLoc = origResult.getLoc().getEndSourceLoc();
-      if (startLoc.isValid() && endLoc.isValid()) {
-        context
-            .diagnose(startLoc, diag::autodiff_nonvaried_result_fixit)
-            .fixItInsert(startLoc, "withoutDerivative(at:")
-            .fixItInsertAfter(endLoc, ")");
-      }
-    }
-
-    auto *diffEntry = getDifferential().getEntryBlock();
-    auto diffLoc = getDifferential().getLocation();
-    diffBuilder.setInsertionPoint(
-        diffEntry, getNextDifferentialLocalAllocationInsertionPoint());
-
-    for (auto index : *getIndices().parameters) {
-      auto diffParam = diffParamArgs[index];
-      auto origParam = origParamArgs[index];
-
-      diffBuilder.createRetainValue(diffLoc, diffParam,
-                                    diffBuilder.getDefaultAtomicity());
-      setTangentValue(
-          origEntry, origParam, makeConcreteTangentValue(diffParam));
-
-      LLVM_DEBUG(getADDebugStream()
-                 << "Assigned parameter " << *diffParam
-                 << " as the tangent of original result " << origParam);
-    }
-
+    startDifferentialGeneration();
     // Clone.
     SmallVector<SILValue, 4> entryArgs(entry->getArguments().begin(),
                                        entry->getArguments().end());
@@ -4254,9 +4254,10 @@ public:
     // If errors occurred, back out.
     if (errorOccurred)
       return true;
-
     LLVM_DEBUG(getADDebugStream() << "Generated JVP for "
                << original->getName() << ":\n" << *jvp);
+    LLVM_DEBUG(getADDebugStream() << "Generated differential for "
+               << original->getName() << ":\n" << getDifferential());
     return errorOccurred;
   }
 
@@ -6588,7 +6589,7 @@ static SILFunction *createEmptyVJP(
   auto vjpGenericSig = getAssociatedFunctionGenericSignature(attr, original);
 
   // RAII that pushes the original function's generic signature to
-  // `module.Types` so that the calls `module.Types.getTypeLowering()` below
+  // `module.Types` so that calls to `module.Types.getTypeLowering()` below
   // will know the VJP's generic parameter types.
   Lowering::GenericContextScope genericContextScope(
       module.Types, vjpGenericSig);
@@ -6638,7 +6639,7 @@ static SILFunction *createEmptyJVP(
   auto jvpGenericSig = getAssociatedFunctionGenericSignature(attr, original);
 
   // RAII that pushes the original function's generic signature to
-  // `module.Types` so that the calls `module.Types.getTypeLowering()` below
+  // `module.Types` so that calls to `module.Types.getTypeLowering()` below
   // will know the VJP's generic parameter types.
   Lowering::GenericContextScope genericContextScope(
       module.Types, jvpGenericSig);
