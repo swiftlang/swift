@@ -64,9 +64,7 @@ public protocol Proto {
   // CHECK-RECOVERY: var unwrappedProp: Int32?
   var unwrappedProp: UnwrappedInt? { get set }
   // CHECK: var wrappedProp: WrappedInt? { get set }
-  // CHECK-RECOVERY: /* placeholder for _ (vtable entries: 1) */
-  // CHECK-RECOVERY: /* placeholder for _ (vtable entries: 1) */
-  // CHECK-RECOVERY: /* placeholder for _ (vtable entries: 1) */
+  // CHECK-RECOVERY: /* placeholder for wrappedProp (vtable entries: 3) */
   var wrappedProp: WrappedInt? { get set }
 
   // CHECK: func returnsUnwrappedMethod() -> UnwrappedInt
@@ -77,7 +75,7 @@ public protocol Proto {
   func returnsWrappedMethod() -> WrappedInt
 
   // CHECK: subscript(_: WrappedInt) -> () { get }
-  // CHECK-RECOVERY: /* placeholder for _ (vtable entries: 1) */
+  // CHECK-RECOVERY: /* placeholder for subscript(_:) (vtable entries: 1) */
   subscript(_: WrappedInt) -> () { get }
 
   // CHECK: init()

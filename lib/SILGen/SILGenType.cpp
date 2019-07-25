@@ -1019,7 +1019,9 @@ public:
     // Collect global variables for static properties.
     // FIXME: We can't statically emit a global variable for generic properties.
     if (vd->isStatic() && vd->hasStorage()) {
-      return emitTypeMemberGlobalVariable(SGM, vd);
+      emitTypeMemberGlobalVariable(SGM, vd);
+      visitAccessors(vd);
+      return;
     }
 
     visitAbstractStorageDecl(vd);
@@ -1027,7 +1029,6 @@ public:
 
   void visitSubscriptDecl(SubscriptDecl *sd) {
     SGM.emitDefaultArgGenerators(sd, sd->getIndices());
-
     visitAbstractStorageDecl(sd);
   }
 
@@ -1035,8 +1036,14 @@ public:
     // FIXME: Default implementations in protocols.
     if (asd->isObjC() && !isa<ProtocolDecl>(asd->getDeclContext()))
       SGM.emitObjCPropertyMethodThunks(asd);
-    
+
     SGM.tryEmitPropertyDescriptor(asd);
+    visitAccessors(asd);
+  }
+
+  void visitAccessors(AbstractStorageDecl *asd) {
+    for (auto *accessor : asd->getAllAccessors())
+      visitFuncDecl(accessor);
   }
 };
 
@@ -1137,8 +1144,11 @@ public:
           vd->hasDidSetOrWillSetDynamicReplacement();
       assert((vd->isStatic() || hasDidSetOrWillSetDynamicReplacement) &&
              "stored property in extension?!");
-      if (!hasDidSetOrWillSetDynamicReplacement)
-        return emitTypeMemberGlobalVariable(SGM, vd);
+      if (!hasDidSetOrWillSetDynamicReplacement) {
+        emitTypeMemberGlobalVariable(SGM, vd);
+        visitAccessors(vd);
+        return;
+      }
     }
     visitAbstractStorageDecl(vd);
   }
@@ -1153,11 +1163,17 @@ public:
     llvm_unreachable("enum elements aren't allowed in extensions");
   }
 
-  void visitAbstractStorageDecl(AbstractStorageDecl *vd) {
-    if (vd->isObjC())
-      SGM.emitObjCPropertyMethodThunks(vd);
+  void visitAbstractStorageDecl(AbstractStorageDecl *asd) {
+    if (asd->isObjC())
+      SGM.emitObjCPropertyMethodThunks(asd);
     
-    SGM.tryEmitPropertyDescriptor(vd);
+    SGM.tryEmitPropertyDescriptor(asd);
+    visitAccessors(asd);
+  }
+
+  void visitAccessors(AbstractStorageDecl *asd) {
+    for (auto *accessor : asd->getAllAccessors())
+      visitFuncDecl(accessor);
   }
 };
 

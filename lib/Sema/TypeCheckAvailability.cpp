@@ -2314,6 +2314,11 @@ public:
         = TC.getFragileFunctionKind(DC);
   }
 
+  // FIXME: Remove this
+  bool shouldWalkAccessorsTheOldWay() override {
+    return true;
+  }
+
   bool shouldWalkIntoNonSingleExpressionClosure() override {
     return false;
   }

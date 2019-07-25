@@ -99,7 +99,6 @@ public class A_Sub2: A_Sub {
 // CHECK-RECOVERY-NEXT: func typeChangeMethod() -> Any
 // CHECK-RECOVERY-NEXT: func disappearingMethodWithOverload()
 // CHECK-RECOVERY-NEXT: /* placeholder for disappearingProperty */
-// CHECK-RECOVERY-NEXT: /* placeholder for _ */
 // CHECK-RECOVERY-NEXT: init()
 // CHECK-RECOVERY-NEXT: {{^}$}}
 
@@ -144,7 +143,6 @@ public class C1_IndexedSubscriptDisappears : IndexedSubscriptDisappearsBase {
 
 // CHECK-RECOVERY-LABEL: class C1_IndexedSubscriptDisappears : IndexedSubscriptDisappearsBase {
 // CHECK-RECOVERY-NEXT: /* placeholder for subscript(_:) */
-// CHECK-RECOVERY-NEXT: /* placeholder for _ */
 // CHECK-RECOVERY-NEXT: init()
 // CHECK-RECOVERY-NEXT: {{^}$}}
 
@@ -160,7 +158,6 @@ public class C2_KeyedSubscriptDisappears : KeyedSubscriptDisappearsBase {
 
 // CHECK-RECOVERY-LABEL: class C2_KeyedSubscriptDisappears : KeyedSubscriptDisappearsBase {
 // CHECK-RECOVERY-NEXT: /* placeholder for subscript(_:) */
-// CHECK-RECOVERY-NEXT: /* placeholder for _ */
 // CHECK-RECOVERY-NEXT: init()
 // CHECK-RECOVERY-NEXT: {{^}$}}
 
@@ -176,7 +173,6 @@ public class C3_GenericIndexedSubscriptDisappears : GenericIndexedSubscriptDisap
 
 // CHECK-RECOVERY-LABEL: class C3_GenericIndexedSubscriptDisappears : GenericIndexedSubscriptDisappearsBase<Base> {
 // CHECK-RECOVERY-NEXT: /* placeholder for subscript(_:) */
-// CHECK-RECOVERY-NEXT: /* placeholder for _ */
 // CHECK-RECOVERY-NEXT: init()
 // CHECK-RECOVERY-NEXT: {{^}$}}
 
@@ -192,7 +188,6 @@ public class C4_GenericKeyedSubscriptDisappears : GenericKeyedSubscriptDisappear
 
 // CHECK-RECOVERY-LABEL: class C4_GenericKeyedSubscriptDisappears : GenericKeyedSubscriptDisappearsBase<Base> {
 // CHECK-RECOVERY-NEXT: /* placeholder for subscript(_:) */
-// CHECK-RECOVERY-NEXT: /* placeholder for _ */
 // CHECK-RECOVERY-NEXT: init()
 // CHECK-RECOVERY-NEXT: {{^}$}}
 

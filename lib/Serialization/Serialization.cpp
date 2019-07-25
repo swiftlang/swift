@@ -2844,7 +2844,10 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
   unsigned getNumberOfRequiredVTableEntries(
       const AbstractStorageDecl *storage) const {
     unsigned count = 0;
-    // FIXME: Implement once accessors are no longer part of their parent.
+    for (auto *accessor : storage->getAllAccessors()) {
+      if (accessor->needsNewVTableEntry())
+        count++;
+    }
     return count;
   }
 
@@ -4762,33 +4765,27 @@ static void collectInterestingNestedDeclarations(
 
   for (const Decl *member : members) {
     // If there is a corresponding Objective-C method, record it.
-    auto recordObjCMethod = [&] {
+    auto recordObjCMethod = [&](const AbstractFunctionDecl *func) {
       if (isLocal)
         return;
 
-      if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
+      if (auto owningClass = func->getDeclContext()->getSelfClassDecl()) {
         if (func->isObjC()) {
-          if (auto owningClass = func->getDeclContext()->getSelfClassDecl()) {
-            Mangle::ASTMangler mangler;
-            std::string ownerName = mangler.mangleNominalType(owningClass);
-            assert(!ownerName.empty() && "Mangled type came back empty!");
+          Mangle::ASTMangler mangler;
+          std::string ownerName = mangler.mangleNominalType(owningClass);
+          assert(!ownerName.empty() && "Mangled type came back empty!");
 
-            objcMethods[func->getObjCSelector()].push_back(
-              std::make_tuple(ownerName,
-                              func->isObjCInstanceMethod(),
-                              S.addDeclRef(func)));
-          }
+          objcMethods[func->getObjCSelector()].push_back(
+            std::make_tuple(ownerName,
+                            func->isObjCInstanceMethod(),
+                            S.addDeclRef(func)));
         }
       }
     };
 
     if (auto memberValue = dyn_cast<ValueDecl>(member)) {
-      if (!memberValue->hasName()) {
-        recordObjCMethod();
-        continue;
-      }
-
-      if (memberValue->isOperator()) {
+      if (memberValue->hasName() &&
+          memberValue->isOperator()) {
         // Add operator methods.
         // Note that we don't have to add operators that are already in the
         // top-level list.
@@ -4796,6 +4793,17 @@ static void collectInterestingNestedDeclarations(
           /*ignored*/0,
           S.addDeclRef(memberValue)
         });
+      }
+    }
+
+    // Record Objective-C methods.
+    if (auto *func = dyn_cast<AbstractFunctionDecl>(member))
+      recordObjCMethod(func);
+
+    // Handle accessors.
+    if (auto storage = dyn_cast<AbstractStorageDecl>(member)) {
+      for (auto *accessor : storage->getAllAccessors()) {
+        recordObjCMethod(accessor);
       }
     }
 
@@ -4820,9 +4828,6 @@ static void collectInterestingNestedDeclarations(
                                            objcMethods, nestedTypeDecls,
                                            isLocal);
     }
-
-    // Record Objective-C methods.
-    recordObjCMethod();
   }
 }
 

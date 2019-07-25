@@ -231,9 +231,6 @@ static AccessorDecl *createGetterPrototype(AbstractStorageDecl *storage,
   if (!storage->requiresOpaqueAccessor(AccessorKind::Get))
     getter->setForcedStaticDispatch(true);
 
-  // Always add the getter to the context immediately after the storage.
-  addMemberToContextIfNeeded(getter, storage->getDeclContext(), storage);
-
   if (ctx.Stats)
     ctx.Stats->getFrontendCounters().NumAccessorsSynthesized++;
 
@@ -281,12 +278,6 @@ static AccessorDecl *createSetterPrototype(AbstractStorageDecl *storage,
 
   // All mutable storage requires a setter.
   assert(storage->requiresOpaqueAccessor(AccessorKind::Set));
-
-  // Always add the setter to the context immediately after the getter.
-  if (!getter) getter = storage->getGetter();
-  if (!getter) getter = storage->getReadCoroutine();
-  assert(getter && "always synthesize setter prototype after get/read");
-  addMemberToContextIfNeeded(setter, storage->getDeclContext(), getter);
 
   if (ctx.Stats)
     ctx.Stats->getFrontendCounters().NumAccessorsSynthesized++;
@@ -476,19 +467,6 @@ createCoroutineAccessorPrototype(AbstractStorageDecl *storage,
 
   AvailabilityInference::applyInferredAvailableAttrs(accessor,
                                                      asAvailableAs, ctx);
-
-  Decl *afterDecl;
-  if (kind == AccessorKind::Read) {
-    // Add the synthesized read coroutine after the getter, if one exists,
-    // or else immediately after the storage.
-    afterDecl = storage->getGetter();
-    if (!afterDecl) afterDecl = storage;
-  } else {
-    // Add the synthesized modify coroutine after the setter.
-    afterDecl = storage->getSetter();
-  }
-
-  addMemberToContextIfNeeded(accessor, dc, afterDecl);
 
   if (ctx.Stats)
     ctx.Stats->getFrontendCounters().NumAccessorsSynthesized++;
@@ -2440,13 +2418,11 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
 /// Try to add the appropriate accessors required a storage declaration.
 /// This needs to be idempotent.
 void swift::maybeAddAccessorsToStorage(AbstractStorageDecl *storage) {
-  // Implicit properties don't get accessors.
-  if (storage->isImplicit() &&
-      !(isa<VarDecl>(storage) &&
-        cast<VarDecl>(storage)->getOriginalWrappedProperty()))
-    return;
-
   if (storage->getImplInfo().isSimpleStored()) {
+    // The backing storage for a lazy property does not get accessors.
+    if (cast<VarDecl>(storage)->isLazyStorageProperty())
+      return;
+
     auto *dc = storage->getDeclContext();
 
     // Local stored variables don't otherwise get accessors.

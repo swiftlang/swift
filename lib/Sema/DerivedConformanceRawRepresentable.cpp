@@ -181,7 +181,7 @@ static VarDecl *deriveRawRepresentable_raw(DerivedConformance &derived) {
   // the raw value without function call overhead.
   maybeMarkAsInlinable(derived, getterDecl);
 
-  derived.addMembersToConformanceContext({getterDecl, propDecl, pbDecl});
+  derived.addMembersToConformanceContext({propDecl, pbDecl});
 
   return propDecl;
 }

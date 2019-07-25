@@ -100,10 +100,7 @@ open class User {
   // CHECK-RECOVERY: var unwrappedProp: Int32?
   public var unwrappedProp: UnwrappedInt?
   // CHECK: var wrappedProp: WrappedInt?
-  // CHECK_RECOVERY: /* placeholder for wrappedProp (field offsets: 1) */
-  // CHECK-RECOVERY: /* placeholder for _ (vtable entries: 1) */
-  // CHECK-RECOVERY: /* placeholder for _ (vtable entries: 1) */
-  // CHECK-RECOVERY: /* placeholder for _ (vtable entries: 1) */
+  // CHECK_RECOVERY: /* placeholder for wrappedProp (vtable entries: 3) (field offsets: 1) */
   public var wrappedProp: WrappedInt?
 
   // CHECK: func returnsUnwrappedMethod() -> UnwrappedInt
@@ -121,11 +118,11 @@ open class User {
   public func constrainedWrapped<T: HasAssoc>(_: T) where T.Assoc == WrappedInt { fatalError() }
 
   // CHECK: subscript(_: WrappedInt) -> () { get }
-  // CHECK-RECOVERY: /* placeholder for _ (vtable entries: 1) */
+  // CHECK-RECOVERY: /* placeholder for subscript(_:) (vtable entries: 1) */
   public subscript(_: WrappedInt) -> () { return () }
 
   // CHECK: subscript<T>(_: T) -> () where T : HasAssoc, T.Assoc == WrappedInt { get }
-  // CHECK-RECOVERY: /* placeholder for _ (vtable entries: 1) */
+  // CHECK-RECOVERY: /* placeholder for subscript(_:) (vtable entries: 1) */
   public subscript<T: HasAssoc>(_: T) -> () where T.Assoc == WrappedInt { return () }
 
   // CHECK: init()

@@ -264,6 +264,9 @@ public:
         BufferID(File.getBufferID().getValue()),
         Walker(Walker) { }
 
+  // FIXME: Remove this
+  bool shouldWalkAccessorsTheOldWay() override { return true; }
+
   void visitSourceFile(SourceFile &SrcFile, ArrayRef<SyntaxNode> Tokens);
 
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override;

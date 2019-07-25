@@ -2660,6 +2660,10 @@ public:
 
     if (VD->getAttrs().hasAttribute<DynamicReplacementAttr>())
       TC.checkDynamicReplacementAttribute(VD);
+
+    // Now check all the accessors.
+    for (auto *accessor : VD->getAllAccessors())
+      visit(accessor);
   }
 
   void visitBoundVars(Pattern *P) {
@@ -2877,6 +2881,10 @@ public:
         SD->diagnose(diag::dynamic_self_in_mutable_subscript);
       }
     }
+
+    // Now check all the accessors.
+    for (auto *accessor : SD->getAllAccessors())
+      visit(accessor);
   }
 
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {

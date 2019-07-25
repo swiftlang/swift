@@ -285,9 +285,12 @@ bool Parser::parseTopLevel() {
   }
 
   // Add newly parsed decls to the module.
-  for (auto Item : Items)
-    if (auto *D = Item.dyn_cast<Decl*>())
+  for (auto Item : Items) {
+    if (auto *D = Item.dyn_cast<Decl*>()) {
+      assert(!isa<AccessorDecl>(D) && "accessors should not be added here");
       SF.Decls.push_back(D);
+    }
+  }
 
   // Note that the source file is fully parsed and verify it.
   SF.ASTStage = SourceFile::Parsed;
@@ -4470,9 +4473,7 @@ struct Parser::ParsedAccessors {
 #define ACCESSOR(ID) AccessorDecl *ID = nullptr;
 #include "swift/AST/AccessorKinds.def"
 
-  void record(Parser &P, AbstractStorageDecl *storage, bool invalid,
-              SmallVectorImpl<Decl *> &decls);
-
+  void record(Parser &P, AbstractStorageDecl *storage, bool invalid);
   void classify(Parser &P, AbstractStorageDecl *storage, bool invalid);
 
   /// Add an accessor.  If there's an existing accessor of this kind,
@@ -4735,48 +4736,6 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags,
   return Invalid ? makeParserError() : makeParserSuccess();
 }
 
-static void fillInAccessorTypeErrors(Parser &P, FuncDecl *accessor,
-                                     AccessorKind kind) {
-  if (!accessor) return;
-
-  // Fill in the parameter types.
-  if (auto *param = accessor->getImplicitSelfDecl())
-    if (param->getTypeLoc().isNull())
-      param->getTypeLoc().setInvalidType(P.Context);
-
-  for (auto *param : *accessor->getParameters())
-    if (param->getTypeLoc().isNull())
-      param->getTypeLoc().setInvalidType(P.Context);
-
-  // Fill in the result type.
-  switch (kind) {
-  // These have non-trivial returns, so fill in error.
-  case AccessorKind::Get:
-  case AccessorKind::Address:
-  case AccessorKind::MutableAddress:
-    accessor->getBodyResultTypeLoc().setInvalidType(P.Context);
-    return;
-
-  // These return void.
-  case AccessorKind::Set:
-  case AccessorKind::WillSet:
-  case AccessorKind::DidSet:
-  case AccessorKind::Read:
-  case AccessorKind::Modify:
-    return;
-  }
-  llvm_unreachable("bad kind");
-}
-
-/// We weren't able to tie the given accessors to a storage declaration.
-/// Fill in various slots with type errors.
-static void fillInAccessorTypeErrors(Parser &P,
-                                     Parser::ParsedAccessors &accessors) {
-#define ACCESSOR(ID) \
-  fillInAccessorTypeErrors(P, accessors.ID, AccessorKind::ID);
-#include "swift/AST/AccessorKinds.def"
-}
-
 /// Parse the brace-enclosed getter and setter for a variable.
 ParserResult<VarDecl>
 Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
@@ -4866,12 +4825,8 @@ Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
     Invalid = true;
 
   // If we have an invalid case, bail out now.
-  if (!PrimaryVar) {
-    fillInAccessorTypeErrors(*this, accessors);
-    // Preserve the invariant that an accessor can be found from its VarDecl
-    accessors.record(*this, storage, Invalid, Decls);
+  if (!PrimaryVar)
     return nullptr;
-  }
 
   if (!TyLoc.hasLocation()) {
     if (accessors.Get || accessors.Set || accessors.Address ||
@@ -4898,7 +4853,7 @@ Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
     Invalid = true;
   }
 
-  accessors.record(*this, PrimaryVar, Invalid, Decls);
+  accessors.record(*this, PrimaryVar, Invalid);
 
   return makeParserResult(PrimaryVar);
 }
@@ -4925,11 +4880,8 @@ AccessorDecl *Parser::ParsedAccessors::add(AccessorDecl *accessor) {
 
 /// Record a bunch of parsed accessors into the given abstract storage decl.
 void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
-                                     bool invalid,
-                                     SmallVectorImpl<Decl *> &decls) {
+                                     bool invalid) {
   classify(P, storage, invalid);
-
-  decls.append(Accessors.begin(), Accessors.end());
   storage->setAccessors(LBLoc, Accessors, RBLoc);
 }
 
@@ -6437,7 +6389,7 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
     Invalid = true;
   }
 
-  accessors.record(*this, Subscript, (Invalid || !Status.isSuccess()), Decls);
+  accessors.record(*this, Subscript, (Invalid || !Status.isSuccess()));
 
   // No need to setLocalDiscriminator because subscripts cannot
   // validly appear outside of type decls.
