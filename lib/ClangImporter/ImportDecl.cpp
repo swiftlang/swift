@@ -2385,6 +2385,7 @@ namespace {
           importedName.getDeclName().getBaseIdentifier(),
           Impl.importSourceLoc(decl->getLocation()), None, nullptr, dc);
       enumDecl->computeType();
+      enumDecl->setMemberLoader(&Impl, 0);
       return enumDecl;
     }
 
@@ -3649,7 +3650,8 @@ namespace {
         return nullptr;
 
       DeclName name = accessorInfo ? DeclName() : importedName.getDeclName();
-      if (importedName.importAsMember()) {
+
+      if (!dc->isModuleScopeContext() && !isa<clang::CXXMethodDecl>(decl)) {
         // Handle initializers.
         if (name.getBaseName() == DeclBaseName::createConstructor()) {
           assert(!accessorInfo);
@@ -8461,6 +8463,28 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
     loadAllMembersOfObjcContainer(D, objcContainer);
     return;
   }
+
+  auto namespaceDecl =
+      dyn_cast_or_null<clang::NamespaceDecl>(D->getClangDecl());
+  if (namespaceDecl) {
+    auto *enumDecl = cast<EnumDecl>(D);
+    // TODO: This redecls should only match redecls that are in the same
+    // module as namespaceDecl after we import one namespace per clang module.
+    for (auto ns : namespaceDecl->redecls()) {
+      for (auto m : ns->decls()) {
+        auto nd = dyn_cast<clang::NamedDecl>(m);
+        if (!nd)
+          continue;
+        auto member = importDecl(nd, CurrentVersion);
+        if (!member)
+          continue;
+
+        enumDecl->addMember(member);
+      }
+    }
+    return;
+  }
+
   loadAllMembersIntoExtension(D, extra);
 }
 

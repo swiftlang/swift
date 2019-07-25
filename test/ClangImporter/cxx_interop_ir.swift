@@ -13,6 +13,13 @@ func indirectUsage() {
 func namespaceManglesIntoName(arg: namespacedT) {
 }
 
+// CHECK-LABEL: define hidden swiftcc void @"$s6cxx_ir14accessNSMemberyyF"()
+// CHECK: %0 = call %"class.ns::T"* @{{_ZN2ns7doMakeTEv|"\?doMakeT@ns@@YAPEAVT@1@XZ"}}()
+// CHECK: call void @{{_Z4useTPN2ns1TE|"\?useT@@YAXPE?AVT@ns@@@Z"}}(%"class.ns::T"* %2)
+func accessNSMember() {
+  useT(ns.doMakeT())
+}
+
 // CHECK-LABEL: define hidden swiftcc i32 @"$s6cxx_ir12basicMethods1as5Int32VSpySo0D0VG_tF"(i8*)
 // CHECK: [[THIS_PTR1:%.*]] = bitcast i8* %0 to %TSo7MethodsV*
 // CHECK: [[THIS_PTR2:%.*]] = bitcast %TSo7MethodsV* [[THIS_PTR1]] to %class.Methods*
