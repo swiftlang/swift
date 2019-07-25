@@ -6473,6 +6473,13 @@ static bool requiresNewVTableEntry(const AbstractFunctionDecl *decl) {
   auto baseInterfaceTy = base->getInterfaceType();
   auto derivedInterfaceTy = decl->getInterfaceType();
 
+  auto sig = ctx.getOverrideGenericSignature(base, (ValueDecl *)decl);
+
+  if (sig &&
+      !sig->requirementsNotSatisfiedBy(decl->getGenericSignature()).empty()) {
+    return true;
+  }
+
   auto selfInterfaceTy = decl->getDeclContext()->getDeclaredInterfaceType();
 
   auto overrideInterfaceTy = selfInterfaceTy->adjustSuperclassMemberDeclType(
