@@ -367,7 +367,7 @@ public:
   template <typename... Tys> struct FixedSizeStorage {
     template <size_t... Counts> struct with_counts {
       enum { Size = totalSizeToAlloc<Tys...>(Counts...) };
-      typedef llvm::AlignedCharArray<alignof(BaseTy), Size> type;
+      using type = std::aligned_storage<Size, alignof(BaseTy)>;
     };
   };
 
