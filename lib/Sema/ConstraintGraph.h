@@ -188,9 +188,8 @@ public:
   /// Gather the set of constraints that involve the given type variable,
   /// i.e., those constraints that will be affected when the type variable
   /// gets merged or bound to a fixed type.
-  void
+  llvm::TinyPtrVector<Constraint *>
   gatherConstraints(TypeVariableType *typeVar,
-                    llvm::SetVector<Constraint *> &constraints,
                     GatheringKind kind,
                     llvm::function_ref<bool(Constraint *)> acceptConstraint =
                         [](Constraint *constraint) { return true; });
