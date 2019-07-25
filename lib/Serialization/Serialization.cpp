@@ -2841,6 +2841,13 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     InlinableBodyTextLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode, body);
   }
 
+  unsigned getNumberOfRequiredVTableEntries(
+      const AbstractStorageDecl *storage) const {
+    unsigned count = 0;
+    // FIXME: Implement once accessors are no longer part of their parent.
+    return count;
+  }
+
 public:
   DeclSerializer(Serializer &S, DeclID id) : S(S), id(id) {}
   ~DeclSerializer() {
@@ -3368,6 +3375,8 @@ public:
 
     auto rawIntroducer = getRawStableVarDeclIntroducer(var->getIntroducer());
 
+    unsigned numVTableEntries = getNumberOfRequiredVTableEntries(var);
+
     unsigned abbrCode = S.DeclTypeAbbrCodes[VarLayout::Code];
     VarLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                           S.addDeclBaseNameRef(var->getName()),
@@ -3391,6 +3400,7 @@ public:
                           rawAccessLevel, rawSetterAccessLevel,
                           S.addDeclRef(var->getOpaqueResultTypeDecl()),
                           numBackingProperties,
+                          numVTableEntries,
                           arrayFields);
   }
 
@@ -3641,6 +3651,8 @@ public:
     uint8_t rawStaticSpelling =
       uint8_t(getStableStaticSpelling(subscript->getStaticSpelling()));
 
+    unsigned numVTableEntries = getNumberOfRequiredVTableEntries(subscript);
+
     unsigned abbrCode = S.DeclTypeAbbrCodes[SubscriptLayout::Code];
     SubscriptLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                                 contextID,
@@ -3663,6 +3675,7 @@ public:
                                 subscript->
                                   getFullName().getArgumentNames().size(),
                                 S.addDeclRef(subscript->getOpaqueResultTypeDecl()),
+                                numVTableEntries,
                                 nameComponentsAndDependencies);
 
     writeGenericParams(subscript->getGenericParams());
