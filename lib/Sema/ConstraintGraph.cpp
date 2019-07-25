@@ -486,50 +486,42 @@ void ConstraintGraph::gatherConstraints(
   auto &reprNode = (*this)[CS.getRepresentative(typeVar)];
   auto equivClass = reprNode.getEquivalenceClass();
   llvm::SmallPtrSet<TypeVariableType *, 4> typeVars;
-  for (auto typeVar : equivClass) {
-    if (!typeVars.insert(typeVar).second)
-      continue;
 
-    for (auto constraint : (*this)[typeVar].getConstraints()) {
+
+  /// Add constraints for the given adjacent type variable.
+  auto addAdjacentConstraints = [&](TypeVariableType *adjTypeVar) {
+    auto adjTypeVarsToVisit =
+        (*this)[CS.getRepresentative(adjTypeVar)].getEquivalenceClass();
+    for (auto adjTypeVarEquiv : adjTypeVarsToVisit) {
+      if (!typeVars.insert(adjTypeVarEquiv).second)
+        continue;
+
+      for (auto constraint : (*this)[adjTypeVarEquiv].getConstraints()) {
+        if (acceptConstraint(constraint))
+          constraints.insert(constraint);
+      }
+    }
+  };
+
+  for (auto typeVar : equivClass) {
+    auto &node = (*this)[typeVar];
+    for (auto constraint : node.getConstraints()) {
       if (acceptConstraint(constraint))
         constraints.insert(constraint);
-    }
 
-    auto &node = (*this)[typeVar];
-
-    // Retrieve the constraints from adjacent bindings.
-    for (auto adjTypeVar : node.getAdjacencies()) {
-      switch (kind) {
-      case GatheringKind::EquivalenceClass:
-        if (!node.getAdjacency(adjTypeVar).FixedBinding)
-          continue;
-        break;
-
-      case GatheringKind::AllMentions:
-        break;
-      }
-
-      ArrayRef<TypeVariableType *> adjTypeVarsToVisit;
-      switch (kind) {
-      case GatheringKind::EquivalenceClass:
-        adjTypeVarsToVisit = adjTypeVar;
-        break;
-
-      case GatheringKind::AllMentions:
-        adjTypeVarsToVisit
-          = (*this)[CS.getRepresentative(adjTypeVar)].getEquivalenceClass();
-        break;
-      }
-
-      for (auto adjTypeVarEquiv : adjTypeVarsToVisit) {
-        if (!typeVars.insert(adjTypeVarEquiv).second)
-          continue;
-
-        for (auto constraint : (*this)[adjTypeVarEquiv].getConstraints()) {
-          if (acceptConstraint(constraint))
-            constraints.insert(constraint);
+      // If we want all mentions, visit type variables within each of our
+      // constraints.
+      if (kind == GatheringKind::AllMentions) {
+        for (auto adjTypeVar : constraint->getTypeVariables()) {
+          addAdjacentConstraints(adjTypeVar);
         }
       }
+    }
+
+    // For any type variable mentioned in a fixed binding, add adjacent
+    // constraints.
+    for (auto adjTypeVar : node.getFixedAdjacencies()) {
+      addAdjacentConstraints(adjTypeVar);
     }
   }
 }
