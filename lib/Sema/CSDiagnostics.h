@@ -529,6 +529,7 @@ public:
       : FailureDiagnostic(root, cs, locator), CorrectLabels(labels) {}
 
   bool diagnoseAsError() override;
+  bool diagnoseAsNote() override;
 };
 
 /// Diagnose errors related to converting function type which
