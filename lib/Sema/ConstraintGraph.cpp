@@ -373,15 +373,14 @@ void ConstraintGraph::unbindTypeVariable(TypeVariableType *typeVar, Type fixed){
   }
 }
 
-void ConstraintGraph::gatherConstraints(
-    TypeVariableType *typeVar, llvm::SetVector<Constraint *> &constraints,
-    GatheringKind kind,
+llvm::TinyPtrVector<Constraint *> ConstraintGraph::gatherConstraints(
+    TypeVariableType *typeVar, GatheringKind kind,
     llvm::function_ref<bool(Constraint *)> acceptConstraint) {
-  auto &reprNode = (*this)[CS.getRepresentative(typeVar)];
-  auto equivClass = reprNode.getEquivalenceClass();
-  llvm::SmallPtrSet<TypeVariableType *, 4> typeVars;
+  llvm::TinyPtrVector<Constraint *> constraints;
 
   /// Add constraints for the given adjacent type variable.
+  llvm::SmallPtrSet<TypeVariableType *, 4> typeVars;
+  llvm::SmallPtrSet<Constraint *, 4> visitedConstraints;
   auto addAdjacentConstraints = [&](TypeVariableType *adjTypeVar) {
     auto adjTypeVarsToVisit =
         (*this)[CS.getRepresentative(adjTypeVar)].getEquivalenceClass();
@@ -390,17 +389,23 @@ void ConstraintGraph::gatherConstraints(
         continue;
 
       for (auto constraint : (*this)[adjTypeVarEquiv].getConstraints()) {
+        if (!visitedConstraints.insert(constraint).second)
+          continue;
+
         if (acceptConstraint(constraint))
-          constraints.insert(constraint);
+          constraints.push_back(constraint);
       }
     }
   };
 
+  auto &reprNode = (*this)[CS.getRepresentative(typeVar)];
+  auto equivClass = reprNode.getEquivalenceClass();
   for (auto typeVar : equivClass) {
     auto &node = (*this)[typeVar];
     for (auto constraint : node.getConstraints()) {
-      if (acceptConstraint(constraint))
-        constraints.insert(constraint);
+      if (visitedConstraints.insert(constraint).second &&
+          acceptConstraint(constraint))
+        constraints.push_back(constraint);
 
       // If we want all mentions, visit type variables within each of our
       // constraints.
@@ -417,6 +422,8 @@ void ConstraintGraph::gatherConstraints(
       addAdjacentConstraints(adjTypeVar);
     }
   }
+
+  return constraints;
 }
 
 #pragma mark Algorithms
