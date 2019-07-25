@@ -48,7 +48,7 @@ enum Result<T> {
   }
 }
 
-func overParenthesized() {
+func parenthesized() {
   // SR-7492: Space projection needs to treat extra paren-patterns explicitly.
   let x: Result<(Result<Int>, String)> = .Ok((.Ok(1), "World"))
   switch x {
@@ -1177,11 +1177,36 @@ func sr10301_as(_ foo: SR10301<String,(Int,Error)>) {
 }
 
 func sr11160() {
-    switch Optional<(Int, Int)>((5, 6)) { // expected-error {{switch must be exhaustive}}
-        // expected-note@-1 {{add missing case: '.some(_, _)'}}
-    case let b?: print(b)
-    case nil:    print(0)
-    }
+  switch Optional<(Int, Int)>((5, 6)) {
+  case let b?: print(b)
+  case nil:    print(0)
+  }
+}
+
+enum Z {
+  case z1(a: Int)
+  case z2(a: Int, b: Int)
+  case z3((c: Int, d: Int))
+}
+
+func sr11160_extra() {
+  switch Z.z1(a: 1) { // expected-error {{switch must be exhaustive}}
+                      // expected-note@-1 {{add missing case: '.z1(let a)'}}
+  case .z2(_, _): ()
+  case .z3(_): ()
+  }
+
+  switch Z.z1(a: 1) { // expected-error {{switch must be exhaustive}}
+                      // expected-note@-1 {{add missing case: '.z2(let a, let b)'}}
+  case .z1(_): ()
+  case .z3(_): ()
+  }
+
+  switch Z.z1(a: 1) { // expected-error {{switch must be exhaustive}}
+                      // expected-note@-1 {{add missing case: '.z3((let c, let d))'}}
+  case .z1(_):    ()
+  case .z2(_, _): ()
+  }
 }
 
 // SR-11212 tests: Some of the tests here rely on compiler bugs related to

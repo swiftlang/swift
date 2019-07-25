@@ -47,10 +47,13 @@ namespace {
 
 namespace {
 
-  /// The SpaceEngine encapsulates an algorithm for computing the exhaustiveness
-  /// of a switch statement using an algebra of spaces described by Fengyun Liu
-  /// and an algorithm for computing warnings for pattern matching by
-  /// Luc Maranget.
+  /// The SpaceEngine encapsulates
+  ///
+  /// 1. An algorithm for computing the exhaustiveness of a switch statement
+  ///    using an algebra of spaces based on Fengyun Liu's
+  ///    "A Generic Algorithm for Checking Exhaustivity of Pattern Matching".
+  /// 2. An algorithm for computing warnings for pattern matching based on
+  ///    Luc Maranget's "Warnings for pattern matching".
   ///
   /// The main algorithm centers around the computation of the difference and
   /// the containment of the "Spaces" given in each case, which reduces the
@@ -298,7 +301,6 @@ namespace {
         }
 
         switch (PairSwitch(getKind(), other.getKind())) {
-        PAIRCASE (SpaceKind::Disjunct, SpaceKind::Empty):
         PAIRCASE (SpaceKind::Disjunct, SpaceKind::Type):
         PAIRCASE (SpaceKind::Disjunct, SpaceKind::Constructor):
         PAIRCASE (SpaceKind::Disjunct, SpaceKind::Disjunct):
@@ -748,8 +750,6 @@ namespace {
           auto children = E->getAllElements();
           std::transform(children.begin(), children.end(),
                          std::back_inserter(arr), [&](EnumElementDecl *eed) {
-            SmallVector<Space, 4> constElemSpaces;
-
             // We need the interface type of this enum case but it may
             // not have been computed.
             if (!eed->hasInterfaceType()) {
@@ -768,17 +768,28 @@ namespace {
               return Space();
             }
 
+            // .e(a: X, b: X)   -> (a: X, b: X)
+            // .f((a: X, b: X)) -> ((a: X, b: X)
             auto eedTy = tp->getCanonicalType()
                            ->getTypeOfMember(E->getModuleContext(), eed,
                                              eed->getArgumentInterfaceType());
+            SmallVector<Space, 4> constElemSpaces;
             if (eedTy) {
               if (auto *TTy = eedTy->getAs<TupleType>()) {
-                // Decompose the payload tuple into its component type spaces.
-                llvm::transform(TTy->getElements(),
-                                std::back_inserter(constElemSpaces),
-                                [&](TupleTypeElt elt) {
-                  return Space::forType(elt.getType(), elt.getName());
-                });
+                if (isa<ParenType>(eedTy.getPointer())) {
+                  // We had an actual tuple!
+                  SmallVector<Space, 4> innerElemSpaces;
+                  for (auto &elt: TTy->getElements())
+                    innerElemSpaces.push_back(
+                      Space::forType(elt.getType(), elt.getName()));
+                  constElemSpaces.push_back(
+                    Space::forConstructor(TTy, Identifier(), innerElemSpaces));
+                } else {
+                  // We're just looking at fields of a constructor here.
+                  for (auto &elt: TTy->getElements())
+                    constElemSpaces.push_back(
+                      Space::forType(elt.getType(), elt.getName()));
+                }
               } else if (auto *TTy = dyn_cast<ParenType>(eedTy.getPointer())) {
                 constElemSpaces.push_back(
                     Space::forType(TTy->getUnderlyingType(), Identifier()));
@@ -1458,9 +1469,7 @@ namespace {
             if (argTupleSpace.isEmpty())
               return Space();
             assert(argTupleSpace.getKind() == SpaceKind::Constructor);
-            conArgSpace.insert(conArgSpace.end(),
-                               argTupleSpace.getSpaces().begin(),
-                               argTupleSpace.getSpaces().end());
+            conArgSpace.push_back(argTupleSpace);
           } else {
             conArgSpace.push_back(projectPattern(TC, SP));
           }
