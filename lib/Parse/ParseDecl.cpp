@@ -4879,6 +4879,10 @@ Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
   if (!PrimaryVar) {
     fillInAccessorTypeErrors(*this, accessors);
     Decls.append(accessors.Accessors.begin(), accessors.Accessors.end());
+    // Preserve the invariaent that accessor an can be found from its
+    // VarDecl.
+    accessors.record(*this, storage, Invalid, Flags, StaticLoc, Attributes,
+                     TyLoc, /*indices*/ nullptr, Decls);
     return nullptr;
   }
 
