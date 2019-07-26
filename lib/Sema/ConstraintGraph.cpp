@@ -526,7 +526,6 @@ unsigned ConstraintGraph::computeConnectedComponents(
   // Track those type variables that the caller cares about.
   llvm::SmallPtrSet<TypeVariableType *, 4> typeVarSubset(typeVars.begin(),
                                                          typeVars.end());
-  typeVars.clear();
 
   // Initialize the components with component == # of type variables,
   // a sentinel value indicating that we have yet to assign a component to
@@ -538,9 +537,7 @@ unsigned ConstraintGraph::computeConnectedComponents(
   // what component it is in.
   llvm::DenseSet<Constraint *> visitedConstraints;
   unsigned numComponents = 0;
-  for (unsigned i = 0; i != numTypeVariables; ++i) {
-    auto typeVar = TypeVariables[i];
-
+  for (auto typeVar : typeVars) {
     // Look up the node for this type variable.
     auto nodeAndIndex = lookupNode(typeVar);
 
@@ -576,6 +573,10 @@ unsigned ConstraintGraph::computeConnectedComponents(
   // are the only components and type variables we want to report.
   SmallVector<bool, 4> componentHasUnboundTypeVar(numComponents, false);
   for (unsigned i = 0; i != numTypeVariables; ++i) {
+    // If we didn't look at this type variable, there's nothing to do.
+    if (components[i] == numTypeVariables)
+      continue;
+
     // If this type variable has a fixed type, skip it.
     if (CS.getFixedType(TypeVariables[i]))
       continue;
@@ -592,6 +593,10 @@ unsigned ConstraintGraph::computeConnectedComponents(
   SmallVector<unsigned, 4> componentRenumbering(numComponents, 0);
   numComponents = 0;
   for (unsigned i = 0, n = componentHasUnboundTypeVar.size(); i != n; ++i) {
+    // If we didn't look at this type variable, there's nothing to do.
+    if (components[i] == numTypeVariables)
+      continue;
+
     // Skip components that have no unbound type variables.
     if (!componentHasUnboundTypeVar[i])
       continue;
@@ -601,8 +606,13 @@ unsigned ConstraintGraph::computeConnectedComponents(
 
   // Copy over the type variables in the live components and remap
   // component numbers.
+  typeVars.clear();
   unsigned outIndex = 0;
   for (unsigned i = 0, n = TypeVariables.size(); i != n; ++i) {
+    // If we didn't look at this type variable, there's nothing to do.
+    if (components[i] == numTypeVariables)
+      continue;
+
     // Skip type variables in dead components.
     if (!componentHasUnboundTypeVar[components[i]])
       continue;
