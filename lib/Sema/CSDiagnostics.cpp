@@ -436,8 +436,8 @@ bool RequirementFailure::diagnoseAsError() {
   const auto *reqDC = getRequirementDC();
   auto *genericCtx = getGenericContext();
 
-  auto lhs = resolveType(getLHS());
-  auto rhs = resolveType(getRHS());
+  auto lhs = getLHS();
+  auto rhs = getRHS();
 
   if (auto *OTD = dyn_cast<OpaqueTypeDecl>(AffectedDecl)) {
     auto *namingDecl = OTD->getNamingDecl();
