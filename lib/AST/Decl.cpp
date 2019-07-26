@@ -6915,7 +6915,6 @@ ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
   
   Bits.ConstructorDecl.ComputedBodyInitKind = 0;
   Bits.ConstructorDecl.HasStubImplementation = 0;
-  Bits.ConstructorDecl.InitKind = static_cast<unsigned>(CtorInitializerKind::Designated);
   Bits.ConstructorDecl.Failability = static_cast<unsigned>(Failability);
 
   assert(Name.getBaseName() == DeclBaseName::createConstructor());
@@ -7105,6 +7104,12 @@ Type ConstructorDecl::getInitializerInterfaceType() {
   InitializerInterfaceType = initFuncTy;
 
   return InitializerInterfaceType;
+}
+
+CtorInitializerKind ConstructorDecl::getInitKind() const {
+  return evaluateOrDefault(getASTContext().evaluator,
+    InitKindRequest{const_cast<ConstructorDecl *>(this)},
+    CtorInitializerKind::Designated);
 }
 
 ConstructorDecl::BodyInitKind

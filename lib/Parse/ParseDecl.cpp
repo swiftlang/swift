@@ -6530,11 +6530,6 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
 
   CD->setGenericParams(GenericParams);
 
-  CtorInitializerKind initKind = CtorInitializerKind::Designated;
-  if (Attributes.hasAttribute<ConvenienceAttr>())
-    initKind = CtorInitializerKind::Convenience;
-  CD->setInitKind(initKind);
-
   // No need to setLocalDiscriminator.
 
   DefaultArgs.setFunctionContext(CD, CD->getParameters());

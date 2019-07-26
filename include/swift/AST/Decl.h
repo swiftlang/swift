@@ -449,16 +449,13 @@ protected:
     AccessorKind : 4
   );
 
-  SWIFT_INLINE_BITFIELD(ConstructorDecl, AbstractFunctionDecl, 3+2+2+1,
+  SWIFT_INLINE_BITFIELD(ConstructorDecl, AbstractFunctionDecl, 3+2+1,
     /// The body initialization kind (+1), or zero if not yet computed.
     ///
     /// This value is cached but is not serialized, because it is a property
     /// of the definition of the constructor that is useful only to semantic
     /// analysis and SIL generation.
     ComputedBodyInitKind : 3,
-
-    /// The kind of initializer we have.
-    InitKind : 2,
 
     /// The failability of this initializer, which is an OptionalTypeKind.
     Failability : 2,
@@ -6519,14 +6516,7 @@ public:
   }
 
   /// Determine the kind of initializer this is.
-  CtorInitializerKind getInitKind() const {
-    return static_cast<CtorInitializerKind>(Bits.ConstructorDecl.InitKind);
-  }
-
-  /// Set whether this is a convenience initializer.
-  void setInitKind(CtorInitializerKind kind) {
-    Bits.ConstructorDecl.InitKind = static_cast<unsigned>(kind);
-  }
+  CtorInitializerKind getInitKind() const;
 
   /// Whether this is a designated initializer.
   bool isDesignatedInit() const {

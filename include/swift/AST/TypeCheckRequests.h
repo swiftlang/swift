@@ -177,6 +177,28 @@ public:
   void cacheResult(bool value) const;
 };
 
+void simple_display(llvm::raw_ostream &out, CtorInitializerKind initKind);
+
+/// Computes the kind of initializer for a given \c ConstructorDecl
+class InitKindRequest:
+    public SimpleRequest<InitKindRequest,
+                         CtorInitializerKind(ConstructorDecl *),
+                         CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<CtorInitializerKind>
+      evaluate(Evaluator &evaluator, ConstructorDecl *decl) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
 /// Determine whether the given protocol declaration is class-bounded.
 class ProtocolRequiresClassRequest:
     public SimpleRequest<ProtocolRequiresClassRequest,

@@ -2707,7 +2707,8 @@ public:
     if (hasStubImplementation)
       ctor->setStubImplementation(true);
     if (initKind.hasValue())
-      ctor->setInitKind(initKind.getValue());
+      ctx.evaluator.cacheOutput(InitKindRequest{ctor},
+                                std::move(initKind.getValue()));
     ctor->setNeedsNewVTableEntry(needsNewVTableEntry);
 
     ctor->setOverriddenDecl(cast_or_null<ConstructorDecl>(overridden.get()));
