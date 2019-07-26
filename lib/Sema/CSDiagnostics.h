@@ -222,12 +222,17 @@ protected:
   /// to diagnose failures related to arguments.
   const ApplyExpr *Apply = nullptr;
 
+  /// Types associated with requirement constraint this
+  /// failure originates from.
+  Type LHS, RHS;
+
 public:
   RequirementFailure(ConstraintSystem &cs, Expr *expr, RequirementKind kind,
-                     ConstraintLocator *locator)
+                     Type lhs, Type rhs, ConstraintLocator *locator)
       : FailureDiagnostic(expr, cs, locator),
         Conformance(getConformanceForConditionalReq(locator)),
-        Signature(getSignature(locator)), AffectedDecl(getDeclRef()) {
+        Signature(getSignature(locator)), AffectedDecl(getDeclRef()),
+        LHS(resolveType(lhs)), RHS(resolveType(rhs)) {
     assert(locator);
     assert(isConditional() || Signature);
     assert(AffectedDecl);
@@ -267,8 +272,8 @@ public:
   /// Generic requirement associated with the failure.
   const Requirement &getRequirement() const;
 
-  virtual Type getLHS() const = 0;
-  virtual Type getRHS() const = 0;
+  Type getLHS() const { return LHS; }
+  Type getRHS() const { return RHS; }
 
   bool diagnoseAsError() override;
   bool diagnoseAsNote() override;
@@ -358,26 +363,14 @@ private:
 ///   foo(S())
 /// ```
 class MissingConformanceFailure final : public RequirementFailure {
-  Type NonConformingType;
-  Type ProtocolType;
-
 public:
   MissingConformanceFailure(Expr *expr, ConstraintSystem &cs,
                             ConstraintLocator *locator,
                             std::pair<Type, Type> conformance)
-      : RequirementFailure(cs, expr, RequirementKind::Conformance, locator),
-        NonConformingType(conformance.first), ProtocolType(conformance.second) {
-  }
+      : RequirementFailure(cs, expr, RequirementKind::Conformance,
+                           conformance.first, conformance.second, locator) {}
 
   bool diagnoseAsError() override;
-
-private:
-  /// The type which was expected, by one of the generic requirements,
-  /// to conform to associated protocol.
-  Type getLHS() const override { return NonConformingType; }
-
-  /// The protocol generic requirement expected associated type to conform to.
-  Type getRHS() const override { return ProtocolType; }
 
 protected:
   DiagOnDecl getDiagnosticOnDecl() const override {
@@ -448,16 +441,11 @@ private:
 ///
 /// `S.T` is not the same type as `Int`, which is required by `foo`.
 class SameTypeRequirementFailure final : public RequirementFailure {
-  Type LHS, RHS;
-
 public:
   SameTypeRequirementFailure(Expr *expr, ConstraintSystem &cs, Type lhs,
                              Type rhs, ConstraintLocator *locator)
-      : RequirementFailure(cs, expr, RequirementKind::SameType, locator),
-        LHS(lhs), RHS(rhs) {}
-
-  Type getLHS() const override { return LHS; }
-  Type getRHS() const override { return RHS; }
+      : RequirementFailure(cs, expr, RequirementKind::SameType, lhs, rhs,
+                           locator) {}
 
 protected:
   DiagOnDecl getDiagnosticOnDecl() const override {
@@ -487,16 +475,11 @@ protected:
 ///
 /// `A` is not the superclass of `B`, which is required by `foo<T>`.
 class SuperclassRequirementFailure final : public RequirementFailure {
-  Type LHS, RHS;
-
 public:
   SuperclassRequirementFailure(Expr *expr, ConstraintSystem &cs, Type lhs,
                                Type rhs, ConstraintLocator *locator)
-      : RequirementFailure(cs, expr, RequirementKind::Superclass, locator),
-        LHS(lhs), RHS(rhs) {}
-
-  Type getLHS() const override { return LHS; }
-  Type getRHS() const override { return RHS; }
+      : RequirementFailure(cs, expr, RequirementKind::Superclass, lhs, rhs,
+                           locator) {}
 
 protected:
   DiagOnDecl getDiagnosticOnDecl() const override {
