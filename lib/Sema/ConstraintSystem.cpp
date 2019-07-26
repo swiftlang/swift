@@ -205,9 +205,8 @@ void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
 void ConstraintSystem::addTypeVariableConstraintsToWorkList(
        TypeVariableType *typeVar) {
   // Gather the constraints affected by a change to this type variable.
-  llvm::SetVector<Constraint *> inactiveConstraints;
-  CG.gatherConstraints(
-      typeVar, inactiveConstraints, ConstraintGraph::GatheringKind::AllMentions,
+  auto inactiveConstraints = CG.gatherConstraints(
+      typeVar, ConstraintGraph::GatheringKind::AllMentions,
       [](Constraint *constraint) { return !constraint->isActive(); });
 
   // Add any constraints that aren't already active to the worklist.
@@ -1985,13 +1984,13 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
         increaseScore(SK_KeyPathSubscript);
 
         auto dynamicResultTy = boundType->castTo<TypeVariableType>();
-        llvm::SetVector<Constraint *> constraints;
-        CG.gatherConstraints(dynamicResultTy, constraints,
-                             ConstraintGraph::GatheringKind::EquivalenceClass,
-                             [](Constraint *constraint) {
-                               return constraint->getKind() ==
-                                      ConstraintKind::ApplicableFunction;
-                             });
+        auto constraints = CG.gatherConstraints(
+            dynamicResultTy,
+            ConstraintGraph::GatheringKind::EquivalenceClass,
+            [](Constraint *constraint) {
+              return constraint->getKind() ==
+                     ConstraintKind::ApplicableFunction;
+            });
 
         assert(constraints.size() == 1);
         auto *applicableFn = constraints.front();

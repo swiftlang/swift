@@ -1519,9 +1519,8 @@ static Constraint *selectBestBindingDisjunction(
     if (!firstBindDisjunction)
       firstBindDisjunction = disjunction;
 
-    llvm::SetVector<Constraint *> constraints;
-    cs.getConstraintGraph().gatherConstraints(
-        typeVar, constraints, ConstraintGraph::GatheringKind::EquivalenceClass,
+    auto constraints = cs.getConstraintGraph().gatherConstraints(
+        typeVar, ConstraintGraph::GatheringKind::EquivalenceClass,
         [](Constraint *constraint) {
           return constraint->getKind() == ConstraintKind::Conversion;
         });
@@ -1576,9 +1575,8 @@ void ConstraintSystem::ArgumentInfoCollector::walk(Type argType) {
 
     visited.insert(rep);
 
-    llvm::SetVector<Constraint *> constraints;
-    CS.getConstraintGraph().gatherConstraints(
-        rep, constraints, ConstraintGraph::GatheringKind::EquivalenceClass);
+    auto constraints = CS.getConstraintGraph().gatherConstraints(
+        rep, ConstraintGraph::GatheringKind::EquivalenceClass);
 
     for (auto *constraint : constraints) {
       switch (constraint->getKind()) {
@@ -1772,9 +1770,8 @@ Constraint *ConstraintSystem::getUnboundBindOverloadDisjunction(
   while (visitedVars.insert(rep).second) {
     // Look for a disjunction that binds this type variable to an overload set.
     TypeVariableType *optionalObjectTypeVar = nullptr;
-    llvm::SetVector<Constraint *> disjunctions;
-    getConstraintGraph().gatherConstraints(
-        rep, disjunctions, ConstraintGraph::GatheringKind::EquivalenceClass,
+    auto disjunctions = getConstraintGraph().gatherConstraints(
+        rep, ConstraintGraph::GatheringKind::EquivalenceClass,
         [this, rep, &optionalObjectTypeVar](Constraint *match) {
           // If we have an "optional object of" constraint where the right-hand
           // side is this type variable, we may need to follow that type
@@ -1875,9 +1872,8 @@ void ConstraintSystem::sortDesignatedTypes(
     SmallVectorImpl<NominalTypeDecl *> &nominalTypes,
     Constraint *bindOverload) {
   auto *tyvar = bindOverload->getFirstType()->castTo<TypeVariableType>();
-  llvm::SetVector<Constraint *> applicableFns;
-  getConstraintGraph().gatherConstraints(
-      tyvar, applicableFns, ConstraintGraph::GatheringKind::EquivalenceClass,
+  auto applicableFns = getConstraintGraph().gatherConstraints(
+      tyvar, ConstraintGraph::GatheringKind::EquivalenceClass,
       [](Constraint *match) {
         return match->getKind() == ConstraintKind::ApplicableFunction;
       });
@@ -2292,21 +2288,21 @@ void DisjunctionChoice::propagateConversionInfo(ConstraintSystem &cs) const {
     return;
 
   auto conversionType = bindings.Bindings[0].BindingType;
-  llvm::SetVector<Constraint *> constraints;
-  cs.CG.gatherConstraints(typeVar, constraints,
-                          ConstraintGraph::GatheringKind::EquivalenceClass,
-                          [](Constraint *constraint) -> bool {
-                            switch (constraint->getKind()) {
-                            case ConstraintKind::Conversion:
-                            case ConstraintKind::Defaultable:
-                            case ConstraintKind::ConformsTo:
-                            case ConstraintKind::LiteralConformsTo:
-                              return false;
+  auto constraints = cs.CG.gatherConstraints(
+      typeVar,
+      ConstraintGraph::GatheringKind::EquivalenceClass,
+      [](Constraint *constraint) -> bool {
+        switch (constraint->getKind()) {
+        case ConstraintKind::Conversion:
+        case ConstraintKind::Defaultable:
+        case ConstraintKind::ConformsTo:
+        case ConstraintKind::LiteralConformsTo:
+          return false;
 
-                            default:
-                              return true;
-                            }
-                          });
+        default:
+          return true;
+        }
+      });
 
   if (constraints.empty())
     cs.addConstraint(ConstraintKind::Bind, typeVar, conversionType,
