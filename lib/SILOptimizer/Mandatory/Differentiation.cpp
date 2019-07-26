@@ -146,6 +146,24 @@ collectAllFormalResultsInTypeOrder(SILFunction &function,
                                                : indResults[indResIdx++]);
 }
 
+/// Given a function, gather all of its direct results in an order defined by
+/// its result type. Note that "formal results" refer to result values in the
+/// body of the function, not at call sites.
+static void
+collectAllDirectResultsInTypeOrder(SILFunction &function,
+                                   SmallVectorImpl<SILValue> &results) {
+  SILFunctionConventions convs(function.getLoweredFunctionType(),
+                               function.getModule());
+  auto *retInst = cast<ReturnInst>(function.findReturnBB()->getTerminator());
+  auto retVal = retInst->getOperand();
+  if (auto *tupleInst =
+      dyn_cast_or_null<TupleInst>(retVal->getDefiningInstruction()))
+    results.append(tupleInst->getElements().begin(),
+                      tupleInst->getElements().end());
+  else
+    results.push_back(retVal);
+}
+
 /// Given a function call site, gather all of its actual results (both direct
 /// and indirect) in an order defined by its result type.
 template <typename IndResRange>
@@ -3881,6 +3899,7 @@ private:
     auto diffBuilder = getDifferentialBuilder();
     auto silType = getModule().Types.getLoweredLoadableType(
         type, ResilienceExpansion::Minimal);
+    llvm::errs() << "AAAAAAAAA\n";
     auto *buffer = diffBuilder.createAllocStack(loc, silType);
     emitZeroIndirect(type, buffer, loc);
     auto *loaded = diffBuilder.createLoad(
@@ -4096,58 +4115,30 @@ private:
     auto &differential = getDifferential();
     auto diffLoc = differential.getLocation();
     auto diffBuilder = getDifferentialBuilder();
-    // Place the builder at the differential exit, return the adjoints wrt
-    // parameters in the differential exit.
-    auto *origEntry = original->getEntryBlock();
-    // TODO: when entry != exit once we have control flow
-    auto *diffExit = origEntry;
-    diffBuilder.setInsertionPoint(diffExit);
 
     // This vector will contain all the materialized return elements.
     SmallVector<SILValue, 8> retElts;
-    // This vector will contain all indirect parameter adjoint buffers.
-    SmallVector<SILValue, 4> indParamATangents;
 
-    auto origParams = original->getArgumentsWithoutIndirectResults();
+    SmallVector<SILValue, 2> results;
+    collectAllDirectResultsInTypeOrder(*original, results);
 
-    // Materializes the return element corresponding to the parameter
-    // `parameterIndex` into the `retElts` vector.
-    auto addRetElt = [&](unsigned parameterIndex) -> void {
-      auto origParam = origParams[parameterIndex];
-      if (origParam->getType().isObject()) {
-        auto diffVal = getTangentValue(origParam);
+    // Materializes the return element corresponding to the result
+    // `resultIndex` into the `retElts` vector.
+    auto addRetElt = [&](unsigned resultIndex) -> void {
+      auto origResult = results[resultIndex];
+      assert(origResult->getType().isObject() &&
+             "Should only be handling direct results for return inst");
+        auto diffVal = getTangentValue(origResult);
         auto val = materializeTangentDirect(diffVal, diffLoc);
         diffBuilder.createRetainValue(diffLoc, val, diffBuilder.getDefaultAtomicity());
         retElts.push_back(val);
-      } else {
-        auto tangentBuf = getTangentBuffer(origEntry, origParam);
-        if (errorOccurred)
-          return;
-        if (tangentBuf->getType().isLoadable(differential))
-          diffBuilder.createRetainValueAddr(diffLoc, tangentBuf,
-                                            diffBuilder.getDefaultAtomicity());
-        indParamATangents.push_back(tangentBuf);
-      }
     };
     // Collect differentiation parameter adjoints.
-    for (auto i : getIndices().parameters->getIndices())
+    for (auto i : range(results.size()))
       addRetElt(i);
-    // Emit cleanups for all local values.
-//    cleanUpTemporariesForBlock(pbExit, diffLoc);
 
-    // Copy them to tangent indirect results.
-    assert(indParamATangents.size() == differential.getIndirectResults().size() &&
-           "Indirect parameter tangent count mismatch");
-    for (auto pair : zip(indParamATangents, differential.getIndirectResults())) {
-      auto source = std::get<0>(pair);
-      auto *dest = std::get<1>(pair);
-      diffBuilder.createCopyAddr(diffLoc, source, dest, IsTake, IsInitialization);
-      // Prevent source buffer from being deallocated, since the underlying
-      // value is moved.
-//      destroyedLocalAllocations.insert(source);
-    }
-
-    diffBuilder.setInsertionPoint(origEntry);
+    diffBuilder.createReturn(
+        diffLoc, joinElements(retElts, diffBuilder, diffLoc));
   }
 
   void emitTangentForReturnInst(ReturnInst *ri) {
@@ -4339,18 +4330,23 @@ private:
         context.getTypeConverter(), diffGenSig);
 
     auto diffBuilder = getDifferentialBuilder();
+    auto loc = cai->getLoc();
     auto *bb = cai->getParent();
-    auto &adjDest = getTangentBuffer(bb, cai->getDest());
+    auto &tanSrc = getTangentBuffer(bb, cai->getSrc());
+    auto tanDest = getTangentBuffer(bb, cai->getDest());
     if (errorOccurred)
       return;
 
-    // Begin access, set the corresponding tangent buffer, and end access.
-    auto *readAccess = diffBuilder.createBeginAccess(
-        cai->getLoc(), adjDest, SILAccessKind::Read,
-        SILAccessEnforcement::Static, /*noNestedConflict*/ true,
-        /*fromBuiltin*/ false);
-    setTangentBuffer(bb, cai->getSrc(), readAccess);
-    diffBuilder.createEndAccess(cai->getLoc(), readAccess, /*aborted*/ false);
+    diffBuilder.createCopyAddr(loc, tanSrc, tanDest, cai->isTakeOfSrc(),
+                               cai->isInitializationOfDest());
+
+//    // Begin access, set the corresponding tangent buffer, and end access.
+//    auto *readAccess = diffBuilder.createBeginAccess(
+//        cai->getLoc(), adjDest, SILAccessKind::Read,
+//        SILAccessEnforcement::Static, /*noNestedConflict*/ true,
+//        /*fromBuiltin*/ false);
+//    setTangentBuffer(bb, cai->getSrc(), readAccess);
+//    diffBuilder.createEndAccess(cai->getLoc(), readAccess, /*aborted*/ false);
   }
 
   /// Handle `begin_access` instruction.
@@ -4439,7 +4435,8 @@ private:
         Lowering::GenericContextScope genericContextScope(
             context.getTypeConverter(), diffGenSig);
         auto diffStructLoweredType =
-        remapTypeInDifferential(differentialInfo.getLinearMapStructLoweredType(&origBB));
+            remapTypeInDifferential(differentialInfo.getLinearMapStructLoweredType(&origBB));
+
         // If the BB is the original entry, then the differential block that we
         // just created must be the differential function's entry. Create
         // differential entry arguments and continue.
@@ -4447,8 +4444,6 @@ private:
           assert(diffBB->isEntry());
           createEntryArguments(&differential);
           auto *lastArg = diffBB->getArguments().back();
-          lastArg->getType().dump();
-          diffStructLoweredType.dump();
           assert(lastArg->getType() == diffStructLoweredType);
           // auto remappedDiffStructType = differential.mapTypeIntoContext(lastArg->getType());
           // assert(remappedDiffStructType == diffStructLoweredType);
@@ -4474,7 +4469,7 @@ private:
     // (arg0', ..., argn', exit_diffs) -> result'.
     auto &diffBuilder = getDifferentialBuilder();
     auto diffParamArgs =
-    differential.getArgumentsWithoutIndirectResults().drop_back();
+        differential.getArgumentsWithoutIndirectResults().drop_back();
     assert(diffParamArgs.size() ==
            attr->getIndices().parameters->getNumIndices());
     auto origParamArgs = original->getArgumentsWithoutIndirectResults();
@@ -4502,23 +4497,13 @@ private:
     diffBuilder.setInsertionPoint(
         diffEntry, getNextDifferentialLocalAllocationInsertionPoint());
 
+    // Create a mapping of the parameters
     for (auto index : *getIndices().parameters) {
-      auto diffParam = diffParamArgs[index];
-      auto origParam = origParamArgs[index];
-      //      if (diffParam->getType().isAddress()) {
-      //        // Create a local copy so that it can be written to by later adjoint
-      //        // zero'ing logic.
-      //        auto *diffBufCopy =
-      //            diffBuilder.createAllocStack(diffLoc, diffParam->getType());
-      //        diffBuilder.createCopyAddr(diffLoc, diffParam, diffBufCopy, IsNotTake,
-      //                                   IsInitialization);
-      //        if (diffParam->getType().isLoadable(diffBuilder.getFunction()))
-      //          diffBuilder.createRetainValueAddr(diffLoc, diffBufCopy,
-      //                                            diffBuilder.getDefaultAtomicity());
-      //        setTangentBuffer(origEntry, origParam, diffBufCopy);
-      //        differentialLocalAllocations.push_back(diffBufCopy);
-      //      } else {
-      if (!diffParam->getType().isAddress()) {
+      auto *diffParam = diffParamArgs[index];
+      auto *origParam = origParamArgs[index];
+      if (diffParam->getType().isAddress()) {
+        setTangentBuffer(origEntry, origParam, diffParam);
+      } else {
         diffBuilder.createRetainValue(diffLoc, diffParam,
                                       diffBuilder.getDefaultAtomicity());
         setTangentValue(
@@ -4527,6 +4512,17 @@ private:
       LLVM_DEBUG(getADDebugStream()
                  << "Assigned parameter " << *diffParam
                  << " as the tangent of original result " << *origParam);
+    }
+
+    // If there are indirect results, create a mapping
+    auto origIndResults = original->getIndirectResults();
+    auto diffIndResults = differential.getIndirectResults();
+    assert(origIndResults.size() == diffIndResults.size());
+
+    for (auto &origBB : *original) {
+      for (auto i : range(diffIndResults.size())) {
+        setTangentBuffer(&origBB, origIndResults[i], diffIndResults[i]);
+      }
     }
   }
 
@@ -4639,6 +4635,7 @@ public:
     SmallVector<SILValue, 4> entryArgs(entry->getArguments().begin(),
                                        entry->getArguments().end());
     cloneFunctionBody(original, entry, entryArgs);
+    emitReturnInstForDifferential();
     // If errors occurred, back out.
     if (errorOccurred)
       return true;
@@ -4649,27 +4646,27 @@ public:
     return errorOccurred;
   }
 
-      void visit(SILInstruction *inst) {
-        auto diffBuilder = getDifferentialBuilder();
-        if (errorOccurred)
-          return;
-        if (shouldBeDifferentiated(inst, getIndices())) {
-          LLVM_DEBUG(getADDebugStream() << "JVPEmitter visited:\n[ORIG]"
-                     << *inst);
+  void visit(SILInstruction *inst) {
+    auto diffBuilder = getDifferentialBuilder();
+    if (errorOccurred)
+      return;
+    if (shouldBeDifferentiated(inst, getIndices())) {
+      LLVM_DEBUG(getADDebugStream() << "JVPEmitter visited:\n[ORIG]"
+                 << *inst);
 #ifndef NDEBUG
-          auto beforeInsertion = std::prev(diffBuilder.getInsertionPoint());
+      auto beforeInsertion = std::prev(diffBuilder.getInsertionPoint());
 #endif
-          SILInstructionVisitor::visit(inst); // TypeSubstCloner::visit(inst);
-          LLVM_DEBUG({
-            auto &s = llvm::dbgs() << "[DF] Emitted in Differential:\n";
-            auto afterInsertion = diffBuilder.getInsertionPoint();
-            for (auto it = ++beforeInsertion; it != afterInsertion; ++it)
-              s << *it;
-          });
-        } else {
-          SILInstructionVisitor::visit(inst); // TypeSubstCloner::visit(inst);
-        }
-      }
+      SILInstructionVisitor::visit(inst); // TypeSubstCloner::visit(inst);
+      LLVM_DEBUG({
+        auto &s = llvm::dbgs() << "[DF] Emitted in Differential:\n";
+        auto afterInsertion = diffBuilder.getInsertionPoint();
+        for (auto it = ++beforeInsertion; it != afterInsertion; ++it)
+          s << *it;
+      });
+    } else {
+      SILInstructionVisitor::visit(inst); // TypeSubstCloner::visit(inst);
+    }
+  }
 
   void postProcess(SILInstruction *orig, SILInstruction *cloned) {
     if (errorOccurred)
@@ -4936,8 +4933,8 @@ public:
         ri->getLoc(), joinElements(directResults, builder, loc));
 
     // Differential emission.
-    if (shouldBeDifferentiated(ri, getIndices()))
-      emitTangentForReturnInst(ri);
+//    if (shouldBeDifferentiated(ri, getIndices()))
+//      emitTangentForReturnInst(ri);
   }
 
   void visitLoadInst(LoadInst *li) {
