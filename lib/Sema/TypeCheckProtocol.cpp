@@ -4351,17 +4351,8 @@ canSuppressPotentialWitnessWarningWithMovement(ValueDecl *requirement,
   // If the witness is a designated or required initializer, we can't move it
   // to an extension.
   if (auto ctor = dyn_cast<ConstructorDecl>(witness)) {
-    switch (ctor->getInitKind()) {
-    case CtorInitializerKind::Designated:
+    if (ctor->isDesignatedInit() || ctor->isRequired())
       return None;
-
-    case CtorInitializerKind::Convenience:
-    case CtorInitializerKind::ConvenienceFactory:
-    case CtorInitializerKind::Factory:
-      break;
-    }
-
-    if (ctor->isRequired()) return None;
   }
 
   // We can move this entity to an extension.
