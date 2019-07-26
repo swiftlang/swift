@@ -50,7 +50,7 @@ using namespace swift;
 // NOTE: older runtimes called these _SwiftNativeNSXXXBase. The two must
 // coexist, so these were renamed. The old names must not be used in the new
 // runtime.
-% for Class in ('Array', 'Dictionary', 'Set', 'String', 'Enumerator', 'Data', 'IndexSet'):
+% for Class in ('Array', 'Dictionary', 'Set', 'String', 'Enumerator'):
 SWIFT_RUNTIME_STDLIB_API
 @interface __SwiftNativeNS${Class}Base : NS${Class}
 {
