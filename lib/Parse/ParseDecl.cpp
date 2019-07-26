@@ -6514,6 +6514,7 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
                                            throwsLoc.isValid(), throwsLoc,
                                            Params.get(), nullptr,
                                            CurDeclContext);
+  CD->getAttrs() = Attributes;
 
   // Parse a 'where' clause if present, adding it to our GenericParamList.
   if (Tok.is(tok::kw_where)) {
@@ -6555,8 +6556,6 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   } else {
     parseAbstractFunctionBody(CD);
   }
-
-  CD->getAttrs() = Attributes;
 
   return makeParserResult(CD);
 }
