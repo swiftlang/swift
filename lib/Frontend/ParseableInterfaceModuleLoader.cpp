@@ -224,8 +224,7 @@ static bool serializedASTLooksValid(const llvm::MemoryBuffer &buf) {
 
 static std::unique_ptr<llvm::MemoryBuffer> getBufferOfDependency(
   llvm::vfs::FileSystem &fs, StringRef depPath) {
-  auto depBuf = fs.getBufferForFile(depPath, /*FileSize=*/-1,
-                                    /*RequiresNullTerminator=*/false);
+  auto depBuf = fs.getBufferForFile(depPath);
   if (!depBuf) {
     return nullptr;
   }

@@ -17,60 +17,32 @@
 using namespace swift;
 
 llvm::ErrorOr<llvm::vfs::Status>
-FileManager::status(StringRef path) {
-  llvm::vfs::Status status;
-  auto error = clang::FileSystemStatCache::get(path, status, /*isFile*/true,
-                                               /*File*/nullptr, &cachedStats,
-                                               *fileSystem);
-  if (error)
-    return error;
-
-  return status;
+FileManager::status(StringRef path, bool isDirectory) {
+  return clangManager->getStatus(path, isDirectory);
 }
 
 StringRef FileManager::getCachedFilename(StringRef path) {
-  llvm::vfs::Status stats;
-  auto stat = status(path);
-  if (!stat)
-    return path;
-  return cachedStats.StatCalls[path].getName();
+  auto file = clangManager->getFile(path);
+  if (!file) return path;
+  return file->getName();
 }
 
 llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>
-FileManager::getBufferForFile(StringRef path, int64_t fileSize,
-                              bool requiresNullTerminator,
-                              bool isVolatile) {
-
-  llvm::vfs::Status status;
-  std::unique_ptr<llvm::vfs::File> file;
-  auto error =
-    clang::FileSystemStatCache::get(path, status, /*isFile*/true,
-                                    &file, &cachedStats,
-                                    *fileSystem);
-  if (error)
-    return error;
-
-  auto buf = file->getBuffer(path, fileSize, requiresNullTerminator,
-                             isVolatile);
-  if (!buf) return buf.getError();
-  return buf;
+FileManager::getBufferForFile(StringRef path, bool isVolatile) {
+  return clangManager->getBufferForFile(path, isVolatile);
 }
 
 llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>
-FileManager::getBufferForFileOrSTDIN(StringRef path, int64_t fileSize,
-                              bool requiresNullTerminator,
-                              bool isVolatile) {
+FileManager::getBufferForFileOrSTDIN(StringRef path, bool isVolatile) {
   if (path == "-")
     return llvm::MemoryBuffer::getSTDIN();
-  return getBufferForFile(path, fileSize, requiresNullTerminator,
-                          isVolatile);
+  return getBufferForFile(path, isVolatile);
 }
 
 std::error_code FileManager::remove(StringRef path) {
-  auto err = llvm::sys::fs::remove(path);
-  if (err) return err;
-  cachedStats.StatCalls.erase(path);
-  return {};
+  auto file = clangManager->getFileOrError(path);
+  if (!file) return file.getError();
+  (*file
 }
 
 bool FileManager::exists(StringRef path) {

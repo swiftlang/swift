@@ -14,7 +14,7 @@
 #define SWIFT_BASIC_FILEMANAGER_H
 
 #include "swift/Basic/LLVM.h"
-#include "clang/Basic/FileSystemStatCache.h"
+#include "clang/Basic/FileManager.h"
 #include "llvm/Support/Errc.h"
 #include "llvm/Support/VirtualFileSystem.h"
 
@@ -22,6 +22,10 @@ namespace llvm {
 namespace vfs {
 class FileSystem;
 }
+}
+
+namespace clang {
+class FileManager;
 }
 
 namespace swift {
@@ -32,42 +36,38 @@ namespace swift {
 class FileManager: public llvm::RefCountedBase<FileManager> {
 private:
   friend class SourceManager;
-  clang::MemorizeStatCalls cachedStats;
-  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fileSystem;
+
+  clang::FileSystemOptions FileSystemOpts;
+  llvm::IntrusiveRefCntPtr<clang::FileManager> clangManager;
   StringRef getCachedFilename(StringRef path);
 public:
   FileManager(llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fs =
-              llvm::vfs::getRealFileSystem())
-    : fileSystem(fs) {}
+              llvm::vfs::getRealFileSystem()) {}
 
   llvm::vfs::FileSystem &getFileSystem() {
-    return *fileSystem;
+    return *clangManager->getVirtualFileSystem();
   }
 
   /// Sets the file system which will be used for file operations.
   /// Setting this will clear the stat cache.
   void setFileSystem(llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fs) {
-    fileSystem = fs;
-    cachedStats = {};
+    clangManager = new clang::FileManager(FileSystemOpts, fs);
   }
 
   /// Gets and caches the filesystem status for the provided path.
-  llvm::ErrorOr<llvm::vfs::Status> status(StringRef path);
+  llvm::ErrorOr<llvm::vfs::Status>
+  status(StringRef path, bool isDirectory = false);
 
   /// Opens the file at the provided path and returns a buffer of that file's
   /// contents. The file's status will be cached just before reading the file.
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>
-  getBufferForFile(StringRef path, int64_t fileSize = -1,
-                   bool requiresNullTerminator = true,
-                   bool isVolatile = false);
+  getBufferForFile(StringRef path, bool isVolatile = false);
 
   /// Opens the file at the provided path (or reads from stdin, if the provided
   /// path is '-') and returns a buffer of that file's contents. The file's
   /// status will be cached just before reading the file.
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>
-  getBufferForFileOrSTDIN(StringRef path, int64_t fileSize = -1,
-                          bool requiresNullTerminator = true,
-                          bool isVolatile = false);
+  getBufferForFileOrSTDIN(StringRef path, bool isVolatile = false);
 
   /// Removes the file at the provided path and removes the cached status value.
   std::error_code remove(StringRef path);

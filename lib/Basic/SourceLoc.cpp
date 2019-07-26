@@ -44,7 +44,7 @@ StringRef SourceManager::getDisplayNameForLoc(SourceLoc Loc) const {
   if (auto VFile = getVirtualFile(Loc))
     return VFile->Name;
 
-  // Otherwise, ask the file manager and cache the result
+  // Otherwise, ask the file manager which will cache the result
   auto Ident = getIdentifierForBuffer(findBufferContainingLoc(Loc));
   return FileMgr->getCachedFilename(Ident);
 }
