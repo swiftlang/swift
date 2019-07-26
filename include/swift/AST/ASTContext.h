@@ -902,6 +902,18 @@ public:
   GenericSignature *getOverrideGenericSignature(ValueDecl *base,
                                                 ValueDecl *derived);
 
+  enum class OverrideGenericSignatureReqCheck {
+    /// Base method's generic requirements are satisifed by derived method
+    BaseReqSatisfiedByDerived,
+
+    /// Derived method's generic requirements are satisifed by base method
+    DerivedReqSatisfiedByBase
+  };
+
+  bool overrideGenericSignatureReqsSatisfied(
+      ValueDecl *base, ValueDecl *derived,
+      OverrideGenericSignatureReqCheck direction);
+
   /// Whether our effective Swift version is at least 'major'.
   ///
   /// This is usually the check you want; for example, when introducing

@@ -111,16 +111,15 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
 
   // If base method's generic requirements are not satisfied by the derived
   // method then we need a thunk.
-  auto sig = getASTContext().getOverrideGenericSignature(base.getDecl(),
-                                                         derived.getDecl());
-  auto derivedSig =
-      derived.getDecl()->getAsGenericContext()->getGenericSignature();
-  auto needsThunk = sig && !sig->requirementsNotSatisfiedBy(derivedSig).empty();
+  using Direction = ASTContext::OverrideGenericSignatureReqCheck;
+  auto doesNotHaveGenericRequirementDifference =
+      getASTContext().overrideGenericSignatureReqsSatisfied(
+          baseDecl, derivedDecl, Direction::BaseReqSatisfiedByDerived);
 
   // The override member type is semantically a subtype of the base
   // member type. If the override is ABI compatible, we do not need
   // a thunk.
-  if (!needsThunk && !baseLessVisibleThanDerived &&
+  if (doesNotHaveGenericRequirementDifference && !baseLessVisibleThanDerived &&
       M.Types.checkFunctionForABIDifferences(derivedInfo.SILFnType,
                                              overrideInfo.SILFnType) ==
           TypeConverter::ABIDifference::Trivial)

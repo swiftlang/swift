@@ -4487,6 +4487,23 @@ GenericSignature *ASTContext::getOverrideGenericSignature(ValueDecl *base,
   return genericSig;
 }
 
+bool ASTContext::overrideGenericSignatureReqsSatisfied(
+    ValueDecl *base, ValueDecl *derived,
+    OverrideGenericSignatureReqCheck direction) {
+  auto sig = getOverrideGenericSignature(base, derived);
+  if (!sig)
+    return false;
+
+  auto derivedSig = derived->getAsGenericContext()->getGenericSignature();
+
+  switch (direction) {
+  case OverrideGenericSignatureReqCheck::BaseReqSatisfiedByDerived:
+    return sig->requirementsNotSatisfiedBy(derivedSig).empty();
+  case OverrideGenericSignatureReqCheck::DerivedReqSatisfiedByBase:
+    return derivedSig->requirementsNotSatisfiedBy(sig).empty();
+  }
+}
+
 SILLayout *SILLayout::get(ASTContext &C,
                           CanGenericSignature Generics,
                           ArrayRef<SILField> Fields) {
