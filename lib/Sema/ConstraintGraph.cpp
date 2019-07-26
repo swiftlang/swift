@@ -497,18 +497,8 @@ void ConstraintGraph::gatherConstraints(
         break;
       }
 
-      ArrayRef<TypeVariableType *> adjTypeVarsToVisit;
-      switch (kind) {
-      case GatheringKind::EquivalenceClass:
-        adjTypeVarsToVisit = adjTypeVar;
-        break;
-
-      case GatheringKind::AllMentions:
-        adjTypeVarsToVisit
+      ArrayRef<TypeVariableType *> adjTypeVarsToVisit =
           = (*this)[CS.getRepresentative(adjTypeVar)].getEquivalenceClass();
-        break;
-      }
-
       for (auto adjTypeVarEquiv : adjTypeVarsToVisit) {
         if (!typeVars.insert(adjTypeVarEquiv).second)
           continue;
