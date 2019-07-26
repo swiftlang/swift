@@ -4492,7 +4492,7 @@ bool ASTContext::overrideGenericSignatureReqsSatisfied(
     OverrideGenericSignatureReqCheck direction) {
   auto sig = getOverrideGenericSignature(base, derived);
   if (!sig)
-    return false;
+    return true;
 
   auto derivedSig = derived->getAsGenericContext()->getGenericSignature();
 
