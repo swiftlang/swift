@@ -275,7 +275,9 @@ static bool isDefaultCaseKnown(ClassHierarchyAnalysis *CHA,
                                ClassDecl *CD,
                                ClassHierarchyAnalysis::ClassList &Subs) {
   ClassMethodInst *CMI = cast<ClassMethodInst>(AI.getCallee());
-  auto *Method = CMI->getMember().getFuncDecl();
+  auto *Method = CMI->getMember().getAbstractFunctionDecl();
+  assert(Method && "not a function");
+
   const DeclContext *DC = AI.getModule().getAssociatedContext();
 
   if (CD->isFinal())
