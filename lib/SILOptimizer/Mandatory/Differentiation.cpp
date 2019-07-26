@@ -4154,7 +4154,9 @@ private:
         ri->getLoc(), tanParam);
   }
 
-  void emitTangentForApplyInst(ApplyInst *ai, SILAutoDiffIndices indices) {
+  void emitTangentForApplyInst(
+      ApplyInst *ai, SILAutoDiffIndices indices,
+      CanSILFunctionType originalDifferentialType) {
     auto *bb = ai->getParent();
     auto loc = ai->getLoc();
     auto diffBuilder = getDifferentialBuilder();
@@ -4164,6 +4166,8 @@ private:
     assert(field);
     SILValue differential = diffBuilder.createStructExtract(
         loc, getDifferentialStructArgument(ai->getParent()), field);
+    auto differentialType =
+        remapType(differential->getType()).castTo<SILFunctionType>();
 
     SmallVector<SILValue, 8> diffArgs;
     for (auto origArg : ai->getArguments()) {
@@ -4192,9 +4196,18 @@ private:
       diffArgs.push_back(tanParam);
     }
 
-    // TODO: Reabstract the differential.
-    // See code from "If pullback was reabstracted in VJP, reabstract pullback
-    // in adjoint.".
+    // If callee pullback was reabstracted in VJP, reabstract callee pullback.
+    if (!differentialType->isEqual(originalDifferentialType)) {
+      SILOptFunctionBuilder fb(context.getTransform());
+      auto *thunk = getOrCreateReabstractionThunk(
+          fb, context.getModule(), loc, &getDifferential(),
+          differentialType, originalDifferentialType);
+      auto *thunkRef = diffBuilder.createFunctionRef(loc, thunk);
+      differential = diffBuilder.createPartialApply(
+         loc, thunkRef,
+         remapSubstitutionMap(thunk->getForwardingSubstitutionMap()),
+         {differential}, differentialType->getCalleeConvention());
+    }
 
     // Call the differential.
     auto *differentialCall = diffBuilder.createApply(
@@ -4203,13 +4216,18 @@ private:
     assert(differentialCall->getNumResults() == 1 &&
            "Expected differential to return one result");
 
-    // TODO: Generalize for indirect results, multiple results, etc
-    auto origResult = ai->getResult(indices.source);
+    // Get the original results of the `apply` instructions.
+    SmallVector<SILValue, 8> origDirResults;
+    collectAllExtractedElements(ai, origDirResults);
+    SmallVector<SILValue, 8> origAllResults;
+    collectAllActualResultsInTypeOrder(
+        ai, origDirResults, ai->getIndirectSILResults(),
+        origAllResults);
+    auto origResult = origAllResults[indices.source];
 
-    // Extract all direct results from the differential.
+    // Get the differential results of the `apply` instructions.
     SmallVector<SILValue, 8> differentialDirResults;
-    extractAllElements(differentialCall, diffBuilder, differentialDirResults);
-    // Get all differential results in type-defined order.
+    collectAllExtractedElements(differentialCall, differentialDirResults);
     SmallVector<SILValue, 8> differentialAllResults;
     collectAllActualResultsInTypeOrder(
         differentialCall, differentialDirResults,
@@ -4217,19 +4235,21 @@ private:
     auto differentialResult = differentialAllResults[indices.source];
 
     // Add tangent for original result.
+    // TODO: what about indirect results?
     assert(indices.source == 0 && "Expected result index to be first.");
-    setTangentValue(bb, origResult,
-                    makeConcreteTangentValue(differentialResult));
+    if (origResult->getType().isObject())
+      setTangentValue(bb, origResult,
+                      makeConcreteTangentValue(differentialResult));
 
     // TODO: handle indirect
     // Add the tangent value of the result of the apply instruction.
-    //    auto tanVal = makeConcreteAdjointValue(
-    //        ValueWithCleanup(originalDirectResult,
-    //        makeCleanup(originalDirectResult, emitCleanup, {})));
-    //    for (auto dirRes : ai->getResults())
-    //      addTangentValue(bb, originalDirectResult, tanVal);
-    //    for (auto indRes : ai->getIndirectSILResults())
-    //      ;
+//    auto tanVal = makeConcreteAdjointValue(
+//        ValueWithCleanup(originalDirectResult,
+//        makeCleanup(originalDirectResult, emitCleanup, {})));
+//    for (auto dirRes : ai->getResults())
+//      addTangentValue(bb, originalDirectResult, tanVal);
+//    for (auto indRes : ai->getIndirectSILResults())
+//      ;
   }
 
   /// Handle `struct_extract` instruction.
@@ -4435,7 +4455,8 @@ private:
         Lowering::GenericContextScope genericContextScope(
             context.getTypeConverter(), diffGenSig);
         auto diffStructLoweredType =
-            remapTypeInDifferential(differentialInfo.getLinearMapStructLoweredType(&origBB));
+            remapTypeInDifferential(
+                differentialInfo.getLinearMapStructLoweredType(&origBB));
 
         // If the BB is the original entry, then the differential block that we
         // just created must be the differential function's entry. Create
@@ -4844,14 +4865,6 @@ public:
           /*differentiationOrder*/ 1, autoDiffFuncInst);
     }
 
-    // Record desired/actual JVP indices.
-    // Temporarily set original differential type to `None`.
-    // TODO: Don't construct `NestedApplyInfo` - use fields directly
-    NestedApplyInfo info{indices, /*originalDifferentialType*/ None};
-    auto insertion = context.getNestedApplyInfo().try_emplace(ai, info);
-    auto &nestedApplyInfo = insertion.first->getSecond();
-    nestedApplyInfo = info;
-
     // Call the JVP using the original parameters.
     SmallVector<SILValue, 8> jvpArgs;
     auto jvpFnTy = getOpType(jvpValue->getType()).castTo<SILFunctionType>();
@@ -4894,12 +4907,41 @@ public:
 
     // Add the differential function for when we create the struct we partially
     // apply to the differential we are generating.
-    auto diffFunc = jvpDirectResults.back();
-    differentialInfo.addLinearMapDecl(ai, getOpType(diffFunc->getType()));
-    differentialValues[ai->getParent()].push_back(diffFunc);
+    auto differential = jvpDirectResults.back();
+    auto *differentialDecl = differentialInfo.addLinearMapDecl(
+        ai, getOpType(differential->getType()));
+    auto originalDifferentialType =
+        getOpType(differential->getType()).getAs<SILFunctionType>();
+    auto differentialType =
+        remapTypeInDifferential(differential->getType())
+            .castTo<SILFunctionType>();
+    auto jvpGenSig = SubsMap.getGenericSignature()
+        ? SubsMap.getGenericSignature()->getCanonicalSignature()
+        : nullptr;
+    Lowering::GenericContextScope genericContextScope(
+        context.getTypeConverter(), jvpGenSig);
+    auto loweredDifferentialType =
+        getOpType(context.getTypeConverter().getLoweredType(
+            differentialDecl->getInterfaceType()->getCanonicalType(),
+            ResilienceExpansion::Minimal))
+            .castTo<SILFunctionType>();
+    // If actual differential type does not match lowered differential type,
+    // reabstract the differential using a thunk.
+    if (!loweredDifferentialType->isEqual(originalDifferentialType)) {
+      SILOptFunctionBuilder fb(context.getTransform());
+      auto *thunk = getOrCreateReabstractionThunk(
+          fb, context.getModule(), loc, &getDifferential(),
+          differentialType, loweredDifferentialType);
+      auto *thunkRef = builder.createFunctionRef(loc, thunk);
+      differential = builder.createPartialApply(
+          loc, thunkRef,
+          remapSubstitutionMap(thunk->getForwardingSubstitutionMap()),
+          {differential}, differentialType->getCalleeConvention());
+    }
+    differentialValues[ai->getParent()].push_back(differential);
 
     // Differential emission.
-    emitTangentForApplyInst(ai, indices);
+    emitTangentForApplyInst(ai, indices, originalDifferentialType);
   }
 
   void visitReturnInst(ReturnInst *ri) {
@@ -4917,10 +4959,10 @@ public:
     // Get and partially apply the differential.
     auto jvpGenericEnv = jvp->getGenericEnvironment();
     auto jvpSubstMap = jvpGenericEnv
-    ? jvpGenericEnv->getForwardingSubstitutionMap()
-    : jvp->getForwardingSubstitutionMap();
+        ? jvpGenericEnv->getForwardingSubstitutionMap()
+        : jvp->getForwardingSubstitutionMap();
     auto *differentialRef =
-    builder.createFunctionRef(loc, &getDifferential());
+        builder.createFunctionRef(loc, &getDifferential());
     auto *differentialPartialApply = builder.createPartialApply(
         loc, differentialRef, jvpSubstMap, {diffStructVal},
         ParameterConvention::Direct_Guaranteed);
@@ -4931,10 +4973,6 @@ public:
     directResults.push_back(differentialPartialApply);
     builder.createReturn(
         ri->getLoc(), joinElements(directResults, builder, loc));
-
-    // Differential emission.
-//    if (shouldBeDifferentiated(ri, getIndices()))
-//      emitTangentForReturnInst(ri);
   }
 
   void visitLoadInst(LoadInst *li) {
