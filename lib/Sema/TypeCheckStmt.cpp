@@ -2068,7 +2068,6 @@ static void checkClassConstructorBody(ClassDecl *classDecl,
                    ctor->getDeclContext()->getDeclaredInterfaceType())
       .fixItInsert(ctor->getLoc(), "convenience ");
     ctx.Diags.diagnose(initExpr->getLoc(), diag::delegation_here);
-    ctor->setInitKind(CtorInitializerKind::Convenience);
   }
 
   // An inlinable constructor in a class must always be delegating,
