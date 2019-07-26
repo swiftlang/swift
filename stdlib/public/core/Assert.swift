@@ -297,6 +297,22 @@ internal func _internalInvariant(
 #endif
 }
 
+// Only perform the invariant check on Swift 5.1 and later
+@_alwaysEmitIntoClient // Swift 5.1
+@_transparent
+internal func _internalInvariant_5_1(
+  _ condition: @autoclosure () -> Bool, _ message: StaticString = StaticString(),
+  file: StaticString = #file, line: UInt = #line
+) {
+#if INTERNAL_CHECKS_ENABLED
+  // FIXME: The below won't run the assert on 5.1 stdlib if testing on older
+  // OSes, which means that testing may not test the assertion. We need a real
+  // solution to this.
+  guard #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) else { return }
+  _internalInvariant(condition(), message, file: file, line: line)
+#endif
+}
+
 @usableFromInline @_transparent
 internal func _internalInvariantFailure(
   _ message: StaticString = StaticString(),
