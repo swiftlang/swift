@@ -113,7 +113,9 @@ if(SWIFT_STDLIB_ENABLE_SIB_TARGETS)
 endif()
 swift_create_stdlib_targets("swift-test-stdlib" "" FALSE)
 
+# FIXME: Include the toolchain directory before the public directory. Otherwise
+# the clang resource directory symlink stops installing correctly.
+add_subdirectory(toolchain)
 add_subdirectory(public)
 add_subdirectory(private)
-add_subdirectory(toolchain)
 add_subdirectory(tools)
