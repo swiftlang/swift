@@ -1,4 +1,4 @@
-//===--- swift_format_main.cpp - Swift code formatting tool ---------------===//
+//===--- swift_indent_main.cpp - Swift code formatting tool ---------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -18,7 +18,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
-#include "swift/IDE/Formatting.h"
+#include "swift/IDE/Indenting.h"
 #include "swift/Option/Options.h"
 #include "swift/Subsystems.h"
 #include "llvm/Option/Arg.h"
@@ -79,7 +79,7 @@ public:
   }
 };
 
-class SwiftFormatInvocation {
+class SwiftIndentInvocation {
 private:
   std::string MainExecutablePath;
   std::string OutputFilename = "-";
@@ -95,7 +95,7 @@ private:
   }
 
 public:
-  SwiftFormatInvocation(const std::string &ExecPath)
+  SwiftIndentInvocation(const std::string &ExecPath)
       : MainExecutablePath(ExecPath) {}
 
   const std::string &getOutputFilename() { return OutputFilename; }
@@ -111,7 +111,7 @@ public:
     unsigned MissingIndex;
     unsigned MissingCount;
     llvm::opt::InputArgList ParsedArgs =
-        Table->ParseArgs(Args, MissingIndex, MissingCount, SwiftFormatOption);
+        Table->ParseArgs(Args, MissingIndex, MissingCount, SwiftIndentOption);
     if (MissingCount) {
       Diags.diagnose(SourceLoc(), diag::error_missing_arg_value,
                      ParsedArgs.getArgString(MissingIndex), MissingCount);
@@ -151,7 +151,7 @@ public:
     if (ParsedArgs.getLastArg(OPT_help)) {
       std::string ExecutableName = llvm::sys::path::stem(MainExecutablePath);
       Table->PrintHelp(llvm::outs(), ExecutableName.c_str(),
-                       "Swift Format Tool", options::SwiftFormatOption, 0,
+                       "Swift Format Tool", options::SwiftIndentOption, 0,
                        /*ShowAllAliases*/false);
       return 1;
     }
@@ -234,13 +234,13 @@ public:
   }
 };
 
-int swift_format_main(ArrayRef<const char *> Args, const char *Argv0,
+int swift_indent_main(ArrayRef<const char *> Args, const char *Argv0,
                       void *MainAddr) {
   CompilerInstance Instance;
   PrintingDiagnosticConsumer PDC;
   Instance.addDiagnosticConsumer(&PDC);
 
-  SwiftFormatInvocation Invocation(
+  SwiftIndentInvocation Invocation(
       llvm::sys::fs::getMainExecutable(Argv0, MainAddr));
 
   DiagnosticEngine &Diags = Instance.getDiags();

@@ -1,4 +1,4 @@
-//===--- Formatting.h -------------------------------------------*- C++ -*-===//
+//===--- Indenting.h --------------------------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_FORMATTING_H
-#define SWIFT_FORMATTING_H
+#ifndef SWIFT_INDENTING_H
+#define SWIFT_INDENTING_H
 
 namespace swift {
 namespace ide {
@@ -101,4 +101,4 @@ std::pair<LineRange, std::string> reformat(LineRange Range,
 } // namespace ide
 } // namespace swift
 
-#endif // LLVM_SWIFT_FORMATTING_H
+#endif // SWIFT_INDENTING_H
