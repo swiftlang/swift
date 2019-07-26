@@ -1799,6 +1799,8 @@ public:
                                 FragileFunctionKind Kind,
                                 bool TreatUsableFromInlineAsPublic);
 
+  Expr *buildDefaultInitializer(Type type);
+  
 private:
   bool diagnoseInlinableDeclRefAccess(SourceLoc loc, const ValueDecl *D,
                                       const DeclContext *DC,
