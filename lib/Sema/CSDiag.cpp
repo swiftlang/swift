@@ -741,7 +741,6 @@ void FailureDiagnosis::diagnoseUnviableLookupResults(
       return;
 
     switch (firstProblem) {
-    case MemberLookupResult::UR_LabelMismatch:
     case MemberLookupResult::UR_WritableKeyPathOnReadOnlyMember:
     case MemberLookupResult::UR_ReferenceWritableKeyPathOnMutatingMember:
     case MemberLookupResult::UR_KeyPathWithAnyObjectRootType:
@@ -4192,7 +4191,7 @@ bool FailureDiagnosis::diagnoseTrailingClosureErrors(ApplyExpr *callExpr) {
   };
 
   SmallPtrSet<TypeBase *, 4> possibleTypes;
-  auto currentType = CS.getType(fnExpr);
+  auto currentType = CS.simplifyType(CS.getType(fnExpr));
 
   // If current type has type variables or unresolved types
   // let's try to re-typecheck it to see if we can get some

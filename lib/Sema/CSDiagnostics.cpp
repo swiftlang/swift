@@ -33,6 +33,7 @@
 #include "swift/Parse/Lexer.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallString.h"
+#include <string>
 
 using namespace swift;
 using namespace constraints;
@@ -689,6 +690,46 @@ bool LabelingFailure::diagnoseAsError() {
 
   return diagnoseArgumentLabelError(cs.getASTContext(), argExpr, CorrectLabels,
                                     isa<SubscriptExpr>(anchor));
+}
+
+bool LabelingFailure::diagnoseAsNote() {
+  auto *anchor = getRawAnchor();
+
+  auto *argExpr = getArgumentExprFor(anchor);
+  if (!argExpr)
+    return false;
+
+  SmallVector<Identifier, 4> argLabels;
+  if (auto *paren = dyn_cast<ParenExpr>(argExpr)) {
+    argLabels.push_back(Identifier());
+  } else if (auto *tuple = dyn_cast<TupleExpr>(argExpr)) {
+    argLabels.append(tuple->getElementNames().begin(),
+                     tuple->getElementNames().end());
+  } else {
+    return false;
+  }
+
+  auto stringifyLabels = [](ArrayRef<Identifier> labels) -> std::string {
+    std::string str;
+    for (auto label : labels) {
+      str += label.empty() ? "_" : label.str();
+      str += ':';
+    }
+    return "(" + str + ")";
+  };
+
+  auto selectedOverload = getChoiceFor(anchor);
+  if (!selectedOverload)
+    return false;
+
+  const auto &choice = selectedOverload->choice;
+  if (auto *decl = choice.getDeclOrNull()) {
+    emitDiagnostic(decl, diag::candidate_expected_different_labels,
+                   stringifyLabels(argLabels), stringifyLabels(CorrectLabels));
+    return true;
+  }
+
+  return false;
 }
 
 bool NoEscapeFuncToTypeConversionFailure::diagnoseAsError() {
