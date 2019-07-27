@@ -1959,6 +1959,9 @@ bool AbstractStorageDecl::requiresOpaqueModifyCoroutine() const {
 
 void AbstractStorageDecl::visitExpectedOpaqueAccessors(
                         llvm::function_ref<void (AccessorKind)> visit) const {
+  if (!requiresOpaqueAccessors())
+    return;
+
   if (requiresOpaqueGetter())
     visit(AccessorKind::Get);
 

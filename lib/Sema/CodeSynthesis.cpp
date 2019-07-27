@@ -1317,13 +1317,9 @@ static void addOpaqueAccessorToStorage(AbstractStorageDecl *storage,
   }
 }
 
-static void addExpectedOpaqueAccessorsToStorage(AbstractStorageDecl *storage,
-                                                ASTContext &ctx) {
-  // Nameless vars from interface files should not have any accessors.
-  // TODO: Replace this check with a broader check that all storage decls
-  //       from interface files have all their accessors up front.
-  if (storage->getBaseName().empty())
-    return;
+void swift::addExpectedOpaqueAccessorsToStorage(AbstractStorageDecl *storage) {
+  auto &ctx = storage->getASTContext();
+
   storage->visitExpectedOpaqueAccessors([&](AccessorKind kind) {
     // If the accessor is already present, there's nothing to do.
     if (storage->getAccessor(kind))
@@ -1782,7 +1778,7 @@ static VarDecl *synthesizePropertyWrapperStorageWrapperProperty(
     property->setImplInfo(StorageImplInfo::getMutableComputed());
   else
     property->setImplInfo(StorageImplInfo::getImmutableComputed());
-  addExpectedOpaqueAccessorsToStorage(property, ctx);
+  addExpectedOpaqueAccessorsToStorage(property);
 
   var->getAttrs().add(
       new (ctx) ProjectedValuePropertyAttr(name, SourceLoc(), SourceRange(),
@@ -2061,7 +2057,7 @@ static bool wouldBeCircularSynthesis(AbstractStorageDecl *storage,
 
 void swift::triggerAccessorSynthesis(TypeChecker &TC,
                                      AbstractStorageDecl *storage) {
-  maybeAddAccessorsToStorage(storage);
+  addExpectedOpaqueAccessorsToStorage(storage);
 
   // Trigger accessor synthesis.
   storage->visitExpectedOpaqueAccessors([&](AccessorKind kind) {
@@ -2418,6 +2414,12 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
 llvm::Expected<bool>
 RequiresOpaqueAccessorsRequest::evaluate(Evaluator &evaluator,
                                          VarDecl *var) const {
+  // Nameless vars from interface files should not have any accessors.
+  // TODO: Replace this check with a broader check that all storage decls
+  //       from interface files have all their accessors up front.
+  if (var->getBaseName().empty())
+    return false;
+
   // Computed properties always require opaque accessors.
   if (!var->getImplInfo().isSimpleStored())
     return true;
@@ -2488,15 +2490,6 @@ RequiresOpaqueModifyCoroutineRequest::evaluate(Evaluator &evaluator,
       return false;
 
   return true;
-}
-
-/// Try to add the appropriate accessors required a storage declaration.
-/// This needs to be idempotent.
-void swift::maybeAddAccessorsToStorage(AbstractStorageDecl *storage) {
-  if (storage->requiresOpaqueAccessors()) {
-    auto &ctx = storage->getASTContext();
-    addExpectedOpaqueAccessorsToStorage(storage, ctx);
-  }
 }
 
 static std::pair<BraceStmt *, bool>
