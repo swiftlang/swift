@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 extension vDSP {
     
     // MARK: Integer to floating-point conversion
@@ -18,8 +19,7 @@ extension vDSP {
     ///
     /// - Parameter source: Source vector.
     /// - Parameter destination: Destination vector.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func convertElements<U, V>(of source: U,
                                              to destination: inout V)
         where
@@ -45,8 +45,7 @@ extension vDSP {
     ///
     /// - Parameter source: Source vector.
     /// - Parameter destination: Destination vector.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func convertElements<U, V>(of source: U,
                                              to destination: inout V)
         where
@@ -72,8 +71,7 @@ extension vDSP {
     ///
     /// - Parameter source: Source vector.
     /// - Parameter destination: Destination vector.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func convertElements<U, V>(of source: U,
                                              to destination: inout V)
         where
@@ -99,8 +97,7 @@ extension vDSP {
     ///
     /// - Parameter source: Source vector.
     /// - Parameter destination: Destination vector.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func convertElements<U, V>(of source: U,
                                              to destination: inout V)
         where
@@ -126,8 +123,7 @@ extension vDSP {
     ///
     /// - Parameter source: Source vector.
     /// - Parameter destination: Destination vector.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func convertElements<U, V>(of source: U,
                                              to destination: inout V)
         where
@@ -153,8 +149,7 @@ extension vDSP {
     ///
     /// - Parameter source: Source vector.
     /// - Parameter destination: Destination vector.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func convertElements<U, V>(of source: U,
                                              to destination: inout V)
         where
@@ -180,8 +175,7 @@ extension vDSP {
     ///
     /// - Parameter source: Source vector.
     /// - Parameter destination: Destination vector.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func convertElements<U, V>(of source: U,
                                              to destination: inout V)
         where
@@ -207,8 +201,7 @@ extension vDSP {
     ///
     /// - Parameter source: Source vector.
     /// - Parameter destination: Destination vector.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func convertElements<U, V>(of source: U,
                                              to destination: inout V)
         where
@@ -234,8 +227,7 @@ extension vDSP {
     ///
     /// - Parameter source: Source vector.
     /// - Parameter destination: Destination vector.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func convertElements<U, V>(of source: U,
                                              to destination: inout V)
         where
@@ -261,8 +253,7 @@ extension vDSP {
     ///
     /// - Parameter source: Source vector.
     /// - Parameter destination: Destination vector.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func convertElements<U, V>(of source: U,
                                              to destination: inout V)
         where
@@ -288,8 +279,7 @@ extension vDSP {
     ///
     /// - Parameter source: Source vector.
     /// - Parameter destination: Destination vector.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func convertElements<U, V>(of source: U,
                                              to destination: inout V)
         where
@@ -315,8 +305,7 @@ extension vDSP {
     ///
     /// - Parameter source: Source vector.
     /// - Parameter destination: Destination vector.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func convertElements<U, V>(of source: U,
                                              to destination: inout V)
         where
@@ -339,7 +328,6 @@ extension vDSP {
     }
     
     // MARK: Floating-point to integer conversion
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public enum RoundingMode {
         case towardZero
         case towardNearestInteger
@@ -349,8 +337,6 @@ extension vDSP {
     ///
     /// - Parameter source: Source vector.
     /// - Parameter destination: Destination vector.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func convertElements<U, V>(of source: U,
                                              to destination: inout V,
                                              rounding: RoundingMode)
@@ -382,8 +368,6 @@ extension vDSP {
     ///
     /// - Parameter source: Source vector.
     /// - Parameter destination: Destination vector.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func convertElements<U, V>(of source: U,
                                              to destination: inout V,
                                              rounding: RoundingMode)
@@ -415,8 +399,6 @@ extension vDSP {
     ///
     /// - Parameter source: Source vector.
     /// - Parameter destination: Destination vector.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func convertElements<U, V>(of source: U,
                                              to destination: inout V,
                                              rounding: RoundingMode)
@@ -448,8 +430,6 @@ extension vDSP {
     ///
     /// - Parameter source: Source vector.
     /// - Parameter destination: Destination vector.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func convertElements<U, V>(of source: U,
                                              to destination: inout V,
                                              rounding: RoundingMode)
@@ -481,8 +461,6 @@ extension vDSP {
     ///
     /// - Parameter source: Source vector.
     /// - Parameter destination: Destination vector.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func convertElements<U, V>(of source: U,
                                              to destination: inout V,
                                              rounding: RoundingMode)
@@ -514,8 +492,6 @@ extension vDSP {
     ///
     /// - Parameter source: Source vector.
     /// - Parameter destination: Destination vector.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func convertElements<U, V>(of source: U,
                                              to destination: inout V,
                                              rounding: RoundingMode)
@@ -548,8 +524,6 @@ extension vDSP {
     ///
     /// - Parameter source: Source vector.
     /// - Parameter destination: Destination vector.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func convertElements<U, V>(of source: U,
                                              to destination: inout V,
                                              rounding: RoundingMode)
@@ -581,8 +555,6 @@ extension vDSP {
     ///
     /// - Parameter source: Source vector.
     /// - Parameter destination: Destination vector.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func convertElements<U, V>(of source: U,
                                              to destination: inout V,
                                              rounding: RoundingMode)
@@ -614,8 +586,6 @@ extension vDSP {
     ///
     /// - Parameter source: Source vector.
     /// - Parameter destination: Destination vector.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func convertElements<U, V>(of source: U,
                                              to destination: inout V,
                                              rounding: RoundingMode)
@@ -647,8 +617,6 @@ extension vDSP {
     ///
     /// - Parameter source: Source vector.
     /// - Parameter destination: Destination vector.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func convertElements<U, V>(of source: U,
                                              to destination: inout V,
                                              rounding: RoundingMode)
@@ -680,8 +648,6 @@ extension vDSP {
     ///
     /// - Parameter source: Source vector.
     /// - Parameter destination: Destination vector.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func convertElements<U, V>(of source: U,
                                              to destination: inout V,
                                              rounding: RoundingMode)
@@ -713,8 +679,6 @@ extension vDSP {
     ///
     /// - Parameter source: Source vector.
     /// - Parameter destination: Destination vector.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func convertElements<U, V>(of source: U,
                                              to destination: inout V,
                                              rounding: RoundingMode)
@@ -746,8 +710,7 @@ extension vDSP {
     ///
     /// - Parameter source: Source vector.
     /// - Parameter destination: Destination vector.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func convertElements<U, V>(of source: U,
                                              to destination: inout V)
         where
@@ -771,8 +734,7 @@ extension vDSP {
     ///
     /// - Parameter source: Source vector.
     /// - Parameter destination: Destination vector.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func convertElements<U, V>(of source: U,
                                              to destination: inout V)
         where
@@ -799,7 +761,7 @@ extension vDSP {
 //
 //===----------------------------------------------------------------------===//
 
-@available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 public protocol vDSP_IntegerConvertable {}
 extension UInt8: vDSP_IntegerConvertable {}
 extension UInt16: vDSP_IntegerConvertable {}
@@ -808,11 +770,12 @@ extension Int8: vDSP_IntegerConvertable {}
 extension Int16: vDSP_IntegerConvertable {}
 extension Int32: vDSP_IntegerConvertable {}
 
-@available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 public protocol vDSP_FloatingPointConvertable {}
 extension Float: vDSP_FloatingPointConvertable {}
 extension Double: vDSP_FloatingPointConvertable {}
 
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 extension vDSP {
     
     // MARK: Integer to floating-point conversion
@@ -821,8 +784,7 @@ extension vDSP {
     ///
     /// - Parameter source: Source vector.
     /// - Returns: Conversion result.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func integerToFloatingPoint<T, U>(_ vector: T,
                                                     floatingPointType: U.Type) -> [U]
         where
@@ -863,8 +825,7 @@ extension vDSP {
     ///
     /// - Parameter source: Source vector.
     /// - Returns: Conversion result.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func integerToFloatingPoint<T, U>(_ vector: T,
                                                     floatingPointType: U.Type) -> [U]
         where
@@ -905,8 +866,7 @@ extension vDSP {
     ///
     /// - Parameter source: Source vector.
     /// - Returns: Conversion result.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func integerToFloatingPoint<T, U>(_ vector: T,
                                                     floatingPointType: U.Type) -> [U]
         where
@@ -947,8 +907,7 @@ extension vDSP {
     ///
     /// - Parameter source: Source vector.
     /// - Returns: Conversion result.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func integerToFloatingPoint<T, U>(_ vector: T,
                                                     floatingPointType: U.Type) -> [U]
         where
@@ -989,8 +948,7 @@ extension vDSP {
     ///
     /// - Parameter source: Source vector.
     /// - Returns: Conversion result.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func integerToFloatingPoint<T, U>(_ vector: T,
                                                     floatingPointType: U.Type) -> [U]
         where
@@ -1031,8 +989,7 @@ extension vDSP {
     ///
     /// - Parameter source: Source vector.
     /// - Returns: Conversion result.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func integerToFloatingPoint<T, U>(_ vector: T,
                                                     floatingPointType: U.Type) -> [U]
         where
@@ -1075,8 +1032,7 @@ extension vDSP {
     ///
     /// - Parameter source: Source vector.
     /// - Returns: Conversion result.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func floatingPointToInteger<T, U>(_ vector: T,
                                                     integerType: U.Type,
                                                     rounding: RoundingMode) -> [U]
@@ -1167,8 +1123,7 @@ extension vDSP {
     ///
     /// - Parameter source: Source vector.
     /// - Returns: Conversion result.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func floatingPointToInteger<T, U>(_ vector: T,
                                                     integerType: U.Type,
                                                     rounding: RoundingMode) -> [U]
@@ -1261,8 +1216,7 @@ extension vDSP {
     ///
     /// - Parameter source: Source vector.
     /// - Returns: Conversion result.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func floatToDouble<U>(_ source: U) -> [Double]
         where
         U: AccelerateBuffer,
@@ -1283,8 +1237,7 @@ extension vDSP {
     ///
     /// - Parameter source: Source vector.
     /// - Returns: Conversion result.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func doubleToFloat<U>(_ source: U) -> [Float]
         where
         U: AccelerateBuffer,

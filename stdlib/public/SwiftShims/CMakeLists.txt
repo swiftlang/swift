@@ -20,6 +20,7 @@ set(sources
   UnicodeShims.h
   Visibility.h
 
+  CoreMediaOverlayShims.h
   DispatchOverlayShims.h
   NetworkOverlayShims.h
   OSOverlayShims.h
@@ -48,6 +49,8 @@ set(sources
   NSLocaleShims.h
   NSTimeZoneShims.h
   NSUndoManagerShims.h
+
+  ClockKitOverlayShims.h
 
   module.modulemap
   )
@@ -84,7 +87,22 @@ endif()
 # First extract the "version" used for Clang's resource directory.
 string(REGEX MATCH "[0-9]+\\.[0-9]+(\\.[0-9]+)?" CLANG_VERSION
   "${LLVM_PACKAGE_VERSION}")
-set(clang_headers_location "${LLVM_LIBRARY_OUTPUT_INTDIR}/clang/${CLANG_VERSION}")
+if(NOT SWIFT_INCLUDE_TOOLS AND SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER)
+  if(SWIFT_COMPILER_IS_MSVC_LIKE)
+    execute_process(COMMAND ${CMAKE_C_COMPILER} /clang:-print-resource-dir
+      OUTPUT_VARIABLE clang_headers_location
+      OUTPUT_STRIP_TRAILING_WHITESPACE
+      ERROR_QUIET)
+  else()
+    execute_process(COMMAND ${CMAKE_C_COMPILER} -print-resource-dir
+      OUTPUT_VARIABLE clang_headers_location
+      OUTPUT_STRIP_TRAILING_WHITESPACE
+      ERROR_QUIET)
+  endif()
+  message(STATUS "Using clang Resource Directory: ${clang_headers_location}")
+else()
+  set(clang_headers_location "${LLVM_LIBRARY_OUTPUT_INTDIR}/clang/${CLANG_VERSION}")
+endif()
 
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
   set(cmake_symlink_option "copy_directory")
@@ -105,16 +123,16 @@ add_custom_command_target(unused_var
     COMMENT "Symlinking Clang resource headers into ${SWIFTLIB_DIR}/clang")
 add_dependencies(copy_shim_headers symlink_clang_headers)
 
-swift_install_in_component(stdlib
-    FILES ${sources}
-    DESTINATION "lib/swift/shims")
+swift_install_in_component(FILES ${sources}
+                           DESTINATION "lib/swift/shims"
+                           COMPONENT stdlib)
 
 # Install Clang headers under the Swift library so that an installed Swift's
 # module importer can find the compiler headers corresponding to its Clang.
-swift_install_in_component(clang-builtin-headers
-    DIRECTORY "${clang_headers_location}/"
-    DESTINATION "lib/swift/clang"
-    PATTERN "*.h")
+swift_install_in_component(DIRECTORY "${clang_headers_location}/"
+                           DESTINATION "lib/swift/clang"
+                           COMPONENT clang-builtin-headers
+                           PATTERN "*.h")
 
 swift_install_symlink_component(clang-resource-dir-symlink
   LINK_NAME clang
@@ -126,7 +144,7 @@ swift_install_symlink_component(clang-resource-dir-symlink
 # should be used in conjunction with clang-resource-dir-symlink.
 file(TO_CMAKE_PATH "${LLVM_LIBRARY_OUTPUT_INTDIR}"
   _SWIFT_SHIMS_PATH_TO_CLANG_BUILD)
-swift_install_in_component(clang-builtin-headers-in-clang-resource-dir
-    DIRECTORY "${_SWIFT_SHIMS_PATH_TO_CLANG_BUILD}/lib/clang"
-    DESTINATION "lib"
-    PATTERN "*.h")
+swift_install_in_component(DIRECTORY "${_SWIFT_SHIMS_PATH_TO_CLANG_BUILD}/lib/clang"
+                           DESTINATION "lib"
+                           COMPONENT clang-builtin-headers-in-clang-resource-dir
+                           PATTERN "*.h")

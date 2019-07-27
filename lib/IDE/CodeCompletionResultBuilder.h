@@ -217,9 +217,19 @@ public:
         CodeCompletionString::Chunk::ChunkKind::RightParen, ")");
   }
 
+  void addAnnotatedLeftBracket() {
+    addLeftBracket();
+    getLastChunk().setIsAnnotation();
+  }
+
   void addLeftBracket() {
     addChunkWithTextNoCopy(
         CodeCompletionString::Chunk::ChunkKind::LeftBracket, "[");
+  }
+
+  void addAnnotatedRightBracket() {
+    addRightBracket();
+    getLastChunk().setIsAnnotation();
   }
 
   void addRightBracket() {
@@ -367,8 +377,11 @@ public:
     // If the parameter is of the type @autoclosure ()->output, then the
     // code completion should show the parameter of the output type
     // instead of the function type ()->output.
-    if (isAutoClosure)
-      Ty = Ty->castTo<FunctionType>()->getResult();
+    if (isAutoClosure) {
+      // 'Ty' may be ErrorType.
+      if (auto funcTy = Ty->getAs<FunctionType>())
+        Ty = funcTy->getResult();
+    }
 
     PrintOptions PO;
     PO.SkipAttributes = true;

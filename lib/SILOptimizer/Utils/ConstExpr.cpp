@@ -43,10 +43,12 @@ enum class WellKnownFunction {
   StringInitEmpty,
   // String.init(_builtinStringLiteral:utf8CodeUnitCount:isASCII:)
   StringMakeUTF8,
-  // static String.+= infix(_: inout String, _: String)
+  // static String.append (_: String, _: inout String)
   StringAppend,
   // static String.== infix(_: String)
-  StringEquals
+  StringEquals,
+  // String.percentEscapedString.getter
+  StringEscapePercent
 };
 
 static llvm::Optional<WellKnownFunction> classifyFunction(SILFunction *fn) {
@@ -61,6 +63,8 @@ static llvm::Optional<WellKnownFunction> classifyFunction(SILFunction *fn) {
     return WellKnownFunction::StringAppend;
   if (fn->hasSemanticsAttr("string.equals"))
     return WellKnownFunction::StringEquals;
+  if (fn->hasSemanticsAttr("string.escapePercent.get"))
+    return WellKnownFunction::StringEscapePercent;
   return None;
 }
 
@@ -210,7 +214,7 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
     return SymbolicValue::getString(sli->getValue(), evaluator.getAllocator());
 
   if (auto *fri = dyn_cast<FunctionRefInst>(value))
-    return SymbolicValue::getFunction(fri->getReferencedFunction());
+    return SymbolicValue::getFunction(fri->getInitiallyReferencedFunction());
 
   // If we have a reference to a metatype, constant fold any substitutable
   // types.
@@ -233,12 +237,11 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
   if (auto *sei = dyn_cast<StructExtractInst>(value)) {
     auto aggValue = sei->getOperand();
     auto val = getConstantValue(aggValue);
-    if (val.isConstant()) {
-      assert(val.getKind() == SymbolicValue::Aggregate);
-      return val.getAggregateValue()[sei->getFieldNo()];
+    if (!val.isConstant()) {
+      return val;
     }
-    // Not a const.
-    return val;
+    assert(val.getKind() == SymbolicValue::Aggregate);
+    return val.getAggregateValue()[sei->getFieldNo()];
   }
 
   // If this is an unchecked_enum_data from a fragile type, then we can return
@@ -278,8 +281,11 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
 
     for (unsigned i = 0, e = inst->getNumOperands(); i != e; ++i) {
       auto val = getConstantValue(inst->getOperand(i));
-      if (!val.isConstant())
+      if (!val.isConstant() && !val.isUnknownDueToUnevaluatedInstructions())
         return val;
+      // Unknown values due to unevaluated instructions can be assigned to
+      // struct properties as they are not indicative of a fatal error or
+      // trap.
       elts.push_back(val);
     }
 
@@ -375,9 +381,35 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
     return createMemoryObject(value, enumVal.getEnumPayloadValue());
   }
 
+  if (isa<SelectEnumInst>(value) || isa<SelectEnumAddrInst>(value)) {
+    SelectEnumInstBase *selectInst = dyn_cast<SelectEnumInst>(value);
+    if (!selectInst) {
+      selectInst = dyn_cast<SelectEnumAddrInst>(value);
+    }
+
+    SILValue enumOperand = selectInst->getEnumOperand();
+    SymbolicValue enumValue = isa<SelectEnumInst>(selectInst)
+                                  ? getConstantValue(enumOperand)
+                                  : getConstAddrAndLoadResult(enumOperand);
+    if (!enumValue.isConstant())
+      return enumValue;
+
+    assert(enumValue.getKind() == SymbolicValue::Enum ||
+           enumValue.getKind() == SymbolicValue::EnumWithPayload);
+
+    SILValue resultOperand =
+        selectInst->getCaseResult(enumValue.getEnumValue());
+    return getConstantValue(resultOperand);
+  }
+
   // This instruction is a marker that returns its first operand.
   if (auto *bai = dyn_cast<BeginAccessInst>(value))
     return getConstantValue(bai->getOperand());
+
+  // Look through copy_value and begin_borrow since the interpreter doesn't
+  // model these memory management instructions.
+  if (isa<CopyValueInst>(value) || isa<BeginBorrowInst>(value))
+    return getConstantValue(cast<SingleValueInstruction>(value)->getOperand(0));
 
   LLVM_DEBUG(llvm::dbgs() << "ConstExpr Unknown simple: " << *value << "\n");
 
@@ -416,30 +448,35 @@ ConstExprFunctionState::computeConstantValueBuiltin(BuiltinInst *inst) {
       if (operand.getKind() != SymbolicValue::Integer)
         return unknownResult();
 
-      auto operandVal = operand.getIntegerValue();
+      APInt operandVal = operand.getIntegerValue();
       uint32_t srcBitWidth = operandVal.getBitWidth();
       auto dstBitWidth =
           builtin.Types[1]->castTo<BuiltinIntegerType>()->getGreatestWidth();
 
-      APInt result = operandVal.trunc(dstBitWidth);
+      // Note that the if the source type is a Builtin.IntLiteral, operandVal
+      // could have fewer bits than the destination bit width and may only
+      // require a sign extension.
+      APInt result = operandVal.sextOrTrunc(dstBitWidth);
 
-      // Compute the overflow by re-extending the value back to its source and
-      // checking for loss of value.
-      APInt reextended =
-          dstSigned ? result.sext(srcBitWidth) : result.zext(srcBitWidth);
-      bool overflowed = (operandVal != reextended);
+      // Determine if there is a overflow.
+      if (operandVal.getBitWidth() > dstBitWidth) {
+        // Re-extend the value back to its source and check for loss of value.
+        APInt reextended =
+            dstSigned ? result.sext(srcBitWidth) : result.zext(srcBitWidth);
+        bool overflowed = (operandVal != reextended);
 
-      if (!srcSigned && dstSigned)
-        overflowed |= result.isSignBitSet();
+        if (!srcSigned && dstSigned)
+          overflowed |= result.isSignBitSet();
 
-      if (overflowed)
-        return evaluator.getUnknown(SILValue(inst), UnknownReason::Overflow);
+        if (overflowed)
+          return evaluator.getUnknown(SILValue(inst), UnknownReason::Overflow);
+      }
 
       auto &allocator = evaluator.getAllocator();
       // Build the Symbolic value result for our truncated value.
       return SymbolicValue::getAggregate(
           {SymbolicValue::getInteger(result, allocator),
-           SymbolicValue::getInteger(APInt(1, overflowed), allocator)},
+           SymbolicValue::getInteger(APInt(1, false), allocator)},
           allocator);
     };
 
@@ -678,21 +715,27 @@ ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
     return None;
   }
   case WellKnownFunction::StringAppend: {
-    // static String.+= infix(_: inout String, _: String)
+    // static String.append (_: String, _: inout String)
     assert(conventions.getNumDirectSILResults() == 0 &&
            conventions.getNumIndirectSILResults() == 0 &&
-           conventions.getNumParameters() == 3 &&
-           "unexpected String.+=() signature");
+           conventions.getNumParameters() == 2 &&
+           "unexpected String.append() signature");
 
-    auto firstOperand = apply->getOperand(1);
-    auto firstString = getConstAddrAndLoadResult(firstOperand);
-    if (firstString.getKind() != SymbolicValue::String) {
+    auto otherString = getConstantValue(apply->getOperand(1));
+    if (!otherString.isConstant()) {
+      return otherString;
+    }
+    if (otherString.getKind() != SymbolicValue::String) {
       return evaluator.getUnknown((SILInstruction *)apply,
                                   UnknownReason::InvalidOperandValue);
     }
 
-    auto otherString = getConstantValue(apply->getOperand(2));
-    if (otherString.getKind() != SymbolicValue::String) {
+    auto inoutOperand = apply->getOperand(2);
+    auto firstString = getConstAddrAndLoadResult(inoutOperand);
+    if (!firstString.isConstant()) {
+      return firstString;
+    }
+    if (firstString.getKind() != SymbolicValue::String) {
       return evaluator.getUnknown((SILInstruction *)apply,
                                   UnknownReason::InvalidOperandValue);
     }
@@ -700,7 +743,7 @@ ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
     auto result = SmallString<8>(firstString.getStringValue());
     result.append(otherString.getStringValue());
     auto resultVal = SymbolicValue::getString(result, evaluator.getAllocator());
-    computeFSStore(resultVal, firstOperand);
+    computeFSStore(resultVal, inoutOperand);
     return None;
   }
   case WellKnownFunction::StringEquals: {
@@ -729,6 +772,38 @@ ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
     auto result = SymbolicValue::getAggregate(ArrayRef<SymbolicValue>(intVal),
                                               evaluator.getAllocator());
     setValue(apply, result);
+    return None;
+  }
+  case WellKnownFunction::StringEscapePercent: {
+    // String.percentEscapedString.getter
+    assert(conventions.getNumDirectSILResults() == 1 &&
+           conventions.getNumIndirectSILResults() == 0 &&
+           conventions.getNumParameters() == 1 &&
+           "unexpected String.percentEscapedString signature");
+
+    auto stringArgument = getConstantValue(apply->getOperand(1));
+    if (!stringArgument.isConstant()) {
+      return stringArgument;
+    }
+
+    if (stringArgument.getKind() != SymbolicValue::String) {
+      return evaluator.getUnknown((SILInstruction *)apply,
+                                  UnknownReason::InvalidOperandValue);
+    }
+
+    // Replace all precent symbol (%) in the string with double percents (%%)
+    StringRef stringVal = stringArgument.getStringValue();
+    SmallString<4> percentEscapedString;
+    for (auto charElem : stringVal) {
+      percentEscapedString.push_back(charElem);
+      if (charElem == '%') {
+        percentEscapedString.push_back('%');
+      }
+    }
+
+    auto resultVal = SymbolicValue::getString(percentEscapedString.str(),
+                                              evaluator.getAllocator());
+    setValue(apply, resultVal);
     return None;
   }
   }
@@ -1227,13 +1302,23 @@ ConstExprFunctionState::evaluateFlowSensitive(SILInstruction *inst) {
       // skip them.
       isa<DestroyAddrInst>(inst) || isa<RetainValueInst>(inst) ||
       isa<ReleaseValueInst>(inst) || isa<StrongRetainInst>(inst) ||
-      isa<StrongReleaseInst>(inst))
+      isa<StrongReleaseInst>(inst) || isa<DestroyValueInst>(inst) ||
+      isa<EndBorrowInst>(inst))
     return None;
 
   // If this is a special flow-sensitive instruction like a stack allocation,
   // store, copy_addr, etc, we handle it specially here.
   if (auto asi = dyn_cast<AllocStackInst>(inst)) {
     createMemoryObject(asi, SymbolicValue::getUninitMemory());
+    return None;
+  }
+
+  // Make sure that our copy_value, begin_borrow form constants. Otherwise,
+  // return why.
+  if (isa<CopyValueInst>(inst) || isa<BeginBorrowInst>(inst)) {
+    auto result = getConstantValue(inst->getOperand(0));
+    if (!result.isConstant())
+      return result;
     return None;
   }
 
@@ -1274,14 +1359,36 @@ ConstExprFunctionState::evaluateFlowSensitive(SILInstruction *inst) {
     return computeFSStore(value, copy->getOperand(1));
   }
 
-  // If the instruction produces normal results, try constant folding it.
+  if (auto *injectEnumInst = dyn_cast<InjectEnumAddrInst>(inst)) {
+    return computeFSStore(SymbolicValue::getEnum(injectEnumInst->getElement()),
+                          injectEnumInst->getOperand());
+  }
+
+  // If the instruction produces a result, try constant folding it.
   // If this fails, then we fail.
-  if (inst->getNumResults() != 0) {
+  if (isa<SingleValueInstruction>(inst)) {
     auto oneResultVal = inst->getResults()[0];
     auto result = getConstantValue(oneResultVal);
     if (!result.isConstant())
       return result;
     LLVM_DEBUG(llvm::dbgs() << "  RESULT: "; result.dump());
+    return None;
+  }
+
+  if (isa<DestructureTupleInst>(inst) || isa<DestructureStructInst>(inst)) {
+    auto *mvi = cast<MultipleValueInstruction>(inst);
+    SymbolicValue aggVal = getConstantValue(mvi->getOperand(0));
+    if (!aggVal.isConstant()) {
+      return aggVal;
+    }
+    assert(aggVal.getKind() == SymbolicValue::Aggregate);
+
+    ArrayRef<SymbolicValue> aggElems = aggVal.getAggregateValue();
+    assert(aggElems.size() == mvi->getNumResults());
+
+    for (unsigned i = 0; i < mvi->getNumResults(); ++i) {
+      setValue(mvi->getResult(i), aggElems[i]);
+    }
     return None;
   }
 
@@ -1520,36 +1627,139 @@ void ConstExprEvaluator::computeConstantValues(
 
 ConstExprStepEvaluator::ConstExprStepEvaluator(SymbolicValueAllocator &alloc,
                                                SILFunction *fun)
-    : evaluator(ConstExprEvaluator(alloc)),
-      internalState(
-          new ConstExprFunctionState(evaluator, fun, {}, stepsEvaluated)) {
+    : evaluator(alloc), internalState(new ConstExprFunctionState(
+                            evaluator, fun, {}, stepsEvaluated)) {
   assert(fun);
 }
 
 ConstExprStepEvaluator::~ConstExprStepEvaluator() { delete internalState; }
 
-Optional<SymbolicValue> ConstExprStepEvaluator::incrementStepsAndCheckLimit(
-    SILInstruction *inst, bool includeInInstructionLimit) {
-  if (includeInInstructionLimit && ++stepsEvaluated > ConstExprLimit) {
-    // Note that there is no call stack to associate with the unknown value
-    // as the interpreter is at the top-level here.
-    return SymbolicValue::getUnknown(inst, UnknownReason::TooManyInstructions,
-                                     {}, evaluator.getAllocator());
-  }
-  return None;
+std::pair<Optional<SILBasicBlock::iterator>, Optional<SymbolicValue>>
+ConstExprStepEvaluator::evaluate(SILBasicBlock::iterator instI) {
+  // Reset `stepsEvaluated` to zero.
+  stepsEvaluated = 0;
+  return internalState->evaluateInstructionAndGetNext(instI, visitedBlocks);
 }
 
 std::pair<Optional<SILBasicBlock::iterator>, Optional<SymbolicValue>>
-ConstExprStepEvaluator::evaluate(SILBasicBlock::iterator instI,
-                                 bool includeInInstructionLimit) {
-  // Diagnose whether evaluating this instruction exceeds the instruction
-  // limit, unless asked to not include this instruction in the limit.
-  auto limitError =
-      incrementStepsAndCheckLimit(&(*instI), includeInInstructionLimit);
-  if (limitError) {
-    return {None, limitError.getValue()};
+ConstExprStepEvaluator::skipByMakingEffectsNonConstant(
+    SILBasicBlock::iterator instI) {
+  SILInstruction *inst = &(*instI);
+
+  // Set all constant state that could be mutated by the instruction
+  // to an unknown symbolic value.
+  for (auto &operand : inst->getAllOperands()) {
+    auto constValOpt = lookupConstValue(operand.get());
+    if (!constValOpt) {
+      continue;
+    }
+    auto constVal = constValOpt.getValue();
+    auto constKind = constVal.getKind();
+
+    // Skip can only be invoked on value types or addresses of value types.
+    // Note that adding a new kind of symbolic value may require handling its
+    // side-effects, especially if that symbolic value does not represent a
+    // value type.
+    assert(constKind == SymbolicValue::Address ||
+           constKind == SymbolicValue::Unknown ||
+           constKind == SymbolicValue::Metatype ||
+           constKind == SymbolicValue::Function ||
+           constKind == SymbolicValue::Integer ||
+           constKind == SymbolicValue::String ||
+           constKind == SymbolicValue::Aggregate ||
+           constKind == SymbolicValue::Enum ||
+           constKind == SymbolicValue::EnumWithPayload ||
+           constKind == SymbolicValue::UninitMemory);
+
+    if (constKind != SymbolicValue::Address) {
+      continue;
+    }
+
+    // If the address is only used @in_guaranteed or @in_constant, there
+    // can be no mutation through this address. Therefore, ignore it.
+    if (ApplyInst *applyInst = dyn_cast<ApplyInst>(inst)) {
+      ApplySite applySite(applyInst);
+      SILArgumentConvention convention =
+        applySite.getArgumentConvention(operand);
+      if (convention == SILArgumentConvention::Indirect_In_Guaranteed ||
+          convention == SILArgumentConvention::Indirect_In_Constant) {
+        continue;
+      }
+    }
+
+    // Write an unknown value into the address.
+    SmallVector<unsigned, 4> accessPath;
+    auto *memoryObject = constVal.getAddressValue(accessPath);
+    auto unknownValue = SymbolicValue::getUnknown(
+        inst, UnknownReason::MutatedByUnevaluatedInstruction, {},
+        evaluator.getAllocator());
+
+    auto memoryContent = memoryObject->getValue();
+    if (memoryContent.getKind() == SymbolicValue::Aggregate) {
+      memoryObject->setIndexedElement(accessPath, unknownValue,
+                                      evaluator.getAllocator());
+    } else {
+      memoryObject->setValue(unknownValue);
+    }
   }
-  return internalState->evaluateInstructionAndGetNext(instI, visitedBlocks);
+
+  // Map the results of this instruction to unknown values.
+  for (auto result : inst->getResults()) {
+    internalState->setValue(
+        result, SymbolicValue::getUnknown(
+                    inst, UnknownReason::ReturnedByUnevaluatedInstruction, {},
+                    evaluator.getAllocator()));
+  }
+
+  // If we have a next instruction in the basic block return it.
+  // Otherwise, return None for the next instruction.
+  // Note that we can find the next instruction in the case of unconditional
+  // branches. But, there is no real need to do that as of now.
+  if (!isa<TermInst>(inst)) {
+    return {++instI, None};
+  }
+  return {None, None};
+}
+
+bool ConstExprStepEvaluator::isFailStopError(SymbolicValue errorVal) {
+  assert(errorVal.isUnknown());
+
+  switch (errorVal.getUnknownReason()) {
+  case UnknownReason::TooManyInstructions:
+  case UnknownReason::Loop:
+  case UnknownReason::Overflow:
+  case UnknownReason::Trap:
+    return true;
+  default:
+    return false;
+  }
+}
+
+std::pair<Optional<SILBasicBlock::iterator>, Optional<SymbolicValue>>
+ConstExprStepEvaluator::tryEvaluateOrElseMakeEffectsNonConstant(
+    SILBasicBlock::iterator instI) {
+
+  auto evaluateResult = evaluate(instI);
+  Optional<SILBasicBlock::iterator> nextI = evaluateResult.first;
+  Optional<SymbolicValue> errorVal = evaluateResult.second;
+
+  if (!errorVal) {
+    assert(nextI);
+    return evaluateResult;
+  }
+  assert(!nextI);
+
+  if (isFailStopError(*errorVal)) {
+    return evaluateResult;
+  }
+
+  // Evaluation cannot fail on unconditional branches.
+  assert(!isa<BranchInst>(&(*instI)));
+
+  // Since the evaluation has failed, make the effects of this instruction
+  // unknown.
+  auto result = skipByMakingEffectsNonConstant(instI);
+  return {result.first, errorVal};
 }
 
 Optional<SymbolicValue>

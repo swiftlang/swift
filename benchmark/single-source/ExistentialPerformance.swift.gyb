@@ -36,8 +36,8 @@ Setup = """
   let existential = existentialType.init()
   let existential2 = existentialType.init()
   var existential = existentialType.init()
-  let existentialArray = grabArray()
-  var existentialArray = grabArray()
+  let existentialArray = array!
+  var existentialArray = array!
 """.splitlines()
 Setup = [Setup[0], Setup[1], '\n'.join(Setup[1:3]), Setup[3], Setup[4], Setup[5]]
 
@@ -90,7 +90,7 @@ Workloads = [
       }
     }
 """),
-  ('Array.Mutating', Setup[5], '100', """
+  ('Array.Mutating', Setup[5], '500', """
     for i in 0 ..< existentialArray.count {
       if !existentialArray[i].mutateIt()  {
         fatalError("expected true")
@@ -151,17 +151,6 @@ func ca<T: Existential>(_: T.Type) {
 % for Variant in Vals + Refs:
 func ca${Variant}() { ca(${Variant}.self) }
 % end
-@inline(never)
-func grabArray() -> [Existential] { // transfer array ownership to caller
-  // FIXME: This is causing Illegal Instruction: 4 crash
-  // defer { array = nil }
-  // return array
-  // This doesn't work either:
-  // let a = array!
-  // array = nil
-  // return a
-  return array!
-}
 
 // `setUpFunctions` that determine which existential type will be tested
 var existentialType: Existential.Type!

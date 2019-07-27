@@ -66,7 +66,7 @@ class TestDateInterval : TestDateIntervalSuper {
     }
 
     func test_hashing() {
-        guard #available(iOS 10.10, OSX 10.12, tvOS 10.0, watchOS 3.0, *) else { return }
+        guard #available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, *) else { return }
 
         let start1a = dateWithString("2019-04-04 17:09:23 -0700")
         let start1b = dateWithString("2019-04-04 17:09:23 -0700")

@@ -41,7 +41,7 @@ func test(x: Int) {
   x.addedMember()
   [x].addedMember()
   [x].addedMemberInt()
-  ([] as [Bool]).addedMemberInt() // expected-error {{'[Bool]' is not convertible to 'Array<Int>'}}
+  ([] as [Bool]).addedMemberInt() // expected-error {{referencing instance method 'addedMemberInt()' on 'Array' requires the types 'Bool' and 'Int' be equivalent}}
 }
 
 #endif

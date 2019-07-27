@@ -139,6 +139,7 @@ SymbolicValue::Kind SymbolicValue::getKind() const {
   case RK_DerivedAddress:
     return Address;
   }
+  llvm_unreachable("covered switch");
 }
 
 /// Clone this SymbolicValue into the specified ASTContext and return the new
@@ -179,6 +180,7 @@ SymbolicValue::cloneInto(SymbolicValueAllocator &allocator) const {
     return getAddress(newMemObject, accessPath, allocator);
   }
   }
+  llvm_unreachable("covered switch");
 }
 
 //===----------------------------------------------------------------------===//
@@ -568,6 +570,12 @@ SymbolicValue SymbolicValue::lookThroughSingleElementAggregates() const {
   }
 }
 
+bool SymbolicValue::isUnknownDueToUnevaluatedInstructions() {
+  auto unknownReason = getUnknownReason();
+  return (unknownReason == UnknownReason::ReturnedByUnevaluatedInstruction ||
+          unknownReason == UnknownReason::MutatedByUnevaluatedInstruction);
+}
+
 /// Given that this is an 'Unknown' value, emit diagnostic notes providing
 /// context about what the problem is. Specifically, point to interesting
 /// source locations and function calls in the call stack.
@@ -676,6 +684,12 @@ void SymbolicValue::emitUnknownDiagnosticNotes(SILLocation fallbackLoc) {
     if (emitTriggerLocInDiag)
       diagnose(ctx, *triggerLoc, diag::constexpr_witness_call_found_here);
     return;
+  case UnknownReason::ReturnedByUnevaluatedInstruction:
+    diagnose(ctx, diagLoc, diag::constexpr_returned_by_unevaluated_instruction);
+    break;
+  case UnknownReason::MutatedByUnevaluatedInstruction:
+    diagnose(ctx, diagLoc, diag::constexpr_mutated_by_unevaluated_instruction);
+    break;
   }
   // TODO: print the call-stack in a controlled way if needed.
 }
@@ -703,9 +717,7 @@ static SymbolicValue getIndexedElement(SymbolicValue aggregate,
   SymbolicValue elt = aggregate.getAggregateValue()[elementNo];
   Type eltType;
   if (auto *decl = type->getStructOrBoundGenericStruct()) {
-    auto it = decl->getStoredProperties().begin();
-    std::advance(it, elementNo);
-    eltType = (*it)->getType();
+    eltType = decl->getStoredProperties()[elementNo]->getType();
   } else if (auto tuple = type->getAs<TupleType>()) {
     assert(elementNo < tuple->getNumElements() && "invalid index");
     eltType = tuple->getElement(elementNo).getType();
@@ -747,8 +759,7 @@ static SymbolicValue setIndexedElement(SymbolicValue aggregate,
     unsigned numMembers;
     // We need to have either a struct or a tuple type.
     if (auto *decl = type->getStructOrBoundGenericStruct()) {
-      numMembers = std::distance(decl->getStoredProperties().begin(),
-                                 decl->getStoredProperties().end());
+      numMembers = decl->getStoredProperties().size();
     } else if (auto tuple = type->getAs<TupleType>()) {
       numMembers = tuple->getNumElements();
     } else {
@@ -768,9 +779,7 @@ static SymbolicValue setIndexedElement(SymbolicValue aggregate,
   ArrayRef<SymbolicValue> oldElts = aggregate.getAggregateValue();
   Type eltType;
   if (auto *decl = type->getStructOrBoundGenericStruct()) {
-    auto it = decl->getStoredProperties().begin();
-    std::advance(it, elementNo);
-    eltType = (*it)->getType();
+    eltType = decl->getStoredProperties()[elementNo]->getType();
   } else if (auto tuple = type->getAs<TupleType>()) {
     assert(elementNo < tuple->getNumElements() && "invalid index");
     eltType = tuple->getElement(elementNo).getType();

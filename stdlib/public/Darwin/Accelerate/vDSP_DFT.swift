@@ -16,11 +16,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 extension vDSP {
     
     /// An enumeration that specifies whether to perform complex-to-complex or
     /// complex-to-real discrete Fourier transform.
-    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     // TODO: Should probably be @_frozen; check with Accelerate.
     public enum DFTTransformType {
         /// Specifies complex-to-complex discrete Fourier transform, forward
@@ -33,7 +33,6 @@ extension vDSP {
     }
     
     /// A class that provides single- and double-precision discrete Fourier transform.
-    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public class DFT <T: vDSP_FloatingPointDiscreteFourierTransformable> {
         fileprivate let dftSetup: vDSP_DFT_Setup
         
@@ -140,26 +139,25 @@ extension vDSP {
     }
 }
 
-@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 public protocol vDSP_FloatingPointDiscreteFourierTransformable: BinaryFloatingPoint {
     associatedtype DFTFunctions: vDSP_DFTFunctions where DFTFunctions.Scalar == Self
 }
 
-@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 extension Float: vDSP_FloatingPointDiscreteFourierTransformable {
     public typealias DFTFunctions = vDSP.VectorizableFloat
 }
 
-@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 extension Double: vDSP_FloatingPointDiscreteFourierTransformable {
     public typealias DFTFunctions = vDSP.VectorizableDouble
 }
 
-@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 public protocol vDSP_DFTFunctions {
     associatedtype Scalar
     
-    @inline(__always)
     /// Returns a setup structure to perform a discrete Fourier transform
     ///
     /// - Parameter previous: a previous vDSP_DFT instance to share data with.
@@ -178,7 +176,6 @@ public protocol vDSP_DFTFunctions {
     /// - Parameter inputImaginary: Input vector - imaginary part.
     /// - Parameter outputReal: Output vector - real part.
     /// - Parameter outputImaginary: Output vector - imaginary part.
-    @inline(__always)
     static func transform<U, V>(dftSetup: OpaquePointer,
                                 inputReal: U,
                                 inputImaginary: U,
@@ -190,7 +187,6 @@ public protocol vDSP_DFTFunctions {
         U.Element == Scalar, V.Element == Scalar
     
     /// Releases a DFT setup object.
-    @inline(__always)
     static func destroySetup(_ setup: OpaquePointer)
 }
 
@@ -200,7 +196,7 @@ public protocol vDSP_DFTFunctions {
 //
 //===----------------------------------------------------------------------===//
 
-@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 extension vDSP.VectorizableFloat: vDSP_DFTFunctions {
     
     /// Returns a setup structure to perform a discrete Fourier transform
@@ -209,7 +205,6 @@ extension vDSP.VectorizableFloat: vDSP_DFTFunctions {
     /// - Parameter count: the number of real elements to be transformed.
     /// - Parameter direction: Specifies the transform direction.
     /// - Parameter transformType: Specficies whether to forward transform is real-to-complex or complex-to-complex.
-    @inline(__always)
     public static func makeDFTSetup<T>(previous: vDSP.DFT<T>? = nil,
                                        count: Int,
                                        direction: vDSP.FourierTransformDirection,
@@ -235,7 +230,6 @@ extension vDSP.VectorizableFloat: vDSP_DFTFunctions {
     /// - Parameter inputImaginary: Input vector - imaginary part.
     /// - Parameter outputReal: Output vector - real part.
     /// - Parameter outputImaginary: Output vector - imaginary part.
-    @inline(__always)
     public static func transform<U, V>(dftSetup: OpaquePointer,
                                        inputReal: U,
                                        inputImaginary: U,
@@ -263,13 +257,12 @@ extension vDSP.VectorizableFloat: vDSP_DFTFunctions {
     }
     
     /// Releases a DFT setup object.
-    @inline(__always)
     public static func destroySetup(_ setup: OpaquePointer) {
         vDSP_DFT_DestroySetup(setup)
     }
 }
 
-@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 extension vDSP.VectorizableDouble: vDSP_DFTFunctions {
     
     /// Returns a data structure for use with to perform a discrete Fourier transform
@@ -278,7 +271,6 @@ extension vDSP.VectorizableDouble: vDSP_DFTFunctions {
     /// - Parameter count: the number of real elements to be transformed.
     /// - Parameter direction: Specifies the transform direction.
     /// - Parameter transformType: Specficies whether to forward transform is real-to-complex or complex-to-complex.
-    @inline(__always)
     public static func makeDFTSetup<T>(previous: vDSP.DFT<T>? = nil,
                                        count: Int,
                                        direction: vDSP.FourierTransformDirection,
@@ -304,7 +296,6 @@ extension vDSP.VectorizableDouble: vDSP_DFTFunctions {
     /// - Parameter inputImaginary: Input vector - imaginary part.
     /// - Parameter outputReal: Output vector - real part.
     /// - Parameter outputImaginary: Output vector - imaginary part.
-    @inline(__always)
     public static func transform<U, V>(dftSetup: OpaquePointer,
                                        inputReal: U, inputImaginary: U,
                                        outputReal: inout V, outputImaginary: inout V)
@@ -330,7 +321,6 @@ extension vDSP.VectorizableDouble: vDSP_DFTFunctions {
     }
     
     /// Releases a DFT setup object.
-    @inline(__always)
     public static func destroySetup(_ setup: OpaquePointer) {
         vDSP_DFT_DestroySetupD(setup)
     }

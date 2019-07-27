@@ -2,12 +2,21 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
+//===----------------------------------------------------------------------===//
+///
+/// An SSA-peephole analysis. Given a single-value instruction, find an existing
+/// equivalent but less costly or more canonical SIL value.
+///
+/// This analysis must handle 'raw' SIL form. It should be possible to perform
+/// the substitution discovered by the analysis without interfering with
+/// subsequent diagnostic passes.
+///
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-simplify"
@@ -445,6 +454,19 @@ SILValue InstSimplifier::visitBeginAccessInst(BeginAccessInst *BAI) {
 }
 
 static SILValue simplifyBuiltin(BuiltinInst *BI) {
+
+  switch (BI->getBuiltinInfo().ID) {
+    case BuiltinValueKind::IntToPtr:
+      if (auto *OpBI = dyn_cast<BuiltinInst>(BI->getOperand(0))) {
+        if (OpBI->getBuiltinInfo().ID == BuiltinValueKind::PtrToInt) {
+          return OpBI->getOperand(0);
+        }
+      }
+      return SILValue();
+    default:
+      break;
+  }
+
   const IntrinsicInfo &Intrinsic = BI->getIntrinsicInfo();
 
   switch (Intrinsic.ID) {
@@ -665,12 +687,17 @@ SILValue swift::simplifyInstruction(SILInstruction *I) {
 /// Replace an instruction with a simplified result, including any debug uses,
 /// and erase the instruction. If the instruction initiates a scope, do not
 /// replace the end of its scope; it will be deleted along with its parent.
-void swift::replaceAllSimplifiedUsesAndErase(
+///
+/// This is a simple transform based on the above analysis.
+///
+/// Return an iterator to the next (nondeleted) instruction.
+SILBasicBlock::iterator swift::replaceAllSimplifiedUsesAndErase(
     SILInstruction *I, SILValue result,
-    std::function<void(SILInstruction *)> eraseNotify) {
+    std::function<void(SILInstruction *)> eraseHandler) {
 
   auto *SVI = cast<SingleValueInstruction>(I);
   assert(SVI != result && "Cannot RAUW a value with itself");
+  SILBasicBlock::iterator nextii = std::next(I->getIterator());
 
   // Only SingleValueInstructions are currently simplified.
   while (!SVI->use_empty()) {
@@ -678,16 +705,22 @@ void swift::replaceAllSimplifiedUsesAndErase(
     SILInstruction *user = use->getUser();
     // Erase the end of scope marker.
     if (isEndOfScopeMarker(user)) {
-      if (eraseNotify)
-        eraseNotify(user);
-      user->eraseFromParent();
+      if (&*nextii == user)
+        ++nextii;
+      if (eraseHandler)
+        eraseHandler(user);
+      else
+        user->eraseFromParent();
       continue;
     }
     use->set(result);
   }
-  I->eraseFromParent();
-  if (eraseNotify)
-    eraseNotify(I);
+  if (eraseHandler)
+    eraseHandler(I);
+  else
+    I->eraseFromParent();
+
+  return nextii;
 }
 
 /// Simplify invocations of builtin operations that may overflow.

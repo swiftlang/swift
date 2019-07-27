@@ -177,7 +177,9 @@ private:
 
     // Don't capture variables which aren't default-initialized.
     if (auto *VD = dyn_cast<VarDecl>(DstDecl))
-      if (!VD->isParentInitialized() && !VD->isInOut())
+      if (!VD->isParentInitialized() &&
+          !(isa<ParamDecl>(VD) &&
+            cast<ParamDecl>(VD)->isInOut()))
         return {true, OriginalExpr};
 
     // Rewrite the original expression into this:

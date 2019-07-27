@@ -13,13 +13,16 @@
 // This file implements semantic analysis for declaration overrides.
 //
 //===----------------------------------------------------------------------===//
-#include "TypeChecker.h"
 #include "CodeSynthesis.h"
 #include "MiscDiagnostics.h"
 #include "TypeCheckAvailability.h"
+#include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Availability.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/GenericSignature.h"
+#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -831,10 +834,14 @@ static void checkOverrideAccessControl(ValueDecl *baseDecl, ValueDecl *decl,
   if (ctx.isAccessControlDisabled())
     return;
 
+  if (isa<ProtocolDecl>(decl->getDeclContext()))
+    return;
+
   auto &diags = ctx.Diags;
 
   auto dc = decl->getDeclContext();
   auto classDecl = dc->getSelfClassDecl();
+  assert(classDecl != nullptr && "Should have ruled out protocols above");
 
   bool isAccessor = isa<AccessorDecl>(decl);
 
@@ -851,8 +858,7 @@ static void checkOverrideAccessControl(ValueDecl *baseDecl, ValueDecl *decl,
   if (!isAccessor &&
       !baseHasOpenAccess &&
       baseDecl->getModuleContext() != decl->getModuleContext() &&
-      !isa<ConstructorDecl>(decl) &&
-      !isa<ProtocolDecl>(decl->getDeclContext())) {
+      !isa<ConstructorDecl>(decl)) {
     // NSObject.hashValue was made non-overridable in Swift 5; one should
     // override NSObject.hash instead.
     if (isNSObjectHashValue(baseDecl)) {
@@ -875,8 +881,7 @@ static void checkOverrideAccessControl(ValueDecl *baseDecl, ValueDecl *decl,
     }
     diags.diagnose(baseDecl, diag::overridden_here);
 
-  } else if (!isa<ConstructorDecl>(decl) &&
-             !isa<ProtocolDecl>(decl->getDeclContext())) {
+  } else if (!isa<ConstructorDecl>(decl)) {
     auto matchAccessScope =
       baseDecl->getFormalAccessScope(dc);
     auto classAccessScope =
@@ -941,6 +946,30 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
                                baseDecl->getFullName());
     fixDeclarationName(diag, decl, baseDecl->getFullName());
     emittedMatchError = true;
+  }
+
+  auto baseGenericCtx = baseDecl->getAsGenericContext();
+  auto derivedGenericCtx = decl->getAsGenericContext();
+
+  if (baseGenericCtx && derivedGenericCtx) {
+    // If the generic signatures are different, then complain
+    if (auto newSig = ctx.getOverrideGenericSignature(baseDecl, decl)) {
+      if (auto derivedSig = derivedGenericCtx->getGenericSignature()) {
+        auto requirementsSatisfied =
+            derivedSig->requirementsNotSatisfiedBy(newSig).empty();
+
+        if (!requirementsSatisfied) {
+          diags.diagnose(
+              decl, diag::override_method_different_generic_sig,
+              decl->getBaseName(),
+              derivedGenericCtx->getGenericSignature()->getAsString(),
+              baseGenericCtx->getGenericSignature()->getAsString(),
+              newSig->getAsString());
+          diags.diagnose(baseDecl, diag::overridden_here);
+          emittedMatchError = true;
+        }
+      }
+    }
   }
 
   // If we have an explicit ownership modifier and our parent doesn't,
@@ -1247,6 +1276,7 @@ namespace  {
 #define UNINTERESTING_ATTR(CLASS)                                              \
     void visit##CLASS##Attr(CLASS##Attr *) {}
 
+    // Please keep these alphabetical.
     UNINTERESTING_ATTR(AccessControl)
     UNINTERESTING_ATTR(Alignment)
     UNINTERESTING_ATTR(AlwaysEmitIntoClient)
@@ -1264,6 +1294,7 @@ namespace  {
     UNINTERESTING_ATTR(IBDesignable)
     UNINTERESTING_ATTR(IBInspectable)
     UNINTERESTING_ATTR(IBOutlet)
+    UNINTERESTING_ATTR(IBSegueAction)
     UNINTERESTING_ATTR(Indirect)
     UNINTERESTING_ATTR(Inline)
     UNINTERESTING_ATTR(Optimize)
@@ -1325,7 +1356,10 @@ namespace  {
     UNINTERESTING_ATTR(HasInitialValue)
     UNINTERESTING_ATTR(ImplementationOnly)
     UNINTERESTING_ATTR(Custom)
-    UNINTERESTING_ATTR(PropertyDelegate)
+    UNINTERESTING_ATTR(PropertyWrapper)
+    UNINTERESTING_ATTR(DisfavoredOverload)
+    UNINTERESTING_ATTR(FunctionBuilder)
+    UNINTERESTING_ATTR(ProjectedValueProperty)
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {
@@ -1630,18 +1664,19 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
       overrideRequiresKeyword(base) != OverrideRequiresKeyword::Never &&
       !override->isImplicit() &&
       override->getDeclContext()->getParentSourceFile()) {
-    // FIXME: rdar://16320042 - For properties, we don't have a useful
-    // location for the 'var' token.  Instead of emitting a bogus fixit, only
-    // emit the fixit for 'func's.
     auto theDiag =
       overrideRequiresKeyword(base) == OverrideRequiresKeyword::Always
         ? diag::missing_override
         : diag::missing_override_warn;
-    if (!isa<VarDecl>(override))
-      diags.diagnose(override, theDiag)
-          .fixItInsert(override->getStartLoc(), "override ");
-    else
-      diags.diagnose(override, theDiag);
+
+    auto diagLoc = override->getStartLoc();
+    // If dynamic cast to VarDecl succeeds, use the location of its parent
+    // pattern binding which will return the VarLoc.
+    if (auto VD = dyn_cast<VarDecl>(override)) {
+      diagLoc = VD->getParentPatternBinding()->getLoc();
+    }
+
+    diags.diagnose(override, theDiag).fixItInsert(diagLoc, "override ");
     diags.diagnose(base, diag::overridden_here);
   }
 

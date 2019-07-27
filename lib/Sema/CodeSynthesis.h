@@ -42,9 +42,6 @@ class TypeChecker;
 
 class ObjCReason;
 
-// These are implemented in TypeCheckDecl.cpp.
-void makeFinal(ASTContext &ctx, ValueDecl *D);
-
 // Implemented in TypeCheckerOverride.cpp
 bool checkOverrides(ValueDecl *decl);
 
@@ -52,10 +49,6 @@ bool checkOverrides(ValueDecl *decl);
 void maybeAddAccessorsToStorage(AbstractStorageDecl *storage);
 
 void triggerAccessorSynthesis(TypeChecker &TC, AbstractStorageDecl *storage);
-
-/// Provide storage and accessor implementations for the given property,
-/// which must be lazy.
-void completeLazyVarImplementation(VarDecl *lazyVar);
 
 /// Describes the kind of implicit constructor that will be
 /// generated.
@@ -68,8 +61,6 @@ enum class ImplicitConstructorKind {
   /// name.
   Memberwise
 };
-
-bool isMemberwiseInitialized(VarDecl *var);
 
 /// Create an implicit struct or class constructor.
 ///

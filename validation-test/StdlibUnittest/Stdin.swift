@@ -18,13 +18,13 @@ func simple_getline() -> [UInt8]? {
   var result = [UInt8]()
   while true {
     let c = getchar()
-    result.append(UInt8(c))
     if c == EOF {
       if result.count == 0 {
         return nil
       }
       return result
     }
+    result.append(UInt8(c))
     if c == CInt(UnicodeScalar("\n").value) {
       return result
     }

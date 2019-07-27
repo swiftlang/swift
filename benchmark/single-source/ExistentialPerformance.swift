@@ -264,17 +264,6 @@ func caRef1() { ca(Ref1.self) }
 func caRef2() { ca(Ref2.self) }
 func caRef3() { ca(Ref3.self) }
 func caRef4() { ca(Ref4.self) }
-@inline(never)
-func grabArray() -> [Existential] { // transfer array ownership to caller
-  // FIXME: This is causing Illegal Instruction: 4 crash
-  // defer { array = nil }
-  // return array
-  // This doesn't work either:
-  // let a = array!
-  // array = nil
-  // return a
-  return array!
-}
 
 // `setUpFunctions` that determine which existential type will be tested
 var existentialType: Existential.Type!
@@ -540,7 +529,7 @@ func run_Array_init(_ N: Int) {
 }
 
 func run_Array_method1x(_ N: Int) {
-  let existentialArray = grabArray()
+  let existentialArray = array!
   for _ in 0 ..< N * 100 {
     for elt in existentialArray {
       if !elt.doIt()  {
@@ -551,7 +540,7 @@ func run_Array_method1x(_ N: Int) {
 }
 
 func run_Array_method2x(_ N: Int) {
-  let existentialArray = grabArray()
+  let existentialArray = array!
   for _ in 0 ..< N * 100 {
     for elt in existentialArray {
       if !elt.doIt() || !elt.reallyDoIt() {
@@ -562,8 +551,8 @@ func run_Array_method2x(_ N: Int) {
 }
 
 func run_ArrayMutating(_ N: Int) {
-  var existentialArray = grabArray()
-  for _ in 0 ..< N * 100 {
+  var existentialArray = array!
+  for _ in 0 ..< N * 500 {
     for i in 0 ..< existentialArray.count {
       if !existentialArray[i].mutateIt()  {
         fatalError("expected true")
@@ -573,7 +562,7 @@ func run_ArrayMutating(_ N: Int) {
 }
 
 func run_ArrayShift(_ N: Int) {
-  var existentialArray = grabArray()
+  var existentialArray = array!
   for _ in 0 ..< N * 25 {
     for i in 0 ..< existentialArray.count-1 {
       existentialArray.swapAt(i, i+1)
@@ -582,7 +571,7 @@ func run_ArrayShift(_ N: Int) {
 }
 
 func run_ArrayConditionalShift(_ N: Int) {
-  var existentialArray = grabArray()
+  var existentialArray = array!
   for _ in 0 ..< N * 25 {
     for i in 0 ..< existentialArray.count-1 {
       let curr = existentialArray[i]

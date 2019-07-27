@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 extension vDSP {
     
     // MARK Dot product
@@ -19,8 +20,7 @@ extension vDSP {
     /// - Parameter vectorA: Single-precision real input vector A.
     /// - Parameter vectorB: Single-precision real input vector B.
     /// - Returns: The dot product of vectors A and B.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func dot<U>(_ vectorA: U,
                               _ vectorB: U) -> Float
         where
@@ -50,8 +50,7 @@ extension vDSP {
     /// - Parameter vectorA: Double-precision real input vector A.
     /// - Parameter vectorB: Double-precision real input vector B.
     /// - Returns: The dot product of vectors A and B.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func dot<U>(_ vectorA: U,
                               _ vectorB: U) -> Double
         where
@@ -84,8 +83,7 @@ extension vDSP {
     /// - Parameter x: The `x` in `z[i] = sqrt(x[i]² + y[i]²)`.
     /// - Parameter y: The `y` in `z[i] = sqrt(x[i]² + y[i]²)`.
     /// - Parameter result: The `z` in `z[i] = sqrt(x[i]² + y[i]²)`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func hypot<U, V>(_ x: U,
                                    _ y: V) -> [Float]
         where
@@ -113,8 +111,7 @@ extension vDSP {
     /// - Parameter x: The `x` in `z[i] = sqrt(x[i]² + y[i]²)`.
     /// - Parameter y: The `y` in `z[i] = sqrt(x[i]² + y[i]²)`.
     /// - Parameter result: The `z` in `z[i] = sqrt(x[i]² + y[i]²)`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func hypot<T, U, V>(_ x: T,
                                       _ y: U,
                                       result: inout V)
@@ -145,8 +142,7 @@ extension vDSP {
     /// - Parameter x: The `x` in `z[i] = sqrt(x[i]² + y[i]²)`.
     /// - Parameter y: The `y` in `z[i] = sqrt(x[i]² + y[i]²)`.
     /// - Parameter result: The `z` in `z[i] = sqrt(x[i]² + y[i]²)`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func hypot<U, V>(_ x: U,
                                    _ y: V) -> [Double]
         where
@@ -174,8 +170,7 @@ extension vDSP {
     /// - Parameter x: The `x` in `z[i] = sqrt(x[i]² + y[i]²)`.
     /// - Parameter y: The `y` in `z[i] = sqrt(x[i]² + y[i]²)`.
     /// - Parameter result: The `z` in `z[i] = sqrt(x[i]² + y[i]²)`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func hypot<T, U, V>(_ x: T,
                                       _ y: U,
                                       result: inout V)
@@ -210,8 +205,7 @@ extension vDSP {
     /// - Parameter y0: The `y0` in `z[i] = sqrt( (x0[i] - x1[i])² + (y0[i] - y1[i])² )`.
     /// - Parameter y1: The `y1` in `z[i] = sqrt( (x0[i] - x1[i])² + (y0[i] - y1[i])² )`.
     /// - Parameter result: The `z` in `z[i] = sqrt( (x0[i] - x1[i])² + (y0[i] - y1[i])² )`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func hypot<R, S, T, U>(x0: R, x1: S,
                                             y0: T, y1: U) -> [Float]
         where
@@ -247,8 +241,7 @@ extension vDSP {
     /// - Parameter y0: The `y0` in `z[i] = sqrt( (x0[i] - x1[i])² + (y0[i] - y1[i])² )`.
     /// - Parameter y1: The `y1` in `z[i] = sqrt( (x0[i] - x1[i])² + (y0[i] - y1[i])² )`.
     /// - Parameter result: The `z` in `z[i] = sqrt( (x0[i] - x1[i])² + (y0[i] - y1[i])² )`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func hypot<R, S, T, U, V>(x0: R, x1: S,
                                             y0: T, y1: U,
                                             result: inout V)
@@ -293,8 +286,7 @@ extension vDSP {
     /// - Parameter y0: The `y0` in `z[i] = sqrt( (x0[i] - x1[i])² + (y0[i] - y1[i])² )`.
     /// - Parameter y1: The `y1` in `z[i] = sqrt( (x0[i] - x1[i])² + (y0[i] - y1[i])² )`.
     /// - Parameter result: The `z` in `z[i] = sqrt( (x0[i] - x1[i])² + (y0[i] - y1[i])² )`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func hypot<R, S, T, U>(x0: R, x1: S,
                                             y0: T, y1: U) -> [Double]
         where
@@ -330,8 +322,7 @@ extension vDSP {
     /// - Parameter y0: The `y0` in `z[i] = sqrt( (x0[i] - x1[i])² + (y0[i] - y1[i])² )`.
     /// - Parameter y1: The `y1` in `z[i] = sqrt( (x0[i] - x1[i])² + (y0[i] - y1[i])² )`.
     /// - Parameter result: The `z` in `z[i] = sqrt( (x0[i] - x1[i])² + (y0[i] - y1[i])² )`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func hypot<R, S, T, U, V>(x0: R, x1: S,
                                             y0: T, y1: U,
                                             result: inout V)
@@ -375,8 +366,7 @@ extension vDSP {
     /// - Parameter pointA: First point in `n` dimensional space, where `n` is the collection count.
     /// - Parameter pointB: Second point in `n` dimensional space, where `n` is the collection count.
     /// - Returns: The distance squared between `pointA` and `pointB`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func distanceSquared<U, V>(_ pointA: U,
                                              _ pointB: V) -> Float
         where
@@ -406,8 +396,7 @@ extension vDSP {
     /// - Parameter pointA: First point in `n` dimensional space, where `n` is the collection count.
     /// - Parameter pointB: Second point in `n` dimensional space, where `n` is the collection count.
     /// - Returns: The distance squared between `pointA` and `pointB`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func distanceSquared<U, V>(_ pointA: U,
                                              _ pointB: V) -> Double
         where

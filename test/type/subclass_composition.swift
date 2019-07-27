@@ -97,8 +97,8 @@ func basicSubtyping(
   anyObject: AnyObject) {
 
   // Errors
-  let _: Base & P2 = base // expected-error {{value of type 'Base<Int>' does not conform to specified type 'Base & P2'}}
-  let _: Base<Int> & P2 = base // expected-error {{value of type 'Base<Int>' does not conform to specified type 'Base<Int> & P2'}}
+  let _: Base & P2 = base // expected-error {{value of type 'Base<Int>' does not conform to specified type 'P2'}}
+  let _: Base<Int> & P2 = base // expected-error {{value of type 'Base<Int>' does not conform to specified type 'P2'}}
   let _: P3 = baseAndP1 // expected-error {{value of type 'Base<Int> & P1' does not conform to specified type 'P3'}}
   let _: P3 = baseAndP2 // expected-error {{value of type 'Base<Int> & P2' does not conform to specified type 'P3'}}
   let _: Derived = baseAndP1 // expected-error {{cannot convert value of type 'Base<Int> & P1' to specified type 'Derived'}}
@@ -530,3 +530,21 @@ struct DerivedBox<T : Derived> {}
 
 func takesBoxWithP3(_: DerivedBox<Derived & P3>) {}
 // expected-error@-1 {{'DerivedBox' requires that 'Derived & P3' inherit from 'Derived'}}
+
+// A bit of a tricky setup -- the real problem is that matchTypes() did the
+// wrong thing when solving a Bind constraint where both sides were protocol
+// compositions, but one of them had a superclass constraint containing type
+// variables. We were checking type equality in this case, which is not
+// correct; we have to do a 'deep equality' check, recursively matching the
+// superclass types.
+struct Generic<T> {
+  var _x: (Base<T> & P2)!
+
+  var x: (Base<T> & P2)? {
+    get { return _x }
+    set { _x = newValue }
+    _modify {
+      yield &_x
+    }
+  }
+}

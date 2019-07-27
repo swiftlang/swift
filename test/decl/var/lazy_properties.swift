@@ -29,7 +29,7 @@ class TestClass {
 
   lazy var d : Int  // expected-error {{lazy properties must have an initializer}} {{3-8=}}
 
-  lazy var (e, f) = (1,2)  // expected-error {{'lazy' cannot destructure an initializer}} {{3-8=}}
+  lazy var (e, f) = (1,2)  // expected-error 2{{'lazy' cannot destructure an initializer}} {{3-8=}}
 
   lazy var g = { 0 }()   // single-expr closure
 

@@ -66,6 +66,8 @@ import DictionaryOfAnyHashableStrings
 import DictionaryRemove
 import DictionarySubscriptDefault
 import DictionarySwap
+import Diffing
+import DiffingMyers
 import DropFirst
 import DropLast
 import DropWhile
@@ -80,6 +82,7 @@ import Hanoi
 import Hash
 import Histogram
 import InsertCharacter
+import IntegerParsing
 import Integrate
 import IterateData
 import Join
@@ -92,6 +95,7 @@ import Memset
 import MonteCarloE
 import MonteCarloPi
 import NibbleSort
+import NIOChannelPipeline
 import NSDictionaryCastToSwift
 import NSError
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
@@ -238,6 +242,8 @@ registerBenchmark(DictionaryOfAnyHashableStrings)
 registerBenchmark(DictionaryRemove)
 registerBenchmark(DictionarySubscriptDefault)
 registerBenchmark(DictionarySwap)
+registerBenchmark(Diffing)
+registerBenchmark(DiffingMyers)
 registerBenchmark(DropFirst)
 registerBenchmark(DropLast)
 registerBenchmark(DropWhile)
@@ -253,6 +259,7 @@ registerBenchmark(Hanoi)
 registerBenchmark(HashTest)
 registerBenchmark(Histogram)
 registerBenchmark(InsertCharacter)
+registerBenchmark(IntegerParsing)
 registerBenchmark(IntegrateTest)
 registerBenchmark(IterateData)
 registerBenchmark(Join)
@@ -270,6 +277,7 @@ registerBenchmark(NSErrorTest)
 registerBenchmark(NSStringConversion)
 #endif
 registerBenchmark(NibbleSort)
+registerBenchmark(NIOChannelPipeline)
 registerBenchmark(NopDeinit)
 registerBenchmark(ObjectAllocation)
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)

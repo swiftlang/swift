@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-constant-evaluation-tester"
+#include "swift/AST/DiagnosticsSIL.h"
 #include "swift/SIL/SILConstants.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -19,6 +20,12 @@
 using namespace swift;
 
 namespace {
+
+template <typename... T, typename... U>
+static InFlightDiagnostic diagnose(ASTContext &Context, SourceLoc loc,
+                                   Diag<T...> diag, U &&... args) {
+  return Context.Diags.diagnose(loc, diag, std::forward<U>(args)...);
+}
 
 /// A compiler pass for testing constant evaluator in the step-wise evaluation
 /// mode. The pass evaluates SIL functions whose names start with "interpret"
@@ -29,6 +36,18 @@ class ConstantEvaluatorTester : public SILFunctionTransform {
   bool shouldInterpret() {
     auto *fun = getFunction();
     return fun->getName().startswith("interpret");
+  }
+
+  bool shouldSkipInstruction(SILInstruction *inst) {
+    auto *applyInst = dyn_cast<ApplyInst>(inst);
+    if (!applyInst)
+      return false;
+
+    auto *callee = applyInst->getReferencedFunctionOrNull();
+    if (!callee)
+      return false;
+
+    return callee->getName().startswith("skip");
   }
 
   void run() override {
@@ -52,6 +71,7 @@ class ConstantEvaluatorTester : public SILFunctionTransform {
         if (!returnVal) {
           llvm::errs() << "Returns unknown"
                        << "\n";
+          break;
         }
         llvm::errs() << "Returns " << returnVal.getValue() << "\n";
         break;
@@ -60,15 +80,33 @@ class ConstantEvaluatorTester : public SILFunctionTransform {
       Optional<SILBasicBlock::iterator> nextInstOpt;
       Optional<SymbolicValue> errorVal;
 
-      std::tie(nextInstOpt, errorVal) = stepEvaluator.evaluate(currI);
-      if (errorVal.hasValue()) {
-        // Diagnose the error.
-        assert(errorVal->getKind() == SymbolicValue::Unknown);
+      // If the instruction is marked as skip, skip it and make its effects
+      // non-constant. Otherwise, try evaluating the instruction and if the
+      // evaluation fails due to a previously skipped instruction,
+      // skip the current instruction.
+      if (shouldSkipInstruction(inst)) {
+        std::tie(nextInstOpt, errorVal) =
+            stepEvaluator.skipByMakingEffectsNonConstant(currI);
+      } else {
+        std::tie(nextInstOpt, errorVal) =
+            stepEvaluator.tryEvaluateOrElseMakeEffectsNonConstant(currI);
+      }
+
+      // Diagnose errors in the evaluation. Unknown symbolic values produced
+      // by skipping instructions are not considered errors.
+      if (errorVal.hasValue() &&
+          !errorVal->isUnknownDueToUnevaluatedInstructions()) {
         errorVal->emitUnknownDiagnosticNotes(inst->getLoc());
         break;
       }
 
-      assert(nextInstOpt);
+      if (!nextInstOpt) {
+        diagnose(fun->getASTContext(), inst->getLoc().getSourceLoc(),
+                 diag::constexpr_unknown_control_flow_due_to_skip);
+        errorVal->emitUnknownDiagnosticNotes(inst->getLoc());
+        break;
+      }
+
       currI = nextInstOpt.getValue();
     }
   }

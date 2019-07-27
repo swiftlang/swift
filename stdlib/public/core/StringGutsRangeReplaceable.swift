@@ -246,7 +246,7 @@ extension _StringGuts {
   internal mutating func replaceSubrange<C>(
     _ bounds: Range<Index>,
     with newElements: C
-  ) where C : Collection, C.Iterator.Element == Character {
+  ) where C: Collection, C.Iterator.Element == Character {
     if isUniqueNative {
       if let replStr = newElements as? String, replStr._guts.isFastUTF8 {
         replStr._guts.withFastUTF8 {

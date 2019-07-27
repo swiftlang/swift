@@ -1,8 +1,8 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-ir %s
 
 import ctypes
 
-func useStructWithUnion(_ vec: GLKVector4) -> GLKVector4 {
+func useStructWithUnion(_ vec: GLKVector4) {
   var vec = vec
   _ = vec.v.0
   _ = vec.v.1
@@ -10,6 +10,7 @@ func useStructWithUnion(_ vec: GLKVector4) -> GLKVector4 {
   _ = vec.v.3
 
   vec.v = (0, 0, 0, 0)
+  
 }
 
 func useUnionIndirectFields(_ vec: GLKVector4) -> GLKVector4 {
@@ -33,7 +34,11 @@ func useUnionIndirectFields(_ vec: GLKVector4) -> GLKVector4 {
   let _: CFloat = vec.v.1
   let _: CFloat = vec.v.2
   let _: CFloat = vec.v.3
-  return vec
+
+  var vec1 = vec
+  vec1.x = vec.y
+
+  return vec1
 }
 
 func useStructWithNamedUnion(_ u: NamedUnion) -> NamedUnion {
@@ -53,7 +58,7 @@ func useStructWithAnonymousUnion(_ u: AnonUnion) -> AnonUnion {
   return u
 }
 
-func useStructWithUnnamedUnion(_ u: UnnamedUnion) -> UnnamedUnion {
+func useStructWithUnnamedUnion(_ u: UnnamedUnion) {
   var u = u
   u.u.i = 100
   u.u.f = 1.0

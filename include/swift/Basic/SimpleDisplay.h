@@ -19,6 +19,7 @@
 #ifndef SWIFT_BASIC_SIMPLE_DISPLAY_H
 #define SWIFT_BASIC_SIMPLE_DISPLAY_H
 
+#include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/raw_ostream.h"
 #include <tuple>
 #include <type_traits>
@@ -91,6 +92,34 @@ namespace swift {
   void simple_display(llvm::raw_ostream &out,
                       const std::tuple<Types...> &value) {
     simple_display_tuple<0>(out, value);
+  }
+  
+  template<typename T>
+  void simple_display(llvm::raw_ostream &out,
+                      const llvm::TinyPtrVector<T> &vector) {
+    out << "{";
+    bool first = true;
+    for (const T &value : vector) {
+      if (first) first = false;
+      else out << ", ";
+      
+      simple_display(out, value);
+    }
+    out << "}";
+  }
+  
+  template<typename T>
+  void simple_display(llvm::raw_ostream &out,
+                      const llvm::ArrayRef<T> &array) {
+    out << "{";
+    bool first = true;
+    for (const T &value : array) {
+      if (first) first = false;
+      else out << ", ";
+      
+      simple_display(out, value);
+    }
+    out << "}";
   }
 }
 

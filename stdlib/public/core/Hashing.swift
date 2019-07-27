@@ -76,7 +76,7 @@ internal struct _UnmanagedAnyObjectArray {
 // renamed. The old name must not be used in the new runtime.
 final internal class __SwiftEmptyNSEnumerator
   : __SwiftNativeNSEnumerator, _NSEnumerator {
-  internal override required init() {}
+  internal override required init() { super.init() }
 
   @objc
   internal func nextObject() -> AnyObject? {

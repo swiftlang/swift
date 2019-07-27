@@ -28,6 +28,7 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILVTableVisitor.h"
 #include "swift/SIL/SILWitnessTable.h"
+#include "swift/SIL/SILWitnessVisitor.h"
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Error.h"
@@ -114,7 +115,8 @@ void TBDGenVisitor::addBaseConformanceDescriptor(
 }
 
 void TBDGenVisitor::addConformances(DeclContext *DC) {
-  for (auto conformance : DC->getLocalConformances()) {
+  for (auto conformance : DC->getLocalConformances(
+                            ConformanceLookupKind::NonInherited)) {
     auto protocol = conformance->getProtocol();
     auto needsWTable =
         Lowering::TypeConverter::protocolRequiresWitnessTable(protocol);
@@ -149,7 +151,7 @@ void TBDGenVisitor::addConformances(DeclContext *DC) {
     };
 
     rootConformance->forEachValueWitness(
-        nullptr, [&](ValueDecl *valueReq, Witness witness) {
+        [&](ValueDecl *valueReq, Witness witness) {
           auto witnessDecl = witness.getDecl();
           if (isa<AbstractFunctionDecl>(valueReq)) {
             addSymbolIfNecessary(valueReq, witnessDecl);
@@ -195,8 +197,6 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
     bool useAllocator = shouldUseAllocatorMangling(AFD);
     addSymbol(LinkEntity::forDynamicallyReplaceableFunctionVariable(
         AFD, useAllocator));
-    addSymbol(
-        LinkEntity::forDynamicallyReplaceableFunctionImpl(AFD, useAllocator));
     addSymbol(
         LinkEntity::forDynamicallyReplaceableFunctionKey(AFD, useAllocator));
 
@@ -281,7 +281,7 @@ void TBDGenVisitor::visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
 
   // Explicitly look at each accessor here: see visitAccessorDecl.
   for (auto accessor : ASD->getAllAccessors()) {
-    visitAbstractFunctionDecl(accessor);
+    visitFuncDecl(accessor);
   }
 }
 
@@ -366,26 +366,21 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
 
   // Some members of classes get extra handling, beyond members of struct/enums,
   // so let's walk over them manually.
-  for (auto *member : CD->getMembers()) {
-    auto value = dyn_cast<ValueDecl>(member);
-    if (!value)
-      continue;
-
-    auto var = dyn_cast<VarDecl>(value);
-    auto hasFieldOffset = var && var->hasStorage() && !var->isStatic();
-    if (hasFieldOffset)
-      addSymbol(LinkEntity::forFieldOffset(var));
-  }
+  for (auto *var : CD->getStoredProperties())
+    addSymbol(LinkEntity::forFieldOffset(var));
 
   visitNominalTypeDecl(CD);
 
-  // Types with resilient superclasses have some extra symbols.
-  if (CD->checkAncestry(AncestryFlags::ResilientOther) ||
-      CD->hasResilientMetadata()) {
-    addSymbol(LinkEntity::forClassMetadataBaseOffset(CD));
+  bool resilientAncestry = CD->checkAncestry(AncestryFlags::ResilientOther);
 
-    auto &Ctx = CD->getASTContext();
-    if (Ctx.LangOpts.EnableObjCResilientClassStubs) {
+  // Types with resilient superclasses have some extra symbols.
+  if (resilientAncestry || CD->hasResilientMetadata()) {
+    addSymbol(LinkEntity::forClassMetadataBaseOffset(CD));
+  }
+
+  auto &Ctx = CD->getASTContext();
+  if (Ctx.LangOpts.EnableObjCInterop) {
+    if (resilientAncestry) {
       addSymbol(LinkEntity::forObjCResilientClassStub(
           CD, TypeMetadataAddress::AddressPoint));
     }
@@ -463,28 +458,6 @@ void TBDGenVisitor::visitExtensionDecl(ExtensionDecl *ED) {
     visit(member);
 }
 
-/// Determine whether the protocol descriptor for the given protocol will
-/// contain any protocol requirements.
-static bool protocolDescriptorHasRequirements(ProtocolDecl *proto) {
-  if (!proto->getRequirementSignature().empty())
-    return true;
-
-  for (auto *member : proto->getMembers()) {
-    if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
-      if (SILDeclRef::requiresNewWitnessTableEntry(func))
-        return true;
-    }
-
-    if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
-      if (assocType->getOverriddenDecls().empty()) {
-        return true;
-      }
-    }
-  }
-
-  return false;
-}
-
 #ifndef NDEBUG
 static bool isValidProtocolMemberForTBDGen(const Decl *D) {
   switch (D->getKind()) {
@@ -520,6 +493,7 @@ static bool isValidProtocolMemberForTBDGen(const Decl *D) {
   case DeclKind::PostfixOperator:
     return false;
   }
+  llvm_unreachable("covered switch");
 }
 #endif
 
@@ -527,45 +501,45 @@ void TBDGenVisitor::visitProtocolDecl(ProtocolDecl *PD) {
   if (!PD->isObjC()) {
     addSymbol(LinkEntity::forProtocolDescriptor(PD));
 
-    // If there are any requirements, emit a requirements base descriptor.
-    if (protocolDescriptorHasRequirements(PD))
-      addProtocolRequirementsBaseDescriptor(PD);
+    struct WitnessVisitor : public SILWitnessVisitor<WitnessVisitor> {
+      TBDGenVisitor &TBD;
+      ProtocolDecl *PD;
 
-    for (const auto &req : PD->getRequirementSignature()) {
-      if (req.getKind() != RequirementKind::Conformance)
-        continue;
+    public:
+      WitnessVisitor(TBDGenVisitor &TBD, ProtocolDecl *PD)
+          : TBD(TBD), PD(PD) {}
 
-      if (req.getFirstType()->isEqual(PD->getSelfInterfaceType())) {
-        BaseConformance conformance(
-          PD,
-          req.getSecondType()->castTo<ProtocolType>()->getDecl());
-        addBaseConformanceDescriptor(conformance);
-      } else {
-        AssociatedConformance conformance(
-          PD,
-          req.getFirstType()->getCanonicalType(),
-          req.getSecondType()->castTo<ProtocolType>()->getDecl());
-        addAssociatedConformanceDescriptor(conformance);
-      }
-    }
-
-    for (auto *member : PD->getMembers()) {
-      if (PD->isResilient()) {
-        if (auto *funcDecl = dyn_cast<AbstractFunctionDecl>(member)) {
-          if (SILDeclRef::requiresNewWitnessTableEntry(funcDecl)) {
-            addDispatchThunk(SILDeclRef(funcDecl));
-            addMethodDescriptor(SILDeclRef(funcDecl));
-          }
+      void addMethod(SILDeclRef declRef) {
+        if (PD->isResilient()) {
+          TBD.addDispatchThunk(declRef);
+          TBD.addMethodDescriptor(declRef);
         }
       }
 
-      // Always produce associated type descriptors, because they can
-      // be referenced by generic signatures.
-      if (auto *assocType = dyn_cast<AssociatedTypeDecl>(member)) {
-        if (assocType->getOverriddenDecls().empty())
-          addAssociatedTypeDescriptor(assocType);
+      void addAssociatedType(AssociatedType associatedType) {
+        TBD.addAssociatedTypeDescriptor(associatedType.getAssociation());
       }
-    }
+
+      void addProtocolConformanceDescriptor() {
+        TBD.addProtocolRequirementsBaseDescriptor(PD);
+      }
+
+      void addOutOfLineBaseProtocol(ProtocolDecl *proto) {
+        TBD.addBaseConformanceDescriptor(BaseConformance(PD, proto));
+      }
+
+      void addAssociatedConformance(AssociatedConformance associatedConf) {
+        TBD.addAssociatedConformanceDescriptor(associatedConf);
+      }
+
+      void addPlaceholder(MissingMemberDecl *decl) {}
+
+      void doIt() {
+        visitProtocolDecl(PD);
+      }
+    };
+
+    WitnessVisitor(*this, PD).doIt();
 
     // Include the self-conformance.
     addConformances(PD);

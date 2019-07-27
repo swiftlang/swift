@@ -181,7 +181,7 @@ extension String {
   ///   - uppercase: Pass `true` to use uppercase letters to represent numerals
   ///     greater than 9, or `false` to use lowercase letters. The default is
   ///     `false`.
-  public init<T : BinaryInteger>(
+  public init<T: BinaryInteger>(
     _ value: T, radix: Int = 10, uppercase: Bool = false
   ) {
     self = value._description(radix: radix, uppercase: uppercase)

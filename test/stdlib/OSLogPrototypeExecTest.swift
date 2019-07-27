@@ -392,12 +392,12 @@ InterpolationTestSuite.test("interpolation of too many arguments") {
       expectEqual(
         String(
           repeating: "%{public}\(intPrefix)d ",
-          count: maxOSLogArgumentCount),
+          count: Int(maxOSLogArgumentCount)),
         formatString)
 
       let bufferChecker = OSLogBufferChecker(buffer)
       bufferChecker.checkSummaryBytes(
-        argumentCount: UInt8(maxOSLogArgumentCount),
+        argumentCount: maxOSLogArgumentCount,
         hasPrivate: false,
         hasNonScalar: false)
 
@@ -408,7 +408,7 @@ InterpolationTestSuite.test("interpolation of too many arguments") {
               startIndex: $0,
               flag: .publicFlag,
               expectedInt: 1) },
-          count: maxOSLogArgumentCount)
+          count: Int(maxOSLogArgumentCount))
       )
   })
 }

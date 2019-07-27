@@ -16,7 +16,7 @@
 ///
 /// - Note: `s.lazy.filter { ... }`, for an arbitrary sequence `s`,
 ///   is a `LazyFilterSequence`.
-@_fixed_layout // lazy-performance
+@frozen // lazy-performance
 public struct LazyFilterSequence<Base: Sequence> {
   @usableFromInline // lazy-performance
   internal var _base: Base
@@ -42,7 +42,7 @@ extension LazyFilterSequence {
   ///
   /// - Note: This is the associated `Iterator` of `LazyFilterSequence`
   /// and `LazyFilterCollection`.
-  @_fixed_layout // lazy-performance
+  @frozen // lazy-performance
   public struct Iterator {
     /// The underlying iterator whose elements are being filtered.
     public var base: Base.Iterator { return _base }
@@ -296,8 +296,8 @@ extension LazyFilterCollection: Collection {
 
 extension LazyFilterCollection: LazyCollectionProtocol { }
 
-extension LazyFilterCollection : BidirectionalCollection
-  where Base : BidirectionalCollection {
+extension LazyFilterCollection: BidirectionalCollection
+  where Base: BidirectionalCollection {
 
   @inlinable // lazy-performance
   public func index(before i: Index) -> Index {

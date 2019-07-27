@@ -1211,7 +1211,6 @@ namespace {
       // hierarchy crosses resilience domains, we use a
       // slightly different query here.
       if (theClass->checkAncestry(AncestryFlags::ResilientOther)) {
-        assert(IGM.Context.LangOpts.EnableObjCResilientClassStubs);
         return IGM.getAddrOfObjCResilientClassStub(theClass, NotForDefinition,
                                              TypeMetadataAddress::AddressPoint);
       }
@@ -2072,9 +2071,7 @@ static llvm::Function *emitObjCMetadataUpdateFunction(IRGenModule &IGM,
 /// does not have statically-emitted metadata.
 bool irgen::hasObjCResilientClassStub(IRGenModule &IGM, ClassDecl *D) {
   assert(IGM.getClassMetadataStrategy(D) == ClassMetadataStrategy::Resilient);
-  return (!D->isGenericContext() &&
-          IGM.ObjCInterop &&
-          IGM.Context.LangOpts.EnableObjCResilientClassStubs);
+  return IGM.ObjCInterop && !D->isGenericContext();
 }
 
 void irgen::emitObjCResilientClassStub(IRGenModule &IGM, ClassDecl *D) {
@@ -2320,6 +2317,11 @@ IRGenModule::getClassMetadataStrategy(const ClassDecl *theClass) {
   // If we have resiliently-sized fields, we might be able to use the
   // update pattern.
   if (resilientLayout.doesMetadataRequireUpdate()) {
+      
+    // FixedOrUpdate strategy does not work in JIT mode
+    if (IRGen.Opts.UseJIT)
+      return ClassMetadataStrategy::Singleton;
+      
     // The update pattern only benefits us on platforms with an Objective-C
     // runtime, otherwise just use the singleton pattern.
     if (!Context.LangOpts.EnableObjCInterop)
@@ -2327,7 +2329,7 @@ IRGenModule::getClassMetadataStrategy(const ClassDecl *theClass) {
 
     // If the Objective-C runtime is new enough, we can just use the update
     // pattern unconditionally.
-    if (Types.doesPlatformSupportObjCMetadataUpdateCallback())
+    if (Context.LangOpts.doesTargetSupportObjCMetadataUpdateCallback())
       return ClassMetadataStrategy::Update;
 
     // Otherwise, check if we have legacy type info for backward deployment.

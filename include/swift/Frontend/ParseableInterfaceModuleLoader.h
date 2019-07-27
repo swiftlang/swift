@@ -116,22 +116,27 @@ namespace unittest {
 
 namespace swift {
 
+  class LangOptions;
+  class SearchPathOptions;
+
 /// A ModuleLoader that runs a subordinate \c CompilerInvocation and
 /// \c CompilerInstance to convert .swiftinterface files to .swiftmodule
 /// files on the fly, caching the resulting .swiftmodules in the module cache
 /// directory, and loading the serialized .swiftmodules from there.
 class ParseableInterfaceModuleLoader : public SerializedModuleLoaderBase {
   friend class unittest::ParseableInterfaceModuleLoaderTest;
-  explicit ParseableInterfaceModuleLoader(ASTContext &ctx, StringRef cacheDir,
-                                          StringRef prebuiltCacheDir,
-                                          DependencyTracker *tracker,
-                                          ModuleLoadingMode loadMode)
+  explicit ParseableInterfaceModuleLoader(
+      ASTContext &ctx, StringRef cacheDir, StringRef prebuiltCacheDir,
+      DependencyTracker *tracker, ModuleLoadingMode loadMode,
+      bool RemarkOnRebuildFromInterface)
   : SerializedModuleLoaderBase(ctx, tracker, loadMode),
-  CacheDir(cacheDir), PrebuiltCacheDir(prebuiltCacheDir)
+  CacheDir(cacheDir), PrebuiltCacheDir(prebuiltCacheDir),
+  RemarkOnRebuildFromInterface(RemarkOnRebuildFromInterface)
   {}
 
   std::string CacheDir;
   std::string PrebuiltCacheDir;
+  bool RemarkOnRebuildFromInterface;
 
   std::error_code findModuleFilesInDirectory(
     AccessPathElem ModuleID, StringRef DirPath, StringRef ModuleFilename,
@@ -144,21 +149,30 @@ class ParseableInterfaceModuleLoader : public SerializedModuleLoaderBase {
 public:
   static std::unique_ptr<ParseableInterfaceModuleLoader>
   create(ASTContext &ctx, StringRef cacheDir, StringRef prebuiltCacheDir,
-         DependencyTracker *tracker, ModuleLoadingMode loadMode) {
+         DependencyTracker *tracker, ModuleLoadingMode loadMode,
+         bool RemarkOnRebuildFromInterface = false) {
     return std::unique_ptr<ParseableInterfaceModuleLoader>(
       new ParseableInterfaceModuleLoader(ctx, cacheDir, prebuiltCacheDir,
-                                         tracker, loadMode));
+                                         tracker, loadMode,
+                                         RemarkOnRebuildFromInterface));
   }
+
+  /// Append visible module names to \p names. Note that names are possibly
+  /// duplicated, and not guaranteed to be ordered in any way.
+  void collectVisibleTopLevelModuleNames(
+      SmallVectorImpl<Identifier> &names) const override;
 
   /// Unconditionally build \p InPath (a swiftinterface file) to \p OutPath (as
   /// a swiftmodule file).
   ///
-  /// A simplified version of the core logic in #openModuleFiles, mostly for
-  /// testing purposes.
+  /// A simplified version of the core logic in #openModuleFiles.
   static bool buildSwiftModuleFromSwiftInterface(
-    ASTContext &Ctx, StringRef CacheDir, StringRef PrebuiltCacheDir,
+    SourceManager &SourceMgr, DiagnosticEngine &Diags,
+    const SearchPathOptions &SearchPathOpts, const LangOptions &LangOpts,
+    StringRef CacheDir, StringRef PrebuiltCacheDir,
     StringRef ModuleName, StringRef InPath, StringRef OutPath,
-    bool SerializeDependencyHashes, bool TrackSystemDependencies);
+    bool SerializeDependencyHashes, bool TrackSystemDependencies,
+    bool RemarkOnRebuildFromInterface);
 };
 
 /// Extract the specified-or-defaulted -module-cache-path that winds up in

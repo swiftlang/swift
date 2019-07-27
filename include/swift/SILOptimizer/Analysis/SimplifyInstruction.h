@@ -38,7 +38,7 @@ SILValue simplifyInstruction(SILInstruction *I);
 ///
 /// If it is nonnull, eraseNotify will be called before each instruction is
 /// deleted.
-void replaceAllSimplifiedUsesAndErase(
+SILBasicBlock::iterator replaceAllSimplifiedUsesAndErase(
     SILInstruction *I, SILValue result,
     std::function<void(SILInstruction *)> eraseNotify = nullptr);
 

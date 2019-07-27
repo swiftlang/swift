@@ -81,6 +81,6 @@ void swift_rootObjCDealloc(HeapObject *self);
 
 }
 
-#endif /* SWIFT_OBJC_INTEROP */
+#endif // SWIFT_OBJC_INTEROP
 
-#endif /* SWIFT_ABI_OBJCBRIDGE_H */
+#endif // SWIFT_ABI_OBJCBRIDGE_H

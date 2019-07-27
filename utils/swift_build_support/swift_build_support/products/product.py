@@ -10,6 +10,10 @@
 #
 # ----------------------------------------------------------------------------
 
+import abc
+
+from .. import cmake
+
 
 class Product(object):
     @classmethod
@@ -57,4 +61,77 @@ class Product(object):
         self.toolchain = toolchain
         self.source_dir = source_dir
         self.build_dir = build_dir
-        self.cmake_options = []
+        self.cmake_options = cmake.CMakeOptions()
+
+
+class ProductBuilder(object):
+    """
+    Abstract base class for all ProductBuilders.
+
+    An specific ProductBuilder will implement the interface methods depending
+    how the product want to be build. Multiple products can use the same
+    product builder if parametrized right (for example all the products build
+    using CMake).
+
+    Ideally a ProductBuilder will be initialized with references to the
+    invocation arguments, the calculated toolchain, the calculated workspace,
+    and the target host, but the base class doesn't impose those requirements
+    in order to be flexible.
+
+    NOTE: Python doesn't need an explicit abstract base class, but it helps
+    documenting the interface.
+    """
+
+    @abc.abstractmethod
+    def __init__(self, product_class, args, toolchain, workspace):
+        """
+        Create a product builder for the given product class.
+
+        Parameters
+        ----------
+        product_class : class
+            A subtype of `Product` which describes the product being built by
+            this builder.
+        args : `argparse.Namespace`
+            The arguments passed by the user to the invocation of the script. A
+            builder should consider this argument read-only.
+        toolchain : `swift_build_support.toolchain.Toolchain`
+            The toolchain being used to build the product. The toolchain will
+            point to the tools that the builder should use to build (like the
+            compiler or the linker).
+        workspace : `swift_build_support.workspace.Workspace`
+            The workspace where the source code and the build directories have
+            to be located. A builder should use the workspace to access its own
+            source/build directory, as well as other products source/build
+            directories.
+        """
+        pass
+
+    @abc.abstractmethod
+    def build(self):
+        """
+        Perform the build phase for the product.
+
+        This phase might also imply a configuration phase, but each product
+        builder is free to determine how to do it.
+        """
+        pass
+
+    @abc.abstractmethod
+    def test(self):
+        """
+        Perform the test phase for the product.
+
+        This phase might build and execute the product tests.
+        """
+        pass
+
+    @abc.abstractmethod
+    def install(self):
+        """
+        Perform the install phase for the product.
+
+        This phase might copy the artifacts from the previous phases into a
+        destination directory.
+        """
+        pass

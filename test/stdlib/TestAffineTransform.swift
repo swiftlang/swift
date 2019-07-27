@@ -316,6 +316,8 @@ class TestAffineTransform : TestAffineTransformSuper {
     }
     
     func test_hashing() {
+        guard #available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, *) else { return }
+
         // the transforms are made up and the values don't matter
         let a = AffineTransform(m11: 1.0, m12: 2.5, m21: 66.2, m22: 40.2, tX: -5.5, tY: 3.7)
         let b = AffineTransform(m11: -55.66, m12: 22.7, m21: 1.5, m22: 0.0, tX: -22, tY: -33)

@@ -180,6 +180,12 @@ protected:
   /// we compute the genset and killset.
   llvm::SmallPtrSet<SILBasicBlock *, 8> InterestBlocks;
 
+#ifndef NDEBUG
+  // SILPrintContext is used to print block IDs in RPO order.
+  // It is optional so only the final insertion point interference is printed.
+  Optional<SILPrintContext> printCtx;
+#endif
+
   /// Return the rc-identity root of the SILValue.
   SILValue getRCRoot(SILValue R) {
      return RCFI->getRCIdentityRoot(R);
@@ -308,14 +314,23 @@ class RetainCodeMotionContext : public CodeMotionContext {
       return true;
     // Identical RC root blocks code motion, we will be able to move this retain
     // further once we move the blocking retain.
-    if (isRetainInstruction(II) && getRCRoot(II) == Ptr)
+    if (isRetainInstruction(II) && getRCRoot(II) == Ptr) {
+      LLVM_DEBUG(if (printCtx) llvm::dbgs()
+                 << "Retain " << Ptr << "  at matching retain " << *II);
       return true;
+    }
     // Ref count checks do not have side effects, but are barriers for retains.
-    if (mayCheckRefCount(II))
+    if (mayCheckRefCount(II)) {
+      LLVM_DEBUG(if (printCtx) llvm::dbgs()
+                 << "Retain " << Ptr << "  at refcount check " << *II);
       return true;
+    }
     // mayDecrement reference count stops code motion.
-    if (mayDecrementRefCount(II, Ptr, AA)) 
+    if (mayDecrementRefCount(II, Ptr, AA)) {
+      LLVM_DEBUG(if (printCtx) llvm::dbgs()
+                 << "Retain " << Ptr << "  at may decrement " << *II);
       return true;
+    }
     // This instruction does not block the retain code motion.
     return false;
   }
@@ -398,6 +413,8 @@ void RetainCodeMotionContext::initializeCodeMotionDataFlow() {
         continue;
       RCRootIndex[Root] = RCRootVault.size();
       RCRootVault.insert(Root);
+      LLVM_DEBUG(llvm::dbgs()
+                 << "Retain Root #" << RCRootVault.size() << " " << Root);
     }
   }
 
@@ -560,6 +577,9 @@ void RetainCodeMotionContext::convergeCodeMotionDataFlow() {
 }
 
 void RetainCodeMotionContext::computeCodeMotionInsertPoints() {
+#ifndef NDEBUG
+  printCtx.emplace(llvm::dbgs(), /*Verbose=*/false, /*Sorted=*/true);
+#endif
   // The BBSetOuts have converged, run last iteration and figure out
   // insertion point for each refcounted root.
   for (SILBasicBlock *BB : PO->getReversePostOrder()) {
@@ -667,11 +687,17 @@ class ReleaseCodeMotionContext : public CodeMotionContext {
       return true;
     // Identical RC root blocks code motion, we will be able to move this release
     // further once we move the blocking release.
-    if (isReleaseInstruction(II) && getRCRoot(II) == Ptr)
+    if (isReleaseInstruction(II) && getRCRoot(II) == Ptr) {
+      LLVM_DEBUG(if (printCtx) llvm::dbgs()
+                 << "Release " << Ptr << "  at matching release " << *II);
       return true;
+    }
     // Stop at may interfere.
-    if (mayHaveSymmetricInterference(II, Ptr, AA))
+    if (mayHaveSymmetricInterference(II, Ptr, AA)) {
+      LLVM_DEBUG(if (printCtx) llvm::dbgs()
+                 << "Release " << Ptr << "  at interference " << *II);
       return true;
+    }
     // This instruction does not block the release.
     return false;
   }
@@ -771,6 +797,8 @@ void ReleaseCodeMotionContext::initializeCodeMotionDataFlow() {
         continue;
       RCRootIndex[Root] = RCRootVault.size();
       RCRootVault.insert(Root);
+      LLVM_DEBUG(llvm::dbgs()
+                 << "Release Root #" << RCRootVault.size() << " " << Root);
     }
     if (MultiIteration && BB.getTerminator()->isFunctionExiting())
       Worklist.push_back(&BB);
@@ -972,6 +1000,10 @@ void ReleaseCodeMotionContext::convergeCodeMotionDataFlow() {
 }
 
 void ReleaseCodeMotionContext::computeCodeMotionInsertPoints() {
+#ifndef NDEBUG
+  printCtx.emplace(llvm::dbgs(), /*Verbose=*/false, /*Sorted=*/true);
+#endif
+
   // The BBSetIns have converged, run last iteration and figure out insertion
   // point for each RC root.
   for (SILBasicBlock *BB : PO->getPostOrder()) {
@@ -991,6 +1023,9 @@ void ReleaseCodeMotionContext::computeCodeMotionInsertPoints() {
         if (!SBB->BBSetIn[i])
           continue;
         InsertPoints[RCRootVault[i]].push_back(&*(*Succ).begin());
+        LLVM_DEBUG(llvm::dbgs()
+                   << "Release partial merge. Insert at successor: "
+                   << printCtx->getID(BB) << " " << RCRootVault[i]);
       }
     }
 
@@ -1010,6 +1045,9 @@ void ReleaseCodeMotionContext::computeCodeMotionInsertPoints() {
         if (!SBB->BBSetIn[i])
           continue;
         InsertPoints[RCRootVault[i]].push_back(&*(*Succ).begin());
+        LLVM_DEBUG(llvm::dbgs()
+                   << "Release terminator use. Insert at successor: "
+                   << printCtx->getID(BB) << " " << RCRootVault[i]);
       }
       S->BBSetOut.reset(i);
     }

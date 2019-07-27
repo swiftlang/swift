@@ -129,10 +129,23 @@ public:
     Bits.AccessEnforcementOptsInfo.seenNestedConflict = 1;
   }
 
+  /// Did a PostOrder walk previously find another access to the same
+  /// storage. If so, then this access could be merged with a subsequent access
+  /// after checking for conflicts.
+  bool seenIdenticalStorage() const {
+    return Bits.AccessEnforcementOptsInfo.seenIdenticalStorage;
+  }
+
+  void setSeenIdenticalStorage() {
+    Bits.AccessEnforcementOptsInfo.seenIdenticalStorage = 1;
+  }
+
   void dump() const {
     AccessedStorage::dump();
     llvm::dbgs() << "  access index: " << getAccessIndex() << " <"
-                 << (seenNestedConflict() ? "" : "no ") << "conflict>\n";
+                 << (seenNestedConflict() ? "" : "no ") << "conflict> <"
+                 << (seenIdenticalStorage() ? "" : "not ") << "seen identical>"
+                 << "\n";
   }
 };
 using AccessInfo = AccessEnforcementOptsInfo;
@@ -267,21 +280,26 @@ public:
 
 private:
   LoopRegionFunctionInfo *LRFI;
+  PostOrderFunctionInfo *PO;
   AccessedStorageAnalysis *ASA;
+
+  // Unique storage locations seen in this function.
+  AccessedStorageSet storageSet;
 
   Result result;
 
 public:
   AccessConflictAndMergeAnalysis(LoopRegionFunctionInfo *LRFI,
+                                 PostOrderFunctionInfo *PO,
                                  AccessedStorageAnalysis *ASA)
-      : LRFI(LRFI), ASA(ASA) {}
+    : LRFI(LRFI), PO(PO), ASA(ASA) {}
 
-  void analyze();
+  bool analyze();
 
   const Result &getResult() { return result; }
 
 protected:
-  void identifyBeginAccesses();
+  bool identifyBeginAccesses();
 
   void
   propagateAccessSetsBottomUp(LoopRegionToAccessedStorage &regionToStorageMap,
@@ -423,10 +441,12 @@ BeginAccessInst *AccessConflictAndMergeAnalysis::findMergeableOutOfScopeAccess(
   // Given a mergeableAccess, 'A', another out-of-scope access, 'B', and the
   // current access, 'C' which has identical storage as 'A', the only situation
   // in which it is illegal to merge 'A' with 'C' is when 'B' has non-distinct
-  // storage from 'A'/'C' and 'B' begins after 'A' and ends before 'C'. This
-  // would introduce a false conflict. Since it is impossible to determine here
-  // whether 'A' and 'B' overlap, we assume they do not and avoid merging. The
-  // case in which they actually do overlap is an unimportant to optimize.
+  // storage from 'A'/'C', 'B' begins after 'A', and 'B' ends before
+  // 'C'. Merging 'A' with 'C' would then introduce a false conflict. Since it
+  // is impossible to determine here whether 'A' and 'B' overlap, we assume they
+  // do not and simply avoid merging whenever 'B' and 'C' overlap. It is not
+  // important to optimize the case in which 'A' and 'B' overlap because
+  // potential conflicts like that are unlikely.
   if (llvm::any_of(state.outOfScopeConflictFreeAccesses,
                    [&](BeginAccessInst *bai) {
                      auto storageInfo = result.getAccessInfo(bai);
@@ -454,6 +474,11 @@ void AccessConflictAndMergeAnalysis::insertOutOfScopeAccess(
     RegionState &state, BeginAccessInst *beginAccess,
     AccessInfo &currStorageInfo) {
 
+  if (!currStorageInfo.seenIdenticalStorage()) {
+    LLVM_DEBUG(llvm::dbgs() << "Ignoring unmergeable access: " << *beginAccess);
+    return;
+  }
+
   auto identicalStorageIter = llvm::find_if(
       state.outOfScopeConflictFreeAccesses, [&](BeginAccessInst *bai) {
         auto storageInfo = result.getAccessInfo(bai);
@@ -468,8 +493,13 @@ void AccessConflictAndMergeAnalysis::insertOutOfScopeAccess(
 }
 
 // Top-level driver for AccessConflictAndMergeAnalysis
-void AccessConflictAndMergeAnalysis::analyze() {
-  identifyBeginAccesses();
+//
+// Returns true if the analysis succeeded.
+bool AccessConflictAndMergeAnalysis::analyze() {
+  if (!identifyBeginAccesses()) {
+    LLVM_DEBUG(llvm::dbgs() << "Skipping AccessConflictAndMergeAnalysis...\n");
+    return false;
+  }
   LoopRegionToAccessedStorage accessSetsOfRegions;
   // Populate a worklist of regions such that the top of the worklist is the
   // innermost loop and the bottom of the worklist is the entry block.
@@ -499,6 +529,7 @@ void AccessConflictAndMergeAnalysis::analyze() {
       }
     }
   }
+  return true;
 }
 
 // Find all begin access operations in this function. Map each access to
@@ -507,13 +538,20 @@ void AccessConflictAndMergeAnalysis::analyze() {
 //
 // Also, add the storage location to the function's RegionStorage
 //
+// Returns true if it is worthwhile to continue the analysis.
+//
 // TODO: begin_unpaired_access is not tracked. Even though begin_unpaired_access
 // isn't explicitly paired, it may be possible after devirtualization and
 // inlining to find all uses of the scratch buffer. However, this doesn't
 // currently happen in practice (rdar://40033735).
-void AccessConflictAndMergeAnalysis::identifyBeginAccesses() {
-  for (auto &BB : *LRFI->getFunction()) {
-    for (auto &I : BB) {
+bool AccessConflictAndMergeAnalysis::identifyBeginAccesses() {
+  bool seenPossibleNestedConflict = false;
+  bool seenIdenticalStorage = false;
+  // Scan blocks in PostOrder (bottom-up) to mark any accesses with identical
+  // storage to another reachable access. The earlier access must be marked
+  // because this analysis does forward data flow to find conflicts.
+  for (auto *BB : PO->getPostOrder()) {
+    for (auto &I : llvm::reverse(*BB)) {
       auto *beginAccess = dyn_cast<BeginAccessInst>(&I);
       if (!beginAccess)
         continue;
@@ -521,15 +559,31 @@ void AccessConflictAndMergeAnalysis::identifyBeginAccesses() {
       if (beginAccess->getEnforcement() != SILAccessEnforcement::Dynamic)
         continue;
 
+      if (!beginAccess->hasNoNestedConflict())
+        seenPossibleNestedConflict = true;
+
       // The accessed base is expected to be valid for begin_access, but for
       // now, since this optimization runs at the end of the pipeline, we
       // gracefully ignore unrecognized source address patterns, which show up
       // here as an invalid `storage` value.
-      const AccessedStorage &storage =
+      AccessedStorage storage =
           findAccessedStorageNonNested(beginAccess->getSource());
 
-      auto iterAndSuccess = result.accessMap.try_emplace(
-          beginAccess, static_cast<const AccessInfo &>(storage));
+      auto iterAndInserted = storageSet.insert(storage);
+
+      // After inserting it in storageSet, this storage object can be downcast
+      // to AccessInfo to use the pass-specific bits.
+      auto &accessInfo = static_cast<AccessInfo &>(storage);
+
+      // If the same location was seen later in the CFG, mark this access as one
+      // to check for merging.
+      if (!iterAndInserted.second) {
+        seenIdenticalStorage = true;
+        accessInfo.setSeenIdenticalStorage();
+      }
+
+      auto iterAndSuccess =
+        result.accessMap.try_emplace(beginAccess, accessInfo);
       (void)iterAndSuccess;
       assert(iterAndSuccess.second);
 
@@ -539,6 +593,7 @@ void AccessConflictAndMergeAnalysis::identifyBeginAccesses() {
       assert(!info.seenNestedConflict());
     }
   }
+  return seenPossibleNestedConflict || seenIdenticalStorage;
 }
 
 // Returns a mapping from each loop sub-region to all its access storage
@@ -617,11 +672,14 @@ void AccessConflictAndMergeAnalysis::visitBeginAccess(
   recordInScopeConflicts(state, beginAccessInfo, beginAccess->getAccessKind());
   // Remove in-scope conflicts to avoid checking them again.
   removeConflicts(state.inScopeConflictFreeAccesses, beginAccessInfo);
-  // Always record the current access as in-scope. It can potentially be folded
-  // to [no_nested_conflict] independent of any enclosing access conflicts.
-  bool inserted = state.inScopeConflictFreeAccesses.insert(beginAccess);
-  (void)inserted;
-  assert(inserted && "the begin_access should not have been seen yet.");
+
+  if (!beginAccess->hasNoNestedConflict()) {
+    // Record the current access as in-scope. It can potentially be folded to
+    // [no_nested_conflict] independent of any enclosing access conflicts.
+    bool inserted = state.inScopeConflictFreeAccesses.insert(beginAccess);
+    (void)inserted;
+    assert(inserted && "the begin_access should not have been seen yet.");
+  }
 
   // Find an out-of-scope access that is mergeable with this access. This is
   // done at the BeginAccess because it doesn't matter whether the merged access
@@ -635,7 +693,7 @@ void AccessConflictAndMergeAnalysis::visitBeginAccess(
   if (BeginAccessInst *mergeableAccess =
           findMergeableOutOfScopeAccess(state, beginAccess)) {
     LLVM_DEBUG(llvm::dbgs() << "Found mergable pair: " << *mergeableAccess
-                            << ", " << *beginAccess << "\n");
+                            << "  with " << *beginAccess << "\n");
     result.mergePairs.emplace_back(mergeableAccess, beginAccess);
   }
   // For the purpose of data-flow, removing the out-of-scope access does not
@@ -947,6 +1005,12 @@ canMerge(PostDominanceInfo *postDomTree,
 static bool mergeAccesses(
     SILFunction *F, PostDominanceInfo *postDomTree,
     const AccessConflictAndMergeAnalysis::MergeablePairs &mergePairs) {
+
+  if (mergePairs.empty()) {
+    LLVM_DEBUG(llvm::dbgs() << "Skipping SCC Analysis...\n");
+    return false;
+  }
+
   bool changed = false;
 
   // Compute a map from each block to its SCC -
@@ -993,7 +1057,7 @@ static bool mergeAccesses(
       continue;
 
     LLVM_DEBUG(llvm::dbgs()
-               << "Merging: " << *childIns << " into " << *parentIns << "\n");
+               << "Merging " << *childIns << " into " << *parentIns << "\n");
 
     // Change the no nested conflict of parent if the child has a nested
     // conflict.
@@ -1038,9 +1102,12 @@ struct AccessEnforcementOpts : public SILFunctionTransform {
                             << F->getName() << "\n");
 
     LoopRegionFunctionInfo *LRFI = getAnalysis<LoopRegionAnalysis>()->get(F);
+    PostOrderFunctionInfo *PO = getAnalysis<PostOrderAnalysis>()->get(F);
     AccessedStorageAnalysis *ASA = getAnalysis<AccessedStorageAnalysis>();
-    AccessConflictAndMergeAnalysis a(LRFI, ASA);
-    a.analyze();
+    AccessConflictAndMergeAnalysis a(LRFI, PO, ASA);
+    if (!a.analyze())
+      return;
+
     auto result = a.getResult();
 
     // Perform access folding by setting the [no_nested_conflict] flag on

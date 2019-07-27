@@ -551,7 +551,7 @@ static bool calleeIsSelfRecursive(SILFunction *Callee) {
   for (auto &BB : *Callee)
     for (auto &I : BB)
       if (auto Apply = FullApplySite::isa(&I))
-        if (Apply.getReferencedFunction() == Callee)
+        if (Apply.getReferencedFunctionOrNull() == Callee)
           return true;
   return false;
 }
@@ -563,7 +563,9 @@ static bool calleeHasPartialApplyWithOpenedExistentials(FullApplySite AI) {
   if (!AI.hasSubstitutions())
     return false;
 
-  SILFunction *Callee = AI.getReferencedFunction();
+  SILFunction *Callee = AI.getReferencedFunctionOrNull();
+  assert(Callee && "Trying to optimize a dynamic function?!");
+
   auto SubsMap = AI.getSubstitutionMap();
 
   // Bail if there are no open existentials in the list of substitutions.
@@ -610,7 +612,7 @@ static bool shouldSkipApplyDuringEarlyInlining(FullApplySite AI) {
   if (ASC && !ASC.canInlineEarly())
     return true;
 
-  SILFunction *Callee = AI.getReferencedFunction();
+  SILFunction *Callee = AI.getReferencedFunctionOrNull();
   if (!Callee)
     return false;
 
@@ -628,7 +630,9 @@ static bool shouldSkipApplyDuringEarlyInlining(FullApplySite AI) {
 
 /// Checks if a generic callee and caller have compatible layout constraints.
 static bool isCallerAndCalleeLayoutConstraintsCompatible(FullApplySite AI) {
-  SILFunction *Callee = AI.getReferencedFunction();
+  SILFunction *Callee = AI.getReferencedFunctionOrNull();
+  assert(Callee && "Trying to optimize a dynamic function!?");
+
   auto CalleeSig = Callee->getLoweredFunctionType()->getGenericSignature();
   auto AISubs = AI.getSubstitutionMap();
 
@@ -665,7 +669,7 @@ static bool isCallerAndCalleeLayoutConstraintsCompatible(FullApplySite AI) {
 // Returns the callee of an apply_inst if it is basically inlinable.
 SILFunction *swift::getEligibleFunction(FullApplySite AI,
                                         InlineSelection WhatToInline) {
-  SILFunction *Callee = AI.getReferencedFunction();
+  SILFunction *Callee = AI.getReferencedFunctionOrNull();
 
   if (!Callee) {
     return nullptr;

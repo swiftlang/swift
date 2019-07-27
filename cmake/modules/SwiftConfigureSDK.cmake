@@ -11,16 +11,35 @@ include(SwiftAndroidSupport)
 # Report the given SDK to the user.
 function(_report_sdk prefix)
   message(STATUS "${SWIFT_SDK_${prefix}_NAME} SDK:")
+  message(STATUS "  Object File Format: ${SWIFT_SDK_${prefix}_OBJECT_FORMAT}")
+  message(STATUS "  Swift Standard Library Path: ${SWIFT_SDK_${prefix}_LIB_SUBDIR}")
+
   if("${prefix}" STREQUAL "WINDOWS")
     message(STATUS "  UCRT Version: ${UCRTVersion}")
-    message(STATUS "  UCRT SDK Dir: ${UniversalCRTSdkDir}")
-    message(STATUS "  VC Dir: ${VCToolsInstallDir}")
+    message(STATUS "  UCRT SDK Path: ${UniversalCRTSdkDir}")
+    message(STATUS "  VC Path: ${VCToolsInstallDir}")
     if("${CMAKE_BUILD_TYPE}" STREQUAL "DEBUG")
       message(STATUS "  ${CMAKE_BUILD_TYPE} VC++ CRT: MDd")
     else()
       message(STATUS "  ${CMAKE_BUILD_TYPE} VC++ CRT: MD")
     endif()
+  endif()
+  if(prefix IN_LIST SWIFT_APPLE_PLATFORMS)
+    message(STATUS "  Version: ${SWIFT_SDK_${prefix}_VERSION}")
+    message(STATUS "  Build number: ${SWIFT_SDK_${prefix}_BUILD_NUMBER}")
+    message(STATUS "  Deployment version: ${SWIFT_SDK_${prefix}_DEPLOYMENT_VERSION}")
+    message(STATUS "  Version min name: ${SWIFT_SDK_${prefix}_VERSION_MIN_NAME}")
+    message(STATUS "  Triple name: ${SWIFT_SDK_${prefix}_TRIPLE_NAME}")
+  endif()
+  if(SWIFT_SDK_${prefix}_MODULE_ARCHITECTURES)
+    message(STATUS "  Module Architectures: ${SWIFT_SDK_${prefix}_MODULE_ARCHITECTURES}")
+  endif()
 
+  message(STATUS "  Architectures: ${SWIFT_SDK_${prefix}_ARCHITECTURES}")
+  foreach(arch ${SWIFT_SDK_${prefix}_ARCHITECTURES})
+    message(STATUS "  ${arch} triple: ${SWIFT_SDK_${prefix}_ARCH_${arch}_TRIPLE}")
+  endforeach()
+  if("${prefix}" STREQUAL "WINDOWS")
     foreach(arch ${SWIFT_SDK_${prefix}_ARCHITECTURES})
       swift_windows_include_for_arch(${arch} ${arch}_INCLUDE)
       swift_windows_lib_for_arch(${arch} ${arch}_LIB)
@@ -28,7 +47,7 @@ function(_report_sdk prefix)
       message(STATUS "  ${arch} LIB: ${${arch}_LIB}")
     endforeach()
   elseif("${prefix}" STREQUAL "ANDROID")
-    message(STATUS " NDK Dir: $ENV{SWIFT_ANDROID_NDK_PATH}")
+    message(STATUS " NDK: $ENV{SWIFT_ANDROID_NDK_PATH}")
     foreach(arch ${SWIFT_SDK_${prefix}_ARCHITECTURES})
       swift_android_include_for_arch(${arch} ${arch}_INCLUDE)
       swift_android_lib_for_arch(${arch} ${arch}_LIB)
@@ -40,33 +59,21 @@ function(_report_sdk prefix)
       message(STATUS "  ${arch} Path: ${SWIFT_SDK_${prefix}_ARCH_${arch}_PATH}")
     endforeach()
   endif()
-  if(prefix IN_LIST SWIFT_APPLE_PLATFORMS)
-    message(STATUS "  Version: ${SWIFT_SDK_${prefix}_VERSION}")
-    message(STATUS "  Build number: ${SWIFT_SDK_${prefix}_BUILD_NUMBER}")
-    message(STATUS "  Deployment version: ${SWIFT_SDK_${prefix}_DEPLOYMENT_VERSION}")
-  endif()
-  message(STATUS "  Library subdir: ${SWIFT_SDK_${prefix}_LIB_SUBDIR}")
-  if(prefix IN_LIST SWIFT_APPLE_PLATFORMS)
-    message(STATUS "  Version min name: ${SWIFT_SDK_${prefix}_VERSION_MIN_NAME}")
-    message(STATUS "  Triple name: ${SWIFT_SDK_${prefix}_TRIPLE_NAME}")
-  endif()
-  message(STATUS "  Architectures: ${SWIFT_SDK_${prefix}_ARCHITECTURES}")
+
   if(NOT prefix IN_LIST SWIFT_APPLE_PLATFORMS)
+    foreach(arch ${SWIFT_SDK_${prefix}_ARCHITECTURES})
+      message(STATUS "  ${arch} libc header path: ${SWIFT_SDK_${prefix}_ARCH_${arch}_LIBC_INCLUDE_DIRECTORY}")
+      message(STATUS "  ${arch} libc architecture specific header path: ${SWIFT_SDK_${prefix}_ARCH_${arch}_LIBC_ARCHITECTURE_INCLUDE_DIRECTORY}")
+    endforeach()
     if(SWIFT_BUILD_STDLIB)
       foreach(arch ${SWIFT_SDK_${prefix}_ARCHITECTURES})
-        message(STATUS "  ICU i18n INCLUDE (${arch}): ${SWIFT_${prefix}_${arch}_ICU_I18N_INCLUDE}")
-        message(STATUS "  ICU i18n LIB (${arch}): ${SWIFT_${prefix}_${arch}_ICU_I18N}")
-        message(STATUS "  ICU unicode INCLUDE (${arch}): ${SWIFT_${prefix}_${arch}_ICU_UC_INCLUDE}")
-        message(STATUS "  ICU unicode LIB (${arch}): ${SWIFT_${prefix}_${arch}_ICU_UC}")
+        message(STATUS "  ${arch} ICU i18n INCLUDE: ${SWIFT_${prefix}_${arch}_ICU_I18N_INCLUDE}")
+        message(STATUS "  ${arch} ICU i18n LIB: ${SWIFT_${prefix}_${arch}_ICU_I18N}")
+        message(STATUS "  ${arch} ICU unicode INCLUDE: ${SWIFT_${prefix}_${arch}_ICU_UC_INCLUDE}")
+        message(STATUS "  ${arch} ICU unicode LIB: ${SWIFT_${prefix}_${arch}_ICU_UC}")
       endforeach()
     endif()
   endif()
-  message(STATUS "  Object Format: ${SWIFT_SDK_${prefix}_OBJECT_FORMAT}")
-
-  foreach(arch ${SWIFT_SDK_${prefix}_ARCHITECTURES})
-    message(STATUS
-        "  Triple for ${arch} is ${SWIFT_SDK_${prefix}_ARCH_${arch}_TRIPLE}")
-  endforeach()
 
   message(STATUS "")
 endfunction()
@@ -141,9 +148,30 @@ macro(configure_sdk_darwin
   set(SWIFT_SDK_${prefix}_LIB_SUBDIR "${xcrun_name}")
   set(SWIFT_SDK_${prefix}_VERSION_MIN_NAME "${version_min_name}")
   set(SWIFT_SDK_${prefix}_TRIPLE_NAME "${triple_name}")
-  set(SWIFT_SDK_${prefix}_ARCHITECTURES "${architectures}")
   set(SWIFT_SDK_${prefix}_OBJECT_FORMAT "MACHO")
 
+  set(SWIFT_SDK_${prefix}_ARCHITECTURES ${architectures})
+  if(SWIFT_DARWIN_SUPPORTED_ARCHS)
+    list_intersect(
+      "${architectures}"                  # lhs
+      "${SWIFT_DARWIN_SUPPORTED_ARCHS}"   # rhs
+      SWIFT_SDK_${prefix}_ARCHITECTURES)  # result
+  endif()
+
+  list_intersect(
+    "${SWIFT_DARWIN_MODULE_ARCHS}"            # lhs
+    "${architectures}"                        # rhs
+    SWIFT_SDK_${prefix}_MODULE_ARCHITECTURES) # result
+
+  # Ensure the architectures and module-only architectures lists are mutually
+  # exclusive.
+  list_subtract(
+    "${SWIFT_SDK_${prefix}_MODULE_ARCHITECTURES}" # lhs
+    "${SWIFT_SDK_${prefix}_ARCHITECTURES}"        # rhs
+    SWIFT_SDK_${prefix}_MODULE_ARCHITECTURES)     # result
+
+  # Configure variables for _all_ architectures even if we aren't "building"
+  # them because they aren't supported.
   foreach(arch ${architectures})
     # On Darwin, all archs share the same SDK path.
     set(SWIFT_SDK_${prefix}_ARCH_${arch}_PATH "${SWIFT_SDK_${prefix}_PATH}")
@@ -176,6 +204,9 @@ macro(configure_sdk_unix name architectures)
 
   foreach(arch ${architectures})
     if("${prefix}" STREQUAL "ANDROID")
+      set(SWIFT_SDK_ANDROID_ARCH_${arch}_LIBC_INCLUDE_DIRECTORY "${SWIFT_ANDROID_NDK_PATH}/sysroot/usr/include" CACHE STRING "Path to C library headers")
+      set(SWIFT_SDK_ANDROID_ARCH_${arch}_LIBC_ARCHITECTURE_INCLUDE_DIRECTORY "${SWIFT_ANDROID_NDK_PATH}/sysroot/usr/include" CACHE STRING "Path to C library architecture headers")
+
       if("${arch}" STREQUAL "armv7")
         set(SWIFT_SDK_ANDROID_ARCH_${arch}_NDK_TRIPLE "arm-linux-androideabi")
         set(SWIFT_SDK_ANDROID_ARCH_${arch}_ALT_SPELLING "arm")
@@ -186,21 +217,49 @@ macro(configure_sdk_unix name architectures)
         set(SWIFT_SDK_ANDROID_ARCH_${arch}_ALT_SPELLING "aarch64")
         set(SWIFT_SDK_ANDROID_ARCH_${arch}_PATH "${SWIFT_ANDROID_NDK_PATH}/platforms/android-${SWIFT_ANDROID_API_LEVEL}/arch-arm64")
         set(SWIFT_SDK_ANDROID_ARCH_${arch}_TRIPLE "aarch64-unknown-linux-android")
+      elseif("${arch}" STREQUAL "i686")
+        set(SWIFT_SDK_ANDROID_ARCH_${arch}_NDK_TRIPLE "i686-linux-android")
+        set(SWIFT_SDK_ANDROID_ARCH_${arch}_ALT_SPELLING "i686")
+        set(SWIFT_SDK_ANDROID_ARCH_${arch}_PATH "${SWIFT_ANDROID_NDK_PATH}/platforms/android-${SWIFT_ANDROID_API_LEVEL}/arch-x86")
+        set(SWIFT_SDK_ANDROID_ARCH_${arch}_TRIPLE "i686-unknown-linux-android")
+      elseif("${arch}" STREQUAL "x86_64")
+        set(SWIFT_SDK_ANDROID_ARCH_${arch}_NDK_TRIPLE "x86_64-linux-android")
+        set(SWIFT_SDK_ANDROID_ARCH_${arch}_ALT_SPELLING "x86_64")
+        set(SWIFT_SDK_ANDROID_ARCH_${arch}_PATH "${SWIFT_ANDROID_NDK_PATH}/platforms/android-${SWIFT_ANDROID_API_LEVEL}/arch-x86_64")
+        set(SWIFT_SDK_ANDROID_ARCH_${arch}_TRIPLE "x86_64-unknown-linux-android")
       else()
         message(FATAL_ERROR "unknown arch for android SDK: ${arch}")
       endif()
 
       # Get the prebuilt suffix to create the correct toolchain path when using the NDK
-      if("${CMAKE_HOST_SYSTEM_NAME}" STREQUAL "Darwin")
-        set(_swift_android_prebuilt_build "darwin-x86_64")
-      elseif("${CMAKE_HOST_SYSTEM_NAME}" STREQUAL "Linux")
-        set(_swift_android_prebuilt_build "linux-x86_64")
+      if(CMAKE_HOST_SYSTEM_NAME STREQUAL Darwin)
+        set(_swift_android_prebuilt_build darwin-x86_64)
+      elseif(CMAKE_HOST_SYSTEM_NAME STREQUAL Linux)
+        set(_swift_android_prebuilt_build linux-x86_64)
+      elseif(CMAKE_HOST_SYSTEM_NAME STREQUAL Windows)
+        set(_swift_android_prebuilt_build Windows-x86_64)
+      else()
+        message(SEND_ERROR "cannot cross-compile to android from ${CMAKE_HOST_SYSTEM_NAME}")
       endif()
-      set(SWIFT_SDK_ANDROID_ARCH_${arch}_NDK_PREBUILT_PATH
+      if("${arch}" STREQUAL "i686")
+        set(SWIFT_SDK_ANDROID_ARCH_${arch}_NDK_PREBUILT_PATH
+          "${SWIFT_ANDROID_NDK_PATH}/toolchains/x86-${SWIFT_ANDROID_NDK_GCC_VERSION}/prebuilt/${_swift_android_prebuilt_build}")
+      elseif("${arch}" STREQUAL "x86_64")
+        set(SWIFT_SDK_ANDROID_ARCH_${arch}_NDK_PREBUILT_PATH
+          "${SWIFT_ANDROID_NDK_PATH}/toolchains/x86_64-${SWIFT_ANDROID_NDK_GCC_VERSION}/prebuilt/${_swift_android_prebuilt_build}")
+      else()
+        set(SWIFT_SDK_ANDROID_ARCH_${arch}_NDK_PREBUILT_PATH
           "${SWIFT_ANDROID_NDK_PATH}/toolchains/${SWIFT_SDK_ANDROID_ARCH_${arch}_NDK_TRIPLE}-${SWIFT_ANDROID_NDK_GCC_VERSION}/prebuilt/${_swift_android_prebuilt_build}")
+      endif()
     else()
-      if(NOT SWIFT_SDK_${prefix}_ARCH_${arch}_PATH)
-        set(SWIFT_SDK_${prefix}_ARCH_${arch}_PATH "/")
+      set(SWIFT_SDK_${prefix}_ARCH_${arch}_PATH "/" CACHE STRING "CMAKE_SYSROOT for ${prefix} ${arch}")
+
+      if("${prefix}" STREQUAL "HAIKU")
+        set(SWIFT_SDK_HAIKU_ARCH_${arch}_LIBC_INCLUDE_DIRECTORY "/system/develop/headers/posix" CACHE STRING "Path to C library headers")
+        set(SWIFT_SDK_HAIKU_ARCH_${arch}_LIBC_ARCHITECTURE_INCLUDE_DIRECTORY "/system/develop/headers" CACHE STRING "Path to C library architecture headers")
+      else()
+        set(SWIFT_SDK_${prefix}_ARCH_${arch}_LIBC_INCLUDE_DIRECTORY "/usr/include" CACHE STRING "Path to C library headers")
+        set(SWIFT_SDK_${prefix}_ARCH_${arch}_LIBC_ARCHITECTURE_INCLUDE_DIRECTORY "${SWIFT_SDK_${prefix}_ARCH_${arch}_LIBC_INCLUDE_DIRECTORY}/${CMAKE_LIBRARY_ARCHITECTURE}" CACHE STRING "Path to C library architecture headers")
       endif()
 
       if("${prefix}" STREQUAL "LINUX")
@@ -255,7 +314,7 @@ macro(configure_sdk_windows name environment architectures)
   string(TOUPPER ${name} prefix)
   string(TOLOWER ${name} platform)
 
-  set(SWIFT_SDK_${prefix}_NAME "${sdk_name}")
+  set(SWIFT_SDK_${prefix}_NAME "${name}")
   set(SWIFT_SDK_${prefix}_LIB_SUBDIR "windows")
   set(SWIFT_SDK_${prefix}_ARCHITECTURES "${architectures}")
   set(SWIFT_SDK_${prefix}_OBJECT_FORMAT "COFF")

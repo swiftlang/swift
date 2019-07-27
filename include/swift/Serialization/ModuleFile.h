@@ -57,8 +57,8 @@ class ModuleFile
   /// A reference back to the AST representation of the file.
   FileUnit *FileContext = nullptr;
 
-  /// The module shadowed by this module, if any.
-  ModuleDecl *ShadowedModule = nullptr;
+  /// The module that this module is an overlay of, if any.
+  ModuleDecl *UnderlyingModule = nullptr;
 
   /// The module file data.
   std::unique_ptr<llvm::MemoryBuffer> ModuleInputBuffer;
@@ -702,8 +702,8 @@ public:
     return Dependencies;
   }
 
-  /// The module shadowed by this module, if any.
-  ModuleDecl *getShadowedModule() const { return ShadowedModule; }
+  /// The module that this module is an overlay for, if any.
+  ModuleDecl *getUnderlyingModule() const { return UnderlyingModule; }
 
   /// Searches the module's top-level decls for the given identifier.
   void lookupValue(DeclName name, SmallVectorImpl<ValueDecl*> &results);
@@ -835,6 +835,10 @@ public:
 
   GenericEnvironment *loadGenericEnvironment(const DeclContext *decl,
                                              uint64_t contextData) override;
+
+  void
+  loadRequirementSignature(const ProtocolDecl *proto, uint64_t contextData,
+                           SmallVectorImpl<Requirement> &requirements) override;
 
   Optional<StringRef> getGroupNameById(unsigned Id) const;
   Optional<StringRef> getSourceFileNameById(unsigned Id) const;

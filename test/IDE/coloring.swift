@@ -18,6 +18,15 @@ struct S {
   var a, b : Int
 }
 
+enum EnumWhereCaseHasADefaultedFunctionTypeParam {
+// CHECK: <kw>enum</kw> EnumWhereCaseHasADefaultedFunctionTypeParam {
+  case foo(x: () -> () = {
+  // CHECK: <kw>case</kw> foo(x: () -> () = {
+    func inner(x: S) {}
+    // CHECK: <kw>func</kw> inner(x: <type>S</type>) {}
+  })
+}
+
 enum EnumWithDerivedEquatableConformance : Int {
 // CHECK-LABEL: <kw>enum</kw> EnumWithDerivedEquatableConformance : {{(<type>)}}Int{{(</type>)?}} {
   case CaseA
@@ -262,6 +271,9 @@ func bar(x: Int) -> (Int, Float) {
   foo(Float())
 }
 
+// CHECK: <object-literal>#colorLiteral(red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0)</object-literal>
+#colorLiteral(red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0)
+
 class GenC<T1,T2> {}
 
 func test() {
@@ -276,6 +288,9 @@ func test2(x: Int) {
   // CHECK: <str>"</str>\<anchor>(</anchor>x<anchor>)</anchor><str>"</str>
   "\(x)"
 }
+
+// CHECK: <kw>#colorLiteral</kw>
+#colorLiteral
 
 // CHECK: <kw>class</kw> Observers {
 class Observers {
@@ -423,3 +438,19 @@ func foo() -> some P {}
 
 // CHECK: <kw>func</kw> foo() -> <kw>some</kw> <type>P</type> & <type>Q</type> {}
 func foo() -> some P & Q {}
+
+// CHECK: <kw>class</kw> PropertyDelgate {
+class PropertyDelgate {
+  // CHECK: @<type>MyDelegate</type>(<int>1</int>, receiveClosure {
+  @MyDelegate(1, receiveClosure {
+    // CHECK: <kw>var</kw> x = <int>1</int>; x
+    var x = 1; x
+  })
+  var something
+}
+
+// CHECK: <kw>func</kw> acceptBuilder<T>(
+func acceptBuilder<T>(
+  // CHECK: @<type>SomeBuilder</type><<type>Element</type>> label param: () -> <type>T</type>
+  @SomeBuilder<Element> label param: () -> T
+) {}

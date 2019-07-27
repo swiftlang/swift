@@ -43,7 +43,7 @@ enum class Status {
   MissingDependency,
 
   /// The module file is an overlay for a Clang module, which can't be found.
-  MissingShadowedModule,
+  MissingUnderlyingModule,
 
   /// The module file depends on a module that is still being loaded, i.e.
   /// there is a circular dependency.

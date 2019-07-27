@@ -278,7 +278,8 @@ private:
       ConstPtrVec<ValueDecl> &classMembers;
       Collector(ConstPtrVec<ValueDecl> &classMembers)
           : classMembers(classMembers) {}
-      void foundDecl(ValueDecl *VD, DeclVisibilityKind) override {
+      void foundDecl(ValueDecl *VD, DeclVisibilityKind,
+                     DynamicLookupInfo) override {
         classMembers.push_back(VD);
       }
     } collector{classMembers};

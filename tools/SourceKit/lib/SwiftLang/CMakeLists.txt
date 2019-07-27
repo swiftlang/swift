@@ -35,7 +35,7 @@ add_sourcekit_library(SourceKitSwiftLang
       clangAST
       clangAPINotes
       clangBasic
-  LLVM_COMPONENT_DEPENDS ${LLVM_TARGETS_TO_BUILD}
+    LLVM_LINK_COMPONENTS ${LLVM_TARGETS_TO_BUILD}
       bitreader
       bitwriter
       coverage

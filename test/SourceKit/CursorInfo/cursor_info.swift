@@ -379,20 +379,17 @@ enum E7: String {
 // CHECK22: <decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>availabilityIntroduced</decl.name>()</decl.function.method.instance>
 
 // RUN: %sourcekitd-test -req=cursor -pos=56:15 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK23 %s
-// CHECK23-NOT: <Declaration>func swiftUnavailable()</Declaration>
-// CHECK23-NOT: <decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>swiftUnavailable</decl.name>()</decl.function.method.instance>
+// CHECK23: <empty cursor info; internal diagnostic: "Unavailable in the current compilation context.">
 
 // RUN: %sourcekitd-test -req=cursor -pos=57:15 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK24 %s
-// CHECK24-NOT: <Declaration>func unavailable()</Declaration>
-// CHECK24-NOT: <decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>unavailable</decl.name>()</decl.function.method.instance>
+// CHECK24: <empty cursor info; internal diagnostic: "Unavailable in the current compilation context.">
 
 // RUN: %sourcekitd-test -req=cursor -pos=58:15 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK25 %s
 // CHECK25: <Declaration>func availabilityIntroducedMsg()</Declaration>
 // CHECK25: <decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>availabilityIntroducedMsg</decl.name>()</decl.function.method.instance>
 
 // RUN: %sourcekitd-test -req=cursor -pos=59:15 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK26 %s
-// CHECK26-NOT: <Declaration>func availabilityDeprecated()</Declaration>
-// CHECK26-NOT: <decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>availabilityDeprecated</decl.name>()</decl.function.method.instance>
+// CHECK26: <empty cursor info; internal diagnostic: "Unavailable in the current compilation context.">
 
 // RUN: %sourcekitd-test -req=cursor -pos=69:14 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK27 %s
 // CHECK27: <Declaration>public subscript(i: <Type usr="s:Si">Int</Type>) -&gt; <Type usr="s:Si">Int</Type> { get }</Declaration>

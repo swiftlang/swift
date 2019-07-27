@@ -73,6 +73,12 @@ public let ObjectiveCBridging = [
   BenchmarkInfo(name: "ObjectiveCBridgeFromNSDateComponents",
     runFunction: run_ObjectiveCBridgeFromNSDateComponents, tags: t,
     setUpFunction: setup_dateComponents),
+  BenchmarkInfo(name: "ObjectiveCBridgeASCIIStringFromFile",
+                runFunction: run_ASCIIStringFromFile, tags: ts,
+                setUpFunction: setup_ASCIIStringFromFile),
+  BenchmarkInfo(name: "UnicodeStringFromCodable",
+                 runFunction: run_UnicodeStringFromCodable, tags: ts,
+                 setUpFunction: setup_UnicodeStringFromCodable),
 ]
 
 #if _runtime(_ObjC)
@@ -705,6 +711,64 @@ public func run_ObjectiveCBridgeFromNSDateComponents(_ N: Int) {
   for _ in 0 ..< N {
     for components in componentsArray! {
       let _ = componentsContainer!.dictionary[components]
+    }
+  }
+  #endif
+}
+
+var ASCIIStringFromFile:String? = nil
+public func setup_ASCIIStringFromFile() {
+  #if _runtime(_ObjC)
+  let url:URL
+  if #available(OSX 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *) {
+    url = FileManager.default.temporaryDirectory.appendingPathComponent(
+      "sphinx.txt"
+    )
+  } else {
+    url = URL(fileURLWithPath: "/tmp/sphinx.txt")
+  }
+  var str = "Sphinx of black quartz judge my vow"
+  str = Array(repeating: str, count: 100).joined()
+  try? str.write(
+    to: url,
+    atomically: true,
+    encoding: .ascii
+  )
+  ASCIIStringFromFile = try! String(contentsOf: url, encoding: .ascii)
+  #endif
+}
+
+@inline(never)
+public func run_ASCIIStringFromFile(_ N: Int) {
+  #if _runtime(_ObjC)
+  for _ in 0 ..< N {
+    blackHole((ASCIIStringFromFile! + "").utf8.count)
+  }
+  #endif
+}
+
+var unicodeStringFromCodable:String? = nil
+var unicodeStringFromCodableDict = [String:Void]()
+public func setup_UnicodeStringFromCodable() {
+  do {
+    let jsonString = "[\(String(reflecting: "Nice string which works rather slöw."))]"
+    
+    let decoded = try JSONDecoder().decode([String].self, from: Data(jsonString.utf8))
+    let reEncoded = try JSONEncoder().encode(decoded)
+    let desc = try JSONDecoder().decode([String].self, from: reEncoded)
+    
+    unicodeStringFromCodable = desc[0]
+  } catch (_) {
+    
+  }
+}
+
+@inline(never)
+public func run_UnicodeStringFromCodable(_ N: Int) {
+  #if _runtime(_ObjC)
+  for _ in 0 ..< N {
+    for _ in 0..<100 {
+      unicodeStringFromCodableDict[identity(unicodeStringFromCodable!)] = ()
     }
   }
   #endif

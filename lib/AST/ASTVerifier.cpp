@@ -784,6 +784,46 @@ public:
       popScope(BS);
     }
 
+    bool shouldVerify(ForEachStmt *S) {
+      if (!shouldVerify(cast<Stmt>(S)))
+        return false;
+
+      if (!S->getElementExpr())
+        return true;
+
+      assert(!OpaqueValues.count(S->getElementExpr()));
+      OpaqueValues[S->getElementExpr()] = 0;
+      return true;
+    }
+
+    void cleanup(ForEachStmt *S) {
+      if (!S->getElementExpr())
+        return;
+
+      assert(OpaqueValues.count(S->getElementExpr()));
+      OpaqueValues.erase(S->getElementExpr());
+    }
+
+    bool shouldVerify(InterpolatedStringLiteralExpr *expr) {
+      if (!shouldVerify(cast<Expr>(expr)))
+        return false;
+
+      if (!expr->getInterpolationExpr())
+        return true;
+
+      assert(!OpaqueValues.count(expr->getInterpolationExpr()));
+      OpaqueValues[expr->getInterpolationExpr()] = 0;
+      return true;
+    }
+
+    void cleanup(InterpolatedStringLiteralExpr *expr) {
+      if (!expr->getInterpolationExpr())
+        return;
+
+      assert(OpaqueValues.count(expr->getInterpolationExpr()));
+      OpaqueValues.erase(expr->getInterpolationExpr());
+    }
+
     bool shouldVerify(OpenExistentialExpr *expr) {
       if (!shouldVerify(cast<Expr>(expr)))
         return false;
@@ -2408,23 +2448,12 @@ public:
     void verifyChecked(VarDecl *var) {
       PrettyStackTraceDecl debugStack("verifying VarDecl", var);
 
-      // Variables must have materializable type, unless they are parameters,
-      // in which case they must either have l-value type or be anonymous.
+      // Variables must have materializable type.
       if (!var->getInterfaceType()->isMaterializable()) {
-        if (!isa<ParamDecl>(var)) {
-          Out << "VarDecl has non-materializable type: ";
-          var->getType().print(Out);
-          Out << "\n";
-          abort();
-        }
-
-        if (!var->isInOut() && var->hasName()) {
-          Out << "ParamDecl may only have non-materializable tuple type "
-                 "when it is anonymous: ";
-          var->getType().print(Out);
-          Out << "\n";
-          abort();
-        }
+        Out << "VarDecl has non-materializable type: ";
+        var->getInterfaceType().print(Out);
+        Out << "\n";
+        abort();
       }
 
       // The fact that this is *directly* be a reference storage type
@@ -2451,43 +2480,47 @@ public:
             Out << "property getter has parameters\n";
             abort();
           }
-          Type getterResultType = getter->getResultInterfaceType();
-          getterResultType =
-              var->getDeclContext()->mapTypeIntoContext(getterResultType);
-          if (!getterResultType->isEqual(typeForAccessors)) {
-            Out << "property and getter have mismatched types: '";
-            typeForAccessors.print(Out);
-            Out << "' vs. '";
-            getterResultType.print(Out);
-            Out << "'\n";
-            abort();
+          if (getter->hasInterfaceType()) {
+            Type getterResultType = getter->getResultInterfaceType();
+            getterResultType =
+                var->getDeclContext()->mapTypeIntoContext(getterResultType);
+            if (!getterResultType->isEqual(typeForAccessors)) {
+              Out << "property and getter have mismatched types: '";
+              typeForAccessors.print(Out);
+              Out << "' vs. '";
+              getterResultType.print(Out);
+              Out << "'\n";
+              abort();
+            }
           }
         }
       }
 
       if (const FuncDecl *setter = var->getSetter()) {
-        if (!setter->getResultInterfaceType()->isVoid()) {
-          Out << "property setter has non-Void result type\n";
-          abort();
-        }
-        if (setter->getParameters()->size() == 0) {
-          Out << "property setter has no parameters\n";
-          abort();
-        }
-        if (setter->getParameters()->size() != 1) {
-          Out << "property setter has 2+ parameters\n";
-          abort();
-        }
-        const ParamDecl *param = setter->getParameters()->get(0);
-        Type paramType = param->getInterfaceType();
-        if (!var->getDeclContext()->contextHasLazyGenericEnvironment()) {
-          paramType = var->getDeclContext()->mapTypeIntoContext(paramType);
-          if (!paramType->isEqual(typeForAccessors)) {
-            Out << "property and setter param have mismatched types:\n";
-            typeForAccessors.dump(Out, 2);
-            Out << "vs.\n";
-            paramType.dump(Out, 2);
+        if (setter->hasInterfaceType()) {
+          if (!setter->getResultInterfaceType()->isVoid()) {
+            Out << "property setter has non-Void result type\n";
             abort();
+          }
+          if (setter->getParameters()->size() == 0) {
+            Out << "property setter has no parameters\n";
+            abort();
+          }
+          if (setter->getParameters()->size() != 1) {
+            Out << "property setter has 2+ parameters\n";
+            abort();
+          }
+          const ParamDecl *param = setter->getParameters()->get(0);
+          Type paramType = param->getInterfaceType();
+          if (!var->getDeclContext()->contextHasLazyGenericEnvironment()) {
+            paramType = var->getDeclContext()->mapTypeIntoContext(paramType);
+            if (!paramType->isEqual(typeForAccessors)) {
+              Out << "property and setter param have mismatched types:\n";
+              typeForAccessors.dump(Out, 2);
+              Out << "vs.\n";
+              paramType.dump(Out, 2);
+              abort();
+            }
           }
         }
       }
@@ -2634,7 +2667,7 @@ public:
 
           // Make sure that the replacement type only uses archetypes allowed
           // in the context where the normal conformance exists.
-          auto replacementType = normal->getTypeWitness(assocType, nullptr);
+          auto replacementType = normal->getTypeWitness(assocType);
           Verifier(M, normal->getDeclContext())
             .verifyChecked(replacementType);
           continue;
@@ -2666,7 +2699,7 @@ public:
           }
 
           // Check the witness substitutions.
-          const auto &witness = normal->getWitness(req, nullptr);
+          const auto &witness = normal->getWitness(req);
 
           if (auto *genericEnv = witness.getSyntheticEnvironment())
             GenericEnv.push_back({genericEnv});
@@ -2832,6 +2865,16 @@ public:
       verifyParsedBase(UED);
     }
 
+    void verifyParsed(EnumCaseDecl *D) {
+      PrettyStackTraceDecl debugStack("verifying EnumCaseDecl", D);
+      if (!D->getAttrs().isEmpty()) {
+        Out << "EnumCaseDecl should not have attributes";
+        abort();
+      }
+
+      verifyParsedBase(D);
+    }
+
     void verifyParsed(AbstractFunctionDecl *AFD) {
       PrettyStackTraceDecl debugStack("verifying AbstractFunctionDecl", AFD);
 
@@ -2989,6 +3032,16 @@ public:
 
     void verifyChecked(AbstractFunctionDecl *AFD) {
       PrettyStackTraceDecl debugStack("verifying AbstractFunctionDecl", AFD);
+
+      if (!AFD->hasValidSignature()) {
+        if (isa<AccessorDecl>(AFD) && AFD->isImplicit())
+          return;
+
+        Out << "All functions except implicit accessors should be "
+               "validated by now\n";
+        AFD->dump(Out);
+        abort();
+      }
 
       // If this function is generic or is within a generic context, it should
       // have an interface type.

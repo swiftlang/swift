@@ -512,6 +512,7 @@ Types
   FUNCTION-KIND ::= 'U'                      // uncurried function type (currently not used)
   FUNCTION-KIND ::= 'K'                      // @auto_closure function type (noescape)
   FUNCTION-KIND ::= 'B'                      // objc block function type
+  FUNCTION-KIND ::= 'L'                      // objc block function type (escaping) (DWARF only; otherwise use 'B')
   FUNCTION-KIND ::= 'C'                      // C function pointer type
   FUNCTION-KIND ::= 'A'                      // @auto_closure function type (escaping)
   FUNCTION-KIND ::= 'E'                      // function type (noescape)
@@ -694,6 +695,7 @@ Property behaviors are implemented using private protocol conformances.
       dependent-associated-conformance 'HA' DEPENDENT-CONFORMANCE-INDEX
 
   dependent-associated-conformance ::= type protocol
+  dependent-protocol-conformance ::= dependent-protocol-conformance opaque-type 'HO'
 
 A compact representation used to represent mangled protocol conformance witness
 arguments at runtime. The ``module`` is only specified for conformances that
@@ -715,8 +717,9 @@ conformance within the witness table, identified by the dependent type and
 protocol. In all cases, the DEPENDENT-CONFORMANCE-INDEX is an INDEX value
 indicating the position of the appropriate value within the generic environment
 (for "HD") or witness table (for "HI" and "HA") when it is known to be at a
-fixed position. A position of zero is used to indicate "unknown"; all other
-values are adjusted by 1.
+fixed position. An index of 1 ("0\_") is used to indicate "unknown"; all other
+values are adjusted by 2. That these indexes are not 0-based is a bug that's
+now codified into the ABI; the index 0 is therefore reserved.
 
 ::
 

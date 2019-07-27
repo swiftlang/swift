@@ -42,7 +42,7 @@ public func run_PopFrontArray(_ N: Int) {
 
 @inline(never)
 public func run_PopFrontUnsafePointer(_ N: Int) {
-  var orig = Array(repeating: 1, count: arrayCount)
+  let orig = Array(repeating: 1, count: arrayCount)
   let a = UnsafeMutablePointer<Int>.allocate(capacity: arrayCount)
   for _ in 1...N {
       for i in 0..<arrayCount {

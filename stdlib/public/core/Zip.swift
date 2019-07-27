@@ -67,8 +67,8 @@ public func zip<Sequence1, Sequence2>(
 ///     // Prints "two: 2
 ///     // Prints "three: 3"
 ///     // Prints "four: 4"
-@_fixed_layout // generic-performance
-public struct Zip2Sequence<Sequence1 : Sequence, Sequence2 : Sequence> {
+@frozen // generic-performance
+public struct Zip2Sequence<Sequence1: Sequence, Sequence2: Sequence> {
   @usableFromInline // generic-performance
   internal let _sequence1: Sequence1
   @usableFromInline // generic-performance
@@ -84,7 +84,7 @@ public struct Zip2Sequence<Sequence1 : Sequence, Sequence2 : Sequence> {
 
 extension Zip2Sequence {
   /// An iterator for `Zip2Sequence`.
-  @_fixed_layout // generic-performance
+  @frozen // generic-performance
   public struct Iterator {
     @usableFromInline // generic-performance
     internal var _baseStream1: Sequence1.Iterator

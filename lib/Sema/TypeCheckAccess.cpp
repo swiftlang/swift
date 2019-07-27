@@ -522,8 +522,8 @@ public:
       highlightOffendingType(TC, diag, complainRepr);
     });
 
-    // Check the property delegate type.
-    if (auto attr = anyVar->getAttachedPropertyDelegate()) {
+    // Check the property wrapper types.
+    for (auto attr : anyVar->getAttachedPropertyWrappers()) {
       checkTypeAccess(attr->getTypeLoc(), anyVar,
                       /*mayBeInferred=*/false,
                       [&](AccessScope typeAccessScope,
@@ -536,7 +536,7 @@ public:
         auto anyVarAccess =
             isExplicit ? anyVar->getFormalAccess()
                        : typeAccessScope.requiredAccessForDiagnostics();
-        auto diag = anyVar->diagnose(diag::property_delegate_type_access,
+        auto diag = anyVar->diagnose(diag::property_wrapper_type_access,
                                      anyVar->isLet(),
                                      isTypeContext,
                                      isExplicit,
@@ -593,7 +593,7 @@ public:
       highlightOffendingType(TC, diag, complainRepr);
     });
   }
-                               
+
   void visitOpaqueTypeDecl(OpaqueTypeDecl *OTD) {
     // TODO(opaque): The constraint class/protocols on the opaque interface, as
     // well as the naming decl for the opaque type, need to be accessible.
@@ -626,7 +626,8 @@ public:
         }
       });
     });
-    checkTypeAccess(assocType->getDefaultDefinitionLoc(), assocType,
+    checkTypeAccess(assocType->getDefaultDefinitionType(),
+                    assocType->getDefaultDefinitionTypeRepr(), assocType,
                     /*mayBeInferred*/false,
                     [&](AccessScope typeAccessScope,
                         const TypeRepr *thisComplainRepr,
@@ -1049,6 +1050,7 @@ public:
   UNINTERESTING(Var) // Handled at the PatternBinding level.
   UNINTERESTING(Destructor) // Always correct.
   UNINTERESTING(Accessor) // Handled by the Var or Subscript.
+  UNINTERESTING(OpaqueType) // Handled by the Var or Subscript.
 
   /// If \p PBD declared stored instance properties in a fixed-contents struct,
   /// return said struct.
@@ -1057,7 +1059,8 @@ public:
     auto *parentStruct = dyn_cast<StructDecl>(PBD->getDeclContext());
     if (!parentStruct)
       return nullptr;
-    if (!parentStruct->getAttrs().hasAttribute<FixedLayoutAttr>() ||
+    if (!(parentStruct->getAttrs().hasAttribute<FrozenAttr>() ||         
+          parentStruct->getAttrs().hasAttribute<FixedLayoutAttr>()) ||
         PBD->isStatic() || !PBD->hasStorage()) {
       return nullptr;
     }
@@ -1089,7 +1092,7 @@ public:
       auto diagID = diag::pattern_type_not_usable_from_inline_inferred;
       if (fixedLayoutStructContext) {
         diagID =
-            diag::pattern_type_not_usable_from_inline_inferred_fixed_layout;
+            diag::pattern_type_not_usable_from_inline_inferred_frozen;
       } else if (!TC.Context.isSwiftVersionAtLeast(5)) {
         diagID = diag::pattern_type_not_usable_from_inline_inferred_warn;
       }
@@ -1125,7 +1128,7 @@ public:
                         DowngradeToWarning downgradeToWarning) {
       auto diagID = diag::pattern_type_not_usable_from_inline;
       if (fixedLayoutStructContext)
-        diagID = diag::pattern_type_not_usable_from_inline_fixed_layout;
+        diagID = diag::pattern_type_not_usable_from_inline_frozen;
       else if (!TC.Context.isSwiftVersionAtLeast(5))
         diagID = diag::pattern_type_not_usable_from_inline_warn;
       auto diag = TC.diagnose(TP->getLoc(), diagID, anyVar->isLet(),
@@ -1133,7 +1136,7 @@ public:
       highlightOffendingType(TC, diag, complainRepr);
     });
 
-    if (auto attr = anyVar->getAttachedPropertyDelegate()) {
+    for (auto attr : anyVar->getAttachedPropertyWrappers()) {
       checkTypeAccess(attr->getTypeLoc(),
                       fixedLayoutStructContext ? fixedLayoutStructContext
                                                : anyVar,
@@ -1142,7 +1145,7 @@ public:
                           const TypeRepr *complainRepr,
                           DowngradeToWarning downgradeToWarning) {
         auto diag = anyVar->diagnose(
-            diag::property_delegate_type_not_usable_from_inline,
+            diag::property_wrapper_type_not_usable_from_inline,
             anyVar->isLet(), isTypeContext);
         highlightOffendingType(TC, diag, complainRepr);
       });
@@ -1193,11 +1196,6 @@ public:
     });
   }
 
-  void visitOpaqueTypeDecl(OpaqueTypeDecl *OTD) {
-    // TODO(opaque): The constraint class/protocols on the opaque interface, as
-    // well as the naming decl for the opaque type, need to be accessible.
-  }
-
   void visitAssociatedTypeDecl(AssociatedTypeDecl *assocType) {
     // This must stay in sync with diag::associated_type_not_usable_from_inline.
     enum {
@@ -1219,7 +1217,8 @@ public:
         highlightOffendingType(TC, diag, complainRepr);
       });
     });
-    checkTypeAccess(assocType->getDefaultDefinitionLoc(), assocType,
+    checkTypeAccess(assocType->getDefaultDefinitionType(),
+                    assocType->getDefaultDefinitionTypeRepr(), assocType,
                      /*mayBeInferred*/false,
                     [&](AccessScope typeAccessScope,
                         const TypeRepr *complainRepr,
@@ -1517,7 +1516,7 @@ class ExportabilityChecker : public DeclVisitor<ExportabilityChecker> {
         diagnoseType(typeDecl, /*typeRepr*/nullptr);
       }
 
-      void visitSubstitutionMap(const SubstitutionMap &subs) {
+      void visitSubstitutionMap(SubstitutionMap subs) {
         for (ProtocolConformanceRef conformance : subs.getConformances()) {
           if (!conformance.isConcrete())
             continue;
@@ -1599,18 +1598,30 @@ class ExportabilityChecker : public DeclVisitor<ExportabilityChecker> {
     });
   }
 
+  // This enum must be kept in sync with
+  // diag::decl_from_implementation_only_module and
+  // diag::conformance_from_implementation_only_module.
+  enum class Reason : unsigned {
+    General,
+    ExtensionWithPublicMembers,
+    ExtensionWithConditionalConformances
+  };
+
   class DiagnoseGenerically {
     TypeChecker &TC;
     const Decl *D;
+    Reason reason;
   public:
-    DiagnoseGenerically(TypeChecker &TC, const Decl *D) : TC(TC), D(D) {}
+    DiagnoseGenerically(TypeChecker &TC, const Decl *D, Reason reason)
+        : TC(TC), D(D), reason(reason) {}
 
     void operator()(const TypeDecl *offendingType,
                     const TypeRepr *complainRepr) {
       ModuleDecl *M = offendingType->getModuleContext();
       auto diag = TC.diagnose(D, diag::decl_from_implementation_only_module,
                               offendingType->getDescriptiveKind(),
-                              offendingType->getFullName(), M->getName());
+                              offendingType->getFullName(),
+                              static_cast<unsigned>(reason), M->getName());
       highlightOffendingType(TC, diag, complainRepr);
     }
 
@@ -1619,7 +1630,7 @@ class ExportabilityChecker : public DeclVisitor<ExportabilityChecker> {
       TC.diagnose(D, diag::conformance_from_implementation_only_module,
                   offendingConformance->getType(),
                   offendingConformance->getProtocol()->getFullName(),
-                  M->getName());
+                  static_cast<unsigned>(reason), M->getName());
     }
   };
 
@@ -1632,14 +1643,23 @@ class ExportabilityChecker : public DeclVisitor<ExportabilityChecker> {
                           CheckExportabilityConformanceCallback>::value,
       "DiagnoseGenerically has wrong call signature for conformance diags");
 
-  DiagnoseGenerically getDiagnoseCallback(const Decl *D) {
-    return DiagnoseGenerically(TC, D);
+  DiagnoseGenerically getDiagnoseCallback(const Decl *D,
+                                          Reason reason = Reason::General) {
+    return DiagnoseGenerically(TC, D, reason);
   }
 
 public:
   explicit ExportabilityChecker(TypeChecker &TC) : TC(TC) {}
 
   static bool shouldSkipChecking(const ValueDecl *VD) {
+    if (VD->getAttrs().hasAttribute<ImplementationOnlyAttr>())
+      return true;
+
+    // Accessors are handled as part of their Var or Subscript, and we don't
+    // want to redo extension signature checking for them.
+    if (isa<AccessorDecl>(VD))
+      return true;
+
     // Is this part of the module's API or ABI?
     AccessScope accessScope =
         VD->getFormalAccessScope(nullptr,
@@ -1664,21 +1684,51 @@ public:
     return true;
   }
 
+  void checkOverride(const ValueDecl *VD) {
+    const ValueDecl *overridden = VD->getOverriddenDecl();
+    if (!overridden)
+      return;
+
+    auto *SF = VD->getDeclContext()->getParentSourceFile();
+    assert(SF && "checking a non-source declaration?");
+
+    ModuleDecl *M = overridden->getModuleContext();
+    if (SF->isImportedImplementationOnly(M)) {
+      TC.diagnose(VD, diag::implementation_only_override_import_without_attr,
+                  overridden->getDescriptiveKind())
+        .fixItInsert(VD->getAttributeInsertionLoc(false),
+                     "@_implementationOnly ");
+      TC.diagnose(overridden, diag::overridden_here);
+      return;
+    }
+
+    if (overridden->getAttrs().hasAttribute<ImplementationOnlyAttr>()) {
+      TC.diagnose(VD, diag::implementation_only_override_without_attr,
+                  overridden->getDescriptiveKind())
+        .fixItInsert(VD->getAttributeInsertionLoc(false),
+                     "@_implementationOnly ");
+      TC.diagnose(overridden, diag::overridden_here);
+      return;
+    }
+
+    // FIXME: Check storage decls where the setter is in a separate module from
+    // the getter, which is a thing Objective-C can do. The ClangImporter
+    // doesn't make this easy, though, because it just gives the setter the same
+    // DeclContext as the property or subscript, which means we've lost the
+    // information about whether its module was implementation-only imported.
+  }
+
   void visit(Decl *D) {
     if (D->isInvalid() || D->isImplicit())
       return;
 
-    if (auto *VD = dyn_cast<ValueDecl>(D))
+    if (auto *VD = dyn_cast<ValueDecl>(D)) {
       if (shouldSkipChecking(VD))
         return;
+      checkOverride(VD);
+    }
 
     DeclVisitor<ExportabilityChecker>::visit(D);
-
-    if (auto *extension = dyn_cast<ExtensionDecl>(D->getDeclContext())) {
-      checkType(extension->getExtendedTypeLoc(), extension,
-                getDiagnoseCallback(extension), getDiagnoseCallback(extension));
-      checkConstrainedExtensionRequirements(extension);
-    }
   }
 
   // Force all kinds to be handled at a lower level.
@@ -1720,8 +1770,11 @@ public:
     const VarDecl *theVar = NP->getDecl();
     if (shouldSkipChecking(theVar))
       return;
-    // Only check individual variables if we didn't check an enclosing
-    // TypedPattern.
+
+    checkOverride(theVar);
+
+    // Only check the type of individual variables if we didn't check an
+    // enclosing TypedPattern.
     if (seenVars.count(theVar) || theVar->isInvalid())
       return;
 
@@ -1779,7 +1832,8 @@ public:
       checkType(requirement, assocType, getDiagnoseCallback(assocType),
                 getDiagnoseCallback(assocType));
     });
-    checkType(assocType->getDefaultDefinitionLoc(), assocType,
+    checkType(assocType->getDefaultDefinitionType(),
+              assocType->getDefaultDefinitionTypeRepr(), assocType,
               getDiagnoseCallback(assocType), getDiagnoseCallback(assocType));
 
     if (assocType->getTrailingWhereClause()) {
@@ -1849,17 +1903,23 @@ public:
                 getDiagnoseCallback(EED));
   }
 
-  void checkConstrainedExtensionRequirements(ExtensionDecl *ED) {
+  void checkConstrainedExtensionRequirements(ExtensionDecl *ED,
+                                             Reason reason) {
     if (!ED->getTrailingWhereClause())
       return;
     forAllRequirementTypes(ED, [&](Type type, TypeRepr *typeRepr) {
-      checkType(type, typeRepr, ED, getDiagnoseCallback(ED),
-                getDiagnoseCallback(ED));
+      checkType(type, typeRepr, ED, getDiagnoseCallback(ED, reason),
+                getDiagnoseCallback(ED, reason));
     });
   }
 
   void visitExtensionDecl(ExtensionDecl *ED) {
-    if (shouldSkipChecking(ED->getExtendedNominal()))
+    auto extendedType = ED->getExtendedNominal();
+    // TODO: Sometimes we have an extension that is marked valid but has no
+    //       extended type. Assert, just in case we see it while testing, but
+    //       don't crash. rdar://50401284
+    assert(extendedType && "valid extension with no extended type?");
+    if (!extendedType || shouldSkipChecking(extendedType))
       return;
 
     // FIXME: We should allow conforming to implementation-only protocols,
@@ -1870,8 +1930,26 @@ public:
                 getDiagnoseCallback(ED));
     });
 
-    if (!ED->getInherited().empty())
-      checkConstrainedExtensionRequirements(ED);
+    bool hasPublicMembers = llvm::any_of(ED->getMembers(),
+                                         [](const Decl *member) -> bool {
+      auto *valueMember = dyn_cast<ValueDecl>(member);
+      if (!valueMember)
+        return false;
+      return !shouldSkipChecking(valueMember);
+    });
+
+    if (hasPublicMembers) {
+      checkType(ED->getExtendedTypeLoc(), ED,
+                getDiagnoseCallback(ED, Reason::ExtensionWithPublicMembers),
+                getDiagnoseCallback(ED, Reason::ExtensionWithPublicMembers));
+    }
+
+    if (hasPublicMembers || !ED->getInherited().empty()) {
+      Reason reason =
+          hasPublicMembers ? Reason::ExtensionWithPublicMembers
+                           : Reason::ExtensionWithConditionalConformances;
+      checkConstrainedExtensionRequirements(ED, reason);
+    }
   }
 
   void checkPrecedenceGroup(const PrecedenceGroupDecl *PGD,
@@ -1884,6 +1962,7 @@ public:
 
     auto diag = TC.diagnose(diagLoc, diag::decl_from_implementation_only_module,
                             PGD->getDescriptiveKind(), PGD->getName(),
+                            static_cast<unsigned>(Reason::General),
                             M->getName());
     if (refRange.isValid())
       diag.highlight(refRange);
