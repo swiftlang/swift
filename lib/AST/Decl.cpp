@@ -7519,6 +7519,20 @@ void swift::simple_display(llvm::raw_ostream &out, const ValueDecl *decl) {
   else out << "(null)";
 }
 
+StringRef swift::getAccessorLabel(AccessorKind kind) {
+  switch (kind) {
+  #define SINGLETON_ACCESSOR(ID, KEYWORD) \
+    case AccessorKind::ID: return #KEYWORD;
+  #define ACCESSOR(ID)
+  #include "swift/AST/AccessorKinds.def"
+    }
+    llvm_unreachable("bad accessor kind");
+}
+
+void swift::simple_display(llvm::raw_ostream &out, AccessorKind kind) {
+  out << getAccessorLabel(kind);
+}
+
 SourceLoc swift::extractNearestSourceLoc(const Decl *decl) {
   auto loc = decl->getLoc();
   if (loc.isValid())

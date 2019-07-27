@@ -383,6 +383,9 @@ private:
   }
 };
 
+StringRef getAccessorLabel(AccessorKind kind);
+void simple_display(llvm::raw_ostream &out, AccessorKind kind);
+
 } // end namespace swift
 
 #endif

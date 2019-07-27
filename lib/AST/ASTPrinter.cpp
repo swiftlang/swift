@@ -1704,16 +1704,6 @@ void PrintAST::printBodyIfNecessary(const AbstractFunctionDecl *decl) {
   printBraceStmt(decl->getBody(), /*newlineIfEmpty*/!isa<AccessorDecl>(decl));
 }
 
-static StringRef getAccessorLabel(AccessorDecl *accessor) {
-  switch (accessor->getAccessorKind()) {
-#define SINGLETON_ACCESSOR(ID, KEYWORD) \
-  case AccessorKind::ID: return #KEYWORD;
-#define ACCESSOR(ID)
-#include "swift/AST/AccessorKinds.def"
-  }
-  llvm_unreachable("bad accessor kind");
-}
-
 void PrintAST::printMutatingModifiersIfNeeded(const AccessorDecl *accessor) {
   if (accessor->isAssumedNonMutating() && accessor->isMutating()) {
     Printer.printKeyword("mutating", Options, " ");
@@ -1830,7 +1820,7 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
     if (!PrintAccessorBody) {
       Printer << " ";
       printMutatingModifiersIfNeeded(Accessor);
-      Printer.printKeyword(getAccessorLabel(Accessor), Options);
+      Printer.printKeyword(getAccessorLabel(Accessor->getAccessorKind()), Options);
     } else {
       {
         IndentRAII IndentMore(*this);
@@ -2719,14 +2709,14 @@ void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
   case AccessorKind::MutableAddress:
     recordDeclLoc(decl,
       [&]{
-        Printer << getAccessorLabel(decl);
+        Printer << getAccessorLabel(decl->getAccessorKind());
       });
     break;
   case AccessorKind::Set:
   case AccessorKind::WillSet:
     recordDeclLoc(decl,
       [&]{
-        Printer << getAccessorLabel(decl);
+        Printer << getAccessorLabel(decl->getAccessorKind());
 
         auto params = decl->getParameters();
         if (params->size() != 0 && !params->get(0)->isImplicit()) {
