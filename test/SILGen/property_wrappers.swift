@@ -308,33 +308,31 @@ struct WrapperC<Value> {
   var wrappedValue: Value?
 }
 
-/* TODO: Reenable composed property wrappers
 struct CompositionMembers {
   // CompositionMembers.p1.getter
-  // C/HECK-LABEL: sil hidden [ossa] @$s17property_wrappers18CompositionMembersV2p1SiSgvg : $@convention(method) (@guaranteed CompositionMembers) -> Optional<Int>
-  // C/HECK: bb0([[SELF:%.*]] : @guaranteed $CompositionMembers):
-  // C/HECK: [[P1:%.*]] = struct_extract [[SELF]] : $CompositionMembers, #CompositionMembers._p1
-  // C/HECK: [[P1_VALUE:%.*]] = struct_extract [[P1]] : $WrapperA<WrapperB<WrapperC<Int>>>, #WrapperA.wrappedValue
-  // C/HECK: [[P1_VALUE2:%.*]] = struct_extract [[P1_VALUE]] : $WrapperB<WrapperC<Int>>, #WrapperB.wrappedValue
-  // C/HECK: [[P1_VALUE3:%.*]] = struct_extract [[P1_VALUE2]] : $WrapperC<Int>, #WrapperC.wrappedValue
-  // C/HECK: return [[P1_VALUE3]] : $Optional<Int>
+  // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers18CompositionMembersV2p1SiSgvg : $@convention(method) (@guaranteed CompositionMembers) -> Optional<Int>
+  // CHECK: bb0([[SELF:%.*]] : @guaranteed $CompositionMembers):
+  // CHECK: [[P1:%.*]] = struct_extract [[SELF]] : $CompositionMembers, #CompositionMembers._p1
+  // CHECK: [[P1_VALUE:%.*]] = struct_extract [[P1]] : $WrapperA<WrapperB<WrapperC<Int>>>, #WrapperA.wrappedValue
+  // CHECK: [[P1_VALUE2:%.*]] = struct_extract [[P1_VALUE]] : $WrapperB<WrapperC<Int>>, #WrapperB.wrappedValue
+  // CHECK: [[P1_VALUE3:%.*]] = struct_extract [[P1_VALUE2]] : $WrapperC<Int>, #WrapperC.wrappedValue
+  // CHECK: return [[P1_VALUE3]] : $Optional<Int>
   @WrapperA @WrapperB @WrapperC var p1: Int?
   @WrapperA @WrapperB @WrapperC var p2 = "Hello"
 
   // variable initialization expression of CompositionMembers.$p2
-  // C/HECK-LABEL: sil hidden [transparent] [ossa] @$s17property_wrappers18CompositionMembersV3_p233_{{.*}}8WrapperAVyAA0N1BVyAA0N1CVySSGGGvpfi : $@convention(thin) () -> @owned Optional<String> {
-  // C/HECK: %0 = string_literal utf8 "Hello"
+  // CHECK-LABEL: sil hidden [transparent] [ossa] @$s17property_wrappers18CompositionMembersV3_p233_{{.*}}8WrapperAVyAA0N1BVyAA0N1CVySSGGGvpfi : $@convention(thin) () -> @owned Optional<String> {
+  // CHECK: %0 = string_literal utf8 "Hello"
 
-  // C/HECK-LABEL: sil hidden [ossa] @$s17property_wrappers18CompositionMembersV2p12p2ACSiSg_SSSgtcfC : $@convention(method) (Optional<Int>, @owned Optional<String>, @thin CompositionMembers.Type) -> @owned CompositionMembers
-  // C/HECK: function_ref @$s17property_wrappers8WrapperCV12wrappedValueACyxGxSg_tcfC
-  // C/HECK: function_ref @$s17property_wrappers8WrapperBV12wrappedValueACyxGx_tcfC
-  // C/HECK: function_ref @$s17property_wrappers8WrapperAV12wrappedValueACyxGx_tcfC
+  // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers18CompositionMembersV2p12p2ACSiSg_SSSgtcfC : $@convention(method) (Optional<Int>, @owned Optional<String>, @thin CompositionMembers.Type) -> @owned CompositionMembers
+  // CHECK: function_ref @$s17property_wrappers8WrapperCV12wrappedValueACyxGxSg_tcfC
+  // CHECK: function_ref @$s17property_wrappers8WrapperBV12wrappedValueACyxGx_tcfC
+  // CHECK: function_ref @$s17property_wrappers8WrapperAV12wrappedValueACyxGx_tcfC
 }
 
 func testComposition() {
   _ = CompositionMembers(p1: nil)
 }
-*/
 
 // Observers with non-default mutatingness.
 @propertyWrapper
