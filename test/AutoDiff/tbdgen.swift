@@ -22,7 +22,7 @@ public extension Float {
   // This should generate public symbols for both JVP and VJP.
   @differentiable
   var x: Float {
-    return .zero
+    return self
   }
 
   // This should generate public symbols for JVP but not VJP, because VJP is user-defined.
@@ -43,16 +43,63 @@ public extension Float {
 
   // This should generate public symbols for both JVP and VJP.
   // Tests self-reordering-method thunking.
-  @differentiable
+  @differentiable(jvp: jvpMethod)
   func method(x: Float, y: Float) -> Float {
     return x
+  }
+  func jvpMethod(x: Float, y: Float) -> (Float, (Float, Float, Float) -> Float) {
+    return (x, { dself, dx, dy in dx })
   }
 
   // This should generate public symbols for both JVP and VJP.
   // Tests self-reordering-method thunking.
-  @differentiable
+  @differentiable(vjp: vjpSubscript)
   subscript(x: Float) -> Float {
     return x
+  }
+  func vjpSubscript(x: Float) -> (Float, (Float) -> (Float, Float)) {
+    return (x, { v in (0, v) })
+  }
+}
+
+struct Nontrivial : Differentiable {
+  var base: [Float]
+
+  // This should generate public symbols for both JVP and VJP.
+  // Tests differential/pullback thunking.
+  @differentiable(jvp: jvpInit, vjp: vjpInit)
+  init(_ base: [Float]) {
+    self.base = base
+  }
+  static func jvpInit(_ base: [Float])
+    -> (Nontrivial, (Array<Float>.TangentVector) -> Nontrivial.TangentVector) {
+    return (Nontrivial(base), { v in Nontrivial.TangentVector(base: v) })
+  }
+  static func vjpInit(_ base: [Float])
+    -> (Nontrivial, (Nontrivial.TangentVector) -> Array<Float>.TangentVector) {
+    return (Nontrivial(base), { v in v.base })
+  }
+
+  // This should generate public symbols for both JVP and VJP.
+  // Tests differential/pullback thunking.
+  @differentiable(vjp: vjpOwnedParameterMismatch)
+  func ownedParameter(_ x: __owned [Float]) -> [Float] {
+    return x
+  }
+  func vjpOwnedParameterMismatch(_ x: __shared [Float])
+    -> ([Float], (Array<Float>.TangentVector) -> (Nontrivial.TangentVector, Array<Float>.TangentVector)) {
+    return (ownedParameter(x), { v in (.zero, v) })
+  }
+
+  // This should generate public symbols for both JVP and VJP.
+  // Tests differential/pullback thunking.
+  @differentiable(vjp: vjpSharedParameterMismatch)
+  func sharedParameter(_ x: __shared [Float]) -> [Float] {
+    return x
+  }
+  func vjpSharedParameterMismatch(_ x: __owned [Float])
+    -> ([Float], (Array<Float>.TangentVector) -> (Nontrivial.TangentVector, Array<Float>.TangentVector)) {
+    return (sharedParameter(x), { v in (.zero, v) })
   }
 }
 
