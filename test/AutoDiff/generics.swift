@@ -181,4 +181,28 @@ func test<Scalar: Numeric>(x: TF_652<Scalar>) -> TF_652<Scalar> {
   return x
 }
 
+// TF-682: Test that SILGen linear map thunk performs correct reabstraction.
+protocol TF_682_Proto {
+  associatedtype Scalar
+}
+extension TF_682_Proto where Scalar : FloatingPoint {
+  @differentiable(
+    vjp: vjpFoo
+    where Self : Differentiable, Scalar : Differentiable,
+          // Same-type requirement with dependent member type.
+          Self.TangentVector == Float
+  )
+  func foo(lhs: Self) -> Self {
+    return lhs
+  }
+}
+extension TF_682_Proto where Self : Differentiable,
+                             Scalar : FloatingPoint & Differentiable,
+                             Self.TangentVector == Float {
+  func vjpFoo(lhs: Self)
+      -> (Self, (TangentVector) -> (TangentVector, TangentVector)) {
+    return (lhs, { v in (v, v) })
+  }
+}
+
 // TODO: add more tests.

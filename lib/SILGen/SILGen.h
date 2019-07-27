@@ -172,11 +172,12 @@ public:
                                            CanType dynamicSelfType);
 
   // SWIFT_ENABLE_TENSORFLOW
-  /// Get or create a thunk for reordering autodiff associated functions with a
-  /// self parameter, so that self appears as:
+  /// Get or create a thunk for reabstracting user-defined JVP/VJP functions.
+  ///
+  /// If `reorderSelf` is true, reorder self so that it appears as:
   /// - The last parameter in the returned differential.
   /// - The last result in the returned pullback.
-  SILFunction *getOrCreateAutoDiffAssociatedFunctionReorderingThunk(
+  SILFunction *getOrCreateAutoDiffAssociatedFunctionThunk(
       SILFunction *original, SILAutoDiffIndices &indices,
       SILFunction *assocFn, AutoDiffAssociatedFunctionKind assocFnKind,
       IsSerialized_t isSerialized);

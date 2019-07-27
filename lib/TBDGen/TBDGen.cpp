@@ -215,8 +215,8 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
   }
 
   // SWIFT_ENABLE_TENSORFLOW
-  // The AutoDiff pass creates an order-1 JVP and VJP for every function with a
-  // `@differentiable` attribute.
+  // The Differentiation transform creates an order-1 JVP and VJP for every
+  // function with a `@differentiable` attribute.
   auto diffAttrs = AFD->getAttrs().getAttributes<DifferentiableAttr>();
   for (auto *DA : diffAttrs) {
     // If a method-self-reordering thunk is generated for the original function,
@@ -305,8 +305,8 @@ void TBDGenVisitor::visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
   }
 
   // SWIFT_ENABLE_TENSORFLOW
-  // The AutoDiff pass creates an order-1 JVP and VJP for every var/subscript
-  // with a `@differentiable` attribute.
+  // The Differentiation transform creates an order-1 JVP and VJP for every
+  // var/subscript with a `@differentiable` attribute.
   auto diffAttrs = ASD->getAttrs().getAttributes<DifferentiableAttr>();
   for (auto *DA : diffAttrs) {
     // If a method-self-reordering thunk is generated for the original function,

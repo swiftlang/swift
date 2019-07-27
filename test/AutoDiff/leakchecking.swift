@@ -215,6 +215,116 @@ LeakCheckingTests.testWithLeakChecking("ClassMethods") {
   expectEqual((3, 3), classValueWithGradient(SubOverrideCustomDerivatives()))
 }
 
+protocol TF_508_Proto {
+  associatedtype Scalar
+}
+extension TF_508_Proto where Scalar : FloatingPoint {
+  @differentiable(
+    jvp: jvpAdd, vjp: vjpAdd
+    where Self : Differentiable, Scalar : Differentiable,
+          // Conformance requirement with dependent member type.
+          Self.TangentVector : TF_508_Proto
+  )
+  static func +(lhs: Self, rhs: Self) -> Self {
+    return lhs
+  }
+
+  @differentiable(
+    jvp: jvpSubtract, vjp: vjpSubtract
+    where Self : Differentiable, Scalar : Differentiable,
+          // Same-type requirement with dependent member type.
+          Self.TangentVector == TF_508_Struct<Float>
+  )
+  func subtract(_ other: Self) -> Self {
+    return self
+  }
+}
+extension TF_508_Proto where Self : Differentiable,
+                             Scalar : FloatingPoint & Differentiable,
+                             Self.TangentVector : TF_508_Proto {
+  static func jvpAdd(lhs: Self, rhs: Self)
+    -> (Self, (TangentVector, TangentVector) -> TangentVector) {
+    return (lhs, { (dlhs, drhs) in dlhs + drhs })
+  }
+  static func vjpAdd(lhs: Self, rhs: Self)
+    -> (Self, (TangentVector) -> (TangentVector, TangentVector)) {
+    return (lhs, { v in (v, v) })
+  }
+}
+extension TF_508_Proto where Self : Differentiable,
+                             Scalar : FloatingPoint & Differentiable,
+                             Self.TangentVector == TF_508_Struct<Float> {
+  func jvpSubtract(lhs: Self)
+    -> (Self, (TangentVector, TangentVector) -> TangentVector) {
+    return (lhs, { dself, dlhs in dself - dlhs })
+  }
+  func vjpSubtract(lhs: Self)
+    -> (Self, (TangentVector) -> (TangentVector, TangentVector)) {
+    return (lhs, { v in (v, v) })
+  }
+}
+
+struct TF_508_Struct<Scalar : AdditiveArithmetic>
+  : TF_508_Proto, AdditiveArithmetic {}
+extension TF_508_Struct : Differentiable where Scalar : Differentiable {
+  typealias TangentVector = TF_508_Struct
+}
+
+// Test leaks regarding `SILGenFunction::getOrCreateAutoDiffLinearMapThunk`.
+LeakCheckingTests.testWithLeakChecking("LinearMapSILGenThunks") {
+  func testLinearMapSILGenThunks() {
+    let x = TF_508_Struct<Float>()
+    // Test conformance requirement with dependent member type.
+    _ = pullback(at: x, in: { (x: TF_508_Struct<Float>) -> TF_508_Struct<Float> in
+      return x + x
+    })
+    // Test same-type requirement with dependent member type.
+    _ = pullback(at: x, in: { (x: TF_508_Struct<Float>) -> TF_508_Struct<Float> in
+      return x.subtract(x)
+    })
+  }
+  testLinearMapSILGenThunks()
+}
+
+LeakCheckingTests.testWithLeakChecking("ParameterConventionMismatchLeakChecking") {
+  struct Nontrivial : Differentiable {
+    var base: Tracked<Float>
+
+    // Test initializer and static VJP function.
+    // Initializers have owned parameters but functions have shared parameters.
+    @differentiable(vjp: vjpInit)
+    init(_ base: Tracked<Float>) {
+      self.base = base
+    }
+    static func vjpInit(_ base: Tracked<Float>)
+      -> (Nontrivial, (Nontrivial.TangentVector) -> Tracked<Float>) {
+      return (Nontrivial(base), { v in v.base })
+    }
+
+    @differentiable(vjp: vjpOwnedParameterMismatch)
+    func ownedParameter(_ x: __owned Tracked<Float>) -> Tracked<Float> {
+      return x
+    }
+    func vjpOwnedParameterMismatch(_ x: __shared Tracked<Float>)
+      -> (Tracked<Float>, (Tracked<Float>) -> (Nontrivial.TangentVector, Tracked<Float>)) {
+      return (ownedParameter(x), { v in (.zero, v) })
+    }
+
+    @differentiable(vjp: vjpSharedParameterMismatch)
+    func sharedParameter(_ x: __shared Tracked<Float>) -> Tracked<Float> {
+      return x
+    }
+    func vjpSharedParameterMismatch(_ x: __owned Tracked<Float>)
+      -> (Tracked<Float>, (Tracked<Float>) -> (Nontrivial.TangentVector, Tracked<Float>)) {
+      return (sharedParameter(x), { v in (.zero, v) })
+    }
+  }
+  let v = Nontrivial.TangentVector(base: 10)
+  expectEqual(10, pullback(at: Tracked<Float>(1)) { x in Nontrivial(x) }(v))
+  _ = Tracked<Float>(1).gradient { x in Nontrivial(x).ownedParameter(x) }
+  _ = Tracked<Float>(1).gradient { x in Nontrivial(x).sharedParameter(x) }
+}
+
 LeakCheckingTests.testWithLeakChecking("ClosureCaptureLeakChecking") {
   do {
     var model = ExampleLeakModel()
