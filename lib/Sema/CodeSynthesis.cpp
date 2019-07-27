@@ -2456,6 +2456,40 @@ RequiresOpaqueAccessorsRequest::evaluate(Evaluator &evaluator,
   return true;
 }
 
+llvm::Expected<bool>
+RequiresOpaqueModifyCoroutineRequest::evaluate(Evaluator &evaluator,
+                                               AbstractStorageDecl *storage) const {
+  // Only for mutable storage.
+  if (!storage->supportsMutation())
+    return false;
+
+  auto *dc = storage->getDeclContext();
+
+  // Local properties don't have an opaque modify coroutine.
+  if (dc->isLocalContext())
+    return false;
+
+  // Fixed-layout global properties don't have an opaque modify coroutine.
+  if (dc->isModuleScopeContext() && !storage->isResilient())
+    return false;
+
+  // Imported storage declarations don't have an opaque modify coroutine.
+  if (storage->hasClangNode())
+    return false;
+
+  // Dynamic storage does not have an opaque modify coroutine.
+  if (dc->getSelfClassDecl())
+    if (storage->isObjCDynamic())
+      return false;
+
+  // Requirements of ObjC protocols don't have an opaque modify coroutine.
+  if (auto protoDecl = dyn_cast<ProtocolDecl>(dc))
+    if (protoDecl->isObjC())
+      return false;
+
+  return true;
+}
+
 /// Try to add the appropriate accessors required a storage declaration.
 /// This needs to be idempotent.
 void swift::maybeAddAccessorsToStorage(AbstractStorageDecl *storage) {

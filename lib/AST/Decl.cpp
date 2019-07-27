@@ -1951,37 +1951,10 @@ bool AbstractStorageDecl::requiresOpaqueAccessor(AccessorKind kind) const {
 }
 
 bool AbstractStorageDecl::requiresOpaqueModifyCoroutine() const {
-  // Only for mutable storage.
-  if (!supportsMutation())
-    return false;
-
-  auto *dc = getDeclContext();
-
-  // Local properties don't have modify accessors.
-  if (dc->isLocalContext())
-    return false;
-
-  // Fixed-layout global properties don't have modify accessors.
-  if (dc->isModuleScopeContext() && !isResilient())
-    return false;
-
-  // Imported storage declarations don't have eagerly-generated modify
-  // accessors.
-  if (hasClangNode())
-    return false;
-
-  // Dynamic storage suppresses the modify coroutine.
-  // If we add a Swift-native concept of `dynamic`, this should be restricted
-  // to the ObjC-supported concept.
-  if (isObjCDynamic())
-    return false;
-
-  // Requirements of ObjC protocols don't support the modify coroutine.
-  if (auto protoDecl = dyn_cast<ProtocolDecl>(dc))
-    if (protoDecl->isObjC())
-      return false;
-
-  return true;
+  ASTContext &ctx = getASTContext();
+  return evaluateOrDefault(ctx.evaluator,
+    RequiresOpaqueModifyCoroutineRequest{const_cast<AbstractStorageDecl *>(this)},
+    false);
 }
 
 void AbstractStorageDecl::visitExpectedOpaqueAccessors(

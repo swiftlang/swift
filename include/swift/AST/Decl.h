@@ -4390,6 +4390,7 @@ class AbstractStorageDecl : public ValueDecl {
   friend class OpaqueReadOwnershipRequest;
   friend class StorageImplInfoRequest;
   friend class RequiresOpaqueAccessorsRequest;
+  friend class RequiresOpaqueModifyCoroutineRequest;
 
 public:
   static const size_t MaxNumAccessors = 255;
@@ -4455,6 +4456,8 @@ private:
     unsigned ImplInfoComputed : 1;
     unsigned RequiresOpaqueAccessorsComputed : 1;
     unsigned RequiresOpaqueAccessors : 1;
+    unsigned RequiresOpaqueModifyCoroutineComputed : 1;
+    unsigned RequiresOpaqueModifyCoroutine : 1;
   } LazySemanticInfo = { };
 
   /// The implementation info for the accessors.

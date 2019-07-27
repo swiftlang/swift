@@ -722,3 +722,21 @@ void RequiresOpaqueAccessorsRequest::cacheResult(bool value) const {
   storage->LazySemanticInfo.RequiresOpaqueAccessorsComputed = 1;
   storage->LazySemanticInfo.RequiresOpaqueAccessors = value;
 }
+
+//----------------------------------------------------------------------------//
+// RequiresOpaqueModifyCoroutineRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<bool>
+RequiresOpaqueModifyCoroutineRequest::getCachedResult() const {
+  auto *storage = std::get<0>(getStorage());
+  if (storage->LazySemanticInfo.RequiresOpaqueModifyCoroutineComputed)
+    return storage->LazySemanticInfo.RequiresOpaqueModifyCoroutine;
+  return None;
+}
+
+void RequiresOpaqueModifyCoroutineRequest::cacheResult(bool value) const {
+  auto *storage = std::get<0>(getStorage());
+  storage->LazySemanticInfo.RequiresOpaqueModifyCoroutineComputed = 1;
+  storage->LazySemanticInfo.RequiresOpaqueModifyCoroutine = value;
+}
