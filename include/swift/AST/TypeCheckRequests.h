@@ -964,6 +964,29 @@ public:
   void cacheResult(bool value) const;
 };
 
+class SynthesizeAccessorRequest :
+    public SimpleRequest<SynthesizeAccessorRequest,
+                         AccessorDecl *(AbstractStorageDecl *,
+                                        AccessorKind),
+                         CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<AccessorDecl *>
+  evaluate(Evaluator &evaluator, AbstractStorageDecl *decl,
+           AccessorKind kind) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<AccessorDecl *> getCachedResult() const;
+  void cacheResult(AccessorDecl *value) const;
+};
+
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
 template<>

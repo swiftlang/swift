@@ -764,3 +764,24 @@ void IsAccessorTransparentRequest::cacheResult(bool value) const {
     }
   }
 }
+
+//----------------------------------------------------------------------------//
+// SynthesizeAccessorRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<AccessorDecl *>
+SynthesizeAccessorRequest::getCachedResult() const {
+  auto *storage = std::get<0>(getStorage());
+  auto kind = std::get<1>(getStorage());
+  auto *accessor = storage->getAccessor(kind);
+  if (accessor)
+    return accessor;
+  return None;
+}
+
+void SynthesizeAccessorRequest::cacheResult(AccessorDecl *accessor) const {
+  auto *storage = std::get<0>(getStorage());
+  auto kind = std::get<1>(getStorage());
+
+  storage->setSynthesizedAccessor(kind, accessor);
+}

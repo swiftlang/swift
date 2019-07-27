@@ -4397,6 +4397,7 @@ class AbstractStorageDecl : public ValueDecl {
   friend class StorageImplInfoRequest;
   friend class RequiresOpaqueAccessorsRequest;
   friend class RequiresOpaqueModifyCoroutineRequest;
+  friend class SynthesizeAccessorRequest;
 
 public:
   static const size_t MaxNumAccessors = 255;
@@ -4468,6 +4469,9 @@ private:
 
   /// The implementation info for the accessors.
   StorageImplInfo ImplInfo;
+
+  /// Add a synthesized accessor.
+  void setSynthesizedAccessor(AccessorKind kind, AccessorDecl *getter);
 
 protected:
   AbstractStorageDecl(DeclKind Kind, bool IsStatic, DeclContext *DC,
@@ -4582,6 +4586,12 @@ public:
     return {};
   }
 
+  /// Return an accessor that this storage is expected to have, synthesizing
+  /// one if necessary. Note that will always synthesize one, even if the
+  /// accessor is not part of the expected opaque set for the storage, so use
+  /// with caution.
+  AccessorDecl *getSynthesizedAccessor(AccessorKind kind) const;
+
   /// Visit all the opaque accessors that this storage is expected to have.
   void visitExpectedOpaqueAccessors(
                             llvm::function_ref<void (AccessorKind)>) const;
@@ -4596,18 +4606,6 @@ public:
   ///
   /// This should only be used by the ClangImporter.
   void setComputedSetter(AccessorDecl *Set);
-
-  /// Add a synthesized getter.
-  void setSynthesizedGetter(AccessorDecl *getter);
-
-  /// Add a synthesized setter.
-  void setSynthesizedSetter(AccessorDecl *setter);
-
-  /// Add a synthesized read coroutine.
-  void setSynthesizedReadCoroutine(AccessorDecl *read);
-
-  /// Add a synthesized modify coroutine.
-  void setSynthesizedModifyCoroutine(AccessorDecl *modify);
 
   /// Does this storage require opaque accessors of any kind?
   bool requiresOpaqueAccessors() const;

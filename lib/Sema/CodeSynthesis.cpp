@@ -1266,54 +1266,24 @@ synthesizeModifyCoroutineBody(AccessorDecl *modify, ASTContext &ctx) {
   return synthesizeCoroutineAccessorBody(modify, ctx);
 }
 
-static void addGetterToStorage(AbstractStorageDecl *storage,
-                               ASTContext &ctx) {
-  auto getter = createGetterPrototype(storage, ctx);
+llvm::Expected<AccessorDecl *>
+SynthesizeAccessorRequest::evaluate(Evaluator &evaluator,
+                                    AbstractStorageDecl *storage,
+                                    AccessorKind kind) const {
+  auto &ctx = storage->getASTContext();
 
-  // Install the prototype.
-  storage->setSynthesizedGetter(getter);
-}
-
-static void addSetterToStorage(AbstractStorageDecl *storage,
-                               ASTContext &ctx) {
-  auto setter = createSetterPrototype(storage, ctx);
-
-  // Install the prototype.
-  storage->setSynthesizedSetter(setter);
-}
-
-static void addReadCoroutineToStorage(AbstractStorageDecl *storage,
-                                      ASTContext &ctx) {
-  auto read = createReadCoroutinePrototype(storage, ctx);
-
-  // Install the prototype.
-  storage->setSynthesizedReadCoroutine(read);
-}
-
-static void addModifyCoroutineToStorage(AbstractStorageDecl *storage,
-                                        ASTContext &ctx) {
-  auto modify = createModifyCoroutinePrototype(storage, ctx);
-
-  // Install the prototype.
-  storage->setSynthesizedModifyCoroutine(modify);
-}
-
-
-static void addOpaqueAccessorToStorage(AbstractStorageDecl *storage,
-                                       AccessorKind kind,
-                                       ASTContext &ctx) {
   switch (kind) {
   case AccessorKind::Get:
-    return addGetterToStorage(storage, ctx);
+    return createGetterPrototype(storage, ctx);
 
   case AccessorKind::Set:
-    return addSetterToStorage(storage, ctx);
+    return createSetterPrototype(storage, ctx);
 
   case AccessorKind::Read:
-    return addReadCoroutineToStorage(storage, ctx);
+    return createReadCoroutinePrototype(storage, ctx);
 
   case AccessorKind::Modify:
-    return addModifyCoroutineToStorage(storage, ctx);
+    return createModifyCoroutinePrototype(storage, ctx);
 
 #define OPAQUE_ACCESSOR(ID, KEYWORD)
 #define ACCESSOR(ID) \
@@ -1324,14 +1294,9 @@ static void addOpaqueAccessorToStorage(AbstractStorageDecl *storage,
 }
 
 void swift::addExpectedOpaqueAccessorsToStorage(AbstractStorageDecl *storage) {
-  auto &ctx = storage->getASTContext();
-
   storage->visitExpectedOpaqueAccessors([&](AccessorKind kind) {
-    // If the accessor is already present, there's nothing to do.
-    if (storage->getAccessor(kind))
-      return;
-
-    addOpaqueAccessorToStorage(storage, kind, ctx);
+    // Force synthesis if necessary.
+    (void) storage->getSynthesizedAccessor(kind);
   });
 }
 
@@ -1366,12 +1331,8 @@ void TypeChecker::synthesizeWitnessAccessorsForStorage(
   DeclsToFinalize.insert(requirement);
 
   requirement->visitExpectedOpaqueAccessors([&](AccessorKind kind) {
-    // If the accessor already exists, we have nothing to do.
-    if (storage->getAccessor(kind))
-      return;
-
-    // Otherwise, synthesize it.
-    addOpaqueAccessorToStorage(storage, kind, Context);
+    // Force synthesis if necessary.
+    (void) storage->getSynthesizedAccessor(kind);
   });
 }
 

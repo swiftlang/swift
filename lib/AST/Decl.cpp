@@ -1960,6 +1960,16 @@ bool AbstractStorageDecl::requiresOpaqueModifyCoroutine() const {
     false);
 }
 
+AccessorDecl *AbstractStorageDecl::getSynthesizedAccessor(AccessorKind kind) const {
+  if (auto *accessor = getAccessor(kind))
+    return accessor;
+
+  ASTContext &ctx = getASTContext();
+  return evaluateOrDefault(ctx.evaluator,
+    SynthesizeAccessorRequest{const_cast<AbstractStorageDecl *>(this), kind},
+    nullptr);
+}
+
 void AbstractStorageDecl::visitExpectedOpaqueAccessors(
                         llvm::function_ref<void (AccessorKind)> visit) const {
   if (!requiresOpaqueAccessors())
@@ -4789,32 +4799,24 @@ AbstractStorageDecl::getSetterFormalAccess() const {
         AccessLevel::Private);
 }
 
-#ifndef NDEBUG
-static bool isAccessor(AccessorDecl *accessor, AccessorKind kind,
-                       AbstractStorageDecl *storage) {
-  // TODO: this should check that the accessor belongs to this storage, but
-  // the Clang importer currently likes to violate that condition.
-  return (accessor && accessor->getAccessorKind() == kind);
-}
-#endif
-
 void AbstractStorageDecl::setComputedSetter(AccessorDecl *setter) {
   assert(getImplInfo().getReadImpl() == ReadImplKind::Get);
   assert(!getImplInfo().supportsMutation());
-  assert(getGetter() && "sanity check: missing getter");
+  assert(getGetter() && "invariant check: missing getter");
   assert(!getSetter() && "already has a setter");
   assert(hasClangNode() && "should only be used for ObjC properties");
-  assert(isAccessor(setter, AccessorKind::Set, this));
   assert(setter && "should not be called for readonly properties");
+  assert(setter->getAccessorKind() == AccessorKind::Set);
 
   setImplInfo(StorageImplInfo::getMutableComputed());
   Accessors.getPointer()->addOpaqueAccessor(setter);
 }
 
 void
-AbstractStorageDecl::setSynthesizedGetter(AccessorDecl *accessor) {
-  assert(!getGetter() && "declaration doesn't already have getter!");
-  assert(isAccessor(accessor, AccessorKind::Get, this));
+AbstractStorageDecl::setSynthesizedAccessor(AccessorKind kind,
+                                            AccessorDecl *accessor) {
+  assert(!getAccessor(kind) && "accessor already exists");
+  assert(accessor->getAccessorKind() == kind);
 
   auto accessors = Accessors.getPointer();
   if (!accessors) {
@@ -4823,42 +4825,6 @@ AbstractStorageDecl::setSynthesizedGetter(AccessorDecl *accessor) {
   }
 
   accessors->addOpaqueAccessor(accessor);
-}
-
-void
-AbstractStorageDecl::setSynthesizedReadCoroutine(AccessorDecl *accessor) {
-  assert(!getReadCoroutine() && "already has a read accessor");
-  assert(isAccessor(accessor, AccessorKind::Read, this));
-
-  auto accessors = Accessors.getPointer();
-  if (!accessors) {
-    accessors = AccessorRecord::create(getASTContext(), SourceRange(), {});
-    Accessors.setPointer(accessors);
-  }
-
-  accessors->addOpaqueAccessor(accessor);
-}
-
-void
-AbstractStorageDecl::setSynthesizedSetter(AccessorDecl *accessor) {
-  assert((getGetter() || getReadCoroutine()) &&
-         "declaration doesn't already have getter!");
-  assert(supportsMutation() && "adding setter to immutable storage");
-  assert(isAccessor(accessor, AccessorKind::Set, this));
-
-  Accessors.getPointer()->addOpaqueAccessor(accessor);
-}
-
-void
-AbstractStorageDecl::setSynthesizedModifyCoroutine(AccessorDecl *accessor) {
-  assert((getGetter() || getReadCoroutine()) &&
-         "declaration doesn't already have getter!");
-  assert(getSetter() && "declaration doesn't already have setter!");
-  assert(supportsMutation() && "adding modify to immutable storage");
-  assert(!getModifyCoroutine() && "already has a modify accessor");
-  assert(isAccessor(accessor, AccessorKind::Modify, this));
-
-  Accessors.getPointer()->addOpaqueAccessor(accessor);
 }
 
 static Optional<ObjCSelector>
