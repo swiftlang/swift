@@ -186,7 +186,7 @@ bool CompilerInstance::setUpASTContextIfNeeded() {
 
   Context.reset(ASTContext::get(Invocation.getLangOptions(),
                                 Invocation.getSearchPathOptions(), SourceMgr,
-                                Diagnostics));
+                                *FileMgr, Diagnostics));
   registerTypeCheckerRequestFunctions(Context->evaluator);
 
   // Migrator, indexing and typo correction need some IDE requests.
@@ -204,7 +204,6 @@ bool CompilerInstance::setUpASTContextIfNeeded() {
 bool CompilerInstance::setup(const CompilerInvocation &Invok) {
   Invocation = Invok;
 
-  FileMgr = new FileManager();
   SourceMgr.setFileManager(FileMgr);
 
   // If initializing the overlay file system fails there's no sense in
@@ -265,7 +264,8 @@ static bool loadAndValidateVFSOverlay(
 }
 
 bool CompilerInstance::setUpVirtualFileSystemOverlays() {
-  auto BaseFS = SourceMgr.getFileSystem();
+  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>
+  BaseFS(&FileMgr->getFileSystem());
   auto OverlayFS = llvm::IntrusiveRefCntPtr<llvm::vfs::OverlayFileSystem>(
                     new llvm::vfs::OverlayFileSystem(BaseFS));
   bool hadAnyFailure = false;
@@ -278,14 +278,8 @@ bool CompilerInstance::setUpVirtualFileSystemOverlays() {
 
   // If we successfully loaded all the overlays, let the source manager and
   // diagnostic engine take advantage of the overlay file system.
-<<<<<<< HEAD
   if (!hadAnyFailure && hasOverlays) {
-    SourceMgr.setFileSystem(OverlayFS);
-=======
-  if (!hadAnyFailure &&
-      (OverlayFS->overlays_begin() != OverlayFS->overlays_end())) {
     FileMgr->setFileSystem(OverlayFS);
->>>>>>> [Frontend] Add FileManager to CompilerInstance
   }
 
   return hadAnyFailure;

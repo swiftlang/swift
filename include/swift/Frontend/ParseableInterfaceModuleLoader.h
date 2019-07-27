@@ -167,10 +167,10 @@ public:
   ///
   /// A simplified version of the core logic in #openModuleFiles.
   static bool buildSwiftModuleFromSwiftInterface(
-    SourceManager &SourceMgr, DiagnosticEngine &Diags,
+    FileManager &FileMgr, DiagnosticEngine &Diags,
     const SearchPathOptions &SearchPathOpts, const LangOptions &LangOpts,
-    StringRef CacheDir, StringRef PrebuiltCacheDir,
-    StringRef ModuleName, StringRef InPath, StringRef OutPath,
+    StringRef CacheDir, StringRef PrebuiltCacheDir, StringRef ModuleName,
+    StringRef InPath, StringRef OutPath,
     bool SerializeDependencyHashes, bool TrackSystemDependencies,
     bool RemarkOnRebuildFromInterface);
 };

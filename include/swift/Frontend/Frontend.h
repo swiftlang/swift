@@ -365,7 +365,7 @@ public:
 class CompilerInstance {
   CompilerInvocation Invocation;
   SourceManager SourceMgr;
-  llvm::IntrusiveRefCntPtr<FileManager> FileMgr;
+  llvm::IntrusiveRefCntPtr<FileManager> FileMgr = new FileManager();
   DiagnosticEngine Diagnostics{SourceMgr};
   std::unique_ptr<ASTContext> Context;
   std::unique_ptr<SILModule> TheSILModule;

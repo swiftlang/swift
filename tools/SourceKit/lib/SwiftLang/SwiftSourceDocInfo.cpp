@@ -1261,6 +1261,7 @@ static void resolveCursor(
       auto &CompIns = AstUnit->getCompilerInstance();
       ModuleDecl *MainModule = CompIns.getMainModule();
       SourceManager &SM = CompIns.getSourceMgr();
+      FileManager &FM = CompIns.getFileMgr();
       unsigned BufferID = AstUnit->getPrimarySourceFile().getBufferID().getValue();
       SourceLoc Loc =
         Lexer::getLocForStartOfToken(SM, BufferID, Offset);
@@ -1364,7 +1365,7 @@ static void resolveCursor(
             resolveCursor(Lang, InputFile, Offset, Length, Actionables,
                           ASTInvok,
                           /*TryExistingAST=*/false, CancelOnSubsequentRequest,
-                          SM.getFileSystem(), Receiver);
+                          &FM.getFileSystem(), Receiver);
           } else {
             CursorInfoData Info;
             Info.InternalDiagnostic = Diagnostic;
@@ -1838,7 +1839,7 @@ static void resolveCursorFromUSR(
             resolveCursorFromUSR(
                 Lang, InputFile, USR, ASTInvok,
                 /*TryExistingAST=*/false, CancelOnSubsequentRequest,
-                CompIns.getSourceMgr().getFileSystem(), Receiver);
+                &CompIns.getFileMgr().getFileSystem(), Receiver);
           } else {
             CursorInfoData Info;
             Info.InternalDiagnostic = Diagnostic;

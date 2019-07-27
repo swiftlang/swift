@@ -42,7 +42,8 @@ FileManager::getBufferForFileOrSTDIN(StringRef path, bool isVolatile) {
 std::error_code FileManager::remove(StringRef path) {
   auto file = clangManager->getFileOrError(path);
   if (!file) return file.getError();
-  (*file
+  clangManager->invalidateCache(*file);
+  return llvm::sys::fs::remove(path);
 }
 
 bool FileManager::exists(StringRef path) {

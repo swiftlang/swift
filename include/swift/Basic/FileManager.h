@@ -24,10 +24,6 @@ class FileSystem;
 }
 }
 
-namespace clang {
-class FileManager;
-}
-
 namespace swift {
 
 /// A file manager that caches file stats, both to avoid re-statting files, but
@@ -42,7 +38,9 @@ private:
   StringRef getCachedFilename(StringRef path);
 public:
   FileManager(llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fs =
-              llvm::vfs::getRealFileSystem()) {}
+              llvm::vfs::getRealFileSystem()) {
+    clangManager = new clang::FileManager(FileSystemOpts, fs);
+  }
 
   llvm::vfs::FileSystem &getFileSystem() {
     return *clangManager->getVirtualFileSystem();

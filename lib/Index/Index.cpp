@@ -21,7 +21,6 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/USRGeneration.h"
-#include "swift/Basic/FileManager.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/IDE/SourceEntityWalker.h"
@@ -30,7 +29,6 @@
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/ErrorHandling.h"
-#include "llvm/Support/FileSystem.h"
 
 using namespace swift;
 using namespace swift::index;
@@ -141,7 +139,6 @@ struct IndexedWitness {
 class IndexSwiftASTWalker : public SourceEntityWalker {
   IndexDataConsumer &IdxConsumer;
   SourceManager &SrcMgr;
-  FileManager &FileMgr;
   unsigned BufferID;
   bool enableWarnings;
 
@@ -278,7 +275,7 @@ class IndexSwiftASTWalker : public SourceEntityWalker {
 public:
   IndexSwiftASTWalker(IndexDataConsumer &IdxConsumer, ASTContext &Ctx,
                       unsigned BufferID = -1)
-      : IdxConsumer(IdxConsumer), SrcMgr(Ctx.SourceMgr), FileMgr(Ctx.FileMgr),
+      : IdxConsumer(IdxConsumer), SrcMgr(Ctx.SourceMgr),
         BufferID(BufferID), enableWarnings(IdxConsumer.enableWarnings()) {}
 
   ~IndexSwiftASTWalker() override {

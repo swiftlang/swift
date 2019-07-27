@@ -129,7 +129,7 @@ void SerializedModuleLoaderBase::collectVisibleTopLevelModuleNamesImpl(
     targetFiles.back() += suffix;
   });
 
-  auto &fs = *Ctx.SourceMgr.getFileSystem();
+  auto &fs = Ctx.FileMgr.getFileSystem();
 
   // Apply \p body for each directory entry in \p dirPath.
   auto forEachDirectoryEntryPath =

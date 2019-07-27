@@ -677,7 +677,7 @@ static bool buildModuleFromParseableInterface(CompilerInvocation &Invocation,
   StringRef InputPath = FEOpts.InputsAndOutputs.getFilenameOfFirstInput();
   StringRef PrebuiltCachePath = FEOpts.PrebuiltModuleCachePath;
   return ParseableInterfaceModuleLoader::buildSwiftModuleFromSwiftInterface(
-      Instance.getSourceMgr(), Instance.getDiags(),
+      Instance.getFileMgr(), Instance.getDiags(),
       Invocation.getSearchPathOptions(), Invocation.getLangOptions(),
       Invocation.getClangModuleCachePath(),
       PrebuiltCachePath, Invocation.getModuleName(), InputPath,

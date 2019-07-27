@@ -199,7 +199,7 @@ static bool swiftCodeCompleteImpl(
   // It is not a huge problem in practice because Xcode auto-saves constantly.
 
   if (FileSystem != llvm::vfs::getRealFileSystem()) {
-    CI.getSourceMgr().setFileSystem(FileSystem);
+    CI.getFileMgr().setFileSystem(FileSystem);
     Invocation.getClangImporterOptions().ForceUseSwiftVirtualFileSystem = true;
   }
 

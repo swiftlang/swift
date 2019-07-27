@@ -950,7 +950,7 @@ ASTUnitRef ASTProducer::createASTUnit(
   Invocation.getLangOptions().CollectParsedToken = true;
 
   if (fileSystem != llvm::vfs::getRealFileSystem()) {
-    CompIns.getSourceMgr().setFileSystem(fileSystem);
+    CompIns.getFileMgr().setFileSystem(fileSystem);
     Invocation.getClangImporterOptions().ForceUseSwiftVirtualFileSystem = true;
   }
 
