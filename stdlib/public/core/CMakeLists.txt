@@ -75,6 +75,7 @@ set(SWIFTLIB_ESSENTIAL
   Hashing.swift
   HashTable.swift
   ICU.swift
+  Identifiable.swift
   Indices.swift
   InputStream.swift
   IntegerParsing.swift
