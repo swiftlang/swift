@@ -2087,11 +2087,8 @@ static void finishLazyVariableImplInfo(VarDecl *var,
   }
 
   // Lazy properties must be written as stored properties in the source.
-  if (!info.isSimpleStored()) {
-    diagnoseAndRemoveAttr(var, attr,
-                          info.hasStorage()
-                          ? diag::lazy_not_observable
-                          : diag::lazy_not_on_computed);
+  if (!info.isSimplyStoredLazy()) {
+    diagnoseAndRemoveAttr(var, attr, diag::lazy_not_on_computed);
     invalid = true;
   }
 

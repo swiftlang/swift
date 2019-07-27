@@ -355,6 +355,13 @@ public:
             getWriteImpl() == WriteImplKind::Immutable);
   }
 
+  bool isSimplyStoredLazy() const {
+    return getReadImpl() == ReadImplKind::Stored &&
+           (getWriteImpl() == WriteImplKind::Stored ||
+            getWriteImpl() == WriteImplKind::Immutable ||
+            getWriteImpl() == WriteImplKind::StoredWithObservers);
+  }
+
   /// Does this describe storage that supports mutation?
   StorageIsMutable_t supportsMutation() const {
     return StorageIsMutable_t(getWriteImpl() != WriteImplKind::Immutable);
