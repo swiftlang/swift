@@ -157,6 +157,23 @@ static GenericParamList *createAccessorGenericParams(
   return nullptr;
 }
 
+static bool doesAccessorHaveBody(AccessorDecl *accessor) {
+  // Protocol requirements don't have bodies.
+  //
+  // FIXME: Revisit this if we ever get 'real' default implementations.
+  if (isa<ProtocolDecl>(accessor->getDeclContext()))
+    return false;
+
+  auto *storage = accessor->getStorage();
+
+  // NSManaged getters and setters don't have bodies.
+  if (storage->getAttrs().hasAttribute<NSManagedAttr>())
+    if (accessor->isGetterOrSetter())
+      return false;
+
+  return true;
+}
+
 static AccessorDecl *createGetterPrototype(AbstractStorageDecl *storage,
                                            ASTContext &ctx) {
   assert(!storage->getGetter());
@@ -295,42 +312,48 @@ static AccessorDecl *createSetterPrototype(AbstractStorageDecl *storage,
 /// If the storage is for a global stored property or a stored property of a
 /// resilient type, we are synthesizing accessors to present a resilient
 /// interface to the storage and they should not be transparent.
-static void maybeMarkTransparent(AccessorDecl *accessor, ASTContext &ctx) {
+llvm::Expected<bool>
+IsAccessorTransparentRequest::evaluate(Evaluator &evaluator,
+                                       AccessorDecl *accessor) const {
+  auto *storage = accessor->getStorage();
+  if (storage->isTransparent())
+    return true;
+
+  if (accessor->getAttrs().hasAttribute<TransparentAttr>())
+    return true;
+
+  if (!accessor->isImplicit())
+    return false;
+
+  if (!doesAccessorHaveBody(accessor))
+    return false;
+
   auto *DC = accessor->getDeclContext();
   auto *nominalDecl = DC->getSelfNominalTypeDecl();
 
   // Global variable accessors are not @_transparent.
   if (!nominalDecl)
-    return;
-
-  auto *storage = accessor->getStorage();
+    return false;
 
   // Accessors for resilient properties are not @_transparent.
   if (storage->isResilient())
-    return;
-
-  // Accessors for protocol storage requirements are never @_transparent
-  // since they do not have bodies.
-  //
-  // FIXME: Revisit this if we ever get 'real' default implementations.
-  if (isa<ProtocolDecl>(nominalDecl))
-    return;
+    return false;
 
   // Accessors for classes with @objc ancestry are not @_transparent,
   // since they use a field offset variable which is not exported.
   if (auto *classDecl = dyn_cast<ClassDecl>(nominalDecl))
     if (classDecl->checkAncestry(AncestryFlags::ObjC))
-      return;
+      return false;
 
   // Accessors synthesized on-demand are never transaprent.
   if (accessor->hasForcedStaticDispatch())
-    return;
+    return false;
 
   if (accessor->getAccessorKind() == AccessorKind::Get ||
       accessor->getAccessorKind() == AccessorKind::Set) {
     // Getters and setters for lazy properties are not @_transparent.
     if (storage->getAttrs().hasAttribute<LazyAttr>())
-      return;
+      return false;
 
     // Getters/setters for a property with a wrapper are not @_transparent if
     // the backing variable has more-restrictive access than the original
@@ -338,14 +361,14 @@ static void maybeMarkTransparent(AccessorDecl *accessor, ASTContext &ctx) {
     if (auto var = dyn_cast<VarDecl>(storage)) {
       if (auto backingVar = var->getPropertyWrapperBackingProperty()) {
         if (backingVar->getFormalAccess() < var->getFormalAccess())
-          return;
+          return false;
       }
 
       if (auto original = var->getOriginalWrappedProperty(
               PropertyWrapperSynthesizedPropertyKind::StorageWrapper)) {
         auto backingVar = original->getPropertyWrapperBackingProperty();
         if (backingVar->getFormalAccess() < var->getFormalAccess())
-          return;
+          return false;
       }
     }
   }
@@ -364,7 +387,7 @@ static void maybeMarkTransparent(AccessorDecl *accessor, ASTContext &ctx) {
         if (var->hasAttachedPropertyWrapper()) {
           if (var->getAccessor(AccessorKind::DidSet) ||
               var->getAccessor(AccessorKind::WillSet))
-            return;
+            return false;
 
           break;
         } else if (var->getOriginalWrappedProperty(
@@ -383,7 +406,7 @@ static void maybeMarkTransparent(AccessorDecl *accessor, ASTContext &ctx) {
       // Setters for observed properties are not @_transparent (because the
       // observers are private) and cannot be referenced from a transparent
       // method).
-      return;
+      return false;
 
     case WriteImplKind::Stored:
     case WriteImplKind::MutableAddress:
@@ -403,7 +426,7 @@ static void maybeMarkTransparent(AccessorDecl *accessor, ASTContext &ctx) {
     llvm_unreachable("bad synthesized function kind");
   }
 
-  accessor->getAttrs().add(new (ctx) TransparentAttr(IsImplicit));
+  return true;
 }
 
 static AccessorDecl *
@@ -1375,8 +1398,6 @@ void TypeChecker::synthesizeWitnessAccessorsForStorage(
       auto *accessor = storage->getAccessor(kind);
       assert(!accessor->hasBody());
       accessor->setBodySynthesizer(&synthesizeAccessorBody);
-
-      maybeMarkTransparent(accessor, Context);
     }
   });
 }
@@ -2076,7 +2097,6 @@ void swift::triggerAccessorSynthesis(TypeChecker &TC,
       return;
 
     if (!accessor->hasBody()) {
-      maybeMarkTransparent(accessor, TC.Context);
       accessor->setBodySynthesizer(&synthesizeAccessorBody);
     }
   });

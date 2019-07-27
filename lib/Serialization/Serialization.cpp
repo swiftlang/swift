@@ -3568,6 +3568,7 @@ public:
                                rawAccessorKind,
                                rawAccessLevel,
                                fn->needsNewVTableEntry(),
+                               fn->isTransparent(),
                                dependencies);
 
     writeGenericParams(fn->getGenericParams());

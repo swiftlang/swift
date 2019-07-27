@@ -445,9 +445,15 @@ protected:
     SelfAccess : 2
   );
 
-  SWIFT_INLINE_BITFIELD(AccessorDecl, FuncDecl, 4,
+  SWIFT_INLINE_BITFIELD(AccessorDecl, FuncDecl, 4+1+1,
     /// The kind of accessor this is.
-    AccessorKind : 4
+    AccessorKind : 4,
+
+    /// Whether the accessor is transparent.
+    IsTransparent : 1,
+
+    /// Whether we have computed the above.
+    IsTransparentComputed : 1
   );
 
   SWIFT_INLINE_BITFIELD(ConstructorDecl, AbstractFunctionDecl, 3+2+1,
@@ -6160,6 +6166,14 @@ class AccessorDecl final : public FuncDecl {
                                   DeclContext *parent,
                                   ClangNode clangNode);
 
+  Optional<bool> getCachedIsTransparent() const {
+    if (Bits.AccessorDecl.IsTransparentComputed)
+      return Bits.AccessorDecl.IsTransparent;
+    return None;
+  }
+
+  friend class IsAccessorTransparentRequest;
+
 public:
   static AccessorDecl *createDeserialized(ASTContext &ctx,
                               SourceLoc declLoc,
@@ -6236,6 +6250,11 @@ public:
 #include "swift/AST/AccessorKinds.def"
     }
     llvm_unreachable("bad accessor kind");
+  }
+
+  void setIsTransparent(bool transparent) {
+    Bits.AccessorDecl.IsTransparent = transparent;
+    Bits.AccessorDecl.IsTransparentComputed = 1;
   }
 
   static bool classof(const Decl *D) {

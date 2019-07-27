@@ -2984,7 +2984,7 @@ public:
     DeclID associatedDeclID;
     DeclID overriddenID;
     DeclID accessorStorageDeclID;
-    bool needsNewVTableEntry;
+    bool needsNewVTableEntry, isTransparent;
     DeclID opaqueResultTypeDeclID;
     ArrayRef<uint64_t> nameAndDependencyIDs;
 
@@ -3013,6 +3013,7 @@ public:
                                               rawAccessorKind,
                                               rawAccessLevel,
                                               needsNewVTableEntry,
+                                              isTransparent,
                                               nameAndDependencyIDs);
     }
 
@@ -3128,12 +3129,15 @@ public:
         /*Throws=*/throws, /*ThrowsLoc=*/SourceLoc(),
         genericParams, DC);
     } else {
-      fn = AccessorDecl::createDeserialized(
+      auto *accessor = AccessorDecl::createDeserialized(
         ctx, /*FuncLoc=*/SourceLoc(), /*AccessorKeywordLoc=*/SourceLoc(),
         accessorKind, storage,
         /*StaticLoc=*/SourceLoc(), staticSpelling.getValue(),
         /*Throws=*/throws, /*ThrowsLoc=*/SourceLoc(),
         genericParams, DC);
+      accessor->setIsTransparent(isTransparent);
+
+      fn = accessor;
     }
     fn->setEarlyAttrValidation();
     declOrOffset = fn;

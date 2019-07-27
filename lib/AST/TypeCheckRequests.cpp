@@ -740,3 +740,27 @@ void RequiresOpaqueModifyCoroutineRequest::cacheResult(bool value) const {
   storage->LazySemanticInfo.RequiresOpaqueModifyCoroutineComputed = 1;
   storage->LazySemanticInfo.RequiresOpaqueModifyCoroutine = value;
 }
+
+//----------------------------------------------------------------------------//
+// IsAccessorTransparentRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<bool>
+IsAccessorTransparentRequest::getCachedResult() const {
+  auto *accessor = std::get<0>(getStorage());
+  return accessor->getCachedIsTransparent();
+}
+
+void IsAccessorTransparentRequest::cacheResult(bool value) const {
+  auto *accessor = std::get<0>(getStorage());
+  accessor->setIsTransparent(value);
+
+  // For interface printing, API diff, etc.
+  if (value) {
+    auto &attrs = accessor->getAttrs();
+    if (!attrs.hasAttribute<TransparentAttr>()) {
+      auto &ctx = accessor->getASTContext();
+      attrs.add(new (ctx) TransparentAttr(/*IsImplicit=*/true));
+    }
+  }
+}

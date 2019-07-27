@@ -534,10 +534,13 @@ bool AbstractFunctionDecl::isTransparent() const {
   if (getAttrs().hasAttribute<TransparentAttr>())
     return true;
 
-  // If this is an accessor, check if the transparent attribute was set
-  // on the storage decl.
+  // If this is an accessor, the computation is a bit more involved, so we
+  // kick off a request.
   if (const auto *AD = dyn_cast<AccessorDecl>(this)) {
-    return AD->getStorage()->isTransparent();
+    ASTContext &ctx = getASTContext();
+    return evaluateOrDefault(ctx.evaluator,
+      IsAccessorTransparentRequest{const_cast<AccessorDecl *>(AD)},
+      false);
   }
 
   return false;

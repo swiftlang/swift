@@ -616,6 +616,7 @@ static void makeEnumRawValueGetter(ClangImporter::Implementation &Impl,
   getterDecl->setImplicit();
   getterDecl->setIsObjC(false);
   getterDecl->setIsDynamic(false);
+  getterDecl->setIsTransparent(false);
 
   getterDecl->computeType();
   getterDecl->setValidationToChecked();
@@ -697,6 +698,7 @@ static AccessorDecl *makeStructRawValueGetter(
   getterDecl->setImplicit();
   getterDecl->setIsObjC(false);
   getterDecl->setIsDynamic(false);
+  getterDecl->setIsTransparent(false);
 
   getterDecl->computeType();
   getterDecl->setValidationToChecked();
@@ -1978,6 +1980,7 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
   getterDecl->setValidationToChecked();
   getterDecl->setIsObjC(false);
   getterDecl->setIsDynamic(false);
+  getterDecl->setIsTransparent(false);
 
   swiftDecl->addMember(errorDomainPropertyDecl);
   makeComputed(errorDomainPropertyDecl, getterDecl, nullptr);
@@ -8379,6 +8382,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
   func->setImplicit();
   func->setIsObjC(false);
   func->setIsDynamic(false);
+  func->setIsTransparent(false);
 
   func->setBodySynthesizer(synthesizeConstantGetterBody,
                            ConstantGetterBodyContextData(valueExpr, convertKind)
