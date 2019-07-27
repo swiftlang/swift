@@ -704,3 +704,21 @@ void StorageImplInfoRequest::cacheResult(StorageImplInfo value) const {
   auto *storage = std::get<0>(getStorage());
   storage->setImplInfo(value);
 }
+
+//----------------------------------------------------------------------------//
+// RequiresOpaqueAccessorsRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<bool>
+RequiresOpaqueAccessorsRequest::getCachedResult() const {
+  auto *storage = std::get<0>(getStorage());
+  if (storage->LazySemanticInfo.RequiresOpaqueAccessorsComputed)
+    return storage->LazySemanticInfo.RequiresOpaqueAccessors;
+  return None;
+}
+
+void RequiresOpaqueAccessorsRequest::cacheResult(bool value) const {
+  auto *storage = std::get<0>(getStorage());
+  storage->LazySemanticInfo.RequiresOpaqueAccessorsComputed = 1;
+  storage->LazySemanticInfo.RequiresOpaqueAccessors = value;
+}

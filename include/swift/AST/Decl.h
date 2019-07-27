@@ -4389,6 +4389,7 @@ class AbstractStorageDecl : public ValueDecl {
   friend class IsSetterMutatingRequest;
   friend class OpaqueReadOwnershipRequest;
   friend class StorageImplInfoRequest;
+  friend class RequiresOpaqueAccessorsRequest;
 
 public:
   static const size_t MaxNumAccessors = 255;
@@ -4452,6 +4453,8 @@ private:
     unsigned OpaqueReadOwnershipComputed : 1;
     unsigned OpaqueReadOwnership : 2;
     unsigned ImplInfoComputed : 1;
+    unsigned RequiresOpaqueAccessorsComputed : 1;
+    unsigned RequiresOpaqueAccessors : 1;
   } LazySemanticInfo = { };
 
   /// The implementation info for the accessors.
@@ -4596,6 +4599,9 @@ public:
 
   /// Add a synthesized modify coroutine.
   void setSynthesizedModifyCoroutine(AccessorDecl *modify);
+
+  /// Does this storage require opaque accessors of any kind?
+  bool requiresOpaqueAccessors() const;
 
   /// Does this storage require an opaque accessor of the given kind?
   bool requiresOpaqueAccessor(AccessorKind kind) const;

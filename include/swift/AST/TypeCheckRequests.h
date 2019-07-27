@@ -901,6 +901,27 @@ public:
   void cacheResult(StorageImplInfo value) const;
 };
 
+class RequiresOpaqueAccessorsRequest :
+    public SimpleRequest<RequiresOpaqueAccessorsRequest,
+                         bool(VarDecl *),
+                         CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool>
+  evaluate(Evaluator &evaluator, VarDecl *decl) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<bool> getCachedResult() const;
+  void cacheResult(bool value) const;
+};
+
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
 template<>

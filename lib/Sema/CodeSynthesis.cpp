@@ -2415,44 +2415,54 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
   return info;
 }
 
-/// Try to add the appropriate accessors required a storage declaration.
-/// This needs to be idempotent.
-void swift::maybeAddAccessorsToStorage(AbstractStorageDecl *storage) {
-  if (storage->getImplInfo().isSimpleStored()) {
-    // The backing storage for a lazy property does not get accessors.
-    if (cast<VarDecl>(storage)->isLazyStorageProperty())
-      return;
+llvm::Expected<bool>
+RequiresOpaqueAccessorsRequest::evaluate(Evaluator &evaluator,
+                                         VarDecl *var) const {
+  // Computed properties always require opaque accessors.
+  if (!var->getImplInfo().isSimpleStored())
+    return true;
 
-    auto *dc = storage->getDeclContext();
+  // The backing storage for a lazy property does require opaque accessors.
+  if (var->isLazyStorageProperty())
+    return false;
 
-    // Local stored variables don't otherwise get accessors.
-    if (dc->isLocalContext()) {
-      return;
+  auto *dc = var->getDeclContext();
 
-    } else if (dc->isModuleScopeContext()) {
-      // Fixed-layout global variables don't get accessors.
-      if (!storage->isResilient() && !storage->isNativeDynamic())
-        return;
+  // Local stored variables don't require opaque accessors.
+  if (dc->isLocalContext()) {
+    return false;
 
-    // Stored properties imported from Clang don't get accessors.
-    } else if (auto *structDecl = dyn_cast<StructDecl>(dc)) {
-      if (structDecl->hasClangNode())
-        return;
-    }
+  } else if (dc->isModuleScopeContext()) {
+    // Fixed-layout global variables don't require opaque accessors.
+    if (!var->isResilient() && !var->isNativeDynamic())
+      return false;
 
-    // Stored properties in SIL mode don't get accessors.
-    // But we might need to create opaque accessors for them.
-    if (auto sourceFile = dc->getParentSourceFile()) {
-      if (sourceFile->Kind == SourceFileKind::SIL) {
-        if (!storage->getGetter())
-          return;
-      }
+  // Stored properties imported from Clang don't require opaque accessors.
+  } else if (auto *structDecl = dyn_cast<StructDecl>(dc)) {
+    if (structDecl->hasClangNode())
+      return false;
+  }
+
+  // Stored properties in SIL mode don't get accessors.
+  // But we might need to create opaque accessors for them.
+  if (auto sourceFile = dc->getParentSourceFile()) {
+    if (sourceFile->Kind == SourceFileKind::SIL) {
+      if (!var->getGetter())
+        return false;
     }
   }
 
-  // Everything else gets mandatory accessors.
-  auto &ctx = storage->getASTContext();
-  addExpectedOpaqueAccessorsToStorage(storage, ctx);
+  // Everything else requires opaque accessors.
+  return true;
+}
+
+/// Try to add the appropriate accessors required a storage declaration.
+/// This needs to be idempotent.
+void swift::maybeAddAccessorsToStorage(AbstractStorageDecl *storage) {
+  if (storage->requiresOpaqueAccessors()) {
+    auto &ctx = storage->getASTContext();
+    addExpectedOpaqueAccessorsToStorage(storage, ctx);
+  }
 }
 
 static std::pair<BraceStmt *, bool>
