@@ -1410,7 +1410,7 @@ void TypeChecker::synthesizeWitnessAccessorsForStorage(
 /// setter which calls them.
 static std::pair<BraceStmt *, bool>
 synthesizeObservedSetterBody(AccessorDecl *Set, TargetImpl target,
-                             ASTContext &Ctx) {
+                             ASTContext &Ctx, VarDecl *storageToUse = nullptr) {
   auto VD = cast<VarDecl>(Set->getStorage());
 
   SourceLoc Loc = VD->getLoc();
@@ -1485,11 +1485,12 @@ synthesizeObservedSetterBody(AccessorDecl *Set, TargetImpl target,
 
   if (auto willSet = VD->getWillSetFunc())
     callObserver(willSet, ValueDecl);
-  
+
   // Create an assignment into the storage or call to superclass setter.
+  auto storage = storageToUse ? storageToUse : VD;
   auto *ValueDRE = new (Ctx) DeclRefExpr(ValueDecl, DeclNameLoc(), true);
   ValueDRE->setType(ValueDecl->getType());
-  createPropertyStoreOrCallSuperclassSetter(Set, ValueDRE, VD, target,
+  createPropertyStoreOrCallSuperclassSetter(Set, ValueDRE, storage, target,
                                             SetterBody, Ctx);
 
   if (auto didSet = VD->getDidSetFunc())
@@ -2460,8 +2461,8 @@ synthesizeSetterBody(AccessorDecl *setter, ASTContext &ctx) {
     if (var->getAttrs().hasAttribute<LazyAttr>()) {
       // Lazy property setters write to the underlying storage.
       auto *storage = var->getLazyStorageProperty();
-      return synthesizeTrivialSetterBodyWithStorage(setter, TargetImpl::Storage,
-                                                    storage, ctx);
+      return synthesizeObservedSetterBody(setter, TargetImpl::Storage, ctx,
+                                          storage);
     }
 
     if (var->hasAttachedPropertyWrapper()) {
