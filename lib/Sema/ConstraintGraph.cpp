@@ -593,10 +593,6 @@ unsigned ConstraintGraph::computeConnectedComponents(
   SmallVector<unsigned, 4> componentRenumbering(numComponents, 0);
   numComponents = 0;
   for (unsigned i = 0, n = componentHasUnboundTypeVar.size(); i != n; ++i) {
-    // If we didn't look at this type variable, there's nothing to do.
-    if (components[i] == numTypeVariables)
-      continue;
-
     // Skip components that have no unbound type variables.
     if (!componentHasUnboundTypeVar[i])
       continue;
