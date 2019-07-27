@@ -48,8 +48,6 @@ bool checkOverrides(ValueDecl *decl);
 // These are implemented in CodeSynthesis.cpp.
 void addExpectedOpaqueAccessorsToStorage(AbstractStorageDecl *storage);
 
-void triggerAccessorSynthesis(TypeChecker &TC, AbstractStorageDecl *storage);
-
 /// Describes the kind of implicit constructor that will be
 /// generated.
 enum class ImplicitConstructorKind {

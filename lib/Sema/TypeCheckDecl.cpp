@@ -2617,7 +2617,7 @@ public:
 
     TC.checkDeclAttributes(VD);
 
-    triggerAccessorSynthesis(TC, VD);
+    addExpectedOpaqueAccessorsToStorage(VD);
 
     if (VD->getDeclContext()->getSelfClassDecl()) {
       checkDynamicSelfType(VD, VD->getValueInterfaceType());
@@ -2865,7 +2865,8 @@ public:
     (void) SD->isGetterMutating();
     (void) SD->isSetterMutating();
 
-    triggerAccessorSynthesis(TC, SD);
+    addExpectedOpaqueAccessorsToStorage(SD);
+
     if (SD->getAttrs().hasAttribute<DynamicReplacementAttr>()) {
       TC.checkDynamicReplacementAttribute(SD);
     }
