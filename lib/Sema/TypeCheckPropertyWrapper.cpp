@@ -460,13 +460,6 @@ AttachedPropertyWrappersRequest::evaluate(Evaluator &evaluator,
     result.push_back(mutableAttr);
   }
 
-  // TODO: Property wrapper compositions do not yet compose correctly
-  // in all situtaions.
-  if (result.size() > 1) {
-    ctx.Diags.diagnose(result[result.size() - 2]->getLocation(),
-                       diag::property_wrapper_composition_not_implemented);
-  }
-
   // Attributes are stored in reverse order in the AST, but we want them in
   // source order so that the outermost property wrapper comes first.
   std::reverse(result.begin(), result.end());

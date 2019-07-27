@@ -1835,6 +1835,76 @@ static void typeCheckSynthesizedWrapperInitializer(
   tc.checkPropertyWrapperErrorHandling(pbd, initializer);
 }
 
+static PropertyWrapperMutability::Value
+getGetterMutatingness(VarDecl *var) {
+  return var->isGetterMutating()
+    ? PropertyWrapperMutability::Mutating
+    : PropertyWrapperMutability::Nonmutating;
+}
+
+static PropertyWrapperMutability::Value
+getSetterMutatingness(VarDecl *var, DeclContext *dc) {
+  if (!var->isSettable(nullptr) ||
+      !var->isSetterAccessibleFrom(dc))
+    return PropertyWrapperMutability::DoesntExist;
+  
+  return var->isSetterMutating()
+    ? PropertyWrapperMutability::Mutating
+    : PropertyWrapperMutability::Nonmutating;
+}
+
+llvm::Expected<Optional<PropertyWrapperMutability>>
+PropertyWrapperMutabilityRequest::evaluate(Evaluator &,
+                                           VarDecl *var) const {
+  unsigned numWrappers = var->getAttachedPropertyWrappers().size();
+  if (numWrappers < 1)
+    return None;
+  if (var->getGetter() && !var->getGetter()->isImplicit())
+    return None;
+  if (var->getSetter() && !var->getSetter()->isImplicit())
+    return None;
+
+  // Start with the traits from the outermost wrapper.
+  auto firstWrapper = var->getAttachedPropertyWrapperTypeInfo(0);
+  if (!firstWrapper.valueVar)
+    return None;
+  
+  PropertyWrapperMutability result;
+  
+  result.Getter = getGetterMutatingness(firstWrapper.valueVar);
+  result.Setter = getSetterMutatingness(firstWrapper.valueVar,
+                                        var->getInnermostDeclContext());
+  
+  // Compose the traits of the following wrappers.
+  for (unsigned i = 1; i < numWrappers; ++i) {
+    auto wrapper = var->getAttachedPropertyWrapperTypeInfo(i);
+    if (!wrapper.valueVar)
+      return None;
+    
+    PropertyWrapperMutability nextResult;
+    nextResult.Getter =
+                    result.composeWith(getGetterMutatingness(wrapper.valueVar));
+    // A property must have a getter, so we can't compose a wrapper that
+    // exposes a mutating getter wrapped inside a get-only wrapper.
+    if (nextResult.Getter == PropertyWrapperMutability::DoesntExist) {
+      auto &ctx = var->getASTContext();
+      ctx.Diags.diagnose(var->getAttachedPropertyWrappers()[i]->getLocation(),
+               diag::property_wrapper_mutating_get_composed_to_get_only,
+               var->getAttachedPropertyWrappers()[i]->getTypeLoc().getType(),
+               var->getAttachedPropertyWrappers()[i-1]->getTypeLoc().getType());
+
+      return None;
+    }
+    nextResult.Setter =
+              result.composeWith(getSetterMutatingness(wrapper.valueVar,
+                                               var->getInnermostDeclContext()));
+    result = nextResult;
+  }
+  assert(result.Getter != PropertyWrapperMutability::DoesntExist
+         && "getter must exist");
+  return result;
+}
+
 llvm::Expected<PropertyWrapperBackingPropertyInfo>
 PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
                                                      VarDecl *var) const {
@@ -1954,7 +2024,7 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
     storageVar = synthesizePropertyWrapperStorageWrapperProperty(
         ctx, var, storageInterfaceType, wrapperInfo.projectedValueVar);
   }
-
+  
   // Get the property wrapper information.
   if (!var->allAttachedPropertyWrappersHaveInitialValueInit() &&
       !originalInitialValue) {
@@ -1972,7 +2042,7 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
       /*ignoreAttributeArgs=*/!originalInitialValue);
   typeCheckSynthesizedWrapperInitializer(
       pbd, backingVar, parentPBD, initializer);
-
+  
   return PropertyWrapperBackingPropertyInfo(
       backingVar, storageVar, originalInitialValue, initializer, origValue);
 }
@@ -2115,25 +2185,6 @@ static void finishLazyVariableImplInfo(VarDecl *var,
     info = StorageImplInfo::getMutableComputed();
 }
 
-/// Determine whether all of the wrapped-value setters for the property
-/// wrappers attached to this variable are available and accessible.
-static bool allPropertyWrapperValueSettersAreAccessible(VarDecl *var) {
-  auto wrapperAttrs = var->getAttachedPropertyWrappers();
-  auto innermostDC = var->getInnermostDeclContext();
-  for (unsigned i : indices(wrapperAttrs)) {
-    auto wrapperInfo = var->getAttachedPropertyWrapperTypeInfo(i);
-    auto valueVar = wrapperInfo.valueVar;
-    // Only nullptr with invalid code.
-    if (!valueVar)
-      return false;
-    if (!valueVar->isSettable(nullptr) ||
-        !valueVar->isSetterAccessibleFrom(innermostDC))
-      return false;
-  }
-  
-  return true;
-}
-
 static void finishPropertyWrapperImplInfo(VarDecl *var,
                                           StorageImplInfo &info) {
   auto parentSF = var->getDeclContext()->getParentSourceFile();
@@ -2149,12 +2200,18 @@ static void finishPropertyWrapperImplInfo(VarDecl *var,
     return;
   }
 
-  bool wrapperSetterIsUsable =
-    var->getSetter() ||
-    (parentSF &&
-     parentSF->Kind != SourceFileKind::Interface &&
-     !var->isLet() &&
-     allPropertyWrapperValueSettersAreAccessible(var));
+  bool wrapperSetterIsUsable = false;
+  if (var->getSetter()) {
+    wrapperSetterIsUsable = true;
+  } else if (parentSF && parentSF->Kind != SourceFileKind::Interface
+             && !var->isLet()) {
+    if (auto comp = var->getPropertyWrapperMutability()) {
+      wrapperSetterIsUsable =
+        comp->Setter != PropertyWrapperMutability::DoesntExist;
+    } else {
+      wrapperSetterIsUsable = true;
+    }
+  }
 
   if (wrapperSetterIsUsable)
     info = StorageImplInfo::getMutableComputed();
