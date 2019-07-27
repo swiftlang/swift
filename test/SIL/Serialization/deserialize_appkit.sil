@@ -6,6 +6,3 @@
 // REQUIRES: OS=macosx
 
 // CHECK-NOT: Unknown
-
-// FIXME: rdar://23805004 Non-fragile shared functions are incorrectly being referenced in fragile functions
-// REQUIRES: rdar23805004
