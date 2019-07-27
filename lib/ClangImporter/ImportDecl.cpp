@@ -1530,11 +1530,6 @@ static void makeStructRawValued(
       AccessLevel::Public,
       setterAccess);
 
-  // Create the getter for the computed value variable.
-  auto varGetter = makeStructRawValueGetter(
-      Impl, structDecl, var, var);
-
-  var->setSynthesizedGetter(varGetter);
   assert(var->hasStorage());
 
   // Create constructors to initialize that value from a value of the
