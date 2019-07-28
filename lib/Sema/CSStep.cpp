@@ -164,12 +164,6 @@ void SplitterStep::computeFollowupSteps(
       componentSteps[known->second]->record(typeVar);
       continue;
     }
-
-    // Otherwise, associate it with all of the component steps,
-    // expect for components with orphaned constraints, they are
-    // not supposed to have any type variables.
-    for (unsigned i = 0; i != firstOrphanedComponent; ++i)
-      componentSteps[i]->record(typeVar);
   }
 
   // Transfer all of the constraints from the work list to
