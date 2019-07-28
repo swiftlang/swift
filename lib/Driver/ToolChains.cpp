@@ -1200,6 +1200,9 @@ void ToolChain::getRuntimeLibraryPaths(SmallVectorImpl<std::string> &runtimeLibP
     scratchPath = SDKPath;
     llvm::sys::path::append(scratchPath, "usr", "lib", "swift");
     runtimeLibPaths.push_back(scratchPath.str());
+
+    llvm::sys::path::append(scratchPath, getPlatformNameForTriple(getTriple()));
+    runtimeLibPaths.push_back(scratchPath.str());
   }
 }
 
