@@ -94,6 +94,8 @@ protected:
   InvocationInfo constructInvocation(const StaticLinkJobAction &job,
                                      const JobContext &context) const override;
 
+  const char *getSwiftRuntimeSupportPath(const llvm::opt::ArgList &Arg) const;
+
 public:
   GenericUnix(const Driver &D, const llvm::Triple &Triple)
       : ToolChain(D, Triple) {}

@@ -113,6 +113,32 @@ bool toolchains::GenericUnix::shouldProvideRPathToLinker() const {
   return true;
 }
 
+const char *toolchains::GenericUnix::getSwiftRuntimeSupportPath(
+    const llvm::opt::ArgList &Args) const {
+  const llvm::Triple &Triple = getTriple();
+  StringRef platform = swift::getPlatformNameForTriple(Triple);
+  StringRef arch = swift::getMajorArchitectureName(Triple);
+
+  // prefer the content in `-sdk`
+  if (const auto *A = Args.getLastArg(options::OPT_sdk)) {
+    StringRef SDKPath = A->getValue();
+    SmallString<128> buffer;
+
+    buffer.append(SDKPath.begin(), SDKPath.end());
+    llvm::sys::path::append(buffer, "usr", "lib", "swift");
+    llvm::sys::path::append(buffer, platform, arch, "swiftrt.o");
+
+    if (llvm::sys::fs::exists(buffer))
+      return Args.MakeArgString(buffer);
+  }
+
+  // fallback to the resource dir
+  SmallString<128> buffer;
+  getResourceDirPath(buffer, Args, /*Shared=*/true);
+  llvm::sys::path::append(buffer, arch, "swiftrt.o");
+  return Args.MakeArgString(buffer);
+}
+
 ToolChain::InvocationInfo
 toolchains::GenericUnix::constructInvocation(const DynamicLinkJobAction &job,
                                              const JobContext &context) const {
@@ -219,14 +245,8 @@ toolchains::GenericUnix::constructInvocation(const DynamicLinkJobAction &job,
     }
   }
 
-  SmallString<128> SharedResourceDirPath;
-  getResourceDirPath(SharedResourceDirPath, context.Args, /*Shared=*/true);
-
-  SmallString<128> swiftrtPath = SharedResourceDirPath;
-  llvm::sys::path::append(swiftrtPath,
-                          swift::getMajorArchitectureName(getTriple()));
-  llvm::sys::path::append(swiftrtPath, "swiftrt.o");
-  Arguments.push_back(context.Args.MakeArgString(swiftrtPath));
+  // swiftrt.o
+  Arguments.push_back(getSwiftRuntimeSupportPath(context.Args));
 
   addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
                          file_types::TY_Object);
@@ -302,6 +322,9 @@ toolchains::GenericUnix::constructInvocation(const DynamicLinkJobAction &job,
   }
 
   if (context.Args.hasArg(options::OPT_profile_generate)) {
+    SmallString<128> SharedResourceDirPath;
+    getResourceDirPath(SharedResourceDirPath, context.Args, /*Shared=*/true);
+
     SmallString<128> LibProfile(SharedResourceDirPath);
     llvm::sys::path::remove_filename(LibProfile); // remove platform name
     llvm::sys::path::append(LibProfile, "clang", "lib");
