@@ -662,6 +662,9 @@ private:
       // Disable all of the overload choices which are different from
       // the one which is currently picked for representative.
       for (auto *constraint : disjunction->getNestedConstraints()) {
+        if (constraint->getKind() != ConstraintKind::BindOverload)
+          continue;
+
         auto choice = constraint->getOverloadChoice();
         if (!choice.isDecl() || choice.getDecl() == representative.getDecl())
           continue;
