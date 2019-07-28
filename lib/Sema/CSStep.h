@@ -19,6 +19,7 @@
 #define SWIFT_SEMA_CSSTEP_H
 
 #include "Constraint.h"
+#include "ConstraintGraph.h"
 #include "ConstraintSystem.h"
 #include "swift/AST/Types.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -336,7 +337,7 @@ class ComponentStep final : public SolverStep {
   std::unique_ptr<Scope> ComponentScope = nullptr;
 
   /// Type variables and constraints "in scope" of this step.
-  std::vector<TypeVariableType *> TypeVars;
+  TinyPtrVector<TypeVariableType *> TypeVars;
   /// Constraints "in scope" of this step.
   ConstraintList *Constraints;
 
@@ -349,16 +350,43 @@ class ComponentStep final : public SolverStep {
   Constraint *OrphanedConstraint = nullptr;
 
 public:
-  ComponentStep(ConstraintSystem &cs, unsigned index, bool single,
+  /// Create a single component step.
+  ComponentStep(ConstraintSystem &cs, unsigned index,
                 ConstraintList *constraints,
                 SmallVectorImpl<Solution> &solutions)
-      : SolverStep(cs, solutions), Index(index), IsSingle(single),
+      : SolverStep(cs, solutions), Index(index), IsSingle(true),
         OriginalScore(getCurrentScore()), OriginalBestScore(getBestScore()),
         Constraints(constraints) {}
 
-  /// Record a type variable as associated with this step.
-  void record(TypeVariableType *typeVar) { TypeVars.push_back(typeVar); }
+  /// Create a component step from a constraint graph component.
+  ComponentStep(ConstraintSystem &cs, unsigned index,
+                ConstraintList *constraints,
+                ConstraintGraph::Component &&component,
+                SmallVectorImpl<Solution> &solutions)
+      : SolverStep(cs, solutions), Index(index), IsSingle(false),
+        OriginalScore(getCurrentScore()), OriginalBestScore(getBestScore()),
+        Constraints(constraints) {
+    TypeVars = std::move(component.typeVars);
 
+    for (auto constraint : component.constraints) {
+      constraints->erase(constraint);
+      record(constraint);
+    }
+  }
+
+  /// Create a component step for an orphaned constraint.
+  ComponentStep(ConstraintSystem &cs, unsigned index,
+                ConstraintList *constraints,
+                Constraint *orphaned,
+                SmallVectorImpl<Solution> &solutions)
+      : SolverStep(cs, solutions), Index(index), IsSingle(false),
+        OriginalScore(getCurrentScore()), OriginalBestScore(getBestScore()),
+        Constraints(constraints), OrphanedConstraint(orphaned) {
+    constraints->erase(orphaned);
+    record(orphaned);
+  }
+
+private:
   /// Record a constraint as associated with this step.
   void record(Constraint *constraint) {
     Constraints->push_back(constraint);
@@ -366,12 +394,7 @@ public:
       ++NumDisjunctions;
   }
 
-  /// Record a constraint as associated with this step but which doesn't
-  /// have any free type variables associated with it.
-  void recordOrphan(Constraint *constraint) {
-    assert(!OrphanedConstraint);
-    OrphanedConstraint = constraint;
-  }
+public:
 
   StepResult take(bool prevFailed) override;
 

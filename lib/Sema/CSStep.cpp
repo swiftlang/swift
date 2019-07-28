@@ -96,15 +96,12 @@ void SplitterStep::computeFollowupSteps(
   CG.optimize();
 
   // Compute the connected components of the constraint graph.
-  // FIXME: We're seeding typeVars with TypeVariables so that the
-  // connected-components algorithm only considers those type variables within
-  // our component. There are clearly better ways to do this.
-  std::vector<TypeVariableType *> typeVars(CS.TypeVariables);
-  std::vector<unsigned> components;
-  unsigned numComponents = CG.computeConnectedComponents(typeVars, components);
+  auto components = CG.computeConnectedComponents(CS.TypeVariables);
+  unsigned numComponents =
+      components.size() + CG.getOrphanedConstraints().size();
   if (numComponents < 2) {
     componentSteps.push_back(llvm::make_unique<ComponentStep>(
-        CS, 0, /*single=*/true, &CS.InactiveConstraints, Solutions));
+        CS, 0, &CS.InactiveConstraints, Solutions));
     return;
   }
 
@@ -112,9 +109,18 @@ void SplitterStep::computeFollowupSteps(
   PartialSolutions = std::unique_ptr<SmallVector<Solution, 4>[]>(
       new SmallVector<Solution, 4>[numComponents]);
 
-  for (unsigned i = 0, n = numComponents; i != n; ++i) {
+  // Add components.
+  for (unsigned i : indices(components)) {
     componentSteps.push_back(llvm::make_unique<ComponentStep>(
-        CS, i, /*single=*/false, &Components[i], PartialSolutions[i]));
+        CS, i, &Components[i], std::move(components[i]), PartialSolutions[i]));
+  }
+
+  // Add components for the orphaned constraints.
+  OrphanedConstraints = CG.takeOrphanedConstraints();
+  for (unsigned i : range(components.size(), numComponents)) {
+    auto orphaned = OrphanedConstraints[i - components.size()];
+    componentSteps.push_back(llvm::make_unique<ComponentStep>(
+        CS, i, &Components[i], orphaned, PartialSolutions[i]));
   }
 
   if (isDebugMode()) {
@@ -128,56 +134,6 @@ void SplitterStep::computeFollowupSteps(
     log << "---Connected components---\n";
     CG.printConnectedComponents(log);
   }
-
-  // Map type variables and constraints into appropriate steps.
-  llvm::DenseMap<TypeVariableType *, unsigned> typeVarComponent;
-  llvm::DenseMap<Constraint *, unsigned> constraintComponent;
-  for (unsigned i = 0, n = typeVars.size(); i != n; ++i) {
-    auto *typeVar = typeVars[i];
-    // Record the component of this type variable.
-    typeVarComponent[typeVar] = components[i];
-
-    for (auto *constraint : CG[typeVar].getConstraints())
-      constraintComponent[constraint] = components[i];
-  }
-
-  // Add the orphaned components to the mapping from constraints to components.
-  unsigned firstOrphanedComponent =
-      numComponents - CG.getOrphanedConstraints().size();
-  {
-    unsigned component = firstOrphanedComponent;
-    for (auto *constraint : CG.getOrphanedConstraints()) {
-      // Register this orphan constraint both as associated with
-      // a given component as a regular constrant, as well as an
-      // "orphan" constraint, so it can be proccessed correctly.
-      constraintComponent[constraint] = component;
-      componentSteps[component]->recordOrphan(constraint);
-      ++component;
-    }
-  }
-
-  for (auto *typeVar : CS.TypeVariables) {
-    auto known = typeVarComponent.find(typeVar);
-    // If current type variable is associated with
-    // a certain component step, record it as being so.
-    if (known != typeVarComponent.end()) {
-      componentSteps[known->second]->record(typeVar);
-      continue;
-    }
-  }
-
-  // Transfer all of the constraints from the work list to
-  // the appropriate component.
-  auto &workList = CS.InactiveConstraints;
-  while (!workList.empty()) {
-    auto *constraint = &workList.front();
-    workList.pop_front();
-    componentSteps[constraintComponent[constraint]]->record(constraint);
-  }
-
-  // Remove all of the orphaned constraints; they'll be re-introduced
-  // by each component independently.
-  OrphanedConstraints = CG.takeOrphanedConstraints();
 
   // Create component ordering based on the information associated
   // with constraints in each step - e.g. number of disjunctions,

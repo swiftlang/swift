@@ -432,35 +432,82 @@ namespace {
   /// A union-find connected components algorithm used to find the connected
   /// components within a constraint graph.
   class ConnectedComponents {
-    llvm::SmallDenseMap<TypeVariableType *, TypeVariableType *> representatives;
+    ConstraintGraph &cg;
+    ArrayRef<TypeVariableType *> typeVars;
+
+    /// A mapping from each type variable to its representative in a union-find
+    /// data structure, including entries where the type variable is its own
+    /// representative.
+    mutable llvm::SmallDenseMap<TypeVariableType *, TypeVariableType *>
+        representatives;
 
   public:
+    using Component = ConstraintGraph::Component;
+
     /// Compute connected components for the given set of type variables
     /// in the constraint graph.
     ConnectedComponents(ConstraintGraph &cg,
-                        ArrayRef<TypeVariableType *> typeVars) {
-      SmallPtrSet<Constraint *, 8> visitedConstraints;
+                        ArrayRef<TypeVariableType *> typeVars)
+        : cg(cg), typeVars(typeVars)
+    {
+      connectedComponents();
+    }
+
+    /// Retrieve the set of components.
+    SmallVector<Component, 1> getComponents() const {
+      // Find those type variables whose components involve unbound type
+      // variables; these are the only components and type variables we want to
+      // report.
+      SmallPtrSet<TypeVariableType *, 4> componentHasUnboundTypeVar;
+      auto &cs = cg.getConstraintSystem();
       for (auto typeVar : typeVars) {
-        auto rep = typeVar->getImpl().getRepresentative(nullptr);
-        for (auto equiv : cg[rep].getEquivalenceClass())
-          unionSets(typeVar, equiv);
+        // If this type variable has a fixed type, skip it.
+        if (cs.getFixedType(typeVar))
+          continue;
 
-        auto &node = cg[typeVar];
-        for (auto fixedAdj : node.getFixedBindings())
-          unionSets(typeVar, fixedAdj);
+        componentHasUnboundTypeVar.insert(findRepresentative(typeVar));
+      }
 
-        for (auto constraint : node.getConstraints()) {
-          if (!visitedConstraints.insert(constraint).second)
-            continue;
+      // Assign each type variable and constraint to its appropriate component.
+      SmallVector<Component, 1> components;
+      llvm::SmallDenseMap<TypeVariableType *, unsigned> componentIdxMap;
+      SmallPtrSet<Constraint *, 4> knownConstraints;
+      for (auto typeVar : typeVars) {
+        // Find the representative. If it's component doesn't have an unbound
+        // type variable, there's nothing to do.
+        auto rep = findRepresentative(typeVar);
+        if (componentHasUnboundTypeVar.count(rep) == 0)
+          continue;
 
-          unionSetsViaConstraint(constraint);
+        // Find the component index.
+        auto knownComponentIdx = componentIdxMap.find(rep);
+        if (knownComponentIdx == componentIdxMap.end()) {
+          // We haven't allocated this component yet; do so now.
+          knownComponentIdx = componentIdxMap.insert(
+              {rep, componentIdxMap.size()}).first;
+          components.push_back({ });
+        }
+
+        // Record this type variable as part of the component.
+        unsigned componentIdx = knownComponentIdx->second;
+        auto &component = components[componentIdx];
+        component.typeVars.push_back(typeVar);
+
+        // Record this type variable's constraints as part of the component,
+        // uniquing as we go.
+        for (auto constraint : cg[typeVar].getConstraints()) {
+          if (knownConstraints.insert(constraint).second) {
+            component.constraints.push_back(constraint);
+          }
         }
       }
+
+      return components;
     }
 
     /// Find the representative for the given type variable within the set
     /// of representatives in a union-find data structure.
-    TypeVariableType *findRepresentative(TypeVariableType *typeVar) {
+    TypeVariableType *findRepresentative(TypeVariableType *typeVar) const {
       // If we don't have a record of this type variable, it is it's own
       // representative.
       auto known = representatives.find(typeVar);
@@ -502,8 +549,7 @@ namespace {
     /// constraint.
     ///
     /// \returns \c true if any components were joined by this constraint.
-    bool unionSetsViaConstraint(
-        Constraint *constraint) {
+    bool unionSetsViaConstraint(Constraint *constraint) {
       auto typeVars = constraint->getTypeVariables();
       if (typeVars.size() < 2)
         return false;
@@ -518,56 +564,39 @@ namespace {
 
       return anyUnioned;
     }
+
+  private:
+    /// Perform the connected components algorithm.
+    void connectedComponents() {
+      SmallPtrSet<Constraint *, 8> visitedConstraints;
+      for (auto typeVar : typeVars) {
+        auto rep = typeVar->getImpl().getRepresentative(nullptr);
+        for (auto equiv : cg[rep].getEquivalenceClass())
+          unionSets(typeVar, equiv);
+
+        auto &node = cg[typeVar];
+        for (auto fixedAdj : node.getFixedBindings())
+          unionSets(typeVar, fixedAdj);
+
+        for (auto constraint : node.getConstraints()) {
+          if (!visitedConstraints.insert(constraint).second)
+            continue;
+
+          unionSetsViaConstraint(constraint);
+        }
+      }
+    }
   };
 }
 
-unsigned ConstraintGraph::computeConnectedComponents(
-           std::vector<TypeVariableType *> &typeVars,
-           std::vector<unsigned> &components) {
-
+SmallVector<ConstraintGraph::Component, 1>
+ConstraintGraph::computeConnectedComponents(
+           ArrayRef<TypeVariableType *> typeVars) {
   // Perform connected components via a union-find algorithm on all of the
   // constraints adjacent to these type variables.
   ConnectedComponents cc(*this, typeVars);
 
-  // Find those type variables whose components involve unbound type
-  // variables; these are the only components and type variables we want to
-  // report.
-  SmallPtrSet<TypeVariableType *, 4> componentHasUnboundTypeVar;
-  for (auto typeVar : typeVars) {
-    // If this type variable has a fixed type, skip it.
-    if (CS.getFixedType(typeVar))
-      continue;
-
-    componentHasUnboundTypeVar.insert(cc.findRepresentative(typeVar));
-  }
-
-  // Remove type variables in dead components and provide component
-  // numbers for those that remain.
-  llvm::SmallDenseMap<TypeVariableType *, unsigned> componentMap;
-  typeVars.erase(
-      std::remove_if(
-        typeVars.begin(), typeVars.end(),
-        [&](TypeVariableType *typeVar) {
-          // If the representative is not in the set of components that have an
-          // unbound type variable, drop this type variable.
-          auto rep = cc.findRepresentative(typeVar);
-          if (componentHasUnboundTypeVar.count(rep) == 0)
-            return true;
-
-          // Find or assign a component number.
-          auto knownComponent = componentMap.find(rep);
-          if (knownComponent == componentMap.end()) {
-            knownComponent = componentMap.insert(
-                {rep, componentMap.size()}).first;
-          }
-
-          // Record the component number.
-          components.push_back(knownComponent->second);
-          return false;
-        }),
-      typeVars.end());
-
-  return componentMap.size() + getOrphanedConstraints().size();
+  return cc.getComponents();
 }
 
 /// For a given constraint kind, decide if we should attempt to eliminate its
@@ -789,19 +818,17 @@ void ConstraintGraph::dump() {
 }
 
 void ConstraintGraph::printConnectedComponents(llvm::raw_ostream &out) {
-  std::vector<TypeVariableType *> typeVars;
-  typeVars.insert(typeVars.end(), TypeVariables.begin(), TypeVariables.end());
-  std::vector<unsigned> components;
-  unsigned numComponents = computeConnectedComponents(typeVars, components);
-  for (unsigned component = 0; component != numComponents; ++component) {
+  auto components = computeConnectedComponents(TypeVariables);
+  for (unsigned component : indices(components)) {
     out.indent(2);
-    out << component << ":";
-    for (unsigned i = 0, n = typeVars.size(); i != n; ++i) {
-      if (components[i] == component) {
-        out << ' ';
-        typeVars[i]->print(out);
-      }
-    }
+    out << component << ": ";
+    interleave(components[component].typeVars,
+               [&](TypeVariableType *typeVar) {
+                 typeVar->print(out);
+               },
+               [&] {
+                 out << ' ';
+               });
     out << '\n';
   }
 }
