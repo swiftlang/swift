@@ -1390,8 +1390,29 @@ unsigned PatternBindingDecl::getPatternEntryIndexForVarDecl(const VarDecl *VD) c
   return ~0U;
 }
 
+Expr *PatternBindingEntry::getOrigInitAsWritten() const {
+  // Before the addition of property wrappers, the following would work:
+  // return InitContextAndIsText.getInt() ? nullptr : InitExpr.Node;
+  // Consider: @Blah(17) var foo: Foo = 18
+  // The code above will return:
+  // Clamped(wrappedValue: 17, min: 0, max: 255)
+  // but what we want is the "18".
+
+  Expr *const init = InitContextAndIsText.getInt() ? nullptr : InitExpr.Node;
+  if (!init)
+    return nullptr;
+  // Assume wrappers only apply to single-variable patterns.
+  VarDecl *const var = getPattern()->getSingleVar();
+  if (!var)
+    return init;
+  auto *e = findOriginalPropertyWrapperInitialValue(var, init);
+  if (e)
+    return e;
+  return init;
+}
+
 SourceRange PatternBindingEntry::getOrigInitRange() const {
-  auto Init = getInitAsWritten();
+  auto Init = getOrigInitAsWritten();
   return Init ? Init->getSourceRange() : SourceRange();
 }
 
@@ -1428,26 +1449,61 @@ VarDecl *PatternBindingEntry::getAnchoringVarDecl() const {
   return variables[0];
 }
 
-SourceRange PatternBindingEntry::getSourceRange(bool omitAccessors) const {
-  // Patterns end at the initializer, if present.
-  SourceLoc endLoc = getOrigInitRange().End;
+SourceLoc PatternBindingEntry::getLastAccessorEndLoc() const {
+  SourceLoc lastAccessorEnd;
+  getPattern()->forEachVariable([&](VarDecl *var) {
+    auto accessorsEndLoc = var->getBracesRange().End;
+    if (accessorsEndLoc.isValid())
+      lastAccessorEnd = accessorsEndLoc;
+  });
+  return lastAccessorEnd;
+}
 
-  // If we're not banned from handling accessors, they follow the initializer.
-  if (!omitAccessors) {
-    getPattern()->forEachVariable([&](VarDecl *var) {
-      auto accessorsEndLoc = var->getBracesRange().End;
-      if (accessorsEndLoc.isValid())
-        endLoc = accessorsEndLoc;
-    });
+SourceLoc PatternBindingEntry::getPostfixInitEndLoc() const {
+  if (getEqualLoc().isInvalid()) // An optimization
+    return SourceLoc();
+
+  const SourceLoc endOrigInit = getOrigInitRange().End;
+  if (endOrigInit.isInvalid())
+    return SourceLoc();
+  // The initializer could precede the pattern if it comes from a
+  // property wrapper.
+  if (const auto *const potentiallyWrappedVar = getPattern()->getSingleVar()) {
+    const auto &SM = potentiallyWrappedVar->getASTContext().SourceMgr;
+    if (SM.isBeforeInBuffer(endOrigInit, getStartLoc())) {
+      assert(getEqualLoc().isInvalid() &&
+             "Needed to get the real postfix init");
+      return SourceLoc();
+    }
   }
+  return endOrigInit;
+}
 
-  // If we didn't find an end yet, check the pattern.
+SourceLoc PatternBindingEntry::getStartLoc() const {
+  return getPattern()->getStartLoc();
+}
+
+SourceLoc PatternBindingEntry::getEndLoc(bool omitAccessors) const {
+  // Accessors are last
+  if (!omitAccessors) {
+    const auto lastAccessorEnd = getLastAccessorEndLoc();
+    if (lastAccessorEnd.isValid())
+      return lastAccessorEnd;
+  }
+  const auto postfixInitEnd = getPostfixInitEndLoc();
+  if (postfixInitEnd.isValid())
+    return postfixInitEnd;
+
+  return getPattern()->getEndLoc();
+}
+
+SourceRange PatternBindingEntry::getSourceRange(bool omitAccessors) const {
+  const SourceLoc startLoc = getStartLoc();
+  if (startLoc.isInvalid())
+    return SourceRange();
+  const SourceLoc endLoc = getEndLoc(omitAccessors);
   if (endLoc.isInvalid())
-    endLoc = getPattern()->getEndLoc();
-
-  SourceLoc startLoc = getPattern()->getStartLoc();
-  if (startLoc.isValid() != endLoc.isValid()) return SourceRange();
-
+    return SourceRange();
   return SourceRange(startLoc, endLoc);
 }
 
@@ -5824,6 +5880,7 @@ void ParamDecl::setDefaultArgumentInitContext(Initializer *initContext) {
   DefaultValueAndFlags.getPointer()->InitContext = initContext;
 }
 
+/// Return nullptr if there is no property wrapper
 Expr *swift::findOriginalPropertyWrapperInitialValue(VarDecl *var,
                                                      Expr *init) {
   auto *PBD = var->getParentPatternBinding();
@@ -5831,13 +5888,15 @@ Expr *swift::findOriginalPropertyWrapperInitialValue(VarDecl *var,
     return nullptr;
 
   // If there is no '=' on the pattern, there was no initial value.
-  if (PBD->getPatternList()[0].getEqualLoc().isInvalid()
-      && !PBD->isDefaultInitializable())
+  if (PBD->getPatternList()[0].getEqualLoc().isInvalid())
     return nullptr;
 
   ASTContext &ctx = var->getASTContext();
   auto dc = var->getInnermostDeclContext();
-  auto innermostAttr = var->getAttachedPropertyWrappers().back();
+  const auto wrapperAttrs = var->getAttachedPropertyWrappers();
+  if (wrapperAttrs.empty())
+    return nullptr;
+  auto innermostAttr = wrapperAttrs.back();
   auto innermostNominal = evaluateOrDefault(
       ctx.evaluator, CustomAttrNominalRequest{innermostAttr, dc}, nullptr);
   if (!innermostNominal)

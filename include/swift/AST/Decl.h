@@ -1981,10 +1981,9 @@ public:
     InitExpr.EqualLoc = equalLoc;
   }
 
-  /// Retrieve the initializer as it was written in the source.
-  Expr *getInitAsWritten() const {
-    return InitContextAndIsText.getInt() ? nullptr : InitExpr.Node;
-  }
+  /// Retrieve the initializer after the =, if any, as it was written in the
+  /// source.
+  Expr *getOrigInitAsWritten() const;
 
   bool isInitializerChecked() const {
     return PatternAndFlags.getInt().contains(Flags::Checked);
@@ -2013,7 +2012,15 @@ public:
     InitContextAndIsText.setPointer(dc);
   }
 
-  /// Retrieve the source range covered by this pattern binding.
+  SourceLoc getStartLoc() const;
+
+  /// Retrieve the end location covered by this pattern binding entry.
+  ///
+  /// \param omitAccessors Whether the computation should omit the accessors
+  /// from the source range.
+  SourceLoc getEndLoc(bool omitAccessors = false) const;
+
+  /// Retrieve the source range covered by this pattern binding entry.
   ///
   /// \param omitAccessors Whether the computation should omit the accessors
   /// from the source range.
@@ -2021,6 +2028,13 @@ public:
 
   const CaptureInfo &getCaptureInfo() const { return Captures; }
   void setCaptureInfo(const CaptureInfo &captures) { Captures = captures; }
+
+private:
+  SourceLoc getLastAccessorEndLoc() const;
+
+  /// Get the end location of an intiaiizer that comes *after* the pattern.
+  /// (Property wrappers introduce initializers that come before.)
+  SourceLoc getPostfixInitEndLoc() const;
 };
 
 /// This decl contains a pattern and optional initializer for a set
