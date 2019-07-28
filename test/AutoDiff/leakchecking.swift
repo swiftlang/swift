@@ -74,10 +74,14 @@ extension DummyLayer {
   func defaultImpl(_ input: Input) -> Output {
     return requirement(input)
   }
-  func vjpDefaultImpl(_ input: Input) -> (Output, (Self.Output.TangentVector) -> (Self.TangentVector, Self.Input.TangentVector)) {
-    return Swift.valueWithPullback(at: self, input) { (m, i) in m.requirement(i) }
+  func vjpDefaultImpl(_ input: Input)
+  -> (Output,
+    (Self.Output.TangentVector)
+    -> (Self.TangentVector, Self.Input.TangentVector)) {
+    return Swift.valueWithPullback(at: self, input) { $0.requirement($1) }
   }
 }
+
 LeakCheckingTests.testWithLeakChecking("TestProtocolDefaultDerivative") {
   struct Foo : DummyLayer {
     // NOTE: Make sure not to override `defaultImpl`.
@@ -95,6 +99,40 @@ LeakCheckingTests.testWithLeakChecking("TestProtocolDefaultDerivative") {
   _ = model.valueWithGradient { model in
     // Call the protocol default implementation method.
     model.defaultImpl(x)
+  }
+}
+
+protocol Module : Differentiable {
+  associatedtype Input
+  associatedtype Output : Differentiable
+  @differentiable(wrt: self)
+  func callAsFunction(_ input: Input) -> Output
+}
+protocol Layer : Module where Input : Differentiable {
+  @differentiable(wrt: (self, input))
+  func callAsFunction(_ input: Input) -> Output
+}
+
+LeakCheckingTests.testWithLeakChecking("ProtocolRequirements") {
+  struct Dense: Layer {
+    var w = Tracked<Float>(1)
+    @differentiable
+    func callAsFunction(_ input: Tracked<Float>) -> Tracked<Float> {
+      input * w
+    }
+  }
+  struct Model: Module {
+    var dense1 = Dense()
+    var dense2 = Dense()
+    @differentiable
+    func callAsFunction(_ input: Tracked<Int>) -> Tracked<Float> {
+      dense2(dense1(Tracked(Float(input.value))))
+    }
+  }
+  let x = Tracked<Int>(1)
+  let model = Model()
+  _ = model.valueWithGradient { model in
+    model(x)
   }
 }
 

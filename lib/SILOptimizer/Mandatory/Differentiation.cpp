@@ -6607,7 +6607,7 @@ SILValue ADContext::promoteToDifferentiableFunction(
     getGeneratedAssociatedFunctionReferences().push_back(assocFn);
 
     // If desired indices are a subset of actual indices, create a "subset
-    // indices thunk".
+    // indices thunk" and destroy the emitted associated function reference.
     // - For JVPs: the thunked JVP returns a differential taking fewer
     //   parameters (using `.zero` for the dropped parameters).
     // - For VJPs: the thunked VJP returns a pullback that drops the unused
@@ -6621,6 +6621,9 @@ SILValue ADContext::promoteToDifferentiableFunction(
         getASTContext(), actualIndices.parameters->getCapacity());
     if (actualIndices.source != desiredIndices.source ||
         !actualIndices.parameters->equals(extendedDesiredIndices)) {
+      // Destroy the already emitted associated function reference because it
+      // is no longer used.
+      builder.emitReleaseValueAndFold(loc, assocFn);
       // Check if underlying original function reference has been partially
       // applied with arguments. If so, produce an error: parameter subset
       // thunks do not yet support this case because partially applied arguments
