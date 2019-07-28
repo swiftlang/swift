@@ -428,163 +428,147 @@ llvm::TinyPtrVector<Constraint *> ConstraintGraph::gatherConstraints(
 
 #pragma mark Algorithms
 
-/// Perform a depth-first search.
-///
-/// \param cg The constraint graph.
-/// \param typeVar The type variable we're searching from.
-/// \param preVisitNode Called before traversing a node. Must return \c
-/// false when the node has already been visited.
-/// \param visitConstraint Called before considering a constraint. If it
-/// returns \c false, that constraint will be skipped.
-/// \param visitedConstraints Set of already-visited constraints, used
-/// internally to avoid duplicated work.
-static void depthFirstSearch(
-    ConstraintGraph &cg,
-    TypeVariableType *typeVar,
-    llvm::function_ref<bool(TypeVariableType *)> preVisitNode,
-    llvm::function_ref<bool(Constraint *)> visitConstraint,
-    llvm::DenseSet<Constraint *> &visitedConstraints) {
-  // Visit this node. If we've already seen it, bail out.
-  if (!preVisitNode(typeVar))
-    return;
+namespace {
+  /// A union-find connected components algorithm used to find the connected
+  /// components within a constraint graph.
+  class ConnectedComponents {
+    llvm::SmallDenseMap<TypeVariableType *, TypeVariableType *> representatives;
 
-  // Local function to visit adjacent type variables.
-  auto visitAdjacencies = [&](ArrayRef<TypeVariableType *> adjTypeVars) {
-    for (auto adj : adjTypeVars) {
-      if (adj == typeVar)
-        continue;
+  public:
+    /// Compute connected components for the given set of type variables
+    /// in the constraint graph.
+    ConnectedComponents(ConstraintGraph &cg,
+                        ArrayRef<TypeVariableType *> typeVars) {
+      SmallPtrSet<Constraint *, 8> visitedConstraints;
+      for (auto typeVar : typeVars) {
+        auto rep = typeVar->getImpl().getRepresentative(nullptr);
+        for (auto equiv : cg[rep].getEquivalenceClass())
+          unionSets(typeVar, equiv);
 
-      // Recurse into this node.
-      depthFirstSearch(cg, adj, preVisitNode, visitConstraint,
-                       visitedConstraints);
+        auto &node = cg[typeVar];
+        for (auto fixedAdj : node.getFixedBindings())
+          unionSets(typeVar, fixedAdj);
+
+        for (auto constraint : node.getConstraints()) {
+          if (!visitedConstraints.insert(constraint).second)
+            continue;
+
+          unionSetsViaConstraint(constraint);
+        }
+      }
+    }
+
+    /// Find the representative for the given type variable within the set
+    /// of representatives in a union-find data structure.
+    TypeVariableType *findRepresentative(TypeVariableType *typeVar) {
+      // If we don't have a record of this type variable, it is it's own
+      // representative.
+      auto known = representatives.find(typeVar);
+      if (known == representatives.end())
+        return typeVar;
+
+      // Find the representative of the parent.
+      auto parent = known->second;
+      auto rep = findRepresentative(parent);
+
+      // Path compression.
+      if (rep != parent)
+        representatives[typeVar] = rep;
+
+      return rep;
+    }
+
+    /// Perform the union of two type variables in a union-find data structure
+    /// used for connected components.
+    ///
+    /// \returns true if the two components were separate and have now been joined,
+    /// \c false if they were already in the same set.
+    bool unionSets(TypeVariableType *typeVar1, TypeVariableType *typeVar2) {
+      auto rep1 = findRepresentative(typeVar1);
+      auto rep2 = findRepresentative(typeVar2);
+      if (rep1 == rep2)
+        return false;
+
+      // Reparent the type variable with the higher ID. The actual choice doesn't
+      // matter, but this makes debugging easier.
+      if (rep1->getID() < rep2->getID())
+        representatives[rep2] = rep1;
+      else
+        representatives[rep1] = rep2;
+      return true;
+    }
+
+    /// Perform a union amongst the type variables referenced by the given
+    /// constraint.
+    ///
+    /// \returns \c true if any components were joined by this constraint.
+    bool unionSetsViaConstraint(
+        Constraint *constraint) {
+      auto typeVars = constraint->getTypeVariables();
+      if (typeVars.size() < 2)
+        return false;
+
+      // Merge the first type variable with all of the others.
+      bool anyUnioned = false;
+      auto typeVar = typeVars.front();
+      for (auto otherTypeVar : typeVars.drop_front()) {
+        if (unionSets(typeVar, otherTypeVar))
+          anyUnioned = true;
+      }
+
+      return anyUnioned;
     }
   };
-
-  auto &node = cg[typeVar];
-
-  // Walk all of the constraints associated with this node to find related
-  // nodes.
-  for (auto constraint : node.getConstraints()) {
-    // If we've already seen this constraint, skip it.
-    if (!visitedConstraints.insert(constraint).second)
-      continue;
-
-    if (visitConstraint(constraint))
-      visitAdjacencies(constraint->getTypeVariables());
-  }
-
-  // Visit all of the other nodes in the equivalence class.
-  auto repTypeVar = cg.getConstraintSystem().getRepresentative(typeVar);
-  if (typeVar == repTypeVar) {
-    // We are the representative, so visit all of the other type variables
-    // in this equivalence class.
-    visitAdjacencies(node.getEquivalenceClass());
-  } else {
-    // We are not the representative; visit the representative.
-    visitAdjacencies(repTypeVar);
-  }
-
-  // Walk any type variables related via fixed bindings.
-  visitAdjacencies(node.getFixedBindings());
-}
-
-/// Perform a depth-first search.
-///
-/// \param cg The constraint graph.
-/// \param typeVar The type variable we're searching from.
-/// \param preVisitNode Called before traversing a node. Must return \c
-/// false when the node has already been visited.
-/// \param visitConstraint Called before considering a constraint. If it
-/// returns \c false, that constraint will be skipped.
-static void depthFirstSearch(
-    ConstraintGraph &cg,
-    TypeVariableType *typeVar,
-    llvm::function_ref<bool(TypeVariableType *)> preVisitNode,
-    llvm::function_ref<bool(Constraint *)> visitConstraint) {
-  llvm::DenseSet<Constraint *> visitedConstraints;
-  depthFirstSearch(cg, typeVar, preVisitNode, visitConstraint,
-                   visitedConstraints);
 }
 
 unsigned ConstraintGraph::computeConnectedComponents(
            std::vector<TypeVariableType *> &typeVars,
            std::vector<unsigned> &components) {
-  llvm::SmallDenseMap<TypeVariableType *, unsigned> componentsMap;
 
-  // Perform a depth-first search from each type variable to identify
-  // what component it is in.
-  unsigned numComponents = 0;
-  for (auto typeVar : typeVars) {
-    // If we've already assigned a component to this type variable, we're done.
-    if (componentsMap.count(typeVar) > 0)
-      continue;
+  // Perform connected components via a union-find algorithm on all of the
+  // constraints adjacent to these type variables.
+  ConnectedComponents cc(*this, typeVars);
 
-    // Record this component.
-    unsigned component = numComponents++;
-
-    // Perform a depth-first search to mark those type variables that are
-    // in the same component as this type variable.
-    depthFirstSearch(
-        *this, typeVar,
-        [&](TypeVariableType *typeVar) {
-          // If we have already seen this node, we're done.
-          if (componentsMap.count(typeVar) > 0) {
-            assert(componentsMap[typeVar] == component && "Wrong component?");
-            return false;
-          }
-
-          componentsMap[typeVar] = component;
-          return true;
-        },
-        [&](Constraint *constraint) {
-          return true;
-        });
-  }
-
-  // Figure out which components have unbound type variables; these
-  // are the only components and type variables we want to report.
-  SmallVector<bool, 4> componentHasUnboundTypeVar(numComponents, false);
+  // Find those type variables whose components involve unbound type
+  // variables; these are the only components and type variables we want to
+  // report.
+  SmallPtrSet<TypeVariableType *, 4> componentHasUnboundTypeVar;
   for (auto typeVar : typeVars) {
     // If this type variable has a fixed type, skip it.
     if (CS.getFixedType(typeVar))
       continue;
 
-    assert(componentsMap.count(typeVar) > 0);
-    componentHasUnboundTypeVar[componentsMap[typeVar]] = true;
-  }
-
-  // Renumber the old components to the new components.
-  SmallVector<unsigned, 4> componentRenumbering(numComponents, 0);
-  numComponents = 0;
-  for (unsigned i : indices(componentRenumbering)) {
-    // Skip components that have no unbound type variables.
-    if (!componentHasUnboundTypeVar[i])
-      continue;
-
-    componentRenumbering[i] = numComponents++;
+    componentHasUnboundTypeVar.insert(cc.findRepresentative(typeVar));
   }
 
   // Remove type variables in dead components and provide component
   // numbers for those that remain.
+  llvm::SmallDenseMap<TypeVariableType *, unsigned> componentMap;
   typeVars.erase(
       std::remove_if(
         typeVars.begin(), typeVars.end(),
         [&](TypeVariableType *typeVar) {
-          assert(componentsMap.count(typeVar) > 0);
-          unsigned component = componentsMap[typeVar];
-          // Remove type variables in dead components.
-          if (!componentHasUnboundTypeVar[component])
+          // If the representative is not in the set of components that have an
+          // unbound type variable, drop this type variable.
+          auto rep = cc.findRepresentative(typeVar);
+          if (componentHasUnboundTypeVar.count(rep) == 0)
             return true;
 
-          // Record the (renumbered) component.
-          components.push_back(componentRenumbering[component]);
+          // Find or assign a component number.
+          auto knownComponent = componentMap.find(rep);
+          if (knownComponent == componentMap.end()) {
+            knownComponent = componentMap.insert(
+                {rep, componentMap.size()}).first;
+          }
+
+          // Record the component number.
+          components.push_back(knownComponent->second);
           return false;
         }),
       typeVars.end());
 
-  return numComponents + getOrphanedConstraints().size();
+  return componentMap.size() + getOrphanedConstraints().size();
 }
-
 
 /// For a given constraint kind, decide if we should attempt to eliminate its
 /// edge in the graph.
