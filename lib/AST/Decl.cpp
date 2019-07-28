@@ -1429,8 +1429,11 @@ VarDecl *PatternBindingEntry::getAnchoringVarDecl() const {
 }
 
 SourceRange PatternBindingEntry::getSourceRange(bool omitAccessors) const {
-  // Patterns end at the initializer, if present.
-  SourceLoc endLoc = getOrigInitRange().End;
+  // A CustomAttr for a property wrapper can have an initializer that comes
+  // before the pattern.
+  const bool initializerFollows = getEqualLoc().isValid();
+  // Patterns end at a following initializer
+  SourceLoc endLoc = initializerFollows ? getOrigInitRange().End : SourceLoc();
 
   // If we're not banned from handling accessors, they follow the initializer.
   if (!omitAccessors) {
