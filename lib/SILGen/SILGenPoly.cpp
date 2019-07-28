@@ -3635,6 +3635,7 @@ static void forwardFunctionArgumentsConvertingOwnership(
     SILGenFunction &SGF, SILLocation loc, CanSILFunctionType fromTy,
     CanSILFunctionType toTy, ArrayRef<ManagedValue> managedArgs,
     SmallVectorImpl<SILValue> &forwardedArgs,
+    SmallVectorImpl<AllocStackInst *> &localAllocations,
     SmallVectorImpl<SILValue> &argumentsToFree) {
   auto fromParameters = fromTy->getParameters();
   auto toParameters = toTy->getParameters();
@@ -3644,13 +3645,27 @@ static void forwardFunctionArgumentsConvertingOwnership(
     auto toParam = toParameters[index];
     // To convert owned argument to be guaranteed, retain the argument.
     if (fromParam.isConsumed() && !toParam.isConsumed()) {
-      if (arg.getType().isObject())
+      // If the argument has an object type, emit `retain_value`.
+      if (arg.getType().isObject()) {
         SGF.B.createRetainValue(loc, arg.getValue(),
                                 SGF.B.getDefaultAtomicity());
-      else
+        forwardedArgs.push_back(arg.getValue());
+        continue;
+      }
+      // If the argument has a loadable address type, emit `retain_value_addr`.
+      if (arg.getType().isLoadable(SGF.F)) {
         SGF.B.createRetainValueAddr(loc, arg.getValue(),
                                     SGF.B.getDefaultAtomicity());
-      forwardedArgs.push_back(arg.getValue());
+        forwardedArgs.push_back(arg.getValue());
+        continue;
+      }
+      // If the argument is address-only, emit a local allocation and
+      // `copy_addr`.
+      auto *alloc = SGF.B.createAllocStack(loc, arg.getType());
+      SGF.B.createCopyAddr(
+          loc, arg.getValue(), alloc, IsNotTake, IsInitialization);
+      localAllocations.push_back(alloc);
+      forwardedArgs.push_back(alloc);
       continue;
     }
     // To convert guaranteed argument to be owned, release the argument later.
@@ -3713,13 +3728,14 @@ SILGenModule::getOrCreateAutoDiffAssociatedFunctionThunk(
   auto assocFnRefType = assocFnRef->getType().castTo<SILFunctionType>();
 
   // Collect thunk arguments, converting ownership.
+  SmallVector<AllocStackInst *, 8> localAllocations;
   SmallVector<SILValue, 8> argumentsToFree;
   SmallVector<SILValue, 8> arguments;
   for (auto *indRes : indirectResults)
     arguments.push_back(indRes);
   forwardFunctionArgumentsConvertingOwnership(
       thunkSGF, loc, assocFnRefType, origAssocFnType, params, arguments,
-      argumentsToFree);
+      localAllocations, argumentsToFree);
   // Apply function argument.
   auto apply = thunkSGF.emitApplyWithRethrow(
       loc, assocFnRef, /*substFnType*/ assocFnRef->getType(),
@@ -3733,17 +3749,26 @@ SILGenModule::getOrCreateAutoDiffAssociatedFunctionThunk(
       origAssocFnType->getResults().back().getSILStorageType())
           .castTo<SILFunctionType>();
 
-  // Free arguments.
-  for (auto arg : argumentsToFree) {
-    if (arg->getType().isObject())
-      thunkSGF.B.emitReleaseValueAndFold(loc, arg);
-    else
-      thunkSGF.B.emitDestroyAddrAndFold(loc, arg);
-  }
+  // Create return instruction in the thunk, first deallocating local
+  // allocations and freeing arguments-to-free.
+  auto createReturn = [&](SILValue retValue) {
+    // Free arguments-to-free.
+    for (auto arg : argumentsToFree)
+      if (arg->getType().isObject())
+        thunkSGF.B.createReleaseValue(loc, arg,
+                                      thunkSGF.B.getDefaultAtomicity());
+      else
+        thunkSGF.B.createDestroyAddr(loc, arg);
+    // Deallocate local allocations.
+    for (auto *alloc : reversed(localAllocations))
+      thunkSGF.B.createDeallocStack(loc, alloc);
+    // Create return.
+    thunkSGF.B.createReturn(loc, retValue);
+  };
 
   // If linear map types are unchanged, return the `apply` instruction.
   if (linearMapFnType == targetLinearMapFnType) {
-    thunkSGF.B.createReturn(loc, apply);
+    createReturn(apply);
     return thunk;
   }
 
@@ -3777,9 +3802,9 @@ SILGenModule::getOrCreateAutoDiffAssociatedFunctionThunk(
         joinElements(originalDirectResults, thunkSGF.B, apply.getLoc());
     auto thunkResult = joinElements(
         {originalDirectResult, linearMap}, thunkSGF.B, loc);
-    thunkSGF.B.createReturn(loc, thunkResult);
+    createReturn(thunkResult);
   } else {
-    thunkSGF.B.createReturn(loc, linearMap);
+    createReturn(linearMap);
   }
   return thunk;
 }

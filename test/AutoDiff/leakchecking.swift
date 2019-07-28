@@ -297,7 +297,7 @@ LeakCheckingTests.testWithLeakChecking("ParameterConventionMismatchLeakChecking"
       self.base = base
     }
     static func vjpInit(_ base: Tracked<Float>)
-      -> (Nontrivial, (Nontrivial.TangentVector) -> Tracked<Float>) {
+      -> (Nontrivial, (TangentVector) -> Tracked<Float>) {
       return (Nontrivial(base), { v in v.base })
     }
 
@@ -306,7 +306,7 @@ LeakCheckingTests.testWithLeakChecking("ParameterConventionMismatchLeakChecking"
       return x
     }
     func vjpOwnedParameterMismatch(_ x: __shared Tracked<Float>)
-      -> (Tracked<Float>, (Tracked<Float>) -> (Nontrivial.TangentVector, Tracked<Float>)) {
+      -> (Tracked<Float>, (Tracked<Float>) -> (TangentVector, Tracked<Float>)) {
       return (ownedParameter(x), { v in (.zero, v) })
     }
 
@@ -315,14 +315,54 @@ LeakCheckingTests.testWithLeakChecking("ParameterConventionMismatchLeakChecking"
       return x
     }
     func vjpSharedParameterMismatch(_ x: __owned Tracked<Float>)
-      -> (Tracked<Float>, (Tracked<Float>) -> (Nontrivial.TangentVector, Tracked<Float>)) {
+      -> (Tracked<Float>, (Tracked<Float>) -> (TangentVector, Tracked<Float>)) {
       return (sharedParameter(x), { v in (.zero, v) })
+    }
+
+    @differentiable(vjp: vjpOwnedParameterGenericMismatch)
+    func ownedParameterGeneric<T : Differentiable>(_ x: __owned T) -> T {
+      return x
+    }
+    func vjpOwnedParameterGenericMismatch<T : Differentiable>(_ x: __shared T)
+      -> (T, (T.TangentVector) -> (TangentVector, T.TangentVector)) {
+      return (ownedParameterGeneric(x), { v in (.zero, v) })
+    }
+
+    @differentiable(vjp: vjpSharedParameterGenericMismatch)
+    func sharedParameterGeneric<T : Differentiable>(_ x: __shared T) -> T {
+      return x
+    }
+    func vjpSharedParameterGenericMismatch<T : Differentiable>(_ x: __owned T)
+      -> (T, (T.TangentVector) -> (TangentVector, T.TangentVector)) {
+      return (sharedParameterGeneric(x), { v in (.zero, v) })
+    }
+
+    @differentiable(vjp: vjpConsuming)
+    __consuming func consuming(_ x: Tracked<Float>) -> Tracked<Float> {
+      return x
+    }
+    func vjpConsuming(_ x: Tracked<Float>)
+      -> (Tracked<Float>, (Tracked<Float>) -> (TangentVector, Tracked<Float>)) {
+      return (consuming(x), { v in (.zero, v) })
+    }
+
+    @differentiable(vjp: vjpConsumingGeneric)
+    __consuming func consumingGeneric<T : Differentiable>(_ x: T) -> T {
+      return x
+    }
+    func vjpConsumingGeneric<T : Differentiable>(_ x: T)
+      -> (T, (T.TangentVector) -> (TangentVector, T.TangentVector)) {
+      return (consumingGeneric(x), { v in (.zero, v) })
     }
   }
   let v = Nontrivial.TangentVector(base: 10)
   expectEqual(10, pullback(at: Tracked<Float>(1)) { x in Nontrivial(x) }(v))
   _ = Tracked<Float>(1).gradient { x in Nontrivial(x).ownedParameter(x) }
   _ = Tracked<Float>(1).gradient { x in Nontrivial(x).sharedParameter(x) }
+  _ = Tracked<Float>(1).gradient { x in Nontrivial(x).ownedParameterGeneric(x) }
+  _ = Tracked<Float>(1).gradient { x in Nontrivial(x).sharedParameterGeneric(x) }
+  _ = Tracked<Float>(1).gradient { x in Nontrivial(x).consuming(x) }
+  _ = Tracked<Float>(1).gradient { x in Nontrivial(x).consumingGeneric(x) }
 }
 
 LeakCheckingTests.testWithLeakChecking("ClosureCaptureLeakChecking") {
