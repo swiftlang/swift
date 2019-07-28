@@ -6475,7 +6475,7 @@ static bool requiresNewVTableEntry(const AbstractFunctionDecl *decl) {
 
   using Direction = ASTContext::OverrideGenericSignatureReqCheck;
   if (!ctx.overrideGenericSignatureReqsSatisfied(
-          base, (ValueDecl *)decl, Direction::BaseReqSatisfiedByDerived)) {
+          base, decl, Direction::BaseReqSatisfiedByDerived)) {
     return true;
   }
 

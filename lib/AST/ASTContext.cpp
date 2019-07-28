@@ -4385,8 +4385,9 @@ CanGenericSignature ASTContext::getExistentialSignature(CanType existential,
   return genericSig;
 }
 
-GenericSignature *ASTContext::getOverrideGenericSignature(ValueDecl *base,
-                                                          ValueDecl *derived) {
+GenericSignature *
+ASTContext::getOverrideGenericSignature(const ValueDecl *base,
+                                        const ValueDecl *derived) {
   auto baseGenericCtx = base->getAsGenericContext();
   auto &ctx = base->getASTContext();
 
@@ -4488,8 +4489,8 @@ GenericSignature *ASTContext::getOverrideGenericSignature(ValueDecl *base,
 }
 
 bool ASTContext::overrideGenericSignatureReqsSatisfied(
-    ValueDecl *base, ValueDecl *derived,
-    OverrideGenericSignatureReqCheck direction) {
+    const ValueDecl *base, const ValueDecl *derived,
+    const OverrideGenericSignatureReqCheck direction) {
   auto sig = getOverrideGenericSignature(base, derived);
   if (!sig)
     return true;

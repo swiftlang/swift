@@ -899,8 +899,8 @@ public:
   CanGenericSignature getExistentialSignature(CanType existential,
                                               ModuleDecl *mod);
 
-  GenericSignature *getOverrideGenericSignature(ValueDecl *base,
-                                                ValueDecl *derived);
+  GenericSignature *getOverrideGenericSignature(const ValueDecl *base,
+                                                const ValueDecl *derived);
 
   enum class OverrideGenericSignatureReqCheck {
     /// Base method's generic requirements are satisifed by derived method
@@ -911,8 +911,8 @@ public:
   };
 
   bool overrideGenericSignatureReqsSatisfied(
-      ValueDecl *base, ValueDecl *derived,
-      OverrideGenericSignatureReqCheck direction);
+      const ValueDecl *base, const ValueDecl *derived,
+      const OverrideGenericSignatureReqCheck direction);
 
   /// Whether our effective Swift version is at least 'major'.
   ///
