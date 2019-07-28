@@ -355,11 +355,9 @@ public:
             getWriteImpl() == WriteImplKind::Immutable);
   }
 
-  bool isSimplyStoredLazy() const {
-    return getReadImpl() == ReadImplKind::Stored &&
-           (getWriteImpl() == WriteImplKind::Stored ||
-            getWriteImpl() == WriteImplKind::Immutable ||
-            getWriteImpl() == WriteImplKind::StoredWithObservers);
+  /// Does this describe a property with observers?
+  bool isStoredWithObservers() const {
+    return getWriteImpl() == WriteImplKind::StoredWithObservers;
   }
 
   /// Does this describe storage that supports mutation?

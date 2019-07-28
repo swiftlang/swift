@@ -2088,7 +2088,7 @@ static void finishLazyVariableImplInfo(VarDecl *var,
   }
 
   // Lazy properties must be written as stored properties in the source.
-  if (!info.isSimplyStoredLazy()) {
+  if (!info.isStoredWithObservers()) {
     diagnoseAndRemoveAttr(var, attr, diag::lazy_not_on_computed);
     invalid = true;
   }
