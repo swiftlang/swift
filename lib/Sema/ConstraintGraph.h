@@ -25,6 +25,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/Compiler.h"
 #include <functional>
 #include <utility>
@@ -202,20 +203,30 @@ public:
     return TypeVariables;
   }
 
+  /// Describes a single component, as produced by the connected components
+  /// algorithm.
+  struct Component {
+    /// The type variables in this component.
+    TinyPtrVector<TypeVariableType *> typeVars;
+
+    /// The constraints in this component.
+    TinyPtrVector<Constraint *> constraints;
+
+    /// Whether this component represents an orphaned constraint.
+    bool isOrphanedConstraint() const {
+      return typeVars.empty();
+    }
+  };
+
   /// Compute the connected components of the graph.
   ///
   /// \param typeVars The type variables that should be included in the
   /// set of connected components that are returned.
   ///
-  /// \param components Receives the component numbers for each type variable
-  /// in \c typeVars.
-  ///
-  /// \returns the number of connected components in the graph, which includes
-  /// one component for each of the constraints produced by
-  /// \c getOrphanedConstraints().
-  unsigned computeConnectedComponents(
-             std::vector<TypeVariableType *> &typeVars,
-             std::vector<unsigned> &components);
+  /// \returns the connected components of the graph, where each component
+  /// contains the type variables and constraints specific to that component.
+  SmallVector<Component, 1> computeConnectedComponents(
+             ArrayRef<TypeVariableType *> typeVars);
 
   /// Retrieve the set of "orphaned" constraints, which are known to the
   /// constraint graph but have no type variables to anchor them.
