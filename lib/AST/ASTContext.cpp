@@ -3634,6 +3634,14 @@ OpaqueTypeArchetypeType::get(OpaqueTypeDecl *Decl,
   auto opaqueInterfaceTy = Decl->getUnderlyingInterfaceType();
   auto layout = signature->getLayoutConstraint(opaqueInterfaceTy);
   auto superclass = signature->getSuperclassBound(opaqueInterfaceTy);
+  #if !DO_IT_CORRECTLY
+    // Ad-hoc substitute the generic parameters of the superclass.
+    // If we correctly applied the substitutions to the generic signature
+    // constraints above, this would be unnecessary.
+    if (superclass && superclass->hasTypeParameter()) {
+      superclass = superclass.subst(Substitutions);
+    }
+  #endif
   SmallVector<ProtocolDecl*, 4> protos;
   for (auto proto : signature->getConformsTo(opaqueInterfaceTy)) {
     protos.push_back(proto);
