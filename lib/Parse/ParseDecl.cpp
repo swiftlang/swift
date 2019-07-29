@@ -3220,26 +3220,6 @@ void Parser::parseDeclListDelayed(IterableDeclContext *IDC) {
   }
 }
 
-/// Return copy of \p existingNodes with \p newNode inserted in source order
-static SmallVector<ASTNode, 8> insertInOrder(ArrayRef<ASTNode> existingNodes,
-                                             const ASTNode newNode,
-                                             SourceManager &SM) {
-  SmallVector<ASTNode, 8> nodesWithInsertion;
-  bool didInsert = false;
-  auto newNodeStart = newNode.getStartLoc();
-  for (auto n : existingNodes) {
-    if (SM.isBeforeInBuffer(newNodeStart, n.getStartLoc())) {
-      nodesWithInsertion.push_back(newNode);
-      didInsert = true;
-    }
-    nodesWithInsertion.push_back(n);
-  }
-  if (!didInsert)
-    nodesWithInsertion.push_back(newNode);
-
-  return nodesWithInsertion;
-}
-
 void Parser::parseDeclDelayed() {
   auto DelayedState = State->takeDelayedDeclState();
   assert(DelayedState.get() && "should have delayed state");
@@ -3277,15 +3257,6 @@ void Parser::parseDeclDelayed() {
         ED->addMember(D);
       } else if (auto *SF = dyn_cast<SourceFile>(parent)) {
         SF->Decls.push_back(D);
-      } else if (auto *CE = dyn_cast<ClosureExpr>(parent)) {
-        // Replace the closure body with one including the new Decl, inserted in
-        // order.
-        auto *const body = CE->getBody();
-        auto Elts = insertInOrder(body->getElements(), D, SourceMgr);
-        auto *newBody =
-            BraceStmt::create(Context, body->getLBraceLoc(), Elts,
-                              body->getRBraceLoc(), body->isImplicit());
-        CE->setBody(newBody, false);
       }
     }
   });
