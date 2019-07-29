@@ -61,6 +61,10 @@ public:
   /// been created by the explicit action.
   OpaqueSyntaxNode getLibSyntaxNodeFor(OpaqueSyntaxNode explicitNode);
 
+  bool isReleaseNeeded() {
+    return ExplicitAction == LibSyntaxAction || !areBothLibSyntax();
+  }
+  
   /// Returns the underlying libSyntax SyntaxTreeCreator.
   std::shared_ptr<SyntaxTreeCreator> getLibSyntaxAction() {
     return LibSyntaxAction;

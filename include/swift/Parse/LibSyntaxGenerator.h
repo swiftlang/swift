@@ -55,7 +55,8 @@ public:
     auto Children = Node.getDeferredChildren();
 
     auto Recorded = Recorder.recordRawSyntax(Kind, Children);
-    auto Raw = static_cast<RawSyntax *>(Recorded.getOpaqueNode());
+    RC<RawSyntax> Raw {static_cast<RawSyntax *>(Recorded.getOpaqueNode()) };
+    Raw->Release(); // -1 since it's transfer of ownership.
     return make<SyntaxNode>(Raw);
   }
 
@@ -67,6 +68,13 @@ public:
   SyntaxNode getLibSyntaxNodeFor(OpaqueSyntaxNode Node) {
     auto Raw = static_cast<RawSyntax *>(Actions->getLibSyntaxNodeFor(Node));
     return make<SyntaxNode>(Raw);
+  }
+
+  void releaseLibSyntaxNodeIfNeededFor(OpaqueSyntaxNode Node) {
+    if (!Actions->isReleaseNeeded())
+      return;
+    auto Raw = static_cast<RawSyntax *>(Actions->getLibSyntaxNodeFor(Node));
+    Raw->Release();
   }
 };
 } // namespace swift

@@ -280,6 +280,7 @@ ParsedRawSyntaxNode SyntaxParsingContext::finalizeRoot() {
     return ParsedRawSyntaxNode::null(); // already finalized.
   }
   ParsedRawSyntaxNode root = finalizeSourceFile();
+  getSyntaxCreator().releaseLibSyntaxNodeIfNeededFor(root.getOpaqueNode());
 
   // Clear the parts because we will call this function again when destroying
   // the root context.
@@ -353,6 +354,10 @@ SyntaxParsingContext::~SyntaxParsingContext() {
   // Remove all parts in this context.
   case AccumulationMode::Discard: {
     auto &nodes = getStorage();
+    for (auto i = nodes.begin()+Offset, e = nodes.end(); i != e; ++i)
+      if (i->isRecorded())
+        getSyntaxCreator().releaseLibSyntaxNodeIfNeededFor(i->getOpaqueNode());
+
     nodes.erase(nodes.begin()+Offset, nodes.end());
     break;
   }
