@@ -3931,49 +3931,6 @@ ConstraintSystem::simplifyFunctionComponentConstraint(
   return SolutionKind::Solved;
 }
 
-/// Retrieve the argument labels that are provided for a member
-/// reference at the given locator.
-static Optional<ConstraintSystem::ArgumentLabelState>
-getArgumentLabels(ConstraintSystem &cs, ConstraintLocatorBuilder locator) {
-  SmallVector<LocatorPathElt, 2> parts;
-  Expr *anchor = locator.getLocatorParts(parts);
-  if (!anchor)
-    return None;
-
-  while (!parts.empty()) {
-    if (parts.back().getKind() == ConstraintLocator::Member ||
-        parts.back().getKind() == ConstraintLocator::SubscriptMember) {
-      parts.pop_back();
-      continue;
-    }
-
-    if (parts.back().getKind() == ConstraintLocator::ApplyFunction) {
-      if (auto applyExpr = dyn_cast<ApplyExpr>(anchor)) {
-        anchor = applyExpr->getSemanticFn();
-      }
-      parts.pop_back();
-      continue;
-    }
-
-    if (parts.back().getKind() == ConstraintLocator::ConstructorMember) {
-      parts.pop_back();
-      continue;
-    }
-    
-    break;
-  }
-  
-  if (!parts.empty())
-    return None;
-
-  anchor = getArgumentLabelTargetExpr(anchor);
-  auto known = cs.ArgumentLabels.find(cs.getConstraintLocator(anchor));
-  if (known == cs.ArgumentLabels.end())
-    return None;
-
-  return known->second;
-}
-
 /// Return true if the specified type or a super-class/super-protocol has the
 /// @dynamicMemberLookup attribute on it.  This implementation is not
 /// particularly fast in the face of deep class hierarchies or lots of protocol
@@ -4194,10 +4151,8 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     // the argument labels into the name: we don't want to look for
     // anything else, because the cost of the general search is so
     // high.
-    if (auto argumentLabels =
-            getArgumentLabels(*this, ConstraintLocatorBuilder(memberLocator))) {
-      memberName = DeclName(TC.Context, memberName.getBaseName(),
-                            argumentLabels->Labels);
+    if (auto info = getArgumentInfo(ConstraintLocatorBuilder(memberLocator))) {
+      memberName = DeclName(TC.Context, memberName.getBaseName(), info->Labels);
     }
   }
 
@@ -4473,8 +4428,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
       if (::hasDynamicMemberLookupAttribute(instanceTy,
                                             DynamicMemberLookupCache) &&
           isValidKeyPathDynamicMemberLookup(subscript, TC)) {
-        auto info =
-            getArgumentLabels(*this, ConstraintLocatorBuilder(memberLocator));
+        auto info = getArgumentInfo(ConstraintLocatorBuilder(memberLocator));
 
         if (!(info && info->Labels.size() == 1 &&
               info->Labels[0] == getASTContext().Id_dynamicMember)) {
@@ -5906,7 +5860,7 @@ Type ConstraintSystem::simplifyAppliedOverloads(
       return markFailure();
   };
 
-  auto argumentInfo = getArgumentLabels(*this, locator);
+  auto argumentInfo = getArgumentInfo(locator);
 
   // Consider each of the constraints in the disjunction.
 retry_after_fail:

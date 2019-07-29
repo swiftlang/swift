@@ -1544,20 +1544,28 @@ public:
   /// The current solver state.
   ///
   /// This will be non-null when we're actively solving the constraint
-  /// system, and carries temporary state related to the current path
+  /// system, and carries temporary state related to the scurrent path
   /// we're exploring.
   SolverState *solverState = nullptr;
 
-  struct ArgumentLabelState {
+  struct ArgumentInfo {
     ArrayRef<Identifier> Labels;
     bool HasTrailingClosure;
   };
 
-  /// A mapping from the constraint locators for references to various
+  /// A mapping from the constraint anchors for references to various
   /// names (e.g., member references, normal name references, possible
   /// constructions) to the argument labels provided in the call to
   /// that locator.
-  llvm::DenseMap<ConstraintLocator *, ArgumentLabelState> ArgumentLabels;
+  llvm::DenseMap<Expr *, ArgumentInfo> ArgumentInfos;
+
+  /// Retrieve the argument info that is associated with a member
+  /// reference at the given anchor expression.
+  Optional<ArgumentInfo> getArgumentInfo(Expr *anchor) const;
+  /// Retrieve the argument info that is associated with a member
+  /// reference at the given locator.
+  Optional<ArgumentInfo>
+  getArgumentInfo(ConstraintLocatorBuilder locator) const;
 
   ResolvedOverloadSetListItem *getResolvedOverloadSets() const {
     return resolvedOverloadSets;

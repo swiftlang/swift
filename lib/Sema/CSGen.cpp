@@ -3225,15 +3225,14 @@ namespace {
       llvm_unreachable("unhandled operation");
     }
 
-    void associateArgumentLabels(Expr *fn,
-                                 ConstraintSystem::ArgumentLabelState labels,
+    void associateArgumentLabels(Expr *fn, ConstraintSystem::ArgumentInfo info,
                                  bool labelsArePermanent = true) {
       fn = getArgumentLabelTargetExpr(fn);
 
       // Record the labels.
       if (!labelsArePermanent)
-        labels.Labels = CS.allocateCopy(labels.Labels);
-      CS.ArgumentLabels[CS.getConstraintLocator(fn)] = labels;
+        info.Labels = CS.allocateCopy(info.Labels);
+      CS.ArgumentInfos[fn] = info;
     }
   };
 

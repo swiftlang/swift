@@ -2783,6 +2783,50 @@ void ConstraintSystem::generateConstraints(
   }
 }
 
+Optional<ConstraintSystem::ArgumentInfo>
+ConstraintSystem::getArgumentInfo(Expr *anchor) const {
+  auto *target = getArgumentLabelTargetExpr(anchor);
+  auto known = ArgumentInfos.find(target);
+  if (known == ArgumentInfos.end())
+    return None;
+  return known->second;
+}
+
+Optional<ConstraintSystem::ArgumentInfo>
+ConstraintSystem::getArgumentInfo(ConstraintLocatorBuilder locator) const {
+  SmallVector<LocatorPathElt, 2> parts;
+  Expr *anchor = locator.getLocatorParts(parts);
+  if (!anchor)
+    return None;
+
+  while (!parts.empty()) {
+    if (parts.back().getKind() == ConstraintLocator::Member ||
+        parts.back().getKind() == ConstraintLocator::SubscriptMember) {
+      parts.pop_back();
+      continue;
+    }
+
+    if (parts.back().getKind() == ConstraintLocator::ApplyFunction) {
+      if (auto applyExpr = dyn_cast<ApplyExpr>(anchor)) {
+        anchor = applyExpr->getSemanticFn();
+      }
+      parts.pop_back();
+      continue;
+    }
+
+    if (parts.back().getKind() == ConstraintLocator::ConstructorMember) {
+      parts.pop_back();
+      continue;
+    }
+    break;
+  }
+
+  if (!parts.empty())
+    return None;
+
+  return getArgumentInfo(anchor);
+}
+
 bool constraints::isKnownKeyPathType(Type type) {
   if (auto *BGT = type->getAs<BoundGenericType>())
     return isKnownKeyPathDecl(type->getASTContext(), BGT->getDecl());
