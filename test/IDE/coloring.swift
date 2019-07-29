@@ -454,3 +454,9 @@ func acceptBuilder<T>(
   // CHECK: @<type>SomeBuilder</type><<type>Element</type>> label param: () -> <type>T</type>
   @SomeBuilder<Element> label param: () -> T
 ) {}
+
+// CHECK: <kw>func</kw> typeAttr(a: <attr-builtin>@escaping</attr-builtin> () -> <type>Int</type>) {}
+func typeAttr(a: @escaping () -> Int) {}
+
+// CHECK: <kw>func</kw> typeAttr2(a: @ <comment-block>/*this is fine...*/</comment-block> <attr-builtin>escaping</attr-builtin> () -> <type>Int</type>, b: <attr-builtin>@ escaping</attr-builtin> () -> <type>Int</type>) {}
+func typeAttr2(a: @ /*this is fine...*/ escaping () -> Int, b: @ escaping () -> Int) {}
