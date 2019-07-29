@@ -79,6 +79,7 @@ namespace swift {
   struct PrintOptions;
   struct PropertyWrapperBackingPropertyInfo;
   struct PropertyWrapperTypeInfo;
+  struct PropertyWrapperMutability;
   class ProtocolDecl;
   class ProtocolType;
   struct RawComment;
@@ -5061,6 +5062,11 @@ public:
   /// property wrapper.
   PropertyWrapperBackingPropertyInfo
       getPropertyWrapperBackingPropertyInfo() const;
+
+  /// Retrieve information about the mutability of the composed
+  /// property wrappers.
+  Optional<PropertyWrapperMutability>
+      getPropertyWrapperMutability() const;
 
   /// Retrieve the backing storage property for a property that has an
   /// attached property wrapper.

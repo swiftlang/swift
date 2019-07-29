@@ -32,6 +32,7 @@ namespace swift {
 class AbstractStorageDecl;
 class GenericParamList;
 struct PropertyWrapperBackingPropertyInfo;
+struct PropertyWrapperMutability;
 class RequirementRepr;
 class SpecializeAttr;
 class TypeAliasDecl;
@@ -594,6 +595,26 @@ private:
 
   // Evaluation.
   llvm::Expected<Type>
+  evaluate(Evaluator &evaluator, VarDecl *var) const;
+
+public:
+  // Caching
+  bool isCached() const;
+};
+
+/// Request information about the mutability of composed property wrappers.
+class PropertyWrapperMutabilityRequest :
+    public SimpleRequest<PropertyWrapperMutabilityRequest,
+                         Optional<PropertyWrapperMutability> (VarDecl *),
+                         CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<Optional<PropertyWrapperMutability>>
   evaluate(Evaluator &evaluator, VarDecl *var) const;
 
 public:

@@ -563,6 +563,11 @@ bool PropertyWrapperBackingPropertyInfoRequest::isCached() const {
   return !var->getAttrs().isEmpty();
 }
 
+bool PropertyWrapperMutabilityRequest::isCached() const {
+  auto var = std::get<0>(getStorage());
+  return !var->getAttrs().isEmpty();
+}
+
 void swift::simple_display(
     llvm::raw_ostream &out, const PropertyWrapperTypeInfo &propertyWrapper) {
   out << "{ ";
@@ -601,6 +606,13 @@ void swift::simple_display(
     out << "factory"; break;
   }
   out << " }";
+}
+
+void swift::simple_display(llvm::raw_ostream &os, PropertyWrapperMutability m) {
+  static const char *names[] =
+    {"is nonmutating", "is mutating", "doesn't exist"};
+  
+  os << "getter " << names[m.Getter] << ", setter " << names[m.Setter];
 }
 
 //----------------------------------------------------------------------------//

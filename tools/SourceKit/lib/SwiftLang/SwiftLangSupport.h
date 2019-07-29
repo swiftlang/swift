@@ -21,7 +21,7 @@
 #include "SourceKit/Support/ThreadSafeRefCntPtr.h"
 #include "SourceKit/Support/Tracing.h"
 #include "swift/Basic/ThreadSafeRefCounted.h"
-#include "swift/IDE/Formatting.h"
+#include "swift/IDE/Indenting.h"
 #include "swift/IDE/Refactoring.h"
 #include "swift/Index/IndexSymbol.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"

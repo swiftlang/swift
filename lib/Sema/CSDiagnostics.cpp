@@ -436,8 +436,8 @@ bool RequirementFailure::diagnoseAsError() {
   const auto *reqDC = getRequirementDC();
   auto *genericCtx = getGenericContext();
 
-  auto lhs = resolveType(getLHS());
-  auto rhs = resolveType(getRHS());
+  auto lhs = getLHS();
+  auto rhs = getRHS();
 
   if (auto *OTD = dyn_cast<OpaqueTypeDecl>(AffectedDecl)) {
     auto *namingDecl = OTD->getNamingDecl();
@@ -1084,6 +1084,14 @@ bool MissingOptionalUnwrapFailure::diagnoseAsError() {
     return false;
 
   auto *anchor = getAnchor();
+
+  // If this is an unresolved member expr e.g. `.foo` its
+  // base type is going to be the same as result type minus
+  // r-value adjustment because base could be an l-value type.
+  // We want to fix both cases by only diagnose one of them,
+  // otherwise this is just going to result in a duplcate diagnostic.
+  if (getLocator()->isLastElement(ConstraintLocator::UnresolvedMember))
+    return false;
 
   if (auto assignExpr = dyn_cast<AssignExpr>(anchor))
     anchor = assignExpr->getSrc();

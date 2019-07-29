@@ -199,6 +199,7 @@
   "Misc": [
     "AtomicInt.swift",
     "ErrorType.swift",
+    "Identifiable.swift",
     "InputStream.swift",
     "LifetimeManager.swift",
     "ManagedBuffer.swift",

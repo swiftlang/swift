@@ -97,7 +97,7 @@ void Driver::parseDriverKind(ArrayRef<const char *> Args) {
   .Case("swift", DriverKind::Interactive)
   .Case("swiftc", DriverKind::Batch)
   .Case("swift-autolink-extract", DriverKind::AutolinkExtract)
-  .Case("swift-format", DriverKind::SwiftFormat)
+  .Case("swift-indent", DriverKind::SwiftIndent)
   .Default(None);
   
   if (Kind.hasValue())
@@ -3053,7 +3053,7 @@ void Driver::printHelp(bool ShowHidden) const {
     break;
   case DriverKind::Batch:
   case DriverKind::AutolinkExtract:
-  case DriverKind::SwiftFormat:
+  case DriverKind::SwiftIndent:
     ExcludedFlagsBitmask |= options::NoBatchOption;
     break;
   }

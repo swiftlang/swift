@@ -61,6 +61,10 @@ option(SWIFT_BUILD_STATIC_SDK_OVERLAY
     "Build static variants of the Swift SDK overlay"
     FALSE)
 
+option(SWIFT_BUILD_STDLIB_EXTRA_TOOLCHAIN_CONTENT
+    "If not building stdlib, controls whether to build 'stdlib/toolchain' content"
+    TRUE)
+
 # In many cases, the CMake build system needs to determine whether to include
 # a directory, or perform other actions, based on whether the stdlib or SDK is
 # being built at all -- statically or dynamically. Please note that these
@@ -1078,7 +1082,9 @@ endif()
 if(SWIFT_BUILD_STDLIB)
   add_subdirectory(stdlib)
 else()
-  add_subdirectory(stdlib/toolchain)
+  if(SWIFT_BUILD_STDLIB_EXTRA_TOOLCHAIN_CONTENT)
+    add_subdirectory(stdlib/toolchain)
+  endif()
 
   # Some tools (e.g. swift-reflection-dump) rely on a host swiftReflection, so
   # ensure we build that when building tools.
