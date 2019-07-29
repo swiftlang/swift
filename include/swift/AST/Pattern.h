@@ -513,14 +513,13 @@ public:
   EnumElementPattern(TypeLoc ParentType, SourceLoc DotLoc, DeclNameLoc NameLoc,
                      DeclNameRef Name, EnumElementDecl *Element,
                      Pattern *SubPattern, Optional<bool> Implicit = None)
-    : Pattern(PatternKind::EnumElement),
-      ParentType(ParentType), DotLoc(DotLoc), NameLoc(NameLoc), Name(Name),
-      ElementDeclOrUnresolvedOriginalExpr(Element),
-      SubPattern(SubPattern) {
+      : Pattern(PatternKind::EnumElement), ParentType(ParentType),
+        DotLoc(DotLoc), NameLoc(NameLoc), Name(Name),
+        ElementDeclOrUnresolvedOriginalExpr(Element), SubPattern(SubPattern) {
     if (Implicit.hasValue() && *Implicit)
       setImplicit();
   }
-  
+
   /// Create an unresolved EnumElementPattern for a `.foo` pattern relying on
   /// contextual type.
   EnumElementPattern(SourceLoc DotLoc,

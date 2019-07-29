@@ -374,7 +374,9 @@ namespace {
           // Optimization: If the constructor heads don't match, subspace is
           // impossible.
 
-          if (this->Head != other.Head) {
+          // FIXME: Extraneous warnings for cases with labels
+          if (this->Head.getBaseIdentifier() !=
+              other.Head.getBaseIdentifier()) {
             return false;
           }
 
@@ -557,6 +559,8 @@ namespace {
         PAIRCASE (SpaceKind::Constructor, SpaceKind::Constructor): {
           // Optimization: If the heads of the constructors don't match then
           // the two are disjoint and their difference is the first space.
+
+          // FIXME: Exhuastiveness checking for labelled Enums
           if (this->Head.getBaseIdentifier() !=
               other.Head.getBaseIdentifier()) {
             return *this;

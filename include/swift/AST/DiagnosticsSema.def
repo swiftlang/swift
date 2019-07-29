@@ -4731,6 +4731,10 @@ ERROR(empty_switch_stmt,none,
       "'switch' statement body must have at least one 'case' or 'default' "
       "block; do you want to add a default case?",())
 ERROR(non_exhaustive_switch,none, "switch must be exhaustive", ())
+ERROR(enum_element_pattern_assoc_values_using_labels,none,
+      "using label to match to enum, enum element pattern cannot match against mixed labels and variable patterns.",())
+ERROR(enum_element_pattern_assoc_values_using_var_patterns,none,
+      "using variable patterns to match against enum, enum element pattern cannot match against mixed labels and variable patterns.",())
 ERROR(possibly_non_exhaustive_switch,none,
       "the compiler is unable to check that this switch is exhaustive in reasonable time",
       ())

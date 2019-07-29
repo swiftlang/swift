@@ -150,3 +150,65 @@ func fallthrough_not_last(i: Int) {
     break
   }
 }
+
+// Do not crash
+enum Foo1 
+{
+    case a(x:Int)
+    case a(y:Int)
+}
+
+func Foo1switcher(_ foo:Foo1) {
+    switch foo {
+    case .a(x:):
+      break 
+    case .a(y:):
+      break 
+    case .a(Int): // expected-error {{cannot convert value of type 'Foo1' to expected argument type 'Optional<_>'}}
+      break
+    }
+}
+
+enum Foo2
+{
+    case a(x: Int, y: Int)
+    case a(x: Int)
+}
+
+func Foo2switcher(_ foo:Foo2) {
+    switch foo {
+    case .a(x: let x):
+      print("x: \(x)")
+      break
+    case .a(x: let x, y: let y):
+      print("x: \(x), y: \(y)")
+      break
+    case .a(let x, let z): // expected-error {{missing argument labels 'x:y:' in call}}
+      break
+    case .a(x: let x, let y): // expected-error {{using label to match to enum, enum element pattern cannot match against mixed labels and variable patterns.}}
+      break
+    case .a(let x, y: let y): // expected-error {{using variable patterns to match against enum, enum element pattern cannot match against mixed labels and variable patterns.}}
+      break
+    }
+}
+
+enum Foo3 
+{
+    case a(x: Int)
+    case b(y: Int)
+    case c(Int)
+}
+
+func Foo3switcher(_ foo:Foo3) {
+    switch foo {
+    case .a(y: let y): // expected-error {{tuple pattern element label 'y' must be 'x'}}
+      break
+    case .b(x: let x): // expected-error {{tuple pattern element label 'x' must be 'y'}}
+      break
+    case .c(let v):
+      break
+    }
+}
+
+
+

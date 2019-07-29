@@ -19,15 +19,82 @@
 #include "TypeCheckAvailability.h"
 #include "TypeCheckType.h"
 #include "swift/Basic/StringExtras.h"
-#include "swift/AST/ASTWalker.h"
 #include "swift/AST/ASTVisitor.h"
-#include "swift/AST/SourceFile.h"
+#include "swift/AST/ASTWalker.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include <utility>
 using namespace swift;
+
+llvm::SmallVector<Identifier, 4> extractArgsFromPattern(ASTContext &Context,
+                                                        Pattern *pattern) {
+  auto &diags = Context.Diags;
+  llvm::SmallVector<Identifier, 4> params;
+  // Get Pattern kind
+  switch (pattern->getKind()) {
+  case PatternKind::Tuple: {
+    // Walk through tuple to get argument names
+    TuplePattern *tp = cast<TuplePattern>(pattern);
+    Optional<bool> usingLabels = None;
+    for (auto elem : tp->getElements()) {
+      Identifier label = elem.getLabel();
+      if (label.empty()) {
+        if (elem.getPattern()->getKind() == PatternKind::Any)
+          params.push_back(Identifier());
+        else
+            // Set None if not using labels, throw error if contradicts
+            if (usingLabels == None)
+          usingLabels = false;
+        else if (usingLabels == true) {
+          diags.diagnose(pattern->getLoc(),
+                         diag::enum_element_pattern_assoc_values_using_labels);
+        }
+        llvm::SmallVector<Identifier, 4> subParams =
+            extractArgsFromPattern(Context, elem.getPattern());
+        if (subParams.size() == 1)
+          params.push_back(subParams[0]);
+        else
+          params.push_back(Identifier());
+      } else {
+        // Set None if using labels, throw error if contradicts
+        if (usingLabels == None)
+          usingLabels = true;
+        else if (usingLabels == false) {
+          diags.diagnose(
+              pattern->getLoc(),
+              diag::enum_element_pattern_assoc_values_using_var_patterns);
+        }
+        params.push_back(label);
+      }
+    }
+    return params;
+    break;
+  }
+  case PatternKind::Paren: {
+    ParenPattern *pp = cast<ParenPattern>(pattern);
+    return extractArgsFromPattern(Context, pp->getSubPattern());
+  }
+  case PatternKind::Var: {
+    VarPattern *vp = cast<VarPattern>(pattern);
+    return extractArgsFromPattern(Context, vp->getSubPattern());
+  }
+  // Relevant variable names are contained in elements in Tuple
+  case PatternKind::Named: {
+    // Get name and set argument to be from a variable
+    NamedPattern *np = cast<NamedPattern>(pattern);
+    Identifier id = np->getBoundName();
+    params.push_back(id);
+    return params;
+  }
+  default:
+    params.push_back(Identifier());
+    return params;
+  }
+  return params;
+}
 
 /// If the given VarDecl is a computed property whose getter always returns a
 /// particular enum element, return that element.
@@ -78,7 +145,6 @@ filterForEnumElement(DeclContext *DC, SourceLoc UseLoc,
                      bool unqualifiedLookup, LookupResult foundElements) {
   EnumElementDecl *foundElement = nullptr;
   VarDecl *foundConstant = nullptr;
-
   for (LookupResultEntry result : foundElements) {
     ValueDecl *e = result.getValueDecl();
     assert(e);
@@ -135,13 +201,78 @@ lookupEnumMemberElement(DeclContext *DC, Type ty,
     return nullptr;
 
   // FIXME: We should probably pay attention to argument labels someday.
-  name = name.withoutArgumentLabels();
+  DeclNameRef nameWithout = name.withoutArgumentLabels();
 
   // Look up the case inside the enum.
   // FIXME: We should be able to tell if this is a private lookup.
   NameLookupOptions lookupOptions = defaultMemberLookupOptions;
   LookupResult foundElements =
-      TypeChecker::lookupMember(DC, ty, name, lookupOptions);
+      TypeChecker::lookupMember(DC, ty, nameWithout, lookupOptions);
+
+  ArrayRef<Identifier> queryParams = name.getArgumentNames();
+
+  if (foundElements.size() != 1) {
+    // Look up enum element only with base name
+    foundElements = TypeChecker::lookupMember(
+        DC, ty, name.withoutArgumentLabels(), lookupOptions);
+
+    int numFoundEntries = 0;
+    LookupResult singleResult;
+    for (LookupResultEntry resultEnt : foundElements) {
+      auto *resultDecl = resultEnt.getValueDecl();
+      if (isa<VarDecl>(resultDecl)) {
+        singleResult.add(resultEnt, false);
+        continue;
+      }
+      if (numFoundEntries == 0) {
+        singleResult.add(resultEnt, false);
+      }
+      numFoundEntries++;
+    }
+    if (numFoundEntries == 1)
+      return filterForEnumElement(DC, UseLoc,
+                                  /*unqualifiedLookup=*/false, singleResult);
+
+    LookupResult revisedResult;
+    // Prune results that don't match
+    for (LookupResultEntry resultEnt : foundElements) {
+      auto *e = resultEnt.getValueDecl();
+      // Maintaining part of list list for filter results
+      if (auto *var = dyn_cast<VarDecl>(e)) {
+        revisedResult.add(resultEnt, false);
+        continue;
+      }
+      DeclName enumElement = e->getFullName();
+      ArrayRef<Identifier> enumElementParams = enumElement.getArgumentNames();
+
+      // If size is not the same, and query is not just a single value
+      // do not consider
+      if (enumElementParams.size() != queryParams.size())
+        continue;
+      bool addCandidate = true;
+      for (auto index : indices(enumElementParams)) {
+        // If enum empty, case must be empty or have let var form
+        if (!enumElementParams[index].empty()) {
+          // If element not empty, enum element can be empty or from var
+          // if this is the only element found with basename
+          if (queryParams[index].empty()) {
+            addCandidate = false;
+            break;
+          }
+          // must match the label
+          if (!queryParams[index].compare(enumElementParams[index]))
+            continue;
+          addCandidate = false;
+          break;
+        }
+      }
+      if (addCandidate) {
+        revisedResult.add(resultEnt, false);
+      }
+    }
+    foundElements = revisedResult;
+  }
+
   return filterForEnumElement(DC, UseLoc,
                               /*unqualifiedLookup=*/false, foundElements);
 }
@@ -443,13 +574,26 @@ public:
     if (auto arg = ume->getArgument()) {
       subPattern = getSubExprPattern(arg);
     }
-    
+
     if (ume->getName().getBaseName().isSpecial())
       return nullptr;
 
-    return new (Context)
-        EnumElementPattern(ume->getDotLoc(), ume->getNameLoc(), ume->getName(),
-                           subPattern, ume);
+    // FIXME: Compound Name. <- Decide if this is covered
+    if (subPattern) {
+      ArrayRef<Identifier> namedParams =
+        extractArgsFromPattern(Context, subPattern);
+
+      if (namedParams.size() != 0) {
+        // FIXME: Compound names.
+        return new (Context) EnumElementPattern(
+            ume->getDotLoc(), ume->getNameLoc(),
+            DeclNameRef(
+                DeclName(Context, ume->getName().getBaseName(), namedParams)),
+            subPattern, ume);
+      }
+    }
+    return new (Context) EnumElementPattern(ume->getDotLoc(), ume->getNameLoc(),
+                                            ume->getName(), subPattern, ume);
   }
   
   // Member syntax 'T.Element' forms a pattern if 'T' is an enum and the
@@ -473,17 +617,18 @@ public:
     if (!enumDecl)
       return nullptr;
 
-    EnumElementDecl *referencedElement
-      = lookupEnumMemberElement(DC, ty, ude->getName(), ude->getLoc());
+    // FIXME: Argument labels?
+    EnumElementDecl *referencedElement =
+        lookupEnumMemberElement(DC, ty, ude->getName(), ude->getLoc());
     if (!referencedElement)
       return nullptr;
     
     // Build a TypeRepr from the head of the full path.
     TypeLoc loc(repr);
     loc.setType(ty);
-    return new (Context) EnumElementPattern(
-        loc, ude->getDotLoc(), ude->getNameLoc(), ude->getName(),
-        referencedElement, nullptr);
+    return new (Context)
+        EnumElementPattern(loc, ude->getDotLoc(), ude->getNameLoc(),
+                           ude->getName(), referencedElement, nullptr);
   }
   
   // A DeclRef 'E' that refers to an enum element forms an EnumElementPattern.
@@ -491,7 +636,7 @@ public:
     auto *elt = dyn_cast<EnumElementDecl>(de->getDecl());
     if (!elt)
       return nullptr;
-    
+
     // Use the type of the enum from context.
     TypeLoc loc = TypeLoc::withoutLoc(
                             elt->getParentEnum()->getDeclaredTypeInContext());
@@ -511,9 +656,9 @@ public:
       auto enumTy = enumDecl->getDeclaredTypeInContext();
       TypeLoc loc = TypeLoc::withoutLoc(enumTy);
 
-      return new (Context) EnumElementPattern(
-          loc, SourceLoc(), ude->getNameLoc(), ude->getName(),
-          referencedElement, nullptr);
+      return new (Context)
+          EnumElementPattern(loc, SourceLoc(), ude->getNameLoc(),
+                             ude->getName(), referencedElement, nullptr);
     }
       
     
@@ -1273,11 +1418,12 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
     Optional<CheckedCastKind> castKind;
     
     EnumElementDecl *elt = EEP->getElementDecl();
-    
+
     Type enumTy;
     if (!elt) {
       elt = lookupEnumMemberElement(dc, type, EEP->getName(),
                                     EEP->getLoc());
+
       if (!elt) {
         if (!type->hasError()) {
           // Lowercasing of Swift.Optional's cases is handled in the
@@ -1286,22 +1432,20 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
           // isn't a static VarDecl, so the existing mechanics in
           // extractEnumElement won't work.
           if (type->getAnyNominal() == Context.getOptionalDecl()) {
-            if (EEP->getName().isSimpleName("None") ||
-                EEP->getName().isSimpleName("Some")) {
+            if (EEP->getName().getBaseIdentifier().str() == "None" ||
+                EEP->getName().getBaseIdentifier().str() == "Some") {
               SmallString<4> Rename;
-              camel_case::toLowercaseWord(EEP->getName()
-                                               .getBaseIdentifier().str(),
-                                          Rename);
+              camel_case::toLowercaseWord(
+                  EEP->getName().getBaseIdentifier().str(), Rename);
               diags.diagnose(
                   EEP->getLoc(), diag::availability_decl_unavailable_rename,
-                  /*"getter" prefix*/ 2, EEP->getName().getBaseName(),
+                  /*"getter" prefix*/ 2, EEP->getName().getBaseIdentifier(),
                   /*replaced*/ false, /*special kind*/ 0, Rename.str(),
-                  /*message*/ StringRef())
-                  .fixItReplace(EEP->getLoc(), Rename.str());
+                  /*message*/ StringRef());
 
               return nullptr;
             }
-          
+
           // If we have the original expression parse tree, try reinterpreting
           // it as an expr-pattern if enum element lookup failed, since `.foo`
           // could also refer to a static member of the context type.
@@ -1427,18 +1571,33 @@ Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
 
     // If there is a subpattern, push the enum element type down onto it.
     auto argType = elt->getArgumentInterfaceType();
-    if (EEP->hasSubPattern()) {
+    if (EEP->hasSubPattern() || EEP->getName().getArgumentNames().size() > 0) {
       Pattern *sub = EEP->getSubPattern();
       if (!elt->hasAssociatedValues()) {
         diags.diagnose(EEP->getLoc(),
                        diag::enum_element_pattern_assoc_values_mismatch,
-                       EEP->getName());
-        diags.diagnose(EEP->getLoc(),
-                       diag::enum_element_pattern_assoc_values_remove)
-          .fixItRemove(sub->getSourceRange());
+                       DeclNameRef(EEP->getName().getBaseName()));
+        diags
+            .diagnose(EEP->getLoc(),
+                      diag::enum_element_pattern_assoc_values_remove)
+            .fixItRemove(sub->getSourceRange());
+        ;
         return nullptr;
       }
-      
+
+      if (!sub) {
+        SmallVector<TuplePatternElt, 8> elements;
+        for (auto &elt : EEP->getName().getArgumentNames()) {
+          auto *subPattern =
+              new (Context) AnyPattern(EEP->getNameLoc().getBaseNameLoc());
+          elements.push_back(TuplePatternElt(
+              elt, EEP->getNameLoc().getBaseNameLoc(), subPattern));
+        }
+        sub = TuplePattern::create(Context, EEP->getNameLoc().getBaseNameLoc(),
+                                   elements, EEP->getEndLoc(),
+                                   /*implicit*/ true);
+      }
+
       Type elementType;
       if (argType)
         elementType = enumTy->getTypeOfMember(elt->getModuleContext(),
