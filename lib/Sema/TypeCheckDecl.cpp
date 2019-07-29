@@ -1279,7 +1279,9 @@ InitKindRequest::evaluate(Evaluator &evaluator, ConstructorDecl *decl) const {
       diags.diagnose(decl->getLoc(), diag::designated_init_in_extension, extType)
         .fixItInsert(decl->getLoc(), "convenience ");
       return CtorInitializerKind::Convenience;
-    } else if (decl->getDeclContext()->getExtendedProtocolDecl()) {
+    }
+
+    if (decl->getDeclContext()->getExtendedProtocolDecl()) {
       return CtorInitializerKind::Convenience;
     }
   }
