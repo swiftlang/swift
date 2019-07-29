@@ -14,11 +14,9 @@
 //
 //===----------------------------------------------------------------------===//
 #include "swift/ClangImporter/ClangImporter.h"
-#include "swift/ClangImporter/ClangModule.h"
+#include "ClangDiagnosticConsumer.h"
 #include "IAMInference.h"
 #include "ImporterImpl.h"
-#include "ClangDiagnosticConsumer.h"
-#include "swift/Subsystems.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
@@ -34,9 +32,11 @@
 #include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporterOptions.h"
 #include "swift/Demangling/Demangle.h"
+#include "swift/ClangImporter/ClangModule.h"
+#include "swift/Config.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/Parser.h"
-#include "swift/Config.h"
+#include "swift/Subsystems.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Mangle.h"
 #include "clang/Basic/CharInfo.h"
@@ -48,8 +48,6 @@
 #include "clang/Frontend/FrontendActions.h"
 #include "clang/Frontend/Utils.h"
 #include "clang/Index/IndexingAction.h"
-#include "clang/Serialization/ASTReader.h"
-#include "clang/Serialization/ASTWriter.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Lex/PreprocessorOptions.h"
 #include "clang/Parse/Parser.h"
@@ -57,9 +55,12 @@
 #include "clang/Rewrite/Frontend/Rewriters.h"
 #include "clang/Sema/Lookup.h"
 #include "clang/Sema/Sema.h"
+#include "clang/Serialization/ASTReader.h"
+#include "clang/Serialization/ASTWriter.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/CrashRecoveryContext.h"
+#include "llvm/Support/FileCollector.h"
 #include "llvm/Support/Memory.h"
 #include "llvm/Support/Path.h"
 #include <algorithm>
@@ -320,11 +321,13 @@ private:
 class ClangImporterDependencyCollector : public clang::DependencyCollector
 {
   llvm::StringSet<> ExcludedPaths;
+  std::shared_ptr<llvm::FileCollector> FileCollector;
   const bool TrackSystemDeps;
 
 public:
-  ClangImporterDependencyCollector(bool TrackSystemDeps)
-    : TrackSystemDeps(TrackSystemDeps) {}
+  ClangImporterDependencyCollector(
+      bool TrackSystemDeps, std::shared_ptr<llvm::FileCollector> FileCollector)
+      : FileCollector(FileCollector), TrackSystemDeps(TrackSystemDeps) {}
 
   void excludePath(StringRef filename) {
     ExcludedPaths.insert(filename);
@@ -353,13 +356,22 @@ public:
       return false;
     return true;
   }
+
+  void maybeAddDependency(StringRef Filename, bool FromModule, bool IsSystem,
+                          bool IsModuleFile, bool IsMissing) override {
+    if (FileCollector)
+      FileCollector->addFile(Filename);
+    clang::DependencyCollector::maybeAddDependency(
+        Filename, FromModule, IsSystem, IsModuleFile, IsMissing);
+  }
 };
 } // end anonymous namespace
 
 std::shared_ptr<clang::DependencyCollector>
-ClangImporter::createDependencyCollector(bool TrackSystemDeps)
-{
-  return std::make_shared<ClangImporterDependencyCollector>(TrackSystemDeps);
+ClangImporter::createDependencyCollector(
+    bool TrackSystemDeps, std::shared_ptr<llvm::FileCollector> FileCollector) {
+  return std::make_shared<ClangImporterDependencyCollector>(TrackSystemDeps,
+                                                            FileCollector);
 }
 
 void ClangImporter::Implementation::addBridgeHeaderTopLevelDecls(
