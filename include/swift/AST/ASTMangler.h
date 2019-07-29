@@ -164,7 +164,7 @@ public:
   // SWIFT_ENABLE_TENSORFLOW
   // Mangle the autodiff linear map (differential/pullback) with the given:
   // - Mangled original function name.
-  // - Associated function kind.
+  // - Linear map kind.
   // - Parameter/result indices.
   std::string mangleAutoDiffLinearMapHelper(
       StringRef name, AutoDiffLinearMapKind kind,
