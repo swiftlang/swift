@@ -94,37 +94,20 @@ void SILFunctionBuilder::addFunctionAttributes(SILFunction *F,
       SILAutoDiffIndices indices(/*source*/ 0, loweredParamIndices);
       // Get JVP/VJP names.
       std::string jvpName, vjpName;
-      // If a method-self-reordering thunk is generated for the original
-      // function, use mangled JVP/VJP symbols.
-      auto *AFD = constant.getAbstractFunctionDecl();
-      auto selfParamIndex =
-          F->getLoweredFunctionType()->getNumParameters() - 1;
-      auto isSelfReorderedMethod =
-          AFD && AFD->isInstanceMember() &&
-          F->getLoweredFunctionType()->hasSelfParam() &&
-          indices.isWrtParameter(selfParamIndex) &&
-          indices.parameters->getNumIndices() > 1;
-      if (isSelfReorderedMethod) {
-        auto &ctx = F->getASTContext();
-        if (A->getJVPFunction()) {
-          Mangle::ASTMangler mangler;
-          jvpName = ctx.getIdentifier(
-              mangler.mangleAutoDiffAssociatedFunctionHelper(
-                  constant.mangle(), AutoDiffAssociatedFunctionKind::JVP,
-                  indices)).str();
-        }
-        if (A->getVJPFunction()) {
-          Mangle::ASTMangler mangler;
-          vjpName = ctx.getIdentifier(
-              mangler.mangleAutoDiffAssociatedFunctionHelper(
-                  constant.mangle(), AutoDiffAssociatedFunctionKind::VJP,
-                  indices)).str();
-        }
-      } else {
-        if (auto *jvpFn = A->getJVPFunction())
-          jvpName = SILDeclRef(jvpFn).mangle();
-        if (auto *vjpFn = A->getVJPFunction())
-          vjpName = SILDeclRef(vjpFn).mangle();
+      auto &ctx = F->getASTContext();
+      if (auto *jvpFn = A->getJVPFunction()) {
+        Mangle::ASTMangler mangler;
+        jvpName = ctx.getIdentifier(
+            mangler.mangleAutoDiffAssociatedFunctionHelper(
+                constant.mangle(), AutoDiffAssociatedFunctionKind::JVP,
+                indices)).str();
+      }
+      if (auto *vjpFn = A->getVJPFunction()) {
+        Mangle::ASTMangler mangler;
+        vjpName = ctx.getIdentifier(
+            mangler.mangleAutoDiffAssociatedFunctionHelper(
+                constant.mangle(), AutoDiffAssociatedFunctionKind::VJP,
+                indices)).str();
       }
       auto *silDiffAttr = SILDifferentiableAttr::create(
           M, indices, A->getRequirements(), M.allocateCopy(jvpName),

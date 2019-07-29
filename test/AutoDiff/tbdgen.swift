@@ -1,7 +1,7 @@
-// RUN: %target-swift-frontend -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=all -swift-version 4 %s
-// RUN: %target-swift-frontend -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=all -swift-version 4 %s -enable-testing
-// RUN: %target-swift-frontend -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=all -swift-version 4 %s -O
-// RUN: %target-swift-frontend -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=all -swift-version 4 %s -enable-testing -O
+// RUN: %target-swift-frontend -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=all %s
+// RUN: %target-swift-frontend -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=all %s -O
+// RUN: %target-swift-frontend -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=missing %s -enable-testing
+// RUN: %target-swift-frontend -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=missing %s -enable-testing -O
 
 // TODO: These tests are disabled because the pullback struct makes the TBDGen be different before/after SILGen.
 // UN: %empty-directory(%t)
@@ -9,13 +9,13 @@
 // UN: %target-swift-frontend -emit-ir -parse-as-library -module-name test %s -emit-tbd -emit-tbd-path %t/emit-ir.tbd
 // UN: diff -u %t/typecheck.tbd %t/emit-ir.tbd
 
-@differentiable() public func publicDiffable(_ x: Float, _ y: Float) -> Float { return x }
+@differentiable public func publicDiffable(_ x: Float, _ y: Float) -> Float { return x }
 @differentiable(wrt: (x)) public func publicDiffableWRT(_ x: Float, _ y: Float) -> Float { return x }
 
-@differentiable() internal func internalDiffable(_ x: Float, _ y: Float) -> Float { return x }
+@differentiable internal func internalDiffable(_ x: Float, _ y: Float) -> Float { return x }
 @differentiable(wrt: (x)) internal func internalDiffableWRT(_ x: Float, _ y: Float) -> Float { return x }
 
-@differentiable() private func privateDiffable(_ x: Float, _ y: Float) -> Float { return x }
+@differentiable private func privateDiffable(_ x: Float, _ y: Float) -> Float { return x }
 @differentiable(wrt: (x)) private func privateDiffableWRT(_ x: Float, _ y: Float) -> Float { return x }
 
 public extension Float {

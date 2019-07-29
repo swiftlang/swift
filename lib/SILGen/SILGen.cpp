@@ -812,27 +812,43 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
 
       // Thunk JVP method, if it is defined.
       if (auto *jvpDecl = diffAttr->getJVPFunction()) {
+        SILFunction *jvpThunk;
         auto *jvpFn = getFunction(SILDeclRef(jvpDecl), NotForDefinition);
         if (jvpFn->getLoweredFunctionType() != expectedJVPType) {
-          auto *thunk = getOrCreateAutoDiffAssociatedFunctionThunk(
+          jvpThunk = getOrCreateAutoDiffAssociatedFunctionThunk(
               F, indices, jvpFn, AutoDiffAssociatedFunctionKind::JVP,
               jvpFn->isSerialized());
-          silDiffAttr->setJVPName(thunk->getName());
-          // Unset JVP so that TBDGen triggers.
-          diffAttr->setJVPFunction(nullptr);
+        } else {
+          auto *id = AutoDiffAssociatedFunctionIdentifier::get(
+              AutoDiffAssociatedFunctionKind::JVP, /*differentiationOrder*/ 1,
+              diffAttr->getParameterIndices(), AFD->getASTContext());
+          jvpThunk = getOrCreateAutoDiffThunk(
+              constant.asAutoDiffAssociatedFunction(id), jvpFn,
+              expectedJVPType);
         }
+        silDiffAttr->setJVPName(jvpThunk->getName());
+        // Unset JVP so that TBDGen triggers.
+        diffAttr->setJVPFunction(nullptr);
       }
       // Thunk VJP method, if it is defined.
       if (auto *vjpDecl = diffAttr->getVJPFunction()) {
+        SILFunction *vjpThunk;
         auto *vjpFn = getFunction(SILDeclRef(vjpDecl), NotForDefinition);
         if (vjpFn->getLoweredFunctionType() != expectedVJPType) {
-          auto *thunk = getOrCreateAutoDiffAssociatedFunctionThunk(
+          vjpThunk = getOrCreateAutoDiffAssociatedFunctionThunk(
               F, indices, vjpFn, AutoDiffAssociatedFunctionKind::VJP,
               vjpFn->isSerialized());
-          silDiffAttr->setVJPName(thunk->getName());
-          // Unset VJP so that TBDGen triggers.
-          diffAttr->setVJPFunction(nullptr);
+        } else {
+          auto *id = AutoDiffAssociatedFunctionIdentifier::get(
+              AutoDiffAssociatedFunctionKind::VJP, /*differentiationOrder*/ 1,
+              diffAttr->getParameterIndices(), AFD->getASTContext());
+          vjpThunk = getOrCreateAutoDiffThunk(
+              constant.asAutoDiffAssociatedFunction(id), vjpFn,
+              expectedVJPType);
         }
+        silDiffAttr->setVJPName(vjpThunk->getName());
+        // Unset VJP so that TBDGen triggers.
+        diffAttr->setVJPFunction(nullptr);
       }
     }
   }
