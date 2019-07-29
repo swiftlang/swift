@@ -211,11 +211,6 @@ public:
 
     /// The constraints in this component.
     TinyPtrVector<Constraint *> constraints;
-
-    /// Whether this component represents an orphaned constraint.
-    bool isOrphanedConstraint() const {
-      return typeVars.empty();
-    }
   };
 
   /// Compute the connected components of the graph.
