@@ -613,6 +613,12 @@ func invalidRequirementLayout<Scalar>(x: Scalar) -> Scalar {
   return x
 }
 
+// expected-error @+1 {{no differentiation parameters could be inferred; must differentiate with respect to at least one parameter conforming to 'Differentiable'}}
+@differentiable
+func missingConformance<T>(_ x: T) -> T {
+  return x
+}
+
 protocol ProtocolRequirements : Differentiable {
   // expected-note @+2 {{protocol requires initializer 'init(x:y:)' with type '(x: Float, y: Float)'}}
   @differentiable

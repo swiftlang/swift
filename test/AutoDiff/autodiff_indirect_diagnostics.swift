@@ -35,16 +35,6 @@ func weirdWrapper<T : Differentiable>(_ x: T) -> T {
 }
 _ = gradient(at: Float(1), in: { x in weirdWrapper(x) })
 
-/*
-// FIXME(TF-482): This currently crashes during differentiation transform.
-// because `T` is not constrained to `Differentiable` in generated
-// `[differentiable]` attribute.
-@differentiable
-func directMissingConformance<T>(_ x: T) -> T {
-  return x
-}
-*/
-
 @differentiable
 func direct<T : Differentiable>(_ x: T) -> T {
   return x
