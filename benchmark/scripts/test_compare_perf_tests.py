@@ -347,6 +347,11 @@ class TestPerformanceTestResult(unittest.TestCase):
         self.assertEquals(r.max_rss, 32768)
         self.assertEqual((r.mem_pages, r.involuntary_cs, r.yield_count),
                          (8, 28, 15))
+        log = '1,Ackermann,2,715,,16,9,,'  # --delta erased 0s
+        r = PerformanceTestResult(
+            log.split(','), quantiles=True, meta=True)
+        self.assertEqual((r.mem_pages, r.involuntary_cs, r.yield_count),
+                         (9, 0, 0))
 
     def test_repr(self):
         log_line = '1,AngryPhonebook,20,10664,12933,11035,576,10884'

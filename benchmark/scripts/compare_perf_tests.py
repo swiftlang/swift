@@ -276,8 +276,9 @@ class PerformanceTestResult(object):
 
         # Optional measurement metadata. The number of:
         # memory pages used, involuntary context switches and voluntary yields
-        self.mem_pages, self.involuntary_cs, self.yield_count = \
-            [int(x) for x in csv_row[-3:]] if meta else (None, None, None)
+        self.mem_pages, self.involuntary_cs, self.yield_count = (
+            [int(x) if x else 0 for x in csv_row[-3:]] if meta else
+            (None, None, None))
         self.yields = None
         self.setup = None
 
