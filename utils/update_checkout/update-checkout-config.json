@@ -444,7 +444,7 @@
                 "icu": "release-61-1",
                 "clang-tools-extra": "swift-DEVELOPMENT-SNAPSHOT-2019-07-22-a",
                 "libcxx": "swift-DEVELOPMENT-SNAPSHOT-2019-07-22-a",
-                "tensorflow": "b89808261726d50241dbedd16ac99367403650ef",
+                "tensorflow": "fee0b38d6a2ce3e480c8b6643efe466b889036fa",
                 "tensorflow-swift-apis": "4656fe74edcdd73d819435235254d1ec9c1dd6ff",
                 "indexstore-db": "swift-DEVELOPMENT-SNAPSHOT-2019-07-22-a",
                 "sourcekit-lsp": "swift-DEVELOPMENT-SNAPSHOT-2019-07-22-a"
