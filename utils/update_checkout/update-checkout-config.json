@@ -38,6 +38,10 @@
             "remote": { "id": "unicode-org/icu" },
             "platforms": [ "Linux" ]
         },
+        "cmake": {
+            "remote": { "id": "KitWare/CMake" },
+            "platforms": [ "Linux" ]
+        },
         "libcxx": {
             "remote": { "id": "apple/swift-libcxx" } },
         "clang-tools-extra": {
@@ -73,6 +77,7 @@
                 "swift-xcode-playground-support": "master",
                 "ninja": "release",
                 "icu": "release-61-1",
+                "cmake": "v3.15.0",
                 "clang-tools-extra": "stable",
                 "libcxx": "stable",
                 "indexstore-db": "master",
@@ -97,6 +102,7 @@
                 "swift-xcode-playground-support": "master",
                 "ninja": "release",
                 "icu": "release-61-1",
+                "cmake": "v3.15.0",
                 "indexstore-db": "master",
                 "sourcekit-lsp": "master"
             }
@@ -123,6 +129,7 @@
                 "swift-xcode-playground-support": "master",
                 "ninja": "release",
                 "icu": "release-61-1",
+                "cmake": "v3.15.0",
                 "clang-tools-extra": "upstream-with-swift",
                 "libcxx": "upstream-with-swift",
                 "indexstore-db": "master",
@@ -146,6 +153,7 @@
                 "swift-xcode-playground-support": "master",
                 "ninja": "release",
                 "icu": "release-61-1",
+                "cmake": "v3.15.0",
                 "indexstore-db": "master",
                 "sourcekit-lsp": "master"
             }
