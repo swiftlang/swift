@@ -156,7 +156,7 @@ public:
     auto *decl = declRef->getDeclRef().getDecl();
     if (auto *varDecl = dyn_cast<VarDecl>(decl)) {
       // DeclRefs to immutable variables are always allowed.
-      if (varDecl->isImmutable())
+      if (varDecl->isLet())
         return {true, declRef};
 
       // DeclRefs to mutable variables are only allowed if they are declared

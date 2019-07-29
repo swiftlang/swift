@@ -254,7 +254,7 @@ ElementaryFunction op) {
   // Create parameter declaration with the given name and type.
   auto createParamDecl = [&](StringRef name, Type type) -> ParamDecl * {
     auto *param = new (C)
-        ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+        ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(),
                   Identifier(), SourceLoc(), C.getIdentifier(name), parentDC);
     param->setInterfaceType(type);
     return param;

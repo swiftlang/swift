@@ -100,6 +100,52 @@ using AssociativityCacheType =
   MACRO(NSNumber) \
   MACRO(NSValue)
 
+struct OverrideSignatureKey {
+  GenericSignature *baseMethodSig;
+  GenericSignature *derivedClassSig;
+  Type superclassTy;
+
+  OverrideSignatureKey(GenericSignature *baseMethodSignature,
+                       GenericSignature *derivedClassSignature,
+                       Type superclassType)
+      : baseMethodSig(baseMethodSignature),
+        derivedClassSig(derivedClassSignature), superclassTy(superclassType) {}
+};
+
+namespace llvm {
+template <> struct DenseMapInfo<OverrideSignatureKey> {
+  using Type = swift::Type;
+  using GenericSignature = swift::GenericSignature;
+
+  static bool isEqual(const OverrideSignatureKey lhs,
+                      const OverrideSignatureKey rhs) {
+    return lhs.baseMethodSig == rhs.baseMethodSig &&
+           lhs.derivedClassSig == rhs.derivedClassSig &&
+           lhs.superclassTy.getPointer() == rhs.superclassTy.getPointer();
+  }
+
+  static inline OverrideSignatureKey getEmptyKey() {
+    return OverrideSignatureKey(DenseMapInfo<GenericSignature *>::getEmptyKey(),
+                                DenseMapInfo<GenericSignature *>::getEmptyKey(),
+                                DenseMapInfo<Type>::getEmptyKey());
+  }
+
+  static inline OverrideSignatureKey getTombstoneKey() {
+    return OverrideSignatureKey(
+        DenseMapInfo<GenericSignature *>::getTombstoneKey(),
+        DenseMapInfo<GenericSignature *>::getTombstoneKey(),
+        DenseMapInfo<Type>::getTombstoneKey());
+  }
+
+  static unsigned getHashValue(const OverrideSignatureKey &Val) {
+    return hash_combine(
+        DenseMapInfo<GenericSignature *>::getHashValue(Val.baseMethodSig),
+        DenseMapInfo<GenericSignature *>::getHashValue(Val.derivedClassSig),
+        DenseMapInfo<Type>::getHashValue(Val.superclassTy));
+  }
+};
+} // namespace llvm
+
 struct ASTContext::Implementation {
   Implementation();
   ~Implementation();
@@ -444,6 +490,8 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   llvm::FoldingSet<SILLayout> SILLayouts;
 
   RC<syntax::SyntaxArena> TheSyntaxArena;
+
+  llvm::DenseMap<OverrideSignatureKey, GenericSignature *> overrideSigCache;
 };
 
 ASTContext::Implementation::Implementation()
@@ -3668,10 +3716,11 @@ OpaqueTypeArchetypeType::get(OpaqueTypeDecl *Decl,
     }
   }
 #else
-  // Assert that there are no same type constraints on the underlying type.
+  // Assert that there are no same type constraints on the underlying type
   // or its associated types.
   //
-  // This should not be possible until we add where clause support.
+  // This should not be possible until we add where clause support, with the
+  // exception of generic base class constraints (handled below).
 # ifndef NDEBUG
   for (auto reqt :
                 Decl->getOpaqueInterfaceGenericSignature()->getRequirements()) {
@@ -4439,6 +4488,108 @@ CanGenericSignature ASTContext::getExistentialSignature(CanType existential,
   assert(result.second);
   (void) result;
 
+  return genericSig;
+}
+
+GenericSignature *ASTContext::getOverrideGenericSignature(ValueDecl *base,
+                                                          ValueDecl *derived) {
+  auto baseGenericCtx = base->getAsGenericContext();
+  auto &ctx = base->getASTContext();
+
+  if (!baseGenericCtx) {
+    return nullptr;
+  }
+
+  auto baseClass = base->getDeclContext()->getSelfClassDecl();
+
+  if (!baseClass) {
+    return nullptr;
+  }
+
+  auto derivedClass = derived->getDeclContext()->getSelfClassDecl();
+  auto *baseClassSig = baseClass->getGenericSignature();
+
+  if (!derivedClass) {
+    return nullptr;
+  }
+
+  if (derivedClass->getSuperclass().isNull()) {
+    return nullptr;
+  }
+
+  if (derivedClass->getGenericSignature() == nullptr &&
+      !baseGenericCtx->isGeneric()) {
+    return nullptr;
+  }
+
+  auto subMap = derivedClass->getSuperclass()->getContextSubstitutionMap(
+      derivedClass->getModuleContext(), baseClass);
+
+  if (baseGenericCtx->getGenericSignature() == nullptr) {
+    return nullptr;
+  }
+  unsigned derivedDepth = 0;
+
+  auto key = OverrideSignatureKey(baseGenericCtx->getGenericSignature(),
+                                  derivedClass->getGenericSignature(),
+                                  derivedClass->getSuperclass());
+
+  if (getImpl().overrideSigCache.find(key) !=
+      getImpl().overrideSigCache.end()) {
+    return getImpl().overrideSigCache.lookup(key);
+  }
+
+  if (auto *derivedSig = derivedClass->getGenericSignature())
+    derivedDepth = derivedSig->getGenericParams().back()->getDepth() + 1;
+
+  GenericSignatureBuilder builder(ctx);
+  builder.addGenericSignature(derivedClass->getGenericSignature());
+
+  if (auto derivedGenericCtx = derived->getAsGenericContext()) {
+    if (derivedGenericCtx->isGeneric()) {
+      for (auto param : *derivedGenericCtx->getGenericParams()) {
+        builder.addGenericParameter(param);
+      }
+    }
+  }
+
+  auto source =
+      GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
+
+  unsigned baseDepth = 0;
+
+  if (baseClassSig) {
+    baseDepth = baseClassSig->getGenericParams().back()->getDepth() + 1;
+  }
+
+  auto substFn = [&](SubstitutableType *type) -> Type {
+    auto *gp = cast<GenericTypeParamType>(type);
+
+    if (gp->getDepth() < baseDepth) {
+      return Type(gp).subst(subMap);
+    }
+
+    return CanGenericTypeParamType::get(
+        gp->getDepth() - baseDepth + derivedDepth, gp->getIndex(), ctx);
+  };
+
+  auto lookupConformanceFn =
+      [&](CanType depTy, Type substTy,
+          ProtocolDecl *proto) -> Optional<ProtocolConformanceRef> {
+    if (auto conf = subMap.lookupConformance(depTy, proto))
+      return conf;
+
+    return ProtocolConformanceRef(proto);
+  };
+
+  for (auto reqt : baseGenericCtx->getGenericSignature()->getRequirements()) {
+    if (auto substReqt = reqt.subst(substFn, lookupConformanceFn)) {
+      builder.addRequirement(*substReqt, source, nullptr);
+    }
+  }
+
+  auto *genericSig = std::move(builder).computeGenericSignature(SourceLoc());
+  getImpl().overrideSigCache.insert(std::make_pair(key, genericSig));
   return genericSig;
 }
 

@@ -2146,17 +2146,29 @@ getActualSelfAccessKind(uint8_t raw) {
 
 /// Translate from the serialization VarDeclSpecifier enumerators, which are
 /// guaranteed to be stable, to the AST ones.
-static Optional<swift::VarDecl::Specifier>
-getActualVarDeclSpecifier(serialization::VarDeclSpecifier raw) {
+static Optional<swift::ParamDecl::Specifier>
+getActualParamDeclSpecifier(serialization::ParamDeclSpecifier raw) {
   switch (raw) {
 #define CASE(ID) \
-  case serialization::VarDeclSpecifier::ID: \
-    return swift::VarDecl::Specifier::ID;
-  CASE(Let)
-  CASE(Var)
+  case serialization::ParamDeclSpecifier::ID: \
+    return swift::ParamDecl::Specifier::ID;
+  CASE(Default)
   CASE(InOut)
   CASE(Shared)
   CASE(Owned)
+  }
+#undef CASE
+  return None;
+}
+
+static Optional<swift::VarDecl::Introducer>
+getActualVarDeclIntroducer(serialization::VarDeclIntroducer raw) {
+  switch (raw) {
+#define CASE(ID) \
+  case serialization::VarDeclIntroducer::ID: \
+    return swift::VarDecl::Introducer::ID;
+  CASE(Let)
+  CASE(Var)
   }
 #undef CASE
   return None;
@@ -2255,13 +2267,15 @@ void ModuleFile::configureStorage(AbstractStorageDecl *decl,
   }
 
   auto implInfo = StorageImplInfo(*readImpl, *writeImpl, *readWriteImpl);
+  decl->setImplInfo(implInfo);
+
   if (implInfo.isSimpleStored() && accessors.empty())
     return;
 
   // We currently don't serialize these locations.
   SourceLoc beginLoc, endLoc;
 
-  decl->setAccessors(implInfo, beginLoc, accessors, endLoc);
+  decl->setAccessors(beginLoc, accessors, endLoc);
 }
 
 template <typename T, typename ...Args>
@@ -2717,10 +2731,11 @@ public:
     IdentifierID nameID;
     DeclContextID contextID;
     bool isImplicit, isObjC, isStatic, hasNonPatternBindingInit;
+    uint8_t rawIntroducer;
     bool isGetterMutating, isSetterMutating;
     bool isLazyStorageProperty;
     DeclID lazyStorageID;
-    unsigned rawSpecifier, numAccessors, numBackingProperties;
+    unsigned numAccessors, numBackingProperties;
     uint8_t readImpl, writeImpl, readWriteImpl, opaqueReadOwnership;
     uint8_t rawAccessLevel, rawSetterAccessLevel;
     TypeID interfaceTypeID;
@@ -2729,7 +2744,7 @@ public:
     ArrayRef<uint64_t> arrayFieldIDs;
 
     decls_block::VarLayout::readRecord(scratch, nameID, contextID,
-                                       isImplicit, isObjC, isStatic, rawSpecifier,
+                                       isImplicit, isObjC, isStatic, rawIntroducer,
                                        hasNonPatternBindingInit,
                                        isGetterMutating, isSetterMutating,
                                        isLazyStorageProperty,
@@ -2785,14 +2800,14 @@ public:
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto specifier = getActualVarDeclSpecifier(
-        (serialization::VarDeclSpecifier)rawSpecifier);
-    if (!specifier) {
+    auto introducer = getActualVarDeclIntroducer(
+        (serialization::VarDeclIntroducer) rawIntroducer);
+    if (!introducer) {
       MF.error();
       return nullptr;
     }
 
-    auto var = MF.createDecl<VarDecl>(/*IsStatic*/ isStatic, *specifier,
+    auto var = MF.createDecl<VarDecl>(/*IsStatic*/ isStatic, *introducer,
                                       /*IsCaptureList*/ false, SourceLoc(),
                                       name, DC);
     var->setHasNonPatternBindingInit(hasNonPatternBindingInit);
@@ -2903,8 +2918,8 @@ public:
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto specifier = getActualVarDeclSpecifier(
-                                               (serialization::VarDeclSpecifier)rawSpecifier);
+    auto specifier = getActualParamDeclSpecifier(
+                              (serialization::ParamDeclSpecifier)rawSpecifier);
     if (!specifier) {
       MF.error();
       return nullptr;
@@ -3325,7 +3340,8 @@ public:
 
     ctx.evaluator.cacheOutput(ProtocolRequiresClassRequest{proto},
                               std::move(isClassBounded));
-    proto->setExistentialTypeSupported(existentialTypeSupported);
+    ctx.evaluator.cacheOutput(ExistentialTypeSupportedRequest{proto},
+                              std::move(existentialTypeSupported));
 
     if (auto accessLevel = getActualAccessLevel(rawAccessLevel)) {
       proto->setAccess(*accessLevel);
@@ -3501,7 +3517,7 @@ public:
                                     StringRef blobData) {
     IdentifierID nameID;
     DeclContextID contextID;
-    bool isImplicit, isObjC, requiresStoredPropertyInits;
+    bool isImplicit, isObjC;
     bool inheritsSuperclassInitializers;
     GenericEnvironmentID genericEnvID;
     TypeID superclassID;
@@ -3510,7 +3526,6 @@ public:
     ArrayRef<uint64_t> rawInheritedAndDependencyIDs;
     decls_block::ClassLayout::readRecord(scratch, nameID, contextID,
                                          isImplicit, isObjC,
-                                         requiresStoredPropertyInits,
                                          inheritsSuperclassInitializers,
                                          genericEnvID, superclassID,
                                          rawAccessLevel, numConformances,
@@ -3554,8 +3569,6 @@ public:
       theClass->setImplicit();
     theClass->setIsObjC(isObjC);
     theClass->setSuperclass(MF.getType(superclassID));
-    if (requiresStoredPropertyInits)
-      theClass->setRequiresStoredPropertyInits(true);
     if (inheritsSuperclassInitializers)
       theClass->setInheritsSuperclassInitializers();
 
@@ -3650,7 +3663,7 @@ public:
   Expected<Decl *> deserializeEnumElement(ArrayRef<uint64_t> scratch,
                                           StringRef blobData) {
     DeclContextID contextID;
-    bool isImplicit; bool hasPayload; bool isNegative;
+    bool isImplicit, hasPayload, isRawValueImplicit, isNegative;
     unsigned rawValueKindID;
     IdentifierID rawValueData;
     unsigned numArgNames;
@@ -3658,7 +3671,8 @@ public:
 
     decls_block::EnumElementLayout::readRecord(scratch, contextID,
                                                isImplicit, hasPayload,
-                                               rawValueKindID, isNegative,
+                                               rawValueKindID,
+                                               isRawValueImplicit, isNegative,
                                                rawValueData,
                                                numArgNames,
                                                argNameAndDependencyIDs);
@@ -3704,7 +3718,7 @@ public:
     case EnumElementRawValueKind::IntegerLiteral: {
       auto literalText = MF.getIdentifierText(rawValueData);
       auto literal = new (ctx) IntegerLiteralExpr(literalText, SourceLoc(),
-                                                  /*implicit*/ true);
+                                                  isRawValueImplicit);
       if (isNegative)
         literal->setNegative(SourceLoc());
       elem->setRawValueExpr(literal);

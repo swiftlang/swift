@@ -104,7 +104,7 @@ deriveBodyTensorArrayProtocol_unpackTensorHandles(
 
   // Create an `if var` statement for the current address.
   VarDecl *currAddressDecl = new (C) VarDecl(
-      /*IsStatic*/ false, VarDecl::Specifier::Var, /*IsCaptureList*/ false,
+      /*IsStatic*/ false, VarDecl::Introducer::Var, /*IsCaptureList*/ false,
       SourceLoc(), C.getIdentifier("currentAddress"), funcDecl);
   currAddressDecl->setImplicit();
   currAddressDecl->setHasNonPatternBindingInit(true);
@@ -228,7 +228,7 @@ static ValueDecl *deriveTensorArrayProtocol_method(
   auto parentDC = derived.getConformanceContext();
 
   auto *param =
-      new (C) ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+      new (C) ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(),
                         argumentName, SourceLoc(), parameterName, parentDC);
   param->setInterfaceType(parameterType);
   ParameterList *params = ParameterList::create(C, {param});
@@ -355,8 +355,7 @@ static ValueDecl *deriveTensorArrayProtocol_tensorHandleCount(
     tensorHandleCountDecl, returnType);
   getterDecl->setBodySynthesizer(
     deriveBodyTensorArrayProtocol_tensorHandleCount, nullptr);
-  tensorHandleCountDecl->setAccessors(StorageImplInfo::getImmutableComputed(),
-                                      SourceLoc(), {getterDecl}, SourceLoc());
+  tensorHandleCountDecl->setAccessors(SourceLoc(), {getterDecl}, SourceLoc());
   derived.addMembersToConformanceContext(
     {getterDecl, tensorHandleCountDecl, patDecl});
 
@@ -440,8 +439,7 @@ static ValueDecl *deriveTensorArrayProtocol_typeList(
       typeListDecl, returnType);
   getterDecl->setBodySynthesizer(
       deriveBodyTensorArrayProtocol_typeList, nullptr);
-  typeListDecl->setAccessors(StorageImplInfo::getImmutableComputed(),
-                             SourceLoc(), {getterDecl}, SourceLoc());
+  typeListDecl->setAccessors(SourceLoc(), {getterDecl}, SourceLoc());
   derived.addMembersToConformanceContext({getterDecl, typeListDecl, patDecl});
 
   return typeListDecl;
@@ -472,7 +470,7 @@ deriveBodyTensorArrayProtocol_init(AbstractFunctionDecl *funcDecl, void *) {
 
   // Create an `if var` statement for the current address.
   VarDecl *currAddressDecl = new (C) VarDecl(
-      /*IsStatic*/ false, VarDecl::Specifier::Var, /*IsCaptureList*/ false,
+      /*IsStatic*/ false, VarDecl::Introducer::Var, /*IsCaptureList*/ false,
       SourceLoc(), C.getIdentifier("currentAddress"), funcDecl);
   currAddressDecl->setImplicit();
   currAddressDecl->setHasNonPatternBindingInit(true);
@@ -631,12 +629,12 @@ static ValueDecl
   Type intType = C.getIntDecl()->getDeclaredType();
 
   auto *param1 = new (C) ParamDecl(
-      VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+      ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(),
       C.getIdentifier("_owning"), SourceLoc(), C.getIdentifier("tensorHandles"),
       parentDC);
   param1->setInterfaceType(addressType);
   auto *param2 = new (C) ParamDecl(
-      VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+      ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(),
       C.getIdentifier("count"), SourceLoc(), C.getIdentifier("count"),
       parentDC);
   param2->setInterfaceType(intType);

@@ -148,12 +148,37 @@ void AccessLevelRequest::cacheResult(AccessLevel value) const {
 // the cycle of computation associated with formal accesses, we give it its own
 // request.
 
+// In a .swiftinterface file, a stored property with an explicit @_hasStorage
+// attribute but no setter is assumed to have originally been a private(set).
+static bool isStoredWithPrivateSetter(VarDecl *VD) {
+  auto *HSA = VD->getAttrs().getAttribute<HasStorageAttr>();
+  if (!HSA || HSA->isImplicit())
+    return false;
+
+  auto *DC = VD->getDeclContext();
+  auto *SF = DC->getParentSourceFile();
+  if (!SF || SF->Kind != SourceFileKind::Interface)
+    return false;
+
+  if (VD->isLet() ||
+      (VD->getSetter() &&
+       !VD->getSetter()->isImplicit()))
+    return false;
+
+  return true;
+}
+
 llvm::Expected<AccessLevel>
 SetterAccessLevelRequest::evaluate(Evaluator &evaluator,
                                    AbstractStorageDecl *ASD) const {
   assert(!ASD->Accessors.getInt().hasValue());
-  if (auto *AA = ASD->getAttrs().getAttribute<SetterAccessAttr>())
-    return AA->getAccess();
+  if (auto *SAA = ASD->getAttrs().getAttribute<SetterAccessAttr>())
+    return SAA->getAccess();
+
+  if (auto *VD = dyn_cast<VarDecl>(ASD))
+    if (isStoredWithPrivateSetter(VD))
+      return AccessLevel::Private;
+
   return ASD->getFormalAccess();
 }
 

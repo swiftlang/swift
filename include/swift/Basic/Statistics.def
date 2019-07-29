@@ -179,6 +179,12 @@ FRONTEND_STATISTIC(Sema, NumDeclsTypechecked)
 /// Number of declarations finalized.
 FRONTEND_STATISTIC(Sema, NumDeclsFinalized)
 
+/// Number of synthesized accessors.
+FRONTEND_STATISTIC(Sema, NumAccessorsSynthesized)
+
+/// Number of synthesized accessor bodies.
+FRONTEND_STATISTIC(Sema, NumAccessorBodiesSynthesized)
+
 /// Number of full function bodies typechecked.
 FRONTEND_STATISTIC(Sema, NumFunctionsTypechecked)
 
@@ -224,6 +230,7 @@ FRONTEND_STATISTIC(Sema, NumUnloadedLazyIterableDeclContexts)
 #include "swift/AST/AccessTypeIDZone.def"
 #include "swift/AST/NameLookupTypeIDZone.def"
 #include "swift/AST/TypeCheckerTypeIDZone.def"
+#include "swift/Sema/IDETypeCheckingRequestIDZone.def"
 #include "swift/IDE/IDERequestIDZone.def"
 #undef SWIFT_TYPEID
 

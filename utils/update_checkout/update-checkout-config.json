@@ -50,6 +50,8 @@
             "remote": { "id": "apple/indexstore-db" } },
         "sourcekit-lsp": {
             "remote": { "id": "apple/sourcekit-lsp" } },
+        "swift-format": {
+            "remote": { "id": "apple/swift-format" } },
         "llvm-project": {
             "remote": { "id": "apple/llvm-project-v1" } }
     },
@@ -78,7 +80,8 @@
                 "clang-tools-extra": "stable",
                 "libcxx": "stable",
                 "indexstore-db": "master",
-                "sourcekit-lsp": "master"
+                "sourcekit-lsp": "master",
+                "swift-format": "master"
             }
         },
         "master-llvm-monorepo": {
@@ -425,29 +428,29 @@
         "tensorflow": {
             "aliases": ["tensorflow"],
             "repos": {
-                "llvm": "swift-DEVELOPMENT-SNAPSHOT-2019-07-22-a",
+                "llvm": "swift-DEVELOPMENT-SNAPSHOT-2019-07-28-a",
                 "clang": "ecfead281dab91cee05d78a5699c72cd3c93b08f",
                 "swift": "tensorflow",
-                "lldb": "e95fced8b55d5c2b3a99fa12f61f3d8f1cdb9f5a",
-                "cmark": "swift-DEVELOPMENT-SNAPSHOT-2019-07-22-a",
-                "llbuild": "swift-DEVELOPMENT-SNAPSHOT-2019-07-22-a",
-                "swiftpm": "swift-DEVELOPMENT-SNAPSHOT-2019-07-22-a",
-                "swift-syntax": "a0ada015f3d879e1fd29c6e87d37aa20521a91ff",
-                "swift-stress-tester": "swift-DEVELOPMENT-SNAPSHOT-2019-07-22-a",
-                "compiler-rt": "swift-DEVELOPMENT-SNAPSHOT-2019-07-22-a",
-                "swift-corelibs-xctest": "swift-DEVELOPMENT-SNAPSHOT-2019-07-22-a",
-                "swift-corelibs-foundation": "swift-DEVELOPMENT-SNAPSHOT-2019-07-22-a",
-                "swift-corelibs-libdispatch": "swift-DEVELOPMENT-SNAPSHOT-2019-07-22-a",
-                "swift-integration-tests": "swift-DEVELOPMENT-SNAPSHOT-2019-07-22-a",
-                "swift-xcode-playground-support": "swift-DEVELOPMENT-SNAPSHOT-2019-07-22-a",
+                "lldb": "a64ed87056305d2199047c461773f9967d5d8536",
+                "cmark": "swift-DEVELOPMENT-SNAPSHOT-2019-07-28-a",
+                "llbuild": "swift-DEVELOPMENT-SNAPSHOT-2019-07-28-a",
+                "swiftpm": "swift-DEVELOPMENT-SNAPSHOT-2019-07-28-a",
+                "swift-syntax": "1c2feb708bbf0586ece4c2139c1e9faf8381e89a",
+                "swift-stress-tester": "swift-DEVELOPMENT-SNAPSHOT-2019-07-28-a",
+                "compiler-rt": "swift-DEVELOPMENT-SNAPSHOT-2019-07-28-a",
+                "swift-corelibs-xctest": "swift-DEVELOPMENT-SNAPSHOT-2019-07-28-a",
+                "swift-corelibs-foundation": "swift-DEVELOPMENT-SNAPSHOT-2019-07-28-a",
+                "swift-corelibs-libdispatch": "swift-DEVELOPMENT-SNAPSHOT-2019-07-28-a",
+                "swift-integration-tests": "swift-DEVELOPMENT-SNAPSHOT-2019-07-28-a",
+                "swift-xcode-playground-support": "swift-DEVELOPMENT-SNAPSHOT-2019-07-28-a",
                 "ninja": "release",
                 "icu": "release-61-1",
-                "clang-tools-extra": "swift-DEVELOPMENT-SNAPSHOT-2019-07-22-a",
-                "libcxx": "swift-DEVELOPMENT-SNAPSHOT-2019-07-22-a",
+                "clang-tools-extra": "swift-DEVELOPMENT-SNAPSHOT-2019-07-28-a",
+                "libcxx": "swift-DEVELOPMENT-SNAPSHOT-2019-07-28-a",
                 "tensorflow": "ebc41609e27dcf0998d8970e77a2e1f53e13ac86",
                 "tensorflow-swift-apis": "4656fe74edcdd73d819435235254d1ec9c1dd6ff",
-                "indexstore-db": "swift-DEVELOPMENT-SNAPSHOT-2019-07-22-a",
-                "sourcekit-lsp": "swift-DEVELOPMENT-SNAPSHOT-2019-07-22-a"
+                "indexstore-db": "swift-DEVELOPMENT-SNAPSHOT-2019-07-28-a",
+                "sourcekit-lsp": "swift-DEVELOPMENT-SNAPSHOT-2019-07-28-a"
             }
         }
     }

@@ -140,8 +140,7 @@ static ValueDecl *deriveTensorGroup_typeList(DerivedConformance &derived) {
   auto *getterDecl = derived.declareDerivedPropertyGetter(
       typeListDecl, returnType);
   getterDecl->setBodySynthesizer(deriveBodyTensorGroup_typeList, nullptr);
-  typeListDecl->setAccessors(StorageImplInfo::getImmutableComputed(),
-                             SourceLoc(), {getterDecl}, SourceLoc());
+  typeListDecl->setAccessors(SourceLoc(), {getterDecl}, SourceLoc());
   derived.addMembersToConformanceContext({getterDecl, typeListDecl, patDecl});
 
   return typeListDecl;
@@ -172,7 +171,7 @@ deriveBodyTensorGroup_init(AbstractFunctionDecl *funcDecl, void *) {
 
   // Create an `if var` statement for the current address.
   VarDecl *currAddressDecl = new (C) VarDecl(
-      /*IsStatic*/ false, VarDecl::Specifier::Var, /*IsCaptureList*/ false,
+      /*IsStatic*/ false, VarDecl::Introducer::Var, /*IsCaptureList*/ false,
       SourceLoc(), C.getIdentifier("currentAddress"), funcDecl);
   currAddressDecl->setImplicit();
   currAddressDecl->setHasNonPatternBindingInit(true);
@@ -326,7 +325,7 @@ static ValueDecl *deriveTensorGroup_constructor(
   auto parentDC = derived.getConformanceContext();
 
   auto *param =
-      new (C) ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+      new (C) ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(),
                         argumentName, SourceLoc(), parameterName, parentDC);
   param->setInterfaceType(parameterType);
   ParameterList *params = ParameterList::create(C, {param});

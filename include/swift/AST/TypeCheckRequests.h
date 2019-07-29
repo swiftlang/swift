@@ -29,8 +29,10 @@
 
 namespace swift {
 
+class AbstractStorageDecl;
 class GenericParamList;
 struct PropertyWrapperBackingPropertyInfo;
+struct PropertyWrapperMutability;
 class RequirementRepr;
 class SpecializeAttr;
 class TypeAliasDecl;
@@ -205,6 +207,32 @@ public:
 /// with a generic type parameter constrained to that protocol.
 class ExistentialConformsToSelfRequest:
     public SimpleRequest<ExistentialConformsToSelfRequest,
+                         bool(ProtocolDecl *),
+                         CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool> evaluate(Evaluator &evaluator, ProtocolDecl *decl) const;
+
+public:
+  // Cycle handling.
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<bool> getCachedResult() const;
+  void cacheResult(bool value) const;
+};
+
+/// Determine whether we are allowed to refer to an existential type conforming
+/// to this protocol.
+class ExistentialTypeSupportedRequest:
+    public SimpleRequest<ExistentialTypeSupportedRequest,
                          bool(ProtocolDecl *),
                          CacheKind::SeparatelyCached> {
 public:
@@ -559,6 +587,26 @@ public:
   bool isCached() const;
 };
 
+/// Request information about the mutability of composed property wrappers.
+class PropertyWrapperMutabilityRequest :
+    public SimpleRequest<PropertyWrapperMutabilityRequest,
+                         Optional<PropertyWrapperMutability> (VarDecl *),
+                         CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<Optional<PropertyWrapperMutability>>
+  evaluate(Evaluator &evaluator, VarDecl *var) const;
+
+public:
+  // Caching
+  bool isCached() const;
+};
+
 /// Request information about the backing property for properties that have
 /// attached property wrappers.
 class PropertyWrapperBackingPropertyInfoRequest :
@@ -815,6 +863,27 @@ private:
 
 public:
   bool isCached() const { return true; }
+};
+
+class StorageImplInfoRequest :
+    public SimpleRequest<StorageImplInfoRequest,
+                         StorageImplInfo(AbstractStorageDecl *),
+                         CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<StorageImplInfo>
+  evaluate(Evaluator &evaluator, AbstractStorageDecl *decl) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<StorageImplInfo> getCachedResult() const;
+  void cacheResult(StorageImplInfo value) const;
 };
 
 // Allow AnyValue to compare two Type values, even though Type doesn't

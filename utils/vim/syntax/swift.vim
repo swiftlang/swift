@@ -158,8 +158,8 @@ syn region swiftParenthesisRegion matchgroup=NONE start=/(/ end=/)/ contains=TOP
 
 syn region swiftString start=/"/ skip=/\\\\\|\\"/ end=/"/ contains=swiftInterpolationRegion
 syn region swiftInterpolationRegion matchgroup=swiftInterpolation start=/\\(/ end=/)/ contained contains=TOP
-syn region swiftComment start="/\*" end="\*/" contains=swiftComment,swiftLineComment,swiftTodo
-syn region swiftLineComment start="//" end="$" contains=swiftComment,swiftTodo
+syn region swiftComment start="/\*" end="\*/" contains=swiftComment,swiftTodo
+syn region swiftLineComment start="//" end="$" contains=swiftTodo
 
 syn match swiftDecimal /[+\-]\?\<\([0-9][0-9_]*\)\([.][0-9_]*\)\?\([eE][+\-]\?[0-9][0-9_]*\)\?\>/
 syn match swiftHex /[+\-]\?\<0x[0-9A-Fa-f][0-9A-Fa-f_]*\(\([.][0-9A-Fa-f_]*\)\?[pP][+\-]\?[0-9][0-9_]*\)\?\>/

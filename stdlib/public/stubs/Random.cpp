@@ -54,6 +54,10 @@ void swift::swift_stdlib_random(void *buf, __swift_size_t nbytes) {
 
 SWIFT_RUNTIME_STDLIB_API
 void swift::swift_stdlib_random(void *buf, __swift_size_t nbytes) {
+  if (nbytes > ULONG_MAX) {
+    fatalError(0, "Fatal error: %zd exceeds ULONG_MAX\n", nbytes);
+  }
+
   NTSTATUS status = BCryptGenRandom(nullptr,
                                     static_cast<PUCHAR>(buf),
                                     static_cast<ULONG>(nbytes),

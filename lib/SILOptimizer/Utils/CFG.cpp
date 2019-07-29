@@ -140,9 +140,13 @@ void swift::erasePhiArgument(SILBasicBlock *block, unsigned argIndex) {
   // Determine the set of predecessors in case any predecessor has
   // two edges to this block (e.g. a conditional branch where both
   // sides reach this block).
-  SmallVector<SILBasicBlock *, 8> predBlocks(block->pred_begin(),
-                                             block->pred_end());
-  sortUnique(predBlocks);
+  //
+  // NOTE: This needs to be a SmallSetVector since we need both uniqueness /and/
+  // insertion order. Otherwise non-determinism can result.
+  SmallSetVector<SILBasicBlock *, 8> predBlocks;
+
+  for (auto *pred : block->getPredecessorBlocks())
+    predBlocks.insert(pred);
 
   for (auto *pred : predBlocks)
     deleteEdgeValue(pred->getTerminator(), block, argIndex);

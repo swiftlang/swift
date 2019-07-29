@@ -1,31 +1,31 @@
-# This file is a minimal swift-format vim-integration.  To install:
-# - Change 'binary' if swift-format is not on the path (see below).
+# This file is a minimal swift-indent vim-integration.  To install:
+# - Change 'binary' if swift-indent is not on the path (see below).
 # - Add to your .vimrc:
 #
-#   map <C-I> :pyf <path-to-this-file>/swift-format.py<cr>
-#   imap <C-I> <c-o>:pyf <path-to-this-file>/swift-format.py<cr>
+#   map <C-I> :pyf <path-to-this-file>/swift-indent.py<cr>
+#   imap <C-I> <c-o>:pyf <path-to-this-file>/swift-indent.py<cr>
 #
-# The first line enables swift-format for NORMAL and VISUAL mode, the second
+# The first line enables swift-indent for NORMAL and VISUAL mode, the second
 # line adds support for INSERT mode.  Change "C-I" to another binding if you
-# need swift-format on a different key (C-I stands for Ctrl+i).
+# need swift-indent on a different key (C-I stands for Ctrl+i).
 #
-# With this integration you can press the bound key and swift-format will
-# format the current line in NORMAL and INSERT mode or the selected region in
+# With this integration you can press the bound key and swift-indent will
+# indent the current line in NORMAL and INSERT mode or the selected region in
 # VISUAL mode.  The line or region is extended to the next bigger syntactic
 # entity.
 #
 # You can also pass in the variable "l:lines" to choose the range for
-# formatting.  This variable can either contain "<start line>:<end line> or
-# "all" to format the full file.  So, to format the full file, write a function
+# indenting.  This variable can either contain "<start line>:<end line> or
+# "all" to indent the full file.  So, to indent the full file, write a function
 # like:
 #
-# :function FormatFile()
+# :function IndentFile()
 # :  let l:lines="all"
-# :  pyf <path-to-this-file>/swift-format.py
+# :  pyf <path-to-this-file>/swift-indent.py
 # :endfunction
 #
 # It operates on the current, potentially unsaved buffer and does not create or
-# save any files.  To revert a formatting, just undo.
+# save any files.  To revert a indenting, just undo.
 
 from __future__ import print_function
 
@@ -36,9 +36,9 @@ import sys
 
 import vim
 
-binary = 'swift-format'
-if vim.eval('exists("g:swift_format_path")') == "1":
-    binary = vim.eval('g:swift_format_path')
+binary = 'swift-indent'
+if vim.eval('exists("g:swift_indent_path")') == "1":
+    binary = vim.eval('g:swift_indent_path')
 
 
 def get_buffer(encoding):
@@ -82,7 +82,7 @@ def main(argc, argv):
         print(stderr)
 
     if not stdout:
-        print('No output from swift-format (crashed?).')
+        print('No output from swift-indent (crashed?).')
         return
 
     lines = stdout.decode(encoding).split('\n')

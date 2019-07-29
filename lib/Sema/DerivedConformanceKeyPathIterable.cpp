@@ -146,8 +146,7 @@ deriveKeyPathIterable_allKeyPaths(DerivedConformance &derived) {
       allKeyPathsDecl, returnTy);
   getterDecl->setBodySynthesizer(
       deriveBodyKeyPathIterable_allKeyPaths, nullptr);
-  allKeyPathsDecl->setAccessors(StorageImplInfo::getImmutableComputed(),
-                                SourceLoc(), {getterDecl}, SourceLoc());
+  allKeyPathsDecl->setAccessors(SourceLoc(), {getterDecl}, SourceLoc());
   derived.addMembersToConformanceContext({getterDecl, allKeyPathsDecl, pbDecl});
 
   return allKeyPathsDecl;
