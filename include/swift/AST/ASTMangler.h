@@ -153,14 +153,22 @@ public:
                                              ModuleDecl *Module);
 
   // SWIFT_ENABLE_TENSORFLOW
-  // Mangle the autodiff associated function with the given:
+  // Mangle the autodiff associated function (JVP/VJP) with the given:
   // - Mangled original function name.
   // - Associated function kind.
   // - Parameter/result indices.
-  // - Flag representing whether the function is a differential/pullback.
   std::string mangleAutoDiffAssociatedFunctionHelper(
       StringRef name, AutoDiffAssociatedFunctionKind kind,
-      const SILAutoDiffIndices &indices, bool isLinearMap = false);
+      const SILAutoDiffIndices &indices);
+
+  // SWIFT_ENABLE_TENSORFLOW
+  // Mangle the autodiff linear map (differential/pullback) with the given:
+  // - Mangled original function name.
+  // - Associated function kind.
+  // - Parameter/result indices.
+  std::string mangleAutoDiffLinearMapHelper(
+      StringRef name, AutoDiffAssociatedFunctionKind kind,
+      const SILAutoDiffIndices &indices);
 
   std::string mangleKeyPathGetterThunkHelper(const AbstractStorageDecl *property,
                                              GenericSignature *signature,

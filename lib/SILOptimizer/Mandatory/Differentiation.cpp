@@ -2961,9 +2961,9 @@ public:
 
     Mangle::ASTMangler mangler;
     auto pbName = original->getASTContext().getIdentifier(
-        mangler.mangleAutoDiffAssociatedFunctionHelper(
+        mangler.mangleAutoDiffLinearMapHelper(
             original->getName(), AutoDiffAssociatedFunctionKind::VJP,
-            indices, /*isLinearMap*/ true)).str();
+            indices)).str();
     auto pbGenericSig = getAssociatedFunctionGenericSignature(attr, original);
     auto *pbGenericEnv = pbGenericSig
         ? pbGenericSig->createGenericEnvironment()
@@ -3553,9 +3553,9 @@ public:
     }
     Mangle::ASTMangler mangler;
     auto diffName = original->getASTContext().getIdentifier(
-        mangler.mangleAutoDiffAssociatedFunctionHelper(
+        mangler.mangleAutoDiffLinearMapHelper(
             original->getName(), AutoDiffAssociatedFunctionKind::JVP,
-            indices, /*isLinearMap*/ true)).str();
+            indices)).str();
     auto diffGenericSig = getAssociatedFunctionGenericSignature(attr, original);
     auto *diffGenericEnv = diffGenericSig
         ? diffGenericSig->createGenericEnvironment()
