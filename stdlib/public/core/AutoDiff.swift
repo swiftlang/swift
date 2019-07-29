@@ -914,6 +914,14 @@ public struct AnyDerivative : Differentiable & AdditiveArithmetic {
     return (lhs + rhs, { v in (v, v) })
   }
 
+  @differentiating(+)
+  @usableFromInline internal static func _jvpAdd(
+    lhs: AnyDerivative, rhs: AnyDerivative
+    ) -> (value: AnyDerivative,
+    differential: (AnyDerivative, AnyDerivative) -> (AnyDerivative)) {
+      return (lhs + rhs, { (dlhs, drhs) in dlhs + drhs })
+  }
+
   public static func - (
     lhs: AnyDerivative, rhs: AnyDerivative
   ) -> AnyDerivative {

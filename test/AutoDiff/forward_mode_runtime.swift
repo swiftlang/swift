@@ -6,6 +6,15 @@ import DifferentiationUnittest
 
 var ForwardModeTests = TestSuite("ForwardMode")
 
+ForwardModeTests.test("Identity") {
+  func func_to_diff(x: Float) -> Float {
+    return x
+  }
+  let (y, differential) = valueWithDifferential(at: 4, in: func_to_diff)
+  expectEqual(4, y)
+  expectEqual(1, differential(1))
+}
+
 ForwardModeTests.test("Unary") {
   func func_to_diff(x: Float) -> Float {
     return x * x
@@ -197,5 +206,98 @@ ForwardModeTests.test("TrackedWithLets") {
   expectEqual(25.25, y)
   expectEqual(4.9375, differential(1, 1))
 }
+
+// Generics.
+
+struct Tensor<Scalar : FloatingPoint & Differentiable> : VectorProtocol, Differentiable {
+  // NOTE: `value` must have type with known size (e.g. `Float`, not `Scalar`)
+  // until differentiation has indirect passing support.
+  var value: Float
+  init(_ value: Float) { self.value = value }
+}
+
+ForwardModeTests.test("GenericIdentity") {
+  func identity<T : Differentiable>(_ x: T) -> T {
+    return x
+  }
+  let (y, differential) = valueWithDifferential(at: 4) { (x: Float) in 
+    identity(x) 
+  }
+  expectEqual(4, y)
+  expectEqual(1, differential(1))
+}
+
+ForwardModeTests.test("GenericTensorIdentity") {
+  func identity<T : FloatingPoint & Differentiable>(_ x: Tensor<T>) -> Tensor<T> {
+    return x
+  }
+  let (y, differential) = valueWithDifferential(at: 4) { (x: Float) in 
+    identity(Tensor<Float>(x)) 
+  }
+  expectEqual(Tensor<Float>(4), y)
+  expectEqual(Tensor<Float>(1), differential(1))
+}
+
+ForwardModeTests.test("GenericTensorPlus") {
+  func plus<T : FloatingPoint & Differentiable>(_ x: Tensor<T>) -> Float {
+    return x.value + x.value
+  }
+  let (y, differential) = valueWithDifferential(at: 4) { (x: Float) in 
+    plus(Tensor<Float>(x)) 
+  }
+  expectEqual(8, y)
+  expectEqual(2, differential(1))
+}
+
+ForwardModeTests.test("GenericTensorBinaryInput") {
+  func binary<T : FloatingPoint & Differentiable>(_ x: Tensor<T>, _ y: Tensor<T>) -> Float {
+    return x.value * y.value
+  }
+  let (y, differential) = valueWithDifferential(at: 4, 5) { (x: Float, y: Float) in 
+    binary(Tensor<Float>(x), Tensor<Float>(y)) 
+  }
+  expectEqual(20, y)
+  expectEqual(9, differential(1, 1))
+}
+
+ForwardModeTests.test("GenericTensorWithLets") {
+  func binary<T : FloatingPoint & Differentiable>(_ x: Tensor<T>, _ y: Tensor<T>) -> Float {
+    let a = Tensor<T>(x.value)
+    let b = Tensor<T>(y.value)
+    return a.value * b.value
+  }
+  let (y, differential) = valueWithDifferential(at: 4, 5) { (x: Float, y: Float) in 
+    binary(Tensor<Float>(x), Tensor<Float>(y)) 
+  }
+  expectEqual(20, y)
+  expectEqual(9, differential(1, 1))
+}
+
+ForwardModeTests.test("GenericTensorWithVars") {
+  func binary<T : FloatingPoint & Differentiable>(_ x: Tensor<T>, _ y: Tensor<T>) -> Float {
+    var a = Tensor<T>(x.value)
+    var b = Tensor<T>(y.value)
+    b = a
+    a = Tensor<T>(y.value)
+    return a.value * b.value
+  }
+  let (y, differential) = valueWithDifferential(at: 4, 5) { (x: Float, y: Float) in 
+    binary(Tensor<Float>(x), Tensor<Float>(y)) 
+  }
+  expectEqual(20, y)
+  expectEqual(9, differential(1, 1))
+}
+
+ForwardModeTests.test("GenericTrackedIdentity") {
+  func identity<T : Differentiable>(_ x: Tracked<T>) -> Tracked<T> {
+    return x
+  }
+  let (y, differential) = valueWithDifferential(at: 4) { (x: Float) in
+    identity(Tracked(x))
+  }
+  expectEqual(4, y)
+  expectEqual(1, differential(1))
+}
+
 
 runAllTests()
