@@ -6147,7 +6147,7 @@ ADContext::getOrCreateSubsetParametersThunkForLinearMap(
       /*withoutActuallyEscaping*/ true,
       DifferentiationThunkKind::Reabstraction);
 
-  // TODO: Use more principled mangling.
+  // TODO(TF-685): Use more principled mangling for thunks.
   std::string thunkName;
   switch (kind) {
     case AutoDiffAssociatedFunctionKind::JVP:
@@ -6413,7 +6413,7 @@ ADContext::getOrCreateSubsetParametersThunkForAssociatedFunction(
         ->getAbstractFunctionDecl()->getNameStr();
   }
   assert(!origName.empty() && "Original function name could not be resolved");
-  // TODO: Use more principled mangling.
+  // TODO(TF-685): Use more principled mangling for thunks.
   std::string thunkName;
   switch (kind) {
     case AutoDiffAssociatedFunctionKind::JVP:
@@ -6536,6 +6536,7 @@ SILValue ADContext::promoteToDifferentiableFunction(
     if (auto *thunkRef = dyn_cast<FunctionRefInst>(ai->getCallee())) {
       SILAutoDiffIndices desiredIndices(resultIndex, parameterIndices);
       auto *thunk = thunkRef->getReferencedFunctionOrNull();
+      // TODO(TF-685): Use more principled mangling for thunks.
       auto newThunkName = "AD__" + thunk->getName().str() +
           "__differentiable_curry_thunk_" + desiredIndices.mangle();
 
