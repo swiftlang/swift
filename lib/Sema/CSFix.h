@@ -255,14 +255,11 @@ public:
 class ForceOptional final : public ConstraintFix {
   Type BaseType;
   Type UnwrappedType;
-  ConstraintLocator *FullLocator;
 
   ForceOptional(ConstraintSystem &cs, Type baseType, Type unwrappedType,
-                ConstraintLocator *simplifiedLocator,
-                ConstraintLocator *fullLocator)
-      : ConstraintFix(cs, FixKind::ForceOptional, simplifiedLocator),
-        BaseType(baseType), UnwrappedType(unwrappedType),
-        FullLocator(fullLocator) {
+                ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::ForceOptional, locator), BaseType(baseType),
+        UnwrappedType(unwrappedType) {
     assert(baseType && "Base type must not be null");
     assert(unwrappedType && "Unwrapped type must not be null");
   }
