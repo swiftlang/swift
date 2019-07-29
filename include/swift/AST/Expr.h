@@ -3560,6 +3560,9 @@ class ClosureExpr : public AbstractClosureExpr {
 
   /// The range of the brackets of the capture list, if present.
   SourceRange BracketRange;
+    
+  /// The (possibly null) VarDecl captured with the literal name "self".
+  VarDecl *CapturedSelfDecl;
   
   /// The location of the "throws", if present.
   SourceLoc ThrowsLoc;
@@ -3577,20 +3580,16 @@ class ClosureExpr : public AbstractClosureExpr {
   /// The body of the closure, along with a bit indicating whether it
   /// was originally just a single expression.
   llvm::PointerIntPair<BraceStmt *, 1, bool> Body;
-  
-  /// The (possibly null) expression of the list of VarDecls captured explicitly
-  /// by this closure.
-  CaptureListExpr *CLE;
 public:
-  ClosureExpr(SourceRange bracketRange, ParameterList *params,
-              SourceLoc throwsLoc, SourceLoc arrowLoc, SourceLoc inLoc,
-              TypeLoc explicitResultType, unsigned discriminator,
-              DeclContext *parent)
+  ClosureExpr(SourceRange bracketRange, VarDecl *capturedSelfDecl,
+              ParameterList *params, SourceLoc throwsLoc, SourceLoc arrowLoc,
+              SourceLoc inLoc, TypeLoc explicitResultType,
+              unsigned discriminator, DeclContext *parent)
     : AbstractClosureExpr(ExprKind::Closure, Type(), /*Implicit=*/false,
                           discriminator, parent),
-      BracketRange(bracketRange), ThrowsLoc(throwsLoc),
-      ArrowLoc(arrowLoc), InLoc(inLoc), ExplicitResultType(explicitResultType),
-      Body(nullptr), CLE(nullptr) {
+      BracketRange(bracketRange), CapturedSelfDecl(capturedSelfDecl),
+      ThrowsLoc(throwsLoc), ArrowLoc(arrowLoc), InLoc(inLoc),
+      ExplicitResultType(explicitResultType), Body(nullptr) {
     setParameterList(params);
     Bits.ClosureExpr.HasAnonymousClosureVars = false;
   }
@@ -3623,9 +3622,6 @@ public:
   bool hasExplicitResultType() const { return ArrowLoc.isValid(); }
 
   /// Retrieve the range of the \c '[' and \c ']' that enclose the capture list.
-  /// Because empty capture lists are alowed, which do not result in a
-  /// CaptureListExpr, this range may be valid even if getCaptureListExpr()
-  /// returns nullptr.
   SourceRange getBracketRange() const { return BracketRange; }
   
   /// Retrieve the location of the \c '->' for closures with an
@@ -3692,10 +3688,7 @@ public:
   /// Is this a completely empty closure?
   bool hasEmptyBody() const;
 
-  CaptureListExpr *getCaptureListExpr() const { return CLE; }
-  void setCaptureListExpr(CaptureListExpr *list) {
-    CLE = list;
-  }
+  VarDecl *getCapturedSelfDecl() const { return CapturedSelfDecl; }
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::Closure;
@@ -3801,9 +3794,6 @@ public:
   const ClosureExpr *getClosureBody() const { return closureBody; }
 
   void setClosureBody(ClosureExpr *body) { closureBody = body; }
-
-  bool hasSelfParamCapture() const;
-  CaptureListEntry getSelfParamCapture() const;
       
   /// This is a bit weird, but the capture list is lexically contained within
   /// the closure, so the ClosureExpr has the full source range.

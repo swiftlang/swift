@@ -1234,8 +1234,9 @@ bool CaptureListEntry::isSimpleSelfCapture() const {
   if (auto *DRE = dyn_cast<DeclRefExpr>(Init->getInit(0)))
     if (auto *VD = dyn_cast<VarDecl>(DRE->getDecl())) {
       auto *ownership = Var->getAttrs().getAttribute<ReferenceOwnershipAttr>();
-      return VD->isSelfParameter() && VD->getName() == Var->getName()
-          && (!ownership || ownership->get() == ReferenceOwnership::Strong);
+      return (VD->isSelfParameter() || VD->isSelfParamCapture())
+             && VD->getName() == Var->getName()
+             && (!ownership || ownership->get() != ReferenceOwnership::Weak);
     }
   return false;
 }
@@ -1877,22 +1878,6 @@ void ClosureExpr::setSingleExpressionBody(Expr *NewBody) {
 
 bool ClosureExpr::hasEmptyBody() const {
   return getBody()->getNumElements() == 0;
-}
-
-bool CaptureListExpr::hasSelfParamCapture() const {
-  for (auto CLE : const_cast<CaptureListExpr *>(this)->getCaptureList()) {
-    if (CLE.isSimpleSelfCapture())
-      return true;
-  }
-  return false;
-}
-
-CaptureListEntry CaptureListExpr::getSelfParamCapture() const {
-  for (auto CLE : const_cast<CaptureListExpr *>(this)->getCaptureList()) {
-    if (CLE.isSimpleSelfCapture())
-      return CLE;
-  }
-  return {nullptr, nullptr};
 }
 
 FORWARD_SOURCE_LOCS_TO(AutoClosureExpr, Body)

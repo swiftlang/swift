@@ -220,8 +220,8 @@ private:
     TypeChecker &TC = TypeChecker::createForContext(Ctx);
     auto *Params = ParameterList::createEmpty(Ctx);
     auto *Closure = new (Ctx)
-        ClosureExpr(SourceRange(), Params, SourceLoc(), SourceLoc(), SourceLoc(),
-                    TypeLoc(), DF.getNextDiscriminator(),
+        ClosureExpr(SourceRange(), nullptr, Params, SourceLoc(), SourceLoc(),
+                    SourceLoc(), TypeLoc(), DF.getNextDiscriminator(),
                     getCurrentDeclContext());
     Closure->setImplicit(true);
 

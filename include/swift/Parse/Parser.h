@@ -1419,6 +1419,7 @@ public:
   bool parseClosureSignatureIfPresent(
                                       SourceRange &bracketRange,
                                 SmallVectorImpl<CaptureListEntry> &captureList,
+                                      VarDecl *&capturedSelfParamDecl,
                                       ParameterList *&params,
                                       SourceLoc &throwsLoc,
                                       SourceLoc &arrowLoc,

@@ -1343,8 +1343,8 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
       return !ty->is<MetatypeType>();
     }
 
-    /// Return true if this is a closure expression that will require "self."
-    /// qualification of member references.
+    /// Return true if this is a closure expression that will require explicit
+    /// use or capture of "self." for qualification of member references.
     static bool isClosureRequiringSelfQualification(
                   const AbstractClosureExpr *CE) {
       // If the closure's type was inferred to be noescape, then it doesn't
@@ -1402,12 +1402,11 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
       // explicit closure), or referencing self explicitly.
       if (memberLoc.isValid()) {
         if (auto *CE = dyn_cast<ClosureExpr>(ACE)) {
-          // If we've already captured something with the name "self", don't
-          // bother with any fix-its
-          if (CE->getCaptureListExpr())
-            for (auto capture : CE->getCaptureListExpr()->getCaptureList())
-              if (capture.Var->getName() == TC.Context.Id_self)
-                return { false, E };
+          // If we've already captured something with the name "self" other than
+          // the actual self param, don't bother with any fix-its.
+          auto *VD = CE->getCapturedSelfDecl();
+          if (VD && !VD->isSelfParamCapture())
+            return { false, E };
           
           auto diag = TC.diagnose(CE->getLoc(),
                                   diag::note_capture_self_explicitly);

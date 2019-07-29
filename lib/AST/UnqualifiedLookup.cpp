@@ -178,6 +178,7 @@ namespace {
     const bool isOriginallyTypeLookup;
     const NLOptions baseNLOptions;
     // Transputs
+    DeclContext *capturedSelfContext;
 #ifndef NDEBUG
     InstrumentedNamedDeclConsumer Consumer;
 #else
@@ -463,6 +464,7 @@ UnqualifiedLookupFactory::UnqualifiedLookupFactory(
   options(options),
   isOriginallyTypeLookup(options.contains(Flags::TypeLookup)),
   baseNLOptions(computeBaseNLOptions(options, isOriginallyTypeLookup)),
+  capturedSelfContext(nullptr),
   #ifdef NDEBUG
   Consumer(Name, Results, isOriginallyTypeLookup),
   #else
@@ -693,9 +695,13 @@ void UnqualifiedLookupFactory::lookupNamesIntroducedByMemberFunction(
         // If we're not in the body of the function (for example, we
         // might be type checking a default argument expression and
         // performing name lookup from there), the base declaration
-        // is the nominal type, not 'self'.
+        // is the nominal type, not 'self'. If we've captured self
+        // somewhere down the tree, we should use that as the context
+        // for lookup.
         DeclContext *const BaseDC =
-            isOutsideBodyOfFunction(AFD) ? fnDeclContext : AFD;
+            isOutsideBodyOfFunction(AFD) ? fnDeclContext
+            : capturedSelfContext == nullptr ?  AFD
+            : capturedSelfContext;
         // If we are inside of a method, check to see if there are any ivars in
         // scope, and if so, whether this is a reference to one of them.
         // FIXME: We should persist this information between lookups.
@@ -727,25 +733,8 @@ void UnqualifiedLookupFactory::lookupNamesIntroducedByClosure(
     AbstractClosureExpr *ACE, Optional<bool> isCascadingUse) {
   if (auto *CE = dyn_cast<ClosureExpr>(ACE)) {
     lookForLocalVariablesIn(CE);
-    auto *CLE = CE->getCaptureListExpr();
-    if (CLE && CLE->hasSelfParamCapture()) {
-      // If this closure has captured self, then we need to look for potential
-      // instance members in the type context of the self param.
-      ifNotDoneYet([&] {
-        assert(CLE->getSelfParamCapture().Init->getNumPatternEntries() == 1);
-        auto *selfDecl = CLE->getSelfParamCapture().Init
-                            ->getSingleInitializerVar();
-        DeclContext *const parentCtx = selfDecl->getDeclContext()->getParent();
-        finishLookingInContext(
-          AddGenericParameters::Yes,
-          CE->getParent(),
-          ResultFinderForTypeContext(this, CE, parentCtx),
-          resolveIsCascadingUse(ACE, isCascadingUse,
-                                /*onlyCareAboutFunctionBody=*/false));
-        // clang-format on
-      });
-      return;
-    }
+      if (capturedSelfContext == nullptr && CE->getCapturedSelfDecl())
+        capturedSelfContext = CE;
   }
   ifNotDoneYet([&] {
     // clang-format off
