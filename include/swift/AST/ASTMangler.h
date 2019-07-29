@@ -167,7 +167,7 @@ public:
   // - Associated function kind.
   // - Parameter/result indices.
   std::string mangleAutoDiffLinearMapHelper(
-      StringRef name, AutoDiffAssociatedFunctionKind kind,
+      StringRef name, AutoDiffLinearMapKind kind,
       const SILAutoDiffIndices &indices);
 
   std::string mangleKeyPathGetterThunkHelper(const AbstractStorageDecl *property,

@@ -393,7 +393,7 @@ std::string ASTMangler::mangleAutoDiffAssociatedFunctionHelper(
 }
 
 std::string ASTMangler::mangleAutoDiffLinearMapHelper(
-    StringRef name, AutoDiffAssociatedFunctionKind kind,
+    StringRef name, AutoDiffLinearMapKind kind,
     const SILAutoDiffIndices &indices) {
   // TODO(TF-20): Make the mangling scheme robust.
   // TODO(TF-680): Mangle `@differentiable` atttribute requirements as well.
@@ -401,10 +401,10 @@ std::string ASTMangler::mangleAutoDiffLinearMapHelper(
 
   Buffer << "AD__" << name << '_';
   switch (kind) {
-  case AutoDiffAssociatedFunctionKind::JVP:
+  case AutoDiffLinearMapKind::Differential:
     Buffer << "_differential_";
     break;
-  case AutoDiffAssociatedFunctionKind::VJP:
+  case AutoDiffLinearMapKind::Pullback:
     Buffer << "_pullback_";
     break;
   }
