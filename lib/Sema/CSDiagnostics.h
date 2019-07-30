@@ -1337,6 +1337,8 @@ public:
     return GP->getDecl()->getDeclContext();
   }
 
+  bool hasDecl() const { return Parameters.front()->getDecl() != nullptr; }
+
   bool diagnoseAsError() override;
 
   bool diagnoseForAnchor(Anchor anchor,
