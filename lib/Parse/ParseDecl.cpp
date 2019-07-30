@@ -4096,6 +4096,7 @@ parseDeclTypeAlias(Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
     }
 
     UnderlyingTy = parseType(diag::expected_type_in_typealias);
+    TAD->setTypeEndLoc(PreviousLoc);
     Status |= UnderlyingTy;
   }
 
@@ -4118,8 +4119,8 @@ parseDeclTypeAlias(Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
     if (EqualLoc.isInvalid()) {
       diagnose(Tok, diag::expected_equal_in_typealias);
       Status.setIsParseError();
+      return Status;
     }
-    return Status;
   }
 
   // Exit the scope introduced for the generic parameters.
@@ -4867,7 +4868,8 @@ Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
   // If we have an invalid case, bail out now.
   if (!PrimaryVar) {
     fillInAccessorTypeErrors(*this, accessors);
-    Decls.append(accessors.Accessors.begin(), accessors.Accessors.end());
+    // Preserve the invariant that an accessor can be found from its VarDecl
+    accessors.record(*this, storage, Invalid, Decls);
     return nullptr;
   }
 
@@ -6424,6 +6426,9 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
                           Indices.get(), ElementTy.get(),
                           accessors, Subscript, StaticLoc);
   }
+
+  // Now that it's been parsed, set the end location.
+  Subscript->setEndLoc(PreviousLoc);
 
   bool Invalid = false;
   // Reject 'subscript' functions outside of type decls
