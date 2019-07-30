@@ -143,7 +143,6 @@ set(SWIFTLIB_ESSENTIAL
   StringGuts.swift
   StringGutsSlice.swift
   StringGutsRangeReplaceable.swift
-  StringGutsVisitor.swift
   StringObject.swift
   StringProtocol.swift
   StringIndex.swift
