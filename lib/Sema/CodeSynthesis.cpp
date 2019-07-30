@@ -1890,8 +1890,8 @@ PropertyWrapperMutabilityRequest::evaluate(Evaluator &,
       auto &ctx = var->getASTContext();
       ctx.Diags.diagnose(var->getAttachedPropertyWrappers()[i]->getLocation(),
                diag::property_wrapper_mutating_get_composed_to_get_only,
-               var->getAttachedPropertyWrappers()[i]->getTypeLoc().getType(),
-               var->getAttachedPropertyWrappers()[i-1]->getTypeLoc().getType());
+               var->getAttachedPropertyWrappers()[i]->getTypeLoc(),
+               var->getAttachedPropertyWrappers()[i-1]->getTypeLoc());
 
       return None;
     }
