@@ -4209,16 +4209,17 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
 
         Optional<DeclNameWithLoc> jvp;
         FuncDecl *jvpDecl = nullptr;
-        if (jvpNameId != 0 && jvpDeclId != 0) {
+        if (jvpNameId != 0)
           jvp = { MF.getIdentifier(jvpNameId), DeclNameLoc() };
+        if (jvpDeclId != 0)
           jvpDecl = cast<FuncDecl>(MF.getDecl(jvpDeclId));
-        }
+
         Optional<DeclNameWithLoc> vjp;
         FuncDecl *vjpDecl = nullptr;
-        if (vjpNameId != 0 && vjpDeclId != 0) {
+        if (vjpNameId != 0)
           vjp = { MF.getIdentifier(vjpNameId), DeclNameLoc() };
+        if (vjpDeclId != 0)
           vjpDecl = cast<FuncDecl>(MF.getDecl(vjpDeclId));
-        }
 
         llvm::SmallBitVector parametersBitVector(parameters.size());
         for (unsigned i : indices(parameters))
