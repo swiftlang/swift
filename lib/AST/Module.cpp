@@ -1672,7 +1672,21 @@ bool FileUnit::walk(ASTWalker &walker) {
     
     if (D->walk(walker))
       return true;
+
+    if (walker.shouldWalkAccessorsTheOldWay()) {
+      // Pretend that accessors share a parent with the storage.
+      //
+      // FIXME: Update existing ASTWalkers to deal with accessors appearing as
+      // children of the storage instead.
+      if (auto *ASD = dyn_cast<AbstractStorageDecl>(D)) {
+        for (auto AD : ASD->getAllAccessors()) {
+          if (AD->walk(walker))
+            return true;
+        }
+      }
+    }
   }
+
   return false;
 }
 
@@ -1686,6 +1700,19 @@ bool SourceFile::walk(ASTWalker &walker) {
 
     if (D->walk(walker))
       return true;
+
+    if (walker.shouldWalkAccessorsTheOldWay()) {
+      // Pretend that accessors share a parent with the storage.
+      //
+      // FIXME: Update existing ASTWalkers to deal with accessors appearing as
+      // children of the storage instead.
+      if (auto *ASD = dyn_cast<AbstractStorageDecl>(D)) {
+        for (auto AD : ASD->getAllAccessors()) {
+          if (AD->walk(walker))
+            return true;
+        }
+      }
+    }
   }
   return false;
 }

@@ -182,7 +182,6 @@ static ValueDecl *deriveProperty(DerivedConformance &derived, Type type,
   synthesizer(getterDecl);
 
   auto *dc = cast<IterableDeclContext>(derived.ConformanceDecl);
-  dc->addMember(getterDecl);
   dc->addMember(propDecl);
   dc->addMember(pbDecl);
   return propDecl;

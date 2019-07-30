@@ -405,7 +405,7 @@ var x23: Int, x24: Int { // expected-error{{'var' declarations with multiple var
 
 var x25: Int { // expected-error{{'var' declarations with multiple variables cannot have explicit getters/setters}}
   return 42
-}, x26: Int
+}, x26: Int // expected-warning{{variable 'x26' was never used; consider replacing with '_' or removing it}}
 
 // Properties of struct/enum/extensions
 struct S {
