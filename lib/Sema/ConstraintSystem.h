@@ -1553,19 +1553,15 @@ public:
     bool HasTrailingClosure;
   };
 
-  /// A mapping from the constraint anchors for references to various
+  /// A mapping from the constraint locators for references to various
   /// names (e.g., member references, normal name references, possible
   /// constructions) to the argument labels provided in the call to
   /// that locator.
-  llvm::DenseMap<Expr *, ArgumentInfo> ArgumentInfos;
+  llvm::DenseMap<ConstraintLocator *, ArgumentInfo> ArgumentInfos;
 
   /// Retrieve the argument info that is associated with a member
-  /// reference at the given anchor expression.
-  Optional<ArgumentInfo> getArgumentInfo(Expr *anchor) const;
-  /// Retrieve the argument info that is associated with a member
   /// reference at the given locator.
-  Optional<ArgumentInfo>
-  getArgumentInfo(ConstraintLocatorBuilder locator) const;
+  Optional<ArgumentInfo> getArgumentInfo(ConstraintLocatorBuilder locator);
 
   ResolvedOverloadSetListItem *getResolvedOverloadSets() const {
     return resolvedOverloadSets;

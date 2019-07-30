@@ -2784,47 +2784,24 @@ void ConstraintSystem::generateConstraints(
 }
 
 Optional<ConstraintSystem::ArgumentInfo>
-ConstraintSystem::getArgumentInfo(Expr *anchor) const {
-  auto *target = getArgumentLabelTargetExpr(anchor);
-  auto known = ArgumentInfos.find(target);
-  if (known == ArgumentInfos.end())
-    return None;
-  return known->second;
-}
-
-Optional<ConstraintSystem::ArgumentInfo>
-ConstraintSystem::getArgumentInfo(ConstraintLocatorBuilder locator) const {
-  SmallVector<LocatorPathElt, 2> parts;
-  Expr *anchor = locator.getLocatorParts(parts);
+ConstraintSystem::getArgumentInfo(const ConstraintLocatorBuilder builder) {
+  Expr *anchor = builder.getAnchor();
   if (!anchor)
     return None;
 
-  while (!parts.empty()) {
-    if (parts.back().getKind() == ConstraintLocator::Member ||
-        parts.back().getKind() == ConstraintLocator::SubscriptMember) {
-      parts.pop_back();
-      continue;
-    }
-
-    if (parts.back().getKind() == ConstraintLocator::ApplyFunction) {
-      if (auto applyExpr = dyn_cast<ApplyExpr>(anchor)) {
-        anchor = applyExpr->getSemanticFn();
-      }
-      parts.pop_back();
-      continue;
-    }
-
-    if (parts.back().getKind() == ConstraintLocator::ConstructorMember) {
-      parts.pop_back();
-      continue;
-    }
-    break;
+  ConstraintLocator *locator = nullptr;
+  if (auto *apply = dyn_cast<ApplyExpr>(anchor)) {
+    auto *fnExpr = getArgumentLabelTargetExpr(apply->getFn());
+    locator = getConstraintLocator(fnExpr);
+  } else {
+    locator = getCalleeLocator(anchor);
   }
 
-  if (!parts.empty())
-    return None;
+  auto known = ArgumentInfos.find(locator);
+  if (known != ArgumentInfos.end())
+    return known->second;
 
-  return getArgumentInfo(anchor);
+  return None;
 }
 
 bool constraints::isKnownKeyPathType(Type type) {
