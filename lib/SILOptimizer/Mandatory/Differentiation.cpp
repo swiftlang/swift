@@ -5042,6 +5042,9 @@ public:
       emitTangentForTupleInst(ti);
   }
 
+  /// Handle `tuple_extract` instruction.
+  ///   Original: y = tuple_extract x, <n>
+  ///    Tangent: tan[y] = tuple_extract tan[x], <n>
   void visitTupleExtractInst(TupleExtractInst *tei) {
     llvm_unreachable("Unsupported SIL instruction.");
   }

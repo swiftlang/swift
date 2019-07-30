@@ -209,7 +209,8 @@ ForwardModeTests.test("TrackedWithLets") {
 
 // Generics.
 
-struct Tensor<Scalar : FloatingPoint & Differentiable> : VectorProtocol, Differentiable {
+struct Tensor<Scalar : FloatingPoint & Differentiable> 
+  : VectorProtocol, Differentiable {
   // NOTE: `value` must have type with known size (e.g. `Float`, not `Scalar`)
   // until differentiation has indirect passing support.
   var value: Float
@@ -228,7 +229,8 @@ ForwardModeTests.test("GenericIdentity") {
 }
 
 ForwardModeTests.test("GenericTensorIdentity") {
-  func identity<T : FloatingPoint & Differentiable>(_ x: Tensor<T>) -> Tensor<T> {
+  func identity<T : FloatingPoint & Differentiable>(
+    _ x: Tensor<T>) -> Tensor<T> {
     return x
   }
   let (y, differential) = valueWithDifferential(at: 4) { (x: Float) in 
@@ -250,10 +252,12 @@ ForwardModeTests.test("GenericTensorPlus") {
 }
 
 ForwardModeTests.test("GenericTensorBinaryInput") {
-  func binary<T : FloatingPoint & Differentiable>(_ x: Tensor<T>, _ y: Tensor<T>) -> Float {
+  func binary<T : FloatingPoint & Differentiable>(
+    _ x: Tensor<T>, _ y: Tensor<T>) -> Float {
     return x.value * y.value
   }
-  let (y, differential) = valueWithDifferential(at: 4, 5) { (x: Float, y: Float) in 
+  let (y, differential) = valueWithDifferential(at: 4, 5) { 
+    (x: Float, y: Float) in 
     binary(Tensor<Float>(x), Tensor<Float>(y)) 
   }
   expectEqual(20, y)
@@ -261,12 +265,14 @@ ForwardModeTests.test("GenericTensorBinaryInput") {
 }
 
 ForwardModeTests.test("GenericTensorWithLets") {
-  func binary<T : FloatingPoint & Differentiable>(_ x: Tensor<T>, _ y: Tensor<T>) -> Float {
+  func binary<T : FloatingPoint & Differentiable>(
+    _ x: Tensor<T>, _ y: Tensor<T>) -> Float {
     let a = Tensor<T>(x.value)
     let b = Tensor<T>(y.value)
     return a.value * b.value
   }
-  let (y, differential) = valueWithDifferential(at: 4, 5) { (x: Float, y: Float) in 
+  let (y, differential) = valueWithDifferential(at: 4, 5) { 
+    (x: Float, y: Float) in 
     binary(Tensor<Float>(x), Tensor<Float>(y)) 
   }
   expectEqual(20, y)
@@ -274,14 +280,16 @@ ForwardModeTests.test("GenericTensorWithLets") {
 }
 
 ForwardModeTests.test("GenericTensorWithVars") {
-  func binary<T : FloatingPoint & Differentiable>(_ x: Tensor<T>, _ y: Tensor<T>) -> Float {
+  func binary<T : FloatingPoint & Differentiable>(
+    _ x: Tensor<T>, _ y: Tensor<T>) -> Float {
     var a = Tensor<T>(x.value)
     var b = Tensor<T>(y.value)
     b = a
     a = Tensor<T>(y.value)
     return a.value * b.value
   }
-  let (y, differential) = valueWithDifferential(at: 4, 5) { (x: Float, y: Float) in 
+  let (y, differential) = valueWithDifferential(at: 4, 5) { 
+    (x: Float, y: Float) in 
     binary(Tensor<Float>(x), Tensor<Float>(y)) 
   }
   expectEqual(20, y)
@@ -353,11 +361,13 @@ extension TF_508_Struct : Differentiable where Scalar : Differentiable {
 func TF_508() {
   let x = TF_508_Struct<Float>()
   // Test conformance requirement with dependent member type.
-  _ = differential(at: x, in: { (x: TF_508_Struct<Float>) -> TF_508_Struct<Float> in
+  _ = differential(at: x, in: { 
+    (x: TF_508_Struct<Float>) -> TF_508_Struct<Float> in
     return x + x
   })
   // Test same-type requirement with dependent member type.
-  _ = differential(at: x, in: { (x: TF_508_Struct<Float>) -> TF_508_Struct<Float> in
+  _ = differential(at: x, in: { 
+    (x: TF_508_Struct<Float>) -> TF_508_Struct<Float> in
     return x - x
   })
 }
@@ -426,11 +436,50 @@ ForwardModeTests.test("GenericTrackedBinaryAdd") {
           T == T.AllDifferentiableVariables {
     return x + y
   }
-  let (y, differential) = valueWithDifferential(at: 4, 5) { (x: Float, y: Float) in
+  let (y, differential) = valueWithDifferential(at: 4, 5) { 
+    (x: Float, y: Float) in
     add(Tracked(x), Tracked(y))
   }
   expectEqual(9, y)
   expectEqual(2, differential(1, 1))
+}
+
+ForwardModeTests.test("GenericTrackedBinaryLets") {
+  func add<T>(_ x: Tracked<T>, _ y: Tracked<T>) -> Tracked<T>
+    where T: Differentiable & SignedNumeric,
+          T == T.TangentVector,
+          T == T.AllDifferentiableVariables,
+          T == T.Magnitude {
+  let a = x * y // xy
+  let b = a + a // 2xy
+  return b + b // 4xy
+}
+// 4y + 4x
+let (y, differential) = valueWithDifferential(at: 4, 5) { (x: Float, y: Float) in
+  add(Tracked(x), Tracked(y))
+}
+  expectEqual(80, y)
+  expectEqual(36, differential(1, 1))
+}
+
+ForwardModeTests.test("GenericTrackedBinaryVars") {
+  func add<T>(_ x: Tracked<T>, _ y: Tracked<T>) -> Tracked<T>
+    where T: Differentiable & SignedNumeric,
+          T == T.TangentVector,
+          T == T.AllDifferentiableVariables,
+          T == T.Magnitude {
+  var a = x * y // xy
+  a = a + a // 2xy
+  var b = x
+  b = a
+  return b + b // 4xy
+}
+// 4y + 4x
+let (y, differential) = valueWithDifferential(at: 4, 5) { (x: Float, y: Float) in
+  add(Tracked(x), Tracked(y))
+}
+  expectEqual(80, y)
+  expectEqual(36, differential(1, 1))
 }
 
 
