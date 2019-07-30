@@ -22,6 +22,8 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/ForeignInfo.h"
 #include "swift/AST/GenericEnvironment.h"
+// SWIFT_ENABLE_TENSORFLOW
+#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/SIL/SILModule.h"
@@ -148,11 +150,41 @@ CanSILFunctionType SILFunctionType::getWithoutDifferentiability() {
                               getOptionalErrorResult(), getASTContext());
 }
 
+// Returns the canonical generic signature for an autodiff associated function
+// given an existing associated function generic signature. All differentiation
+// parameters are constrained to conform to `Differentiable`.
+static CanGenericSignature getAssociatedFunctionGenericSignature(
+    CanGenericSignature assocFnGenSig,
+    ArrayRef<SILParameterInfo> originalParameters,
+    AutoDiffIndexSubset *parameterIndices, SILModule &module) {
+  // If associated function has no
+  if (!assocFnGenSig)
+    return nullptr;
+  auto &ctx = module.getASTContext();
+  GenericSignatureBuilder builder(ctx);
+
+  // Add associated function generic signature.
+  builder.addGenericSignature(assocFnGenSig);
+  // Constrain all wrt parameters to conform to `Differentiable`.
+  auto source =
+      GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
+  auto *diffableProto = ctx.getProtocol(KnownProtocolKind::Differentiable);
+  for (unsigned paramIdx : parameterIndices->getIndices()) {
+    auto paramType = originalParameters[paramIdx].getType();
+    Requirement req(RequirementKind::Conformance, paramType,
+                    diffableProto->getDeclaredType());
+    builder.addRequirement(req, source, module.getSwiftModule());
+  }
+  return std::move(builder)
+      .computeGenericSignature(SourceLoc(), /*allowConcreteGenericParams*/ true)
+      ->getCanonicalSignature();
+}
+
 CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
     AutoDiffIndexSubset *parameterIndices, unsigned resultIndex,
     unsigned differentiationOrder, AutoDiffAssociatedFunctionKind kind,
     SILModule &module, LookupConformanceFn lookupConformance,
-    CanGenericSignature whereClauseGenSig) {
+    CanGenericSignature assocFnGenSig) {
   // JVP: (T...) -> ((R...),
   //                 (T.TangentVector...) -> (R.TangentVector...))
   // VJP: (T...) -> ((R...),
@@ -160,10 +192,26 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
 
   auto &ctx = getASTContext();
   auto &typeConverter = module.Types;
-  if (!whereClauseGenSig)
-    whereClauseGenSig = getGenericSignature();
-  Lowering::GenericContextScope genericContextScope(
-      module.Types, whereClauseGenSig);
+
+  // Helper function testing if we are differentiating wrt this index.
+  auto isWrtIndex = [&](unsigned index) -> bool {
+    return index < parameterIndices->getCapacity() &&
+        parameterIndices->contains(index);
+  };
+
+  // Calculate differentiation parameter infos.
+  SmallVector<SILParameterInfo, 4> wrtParams;
+  for (auto valueAndIndex : enumerate(getParameters()))
+    if (isWrtIndex(valueAndIndex.index()))
+      wrtParams.push_back(valueAndIndex.value());
+
+  // Get the canonical associated function generic signature.
+  if (!assocFnGenSig)
+    assocFnGenSig = getGenericSignature();
+  assocFnGenSig = getAssociatedFunctionGenericSignature(
+      assocFnGenSig, getParameters(), parameterIndices, module);
+  Lowering::GenericContextScope genericContextScope(module.Types,
+                                                    assocFnGenSig);
 
   // Given a type, returns its formal SIL parameter info.
   auto getTangentParameterInfoForOriginalResult = [&](
@@ -213,18 +261,6 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
     }
     return {tanType, conv};
   };
-
-  // Helper function testing if we are differentiating wrt this index.
-  auto isWrtIndex = [&](unsigned index) -> bool {
-    return index < parameterIndices->getCapacity() &&
-        parameterIndices->contains(index);
-  };
-
-  // Calculate differentiation parameter infos.
-  SmallVector<SILParameterInfo, 4> wrtParams;
-  for (auto valueAndIndex : enumerate(getParameters()))
-    if (isWrtIndex(valueAndIndex.index()))
-      wrtParams.push_back(valueAndIndex.value());
 
   CanSILFunctionType closureType;
   switch (kind) {
@@ -280,12 +316,12 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
   newResults.reserve(getNumResults() + 1);
   for (auto &result : getResults()) {
     auto mappedResult = result.getWithType(
-        result.getType()->getCanonicalType(whereClauseGenSig));
+        result.getType()->getCanonicalType(assocFnGenSig));
     newResults.push_back(mappedResult);
   }
-  newResults.push_back({closureType->getCanonicalType(whereClauseGenSig),
+  newResults.push_back({closureType->getCanonicalType(assocFnGenSig),
                         ResultConvention::Owned});
-  return SILFunctionType::get(whereClauseGenSig, getExtInfo(),
+  return SILFunctionType::get(assocFnGenSig, getExtInfo(),
                               getCoroutineKind(), getCalleeConvention(),
                               getParameters(), getYields(), newResults,
                               getOptionalErrorResult(), ctx,

@@ -199,17 +199,20 @@ static LoadOwnershipQualifier getBufferLOQ(Type type, SILFunction &fn) {
   return LoadOwnershipQualifier::Unqualified;
 }
 
-// Return the expected generic signature for autodiff associated functions given
-// a SILDifferentiableAttr. The expected generic signature is built from the
-// original generic signature and the attribute's requirements.
+// Returns the generic signature for an autodiff associated function given a
+// `SILDifferentiableAttr` and the original function. The associated function's
+// generic signature is built from the original function's generic signature and
+// the attribute's requirements. All differentiation parameters are constrained
+// to conform to `Differentiable`.
 static CanGenericSignature
 getAssociatedFunctionGenericSignature(SILDifferentiableAttr *attr,
                                       SILFunction *original) {
-  auto originalGenSig =
-      original->getLoweredFunctionType()->getGenericSignature();
+  auto originalFnTy = original->getLoweredFunctionType();
+  auto originalGenSig = originalFnTy->getGenericSignature();
   if (!originalGenSig)
     return nullptr;
-  GenericSignatureBuilder builder(original->getASTContext());
+  auto &ctx = original->getASTContext();
+  GenericSignatureBuilder builder(ctx);
   // Add original generic signature.
   builder.addGenericSignature(originalGenSig);
   // Add where clause requirements.
@@ -217,8 +220,17 @@ getAssociatedFunctionGenericSignature(SILDifferentiableAttr *attr,
       GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
   for (auto &req : attr->getRequirements())
     builder.addRequirement(req, source, original->getModule().getSwiftModule());
+  // Constrain all wrt parameters to conform to `Differentiable`.
+  auto *diffableProto = ctx.getProtocol(KnownProtocolKind::Differentiable);
+  auto paramIndexSet = attr->getIndices().parameters;
+  for (unsigned paramIdx : paramIndexSet->getIndices()) {
+    auto paramType = originalFnTy->getParameters()[paramIdx].getType();
+    Requirement req(RequirementKind::Conformance, paramType,
+                    diffableProto->getDeclaredType());
+    builder.addRequirement(req, source, original->getModule().getSwiftModule());
+  }
   return std::move(builder)
-      .computeGenericSignature(SourceLoc(), /*allowConcreteGenericParams=*/true)
+      .computeGenericSignature(SourceLoc(), /*allowConcreteGenericParams*/ true)
       ->getCanonicalSignature();
 }
 

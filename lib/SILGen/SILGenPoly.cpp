@@ -3687,8 +3687,7 @@ static void forwardFunctionArgumentsConvertingOwnership(
 SILFunction *
 SILGenModule::getOrCreateAutoDiffAssociatedFunctionThunk(
     SILFunction *original, SILAutoDiffIndices &indices,
-    SILFunction *assocFn, AutoDiffAssociatedFunctionKind assocFnKind,
-    IsSerialized_t isSerialized) {
+    SILFunction *assocFn, AutoDiffAssociatedFunctionKind assocFnKind) {
   auto assocFnType = assocFn->getLoweredFunctionType();
 
   Mangle::ASTMangler mangler;
