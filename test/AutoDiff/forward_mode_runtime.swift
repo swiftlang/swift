@@ -362,6 +362,51 @@ func TF_508() {
   })
 }
 
+// TF-523
+struct TF_523_Struct : Differentiable & AdditiveArithmetic {
+  var a: Float = 1
+  typealias TangentVector = TF_523_Struct
+  typealias AllDifferentiableVariables = TF_523_Struct
+}
+
+@differentiable
+func TF_523_f(_ x: TF_523_Struct) -> Float {
+  return x.a * 2
+}
+
+// TF-534: Thunk substitution map remapping.
+// protocol TF_534_Layer : Differentiable {
+//   associatedtype Input : Differentiable
+//   associatedtype Output : Differentiable
+
+//   @differentiable
+//   func callAsFunction(_ input: Input) -> Output
+// }
+// struct TF_534_Tensor<Scalar> : Differentiable {}
+
+// func TF_534<Model: TF_534_Layer>(
+//   _ model: inout Model, inputs: Model.Input
+// ) -> TF_534_Tensor<Float> where Model.Output == TF_534_Tensor<Float> {
+//   return valueWithDifferential(at: model) { model -> Model.Output in
+//     return model(inputs)
+//   }.0
+// }
+
+// TODO: uncomment once control flow is supported in forward mode.
+// TF-652: Test VJPEmitter substitution map generic signature.
+// The substitution map should have the VJP's generic signature, not the
+// original function's.
+// struct TF_652<Scalar> {}
+// extension TF_652 : Differentiable where Scalar : FloatingPoint {}
+
+// @differentiable(wrt: x where Scalar: FloatingPoint)
+// func test<Scalar: Numeric>(x: TF_652<Scalar>) -> TF_652<Scalar> {
+//   for _ in 0..<10 {
+//     let _ = x
+//   }
+//   return x
+// }
+
 // Tracked Generic.
 
 ForwardModeTests.test("GenericTrackedIdentity") {

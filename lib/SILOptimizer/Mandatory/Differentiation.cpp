@@ -3858,7 +3858,7 @@ private:
   //--------------------------------------------------------------------------//
 
   AdjointValue makeZeroTangentValue(SILType type) {
-    return AdjointValue::createZero(allocator, remapType(type));
+    return AdjointValue::createZero(allocator, remapTypeInDifferential(type));
   }
 
   AdjointValue makeConcreteTangentValue(SILValue value) {
