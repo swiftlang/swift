@@ -977,11 +977,10 @@ static void lookupVisibleDynamicMemberLookupDecls(
     if (!subscript)
       continue;
 
-    auto rootAndResult =
-        getRootAndResultTypeOfKeypathDynamicMember(subscript, dc);
-    if (!rootAndResult)
+    auto rootType = evaluateOrDefault(subscript->getASTContext().evaluator,
+      RootTypeOfKeypathDynamicMemberRequest{subscript}, Type());
+    if (rootType.isNull())
       continue;
-    auto rootType = rootAndResult->first;
 
     auto subs =
         baseType->getMemberSubstitutionMap(dc->getParentModule(), subscript);
