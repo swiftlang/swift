@@ -803,8 +803,15 @@ void LifetimeChecker::doIt() {
   SILValue ControlVariable;
   if (HasConditionalInitAssign ||
       HasConditionalDestroy ||
-      HasConditionalSelfInitialized)
+      HasConditionalSelfInitialized) {
     ControlVariable = handleConditionalInitAssign();
+    SILValue memAddr = TheMemory.MemoryInst->getOperand();
+    if (auto *ASI = dyn_cast<AllocStackInst>(memAddr)) {
+      ASI->setDynamicLifetime();
+    } else if (auto *ABI = dyn_cast<AllocBoxInst>(memAddr)) {
+      ABI->setDynamicLifetime();
+    }
+  }
   if (!ConditionalDestroys.empty())
     handleConditionalDestroys(ControlVariable);
 

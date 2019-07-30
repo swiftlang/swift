@@ -1370,15 +1370,18 @@ class AllocStackInst final
   friend TrailingObjects;
   friend SILBuilder;
 
+  bool dynamicLifetime = false;
+
   AllocStackInst(SILDebugLocation Loc, SILType elementType,
                  ArrayRef<SILValue> TypeDependentOperands,
                  SILFunction &F,
-                 Optional<SILDebugVariable> Var);
+                 Optional<SILDebugVariable> Var, bool hasDynamicLifetime);
 
   static AllocStackInst *create(SILDebugLocation Loc, SILType elementType,
                                 SILFunction &F,
                                 SILOpenedArchetypesState &OpenedArchetypes,
-                                Optional<SILDebugVariable> Var);
+                                Optional<SILDebugVariable> Var,
+                                bool hasDynamicLifetime);
 
   size_t numTrailingObjects(OverloadToken<Operand>) const {
     return SILInstruction::Bits.AllocStackInst.NumOperands;
@@ -1392,6 +1395,9 @@ public:
       Operands[i].~Operand();
     }
   }
+
+  void setDynamicLifetime() { dynamicLifetime = true; }
+  bool hasDynamicLifetime() const { return dynamicLifetime; }
 
   /// Return the underlying variable declaration associated with this
   /// allocation, or null if this is a temporary allocation.
@@ -1616,19 +1622,25 @@ class AllocBoxInst final
 
   TailAllocatedDebugVariable VarInfo;
 
+  bool dynamicLifetime = false;
+
   AllocBoxInst(SILDebugLocation DebugLoc, CanSILBoxType BoxType,
                ArrayRef<SILValue> TypeDependentOperands, SILFunction &F,
-               Optional<SILDebugVariable> Var);
+               Optional<SILDebugVariable> Var, bool hasDynamicLifetime);
 
   static AllocBoxInst *create(SILDebugLocation Loc, CanSILBoxType boxType,
                               SILFunction &F,
                               SILOpenedArchetypesState &OpenedArchetypes,
-                              Optional<SILDebugVariable> Var);
+                              Optional<SILDebugVariable> Var,
+                              bool hasDynamicLifetime);
 
 public:
   CanSILBoxType getBoxType() const {
     return getType().castTo<SILBoxType>();
   }
+
+  void setDynamicLifetime() { dynamicLifetime = true; }
+  bool hasDynamicLifetime() const { return dynamicLifetime; }
 
   // Return the type of the memory stored in the alloc_box.
   SILType getAddressType() const {
