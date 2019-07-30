@@ -2040,8 +2040,9 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
                                          TypeResolutionOptions options) {
   // Convenience to grab the source range of a type attribute.
   auto getTypeAttrRangeWithAt = [](ASTContext &ctx, SourceLoc attrLoc) {
-    return SourceRange(attrLoc.getAdvancedLoc(-1),
-                       Lexer::getLocForEndOfToken(ctx.SourceMgr, attrLoc));
+    return SourceRange(attrLoc,
+                       Lexer::getLocForEndOfToken(ctx.SourceMgr,
+                                                  attrLoc.getAdvancedLoc(1)));
 
   };
 

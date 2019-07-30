@@ -975,7 +975,7 @@ public:
   bool parseTypeAttributeListPresent(ParamDecl::Specifier &Specifier,
                                      SourceLoc &SpecifierLoc,
                                      TypeAttributes &Attributes);
-  bool parseTypeAttribute(TypeAttributes &Attributes,
+  bool parseTypeAttribute(TypeAttributes &Attributes, SourceLoc AtLoc,
                           bool justChecking = false);
   
   
