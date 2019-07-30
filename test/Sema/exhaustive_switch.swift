@@ -1178,6 +1178,11 @@ func sr10301_as(_ foo: SR10301<String,(Int,Error)>) {
 
 func sr11160() {
   switch Optional<(Int, Int)>((5, 6)) {
+  case .some((let a, let b)): print(a, b)
+  case nil:                   print(0)
+  }
+
+  switch Optional<(Int, Int)>((5, 6)) {
   case let b?: print(b)
   case nil:    print(0)
   }

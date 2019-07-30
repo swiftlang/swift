@@ -737,6 +737,30 @@ namespace {
         }
       }
 
+      /// Use this if you're doing getAs<TupleType> on a Type (and it succeeds)
+      /// to compute the spaces for it. Handy for disambiguating fields
+      /// that are tuples from associated values.
+      ///
+      ///    .e((a: X, b: X)) -> ((a: X, b: X))
+      /// vs .f(a: X, b: X)   -> (a: X, b: X)
+      static void getTupleTypeSpaces(Type &outerType,
+                                     TupleType *tty,
+                                     SmallVectorImpl<Space> &spaces) {
+        ArrayRef<TupleTypeElt> ttyElts = tty->getElements();
+        if (isa<ParenType>(outerType.getPointer())) {
+          // We had an actual tuple!
+          SmallVector<Space, 4> innerSpaces;
+          for (auto &elt: ttyElts)
+            innerSpaces.push_back(Space::forType(elt.getType(), elt.getName()));
+          spaces.push_back(
+            Space::forConstructor(tty, Identifier(), innerSpaces));
+        } else {
+          // We're looking at the fields of a constructor here.
+          for (auto &elt: ttyElts)
+            spaces.push_back(Space::forType(elt.getType(), elt.getName()));
+        }
+      };
+
       // Decompose a type into its component spaces.
       static void decompose(TypeChecker &TC, const DeclContext *DC, Type tp,
                             SmallVectorImpl<Space> &arr) {
@@ -776,20 +800,7 @@ namespace {
             SmallVector<Space, 4> constElemSpaces;
             if (eedTy) {
               if (auto *TTy = eedTy->getAs<TupleType>()) {
-                if (isa<ParenType>(eedTy.getPointer())) {
-                  // We had an actual tuple!
-                  SmallVector<Space, 4> innerElemSpaces;
-                  for (auto &elt: TTy->getElements())
-                    innerElemSpaces.push_back(
-                      Space::forType(elt.getType(), elt.getName()));
-                  constElemSpaces.push_back(
-                    Space::forConstructor(TTy, Identifier(), innerElemSpaces));
-                } else {
-                  // We're just looking at fields of a constructor here.
-                  for (auto &elt: TTy->getElements())
-                    constElemSpaces.push_back(
-                      Space::forType(elt.getType(), elt.getName()));
-                }
+                Space::getTupleTypeSpaces(eedTy, TTy, constElemSpaces);
               } else if (auto *TTy = dyn_cast<ParenType>(eedTy.getPointer())) {
                 constElemSpaces.push_back(
                     Space::forType(TTy->getUnderlyingType(), Identifier()));
@@ -1452,14 +1463,11 @@ namespace {
           // FIXME: SE-0155 makes this case unreachable.
           if (SP->getKind() == PatternKind::Named
               || SP->getKind() == PatternKind::Any) {
-            if (auto *TTy = SP->getType()->getAs<TupleType>()) {
-              for (auto ty : TTy->getElements()) {
-                conArgSpace.push_back(Space::forType(ty.getType(),
-                                                     ty.getName()));
-              }
-            } else {
+            Type outerType = SP->getType();
+            if (auto *TTy = outerType->getAs<TupleType>())
+              Space::getTupleTypeSpaces(outerType, TTy, conArgSpace);
+            else
               conArgSpace.push_back(projectPattern(TC, SP));
-            }
           } else if (SP->getKind() == PatternKind::Tuple) {
             Space argTupleSpace = projectPattern(TC, SP);
             // Tuples are modeled as if they are enums with a single, nameless
