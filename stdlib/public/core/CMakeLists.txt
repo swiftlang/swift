@@ -319,4 +319,5 @@ add_swift_target_library(swiftCore
                   FRAMEWORK_DEPENDS
                     ${swift_core_framework_depends}
                   INSTALL_IN_COMPONENT
-                    stdlib)
+                    stdlib
+                  INSTALL_IN_SDK)

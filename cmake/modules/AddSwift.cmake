@@ -11,6 +11,17 @@ set(SWIFTLIB_DIR
 set(SWIFTSTATICLIB_DIR
     "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib/swift_static")
 
+set(SWIFT_PLATFORMS_DIR
+  ${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/Developer/Platforms)
+foreach(sdk ${SWIFT_SDKS})
+  set(SWIFT_${sdk}_SDK_DIR
+    ${SWIFT_PLATFORMS_DIR}/${SWIFT_SDK_${sdk}_LIB_SUBDIR}.platform/Developer/SDKs/${SWIFT_SDK_${sdk}_LIB_SUBDIR}.sdk)
+  if(NOT TARGET swift-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-sdk)
+    file(MAKE_DIRECTORY ${SWIFT_${sdk}_SDK_DIR})
+    add_custom_target(swift-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-sdk)
+  endif()
+endforeach()
+
 function(add_dependencies_multiple_targets)
   cmake_parse_arguments(
       ADMT # prefix
@@ -1551,6 +1562,7 @@ endfunction()
 #     [IS_STDLIB_CORE]
 #     [TARGET_LIBRARY]
 #     [INSTALL_WITH_SHARED]
+#     [INSTALL_IN_SDK]
 #     INSTALL_IN_COMPONENT comp
 #     DEPLOYMENT_VERSION_OSX version
 #     DEPLOYMENT_VERSION_IOS version
@@ -1675,6 +1687,7 @@ function(add_swift_target_library name)
         SHARED
         STATIC
         TARGET_LIBRARY
+        INSTALL_IN_SDK
         INSTALL_WITH_SHARED)
   set(SWIFTLIB_single_parameter_options
         DEPLOYMENT_VERSION_IOS
@@ -2003,6 +2016,52 @@ function(add_swift_target_library name)
         GYB_SOURCES ${SWIFTLIB_GYB_SOURCES}
       )
 
+      if(SWIFTLIB_INSTALL_IN_SDK)
+        if(SWIFTLIB_SHARED)
+          if(${sdk} STREQUAL WINDOWS)
+            set(target_file ${name}.lib)
+          else()
+            set(target_file ${CMAKE_SHARED_LIBRARY_PREFIX}${name}${CMAKE_SHARED_LIBRARY_SUFFIX})
+          endif()
+
+          add_custom_command(OUTPUT ${SWIFT_${sdk}_SDK_DIR}/usr/lib/swift/${arch}/${target_file}
+            DEPENDS ${SWIFT_LIBRARY_OUTPUT_INTDIR}/swift/${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}/${target_file}
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different ${SWIFT_LIBRARY_OUTPUT_INTDIR}/swift/${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}/${target_file} ${SWIFT_${sdk}_SDK_DIR}/usr/lib/swift/${arch}/${target_file})
+          add_custom_target(swift-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-sdk-${name}-${arch}
+            DEPENDS ${SWIFT_${sdk}_SDK_DIR}/usr/lib/swift/${arch}/${target_file})
+
+          if(SWIFTLIB_IS_STDLIB_CORE)
+            set(module_name Swift)
+          else()
+            string(REPLACE swift "" module_name "${name}")
+          endif()
+
+          add_custom_command(OUTPUT ${SWIFT_${sdk}_SDK_DIR}/usr/lib/swift/${arch}/${module_name}.swiftdoc
+            DEPENDS ${SWIFT_LIBRARY_OUTPUT_INTDIR}/swift/${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}/${module_name}.swiftdoc
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different ${SWIFT_LIBRARY_OUTPUT_INTDIR}/swift/${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}/${module_name}.swiftdoc ${SWIFT_${sdk}_SDK_DIR}/usr/lib/swift/${arch}/${module_name}.swiftdoc)
+          add_custom_target(swift-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-sdk-${name}-${arch}-swiftdoc
+            DEPENDS ${SWIFT_${sdk}_SDK_DIR}/usr/lib/swift/${arch}/${module_name}.swiftdoc)
+
+          add_custom_command(OUTPUT ${SWIFT_${sdk}_SDK_DIR}/usr/lib/swift/${arch}/${module_name}.swiftinterface
+            DEPENDS ${SWIFT_LIBRARY_OUTPUT_INTDIR}/swift/${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}/${module_name}.swiftinterface
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different ${SWIFT_LIBRARY_OUTPUT_INTDIR}/swift/${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}/${module_name}.swiftinterface ${SWIFT_${sdk}_SDK_DIR}/usr/lib/swift/${arch}/${module_name}.swiftinterface)
+          add_custom_target(swift-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-sdk-${name}-${arch}-swiftinterface
+            DEPENDS ${SWIFT_${sdk}_SDK_DIR}/usr/lib/swift/${arch}/${module_name}.swiftinterface)
+
+          add_custom_command(OUTPUT ${SWIFT_${sdk}_SDK_DIR}/usr/lib/swift/${arch}/${module_name}.swiftmodule
+            DEPENDS ${SWIFT_LIBRARY_OUTPUT_INTDIR}/swift/${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}/${module_name}.swiftmodule
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different ${SWIFT_LIBRARY_OUTPUT_INTDIR}/swift/${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}/${module_name}.swiftmodule ${SWIFT_${sdk}_SDK_DIR}/usr/lib/swift/${arch}/${module_name}.swiftmodule)
+          add_custom_target(swift-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-sdk-${name}-${arch}-swiftmodule
+            DEPENDS ${SWIFT_${sdk}_SDK_DIR}/usr/lib/swift/${arch}/${module_name}.swiftmodule)
+
+          add_dependencies(swift-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-sdk
+            swift-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-sdk-${name}-${arch}
+            swift-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-sdk-${name}-${arch}-swiftdoc
+            swift-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-sdk-${name}-${arch}-swiftinterface
+            swift-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-sdk-${name}-${arch}-swiftmodule)
+        endif()
+      endif()
+
       if(sdk STREQUAL WINDOWS)
         if(SWIFT_COMPILER_IS_MSVC_LIKE)
           if (SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY MATCHES MultiThreadedDebugDLL)
@@ -2151,6 +2210,7 @@ function(add_swift_target_library name)
                                    PERMISSIONS ${file_permissions}
                                    "${optional_arg}")
       endif()
+
       if(sdk STREQUAL WINDOWS)
         foreach(arch ${SWIFT_SDK_WINDOWS_ARCHITECTURES})
           if(TARGET ${name}-windows-${arch}_IMPLIB)

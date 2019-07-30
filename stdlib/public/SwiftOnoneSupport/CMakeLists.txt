@@ -11,7 +11,8 @@ add_swift_target_library(swiftSwiftOnoneSupport ${SWIFT_STDLIB_LIBRARY_BUILD_TYP
   # pre-optimization for performance) list them.
   SWIFT_COMPILE_FLAGS "-parse-stdlib" "-Xllvm" "-sil-inline-generics=false" "-Xfrontend" "-validate-tbd-against-ir=none" "-Xfrontend" "-check-onone-completeness" "-Xfrontend" "-disable-access-control" "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}" "${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}"
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
-  INSTALL_IN_COMPONENT stdlib)
+  INSTALL_IN_COMPONENT stdlib
+  INSTALL_IN_SDK)
 if(WINDOWS IN_LIST SWIFT_SDKS)
   # When building in Debug mode, the standard library provides the symbols that
   # we need and as such SwiftOnoneSupport does not need to provide any exported

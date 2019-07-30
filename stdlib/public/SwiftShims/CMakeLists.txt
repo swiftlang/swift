@@ -65,11 +65,19 @@ foreach(input ${sources})
       OUTPUT "${output_dir}/${input}"
       DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/${input}"
       COMMAND
-        "${CMAKE_COMMAND}" "-E" "copy_if_different"
-        "${CMAKE_CURRENT_SOURCE_DIR}/${input}"
-        "${output_dir}/${input}"
+        "${CMAKE_COMMAND}" "-E" "copy_if_different" "${CMAKE_CURRENT_SOURCE_DIR}/${input}" "${output_dir}/${input}"
       COMMENT "Copying ${input} to ${output_dir}")
   list(APPEND outputs "${output_dir}/${input}")
+
+  foreach(sdk ${SWIFT_SDKS})
+    add_custom_command(OUTPUT ${SWIFT_${sdk}_SDK_DIR}/usr/lib/swift/shims/${input}
+      DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${input}
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/${input} ${SWIFT_${sdk}_SDK_DIR}/usr/lib/swift/shims/${input})
+    add_custom_target(swift-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-sdk-shims-${input}
+      DEPENDS ${SWIFT_${sdk}_SDK_DIR}/usr/lib/swift/shims/${input})
+    add_dependencies(swift-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-sdk
+      swift-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-sdk-shims-${input})
+  endforeach()
 endforeach()
 # Put the output dir itself last so that it isn't considered the primary output.
 list(APPEND outputs "${output_dir}")
@@ -122,6 +130,16 @@ add_custom_command_target(unused_var
     OUTPUT "${SWIFTLIB_DIR}/clang"
     COMMENT "Symlinking Clang resource headers into ${SWIFTLIB_DIR}/clang")
 add_dependencies(copy_shim_headers symlink_clang_headers)
+
+foreach(sdk ${SWIFT_SDKS})
+  add_custom_command(OUTPUT ${SWIFT_${sdk}_SDK_DIR}/usr/lib/swift/clang
+    DEPENDS ${clang_headers_location}
+    COMMAND ${CMAKE_COMMAND} -E copy_directory ${clang_headers_location} ${SWIFT_${sdk}_SDK_DIR}/usr/lib/swift/clang)
+  add_custom_target(swift-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-sdk-clang-headers
+    DEPENDS ${SWIFT_${sdk}_SDK_DIR}/usr/lib/swift/clang)
+  add_dependencies(swift-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-sdk
+    swift-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-sdk-clang-headers)
+endforeach()
 
 swift_install_in_component(FILES ${sources}
                            DESTINATION "lib/swift/shims"
