@@ -36,6 +36,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/PrettyStackTrace.h"
 #include "swift/ClangImporter/ClangModule.h"
@@ -5694,7 +5695,8 @@ Decl *SwiftDeclConverter::importGlobalAsInitializer(
       initOptionality, /*FailabilityLoc=*/SourceLoc(),
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), parameterList,
       /*GenericParams=*/nullptr, dc);
-  result->setInitKind(initKind);
+  result->getASTContext().evaluator.cacheOutput(InitKindRequest{result},
+                                                std::move(initKind));
   result->setImportAsStaticMember();
 
   // Set the constructor's type.
@@ -6323,7 +6325,8 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
     result->setImplicit();
 
   // Set the kind of initializer.
-  result->setInitKind(kind);
+  result->getASTContext().evaluator.cacheOutput(InitKindRequest{result},
+                                                std::move(kind));
 
   // Consult API notes to determine whether this initializer is required.
   if (!required && isRequiredInitializer(objcMethod))
