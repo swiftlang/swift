@@ -3503,6 +3503,8 @@ SourceRange TypeAliasDecl::getSourceRange() const {
     return { TypeAliasLoc, TrailingWhereClauseSourceRange.End };
   if (UnderlyingTy.hasLocation())
     return { TypeAliasLoc, UnderlyingTy.getSourceRange().End };
+  if (TypeEndLoc.isValid())
+    return { TypeAliasLoc, TypeEndLoc };
   return { TypeAliasLoc, getNameLoc() };
 }
 
@@ -6080,15 +6082,7 @@ ObjCSubscriptKind SubscriptDecl::getObjCSubscriptKind() const {
 }
 
 SourceRange SubscriptDecl::getSourceRange() const {
-  if (getBracesRange().isValid()) {
-    return { getSubscriptLoc(), getBracesRange().End };
-  } else if (ElementTy.getSourceRange().End.isValid()) {
-    return { getSubscriptLoc(), ElementTy.getSourceRange().End };
-  } else if (ArrowLoc.isValid()) {
-    return { getSubscriptLoc(), ArrowLoc };
-  } else {
-    return getSubscriptLoc();
-  }
+  return {getSubscriptLoc(), getEndLoc()};
 }
 
 SourceRange SubscriptDecl::getSignatureSourceRange() const {
