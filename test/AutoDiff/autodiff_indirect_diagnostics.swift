@@ -12,7 +12,9 @@ func generic<T: Differentiable & FloatingPoint>(_ x: T) -> T {
 }
 _ = gradient(at: 1.0, in: generic)
 
-// Test unmet generic requirements.
+//===----------------------------------------------------------------------===//
+// Unmet generic requirements
+//===----------------------------------------------------------------------===//
 
 @differentiable(
   vjp: vjpWeirdExtraRequirements
@@ -67,3 +69,22 @@ struct TF8Struct<Scalar> : TF8Proto where Scalar : FloatingPoint & Differentiabl
 }
 
 _ = gradient(at: 1.0, in: { x in x.squareRoot() })
+
+//===----------------------------------------------------------------------===//
+// Add `Differentiable` conformance for generic wrt parameters
+//===----------------------------------------------------------------------===//
+
+func id<T>(_ x: T) -> T { x }
+let _: @differentiable (Float) -> Float = { x in id(x) }
+
+struct TF_691<Scalar> {
+  var x: Scalar
+  init(_ x: Scalar) {
+    self.x = x
+  }
+}
+extension TF_691: Differentiable where Scalar: Differentiable {}
+
+func identity<T>(_ x: TF_691<T>) -> TF_691<T> { x }
+let _: @differentiable (Float) -> TF_691<Float> = { x in identity(TF_691(x)) }
+let _: @differentiable (Float) -> TF_691<Float> = { x in id(TF_691(x)) }
