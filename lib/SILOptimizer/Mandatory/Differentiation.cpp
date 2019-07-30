@@ -733,64 +733,6 @@ void DifferentiationInvoker::print(llvm::raw_ostream &os) const {
   os << ')';
 }
 
-// Check whether the given requirements are satisfied, with the given
-// substitution map and in the given module.
-static bool checkRequirementsSatisfied(
-    ArrayRef<Requirement> requirements, SubstitutionMap substMap,
-    SILFunction *original, ModuleDecl *swiftModule) {
-  if (requirements.empty())
-    return true;
-  // Iterate through all requirements and check whether they are satisfied.
-  SmallVector<Requirement, 2> unsatisfiedRequirements;
-  for (auto req : requirements) {
-    auto firstType = req.getFirstType();
-    auto secondType = req.getSecondType();
-    // Substitute first and second types using the given substitution map,
-    // looking up conformances in the current module, if possible.
-    if (auto substFirstType =
-            firstType.subst(QuerySubstitutionMap{substMap},
-                            LookUpConformanceInModule(swiftModule))) {
-      firstType = substFirstType;
-    }
-    if (auto substSecondType =
-            secondType.subst(QuerySubstitutionMap{substMap},
-                             LookUpConformanceInModule(swiftModule))) {
-      secondType = substSecondType;
-    }
-    switch (req.getKind()) {
-    // Check same type requirements.
-    case RequirementKind::SameType:
-      // If the first type does not equal the second type, then record the
-      // unsatisfied requirement.
-      if (!firstType->isEqual(secondType))
-        unsatisfiedRequirements.push_back(req);
-      continue;
-    // Check conformance requirements.
-    case RequirementKind::Conformance: {
-      auto protocolType = req.getSecondType()->castTo<ProtocolType>();
-      auto protocol = protocolType->getDecl();
-      assert(protocol && "Expected protocol in generic signature requirement");
-      // If the first type does not conform to the second type in the current
-      // module, then record the unsatisfied requirement.
-      if (!swiftModule->lookupConformance(firstType, protocol))
-        unsatisfiedRequirements.push_back(req);
-      continue;
-    }
-    // Ignore other requirements (superclass and layout).
-    // Layout requirements are rejected during type-checking.
-    default:
-      continue;
-    }
-  }
-  // Diagnose unsatisfied requirements.
-  for (auto req : unsatisfiedRequirements) {
-    LLVM_DEBUG(auto &s = getADDebugStream() << "Unsatisfied requirement:\n";
-               req.print(s, PrintOptions());
-               s << '\n');
-  }
-  return unsatisfiedRequirements.empty();
-}
-
 //===----------------------------------------------------------------------===//
 // ADContext - Per-module contextual information for the Differentiation pass.
 //===----------------------------------------------------------------------===//
@@ -1877,6 +1819,73 @@ static bool diagnoseUnsupportedControlFlow(ADContext &context,
   return false;
 }
 
+/// Check whether the given requirements are satisfied, with the given original
+/// function and substitution map. Returns true if error is emitted.
+static bool diagnoseUnsatisfiedRequirements(ADContext &context,
+                                            ArrayRef<Requirement> requirements,
+                                            SILFunction *original,
+                                            SubstitutionMap substMap,
+                                            DifferentiationInvoker invoker,
+                                            SourceLoc loc) {
+  if (requirements.empty())
+    return false;
+  auto *swiftModule = context.getModule().getSwiftModule();
+  // Iterate through all requirements and check whether they are satisfied.
+  SmallVector<Requirement, 2> unsatisfiedRequirements;
+  for (auto req : requirements) {
+    auto firstType = req.getFirstType();
+    auto secondType = req.getSecondType();
+    // Substitute first and second types using the given substitution map,
+    // looking up conformances in the current module, if possible.
+    if (auto substFirstType =
+            firstType.subst(QuerySubstitutionMap{substMap},
+                            LookUpConformanceInModule(swiftModule))) {
+      firstType = substFirstType;
+    }
+    if (auto substSecondType =
+            secondType.subst(QuerySubstitutionMap{substMap},
+                             LookUpConformanceInModule(swiftModule))) {
+      secondType = substSecondType;
+    }
+    switch (req.getKind()) {
+    // Check same type requirements.
+    case RequirementKind::SameType:
+      // If the first type does not equal the second type, then record the
+      // unsatisfied requirement.
+      if (!firstType->isEqual(secondType))
+        unsatisfiedRequirements.push_back(req);
+      continue;
+    // Check conformance requirements.
+    case RequirementKind::Conformance: {
+      auto protocolType = req.getSecondType()->castTo<ProtocolType>();
+      auto protocol = protocolType->getDecl();
+      assert(protocol && "Expected protocol in generic signature requirement");
+      // If the first type does not conform to the second type in the current
+      // module, then record the unsatisfied requirement.
+      if (!swiftModule->lookupConformance(firstType, protocol))
+        unsatisfiedRequirements.push_back(req);
+      continue;
+    }
+    // Ignore other requirements (superclass and layout).
+    // Layout requirements are rejected during type-checking.
+    default:
+      continue;
+    }
+  }
+  if (unsatisfiedRequirements.empty())
+    return false;
+  // Diagnose unsatisfied requirements.
+  std::string reqText;
+  llvm::raw_string_ostream stream(reqText);
+  interleave(unsatisfiedRequirements,
+             [&](Requirement req) { req.print(stream, PrintOptions()); },
+             [&] { stream << ", "; });
+  context.emitNondifferentiabilityError(
+      loc, invoker, diag::autodiff_function_assoc_func_unmet_requirements,
+      stream.str());
+  return true;
+}
+
 //===----------------------------------------------------------------------===//
 // Code emission utilities
 //===----------------------------------------------------------------------===//
@@ -2113,13 +2122,10 @@ emitAssociatedFunctionReference(
     assert(minimalAttr);
     // TODO(TF-482): Move generic requirement checking logic to
     // `lookUpMinimalDifferentiableAttr`.
-    if (!checkRequirementsSatisfied(
-            minimalAttr->getRequirements(),
-            substMap, originalFn, context.getModule().getSwiftModule())) {
-      context.emitNondifferentiabilityError(original, invoker,
-          diag::autodiff_function_assoc_func_requirements_unmet);
+    if (diagnoseUnsatisfiedRequirements(context, minimalAttr->getRequirements(),
+                                        originalFn, substMap, invoker,
+                                        original.getLoc().getSourceLoc()))
       return None;
-    }
     if (context.processDifferentiableAttribute(
             originalFn, minimalAttr, invoker))
       return None;

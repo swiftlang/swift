@@ -30,7 +30,7 @@ func vjpWeirdExtraRequirements<
 }
 func weirdWrapper<T : Differentiable>(_ x: T) -> T {
   // expected-error @+2 {{expression is not differentiable}}
-  // expected-note @+1 {{function call is not differentiable because generic requirements are not met}}
+  // expected-note @+1 {{function call is not differentiable because generic requirements are not met: 'T : CaseIterable, T.AllCases : ExpressibleByStringLiteral'}}
   return weird(x)
 }
 _ = gradient(at: Float(1), in: { x in weirdWrapper(x) })
