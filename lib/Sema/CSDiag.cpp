@@ -4059,44 +4059,6 @@ bool FailureDiagnosis::diagnoseArgumentGenericRequirements(
   return result == RequirementCheckResult::Failure;
 }
 
-/// When initializing Unsafe[Mutable]Pointer<T> from Unsafe[Mutable]RawPointer,
-/// issue a diagnostic that refers to the API for binding memory to a type.
-static bool isCastToTypedPointer(ConstraintSystem &CS, const Expr *Fn,
-                                 const Expr *Arg) {
-  auto &Ctx = CS.DC->getASTContext();
-  auto *TypeExp = dyn_cast<TypeExpr>(Fn);
-  auto *ParenExp = dyn_cast<ParenExpr>(Arg);
-  if (!TypeExp || !ParenExp)
-    return false;
-
-  auto InitType = CS.getInstanceType(TypeExp);
-  auto ArgType = CS.getType(ParenExp->getSubExpr());
-  if (InitType.isNull() || ArgType.isNull())
-    return false;
-
-  // unwrap one level of Optional
-  if (auto ArgOptType = ArgType->getOptionalObjectType())
-    ArgType = ArgOptType;
-
-  auto *InitNom = InitType->getAnyNominal();
-  if (!InitNom)
-    return false;
-
-  if (InitNom != Ctx.getUnsafeMutablePointerDecl()
-      && InitNom != Ctx.getUnsafePointerDecl()) {
-    return false;
-  }
-  auto *ArgNom = ArgType->getAnyNominal();
-  if (!ArgNom)
-    return false;
-
-  if (ArgNom != Ctx.getUnsafeMutableRawPointerDecl()
-      && ArgNom != Ctx.getUnsafeRawPointerDecl()) {
-    return false;
-  }
-  return true;
-}
-
 static bool diagnoseClosureExplicitParameterMismatch(
     ConstraintSystem &CS, SourceLoc loc,
     ArrayRef<AnyFunctionType::Param> params,
@@ -4971,11 +4933,6 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
              overloadName, argString, isInitializer);
   }
 
-  if (isCastToTypedPointer(CS, fnExpr, argExpr)) {
-    diagnose(fnExpr->getLoc(), diag::pointer_init_to_type)
-      .highlight(argExpr->getSourceRange());
-  }
-  
   // Did the user intend on invoking a different overload?
   calleeInfo.suggestPotentialOverloads(fnExpr->getLoc());
   return true;
