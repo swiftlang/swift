@@ -4049,6 +4049,12 @@ private:
   // Differential type calculations
   //--------------------------------------------------------------------------//
 
+  /// Substitutes all replacement types of the given substitution map using the
+  /// adjoint function's substitution map.
+  SubstitutionMap remapSubstitutionMapInDifferential(SubstitutionMap substMap) {
+    return substMap.subst(getDifferential().getForwardingSubstitutionMap());
+  }
+
   /// Remap any archetypes into the differential function's context.
   SILType remapTypeInDifferential(SILType ty) {
     if (ty.hasArchetype())
@@ -4165,8 +4171,8 @@ private:
     assert(field);
     SILValue differential = diffBuilder.createStructExtract(
         loc, getDifferentialStructArgument(ai->getParent()), field);
-    auto differentialType =
-        remapType(differential->getType()).castTo<SILFunctionType>();
+    auto differentialType = remapTypeInDifferential(differential->getType())
+        .castTo<SILFunctionType>();
 
     SmallVector<SILValue, 8> diffArgs;
     for (auto origArg : ai->getArguments()) {
@@ -4195,7 +4201,7 @@ private:
       diffArgs.push_back(tanParam);
     }
 
-    // If callee pullback was reabstracted in VJP, reabstract callee pullback.
+    // If callee pullback was reabstracted in JVP, reabstract callee pullback.
     if (!differentialType->isEqual(originalDifferentialType)) {
       SILOptFunctionBuilder fb(context.getTransform());
       auto *thunk = getOrCreateReabstractionThunk(
@@ -4204,7 +4210,7 @@ private:
       auto *thunkRef = diffBuilder.createFunctionRef(loc, thunk);
       differential = diffBuilder.createPartialApply(
          loc, thunkRef,
-         remapSubstitutionMap(thunk->getForwardingSubstitutionMap()),
+         remapSubstitutionMapInDifferential(thunk->getForwardingSubstitutionMap()),
          {differential}, differentialType->getCalleeConvention());
     }
 
@@ -4912,7 +4918,7 @@ public:
     auto originalDifferentialType =
         getOpType(differential->getType()).getAs<SILFunctionType>();
     auto differentialType =
-        remapTypeInDifferential(differential->getType())
+        remapType(differential->getType())
             .castTo<SILFunctionType>();
     auto jvpGenSig = SubsMap.getGenericSignature()
         ? SubsMap.getGenericSignature()->getCanonicalSignature()
@@ -4934,7 +4940,7 @@ public:
       auto *thunkRef = builder.createFunctionRef(loc, thunk);
       differential = builder.createPartialApply(
           loc, thunkRef,
-          remapSubstitutionMap(thunk->getForwardingSubstitutionMap()),
+          getOpSubstitutionMap(thunk->getForwardingSubstitutionMap()),
           {differential}, differentialType->getCalleeConvention());
     }
     differentialValues[ai->getParent()].push_back(differential);
