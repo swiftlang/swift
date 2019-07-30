@@ -3280,6 +3280,9 @@ bool MissingGenericArgumentsFailure::diagnoseForAnchor(
   if (!diagnosed)
     return false;
 
+  if (!hasDecl())
+    return true;
+
   auto *DC = getDeclContext();
   if (auto *SD = dyn_cast<SubscriptDecl>(DC)) {
     emitDiagnostic(SD, diag::note_call_to_subscript, SD->getFullName());
@@ -3329,6 +3332,9 @@ bool MissingGenericArgumentsFailure::diagnoseParameter(
   } else {
     emitDiagnostic(loc, diag::unbound_generic_parameter, GP);
   }
+
+  if (!hasDecl())
+    return true;
 
   if (!hasLoc(GP))
     return true;
