@@ -176,39 +176,39 @@ LeakCheckingTests.testWithLeakChecking("NestedVarTuples") {
 LeakCheckingTests.testWithLeakChecking("ClassMethods") {
   class Super {
     @differentiable(wrt: x, jvp: jvpf, vjp: vjpf)
-    func f(_ x: Float) -> Float {
+    func f(_ x: Tracked<Float>) -> Tracked<Float> {
       return 2 * x
     }
-    final func jvpf(_ x: Float) -> (Float, (Float) -> Float) {
+    final func jvpf(_ x: Tracked<Float>) -> (Tracked<Float>, (Tracked<Float>) -> Tracked<Float>) {
       return (f(x), { v in 2 * v })
     }
-    final func vjpf(_ x: Float) -> (Float, (Float) -> Float) {
+    final func vjpf(_ x: Tracked<Float>) -> (Tracked<Float>, (Tracked<Float>) -> Tracked<Float>) {
       return (f(x), { v in 2 * v })
     }
   }
 
   class SubOverride : Super {
     @differentiable(wrt: x)
-    override func f(_ x: Float) -> Float {
+    override func f(_ x: Tracked<Float>) -> Tracked<Float> {
       return 3 * x
     }
   }
 
   class SubOverrideCustomDerivatives : Super {
     @differentiable(wrt: x, jvp: jvpf2, vjp: vjpf2)
-    override func f(_ x: Float) -> Float {
+    override func f(_ x: Tracked<Float>) -> Tracked<Float> {
       return 3 * x
     }
-    final func jvpf2(_ x: Float) -> (Float, (Float) -> Float) {
+    final func jvpf2(_ x: Tracked<Float>) -> (Tracked<Float>, (Tracked<Float>) -> Tracked<Float>) {
       return (f(x), { v in 3 * v })
     }
-    final func vjpf2(_ x: Float) -> (Float, (Float) -> Float) {
+    final func vjpf2(_ x: Tracked<Float>) -> (Tracked<Float>, (Tracked<Float>) -> Tracked<Float>) {
       return (f(x), { v in 3 * v })
     }
   }
 
-  func classValueWithGradient(_ c: Super) -> (Float, Float) {
-    return valueWithGradient(at: 1) { c.f($0) }
+  func classValueWithGradient(_ c: Super) -> (Tracked<Float>, Tracked<Float>) {
+    return Tracked<Float>(1).valueWithGradient { c.f($0) }
   }
   expectEqual((2, 2), classValueWithGradient(Super()))
   expectEqual((3, 3), classValueWithGradient(SubOverride()))
