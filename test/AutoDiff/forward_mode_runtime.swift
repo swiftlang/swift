@@ -288,6 +288,82 @@ ForwardModeTests.test("GenericTensorWithVars") {
   expectEqual(9, differential(1, 1))
 }
 
+// Test case where associated derivative function's requirements are met.
+extension Tensor where Scalar : Numeric {
+  @differentiable(wrt: self where Scalar : Differentiable & FloatingPoint)
+  func mean() -> Tensor {
+    return self
+  }
+
+  @differentiable(wrt: self where Scalar : Differentiable & FloatingPoint)
+  func variance() -> Tensor {
+    return mean() // ok
+  }
+}
+_ = differential(at: Tensor<Float>(1), in: { $0.variance() })
+
+// Tests TF-508: differentiation requirements with dependent member types.
+protocol TF_508_Proto {
+  associatedtype Scalar
+}
+extension TF_508_Proto where Scalar : FloatingPoint {
+  @differentiable(
+    jvp: jvpAdd
+    where Self : Differentiable, Scalar : Differentiable,
+          // Conformance requirement with dependent member type.
+          Self.TangentVector : TF_508_Proto
+  )
+  static func +(lhs: Self, rhs: Self) -> Self {
+    return lhs
+  }
+
+  @differentiable(
+    jvp: jvpSubtract
+    where Self : Differentiable, Scalar : Differentiable,
+          // Same-type requirement with dependent member type.
+          Self.TangentVector == Float
+  )
+  static func -(lhs: Self, rhs: Self) -> Self {
+    return lhs
+  }
+}
+extension TF_508_Proto where Self : Differentiable,
+                             Scalar : FloatingPoint & Differentiable,
+                             Self.TangentVector : TF_508_Proto {
+  static func jvpAdd(lhs: Self, rhs: Self)
+      -> (Self, (TangentVector, TangentVector) -> TangentVector) {
+    return (lhs, { (dlhs, drhs) in dlhs })
+  }
+}
+extension TF_508_Proto where Self : Differentiable,
+                             Scalar : FloatingPoint & Differentiable,
+                             Self.TangentVector == Float {
+  static func jvpSubtract(lhs: Self, rhs: Self)
+      -> (Self, (TangentVector, TangentVector) -> TangentVector) {
+    return (lhs, { (dlhs, drhs) in dlhs })
+  }
+}
+
+struct TF_508_Struct<Scalar : AdditiveArithmetic>
+  : TF_508_Proto, AdditiveArithmetic {}
+extension TF_508_Struct : Differentiable where Scalar : Differentiable {
+  typealias TangentVector = TF_508_Struct
+}
+
+func TF_508() {
+  let x = TF_508_Struct<Float>()
+  // Test conformance requirement with dependent member type.
+  _ = differential(at: x, in: { (x: TF_508_Struct<Float>) -> TF_508_Struct<Float> in
+    return x + x
+  })
+  // Test same-type requirement with dependent member type.
+  _ = differential(at: x, in: { (x: TF_508_Struct<Float>) -> TF_508_Struct<Float> in
+    return x - x
+  })
+}
+
+// Tracked Generic.
+
 ForwardModeTests.test("GenericTrackedIdentity") {
   func identity<T : Differentiable>(_ x: Tracked<T>) -> Tracked<T> {
     return x
@@ -297,6 +373,19 @@ ForwardModeTests.test("GenericTrackedIdentity") {
   }
   expectEqual(4, y)
   expectEqual(1, differential(1))
+}
+
+ForwardModeTests.test("GenericTrackedBinaryAdd") {
+  func add<T>(_ x: Tracked<T>, _ y: Tracked<T>) -> Tracked<T>
+    where T: Differentiable, T == T.TangentVector,
+          T == T.AllDifferentiableVariables {
+    return x + y
+  }
+  let (y, differential) = valueWithDifferential(at: 4, 5) { (x: Float, y: Float) in
+    add(Tracked(x), Tracked(y))
+  }
+  expectEqual(9, y)
+  expectEqual(2, differential(1, 1))
 }
 
 

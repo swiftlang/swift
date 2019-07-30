@@ -3899,7 +3899,6 @@ private:
     auto diffBuilder = getDifferentialBuilder();
     auto silType = getModule().Types.getLoweredLoadableType(
         type, ResilienceExpansion::Minimal);
-    llvm::errs() << "AAAAAAAAA\n";
     auto *buffer = diffBuilder.createAllocStack(loc, silType);
     emitZeroIndirect(type, buffer, loc);
     auto *loaded = diffBuilder.createLoad(
