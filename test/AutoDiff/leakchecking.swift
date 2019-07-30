@@ -287,18 +287,21 @@ LeakCheckingTests.testWithLeakChecking("LinearMapSILGenThunks") {
 }
 
 LeakCheckingTests.testWithLeakChecking("ParameterConventionMismatchLeakChecking") {
-  struct Nontrivial : Differentiable {
+  struct MyTrackedFloat<Dummy> : Differentiable {
+    // The property with type `Dummy` makes `Self` be indirect.
+    @noDerivative var indirectDummy: Dummy
     var base: Tracked<Float>
 
     // Test initializer and static VJP function.
     // Initializers have owned parameters but functions have shared parameters.
     @differentiable(vjp: vjpInit)
-    init(_ base: Tracked<Float>) {
+    init(_ base: Tracked<Float>, dummy: Dummy) {
       self.base = base
+      self.indirectDummy = dummy
     }
-    static func vjpInit(_ base: Tracked<Float>)
-      -> (Nontrivial, (TangentVector) -> Tracked<Float>) {
-      return (Nontrivial(base), { v in v.base })
+    static func vjpInit(_ base: Tracked<Float>, dummy: Dummy)
+      -> (MyTrackedFloat, (TangentVector) -> Tracked<Float>) {
+      return (MyTrackedFloat(base, dummy: dummy), { v in v.base })
     }
 
     @differentiable(vjp: vjpOwnedParameterMismatch)
@@ -337,32 +340,52 @@ LeakCheckingTests.testWithLeakChecking("ParameterConventionMismatchLeakChecking"
       return (sharedParameterGeneric(x), { v in (.zero, v) })
     }
 
-    @differentiable(vjp: vjpConsuming)
+    @differentiable(vjp: vjpConsumingMismatch)
     __consuming func consuming(_ x: Tracked<Float>) -> Tracked<Float> {
       return x
     }
-    func vjpConsuming(_ x: Tracked<Float>)
+    func vjpConsumingMismatch(_ x: Tracked<Float>)
       -> (Tracked<Float>, (Tracked<Float>) -> (TangentVector, Tracked<Float>)) {
       return (consuming(x), { v in (.zero, v) })
     }
 
-    @differentiable(vjp: vjpConsumingGeneric)
+    @differentiable(vjp: vjpConsumingGenericMismatch)
     __consuming func consumingGeneric<T : Differentiable>(_ x: T) -> T {
       return x
     }
-    func vjpConsumingGeneric<T : Differentiable>(_ x: T)
+    func vjpConsumingGenericMismatch<T : Differentiable>(_ x: T)
       -> (T, (T.TangentVector) -> (TangentVector, T.TangentVector)) {
       return (consumingGeneric(x), { v in (.zero, v) })
     }
+
+    @differentiable(vjp: vjpNonconsumingMismatch)
+    func nonconsuming(_ x: Tracked<Float>) -> Tracked<Float> {
+      return x
+    }
+    __consuming func vjpNonconsumingMismatch(_ x: Tracked<Float>)
+      -> (Tracked<Float>, (Tracked<Float>) -> (TangentVector, Tracked<Float>)) {
+      return (nonconsuming(x), { v in (.zero, v) })
+    }
+
+    @differentiable(vjp: vjpNonconsumingGenericMismatch)
+    func nonconsumingGeneric<T : Differentiable>(_ x: T) -> T {
+      return x
+    }
+    __consuming func vjpNonconsumingGenericMismatch<T : Differentiable>(_ x: T)
+      -> (T, (T.TangentVector) -> (TangentVector, T.TangentVector)) {
+      return (nonconsumingGeneric(x), { v in (.zero, v) })
+    }
   }
-  let v = Nontrivial.TangentVector(base: 10)
-  expectEqual(10, pullback(at: Tracked<Float>(1)) { x in Nontrivial(x) }(v))
-  _ = Tracked<Float>(1).gradient { x in Nontrivial(x).ownedParameter(x) }
-  _ = Tracked<Float>(1).gradient { x in Nontrivial(x).sharedParameter(x) }
-  _ = Tracked<Float>(1).gradient { x in Nontrivial(x).ownedParameterGeneric(x) }
-  _ = Tracked<Float>(1).gradient { x in Nontrivial(x).sharedParameterGeneric(x) }
-  _ = Tracked<Float>(1).gradient { x in Nontrivial(x).consuming(x) }
-  _ = Tracked<Float>(1).gradient { x in Nontrivial(x).consumingGeneric(x) }
+  let v = MyTrackedFloat<Any>.TangentVector(base: 10)
+  expectEqual(10, pullback(at: Tracked<Float>(1)) { x in MyTrackedFloat(x, dummy: 1.0) }(v))
+  _ = Tracked<Float>(1).gradient { x in MyTrackedFloat<Any>(x, dummy: 1).ownedParameter(x) }
+  _ = Tracked<Float>(1).gradient { x in MyTrackedFloat<Any>(x, dummy: 1).sharedParameter(x) }
+  _ = Tracked<Float>(1).gradient { x in MyTrackedFloat<Any>(x, dummy: 1).ownedParameterGeneric(x) }
+  _ = Tracked<Float>(1).gradient { x in MyTrackedFloat<Any>(x, dummy: 1).sharedParameterGeneric(x) }
+  _ = Tracked<Float>(1).gradient { x in MyTrackedFloat<Any>(x, dummy: 1).consuming(x) }
+  _ = Tracked<Float>(1).gradient { x in MyTrackedFloat<Any>(x, dummy: 1).consumingGeneric(x) }
+  _ = Tracked<Float>(1).gradient { x in MyTrackedFloat<Any>(x, dummy: 1).nonconsuming(x) }
+  _ = Tracked<Float>(1).gradient { x in MyTrackedFloat<Any>(x, dummy: 1).nonconsumingGeneric(x) }
 }
 
 LeakCheckingTests.testWithLeakChecking("ClosureCaptureLeakChecking") {

@@ -3435,8 +3435,8 @@ SILGenFunction::getOrCreateAutoDiffLinearMapThunk(
 
   SILGenFunction thunkSGF(SGM, *thunk, FunctionDC);
   SmallVector<ManagedValue, 4> params;
-  SmallVector<SILArgument *, 4> indirectResults;
-  thunkSGF.collectThunkParams(loc, params, &indirectResults);
+  SmallVector<SILArgument *, 4> thunkIndirectResults;
+  thunkSGF.collectThunkParams(loc, params, &thunkIndirectResults);
 
   SILFunctionConventions fromConv(fromType, getModule());
   SILFunctionConventions toConv(toType, getModule());
@@ -3453,11 +3453,11 @@ SILGenFunction::getOrCreateAutoDiffLinearMapThunk(
   //   - If self is indirect, reorder indirect results.
   //   - If self is direct, reorder direct results after `apply` is generated.
   // - For differentials: reorder parameter infos and arguments.
-  auto numIndirectResults = indirectResults.size();
+  auto numIndirectResults = thunkIndirectResults.size();
   if (reorderSelf && assocFnKind == AutoDiffAssociatedFunctionKind::VJP &&
       toResults.size() > 1) {
-    auto selfResult = toResults.back();
-    if (selfResult.isFormalIndirect() && numIndirectResults > 1) {
+    auto toSelfResult = toResults.back();
+    if (toSelfResult.isFormalIndirect() && numIndirectResults > 1) {
       std::rotate(thunkArguments.begin(),
                   thunkArguments.begin() + numIndirectResults - 1,
                   thunkArguments.begin() + numIndirectResults);
@@ -3573,11 +3573,15 @@ SILGenFunction::getOrCreateAutoDiffLinearMapThunk(
   // Handle self reordering.
   // For pullbacks: rotate direct results if self is direct.
   if (reorderSelf && assocFnKind == AutoDiffAssociatedFunctionKind::VJP) {
-    auto selfResult = toConv.getResults().back();
-    if (selfResult.isFormalIndirect() && indirectResults.size() > 1) {
-      std::rotate(indirectResults.begin(), indirectResults.end() - 1,
-                  indirectResults.end());
-    } else if (directResults.size() > 1) {
+    auto fromSelfResult = fromConv.getResults().front();
+    auto toSelfResult = toConv.getResults().back();
+    assert(fromSelfResult.getType() == toSelfResult.getType());
+    if (toSelfResult.isFormalIndirect() && thunkIndirectResults.size() > 1) {
+      std::rotate(thunkIndirectResults.begin(), thunkIndirectResults.end() - 1,
+                  thunkIndirectResults.end());
+    }
+    if (toSelfResult.isFormalDirect() && fromSelfResult.isFormalDirect() &&
+        directResults.size() > 1) {
       std::rotate(directResults.begin(), directResults.end() - 1,
                   directResults.end());
     }
@@ -3585,7 +3589,7 @@ SILGenFunction::getOrCreateAutoDiffLinearMapThunk(
 
   auto fromDirResultsIter = directResults.begin();
   auto fromIndResultsIter = apply->getIndirectSILResults().begin();
-  auto toIndResultsIter = indirectResults.begin();
+  auto toIndResultsIter = thunkIndirectResults.begin();
   // Reabstract results.
   for (unsigned resIdx : range(toType->getNumResults())) {
     auto fromRes = fromConv.getResults()[resIdx];
