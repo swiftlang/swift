@@ -423,7 +423,7 @@ extension String.UTF8View {
 
     if utf8Len == 1 {
       _internalInvariant(idx.transcodedOffset == 0)
-      return idx.nextEncoded
+      return idx.nextEncoded._scalarAligned
     }
 
     // Check if we're still transcoding sub-scalar
@@ -432,7 +432,8 @@ extension String.UTF8View {
     }
 
     // Skip to the next scalar
-    return idx.encoded(offsetBy: scalarLen)
+    _internalInvariant(idx.transcodedOffset == utf8Len - 1)
+    return idx.encoded(offsetBy: scalarLen)._scalarAligned
   }
 
   @usableFromInline @inline(never)
