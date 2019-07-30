@@ -352,7 +352,8 @@ static void maybeMarkTransparent(AccessorDecl *accessor, ASTContext &ctx) {
 
       if (auto original = var->getOriginalWrappedProperty(
               PropertyWrapperSynthesizedPropertyKind::StorageWrapper)) {
-        if (var->getFormalAccess() < original->getFormalAccess())
+        auto backingVar = original->getPropertyWrapperBackingProperty();
+        if (backingVar->getFormalAccess() < var->getFormalAccess())
           return;
       }
     }
