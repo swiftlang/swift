@@ -740,6 +740,7 @@ void IterableDeclContext::addMember(Decl *member, Decl *Hint) {
 }
 
 void IterableDeclContext::addMemberSilently(Decl *member, Decl *hint) const {
+  assert(!isa<AccessorDecl>(member) && "Accessors should not be added here");
   assert(!member->NextDecl && "Already added to a container");
 
   // If there is a hint decl that specifies where to add this, just

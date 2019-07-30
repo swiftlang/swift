@@ -5853,10 +5853,6 @@ public:
     return cast_or_null<AbstractFunctionDecl>(ValueDecl::getOverriddenDecl());
   }
 
-  /// Returns true if a function declaration overrides a given
-  /// method from its direct or indirect superclass.
-  bool isOverridingDecl(const AbstractFunctionDecl *method) const;
-
   /// Whether the declaration is later overridden in the module
   ///
   /// Overrides are resolved during type checking; only query this field after
@@ -7041,22 +7037,14 @@ class MissingMemberDecl : public Decl {
   }
 public:
   static MissingMemberDecl *
-  forMethod(ASTContext &ctx, DeclContext *DC, DeclName name,
-            bool hasNormalVTableEntry) {
-    assert(!name || name.isCompoundName());
-    return new (ctx) MissingMemberDecl(DC, name, hasNormalVTableEntry, 0);
-  }
+  create(ASTContext &ctx, DeclContext *DC, DeclName name,
+         unsigned numVTableEntries, bool hasStorage) {
+    assert(!numVTableEntries || isa<ProtocolDecl>(DC) || isa<ClassDecl>(DC) &&
+           "Only classes and protocols have vtable/witness table entries");
+    assert(!hasStorage || !isa<ProtocolDecl>(DC) &&
+           "Protocols cannot have missing stored properties");
 
-  static MissingMemberDecl *
-  forInitializer(ASTContext &ctx, DeclContext *DC, DeclName name,
-                 bool hasVTableEntry) {
-    unsigned entries = hasVTableEntry ? 1 : 0;
-    return new (ctx) MissingMemberDecl(DC, name, entries, 0);
-  }
-  
-  static MissingMemberDecl *
-  forStoredProperty(ASTContext &ctx, DeclContext *DC, DeclName name) {
-    return new (ctx) MissingMemberDecl(DC, name, 0, 1);
+    return new (ctx) MissingMemberDecl(DC, name, numVTableEntries, hasStorage);
   }
 
   DeclName getFullName() const {

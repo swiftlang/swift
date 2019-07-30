@@ -45,6 +45,10 @@ public:
   bool isDone() const { return Cancelled; }
 
 private:
+
+  // FIXME: Remove this
+  bool shouldWalkAccessorsTheOldWay() override { return true; }
+
   bool shouldWalkIntoGenericParams() override {
     return SEWalker.shouldWalkIntoGenericParams();
   }

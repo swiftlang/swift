@@ -593,9 +593,9 @@ synthesizeEnumRawValueGetterBody(AbstractFunctionDecl *afd, void *context) {
 //   }
 // Unlike a standard init(rawValue:) enum initializer, this does a reinterpret
 // cast in order to preserve unknown or future cases from C.
-static AccessorDecl *makeEnumRawValueGetter(ClangImporter::Implementation &Impl,
-                                            EnumDecl *enumDecl,
-                                            VarDecl *rawValueDecl) {
+static void makeEnumRawValueGetter(ClangImporter::Implementation &Impl,
+                                   EnumDecl *enumDecl,
+                                   VarDecl *rawValueDecl) {
   ASTContext &C = Impl.SwiftContext;
 
   auto rawTy = enumDecl->getRawType();
@@ -623,7 +623,6 @@ static AccessorDecl *makeEnumRawValueGetter(ClangImporter::Implementation &Impl,
   getterDecl->setAccess(AccessLevel::Public);
   getterDecl->setBodySynthesizer(synthesizeEnumRawValueGetterBody, enumDecl);
   makeComputed(rawValueDecl, getterDecl, nullptr);
-  return getterDecl;
 }
 
 /// Synthesizer for the rawValue getter for an imported struct.
@@ -1551,7 +1550,6 @@ static void makeStructRawValued(
   structDecl->addMember(initRawValue);
   structDecl->addMember(patternBinding);
   structDecl->addMember(var);
-  structDecl->addMember(varGetter);
 
   addSynthesizedTypealias(structDecl, ctx.Id_RawValue, underlyingType);
   Impl.RawTypes[structDecl] = underlyingType;
@@ -1702,7 +1700,6 @@ static void makeStructRawValuedWithBridge(
   structDecl->addMember(storedVar);
   structDecl->addMember(computedPatternBinding);
   structDecl->addMember(computedVar);
-  structDecl->addMember(computedVarGetter);
 
   addSynthesizedTypealias(structDecl, ctx.Id_RawValue, bridgedType);
   Impl.RawTypes[structDecl] = bridgedType;
@@ -1983,7 +1980,6 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
   getterDecl->setIsDynamic(false);
 
   swiftDecl->addMember(errorDomainPropertyDecl);
-  swiftDecl->addMember(getterDecl);
   makeComputed(errorDomainPropertyDecl, getterDecl, nullptr);
 
   getterDecl->setImplicit();
@@ -2932,10 +2928,9 @@ namespace {
             C, StaticSpellingKind::None, varPattern, /*InitExpr*/ nullptr,
             enumDecl);
 
-        auto rawValueGetter = makeEnumRawValueGetter(Impl, enumDecl, rawValue);
+        makeEnumRawValueGetter(Impl, enumDecl, rawValue);
 
         enumDecl->addMember(rawValueConstructor);
-        enumDecl->addMember(rawValueGetter);
         enumDecl->addMember(rawValue);
         enumDecl->addMember(rawValueBinding);
 
@@ -3134,8 +3129,6 @@ namespace {
           auto addDecl = [&](NominalTypeDecl *nominal, Decl *decl) {
             if (!decl) return;
             nominal->addMember(decl);
-            if (auto *var = dyn_cast<VarDecl>(decl))
-              nominal->addMember(var->getGetter());
           };
 
           addDecl(result, enumeratorDecl);
@@ -8529,11 +8522,13 @@ bool ClangImporter::Implementation::addMemberAndAlternatesToExtension(
   member = findMemberThatWillLandInAnExtensionContext(member);
   if (!member || member->getDeclContext() != ext)
     return true;
-  ext->addMember(member);
+  if (!isa<AccessorDecl>(member))
+    ext->addMember(member);
 
   for (auto alternate : getAlternateDecls(member)) {
     if (alternate->getDeclContext() == ext)
-      ext->addMember(alternate);
+      if (!isa<AccessorDecl>(alternate))
+        ext->addMember(alternate);
   }
   return true;
 }

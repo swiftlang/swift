@@ -251,10 +251,7 @@ void TBDGenVisitor::visitFuncDecl(FuncDecl *FD) {
 }
 
 void TBDGenVisitor::visitAccessorDecl(AccessorDecl *AD) {
-  // Do nothing: accessors are always nested within the storage decl, but
-  // sometimes appear outside it too. To avoid double-walking them, we
-  // explicitly visit them as members of the storage and ignore them when we
-  // visit them as part of the main walk, here.
+  llvm_unreachable("should not see an accessor here");
 }
 
 void TBDGenVisitor::visitAbstractStorageDecl(AbstractStorageDecl *ASD) {

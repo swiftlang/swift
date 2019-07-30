@@ -1224,7 +1224,7 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
   C.addSynthesizedDecl(hashValueDecl);
   C.addSynthesizedDecl(getterDecl);
 
-  derived.addMembersToConformanceContext({getterDecl, hashValueDecl, patDecl});
+  derived.addMembersToConformanceContext({hashValueDecl, patDecl});
   return hashValueDecl;
 }
 
