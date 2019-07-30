@@ -137,37 +137,37 @@ class BenchmarkDriver(object):
 
     def run(self, test=None, num_samples=None, num_iters=None,
             sample_time=None, verbose=None, measure_memory=False,
-            quantile=None):
+            quantile=None, min_samples=None, gather_metadata=False):
         """Execute benchmark and gather results."""
-        num_samples = num_samples or 0
-        num_iters = num_iters or 0  # automatically determine N to run for 1s
-        sample_time = sample_time or 0  # default is 1s
-
         cmd = self._cmd_run(
-            test, num_samples, num_iters, sample_time,
-            verbose, measure_memory, quantile)
+            test, num_samples, num_iters, sample_time, min_samples,
+            verbose, measure_memory, quantile, gather_metadata)
         output = self._invoke(cmd)
         results = self.parser.results_from_string(output)
         return results.items()[0][1] if test else results
 
-    def _cmd_run(self, test, num_samples, num_iters, sample_time,
-                 verbose, measure_memory, quantile):
+    def _cmd_run(self, test, num_samples, num_iters, sample_time, min_samples,
+                 verbose, measure_memory, quantile, gather_metadata):
         cmd = [self.test_harness]
         if test:
             cmd.append(test)
         else:
             cmd.extend([self.test_number.get(name, name)
                         for name in self.tests])
-        if num_samples > 0:
+        if num_samples:
             cmd.append('--num-samples={0}'.format(num_samples))
-        if num_iters > 0:
+        if min_samples:
+            cmd.append('--min-samples={0}'.format(min_samples))
+        if num_iters:
             cmd.append('--num-iters={0}'.format(num_iters))
-        if sample_time > 0:
+        if sample_time:
             cmd.append('--sample-time={0}'.format(sample_time))
         if verbose:
             cmd.append('--verbose')
         if measure_memory:
             cmd.append('--memory')
+        if gather_metadata:
+            cmd.append('--meta')
         if quantile:
             cmd.append('--quantile={0}'.format(quantile))
             cmd.append('--delta')
@@ -183,8 +183,8 @@ class BenchmarkDriver(object):
             return a
 
         return reduce(merge_results,
-                      [self.run(test, measure_memory=True,
-                                num_iters=1, quantile=20)
+                      [self.run(test, num_iters=1, quantile=20,
+                                measure_memory=True, gather_metadata=True)
                        for _ in range(self.args.independent_samples)])
 
     def log_results(self, output, log_file=None):

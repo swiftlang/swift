@@ -277,6 +277,11 @@ class TestBenchmarkDriverRunningTests(unittest.TestCase):
         self.subprocess_mock.assert_called_with(
             ('/benchmarks/Benchmark_O', 'b2', '--num-samples=5'))
 
+    def test_run_benchmark_with_minimum_samples(self):
+        self.driver.run('b', min_samples=7)
+        self.subprocess_mock.assert_called_with(
+            ('/benchmarks/Benchmark_O', 'b', '--min-samples=7'))
+
     def test_run_benchmark_with_specified_number_of_iterations(self):
         self.driver.run('b', num_iters=1)
         self.subprocess_mock.assert_called_with(
@@ -321,6 +326,11 @@ class TestBenchmarkDriverRunningTests(unittest.TestCase):
         self.subprocess_mock.assert_called_with(
             ('/benchmarks/Benchmark_O', 'b', '--memory'))
 
+    def test_gather_metadata(self):
+        self.driver.run('b', gather_metadata=True)
+        self.subprocess_mock.assert_called_with(
+            ('/benchmarks/Benchmark_O', 'b', '--meta'))
+
     def test_report_quantiles(self):
         """Use delta compression for quantile reports."""
         self.driver.run('b', quantile=4)
@@ -333,7 +343,7 @@ class TestBenchmarkDriverRunningTests(unittest.TestCase):
         r = self.driver.run_independent_samples('b1')
         self.assertEqual(self.subprocess_mock.calls.count(
             ('/benchmarks/Benchmark_O', 'b1', '--num-iters=1', '--memory',
-             '--quantile=20', '--delta')), 3)
+             '--meta', '--quantile=20', '--delta')), 3)
         self.assertEqual(r.num_samples, 3)  # results are merged
 
     def test_run_and_log(self):
@@ -411,21 +421,26 @@ class TestBenchmarkDriverRunningTests(unittest.TestCase):
 
 
 class BenchmarkDriverMock(Mock):
-    """Mock for BenchmarkDriver's `run` method"""
+    """Mock for BenchmarkDriver's `run` method."""
+
     def __init__(self, tests, responses=None):
         super(BenchmarkDriverMock, self).__init__(responses)
         self.tests = tests
         self.args = ArgsStub()
 
-        def _run(test, num_samples=None, num_iters=None,
-                 verbose=None, measure_memory=False):
-            return self.record_and_respond(test, num_samples, num_iters,
-                                           verbose, measure_memory)
+        def _run(test=None, num_samples=None, num_iters=None,
+                 sample_time=None, verbose=None, measure_memory=False,
+                 quantile=None, min_samples=None, gather_metadata=False):
+            return self._record_and_respond(
+                test, num_samples, num_iters, sample_time, min_samples,
+                verbose, measure_memory, quantile, gather_metadata)
         self.run = _run
 
-    def record_and_respond(self, test, num_samples, num_iters,
-                           verbose, measure_memory):
-        args = (test, num_samples, num_iters, verbose, measure_memory)
+    def _record_and_respond(
+        self, test, num_samples, num_iters, sample_time, min_samples,
+            verbose, measure_memory, quantile, gather_metadata):
+        args = (test, num_samples, num_iters, sample_time, min_samples,
+                verbose, measure_memory, quantile, gather_metadata)
         self.calls.append(args)
         return self.respond.get(args, _PTR(min=700))
 
@@ -520,11 +535,12 @@ def _PTR(min=700, mem_pages=1000, setup=None):
     return Stub(samples=Stub(min=min), mem_pages=mem_pages, setup=setup)
 
 
-def _run(test, num_samples=None, num_iters=None, verbose=None,
-         measure_memory=False):
+def _run(test=None, num_samples=None, num_iters=None,
+         sample_time=None, verbose=None, measure_memory=False,
+         quantile=None, min_samples=None, gather_metadata=False):
     """Helper function that constructs tuple with arguments for run method."""
-    return (
-        test, num_samples, num_iters, verbose, measure_memory)
+    return (test, num_samples, num_iters, sample_time, min_samples,
+            verbose, measure_memory, quantile, gather_metadata)
 
 
 class TestBenchmarkDoctor(unittest.TestCase):
