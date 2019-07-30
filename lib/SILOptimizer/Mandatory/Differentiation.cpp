@@ -78,30 +78,6 @@ template <typename T> static inline void debugDump(T &v) {
                           << v << "\n==== END DEBUG DUMP ====\n");
 }
 
-/// Creates arguments in the entry block based on the function type.
-static void createEntryArguments(SILFunction *f) {
-  auto *entry = f->getEntryBlock();
-  auto conv = f->getConventions();
-  auto &ctx = f->getASTContext();
-  auto moduleDecl = f->getModule().getSwiftModule();
-  assert((entry->getNumArguments() == 0 || conv.getNumSILArguments() == 0) &&
-         "Entry already has arguments?!");
-  auto createFunctionArgument = [&](SILType type) {
-    // Create a dummy parameter declaration.
-    // Necessary to prevent crash during argument explosion optimization.
-    auto loc = f->getLocation().getSourceLoc();
-    auto *decl = new (ctx)
-        ParamDecl(VarDecl::Specifier::Default, loc, loc, Identifier(), loc,
-                  Identifier(), moduleDecl);
-    decl->setType(type.getASTType());
-    entry->createFunctionArgument(type, decl);
-  };
-  for (auto indResTy : conv.getIndirectSILResultTypes())
-    createFunctionArgument(f->mapTypeIntoContext(indResTy).getAddressType());
-  for (auto paramTy : conv.getParameterSILTypes())
-    createFunctionArgument(f->mapTypeIntoContext(paramTy));
-}
-
 static bool isWithoutDerivative(SILValue v) {
   if (auto *fnRef = dyn_cast<FunctionRefInst>(v))
     return fnRef->getReferencedFunctionOrNull()->hasSemanticsAttr(
@@ -2982,9 +2958,8 @@ public:
         original->isBare(), IsNotTransparent, original->isSerialized(),
         original->isDynamicallyReplaceable());
     pullback->setOwnershipEliminated();
-    pullback->setDebugScope(new (module)
-                                SILDebugScope(original->getLocation(),
-                                              pullback));
+    pullback->setDebugScope(
+        new (module) SILDebugScope(original->getLocation(), pullback));
     return pullback;
   }
 
@@ -3655,7 +3630,7 @@ public:
   void visitAutoDiffFunctionInst(AutoDiffFunctionInst *adfi) {
     // Clone `autodiff_function` from original to JVP, then add the cloned
     // instruction to the `autodiff_function` worklist.
-    SILClonerWithScopes::visitAutoDiffFunctionInst(adfi);
+    TypeSubstCloner::visitAutoDiffFunctionInst(adfi);
     auto *newADFI = cast<AutoDiffFunctionInst>(getOpValue(adfi));
     context.getAutoDiffFunctionInsts().push_back(newADFI);
   }
@@ -6566,10 +6541,12 @@ SILValue ADContext::promoteToDifferentiableFunction(
         // returned function value with an `autodiff_function` instruction,
         // and process the `autodiff_function` instruction.
         if (newThunk->empty()) {
+          if (auto newThunkGenSig = thunkType->getGenericSignature())
+            newThunk->setGenericEnvironment(
+                newThunkGenSig->createGenericEnvironment());
           newThunk->setOwnershipEliminated();
-          SILFunctionCloner cloner(newThunk);
-          cloner.cloneFunction(thunk);
-
+          BasicTypeSubstCloner cloner(thunk, newThunk);
+          cloner.run();
           auto *retInst =
               cast<ReturnInst>(newThunk->findReturnBB()->getTerminator());
           SILBuilder thunkBuilder(retInst);

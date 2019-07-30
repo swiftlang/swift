@@ -24,6 +24,7 @@
 #ifndef SWIFT_SILOPTIMIZER_MANDATORY_DIFFERENTIATION_H
 #define SWIFT_SILOPTIMIZER_MANDATORY_DIFFERENTIATION_H
 
+#include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Utils/Local.h"
 
@@ -85,6 +86,62 @@ public:
       if (pred(childBB))
         buffer.push_back(child);
     }
+  }
+};
+
+/// Creates arguments in the entry block based on the function type.
+void createEntryArguments(SILFunction *f) {
+  auto *entry = f->getEntryBlock();
+  auto conv = f->getConventions();
+  auto &ctx = f->getASTContext();
+  auto moduleDecl = f->getModule().getSwiftModule();
+  assert((entry->getNumArguments() == 0 || conv.getNumSILArguments() == 0) &&
+         "Entry already has arguments?!");
+  auto createFunctionArgument = [&](SILType type) {
+    // Create a dummy parameter declaration.
+    // Necessary to prevent crash during argument explosion optimization.
+    auto loc = f->getLocation().getSourceLoc();
+    auto *decl = new (ctx)
+        ParamDecl(VarDecl::Specifier::Default, loc, loc, Identifier(), loc,
+                  Identifier(), moduleDecl);
+    decl->setType(type.getASTType());
+    entry->createFunctionArgument(type, decl);
+  };
+  for (auto indResTy : conv.getIndirectSILResultTypes())
+    createFunctionArgument(f->mapTypeIntoContext(indResTy).getAddressType());
+  for (auto paramTy : conv.getParameterSILTypes())
+    createFunctionArgument(f->mapTypeIntoContext(paramTy));
+}
+
+/// Cloner that remaps types using the target function's generic environment.
+class BasicTypeSubstCloner final
+    : public TypeSubstCloner<BasicTypeSubstCloner, SILOptFunctionBuilder> {
+
+  static SubstitutionMap getSubstitutionMap(SILFunction *target) {
+    if (auto *targetGenEnv = target->getGenericEnvironment())
+      return targetGenEnv->getForwardingSubstitutionMap();
+    return SubstitutionMap();
+  }
+
+public:
+  explicit BasicTypeSubstCloner(SILFunction *original, SILFunction *target)
+      : TypeSubstCloner(*target, *original, getSubstitutionMap(target)) {}
+
+  void postProcess(SILInstruction *orig, SILInstruction *cloned) {
+    SILClonerWithScopes::postProcess(orig, cloned);
+  }
+
+  void visit(SILInstruction *inst) {
+    TypeSubstCloner::visit(inst);
+  }
+
+  void run() {
+    auto &target = Builder.getFunction();
+    auto *entry = target.createBasicBlock();
+    createEntryArguments(&target);
+    SmallVector<SILValue, 8> entryArguments(target.getArguments().begin(),
+                                            target.getArguments().end());
+    cloneFunctionBody(&Original, entry, entryArguments);
   }
 };
 
