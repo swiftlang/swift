@@ -131,10 +131,6 @@ public:
     SILClonerWithScopes::postProcess(orig, cloned);
   }
 
-  void visit(SILInstruction *inst) {
-    TypeSubstCloner::visit(inst);
-  }
-
   void run() {
     auto &target = Builder.getFunction();
     auto *entry = target.createBasicBlock();
