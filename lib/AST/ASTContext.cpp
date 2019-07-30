@@ -4394,8 +4394,9 @@ CanGenericSignature ASTContext::getExistentialSignature(CanType existential,
   return genericSig;
 }
 
-GenericSignature *ASTContext::getOverrideGenericSignature(ValueDecl *base,
-                                                          ValueDecl *derived) {
+GenericSignature *
+ASTContext::getOverrideGenericSignature(const ValueDecl *base,
+                                        const ValueDecl *derived) {
   auto baseGenericCtx = base->getAsGenericContext();
   auto &ctx = base->getASTContext();
 
@@ -4494,6 +4495,23 @@ GenericSignature *ASTContext::getOverrideGenericSignature(ValueDecl *base,
   auto *genericSig = std::move(builder).computeGenericSignature(SourceLoc());
   getImpl().overrideSigCache.insert(std::make_pair(key, genericSig));
   return genericSig;
+}
+
+bool ASTContext::overrideGenericSignatureReqsSatisfied(
+    const ValueDecl *base, const ValueDecl *derived,
+    const OverrideGenericSignatureReqCheck direction) {
+  auto sig = getOverrideGenericSignature(base, derived);
+  if (!sig)
+    return true;
+
+  auto derivedSig = derived->getAsGenericContext()->getGenericSignature();
+
+  switch (direction) {
+  case OverrideGenericSignatureReqCheck::BaseReqSatisfiedByDerived:
+    return sig->requirementsNotSatisfiedBy(derivedSig).empty();
+  case OverrideGenericSignatureReqCheck::DerivedReqSatisfiedByBase:
+    return derivedSig->requirementsNotSatisfiedBy(sig).empty();
+  }
 }
 
 SILLayout *SILLayout::get(ASTContext &C,
