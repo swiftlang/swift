@@ -490,6 +490,16 @@ addGetterToReadOnlyDerivedProperty(VarDecl *property,
   return getter;
 }
 
+std::pair<AccessorDecl *, AccessorDecl *>
+DerivedConformance::addGetterAndSetterToMutableDerivedProperty(
+    VarDecl *property, Type propertyContextType) {
+  auto *getter = declareDerivedPropertyGetter(property, propertyContextType);
+  auto *setter = declareDerivedPropertySetter(property, propertyContextType);
+  property->setImplInfo(StorageImplInfo::getMutableComputed());
+  property->setAccessors(SourceLoc(), {getter, setter}, SourceLoc());
+  return std::make_pair(getter, setter);
+}
+
 AccessorDecl *
 DerivedConformance::declareDerivedPropertyGetter(VarDecl *property,
                                                  Type propertyContextType) {
@@ -526,13 +536,12 @@ DerivedConformance::declareDerivedPropertyGetter(VarDecl *property,
 
 // SWIFT_ENABLE_TENSORFLOW
 AccessorDecl *
-DerivedConformance::declareDerivedPropertySetter(TypeChecker &tc,
-                                                 VarDecl *property,
+DerivedConformance::declareDerivedPropertySetter(VarDecl *property,
                                                  Type propertyContextType) {
   bool isStatic = property->isStatic();
   bool isFinal = property->isFinal();
 
-  auto &C = tc.Context;
+  auto &C = property->getASTContext();
   auto parentDC = property->getDeclContext();
 
   auto propertyInterfaceType = property->getInterfaceType();

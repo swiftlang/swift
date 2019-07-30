@@ -521,17 +521,13 @@ deriveDifferentiable_allDifferentiableVariables(DerivedConformance &derived) {
       C.Id_allDifferentiableVariables, returnInterfaceTy, returnTy,
       /*isStatic*/ false, /*isFinal*/ true);
 
-  auto *getterDecl = derived.declareDerivedPropertyGetter(
-      allDiffableVarsDecl, returnTy);
+  AccessorDecl *getterDecl;
+  AccessorDecl *setterDecl;
+  std::tie(getterDecl, setterDecl) =
+      derived.addGetterAndSetterToMutableDerivedProperty(allDiffableVarsDecl,
+                                                         returnTy);
   getterDecl->setBodySynthesizer(&derivedBody_allDifferentiableVariablesGetter);
-
-  auto *setterDecl = derived.declareDerivedPropertySetter(
-      derived.TC, allDiffableVarsDecl, returnTy);
   setterDecl->setBodySynthesizer(&derivedBody_allDifferentiableVariablesSetter);
-
-  allDiffableVarsDecl->setAccessors(SourceLoc(), {getterDecl, setterDecl},
-                                    SourceLoc());
-
   derived.addMembersToConformanceContext(
       {getterDecl, setterDecl, allDiffableVarsDecl, pbDecl});
 

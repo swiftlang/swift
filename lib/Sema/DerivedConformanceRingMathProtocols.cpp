@@ -386,9 +386,8 @@ deriveRingProperty(DerivedConformance &derived, Identifier propertyName,
 
   // Create ring property getter.
   auto *getterDecl =
-      derived.declareDerivedPropertyGetter(propDecl, returnTy);
+      derived.addGetterToReadOnlyDerivedProperty(propDecl, returnTy);
   getterDecl->setBodySynthesizer(bodySynthesizer.Fn, bodySynthesizer.Context);
-  propDecl->setAccessors(SourceLoc(), {getterDecl}, SourceLoc());
   derived.addMembersToConformanceContext({getterDecl, propDecl, pbDecl});
 
   return propDecl;

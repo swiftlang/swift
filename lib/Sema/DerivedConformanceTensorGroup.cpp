@@ -137,10 +137,9 @@ static ValueDecl *deriveTensorGroup_typeList(DerivedConformance &derived) {
     typeListDecl->getAttrs().add(new (C) InlinableAttr(/*implicit*/ true));
 
   // Create `_typeList` getter.
-  auto *getterDecl = derived.declareDerivedPropertyGetter(
+  auto *getterDecl = derived.addGetterToReadOnlyDerivedProperty(
       typeListDecl, returnType);
   getterDecl->setBodySynthesizer(deriveBodyTensorGroup_typeList, nullptr);
-  typeListDecl->setAccessors(SourceLoc(), {getterDecl}, SourceLoc());
   derived.addMembersToConformanceContext({getterDecl, typeListDecl, patDecl});
 
   return typeListDecl;

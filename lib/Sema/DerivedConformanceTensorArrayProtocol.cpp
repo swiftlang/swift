@@ -351,11 +351,10 @@ static ValueDecl *deriveTensorArrayProtocol_tensorHandleCount(
       new (C) InlinableAttr(/*implicit*/ true));
 
   // Create `_tensorHandleCount` getter.
-  auto *getterDecl = derived.declareDerivedPropertyGetter(
+  auto *getterDecl = derived.addGetterToReadOnlyDerivedProperty(
     tensorHandleCountDecl, returnType);
   getterDecl->setBodySynthesizer(
     deriveBodyTensorArrayProtocol_tensorHandleCount, nullptr);
-  tensorHandleCountDecl->setAccessors(SourceLoc(), {getterDecl}, SourceLoc());
   derived.addMembersToConformanceContext(
     {getterDecl, tensorHandleCountDecl, patDecl});
 
@@ -435,11 +434,10 @@ static ValueDecl *deriveTensorArrayProtocol_typeList(
     typeListDecl->getAttrs().add(new (C) InlinableAttr(/*implicit*/ true));
 
   // Create `_typeList` getter.
-  auto *getterDecl = derived.declareDerivedPropertyGetter(
+  auto *getterDecl = derived.addGetterToReadOnlyDerivedProperty(
       typeListDecl, returnType);
   getterDecl->setBodySynthesizer(
       deriveBodyTensorArrayProtocol_typeList, nullptr);
-  typeListDecl->setAccessors(SourceLoc(), {getterDecl}, SourceLoc());
   derived.addMembersToConformanceContext({getterDecl, typeListDecl, patDecl});
 
   return typeListDecl;
