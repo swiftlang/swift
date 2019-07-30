@@ -751,6 +751,36 @@ struct TF285MissingOneDiffAttr : TF285 {
   }
 }
 
+// TF-521: Test invalid `@differentiable` attribute due to invalid
+// `Differentiable` conformance (`TangentVector` does not conform to
+// `AdditiveArithmetic`).
+struct TF_521<T: FloatingPoint> {
+  var real: T
+  var imaginary: T
+
+  // expected-error @+1 {{can only differentiate functions with results that conform to 'Differentiable', but 'TF_521<T>' does not conform to 'Differentiable'}}
+  @differentiable(vjp: _vjpInit where T: Differentiable, T == T.TangentVector)
+  init(real: T = 0, imaginary: T = 0) {
+    self.real = real
+    self.imaginary = imaginary
+  }
+}
+// expected-error @+2 {{type 'TF_521<T>' does not conform to protocol 'Differentiable'}}
+// expected-note @+1 {{do you want to add protocol stubs}}
+extension TF_521: Differentiable where T: Differentiable {
+  // expected-note @+1 {{possibly intended match 'TF_521<T>.TangentVector' does not conform to 'AdditiveArithmetic'}}
+  typealias TangentVector = TF_521
+  typealias AllDifferentiableVariables = TF_521
+}
+extension TF_521 where T: Differentiable, T == T.TangentVector {
+  static func _vjpInit(real: T, imaginary: T) -> (TF_521, (TF_521) -> (T, T)) {
+    return (TF_521(real: real, imaginary: imaginary), { ($0.real, $0.imaginary) })
+  }
+}
+// expected-error @+1 {{result is not differentiable, but the function type is marked '@differentiable'}}
+let _: @differentiable(Float, Float) -> TF_521<Float> = { r, i in
+  TF_521(real: r, imaginary: i)
+}
 
 // TF-296: Infer `@differentiable` wrt parameters to be to all parameters that conform to `Differentiable`.
 
