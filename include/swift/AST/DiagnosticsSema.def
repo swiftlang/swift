@@ -2813,13 +2813,13 @@ NOTE(convenience_init_here,none,
 ERROR(designated_init_in_extension,none,
       "designated initializer cannot be declared in an extension of %0; "
       "did you mean this to be a convenience initializer?",
-      (Type))
+      (DeclName))
 ERROR(enumstruct_convenience_init,none,
       "delegating initializers in %0 are not marked with 'convenience'",
       (StringRef))
 ERROR(nonclass_convenience_init,none,
       "convenience initializer not allowed in non-class type %0",
-      (Type))
+      (DeclName))
 ERROR(cfclass_convenience_init,none,
       "convenience initializers are not supported in extensions of CF types",
       ())

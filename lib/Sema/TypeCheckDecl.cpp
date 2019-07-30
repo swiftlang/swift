@@ -1228,6 +1228,69 @@ static bool doesAccessorNeedDynamicAttribute(AccessorDecl *accessor) {
   llvm_unreachable("covered switch");
 }
 
+llvm::Expected<CtorInitializerKind>
+InitKindRequest::evaluate(Evaluator &evaluator, ConstructorDecl *decl) const {
+  auto &diags = decl->getASTContext().Diags;
+
+  // Convenience inits are only allowed on classes and in extensions thereof.
+  if (decl->getAttrs().hasAttribute<ConvenienceAttr>()) {
+    if (auto nominal = decl->getDeclContext()->getSelfNominalTypeDecl()) {
+      auto classDecl = dyn_cast<ClassDecl>(nominal);
+
+      // Forbid convenience inits on Foreign CF types, as Swift does not yet
+      // support user-defined factory inits.
+      if (classDecl &&
+          classDecl->getForeignClassKind() == ClassDecl::ForeignKind::CFType) {
+        diags.diagnose(decl->getLoc(), diag::cfclass_convenience_init);
+      }
+
+      if (!classDecl) {
+        auto ConvenienceLoc =
+          decl->getAttrs().getAttribute<ConvenienceAttr>()->getLocation();
+
+        // Produce a tailored diagnostic for structs and enums.
+        bool isStruct = dyn_cast<StructDecl>(nominal) != nullptr;
+        if (isStruct || dyn_cast<EnumDecl>(nominal)) {
+          diags.diagnose(decl->getLoc(), diag::enumstruct_convenience_init,
+                         isStruct ? "structs" : "enums")
+            .fixItRemove(ConvenienceLoc);
+        } else {
+          diags.diagnose(decl->getLoc(), diag::nonclass_convenience_init,
+                         nominal->getName())
+            .fixItRemove(ConvenienceLoc);
+        }
+        return CtorInitializerKind::Designated;
+      }
+    }
+
+    return CtorInitializerKind::Convenience;
+
+  } else if (auto nominal = decl->getDeclContext()->getSelfNominalTypeDecl()) {
+    // A designated init for a class must be written within the class itself.
+    //
+    // This is because designated initializers of classes get a vtable entry,
+    // and extensions cannot add vtable entries to the extended type.
+    //
+    // If we implement the ability for extensions defined in the same module
+    // (or the same file) to add vtable entries, we can re-evaluate this
+    // restriction.
+    if (dyn_cast<ClassDecl>(nominal) &&
+        !decl->isSynthesized() && isa<ExtensionDecl>(decl->getDeclContext()) &&
+        !(decl->getAttrs().hasAttribute<DynamicReplacementAttr>())) {
+      diags.diagnose(decl->getLoc(), diag::designated_init_in_extension,
+                     nominal->getName())
+        .fixItInsert(decl->getLoc(), "convenience ");
+      return CtorInitializerKind::Convenience;
+    }
+
+    if (decl->getDeclContext()->getExtendedProtocolDecl()) {
+      return CtorInitializerKind::Convenience;
+    }
+  }
+
+  return CtorInitializerKind::Designated;
+}
+
 llvm::Expected<bool>
 ProtocolRequiresClassRequest::evaluate(Evaluator &evaluator,
                                        ProtocolDecl *decl) const {
@@ -3488,6 +3551,9 @@ public:
   void visitConstructorDecl(ConstructorDecl *CD) {
     TC.validateDecl(CD);
 
+    // Compute these requests in case they emit diagnostics.
+    (void) CD->getInitKind();
+
     if (!CD->isInvalid()) {
       checkGenericParams(CD->getGenericParams(), CD, TC);
       TC.checkReferencedGenericParams(CD);
@@ -4313,57 +4379,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     DeclValidationRAII IBV(CD);
 
     checkDeclAttributesEarly(CD);
-
-    // convenience initializers are only allowed on classes and in
-    // extensions thereof.
-    if (CD->isConvenienceInit()) {
-      if (auto extType = CD->getDeclContext()->getDeclaredInterfaceType()) {
-        auto extClass = extType->getClassOrBoundGenericClass();
-
-        // Forbid convenience inits on Foreign CF types, as Swift does not yet
-        // support user-defined factory inits.
-        if (extClass &&
-            extClass->getForeignClassKind() == ClassDecl::ForeignKind::CFType) {
-          diagnose(CD->getLoc(), diag::cfclass_convenience_init);
-        }
-
-        if (!extClass && !extType->hasError()) {
-          auto ConvenienceLoc =
-            CD->getAttrs().getAttribute<ConvenienceAttr>()->getLocation();
-
-          // Produce a tailored diagnostic for structs and enums.
-          bool isStruct = extType->getStructOrBoundGenericStruct() != nullptr;
-          if (isStruct || extType->getEnumOrBoundGenericEnum()) {
-            diagnose(CD->getLoc(), diag::enumstruct_convenience_init,
-                     isStruct ? "structs" : "enums")
-              .fixItRemove(ConvenienceLoc);
-          } else {
-            diagnose(CD->getLoc(), diag::nonclass_convenience_init, extType)
-              .fixItRemove(ConvenienceLoc);
-          }
-          CD->setInitKind(CtorInitializerKind::Designated);
-        }
-      }
-    } else if (auto extType = CD->getDeclContext()->getDeclaredInterfaceType()) {
-      // A designated initializer for a class must be written within the class
-      // itself.
-      //
-      // This is because designated initializers of classes get a vtable entry,
-      // and extensions cannot add vtable entries to the extended type.
-      //
-      // If we implement the ability for extensions defined in the same module
-      // (or the same file) to add vtable entries, we can re-evaluate this
-      // restriction.
-      if (extType->getClassOrBoundGenericClass() &&
-          isa<ExtensionDecl>(CD->getDeclContext()) &&
-          !(CD->getAttrs().hasAttribute<DynamicReplacementAttr>())) {
-        diagnose(CD->getLoc(), diag::designated_init_in_extension, extType)
-          .fixItInsert(CD->getLoc(), "convenience ");
-        CD->setInitKind(CtorInitializerKind::Convenience);
-      } else if (CD->getDeclContext()->getExtendedProtocolDecl()) {
-        CD->setInitKind(CtorInitializerKind::Convenience);
-      }
-    }
 
     validateGenericFuncOrSubscriptSignature(CD, CD, CD);
 

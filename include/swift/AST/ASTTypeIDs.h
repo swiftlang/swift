@@ -24,6 +24,7 @@ class CustomAttr;
 class NominalTypeDecl;
 struct PropertyWrapperBackingPropertyInfo;
 struct PropertyWrapperTypeInfo;
+enum class CtorInitializerKind;
 struct PropertyWrapperMutability;
 class Type;
 class VarDecl;
