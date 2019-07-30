@@ -3280,10 +3280,10 @@ bool MissingGenericArgumentsFailure::diagnoseForAnchor(
   if (!diagnosed)
     return false;
 
-  if (!hasDecl())
+  auto *DC = getDeclContext();
+  if (!DC)
     return true;
 
-  auto *DC = getDeclContext();
   if (auto *SD = dyn_cast<SubscriptDecl>(DC)) {
     emitDiagnostic(SD, diag::note_call_to_subscript, SD->getFullName());
     return true;
@@ -3333,14 +3333,13 @@ bool MissingGenericArgumentsFailure::diagnoseParameter(
     emitDiagnostic(loc, diag::unbound_generic_parameter, GP);
   }
 
-  if (!hasDecl())
+  Type baseTyForNote;
+  auto *DC = getDeclContext();
+  if (!DC)
     return true;
 
   if (!hasLoc(GP))
     return true;
-
-  Type baseTyForNote;
-  auto *DC = getDeclContext();
 
   if (auto *NTD =
           dyn_cast_or_null<NominalTypeDecl>(DC->getSelfNominalTypeDecl())) {
@@ -3361,6 +3360,9 @@ void MissingGenericArgumentsFailure::emitGenericSignatureNote(
   auto &cs = getConstraintSystem();
   auto &TC = getTypeChecker();
   auto *paramDC = getDeclContext();
+
+  if (!paramDC)
+    return;
 
   auto *GTD = dyn_cast<GenericTypeDecl>(paramDC);
   if (!GTD || anchor.is<Expr *>())

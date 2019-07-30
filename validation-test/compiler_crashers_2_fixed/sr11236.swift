@@ -10,4 +10,3 @@ public func myTri<T: Comparable, U: Comparable> (retval: UnsafeMutablePointer<U>
   retval.initialize(to: trichotomy(x: x, y: y))
 }
 
-print("Hello, World!")

@@ -1435,10 +1435,10 @@ public:
 
   DeclContext *getDeclContext() const {
     auto *GP = Parameters.front();
-    return GP->getDecl()->getDeclContext();
-  }
+    auto *decl = GP->getDecl();
 
-  bool hasDecl() const { return Parameters.front()->getDecl() != nullptr; }
+    return decl ? decl->getDeclContext() : nullptr;
+  }
 
   bool diagnoseAsError() override;
 
