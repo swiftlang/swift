@@ -234,10 +234,10 @@ namespace swift {
   /// dynamic member lookup subscript, or \c None if it cannot be determined.
   ///
   /// \param subscript The potential keypath dynamic member lookup subscript.
-  /// \param DC The DeclContext from which the subscript is being referenced.
-  Optional<std::pair<Type, Type>>
-  getRootAndResultTypeOfKeypathDynamicMember(SubscriptDecl *subscript,
-                                             const DeclContext *DC);
+  Type getRootTypeOfKeypathDynamicMember(SubscriptDecl *subscript);
+
+  Type getResultTypeOfKeypathDynamicMember(SubscriptDecl *subscript);
+
   /// Collect all the protocol requirements that a given declaration can
   ///   provide default implementations for. VD is a declaration in extension
   ///   declaration. Scratch is the buffer to collect those protocol
