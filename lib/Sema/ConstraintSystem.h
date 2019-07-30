@@ -1544,7 +1544,7 @@ public:
   /// The current solver state.
   ///
   /// This will be non-null when we're actively solving the constraint
-  /// system, and carries temporary state related to the scurrent path
+  /// system, and carries temporary state related to the current path
   /// we're exploring.
   SolverState *solverState = nullptr;
 
