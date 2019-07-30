@@ -1994,18 +1994,14 @@ public:
       //     τ_1_0(U) => U }
       auto subs = keyPathInfo.baseType->getMemberSubstitutions(SD);
 
-      // Extract the root and result type of the KeyPath type in the parameter.
-      // i.e. 'T' and 'U'
-      auto rootAndResult =
-          getRootAndResultTypeOfKeypathDynamicMember(SD, CurrDeclContext);
-
       // If the keyPath result type has type parameters, that might affect the
       // subscript result type.
-      auto keyPathResultTy = rootAndResult->second->mapTypeOutOfContext();
+      auto keyPathResultTy = getResultTypeOfKeypathDynamicMember(SD)->
+        mapTypeOutOfContext();
       if (keyPathResultTy->hasTypeParameter()) {
-        auto keyPathRootTy =
-            rootAndResult->first.subst(QueryTypeSubstitutionMap{subs},
-                                       LookUpConformanceInModule(CurrModule));
+        auto keyPathRootTy = getRootTypeOfKeypathDynamicMember(SD).
+          subst(QueryTypeSubstitutionMap{subs},
+                LookUpConformanceInModule(CurrModule));
 
         // The result type of the VD.
         // i.e. 'Circle.center' => 'Point'.

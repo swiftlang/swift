@@ -771,3 +771,14 @@ bool swift::isConvertibleTo(Type T1, Type T2, bool openArchetypes,
     TypeRelationCheckRequest(TypeRelationCheckInput(&DC, T1, T2,
       TypeRelation::ConvertTo, openArchetypes)), false);
 }
+
+Type swift::getRootTypeOfKeypathDynamicMember(SubscriptDecl *SD) {
+  return evaluateOrDefault(SD->getASTContext().evaluator,
+    RootTypeOfKeypathDynamicMemberRequest{SD}, Type());
+}
+
+Type swift::getResultTypeOfKeypathDynamicMember(SubscriptDecl *SD) {
+  return evaluateOrDefault(SD->getASTContext().evaluator,
+    RootAndResultTypeOfKeypathDynamicMemberRequest{SD}, TypePair()).
+      SecondTy;
+}
