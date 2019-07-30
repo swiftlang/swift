@@ -6487,6 +6487,12 @@ static bool requiresNewVTableEntry(const AbstractFunctionDecl *decl) {
   auto baseInterfaceTy = base->getInterfaceType();
   auto derivedInterfaceTy = decl->getInterfaceType();
 
+  using Direction = ASTContext::OverrideGenericSignatureReqCheck;
+  if (!ctx.overrideGenericSignatureReqsSatisfied(
+          base, decl, Direction::BaseReqSatisfiedByDerived)) {
+    return true;
+  }
+
   auto selfInterfaceTy = decl->getDeclContext()->getDeclaredInterfaceType();
 
   auto overrideInterfaceTy = selfInterfaceTy->adjustSuperclassMemberDeclType(

@@ -129,6 +129,16 @@ class F: D {
   override func i4(x: Int, y: Int) -> Int {}
 }
 
+protocol Proto {}
+
+class G {
+  func foo<T: Proto>(arg: T) {}
+}
+
+class H: G {
+  override func foo<T>(arg: T) {}
+}
+
 // This test is incorrect in semantic SIL today. But it will be fixed in
 // forthcoming commits.
 //
@@ -303,6 +313,10 @@ class Noot : Aap {
 // CHECK:         #B.i2!1: {{.*}} : @$s13vtable_thunks1F{{[A-Z0-9a-z_]*}}FTV
 // CHECK:         #B.i3!1: {{.*}} : @$s13vtable_thunks1F{{[A-Z0-9a-z_]*}}FTV
 // CHECK:         #B.i4!1: {{.*}} : @$s13vtable_thunks1F{{[A-Z0-9a-z_]*}}F
+
+// CHECK-LABEL: sil_vtable H {
+// CHECK:  #G.foo!1: <T where T : Proto> (G) -> (T) -> () : @$s13vtable_thunks1H{{[A-Z0-9a-z_]*}}FTV [override]
+// CHECK:  #H.foo!1: <T> (H) -> (T) -> () : @$s13vtable_thunks1H{{[A-Z0-9a-z_]*}}tlF
 
 // CHECK-LABEL: sil_vtable NoThrowVariance {
 // CHECK:         #ThrowVariance.mightThrow!1: {{.*}} : @$s13vtable_thunks{{[A-Z0-9a-z_]*}}F

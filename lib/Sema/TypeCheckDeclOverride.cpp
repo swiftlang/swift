@@ -951,24 +951,18 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
   auto baseGenericCtx = baseDecl->getAsGenericContext();
   auto derivedGenericCtx = decl->getAsGenericContext();
 
+  using Direction = ASTContext::OverrideGenericSignatureReqCheck;
   if (baseGenericCtx && derivedGenericCtx) {
-    // If the generic signatures are different, then complain
-    if (auto newSig = ctx.getOverrideGenericSignature(baseDecl, decl)) {
-      if (auto derivedSig = derivedGenericCtx->getGenericSignature()) {
-        auto requirementsSatisfied =
-            derivedSig->requirementsNotSatisfiedBy(newSig).empty();
-
-        if (!requirementsSatisfied) {
-          diags.diagnose(
-              decl, diag::override_method_different_generic_sig,
-              decl->getBaseName(),
-              derivedGenericCtx->getGenericSignature()->getAsString(),
-              baseGenericCtx->getGenericSignature()->getAsString(),
-              newSig->getAsString());
-          diags.diagnose(baseDecl, diag::overridden_here);
-          emittedMatchError = true;
-        }
-      }
+    if (!ctx.overrideGenericSignatureReqsSatisfied(
+            baseDecl, decl, Direction::DerivedReqSatisfiedByBase)) {
+      auto newSig = ctx.getOverrideGenericSignature(baseDecl, decl);
+      diags.diagnose(decl, diag::override_method_different_generic_sig,
+                     decl->getBaseName(),
+                     derivedGenericCtx->getGenericSignature()->getAsString(),
+                     baseGenericCtx->getGenericSignature()->getAsString(),
+                     newSig->getAsString());
+      diags.diagnose(baseDecl, diag::overridden_here);
+      emittedMatchError = true;
     }
   }
 
