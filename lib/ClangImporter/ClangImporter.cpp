@@ -320,6 +320,8 @@ private:
 class ClangImporterDependencyCollector : public clang::DependencyCollector
 {
   llvm::StringSet<> ExcludedPaths;
+  /// The FileCollector is used by LLDB to generate reproducers. It's not used
+  /// by Swift to track dependencies.
   std::shared_ptr<llvm::FileCollector> FileCollector;
   const bool TrackSystemDeps;
 
