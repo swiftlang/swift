@@ -3282,27 +3282,36 @@ public:
           /*differentiationOrder*/ 1, functionSource);
     }
 
-    // Check and diagnose non-differentiable arguments.
-    for (unsigned paramIndex : range(originalFnTy->getNumParameters())) {
-      if (indices.isWrtParameter(paramIndex) &&
-              !originalFnTy->getParameters()[paramIndex]
-              .getSILStorageType()
-              .isDifferentiable(getModule())) {
-        context.emitNondifferentiabilityError(
-            original, invoker, diag::autodiff_nondifferentiable_argument);
-        errorOccurred = true;
-        return;
-      }
-    }
-    // Check and diagnose non-differentiable results.
-    if (!originalFnTy->getResults()[indices.source]
-            .getSILStorageType()
-            .isDifferentiable(getModule())) {
-      context.emitNondifferentiabilityError(
-          original, invoker, diag::autodiff_nondifferentiable_result);
-      errorOccurred = true;
+    // Check and diagnose non-differentiable original function type.
+    auto diagnoseNondifferentiableOriginalFunctionType =
+        [&](CanSILFunctionType origFnTy) {
+          // Check and diagnose non-differentiable arguments.
+          for (unsigned paramIndex : range(originalFnTy->getNumParameters())) {
+            if (indices.isWrtParameter(paramIndex) &&
+                    !originalFnTy->getParameters()[paramIndex]
+                    .getSILStorageType()
+                    .isDifferentiable(getModule())) {
+              context.emitNondifferentiabilityError(
+                  ai->getArgumentsWithoutIndirectResults()[paramIndex], invoker,
+                  diag::autodiff_nondifferentiable_argument);
+              errorOccurred = true;
+              return true;
+            }
+          }
+          // Check and diagnose non-differentiable results.
+          if (!originalFnTy->getResults()[indices.source]
+                  .getSILStorageType()
+                  .isDifferentiable(getModule())) {
+            context.emitNondifferentiabilityError(
+                original, invoker, diag::autodiff_nondifferentiable_result);
+            errorOccurred = true;
+            return true;
+          }
+          return false;
+        };
+    if (diagnoseNondifferentiableOriginalFunctionType(originalFnTy))
       return;
-    }
+
     // If VJP has not yet been found, emit an `autodiff_function` instruction
     // on the remapped original function operand and `autodiff_function_extract`
     // the VJP. The actual JVP/VJP functions will be populated in the
@@ -3333,6 +3342,10 @@ public:
             ai->getLoc(), original, substMap, {},
             ParameterConvention::Direct_Guaranteed);
         original = vjpPartialApply;
+        originalFnTy = original->getType().castTo<SILFunctionType>();
+        // Diagnose if new original function type is non-differentiable.
+        if (diagnoseNondifferentiableOriginalFunctionType(originalFnTy))
+          return;
       }
 
       auto *autoDiffFuncInst = context.createAutoDiffFunction(
@@ -3342,6 +3355,8 @@ public:
 
       // Record the `autodiff_function` instruction.
       context.getAutoDiffFunctionInsts().push_back(autoDiffFuncInst);
+      // TODO(TF-689): Make `autodiff_function` store result indices and remove
+      // `ADContext::resultIndices`.
       context.getResultIndices()[autoDiffFuncInst] =
           activeResultIndices.front();
 

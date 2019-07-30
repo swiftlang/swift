@@ -67,3 +67,20 @@ struct TF8Struct<Scalar> : TF8Proto where Scalar : FloatingPoint & Differentiabl
 }
 
 _ = gradient(at: 1.0, in: { x in x.squareRoot() })
+
+//===----------------------------------------------------------------------===//
+// Non-differentiable arguments and results
+//===----------------------------------------------------------------------===//
+
+struct TF_687<T> : Differentiable {
+  @noDerivative var indirectDummy: T
+  var base: Float
+
+  init(_ base: Float, dummy: T) {
+    self.base = base
+    self.indirectDummy = dummy
+  }
+}
+// expected-error @+2 {{function is not differentiable}}
+// expected-note @+1 {{cannot differentiate through a non-differentiable argument; do you want to use 'withoutDerivative(at:)'?}}
+let _: @differentiable (Float) -> TF_687<Any> = { x in TF_687<Any>(x, dummy: x) }
