@@ -252,6 +252,10 @@ let no_return: @differentiable (Float) -> Float = { x in
 // expected-note @+1 {{missing return for differentiation}}
 }
 
+//===----------------------------------------------------------------------===//
+// Non-differentiable arguments and results
+//===----------------------------------------------------------------------===//
+
 // expected-error @+1 {{function is not differentiable}}
 @differentiable
 // expected-note @+1 {{when differentiating this function definition}}
