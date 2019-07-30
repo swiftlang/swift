@@ -148,10 +148,18 @@ public:
                                CanSILFunctionType constantTy);
 
   // SWIFT_ENABLE_TENSORFLOW
-  /// Get the autodiff associated function thunk for a JVP/VJP SILDeclRef.
-  /// Currently used only for JVP/VJP vtable entries.
-  SILFunction *getAutoDiffThunk(SILDeclRef constant,
-                                CanSILFunctionType constantTy);
+  /// Get or create an autodiff associated function thunk for the given
+  /// SILDeclRef, SILFunction, and associated function type.
+  SILFunction *getOrCreateAutoDiffThunk(SILDeclRef assocFnRef,
+                                        SILFunction *assocFn,
+                                        CanSILFunctionType assocFnTy);
+
+  // SWIFT_ENABLE_TENSORFLOW
+  /// Get or create an autodiff associated function vtable entry thunk for the
+  /// given SILDeclRef and associated function type.
+  SILFunction *
+  getOrCreateAutoDiffClassMethodThunk(SILDeclRef assocFnRef,
+                                      CanSILFunctionType assocFnTy);
 
   /// Emit a vtable thunk for a derived method if its natural abstraction level
   /// diverges from the overridden base method. If no thunking is needed,
@@ -172,11 +180,12 @@ public:
                                            CanType dynamicSelfType);
 
   // SWIFT_ENABLE_TENSORFLOW
-  /// Get or create a thunk for reordering autodiff associated functions with a
-  /// self parameter, so that self appears as:
+  /// Get or create a thunk for reabstracting user-defined JVP/VJP functions.
+  ///
+  /// If `reorderSelf` is true, reorder self so that it appears as:
   /// - The last parameter in the returned differential.
   /// - The last result in the returned pullback.
-  SILFunction *getOrCreateAutoDiffAssociatedFunctionReorderingThunk(
+  SILFunction *getOrCreateAutoDiffAssociatedFunctionThunk(
       SILFunction *original, SILAutoDiffIndices &indices,
       SILFunction *assocFn, AutoDiffAssociatedFunctionKind assocFnKind,
       IsSerialized_t isSerialized);

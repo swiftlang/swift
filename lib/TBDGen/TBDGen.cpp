@@ -215,29 +215,18 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
   }
 
   // SWIFT_ENABLE_TENSORFLOW
-  // The AutoDiff pass creates an order-1 JVP and VJP for every function with a
-  // `@differentiable` attribute.
+  // The Differentiation transform creates an order-1 JVP and VJP for every
+  // function with a `@differentiable` attribute.
   auto diffAttrs = AFD->getAttrs().getAttributes<DifferentiableAttr>();
   for (auto *DA : diffAttrs) {
-    // If a method-self-reordering thunk is generated for the original function,
-    // emit symbol.
-    auto isSelfReorderedMethod = AFD && AFD->isInstanceMember() &&
-        AFD->hasImplicitSelfDecl() &&
-        DA->getParameterIndices()->parameters.count() > 1;
-    // FIXME: When we get rid of `vjp:` and `jvp:` arguments in `@differentiable`,
-    // we will no longer need to see whether they are specified.
-    if (!DA->getJVPFunction() || isSelfReorderedMethod) {
-      auto *id = AutoDiffAssociatedFunctionIdentifier::get(
-          AutoDiffAssociatedFunctionKind::JVP, /*differentiationOrder*/ 1,
-          DA->getParameterIndices(), AFD->getASTContext());
-      addSymbol(SILDeclRef(AFD).asAutoDiffAssociatedFunction(id));
-    }
-    if (!DA->getVJPFunction() || isSelfReorderedMethod) {
-      auto *id = AutoDiffAssociatedFunctionIdentifier::get(
-          AutoDiffAssociatedFunctionKind::VJP, /*differentiationOrder*/ 1,
-          DA->getParameterIndices(), AFD->getASTContext());
-      addSymbol(SILDeclRef(AFD).asAutoDiffAssociatedFunction(id));
-    }
+    auto *jvpId = AutoDiffAssociatedFunctionIdentifier::get(
+        AutoDiffAssociatedFunctionKind::JVP, /*differentiationOrder*/ 1,
+        DA->getParameterIndices(), AFD->getASTContext());
+    addSymbol(SILDeclRef(AFD).asAutoDiffAssociatedFunction(jvpId));
+    auto *vjpId = AutoDiffAssociatedFunctionIdentifier::get(
+        AutoDiffAssociatedFunctionKind::VJP, /*differentiationOrder*/ 1,
+        DA->getParameterIndices(), AFD->getASTContext());
+    addSymbol(SILDeclRef(AFD).asAutoDiffAssociatedFunction(vjpId));
   }
 
   auto publicDefaultArgGenerators = SwiftModule->isTestingEnabled() ||
@@ -305,30 +294,18 @@ void TBDGenVisitor::visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
   }
 
   // SWIFT_ENABLE_TENSORFLOW
-  // The AutoDiff pass creates an order-1 JVP and VJP for every var/subscript
-  // with a `@differentiable` attribute.
+  // The Differentiation transform creates an order-1 JVP and VJP for every
+  // var/subscript with a `@differentiable` attribute.
   auto diffAttrs = ASD->getAttrs().getAttributes<DifferentiableAttr>();
   for (auto *DA : diffAttrs) {
-    // If a method-self-reordering thunk is generated for the original function,
-    // emit symbol.
-    auto isSelfReorderedMethod = ASD->getGetter() &&
-        ASD->getGetter()->isInstanceMember() &&
-        ASD->getGetter()->hasImplicitSelfDecl() &&
-        DA->getParameterIndices()->parameters.count() > 1;
-    // FIXME: When we get rid of `vjp:` and `jvp:` arguments in `@differentiable`,
-    // we will no longer need to see whether they are specified.
-    if (!DA->getJVPFunction() || isSelfReorderedMethod) {
-      auto *id = AutoDiffAssociatedFunctionIdentifier::get(
-          AutoDiffAssociatedFunctionKind::JVP, /*differentiationOrder*/ 1,
-          DA->getParameterIndices(), ASD->getASTContext());
-      addSymbol(SILDeclRef(ASD->getGetter()).asAutoDiffAssociatedFunction(id));
-    }
-    if (!DA->getVJPFunction() || isSelfReorderedMethod) {
-      auto *id = AutoDiffAssociatedFunctionIdentifier::get(
-          AutoDiffAssociatedFunctionKind::VJP, /*differentiationOrder*/ 1,
-          DA->getParameterIndices(), ASD->getASTContext());
-      addSymbol(SILDeclRef(ASD->getGetter()).asAutoDiffAssociatedFunction(id));
-    }
+    auto *jvpId = AutoDiffAssociatedFunctionIdentifier::get(
+        AutoDiffAssociatedFunctionKind::JVP, /*differentiationOrder*/ 1,
+        DA->getParameterIndices(), ASD->getASTContext());
+    addSymbol(SILDeclRef(ASD->getGetter()).asAutoDiffAssociatedFunction(jvpId));
+    auto *vjpId = AutoDiffAssociatedFunctionIdentifier::get(
+        AutoDiffAssociatedFunctionKind::VJP, /*differentiationOrder*/ 1,
+        DA->getParameterIndices(), ASD->getASTContext());
+    addSymbol(SILDeclRef(ASD->getGetter()).asAutoDiffAssociatedFunction(vjpId));
   }
 
   // Explicitly look at each accessor here: see visitAccessorDecl.

@@ -2553,16 +2553,17 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
 
       IdentifierID jvpName = 0;
       DeclID jvpRef = 0;
-      if (auto jvp = attr->getJVP()) {
+      if (auto jvp = attr->getJVP())
         jvpName = S.addDeclBaseNameRef(jvp->Name.getBaseName());
-        jvpRef = S.addDeclRef(attr->getJVPFunction());
-      }
+      if (auto jvpFunction = attr->getJVPFunction())
+        jvpRef = S.addDeclRef(jvpFunction);
+
       IdentifierID vjpName = 0;
       DeclID vjpRef = 0;
-      if (auto vjp = attr->getVJP()) {
+      if (auto vjp = attr->getVJP())
         vjpName = S.addDeclBaseNameRef(vjp->Name.getBaseName());
-        vjpRef = S.addDeclRef(attr->getVJPFunction());
-      }
+      if (auto vjpFunction = attr->getVJPFunction())
+        vjpRef = S.addDeclRef(vjpFunction);
 
       auto paramIndices = attr->getParameterIndices();
       assert(paramIndices && "Checked parameter indices must be resolved");
