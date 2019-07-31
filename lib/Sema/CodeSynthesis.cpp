@@ -1272,6 +1272,9 @@ SynthesizeAccessorRequest::evaluate(Evaluator &evaluator,
                                     AccessorKind kind) const {
   auto &ctx = storage->getASTContext();
 
+  if (!storage->hasInterfaceType())
+    ctx.getLazyResolver()->resolveDeclSignature(storage);
+
   switch (kind) {
   case AccessorKind::Get:
     return createGetterPrototype(storage, ctx);
