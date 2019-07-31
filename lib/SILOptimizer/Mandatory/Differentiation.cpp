@@ -6030,11 +6030,16 @@ bool ADContext::processDifferentiableAttribute(
     attr->setJVPName(jvpName);
   }
 
-  // If differentiation is triggered by `[differentiable]`, associated function
-  // should share linkage of original function.
+  // Associated function should share linkage of original function if
+  // differentiation is triggered by:
+  // - `[differentiable]` attribute.
+  // - `autodiff_function` in a serialized function.
   auto isAssocFnExported =
       invoker.getKind() ==
-          DifferentiationInvoker::Kind::SILDifferentiableAttribute;
+          DifferentiationInvoker::Kind::SILDifferentiableAttribute ||
+      (invoker.getKind() ==
+          DifferentiationInvoker::Kind::AutoDiffFunctionInst &&
+       invoker.getAutoDiffFunctionInst()->getFunction()->isSerialized());
 
   // Try to look up VJP only if attribute specifies VJP name or if original
   // function is an external declaration. If VJP function cannot be found,
