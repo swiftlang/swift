@@ -1212,11 +1212,7 @@ OpaqueSyntaxNode ParserUnit::parse() {
     P.parseTopLevel();
     Done = P.Tok.is(tok::eof);
   }
-  auto rawNode = P.finalizeSyntaxTree();
-  if (rawNode.isNull()) {
-    return nullptr;
-  }
-  return rawNode.getOpaqueNode();
+  return P.finalizeSyntaxTree();
 }
 
 Parser &ParserUnit::getParser() {

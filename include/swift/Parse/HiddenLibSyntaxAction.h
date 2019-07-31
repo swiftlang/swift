@@ -15,22 +15,39 @@
 
 #include "swift/Parse/SyntaxParseActions.h"
 #include "swift/SyntaxParse/SyntaxTreeCreator.h"
-#include "llvm/ADT/DenseMap.h"
+#include "llvm/Support/Allocator.h"
 
 namespace swift {
+namespace syntax {
+class RawSyntax;
+}
+
 /// Holds an explicitly provided action and uses it to handle all function
 /// calls. Also hides an implicit SyntaxTreeCreator and ensures libSyntax nodes
 /// are always created. Provides an interface to map results of the explicitly
 /// provided action to the hidden libSyntax action.
 // todo [gsoc]: remove when possible
 class HiddenLibSyntaxAction : public SyntaxParseActions {
+
+  struct Node {
+    OpaqueSyntaxNode ExplicitActionNode;
+    OpaqueSyntaxNode LibSyntaxNode;
+
+    Node(OpaqueSyntaxNode ExplicitActionNode, OpaqueSyntaxNode LibSyntaxNode)
+        : ExplicitActionNode(ExplicitActionNode), LibSyntaxNode(LibSyntaxNode) {
+    }
+  };
+
   std::shared_ptr<SyntaxParseActions> ExplicitAction;
   std::shared_ptr<SyntaxTreeCreator> LibSyntaxAction;
-  llvm::DenseMap<OpaqueSyntaxNode, OpaqueSyntaxNode> OpaqueNodeMap;
+  llvm::SpecificBumpPtrAllocator<Node> NodeAllocator;
 
   bool areBothLibSyntax() {
     return ExplicitAction->getOpaqueKind() == OpaqueSyntaxNodeKind::LibSyntax;
   }
+
+  OpaqueSyntaxNode makeHiddenNode(OpaqueSyntaxNode explicitActionNode,
+                                  OpaqueSyntaxNode libSyntaxNode);
 
 public:
   HiddenLibSyntaxAction(
@@ -57,14 +74,18 @@ public:
     return ExplicitAction->getOpaqueKind();
   }
 
-  /// Returns the libSyntax node corresponding to the provided node that has
-  /// been created by the explicit action.
-  OpaqueSyntaxNode getLibSyntaxNodeFor(OpaqueSyntaxNode explicitNode);
+  /// Returns the libSyntax node from the specified node that has been created
+  /// by this action.
+  syntax::RawSyntax *getLibSyntaxNodeFor(OpaqueSyntaxNode node);
+
+  /// Returns the node created by explicit syntax action from the specified
+  /// node that has been created by this action.
+  OpaqueSyntaxNode getExplicitNodeFor(OpaqueSyntaxNode node);
 
   bool isReleaseNeeded() {
     return ExplicitAction == LibSyntaxAction || !areBothLibSyntax();
   }
-  
+
   /// Returns the underlying libSyntax SyntaxTreeCreator.
   std::shared_ptr<SyntaxTreeCreator> getLibSyntaxAction() {
     return LibSyntaxAction;

@@ -66,15 +66,13 @@ public:
 
   template <typename SyntaxNode>
   SyntaxNode getLibSyntaxNodeFor(OpaqueSyntaxNode Node) {
-    auto Raw = static_cast<RawSyntax *>(Actions->getLibSyntaxNodeFor(Node));
-    return make<SyntaxNode>(Raw);
+    return make<SyntaxNode>(Actions->getLibSyntaxNodeFor(Node));
   }
 
-  void releaseLibSyntaxNodeIfNeededFor(OpaqueSyntaxNode Node) {
-    if (!Actions->isReleaseNeeded())
-      return;
-    auto Raw = static_cast<RawSyntax *>(Actions->getLibSyntaxNodeFor(Node));
-    Raw->Release();
+  OpaqueSyntaxNode finalizeNode(OpaqueSyntaxNode Node) {
+    if (Actions->isReleaseNeeded())
+      Actions->getLibSyntaxNodeFor(Node)->Release();
+    return Actions->getExplicitNodeFor(Node);
   }
 };
 } // namespace swift

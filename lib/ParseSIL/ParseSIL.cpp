@@ -165,7 +165,7 @@ static bool parseIntoSourceFileImpl(SourceFile &SF,
 
   if (STreeCreator) {
     auto rawNode = P.finalizeSyntaxTree();
-    STreeCreator->acceptSyntaxRoot(rawNode.getOpaqueNode(), SF);
+    STreeCreator->acceptSyntaxRoot(rawNode, SF);
   }
 
   return FoundSideEffects;

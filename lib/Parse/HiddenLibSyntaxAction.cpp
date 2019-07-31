@@ -28,65 +28,100 @@ using namespace swift;
 using namespace swift::syntax;
 using namespace llvm;
 
+OpaqueSyntaxNode
+HiddenLibSyntaxAction::makeHiddenNode(OpaqueSyntaxNode explicitActionNode,
+                                      OpaqueSyntaxNode libSyntaxNode) {
+  auto dat = NodeAllocator.Allocate();
+  return new (dat) Node(explicitActionNode, libSyntaxNode);
+}
+
 OpaqueSyntaxNode HiddenLibSyntaxAction::recordToken(
     tok tokenKind, ArrayRef<ParsedTriviaPiece> leadingTrivia,
     ArrayRef<ParsedTriviaPiece> trailingTrivia, CharSourceRange range) {
   OpaqueSyntaxNode primaryNode = ExplicitAction->recordToken(
       tokenKind, leadingTrivia, trailingTrivia, range);
+  OpaqueSyntaxNode secondaryNode = nullptr;
 
-  if (!areBothLibSyntax()) {
-    OpaqueSyntaxNode secondaryNode = LibSyntaxAction->recordToken(
-        tokenKind, leadingTrivia, trailingTrivia, range);
-    OpaqueNodeMap[primaryNode] = secondaryNode;
+  if (areBothLibSyntax()) {
+    secondaryNode = primaryNode;
+  } else {
+    secondaryNode = LibSyntaxAction->recordToken(tokenKind, leadingTrivia,
+                                                 trailingTrivia, range);
   }
 
-  return primaryNode;
+  return makeHiddenNode(primaryNode, secondaryNode);
 }
 
 OpaqueSyntaxNode HiddenLibSyntaxAction::recordMissingToken(tok tokenKind,
                                                            SourceLoc loc) {
   OpaqueSyntaxNode primaryNode =
       ExplicitAction->recordMissingToken(tokenKind, loc);
+  OpaqueSyntaxNode secondaryNode = nullptr;
 
-  if (!areBothLibSyntax()) {
-    OpaqueSyntaxNode secondaryNode =
-        LibSyntaxAction->recordMissingToken(tokenKind, loc);
-    OpaqueNodeMap[primaryNode] = secondaryNode;
+  if (areBothLibSyntax()) {
+    secondaryNode = primaryNode;
+  } else {
+    secondaryNode = LibSyntaxAction->recordMissingToken(tokenKind, loc);
   }
 
-  return primaryNode;
+  return makeHiddenNode(primaryNode, secondaryNode);
 }
 
 OpaqueSyntaxNode
 HiddenLibSyntaxAction::recordRawSyntax(syntax::SyntaxKind kind,
                                        ArrayRef<OpaqueSyntaxNode> elements,
                                        CharSourceRange range) {
-  OpaqueSyntaxNode primaryNode =
-      ExplicitAction->recordRawSyntax(kind, elements, range);
+  OpaqueSyntaxNode primaryNode = nullptr;
+  OpaqueSyntaxNode secondaryNode = nullptr;
 
-  if (!areBothLibSyntax()) {
-    SmallVector<OpaqueSyntaxNode, 4> secondaryElements;
-    secondaryElements.reserve(elements.size());
-    for (auto &&element : elements) {
-      secondaryElements.push_back(OpaqueNodeMap[element]);
+  {
+    SmallVector<OpaqueSyntaxNode, 4> primaryElements;
+    primaryElements.reserve(elements.size());
+    for (auto element : elements) {
+      OpaqueSyntaxNode primaryElement = nullptr;
+      if (element)
+        primaryElement = ((Node *)element)->ExplicitActionNode;
+      primaryElements.push_back(primaryElement);
     }
-    OpaqueSyntaxNode secondaryNode =
-        LibSyntaxAction->recordRawSyntax(kind, secondaryElements, range);
-    OpaqueNodeMap[primaryNode] = secondaryNode;
+
+    primaryNode = ExplicitAction->recordRawSyntax(kind, primaryElements, range);
   }
 
-  return primaryNode;
+  if (areBothLibSyntax()) {
+    secondaryNode = primaryNode;
+  } else {
+    SmallVector<OpaqueSyntaxNode, 4> secondaryElements;
+    secondaryElements.reserve(elements.size());
+    for (auto element : elements) {
+      OpaqueSyntaxNode secondaryElement = nullptr;
+      if (element)
+        secondaryElement = ((Node *)element)->LibSyntaxNode;
+      secondaryElements.push_back(secondaryElement);
+    }
+    secondaryNode =
+        LibSyntaxAction->recordRawSyntax(kind, secondaryElements, range);
+  }
+
+  return makeHiddenNode(primaryNode, secondaryNode);
 }
 
 std::pair<size_t, OpaqueSyntaxNode>
 HiddenLibSyntaxAction::lookupNode(size_t lexerOffset, syntax::SyntaxKind kind) {
-  return ExplicitAction->lookupNode(lexerOffset, kind);
+  size_t length;
+  OpaqueSyntaxNode n;
+  std::tie(length, n) = ExplicitAction->lookupNode(lexerOffset, kind);
+  if (length == 0)
+    return {0, nullptr};
+  return {length, makeHiddenNode(n, nullptr)};
+}
+
+RawSyntax *HiddenLibSyntaxAction::getLibSyntaxNodeFor(OpaqueSyntaxNode node) {
+  auto hiddenNode = (Node *)node;
+  return (RawSyntax *)hiddenNode->LibSyntaxNode;
 }
 
 OpaqueSyntaxNode
-HiddenLibSyntaxAction::getLibSyntaxNodeFor(OpaqueSyntaxNode explicitNode) {
-  if (!areBothLibSyntax())
-    return OpaqueNodeMap[explicitNode];
-
-  return explicitNode;
+HiddenLibSyntaxAction::getExplicitNodeFor(OpaqueSyntaxNode node) {
+  auto hiddenNode = (Node *)node;
+  return hiddenNode->ExplicitActionNode;
 }

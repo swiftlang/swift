@@ -350,7 +350,7 @@ public:
   /// This function will be called during the destroying of a root syntax
   /// parsing context. However, we can explicitly call this function to get
   /// the syntax tree before closing the root context.
-  ParsedRawSyntaxNode finalizeRoot();
+  OpaqueSyntaxNode finalizeRoot();
 
   /// Make a missing node corresponding to the given token kind and
   /// push this node into the context. The synthesized node can help

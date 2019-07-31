@@ -272,21 +272,21 @@ ParsedRawSyntaxNode SyntaxParsingContext::finalizeSourceFile() {
                                   { itemList, EOFToken });
 }
 
-ParsedRawSyntaxNode SyntaxParsingContext::finalizeRoot() {
+  OpaqueSyntaxNode SyntaxParsingContext::finalizeRoot() {
   assert(isTopOfContextStack() && "some sub-contexts are not destructed");
   assert(isRoot() && "only root context can finalize the tree");
   assert(Mode == AccumulationMode::Root);
   if (getStorage().empty()) {
-    return ParsedRawSyntaxNode::null(); // already finalized.
+    return nullptr; // already finalized.
   }
   ParsedRawSyntaxNode root = finalizeSourceFile();
-  getSyntaxCreator().releaseLibSyntaxNodeIfNeededFor(root.getOpaqueNode());
+  auto opaqueRoot = getSyntaxCreator().finalizeNode(root.getOpaqueNode());
 
   // Clear the parts because we will call this function again when destroying
   // the root context.
   getStorage().clear();
 
-  return root;
+  return opaqueRoot;
 }
 
 void SyntaxParsingContext::synthesize(tok Kind, SourceLoc Loc) {
@@ -356,7 +356,7 @@ SyntaxParsingContext::~SyntaxParsingContext() {
     auto &nodes = getStorage();
     for (auto i = nodes.begin()+Offset, e = nodes.end(); i != e; ++i)
       if (i->isRecorded())
-        getSyntaxCreator().releaseLibSyntaxNodeIfNeededFor(i->getOpaqueNode());
+        getSyntaxCreator().finalizeNode(i->getOpaqueNode());
 
     nodes.erase(nodes.begin()+Offset, nodes.end());
     break;

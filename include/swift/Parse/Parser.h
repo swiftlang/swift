@@ -402,7 +402,7 @@ public:
 
   /// Calling this function to finalize libSyntax tree creation without destroying
   /// the parser instance.
-  ParsedRawSyntaxNode finalizeSyntaxTree() {
+  OpaqueSyntaxNode finalizeSyntaxTree() {
     assert(Tok.is(tok::eof) && "not done parsing yet");
     return SyntaxContext->finalizeRoot();
   }
