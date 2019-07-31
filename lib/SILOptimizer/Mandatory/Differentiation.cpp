@@ -3821,12 +3821,13 @@ private:
                               const SILAutoDiffIndices &indices) {
     // Anything with an active result should be differentiated.
     if (llvm::any_of(inst->getResults(), [&](SILValue val) {
-      return activityInfo.isActive(val, indices);
-    }))
+          return activityInfo.isActive(val, indices);
+        }))
       return true;
     // Anything with an an active argument should be differentiated
     // (i.e. `return %0`).
-    if (llvm::any_of(inst->getAllOperands(), [&](Operand &val) {
+    if (dyn_cast<ReturnInst>(inst) &&
+        llvm::any_of(inst->getAllOperands(), [&](Operand &val) {
       return activityInfo.isActive(val.get(), indices);
     }))
       return true;
@@ -3969,6 +3970,8 @@ private:
     if (auto *teai = dyn_cast<TupleElementAddrInst>(originalProjection)) {
       auto source = teai->getOperand();
       auto adjSource = getTangentBuffer(origBB, source);
+      // If the adjoint buffer of the source does not have a tuple type, then
+      // it must represent a "single element tuple type". Return it directly.
       if (!adjSource->getType().is<TupleType>())
         return adjSource;
       auto origTupleTy = source->getType().castTo<TupleType>();
@@ -4162,6 +4165,8 @@ private:
   void emitTangentForApplyInst(
       ApplyInst *ai, SILAutoDiffIndices indices,
       CanSILFunctionType originalDifferentialType) {
+    if (ai->hasSemantics("array.uninitialized_intrinsic"))
+      return emitTangentForArrayInitializationInst(ai);
     auto *bb = ai->getParent();
     auto loc = ai->getLoc();
     auto diffBuilder = getDifferentialBuilder();
@@ -4245,16 +4250,6 @@ private:
     if (origResult->getType().isObject())
       setTangentValue(bb, origResult,
                       makeConcreteTangentValue(differentialResult));
-
-    // TODO: handle indirect
-    // Add the tangent value of the result of the apply instruction.
-//    auto tanVal = makeConcreteAdjointValue(
-//        ValueWithCleanup(originalDirectResult,
-//        makeCleanup(originalDirectResult, emitCleanup, {})));
-//    for (auto dirRes : ai->getResults())
-//      addTangentValue(bb, originalDirectResult, tanVal);
-//    for (auto indRes : ai->getIndirectSILResults())
-//      ;
   }
 
   /// Handle `struct_extract` instruction.
@@ -4398,7 +4393,6 @@ private:
   /// Add the value mapping and emit the same instruction.
   void emitTangentForAllocStackInst(AllocStackInst *asi) {
     auto &diffBuilder = getDifferentialBuilder();
-
     auto *mappedAllocStackInst =
         diffBuilder.createAllocStack(
             asi->getLoc(), getRemappedTangentType(asi->getElementType()));
@@ -4442,6 +4436,34 @@ private:
     // Emit the instruction and add the tangent mapping.
     auto tanTuple = diffBuilder.createTuple(ti->getLoc(), tangentTupleElements);
     setTangentValue(bb, ti, makeConcreteTangentValue(tanTuple));
+  }
+
+  void emitTangentForArrayInitializationInst(ApplyInst *ai) {
+    llvm_unreachable("Unsupported SIL instruction.");
+  }
+
+  void emitTangentForTupleElementAddrInst(TupleElementAddrInst *teai) {
+    auto *bb = teai->getParent();
+    auto &diffBuilder = getDifferentialBuilder();
+    auto origTupleTy = teai->getOperand()->getType().castTo<TupleType>();
+    unsigned tanIndex = 0;
+    for (unsigned i : range(teai->getFieldNo())) {
+      if (getTangentSpace(
+              origTupleTy->getElement(i).getType()->getCanonicalType()))
+        ++tanIndex;
+    }
+    auto tanType = getRemappedTangentType(teai->getType());
+    auto tanSource = getTangentBuffer(bb, teai->getOperand());
+    SILValue tanBuffer;
+    // If the tangent buffer of the source does not have a tuple type, then
+    // it must represent a "single element tuple type". Use it directly.
+    if (!tanSource->getType().is<TupleType>()) {
+      tanBuffer = tanSource;
+    } else {
+      tanBuffer = diffBuilder.createTupleElementAddr(
+          teai->getLoc(), tanSource, tanIndex, tanType);
+    }
+    bufferMap.try_emplace({teai->getParent(), teai}, tanBuffer);
   }
 
   void startDifferentialGeneration() {
@@ -5028,10 +5050,6 @@ public:
       emitTangentForStructInst(si);
   }
 
-  void visitArrayInitialization(ApplyInst *ai) {
-    llvm_unreachable("Unsupported SIL instruction.");
-  }
-
   /// Handle `tuple` instruction.
   ///   Original: y = tuple (x0, x1, x2, ...)
   ///    Tangent: tan[y] = tuple (tan[x0], tan[x1], tan[x2], ...)
@@ -5040,6 +5058,15 @@ public:
     TypeSubstCloner::visitTupleInst(ti);
     if (shouldBeDifferentiated(ti, getIndices()))
       emitTangentForTupleInst(ti);
+  }
+
+  /// Handle `tuple_extract` instruction.
+  ///   Original: y = tuple_element_addr x, <n>
+  ///    Tangent: tan[y] = tuple_element_addr tan[x], <n>
+  void visitTupleElementAddrInst(TupleElementAddrInst *teai) {
+    TypeSubstCloner::visitTupleElementAddrInst(teai);
+    if(shouldBeDifferentiated(teai, getIndices()))
+      emitTangentForTupleElementAddrInst(teai);
   }
 
   /// Handle `tuple_extract` instruction.
@@ -6495,7 +6522,7 @@ public:
   /// Handle `tuple_extract` instruction.
   ///   Original: y = tuple_extract x, <n>
   ///    Adjoint: adj[x] += tuple (0, 0, ..., adj[y], ..., 0, 0)
-  ///                                         ^~~~~~
+  ///                             ^~~~~~
   ///                            n'-th element, where n' is tuple tangent space
   ///                            index corresponding to n
   void visitTupleExtractInst(TupleExtractInst *tei) {

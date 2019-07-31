@@ -44,7 +44,9 @@ ForwardModeTests.test("BinaryWithLets") {
   expectEqual(-19, differential(1, 1))
 }
 
-// Functions with variables.
+//===----------------------------------------------------------------------===//
+// Functions with variables
+//===----------------------------------------------------------------------===//
 
 ForwardModeTests.test("UnaryWithVars") {
   func unary(x: Float) -> Float {
@@ -63,7 +65,9 @@ ForwardModeTests.test("UnaryWithVars") {
   expectEqual(4, differential(1))
 }
 
+//===----------------------------------------------------------------------===//
 // Functions with basic struct
+//===----------------------------------------------------------------------===//
 
 struct A: Differentiable & AdditiveArithmetic {
     var x: Float
@@ -106,7 +110,9 @@ ForwardModeTests.test("LocalStructVariable") {
   expectEqual(A(x: 4), differential(A(x: 1)))
 }
 
-// Functions with methods.
+//===----------------------------------------------------------------------===//
+// Functions with methods
+//===----------------------------------------------------------------------===//
 
 extension A {
   func noParamMethodA() -> A {
@@ -207,7 +213,105 @@ ForwardModeTests.test("TrackedWithLets") {
   expectEqual(4.9375, differential(1, 1))
 }
 
-// Generics.
+//===----------------------------------------------------------------------===//
+// Tuples
+//===----------------------------------------------------------------------===//
+
+ForwardModeTests.test("SimpleTupleExtractLet") {
+  func foo(_ x: Float) -> Float {
+    let tuple = (2*x, x)
+    return tuple.0
+  }
+  let (y, differential) = valueWithDifferential(at: 4, in: foo)
+  expectEqual(8, y)
+  expectEqual(2, differential(1))
+}
+
+ForwardModeTests.test("SimpleTupleExtractVar") {
+  func foo(_ x: Float) -> Float {
+    let tuple = (2*x, x)
+    return tuple.0
+  }
+  let (y, differential) = valueWithDifferential(at: 4, in: foo)
+  expectEqual(8, y)
+  expectEqual(2, differential(1))
+}
+
+ForwardModeTests.test("TupleSideEffects") {
+  func foo(_ x: Float) -> Float {
+    var tuple = (x, x)
+    tuple.0 = tuple.0 * x
+    return x * tuple.0
+  }
+  expectEqual(27, derivative(at: 3, in: foo))
+
+  func fifthPower(_ x: Float) -> Float {
+    var tuple = (x, x)
+    tuple.0 = tuple.0 * x
+    tuple.1 = tuple.0 * x
+    return tuple.0 * tuple.1
+  }
+  expectEqual(405, derivative(at: 3, in: fifthPower))
+
+  func nested(_ x: Float) -> Float {
+    var tuple = ((x, x), x)
+    tuple.0.0 = tuple.0.0 * x
+    tuple.0.1 = tuple.0.0 * x
+    return tuple.0.0 * tuple.0.1
+  }
+  expectEqual(405, derivative(at: 3, in: nested))
+
+  // FIXME(TF-201): Update after reabstraction thunks can be directly differentiated.
+  /*
+  func generic<T : Differentiable & AdditiveArithmetic>(_ x: T) -> T {
+    var tuple = (x, x)
+    tuple.0 += x
+    tuple.1 += x
+    return tuple.0 + tuple.0
+  }
+  expectEqual(1, derivative(at: 3.0, in: generic))
+  */
+}
+
+// Tests TF-321.
+ForwardModeTests.test("TupleNonDifferentiableElements") {
+  // @differentiable
+  func foo(_ x: Float) -> Float {
+    var tuple = (x, 1)
+    tuple.0 = x
+    tuple.1 = 1
+    return tuple.0
+  }
+  expectEqual(1, derivative(at: 1, in: foo))
+
+  func bar(_ x: Float) -> Float {
+    var tuple: (Int, Int, Float, Float) = (1, 1, x, x)
+    tuple.0 = 1
+    tuple.1 = 1
+    tuple.3 = x
+    return tuple.3
+  }
+  expectEqual(1, derivative(at: 1, in: bar))
+
+  struct Wrapper<T> {
+    @differentiable(where T : Differentiable)
+    func baz(_ x: T) -> T {
+      var tuple = (1, 1, x, 1)
+      tuple.0 = 1
+      tuple.2 = x
+      tuple.3 = 1
+      return tuple.2
+    }
+  }
+  expectEqual(1, derivative(at: Float(1), in: { x -> Float in
+    let wrapper = Wrapper<Float>()
+    return wrapper.baz(x)
+  }))
+}
+
+//===----------------------------------------------------------------------===//
+// Generics
+//===----------------------------------------------------------------------===//
 
 struct Tensor<Scalar : FloatingPoint & Differentiable> 
   : VectorProtocol, Differentiable {
@@ -450,14 +554,14 @@ ForwardModeTests.test("GenericTrackedBinaryLets") {
           T == T.TangentVector,
           T == T.AllDifferentiableVariables,
           T == T.Magnitude {
-  let a = x * y // xy
-  let b = a + a // 2xy
-  return b + b // 4xy
-}
-// 4y + 4x
-let (y, differential) = valueWithDifferential(at: 4, 5) { (x: Float, y: Float) in
-  add(Tracked(x), Tracked(y))
-}
+    let a = x * y // xy
+    let b = a + a // 2xy
+    return b + b // 4xy
+  }
+  // 4y + 4x
+  let (y, differential) = valueWithDifferential(at: 4, 5) { (x: Float, y: Float) in
+    add(Tracked(x), Tracked(y))
+  }
   expectEqual(80, y)
   expectEqual(36, differential(1, 1))
 }
@@ -468,16 +572,16 @@ ForwardModeTests.test("GenericTrackedBinaryVars") {
           T == T.TangentVector,
           T == T.AllDifferentiableVariables,
           T == T.Magnitude {
-  var a = x * y // xy
-  a = a + a // 2xy
-  var b = x
-  b = a
-  return b + b // 4xy
-}
-// 4y + 4x
-let (y, differential) = valueWithDifferential(at: 4, 5) { (x: Float, y: Float) in
-  add(Tracked(x), Tracked(y))
-}
+    var a = x * y // xy
+    a = a + a // 2xy
+    var b = x
+    b = a
+    return b + b // 4xy
+  }
+  // 4y + 4x
+  let (y, differential) = valueWithDifferential(at: 4, 5) { (x: Float, y: Float) in
+    add(Tracked(x), Tracked(y))
+  }
   expectEqual(80, y)
   expectEqual(36, differential(1, 1))
 }
