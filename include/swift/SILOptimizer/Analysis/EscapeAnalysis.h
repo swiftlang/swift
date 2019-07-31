@@ -151,6 +151,7 @@
 #include "swift/SIL/SILFunction.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/BottomUpIPAnalysis.h"
+#include "swift/SILOptimizer/Analysis/ValueTracking.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
@@ -249,9 +250,11 @@ public:
   /// pointer points to (see NodeType).
   class CGNode {
 
-    /// The associated value in the function. It is only used for debug printing.
-    /// There may be multiple nodes associated to the same value, e.g. a Content
-    /// node has the same V as its points-to predecessor.
+    /// The associated value in the function. This is always valid for Argument
+    /// and Value nodes, and always nullptr for Return nodes. For Content nodes,
+    /// i is only used for debug printing. There may be multiple nodes
+    /// associated to the same value, e.g. a Content node has the same V as its
+    /// points-to predecessor.
     ValueBase *V;
 
     /// The outgoing points-to edge (if any) to a Content node. See also:
@@ -430,13 +433,13 @@ public:
     /// the node's value.
     /// Note that in the false-case the node's value can still escape via
     /// the return instruction.
-    bool escapesInsideFunction(bool isNotAliasingArgument) const {
+    bool escapesInsideFunction() const {
       switch (getEscapeState()) {
         case EscapeState::None:
         case EscapeState::Return:
           return false;
         case EscapeState::Arguments:
-          return !isNotAliasingArgument;
+          return !isNotAliasingArgument(V);
         case EscapeState::Global:
           return true;
       }

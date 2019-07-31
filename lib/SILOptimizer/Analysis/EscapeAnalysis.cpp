@@ -14,7 +14,6 @@
 #include "swift/SILOptimizer/Analysis/EscapeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ArraySemantic.h"
-#include "swift/SILOptimizer/Analysis/ValueTracking.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
 #include "swift/SILOptimizer/Utils/Local.h"
 #include "swift/SIL/SILArgument.h"
@@ -1848,7 +1847,7 @@ bool EscapeAnalysis::canEscapeToUsePoint(SILValue V, SILNode *UsePoint,
 
   // First check if there are escape paths which we don't explicitly see
   // in the graph.
-  if (Node->escapesInsideFunction(isNotAliasingArgument(V)))
+  if (Node->escapesInsideFunction())
     return true;
 
   // No hidden escapes: check if the Node is reachable from the UsePoint.
@@ -1868,7 +1867,7 @@ bool EscapeAnalysis::canEscapeToUsePoint(SILValue V, SILNode *UsePoint,
   // As V1's content node is the same as V's content node, we also make the
   // check for the content node.
   CGNode *ContentNode = ConGraph->getContentNode(Node);
-  if (ContentNode->escapesInsideFunction(false))
+  if (ContentNode->escapesInsideFunction())
     return true;
 
   if (ConGraph->isUsePoint(UsePoint, ContentNode))
@@ -1948,10 +1947,10 @@ bool EscapeAnalysis::canPointToSameMemory(SILValue V1, SILValue V2) {
     return true;
 
   // Finish the check for one value being a non-escaping local object.
-  if (isLocal1 && Node1->escapesInsideFunction(isNotAliasingArgument(V1)))
+  if (isLocal1 && Node1->escapesInsideFunction())
     isLocal1 = false;
 
-  if (isLocal2 && Node2->escapesInsideFunction(isNotAliasingArgument(V2)))
+  if (isLocal2 && Node2->escapesInsideFunction())
     isLocal2 = false;
 
   if (!isLocal1 && !isLocal2)
