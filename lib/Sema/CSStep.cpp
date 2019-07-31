@@ -123,6 +123,16 @@ void SplitterStep::computeFollowupSteps(
         CS, i, &Components[i], orphaned, PartialSolutions[i]));
   }
 
+  // Transfer any remaining constraints from the work list to the first
+  // component, which is arbitrary but prevents them from being visited
+  // again.
+  auto &workList = CS.InactiveConstraints;
+  while (!workList.empty()) {
+    auto *constraint = &workList.front();
+    workList.pop_front();
+    componentSteps[0]->record(constraint);
+  }
+
   if (isDebugMode()) {
     auto &log = getDebugLogger();
     // Verify that the constraint graph is valid.

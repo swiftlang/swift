@@ -386,7 +386,6 @@ public:
     record(orphaned);
   }
 
-private:
   /// Record a constraint as associated with this step.
   void record(Constraint *constraint) {
     Constraints->push_back(constraint);
