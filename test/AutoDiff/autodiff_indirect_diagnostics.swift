@@ -12,9 +12,7 @@ func generic<T: Differentiable & FloatingPoint>(_ x: T) -> T {
 }
 _ = gradient(at: 1.0, in: generic)
 
-//===----------------------------------------------------------------------===//
-// Unmet generic requirements
-//===----------------------------------------------------------------------===//
+// Test unmet generic requirements.
 
 @differentiable(
   vjp: vjpWeirdExtraRequirements

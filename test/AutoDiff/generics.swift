@@ -247,4 +247,33 @@ public func TF_688<Scalar: Differentiable>(
   reduction(x)
 }
 
+// TF-697: Test generic requirements of generated AD associated function.
+protocol TF_697_Module: Differentiable where AllDifferentiableVariables == TangentVector {
+    associatedtype Input
+    associatedtype Output: Differentiable
+
+    @differentiable(wrt: self)
+    func callModule(_ input: Input) -> Output
+}
+protocol TF_697_Layer: TF_697_Module where Input: Differentiable {
+    @differentiable
+    func callLayer(_ input: Input) -> Output
+}
+struct TF_697_Sequential<Layer1: TF_697_Module, Layer2: TF_697_Layer>: TF_697_Module
+    where Layer1.Output == Layer2.Input {
+    var layer1: Layer1
+    var layer2: Layer2
+
+    @differentiable(wrt: self)
+    func callModule(_ input: Layer1.Input) -> Layer2.Output {
+        layer2.callLayer(layer1.callModule(input))
+    }
+}
+extension TF_697_Sequential: TF_697_Layer where Layer1: TF_697_Layer {
+    @differentiable
+    func callLayer(_ input: Layer1.Input) -> Layer2.Output {
+        layer2.callLayer(layer1.callLayer(input))
+    }
+}
+
 // TODO: add more tests.

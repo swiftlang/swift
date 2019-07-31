@@ -4228,11 +4228,11 @@ public:
       AutoDiffIndexSubset *parameterIndices, unsigned resultIndex,
       unsigned differentiationOrder, AutoDiffAssociatedFunctionKind kind,
       SILModule &module, LookupConformanceFn lookupConformance,
-      CanGenericSignature whereClauseGenericSignature = nullptr);
+      CanGenericSignature associatedFunctionGenericSignature = nullptr);
 
   /// Returns a bit vector that specifices which parameters you can
   /// differentiate with respect to for this differentiable function type. (e.g.
-  /// which parameters are not @nondiff). The function type must be
+  /// which parameters are not `@nondiff`). The function type must be
   /// differentiable.
   AutoDiffIndexSubset *getDifferentiationParameterIndices();
 
