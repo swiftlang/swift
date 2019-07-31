@@ -3052,6 +3052,12 @@ private:
                                              TypeMatchOptions flags,
                                              ConstraintLocatorBuilder locator);
 
+  /// Attempt to simplify a one-way constraint.
+  SolutionKind simplifyOneWayConstraint(ConstraintKind kind,
+                                        Type first, Type second,
+                                        TypeMatchOptions flags,
+                                        ConstraintLocatorBuilder locator);
+
   /// Simplify a conversion constraint by applying the given
   /// reduction rule, which is known to apply at the outermost level.
   SolutionKind simplifyRestrictedConstraintImpl(
