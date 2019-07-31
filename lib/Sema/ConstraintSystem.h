@@ -1559,6 +1559,10 @@ public:
   /// that locator.
   llvm::DenseMap<ConstraintLocator *, ArgumentInfo> ArgumentInfos;
 
+  /// Form a locator with given anchor which then could be used
+  /// to retrieve argument information cached in the constraint system.
+  ConstraintLocator *getArgumentInfoLocator(Expr *anchor);
+
   /// Retrieve the argument info that is associated with a member
   /// reference at the given locator.
   Optional<ArgumentInfo> getArgumentInfo(ConstraintLocator *locator);

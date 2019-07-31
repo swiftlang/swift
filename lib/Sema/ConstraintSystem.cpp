@@ -2780,23 +2780,25 @@ void ConstraintSystem::generateConstraints(
   }
 }
 
-Optional<ConstraintSystem::ArgumentInfo>
-ConstraintSystem::getArgumentInfo(ConstraintLocator *locator) {
-  Expr *anchor = locator->getAnchor();
+ConstraintLocator *ConstraintSystem::getArgumentInfoLocator(Expr *anchor) {
   if (!anchor)
-    return None;
+    return nullptr;
 
   if (auto *apply = dyn_cast<ApplyExpr>(anchor)) {
     auto *fnExpr = getArgumentLabelTargetExpr(apply->getFn());
-    locator = getConstraintLocator(fnExpr);
-  } else {
-    locator = getCalleeLocator(anchor);
+    return getConstraintLocator(fnExpr);
   }
 
-  auto known = ArgumentInfos.find(locator);
-  if (known != ArgumentInfos.end())
-    return known->second;
+  return getCalleeLocator(anchor);
+}
 
+Optional<ConstraintSystem::ArgumentInfo>
+ConstraintSystem::getArgumentInfo(ConstraintLocator *locator) {
+  if (auto *infoLocator = getArgumentInfoLocator(locator->getAnchor())) {
+    auto known = ArgumentInfos.find(infoLocator);
+    if (known != ArgumentInfos.end())
+      return known->second;
+  }
   return None;
 }
 

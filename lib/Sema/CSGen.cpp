@@ -3227,18 +3227,11 @@ namespace {
     void associateArgumentLabels(Expr *expr,
                                  ConstraintSystem::ArgumentInfo info,
                                  bool labelsArePermanent = true) {
-      ConstraintLocator *locator = nullptr;
-      if (auto *apply = dyn_cast<ApplyExpr>(expr)) {
-        auto *fnExpr = getArgumentLabelTargetExpr(apply->getFn());
-        locator = CS.getConstraintLocator(fnExpr);
-      } else {
-        locator = CS.getCalleeLocator(expr);
-      }
-
+      assert(expr);
       // Record the labels.
       if (!labelsArePermanent)
         info.Labels = CS.allocateCopy(info.Labels);
-      CS.ArgumentInfos[locator] = info;
+      CS.ArgumentInfos[CS.getArgumentInfoLocator(expr)] = info;
     }
   };
 
