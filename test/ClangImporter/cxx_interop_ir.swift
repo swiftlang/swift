@@ -3,8 +3,8 @@
 import CXXInterop
 
 // CHECK-LABEL: define hidden swiftcc void @"$s6cxx_ir13indirectUsageyyF"()
-// CHECK: %0 = call %"class.ns::T"* @_Z5makeTv()
-// CHECK: call void @_Z4useTPN2ns1TE(%"class.ns::T"* %2)
+// CHECK: %0 = call %"class.ns::T"* @{{_Z5makeTv|"\?makeT@@YAPE?AVT@ns@@XZ"}}()
+// CHECK: call void @{{_Z4useTPN2ns1TE|"\?useT@@YAXPE?AVT@ns@@@Z"}}(%"class.ns::T"* %2)
 func indirectUsage() {
   useT(makeT())
 }
