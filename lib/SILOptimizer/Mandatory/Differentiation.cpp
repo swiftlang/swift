@@ -217,19 +217,6 @@ getAssociatedFunctionGenericSignature(SILDifferentiableAttr *attr,
       GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
   for (auto &req : attr->getRequirements())
     builder.addRequirement(req, source, original->getModule().getSwiftModule());
-  // Constrain all wrt parameters to conform to `Differentiable`.
-  auto &ctx = original->getASTContext();
-  auto *diffableProto = ctx.getProtocol(KnownProtocolKind::Differentiable);
-  auto paramIndexSet = attr->getIndices().parameters;
-  for (unsigned paramIdx : paramIndexSet->getIndices()) {
-    if (!paramIndexSet->contains(paramIdx))
-      continue;
-    auto paramType =
-        original->getConventions().getSILArgumentType(paramIdx).getASTType();
-    Requirement req(RequirementKind::Conformance, paramType,
-                    diffableProto->getDeclaredType());
-    builder.addRequirement(req, source, original->getModule().getSwiftModule());
-  }
   return std::move(builder)
       .computeGenericSignature(SourceLoc(), /*allowConcreteGenericParams=*/true)
       ->getCanonicalSignature();
@@ -2863,17 +2850,11 @@ public:
     auto origTy = original->getLoweredFunctionType();
     auto lookupConformance = LookUpConformanceInModule(module.getSwiftModule());
 
-    auto pbGenericSig = getAssociatedFunctionGenericSignature(attr, original);
-
     // RAII that pushes the original function's generic signature to
     // `module.Types` so that the calls `module.Types.getTypeLowering()` below
-    // will know the pullback's generic parameter types.
+    // will know the original function's generic parameter types.
     Lowering::GenericContextScope genericContextScope(
-        module.Types, pbGenericSig);
-
-    auto *pbGenericEnv = pbGenericSig
-        ? pbGenericSig->createGenericEnvironment()
-        : nullptr;
+        module.Types, origTy->getGenericSignature());
 
     // Given a type, returns its formal SIL parameter info.
     auto getTangentParameterInfoForOriginalResult = [&](
@@ -2965,6 +2946,10 @@ public:
         mangler.mangleAutoDiffLinearMapHelper(
             original->getName(), AutoDiffLinearMapKind::Pullback,
             indices)).str();
+    auto pbGenericSig = getAssociatedFunctionGenericSignature(attr, original);
+    auto *pbGenericEnv = pbGenericSig
+        ? pbGenericSig->createGenericEnvironment()
+        : nullptr;
     auto pbType = SILFunctionType::get(
         pbGenericSig, origTy->getExtInfo(), origTy->getCoroutineKind(),
         origTy->getCalleeConvention(), pbParams, {}, adjResults, None,
@@ -3286,7 +3271,7 @@ public:
     auto original = getOpValue(ai->getCallee());
     auto functionSource = original;
     SILValue vjpValue;
-    // If `functionSource` is a `@differentiable` function, just extract it.
+    // If functionSource is a @differentiable function, just extract it.
     auto originalFnTy = original->getType().castTo<SILFunctionType>();
     if (originalFnTy->isDifferentiable()) {
       auto paramIndices = originalFnTy->getDifferentiationParameterIndices();
@@ -3536,6 +3521,12 @@ public:
     auto origTy = original->getLoweredFunctionType();
     auto lookupConformance = LookUpConformanceInModule(module.getSwiftModule());
 
+    // RAII that pushes the original function's generic signature to
+    // `module.Types` so that the calls `module.Types.getTypeLowering()` below
+    // will know the original function's generic parameter types.
+    Lowering::GenericContextScope genericContextScope(
+        module.Types, origTy->getGenericSignature());
+
     SmallVector<SILParameterInfo, 8> diffParams;
     SmallVector<SILResultInfo, 8> diffResults;
     auto origParams = origTy->getParameters();
@@ -3562,13 +3553,6 @@ public:
             original->getName(), AutoDiffLinearMapKind::Differential,
             indices)).str();
     auto diffGenericSig = getAssociatedFunctionGenericSignature(attr, original);
-
-    // RAII that pushes the original function's generic signature to
-    // `module.Types` so that the calls `module.Types.getTypeLowering()` below
-    // will know the differential's generic parameter types.
-    Lowering::GenericContextScope genericContextScope(
-        module.Types, diffGenericSig);
-
     auto *diffGenericEnv = diffGenericSig
         ? diffGenericSig->createGenericEnvironment()
         : nullptr;
@@ -5991,7 +5975,7 @@ static SILFunction *createEmptyJVP(
 
   // RAII that pushes the original function's generic signature to
   // `module.Types` so that the calls `module.Types.getTypeLowering()` below
-  // will know the JVP's generic parameter types.
+  // will know the VJP's generic parameter types.
   Lowering::GenericContextScope genericContextScope(
       module.Types, jvpGenericSig);
 
