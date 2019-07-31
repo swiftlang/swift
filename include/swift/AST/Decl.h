@@ -1902,18 +1902,22 @@ class PatternBindingEntry {
   };
   llvm::PointerIntPair<Pattern *, 3, OptionSet<Flags>> PatternAndFlags;
 
-  struct ExprAndEqualLoc {
-    // When the initializer is removed we don't actually clear the pointer
+  struct InitializerAndEqualLoc {
+    // When the initializer is removed we don't actually clear the pointers
     // because we might need to get initializer's source range. Since the
     // initializer is ASTContext-allocated it is safe.
-    Expr *Node;
+    
+    /// Exactly the expr the programmer wrote
+    Expr *origInit;
+    /// Might be transformed, e.g. for a property wrapper
+    Expr *initAfterSynthesis;
     /// The location of the equal '=' token.
     SourceLoc EqualLoc;
   };
 
   union {
     /// The initializer expression and its '=' token loc.
-    ExprAndEqualLoc InitExpr;
+    InitializerAndEqualLoc InitExpr;
 
     /// The text of the initializer expression if deserialized from a module.
     StringRef InitStringRepresentation;
@@ -1930,7 +1934,7 @@ class PatternBindingEntry {
 public:
   PatternBindingEntry(Pattern *P, SourceLoc EqualLoc, Expr *E,
                       DeclContext *InitContext)
-    : PatternAndFlags(P, {}), InitExpr({E, EqualLoc}),
+    : PatternAndFlags(P, {}), InitExpr({E, E, EqualLoc}),
       InitContextAndIsText({InitContext, false}) {
   }
 
@@ -1944,7 +1948,7 @@ public:
     if (PatternAndFlags.getInt().contains(Flags::Removed) ||
         InitContextAndIsText.getInt())
       return nullptr;
-    return InitExpr.Node;
+    return InitExpr.initAfterSynthesis;
   }
   /// Retrieve the initializer if it should be executed to initialize this
   /// particular pattern binding.
@@ -1983,7 +1987,10 @@ public:
 
   /// Retrieve the initializer after the =, if any, as it was written in the
   /// source.
-  Expr *getOrigInitAsWritten() const;
+  Expr *getOrigInit() const;
+  
+  /// Set the initializer after the = as it was written in the source.
+  void setOrigInit(Expr*);
 
   bool isInitializerChecked() const {
     return PatternAndFlags.getInt().contains(Flags::Checked);
@@ -2031,10 +2038,6 @@ public:
 
 private:
   SourceLoc getLastAccessorEndLoc() const;
-
-  /// Get the end location of an intiaiizer that comes *after* the pattern.
-  /// (Property wrappers introduce initializers that come before.)
-  SourceLoc getPostfixInitEndLoc() const;
 };
 
 /// This decl contains a pattern and optional initializer for a set

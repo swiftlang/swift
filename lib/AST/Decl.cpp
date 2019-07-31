@@ -1283,8 +1283,9 @@ PatternBindingDecl *PatternBindingDecl::createImplicit(
     ASTContext &Ctx, StaticSpellingKind StaticSpelling, Pattern *Pat, Expr *E,
     DeclContext *Parent, SourceLoc VarLoc) {
   auto *Result = create(Ctx, /*StaticLoc*/ SourceLoc(), StaticSpelling, VarLoc,
-                        Pat, /*EqualLoc*/ SourceLoc(), E, Parent);
+                        Pat, /*EqualLoc*/ SourceLoc(), nullptr, Parent);
   Result->setImplicit();
+  Result->setInit(0, E);
   return Result;
 }
 
@@ -1390,30 +1391,19 @@ unsigned PatternBindingDecl::getPatternEntryIndexForVarDecl(const VarDecl *VD) c
   return ~0U;
 }
 
-Expr *PatternBindingEntry::getOrigInitAsWritten() const {
-  // Before the addition of property wrappers, the following would work:
-  // return InitContextAndIsText.getInt() ? nullptr : InitExpr.Node;
-  // Consider: @Blah(17) var foo: Foo = 18
-  // The code above will return:
-  // Clamped(wrappedValue: 17, min: 0, max: 255)
-  // but what we want is the "18".
-
-  Expr *const init = InitContextAndIsText.getInt() ? nullptr : InitExpr.Node;
-  if (!init)
-    return nullptr;
-  // Assume wrappers only apply to single-variable patterns.
-  VarDecl *const var = getPattern()->getSingleVar();
-  if (!var)
-    return init;
-  auto *e = findOriginalPropertyWrapperInitialValue(var, init);
-  if (e)
-    return e;
-  return init;
+Expr *PatternBindingEntry::getOrigInit() const {
+  return InitContextAndIsText.getInt() ? nullptr : InitExpr.origInit;
 }
 
 SourceRange PatternBindingEntry::getOrigInitRange() const {
-  auto Init = getOrigInitAsWritten();
-  return Init ? Init->getSourceRange() : SourceRange();
+  if (auto *i = getOrigInit())
+    return i->getSourceRange();
+  return SourceRange();
+}
+
+void PatternBindingEntry::setOrigInit(Expr *E) {
+  InitExpr.origInit = E;
+  InitContextAndIsText.setInt(false);
 }
 
 bool PatternBindingEntry::isInitialized() const {
@@ -1438,7 +1428,7 @@ void PatternBindingEntry::setInit(Expr *E) {
   } else {
     PatternAndFlags.setInt(F | Flags::Removed);
   }
-  InitExpr.Node = E;
+  InitExpr.initAfterSynthesis = E;
   InitContextAndIsText.setInt(false);
 }
 
@@ -1459,26 +1449,6 @@ SourceLoc PatternBindingEntry::getLastAccessorEndLoc() const {
   return lastAccessorEnd;
 }
 
-SourceLoc PatternBindingEntry::getPostfixInitEndLoc() const {
-  if (getEqualLoc().isInvalid()) // An optimization
-    return SourceLoc();
-
-  const SourceLoc endOrigInit = getOrigInitRange().End;
-  if (endOrigInit.isInvalid())
-    return SourceLoc();
-  // The initializer could precede the pattern if it comes from a
-  // property wrapper.
-  if (const auto *const potentiallyWrappedVar = getPattern()->getSingleVar()) {
-    const auto &SM = potentiallyWrappedVar->getASTContext().SourceMgr;
-    if (SM.isBeforeInBuffer(endOrigInit, getStartLoc())) {
-      assert(getEqualLoc().isInvalid() &&
-             "Needed to get the real postfix init");
-      return SourceLoc();
-    }
-  }
-  return endOrigInit;
-}
-
 SourceLoc PatternBindingEntry::getStartLoc() const {
   return getPattern()->getStartLoc();
 }
@@ -1490,9 +1460,9 @@ SourceLoc PatternBindingEntry::getEndLoc(bool omitAccessors) const {
     if (lastAccessorEnd.isValid())
       return lastAccessorEnd;
   }
-  const auto postfixInitEnd = getPostfixInitEndLoc();
-  if (postfixInitEnd.isValid())
-    return postfixInitEnd;
+  const auto initEnd = getOrigInitRange().End;
+  if (initEnd.isValid())
+    return initEnd;
 
   return getPattern()->getEndLoc();
 }
