@@ -2878,7 +2878,7 @@ public:
       checkDynamicSelfType(SD, SD->getValueInterfaceType());
 
       if (SD->getValueInterfaceType()->hasDynamicSelfType() &&
-          SD->isSettable()) {
+          SD->supportsMutation()) {
         SD->diagnose(diag::dynamic_self_in_mutable_subscript);
       }
     }

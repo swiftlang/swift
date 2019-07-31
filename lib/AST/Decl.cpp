@@ -5062,10 +5062,6 @@ bool VarDecl::isLazilyInitializedGlobal() const {
   return !sourceFileContext->isScriptMode();
 }
 
-bool SubscriptDecl::isSettable() const {
-  return supportsMutation();
-}
-
 SourceRange VarDecl::getSourceRange() const {
   if (auto Param = dyn_cast<ParamDecl>(this))
     return Param->getSourceRange();

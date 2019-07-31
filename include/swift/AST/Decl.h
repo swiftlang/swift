@@ -5489,9 +5489,6 @@ public:
   /// element types.
   void computeType();
 
-  /// Returns whether the result of the subscript operation can be set.
-  bool isSettable() const;
-
   /// Determine the kind of Objective-C subscripting this declaration
   /// implies.
   ObjCSubscriptKind getObjCSubscriptKind() const;
@@ -7107,7 +7104,7 @@ inline bool ValueDecl::isSettable(const DeclContext *UseDC,
   if (auto vd = dyn_cast<VarDecl>(this)) {
     return vd->isSettable(UseDC, base);
   } else if (auto sd = dyn_cast<SubscriptDecl>(this)) {
-    return sd->isSettable();
+    return sd->supportsMutation();
   } else
     return false;
 }
