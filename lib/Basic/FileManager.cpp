@@ -24,7 +24,7 @@ FileManager::status(StringRef path, bool isDirectory) {
 StringRef FileManager::getCachedFilename(StringRef path) {
   auto file = clangManager->getFile(path);
   if (!file) return path;
-  return file->getName();
+  return (*file)->getName();
 }
 
 llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>
@@ -40,7 +40,7 @@ FileManager::getBufferForFileOrSTDIN(StringRef path, bool isVolatile) {
 }
 
 std::error_code FileManager::remove(StringRef path) {
-  auto file = clangManager->getFileOrError(path);
+  auto file = clangManager->getFile(path);
   if (!file) return file.getError();
   clangManager->invalidateCache(*file);
   return llvm::sys::fs::remove(path);

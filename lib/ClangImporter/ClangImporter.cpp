@@ -1158,9 +1158,10 @@ ClangImporter::create(ASTContext &ctx,
 bool ClangImporter::addSearchPath(StringRef newSearchPath, bool isFramework,
                                   bool isSystem) {
   clang::FileManager &fileMgr = Impl.Instance->getFileManager();
-  const clang::DirectoryEntry *entry = fileMgr.getDirectory(newSearchPath);
-  if (!entry)
+  auto entryOrErr = fileMgr.getDirectory(newSearchPath);
+  if (!entryOrErr)
     return true;
+  const clang::DirectoryEntry *entry = *entryOrErr;
 
   auto &headerSearchInfo = Impl.getClangPreprocessor().getHeaderSearchInfo();
   auto exists = std::any_of(headerSearchInfo.search_dir_begin(),
@@ -1339,10 +1340,9 @@ bool ClangImporter::importHeader(StringRef header, ModuleDecl *adapter,
                                  off_t expectedSize, time_t expectedModTime,
                                  StringRef cachedContents, SourceLoc diagLoc) {
   clang::FileManager &fileManager = Impl.Instance->getFileManager();
-  const clang::FileEntry *headerFile = fileManager.getFile(header,
-                                                           /*OpenFile=*/true);
-  if (headerFile && headerFile->getSize() == expectedSize &&
-      headerFile->getModificationTime() == expectedModTime) {
+  auto headerFile = fileManager.getFile(header, /*OpenFile=*/true);
+  if (headerFile && (*headerFile)->getSize() == expectedSize &&
+      (*headerFile)->getModificationTime() == expectedModTime) {
     return importBridgingHeader(header, adapter, diagLoc, false, true);
   }
 
@@ -1375,8 +1375,7 @@ bool ClangImporter::importBridgingHeader(StringRef header, ModuleDecl *adapter,
   }
 
   clang::FileManager &fileManager = Impl.Instance->getFileManager();
-  const clang::FileEntry *headerFile = fileManager.getFile(header,
-                                                           /*OpenFile=*/true);
+  auto headerFile = fileManager.getFile(header, /*OpenFile=*/true);
   if (!headerFile) {
     Impl.SwiftContext.Diags.diagnose(diagLoc, diag::bridging_header_missing,
                                      header);
@@ -1452,7 +1451,7 @@ std::string ClangImporter::getBridgingHeaderContents(StringRef headerPath,
     return "";
   }
 
-  const clang::FileEntry *fileInfo = fileManager.getFile(headerPath);
+  const clang::FileEntry *fileInfo = *fileManager.getFile(headerPath);
   fileSize = fileInfo->getSize();
   fileModTime = fileInfo->getModificationTime();
   return result;
@@ -2388,10 +2387,10 @@ void ClangImporter::lookupBridgingHeaderDecls(
 bool ClangImporter::lookupDeclsFromHeader(StringRef Filename,
                               llvm::function_ref<bool(ClangNode)> filter,
                               llvm::function_ref<void(Decl*)> receiver) const {
-  const clang::FileEntry *File =
-    getClangPreprocessor().getFileManager().getFile(Filename);
-  if (!File)
+  auto FileOrErr = getClangPreprocessor().getFileManager().getFile(Filename);
+  if (!FileOrErr)
     return true;
+  const clang::FileEntry *File = *FileOrErr;
 
   auto &ClangCtx = getClangASTContext();
   auto &ClangSM = ClangCtx.getSourceManager();

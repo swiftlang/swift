@@ -14,6 +14,7 @@ add_swift_unittest(SwiftBasicTests
   EditorPlaceholderTest.cpp
   EncodedSequenceTest.cpp
   ExponentialGrowthAppendingBinaryByteStreamTests.cpp
+  FileManagerTest.cpp
   FileSystemTest.cpp
   ImmutablePointerSetTest.cpp
   JSONSerialization.cpp
