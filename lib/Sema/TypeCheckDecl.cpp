@@ -2472,11 +2472,6 @@ public:
       (void) VD->isObjC();
       (void) VD->isDynamic();
 
-      // Make sure we finalize this declaration.
-      if (isa<ClassDecl>(VD) || isa<ProtocolDecl>(VD) ||
-          isa<AbstractStorageDecl>(VD))
-        TC.DeclsToFinalize.insert(VD);
-
       // If this is a member of a nominal type, don't allow it to have a name of
       // "Type" or "Protocol" since we reserve the X.Type and X.Protocol
       // expressions to mean something builtin to the language.  We *do* allow
@@ -3155,6 +3150,8 @@ public:
 
 
   void visitClassDecl(ClassDecl *CD) {
+    TC.DeclsToFinalize.insert(CD);
+
     TC.checkDeclAttributesEarly(CD);
 
     checkUnsupportedNestedType(CD);
@@ -3499,7 +3496,7 @@ public:
     if (auto nominal = ED->getExtendedNominal()) {
       TC.validateDecl(nominal);
       if (auto *classDecl = dyn_cast<ClassDecl>(nominal))
-        TC.requestNominalLayout(classDecl);
+        TC.requestClassLayout(classDecl);
 
       // Check the raw values of an enum, since we might synthesize
       // RawRepresentable while checking conformances on this extension.
@@ -4143,14 +4140,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     validateAttributes(*this, D);
 
-    // FIXME: IRGen likes to emit @objc protocol descriptors even if the
-    // protocol comes from a different module or translation unit.
-    //
-    // It would be nice if it didn't have to do that, then we could remove
-    // this case.
-    if (proto->isObjC())
-      requestNominalLayout(proto);
-
     break;
   }
 
@@ -4522,14 +4511,6 @@ void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
       return;
     proto->computeType();
 
-    // FIXME: IRGen likes to emit @objc protocol descriptors even if the
-    // protocol comes from a different module or translation unit.
-    //
-    // It would be nice if it didn't have to do that, then we could remove
-    // this case.
-    if (proto->isObjC())
-      requestNominalLayout(proto);
-
     break;
   }
   case DeclKind::AssociatedType: {
@@ -4594,96 +4575,59 @@ void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
 void TypeChecker::requestMemberLayout(ValueDecl *member) {
   auto *dc = member->getDeclContext();
   if (auto *classDecl = dyn_cast<ClassDecl>(dc))
-    requestNominalLayout(classDecl);
-  if (auto *protocolDecl = dyn_cast<ProtocolDecl>(dc))
-    requestNominalLayout(protocolDecl);
-
-  // If this represents (abstract) storage, form the appropriate accessors.
-  if (auto storage = dyn_cast<AbstractStorageDecl>(member))
-    DeclsToFinalize.insert(storage);
+    requestClassLayout(classDecl);
 }
 
-void TypeChecker::requestNominalLayout(NominalTypeDecl *nominalDecl) {
-  if (isa<SourceFile>(nominalDecl->getModuleScopeContext()))
-    DeclsToFinalize.insert(nominalDecl);
+void TypeChecker::requestClassLayout(ClassDecl *classDecl) {
+  if (isa<SourceFile>(classDecl->getModuleScopeContext()))
+    DeclsToFinalize.insert(classDecl);
 }
 
 void TypeChecker::requestSuperclassLayout(ClassDecl *classDecl) {
   if (auto *superclassDecl = classDecl->getSuperclassDecl()) {
     if (superclassDecl)
-      requestNominalLayout(superclassDecl);
+      requestClassLayout(superclassDecl);
   }
 }
 
-/// "Finalize" the type so that SILGen can make copies of it, call
-/// methods on it, etc. This requires forcing enough computation so
-/// that (for example) a class can layout its vtable or a struct can
-/// be laid out in memory.
-static void finalizeType(TypeChecker &TC, NominalTypeDecl *nominal) {
-  assert(!nominal->hasClangNode());
-  assert(isa<SourceFile>(nominal->getModuleScopeContext()));
-
-  if (auto *CD = dyn_cast<ClassDecl>(nominal)) {
-    // We need to add implicit initializers and dtors because it
-    // affects vtable layout.
-    TC.addImplicitConstructors(CD);
-    CD->addImplicitDestructor();
-
-    // Force lowering of stored properties.
-    (void) nominal->getStoredProperties();
-  }
-
-  if (isa<ClassDecl>(nominal) || isa<ProtocolDecl>(nominal)) {
-    for (auto *D : nominal->getMembers()) {
-      if (auto *ASD = dyn_cast<AbstractStorageDecl>(D))
-        TC.DeclsToFinalize.insert(ASD);
-    }
-  }
-
-  if (auto *CD = dyn_cast<ClassDecl>(nominal)) {
-    // We need the superclass vtable layout as well.
-    TC.requestSuperclassLayout(CD);
-
-    auto forceConformance = [&](ProtocolDecl *protocol) {
-      if (auto ref = TypeChecker::conformsToProtocol(
-            CD->getDeclaredInterfaceType(), protocol, CD,
-            ConformanceCheckFlags::SkipConditionalRequirements,
-            SourceLoc())) {
-        auto conformance = ref->getConcrete();
-        if (conformance->getDeclContext() == CD &&
-            conformance->getState() == ProtocolConformanceState::Incomplete) {
-          TC.checkConformance(conformance->getRootNormalConformance());
-        }
-      }
-    };
-
-    // If the class is Encodable, Decodable or Hashable, force those
-    // conformances to ensure that the synthesized members appear in the vtable.
-    //
-    // FIXME: Generalize this to other protocols for which
-    // we can derive conformances.
-    forceConformance(TC.Context.getProtocol(KnownProtocolKind::Decodable));
-    forceConformance(TC.Context.getProtocol(KnownProtocolKind::Encodable));
-    forceConformance(TC.Context.getProtocol(KnownProtocolKind::Hashable));
-  }
-
-  if (auto PD = dyn_cast<ProtocolDecl>(nominal)) {
-    for (auto *inherited : PD->getInheritedProtocols())
-      TC.requestNominalLayout(inherited);
-  }
-}
-
-void TypeChecker::finalizeDecl(ValueDecl *decl) {
+void TypeChecker::finalizeDecl(ClassDecl *CD) {
   if (Context.Stats)
     Context.Stats->getFrontendCounters().NumDeclsFinalized++;
 
-  validateDecl(decl);
+  assert(!CD->hasClangNode());
+  assert(isa<SourceFile>(CD->getModuleScopeContext()));
 
-  if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
-    finalizeType(*this, nominal);
-  } else if (auto storage = dyn_cast<AbstractStorageDecl>(decl)) {
-    addExpectedOpaqueAccessorsToStorage(storage);
-  }
+  validateDecl(CD);
+
+  // We need to add implicit initializers and dtors because it
+  // affects vtable layout.
+  addImplicitConstructors(CD);
+  CD->addImplicitDestructor();
+
+  // We need the superclass vtable layout as well.
+  requestSuperclassLayout(CD);
+
+  auto forceConformance = [&](ProtocolDecl *protocol) {
+    if (auto ref = TypeChecker::conformsToProtocol(
+          CD->getDeclaredInterfaceType(), protocol, CD,
+          ConformanceCheckFlags::SkipConditionalRequirements,
+          SourceLoc())) {
+      auto conformance = ref->getConcrete();
+      if (conformance->getDeclContext() == CD &&
+          conformance->getState() == ProtocolConformanceState::Incomplete) {
+        checkConformance(conformance->getRootNormalConformance());
+      }
+    }
+  };
+
+  // If the class is Encodable, Decodable or Hashable, force those
+  // conformances to ensure that the synthesized members appear in the vtable.
+  //
+  // FIXME: Generalize this to other protocols for which
+  // we can derive conformances.
+  forceConformance(Context.getProtocol(KnownProtocolKind::Decodable));
+  forceConformance(Context.getProtocol(KnownProtocolKind::Encodable));
+  forceConformance(Context.getProtocol(KnownProtocolKind::Hashable));
 }
 
 /// Determine whether this is a "pass-through" typealias, which has the

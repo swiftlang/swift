@@ -3693,11 +3693,6 @@ void ConformanceChecker::resolveValueWitnesses() {
       auto witness = Conformance->getWitness(requirement).getDecl();
       if (!witness) return;
 
-      // Make sure that we finalize the witness, so we can emit this
-      // witness table.
-      if (isa<AbstractStorageDecl>(witness))
-        TC.DeclsToFinalize.insert(witness);
-
       // Objective-C checking for @objc requirements.
       if (requirement->isObjC() &&
           requirement->getFullName() == witness->getFullName() &&

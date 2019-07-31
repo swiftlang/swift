@@ -556,7 +556,7 @@ public:
   /// The list of declarations that we've done at least partial validation
   /// of during type-checking, but which will need to be finalized before
   /// we can hand them off to SILGen etc.
-  llvm::SetVector<ValueDecl *> DeclsToFinalize;
+  llvm::SetVector<ClassDecl *> DeclsToFinalize;
 
   /// Track the index of the next declaration that needs to be finalized,
   /// from the \c DeclsToFinalize set.
@@ -810,7 +810,7 @@ public:
 
   /// Request that the given class needs to have all members validated
   /// after everything in the translation unit has been processed.
-  void requestNominalLayout(NominalTypeDecl *nominalDecl);
+  void requestClassLayout(ClassDecl *classDecl);
 
   /// Request that the superclass of the given class, if any, needs to have
   /// all members validated after everything in the translation unit has
@@ -819,7 +819,7 @@ public:
 
   /// Perform final validation of a declaration after everything in the
   /// translation unit has been processed.
-  void finalizeDecl(ValueDecl *D);
+  void finalizeDecl(ClassDecl *CD);
 
   /// Resolve a reference to the given type declaration within a particular
   /// context.
