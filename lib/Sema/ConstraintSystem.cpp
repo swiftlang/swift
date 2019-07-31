@@ -435,23 +435,20 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(Expr *expr) {
     expr = fnExpr->getSemanticsProvidingExpr();
   }
 
-  auto *locator = getConstraintLocator(expr);
-  if (auto *ude = dyn_cast<UnresolvedDotExpr>(expr)) {
-    if (TC.getSelfForInitDelegationInConstructor(DC, ude)) {
-      return getConstraintLocator(locator,
-                                  ConstraintLocator::ConstructorMember);
-    } else {
-      return getConstraintLocator(locator, ConstraintLocator::Member);
-    }
+  if (auto *UDE = dyn_cast<UnresolvedDotExpr>(expr)) {
+    return getConstraintLocator(
+        expr, TC.getSelfForInitDelegationInConstructor(DC, UDE)
+                  ? ConstraintLocator::ConstructorMember
+                  : ConstraintLocator::Member);
   }
 
   if (isa<UnresolvedMemberExpr>(expr))
-    return getConstraintLocator(locator, ConstraintLocator::UnresolvedMember);
+    return getConstraintLocator(expr, ConstraintLocator::UnresolvedMember);
 
   if (isa<MemberRefExpr>(expr))
-    return getConstraintLocator(locator, ConstraintLocator::Member);
+    return getConstraintLocator(expr, ConstraintLocator::Member);
 
-  return locator;
+  return getConstraintLocator(expr);
 }
 
 Type ConstraintSystem::openUnboundGenericType(UnboundGenericType *unbound,
