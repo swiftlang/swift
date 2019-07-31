@@ -153,7 +153,7 @@ CanSILFunctionType SILFunctionType::getWithoutDifferentiability() {
 // Returns the canonical generic signature for an autodiff associated function
 // given an existing associated function generic signature. All differentiation
 // parameters are constrained to conform to `Differentiable`.
-static CanGenericSignature getAssociatedFunctionGenericSignature(
+static CanGenericSignature getAutoDiffAssociatedFunctionGenericSignature(
     CanGenericSignature assocFnGenSig,
     ArrayRef<SILParameterInfo> originalParameters,
     AutoDiffIndexSubset *parameterIndices, SILModule &module) {
@@ -208,7 +208,7 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
   // Get the canonical associated function generic signature.
   if (!assocFnGenSig)
     assocFnGenSig = getGenericSignature();
-  assocFnGenSig = getAssociatedFunctionGenericSignature(
+  assocFnGenSig = getAutoDiffAssociatedFunctionGenericSignature(
       assocFnGenSig, getParameters(), parameterIndices, module);
   Lowering::GenericContextScope genericContextScope(module.Types,
                                                     assocFnGenSig);
