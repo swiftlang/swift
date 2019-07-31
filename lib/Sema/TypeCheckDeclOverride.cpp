@@ -893,19 +893,20 @@ static void checkOverrideAccessControl(ValueDecl *baseDecl, ValueDecl *decl,
     bool shouldDiagnose = !decl->isAccessibleFrom(scopeDC);
 
     bool shouldDiagnoseSetter = false;
-    if (!shouldDiagnose && baseDecl->isSettable(dc)){
-      auto matchASD = cast<AbstractStorageDecl>(baseDecl);
-      if (matchASD->isSetterAccessibleFrom(dc)) {
-        auto matchSetterAccessScope =
-          matchASD->getSetterFormalAccessScope(dc);
-        auto requiredSetterAccessScope =
-          matchSetterAccessScope.intersectWith(classAccessScope);
-        auto setterScopeDC = requiredSetterAccessScope->getDeclContext();
+    if (auto matchASD = dyn_cast<AbstractStorageDecl>(baseDecl)) {
+      if (!shouldDiagnose && matchASD->isSettable(dc)){
+        if (matchASD->isSetterAccessibleFrom(dc)) {
+          auto matchSetterAccessScope =
+            matchASD->getSetterFormalAccessScope(dc);
+          auto requiredSetterAccessScope =
+            matchSetterAccessScope.intersectWith(classAccessScope);
+          auto setterScopeDC = requiredSetterAccessScope->getDeclContext();
 
-        const auto *ASD = cast<AbstractStorageDecl>(decl);
-        shouldDiagnoseSetter =
-            ASD->isSettable(setterScopeDC) &&
-            !ASD->isSetterAccessibleFrom(setterScopeDC);
+          const auto *ASD = cast<AbstractStorageDecl>(decl);
+          shouldDiagnoseSetter =
+              ASD->isSettable(setterScopeDC) &&
+              !ASD->isSetterAccessibleFrom(setterScopeDC);
+        }
       }
     }
 
@@ -1594,7 +1595,7 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
     // Make sure we're not overriding a settable property with a non-settable
     // one.  The only reasonable semantics for this would be to inherit the
     // setter but override the getter, and that would be surprising at best.
-    if (baseIsSettable && !override->isSettable(override->getDeclContext())) {
+    if (baseIsSettable && !overrideASD->isSettable(override->getDeclContext())) {
       diags.diagnose(overrideASD, diag::override_mutable_with_readonly_property,
                      overrideASD->getBaseName().getIdentifier());
       diags.diagnose(baseASD, diag::property_override_here);

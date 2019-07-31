@@ -342,7 +342,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
                                  CapturedValue capture,
                                  uint16_t ArgNo) {
 
-  auto *VD = capture.getDecl();
+  auto *VD = cast<VarDecl>(capture.getDecl());
   SILLocation Loc(VD);
   Loc.markAsPrologue();
 

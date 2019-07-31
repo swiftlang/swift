@@ -2588,12 +2588,6 @@ public:
   void setInterfaceType(Type type);
 
   bool hasValidSignature() const;
-
-  /// isSettable - Determine whether references to this decl may appear
-  /// on the left-hand side of an assignment or as the operand of a
-  /// `&` or 'inout' operator.
-  bool isSettable(const DeclContext *UseDC,
-                  const DeclRefExpr *base = nullptr) const;
   
   /// isInstanceMember - Determine whether this value is an instance member
   /// of an enum or protocol.
@@ -4545,6 +4539,12 @@ public:
   StorageIsMutable_t supportsMutation() const {
     return getImplInfo().supportsMutation();
   }
+
+  /// isSettable - Determine whether references to this decl may appear
+  /// on the left-hand side of an assignment or as the operand of a
+  /// `&` or 'inout' operator.
+  bool isSettable(const DeclContext *UseDC,
+                  const DeclRefExpr *base = nullptr) const;
 
   /// Are there any accessors for this declaration, including implicit ones?
   bool hasAnyAccessors() const {
@@ -7099,14 +7099,13 @@ public:
   }
 };
 
-inline bool ValueDecl::isSettable(const DeclContext *UseDC,
-                                  const DeclRefExpr *base) const {
-  if (auto vd = dyn_cast<VarDecl>(this)) {
+inline bool AbstractStorageDecl::isSettable(const DeclContext *UseDC,
+                                            const DeclRefExpr *base) const {
+  if (auto vd = dyn_cast<VarDecl>(this))
     return vd->isSettable(UseDC, base);
-  } else if (auto sd = dyn_cast<SubscriptDecl>(this)) {
-    return sd->supportsMutation();
-  } else
-    return false;
+
+  auto sd = cast<SubscriptDecl>(this);
+  return sd->supportsMutation();
 }
 
 inline void
