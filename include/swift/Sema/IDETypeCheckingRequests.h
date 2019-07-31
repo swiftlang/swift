@@ -234,6 +234,29 @@ public:
   SourceLoc getNearestLoc() const { return SourceLoc(); };
 };
 
+//----------------------------------------------------------------------------//
+// HasDynamicMemberLookupAttributeRequest
+//----------------------------------------------------------------------------//
+class HasDynamicMemberLookupAttributeRequest:
+    public SimpleRequest<HasDynamicMemberLookupAttributeRequest,
+                         bool(TypeBase*),
+                         CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool> evaluate(Evaluator &evaluator, TypeBase *ty) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+  // Source location
+  SourceLoc getNearestLoc() const { return SourceLoc(); };
+};
+
 /// The zone number for the IDE.
 #define SWIFT_IDE_TYPE_CHECK_REQUESTS_TYPEID_ZONE 97
 #define SWIFT_TYPEID_ZONE SWIFT_IDE_TYPE_CHECK_REQUESTS_TYPEID_ZONE

@@ -3979,7 +3979,7 @@ getArgumentLabels(ConstraintSystem &cs, ConstraintLocatorBuilder locator) {
 /// particularly fast in the face of deep class hierarchies or lots of protocol
 /// conformances, but this is fine because it doesn't get invoked in the normal
 /// name lookup path (only when lookup is about to fail).
-static bool hasDynamicMemberLookupAttribute(Type type,
+bool swift::hasDynamicMemberLookupAttribute(Type type,
                     llvm::DenseMap<CanType, bool> &DynamicMemberLookupCache) {
   auto canType = type->getCanonicalType();
   auto it = DynamicMemberLookupCache.find(canType);
@@ -4051,12 +4051,6 @@ static bool hasDynamicMemberLookupAttribute(Type type,
   if (!type->hasTypeVariable())
     DynamicMemberLookupCache[canType] = result;
   return result;
-}
-
-// for IDETypeChecking
-bool swift::hasDynamicMemberLookupAttribute(Type type) {
-  llvm::DenseMap<CanType, bool> DynamicMemberLookupCache;
-  return ::hasDynamicMemberLookupAttribute(type, DynamicMemberLookupCache);
 }
 
 static bool isForKeyPathSubscript(ConstraintSystem &cs,
