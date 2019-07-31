@@ -225,6 +225,13 @@ public:
     TinyPtrVector<Constraint *> constraints;
 
   public:
+    /// The set of components that this component depends on, such that
+    /// the partial solutions of the those components need to be available
+    /// before this component can be solved.
+    ///
+    /// FIXME: Use a TinyPtrVector here.
+    std::vector<unsigned> dependsOn;
+
     Component(unsigned solutionIndex) : solutionIndex(solutionIndex) { }
 
     /// Whether this component represents an orphaned constraint.

@@ -49,23 +49,19 @@ StepResult SplitterStep::take(bool prevFailed) {
   if (prevFailed || CS.failedConstraint || CS.simplify())
     return done(/*isSuccess=*/false);
 
-  SmallVector<std::unique_ptr<ComponentStep>, 4> components;
+  SmallVector<std::unique_ptr<SolverStep>, 4> followup;
   // Try to run "connected components" algorithm and split
   // type variables and their constraints into independent
   // sub-systems to solve.
-  computeFollowupSteps(components);
+  computeFollowupSteps(followup);
 
-  // If there is only one component, there is no reason to
+  // If there is only one step, there is no reason to
   // try to merge solutions, "split" step should be considered
   // done and replaced by a single component step.
-  if (components.size() < 2)
-    return replaceWith(std::move(components.front()));
+  if (followup.size() < 2)
+    return replaceWith(std::move(followup.front()));
 
-  SmallVector<std::unique_ptr<SolverStep>, 4> followup;
-  for (auto &step : components)
-    followup.push_back(std::move(step));
-
-  /// Wait until all of the component steps are done.
+  /// Wait until all of the steps are done.
   return suspend(followup);
 }
 
@@ -81,13 +77,13 @@ StepResult SplitterStep::resume(bool prevFailed) {
   if (prevFailed)
     return done(/*isSuccess=*/false);
 
-  // Otherwise let's try to merge partial soltuions together
+  // Otherwise let's try to merge partial solutions together
   // and form a complete solution(s) for this split.
   return done(mergePartialSolutions());
 }
 
 void SplitterStep::computeFollowupSteps(
-    SmallVectorImpl<std::unique_ptr<ComponentStep>> &componentSteps) {
+    SmallVectorImpl<std::unique_ptr<SolverStep>> &steps) {
   // Compute next steps based on that connected components
   // algorithm tells us is splittable.
 
@@ -99,7 +95,7 @@ void SplitterStep::computeFollowupSteps(
   auto components = CG.computeConnectedComponents(CS.TypeVariables);
   unsigned numComponents = components.size();
   if (numComponents < 2) {
-    componentSteps.push_back(llvm::make_unique<ComponentStep>(
+    steps.push_back(llvm::make_unique<ComponentStep>(
         CS, 0, &CS.InactiveConstraints, Solutions));
     return;
   }
@@ -119,6 +115,7 @@ void SplitterStep::computeFollowupSteps(
   // Take the orphaned constraints, because they'll go into a component now.
   OrphanedConstraints = CG.takeOrphanedConstraints();
 
+  IncludeInMergedResults.resize(numComponents, true);
   Components.resize(numComponents);
   PartialSolutions = std::unique_ptr<SmallVector<Solution, 4>[]>(
       new SmallVector<Solution, 4>[numComponents]);
@@ -126,26 +123,113 @@ void SplitterStep::computeFollowupSteps(
   // Add components.
   for (unsigned i : indices(components)) {
     unsigned solutionIndex = components[i].solutionIndex;
-    componentSteps.push_back(llvm::make_unique<ComponentStep>(
-        CS, solutionIndex, &Components[i], std::move(components[i]),
-        PartialSolutions[solutionIndex]));
+
+    // If there are no dependencies, build a normal component step.
+    if (components[i].dependsOn.empty()) {
+      steps.push_back(llvm::make_unique<ComponentStep>(
+          CS, solutionIndex, &Components[i], std::move(components[i]),
+          PartialSolutions[solutionIndex]));
+      continue;
+    }
+
+    // Note that the partial results from any dependencies of this component
+    // need not be included in the final merged results, because they'll
+    // already be part of the partial results for this component.
+    for (auto dependsOn : components[i].dependsOn) {
+      IncludeInMergedResults[dependsOn] = false;
+    }
+
+    // Otherwise, build a dependent component "splitter" step, which
+    // handles all combinations of incoming partial solutions.
+    steps.push_back(llvm::make_unique<DependentComponentSplitterStep>(
+        CS, &Components[i], solutionIndex, std::move(components[i]),
+        llvm::makeMutableArrayRef(PartialSolutions.get(), numComponents)));
+  }
+
+  assert(CS.InactiveConstraints.empty() && "Missed a constraint");
+}
+
+namespace {
+  /// Retrieve the size of a container.
+  template<typename Container>
+  unsigned getSize(const Container &container) {
+    return container.size();
+  }
+
+  /// Retrieve the size of a container referenced by a pointer.
+  template<typename Container>
+  unsigned getSize(const Container *container) {
+    return container->size();
+  }
+
+  /// Identity getSize() for cases where we are working with a count.
+  unsigned getSize(unsigned size) {
+    return size;
+  }
+
+  /// Compute the next combination of indices into the given array of
+  /// containers.
+  /// \param containers Containers (each of which must have a `size()`) in
+  /// which the indices will be generated.
+  /// \param indices The current indices into the containers, which will
+  /// be updated to represent the next combination.
+  /// \returns true to indicate that \c indices contains the next combination,
+  /// or \c false to indicate that there are no combinations left.
+  template<typename Container>
+  bool nextCombination(ArrayRef<Container> containers,
+                       MutableArrayRef<unsigned> indices) {
+    assert(containers.size() == indices.size() &&
+           "Indices should have been initialized to the same size with 0s");
+    unsigned numIndices = containers.size();
+    for (unsigned n = numIndices; n > 0; --n) {
+      ++indices[n - 1];
+
+      // If we haven't run out of solutions yet, we're done.
+      if (indices[n - 1] < getSize(containers[n - 1]))
+        break;
+
+      // If we ran out of solutions at the first position, we're done.
+      if (n == 1) {
+        return false;
+      }
+
+      // Zero out the indices from here to the end.
+      for (unsigned i = n - 1; i != numIndices; ++i)
+        indices[i] = 0;
+    }
+
+    return true;
   }
 }
 
 bool SplitterStep::mergePartialSolutions() const {
   assert(Components.size() >= 2);
 
+  // Compute the # of partial solutions that will be merged for each
+  // component. Components that shouldn't be included will get a count of 1,
+  // an we'll skip them later.
   auto numComponents = Components.size();
+  SmallVector<unsigned, 2> countsVec;
+  countsVec.reserve(numComponents);
+  for (unsigned idx : range(numComponents)) {
+    countsVec.push_back(
+        IncludeInMergedResults[idx] ? PartialSolutions[idx].size() : 1);
+  }
+
   // Produce all combinations of partial solutions.
+  ArrayRef<unsigned> counts = countsVec;
   SmallVector<unsigned, 2> indices(numComponents, 0);
-  bool done = false;
   bool anySolutions = false;
   do {
-    // Create a new solver scope in which we apply all of the partial
+    // Create a new solver scope in which we apply all of the relevant partial
     // solutions.
     ConstraintSystem::SolverScope scope(CS);
-    for (unsigned i = 0; i != numComponents; ++i)
+    for (unsigned i : range(numComponents)) {
+      if (!IncludeInMergedResults[i])
+        continue;
+
       CS.applySolution(PartialSolutions[i][indices[i]]);
+    }
 
     // This solution might be worse than the best solution found so far.
     // If so, skip it.
@@ -159,38 +243,86 @@ bool SplitterStep::mergePartialSolutions() const {
       Solutions.push_back(std::move(solution));
       anySolutions = true;
     }
-
-    // Find the next combination.
-    for (unsigned n = numComponents; n > 0; --n) {
-      ++indices[n - 1];
-
-      // If we haven't run out of solutions yet, we're done.
-      if (indices[n - 1] < PartialSolutions[n - 1].size())
-        break;
-
-      // If we ran out of solutions at the first position, we're done.
-      if (n == 1) {
-        done = true;
-        break;
-      }
-
-      // Zero out the indices from here to the end.
-      for (unsigned i = n - 1; i != numComponents; ++i)
-        indices[i] = 0;
-    }
-  } while (!done);
+  } while (nextCombination(counts, indices));
 
   return anySolutions;
+}
+
+StepResult DependentComponentSplitterStep::take(bool prevFailed) {
+  // "split" is considered a failure if previous step failed,
+  // or there is a failure recorded by constraint system, or
+  // system can't be simplified.
+  if (prevFailed || CS.failedConstraint || CS.simplify())
+    return done(/*isSuccess=*/false);
+
+  // Figure out the sets of partial solutions that this component depends on.
+  SmallVector<const SmallVector<Solution, 4> *, 2> dependsOnSets;
+  for (auto index : Component.dependsOn) {
+    dependsOnSets.push_back(&AllPartialSolutions[index]);
+  }
+
+  // Produce all combinations of partial solutions for the inputs.
+  SmallVector<std::unique_ptr<SolverStep>, 4> followup;
+  SmallVector<unsigned, 2> indices(Component.dependsOn.size(), 0);
+  auto dependsOnSetsRef = llvm::makeArrayRef(dependsOnSets);
+  do {
+    // Form the set of input partial solutions.
+    SmallVector<const Solution *, 2> dependsOnSolutions;
+    for (auto index : swift::indices(indices)) {
+      dependsOnSolutions.push_back(&(*dependsOnSets[index])[indices[index]]);
+    }
+
+    followup.push_back(
+        llvm::make_unique<ComponentStep>(CS, Index, Constraints, Component,
+                                         std::move(dependsOnSolutions),
+                                         Solutions));
+  } while (nextCombination(dependsOnSetsRef, indices));
+
+  /// Wait until all of the component steps are done.
+  return suspend(followup);
+}
+
+StepResult DependentComponentSplitterStep::resume(bool prevFailed) {
+  return done(/*isSuccess=*/!Solutions.empty());
+}
+
+void DependentComponentSplitterStep::print(llvm::raw_ostream &Out) {
+  Out << "DependentComponentSplitterStep for dependencies on [";
+  interleave(Component.dependsOn, [&](unsigned index) { Out << index; },
+             [&] { Out << ", "; });
+  Out << "]\n";
 }
 
 StepResult ComponentStep::take(bool prevFailed) {
   // One of the previous components created by "split"
   // failed, it means that we can't solve this component.
-  if (prevFailed || CS.getExpressionTooComplex(Solutions))
+  if ((prevFailed && DependsOnPartialSolutions.empty()) ||
+      CS.getExpressionTooComplex(Solutions))
     return done(/*isSuccess=*/false);
 
   // Setup active scope, only if previous component didn't fail.
   setupScope();
+
+  // If there are any dependent partial solutions to compose, do so now.
+  if (!DependsOnPartialSolutions.empty()) {
+    for (auto partial : DependsOnPartialSolutions) {
+      CS.applySolution(*partial);
+    }
+
+    // Activate all of the one-way constraints.
+    SmallVector<Constraint *, 4> oneWayConstraints;
+    for (auto &constraint : CS.InactiveConstraints) {
+      if (constraint.getKind() == ConstraintKind::OneWayBind)
+        oneWayConstraints.push_back(&constraint);
+    }
+    for (auto constraint : oneWayConstraints) {
+      CS.activateConstraint(constraint);
+    }
+
+    // Simplify again.
+    if (CS.failedConstraint || CS.simplify())
+      return done(/*isSuccess=*/false);
+  }
 
   /// Try to figure out what this step is going to be,
   /// after the scope has been established.
