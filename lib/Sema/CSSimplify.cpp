@@ -719,43 +719,34 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
 static std::tuple<ValueDecl *, bool, ArrayRef<Identifier>, bool,
                   ConstraintLocator *>
 getCalleeDeclAndArgs(ConstraintSystem &cs,
-                     ConstraintLocatorBuilder callLocator,
-                     SmallVectorImpl<Identifier> &argLabelsScratch) {
+                     ConstraintLocatorBuilder callBuilder) {
   ArrayRef<Identifier> argLabels;
   bool hasTrailingClosure = false;
+  ConstraintLocator *targetLocator = nullptr;
+
+  auto *callLocator = cs.getConstraintLocator(callBuilder);
+  auto *callExpr = callLocator->getAnchor();
 
   // Break down the call.
-  SmallVector<LocatorPathElt, 2> path;
-  auto callExpr = callLocator.getLocatorParts(path);
   if (!callExpr)
     return std::make_tuple(nullptr, /*hasAppliedSelf=*/false, argLabels,
-                           hasTrailingClosure, nullptr);
+                           hasTrailingClosure, targetLocator);
 
+  auto path = callLocator->getPath();
   // Our remaining path can only be 'ApplyArgument'.
   if (!path.empty() &&
       !(path.size() <= 2 &&
         path.back().getKind() == ConstraintLocator::ApplyArgument))
     return std::make_tuple(nullptr, /*hasAppliedSelf=*/false, argLabels,
-                           hasTrailingClosure, nullptr);
+                           hasTrailingClosure, targetLocator);
 
-  // Dig out the callee.
-  ConstraintLocator *targetLocator;
-  if (auto call = dyn_cast<CallExpr>(callExpr)) {
-    targetLocator = cs.getConstraintLocator(call->getDirectCallee());
-    argLabels = call->getArgumentLabels();
-    hasTrailingClosure = call->hasTrailingClosure();
-  } else if (auto unresolved = dyn_cast<UnresolvedMemberExpr>(callExpr)) {
-    targetLocator = cs.getConstraintLocator(callExpr);
-    argLabels = unresolved->getArgumentLabels();
-    hasTrailingClosure = unresolved->hasTrailingClosure();
-  } else if (auto subscript = dyn_cast<SubscriptExpr>(callExpr)) {
-    targetLocator = cs.getConstraintLocator(callExpr);
-    argLabels = subscript->getArgumentLabels();
-    hasTrailingClosure = subscript->hasTrailingClosure();
-  } else if (auto dynSubscript = dyn_cast<DynamicSubscriptExpr>(callExpr)) {
-    targetLocator = cs.getConstraintLocator(callExpr);
-    argLabels = dynSubscript->getArgumentLabels();
-    hasTrailingClosure = dynSubscript->hasTrailingClosure();
+  // Dig out the callee information.
+  if (auto argInfo = cs.getArgumentInfo(callLocator)) {
+    argLabels = argInfo->Labels;
+    hasTrailingClosure = argInfo->HasTrailingClosure;
+    targetLocator = cs.getConstraintLocator(
+        isa<CallExpr>(callExpr) ? cast<CallExpr>(callExpr)->getDirectCallee()
+                                : callExpr);
   } else if (auto keyPath = dyn_cast<KeyPathExpr>(callExpr)) {
     if (path.size() != 2 ||
         path[0].getKind() != ConstraintLocator::KeyPathComponent ||
@@ -788,17 +779,9 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
       return std::make_tuple(nullptr, /*hasAppliedSelf=*/false, argLabels,
                              hasTrailingClosure, nullptr);
     }
-
   } else {
-    if (auto apply = dyn_cast<ApplyExpr>(callExpr)) {
-      argLabels = apply->getArgumentLabels(argLabelsScratch);
-      assert(!apply->hasTrailingClosure());
-    } else if (auto objectLiteral = dyn_cast<ObjectLiteralExpr>(callExpr)) {
-      argLabels = objectLiteral->getArgumentLabels();
-      hasTrailingClosure = objectLiteral->hasTrailingClosure();
-    }
     return std::make_tuple(nullptr, /*hasAppliedSelf=*/false, argLabels,
-                           hasTrailingClosure, nullptr);
+                           hasTrailingClosure, targetLocator);
   }
 
   // Find the overload choice corresponding to the callee locator.
@@ -941,12 +924,11 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
   ValueDecl *callee;
   bool hasAppliedSelf;
   ArrayRef<Identifier> argLabels;
-  SmallVector<Identifier, 2> argLabelsScratch;
   bool hasTrailingClosure = false;
   ConstraintLocator *calleeLocator;
   std::tie(callee, hasAppliedSelf, argLabels, hasTrailingClosure,
            calleeLocator) =
-    getCalleeDeclAndArgs(cs, locator, argLabelsScratch);
+    getCalleeDeclAndArgs(cs, locator);
 
   ParameterListInfo paramInfo(params, callee, hasAppliedSelf);
 
@@ -3931,49 +3913,6 @@ ConstraintSystem::simplifyFunctionComponentConstraint(
   return SolutionKind::Solved;
 }
 
-/// Retrieve the argument labels that are provided for a member
-/// reference at the given locator.
-static Optional<ConstraintSystem::ArgumentLabelState>
-getArgumentLabels(ConstraintSystem &cs, ConstraintLocatorBuilder locator) {
-  SmallVector<LocatorPathElt, 2> parts;
-  Expr *anchor = locator.getLocatorParts(parts);
-  if (!anchor)
-    return None;
-
-  while (!parts.empty()) {
-    if (parts.back().getKind() == ConstraintLocator::Member ||
-        parts.back().getKind() == ConstraintLocator::SubscriptMember) {
-      parts.pop_back();
-      continue;
-    }
-
-    if (parts.back().getKind() == ConstraintLocator::ApplyFunction) {
-      if (auto applyExpr = dyn_cast<ApplyExpr>(anchor)) {
-        anchor = applyExpr->getSemanticFn();
-      }
-      parts.pop_back();
-      continue;
-    }
-
-    if (parts.back().getKind() == ConstraintLocator::ConstructorMember) {
-      parts.pop_back();
-      continue;
-    }
-    
-    break;
-  }
-  
-  if (!parts.empty())
-    return None;
-
-  anchor = getArgumentLabelTargetExpr(anchor);
-  auto known = cs.ArgumentLabels.find(cs.getConstraintLocator(anchor));
-  if (known == cs.ArgumentLabels.end())
-    return None;
-
-  return known->second;
-}
-
 /// Return true if the specified type or a super-class/super-protocol has the
 /// @dynamicMemberLookup attribute on it.  This implementation is not
 /// particularly fast in the face of deep class hierarchies or lots of protocol
@@ -4194,10 +4133,8 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     // the argument labels into the name: we don't want to look for
     // anything else, because the cost of the general search is so
     // high.
-    if (auto argumentLabels =
-            getArgumentLabels(*this, ConstraintLocatorBuilder(memberLocator))) {
-      memberName = DeclName(TC.Context, memberName.getBaseName(),
-                            argumentLabels->Labels);
+    if (auto info = getArgumentInfo(memberLocator)) {
+      memberName = DeclName(TC.Context, memberName.getBaseName(), info->Labels);
     }
   }
 
@@ -4473,8 +4410,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
       if (::hasDynamicMemberLookupAttribute(instanceTy,
                                             DynamicMemberLookupCache) &&
           isValidKeyPathDynamicMemberLookup(subscript, TC)) {
-        auto info =
-            getArgumentLabels(*this, ConstraintLocatorBuilder(memberLocator));
+        auto info = getArgumentInfo(memberLocator);
 
         if (!(info && info->Labels.size() == 1 &&
               info->Labels[0] == getASTContext().Id_dynamicMember)) {
@@ -5906,7 +5842,7 @@ Type ConstraintSystem::simplifyAppliedOverloads(
       return markFailure();
   };
 
-  auto argumentInfo = getArgumentLabels(*this, locator);
+  auto argumentInfo = getArgumentInfo(getConstraintLocator(locator));
 
   // Consider each of the constraints in the disjunction.
 retry_after_fail:
