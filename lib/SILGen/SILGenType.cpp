@@ -88,36 +88,11 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
     implFn = getDynamicThunk(derived, Types.getConstantInfo(derived).SILFnType);
   // SWIFT_ENABLE_TENSORFLOW
   } else if (auto *adafi = derived.autoDiffAssociatedFunctionIdentifier) {
-    auto *decl = derived.getDecl();
-    auto *DA = *llvm::find_if(
-        decl->getAttrs().getAttributes<DifferentiableAttr>(),
-        [&](const DifferentiableAttr *attr) {
-          return attr->getParameterIndices() == adafi->getParameterIndices();
-        });
-    assert(DA && "Expected `@differentiable` attribute");
-    // Get autodiff associated function declaration, if it exists.
-    FuncDecl *assocDecl = nullptr;
-    switch (adafi->getKind()) {
-    case AutoDiffAssociatedFunctionKind::JVP:
-      assocDecl = DA->getJVPFunction();
-      break;
-    case AutoDiffAssociatedFunctionKind::VJP:
-      assocDecl = DA->getVJPFunction();
-      break;
-    }
-    // If declaration exists, get corresponding SIL function.
-    if (assocDecl) {
-      SILDeclRef assocRef(assocDecl, SILDeclRef::Kind::Func);
-      implFn = getFunction(assocRef, NotForDefinition);
-    }
-    // Otherwise, create an autodiff vtable entry thunk. The thunk contains an
-    // `autodiff_function` instruction, which is later filled during
+    // For JVP/VJP methods, create a vtable entry thunk. The thunk contains an
+    // `autodiff_function` instruction, which is later filled during the
     // differentiation transform.
-    // TODO(TF-524): Generalize canonical JVP/VJP thunk generation.
-    else {
-      implFn = getOrCreateAutoDiffClassMethodThunk(
-          derived, Types.getConstantInfo(derived).SILFnType);
-    }
+    implFn = getOrCreateAutoDiffClassMethodThunk(
+        derived, Types.getConstantInfo(derived).SILFnType);
   // SWIFT_ENABLE_TENSORFLOW END
   } else {
     implFn = getFunction(derived, NotForDefinition);

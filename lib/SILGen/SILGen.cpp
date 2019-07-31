@@ -826,8 +826,6 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
               expectedJVPType);
         }
         silDiffAttr->setJVPName(jvpThunk->getName());
-        // Unset JVP so that TBDGen triggers.
-        diffAttr->setJVPFunction(nullptr);
       }
       // Thunk VJP method, if it is defined.
       if (auto *vjpDecl = diffAttr->getVJPFunction()) {
@@ -845,8 +843,6 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
               expectedVJPType);
         }
         silDiffAttr->setVJPName(vjpThunk->getName());
-        // Unset VJP so that TBDGen triggers.
-        diffAttr->setVJPFunction(nullptr);
       }
     }
   }
