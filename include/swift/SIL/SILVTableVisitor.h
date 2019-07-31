@@ -100,11 +100,6 @@ template <class T> class SILVTableVisitor {
   }
 
   void maybeAddAccessors(AbstractStorageDecl *asd) {
-    // FIXME: This should not be necessary once visitOpaqueAccessors()
-    // incorporates the logic currently in maybeAddAccessorsToStorage().
-    if (!asd->hasAnyAccessors())
-      return;
-
     asd->visitOpaqueAccessors([&](AccessorDecl *accessor) {
       maybeAddMethod(accessor);
     });

@@ -52,7 +52,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 505; // track vtable entries for storage
+const uint16_t SWIFTMODULE_VERSION_MINOR = 506; // transparent accessor bit
 
 using DeclIDField = BCFixed<31>;
 
@@ -1139,6 +1139,7 @@ namespace decls_block {
     AccessorKindField, // accessor kind
     AccessLevelField, // access level
     BCFixed<1>,   // requires a new vtable slot
+    BCFixed<1>,   // is transparent
     BCArray<IdentifierIDField> // name components,
                                // followed by TypeID dependencies
     // The record is trailed by:
