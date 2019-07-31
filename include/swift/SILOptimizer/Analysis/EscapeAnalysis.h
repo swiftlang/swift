@@ -439,7 +439,7 @@ public:
         case EscapeState::Return:
           return false;
         case EscapeState::Arguments:
-          return !isNotAliasingArgument(V);
+          return !isExclusiveArgument(V);
         case EscapeState::Global:
           return true;
       }

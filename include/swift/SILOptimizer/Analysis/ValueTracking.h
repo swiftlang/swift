@@ -24,18 +24,12 @@ namespace swift {
 
 /// Returns true if \p V is a function argument which may not alias to
 /// any other pointer in the function.
-/// The \p assumeInoutIsNotAliasing specifies in no-aliasing is assumed for
-/// the @inout convention. See swift::isNotAliasedIndirectParameter().
-bool isNotAliasingArgument(SILValue V, InoutAliasingAssumption isInoutAliasing =
-                                         InoutAliasingAssumption::Aliasing);
+bool isExclusiveArgument(SILValue V);
 
 /// Returns true if \p V is local inside its function. This means its underlying
 /// object either is a non-aliasing function argument or a locally allocated
 /// object.
-/// The \p assumeInoutIsNotAliasing specifies in no-aliasing is assumed for
-/// the @inout convention. See swift::isNotAliasedIndirectParameter().
-bool pointsToLocalObject(SILValue V, InoutAliasingAssumption isInoutAliasing =
-                                         InoutAliasingAssumption::Aliasing);
+bool pointsToLocalObject(SILValue V);
 
 enum class IsZeroKind {
   Zero,

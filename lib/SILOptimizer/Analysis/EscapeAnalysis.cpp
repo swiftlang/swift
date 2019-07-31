@@ -600,7 +600,6 @@ bool EscapeAnalysis::ConnectionGraph::isReachable(CGNode *From, CGNode *To) {
   return false;
 }
 
-
 //===----------------------------------------------------------------------===//
 //                      Dumping, Viewing and Verification
 //===----------------------------------------------------------------------===//

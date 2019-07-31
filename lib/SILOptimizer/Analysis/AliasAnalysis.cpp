@@ -128,7 +128,7 @@ static bool isFunctionArgument(SILValue V) {
 static bool isIdentifiableObject(SILValue V) {
   if (isa<AllocationInst>(V) || isa<LiteralInst>(V))
     return true;
-  if (isNotAliasingArgument(V))
+  if (isExclusiveArgument(V))
     return true;
   return false;
 }
@@ -178,8 +178,7 @@ static bool isLocalLiteral(SILValue V) {
 /// Is this a value that can be unambiguously identified as being defined at the
 /// function level.
 static bool isIdentifiedFunctionLocal(SILValue V) {
-  return isa<AllocationInst>(*V) || isNotAliasingArgument(V) ||
-         isLocalLiteral(V);
+  return isa<AllocationInst>(*V) || isExclusiveArgument(V) || isLocalLiteral(V);
 }
 
 /// Returns true if we can prove that the two input SILValues which do not equal
