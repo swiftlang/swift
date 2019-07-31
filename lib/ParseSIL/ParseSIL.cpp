@@ -974,7 +974,7 @@ void SILParser::convertRequirements(SILFunction *F,
 
 /// SWIFT_ENABLE_TENSORFLOW
 /// Parse a `differentiable` attribute, e.g.
-/// `[differentiable wrt 0, 1 vjp @other]`.
+/// `[differentiable wrt 0, 1 where T : Differentiable]`.
 /// Returns true on error.
 static bool parseDifferentiableAttr(
   SmallVectorImpl<SILDifferentiableAttr *> &DAs, SILParser &SP) {
@@ -1011,24 +1011,6 @@ static bool parseDifferentiableAttr(
     if (parseParam())
       return true;
 
-  // Parse a SIL function name, e.g. '@foo'.
-  auto parseFnName = [&P, &LastLoc](Identifier &id) -> bool {
-    return P.parseToken(tok::at_sign, diag::expected_sil_function_name) ||
-      P.parseIdentifier(id, LastLoc, diag::expected_sil_function_name);
-  };
-
-  // Parse optional 'jvp'.
-  Identifier JVPName;
-  if (P.Tok.is(tok::identifier) && P.Tok.getText() == "jvp") {
-    P.consumeToken();
-    if (parseFnName(JVPName)) return true;
-  }
-  // Parse optional 'vjp'.
-  Identifier VJPName;
-  if (P.Tok.is(tok::identifier) && P.Tok.getText() == "vjp") {
-    P.consumeToken();
-    if (parseFnName(VJPName)) return true;
-  }
   // Parse a trailing 'where' clause if any.
   TrailingWhereClause *WhereClause = nullptr;
   if (P.Tok.is(tok::kw_where)) {
@@ -1049,8 +1031,7 @@ static bool parseDifferentiableAttr(
   auto *paramIndicesSubset = AutoDiffIndexSubset::get(
       P.Context, maxIndexRef ? *maxIndexRef + 1 : 0, ParamIndices);
   auto *Attr = SILDifferentiableAttr::create(
-      SP.SILMod, {SourceIndex, paramIndicesSubset}, JVPName.str(),
-      VJPName.str(), WhereClause);
+      SP.SILMod, {SourceIndex, paramIndicesSubset}, WhereClause);
   DAs.push_back(Attr);
   return false;
 }

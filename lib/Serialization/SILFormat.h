@@ -316,8 +316,6 @@ namespace sil_block {
   // SWIFT_ENABLE_TENSORFLOW
   using SILDifferentiableAttrLayout = BCRecordLayout<
     SIL_DIFFERENTIABLE_ATTR,
-    IdentifierIDField,    // JVP name.
-    IdentifierIDField,    // VJP name.
     BCVBR<8>,             // Result index.
     BCArray<ValueIDField> // Parameter indices.
   >;

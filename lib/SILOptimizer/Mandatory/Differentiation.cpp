@@ -1013,13 +1013,13 @@ private:
 
 public:
   /// Process the given `[differentiable]` attribute, filling in JVP/VJPs if
-  /// missing.
+  /// missing. Returns true on error.
   bool processDifferentiableAttribute(
       SILFunction *original, SILDifferentiableAttr *attr,
       DifferentiationInvoker invoker);
 
   /// Process the given `autodiff_function` instruction, filling in missing
-  /// associated functions if necessary.
+  /// associated functions if necessary. Returns true on error.
   bool processAutoDiffFunctionInst(AutoDiffFunctionInst *adfi);
 
   /// Fold `autodiff_function_extract` users of the given `autodiff_function`
@@ -2118,15 +2118,24 @@ emitAssociatedFunctionReference(
             originalFn, minimalAttr, invoker))
       return None;
     SILFunction *assocFn = nullptr;
+    Mangle::ASTMangler mangler;
     switch (kind) {
-    case AutoDiffAssociatedFunctionKind::JVP:
-      assert(!minimalAttr->getJVPName().empty() && "Expected JVP name");
-      assocFn = context.getModule().lookUpFunction(minimalAttr->getJVPName());
+    case AutoDiffAssociatedFunctionKind::JVP: {
+      auto jvpName = context.getASTContext().getIdentifier(
+          mangler.mangleAutoDiffAssociatedFunctionHelper(
+              originalFn->getName(), AutoDiffAssociatedFunctionKind::JVP,
+              minimalAttr->getIndices())).str();
+      assocFn = context.getModule().lookUpFunction(jvpName);
       break;
-    case AutoDiffAssociatedFunctionKind::VJP:
-      assert(!minimalAttr->getVJPName().empty() && "Expected VJP name");
-      assocFn = context.getModule().lookUpFunction(minimalAttr->getVJPName());
+    }
+    case AutoDiffAssociatedFunctionKind::VJP: {
+      auto vjpName = context.getASTContext().getIdentifier(
+          mangler.mangleAutoDiffAssociatedFunctionHelper(
+              originalFn->getName(), AutoDiffAssociatedFunctionKind::JVP,
+              minimalAttr->getIndices())).str();
+      assocFn = context.getModule().lookUpFunction(vjpName);
       break;
+    }
     }
     auto *assocFnRef = builder.createFunctionRef(loc, assocFn);
     // FIXME(TF-201): Handle direct differentiation of reabstraction thunks.
@@ -5957,7 +5966,6 @@ static SILFunction *createEmptyVJP(
                                 original->isDynamicallyReplaceable());
   vjp->setOwnershipEliminated();
   vjp->setDebugScope(new (module) SILDebugScope(original->getLocation(), vjp));
-  attr->setVJPName(vjpName);
 
   LLVM_DEBUG(llvm::dbgs() << "VJP type: " << vjp->getLoweredFunctionType()
                           << "\n");
@@ -6008,39 +6016,25 @@ static SILFunction *createEmptyJVP(
                                 original->isDynamicallyReplaceable());
   jvp->setOwnershipEliminated();
   jvp->setDebugScope(new (module) SILDebugScope(original->getLocation(), jvp));
-  attr->setJVPName(jvpName);
 
   LLVM_DEBUG(llvm::dbgs() << "JVP type: " << jvp->getLoweredFunctionType()
              << "\n");
   return jvp;
 }
 
-/// Returns true on error.
 bool ADContext::processDifferentiableAttribute(
     SILFunction *original, SILDifferentiableAttr *attr,
     DifferentiationInvoker invoker) {
   auto &module = getModule();
-  // Try to look up JVP only if attribute specifies JVP name or if original
-  // function is an external declaration. If JVP function cannot be found,
-  // create an external JVP reference.
-  StringRef jvpName;
-  SILFunction *jvp = nullptr;
-  if (attr->hasJVP()) {
-    jvpName = attr->getJVPName();
-  } else if (original->isExternalDeclaration()) {
-    Mangle::ASTMangler mangler;
-    jvpName = original->getASTContext().getIdentifier(
-        mangler.mangleAutoDiffAssociatedFunctionHelper(
-            original->getName(), AutoDiffAssociatedFunctionKind::JVP,
-            attr->getIndices())).str();
-  }
-  if (!jvpName.empty()) {
-    jvp = module.lookUpFunction(jvpName);
-    if (!jvp)
-      jvp = declareExternalAssociatedFunction(
-          original, attr, jvpName, AutoDiffAssociatedFunctionKind::JVP);
-    attr->setJVPName(jvpName);
-  }
+  Mangle::ASTMangler mangler;
+  auto jvpName = original->getASTContext().getIdentifier(
+      mangler.mangleAutoDiffAssociatedFunctionHelper(
+          original->getName(), AutoDiffAssociatedFunctionKind::JVP,
+          attr->getIndices())).str();
+  auto *jvp = module.lookUpFunction(jvpName);
+  if (!jvp)
+    jvp = declareExternalAssociatedFunction(
+        original, attr, jvpName, AutoDiffAssociatedFunctionKind::JVP);
 
   // If differentiation is triggered by `[differentiable]`, associated function
   // should share linkage of original function.
@@ -6048,27 +6042,14 @@ bool ADContext::processDifferentiableAttribute(
       invoker.getKind() ==
           DifferentiationInvoker::Kind::SILDifferentiableAttribute;
 
-  // Try to look up VJP only if attribute specifies VJP name or if original
-  // function is an external declaration. If VJP function cannot be found,
-  // create an external VJP reference.
-  StringRef vjpName;
-  SILFunction *vjp = nullptr;
-  if (attr->hasVJP()) {
-    vjpName = attr->getVJPName();
-  } else if (original->isExternalDeclaration()) {
-    Mangle::ASTMangler mangler;
-    vjpName = original->getASTContext().getIdentifier(
-        mangler.mangleAutoDiffAssociatedFunctionHelper(
-            original->getName(), AutoDiffAssociatedFunctionKind::VJP,
-            attr->getIndices())).str();
-  }
-  if (!vjpName.empty()) {
-    vjp = module.lookUpFunction(vjpName);
-    if (!vjp)
-      vjp = declareExternalAssociatedFunction(
-          original, attr, vjpName, AutoDiffAssociatedFunctionKind::VJP);
-    attr->setVJPName(vjpName);
-  }
+  auto vjpName = original->getASTContext().getIdentifier(
+      mangler.mangleAutoDiffAssociatedFunctionHelper(
+          original->getName(), AutoDiffAssociatedFunctionKind::VJP,
+          attr->getIndices())).str();
+  auto *vjp = module.lookUpFunction(vjpName);
+  if (!vjp)
+    vjp = declareExternalAssociatedFunction(
+        original, attr, vjpName, AutoDiffAssociatedFunctionKind::VJP);
 
   // If the JVP doesn't exist, need to synthesize it.
   auto vjpGenerated = false;

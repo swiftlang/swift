@@ -92,26 +92,8 @@ void SILFunctionBuilder::addFunctionAttributes(SILFunction *F,
           F->getASTContext(),
           decl->getInterfaceType()->castTo<AnyFunctionType>());
       SILAutoDiffIndices indices(/*source*/ 0, loweredParamIndices);
-      // Get JVP/VJP names.
-      std::string jvpName, vjpName;
-      auto &ctx = F->getASTContext();
-      if (auto *jvpFn = A->getJVPFunction()) {
-        Mangle::ASTMangler mangler;
-        jvpName = ctx.getIdentifier(
-            mangler.mangleAutoDiffAssociatedFunctionHelper(
-                constant.mangle(), AutoDiffAssociatedFunctionKind::JVP,
-                indices)).str();
-      }
-      if (auto *vjpFn = A->getVJPFunction()) {
-        Mangle::ASTMangler mangler;
-        vjpName = ctx.getIdentifier(
-            mangler.mangleAutoDiffAssociatedFunctionHelper(
-                constant.mangle(), AutoDiffAssociatedFunctionKind::VJP,
-                indices)).str();
-      }
       auto *silDiffAttr = SILDifferentiableAttr::create(
-          M, indices, A->getRequirements(), M.allocateCopy(jvpName),
-          M.allocateCopy(vjpName));
+          M, indices, A->getRequirements());
 #ifndef NDEBUG
       // Verify that no existing attributes have the same indices.
       for (auto *existingAttr : F->getDifferentiableAttrs()) {

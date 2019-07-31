@@ -433,27 +433,16 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   }
 
   // SWIFT_ENABLE_TENSORFLOW
-  auto &Ctx = F.getASTContext();
   for (auto *DA : F.getDifferentiableAttrs()) {
     unsigned differentiableAttrAbbrCode =
         SILAbbrCodes[SILDifferentiableAttrLayout::Code];
-
-    if (F.getModule().getStage() == SILStage::Canonical)
-      assert(DA->hasJVP() && DA->hasVJP() &&
-             "JVP and VJP must exist in canonical SIL");
 
     auto &indices = DA->getIndices();
     SmallVector<unsigned, 8> parameters(indices.parameters->begin(),
                                         indices.parameters->end());
     SILDifferentiableAttrLayout::emitRecord(
-        Out, ScratchRecord, differentiableAttrAbbrCode,
-        DA->hasJVP()
-            ? S.addDeclBaseNameRef(Ctx.getIdentifier(DA->getJVPName()))
-            : IdentifierID(),
-        DA->hasVJP()
-            ? S.addDeclBaseNameRef(Ctx.getIdentifier(DA->getVJPName()))
-            : IdentifierID(),
-        indices.source, parameters);
+        Out, ScratchRecord, differentiableAttrAbbrCode, indices.source,
+        parameters);
     S.writeGenericRequirements(DA->getRequirements(), SILAbbrCodes);
   }
 

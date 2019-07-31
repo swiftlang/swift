@@ -825,7 +825,6 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
               constant.asAutoDiffAssociatedFunction(id), jvpFn,
               expectedJVPType);
         }
-        silDiffAttr->setJVPName(jvpThunk->getName());
       }
       // Thunk VJP method, if it is defined.
       if (auto *vjpDecl = diffAttr->getVJPFunction()) {
@@ -842,7 +841,6 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
               constant.asAutoDiffAssociatedFunction(id), vjpFn,
               expectedVJPType);
         }
-        silDiffAttr->setVJPName(vjpThunk->getName());
       }
     }
   }

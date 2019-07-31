@@ -651,17 +651,12 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     assert(kind == SIL_DIFFERENTIABLE_ATTR &&
            "Missing differentiable attribute");
 
-    uint64_t jvpNameId;
-    uint64_t vjpNameId;
     unsigned source;
     ArrayRef<uint64_t> rawParameterIndices;
     SmallVector<Requirement, 8> requirements;
 
-    SILDifferentiableAttrLayout::readRecord(scratch, jvpNameId, vjpNameId,
-                                            source, rawParameterIndices);
-
-    StringRef jvpName = MF->getIdentifier(jvpNameId).str();
-    StringRef vjpName = MF->getIdentifier(vjpNameId).str();
+    SILDifferentiableAttrLayout::readRecord(
+        scratch, source, rawParameterIndices);
 
     SmallVector<unsigned, 8> parameterIndices(rawParameterIndices.begin(),
                                               rawParameterIndices.end());
@@ -671,8 +666,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     SILAutoDiffIndices indices(source, parameterIndexSubset);
     MF->readGenericRequirements(requirements, SILCursor);
 
-    auto *attr = SILDifferentiableAttr::create(SILMod, indices, requirements,
-                                               jvpName, vjpName);
+    auto *attr = SILDifferentiableAttr::create(SILMod, indices, requirements);
     fn->addDifferentiableAttr(attr);
   }
 

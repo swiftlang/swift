@@ -120,16 +120,14 @@ private:
 /// AD pass does not use or synthesize them.
 ///
 /// Example:
-///   sil [differentiable jvp @foo_jvp vjp @foo_vjp] @foo
-///     : $(Float) -> Float { ... }
+///   sil [differentiable wrt 0] @foo : $(Float) -> Float
+///   sil [differentiable wrt 0 where T : Differentiable] @foo : $(T) -> T
 class SILDifferentiableAttr final {
   friend SILFunction;
 
 private:
   /// The AD indices.
   SILAutoDiffIndices indices;
-  /// The JVP and VJP function names.
-  StringRef JVPName, VJPName;
   /// The trailing constraint clause.
   TrailingWhereClause *WhereClause = nullptr;
   /// The number of constraint clause requirements.
@@ -144,33 +142,19 @@ private:
   }
 
   SILDifferentiableAttr(const SILAutoDiffIndices &indices,
-                        StringRef jvpName,
-                        StringRef vjpName,
                         TrailingWhereClause *whereClause);
 
   SILDifferentiableAttr(const SILAutoDiffIndices &indices,
-                        StringRef jvpName,
-                        StringRef vjpName,
                         ArrayRef<Requirement> requirements);
 
 public:
   static SILDifferentiableAttr *create(
       SILModule &M, const SILAutoDiffIndices &indices,
-      StringRef jvpName = StringRef(), StringRef vjpName = StringRef(),
       TrailingWhereClause *whereClause = nullptr);
 
   static SILDifferentiableAttr *create(
       SILModule &M, const SILAutoDiffIndices &indices,
-      ArrayRef<Requirement> requirements, StringRef jvpName = StringRef(),
-      StringRef vjpName = StringRef());
-
-  bool hasJVP() const { return !JVPName.empty(); }
-  StringRef getJVPName() const { assert(hasJVP()); return JVPName; }
-  void setJVPName(StringRef name) { JVPName = name; }
-
-  bool hasVJP() const { return !VJPName.empty(); }
-  StringRef getVJPName() const { assert(hasVJP()); return VJPName; }
-  void setVJPName(StringRef name) { VJPName = name; }
+      ArrayRef<Requirement> requirements);
 
   SILFunction *getOriginal() const { return Original; }
 

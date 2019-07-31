@@ -59,48 +59,36 @@ void SILFunction::addSpecializeAttr(SILSpecializeAttr *Attr) {
 /// SWIFT_ENABLE_TENSORFLOW
 SILDifferentiableAttr::
 SILDifferentiableAttr(const SILAutoDiffIndices &indices,
-                      StringRef jvpName,
-                      StringRef vjpName,
                       TrailingWhereClause *whereClause)
-  : indices(indices), JVPName(jvpName), VJPName(vjpName),
-    WhereClause(whereClause),
+  : indices(indices), WhereClause(whereClause),
     NumRequirements(whereClause ? whereClause->getRequirements().size() : 0) {}
 
 SILDifferentiableAttr::
 SILDifferentiableAttr(const SILAutoDiffIndices &indices,
-                      StringRef jvpName,
-                      StringRef vjpName,
                       ArrayRef<Requirement> requirements)
-  : indices(indices), JVPName(jvpName), VJPName(vjpName),
-    NumRequirements(requirements.size()) {
+  : indices(indices), NumRequirements(requirements.size()) {
   std::copy(requirements.begin(), requirements.end(), getRequirementsData());
 }
 
 SILDifferentiableAttr *
 SILDifferentiableAttr::create(SILModule &M,
                               const SILAutoDiffIndices &indices,
-                              StringRef jvpName,
-                              StringRef vjpName,
                               TrailingWhereClause *whereClause) {
   unsigned size = sizeof(SILDifferentiableAttr);
   if (whereClause)
     size += whereClause->getRequirements().size() * sizeof(Requirement);
   void *mem = M.allocate(size, alignof(SILDifferentiableAttr));
-  return ::new (mem)
-      SILDifferentiableAttr(indices, jvpName, vjpName, whereClause);
+  return ::new (mem) SILDifferentiableAttr(indices, whereClause);
 }
 
 SILDifferentiableAttr *
 SILDifferentiableAttr::create(SILModule &M,
                               const SILAutoDiffIndices &indices,
-                              ArrayRef<Requirement> requirements,
-                              StringRef jvpName,
-                              StringRef vjpName) {
+                              ArrayRef<Requirement> requirements) {
   unsigned size = sizeof(SILDifferentiableAttr) +
       requirements.size() * sizeof(Requirement);
   void *mem = M.allocate(size, alignof(SILDifferentiableAttr));
-  return ::new (mem)
-      SILDifferentiableAttr(indices, jvpName, vjpName, requirements);
+  return ::new (mem) SILDifferentiableAttr(indices, requirements);
 }
 
 void SILDifferentiableAttr::setRequirements(

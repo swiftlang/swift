@@ -3124,12 +3124,6 @@ void SILDifferentiableAttr::print(llvm::raw_ostream &OS) const {
   interleave(indices.parameters->getIndices(),
              [&](unsigned index) { OS << index; },
              [&] { OS << ", "; });
-  if (!JVPName.empty()) {
-    OS << " jvp @" << JVPName;
-  }
-  if (!VJPName.empty()) {
-    OS << " vjp @" << VJPName;
-  }
   if (!getRequirements().empty()) {
     OS << " where ";
     SILFunction *original = getOriginal();
