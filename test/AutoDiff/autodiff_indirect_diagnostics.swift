@@ -89,10 +89,6 @@ let _: @differentiable (Float) -> TF_687<Any> = { x in TF_687<Any>(x, dummy: x) 
 // Add `Differentiable` conformance for generic wrt parameters
 //===----------------------------------------------------------------------===//
 
-// FIXME(TF-697): The tests below were fixed by
-// https://github.com/apple/swift/pull/26406, which was reverted because it
-// introduced TF-697.
-/*
 func id<T>(_ x: T) -> T { x }
 let _: @differentiable (Float) -> Float = { x in id(x) }
 
@@ -107,4 +103,3 @@ extension TF_691: Differentiable where Scalar: Differentiable {}
 func identity<T>(_ x: TF_691<T>) -> TF_691<T> { x }
 let _: @differentiable (Float) -> TF_691<Float> = { x in identity(TF_691(x)) }
 let _: @differentiable (Float) -> TF_691<Float> = { x in id(TF_691(x)) }
-*/

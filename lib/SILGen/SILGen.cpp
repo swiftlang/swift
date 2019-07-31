@@ -816,8 +816,7 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
         auto *jvpFn = getFunction(SILDeclRef(jvpDecl), NotForDefinition);
         if (jvpFn->getLoweredFunctionType() != expectedJVPType) {
           jvpThunk = getOrCreateAutoDiffAssociatedFunctionThunk(
-              F, indices, jvpFn, AutoDiffAssociatedFunctionKind::JVP,
-              jvpFn->isSerialized());
+              F, indices, jvpFn, AutoDiffAssociatedFunctionKind::JVP);
         } else {
           auto *id = AutoDiffAssociatedFunctionIdentifier::get(
               AutoDiffAssociatedFunctionKind::JVP, /*differentiationOrder*/ 1,
@@ -836,8 +835,7 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
         auto *vjpFn = getFunction(SILDeclRef(vjpDecl), NotForDefinition);
         if (vjpFn->getLoweredFunctionType() != expectedVJPType) {
           vjpThunk = getOrCreateAutoDiffAssociatedFunctionThunk(
-              F, indices, vjpFn, AutoDiffAssociatedFunctionKind::VJP,
-              vjpFn->isSerialized());
+              F, indices, vjpFn, AutoDiffAssociatedFunctionKind::VJP);
         } else {
           auto *id = AutoDiffAssociatedFunctionIdentifier::get(
               AutoDiffAssociatedFunctionKind::VJP, /*differentiationOrder*/ 1,
