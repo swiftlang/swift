@@ -1169,7 +1169,7 @@ public:
         assert(isa<CaseStmt>(initialCaseVarDecl->getParentPatternStmt()));
 
         if (vd->hasType() && initialCaseVarDecl->hasType() &&
-            !initialCaseVarDecl->isInvalid() &&
+            !initialCaseVarDecl->isInvalid() && !vd->isInvalid() &&
             !vd->getType()->isEqual(initialCaseVarDecl->getType())) {
           TC.diagnose(vd->getLoc(), diag::type_mismatch_multiple_pattern_list,
                       vd->getType(), initialCaseVarDecl->getType());
