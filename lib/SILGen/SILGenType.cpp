@@ -110,13 +110,13 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
       SILDeclRef assocRef(assocDecl, SILDeclRef::Kind::Func);
       implFn = getFunction(assocRef, NotForDefinition);
     }
-    // Otherwise, create an autodiff thunk. The thunk contains an
+    // Otherwise, create an autodiff vtable entry thunk. The thunk contains an
     // `autodiff_function` instruction, which is later filled during
     // differentiation transform.
     // TODO(TF-524): Generalize canonical JVP/VJP thunk generation.
     else {
-      implFn =
-          getAutoDiffThunk(derived, Types.getConstantInfo(derived).SILFnType);
+      implFn = getOrCreateAutoDiffClassMethodThunk(
+          derived, Types.getConstantInfo(derived).SILFnType);
     }
   // SWIFT_ENABLE_TENSORFLOW END
   } else {

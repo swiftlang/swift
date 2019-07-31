@@ -78,30 +78,6 @@ template <typename T> static inline void debugDump(T &v) {
                           << v << "\n==== END DEBUG DUMP ====\n");
 }
 
-/// Creates arguments in the entry block based on the function type.
-static void createEntryArguments(SILFunction *f) {
-  auto *entry = f->getEntryBlock();
-  auto conv = f->getConventions();
-  auto &ctx = f->getASTContext();
-  auto moduleDecl = f->getModule().getSwiftModule();
-  assert((entry->getNumArguments() == 0 || conv.getNumSILArguments() == 0) &&
-         "Entry already has arguments?!");
-  auto createFunctionArgument = [&](SILType type) {
-    // Create a dummy parameter declaration.
-    // Necessary to prevent crash during argument explosion optimization.
-    auto loc = f->getLocation().getSourceLoc();
-    auto *decl = new (ctx)
-        ParamDecl(ParamDecl::Specifier::Default, loc, loc, Identifier(), loc,
-                  Identifier(), moduleDecl);
-    decl->setType(type.getASTType());
-    entry->createFunctionArgument(type, decl);
-  };
-  for (auto indResTy : conv.getIndirectSILResultTypes())
-    createFunctionArgument(f->mapTypeIntoContext(indResTy).getAddressType());
-  for (auto paramTy : conv.getParameterSILTypes())
-    createFunctionArgument(f->mapTypeIntoContext(paramTy));
-}
-
 static bool isWithoutDerivative(SILValue v) {
   if (auto *fnRef = dyn_cast<FunctionRefInst>(v))
     return fnRef->getReferencedFunctionOrNull()->hasSemanticsAttr(
@@ -241,6 +217,19 @@ getAssociatedFunctionGenericSignature(SILDifferentiableAttr *attr,
       GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
   for (auto &req : attr->getRequirements())
     builder.addRequirement(req, source, original->getModule().getSwiftModule());
+  // Constrain all wrt parameters to conform to `Differentiable`.
+  auto &ctx = original->getASTContext();
+  auto *diffableProto = ctx.getProtocol(KnownProtocolKind::Differentiable);
+  auto paramIndexSet = attr->getIndices().parameters;
+  for (unsigned paramIdx : paramIndexSet->getIndices()) {
+    if (!paramIndexSet->contains(paramIdx))
+      continue;
+    auto paramType =
+        original->getConventions().getSILArgumentType(paramIdx).getASTType();
+    Requirement req(RequirementKind::Conformance, paramType,
+                    diffableProto->getDeclaredType());
+    builder.addRequirement(req, source, original->getModule().getSwiftModule());
+  }
   return std::move(builder)
       .computeGenericSignature(SourceLoc(), /*allowConcreteGenericParams=*/true)
       ->getCanonicalSignature();
@@ -731,64 +720,6 @@ void DifferentiationInvoker::print(llvm::raw_ostream &os) const {
   }
   }
   os << ')';
-}
-
-// Check whether the given requirements are satisfied, with the given
-// substitution map and in the given module.
-static bool checkRequirementsSatisfied(
-    ArrayRef<Requirement> requirements, SubstitutionMap substMap,
-    SILFunction *original, ModuleDecl *swiftModule) {
-  if (requirements.empty())
-    return true;
-  // Iterate through all requirements and check whether they are satisfied.
-  SmallVector<Requirement, 2> unsatisfiedRequirements;
-  for (auto req : requirements) {
-    auto firstType = req.getFirstType();
-    auto secondType = req.getSecondType();
-    // Substitute first and second types using the given substitution map,
-    // looking up conformances in the current module, if possible.
-    if (auto substFirstType =
-            firstType.subst(QuerySubstitutionMap{substMap},
-                            LookUpConformanceInModule(swiftModule))) {
-      firstType = substFirstType;
-    }
-    if (auto substSecondType =
-            secondType.subst(QuerySubstitutionMap{substMap},
-                             LookUpConformanceInModule(swiftModule))) {
-      secondType = substSecondType;
-    }
-    switch (req.getKind()) {
-    // Check same type requirements.
-    case RequirementKind::SameType:
-      // If the first type does not equal the second type, then record the
-      // unsatisfied requirement.
-      if (!firstType->isEqual(secondType))
-        unsatisfiedRequirements.push_back(req);
-      continue;
-    // Check conformance requirements.
-    case RequirementKind::Conformance: {
-      auto protocolType = req.getSecondType()->castTo<ProtocolType>();
-      auto protocol = protocolType->getDecl();
-      assert(protocol && "Expected protocol in generic signature requirement");
-      // If the first type does not conform to the second type in the current
-      // module, then record the unsatisfied requirement.
-      if (!swiftModule->lookupConformance(firstType, protocol))
-        unsatisfiedRequirements.push_back(req);
-      continue;
-    }
-    // Ignore other requirements (superclass and layout).
-    // Layout requirements are rejected during type-checking.
-    default:
-      continue;
-    }
-  }
-  // Diagnose unsatisfied requirements.
-  for (auto req : unsatisfiedRequirements) {
-    LLVM_DEBUG(auto &s = getADDebugStream() << "Unsatisfied requirement:\n";
-               req.print(s, PrintOptions());
-               s << '\n');
-  }
-  return unsatisfiedRequirements.empty();
 }
 
 //===----------------------------------------------------------------------===//
@@ -1877,6 +1808,73 @@ static bool diagnoseUnsupportedControlFlow(ADContext &context,
   return false;
 }
 
+/// Check whether the given requirements are satisfied, with the given original
+/// function and substitution map. Returns true if error is emitted.
+static bool diagnoseUnsatisfiedRequirements(ADContext &context,
+                                            ArrayRef<Requirement> requirements,
+                                            SILFunction *original,
+                                            SubstitutionMap substMap,
+                                            DifferentiationInvoker invoker,
+                                            SourceLoc loc) {
+  if (requirements.empty())
+    return false;
+  auto *swiftModule = context.getModule().getSwiftModule();
+  // Iterate through all requirements and check whether they are satisfied.
+  SmallVector<Requirement, 2> unsatisfiedRequirements;
+  for (auto req : requirements) {
+    auto firstType = req.getFirstType();
+    auto secondType = req.getSecondType();
+    // Substitute first and second types using the given substitution map,
+    // looking up conformances in the current module, if possible.
+    if (auto substFirstType =
+            firstType.subst(QuerySubstitutionMap{substMap},
+                            LookUpConformanceInModule(swiftModule))) {
+      firstType = substFirstType;
+    }
+    if (auto substSecondType =
+            secondType.subst(QuerySubstitutionMap{substMap},
+                             LookUpConformanceInModule(swiftModule))) {
+      secondType = substSecondType;
+    }
+    switch (req.getKind()) {
+    // Check same type requirements.
+    case RequirementKind::SameType:
+      // If the first type does not equal the second type, then record the
+      // unsatisfied requirement.
+      if (!firstType->isEqual(secondType))
+        unsatisfiedRequirements.push_back(req);
+      continue;
+    // Check conformance requirements.
+    case RequirementKind::Conformance: {
+      auto protocolType = req.getSecondType()->castTo<ProtocolType>();
+      auto protocol = protocolType->getDecl();
+      assert(protocol && "Expected protocol in generic signature requirement");
+      // If the first type does not conform to the second type in the current
+      // module, then record the unsatisfied requirement.
+      if (!swiftModule->lookupConformance(firstType, protocol))
+        unsatisfiedRequirements.push_back(req);
+      continue;
+    }
+    // Ignore other requirements (superclass and layout).
+    // Layout requirements are rejected during type-checking.
+    default:
+      continue;
+    }
+  }
+  if (unsatisfiedRequirements.empty())
+    return false;
+  // Diagnose unsatisfied requirements.
+  std::string reqText;
+  llvm::raw_string_ostream stream(reqText);
+  interleave(unsatisfiedRequirements,
+             [&](Requirement req) { req.print(stream, PrintOptions()); },
+             [&] { stream << ", "; });
+  context.emitNondifferentiabilityError(
+      loc, invoker, diag::autodiff_function_assoc_func_unmet_requirements,
+      stream.str());
+  return true;
+}
+
 //===----------------------------------------------------------------------===//
 // Code emission utilities
 //===----------------------------------------------------------------------===//
@@ -2057,7 +2055,7 @@ emitAssociatedFunctionReference(
     auto substMap = getSubstitutionMap(original);
     // Attempt to look up a `[differentiable]` attribute that minimally
     // satisfies the specified indices.
-    // TODO(TF-482): Change `lookupMinimalDifferentiableAttr` to additionally
+    // TODO(TF-482): Change `lookUpMinimalDifferentiableAttr` to additionally
     // check whether `[differentiable]` attribute generic requirements are
     // satisfied.
     auto *minimalAttr =
@@ -2112,14 +2110,11 @@ emitAssociatedFunctionReference(
     }
     assert(minimalAttr);
     // TODO(TF-482): Move generic requirement checking logic to
-    // `lookupMinimalDifferentiableAttr`.
-    if (!checkRequirementsSatisfied(
-            minimalAttr->getRequirements(),
-            substMap, originalFn, context.getModule().getSwiftModule())) {
-      context.emitNondifferentiabilityError(original, invoker,
-          diag::autodiff_function_assoc_func_requirements_unmet);
+    // `lookUpMinimalDifferentiableAttr`.
+    if (diagnoseUnsatisfiedRequirements(context, minimalAttr->getRequirements(),
+                                        originalFn, substMap, invoker,
+                                        original.getLoc().getSourceLoc()))
       return None;
-    }
     if (context.processDifferentiableAttribute(
             originalFn, minimalAttr, invoker))
       return None;
@@ -2868,11 +2863,17 @@ public:
     auto origTy = original->getLoweredFunctionType();
     auto lookupConformance = LookUpConformanceInModule(module.getSwiftModule());
 
+    auto pbGenericSig = getAssociatedFunctionGenericSignature(attr, original);
+
     // RAII that pushes the original function's generic signature to
     // `module.Types` so that the calls `module.Types.getTypeLowering()` below
-    // will know the original function's generic parameter types.
+    // will know the pullback's generic parameter types.
     Lowering::GenericContextScope genericContextScope(
-        module.Types, origTy->getGenericSignature());
+        module.Types, pbGenericSig);
+
+    auto *pbGenericEnv = pbGenericSig
+        ? pbGenericSig->createGenericEnvironment()
+        : nullptr;
 
     // Given a type, returns its formal SIL parameter info.
     auto getTangentParameterInfoForOriginalResult = [&](
@@ -2959,14 +2960,11 @@ public:
               ->getCanonicalType(), origParam.getConvention()));
     }
 
-    auto pbName = original->getASTContext()
-                       .getIdentifier("AD__" + original->getName().str() +
-                                      "__pullback_" + indices.mangle())
-                       .str();
-    auto pbGenericSig = getAssociatedFunctionGenericSignature(attr, original);
-    auto *pbGenericEnv = pbGenericSig
-        ? pbGenericSig->createGenericEnvironment()
-        : nullptr;
+    Mangle::ASTMangler mangler;
+    auto pbName = original->getASTContext().getIdentifier(
+        mangler.mangleAutoDiffLinearMapHelper(
+            original->getName(), AutoDiffLinearMapKind::Pullback,
+            indices)).str();
     auto pbType = SILFunctionType::get(
         pbGenericSig, origTy->getExtInfo(), origTy->getCoroutineKind(),
         origTy->getCalleeConvention(), pbParams, {}, adjResults, None,
@@ -2981,9 +2979,8 @@ public:
         original->isBare(), IsNotTransparent, original->isSerialized(),
         original->isDynamicallyReplaceable());
     pullback->setOwnershipEliminated();
-    pullback->setDebugScope(new (module)
-                                SILDebugScope(original->getLocation(),
-                                              pullback));
+    pullback->setDebugScope(
+        new (module) SILDebugScope(original->getLocation(), pullback));
     return pullback;
   }
 
@@ -3289,7 +3286,7 @@ public:
     auto original = getOpValue(ai->getCallee());
     auto functionSource = original;
     SILValue vjpValue;
-    // If functionSource is a @differentiable function, just extract it.
+    // If `functionSource` is a `@differentiable` function, just extract it.
     auto originalFnTy = original->getType().castTo<SILFunctionType>();
     if (originalFnTy->isDifferentiable()) {
       auto paramIndices = originalFnTy->getDifferentiationParameterIndices();
@@ -3306,27 +3303,36 @@ public:
           /*differentiationOrder*/ 1, functionSource);
     }
 
-    // Check and diagnose non-differentiable arguments.
-    for (unsigned paramIndex : range(originalFnTy->getNumParameters())) {
-      if (indices.isWrtParameter(paramIndex) &&
-              !originalFnTy->getParameters()[paramIndex]
-              .getSILStorageType()
-              .isDifferentiable(getModule())) {
-        context.emitNondifferentiabilityError(
-            original, invoker, diag::autodiff_nondifferentiable_argument);
-        errorOccurred = true;
-        return;
-      }
-    }
-    // Check and diagnose non-differentiable results.
-    if (!originalFnTy->getResults()[indices.source]
-            .getSILStorageType()
-            .isDifferentiable(getModule())) {
-      context.emitNondifferentiabilityError(
-          original, invoker, diag::autodiff_nondifferentiable_result);
-      errorOccurred = true;
+    // Check and diagnose non-differentiable original function type.
+    auto diagnoseNondifferentiableOriginalFunctionType =
+        [&](CanSILFunctionType origFnTy) {
+          // Check and diagnose non-differentiable arguments.
+          for (unsigned paramIndex : range(originalFnTy->getNumParameters())) {
+            if (indices.isWrtParameter(paramIndex) &&
+                    !originalFnTy->getParameters()[paramIndex]
+                    .getSILStorageType()
+                    .isDifferentiable(getModule())) {
+              context.emitNondifferentiabilityError(
+                  ai->getArgumentsWithoutIndirectResults()[paramIndex], invoker,
+                  diag::autodiff_nondifferentiable_argument);
+              errorOccurred = true;
+              return true;
+            }
+          }
+          // Check and diagnose non-differentiable results.
+          if (!originalFnTy->getResults()[indices.source]
+                  .getSILStorageType()
+                  .isDifferentiable(getModule())) {
+            context.emitNondifferentiabilityError(
+                original, invoker, diag::autodiff_nondifferentiable_result);
+            errorOccurred = true;
+            return true;
+          }
+          return false;
+        };
+    if (diagnoseNondifferentiableOriginalFunctionType(originalFnTy))
       return;
-    }
+
     // If VJP has not yet been found, emit an `autodiff_function` instruction
     // on the remapped original function operand and `autodiff_function_extract`
     // the VJP. The actual JVP/VJP functions will be populated in the
@@ -3357,6 +3363,10 @@ public:
             ai->getLoc(), original, substMap, {},
             ParameterConvention::Direct_Guaranteed);
         original = vjpPartialApply;
+        originalFnTy = original->getType().castTo<SILFunctionType>();
+        // Diagnose if new original function type is non-differentiable.
+        if (diagnoseNondifferentiableOriginalFunctionType(originalFnTy))
+          return;
       }
 
       auto *autoDiffFuncInst = context.createAutoDiffFunction(
@@ -3366,6 +3376,8 @@ public:
 
       // Record the `autodiff_function` instruction.
       context.getAutoDiffFunctionInsts().push_back(autoDiffFuncInst);
+      // TODO(TF-689): Make `autodiff_function` store result indices and remove
+      // `ADContext::resultIndices`.
       context.getResultIndices()[autoDiffFuncInst] =
           activeResultIndices.front();
 
@@ -3460,7 +3472,7 @@ public:
   void visitAutoDiffFunctionInst(AutoDiffFunctionInst *adfi) {
     // Clone `autodiff_function` from original to VJP, then add the cloned
     // instruction to the `autodiff_function` worklist.
-    SILClonerWithScopes::visitAutoDiffFunctionInst(adfi);
+    TypeSubstCloner::visitAutoDiffFunctionInst(adfi);
     auto *newADFI = cast<AutoDiffFunctionInst>(getOpValue(adfi));
     context.getAutoDiffFunctionInsts().push_back(newADFI);
   }
@@ -3524,12 +3536,6 @@ public:
     auto origTy = original->getLoweredFunctionType();
     auto lookupConformance = LookUpConformanceInModule(module.getSwiftModule());
 
-    // RAII that pushes the original function's generic signature to
-    // `module.Types` so that the calls `module.Types.getTypeLowering()` below
-    // will know the original function's generic parameter types.
-    Lowering::GenericContextScope genericContextScope(
-        module.Types, origTy->getGenericSignature());
-
     SmallVector<SILParameterInfo, 8> diffParams;
     SmallVector<SILResultInfo, 8> diffResults;
     auto origParams = origTy->getParameters();
@@ -3550,12 +3556,19 @@ public:
               ->getAutoDiffAssociatedTangentSpace(lookupConformance)
               ->getCanonicalType(), origParam.getConvention()));
     }
-
-    auto diffName = original->getASTContext()
-        .getIdentifier("AD__" + original->getName().str() + "__differential_" +
-                       indices.mangle())
-        .str();
+    Mangle::ASTMangler mangler;
+    auto diffName = original->getASTContext().getIdentifier(
+        mangler.mangleAutoDiffLinearMapHelper(
+            original->getName(), AutoDiffLinearMapKind::Differential,
+            indices)).str();
     auto diffGenericSig = getAssociatedFunctionGenericSignature(attr, original);
+
+    // RAII that pushes the original function's generic signature to
+    // `module.Types` so that the calls `module.Types.getTypeLowering()` below
+    // will know the differential's generic parameter types.
+    Lowering::GenericContextScope genericContextScope(
+        module.Types, diffGenericSig);
+
     auto *diffGenericEnv = diffGenericSig
         ? diffGenericSig->createGenericEnvironment()
         : nullptr;
@@ -3654,7 +3667,7 @@ public:
   void visitAutoDiffFunctionInst(AutoDiffFunctionInst *adfi) {
     // Clone `autodiff_function` from original to JVP, then add the cloned
     // instruction to the `autodiff_function` worklist.
-    SILClonerWithScopes::visitAutoDiffFunctionInst(adfi);
+    TypeSubstCloner::visitAutoDiffFunctionInst(adfi);
     auto *newADFI = cast<AutoDiffFunctionInst>(getOpValue(adfi));
     context.getAutoDiffFunctionInsts().push_back(newADFI);
   }
@@ -5918,10 +5931,11 @@ static SILFunction *createEmptyVJP(
   auto indices = attr->getIndices();
 
   // === Create an empty VJP. ===
-  auto vjpName = original->getASTContext()
-                     .getIdentifier("AD__" + original->getName().str() +
-                                    "__vjp_" + indices.mangle())
-                     .str();
+  Mangle::ASTMangler mangler;
+  auto vjpName = original->getASTContext().getIdentifier(
+      mangler.mangleAutoDiffAssociatedFunctionHelper(
+          original->getName(), AutoDiffAssociatedFunctionKind::VJP, indices))
+              .str();
   auto vjpGenericSig = getAssociatedFunctionGenericSignature(attr, original);
 
   // RAII that pushes the original function's generic signature to
@@ -5968,15 +5982,16 @@ static SILFunction *createEmptyJVP(
   auto indices = attr->getIndices();
 
   // === Create an empty JVP. ===
-  auto jvpName = original->getASTContext()
-      .getIdentifier("AD__" + original->getName().str() +
-                     "__jvp_" + indices.mangle())
-      .str();
+  Mangle::ASTMangler mangler;
+  auto jvpName = original->getASTContext().getIdentifier(
+      mangler.mangleAutoDiffAssociatedFunctionHelper(
+          original->getName(), AutoDiffAssociatedFunctionKind::JVP, indices))
+              .str();
   auto jvpGenericSig = getAssociatedFunctionGenericSignature(attr, original);
 
   // RAII that pushes the original function's generic signature to
   // `module.Types` so that the calls `module.Types.getTypeLowering()` below
-  // will know the VJP's generic parameter types.
+  // will know the JVP's generic parameter types.
   Lowering::GenericContextScope genericContextScope(
       module.Types, jvpGenericSig);
 
@@ -6017,10 +6032,11 @@ bool ADContext::processDifferentiableAttribute(
   if (attr->hasJVP()) {
     jvpName = attr->getJVPName();
   } else if (original->isExternalDeclaration()) {
-    jvpName = original->getASTContext()
-                  .getIdentifier("AD__" + original->getName().str() +
-                                 "__jvp_" + attr->getIndices().mangle())
-                  .str();
+    Mangle::ASTMangler mangler;
+    jvpName = original->getASTContext().getIdentifier(
+        mangler.mangleAutoDiffAssociatedFunctionHelper(
+            original->getName(), AutoDiffAssociatedFunctionKind::JVP,
+            attr->getIndices())).str();
   }
   if (!jvpName.empty()) {
     jvp = module.lookUpFunction(jvpName);
@@ -6044,10 +6060,11 @@ bool ADContext::processDifferentiableAttribute(
   if (attr->hasVJP()) {
     vjpName = attr->getVJPName();
   } else if (original->isExternalDeclaration()) {
-    vjpName = original->getASTContext()
-                  .getIdentifier("AD__" + original->getName().str() +
-				                         "__vjp_" + attr->getIndices().mangle())
-                  .str();
+    Mangle::ASTMangler mangler;
+    vjpName = original->getASTContext().getIdentifier(
+        mangler.mangleAutoDiffAssociatedFunctionHelper(
+            original->getName(), AutoDiffAssociatedFunctionKind::VJP,
+            attr->getIndices())).str();
   }
   if (!vjpName.empty()) {
     vjp = module.lookUpFunction(vjpName);
@@ -6142,7 +6159,7 @@ ADContext::getOrCreateSubsetParametersThunkForLinearMap(
       /*withoutActuallyEscaping*/ true,
       DifferentiationThunkKind::Reabstraction);
 
-  // TODO: Use more principled mangling.
+  // TODO(TF-685): Use more principled mangling for thunks.
   std::string thunkName;
   switch (kind) {
     case AutoDiffAssociatedFunctionKind::JVP:
@@ -6408,7 +6425,7 @@ ADContext::getOrCreateSubsetParametersThunkForAssociatedFunction(
         ->getAbstractFunctionDecl()->getNameStr();
   }
   assert(!origName.empty() && "Original function name could not be resolved");
-  // TODO: Use more principled mangling.
+  // TODO(TF-685): Use more principled mangling for thunks.
   std::string thunkName;
   switch (kind) {
     case AutoDiffAssociatedFunctionKind::JVP:
@@ -6531,6 +6548,7 @@ SILValue ADContext::promoteToDifferentiableFunction(
     if (auto *thunkRef = dyn_cast<FunctionRefInst>(ai->getCallee())) {
       SILAutoDiffIndices desiredIndices(resultIndex, parameterIndices);
       auto *thunk = thunkRef->getReferencedFunctionOrNull();
+      // TODO(TF-685): Use more principled mangling for thunks.
       auto newThunkName = "AD__" + thunk->getName().str() +
           "__differentiable_curry_thunk_" + desiredIndices.mangle();
 
@@ -6560,10 +6578,12 @@ SILValue ADContext::promoteToDifferentiableFunction(
         // returned function value with an `autodiff_function` instruction,
         // and process the `autodiff_function` instruction.
         if (newThunk->empty()) {
+          if (auto newThunkGenSig = thunkType->getGenericSignature())
+            newThunk->setGenericEnvironment(
+                newThunkGenSig->createGenericEnvironment());
           newThunk->setOwnershipEliminated();
-          SILFunctionCloner cloner(newThunk);
-          cloner.cloneFunction(thunk);
-
+          BasicTypeSubstCloner cloner(thunk, newThunk);
+          cloner.run();
           auto *retInst =
               cast<ReturnInst>(newThunk->findReturnBB()->getTerminator());
           SILBuilder thunkBuilder(retInst);

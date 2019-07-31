@@ -459,9 +459,9 @@ NOTE(autodiff_member_subset_indices_not_differentiable,none,
      "arguments", ())
 NOTE(autodiff_function_nondiff_parameter_not_differentiable,none,
      "cannot differentiate with respect to a '@nondiff' parameter", ())
-NOTE(autodiff_function_assoc_func_requirements_unmet,none,
+NOTE(autodiff_function_assoc_func_unmet_requirements,none,
      "function call is not differentiable because generic requirements are not "
-     "met", ())
+     "met: '%0'", (StringRef))
 NOTE(autodiff_opaque_function_not_differentiable,none,
      "opaque non-'@differentiable' function is not differentiable", ())
 NOTE(autodiff_property_not_differentiable,none,

@@ -369,6 +369,52 @@ std::string ASTMangler::mangleReabstractionThunkHelper(
   return finalize();
 }
 
+std::string ASTMangler::mangleAutoDiffAssociatedFunctionHelper(
+    StringRef name, AutoDiffAssociatedFunctionKind kind,
+    const SILAutoDiffIndices &indices) {
+  // TODO(TF-20): Make the mangling scheme robust.
+  // TODO(TF-680): Mangle `@differentiable` atttribute requirements as well.
+  beginManglingWithoutPrefix();
+
+  Buffer << "AD__" << name << '_';
+  switch (kind) {
+  case AutoDiffAssociatedFunctionKind::JVP:
+    Buffer << "_jvp_";
+    break;
+  case AutoDiffAssociatedFunctionKind::VJP:
+    Buffer << "_vjp_";
+    break;
+  }
+  Buffer << indices.mangle();
+
+  auto result = Storage.str().str();
+  Storage.clear();
+  return result;
+}
+
+std::string ASTMangler::mangleAutoDiffLinearMapHelper(
+    StringRef name, AutoDiffLinearMapKind kind,
+    const SILAutoDiffIndices &indices) {
+  // TODO(TF-20): Make the mangling scheme robust.
+  // TODO(TF-680): Mangle `@differentiable` atttribute requirements as well.
+  beginManglingWithoutPrefix();
+
+  Buffer << "AD__" << name << '_';
+  switch (kind) {
+  case AutoDiffLinearMapKind::Differential:
+    Buffer << "_differential_";
+    break;
+  case AutoDiffLinearMapKind::Pullback:
+    Buffer << "_pullback_";
+    break;
+  }
+  Buffer << indices.mangle();
+
+  auto result = Storage.str().str();
+  Storage.clear();
+  return result;
+}
+
 std::string ASTMangler::mangleTypeForDebugger(Type Ty, const DeclContext *DC) {
   PrettyStackTraceType prettyStackTrace(Ty->getASTContext(),
                                         "mangling type for debugger", Ty);

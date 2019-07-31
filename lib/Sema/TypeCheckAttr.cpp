@@ -2600,9 +2600,14 @@ static bool conformsToDifferentiable(Type type, DeclContext *DC) {
   auto &ctx = type->getASTContext();
   auto *differentiableProto =
       ctx.getProtocol(KnownProtocolKind::Differentiable);
-  return TypeChecker::conformsToProtocol(type, differentiableProto, DC,
-                                         ConformanceCheckFlags::InExpression)
-      .hasValue();
+  auto conf = TypeChecker::conformsToProtocol(
+      type, differentiableProto, DC, ConformanceCheckFlags::InExpression);
+  if (!conf)
+    return false;
+  // Try to get the `TangentVector` type witness, in case the conformance has
+  // not been fully checked and the type witness cannot be resolved.
+  Type tanType = conf->getTypeWitnessByName(type, ctx.Id_TangentVector);
+  return !tanType.isNull();
 };
 
 // SWIFT_ENABLE_TENSORFLOW

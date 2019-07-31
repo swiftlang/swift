@@ -546,6 +546,20 @@ struct AutoDiffAssociatedFunctionKind {
   operator innerty() const { return rawValue; }
 };
 
+/// The kind of an linear map.
+struct AutoDiffLinearMapKind {
+  enum innerty : uint8_t {
+     // The differential function.
+     Differential = 0,
+     // The pullback function.
+     Pullback = 1
+  } rawValue;
+
+  AutoDiffLinearMapKind() = default;
+  AutoDiffLinearMapKind(innerty rawValue) : rawValue(rawValue) {}
+  operator innerty() const { return rawValue; }
+};
+
 /// In conjunction with the original function decl, identifies an associated
 /// autodiff function.
 ///

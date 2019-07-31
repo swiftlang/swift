@@ -176,43 +176,216 @@ LeakCheckingTests.testWithLeakChecking("NestedVarTuples") {
 LeakCheckingTests.testWithLeakChecking("ClassMethods") {
   class Super {
     @differentiable(wrt: x, jvp: jvpf, vjp: vjpf)
-    func f(_ x: Float) -> Float {
+    func f(_ x: Tracked<Float>) -> Tracked<Float> {
       return 2 * x
     }
-    final func jvpf(_ x: Float) -> (Float, (Float) -> Float) {
+    final func jvpf(_ x: Tracked<Float>) -> (Tracked<Float>, (Tracked<Float>) -> Tracked<Float>) {
       return (f(x), { v in 2 * v })
     }
-    final func vjpf(_ x: Float) -> (Float, (Float) -> Float) {
+    final func vjpf(_ x: Tracked<Float>) -> (Tracked<Float>, (Tracked<Float>) -> Tracked<Float>) {
       return (f(x), { v in 2 * v })
     }
   }
 
   class SubOverride : Super {
     @differentiable(wrt: x)
-    override func f(_ x: Float) -> Float {
+    override func f(_ x: Tracked<Float>) -> Tracked<Float> {
       return 3 * x
     }
   }
 
   class SubOverrideCustomDerivatives : Super {
     @differentiable(wrt: x, jvp: jvpf2, vjp: vjpf2)
-    override func f(_ x: Float) -> Float {
+    override func f(_ x: Tracked<Float>) -> Tracked<Float> {
       return 3 * x
     }
-    final func jvpf2(_ x: Float) -> (Float, (Float) -> Float) {
+    final func jvpf2(_ x: Tracked<Float>) -> (Tracked<Float>, (Tracked<Float>) -> Tracked<Float>) {
       return (f(x), { v in 3 * v })
     }
-    final func vjpf2(_ x: Float) -> (Float, (Float) -> Float) {
+    final func vjpf2(_ x: Tracked<Float>) -> (Tracked<Float>, (Tracked<Float>) -> Tracked<Float>) {
       return (f(x), { v in 3 * v })
     }
   }
 
-  func classValueWithGradient(_ c: Super) -> (Float, Float) {
-    return valueWithGradient(at: 1) { c.f($0) }
+  func classValueWithGradient(_ c: Super) -> (Tracked<Float>, Tracked<Float>) {
+    return Tracked<Float>(1).valueWithGradient { c.f($0) }
   }
   expectEqual((2, 2), classValueWithGradient(Super()))
   expectEqual((3, 3), classValueWithGradient(SubOverride()))
   expectEqual((3, 3), classValueWithGradient(SubOverrideCustomDerivatives()))
+}
+
+protocol TF_508_Proto {
+  associatedtype Scalar
+}
+extension TF_508_Proto where Scalar : FloatingPoint {
+  @differentiable(
+    jvp: jvpAdd, vjp: vjpAdd
+    where Self : Differentiable, Scalar : Differentiable,
+          // Conformance requirement with dependent member type.
+          Self.TangentVector : TF_508_Proto
+  )
+  static func +(lhs: Self, rhs: Self) -> Self {
+    return lhs
+  }
+
+  @differentiable(
+    jvp: jvpSubtract, vjp: vjpSubtract
+    where Self : Differentiable, Scalar : Differentiable,
+          // Same-type requirement with dependent member type.
+          Self.TangentVector == TF_508_Struct<Float>
+  )
+  func subtract(_ other: Self) -> Self {
+    return self
+  }
+}
+extension TF_508_Proto where Self : Differentiable,
+                             Scalar : FloatingPoint & Differentiable,
+                             Self.TangentVector : TF_508_Proto {
+  static func jvpAdd(lhs: Self, rhs: Self)
+    -> (Self, (TangentVector, TangentVector) -> TangentVector) {
+    return (lhs, { (dlhs, drhs) in dlhs + drhs })
+  }
+  static func vjpAdd(lhs: Self, rhs: Self)
+    -> (Self, (TangentVector) -> (TangentVector, TangentVector)) {
+    return (lhs, { v in (v, v) })
+  }
+}
+extension TF_508_Proto where Self : Differentiable,
+                             Scalar : FloatingPoint & Differentiable,
+                             Self.TangentVector == TF_508_Struct<Float> {
+  func jvpSubtract(lhs: Self)
+    -> (Self, (TangentVector, TangentVector) -> TangentVector) {
+    return (lhs, { dself, dlhs in dself - dlhs })
+  }
+  func vjpSubtract(lhs: Self)
+    -> (Self, (TangentVector) -> (TangentVector, TangentVector)) {
+    return (lhs, { v in (v, v) })
+  }
+}
+
+struct TF_508_Struct<Scalar : AdditiveArithmetic>
+  : TF_508_Proto, AdditiveArithmetic {}
+extension TF_508_Struct : Differentiable where Scalar : Differentiable {
+  typealias TangentVector = TF_508_Struct
+}
+
+// Test leaks regarding `SILGenFunction::getOrCreateAutoDiffLinearMapThunk`.
+LeakCheckingTests.testWithLeakChecking("LinearMapSILGenThunks") {
+  func testLinearMapSILGenThunks() {
+    let x = TF_508_Struct<Float>()
+    // Test conformance requirement with dependent member type.
+    _ = pullback(at: x, in: { (x: TF_508_Struct<Float>) -> TF_508_Struct<Float> in
+      return x + x
+    })
+    // Test same-type requirement with dependent member type.
+    _ = pullback(at: x, in: { (x: TF_508_Struct<Float>) -> TF_508_Struct<Float> in
+      return x.subtract(x)
+    })
+  }
+  testLinearMapSILGenThunks()
+}
+
+LeakCheckingTests.testWithLeakChecking("ParameterConventionMismatchLeakChecking") {
+  struct MyTrackedFloat<Dummy> : Differentiable {
+    // The property with type `Dummy` makes `Self` be indirect.
+    @noDerivative var indirectDummy: Dummy
+    var base: Tracked<Float>
+
+    // Test initializer and static VJP function.
+    // Initializers have owned parameters but functions have shared parameters.
+    @differentiable(vjp: vjpInit)
+    init(_ base: Tracked<Float>, dummy: Dummy) {
+      self.base = base
+      self.indirectDummy = dummy
+    }
+    static func vjpInit(_ base: Tracked<Float>, dummy: Dummy)
+      -> (MyTrackedFloat, (TangentVector) -> Tracked<Float>) {
+      return (MyTrackedFloat(base, dummy: dummy), { v in v.base })
+    }
+
+    @differentiable(vjp: vjpOwnedParameterMismatch)
+    func ownedParameter(_ x: __owned Tracked<Float>) -> Tracked<Float> {
+      return x
+    }
+    func vjpOwnedParameterMismatch(_ x: __shared Tracked<Float>)
+      -> (Tracked<Float>, (Tracked<Float>) -> (TangentVector, Tracked<Float>)) {
+      return (ownedParameter(x), { v in (.zero, v) })
+    }
+
+    @differentiable(vjp: vjpSharedParameterMismatch)
+    func sharedParameter(_ x: __shared Tracked<Float>) -> Tracked<Float> {
+      return x
+    }
+    func vjpSharedParameterMismatch(_ x: __owned Tracked<Float>)
+      -> (Tracked<Float>, (Tracked<Float>) -> (TangentVector, Tracked<Float>)) {
+      return (sharedParameter(x), { v in (.zero, v) })
+    }
+
+    @differentiable(vjp: vjpOwnedParameterGenericMismatch)
+    func ownedParameterGeneric<T : Differentiable>(_ x: __owned T) -> T {
+      return x
+    }
+    func vjpOwnedParameterGenericMismatch<T : Differentiable>(_ x: __shared T)
+      -> (T, (T.TangentVector) -> (TangentVector, T.TangentVector)) {
+      return (ownedParameterGeneric(x), { v in (.zero, v) })
+    }
+
+    @differentiable(vjp: vjpSharedParameterGenericMismatch)
+    func sharedParameterGeneric<T : Differentiable>(_ x: __shared T) -> T {
+      return x
+    }
+    func vjpSharedParameterGenericMismatch<T : Differentiable>(_ x: __owned T)
+      -> (T, (T.TangentVector) -> (TangentVector, T.TangentVector)) {
+      return (sharedParameterGeneric(x), { v in (.zero, v) })
+    }
+
+    @differentiable(vjp: vjpConsumingMismatch)
+    __consuming func consuming(_ x: Tracked<Float>) -> Tracked<Float> {
+      return x
+    }
+    func vjpConsumingMismatch(_ x: Tracked<Float>)
+      -> (Tracked<Float>, (Tracked<Float>) -> (TangentVector, Tracked<Float>)) {
+      return (consuming(x), { v in (.zero, v) })
+    }
+
+    @differentiable(vjp: vjpConsumingGenericMismatch)
+    __consuming func consumingGeneric<T : Differentiable>(_ x: T) -> T {
+      return x
+    }
+    func vjpConsumingGenericMismatch<T : Differentiable>(_ x: T)
+      -> (T, (T.TangentVector) -> (TangentVector, T.TangentVector)) {
+      return (consumingGeneric(x), { v in (.zero, v) })
+    }
+
+    @differentiable(vjp: vjpNonconsumingMismatch)
+    func nonconsuming(_ x: Tracked<Float>) -> Tracked<Float> {
+      return x
+    }
+    __consuming func vjpNonconsumingMismatch(_ x: Tracked<Float>)
+      -> (Tracked<Float>, (Tracked<Float>) -> (TangentVector, Tracked<Float>)) {
+      return (nonconsuming(x), { v in (.zero, v) })
+    }
+
+    @differentiable(vjp: vjpNonconsumingGenericMismatch)
+    func nonconsumingGeneric<T : Differentiable>(_ x: T) -> T {
+      return x
+    }
+    __consuming func vjpNonconsumingGenericMismatch<T : Differentiable>(_ x: T)
+      -> (T, (T.TangentVector) -> (TangentVector, T.TangentVector)) {
+      return (nonconsumingGeneric(x), { v in (.zero, v) })
+    }
+  }
+  let v = MyTrackedFloat<Any>.TangentVector(base: 10)
+  expectEqual(10, pullback(at: Tracked<Float>(1)) { x in MyTrackedFloat(x, dummy: 1.0) }(v))
+  _ = Tracked<Float>(1).gradient { x in MyTrackedFloat<Any>(x, dummy: 1).ownedParameter(x) }
+  _ = Tracked<Float>(1).gradient { x in MyTrackedFloat<Any>(x, dummy: 1).sharedParameter(x) }
+  _ = Tracked<Float>(1).gradient { x in MyTrackedFloat<Any>(x, dummy: 1).ownedParameterGeneric(x) }
+  _ = Tracked<Float>(1).gradient { x in MyTrackedFloat<Any>(x, dummy: 1).sharedParameterGeneric(x) }
+  _ = Tracked<Float>(1).gradient { x in MyTrackedFloat<Any>(x, dummy: 1).consuming(x) }
+  _ = Tracked<Float>(1).gradient { x in MyTrackedFloat<Any>(x, dummy: 1).consumingGeneric(x) }
+  _ = Tracked<Float>(1).gradient { x in MyTrackedFloat<Any>(x, dummy: 1).nonconsuming(x) }
+  _ = Tracked<Float>(1).gradient { x in MyTrackedFloat<Any>(x, dummy: 1).nonconsumingGeneric(x) }
 }
 
 LeakCheckingTests.testWithLeakChecking("ClosureCaptureLeakChecking") {
