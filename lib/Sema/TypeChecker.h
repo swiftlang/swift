@@ -2176,6 +2176,9 @@ bool areGenericRequirementsSatisfied(const DeclContext *DC,
 
 bool canSatisfy(Type type1, Type type2, bool openArchetypes,
                 constraints::ConstraintKind kind, DeclContext *dc);
+
+bool hasDynamicMemberLookupAttribute(Type type,
+  llvm::DenseMap<CanType, bool> &DynamicMemberLookupCache);
 } // end namespace swift
 
 #endif
