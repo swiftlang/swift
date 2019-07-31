@@ -2277,10 +2277,10 @@ IsGetterMutatingRequest::evaluate(Evaluator &evaluator,
   }
 
   auto checkMutability = [&](AccessorKind kind) -> bool {
-    auto *accessor = storage->getAccessor(kind);
+    auto *accessor = storage->getParsedAccessor(kind);
     if (!accessor)
       return false;
-    
+
     return accessor->isMutating();
   };
 
@@ -2337,7 +2337,7 @@ IsSetterMutatingRequest::evaluate(Evaluator &evaluator,
   case WriteImplKind::StoredWithObservers:
   case WriteImplKind::InheritedWithObservers:
   case WriteImplKind::Set: {
-    auto *setter = storage->getAccessor(AccessorKind::Set);
+    auto *setter = storage->getParsedAccessor(AccessorKind::Set);
 
     if (setter)
       result = setter->isMutating();
@@ -2347,7 +2347,7 @@ IsSetterMutatingRequest::evaluate(Evaluator &evaluator,
     // coroutine, check that it has the same mutatingness as the setter.
     // TODO: arguably this should require the spelling to match even when
     // it's the implied value.
-    auto modifyAccessor = storage->getAccessor(AccessorKind::Modify);
+    auto modifyAccessor = storage->getParsedAccessor(AccessorKind::Modify);
 
     if (impl.getReadWriteImpl() == ReadWriteImplKind::Modify &&
         modifyAccessor != nullptr) {
@@ -2369,11 +2369,11 @@ IsSetterMutatingRequest::evaluate(Evaluator &evaluator,
   }
 
   case WriteImplKind::MutableAddress:
-    return storage->getAccessor(AccessorKind::MutableAddress)
+    return storage->getParsedAccessor(AccessorKind::MutableAddress)
       ->isMutating();
 
   case WriteImplKind::Modify:
-    return storage->getAccessor(AccessorKind::Modify)
+    return storage->getParsedAccessor(AccessorKind::Modify)
       ->isMutating();
   }
   llvm_unreachable("bad storage kind");
@@ -2635,11 +2635,9 @@ public:
 
     // FIXME: Temporary hack until capture computation has been request-ified.
     if (VD->getDeclContext()->isLocalContext()) {
-      VD->visitExpectedOpaqueAccessors([&](AccessorKind kind) {
-        auto accessor = VD->getAccessor(kind);
-        if (!accessor) return;
-
-        TC.definedFunctions.push_back(accessor);
+      VD->visitOpaqueAccessors([&](AccessorDecl *accessor) {
+        if (accessor->isImplicit())
+          TC.definedFunctions.push_back(accessor);
       });
     }
 

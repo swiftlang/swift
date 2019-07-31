@@ -114,7 +114,7 @@ getObjCNameForSwiftDecl(const ValueDecl *VD, DeclName PreferredName){
       return {BaseName, ObjCSelector()};
     return {VAD->getObjCPropertyName(), ObjCSelector()};
   } else if (auto *SD = dyn_cast<SubscriptDecl>(VD)) {
-    return getObjCNameForSwiftDecl(SD->getAccessor(AccessorKind::Get),
+    return getObjCNameForSwiftDecl(SD->getParsedAccessor(AccessorKind::Get),
                                    PreferredName);
   } else if (auto *EL = dyn_cast<EnumElementDecl>(VD)) {
     SmallString<64> Buffer;

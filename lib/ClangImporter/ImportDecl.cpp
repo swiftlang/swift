@@ -3628,13 +3628,13 @@ namespace {
       case ImportedAccessorKind::PropertyGetter: {
         auto property = getImplicitProperty(importedName, decl);
         if (!property) return nullptr;
-        return property->getAccessor(AccessorKind::Get);
+        return property->getParsedAccessor(AccessorKind::Get);
       }
 
       case ImportedAccessorKind::PropertySetter:
         auto property = getImplicitProperty(importedName, decl);
         if (!property) return nullptr;
-        return property->getAccessor(AccessorKind::Set);
+        return property->getParsedAccessor(AccessorKind::Set);
       }
 
       return importFunctionDecl(decl, importedName, correctSwiftName, None);
@@ -5010,8 +5010,8 @@ namespace {
       // Only record overrides of class members.
       if (overridden) {
         result->setOverriddenDecl(overridden);
-        getter->setOverriddenDecl(overridden->getAccessor(AccessorKind::Get));
-        if (auto parentSetter = overridden->getAccessor(AccessorKind::Set))
+        getter->setOverriddenDecl(overridden->getParsedAccessor(AccessorKind::Get));
+        if (auto parentSetter = overridden->getParsedAccessor(AccessorKind::Set))
           if (setter)
             setter->setOverriddenDecl(parentSetter);
       }
@@ -6516,10 +6516,10 @@ void SwiftDeclConverter::recordObjCOverride(SubscriptDecl *subscript) {
 
     // The index types match. This is an override, so mark it as such.
     subscript->setOverriddenDecl(parentSub);
-    auto getterThunk = subscript->getAccessor(AccessorKind::Get);
-    getterThunk->setOverriddenDecl(parentSub->getAccessor(AccessorKind::Get));
-    if (auto parentSetter = parentSub->getAccessor(AccessorKind::Set)) {
-      if (auto setterThunk = subscript->getAccessor(AccessorKind::Set))
+    auto getterThunk = subscript->getParsedAccessor(AccessorKind::Get);
+    getterThunk->setOverriddenDecl(parentSub->getParsedAccessor(AccessorKind::Get));
+    if (auto parentSetter = parentSub->getParsedAccessor(AccessorKind::Set)) {
+      if (auto setterThunk = subscript->getParsedAccessor(AccessorKind::Set))
         setterThunk->setOverriddenDecl(parentSetter);
     }
 
@@ -8397,10 +8397,8 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
   func->computeType();
   func->setAccess(getOverridableAccessLevel(dc));
   func->setValidationToChecked();
-  func->setImplicit();
   func->setIsObjC(false);
   func->setIsDynamic(false);
-  func->setIsTransparent(false);
 
   func->setBodySynthesizer(synthesizeConstantGetterBody,
                            ConstantGetterBodyContextData(valueExpr, convertKind)

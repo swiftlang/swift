@@ -1062,14 +1062,10 @@ bool IndexSwiftASTWalker::report(ValueDecl *D) {
   if (startEntityDecl(D)) {
     // Pass accessors.
     if (auto StoreD = dyn_cast<AbstractStorageDecl>(D)) {
-      auto isNullOrImplicit = [](const Decl *D) -> bool {
-        return !D || D->isImplicit();
-      };
-
       bool usedPseudoAccessors = false;
       if (isa<VarDecl>(D) &&
-          isNullOrImplicit(StoreD->getAccessor(AccessorKind::Get)) &&
-          isNullOrImplicit(StoreD->getAccessor(AccessorKind::Set))) {
+          !StoreD->getParsedAccessor(AccessorKind::Get) &&
+          !StoreD->getParsedAccessor(AccessorKind::Set)) {
         usedPseudoAccessors = true;
         auto VarD = cast<VarDecl>(D);
         // No actual getter or setter, pass 'pseudo' accessors.

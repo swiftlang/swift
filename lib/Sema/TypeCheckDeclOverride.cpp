@@ -1041,7 +1041,7 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
     // Otherwise, if this is a subscript, validate that covariance is ok.
     // If the parent is non-mutable, it's okay to be covariant.
     auto parentSubscript = cast<SubscriptDecl>(baseDecl);
-    if (parentSubscript->getAccessor(AccessorKind::Set)) {
+    if (parentSubscript->supportsMutation()) {
       diags.diagnose(subscript, diag::override_mutable_covariant_subscript,
                      declTy, baseTy);
       diags.diagnose(baseDecl, diag::subscript_override_here);
@@ -1088,7 +1088,7 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
           IsSilentDifference = true;
 
     // The overridden property must not be mutable.
-    if (cast<AbstractStorageDecl>(baseDecl)->getAccessor(AccessorKind::Set) &&
+    if (cast<AbstractStorageDecl>(baseDecl)->supportsMutation() &&
         !IsSilentDifference) {
       diags.diagnose(property, diag::override_mutable_covariant_property,
                   property->getName(), parentPropertyTy, propertyTy);
@@ -1472,8 +1472,8 @@ isRedundantAccessorOverrideAvailabilityDiagnostic(ValueDecl *override,
   // Returns true if we will already diagnose a bad override
   // on the property's accessor of the given kind.
   auto accessorOverrideAlreadyDiagnosed = [&](AccessorKind kind) {
-    FuncDecl *overrideAccessor = overrideASD->getAccessor(kind);
-    FuncDecl *baseAccessor = baseASD->getAccessor(kind);
+    FuncDecl *overrideAccessor = overrideASD->getOpaqueAccessor(kind);
+    FuncDecl *baseAccessor = baseASD->getOpaqueAccessor(kind);
     if (overrideAccessor && baseAccessor &&
         !isAvailabilitySafeForOverride(overrideAccessor, baseAccessor)) {
       return true;
@@ -1557,8 +1557,8 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
     // Make sure that the overriding property doesn't have storage.
     if ((overrideASD->hasStorage() ||
          overrideASD->getAttrs().hasAttribute<LazyAttr>()) &&
-        !(overrideASD->getAccessor(AccessorKind::WillSet) ||
-          overrideASD->getAccessor(AccessorKind::DidSet))) {
+        !(overrideASD->getParsedAccessor(AccessorKind::WillSet) ||
+          overrideASD->getParsedAccessor(AccessorKind::DidSet))) {
       bool downgradeToWarning = false;
       if (!ctx.isSwiftVersionAtLeast(5) &&
           overrideASD->getAttrs().hasAttribute<LazyAttr>()) {
@@ -1889,11 +1889,12 @@ OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
         continue;
 
       // Find the base accessor; if there isn't one, we're done.
-      auto baseAccessor = baseASD->getAccessor(kind);
-      if (!baseAccessor) continue;
-
-      if (baseAccessor->hasForcedStaticDispatch())
+      auto baseAccessor = baseASD->getOpaqueAccessor(kind);
+      if (!baseAccessor)
         continue;
+
+      assert(!baseAccessor->hasForcedStaticDispatch() &&
+             "opaque accessor with forced static dispatch?");
 
       switch (kind) {
       case AccessorKind::Get:

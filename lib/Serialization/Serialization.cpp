@@ -4891,15 +4891,6 @@ void Serializer::writeAST(ModuleOrSourceFile DC,
 
       orderedTopLevelDecls.push_back(addDeclRef(D));
 
-      // If this is a global variable, force the accessors to be
-      // serialized.
-      if (auto VD = dyn_cast<VarDecl>(D)) {
-        if (auto *getter = VD->getAccessor(swift::AccessorKind::Get))
-          addDeclRef(getter);
-        if (auto *setter = VD->getAccessor(swift::AccessorKind::Set))
-          addDeclRef(setter);
-      }
-
       // If this nominal type has associated top-level decls for a
       // derived conformance (for example, ==), force them to be
       // serialized.

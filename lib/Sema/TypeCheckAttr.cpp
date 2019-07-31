@@ -2499,8 +2499,8 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
       decl = func;
     } else if (auto storage = dyn_cast<AbstractStorageDecl>(D)) {
       decl = storage;
-      auto getter = storage->getAccessor(AccessorKind::Get);
-      if (!getter || getter->isImplicit() || !getter->hasBody()) {
+      auto getter = storage->getParsedAccessor(AccessorKind::Get);
+      if (!getter || !getter->hasBody()) {
         TC.diagnose(attr->getLocation(),
                     diag::function_builder_attribute_on_storage_without_getter,
                     nominal->getFullName(),
@@ -2836,8 +2836,8 @@ void TypeChecker::addImplicitDynamicAttribute(Decl *D) {
     // exclusivity checking.
     // If there is a didSet or willSet function we allow dynamic replacement.
     if (VD->hasStorage() &&
-        !VD->getAccessor(AccessorKind::DidSet) &&
-        !VD->getAccessor(AccessorKind::WillSet))
+        !VD->getParsedAccessor(AccessorKind::DidSet) &&
+        !VD->getParsedAccessor(AccessorKind::WillSet))
       return;
     // Don't add dynamic to local variables.
     if (VD->getDeclContext()->isLocalContext())
