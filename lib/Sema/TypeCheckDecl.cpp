@@ -4628,10 +4628,10 @@ static void finalizeType(TypeChecker &TC, NominalTypeDecl *nominal) {
     // affects vtable layout.
     TC.addImplicitConstructors(CD);
     CD->addImplicitDestructor();
-  }
 
-  // Force lowering of stored properties.
-  (void) nominal->getStoredProperties();
+    // Force lowering of stored properties.
+    (void) nominal->getStoredProperties();
+  }
 
   if (isa<ClassDecl>(nominal) || isa<ProtocolDecl>(nominal)) {
     for (auto *D : nominal->getMembers()) {
