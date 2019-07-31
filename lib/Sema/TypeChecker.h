@@ -1172,12 +1172,6 @@ public:
   /// target.
   void synthesizeMemberForLookup(NominalTypeDecl *target, DeclName member);
 
-  /// The specified AbstractStorageDecl \c storage was just found to satisfy
-  /// the protocol property \c requirement.  Ensure that it has the full
-  /// complement of accessors.
-  void synthesizeWitnessAccessorsForStorage(AbstractStorageDecl *requirement,
-                                            AbstractStorageDecl *storage);
-
   /// Pre-check the expression, validating any types that occur in the
   /// expression and folding sequence expressions.
   bool preCheckExpression(Expr *&expr, DeclContext *dc);

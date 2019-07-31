@@ -1320,22 +1320,6 @@ synthesizeModifyCoroutineSetterBody(AccessorDecl *setter, ASTContext &ctx) {
                                                 setter->getStorage(), ctx);
 }
 
-/// The specified AbstractStorageDecl was just found to satisfy a
-/// protocol property requirement.  Ensure that it has the full
-/// complement of accessors.
-void TypeChecker::synthesizeWitnessAccessorsForStorage(
-                                             AbstractStorageDecl *requirement,
-                                             AbstractStorageDecl *storage) {
-  // Make sure the protocol requirement itself has the right accessors.
-  // FIXME: This should be a request kicked off by SILGen.
-  DeclsToFinalize.insert(requirement);
-
-  requirement->visitExpectedOpaqueAccessors([&](AccessorKind kind) {
-    // Force synthesis if necessary.
-    (void) storage->getSynthesizedAccessor(kind);
-  });
-}
-
 /// Given a VarDecl with a willSet: and/or didSet: specifier, synthesize the
 /// setter which calls them.
 static std::pair<BraceStmt *, bool>

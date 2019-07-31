@@ -2208,12 +2208,6 @@ void ConformanceChecker::recordWitness(ValueDecl *requirement,
   // Record this witness in the conformance.
   auto witness = match.getWitness(TC.Context);
   Conformance->setWitness(requirement, witness);
-
-  // Synthesize accessors for the protocol witness table to use.
-  if (auto storage = dyn_cast<AbstractStorageDecl>(witness.getDecl()))
-    TC.synthesizeWitnessAccessorsForStorage(
-                                        cast<AbstractStorageDecl>(requirement),
-                                        storage);
 }
 
 void ConformanceChecker::recordOptionalWitness(ValueDecl *requirement) {
@@ -5337,12 +5331,6 @@ void DefaultWitnessChecker::recordWitness(
                                   const RequirementMatch &match) {
   Proto->setDefaultWitness(requirement,
                            match.getWitness(TC.Context));
-
-  // Synthesize accessors for the protocol witness table to use.
-  if (auto storage = dyn_cast<AbstractStorageDecl>(match.Witness))
-    TC.synthesizeWitnessAccessorsForStorage(
-                                        cast<AbstractStorageDecl>(requirement),
-                                        storage);
 }
 
 void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
