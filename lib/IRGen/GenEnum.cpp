@@ -5900,6 +5900,13 @@ EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
                                          std::move(elementsWithNoPayload)));
   }
 
+  // namespace-like enums must be imported as empty decls.
+  if (theEnum->hasClangNode() && numElements == 0 && !theEnum->isObjC()) {
+    return std::unique_ptr<EnumImplStrategy>(new SingletonEnumImplStrategy(
+        TC.IGM, tik, alwaysFixedSize, numElements,
+        std::move(elementsWithPayload), std::move(elementsWithNoPayload)));
+  }
+
   // Enums imported from Clang or marked with @objc use C-compatible layout.
   if (theEnum->hasClangNode() || theEnum->isObjC()) {
     assert(elementsWithPayload.empty() && "C enum with payload?!");

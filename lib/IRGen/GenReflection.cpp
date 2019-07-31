@@ -607,7 +607,11 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
   }
 
   void layout() override {
-    assert(!NTD->hasClangNode() || isa<StructDecl>(NTD));
+    if (NTD->hasClangNode()) {
+      auto *enumDecl = dyn_cast<EnumDecl>(NTD);
+      // Structs and namespace-like enums are ok.
+      assert(isa<StructDecl>(NTD) || (enumDecl && !enumDecl->hasCases()));
+    }
 
     PrettyStackTraceDecl DebugStack("emitting field type metadata", NTD);
     addNominalRef(NTD);

@@ -9,6 +9,12 @@ func indirectUsage() {
   useT(makeT())
 }
 
+// CHECK-LABEL: define hidden swiftcc %swift.type* @"$s6cxx_ir14reflectionInfo3argypXpSo2nsV1TV_tF"
+// CHECK: %0 = call swiftcc %swift.metadata_response @"$sSo2nsV1TVMa"({{i64|i32}} 0)
+func reflectionInfo(arg: namespacedT) -> Any.Type {
+  return type(of: arg)
+}
+
 // CHECK: define hidden swiftcc void @"$s6cxx_ir24namespaceManglesIntoName3argySo2nsV1TV_tF"
 func namespaceManglesIntoName(arg: namespacedT) {
 }
