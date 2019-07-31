@@ -840,10 +840,15 @@ bool ClangImporter::canReadPCH(StringRef PCHFilename) {
   };
   ctx.InitBuiltinTypes(CI.getTarget());
 
+  auto failureCapabilities =
+    clang::ASTReader::ARR_Missing |
+    clang::ASTReader::ARR_OutOfDate |
+    clang::ASTReader::ARR_VersionMismatch;
+
   auto result = Reader->ReadAST(PCHFilename,
                   clang::serialization::MK_PCH,
                   clang::SourceLocation(),
-                  clang::ASTReader::ARR_None);
+                  failureCapabilities);
   switch (result) {
   case clang::ASTReader::Success:
     return true;
