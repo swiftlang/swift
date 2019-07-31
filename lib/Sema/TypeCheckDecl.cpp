@@ -2528,12 +2528,8 @@ public:
     // Compute these requests in case they emit diagnostics.
     (void) VD->isGetterMutating();
     (void) VD->isSetterMutating();
-
-    // Retrieve the backing property of a wrapped property.
     (void) VD->getPropertyWrapperBackingProperty();
-
-    // Set up accessors, also lowering lazy and @NSManaged properties.
-    addExpectedOpaqueAccessorsToStorage(VD);
+    (void) VD->getImplInfo();
 
     // Add the '@_hasStorage' attribute if this property is stored.
     if (VD->hasStorage() && !VD->getAttrs().hasAttribute<HasStorageAttr>())
@@ -2542,9 +2538,8 @@ public:
     // Reject cases where this is a variable that has storage but it isn't
     // allowed.
     if (VD->hasStorage()) {
-      // Stored properties in protocols are diagnosed in
-      // addExpectedOpaqueAccessorsToStorage(), to ensure they run when a
-      // protocol requirement is validated but not type checked.
+      // Note: Stored properties in protocols are diagnosed in
+      // finishProtocolStorageImplInfo().
 
       // Enums and extensions cannot have stored instance properties.
       // Static stored properties are allowed, with restrictions
@@ -2614,8 +2609,6 @@ public:
     }
 
     TC.checkDeclAttributes(VD);
-
-    addExpectedOpaqueAccessorsToStorage(VD);
 
     if (VD->getDeclContext()->getSelfClassDecl()) {
       checkDynamicSelfType(VD, VD->getValueInterfaceType());
@@ -2861,8 +2854,7 @@ public:
     // Compute these requests in case they emit diagnostics.
     (void) SD->isGetterMutating();
     (void) SD->isSetterMutating();
-
-    addExpectedOpaqueAccessorsToStorage(SD);
+    (void) SD->getImplInfo();
 
     if (SD->getAttrs().hasAttribute<DynamicReplacementAttr>()) {
       TC.checkDynamicReplacementAttribute(SD);
