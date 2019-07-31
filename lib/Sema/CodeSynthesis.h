@@ -46,9 +46,7 @@ class ObjCReason;
 bool checkOverrides(ValueDecl *decl);
 
 // These are implemented in CodeSynthesis.cpp.
-void maybeAddAccessorsToStorage(AbstractStorageDecl *storage);
-
-void triggerAccessorSynthesis(TypeChecker &TC, AbstractStorageDecl *storage);
+void addExpectedOpaqueAccessorsToStorage(AbstractStorageDecl *storage);
 
 /// Describes the kind of implicit constructor that will be
 /// generated.

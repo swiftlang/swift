@@ -445,9 +445,15 @@ protected:
     SelfAccess : 2
   );
 
-  SWIFT_INLINE_BITFIELD(AccessorDecl, FuncDecl, 4,
+  SWIFT_INLINE_BITFIELD(AccessorDecl, FuncDecl, 4+1+1,
     /// The kind of accessor this is.
-    AccessorKind : 4
+    AccessorKind : 4,
+
+    /// Whether the accessor is transparent.
+    IsTransparent : 1,
+
+    /// Whether we have computed the above.
+    IsTransparentComputed : 1
   );
 
   SWIFT_INLINE_BITFIELD(ConstructorDecl, AbstractFunctionDecl, 3+2+1,
@@ -4389,6 +4395,9 @@ class AbstractStorageDecl : public ValueDecl {
   friend class IsSetterMutatingRequest;
   friend class OpaqueReadOwnershipRequest;
   friend class StorageImplInfoRequest;
+  friend class RequiresOpaqueAccessorsRequest;
+  friend class RequiresOpaqueModifyCoroutineRequest;
+  friend class SynthesizeAccessorRequest;
 
 public:
   static const size_t MaxNumAccessors = 255;
@@ -4452,10 +4461,17 @@ private:
     unsigned OpaqueReadOwnershipComputed : 1;
     unsigned OpaqueReadOwnership : 2;
     unsigned ImplInfoComputed : 1;
+    unsigned RequiresOpaqueAccessorsComputed : 1;
+    unsigned RequiresOpaqueAccessors : 1;
+    unsigned RequiresOpaqueModifyCoroutineComputed : 1;
+    unsigned RequiresOpaqueModifyCoroutine : 1;
   } LazySemanticInfo = { };
 
   /// The implementation info for the accessors.
   StorageImplInfo ImplInfo;
+
+  /// Add a synthesized accessor.
+  void setSynthesizedAccessor(AccessorKind kind, AccessorDecl *getter);
 
 protected:
   AbstractStorageDecl(DeclKind Kind, bool IsStatic, DeclContext *DC,
@@ -4570,6 +4586,12 @@ public:
     return {};
   }
 
+  /// Return an accessor that this storage is expected to have, synthesizing
+  /// one if necessary. Note that will always synthesize one, even if the
+  /// accessor is not part of the expected opaque set for the storage, so use
+  /// with caution.
+  AccessorDecl *getSynthesizedAccessor(AccessorKind kind) const;
+
   /// Visit all the opaque accessors that this storage is expected to have.
   void visitExpectedOpaqueAccessors(
                             llvm::function_ref<void (AccessorKind)>) const;
@@ -4585,17 +4607,8 @@ public:
   /// This should only be used by the ClangImporter.
   void setComputedSetter(AccessorDecl *Set);
 
-  /// Add a synthesized getter.
-  void setSynthesizedGetter(AccessorDecl *getter);
-
-  /// Add a synthesized setter.
-  void setSynthesizedSetter(AccessorDecl *setter);
-
-  /// Add a synthesized read coroutine.
-  void setSynthesizedReadCoroutine(AccessorDecl *read);
-
-  /// Add a synthesized modify coroutine.
-  void setSynthesizedModifyCoroutine(AccessorDecl *modify);
+  /// Does this storage require opaque accessors of any kind?
+  bool requiresOpaqueAccessors() const;
 
   /// Does this storage require an opaque accessor of the given kind?
   bool requiresOpaqueAccessor(AccessorKind kind) const;
@@ -6151,6 +6164,14 @@ class AccessorDecl final : public FuncDecl {
                                   DeclContext *parent,
                                   ClangNode clangNode);
 
+  Optional<bool> getCachedIsTransparent() const {
+    if (Bits.AccessorDecl.IsTransparentComputed)
+      return Bits.AccessorDecl.IsTransparent;
+    return None;
+  }
+
+  friend class IsAccessorTransparentRequest;
+
 public:
   static AccessorDecl *createDeserialized(ASTContext &ctx,
                               SourceLoc declLoc,
@@ -6227,6 +6248,11 @@ public:
 #include "swift/AST/AccessorKinds.def"
     }
     llvm_unreachable("bad accessor kind");
+  }
+
+  void setIsTransparent(bool transparent) {
+    Bits.AccessorDecl.IsTransparent = transparent;
+    Bits.AccessorDecl.IsTransparentComputed = 1;
   }
 
   static bool classof(const Decl *D) {

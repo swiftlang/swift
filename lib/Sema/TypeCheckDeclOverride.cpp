@@ -898,7 +898,7 @@ static void checkOverrideAccessControl(ValueDecl *baseDecl, ValueDecl *decl,
       if (matchASD->isSetterAccessibleFrom(dc)) {
         // Match sure we've created the setter.
         if (!matchASD->getSetter())
-          maybeAddAccessorsToStorage(matchASD);
+          addExpectedOpaqueAccessorsToStorage(matchASD);
 
         auto matchSetterAccessScope = matchASD->getSetter()
           ->getFormalAccessScope(dc);
@@ -1881,7 +1881,7 @@ OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     SmallVector<OverrideMatch, 2> matches;
     for (auto overridden : overridingASD->getOverriddenDecls()) {
       auto baseASD = cast<AbstractStorageDecl>(overridden);
-      maybeAddAccessorsToStorage(baseASD);
+      addExpectedOpaqueAccessorsToStorage(baseASD);
 
       auto kind = accessor->getAccessorKind();
 

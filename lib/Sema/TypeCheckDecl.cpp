@@ -2535,7 +2535,7 @@ public:
     (void) VD->getPropertyWrapperBackingProperty();
 
     // Set up accessors, also lowering lazy and @NSManaged properties.
-    maybeAddAccessorsToStorage(VD);
+    addExpectedOpaqueAccessorsToStorage(VD);
 
     // Add the '@_hasStorage' attribute if this property is stored.
     if (VD->hasStorage() && !VD->getAttrs().hasAttribute<HasStorageAttr>())
@@ -2545,7 +2545,7 @@ public:
     // allowed.
     if (VD->hasStorage()) {
       // Stored properties in protocols are diagnosed in
-      // maybeAddAccessorsToStorage(), to ensure they run when a
+      // addExpectedOpaqueAccessorsToStorage(), to ensure they run when a
       // protocol requirement is validated but not type checked.
 
       // Enums and extensions cannot have stored instance properties.
@@ -2617,7 +2617,7 @@ public:
 
     TC.checkDeclAttributes(VD);
 
-    triggerAccessorSynthesis(TC, VD);
+    addExpectedOpaqueAccessorsToStorage(VD);
 
     if (VD->getDeclContext()->getSelfClassDecl()) {
       checkDynamicSelfType(VD, VD->getValueInterfaceType());
@@ -2865,7 +2865,8 @@ public:
     (void) SD->isGetterMutating();
     (void) SD->isSetterMutating();
 
-    triggerAccessorSynthesis(TC, SD);
+    addExpectedOpaqueAccessorsToStorage(SD);
+
     if (SD->getAttrs().hasAttribute<DynamicReplacementAttr>()) {
       TC.checkDynamicReplacementAttribute(SD);
     }
@@ -4680,7 +4681,7 @@ void TypeChecker::finalizeDecl(ValueDecl *decl) {
   if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
     finalizeType(*this, nominal);
   } else if (auto storage = dyn_cast<AbstractStorageDecl>(decl)) {
-    maybeAddAccessorsToStorage(storage);
+    addExpectedOpaqueAccessorsToStorage(storage);
   }
 }
 
