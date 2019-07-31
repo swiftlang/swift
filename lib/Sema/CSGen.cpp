@@ -3080,6 +3080,14 @@ namespace {
       llvm_unreachable("found KeyPathDotExpr in CSGen");
     }
 
+    Type visitOneWayExpr(OneWayExpr *expr) {
+      auto locator = CS.getConstraintLocator(expr);
+      auto resultTypeVar = CS.createTypeVariable(locator, 0);
+      CS.addConstraint(ConstraintKind::OneWayBind, resultTypeVar,
+                       CS.getType(expr->getSubExpr()), locator);
+      return resultTypeVar;
+    }
+
     Type visitTapExpr(TapExpr *expr) {
       DeclContext *varDC = expr->getVar()->getDeclContext();
       assert(varDC == CS.DC || (varDC && isa<AbstractClosureExpr>(varDC)) &&
@@ -3113,7 +3121,8 @@ namespace {
                                Join,
                                JoinInout,
                                JoinMeta,
-                               JoinNonexistent
+                               JoinNonexistent,
+                               OneWay,
     };
 
     static TypeOperation getTypeOperation(UnresolvedDotExpr *UDE,
@@ -3127,6 +3136,7 @@ namespace {
 
       return llvm::StringSwitch<TypeOperation>(
                  UDE->getName().getBaseIdentifier().str())
+          .Case("one_way", TypeOperation::OneWay)
           .Case("type_join", TypeOperation::Join)
           .Case("type_join_inout", TypeOperation::JoinInout)
           .Case("type_join_meta", TypeOperation::JoinMeta)
@@ -3135,14 +3145,14 @@ namespace {
     }
 
     Type resultOfTypeOperation(TypeOperation op, Expr *Arg) {
-      auto *tuple = dyn_cast<TupleExpr>(Arg);
-      assert(tuple && "Expected argument tuple for join operations!");
+      auto *tuple = cast<TupleExpr>(Arg);
 
       auto *lhs = tuple->getElement(0);
       auto *rhs = tuple->getElement(1);
 
       switch (op) {
       case TypeOperation::None:
+      case TypeOperation::OneWay:
         llvm_unreachable(
             "We should have a valid type operation at this point!");
 
@@ -3582,10 +3592,7 @@ namespace {
     /// Once we've visited the children of the given expression,
     /// generate constraints from the expression.
     Expr *walkToExprPost(Expr *expr) override {
-
-      // Handle the Builtin.type_join* family of calls by replacing
-      // them with dot_self_expr of type_expr with the type being the
-      // result of the join.
+      // Translate special type-checker Builtin calls into simpler expressions.
       if (auto *apply = dyn_cast<ApplyExpr>(expr)) {
         auto fnExpr = apply->getFn();
         if (auto *UDE = dyn_cast<UnresolvedDotExpr>(fnExpr)) {
@@ -3593,7 +3600,15 @@ namespace {
           auto typeOperation =
               ConstraintGenerator::getTypeOperation(UDE, CS.getASTContext());
 
-          if (typeOperation != ConstraintGenerator::TypeOperation::None) {
+          if (typeOperation == ConstraintGenerator::TypeOperation::OneWay) {
+            // For a one-way constraint, create the OneWayExpr node.
+            auto *arg = cast<ParenExpr>(apply->getArg())->getSubExpr();
+            expr = new (CS.getASTContext()) OneWayExpr(arg);
+          } else if (typeOperation !=
+                         ConstraintGenerator::TypeOperation::None) {
+            // Handle the Builtin.type_join* family of calls by replacing
+            // them with dot_self_expr of type_expr with the type being the
+            // result of the join.
             auto joinMetaTy =
                 CG.resultOfTypeOperation(typeOperation, apply->getArg());
             auto joinTy = joinMetaTy->castTo<MetatypeType>()->getInstanceType();
