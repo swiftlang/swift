@@ -4165,8 +4165,6 @@ private:
   void emitTangentForApplyInst(
       ApplyInst *ai, SILAutoDiffIndices indices,
       CanSILFunctionType originalDifferentialType) {
-    if (ai->hasSemantics("array.uninitialized_intrinsic"))
-      return emitTangentForArrayInitializationInst(ai);
     auto *bb = ai->getParent();
     auto loc = ai->getLoc();
     auto diffBuilder = getDifferentialBuilder();
@@ -4466,6 +4464,31 @@ private:
     bufferMap.try_emplace({teai->getParent(), teai}, tanBuffer);
   }
 
+  void emitTangentForTupleExtractInst(TupleExtractInst *teai) {
+    auto loc = teai->getLoc();
+    auto &diffBuilder = getDifferentialBuilder();
+    auto origTupleTy = teai->getOperand()->getType().castTo<TupleType>();
+    unsigned tanIndex = 0;
+    for (unsigned i : range(teai->getFieldNo())) {
+      if (getTangentSpace(
+              origTupleTy->getElement(i).getType()->getCanonicalType()))
+        ++tanIndex;
+    }
+    auto tanType = getRemappedTangentType(teai->getType());
+    auto tanSource = materializeTangent(
+        getTangentValue(teai->getOperand()), loc);
+    SILValue tanBuffer;
+    // If the tangent buffer of the source does not have a tuple type, then
+    // it must represent a "single element tuple type". Use it directly.
+    if (!tanSource->getType().is<TupleType>()) {
+      tanBuffer = tanSource;
+    } else {
+      tanBuffer = diffBuilder.createTupleExtract(
+           loc, tanSource, tanIndex, tanType);
+    }
+    bufferMap.try_emplace({teai->getParent(), teai}, tanBuffer);
+  }
+
   void startDifferentialGeneration() {
     // Create differential blocks and arguments.
     // TODO: Consider visiting original blocks in pre-order (dominance) order.
@@ -4734,6 +4757,8 @@ public:
     // Special handling logic only applies when `apply` has active results or
     // active arguments at an active parameter position. If not, just do
     // standard cloning.
+//    if (ai->hasSemantics("array.uninitialized_intrinsic"))
+//      return emitTangentForArrayInitializationInst(ai);
     SmallVector<SILValue, 4> allResults;
     allResults.push_back(ai);
     allResults.append(ai->getIndirectSILResults().begin(),
@@ -5073,7 +5098,9 @@ public:
   ///   Original: y = tuple_extract x, <n>
   ///    Tangent: tan[y] = tuple_extract tan[x], <n>
   void visitTupleExtractInst(TupleExtractInst *tei) {
-    llvm_unreachable("Unsupported SIL instruction.");
+    TypeSubstCloner::visitTupleExtractInst(tei);
+    if(shouldBeDifferentiated(tei, getIndices()))
+      emitTangentForTupleExtractInst(tei);
   }
 
   void visitBranchInst(BranchInst *bi) {
