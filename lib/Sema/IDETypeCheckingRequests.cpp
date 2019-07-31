@@ -135,3 +135,10 @@ RootAndResultTypeOfKeypathDynamicMemberRequest::evaluate(Evaluator &evaluator,
          "invalid keypath dynamic member");
   return TypePair(genericArgs[0], genericArgs[1]);
 }
+
+llvm::Expected<bool>
+HasDynamicMemberLookupAttributeRequest::evaluate(Evaluator &evaluator,
+                                                 TypeBase *ty) const {
+  llvm::DenseMap<CanType, bool> DynamicMemberLookupCache;
+  return hasDynamicMemberLookupAttribute(Type(ty), DynamicMemberLookupCache);
+}

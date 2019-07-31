@@ -959,7 +959,8 @@ static void lookupVisibleDynamicMemberLookupDecls(
   if (!seenDynamicLookup.insert(baseType.getPointer()).second)
     return;
 
-  if (!hasDynamicMemberLookupAttribute(baseType))
+  if (!evaluateOrDefault(dc->getASTContext().evaluator,
+         HasDynamicMemberLookupAttributeRequest{baseType.getPointer()}, false))
     return;
 
   auto &ctx = dc->getASTContext();
