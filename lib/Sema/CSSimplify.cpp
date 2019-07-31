@@ -719,8 +719,7 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
 static std::tuple<ValueDecl *, bool, ArrayRef<Identifier>, bool,
                   ConstraintLocator *>
 getCalleeDeclAndArgs(ConstraintSystem &cs,
-                     ConstraintLocatorBuilder callBuilder,
-                     SmallVectorImpl<Identifier> &argLabelsScratch) {
+                     ConstraintLocatorBuilder callBuilder) {
   ArrayRef<Identifier> argLabels;
   bool hasTrailingClosure = false;
   ConstraintLocator *targetLocator = nullptr;
@@ -925,12 +924,11 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
   ValueDecl *callee;
   bool hasAppliedSelf;
   ArrayRef<Identifier> argLabels;
-  SmallVector<Identifier, 2> argLabelsScratch;
   bool hasTrailingClosure = false;
   ConstraintLocator *calleeLocator;
   std::tie(callee, hasAppliedSelf, argLabels, hasTrailingClosure,
            calleeLocator) =
-    getCalleeDeclAndArgs(cs, locator, argLabelsScratch);
+    getCalleeDeclAndArgs(cs, locator);
 
   ParameterListInfo paramInfo(params, callee, hasAppliedSelf);
 
