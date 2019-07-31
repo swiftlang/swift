@@ -896,12 +896,8 @@ static void checkOverrideAccessControl(ValueDecl *baseDecl, ValueDecl *decl,
     if (!shouldDiagnose && baseDecl->isSettable(dc)){
       auto matchASD = cast<AbstractStorageDecl>(baseDecl);
       if (matchASD->isSetterAccessibleFrom(dc)) {
-        // Match sure we've created the setter.
-        if (!matchASD->getSetter())
-          addExpectedOpaqueAccessorsToStorage(matchASD);
-
-        auto matchSetterAccessScope = matchASD->getSetter()
-          ->getFormalAccessScope(dc);
+        auto matchSetterAccessScope =
+          matchASD->getSetterFormalAccessScope(dc);
         auto requiredSetterAccessScope =
           matchSetterAccessScope.intersectWith(classAccessScope);
         auto setterScopeDC = requiredSetterAccessScope->getDeclContext();

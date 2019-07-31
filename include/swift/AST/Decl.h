@@ -4647,6 +4647,10 @@ public:
 
   AccessLevel getSetterFormalAccess() const;
 
+  AccessScope
+  getSetterFormalAccessScope(const DeclContext *useDC = nullptr,
+                             bool treatUsableFromInlineAsPublic = false) const;
+
   void setSetterAccess(AccessLevel accessLevel) {
     assert(!Accessors.getInt().hasValue());
     overwriteSetterAccess(accessLevel);
