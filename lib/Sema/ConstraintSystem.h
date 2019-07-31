@@ -1561,7 +1561,7 @@ public:
 
   /// Retrieve the argument info that is associated with a member
   /// reference at the given locator.
-  Optional<ArgumentInfo> getArgumentInfo(ConstraintLocatorBuilder locator);
+  Optional<ArgumentInfo> getArgumentInfo(ConstraintLocator *locator);
 
   ResolvedOverloadSetListItem *getResolvedOverloadSets() const {
     return resolvedOverloadSets;

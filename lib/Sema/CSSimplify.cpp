@@ -719,19 +719,21 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
 static std::tuple<ValueDecl *, bool, ArrayRef<Identifier>, bool,
                   ConstraintLocator *>
 getCalleeDeclAndArgs(ConstraintSystem &cs,
-                     ConstraintLocatorBuilder callLocator,
+                     ConstraintLocatorBuilder callBuilder,
                      SmallVectorImpl<Identifier> &argLabelsScratch) {
   ArrayRef<Identifier> argLabels;
   bool hasTrailingClosure = false;
   ConstraintLocator *targetLocator = nullptr;
 
+  auto *callLocator = cs.getConstraintLocator(callBuilder);
+  auto *callExpr = callLocator->getAnchor();
+
   // Break down the call.
-  SmallVector<LocatorPathElt, 2> path;
-  auto callExpr = callLocator.getLocatorParts(path);
   if (!callExpr)
     return std::make_tuple(nullptr, /*hasAppliedSelf=*/false, argLabels,
                            hasTrailingClosure, targetLocator);
 
+  auto path = callLocator->getPath();
   // Our remaining path can only be 'ApplyArgument'.
   if (!path.empty() &&
       !(path.size() <= 2 &&
@@ -4133,7 +4135,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     // the argument labels into the name: we don't want to look for
     // anything else, because the cost of the general search is so
     // high.
-    if (auto info = getArgumentInfo(ConstraintLocatorBuilder(memberLocator))) {
+    if (auto info = getArgumentInfo(memberLocator)) {
       memberName = DeclName(TC.Context, memberName.getBaseName(), info->Labels);
     }
   }
@@ -4410,7 +4412,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
       if (::hasDynamicMemberLookupAttribute(instanceTy,
                                             DynamicMemberLookupCache) &&
           isValidKeyPathDynamicMemberLookup(subscript, TC)) {
-        auto info = getArgumentInfo(ConstraintLocatorBuilder(memberLocator));
+        auto info = getArgumentInfo(memberLocator);
 
         if (!(info && info->Labels.size() == 1 &&
               info->Labels[0] == getASTContext().Id_dynamicMember)) {
@@ -5842,7 +5844,7 @@ Type ConstraintSystem::simplifyAppliedOverloads(
       return markFailure();
   };
 
-  auto argumentInfo = getArgumentInfo(locator);
+  auto argumentInfo = getArgumentInfo(getConstraintLocator(locator));
 
   // Consider each of the constraints in the disjunction.
 retry_after_fail:

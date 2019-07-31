@@ -2784,12 +2784,11 @@ void ConstraintSystem::generateConstraints(
 }
 
 Optional<ConstraintSystem::ArgumentInfo>
-ConstraintSystem::getArgumentInfo(const ConstraintLocatorBuilder builder) {
-  Expr *anchor = builder.getAnchor();
+ConstraintSystem::getArgumentInfo(ConstraintLocator *locator) {
+  Expr *anchor = locator->getAnchor();
   if (!anchor)
     return None;
 
-  ConstraintLocator *locator = nullptr;
   if (auto *apply = dyn_cast<ApplyExpr>(anchor)) {
     auto *fnExpr = getArgumentLabelTargetExpr(apply->getFn());
     locator = getConstraintLocator(fnExpr);
