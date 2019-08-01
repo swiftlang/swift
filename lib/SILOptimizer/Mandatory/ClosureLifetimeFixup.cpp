@@ -113,8 +113,10 @@ static void findReachableExitBlocks(SILInstruction *i,
       result.push_back(bb);
       continue;
     }
-    copy_if(bb->getSuccessorBlocks(), std::back_inserter(worklist),
-            [&](SILBasicBlock *bb) { return visitedBlocks.insert(bb).second; });
+    llvm::copy_if(bb->getSuccessorBlocks(), std::back_inserter(worklist),
+                  [&](SILBasicBlock *bb) {
+      return visitedBlocks.insert(bb).second;
+    });
   }
 }
 
@@ -186,11 +188,11 @@ cleanupDeadTrivialPhiArgs(SILValue initialValue,
 
       auto *termInst = cast<TermInst>(user);
       for (auto succBlockArgList : termInst->getSuccessorBlockArguments()) {
-        copy_if(succBlockArgList, std::back_inserter(worklist),
-                [&](SILPhiArgument *succArg) -> bool {
-                  auto it = lower_bound(insertedPhis, succArg);
-                  return it != insertedPhis.end() && *it == succArg;
-                });
+        llvm::copy_if(succBlockArgList, std::back_inserter(worklist),
+                      [&](SILPhiArgument *succArg) -> bool {
+                        auto it = lower_bound(insertedPhis, succArg);
+                        return it != insertedPhis.end() && *it == succArg;
+                      });
       }
     }
 
