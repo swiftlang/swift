@@ -100,10 +100,6 @@ public func testTopLevel() {
 #endif
 }
 
-// CHECK-LABEL: define linkonce_odr hidden swiftcc %swift.metadata_response @"$sSo10PrivFooSubCMa{{.*}} {
-// CHECK: %objc_class** @"OBJC_CLASS_REF_$_PrivFooSub"
-// CHECK: }
-
 _ = __PrivAnonymousA
 _ = __E0PrivA
 _ = __PrivE1A as __PrivE1

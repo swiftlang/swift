@@ -303,6 +303,16 @@ public:
       llvm::Intrinsic::getDeclaration(getModule(), intrinsicID, typeArgs);
     return CreateCall(intrinsicFn, args, name);
   }
+  
+  /// Create an expect intrinsic call.
+  llvm::CallInst *CreateExpect(llvm::Value *value,
+                               llvm::Value *expected,
+                               const Twine &name = "") {
+    return CreateIntrinsicCall(llvm::Intrinsic::expect,
+                               {value->getType()},
+                               {value, expected},
+                               name);
+  }
 
   /// Call the trap intrinsic. If optimizations are enabled, an inline asm
   /// gadget is emitted before the trap. The gadget inhibits transforms which

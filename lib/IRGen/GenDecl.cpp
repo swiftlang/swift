@@ -1248,6 +1248,14 @@ void IRGenerator::noteUseOfTypeGlobals(NominalTypeDecl *type,
                                        RequireMetadata_t requireMetadata) {
   if (!type)
     return;
+  
+  // Force emission of ObjC protocol descriptors used by type refs.
+  if (auto proto = dyn_cast<ProtocolDecl>(type)) {
+    if (proto->isObjC()) {
+      PrimaryIGM->getAddrOfObjCProtocolRecord(proto, NotForDefinition);
+      return;
+    }
+  }
 
   if (!hasLazyMetadata(type))
     return;
@@ -3411,20 +3419,27 @@ IRGenModule::getAddrOfGenericTypeMetadataAccessFunction(
 /// Get or create a type metadata cache variable.  These are an
 /// implementation detail of type metadata access functions.
 llvm::Constant *
-IRGenModule::getAddrOfTypeMetadataLazyCacheVariable(CanType type,
-                                              ForDefinition_t forDefinition) {
+IRGenModule::getAddrOfTypeMetadataLazyCacheVariable(CanType type) {
   assert(!type->hasArchetype() && !type->hasTypeParameter());
   LinkEntity entity = LinkEntity::forTypeMetadataLazyCacheVariable(type);
   auto variable =
-    getAddrOfLLVMVariable(entity, forDefinition, DebugTypeInfo());
+    getAddrOfLLVMVariable(entity, ForDefinition, DebugTypeInfo());
 
   // Zero-initialize if we're asking for a definition.
-  if (forDefinition) {
-    cast<llvm::GlobalVariable>(variable)->setInitializer(
-      llvm::ConstantPointerNull::get(TypeMetadataPtrTy));
-  }
+  cast<llvm::GlobalVariable>(variable)->setInitializer(
+    llvm::ConstantPointerNull::get(TypeMetadataPtrTy));
 
   return variable;
+}
+
+/// Get or create a type metadata cache variable.  These are an
+/// implementation detail of type metadata access functions.
+llvm::Constant *
+IRGenModule::getAddrOfTypeMetadataDemanglingCacheVariable(CanType type,
+                                                      ConstantInit definition) {
+  assert(!type->hasArchetype() && !type->hasTypeParameter());
+  LinkEntity entity = LinkEntity::forTypeMetadataDemanglingCacheVariable(type);
+  return getAddrOfLLVMVariable(entity, definition, DebugTypeInfo());
 }
 
 llvm::Constant *

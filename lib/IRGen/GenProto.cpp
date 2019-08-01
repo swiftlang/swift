@@ -1432,7 +1432,7 @@ llvm::Constant *IRGenModule::getAssociatedTypeWitness(Type type,
   auto role = inProtocolContext
     ? MangledTypeRefRole::DefaultAssociatedTypeWitness
     : MangledTypeRefRole::Metadata;
-  auto typeRef = getTypeRef(type, /*generic signature*/nullptr, role);
+  auto typeRef = getTypeRef(type, /*generic signature*/nullptr, role).first;
 
   // Set the low bit to indicate that this is a mangled name.
   auto witness = llvm::ConstantExpr::getPtrToInt(typeRef, IntPtrTy);

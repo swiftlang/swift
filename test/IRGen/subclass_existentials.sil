@@ -41,24 +41,9 @@ sil @takesMetadata : $@convention(thin) <T> (@thick T.Type) -> ()
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @checkMetadata()
 // CHECK-NEXT: entry:
-// CHECK-NEXT:   [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s21subclass_existentials1P_AA1CCXcMa"([[INT]] 0)
-// CHECK-NEXT:   [[TYPE:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
+// CHECK-NEXT:   [[TYPE:%.*]] = call {{.*}}@"$s21subclass_existentials1P_AA1CCXcMD"
 // CHECK-NEXT:   call swiftcc void @takesMetadata(%swift.type* [[TYPE]], %swift.type* [[TYPE]])
 // CHECK-NEXT:   ret void
-
-// CHECK-LABEL: define linkonce_odr hidden swiftcc %swift.metadata_response @"$s21subclass_existentials1P_AA1CCXcMa"
-// CHECK-SAME:    ([[INT]])
-// CHECK:      entry:
-// CHECK-NEXT:   [[PROTOCOL_ARRAY:%.*]] = alloca [1 x [[INT]]]
-// CHECK:      cacheIsNull:
-// CHECK:        [[PROTOCOLS:%.*]] = bitcast [1 x [[INT]]]* [[PROTOCOL_ARRAY]] to [[INT]]*
-// CHECK-NEXT:   [[PROTOCOL:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[PROTOCOLS]], i32 0
-// CHECK-NEXT:   store [[INT]] ptrtoint ({{.*}} @"$s21subclass_existentials1PMp" to [[INT]]), [[INT]]* [[PROTOCOL]]
-// CHECK-NEXT:   [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s21subclass_existentials1CCMa"([[INT]] 255)
-// CHECK-NEXT:   [[SUPERCLASS:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
-// CHECK-NEXT:   extractvalue %swift.metadata_response [[TMP]], 1
-// CHECK-NEXT:   [[METATYPE:%.*]] = call %swift.type* @swift_getExistentialTypeMetadata(i1 false, %swift.type* [[SUPERCLASS]], {{i32|i64}} 1, [[INT]]* [[PROTOCOLS]])
-// CHECK:        ret
 
 sil [ossa] @checkMetadata : $@convention(thin) () -> () {
 bb0:
