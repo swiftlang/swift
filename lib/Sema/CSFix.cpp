@@ -743,3 +743,17 @@ bool AllowTupleSplatForSingleParameter::attempt(
 
   return cs.recordFix(fix);
 }
+
+bool IgnoreContextualType::diagnose(Expr *root, bool asNote) const {
+  auto &cs = getConstraintSystem();
+  ContextualFailure failure(root, cs, getFromType(), getToType(), getLocator());
+  return failure.diagnose(asNote);
+}
+
+IgnoreContextualType *IgnoreContextualType::create(ConstraintSystem &cs,
+                                                   Type resultTy,
+                                                   Type specifiedTy,
+                                                   ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      IgnoreContextualType(cs, resultTy, specifiedTy, locator);
+}
