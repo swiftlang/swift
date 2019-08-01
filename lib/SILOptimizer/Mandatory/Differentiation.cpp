@@ -3277,7 +3277,9 @@ public:
     // If there's no active results, this function should not be differentiated.
     // Do standard cloning.
     if (!hasActiveResults || !hasActiveArguments) {
-      LLVM_DEBUG(getADDebugStream() << "No active results:\n" << *ai << '\n');
+      LLVM_DEBUG(getADDebugStream()
+                 << "No active results nor active arguments:\n"
+                 << *ai << '\n');
       TypeSubstCloner::visitApplyInst(ai);
       return;
     }
@@ -3744,8 +3746,12 @@ private:
   static SubstitutionMap getSubstitutionMap(SILFunction *original,
                                             SILFunction *jvp) {
     auto substMap = original->getForwardingSubstitutionMap();
-    if (auto *jvpGenEnv = jvp->getGenericEnvironment())
-      substMap = substMap.subst(jvpGenEnv->getForwardingSubstitutionMap());
+    if (auto *jvpGenEnv = jvp->getGenericEnvironment()) {
+      auto jvpSubstMap = jvpGenEnv->getForwardingSubstitutionMap();
+      substMap = SubstitutionMap::get(
+          jvpGenEnv->getGenericSignature(), QuerySubstitutionMap{jvpSubstMap},
+          LookUpConformanceInSubstitutionMap(jvpSubstMap));
+    }
     return substMap;
   }
 
@@ -4052,10 +4058,29 @@ private:
   // Differential type calculations
   //--------------------------------------------------------------------------//
 
+  /// Get the result of the `apply` instructions.
+  SILValue getApplyResult(ApplyInst *ai, unsigned source) {
+    SmallVector<SILValue, 8> dirResults;
+    collectAllExtractedElements(ai, dirResults);
+    SmallVector<SILValue, 8> allResults;
+    collectAllActualResultsInTypeOrder(
+        ai, dirResults, ai->getIndirectSILResults(), allResults);
+    return allResults[source];
+  }
+
   /// Substitutes all replacement types of the given substitution map using the
   /// adjoint function's substitution map.
   SubstitutionMap remapSubstitutionMapInDifferential(SubstitutionMap substMap) {
     return substMap.subst(getDifferential().getForwardingSubstitutionMap());
+#if 0
+    auto *diffGenEnv = getDifferential().getGenericEnvironment();
+    if (!diffGenEnv)
+      return substMap;
+    auto diffSubstMap = diffGenEnv->getForwardingSubstitutionMap();
+    return SubstitutionMap::get(
+        diffGenEnv->getGenericSignature(), QuerySubstitutionMap{diffSubstMap},
+        LookUpConformanceInSubstitutionMap(diffSubstMap));
+#endif
   }
 
   /// Remap any archetypes into the differential function's context.
@@ -4137,7 +4162,7 @@ private:
       assert(origResult->getType().isObject() &&
              "Should only be handling direct results for return inst");
         auto diffVal = getTangentValue(origResult);
-        auto val = materializeTangentDirect(diffVal, diffLoc);
+        auto val = materializeTangent(diffVal, diffLoc); // PROBLEM
         diffBuilder.createRetainValue(diffLoc, val, diffBuilder.getDefaultAtomicity());
         retElts.push_back(val);
     };
@@ -4149,25 +4174,12 @@ private:
         diffLoc, joinElements(retElts, diffBuilder, diffLoc));
   }
 
-  void emitTangentForReturnInst(ReturnInst *ri) {
-    auto loc = ri->getOperand().getLoc();
-    auto diffBuilder = getDifferentialBuilder();
-    // This vector will contain all the materialized return elements.
-    SmallVector<SILValue, 8> retElts;
-    // This vector will contain all indirect parameter tangent buffers.
-    // TODO: Handle indirect results.
-    auto tanParam =
-        materializeTangent(getTangentValue(ri->getOperand()), loc);
-    diffBuilder.createReturn(
-        ri->getLoc(), tanParam);
-  }
-
   void emitTangentForApplyInst(
       ApplyInst *ai, SILAutoDiffIndices indices,
       CanSILFunctionType originalDifferentialType) {
     auto *bb = ai->getParent();
     auto loc = ai->getLoc();
-    auto diffBuilder = getDifferentialBuilder();
+    auto &diffBuilder = getDifferentialBuilder();
 
     // Get the differential.
     auto *field = differentialInfo.lookUpLinearMapDecl(ai);
@@ -4229,8 +4241,7 @@ private:
     collectAllExtractedElements(ai, origDirResults);
     SmallVector<SILValue, 8> origAllResults;
     collectAllActualResultsInTypeOrder(
-        ai, origDirResults, ai->getIndirectSILResults(),
-        origAllResults);
+        ai, origDirResults, ai->getIndirectSILResults(), origAllResults);
     auto origResult = origAllResults[indices.source];
 
     // Get the differential results of the `apply` instructions.
@@ -4437,7 +4448,147 @@ private:
   }
 
   void emitTangentForArrayInitializationInst(ApplyInst *ai) {
-    llvm_unreachable("Unsupported SIL instruction.");
+    auto indices = getIndices();
+    auto *bb = ai->getParent();
+    auto loc = ai->getLoc();
+    auto &diffBuilder = getDifferentialBuilder();
+
+    assert(ai->getNumArguments() == 1);
+
+    // Step 1: Clone array size operand
+    // TODO: add cast assertion?
+    auto arraySizeOperand = cast<IntegerLiteralInst>(ai->getArgument(0));
+    auto integerLiteral = diffBuilder.createIntegerLiteral(
+        loc, arraySizeOperand->getType(), arraySizeOperand->getValue());
+    SmallVector<SILValue, 8> args;
+    args.push_back(integerLiteral);
+    SILValue arrayInit = diffBuilder.createFunctionRefFor(loc, ai->getCalleeFunction());
+
+    // Step 2: Apply _allocateUninitializedArray<A>, but remapping the
+    // substitution map to use τ_0_0.TangentVector.
+    llvm::errs() << "AI SUBST MAP VS DIFFERENTIAL SUBST MAP\n";
+    ai->getSubstitutionMap().dump();
+    getDifferential().getForwardingSubstitutionMap().dump();
+//    auto remappedSubs = ai->getSubstitutionMap().subst(
+//        getDifferential().getForwardingSubstitutionMap());
+//#if 0
+    // If the original `apply` instruction has a substitution map, then the
+    // applied function is specialized.
+    // In the differential, specialization is also necessary for parity. The
+    // original function operand is specialized with a remapped version of same
+    // substitution map using an argument-less `partial_apply`.
+    auto remappedSubs = remapSubstitutionMapInDifferential(
+        ai->getSubstitutionMap());
+    if (!ai->getSubstitutionMap().empty()) {
+      llvm::errs() << "REMAPPED SUBS\n";
+      remappedSubs.dump();
+      llvm::errs() << "SubstitutionMap()\n";
+      SubstitutionMap().dump();
+      arrayInit = getBuilder().createPartialApply(
+          ai->getLoc(), arrayInit, remappedSubs, {},
+          ParameterConvention::Direct_Guaranteed);
+      remappedSubs = SubstitutionMap();
+    }
+//#endif
+    auto *diffArrayInitInst =
+        diffBuilder.createApply(loc, arrayInit, remappedSubs, args);
+
+    // Step 3: Create the non-active `tuple_extract` instruction for the
+    // array pointer (second element in tuple).
+    auto *diffArray =
+        diffBuilder.createTupleExtract(loc, diffArrayInitInst, 0);
+    auto *diffRawPointerInst =
+        diffBuilder.createTupleExtract(loc, diffArrayInitInst, 1);
+
+    // Step 4: Get the `DifferentiableView` of the array.
+    SmallVector<SILValue, 8> diffArgs;
+    diffArgs.push_back(diffArray);
+    auto diffArrayView = getTangentSpace(ai->getType().getASTType());
+    auto metatypeType = CanMetatypeType::get(
+        diffArrayView->getCanonicalType(), MetatypeRepresentation::Thin);
+    auto metatype = diffBuilder.createMetatype(
+        loc, SILType::getPrimitiveObjectType(metatypeType));
+    diffArgs.push_back(metatype);
+    // Allocate memory for a `DifferentiableView` and add to the differential
+    // arguments for the creation of the returned `DifferentiableView`.
+    auto astType = diffArrayView->getCanonicalType();
+    auto typeDecl = astType->getStructOrBoundGenericStruct();
+    auto candidates = typeDecl->lookupDirect(DeclBaseName::createConstructor());
+    // Remove any initializer with argument lables, leaving `init(_:)`.
+    llvm::erase_if(candidates, [](ValueDecl *v) {
+      return llvm::any_of(v->getFullName().getArgumentNames(), [](Identifier id) {
+        return !id.empty();
+      });
+    });
+    assert(candidates.size() == 1 &&
+           "Expected single `DifferentiableView` intializer");
+    auto initDecl = cast<ConstructorDecl>(candidates.front());
+    SILDeclRef initRef(initDecl, SILDeclRef::Kind::Allocator);
+#if 0
+    auto *initFn = getModule().lookUpFunction(initRef);
+#endif
+    SILOptFunctionBuilder fb(context.getTransform());
+    auto *initFn = fb.getOrCreateFunction(
+        ai->getLoc(), initRef, NotForDefinition);
+    auto *fnRef = diffBuilder.createFunctionRef(ai->getLoc(), initFn);
+    auto *diffViewInitInst =
+        diffBuilder.createApply(loc, fnRef, remappedSubs, diffArgs);
+
+    // Add value map between `Array` init tuple and `DifferentiableView`.
+    setTangentValue(bb, ai, makeConcreteTangentValue(diffViewInitInst));
+
+
+    // Loop over all uses of the array initialization, making sure to handle
+    // any `tuple_extract` instructions. These instructions can either be
+    // for getting the array, or the `RawPointer`. We are only interested in
+    // adding additional instructions for the `RawPointer`, the second element
+    // in the array tuple as the array is already handled through it being
+    // chosen to be differentiated when using activity analysis.
+    for (auto aiUse : ai->getUses()) {
+      auto tei = dyn_cast<TupleExtractInst>(aiUse->getUser()->getResult(0));
+      // Only handle the `RawPointer` instructions.
+      if (!tei || tei->getFieldNo() != 1) continue;
+
+      // TODO: might not need a loop since there should be one use of `RawPointer`.
+      // Get the `pointer_to_address` instruction which is the instruction
+      // that wraps the `RawPointer` in order to do subsequent instructions
+      for (auto teiUse : tei->getUses()) {
+        // Add tangent map between the `pointer_to_address` result.
+        // TODO: add cast assertion?
+        auto pointerAddrInst = dyn_cast<PointerToAddressInst>(teiUse->getUser()->getResult(0));
+        assert(pointerAddrInst && "RawPointer only use should be a "
+                                  "'pointer_to_address' instruction");
+        auto originalResult =
+            pointerAddrInst->getResults()[indices.source];
+        auto tangentPointerAddrInst = diffBuilder.createPointerToAddress(
+            loc, diffRawPointerInst, pointerAddrInst->getType(),
+            pointerAddrInst->isStrict());
+        auto differentialResult = tangentPointerAddrInst
+            ->SILInstruction::getResults()[indices.source];
+        // Add tangent for original result.
+        // TODO: what about indirect results?
+        assert(indices.source == 0 && "Expected result index to be first.");
+        setTangentBuffer(bb, originalResult, differentialResult);
+
+        // Handle the uses of the array pointer which can be:
+        // - `StoreInst`
+        // - `CopyAddrInst`
+        // - `IndexAddrInst`
+//        for (auto pointerUse : teiUse->getUser()->getResult(0)->getUses()) {
+//          auto inst = pointerUse->getUser();
+//          if (auto si = dyn_cast<StoreInst>(inst)) {
+//            emitTangentForStoreInst(si);
+//          } else if (auto cai = dyn_cast<CopyAddrInst>(inst)) {
+//            llvm_unreachable("Can't handle 'copy_addr' instruction for "
+//                             "array yet");
+//          } else if (auto iai = dyn_cast<IndexAddrInst>(inst)) {
+//            llvm_unreachable("Can't handle 'index_addr' instruction for "
+//                             "array yet");
+//          }
+//        }
+      }
+    }
+
   }
 
   void emitTangentForTupleElementAddrInst(TupleElementAddrInst *teai) {
@@ -4481,12 +4632,13 @@ private:
     // If the tangent buffer of the source does not have a tuple type, then
     // it must represent a "single element tuple type". Use it directly.
     if (!tanSource->getType().is<TupleType>()) {
-      tanBuffer = tanSource;
+      setTangentValue(teai->getParent(), teai,
+                      makeConcreteTangentValue(tanSource));
     } else {
       tanBuffer = diffBuilder.createTupleExtract(
            loc, tanSource, tanIndex, tanType);
+      bufferMap.try_emplace({teai->getParent(), teai}, tanBuffer);
     }
-    bufferMap.try_emplace({teai->getParent(), teai}, tanBuffer);
   }
 
   void startDifferentialGeneration() {
@@ -4751,14 +4903,21 @@ public:
     return jvpBB;
   }
 
+  void visitArrayInitializationInst(ApplyInst *ai) {
+    TypeSubstCloner::visitApplyInst(ai);
+    emitTangentForArrayInitializationInst(ai);
+  }
+
   // If an `apply` has active results or active inout parameters, replace it
   // with an `apply` of its JVP.
   void visitApplyInst(ApplyInst *ai) {
+    // Handle array uninitialized allocation intrinsic specially.
+    if (ai->hasSemantics("array.uninitialized_intrinsic"))
+      return visitArrayInitializationInst(ai);
+
     // Special handling logic only applies when `apply` has active results or
     // active arguments at an active parameter position. If not, just do
     // standard cloning.
-//    if (ai->hasSemantics("array.uninitialized_intrinsic"))
-//      return emitTangentForArrayInitializationInst(ai);
     SmallVector<SILValue, 4> allResults;
     allResults.push_back(ai);
     allResults.append(ai->getIndirectSILResults().begin(),
@@ -4788,7 +4947,9 @@ public:
     // If there's no active results, this function should not be differentiated.
     // Do standard cloning.
     if (!hasActiveResults || !hasActiveArguments) {
-      LLVM_DEBUG(getADDebugStream() << "No active results:\n" << *ai << '\n');
+      LLVM_DEBUG(getADDebugStream()
+                 << "No active results nor active arguments:\n"
+                 << *ai << '\n');
       TypeSubstCloner::visitApplyInst(ai);
       return;
     }

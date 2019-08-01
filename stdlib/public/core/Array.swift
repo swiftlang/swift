@@ -1927,7 +1927,7 @@ extension Array where Element : Differentiable {
     // Maybe it's related to `@frozen`?
     // TODO: Determine if that is a bug, and fix.
     public var base: [Element] {
-      @differentiable(wrt: self, vjp: _vjpBase)
+      @differentiable(wrt: self, jvp: _jvpBase, vjp: _vjpBase)
       get { return _base }
       _modify { yield &_base }
     }
@@ -1938,14 +1938,26 @@ extension Array where Element : Differentiable {
       return (base, { $0 })
     }
 
+    @usableFromInline
+    func _jvpBase() ->
+      ([Element], (Array<Element>.TangentVector) -> TangentVector) {
+        return (base, { $0 })
+    }
+
     /// Creates a differentiable view of the given array.
-    @differentiable(wrt: base, vjp: _vjpInit)
+    @differentiable(wrt: base, jvp: _jvpInit, vjp: _vjpInit)
     public init(_ base: [Element]) { self._base = base }
 
     @usableFromInline
     static func _vjpInit(_ base: [Element]) ->
       (Array.DifferentiableView, (TangentVector) -> TangentVector) {
       return (Array.DifferentiableView(base), { $0 })
+    }
+
+    @usableFromInline
+    static func _jvpInit(_ base: [Element]) ->
+      (Array.DifferentiableView, (TangentVector) -> TangentVector) {
+        return (Array.DifferentiableView(base), { $0 })
     }
 
     // MARK: - Differentiable conformance.
