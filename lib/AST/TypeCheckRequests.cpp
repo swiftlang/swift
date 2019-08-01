@@ -615,6 +615,11 @@ void swift::simple_display(llvm::raw_ostream &os, PropertyWrapperMutability m) {
   os << "getter " << names[m.Getter] << ", setter " << names[m.Setter];
 }
 
+void swift::simple_display(llvm::raw_ostream &out,
+                           const ResilienceExpansion &value) {
+  out << value;
+}
+
 //----------------------------------------------------------------------------//
 // FunctionBuilder-related requests.
 //----------------------------------------------------------------------------//
