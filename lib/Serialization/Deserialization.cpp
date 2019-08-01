@@ -3892,7 +3892,7 @@ public:
       return nullptr;
     }
 
-    if (subscript->isSettable()) {
+    if (subscript->supportsMutation()) {
       if (auto setterAccess = getActualAccessLevel(rawSetterAccessLevel)) {
         subscript->setSetterAccess(*setterAccess);
       } else {

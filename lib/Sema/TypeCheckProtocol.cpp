@@ -398,8 +398,8 @@ swift::matchWitness(
       return RequirementMatch(witness, MatchKind::StaticNonStaticConflict);
 
     // If the requirement is settable and the witness is not, reject it.
-    if (req->isSettable(req->getDeclContext()) &&
-        !witness->isSettable(witness->getDeclContext()))
+    if (reqASD->isSettable(req->getDeclContext()) &&
+        !witnessASD->isSettable(witness->getDeclContext()))
       return RequirementMatch(witness, MatchKind::SettableConflict);
 
     // Validate that the 'mutating' bit lines up for getters and setters.
@@ -407,7 +407,7 @@ swift::matchWitness(
       return RequirementMatch(getStandinForAccessor(witnessASD, AccessorKind::Get),
                               MatchKind::MutatingConflict);
 
-    if (req->isSettable(req->getDeclContext())) {
+    if (reqASD->isSettable(req->getDeclContext())) {
       if (!reqASD->isSetterMutating() && witnessASD->isSetterMutating())
         return RequirementMatch(getStandinForAccessor(witnessASD, AccessorKind::Set),
                                 MatchKind::MutatingConflict);
@@ -1197,15 +1197,17 @@ bool WitnessChecker::checkWitnessAccess(ValueDecl *requirement,
       return true;
   }
 
-  if (requirement->isSettable(DC)) {
-    *isSetter = true;
+  if (auto *requirementASD = dyn_cast<AbstractStorageDecl>(requirement)) {
+    if (requirementASD->isSettable(DC)) {
+      *isSetter = true;
 
-    auto ASD = cast<AbstractStorageDecl>(witness);
+      auto witnessASD = cast<AbstractStorageDecl>(witness);
 
-    // See above about the forConformance flag.
-    if (!ASD->isSetterAccessibleFrom(actualScopeToCheck.getDeclContext(),
-                                     /*forConformance=*/true))
-      return true;
+      // See above about the forConformance flag.
+      if (!witnessASD->isSetterAccessibleFrom(actualScopeToCheck.getDeclContext(),
+                                              /*forConformance=*/true))
+        return true;
+    }
   }
 
   return false;

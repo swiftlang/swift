@@ -2588,12 +2588,6 @@ public:
   void setInterfaceType(Type type);
 
   bool hasValidSignature() const;
-
-  /// isSettable - Determine whether references to this decl may appear
-  /// on the left-hand side of an assignment or as the operand of a
-  /// `&` or 'inout' operator.
-  bool isSettable(const DeclContext *UseDC,
-                  const DeclRefExpr *base = nullptr) const;
   
   /// isInstanceMember - Determine whether this value is an instance member
   /// of an enum or protocol.
@@ -4546,6 +4540,12 @@ public:
     return getImplInfo().supportsMutation();
   }
 
+  /// isSettable - Determine whether references to this decl may appear
+  /// on the left-hand side of an assignment or as the operand of a
+  /// `&` or 'inout' operator.
+  bool isSettable(const DeclContext *UseDC,
+                  const DeclRefExpr *base = nullptr) const;
+
   /// Are there any accessors for this declaration, including implicit ones?
   bool hasAnyAccessors() const {
     return !getAllAccessors().empty();
@@ -4646,6 +4646,10 @@ public:
   }
 
   AccessLevel getSetterFormalAccess() const;
+
+  AccessScope
+  getSetterFormalAccessScope(const DeclContext *useDC = nullptr,
+                             bool treatUsableFromInlineAsPublic = false) const;
 
   void setSetterAccess(AccessLevel accessLevel) {
     assert(!Accessors.getInt().hasValue());
@@ -5484,9 +5488,6 @@ public:
   /// Compute the interface type of this subscript from the parameter and
   /// element types.
   void computeType();
-
-  /// Returns whether the result of the subscript operation can be set.
-  bool isSettable() const;
 
   /// Determine the kind of Objective-C subscripting this declaration
   /// implies.
@@ -7098,14 +7099,13 @@ public:
   }
 };
 
-inline bool ValueDecl::isSettable(const DeclContext *UseDC,
-                                  const DeclRefExpr *base) const {
-  if (auto vd = dyn_cast<VarDecl>(this)) {
+inline bool AbstractStorageDecl::isSettable(const DeclContext *UseDC,
+                                            const DeclRefExpr *base) const {
+  if (auto vd = dyn_cast<VarDecl>(this))
     return vd->isSettable(UseDC, base);
-  } else if (auto sd = dyn_cast<SubscriptDecl>(this)) {
-    return sd->isSettable();
-  } else
-    return false;
+
+  auto sd = cast<SubscriptDecl>(this);
+  return sd->supportsMutation();
 }
 
 inline void

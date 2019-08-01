@@ -241,7 +241,7 @@ public:
     llvm::Value *getterArgs[] = {classMetadata, sel, imp, types};
     Builder.CreateCall(class_replaceMethod, getterArgs);
 
-    if (subscript->isSettable()) {
+    if (subscript->supportsMutation()) {
       emitObjCSetterDescriptorParts(IGM, subscript,
                                     name, types, imp);
       sel = Builder.CreateCall(IGM.getObjCSelRegisterNameFn(),

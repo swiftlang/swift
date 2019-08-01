@@ -1452,7 +1452,7 @@ bool AssignmentFailure::diagnoseAsError() {
     // If the underlying expression was a read-only subscript, diagnose that.
     if (auto *SD = dyn_cast_or_null<SubscriptDecl>(choice->getDecl())) {
       StringRef message;
-      if (!SD->isSettable())
+      if (!SD->supportsMutation())
         message = "subscript is get-only";
       else if (!SD->isSetterAccessibleFrom(DC))
         message = "subscript setter is inaccessible";

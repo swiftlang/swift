@@ -1242,7 +1242,7 @@ SILFunction *irgen::emitObjCSetterDescriptorParts(IRGenModule &IGM,
                                                   llvm::Constant *&selectorRef,
                                                   llvm::Constant *&atEncoding,
                                                   llvm::Constant *&impl) {
-  assert(subscript->isSettable() && "not a settable subscript?!");
+  assert(subscript->supportsMutation() && "not a settable subscript?!");
 
   Selector setterSel(subscript, Selector::ForSetter);
   selectorRef = IGM.getAddrOfObjCMethodName(setterSel.str());

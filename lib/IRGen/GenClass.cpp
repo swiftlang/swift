@@ -22,6 +22,7 @@
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/IRGenOptions.h"
+#include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrettyStackTrace.h"
@@ -297,6 +298,9 @@ namespace {
                                   SILType classType,
                                   bool superclass) {
       for (VarDecl *var : theClass->getStoredProperties()) {
+        if (!var->hasInterfaceType())
+          IGM.Context.getLazyResolver()->resolveDeclSignature(var);
+
         SILType type = classType.getFieldType(var, IGM.getSILModule());
 
         // Lower the field type.

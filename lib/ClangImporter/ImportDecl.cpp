@@ -6693,7 +6693,7 @@ SwiftDeclConverter::importSubscript(Decl *decl,
     if (setter && existingSubscript && getterAndSetterInSameType) {
       // Can we update the subscript by adding the setter?
       if (existingSubscript->hasClangNode() &&
-          !existingSubscript->isSettable()) {
+          !existingSubscript->supportsMutation()) {
         // Create the setter thunk.
         auto setterThunk = buildSubscriptSetterDecl(
             Impl, existingSubscript, setter, elementTy,

@@ -4944,8 +4944,8 @@ public:
       if (F->hasForeignBody())
         return;
 
-      assert(F->isAvailableExternally() &&
-             "external declaration of internal SILFunction not allowed");
+      require(F->isAvailableExternally(),
+              "external declaration of internal SILFunction not allowed");
       // If F is an external declaration, there is nothing further to do,
       // return.
       return;
