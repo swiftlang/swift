@@ -1120,7 +1120,8 @@ public:
 
       if (hasDidSetOrWillSetDynamicReplacement &&
           isa<ExtensionDecl>(storage->getDeclContext()) &&
-          fd != storage->getDidSetFunc() && fd != storage->getWillSetFunc())
+          fd != storage->getAccessor(AccessorKind::WillSet) &&
+          fd != storage->getAccessor(AccessorKind::DidSet))
         return;
     }
     SGM.emitFunction(fd);
