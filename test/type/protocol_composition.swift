@@ -178,3 +178,10 @@ takesP1AndP2([Swift.DoesNotExist & P1 & P2]()) // expected-error {{module 'Swift
 typealias T08 = P1 & inout P2 // expected-error {{'inout' may only be used on parameters}}
 typealias T09 = P1 & __shared P2 // expected-error {{'__shared' may only be used on parameters}}
 typealias T10 = P1 & __owned P2 // expected-error {{'__owned' may only be used on parameters}}
+
+// Using a typealias of a protocol composition in a protocol composition
+protocol C { }
+protocol DA { }
+protocol DB { }
+typealias DD = DA & DB
+func composeTypealiasOfComposition<T: C & DD>(x: T) {}

@@ -1035,5 +1035,17 @@ swift::StructuralTypeRequest::evaluate(Evaluator &evaluator,
 
   auto typeRepr = D->getUnderlyingTypeLoc().getTypeRepr();
   auto resolution = TypeResolution::forStructural(D);
-  return resolution.resolveType(typeRepr, options);
+  auto resolvedType = resolution.resolveType(typeRepr, options);
+
+  // Wrap the resolved type in a TypeAliasType
+  auto *genericSig = D->getGenericSignature();
+  SubstitutionMap subs;
+  if (genericSig)
+    subs = genericSig->getIdentitySubstitutionMap();
+
+  Type parent;
+  auto parentDC = D->getDeclContext();
+  if (parentDC->isTypeContext())
+    parent = parentDC->getSelfInterfaceType();
+  return TypeAliasType::get(D, parent, subs, resolvedType);
 }
