@@ -134,7 +134,10 @@ bool TypeBase::isUninhabited() {
   // Empty enum declarations are uninhabited
   if (auto nominalDecl = getAnyNominal())
     if (auto enumDecl = dyn_cast<EnumDecl>(nominalDecl))
-      if (enumDecl->getAllElements().empty())
+      // Objective-C enums may be allowed to hold any value representable by
+      // the underlying type, but only if they come from clang.
+      if (enumDecl->getAllElements().empty() &&
+          !(enumDecl->isObjC() && enumDecl->hasClangNode()))
         return true;
   return false;
 }
