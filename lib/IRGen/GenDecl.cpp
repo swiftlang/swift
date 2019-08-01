@@ -47,6 +47,7 @@
 #include "llvm/Support/ConvertUTF.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/SaveAndRestore.h"
+#include "llvm/Target/TargetMachine.h"
 #include "llvm/Transforms/Utils/ModuleUtils.h"
 
 #include "Callee.h"
@@ -2570,7 +2571,11 @@ static llvm::GlobalVariable *createGOTEquivalent(IRGenModule &IGM,
   // rdar://problem/50968433: Unnamed_addr constants appear to get emitted
   // with incorrect alignment by the LLVM JIT in some cases. Don't use
   // unnamed_addr as a workaround.
-  if (!IGM.getOptions().UseJIT) {
+  // rdar://problem/53836960: i386 ld64 also mis-links relative references
+  // to GOT entries.
+  if (!IGM.getOptions().UseJIT
+      && (!IGM.Triple.isOSDarwin()
+          || IGM.Triple.getArch() != llvm::Triple::x86)) {
     gotEquivalent->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
   } else {
     ApplyIRLinkage(IRLinkage::InternalLinkOnceODR)
