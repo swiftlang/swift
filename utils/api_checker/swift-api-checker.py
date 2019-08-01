@@ -78,10 +78,10 @@ def create_directory(path):
 class DumpConfig:
     def __init__(self, tool_path, platform):
         target_map = {
-            'iphoneos': 'arm64-apple-ios10.0',
-            'macosx': 'x86_64-apple-macosx10.11',
-            'appletvos': 'arm64-apple-tvos10.0',
-            'watchos': 'armv7k-apple-watchos3.0',
+            'iphoneos': 'arm64-apple-ios13.0',
+            'macosx': 'x86_64-apple-macosx10.15',
+            'appletvos': 'arm64-apple-tvos13.0',
+            'watchos': 'armv7k-apple-watchos6.0',
         }
         self.tool_path = get_api_digester_path(tool_path)
         self.platform = platform
@@ -169,8 +169,8 @@ A convenient wrapper for swift-api-digester.
         the output file of the module baseline should end with .json
         ''')
 
-    basic_group.add_argument('--swift-version', default='4', help='''
-        Swift version to use; default is 4
+    basic_group.add_argument('--swift-version', default='5', help='''
+        Swift version to use; default is 5
         ''')
 
     basic_group.add_argument('--module', default=None, help='''
