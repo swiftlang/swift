@@ -714,6 +714,21 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
   return listener.relabelArguments(actualArgNames);
 }
 
+static bool hasAppliedSelf(ConstraintSystem &cs, const OverloadChoice &choice) {
+  auto *decl = choice.getDeclOrNull();
+  if (!decl)
+    return false;
+
+  auto baseType = choice.getBaseType();
+  if (baseType)
+    baseType = cs.getFixedTypeRecursive(baseType, /*wantRValue=*/true);
+
+  // In most cases where we reference a declaration with a curried self
+  // parameter, it gets dropped from the type of the reference.
+  return decl->hasCurriedSelf() &&
+         doesMemberRefApplyCurriedSelf(baseType, decl);
+}
+
 /// Find the callee declaration and uncurry level for a given call
 /// locator.
 static std::tuple<ValueDecl *, bool, ArrayRef<Identifier>, bool,
@@ -828,16 +843,8 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
 
   // If there's a declaration, return it.
   if (auto *decl = choice->getDeclOrNull()) {
-    auto baseType = choice->getBaseType();
-    if (baseType)
-      baseType = cs.getFixedTypeRecursive(baseType, /*wantRValue=*/true);
-
-    // In most cases where we reference a declaration with a curried self
-    // parameter, it gets dropped from the type of the reference.
-    bool hasAppliedSelf =
-        decl->hasCurriedSelf() && doesMemberRefApplyCurriedSelf(baseType, decl);
-    return std::make_tuple(decl, hasAppliedSelf, argLabels, hasTrailingClosure,
-                           calleeLocator);
+    return std::make_tuple(decl, hasAppliedSelf(cs, *choice), argLabels,
+                           hasTrailingClosure, calleeLocator);
   }
 
   return std::make_tuple(nullptr, /*hasAppliedSelf=*/false, argLabels,
@@ -2197,8 +2204,33 @@ bool ConstraintSystem::repairFailures(
   //     of the function value e.g. `foo = bar` or `foo = .bar`
   auto repairByInsertingExplicitCall = [&](Type srcType, Type dstType) -> bool {
     auto fnType = srcType->getAs<FunctionType>();
-    if (!fnType || fnType->getNumParams() > 0)
+    if (!fnType)
       return false;
+
+    // If argument is a function type and all of its parameters have
+    // default values, let's see whether error is related to missing
+    // explicit call.
+    if (fnType->getNumParams() > 0) {
+      auto *anchor =
+          simplifyLocatorToAnchor(*this, getConstraintLocator(locator));
+
+      if (!anchor)
+        return false;
+
+      auto *overload = findSelectedOverloadFor(anchor);
+      if (!(overload && overload->Choice.isDecl()))
+        return false;
+
+      const auto &choice = overload->Choice;
+      ParameterListInfo info(fnType->getParams(), choice.getDecl(),
+                             hasAppliedSelf(*this, choice));
+
+      if (llvm::any_of(indices(fnType->getParams()),
+                       [&info](const unsigned idx) {
+                         return !info.hasDefaultArgument(idx);
+                       }))
+        return false;
+    }
 
     auto resultType = fnType->getResult();
     // If this is situation like `x = { ... }` where closure results in

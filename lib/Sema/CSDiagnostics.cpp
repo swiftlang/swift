@@ -2006,7 +2006,6 @@ bool MissingCallFailure::diagnoseAsError() {
     case ConstraintLocator::ContextualType:
     case ConstraintLocator::ApplyArgToParam: {
       auto fnType = getType(baseExpr)->castTo<FunctionType>();
-      assert(fnType->getNumParams() == 0);
       emitDiagnostic(baseExpr->getLoc(), diag::missing_nullary_call,
                      fnType->getResult())
           .fixItInsertAfter(baseExpr->getEndLoc(), "()");
