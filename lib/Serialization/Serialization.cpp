@@ -3649,7 +3649,7 @@ public:
     uint8_t rawAccessLevel =
       getRawStableAccessLevel(subscript->getFormalAccess());
     uint8_t rawSetterAccessLevel = rawAccessLevel;
-    if (subscript->isSettable())
+    if (subscript->supportsMutation())
       rawSetterAccessLevel =
         getRawStableAccessLevel(subscript->getSetterFormalAccess());
     uint8_t rawStaticSpelling =
