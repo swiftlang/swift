@@ -576,7 +576,7 @@ extension A_SR_5030 {
   func foo() -> B_SR_5030<Int> {
     let tt : B_SR_5030<Int> = sr5030_exFalso()
     return tt.map { x in (idx: x) }
-    // expected-error@-1 {{cannot convert value of type '(idx: Int)' to closure result type 'Int'}}
+    // expected-error@-1 {{cannot convert return expression of type 'B_SR_5030<(idx: Int)>' to return type 'B_SR_5030<Int>'}}
   }
 }
 

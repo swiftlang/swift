@@ -772,8 +772,8 @@ secondArgumentNotLabeled(10, 20)
 func testImplConversion(a : Float?) -> Bool {}
 func testImplConversion(a : Int?) -> Bool {
   let someInt = 42
-  let a : Int = testImplConversion(someInt) // expected-error {{argument labels '(_:)' do not match any available overloads}}
-  // expected-note @-1 {{overloads for 'testImplConversion' exist with these partially matching parameter lists: (a: Float?), (a: Int?)}}
+  let a : Int = testImplConversion(someInt) // expected-error {{missing argument label 'a:' in call}} {{36-36=a: }}
+  // expected-error@-2 {{cannot convert value of type 'Bool' to specified type 'Int'}}
 }
 
 // <rdar://problem/23752537> QoI: Bogus error message: Binary operator '&&' cannot be applied to two 'Bool' operands
@@ -801,7 +801,7 @@ func read2(_ p: UnsafeMutableRawPointer, maxLength: Int) {}
 func read<T : BinaryInteger>() -> T? {
   var buffer : T 
   let n = withUnsafeMutablePointer(to: &buffer) { (p) in
-    read2(UnsafePointer(p), maxLength: MemoryLayout<T>.size) // expected-error {{cannot convert value of type 'UnsafePointer<_>' to expected argument type 'UnsafeMutableRawPointer'}}
+    read2(UnsafePointer(p), maxLength: MemoryLayout<T>.size) // expected-error {{cannot convert value of type 'UnsafePointer<Pointee>' to expected argument type 'UnsafeMutableRawPointer'}}
   }
 }
 
@@ -1236,7 +1236,7 @@ let baz4: ((Swift.Error)) = (Error()) //expected-error {{value of type 'diagnost
 
 // SyntaxSugarTypes with unresolved types
 func takesGenericArray<T>(_ x: [T]) {}
-takesGenericArray(1) // expected-error {{cannot convert value of type 'Int' to expected argument type 'Array<_>'}}
+takesGenericArray(1) // expected-error {{cannot convert value of type 'Int' to expected argument type 'Array<Element>'}}
 func takesNestedGenericArray<T>(_ x: [[T]]) {}
 takesNestedGenericArray(1) // expected-error {{cannot convert value of type 'Int' to expected argument type 'Array<Array<_>>'}}
 func takesSetOfGenericArrays<T>(_ x: Set<[T]>) {}
