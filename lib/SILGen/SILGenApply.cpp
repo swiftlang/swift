@@ -240,11 +240,11 @@ static void convertOwnershipConventionsGivenParamInfos(
     llvm::SmallVectorImpl<ManagedValue> &outVar) {
   assert(params.size() == values.size() &&
          "Different number of params from arguments");
-  transform(indices(params), std::back_inserter(outVar),
-            [&](unsigned i) -> ManagedValue {
-              return convertOwnershipConventionGivenParamInfo(
-                  SGF, params[i], values[i], loc, isForCoroutine);
-            });
+  llvm::transform(indices(params), std::back_inserter(outVar),
+                  [&](unsigned i) -> ManagedValue {
+                    return convertOwnershipConventionGivenParamInfo(
+                        SGF, params[i], values[i], loc, isForCoroutine);
+                  });
 }
 
 //===----------------------------------------------------------------------===//

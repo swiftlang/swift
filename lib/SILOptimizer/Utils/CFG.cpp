@@ -96,8 +96,8 @@ TermInst *swift::deleteEdgeValue(TermInst *branch, SILBasicBlock *destBlock,
     SmallVector<SILValue, 8> trueArgs;
     SmallVector<SILValue, 8> falseArgs;
 
-    copy(cbi->getTrueArgs(), std::back_inserter(trueArgs));
-    copy(cbi->getFalseArgs(), std::back_inserter(falseArgs));
+    llvm::copy(cbi->getTrueArgs(), std::back_inserter(trueArgs));
+    llvm::copy(cbi->getFalseArgs(), std::back_inserter(falseArgs));
 
     if (destBlock == cbi->getTrueBB()) {
       deleteTriviallyDeadOperandsOfDeadArgument(cbi->getTrueOperands(), argIndex);
@@ -120,7 +120,7 @@ TermInst *swift::deleteEdgeValue(TermInst *branch, SILBasicBlock *destBlock,
 
   if (auto *bi = dyn_cast<BranchInst>(branch)) {
     SmallVector<SILValue, 8> args;
-    copy(bi->getArgs(), std::back_inserter(args));
+    llvm::copy(bi->getArgs(), std::back_inserter(args));
 
     deleteTriviallyDeadOperandsOfDeadArgument(bi->getAllOperands(), argIndex);
     args.erase(args.begin() + argIndex);
@@ -635,10 +635,10 @@ void swift::completeJointPostDominanceSet(
   // add the predecessors to the worklist once.
   llvm::SmallVector<SILBasicBlock *, 32> Worklist;
   for (auto *Block : UserBlocks) {
-    copy_if(Block->getPredecessorBlocks(), std::back_inserter(Worklist),
-            [&](SILBasicBlock *PredBlock) -> bool {
-              return VisitedBlocks.insert(PredBlock).second;
-            });
+    llvm::copy_if(Block->getPredecessorBlocks(), std::back_inserter(Worklist),
+                  [&](SILBasicBlock *PredBlock) -> bool {
+                    return VisitedBlocks.insert(PredBlock).second;
+                  });
   }
 
   // Then until we reach a fix point.
@@ -666,15 +666,15 @@ void swift::completeJointPostDominanceSet(
       continue;
 
     // Otherwise add all unvisited predecessors to the worklist.
-    copy_if(Block->getPredecessorBlocks(), std::back_inserter(Worklist),
-            [&](SILBasicBlock *Block) -> bool {
-              return VisitedBlocks.insert(Block).second;
-            });
+    llvm::copy_if(Block->getPredecessorBlocks(), std::back_inserter(Worklist),
+                  [&](SILBasicBlock *Block) -> bool {
+                    return VisitedBlocks.insert(Block).second;
+                  });
   }
 
   // Now that we are done, add all remaining must visit blocks to our result
   // list. These are the remaining parts of our joint post-dominance closure.
-  copy(MustVisitSuccessorBlocks, std::back_inserter(Result));
+  llvm::copy(MustVisitSuccessorBlocks, std::back_inserter(Result));
 }
 
 bool swift::splitAllCondBrCriticalEdgesWithNonTrivialArgs(SILFunction &Fn,

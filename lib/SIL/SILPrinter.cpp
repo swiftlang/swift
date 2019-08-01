@@ -653,7 +653,7 @@ public:
       assert(!isa<SingleValueInstruction>(inst) && "SingleValueInstruction was "
                                                    "handled by the previous "
                                                    "value base check.");
-      copy(inst->getResults(), std::back_inserter(values));
+      llvm::copy(inst->getResults(), std::back_inserter(values));
     }
 
     // If the set of values is empty, we need to print the ID of
