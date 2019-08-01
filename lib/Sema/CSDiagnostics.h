@@ -698,6 +698,10 @@ private:
   /// Try to add a fix-it to convert a stored property into a computed
   /// property
   void tryComputedPropertyFixIts(Expr *expr) const;
+
+protected:
+  static Optional<Diag<Type, Type>>
+  getDiagnosticFor(ContextualTypePurpose context, bool forProtocol);
 };
 
 /// Diagnose failures related attempt to implicitly convert types which
@@ -1422,10 +1426,6 @@ public:
   }
 
   bool diagnoseAsError() override;
-
-private:
-  static Optional<Diag<Type, Type>>
-  getDiagnosticFor(ContextualTypePurpose purpose);
 };
 
 /// Diagnose generic argument omission e.g.

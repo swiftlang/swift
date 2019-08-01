@@ -1852,13 +1852,15 @@ bool ContextualFailure::diagnoseAsError() {
   }
 
   case ConstraintLocator::ContextualType: {
-    if (isKnownKeyPathType(FromType) && isKnownKeyPathType(ToType)) {
-      diagnostic = diag::cannot_convert_initializer_value;
+    auto &cs = getConstraintSystem();
+    if (auto msg = getDiagnosticFor(cs.getContextualTypePurpose(),
+                                    /*forProtocol=*/false)) {
+      diagnostic = *msg;
       break;
     }
-
-    LLVM_FALLTHROUGH;
+    return false;
   }
+
   default:
     return false;
   }
@@ -1969,6 +1971,60 @@ void ContextualFailure::tryComputedPropertyFixIts(Expr *expr) const {
       }
     }
   }
+}
+
+Optional<Diag<Type, Type>>
+ContextualFailure::getDiagnosticFor(ContextualTypePurpose context,
+                                    bool forProtocol) {
+  switch (context) {
+  case CTP_Initialization:
+    return forProtocol ? diag::cannot_convert_initializer_value_protocol
+                       : diag::cannot_convert_initializer_value;
+  case CTP_ReturnStmt:
+  case CTP_ReturnSingleExpr:
+    return forProtocol ? diag::cannot_convert_to_return_type_protocol
+                       : diag::cannot_convert_to_return_type;
+  case CTP_EnumCaseRawValue:
+    return diag::cannot_convert_raw_initializer_value;
+  case CTP_DefaultParameter:
+    return forProtocol ? diag::cannot_convert_default_arg_value_protocol
+                       : diag::cannot_convert_default_arg_value;
+  case CTP_YieldByValue:
+    return forProtocol ? diag::cannot_convert_yield_value_protocol
+                       : diag::cannot_convert_yield_value;
+  case CTP_CallArgument:
+    return forProtocol ? diag::cannot_convert_argument_value_protocol
+                       : diag::cannot_convert_argument_value;
+  case CTP_ClosureResult:
+    return forProtocol ? diag::cannot_convert_closure_result_protocol
+                       : diag::cannot_convert_closure_result;
+  case CTP_ArrayElement:
+    return forProtocol ? diag::cannot_convert_array_element_protocol
+                       : diag::cannot_convert_array_element;
+  case CTP_DictionaryKey:
+    return forProtocol ? diag::cannot_convert_dict_key_protocol
+                       : diag::cannot_convert_dict_key;
+  case CTP_DictionaryValue:
+    return forProtocol ? diag::cannot_convert_dict_value_protocol
+                       : diag::cannot_convert_dict_value;
+  case CTP_CoerceOperand:
+    return forProtocol ? diag::cannot_convert_coerce_protocol
+                       : diag::cannot_convert_coerce;
+  case CTP_AssignSource:
+    return forProtocol ? diag::cannot_convert_assign_protocol
+                       : diag::cannot_convert_assign;
+  case CTP_SubscriptAssignSource:
+    return forProtocol ? diag::cannot_convert_subscript_assign_protocol
+                       : diag::cannot_convert_subscript_assign;
+
+  case CTP_ThrowStmt:
+  case CTP_Unused:
+  case CTP_CannotFail:
+  case CTP_YieldByReference:
+  case CTP_CalleeResult:
+    break;
+  }
+  return None;
 }
 
 bool TupleContextualFailure::diagnoseAsError() {
@@ -3275,16 +3331,17 @@ bool MissingContextualConformanceFailure::diagnoseAsError() {
   if (path.empty()) {
     assert(isa<AssignExpr>(anchor));
     if (isa<SubscriptExpr>(cast<AssignExpr>(anchor)->getDest())) {
-      diagnostic = getDiagnosticFor(CTP_SubscriptAssignSource);
+      diagnostic =
+          getDiagnosticFor(CTP_SubscriptAssignSource, /*forProtocol=*/true);
     } else {
-      diagnostic = getDiagnosticFor(CTP_AssignSource);
+      diagnostic = getDiagnosticFor(CTP_AssignSource, /*forProtocol=*/true);
     }
   } else {
     const auto &last = path.back();
     switch (last.getKind()) {
     case ConstraintLocator::ContextualType:
       assert(Context != CTP_Unused);
-      diagnostic = getDiagnosticFor(Context);
+      diagnostic = getDiagnosticFor(Context, /*forProtocol=*/true);
       break;
 
     case ConstraintLocator::SequenceElementType: {
@@ -3314,48 +3371,6 @@ bool MissingContextualConformanceFailure::diagnoseAsError() {
   }
 
   return true;
-}
-
-Optional<Diag<Type, Type>>
-MissingContextualConformanceFailure::getDiagnosticFor(
-    ContextualTypePurpose context) {
-  switch (context) {
-  case CTP_Initialization:
-    return diag::cannot_convert_initializer_value_protocol;
-  case CTP_ReturnStmt:
-  case CTP_ReturnSingleExpr:
-    return diag::cannot_convert_to_return_type_protocol;
-  case CTP_EnumCaseRawValue:
-    return diag::cannot_convert_raw_initializer_value;
-  case CTP_DefaultParameter:
-    return diag::cannot_convert_default_arg_value_protocol;
-  case CTP_YieldByValue:
-    return diag::cannot_convert_yield_value_protocol;
-  case CTP_CallArgument:
-    return diag::cannot_convert_argument_value_protocol;
-  case CTP_ClosureResult:
-    return diag::cannot_convert_closure_result_protocol;
-  case CTP_ArrayElement:
-    return diag::cannot_convert_array_element_protocol;
-  case CTP_DictionaryKey:
-    return diag::cannot_convert_dict_key_protocol;
-  case CTP_DictionaryValue:
-    return diag::cannot_convert_dict_value_protocol;
-  case CTP_CoerceOperand:
-    return diag::cannot_convert_coerce_protocol;
-  case CTP_AssignSource:
-    return diag::cannot_convert_assign_protocol;
-  case CTP_SubscriptAssignSource:
-    return diag::cannot_convert_subscript_assign_protocol;
-
-  case CTP_ThrowStmt:
-  case CTP_Unused:
-  case CTP_CannotFail:
-  case CTP_YieldByReference:
-  case CTP_CalleeResult:
-    break;
-  }
-  return None;
 }
 
 bool MissingGenericArgumentsFailure::hasLoc(GenericTypeParamType *GP) const {
