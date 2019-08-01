@@ -271,6 +271,29 @@ toolchains::Darwin::addArgsToLinkARCLite(ArgStringList &Arguments,
 }
 
 void
+toolchains::Darwin::addSanitizerArgs(ArgStringList &Arguments,
+                                     const DynamicLinkJobAction &job,
+                                     const JobContext &context) const {
+  // Linking sanitizers will add rpaths, which might negatively interact when
+  // other rpaths are involved, so we should make sure we add the rpaths after
+  // all user-specified rpaths.
+  if (context.OI.SelectedSanitizers & SanitizerKind::Address)
+    addLinkSanitizerLibArgsForDarwin(context.Args, Arguments, "asan", *this);
+
+  if (context.OI.SelectedSanitizers & SanitizerKind::Thread)
+    addLinkSanitizerLibArgsForDarwin(context.Args, Arguments, "tsan", *this);
+
+  if (context.OI.SelectedSanitizers & SanitizerKind::Undefined)
+    addLinkSanitizerLibArgsForDarwin(context.Args, Arguments, "ubsan", *this);
+
+  // Only link in libFuzzer for executables.
+  if (job.getKind() == LinkKind::Executable &&
+      (context.OI.SelectedSanitizers & SanitizerKind::Fuzzer))
+    addLinkSanitizerLibArgsForDarwin(context.Args, Arguments, "fuzzer", *this,
+                                     /*shared=*/false);
+}
+
+void
 toolchains::Darwin::addArgsToLinkStdlib(ArgStringList &Arguments,
                                         const DynamicLinkJobAction &job,
                                         const JobContext &context) const {
@@ -556,23 +579,7 @@ toolchains::Darwin::constructInvocation(const DynamicLinkJobAction &job,
     Arguments.push_back("-application_extension");
   }
 
-  // Linking sanitizers will add rpaths, which might negatively interact when
-  // other rpaths are involved, so we should make sure we add the rpaths after
-  // all user-specified rpaths.
-  if (context.OI.SelectedSanitizers & SanitizerKind::Address)
-    addLinkSanitizerLibArgsForDarwin(context.Args, Arguments, "asan", *this);
-
-  if (context.OI.SelectedSanitizers & SanitizerKind::Thread)
-    addLinkSanitizerLibArgsForDarwin(context.Args, Arguments, "tsan", *this);
-
-  if (context.OI.SelectedSanitizers & SanitizerKind::Undefined)
-    addLinkSanitizerLibArgsForDarwin(context.Args, Arguments, "ubsan", *this);
-
-  // Only link in libFuzzer for executables.
-  if (job.getKind() == LinkKind::Executable &&
-      (context.OI.SelectedSanitizers & SanitizerKind::Fuzzer))
-    addLinkSanitizerLibArgsForDarwin(context.Args, Arguments, "fuzzer", *this,
-                                     /*shared=*/false);
+  addSanitizerArgs(Arguments, job, context);
 
   if (context.Args.hasArg(options::OPT_embed_bitcode,
                           options::OPT_embed_bitcode_marker)) {
