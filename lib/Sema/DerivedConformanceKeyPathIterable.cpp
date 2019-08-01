@@ -142,12 +142,10 @@ deriveKeyPathIterable_allKeyPaths(DerivedConformance &derived) {
   }
 
   // Create `allKeyPaths` getter.
-  auto *getterDecl = derived.declareDerivedPropertyGetter(
+  auto *getterDecl = derived.addGetterToReadOnlyDerivedProperty(
       allKeyPathsDecl, returnTy);
   getterDecl->setBodySynthesizer(
       deriveBodyKeyPathIterable_allKeyPaths, nullptr);
-  allKeyPathsDecl->setAccessors(StorageImplInfo::getImmutableComputed(),
-                                SourceLoc(), {getterDecl}, SourceLoc());
   derived.addMembersToConformanceContext({getterDecl, allKeyPathsDecl, pbDecl});
 
   return allKeyPathsDecl;

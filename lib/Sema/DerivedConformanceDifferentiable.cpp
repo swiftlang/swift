@@ -313,7 +313,7 @@ static ValueDecl *deriveDifferentiable_method(
   auto *parentDC = derived.getConformanceContext();
 
   auto *param =
-      new (C) ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+      new (C) ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(),
                         argumentName, SourceLoc(), parameterName, parentDC);
   param->setInterfaceType(parameterType);
   ParameterList *params = ParameterList::create(C, {param});
@@ -521,18 +521,13 @@ deriveDifferentiable_allDifferentiableVariables(DerivedConformance &derived) {
       C.Id_allDifferentiableVariables, returnInterfaceTy, returnTy,
       /*isStatic*/ false, /*isFinal*/ true);
 
-  auto *getterDecl = derived.declareDerivedPropertyGetter(
-      allDiffableVarsDecl, returnTy);
+  AccessorDecl *getterDecl;
+  AccessorDecl *setterDecl;
+  std::tie(getterDecl, setterDecl) =
+      derived.addGetterAndSetterToMutableDerivedProperty(allDiffableVarsDecl,
+                                                         returnTy);
   getterDecl->setBodySynthesizer(&derivedBody_allDifferentiableVariablesGetter);
-
-  auto *setterDecl = derived.declareDerivedPropertySetter(
-      derived.TC, allDiffableVarsDecl, returnTy);
   setterDecl->setBodySynthesizer(&derivedBody_allDifferentiableVariablesSetter);
-
-  allDiffableVarsDecl->setAccessors(StorageImplInfo::getMutableComputed(),
-                                    SourceLoc(), {getterDecl, setterDecl},
-                                    SourceLoc());
-
   derived.addMembersToConformanceContext(
       {getterDecl, setterDecl, allDiffableVarsDecl, pbDecl});
 
@@ -674,7 +669,7 @@ getOrSynthesizeSingleAssociatedStruct(DerivedConformance &derived,
     // Add this member's corresponding associated type to the parent's
     // associated struct.
     auto *newMember = new (C) VarDecl(
-        member->isStatic(), member->getSpecifier(), member->isCaptureList(),
+        member->isStatic(), member->getIntroducer(), member->isCaptureList(),
         /*NameLoc*/ SourceLoc(), member->getName(), structDecl);
     // NOTE: `newMember` is not marked as implicit here, because that affects
     // memberwise initializer synthesis.

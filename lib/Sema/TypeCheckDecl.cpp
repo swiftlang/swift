@@ -642,10 +642,10 @@ TypeChecker::handleSILGenericParams(GenericParamList *genericParams,
 }
 
 /// Build a default initializer for the given type.
-static Expr *buildDefaultInitializer(TypeChecker &tc, Type type) {
+Expr *TypeChecker::buildDefaultInitializer(Type type) {
   // Default-initialize optional types and weak values to 'nil'.
   if (type->getReferenceStorageReferent()->getOptionalObjectType())
-    return new (tc.Context) NilLiteralExpr(SourceLoc(), /*Implicit=*/true);
+    return new (Context) NilLiteralExpr(SourceLoc(), /*Implicit=*/true);
 
   // Build tuple literals for tuple types.
   if (auto tupleType = type->getAs<TupleType>()) {
@@ -654,14 +654,14 @@ static Expr *buildDefaultInitializer(TypeChecker &tc, Type type) {
       if (elt.isVararg())
         return nullptr;
 
-      auto eltInit = buildDefaultInitializer(tc, elt.getType());
+      auto eltInit = buildDefaultInitializer(elt.getType());
       if (!eltInit)
         return nullptr;
 
       inits.push_back(eltInit);
     }
 
-    return TupleExpr::createImplicit(tc.Context, inits, { });
+    return TupleExpr::createImplicit(Context, inits, { });
   }
 
   // We don't default-initialize anything else.
@@ -946,56 +946,44 @@ static bool contextAllowsPatternBindingWithoutVariables(DeclContext *dc) {
   return true;
 }
 
-static VarDecl *getStoredPropertyFor(VarDecl *var) {
-  if (var->isStatic())
-    return nullptr;
+static bool hasStoredProperties(NominalTypeDecl *decl) {
+  return (isa<StructDecl>(decl) ||
+          (isa<ClassDecl>(decl) && !decl->hasClangNode()));
+}
 
-  if (var->isLazyStorageProperty())
-    return nullptr;
+static void computeLoweredStoredProperties(NominalTypeDecl *decl) {
+  // Just walk over the members of the type, forcing backing storage
+  // for lazy properties and property wrappers to be synthesized.
+  for (auto *member : decl->getMembers()) {
+    auto *var = dyn_cast<VarDecl>(member);
+    if (!var || var->isStatic())
+      continue;
 
-  if (var->getOriginalWrappedProperty())
-    return nullptr;
+    if (var->getAttrs().hasAttribute<LazyAttr>())
+      (void) var->getLazyStorageProperty();
 
-  if (var->getAttrs().hasAttribute<LazyAttr>()) {
-    if (auto *storage = var->getLazyStorageProperty()) {
-      assert(storage->hasStorage());
-      return storage;
-    }
-
-    return nullptr;
+    if (var->hasAttachedPropertyWrapper())
+      (void) var->getPropertyWrapperBackingProperty();
   }
-
-  if (var->hasAttachedPropertyWrapper()) {
-    if (auto *storage = var->getPropertyWrapperBackingProperty()) {
-      assert(storage->hasStorage());
-      return storage;
-    }
-
-    return nullptr;
-  }
-
-  if (var->getAttrs().hasAttribute<NSManagedAttr>())
-    return nullptr;
-
-  if (!var->hasStorage())
-    return nullptr;
-
-  return var;
 }
 
 llvm::Expected<ArrayRef<VarDecl *>>
 StoredPropertiesRequest::evaluate(Evaluator &evaluator,
                                   NominalTypeDecl *decl) const {
-  if (isa<EnumDecl>(decl) ||
-      isa<ProtocolDecl>(decl) ||
-      (isa<ClassDecl>(decl) && decl->hasClangNode()))
+  if (!hasStoredProperties(decl))
     return ArrayRef<VarDecl *>();
 
   SmallVector<VarDecl *, 4> results;
+
+  // Unless we're in a source file we don't have to do anything
+  // special to lower lazy properties and property wrappers.
+  if (isa<SourceFile>(decl->getModuleScopeContext()))
+    computeLoweredStoredProperties(decl);
+
   for (auto *member : decl->getMembers()) {
     if (auto *var = dyn_cast<VarDecl>(member))
-      if (auto *storage = getStoredPropertyFor(var))
-        results.push_back(storage);
+      if (!var->isStatic() && var->hasStorage())
+        results.push_back(var);
   }
 
   return decl->getASTContext().AllocateCopy(results);
@@ -1004,16 +992,20 @@ StoredPropertiesRequest::evaluate(Evaluator &evaluator,
 llvm::Expected<ArrayRef<Decl *>>
 StoredPropertiesAndMissingMembersRequest::evaluate(Evaluator &evaluator,
                                                    NominalTypeDecl *decl) const {
-  if (isa<EnumDecl>(decl) ||
-      isa<ProtocolDecl>(decl) ||
-      (isa<ClassDecl>(decl) && decl->hasClangNode()))
+  if (!hasStoredProperties(decl))
     return ArrayRef<Decl *>();
 
   SmallVector<Decl *, 4> results;
+
+  // Unless we're in a source file we don't have to do anything
+  // special to lower lazy properties and property wrappers.
+  if (isa<SourceFile>(decl->getModuleScopeContext()))
+    computeLoweredStoredProperties(decl);
+
   for (auto *member : decl->getMembers()) {
     if (auto *var = dyn_cast<VarDecl>(member))
-      if (auto *storage = getStoredPropertyFor(var))
-        results.push_back(storage);
+      if (!var->isStatic() && var->hasStorage())
+        results.push_back(var);
 
     if (auto missing = dyn_cast<MissingMemberDecl>(member))
       if (missing->getNumberOfFieldOffsetVectorEntries() > 0)
@@ -1291,6 +1283,38 @@ ExistentialConformsToSelfRequest::evaluate(Evaluator &evaluator,
   // Check whether any of the inherited protocols fail to conform to themselves.
   for (auto proto : decl->getInheritedProtocols()) {
     if (!proto->existentialConformsToSelf())
+      return false;
+  }
+
+  return true;
+}
+
+llvm::Expected<bool>
+ExistentialTypeSupportedRequest::evaluate(Evaluator &evaluator,
+                                          ProtocolDecl *decl) const {
+  // ObjC protocols can always be existential.
+  if (decl->isObjC())
+    return true;
+
+  for (auto member : decl->getMembers()) {
+    // Existential types cannot be used if the protocol has an associated type.
+    if (isa<AssociatedTypeDecl>(member))
+      return false;
+
+    // For value members, look at their type signatures.
+    if (auto valueMember = dyn_cast<ValueDecl>(member)) {
+      if (!valueMember->hasInterfaceType())
+        if (auto *resolver = decl->getASTContext().getLazyResolver())
+          resolver->resolveDeclSignature(valueMember);
+
+      if (!decl->isAvailableInExistential(valueMember))
+        return false;
+    }
+  }
+
+  // Check whether all of the inherited protocols support existential types.
+  for (auto proto : decl->getInheritedProtocols()) {
+    if (!proto->existentialTypeSupported())
       return false;
   }
 
@@ -2180,16 +2204,22 @@ IsGetterMutatingRequest::evaluate(Evaluator &evaluator,
     return result;
   }
 
-  // If we have an attached property wrapper, the getter is mutating if
-  // the "value" property of the outermost wrapper type is mutating and we're
-  // in a context that has value semantics.
+  // If we have an attached property wrapper, the getter's mutating-ness
+  // depends on the composition of the wrappers.
   if (auto var = dyn_cast<VarDecl>(storage)) {
-    if (auto wrapperInfo = var->getAttachedPropertyWrapperTypeInfo(0)) {
-      if (wrapperInfo.valueVar &&
-          (!storage->getGetter() || storage->getGetter()->isImplicit())) {
-        return wrapperInfo.valueVar->isGetterMutating() && result;
-      }
+    if (auto mut = var->getPropertyWrapperMutability()) {
+      return mut->Getter == PropertyWrapperMutability::Mutating
+        && result;
     }
+  }
+
+  // Protocol requirements are always written as '{ get }' or '{ get set }';
+  // the @_borrowed attribute determines if getReadImpl() becomes Get or Read.
+  if (isa<ProtocolDecl>(storage->getDeclContext())) {
+    if (!storage->getGetter())
+      return false;
+
+    return storage->getGetter()->isMutating();
   }
 
   switch (storage->getReadImpl()) {
@@ -2221,15 +2251,12 @@ IsSetterMutatingRequest::evaluate(Evaluator &evaluator,
   bool result = (!storage->isStatic() &&
                  doesContextHaveValueSemantics(storage->getDeclContext()));
 
-  // If we have an attached property wrapper, the setter is mutating if
-  // the "value" property of the outermost wrapper type is mutating and we're
-  // in a context that has value semantics.
+  // If we have an attached property wrapper, the setter is mutating
+  // or not based on the composition of the wrappers.
   if (auto var = dyn_cast<VarDecl>(storage)) {
-    if (auto wrapperInfo = var->getAttachedPropertyWrapperTypeInfo(0)) {
-      if (wrapperInfo.valueVar &&
-          (!storage->getSetter() || storage->getSetter()->isImplicit())) {
-        return wrapperInfo.valueVar->isSetterMutating() && result;
-      }
+    if (auto mut = var->getPropertyWrapperMutability()) {
+      return mut->Setter == PropertyWrapperMutability::Mutating
+        && result;
     }
   }
 
@@ -2596,7 +2623,7 @@ public:
           PBD->getPattern(i)->hasStorage() &&
           !PBD->getPattern(i)->getType()->hasError()) {
         auto type = PBD->getPattern(i)->getType();
-        if (auto defaultInit = buildDefaultInitializer(TC, type)) {
+        if (auto defaultInit = TC.buildDefaultInitializer(type)) {
           // If we got a default initializer, install it and re-type-check it
           // to make sure it is properly coerced to the pattern type.
           PBD->setInit(i, defaultInit);
@@ -3771,8 +3798,36 @@ void bindFuncDeclToOperator(TypeChecker &TC, FuncDecl *FD) {
   }
 
   if (!op) {
-    // FIXME: Add Fix-It introducing an operator declaration?
-    TC.diagnose(FD, diag::declared_operator_without_operator_decl);
+    SourceLoc insertionLoc;
+    if (isa<SourceFile>(FD->getParent())) {
+      // Parent context is SourceFile, insertion location is start of func declaration
+      // or unary operator
+      insertionLoc = FD->isUnaryOperator() ? FD->getAttrs().getStartLoc() : FD->getStartLoc();
+    } else {
+      // Finding top-level decl context before SourceFile and inserting before it
+      for (DeclContext *CurContext = FD->getLocalContext();
+           !isa<SourceFile>(CurContext);
+           CurContext = CurContext->getParent()) {
+        insertionLoc = CurContext->getAsDecl()->getStartLoc();
+      }
+    }
+
+    SmallString<128> insertion;
+    auto numOfParams = FD->getParameters()->size();
+    if (numOfParams == 1) {
+      if (FD->getAttrs().hasAttribute<PrefixAttr>())
+        insertion += "prefix operator ";
+      else
+        insertion += "postfix operator ";
+    } else if (numOfParams == 2) {
+      insertion += "infix operator ";
+    }
+
+    insertion += operatorName.str();
+    insertion += " : <# Precedence Group #>\n";
+    InFlightDiagnostic opDiagnostic = TC.diagnose(FD, diag::declared_operator_without_operator_decl);
+    if (insertionLoc.isValid())
+      opDiagnostic.fixItInsert(insertionLoc, insertion);
     return;
   }
 
@@ -3962,14 +4017,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     nominal->setSignatureIsValidated();
 
     validateAttributes(*this, D);
-
-    if (auto CD = dyn_cast<ClassDecl>(nominal)) {
-      // Determine whether we require in-class initializers.
-      if (CD->getAttrs().hasAttribute<RequiresStoredPropertyInitsAttr>() ||
-          (CD->hasSuperclass() &&
-           CD->getSuperclassDecl()->requiresStoredPropertyInits()))
-        CD->setRequiresStoredPropertyInits(true);
-    }
 
     if (auto *ED = dyn_cast<EnumDecl>(nominal)) {
       // @objc enums use their raw values as the value representation, so we

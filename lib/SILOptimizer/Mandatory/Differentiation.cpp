@@ -408,7 +408,7 @@ private:
     auto &astCtx = nominal->getASTContext();
     auto id = astCtx.getIdentifier(name);
     auto *varDecl = new (astCtx) VarDecl(
-        /*IsStatic*/ false, VarDecl::Specifier::Var,
+        /*IsStatic*/ false, VarDecl::Introducer::Var,
         /*IsCaptureList*/ false, SourceLoc(), id, nominal);
     varDecl->setAccess(nominal->getEffectiveAccess());
     if (type->hasArchetype())
@@ -507,7 +507,7 @@ private:
           predPBStruct->getDeclaredInterfaceType()->getCanonicalType();
       // Create dummy declaration representing enum case parameter.
       auto *decl = new (astCtx)
-          ParamDecl(VarDecl::Specifier::Default, loc, loc, Identifier(), loc,
+          ParamDecl(ParamDecl::Specifier::Default, loc, loc, Identifier(), loc,
                     Identifier(), moduleDecl);
       if (predPBStructTy->hasArchetype())
         decl->setInterfaceType(predPBStructTy->mapTypeOutOfContext());

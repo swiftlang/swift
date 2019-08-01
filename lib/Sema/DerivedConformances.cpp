@@ -484,10 +484,20 @@ addGetterToReadOnlyDerivedProperty(VarDecl *property,
   auto getter =
     declareDerivedPropertyGetter(property, propertyContextType);
 
-  property->setAccessors(StorageImplInfo::getImmutableComputed(),
-                         SourceLoc(), {getter}, SourceLoc());
+  property->setImplInfo(StorageImplInfo::getImmutableComputed());
+  property->setAccessors(SourceLoc(), {getter}, SourceLoc());
 
   return getter;
+}
+
+std::pair<AccessorDecl *, AccessorDecl *>
+DerivedConformance::addGetterAndSetterToMutableDerivedProperty(
+    VarDecl *property, Type propertyContextType) {
+  auto *getter = declareDerivedPropertyGetter(property, propertyContextType);
+  auto *setter = declareDerivedPropertySetter(property, propertyContextType);
+  property->setImplInfo(StorageImplInfo::getMutableComputed());
+  property->setAccessors(SourceLoc(), {getter, setter}, SourceLoc());
+  return std::make_pair(getter, setter);
 }
 
 AccessorDecl *
@@ -526,18 +536,17 @@ DerivedConformance::declareDerivedPropertyGetter(VarDecl *property,
 
 // SWIFT_ENABLE_TENSORFLOW
 AccessorDecl *
-DerivedConformance::declareDerivedPropertySetter(TypeChecker &tc,
-                                                 VarDecl *property,
+DerivedConformance::declareDerivedPropertySetter(VarDecl *property,
                                                  Type propertyContextType) {
   bool isStatic = property->isStatic();
   bool isFinal = property->isFinal();
 
-  auto &C = tc.Context;
+  auto &C = property->getASTContext();
   auto parentDC = property->getDeclContext();
 
   auto propertyInterfaceType = property->getInterfaceType();
   auto propertyParam = new (C)
-    ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+    ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(),
               Identifier(), property->getLoc(), C.getIdentifier("newValue"),
               parentDC);
   propertyParam->setInterfaceType(propertyInterfaceType);
@@ -580,7 +589,7 @@ DerivedConformance::declareDerivedProperty(Identifier name,
   auto &C = TC.Context;
   auto parentDC = getConformanceContext();
 
-  VarDecl *propDecl = new (C) VarDecl(/*IsStatic*/isStatic, VarDecl::Specifier::Var,
+  VarDecl *propDecl = new (C) VarDecl(/*IsStatic*/isStatic, VarDecl::Introducer::Var,
                                       /*IsCaptureList*/false, SourceLoc(), name,
                                       parentDC);
   // SWIFT_ENABLE_TENSORFLOW

@@ -34,7 +34,7 @@ using namespace swift::syntax;
 
 TypeRepr *Parser::applyAttributeToType(TypeRepr *ty,
                                        const TypeAttributes &attrs,
-                                       VarDecl::Specifier specifier,
+                                       ParamDecl::Specifier specifier,
                                        SourceLoc specifierLoc) {
   // Apply those attributes that do apply.
   if (!attrs.empty()) {
@@ -44,19 +44,16 @@ TypeRepr *Parser::applyAttributeToType(TypeRepr *ty,
   // Apply 'inout' or '__shared' or '__owned'
   if (specifierLoc.isValid()) {
     switch (specifier) {
-    case VarDecl::Specifier::Owned:
+    case ParamDecl::Specifier::Owned:
       ty = new (Context) OwnedTypeRepr(ty, specifierLoc);
       break;
-    case VarDecl::Specifier::InOut:
+    case ParamDecl::Specifier::InOut:
       ty = new (Context) InOutTypeRepr(ty, specifierLoc);
       break;
-    case VarDecl::Specifier::Shared:
+    case ParamDecl::Specifier::Shared:
       ty = new (Context) SharedTypeRepr(ty, specifierLoc);
       break;
-    case VarDecl::Specifier::Default:
-      break;
-    case VarDecl::Specifier::Var:
-      llvm_unreachable("cannot have var as specifier");
+    case ParamDecl::Specifier::Default:
       break;
     }
   }
@@ -347,7 +344,7 @@ ParserResult<TypeRepr> Parser::parseSILBoxType(GenericParamList *generics,
                                      LBraceLoc, Fields, RBraceLoc,
                                      LAngleLoc, Args, RAngleLoc);
   return makeParserResult(applyAttributeToType(repr, attrs,
-                                               VarDecl::Specifier::Owned,
+                                               ParamDecl::Specifier::Owned,
                                                SourceLoc()));
 }
 
@@ -367,7 +364,7 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
   SyntaxParsingContext TypeParsingContext(SyntaxContext,
                                           SyntaxContextKind::Type);
   // Parse attributes.
-  VarDecl::Specifier specifier;
+  ParamDecl::Specifier specifier;
   SourceLoc specifierLoc;
   TypeAttributes attrs;
   parseTypeAttributeList(specifier, specifierLoc, attrs);

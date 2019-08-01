@@ -228,7 +228,7 @@ static ValueDecl *deriveMathOperator(DerivedConformance &derived,
   // Create parameter declaration with the given name and type.
   auto createParamDecl = [&](StringRef name, Type type) -> ParamDecl * {
     auto *param = new (C)
-        ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+        ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(),
                   Identifier(), SourceLoc(), C.getIdentifier(name), parentDC);
     param->setInterfaceType(type);
     return param;
@@ -386,10 +386,8 @@ deriveRingProperty(DerivedConformance &derived, Identifier propertyName,
 
   // Create ring property getter.
   auto *getterDecl =
-      derived.declareDerivedPropertyGetter(propDecl, returnTy);
+      derived.addGetterToReadOnlyDerivedProperty(propDecl, returnTy);
   getterDecl->setBodySynthesizer(bodySynthesizer.Fn, bodySynthesizer.Context);
-  propDecl->setAccessors(StorageImplInfo::getImmutableComputed(), SourceLoc(),
-                         {getterDecl}, SourceLoc());
   derived.addMembersToConformanceContext({getterDecl, propDecl, pbDecl});
 
   return propDecl;

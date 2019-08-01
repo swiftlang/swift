@@ -3012,10 +3012,10 @@ bool Parser::parseDeclModifierList(DeclAttributes &Attributes,
 ///     '@' attribute
 ///     '@' attribute attribute-list-clause
 /// \endverbatim
-bool Parser::parseTypeAttributeListPresent(VarDecl::Specifier &Specifier,
+bool Parser::parseTypeAttributeListPresent(ParamDecl::Specifier &Specifier,
                                            SourceLoc &SpecifierLoc,
                                            TypeAttributes &Attributes) {
-  Specifier = VarDecl::Specifier::Default;
+  Specifier = ParamDecl::Specifier::Default;
   while (Tok.is(tok::kw_inout) ||
          (Tok.is(tok::identifier) &&
           (Tok.getRawText().equals("__shared") ||
@@ -3025,12 +3025,12 @@ bool Parser::parseTypeAttributeListPresent(VarDecl::Specifier &Specifier,
         .fixItRemove(SpecifierLoc);
     } else {
       if (Tok.is(tok::kw_inout)) {
-        Specifier = VarDecl::Specifier::InOut;
+        Specifier = ParamDecl::Specifier::InOut;
       } else if (Tok.is(tok::identifier)) {
         if (Tok.getRawText().equals("__shared")) {
-          Specifier = VarDecl::Specifier::Shared;
+          Specifier = ParamDecl::Specifier::Shared;
         } else if (Tok.getRawText().equals("__owned")) {
-          Specifier = VarDecl::Specifier::Owned;
+          Specifier = ParamDecl::Specifier::Owned;
         }
       }
     }
@@ -4918,7 +4918,7 @@ static ParamDecl *createSetterAccessorArgument(SourceLoc nameLoc,
   }
 
   auto result = new (P.Context)
-      ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+      ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(),
                 Identifier(), nameLoc, name, P.CurDeclContext);
   if (isNameImplicit)
     result->setImplicit();
@@ -5067,16 +5067,9 @@ struct Parser::ParsedAccessors {
 #include "swift/AST/AccessorKinds.def"
 
   void record(Parser &P, AbstractStorageDecl *storage, bool invalid,
-              ParseDeclOptions flags, SourceLoc staticLoc,
-              const DeclAttributes &attrs,
-              TypeLoc elementTy, ParameterList *indices,
               SmallVectorImpl<Decl *> &decls);
 
-  StorageImplInfo
-  classify(Parser &P, AbstractStorageDecl *storage, bool invalid,
-           ParseDeclOptions flags, SourceLoc staticLoc,
-           const DeclAttributes &attrs,
-           TypeLoc elementTy, ParameterList *indices);
+  void classify(Parser &P, AbstractStorageDecl *storage, bool invalid);
 
   /// Add an accessor.  If there's an existing accessor of this kind,
   /// return it.  The new accessor is still remembered but will be
@@ -5436,7 +5429,7 @@ Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
   VarDecl *storage = PrimaryVar;
   if (!storage) {
     storage = new (Context) VarDecl(StaticLoc.isValid(),
-                                    VarDecl::Specifier::Var,
+                                    VarDecl::Introducer::Var,
                                     /*is capture list*/ false,
                                     VarLoc, Identifier(),
                                     CurDeclContext);
@@ -5497,21 +5490,10 @@ Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
       DiagID = diag::let_cannot_be_computed_property;
 
     diagnose(accessors.LBLoc, DiagID).fixItReplace(VarLoc, "var");
-    PrimaryVar->setSpecifier(VarDecl::Specifier::Var);
     Invalid = true;
   }
 
-  // Lazy var should not have explicit getter/setter.
-  // For error-recovery, we mark them as invalid.
-  if (Attributes.hasAttribute<LazyAttr>()){
-    if (accessors.Get)
-      accessors.Get->setInvalid();
-    if (accessors.Set)
-      accessors.Set->setInvalid();
-  }
-
-  accessors.record(*this, PrimaryVar, Invalid, Flags, StaticLoc,
-                   Attributes, TyLoc, /*indices*/ nullptr, Decls);
+  accessors.record(*this, PrimaryVar, Invalid, Decls);
 
   return makeParserResult(PrimaryVar);
 }
@@ -5538,29 +5520,17 @@ AccessorDecl *Parser::ParsedAccessors::add(AccessorDecl *accessor) {
 
 /// Record a bunch of parsed accessors into the given abstract storage decl.
 void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
-                                     bool invalid, ParseDeclOptions flags,
-                                     SourceLoc staticLoc,
-                                     const DeclAttributes &attrs,
-                                     TypeLoc elementTy, ParameterList *indices,
+                                     bool invalid,
                                      SmallVectorImpl<Decl *> &decls) {
-  auto storageKind = classify(P, storage, invalid, flags, staticLoc, attrs,
-                              elementTy, indices);
+  classify(P, storage, invalid);
 
   decls.append(Accessors.begin(), Accessors.end());
-
-  storage->setAccessors(storageKind, LBLoc, Accessors, RBLoc);
+  storage->setAccessors(LBLoc, Accessors, RBLoc);
 }
 
 static void flagInvalidAccessor(AccessorDecl *func) {
   if (func) {
     func->setInvalid();
-  }
-}
-
-static void ignoreInvalidAccessor(AccessorDecl *&func) {
-  if (func) {
-    flagInvalidAccessor(func);
-    func = nullptr;
   }
 }
 
@@ -5574,7 +5544,7 @@ static void diagnoseConflictingAccessors(Parser &P, AccessorDecl *first,
   P.diagnose(first->getLoc(), diag::previous_accessor,
              getAccessorNameForDiagnostic(first, /*article*/ false),
              /*already*/ false);
-  ignoreInvalidAccessor(second);
+  flagInvalidAccessor(second);
 }
 
 template <class... DiagArgs>
@@ -5584,90 +5554,16 @@ static void diagnoseAndIgnoreObservers(Parser &P,
                         typename std::enable_if<true, DiagArgs>::type... args) {
   if (auto &accessor = accessors.WillSet) {
     P.diagnose(accessor->getLoc(), diagnostic, /*willSet*/ 0, args...);
-    ignoreInvalidAccessor(accessor);
+    flagInvalidAccessor(accessor);
   }
   if (auto &accessor = accessors.DidSet) {
     P.diagnose(accessor->getLoc(), diagnostic, /*didSet*/ 1, args...);
-    ignoreInvalidAccessor(accessor);
+    flagInvalidAccessor(accessor);
   }
 }
 
-/// Gets the storage info of the provided storage decl if it has the
-/// @_hasStorage attribute and it's not in SIL mode.
-///
-/// In this case, we say the decl is:
-///
-/// Read:
-///   - Stored, always
-/// Write:
-///   - Stored, if the decl is a 'var'.
-///   - StoredWithObservers, if the decl has a setter
-///     - This indicates that the original decl had a 'didSet' and/or 'willSet'
-///   - InheritedWithObservers, if the decl has a setter and is an overridde.
-///   - Immutable, if the decl is a 'let' or it does not have a setter.
-/// ReadWrite:
-///   - Stored, if the decl has no accessors listed.
-///   - Immutable, if the decl is a 'let' or it does not have a setter.
-///   - MaterializeToTemporary, if the decl has a setter.
-static StorageImplInfo classifyWithHasStorageAttr(
-  Parser::ParsedAccessors &accessors, ASTContext &ctx,
-  AbstractStorageDecl *storage, const DeclAttributes &attrs) {
-
-  // Determines if the storage is immutable, either by declaring itself as a
-  // `let` or by omitting a setter.
-  auto isImmutable = [&]() {
-    if (auto varDecl = dyn_cast<VarDecl>(storage))
-      return varDecl->isImmutable();
-    if (accessors.Set == nullptr) return true;
-    return false;
-  };
-
-  // Determines if the storage had a private setter, i.e. it's not a 'let' and
-  // it had a setter.
-  auto isPrivateSet = [&]() {
-    if (auto varDecl = dyn_cast<VarDecl>(storage))
-      return !varDecl->isImmutable() && accessors.Set == nullptr;
-    return false;
-  };
-
-  // Default to stored writes.
-  WriteImplKind writeImpl = WriteImplKind::Stored;
-  ReadWriteImplKind readWriteImpl = ReadWriteImplKind::Stored;
-
-  if (accessors.Get && accessors.Set) {
-    // If we see `@_hasStorage var x: T { get set }`, then our property has
-    // willSet/didSet observers.
-    writeImpl = attrs.hasAttribute<OverrideAttr>() ?
-      WriteImplKind::InheritedWithObservers :
-      WriteImplKind::StoredWithObservers;
-    readWriteImpl = ReadWriteImplKind::MaterializeToTemporary;
-  } else if (isImmutable()) {
-    writeImpl = WriteImplKind::Immutable;
-    readWriteImpl = ReadWriteImplKind::Immutable;
-  }
-
-  if (isPrivateSet()) {
-    // If we saw a 'var' with no setter, that means it was
-    // private/internal(set). Honor that with a synthesized attribute.
-    storage->getAttrs().add(
-      new (ctx) SetterAccessAttr(
-        SourceLoc(), SourceLoc(), AccessLevel::Private, /*implicit: */true));
-  }
-
-  // Always force Stored reads if @_hasStorage is present.
-  return StorageImplInfo(ReadImplKind::Stored, writeImpl, readWriteImpl);
-}
-
-StorageImplInfo
-Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
-                                  bool invalid, ParseDeclOptions flags,
-                                  SourceLoc staticLoc,
-                                  const DeclAttributes &attrs,
-                                  TypeLoc elementTy, ParameterList *indices) {
-  GenericParamList *genericParams = nullptr;
-  if (auto *subscript = dyn_cast<SubscriptDecl>(storage))
-    genericParams = subscript->getGenericParams();
-
+void Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
+                                       bool invalid) {
   // If there was a problem parsing accessors, mark all parsed accessors
   // as invalid to avoid tripping up later invariants.
   // We also want to avoid diagnose missing accessors if something
@@ -5691,35 +5587,19 @@ Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
       diagnoseAndIgnoreObservers(P, *this,
                    diag::observing_accessor_conflicts_with_accessor,
                    getAccessorNameForDiagnostic(nonObserver, /*article*/ true));
-
-    // Otherwise, we have either a stored or inherited observing property.
-    } else {
-      if (attrs.hasAttribute<OverrideAttr>()) {
-        return StorageImplInfo(ReadImplKind::Inherited,
-                               WriteImplKind::InheritedWithObservers,
-                               ReadWriteImplKind::MaterializeToTemporary);
-      } else {
-        return StorageImplInfo(ReadImplKind::Stored,
-                               WriteImplKind::StoredWithObservers,
-                               ReadWriteImplKind::MaterializeToTemporary);
-      }
     }
   }
 
   // Okay, observers are out of the way.
-  assert(!WillSet && !DidSet);
 
   // 'get', 'read', and a non-mutable addressor are all exclusive.
-  ReadImplKind readImpl;
   if (Get) {
     diagnoseConflictingAccessors(P, Get, Read);
     diagnoseConflictingAccessors(P, Get, Address);
-    readImpl = ReadImplKind::Get;
   } else if (Read) {
     diagnoseConflictingAccessors(P, Read, Address);
-    readImpl = ReadImplKind::Read;
   } else if (Address) {
-    readImpl = ReadImplKind::Address;
+    // Nothing can go wrong.
 
   // If there's a writing accessor of any sort, there must also be a
   // reading accessor.
@@ -5735,77 +5615,21 @@ Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
                  getAccessorNameForDiagnostic(mutator, /*article*/ true));
     }
 
-    readImpl = ReadImplKind::Get;
-
   // Subscripts always have to have some sort of accessor; they can't be
   // purely stored.
   } else if (isa<SubscriptDecl>(storage)) {
     if (!invalid) {
       P.diagnose(LBLoc, diag::subscript_without_get);
     }
-
-    readImpl = ReadImplKind::Get;
-
-  // Otherwise, it's stored.
-  } else {
-    readImpl = ReadImplKind::Stored;
   }
 
   // A mutable addressor is exclusive with 'set' and 'modify', but
   // 'set' and 'modify' can appear together.
-  // Prefer using 'set' and 'modify' over a mutable addressor.
-  WriteImplKind writeImpl;
-  ReadWriteImplKind readWriteImpl;
   if (Set) {
     diagnoseConflictingAccessors(P, Set, MutableAddress);
-    writeImpl = WriteImplKind::Set;
-    if (Modify) {
-      readWriteImpl = ReadWriteImplKind::Modify;
-    } else {
-      readWriteImpl = ReadWriteImplKind::MaterializeToTemporary;
-    }
   } else if (Modify) {
     diagnoseConflictingAccessors(P, Modify, MutableAddress);
-    writeImpl = WriteImplKind::Modify;
-    readWriteImpl = ReadWriteImplKind::Modify;
-  } else if (MutableAddress) {
-    writeImpl = WriteImplKind::MutableAddress;
-    readWriteImpl = ReadWriteImplKind::MutableAddress;
-
-  // Otherwise, it's stored if there was no specific reading accessor.
-  } else if (readImpl == ReadImplKind::Stored) {
-    writeImpl = WriteImplKind::Stored;
-    readWriteImpl = ReadWriteImplKind::Stored;
-
-  // Otherwise, it's immutable.
-  } else {
-    writeImpl = WriteImplKind::Immutable;
-    readWriteImpl = ReadWriteImplKind::Immutable;
   }
-
-  // Allow the @_hasStorage attribute to override all the accessors we parsed
-  // when making the final classification.
-  if (attrs.hasAttribute<HasStorageAttr>()) {
-    // The SIL rules for @_hasStorage are slightly different from the non-SIL
-    // rules. In SIL mode, @_hasStorage marks that the type is simply stored,
-    // and the only thing that determines mutability is the existence of the
-    // setter.
-    //
-    // FIXME: SIL should not be special cased here. The behavior should be
-    //        consistent between SIL and non-SIL.
-    //        The strategy here should be to keep track of all opaque accessors
-    //        along with enough information to access the storage trivially
-    //        if allowed. This could be a representational change to
-    //        StorageImplInfo such that it keeps a bitset of listed accessors
-    //        and dynamically determines the access strategy from that.
-    if (P.isInSILMode())
-      return StorageImplInfo::getSimpleStored(
-        StorageIsMutable_t(Set != nullptr));
-
-    return classifyWithHasStorageAttr(*this, P.Context, storage, attrs);
-  }
-
-  return StorageImplInfo(readImpl, writeImpl, readWriteImpl);
 }
 
 
@@ -6020,11 +5844,6 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
       // global, record it.
       PBDEntries.back().setInitContext(initContext);
 
-      // If the attributes include @lazy, flag that on each initializer.
-      if (Attributes.hasAttribute<LazyAttr>()) {
-        PBDEntries.back().setInitializerSubsumed();
-      }
-
       if (init.hasCodeCompletion()) {
         Status |= init;
         // If we are doing second pass of code completion, we don't want to
@@ -6046,12 +5865,6 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
                              PatternInit != nullptr, Attributes, Decls);
       if (boundVar.hasCodeCompletion())
         return makeResult(makeParserCodeCompletionStatus());
-      if (PatternInit && boundVar.isNonNull() &&
-          !boundVar.get()->hasStorage()) {
-        diagnose(pattern->getLoc(), diag::getset_init)
-            .highlight(PatternInit->getSourceRange());
-        PatternInit = nullptr;
-      }
     }
     
     // Add all parsed vardecls to this scope.
@@ -7216,9 +7029,7 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
     Invalid = true;
   }
 
-  accessors.record(*this, Subscript, (Invalid || !Status.isSuccess()),
-                   Flags, StaticLoc, Attributes,
-                   ElementTy.get(), Indices.get(), Decls);
+  accessors.record(*this, Subscript, (Invalid || !Status.isSuccess()), Decls);
 
   // No need to setLocalDiscriminator because subscripts cannot
   // validly appear outside of type decls.
