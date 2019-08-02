@@ -2292,25 +2292,8 @@ Constraint *ConstraintSystem::selectDisjunction() {
   auto minDisjunction =
       std::min_element(disjunctions.begin(), disjunctions.end(),
                        [&](Constraint *first, Constraint *second) -> bool {
-                         unsigned firstFavored = first->countFavoredNestedConstraints();
-                         unsigned secondFavored = second->countFavoredNestedConstraints();
-
-                         if (firstFavored == secondFavored) {
-                           // Look for additional choices to favor
-                           SmallVector<Constraint *, 4> firstExisting;
-                           SmallVector<Constraint *, 4> secondExisting;
-
-                           existingOperatorBindingsForDisjunction(*cs, first->getNestedConstraints(), firstExisting);
-                           firstFavored = firstExisting.size() ?: first->countActiveNestedConstraints();
-                           existingOperatorBindingsForDisjunction(*cs, second->getNestedConstraints(), secondExisting);
-                           secondFavored = secondExisting.size() ?: second->countActiveNestedConstraints();
-
-                           return firstFavored < secondFavored;
-                         } else {
-                           firstFavored = firstFavored ?: first->countActiveNestedConstraints();
-                           secondFavored = secondFavored ?: second->countActiveNestedConstraints();
-                           return firstFavored < secondFavored;
-                         }
+                         return first->countActiveNestedConstraints() <
+                                second->countActiveNestedConstraints();
                        });
 
   if (minDisjunction != disjunctions.end())
