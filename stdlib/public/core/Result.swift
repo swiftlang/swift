@@ -163,6 +163,14 @@ extension Result where Failure == Swift.Error {
   }
 }
 
+extension Result where Success == Void {
+  /// A success, without passing `Void` explicitly as a the `Success` value.
+  @_transparent
+  public static var success: Result<Success, Failure> {
+    return .success(())
+  }
+}
+
 extension Result: Equatable where Success: Equatable, Failure: Equatable { }
 
 extension Result: Hashable where Success: Hashable, Failure: Hashable { }
