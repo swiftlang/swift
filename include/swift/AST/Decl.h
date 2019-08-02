@@ -4635,16 +4635,6 @@ public:
     return SourceRange();
   }
 
-  /// Retrieve the getter used to access the value of this variable.
-  AccessorDecl *getGetter() const {
-    return getAccessor(AccessorKind::Get);
-  }
-  
-  /// Retrieve the setter used to mutate the value of this variable.
-  AccessorDecl *getSetter() const {
-    return getAccessor(AccessorKind::Set);
-  }
-
   AccessLevel getSetterFormalAccess() const;
 
   AccessScope
@@ -4657,45 +4647,6 @@ public:
   }
 
   void overwriteSetterAccess(AccessLevel accessLevel);
-
-  /// Return the decl for the immutable addressor if it exists.
-  AccessorDecl *getAddressor() const {
-    return getAccessor(AccessorKind::Address);
-  }
-
-  /// Return the decl for the mutable accessor if it exists.
-  AccessorDecl *getMutableAddressor() const {
-    return getAccessor(AccessorKind::MutableAddress);
-  }
-
-  /// Return the appropriate addressor for the given access kind.
-  AccessorDecl *getAddressorForAccess(AccessKind accessKind) const {
-    if (accessKind == AccessKind::Read)
-      return getAddressor();
-    return getMutableAddressor();
-  }
-
-  /// Return the decl for the 'read' coroutine accessor if it exists.
-  AccessorDecl *getReadCoroutine() const {
-    return getAccessor(AccessorKind::Read);
-  }
-
-  /// Return the decl for the 'modify' coroutine accessor if it exists.
-  AccessorDecl *getModifyCoroutine() const {
-    return getAccessor(AccessorKind::Modify);
-  }
-
-  /// Return the decl for the willSet specifier if it exists, this is
-  /// only valid on a declaration with Observing storage.
-  AccessorDecl *getWillSetFunc() const {
-    return getAccessor(AccessorKind::WillSet);
-  }
-
-  /// Return the decl for the didSet specifier if it exists, this is
-  /// only valid on a declaration with Observing storage.
-  AccessorDecl *getDidSetFunc() const {
-    return getAccessor(AccessorKind::DidSet);
-  }
 
   /// Given that this is an Objective-C property or subscript declaration,
   /// produce its getter selector.
@@ -7111,11 +7062,11 @@ inline bool AbstractStorageDecl::isSettable(const DeclContext *UseDC,
 inline void
 AbstractStorageDecl::overwriteSetterAccess(AccessLevel accessLevel) {
   Accessors.setInt(accessLevel);
-  if (auto setter = getSetter())
+  if (auto setter = getAccessor(AccessorKind::Set))
     setter->overwriteAccess(accessLevel);
-  if (auto modify = getModifyCoroutine())
+  if (auto modify = getAccessor(AccessorKind::Modify))
     modify->overwriteAccess(accessLevel);
-  if (auto mutableAddressor = getMutableAddressor())
+  if (auto mutableAddressor = getAccessor(AccessorKind::MutableAddress))
     mutableAddressor->overwriteAccess(accessLevel);
 }
 

@@ -2384,6 +2384,7 @@ namespace {
           importedName.getDeclName().getBaseIdentifier(),
           Impl.importSourceLoc(decl->getLocation()), None, nullptr, dc);
       enumDecl->computeType();
+      enumDecl->setMemberLoader(&Impl, 0);
       return enumDecl;
     }
 
@@ -3241,6 +3242,7 @@ namespace {
 
       // Import each of the members.
       SmallVector<VarDecl *, 4> members;
+      SmallVector<FuncDecl *, 4> methods;
       SmallVector<ConstructorDecl *, 4> ctors;
 
       // FIXME: Import anonymous union fields and support field access when
@@ -3305,6 +3307,10 @@ namespace {
           continue;
         }
 
+        if (auto MD = dyn_cast<FuncDecl>(member)) {
+          methods.push_back(MD);
+          continue;
+        }
         auto VD = cast<VarDecl>(member);
 
         if (isa<clang::IndirectFieldDecl>(nd) || decl->isUnion()) {
@@ -3382,9 +3388,13 @@ namespace {
       for (auto member : members) {
         result->addMember(member);
       }
-      
+
       for (auto ctor : ctors) {
         result->addMember(ctor);
+      }
+
+      for (auto method : methods) {
+        result->addMember(method);
       }
 
       result->setHasUnreferenceableStorage(hasUnreferenceableStorage);
@@ -3617,13 +3627,13 @@ namespace {
       case ImportedAccessorKind::PropertyGetter: {
         auto property = getImplicitProperty(importedName, decl);
         if (!property) return nullptr;
-        return property->getGetter();
+        return property->getAccessor(AccessorKind::Get);
       }
 
       case ImportedAccessorKind::PropertySetter:
         auto property = getImplicitProperty(importedName, decl);
         if (!property) return nullptr;
-        return property->getSetter();
+        return property->getAccessor(AccessorKind::Set);
       }
 
       return importFunctionDecl(decl, importedName, correctSwiftName, None);
@@ -3639,7 +3649,8 @@ namespace {
         return nullptr;
 
       DeclName name = accessorInfo ? DeclName() : importedName.getDeclName();
-      if (importedName.importAsMember()) {
+
+      if (!dc->isModuleScopeContext() && !isa<clang::CXXMethodDecl>(decl)) {
         // Handle initializers.
         if (name.getBaseName() == DeclBaseName::createConstructor()) {
           assert(!accessorInfo);
@@ -3681,6 +3692,19 @@ namespace {
                                               /*throws*/ false,
                                               dc, decl);
 
+      if (auto *mdecl = dyn_cast<clang::CXXMethodDecl>(decl)) {
+        if (!mdecl->isStatic()) {
+          // Workaround until proper const support is handled: Force
+          // everything to be mutating. This implicitly makes the parameter
+          // indirect.
+          result->setSelfAccessKind(SelfAccessKind::Mutating);
+          // "self" is the first argument.
+          result->setSelfIndex(0);
+        } else {
+          result->setStatic();
+          result->setImportAsStaticMember();
+        }
+      }
       result->computeType();
       result->setValidationToChecked();
       result->setIsObjC(false);
@@ -3722,8 +3746,7 @@ namespace {
     }
 
     Decl *VisitCXXMethodDecl(const clang::CXXMethodDecl *decl) {
-      // FIXME: Import C++ member functions as methods.
-      return nullptr;
+      return VisitFunctionDecl(decl);
     }
 
     Decl *VisitFieldDecl(const clang::FieldDecl *decl) {
@@ -4986,8 +5009,8 @@ namespace {
       // Only record overrides of class members.
       if (overridden) {
         result->setOverriddenDecl(overridden);
-        getter->setOverriddenDecl(overridden->getGetter());
-        if (auto parentSetter = overridden->getSetter())
+        getter->setOverriddenDecl(overridden->getAccessor(AccessorKind::Get));
+        if (auto parentSetter = overridden->getAccessor(AccessorKind::Set))
           if (setter)
             setter->setOverriddenDecl(parentSetter);
       }
@@ -6492,10 +6515,10 @@ void SwiftDeclConverter::recordObjCOverride(SubscriptDecl *subscript) {
 
     // The index types match. This is an override, so mark it as such.
     subscript->setOverriddenDecl(parentSub);
-    auto getterThunk = subscript->getGetter();
-    getterThunk->setOverriddenDecl(parentSub->getGetter());
-    if (auto parentSetter = parentSub->getSetter()) {
-      if (auto setterThunk = subscript->getSetter())
+    auto getterThunk = subscript->getAccessor(AccessorKind::Get);
+    getterThunk->setOverriddenDecl(parentSub->getAccessor(AccessorKind::Get));
+    if (auto parentSetter = parentSub->getAccessor(AccessorKind::Set)) {
+      if (auto setterThunk = subscript->getAccessor(AccessorKind::Set))
         setterThunk->setOverriddenDecl(parentSetter);
     }
 
@@ -8441,6 +8464,28 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
     loadAllMembersOfObjcContainer(D, objcContainer);
     return;
   }
+
+  auto namespaceDecl =
+      dyn_cast_or_null<clang::NamespaceDecl>(D->getClangDecl());
+  if (namespaceDecl) {
+    auto *enumDecl = cast<EnumDecl>(D);
+    // TODO: This redecls should only match redecls that are in the same
+    // module as namespaceDecl after we import one namespace per clang module.
+    for (auto ns : namespaceDecl->redecls()) {
+      for (auto m : ns->decls()) {
+        auto nd = dyn_cast<clang::NamedDecl>(m);
+        if (!nd)
+          continue;
+        auto member = importDecl(nd, CurrentVersion);
+        if (!member)
+          continue;
+
+        enumDecl->addMember(member);
+      }
+    }
+    return;
+  }
+
   loadAllMembersIntoExtension(D, extra);
 }
 
