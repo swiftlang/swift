@@ -440,6 +440,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   if (Args.getLastArg(OPT_solver_disable_shrink))
     Opts.SolverDisableShrink = true;
+  if (Args.getLastArg(OPT_enable_function_builder_one_way_constraints))
+    Opts.FunctionBuilderOneWayConstraints = true;
 
   if (const Arg *A = Args.getLastArg(OPT_value_recursion_threshold)) {
     unsigned threshold;
