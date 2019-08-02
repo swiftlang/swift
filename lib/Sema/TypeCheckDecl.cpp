@@ -2658,8 +2658,9 @@ public:
       TC.checkDynamicReplacementAttribute(VD);
 
     // Now check all the accessors.
-    for (auto *accessor : VD->getAllAccessors())
+    VD->visitEmittedAccessors([&](AccessorDecl *accessor) {
       visit(accessor);
+    });
   }
 
   void visitBoundVars(Pattern *P) {
@@ -2880,8 +2881,9 @@ public:
     }
 
     // Now check all the accessors.
-    for (auto *accessor : SD->getAllAccessors())
+    SD->visitEmittedAccessors([&](AccessorDecl *accessor) {
       visit(accessor);
+    });
   }
 
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {

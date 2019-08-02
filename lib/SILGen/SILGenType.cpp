@@ -1050,9 +1050,9 @@ public:
   }
 
   void visitAccessors(AbstractStorageDecl *asd) {
-    for (auto *accessor : asd->getAllAccessors())
-      if (!accessor->hasForcedStaticDispatch())
-        visitFuncDecl(accessor);
+    asd->visitEmittedAccessors([&](AccessorDecl *accessor) {
+      visitFuncDecl(accessor);
+    });
   }
 };
 
@@ -1182,9 +1182,9 @@ public:
   }
 
   void visitAccessors(AbstractStorageDecl *asd) {
-    for (auto *accessor : asd->getAllAccessors())
-      if (!accessor->hasForcedStaticDispatch())
-        visitFuncDecl(accessor);
+    asd->visitEmittedAccessors([&](AccessorDecl *accessor) {
+      visitFuncDecl(accessor);
+    });
   }
 };
 

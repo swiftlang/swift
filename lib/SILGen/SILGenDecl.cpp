@@ -1194,8 +1194,9 @@ void SILGenFunction::visitVarDecl(VarDecl *D) {
   // We handle emitting the variable storage when we see the pattern binding.
 
   // Emit the variable's accessors.
-  for (auto *accessor : D->getAllAccessors())
+  D->visitEmittedAccessors([&](AccessorDecl *accessor) {
     SGM.emitFunction(accessor);
+  });
 }
 
 /// Emit literals for the major, minor, and subminor components of the version

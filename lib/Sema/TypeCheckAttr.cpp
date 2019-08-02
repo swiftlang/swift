@@ -2140,23 +2140,24 @@ static FuncDecl *findReplacedAccessor(DeclName replacedVarName,
   }
 
   // Find the accessor in the replaced storage decl.
-  for (auto *origAccessor : origStorage->getAllAccessors()) {
-    TC.validateDecl(origAccessor);
-    if (origAccessor->getAccessorKind() != replacement->getAccessorKind())
-      continue;
+  auto *origAccessor = origStorage->getOpaqueAccessor(
+      replacement->getAccessorKind());
+  if (!origAccessor)
+    return nullptr;
 
-    if (origAccessor->isImplicit() &&
-        !(origStorage->getReadImpl() == ReadImplKind::Stored &&
-          origStorage->getWriteImpl() == WriteImplKind::Stored)) {
-      TC.diagnose(attr->getLocation(),
-                  diag::dynamic_replacement_accessor_not_explicit,
-                  (unsigned)origAccessor->getAccessorKind(), replacedVarName);
-      attr->setInvalid();
-      return nullptr;
-    }
-    return origAccessor;
+  TC.validateDecl(origAccessor);
+
+  if (origAccessor->isImplicit() &&
+      !(origStorage->getReadImpl() == ReadImplKind::Stored &&
+        origStorage->getWriteImpl() == WriteImplKind::Stored)) {
+    TC.diagnose(attr->getLocation(),
+                diag::dynamic_replacement_accessor_not_explicit,
+                (unsigned)origAccessor->getAccessorKind(), replacedVarName);
+    attr->setInvalid();
+    return nullptr;
   }
-  return nullptr;
+
+  return origAccessor;
 }
 
 static AbstractFunctionDecl *
@@ -2298,19 +2299,19 @@ void TypeChecker::checkDynamicReplacementAttribute(ValueDecl *D) {
 
   // Collect the accessor replacement mapping if this is an abstract storage.
   if (auto *var = dyn_cast<AbstractStorageDecl>(D)) {
-     for (auto *accessor : var->getAllAccessors()) {
+    var->visitParsedAccessors([&](AccessorDecl *accessor) {
+      if (attr->isInvalid())
+        return;
+
        validateDecl(accessor);
-       if (accessor->isImplicit())
-         continue;
        auto *orig = findReplacedAccessor(attr->getReplacedFunctionName(),
                                          accessor, attr, *this);
-       if (attr->isInvalid())
-         return;
        if (!orig)
-         continue;
+         return;
+
        origs.push_back(orig);
        replacements.push_back(accessor);
-     }
+     });
   } else {
     // Otherwise, find the matching function.
     auto *fun = cast<AbstractFunctionDecl>(D);
@@ -2823,12 +2824,14 @@ void TypeChecker::addImplicitDynamicAttribute(Decl *D) {
       return;
   }
 
-  // Don't add dynamic if accessor is inlinable or tranparent.
+  // Don't add dynamic if accessor is inlinable or transparent.
   if (auto *asd = dyn_cast<AbstractStorageDecl>(D)) {
-    for (auto *accessor : asd->getAllAccessors()) {
-      if (!accessor->isImplicit() && shouldBlockImplicitDynamic(accessor))
-        return;
-    }
+    bool blocked = false;
+    asd->visitParsedAccessors([&](AccessorDecl *accessor) {
+      blocked |= shouldBlockImplicitDynamic(accessor);
+    });
+    if (blocked)
+      return;
   }
 
   if (auto *VD = dyn_cast<VarDecl>(D)) {
