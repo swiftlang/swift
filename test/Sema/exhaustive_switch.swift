@@ -1215,8 +1215,7 @@ func sr11160_extra() {
 }
 
 // SR-11212 tests: Some of the tests here rely on compiler bugs related to
-// implicit (un)tupling in patterns. When you add a warning for the erroneous
-// cases, feel free to add expected notes as appropriate.
+// implicit (un)tupling in patterns.
 enum SR11212Tests {
 
   enum Untupled {
@@ -1226,12 +1225,14 @@ enum SR11212Tests {
   func sr11212_content_untupled_pattern_tupled(u: Untupled) -> (Int, Int) {
     switch u {
     case .upair((let x, let y)): return (x, y)
+    // expected-warning@-1 {{a tuple pattern cannot match several associated values at once, implicitly tupling the associated values and trying to match that instead}}
     }
   }
 
   func sr11212_content_untupled_pattern_tupled_nested(u: Untupled) -> (Int, Int) {
     switch u {
     case .upair(let (x, y)): return (x, y)
+    // expected-warning@-1 {{a tuple pattern cannot match several associated values at once, implicitly tupling the associated values and trying to match that instead}}
     }
   }
 
@@ -1244,6 +1245,7 @@ enum SR11212Tests {
   func sr11212_content_untupled_pattern_ambiguous(u: Untupled) -> (Int, Int) {
     switch u {
     case .upair(let u_): return u_
+    // expected-warning@-1 {{cannot match several associated values at once, implicitly tupling the associated values and trying to match that instead}}
     }
   }
 
@@ -1266,6 +1268,7 @@ enum SR11212Tests {
   func sr11212_content_tupled_pattern_untupled(t: Tupled) -> (Int, Int) {
     switch t {
     case .tpair(let x, let y): return (x, y)
+    // expected-warning@-1 {{the enum case has a single tuple as an associated value, but there are several patterns here, implicitly tupling the patterns and trying to match that instead}}
     }
   }
 
@@ -1294,6 +1297,7 @@ enum SR11212Tests {
   func sr11212_content_generic_pattern_untupled(b: Box<(Int, Int)>) -> (Int, Int) {
     switch b {
     case .box(let x, let y): return (x, y)
+    // expected-warning@-1 {{the enum case has a single tuple as an associated value, but there are several patterns here, implicitly tupling the patterns and trying to match that instead}}
     }
   }
 
