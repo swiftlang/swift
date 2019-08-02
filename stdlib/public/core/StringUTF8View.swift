@@ -506,7 +506,7 @@ extension String.UTF8View {
       // _cocoaStringUTF8Count gave us the scalar aligned count, but we still
       // need to compensate for sub-scalar indexing, e.g. if `i` is in the
       // middle of a two-byte UTF8 scalar.
-      let refinedCount = count - (i.transcodedOffset + j.transcodedOffset)
+      let refinedCount = (count - i.transcodedOffset) + j.transcodedOffset
       _internalInvariant(refinedCount == _distance(from: i, to: j))
       return refinedCount
     }

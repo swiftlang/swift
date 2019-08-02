@@ -210,6 +210,7 @@ internal func _cocoaStringUTF8Count(
   _ target: _CocoaString,
   range: Range<Int>
 ) -> Int? {
+  if range.isEmpty { return 0 }
   return _NSStringUTF8Count(_objc(target), range: range)
 }
 
