@@ -679,6 +679,9 @@ public:
   // then we probably meant to call the value.
   bool diagnoseMissingFunctionCall() const;
 
+  /// Produce a specialized diagnostic if this is an invalid conversion to Bool.
+  bool diagnoseConversionToBool() const;
+
   /// Try to add a fix-it when converting between a collection and its slice
   /// type, such as String <-> Substring or (eventually) Array <-> ArraySlice
   static bool trySequenceSubsequenceFixIts(InFlightDiagnostic &diag,
