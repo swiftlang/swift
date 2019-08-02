@@ -269,6 +269,20 @@ AutoClosureForwarding *AutoClosureForwarding::create(ConstraintSystem &cs,
   return new (cs.getAllocator()) AutoClosureForwarding(cs, locator);
 }
 
+bool AllowAutoClosurePointerConversion::diagnose(Expr *root, bool asNote) const {
+  auto failure = AutoClosurePointerConversionFailure(root, getConstraintSystem(),
+      PointeeType, PointerType, getLocator());
+  return failure.diagnose(asNote);
+}
+
+AllowAutoClosurePointerConversion *
+AllowAutoClosurePointerConversion::create(ConstraintSystem &cs, Type pointeeType,
+                                          Type pointerType,
+                                          ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowAutoClosurePointerConversion(cs, pointeeType, pointerType, locator);
+}
+
 bool RemoveUnwrap::diagnose(Expr *root, bool asNote) const {
   auto failure = NonOptionalUnwrapFailure(root, getConstraintSystem(), BaseType,
                                           getLocator());

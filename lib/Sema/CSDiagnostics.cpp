@@ -1978,6 +1978,14 @@ bool AutoClosureForwardingFailure::diagnoseAsError() {
   return true;
 }
 
+bool AutoClosurePointerConversionFailure::diagnoseAsError() {
+  auto *anchor = getAnchor();
+  auto diagnostic = diag::invalid_autoclosure_pointer_conversion;
+  emitDiagnostic(anchor->getLoc(), diagnostic, PointeeType, PointerType)
+      .highlight(anchor->getSourceRange());
+  return true;
+}
+
 bool NonOptionalUnwrapFailure::diagnoseAsError() {
   auto *anchor = getAnchor();
 
