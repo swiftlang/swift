@@ -310,6 +310,19 @@ ForwardModeTests.test("TupleNonDifferentiableElements") {
 }
 
 //===----------------------------------------------------------------------===//
+// Arrays
+//===----------------------------------------------------------------------===//
+ForwardModeTests.test("IdentityArrayInit") {
+  func foo(_ x: Float) -> [Float] {
+    let a = [x]
+    return a
+  }
+  let (y, differential) = valueWithDifferential(at: 5, in: foo)
+  expectEqual([5.0], y)
+  expectEqual([1.0], differential(1))
+}
+
+//===----------------------------------------------------------------------===//
 // Generics
 //===----------------------------------------------------------------------===//
 

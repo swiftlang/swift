@@ -4084,6 +4084,13 @@ private:
   }
 
   /// Remap any archetypes into the differential function's context.
+  Type remapASTTypeInDifferential(Type ty) {
+    if (ty->hasArchetype())
+      return getDifferential().mapTypeIntoContext(ty->mapTypeOutOfContext());
+    return getDifferential().mapTypeIntoContext(ty);
+  }
+
+  /// Remap any archetypes into the differential function's context.
   SILType remapTypeInDifferential(SILType ty) {
     if (ty.hasArchetype())
       return getDifferential().mapTypeIntoContext(ty.mapTypeOutOfContext());
@@ -4097,6 +4104,13 @@ private:
 
   /// Assuming the given type conforms to `Differentiable` after remapping,
   /// returns the associated tangent space type.
+  CanType getRemappedTangentASTType(Type type) {
+    auto remappedType = remapASTTypeInDifferential(type)->getCanonicalType();
+    return getTangentSpace(remappedType)->getCanonicalType();
+  }
+
+  /// Assuming the given type conforms to `Differentiable` after remapping,
+  /// returns the associated tangent space SIL type.
   SILType getRemappedTangentType(SILType type) {
     return SILType::getPrimitiveType(
         getTangentSpace(remapTypeInDifferential(type).getASTType())
@@ -4462,36 +4476,28 @@ private:
         loc, arraySizeOperand->getType(), arraySizeOperand->getValue());
     SmallVector<SILValue, 8> args;
     args.push_back(integerLiteral);
-    SILValue arrayInit = diffBuilder.createFunctionRefFor(loc, ai->getCalleeFunction());
 
     // Step 2: Apply _allocateUninitializedArray<A>, but remapping the
     // substitution map to use τ_0_0.TangentVector.
-    llvm::errs() << "AI SUBST MAP VS DIFFERENTIAL SUBST MAP\n";
-    ai->getSubstitutionMap().dump();
-    getDifferential().getForwardingSubstitutionMap().dump();
 //    auto remappedSubs = ai->getSubstitutionMap().subst(
 //        getDifferential().getForwardingSubstitutionMap());
-//#if 0
+
     // If the original `apply` instruction has a substitution map, then the
     // applied function is specialized.
     // In the differential, specialization is also necessary for parity. The
     // original function operand is specialized with a remapped version of same
     // substitution map using an argument-less `partial_apply`.
+    SILValue diffArrayInitFuncRef =
+        diffBuilder.createFunctionRefFor(loc, ai->getCalleeFunction());
     auto remappedSubs = remapSubstitutionMapInDifferential(
         ai->getSubstitutionMap());
     if (!ai->getSubstitutionMap().empty()) {
-      llvm::errs() << "REMAPPED SUBS\n";
-      remappedSubs.dump();
-      llvm::errs() << "SubstitutionMap()\n";
-      SubstitutionMap().dump();
-      arrayInit = getBuilder().createPartialApply(
-          ai->getLoc(), arrayInit, remappedSubs, {},
+      diffArrayInitFuncRef = diffBuilder.createPartialApply(
+          ai->getLoc(), diffArrayInitFuncRef, remappedSubs, {},
           ParameterConvention::Direct_Guaranteed);
-      remappedSubs = SubstitutionMap();
     }
-//#endif
     auto *diffArrayInitInst =
-        diffBuilder.createApply(loc, arrayInit, remappedSubs, args);
+        diffBuilder.createApply(loc, diffArrayInitFuncRef, SubstitutionMap(), args);
 
     // Step 3: Create the non-active `tuple_extract` instruction for the
     // array pointer (second element in tuple).
@@ -4503,16 +4509,15 @@ private:
     // Step 4: Get the `DifferentiableView` of the array.
     SmallVector<SILValue, 8> diffArgs;
     diffArgs.push_back(diffArray);
-    auto diffArrayView = getTangentSpace(ai->getType().getASTType());
+    auto diffArrayViewType = getRemappedTangentType(ai->getType()).getASTType();
     auto metatypeType = CanMetatypeType::get(
-        diffArrayView->getCanonicalType(), MetatypeRepresentation::Thin);
+        diffArrayViewType, MetatypeRepresentation::Thin);
     auto metatype = diffBuilder.createMetatype(
         loc, SILType::getPrimitiveObjectType(metatypeType));
     diffArgs.push_back(metatype);
     // Allocate memory for a `DifferentiableView` and add to the differential
     // arguments for the creation of the returned `DifferentiableView`.
-    auto astType = diffArrayView->getCanonicalType();
-    auto typeDecl = astType->getStructOrBoundGenericStruct();
+    auto typeDecl = diffArrayViewType->getStructOrBoundGenericStruct();
     auto candidates = typeDecl->lookupDirect(DeclBaseName::createConstructor());
     // Remove any initializer with argument lables, leaving `init(_:)`.
     llvm::erase_if(candidates, [](ValueDecl *v) {
@@ -4524,19 +4529,42 @@ private:
            "Expected single `DifferentiableView` intializer");
     auto initDecl = cast<ConstructorDecl>(candidates.front());
     SILDeclRef initRef(initDecl, SILDeclRef::Kind::Allocator);
-#if 0
-    auto *initFn = getModule().lookUpFunction(initRef);
-#endif
+
+    // Get a function reference to the `DifferentiableView` intializer.
     SILOptFunctionBuilder fb(context.getTransform());
     auto *initFn = fb.getOrCreateFunction(
         ai->getLoc(), initRef, NotForDefinition);
-    auto *fnRef = diffBuilder.createFunctionRef(ai->getLoc(), initFn);
+    SILValue diffViewInitFuncRef = diffBuilder.createFunctionRefFor(ai->getLoc(), initFn);
+
+    // Because the `DifferentiableView` intializer is generic, we need to
+    // create our own substitution map to replace the generic element type
+    // with a concrete type.
+    // Grab the concret element type.
+    auto elementType = getRemappedTangentASTType(
+        ai->getType().getAs<TupleType>()->getElement(0).getType()
+        ->getAs<BoundGenericStructType>()->getGenericArgs().front());
+    // Grab the `Differentiable` protocol conformance we will need the
+    // generic type to conform to.
+    auto swiftModule = getModule().getSwiftModule();
+    auto diffProto =
+        getASTContext().getProtocol(KnownProtocolKind::Differentiable);
+    auto diffConf = swiftModule->lookupConformance(
+        elementType, diffProto);
+    ArrayRef<ProtocolConformanceRef> conformances = {*diffConf};
+    // Get the `DifferentiableView` intializer's generic signature.
+    auto genericSig = diffViewInitFuncRef->getType().castTo<SILFunctionType>()
+        ->getGenericSignature();
+    // Create the substitution map and apply the generic initializer with it in
+    // order to get the concrete `DifferentiableView` which will have the same
+    // element type as the original `Array`.
+    auto subs = SubstitutionMap::get(
+        genericSig, {elementType}, conformances);
     auto *diffViewInitInst =
-        diffBuilder.createApply(loc, fnRef, remappedSubs, diffArgs);
+        diffBuilder.createApply(loc, diffViewInitFuncRef, subs,
+                                diffArgs);
 
     // Add value map between `Array` init tuple and `DifferentiableView`.
     setTangentValue(bb, ai, makeConcreteTangentValue(diffViewInitInst));
-
 
     // Loop over all uses of the array initialization, making sure to handle
     // any `tuple_extract` instructions. These instructions can either be
