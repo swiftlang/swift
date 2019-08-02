@@ -1,7 +1,6 @@
 add_swift_target_library(swiftOSLogPrototype
   IS_SDK_OVERLAY
   SHARED
-  TARGET_LIBRARY
 
   OSLog.swift
   OSLogMessage.swift
