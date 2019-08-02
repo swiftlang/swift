@@ -108,6 +108,13 @@ static constexpr const char *const debugDiagnosticStrings[] = {
     "<not a diagnostic>",
 };
 
+static constexpr const char *const fixItStrings[] = {
+#define DIAG(KIND, ID, Options, Text, Signature)
+#define FIXIT(ID, Text, Signature) Text,
+#include "swift/AST/DiagnosticsAll.def"
+    "<not a fix-it>",
+};
+
 DiagnosticState::DiagnosticState() {
   // Initialize our per-diagnostic state to default
   perDiagnosticBehavior.resize(LocalDiagID::NumDiags, Behavior::Unspecified);
@@ -162,10 +169,11 @@ InFlightDiagnostic &InFlightDiagnostic::highlightChars(SourceLoc Start,
 /// Add an insertion fix-it to the currently-active diagnostic.  The
 /// text is inserted immediately *after* the token specified.
 ///
-InFlightDiagnostic &InFlightDiagnostic::fixItInsertAfter(SourceLoc L,
-                                                         StringRef Str) {
+InFlightDiagnostic &
+InFlightDiagnostic::fixItInsertAfter(SourceLoc L, StringRef FormatString,
+                                     ArrayRef<DiagnosticArgument> Args) {
   L = Lexer::getLocForEndOfToken(Engine->SourceMgr, L);
-  return fixItInsert(L, Str);
+  return fixItInsert(L, FormatString, Args);
 }
 
 /// Add a token-based removal fix-it to the currently-active
@@ -189,10 +197,20 @@ InFlightDiagnostic &InFlightDiagnostic::fixItRemove(SourceRange R) {
     charRange = CharSourceRange(charRange.getStart(),
                                 charRange.getByteLength()+1);
   }
-  Engine->getActiveDiagnostic().addFixIt(Diagnostic::FixIt(charRange, {}));
+  Engine->getActiveDiagnostic().addFixIt(Diagnostic::FixIt(charRange, {}, {}));
   return *this;
 }
 
+InFlightDiagnostic &
+InFlightDiagnostic::fixItReplace(SourceRange R, StringRef FormatString,
+                                 ArrayRef<DiagnosticArgument> Args) {
+  auto &SM = Engine->SourceMgr;
+  auto charRange = toCharSourceRange(SM, R);
+
+  Engine->getActiveDiagnostic().addFixIt(
+      Diagnostic::FixIt(charRange, FormatString, Args));
+  return *this;
+}
 
 InFlightDiagnostic &InFlightDiagnostic::fixItReplace(SourceRange R,
                                                      StringRef Str) {
@@ -207,6 +225,7 @@ InFlightDiagnostic &InFlightDiagnostic::fixItReplace(SourceRange R,
 
   // If we're replacing with something that wants spaces around it, do a bit of
   // extra work so that we don't suggest extra spaces.
+  // FIXME: This could probably be applied to structured fix-its as well.
   if (Str.back() == ' ') {
     if (isspace(extractCharAfter(SM, charRange.getEnd())))
       Str = Str.drop_back();
@@ -215,18 +234,19 @@ InFlightDiagnostic &InFlightDiagnostic::fixItReplace(SourceRange R,
     if (isspace(extractCharBefore(SM, charRange.getStart())))
       Str = Str.drop_front();
   }
-
-  Engine->getActiveDiagnostic().addFixIt(Diagnostic::FixIt(charRange, Str));
-  return *this;
+  
+  return fixItReplace(R, "%0", {Str});
 }
 
-InFlightDiagnostic &InFlightDiagnostic::fixItReplaceChars(SourceLoc Start,
-                                                          SourceLoc End,
-                                                          StringRef Str) {
+InFlightDiagnostic &
+InFlightDiagnostic::fixItReplaceChars(SourceLoc Start, SourceLoc End,
+                                      StringRef FormatString,
+                                      ArrayRef<DiagnosticArgument> Args) {
   assert(IsActive && "Cannot modify an inactive diagnostic");
   if (Engine && Start.isValid())
-    Engine->getActiveDiagnostic().addFixIt(Diagnostic::FixIt(
-        toCharSourceRange(Engine->SourceMgr, Start, End), Str));
+    Engine->getActiveDiagnostic().addFixIt(
+        Diagnostic::FixIt(toCharSourceRange(Engine->SourceMgr, Start, End),
+                          FormatString, Args));
   return *this;
 }
 
@@ -242,10 +262,10 @@ InFlightDiagnostic &InFlightDiagnostic::fixItExchange(SourceRange R1,
   auto text1 = SM.extractText(charRange1);
   auto text2 = SM.extractText(charRange2);
 
-  Engine->getActiveDiagnostic()
-    .addFixIt(Diagnostic::FixIt(charRange1, text2));
-  Engine->getActiveDiagnostic()
-    .addFixIt(Diagnostic::FixIt(charRange2, text1));
+  Engine->getActiveDiagnostic().addFixIt(
+      Diagnostic::FixIt(charRange1, "%0", {text2}));
+  Engine->getActiveDiagnostic().addFixIt(
+      Diagnostic::FixIt(charRange2, "%0", {text1}));
   return *this;
 }
 
@@ -921,6 +941,10 @@ const char *DiagnosticEngine::diagnosticStringFor(const DiagID id,
     return debugDiagnosticStrings[(unsigned)id];
   }
   return diagnosticStrings[(unsigned)id];
+}
+
+const char *InFlightDiagnostic::fixItStringFor(const FixItID id) {
+  return fixItStrings[(unsigned)id];
 }
 
 void DiagnosticEngine::setBufferIndirectlyCausingDiagnosticToInput(

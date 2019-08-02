@@ -36,6 +36,10 @@
   DIAG(NOTE,ID,Options,Text,Signature)
 #endif
 
+#ifndef FIXIT
+#  define FIXIT(ID, Text, Signature)
+#endif
+
 //==============================================================================
 // MARK: Lexing and Parsing diagnostics
 //==============================================================================
@@ -1638,4 +1642,5 @@ ERROR(unknown_syntax_entity, PointsToFirstBadToken,
 # undef NOTE
 # undef WARNING
 # undef ERROR
+# undef FIXIT
 #endif

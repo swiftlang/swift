@@ -309,8 +309,22 @@ namespace swift {
         : OpeningQuotationMark("'"), ClosingQuotationMark("'"),
           AKAFormatString("'%s' (aka '%s')"),
           OpaqueResultFormatString("'%s' (%s of '%s')") {}
+
+    /// When formatting fix-it arguments, don't include quotes or other
+    /// additions which would result in invalid code.
+    static DiagnosticFormatOptions formatForFixIts() {
+      return DiagnosticFormatOptions("", "", "%s", "%s");
+    }
   };
-  
+
+  enum class FixItID : uint32_t;
+
+  /// Represents a fix-it defined  with a format string and optional
+  /// DiagnosticArguments. The template parameters allow the
+  /// fixIt... methods on InFlightDiagnostic to infer their own
+  /// template params.
+  template <typename... ArgTypes> struct StructuredFixIt { FixItID ID; };
+
   /// Diagnostic - This is a specific instance of a diagnostic along with all of
   /// the DiagnosticArguments that it requires. 
   class Diagnostic {
@@ -333,7 +347,7 @@ namespace swift {
     Diagnostic(Diag<ArgTypes...> ID,
                typename detail::PassArgument<ArgTypes>::type... VArgs)
       : ID(ID.ID) {
-      DiagnosticArgument DiagArgs[] = { 
+      DiagnosticArgument DiagArgs[] = {
         DiagnosticArgument(0), std::move(VArgs)... 
       };
       Args.append(DiagArgs + 1, DiagArgs + 1 + sizeof...(VArgs));
@@ -425,6 +439,48 @@ namespace swift {
     /// Add a character-based range to the currently-active diagnostic.
     InFlightDiagnostic &highlightChars(SourceLoc Start, SourceLoc End);
 
+    static const char *fixItStringFor(const FixItID id);
+
+    /// Add a token-based replacement fix-it to the currently-active
+    /// diagnostic.
+    template <typename... ArgTypes>
+    InFlightDiagnostic &
+    fixItReplace(SourceRange R, StructuredFixIt<ArgTypes...> fixIt,
+                 typename detail::PassArgument<ArgTypes>::type... VArgs) {
+      DiagnosticArgument DiagArgs[] = { std::move(VArgs)... };
+      return fixItReplace(R, fixItStringFor(fixIt.ID), DiagArgs);
+    }
+
+    /// Add a character-based replacement fix-it to the currently-active
+    /// diagnostic.
+    template <typename... ArgTypes>
+    InFlightDiagnostic &
+    fixItReplaceChars(SourceLoc Start, SourceLoc End,
+                      StructuredFixIt<ArgTypes...> fixIt,
+                      typename detail::PassArgument<ArgTypes>::type... VArgs) {
+      DiagnosticArgument DiagArgs[] = { std::move(VArgs)... };
+      return fixItReplaceChars(Start, End, fixItStringFor(fixIt.ID), DiagArgs);
+    }
+
+    /// Add an insertion fix-it to the currently-active diagnostic.
+    template <typename... ArgTypes>
+    InFlightDiagnostic &
+    fixItInsert(SourceLoc L, StructuredFixIt<ArgTypes...> fixIt,
+                typename detail::PassArgument<ArgTypes>::type... VArgs) {
+      DiagnosticArgument DiagArgs[] = { std::move(VArgs)... };
+      return fixItReplaceChars(L, L, fixItStringFor(fixIt.ID), DiagArgs);
+    }
+
+    /// Add an insertion fix-it to the currently-active diagnostic.  The
+    /// text is inserted immediately *after* the token specified.
+    template <typename... ArgTypes>
+    InFlightDiagnostic &
+    fixItInsertAfter(SourceLoc L, StructuredFixIt<ArgTypes...> fixIt,
+                     typename detail::PassArgument<ArgTypes>::type... VArgs) {
+      DiagnosticArgument DiagArgs[] = { std::move(VArgs)... };
+      return fixItInsertAfter(L, fixItStringFor(fixIt.ID), DiagArgs);
+    }
+
     /// Add a token-based replacement fix-it to the currently-active
     /// diagnostic.
     InFlightDiagnostic &fixItReplace(SourceRange R, StringRef Str);
@@ -432,18 +488,21 @@ namespace swift {
     /// Add a character-based replacement fix-it to the currently-active
     /// diagnostic.
     InFlightDiagnostic &fixItReplaceChars(SourceLoc Start, SourceLoc End,
-                                          StringRef Str);
+                                          StringRef Str) {
+      return fixItReplaceChars(Start, End, "%0", {Str});
+    }
 
     /// Add an insertion fix-it to the currently-active diagnostic.
     InFlightDiagnostic &fixItInsert(SourceLoc L, StringRef Str) {
-      return fixItReplaceChars(L, L, Str);
+      return fixItReplaceChars(L, L, "%0", {Str});
     }
 
     /// Add an insertion fix-it to the currently-active diagnostic.  The
     /// text is inserted immediately *after* the token specified.
-    ///
-    InFlightDiagnostic &fixItInsertAfter(SourceLoc L, StringRef);
-
+    InFlightDiagnostic &fixItInsertAfter(SourceLoc L, StringRef Str) {
+      return fixItInsertAfter(L, "%0", {Str});
+    }
+    
     /// Add a token-based removal fix-it to the currently-active
     /// diagnostic.
     InFlightDiagnostic &fixItRemove(SourceRange R);
@@ -457,6 +516,22 @@ namespace swift {
     /// Add two replacement fix-it exchanging source ranges to the
     /// currently-active diagnostic.
     InFlightDiagnostic &fixItExchange(SourceRange R1, SourceRange R2);
+    
+  private:
+    InFlightDiagnostic &fixItReplace(SourceRange R, StringRef FormatString,
+                                     ArrayRef<DiagnosticArgument> Args);
+
+    InFlightDiagnostic &fixItReplaceChars(SourceLoc Start, SourceLoc End,
+                                          StringRef FormatString,
+                                          ArrayRef<DiagnosticArgument> Args);
+
+    InFlightDiagnostic &fixItInsert(SourceLoc L, StringRef FormatString,
+                                    ArrayRef<DiagnosticArgument> Args) {
+      return fixItReplaceChars(L, L, FormatString, Args);
+    }
+
+    InFlightDiagnostic &fixItInsertAfter(SourceLoc L, StringRef FormatString,
+                                         ArrayRef<DiagnosticArgument> Args);
   };
 
   /// Class to track, map, and remap diagnostic severity and fatality
