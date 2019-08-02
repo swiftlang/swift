@@ -49,8 +49,7 @@ struct DiagnosticInfo {
     std::string Text;
 
   public:
-    FixIt(CharSourceRange R, StringRef Str)
-        : Range(R), Text(Str) {}
+    FixIt(CharSourceRange R, StringRef Str, ArrayRef<DiagnosticArgument> Args);
 
     CharSourceRange getRange() const { return Range; }
     StringRef getText() const { return Text; }

@@ -2242,17 +2242,13 @@ bool ContextualFailure::tryTypeCoercionFixIt(
   if (Kind != CheckedCastKind::Unresolved) {
     auto *anchor = getAnchor();
 
-    SmallString<32> buffer;
-    llvm::raw_svector_ostream OS(buffer);
     bool canUseAs = Kind == CheckedCastKind::Coercion ||
                     Kind == CheckedCastKind::BridgingCoercion;
     if (bothOptional && canUseAs)
       toType = OptionalType::get(toType);
-    toType->print(OS);
-    diagnostic.fixItInsert(
-        Lexer::getLocForEndOfToken(getASTContext().SourceMgr,
-                                   anchor->getEndLoc()),
-        (llvm::Twine(canUseAs ? " as " : " as! ") + OS.str()).str());
+    diagnostic.fixItInsert(Lexer::getLocForEndOfToken(getASTContext().SourceMgr,
+                                                      anchor->getEndLoc()),
+                           fixIt::insert_type_coercion, canUseAs, toType);
     return true;
   }
 
@@ -3093,12 +3089,13 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
 
     // Fall back to a fix-it with a full type qualifier
     if (auto *NTD = Member->getDeclContext()->getSelfNominalTypeDecl()) {
-      auto typeName = NTD->getSelfInterfaceType()->getString();
+      auto type = NTD->getSelfInterfaceType();
       if (auto *SE = dyn_cast<SubscriptExpr>(getRawAnchor())) {
         auto *baseExpr = SE->getBase();
-        Diag->fixItReplace(baseExpr->getSourceRange(), typeName);
+        Diag->fixItReplace(baseExpr->getSourceRange(), fixIt::replace_with_type,
+                           type);
       } else {
-        Diag->fixItInsert(loc, typeName + ".");
+        Diag->fixItInsert(loc, fixIt::insert_type_qualification, type);
       }
     }
 

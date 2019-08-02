@@ -1,0 +1,32 @@
+//===--- FixIts.def - Fix-Its Text ------------------------------*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2019 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+//  This file defines fix-its which can be emitted alongside a diagnostic.
+//  Each fix-it is described by a unique identifier and text, and is
+//  followed by a signature describing the diagnostic argument kinds.
+//
+//===----------------------------------------------------------------------===//
+
+#if (!(defined(FIXIT)))
+#  error Must define FIXIT
+#endif
+
+FIXIT(insert_type_coercion, " %select{as!|as}0 %1", (bool, Type))
+
+FIXIT(replace_with_type, "%0", (Type))
+FIXIT(insert_type_qualification, "%0.", (Type))
+
+FIXIT(insert_closure_return_type, "%select{| () }1-> %0 %select{|in }1", (Type, bool))
+
+#ifndef DIAG_NO_UNDEF
+#  undef FIXIT
+#endif
