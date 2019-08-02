@@ -1180,7 +1180,7 @@ ClangImporter::create(ASTContext &ctx,
 bool ClangImporter::addSearchPath(StringRef newSearchPath, bool isFramework,
                                   bool isSystem) {
   clang::FileManager &fileMgr = Impl.Instance->getFileManager();
-  const clang::DirectoryEntry *entry = fileMgr.getDirectory(newSearchPath);
+  auto entry = fileMgr.getDirectory(newSearchPath);
   if (!entry)
     return true;
 
@@ -1189,8 +1189,8 @@ bool ClangImporter::addSearchPath(StringRef newSearchPath, bool isFramework,
                             headerSearchInfo.search_dir_end(),
                             [&](const clang::DirectoryLookup &lookup) -> bool {
     if (isFramework)
-      return lookup.getFrameworkDir() == entry;
-    return lookup.getDir() == entry;
+      return lookup.getFrameworkDir() == *entry;
+    return lookup.getDir() == *entry;
   });
   if (exists) {
     // Don't bother adding a search path that's already there. Clang would have
@@ -1199,7 +1199,7 @@ bool ClangImporter::addSearchPath(StringRef newSearchPath, bool isFramework,
   }
 
   auto kind = isSystem ? clang::SrcMgr::C_System : clang::SrcMgr::C_User;
-  headerSearchInfo.AddSearchPath({entry, kind, isFramework},
+  headerSearchInfo.AddSearchPath({*entry, kind, isFramework},
                                  /*isAngled=*/true);
 
   // In addition to changing the current preprocessor directly, we still need
@@ -1361,10 +1361,9 @@ bool ClangImporter::importHeader(StringRef header, ModuleDecl *adapter,
                                  off_t expectedSize, time_t expectedModTime,
                                  StringRef cachedContents, SourceLoc diagLoc) {
   clang::FileManager &fileManager = Impl.Instance->getFileManager();
-  const clang::FileEntry *headerFile = fileManager.getFile(header,
-                                                           /*OpenFile=*/true);
-  if (headerFile && headerFile->getSize() == expectedSize &&
-      headerFile->getModificationTime() == expectedModTime) {
+  auto headerFile = fileManager.getFile(header, /*OpenFile=*/true);
+  if (headerFile && (*headerFile)->getSize() == expectedSize &&
+      (*headerFile)->getModificationTime() == expectedModTime) {
     return importBridgingHeader(header, adapter, diagLoc, false, true);
   }
 
@@ -1397,8 +1396,7 @@ bool ClangImporter::importBridgingHeader(StringRef header, ModuleDecl *adapter,
   }
 
   clang::FileManager &fileManager = Impl.Instance->getFileManager();
-  const clang::FileEntry *headerFile = fileManager.getFile(header,
-                                                           /*OpenFile=*/true);
+  auto headerFile = fileManager.getFile(header, /*OpenFile=*/true);
   if (!headerFile) {
     Impl.SwiftContext.Diags.diagnose(diagLoc, diag::bridging_header_missing,
                                      header);
@@ -1474,9 +1472,10 @@ std::string ClangImporter::getBridgingHeaderContents(StringRef headerPath,
     return "";
   }
 
-  const clang::FileEntry *fileInfo = fileManager.getFile(headerPath);
-  fileSize = fileInfo->getSize();
-  fileModTime = fileInfo->getModificationTime();
+  if (auto fileInfo = fileManager.getFile(headerPath)) {
+    fileSize = (*fileInfo)->getSize();
+    fileModTime = (*fileInfo)->getModificationTime();
+  }
   return result;
 }
 
@@ -2410,8 +2409,7 @@ void ClangImporter::lookupBridgingHeaderDecls(
 bool ClangImporter::lookupDeclsFromHeader(StringRef Filename,
                               llvm::function_ref<bool(ClangNode)> filter,
                               llvm::function_ref<void(Decl*)> receiver) const {
-  const clang::FileEntry *File =
-    getClangPreprocessor().getFileManager().getFile(Filename);
+  auto File = getClangPreprocessor().getFileManager().getFile(Filename);
   if (!File)
     return true;
 
@@ -2420,7 +2418,7 @@ bool ClangImporter::lookupDeclsFromHeader(StringRef Filename,
   auto &ClangPP = getClangPreprocessor();
 
   // Look up the header in the includes of the bridging header.
-  if (Impl.BridgeHeaderFiles.count(File)) {
+  if (Impl.BridgeHeaderFiles.count(*File)) {
     auto headerFilter = [&](ClangNode ClangN) -> bool {
       if (ClangN.isNull())
         return false;
@@ -2429,7 +2427,7 @@ bool ClangImporter::lookupDeclsFromHeader(StringRef Filename,
       if (ClangLoc.isInvalid())
         return false;
 
-      if (ClangSM.getFileEntryForID(ClangSM.getFileID(ClangLoc)) != File)
+      if (ClangSM.getFileEntryForID(ClangSM.getFileID(ClangLoc)) != *File)
         return false;
 
       return filter(ClangN);
@@ -2439,7 +2437,7 @@ bool ClangImporter::lookupDeclsFromHeader(StringRef Filename,
     return false;
   }
 
-  clang::FileID FID = ClangSM.translateFile(File);
+  clang::FileID FID = ClangSM.translateFile(*File);
   if (FID.isInvalid())
     return false;
 
