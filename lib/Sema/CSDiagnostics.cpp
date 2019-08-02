@@ -1954,6 +1954,14 @@ void ContextualFailure::tryComputedPropertyFixIts(Expr *expr) const {
   }
 }
 
+bool TupleContextualFailure::diagnoseAsError() {
+  auto diagnostic = isNumElementsMismatch()
+                        ? diag::tuple_types_not_convertible_nelts
+                        : diag::tuple_types_not_convertible;
+  emitDiagnostic(getAnchor()->getLoc(), diagnostic, getFromType(), getToType());
+  return true;
+}
+
 bool AutoClosureForwardingFailure::diagnoseAsError() {
   auto path = getLocator()->getPath();
   assert(!path.empty());

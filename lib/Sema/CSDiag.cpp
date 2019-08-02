@@ -1146,10 +1146,9 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
   if (auto fromTT = fromType->getAs<TupleType>())
     if (auto toTT = toType->getAs<TupleType>()) {
       if (fromTT->getNumElements() != toTT->getNumElements()) {
-        diagnose(anchor->getLoc(), diag::tuple_types_not_convertible_nelts,
-                 fromTT, toTT)
-        .highlight(anchor->getSourceRange());
-        return true;
+        auto failure = TupleContextualFailure(anchor, CS, fromTT, toTT,
+                                              CS.getConstraintLocator(expr));
+        return failure.diagnoseAsError();
       }
      
       SmallVector<TupleTypeElt, 4> FromElts;
@@ -1165,10 +1164,9 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
       // then we have a type error.
       if (computeTupleShuffle(TEType->castTo<TupleType>()->getElements(),
                               toTT->getElements(), sources)) {
-        diagnose(anchor->getLoc(), diag::tuple_types_not_convertible,
-                 fromTT, toTT)
-        .highlight(anchor->getSourceRange());
-        return true;
+        auto failure = TupleContextualFailure(anchor, CS, fromTT, toTT,
+                                              CS.getConstraintLocator(expr));
+        return failure.diagnoseAsError();
       }
     }
   
