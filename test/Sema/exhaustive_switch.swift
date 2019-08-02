@@ -1216,6 +1216,8 @@ func sr11160_extra() {
 
 // SR-11212 tests: Some of the tests here rely on compiler bugs related to
 // implicit (un)tupling in patterns.
+//
+// Related codegen test: Compatibility/implicit_tupling_untupling_codegen.swift
 enum SR11212Tests {
 
   enum Untupled {
