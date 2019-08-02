@@ -20,6 +20,7 @@
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Types.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "llvm/ADT/DenseMap.h"
@@ -310,7 +311,16 @@ bool DeclContext::isGenericContext() const {
 /// domains, this ensures that only sufficiently-conservative access patterns
 /// are used.
 ResilienceExpansion DeclContext::getResilienceExpansion() const {
-  for (const auto *dc = getLocalContext(); dc && dc->isLocalContext();
+  auto &context = getASTContext();
+  return evaluateOrDefault(context.evaluator,
+                           ResilienceExpansionRequest { const_cast<DeclContext *>(this) },
+                           ResilienceExpansion::Minimal);
+}
+
+llvm::Expected<ResilienceExpansion>
+  swift::ResilienceExpansionRequest::evaluate(Evaluator &eval,
+                                              DeclContext *context) const {
+  for (const auto *dc = context->getLocalContext(); dc && dc->isLocalContext();
        dc = dc->getParent()) {
     // Default argument initializer contexts have their resilience expansion
     // set when they're type checked.
