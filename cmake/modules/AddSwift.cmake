@@ -1005,7 +1005,7 @@ function(_add_swift_library_single target name)
               ${SWIFTLIB_SINGLE_XCODE_WORKAROUND_SOURCES})
   if(("${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_OBJECT_FORMAT}" STREQUAL "ELF" OR
       "${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_OBJECT_FORMAT}" STREQUAL "COFF") AND
-     SWIFTLIB_TARGET_LIBRARY)
+     SWIFTLIB_SINGLE_TARGET_LIBRARY)
     if("${libkind}" STREQUAL "SHARED" AND NOT SWIFTLIB_SINGLE_NOSWIFTRT)
       # TODO(compnerd) switch to the generator expression when cmake is upgraded
       # to a version which supports it.
