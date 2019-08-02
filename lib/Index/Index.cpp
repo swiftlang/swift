@@ -1067,8 +1067,9 @@ bool IndexSwiftASTWalker::report(ValueDecl *D) {
       };
 
       bool usedPseudoAccessors = false;
-      if (isa<VarDecl>(D) && isNullOrImplicit(StoreD->getGetter()) &&
-          isNullOrImplicit(StoreD->getSetter())) {
+      if (isa<VarDecl>(D) &&
+          isNullOrImplicit(StoreD->getAccessor(AccessorKind::Get)) &&
+          isNullOrImplicit(StoreD->getAccessor(AccessorKind::Set))) {
         usedPseudoAccessors = true;
         auto VarD = cast<VarDecl>(D);
         // No actual getter or setter, pass 'pseudo' accessors.

@@ -1041,7 +1041,7 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
     // Otherwise, if this is a subscript, validate that covariance is ok.
     // If the parent is non-mutable, it's okay to be covariant.
     auto parentSubscript = cast<SubscriptDecl>(baseDecl);
-    if (parentSubscript->getSetter()) {
+    if (parentSubscript->getAccessor(AccessorKind::Set)) {
       diags.diagnose(subscript, diag::override_mutable_covariant_subscript,
                      declTy, baseTy);
       diags.diagnose(baseDecl, diag::subscript_override_here);
@@ -1088,7 +1088,7 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
           IsSilentDifference = true;
 
     // The overridden property must not be mutable.
-    if (cast<AbstractStorageDecl>(baseDecl)->getSetter() &&
+    if (cast<AbstractStorageDecl>(baseDecl)->getAccessor(AccessorKind::Set) &&
         !IsSilentDifference) {
       diags.diagnose(property, diag::override_mutable_covariant_property,
                   property->getName(), parentPropertyTy, propertyTy);
@@ -1557,7 +1557,8 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
     // Make sure that the overriding property doesn't have storage.
     if ((overrideASD->hasStorage() ||
          overrideASD->getAttrs().hasAttribute<LazyAttr>()) &&
-        !(overrideASD->getWillSetFunc() || overrideASD->getDidSetFunc())) {
+        !(overrideASD->getAccessor(AccessorKind::WillSet) ||
+          overrideASD->getAccessor(AccessorKind::DidSet))) {
       bool downgradeToWarning = false;
       if (!ctx.isSwiftVersionAtLeast(5) &&
           overrideASD->getAttrs().hasAttribute<LazyAttr>()) {

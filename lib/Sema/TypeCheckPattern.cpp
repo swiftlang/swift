@@ -37,7 +37,7 @@ extractEnumElement(TypeChecker &TC, DeclContext *DC, SourceLoc UseLoc,
                    const VarDecl *constant) {
   diagnoseExplicitUnavailability(constant, UseLoc, DC, nullptr);
 
-  const FuncDecl *getter = constant->getGetter();
+  const FuncDecl *getter = constant->getAccessor(AccessorKind::Get);
   if (!getter)
     return nullptr;
 

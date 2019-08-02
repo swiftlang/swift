@@ -1261,17 +1261,18 @@ private:
       os << ")\n";
       // Older Clangs don't support class properties, so print the accessors as
       // well. This is harmless.
-      printAbstractFunctionAsMethod(VD->getGetter(), true);
+      printAbstractFunctionAsMethod(VD->getAccessor(AccessorKind::Get), true);
       if (isSettable) {
-        assert(VD->getSetter() && "settable ObjC property missing setter decl");
-        printAbstractFunctionAsMethod(VD->getSetter(), true);
+        auto *setter = VD->getAccessor(AccessorKind::Set);
+        assert(setter && "settable ObjC property missing setter decl");
+        printAbstractFunctionAsMethod(setter, true);
       }
     } else {
       os << "\n";
       if (looksLikeInitMethod(VD->getObjCGetterSelector()))
-        printAbstractFunctionAsMethod(VD->getGetter(), false);
+        printAbstractFunctionAsMethod(VD->getAccessor(AccessorKind::Get), false);
       if (isSettable && looksLikeInitMethod(VD->getObjCSetterSelector()))
-        printAbstractFunctionAsMethod(VD->getSetter(), false);
+        printAbstractFunctionAsMethod(VD->getAccessor(AccessorKind::Set), false);
     }
   }
 
@@ -1286,8 +1287,9 @@ private:
       isNSUIntegerSubscript = isNSUInteger(indexParam->getType());
     }
 
-    printAbstractFunctionAsMethod(SD->getGetter(), false, isNSUIntegerSubscript);
-    if (auto setter = SD->getSetter())
+    printAbstractFunctionAsMethod(SD->getAccessor(AccessorKind::Get), false,
+                                  isNSUIntegerSubscript);
+    if (auto setter = SD->getAccessor(AccessorKind::Set))
       printAbstractFunctionAsMethod(setter, false, isNSUIntegerSubscript);
   }
 

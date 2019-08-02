@@ -165,7 +165,7 @@ static void finishImplicitAccessor(AccessorDecl *accessor,
 
 static AccessorDecl *createGetterPrototype(AbstractStorageDecl *storage,
                                            ASTContext &ctx) {
-  assert(!storage->getGetter());
+  assert(!storage->getAccessor(AccessorKind::Get));
 
   SourceLoc loc = storage->getLoc();
 
@@ -244,7 +244,7 @@ static AccessorDecl *createGetterPrototype(AbstractStorageDecl *storage,
 static AccessorDecl *createSetterPrototype(AbstractStorageDecl *storage,
                                            ASTContext &ctx,
                                            AccessorDecl *getter = nullptr) {
-  assert(!storage->getSetter());
+  assert(!storage->getAccessor(AccessorKind::Set));
   assert(storage->supportsMutation());
 
   SourceLoc loc = storage->getLoc();
@@ -463,11 +463,11 @@ createCoroutineAccessorPrototype(AbstractStorageDecl *storage,
   // the storage (and its getters/setters if it has them).
   SmallVector<const Decl *, 2> asAvailableAs;
   asAvailableAs.push_back(storage);
-  if (FuncDecl *getter = storage->getGetter()) {
+  if (FuncDecl *getter = storage->getAccessor(AccessorKind::Get)) {
     asAvailableAs.push_back(getter);
   }
   if (kind == AccessorKind::Modify) {
-    if (FuncDecl *setter = storage->getSetter()) {
+    if (FuncDecl *setter = storage->getAccessor(AccessorKind::Set)) {
       asAvailableAs.push_back(setter);
     }
   }
@@ -1148,7 +1148,7 @@ synthesizeInheritedGetterBody(AccessorDecl *getter, ASTContext &ctx) {
 /// Synthesize the body of a getter which just delegates to an addressor.
 static std::pair<BraceStmt *, bool>
 synthesizeAddressedGetterBody(AccessorDecl *getter, ASTContext &ctx) {
-  assert(getter->getStorage()->getAddressor());
+  assert(getter->getStorage()->getAccessor(AccessorKind::Address));
 
   // This should call the addressor.
   return synthesizeTrivialGetterBody(getter, TargetImpl::Implementation, ctx);
@@ -1158,7 +1158,7 @@ synthesizeAddressedGetterBody(AccessorDecl *getter, ASTContext &ctx) {
 /// coroutine accessor.
 static std::pair<BraceStmt *, bool>
 synthesizeReadCoroutineGetterBody(AccessorDecl *getter, ASTContext &ctx) {
-  assert(getter->getStorage()->getReadCoroutine());
+  assert(getter->getStorage()->getAccessor(AccessorKind::Read));
 
   // This should call the read coroutine.
   return synthesizeTrivialGetterBody(getter, TargetImpl::Implementation, ctx);
@@ -1399,7 +1399,7 @@ synthesizeObservedSetterBody(AccessorDecl *Set, TargetImpl target,
   // TODO: check the body of didSet to only do this load (which may call the
   // superclass getter) if didSet takes an argument.
   VarDecl *OldValue = nullptr;
-  if (VD->getDidSetFunc()) {
+  if (VD->getAccessor(AccessorKind::DidSet)) {
     Expr *OldValueExpr
       = buildStorageReference(Set, VD, target, /*isLValue=*/true, Ctx);
     OldValueExpr = new (Ctx) LoadExpr(OldValueExpr, VD->getType());
@@ -1416,7 +1416,7 @@ synthesizeObservedSetterBody(AccessorDecl *Set, TargetImpl target,
     SetterBody.push_back(OldValue);
   }
 
-  if (auto willSet = VD->getWillSetFunc())
+  if (auto willSet = VD->getAccessor(AccessorKind::WillSet))
     callObserver(willSet, ValueDecl);
   
   // Create an assignment into the storage or call to superclass setter.
@@ -1425,7 +1425,7 @@ synthesizeObservedSetterBody(AccessorDecl *Set, TargetImpl target,
   createPropertyStoreOrCallSuperclassSetter(Set, ValueDRE, VD, target,
                                             SetterBody, Ctx);
 
-  if (auto didSet = VD->getDidSetFunc())
+  if (auto didSet = VD->getAccessor(AccessorKind::DidSet))
     callObserver(didSet, OldValue);
 
   return { BraceStmt::create(Ctx, Loc, SetterBody, Loc, true),
@@ -1792,9 +1792,11 @@ PropertyWrapperMutabilityRequest::evaluate(Evaluator &,
   unsigned numWrappers = var->getAttachedPropertyWrappers().size();
   if (numWrappers < 1)
     return None;
-  if (var->getGetter() && !var->getGetter()->isImplicit())
+  if (var->getAccessor(AccessorKind::Get) &&
+      !var->getAccessor(AccessorKind::Get)->isImplicit())
     return None;
-  if (var->getSetter() && !var->getSetter()->isImplicit())
+  if (var->getAccessor(AccessorKind::Set) &&
+      !var->getAccessor(AccessorKind::Set)->isImplicit())
     return None;
 
   // Start with the traits from the outermost wrapper.
@@ -2074,7 +2076,7 @@ static void finishPropertyWrapperImplInfo(VarDecl *var,
   }
 
   bool wrapperSetterIsUsable = false;
-  if (var->getSetter()) {
+  if (var->getAccessor(AccessorKind::Set)) {
     wrapperSetterIsUsable = true;
   } else if (parentSF && parentSF->Kind != SourceFileKind::Interface
              && !var->isLet()) {
@@ -2347,7 +2349,7 @@ RequiresOpaqueAccessorsRequest::evaluate(Evaluator &evaluator,
   // But we might need to create opaque accessors for them.
   if (auto sourceFile = dc->getParentSourceFile()) {
     if (sourceFile->Kind == SourceFileKind::SIL) {
-      if (!var->getGetter())
+      if (!var->getAccessor(AccessorKind::Get))
         return false;
     }
   }
