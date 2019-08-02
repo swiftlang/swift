@@ -1400,6 +1400,10 @@ void irgen::emitCacheAccessFunction(IRGenModule &IGM,
                                     bool isReadNone) {
   assert((cacheStrategy == CacheStrategy::None) == (cacheVariable == nullptr));
   accessor->setDoesNotThrow();
+  // Don't inline cache functions, since doing so has little impact on
+  // overall performance.
+  accessor->addAttribute(llvm::AttributeList::FunctionIndex,
+                         llvm::Attribute::NoInline);
 
   // This function is logically 'readnone': the caller does not need
   // to reason about any side effects or stores it might perform.
