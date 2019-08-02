@@ -769,10 +769,10 @@ public:
   bool diagnoseAsError() override;
 
   bool isNumElementsMismatch() const {
-    auto lhsTy = dyn_cast<TupleType>(getFromType().getPointer());
-    auto rhsTy = dyn_cast<TupleType>(getToType().getPointer());
+    auto lhsTy = getFromType()->castTo<TupleType>();
+    auto rhsTy = getToType()->castTo<TupleType>();
     assert(lhsTy && rhsTy);
-    return lhsTy->getElements().size() != rhsTy->getElements().size();
+    return lhsTy->getNumElements() != rhsTy->getNumElements();
   }
 };
 

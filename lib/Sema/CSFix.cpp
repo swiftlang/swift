@@ -230,14 +230,16 @@ ContextualMismatch *ContextualMismatch::create(ConstraintSystem &cs, Type lhs,
 }
 
 bool AllowTupleTypeMismatch::diagnose(Expr *root, bool asNote) const {
-  auto failure = TupleContextualFailure(root, getConstraintSystem(), LHS, RHS,
-                                        getLocator());
+  auto failure = TupleContextualFailure(
+      root, getConstraintSystem(), getFromType(), getToType(), getLocator());
   return failure.diagnose(asNote);
 }
 
 AllowTupleTypeMismatch *
 AllowTupleTypeMismatch::create(ConstraintSystem &cs, Type lhs, Type rhs,
                                ConstraintLocator *locator) {
+  assert(lhs->is<TupleType>() && rhs->is<TupleType>() &&
+         "lhs and rhs must be tuple types");
   return new (cs.getAllocator()) AllowTupleTypeMismatch(cs, lhs, rhs, locator);
 }
 

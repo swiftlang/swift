@@ -6964,29 +6964,42 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   }
 
   case FixKind::AllowTupleTypeMismatch: {
-    auto lhs = dyn_cast<TupleType>(type1.getPointer());
-    auto rhs = dyn_cast<TupleType>(type2.getPointer());
-    auto lhsLarger = lhs->getElements().size() >= rhs->getElements().size();
+    auto lhs = type1->castTo<TupleType>();
+    auto rhs = type2->castTo<TupleType>();
+    // Create a new tuple type the size of the smaller tuple with elements
+    // from the larger tuple whenever either side contains a type variable.
+    // For example (A, $0, B, $2) and (X, Y, $1) produces: (X, $0, B).
+    // This allows us to guarentee that the types will match, and all
+    // type variables will get bound to something as long as we default
+    // excess types in the larger tuple to Any. In the prior example,
+    // when the tuples (X, Y, $1) and (X, $0, B) get matched, $0 is equated
+    // to Y, $1 is equated to B, and $2 is defaulted to Any.
+    auto lhsLarger = lhs->getNumElements() >= rhs->getNumElements();
     auto larger = lhsLarger ? lhs : rhs;
     auto smaller = lhsLarger ? rhs : lhs;
-    if (lhs && rhs && getContextualTypePurpose() == CTP_Initialization) {
-      // Match up the tuple type elements, and match any
-      for (unsigned i = 0; i < larger->getElements().size(); ++i) {
-        auto largerTy = larger->getElement(i).getType();
-        if (i < smaller->getElements().size()) {
-          auto smallerTy = smaller->getElement(i).getType();
-          if (smallerTy->isTypeVariableOrMember() ||
-              largerTy->isTypeVariableOrMember())
-            addConstraint(ConstraintKind::Bind, largerTy, smallerTy,
-                          getConstraintLocator(locator));
-        } else {
-          addConstraint(ConstraintKind::Defaultable, largerTy,
+    llvm::SmallVector<TupleTypeElt, 4> newTupleTypes;
+
+    for (unsigned i = 0; i < larger->getNumElements(); ++i) {
+      auto largerElt = larger->getElement(i);
+      if (i < smaller->getNumElements()) {
+        auto smallerElt = smaller->getElement(i);
+        if (largerElt.getType()->isTypeVariableOrMember() ||
+            smallerElt.getType()->isTypeVariableOrMember())
+          newTupleTypes.push_back(largerElt);
+        else
+          newTupleTypes.push_back(smallerElt);
+      } else {
+        if (largerElt.getType()->isTypeVariableOrMember())
+          addConstraint(ConstraintKind::Defaultable, largerElt.getType(),
                         getASTContext().TheAnyType,
                         getConstraintLocator(locator));
-        }
       }
     }
-    return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
+    auto matchingType =
+        TupleType::get(newTupleTypes, getASTContext())->castTo<TupleType>();
+    if (recordFix(fix))
+      return SolutionKind::Error;
+    return matchTupleTypes(matchingType, smaller, matchKind, subflags, locator);
   }
 
   case FixKind::InsertCall:

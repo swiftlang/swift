@@ -136,8 +136,8 @@ enum class FixKind : uint8_t {
   /// referenced constructor must be required.
   AllowInvalidInitRef,
 
-  /// Allow a tuple to be destructured with a mismatched number of
-  /// elements, or mismatched types.
+  /// Allow a tuple to be destructured with mismatched arity, or mismatched
+  /// types.
   AllowTupleTypeMismatch,
 
   /// Allow an invalid member access on a value of protocol type as if
@@ -498,6 +498,9 @@ protected:
                      ConstraintLocator *locator)
       : ConstraintFix(cs, FixKind::ContextualMismatch, locator), LHS(lhs),
         RHS(rhs) {}
+  ContextualMismatch(ConstraintSystem &cs, FixKind kind, Type lhs, Type rhs,
+                     ConstraintLocator *locator)
+      : ConstraintFix(cs, kind, locator), LHS(lhs), RHS(rhs) {}
 
 public:
   std::string getName() const override { return "fix contextual mismatch"; }
@@ -866,20 +869,18 @@ private:
                                      ConstraintLocator *locator);
 };
 
-class AllowTupleTypeMismatch final : public ConstraintFix {
-  Type LHS, RHS;
-
+class AllowTupleTypeMismatch final : public ContextualMismatch {
   AllowTupleTypeMismatch(ConstraintSystem &cs, Type lhs, Type rhs,
                          ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::AllowTupleTypeMismatch, locator), LHS(lhs),
-        RHS(rhs) {}
+      : ContextualMismatch(cs, FixKind::AllowTupleTypeMismatch, lhs, rhs,
+                           locator) {}
 
 public:
   static AllowTupleTypeMismatch *create(ConstraintSystem &cs, Type lhs,
                                         Type rhs, ConstraintLocator *locator);
 
   std::string getName() const override {
-    return "allow invalid tuple destructuring";
+    return "fix tuple mismatches in type and arity";
   }
 
   bool diagnose(Expr *root, bool asNote = false) const override;

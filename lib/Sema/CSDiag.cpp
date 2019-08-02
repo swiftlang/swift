@@ -1149,8 +1149,7 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
       if (fromTT->getNumElements() != toTT->getNumElements()) {
         auto failure = TupleContextualFailure(anchor, CS, fromTT, toTT,
                                               CS.getConstraintLocator(expr));
-        failure.diagnoseAsError();
-        return true;
+        return failure.diagnoseAsError();
       }
      
       SmallVector<TupleTypeElt, 4> FromElts;
@@ -1168,8 +1167,7 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
                               toTT->getElements(), sources)) {
         auto failure = TupleContextualFailure(anchor, CS, fromTT, toTT,
                                               CS.getConstraintLocator(expr));
-        failure.diagnoseAsError();
-        return true;
+        return failure.diagnoseAsError();
       }
     }
   
