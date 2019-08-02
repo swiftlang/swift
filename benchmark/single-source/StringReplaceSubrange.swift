@@ -37,12 +37,12 @@ public let StringReplaceSubrange = [
   ),
   BenchmarkInfo(
     name: "String.replaceSubrange.ArrChar.Small",
-    runFunction: { replaceSubrange($0, smallString, with: Array<Character>(["t"])) },
+    runFunction: { replaceSubrange($0, smallString, with: arrayCharacter) },
     tags: tags
   ),
   BenchmarkInfo(
     name: "String.replaceSubrange.ArrChar",
-    runFunction: { replaceSubrange($0, largeString, with: Array<Character>(["t"])) },
+    runFunction: { replaceSubrange($0, largeString, with: arrayCharacter) },
     tags: tags
   ),
   BenchmarkInfo(
@@ -57,24 +57,19 @@ public let StringReplaceSubrange = [
   ),
 ]
 
-// MARK: - Privates for String
+let smallString = "coffee"
+let largeString = "coffee\u{301}coffeecoffeecoffeecoffee"
 
-private let smallString = "coffee"
-private let largeString = "coffee\u{301}coffeecoffeecoffeecoffee"
-
-// MARK: - Privates for Repeated<Character>
-
-private let repeatedCharacter: Repeated<Character> = {
-  let character = Character("c")
-  return repeatElement(character, count: 1)
-}()
+let arrayCharacter = Array<Character>(["t"])
+let repeatedCharacter = repeatElement(Character("t"), count: 1)
 
 @inline(never)
-private func replaceSubrange<C: Collection>(_ N: Int, _ string: String, with newElements: C)
-  where C.Element == Character {
+private func replaceSubrange<C: Collection>(
+  _ N: Int, _ string: String, with newElements: C
+) where C.Element == Character {
     var copy = getString(string)
     let range = string.startIndex..<string.index(after: string.startIndex)
-    for _ in 0 ..< 5_000 * N {
+    for _ in 0 ..< 500 * N {
       copy.replaceSubrange(range, with: newElements)
     }
 }
