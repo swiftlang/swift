@@ -4565,10 +4565,9 @@ public:
   bool isSettable(const DeclContext *UseDC,
                   const DeclRefExpr *base = nullptr) const;
 
-  /// Are there any accessors for this declaration, including implicit ones?
-  bool hasAnyAccessors() const {
-    return !getAllAccessors().empty();
-  }
+  /// Does this storage declaration have explicitly-defined accessors
+  /// written in the source?
+  bool hasParsedAccessors() const;
 
   /// Return the ownership of values opaquely read from this storage.
   OpaqueReadOwnership getOpaqueReadOwnership() const;

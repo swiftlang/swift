@@ -2010,6 +2010,13 @@ AccessorDecl *AbstractStorageDecl::getOpaqueAccessor(AccessorKind kind) const {
   return getSynthesizedAccessor(kind);
 }
 
+bool AbstractStorageDecl::hasParsedAccessors() const {
+  for (auto *accessor : getAllAccessors())
+    if (!accessor->isImplicit())
+      return true;
+  return false;
+}
+
 AccessorDecl *AbstractStorageDecl::getParsedAccessor(AccessorKind kind) const {
   auto *accessor = getAccessor(kind);
   if (accessor && !accessor->isImplicit())
