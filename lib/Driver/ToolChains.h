@@ -26,6 +26,27 @@ namespace toolchains {
 
 class LLVM_LIBRARY_VISIBILITY Darwin : public ToolChain {
 protected:
+
+  void addLinkerInputArgs(InvocationInfo &II,
+                          const JobContext &context) const;
+
+  void addArgsToLinkARCLite(llvm::opt::ArgStringList &Arguments,
+                            const JobContext &context) const;
+
+  void addSanitizerArgs(llvm::opt::ArgStringList &Arguments,
+                        const DynamicLinkJobAction &job,
+                        const JobContext &context) const;
+
+  void addArgsToLinkStdlib(llvm::opt::ArgStringList &Arguments,
+                           const DynamicLinkJobAction &job,
+                           const JobContext &context) const;
+
+  void addProfileGenerationArgs(llvm::opt::ArgStringList &Arguments,
+                                const JobContext &context) const;
+
+  void addDeploymentTargetArgs(llvm::opt::ArgStringList &Arguments,
+                               const JobContext &context) const;
+
   InvocationInfo constructInvocation(const InterpretJobAction &job,
                                      const JobContext &context) const override;
   InvocationInfo constructInvocation(const DynamicLinkJobAction &job,

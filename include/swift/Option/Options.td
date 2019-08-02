@@ -502,6 +502,12 @@ def static_stdlib: Flag<["-"], "static-stdlib">,
 def no_static_stdlib: Flag<["-"], "no-static-stdlib">,
   Flags<[HelpHidden,DoesNotAffectIncrementalBuild]>,
   HelpText<"Don't statically link the Swift standard library">;
+def toolchain_stdlib_rpath: Flag<["-"], "toolchain-stdlib-rpath">,
+  Flags<[HelpHidden,DoesNotAffectIncrementalBuild]>,
+  HelpText<"Add an rpath entry for the toolchain's standard library, rather than the OS's">;
+def no_stdlib_rpath: Flag<["-"], "no-stdlib-rpath">,
+  Flags<[HelpHidden,DoesNotAffectIncrementalBuild]>,
+  HelpText<"Don't add any rpath entries.">;
 
 def static_executable : Flag<["-"], "static-executable">,
   HelpText<"Statically link the executable">;
