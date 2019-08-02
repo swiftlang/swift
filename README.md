@@ -42,6 +42,17 @@ modules, eliminating the need for headers and the code duplication they entail.
 
 To learn more about the programming language, visit [swift.org](https://swift.org/documentation/).
 
+- [Contributing to Swift](#contributing-to-swift)
+- [Getting Started](#getting-started)
+  - [System Requirements](#system-requirements)
+  - [Getting Sources for Swift and Related Projects](#getting-sources-for-swift-and-related-projects)
+  - [Building Swift](#building-swift)
+  - [Swift Toolchains](#swift-toolchains)
+  - [Build Failures](#build-failures)
+- [Testing Swift](#testing-swift)
+- [Learning More](#learning-more)
+- [Build Dependencies](#build-dependencies)
+
 ## Contributing to Swift
 
 Contributions to Swift are welcomed and encouraged! Please see the
