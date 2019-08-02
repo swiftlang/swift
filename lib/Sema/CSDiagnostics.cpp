@@ -1981,7 +1981,7 @@ bool AutoClosureForwardingFailure::diagnoseAsError() {
 bool AutoClosurePointerConversionFailure::diagnoseAsError() {
   auto *anchor = getAnchor();
   auto diagnostic = diag::invalid_autoclosure_pointer_conversion;
-  emitDiagnostic(anchor->getLoc(), diagnostic, PointeeType, PointerType)
+  emitDiagnostic(anchor->getLoc(), diagnostic, getFromType(), getToType())
       .highlight(anchor->getSourceRange());
   return true;
 }

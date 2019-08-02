@@ -271,7 +271,7 @@ AutoClosureForwarding *AutoClosureForwarding::create(ConstraintSystem &cs,
 
 bool AllowAutoClosurePointerConversion::diagnose(Expr *root, bool asNote) const {
   auto failure = AutoClosurePointerConversionFailure(root, getConstraintSystem(),
-      PointeeType, PointerType, getLocator());
+      getFromType(), getToType(), getLocator());
   return failure.diagnose(asNote);
 }
 

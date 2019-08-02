@@ -785,16 +785,12 @@ public:
 /// var i = 0
 /// foo(&i) // Invalid conversion to UnsafePointer
 /// \endcode
-class AutoClosurePointerConversionFailure final : public FailureDiagnostic {
-  Type PointeeType;
-  Type PointerType;
-
+class AutoClosurePointerConversionFailure final : public ContextualFailure {
 public:
   AutoClosurePointerConversionFailure(Expr *root, ConstraintSystem &cs,
                                       Type pointeeType, Type pointerType,
                                       ConstraintLocator *locator)
-      : FailureDiagnostic(root, cs, locator), PointeeType(pointeeType),
-        PointerType(pointerType) {}
+      : ContextualFailure(root, cs, pointeeType, pointerType, locator) {}
 
   bool diagnoseAsError() override;
 };

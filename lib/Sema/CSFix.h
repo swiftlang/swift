@@ -625,14 +625,11 @@ public:
                                        ConstraintLocator *locator);
 };
 
-class AllowAutoClosurePointerConversion final : public ConstraintFix {
-  Type PointeeType;
-  Type PointerType;
-
+class AllowAutoClosurePointerConversion final : public ContextualMismatch {
   AllowAutoClosurePointerConversion(ConstraintSystem &cs, Type pointeeType,
                                     Type pointerType, ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::AllowAutoClosurePointerConversion, locator),
-        PointeeType(pointeeType), PointerType(pointerType) {}
+      : ContextualMismatch(cs, FixKind::AllowAutoClosurePointerConversion,
+                           pointeeType, pointerType, locator) {}
 
 public:
   std::string getName() const override {
