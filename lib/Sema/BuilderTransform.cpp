@@ -50,9 +50,9 @@ public:
 
 private:
   /// Produce a builder call to the given named function with the given arguments.
-  CallExpr *buildCallIfWanted(SourceLoc loc,
-                              Identifier fnName, ArrayRef<Expr *> args,
-                              ArrayRef<Identifier> argLabels = {}) {
+  Expr *buildCallIfWanted(SourceLoc loc,
+                          Identifier fnName, ArrayRef<Expr *> args,
+                          ArrayRef<Identifier> argLabels = {}) {
     if (!wantExpr)
       return nullptr;
 
@@ -81,9 +81,17 @@ private:
         typeExpr, loc, fnName, DeclNameLoc(loc), /*implicit=*/true);
     SourceLoc openLoc = args.empty() ? loc : args.front()->getStartLoc();
     SourceLoc closeLoc = args.empty() ? loc : args.back()->getEndLoc();
-    return CallExpr::create(ctx, memberRef, openLoc, args,
-                            argLabels, argLabelLocs, closeLoc,
-                            /*trailing closure*/ nullptr, /*implicit*/true);
+    Expr *result = CallExpr::create(ctx, memberRef, openLoc, args,
+                                    argLabels, argLabelLocs, closeLoc,
+                                    /*trailing closure*/ nullptr,
+                                    /*implicit*/true);
+
+    if (ctx.LangOpts.FunctionBuilderOneWayConstraints) {
+      // Form a one-way constraint to prevent backward propagation.
+      result = new (ctx) OneWayExpr(result);
+    }
+
+    return result;
   }
 
   /// Check whether the builder supports the given operation.
@@ -160,6 +168,9 @@ public:
       }
 
       auto expr = node.get<Expr *>();
+      if (wantExpr && ctx.LangOpts.FunctionBuilderOneWayConstraints)
+        expr = new (ctx) OneWayExpr(expr);
+
       expressions.push_back(expr);
     }
 
