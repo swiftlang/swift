@@ -782,3 +782,8 @@ Type swift::getResultTypeOfKeypathDynamicMember(SubscriptDecl *SD) {
     RootAndResultTypeOfKeypathDynamicMemberRequest{SD}, TypePair()).
       SecondTy;
 }
+
+bool swift::hasDynamicMemberLookupAttribute(Type ty) {
+  return evaluateOrDefault(ty->getASTContext().evaluator,
+    HasDynamicMemberLookupAttributeRequest{ty.getPointer()}, false);
+}

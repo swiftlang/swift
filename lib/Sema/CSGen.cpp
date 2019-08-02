@@ -2490,8 +2490,7 @@ namespace {
 
       SmallVector<Identifier, 4> scratch;
       associateArgumentLabels(
-          fnExpr,
-          {expr->getArgumentLabels(scratch), expr->hasTrailingClosure()},
+          expr, {expr->getArgumentLabels(scratch), expr->hasTrailingClosure()},
           /*labelsArePermanent=*/isa<CallExpr>(expr));
 
       if (auto *UDE = dyn_cast<UnresolvedDotExpr>(fnExpr)) {
@@ -3225,15 +3224,14 @@ namespace {
       llvm_unreachable("unhandled operation");
     }
 
-    void associateArgumentLabels(Expr *fn,
-                                 ConstraintSystem::ArgumentLabelState labels,
+    void associateArgumentLabels(Expr *expr,
+                                 ConstraintSystem::ArgumentInfo info,
                                  bool labelsArePermanent = true) {
-      fn = getArgumentLabelTargetExpr(fn);
-
+      assert(expr);
       // Record the labels.
       if (!labelsArePermanent)
-        labels.Labels = CS.allocateCopy(labels.Labels);
-      CS.ArgumentLabels[CS.getConstraintLocator(fn)] = labels;
+        info.Labels = CS.allocateCopy(info.Labels);
+      CS.ArgumentInfos[CS.getArgumentInfoLocator(expr)] = info;
     }
   };
 

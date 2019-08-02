@@ -893,23 +893,20 @@ static void checkOverrideAccessControl(ValueDecl *baseDecl, ValueDecl *decl,
     bool shouldDiagnose = !decl->isAccessibleFrom(scopeDC);
 
     bool shouldDiagnoseSetter = false;
-    if (!shouldDiagnose && baseDecl->isSettable(dc)){
-      auto matchASD = cast<AbstractStorageDecl>(baseDecl);
-      if (matchASD->isSetterAccessibleFrom(dc)) {
-        // Match sure we've created the setter.
-        if (!matchASD->getSetter())
-          maybeAddAccessorsToStorage(matchASD);
+    if (auto matchASD = dyn_cast<AbstractStorageDecl>(baseDecl)) {
+      if (!shouldDiagnose && matchASD->isSettable(dc)){
+        if (matchASD->isSetterAccessibleFrom(dc)) {
+          auto matchSetterAccessScope =
+            matchASD->getSetterFormalAccessScope(dc);
+          auto requiredSetterAccessScope =
+            matchSetterAccessScope.intersectWith(classAccessScope);
+          auto setterScopeDC = requiredSetterAccessScope->getDeclContext();
 
-        auto matchSetterAccessScope = matchASD->getSetter()
-          ->getFormalAccessScope(dc);
-        auto requiredSetterAccessScope =
-          matchSetterAccessScope.intersectWith(classAccessScope);
-        auto setterScopeDC = requiredSetterAccessScope->getDeclContext();
-
-        const auto *ASD = cast<AbstractStorageDecl>(decl);
-        shouldDiagnoseSetter =
-            ASD->isSettable(setterScopeDC) &&
-            !ASD->isSetterAccessibleFrom(setterScopeDC);
+          const auto *ASD = cast<AbstractStorageDecl>(decl);
+          shouldDiagnoseSetter =
+              ASD->isSettable(setterScopeDC) &&
+              !ASD->isSetterAccessibleFrom(setterScopeDC);
+        }
       }
     }
 
@@ -1044,7 +1041,7 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
     // Otherwise, if this is a subscript, validate that covariance is ok.
     // If the parent is non-mutable, it's okay to be covariant.
     auto parentSubscript = cast<SubscriptDecl>(baseDecl);
-    if (parentSubscript->getSetter()) {
+    if (parentSubscript->getAccessor(AccessorKind::Set)) {
       diags.diagnose(subscript, diag::override_mutable_covariant_subscript,
                      declTy, baseTy);
       diags.diagnose(baseDecl, diag::subscript_override_here);
@@ -1091,7 +1088,7 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
           IsSilentDifference = true;
 
     // The overridden property must not be mutable.
-    if (cast<AbstractStorageDecl>(baseDecl)->getSetter() &&
+    if (cast<AbstractStorageDecl>(baseDecl)->getAccessor(AccessorKind::Set) &&
         !IsSilentDifference) {
       diags.diagnose(property, diag::override_mutable_covariant_property,
                   property->getName(), parentPropertyTy, propertyTy);
@@ -1560,7 +1557,8 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
     // Make sure that the overriding property doesn't have storage.
     if ((overrideASD->hasStorage() ||
          overrideASD->getAttrs().hasAttribute<LazyAttr>()) &&
-        !(overrideASD->getWillSetFunc() || overrideASD->getDidSetFunc())) {
+        !(overrideASD->getAccessor(AccessorKind::WillSet) ||
+          overrideASD->getAccessor(AccessorKind::DidSet))) {
       bool downgradeToWarning = false;
       if (!ctx.isSwiftVersionAtLeast(5) &&
           overrideASD->getAttrs().hasAttribute<LazyAttr>()) {
@@ -1598,7 +1596,7 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
     // Make sure we're not overriding a settable property with a non-settable
     // one.  The only reasonable semantics for this would be to inherit the
     // setter but override the getter, and that would be surprising at best.
-    if (baseIsSettable && !override->isSettable(override->getDeclContext())) {
+    if (baseIsSettable && !overrideASD->isSettable(override->getDeclContext())) {
       diags.diagnose(overrideASD, diag::override_mutable_with_readonly_property,
                      overrideASD->getBaseName().getIdentifier());
       diags.diagnose(baseASD, diag::property_override_here);
@@ -1881,7 +1879,7 @@ OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     SmallVector<OverrideMatch, 2> matches;
     for (auto overridden : overridingASD->getOverriddenDecls()) {
       auto baseASD = cast<AbstractStorageDecl>(overridden);
-      maybeAddAccessorsToStorage(baseASD);
+      addExpectedOpaqueAccessorsToStorage(baseASD);
 
       auto kind = accessor->getAccessorKind();
 

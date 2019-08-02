@@ -22,6 +22,7 @@
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/IRGenOptions.h"
+#include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrettyStackTrace.h"
@@ -297,6 +298,9 @@ namespace {
                                   SILType classType,
                                   bool superclass) {
       for (VarDecl *var : theClass->getStoredProperties()) {
+        if (!var->hasInterfaceType())
+          IGM.Context.getLazyResolver()->resolveDeclSignature(var);
+
         SILType type = classType.getFieldType(var, IGM.getSILModule());
 
         // Lower the field type.
@@ -1789,7 +1793,7 @@ namespace {
         }
 
         // Don't emit descriptors for properties without accessors.
-        auto getter = var->getGetter();
+        auto getter = var->getAccessor(AccessorKind::Get);
         if (!getter)
           return;
 
@@ -1800,7 +1804,7 @@ namespace {
         auto &methods = getMethodList(var);
         methods.push_back(getter);
 
-        if (auto setter = var->getSetter())
+        if (auto setter = var->getAccessor(AccessorKind::Set))
           methods.push_back(setter);
       }
     }
@@ -2026,13 +2030,13 @@ namespace {
     void visitSubscriptDecl(SubscriptDecl *subscript) {
       if (!requiresObjCSubscriptDescriptor(IGM, subscript)) return;
 
-      auto getter = subscript->getGetter();
+      auto getter = subscript->getAccessor(AccessorKind::Get);
       if (!getter) return;
 
       auto &methods = getMethodList(subscript);
       methods.push_back(getter);
 
-      if (auto setter = subscript->getSetter())
+      if (auto setter = subscript->getAccessor(AccessorKind::Set))
         methods.push_back(setter);
     }
   };

@@ -399,8 +399,8 @@ void State::checkDataflowEndState(DeadEndBlocks &deBlocks) {
     // If we are asked to store any leaking blocks, put them in the leaking
     // blocks array.
     if (leakingBlocks) {
-      copy(successorBlocksThatMustBeVisited,
-           std::back_inserter(*leakingBlocks));
+      llvm::copy(successorBlocksThatMustBeVisited,
+                 std::back_inserter(*leakingBlocks));
     }
 
     // If we are supposed to error on leaks, do so now.

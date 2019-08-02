@@ -923,7 +923,8 @@ static llvm::Constant *getObjCGetterPointer(IRGenModule &IGM,
   if (isa<ProtocolDecl>(property->getDeclContext()))
     return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
 
-  SILDeclRef getter = SILDeclRef(property->getGetter(), SILDeclRef::Kind::Func)
+  SILDeclRef getter = SILDeclRef(property->getAccessor(AccessorKind::Get),
+                                 SILDeclRef::Kind::Func)
     .asForeign();
 
   return findSwiftAsObjCThunk(IGM, getter, silFn);
@@ -943,7 +944,8 @@ static llvm::Constant *getObjCSetterPointer(IRGenModule &IGM,
   assert(property->isSettable(property->getDeclContext()) &&
          "property is not settable?!");
   
-  SILDeclRef setter = SILDeclRef(property->getSetter(), SILDeclRef::Kind::Func)
+  SILDeclRef setter = SILDeclRef(property->getAccessor(AccessorKind::Set),
+                                 SILDeclRef::Kind::Func)
     .asForeign();
   return findSwiftAsObjCThunk(IGM, setter, silFn);
 }
@@ -1011,7 +1013,7 @@ static CanSILFunctionType getObjCMethodType(IRGenModule &IGM,
 static clang::CanQualType getObjCPropertyType(IRGenModule &IGM,
                                               VarDecl *property) {
   // Use the lowered return type of the foreign getter.
-  auto getter = property->getGetter();
+  auto getter = property->getAccessor(AccessorKind::Get);
   assert(getter);
   CanSILFunctionType methodTy = getObjCMethodType(IGM, getter);
   return IGM.getClangType(
@@ -1170,7 +1172,8 @@ SILFunction *irgen::emitObjCGetterDescriptorParts(IRGenModule &IGM,
                                                   llvm::Constant *&impl) {
   Selector getterSel(subscript, Selector::ForGetter);
   selectorRef = IGM.getAddrOfObjCMethodName(getterSel.str());
-  CanSILFunctionType methodTy = getObjCMethodType(IGM, subscript->getGetter());
+  auto methodTy = getObjCMethodType(IGM,
+                                    subscript->getAccessor(AccessorKind::Get));
   atEncoding = getObjCEncodingForMethodType(IGM, methodTy, /*extended*/false);
   SILFunction *silFn = nullptr;
   impl = getObjCGetterPointer(IGM, subscript, silFn);
@@ -1242,11 +1245,12 @@ SILFunction *irgen::emitObjCSetterDescriptorParts(IRGenModule &IGM,
                                                   llvm::Constant *&selectorRef,
                                                   llvm::Constant *&atEncoding,
                                                   llvm::Constant *&impl) {
-  assert(subscript->isSettable() && "not a settable subscript?!");
+  assert(subscript->supportsMutation() && "not a settable subscript?!");
 
   Selector setterSel(subscript, Selector::ForSetter);
   selectorRef = IGM.getAddrOfObjCMethodName(setterSel.str());
-  CanSILFunctionType methodTy = getObjCMethodType(IGM, subscript->getSetter());
+  auto methodTy = getObjCMethodType(IGM,
+                                    subscript->getAccessor(AccessorKind::Set));
   atEncoding = getObjCEncodingForMethodType(IGM, methodTy, /*extended*/false);
   SILFunction *silFn = nullptr;
   impl = getObjCSetterPointer(IGM, subscript, silFn);
@@ -1397,7 +1401,7 @@ bool irgen::requiresObjCPropertyDescriptor(IRGenModule &IGM,
   // Don't generate a descriptor for a property without any accessors.
   // This is only possible in SIL files because Sema will normally
   // implicitly synthesize accessors for @objc properties.
-  return property->isObjC() && property->getGetter();
+  return property->isObjC() && property->getAccessor(AccessorKind::Get);
 }
 
 bool irgen::requiresObjCSubscriptDescriptor(IRGenModule &IGM,

@@ -1050,7 +1050,8 @@ public:
 
   void visitAccessors(AbstractStorageDecl *asd) {
     for (auto *accessor : asd->getAllAccessors())
-      visitFuncDecl(accessor);
+      if (!accessor->hasForcedStaticDispatch())
+        visitFuncDecl(accessor);
   }
 };
 
@@ -1119,7 +1120,8 @@ public:
 
       if (hasDidSetOrWillSetDynamicReplacement &&
           isa<ExtensionDecl>(storage->getDeclContext()) &&
-          fd != storage->getDidSetFunc() && fd != storage->getWillSetFunc())
+          fd != storage->getAccessor(AccessorKind::WillSet) &&
+          fd != storage->getAccessor(AccessorKind::DidSet))
         return;
     }
     SGM.emitFunction(fd);
@@ -1180,7 +1182,8 @@ public:
 
   void visitAccessors(AbstractStorageDecl *asd) {
     for (auto *accessor : asd->getAllAccessors())
-      visitFuncDecl(accessor);
+      if (!accessor->hasForcedStaticDispatch())
+        visitFuncDecl(accessor);
   }
 };
 

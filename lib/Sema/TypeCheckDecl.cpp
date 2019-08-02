@@ -2276,14 +2276,18 @@ IsGetterMutatingRequest::evaluate(Evaluator &evaluator,
     }
   }
 
+  auto checkMutability = [&](AccessorKind kind) -> bool {
+    auto *accessor = storage->getAccessor(kind);
+    if (!accessor)
+      return false;
+    
+    return accessor->isMutating();
+  };
+
   // Protocol requirements are always written as '{ get }' or '{ get set }';
   // the @_borrowed attribute determines if getReadImpl() becomes Get or Read.
-  if (isa<ProtocolDecl>(storage->getDeclContext())) {
-    if (!storage->getGetter())
-      return false;
-
-    return storage->getGetter()->isMutating();
-  }
+  if (isa<ProtocolDecl>(storage->getDeclContext()))
+    return checkMutability(AccessorKind::Get);
 
   switch (storage->getReadImpl()) {
   case ReadImplKind::Stored:
@@ -2291,16 +2295,13 @@ IsGetterMutatingRequest::evaluate(Evaluator &evaluator,
     return false;
 
   case ReadImplKind::Get:
-    if (!storage->getGetter())
-      return false;
-
-    return storage->getGetter()->isMutating();
+    return checkMutability(AccessorKind::Get);
 
   case ReadImplKind::Address:
-    return storage->getAddressor()->isMutating();
+    return checkMutability(AccessorKind::Address);
 
   case ReadImplKind::Read:
-    return storage->getReadCoroutine()->isMutating();
+    return checkMutability(AccessorKind::Read);
   }
 
   llvm_unreachable("bad impl kind");
@@ -2336,7 +2337,7 @@ IsSetterMutatingRequest::evaluate(Evaluator &evaluator,
   case WriteImplKind::StoredWithObservers:
   case WriteImplKind::InheritedWithObservers:
   case WriteImplKind::Set: {
-    auto *setter = storage->getSetter();
+    auto *setter = storage->getAccessor(AccessorKind::Set);
 
     if (setter)
       result = setter->isMutating();
@@ -2346,7 +2347,7 @@ IsSetterMutatingRequest::evaluate(Evaluator &evaluator,
     // coroutine, check that it has the same mutatingness as the setter.
     // TODO: arguably this should require the spelling to match even when
     // it's the implied value.
-    auto modifyAccessor = storage->getModifyCoroutine();
+    auto modifyAccessor = storage->getAccessor(AccessorKind::Modify);
 
     if (impl.getReadWriteImpl() == ReadWriteImplKind::Modify &&
         modifyAccessor != nullptr) {
@@ -2368,10 +2369,12 @@ IsSetterMutatingRequest::evaluate(Evaluator &evaluator,
   }
 
   case WriteImplKind::MutableAddress:
-    return storage->getMutableAddressor()->isMutating();
+    return storage->getAccessor(AccessorKind::MutableAddress)
+      ->isMutating();
 
   case WriteImplKind::Modify:
-    return storage->getModifyCoroutine()->isMutating();
+    return storage->getAccessor(AccessorKind::Modify)
+      ->isMutating();
   }
   llvm_unreachable("bad storage kind");
 }
@@ -2535,7 +2538,7 @@ public:
     (void) VD->getPropertyWrapperBackingProperty();
 
     // Set up accessors, also lowering lazy and @NSManaged properties.
-    maybeAddAccessorsToStorage(VD);
+    addExpectedOpaqueAccessorsToStorage(VD);
 
     // Add the '@_hasStorage' attribute if this property is stored.
     if (VD->hasStorage() && !VD->getAttrs().hasAttribute<HasStorageAttr>())
@@ -2545,7 +2548,7 @@ public:
     // allowed.
     if (VD->hasStorage()) {
       // Stored properties in protocols are diagnosed in
-      // maybeAddAccessorsToStorage(), to ensure they run when a
+      // addExpectedOpaqueAccessorsToStorage(), to ensure they run when a
       // protocol requirement is validated but not type checked.
 
       // Enums and extensions cannot have stored instance properties.
@@ -2617,7 +2620,7 @@ public:
 
     TC.checkDeclAttributes(VD);
 
-    triggerAccessorSynthesis(TC, VD);
+    addExpectedOpaqueAccessorsToStorage(VD);
 
     if (VD->getDeclContext()->getSelfClassDecl()) {
       checkDynamicSelfType(VD, VD->getValueInterfaceType());
@@ -2865,7 +2868,8 @@ public:
     (void) SD->isGetterMutating();
     (void) SD->isSetterMutating();
 
-    triggerAccessorSynthesis(TC, SD);
+    addExpectedOpaqueAccessorsToStorage(SD);
+
     if (SD->getAttrs().hasAttribute<DynamicReplacementAttr>()) {
       TC.checkDynamicReplacementAttribute(SD);
     }
@@ -2877,7 +2881,7 @@ public:
       checkDynamicSelfType(SD, SD->getValueInterfaceType());
 
       if (SD->getValueInterfaceType()->hasDynamicSelfType() &&
-          SD->isSettable()) {
+          SD->supportsMutation()) {
         SD->diagnose(diag::dynamic_self_in_mutable_subscript);
       }
     }
@@ -4680,7 +4684,7 @@ void TypeChecker::finalizeDecl(ValueDecl *decl) {
   if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
     finalizeType(*this, nominal);
   } else if (auto storage = dyn_cast<AbstractStorageDecl>(decl)) {
-    maybeAddAccessorsToStorage(storage);
+    addExpectedOpaqueAccessorsToStorage(storage);
   }
 }
 

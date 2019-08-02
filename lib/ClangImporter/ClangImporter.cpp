@@ -826,10 +826,15 @@ bool ClangImporter::canReadPCH(StringRef PCHFilename) {
   };
   ctx.InitBuiltinTypes(CI.getTarget());
 
+  auto failureCapabilities =
+    clang::ASTReader::ARR_Missing |
+    clang::ASTReader::ARR_OutOfDate |
+    clang::ASTReader::ARR_VersionMismatch;
+
   auto result = Reader->ReadAST(PCHFilename,
                   clang::serialization::MK_PCH,
                   clang::SourceLocation(),
-                  clang::ASTReader::ARR_None);
+                  failureCapabilities);
   switch (result) {
   case clang::ASTReader::Success:
     return true;
@@ -3652,7 +3657,7 @@ ClangImporter::Implementation::loadNamedMembers(
 
   clang::ASTContext &clangCtx = getClangASTContext();
 
-  assert(isa<clang::ObjCContainerDecl>(CD));
+  assert(isa<clang::ObjCContainerDecl>(CD) || isa<clang::NamespaceDecl>(CD));
 
   TinyPtrVector<ValueDecl *> Members;
   for (auto entry : table->lookup(SerializedSwiftName(N),

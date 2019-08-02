@@ -238,14 +238,16 @@ static bool checkObjCWitnessSelector(TypeChecker &tc, ValueDecl *req,
   // FIXME: Check property names!
 
   // Check the getter.
-  if (auto reqGetter = reqStorage->getGetter()) {
-    if (checkObjCWitnessSelector(tc, reqGetter, witnessStorage->getGetter()))
+  if (auto reqGetter = reqStorage->getAccessor(AccessorKind::Get)) {
+    auto *witnessGetter = witnessStorage->getAccessor(AccessorKind::Get);
+    if (checkObjCWitnessSelector(tc, reqGetter, witnessGetter))
       return true;
   }
 
   // Check the setter.
-  if (auto reqSetter = reqStorage->getSetter()) {
-    if (checkObjCWitnessSelector(tc, reqSetter, witnessStorage->getSetter()))
+  if (auto reqSetter = reqStorage->getAccessor(AccessorKind::Set)) {
+    auto *witnessSetter = witnessStorage->getAccessor(AccessorKind::Set);
+    if (checkObjCWitnessSelector(tc, reqSetter, witnessSetter))
       return true;
   }
 
@@ -398,8 +400,8 @@ swift::matchWitness(
       return RequirementMatch(witness, MatchKind::StaticNonStaticConflict);
 
     // If the requirement is settable and the witness is not, reject it.
-    if (req->isSettable(req->getDeclContext()) &&
-        !witness->isSettable(witness->getDeclContext()))
+    if (reqASD->isSettable(req->getDeclContext()) &&
+        !witnessASD->isSettable(witness->getDeclContext()))
       return RequirementMatch(witness, MatchKind::SettableConflict);
 
     // Validate that the 'mutating' bit lines up for getters and setters.
@@ -407,7 +409,7 @@ swift::matchWitness(
       return RequirementMatch(getStandinForAccessor(witnessASD, AccessorKind::Get),
                               MatchKind::MutatingConflict);
 
-    if (req->isSettable(req->getDeclContext())) {
+    if (reqASD->isSettable(req->getDeclContext())) {
       if (!reqASD->isSetterMutating() && witnessASD->isSetterMutating())
         return RequirementMatch(getStandinForAccessor(witnessASD, AccessorKind::Set),
                                 MatchKind::MutatingConflict);
@@ -1197,15 +1199,17 @@ bool WitnessChecker::checkWitnessAccess(ValueDecl *requirement,
       return true;
   }
 
-  if (requirement->isSettable(DC)) {
-    *isSetter = true;
+  if (auto *requirementASD = dyn_cast<AbstractStorageDecl>(requirement)) {
+    if (requirementASD->isSettable(DC)) {
+      *isSetter = true;
 
-    auto ASD = cast<AbstractStorageDecl>(witness);
+      auto witnessASD = cast<AbstractStorageDecl>(witness);
 
-    // See above about the forConformance flag.
-    if (!ASD->isSetterAccessibleFrom(actualScopeToCheck.getDeclContext(),
-                                     /*forConformance=*/true))
-      return true;
+      // See above about the forConformance flag.
+      if (!witnessASD->isSetterAccessibleFrom(actualScopeToCheck.getDeclContext(),
+                                              /*forConformance=*/true))
+        return true;
+    }
   }
 
   return false;
@@ -5036,9 +5040,9 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
           sf->ObjCUnsatisfiedOptReqs.emplace_back(dc, funcReq);
         } else {
           auto storageReq = cast<AbstractStorageDecl>(req);
-          if (auto getter = storageReq->getGetter())
+          if (auto getter = storageReq->getAccessor(AccessorKind::Get))
             sf->ObjCUnsatisfiedOptReqs.emplace_back(dc, getter);
-          if (auto setter = storageReq->getSetter())
+          if (auto setter = storageReq->getAccessor(AccessorKind::Set))
             sf->ObjCUnsatisfiedOptReqs.emplace_back(dc, setter);
         }
       }

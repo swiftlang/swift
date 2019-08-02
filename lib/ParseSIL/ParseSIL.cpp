@@ -156,9 +156,16 @@ static bool parseIntoSourceFileImpl(SourceFile &SF,
     *Done = P.Tok.is(tok::eof);
   } while (FullParse && !*Done);
 
+  if (!FullParse && !*Done) {
+    // Only parsed a part of the source file.
+    // Add artificial EOF to be able to finalize the tree.
+    P.SyntaxContext->addRawSyntax(
+      ParsedRawSyntaxNode::makeDeferredMissing(tok::eof, P.Tok.getLoc()));
+  }
+
   if (STreeCreator) {
     auto rawNode = P.finalizeSyntaxTree();
-    STreeCreator->acceptSyntaxRoot(rawNode.getOpaqueNode(), SF);
+    STreeCreator->acceptSyntaxRoot(rawNode, SF);
   }
 
   return FoundSideEffects;

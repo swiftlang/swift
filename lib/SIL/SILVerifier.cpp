@@ -491,7 +491,7 @@ struct ImmutableAddressUseVerifier {
   }
 
   bool isMutatingOrConsuming(SILValue address) {
-    copy(address->getUses(), std::back_inserter(worklist));
+    llvm::copy(address->getUses(), std::back_inserter(worklist));
     while (!worklist.empty()) {
       auto *use = worklist.pop_back_val();
       auto *inst = use->getUser();
@@ -584,7 +584,7 @@ struct ImmutableAddressUseVerifier {
       case SILInstructionKind::IndexRawPointerInst:
         // Add these to our worklist.
         for (auto result : inst->getResults()) {
-          copy(result->getUses(), std::back_inserter(worklist));
+          llvm::copy(result->getUses(), std::back_inserter(worklist));
         }
         break;
       default:
@@ -4944,8 +4944,8 @@ public:
       if (F->hasForeignBody())
         return;
 
-      assert(F->isAvailableExternally() &&
-             "external declaration of internal SILFunction not allowed");
+      require(F->isAvailableExternally(),
+              "external declaration of internal SILFunction not allowed");
       // If F is an external declaration, there is nothing further to do,
       // return.
       return;

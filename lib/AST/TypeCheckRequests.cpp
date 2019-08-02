@@ -704,3 +704,84 @@ void StorageImplInfoRequest::cacheResult(StorageImplInfo value) const {
   auto *storage = std::get<0>(getStorage());
   storage->setImplInfo(value);
 }
+
+//----------------------------------------------------------------------------//
+// RequiresOpaqueAccessorsRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<bool>
+RequiresOpaqueAccessorsRequest::getCachedResult() const {
+  auto *storage = std::get<0>(getStorage());
+  if (storage->LazySemanticInfo.RequiresOpaqueAccessorsComputed)
+    return storage->LazySemanticInfo.RequiresOpaqueAccessors;
+  return None;
+}
+
+void RequiresOpaqueAccessorsRequest::cacheResult(bool value) const {
+  auto *storage = std::get<0>(getStorage());
+  storage->LazySemanticInfo.RequiresOpaqueAccessorsComputed = 1;
+  storage->LazySemanticInfo.RequiresOpaqueAccessors = value;
+}
+
+//----------------------------------------------------------------------------//
+// RequiresOpaqueModifyCoroutineRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<bool>
+RequiresOpaqueModifyCoroutineRequest::getCachedResult() const {
+  auto *storage = std::get<0>(getStorage());
+  if (storage->LazySemanticInfo.RequiresOpaqueModifyCoroutineComputed)
+    return storage->LazySemanticInfo.RequiresOpaqueModifyCoroutine;
+  return None;
+}
+
+void RequiresOpaqueModifyCoroutineRequest::cacheResult(bool value) const {
+  auto *storage = std::get<0>(getStorage());
+  storage->LazySemanticInfo.RequiresOpaqueModifyCoroutineComputed = 1;
+  storage->LazySemanticInfo.RequiresOpaqueModifyCoroutine = value;
+}
+
+//----------------------------------------------------------------------------//
+// IsAccessorTransparentRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<bool>
+IsAccessorTransparentRequest::getCachedResult() const {
+  auto *accessor = std::get<0>(getStorage());
+  return accessor->getCachedIsTransparent();
+}
+
+void IsAccessorTransparentRequest::cacheResult(bool value) const {
+  auto *accessor = std::get<0>(getStorage());
+  accessor->setIsTransparent(value);
+
+  // For interface printing, API diff, etc.
+  if (value) {
+    auto &attrs = accessor->getAttrs();
+    if (!attrs.hasAttribute<TransparentAttr>()) {
+      auto &ctx = accessor->getASTContext();
+      attrs.add(new (ctx) TransparentAttr(/*IsImplicit=*/true));
+    }
+  }
+}
+
+//----------------------------------------------------------------------------//
+// SynthesizeAccessorRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<AccessorDecl *>
+SynthesizeAccessorRequest::getCachedResult() const {
+  auto *storage = std::get<0>(getStorage());
+  auto kind = std::get<1>(getStorage());
+  auto *accessor = storage->getAccessor(kind);
+  if (accessor)
+    return accessor;
+  return None;
+}
+
+void SynthesizeAccessorRequest::cacheResult(AccessorDecl *accessor) const {
+  auto *storage = std::get<0>(getStorage());
+  auto kind = std::get<1>(getStorage());
+
+  storage->setSynthesizedAccessor(kind, accessor);
+}
