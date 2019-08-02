@@ -3,6 +3,8 @@
 // Ensure c++ features are used.
 namespace ns {
 class T {};
+
+T *doMakeT();
 } // namespace ns
 
 struct Basic {

@@ -3657,7 +3657,7 @@ ClangImporter::Implementation::loadNamedMembers(
 
   clang::ASTContext &clangCtx = getClangASTContext();
 
-  assert(isa<clang::ObjCContainerDecl>(CD));
+  assert(isa<clang::ObjCContainerDecl>(CD) || isa<clang::NamespaceDecl>(CD));
 
   TinyPtrVector<ValueDecl *> Members;
   for (auto entry : table->lookup(SerializedSwiftName(N),
