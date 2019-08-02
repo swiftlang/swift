@@ -3628,13 +3628,13 @@ namespace {
       case ImportedAccessorKind::PropertyGetter: {
         auto property = getImplicitProperty(importedName, decl);
         if (!property) return nullptr;
-        return property->getAccessor(AccessorKind::Get);
+        return property->getGetter();
       }
 
       case ImportedAccessorKind::PropertySetter:
         auto property = getImplicitProperty(importedName, decl);
         if (!property) return nullptr;
-        return property->getAccessor(AccessorKind::Set);
+        return property->getSetter();
       }
 
       return importFunctionDecl(decl, importedName, correctSwiftName, None);
@@ -5010,8 +5010,8 @@ namespace {
       // Only record overrides of class members.
       if (overridden) {
         result->setOverriddenDecl(overridden);
-        getter->setOverriddenDecl(overridden->getAccessor(AccessorKind::Get));
-        if (auto parentSetter = overridden->getAccessor(AccessorKind::Set))
+        getter->setOverriddenDecl(overridden->getGetter());
+        if (auto parentSetter = overridden->getSetter())
           if (setter)
             setter->setOverriddenDecl(parentSetter);
       }
@@ -6516,10 +6516,10 @@ void SwiftDeclConverter::recordObjCOverride(SubscriptDecl *subscript) {
 
     // The index types match. This is an override, so mark it as such.
     subscript->setOverriddenDecl(parentSub);
-    auto getterThunk = subscript->getAccessor(AccessorKind::Get);
-    getterThunk->setOverriddenDecl(parentSub->getAccessor(AccessorKind::Get));
-    if (auto parentSetter = parentSub->getAccessor(AccessorKind::Set)) {
-      if (auto setterThunk = subscript->getAccessor(AccessorKind::Set))
+    auto getterThunk = subscript->getGetter();
+    getterThunk->setOverriddenDecl(parentSub->getGetter());
+    if (auto parentSetter = parentSub->getSetter()) {
+      if (auto setterThunk = subscript->getSetter())
         setterThunk->setOverriddenDecl(parentSetter);
     }
 

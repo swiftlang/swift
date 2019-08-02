@@ -215,7 +215,7 @@ bool AbstractStorageDecl::exportsPropertyDescriptor() const {
   
   // Any property that's potentially resilient should have accessors
   // synthesized.
-  if (!getAccessor(AccessorKind::Get))
+  if (!getGetter())
     return false;
 
   // If the getter is mutating, we cannot form a keypath to it at all.
@@ -231,7 +231,7 @@ bool AbstractStorageDecl::exportsPropertyDescriptor() const {
   // then we still do.
 
   // Check the linkage of the declaration.
-  auto getter = SILDeclRef(getAccessor(AccessorKind::Get));
+  auto getter = SILDeclRef(getGetter());
   auto getterLinkage = getter.getLinkage(ForDefinition);
   
   switch (getterLinkage) {

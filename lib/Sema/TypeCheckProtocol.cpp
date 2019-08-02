@@ -238,16 +238,14 @@ static bool checkObjCWitnessSelector(TypeChecker &tc, ValueDecl *req,
   // FIXME: Check property names!
 
   // Check the getter.
-  if (auto reqGetter = reqStorage->getAccessor(AccessorKind::Get)) {
-    auto *witnessGetter = witnessStorage->getAccessor(AccessorKind::Get);
-    if (checkObjCWitnessSelector(tc, reqGetter, witnessGetter))
+  if (auto reqGetter = reqStorage->getGetter()) {
+    if (checkObjCWitnessSelector(tc, reqGetter, witnessStorage->getGetter()))
       return true;
   }
 
   // Check the setter.
-  if (auto reqSetter = reqStorage->getAccessor(AccessorKind::Set)) {
-    auto *witnessSetter = witnessStorage->getAccessor(AccessorKind::Set);
-    if (checkObjCWitnessSelector(tc, reqSetter, witnessSetter))
+  if (auto reqSetter = reqStorage->getSetter()) {
+    if (checkObjCWitnessSelector(tc, reqSetter, witnessStorage->getSetter()))
       return true;
   }
 
@@ -5040,9 +5038,9 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
           sf->ObjCUnsatisfiedOptReqs.emplace_back(dc, funcReq);
         } else {
           auto storageReq = cast<AbstractStorageDecl>(req);
-          if (auto getter = storageReq->getAccessor(AccessorKind::Get))
+          if (auto getter = storageReq->getGetter())
             sf->ObjCUnsatisfiedOptReqs.emplace_back(dc, getter);
-          if (auto setter = storageReq->getAccessor(AccessorKind::Set))
+          if (auto setter = storageReq->getSetter())
             sf->ObjCUnsatisfiedOptReqs.emplace_back(dc, setter);
         }
       }

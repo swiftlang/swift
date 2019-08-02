@@ -2183,10 +2183,6 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
       // If the capture is of a computed property, grab the transitive captures
       // of its accessors.
       if (auto capturedVar = dyn_cast<VarDecl>(capture.getDecl())) {
-        auto collectAccessorCaptures = [&](AccessorKind kind) {
-          collectFunctionCaptures(capturedVar->getAccessor(kind));
-        };
-
         if (!capture.isDirect()) {
           auto impl = capturedVar->getImplInfo();
 
@@ -2195,13 +2191,13 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
             // Will capture storage later.
             break;
           case ReadImplKind::Address:
-            collectAccessorCaptures(AccessorKind::Address);
+            collectFunctionCaptures(capturedVar->getAddressor());
             break;
           case ReadImplKind::Get:
-            collectAccessorCaptures(AccessorKind::Get);
+            collectFunctionCaptures(capturedVar->getGetter());
             break;
           case ReadImplKind::Read:
-            collectAccessorCaptures(AccessorKind::Read);
+            collectFunctionCaptures(capturedVar->getReadCoroutine());
             break;
           case ReadImplKind::Inherited:
             llvm_unreachable("inherited local variable?");
@@ -2213,13 +2209,13 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
             break;
           case WriteImplKind::StoredWithObservers:
           case WriteImplKind::Set:
-            collectAccessorCaptures(AccessorKind::Set);
+            collectFunctionCaptures(capturedVar->getSetter());
             break;
           case WriteImplKind::MutableAddress:
-            collectAccessorCaptures(AccessorKind::MutableAddress);
+            collectFunctionCaptures(capturedVar->getMutableAddressor());
             break;
           case WriteImplKind::Modify:
-            collectAccessorCaptures(AccessorKind::Modify);
+            collectFunctionCaptures(capturedVar->getModifyCoroutine());
             break;
           case WriteImplKind::InheritedWithObservers:
             llvm_unreachable("inherited local variable");
@@ -2233,10 +2229,10 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
             // We've already processed the read and write operations.
             break;
           case ReadWriteImplKind::MutableAddress:
-            collectAccessorCaptures(AccessorKind::MutableAddress);
+            collectFunctionCaptures(capturedVar->getMutableAddressor());
             break;
           case ReadWriteImplKind::Modify:
-            collectAccessorCaptures(AccessorKind::Modify);
+            collectFunctionCaptures(capturedVar->getModifyCoroutine());
             break;
           }
         }

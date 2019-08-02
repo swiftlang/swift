@@ -268,7 +268,7 @@ public:
         //   return 0; <- No indentation added because of the getter.
         // }
         if (auto VD = dyn_cast_or_null<VarDecl>(Cursor->getAsDecl())) {
-          if (auto Getter = VD->getAccessor(AccessorKind::Get)) {
+          if (auto Getter = VD->getGetter()) {
             if (!Getter->isImplicit() &&
                 Getter->getAccessorKeywordLoc().isInvalid()) {
               LineAndColumn = ParentLineAndColumn;

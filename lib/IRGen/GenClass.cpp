@@ -1793,7 +1793,7 @@ namespace {
         }
 
         // Don't emit descriptors for properties without accessors.
-        auto getter = var->getAccessor(AccessorKind::Get);
+        auto getter = var->getGetter();
         if (!getter)
           return;
 
@@ -1804,7 +1804,7 @@ namespace {
         auto &methods = getMethodList(var);
         methods.push_back(getter);
 
-        if (auto setter = var->getAccessor(AccessorKind::Set))
+        if (auto setter = var->getSetter())
           methods.push_back(setter);
       }
     }
@@ -2030,13 +2030,13 @@ namespace {
     void visitSubscriptDecl(SubscriptDecl *subscript) {
       if (!requiresObjCSubscriptDescriptor(IGM, subscript)) return;
 
-      auto getter = subscript->getAccessor(AccessorKind::Get);
+      auto getter = subscript->getGetter();
       if (!getter) return;
 
       auto &methods = getMethodList(subscript);
       methods.push_back(getter);
 
-      if (auto setter = subscript->getAccessor(AccessorKind::Set))
+      if (auto setter = subscript->getSetter())
         methods.push_back(setter);
     }
   };

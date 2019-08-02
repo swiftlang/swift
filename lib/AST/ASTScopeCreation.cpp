@@ -856,7 +856,7 @@ void SubscriptDeclScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
   auto *leaf =
       scopeCreator.createGenericParamScopes(sub, sub->getGenericParams(), this);
   auto *params = scopeCreator.createSubtree<AbstractFunctionParamsScope>(
-      leaf, sub->getIndices(), sub->getAccessor(AccessorKind::Get));
+      leaf, sub->getIndices(), sub->getGetter());
   scopeCreator.addChildrenForAllExplicitAccessors(sub, params);
 }
 

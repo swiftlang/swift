@@ -4085,12 +4085,12 @@ namespace {
           // The property is non-settable, so add "getter:".
           primaryDiag.fixItInsert(modifierLoc, "getter: ");
           E->overrideObjCSelectorKind(ObjCSelectorExpr::Getter, modifierLoc);
-          method = var->getAccessor(AccessorKind::Get);
+          method = var->getGetter();
           break;
         }
 
         case ObjCSelectorExpr::Getter:
-          method = var->getAccessor(AccessorKind::Get);
+          method = var->getGetter();
           break;
 
         case ObjCSelectorExpr::Setter:
@@ -4111,7 +4111,7 @@ namespace {
             return E;
           }
 
-          method = var->getAccessor(AccessorKind::Set);
+          method = var->getSetter();
           break;
         }
       } else {

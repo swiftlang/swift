@@ -2529,22 +2529,20 @@ private:
     // specifically using the getter/setter.
     switch (AccessContext) {
     case MemberAccessContext::Getter:
-      diagAccessorAvailability(D->getAccessor(AccessorKind::Get),
-                               ReferenceRange, ReferenceDC, None);
+      diagAccessorAvailability(D->getGetter(), ReferenceRange, ReferenceDC,
+                               None);
       break;
 
     case MemberAccessContext::Setter:
-      diagAccessorAvailability(D->getAccessor(AccessorKind::Set),
-                               ReferenceRange, ReferenceDC, None);
+      diagAccessorAvailability(D->getSetter(), ReferenceRange, ReferenceDC,
+                               None);
       break;
 
     case MemberAccessContext::InOut:
-      diagAccessorAvailability(D->getAccessor(AccessorKind::Get),
-                               ReferenceRange, ReferenceDC,
+      diagAccessorAvailability(D->getGetter(), ReferenceRange, ReferenceDC,
                                DeclAvailabilityFlag::ForInout);
 
-      diagAccessorAvailability(D->getAccessor(AccessorKind::Set),
-                               ReferenceRange, ReferenceDC,
+      diagAccessorAvailability(D->getSetter(), ReferenceRange, ReferenceDC,
                                DeclAvailabilityFlag::ForInout);
       break;
     }

@@ -1307,7 +1307,7 @@ namespace {
           // If we have a nonmutating setter on a value type, the call
           // captures all of 'self' and we cannot rewrite an assignment
           // into an initialization.
-          auto setter = VD->getAccessor(AccessorKind::Set);
+          auto setter = VD->getSetter();
           if (setter->isNonMutating() &&
               setter->getDeclContext()->getSelfNominalTypeDecl() &&
               setter->isInstanceMember() &&

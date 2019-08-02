@@ -2390,50 +2390,50 @@ public:
     void verifyChecked(AbstractStorageDecl *ASD) {
       if (ASD->hasAccess() && ASD->isSettable(nullptr)) {
         auto setterAccess = ASD->getSetterFormalAccess();
-        auto *setter = ASD->getAccessor(AccessorKind::Set);
-        if (setter && setter->getFormalAccess() != setterAccess) {
+        if (ASD->getSetter() &&
+            ASD->getSetter()->getFormalAccess() != setterAccess) {
           Out << "AbstractStorageDecl's setter access is out of sync"
                  " with the access actually on the setter\n";
           abort();
         }
       }
 
-      if (auto getter = ASD->getAccessor(AccessorKind::Get)) {
+      if (auto getter = ASD->getGetter()) {
         if (getter->isMutating() != ASD->isGetterMutating()) {
           Out << "AbstractStorageDecl::isGetterMutating is out of sync"
                  " with whether the getter is actually mutating\n";
           abort();
         }
       }
-      if (auto setter = ASD->getAccessor(AccessorKind::Set)) {
+      if (auto setter = ASD->getSetter()) {
         if (setter->isMutating() != ASD->isSetterMutating()) {
           Out << "AbstractStorageDecl::isSetterMutating is out of sync"
                  " with whether the setter is actually mutating\n";
           abort();
         }
       }
-      if (auto addressor = ASD->getAccessor(AccessorKind::Address)) {
+      if (auto addressor = ASD->getAddressor()) {
         if (addressor->isMutating() != ASD->isGetterMutating()) {
           Out << "AbstractStorageDecl::isGetterMutating is out of sync"
                  " with whether immutable addressor is mutating";
           abort();
         }
       }
-      if (auto reader = ASD->getAccessor(AccessorKind::Read)) {
+      if (auto reader = ASD->getReadCoroutine()) {
         if (reader->isMutating() != ASD->isGetterMutating()) {
           Out << "AbstractStorageDecl::isGetterMutating is out of sync"
                  " with whether read accessor is mutating";
           abort();
         }
       }
-      if (auto addressor = ASD->getAccessor(AccessorKind::MutableAddress)) {
+      if (auto addressor = ASD->getMutableAddressor()) {
         if (addressor->isMutating() != ASD->isSetterMutating()) {
           Out << "AbstractStorageDecl::isSetterMutating is out of sync"
                  " with whether mutable addressor is mutating";
           abort();
         }
       }
-      if (auto modifier = ASD->getAccessor(AccessorKind::Modify)) {
+      if (auto modifier = ASD->getModifyCoroutine()) {
         if (modifier->isMutating() !=
             (ASD->isSetterMutating() || ASD->isGetterMutating())) {
           Out << "AbstractStorageDecl::isSetterMutating is out of sync"
@@ -2475,7 +2475,7 @@ public:
       if (!var->getDeclContext()->contextHasLazyGenericEnvironment()) {
         typeForAccessors =
             var->getDeclContext()->mapTypeIntoContext(typeForAccessors);
-        if (const FuncDecl *getter = var->getAccessor(AccessorKind::Get)) {
+        if (const FuncDecl *getter = var->getGetter()) {
           if (getter->getParameters()->size() != 0) {
             Out << "property getter has parameters\n";
             abort();
@@ -2496,7 +2496,7 @@ public:
         }
       }
 
-      if (const FuncDecl *setter = var->getAccessor(AccessorKind::Set)) {
+      if (const FuncDecl *setter = var->getSetter()) {
         if (setter->hasInterfaceType()) {
           if (!setter->getResultInterfaceType()->isVoid()) {
             Out << "property setter has non-Void result type\n";

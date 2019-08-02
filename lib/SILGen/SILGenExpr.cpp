@@ -2604,9 +2604,9 @@ loadIndexValuesForKeyPathComponent(SILGenFunction &SGF, SILLocation loc,
 static AccessorDecl *
 getRepresentativeAccessorForKeyPath(AbstractStorageDecl *storage) {
   if (storage->requiresOpaqueGetter())
-    return storage->getAccessor(AccessorKind::Get);
+    return storage->getGetter();
   assert(storage->requiresOpaqueReadCoroutine());
-  return storage->getAccessor(AccessorKind::Read);
+  return storage->getReadCoroutine();
 }
 
 static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
@@ -2755,7 +2755,7 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
   // back to the declaration whose setter introduced the witness table
   // entry.
   if (isa<ProtocolDecl>(property->getDeclContext())) {
-    auto setter = property->getAccessor(AccessorKind::Set);
+    auto setter = property->getSetter();
     if (!SILDeclRef::requiresNewWitnessTableEntry(setter)) {
       // Find the setter that does have a witness table entry.
       auto wtableSetter =

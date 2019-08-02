@@ -2276,18 +2276,14 @@ IsGetterMutatingRequest::evaluate(Evaluator &evaluator,
     }
   }
 
-  auto checkMutability = [&](AccessorKind kind) -> bool {
-    auto *accessor = storage->getAccessor(kind);
-    if (!accessor)
-      return false;
-    
-    return accessor->isMutating();
-  };
-
   // Protocol requirements are always written as '{ get }' or '{ get set }';
   // the @_borrowed attribute determines if getReadImpl() becomes Get or Read.
-  if (isa<ProtocolDecl>(storage->getDeclContext()))
-    return checkMutability(AccessorKind::Get);
+  if (isa<ProtocolDecl>(storage->getDeclContext())) {
+    if (!storage->getGetter())
+      return false;
+
+    return storage->getGetter()->isMutating();
+  }
 
   switch (storage->getReadImpl()) {
   case ReadImplKind::Stored:
@@ -2295,13 +2291,16 @@ IsGetterMutatingRequest::evaluate(Evaluator &evaluator,
     return false;
 
   case ReadImplKind::Get:
-    return checkMutability(AccessorKind::Get);
+    if (!storage->getGetter())
+      return false;
+
+    return storage->getGetter()->isMutating();
 
   case ReadImplKind::Address:
-    return checkMutability(AccessorKind::Address);
+    return storage->getAddressor()->isMutating();
 
   case ReadImplKind::Read:
-    return checkMutability(AccessorKind::Read);
+    return storage->getReadCoroutine()->isMutating();
   }
 
   llvm_unreachable("bad impl kind");
@@ -2337,7 +2336,7 @@ IsSetterMutatingRequest::evaluate(Evaluator &evaluator,
   case WriteImplKind::StoredWithObservers:
   case WriteImplKind::InheritedWithObservers:
   case WriteImplKind::Set: {
-    auto *setter = storage->getAccessor(AccessorKind::Set);
+    auto *setter = storage->getSetter();
 
     if (setter)
       result = setter->isMutating();
@@ -2347,7 +2346,7 @@ IsSetterMutatingRequest::evaluate(Evaluator &evaluator,
     // coroutine, check that it has the same mutatingness as the setter.
     // TODO: arguably this should require the spelling to match even when
     // it's the implied value.
-    auto modifyAccessor = storage->getAccessor(AccessorKind::Modify);
+    auto modifyAccessor = storage->getModifyCoroutine();
 
     if (impl.getReadWriteImpl() == ReadWriteImplKind::Modify &&
         modifyAccessor != nullptr) {
@@ -2369,12 +2368,10 @@ IsSetterMutatingRequest::evaluate(Evaluator &evaluator,
   }
 
   case WriteImplKind::MutableAddress:
-    return storage->getAccessor(AccessorKind::MutableAddress)
-      ->isMutating();
+    return storage->getMutableAddressor()->isMutating();
 
   case WriteImplKind::Modify:
-    return storage->getAccessor(AccessorKind::Modify)
-      ->isMutating();
+    return storage->getModifyCoroutine()->isMutating();
   }
   llvm_unreachable("bad storage kind");
 }

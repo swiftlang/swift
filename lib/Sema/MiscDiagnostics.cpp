@@ -3987,7 +3987,7 @@ void swift::fixItAccess(InFlightDiagnostic &diag, ValueDecl *VD,
     VD->overwriteAccess(desiredAccess);
 
     if (auto *ASD = dyn_cast<AbstractStorageDecl>(VD)) {
-      if (auto *getter = ASD->getAccessor(AccessorKind::Get))
+      if (auto *getter = ASD->getGetter())
         getter->overwriteAccess(desiredAccess);
 
       if (auto *setterAttr = attrs.getAttribute<SetterAccessAttr>()) {

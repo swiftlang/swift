@@ -4651,9 +4651,9 @@ bool AbstractStorageDecl::hasPrivateAccessor() const {
 }
 
 bool AbstractStorageDecl::hasDidSetOrWillSetDynamicReplacement() const {
-  if (auto *func = getAccessor(AccessorKind::DidSet))
+  if (auto *func = getDidSetFunc())
     return func->getAttrs().hasAttribute<DynamicReplacementAttr>();
-  if (auto *func = getAccessor(AccessorKind::WillSet))
+  if (auto *func = getWillSetFunc())
     return func->getAttrs().hasAttribute<DynamicReplacementAttr>();
   return false;
 }
@@ -4809,8 +4809,8 @@ AbstractStorageDecl::getSetterFormalAccessScope(const DeclContext *useDC,
 void AbstractStorageDecl::setComputedSetter(AccessorDecl *setter) {
   assert(getImplInfo().getReadImpl() == ReadImplKind::Get);
   assert(!getImplInfo().supportsMutation());
-  assert(getAccessor(AccessorKind::Get) && "invariant check: missing getter");
-  assert(!getAccessor(AccessorKind::Set) && "already has a setter");
+  assert(getGetter() && "invariant check: missing getter");
+  assert(!getSetter() && "already has a setter");
   assert(hasClangNode() && "should only be used for ObjC properties");
   assert(setter && "should not be called for readonly properties");
   assert(setter->getAccessorKind() == AccessorKind::Set);
@@ -4855,7 +4855,7 @@ getNameFromObjcAttribute(const ObjCAttr *attr, DeclName preferredName) {
 ObjCSelector
 AbstractStorageDecl::getObjCGetterSelector(Identifier preferredName) const {
   // If the getter has an @objc attribute with a name, use that.
-  if (auto getter = getAccessor(AccessorKind::Get)) {
+  if (auto getter = getGetter()) {
       if (auto name = getNameFromObjcAttribute(getter->getAttrs().
           getAttribute<ObjCAttr>(), preferredName))
         return *name;
@@ -4885,7 +4885,7 @@ AbstractStorageDecl::getObjCGetterSelector(Identifier preferredName) const {
 ObjCSelector
 AbstractStorageDecl::getObjCSetterSelector(Identifier preferredName) const {
   // If the setter has an @objc attribute with a name, use that.
-  auto setter = getAccessor(AccessorKind::Set);
+  auto setter = getSetter();
   auto objcAttr = setter ? setter->getAttrs().getAttribute<ObjCAttr>()
                          : nullptr;
   if (auto name = getNameFromObjcAttribute(objcAttr, DeclName(preferredName))) {

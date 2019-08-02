@@ -566,8 +566,7 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     // Return the linkage of the getter, which may be more permissive than the
     // property itself (for instance, with a private/internal property whose
     // accessor is @inlinable or @usableFromInline)
-    auto getterDecl = cast<AbstractStorageDecl>(getDecl())
-      ->getAccessor(AccessorKind::Get);
+    auto getterDecl = cast<AbstractStorageDecl>(getDecl())->getGetter();
     return getSILLinkage(getDeclLinkage(getterDecl), forDefinition);
   }
 
