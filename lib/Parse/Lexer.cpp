@@ -2046,7 +2046,9 @@ bool Lexer::lexUnknown(bool EmitDiagnosticsIfToken) {
 
   // This character isn't allowed in Swift source.
   uint32_t Codepoint = validateUTF8CharacterAndAdvance(Tmp, BufferEnd);
-  if (Codepoint == ~0U) {
+  // fixme: replace with `UNI_REPLACEMENT_CHAR`
+  if (Codepoint == ~0U || Codepoint == 0x0000FFFD) {
+    // Invalid UTF-8 character or replacement character.
     diagnose(CurPtr - 1, diag::lex_invalid_utf8)
         .fixItReplaceChars(getSourceLoc(CurPtr - 1), getSourceLoc(Tmp), " ");
     CurPtr = Tmp;

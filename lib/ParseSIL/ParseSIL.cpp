@@ -1249,7 +1249,7 @@ bool SILParser::parseSILType(SILType &Result,
   SILValueCategory category = SILValueCategory::Object;
   if (P.Tok.isAnyOperator() && P.Tok.getText().startswith("*")) {
     category = SILValueCategory::Address;
-    P.consumeStartingCharacterOfCurrentToken();
+    P.consumeStartingCharacterOfCurrentToken(tok::oper_binary_unspaced);
   }
 
   // Parse attributes.
