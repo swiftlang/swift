@@ -238,15 +238,17 @@ static bool checkObjCWitnessSelector(TypeChecker &tc, ValueDecl *req,
   // FIXME: Check property names!
 
   // Check the getter.
-  if (auto reqGetter = reqStorage->getAccessor(AccessorKind::Get)) {
-    auto *witnessGetter = witnessStorage->getAccessor(AccessorKind::Get);
+  if (auto reqGetter = reqStorage->getParsedAccessor(AccessorKind::Get)) {
+    auto *witnessGetter =
+      witnessStorage->getSynthesizedAccessor(AccessorKind::Get);
     if (checkObjCWitnessSelector(tc, reqGetter, witnessGetter))
       return true;
   }
 
   // Check the setter.
-  if (auto reqSetter = reqStorage->getAccessor(AccessorKind::Set)) {
-    auto *witnessSetter = witnessStorage->getAccessor(AccessorKind::Set);
+  if (auto reqSetter = reqStorage->getParsedAccessor(AccessorKind::Set)) {
+    auto *witnessSetter =
+      witnessStorage->getSynthesizedAccessor(AccessorKind::Set);
     if (checkObjCWitnessSelector(tc, reqSetter, witnessSetter))
       return true;
   }
@@ -264,48 +266,40 @@ static ParameterList *getParameterList(ValueDecl *value) {
 
 // Find a standin declaration to place the diagnostic at for the
 // given accessor kind.
-static ValueDecl *getStandinForAccessor(AbstractStorageDecl *witnessStorage,
+static ValueDecl *getStandinForAccessor(AbstractStorageDecl *witness,
                                         AccessorKind requirementKind) {
-  auto getExplicitAccessor = [&](AccessorKind kind) -> AccessorDecl* {
-    if (auto accessor = witnessStorage->getAccessor(kind)) {
-      if (!accessor->isImplicit())
-        return accessor;
-    }
-    return nullptr;
-  };
-
   // If the storage actually explicitly provides that accessor, great.
-  if (auto accessor = getExplicitAccessor(requirementKind))
+  if (auto accessor = witness->getParsedAccessor(requirementKind))
     return accessor;
 
   // If it didn't, check to see if it provides something else that corresponds
   // to the requirement.
   switch (requirementKind) {
   case AccessorKind::Get:
-    if (auto read = getExplicitAccessor(AccessorKind::Read))
+    if (auto read = witness->getParsedAccessor(AccessorKind::Read))
       return read;
-    if (auto addressor = getExplicitAccessor(AccessorKind::Address))
+    if (auto addressor = witness->getParsedAccessor(AccessorKind::Address))
       return addressor;
     break;
 
   case AccessorKind::Read:
-    if (auto getter = getExplicitAccessor(AccessorKind::Get))
+    if (auto getter = witness->getParsedAccessor(AccessorKind::Get))
       return getter;
-    if (auto addressor = getExplicitAccessor(AccessorKind::Address))
+    if (auto addressor = witness->getParsedAccessor(AccessorKind::Address))
       return addressor;
     break;
 
   case AccessorKind::Modify:
-    if (auto setter = getExplicitAccessor(AccessorKind::Set))
+    if (auto setter = witness->getParsedAccessor(AccessorKind::Set))
       return setter;
-    if (auto addressor = getExplicitAccessor(AccessorKind::MutableAddress))
+    if (auto addressor = witness->getParsedAccessor(AccessorKind::MutableAddress))
       return addressor;
     break;
 
   case AccessorKind::Set:
-    if (auto modify = getExplicitAccessor(AccessorKind::Modify))
+    if (auto modify = witness->getParsedAccessor(AccessorKind::Modify))
       return modify;
-    if (auto addressor = getExplicitAccessor(AccessorKind::MutableAddress))
+    if (auto addressor = witness->getParsedAccessor(AccessorKind::MutableAddress))
       return addressor;
     break;
 
@@ -317,7 +311,7 @@ static ValueDecl *getStandinForAccessor(AbstractStorageDecl *witnessStorage,
   }
 
   // Otherwise, just diagnose starting at the storage declaration itself.
-  return witnessStorage;
+  return witness;
 }
 
 RequirementMatch
@@ -2214,12 +2208,6 @@ void ConformanceChecker::recordWitness(ValueDecl *requirement,
   // Record this witness in the conformance.
   auto witness = match.getWitness(TC.Context);
   Conformance->setWitness(requirement, witness);
-
-  // Synthesize accessors for the protocol witness table to use.
-  if (auto storage = dyn_cast<AbstractStorageDecl>(witness.getDecl()))
-    TC.synthesizeWitnessAccessorsForStorage(
-                                        cast<AbstractStorageDecl>(requirement),
-                                        storage);
 }
 
 void ConformanceChecker::recordOptionalWitness(ValueDecl *requirement) {
@@ -3705,11 +3693,6 @@ void ConformanceChecker::resolveValueWitnesses() {
       auto witness = Conformance->getWitness(requirement).getDecl();
       if (!witness) return;
 
-      // Make sure that we finalize the witness, so we can emit this
-      // witness table.
-      if (isa<AbstractStorageDecl>(witness))
-        TC.DeclsToFinalize.insert(witness);
-
       // Objective-C checking for @objc requirements.
       if (requirement->isObjC() &&
           requirement->getFullName() == witness->getFullName() &&
@@ -5040,9 +5023,9 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
           sf->ObjCUnsatisfiedOptReqs.emplace_back(dc, funcReq);
         } else {
           auto storageReq = cast<AbstractStorageDecl>(req);
-          if (auto getter = storageReq->getAccessor(AccessorKind::Get))
+          if (auto getter = storageReq->getParsedAccessor(AccessorKind::Get))
             sf->ObjCUnsatisfiedOptReqs.emplace_back(dc, getter);
-          if (auto setter = storageReq->getAccessor(AccessorKind::Set))
+          if (auto setter = storageReq->getParsedAccessor(AccessorKind::Set))
             sf->ObjCUnsatisfiedOptReqs.emplace_back(dc, setter);
         }
       }
@@ -5151,7 +5134,7 @@ swift::findWitnessedObjCRequirements(const ValueDecl *witness,
             auto *storageReq = dyn_cast<AbstractStorageDecl>(req);
             if (!storageReq)
               continue;
-            req = storageReq->getAccessor(*accessorKind);
+            req = storageReq->getOpaqueAccessor(*accessorKind);
             if (!req)
               continue;
           }
@@ -5169,10 +5152,10 @@ swift::findWitnessedObjCRequirements(const ValueDecl *witness,
         auto *storageFound = dyn_cast_or_null<AbstractStorageDecl>(found);
         if (!storageReq || !storageFound)
           continue;
-        req = storageReq->getAccessor(*accessorKind);
+        req = storageReq->getOpaqueAccessor(*accessorKind);
         if (!req)
           continue;
-        found = storageFound->getAccessor(*accessorKind);
+        found = storageFound->getOpaqueAccessor(*accessorKind);
       }
 
       // Determine whether the witness for this conformance is in fact
@@ -5343,12 +5326,6 @@ void DefaultWitnessChecker::recordWitness(
                                   const RequirementMatch &match) {
   Proto->setDefaultWitness(requirement,
                            match.getWitness(TC.Context));
-
-  // Synthesize accessors for the protocol witness table to use.
-  if (auto storage = dyn_cast<AbstractStorageDecl>(match.Witness))
-    TC.synthesizeWitnessAccessorsForStorage(
-                                        cast<AbstractStorageDecl>(requirement),
-                                        storage);
 }
 
 void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {

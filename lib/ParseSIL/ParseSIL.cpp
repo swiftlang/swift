@@ -1447,7 +1447,7 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
         size_t destI = 0;
         for (size_t srcI = 0, e = values.size(); srcI != e; ++srcI) {
           if (auto storage = dyn_cast<AbstractStorageDecl>(values[srcI]))
-            if (auto accessor = storage->getAccessor(*accessorKind))
+            if (auto accessor = storage->getOpaqueAccessor(*accessorKind))
               values[destI++] = accessor;
         }
         values.resize(destI);

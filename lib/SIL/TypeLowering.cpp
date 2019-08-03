@@ -2184,7 +2184,8 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
       // of its accessors.
       if (auto capturedVar = dyn_cast<VarDecl>(capture.getDecl())) {
         auto collectAccessorCaptures = [&](AccessorKind kind) {
-          collectFunctionCaptures(capturedVar->getAccessor(kind));
+          if (auto *accessor = capturedVar->getParsedAccessor(kind))
+            collectFunctionCaptures(accessor);
         };
 
         if (!capture.isDirect()) {
@@ -2212,6 +2213,9 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
           case WriteImplKind::Stored:
             break;
           case WriteImplKind::StoredWithObservers:
+            collectAccessorCaptures(AccessorKind::WillSet);
+            collectAccessorCaptures(AccessorKind::DidSet);
+            break;
           case WriteImplKind::Set:
             collectAccessorCaptures(AccessorKind::Set);
             break;

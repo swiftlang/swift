@@ -1240,7 +1240,7 @@ void SILGenModule::emitObjCMethodThunk(FuncDecl *method) {
 }
 
 void SILGenModule::emitObjCPropertyMethodThunks(AbstractStorageDecl *prop) {
-  auto *getter = prop->getAccessor(AccessorKind::Get);
+  auto *getter = prop->getOpaqueAccessor(AccessorKind::Get);
 
   // If we don't actually need an entry point for the getter, do nothing.
   if (!getter || !requiresObjCMethodEntryPoint(getter))
@@ -1270,7 +1270,7 @@ void SILGenModule::emitObjCPropertyMethodThunks(AbstractStorageDecl *prop) {
     return;
 
   // FIXME: Add proper location.
-  auto *setter = prop->getAccessor(AccessorKind::Set);
+  auto *setter = prop->getOpaqueAccessor(AccessorKind::Set);
   auto setterRef = SILDeclRef(setter, SILDeclRef::Kind::Func).asForeign();
 
   SILFunction *f = getFunction(setterRef, ForDefinition);
@@ -1396,11 +1396,12 @@ static bool canStorageUseTrivialDescriptor(SILGenModule &SGM,
       // property in a fixed-layout type.
       return !decl->isFormallyResilient();
     }
+
     // If the type is computed and doesn't have a setter that's hidden from
     // the public, then external components can form the canonical key path
     // without our help.
-    auto setter = decl->getAccessor(AccessorKind::Set);
-    if (setter == nullptr)
+    auto *setter = decl->getOpaqueAccessor(AccessorKind::Set);
+    if (!setter)
       return true;
 
     if (setter->getFormalAccessScope(nullptr, true).isPublic())
@@ -1415,8 +1416,8 @@ static bool canStorageUseTrivialDescriptor(SILGenModule &SGM,
   // or a fixed-layout type may not have been.
   // Without availability information, only get-only computed properties
   // can resiliently use trivial descriptors.
-  return !SGM.canStorageUseStoredKeyPathComponent(decl, expansion)
-    && decl->getAccessor(AccessorKind::Set) == nullptr;
+  return (!SGM.canStorageUseStoredKeyPathComponent(decl, expansion) &&
+          !decl->supportsMutation());
 }
 
 void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {

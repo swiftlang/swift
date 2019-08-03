@@ -165,8 +165,6 @@ static void finishImplicitAccessor(AccessorDecl *accessor,
 
 static AccessorDecl *createGetterPrototype(AbstractStorageDecl *storage,
                                            ASTContext &ctx) {
-  assert(!storage->getAccessor(AccessorKind::Get));
-
   SourceLoc loc = storage->getLoc();
 
   GenericEnvironment *genericEnvironmentOfLazyAccessor = nullptr;
@@ -244,7 +242,6 @@ static AccessorDecl *createGetterPrototype(AbstractStorageDecl *storage,
 static AccessorDecl *createSetterPrototype(AbstractStorageDecl *storage,
                                            ASTContext &ctx,
                                            AccessorDecl *getter = nullptr) {
-  assert(!storage->getAccessor(AccessorKind::Set));
   assert(storage->supportsMutation());
 
   SourceLoc loc = storage->getLoc();
@@ -370,8 +367,8 @@ IsAccessorTransparentRequest::evaluate(Evaluator &evaluator,
       // FIXME: This should be folded into the WriteImplKind below.
       if (auto var = dyn_cast<VarDecl>(storage)) {
         if (var->hasAttachedPropertyWrapper()) {
-          if (var->getAccessor(AccessorKind::DidSet) ||
-              var->getAccessor(AccessorKind::WillSet))
+          if (var->getParsedAccessor(AccessorKind::DidSet) ||
+              var->getParsedAccessor(AccessorKind::WillSet))
             return false;
 
           break;
@@ -463,11 +460,11 @@ createCoroutineAccessorPrototype(AbstractStorageDecl *storage,
   // the storage (and its getters/setters if it has them).
   SmallVector<const Decl *, 2> asAvailableAs;
   asAvailableAs.push_back(storage);
-  if (FuncDecl *getter = storage->getAccessor(AccessorKind::Get)) {
+  if (FuncDecl *getter = storage->getParsedAccessor(AccessorKind::Get)) {
     asAvailableAs.push_back(getter);
   }
   if (kind == AccessorKind::Modify) {
-    if (FuncDecl *setter = storage->getAccessor(AccessorKind::Set)) {
+    if (FuncDecl *setter = storage->getParsedAccessor(AccessorKind::Set)) {
       asAvailableAs.push_back(setter);
     }
   }
@@ -1148,7 +1145,7 @@ synthesizeInheritedGetterBody(AccessorDecl *getter, ASTContext &ctx) {
 /// Synthesize the body of a getter which just delegates to an addressor.
 static std::pair<BraceStmt *, bool>
 synthesizeAddressedGetterBody(AccessorDecl *getter, ASTContext &ctx) {
-  assert(getter->getStorage()->getAccessor(AccessorKind::Address));
+  assert(getter->getStorage()->getParsedAccessor(AccessorKind::Address));
 
   // This should call the addressor.
   return synthesizeTrivialGetterBody(getter, TargetImpl::Implementation, ctx);
@@ -1158,7 +1155,7 @@ synthesizeAddressedGetterBody(AccessorDecl *getter, ASTContext &ctx) {
 /// coroutine accessor.
 static std::pair<BraceStmt *, bool>
 synthesizeReadCoroutineGetterBody(AccessorDecl *getter, ASTContext &ctx) {
-  assert(getter->getStorage()->getAccessor(AccessorKind::Read));
+  assert(getter->getStorage()->getParsedAccessor(AccessorKind::Read));
 
   // This should call the read coroutine.
   return synthesizeTrivialGetterBody(getter, TargetImpl::Implementation, ctx);
@@ -1323,22 +1320,6 @@ synthesizeModifyCoroutineSetterBody(AccessorDecl *setter, ASTContext &ctx) {
                                                 setter->getStorage(), ctx);
 }
 
-/// The specified AbstractStorageDecl was just found to satisfy a
-/// protocol property requirement.  Ensure that it has the full
-/// complement of accessors.
-void TypeChecker::synthesizeWitnessAccessorsForStorage(
-                                             AbstractStorageDecl *requirement,
-                                             AbstractStorageDecl *storage) {
-  // Make sure the protocol requirement itself has the right accessors.
-  // FIXME: This should be a request kicked off by SILGen.
-  DeclsToFinalize.insert(requirement);
-
-  requirement->visitExpectedOpaqueAccessors([&](AccessorKind kind) {
-    // Force synthesis if necessary.
-    (void) storage->getSynthesizedAccessor(kind);
-  });
-}
-
 /// Given a VarDecl with a willSet: and/or didSet: specifier, synthesize the
 /// setter which calls them.
 static std::pair<BraceStmt *, bool>
@@ -1399,7 +1380,7 @@ synthesizeObservedSetterBody(AccessorDecl *Set, TargetImpl target,
   // TODO: check the body of didSet to only do this load (which may call the
   // superclass getter) if didSet takes an argument.
   VarDecl *OldValue = nullptr;
-  if (VD->getAccessor(AccessorKind::DidSet)) {
+  if (VD->getParsedAccessor(AccessorKind::DidSet)) {
     Expr *OldValueExpr
       = buildStorageReference(Set, VD, target, /*isLValue=*/true, Ctx);
     OldValueExpr = new (Ctx) LoadExpr(OldValueExpr, VD->getType());
@@ -1416,7 +1397,7 @@ synthesizeObservedSetterBody(AccessorDecl *Set, TargetImpl target,
     SetterBody.push_back(OldValue);
   }
 
-  if (auto willSet = VD->getAccessor(AccessorKind::WillSet))
+  if (auto willSet = VD->getParsedAccessor(AccessorKind::WillSet))
     callObserver(willSet, ValueDecl);
   
   // Create an assignment into the storage or call to superclass setter.
@@ -1425,7 +1406,7 @@ synthesizeObservedSetterBody(AccessorDecl *Set, TargetImpl target,
   createPropertyStoreOrCallSuperclassSetter(Set, ValueDRE, VD, target,
                                             SetterBody, Ctx);
 
-  if (auto didSet = VD->getAccessor(AccessorKind::DidSet))
+  if (auto didSet = VD->getParsedAccessor(AccessorKind::DidSet))
     callObserver(didSet, OldValue);
 
   return { BraceStmt::create(Ctx, Loc, SetterBody, Loc, true),
@@ -1792,11 +1773,9 @@ PropertyWrapperMutabilityRequest::evaluate(Evaluator &,
   unsigned numWrappers = var->getAttachedPropertyWrappers().size();
   if (numWrappers < 1)
     return None;
-  if (var->getAccessor(AccessorKind::Get) &&
-      !var->getAccessor(AccessorKind::Get)->isImplicit())
+  if (var->getParsedAccessor(AccessorKind::Get))
     return None;
-  if (var->getAccessor(AccessorKind::Set) &&
-      !var->getAccessor(AccessorKind::Set)->isImplicit())
+  if (var->getParsedAccessor(AccessorKind::Set))
     return None;
 
   // Start with the traits from the outermost wrapper.
@@ -2076,7 +2055,7 @@ static void finishPropertyWrapperImplInfo(VarDecl *var,
   }
 
   bool wrapperSetterIsUsable = false;
-  if (var->getAccessor(AccessorKind::Set)) {
+  if (var->getParsedAccessor(AccessorKind::Set)) {
     wrapperSetterIsUsable = true;
   } else if (parentSF && parentSF->Kind != SourceFileKind::Interface
              && !var->isLet()) {
@@ -2153,11 +2132,6 @@ static void finishStorageImplInfo(AbstractStorageDecl *storage,
     finishProtocolStorageImplInfo(storage, info);
 }
 
-static bool hasParsedAccessor(AbstractStorageDecl *storage, AccessorKind kind) {
-  auto *accessor = storage->getAccessor(kind);
-  return (accessor && !accessor->isImplicit());
-}
-
 /// Gets the storage info of the provided storage decl if it has the
 /// @_hasStorage attribute and it's not in SIL mode.
 ///
@@ -2179,8 +2153,8 @@ static StorageImplInfo classifyWithHasStorageAttr(VarDecl *var) {
   WriteImplKind writeImpl;
   ReadWriteImplKind readWriteImpl;
 
-  if (hasParsedAccessor(var, AccessorKind::Get) &&
-      hasParsedAccessor(var, AccessorKind::Set)) {
+  if (var->getParsedAccessor(AccessorKind::Get) &&
+      var->getParsedAccessor(AccessorKind::Set)) {
     // If we see `@_hasStorage var x: T { get set }`, then our property has
     // willSet/didSet observers.
     writeImpl = var->getAttrs().hasAttribute<OverrideAttr>() ?
@@ -2222,25 +2196,27 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
       auto *SF = storage->getDeclContext()->getParentSourceFile();
       if (SF && SF->Kind == SourceFileKind::SIL)
         return StorageImplInfo::getSimpleStored(
-          StorageIsMutable_t(hasParsedAccessor(var, AccessorKind::Set)));
+          var->getParsedAccessor(AccessorKind::Set)
+          ? StorageIsMutable
+          : StorageIsNotMutable);
 
       return classifyWithHasStorageAttr(var);
     }
   }
 
-  bool hasWillSet = hasParsedAccessor(storage, AccessorKind::WillSet);
-  bool hasDidSet = hasParsedAccessor(storage, AccessorKind::DidSet);
-  bool hasSetter = hasParsedAccessor(storage, AccessorKind::Set);
-  bool hasModify = hasParsedAccessor(storage, AccessorKind::Modify);
-  bool hasMutableAddress = hasParsedAccessor(storage, AccessorKind::MutableAddress);
+  bool hasWillSet = storage->getParsedAccessor(AccessorKind::WillSet);
+  bool hasDidSet = storage->getParsedAccessor(AccessorKind::DidSet);
+  bool hasSetter = storage->getParsedAccessor(AccessorKind::Set);
+  bool hasModify = storage->getParsedAccessor(AccessorKind::Modify);
+  bool hasMutableAddress = storage->getParsedAccessor(AccessorKind::MutableAddress);
 
   // 'get', 'read', and a non-mutable addressor are all exclusive.
   ReadImplKind readImpl;
-  if (hasParsedAccessor(storage, AccessorKind::Get)) {
+  if (storage->getParsedAccessor(AccessorKind::Get)) {
     readImpl = ReadImplKind::Get;
-  } else if (hasParsedAccessor(storage, AccessorKind::Read)) {
+  } else if (storage->getParsedAccessor(AccessorKind::Read)) {
     readImpl = ReadImplKind::Read;
-  } else if (hasParsedAccessor(storage, AccessorKind::Address)) {
+  } else if (storage->getParsedAccessor(AccessorKind::Address)) {
     readImpl = ReadImplKind::Address;
 
   // If there's a writing accessor of any sort, there must also be a
@@ -2349,7 +2325,7 @@ RequiresOpaqueAccessorsRequest::evaluate(Evaluator &evaluator,
   // But we might need to create opaque accessors for them.
   if (auto sourceFile = dc->getParentSourceFile()) {
     if (sourceFile->Kind == SourceFileKind::SIL) {
-      if (!var->getAccessor(AccessorKind::Get))
+      if (!var->getParsedAccessor(AccessorKind::Get))
         return false;
     }
   }
@@ -2451,8 +2427,8 @@ synthesizeSetterBody(AccessorDecl *setter, ASTContext &ctx) {
     }
 
     if (var->hasAttachedPropertyWrapper()) {
-      if (var->getAccessor(AccessorKind::WillSet) ||
-          var->getAccessor(AccessorKind::DidSet)) {
+      if (var->getParsedAccessor(AccessorKind::WillSet) ||
+          var->getParsedAccessor(AccessorKind::DidSet)) {
         return synthesizeObservedSetterBody(setter, TargetImpl::Wrapper, ctx);
       }
 

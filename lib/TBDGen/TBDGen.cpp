@@ -159,8 +159,8 @@ void TBDGenVisitor::addConformances(DeclContext *DC) {
             auto witnessStorage = cast<AbstractStorageDecl>(witnessDecl);
             storage->visitOpaqueAccessors([&](AccessorDecl *reqtAccessor) {
               auto witnessAccessor =
-                witnessStorage->getAccessor(reqtAccessor->getAccessorKind());
-              assert(witnessAccessor && "no corresponding witness accessor?");
+                witnessStorage->getSynthesizedAccessor(
+                  reqtAccessor->getAccessorKind());
               addSymbolIfNecessary(reqtAccessor, witnessAccessor);
             });
           }

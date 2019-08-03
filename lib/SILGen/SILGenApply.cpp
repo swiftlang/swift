@@ -5811,7 +5811,7 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
   // Create the branch.
   FuncDecl *memberFunc;
   if (auto *VD = dyn_cast<VarDecl>(e->getMember().getDecl())) {
-    memberFunc = VD->getAccessor(AccessorKind::Get);
+    memberFunc = VD->getOpaqueAccessor(AccessorKind::Get);
     memberMethodTy = FunctionType::get({}, memberMethodTy);
   } else
     memberFunc = cast<FuncDecl>(e->getMember().getDecl());
@@ -5920,7 +5920,7 @@ RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e,
 
   // Create the branch.
   auto subscriptDecl = cast<SubscriptDecl>(e->getMember().getDecl());
-  auto member = SILDeclRef(subscriptDecl->getAccessor(AccessorKind::Get),
+  auto member = SILDeclRef(subscriptDecl->getOpaqueAccessor(AccessorKind::Get),
                            SILDeclRef::Kind::Func)
     .asForeign();
   B.createDynamicMethodBranch(e, base, member, hasMemberBB, noMemberBB);

@@ -290,6 +290,7 @@ endif()
 
 if(SWIFT_CHECK_ESSENTIAL_STDLIB)
   add_swift_target_library(swift_stdlib_essential ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB IS_STDLIB_CORE
+      INSTALL_IN_COMPONENT never_install
       ${SWIFTLIB_ESSENTIAL}
       GYB_SOURCES
         ${SWIFTLIB_ESSENTIAL_GYB_SOURCES})

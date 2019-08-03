@@ -1876,7 +1876,7 @@ public:
       if (auto *baseIOT = E->getBase()->getType()->getAs<InOutType>()) {
         if (!baseIOT->getObjectType()->is<ArchetypeType>()) {
           auto *VD = dyn_cast<VarDecl>(E->getMember().getDecl());
-          if (!VD || VD->getAllAccessors().empty()) {
+          if (!VD || !VD->requiresOpaqueAccessors()) {
             Out << "member_ref_expr on value of inout type\n";
             E->dump(Out);
             Out << "\n";
@@ -2446,6 +2446,9 @@ public:
     }
 
     void verifyChecked(VarDecl *var) {
+      if (!var->hasInterfaceType())
+        return;
+
       PrettyStackTraceDecl debugStack("verifying VarDecl", var);
 
       // Variables must have materializable type.
@@ -2472,26 +2475,20 @@ public:
       }
 
       Type typeForAccessors = var->getValueInterfaceType();
-      if (!var->getDeclContext()->contextHasLazyGenericEnvironment()) {
-        typeForAccessors =
-            var->getDeclContext()->mapTypeIntoContext(typeForAccessors);
-        if (const FuncDecl *getter = var->getAccessor(AccessorKind::Get)) {
-          if (getter->getParameters()->size() != 0) {
-            Out << "property getter has parameters\n";
+      if (const FuncDecl *getter = var->getAccessor(AccessorKind::Get)) {
+        if (getter->getParameters()->size() != 0) {
+          Out << "property getter has parameters\n";
+          abort();
+        }
+        if (getter->hasInterfaceType()) {
+          Type getterResultType = getter->getResultInterfaceType();
+          if (!getterResultType->isEqual(typeForAccessors)) {
+            Out << "property and getter have mismatched types: '";
+            typeForAccessors.print(Out);
+            Out << "' vs. '";
+            getterResultType.print(Out);
+            Out << "'\n";
             abort();
-          }
-          if (getter->hasInterfaceType()) {
-            Type getterResultType = getter->getResultInterfaceType();
-            getterResultType =
-                var->getDeclContext()->mapTypeIntoContext(getterResultType);
-            if (!getterResultType->isEqual(typeForAccessors)) {
-              Out << "property and getter have mismatched types: '";
-              typeForAccessors.print(Out);
-              Out << "' vs. '";
-              getterResultType.print(Out);
-              Out << "'\n";
-              abort();
-            }
           }
         }
       }
@@ -2512,15 +2509,12 @@ public:
           }
           const ParamDecl *param = setter->getParameters()->get(0);
           Type paramType = param->getInterfaceType();
-          if (!var->getDeclContext()->contextHasLazyGenericEnvironment()) {
-            paramType = var->getDeclContext()->mapTypeIntoContext(paramType);
-            if (!paramType->isEqual(typeForAccessors)) {
-              Out << "property and setter param have mismatched types:\n";
-              typeForAccessors.dump(Out, 2);
-              Out << "vs.\n";
-              paramType.dump(Out, 2);
-              abort();
-            }
+          if (!paramType->isEqual(typeForAccessors)) {
+            Out << "property and setter param have mismatched types:\n";
+            typeForAccessors.dump(Out, 2);
+            Out << "vs.\n";
+            paramType.dump(Out, 2);
+            abort();
           }
         }
       }
