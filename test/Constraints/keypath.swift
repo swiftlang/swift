@@ -51,4 +51,3 @@ func testFunc() {
   let f = \S.i
   let _: (S) -> Int = f // expected-error {{cannot convert value of type 'KeyPath<S, Int>' to specified type '(S) -> Int'}}
 }
->>>>>>> Add typechecking tests

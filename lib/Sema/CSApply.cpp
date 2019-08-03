@@ -4451,11 +4451,10 @@ namespace {
           FunctionType::get({ FunctionType::Param(baseTy) }, leafTy);
       auto closure = new (ctx)
           AutoClosureExpr(E, leafTy, discriminator, cs.DC);
-      auto param = new (ctx)
-          ParamDecl(VarDecl::Specifier::Default, SourceLoc(),
-                    /*argument label*/ SourceLoc(), Identifier(),
-                    /*parameter name*/ SourceLoc(), ctx.getIdentifier("$0"),
-                    closure);
+      auto param = new (ctx) ParamDecl(
+          ParamDecl::Specifier::Default, SourceLoc(),
+          /*argument label*/ SourceLoc(), Identifier(),
+          /*parameter name*/ SourceLoc(), ctx.getIdentifier("$0"), closure);
       param->setType(baseTy);
       param->setInterfaceType(baseTy->mapTypeOutOfContext());
 
@@ -4466,11 +4465,11 @@ namespace {
           FunctionType::get({ FunctionType::Param(keyPathTy) }, closureTy);
       auto outerClosure = new (ctx)
           AutoClosureExpr(closure, closureTy, discriminator, cs.DC);
-      auto outerParam = new (ctx)
-          ParamDecl(VarDecl::Specifier::Default, SourceLoc(),
-                    /*argument label*/ SourceLoc(), Identifier(),
-                    /*parameter name*/ SourceLoc(), ctx.getIdentifier("$kp$"),
-                    outerClosure);
+      auto outerParam =
+          new (ctx) ParamDecl(ParamDecl::Specifier::Default, SourceLoc(),
+                              /*argument label*/ SourceLoc(), Identifier(),
+                              /*parameter name*/ SourceLoc(),
+                              ctx.getIdentifier("$kp$"), outerClosure);
       outerParam->setType(keyPathTy);
       outerParam->setInterfaceType(keyPathTy->mapTypeOutOfContext());
 

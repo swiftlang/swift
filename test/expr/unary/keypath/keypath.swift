@@ -130,8 +130,6 @@ func testKeyPath(sub: Sub, optSub: OptSub,
   //expected-error@-1 {{cannot convert value of type 'WritableKeyPath<A, Prop>' to specified type 'ReferenceWritableKeyPath<A, Prop>'}}
 
   let _: (A) -> A = \.[sub]
-  // FIXME: shouldn't be ambiguous
-  // expected-error@+1{{ambiguous}}
   let _: PartialKeyPath<A> = \.[sub]
   let _: KeyPath<A, A> = \.[sub]
   let _: WritableKeyPath<A, A> = \.[sub]
