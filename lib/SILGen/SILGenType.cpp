@@ -358,10 +358,11 @@ public:
       return asDerived().addMissingMethod(requirementRef);
 
     auto witnessStorage = cast<AbstractStorageDecl>(witness.getDecl());
-    auto witnessAccessor =
-      witnessStorage->getAccessor(reqAccessor->getAccessorKind());
-    if (!witnessAccessor)
+    if (reqAccessor->isSetter() && !witnessStorage->supportsMutation())
       return asDerived().addMissingMethod(requirementRef);
+
+    auto witnessAccessor =
+      witnessStorage->getSynthesizedAccessor(reqAccessor->getAccessorKind());
 
     return addMethodImplementation(requirementRef,
                                    SILDeclRef(witnessAccessor,
@@ -1120,8 +1121,8 @@ public:
 
       if (hasDidSetOrWillSetDynamicReplacement &&
           isa<ExtensionDecl>(storage->getDeclContext()) &&
-          fd != storage->getAccessor(AccessorKind::WillSet) &&
-          fd != storage->getAccessor(AccessorKind::DidSet))
+          fd != storage->getParsedAccessor(AccessorKind::WillSet) &&
+          fd != storage->getParsedAccessor(AccessorKind::DidSet))
         return;
     }
     SGM.emitFunction(fd);

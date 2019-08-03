@@ -1970,6 +1970,28 @@ AccessorDecl *AbstractStorageDecl::getSynthesizedAccessor(AccessorKind kind) con
     nullptr);
 }
 
+AccessorDecl *AbstractStorageDecl::getOpaqueAccessor(AccessorKind kind) const {
+  auto *accessor = getAccessor(kind);
+  if (accessor && !accessor->isImplicit())
+    return accessor;
+
+  if (!requiresOpaqueAccessors())
+    return nullptr;
+
+  if (!requiresOpaqueAccessor(kind))
+    return nullptr;
+
+  return getSynthesizedAccessor(kind);
+}
+
+AccessorDecl *AbstractStorageDecl::getParsedAccessor(AccessorKind kind) const {
+  auto *accessor = getAccessor(kind);
+  if (accessor && !accessor->isImplicit())
+    return accessor;
+
+  return nullptr;
+}
+
 void AbstractStorageDecl::visitExpectedOpaqueAccessors(
                         llvm::function_ref<void (AccessorKind)> visit) const {
   if (!requiresOpaqueAccessors())
@@ -1993,8 +2015,9 @@ void AbstractStorageDecl::visitExpectedOpaqueAccessors(
 void AbstractStorageDecl::visitOpaqueAccessors(
                         llvm::function_ref<void (AccessorDecl*)> visit) const {
   visitExpectedOpaqueAccessors([&](AccessorKind kind) {
-    auto accessor = getAccessor(kind);
-    assert(accessor && "didn't have expected opaque accessor");
+    auto accessor = getSynthesizedAccessor(kind);
+    assert(!accessor->hasForcedStaticDispatch() &&
+            "opaque accessor with forced static dispatch?");
     visit(accessor);
   });
 }
@@ -4029,7 +4052,7 @@ ClassDecl::findOverridingDecl(const AbstractFunctionDecl *Method) const {
     auto *Storage = Accessor->getStorage();
     if (auto *Derived = ::findOverridingDecl(this, Storage)) {
       auto *DerivedStorage = cast<AbstractStorageDecl>(Derived);
-      return DerivedStorage->getAccessor(Accessor->getAccessorKind());
+      return DerivedStorage->getOpaqueAccessor(Accessor->getAccessorKind());
     }
 
     return nullptr;
@@ -4651,9 +4674,9 @@ bool AbstractStorageDecl::hasPrivateAccessor() const {
 }
 
 bool AbstractStorageDecl::hasDidSetOrWillSetDynamicReplacement() const {
-  if (auto *func = getAccessor(AccessorKind::DidSet))
+  if (auto *func = getParsedAccessor(AccessorKind::DidSet))
     return func->getAttrs().hasAttribute<DynamicReplacementAttr>();
-  if (auto *func = getAccessor(AccessorKind::WillSet))
+  if (auto *func = getParsedAccessor(AccessorKind::WillSet))
     return func->getAttrs().hasAttribute<DynamicReplacementAttr>();
   return false;
 }
@@ -4855,7 +4878,7 @@ getNameFromObjcAttribute(const ObjCAttr *attr, DeclName preferredName) {
 ObjCSelector
 AbstractStorageDecl::getObjCGetterSelector(Identifier preferredName) const {
   // If the getter has an @objc attribute with a name, use that.
-  if (auto getter = getAccessor(AccessorKind::Get)) {
+  if (auto getter = getParsedAccessor(AccessorKind::Get)) {
       if (auto name = getNameFromObjcAttribute(getter->getAttrs().
           getAttribute<ObjCAttr>(), preferredName))
         return *name;
@@ -4885,7 +4908,7 @@ AbstractStorageDecl::getObjCGetterSelector(Identifier preferredName) const {
 ObjCSelector
 AbstractStorageDecl::getObjCSetterSelector(Identifier preferredName) const {
   // If the setter has an @objc attribute with a name, use that.
-  auto setter = getAccessor(AccessorKind::Set);
+  auto setter = getParsedAccessor(AccessorKind::Set);
   auto objcAttr = setter ? setter->getAttrs().getAttribute<ObjCAttr>()
                          : nullptr;
   if (auto name = getNameFromObjcAttribute(objcAttr, DeclName(preferredName))) {

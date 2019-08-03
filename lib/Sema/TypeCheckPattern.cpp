@@ -809,8 +809,8 @@ static void requestLayoutForMetadataSources(TypeChecker &tc, Type type) {
     // parameter is of dependent type then the body of a function with said
     // parameter could potentially require the generic type's layout to
     // recover them.
-    if (auto *nominalDecl = type->getAnyNominal()) {
-      tc.requestNominalLayout(nominalDecl);
+    if (auto *classDecl = type->getClassOrBoundGenericClass()) {
+      tc.requestClassLayout(classDecl);
     }
   });
 }

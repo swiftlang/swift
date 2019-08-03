@@ -4592,6 +4592,23 @@ public:
   /// with caution.
   AccessorDecl *getSynthesizedAccessor(AccessorKind kind) const;
 
+  /// Return an accessor part of the set of opaque accessors dictated by the
+  /// requirements of the ABI.
+  ///
+  /// This will synthesize the accessor if one is required but not specified
+  /// in source; for example, most of the time a mutable property is required
+  /// to have a 'modify' accessor, but if the property was only written with
+  /// 'get' and 'set' accessors, 'modify' will be synthesized to call 'get'
+  /// followed by 'set'.
+  ///
+  /// If the accessor is not needed for ABI reasons, this returns nullptr.
+  /// To ensure an accessor is always returned, use getSynthesizedAccessor().
+  AccessorDecl *getOpaqueAccessor(AccessorKind kind) const;
+
+  /// Return an accessor that was written in source. Returns null if the
+  /// accessor was not explicitly defined by the user.
+  AccessorDecl *getParsedAccessor(AccessorKind kind) const;
+
   /// Visit all the opaque accessors that this storage is expected to have.
   void visitExpectedOpaqueAccessors(
                             llvm::function_ref<void (AccessorKind)>) const;

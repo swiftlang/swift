@@ -1804,7 +1804,7 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
   if ((PrintAbstract || isGetSetImpl()) &&
       !Options.PrintGetSetOnRWProperties &&
       !Options.FunctionDefinitions &&
-      !ASD->getAccessor(AccessorKind::Get)->isMutating() &&
+      !ASD->isGetterMutating() &&
       !ASD->getAccessor(AccessorKind::Set)->isExplicitNonMutating()) {
     return;
   }

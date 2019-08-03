@@ -567,7 +567,7 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     // property itself (for instance, with a private/internal property whose
     // accessor is @inlinable or @usableFromInline)
     auto getterDecl = cast<AbstractStorageDecl>(getDecl())
-      ->getAccessor(AccessorKind::Get);
+      ->getOpaqueAccessor(AccessorKind::Get);
     return getSILLinkage(getDeclLinkage(getterDecl), forDefinition);
   }
 

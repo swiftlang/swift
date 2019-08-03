@@ -2519,31 +2519,31 @@ private:
     if (!D)
       return;
 
-    if (!D->hasAnyAccessors()) {
+    if (!D->requiresOpaqueAccessors()) {
       return;
     }
-    
+
     // Check availability of accessor functions.
     // TODO: if we're talking about an inlineable storage declaration,
     // this probably needs to be refined to not assume that the accesses are
     // specifically using the getter/setter.
     switch (AccessContext) {
     case MemberAccessContext::Getter:
-      diagAccessorAvailability(D->getAccessor(AccessorKind::Get),
+      diagAccessorAvailability(D->getOpaqueAccessor(AccessorKind::Get),
                                ReferenceRange, ReferenceDC, None);
       break;
 
     case MemberAccessContext::Setter:
-      diagAccessorAvailability(D->getAccessor(AccessorKind::Set),
+      diagAccessorAvailability(D->getOpaqueAccessor(AccessorKind::Set),
                                ReferenceRange, ReferenceDC, None);
       break;
 
     case MemberAccessContext::InOut:
-      diagAccessorAvailability(D->getAccessor(AccessorKind::Get),
+      diagAccessorAvailability(D->getOpaqueAccessor(AccessorKind::Get),
                                ReferenceRange, ReferenceDC,
                                DeclAvailabilityFlag::ForInout);
 
-      diagAccessorAvailability(D->getAccessor(AccessorKind::Set),
+      diagAccessorAvailability(D->getOpaqueAccessor(AccessorKind::Set),
                                ReferenceRange, ReferenceDC,
                                DeclAvailabilityFlag::ForInout);
       break;
