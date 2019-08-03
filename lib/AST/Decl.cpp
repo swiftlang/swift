@@ -1391,18 +1391,18 @@ unsigned PatternBindingDecl::getPatternEntryIndexForVarDecl(const VarDecl *VD) c
   return ~0U;
 }
 
-Expr *PatternBindingEntry::getOrigInit() const {
-  return InitContextAndIsText.getInt() ? nullptr : InitExpr.origInit;
+Expr *PatternBindingEntry::getOriginalInit() const {
+  return InitContextAndIsText.getInt() ? nullptr : InitExpr.originalInit;
 }
 
-SourceRange PatternBindingEntry::getOrigInitRange() const {
-  if (auto *i = getOrigInit())
+SourceRange PatternBindingEntry::getOriginalInitRange() const {
+  if (auto *i = getOriginalInit())
     return i->getSourceRange();
   return SourceRange();
 }
 
-void PatternBindingEntry::setOrigInit(Expr *E) {
-  InitExpr.origInit = E;
+void PatternBindingEntry::setOriginalInit(Expr *E) {
+  InitExpr.originalInit = E;
   InitContextAndIsText.setInt(false);
 }
 
@@ -1460,7 +1460,7 @@ SourceLoc PatternBindingEntry::getEndLoc(bool omitAccessors) const {
     if (lastAccessorEnd.isValid())
       return lastAccessorEnd;
   }
-  const auto initEnd = getOrigInitRange().End;
+  const auto initEnd = getOriginalInitRange().End;
   if (initEnd.isValid())
     return initEnd;
 
@@ -1492,7 +1492,7 @@ StringRef PatternBindingEntry::getInitStringRepresentation(
   if (InitContextAndIsText.getInt() && !InitStringRepresentation.empty())
     return InitStringRepresentation;
   auto &sourceMgr = getAnchoringVarDecl()->getASTContext().SourceMgr;
-  auto init = getInit();
+  auto init = getOriginalInit();
   return extractInlinableText(sourceMgr, init, scratch);
 }
 

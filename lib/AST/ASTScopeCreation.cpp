@@ -629,8 +629,8 @@ ASTScopeImpl *PatternEntryDeclScope::expandAScopeThatCreatesANewInsertionPoint(
   // initializer (because of InterpolatedLiteralStrings and EditorPlaceHolders),
   // so compute it ourselves.
   SourceLoc initializerEnd;
-  if (patternEntry.getOrigInit() &&
-      patternEntry.getOrigInit()->getSourceRange().isValid()) {
+  if (patternEntry.getOriginalInit() &&
+      patternEntry.getOriginalInit()->getSourceRange().isValid()) {
     auto *initializer =
         scopeCreator.createSubtree<PatternEntryInitializerScope>(
             this, decl, patternEntryIndex, vis);
@@ -649,8 +649,8 @@ ASTScopeImpl *
 PatternEntryInitializerScope::expandAScopeThatCreatesANewInsertionPoint(
     ScopeCreator &scopeCreator) {
   // Create a child for the initializer expression.
-  ASTVisitorForScopeCreation().visitExpr(getPatternEntry().getOrigInit(), this,
-                                         scopeCreator);
+  ASTVisitorForScopeCreation().visitExpr(getPatternEntry().getOriginalInit(),
+                                         this, scopeCreator);
   return this;
 }
 

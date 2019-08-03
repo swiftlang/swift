@@ -1908,8 +1908,9 @@ class PatternBindingEntry {
     // initializer is ASTContext-allocated it is safe.
     
     /// Exactly the expr the programmer wrote
-    Expr *origInit;
-    /// Might be transformed, e.g. for a property wrapper
+    Expr *originalInit;
+    /// Might be transformed, e.g. for a property wrapper. In the absence of
+    /// transformation or synthesis, holds the expr as parsed.
     Expr *initAfterSynthesis;
     /// The location of the equal '=' token.
     SourceLoc EqualLoc;
@@ -1932,6 +1933,7 @@ class PatternBindingEntry {
   friend class PatternBindingInitializer;
 
 public:
+  /// \p E is the initializer as parsed.
   PatternBindingEntry(Pattern *P, SourceLoc EqualLoc, Expr *E,
                       DeclContext *InitContext)
     : PatternAndFlags(P, {}), InitExpr({E, E, EqualLoc}),
@@ -1955,7 +1957,7 @@ public:
   Expr *getExecutableInit() const {
     return isInitializerSubsumed() ? nullptr : getInit();
   }
-  SourceRange getOrigInitRange() const;
+  SourceRange getOriginalInitRange() const;
   void setInit(Expr *E);
 
   /// Gets the text of the initializer expression, stripping out inactive
@@ -1987,10 +1989,10 @@ public:
 
   /// Retrieve the initializer after the =, if any, as it was written in the
   /// source.
-  Expr *getOrigInit() const;
-  
+  Expr *getOriginalInit() const;
+
   /// Set the initializer after the = as it was written in the source.
-  void setOrigInit(Expr*);
+  void setOriginalInit(Expr *);
 
   bool isInitializerChecked() const {
     return PatternAndFlags.getInt().contains(Flags::Checked);
@@ -2120,9 +2122,9 @@ public:
   Expr *getExecutableInit(unsigned i) const {
     return getPatternList()[i].getExecutableInit();
   }
-  
-  SourceRange getOrigInitRange(unsigned i) const {
-    return getPatternList()[i].getOrigInitRange();
+
+  SourceRange getOriginalInitRange(unsigned i) const {
+    return getPatternList()[i].getOriginalInitRange();
   }
 
   void setInit(unsigned i, Expr *E) {
