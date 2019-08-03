@@ -155,8 +155,7 @@ if(SWIFT_BUILD_STATIC_STDLIB AND "${sdk}" STREQUAL "LINUX")
     ImageInspectionELF.cpp
     C_COMPILE_FLAGS ${swift_runtime_library_compile_flags}
     LINK_FLAGS ${swift_runtime_linker_flags}
-    SWIFT_COMPILE_FLAGS ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
-    INSTALL_IN_COMPONENT never_install)
+    SWIFT_COMPILE_FLAGS ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS})
 endif()
 
 add_swift_target_library(swiftRuntime OBJECT_LIBRARY
@@ -165,8 +164,7 @@ add_swift_target_library(swiftRuntime OBJECT_LIBRARY
   ${swift_runtime_leaks_sources}
   C_COMPILE_FLAGS ${swift_runtime_library_compile_flags}
   LINK_FLAGS ${swift_runtime_linker_flags}
-  SWIFT_COMPILE_FLAGS ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
-  INSTALL_IN_COMPONENT never_install)
+  SWIFT_COMPILE_FLAGS ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS})
 
 set(ELFISH_SDKS)
 set(COFF_SDKS)
@@ -184,8 +182,7 @@ add_swift_target_library(swiftImageRegistrationObjectELF
                   C_COMPILE_FLAGS ${SWIFT_RUNTIME_CORE_CXX_FLAGS}
                   LINK_FLAGS ${SWIFT_RUNTIME_CORE_LINK_FLAGS}
                   TARGET_SDKS ${ELFISH_SDKS}
-                  SWIFT_COMPILE_FLAGS ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
-                  INSTALL_IN_COMPONENT none)
+                  SWIFT_COMPILE_FLAGS ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS})
 # FIXME(compnerd) this should be compiled twice, once for static and once for
 # shared.  The static version should be used for building the standard library.
 add_swift_target_library(swiftImageRegistrationObjectCOFF
@@ -194,8 +191,7 @@ add_swift_target_library(swiftImageRegistrationObjectCOFF
                   C_COMPILE_FLAGS ${SWIFT_RUNTIME_CORE_CXX_FLAGS}
                   LINK_FLAGS ${SWIFT_RUNTIME_CORE_LINK_FLAGS}
                   TARGET_SDKS ${COFF_SDKS}
-                  SWIFT_COMPILE_FLAGS ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
-                  INSTALL_IN_COMPONENT none)
+                  SWIFT_COMPILE_FLAGS ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS})
 
 foreach(sdk ${SWIFT_CONFIGURED_SDKS})
   foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})

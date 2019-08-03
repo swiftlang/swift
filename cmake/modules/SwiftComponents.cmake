@@ -113,18 +113,13 @@ endmacro()
 # Sets the is_installing variable.
 function(swift_is_installing_component component result_var_name)
   precondition(component MESSAGE "Component name is required")
-
-  if("${component}" STREQUAL "never_install")
-    set("${result_var_name}" FALSE PARENT_SCOPE)
-  else()
-    if(NOT "${component}" IN_LIST _SWIFT_DEFINED_COMPONENTS)
-      message(FATAL_ERROR "unknown install component: ${component}")
-    endif()
-
-    string(TOUPPER "${component}" var_name_piece)
-    string(REPLACE "-" "_" var_name_piece "${var_name_piece}")
-    set("${result_var_name}" "${SWIFT_INSTALL_${var_name_piece}}" PARENT_SCOPE)
+  if(NOT "${component}" IN_LIST _SWIFT_DEFINED_COMPONENTS)
+    message(FATAL_ERROR "unknown install component: ${component}")
   endif()
+
+  string(TOUPPER "${component}" var_name_piece)
+  string(REPLACE "-" "_" var_name_piece "${var_name_piece}")
+  set("${result_var_name}" "${SWIFT_INSTALL_${var_name_piece}}" PARENT_SCOPE)
 endfunction()
 
 # swift_install_in_component(<same parameters as install()>)

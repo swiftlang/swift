@@ -28,14 +28,12 @@ function(handle_swift_sources
   translate_flag(${SWIFTSOURCES_EMBED_BITCODE} "EMBED_BITCODE"
                  EMBED_BITCODE_arg)
 
-  if(SWIFTSOURCES_IS_MAIN)
-    set(SWIFTSOURCES_INSTALL_IN_COMPONENT never_install)
-  endif()
-
   # Check arguments.
   precondition(SWIFTSOURCES_SDK "Should specify an SDK")
   precondition(SWIFTSOURCES_ARCHITECTURE "Should specify an architecture")
-  precondition(SWIFTSOURCES_INSTALL_IN_COMPONENT "INSTALL_IN_COMPONENT is required")
+  if(SWIFTSOURCES_INSTALL_IN_COMPONENT)
+    set(component_arg INSTALL_IN_COMPONENT "${SWIFTSOURCES_INSTALL_IN_COMPONENT}")
+  endif()
 
   # Clear the result variable.
   set("${dependency_target_out_var_name}" "" PARENT_SCOPE)
@@ -91,7 +89,7 @@ function(handle_swift_sources
         ${IS_SDK_OVERLAY_arg}
         ${EMBED_BITCODE_arg}
         ${STATIC_arg}
-        INSTALL_IN_COMPONENT "${SWIFTSOURCES_INSTALL_IN_COMPONENT}")
+        ${component_arg})
     set("${dependency_target_out_var_name}" "${dependency_target}" PARENT_SCOPE)
     set("${dependency_module_target_out_var_name}" "${module_dependency_target}" PARENT_SCOPE)
     set("${dependency_sib_target_out_var_name}" "${sib_dependency_target}" PARENT_SCOPE)
@@ -173,7 +171,6 @@ function(_compile_swift_files
 
   precondition(SWIFTFILE_SDK MESSAGE "Should specify an SDK")
   precondition(SWIFTFILE_ARCHITECTURE MESSAGE "Should specify an architecture")
-  precondition(SWIFTFILE_INSTALL_IN_COMPONENT MESSAGE "INSTALL_IN_COMPONENT is required")
 
   if ("${SWIFTFILE_MODULE_NAME}" STREQUAL "")
     get_filename_component(SWIFTFILE_MODULE_NAME "${first_output}" NAME_WE)
@@ -344,15 +341,17 @@ function(_compile_swift_files
     list(APPEND module_outputs "${interface_file}")
   endif()
 
-  if(SWIFTFILE_SDK IN_LIST SWIFT_APPLE_PLATFORMS)
-    swift_install_in_component(DIRECTORY "${specific_module_dir}"
-                               DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${library_subdir}"
-                               COMPONENT "${SWIFTFILE_INSTALL_IN_COMPONENT}"
-                               OPTIONAL)
-  else()
-    swift_install_in_component(FILES ${module_outputs}
-                               DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${library_subdir}"
-                               COMPONENT "${SWIFTFILE_INSTALL_IN_COMPONENT}")
+  if(SWIFTFILE_INSTALL_IN_COMPONENT)
+    if(SWIFTFILE_SDK IN_LIST SWIFT_APPLE_PLATFORMS)
+      swift_install_in_component(DIRECTORY "${specific_module_dir}"
+                                 DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${library_subdir}"
+                                 COMPONENT "${SWIFTFILE_INSTALL_IN_COMPONENT}"
+                                 OPTIONAL)
+    else()
+      swift_install_in_component(FILES ${module_outputs}
+                                 DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${library_subdir}"
+                                 COMPONENT "${SWIFTFILE_INSTALL_IN_COMPONENT}")
+    endif()
   endif()
 
   set(line_directive_tool "${SWIFT_SOURCE_DIR}/utils/line-directive")

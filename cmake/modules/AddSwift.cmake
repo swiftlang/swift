@@ -807,7 +807,9 @@ function(_add_swift_library_single target name)
   # Check arguments.
   precondition(SWIFTLIB_SINGLE_SDK MESSAGE "Should specify an SDK")
   precondition(SWIFTLIB_SINGLE_ARCHITECTURE MESSAGE "Should specify an architecture")
-  precondition(SWIFTLIB_SINGLE_INSTALL_IN_COMPONENT MESSAGE "INSTALL_IN_COMPONENT is required")
+  if(SWIFTLIB_SINGLE_INSTALL_IN_COMPONENT)
+    set(component_arg INSTALL_IN_COMPONENT "${SWIFTLIB_SINGLE_INSTALL_IN_COMPONENT}")
+  endif()
 
   if(NOT SWIFTLIB_SINGLE_SHARED AND
      NOT SWIFTLIB_SINGLE_STATIC AND
@@ -933,7 +935,7 @@ function(_add_swift_library_single target name)
       ${SWIFTLIB_SINGLE_IS_STDLIB_CORE_keyword}
       ${SWIFTLIB_SINGLE_IS_SDK_OVERLAY_keyword}
       ${embed_bitcode_arg}
-      INSTALL_IN_COMPONENT "${SWIFTLIB_SINGLE_INSTALL_IN_COMPONENT}")
+      ${component_arg})
   add_swift_source_group("${SWIFTLIB_SINGLE_EXTERNAL_SOURCES}")
 
   # If there were any swift sources, then a .swiftmodule may have been created.
@@ -1757,7 +1759,6 @@ function(add_swift_target_library name)
   endif()
 
   translate_flags(SWIFTLIB "${SWIFTLIB_options}")
-  precondition(SWIFTLIB_INSTALL_IN_COMPONENT MESSAGE "INSTALL_IN_COMPONENT is required")
 
   if(NOT SWIFTLIB_SHARED AND
      NOT SWIFTLIB_STATIC AND
@@ -1951,6 +1952,9 @@ function(add_swift_target_library name)
 
       list(APPEND swiftlib_c_compile_flags_all "-DSWIFT_TARGET_LIBRARY_NAME=${name}")
 
+      if(SWIFTLIB_INSTALL_IN_COMPONENT)
+        set(install_in_component_arg INSTALL_IN_COMPONENT "${SWIFTLIB_INSTALL_IN_COMPONENT}")
+      endif()
       # Add this library variant.
       _add_swift_library_single(
         ${VARIANT_NAME}
@@ -1983,7 +1987,7 @@ function(add_swift_target_library name)
         ${SWIFTLIB_FORCE_BUILD_OPTIMIZED_keyword}
         ${SWIFTLIB_NOSWIFTRT_keyword}
         DARWIN_INSTALL_NAME_DIR "${SWIFTLIB_DARWIN_INSTALL_NAME_DIR}"
-        INSTALL_IN_COMPONENT "${SWIFTLIB_INSTALL_IN_COMPONENT}"
+        ${install_in_component_arg}
         DEPLOYMENT_VERSION_OSX "${SWIFTLIB_DEPLOYMENT_VERSION_OSX}"
         DEPLOYMENT_VERSION_IOS "${SWIFTLIB_DEPLOYMENT_VERSION_IOS}"
         DEPLOYMENT_VERSION_TVOS "${SWIFTLIB_DEPLOYMENT_VERSION_TVOS}"
@@ -2120,56 +2124,58 @@ function(add_swift_target_library name)
         set(optional_arg "OPTIONAL")
       endif()
 
-      if(sdk STREQUAL WINDOWS AND CMAKE_SYSTEM_NAME STREQUAL Windows)
-        swift_install_in_component(TARGETS ${name}-windows-${SWIFT_PRIMARY_VARIANT_ARCH}
-                                   RUNTIME
-                                     DESTINATION "bin"
+      if(SWIFTLIB_INSTALL_IN_COMPONENT)
+        if(sdk STREQUAL WINDOWS AND CMAKE_SYSTEM_NAME STREQUAL Windows)
+          swift_install_in_component(TARGETS ${name}-windows-${SWIFT_PRIMARY_VARIANT_ARCH}
+                                     RUNTIME
+                                       DESTINATION "bin"
+                                       COMPONENT "${SWIFTLIB_INSTALL_IN_COMPONENT}"
+                                     LIBRARY
+                                       DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${resource_dir_sdk_subdir}/${SWIFT_PRIMARY_VARIANT_ARCH}"
+                                       COMPONENT "${SWIFTLIB_INSTALL_IN_COMPONENT}"
+                                     ARCHIVE
+                                       DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${resource_dir_sdk_subdir}/${SWIFT_PRIMARY_VARIANT_ARCH}"
+                                       COMPONENT "${SWIFTLIB_INSTALL_IN_COMPONENT}"
+                                     PERMISSIONS ${file_permissions})
+        else()
+          swift_install_in_component(FILES "${UNIVERSAL_LIBRARY_NAME}"
+                                     DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${resource_dir_sdk_subdir}"
                                      COMPONENT "${SWIFTLIB_INSTALL_IN_COMPONENT}"
-                                   LIBRARY
-                                     DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${resource_dir_sdk_subdir}/${SWIFT_PRIMARY_VARIANT_ARCH}"
-                                     COMPONENT "${SWIFTLIB_INSTALL_IN_COMPONENT}"
-                                   ARCHIVE
-                                     DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${resource_dir_sdk_subdir}/${SWIFT_PRIMARY_VARIANT_ARCH}"
-                                     COMPONENT "${SWIFTLIB_INSTALL_IN_COMPONENT}"
-                                   PERMISSIONS ${file_permissions})
-      else()
-        swift_install_in_component(FILES "${UNIVERSAL_LIBRARY_NAME}"
-                                   DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${resource_dir_sdk_subdir}"
-                                   COMPONENT "${SWIFTLIB_INSTALL_IN_COMPONENT}"
-                                   PERMISSIONS ${file_permissions}
-                                   "${optional_arg}")
-      endif()
-      if(sdk STREQUAL WINDOWS)
-        foreach(arch ${SWIFT_SDK_WINDOWS_ARCHITECTURES})
-          if(TARGET ${name}-windows-${arch}_IMPLIB)
-            get_target_property(import_library ${name}-windows-${arch}_IMPLIB IMPORTED_LOCATION)
-            swift_install_in_component(FILES ${import_library}
-                                       DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${resource_dir_sdk_subdir}/${arch}"
-                                       COMPONENT ${SWIFTLIB_INSTALL_IN_COMPONENT}
-                                       PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ)
+                                     PERMISSIONS ${file_permissions}
+                                     "${optional_arg}")
+        endif()
+        if(sdk STREQUAL WINDOWS)
+          foreach(arch ${SWIFT_SDK_WINDOWS_ARCHITECTURES})
+            if(TARGET ${name}-windows-${arch}_IMPLIB)
+              get_target_property(import_library ${name}-windows-${arch}_IMPLIB IMPORTED_LOCATION)
+              swift_install_in_component(FILES ${import_library}
+                                         DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${resource_dir_sdk_subdir}/${arch}"
+                                         COMPONENT "${SWIFTLIB_INSTALL_IN_COMPONENT}"
+                                         PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ)
+            endif()
+          endforeach()
+        endif()
+
+        swift_is_installing_component(
+          "${SWIFTLIB_INSTALL_IN_COMPONENT}"
+          is_installing)
+
+        # Add the arch-specific library targets to the global exports.
+        foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
+          set(_variant_name "${name}-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}")
+          if(NOT TARGET "${_variant_name}")
+            continue()
+          endif()
+
+          if(is_installing)
+            set_property(GLOBAL APPEND
+              PROPERTY SWIFT_EXPORTS ${_variant_name})
+          else()
+            set_property(GLOBAL APPEND
+              PROPERTY SWIFT_BUILDTREE_EXPORTS ${_variant_name})
           endif()
         endforeach()
       endif()
-
-      swift_is_installing_component(
-        "${SWIFTLIB_INSTALL_IN_COMPONENT}"
-        is_installing)
-
-      # Add the arch-specific library targets to the global exports.
-      foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
-        set(_variant_name "${name}-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}")
-        if(NOT TARGET "${_variant_name}")
-          continue()
-        endif()
-
-        if(is_installing)
-          set_property(GLOBAL APPEND
-            PROPERTY SWIFT_EXPORTS ${_variant_name})
-        else()
-          set_property(GLOBAL APPEND
-            PROPERTY SWIFT_BUILDTREE_EXPORTS ${_variant_name})
-        endif()
-      endforeach()
 
       # Add the swiftmodule-only targets to the lipo target depdencies.
       foreach(arch ${SWIFT_SDK_${sdk}_MODULE_ARCHITECTURES})
@@ -2209,14 +2215,16 @@ function(add_swift_target_library name)
                                OUTPUT
                                  "${UNIVERSAL_LIBRARY_NAME}"
                                ${THIN_INPUT_TARGETS_STATIC})
-        swift_install_in_component(FILES "${UNIVERSAL_LIBRARY_NAME}"
-                                   DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/${install_subdir}/${resource_dir_sdk_subdir}"
-                                   PERMISSIONS
-                                     OWNER_READ OWNER_WRITE
-                                     GROUP_READ
-                                     WORLD_READ
-                                   COMPONENT "${SWIFTLIB_INSTALL_IN_COMPONENT}"
-                                   "${optional_arg}")
+        if (SWIFTLIB_INSTALL_IN_COMPONENT)
+          swift_install_in_component(FILES "${UNIVERSAL_LIBRARY_NAME}"
+                                     DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/${install_subdir}/${resource_dir_sdk_subdir}"
+                                     PERMISSIONS
+                                       OWNER_READ OWNER_WRITE
+                                       GROUP_READ
+                                       WORLD_READ
+                                       COMPONENT "${SWIFTLIB_INSTALL_IN_COMPONENT}"
+                                     "${optional_arg}")
+        endif()
       endif()
 
       # Add Swift standard library targets as dependencies to the top-level
