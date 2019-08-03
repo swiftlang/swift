@@ -14,6 +14,7 @@
 #define SWIFT_AST_CLANG_MODULE_LOADER_H
 
 #include "swift/AST/ModuleLoader.h"
+#include "swift/Demangling/Demangle.h"
 
 namespace clang {
 class ASTContext;
@@ -25,6 +26,7 @@ class Sema;
 namespace swift {
 
 class DeclContext;
+class VisibleDeclConsumer;
 
 class ClangModuleLoader : public ModuleLoader {
 private:
@@ -58,6 +60,30 @@ public:
                                             const DeclContext *overlayDC,
                                             const DeclContext *importedDC) = 0;
 
+  /// Look for declarations associated with the given name.
+  ///
+  /// \param name The name we're searching for.
+  virtual void lookupValue(DeclName name, VisibleDeclConsumer &consumer) {}
+
+  /// Look up a type declaration by its Clang name.
+  ///
+  /// Note that this method does no filtering. If it finds the type in a loaded
+  /// module, it returns it. This is intended for use in reflection / debugging
+  /// contexts where access is not a problem.
+  virtual void lookupTypeDecl(StringRef clangName, Demangle::Node::Kind kind,
+                              llvm::function_ref<void(TypeDecl *)> receiver) {}
+
+  /// Look up type a declaration synthesized by the Clang importer itself, using
+  /// a "related entity kind" to determine which type it should be. For example,
+  /// this can be used to find the synthesized error struct for an
+  /// NS_ERROR_ENUM.
+  ///
+  /// Note that this method does no filtering. If it finds the type in a loaded
+  /// module, it returns it. This is intended for use in reflection / debugging
+  /// contexts where access is not a problem.
+  virtual void
+  lookupRelatedEntity(StringRef clangName, StringRef relatedEntityKind,
+                      llvm::function_ref<void(TypeDecl *)> receiver) {}
 };
 
 } // namespace swift

@@ -318,6 +318,7 @@ class LLVM_LIBRARY_VISIBILITY ClangImporter::Implementation
     public LazyConformanceLoader
 {
   friend class ClangImporter;
+  friend class DWARFImporter;
   using Version = importer::ImportNameVersion;
 
 public:
