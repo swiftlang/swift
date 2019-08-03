@@ -1549,6 +1549,7 @@ endfunction()
 #     [INSTALL]
 #     [IS_STDLIB]
 #     [IS_STDLIB_CORE]
+#     [TARGET_LIBRARY]
 #     [INSTALL_WITH_SHARED]
 #     INSTALL_IN_COMPONENT comp
 #     DEPLOYMENT_VERSION_OSX version
@@ -1629,13 +1630,17 @@ endfunction()
 #
 # IS_STDLIB
 #   Treat the library as a part of the Swift standard library.
+#   IS_STDLIB implies TARGET_LIBRARY.
 #
 # IS_STDLIB_CORE
 #   Compile as the Swift standard library core.
 #
 # IS_SDK_OVERLAY
 #   Treat the library as a part of the Swift SDK overlay.
-#   IS_SDK_OVERLAY implies IS_STDLIB.
+#   IS_SDK_OVERLAY implies TARGET_LIBRARY and IS_STDLIB.
+#
+# TARGET_LIBRARY
+#   Build library for the target SDKs.
 #
 # INSTALL_IN_COMPONENT comp
 #   The Swift installation component that this library belongs to.
@@ -1669,6 +1674,7 @@ function(add_swift_target_library name)
         OBJECT_LIBRARY
         SHARED
         STATIC
+        TARGET_LIBRARY
         INSTALL_WITH_SHARED)
   set(SWIFTLIB_single_parameter_options
         DEPLOYMENT_VERSION_IOS
@@ -1722,11 +1728,18 @@ function(add_swift_target_library name)
   if(SWIFTLIB_IS_SDK_OVERLAY)
     set(SWIFTLIB_HAS_SWIFT_CONTENT TRUE)
     set(SWIFTLIB_IS_STDLIB TRUE)
+    set(SWIFTLIB_TARGET_LIBRARY TRUE)
+
+    # Install to sdk-overlay by default, but don't hardcode it
+    if(NOT SWIFTLIB_INSTALL_IN_COMPONENT)
+      set(SWIFTLIB_INSTALL_IN_COMPONENT sdk-overlay)
+    endif()
   endif()
 
   # Standard library is always a target library.
   if(SWIFTLIB_IS_STDLIB)
     set(SWIFTLIB_HAS_SWIFT_CONTENT TRUE)
+    set(SWIFTLIB_TARGET_LIBRARY TRUE)
   endif()
 
   # If target SDKs are not specified, build for all known SDKs.
@@ -1765,6 +1778,9 @@ function(add_swift_target_library name)
     message(FATAL_ERROR
         "Either SHARED, STATIC, or OBJECT_LIBRARY must be specified")
   endif()
+
+  precondition(SWIFTLIB_TARGET_LIBRARY
+    MESSAGE "TARGET_LIBRARY not inferred in add_swift_target_library?!")
 
   # In the standard library and overlays, warn about implicit overrides
   # as a reminder to consider when inherited protocols need different
@@ -1960,7 +1976,6 @@ function(add_swift_target_library name)
         ${SWIFTLIB_OBJECT_LIBRARY_keyword}
         ${SWIFTLIB_INSTALL_WITH_SHARED_keyword}
         ${SWIFTLIB_SOURCES}
-        TARGET_LIBRARY
         MODULE_TARGET ${MODULE_VARIANT_NAME}
         SDK ${sdk}
         ARCHITECTURE ${arch}
@@ -1980,6 +1995,7 @@ function(add_swift_target_library name)
         ${SWIFTLIB_IS_STDLIB_keyword}
         ${SWIFTLIB_IS_STDLIB_CORE_keyword}
         ${SWIFTLIB_IS_SDK_OVERLAY_keyword}
+        ${SWIFTLIB_TARGET_LIBRARY_keyword}
         ${SWIFTLIB_FORCE_BUILD_OPTIMIZED_keyword}
         ${SWIFTLIB_NOSWIFTRT_keyword}
         DARWIN_INSTALL_NAME_DIR "${SWIFTLIB_DARWIN_INSTALL_NAME_DIR}"

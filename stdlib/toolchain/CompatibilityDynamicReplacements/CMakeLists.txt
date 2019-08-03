@@ -1,6 +1,6 @@
 set(library_name "swiftCompatibilityDynamicReplacements")
 
-add_swift_target_library("${library_name}" STATIC
+add_swift_target_library("${library_name}" STATIC TARGET_LIBRARY
   DynamicReplaceable.cpp
 
   TARGET_SDKS ${SWIFT_APPLE_PLATFORMS}

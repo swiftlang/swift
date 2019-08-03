@@ -94,7 +94,7 @@ if(SWIFT_BUILD_STATIC_STDLIB AND "${sdk}" STREQUAL "LINUX")
   string(TOLOWER "${sdk}" lowercase_sdk)
 
   # These two libraries are only used with the static swiftcore
-  add_swift_target_library(swiftImageInspectionShared STATIC
+  add_swift_target_library(swiftImageInspectionShared TARGET_LIBRARY STATIC
     ImageInspectionELF.cpp
     C_COMPILE_FLAGS ${swift_runtime_library_compile_flags}
     LINK_FLAGS ${swift_runtime_linker_flags}
@@ -151,7 +151,7 @@ if(SWIFT_BUILD_STATIC_STDLIB AND "${sdk}" STREQUAL "LINUX")
   endforeach()
   add_dependencies(static_binary_magic ${swift_image_inspection_static_primary_arch})
 
-  add_swift_target_library(swiftImageInspectionSharedObject OBJECT_LIBRARY
+  add_swift_target_library(swiftImageInspectionSharedObject OBJECT_LIBRARY TARGET_LIBRARY
     ImageInspectionELF.cpp
     C_COMPILE_FLAGS ${swift_runtime_library_compile_flags}
     LINK_FLAGS ${swift_runtime_linker_flags}
@@ -159,7 +159,7 @@ if(SWIFT_BUILD_STATIC_STDLIB AND "${sdk}" STREQUAL "LINUX")
     INSTALL_IN_COMPONENT never_install)
 endif()
 
-add_swift_target_library(swiftRuntime OBJECT_LIBRARY
+add_swift_target_library(swiftRuntime OBJECT_LIBRARY TARGET_LIBRARY
   ${swift_runtime_sources}
   ${swift_runtime_objc_sources}
   ${swift_runtime_leaks_sources}
