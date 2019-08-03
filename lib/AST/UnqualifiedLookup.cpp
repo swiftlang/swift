@@ -488,7 +488,7 @@ void UnqualifiedLookupFactory::performUnqualifiedLookup() {
     static bool haveWarned = false;
     if (!haveWarned) {
       haveWarned = true;
-      llvm::errs() << "WARNING: TRYING Scope exclusively\n";
+     //xxx llvm::errs() << "WARNING: TRYING Scope exclusively\n";
     }
     experimentallyLookInASTScopes();
     return;
@@ -1332,7 +1332,7 @@ bool UnqualifiedLookupFactory::verifyEqualTo(
       e.getValueDecl()->print(as);
       oe.getValueDecl()->print(bs);
       if (a == b)
-        llvm::errs() << "ValueDecls differ but print same";
+        llvm::errs() << "ValueDecls differ but print same\n";
       else {
         writeErr(std::string( "ValueDecls differ at ") + std::to_string(i));
         assert(false && "ASTScopeImpl found different Decl");
