@@ -390,6 +390,33 @@ class TestPerformanceTestResult(unittest.TestCase):
         self.assertEqual(as_tuple(r),  # picks smaller of the setup values
                          (4, 11616, 12325, 12064, None, None, 10498048, 7))
 
+    def test_merge_with_samples(self):
+        # --quantile=20 --delta
+        log = """
+684,B,200,967,,14,5,3,3,2,1,1,,,,,1,,3,3,5,11,76,1827
+684,B,200,972,,,,,,,,2,2,3,1,,,3,6,21,30,146,694,4590
+684,B,200,986,,,1,1,,1,,,,1,,2,2,9,5,6,15,28,224,2902
+""".split('\n')[1:-1]
+        results = [
+            PerformanceTestResult(line.split(','), quantiles=True, delta=True)
+            for line in log]
+        self.assertEqual([r.num_samples for r in results], [200, 200, 200])
+        self.assertEqual(
+            [r.samples.num_samples for r in results], [21, 21, 21])
+        # after excluding outliers, the real sample count is lower
+        self.assertEqual([r.samples.count for r in results], [18, 17, 18])
+
+        def as_tuple(r):
+            return (r.num_samples, r.samples.num_samples, r.samples.count,
+                    r.min, r.samples.median, r.max)
+
+        r = results[0]
+        self.assertEqual(as_tuple(r), (200, 21, 18, 967, 996, 1008))
+        r.merge(results[1])  # 18 + 17 = 35, after merge using only ventiles
+        self.assertEqual(as_tuple(r), (400, 42, 35, 967, 983, 1010))
+        r.merge(results[2])  # 35 + 18 = 53
+        self.assertEqual(as_tuple(r), (600, 63, 53, 967, 989, 1029))
+
 
 class TestResultComparison(unittest.TestCase):
     def setUp(self):

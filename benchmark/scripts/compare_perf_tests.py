@@ -302,7 +302,8 @@ class PerformanceTestResult(object):
         if self.samples and r.samples:
             map(self.samples.add, r.samples.samples)
             sams = self.samples
-            self.num_samples = sams.num_samples
+            self.num_samples += r.num_samples
+            sams.outliers += r.samples.outliers
             self.min, self.max, self.median, self.mean, self.sd = \
                 sams.min, sams.max, sams.median, sams.mean, sams.sd
         else:
@@ -517,10 +518,8 @@ class TestComparator(object):
         self.removed = sorted([old_results[t] for t in removed_tests],
                               key=lambda r: r.name)
 
-        def compare(name):
-            return ResultComparison(old_results[name], new_results[name])
-
-        comparisons = map(compare, comparable_tests)
+        comparisons = [ResultComparison(old_results[name], new_results[name])
+                       for name in comparable_tests]
 
         def partition(l, p):
             return reduce(lambda x, y: x[not p(y)].append(y) or x, l, ([], []))
