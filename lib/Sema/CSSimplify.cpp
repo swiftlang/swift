@@ -5533,90 +5533,61 @@ ConstraintSystem::simplifyKeyPathConstraint(Type keyPathTy,
   bool definitelyFunctionType = false;
   bool definitelyKeyPathType = false;
 
-  auto tryMatchRootAndValueFromKeyPathType =
-    [&](BoundGenericType *bgt, bool allowPartial) -> SolutionKind {
-      Type boundRoot, boundValue;
+  auto tryMatchRootAndValueFromType = [&](Type type,
+                                          bool allowPartial = true) -> bool {
+    Type boundRoot = Type(), boundValue = Type();
 
+    if (auto bgt = type->getAs<BoundGenericType>()) {
       definitelyKeyPathType = true;
 
       // We can get root and value from a concrete key path type.
-      if (bgt->getDecl() == getASTContext().getKeyPathDecl()
-          || bgt->getDecl() == getASTContext().getWritableKeyPathDecl()
-          || bgt->getDecl() == getASTContext().getReferenceWritableKeyPathDecl()) {
+      if (bgt->getDecl() == getASTContext().getKeyPathDecl() ||
+          bgt->getDecl() == getASTContext().getWritableKeyPathDecl() ||
+          bgt->getDecl() == getASTContext().getReferenceWritableKeyPathDecl()) {
         boundRoot = bgt->getGenericArgs()[0];
         boundValue = bgt->getGenericArgs()[1];
       } else if (bgt->getDecl() == getASTContext().getPartialKeyPathDecl()) {
-        if (allowPartial) {
-          // We can still get the root from a PartialKeyPath.
-          boundRoot = bgt->getGenericArgs()[0];
-          boundValue = Type();
-        } else {
-          return SolutionKind::Error;
-        }
-      } else {
-        // We can't bind anything from this type.
-        return SolutionKind::Solved;
+        if (!allowPartial)
+          return false;
+
+        // We can still get the root from a PartialKeyPath.
+        boundRoot = bgt->getGenericArgs()[0];
       }
-      if (matchTypes(boundRoot, rootTy,
-                ConstraintKind::Bind, subflags, locator).isFailure())
-        return SolutionKind::Error;
+    }
 
-      if (boundValue
-          && matchTypes(boundValue, valueTy,
-                ConstraintKind::Bind, subflags, locator).isFailure())
-        return SolutionKind::Error;
-      
-      return SolutionKind::Solved;
-    };
+    if (auto fnTy = type->getAs<FunctionType>()) {
+      definitelyFunctionType = true;
 
-  auto tryMatchRootAndValueFromFunctionType =
-      [&](FunctionType *fnTy) -> SolutionKind {
-    if (fnTy->getParams().size() != 1)
-      return SolutionKind::Error;
+      if (fnTy->getParams().size() != 1)
+        return false;
 
-    Type boundRoot = fnTy->getParams()[0].getPlainType();
-    Type boundValue = fnTy->getResult();
+      boundRoot = fnTy->getParams()[0].getPlainType();
+      boundValue = fnTy->getResult();
+    }
 
-    if (matchTypes(boundRoot, rootTy, ConstraintKind::Bind, subflags, locator)
+    if (boundRoot &&
+        matchTypes(boundRoot, rootTy, ConstraintKind::Bind, subflags, locator)
             .isFailure())
-      return SolutionKind::Error;
+      return false;
 
-    if (matchTypes(boundValue, valueTy, ConstraintKind::Bind, subflags, locator)
+    if (boundValue &&
+        matchTypes(boundValue, valueTy, ConstraintKind::Bind, subflags, locator)
             .isFailure())
-      return SolutionKind::Error;
+      return false;
 
-    definitelyFunctionType = true;
-    return SolutionKind::Solved;
+    return true;
   };
 
   // If we're fixed to a bound generic type, trying harvesting context from it.
   // However, we don't want a solution that fixes the expression type to
   // PartialKeyPath; we'd rather that be represented using an upcast conversion.
-  auto keyPathBGT = keyPathTy->getAs<BoundGenericType>();
-  if (keyPathBGT) {
-    if (tryMatchRootAndValueFromKeyPathType(keyPathBGT, /*allowPartial*/false)
-          == SolutionKind::Error)
-      return SolutionKind::Error;
-  }
-  // If we're bound to a (Root) -> Value function type, use that for context.
-  if (auto fnTy = keyPathTy->getAs<FunctionType>()) {
-    if (tryMatchRootAndValueFromFunctionType(fnTy) == SolutionKind::Error)
-      return SolutionKind::Error;
-  }
+  if (!tryMatchRootAndValueFromType(keyPathTy, /*allowPartial=*/false))
+    return SolutionKind::Error;
 
   // If the expression has contextual type information, try using that too.
   if (auto contextualTy = getContextualType(keyPath)) {
-    if (auto contextualBGT = contextualTy->getAs<BoundGenericType>()) {
-      if (tryMatchRootAndValueFromKeyPathType(contextualBGT,
-                                              /*allowPartial*/true)
-            == SolutionKind::Error)
-        return SolutionKind::Error;
-    }
-    if (auto contextualBGT = contextualTy->getAs<FunctionType>()) {
-      if (tryMatchRootAndValueFromFunctionType(contextualBGT) ==
-          SolutionKind::Error)
-        return SolutionKind::Error;
-    }
+    if (!tryMatchRootAndValueFromType(contextualTy))
+      return SolutionKind::Error;
   }
 
   // If we have nothing else, and there's another constraint on our keyPathTy
@@ -5628,11 +5599,9 @@ ConstraintSystem::simplifyKeyPathConstraint(Type keyPathTy,
         continue;
       if (constraint.getFirstType().getPointer() == keyPathTy.getPointer()) {
         auto otherType = constraint.getSecondType();
-        if (auto otherFT = otherType->getAs<FunctionType>()) {
-          if (tryMatchRootAndValueFromFunctionType(otherFT) ==
-              SolutionKind::Error)
-            return SolutionKind::Error;
-        }
+        if (otherType->is<FunctionType>() &&
+            !tryMatchRootAndValueFromType(otherType))
+          return SolutionKind::Error;
       }
     }
   }
@@ -5756,7 +5725,7 @@ done:
   
   // FIXME: Allow the type to be upcast if the type system has a concrete
   // KeyPath type assigned to the expression already.
-  if (keyPathBGT) {
+  if (auto keyPathBGT = keyPathTy->getAs<BoundGenericType>()) {
     if (keyPathBGT->getDecl() == getASTContext().getKeyPathDecl())
       kpDecl = getASTContext().getKeyPathDecl();
     else if (keyPathBGT->getDecl() ==
@@ -5764,7 +5733,7 @@ done:
              capability >= Writable)
       kpDecl = getASTContext().getWritableKeyPathDecl();
   }
-  
+
   auto loc = locator.getBaseLocator();
   if (definitelyFunctionType) {
     Type fnType =
