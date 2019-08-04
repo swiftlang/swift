@@ -3240,7 +3240,7 @@ static ManagedValue createThunk(SILGenFunction &SGF,
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-/// Create a reabstraction thunk for an @differentiable function.
+/// Create a reabstraction thunk for a @differentiable function.
 static ManagedValue createAutoDiffThunk(SILGenFunction &SGF,
                                         SILLocation loc,
                                         ManagedValue fn,
@@ -3275,9 +3275,10 @@ static ManagedValue createAutoDiffThunk(SILGenFunction &SGF,
                                                 outputSubstTypeNotDiff);
   // `autodiff_function_extract` is consuming; copy `fn` before passing as
   // operand.
-  auto copiedFnValue = fn.copy(SGF, loc);
-  auto *original = SGF.B.createAutoDiffFunctionExtractOriginal(
-      loc, copiedFnValue.forward(SGF));
+  auto borrowedFnValue = fn.borrow(SGF, loc);
+  SILValue original = SGF.B.createAutoDiffFunctionExtractOriginal(
+      loc, borrowedFnValue.getValue());
+  original = SGF.B.emitCopyValueOperation(loc, original);
   auto managedOriginal = SGF.emitManagedRValueWithCleanup(original);
 
   ManagedValue originalThunk = createThunk(
@@ -3319,11 +3320,9 @@ static ManagedValue createAutoDiffThunk(SILGenFunction &SGF,
     auto assocFnOutputSubstType = getAssocFnTy(outputSubstTypeNotDiff, kind);
     auto &assocFnExpectedTL = SGF.getTypeLowering(assocFnOutputOrigType,
                                                   assocFnOutputSubstType);
-    // `autodiff_function_extract` is consuming; copy `fn` before passing as
-    // operand.
-    auto copiedFnValue = fn.copy(SGF, loc);
-    auto *assocFn = SGF.B.createAutoDiffFunctionExtract(
-        loc, kind, /*differentiationOrder*/ 1, copiedFnValue.forward(SGF));
+    SILValue assocFn = SGF.B.createAutoDiffFunctionExtract(
+        loc, kind, /*differentiationOrder*/ 1, borrowedFnValue.getValue());
+    assocFn = SGF.B.emitCopyValueOperation(loc, assocFn);
     auto managedAssocFn = SGF.emitManagedRValueWithCleanup(assocFn);
     return createThunk(SGF, loc, managedAssocFn, assocFnInputOrigType,
                        assocFnInputSubstType, assocFnOutputOrigType,
@@ -3336,9 +3335,8 @@ static ManagedValue createAutoDiffThunk(SILGenFunction &SGF,
   SILValue convertedBundle = SGF.B.createAutoDiffFunction(
       loc, sourceType->getDifferentiationParameterIndices(),
       /*differentiationOrder*/ 1,
-      originalThunk.ensurePlusOne(SGF, loc).forward(SGF),
-      {jvpThunk.ensurePlusOne(SGF, loc).forward(SGF),
-       vjpThunk.ensurePlusOne(SGF, loc).forward(SGF)});
+      originalThunk.forward(SGF),
+      {jvpThunk.forward(SGF), vjpThunk.forward(SGF)});
   return SGF.emitManagedRValueWithCleanup(convertedBundle);
 }
 
