@@ -3033,6 +3033,11 @@ NOTE(note_capture_self_explicitly,none,
       "capture 'self' explicitly to enable implicit 'self' in this closure", ())
 NOTE(note_reference_self_explicitly,none,
       "reference 'self.' explicitly", ())
+NOTE(note_other_self_capture,none,
+      "variable other than 'self' captured here under the name 'self' does not "
+      "enable implicit 'self'", ())
+NOTE(note_self_captured_weakly,none,
+      "weak capture of 'self' here does not enable implicit 'self'", ())
 ERROR(implicit_use_of_self_in_closure,none,
       "implicit use of 'self' in closure; use 'self.' to make"
       " capture semantics explicit", ())

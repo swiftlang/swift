@@ -1532,7 +1532,7 @@ VarDecl *PatternBindingDecl::getSingleInitializerVar() const {
     return dyn_cast<VarDecl>(dyn_cast<DeclRefExpr>(getInit(0))->getDecl());
   return nullptr;
 }
-
+    
 bool VarDecl::isInitExposedToClients() const {
   auto parent = dyn_cast<NominalTypeDecl>(getDeclContext());
   if (!parent) return false;

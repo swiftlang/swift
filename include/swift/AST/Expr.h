@@ -3688,6 +3688,7 @@ public:
   /// Is this a completely empty closure?
   bool hasEmptyBody() const;
 
+  /// VarDecl captured by this closure under the literal name \c self , if any.
   VarDecl *getCapturedSelfDecl() const { return CapturedSelfDecl; }
 
   static bool classof(const Expr *E) {
@@ -3794,7 +3795,7 @@ public:
   const ClosureExpr *getClosureBody() const { return closureBody; }
 
   void setClosureBody(ClosureExpr *body) { closureBody = body; }
-      
+
   /// This is a bit weird, but the capture list is lexically contained within
   /// the closure, so the ClosureExpr has the full source range.
   SWIFT_FORWARD_SOURCE_LOCS_TO(closureBody)

@@ -1233,10 +1233,8 @@ bool CaptureListEntry::isSimpleSelfCapture() const {
     return false;
   if (auto *DRE = dyn_cast<DeclRefExpr>(Init->getInit(0)))
     if (auto *VD = dyn_cast<VarDecl>(DRE->getDecl())) {
-      auto *ownership = Var->getAttrs().getAttribute<ReferenceOwnershipAttr>();
       return (VD->isSelfParameter() || VD->isSelfParamCapture())
-             && VD->getName() == Var->getName()
-             && (!ownership || ownership->get() != ReferenceOwnership::Weak);
+             && VD->getName() == Var->getName();
     }
   return false;
 }

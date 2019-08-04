@@ -1386,7 +1386,7 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
                       diag::property_use_in_closure_without_explicit_self,
                       MRE->getMember().getDecl()->getBaseName().getIdentifier());
         }
-      
+
       // Handle method calls with a specific diagnostic + fixit.
       if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(E))
         if (isImplicitSelfParamUse(DSCE->getBase()) &&
@@ -1403,10 +1403,22 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
       if (memberLoc.isValid()) {
         if (auto *CE = dyn_cast<ClosureExpr>(ACE)) {
           // If we've already captured something with the name "self" other than
-          // the actual self param, don't bother with any fix-its.
-          auto *VD = CE->getCapturedSelfDecl();
-          if (VD && !VD->isSelfParamCapture())
+          // the actual self param, offer special diagnostics.
+          if (auto *VD = CE->getCapturedSelfDecl()) {
+            // Either this is a weak capture of self...
+            if (VD->getType()->is<WeakStorageType>()) {
+              TC.diagnose(VD->getLoc(), diag::note_self_captured_weakly);
+            // ...or something completely different.
+            } else {
+              TC.diagnose(VD->getLoc(), diag::note_other_self_capture);
+            }
+            // Bail on the rest of the diagnostics. Offering the option to
+            // capture 'self' explicitly will result in an error, and using
+            // 'self.' explicitly will be accessing something other than the
+            // self param.
+            // FIXME: We could offer a special fixit in the [weak self] case to insert 'self?.'...
             return { false, E };
+          }
           
           auto diag = TC.diagnose(CE->getLoc(),
                                   diag::note_capture_self_explicitly);

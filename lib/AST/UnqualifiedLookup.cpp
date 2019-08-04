@@ -700,8 +700,7 @@ void UnqualifiedLookupFactory::lookupNamesIntroducedByMemberFunction(
         // for lookup.
         DeclContext *const BaseDC =
             isOutsideBodyOfFunction(AFD) ? fnDeclContext
-            : capturedSelfContext == nullptr ?  AFD
-            : capturedSelfContext;
+            : capturedSelfContext ?:  AFD;
         // If we are inside of a method, check to see if there are any ivars in
         // scope, and if so, whether this is a reference to one of them.
         // FIXME: We should persist this information between lookups.
@@ -733,8 +732,12 @@ void UnqualifiedLookupFactory::lookupNamesIntroducedByClosure(
     AbstractClosureExpr *ACE, Optional<bool> isCascadingUse) {
   if (auto *CE = dyn_cast<ClosureExpr>(ACE)) {
     lookForLocalVariablesIn(CE);
-      if (capturedSelfContext == nullptr && CE->getCapturedSelfDecl())
-        capturedSelfContext = CE;
+    // If we don't already have a captured self context, and this closure
+    // captures the self param, remember that.
+    if (capturedSelfContext == nullptr)
+      if (auto *VD = CE->getCapturedSelfDecl())
+        if (VD->isSelfParamCapture() && !VD->getType()->is<WeakStorageType>())
+          capturedSelfContext = CE;
   }
   ifNotDoneYet([&] {
     // clang-format off
