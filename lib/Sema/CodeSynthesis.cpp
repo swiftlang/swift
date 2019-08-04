@@ -1446,7 +1446,7 @@ namespace {
           CLE.Init->setDeclContext(NewDC);
         }
       }
-
+      
       // Unlike a closure, a TapExpr is not a DeclContext, so we need to
       // recontextualize its variable and then anything else in its body.
       // FIXME: Might be better to change walkToDeclPre() and walkToStmtPre()

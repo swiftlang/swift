@@ -733,7 +733,8 @@ void UnqualifiedLookupFactory::lookupNamesIntroducedByClosure(
   if (auto *CE = dyn_cast<ClosureExpr>(ACE)) {
     lookForLocalVariablesIn(CE);
     // If we don't already have a captured self context, and this closure
-    // captures the self param, remember that.
+    // captures the self param (not weakly, so that implicit self is available),
+    // remember that.
     if (capturedSelfContext == nullptr)
       if (auto *VD = CE->getCapturedSelfDecl())
         if (VD->isSelfParamCapture() && !VD->getType()->is<WeakStorageType>())
