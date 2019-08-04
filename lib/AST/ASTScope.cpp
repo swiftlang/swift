@@ -36,7 +36,7 @@ using namespace swift;
 using namespace ast_scope;
 
 #pragma mark ASTScope
-
+// bogus comment
 llvm::SmallVector<const ASTScopeImpl *, 0> ASTScope::unqualifiedLookup(
     SourceFile *SF, DeclName name, SourceLoc loc,
     const DeclContext *startingContext,
