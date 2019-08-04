@@ -1951,19 +1951,35 @@ reapplyFunctionConversion(SILValue newFunc, SILValue oldFunc,
         builder.createDeallocStack(loc, alloc);
     };
     for (auto arg : pai->getArguments()) {
-      // Retain the argument since it's to be owned by the newly created
+      // Retain the argument if it's to be owned by the newly created
       // closure.
+      // Objects are to be retained.
       if (arg->getType().isObject()) {
         builder.createRetainValue(loc, arg, builder.getDefaultAtomicity());
         newArgs.push_back(arg);
-      } else if (arg->getType().isLoadable(builder.getFunction())) {
-        builder.createRetainValueAddr(loc, arg, builder.getDefaultAtomicity());
-        newArgs.push_back(arg);
-      } else {
-        auto *argCopy = builder.createAllocStack(loc, arg->getType());
-        copiedIndirectParams.push_back(argCopy);
-        builder.createCopyAddr(loc, arg, argCopy, IsNotTake, IsInitialization);
-        newArgs.push_back(argCopy);
+      }
+      // Addresses depend on argument conventions.
+      else {
+        auto conv = pai->getCalleeFunction()->getConventions();
+        auto argConv =
+            conv.getSILArgumentConvention(conv.getNumSILArguments() - 1);
+        // If the argument is an aliasable inout reference, do not retain the
+        // argument since it's a `@noescape` capture.
+        if (argConv == SILArgumentConvention::Indirect_InoutAliasable) {
+          newArgs.push_back(arg);
+        }
+        // Otherwise, retain/copy the underlying value.
+        else if (arg->getType().isLoadable(builder.getFunction())) {
+          builder.createRetainValueAddr(loc, arg,
+                                        builder.getDefaultAtomicity());
+          newArgs.push_back(arg);
+        } else {
+          auto *argCopy = builder.createAllocStack(loc, arg->getType());
+          copiedIndirectParams.push_back(argCopy);
+          builder.createCopyAddr(loc, arg, argCopy, IsNotTake,
+                                 IsInitialization);
+          newArgs.push_back(argCopy);
+        }
       }
     }
     auto innerNewFunc = reapplyFunctionConversion(

@@ -207,6 +207,21 @@ LeakCheckingTests.testWithLeakChecking("ClosureCaptureLeakChecking") {
       return model.applied(to: x)
     }
   }
+
+  do {
+    struct Foo {
+      let x: Tracked<Float> = .zero
+      var y: Tracked<Float> = .zero
+      mutating func differentiateSomethingThatCapturesSelf() {
+        _ = x.gradient { x in
+          self.y += .zero
+          return .zero
+        }
+      }
+    }
+    var foo = Foo()
+    foo.differentiateSomethingThatCapturesSelf()
+  }
 }
 
 LeakCheckingTests.testWithLeakChecking("ControlFlowWithTrivialUnconditionalMath") {
