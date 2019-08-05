@@ -206,7 +206,7 @@ char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
     
   return outBuf;
 }
-#else // __ANDROID__; Add your favorite arch's command line arg grabber here.
+#else // Add your favorite OS's command line arg grabber here.
 SWIFT_RUNTIME_STDLIB_API
 char ** _swift_stdlib_getUnsafeArgvArgc(int *outArgLen) {
   if (_swift_stdlib_ProcessOverrideUnsafeArgv) {
