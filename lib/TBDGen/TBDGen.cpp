@@ -182,6 +182,23 @@ static bool shouldUseAllocatorMangling(const AbstractFunctionDecl *afd) {
          constructor->isConvenienceInit();
 }
 
+void TBDGenVisitor::visitDefaultArguments(ValueDecl *VD, ParameterList *PL) {
+  auto publicDefaultArgGenerators = SwiftModule->isTestingEnabled() ||
+                                    SwiftModule->arePrivateImportsEnabled();
+  if (!publicDefaultArgGenerators)
+    return;
+
+  // In Swift 3 (or under -enable-testing), default arguments (of public
+  // functions) are public symbols, as the default values are computed at the
+  // call site.
+  auto index = 0;
+  for (auto *param : *PL) {
+    if (param->isDefaultArgument())
+      addSymbol(SILDeclRef::getDefaultArgGenerator(VD, index));
+    index++;
+  }
+}
+
 void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
   // A @_silgen_name("...") function without a body only exists
   // to forward-declare a symbol from another library.
@@ -198,7 +215,6 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
         AFD, useAllocator));
     addSymbol(
         LinkEntity::forDynamicallyReplaceableFunctionKey(AFD, useAllocator));
-
   }
   if (AFD->getAttrs().hasAttribute<DynamicReplacementAttr>()) {
     bool useAllocator = shouldUseAllocatorMangling(AFD);
@@ -214,20 +230,7 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
     addSymbol(SILDeclRef(AFD).asForeign());
   }
 
-  auto publicDefaultArgGenerators = SwiftModule->isTestingEnabled() ||
-                                    SwiftModule->arePrivateImportsEnabled();
-  if (!publicDefaultArgGenerators)
-    return;
-
-  // In Swift 3 (or under -enable-testing), default arguments (of public
-  // functions) are public symbols, as the default values are computed at the
-  // call site.
-  auto index = 0;
-  for (auto *param : *AFD->getParameters()) {
-    if (param->isDefaultArgument())
-      addSymbol(SILDeclRef::getDefaultArgGenerator(AFD, index));
-    index++;
-  }
+  visitDefaultArguments(AFD, AFD->getParameters());
 }
 
 void TBDGenVisitor::visitFuncDecl(FuncDecl *FD) {
@@ -590,12 +593,12 @@ void TBDGenVisitor::visitEnumDecl(EnumDecl *ED) {
 
   if (!ED->isResilient())
     return;
+}
 
-  // Emit resilient tags.
-  for (auto *elt : ED->getAllElements()) {
-    auto entity = LinkEntity::forEnumCase(elt);
-    addSymbol(entity);
-  }
+void TBDGenVisitor::visitEnumElementDecl(EnumElementDecl *EED) {
+  addSymbol(LinkEntity::forEnumCase(EED));
+  if (auto *PL = EED->getParameterList())
+    visitDefaultArguments(EED, PL);
 }
 
 void TBDGenVisitor::addFirstFileSymbols() {
