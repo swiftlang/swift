@@ -2074,11 +2074,11 @@ emitMetadataAccessByMangledName(IRGenFunction &IGF, CanType type,
   }
 
   // Get or create a shared helper function to do the instantiation.
-  auto instantiationFn = cast<llvm::Function>(
-       IGM.getModule()
-         ->getOrInsertFunction("__swift_instantiateConcreteTypeFromMangledName",
-                               IGF.IGM.TypeMetadataPtrTy, cache->getType())
-         ->stripPointerCasts());
+  auto *instantiationFnTy = llvm::FunctionType::get(IGF.IGM.TypeMetadataPtrTy,
+                                                    {cache->getType()}, false);
+  auto instantiationFn = llvm::Function::Create(
+      instantiationFnTy, llvm::Function::ExternalLinkage,
+      "__swift_instantiateConcreteTypeFromMangledName", IGM.getModule());
   if (instantiationFn->empty()) {
     ApplyIRLinkage(IRLinkage::InternalLinkOnceODR)
       .to(instantiationFn);

@@ -91,8 +91,8 @@ template <> struct ScalarTraits<UUID> {
 };
 
 using clang::InputKind;
-template <> struct ScalarEnumerationTraits<InputKind::Language> {
-  static void enumeration(IO &io, InputKind::Language &kind);
+template <> struct ScalarEnumerationTraits<clang::Language> {
+  static void enumeration(IO &io, clang::Language &kind);
 };
 
 } // end namespace yaml.

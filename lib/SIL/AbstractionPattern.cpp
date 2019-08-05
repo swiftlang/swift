@@ -366,8 +366,7 @@ AbstractionPattern::getCXXMethodSelfPattern(CanType selfType) const {
     // Use the clang type for the receiver type.  If this is ever
     // insufficient --- if we have interesting bridging to do to
     // 'self' --- we have the right information to be more exact.
-    auto clangSelfType =
-        CXXMethod->getThisType(CXXMethod->getASTContext()).getTypePtr();
+    auto clangSelfType = CXXMethod->getThisType().getTypePtr();
     return AbstractionPattern(getGenericSignatureForFunctionComponent(),
                               selfType, clangSelfType);
   }
