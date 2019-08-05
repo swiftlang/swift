@@ -1648,11 +1648,6 @@ bool FailureDiagnosis::diagnoseCalleeResultContextualConversionError() {
   }
 }
 
-static bool isIntegerType(Type fromType, ConstraintSystem &CS) {
-  return conformsToKnownProtocol(CS, fromType,
-                                 KnownProtocolKind::ExpressibleByIntegerLiteral);
-}
-
 /// Return true if the conversion from fromType to toType is an invalid string
 /// index operation.
 static bool isIntegerToStringIndexConversion(Type fromType, Type toType,
@@ -1660,57 +1655,6 @@ static bool isIntegerToStringIndexConversion(Type fromType, Type toType,
   auto kind = KnownProtocolKind::ExpressibleByIntegerLiteral;
   return (conformsToKnownProtocol(CS, fromType, kind) &&
           toType->getCanonicalType().getString() == "String.CharacterView.Index");
-}
-
-/// Attempts to add fix-its for these two mistakes:
-///
-/// - Passing an integer with the right type but which is getting wrapped with a
-///   different integer type unnecessarily. The fixit removes the cast.
-///
-/// - Passing an integer but expecting different integer type. The fixit adds
-///   a wrapping cast.
-///
-/// - Return true on the fixit is added, false otherwise.
-///
-/// This helps migration with SDK changes.
-static bool tryIntegerCastFixIts(InFlightDiagnostic &diag, ConstraintSystem &CS,
-                                 Type fromType, Type toType, Expr *expr) {
-  if (!isIntegerType(fromType, CS) || !isIntegerType(toType, CS))
-    return false;
-
-  auto getInnerCastedExpr = [&]() -> Expr * {
-    if (auto *CE = dyn_cast<CoerceExpr>(expr))
-      return CE->getSubExpr();
-
-    auto *CE = dyn_cast<CallExpr>(expr);
-    if (!CE)
-      return nullptr;
-    if (!isa<ConstructorRefCallExpr>(CE->getFn()))
-      return nullptr;
-    auto *parenE = dyn_cast<ParenExpr>(CE->getArg());
-    if (!parenE)
-      return nullptr;
-    return parenE->getSubExpr();
-  };
-
-  if (Expr *innerE = getInnerCastedExpr()) {
-    Type innerTy = CS.getType(innerE);
-    if (CS.TC.isConvertibleTo(innerTy, toType, CS.DC)) {
-      // Remove the unnecessary cast.
-      diag.fixItRemoveChars(expr->getLoc(), innerE->getStartLoc())
-        .fixItRemove(expr->getEndLoc());
-      return true;
-    }
-  }
-
-  // Add a wrapping integer cast.
-  std::string convWrapBefore = toType.getString();
-  convWrapBefore += "(";
-  std::string convWrapAfter = ")";
-  SourceRange exprRange = expr->getSourceRange();
-  diag.fixItInsert(exprRange.Start, convWrapBefore);
-  diag.fixItInsertAfter(exprRange.End, convWrapAfter);
-  return true;
 }
 
 static bool addTypeCoerceFixit(InFlightDiagnostic &diag, ConstraintSystem &CS,
@@ -2110,7 +2054,6 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
   case CTP_SubscriptAssignSource:
   case CTP_Initialization:
   case CTP_ReturnStmt:
-    tryIntegerCastFixIts(diag, CS, exprType, contextualType, expr) ||
     addTypeCoerceFixit(diag, CS, exprType, contextualType, expr);
     break;
 
@@ -4572,11 +4515,17 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
         if (!lhsIsCandidate && !rhsIsCandidate)
           return false;
 
-        if (!lhsIsCandidate)
-          return tryIntegerCastFixIts(diag, CS, lhsType, lhsCandidate, lhsExpr);
+        if (!lhsIsCandidate) {
+          ContextualFailure failure(expr, CS, lhsType, lhsCandidate,
+                                    CS.getConstraintLocator(lhsExpr));
+          return failure.tryIntegerCastFixIts(diag);
+        }
 
-        if (!rhsIsCandidate)
-          return tryIntegerCastFixIts(diag, CS, rhsType, rhsCandidate, rhsExpr);
+        if (!rhsIsCandidate) {
+          ContextualFailure failure(expr, CS, rhsType, rhsCandidate,
+                                    CS.getConstraintLocator(rhsExpr));
+          return failure.tryIntegerCastFixIts(diag);
+        }
 
         return false;
       };

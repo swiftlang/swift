@@ -1886,6 +1886,9 @@ bool ContextualFailure::tryFixIts(InFlightDiagnostic &diagnostic) const {
                                 KnownProtocolKind::ExpressibleByStringLiteral))
     return true;
 
+  if (tryIntegerCastFixIts(diagnostic))
+    return true;
+
   return false;
 }
 
@@ -2075,6 +2078,48 @@ bool ContextualFailure::tryRawRepresentableFixIts(
   }
 
   return false;
+}
+
+bool ContextualFailure::tryIntegerCastFixIts(
+    InFlightDiagnostic &diagnostic) const {
+  if (!isIntegerType(FromType) || !isIntegerType(ToType))
+    return false;
+
+  auto getInnerCastedExpr = [&](Expr *expr) -> Expr * {
+    if (auto *CE = dyn_cast<CoerceExpr>(expr))
+      return CE->getSubExpr();
+
+    auto *CE = dyn_cast<CallExpr>(expr);
+    if (!CE)
+      return nullptr;
+    if (!isa<ConstructorRefCallExpr>(CE->getFn()))
+      return nullptr;
+    auto *parenE = dyn_cast<ParenExpr>(CE->getArg());
+    if (!parenE)
+      return nullptr;
+    return parenE->getSubExpr();
+  };
+
+  auto *anchor = getAnchor();
+  if (Expr *innerE = getInnerCastedExpr(anchor)) {
+    Type innerTy = getType(innerE);
+    auto &TC = getTypeChecker();
+    if (TC.isConvertibleTo(innerTy, ToType, getDC())) {
+      // Remove the unnecessary cast.
+      diagnostic.fixItRemoveChars(anchor->getLoc(), innerE->getStartLoc())
+          .fixItRemove(anchor->getEndLoc());
+      return true;
+    }
+  }
+
+  // Add a wrapping integer cast.
+  std::string convWrapBefore = ToType.getString();
+  convWrapBefore += "(";
+  std::string convWrapAfter = ")";
+  SourceRange exprRange = anchor->getSourceRange();
+  diagnostic.fixItInsert(exprRange.Start, convWrapBefore);
+  diagnostic.fixItInsertAfter(exprRange.End, convWrapAfter);
+  return true;
 }
 
 bool ContextualFailure::trySequenceSubsequenceFixIts(

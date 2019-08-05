@@ -702,6 +702,19 @@ public:
   tryRawRepresentableFixIts(InFlightDiagnostic &diagnostic,
                             KnownProtocolKind rawRepresentablePrococol) const;
 
+  /// Attempts to add fix-its for these two mistakes:
+  ///
+  /// - Passing an integer with the right type but which is getting wrapped with
+  ///   a different integer type unnecessarily. The fixit removes the cast.
+  ///
+  /// - Passing an integer but expecting different integer type. The fixit adds
+  ///   a wrapping cast.
+  ///
+  /// - Return true on the fixit is added, false otherwise.
+  ///
+  /// This helps migration with SDK changes.
+  bool tryIntegerCastFixIts(InFlightDiagnostic &diagnostic) const;
+
 protected:
   /// Try to add a fix-it when converting between a collection and its slice
   /// type, such as String <-> Substring or (eventually) Array <-> ArraySlice
@@ -720,6 +733,12 @@ private:
   /// Try to add a fix-it to convert a stored property into a computed
   /// property
   void tryComputedPropertyFixIts(Expr *expr) const;
+
+  bool isIntegerType(Type type) const {
+    return conformsToKnownProtocol(
+        getConstraintSystem(), type,
+        KnownProtocolKind::ExpressibleByIntegerLiteral);
+  }
 
 protected:
   static Optional<Diag<Type, Type>>
