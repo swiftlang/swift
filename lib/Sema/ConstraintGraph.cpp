@@ -791,22 +791,29 @@ void ConstraintGraphNode::dump() {
   print(llvm::dbgs(), 0);
 }
 
-void ConstraintGraph::print(llvm::raw_ostream &out) {
-  for (auto typeVar : TypeVariables) {
+void ConstraintGraph::print(ArrayRef<TypeVariableType *> typeVars,
+                            llvm::raw_ostream &out) {
+  for (auto typeVar : typeVars) {
     (*this)[typeVar].print(out, 2);
     out << "\n";
   }
 }
 
 void ConstraintGraph::dump() {
-  llvm::SaveAndRestore<bool>
-    debug(CS.getASTContext().LangOpts.DebugConstraintSolver, true);
-  print(llvm::dbgs());
+  dump(llvm::dbgs());
 }
 
-void ConstraintGraph::printConnectedComponents(llvm::raw_ostream &out) {
+void ConstraintGraph::dump(llvm::raw_ostream &out) {
+  llvm::SaveAndRestore<bool>
+    debug(CS.getASTContext().LangOpts.DebugConstraintSolver, true);
+  print(CS.TypeVariables, out);
+}
+
+void ConstraintGraph::printConnectedComponents(
+    ArrayRef<TypeVariableType *> inTypeVars,
+    llvm::raw_ostream &out) {
   std::vector<TypeVariableType *> typeVars;
-  typeVars.insert(typeVars.end(), TypeVariables.begin(), TypeVariables.end());
+  typeVars.insert(typeVars.end(), inTypeVars.begin(), inTypeVars.end());
   std::vector<unsigned> components;
   unsigned numComponents = computeConnectedComponents(typeVars, components);
   for (unsigned component = 0; component != numComponents; ++component) {
@@ -823,7 +830,7 @@ void ConstraintGraph::printConnectedComponents(llvm::raw_ostream &out) {
 }
 
 void ConstraintGraph::dumpConnectedComponents() {
-  printConnectedComponents(llvm::dbgs());
+  printConnectedComponents(CS.TypeVariables, llvm::dbgs());
 }
 
 #pragma mark Verification of graph invariants
@@ -856,7 +863,7 @@ static void _require(bool condition, const Twine &complaint,
 
   // Print the graph.
   // FIXME: Highlight the offending node/constraint/etc.
-  cg.print(llvm::dbgs());
+  cg.dump(llvm::dbgs());
 
   abort();
 }

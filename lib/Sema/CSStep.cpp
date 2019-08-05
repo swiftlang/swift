@@ -123,10 +123,10 @@ void SplitterStep::computeFollowupSteps(
     CG.verify();
 
     log << "---Constraint graph---\n";
-    CG.print(log);
+    CG.print(CS.TypeVariables, log);
 
     log << "---Connected components---\n";
-    CG.printConnectedComponents(log);
+    CG.printConnectedComponents(CS.TypeVariables, log);
   }
 
   // Map type variables and constraints into appropriate steps.
