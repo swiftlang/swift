@@ -1657,39 +1657,6 @@ static bool isIntegerToStringIndexConversion(Type fromType, Type toType,
           toType->getCanonicalType().getString() == "String.CharacterView.Index");
 }
 
-static bool addTypeCoerceFixit(InFlightDiagnostic &diag, ConstraintSystem &CS,
-                               Type fromType, Type toType, Expr *expr) {
-  // Look through optional types; casts can add them, but can't remove extra
-  // ones.
-  bool bothOptional =
-      fromType->getOptionalObjectType() && toType->getOptionalObjectType();
-  if (bothOptional)
-    fromType = fromType->getOptionalObjectType();
-  toType = toType->lookThroughAllOptionalTypes();
-
-  if (!toType->hasTypeRepr())
-    return false;
-
-  CheckedCastKind Kind = CS.getTypeChecker().typeCheckCheckedCast(
-      fromType, toType, CheckedCastContextKind::None, CS.DC, SourceLoc(),
-      nullptr, SourceRange());
-  if (Kind != CheckedCastKind::Unresolved) {
-    SmallString<32> buffer;
-    llvm::raw_svector_ostream OS(buffer);
-    bool canUseAs = Kind == CheckedCastKind::Coercion ||
-      Kind == CheckedCastKind::BridgingCoercion;
-    if (bothOptional && canUseAs)
-      toType = OptionalType::get(toType);
-    toType->print(OS);
-    diag.fixItInsert(
-        Lexer::getLocForEndOfToken(CS.DC->getASTContext().SourceMgr,
-                                   expr->getEndLoc()),
-        (llvm::Twine(canUseAs ? " as " : " as! ") + OS.str()).str());
-    return true;
-  }
-  return false;
-}
-
 /// Try to diagnose common errors involving implicitly non-escaping parameters
 /// of function type, giving more specific and simpler diagnostics, attaching
 /// notes on the parameter, and offering fixits to insert @escaping. Returns
@@ -2041,27 +2008,7 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
                                      exprType, contextualType);
   diag.highlight(expr->getSourceRange());
 
-  if (failure.tryFixIts(diag))
-    return true;
-
-  // Attempt to add a fixit for the error.
-  switch (CTP) {
-  case CTP_CallArgument:
-  case CTP_ArrayElement:
-  case CTP_DictionaryKey:
-  case CTP_DictionaryValue:
-  case CTP_AssignSource:
-  case CTP_SubscriptAssignSource:
-  case CTP_Initialization:
-  case CTP_ReturnStmt:
-    addTypeCoerceFixit(diag, CS, exprType, contextualType, expr);
-    break;
-
-  default:
-    // FIXME: Other contextual conversions too?
-    break;
-  }
-
+  failure.tryFixIts(diag);
   return true;
 }
 

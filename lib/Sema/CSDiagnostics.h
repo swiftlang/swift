@@ -683,7 +683,7 @@ public:
   bool diagnoseConversionToBool() const;
 
   /// Attempt to attach any relevant fix-its to already produced diagnostic.
-  bool tryFixIts(InFlightDiagnostic &diagnostic) const;
+  void tryFixIts(InFlightDiagnostic &diagnostic) const;
 
   /// Attempts to add fix-its for these two mistakes:
   ///
@@ -719,6 +719,11 @@ protected:
   /// Try to add a fix-it when converting between a collection and its slice
   /// type, such as String <-> Substring or (eventually) Array <-> ArraySlice
   bool trySequenceSubsequenceFixIts(InFlightDiagnostic &diagnostic) const;
+
+  /// Try to add a fix-it that suggests to explicitly use `as` or `as!`
+  /// to coerce one type to another if type-checker can prove that such
+  /// conversion is possible.
+  bool tryTypeCoercionFixIt(InFlightDiagnostic &diagnostic) const;
 
 private:
   Type resolve(Type rawType) {

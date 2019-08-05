@@ -1876,20 +1876,21 @@ bool ContextualFailure::diagnoseAsError() {
   return true;
 }
 
-bool ContextualFailure::tryFixIts(InFlightDiagnostic &diagnostic) const {
+void ContextualFailure::tryFixIts(InFlightDiagnostic &diagnostic) const {
   if (trySequenceSubsequenceFixIts(diagnostic))
-    return true;
+    return;
 
   if (tryRawRepresentableFixIts(
           diagnostic, KnownProtocolKind::ExpressibleByIntegerLiteral) ||
       tryRawRepresentableFixIts(diagnostic,
                                 KnownProtocolKind::ExpressibleByStringLiteral))
-    return true;
+    return;
 
   if (tryIntegerCastFixIts(diagnostic))
-    return true;
+    return;
 
-  return false;
+  if (tryTypeCoercionFixIt(diagnostic))
+    return;
 }
 
 bool ContextualFailure::diagnoseMissingFunctionCall() const {
@@ -2145,6 +2146,47 @@ bool ContextualFailure::trySequenceSubsequenceFixIts(
       diagnostic.fixItInsertAfter(range.End, ")");
       return true;
     }
+  }
+
+  return false;
+}
+
+bool ContextualFailure::tryTypeCoercionFixIt(
+    InFlightDiagnostic &diagnostic) const {
+  auto fromType = getFromType();
+  auto toType = getToType();
+
+  // Look through optional types; casts can add them, but can't remove extra
+  // ones.
+  bool bothOptional =
+      fromType->getOptionalObjectType() && toType->getOptionalObjectType();
+  if (bothOptional)
+    fromType = fromType->getOptionalObjectType();
+  toType = toType->lookThroughAllOptionalTypes();
+
+  if (!toType->hasTypeRepr())
+    return false;
+
+  auto &TC = getTypeChecker();
+  CheckedCastKind Kind =
+      TC.typeCheckCheckedCast(fromType, toType, CheckedCastContextKind::None,
+                              getDC(), SourceLoc(), nullptr, SourceRange());
+
+  if (Kind != CheckedCastKind::Unresolved) {
+    auto *anchor = getAnchor();
+
+    SmallString<32> buffer;
+    llvm::raw_svector_ostream OS(buffer);
+    bool canUseAs = Kind == CheckedCastKind::Coercion ||
+                    Kind == CheckedCastKind::BridgingCoercion;
+    if (bothOptional && canUseAs)
+      toType = OptionalType::get(toType);
+    toType->print(OS);
+    diagnostic.fixItInsert(
+        Lexer::getLocForEndOfToken(getASTContext().SourceMgr,
+                                   anchor->getEndLoc()),
+        (llvm::Twine(canUseAs ? " as " : " as! ") + OS.str()).str());
+    return true;
   }
 
   return false;
