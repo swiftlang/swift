@@ -804,7 +804,6 @@ namespace {
                              std::move(WithNoPayload))
     {
       assert(ElementsWithPayload.empty());
-      assert(!ElementsWithNoPayload.empty());
     }
 
     bool needsPayloadSizeInMetadata() const override { return false; }
@@ -1164,7 +1163,6 @@ namespace {
                                       std::move(WithNoPayload))
     {
       assert(ElementsWithPayload.empty());
-      assert(!ElementsWithNoPayload.empty());
     }
 
     TypeInfo *completeEnumTypeLayout(TypeConverter &TC,

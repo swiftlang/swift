@@ -34,3 +34,5 @@ class Methods2 {
 public:
   int SimpleMethod(int);
 };
+
+enum __attribute__((enum_extensibility(open))) OpenEmptyEnum : char {};
