@@ -50,3 +50,12 @@ func basicMethodsConst(a: UnsafeMutablePointer<Methods>) -> Int32 {
 func basicMethodsStatic() -> Int32 {
   return Methods.SimpleStaticMethod(5)
 }
+
+// CHECK-LABEL: define hidden swiftcc i32 @"$s6cxx_ir12basicMethods1as5Int32VSpySo8Methods2VG_tF"(i8*)
+// CHECK: [[THIS_PTR1:%.*]] = bitcast i8* %0 to %TSo8Methods2V*
+// CHECK: [[THIS_PTR2:%.*]] = bitcast %TSo8Methods2V* [[THIS_PTR1]] to %class.Methods2*
+// CHECK: [[RESULT:%.*]] = call i32 @{{_ZN8Methods212SimpleMethodEi|"\?SimpleMethod@Methods2@@QEAAHH@Z"}}(%class.Methods2* [[THIS_PTR2]], i32 4)
+// CHECK: ret i32 [[RESULT]]
+func basicMethods(a: UnsafeMutablePointer<Methods2>) -> Int32 {
+  return a.pointee.SimpleMethod(4)
+}

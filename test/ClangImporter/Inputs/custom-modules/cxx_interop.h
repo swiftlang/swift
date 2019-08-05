@@ -29,3 +29,8 @@ class Methods {
 
   static int SimpleStaticMethod(int);
 };
+
+class Methods2 {
+public:
+  int SimpleMethod(int);
+};
