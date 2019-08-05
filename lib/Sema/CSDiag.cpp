@@ -1648,54 +1648,9 @@ bool FailureDiagnosis::diagnoseCalleeResultContextualConversionError() {
   }
 }
 
-
-/// Return true if the given type conforms to a known protocol type.
-static bool conformsToKnownProtocol(Type fromType, KnownProtocolKind kind,
-                                    const ConstraintSystem &CS) {
-  auto proto = CS.TC.getProtocol(SourceLoc(), kind);
-  if (!proto)
-    return false;
-
-  if (TypeChecker::conformsToProtocol(fromType, proto, CS.DC,
-                                      ConformanceCheckFlags::InExpression)) {
-    return true;
-  }
-
-  return false;
-}
-
-static bool isIntegerType(Type fromType, const ConstraintSystem &CS) {
-  return conformsToKnownProtocol(fromType,
-                                 KnownProtocolKind::ExpressibleByIntegerLiteral,
-                                 CS);
-}
-
-/// Return true if the given type conforms to RawRepresentable.
-static Type isRawRepresentable(Type fromType, const ConstraintSystem &CS) {
-  auto rawReprType =
-      CS.TC.getProtocol(SourceLoc(), KnownProtocolKind::RawRepresentable);
-  if (!rawReprType)
-    return Type();
-
-  auto conformance = TypeChecker::conformsToProtocol(
-      fromType, rawReprType, CS.DC, ConformanceCheckFlags::InExpression);
-  if (!conformance)
-    return Type();
-
-  Type rawTy = conformance->getTypeWitnessByName(
-      fromType, CS.getASTContext().Id_RawValue);
-  return rawTy;
-}
-
-/// Return true if the given type conforms to RawRepresentable, with an
-/// underlying type conforming to the given known protocol.
-static Type isRawRepresentable(Type fromType, KnownProtocolKind kind,
-                               const ConstraintSystem &CS) {
-  Type rawTy = isRawRepresentable(fromType, CS);
-  if (!rawTy || !conformsToKnownProtocol(rawTy, kind, CS))
-    return Type();
-
-  return rawTy;
+static bool isIntegerType(Type fromType, ConstraintSystem &CS) {
+  return conformsToKnownProtocol(CS, fromType,
+                                 KnownProtocolKind::ExpressibleByIntegerLiteral);
 }
 
 /// Return true if the conversion from fromType to toType is an invalid string
@@ -1703,14 +1658,12 @@ static Type isRawRepresentable(Type fromType, KnownProtocolKind kind,
 static bool isIntegerToStringIndexConversion(Type fromType, Type toType,
                                              ConstraintSystem &CS) {
   auto kind = KnownProtocolKind::ExpressibleByIntegerLiteral;
-  return (conformsToKnownProtocol(fromType, kind, CS) &&
+  return (conformsToKnownProtocol(CS, fromType, kind) &&
           toType->getCanonicalType().getString() == "String.CharacterView.Index");
 }
 
-static bool isOptionSetType(Type fromType, const ConstraintSystem &CS) {
-  return conformsToKnownProtocol(fromType,
-                                 KnownProtocolKind::OptionSet,
-                                 CS);
+static bool isOptionSetType(Type fromType, ConstraintSystem &CS) {
+  return conformsToKnownProtocol(CS, fromType, KnownProtocolKind::OptionSet);
 }
 
 /// Attempts to add fix-its for these two mistakes:
@@ -1727,7 +1680,7 @@ static bool isOptionSetType(Type fromType, const ConstraintSystem &CS) {
 ///
 /// This helps migration with SDK changes.
 static bool tryRawRepresentableFixIts(InFlightDiagnostic &diag,
-                                      const ConstraintSystem &CS, Type fromType,
+                                      ConstraintSystem &CS, Type fromType,
                                       Type toType, KnownProtocolKind kind,
                                       const Expr *expr) {
   // The following fixes apply for optional destination types as well.
@@ -1781,14 +1734,14 @@ static bool tryRawRepresentableFixIts(InFlightDiagnostic &diag,
     }
   };
 
-  if (conformsToKnownProtocol(fromType, kind, CS)) {
+  if (conformsToKnownProtocol(CS, fromType, kind)) {
     if (isOptionSetType(toType, CS) &&
         isa<IntegerLiteralExpr>(expr) &&
         cast<IntegerLiteralExpr>(expr)->getDigitsText() == "0") {
       diag.fixItReplace(expr->getSourceRange(), "[]");
       return true;
     }
-    if (auto rawTy = isRawRepresentable(toType, kind, CS)) {
+    if (auto rawTy = isRawRepresentable(CS, toType, kind)) {
       // Produce before/after strings like 'Result(rawValue: RawType(<expr>))'
       // or just 'Result(rawValue: <expr>)'.
       std::string convWrapBefore = toType.getString();
@@ -1815,8 +1768,8 @@ static bool tryRawRepresentableFixIts(InFlightDiagnostic &diag,
     }
   }
 
-  if (auto rawTy = isRawRepresentable(fromType, kind, CS)) {
-    if (conformsToKnownProtocol(toType, kind, CS)) {
+  if (auto rawTy = isRawRepresentable(CS, fromType, kind)) {
+    if (conformsToKnownProtocol(CS, toType, kind)) {
       std::string convWrapBefore;
       std::string convWrapAfter = ".rawValue";
       if (!CS.TC.isConvertibleTo(rawTy, toType, CS.DC)) {
@@ -3315,7 +3268,7 @@ diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI, Expr *fnExpr,
     AnyFunctionType::Param &arg = args[0];
     auto resTy =
         candidate.getResultType()->lookThroughAllOptionalTypes();
-    auto rawTy = isRawRepresentable(resTy, CCI.CS);
+    auto rawTy = isRawRepresentable(CCI.CS, resTy);
     if (rawTy && arg.getOldType() && resTy->isEqual(arg.getOldType())) {
       auto getInnerExpr = [](Expr *E) -> Expr * {
         auto *parenE = dyn_cast<ParenExpr>(E);
@@ -3361,14 +3314,14 @@ enum class RawRepresentableMismatch {
 static RawRepresentableMismatch
 checkRawRepresentableMismatch(Type fromType, Type toType,
                               KnownProtocolKind kind,
-                              const ConstraintSystem &CS) {
+                              ConstraintSystem &CS) {
   toType = toType->lookThroughAllOptionalTypes();
   fromType = fromType->lookThroughAllOptionalTypes();
 
   // First check if this is an attempt to convert from something to
   // raw representable.
-  if (conformsToKnownProtocol(fromType, kind, CS)) {
-    if (auto rawType = isRawRepresentable(toType, kind, CS)) {
+  if (conformsToKnownProtocol(CS, fromType, kind)) {
+    if (auto rawType = isRawRepresentable(CS, toType, kind)) {
       if (rawType->isEqual(fromType))
         return RawRepresentableMismatch::ExactMatch;
       return RawRepresentableMismatch::Convertible;
@@ -3377,8 +3330,8 @@ checkRawRepresentableMismatch(Type fromType, Type toType,
 
   // Otherwise, it might be an attempt to convert from raw representable
   // to its raw value.
-  if (auto rawType = isRawRepresentable(fromType, kind, CS)) {
-    if (conformsToKnownProtocol(toType, kind, CS)) {
+  if (auto rawType = isRawRepresentable(CS, fromType, kind)) {
+    if (conformsToKnownProtocol(CS, toType, kind)) {
       if (rawType->isEqual(toType))
         return RawRepresentableMismatch::ExactMatch;
       return RawRepresentableMismatch::Convertible;
@@ -3414,7 +3367,7 @@ static bool diagnoseRawRepresentableMismatch(CalleeCandidateInfo &CCI,
       KnownProtocolKind::ExpressibleByStringLiteral,
       KnownProtocolKind::ExpressibleByIntegerLiteral};
 
-  const auto &CS = CCI.CS;
+  auto &CS = CCI.CS;
   auto arguments = decomposeArgType(argType, argLabels);
 
   auto bestMatchKind = RawRepresentableMismatch::NotApplicable;
