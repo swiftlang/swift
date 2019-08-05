@@ -3637,8 +3637,8 @@ public:
 
     void checkSourceRanges(Decl *D) {
       PrettyStackTraceDecl debugStack("verifying ranges", D);
-
-      if (!D->getSourceRange().isValid()) {
+      const auto SR = D->getSourceRange();
+      if (!SR.isValid()) {
         // We don't care about source ranges on implicitly-generated
         // decls.
         if (D->isImplicit())
@@ -3649,8 +3649,16 @@ public:
         Out << "\n";
         abort();
       }
-      checkSourceRanges(D->getSourceRange(), Parent,
-                        [&]{ D->print(Out); });
+      // ASTScope lookup depends on Decls having correct ordering.
+      // Move the order check to isGoodSourceRange after extending
+      // the invariant to Exprs, etc., per rdar://53637494
+      if (Ctx.SourceMgr.isBeforeInBuffer(SR.End, SR.Start)) {
+        Out << "backwards source range for decl: ";
+        D->print(Out);
+        Out << "\n";
+        abort();
+      }
+      checkSourceRanges(SR, Parent, [&] { D->print(Out); });
     }
 
     /// Verify that the given source ranges is contained within the
