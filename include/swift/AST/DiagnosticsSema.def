@@ -42,7 +42,7 @@ NOTE(decl_declared_here,none,
 NOTE(kind_declared_here,none,
      "%0 declared here", (DescriptiveDeclKind))
 NOTE(implicit_member_declared_here,none,
-     "%1 '%0' is implicitly declared", (StringRef, StringRef))
+     "%1 `%0` is implicitly declared", (StringRef, StringRef))
 NOTE(extended_type_declared_here,none,
      "extended type declared here", ())
 NOTE(opaque_return_type_declared_here,none,
@@ -88,7 +88,7 @@ ERROR(could_not_find_type_member_corrected,none,
       (Type, DeclName, DeclName))
 
 ERROR(could_not_find_subscript_member_did_you_mean,none,
-      "value of type %0 has no property or method named 'subscript'; "
+      "value of type %0 has no property or method named `subscript`; "
       "did you mean to use the subscript operator?",
       (Type))
 
@@ -4534,7 +4534,7 @@ WARNING(property_wrapper_wrapperValue,none,
         "'projectedValue'; use of 'wrapperValue' is deprecated", ())
 WARNING(property_wrapper_init_initialValue,none,
         "property wrapper's `init(initialValue:)` should be renamed "
-        "to 'init(wrappedValue:)'; use of 'init(initialValue:)' is deprecated",
+        "to `init(wrappedValue:)`; use of `init(initialValue:)` is deprecated",
         ())
 ERROR(property_wrapper_projection_value_missing,none,
       "could not find projection value property %0", (Identifier))

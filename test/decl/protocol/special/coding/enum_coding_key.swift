@@ -50,8 +50,8 @@ class ClassKey : CodingKey { //expected-error {{type 'ClassKey' does not conform
 // Types which are valid for CodingKey derived conformance should not get that
 // derivation unless they explicitly conform to CodingKey.
 enum X          { case a }
-enum Y : String { case a } // expected-note {{property 'rawValue' is implicitly declared}}
-enum Z : Int    { case a } // expected-note {{property 'rawValue' is implicitly declared}}
+enum Y : String { case a } // expected-note {{property `rawValue` is implicitly declared}}
+enum Z : Int    { case a } // expected-note {{property `rawValue` is implicitly declared}}
 
 let _ = X.a.stringValue // expected-error {{value of type 'X' has no member 'stringValue'}}
 let _ = Y.a.stringValue // expected-error {{value of type 'Y' has no member 'stringValue'}}

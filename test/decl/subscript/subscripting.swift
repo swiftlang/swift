@@ -332,16 +332,16 @@ struct GenSubscriptFixitTest {
 func testGenSubscriptFixit(_ s0: GenSubscriptFixitTest) {
 
   _ = s0.subscript("hello")
-  // expected-error@-1 {{value of type 'GenSubscriptFixitTest' has no property or method named 'subscript'; did you mean to use the subscript operator?}} {{9-10=}} {{10-19=}} {{19-20=[}} {{27-28=]}}
+  // expected-error@-1 {{value of type 'GenSubscriptFixitTest' has no property or method named `subscript`; did you mean to use the subscript operator?}} {{9-10=}} {{10-19=}} {{19-20=[}} {{27-28=]}}
 }
 
 func testUnresolvedMemberSubscriptFixit(_ s0: GenSubscriptFixitTest) {
 
   _ = s0.subscript
-  // expected-error@-1 {{value of type 'GenSubscriptFixitTest' has no property or method named 'subscript'; did you mean to use the subscript operator?}} {{9-19=[<#index#>]}}
+  // expected-error@-1 {{value of type 'GenSubscriptFixitTest' has no property or method named `subscript`; did you mean to use the subscript operator?}} {{9-19=[<#index#>]}}
 
   s0.subscript = true
-  // expected-error@-1 {{value of type 'GenSubscriptFixitTest' has no property or method named 'subscript'; did you mean to use the subscript operator?}} {{5-15=[<#index#>]}}
+  // expected-error@-1 {{value of type 'GenSubscriptFixitTest' has no property or method named `subscript`; did you mean to use the subscript operator?}} {{5-15=[<#index#>]}}
 }
 
 struct SubscriptTest1 {
@@ -363,17 +363,17 @@ func testSubscript1(_ s1 : SubscriptTest1) {
   if s1["hello"] {}
 
   _ = s1.subscript((true, (5, SubClass())), "hello")
-  // expected-error@-1 {{value of type 'SubscriptTest1' has no property or method named 'subscript'; did you mean to use the subscript operator?}} {{9-10=}} {{10-19=}} {{19-20=[}} {{52-53=]}}
+  // expected-error@-1 {{value of type 'SubscriptTest1' has no property or method named `subscript`; did you mean to use the subscript operator?}} {{9-10=}} {{10-19=}} {{19-20=[}} {{52-53=]}}
   _ = s1.subscript((true, (5, baz: SubSubClass())), "hello")
-  // expected-error@-1 {{value of type 'SubscriptTest1' has no property or method named 'subscript'; did you mean to use the subscript operator?}} {{9-10=}} {{10-19=}} {{19-20=[}} {{60-61=]}}
+  // expected-error@-1 {{value of type 'SubscriptTest1' has no property or method named `subscript`; did you mean to use the subscript operator?}} {{9-10=}} {{10-19=}} {{19-20=[}} {{60-61=]}}
   _ = s1.subscript((fo: true, (5, baz: SubClass())), "hello")
   // expected-error@-1 {{cannot convert value of type '(fo: Bool, (Int, baz: SubClass))' to expected argument type '(foo: Bool, bar: (Int, baz: SubClass))'}}
   _ = s1.subscript(SubSubClass())
-  // expected-error@-1 {{value of type 'SubscriptTest1' has no property or method named 'subscript'; did you mean to use the subscript operator?}} {{9-10=}} {{10-19=}} {{19-20=[}} {{33-34=]}}
+  // expected-error@-1 {{value of type 'SubscriptTest1' has no property or method named `subscript`; did you mean to use the subscript operator?}} {{9-10=}} {{10-19=}} {{19-20=[}} {{33-34=]}}
   _ = s1.subscript(ClassConformingToProtocol())
-  // expected-error@-1 {{value of type 'SubscriptTest1' has no property or method named 'subscript'; did you mean to use the subscript operator?}} {{9-10=}} {{10-19=}} {{19-20=[}} {{47-48=]}}
+  // expected-error@-1 {{value of type 'SubscriptTest1' has no property or method named `subscript`; did you mean to use the subscript operator?}} {{9-10=}} {{10-19=}} {{19-20=[}} {{47-48=]}}
   _ = s1.subscript(ClassConformingToRefinedProtocol())
-  // expected-error@-1 {{value of type 'SubscriptTest1' has no property or method named 'subscript'; did you mean to use the subscript operator?}} {{9-10=}} {{10-19=}} {{19-20=[}} {{54-55=]}}
+  // expected-error@-1 {{value of type 'SubscriptTest1' has no property or method named `subscript`; did you mean to use the subscript operator?}} {{9-10=}} {{10-19=}} {{19-20=[}} {{54-55=]}}
   _ = s1.subscript(true)
   // expected-error@-1 {{cannot invoke 'subscript' with an argument list of type '(Bool)'}}
   // expected-note@-2 {{overloads for 'subscript' exist with these partially matching parameter lists: (Protocol), (String), (SubClass)}}
@@ -381,9 +381,9 @@ func testSubscript1(_ s1 : SubscriptTest1) {
   // expected-error@-1 {{cannot invoke 'subscript' with an argument list of type '(SuperClass)'}}
   // expected-note@-2 {{overloads for 'subscript' exist with these partially matching parameter lists: (Protocol), (String), (SubClass)}}
   _ = s1.subscript("hello")
-  // expected-error@-1 {{value of type 'SubscriptTest1' has no property or method named 'subscript'; did you mean to use the subscript operator?}}
+  // expected-error@-1 {{value of type 'SubscriptTest1' has no property or method named `subscript`; did you mean to use the subscript operator?}}
   _ = s1.subscript("hello"
-  // expected-error@-1 {{value of type 'SubscriptTest1' has no property or method named 'subscript'; did you mean to use the subscript operator?}}
+  // expected-error@-1 {{value of type 'SubscriptTest1' has no property or method named `subscript`; did you mean to use the subscript operator?}}
   // expected-note@-2 {{to match this opening '('}}
 
   let _ = s1["hello"]
@@ -405,7 +405,7 @@ func testSubscript1(_ s2 : SubscriptTest2) {
   // expected-note @-1 {{overloads for 'subscript' exist with these partially matching parameter lists: (String, Int), (String, String)}}
 
   _ = s2.subscript("hello", 6)
-  // expected-error@-1 {{value of type 'SubscriptTest2' has no property or method named 'subscript'; did you mean to use the subscript operator?}} {{9-10=}} {{10-19=}} {{19-20=[}} {{30-31=]}}
+  // expected-error@-1 {{value of type 'SubscriptTest2' has no property or method named `subscript`; did you mean to use the subscript operator?}} {{9-10=}} {{10-19=}} {{19-20=[}} {{30-31=]}}
   let b = s2[1, "foo"] // expected-error {{cannot convert value of type 'Int' to expected argument type 'String'}}
 
   // rdar://problem/27449208
@@ -443,7 +443,7 @@ struct SR2575 {
 }
 
 SR2575().subscript()
-// expected-error@-1 {{value of type 'SR2575' has no property or method named 'subscript'; did you mean to use the subscript operator?}} {{9-10=}} {{10-19=}} {{19-20=[}} {{20-21=]}}
+// expected-error@-1 {{value of type 'SR2575' has no property or method named `subscript`; did you mean to use the subscript operator?}} {{9-10=}} {{10-19=}} {{19-20=[}} {{20-21=]}}
 
 // SR-7890
 

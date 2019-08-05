@@ -310,7 +310,7 @@ enum E21269142 {  // expected-note {{did you mean to specify a raw type on the e
 print(E21269142.Foo.rawValue)  // expected-error {{value of type 'E21269142' has no member 'rawValue'}}
 
 // Check that typo correction does something sensible with synthesized members.
-enum SyntheticMember { // expected-note {{property 'hashValue' is implicitly declared}}
+enum SyntheticMember { // expected-note {{property `hashValue` is implicitly declared}}
   case Foo
 }
 
