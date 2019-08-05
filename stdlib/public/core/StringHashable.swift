@@ -12,7 +12,7 @@
 
 import SwiftShims
 
-extension String : Hashable {
+extension String: Hashable {
   /// Hashes the essential components of this value by feeding them into the
   /// given hasher.
   ///

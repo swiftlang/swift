@@ -80,7 +80,8 @@ static ValueDecl *getProtocolRequirement(ProtocolDecl *proto, DeclName name) {
 }
 
 // Synthesize body for `_unpackTensorHandles(into:)`.
-static void deriveBodyTensorArrayProtocol_unpackTensorHandles(
+static std::pair<BraceStmt *, bool>
+deriveBodyTensorArrayProtocol_unpackTensorHandles(
     AbstractFunctionDecl *funcDecl, void *) {
   auto *parentDC = funcDecl->getParent();
   auto *nominal = parentDC->getSelfNominalTypeDecl();
@@ -103,7 +104,7 @@ static void deriveBodyTensorArrayProtocol_unpackTensorHandles(
 
   // Create an `if var` statement for the current address.
   VarDecl *currAddressDecl = new (C) VarDecl(
-      /*IsStatic*/ false, VarDecl::Specifier::Var, /*IsCaptureList*/ false,
+      /*IsStatic*/ false, VarDecl::Introducer::Var, /*IsCaptureList*/ false,
       SourceLoc(), C.getIdentifier("currentAddress"), funcDecl);
   currAddressDecl->setImplicit();
   currAddressDecl->setHasNonPatternBindingInit(true);
@@ -211,8 +212,9 @@ auto *intInitCallExpr = CallExpr::createImplicit(
              /*Cond*/ C.AllocateCopy(cond), /*Then*/ thenBody,
              /*ElseLoc*/ SourceLoc(), /*Else*/ nullptr, /*implicit*/ true);
 
-  funcDecl->setBody(BraceStmt::create(C, SourceLoc(), {ifStmt}, SourceLoc(),
-                                      /*implicit*/ true));
+  auto *braceStmt = BraceStmt::create(C, SourceLoc(), {ifStmt}, SourceLoc(),
+                                      /*implicit*/ true);
+  return std::pair<BraceStmt *, bool>(braceStmt, false);
 }
 
 // Synthesize function declaration for a `TensorArrayProtocol`
@@ -226,7 +228,7 @@ static ValueDecl *deriveTensorArrayProtocol_method(
   auto parentDC = derived.getConformanceContext();
 
   auto *param =
-      new (C) ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+      new (C) ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(),
                         argumentName, SourceLoc(), parameterName, parentDC);
   param->setInterfaceType(parameterType);
   ParameterList *params = ParameterList::create(C, {param});
@@ -272,8 +274,9 @@ static ValueDecl
 }
 
 /// Derive the body for the '_tensorHandleCount' getter.
-static void deriveBodyTensorArrayProtocol_tensorHandleCount(
-    AbstractFunctionDecl *funcDecl, void *) {
+static std::pair<BraceStmt *, bool>
+deriveBodyTensorArrayProtocol_tensorHandleCount(AbstractFunctionDecl *funcDecl,
+                                                void *) {
   auto *nominal = funcDecl->getDeclContext()->getSelfNominalTypeDecl();
   auto &C = nominal->getASTContext();
 
@@ -319,8 +322,9 @@ static void deriveBodyTensorArrayProtocol_tensorHandleCount(
   auto *returnStmt = new (C) ReturnStmt(SourceLoc(), tensorHandleCountExpr);
   auto *body = BraceStmt::create(C, SourceLoc(), {returnStmt}, SourceLoc(),
                                  /*Implicit*/ true);
-  funcDecl->setBody(BraceStmt::create(C, SourceLoc(), {body}, SourceLoc(),
-                                      /*Implicit*/ true));
+  auto *braceStmt = BraceStmt::create(C, SourceLoc(), {body}, SourceLoc(),
+                                      /*Implicit*/ true);
+  return std::pair<BraceStmt *, bool>(braceStmt, false);
 }
 
 /// Derive a `_tensorHandleCount` implementation.
@@ -347,12 +351,10 @@ static ValueDecl *deriveTensorArrayProtocol_tensorHandleCount(
       new (C) InlinableAttr(/*implicit*/ true));
 
   // Create `_tensorHandleCount` getter.
-  auto *getterDecl = derived.declareDerivedPropertyGetter(
+  auto *getterDecl = derived.addGetterToReadOnlyDerivedProperty(
     tensorHandleCountDecl, returnType);
   getterDecl->setBodySynthesizer(
     deriveBodyTensorArrayProtocol_tensorHandleCount, nullptr);
-  tensorHandleCountDecl->setAccessors(StorageImplInfo::getImmutableComputed(),
-                                      SourceLoc(), {getterDecl}, SourceLoc());
   derived.addMembersToConformanceContext(
     {getterDecl, tensorHandleCountDecl, patDecl});
 
@@ -360,7 +362,7 @@ static ValueDecl *deriveTensorArrayProtocol_tensorHandleCount(
 }
 
 /// Derive the body for the '_typeList' getter.
-static void
+static std::pair<BraceStmt *, bool>
 deriveBodyTensorArrayProtocol_typeList(AbstractFunctionDecl *funcDecl, void *) {
   auto *parentDC = funcDecl->getParent();
   auto *nominal = funcDecl->getDeclContext()->getSelfNominalTypeDecl();
@@ -402,8 +404,9 @@ deriveBodyTensorArrayProtocol_typeList(AbstractFunctionDecl *funcDecl, void *) {
   auto *returnStmt = new (C) ReturnStmt(SourceLoc(), typeListExpr);
   auto *body = BraceStmt::create(C, SourceLoc(), {returnStmt}, SourceLoc(),
                                  /*Implicit*/ true);
-  funcDecl->setBody(BraceStmt::create(C, SourceLoc(), {body}, SourceLoc(),
-                                      /*Implicit*/ true));
+  auto *braceStmt = BraceStmt::create(C, SourceLoc(), {body}, SourceLoc(),
+                                      /*Implicit*/ true);
+  return std::pair<BraceStmt *, bool>(braceStmt, false);
 }
 
 /// Derive a `_typeList` implementation.
@@ -431,19 +434,17 @@ static ValueDecl *deriveTensorArrayProtocol_typeList(
     typeListDecl->getAttrs().add(new (C) InlinableAttr(/*implicit*/ true));
 
   // Create `_typeList` getter.
-  auto *getterDecl = derived.declareDerivedPropertyGetter(
+  auto *getterDecl = derived.addGetterToReadOnlyDerivedProperty(
       typeListDecl, returnType);
   getterDecl->setBodySynthesizer(
       deriveBodyTensorArrayProtocol_typeList, nullptr);
-  typeListDecl->setAccessors(StorageImplInfo::getImmutableComputed(),
-                             SourceLoc(), {getterDecl}, SourceLoc());
   derived.addMembersToConformanceContext({getterDecl, typeListDecl, patDecl});
 
   return typeListDecl;
 }
 
 // Synthesize body for `init(_owning:count:)`.
-static void
+static std::pair<BraceStmt *, bool>
 deriveBodyTensorArrayProtocol_init(AbstractFunctionDecl *funcDecl, void *) {
   auto *parentDC = funcDecl->getParent();
   auto *nominal = parentDC->getSelfNominalTypeDecl();
@@ -467,7 +468,7 @@ deriveBodyTensorArrayProtocol_init(AbstractFunctionDecl *funcDecl, void *) {
 
   // Create an `if var` statement for the current address.
   VarDecl *currAddressDecl = new (C) VarDecl(
-      /*IsStatic*/ false, VarDecl::Specifier::Var, /*IsCaptureList*/ false,
+      /*IsStatic*/ false, VarDecl::Introducer::Var, /*IsCaptureList*/ false,
       SourceLoc(), C.getIdentifier("currentAddress"), funcDecl);
   currAddressDecl->setImplicit();
   currAddressDecl->setHasNonPatternBindingInit(true);
@@ -605,8 +606,9 @@ deriveBodyTensorArrayProtocol_init(AbstractFunctionDecl *funcDecl, void *) {
              /*Cond*/ C.AllocateCopy(cond), /*Then*/ thenBody,
              /*ElseLoc*/ SourceLoc(), /*Else*/ elseBody, /*implicit*/ true);
 
-  funcDecl->setBody(BraceStmt::create(C, SourceLoc(), {ifStmt}, SourceLoc(),
-                                      /*implicit*/ true));
+  auto *braceStmt = BraceStmt::create(C, SourceLoc(), {ifStmt}, SourceLoc(),
+                                      /*implicit*/ true);
+  return std::pair<BraceStmt *, bool>(braceStmt, false);
 }
 
 // Synthesize the `init(_owning:count:)` function declaration.
@@ -625,12 +627,12 @@ static ValueDecl
   Type intType = C.getIntDecl()->getDeclaredType();
 
   auto *param1 = new (C) ParamDecl(
-      VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+      ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(),
       C.getIdentifier("_owning"), SourceLoc(), C.getIdentifier("tensorHandles"),
       parentDC);
   param1->setInterfaceType(addressType);
   auto *param2 = new (C) ParamDecl(
-      VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+      ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(),
       C.getIdentifier("count"), SourceLoc(), C.getIdentifier("count"),
       parentDC);
   param2->setInterfaceType(intType);

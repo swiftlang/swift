@@ -308,6 +308,46 @@ class TestPerformanceTestResult(unittest.TestCase):
 1,,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1"""
         map(validatePTR, delta_encoded_quantiles.split('\n')[1:])
 
+    def test_init_meta(self):
+        # #,TEST,SAMPLES,MIN(μs),MAX(μs),MEAN(μs),SD(μs),MEDIAN(μs),…
+        # …PAGES,ICS,YIELD
+        log = '1,Ackermann,200,715,1281,726,47,715,7,29,15'
+        r = PerformanceTestResult(log.split(','), meta=True)
+        self.assertEqual((r.test_num, r.name), ('1', 'Ackermann'))
+        self.assertEqual(
+            (r.num_samples, r.min, r.max, r.mean, r.sd, r.median),
+            (200, 715, 1281, 726, 47, 715))
+        self.assertEqual((r.mem_pages, r.involuntary_cs, r.yield_count),
+                         (7, 29, 15))
+        # #,TEST,SAMPLES,MIN(μs),MAX(μs),MEAN(μs),SD(μs),MEDIAN(μs),MAX_RSS(B),…
+        # …PAGES,ICS,YIELD
+        log = '1,Ackermann,200,715,1951,734,97,715,36864,9,50,15'
+        r = PerformanceTestResult(log.split(','), memory=True, meta=True)
+        self.assertEqual(
+            (r.num_samples, r.min, r.max, r.mean, r.sd, r.median),
+            (200, 715, 1951, 734, 97, 715))
+        self.assertEqual(
+            (r.mem_pages, r.involuntary_cs, r.yield_count, r.max_rss),
+            (9, 50, 15, 36864))
+        # #,TEST,SAMPLES,MIN(μs),MAX(μs),PAGES,ICS,YIELD
+        log = '1,Ackermann,200,715,3548,8,31,15'
+        r = PerformanceTestResult(log.split(','), quantiles=True, meta=True)
+        self.assertEqual((r.num_samples, r.min, r.max), (200, 715, 3548))
+        self.assertEqual((r.samples.count, r.samples.min, r.samples.max),
+                         (2, 715, 3548))
+        self.assertEqual((r.mem_pages, r.involuntary_cs, r.yield_count),
+                         (8, 31, 15))
+        # #,TEST,SAMPLES,MIN(μs),MAX(μs),MAX_RSS(B),PAGES,ICS,YIELD
+        log = '1,Ackermann,200,715,1259,32768,8,28,15'
+        r = PerformanceTestResult(
+            log.split(','), quantiles=True, memory=True, meta=True)
+        self.assertEqual((r.num_samples, r.min, r.max), (200, 715, 1259))
+        self.assertEqual((r.samples.count, r.samples.min, r.samples.max),
+                         (2, 715, 1259))
+        self.assertEquals(r.max_rss, 32768)
+        self.assertEqual((r.mem_pages, r.involuntary_cs, r.yield_count),
+                         (8, 28, 15))
+
     def test_repr(self):
         log_line = '1,AngryPhonebook,20,10664,12933,11035,576,10884'
         r = PerformanceTestResult(log_line.split(','))
@@ -516,6 +556,33 @@ Total performance tests executed: 1
             (r.num_samples, r.min, r.max, r.samples.count),
             # last 3 ventiles were outliers and were excluded from the sample
             (200, 214, 215, 18))
+
+    def test_parse_meta(self):
+        r = LogParser.results_from_string(
+            '#,TEST,SAMPLES,MIN(μs),MAX(μs),MEAN(μs),SD(μs),MEDIAN(μs),' +
+            'PAGES,ICS,YIELD\n' +
+            '0,B,1,2,2,2,0,2,7,29,15')['B']
+        self.assertEqual(
+            (r.min, r.mem_pages, r.involuntary_cs, r.yield_count),
+            (2, 7, 29, 15))
+        r = LogParser.results_from_string(
+            '#,TEST,SAMPLES,MIN(μs),MAX(μs),MEAN(μs),SD(μs),MEDIAN(μs),' +
+            'MAX_RSS(B),PAGES,ICS,YIELD\n' +
+            '0,B,1,3,3,3,0,3,36864,9,50,15')['B']
+        self.assertEqual(
+            (r.min, r.mem_pages, r.involuntary_cs, r.yield_count, r.max_rss),
+            (3, 9, 50, 15, 36864))
+        r = LogParser.results_from_string(
+            '#,TEST,SAMPLES,MIN(μs),MAX(μs),PAGES,ICS,YIELD\n' +
+            '0,B,1,4,4,8,31,15')['B']
+        self.assertEqual((r.min, r.mem_pages, r.involuntary_cs, r.yield_count),
+                         (4, 8, 31, 15))
+        r = LogParser.results_from_string(
+            '#,TEST,SAMPLES,MIN(μs),MAX(μs),MAX_RSS(B),PAGES,ICS,YIELD\n' +
+            '0,B,1,5,5,32768,8,28,15')['B']
+        self.assertEqual(
+            (r.min, r.mem_pages, r.involuntary_cs, r.yield_count, r.max_rss),
+            (5, 8, 28, 15, 32768))
 
     def test_parse_results_verbose(self):
         """Parse multiple performance test results with 2 sample formats:

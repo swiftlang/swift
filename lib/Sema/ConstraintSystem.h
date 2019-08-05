@@ -886,9 +886,6 @@ struct MemberLookupResult {
   
   /// This enum tracks reasons why a candidate is not viable.
   enum UnviableReason {
-    /// Argument labels don't match.
-    UR_LabelMismatch,
-
     /// This uses a type like Self in its signature that cannot be used on an
     /// existential box.
     UR_UnavailableInExistential,
@@ -2266,7 +2263,12 @@ public:
       if (auto *decl = dyn_cast<VarDecl>(resolvedOverload->Choice.getDecl())) {
         if (decl->hasAttachedPropertyWrapper()) {
           if (auto storageWrapper = decl->getPropertyWrapperStorageWrapper()) {
-            return std::make_pair(decl, storageWrapper->getType());
+            Type type = storageWrapper->getInterfaceType();
+            if (Type baseType = resolvedOverload->Choice.getBaseType()) {
+              type = baseType->getTypeOfMember(DC->getParentModule(),
+                                               storageWrapper, type);
+            }
+            return std::make_pair(decl, type);
           }
         }
       }
@@ -2283,6 +2285,10 @@ public:
       if (auto *decl = dyn_cast<VarDecl>(resolvedOverload->Choice.getDecl())) {
         if (decl->hasAttachedPropertyWrapper()) {
           auto wrapperTy = decl->getPropertyWrapperBackingPropertyType();
+          if (Type baseType = resolvedOverload->Choice.getBaseType()) {
+            wrapperTy = baseType->getTypeOfMember(DC->getParentModule(),
+                                                  decl, wrapperTy);
+          }
           return std::make_pair(decl, wrapperTy);
         }
       }
@@ -2299,7 +2305,12 @@ public:
     if (resolvedOverload->Choice.isDecl()) {
       if (auto *decl = dyn_cast<VarDecl>(resolvedOverload->Choice.getDecl())) {
         if (auto wrapped = decl->getOriginalWrappedProperty()) {
-          return std::make_pair(decl, wrapped->getType());
+          Type type = wrapped->getInterfaceType();
+          if (Type baseType = resolvedOverload->Choice.getBaseType()) {
+            type = baseType->getTypeOfMember(DC->getParentModule(),
+                                             wrapped, type);
+          }
+          return std::make_pair(decl, type);
         }
       }
     }
@@ -2583,15 +2594,11 @@ public:
   /// (as the function parameters) and the expected result type of the
   /// call.
   ///
-  /// \param argumentLabels The argument labels provided at the call site,
-  /// if known.
-  ///
   /// \returns \c fnType, or some simplified form of it if this function
   /// was able to find a single overload or derive some common structure
   /// among the overloads.
   Type simplifyAppliedOverloads(TypeVariableType *fnTypeVar,
                                 const FunctionType *argFnType,
-                                Optional<ArgumentLabelState> argumentLabels,
                                 ConstraintLocatorBuilder locator);
 
   /// Retrieve the type that will be used when matching the given overload.
@@ -3850,20 +3857,13 @@ matchCallArguments(ConstraintSystem &cs,
 /// subscript, etc.), find the underlying target expression.
 Expr *getArgumentLabelTargetExpr(Expr *fn);
 
-/// Returns true if a reference to a member on a given base type will apply its
-/// curried self parameter, assuming it has one.
+/// Returns true if a reference to a member on a given base type will apply
+/// its curried self parameter, assuming it has one.
 ///
-/// This is true for most member references, however isn't true for things like
-/// an instance member being referenced on a metatype, where the curried self
-/// parameter remains unapplied.
+/// This is true for most member references, however isn't true for things
+/// like an instance member being referenced on a metatype, where the
+/// curried self parameter remains unapplied.
 bool doesMemberRefApplyCurriedSelf(Type baseTy, const ValueDecl *decl);
-
-/// Attempt to prove that arguments with the given labels at the
-/// given parameter depth cannot be used with the given value.
-/// If this cannot be proven, conservatively returns true.
-bool areConservativelyCompatibleArgumentLabels(OverloadChoice choice,
-                                               ArrayRef<Identifier> labels,
-                                               bool hasTrailingClosure);
 
 /// Simplify the given locator by zeroing in on the most specific
 /// subexpression described by the locator.

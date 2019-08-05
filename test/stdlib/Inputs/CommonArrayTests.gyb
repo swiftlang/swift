@@ -572,7 +572,7 @@ ${Suite}.test("${ArrayType}/init(unsafeUninitializedCapacity:...:)/validCount") 
 }
 
 ${Suite}.test("${ArrayType}/init(unsafeUninitializedCapacity:...:)/reassignBuffer") {
-  guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else {
+  guard #available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, *) else {
     // When back-deployed to 5.0, this coding error does not get detected.
     return
   }

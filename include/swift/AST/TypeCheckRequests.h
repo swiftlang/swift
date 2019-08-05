@@ -29,8 +29,10 @@
 
 namespace swift {
 
+class AbstractStorageDecl;
 class GenericParamList;
 struct PropertyWrapperBackingPropertyInfo;
+struct PropertyWrapperMutability;
 class RequirementRepr;
 class SpecializeAttr;
 class TypeAliasDecl;
@@ -71,9 +73,8 @@ private:
            TypeResolutionStage stage) const;
 
 public:
-  // Cycle handling
-  void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
+  // Source location
+  SourceLoc getNearestLoc() const;
 
   // Caching
   bool isCached() const;
@@ -100,7 +101,6 @@ private:
 public:
   // Cycle handling
   void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
 
   // Separate caching.
   bool isCached() const;
@@ -127,7 +127,6 @@ private:
 public:
   // Cycle handling
   void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
 
   // Separate caching.
   bool isCached() const;
@@ -152,10 +151,6 @@ private:
   evaluate(Evaluator &evaluator, ValueDecl *decl) const;
 
 public:
-  // Cycle handling
-  void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
-
   // Separate caching.
   bool isCached() const { return true; }
   Optional<llvm::TinyPtrVector<ValueDecl *>> getCachedResult() const;
@@ -177,7 +172,80 @@ private:
   llvm::Expected<bool> evaluate(Evaluator &evaluator, ValueDecl *decl) const;
 
 public:
-  // Cycle handling
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<bool> getCachedResult() const;
+  void cacheResult(bool value) const;
+};
+
+/// Determine whether the given protocol declaration is class-bounded.
+class ProtocolRequiresClassRequest:
+    public SimpleRequest<ProtocolRequiresClassRequest,
+                         bool(ProtocolDecl *),
+                         CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool> evaluate(Evaluator &evaluator, ProtocolDecl *decl) const;
+
+public:
+  // Cycle handling.
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<bool> getCachedResult() const;
+  void cacheResult(bool value) const;
+};
+
+/// Determine whether an existential conforming to a protocol can be matched
+/// with a generic type parameter constrained to that protocol.
+class ExistentialConformsToSelfRequest:
+    public SimpleRequest<ExistentialConformsToSelfRequest,
+                         bool(ProtocolDecl *),
+                         CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool> evaluate(Evaluator &evaluator, ProtocolDecl *decl) const;
+
+public:
+  // Cycle handling.
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<bool> getCachedResult() const;
+  void cacheResult(bool value) const;
+};
+
+/// Determine whether we are allowed to refer to an existential type conforming
+/// to this protocol.
+class ExistentialTypeSupportedRequest:
+    public SimpleRequest<ExistentialTypeSupportedRequest,
+                         bool(ProtocolDecl *),
+                         CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool> evaluate(Evaluator &evaluator, ProtocolDecl *decl) const;
+
+public:
+  // Cycle handling.
   void diagnoseCycle(DiagnosticEngine &diags) const;
   void noteCycleStep(DiagnosticEngine &diags) const;
 
@@ -202,10 +270,6 @@ private:
   llvm::Expected<bool> evaluate(Evaluator &evaluator, ValueDecl *decl) const;
 
 public:
-  // Cycle handling
-  void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
-
   // Separate caching.
   bool isCached() const { return true; }
   Optional<bool> getCachedResult() const;
@@ -227,10 +291,6 @@ private:
   llvm::Expected<bool> evaluate(Evaluator &evaluator, ValueDecl *decl) const;
 
 public:
-  // Cycle handling
-  void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
-
   // Separate caching.
   bool isCached() const { return true; }
   Optional<bool> getCachedResult() const;
@@ -252,10 +312,6 @@ private:
   llvm::Expected<ArrayRef<Requirement>> evaluate(Evaluator &evaluator, ProtocolDecl *proto) const;
 
 public:
-  // Cycle handling
-  void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
-
   // Separate caching.
   bool isCached() const { return true; }
   Optional<ArrayRef<Requirement>> getCachedResult() const;
@@ -277,10 +333,6 @@ private:
   llvm::Expected<Type> evaluate(Evaluator &evaluator, AssociatedTypeDecl *decl) const;
 
 public:
-  // Cycle handling
-  void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
-
   // Caching.
   bool isCached() const { return true; }
 };
@@ -364,9 +416,8 @@ private:
                                        TypeResolutionStage stage) const;
 
 public:
-  // Cycle handling
-  void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
+  // Source location
+  SourceLoc getNearestLoc() const;
 
   // Separate caching.
   bool isCached() const;
@@ -390,10 +441,6 @@ private:
   llvm::Expected<std::string> evaluate(Evaluator &eval, const ValueDecl *d) const;
 
 public:
-  // Cycle handling
-  void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
-
   // Caching
   bool isCached() const { return true; }
 };
@@ -414,10 +461,6 @@ private:
   llvm::Expected<std::string> evaluate(Evaluator &eval, const TypeDecl *d) const;
 
 public:
-  // Cycle handling
-  void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
-
   // Caching
   bool isCached() const { return true; }
 };
@@ -441,10 +484,6 @@ private:
                                 const DeclContext *) const;
 
 public:
-  // Cycle handling
-  void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
-
   // Caching
   bool isCached() const { return true; }
   Optional<Type> getCachedResult() const;
@@ -483,10 +522,6 @@ private:
 public:
   // Caching
   bool isCached() const;
-
-  // Cycle handling
-  void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
 };
 
 /// Request the nominal type declaration to which the given custom attribute
@@ -508,10 +543,6 @@ private:
 public:
   // Caching
   bool isCached() const;
-
-  // Cycle handling
-  void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
 };
 
 /// Request the raw (possibly unbound generic) type of the property wrapper
@@ -533,10 +564,6 @@ private:
 public:
   // Caching
   bool isCached() const;
-
-  // Cycle handling
-  void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
 };
 
 /// Request the nominal type declaration to which the given custom attribute
@@ -558,10 +585,26 @@ private:
 public:
   // Caching
   bool isCached() const;
+};
 
-  // Cycle handling
-  void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
+/// Request information about the mutability of composed property wrappers.
+class PropertyWrapperMutabilityRequest :
+    public SimpleRequest<PropertyWrapperMutabilityRequest,
+                         Optional<PropertyWrapperMutability> (VarDecl *),
+                         CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<Optional<PropertyWrapperMutability>>
+  evaluate(Evaluator &evaluator, VarDecl *var) const;
+
+public:
+  // Caching
+  bool isCached() const;
 };
 
 /// Request information about the backing property for properties that have
@@ -583,10 +626,6 @@ private:
 public:
   // Caching
   bool isCached() const;
-
-  // Cycle handling
-  void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
 };
 
 /// Retrieve the structural type of an alias type.
@@ -604,10 +643,6 @@ private:
   llvm::Expected<Type> evaluate(Evaluator &eval, TypeAliasDecl *d) const;
 
 public:
-  // Cycle handling.
-  void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
-
   // Caching.
   bool isCached() const { return true; }
 };
@@ -631,10 +666,6 @@ private:
 public:
   // Caching
   bool isCached() const;
-
-  // Cycle handling
-  void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
 };
 
 /// Request the function builder type attached to the given declaration,
@@ -655,10 +686,6 @@ private:
 public:
   // Caching
   bool isCached() const { return true; }
-
-  // Cycle handling
-  void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
 };
 
 /// Request a function's self access kind.
@@ -677,10 +704,6 @@ private:
   evaluate(Evaluator &evaluator, FuncDecl *func) const;
 
 public:
-  // Cycle handling
-  void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
-
   // Separate caching.
   bool isCached() const { return true; }
   Optional<SelfAccessKind> getCachedResult() const;
@@ -703,10 +726,6 @@ private:
   evaluate(Evaluator &evaluator, AbstractStorageDecl *func) const;
 
 public:
-  // Cycle handling
-  void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
-
   // Separate caching.
   bool isCached() const { return true; }
   Optional<bool> getCachedResult() const;
@@ -729,10 +748,6 @@ private:
   evaluate(Evaluator &evaluator, AbstractStorageDecl *func) const;
 
 public:
-  // Cycle handling
-  void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
-
   // Separate caching.
   bool isCached() const { return true; }
   Optional<bool> getCachedResult() const;
@@ -755,10 +770,6 @@ private:
   evaluate(Evaluator &evaluator, AbstractStorageDecl *storage) const;
 
 public:
-  // Cycle handling
-  void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
-
   // Separate caching.
   bool isCached() const { return true; }
   Optional<OpaqueReadOwnership> getCachedResult() const;
@@ -781,11 +792,98 @@ private:
   evaluate(Evaluator &evaluator, VarDecl *lazyVar) const;
 
 public:
-  // Cycle handling
-  void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
-
   bool isCached() const { return true; }
+};
+
+/// Request to type check the body of the given function up to the given
+/// source location.
+///
+/// Produces true if an error occurred, false otherwise.
+/// FIXME: it would be far better to return the type-checked body.
+class TypeCheckFunctionBodyUntilRequest :
+    public SimpleRequest<TypeCheckFunctionBodyUntilRequest,
+                         bool(AbstractFunctionDecl *, SourceLoc),
+                         CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool>
+  evaluate(Evaluator &evaluator, AbstractFunctionDecl *func,
+           SourceLoc endTypeCheckLoc) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+/// Request to obtain a list of stored properties in a nominal type.
+///
+/// This will include backing storage for lazy properties and
+/// property wrappers, synthesizing them if necessary.
+class StoredPropertiesRequest :
+    public SimpleRequest<StoredPropertiesRequest,
+                         ArrayRef<VarDecl *>(NominalTypeDecl *),
+                         CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<ArrayRef<VarDecl *>>
+  evaluate(Evaluator &evaluator, NominalTypeDecl *decl) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+/// Request to obtain a list of stored properties in a nominal type,
+/// together with any missing members corresponding to stored
+/// properties that could not be deserialized.
+///
+/// This will include backing storage for lazy properties and
+/// property wrappers, synthesizing them if necessary.
+class StoredPropertiesAndMissingMembersRequest :
+    public SimpleRequest<StoredPropertiesAndMissingMembersRequest,
+                         ArrayRef<Decl *>(NominalTypeDecl *),
+                         CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<ArrayRef<Decl *>>
+  evaluate(Evaluator &evaluator, NominalTypeDecl *decl) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+class StorageImplInfoRequest :
+    public SimpleRequest<StorageImplInfoRequest,
+                         StorageImplInfo(AbstractStorageDecl *),
+                         CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<StorageImplInfo>
+  evaluate(Evaluator &evaluator, AbstractStorageDecl *decl) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<StorageImplInfo> getCachedResult() const;
+  void cacheResult(StorageImplInfo value) const;
 };
 
 // Allow AnyValue to compare two Type values, even though Type doesn't

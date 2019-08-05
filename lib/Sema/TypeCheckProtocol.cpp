@@ -3786,7 +3786,8 @@ void ConformanceChecker::resolveValueWitnesses() {
 
       // Make sure that we finalize the witness, so we can emit this
       // witness table.
-      TC.DeclsToFinalize.insert(witness);
+      if (isa<AbstractStorageDecl>(witness))
+        TC.DeclsToFinalize.insert(witness);
 
       // Objective-C checking for @objc requirements.
       if (requirement->isObjC() &&
@@ -5594,16 +5595,4 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
     proto->setDefaultAssociatedConformanceWitness(
         req.getFirstType()->getCanonicalType(), requirementProto, *conformance);
   }
-}
-
-Type TypeChecker::getWitnessType(Type type, ProtocolDecl *protocol,
-                                 ProtocolConformanceRef conformance,
-                                 Identifier name,
-                                 Diag<> brokenProtocolDiag) {
-  Type ty = conformance.getTypeWitnessByName(type, name);
-  if (!ty &&
-      !(conformance.isConcrete() && conformance.getConcrete()->isInvalid()))
-    diagnose(protocol->getLoc(), brokenProtocolDiag);
-
-  return (!ty || ty->hasError()) ? Type() : ty;
 }

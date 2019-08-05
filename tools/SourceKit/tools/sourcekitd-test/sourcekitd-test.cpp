@@ -10,13 +10,16 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "sourcekitd/FileSystemProvider.h"
 #include "sourcekitd/sourcekitd.h"
 
+// SWIFT_ENABLE_TENSORFLOW
+#include "sourcekitd/FileSystemProvider.h"
 #include "SourceKit/Support/Concurrency.h"
 #include "TestOptions.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "clang/Rewrite/Core/RewriteBuffer.h"
+// SWIFT_ENABLE_TENSORFLOW
+#include "clang/Basic/InMemoryOutputFileSystem.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/Optional.h"
@@ -28,8 +31,6 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Regex.h"
 #include "llvm/Support/Signals.h"
-// SWIFT_ENABLE_TENSORFLOW
-#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/Threading.h"
 #include "llvm/Support/raw_ostream.h"
 #include <fstream>
@@ -90,7 +91,7 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
                            std::unique_ptr<llvm::MemoryBuffer> SourceBuf,
                            TestOptions *InitOpts);
 static void printCursorInfo(sourcekitd_variant_t Info, StringRef Filename,
-                            const llvm::StringMap<std::string> &VFSFiles,
+                            const llvm::StringMap<TestOptions::VFSFile> &VFSFiles,
                             llvm::raw_ostream &OS);
 static void printNameTranslationInfo(sourcekitd_variant_t Info, llvm::raw_ostream &OS);
 static void printRangeInfo(sourcekitd_variant_t Info, StringRef Filename,
@@ -100,7 +101,7 @@ static void printDocInfo(sourcekitd_variant_t Info, StringRef Filename);
 static void printInterfaceGen(sourcekitd_variant_t Info, bool CheckASCII);
 static void printSemanticInfo();
 static void printRelatedIdents(sourcekitd_variant_t Info, StringRef Filename,
-                               const llvm::StringMap<std::string> &VFSFiles,
+                               const llvm::StringMap<TestOptions::VFSFile> &VFSFiles,
                                llvm::raw_ostream &OS);
 static void printFoundInterface(sourcekitd_variant_t Info,
                                 llvm::raw_ostream &OS);
@@ -126,19 +127,19 @@ static void printStatistics(sourcekitd_variant_t Info, raw_ostream &OS);
 
 static unsigned
 resolveFromLineCol(unsigned Line, unsigned Col, StringRef Filename,
-                   const llvm::StringMap<std::string> &VFSFiles);
+                   const llvm::StringMap<TestOptions::VFSFile> &VFSFiles);
 static unsigned resolveFromLineCol(unsigned Line, unsigned Col,
                                    llvm::MemoryBuffer *InputBuf);
 static std::pair<unsigned, unsigned>
 resolveToLineCol(unsigned Offset, StringRef Filename,
-                 const llvm::StringMap<std::string> &VFSFiles);
+                 const llvm::StringMap<TestOptions::VFSFile> &VFSFiles);
 static std::pair<unsigned, unsigned> resolveToLineCol(unsigned Offset,
                                                   llvm::MemoryBuffer *InputBuf);
 static std::pair<unsigned, unsigned> resolveToLineColFromBuf(unsigned Offset,
                                                       const char *Buf);
 static llvm::MemoryBuffer *
 getBufferForFilename(StringRef Filename,
-                     const llvm::StringMap<std::string> &VFSFiles);
+                     const llvm::StringMap<TestOptions::VFSFile> &VFSFiles);
 
 static void notification_receiver(sourcekitd_response_t resp);
 
@@ -222,42 +223,6 @@ static void printBufferedNotifications(bool syncWithService = true) {
   });
 }
 
-// SWIFT_ENABLE_TENSORFLOW
-/// A simple configurable FileSystemProvider, useful for tests that exercise
-/// the FileSystemProvider code.
-class TestFileSystemProvider : public SourceKit::FileSystemProvider {
-  /// Provides the real filesystem, overlayed with an InMemoryFileSystem that
-  /// contains specified files at specified locations.
-  /// \param Args The locations of the InMemoryFileSystem files, interleaved
-  //              with paths on the real filesystem to fetch their contents
-  //              from.
-  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>
-  getFileSystem(const llvm::SmallVectorImpl<const char *> &Args,
-                llvm::SmallVectorImpl<char> &ErrBuf) override {
-    auto InMemoryFS = llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem>(
-        new llvm::vfs::InMemoryFileSystem());
-    for (unsigned i = 0; i < Args.size(); i += 2) {
-      const char *InMemoryName = Args[i];
-      const char *TargetPath = Args[i + 1];
-      auto TargetBufferOrErr = llvm::MemoryBuffer::getFile(TargetPath);
-      if (auto Err = TargetBufferOrErr.getError()) {
-        llvm::raw_svector_ostream ErrStream(ErrBuf);
-        ErrStream << "Error reading target file '" << TargetPath
-                  << "': " << Err.message() << "\n";
-        return nullptr;
-      }
-      auto RenamedTargetBuffer = llvm::MemoryBuffer::getMemBufferCopy(
-          TargetBufferOrErr.get()->getBuffer(), InMemoryName);
-      InMemoryFS->addFile(InMemoryName, 0, std::move(RenamedTargetBuffer));
-    }
-
-    auto OverlayFS = llvm::IntrusiveRefCntPtr<llvm::vfs::OverlayFileSystem>(
-        new llvm::vfs::OverlayFileSystem(llvm::vfs::getRealFileSystem()));
-    OverlayFS->pushOverlay(std::move(InMemoryFS));
-    return OverlayFS;
-  }
-};
-
 struct skt_args {
   int argc;
   const char **argv;
@@ -281,11 +246,6 @@ static void skt_main(skt_args *args) {
   llvm::sys::PrintStackTraceOnErrorSignal(argv[0]);
 
   sourcekitd_initialize();
-
-#ifdef SWIFT_SOURCEKIT_USE_INPROC_LIBRARY
-  TestFileSystemProvider testFileSystemProvider;
-  SourceKit::setGlobalFileSystemProvider("testvfs", &testFileSystemProvider);
-#endif
 
   sourcekitd_set_notification_handler(^(sourcekitd_response_t resp) {
     notification_receiver(resp);
@@ -352,10 +312,11 @@ static void skt_main(skt_args *args) {
   return;
 }
 
-static inline const char *getInterfaceGenDocumentName() {
-  // Absolute "path" so that handleTestInvocation doesn't try to make it
-  // absolute.
-  return "/<interface-gen>";
+static inline std::string getInterfaceGenDocumentName() {
+  // "Absolute path" on all platforms since handleTestInvocation will attempt to make this absolute
+  llvm::SmallString<64> path = llvm::StringRef("/<interface-gen>");
+  llvm::sys::fs::make_absolute(path);
+  return path.str();
 }
 
 static int printAnnotations();
@@ -921,7 +882,7 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
                                             RequestEditorOpenHeaderInterface);
     }
 
-    sourcekitd_request_dictionary_set_string(Req, KeyName, getInterfaceGenDocumentName());
+    sourcekitd_request_dictionary_set_string(Req, KeyName, getInterfaceGenDocumentName().c_str());
     if (!Opts.ModuleGroupName.empty())
       sourcekitd_request_dictionary_set_string(Req, KeyGroupName,
                                                Opts.ModuleGroupName.c_str());
@@ -1043,17 +1004,28 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     }
   }
 
+  if (Opts.VFSName) {
+    sourcekitd_request_dictionary_set_string(Req, KeyVFSName, Opts.VFSName->c_str());
+  }
   if (!Opts.VFSFiles.empty()) {
-    sourcekitd_request_dictionary_set_string(Req, KeyVFSName, "testvfs");
-    sourcekitd_object_t VFSArgs = sourcekitd_request_array_create(nullptr, 0);
+    sourcekitd_object_t files = sourcekitd_request_array_create(nullptr, 0);
     for (auto &NameAndTarget : Opts.VFSFiles) {
-      sourcekitd_request_array_set_string(VFSArgs, SOURCEKITD_ARRAY_APPEND,
-                                          NameAndTarget.first().data());
-      sourcekitd_request_array_set_string(VFSArgs, SOURCEKITD_ARRAY_APPEND,
-                                          NameAndTarget.second.c_str());
+      sourcekitd_object_t file = sourcekitd_request_dictionary_create(nullptr, nullptr, 0);
+      sourcekitd_request_dictionary_set_string(file, KeyName, NameAndTarget.first().data());
+
+      if (NameAndTarget.second.passAsSourceText) {
+        auto content = getBufferForFilename(NameAndTarget.first(), Opts.VFSFiles);
+        sourcekitd_request_dictionary_set_string(file, KeySourceText,  content->getBufferStart());
+      } else {
+        sourcekitd_request_dictionary_set_string(file, KeySourceFile,  NameAndTarget.second.path.c_str());
+      }
+      sourcekitd_request_array_set_value(files, SOURCEKITD_ARRAY_APPEND, file);
     }
-    sourcekitd_request_dictionary_set_value(Req, KeyVFSArgs, VFSArgs);
-    sourcekitd_request_release(VFSArgs);
+    sourcekitd_object_t vfsOpts = sourcekitd_request_dictionary_create(nullptr, nullptr, 0);
+    sourcekitd_request_dictionary_set_value(vfsOpts, KeyFiles, files);
+    sourcekitd_request_dictionary_set_value(Req, KeyVFSOptions, vfsOpts);
+    sourcekitd_request_release(vfsOpts);
+    sourcekitd_request_release(files);
   }
 
   if (!Opts.isAsyncRequest) {
@@ -1457,7 +1429,7 @@ static void printNameTranslationInfo(sourcekitd_variant_t Info,
 }
 
 static void printCursorInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
-                            const llvm::StringMap<std::string> &VFSFiles,
+                            const llvm::StringMap<TestOptions::VFSFile> &VFSFiles,
                             llvm::raw_ostream &OS) {
   const char *InternalDiagnostic =
       sourcekitd_variant_dictionary_get_string(Info, KeyInternalDiagnostic);
@@ -1932,7 +1904,7 @@ static void printInterfaceGen(sourcekitd_variant_t Info, bool CheckASCII) {
 }
 
 static void printRelatedIdents(sourcekitd_variant_t Info, StringRef Filename,
-                               const llvm::StringMap<std::string> &VFSFiles,
+                               const llvm::StringMap<TestOptions::VFSFile> &VFSFiles,
                                llvm::raw_ostream &OS) {
   OS << "START RANGES\n";
   sourcekitd_variant_t Res =
@@ -2144,7 +2116,7 @@ static void expandPlaceholders(llvm::MemoryBuffer *SourceBuf,
 
 static std::pair<unsigned, unsigned>
 resolveToLineCol(unsigned Offset, StringRef Filename,
-                 const llvm::StringMap<std::string> &VFSFiles) {
+                 const llvm::StringMap<TestOptions::VFSFile> &VFSFiles) {
   return resolveToLineCol(Offset, getBufferForFilename(Filename, VFSFiles));
 }
 
@@ -2177,7 +2149,7 @@ resolveToLineColFromBuf(unsigned Offset, const char *Ptr) {
 
 static unsigned
 resolveFromLineCol(unsigned Line, unsigned Col, StringRef Filename,
-                   const llvm::StringMap<std::string> &VFSFiles) {
+                   const llvm::StringMap<TestOptions::VFSFile> &VFSFiles) {
   return resolveFromLineCol(Line, Col,
                             getBufferForFilename(Filename, VFSFiles));
 }
@@ -2220,10 +2192,10 @@ static llvm::StringMap<llvm::MemoryBuffer*> Buffers;
 
 static llvm::MemoryBuffer *
 getBufferForFilename(StringRef Filename,
-                     const llvm::StringMap<std::string> &VFSFiles) {
+                     const llvm::StringMap<TestOptions::VFSFile> &VFSFiles) {
   auto VFSFileIt = VFSFiles.find(Filename);
   auto MappedFilename =
-      VFSFileIt == VFSFiles.end() ? Filename : StringRef(VFSFileIt->second);
+      VFSFileIt == VFSFiles.end() ? Filename : StringRef(VFSFileIt->second.path);
 
   auto It = Buffers.find(MappedFilename);
   if (It != Buffers.end())

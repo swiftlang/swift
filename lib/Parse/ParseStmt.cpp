@@ -988,10 +988,10 @@ ParserResult<Stmt> Parser::parseStmtDefer() {
     if (Body.isNull())
       return nullptr;
     Status |= Body;
-    tempDecl->setBody(Body.get());
+    tempDecl->setBodyParsed(Body.get());
   }
   
-  SourceLoc loc = tempDecl->getBody()->getStartLoc();
+  SourceLoc loc = tempDecl->getBodySourceRange().Start;
 
   // Form the call, which will be emitted on any path that needs to run the
   // code.
@@ -1108,7 +1108,7 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
     auto loc = P.Tok.getLoc();
     auto errorName = P.Context.Id_error;
     auto var = new (P.Context) VarDecl(/*IsStatic*/false,
-                                       VarDecl::Specifier::Let,
+                                       VarDecl::Introducer::Let,
                                        /*IsCaptureList*/false, loc, errorName,
                                        P.CurDeclContext);
     var->setImplicit();
@@ -2335,7 +2335,7 @@ parseStmtCase(Parser &P, SourceLoc &CaseLoc,
     for (unsigned i : indices(tmp)) {
       auto *vOld = tmp[i];
       auto *vNew = new (P.Context) VarDecl(
-          /*IsStatic*/ false, vOld->getSpecifier(), false /*IsCaptureList*/,
+          /*IsStatic*/ false, vOld->getIntroducer(), false /*IsCaptureList*/,
           vOld->getNameLoc(), vOld->getName(), vOld->getDeclContext());
       vNew->setHasNonPatternBindingInit();
       vNew->setImplicit();

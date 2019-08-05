@@ -85,6 +85,7 @@ struct ForwardingModule {
     std::string path;
     uint64_t size;
     uint64_t lastModificationTime;
+    bool isSDKRelative;
   };
   std::vector<Dependency> dependencies;
   unsigned version = 1;
@@ -99,8 +100,9 @@ struct ForwardingModule {
   static llvm::ErrorOr<ForwardingModule> load(const llvm::MemoryBuffer &buf);
 
   /// Adds a given dependency to the dependencies list.
-  void addDependency(StringRef path, uint64_t size, uint64_t modTime) {
-    dependencies.push_back({path.str(), size, modTime});
+  void addDependency(StringRef path, bool isSDKRelative, uint64_t size,
+                     uint64_t modTime) {
+    dependencies.push_back({path.str(), size, modTime, isSDKRelative});
   }
 };
 
@@ -116,6 +118,7 @@ namespace llvm {
         io.mapRequired("mtime", dep.lastModificationTime);
         io.mapRequired("path", dep.path);
         io.mapRequired("size", dep.size);
+        io.mapOptional("sdk_relative", dep.isSDKRelative, /*default*/false);
       }
     };
 
@@ -504,7 +507,7 @@ public:
       // Note that we don't assume cachePath is the same as the Clang
       // module cache path at this point.
       if (!moduleCachePath.empty())
-        (void)llvm::sys::fs::create_directory(moduleCachePath);
+        (void)llvm::sys::fs::create_directories(moduleCachePath);
 
       configureSubInvocationInputsAndOutputs(OutPath);
 
@@ -899,9 +902,14 @@ class ParseableInterfaceModuleLoaderImpl {
   // Check if all the provided file dependencies are up-to-date compared to
   // what's currently on disk.
   bool dependenciesAreUpToDate(StringRef modulePath,
-                               ArrayRef<FileDependency> deps) {
+                               ArrayRef<FileDependency> deps,
+                               bool skipSystemDependencies) {
     SmallString<128> SDKRelativeBuffer;
     for (auto &in : deps) {
+      if (skipSystemDependencies && in.isSDKRelative() &&
+          in.isModificationTimeBased()) {
+        continue;
+      }
       StringRef fullPath = getFullDependencyPath(in, SDKRelativeBuffer);
       switch (checkDependency(modulePath, in, fullPath)) {
       case DependencyStatus::UpToDate:
@@ -939,7 +947,10 @@ class ParseableInterfaceModuleLoaderImpl {
       return false;
     }
 
-    return dependenciesAreUpToDate(path, allDeps);
+    bool skipCheckingSystemDependencies =
+        ctx.SearchPathOpts.DisableModulesValidateSystemDependencies;
+    return dependenciesAreUpToDate(path, allDeps,
+                                   skipCheckingSystemDependencies);
   }
 
   // Check that the output .swiftmodule file is at least as new as all the
@@ -975,14 +986,14 @@ class ParseableInterfaceModuleLoaderImpl {
 
     // Next, check the dependencies in the forwarding file.
     for (auto &dep : fwd.dependencies) {
-      // Forwarding modules expand SDKRelative paths when generated, so are
-      // guaranteed to be absolute.
       deps.push_back(
         FileDependency::modTimeBased(
-          dep.path, /*isSDKRelative=*/false, dep.size,
-          dep.lastModificationTime));
+          dep.path, dep.isSDKRelative, dep.size, dep.lastModificationTime));
     }
-    if (!dependenciesAreUpToDate(path, deps))
+
+    bool skipCheckingSystemDependencies =
+        ctx.SearchPathOpts.DisableModulesValidateSystemDependencies;
+    if (!dependenciesAreUpToDate(path, deps, skipCheckingSystemDependencies))
       return false;
 
     moduleBuffer = std::move(*modBuf);
@@ -1241,31 +1252,36 @@ class ParseableInterfaceModuleLoaderImpl {
 
     // FIXME: We need to avoid re-statting all these dependencies, otherwise
     //        we may record out-of-date information.
-    auto addDependency = [&](StringRef path) -> FileDependency {
-      auto status = fs.status(path);
+    SmallString<128> SDKRelativeBuffer;
+    auto addDependency = [&](FileDependency dep) -> FileDependency {
+      auto status = fs.status(getFullDependencyPath(dep, SDKRelativeBuffer));
       uint64_t mtime =
         status->getLastModificationTime().time_since_epoch().count();
-      fwd.addDependency(path, status->getSize(), mtime);
+      fwd.addDependency(dep.getPath(), dep.isSDKRelative(), status->getSize(),
+                        mtime);
 
       // Construct new FileDependency matching what we've added to the
-      // forwarding module. This is no longer SDK-relative because the absolute
-      // path has already been resolved.
-      return FileDependency::modTimeBased(path, /*isSDKRelative*/false,
+      // forwarding module.
+      return FileDependency::modTimeBased(dep.getPath(), dep.isSDKRelative(),
                                           status->getSize(), mtime);
     };
 
     // Add the prebuilt module as a dependency of the forwarding module, but
     // don't add it to the outer dependency list.
-    (void)addDependency(fwd.underlyingModulePath);
+    (void)addDependency(FileDependency::hashBased(fwd.underlyingModulePath,
+                                                  /*SDKRelative*/false,
+                                                  /*size*/0, /*hash*/0));
 
     // Add all the dependencies from the prebuilt module, and update our list
     // of dependencies to reflect what's recorded in the forwarding module.
-    SmallString<128> SDKRelativeBuffer;
     for (auto dep : deps) {
-      auto adjustedDep =
-          addDependency(getFullDependencyPath(dep, SDKRelativeBuffer));
+      auto adjustedDep = addDependency(dep);
       depsAdjustedToMTime.push_back(adjustedDep);
     }
+
+    // Create the module cache if we haven't created it yet.
+    StringRef parentDir = path::parent_path(outputPath);
+    (void)llvm::sys::fs::create_directories(parentDir);
 
     auto hadError = withOutputFile(diags, outputPath,
       [&](llvm::raw_pwrite_stream &out) {
@@ -1293,8 +1309,6 @@ class ParseableInterfaceModuleLoaderImpl {
   findOrBuildLoadableModule() {
 
     // Track system dependencies if the parent tracker is set to do so.
-    // FIXME: This means -track-system-dependencies isn't honored when the
-    // top-level invocation isn't tracking dependencies
     bool trackSystemDependencies = false;
     if (dependencyTracker) {
       auto ClangDependencyTracker = dependencyTracker->getClangCollector();

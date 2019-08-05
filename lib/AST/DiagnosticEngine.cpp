@@ -468,6 +468,13 @@ static void formatDiagnosticArgument(StringRef Modifier,
     
     // Strip extraneous parentheses; they add no value.
     auto type = Arg.getAsType()->getWithoutParens();
+
+    // If a type has an unresolved type, print it with syntax sugar removed for
+    // clarity. For example, print `Array<_>` instead of `[_]`.
+    if (type->hasUnresolvedType()) {
+      type = type->getWithoutSyntaxSugar();
+    }
+
     bool isAmbiguous = typeSpellingIsAmbiguous(type, Args);
 
     if (isAmbiguous && isa<OpaqueTypeArchetypeType>(type.getPointer())) {
@@ -747,6 +754,7 @@ void DiagnosticEngine::flushActiveDiagnostic() {
   if (TransactionCount == 0) {
     emitDiagnostic(*ActiveDiagnostic);
   } else {
+    onTentativeDiagnosticFlush(*ActiveDiagnostic);
     TentativeDiagnostics.emplace_back(std::move(*ActiveDiagnostic));
   }
   ActiveDiagnostic.reset();
@@ -932,4 +940,18 @@ BufferIndirectlyCausingDiagnosticRAII::BufferIndirectlyCausingDiagnosticRAII(
   auto loc = SF.getASTContext().SourceMgr.getLocForBufferStart(*id);
   if (loc.isValid())
     Diags.setBufferIndirectlyCausingDiagnosticToInput(loc);
+}
+
+void DiagnosticEngine::onTentativeDiagnosticFlush(Diagnostic &diagnostic) {
+  for (auto &argument : diagnostic.Args) {
+    if (argument.getKind() != DiagnosticArgumentKind::String)
+      continue;
+
+    auto content = argument.getAsString();
+    if (content.empty())
+      continue;
+
+    auto I = TransactionStrings.insert(std::make_pair(content, char())).first;
+    argument = DiagnosticArgument(StringRef(I->getKeyData()));
+  }
 }

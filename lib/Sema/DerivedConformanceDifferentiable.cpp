@@ -209,9 +209,10 @@ bool DerivedConformance::canDeriveDifferentiable(NominalTypeDecl *nominal,
 }
 
 // Synthesize body for a `Differentiable` method requirement.
-static void deriveBodyDifferentiable_method(AbstractFunctionDecl *funcDecl,
-                                            Identifier methodName,
-                                            Identifier methodParamLabel) {
+static std::pair<BraceStmt *, bool>
+deriveBodyDifferentiable_method(AbstractFunctionDecl *funcDecl,
+                                Identifier methodName,
+                                Identifier methodParamLabel) {
   auto *parentDC = funcDecl->getParent();
   auto *nominal = parentDC->getSelfNominalTypeDecl();
   auto &C = nominal->getASTContext();
@@ -289,16 +290,17 @@ static void deriveBodyDifferentiable_method(AbstractFunctionDecl *funcDecl,
     memberMethodCallExprs.push_back(createMemberMethodCallExpr(member));
     memberNames.push_back(member->getName());
   }
-  funcDecl->setBody(BraceStmt::create(
-      C, SourceLoc(), memberMethodCallExprs, SourceLoc(), true));
+  auto *braceStmt = BraceStmt::create(C, SourceLoc(), memberMethodCallExprs,
+                                      SourceLoc(), true);
+  return std::pair<BraceStmt *, bool>(braceStmt, false);
 }
 
 // Synthesize body for `move(along:)`.
-static void deriveBodyDifferentiable_move(AbstractFunctionDecl *funcDecl,
-                                           void *) {
+static std::pair<BraceStmt *, bool>
+deriveBodyDifferentiable_move(AbstractFunctionDecl *funcDecl, void *) {
   auto &C = funcDecl->getASTContext();
-  deriveBodyDifferentiable_method(funcDecl, C.Id_move,
-                                  C.getIdentifier("along"));
+  return deriveBodyDifferentiable_method(funcDecl, C.Id_move,
+                                         C.getIdentifier("along"));
 }
 
 // Synthesize function declaration for a `Differentiable` method requirement.
@@ -311,7 +313,7 @@ static ValueDecl *deriveDifferentiable_method(
   auto *parentDC = derived.getConformanceContext();
 
   auto *param =
-      new (C) ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+      new (C) ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(),
                         argumentName, SourceLoc(), parameterName, parentDC);
   param->setInterfaceType(parameterType);
   ParameterList *params = ParameterList::create(C, {param});
@@ -379,8 +381,9 @@ static ValueDecl *getUnderlyingAllDiffableVariables(DeclContext *DC,
 }
 
 // Synthesize getter body for `allDifferentiableVariables` computed property.
-static void derivedBody_allDifferentiableVariablesGetter(
-    AbstractFunctionDecl *getterDecl, void *) {
+static std::pair<BraceStmt *, bool>
+derivedBody_allDifferentiableVariablesGetter(AbstractFunctionDecl *getterDecl,
+                                             void *) {
   auto *parentDC = getterDecl->getParent();
   auto *nominal = parentDC->getSelfNominalTypeDecl();
   auto &C = nominal->getASTContext();
@@ -434,13 +437,15 @@ static void derivedBody_allDifferentiableVariablesGetter(
   Expr *callExpr = CallExpr::createImplicit(C, initExpr, members, memberNames);
 
   ASTNode returnStmt = new (C) ReturnStmt(SourceLoc(), callExpr, true);
-  getterDecl->setBody(
-      BraceStmt::create(C, SourceLoc(), returnStmt, SourceLoc(), true));
+  auto *braceStmt =
+      BraceStmt::create(C, SourceLoc(), returnStmt, SourceLoc(), true);
+  return std::pair<BraceStmt *, bool>(braceStmt, false);
 }
 
 // Synthesize setter body for `allDifferentiableVariables` computed property.
-static void derivedBody_allDifferentiableVariablesSetter(
-    AbstractFunctionDecl *setterDecl, void *) {
+static std::pair<BraceStmt *, bool>
+derivedBody_allDifferentiableVariablesSetter(AbstractFunctionDecl *setterDecl,
+                                             void *) {
   auto *parentDC = setterDecl->getParent();
   auto *nominal = parentDC->getSelfNominalTypeDecl();
   auto &C = nominal->getASTContext();
@@ -491,8 +496,9 @@ static void derivedBody_allDifferentiableVariablesSetter(
     assignExprs.push_back(assignExpr);
   }
 
-  setterDecl->setBody(
-      BraceStmt::create(C, SourceLoc(), assignExprs, SourceLoc(), true));
+  auto *braceStmt =
+      BraceStmt::create(C, SourceLoc(), assignExprs, SourceLoc(), true);
+  return std::pair<BraceStmt *, bool>(braceStmt, false);
 }
 
 // Synthesize `allDifferentiableVariables` computed property declaration.
@@ -515,18 +521,13 @@ deriveDifferentiable_allDifferentiableVariables(DerivedConformance &derived) {
       C.Id_allDifferentiableVariables, returnInterfaceTy, returnTy,
       /*isStatic*/ false, /*isFinal*/ true);
 
-  auto *getterDecl = derived.declareDerivedPropertyGetter(
-      allDiffableVarsDecl, returnTy);
+  AccessorDecl *getterDecl;
+  AccessorDecl *setterDecl;
+  std::tie(getterDecl, setterDecl) =
+      derived.addGetterAndSetterToMutableDerivedProperty(allDiffableVarsDecl,
+                                                         returnTy);
   getterDecl->setBodySynthesizer(&derivedBody_allDifferentiableVariablesGetter);
-
-  auto *setterDecl = derived.declareDerivedPropertySetter(
-      derived.TC, allDiffableVarsDecl, returnTy);
   setterDecl->setBodySynthesizer(&derivedBody_allDifferentiableVariablesSetter);
-
-  allDiffableVarsDecl->setAccessors(StorageImplInfo::getMutableComputed(),
-                                    SourceLoc(), {getterDecl, setterDecl},
-                                    SourceLoc());
-
   derived.addMembersToConformanceContext(
       {getterDecl, setterDecl, allDiffableVarsDecl, pbDecl});
 
@@ -668,7 +669,7 @@ getOrSynthesizeSingleAssociatedStruct(DerivedConformance &derived,
     // Add this member's corresponding associated type to the parent's
     // associated struct.
     auto *newMember = new (C) VarDecl(
-        member->isStatic(), member->getSpecifier(), member->isCaptureList(),
+        member->isStatic(), member->getIntroducer(), member->isCaptureList(),
         /*NameLoc*/ SourceLoc(), member->getName(), structDecl);
     // NOTE: `newMember` is not marked as implicit here, because that affects
     // memberwise initializer synthesis.

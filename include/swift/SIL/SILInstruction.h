@@ -4826,11 +4826,10 @@ public:
 
     StructDecl *S = getStructDecl();
 
-    NominalTypeDecl::StoredPropertyRange Range = S->getStoredProperties();
-    unsigned Index = 0;
-    for (auto I = Range.begin(), E = Range.end(); I != E; ++I, ++Index)
-      if (V == *I)
-        return &getAllOperands()[Index];
+    auto Props = S->getStoredProperties();
+    for (unsigned I = 0, E = Props.size(); I < E; ++I)
+      if (V == Props[I])
+        return &getAllOperands()[I];
 
     // Did not find a matching VarDecl, return nullptr.
     return nullptr;
@@ -6717,14 +6716,28 @@ class ProjectExistentialBoxInst
 //===----------------------------------------------------------------------===//
 
 /// Trigger a runtime failure if the given Int1 value is true.
-class CondFailInst
+///
+/// Optionally cond_fail has a static failure message, which is displayed in the debugger in case the failure
+/// is triggered.
+class CondFailInst final
     : public UnaryInstructionBase<SILInstructionKind::CondFailInst,
-                                  NonValueInstruction>
+                                  NonValueInstruction>,
+      private llvm::TrailingObjects<CondFailInst, char>
 {
+  friend TrailingObjects;
   friend SILBuilder;
 
-  CondFailInst(SILDebugLocation DebugLoc, SILValue Operand)
-      : UnaryInstructionBase(DebugLoc, Operand) {}
+  unsigned MessageSize;
+
+  CondFailInst(SILDebugLocation DebugLoc, SILValue Operand, StringRef Message);
+
+  static CondFailInst *create(SILDebugLocation DebugLoc, SILValue Operand,
+                              StringRef Message, SILModule &M);
+
+public:
+  StringRef getMessage() const {
+    return {getTrailingObjects<char>(), MessageSize};
+  }
 };
 
 //===----------------------------------------------------------------------===//

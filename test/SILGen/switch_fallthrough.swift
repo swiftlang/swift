@@ -154,7 +154,7 @@ func test5() {
     
     // CHECK: [[CASE2]]([[INCOMING_N:%.*]] : $Int):
     // CHECK:   [[Z:%.*]] = function_ref @$s18switch_fallthrough1zyySiF
-    // CHECK    apply [[Z]]([[INCOMING_N]]) : $@convention(thin) (Int) -> ()
+    // CHECK:    apply [[Z]]([[INCOMING_N]]) : $@convention(thin) (Int) -> ()
     // CHECK:   br [[CONT:bb[0-9]+]]
     z(n)
   case (_, _):

@@ -13,25 +13,10 @@
 #ifndef LLVM_SOURCEKITD_FILESYSTEMPROVIDER_H
 #define LLVM_SOURCEKITD_FILESYSTEMPROVIDER_H
 
-#include "SourceKit/Support/FileSystemProvider.h"
 #include "clang/Basic/InMemoryOutputFileSystem.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
-#include "llvm/ADT/StringRef.h"
 
 namespace SourceKit {
-
-/// Registers a FileSystemProvider with the running sourcekitd. After this
-/// function is called, requests can use this FileSystemProvider by setting
-/// 'key.vfs.name' to Name.
-///
-/// The caller is responsible for keeping FileSystemProvider alive as long as
-/// sourcekitd.
-///
-/// Is not threadsafe.
-///
-/// \param FileSystemProvider must be non-null
-void setGlobalFileSystemProvider(
-    llvm::StringRef Name, SourceKit::FileSystemProvider *FileSystemProvider);
 
 /// Subsequent requests will write temporary output files to this filesystem
 /// rather than to the real filesystem.

@@ -968,19 +968,16 @@ namespace {
       }
 
       switch (P->getSpecifier()) {
-      case VarDecl::Specifier::Let:
+      case ParamDecl::Specifier::Default:
         /* nothing */
         break;
-      case VarDecl::Specifier::Var:
-        OS << " mutable";
-        break;
-      case VarDecl::Specifier::InOut:
+      case ParamDecl::Specifier::InOut:
         OS << " inout";
         break;
-      case VarDecl::Specifier::Shared:
+      case ParamDecl::Specifier::Shared:
         OS << " shared";
         break;
-      case VarDecl::Specifier::Owned:
+      case ParamDecl::Specifier::Owned:
         OS << " owned";
         break;
       }
@@ -1949,9 +1946,13 @@ public:
     PrintWithColorRAII(OS, LiteralValueColor)
       << " literal_capacity="
       << E->getLiteralCapacity() << " interpolation_count="
-      << E->getInterpolationCount() << '\n';
+      << E->getInterpolationCount();
+    PrintWithColorRAII(OS, LiteralValueColor) << " builder_init=";
+    E->getBuilderInit().dump(PrintWithColorRAII(OS, LiteralValueColor).getOS());
+    PrintWithColorRAII(OS, LiteralValueColor) << " result_init=";
+    E->getResultInit().dump(PrintWithColorRAII(OS, LiteralValueColor).getOS());
+    OS << "\n";
     printRec(E->getAppendingExpr());
-    printSemanticExpr(E->getSemanticExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   void visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E) {
@@ -1977,7 +1978,6 @@ public:
     printArgumentLabels(E->getArgumentLabels());
     OS << "\n";
     printRec(E->getArg());
-    printSemanticExpr(E->getSemanticExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 

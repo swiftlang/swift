@@ -352,7 +352,8 @@ func testDynamicSelf(_ queen: Bee, wobbler: NSWobbling) {
   // class itself.
   // FIXME: This should be accepted.
   let baseClass: ObjCParseExtras.Base.Type = ObjCParseExtras.Base.returnMyself()
-  // expected-error@-1 {{missing argument for parameter #1 in call}}
+  // expected-error@-1 {{instance member 'returnMyself' cannot be used on type 'Base'; did you mean to use a value of this type instead?}}
+  // expected-error@-2 {{cannot convert value of type 'Base?' to specified type 'Base.Type'}}
 }
 
 func testRepeatedProtocolAdoption(_ w: NSWindow) {

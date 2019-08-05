@@ -33,6 +33,7 @@
 #include "swift/Parse/Lexer.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallString.h"
+#include <string>
 
 using namespace swift;
 using namespace constraints;
@@ -277,6 +278,24 @@ FailureDiagnostic::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
                               fnInterfaceType, fnType, callee);
 }
 
+Type FailureDiagnostic::restoreGenericParameters(
+    Type type,
+    llvm::function_ref<void(GenericTypeParamType *, Type)> substitution) {
+  llvm::SmallPtrSet<GenericTypeParamType *, 4> processed;
+  return type.transform([&](Type type) -> Type {
+    if (auto *typeVar = type->getAs<TypeVariableType>()) {
+      type = resolveType(typeVar);
+      if (auto *GP = typeVar->getImpl().getGenericParameter()) {
+        if (processed.insert(GP).second)
+          substitution(GP, type);
+        return GP;
+      }
+    }
+
+    return type;
+  });
+}
+
 Type RequirementFailure::getOwnerType() const {
   auto *anchor = getRawAnchor();
 
@@ -417,8 +436,8 @@ bool RequirementFailure::diagnoseAsError() {
   const auto *reqDC = getRequirementDC();
   auto *genericCtx = getGenericContext();
 
-  auto lhs = resolveType(getLHS());
-  auto rhs = resolveType(getRHS());
+  auto lhs = getLHS();
+  auto rhs = getRHS();
 
   if (auto *OTD = dyn_cast<OpaqueTypeDecl>(AffectedDecl)) {
     auto *namingDecl = OTD->getNamingDecl();
@@ -671,6 +690,46 @@ bool LabelingFailure::diagnoseAsError() {
 
   return diagnoseArgumentLabelError(cs.getASTContext(), argExpr, CorrectLabels,
                                     isa<SubscriptExpr>(anchor));
+}
+
+bool LabelingFailure::diagnoseAsNote() {
+  auto *anchor = getRawAnchor();
+
+  auto *argExpr = getArgumentExprFor(anchor);
+  if (!argExpr)
+    return false;
+
+  SmallVector<Identifier, 4> argLabels;
+  if (auto *paren = dyn_cast<ParenExpr>(argExpr)) {
+    argLabels.push_back(Identifier());
+  } else if (auto *tuple = dyn_cast<TupleExpr>(argExpr)) {
+    argLabels.append(tuple->getElementNames().begin(),
+                     tuple->getElementNames().end());
+  } else {
+    return false;
+  }
+
+  auto stringifyLabels = [](ArrayRef<Identifier> labels) -> std::string {
+    std::string str;
+    for (auto label : labels) {
+      str += label.empty() ? "_" : label.str();
+      str += ':';
+    }
+    return "(" + str + ")";
+  };
+
+  auto selectedOverload = getChoiceFor(anchor);
+  if (!selectedOverload)
+    return false;
+
+  const auto &choice = selectedOverload->choice;
+  if (auto *decl = choice.getDeclOrNull()) {
+    emitDiagnostic(decl, diag::candidate_expected_different_labels,
+                   stringifyLabels(argLabels), stringifyLabels(CorrectLabels));
+    return true;
+  }
+
+  return false;
 }
 
 bool NoEscapeFuncToTypeConversionFailure::diagnoseAsError() {
@@ -2710,6 +2769,21 @@ bool MissingArgumentsFailure::diagnoseTrailingClosure(ClosureExpr *closure) {
   return true;
 }
 
+bool DefaultArgumentTypeMismatch::diagnoseAsError() {
+  auto choice = getChoiceFor(getRawAnchor());
+  if (!choice.hasValue())
+    return false;
+
+  auto declName = choice.getValue().choice.getName();
+  auto declKind = choice.getValue().choice.getDecl()->getDescriptiveKind();
+
+  emitDiagnostic(getAnchor()->getLoc(),
+                 diag::default_argument_literal_cannot_convert, declKind,
+                 declName, FromType, ToType);
+
+  return true;
+}
+
 bool ClosureParamDestructuringFailure::diagnoseAsError() {
   auto *closure = cast<ClosureExpr>(getAnchor());
   auto params = closure->getParameters();
@@ -2879,6 +2953,15 @@ bool OutOfOrderArgumentFailure::diagnoseAsError() {
   SourceLoc diagLoc = firstRange.Start;
 
   auto addFixIts = [&](InFlightDiagnostic diag) {
+    // Don't add Fix-Its if one of the ranges is outside of the argument
+    // list, which can happen when we're splicing together an argument list
+    // from multiple sources.
+    auto &SM = getASTContext().SourceMgr;
+    auto argsRange = tuple->getSourceRange();
+    if (!SM.rangeContains(argsRange, firstRange) ||
+        !SM.rangeContains(argsRange, secondRange))
+      return;
+
     diag.highlight(firstRange).highlight(secondRange);
 
     // Move the misplaced argument by removing it from one location and
@@ -2886,7 +2969,6 @@ bool OutOfOrderArgumentFailure::diagnoseAsError() {
     // separation, since the argument is always moving to an earlier index
     // the preceding comma and whitespace is removed and a new trailing
     // comma and space is inserted with the moved argument.
-    auto &SM = getASTContext().SourceMgr;
     auto text = SM.extractText(
         Lexer::getCharSourceRangeFromSourceRange(SM, firstRange));
 
@@ -3492,4 +3574,65 @@ bool MutatingMemberRefOnImmutableBase::diagnoseAsError() {
   AssignmentFailure failure(baseExpr, cs, anchor->getLoc(), diagIDsubelt,
                             diagIDmember);
   return failure.diagnoseAsError();
+}
+
+bool InvalidTupleSplatWithSingleParameterFailure::diagnoseAsError() {
+  auto *anchor = getRawAnchor();
+
+  auto selectedOverload = getChoiceFor(anchor);
+  if (!selectedOverload || !selectedOverload->choice.isDecl())
+    return false;
+
+  auto *choice = selectedOverload->choice.getDecl();
+
+  auto *argExpr = getArgumentExprFor(anchor);
+  if (!argExpr)
+    return false;
+
+  using Substitution = std::pair<GenericTypeParamType *, Type>;
+  llvm::SmallVector<Substitution, 8> substitutions;
+
+  auto paramTy = restoreGenericParameters(
+      ParamType, [&](GenericTypeParamType *GP, Type resolvedType) {
+        substitutions.push_back(std::make_pair(GP, resolvedType));
+      });
+
+  DeclBaseName name = choice->getBaseName();
+
+  std::string subsStr;
+  if (!substitutions.empty()) {
+    llvm::array_pod_sort(
+        substitutions.begin(), substitutions.end(),
+        [](const std::pair<GenericTypeParamType *, Type> *lhs,
+           const std::pair<GenericTypeParamType *, Type> *rhs) -> int {
+          GenericParamKey key1(lhs->first);
+          GenericParamKey key2(rhs->first);
+          return key1 < key2 ? -1 : (key1 == key2) ? 0 : 1;
+        });
+
+    subsStr += " [with ";
+    interleave(
+        substitutions,
+        [&subsStr](const Substitution &substitution) {
+          subsStr += substitution.first->getString();
+          subsStr += " = ";
+          subsStr += substitution.second->getString();
+        },
+        [&subsStr] { subsStr += ", "; });
+    subsStr += ']';
+  }
+
+  auto diagnostic =
+      name.isSpecial()
+          ? emitDiagnostic(argExpr->getLoc(),
+                           diag::single_tuple_parameter_mismatch_special,
+                           choice->getDescriptiveKind(), paramTy, subsStr)
+          : emitDiagnostic(
+                argExpr->getLoc(), diag::single_tuple_parameter_mismatch_normal,
+                choice->getDescriptiveKind(), name, paramTy, subsStr);
+
+  diagnostic.highlight(argExpr->getSourceRange())
+      .fixItInsertAfter(argExpr->getStartLoc(), "(")
+      .fixItInsert(argExpr->getEndLoc(), ")");
+  return true;
 }

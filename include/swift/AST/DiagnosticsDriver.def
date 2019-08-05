@@ -166,6 +166,9 @@ WARNING(warn_use_filelists_deprecated, none,
 ERROR(cannot_find_migration_script, none,
       "missing migration script from path '%0'", (StringRef))
 
+ERROR(error_darwin_static_stdlib_not_supported, none,
+      "-static-stdlib is no longer supported on Apple platforms", ())
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG

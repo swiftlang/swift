@@ -68,7 +68,7 @@ public struct AnyIterator<Element> {
   ///
   /// - Parameter base: An iterator to type-erase.
   @inlinable
-  public init<I : IteratorProtocol>(_ base: I) where I.Element == Element {
+  public init<I: IteratorProtocol>(_ base: I) where I.Element == Element {
     self._box = _IteratorBox(base)
   }
 
@@ -116,7 +116,7 @@ extension AnyIterator: Sequence { }
 
 @usableFromInline
 @frozen
-internal struct _ClosureBasedIterator<Element> : IteratorProtocol {
+internal struct _ClosureBasedIterator<Element>: IteratorProtocol {
   @inlinable
   internal init(_ body: @escaping () -> Element?) {
     self._body = body
@@ -129,7 +129,7 @@ internal struct _ClosureBasedIterator<Element> : IteratorProtocol {
 
 @_fixed_layout
 @usableFromInline
-internal class _AnyIteratorBoxBase<Element> : IteratorProtocol {
+internal class _AnyIteratorBoxBase<Element>: IteratorProtocol {
   @inlinable // FIXME(sil-serialize-all)
   internal init() {}
 
@@ -148,8 +148,8 @@ internal class _AnyIteratorBoxBase<Element> : IteratorProtocol {
 @_fixed_layout
 @usableFromInline
 internal final class _IteratorBox<
-  Base : IteratorProtocol
-> : _AnyIteratorBoxBase<Base.Element> {
+  Base: IteratorProtocol
+>: _AnyIteratorBoxBase<Base.Element> {
   @inlinable
   internal init(_ base: Base) { self._base = base }
   @inlinable // FIXME(sil-serialize-all)
@@ -170,7 +170,7 @@ internal final class _IteratorBox<
 %   if Kind == 'Sequence':
 internal class _AnySequenceBox<Element>
 %   elif Kind == 'Collection':
-internal class _AnyCollectionBox<Element> : _AnySequenceBox<Element>
+internal class _AnyCollectionBox<Element>: _AnySequenceBox<Element>
 %   elif Kind == 'BidirectionalCollection':
 internal class _AnyBidirectionalCollectionBox<Element>
   : _AnyCollectionBox<Element>
@@ -425,7 +425,7 @@ internal class _AnyRandomAccessCollectionBox<Element>
 
 @_fixed_layout
 @usableFromInline
-internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Element>
+internal final class _${Kind}Box<S: ${Kind}>: _Any${Kind}Box<S.Element>
 {
   @usableFromInline
   internal typealias Element = S.Element
@@ -673,7 +673,7 @@ internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Element>
 
 @usableFromInline
 @frozen
-internal struct _ClosureBasedSequence<Iterator : IteratorProtocol> {
+internal struct _ClosureBasedSequence<Iterator: IteratorProtocol> {
   @usableFromInline
   internal var _makeUnderlyingIterator: () -> Iterator
 
@@ -703,7 +703,7 @@ public struct AnySequence<Element> {
   /// Creates a sequence whose `makeIterator()` method forwards to
   /// `makeUnderlyingIterator`.
   @inlinable
-  public init<I : IteratorProtocol>(
+  public init<I: IteratorProtocol>(
     _ makeUnderlyingIterator: @escaping () -> I
   ) where I.Element == Element {
     self.init(_ClosureBasedSequence(makeUnderlyingIterator))
@@ -720,7 +720,7 @@ extension  AnySequence: Sequence {
 
   /// Creates a new sequence that wraps and forwards operations to `base`.
   @inlinable
-  public init<S : Sequence>(_ base: S)
+  public init<S: Sequence>(_ base: S)
     where
     S.Element == Element {
     self._box = _SequenceBox(_base: base)
@@ -841,10 +841,10 @@ extension Any${Kind} {
 //===----------------------------------------------------------------------===//
 
 @usableFromInline
-internal protocol _AnyIndexBox : class {
+internal protocol _AnyIndexBox: class {
   var _typeID: ObjectIdentifier { get }
 
-  func _unbox<T : Comparable>() -> T?
+  func _unbox<T: Comparable>() -> T?
 
   func _isEqual(to rhs: _AnyIndexBox) -> Bool
 
@@ -873,7 +873,7 @@ internal final class _IndexBox<BaseIndex: Comparable>: _AnyIndexBox {
   }
 
   @inlinable
-  internal func _unbox<T : Comparable>() -> T? {
+  internal func _unbox<T: Comparable>() -> T? {
     return (self as _AnyIndexBox as? _IndexBox<T>)?._base
   }
 
@@ -896,7 +896,7 @@ public struct AnyIndex {
 
   /// Creates a new index wrapping `base`.
   @inlinable
-  public init<BaseIndex : Comparable>(_ base: BaseIndex) {
+  public init<BaseIndex: Comparable>(_ base: BaseIndex) {
     self._box = _IndexBox(_base: base)
   }
 
@@ -911,7 +911,7 @@ public struct AnyIndex {
   }
 }
 
-extension AnyIndex : Comparable {
+extension AnyIndex: Comparable {
   /// Returns a Boolean value indicating whether two indices wrap equal
   /// underlying indices.
   ///
@@ -945,7 +945,7 @@ extension AnyIndex : Comparable {
 //===----------------------------------------------------------------------===//
 
 public // @testable
-protocol _AnyCollectionProtocol : Collection {
+protocol _AnyCollectionProtocol: Collection {
   /// Identifies the underlying collection stored by `self`. Instances
   /// copied or upgraded/downgraded from one another have the same `_boxID`.
   var _boxID: ObjectIdentifier { get }
@@ -986,7 +986,7 @@ extension ${Self}: ${SelfProtocol} {
   /// - Complexity: O(1).
   @inline(__always)
   @inlinable
-  public init<C : ${SubProtocol}>(_ base: C) where C.Element == Element {
+  public init<C: ${SubProtocol}>(_ base: C) where C.Element == Element {
     // Traversal: ${Traversal}
     // SubTraversal: ${SubTraversal}
     self._box = _${SubProtocol}Box<C>(

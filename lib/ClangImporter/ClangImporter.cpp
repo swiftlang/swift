@@ -656,7 +656,7 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
     invocationArgStrs.back().append(moduleCachePath);
   }
 
-  if (importerOpts.DisableModulesValidateSystemHeaders) {
+  if (ctx.SearchPathOpts.DisableModulesValidateSystemDependencies) {
     invocationArgStrs.push_back("-fno-modules-validate-system-headers");
   } else {
     invocationArgStrs.push_back("-fmodules-validate-system-headers");
@@ -1042,7 +1042,8 @@ ClangImporter::create(ASTContext &ctx,
       overlayFileSystem->pushOverlay(importerOpts.InMemoryOutputFileSystem);
       clangFileSystem = overlayFileSystem;
     }
-    if (clangFileSystem != llvm::vfs::getRealFileSystem() ||
+    if (!ctx.SearchPathOpts.VFSOverlayFiles.empty() ||
+        importerOpts.ForceUseSwiftVirtualFileSystem ||
         importerOpts.InMemoryOutputFileSystem) {
       // If the clang instance has overlays it means the user has provided
       // -ivfsoverlay options.  We're going to clobber their file system with

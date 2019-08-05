@@ -1332,7 +1332,7 @@ bool SILParser::parseSILType(SILType &Result,
   }
 
   // Parse attributes.
-  VarDecl::Specifier specifier;
+  ParamDecl::Specifier specifier;
   SourceLoc specifierLoc;
   TypeAttributes attrs;
   P.parseTypeAttributeList(specifier, specifierLoc, attrs);
@@ -2785,6 +2785,33 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     break;
   }
 
+  case SILInstructionKind::CondFailInst: {
+
+    if (parseTypedValueRef(Val, B))
+      return true;
+
+    SmallVector<char, 128> stringBuffer;
+    StringRef message;
+    if (P.consumeIf(tok::comma)) {
+      // Parse the string.
+      if (P.Tok.getKind() != tok::string_literal) {
+        P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "string");
+        return true;
+      }
+      SmallVector<Lexer::StringSegment, 1> segments;
+      P.L->getStringLiteralSegments(P.Tok, segments);
+      assert(segments.size() == 1);
+
+      P.consumeToken(tok::string_literal);
+      message = P.L->getEncodedStringSegment(segments.front(), stringBuffer);
+    }
+    if (parseSILDebugLocation(InstLoc, B))
+      return true;
+
+    ResultVal = B.createCondFail(InstLoc, Val, message);
+    break;
+  }
+
   case SILInstructionKind::AllocValueBufferInst: {
     SILType Ty;
     if (parseSILType(Ty) ||
@@ -3176,7 +3203,6 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     UNARY_INSTRUCTION(DestroyAddr)
     UNARY_INSTRUCTION(CopyValue)
     UNARY_INSTRUCTION(DestroyValue)
-    UNARY_INSTRUCTION(CondFail)
     UNARY_INSTRUCTION(EndBorrow)
     UNARY_INSTRUCTION(DestructureStruct)
     UNARY_INSTRUCTION(DestructureTuple)

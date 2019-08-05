@@ -697,7 +697,8 @@ static bool validateTypedPattern(TypeChecker &TC,
       auto opaqueTy = TC.getOrCreateOpaqueResultType(resolution,
                                                      named->getDecl(),
                                                      opaqueRepr);
-      TL.setType(opaqueTy);
+      TL.setType(named->getDecl()->getDeclContext()
+                                 ->mapTypeIntoContext(opaqueTy));
       hadError = opaqueTy->hasError();
     } else {
       TC.diagnose(TP->getLoc(), diag::opaque_type_unsupported_pattern);
@@ -877,11 +878,11 @@ bool TypeChecker::typeCheckParameterList(ParameterList *PL,
       }
 
       if (isa<InOutTypeRepr>(nestedRepr)) {
-        param->setSpecifier(VarDecl::Specifier::InOut);
+        param->setSpecifier(ParamDecl::Specifier::InOut);
       } else if (isa<SharedTypeRepr>(nestedRepr)) {
-        param->setSpecifier(VarDecl::Specifier::Shared);
+        param->setSpecifier(ParamDecl::Specifier::Shared);
       } else if (isa<OwnedTypeRepr>(nestedRepr)) {
-        param->setSpecifier(VarDecl::Specifier::Owned);
+        param->setSpecifier(ParamDecl::Specifier::Owned);
       }
     }
 
@@ -1636,7 +1637,7 @@ void TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
 
   auto handleParameter = [&](ParamDecl *param, Type ty, bool forceMutable) {
     if (forceMutable)
-      param->setSpecifier(VarDecl::Specifier::InOut);
+      param->setSpecifier(ParamDecl::Specifier::InOut);
 
     // If contextual type is invalid and we have a valid argument type
     // trying to coerce argument to contextual type would mean erasing

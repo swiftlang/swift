@@ -52,7 +52,7 @@
 /// - `x.isStrictSuperset(of: y)` if and only if
 ///   `x.isSuperset(of: y) && x != y`
 /// - `x.isStrictSubset(of: y)` if and only if `x.isSubset(of: y) && x != y`
-public protocol SetAlgebra : Equatable, ExpressibleByArrayLiteral {  
+public protocol SetAlgebra: Equatable, ExpressibleByArrayLiteral {
   /// A type for which the conforming type provides a containment test.
   associatedtype Element
   
@@ -370,7 +370,7 @@ public protocol SetAlgebra : Equatable, ExpressibleByArrayLiteral {
   ///     // Prints "[6, 0, 1, 3]"
   ///
   /// - Parameter sequence: The elements to use as members of the new set.
-  init<S : Sequence>(_ sequence: __owned S) where S.Element == Element
+  init<S: Sequence>(_ sequence: __owned S) where S.Element == Element
 
   /// Removes the elements of the given set from this set.
   ///
@@ -406,7 +406,7 @@ extension SetAlgebra {
   ///
   /// - Parameter sequence: The elements to use as members of the new set.
   @inlinable // protocol-only
-  public init<S : Sequence>(_ sequence: __owned S)
+  public init<S: Sequence>(_ sequence: __owned S)
     where S.Element == Element {
     self.init()
     for e in sequence { insert(e) }

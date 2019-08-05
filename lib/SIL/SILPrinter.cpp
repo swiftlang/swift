@@ -1924,7 +1924,8 @@ public:
   }
 
   void visitCondFailInst(CondFailInst *FI) {
-    *this << getIDAndType(FI->getOperand());
+    *this << getIDAndType(FI->getOperand()) << ", "
+          << QuotedString(FI->getMessage());
   }
   
   void visitIndexAddrInst(IndexAddrInst *IAI) {

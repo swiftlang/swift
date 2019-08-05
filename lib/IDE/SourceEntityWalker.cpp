@@ -182,25 +182,6 @@ bool SemaAnnotator::walkToDeclPost(Decl *D) {
   if (shouldIgnore(D, ShouldVisitChildren))
     return true;
 
-  // FIXME: rdar://17671977 the initializer for a lazy property has already
-  // been moved into its implicit getter.
-  if (auto *PBD = dyn_cast<PatternBindingDecl>(D)) {
-    if (auto *VD = PBD->getSingleVar()) {
-      if (VD->getAttrs().hasAttribute<LazyAttr>()) {
-        if (auto *Get = VD->getGetter()) {
-          assert((Get->isImplicit() || Get->isInvalid())
-            && "lazy var getter must be either implicitly computed or invalid");
-
-          // Note that an implicit getter may not have the body synthesized
-          // in case the owning PatternBindingDecl is invalid.
-          if (auto *Body = Get->getBody()) {
-            Body->walk(*this);
-          }
-        }
-      }
-    }
-  }
-
   if (isa<ExtensionDecl>(D)) {
     assert(ExtDecls.back() == D);
     ExtDecls.pop_back();

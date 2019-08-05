@@ -69,6 +69,90 @@ SILFunction *SILGenModule::getDynamicThunk(SILDeclRef constant,
   return F;
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+SILFunction *
+SILGenModule::getOrCreateAutoDiffThunk(SILDeclRef assocFnDeclRef,
+                                       SILFunction *assocFn,
+                                       CanSILFunctionType assocFnTy) {
+  auto *autoDiffFuncId = assocFnDeclRef.autoDiffAssociatedFunctionIdentifier;
+  assert(autoDiffFuncId);
+  auto *assocFnDecl = assocFnDeclRef.getDecl();
+
+  SILGenFunctionBuilder builder(*this);
+  auto originalFn = assocFnDeclRef.asAutoDiffOriginalFunction();
+  auto originalLinkage = originalFn.getLinkage(ForDefinition);
+  auto linkage = autodiff::getAutoDiffAssociatedFunctionLinkage(
+      originalLinkage, /*isAssocFnExported*/ true);
+  auto name = assocFnDeclRef.mangle();
+  auto *F = builder.getOrCreateFunction(
+      assocFnDecl, name, linkage, assocFnTy, IsBare, IsTransparent,
+      assocFnDeclRef.isSerialized(), IsNotDynamic, ProfileCounter(), IsThunk);
+
+  if (F->empty()) {
+    if (auto genSig = assocFnTy->getGenericSignature())
+      F->setGenericEnvironment(genSig->createGenericEnvironment());
+    SILGenFunction SGF(*this, *F, SwiftModule);
+    SmallVector<ManagedValue, 4> params;
+    auto loc = assocFnDeclRef.getAsRegularLocation();
+    SGF.collectThunkParams(loc, params);
+    auto assocFnRef = SGF.B.createFunctionRef(loc, assocFn);
+    auto autoDiffAssocFnSILTy = SILType::getPrimitiveObjectType(assocFnTy);
+    SmallVector<SILValue, 4> args(F->getArguments().begin(),
+                                  F->getArguments().end());
+    auto apply = SGF.emitApplyWithRethrow(
+        loc, assocFnRef, autoDiffAssocFnSILTy,
+        SGF.getForwardingSubstitutionMap(), args);
+    SGF.B.createReturn(loc, apply);
+  }
+
+  return F;
+}
+
+// SWIFT_ENABLE_TENSORFLOW
+SILFunction *SILGenModule::getOrCreateAutoDiffClassMethodThunk(
+    SILDeclRef assocFnDeclRef, CanSILFunctionType constantTy) {
+  auto *autoDiffFuncId = assocFnDeclRef.autoDiffAssociatedFunctionIdentifier;
+  assert(autoDiffFuncId);
+  auto *assocFnDecl = assocFnDeclRef.getDecl();
+
+  SILGenFunctionBuilder builder(*this);
+  auto originalFn = assocFnDeclRef.asAutoDiffOriginalFunction();
+  auto originalLinkage = originalFn.getLinkage(ForDefinition);
+  auto linkage = autodiff::getAutoDiffAssociatedFunctionLinkage(
+      originalLinkage, /*isAssocFnExported*/ true);
+  auto name = assocFnDeclRef.mangle() + "_thunk";
+  auto *F = builder.getOrCreateFunction(
+      assocFnDecl, name, linkage, constantTy, IsBare, IsTransparent,
+      assocFnDeclRef.isSerialized(), IsNotDynamic, ProfileCounter(), IsThunk);
+
+  if (F->empty()) {
+    if (auto genSig = constantTy->getGenericSignature())
+      F->setGenericEnvironment(genSig->createGenericEnvironment());
+    SILGenFunction SGF(*this, *F, SwiftModule);
+    SmallVector<ManagedValue, 4> params;
+    auto loc = assocFnDeclRef.getAsRegularLocation();
+    SGF.collectThunkParams(loc, params);
+    auto originalFnRef = SGF.emitGlobalFunctionRef(loc, originalFn);
+    auto loweredIndices = autoDiffFuncId->getParameterIndices()->getLowered(
+        SGF.getASTContext(),
+        assocFnDecl->getInterfaceType()->castTo<AnyFunctionType>());
+    auto autoDiffFn = SGF.B.createAutoDiffFunction(
+        loc, loweredIndices, /*differentiationOrder*/ 1, originalFnRef);
+    auto autoDiffAssocFn = SGF.B.createAutoDiffFunctionExtract(
+        loc, AutoDiffFunctionExtractInst::Extractee(autoDiffFuncId->getKind()),
+        /*differentiationOrder*/ 1, autoDiffFn);
+    auto autoDiffAssocFnSILTy = SILType::getPrimitiveObjectType(constantTy);
+    SmallVector<SILValue, 4> args(F->getArguments().begin(),
+                                  F->getArguments().end());
+    auto apply = SGF.emitApplyWithRethrow(
+        loc, autoDiffAssocFn, autoDiffAssocFnSILTy,
+        SGF.getForwardingSubstitutionMap(), args);
+    SGF.B.createReturn(loc, apply);
+  }
+
+  return F;
+}
+
 ManagedValue
 SILGenFunction::emitDynamicMethodRef(SILLocation loc, SILDeclRef constant,
                                      CanSILFunctionType constantTy) {

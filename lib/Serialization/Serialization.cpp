@@ -21,6 +21,7 @@
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/LazyResolver.h"
 #include "swift/AST/LinkLibrary.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
@@ -2232,20 +2233,28 @@ static ForeignErrorConventionKind getRawStableForeignErrorConventionKind(
 
 /// Translate from the AST VarDeclSpecifier enum to the
 /// Serialization enum values, which are guaranteed to be stable.
-static uint8_t getRawStableVarDeclSpecifier(swift::VarDecl::Specifier sf) {
+static uint8_t getRawStableParamDeclSpecifier(swift::ParamDecl::Specifier sf) {
   switch (sf) {
-  case swift::VarDecl::Specifier::Let:
-    return uint8_t(serialization::VarDeclSpecifier::Let);
-  case swift::VarDecl::Specifier::Var:
-    return uint8_t(serialization::VarDeclSpecifier::Var);
-  case swift::VarDecl::Specifier::InOut:
-    return uint8_t(serialization::VarDeclSpecifier::InOut);
-  case swift::VarDecl::Specifier::Shared:
-    return uint8_t(serialization::VarDeclSpecifier::Shared);
-  case swift::VarDecl::Specifier::Owned:
-    return uint8_t(serialization::VarDeclSpecifier::Owned);
+  case swift::ParamDecl::Specifier::Default:
+    return uint8_t(serialization::ParamDeclSpecifier::Default);
+  case swift::ParamDecl::Specifier::InOut:
+    return uint8_t(serialization::ParamDeclSpecifier::InOut);
+  case swift::ParamDecl::Specifier::Shared:
+    return uint8_t(serialization::ParamDeclSpecifier::Shared);
+  case swift::ParamDecl::Specifier::Owned:
+    return uint8_t(serialization::ParamDeclSpecifier::Owned);
   }
-  llvm_unreachable("bad variable decl specifier kind");
+  llvm_unreachable("bad param decl specifier kind");
+}
+
+static uint8_t getRawStableVarDeclIntroducer(swift::VarDecl::Introducer intr) {
+  switch (intr) {
+  case swift::VarDecl::Introducer::Let:
+    return uint8_t(serialization::VarDeclIntroducer::Let);
+  case swift::VarDecl::Introducer::Var:
+    return uint8_t(serialization::VarDeclIntroducer::Var);
+  }
+  llvm_unreachable("bad variable decl introducer kind");
 }
 
 /// Returns true if the declaration of \p decl depends on \p problemContext
@@ -2552,16 +2561,17 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
 
       IdentifierID jvpName = 0;
       DeclID jvpRef = 0;
-      if (auto jvp = attr->getJVP()) {
+      if (auto jvp = attr->getJVP())
         jvpName = S.addDeclBaseNameRef(jvp->Name.getBaseName());
-        jvpRef = S.addDeclRef(attr->getJVPFunction());
-      }
+      if (auto jvpFunction = attr->getJVPFunction())
+        jvpRef = S.addDeclRef(jvpFunction);
+
       IdentifierID vjpName = 0;
       DeclID vjpRef = 0;
-      if (auto vjp = attr->getVJP()) {
+      if (auto vjp = attr->getVJP())
         vjpName = S.addDeclBaseNameRef(vjp->Name.getBaseName());
-        vjpRef = S.addDeclRef(attr->getVJPFunction());
-      }
+      if (auto vjpFunction = attr->getVJPFunction())
+        vjpRef = S.addDeclRef(vjpFunction);
 
       auto paramIndices = attr->getParameterIndices();
       assert(paramIndices && "Checked parameter indices must be resolved");
@@ -3314,7 +3324,6 @@ public:
                             contextID,
                             theClass->isImplicit(),
                             theClass->isObjC(),
-                            theClass->requiresStoredPropertyInits(),
                             inheritsSuperclassInitializers,
                             S.addGenericEnvironmentRef(
                                              theClass->getGenericEnvironment()),
@@ -3415,6 +3424,8 @@ public:
     if (var->getAttrs().hasAttribute<LazyAttr>())
       lazyStorage = var->getLazyStorageProperty();
 
+    auto rawIntroducer = getRawStableVarDeclIntroducer(var->getIntroducer());
+
     unsigned abbrCode = S.DeclTypeAbbrCodes[VarLayout::Code];
     VarLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                           S.addDeclBaseNameRef(var->getName()),
@@ -3422,7 +3433,7 @@ public:
                           var->isImplicit(),
                           var->isObjC(),
                           var->isStatic(),
-                          getRawStableVarDeclSpecifier(var->getSpecifier()),
+                          rawIntroducer,
                           var->hasNonPatternBindingInit(),
                           var->isGetterMutating(),
                           var->isSetterMutating(),
@@ -3463,7 +3474,7 @@ public:
         S.addDeclBaseNameRef(param->getArgumentName()),
         S.addDeclBaseNameRef(param->getName()),
         contextID,
-        getRawStableVarDeclSpecifier(param->getSpecifier()),
+        getRawStableParamDeclSpecifier(param->getSpecifier()),
         S.addTypeRef(interfaceType),
         param->isVariadic(),
         param->isAutoClosure(),
@@ -3556,6 +3567,17 @@ public:
   }
 
   void visitAccessorDecl(const AccessorDecl *fn) {
+    // Accessor synthesis and type checking is now sufficiently lazy that
+    // we might have unvalidated accessors in a primary file.
+    //
+    // FIXME: Once accessor synthesis and getInterfaceType() itself are
+    // request-ified this goes away.
+    if (!fn->hasValidSignature()) {
+      assert(fn->isImplicit());
+      S.M->getASTContext().getLazyResolver()->resolveDeclSignature(
+          const_cast<AccessorDecl *>(fn));
+    }
+
     using namespace decls_block;
     verifyAttrSerializable(fn);
 
@@ -3622,15 +3644,16 @@ public:
 
     // We only serialize the raw values of @objc enums, because they're part
     // of the ABI. That isn't the case for Swift enums.
-    auto RawValueKind = EnumElementRawValueKind::None;
-    bool Negative = false;
+    auto rawValueKind = EnumElementRawValueKind::None;
+    bool isNegative = false, isRawValueImplicit = false;
     StringRef RawValueText;
     if (elem->getParentEnum()->isObjC()) {
       // Currently ObjC enums always have integer raw values.
-      RawValueKind = EnumElementRawValueKind::IntegerLiteral;
+      rawValueKind = EnumElementRawValueKind::IntegerLiteral;
       auto ILE = cast<IntegerLiteralExpr>(elem->getRawValueExpr());
       RawValueText = ILE->getDigitsText();
-      Negative = ILE->isNegative();
+      isNegative = ILE->isNegative();
+      isRawValueImplicit = ILE->isImplicit();
     }
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[EnumElementLayout::Code];
@@ -3638,8 +3661,9 @@ public:
                                   contextID,
                                   elem->isImplicit(),
                                   elem->hasAssociatedValues(),
-                                  (unsigned)RawValueKind,
-                                  Negative,
+                                  (unsigned)rawValueKind,
+                                  isRawValueImplicit,
+                                  isNegative,
                                   S.addUniquedStringRef(RawValueText),
                                   elem->getFullName().getArgumentNames().size()+1,
                                   nameComponentsAndDependencies);

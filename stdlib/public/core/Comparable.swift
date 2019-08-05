@@ -135,7 +135,7 @@
 ///   (`FloatingPoint.nan`) compares as neither less than, greater than, nor
 ///   equal to any normal floating-point value. Exceptional values need not
 ///   take part in the strict total order.
-public protocol Comparable : Equatable {
+public protocol Comparable: Equatable {
   /// Returns a Boolean value indicating whether the value of the first
   /// argument is less than that of the second argument.
   ///

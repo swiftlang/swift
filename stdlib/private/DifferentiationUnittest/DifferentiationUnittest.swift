@@ -10,8 +10,42 @@
 //
 //===----------------------------------------------------------------------===//
 
+import StdlibUnittest
+
 public enum _GlobalLeakCount {
   public static var count = 0
+}
+
+/// Execute body and check expected leak count.
+public func withLeakChecking(
+  expectedLeakCount: Int = 0, file: String = #file, line: UInt = #line,
+  _ body: () -> Void
+) {
+  // Note: compare expected leak count with relative leak count after
+  // running `body`.
+  // This approach is more robust than comparing leak count with zero
+  // and resetting leak count to zero, which is stateful and causes issues.
+  let beforeLeakCount = _GlobalLeakCount.count
+  body()
+  let leakCount = _GlobalLeakCount.count - beforeLeakCount
+  expectEqual(
+    expectedLeakCount, leakCount, "Leaks detected: \(leakCount)",
+    file: file, line: line)
+}
+
+public extension TestSuite {
+  /// Execute test function and check expected leak count.
+  func testWithLeakChecking(
+    _ name: String,
+    expectedLeakCount: Int = 0,
+    file: String = #file, line: UInt = #line,
+    _ testFunction: @escaping () -> Void
+  ) {
+    test(name, file: file, line: line) {
+      withLeakChecking(expectedLeakCount: expectedLeakCount, file: file,
+                       line: line, testFunction)
+    }
+  }
 }
 
 /// A type that tracks the number of live instances of a wrapped value type.
@@ -153,11 +187,8 @@ extension Tracked : Differentiable
 extension Tracked where T : Differentiable, T == T.AllDifferentiableVariables,
                         T == T.TangentVector
 {
-  // FIXME(TF-667): VJPs of initializers are currently not being reabstracted,
-  // while there is a parameter convention mismatch. We must explicitly make
-  // VJPs of initializers have `@owned` parameters to avoid memory leaks.
   @usableFromInline
-  internal static func _vjpInit(_ value: __owned T)
+  internal static func _vjpInit(_ value: T)
       -> (value: Self, pullback: (Self.TangentVector) -> (T.TangentVector)) {
     return (Tracked(value), { v in v.value })
   }

@@ -77,6 +77,81 @@ TermInst *swift::addNewEdgeValueToBranch(TermInst *Branch, SILBasicBlock *Dest,
   return NewBr;
 }
 
+static void
+deleteTriviallyDeadOperandsOfDeadArgument(MutableArrayRef<Operand> termOperands,
+                                          unsigned deadArgIndex) {
+  Operand &op = termOperands[deadArgIndex];
+  auto *i = op.get()->getDefiningInstruction();
+  if (!i)
+    return;
+  op.set(SILUndef::get(op.get()->getType(), *i->getFunction()));
+  recursivelyDeleteTriviallyDeadInstructions(i);
+}
+
+// Our implementation assumes that our caller is attempting to remove a dead
+// SILPhiArgument from a SILBasicBlock and has already RAUWed the argument.
+TermInst *swift::deleteEdgeValue(TermInst *branch, SILBasicBlock *destBlock,
+                                 size_t argIndex) {
+  if (auto *cbi = dyn_cast<CondBranchInst>(branch)) {
+    SmallVector<SILValue, 8> trueArgs;
+    SmallVector<SILValue, 8> falseArgs;
+
+    copy(cbi->getTrueArgs(), std::back_inserter(trueArgs));
+    copy(cbi->getFalseArgs(), std::back_inserter(falseArgs));
+
+    if (destBlock == cbi->getTrueBB()) {
+      deleteTriviallyDeadOperandsOfDeadArgument(cbi->getTrueOperands(), argIndex);
+      trueArgs.erase(trueArgs.begin() + argIndex);
+    }
+
+    if (destBlock == cbi->getFalseBB()) {
+      deleteTriviallyDeadOperandsOfDeadArgument(cbi->getFalseOperands(), argIndex);
+      falseArgs.erase(falseArgs.begin() + argIndex);
+    }
+
+    SILBuilderWithScope builder(cbi);
+    auto *result = builder.createCondBranch(cbi->getLoc(), cbi->getCondition(),
+                             cbi->getTrueBB(), trueArgs, cbi->getFalseBB(),
+                             falseArgs, cbi->getTrueBBCount(),
+                             cbi->getFalseBBCount());
+    branch->eraseFromParent();
+    return result;
+  }
+
+  if (auto *bi = dyn_cast<BranchInst>(branch)) {
+    SmallVector<SILValue, 8> args;
+    copy(bi->getArgs(), std::back_inserter(args));
+
+    deleteTriviallyDeadOperandsOfDeadArgument(bi->getAllOperands(), argIndex);
+    args.erase(args.begin() + argIndex);
+    auto *result = SILBuilderWithScope(bi).createBranch(bi->getLoc(), bi->getDestBB(), args);
+    branch->eraseFromParent();
+    return result;
+  }
+
+  llvm_unreachable("unsupported terminator");
+}
+
+void swift::erasePhiArgument(SILBasicBlock *block, unsigned argIndex) {
+  assert(block->getArgument(argIndex)->isPhiArgument() &&
+         "Only should be used on phi arguments");
+  block->eraseArgument(argIndex);
+
+  // Determine the set of predecessors in case any predecessor has
+  // two edges to this block (e.g. a conditional branch where both
+  // sides reach this block).
+  //
+  // NOTE: This needs to be a SmallSetVector since we need both uniqueness /and/
+  // insertion order. Otherwise non-determinism can result.
+  SmallSetVector<SILBasicBlock *, 8> predBlocks;
+
+  for (auto *pred : block->getPredecessorBlocks())
+    predBlocks.insert(pred);
+
+  for (auto *pred : predBlocks)
+    deleteEdgeValue(pred->getTerminator(), block, argIndex);
+}
+
 /// Changes the edge value between a branch and destination basic block
 /// at the specified index. Changes all edges from \p Branch to \p Dest to carry
 /// the value.

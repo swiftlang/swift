@@ -642,11 +642,6 @@ static MetadataResponse emitNominalMetadataRef(IRGenFunction &IGF,
 bool irgen::isTypeMetadataAccessTrivial(IRGenModule &IGM, CanType type) {
   assert(!type->hasArchetype());
 
-  // Support dynamically replacing opaque result types. Don't cache the
-  // accessor result.
-  if (!IGM.getOptions().shouldOptimize() && type->hasOpaqueArchetype())
-    return true;
-
   // Value type metadata only requires dynamic initialization on first
   // access if it contains a resilient type.
   if (isa<StructType>(type) || isa<EnumType>(type)) {
@@ -1509,6 +1504,7 @@ void irgen::emitCacheAccessFunction(IRGenModule &IGM,
 
   // If the load yielded null, emit the type metadata.
   IGF.Builder.emitBlock(isNullBB);
+  
   MetadataResponse response = getValue(IGF, parameters);
 
   // Ensure that we have a dynamically-correct state value.

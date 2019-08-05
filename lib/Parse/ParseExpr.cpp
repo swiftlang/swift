@@ -1487,10 +1487,10 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
         peekToken().isNot(tok::period, tok::period_prefix, tok::l_paren)) {
       Identifier name;
       SourceLoc loc = consumeIdentifier(&name, /*allowDollarIdentifier=*/true);
-      auto specifier = (InVarOrLetPattern != IVOLP_InVar)
-                     ? VarDecl::Specifier::Let
-                     : VarDecl::Specifier::Var;
-      auto pattern = createBindingFromPattern(loc, name, specifier);
+      auto introducer = (InVarOrLetPattern != IVOLP_InVar
+                         ? VarDecl::Introducer::Let
+                         : VarDecl::Introducer::Var);
+      auto pattern = createBindingFromPattern(loc, name, introducer);
       if (SyntaxContext->isEnabled()) {
         ParsedPatternSyntax PatternNode =
             ParsedSyntaxRecorder::makeIdentifierPattern(
@@ -1996,7 +1996,7 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
 
     // Make the variable which will contain our temporary value.
     auto InterpolationVar =
-      new (Context) VarDecl(/*IsStatic=*/false, VarDecl::Specifier::Var,
+      new (Context) VarDecl(/*IsStatic=*/false, VarDecl::Introducer::Var,
                             /*IsCaptureList=*/false, /*NameLoc=*/SourceLoc(),
                             Context.Id_dollarInterpolation, CurDeclContext);
     InterpolationVar->setImplicit(true);
@@ -2531,11 +2531,10 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
       // Create the VarDecl and the PatternBindingDecl for the captured
       // expression.  This uses the parent declcontext (not the closure) since
       // the initializer expression is evaluated before the closure is formed.
-      auto specifierKind = (ownershipKind != ReferenceOwnership::Weak)
-                               ? VarDecl::Specifier::Let
-                               : VarDecl::Specifier::Var;
-      auto *VD = new (Context) VarDecl(/*isStatic*/false,
-                                       specifierKind,
+      auto introducer = (ownershipKind != ReferenceOwnership::Weak
+                         ? VarDecl::Introducer::Let
+                         : VarDecl::Introducer::Var);
+      auto *VD = new (Context) VarDecl(/*isStatic*/false, introducer,
                                        /*isCaptureList*/true,
                                        nameLoc, name, CurDeclContext);
 
@@ -2595,7 +2594,7 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
           nameLoc = consumeToken(tok::kw__);
         }
         auto var = new (Context)
-            ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+            ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(),
                       Identifier(), nameLoc, name, nullptr);
         elements.push_back(var);
 
@@ -2902,7 +2901,7 @@ Expr *Parser::parseExprAnonClosureArg() {
     Identifier ident = Context.getIdentifier(varName);
     SourceLoc varLoc = leftBraceLoc;
     auto *var = new (Context)
-        ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+        ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(),
                   Identifier(), varLoc, ident, closure);
     var->setImplicit();
     decls.push_back(var);
@@ -3447,8 +3446,10 @@ Parser::parseExprCollectionElement(Optional<bool> &isDictionary) {
   if (!isDictionary.hasValue())
     isDictionary = Tok.is(tok::colon);
 
-  if (!*isDictionary)
+  if (!*isDictionary) {
+    validateCollectionElement(Element);
     return Element;
+  }
 
   if (Element.isNull())
     return Element;
@@ -3469,6 +3470,43 @@ Parser::parseExprCollectionElement(Optional<bool> &isDictionary) {
   return makeParserResult(
       ParserStatus(Element) | ParserStatus(Value),
       TupleExpr::createImplicit(Context, {Element.get(), Value.get()}, {}));
+}
+
+/// validateCollectionElement - Check if a given collection element is valid.
+///
+/// At the moment, this checks whether a given collection element is a subscript
+/// expression and whether we're subscripting into an array. If we are, then it
+/// we emit a diagnostic in case it was not something that the user was
+/// expecting.
+///
+/// For example: `let array [ [0, 1] [42] ]`
+void Parser::validateCollectionElement(ParserResult<Expr> element) {
+  if (element.isNull())
+    return;
+
+  auto elementExpr = element.get();
+  if (!isa<SubscriptExpr>(elementExpr))
+    return;
+
+  auto subscriptExpr = cast<SubscriptExpr>(elementExpr);
+  if (!isa<ArrayExpr>(subscriptExpr->getBase()))
+    return;
+
+  auto arrayExpr = cast<ArrayExpr>(subscriptExpr->getBase());
+
+  auto startLocOfSubscript = subscriptExpr->getIndex()->getStartLoc();
+  auto endLocOfArray = arrayExpr->getEndLoc();
+  auto locForEndOfTokenArray = L->getLocForEndOfToken(SourceMgr, endLocOfArray);
+
+  if (locForEndOfTokenArray != startLocOfSubscript) {
+    auto subscriptLoc = subscriptExpr->getLoc();
+    diagnose(subscriptLoc, diag::subscript_array_element)
+        .highlight(subscriptExpr->getSourceRange());
+    diagnose(subscriptLoc, diag::subscript_array_element_fix_it_add_comma)
+        .fixItInsertAfter(endLocOfArray, ",");
+    diagnose(subscriptLoc, diag::subscript_array_element_fix_it_remove_space)
+        .fixItRemoveChars(locForEndOfTokenArray, startLocOfSubscript);
+  }
 }
 
 void Parser::addPatternVariablesToScope(ArrayRef<Pattern *> Patterns) {

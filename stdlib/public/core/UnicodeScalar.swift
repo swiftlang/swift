@@ -274,7 +274,7 @@ extension Unicode.Scalar :
   }
 }
 
-extension Unicode.Scalar : CustomStringConvertible, CustomDebugStringConvertible {
+extension Unicode.Scalar: CustomStringConvertible, CustomDebugStringConvertible {
   /// A textual representation of the Unicode scalar.
   @inlinable
   public var description: String {
@@ -288,7 +288,7 @@ extension Unicode.Scalar : CustomStringConvertible, CustomDebugStringConvertible
   }
 }
 
-extension Unicode.Scalar : LosslessStringConvertible {
+extension Unicode.Scalar: LosslessStringConvertible {
   @inlinable
   public init?(_ description: String) {
     let scalars = description.unicodeScalars
@@ -299,7 +299,7 @@ extension Unicode.Scalar : LosslessStringConvertible {
   }
 }
 
-extension Unicode.Scalar : Hashable {
+extension Unicode.Scalar: Hashable {
   /// Hashes the essential components of this value by feeding them into the
   /// given hasher.
   ///
@@ -371,14 +371,14 @@ extension UInt64 {
   }
 }
 
-extension Unicode.Scalar : Equatable {
+extension Unicode.Scalar: Equatable {
   @inlinable
   public static func == (lhs: Unicode.Scalar, rhs: Unicode.Scalar) -> Bool {
     return lhs.value == rhs.value
   }
 }
 
-extension Unicode.Scalar : Comparable {
+extension Unicode.Scalar: Comparable {
   @inlinable
   public static func < (lhs: Unicode.Scalar, rhs: Unicode.Scalar) -> Bool {
     return lhs.value < rhs.value
@@ -402,7 +402,7 @@ extension Unicode.Scalar {
   }
 }
 
-extension Unicode.Scalar.UTF16View : RandomAccessCollection {
+extension Unicode.Scalar.UTF16View: RandomAccessCollection {
 
   public typealias Indices = Range<Int>
 
@@ -435,7 +435,7 @@ extension Unicode.Scalar.UTF16View : RandomAccessCollection {
 }
 
 extension Unicode.Scalar {
-  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+  @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
   @frozen
   public struct UTF8View {
     @inlinable
@@ -446,13 +446,13 @@ extension Unicode.Scalar {
     internal var value: Unicode.Scalar
   }
 
-  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+  @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
   @inlinable
   public var utf8: UTF8View { return UTF8View(value: self) }
 }
 
-@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
-extension Unicode.Scalar.UTF8View : RandomAccessCollection {
+@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+extension Unicode.Scalar.UTF8View: RandomAccessCollection {
   public typealias Indices = Range<Int>
 
   /// The position of the first code unit.

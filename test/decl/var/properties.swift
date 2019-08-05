@@ -882,7 +882,7 @@ protocol ProtocolWillSetDidSet4 {
   var a: Int { didSet willSet } // expected-error {{property in protocol must have explicit { get } or { get set } specifier}} {{14-32={ get <#set#> \}}} expected-error 2 {{expected get or set in a protocol property}}
 }
 protocol ProtocolWillSetDidSet5 {
-  let a: Int { didSet willSet }  // expected-error {{property in protocol must have explicit { get } or { get set } specifier}} {{14-32={ get <#set#> \}}} {{none}} expected-error 2 {{expected get or set in a protocol property}} expected-error {{'let' declarations cannot be computed properties}} {{3-6=var}}
+  let a: Int { didSet willSet }  // expected-error {{immutable property requirement must be declared as 'var' with a '{ get }' specifier}} {{3-6=var}} {{13-13= { get \}}} {{none}} expected-error 2 {{expected get or set in a protocol property}} expected-error {{'let' declarations cannot be computed properties}} {{3-6=var}}
 }
 
 var globalDidsetWillSet: Int {  // expected-error {{non-member observing properties require an initializer}}

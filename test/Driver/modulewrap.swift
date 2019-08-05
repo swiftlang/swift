@@ -4,4 +4,4 @@
 // CHECK: bin{{/|\\\\}}swift{{c?(\.EXE)?"?}} {{.*}}-emit-module [[MOD]]
 // CHECK-SAME:                                 -o [[MERGED:.*\.swiftmodule]]
 // CHECK: bin{{/|\\\\}}swift{{c?(\.EXE)?"?}} -modulewrap [[MERGED]]{{"?}} -target x86_64-unknown-linux-gnu -o [[OBJ:.*\.o]]
-// CHECK: bin{{/|\\\\}}clang++{{.*}} [[OBJ]]
+// CHECK: bin{{/|\\\\}}clang{{.*}} [[OBJ]]
