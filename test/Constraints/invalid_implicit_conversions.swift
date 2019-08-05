@@ -15,14 +15,14 @@ func test(
   var a: [Int] = [0]
   let s = "string"
 
-  takesAutoclosure(rawPtr, &i) // expected-error {{'&' used with non-inout argument of type 'Int'}}
-  takesAutoclosure(mutRawPtr, &i) // expected-error {{'&' used with non-inout argument of type 'Int'}}
-  takesAutoclosure(mutPtr, &i) // expected-error {{'&' used with non-inout argument of type 'Int'}}
-  takesAutoclosure(ptr, &i) // expected-error {{'&' used with non-inout argument of type 'Int'}}
-  takesAutoclosure(rawPtr, &a) // expected-error {{'&' used with non-inout argument of type '[Int]'}}
-  takesAutoclosure(mutRawPtr, &a) // expected-error {{'&' used with non-inout argument of type '[Int]'}}
-  takesAutoclosure(mutPtr, &a) // expected-error {{'&' used with non-inout argument of type '[Int]'}}
-  takesAutoclosure(ptr, &a) // expected-error {{'&' used with non-inout argument of type '[Int]'}}
+  takesAutoclosure(rawPtr, &i) // expected-error {{cannot perform pointer conversion of value of type 'Int' to autoclosure result type 'UnsafeRawPointer'}}
+  takesAutoclosure(mutRawPtr, &i) // expected-error {{cannot perform pointer conversion of value of type 'Int' to autoclosure result type 'UnsafeMutableRawPointer'}}
+  takesAutoclosure(mutPtr, &i) // expected-error {{cannot perform pointer conversion of value of type 'Int' to autoclosure result type 'UnsafeMutablePointer<Int>'}}
+  takesAutoclosure(ptr, &i) // expected-error {{cannot perform pointer conversion of value of type 'Int' to autoclosure result type 'UnsafePointer<Int>'}}
+  takesAutoclosure(rawPtr, &a) // expected-error {{cannot perform pointer conversion of value of type '[Int]' to autoclosure result type 'UnsafeRawPointer'}}
+  takesAutoclosure(mutRawPtr, &a) // expected-error {{cannot perform pointer conversion of value of type '[Int]' to autoclosure result type 'UnsafeMutableRawPointer'}}
+  takesAutoclosure(mutPtr, &a) // expected-error {{cannot perform pointer conversion of value of type '[Int]' to autoclosure result type 'UnsafeMutablePointer<Int>'}}
+  takesAutoclosure(ptr, &a) // expected-error {{cannot perform pointer conversion of value of type '[Int]' to autoclosure result type 'UnsafePointer<Int>'}}
 
   takesAutoclosure(rawPtr, a) // expected-error {{cannot invoke 'takesAutoclosure' with an argument list of type '(UnsafeRawPointer, [Int])'}}
   // expected-note@-1 {{expected an argument list of type '(T, @autoclosure () throws -> T)'}}
