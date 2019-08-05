@@ -669,9 +669,9 @@ public:
       : FailureDiagnostic(root, cs, locator), FromType(resolve(lhs)),
         ToType(resolve(rhs)) {}
 
-  Type getFromType() const { return resolveType(FromType); }
+  Type getFromType() const { return FromType; }
 
-  Type getToType() const { return resolveType(ToType); }
+  Type getToType() const { return ToType; }
 
   bool diagnoseAsError() override;
 
@@ -682,11 +682,30 @@ public:
   /// Produce a specialized diagnostic if this is an invalid conversion to Bool.
   bool diagnoseConversionToBool() const;
 
+  /// Attempt to attach any relevant fix-its to already produced diagnostic.
+  bool tryFixIts(InFlightDiagnostic &diagnostic) const;
+
+  /// Attempts to add fix-its for these two mistakes:
+  ///
+  /// - Passing an integer where a type conforming to RawRepresentable is
+  ///   expected, by wrapping the expression in a call to the contextual
+  ///   type's initializer
+  ///
+  /// - Passing a type conforming to RawRepresentable where an integer is
+  ///   expected, by wrapping the expression in a call to the rawValue
+  ///   accessor
+  ///
+  /// - Return true on the fixit is added, false otherwise.
+  ///
+  /// This helps migration with SDK changes.
+  bool
+  tryRawRepresentableFixIts(InFlightDiagnostic &diagnostic,
+                            KnownProtocolKind rawRepresentablePrococol) const;
+
+protected:
   /// Try to add a fix-it when converting between a collection and its slice
   /// type, such as String <-> Substring or (eventually) Array <-> ArraySlice
-  static bool trySequenceSubsequenceFixIts(InFlightDiagnostic &diag,
-                                           ConstraintSystem &CS, Type fromType,
-                                           Type toType, Expr *expr);
+  bool trySequenceSubsequenceFixIts(InFlightDiagnostic &diagnostic) const;
 
 private:
   Type resolve(Type rawType) {

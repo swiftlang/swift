@@ -1662,138 +1662,6 @@ static bool isIntegerToStringIndexConversion(Type fromType, Type toType,
           toType->getCanonicalType().getString() == "String.CharacterView.Index");
 }
 
-static bool isOptionSetType(Type fromType, ConstraintSystem &CS) {
-  return conformsToKnownProtocol(CS, fromType, KnownProtocolKind::OptionSet);
-}
-
-/// Attempts to add fix-its for these two mistakes:
-///
-/// - Passing an integer where a type conforming to RawRepresentable is
-///   expected, by wrapping the expression in a call to the contextual
-///   type's initializer
-///
-/// - Passing a type conforming to RawRepresentable where an integer is
-///   expected, by wrapping the expression in a call to the rawValue
-///   accessor
-///
-/// - Return true on the fixit is added, false otherwise.
-///
-/// This helps migration with SDK changes.
-static bool tryRawRepresentableFixIts(InFlightDiagnostic &diag,
-                                      ConstraintSystem &CS, Type fromType,
-                                      Type toType, KnownProtocolKind kind,
-                                      const Expr *expr) {
-  // The following fixes apply for optional destination types as well.
-  bool toTypeIsOptional = !toType->getOptionalObjectType().isNull();
-  toType = toType->lookThroughAllOptionalTypes();
-
-  Type fromTypeUnwrapped = fromType->getOptionalObjectType();
-  bool fromTypeIsOptional = !fromTypeUnwrapped.isNull();
-  if (fromTypeIsOptional)
-    fromType = fromTypeUnwrapped;
-
-  auto fixIt = [&](StringRef convWrapBefore, StringRef convWrapAfter) {
-    SourceRange exprRange = expr->getSourceRange();
-    if (fromTypeIsOptional && toTypeIsOptional) {
-      // Use optional's map function to convert conditionally, like so:
-      //   expr.map{ T(rawValue: $0) }
-      bool needsParens = !expr->canAppendPostfixExpression();
-      std::string mapCodeFix;
-      if (needsParens) {
-        diag.fixItInsert(exprRange.Start, "(");
-        mapCodeFix += ")";
-      }
-      mapCodeFix += ".map { ";
-      mapCodeFix += convWrapBefore;
-      mapCodeFix += "$0";
-      mapCodeFix += convWrapAfter;
-      mapCodeFix += " }";
-      diag.fixItInsertAfter(exprRange.End, mapCodeFix);
-    } else if (!fromTypeIsOptional) {
-      diag.fixItInsert(exprRange.Start, convWrapBefore);
-      diag.fixItInsertAfter(exprRange.End, convWrapAfter);
-    } else {
-      SmallString<16> fixItBefore(convWrapBefore);
-      SmallString<16> fixItAfter;
-
-      if (!expr->canAppendPostfixExpression(true)) {
-        fixItBefore += "(";
-        fixItAfter = ")";
-      }
-
-      fixItAfter += "!" + convWrapAfter.str();
-
-      diag.flush();
-      CS.TC
-          .diagnose(expr->getLoc(),
-                    diag::construct_raw_representable_from_unwrapped_value,
-                    toType, fromType)
-          .highlight(exprRange)
-          .fixItInsert(exprRange.Start, fixItBefore)
-          .fixItInsertAfter(exprRange.End, fixItAfter);
-    }
-  };
-
-  if (conformsToKnownProtocol(CS, fromType, kind)) {
-    if (isOptionSetType(toType, CS) &&
-        isa<IntegerLiteralExpr>(expr) &&
-        cast<IntegerLiteralExpr>(expr)->getDigitsText() == "0") {
-      diag.fixItReplace(expr->getSourceRange(), "[]");
-      return true;
-    }
-    if (auto rawTy = isRawRepresentable(CS, toType, kind)) {
-      // Produce before/after strings like 'Result(rawValue: RawType(<expr>))'
-      // or just 'Result(rawValue: <expr>)'.
-      std::string convWrapBefore = toType.getString();
-      convWrapBefore += "(rawValue: ";
-      std::string convWrapAfter = ")";
-      if (!isa<LiteralExpr>(expr) &&
-          !CS.TC.isConvertibleTo(fromType, rawTy, CS.DC)) {
-        // Only try to insert a converting construction if the protocol is a
-        // literal protocol and not some other known protocol.
-        switch (kind) {
-#define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(name, _, __, ___)            \
-  case KnownProtocolKind::name:                                                \
-    break;
-#define PROTOCOL_WITH_NAME(name, _) \
-        case KnownProtocolKind::name: return false;
-#include "swift/AST/KnownProtocols.def"
-        }
-        convWrapBefore += rawTy->getString();
-        convWrapBefore += "(";
-        convWrapAfter += ")";
-      }
-      fixIt(convWrapBefore, convWrapAfter);
-      return true;
-    }
-  }
-
-  if (auto rawTy = isRawRepresentable(CS, fromType, kind)) {
-    if (conformsToKnownProtocol(CS, toType, kind)) {
-      std::string convWrapBefore;
-      std::string convWrapAfter = ".rawValue";
-      if (!CS.TC.isConvertibleTo(rawTy, toType, CS.DC)) {
-        // Only try to insert a converting construction if the protocol is a
-        // literal protocol and not some other known protocol.
-        switch (kind) {
-#define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(name, _, __, ___)            \
-  case KnownProtocolKind::name:                                                \
-    break;
-#define PROTOCOL_WITH_NAME(name, _) \
-        case KnownProtocolKind::name: return false;
-#include "swift/AST/KnownProtocols.def"
-        }
-        convWrapBefore += toType->getString();
-        convWrapBefore += "(";
-        convWrapAfter += ")";
-      }
-      fixIt(convWrapBefore, convWrapAfter);
-      return true;
-    }
-  }
-  return false;
-}
-
 /// Attempts to add fix-its for these two mistakes:
 ///
 /// - Passing an integer with the right type but which is getting wrapped with a
@@ -2229,10 +2097,7 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
                                      exprType, contextualType);
   diag.highlight(expr->getSourceRange());
 
-  // Try to convert between a sequence and its subsequence, notably
-  // String <-> Substring.
-  if (ContextualFailure::trySequenceSubsequenceFixIts(diag, CS, exprType,
-                                                      contextualType, expr))
+  if (failure.tryFixIts(diag))
     return true;
 
   // Attempt to add a fixit for the error.
@@ -2245,12 +2110,6 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
   case CTP_SubscriptAssignSource:
   case CTP_Initialization:
   case CTP_ReturnStmt:
-    tryRawRepresentableFixIts(diag, CS, exprType, contextualType,
-                              KnownProtocolKind::ExpressibleByIntegerLiteral,
-                              expr) ||
-    tryRawRepresentableFixIts(diag, CS, exprType, contextualType,
-                              KnownProtocolKind::ExpressibleByStringLiteral,
-                              expr) ||
     tryIntegerCastFixIts(diag, CS, exprType, contextualType, expr) ||
     addTypeCoerceFixit(diag, CS, exprType, contextualType, expr);
     break;
@@ -3410,7 +3269,7 @@ static bool diagnoseRawRepresentableMismatch(CalleeCandidateInfo &CCI,
   if (bestMatchKind == RawRepresentableMismatch::NotApplicable)
     return false;
 
-  const Expr *expr = argExpr;
+  Expr *expr = argExpr;
   if (auto *tupleArgs = dyn_cast<TupleExpr>(argExpr))
     expr = tupleArgs->getElement(bestMatchIndex);
 
@@ -3424,10 +3283,11 @@ static bool diagnoseRawRepresentableMismatch(CalleeCandidateInfo &CCI,
                              diag::cannot_convert_argument_value,
                              singleArgType, paramType);
 
-  tryRawRepresentableFixIts(diag, CS, singleArgType, paramType,
-                            bestMatchProtocol, expr);
-  return true;
+  ContextualFailure failure(expr, CS, singleArgType, paramType,
+                            CS.getConstraintLocator(expr));
 
+  (void)failure.tryRawRepresentableFixIts(diag, bestMatchProtocol);
+  return true;
 }
 
 // Extract expression for failed argument number

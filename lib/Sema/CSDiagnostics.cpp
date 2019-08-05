@@ -1872,9 +1872,21 @@ bool ContextualFailure::diagnoseAsError() {
   auto diag = emitDiagnostic(anchor->getLoc(), diagnostic, FromType, ToType);
   diag.highlight(anchor->getSourceRange());
 
-  (void)trySequenceSubsequenceFixIts(diag, getConstraintSystem(), FromType,
-                                     ToType, anchor);
+  (void)tryFixIts(diag);
   return true;
+}
+
+bool ContextualFailure::tryFixIts(InFlightDiagnostic &diagnostic) const {
+  if (trySequenceSubsequenceFixIts(diagnostic))
+    return true;
+
+  if (tryRawRepresentableFixIts(
+          diagnostic, KnownProtocolKind::ExpressibleByIntegerLiteral) ||
+      tryRawRepresentableFixIts(diagnostic,
+                                KnownProtocolKind::ExpressibleByStringLiteral))
+    return true;
+
+  return false;
 }
 
 bool ContextualFailure::diagnoseMissingFunctionCall() const {
@@ -1942,26 +1954,150 @@ bool ContextualFailure::diagnoseConversionToBool() const {
   return false;
 }
 
-bool ContextualFailure::trySequenceSubsequenceFixIts(InFlightDiagnostic &diag,
-                                                     ConstraintSystem &CS,
-                                                     Type fromType, Type toType,
-                                                     Expr *expr) {
-  if (!CS.TC.Context.getStdlibModule())
+bool ContextualFailure::tryRawRepresentableFixIts(
+    InFlightDiagnostic &diagnostic,
+    KnownProtocolKind rawRepresentableProtocol) const {
+  auto &CS = getConstraintSystem();
+  auto &TC = getTypeChecker();
+
+  auto *expr = getAnchor();
+  auto fromType = getFromType();
+  auto toType = getToType();
+
+  // The following fixes apply for optional destination types as well.
+  bool toTypeIsOptional = !toType->getOptionalObjectType().isNull();
+  toType = toType->lookThroughAllOptionalTypes();
+
+  Type fromTypeUnwrapped = fromType->getOptionalObjectType();
+  bool fromTypeIsOptional = !fromTypeUnwrapped.isNull();
+  if (fromTypeIsOptional)
+    fromType = fromTypeUnwrapped;
+
+  auto fixIt = [&](StringRef convWrapBefore, StringRef convWrapAfter) {
+    SourceRange exprRange = expr->getSourceRange();
+    if (fromTypeIsOptional && toTypeIsOptional) {
+      // Use optional's map function to convert conditionally, like so:
+      //   expr.map{ T(rawValue: $0) }
+      bool needsParens = !expr->canAppendPostfixExpression();
+      std::string mapCodeFix;
+      if (needsParens) {
+        diagnostic.fixItInsert(exprRange.Start, "(");
+        mapCodeFix += ")";
+      }
+      mapCodeFix += ".map { ";
+      mapCodeFix += convWrapBefore;
+      mapCodeFix += "$0";
+      mapCodeFix += convWrapAfter;
+      mapCodeFix += " }";
+      diagnostic.fixItInsertAfter(exprRange.End, mapCodeFix);
+    } else if (!fromTypeIsOptional) {
+      diagnostic.fixItInsert(exprRange.Start, convWrapBefore);
+      diagnostic.fixItInsertAfter(exprRange.End, convWrapAfter);
+    } else {
+      SmallString<16> fixItBefore(convWrapBefore);
+      SmallString<16> fixItAfter;
+
+      if (!expr->canAppendPostfixExpression(true)) {
+        fixItBefore += "(";
+        fixItAfter = ")";
+      }
+
+      fixItAfter += "!" + convWrapAfter.str();
+
+      diagnostic.flush();
+      emitDiagnostic(expr->getLoc(),
+                     diag::construct_raw_representable_from_unwrapped_value,
+                     toType, fromType)
+          .highlight(exprRange)
+          .fixItInsert(exprRange.Start, fixItBefore)
+          .fixItInsertAfter(exprRange.End, fixItAfter);
+    }
+  };
+
+  if (conformsToKnownProtocol(CS, fromType, rawRepresentableProtocol)) {
+    if (conformsToKnownProtocol(CS, fromType, KnownProtocolKind::OptionSet) &&
+        isa<IntegerLiteralExpr>(expr) &&
+        cast<IntegerLiteralExpr>(expr)->getDigitsText() == "0") {
+      diagnostic.fixItReplace(expr->getSourceRange(), "[]");
+      return true;
+    }
+    if (auto rawTy = isRawRepresentable(CS, toType, rawRepresentableProtocol)) {
+      // Produce before/after strings like 'Result(rawValue: RawType(<expr>))'
+      // or just 'Result(rawValue: <expr>)'.
+      std::string convWrapBefore = toType.getString();
+      convWrapBefore += "(rawValue: ";
+      std::string convWrapAfter = ")";
+      if (!isa<LiteralExpr>(expr) &&
+          !TC.isConvertibleTo(fromType, rawTy, getDC())) {
+        // Only try to insert a converting construction if the protocol is a
+        // literal protocol and not some other known protocol.
+        switch (rawRepresentableProtocol) {
+#define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(name, _, __, ___)            \
+  case KnownProtocolKind::name:                                                \
+    break;
+#define PROTOCOL_WITH_NAME(name, _)                                            \
+  case KnownProtocolKind::name:                                                \
+    return false;
+#include "swift/AST/KnownProtocols.def"
+        }
+        convWrapBefore += rawTy->getString();
+        convWrapBefore += "(";
+        convWrapAfter += ")";
+      }
+      fixIt(convWrapBefore, convWrapAfter);
+      return true;
+    }
+  }
+
+  if (auto rawTy = isRawRepresentable(CS, fromType, rawRepresentableProtocol)) {
+    if (conformsToKnownProtocol(CS, toType, rawRepresentableProtocol)) {
+      std::string convWrapBefore;
+      std::string convWrapAfter = ".rawValue";
+      if (!TC.isConvertibleTo(rawTy, toType, getDC())) {
+        // Only try to insert a converting construction if the protocol is a
+        // literal protocol and not some other known protocol.
+        switch (rawRepresentableProtocol) {
+#define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(name, _, __, ___)            \
+  case KnownProtocolKind::name:                                                \
+    break;
+#define PROTOCOL_WITH_NAME(name, _)                                            \
+  case KnownProtocolKind::name:                                                \
+    return false;
+#include "swift/AST/KnownProtocols.def"
+        }
+        convWrapBefore += toType->getString();
+        convWrapBefore += "(";
+        convWrapAfter += ")";
+      }
+      fixIt(convWrapBefore, convWrapAfter);
+      return true;
+    }
+  }
+
+  return false;
+}
+
+bool ContextualFailure::trySequenceSubsequenceFixIts(
+    InFlightDiagnostic &diagnostic) const {
+  if (!getASTContext().getStdlibModule())
     return false;
 
-  auto String = CS.TC.getStringType(CS.DC);
-  auto Substring = CS.TC.getSubstringType(CS.DC);
+  auto &TC = getTypeChecker();
+  auto *DC = getDC();
+
+  auto String = TC.getStringType(DC);
+  auto Substring = TC.getSubstringType(DC);
 
   if (!String || !Substring)
     return false;
 
   // Substring -> String conversion
   // Wrap in String.init
-  if (fromType->isEqual(Substring)) {
-    if (toType->isEqual(String)) {
-      auto range = expr->getSourceRange();
-      diag.fixItInsert(range.Start, "String(");
-      diag.fixItInsertAfter(range.End, ")");
+  if (FromType->isEqual(Substring)) {
+    if (ToType->isEqual(String)) {
+      auto range = getAnchor()->getSourceRange();
+      diagnostic.fixItInsert(range.Start, "String(");
+      diagnostic.fixItInsertAfter(range.End, ")");
       return true;
     }
   }
@@ -3365,8 +3501,7 @@ bool CollectionElementContextualFailure::diagnoseAsError() {
   if (!diagnostic)
     return false;
 
-  (void)trySequenceSubsequenceFixIts(*diagnostic, getConstraintSystem(),
-                                     eltType, contextualType, anchor);
+  (void)trySequenceSubsequenceFixIts(*diagnostic);
   return true;
 }
 
