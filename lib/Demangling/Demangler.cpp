@@ -1788,36 +1788,50 @@ NodePointer Demangler::demangleImplFunctionType() {
 
 NodePointer Demangler::demangleMetatype() {
   switch (nextChar()) {
+    case 'a':
+      return createWithPoppedType(Node::Kind::TypeMetadataAccessFunction);
+    case 'A':
+      return createWithChild(Node::Kind::ReflectionMetadataAssocTypeDescriptor,
+                             popProtocolConformance());
+    case 'B':
+      return createWithChild(Node::Kind::ReflectionMetadataBuiltinDescriptor,
+                               popNode(Node::Kind::Type));
     case 'c':
       return createWithChild(Node::Kind::ProtocolConformanceDescriptor,
                              popProtocolConformance());
+    case 'C': {
+      NodePointer Ty = popNode(Node::Kind::Type);
+      if (!Ty || !isAnyGeneric(Ty->getChild(0)->getKind()))
+        return nullptr;
+      return createWithChild(Node::Kind::ReflectionMetadataSuperclassDescriptor,
+                             Ty->getChild(0));
+    }
+    case 'D':
+      return createWithPoppedType(Node::Kind::TypeMetadataDemanglingCache);
     case 'f':
       return createWithPoppedType(Node::Kind::FullTypeMetadata);
-    case 'P':
-      return createWithPoppedType(Node::Kind::GenericTypeMetadataPattern);
-    case 'a':
-      return createWithPoppedType(Node::Kind::TypeMetadataAccessFunction);
+    case 'F':
+      return createWithChild(Node::Kind::ReflectionMetadataFieldDescriptor,
+                             popNode(Node::Kind::Type));
     case 'g':
       return createWithChild(Node::Kind::OpaqueTypeDescriptorAccessor,
                              popNode());
     case 'h':
       return createWithChild(Node::Kind::OpaqueTypeDescriptorAccessorImpl,
                              popNode());
+    case 'i':
+      return createWithPoppedType(Node::Kind::TypeMetadataInstantiationFunction);
+    case 'I':
+      return createWithPoppedType(Node::Kind::TypeMetadataInstantiationCache);
     case 'j':
       return createWithChild(Node::Kind::OpaqueTypeDescriptorAccessorKey,
                              popNode());
     case 'k':
       return createWithChild(Node::Kind::OpaqueTypeDescriptorAccessorVar,
                              popNode());
-    case 'I':
-      return createWithPoppedType(Node::Kind::TypeMetadataInstantiationCache);
-    case 'i':
-      return createWithPoppedType(Node::Kind::TypeMetadataInstantiationFunction);
-    case 'r':
-      return createWithPoppedType(Node::Kind::TypeMetadataCompletionFunction);
     case 'l':
       return createWithPoppedType(
-                            Node::Kind::TypeMetadataSingletonInitializationCache);
+                          Node::Kind::TypeMetadataSingletonInitializationCache);
     case 'L':
       return createWithPoppedType(Node::Kind::TypeMetadataLazyCache);
     case 'm':
@@ -1828,35 +1842,23 @@ NodePointer Demangler::demangleMetatype() {
       return createWithPoppedType(Node::Kind::ClassMetadataBaseOffset);
     case 'p':
       return createWithChild(Node::Kind::ProtocolDescriptor, popProtocol());
+    case 'P':
+      return createWithPoppedType(Node::Kind::GenericTypeMetadataPattern);
     case 'Q':
       return createWithChild(Node::Kind::OpaqueTypeDescriptor, popNode());
+    case 'r':
+      return createWithPoppedType(Node::Kind::TypeMetadataCompletionFunction);
+    case 's':
+      return createWithPoppedType(Node::Kind::ObjCResilientClassStub);
     case 'S':
       return createWithChild(Node::Kind::ProtocolSelfConformanceDescriptor,
                              popProtocol());
+    case 't':
+      return createWithPoppedType(Node::Kind::FullObjCResilientClassStub);
     case 'u':
       return createWithPoppedType(Node::Kind::MethodLookupFunction);
     case 'U':
       return createWithPoppedType(Node::Kind::ObjCMetadataUpdateFunction);
-    case 's':
-      return createWithPoppedType(Node::Kind::ObjCResilientClassStub);
-    case 't':
-      return createWithPoppedType(Node::Kind::FullObjCResilientClassStub);
-    case 'B':
-      return createWithChild(Node::Kind::ReflectionMetadataBuiltinDescriptor,
-                             popNode(Node::Kind::Type));
-    case 'F':
-      return createWithChild(Node::Kind::ReflectionMetadataFieldDescriptor,
-                             popNode(Node::Kind::Type));
-    case 'A':
-      return createWithChild(Node::Kind::ReflectionMetadataAssocTypeDescriptor,
-                             popProtocolConformance());
-    case 'C': {
-      NodePointer Ty = popNode(Node::Kind::Type);
-      if (!Ty || !isAnyGeneric(Ty->getChild(0)->getKind()))
-        return nullptr;
-      return createWithChild(Node::Kind::ReflectionMetadataSuperclassDescriptor,
-                             Ty->getChild(0));
-    }
     case 'V':
       return createWithChild(Node::Kind::PropertyDescriptor,
                              popNode(isEntity));
