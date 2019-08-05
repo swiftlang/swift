@@ -3401,8 +3401,7 @@ public:
       return bbi->getOperand();
     if (auto *lbi = dyn_cast<LoadBorrowInst>(v))
       return lbi->getOperand();
-    llvm::errs() << "Can not end borrow for value: " << v;
-    llvm_unreachable("standard error assertion");
+    return SILValue();
   }
 
   /// Return the set of guaranteed values that have scopes ended by this
