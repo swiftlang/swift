@@ -2077,7 +2077,7 @@ swift::ide::api::getSDKNodeRoot(SDKContext &SDKCtx,
     if (Opts.Verbose)
       llvm::errs() << "Loading module: " << Name << "...\n";
     auto *M = Ctx.getModuleByName(Name);
-    if (!M) {
+    if (!M || M->failedToLoad()) {
       llvm::errs() << "Failed to load module: " << Name << '\n';
       if (Opts.AbortOnModuleLoadFailure)
         return nullptr;
