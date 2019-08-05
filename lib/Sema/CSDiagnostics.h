@@ -777,6 +777,24 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Diagnose invalid pointer conversions for an autoclosure result type.
+///
+/// \code
+/// func foo(_ x: @autoclosure () -> UnsafePointer<Int>) {}
+///
+/// var i = 0
+/// foo(&i) // Invalid conversion to UnsafePointer
+/// \endcode
+class AutoClosurePointerConversionFailure final : public ContextualFailure {
+public:
+  AutoClosurePointerConversionFailure(Expr *root, ConstraintSystem &cs,
+                                      Type pointeeType, Type pointerType,
+                                      ConstraintLocator *locator)
+      : ContextualFailure(root, cs, pointeeType, pointerType, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
 /// Diagnose situations when there was an attempt to unwrap entity
 /// of non-optional type e.g.
 ///

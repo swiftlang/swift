@@ -368,6 +368,10 @@ class LinkEntity {
     /// The pointer is a canonical TypeBase*.
     TypeMetadataLazyCacheVariable,
 
+    /// A lazy cache variable for fetching type metadata from a mangled name.
+    /// The pointer is a canonical TypeBase*.
+    TypeMetadataDemanglingCacheVariable,
+
     /// A reflection metadata descriptor for a builtin or imported type.
     ReflectionBuiltinDescriptor,
 
@@ -702,6 +706,12 @@ public:
   static LinkEntity forTypeMetadataLazyCacheVariable(CanType type) {
     LinkEntity entity;
     entity.setForType(Kind::TypeMetadataLazyCacheVariable, type);
+    return entity;
+  }
+
+  static LinkEntity forTypeMetadataDemanglingCacheVariable(CanType type) {
+    LinkEntity entity;
+    entity.setForType(Kind::TypeMetadataDemanglingCacheVariable, type);
     return entity;
   }
 

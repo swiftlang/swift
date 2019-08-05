@@ -471,7 +471,7 @@ namespace {
     void addExtendedContext() {
       auto string = IGM.getTypeRef(E->getSelfInterfaceType(),
                                    E->getGenericSignature(),
-                                   MangledTypeRefRole::Metadata);
+                                   MangledTypeRefRole::Metadata).first;
       B.addRelativeAddress(string);
     }
     
@@ -1595,7 +1595,8 @@ namespace {
         GenericSignature *genericSig = getType()->getGenericSignature();
         B.addRelativeAddress(IGM.getTypeRef(superclassType->getCanonicalType(),
                                             genericSig,
-                                            MangledTypeRefRole::Metadata));
+                                            MangledTypeRefRole::Metadata)
+                               .first);
       } else {
         B.addInt32(0);
       }
@@ -1686,7 +1687,7 @@ namespace {
         ->getCanonicalType(O->getOpaqueInterfaceGenericSignature());
 
       B.addRelativeAddress(IGM.getTypeRef(underlyingType,
-                                          MangledTypeRefRole::Metadata));
+                                          MangledTypeRefRole::Metadata).first);
       
       auto opaqueType = O->getDeclaredInterfaceType()
                          ->castTo<OpaqueTypeArchetypeType>();
@@ -4267,7 +4268,7 @@ static void addGenericRequirement(IRGenModule &IGM, ConstantStructBuilder &B,
 
   B.addInt(IGM.Int32Ty, flags.getIntValue());
   auto typeName =
-      IGM.getTypeRef(paramType, nullptr, MangledTypeRefRole::Metadata);
+      IGM.getTypeRef(paramType, nullptr, MangledTypeRefRole::Metadata).first;
   B.addRelativeAddress(typeName);
   addReference();
 }
@@ -4335,7 +4336,7 @@ GenericRequirementsMetadata irgen::addGenericRequirements(
       auto flags = GenericRequirementFlags(abiKind, false, false);
       auto typeName =
           IGM.getTypeRef(requirement.getSecondType(), nullptr,
-                         MangledTypeRefRole::Metadata);
+                         MangledTypeRefRole::Metadata).first;
 
       addGenericRequirement(IGM, B, metadata, sig, flags,
                             requirement.getFirstType(),
