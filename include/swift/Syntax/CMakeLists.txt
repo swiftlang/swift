@@ -17,3 +17,7 @@ add_gyb_target(swift-syntax-generated-headers
     "${generated_include_sources}")
 set_property(TARGET swift-syntax-generated-headers
     PROPERTY FOLDER "Miscellaneous")
+
+if(TARGET clang)
+  add_dependencies(swift-syntax-generated-headers clang)
+endif()

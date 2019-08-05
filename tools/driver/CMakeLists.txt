@@ -35,6 +35,7 @@ add_swift_tool_symlink(swift-format swift editor-integration)
 # If building as part of clang, make sure the headers are installed.
 if(NOT SWIFT_BUILT_STANDALONE)
   add_dependencies(swift clang-resource-headers)
+  add_dependencies(swift swift-syntax-generated-headers)
 endif()
 
 swift_install_in_component(FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swiftc${CMAKE_EXECUTABLE_SUFFIX}"

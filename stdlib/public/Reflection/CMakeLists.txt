@@ -53,4 +53,8 @@ if(SWIFT_INCLUDE_TOOLS)
     set(CMAKE_C_COMPILER ${CURRENT_CMAKE_C_COMPILER})
     set(CMAKE_CXX_COMPILER ${CURRENT_CMAKE_CXX_COMPILER})
   endif()
+
+  if(TARGET clang)
+    add_dependencies(swiftReflection clang)
+  endif()
 endif()
