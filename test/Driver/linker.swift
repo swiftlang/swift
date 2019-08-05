@@ -219,7 +219,7 @@
 // ANDROID-armv7-DAG: [[OBJECTFILE]]
 // ANDROID-armv7-DAG: -lswiftCore
 // ANDROID-armv7-DAG: -L [[STDLIB_PATH:[^ ]+(/|\\\\)lib(/|\\\\)swift]]
-// ANDROID-armv7-DAG: -target armv7-none-linux-androideabi
+// ANDROID-armv7-DAG: -target armv7-unknown-linux-androideabi
 // ANDROID-armv7-DAG: -F foo -iframework car -F cdr
 // ANDROID-armv7-DAG: -framework bar
 // ANDROID-armv7-DAG: -L baz
