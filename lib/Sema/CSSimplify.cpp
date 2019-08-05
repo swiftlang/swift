@@ -2657,8 +2657,20 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::Subtype:
     case ConstraintKind::Conversion:
     case ConstraintKind::ArgumentConversion:
-    case ConstraintKind::OperatorArgumentConversion:
+    case ConstraintKind::OperatorArgumentConversion: {
+      if (typeVar1) {
+        if (auto *locator = typeVar1->getImpl().getLocator()) {
+          // TODO(diagnostics): Only binding here for function types, because
+          // doing so for KeyPath types leaves the constraint system in an
+          // unexpected state for key path diagnostics should we fail.
+          if (locator->isLastElement(ConstraintLocator::KeyPathType) &&
+              type2->is<AnyFunctionType>())
+            return matchTypesBindTypeVar(typeVar1, type2, kind, flags, locator,
+                                         formUnsolvedResult);
+        }
+      }
       return formUnsolvedResult();
+    }
 
     case ConstraintKind::OpaqueUnderlyingType:
     case ConstraintKind::ApplicableFunction:
@@ -5590,22 +5602,6 @@ ConstraintSystem::simplifyKeyPathConstraint(Type keyPathTy,
       return SolutionKind::Error;
   }
 
-  // If we have nothing else, and there's another constraint on our keyPathTy
-  // type variable that's some sort of conversion to a function type, use that
-  // constraint's second type.
-  if (keyPathTy->isTypeVariableOrMember()) {
-    for (auto constraint : getActiveConstraints()) {
-      if (constraint.getKind() > ConstraintKind::OperatorArgumentConversion)
-        continue;
-      if (constraint.getFirstType().getPointer() == keyPathTy.getPointer()) {
-        auto otherType = constraint.getSecondType();
-        if (otherType->is<FunctionType>() &&
-            !tryMatchRootAndValueFromType(otherType))
-          return SolutionKind::Error;
-      }
-    }
-  }
-
   // See if we resolved overloads for all the components involved.
   enum {
     ReadOnly,
@@ -5736,10 +5732,7 @@ done:
 
   auto loc = locator.getBaseLocator();
   if (definitelyFunctionType) {
-    Type fnType =
-        FunctionType::get({AnyFunctionType::Param(rootTy)}, valueTy,
-                          AnyFunctionType::ExtInfo().withThrows(false));
-    return matchTypes(keyPathTy, fnType, ConstraintKind::Bind, subflags, loc);
+    return SolutionKind::Solved;
   } else if (!anyComponentsUnresolved ||
              (definitelyKeyPathType && capability == ReadOnly)) {
     auto resolvedKPTy =
