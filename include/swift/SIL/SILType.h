@@ -444,10 +444,10 @@ public:
   ///
   /// If the replacement types are generic, you must push a generic context
   /// first.
-  SILType subst(SILModule &silModule,
-                TypeSubstitutionFn subs,
+  SILType subst(SILModule &silModule, TypeSubstitutionFn subs,
                 LookupConformanceFn conformances,
-                CanGenericSignature genericSig=CanGenericSignature()) const;
+                CanGenericSignature genericSig = CanGenericSignature(),
+                bool shouldSubstituteOpaqueArchetypes = false) const;
 
   SILType subst(SILModule &silModule, SubstitutionMap subs) const;
 
@@ -538,7 +538,11 @@ public:
   bool operator!=(SILType rhs) const {
     return value.getOpaqueValue() != rhs.value.getOpaqueValue();
   }
-  
+
+  /// Return the mangled name of this type, ignoring its prefix. Meant for
+  /// diagnostic purposes.
+  std::string getMangledName() const;
+
   std::string getAsString() const;
   void dump() const;
   void print(raw_ostream &OS) const;

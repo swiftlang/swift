@@ -210,6 +210,29 @@ SILPhiArgument *SILBasicBlock::replacePhiArgument(unsigned i, SILType Ty,
   return NewArg;
 }
 
+SILPhiArgument *SILBasicBlock::replacePhiArgumentAndReplaceAllUses(
+    unsigned i, SILType ty, ValueOwnershipKind kind, const ValueDecl *d) {
+  // Put in an undef placeholder before we do the replacement since
+  // replacePhiArgument() expects the replaced argument to not have
+  // any uses.
+  SmallVector<Operand *, 16> operands;
+  SILValue undef = SILUndef::get(ty, *getParent());
+  for (auto *use : getArgument(i)->getUses()) {
+    use->set(undef);
+    operands.push_back(use);
+  }
+
+  // Perform the replacement.
+  auto *newArg = replacePhiArgument(i, ty, kind, d);
+
+  // Wire back up the uses.
+  while (!operands.empty()) {
+    operands.pop_back_val()->set(newArg);
+  }
+
+  return newArg;
+}
+
 SILPhiArgument *SILBasicBlock::createPhiArgument(SILType Ty,
                                                  ValueOwnershipKind Kind,
                                                  const ValueDecl *D) {

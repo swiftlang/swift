@@ -1193,12 +1193,11 @@ void PatternMatchEmission::bindVariable(Pattern *pattern, VarDecl *var,
 
   // Initialize the variable value.
   InitializationPtr init = SGF.emitInitializationForVarDecl(var, immutable);
-  CanType formalValueType = pattern->getType()->getCanonicalType();
-  RValue rv(SGF, pattern, formalValueType, value.getFinalManagedValue());
+  auto mv = value.getFinalManagedValue();
   if (shouldTake(value, isIrrefutable)) {
-    std::move(rv).forwardInto(SGF, pattern, init.get());
+    mv.forwardInto(SGF, pattern, init.get());
   } else {
-    std::move(rv).copyInto(SGF, pattern, init.get());
+    mv.copyInto(SGF, pattern, init.get());
   }
 }
 
@@ -1371,6 +1370,7 @@ getManagedSubobject(SILGenFunction &SGF, SILValue value,
   case CastConsumptionKind::TakeOnSuccess:
     return {SGF.emitManagedRValueWithCleanup(value, valueTL), consumption};
   }
+  llvm_unreachable("covered switch");
 }
 
 static ConsumableManagedValue
@@ -1540,6 +1540,7 @@ emitTupleDispatch(ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
             "Borrow always can only occur along object only code paths");
       }
       }
+      llvm_unreachable("covered switch");
     }());
 
     // If we aren't loadable, add to the unforward array.

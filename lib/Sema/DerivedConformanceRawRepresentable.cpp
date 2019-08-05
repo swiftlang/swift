@@ -59,8 +59,8 @@ static Type deriveRawRepresentable_Raw(DerivedConformance &derived) {
   return derived.getConformanceContext()->mapTypeIntoContext(rawInterfaceType);
 }
 
-static void deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl,
-                                           void *) {
+static std::pair<BraceStmt *, bool>
+deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl, void *) {
   // enum SomeEnum : SomeType {
   //   case A = 111, B = 222
   //   @derived
@@ -108,8 +108,7 @@ static void deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl,
     auto returnStmt = new (C) ReturnStmt(SourceLoc(), call);
     auto body = BraceStmt::create(C, SourceLoc(), ASTNode(returnStmt),
                                   SourceLoc());
-    toRawDecl->setBody(body);
-    return;
+    return { body, /*isTypeChecked=*/false };
   }
 
   Type enumType = parentDC->getDeclaredTypeInContext();
@@ -140,7 +139,7 @@ static void deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl,
   auto body = BraceStmt::create(C, SourceLoc(),
                                 ASTNode(switchStmt),
                                 SourceLoc());
-  toRawDecl->setBody(body);
+  return { body, /*isTypeChecked=*/false };
 }
 
 static void maybeMarkAsInlinable(DerivedConformance &derived,
@@ -175,14 +174,14 @@ static VarDecl *deriveRawRepresentable_raw(DerivedConformance &derived) {
 
   // Define the getter.
   auto getterDecl = DerivedConformance::addGetterToReadOnlyDerivedProperty(
-      derived.TC, propDecl, rawType);
+      propDecl, rawType);
   getterDecl->setBodySynthesizer(&deriveBodyRawRepresentable_raw);
 
   // If the containing module is not resilient, make sure clients can get at
   // the raw value without function call overhead.
   maybeMarkAsInlinable(derived, getterDecl);
 
-  derived.addMembersToConformanceContext({getterDecl, propDecl, pbDecl});
+  derived.addMembersToConformanceContext({propDecl, pbDecl});
 
   return propDecl;
 }
@@ -267,7 +266,7 @@ static bool checkAvailability(const EnumElementDecl* elt, ASTContext &C,
   return true;
 }
 
-static void
+static std::pair<BraceStmt *, bool>
 deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
   // enum SomeEnum : SomeType {
   //   case A = 111, B = 222
@@ -405,7 +404,7 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
   auto body = BraceStmt::create(C, SourceLoc(),
                                 ASTNode(switchStmt),
                                 SourceLoc());
-  initDecl->setBody(body);
+  return { body, /*isTypeChecked=*/false };
 }
 
 static ConstructorDecl *
@@ -421,12 +420,13 @@ deriveRawRepresentable_init(DerivedConformance &derived) {
   auto equatableProto = tc.getProtocol(enumDecl->getLoc(),
                                        KnownProtocolKind::Equatable);
   assert(equatableProto);
-  assert(tc.conformsToProtocol(rawType, equatableProto, enumDecl, None));
+  assert(TypeChecker::conformsToProtocol(rawType, equatableProto,
+                                         enumDecl, None));
   (void)equatableProto;
   (void)rawType;
 
   auto *rawDecl = new (C)
-      ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+      ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(),
                 C.Id_rawValue, SourceLoc(), C.Id_rawValue, parentDC);
   rawDecl->setInterfaceType(rawInterfaceType);
   rawDecl->setImplicit();
@@ -489,7 +489,8 @@ static bool canSynthesizeRawRepresentable(DerivedConformance &derived) {
   if (!equatableProto)
     return false;
 
-  if (!tc.conformsToProtocol(rawType, equatableProto, enumDecl, None))
+  if (!TypeChecker::conformsToProtocol(rawType, equatableProto,
+                                       enumDecl, None))
     return false;
   
   // There must be enum elements.

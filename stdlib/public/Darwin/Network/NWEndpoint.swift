@@ -215,9 +215,7 @@ public struct IPv4Address: IPAddress, Hashable, CustomDebugStringConvertible {
 		if rawValue.count != MemoryLayout<in_addr>.size {
 			return nil
 		}
-		let v4 = rawValue.withUnsafeBytes { (ptr: UnsafePointer<in_addr>) -> in_addr in
-			return ptr.pointee
-		}
+		let v4 = rawValue.withUnsafeBytes { $0.load(as: in_addr.self) }
 		self.init(v4, interface)
 	}
 
@@ -381,9 +379,7 @@ public struct IPv6Address: IPAddress, Hashable, CustomDebugStringConvertible {
 		if rawValue.count != MemoryLayout<in6_addr>.size {
 			return nil
 		}
-		let v6 = rawValue.withUnsafeBytes { (ptr: UnsafePointer<in6_addr>) -> in6_addr in
-			return ptr.pointee
-		}
+		let v6 = rawValue.withUnsafeBytes { $0.load(as: in6_addr.self) }
 		self.init(v6, interface)
 	}
 

@@ -175,6 +175,32 @@ void CompilerInstance::recordPrimarySourceFile(SourceFile *SF) {
     recordPrimaryInputBuffer(SF->getBufferID().getValue());
 }
 
+bool CompilerInstance::setUpASTContextIfNeeded() {
+  if (Invocation.getFrontendOptions().RequestedAction ==
+      FrontendOptions::ActionType::CompileModuleFromInterface) {
+    // Compiling a module interface from source uses its own CompilerInstance
+    // with options read from the input file. Don't bother setting up an
+    // ASTContext at this level.
+    return false;
+  }
+
+  Context.reset(ASTContext::get(Invocation.getLangOptions(),
+                                Invocation.getSearchPathOptions(), SourceMgr,
+                                Diagnostics));
+  registerTypeCheckerRequestFunctions(Context->evaluator);
+
+  // Migrator, indexing and typo correction need some IDE requests.
+  if (Invocation.getMigratorOptions().shouldRunMigrator() ||
+      !Invocation.getFrontendOptions().IndexStorePath.empty() ||
+      Invocation.getLangOptions().TypoCorrectionLimit) {
+    registerIDERequestFunctions(Context->evaluator);
+  }
+  if (setUpModuleLoaders())
+    return true;
+
+  return false;
+}
+
 bool CompilerInstance::setup(const CompilerInvocation &Invok) {
   Invocation = Invok;
 
@@ -196,20 +222,18 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
     Invocation.getLangOptions().AttachCommentsToDecls = true;
   }
 
-  Context.reset(ASTContext::get(Invocation.getLangOptions(),
-                                Invocation.getSearchPathOptions(), SourceMgr,
-                                Diagnostics));
-  registerTypeCheckerRequestFunctions(Context->evaluator);
-
-  if (setUpModuleLoaders())
-    return true;
-
   assert(Lexer::isIdentifier(Invocation.getModuleName()));
 
   if (isInSILMode())
     Invocation.getLangOptions().EnableAccessControl = false;
 
-  return setUpInputs();
+  if (setUpInputs())
+    return true;
+
+  if (setUpASTContextIfNeeded())
+    return true;
+
+  return false;
 }
 
 static bool loadAndValidateVFSOverlay(
@@ -238,19 +262,20 @@ static bool loadAndValidateVFSOverlay(
 }
 
 bool CompilerInstance::setUpVirtualFileSystemOverlays() {
-  auto BaseFS = llvm::vfs::getRealFileSystem();
+  auto BaseFS = SourceMgr.getFileSystem();
   auto OverlayFS = llvm::IntrusiveRefCntPtr<llvm::vfs::OverlayFileSystem>(
                     new llvm::vfs::OverlayFileSystem(BaseFS));
   bool hadAnyFailure = false;
+  bool hasOverlays = false;
   for (const auto &File : Invocation.getSearchPathOptions().VFSOverlayFiles) {
+    hasOverlays = true;
     hadAnyFailure |=
         loadAndValidateVFSOverlay(File, BaseFS, OverlayFS, Diagnostics);
   }
 
   // If we successfully loaded all the overlays, let the source manager and
   // diagnostic engine take advantage of the overlay file system.
-  if (!hadAnyFailure &&
-      (OverlayFS->overlays_begin() != OverlayFS->overlays_end())) {
+  if (!hadAnyFailure && hasOverlays) {
     SourceMgr.setFileSystem(OverlayFS);
   }
 
@@ -339,13 +364,11 @@ bool CompilerInstance::setUpModuleLoaders() {
   if (MLM != ModuleLoadingMode::OnlySerialized) {
     auto const &Clang = clangImporter->getClangInstance();
     std::string ModuleCachePath = getModuleCachePathFromClang(Clang);
-    StringRef PrebuiltModuleCachePath =
-        Invocation.getFrontendOptions().PrebuiltModuleCachePath;
-    auto PIML = ParseableInterfaceModuleLoader::create(*Context,
-                                                       ModuleCachePath,
-                                                       PrebuiltModuleCachePath,
-                                                       getDependencyTracker(),
-                                                       MLM);
+    auto &FEOpts = Invocation.getFrontendOptions();
+    StringRef PrebuiltModuleCachePath = FEOpts.PrebuiltModuleCachePath;
+    auto PIML = ParseableInterfaceModuleLoader::create(
+        *Context, ModuleCachePath, PrebuiltModuleCachePath,
+        getDependencyTracker(), MLM, FEOpts.RemarkOnRebuildFromModuleInterface);
     Context->addModuleLoader(std::move(PIML));
   }
   Context->addModuleLoader(std::move(SML));
@@ -809,6 +832,18 @@ void CompilerInstance::parseAndCheckTypesUpTo(
                         options.WarnLongExpressionTypeChecking,
                         options.SolverExpressionTimeThreshold,
                         options.SwitchCheckingInvocationThreshold);
+
+    if (!Context->hadError() && Invocation.getFrontendOptions().PCMacro) {
+      performPCMacro(SF, PersistentState.getTopLevelContext());
+    }
+
+    // Playground transform knows to look out for PCMacro's changes and not
+    // to playground log them.
+    if (!Context->hadError() &&
+        Invocation.getFrontendOptions().PlaygroundTransform) {
+      performPlaygroundTransform(
+          SF, Invocation.getFrontendOptions().PlaygroundHighPerformance);
+    }
   });
 
   if (Invocation.isCodeCompletion()) {
@@ -949,17 +984,6 @@ void CompilerInstance::parseAndTypeCheckMainFileUpTo(
     performDebuggerTestingTransform(MainFile);
   }
 
-  if (mainIsPrimary && !Context->hadError() &&
-      Invocation.getFrontendOptions().PCMacro) {
-    performPCMacro(MainFile, PersistentState.getTopLevelContext());
-  }
-
-  // Playground transform knows to look out for PCMacro's changes and not
-  // to playground log them.
-  if (mainIsPrimary && !Context->hadError() &&
-      Invocation.getFrontendOptions().PlaygroundTransform)
-    performPlaygroundTransform(
-        MainFile, Invocation.getFrontendOptions().PlaygroundHighPerformance);
   if (!mainIsPrimary) {
     performNameBinding(MainFile);
   }
@@ -992,6 +1016,8 @@ void CompilerInstance::finishTypeChecking(
       performWholeModuleTypeChecking(SF);
     });
   }
+
+  checkInconsistentImplementationOnlyImports(MainModule);
 }
 
 SourceFile *CompilerInstance::createSourceFileForMainModule(

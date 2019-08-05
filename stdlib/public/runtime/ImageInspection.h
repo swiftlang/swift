@@ -80,7 +80,9 @@ void addImageProtocolConformanceBlockCallback(const void *start,
                                               uintptr_t size);
 void addImageTypeMetadataRecordBlockCallback(const void *start,
                                              uintptr_t size);
-void addImageDynamicReplacementBlockCallback(const void *start, uintptr_t size);
+void addImageDynamicReplacementBlockCallback(const void *start, uintptr_t size,
+                                             const void *start2,
+                                             uintptr_t size2);
 
 int lookupSymbol(const void *address, SymbolInfo *info);
 void *lookupSection(const char *segment, const char *section, size_t *outSize);

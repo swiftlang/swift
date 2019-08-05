@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "sil-inliner"
 
 #include "swift/SILOptimizer/Utils/SILInliner.h"
+#include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SILOptimizer/Utils/CFG.h"
@@ -49,7 +50,7 @@ static bool canInlineBeginApply(BeginApplyInst *BA) {
   // potentially after the resumption site when there are un-mergeable
   // values alive across it.
   bool hasYield = false;
-  for (auto &B : BA->getReferencedFunction()->getBlocks()) {
+  for (auto &B : BA->getReferencedFunctionOrNull()->getBlocks()) {
     if (isa<YieldInst>(B.getTerminator())) {
       if (hasYield) return false;
       hasYield = true;
@@ -325,6 +326,8 @@ protected:
 std::pair<SILBasicBlock::iterator, SILBasicBlock *>
 SILInliner::inlineFunction(SILFunction *calleeFunction, FullApplySite apply,
                            ArrayRef<SILValue> appliedArgs) {
+  PrettyStackTraceSILFunction calleeTraceRAII("inlining", calleeFunction);
+  PrettyStackTraceSILFunction callerTraceRAII("...into", apply.getFunction());
   assert(canInlineApplySite(apply)
          && "Asked to inline function that is unable to be inlined?!");
 
@@ -332,6 +335,29 @@ SILInliner::inlineFunction(SILFunction *calleeFunction, FullApplySite apply,
                          OpenedArchetypesTracker, DeletionCallback);
   auto nextI = cloner.cloneInline(appliedArgs);
   return std::make_pair(nextI, cloner.getLastClonedBB());
+}
+
+std::pair<SILBasicBlock::iterator, SILBasicBlock *>
+SILInliner::inlineFullApply(FullApplySite apply,
+                            SILInliner::InlineKind inlineKind,
+                            SILOptFunctionBuilder &funcBuilder) {
+  assert(apply.canOptimize());
+  SmallVector<SILValue, 8> appliedArgs;
+  for (const auto &arg : apply.getArguments())
+    appliedArgs.push_back(arg);
+
+  SILFunction *caller = apply.getFunction();
+  SILOpenedArchetypesTracker OpenedArchetypesTracker(caller);
+  caller->getModule().registerDeleteNotificationHandler(
+      &OpenedArchetypesTracker);
+  // The callee only needs to know about opened archetypes used in
+  // the substitution list.
+  OpenedArchetypesTracker.registerUsedOpenedArchetypes(apply.getInstruction());
+
+  SILInliner Inliner(funcBuilder, inlineKind, apply.getSubstitutionMap(),
+                     OpenedArchetypesTracker);
+  return Inliner.inlineFunction(apply.getReferencedFunctionOrNull(), apply,
+                                appliedArgs);
 }
 
 SILInlineCloner::SILInlineCloner(
@@ -518,11 +544,13 @@ void SILInlineCloner::fixUp(SILFunction *calleeFunction) {
   assert(!Apply.getInstruction()->hasUsesOfAnyResult());
 
   auto deleteCallback = [this](SILInstruction *deletedI) {
+    if (NextIter == deletedI->getIterator())
+      ++NextIter;
     if (DeletionCallback)
       DeletionCallback(deletedI);
   };
-  NextIter = recursivelyDeleteTriviallyDeadInstructions(Apply.getInstruction(),
-                                                        true, deleteCallback);
+  recursivelyDeleteTriviallyDeadInstructions(Apply.getInstruction(), true,
+                                             deleteCallback);
 }
 
 SILValue SILInlineCloner::borrowFunctionArgument(SILValue callArg,
@@ -531,15 +559,20 @@ SILValue SILInlineCloner::borrowFunctionArgument(SILValue callArg,
       || callArg.getOwnershipKind() != ValueOwnershipKind::Owned) {
     return callArg;
   }
-  auto *borrow = getBuilder().createBeginBorrow(AI.getLoc(), callArg);
+
+  SILBuilderWithScope beginBuilder(AI.getInstruction(), getBuilder());
+  auto *borrow = beginBuilder.createBeginBorrow(AI.getLoc(), callArg);
   if (auto *tryAI = dyn_cast<TryApplyInst>(AI)) {
-    SILBuilder returnBuilder(tryAI->getNormalBB()->begin());
+    SILBuilderWithScope returnBuilder(tryAI->getNormalBB()->begin(),
+                                      getBuilder());
     returnBuilder.createEndBorrow(AI.getLoc(), borrow, callArg);
 
-    SILBuilder throwBuilder(tryAI->getErrorBB()->begin());
+    SILBuilderWithScope throwBuilder(tryAI->getErrorBB()->begin(),
+                                     getBuilder());
     throwBuilder.createEndBorrow(AI.getLoc(), borrow, callArg);
   } else {
-    SILBuilder returnBuilder(std::next(AI.getInstruction()->getIterator()));
+    SILBuilderWithScope returnBuilder(
+        std::next(AI.getInstruction()->getIterator()), getBuilder());
     returnBuilder.createEndBorrow(AI.getLoc(), borrow, callArg);
   }
   return borrow;
@@ -731,7 +764,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::ValueMetatypeInst:
   case SILInstructionKind::WitnessMethodInst:
   case SILInstructionKind::AssignInst:
-  case SILInstructionKind::AssignByDelegateInst:
+  case SILInstructionKind::AssignByWrapperInst:
   case SILInstructionKind::BranchInst:
   case SILInstructionKind::CheckedCastBranchInst:
   case SILInstructionKind::CheckedCastValueBranchInst:

@@ -46,7 +46,6 @@ namespace clang {
 namespace swift {
   enum class ArtificialMainKind : uint8_t;
   class ASTContext;
-  class ASTScope;
   class ASTWalker;
   class BraceStmt;
   class Decl;
@@ -80,9 +79,13 @@ namespace swift {
   class VarDecl;
   class VisibleDeclConsumer;
   class SyntaxParsingCache;
-  
-namespace syntax {
+  class ASTScope;
+
+  namespace syntax {
   class SourceFileSyntax;
+}
+namespace ast_scope {
+class ASTSourceFileScope;
 }
 
 /// Discriminator for file-units.
@@ -325,6 +328,27 @@ public:
     Bits.ModuleDecl.RawResilienceStrategy = unsigned(strategy);
   }
 
+  /// \returns true if this module is a system module; note that the StdLib is
+  /// considered a system module.
+  bool isSystemModule() const {
+    return Bits.ModuleDecl.IsSystemModule;
+  }
+  void setIsSystemModule(bool flag = true) {
+    Bits.ModuleDecl.IsSystemModule = flag;
+  }
+
+  /// Returns true if this module is a non-Swift module that was imported into
+  /// Swift.
+  ///
+  /// Right now that's just Clang modules.
+  bool isNonSwiftModule() const {
+    return Bits.ModuleDecl.IsNonSwiftModule;
+  }
+  /// \see #isNonSwiftModule
+  void setIsNonSwiftModule(bool flag = true) {
+    Bits.ModuleDecl.IsNonSwiftModule = flag;
+  }
+
   bool isResilient() const {
     return getResilienceStrategy() != ResilienceStrategy::Default;
   }
@@ -552,10 +576,6 @@ public:
 
   /// \returns true if this module is the "SwiftOnoneSupport" module;
   bool isOnoneSupportModule() const;
-
-  /// \returns true if this module is a system module; note that the StdLib is
-  /// considered a system module.
-  bool isSystemModule() const;
 
   /// \returns true if traversal was aborted, false otherwise.
   bool walk(ASTWalker &Walker);
@@ -984,7 +1004,7 @@ private:
   bool HasImplementationOnlyImports = false;
 
   /// The scope map that describes this source file.
-  ASTScope *Scope = nullptr;
+  std::unique_ptr<ASTScope> Scope;
 
   friend ASTContext;
   friend Impl;
@@ -1000,6 +1020,7 @@ public:
   llvm::SetVector<TypeDecl *> LocalTypeDecls;
   
   /// The set of validated opaque return type decls in the source file.
+  llvm::SmallVector<OpaqueTypeDecl *, 4> OpaqueReturnTypes;
   llvm::StringMap<OpaqueTypeDecl *> ValidatedOpaqueReturnTypes;
   /// The set of parsed decls with opaque return types that have not yet
   /// been validated.
@@ -1073,6 +1094,8 @@ public:
   SourceFile(ModuleDecl &M, SourceFileKind K, Optional<unsigned> bufferID,
              ImplicitModuleImportKind ModImpKind, bool KeepParsedTokens = false,
              bool KeepSyntaxTree = false);
+
+  ~SourceFile();
 
   void addImports(ArrayRef<ImportedModuleDesc> IM);
 
@@ -1299,7 +1322,7 @@ public:
   }
   
   void markDeclWithOpaqueResultTypeAsValidated(ValueDecl *vd);
-  
+
 private:
 
   /// If not None, the underlying vector should contain tokens of this source file.
@@ -1397,7 +1420,7 @@ public:
   }
 
   /// Returns the Swift module that overlays a Clang module.
-  virtual ModuleDecl *getAdapterModule() const { return nullptr; }
+  virtual ModuleDecl *getOverlayModule() const { return nullptr; }
 
   virtual bool isSystemModule() const { return false; }
 

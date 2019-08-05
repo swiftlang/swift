@@ -69,6 +69,47 @@ internal func _cocoaStringSubscript(
   return _swift_stdlib_CFStringGetCharacterAtIndex(cfSelf, position)
 }
 
+@_effects(releasenone)
+internal func _cocoaStringCopyUTF8(
+  _ target: _CocoaString,
+  into bufPtr: UnsafeMutableBufferPointer<UInt8>
+) -> Int? {
+  let ptr = bufPtr.baseAddress._unsafelyUnwrappedUnchecked
+  let len = _stdlib_binary_CFStringGetLength(target)
+  var count = 0
+  let converted = _swift_stdlib_CFStringGetBytes(
+    target,
+    _swift_shims_CFRange(location: 0, length: len),
+    kCFStringEncodingUTF8,
+    0,
+    0,
+    ptr,
+    bufPtr.count,
+    &count
+  )
+  return len == converted ? count : nil
+}
+
+@_effects(readonly)
+internal func _cocoaStringUTF8Count(
+  _ target: _CocoaString,
+  range: Range<Int>
+) -> Int? {
+  var count = 0
+  let len = _stdlib_binary_CFStringGetLength(target)
+  let converted = _swift_stdlib_CFStringGetBytes(
+    target,
+    _swift_shims_CFRange(location: range.startIndex, length: range.count),
+    kCFStringEncodingUTF8,
+    0,
+    0,
+    UnsafeMutablePointer<UInt8>(Builtin.inttoptr_Word(0._builtinWordValue)),
+    0,
+    &count
+  )
+  return converted == len ? count : nil
+}
+
 @_effects(readonly)
 internal func _cocoaStringCompare(
   _ string: _CocoaString, _ other: _CocoaString
@@ -117,11 +158,11 @@ internal func _cocoaGetCStringTrampoline(
 // Conversion from NSString to Swift's native representation.
 //
 
-private var kCFStringEncodingASCII : _swift_shims_CFStringEncoding {
+private var kCFStringEncodingASCII: _swift_shims_CFStringEncoding {
   @inline(__always) get { return 0x0600 }
 }
 
-private var kCFStringEncodingUTF8 : _swift_shims_CFStringEncoding {
+private var kCFStringEncodingUTF8: _swift_shims_CFStringEncoding {
   @inline(__always) get { return 0x8000100 }
 }
 
@@ -132,17 +173,17 @@ internal enum _KnownCocoaString {
 #if !(arch(i386) || arch(arm))
   case tagged
 #endif
-  
+
   @inline(__always)
   init(_ str: _CocoaString) {
-    
+
 #if !(arch(i386) || arch(arm))
     if _isObjCTaggedPointer(str) {
       self = .tagged
       return
     }
 #endif
-    
+
     switch unsafeBitCast(_swift_classOfObjCHeapObject(str), to: UInt.self) {
     case unsafeBitCast(__StringStorage.self, to: UInt.self):
       self = .storage
@@ -231,13 +272,13 @@ internal func _bridgeCocoaString(_ cocoaString: _CocoaString) -> _StringGuts {
     //   3) If it's mutable with associated information, must make the call
     let immutableCopy
       = _stdlib_binary_CFStringCreateCopy(cocoaString) as AnyObject
-    
+
 #if !(arch(i386) || arch(arm))
     if _isObjCTaggedPointer(immutableCopy) {
       return _StringGuts(_SmallString(taggedCocoa: immutableCopy))
     }
 #endif
-    
+
     let (fastUTF8, isASCII): (Bool, Bool)
     switch _getCocoaStringPointer(immutableCopy) {
     case .ascii(_): (fastUTF8, isASCII) = (true, true)
@@ -245,7 +286,7 @@ internal func _bridgeCocoaString(_ cocoaString: _CocoaString) -> _StringGuts {
     default:  (fastUTF8, isASCII) = (false, false)
     }
     let length = _stdlib_binary_CFStringGetLength(immutableCopy)
-    
+
     return _StringGuts(
       cocoa: immutableCopy,
       providesFastUTF8: fastUTF8,
@@ -280,14 +321,24 @@ extension String {
   @_effects(releasenone)
   public // SPI(Foundation)
   func _bridgeToObjectiveCImpl() -> AnyObject {
-    if _guts.isSmall {
+    // Smol ASCII a) may bridge to tagged pointers, b) can't contain a BOM
+    if _guts.isSmallASCII {
       return _guts.asSmall.withUTF8 { bufPtr in
         return _createCFString(
-            bufPtr.baseAddress._unsafelyUnwrappedUnchecked,
-            bufPtr.count,
-            kCFStringEncodingUTF8
+          bufPtr.baseAddress._unsafelyUnwrappedUnchecked,
+          bufPtr.count,
+          kCFStringEncodingUTF8
         )
       }
+    }
+    if _guts.isSmall {
+        // We can't form a tagged pointer String, so grow to a non-small String,
+        // and bridge that instead. Also avoids CF deleting any BOM that may be
+        // present
+        var copy = self
+        copy._guts.grow(_SmallString.capacity + 1)
+        _internalInvariant(!copy._guts.isSmall)
+        return copy._bridgeToObjectiveCImpl()
     }
     if _guts._object.isImmortal {
       // TODO: We'd rather emit a valid ObjC object statically than create a
@@ -379,6 +430,6 @@ extension String {
   ) {
     _internalInvariant(buffer.count >= range.count)
     let indexRange = self._toUTF16Indices(range)
-    self._nativeCopyUTF16CodeUnits(into: buffer, range: indexRange)
+    self.utf16._nativeCopy(into: buffer, alignedRange: indexRange)
   }
 }

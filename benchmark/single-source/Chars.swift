@@ -20,7 +20,7 @@ public let Chars = BenchmarkInfo(
   setUpFunction: { blackHole(alphabetInput) },
   legacyFactor: 50)
 
-var alphabetInput: [Character] = [
+let alphabetInput: [Character] = [
     "A", "B", "C", "D", "E", "F", "G",
     "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R",
     "S", "T", "U",

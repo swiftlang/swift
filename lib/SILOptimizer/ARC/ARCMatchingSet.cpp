@@ -77,7 +77,7 @@ ARCMatchingSetBuilder::matchIncrementsToDecrements() {
 
     bool BUCodeMotionSafe = (*BURefCountState)->second.isCodeMotionSafe();
     LLVM_DEBUG(llvm::dbgs() << "        BOTTOM UP CODEMOTIONSAFE: "
-                            << (BUIsKnownSafe ? "true" : "false") << "\n");
+                            << (BUCodeMotionSafe ? "true" : "false") << "\n");
     Flags.CodeMotionSafe &= BUCodeMotionSafe;
 
     // Now that we know we have an inst, grab the decrement.
@@ -161,7 +161,7 @@ ARCMatchingSetBuilder::matchDecrementsToIncrements() {
 
     bool TDCodeMotionSafe = (*TDRefCountState)->second.isCodeMotionSafe();
     LLVM_DEBUG(llvm::dbgs() << "        TOP DOWN CODEMOTIONSAFE: "
-                            << (TDIsKnownSafe ? "true" : "false") << "\n");
+                            << (TDCodeMotionSafe ? "true" : "false") << "\n");
     Flags.CodeMotionSafe &= TDCodeMotionSafe;
 
     // Now that we know we have an inst, grab the decrement.

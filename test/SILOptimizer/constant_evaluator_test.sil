@@ -153,6 +153,15 @@ bb0:
   return %2 : $(Builtin.Int8)
 } // CHECK: Returns int: -1
 
+// CHECK-LABEL: @interpretSignedTruncWithIntLiteral
+sil @interpretSignedTruncWithIntLiteral : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  %0 = integer_literal $Builtin.IntLiteral, 5
+  %1 = builtin "s_to_s_checked_trunc_IntLiteral_Int64"(%0 : $Builtin.IntLiteral) : $(Builtin.Int64, Builtin.Int1)
+  %2 = tuple_extract %1 : $(Builtin.Int64, Builtin.Int1), 0
+  return %2 : $(Builtin.Int64)
+} // CHECK: Returns int: 5
+
 // CHECK-LABEL: @interpretSignedExtend
 sil @interpretSignedExtend : $@convention(thin) () -> Builtin.Int64 {
 bb0:
@@ -486,7 +495,7 @@ bb3:
 
 // Test stack allocation and memory access.
 
-// CHECK-LABEL @interpretLoadStore
+// CHECK-LABEL: @interpretLoadStore
 sil hidden @interpretLoadStore : $@convention(thin) () -> Builtin.Int64 {
 bb0:
   %0 = alloc_stack $Builtin.Int64, var, name "i"
@@ -497,7 +506,7 @@ bb0:
   return %3 : $Builtin.Int64
 } // CHECK: Returns int: 11
 
-// CHECK-LABEL @interpretBeginEndAccess
+// CHECK-LABEL: @interpretBeginEndAccess
 sil hidden @interpretBeginEndAccess : $@convention(thin) () -> Builtin.Int64 {
 bb0:
   %0 = alloc_stack $Builtin.Int64, var, name "i"
@@ -626,9 +635,9 @@ bb0:
   return %5 : $String
 }
 
-// static String.+= infix(_:_:)
+// String.append(_:_:)
 // The semantics attribute is used by the interpreter.
-sil [serialized] [_semantics "string.append"] @$sSS2peoiyySSz_SStFZ : $@convention(method) (@inout String, @guaranteed String, @thin String.Type) -> ()
+sil [serialized] [_semantics "string.append"] @$sSS6appendyySSF : $@convention(method) (@guaranteed String, @inout String) -> ()
 
 // CHECK-LABEL: @interpretStringAppend
 sil @interpretStringAppend: $@convention(thin) () -> @owned String {
@@ -649,9 +658,9 @@ bb0:
   %13 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
   %14 = apply %13(%9, %10, %11, %12) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
   %15 = begin_access [modify] [static] %0 : $*String
-  // function_ref static String.+= infix(_:_:)
-  %16 = function_ref @$sSS2peoiyySSz_SStFZ : $@convention(method) (@inout String, @guaranteed String, @thin String.Type) -> ()
-  %17 = apply %16(%15, %14, %8) : $@convention(method) (@inout String, @guaranteed String, @thin String.Type) -> ()
+  // function_ref static String.append (_:_:)
+  %16 = function_ref @$sSS6appendyySSF : $@convention(method) (@guaranteed String, @inout String) -> ()
+  %17 = apply %16(%14, %15) : $@convention(method) (@guaranteed String, @inout String) -> ()
   end_access %15 : $*String
   release_value %14 : $String
   %20 = begin_access [read] [static] %0 : $*String
@@ -683,8 +692,8 @@ bb0:
   %14 = apply %13(%9, %10, %11, %12) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
   %15 = begin_access [modify] [static] %0 : $*String
   // function_ref static String.+= infix(_:_:)
-  %16 = function_ref @$sSS2peoiyySSz_SStFZ : $@convention(method) (@inout String, @guaranteed String, @thin String.Type) -> ()
-  %17 = apply %16(%15, %14, %8) : $@convention(method) (@inout String, @guaranteed String, @thin String.Type) -> ()
+  %16 = function_ref @$sSS6appendyySSF : $@convention(method) (@guaranteed String, @inout String) -> ()
+  %17 = apply %16(%14, %15) : $@convention(method) (@guaranteed String, @inout String) -> ()
   end_access %15 : $*String
   release_value %14 : $String
   %20 = begin_access [read] [static] %0 : $*String
@@ -739,6 +748,68 @@ bb2(%15 : $(Int64, Int64)):
 bb3(%30 : $Builtin.Int64):
     return %30 : $Builtin.Int64
 } // CHECK: Returns int: 100
+
+// Test inject_enum_addr instruction.
+
+public enum Direction {
+  case north
+  case south
+  case east
+  case west
+}
+
+sil @isNorth : $@convention(thin) (@in_guaranteed Direction) -> Builtin.Int32 {
+bb0(%0 : $*Direction):
+  switch_enum_addr %0 : $*Direction, case #Direction.north!enumelt: bb1, default bb2
+
+bb1:
+  %3 = integer_literal $Builtin.Int32, 1
+  br bb3(%3 : $Builtin.Int32)
+
+bb2:
+  %6 = integer_literal $Builtin.Int32, 0
+  br bb3(%6 : $Builtin.Int32)
+
+bb3(%9 : $Builtin.Int32):
+  return %9 : $Builtin.Int32
+}
+
+// CHECK: @interpretTestInjectEnumAddr
+sil hidden @interpretTestInjectEnumAddr : $@convention(thin) () -> Builtin.Int32 {
+bb0:
+  %1 = alloc_stack $Direction
+  inject_enum_addr %1 : $*Direction, #Direction.north!enumelt
+  %2 = function_ref @isNorth : $@convention(thin) (@in_guaranteed Direction) -> Builtin.Int32
+  %3 = apply %2(%1) : $@convention(thin) (@in_guaranteed Direction) -> Builtin.Int32
+  destroy_addr %1 : $*Direction
+  dealloc_stack %1 : $*Direction
+  return %3 : $Builtin.Int32
+} // CHECK: Returns int: 1
+
+// Test select_enum and select_enum_addr instructions.
+
+// CHECK: @interpretTestSelectEnum
+sil hidden @interpretTestSelectEnum : $@convention(thin) () -> Builtin.Int32 {
+bb0:
+  %1 = enum $Direction, #Direction.north!enumelt
+  %2 = integer_literal $Builtin.Int32, 1
+  %3 = integer_literal $Builtin.Int32, 0
+  %4 = select_enum %1 : $Direction, case #Direction.north!enumelt: %2, default %3 : $Builtin.Int32
+  return %4 : $Builtin.Int32
+} // CHECK: Returns int: 1
+
+// CHECK: @interpretTestSelectEnumAddr
+sil hidden @interpretTestSelectEnumAddr : $@convention(thin) () -> Builtin.Int32 {
+bb0:
+  %1 = alloc_stack $Direction
+  inject_enum_addr %1 : $*Direction, #Direction.north!enumelt
+  %2 = integer_literal $Builtin.Int32, 1
+  %3 = integer_literal $Builtin.Int32, 0
+  %4 = select_enum_addr %1 : $*Direction, case #Direction.north!enumelt: %2, default %3 : $Builtin.Int32
+  destroy_addr %1 : $*Direction
+  dealloc_stack %1 : $*Direction
+  return %4 : $Builtin.Int32
+} // CHECK: Returns int: 1
 
 // Test calling conventions.
 
@@ -836,8 +907,8 @@ bb4:
   %40 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
   %41 = apply %40(%36, %37, %38, %39) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
   %42 = begin_access [modify] [static] %10 : $*String
-  %43 = function_ref @$sSS2peoiyySSz_SStFZ : $@convention(method) (@inout String, @guaranteed String, @thin String.Type) -> ()
-  %44 = apply %43(%42, %41, %35) : $@convention(method) (@inout String, @guaranteed String, @thin String.Type) -> ()
+  %43 = function_ref @$sSS6appendyySSF : $@convention(method) (@guaranteed String, @inout String) -> ()
+  %44 = apply %43(%41, %42) : $@convention(method) (@guaranteed String, @inout String) -> ()
   end_access %42 : $*String
   release_value %41 : $String
   br bb6
@@ -857,8 +928,8 @@ bb7:
   %55 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
   %56 = apply %55(%51, %52, %53, %54) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
   %57 = begin_access [modify] [static] %10 : $*String
-  %58 = function_ref @$sSS2peoiyySSz_SStFZ : $@convention(method) (@inout String, @guaranteed String, @thin String.Type) -> ()
-  %59 = apply %58(%57, %56, %50) : $@convention(method) (@inout String, @guaranteed String, @thin String.Type) -> ()
+  %58 = function_ref @$sSS6appendyySSF : $@convention(method) (@guaranteed String, @inout String) -> ()
+  %59 = apply %58(%56, %57) : $@convention(method) (@guaranteed String, @inout String) -> ()
   end_access %57 : $*String
   release_value %56 : $String
   br bb13
@@ -872,8 +943,8 @@ bb8:
   %68 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
   %69 = apply %68(%64, %65, %66, %67) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
   %70 = begin_access [modify] [static] %10 : $*String
-  %71 = function_ref @$sSS2peoiyySSz_SStFZ : $@convention(method) (@inout String, @guaranteed String, @thin String.Type) -> ()
-  %72 = apply %71(%70, %69, %63) : $@convention(method) (@inout String, @guaranteed String, @thin String.Type) -> ()
+  %71 = function_ref @$sSS6appendyySSF : $@convention(method) (@guaranteed String, @inout String) -> ()
+  %72 = apply %71(%69, %70) : $@convention(method) (@guaranteed String, @inout String) -> ()
   end_access %70 : $*String
   release_value %69 : $String
   br bb13
@@ -903,8 +974,8 @@ bb11:
 
 bb12(%93 : $String):
   %94 = begin_access [modify] [static] %10 : $*String
-  %95 = function_ref @$sSS2peoiyySSz_SStFZ : $@convention(method) (@inout String, @guaranteed String, @thin String.Type) -> ()
-  %96 = apply %95(%94, %93, %76) : $@convention(method) (@inout String, @guaranteed String, @thin String.Type) -> ()
+  %95 = function_ref @$sSS6appendyySSF : $@convention(method) (@guaranteed String, @inout String) -> ()
+  %96 = apply %95(%93, %94) : $@convention(method) (@guaranteed String, @inout String) -> ()
   end_access %94 : $*String
   release_value %93 : $String
   br bb13
@@ -982,3 +1053,102 @@ bb0:
   %11 = apply %10(%3, %5, %7, %9) : $@convention(thin) (IntFormat, Bool, Int64, Bool) -> @owned String
   return %11 : $String
 } // CHECK: Returns string: "%{public}llu"
+
+// String.percentEscapedString.getter
+// The semantics attribute is used by the interpreter.
+sil [serialized] [readonly] [_semantics "string.escapePercent.get"] @$sSS14OSLogPrototypeE20percentEscapedStringSSvg : $@convention(method) (@guaranteed String) -> @owned String
+
+// CHECK-LABEL: @interpretStringPercentEscape
+sil @interpretStringPercentEscape : $@convention(thin) () -> @owned String {
+bb0:
+  %1 = string_literal utf8 "a%"
+  %2 = integer_literal $Builtin.Word, 2
+  %3 = integer_literal $Builtin.Int1, -1
+  %4 = metatype $@thin String.Type
+  %5 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+  %6 = apply %5(%1, %2, %3, %4) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+  %8 = function_ref @$sSS14OSLogPrototypeE20percentEscapedStringSSvg : $@convention(method) (@guaranteed String) -> @owned String
+  %9 = apply %8(%6) : $@convention(method) (@guaranteed String) -> @owned String
+  return %9 : $String
+} // CHECK: Returns string: "a%%"
+
+// CHECK-LABEL: @interpretEscapeMutiplePercent
+sil @interpretEscapeMutiplePercent : $@convention(thin) () -> @owned String {
+bb0:
+  %1 = string_literal utf8 "%%%a% %%b%"
+  %2 = integer_literal $Builtin.Word, 10
+  %3 = integer_literal $Builtin.Int1, -1
+  %4 = metatype $@thin String.Type
+  %5 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+  %6 = apply %5(%1, %2, %3, %4) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+  %8 = function_ref @$sSS14OSLogPrototypeE20percentEscapedStringSSvg : $@convention(method) (@guaranteed String) -> @owned String
+  %9 = apply %8(%6) : $@convention(method) (@guaranteed String) -> @owned String
+  return %9 : $String
+} // CHECK: Returns string: "%%%%%%a%% %%%%b%%"
+
+// Tests for Ownership SIL.
+
+// CHECK-LABEL: @interpretDestructureInt64
+sil [ossa] @interpretDestructureInt64 : $@convention(thin) () -> Builtin.Int64 {
+  %1 = integer_literal $Builtin.Int64, 12
+  %2 = struct $Int64 (%1 : $Builtin.Int64)
+  %3 = destructure_struct %2 : $Int64
+  return %3 : $Builtin.Int64
+} // CHECK: Returns int: 12
+
+struct IntPair {
+  var first: Builtin.Int64
+  var second: Builtin.Int64
+}
+
+// CHECK-LABEL: @interpretIntPairStruct
+sil [ossa] @interpretIntPairStruct : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 17
+  %1 = integer_literal $Builtin.Int64, 34
+  %2 = struct $IntPair (%0: $Builtin.Int64, %1: $Builtin.Int64)
+  (%3, %4) = destructure_struct %2 : $IntPair
+  return %4 : $Builtin.Int64
+} // CHECK: Returns int: 34
+
+sil [ossa] @constructCustomStructOSSA : $@convention(thin) () -> CustomStruct {
+bb0:
+  %1 = integer_literal $Builtin.Int64, 11
+  %2 = struct $Int64 (%1 : $Builtin.Int64)
+  %3 = integer_literal $Builtin.Int64, 12
+  %4 = struct $Int64 (%3 : $Builtin.Int64)
+  %6 = integer_literal $Builtin.Int64, 13
+  %7 = struct $Int64 (%6 : $Builtin.Int64)
+  %8 = integer_literal $Builtin.Int1, 0
+  %9 = struct $Bool (%8 : $Builtin.Int1)
+
+  %10 = struct $InnerStruct (%7 : $Int64, %9 : $Bool)
+  %11 = tuple (%2 : $Int64, %4 : $Int64)
+  %12 = struct $CustomStruct (%11 : $(Int64, Int64), %10 : $InnerStruct)
+  return %12 : $CustomStruct
+}
+
+// CHECK-LABEL: @interpretCustomStructOSSA
+sil [ossa] @interpretCustomStructOSSA : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  %1 = function_ref @constructCustomStructOSSA : $@convention(thin) () -> CustomStruct
+  %2 = apply %1() : $@convention(thin) () -> CustomStruct
+  (%3, %4) = destructure_struct %2 : $CustomStruct
+  (%5, %6) = destructure_tuple %3 : $(Int64, Int64)
+  (%7, %8) = destructure_struct %4 : $InnerStruct
+  %9 = destructure_struct %5 : $Int64
+  %10 = destructure_struct %6 : $Int64
+  %11 = destructure_struct %7 : $Int64
+  %12 = destructure_struct %8 : $Bool
+  cond_fail %12 : $Builtin.Int1
+
+  %13 = integer_literal $Builtin.Int1, -1
+  %14 = builtin "sadd_with_overflow_Int64"(%9 : $Builtin.Int64, %10 : $Builtin.Int64, %13 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  (%15, %16) = destructure_tuple %14 : $(Builtin.Int64, Builtin.Int1)
+  cond_fail %16 : $Builtin.Int1
+
+  %17 = builtin "sadd_with_overflow_Int64"(%15 : $Builtin.Int64, %11 : $Builtin.Int64, %13 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  (%18, %19) = destructure_tuple %17 : $(Builtin.Int64, Builtin.Int1)
+  cond_fail %19 : $Builtin.Int1
+  return %18 : $Builtin.Int64
+} // CHECK: Returns int: 36

@@ -14,7 +14,8 @@ add_swift_host_library(swiftIDE STATIC
   IDETypeChecking.cpp
   APIDigesterData.cpp
   SourceEntityWalker.cpp
-  TypeContextInfo.cpp)
+  TypeContextInfo.cpp
+  IDERequests.cpp)
 target_link_libraries(swiftIDE PRIVATE
   swiftAST
   swiftClangImporter

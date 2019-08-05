@@ -16,7 +16,7 @@
 /// or NSDictionary will be the result of calling `_bridgeToObjectiveC`
 /// on each element of the source container.
 public protocol _ObjectiveCBridgeable {
-  associatedtype _ObjectiveCType : AnyObject
+  associatedtype _ObjectiveCType: AnyObject
 
   /// Convert `self` to Objective-C.
   func _bridgeToObjectiveC() -> _ObjectiveCType
@@ -356,7 +356,7 @@ public func _getBridgedNonVerbatimObjectiveCType<T>(_: T.Type) -> Any.Type?
 /// This type does not carry an owner pointer unlike the other C*Pointer types
 /// because it only needs to reference the results of inout conversions, which
 /// already have writeback-scoped lifetime.
-@_fixed_layout
+@frozen
 public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   :  _Pointer {
 
@@ -374,9 +374,10 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   ///   `Pointee`.
   @inlinable
   public var pointee: Pointee {
-    @_transparent _read {
+    /// Retrieve the value the pointer points to.
+    @_transparent get {
       // We can do a strong load normally.
-      yield UnsafePointer(self).pointee
+      return UnsafePointer(self).pointee
     }
     /// Set the value the pointer points to, copying over the previous value.
     ///
@@ -413,9 +414,9 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   @inlinable // unsafe-performance
   public subscript(i: Int) -> Pointee {
     @_transparent
-    _read {
+    get {
       // We can do a strong load normally.
-      yield ((UnsafePointer<Pointee>(self) + i).pointee)
+      return (UnsafePointer<Pointee>(self) + i).pointee
     }
   }
 

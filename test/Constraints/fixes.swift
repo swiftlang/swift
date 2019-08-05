@@ -14,8 +14,8 @@ func f4() -> B { }
 func f5(_ a: A) { }
 func f6(_ a: A, _: Int) { }
 
-func createB() -> B { }  // expected-note {{found this candidate}}
-func createB(_ i: Int) -> B { } // expected-note {{found this candidate}}
+func createB() -> B { }
+func createB(_ i: Int) -> B { }
 
 func f7(_ a: A, _: @escaping () -> Int) -> B { }
 func f7(_ a: A, _: Int) -> Int { }
@@ -35,9 +35,13 @@ func forgotCall() {
   // As a call
   f5(f4) // expected-error{{function produces expected type 'B'; did you mean to call it with '()'?}}{{8-8=()}}
   f6(f4, f2) // expected-error{{function produces expected type 'B'; did you mean to call it with '()'?}}{{8-8=()}}
+  // expected-error@-1 {{function produces expected type 'Int'; did you mean to call it with '()'?}} {{12-12=()}}
 
   // With overloading: only one succeeds.
-  a = createB // expected-error{{ambiguous reference to member 'createB()'}}
+  a = createB // expected-error{{function produces expected type 'B'; did you mean to call it with '()'?}}
+
+  let _: A = createB // expected-error{{function produces expected type 'B'; did you mean to call it with '()'?}} {{21-21=()}}
+  let _: B = createB // expected-error{{function produces expected type 'B'; did you mean to call it with '()'?}} {{21-21=()}}
 
   // With overloading, pick the fewest number of fixes.
   var b = f7(f4, f1) // expected-error{{function produces expected type 'B'; did you mean to call it with '()'?}}
@@ -258,6 +262,8 @@ struct FooStruct {
   }
 
   let e: BarStruct? = BarStruct()
+
+  func f() -> Optional<Optional<Int>> { return 29 }
 }
 
 struct BarStruct {
@@ -287,6 +293,9 @@ let _: Int = thing?.e?.a() // expected-error {{value of optional type 'Int?' mus
 let _: Int? = thing?.e?.b // expected-error {{value of optional type 'Int??' must be unwrapped to a value of type 'Int?'}}
 // expected-note@-1{{coalesce}}
 // expected-note@-2{{force-unwrap}}
+let _: Int? = thing?.f() // expected-error {{value of optional type 'Int??' must be unwrapped to a value of type 'Int?'}}
+// expected-note@-1{{coalesce}}
+// expected-note@-2{{force-unwrap}}
 
 // SR-9851 - https://bugs.swift.org/browse/SR-9851
 func coalesceWithParensRootExprFix() {
@@ -294,4 +303,18 @@ func coalesceWithParensRootExprFix() {
   if !optionalBool { }  // expected-error{{value of optional type 'Bool?' must be unwrapped to a value of type 'Bool'}}
   // expected-note@-1{{coalesce using '??' to provide a default when the optional value contains 'nil'}}{{7-7=(}}{{19-19= ?? <#default value#>)}}
   // expected-note@-2{{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+}
+
+func test_explicit_call_with_overloads() {
+  func foo(_: Int) {}
+
+  struct S {
+    func foo(_: Int) -> Int { return 0 }
+    func foo(_: Int = 32, _: String = "hello") -> Int {
+      return 42
+    }
+  }
+
+  foo(S().foo)
+  // expected-error@-1 {{function produces expected type 'Int'; did you mean to call it with '()'?}} {{14-14=()}}
 }

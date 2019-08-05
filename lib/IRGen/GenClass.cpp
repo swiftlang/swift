@@ -22,6 +22,7 @@
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/IRGenOptions.h"
+#include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrettyStackTrace.h"
@@ -297,6 +298,9 @@ namespace {
                                   SILType classType,
                                   bool superclass) {
       for (VarDecl *var : theClass->getStoredProperties()) {
+        if (!var->hasInterfaceType())
+          IGM.Context.getLazyResolver()->resolveDeclSignature(var);
+
         SILType type = classType.getFieldType(var, IGM.getSILModule());
 
         // Lower the field type.
@@ -1211,7 +1215,6 @@ namespace {
       // hierarchy crosses resilience domains, we use a
       // slightly different query here.
       if (theClass->checkAncestry(AncestryFlags::ResilientOther)) {
-        assert(IGM.Context.LangOpts.EnableObjCResilientClassStubs);
         return IGM.getAddrOfObjCResilientClassStub(theClass, NotForDefinition,
                                              TypeMetadataAddress::AddressPoint);
       }
@@ -1790,7 +1793,7 @@ namespace {
         }
 
         // Don't emit descriptors for properties without accessors.
-        auto getter = var->getGetter();
+        auto getter = var->getOpaqueAccessor(AccessorKind::Get);
         if (!getter)
           return;
 
@@ -1801,7 +1804,7 @@ namespace {
         auto &methods = getMethodList(var);
         methods.push_back(getter);
 
-        if (auto setter = var->getSetter())
+        if (auto setter = var->getOpaqueAccessor(AccessorKind::Set))
           methods.push_back(setter);
       }
     }
@@ -2027,13 +2030,13 @@ namespace {
     void visitSubscriptDecl(SubscriptDecl *subscript) {
       if (!requiresObjCSubscriptDescriptor(IGM, subscript)) return;
 
-      auto getter = subscript->getGetter();
+      auto getter = subscript->getOpaqueAccessor(AccessorKind::Get);
       if (!getter) return;
 
       auto &methods = getMethodList(subscript);
       methods.push_back(getter);
 
-      if (auto setter = subscript->getSetter())
+      if (auto setter = subscript->getOpaqueAccessor(AccessorKind::Set))
         methods.push_back(setter);
     }
   };
@@ -2072,9 +2075,7 @@ static llvm::Function *emitObjCMetadataUpdateFunction(IRGenModule &IGM,
 /// does not have statically-emitted metadata.
 bool irgen::hasObjCResilientClassStub(IRGenModule &IGM, ClassDecl *D) {
   assert(IGM.getClassMetadataStrategy(D) == ClassMetadataStrategy::Resilient);
-  return (!D->isGenericContext() &&
-          IGM.ObjCInterop &&
-          IGM.Context.LangOpts.EnableObjCResilientClassStubs);
+  return IGM.ObjCInterop && !D->isGenericContext();
 }
 
 void irgen::emitObjCResilientClassStub(IRGenModule &IGM, ClassDecl *D) {
@@ -2320,6 +2321,11 @@ IRGenModule::getClassMetadataStrategy(const ClassDecl *theClass) {
   // If we have resiliently-sized fields, we might be able to use the
   // update pattern.
   if (resilientLayout.doesMetadataRequireUpdate()) {
+      
+    // FixedOrUpdate strategy does not work in JIT mode
+    if (IRGen.Opts.UseJIT)
+      return ClassMetadataStrategy::Singleton;
+      
     // The update pattern only benefits us on platforms with an Objective-C
     // runtime, otherwise just use the singleton pattern.
     if (!Context.LangOpts.EnableObjCInterop)
@@ -2327,7 +2333,7 @@ IRGenModule::getClassMetadataStrategy(const ClassDecl *theClass) {
 
     // If the Objective-C runtime is new enough, we can just use the update
     // pattern unconditionally.
-    if (Types.doesPlatformSupportObjCMetadataUpdateCallback())
+    if (Context.LangOpts.doesTargetSupportObjCMetadataUpdateCallback())
       return ClassMetadataStrategy::Update;
 
     // Otherwise, check if we have legacy type info for backward deployment.

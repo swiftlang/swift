@@ -10,11 +10,11 @@ import Accelerate
 
 var Accelerate_vImageTests = TestSuite("Accelerate_vImage")
 
-if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
-    let width = UInt(48)
-    let height = UInt(12)
-    let widthi = 48
-    let heighti = 12
+if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
+    let width = UInt(64)
+    let height = UInt(32)
+    let widthi = 64
+    let heighti = 32
     
     //===----------------------------------------------------------------------===//
     //
@@ -64,6 +64,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                                              destination: &destinationCGBuffer)
         
         let destinationPixels: [UInt8] = arrayFromBuffer(buffer: destinationCGBuffer,
+                                                         channelCount: 4,
                                                          count: pixels.count)
         
         expectEqual(destinationPixels, pixels)
@@ -187,8 +188,10 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         // Compare results
         
         let destinationPixels: [UInt8] = arrayFromBuffer(buffer: destinationBuffer,
+                                                         channelCount: 4,
                                                          count: pixels.count)
         let legacyDestinationPixels: [UInt8] = arrayFromBuffer(buffer: legacyDestinationBuffer,
+                                                               channelCount: 4,
                                                                count: pixels.count)
         
         expectTrue(legacyDestinationPixels.elementsEqual(destinationPixels))
@@ -269,7 +272,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         var destination = try! vImage_Buffer(width: 20, height: 20, bitsPerPixel: 32)
         
         expectCrashLater()
-        try! source.copy(destinationBuffer: &destination)
+        try! source.copy(destinationBuffer: &destination,
+                         pixelSize: 4)
     }
 
     Accelerate_vImageTests.test("vImage/CopyBadHeight") {
@@ -277,7 +281,8 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         var destination = try! vImage_Buffer(width: 20, height: 20, bitsPerPixel: 32)
         
         expectCrashLater()
-        try! source.copy(destinationBuffer: &destination)
+        try! source.copy(destinationBuffer: &destination,
+                         pixelSize: 4)
     }
     
     Accelerate_vImageTests.test("vImage/Copy") {
@@ -294,11 +299,14 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         var destination = try! vImage_Buffer(width: widthi, height: heighti,
                                              bitsPerPixel: 32)
         
-        try! source.copy(destinationBuffer: &destination)
+        try! source.copy(destinationBuffer: &destination,
+                         pixelSize: 4)
         
         let sourcePixels: [UInt8] = arrayFromBuffer(buffer: source,
+                                                    channelCount: 4,
                                                     count: pixels.count)
         let destinationPixels: [UInt8] = arrayFromBuffer(buffer: destination,
+                                                         channelCount: 4,
                                                          count: pixels.count)
         
         expectTrue(sourcePixels.elementsEqual(destinationPixels))
@@ -306,7 +314,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         source.free()
         destination.free()
     }
-    
+
     Accelerate_vImageTests.test("vImage/InitializeWithFormat") {
         let pixels: [UInt8] = (0 ..< width * height * 4).map { _ in
             return UInt8.random(in: 0 ..< 255)
@@ -322,6 +330,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
                                         format:  format)
         
         let bufferPixels: [UInt8] = arrayFromBuffer(buffer: buffer,
+                                                    channelCount: 4,
                                                     count: pixels.count)
         
         expectTrue(bufferPixels.elementsEqual(pixels))
@@ -383,9 +392,11 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         }()
         
         let bufferPixels: [UInt8] = arrayFromBuffer(buffer: buffer,
+                                                    channelCount: 4,
                                                     count: pixels.count)
         
         let legacyBufferPixels: [UInt8] = arrayFromBuffer(buffer: legacyBuffer,
+                                                          channelCount: 4,
                                                           count: pixels.count)
         
         expectTrue(bufferPixels.elementsEqual(legacyBufferPixels))
@@ -547,7 +558,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         expectTrue(vImageCGImageFormat_IsEqual(&format, &legacyFormat))
         expectTrue(format.componentCount == 4)
     }
-    
+
     //===----------------------------------------------------------------------===//
     //
     //  MARK: Helper Functions
@@ -566,10 +577,33 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         return pixelBuffer
     }
     
-    func arrayFromBuffer<T>(buffer: vImage_Buffer, count: Int) -> Array<T> {
-        let ptr = buffer.data.bindMemory(to: T.self, capacity: count)
-        let buf = UnsafeBufferPointer(start: ptr, count: count)
-        return Array(buf)
+    func arrayFromBuffer<T>(buffer: vImage_Buffer,
+                            channelCount: Int,
+                            count: Int) -> Array<T> {
+        
+        if (buffer.rowBytes == Int(buffer.width) * MemoryLayout<T>.stride * channelCount) {
+            let ptr = buffer.data.bindMemory(to: T.self,
+                                             capacity: count)
+            
+            let buf = UnsafeBufferPointer(start: ptr, count: count)
+            return Array(buf)
+        } else {
+            var returnArray = [T]()
+            
+            let perRowCount = Int(buffer.width) * MemoryLayout<T>.stride * channelCount
+            var ptr = buffer.data.bindMemory(to: T.self,
+                                             capacity: perRowCount)
+            
+            for _ in 0 ..< buffer.height {
+                let buf = UnsafeBufferPointer(start: ptr, count: perRowCount)
+                
+                returnArray.append(contentsOf: Array(buf))
+                
+                ptr = ptr.advanced(by: buffer.rowBytes)
+            }
+            
+            return returnArray
+        }
     }
     
     func imageToPixels(image: CGImage) -> [UInt8] {

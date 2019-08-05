@@ -253,7 +253,7 @@ private func _findBoundary(
   }
 }
 
-@_frozen
+@frozen
 @usableFromInline
 internal enum _StringComparisonResult {
   case equal

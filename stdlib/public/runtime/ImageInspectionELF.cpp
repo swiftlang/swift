@@ -121,9 +121,14 @@ void swift_addNewDSOImage(const void *addr) {
   const auto &dynamic_replacements = sections->swift5_replace;
   const auto *replacements =
       reinterpret_cast<void *>(dynamic_replacements.start);
-  if (dynamic_replacements.length)
-    addImageDynamicReplacementBlockCallback(replacements,
-                                            dynamic_replacements.length);
+  if (dynamic_replacements.length) {
+    const auto &dynamic_replacements_some = sections->swift5_replac2;
+    const auto *replacements_some =
+      reinterpret_cast<void *>(dynamic_replacements_some.start);
+    addImageDynamicReplacementBlockCallback(
+        replacements, dynamic_replacements.length, replacements_some,
+        dynamic_replacements_some.length);
+  }
 }
 
 int swift::lookupSymbol(const void *address, SymbolInfo *info) {

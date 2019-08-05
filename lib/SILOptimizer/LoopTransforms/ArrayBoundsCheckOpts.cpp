@@ -712,7 +712,7 @@ struct InductionInfo {
     auto ResultTy = SILType::getBuiltinIntegerType(1, Builder.getASTContext());
     auto *CmpSGE = Builder.createBuiltinBinaryFunction(
         Loc, "cmp_sge", Start->getType(), ResultTy, {Start, End});
-    Builder.createCondFail(Loc, CmpSGE);
+    Builder.createCondFail(Loc, CmpSGE, "loop induction variable overflowed");
     IsOverflowCheckInserted = true;
 
     // We can now remove the cond fail on the increment the above comparison

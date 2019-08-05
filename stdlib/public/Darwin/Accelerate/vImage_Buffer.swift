@@ -16,7 +16,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 extension vImage_Buffer {
     
     /// The size of the vImage buffer.
@@ -105,7 +105,7 @@ extension vImage_Buffer {
 
 // MARK: Core Graphics Support
 
-@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 extension vImage_Buffer {
     
     /// Initialize a vImage buffer with the contents of a Core Graphics image.
@@ -205,8 +205,10 @@ extension vImage_Buffer {
     /// Copies this buffer to `destinationBuffer`.
     ///
     /// - Parameter destinationBuffer: The destination vImage buffer.
+    /// - Parameter pixelSize: The number of bytes for one pixel.
     /// - Parameter options: The options to use when performing this operation.
     public func copy(destinationBuffer: inout vImage_Buffer,
+                     pixelSize: Int,
                      flags options: vImage.Options = .noFlags) throws {
         
         if Int(width) == 0 {
@@ -218,7 +220,7 @@ extension vImage_Buffer {
         _ = withUnsafePointer(to: self) {
             error =  vImageCopyBuffer($0,
                                       &destinationBuffer,
-                                      rowBytes / Int(width),
+                                      pixelSize,
                                       options.flags)
         }
         

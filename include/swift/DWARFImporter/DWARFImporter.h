@@ -66,6 +66,9 @@ public:
 
   ~DWARFImporter();
 
+  void collectVisibleTopLevelModuleNames(
+      SmallVectorImpl<Identifier> &names) const override;
+
   /// Check whether the module with a given name can be imported without
   /// importing it.
   ///

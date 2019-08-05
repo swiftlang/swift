@@ -12,6 +12,7 @@
 
 // Vector-vector and vector-scalar arithmetic
 
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 extension vDSP {
     
     // MARK: c[i] = a[i] + b                                vDSP_vsadd
@@ -22,8 +23,7 @@ extension vDSP {
     /// - Parameter scalar: the `b` in `c[i] = a[i] + b`.
     /// - Parameter vector: the `a` in `c[i] = a[i] + b`.
     /// - Returns: The `c` in `c[i] = a[i] + b`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func add<U>(_ scalar: Float,
                               _ vector: U) -> [Float]
         where
@@ -49,8 +49,7 @@ extension vDSP {
     /// - Parameter scalar: the `b` in `c[i] = a[i] + b`.
     /// - Parameter vector: the `a` in `c[i] = a[i] + b`.
     /// - Parameter result: The `c` in `c[i] = a[i] + b`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func add<U, V>(_ scalar: Float,
                                  _ vector: U,
                                  result: inout V)
@@ -79,8 +78,7 @@ extension vDSP {
     /// - Parameter scalar: the `b` in `c[i] = a[i] + b`.
     /// - Parameter vector: the `a` in `c[i] = a[i] + b`.
     /// - Returns: The `c` in `c[i] = a[i] + b`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func add<U>(_ scalar: Double,
                               _ vector: U) -> [Double]
         where
@@ -106,8 +104,7 @@ extension vDSP {
     /// - Parameter scalar: the `b` in `c[i] = a[i] + b`.
     /// - Parameter vector: the `a` in `c[i] = a[i] + b`.
     /// - Parameter result: The `c` in `c[i] = a[i] + b`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func add<U, V>(_ scalar: Double,
                                  _ vector: U,
                                  result: inout V)
@@ -138,8 +135,7 @@ extension vDSP {
     /// - Parameter vectorA: the `a` in `c[i] = a[i] + b[i]`.
     /// - Parameter vectorB: the `b` in `c[i] = a[i] + b[i]`.
     /// - Returns: The `c` in `c[i] = a[i] + b[i]`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func add<T, U>(_ vectorA: T,
                                  _ vectorB: U) -> [Float]
         where
@@ -166,8 +162,7 @@ extension vDSP {
     /// - Parameter vectorA: the `a` in `c[i] = a[i] + b[i]`.
     /// - Parameter vectorB: the `b` in `c[i] = a[i] + b[i]`.
     /// - Parameter result: The `c` in `c[i] = a[i] + b[i]`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func add<T, U, V>(_ vectorA: T,
                                     _ vectorB: U,
                                     result: inout V)
@@ -198,8 +193,7 @@ extension vDSP {
     /// - Parameter vectorA: the `a` in `c[i] = a[i] + b[i]`.
     /// - Parameter vectorB: the `b` in `c[i] = a[i] + b[i]`.
     /// - Returns: The `c` in `c[i] = a[i] + b[i]`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func add<T, U>(_ vectorA: T,
                                  _ vectorB: U) -> [Double]
         where
@@ -226,8 +220,7 @@ extension vDSP {
     /// - Parameter vectorA: the `a` in `c[i] = a[i] + b[i]`.
     /// - Parameter vectorB: the `b` in `c[i] = a[i] + b[i]`.
     /// - Parameter result: The `c` in `c[i] = a[i] + b[i]`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func add<T, U, V>(_ vectorA: T,
                                     _ vectorB: U,
                                     result: inout V)
@@ -260,8 +253,7 @@ extension vDSP {
     /// - Parameter vectorA: the `a` in `c[i] = a[i] - b[i]`.
     /// - Parameter vectorB: the `b` in `c[i] = a[i] - b[i]`.
     /// - Returns: The `c` in `c[i] = a[i] - b[i]`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func subtract<T, U>(_ vectorA: U,
                                       _ vectorB: T) -> [Float]
         where
@@ -288,8 +280,7 @@ extension vDSP {
     /// - Parameter vectorA: the `a` in `c[i] = a[i] - b[i]`.
     /// - Parameter vectorB: the `b` in `c[i] = a[i] - b[i]`.
     /// - Parameter result: The `c` in `c[i] = a[i] - b[i]`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func subtract<T, U, V>(_ vectorA: U,
                                          _ vectorB: T,
                                          result: inout V)
@@ -320,8 +311,7 @@ extension vDSP {
     /// - Parameter vectorA: the `a` in `c[i] = a[i] - b[i]`.
     /// - Parameter vectorB: the `b` in `c[i] = a[i] - b[i]`.
     /// - Returns: The `c` in `c[i] = a[i] - b[i]`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func subtract<T, U>(_ vectorA: U,
                                       _ vectorB: T) -> [Double]
         where
@@ -348,8 +338,7 @@ extension vDSP {
     /// - Parameter vectorA: the `a` in `c[i] = a[i] - b[i]`.
     /// - Parameter vectorB: the `b` in `c[i] = a[i] - b[i]`.
     /// - Parameter result: The `c` in `c[i] = a[i] - b[i]`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func subtract<T, U, V>(_ vectorA: U,
                                          _ vectorB: T,
                                          result: inout V)
@@ -382,8 +371,7 @@ extension vDSP {
     /// - Parameter vector: the `a` in `c[i] = a[i] * b`.
     /// - Parameter scalar: the `b` in `c[i] = a[i] * b`.
     /// - Returns: The `c` in `c[i] = a[i] * b`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func multiply<U>(_ scalar: Float,
                                    _ vector: U) -> [Float]
         where
@@ -409,8 +397,7 @@ extension vDSP {
     /// - Parameter vector: the `a` in `c[i] = a[i] * b`.
     /// - Parameter scalar: the `b` in `c[i] = a[i] * b`.
     /// - Parameter result: The `c` in `c[i] = a[i] * b`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func multiply<U, V>(_ scalar: Float,
                                       _ vector: U,
                                       result: inout V)
@@ -439,8 +426,7 @@ extension vDSP {
     /// - Parameter vector: the `a` in `c[i] = a[i] * b`.
     /// - Parameter scalar: the `b` in `c[i] = a[i] * b`.
     /// - Returns: The `c` in `c[i] = a[i] * b`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func multiply<U>(_ scalar: Double,
                                    _ vector: U) -> [Double]
         where
@@ -466,8 +452,7 @@ extension vDSP {
     /// - Parameter vector: the `a` in `c[i] = a[i] * b`.
     /// - Parameter scalar: the `b` in `c[i] = a[i] * b`.
     /// - Parameter result: The `c` in `c[i] = a[i] * b`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func multiply<U, V>(_ scalar: Double,
                                       _ vector: U,
                                       result: inout V)
@@ -498,8 +483,7 @@ extension vDSP {
     /// - Parameter vectorA: the `a` in `c[i] = a[i] * b[i]`.
     /// - Parameter vectorB: the `b` in `c[i] = a[i] * b[i]`.
     /// - Parameter result: The `c` in `c[i] = a[i] * b[i]`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func multiply<T, U>(_ vectorA: T,
                                       _ vectorB: U) -> [Float]
         where
@@ -526,8 +510,7 @@ extension vDSP {
     /// - Parameter vectorA: the `a` in `c[i] = a[i] * b[i]`.
     /// - Parameter vectorB: the `b` in `c[i] = a[i] * b[i]`.
     /// - Parameter result: The `c` in `c[i] = a[i] * b[i]`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func multiply<T, U, V>(_ vectorA: T,
                                          _ vectorB: U,
                                          result: inout V)
@@ -557,8 +540,7 @@ extension vDSP {
     /// - Parameter vectorA: the `a` in `c[i] = a[i] * b[i]`.
     /// - Parameter vectorB: the `b` in `c[i] = a[i] * b[i]`.
     /// - Parameter result: The `c` in `c[i] = a[i] * b[i]`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func multiply<T, U>(_ vectorA: T,
                                       _ vectorB: U) -> [Double]
         where
@@ -585,8 +567,7 @@ extension vDSP {
     /// - Parameter vectorA: the `a` in `c[i] = a[i] * b[i]`.
     /// - Parameter vectorB: the `b` in `c[i] = a[i] * b[i]`.
     /// - Parameter result: The `c` in `c[i] = a[i] * b[i]`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func multiply<T, U, V>(_ vectorA: T,
                                          _ vectorB: U,
                                          result: inout V)
@@ -618,8 +599,7 @@ extension vDSP {
     /// - Parameter vector: the `a` in `c[i] = a[i] / b`.
     /// - Parameter scalar: the `b` in `c[i] = a[i] / b`.
     /// - Returns: The `c` in `c[i] = a[i] / b`
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func divide<U>(_ vector: U,
                                  _ scalar: Float) -> [Float]
         where
@@ -645,8 +625,7 @@ extension vDSP {
     /// - Parameter vector: the `a` in `c[i] = a[i] / b`.
     /// - Parameter scalar: the `b` in `c[i] = a[i] / b`.
     /// - Parameter result: The `c` in `c[i] = a[i] / b`
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func divide<U, V>(_ vector: U,
                                     _ scalar: Float,
                                     result: inout V)
@@ -675,8 +654,7 @@ extension vDSP {
     /// - Parameter vector: the `a` in `c[i] = a[i] / b`.
     /// - Parameter scalar: the `b` in `c[i] = a[i] / b`.
     /// - Returns: The `c` in `c[i] = a[i] / b`
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func divide<U>(_ vector: U,
                                  _ scalar: Double) -> [Double]
         where
@@ -702,8 +680,7 @@ extension vDSP {
     /// - Parameter vector: the `a` in `c[i] = a[i] / b`.
     /// - Parameter scalar: the `b` in `c[i] = a[i] / b`.
     /// - Parameter result: The `c` in `c[i] = a[i] / b`
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func divide<U, V>(_ vector: U,
                                     _ scalar: Double,
                                     result: inout V)
@@ -734,8 +711,7 @@ extension vDSP {
     /// - Parameter scalar: the `a` in `c[i] = a / b[i]`.
     /// - Parameter vector: the `b` in `c[i] = a / b[i]`.
     /// - Returns: The `c` in `c[i] = a / b[i]`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func divide<U>(_ scalar: Float,
                                  _ vector: U) -> [Float]
         where
@@ -761,8 +737,7 @@ extension vDSP {
     /// - Parameter scalar: the `a` in `c[i] = a / b[i]`.
     /// - Parameter vector: the `b` in `c[i] = a / b[i]`.
     /// - Parameter result: The `c` in `c[i] = a / b[i]`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func divide<U, V>(_ scalar: Float,
                                     _ vector: U,
                                     result: inout V)
@@ -791,8 +766,7 @@ extension vDSP {
     /// - Parameter scalar: the `a` in `c[i] = a / b[i]`.
     /// - Parameter vector: the `b` in `c[i] = a / b[i]`.
     /// - Returns: The `c` in `c[i] = a / b[i]`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func divide<U>(_ scalar: Double,
                                  _ vector: U) -> [Double]
         where
@@ -818,8 +792,7 @@ extension vDSP {
     /// - Parameter scalar: the `a` in `c[i] = a / b[i]`.
     /// - Parameter vector: the `b` in `c[i] = a / b[i]`.
     /// - Parameter result: The `c` in `c[i] = a / b[i]`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func divide<U, V>(_ scalar: Double,
                                     _ vector: U,
                                     result: inout V)
@@ -850,8 +823,7 @@ extension vDSP {
     /// - Parameter vectorA: the `a` in `c[i] = a[i] / b[i]`.
     /// - Parameter vectorB: the `b` in `c[i] = a[i] / b[i]`.
     /// - Returns: The `c` in `c[i] = a[i] / b[i]`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func divide<T, U>(_ vectorA: T,
                                     _ vectorB: U) -> [Float]
         where
@@ -878,8 +850,7 @@ extension vDSP {
     /// - Parameter vectorA: the `a` in `c[i] = a[i] / b[i]`.
     /// - Parameter vectorB: the `b` in `c[i] = a[i] / b[i]`.
     /// - Parameter result: The `c` in `c[i] = a[i] / b[i]`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func divide<T, U, V>(_ vectorA: T,
                                        _ vectorB: U,
                                        result: inout V)
@@ -909,8 +880,7 @@ extension vDSP {
     /// - Parameter vectorA: the `a` in `c[i] = a[i] / b[i]`.
     /// - Parameter vectorB: the `b` in `c[i] = a[i] / b[i]`.
     /// - Returns: The `c` in `c[i] = a[i] / b[i]`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func divide<T, U>(_ vectorA: T,
                                     _ vectorB: U) -> [Double]
         where
@@ -937,8 +907,7 @@ extension vDSP {
     /// - Parameter vectorA: the `a` in `c[i] = a[i] / b[i]`.
     /// - Parameter vectorB: the `b` in `c[i] = a[i] / b[i]`.
     /// - Parameter result: The `c` in `c[i] = a[i] / b[i]`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func divide<T, U, V>(_ vectorA: T,
                                        _ vectorB: U,
                                        result: inout V)
@@ -971,8 +940,7 @@ extension vDSP {
     /// - Parameter vectorB: the `i0` in o0[i] = i1[i] + i0[i]; o1[i] = i1[i] - i0[i]`.
     /// - Parameter addResult: The `o0` in o0[i] = i1[i] + i0[i]; o1[i] = i1[i] - i0[i]`.
     /// - Parameter subtractResult: The `o1` in o0[i] = i1[i] + i0[i]; o1[i] = i1[i] - i0[i]`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func addSubtract<S, T, U, V>(_ vectorA: S,
                                                _ vectorB: T,
                                                addResult: inout U,
@@ -1012,8 +980,7 @@ extension vDSP {
     /// - Parameter vectorB: the `i0` in o0[i] = i1[i] + i0[i]; o1[i] = i1[i] - i0[i]`.
     /// - Parameter addResult: The `o0` in o0[i] = i1[i] + i0[i]; o1[i] = i1[i] - i0[i]`.
     /// - Parameter subtractResult: The `o1` in o0[i] = i1[i] + i0[i]; o1[i] = i1[i] - i0[i]`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func addSubtract<S, T, U, V>(_ vectorA: S,
                                                _ vectorB: T,
                                                addResult: inout U,
@@ -1054,8 +1021,7 @@ extension vDSP {
     /// - Parameter addition: the `a` and `b` in `d[i] = (a[i] + b[i]) * c`.
     /// - Parameter scalar: the `c` in `d[i] = `(a[i] + b[i]) * c`.
     /// - Returns: The `d` in `d[i] = `(a[i] + b[i]) * c`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func multiply<T, U>(addition: (a: T, b: U),
                                       _ scalar: Float) -> [Float]
         where
@@ -1082,8 +1048,7 @@ extension vDSP {
     /// - Parameter addition: the `a` and `b` in `d[i] = (a[i] + b[i]) * c`.
     /// - Parameter scalar: the `c` in `d[i] = `(a[i] + b[i]) * c`.
     /// - Parameter result: The `d` in `d[i] = `(a[i] + b[i]) * c`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func multiply<T, U, V>(addition: (a: T, b: U),
                                          _ scalar: Float,
                                          result: inout V)
@@ -1118,8 +1083,7 @@ extension vDSP {
     /// - Parameter addition: the `a` and `b` in `d[i] = (a[i] + b[i]) * c`.
     /// - Parameter scalar: the `c` in `d[i] = `(a[i] + b[i]) * c`.
     /// - Returns: The `d` in `d[i] = `(a[i] + b[i]) * c`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func multiply<T, U>(addition: (a: T, b: U),
                                       _ scalar: Double) -> [Double]
         where
@@ -1146,8 +1110,7 @@ extension vDSP {
     /// - Parameter addition: the `a` and `b` in `d[i] = (a[i] + b[i]) * c`.
     /// - Parameter scalar: the `c` in `d[i] = `(a[i] + b[i]) * c`.
     /// - Parameter result: The `d` in `d[i] = `(a[i] + b[i]) * c`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func multiply<T, U, V>(addition: (a: T, b: U),
                                          _ scalar: Double,
                                          result: inout V)
@@ -1184,8 +1147,7 @@ extension vDSP {
     /// - Parameter addition: the `a` and `b` in `d[i] = (a[i] + b[i]) * c[i]`.
     /// - Parameter vector: the `c` in `d[i] = (a[i] + b[i]) * c[i]`.
     /// - Returns: The `d` in `d[i] = (a[i] + b[i]) * c[i]`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func multiply<S, T, U>(addition: (a: S, b: T),
                                          _ vector: U) -> [Float]
         where
@@ -1214,8 +1176,7 @@ extension vDSP {
     /// - Parameter addition: the `a` and `b` in `d[i] = (a[i] + b[i]) * c[i]`.
     /// - Parameter vector: the `c` in `d[i] = (a[i] + b[i]) * c[i]`.
     /// - Parameter result: The `d` in `d[i] = (a[i] + b[i]) * c[i]`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func multiply<S, T, U, V>(addition: (a: S, b: T),
                                             _ vector: U,
                                             result: inout V)
@@ -1252,8 +1213,7 @@ extension vDSP {
     /// - Parameter addition: the `a` and `b` in `d[i] = (a[i] + b[i]) * c[i]`.
     /// - Parameter vector: the `c` in `d[i] = (a[i] + b[i]) * c[i]`.
     /// - Returns: The `d` in `d[i] = (a[i] + b[i]) * c[i]`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func multiply<S, T, U>(addition: (a: S, b: T),
                                          _ vector: U) -> [Double]
         where
@@ -1282,8 +1242,7 @@ extension vDSP {
     /// - Parameter addition: the `a` and `b` in `d[i] = (a[i] + b[i]) * c[i]`.
     /// - Parameter vector: the `c` in `d[i] = (a[i] + b[i]) * c[i]`.
     /// - Parameter result: The `d` in `d[i] = (a[i] + b[i]) * c[i]`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func multiply<S, T, U, V>(addition: (a: S, b: T),
                                             _ vector: U,
                                             result: inout V)
@@ -1322,8 +1281,7 @@ extension vDSP {
     /// - Parameter subtraction: the `a` and `b` in `d[i] = (a[i] - b[i]) * c`.
     /// - Parameter scalar: the `c` in `d[i] = `(a[i] - b[i]) * c`.
     /// - Returns: The `d` in `d[i] = `(a[i] - b[i]) * c`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func multiply<T, U>(subtraction: (a: T, b: U),
                                       _ scalar: Float) -> [Float]
         where
@@ -1350,8 +1308,7 @@ extension vDSP {
     /// - Parameter subtraction: the `a` and `b` in `d[i] = (a[i] - b[i]) * c`.
     /// - Parameter scalar: the `c` in `d[i] = `(a[i] - b[i]) * c`.
     /// - Parameter result: The `d` in `d[i] = `(a[i] - b[i]) * c`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func multiply<T, U, V>(subtraction: (a: T, b: U),
                                          _ scalar: Float,
                                          result: inout V)
@@ -1386,8 +1343,7 @@ extension vDSP {
     /// - Parameter subtraction: the `a` and `b` in `d[i] = (a[i] - b[i]) * c`.
     /// - Parameter scalar: the `c` in `d[i] = `(a[i] - b[i]) * c`.
     /// - Returns: The `d` in `d[i] = `(a[i] - b[i]) * c`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func multiply<T, U>(subtraction: (a: T, b: U),
                                       _ scalar: Double) -> [Double]
         where
@@ -1414,8 +1370,7 @@ extension vDSP {
     /// - Parameter subtraction: the `a` and `b` in `d[i] = (a[i] - b[i]) * c`.
     /// - Parameter scalar: the `c` in `d[i] = `(a[i] - b[i]) * c`.
     /// - Parameter result: The `d` in `d[i] = `(a[i] - b[i]) * c`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func multiply<T, U, V>(subtraction: (a: T, b: U),
                                          _ scalar: Double,
                                          result: inout V)
@@ -1452,8 +1407,7 @@ extension vDSP {
     /// - Parameter subtraction: the `a` and `b` in `d[i] = (a[i] - b[i]) * c[i]`.
     /// - Parameter vector: the `c` in `d[i] = `(a[i] - b[i]) * c[i]`.
     /// - Returns: The `d` in `d[i] = `(a[i] - b[i]) * c[i]`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func multiply<S, T, U>(subtraction: (a: S, b: T),
                                          _ vector: U) -> [Float]
         where
@@ -1482,8 +1436,7 @@ extension vDSP {
     /// - Parameter subtraction: the `a` and `b` in `d[i] = (a[i] - b[i]) * c[i]`.
     /// - Parameter vector: the `c` in `d[i] = `(a[i] - b[i]) * c[i]`.
     /// - Parameter result: The `d` in `d[i] = `(a[i] - b[i]) * c[i]`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func multiply<S, T, U, V>(subtraction: (a: S, b: T),
                                             _ vector: U,
                                             result: inout V)
@@ -1520,8 +1473,7 @@ extension vDSP {
     /// - Parameter subtraction: the `a` and `b` in `d[i] = (a[i] - b[i]) * c[i]`.
     /// - Parameter vector: the `c` in `d[i] = `(a[i] - b[i]) * c[i]`.
     /// - Returns: The `d` in `d[i] = `(a[i] - b[i]) * c[i]`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func multiply<S, T, U>(subtraction: (a: S, b: T),
                                          _ vector: U) -> [Double]
         where
@@ -1550,8 +1502,7 @@ extension vDSP {
     /// - Parameter subtraction: the `a` and `b` in `d[i] = (a[i] - b[i]) * c[i]`.
     /// - Parameter vector: the `c` in `d[i] = `(a[i] - b[i]) * c[i]`.
     /// - Parameter result: The `d` in `d[i] = `(a[i] - b[i]) * c[i]`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func multiply<S, T, U, V>(subtraction: (a: S, b: T),
                                             _ vector: U,
                                             result: inout V)
@@ -1591,8 +1542,7 @@ extension vDSP {
     /// - Parameter multiplication: the `a` and `b` in `d[i] = a[i]*b[i] + c`.
     /// - Parameter scalar: the `c` in `d[i] = a[i]*b[i] + c`.
     /// - Returns: the `d` in `d[i] = a[i]*b[i] + c`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func add<T, U>(multiplication: (a: T, b: U),
                                  _ scalar: Float) -> [Float]
         where
@@ -1620,8 +1570,7 @@ extension vDSP {
     /// - Parameter multiplication: the `a` and `b` in `d[i] = a[i]*b[i] + c`.
     /// - Parameter scalar: the `c` in `d[i] = a[i]*b[i] + c`.
     /// - Parameter result: the `d` in `d[i] = a[i]*b[i] + c`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func add<T, U, V>(multiplication: (a: T, b: U),
                                     _ scalar: Float,
                                     result: inout V)
@@ -1657,8 +1606,7 @@ extension vDSP {
     /// - Parameter multiplication: the `a` and `b` in `d[i] = a[i]*b[i] + c`.
     /// - Parameter scalar: the `c` in `d[i] = a[i]*b[i] + c`.
     /// - Returns: the `d` in `d[i] = a[i]*b[i] + c`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func add<T, U>(multiplication: (a: T, b: U),
                                  _ scalar: Double) -> [Double]
         where
@@ -1686,8 +1634,7 @@ extension vDSP {
     /// - Parameter multiplication: the `a` and `b` in `d[i] = a[i]*b[i] + c`.
     /// - Parameter scalar: the `c` in `d[i] = a[i]*b[i] + c`.
     /// - Parameter result: the `d` in `d[i] = a[i]*b[i] + c`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func add<T, U, V>(multiplication: (a: T, b: U),
                                     _ scalar: Double,
                                     result: inout V)
@@ -1725,8 +1672,7 @@ extension vDSP {
     /// - Parameter multiplication: the `a` and `b` in `d[i] = (a[i] * b) + c[i]`.
     /// - Parameter vector: the `c` in `d[i] = (a[i] * b) + c[i]`.
     /// - Returns: the `d` in `d[i] = (a[i] * b) + c[i]`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func add<T, U>(multiplication: (a: T, b: Float),
                                  _ vector: U) -> [Float]
         where
@@ -1754,8 +1700,7 @@ extension vDSP {
     /// - Parameter multiplication: the `a` and `b` in `d[i] = (a[i] * b) + c[i]`.
     /// - Parameter vector: the `c` in `d[i] = (a[i] * b) + c[i]`.
     /// - Parameter result: the `d` in `d[i] = (a[i] * b) + c[i]`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func add<T, U, V>(multiplication: (a: T, b: Float),
                                     _ vector: U,
                                     result: inout V)
@@ -1790,8 +1735,7 @@ extension vDSP {
     /// - Parameter multiplication: the `a` and `b` in `d[i] = (a[i] * b) + c[i]`.
     /// - Parameter vector: the `c` in `d[i] = (a[i] * b) + c[i]`.
     /// - Returns: the `d` in `d[i] = (a[i] * b) + c[i]`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func add<T, U>(multiplication: (a: T, b: Double),
                                  _ vector: U) -> [Double]
         where
@@ -1819,8 +1763,7 @@ extension vDSP {
     /// - Parameter multiplication: the `a` and `b` in `d[i] = (a[i] * b) + c[i]`.
     /// - Parameter vector: the `c` in `d[i] = (a[i] * b) + c[i]`.
     /// - Parameter result: the `d` in `d[i] = (a[i] * b) + c[i]`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func add<T, U, V>(multiplication: (a: T, b: Double),
                                     _ vector: U,
                                     result: inout V)
@@ -1857,8 +1800,7 @@ extension vDSP {
     /// - Parameter multiplication: the `a` and `b` in `d[i] = (a[i] * b[i]) + c[i]`.
     /// - Parameter vector: the `c` in `d[i] = (a[i] * b[i]) + c[i]`.
     /// - Returns: the `d` in `d[i] = (a[i] * b[i]) + c[i]`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func add<S, T, U>(multiplication: (a: S, b: T),
                                     _ vector: U) -> [Float]
         where
@@ -1888,8 +1830,7 @@ extension vDSP {
     /// - Parameter multiplication: the `a` and `b` in `d[i] = (a[i] * b[i]) + c[i]`.
     /// - Parameter vector: the `c` in `d[i] = (a[i] * b[i]) + c[i]`.
     /// - Parameter result: the `d` in `d[i] = (a[i] * b[i]) + c[i]`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func add<S, T, U, V>(multiplication: (a: S, b: T),
                                        _ vector: U,
                                        result: inout V)
@@ -1927,8 +1868,7 @@ extension vDSP {
     /// - Parameter multiplication: the `a` and `b` in `d[i] = (a[i] * b[i]) + c[i]`.
     /// - Parameter vector: the `c` in `d[i] = (a[i] * b[i]) + c[i]`.
     /// - Returns: the `d` in `d[i] = (a[i] * b[i]) + c[i]`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func add<S, T, U>(multiplication: (a: S, b: T),
                                     _ vector: U) -> [Double]
         where
@@ -1958,8 +1898,7 @@ extension vDSP {
     /// - Parameter multiplication: the `a` and `b` in `d[i] = (a[i] * b[i]) + c[i]`.
     /// - Parameter vector: the `c` in `d[i] = (a[i] * b[i]) + c[i]`.
     /// - Parameter result: the `d` in `d[i] = (a[i] * b[i]) + c[i]`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func add<S, T, U, V>(multiplication: (a: S, b: T),
                                        _ vector: U,
                                        result: inout V)
@@ -1999,8 +1938,7 @@ extension vDSP {
     /// - Parameter multiplication: the `a` and `b` in `d[i] = (a[i] * b[i]) - c[i]`.
     /// - Parameter vector: the `c` in `d[i] = (a[i] * b[i]) - c[i]`.
     /// - Returns: the `d` in `d[i] = (a[i] * b[i]) - c[i]`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func subtract<S, T, U>(multiplication: (a: T, b: U),
                                          _ vector: S) -> [Float]
         where
@@ -2030,8 +1968,7 @@ extension vDSP {
     /// - Parameter multiplication: the `a` and `b` in `d[i] = (a[i] * b[i]) - c[i]`.
     /// - Parameter vector: the `c` in `d[i] = (a[i] * b[i]) - c[i]`.
     /// - Parameter result: the `d` in `d[i] = (a[i] * b[i]) - c[i]`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func subtract<S, T, U, V>(multiplication: (a: T, b: U),
                                             _ vector: S,
                                             result: inout V)
@@ -2069,8 +2006,7 @@ extension vDSP {
     /// - Parameter multiplication: the `a` and `b` in `d[i] = (a[i] * b[i]) - c[i]`.
     /// - Parameter vector: the `c` in `d[i] = (a[i] * b[i]) - c[i]`.
     /// - Returns: the `d` in `d[i] = (a[i] * b[i]) - c[i]`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func subtract<S, T, U>(multiplication: (a: T, b: U),
                                          _ vector: S) -> [Double]
         where
@@ -2100,8 +2036,7 @@ extension vDSP {
     /// - Parameter multiplication: the `a` and `b` in `d[i] = (a[i] * b[i]) - c[i]`.
     /// - Parameter vector: the `c` in `d[i] = (a[i] * b[i]) - c[i]`.
     /// - Parameter result: the `d` in `d[i] = (a[i] * b[i]) - c[i]`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func subtract<S, T, U, V>(multiplication: (a: T, b: U),
                                             _ vector: S,
                                             result: inout V)
@@ -2140,8 +2075,7 @@ extension vDSP {
     /// - Parameter multiplicationAB: the `a` and `b` in `e[i] = (a[i] * b) + (c[i] * d)`.
     /// - Parameter multiplicationCD: the `c` and `d` in `e[i] = (a[i] * b) + (c[i] * d)`.
     /// - Returns: the `e` in `e[i] = (a[i] * b) + (c[i] * d)`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func add<T, U>(multiplication multiplicationAB: (a: T, b: Float),
                                  multiplication multiplicationCD: (c: U, d: Float)) -> [Float]
         where
@@ -2168,8 +2102,7 @@ extension vDSP {
     /// - Parameter multiplicationAB: the `a` and `b` in `e[i] = (a[i] * b) + (c[i] * d)`.
     /// - Parameter multiplicationCD: the `c` and `d` in `e[i] = (a[i] * b) + (c[i] * d)`.
     /// - Parameter result: the `e` in `e[i] = (a[i] * b) + (c[i] * d)`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func add<T, U, V>(multiplication multiplicationAB: (a: T, b: Float),
                                     multiplication multiplicationCD: (c: U, d: Float),
                                     result: inout V)
@@ -2207,8 +2140,7 @@ extension vDSP {
     /// - Parameter multiplicationAB: the `a` and `b` in `e[i] = (a[i] * b) + (c[i] * d)`.
     /// - Parameter multiplicationCD: the `c` and `d` in `e[i] = (a[i] * b) + (c[i] * d)`.
     /// - Returns: the `e` in `e[i] = (a[i] * b) + (c[i] * d)`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func add<T, U>(multiplication multiplicationAB: (a: T, b: Double),
                                  multiplication multiplicationCD: (c: U, d: Double)) -> [Double]
         where
@@ -2235,8 +2167,7 @@ extension vDSP {
     /// - Parameter multiplicationAB: the `a` and `b` in `e[i] = (a[i] * b) + (c[i] * d)`.
     /// - Parameter multiplicationCD: the `c` and `d` in `e[i] = (a[i] * b) + (c[i] * d)`.
     /// - Parameter result: the `e` in `e[i] = (a[i] * b) + (c[i] * d)`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func add<T, U, V>(multiplication multiplicationAB: (a: T, b: Double),
                                     multiplication multiplicationCD: (c: U, d: Double),
                                     result: inout V)
@@ -2276,8 +2207,7 @@ extension vDSP {
     /// - Parameter multiplicationAB: the `a` and `b` in `e[i] = (a[i] * b[i]) + (c[i] * d[i])`.
     /// - Parameter multiplicationCD: the `c` and `d` in `e[i] = (a[i] * b[i]) + (c[i] * d[i])`.
     /// - Returns: the `e` in `e[i] = (a[i] * b[i]) + (c[i] * d[i])`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func add<R, S, T, U>(multiplication multiplicationAB: (a: R, b: S),
                                        multiplication multiplicationCD: (c: T, d: U)) -> [Float]
         where
@@ -2308,8 +2238,7 @@ extension vDSP {
     /// - Parameter multiplicationAB: the `a` and `b` in `e[i] = (a[i] * b[i]) + (c[i] * d[i])`.
     /// - Parameter multiplicationCD: the `c` and `d` in `e[i] = (a[i] * b[i]) + (c[i] * d[i])`.
     /// - Parameter result: the `e` in `e[i] = (a[i] * b[i]) + (c[i] * d[i])`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func add<R, S, T, U, V>(multiplication multiplicationAB: (a: R, b: S),
                                           multiplication multiplicationCD: (c: T, d: U),
                                           result: inout V)
@@ -2353,8 +2282,7 @@ extension vDSP {
     /// - Parameter multiplicationAB: the `a` and `b` in `e[i] = (a[i] * b[i]) + (c[i] * d[i])`.
     /// - Parameter multiplicationCD: the `c` and `d` in `e[i] = (a[i] * b[i]) + (c[i] * d[i])`.
     /// - Returns: the `e` in `e[i] = (a[i] * b[i]) + (c[i] * d[i])`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func add<R, S, T, U>(multiplication multiplicationAB: (a: R, b: S),
                                        multiplication multiplicationCD: (c: T, d: U)) -> [Double]
         where
@@ -2385,8 +2313,7 @@ extension vDSP {
     /// - Parameter multiplicationAB: the `a` and `b` in `e[i] = (a[i] * b[i]) + (c[i] * d[i])`.
     /// - Parameter multiplicationCD: the `c` and `d` in `e[i] = (a[i] * b[i]) + (c[i] * d[i])`.
     /// - Parameter result: the `e` in `e[i] = (a[i] * b[i]) + (c[i] * d[i])`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func add<R, S, T, U, V>(multiplication multiplicationAB: (a: R, b: S),
                                           multiplication multiplicationCD: (c: T, d: U),
                                           result: inout V)
@@ -2432,8 +2359,7 @@ extension vDSP {
     /// - Parameter additionAB: the `a` and `b` in `e[i] = (a[i] + b[i]) * (c[i] + d[i])`.
     /// - Parameter additionCD: the `c` and `d` in `e[i] = (a[i] + b[i]) * (c[i] + d[i])`.
     /// - Returns: the `e` in `e[i] = (a[i] + b[i]) * (c[i] + d[i])`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func multiply<S, T, U>(addition additionAB: (a: S, b: T),
                                          addition additionCD: (c: U, d: U)) -> [Float]
         where
@@ -2462,8 +2388,7 @@ extension vDSP {
     /// - Parameter additionAB: the `a` and `b` in `e[i] = (a[i] + b[i]) * (c[i] + d[i])`.
     /// - Parameter additionCD: the `c` and `d` in `e[i] = (a[i] + b[i]) * (c[i] + d[i])`.
     /// - Parameter result: the `e` in `e[i] = (a[i] + b[i]) * (c[i] + d[i])`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func multiply<S, T, U, V>(addition additionAB: (a: S, b: T),
                                             addition additionCD: (c: U, d: U),
                                             result: inout V)
@@ -2505,8 +2430,7 @@ extension vDSP {
     /// - Parameter additionAB: the `a` and `b` in `e[i] = (a[i] + b[i]) * (c[i] + d[i])`.
     /// - Parameter additionCD: the `c` and `d` in `e[i] = (a[i] + b[i]) * (c[i] + d[i])`.
     /// - Returns: the `e` in `e[i] = (a[i] + b[i]) * (c[i] + d[i])`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func multiply<S, T, U>(addition additionAB: (a: S, b: T),
                                          addition additionCD: (c: U, d: U)) -> [Double]
         where
@@ -2535,8 +2459,7 @@ extension vDSP {
     /// - Parameter additionAB: the `a` and `b` in `e[i] = (a[i] + b[i]) * (c[i] + d[i])`.
     /// - Parameter additionCD: the `c` and `d` in `e[i] = (a[i] + b[i]) * (c[i] + d[i])`.
     /// - Parameter result: the `e` in `e[i] = (a[i] + b[i]) * (c[i] + d[i])`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func multiply<S, T, U, V>(addition additionAB: (a: S, b: T),
                                             addition additionCD: (c: U, d: U),
                                             result: inout V)
@@ -2580,8 +2503,7 @@ extension vDSP {
     /// - Parameter multiplicationAB: the `a` and `b` in `e[i] = (a[i] * b[i]) - (c[i] * d[i])`.
     /// - Parameter multiplicationCD: the `c` and `d` in `e[i] = (a[i] * b[i]) - (c[i] * d[i])`.
     /// - Returns: the `e` in `e[i] = (a[i] * b[i]) - (c[i] * d[i])`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func subtract<R, S, T, U>(multiplication multiplicationAB: (a: T, b: U),
                                             multiplication multiplicationCD: (c: R, d: S)) -> [Float]
         where
@@ -2612,8 +2534,7 @@ extension vDSP {
     /// - Parameter multiplicationAB: the `a` and `b` in `e[i] = (a[i] * b[i]) - (c[i] * d[i])`.
     /// - Parameter multiplicationCD: the `c` and `d` in `e[i] = (a[i] * b[i]) - (c[i] * d[i])`.
     /// - Parameter result: the `e` in `e[i] = (a[i] * b[i]) - (c[i] * d[i])`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func subtract<R, S, T, U, V>(multiplication multiplicationAB: (a: T, b: U),
                                                multiplication multiplicationCD: (c: R, d: S),
                                                result: inout V)
@@ -2657,8 +2578,7 @@ extension vDSP {
     /// - Parameter multiplicationAB: the `a` and `b` in `e[i] = (a[i] * b[i]) - (c[i] * d[i])`.
     /// - Parameter multiplicationCD: the `c` and `d` in `e[i] = (a[i] * b[i]) - (c[i] * d[i])`.
     /// - Returns: the `e` in `e[i] = (a[i] * b[i]) - (c[i] * d[i])`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func subtract<R, S, T, U>(multiplication multiplicationAB: (a: T, b: U),
                                             multiplication multiplicationCD: (c: R, d: S)) -> [Double]
         where
@@ -2689,8 +2609,7 @@ extension vDSP {
     /// - Parameter multiplicationAB: the `a` and `b` in `e[i] = (a[i] * b[i]) - (c[i] * d[i])`.
     /// - Parameter multiplicationCD: the `c` and `d` in `e[i] = (a[i] * b[i]) - (c[i] * d[i])`.
     /// - Parameter result: the `e` in `e[i] = (a[i] * b[i]) - (c[i] * d[i])`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func subtract<R, S, T, U, V>(multiplication multiplicationAB: (a: T, b: U),
                                                multiplication multiplicationCD: (c: R, d: S),
                                                result: inout V)
@@ -2736,8 +2655,7 @@ extension vDSP {
     /// - Parameter subtractionAB: the `a` and `b` in `e[i] = (a[i] - b[i]) * (c[i] - d[i])`.
     /// - Parameter subtractionCD: the `c` and `d` in `e[i] = (a[i] - b[i]) * (c[i] - d[i])`.
     /// - Returns: the `e` in `e[i] = (a[i] - b[i]) * (c[i] - d[i])`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func multiply<R, S, T, U>(subtraction subtractionAB: (a: R, b: S),
                                             subtraction subtractionCD: (c: T, d: U)) -> [Float]
         where
@@ -2768,8 +2686,7 @@ extension vDSP {
     /// - Parameter subtractionAB: the `a` and `b` in `e[i] = (a[i] - b[i]) * (c[i] - d[i])`.
     /// - Parameter subtractionCD: the `c` and `d` in `e[i] = (a[i] - b[i]) * (c[i] - d[i])`.
     /// - Parameter result: the `e` in `e[i] = (a[i] - b[i]) * (c[i] - d[i])`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func multiply<R, S, T, U, V>(subtraction subtractionAB: (a: R, b: S),
                                                subtraction subtractionCD: (c: T, d: U),
                                                result: inout V)
@@ -2813,8 +2730,7 @@ extension vDSP {
     /// - Parameter subtractionAB: the `a` and `b` in `e[i] = (a[i] - b[i]) * (c[i] - d[i])`.
     /// - Parameter subtractionCD: the `c` and `d` in `e[i] = (a[i] - b[i]) * (c[i] - d[i])`.
     /// - Returns: the `e` in `e[i] = (a[i] - b[i]) * (c[i] - d[i])`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func multiply<R, S, T, U>(subtraction subtractionAB: (a: R, b: S),
                                             subtraction subtractionCD: (c: T, d: U)) -> [Double]
         where
@@ -2845,8 +2761,7 @@ extension vDSP {
     /// - Parameter subtractionAB: the `a` and `b` in `e[i] = (a[i] - b[i]) * (c[i] - d[i])`.
     /// - Parameter subtractionCD: the `c` and `d` in `e[i] = (a[i] - b[i]) * (c[i] - d[i])`.
     /// - Parameter result: the `e` in `e[i] = (a[i] - b[i]) * (c[i] - d[i])`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func multiply<R, S, T, U, V>(subtraction subtractionAB: (a: R, b: S),
                                                subtraction subtractionCD: (c: T, d: U),
                                                result: inout V)
@@ -2892,8 +2807,7 @@ extension vDSP {
     /// - Parameter addition: the `a` and `b` in `e[i] = (a[i] + b[i]) * (c[i] - d[i])`.
     /// - Parameter subtraction: the `c` and `d` in `e[i] = (a[i] + b[i]) * (c[i] - d[i])`.
     /// - Returns: the `e` in `e[i] = (a[i] + b[i]) * (c[i] - d[i])`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func multiply<R, S, T, U>(addition: (a: R, b: S),
                                             subtraction: (c: T, d: U)) -> [Float]
         where
@@ -2924,8 +2838,7 @@ extension vDSP {
     /// - Parameter addition: the `a` and `b` in `e[i] = (a[i] + b[i]) * (c[i] - d[i])`.
     /// - Parameter subtraction: the `c` and `d` in `e[i] = (a[i] + b[i]) * (c[i] - d[i])`.
     /// - Parameter result: the `e` in `e[i] = (a[i] + b[i]) * (c[i] - d[i])`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func multiply<R, S, T, U, V>(addition: (a: R, b: S),
                                                subtraction: (c: T, d: U),
                                                result: inout V)
@@ -2969,8 +2882,7 @@ extension vDSP {
     /// - Parameter addition: the `a` and `b` in `e[i] = (a[i] + b[i]) * (c[i] - d[i])`.
     /// - Parameter subtraction: the `c` and `d` in `e[i] = (a[i] + b[i]) * (c[i] - d[i])`.
     /// - Returns: the `e` in `e[i] = (a[i] + b[i]) * (c[i] - d[i])`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func multiply<R, S, T, U>(addition: (a: R, b: S),
                                             subtraction: (c: T, d: U)) -> [Double]
         where
@@ -3001,8 +2913,7 @@ extension vDSP {
     /// - Parameter addition: the `a` and `b` in `e[i] = (a[i] + b[i]) * (c[i] - d[i])`.
     /// - Parameter subtraction: the `c` and `d` in `e[i] = (a[i] + b[i]) * (c[i] - d[i])`.
     /// - Parameter result: the `e` in `e[i] = (a[i] + b[i]) * (c[i] - d[i])`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func multiply<R, S, T, U, V>(addition: (a: R, b: S),
                                                subtraction: (c: T, d: U),
                                                result: inout V)
@@ -3048,8 +2959,7 @@ extension vDSP {
     /// - Parameter multiplication: the `a` and `b` in `d[n] = a[n]*b + c`.
     /// - Parameter scalar: the `c` in `d[n] = a[n]*b + c`.
     /// - Returns: the `e` in `d[n] = a[n]*b + c`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func add<U>(multiplication: (a: U, b: Float),
                               _ scalar: Float) -> [Float]
         where
@@ -3075,8 +2985,7 @@ extension vDSP {
     /// - Parameter multiplication: the `a` and `b` in `d[n] = a[n]*b + c`.
     /// - Parameter scalar: the `c` in `d[n] = a[n]*b + c`.
     /// - Parameter result: the `e` in `d[n] = a[n]*b + c`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func add<U, V>(multiplication: (a: U, b: Float),
                                  _ scalar: Float,
                                  result: inout V)
@@ -3108,8 +3017,7 @@ extension vDSP {
     /// - Parameter multiplication: the `a` and `b` in `d[n] = a[n]*b + c`.
     /// - Parameter scalar: the `c` in `d[n] = a[n]*b + c`.
     /// - Returns: the `e` in `d[n] = a[n]*b + c`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func add<U>(multiplication: (a: U, b: Double),
                               _ scalar: Double) -> [Double]
         where
@@ -3135,8 +3043,7 @@ extension vDSP {
     /// - Parameter multiplication: the `a` and `b` in `d[n] = a[n]*b + c`.
     /// - Parameter scalar: the `c`in `d[n] = a[n]*b + c`.
     /// - Parameter result: the `e` in `d[n] = a[n]*b + c`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func add<U, V>(multiplication: (a: U, b: Double),
                                  _ scalar: Double,
                                  result: inout V)
@@ -3171,8 +3078,7 @@ extension vDSP {
     /// - Parameter multiplication: the `a` and `b` in `D[n] = A[n]*B - C[n]`.
     /// - Parameter vector: the `c` in `D[n] = A[n]*B - C[n]`.
     /// - Returns: the `d` in `D[n] = A[n]*B - C[n]`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func subtract<T, U>(multiplication: (a: U, b: Float),
                                       _ vector: T) -> [Float]
         where
@@ -3201,8 +3107,7 @@ extension vDSP {
     /// - Parameter multiplication: the `a` and `b` in `D[n] = A[n]*B - C[n]`.
     /// - Parameter vector: the `c` in `D[n] = A[n]*B - C[n]`.
     /// - Parameter result: the `d` in `D[n] = A[n]*B - C[n]`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func subtract<T, U, V>(multiplication: (a: U, b: Float),
                                          _ vector: T,
                                          result: inout V)
@@ -3239,8 +3144,7 @@ extension vDSP {
     /// - Parameter multiplication: the `a` and `b` in `D[n] = A[n]*B - C[n]`.
     /// - Parameter vector: the `c` in `D[n] = A[n]*B - C[n]`.
     /// - Returns: the `d` in `D[n] = A[n]*B - C[n]`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func subtract<T, U>(multiplication: (a: U, b: Double),
                                       _ vector: T) -> [Double]
         where
@@ -3269,8 +3173,7 @@ extension vDSP {
     /// - Parameter vector: the `c` in `D[n] = A[n]*B - C[n]`.
     /// - Parameter multiplication: the `a` and `b` in `D[n] = A[n]*B - C[n]`.
     /// - Parameter result: the `d` in `D[n] = A[n]*B - C[n]`.
-    @inline(__always)
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @inlinable
     public static func subtract<T, U, V>(multiplication: (a: U, b: Double),
                                          _ vector: T,
                                          result: inout V)

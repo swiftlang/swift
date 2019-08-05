@@ -360,7 +360,7 @@ enum MyNever {}
 func ~= (_ : MyNever, _ : MyNever) -> Bool { return true }
 func myFatalError() -> MyNever { fatalError() }
 
-@_frozen public enum UninhabitedT4<A> {
+@frozen public enum UninhabitedT4<A> {
   case x(A)
 }
 
@@ -786,7 +786,7 @@ public enum NonExhaustivePayload {
   case a(Int), b(Bool)
 }
 
-@_frozen public enum TemporalProxy {
+@frozen public enum TemporalProxy {
   case seconds(Int)
   case milliseconds(Int)
   case microseconds(Int)
@@ -1175,3 +1175,94 @@ func sr10301_as(_ foo: SR10301<String,(Int,Error)>) {
     return
   }
 }
+
+// SR-11212 tests: Some of the tests here rely on compiler bugs related to
+// implicit (un)tupling in patterns. When you add a warning for the erroneous
+// cases, feel free to add expected notes as appropriate.
+enum SR11212Tests {
+
+  enum Untupled {
+    case upair(Int, Int)
+  }
+
+  func sr11212_content_untupled_pattern_tupled(u: Untupled) -> (Int, Int) {
+    switch u {
+    case .upair((let x, let y)): return (x, y)
+    }
+  }
+
+  func sr11212_content_untupled_pattern_tupled_nested(u: Untupled) -> (Int, Int) {
+    switch u {
+    case .upair(let (x, y)): return (x, y)
+    }
+  }
+
+  func sr11212_content_untupled_pattern_untupled(u: Untupled) -> (Int, Int) {
+    switch u {
+    case .upair(let x, let y): return (x, y)
+    }
+  }
+
+  func sr11212_content_untupled_pattern_ambiguous(u: Untupled) -> (Int, Int) {
+    switch u {
+    case .upair(let u_): return u_
+    }
+  }
+
+  enum Tupled {
+    case tpair((Int, Int))
+  }
+
+  func sr11212_content_tupled_pattern_tupled(t: Tupled) -> (Int, Int) {
+    switch t {
+    case .tpair((let x, let y)): return (x, y)
+    }
+  }
+
+  func sr11212_content_tupled_pattern_tupled_nested(t: Tupled) -> (Int, Int) {
+    switch t {
+    case .tpair(let (x, y)): return (x, y)
+    }
+  }
+
+  func sr11212_content_tupled_pattern_untupled(t: Tupled) -> (Int, Int) {
+    switch t {
+    case .tpair(let x, let y): return (x, y)
+    }
+  }
+
+  func sr11212_content_tupled_pattern_ambiguous(t: Tupled) -> (Int, Int) {
+    switch t {
+    case .tpair(let t_): return t_
+    }
+  }
+
+  enum Box<T> {
+    case box(T)
+  }
+
+  func sr11212_content_generic_pattern_tupled(b: Box<(Int, Int)>) -> (Int, Int) {
+    switch b {
+    case .box((let x, let y)): return (x, y)
+    }
+  }
+
+  func sr11212_content_generic_pattern_tupled_nested(b: Box<(Int, Int)>) -> (Int, Int) {
+    switch b {
+    case .box(let (x, y)): return (x, y)
+    }
+  }
+
+  func sr11212_content_generic_pattern_untupled(b: Box<(Int, Int)>) -> (Int, Int) {
+    switch b {
+    case .box(let x, let y): return (x, y)
+    }
+  }
+
+  func sr11212_content_generic_pattern_ambiguous(b: Box<(Int, Int)>) -> (Int, Int) {
+    switch b {
+    case .box(let b_): return b_
+    }
+  }
+
+} // end SR11212Tests

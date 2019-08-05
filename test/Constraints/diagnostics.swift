@@ -364,12 +364,12 @@ c.method2(1.0)(2.0) // expected-error {{cannot convert value of type 'Double' to
 CurriedClass.method1(c)()
 _ = CurriedClass.method1(c)
 CurriedClass.method1(c)(1)         // expected-error {{argument passed to call that takes no arguments}}
-CurriedClass.method1(2.0)(1)       // expected-error {{instance member 'method1' cannot be used on type 'CurriedClass'; did you mean to use a value of this type instead?}}
+CurriedClass.method1(2.0)(1)       // expected-error {{cannot convert value of type 'Double' to expected argument type 'CurriedClass'}}
 
 CurriedClass.method2(c)(32)(b: 1) // expected-error{{extraneous argument label 'b:' in call}}
 _ = CurriedClass.method2(c)
 _ = CurriedClass.method2(c)(32)
-_ = CurriedClass.method2(1,2)      // expected-error {{instance member 'method2' cannot be used on type 'CurriedClass'; did you mean to use a value of this type instead?}}
+_ = CurriedClass.method2(1,2)      // expected-error {{extra argument in call}}
 CurriedClass.method2(c)(1.0)(b: 1) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 CurriedClass.method2(c)(1)(1.0) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 CurriedClass.method2(c)(2)(c: 1.0) // expected-error {{extraneous argument label 'c:'}}
@@ -379,6 +379,7 @@ _ = CurriedClass.method3(c)
 _ = CurriedClass.method3(c)(1, 2)        // expected-error {{missing argument label 'b:' in call}} {{32-32=b: }}
 _ = CurriedClass.method3(c)(1, b: 2)(32) // expected-error {{cannot call value of non-function type '()'}}
 _ = CurriedClass.method3(1, 2)           // expected-error {{instance member 'method3' cannot be used on type 'CurriedClass'; did you mean to use a value of this type instead?}}
+// expected-error@-1 {{missing argument label 'b:' in call}}
 CurriedClass.method3(c)(1.0, b: 1)       // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 CurriedClass.method3(c)(1)               // expected-error {{missing argument for parameter 'b' in call}}
 CurriedClass.method3(c)(c: 1.0)          // expected-error {{missing argument for parameter #1 in call}}
@@ -416,15 +417,15 @@ enum Color {
 
   static func rainbow() -> Color {}
   
-  static func overload(a : Int) -> Color {}
-  static func overload(b : Int) -> Color {}
+  static func overload(a : Int) -> Color {} // expected-note {{incorrect labels for candidate (have: '(_:)', expected: '(a:)')}}
+  static func overload(b : Int) -> Color {} // expected-note {{incorrect labels for candidate (have: '(_:)', expected: '(b:)')}}
   
   static func frob(_ a : Int, b : inout Int) -> Color {}
   static var svar: Color { return .Red }
 }
 
 // FIXME: This used to be better: "'map' produces '[T]', not the expected contextual result type '(Int, Color)'"
-let _: (Int, Color) = [1,2].map({ ($0, .Unknown("")) }) // expected-error {{expression type '((Int) throws -> _) throws -> [_]' is ambiguous without more context}}
+let _: (Int, Color) = [1,2].map({ ($0, .Unknown("")) }) // expected-error {{expression type '((Int) throws -> _) throws -> Array<_>' is ambiguous without more context}}
 
 let _: [(Int, Color)] = [1,2].map({ ($0, .Unknown("")) })// expected-error {{missing argument label 'description:' in call}}
 
@@ -443,8 +444,7 @@ let _ : Color = .rainbow  // expected-error {{member 'rainbow' is a function; di
 let _: Color = .overload(a : 1.0)  // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 let _: Color = .overload(1.0)  // expected-error {{ambiguous reference to member 'overload'}}
 // expected-note @-1 {{overloads for 'overload' exist with these partially matching parameter lists: (a: Int), (b: Int)}}
-let _: Color = .overload(1)  // expected-error {{ambiguous reference to member 'overload'}}
-// expected-note @-1 {{overloads for 'overload' exist with these partially matching parameter lists: (a: Int), (b: Int)}}
+let _: Color = .overload(1)  // expected-error {{no exact matches in call to static method 'overload'}}
 let _: Color = .frob(1.0, &i) // expected-error {{missing argument label 'b:' in call}}
 let _: Color = .frob(1.0, b: &i) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 let _: Color = .frob(1, i)  // expected-error {{missing argument label 'b:' in call}}
@@ -603,7 +603,7 @@ func r22470302(_ c: r22470302Class) {
 // <rdar://problem/21928143> QoI: Pointfree reference to generic initializer in generic context does not compile
 extension String {
   @available(*, unavailable, message: "calling this is unwise")
-  func unavail<T : Sequence> // expected-note 2 {{'unavail' has been explicitly marked unavailable here}}
+  func unavail<T : Sequence> // expected-note {{'unavail' has been explicitly marked unavailable here}}
     (_ a : T) -> String where T.Iterator.Element == String {}
 }
 extension Array {
@@ -612,7 +612,7 @@ extension Array {
   }
   
   func h() -> String {
-    return "foo".unavail([0])  // expected-error {{'unavail' is unavailable: calling this is unwise}}
+    return "foo".unavail([0])  // expected-error {{cannot convert value of type 'Int' to expected element type 'String'}}
   }
 }
 
@@ -903,7 +903,7 @@ func test2208() {
 
 // SR-2164: Erroneous diagnostic when unable to infer generic type
 
-struct SR_2164<A, B> { // expected-note 3 {{'B' declared as parameter to type 'SR_2164'}} expected-note 2 {{'A' declared as parameter to type 'SR_2164'}} expected-note * {{generic type 'SR_2164' declared here}}
+struct SR_2164<A, B> { // expected-note 4 {{'B' declared as parameter to type 'SR_2164'}} expected-note 2 {{'A' declared as parameter to type 'SR_2164'}} expected-note * {{generic type 'SR_2164' declared here}}
   init(a: A) {}
   init(b: B) {}
   init(c: Int) {}
@@ -921,7 +921,10 @@ struct SR_2164_Dict<A: Hashable, B> { // expected-note {{'B' declared as paramet
 
 SR_2164(a: 0) // expected-error {{generic parameter 'B' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}}
 SR_2164(b: 1) // expected-error {{generic parameter 'A' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}}
-SR_2164(c: 2) // expected-error {{generic parameter 'A' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}}
+SR_2164(c: 2)
+// expected-error@-1 {{generic parameter 'A' could not be inferred}}
+// expected-error@-2 {{generic parameter 'B' could not be inferred}}
+// expected-note@-3 {{explicitly specify the generic arguments to fix this issue}} {{8-8=<Any, Any>}}
 SR_2164(3) // expected-error {{generic parameter 'B' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}}
 SR_2164_Array([4]) // expected-error {{generic parameter 'B' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}}
 SR_2164(e: 5) // expected-error {{generic parameter 'B' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}}
@@ -1220,3 +1223,34 @@ func unresolvedTypeExistential() -> Bool {
 
 func rdar43525641(_ a: Int, _ b: Int = 0, c: Int = 0, _ d: Int) {}
 rdar43525641(1, c: 2, 3) // Ok
+
+struct Array {}
+let foo: Swift.Array = Array() // expected-error {{cannot convert value of type 'diagnostics.Array' to specified type 'Swift.Array'}}
+
+struct Error {}
+let bar: Swift.Error = Error() //expected-error {{value of type 'diagnostics.Error' does not conform to specified type 'Swift.Error'}}
+let baz: (Swift.Error) = Error() //expected-error {{value of type 'diagnostics.Error' does not conform to specified type 'Swift.Error'}}
+let baz2: Swift.Error = (Error()) //expected-error {{value of type 'diagnostics.Error' does not conform to specified type 'Swift.Error'}}
+let baz3: (Swift.Error) = (Error()) //expected-error {{value of type 'diagnostics.Error' does not conform to specified type 'Swift.Error'}}
+let baz4: ((Swift.Error)) = (Error()) //expected-error {{value of type 'diagnostics.Error' does not conform to specified type 'Swift.Error'}}
+
+// SyntaxSugarTypes with unresolved types
+func takesGenericArray<T>(_ x: [T]) {}
+takesGenericArray(1) // expected-error {{cannot convert value of type 'Int' to expected argument type 'Array<_>'}}
+func takesNestedGenericArray<T>(_ x: [[T]]) {}
+takesNestedGenericArray(1) // expected-error {{cannot convert value of type 'Int' to expected argument type 'Array<Array<_>>'}}
+func takesSetOfGenericArrays<T>(_ x: Set<[T]>) {}
+takesSetOfGenericArrays(1) // expected-error {{cannot convert value of type 'Int' to expected argument type 'Set<Array<_>>'}}
+func takesArrayOfSetOfGenericArrays<T>(_ x: [Set<[T]>]) {}
+takesArrayOfSetOfGenericArrays(1) // expected-error {{cannot convert value of type 'Int' to expected argument type 'Array<Set<Array<_>>>'}}
+func takesArrayOfGenericOptionals<T>(_ x: [T?]) {}
+takesArrayOfGenericOptionals(1) // expected-error {{cannot convert value of type 'Int' to expected argument type 'Array<Optional<_>>'}}
+func takesGenericDictionary<T, U>(_ x: [T : U]) {}
+takesGenericDictionary(true) // expected-error {{cannot convert value of type 'Bool' to expected argument type 'Dictionary<_, _>'}}
+typealias Z = Int
+func takesGenericDictionaryWithTypealias<T>(_ x: [T : Z]) {}
+takesGenericDictionaryWithTypealias(true) // expected-error {{cannot convert value of type 'Bool' to expected argument type 'Dictionary<_, Z>'}}
+func takesGenericFunction<T>(_ x: ([T]) -> Void) {}
+takesGenericFunction(true) // expected-error {{cannot convert value of type 'Bool' to expected argument type '(Array<_>) -> Void'}}
+func takesTuple<T>(_ x: ([T], [T])) {}
+takesTuple(true) // expected-error {{cannot convert value of type 'Bool' to expected argument type '(Array<_>, Array<_>)'}}

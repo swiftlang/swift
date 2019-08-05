@@ -28,7 +28,7 @@ list(APPEND swift_stubs_c_compile_flags -DswiftCore_EXPORTS)
 list(APPEND swift_stubs_c_compile_flags -I${SWIFT_SOURCE_DIR}/include)
 
 add_swift_target_library(swiftStdlibStubs
-                  OBJECT_LIBRARY TARGET_LIBRARY
+                  OBJECT_LIBRARY
                     ${swift_stubs_sources}
                     ${swift_stubs_objc_sources}
                     ${swift_stubs_unicode_normalization_sources}
@@ -38,10 +38,11 @@ add_swift_target_library(swiftStdlibStubs
                     ${swift_stubs_c_compile_flags}
                   LINK_FLAGS
                     ${SWIFT_RUNTIME_CORE_LINK_FLAGS}
+                  SWIFT_COMPILE_FLAGS ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
                   INSTALL_IN_COMPONENT
                     stdlib)
 
-if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+if("${SWIFT_PRIMARY_VARIANT_SDK}" IN_LIST SWIFT_APPLE_PLATFORMS)
   set_property(SOURCE
                  SwiftNativeNSXXXBaseARC.m
                APPEND_STRING PROPERTY COMPILE_FLAGS

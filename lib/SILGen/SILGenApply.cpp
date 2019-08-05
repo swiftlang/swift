@@ -110,7 +110,7 @@ getPartialApplyOfDynamicMethodFormalType(SILGenModule &SGM, SILDeclRef member,
   // Adjust the result type to replace dynamic-self with AnyObject.
   CanType resultType = completeMethodTy.getResult();
   if (auto fnDecl = dyn_cast<FuncDecl>(member.getDecl())) {
-    if (fnDecl->hasDynamicSelf()) {
+    if (fnDecl->hasDynamicSelfResult()) {
       auto anyObjectTy = SGM.getASTContext().getAnyObjectType();
       resultType = resultType->replaceCovariantResultType(anyObjectTy, 0)
                              ->getCanonicalType();
@@ -240,11 +240,11 @@ static void convertOwnershipConventionsGivenParamInfos(
     llvm::SmallVectorImpl<ManagedValue> &outVar) {
   assert(params.size() == values.size() &&
          "Different number of params from arguments");
-  transform(indices(params), std::back_inserter(outVar),
-            [&](unsigned i) -> ManagedValue {
-              return convertOwnershipConventionGivenParamInfo(
-                  SGF, params[i], values[i], loc, isForCoroutine);
-            });
+  llvm::transform(indices(params), std::back_inserter(outVar),
+                  [&](unsigned i) -> ManagedValue {
+                    return convertOwnershipConventionGivenParamInfo(
+                        SGF, params[i], values[i], loc, isForCoroutine);
+                  });
 }
 
 //===----------------------------------------------------------------------===//
@@ -1047,7 +1047,9 @@ public:
     // Directly dispatch to calls of the replaced function inside of
     // '@_dynamicReplacement(for:)' methods.
     bool isObjCReplacementCall = false;
-    if (isCallToReplacedInDynamicReplacement(SGF, afd, isObjCReplacementCall) &&
+    if (SGF.getOptions()
+            .EnableDynamicReplacementCanCallPreviousImplementation &&
+        isCallToReplacedInDynamicReplacement(SGF, afd, isObjCReplacementCall) &&
         thisCallSite->getArg()->isSelfExprOf(
             cast<AbstractFunctionDecl>(SGF.FunctionDC->getAsDecl()), false)) {
       auto constant = SILDeclRef(afd).asForeign(
@@ -1118,6 +1120,8 @@ public:
     ApplyExpr *thisCallSite = callSites.back();
     bool isObjCReplacementSelfCall = false;
     bool isSelfCallToReplacedInDynamicReplacement =
+        SGF.getOptions()
+            .EnableDynamicReplacementCanCallPreviousImplementation &&
         isCallToReplacedInDynamicReplacement(
             SGF, cast<AbstractFunctionDecl>(constant.getDecl()),
             isObjCReplacementSelfCall) &&
@@ -1452,6 +1456,8 @@ public:
 
     bool isObjCReplacementSelfCall = false;
     bool isSelfCallToReplacedInDynamicReplacement =
+        SGF.getOptions()
+            .EnableDynamicReplacementCanCallPreviousImplementation &&
         isCallToReplacedInDynamicReplacement(
             SGF, cast<AbstractFunctionDecl>(constant.getDecl()),
             isObjCReplacementSelfCall) &&
@@ -4051,12 +4057,14 @@ CallEmission::applySpecializedEmitter(SpecializedEmitter &specializedEmitter,
     return firstLevelResult;
   }
 
-  // Builtins.
+  // Named Builtins.
   assert(specializedEmitter.isNamedBuiltin());
   auto builtinName = specializedEmitter.getBuiltinName();
   SmallVector<SILValue, 4> consumedArgs;
   for (auto arg : uncurriedArgs) {
-    // Builtins have a special convention that takes everything at +1.
+    // Named builtins are by default assumed to take all arguments at +1 i.e.,
+    // as Owned or Trivial. Named builtins that don't follow this convention
+    // must use a specialized emitter.
     auto maybePlusOne = arg.ensurePlusOne(SGF, uncurriedLoc.getValue());
     consumedArgs.push_back(maybePlusOne.forward(SGF));
   }
@@ -4893,14 +4901,68 @@ RValue SILGenFunction::emitApplyAllocatingInitializer(SILLocation loc,
   return result;
 }
 
-RValue SILGenFunction::emitApplyPropertyDelegateAllocator(SILLocation loc,
+/// Emit an application of the given method.
+RValue SILGenFunction::emitApplyMethod(SILLocation loc, ConcreteDeclRef declRef,
+                                       ArgumentSource &&self,
+                                       PreparedArguments &&args, SGFContext C) {
+  auto *call = cast<AbstractFunctionDecl>(declRef.getDecl());
+
+  // Form the reference to the method.
+  auto callRef = SILDeclRef(call, SILDeclRef::Kind::Func)
+                     .asForeign(requiresForeignEntryPoint(declRef.getDecl()));
+  auto declRefConstant = getConstantInfo(callRef);
+  auto subs = declRef.getSubstitutions();
+
+  // Scope any further writeback just within this operation.
+  FormalEvaluationScope writebackScope(*this);
+
+  // Form the metatype argument.
+  ManagedValue selfMetaVal;
+  SILType selfMetaTy;
+  {
+    // Determine the self metatype type.
+    CanSILFunctionType substFnType =
+        declRefConstant.SILFnType->substGenericArgs(SGM.M, subs);
+    SILType selfParamMetaTy = getSILType(substFnType->getSelfParameter());
+    selfMetaTy = selfParamMetaTy;
+  }
+
+  // Form the callee.
+  Optional<Callee> callee;
+  if (isa<ProtocolDecl>(call->getDeclContext())) {
+    callee.emplace(Callee::forWitnessMethod(*this, selfMetaTy.getASTType(),
+                                            callRef, subs, loc));
+  } else if (getMethodDispatch(call) == MethodDispatch::Class) {
+    callee.emplace(Callee::forClassMethod(*this, callRef, subs, loc));
+  } else {
+    callee.emplace(Callee::forDirect(*this, callRef, subs, loc));
+  }
+
+  auto substFormalType = callee->getSubstFormalType();
+
+  // Form the call emission.
+  CallEmission emission(*this, std::move(*callee), std::move(writebackScope));
+
+  auto methodType = cast<FunctionType>(substFormalType.getResult());
+  auto resultType = methodType.getResult();
+
+  emission.addSelfParam(loc, std::move(self), substFormalType.getParams()[0],
+                        methodType);
+
+  // Arguments.
+  emission.addCallSite(loc, std::move(args), resultType, /*throws*/ false);
+
+  return emission.apply(C);
+}
+
+RValue SILGenFunction::emitApplyPropertyWrapperAllocator(SILLocation loc,
                                                           SubstitutionMap subs,
                                                           SILDeclRef ctorRef,
-                                                          Type delegateTy,
+                                                          Type wrapperTy,
                                                     CanAnyFunctionType funcTy) {
   Callee callee = Callee::forDirect(*this, ctorRef, subs, loc);
 
-  MetatypeType *MTty = MetatypeType::get(delegateTy);
+  MetatypeType *MTty = MetatypeType::get(wrapperTy);
   auto metatypeVal = B.createMetatype(loc, getLoweredType(MTty));
   ManagedValue mtManagedVal = ManagedValue::forUnmanaged(metatypeVal);
   RValue metatypeRVal(*this, loc, MTty->getCanonicalType(), mtManagedVal);
@@ -5119,8 +5181,11 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &SGF,
   auto *decl = cast<AbstractFunctionDecl>(constant.getDecl());
 
   bool isObjCReplacementSelfCall = false;
-  if (isOnSelfParameter && isCallToReplacedInDynamicReplacement(
-                               SGF, decl, isObjCReplacementSelfCall)) {
+  if (isOnSelfParameter &&
+      SGF.getOptions()
+          .EnableDynamicReplacementCanCallPreviousImplementation &&
+      isCallToReplacedInDynamicReplacement(SGF, decl,
+                                           isObjCReplacementSelfCall)) {
     return Callee::forDirect(
         SGF,
         SILDeclRef(cast<AbstractFunctionDecl>(SGF.FunctionDC->getAsDecl()),
@@ -5625,9 +5690,8 @@ ManagedValue SILGenFunction::emitAddressorAccessor(
   auto pointerType =
     pointer->getType().castTo<BoundGenericStructType>()->getDecl();
   auto props = pointerType->getStoredProperties();
-  assert(props.begin() != props.end());
-  assert(std::next(props.begin()) == props.end());
-  VarDecl *rawPointerField = *props.begin();
+  assert(props.size() == 1);
+  VarDecl *rawPointerField = props[0];
   pointer = B.createStructExtract(loc, pointer, rawPointerField,
                                   SILType::getRawPointerType(getASTContext()));
 
@@ -5747,7 +5811,7 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
   // Create the branch.
   FuncDecl *memberFunc;
   if (auto *VD = dyn_cast<VarDecl>(e->getMember().getDecl())) {
-    memberFunc = VD->getGetter();
+    memberFunc = VD->getOpaqueAccessor(AccessorKind::Get);
     memberMethodTy = FunctionType::get({}, memberMethodTy);
   } else
     memberFunc = cast<FuncDecl>(e->getMember().getDecl());
@@ -5856,7 +5920,7 @@ RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e,
 
   // Create the branch.
   auto subscriptDecl = cast<SubscriptDecl>(e->getMember().getDecl());
-  auto member = SILDeclRef(subscriptDecl->getGetter(),
+  auto member = SILDeclRef(subscriptDecl->getOpaqueAccessor(AccessorKind::Get),
                            SILDeclRef::Kind::Func)
     .asForeign();
   B.createDynamicMethodBranch(e, base, member, hasMemberBB, noMemberBB);

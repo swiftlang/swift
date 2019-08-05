@@ -12,6 +12,7 @@
 from __future__ import print_function
 
 import argparse
+import json
 import os
 import pipes
 import platform
@@ -41,6 +42,8 @@ from swift_build_support.swift_build_support.SwiftBuildSupport import (
     SWIFT_SOURCE_ROOT,
 )
 from swift_build_support.swift_build_support.cmake import CMake
+from swift_build_support.swift_build_support.host_specific_configuration \
+    import HostSpecificConfiguration
 from swift_build_support.swift_build_support.targets import \
     StdlibDeploymentTarget
 from swift_build_support.swift_build_support.toolchain import host_toolchain
@@ -56,235 +59,13 @@ def exit_rejecting_arguments(message, parser=None):
     sys.exit(2)  # 2 is the same as `argparse` error exit code.
 
 
-class HostSpecificConfiguration(object):
+class JSONDumper(json.JSONEncoder):
+    def __init__(self, *args, **kwargs):
+        json.JSONEncoder.__init__(self, indent=2, separators=(',', ': '),
+                                  *args, **kwargs)
 
-    """Configuration information for an individual host."""
-
-    def __init__(self, host_target, args):
-        """Initialize for the given `host_target`."""
-
-        # Compute the set of deployment targets to configure/build.
-        if host_target == args.host_target:
-            # This host is the user's desired product, so honor the requested
-            # set of targets to configure/build.
-            stdlib_targets_to_configure = args.stdlib_deployment_targets
-            if "all" in args.build_stdlib_deployment_targets:
-                stdlib_targets_to_build = set(stdlib_targets_to_configure)
-            else:
-                stdlib_targets_to_build = set(
-                    args.build_stdlib_deployment_targets).intersection(
-                    set(args.stdlib_deployment_targets))
-        else:
-            # Otherwise, this is a host we are building as part of
-            # cross-compiling, so we only need the target itself.
-            stdlib_targets_to_configure = [host_target]
-            stdlib_targets_to_build = set(stdlib_targets_to_configure)
-
-        # Compute derived information from the arguments.
-        #
-        # FIXME: We should move the platform-derived arguments to be entirely
-        # data driven, so that we can eliminate this code duplication and just
-        # iterate over all supported platforms.
-        platforms_to_skip_build = self.__platforms_to_skip_build(args)
-        platforms_to_skip_test = self.__platforms_to_skip_test(args)
-        platforms_archs_to_skip_test = \
-            self.__platforms_archs_to_skip_test(args)
-        platforms_to_skip_test_host = self.__platforms_to_skip_test_host(args)
-
-        # Compute the lists of **CMake** targets for each use case (configure
-        # vs. build vs. run) and the SDKs to configure with.
-        self.sdks_to_configure = set()
-        self.swift_stdlib_build_targets = []
-        self.swift_test_run_targets = []
-        self.swift_benchmark_build_targets = []
-        self.swift_benchmark_run_targets = []
-        for deployment_target_name in stdlib_targets_to_configure:
-            # Get the target object.
-            deployment_target = StdlibDeploymentTarget.get_target_for_name(
-                deployment_target_name)
-            if deployment_target is None:
-                diagnostics.fatal("unknown target: %r" % (
-                    deployment_target_name,))
-
-            # Add the SDK to use.
-            deployment_platform = deployment_target.platform
-            self.sdks_to_configure.add(deployment_platform.sdk_name)
-
-            # If we aren't actually building this target (only configuring
-            # it), do nothing else.
-            if deployment_target_name not in stdlib_targets_to_build:
-                continue
-
-            # Compute which actions are desired.
-            build = (
-                deployment_platform not in platforms_to_skip_build)
-            test = (
-                deployment_platform not in platforms_to_skip_test)
-            test_host_only = None
-            dt_supports_benchmark = deployment_target.supports_benchmark
-            build_benchmarks = build and dt_supports_benchmark
-            build_external_benchmarks = all([build, dt_supports_benchmark,
-                                             args.build_external_benchmarks])
-
-            # FIXME: Note, `build-script-impl` computed a property here
-            # w.r.t. testing, but it was actually unused.
-
-            # For platforms which normally require a connected device to
-            # test, the default behavior is to run tests that only require
-            # the host (i.e., they do not attempt to execute).
-            if deployment_platform.uses_host_tests and \
-                    deployment_platform not in \
-                    platforms_to_skip_test_host:
-                test_host_only = True
-
-            name = deployment_target.name
-
-            for skip_test_arch in platforms_archs_to_skip_test:
-                if deployment_target.name == skip_test_arch.name:
-                    test = False
-
-            if build:
-                # Validation, long, and stress tests require building the full
-                # standard library, whereas the other targets can build a
-                # slightly smaller subset which is faster to build.
-                if args.build_swift_stdlib_unittest_extra or \
-                        args.validation_test or args.long_test or \
-                        args.stress_test:
-                    self.swift_stdlib_build_targets.append(
-                        "swift-stdlib-" + name)
-                else:
-                    self.swift_stdlib_build_targets.append(
-                        "swift-test-stdlib-" + name)
-            if build_benchmarks:
-                self.swift_benchmark_build_targets.append(
-                    "swift-benchmark-" + name)
-                if args.benchmark:
-                    self.swift_benchmark_run_targets.append(
-                        "check-swift-benchmark-" + name)
-
-            if build_external_benchmarks:
-                # Add support for the external benchmarks.
-                self.swift_benchmark_build_targets.append(
-                    "swift-benchmark-{}-external".format(name))
-                if args.benchmark:
-                    self.swift_benchmark_run_targets.append(
-                        "check-swift-benchmark-{}-external".format(name))
-            if test:
-                if test_host_only:
-                    suffix = "-only_non_executable"
-                else:
-                    suffix = ""
-                subset_suffix = ""
-                if args.validation_test and args.long_test and \
-                        args.stress_test:
-                    subset_suffix = "-all"
-                elif args.validation_test:
-                    subset_suffix = "-validation"
-                elif args.long_test:
-                    subset_suffix = "-only_long"
-                elif args.stress_test:
-                    subset_suffix = "-only_stress"
-                else:
-                    subset_suffix = ""
-                self.swift_test_run_targets.append("check-swift{}{}-{}".format(
-                    subset_suffix, suffix, name))
-                if args.test_optimized and not test_host_only:
-                    self.swift_test_run_targets.append(
-                        "check-swift{}-optimize-{}".format(
-                            subset_suffix, name))
-                if args.test_optimize_for_size and not test_host_only:
-                    self.swift_test_run_targets.append(
-                        "check-swift{}-optimize_size-{}".format(
-                            subset_suffix, name))
-                if args.test_optimize_none_implicit_dynamic and \
-                        not test_host_only:
-                    self.swift_test_run_targets.append(
-                        "check-swift{}-optimize_none_implicit_dynamic-{}"
-                        .format(subset_suffix, name))
-
-    def __platforms_to_skip_build(self, args):
-        platforms_to_skip_build = set()
-        if not args.build_linux:
-            platforms_to_skip_build.add(StdlibDeploymentTarget.Linux)
-        if not args.build_freebsd:
-            platforms_to_skip_build.add(StdlibDeploymentTarget.FreeBSD)
-        if not args.build_cygwin:
-            platforms_to_skip_build.add(StdlibDeploymentTarget.Cygwin)
-        if not args.build_osx:
-            platforms_to_skip_build.add(StdlibDeploymentTarget.OSX)
-        if not args.build_ios_device:
-            platforms_to_skip_build.add(StdlibDeploymentTarget.iOS)
-        if not args.build_ios_simulator:
-            platforms_to_skip_build.add(StdlibDeploymentTarget.iOSSimulator)
-        if not args.build_tvos_device:
-            platforms_to_skip_build.add(StdlibDeploymentTarget.AppleTV)
-        if not args.build_tvos_simulator:
-            platforms_to_skip_build.add(
-                StdlibDeploymentTarget.AppleTVSimulator)
-        if not args.build_watchos_device:
-            platforms_to_skip_build.add(StdlibDeploymentTarget.AppleWatch)
-        if not args.build_watchos_simulator:
-            platforms_to_skip_build.add(
-                StdlibDeploymentTarget.AppleWatchSimulator)
-        if not args.build_android:
-            platforms_to_skip_build.add(StdlibDeploymentTarget.Android)
-        return platforms_to_skip_build
-
-    def __platforms_to_skip_test(self, args):
-        platforms_to_skip_test = set()
-        if not args.test_linux:
-            platforms_to_skip_test.add(StdlibDeploymentTarget.Linux)
-        if not args.test_freebsd:
-            platforms_to_skip_test.add(StdlibDeploymentTarget.FreeBSD)
-        if not args.test_cygwin:
-            platforms_to_skip_test.add(StdlibDeploymentTarget.Cygwin)
-        if not args.test_osx:
-            platforms_to_skip_test.add(StdlibDeploymentTarget.OSX)
-        if not args.test_ios_host:
-            platforms_to_skip_test.add(StdlibDeploymentTarget.iOS)
-        else:
-            exit_rejecting_arguments("error: iOS device tests are not " +
-                                     "supported in open-source Swift.")
-        if not args.test_ios_simulator:
-            platforms_to_skip_test.add(StdlibDeploymentTarget.iOSSimulator)
-        if not args.test_tvos_host:
-            platforms_to_skip_test.add(StdlibDeploymentTarget.AppleTV)
-        else:
-            exit_rejecting_arguments("error: tvOS device tests are not " +
-                                     "supported in open-source Swift.")
-        if not args.test_tvos_simulator:
-            platforms_to_skip_test.add(StdlibDeploymentTarget.AppleTVSimulator)
-        if not args.test_watchos_host:
-            platforms_to_skip_test.add(StdlibDeploymentTarget.AppleWatch)
-        else:
-            exit_rejecting_arguments("error: watchOS device tests are not " +
-                                     "supported in open-source Swift.")
-        if not args.test_watchos_simulator:
-            platforms_to_skip_test.add(
-                StdlibDeploymentTarget.AppleWatchSimulator)
-        if not args.test_android:
-            platforms_to_skip_test.add(StdlibDeploymentTarget.Android)
-
-        return platforms_to_skip_test
-
-    def __platforms_archs_to_skip_test(self, args):
-        platforms_archs_to_skip_test = set()
-        if not args.test_ios_32bit_simulator:
-            platforms_archs_to_skip_test.add(
-                StdlibDeploymentTarget.iOSSimulator.i386)
-        return platforms_archs_to_skip_test
-
-    def __platforms_to_skip_test_host(self, args):
-        platforms_to_skip_test_host = set()
-        if not args.test_android_host:
-            platforms_to_skip_test_host.add(StdlibDeploymentTarget.Android)
-        if not args.test_ios_host:
-            platforms_to_skip_test_host.add(StdlibDeploymentTarget.iOS)
-        if not args.test_tvos_host:
-            platforms_to_skip_test_host.add(StdlibDeploymentTarget.AppleTV)
-        if not args.test_watchos_host:
-            platforms_to_skip_test_host.add(StdlibDeploymentTarget.AppleWatch)
-        return platforms_to_skip_test_host
+    def default(self, o):
+        return vars(o)
 
 
 class BuildScriptInvocation(object):
@@ -342,6 +123,7 @@ class BuildScriptInvocation(object):
             'build_indexstoredb',
             'build_sourcekitlsp',
             'build_toolchainbenchmarks',
+            'tsan_libdispatch_test',
         ]
         has_target_needing_toolchain = \
             bool(sum(getattr(args, x) for x in targets_needing_toolchain))
@@ -354,7 +136,8 @@ class BuildScriptInvocation(object):
     def apply_default_arguments(toolchain, args):
         # Infer if ninja is required
         ninja_required = (
-            args.cmake_generator == 'Ninja' or args.build_foundation)
+            args.cmake_generator == 'Ninja' or args.build_foundation or
+            args.build_sourcekitlsp or args.build_indexstoredb)
         if ninja_required and toolchain.ninja is None:
             args.build_ninja = True
 
@@ -407,6 +190,31 @@ class BuildScriptInvocation(object):
             args.android = True
             args.build_android = False
 
+        # Include the Darwin supported architectures in the CMake options.
+        if args.swift_darwin_supported_archs:
+            args.extra_cmake_options.append(
+                '-DSWIFT_DARWIN_SUPPORTED_ARCHS:STRING={}'.format(
+                    args.swift_darwin_supported_archs))
+
+            # Remove unsupported Darwin archs from the standard library
+            # deployment targets.
+            supported_archs = args.swift_darwin_supported_archs.split(';')
+            targets = StdlibDeploymentTarget.get_targets_by_name(
+                args.stdlib_deployment_targets)
+
+            args.stdlib_deployment_targets = [
+                target.name
+                for target in targets
+                if (target.platform.is_darwin and
+                    target.arch in supported_archs)
+            ]
+
+        # Include the Darwin module-only architectures in the CMake options.
+        if args.swift_darwin_module_archs:
+            args.extra_cmake_options.append(
+                '-DSWIFT_DARWIN_MODULE_ARCHS:STRING={}'.format(
+                    args.swift_darwin_module_archs))
+
 # ---
 
     def __init__(self, toolchain, args):
@@ -444,11 +252,12 @@ class BuildScriptInvocation(object):
                 "can't find source directory for ninja "
                 "(tried %s)" % (self.workspace.source_dir("ninja")))
 
-        ninja_build = products.Ninja(
+        ninja_build = products.Ninja.new_builder(
             args=self.args,
             toolchain=self.toolchain,
-            source_dir=self.workspace.source_dir("ninja"),
-            build_dir=self.workspace.build_dir("build", "ninja"))
+            workspace=self.workspace,
+            host=StdlibDeploymentTarget.get_target_for_name(
+                self.args.host_target))
         ninja_build.build()
         self.toolchain.ninja = ninja_build.ninja_bin_path
 
@@ -471,8 +280,8 @@ class BuildScriptInvocation(object):
             "--build-dir", self.workspace.build_root,
             "--install-prefix", args.install_prefix,
             "--host-target", args.host_target,
-            "--stdlib-deployment-targets",
-            " ".join(args.stdlib_deployment_targets),
+            "--stdlib-deployment-targets={}".format(
+                " ".join(args.stdlib_deployment_targets)),
             "--host-cc", toolchain.cc,
             "--host-cxx", toolchain.cxx,
             "--darwin-xcrun-toolchain", args.darwin_xcrun_toolchain,
@@ -718,14 +527,16 @@ class BuildScriptInvocation(object):
             impl_args += ["--long-test"]
         if args.stress_test:
             impl_args += ["--stress-test"]
+        if args.only_executable_test:
+            impl_args += ["--only-executable-test"]
         if not args.benchmark:
             impl_args += ["--skip-test-benchmarks"]
         if not args.test_optimized:
             impl_args += ["--skip-test-optimized"]
         if not args.test_optimize_for_size:
             impl_args += ["--skip-test-optimize-for-size"]
-        if not args.test_optimize_none_implicit_dynamic:
-            impl_args += ["--skip-test-optimize-none-implicit-dynamic"]
+        if not args.test_optimize_none_with_implicit_dynamic:
+            impl_args += ["--skip-test-optimize-none-with-implicit-dynamic"]
         if args.build_libparser_only:
             impl_args += ["--build-libparser-only"]
         if args.android:
@@ -836,7 +647,10 @@ class BuildScriptInvocation(object):
         options = {}
         for host_target in [args.host_target] + args.cross_compile_hosts:
             # Compute the host specific configuration.
-            config = HostSpecificConfiguration(host_target, args)
+            try:
+                config = HostSpecificConfiguration(host_target, args)
+            except argparse.ArgumentError as e:
+                exit_rejecting_arguments(e.message)
 
             # Convert into `build-script-impl` style variables.
             options[host_target] = {
@@ -896,6 +710,8 @@ class BuildScriptInvocation(object):
             product_classes.append(products.SourceKitLSP)
         if self.args.build_toolchainbenchmarks:
             product_classes.append(products.Benchmarks)
+        if self.args.tsan_libdispatch_test:
+            product_classes.append(products.TSanLibDispatch)
         return product_classes
 
     def execute(self):
@@ -934,7 +750,10 @@ class BuildScriptInvocation(object):
         # Build...
         for host_target in all_hosts:
             # FIXME: We should only compute these once.
-            config = HostSpecificConfiguration(host_target.name, self.args)
+            try:
+                config = HostSpecificConfiguration(host_target.name, self.args)
+            except argparse.ArgumentError as e:
+                exit_rejecting_arguments(e.message)
             print("Building the standard library for: {}".format(
                 " ".join(config.swift_stdlib_build_targets)))
             if config.swift_test_run_targets and (
@@ -1078,7 +897,7 @@ def main_preset():
         nargs="*",
         metavar="SUBSTITUTION")
     parser.add_argument(
-        "--expand-build-script-invocation",
+        "--expand-invocation", "--expand-build-script-invocation",
         help="Print the expanded build-script invocation generated "
              "by the preset, but do not run the preset",
         action=arguments.action.optional_bool)
@@ -1088,6 +907,17 @@ def main_preset():
     parser.add_argument(
         "--build-dir",
         help="specify the directory where build artifact should be stored")
+    parser.add_argument(
+        "--dump-config",
+        help="instead of building, write JSON to stdout containing "
+             "various values used to build in this configuration",
+        action="store_true",
+        default=False)
+    parser.add_argument(
+        "--reconfigure",
+        help="Reconfigure all projects as we build",
+        action="store_true",
+        default=False)
     args = parser.parse_args()
     if len(args.preset_file_names) == 0:
         args.preset_file_names = [
@@ -1137,6 +967,8 @@ def main_preset():
     build_script_args = [sys.argv[0]]
     if args.dry_run:
         build_script_args += ["--dry-run"]
+    if args.dump_config:
+        build_script_args += ["--dump-config"]
 
     build_script_args += preset_args
     if args.distcc:
@@ -1153,13 +985,16 @@ def main_preset():
         build_script_args += ["--cmake-c-launcher", args.cmake_c_launcher]
     if args.cmake_cxx_launcher:
         build_script_args += ["--cmake-cxx-launcher", args.cmake_cxx_launcher]
-
-    diagnostics.note('using preset "{}", which expands to \n\n{}\n'.format(
-        args.preset, shell.quote_command(build_script_args)))
-
-    if args.expand_build_script_invocation:
+    printable_command = shell.quote_command(build_script_args)
+    if args.expand_invocation:
+        print(printable_command)
         return 0
 
+    if args.reconfigure:
+        build_script_args += ["--reconfigure"]
+
+    diagnostics.note('using preset "{}", which expands to \n\n{}\n'.format(
+        args.preset, printable_command))
     shell.call_without_sleeping(build_script_args)
     return 0
 
@@ -1221,6 +1056,10 @@ def main_normal():
     # Show SDKs, if requested.
     if args.show_sdks:
         debug.print_xcodebuild_versions()
+
+    if args.dump_config:
+        print(JSONDumper().encode(invocation))
+        return 0
 
     # Clean build directory if requested.
     if args.clean:

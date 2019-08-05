@@ -405,7 +405,7 @@ var x23: Int, x24: Int { // expected-error{{'var' declarations with multiple var
 
 var x25: Int { // expected-error{{'var' declarations with multiple variables cannot have explicit getters/setters}}
   return 42
-}, x26: Int
+}, x26: Int // expected-warning{{variable 'x26' was never used; consider replacing with '_' or removing it}}
 
 // Properties of struct/enum/extensions
 struct S {
@@ -882,7 +882,7 @@ protocol ProtocolWillSetDidSet4 {
   var a: Int { didSet willSet } // expected-error {{property in protocol must have explicit { get } or { get set } specifier}} {{14-32={ get <#set#> \}}} expected-error 2 {{expected get or set in a protocol property}}
 }
 protocol ProtocolWillSetDidSet5 {
-  let a: Int { didSet willSet }  // expected-error {{property in protocol must have explicit { get } or { get set } specifier}} {{14-32={ get <#set#> \}}} {{none}} expected-error 2 {{expected get or set in a protocol property}} expected-error {{'let' declarations cannot be computed properties}} {{3-6=var}}
+  let a: Int { didSet willSet }  // expected-error {{immutable property requirement must be declared as 'var' with a '{ get }' specifier}} {{3-6=var}} {{13-13= { get \}}} {{none}} expected-error 2 {{expected get or set in a protocol property}} expected-error {{'let' declarations cannot be computed properties}} {{3-6=var}}
 }
 
 var globalDidsetWillSet: Int {  // expected-error {{non-member observing properties require an initializer}}
@@ -1277,6 +1277,27 @@ let sr8811b: Never = fatalError() // Ok
 let sr8811c = (16, fatalError()) // expected-warning {{constant 'sr8811c' inferred to have type '(Int, Never)', which contains an enum with no cases}} expected-note {{add an explicit type annotation to silence this warning}}
 
 let sr8811d: (Int, Never) = (16, fatalError()) // Ok
+
+// SR-10995
+
+class SR_10995 {
+  func makeDoubleOptionalNever() -> Never?? {
+    return nil
+  }
+
+  func makeSingleOptionalNever() -> Never? {
+    return nil
+  }
+
+  func sr_10995_foo() {
+    let doubleOptionalNever = makeDoubleOptionalNever() // expected-warning {{constant 'doubleOptionalNever' inferred to have type 'Never??', which may be unexpected}} 
+    // expected-note@-1 {{add an explicit type annotation to silence this warning}} 
+    // expected-warning@-2 {{initialization of immutable value 'doubleOptionalNever' was never used; consider replacing with assignment to '_' or removing it}}
+    let singleOptionalNever = makeSingleOptionalNever() // expected-warning {{constant 'singleOptionalNever' inferred to have type 'Never?', which may be unexpected}} 
+    // expected-note@-1 {{add an explicit type annotation to silence this warning}} 
+    // expected-warning@-2 {{initialization of immutable value 'singleOptionalNever' was never used; consider replacing with assignment to '_' or removing it}}
+  }
+}
 
 // SR-9267
 

@@ -64,20 +64,6 @@ recursivelyDeleteTriviallyDeadInstructions(
   ArrayRef<SILInstruction*> I, bool Force = false,
   llvm::function_ref<void(SILInstruction *)> C = [](SILInstruction *){});
 
-/// For each of the given instructions, if they are dead delete them
-/// along with their dead operands.
-///
-/// \param I The ArrayRef of instructions to be deleted.
-/// \param InstIter is updated to the next valid instruction if it points to any
-/// deleted instruction, including debug values.
-/// \param Force If Force is set, don't check if the top level instructions
-///        are considered dead - delete them regardless.
-/// \param C a callback called whenever an instruction is deleted.
-void recursivelyDeleteTriviallyDeadInstructions(
-    ArrayRef<SILInstruction *> I, SILBasicBlock::iterator &InstIter,
-    bool Force = false,
-    llvm::function_ref<void(SILInstruction *)> C = [](SILInstruction *) {});
-
 /// If the given instruction is dead, delete it along with its dead
 /// operands.
 ///
@@ -85,10 +71,7 @@ void recursivelyDeleteTriviallyDeadInstructions(
 /// \param Force If Force is set, don't check if the top level instruction is
 ///        considered dead - delete it regardless.
 /// \param C a callback called whenever an instruction is deleted.
-///
-/// Returns a valid instruction iterator to the next nondeleted instruction
-/// after `I`.
-SILBasicBlock::iterator recursivelyDeleteTriviallyDeadInstructions(
+void recursivelyDeleteTriviallyDeadInstructions(
     SILInstruction *I, bool Force = false,
     llvm::function_ref<void(SILInstruction *)> C = [](SILInstruction *) {});
 

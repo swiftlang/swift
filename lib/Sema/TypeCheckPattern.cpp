@@ -37,7 +37,7 @@ extractEnumElement(TypeChecker &TC, DeclContext *DC, SourceLoc UseLoc,
                    const VarDecl *constant) {
   diagnoseExplicitUnavailability(constant, UseLoc, DC, nullptr);
 
-  const FuncDecl *getter = constant->getGetter();
+  const FuncDecl *getter = constant->getAccessor(AccessorKind::Get);
   if (!getter)
     return nullptr;
 
@@ -313,7 +313,7 @@ public:
   Pattern *visitExprPattern(ExprPattern *P) {
     if (P->isResolved())
       return P;
-    
+
     // Try to convert to a pattern.
     Pattern *exprAsPattern = visit(P->getSubExpr());
     // If we failed, keep the ExprPattern as is.
@@ -697,7 +697,8 @@ static bool validateTypedPattern(TypeChecker &TC,
       auto opaqueTy = TC.getOrCreateOpaqueResultType(resolution,
                                                      named->getDecl(),
                                                      opaqueRepr);
-      TL.setType(opaqueTy);
+      TL.setType(named->getDecl()->getDeclContext()
+                                 ->mapTypeIntoContext(opaqueTy));
       hadError = opaqueTy->hasError();
     } else {
       TC.diagnose(TP->getLoc(), diag::opaque_type_unsupported_pattern);
@@ -808,8 +809,8 @@ static void requestLayoutForMetadataSources(TypeChecker &tc, Type type) {
     // parameter is of dependent type then the body of a function with said
     // parameter could potentially require the generic type's layout to
     // recover them.
-    if (auto *nominalDecl = type->getAnyNominal()) {
-      tc.requestNominalLayout(nominalDecl);
+    if (auto *classDecl = type->getClassOrBoundGenericClass()) {
+      tc.requestClassLayout(classDecl);
     }
   });
 }
@@ -877,11 +878,11 @@ bool TypeChecker::typeCheckParameterList(ParameterList *PL,
       }
 
       if (isa<InOutTypeRepr>(nestedRepr)) {
-        param->setSpecifier(VarDecl::Specifier::InOut);
+        param->setSpecifier(ParamDecl::Specifier::InOut);
       } else if (isa<SharedTypeRepr>(nestedRepr)) {
-        param->setSpecifier(VarDecl::Specifier::Shared);
+        param->setSpecifier(ParamDecl::Specifier::Shared);
       } else if (isa<OwnedTypeRepr>(nestedRepr)) {
-        param->setSpecifier(VarDecl::Specifier::Owned);
+        param->setSpecifier(ParamDecl::Specifier::Owned);
       }
     }
 
@@ -1133,7 +1134,8 @@ recur:
     // a variable, or there is some other bug.  We always tell them that they
     // can silence the warning with an explicit type annotation
     // (and provide a fixit) as a note.
-    Type diagTy = type->getOptionalObjectType();
+    Type diagTy = type->lookThroughAllOptionalTypes();
+    bool isOptional = !type->getOptionalObjectType().isNull();
     if (!diagTy) diagTy = type;
     
     auto diag = diag::type_inferred_to_undesirable_type;
@@ -1148,10 +1150,12 @@ recur:
         shouldRequireType = true;
     } else if (diagTy->isStructurallyUninhabited()) {
       shouldRequireType = true;
-      diag = diag::type_inferred_to_uninhabited_type;
-      
+      diag = isOptional ? diag::type_inferred_to_undesirable_type
+                        : diag::type_inferred_to_uninhabited_type;
+
       if (diagTy->is<TupleType>()) {
-        diag = diag::type_inferred_to_uninhabited_tuple_type;
+        diag = isOptional ? diag::type_inferred_to_undesirable_type
+                          : diag::type_inferred_to_uninhabited_tuple_type;
       } else {
         assert((diagTy->is<EnumType>() || diagTy->is<BoundGenericEnumType>()) &&
           "unknown structurally uninhabited type");
@@ -1291,9 +1295,6 @@ recur:
       return true;
 
     auto castType = IP->getCastTypeLoc().getType();
-
-    // Make sure we use any bridged NSError-related conformances.
-    useBridgedNSErrorConformances(dc, castType);
 
     // Determine whether we have an imbalance in the number of optionals.
     SmallVector<Type, 2> inputTypeOptionals;
@@ -1438,6 +1439,10 @@ recur:
           }
         }
       }
+
+      if (!elt)
+        return true;
+
       enumTy = type;
     } else {
       // Check if the explicitly-written enum type matches the type we're
@@ -1632,7 +1637,7 @@ void TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
 
   auto handleParameter = [&](ParamDecl *param, Type ty, bool forceMutable) {
     if (forceMutable)
-      param->setSpecifier(VarDecl::Specifier::InOut);
+      param->setSpecifier(ParamDecl::Specifier::InOut);
 
     // If contextual type is invalid and we have a valid argument type
     // trying to coerce argument to contextual type would mean erasing

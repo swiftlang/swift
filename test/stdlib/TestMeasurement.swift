@@ -10,9 +10,6 @@
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
-// Requires swift-version 4
-// UNSUPPORTED: swift_test_mode_optimize_none_with_implicit_dynamic
-
 import Foundation
 
 #if FOUNDATION_XCTEST
@@ -155,6 +152,7 @@ class TestMeasurement : TestMeasurementSuper {
     }
 
     func testHashing() {
+        guard #available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, *) else { return }
         let lengths: [[Measurement<UnitLength>]] = [
             [
                 Measurement(value: 5, unit: UnitLength.kilometers),

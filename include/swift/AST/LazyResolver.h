@@ -74,14 +74,6 @@ public:
 
   /// Resolve an implicitly-generated member with the given name.
   virtual void resolveImplicitMember(NominalTypeDecl *nominal, DeclName member) = 0;
-
-  /// Mark the given conformance as "used" from the given declaration context.
-  virtual void markConformanceUsed(ProtocolConformanceRef conformance,
-                                   DeclContext *dc) = 0;
-
-  /// Fill in the signature conformances of the given protocol conformance.
-  virtual void checkConformanceRequirements(
-                                    NormalProtocolConformance *conformance) = 0;
 };
 
 class LazyMemberLoader;
@@ -129,6 +121,14 @@ public:
   uint64_t allConformancesData = 0;
 };
 
+/// Context data for protocols.
+class LazyProtocolData : public LazyIterableDeclContextData {
+public:
+  /// The context data used for loading all of the members of the iterable
+  /// context.
+  uint64_t requirementSignatureData = 0;
+};
+
 /// A class that can lazily load members from a serialized format.
 class alignas(void*) LazyMemberLoader {
   virtual void anchor();
@@ -165,6 +165,11 @@ public:
   /// Returns the generic environment.
   virtual GenericEnvironment *loadGenericEnvironment(const DeclContext *decl,
                                                      uint64_t contextData) = 0;
+
+  /// Loads the requirement signature for a protocol.
+  virtual void
+  loadRequirementSignature(const ProtocolDecl *proto, uint64_t contextData,
+                           SmallVectorImpl<Requirement> &requirements) = 0;
 };
 
 /// A class that can lazily load conformances from a serialized format.

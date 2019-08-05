@@ -370,6 +370,8 @@ func statementTests() {
 
   guard let a = b else {}
 
+  guard let self = self else {}
+
   for var i in foo where i.foo {}
   for case is Int in foo {}
 
@@ -434,11 +436,12 @@ extension ext where A == Int, B: Numeric {}
 extension ext.a.b {}
 
 func foo() {
-  var a = "abc \(foo()) def \(a + b + "a \(3)") gh"
+  var a = "abc \(foo()) def \(a + b + "a \(3)") gh \(bar, default: 1)"
   var a = """
   abc \( foo() + bar() )
   de \(3 + 3 + "abc \(foo()) def")
   fg
+  \(bar, default: 1)
   """
 }
 
@@ -550,7 +553,7 @@ struct ReadModify {
   }
 }
 
-@_alignment(16) public struct float3 { public var x, y, z: Float }
+@custom @_alignment(16) public struct float3 { public var x, y, z: Float }
 
 #sourceLocation(file: "otherFile.swift", line: 5)
 
@@ -567,3 +570,17 @@ func foo() {}
 public func anyFoo() -> some Foo {}
 public func qoo() -> some O & O2 {}
 func zlop() -> some C & AnyObject & P {}
+
+@custom(a, b,c)
+func foo() {}
+
+@custom_attr
+@custom(A: a, B: b, C:c)
+func foo() {}
+
+"abc"
+"abc \(foo)"
+#"abc"#
+#"abc \#(foo)"#
+##"abc"##
+##"abc \##(foo)"##

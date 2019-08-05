@@ -3,34 +3,98 @@
 # a top-level build of the CMAKE_SOURCE_DIR. Otherwise, define a guard variable
 # and return.
 if(DEFINED SWIFT_MASTER_LOADED
-  OR NOT ${CMAKE_CURRENT_SOURCE_DIR} STREQUAL ${CMAKE_SOURCE_DIR})
+    OR NOT CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
   set(SWIFT_MASTER_LOADED TRUE)
   return()
 endif()
 
-set(CMAKE_INSTALL_PREFIX "${SWIFT_DEST_ROOT}${TOOLCHAIN_DIR}/usr")
-
-# Only happens if it's called from a top-level cmake invocation.
-set(BUILD_STANDALONE TRUE)
-set(SWIFT_STDLIB_BUILD_TYPE "Release")
-set(SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES "SHARED")
-set(SWIFT_INSTALL_COMPONENTS "sdk-overlay" CACHE STRING "")
-set(SWIFT_DARWIN_DEPLOYMENT_VERSION_OSX "10.9" CACHE STRING "")
-set(SWIFT_DARWIN_DEPLOYMENT_VERSION_IOS "7.0" CACHE STRING "")
-set(SWIFT_DARWIN_DEPLOYMENT_VERSION_TVOS "9.0" CACHE STRING "")
-set(SWIFT_DARWIN_DEPLOYMENT_VERSION_WATCHOS "2.0" CACHE STRING "")
-set(SWIFT_ENABLE_PARSEABLE_MODULE_INTERFACES TRUE)
-
-set(SWIFT_SOURCE_DIR "${SWIFT_SOURCE_ROOT}/swift" CACHE PATH "")
-set(SWIFT_NATIVE_SWIFT_TOOLS_PATH "${TOOLCHAIN_DIR}/usr/bin" CACHE PATH "")
-set(SWIFT_SDKS ${SWIFT_HOST_VARIANT_SDK})
 
 list(APPEND CMAKE_MODULE_PATH
   "${SWIFT_SOURCE_ROOT}/llvm/cmake/modules"
-  "${PROJECT_SOURCE_DIR}/../../../../cmake/modules")
+  "${PROJECT_SOURCE_DIR}/../../../../cmake/modules"
+  "${PROJECT_SOURCE_DIR}/../../../cmake/modules")
+
+
+# -----------------------------------------------------------------------------
+# Preconditions
+
+include(SwiftUtils)
+
+precondition(CMAKE_INSTALL_PREFIX)
+precondition(SWIFT_DEST_ROOT)
+precondition(SWIFT_HOST_VARIANT_SDK)
+precondition(SWIFT_SOURCE_ROOT)
+precondition(TOOLCHAIN_DIR)
+
+
+# -----------------------------------------------------------------------------
+# Cache Variables and Options
+
+set(SWIFT_SOURCE_DIR "${SWIFT_SOURCE_ROOT}/swift" CACHE PATH
+  "Path to the directory containing the Swift sources.")
 
 set(SWIFT_DARWIN_XCRUN_TOOLCHAIN "XcodeDefault" CACHE STRING
-    "The name of the toolchain to pass to 'xcrun'")
+  "The name of the toolchain to pass to 'xcrun'.")
+
+set(SWIFT_DARWIN_DEPLOYMENT_VERSION_OSX "10.9" CACHE STRING
+    "Minimum deployment target version for macOS.")
+set(SWIFT_DARWIN_DEPLOYMENT_VERSION_IOS "7.0" CACHE STRING
+    "Minimum deployment target version for iOS.")
+set(SWIFT_DARWIN_DEPLOYMENT_VERSION_TVOS "9.0" CACHE STRING
+    "Minimum deployment target version for tvOS.")
+set(SWIFT_DARWIN_DEPLOYMENT_VERSION_WATCHOS "2.0" CACHE STRING
+    "Minimum deployment target version for watchOS.")
+
+set(SWIFT_INSTALL_COMPONENTS "sdk-overlay" CACHE STRING
+  "A semicolon-separated list of install components.")
+
+set(SWIFT_SDKS "${SWIFT_HOST_VARIANT_SDK}" CACHE STRING
+  "List of Swift SDKs to build.")
+
+set(SWIFT_NATIVE_LLVM_TOOLS_PATH "${TOOLCHAIN_DIR}/usr/bin" CACHE STRING
+  "Path to LLVM tools that are executable on the build machine.")
+set(SWIFT_NATIVE_CLANG_TOOLS_PATH "${TOOLCHAIN_DIR}/usr/bin" CACHE STRING
+  "Path to Clang tools that are executable on the build machine.")
+set(SWIFT_NATIVE_SWIFT_TOOLS_PATH "${TOOLCHAIN_DIR}/usr/bin" CACHE STRING
+  "Path to Swift tools that are executable on the build machine.")
+
+option(SWIFT_ENABLE_PARSEABLE_MODULE_INTERFACES
+  "Generate .swiftinterface files alongside .swiftmodule files."
+  TRUE)
+
+set(SWIFT_STDLIB_BUILD_TYPE "${CMAKE_BUILD_TYPE}" CACHE STRING
+  "Build type for the Swift standard library and SDK overlays.")
+
+set(SWIFT_DARWIN_SUPPORTED_ARCHS "" CACHE STRING
+  "Semicolon-separated list of architectures to configure on Darwin platforms. \
+If left empty all default architectures are configured.")
+
+set(SWIFT_DARWIN_MODULE_ARCHS "" CACHE STRING
+  "Semicolon-separated list of architectures to configure Swift module-only \
+targets on Darwin platforms. These targets are in addition to the full \
+library targets.")
+
+
+# -----------------------------------------------------------------------------
+# Constants
+
+set(CMAKE_INSTALL_PREFIX
+  "${SWIFT_DEST_ROOT}${TOOLCHAIN_DIR}/usr")
+
+
+set(SWIFT_APPLE_PLATFORMS
+  OSX IOS IOS_SIMULATOR TVOS TVOS_SIMULATOR WATCHOS WATCHOS_SIMULATOR)
+
+# Flags used to indicate we are building a standalone overlay.
+# FIXME: We should cut this down to a single flag.
+set(BUILD_STANDALONE TRUE)
+set(SWIFT_BUILD_STANDALONE_OVERLAY TRUE)
+
+set(SWIFT_STDLIB_LIBRARY_BUILD_TYPES "SHARED")
+set(SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES "SHARED")
+
+
+# -----------------------------------------------------------------------------
 
 include(SwiftToolchainUtils)
 if(NOT SWIFT_LIPO)
@@ -38,7 +102,6 @@ if(NOT SWIFT_LIPO)
 endif()
 
 include(AddLLVM)
-include(SwiftUtils)
 include(SwiftSharedCMakeConfig)
 include(AddSwift)
 include(SwiftHandleGybSources)
@@ -47,25 +110,22 @@ include(SwiftSource)
 include(SwiftComponents)
 include(DarwinSDKs)
 
-# These variables should be passed as -D variables to cmake.
-# e.g. cmake -G Ninja -DSWIFT_HOST_VARIANT_SDK=OSX ..
-precondition(CMAKE_INSTALL_PREFIX)
-precondition(SWIFT_SOURCE_ROOT)
-precondition(SWIFT_DEST_ROOT)
-precondition(SWIFT_HOST_VARIANT_SDK)
-precondition(TOOLCHAIN_DIR)
 
 # Without this line, installing components is broken. This needs refactoring.
 swift_configure_components()
 
-# Some overlays include the runtime's headers,
-# and some of those headers are generated at build time.
+
+list_subtract(
+  "${SWIFT_SDKS}"
+  "${SWIFT_CONFIGURED_SDKS}"
+  unknown_sdks)
+
+precondition(unknown_sdks NEGATE
+  MESSAGE
+    "Unknown SDKs: ${unknown_sdks}")
+
+
+# Some overlays include the runtime's headers, and some of those headers are
+# generated at build time.
 add_subdirectory("${SWIFT_SOURCE_DIR}/include" "${SWIFT_SOURCE_DIR}/include")
 add_subdirectory("${SWIFT_SOURCE_DIR}/apinotes" "${SWIFT_SOURCE_DIR}/apinotes")
-
-precondition(unknown_sdks NEGATE MESSAGE "Unknown SDKs: ${unknown_sdks}")
-precondition(SWIFT_CONFIGURED_SDKS MESSAGE "No SDKs selected.")
-precondition(SWIFT_HOST_VARIANT_SDK MESSAGE "No SDK for host tools.")
-
-# ARCH is set somewhere later.
-#precondition(SWIFT_HOST_VARIANT_ARCH MESSAGE "No arch for host tools")

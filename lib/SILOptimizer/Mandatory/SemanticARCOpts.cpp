@@ -91,7 +91,7 @@ static bool isConsumed(
         for (SILValue v : user->getResults()) {
           if (v.getOwnershipKind() != ValueOwnershipKind::Owned)
             continue;
-          copy(v->getUses(), std::back_inserter(worklist));
+          llvm::copy(v->getUses(), std::back_inserter(worklist));
         }
         continue;
       }
@@ -339,56 +339,29 @@ bool SemanticARCOptVisitor::visitCopyValueInst(CopyValueInst *cvi) {
 //                         load [copy] Optimizations
 //===----------------------------------------------------------------------===//
 
-/// A flow insensitive analysis that tells the load [copy] analysis if the
-/// storage has 0, 1, >1 writes to it.
-///
-/// In the case of 0 writes, we return CanOptimizeLoadCopyResult::Always.
-///
-/// In the case of 1 write, we return OnlyIfStorageIsLocal. We are taking
-/// advantage of definite initialization implying that an alloc_stack must be
-/// written to once before any loads from the memory location. Thus if we are
-/// local and see 1 write, we can still change to load_borrow if all other uses
-/// check out.
-///
-/// If there is 2+ writes, we can not optimize = (.
-namespace {
+// A flow insensitive analysis that tells the load [copy] analysis if the
+// storage has 0, 1, >1 writes to it.
+//
+// In the case of 0 writes, we return CanOptimizeLoadCopyResult::Always.
+//
+// In the case of 1 write, we return OnlyIfStorageIsLocal. We are taking
+// advantage of definite initialization implying that an alloc_stack must be
+// written to once before any loads from the memory location. Thus if we are
+// local and see 1 write, we can still change to load_borrow if all other uses
+// check out.
+//
+// If there is 2+ writes, we can not optimize = (.
 
-struct CanOptimizeLoadCopyFromAccessVisitor
-    : AccessedStorageVisitor<CanOptimizeLoadCopyFromAccessVisitor, bool> {
-  SILFunction &f;
-
-  CanOptimizeLoadCopyFromAccessVisitor(SILFunction &f) : f(f) {}
-
-  // Stubs
-  bool visitBox(const AccessedStorage &boxStorage) { return false; }
-  bool visitStack(const AccessedStorage &stackStorage) { return false; }
-  bool visitGlobal(const AccessedStorage &globalStorage) { return false; }
-  bool visitClass(const AccessedStorage &classStorage) { return false; }
-  bool visitYield(const AccessedStorage &yieldStorage) { return false; }
-  bool visitUnidentified(const AccessedStorage &unidentifiedStorage) {
-    return false;
-  }
-  bool visitNested(const AccessedStorage &nested) {
-    llvm_unreachable("Visitor should never see nested since we lookup our "
-                     "address storage using lookup non nested");
-  }
-
-  bool visitArgument(const AccessedStorage &argumentStorage);
-};
-
-} // namespace
-
-bool CanOptimizeLoadCopyFromAccessVisitor::visitArgument(
-    const AccessedStorage &storage) {
-  auto *arg = cast<SILFunctionArgument>(storage.getArgument(&f));
+bool mayFunctionMutateArgument(const AccessedStorage &storage, SILFunction &f) {
+  auto *arg = cast<SILFunctionArgument>(storage.getArgument());
 
   // Then check if we have an in_guaranteed argument. In this case, we can
   // always optimize load [copy] from this.
   if (arg->hasConvention(SILArgumentConvention::Indirect_In_Guaranteed))
-    return true;
+    return false;
 
   // For now just return false.
-  return false;
+  return true;
 }
 
 static bool isWrittenTo(SILFunction &f, SILValue value) {
@@ -402,7 +375,20 @@ static bool isWrittenTo(SILFunction &f, SILValue value) {
   // way (ignoring stores that are obviously the only initializer to
   // memory). We have to do this since load_borrow assumes that the
   // underlying memory is never written to.
-  return !CanOptimizeLoadCopyFromAccessVisitor(f).visit(storage);
+  switch (storage.getKind()) {
+  case AccessedStorage::Box:
+  case AccessedStorage::Stack:
+  case AccessedStorage::Global:
+  case AccessedStorage::Class:
+  case AccessedStorage::Yield:
+  case AccessedStorage::Nested:
+  case AccessedStorage::Unidentified:
+    return true;
+
+  case AccessedStorage::Argument:
+    return mayFunctionMutateArgument(storage, f);
+  }
+  llvm_unreachable("covered switch");
 }
 
 // Convert a load [copy] from unique storage [read] that has all uses that can

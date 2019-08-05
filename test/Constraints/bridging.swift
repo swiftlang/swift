@@ -223,7 +223,9 @@ func takesDictionary<K, V>(_ p: Dictionary<K, V>) {} // expected-note {{in call 
 func takesArray<T>(_ t: Array<T>) {} // expected-note {{in call to function 'takesArray'}}
 func rdar19695671() {
   takesSet(NSSet() as! Set) // expected-error{{generic parameter 'T' could not be inferred}}
-  takesDictionary(NSDictionary() as! Dictionary) // expected-error{{generic parameter 'K' could not be inferred}}
+  takesDictionary(NSDictionary() as! Dictionary)
+  // expected-error@-1 {{generic parameter 'K' could not be inferred}}
+  // expected-error@-2 {{generic parameter 'V' could not be inferred}}
   takesArray(NSArray() as! Array) // expected-error{{generic parameter 'T' could not be inferred}}
 }
 
@@ -349,7 +351,7 @@ func forceUniversalBridgeToAnyObject<T, U: KnownClassProtocol>(a: T, b: U, c: An
 
   z = a // expected-error{{does not conform to 'AnyObject'}}
   z = b
-  z = c // expected-error{{does not conform to 'AnyObject'}}
+  z = c // expected-error{{does not conform to 'AnyObject'}} expected-note {{cast 'Any' to 'AnyObject'}} {{8-8= as AnyObject}}
   z = d // expected-error{{does not conform to 'AnyObject'}}
   z = e
   z = f

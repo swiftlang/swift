@@ -102,7 +102,7 @@ ASTBuilder::createBuiltinType(StringRef builtinName,
 
     ModuleDecl::AccessPathTy accessPath;
     StringRef strippedName =
-          builtinName.drop_front(strlen(BUILTIN_TYPE_NAME_PREFIX));
+        builtinName.drop_front(BUILTIN_TYPE_NAME_PREFIX.size());
     Ctx.TheBuiltinModule->lookupValue(accessPath,
                                       Ctx.getIdentifier(strippedName),
                                       NLKind::QualifiedLookup,
@@ -155,7 +155,9 @@ Type ASTBuilder::createNominalType(GenericTypeDecl *decl, Type parent) {
   // Imported types can be renamed to be members of other (non-generic)
   // types, but the mangling does not have a parent type. Just use the
   // declared type directly in this case and skip the parent check below.
-  if (nominalDecl->hasClangNode() && !nominalDecl->isGenericContext())
+  bool isImported = nominalDecl->hasClangNode() ||
+      nominalDecl->getAttrs().hasAttribute<ClangImporterSynthesizedTypeAttr>();
+  if (isImported && !nominalDecl->isGenericContext())
     return nominalDecl->getDeclaredType();
 
   // Validate the parent type.
@@ -177,7 +179,9 @@ Type ASTBuilder::createTypeAliasType(GenericTypeDecl *decl, Type parent) {
   // Imported types can be renamed to be members of other (non-generic)
   // types, but the mangling does not have a parent type. Just use the
   // declared type directly in this case and skip the parent check below.
-  if (aliasDecl->hasClangNode() && !aliasDecl->isGenericContext())
+  bool isImported = aliasDecl->hasClangNode() ||
+      aliasDecl->getAttrs().hasAttribute<ClangImporterSynthesizedTypeAttr>();
+  if (isImported && !aliasDecl->isGenericContext())
     return aliasDecl->getDeclaredInterfaceType();
 
   // Validate the parent type.
@@ -251,15 +255,18 @@ Type ASTBuilder::createBoundGenericType(GenericTypeDecl *decl,
 }
 
 Type ASTBuilder::resolveOpaqueType(NodePointer opaqueDescriptor,
-                                   ArrayRef<Type> args,
+                                   ArrayRef<ArrayRef<Type>> args,
                                    unsigned ordinal) {
   if (opaqueDescriptor->getKind() == Node::Kind::OpaqueReturnTypeOf) {
     auto definingDecl = opaqueDescriptor->getChild(0);
-    auto mangledName = mangleNode(definingDecl);
+    auto definingGlobal = Factory.createNode(Node::Kind::Global);
+    definingGlobal->addChild(definingDecl, Factory);
+    auto mangledName = mangleNode(definingGlobal);
+    
     auto moduleNode = findModuleNode(definingDecl);
     if (!moduleNode)
       return Type();
-    auto parentModule = findModule(findModuleNode(definingDecl));
+    auto parentModule = findModule(moduleNode);
     if (!parentModule)
       return Type();
 
@@ -271,9 +278,14 @@ Type ASTBuilder::resolveOpaqueType(NodePointer opaqueDescriptor,
     assert(ordinal == 0 && "not implemented");
     if (ordinal != 0)
       return Type();
+    
+    SmallVector<Type, 8> allArgs;
+    for (auto argSet : args) {
+      allArgs.append(argSet.begin(), argSet.end());
+    }
 
     SubstitutionMap subs = createSubstitutionMapFromGenericArgs(
-                         opaqueDecl->getGenericSignature(), args, parentModule);
+                      opaqueDecl->getGenericSignature(), allArgs, parentModule);
     return OpaqueTypeArchetypeType::get(opaqueDecl, subs);
   }
   
@@ -371,10 +383,14 @@ Type ASTBuilder::createFunctionType(
 
   auto einfo = AnyFunctionType::ExtInfo(representation,
                                         /*throws*/ flags.throws());
-  if (flags.isEscaping())
-    einfo = einfo.withNoEscape(false);
-  else
-    einfo = einfo.withNoEscape(true);
+
+  if (representation == FunctionTypeRepresentation::Swift ||
+      representation == FunctionTypeRepresentation::Block) {
+    if (flags.isEscaping())
+      einfo = einfo.withNoEscape(false);
+    else
+      einfo = einfo.withNoEscape(true);
+  }
 
   // The result type must be materializable.
   if (!output->isMaterializable()) return Type();
@@ -421,6 +437,7 @@ getParameterConvention(ImplParameterConvention conv) {
   case Demangle::ImplParameterConvention::Direct_Guaranteed:
     return ParameterConvention::Direct_Guaranteed;
   }
+  llvm_unreachable("covered switch");
 }
 
 static ResultConvention getResultConvention(ImplResultConvention conv) {
@@ -436,6 +453,7 @@ static ResultConvention getResultConvention(ImplResultConvention conv) {
   case Demangle::ImplResultConvention::Autoreleased:
     return ResultConvention::Autoreleased;
   }
+  llvm_unreachable("covered switch");
 }
 
 Type ASTBuilder::createImplFunctionType(
@@ -532,6 +550,7 @@ getMetatypeRepresentation(ImplMetatypeRepresentation repr) {
   case Demangle::ImplMetatypeRepresentation::ObjC:
     return MetatypeRepresentation::ObjC;
   }
+  llvm_unreachable("covered switch");
 }
 
 Type ASTBuilder::createExistentialMetatypeType(Type instance,
@@ -1038,7 +1057,8 @@ ASTBuilder::findForeignTypeDecl(StringRef name,
 
     explicit Consumer(Demangle::Node::Kind kind) : ExpectedKind(kind) {}
 
-    void foundDecl(ValueDecl *decl, DeclVisibilityKind reason) override {
+    void foundDecl(ValueDecl *decl, DeclVisibilityKind reason,
+                   DynamicLookupInfo dynamicLookupInfo = {}) override {
       if (HadError) return;
       if (decl == Result) return;
       if (!Result) {

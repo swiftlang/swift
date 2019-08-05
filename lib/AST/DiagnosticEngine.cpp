@@ -385,6 +385,23 @@ static bool shouldShowAKA(Type type, StringRef typeName) {
   return true;
 }
 
+/// If a type is part of an argument list which includes another, distinct type
+/// with the same string representation, it should be qualified during
+/// formatting.
+static bool typeSpellingIsAmbiguous(Type type,
+                                    ArrayRef<DiagnosticArgument> Args) {
+  for (auto arg : Args) {
+    if (arg.getKind() == DiagnosticArgumentKind::Type) {
+      auto argType = arg.getAsType();
+      if (argType && !argType->isEqual(type) &&
+          argType->getWithoutParens().getString() == type.getString()) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 /// Format a single diagnostic argument and write it to the given
 /// stream.
 static void formatDiagnosticArgument(StringRef Modifier, 
@@ -451,17 +468,50 @@ static void formatDiagnosticArgument(StringRef Modifier,
     
     // Strip extraneous parentheses; they add no value.
     auto type = Arg.getAsType()->getWithoutParens();
-    std::string typeName = type->getString();
 
-    if (shouldShowAKA(type, typeName)) {
-      llvm::SmallString<256> AkaText;
-      llvm::raw_svector_ostream OutAka(AkaText);
-      OutAka << type->getCanonicalType();
-      Out << llvm::format(FormatOpts.AKAFormatString.c_str(), typeName.c_str(),
-                          AkaText.c_str());
+    // If a type has an unresolved type, print it with syntax sugar removed for
+    // clarity. For example, print `Array<_>` instead of `[_]`.
+    if (type->hasUnresolvedType()) {
+      type = type->getWithoutSyntaxSugar();
+    }
+
+    bool isAmbiguous = typeSpellingIsAmbiguous(type, Args);
+
+    if (isAmbiguous && isa<OpaqueTypeArchetypeType>(type.getPointer())) {
+      auto opaqueTypeDecl = type->castTo<OpaqueTypeArchetypeType>()->getDecl();
+
+      llvm::SmallString<256> NamingDeclText;
+      llvm::raw_svector_ostream OutNaming(NamingDeclText);
+      auto namingDecl = opaqueTypeDecl->getNamingDecl();
+      if (namingDecl->getDeclContext()->isTypeContext()) {
+        auto selfTy = namingDecl->getDeclContext()->getSelfInterfaceType();
+        selfTy->print(OutNaming);
+        OutNaming << '.';
+      }
+      namingDecl->getFullName().printPretty(OutNaming);
+
+      auto descriptiveKind = opaqueTypeDecl->getDescriptiveKind();
+
+      Out << llvm::format(FormatOpts.OpaqueResultFormatString.c_str(),
+                          type->getString().c_str(),
+                          Decl::getDescriptiveKindName(descriptiveKind).data(),
+                          NamingDeclText.c_str());
+
     } else {
-      Out << FormatOpts.OpeningQuotationMark << typeName
-          << FormatOpts.ClosingQuotationMark;
+      auto printOptions = PrintOptions();
+      printOptions.FullyQualifiedTypes = isAmbiguous;
+      std::string typeName = type->getString(printOptions);
+
+      if (shouldShowAKA(type, typeName)) {
+        llvm::SmallString<256> AkaText;
+        llvm::raw_svector_ostream OutAka(AkaText);
+        OutAka << type->getCanonicalType();
+        Out << llvm::format(FormatOpts.AKAFormatString.c_str(),
+                            typeName.c_str(), AkaText.c_str());
+      } else {
+        Out << FormatOpts.OpeningQuotationMark << typeName
+            << FormatOpts.ClosingQuotationMark;
+      }
     }
     break;
   }
@@ -622,10 +672,14 @@ static DiagnosticKind toDiagnosticKind(DiagnosticState::Behavior behavior) {
   llvm_unreachable("Unhandled DiagnosticKind in switch.");
 }
 
-/// A special option only for compiler writers that causes Diagnostics to assert
-/// when a failure diagnostic is emitted. Intended for use in the debugger.
+// A special option only for compiler writers that causes Diagnostics to assert
+// when a failure diagnostic is emitted. Intended for use in the debugger.
 llvm::cl::opt<bool> AssertOnError("swift-diagnostics-assert-on-error",
                                   llvm::cl::init(false));
+// A special option only for compiler writers that causes Diagnostics to assert
+// when a warning diagnostic is emitted. Intended for use in the debugger.
+llvm::cl::opt<bool> AssertOnWarning("swift-diagnostics-assert-on-warning",
+                                    llvm::cl::init(false));
 
 DiagnosticState::Behavior DiagnosticState::determineBehavior(DiagID id) {
   auto set = [this](DiagnosticState::Behavior lvl) {
@@ -637,6 +691,8 @@ DiagnosticState::Behavior DiagnosticState::determineBehavior(DiagID id) {
     }
 
     assert((!AssertOnError || !anyErrorOccurred) && "We emitted an error?!");
+    assert((!AssertOnWarning || (lvl != Behavior::Warning)) &&
+           "We emitted a warning?!");
     previousBehavior = lvl;
     return lvl;
   };
@@ -698,6 +754,7 @@ void DiagnosticEngine::flushActiveDiagnostic() {
   if (TransactionCount == 0) {
     emitDiagnostic(*ActiveDiagnostic);
   } else {
+    onTentativeDiagnosticFlush(*ActiveDiagnostic);
     TentativeDiagnostics.emplace_back(std::move(*ActiveDiagnostic));
   }
   ActiveDiagnostic.reset();
@@ -883,4 +940,18 @@ BufferIndirectlyCausingDiagnosticRAII::BufferIndirectlyCausingDiagnosticRAII(
   auto loc = SF.getASTContext().SourceMgr.getLocForBufferStart(*id);
   if (loc.isValid())
     Diags.setBufferIndirectlyCausingDiagnosticToInput(loc);
+}
+
+void DiagnosticEngine::onTentativeDiagnosticFlush(Diagnostic &diagnostic) {
+  for (auto &argument : diagnostic.Args) {
+    if (argument.getKind() != DiagnosticArgumentKind::String)
+      continue;
+
+    auto content = argument.getAsString();
+    if (content.empty())
+      continue;
+
+    auto I = TransactionStrings.insert(std::make_pair(content, char())).first;
+    argument = DiagnosticArgument(StringRef(I->getKeyData()));
+  }
 }

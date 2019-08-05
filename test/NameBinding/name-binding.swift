@@ -1,3 +1,4 @@
+// XFAIL: enable-astscope-lookup
 // RUN: %target-swift-frontend -typecheck %s -module-name themodule -enable-source-import -I %S/../decl/enum -sdk "" -verify -show-diagnostics-after-fatal -verify-ignore-unknown
 
 // -verify-ignore-unknown is for
@@ -54,8 +55,8 @@ func test_varname_binding() {
   var (d, e) = (c.1, c.0)
   var ((), (g1, g2), h) = ((), (e, d), e)
   var (j, k, l) = callee1()
-  var (m, n) = callee1() // expected-error{{'(Int, Int, Int)' is not convertible to '(_, _)', tuples have a different number of elements}}
-  var (o, p, q, r) = callee1() // expected-error{{'(Int, Int, Int)' is not convertible to '(_, _, _, _)', tuples have a different number of elements}}
+  var (m, n) = callee1() // expected-error{{'(Int, Int, Int)' is not convertible to '(Int, Int)', tuples have a different number of elements}}
+  var (o, p, q, r) = callee1() // expected-error{{'(Int, Int, Int)' is not convertible to '(Int, Int, Int, Any)', tuples have a different number of elements}}
 }
 
 //===----------------------------------------------------------------------===//

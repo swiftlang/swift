@@ -204,7 +204,8 @@ public:
   }
   
   bool shouldInclude(const ValueDecl *VD) {
-    return isVisibleToObjC(VD, minRequiredAccess);
+    return isVisibleToObjC(VD, minRequiredAccess) &&
+           !VD->getAttrs().hasAttribute<ImplementationOnlyAttr>();
   }
 
 private:
@@ -256,8 +257,8 @@ private:
   void printDocumentationComment(Decl *D) {
     swift::markup::MarkupContext MC;
     auto DC = getSingleDocComment(MC, D);
-    if (DC.hasValue())
-      ide::getDocumentationCommentAsDoxygen(DC.getValue(), os);
+    if (DC)
+      ide::getDocumentationCommentAsDoxygen(DC, os);
   }
 
   /// Prints an encoded string, escaped properly for C.
@@ -321,6 +322,13 @@ private:
 
   void visitClassDecl(ClassDecl *CD) {
     printDocumentationComment(CD);
+
+    // This is just for testing, so we check explicitly for the attribute instead
+    // of asking if the class is weak imported. If the class has availablility,
+    // we'll print a SWIFT_AVAIALBLE() which implies __attribute__((weak_imported))
+    // already.
+    if (CD->getAttrs().hasAttribute<WeakLinkedAttr>())
+      os << "SWIFT_WEAK_IMPORT\n";
 
     bool hasResilientAncestry =
       CD->checkAncestry().contains(AncestryFlags::ResilientOther);
@@ -563,7 +571,7 @@ private:
     // Constructors and methods returning DynamicSelf return
     // instancetype.
     if (isa<ConstructorDecl>(AFD) ||
-        (isa<FuncDecl>(AFD) && cast<FuncDecl>(AFD)->hasDynamicSelf())) {
+        (isa<FuncDecl>(AFD) && cast<FuncDecl>(AFD)->hasDynamicSelfResult())) {
       if (errorConvention && errorConvention->stripsResultOptionality()) {
         printNullability(OTK_Optional, NullabilityPrintKind::ContextSensitive);
       } else if (auto ctor = dyn_cast<ConstructorDecl>(AFD)) {
@@ -587,6 +595,11 @@ private:
     } else if (clangMethod && isNSUInteger(clangMethod->getReturnType())) {
       os << "NSUInteger";
     } else {
+      // IBSegueAction is placed before whatever return value is chosen.
+      if (AFD->getAttrs().hasAttribute<IBSegueActionAttr>()) {
+        os << "IBSegueAction ";
+      }
+
       OptionalTypeKind kind;
       Type objTy;
       std::tie(objTy, kind) = getObjectTypeAndOptionality(AFD, resultTy);
@@ -1243,22 +1256,25 @@ private:
 
     printAvailability(VD);
 
+    auto *getter = VD->getOpaqueAccessor(AccessorKind::Get);
+    auto *setter = VD->getOpaqueAccessor(AccessorKind::Set);
+
     os << ";";
     if (VD->isStatic()) {
       os << ")\n";
       // Older Clangs don't support class properties, so print the accessors as
       // well. This is harmless.
-      printAbstractFunctionAsMethod(VD->getGetter(), true);
+      printAbstractFunctionAsMethod(getter, true);
       if (isSettable) {
-        assert(VD->getSetter() && "settable ObjC property missing setter decl");
-        printAbstractFunctionAsMethod(VD->getSetter(), true);
+        assert(setter && "settable ObjC property missing setter decl");
+        printAbstractFunctionAsMethod(setter, true);
       }
     } else {
       os << "\n";
       if (looksLikeInitMethod(VD->getObjCGetterSelector()))
-        printAbstractFunctionAsMethod(VD->getGetter(), false);
+        printAbstractFunctionAsMethod(getter, false);
       if (isSettable && looksLikeInitMethod(VD->getObjCSetterSelector()))
-        printAbstractFunctionAsMethod(VD->getSetter(), false);
+        printAbstractFunctionAsMethod(setter, false);
     }
   }
 
@@ -1273,8 +1289,10 @@ private:
       isNSUIntegerSubscript = isNSUInteger(indexParam->getType());
     }
 
-    printAbstractFunctionAsMethod(SD->getGetter(), false, isNSUIntegerSubscript);
-    if (auto setter = SD->getSetter())
+    auto *getter = SD->getOpaqueAccessor(AccessorKind::Get);
+    printAbstractFunctionAsMethod(getter, false,
+                                  isNSUIntegerSubscript);
+    if (auto *setter = SD->getOpaqueAccessor(AccessorKind::Set))
       printAbstractFunctionAsMethod(setter, false, isNSUIntegerSubscript);
   }
 
@@ -1370,11 +1388,9 @@ private:
 
     // Dig out the Objective-C type.
     auto conformance = conformances.front();
-    Type objcType = ProtocolConformanceRef::getTypeWitnessByName(
-                      nominal->getDeclaredType(),
-                      ProtocolConformanceRef(conformance),
-                      ctx.Id_ObjectiveCType,
-                      nullptr);
+    Type objcType = ProtocolConformanceRef(conformance).getTypeWitnessByName(
+                                           nominal->getDeclaredType(),
+                                           ctx.Id_ObjectiveCType);
     if (!objcType) return nullptr;
 
     // Dig out the Objective-C class.
@@ -1917,6 +1933,14 @@ private:
              "constrained extensions or custom generic parameters?");
       type = extendedClass->getGenericEnvironment()->getSugaredType(type);
       decl = type->getDecl();
+    }
+
+    if (auto *proto = dyn_cast<ProtocolDecl>(decl->getDeclContext())) {
+      if (type->isEqual(proto->getSelfInterfaceType())) {
+        printNullability(optionalKind, NullabilityPrintKind::ContextSensitive);
+        os << "instancetype";
+        return;
+      }
     }
 
     assert(decl->getClangDecl() && "can only handle imported ObjC generics");
@@ -2717,6 +2741,9 @@ public:
            "#if !defined(SWIFT_AVAILABILITY)\n"
            "# define SWIFT_AVAILABILITY(plat, ...) __attribute__((availability(plat, __VA_ARGS__)))\n"
            "#endif\n"
+           "#if !defined(SWIFT_WEAK_IMPORT)\n"
+           "# define SWIFT_WEAK_IMPORT __attribute__((weak_import))\n"
+           "#endif\n"
            "#if !defined(SWIFT_DEPRECATED)\n"
            "# define SWIFT_DEPRECATED __attribute__((deprecated))\n"
            "#endif\n"
@@ -2727,6 +2754,9 @@ public:
            "# define SWIFT_DEPRECATED_OBJC(Msg) __attribute__((diagnose_if(1, Msg, \"warning\")))\n"
            "#else\n"
            "# define SWIFT_DEPRECATED_OBJC(Msg) SWIFT_DEPRECATED_MSG(Msg)\n"
+           "#endif\n"
+           "#if !defined(IBSegueAction)\n"
+           "# define IBSegueAction\n"
            "#endif\n"
            ;
     static_assert(SWIFT_MAX_IMPORTED_SIMD_ELEMENTS == 4,

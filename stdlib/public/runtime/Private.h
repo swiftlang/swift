@@ -22,6 +22,10 @@
 #include "swift/Runtime/Metadata.h"
 #include "llvm/Support/Compiler.h"
 
+#if defined(__APPLE__) && defined(__MACH__)
+#include <TargetConditionals.h>
+#endif
+
 // Opaque ISAs need to use object_getClass which is in runtime.h
 #if SWIFT_HAS_OPAQUE_ISAS
 #include <objc/runtime.h>
@@ -84,6 +88,24 @@ public:
 #if SWIFT_HAS_ISA_MASKING
   SWIFT_RUNTIME_EXPORT
   uintptr_t swift_isaMask;
+
+// Hardcode the mask. We have our own copy of the value, as it's hard to work
+// out the proper includes from libobjc. The values MUST match the ones from
+// libobjc. Debug builds check these values against objc_debug_isa_class_mask
+// from libobjc.
+#  if TARGET_OS_SIMULATOR
+// Simulators don't currently use isa masking, but we still want to emit
+// swift_isaMask and the corresponding code in case that changes. libobjc's
+// mask has the bottom bits clear to include pointer alignment, match that
+// value here.
+#    define SWIFT_ISA_MASK 0xfffffffffffffff8ULL
+#  elif __arm64__
+#    define SWIFT_ISA_MASK 0x0000000ffffffff8ULL
+#  elif __x86_64__
+#    define SWIFT_ISA_MASK 0x00007ffffffffff8ULL
+#  else
+#    error Unknown architecture for masked isa.
+#  endif
 #endif
 
 #if SWIFT_OBJC_INTEROP
@@ -134,7 +156,7 @@ public:
 
 #if SWIFT_HAS_ISA_MASKING
     // Apply the mask.
-    bits &= swift_isaMask;
+    bits &= SWIFT_ISA_MASK;
 #endif
 
     // The result is a class pointer.
@@ -287,7 +309,8 @@ public:
     ///
     /// \returns a pair containing the number of key generic parameters in
     /// the path up to this point.
-    unsigned buildDescriptorPath(const ContextDescriptor *context) const;
+    unsigned buildDescriptorPath(const ContextDescriptor *context,
+                                 Demangler &demangler) const;
 
     /// Builds a path from the generic environment.
     unsigned buildEnvironmentPath(
@@ -440,6 +463,24 @@ public:
 #else
     return c;
 #endif
+  }
+  
+  template<> inline const ClassMetadata *
+  Metadata::getClassObject() const {
+    switch (getKind()) {
+    case MetadataKind::Class: {
+      // Native Swift class metadata is also the class object.
+      return static_cast<const ClassMetadata *>(this);
+    }
+    case MetadataKind::ObjCClassWrapper: {
+      // Objective-C class objects are referenced by their Swift metadata wrapper.
+      auto wrapper = static_cast<const ObjCClassWrapperMetadata *>(this);
+      return wrapper->Class;
+    }
+    // Other kinds of types don't have class objects.
+    default:
+      return nullptr;
+    }
   }
 
   void *allocateMetadata(size_t size, size_t align);

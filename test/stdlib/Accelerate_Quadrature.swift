@@ -1,6 +1,7 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
+// REQUIRES: rdar50301438
 // REQUIRES: objc_interop
 // UNSUPPORTED: OS=watchos
 
@@ -15,7 +16,7 @@ var AccelerateQuadratureTests = TestSuite("Accelerate_Quadrature")
 //
 //===----------------------------------------------------------------------===//
 
-if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
+if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
     
     func vectorExp(x: UnsafeBufferPointer<Double>,
                    y: UnsafeMutableBufferPointer<Double>) {

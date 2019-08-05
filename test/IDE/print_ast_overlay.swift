@@ -12,6 +12,7 @@
 // RUN: %FileCheck %s -check-prefix=PASS_ANNOTATED -strict-whitespace < %t.annotated.txt
 
 // REQUIRES: executable_test
+// REQUIRES: swift_tools_extra
 
 @_exported import Foo
 

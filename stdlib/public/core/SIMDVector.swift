@@ -10,19 +10,19 @@
 //
 //===----------------------------------------------------------------------===//
 
-infix operator .== : ComparisonPrecedence
-infix operator .!= : ComparisonPrecedence
-infix operator .< : ComparisonPrecedence
-infix operator .<= : ComparisonPrecedence
-infix operator .> : ComparisonPrecedence
-infix operator .>= : ComparisonPrecedence
+infix operator .==: ComparisonPrecedence
+infix operator .!=: ComparisonPrecedence
+infix operator .<: ComparisonPrecedence
+infix operator .<=: ComparisonPrecedence
+infix operator .>: ComparisonPrecedence
+infix operator .>=: ComparisonPrecedence
 
-infix operator .& : LogicalConjunctionPrecedence
-infix operator .^ : LogicalDisjunctionPrecedence
-infix operator .| : LogicalDisjunctionPrecedence
-infix operator .&= : AssignmentPrecedence
-infix operator .^= : AssignmentPrecedence
-infix operator .|= : AssignmentPrecedence
+infix operator .&: LogicalConjunctionPrecedence
+infix operator .^: LogicalDisjunctionPrecedence
+infix operator .|: LogicalDisjunctionPrecedence
+infix operator .&=: AssignmentPrecedence
+infix operator .^=: AssignmentPrecedence
+infix operator .|=: AssignmentPrecedence
 prefix operator .!
 
 /// A type that can function as storage for a SIMD vector type.
@@ -607,7 +607,7 @@ where Scalar: BinaryFloatingPoint, Scalar.RawSignificand: FixedWidthInteger {
   }
 }
 
-@_fixed_layout
+@frozen
 public struct SIMDMask<Storage>: SIMD
                   where Storage: SIMD,
                  Storage.Scalar: FixedWidthInteger & SignedInteger {

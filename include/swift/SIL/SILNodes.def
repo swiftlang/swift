@@ -805,7 +805,7 @@ NON_VALUE_INST(StoreInst, store,
                SILInstruction, MayWrite, DoesNotRelease)
 NON_VALUE_INST(AssignInst, assign,
                SILInstruction, MayWrite, DoesNotRelease)
-NON_VALUE_INST(AssignByDelegateInst, assign_by_delegate,
+NON_VALUE_INST(AssignByWrapperInst, assign_by_wrapper,
                SILInstruction, MayWrite, DoesNotRelease)
 NON_VALUE_INST(MarkFunctionEscapeInst, mark_function_escape,
                SILInstruction, None, DoesNotRelease)

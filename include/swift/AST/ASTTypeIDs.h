@@ -22,10 +22,15 @@ namespace swift {
 
 class CustomAttr;
 class NominalTypeDecl;
-struct PropertyDelegateBackingPropertyInfo;
-struct PropertyDelegateTypeInfo;
+struct PropertyWrapperBackingPropertyInfo;
+struct PropertyWrapperTypeInfo;
+enum class CtorInitializerKind;
+struct PropertyWrapperMutability;
 class Type;
 class VarDecl;
+class TypeAliasDecl;
+class Type;
+struct TypePair;
 
 #define SWIFT_AST_TYPEID_ZONE 1
 
@@ -36,4 +41,4 @@ class VarDecl;
 
 } // end namespace swift
 
-#endif /* SWIFT_AST_ASTTYPEIDS_H */
+#endif // SWIFT_AST_ASTTYPEIDS_H

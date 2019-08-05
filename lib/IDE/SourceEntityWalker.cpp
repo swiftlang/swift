@@ -34,6 +34,7 @@ class SemaAnnotator : public ASTWalker {
   SmallVector<ConstructorRefCallExpr *, 2> CtorRefs;
   SmallVector<ExtensionDecl *, 2> ExtDecls;
   llvm::SmallDenseMap<OpaqueValueExpr *, Expr *, 4> OpaqueValueMap;
+  llvm::SmallPtrSet<Expr *, 16> ExprsToSkip;
   bool Cancelled = false;
   Optional<AccessKind> OpAccess;
 
@@ -44,6 +45,10 @@ public:
   bool isDone() const { return Cancelled; }
 
 private:
+
+  // FIXME: Remove this
+  bool shouldWalkAccessorsTheOldWay() override { return true; }
+
   bool shouldWalkIntoGenericParams() override {
     return SEWalker.shouldWalkIntoGenericParams();
   }
@@ -61,6 +66,7 @@ private:
   std::pair<bool, Pattern *> walkToPatternPre(Pattern *P) override;
 
   bool handleImports(ImportDecl *Import);
+  bool handleCustomAttributes(Decl *D);
   bool passModulePathElements(ArrayRef<ImportDecl::AccessPathElement> Path,
                               const clang::Module *ClangMod);
 
@@ -94,6 +100,11 @@ bool SemaAnnotator::walkToDeclPre(Decl *D) {
   bool ShouldVisitChildren;
   if (shouldIgnore(D, ShouldVisitChildren))
     return ShouldVisitChildren;
+
+  if (!handleCustomAttributes(D)) {
+    Cancelled = true;
+    return false;
+  }
 
   SourceLoc Loc = D->getLoc();
   unsigned NameLen = 0;
@@ -175,25 +186,6 @@ bool SemaAnnotator::walkToDeclPost(Decl *D) {
   if (shouldIgnore(D, ShouldVisitChildren))
     return true;
 
-  // FIXME: rdar://17671977 the initializer for a lazy property has already
-  // been moved into its implicit getter.
-  if (auto *PBD = dyn_cast<PatternBindingDecl>(D)) {
-    if (auto *VD = PBD->getSingleVar()) {
-      if (VD->getAttrs().hasAttribute<LazyAttr>()) {
-        if (auto *Get = VD->getGetter()) {
-          assert((Get->isImplicit() || Get->isInvalid())
-            && "lazy var getter must be either implicitly computed or invalid");
-
-          // Note that an implicit getter may not have the body synthesized
-          // in case the owning PatternBindingDecl is invalid.
-          if (auto *Body = Get->getBody()) {
-            Body->walk(*this);
-          }
-        }
-      }
-    }
-  }
-
   if (isa<ExtensionDecl>(D)) {
     assert(ExtDecls.back() == D);
     ExtDecls.pop_back();
@@ -251,6 +243,9 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
 
   if (isDone())
     return { false, nullptr };
+
+  if (ExprsToSkip.count(E) != 0)
+    return { false, E };
 
   if (!SEWalker.walkToExprPre(E))
     return { false, E };
@@ -539,6 +534,41 @@ std::pair<bool, Pattern *> SemaAnnotator::walkToPatternPre(Pattern *P) {
   // subpattern.  The type will be walked as a part of another TypedPattern.
   TP->getSubPattern()->walk(*this);
   return { false, P };
+}
+
+bool SemaAnnotator::handleCustomAttributes(Decl *D) {
+  // CustomAttrs of non-param VarDecls are handled when this method is called
+  // on their containing PatternBindingDecls (see below).
+  if (isa<VarDecl>(D) && !isa<ParamDecl>(D))
+    return true;
+
+  if (auto *PBD = dyn_cast<PatternBindingDecl>(D)) {
+    if (auto *SingleVar = PBD->getSingleVar()) {
+      D = SingleVar;
+    } else {
+      return true;
+    }
+  }
+  for (auto *customAttr : D->getAttrs().getAttributes<CustomAttr, true>()) {
+    if (auto *Repr = customAttr->getTypeLoc().getTypeRepr()) {
+      if (!Repr->walk(*this))
+        return false;
+    }
+    if (auto *SemaInit = customAttr->getSemanticInit()) {
+      if (!SemaInit->isImplicit()) {
+        assert(customAttr->getArg());
+        if (!SemaInit->walk(*this))
+          return false;
+        // Don't walk this again via the associated PatternBindingDecl's
+        // initializer
+        ExprsToSkip.insert(SemaInit);
+      }
+    } else if (auto *Arg = customAttr->getArg()) {
+      if (!Arg->walk(*this))
+        return false;
+    }
+  }
+  return true;
 }
 
 bool SemaAnnotator::handleImports(ImportDecl *Import) {

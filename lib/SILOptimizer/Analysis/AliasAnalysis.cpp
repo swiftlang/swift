@@ -580,6 +580,10 @@ AliasResult AliasAnalysis::aliasInner(SILValue V1, SILValue V2,
   LLVM_DEBUG(llvm::dbgs() << "ALIAS ANALYSIS:\n    V1: " << *V1
              << "    V2: " << *V2);
 
+  // If this is SILUndef, return may alias.
+  if (!V1->getFunction())
+    return AliasResult::MayAlias;
+
   // Pass in both the TBAA types so we can perform typed access TBAA and the
   // actual types of V1, V2 so we can perform class based TBAA.
   if (!typesMayAlias(TBAAType1, TBAAType2, *V1->getFunction()))

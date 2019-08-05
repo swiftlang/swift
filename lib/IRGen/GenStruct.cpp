@@ -626,7 +626,6 @@ public:
       TotalStride(Size(ClangLayout.getSize().getQuantity())),
       TotalAlignment(IGM.getCappedAlignment(
                                        Alignment(ClangLayout.getAlignment()))) {
-    SpareBits.reserve(TotalStride.getValue() * 8);
   }
 
   void collectRecordFields() {
@@ -879,19 +878,18 @@ void IRGenModule::emitStructDecl(StructDecl *st) {
   emitNestedTypeDecls(st->getMembers());
 }
 
-void IRGenModule::emitFuncDecl(FuncDecl *fd) {
-  // If there's an opaque return type for this function, emit its descriptor.
-  if (auto opaque = fd->getOpaqueResultTypeDecl()) {
-    if (!IRGen.hasLazyMetadata(opaque))
+void IRGenModule::maybeEmitOpaqueTypeDecl(OpaqueTypeDecl *opaque) {
+  if (IRGen.Opts.EnableAnonymousContextMangledNames) {
+    // If we're emitting anonymous context mangled names for debuggability,
+    // then emit all opaque type descriptors and make them runtime-discoverable
+    // so that remote ast/mirror can recover them.
+    addRuntimeResolvableType(opaque);
+    if (IRGen.hasLazyMetadata(opaque))
+      IRGen.noteUseOfOpaqueTypeDescriptor(opaque);
+    else
       emitOpaqueTypeDecl(opaque);
-  }
-}
-
-void IRGenModule::emitAbstractStorageDecl(AbstractStorageDecl *fd) {
-  // If there's an opaque return type for this function, emit its descriptor.
-  if (auto opaque = fd->getOpaqueResultTypeDecl()) {
-    if (!IRGen.hasLazyMetadata(opaque))
-      emitOpaqueTypeDecl(opaque);
+  } else if (!IRGen.hasLazyMetadata(opaque)) {
+    emitOpaqueTypeDecl(opaque);
   }
 }
 
@@ -946,14 +944,12 @@ const TypeInfo *TypeConverter::convertStructType(TypeBase *key, CanType type,
 
     } else if (isa<clang::EnumDecl>(clangDecl)) {
       // Fall back to Swift lowering for the enum's representation as a struct.
-      assert(std::distance(D->getStoredProperties().begin(),
-                           D->getStoredProperties().end()) == 1 &&
+      assert(D->getStoredProperties().size() == 1 &&
              "Struct representation of a Clang enum should wrap one value");
     } else if (clangDecl->hasAttr<clang::SwiftNewtypeAttr>()) {
       // Fall back to Swift lowering for the underlying type's
       // representation as a struct member.
-      assert(std::distance(D->getStoredProperties().begin(),
-                           D->getStoredProperties().end()) == 1 &&
+      assert(D->getStoredProperties().size() == 1 &&
              "Struct representation of a swift_newtype should wrap one value");
     } else {
       llvm_unreachable("Swift struct represents unexpected imported type");

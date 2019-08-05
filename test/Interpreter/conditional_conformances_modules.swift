@@ -7,7 +7,7 @@
 
 // REQUIRES: executable_test
 // FIXME: seems to fail on 32-bit simulator?
-// REQUIRES: OS=macosx || OS=linux
+// REQUIRES: OS=macosx || OS=linux-gnu || OS=linux-androideabi || OS=linux-android
 
 import Basic
 import WithAssoc

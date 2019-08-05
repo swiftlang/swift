@@ -51,7 +51,7 @@ add_swift_host_library(swiftIRGen STATIC
   TypeLayoutDumper.cpp
   TypeLayoutVerifier.cpp
 
-  LLVM_COMPONENT_DEPENDS
+  LLVM_LINK_COMPONENTS
     target
     transformutils
 )

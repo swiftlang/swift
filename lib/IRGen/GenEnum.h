@@ -91,30 +91,38 @@ void emitStoreEnumTagToAddress(IRGenFunction &IGF,
                                 Address enumAddr,
                                 EnumElementDecl *theCase);
   
-/// Interleave the occupiedValue and spareValue bits, taking a bit from one
-/// or the other at each position based on the spareBits mask.
-APInt
-interleaveSpareBits(IRGenModule &IGM, const SpareBitVector &spareBits,
-                    unsigned bits, unsigned spareValue, unsigned occupiedValue);
-
-/// A version of the above where the tag value is dynamic.
+/// Unpack bits from value and scatter them into the masked bits.
 EnumPayload interleaveSpareBits(IRGenFunction &IGF,
                                 const EnumPayloadSchema &schema,
                                 const SpareBitVector &spareBitVector,
                                 llvm::Value *value);
 
-/// Gather spare bits into the low bits of a smaller integer value.
-llvm::Value *emitGatherSpareBits(IRGenFunction &IGF,
-                                 const SpareBitVector &spareBitMask,
-                                 llvm::Value *spareBits,
-                                 unsigned resultLowBit,
-                                 unsigned resultBitWidth);
-/// Scatter spare bits from the low bits of a smaller integer value.
-llvm::Value *emitScatterSpareBits(IRGenFunction &IGF,
-                                  const SpareBitVector &spareBitMask,
-                                  llvm::Value *packedBits,
-                                  unsigned packedLowBit);
-  
+/// Pack masked bits into the low bits of an integer value.
+/// Equivalent to a parallel bit extract instruction (PEXT),
+/// although we don't currently emit PEXT directly.
+llvm::Value *emitGatherBits(IRGenFunction &IGF,
+                            llvm::APInt mask,
+                            llvm::Value *source,
+                            unsigned resultLowBit,
+                            unsigned resultBitWidth);
+
+/// Pack masked bits into the low bits of an integer value.
+llvm::APInt gatherBits(const llvm::APInt &mask,
+                       const llvm::APInt &value);
+
+/// Unpack bits from the low bits of an integer value and
+/// move them to the bit positions indicated by the mask.
+/// Equivalent to a parallel bit deposit instruction (PDEP),
+/// although we don't currently emit PDEP directly.
+llvm::Value *emitScatterBits(IRGenFunction &IGF,
+                             llvm::APInt mask,
+                             llvm::Value *packedBits,
+                             unsigned packedLowBit);
+
+/// Unpack bits from the low bits of an integer value and
+/// move them to the bit positions indicated by the mask.
+llvm::APInt scatterBits(const llvm::APInt &mask, unsigned value);
+
 /// An implementation strategy for an enum, which handles how the enum is
 /// laid out and how to perform TypeInfo operations on values of the enum.
 class EnumImplStrategy {

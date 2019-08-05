@@ -519,17 +519,17 @@ void SILBuilder::emitDestructureValueOperation(
   // Otherwise, we want to destructure add the destructure and return.
   if (getFunction().hasOwnership()) {
     auto *i = emitDestructureValueOperation(loc, v);
-    copy(i->getResults(), std::back_inserter(results));
+    llvm::copy(i->getResults(), std::back_inserter(results));
     return;
   }
 
   // In non qualified ownership SIL, drop back to using projection code.
   SmallVector<Projection, 16> projections;
   Projection::getFirstLevelProjections(v->getType(), getModule(), projections);
-  transform(projections, std::back_inserter(results),
-            [&](const Projection &p) -> SILValue {
-              return p.createObjectProjection(*this, loc, v).get();
-            });
+  llvm::transform(projections, std::back_inserter(results),
+                  [&](const Projection &p) -> SILValue {
+                    return p.createObjectProjection(*this, loc, v).get();
+                  });
 }
 
 // TODO: Can we put this on type lowering? It would take a little bit of work
@@ -547,10 +547,10 @@ void SILBuilder::emitDestructureAddressOperation(
 
   SmallVector<Projection, 16> projections;
   Projection::getFirstLevelProjections(v->getType(), getModule(), projections);
-  transform(projections, std::back_inserter(results),
-            [&](const Projection &p) -> SILValue {
-              return p.createAddressProjection(*this, loc, v).get();
-            });
+  llvm::transform(projections, std::back_inserter(results),
+                  [&](const Projection &p) -> SILValue {
+                    return p.createAddressProjection(*this, loc, v).get();
+                  });
 }
 
 void SILBuilder::emitDestructureValueOperation(
@@ -599,4 +599,16 @@ void SILBuilder::emitScopedBorrowOperation(SILLocation loc, SILValue original,
   fun(original);
 
   createEndBorrow(loc, original);
+}
+
+CheckedCastBranchInst *SILBuilder::createCheckedCastBranch(
+    SILLocation Loc, bool isExact, SILValue op, SILType destTy,
+    SILBasicBlock *successBB, SILBasicBlock *failureBB,
+    ProfileCounter target1Count, ProfileCounter target2Count) {
+  assert((!hasOwnership() || !failureBB->getNumArguments() ||
+          failureBB->getArgument(0)->getType() == op->getType()) &&
+         "failureBB's argument doesn't match incoming argument type");
+  return insertTerminator(CheckedCastBranchInst::create(
+      getSILDebugLocation(Loc), isExact, op, destTy, successBB, failureBB,
+      getFunction(), C.OpenedArchetypes, target1Count, target2Count));
 }

@@ -253,18 +253,23 @@ function(_compile_swift_files
     list(APPEND swift_flags "-module-name" "${SWIFTFILE_MODULE_NAME}")
   endif()
 
-  # Force swift 5 mode for Standard Library.
+  # Force swift 5 mode for Standard Library and overlays.
   if (SWIFTFILE_IS_STDLIB)
     list(APPEND swift_flags "-swift-version" "5")
   endif()
-
-  # Force swift 4 compatibility mode for overlays.
   if (SWIFTFILE_IS_SDK_OVERLAY)
-    list(APPEND swift_flags "-swift-version" "4")
+    list(APPEND swift_flags "-swift-version" "5")
   endif()
 
   if(SWIFTFILE_IS_SDK_OVERLAY)
     list(APPEND swift_flags "-autolink-force-load")
+  endif()
+
+  # Don't need to link runtime compatibility libraries for older runtimes 
+  # into the new runtime.
+  if (SWIFTFILE_IS_STDLIB OR SWIFTFILE_IS_SDK_OVERLAY)
+    list(APPEND swift_flags "-runtime-compatibility-version" "none")
+    list(APPEND swift_flags "-disable-autolinking-runtime-compatibility-dynamic-replacements")
   endif()
 
   if (SWIFTFILE_IS_STDLIB_CORE OR SWIFTFILE_IS_SDK_OVERLAY)
@@ -340,14 +345,14 @@ function(_compile_swift_files
   endif()
 
   if(SWIFTFILE_SDK IN_LIST SWIFT_APPLE_PLATFORMS)
-    swift_install_in_component("${SWIFTFILE_INSTALL_IN_COMPONENT}"
-      DIRECTORY "${specific_module_dir}"
-      DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${library_subdir}"
-      OPTIONAL)
+    swift_install_in_component(DIRECTORY "${specific_module_dir}"
+                               DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${library_subdir}"
+                               COMPONENT "${SWIFTFILE_INSTALL_IN_COMPONENT}"
+                               OPTIONAL)
   else()
-    swift_install_in_component("${SWIFTFILE_INSTALL_IN_COMPONENT}"
-      FILES ${module_outputs}
-      DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${library_subdir}")
+    swift_install_in_component(FILES ${module_outputs}
+                               DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${library_subdir}"
+                               COMPONENT "${SWIFTFILE_INSTALL_IN_COMPONENT}")
   endif()
 
   set(line_directive_tool "${SWIFT_SOURCE_DIR}/utils/line-directive")

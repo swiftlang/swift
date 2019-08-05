@@ -115,7 +115,7 @@ public typealias CBool = Bool
 ///
 /// Opaque pointers are used to represent C pointers to types that
 /// cannot be represented in Swift, such as incomplete struct types.
-@_fixed_layout
+@frozen
 public struct OpaquePointer {
   @usableFromInline
   internal var _rawValue: Builtin.RawPointer
@@ -189,7 +189,7 @@ extension OpaquePointer: Hashable {
   }
 }
 
-extension OpaquePointer : CustomDebugStringConvertible {
+extension OpaquePointer: CustomDebugStringConvertible {
   /// A textual representation of the pointer, suitable for debugging.
   public var debugDescription: String {
     return _rawPointerToString(_rawValue)
@@ -226,7 +226,7 @@ extension UInt {
 
 /// A wrapper around a C `va_list` pointer.
 #if arch(arm64) && !(os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(Windows))
-@_fixed_layout
+@frozen
 public struct CVaListPointer {
   @usableFromInline // unsafe-performance
   internal var _value: (__stack: UnsafeMutablePointer<Int>?,
@@ -246,7 +246,7 @@ public struct CVaListPointer {
   }
 }
 
-extension CVaListPointer : CustomDebugStringConvertible {
+extension CVaListPointer: CustomDebugStringConvertible {
   public var debugDescription: String {
     return "(\(_value.__stack.debugDescription), " +
            "\(_value.__gr_top.debugDescription), " +
@@ -258,7 +258,7 @@ extension CVaListPointer : CustomDebugStringConvertible {
 
 #else
 
-@_fixed_layout
+@frozen
 public struct CVaListPointer {
   @usableFromInline // unsafe-performance
   internal var _value: UnsafeMutableRawPointer
@@ -270,7 +270,7 @@ public struct CVaListPointer {
   }
 }
 
-extension CVaListPointer : CustomDebugStringConvertible {
+extension CVaListPointer: CustomDebugStringConvertible {
   /// A textual representation of the pointer, suitable for debugging.
   public var debugDescription: String {
     return _value.debugDescription

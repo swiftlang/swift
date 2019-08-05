@@ -101,7 +101,7 @@ enum Z2 {
 // Ill-formed initialization: wrong context.
 class Z3 {
   func f() {
-    self.init() // expected-error{{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{10-10=type(of: }} {{14-14=)}}
+    self.init() // expected-error{{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{5-5=type(of: }} {{9-9=)}}
   }
 
   init() { }
@@ -112,7 +112,7 @@ class Z4 {
   init() {} // expected-note{{selected non-required initializer}}
 
   convenience init(other: Z4) {
-    other.init() // expected-error{{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{11-11=type(of: }} {{15-15=)}}
+    other.init() // expected-error{{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{5-5=type(of: }} {{10-10=)}}
     type(of: other).init() // expected-error{{must use a 'required' initializer}}
   }
 }
@@ -121,7 +121,7 @@ class Z5 : Z4 {
   override init() { }
 
   convenience init(other: Z5) {
-    other.init() // expected-error{{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{11-11=type(of: }} {{15-15=)}}
+    other.init() // expected-error{{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{5-5=type(of: }} {{10-10=)}}
   }
 }
 
@@ -150,7 +150,7 @@ struct RDar16603812 {
    var i = 42
    init() {}
    func foo() {
-      self.init() // expected-error {{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{12-12=type(of: }} {{16-16=)}}
+      self.init() // expected-error {{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{7-7=type(of: }} {{11-11=)}}
       type(of: self).init() // expected-warning{{result of 'RDar16603812' initializer is unused}}
    }
 }
@@ -199,7 +199,7 @@ class D: C {
   }
 
   func foo() {
-    self.init(x: 0) // expected-error{{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{10-10=type(of: }} {{14-14=)}}
+    self.init(x: 0) // expected-error{{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{5-5=type(of: }} {{9-9=)}}
   }
   func bar() {
     super.init(x: 0) // expected-error{{'super.init' cannot be called outside of an initializer}}
@@ -270,15 +270,26 @@ func foo<T: C>(_ x: T, y: T.Type) where T: P {
   var c3a = type(of: x).init() // expected-error{{'required' initializer}}
   var c4a = type(of: x).init(proto: "")
 
-  var ci1 = x.init(required: 0) // expected-error{{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{15-15=type(of: }} {{19-19=)}}
-  var ci2 = x.init(x: 0) // expected-error{{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{15-15=type(of: }} {{19-19=)}}
-  var ci3 = x.init() // expected-error{{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{15-15=type(of: }} {{19-19=)}}
-  var ci4 = x.init(proto: "") // expected-error{{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{15-15=type(of: }} {{19-19=)}} 
-
-  var ci1a = x(required: 0) // expected-error{{cannot call value of non-function type 'T'}}
-  var ci2a = x(x: 0) // expected-error{{cannot call value of non-function type 'T'}}
-  var ci3a = x() // expected-error{{cannot call value of non-function type 'T'}}{{15-17=}}
-  var ci4a = x(proto: "") // expected-error{{cannot call value of non-function type 'T'}}
+  var ci1 = x.init(required: 0) // expected-error{{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{13-13=type(of: }} {{14-14=)}}
+  var ci2 = x.init(x: 0) // expected-error{{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{13-13=type(of: }} {{14-14=)}}
+  var ci3 = x.init() // expected-error{{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{13-13=type(of: }} {{14-14=)}}
+  var ci4 = x.init(proto: "") // expected-error{{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{13-13=type(of: }} {{14-14=)}}
+  
+  var z = x
+  z.init(required: 0) // expected-error {{'init' is a member of the type; use assignment to initalize the value instead}} {{4-4= = }}
+  z.init(x: 0) // expected-error {{'init' is a member of the type; use assignment to initalize the value instead}} {{4-4= = }}
+  z.init() // expected-error {{'init' is a member of the type; use assignment to initalize the value instead}} {{4-4= = }}
+  z.init(proto: "") // expected-error {{'init' is a member of the type; use assignment to initalize the value instead}} {{4-4= = }}
+  
+  var ci1a = z.init(required: 0) // expected-error {{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{14-14=type(of: }} {{15-15=)}}
+  var ci2a = z.init(x: 0) // expected-error {{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{14-14=type(of: }} {{15-15=)}}
+  var ci3a = z.init() // expected-error {{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{14-14=type(of: }} {{15-15=)}}
+  var ci4a = z.init(proto: "") // expected-error {{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{14-14=type(of: }} {{15-15=)}}
+  
+  var ci1b = x(required: 0) // expected-error{{cannot call value of non-function type 'T'}}
+  var ci2b = x(x: 0) // expected-error{{cannot call value of non-function type 'T'}}
+  var ci3b = x() // expected-error{{cannot call value of non-function type 'T'}}{{15-17=}}
+  var ci4b = x(proto: "") // expected-error{{cannot call value of non-function type 'T'}}
 
   var cm1 = y.init(required: 0)
   var cm2 = y.init(x: 0) // expected-error{{'required' initializer}}
@@ -498,4 +509,51 @@ class TestOptionalTrySub : TestOptionalTry {
     try? super.init() // expected-error {{a non-failable initializer cannot use 'try?' to chain to another initializer}}
     // expected-note@-1 {{force potentially-failing result with 'try!'}} {{5-9=try!}}
   }
+}
+
+struct X { init() {} }
+
+func +(lhs: X, rhs: X) -> X { return lhs }
+func testInsideOperator(x: X) {
+  x.init() + x // expected-error {{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{3-3=type(of: }} {{4-4=)}}
+  x + x.init() // expected-error {{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{7-7=type(of: }} {{8-8=)}}
+  x.init() + x.init() // expected-error {{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{3-3=type(of: }} {{4-4=)}}
+  // expected-error@-1 {{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{14-14=type(of: }} {{15-15=)}}
+}
+
+struct Y {
+  var x: X
+  let x2: X
+  
+  init() {
+    x.init() // expected-error {{'init' is a member of the type; use assignment to initalize the value instead}} {{6-6= = }}
+    foo(x.init()) // expected-error {{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{9-9=type(of: }} {{10-10=)}}
+  }
+  
+  func foo(_: X) {}
+  func asFunctionReturn() -> X {
+    var a = X()
+    return a.init() // expected-error {{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{12-12=type(of: }} {{13-13=)}}
+  }
+}
+
+struct MultipleMemberAccesses {
+  var y: Y
+  let y2: Y
+  init() {
+    y = Y()
+    y2 = Y()
+    y.x.init() // expected-error {{'init' is a member of the type; use assignment to initalize the value instead}} {{8-8= = }}
+    y2.x2.init() // expected-error {{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{5-5=type(of: }} {{10-10=)}}
+  }
+}
+
+func sr10670() {
+  struct S {
+    init(_ x: inout String) {}
+    init(_ x: inout [Int]) {}
+  }
+  var a = 0
+  S.init(&a) // expected-error {{cannot invoke 'S.Type.init' with an argument list of type '(inout Int)'}}
+  // expected-note@-1 {{overloads for 'S.Type.init' exist with these partially matching parameter lists: (inout String), (inout [Int])}}
 }

@@ -62,6 +62,7 @@ set(SWIFTLIB_ESSENTIAL
   Equatable.swift
   ErrorType.swift
   Filter.swift
+  FixedArray.swift
   FlatMap.swift
   Flatten.swift
   FloatingPoint.swift
@@ -74,6 +75,7 @@ set(SWIFTLIB_ESSENTIAL
   Hashing.swift
   HashTable.swift
   ICU.swift
+  Identifiable.swift
   Indices.swift
   InputStream.swift
   IntegerParsing.swift
@@ -128,7 +130,6 @@ set(SWIFTLIB_ESSENTIAL
   ShadowProtocols.swift
   Shims.swift
   Slice.swift
-  SmallBuffer.swift
   SmallString.swift
   Sort.swift
   StaticString.swift
@@ -144,7 +145,6 @@ set(SWIFTLIB_ESSENTIAL
   StringGuts.swift
   StringGutsSlice.swift
   StringGutsRangeReplaceable.swift
-  StringGutsVisitor.swift
   StringObject.swift
   StringProtocol.swift
   StringIndex.swift
@@ -187,7 +187,6 @@ set(SWIFTLIB_ESSENTIAL
 set(SWIFTLIB_ESSENTIAL_GYB_SOURCES
   AtomicInt.swift.gyb
   Codable.swift.gyb
-  FixedArray.swift.gyb
   FloatingPointParsing.swift.gyb
   FloatingPointTypes.swift.gyb
   IntegerTypes.swift.gyb
@@ -293,6 +292,7 @@ endif()
 
 if(SWIFT_CHECK_ESSENTIAL_STDLIB)
   add_swift_target_library(swift_stdlib_essential ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB IS_STDLIB_CORE
+      INSTALL_IN_COMPONENT never_install
       ${SWIFTLIB_ESSENTIAL}
       GYB_SOURCES
         ${SWIFTLIB_ESSENTIAL_GYB_SOURCES})
@@ -312,7 +312,7 @@ add_swift_target_library(swiftCore
                   FILE_DEPENDS
                     copy_shim_headers "${SWIFTLIB_DIR}/shims" ${GROUP_INFO_JSON_FILE}
                   SWIFT_COMPILE_FLAGS
-                    ${swift_stdlib_compile_flags} -Xcc -DswiftCore_EXPORTS
+                    ${swift_stdlib_compile_flags} -Xcc -DswiftCore_EXPORTS ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
                   LINK_FLAGS
                     ${swift_core_link_flags}
                   PRIVATE_LINK_LIBRARIES

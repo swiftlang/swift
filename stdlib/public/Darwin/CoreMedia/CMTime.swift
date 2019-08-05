@@ -14,11 +14,11 @@
 
 extension CMTime {
   public init(seconds: Double, preferredTimescale: CMTimeScale) {
-    self = CMTimeMakeWithSeconds(seconds, preferredTimescale)
+    self = CMTimeMakeWithSeconds(seconds, preferredTimescale: preferredTimescale)
   }
 
   public init(value: CMTimeValue, timescale: CMTimeScale) {
-    self = CMTimeMake(value, timescale)
+    self = CMTimeMake(value: value, timescale: timescale)
   }
 }
 
@@ -67,7 +67,7 @@ extension CMTime {
 
   public func convertScale(_ newTimescale: Int32, method: CMTimeRoundingMethod)
     -> CMTime {
-    return CMTimeConvertScale(self, newTimescale, method)
+    return CMTimeConvertScale(self, timescale: newTimescale, method: method)
   }
 }
 

@@ -22,7 +22,6 @@
     "StringObject.swift",
     "StringGuts.swift",
     "StringGutsSlice.swift",
-    "StringGutsVisitor.swift",
     "StringGraphemeBreaking.swift",
     "StringHashable.swift",
     "StringIndex.swift",
@@ -145,7 +144,6 @@
     "VarArgs.swift",
     "CTypes.swift",
     "MemoryLayout.swift",
-    "SmallBuffer.swift"
   ],
   "KeyPaths": [
     "KeyPath.swift"
@@ -201,6 +199,7 @@
   "Misc": [
     "AtomicInt.swift",
     "ErrorType.swift",
+    "Identifiable.swift",
     "InputStream.swift",
     "LifetimeManager.swift",
     "ManagedBuffer.swift",

@@ -77,33 +77,16 @@ public:
   /// The most recent declaration we considered for emission.
   SILDeclRef lastEmittedFunction;
 
-  /// Set of used conformances for which witness tables need to be emitted.
-  llvm::DenseSet<RootProtocolConformance *> usedConformances;
-
   /// Bookkeeping to ensure that useConformancesFrom{ObjectiveC,}Type() is
   /// only called once for each unique type, as an optimization.
   llvm::DenseSet<TypeBase *> usedConformancesFromTypes;
   llvm::DenseSet<TypeBase *> usedConformancesFromObjectiveCTypes;
 
-  struct DelayedWitnessTable {
-    NormalProtocolConformance *insertAfter;
-  };
+  /// Queue of delayed conformances that need to be emitted.
+  std::deque<NormalProtocolConformance *> pendingConformances;
 
-  /// Set of conformances we delayed emitting witness tables for.
-  llvm::DenseMap<NormalProtocolConformance *, DelayedWitnessTable>
-    delayedConformances;
-
-  /// Queue of delayed conformances that need to be forced.
-  std::deque<std::pair<NormalProtocolConformance *, DelayedWitnessTable>>
-    forcedConformances;
-
-  /// The most recent conformance...
-  NormalProtocolConformance *lastEmittedConformance = nullptr;
-
-  /// Profiler instances for constructors, grouped by associated decl.
-  /// Each profiler is shared by all member initializers for a nominal type.
-  /// Constructors within extensions are profiled separately.
-  llvm::DenseMap<Decl *, SILProfiler *> constructorProfilers;
+  /// Set of delayed conformances that have already been forced.
+  llvm::DenseSet<NormalProtocolConformance *> forcedConformances;
 
   SILFunction *emitTopLevelFunction(SILLocation Loc);
 
@@ -205,11 +188,13 @@ public:
   void visitTypeAliasDecl(TypeAliasDecl *d) {}
   void visitOpaqueTypeDecl(OpaqueTypeDecl *d) {}
   void visitAbstractTypeParamDecl(AbstractTypeParamDecl *d) {}
-  void visitSubscriptDecl(SubscriptDecl *d) {}
   void visitConstructorDecl(ConstructorDecl *d) {}
   void visitDestructorDecl(DestructorDecl *d) {}
   void visitModuleDecl(ModuleDecl *d) { }
   void visitMissingMemberDecl(MissingMemberDecl *d) {}
+
+  // Emitted as part of its storage.
+  void visitAccessorDecl(AccessorDecl *ad) {}
 
   void visitFuncDecl(FuncDecl *fd);
   void visitPatternBindingDecl(PatternBindingDecl *vd);
@@ -219,6 +204,7 @@ public:
   void visitNominalTypeDecl(NominalTypeDecl *ntd);
   void visitExtensionDecl(ExtensionDecl *ed);
   void visitVarDecl(VarDecl *vd);
+  void visitSubscriptDecl(SubscriptDecl *sd);
 
   void emitAbstractFuncDecl(AbstractFunctionDecl *AFD);
   
@@ -275,12 +261,6 @@ public:
   
   /// Add a global variable to the SILModule.
   void addGlobalVariable(VarDecl *global);
-  
-  /// Emit SIL related to a Clang-imported declaration.
-  void emitExternalDefinition(Decl *d);
-
-  /// Emit SIL related to a Clang-imported declaration.
-  void emitExternalWitnessTable(NormalProtocolConformance *d);
 
   /// Emit the ObjC-compatible entry point for a method.
   void emitObjCMethodThunk(FuncDecl *method);
@@ -472,12 +452,6 @@ public:
 
   /// Emit a property descriptor for the given storage decl if it needs one.
   void tryEmitPropertyDescriptor(AbstractStorageDecl *decl);
-
-  /// Get or create the shared profiler instance for a type's constructors.
-  /// This takes care to create separate profilers for extensions, which may
-  /// reside in a different file than the one where the base type is defined.
-  SILProfiler *getOrCreateProfilerForConstructors(DeclContext *ctx,
-                                                  ConstructorDecl *cd);
 
 private:
   /// Emit the deallocator for a class that uses the objc allocator.

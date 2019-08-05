@@ -19,6 +19,7 @@
 
 namespace swift {
 class ModuleFile;
+class LazyResolver;
 
 /// Spceifies how to load modules when both a parseable interface and serialized
 /// AST are present, or whether to disallow one format or the other altogether.
@@ -44,11 +45,14 @@ protected:
   SerializedModuleLoaderBase(ASTContext &ctx, DependencyTracker *tracker,
                              ModuleLoadingMode LoadMode);
 
+  void collectVisibleTopLevelModuleNamesImpl(SmallVectorImpl<Identifier> &names,
+                                             StringRef extension) const;
+
   using AccessPathElem = std::pair<Identifier, SourceLoc>;
   bool findModule(AccessPathElem moduleID,
                   std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
                   std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
-                  bool &isFramework);
+                  bool &isFramework, bool &isSystemModule);
 
   /// Attempts to search the provided directory for a loadable serialized
   /// .swiftmodule with the provided `ModuleFilename`. Subclasses must
@@ -169,6 +173,11 @@ class SerializedModuleLoader : public SerializedModuleLoaderBase {
 public:
   virtual ~SerializedModuleLoader();
 
+  /// Append visible module names to \p names. Note that names are possibly
+  /// duplicated, and not guaranteed to be ordered in any way.
+  void collectVisibleTopLevelModuleNames(
+      SmallVectorImpl<Identifier> &names) const override;
+
   /// Create a new importer that can load serialized Swift modules
   /// into the given ASTContext.
   static std::unique_ptr<SerializedModuleLoader>
@@ -219,6 +228,9 @@ public:
                             std::unique_ptr<llvm::MemoryBuffer> input) {
     MemoryBuffers[AccessPath] = std::move(input);
   }
+
+  void collectVisibleTopLevelModuleNames(
+      SmallVectorImpl<Identifier> &names) const override {}
 
   /// Create a new importer that can load serialized Swift modules
   /// into the given ASTContext.

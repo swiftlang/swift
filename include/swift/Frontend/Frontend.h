@@ -535,6 +535,7 @@ private:
   }
 
   bool setUpInputs();
+  bool setUpASTContextIfNeeded();
   Optional<unsigned> setUpCodeCompletionBuffer();
 
   /// Set up all state in the CompilerInstance to process the given input file.

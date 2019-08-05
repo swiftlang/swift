@@ -3,6 +3,7 @@
 // RUN: %target-run %t_tsan-binary 2>&1 | %FileCheck %s
 // REQUIRES: executable_test
 // REQUIRES: tsan_runtime
+// REQUIRES: foundation
 // UNSUPPORTED: OS=tvos
 
 // FIXME: This should be covered by "tsan_runtime"; older versions of Apple OSs

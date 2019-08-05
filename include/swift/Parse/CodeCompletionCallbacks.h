@@ -115,6 +115,9 @@ public:
     }
   };
 
+  /// Set target decl for attribute if the CC token is in attribute of the decl.
+  virtual void setAttrTargetDeclKind(Optional<DeclKind> DK) {}
+
   /// Complete the whole expression.  This is a fallback that should
   /// produce results when more specific completion methods failed.
   virtual void completeExpr() {};
@@ -139,13 +142,6 @@ public:
   /// Complete a given expr-postfix, given that there is a following
   /// left parenthesis.
   virtual void completePostfixExprParen(Expr *E, Expr *CodeCompletionE) {};
-
-  /// Complete expr-super after we have consumed the 'super' keyword.
-  virtual void completeExprSuper(SuperRefExpr *SRE) {};
-
-  /// Complete expr-super after we have consumed the 'super' keyword and
-  /// a dot.
-  virtual void completeExprSuperDot(SuperRefExpr *SRE) {};
 
   /// Complete the argument to an Objective-C #keyPath
   /// expression.
@@ -172,10 +168,7 @@ public:
   virtual void completeCaseStmtKeyword() {};
 
   /// Complete at the beginning of a case stmt pattern.
-  virtual void completeCaseStmtBeginning() {};
-
-  /// Complete a case stmt pattern that starts with a dot.
-  virtual void completeCaseStmtDotPrefix() {};
+  virtual void completeCaseStmtBeginning(CodeCompletionExpr *E) {};
 
   /// Complete at the beginning of member of a nominal decl member -- no tokens
   /// provided by user.
@@ -186,7 +179,7 @@ public:
   virtual void completeAccessorBeginning(CodeCompletionExpr *E) {};
 
   /// Complete the keyword in attribute, for instance, @available.
-  virtual void completeDeclAttrKeyword(Decl *D, bool Sil, bool Param) {};
+  virtual void completeDeclAttrBeginning(bool Sil, bool isIndependent) {};
 
   /// Complete the parameters in attribute, for instance, version specifier for
   /// @available.
@@ -209,7 +202,7 @@ public:
 
   virtual void completeAssignmentRHS(AssignExpr *E) {};
 
-  virtual void completeCallArg(CodeCompletionExpr *E) {};
+  virtual void completeCallArg(CodeCompletionExpr *E, bool isFirst) {};
 
   virtual void completeReturnStmt(CodeCompletionExpr *E) {};
 

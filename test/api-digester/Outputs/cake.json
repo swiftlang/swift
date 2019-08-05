@@ -64,12 +64,14 @@
         {
           "kind": "Conformance",
           "name": "P2",
-          "printedName": "P2"
+          "printedName": "P2",
+          "usr": "s:4cake2P2P"
         },
         {
           "kind": "Conformance",
           "name": "P1",
-          "printedName": "P1"
+          "printedName": "P1",
+          "usr": "s:4cake2P1P"
         }
       ]
     },
@@ -139,18 +141,20 @@
       "usr": "s:4cake2S1V",
       "moduleName": "cake",
       "declAttributes": [
-        "FixedLayout"
+        "Frozen"
       ],
       "conformances": [
         {
           "kind": "Conformance",
           "name": "P1",
-          "printedName": "P1"
+          "printedName": "P1",
+          "usr": "s:4cake2P1P"
         },
         {
           "kind": "Conformance",
           "name": "P2",
-          "printedName": "P2"
+          "printedName": "P2",
+          "usr": "s:4cake2P2P"
         }
       ]
     },
@@ -267,9 +271,21 @@
               "kind": "TypeNominal",
               "name": "WeakStorage",
               "printedName": "C1?"
-            },
+            }
+          ],
+          "declKind": "Var",
+          "usr": "s:4cake2C1C3InsACSgvp",
+          "moduleName": "cake",
+          "declAttributes": [
+            "HasInitialValue",
+            "ReferenceOwnership",
+            "HasStorage"
+          ],
+          "ownership": 1,
+          "hasStorage": true,
+          "accessors": [
             {
-              "kind": "Getter",
+              "kind": "Accessor",
               "name": "Get",
               "printedName": "Get()",
               "children": [
@@ -294,10 +310,11 @@
               "implicit": true,
               "declAttributes": [
                 "Transparent"
-              ]
+              ],
+              "accessorKind": "get"
             },
             {
-              "kind": "Setter",
+              "kind": "Accessor",
               "name": "Set",
               "printedName": "Set()",
               "children": [
@@ -327,19 +344,10 @@
               "implicit": true,
               "declAttributes": [
                 "Transparent"
-              ]
+              ],
+              "accessorKind": "set"
             }
-          ],
-          "declKind": "Var",
-          "usr": "s:4cake2C1C3InsACSgvp",
-          "moduleName": "cake",
-          "declAttributes": [
-            "HasInitialValue",
-            "ReferenceOwnership",
-            "HasStorage"
-          ],
-          "ownership": 1,
-          "hasStorage": true
+          ]
         },
         {
           "kind": "Var",
@@ -350,9 +358,21 @@
               "kind": "TypeNominal",
               "name": "UnownedStorage",
               "printedName": "C1"
-            },
+            }
+          ],
+          "declKind": "Var",
+          "usr": "s:4cake2C1C4Ins2ACvp",
+          "moduleName": "cake",
+          "declAttributes": [
+            "HasInitialValue",
+            "ReferenceOwnership",
+            "HasStorage"
+          ],
+          "ownership": 2,
+          "hasStorage": true,
+          "accessors": [
             {
-              "kind": "Getter",
+              "kind": "Accessor",
               "name": "Get",
               "printedName": "Get()",
               "children": [
@@ -369,10 +389,11 @@
               "implicit": true,
               "declAttributes": [
                 "Transparent"
-              ]
+              ],
+              "accessorKind": "get"
             },
             {
-              "kind": "Setter",
+              "kind": "Accessor",
               "name": "Set",
               "printedName": "Set()",
               "children": [
@@ -394,19 +415,10 @@
               "implicit": true,
               "declAttributes": [
                 "Transparent"
-              ]
+              ],
+              "accessorKind": "set"
             }
-          ],
-          "declKind": "Var",
-          "usr": "s:4cake2C1C4Ins2ACvp",
-          "moduleName": "cake",
-          "declAttributes": [
-            "HasInitialValue",
-            "ReferenceOwnership",
-            "HasStorage"
-          ],
-          "ownership": 2,
-          "hasStorage": true
+          ]
         }
       ],
       "declKind": "Class",
@@ -584,9 +596,15 @@
               "name": "Int",
               "printedName": "Int",
               "usr": "s:Si"
-            },
+            }
+          ],
+          "declKind": "Var",
+          "usr": "s:4cake6NumberO8rawValueSivp",
+          "moduleName": "cake",
+          "implicit": true,
+          "accessors": [
             {
-              "kind": "Getter",
+              "kind": "Accessor",
               "name": "Get",
               "printedName": "Get()",
               "children": [
@@ -603,13 +621,10 @@
               "implicit": true,
               "declAttributes": [
                 "Inlinable"
-              ]
+              ],
+              "accessorKind": "get"
             }
-          ],
-          "declKind": "Var",
-          "usr": "s:4cake6NumberO8rawValueSivp",
-          "moduleName": "cake",
-          "implicit": true
+          ]
         }
       ],
       "declKind": "Enum",
@@ -620,12 +635,14 @@
         {
           "kind": "Conformance",
           "name": "Equatable",
-          "printedName": "Equatable"
+          "printedName": "Equatable",
+          "usr": "s:SQ"
         },
         {
           "kind": "Conformance",
           "name": "Hashable",
-          "printedName": "Hashable"
+          "printedName": "Hashable",
+          "usr": "s:SH"
         },
         {
           "kind": "Conformance",
@@ -645,7 +662,8 @@
                 }
               ]
             }
-          ]
+          ],
+          "usr": "s:SY"
         }
       ]
     },
@@ -700,9 +718,19 @@
               "name": "Int",
               "printedName": "Int",
               "usr": "s:Si"
-            },
+            }
+          ],
+          "declKind": "Var",
+          "usr": "s:4cake17fixedLayoutStructV1aSivp",
+          "moduleName": "cake",
+          "declAttributes": [
+            "HasInitialValue",
+            "HasStorage"
+          ],
+          "hasStorage": true,
+          "accessors": [
             {
-              "kind": "Getter",
+              "kind": "Accessor",
               "name": "Get",
               "printedName": "Get()",
               "children": [
@@ -719,10 +747,11 @@
               "implicit": true,
               "declAttributes": [
                 "Transparent"
-              ]
+              ],
+              "accessorKind": "get"
             },
             {
-              "kind": "Setter",
+              "kind": "Accessor",
               "name": "Set",
               "printedName": "Set()",
               "children": [
@@ -744,24 +773,17 @@
               "implicit": true,
               "declAttributes": [
                 "Transparent"
-              ]
+              ],
+              "accessorKind": "set"
             }
-          ],
-          "declKind": "Var",
-          "usr": "s:4cake17fixedLayoutStructV1aSivp",
-          "moduleName": "cake",
-          "declAttributes": [
-            "HasInitialValue",
-            "HasStorage"
-          ],
-          "hasStorage": true
+          ]
         }
       ],
       "declKind": "Struct",
       "usr": "s:4cake17fixedLayoutStructV",
       "moduleName": "cake",
       "declAttributes": [
-        "FixedLayout"
+        "Frozen"
       ]
     },
     {
@@ -822,9 +844,14 @@
               "name": "Int",
               "printedName": "Int",
               "usr": "s:Si"
-            },
+            }
+          ],
+          "declKind": "Var",
+          "usr": "s:4cake21ProWithAssociatedTypePAAE9NonReqVarSivp",
+          "moduleName": "cake",
+          "accessors": [
             {
-              "kind": "Getter",
+              "kind": "Accessor",
               "name": "Get",
               "printedName": "Get()",
               "children": [
@@ -838,12 +865,10 @@
               "declKind": "Accessor",
               "usr": "s:4cake21ProWithAssociatedTypePAAE9NonReqVarSivg",
               "moduleName": "cake",
-              "genericSig": "<Self where Self : ProWithAssociatedType>"
+              "genericSig": "<Self where Self : ProWithAssociatedType>",
+              "accessorKind": "get"
             }
-          ],
-          "declKind": "Var",
-          "usr": "s:4cake21ProWithAssociatedTypePAAE9NonReqVarSivp",
-          "moduleName": "cake"
+          ]
         },
         {
           "kind": "TypeAlias",
@@ -894,7 +919,35 @@
           "usr": "s:4cake13SubsContainerP6getterS2i_tcip",
           "moduleName": "cake",
           "genericSig": "<Self where Self : SubsContainer>",
-          "protocolReq": true
+          "protocolReq": true,
+          "accessors": [
+            {
+              "kind": "Accessor",
+              "name": "Get",
+              "printedName": "Get()",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int",
+                  "printedName": "Int",
+                  "usr": "s:Si"
+                },
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int",
+                  "printedName": "Int",
+                  "usr": "s:Si"
+                }
+              ],
+              "declKind": "Accessor",
+              "usr": "s:4cake13SubsContainerP6getterS2i_tcig",
+              "moduleName": "cake",
+              "genericSig": "<Self where Self : SubsContainer>",
+              "protocolReq": true,
+              "reqNewWitnessTableEntry": true,
+              "accessorKind": "get"
+            }
+          ]
         },
         {
           "kind": "Subscript",
@@ -919,7 +972,65 @@
           "moduleName": "cake",
           "genericSig": "<Self where Self : SubsContainer>",
           "protocolReq": true,
-          "hasSetter": true
+          "accessors": [
+            {
+              "kind": "Accessor",
+              "name": "Get",
+              "printedName": "Get()",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int",
+                  "printedName": "Int",
+                  "usr": "s:Si"
+                },
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int",
+                  "printedName": "Int",
+                  "usr": "s:Si"
+                }
+              ],
+              "declKind": "Accessor",
+              "usr": "s:4cake13SubsContainerP6setterS2i_tcig",
+              "moduleName": "cake",
+              "genericSig": "<Self where Self : SubsContainer>",
+              "protocolReq": true,
+              "reqNewWitnessTableEntry": true,
+              "accessorKind": "get"
+            },
+            {
+              "kind": "Accessor",
+              "name": "Set",
+              "printedName": "Set()",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Void",
+                  "printedName": "()"
+                },
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int",
+                  "printedName": "Int",
+                  "usr": "s:Si"
+                },
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int",
+                  "printedName": "Int",
+                  "usr": "s:Si"
+                }
+              ],
+              "declKind": "Accessor",
+              "usr": "s:4cake13SubsContainerP6setterS2i_tcis",
+              "moduleName": "cake",
+              "genericSig": "<Self where Self : SubsContainer>",
+              "protocolReq": true,
+              "reqNewWitnessTableEntry": true,
+              "accessorKind": "set"
+            }
+          ]
         }
       ],
       "declKind": "Protocol",
@@ -974,7 +1085,10 @@
           "usr": "s:4cake6PSuperPAAE9futureFooyyF",
           "moduleName": "cake",
           "genericSig": "<Self where Self : PSuper>",
-          "isABIPlaceholder": true,
+          "intro_Macosx": "10.15",
+          "intro_iOS": "13",
+          "intro_tvOS": "13",
+          "intro_watchOS": "6",
           "funcSelfKind": "NonMutating"
         }
       ],
@@ -1028,7 +1142,8 @@
         {
           "kind": "Conformance",
           "name": "PSuper",
-          "printedName": "PSuper"
+          "printedName": "PSuper",
+          "usr": "s:4cake6PSuperP"
         }
       ]
     },
@@ -1083,7 +1198,10 @@
           "declKind": "Func",
           "usr": "s:4cake15FutureContainerC9futureFooyyF",
           "moduleName": "cake",
-          "isABIPlaceholder": true,
+          "intro_Macosx": "10.15",
+          "intro_iOS": "13",
+          "intro_tvOS": "13",
+          "intro_watchOS": "6",
           "declAttributes": [
             "Available",
             "Available",
@@ -1106,6 +1224,7 @@
           "declKind": "Func",
           "usr": "s:4cake15FutureContainerC12NotfutureFooyyF",
           "moduleName": "cake",
+          "intro_Macosx": "10.15",
           "declAttributes": [
             "Available"
           ],
@@ -1120,13 +1239,44 @@
           "kind": "Conformance",
           "name": "P1",
           "printedName": "P1",
-          "isABIPlaceholder": true
+          "usr": "s:4cake2P1P"
         },
         {
           "kind": "Conformance",
           "name": "P2",
-          "printedName": "P2"
+          "printedName": "P2",
+          "usr": "s:4cake2P2P"
         }
+      ]
+    },
+    {
+      "kind": "TypeDecl",
+      "name": "PlatformIntroClass",
+      "printedName": "PlatformIntroClass",
+      "declKind": "Class",
+      "usr": "s:4cake18PlatformIntroClassC",
+      "moduleName": "cake",
+      "intro_Macosx": "10.1",
+      "intro_iOS": "10.2",
+      "intro_tvOS": "10.3",
+      "intro_watchOS": "3.4",
+      "declAttributes": [
+        "Available",
+        "Available",
+        "Available",
+        "Available"
+      ]
+    },
+    {
+      "kind": "TypeDecl",
+      "name": "SwiftIntroClass",
+      "printedName": "SwiftIntroClass",
+      "declKind": "Class",
+      "usr": "s:4cake15SwiftIntroClassC",
+      "moduleName": "cake",
+      "intro_swift": "5",
+      "declAttributes": [
+        "Available"
       ]
     },
     {
@@ -1171,18 +1321,21 @@
       "usr": "s:Si",
       "moduleName": "Swift",
       "declAttributes": [
-        "FixedLayout"
+        "Frozen"
       ],
+      "isExternal": true,
       "conformances": [
         {
           "kind": "Conformance",
           "name": "FixedWidthInteger",
-          "printedName": "FixedWidthInteger"
+          "printedName": "FixedWidthInteger",
+          "usr": "s:s17FixedWidthIntegerP"
         },
         {
           "kind": "Conformance",
           "name": "SignedInteger",
-          "printedName": "SignedInteger"
+          "printedName": "SignedInteger",
+          "usr": "s:SZ"
         },
         {
           "kind": "Conformance",
@@ -1202,17 +1355,20 @@
                 }
               ]
             }
-          ]
+          ],
+          "usr": "s:Sz"
         },
         {
           "kind": "Conformance",
           "name": "LosslessStringConvertible",
-          "printedName": "LosslessStringConvertible"
+          "printedName": "LosslessStringConvertible",
+          "usr": "s:s25LosslessStringConvertibleP"
         },
         {
           "kind": "Conformance",
           "name": "SignedNumeric",
-          "printedName": "SignedNumeric"
+          "printedName": "SignedNumeric",
+          "usr": "s:s13SignedNumericP"
         },
         {
           "kind": "Conformance",
@@ -1239,12 +1395,14 @@
                 }
               ]
             }
-          ]
+          ],
+          "usr": "s:Sj"
         },
         {
           "kind": "Conformance",
           "name": "CustomStringConvertible",
-          "printedName": "CustomStringConvertible"
+          "printedName": "CustomStringConvertible",
+          "usr": "s:s23CustomStringConvertibleP"
         },
         {
           "kind": "Conformance",
@@ -1264,12 +1422,14 @@
                 }
               ]
             }
-          ]
+          ],
+          "usr": "s:Sx"
         },
         {
           "kind": "Conformance",
           "name": "AdditiveArithmetic",
-          "printedName": "AdditiveArithmetic"
+          "printedName": "AdditiveArithmetic",
+          "usr": "s:s18AdditiveArithmeticP"
         },
         {
           "kind": "Conformance",
@@ -1296,52 +1456,62 @@
                 }
               ]
             }
-          ]
+          ],
+          "usr": "s:s27ExpressibleByIntegerLiteralP"
         },
         {
           "kind": "Conformance",
           "name": "Comparable",
-          "printedName": "Comparable"
+          "printedName": "Comparable",
+          "usr": "s:SL"
         },
         {
           "kind": "Conformance",
           "name": "P1",
-          "printedName": "P1"
+          "printedName": "P1",
+          "usr": "s:4cake2P1P"
         },
         {
           "kind": "Conformance",
           "name": "MirrorPath",
-          "printedName": "MirrorPath"
+          "printedName": "MirrorPath",
+          "usr": "s:s10MirrorPathP"
         },
         {
           "kind": "Conformance",
           "name": "CVarArg",
-          "printedName": "CVarArg"
+          "printedName": "CVarArg",
+          "usr": "s:s7CVarArgP"
         },
         {
           "kind": "Conformance",
           "name": "Encodable",
-          "printedName": "Encodable"
+          "printedName": "Encodable",
+          "usr": "s:SE"
         },
         {
           "kind": "Conformance",
           "name": "Decodable",
-          "printedName": "Decodable"
+          "printedName": "Decodable",
+          "usr": "s:Se"
         },
         {
           "kind": "Conformance",
           "name": "Hashable",
-          "printedName": "Hashable"
+          "printedName": "Hashable",
+          "usr": "s:SH"
         },
         {
           "kind": "Conformance",
           "name": "Equatable",
-          "printedName": "Equatable"
+          "printedName": "Equatable",
+          "usr": "s:SQ"
         },
         {
           "kind": "Conformance",
           "name": "CustomReflectable",
-          "printedName": "CustomReflectable"
+          "printedName": "CustomReflectable",
+          "usr": "s:s17CustomReflectableP"
         },
         {
           "kind": "Conformance",
@@ -1446,7 +1616,8 @@
                 }
               ]
             }
-          ]
+          ],
+          "usr": "s:s10SIMDScalarP"
         }
       ]
     }

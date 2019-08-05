@@ -618,15 +618,16 @@ static ManagedValue emitBuiltinEndUnpairedAccess(SILGenFunction &SGF,
   return ManagedValue::forUnmanaged(SGF.emitEmptyTuple(loc));
 }
 
-/// Specialized emitter for Builtin.condfail.
-static ManagedValue emitBuiltinCondFail(SILGenFunction &SGF,
-                                        SILLocation loc,
-                                        SubstitutionMap substitutions,
-                                        ArrayRef<ManagedValue> args,
-                                        SGFContext C) {
+/// Specialized emitter for the legacy Builtin.condfail.
+static ManagedValue emitBuiltinLegacyCondFail(SILGenFunction &SGF,
+                                              SILLocation loc,
+                                              SubstitutionMap substitutions,
+                                              ArrayRef<ManagedValue> args,
+                                              SGFContext C) {
   assert(args.size() == 1 && "condfail should be given one argument");
-  
-  SGF.B.createCondFail(loc, args[0].getUnmanagedValue());
+
+  SGF.B.createCondFail(loc, args[0].getUnmanagedValue(),
+    "unknown runtime failure");
   return ManagedValue::forUnmanaged(SGF.emitEmptyTuple(loc));
 }
 
@@ -1028,6 +1029,28 @@ static ManagedValue emitBuiltinTypeTrait(SILGenFunction &SGF,
   return ManagedValue::forUnmanaged(val);
 }
 
+/// Emit SIL for the named builtin: globalStringTablePointer. Unlike the default
+/// ownership convention for named builtins, which is to take (non-trivial)
+/// arguments as Owned, this builtin accepts owned as well as guaranteed
+/// arguments, and hence doesn't require the arguments to be at +1. Therefore,
+/// this builtin is emitted specially.
+static ManagedValue
+emitBuiltinGlobalStringTablePointer(SILGenFunction &SGF, SILLocation loc,
+                                    SubstitutionMap subs,
+                                    ArrayRef<ManagedValue> args, SGFContext C) {
+  assert(args.size() == 1);
+
+  SILValue argValue = args[0].getValue();
+  auto &astContext = SGF.getASTContext();
+  Identifier builtinId = astContext.getIdentifier(
+      getBuiltinName(BuiltinValueKind::GlobalStringTablePointer));
+
+  auto resultVal = SGF.B.createBuiltin(loc, builtinId,
+                                       SILType::getRawPointerType(astContext),
+                                       subs, ArrayRef<SILValue>(argValue));
+  return SGF.emitManagedRValueWithCleanup(resultVal);
+}
+
 Optional<SpecializedEmitter>
 SpecializedEmitter::forDecl(SILGenModule &SGM, SILDeclRef function) {
   // Only consider standalone declarations in the Builtin module.
@@ -1052,6 +1075,7 @@ SpecializedEmitter::forDecl(SILGenModule &SGM, SILDeclRef function) {
 #define BUILTIN(Id, Name, Attrs)                                            \
   case BuiltinValueKind::Id:
 #define BUILTIN_SIL_OPERATION(Id, Name, Overload)
+#define BUILTIN_MISC_OPERATION_WITH_SILGEN(Id, Name, Attrs, Overload)
 #define BUILTIN_SANITIZER_OPERATION(Id, Name, Attrs)
 #define BUILTIN_TYPE_CHECKER_OPERATION(Id, Name)
 #define BUILTIN_TYPE_TRAIT_OPERATION(Id, Name)
@@ -1068,8 +1092,12 @@ SpecializedEmitter::forDecl(SILGenModule &SGM, SILDeclRef function) {
   case BuiltinValueKind::Id:                                                \
     return SpecializedEmitter(&emitBuiltin##Id);
 
-  // Sanitizer builtins should never directly be called; they should only
-  // be inserted as instrumentation by SILGen.
+#define BUILTIN_MISC_OPERATION_WITH_SILGEN(Id, Name, Attrs, Overload)          \
+  case BuiltinValueKind::Id:                                                   \
+    return SpecializedEmitter(&emitBuiltin##Id);
+
+    // Sanitizer builtins should never directly be called; they should only
+    // be inserted as instrumentation by SILGen.
 #define BUILTIN_SANITIZER_OPERATION(Id, Name, Attrs)                        \
   case BuiltinValueKind::Id:                                                \
     llvm_unreachable("Sanitizer builtin called directly?");

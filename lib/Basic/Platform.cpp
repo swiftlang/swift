@@ -14,6 +14,7 @@
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Triple.h"
+#include "llvm/Support/VersionTuple.h"
 
 using namespace swift;
 
@@ -51,6 +52,24 @@ bool swift::tripleIsAnySimulator(const llvm::Triple &triple) {
     tripleIsiOSSimulator(triple) ||
     tripleIsWatchSimulator(triple) ||
     tripleIsAppleTVSimulator(triple);
+}
+
+
+bool swift::tripleRequiresRPathForSwiftInOS(const llvm::Triple &triple) {
+  if (triple.isMacOSX()) {
+    // macOS 10.14.4 contains a copy of Swift, but the linker will still use an
+    // rpath-based install name until 10.15.
+    return triple.isMacOSXVersionLT(10, 15);
+
+  } else if (triple.isiOS()) {
+    return triple.isOSVersionLT(12, 2);
+
+  } else if (triple.isWatchOS()) {
+    return triple.isOSVersionLT(5, 2);
+  }
+
+  // Other platforms don't have Swift installed as part of the OS by default.
+  return false;
 }
 
 DarwinPlatformKind swift::getDarwinPlatformKind(const llvm::Triple &triple) {
@@ -311,5 +330,39 @@ llvm::Triple swift::getTargetSpecificModuleTriple(const llvm::Triple &triple) {
 
   // Other platforms get no normalization.
   return triple;
+}
+
+Optional<llvm::VersionTuple>
+swift::getSwiftRuntimeCompatibilityVersionForTarget(const llvm::Triple &Triple){
+  unsigned Major, Minor, Micro;
+  
+  if (Triple.isMacOSX()) {
+    Triple.getMacOSXVersion(Major, Minor, Micro);
+    if (Major == 10) {
+      if (Minor <= 14) {
+        return llvm::VersionTuple(5, 0);
+      } else {
+        return None;
+      }
+    } else {
+      return None;
+    }
+  } else if (Triple.isiOS()) { // includes tvOS
+    Triple.getiOSVersion(Major, Minor, Micro);
+    if (Major <= 12) {
+      return llvm::VersionTuple(5, 0);
+    } else {
+      return None;
+    }
+  } else if (Triple.isWatchOS()) {
+    Triple.getWatchOSVersion(Major, Minor, Micro);
+    if (Major <= 5) {
+      return llvm::VersionTuple(5, 0);
+    } else {
+      return None;
+    }
+  } else {
+    return None;
+  }
 }
 

@@ -45,11 +45,8 @@ bb0(%0 : $*T, %1 : $T):
 // CHECK: bb0(%0 : $Builtin.Int64):
 // CHECK:   %1 = function_ref @f040_multiResult : $@convention(thin) <τ_0_0> (@in τ_0_0) -> (@out τ_0_0, @out τ_0_0, @out τ_0_0)
 // CHECK:   %2 = apply %1<Builtin.Int64>(%0) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> (@out τ_0_0, @out τ_0_0, @out τ_0_0)
-// CHECK:   %3 = tuple_extract %2 : $(Builtin.Int64, Builtin.Int64, Builtin.Int64), 0
-// CHECK:   %4 = tuple_extract %2 : $(Builtin.Int64, Builtin.Int64, Builtin.Int64), 1
-// CHECK:   %5 = tuple_extract %2 : $(Builtin.Int64, Builtin.Int64, Builtin.Int64), 2
-// CHECK:   %6 = tuple (%3 : $Builtin.Int64, %4 : $Builtin.Int64, %5 : $Builtin.Int64)
-// CHECK:   return %6 : $(Builtin.Int64, Builtin.Int64, Builtin.Int64)
+// Note: the tuple construction is simplified away.
+// CHECK:   return %2 : $(Builtin.Int64, Builtin.Int64, Builtin.Int64)
 // CHECK-LABEL: } // end sil function 'f030_callMultiResult'
 sil @f030_callMultiResult : $@convention(thin) (Int) -> (Int, Int, Int) {
 bb0(%0 : $Int):

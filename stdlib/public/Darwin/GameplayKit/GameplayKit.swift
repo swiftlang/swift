@@ -20,10 +20,10 @@ import simd
 @available(tvOS, introduced: 9.0)
 extension GKPath {
   /// Creates a path from an array of points
-  /// - Parameter points: an array of simd.float2 points to make a path from
+  /// - Parameter points: an array of SIMD2<Float> points to make a path from
   /// - Parameter radius: radius of the path to create
   /// - Parameter cyclical: if the path is of a cycle that loops back on itself
-  public convenience init(points: [simd.float2], radius: Float, cyclical: Bool) {
+  public convenience init(points: [SIMD2<Float>], radius: Float, cyclical: Bool) {
     var variablePoints = points
     self.init(__points: &variablePoints, count: points.count, radius: radius, cyclical: cyclical)
   }
@@ -35,10 +35,10 @@ extension GKPath {
 @available(tvOS, introduced: 10.0)
 extension GKPath {
   /// Creates a path from an array of points
-  /// - Parameter points: an array of simd.float3 points to make a path from
+  /// - Parameter points: an array of SIMD3<Float> points to make a path from
   /// - Parameter radius: the radius of the path to create
   /// - Parameter cyclical: if the path is of a cycle that loops back on itself
-  public convenience init(points: [simd.float3], radius: Float, cyclical: Bool) {
+  public convenience init(points: [SIMD3<Float>], radius: Float, cyclical: Bool) {
     var variablePoints = points
     self.init(__float3Points: &variablePoints, count: points.count, radius: radius, cyclical: cyclical)
   }
@@ -50,7 +50,7 @@ extension GKPath {
 extension GKPolygonObstacle {
   /// Creates a polygon obstacle with an array of points.
   /// - Parameter points: array of points in counter-clockwise order that are the vertices of a convex polygon
-  public convenience init(points: [simd.float2]) {
+  public convenience init(points: [SIMD2<Float>]) {
     var variablePoints = points
     self.init(__points: &variablePoints, count: points.count)
   }

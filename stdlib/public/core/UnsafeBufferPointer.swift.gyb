@@ -32,7 +32,7 @@
 // FIXME: rdar://18157434 - until this is fixed, this has to be fixed layout
 // to avoid a hang in Foundation, which has the following setup:
 // struct A { struct B { let x: UnsafeMutableBufferPointer<...> } let b: B }
-@_fixed_layout // unsafe-performance
+@frozen // unsafe-performance
 public struct Unsafe${Mutable}BufferPointer<Element> {
 
   @usableFromInline
@@ -49,7 +49,7 @@ public struct Unsafe${Mutable}BufferPointer<Element> {
 extension UnsafeBufferPointer {
   /// An iterator for the elements in the buffer referenced by an
   /// `UnsafeBufferPointer` or `UnsafeMutableBufferPointer` instance.
-  @_fixed_layout // unsafe-performance
+  @frozen // unsafe-performance
   public struct Iterator {
     @usableFromInline
     internal var _position, _end: UnsafePointer<Element>?
@@ -694,7 +694,7 @@ extension Unsafe${Mutable}BufferPointer {
   }
 }
 
-extension Unsafe${Mutable}BufferPointer : CustomDebugStringConvertible {
+extension Unsafe${Mutable}BufferPointer: CustomDebugStringConvertible {
   /// A textual representation of the buffer, suitable for debugging.
   public var debugDescription: String {
     return "Unsafe${Mutable}BufferPointer"

@@ -216,6 +216,14 @@ namespace swift {
   /// emitted.
   void performWholeModuleTypeChecking(SourceFile &SF);
 
+  /// Checks to see if any of the imports in \p M use `@_implementationOnly` in
+  /// one file and not in another.
+  ///
+  /// Like redeclaration checking, but for imports. This isn't part of
+  /// swift::performWholeModuleTypeChecking because it's linear in the number
+  /// of declarations in the module.
+  void checkInconsistentImplementationOnlyImports(ModuleDecl *M);
+
   /// Incrementally type-check only added external definitions.
   void typeCheckExternalDefinitions(SourceFile &SF);
 
@@ -387,6 +395,17 @@ namespace swift {
   /// using Sema-level logic should call these functions after forming the
   /// ASTContext.
   void registerTypeCheckerRequestFunctions(Evaluator &evaluator);
+
+  /// Register IDE-level request functions with the evaluator.
+  ///
+  /// The ASTContext will automatically call these upon construction.
+  void registerIDERequestFunctions(Evaluator &evaluator);
+
+  /// Register type check request functions for IDE's usage with the evaluator.
+  ///
+  /// The ASTContext will automatically call these upon construction.
+  /// Calling registerIDERequestFunctions will invoke this function as well.
+  void registerIDETypeCheckRequestFunctions(Evaluator &evaluator);
 
 } // end namespace swift
 

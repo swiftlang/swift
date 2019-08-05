@@ -193,7 +193,7 @@ extension Container {
   fileprivate typealias PrivateAlias = VeryPrivateStruct // expected-error {{type alias cannot be declared fileprivate because its underlying type uses a private type}} {{none}}
   fileprivate subscript(_: VeryPrivateStruct) -> Void { return () } // expected-error {{subscript cannot be declared fileprivate because its index uses a private type}} {{none}}
   fileprivate func privateMethod(_: VeryPrivateStruct) -> Void {} // expected-error {{method cannot be declared fileprivate because its parameter uses a private type}} {{none}}
-  fileprivate enum PrivateRawValue: VeryPrivateStruct {} // expected-error {{enum cannot be declared fileprivate because its raw type uses a private type}} {{none}}
+  fileprivate enum PrivateRawValue: VeryPrivateStruct {} // expected-error {{enum cannot be declared fileprivate because its raw type uses a private type}} {{none}} expected-note {{do you want to add protocol stubs?}}
   // expected-error@-1 {{raw type 'Container.VeryPrivateStruct' is not expressible by a string, integer, or floating-point literal}}
   // expected-error@-2 {{'Container.PrivateRawValue' declares raw type 'Container.VeryPrivateStruct', but does not conform to RawRepresentable and conformance could not be synthesized}}
   // expected-error@-3 {{RawRepresentable conformance cannot be synthesized because raw type 'Container.VeryPrivateStruct' is not Equatable}}

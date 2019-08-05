@@ -123,31 +123,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   //===--------------------------------------------------------------------===//
-  //                               Attributes
-  //===--------------------------------------------------------------------===//
-  bool visitCustomAttributes(Decl *D) {
-    for (auto *customAttr : D->getAttrs().getAttributes<CustomAttr>()) {
-      CustomAttr *mutableCustomAttr = const_cast<CustomAttr *>(customAttr);
-      if (doIt(mutableCustomAttr->getTypeLoc()))
-        return true;
-
-      if (auto semanticInit = customAttr->getSemanticInit()) {
-        if (auto newSemanticInit = doIt(semanticInit))
-          mutableCustomAttr->setSemanticInit(newSemanticInit);
-        else
-          return true;
-      } else if (auto arg = customAttr->getArg()) {
-        if (auto newArg = doIt(arg))
-          mutableCustomAttr->setArg(newArg);
-        else
-          return true;
-      }
-    }
-
-    return false;
-  }
-
-  //===--------------------------------------------------------------------===//
   //                                 Decls
   //===--------------------------------------------------------------------===//
 
@@ -171,19 +146,29 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     for (Decl *M : ED->getMembers()) {
       if (doIt(M))
         return true;
+
+      if (Walker.shouldWalkAccessorsTheOldWay()) {
+        // Pretend that accessors share a parent with the storage.
+        //
+        // FIXME: Update existing ASTWalkers to deal with accessors appearing as
+        // children of the storage instead.
+        if (auto *ASD = dyn_cast<AbstractStorageDecl>(M)) {
+          for (auto AD : ASD->getAllAccessors()) {
+            if (doIt(AD))
+              return true;
+          }
+        }
+      }
     }
     return false;
   }
 
   bool visitPatternBindingDecl(PatternBindingDecl *PBD) {
     // If there is a single variable, walk it's attributes.
-    bool isPropertyDelegateBackingProperty = false;
+    bool isPropertyWrapperBackingProperty = false;
     if (auto singleVar = PBD->getSingleVar()) {
-      if (visitCustomAttributes(singleVar))
-        return true;
-
-      isPropertyDelegateBackingProperty =
-        singleVar->getOriginalDelegatedProperty() != nullptr;
+      isPropertyWrapperBackingProperty =
+        singleVar->getOriginalWrappedProperty() != nullptr;
     }
 
     unsigned idx = 0U-1;
@@ -194,7 +179,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       else
         return true;
       if (entry.getInit() &&
-          !isPropertyDelegateBackingProperty &&
+          !isPropertyWrapperBackingProperty &&
           (!entry.isInitializerSubsumed() ||
            Walker.shouldWalkIntoLazyInitializers())) {
 #ifndef NDEBUG
@@ -305,9 +290,23 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       }
     }
     
-    for (Decl *Member : NTD->getMembers())
+    for (Decl *Member : NTD->getMembers()) {
       if (doIt(Member))
         return true;
+
+      if (Walker.shouldWalkAccessorsTheOldWay()) {
+        // Pretend that accessors share a parent with the storage.
+        //
+        // FIXME: Update existing ASTWalkers to deal with accessors appearing as
+        // children of the storage instead.
+        if (auto *ASD = dyn_cast<AbstractStorageDecl>(Member)) {
+          for (auto AD : ASD->getAllAccessors()) {
+            if (doIt(AD))
+              return true;
+          }
+        }
+      }
+    }
     return false;
   }
 
@@ -317,6 +316,12 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   bool visitVarDecl(VarDecl *VD) {
+    if (!Walker.shouldWalkAccessorsTheOldWay()) {
+      for (auto *AD : VD->getAllAccessors())
+        if (doIt(AD))
+          return true;
+    }
+
     return false;
   }
 
@@ -337,6 +342,13 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
           return true;
       }
     }
+
+    if (!Walker.shouldWalkAccessorsTheOldWay()) {
+      for (auto *AD : SD->getAllAccessors())
+        if (doIt(AD))
+          return true;
+    }
+
     return false;
   }
 
@@ -500,8 +512,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   Expr *visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E) {
-    HANDLE_SEMANTIC_EXPR(E);
-
     if (auto oldAppendingExpr = E->getAppendingExpr()) {
       if (auto appendingExpr = doIt(oldAppendingExpr))
         E->setAppendingExpr(dyn_cast<TapExpr>(appendingExpr));
@@ -512,8 +522,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   Expr *visitObjectLiteralExpr(ObjectLiteralExpr *E) {
-    HANDLE_SEMANTIC_EXPR(E);
-
     if (Expr *arg = E->getArg()) {
       if (Expr *arg2 = doIt(arg)) {
         E->setArg(arg2);
@@ -525,8 +533,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   Expr *visitCollectionExpr(CollectionExpr *E) {
-    HANDLE_SEMANTIC_EXPR(E);
-
     for (auto &elt : E->getElements())
       if (Expr *Sub = doIt(elt))
         elt = Sub;
@@ -1154,20 +1160,20 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       // Walk each parameter's decl and typeloc and default value.
       if (doIt(P))
         return true;
-      
+
       // Don't walk into the type if the decl is implicit, or if the type is
       // implicit.
       if (!P->isImplicit() && !P->isTypeLocImplicit() &&
           doIt(P->getTypeLoc()))
         return true;
-      
+
       if (auto *E = P->getDefaultValue()) {
         auto res = doIt(E);
         if (!res) return true;
         P->setDefaultValue(res);
       }
     }
-    
+
     return Walker.walkToParameterListPost(PL);
   }
   
@@ -1256,7 +1262,7 @@ public:
 
     return P;
   }
-  
+
   bool doIt(const StmtCondition &C) {
     for (auto &elt : C) {
       switch (elt.getKind()) {
@@ -1387,8 +1393,22 @@ Stmt *Traversal::visitBraceStmt(BraceStmt *BS) {
       continue;
     }
 
-    if (doIt(Elem.get<Decl*>()))
+    auto *D = Elem.get<Decl*>();
+    if (doIt(D))
       return nullptr;
+
+    if (Walker.shouldWalkAccessorsTheOldWay()) {
+      // Pretend that accessors share a parent with the storage.
+      //
+      // FIXME: Update existing ASTWalkers to deal with accessors appearing as
+      // children of the storage instead.
+      if (auto *ASD = dyn_cast<AbstractStorageDecl>(D)) {
+        for (auto AD : ASD->getAllAccessors()) {
+          if (doIt(AD))
+            return nullptr;
+        }
+      }
+    }
   }
 
   return BS;
@@ -1552,20 +1572,28 @@ Stmt *Traversal::visitForEachStmt(ForEachStmt *S) {
 
   // The iterator decl is built directly on top of the sequence
   // expression, so don't visit both.
-  if (PatternBindingDecl *Iterator = S->getIterator()) {
-    if (doIt(Iterator))
-      return nullptr;
-
-  } else if (Expr *Sequence = S->getSequence()) {
+  if (Expr *Sequence = S->getSequence()) {
     if ((Sequence = doIt(Sequence)))
       S->setSequence(Sequence);
     else
       return nullptr;
   }
 
-  if (auto IteratorNext = S->getIteratorNext()) {
+  if (auto IteratorNext = S->getConvertElementExpr()) {
     if ((IteratorNext = doIt(IteratorNext)))
-      S->setIteratorNext(IteratorNext);
+      S->setConvertElementExpr(IteratorNext);
+    else
+      return nullptr;
+  }
+
+  if (auto IteratorVar = S->getIteratorVar()) {
+    if (doIt(IteratorVar))
+      return nullptr;
+  }
+
+  if (auto IteratorVarRef = S->getIteratorVarRef()) {
+    if ((IteratorVarRef = doIt(IteratorVarRef)))
+      S->setIteratorVarRef(IteratorVarRef);
     else
       return nullptr;
   }

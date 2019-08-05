@@ -86,15 +86,12 @@ class ValueDecl;
 enum class ConstantConvertKind {
   /// No conversion required.
   None,
-  /// Coerce the constant to the given type.
-  Coerce,
-  /// Construct the given type from the constant value.
+  /// Construct the given type from the constant value by calling
+  /// init(rawValue:).
   Construction,
-  /// Construct the given type from the constant value, using an
-  /// optional initializer.
-  ConstructionWithUnwrap,
-  /// Perform an unchecked downcast to the given type.
-  Downcast
+  /// Construct the given type from the constant value by force
+  /// unwrapping the result of init(rawValue:).
+  ConstructionWithUnwrap
 };
 
 /// Describes the kind of type import we're performing.
@@ -334,7 +331,7 @@ public:
   const bool InferImportAsMember;
   const bool DisableSwiftBridgeAttr;
   const bool BridgingHeaderExplicitlyRequested;
-  const bool DisableAdapterModules;
+  const bool DisableOverlayModules;
 
   bool IsReadingBridgingPCH;
   llvm::SmallVector<clang::serialization::SubmoduleID, 2> PCHImportedSubmodules;
@@ -454,6 +451,9 @@ public:
   llvm::DenseMap<std::pair<ObjCSelector, char>, unsigned>
     ActiveSelectors;
 
+  // Mapping from imported types to their raw value types.
+  llvm::DenseMap<const NominalTypeDecl *, Type> RawTypes;
+
   clang::CompilerInstance *getClangInstance() {
     return Instance.get();
   }
@@ -520,7 +520,7 @@ private:
   Type NSObjectTy;
 
   /// A pair containing a ClangModuleUnit,
-  /// and whether the adapters of its re-exported modules have all been forced
+  /// and whether the overlays of its re-exported modules have all been forced
   /// to load already.
   using ModuleInitPair = llvm::PointerIntPair<ClangModuleUnit *, 1, bool>;
 
@@ -603,11 +603,6 @@ public:
   bool shouldIgnoreBridgeHeaderTopLevelDecl(clang::Decl *D);
 
 public:
-  void registerExternalDecl(Decl *D) {
-    if (!hasFinishedTypeChecking())
-      SwiftContext.addExternalDecl(D);
-  }
-
   void recordImplicitUnwrapForDecl(Decl *decl, bool isIUO) {
 #if !defined(NDEBUG)
     Type ty;
@@ -894,7 +889,7 @@ public:
 
   /// Constructs a Swift module for the given Clang module.
   ModuleDecl *finishLoadingClangModule(const clang::Module *clangModule,
-                                       bool preferAdapter);
+                                       bool preferOverlay);
 
   /// Call finishLoadingClangModule on each deferred import collected
   /// while scanning a bridging header or PCH.
@@ -1173,10 +1168,6 @@ public:
            "already have a type resolver");
     typeResolver.setPointerAndInt(newResolver, true);
   }
-  bool hasBegunTypeChecking() const { return typeResolver.getInt(); }
-  bool hasFinishedTypeChecking() const {
-    return hasBegunTypeChecking() && !getTypeResolver();
-  }
 
   /// Allocate a new delayed conformance ID with the given set of
   /// conformances.
@@ -1269,6 +1260,11 @@ public:
   /// Returns the generic environment.
   virtual GenericEnvironment *loadGenericEnvironment(const DeclContext *decl,
                                                      uint64_t contextData) override {
+    llvm_unreachable("unimplemented for ClangImporter");
+  }
+
+  void loadRequirementSignature(const ProtocolDecl *decl, uint64_t contextData,
+                                SmallVectorImpl<Requirement> &reqs) override {
     llvm_unreachable("unimplemented for ClangImporter");
   }
 

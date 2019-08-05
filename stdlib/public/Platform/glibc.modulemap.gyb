@@ -38,7 +38,7 @@ module SwiftGlibc [system] {
 
   // C standard library
   module C {
-% if CMAKE_SDK in ["LINUX", "ANDROID", "CYGWIN"]:
+% if CMAKE_SDK in ["LINUX", "CYGWIN"]:
     module features {
 % if CMAKE_SDK == "LINUX":
       header "${GLIBC_INCLUDE_PATH}/stdc-predef.h"
@@ -317,6 +317,10 @@ module SwiftGlibc [system] {
     }
     module dirent {
       header "${GLIBC_INCLUDE_PATH}/dirent.h"
+      export *
+    }
+    module dl {
+      header "${GLIBC_INCLUDE_PATH}/link.h"
       export *
     }
     module dlfcn {

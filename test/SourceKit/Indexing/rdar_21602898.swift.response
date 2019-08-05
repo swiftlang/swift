@@ -1,11 +1,9 @@
 {
-  key.hash: <hash>,
   key.dependencies: [
     {
       key.kind: source.lang.swift.import.module.swift,
       key.name: "Swift",
       key.filepath: Swift.swiftmodule,
-      key.hash: <hash>,
       key.is_system: 1
     }
   ],
@@ -57,7 +55,7 @@
           ],
           key.attributes: [
             {
-              key.attribute: source.decl.attribute._fixed_layout
+              key.attribute: source.decl.attribute.frozen
             }
           ]
         },
