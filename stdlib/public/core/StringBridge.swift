@@ -22,7 +22,7 @@ internal typealias _CocoaString = AnyObject
 // variables, allowing the core stdlib to remain decoupled from
 // Foundation.
 
-@objc internal protocol _StringSelectorHolder : _NSCopying {
+@objc private protocol _StringSelectorHolder : _NSCopying {
     
   @objc var length: Int { get }
   
@@ -71,7 +71,7 @@ internal typealias _CocoaString = AnyObject
  knowledge that the _CocoaString and _StringSelectorHolder are the same object.
  */
 @inline(__always)
-internal func _objc(_ str: _CocoaString) -> _StringSelectorHolder {
+private func _objc(_ str: _CocoaString) -> _StringSelectorHolder {
   return unsafeBitCast(str, to: _StringSelectorHolder.self)
 }
 
