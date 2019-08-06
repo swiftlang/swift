@@ -566,11 +566,13 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
         linkage == SILLinkage::PublicNonABI) {
       fn->setLinkage(SILLinkage::SharedExternal);
     }
+
     if (fn->isDynamicallyReplaceable() != isDynamic) {
       LLVM_DEBUG(llvm::dbgs() << "SILFunction type mismatch.\n");
       MF->error();
       return nullptr;
     }
+
   } else {
     // Otherwise, create a new function.
     SILSerializationFunctionBuilder builder(SILMod);
@@ -595,7 +597,8 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     for (auto ID : SemanticsIDs) {
       fn->addSemanticsAttr(MF->getIdentifierText(ID));
     }
-
+    if (!hasQualifiedOwnership)
+      fn->setOwnershipEliminated();
     if (Callback) Callback->didDeserialize(MF->getAssociatedModule(), fn);
   }
   // Mark this function as deserialized. This avoids rerunning diagnostic
@@ -664,15 +667,15 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     return fn;
   }
 
-  if (!hasQualifiedOwnership)
-    fn->setOwnershipEliminated();
-
   NumDeserializedFunc++;
 
   assert(!(fn->getGenericEnvironment() && !fn->empty())
          && "function already has context generic params?!");
   if (genericEnv)
     fn->setGenericEnvironment(genericEnv);
+  if (!hasQualifiedOwnership) {
+    fn->setOwnershipEliminated();
+  }
 
   scratch.clear();
   kind = SILCursor.readRecord(entry.ID, scratch);
