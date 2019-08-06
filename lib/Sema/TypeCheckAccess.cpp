@@ -1516,7 +1516,7 @@ class ExportabilityChecker : public DeclVisitor<ExportabilityChecker> {
         diagnoseType(typeDecl, /*typeRepr*/nullptr);
       }
 
-      void visitSubstitutionMap(const SubstitutionMap &subs) {
+      void visitSubstitutionMap(SubstitutionMap subs) {
         for (ProtocolConformanceRef conformance : subs.getConformances()) {
           if (!conformance.isConcrete())
             continue;

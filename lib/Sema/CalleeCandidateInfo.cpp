@@ -308,7 +308,7 @@ CalleeCandidateInfo::ClosenessResultTy CalleeCandidateInfo::evaluateCloseness(
       return true;
     }
     bool trailingClosureMismatch(unsigned paramIdx, unsigned argIdx) override {
-      result = CC_ArgumentMismatch;
+      result = CC_ArgumentCountMismatch;
       return true;
     }
   } listener;
@@ -701,8 +701,10 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
     // initializing, provide it.
     if (UDE->getName().getBaseName() == DeclBaseName::createConstructor()) {
       auto selfTy = CS.getType(UDE->getBase())->getWithoutSpecifierType();
+      if (auto *dynamicSelfTy = selfTy->getAs<DynamicSelfType>())
+        selfTy = dynamicSelfTy->getSelfType();
       if (!selfTy->hasTypeVariable())
-        declName = selfTy->eraseDynamicSelfType().getString() + "." + declName;
+        declName = selfTy.getString() + "." + declName;
     }
     
     // Otherwise, look for a disjunction constraint explaining what the set is.

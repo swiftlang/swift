@@ -33,5 +33,6 @@ if(SWIFT_ANALYZE_CODE_COVERAGE)
 endif()
 
 swift_install_in_component(TARGETS sourcekitd-test
-                           RUNTIME DESTINATION bin
-                           COMPONENT tools)
+                           RUNTIME
+                             DESTINATION bin
+                             COMPONENT tools)

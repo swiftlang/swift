@@ -149,6 +149,11 @@ bool ASTScopeImpl::verifyThatThisNodeComeAfterItsPriorSibling() const {
   print(out);
   out << "\n***Parent node***\n";
   getParent().get()->print(out);
+  llvm::errs() << "\n\nsource:\n"
+               << getSourceManager()
+                      .getRangeForBuffer(
+                          getSourceFile()->getBufferID().getValue())
+                      .str();
   abort();
 }
 
@@ -208,7 +213,7 @@ SourceRange PatternEntryDeclScope::getChildlessSourceRange() const {
 }
 
 SourceRange PatternEntryInitializerScope::getChildlessSourceRange() const {
-  return getPatternEntry().getInitAsWritten()->getSourceRange();
+  return getPatternEntry().getOriginalInit()->getSourceRange();
 }
 
 SourceRange PatternEntryUseScope::getChildlessSourceRange() const {
@@ -296,7 +301,7 @@ SourceRange AbstractFunctionDeclScope::getChildlessSourceRange() const {
     assert(r.End.isValid());
     return r;
   }
-  return decl->getBody()->getSourceRange();
+  return decl->getBodySourceRange();
 }
 
 SourceRange AbstractFunctionParamsScope::getChildlessSourceRange() const {

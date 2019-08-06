@@ -1059,7 +1059,12 @@ public:
   /// reflection metadata.
   llvm::SetVector<CanType> BuiltinTypes;
 
-  llvm::Constant *getTypeRef(CanType type, MangledTypeRefRole role);
+  std::pair<llvm::Constant *, unsigned>
+  getTypeRef(Type type, GenericSignature *genericSig, MangledTypeRefRole role);
+  
+  std::pair<llvm::Constant *, unsigned>
+  getTypeRef(CanType type, MangledTypeRefRole role);
+  
   llvm::Constant *emitWitnessTableRefString(CanType type,
                                             ProtocolConformanceRef conformance,
                                             GenericSignature *genericSig,
@@ -1100,8 +1105,7 @@ public:
   llvm::Constant *getAddrOfBoxDescriptor(CanType boxedType);
 
   /// Produce an associated type witness that refers to the given type.
-  llvm::Constant *getAssociatedTypeWitness(CanType type,
-                                           bool inProtocolContext);
+  llvm::Constant *getAssociatedTypeWitness(Type type, bool inProtocolContext);
 
   void emitAssociatedTypeMetadataRecord(const RootProtocolConformance *C);
   void emitFieldDescriptor(const NominalTypeDecl *Decl);
@@ -1292,8 +1296,9 @@ public:
                                              NominalTypeDecl *nominal,
                                              ArrayRef<llvm::Type *> genericArgs,
                                              ForDefinition_t forDefinition);
-  llvm::Constant *getAddrOfTypeMetadataLazyCacheVariable(CanType type,
-                                               ForDefinition_t forDefinition);
+  llvm::Constant *getAddrOfTypeMetadataLazyCacheVariable(CanType type);
+  llvm::Constant *getAddrOfTypeMetadataDemanglingCacheVariable(CanType type,
+                                                       ConstantInit definition);
 
   llvm::Constant *getAddrOfClassMetadataBounds(ClassDecl *D,
                                                ForDefinition_t forDefinition);

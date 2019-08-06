@@ -1775,15 +1775,15 @@ public:
   //===--------------------------------------------------------------------===//
 
   CondFailInst *createCondFail(SILLocation Loc, SILValue Operand,
-                               bool Inverted = false) {
+                               StringRef Message, bool Inverted = false) {
     if (Inverted) {
       SILType Ty = Operand->getType();
       SILValue True(createIntegerLiteral(Loc, Ty, 1));
       Operand =
           createBuiltinBinaryFunction(Loc, "xor", Ty, Ty, {Operand, True});
     }
-    return insert(new (getModule())
-                      CondFailInst(getSILDebugLocation(Loc), Operand));
+    return insert(CondFailInst::create(getSILDebugLocation(Loc), Operand,
+                                       Message, getModule()));
   }
 
   BuiltinInst *createBuiltinTrap(SILLocation Loc) {

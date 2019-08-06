@@ -13,7 +13,7 @@ func getAssocSubscriptType<T: AssocTypeInference>(_ x: T) -> T.AssocSubscript {
 struct MyFoo: Foo {}
 struct YourFoo: Foo {}
 
-@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
 func someTypeIsTheSame() {
   var a = foo(0)
   a = foo(0)

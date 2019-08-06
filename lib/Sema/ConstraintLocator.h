@@ -65,6 +65,8 @@ public:
     GenericParameter,
     /// The argument type of a function.
     FunctionArgument,
+    /// The default argument type of a function.
+    DefaultArgument,
     /// The result type of a function.
     FunctionResult,
     /// A tuple element referenced by position.
@@ -147,6 +149,7 @@ public:
     case ApplyFunction:
     case GenericParameter:
     case FunctionArgument:
+    case DefaultArgument:
     case FunctionResult:
     case OptionalPayload:
     case Member:
@@ -244,6 +247,7 @@ public:
       return 0;
 
     case FunctionArgument:
+    case DefaultArgument:
     case FunctionResult:
       return IsFunctionConversion;
     }
@@ -588,6 +592,10 @@ public:
 
   /// Determine whether this locator points to the contextual type.
   bool isForContextualType() const;
+
+  /// Check whether the last element in the path of this locator
+  /// is of a given kind.
+  bool isLastElement(ConstraintLocator::PathElementKind kind) const;
 
   /// If this locator points to generic parameter return its type.
   GenericTypeParamType *getGenericParameter() const;

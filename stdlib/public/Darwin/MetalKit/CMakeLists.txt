@@ -6,12 +6,12 @@ add_swift_target_library(swiftMetalKit ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} 
 
   "${SWIFT_SOURCE_DIR}/stdlib/linker-support/magic-symbols-for-install-name.c"
 
-  SWIFT_COMPILE_FLAGS "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}"
+  SWIFT_COMPILE_FLAGS ${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS} ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
   TARGET_SDKS OSX IOS IOS_SIMULATOR TVOS TVOS_SIMULATOR
-  SWIFT_MODULE_DEPENDS_OSX Darwin AppKit CoreData CoreFoundation CoreGraphics CoreImage Dispatch Foundation IOKit Metal ModelIO ObjectiveC QuartzCore simd XPC # auto-updated
-  SWIFT_MODULE_DEPENDS_IOS Darwin CoreFoundation CoreGraphics CoreImage Dispatch Foundation Metal ModelIO ObjectiveC QuartzCore simd UIKit # auto-updated
-  SWIFT_MODULE_DEPENDS_TVOS Darwin CoreFoundation CoreGraphics CoreImage Dispatch Foundation Metal ModelIO ObjectiveC QuartzCore simd UIKit # auto-updated
+  SWIFT_MODULE_DEPENDS_OSX Darwin CoreImage CoreGraphics Metal Dispatch IOKit simd Foundation CoreData QuartzCore AppKit ModelIO XPC CoreFoundation ObjectiveC # auto-updated
+  SWIFT_MODULE_DEPENDS_IOS Darwin CoreImage CoreGraphics Metal UIKit Dispatch simd Foundation QuartzCore ModelIO CoreFoundation ObjectiveC # auto-updated
+  SWIFT_MODULE_DEPENDS_TVOS Darwin CoreImage CoreGraphics Metal UIKit Dispatch simd Foundation QuartzCore ModelIO CoreFoundation ObjectiveC # auto-updated
   
   FRAMEWORK_DEPENDS_WEAK MetalKit
   FRAMEWORK_DEPENDS_WEAK Metal
@@ -19,4 +19,5 @@ add_swift_target_library(swiftMetalKit ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} 
   DEPLOYMENT_VERSION_OSX ${SWIFTLIB_DEPLOYMENT_VERSION_METALKIT_OSX}
   DEPLOYMENT_VERSION_IOS ${SWIFTLIB_DEPLOYMENT_VERSION_METALKIT_IOS}
   DEPLOYMENT_VERSION_TVOS ${SWIFTLIB_DEPLOYMENT_VERSION_METALKIT_TVOS}
+  INSTALL_IN_COMPONENT sdk-overlay
 )

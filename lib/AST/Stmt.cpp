@@ -141,6 +141,12 @@ BraceStmt::BraceStmt(SourceLoc lbloc, ArrayRef<ASTNode> elts,
   Bits.BraceStmt.NumElements = elts.size();
   std::uninitialized_copy(elts.begin(), elts.end(),
                           getTrailingObjects<ASTNode>());
+
+#ifndef NDEBUG
+  for (auto elt : elts)
+    if (auto *decl = elt.dyn_cast<Decl *>())
+      assert(!isa<AccessorDecl>(decl) && "accessors should not be added here");
+#endif
 }
 
 BraceStmt *BraceStmt::create(ASTContext &ctx, SourceLoc lbloc,

@@ -19,7 +19,7 @@ internal func _ascii16(_ c: Unicode.Scalar) -> UTF16.CodeUnit {
 
 @inlinable
 @inline(__always)
-internal func _asciiDigit<CodeUnit : UnsignedInteger, Result : BinaryInteger>(
+internal func _asciiDigit<CodeUnit: UnsignedInteger, Result: BinaryInteger>(
   codeUnit u_: CodeUnit, radix: Result
 ) -> Result? {
   let digit = _ascii16("0")..._ascii16("9")
@@ -39,11 +39,11 @@ internal func _asciiDigit<CodeUnit : UnsignedInteger, Result : BinaryInteger>(
 @inlinable
 @inline(__always)
 internal func _parseUnsignedASCII<
-  Rest : IteratorProtocol, Result: FixedWidthInteger
+  Rest: IteratorProtocol, Result: FixedWidthInteger
 >(
   first: Rest.Element, rest: inout Rest, radix: Result, positive: Bool
 ) -> Result?
-where Rest.Element : UnsignedInteger {
+where Rest.Element: UnsignedInteger {
   let r0 = _asciiDigit(codeUnit: first, radix: radix)
   guard _fastPath(r0 != nil), var result = r0 else { return nil }
   if !positive {
@@ -75,11 +75,11 @@ where Rest.Element : UnsignedInteger {
 @inlinable
 @inline(__always)
 internal func _parseASCII<
-  CodeUnits : IteratorProtocol, Result: FixedWidthInteger
+  CodeUnits: IteratorProtocol, Result: FixedWidthInteger
 >(
   codeUnits: inout CodeUnits, radix: Result
 ) -> Result?
-where CodeUnits.Element : UnsignedInteger {
+where CodeUnits.Element: UnsignedInteger {
   let c0_ = codeUnits.next()
   guard _fastPath(c0_ != nil), let c0 = c0_ else { return nil }
   if _fastPath(c0 != _ascii16("+") && c0 != _ascii16("-")) {
@@ -106,11 +106,11 @@ extension FixedWidthInteger {
   @inline(never)
   @usableFromInline
   internal static func _parseASCIISlowPath<
-    CodeUnits : IteratorProtocol, Result: FixedWidthInteger
+    CodeUnits: IteratorProtocol, Result: FixedWidthInteger
   >(
     codeUnits: inout CodeUnits, radix: Result
   ) -> Result?
-  where CodeUnits.Element : UnsignedInteger {
+  where CodeUnits.Element: UnsignedInteger {
     return _parseASCII(codeUnits: &codeUnits, radix: radix)
   }
 
@@ -148,7 +148,7 @@ extension FixedWidthInteger {
   ///     value. `radix` must be in the range `2...36`. The default is 10.
   @inlinable // @specializable
   @_semantics("optimize.sil.specialize.generic.partial.never")
-  public init?<S : StringProtocol>(_ text: S, radix: Int = 10) {
+  public init?<S: StringProtocol>(_ text: S, radix: Int = 10) {
     _precondition(2...36 ~= radix, "Radix not in range 2...36")
 
     if let str = text as? String, str._guts.isFastUTF8 {

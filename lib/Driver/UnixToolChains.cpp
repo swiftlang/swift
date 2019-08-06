@@ -51,13 +51,13 @@ toolchains::GenericUnix::constructInvocation(const InterpretJobAction &job,
                                              const JobContext &context) const {
   InvocationInfo II = ToolChain::constructInvocation(job, context);
 
-  SmallString<128> runtimeLibraryPath;
-  getRuntimeLibraryPath(runtimeLibraryPath, context.Args,
-                        /*Shared=*/true);
+  SmallVector<std::string, 4> runtimeLibraryPaths;
+  getRuntimeLibraryPaths(runtimeLibraryPaths, context.Args, context.OI.SDKPath,
+                         /*Shared=*/true);
 
   addPathEnvironmentVariableIfNeeded(II.ExtraEnvironment, "LD_LIBRARY_PATH",
                                      ":", options::OPT_L, context.Args,
-                                     runtimeLibraryPath);
+                                     runtimeLibraryPaths);
   return II;
 }
 
@@ -121,6 +121,12 @@ toolchains::GenericUnix::constructInvocation(const DynamicLinkJobAction &job,
 
   ArgStringList Arguments;
 
+  std::string Target = getTargetForLinker();
+  if (!Target.empty()) {
+    Arguments.push_back("-target");
+    Arguments.push_back(context.Args.MakeArgString(Target));
+  }
+
   switch (job.getKind()) {
   case LinkKind::None:
     llvm_unreachable("invalid link kind");
@@ -152,15 +158,29 @@ toolchains::GenericUnix::constructInvocation(const DynamicLinkJobAction &job,
   }
 
   // Configure the toolchain.
-  // By default, use the system clang++ to link.
-  const char *Clang = "clang++";
+  //
+  // By default use the system `clang` to perform the link.  We use `clang` for
+  // the driver here because we do not wish to select a particular C++ runtime.
+  // Furthermore, until C++ interop is enabled, we cannot have a dependency on
+  // C++ code from pure Swift code.  If linked libraries are C++ based, they
+  // should properly link C++.  In the case of static linking, the user can
+  // explicitly specify the C++ runtime to link against.  This is particularly
+  // important for platforms like android where as it is a Linux platform, the
+  // default C++ runtime is `libstdc++` which is unsupported on the target but
+  // as the builds are usually cross-compiled from Linux, libstdc++ is going to
+  // be present.  This results in linking the wrong version of libstdc++
+  // generating invalid binaries.  It is also possible to use different C++
+  // runtimes than the default C++ runtime for the platform (e.g. libc++ on
+  // Windows rather than msvcprt).  When C++ interop is enabled, we will need to
+  // surface this via a driver flag.  For now, opt for the simpler approach of
+  // just using `clang` and avoid a dependency on the C++ runtime.
+  const char *Clang = "clang";
   if (const Arg *A = context.Args.getLastArg(options::OPT_tools_directory)) {
     StringRef toolchainPath(A->getValue());
 
     // If there is a clang in the toolchain folder, use that instead.
-    if (auto toolchainClang =
-            llvm::sys::findProgramByName("clang++", {toolchainPath})) {
-      Clang = context.Args.MakeArgString(toolchainClang.get());
+    if (auto tool = llvm::sys::findProgramByName("clang", {toolchainPath})) {
+      Clang = context.Args.MakeArgString(tool.get());
     }
 
     // Look for binutils in the toolchain folder.
@@ -171,12 +191,6 @@ toolchains::GenericUnix::constructInvocation(const DynamicLinkJobAction &job,
   if (getTriple().getOS() == llvm::Triple::Linux &&
       job.getKind() == LinkKind::Executable) {
     Arguments.push_back("-pie");
-  }
-
-  std::string Target = getTargetForLinker();
-  if (!Target.empty()) {
-    Arguments.push_back("-target");
-    Arguments.push_back(context.Args.MakeArgString(Target));
   }
 
   bool staticExecutable = false;
@@ -190,24 +204,25 @@ toolchains::GenericUnix::constructInvocation(const DynamicLinkJobAction &job,
     staticStdlib = true;
   }
 
-  SmallString<128> SharedRuntimeLibPath;
-  getRuntimeLibraryPath(SharedRuntimeLibPath, context.Args, /*Shared=*/true);
+  SmallVector<std::string, 4> RuntimeLibPaths;
+  getRuntimeLibraryPaths(RuntimeLibPaths, context.Args, context.OI.SDKPath,
+                         /*Shared=*/!(staticExecutable || staticStdlib));
 
-  SmallString<128> StaticRuntimeLibPath;
-  getRuntimeLibraryPath(StaticRuntimeLibPath, context.Args, /*Shared=*/false);
-
-  // Add the runtime library link path, which is platform-specific and found
-  // relative to the compiler.
   if (!(staticExecutable || staticStdlib) && shouldProvideRPathToLinker()) {
     // FIXME: We probably shouldn't be adding an rpath here unless we know
     //        ahead of time the standard library won't be copied.
-    Arguments.push_back("-Xlinker");
-    Arguments.push_back("-rpath");
-    Arguments.push_back("-Xlinker");
-    Arguments.push_back(context.Args.MakeArgString(SharedRuntimeLibPath));
+    for (auto path : RuntimeLibPaths) {
+      Arguments.push_back("-Xlinker");
+      Arguments.push_back("-rpath");
+      Arguments.push_back("-Xlinker");
+      Arguments.push_back(context.Args.MakeArgString(path));
+    }
   }
 
-  SmallString<128> swiftrtPath = SharedRuntimeLibPath;
+  SmallString<128> SharedResourceDirPath;
+  getResourceDirPath(SharedResourceDirPath, context.Args, /*Shared=*/true);
+
+  SmallString<128> swiftrtPath = SharedResourceDirPath;
   llvm::sys::path::append(swiftrtPath,
                           swift::getMajorArchitectureName(getTriple()));
   llvm::sys::path::append(swiftrtPath, "swiftrt.o");
@@ -239,36 +254,34 @@ toolchains::GenericUnix::constructInvocation(const DynamicLinkJobAction &job,
           Twine("@") + OutputInfo.getPrimaryOutputFilename()));
   }
 
-  // Link the standard library.
-  Arguments.push_back("-L");
+  // Add the runtime library link paths.
+  for (auto path : RuntimeLibPaths) {
+    Arguments.push_back("-L");
+    Arguments.push_back(context.Args.MakeArgString(path));
+  }
+
+  // Link the standard library. In two paths, we do this using a .lnk file;
+  // if we're going that route, we'll set `linkFilePath` to the path to that
+  // file.
+  SmallString<128> linkFilePath;
+  getResourceDirPath(linkFilePath, context.Args, /*Shared=*/false);
 
   if (staticExecutable) {
-    Arguments.push_back(context.Args.MakeArgString(StaticRuntimeLibPath));
-
-    SmallString<128> linkFilePath = StaticRuntimeLibPath;
     llvm::sys::path::append(linkFilePath, "static-executable-args.lnk");
-    auto linkFile = linkFilePath.str();
-
-    if (llvm::sys::fs::is_regular_file(linkFile)) {
-      Arguments.push_back(context.Args.MakeArgString(Twine("@") + linkFile));
-    } else {
-      llvm::report_fatal_error(
-          "-static-executable not supported on this platform");
-    }
   } else if (staticStdlib) {
-    Arguments.push_back(context.Args.MakeArgString(StaticRuntimeLibPath));
-
-    SmallString<128> linkFilePath = StaticRuntimeLibPath;
     llvm::sys::path::append(linkFilePath, "static-stdlib-args.lnk");
+  } else {
+    linkFilePath.clear();
+    Arguments.push_back("-lswiftCore");
+  }
+
+  if (!linkFilePath.empty()) {
     auto linkFile = linkFilePath.str();
     if (llvm::sys::fs::is_regular_file(linkFile)) {
       Arguments.push_back(context.Args.MakeArgString(Twine("@") + linkFile));
     } else {
       llvm::report_fatal_error(linkFile + " not found");
     }
-  } else {
-    Arguments.push_back(context.Args.MakeArgString(SharedRuntimeLibPath));
-    Arguments.push_back("-lswiftCore");
   }
 
   // Explicitly pass the target to the linker
@@ -289,7 +302,7 @@ toolchains::GenericUnix::constructInvocation(const DynamicLinkJobAction &job,
   }
 
   if (context.Args.hasArg(options::OPT_profile_generate)) {
-    SmallString<128> LibProfile(SharedRuntimeLibPath);
+    SmallString<128> LibProfile(SharedResourceDirPath);
     llvm::sys::path::remove_filename(LibProfile); // remove platform name
     llvm::sys::path::append(LibProfile, "clang", "lib");
 
@@ -349,12 +362,22 @@ toolchains::GenericUnix::constructInvocation(const StaticLinkJobAction &job,
 
 std::string toolchains::Android::getTargetForLinker() const {
   const llvm::Triple &T = getTriple();
-  if (T.getArch() == llvm::Triple::arm &&
-      T.getSubArch() == llvm::Triple::SubArchType::ARMSubArch_v7)
-    // Explicitly set the linker target to "androideabi", as opposed to the
-    // llvm::Triple representation of "armv7-none-linux-android".
-    return "armv7-none-linux-androideabi";
-  return T.str();
+  switch (T.getArch()) {
+  default:
+    // FIXME: we should just abort on an unsupported target
+    return T.str();
+  case llvm::Triple::arm:
+  case llvm::Triple::thumb:
+    // Current Android NDK versions only support ARMv7+.  Always assume ARMv7+
+    // for the arm/thumb target.
+    return "armv7-unknown-linux-androideabi";
+  case llvm::Triple::aarch64:
+    return "aarch64-unknown-linux-android";
+  case llvm::Triple::x86:
+    return "i686-unknown-linux-android";
+  case llvm::Triple::x86_64:
+    return "x86_64-unknown-linux-android";
+  }
 }
 
 bool toolchains::Android::shouldProvideRPathToLinker() const { return false; }

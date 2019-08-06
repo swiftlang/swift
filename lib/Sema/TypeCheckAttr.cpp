@@ -501,36 +501,6 @@ void AttributeEarlyChecker::visitNSManagedAttr(NSManagedAttr *attr) {
   // Everything below deals with restrictions on @NSManaged properties.
   auto *VD = cast<VarDecl>(D);
 
-  if (VD->isLet())
-    diagnoseAndRemoveAttr(attr, diag::attr_NSManaged_let_property);
-
-  auto diagnoseNotStored = [&](unsigned kind) {
-    TC.diagnose(attr->getLocation(), diag::attr_NSManaged_not_stored, kind);
-    return attr->setInvalid();
-  };
-
-  // @NSManaged properties must be written as stored.
-  auto impl = VD->getImplInfo();
-  if (impl.isSimpleStored()) {
-    // @NSManaged properties end up being computed; complain if there is
-    // an initializer.
-    if (VD->getParentInitializer()) {
-      TC.diagnose(attr->getLocation(), diag::attr_NSManaged_initial_value)
-        .highlight(VD->getParentInitializer()->getSourceRange());
-      auto PBD = VD->getParentPatternBinding();
-      PBD->setInit(PBD->getPatternEntryIndexForVarDecl(VD), nullptr);
-    }
-    // Otherwise, ok.
-  } else if (impl.getReadImpl() == ReadImplKind::Address ||
-             impl.getWriteImpl() == WriteImplKind::MutableAddress) {
-    return diagnoseNotStored(/*addressed*/ 2);    
-  } else if (impl.getWriteImpl() == WriteImplKind::StoredWithObservers ||
-             impl.getWriteImpl() == WriteImplKind::InheritedWithObservers) {
-    return diagnoseNotStored(/*observing*/ 1);    
-  } else {
-    return diagnoseNotStored(/*computed*/ 0);
-  }
-
   // @NSManaged properties cannot be @NSCopying
   if (auto *NSCopy = VD->getAttrs().getAttribute<NSCopyingAttr>())
     diagnoseAndRemoveAttr(NSCopy, diag::attr_NSManaged_NSCopying);
@@ -562,21 +532,12 @@ void AttributeEarlyChecker::visitLazyAttr(LazyAttr *attr) {
   // lazy may only be used on properties.
   auto *VD = cast<VarDecl>(D);
 
-  // It cannot currently be used on let's since we don't have a mutability model
-  // that supports it.
-  if (VD->isLet())
-    diagnoseAndRemoveAttr(attr, diag::lazy_not_on_let);
-
   auto attrs = VD->getAttrs();
   // 'lazy' is not allowed to have reference attributes
   if (auto *refAttr = attrs.getAttribute<ReferenceOwnershipAttr>())
     diagnoseAndRemoveAttr(attr, diag::lazy_not_strong, refAttr->get());
 
-  // lazy is not allowed on a protocol requirement.
   auto varDC = VD->getDeclContext();
-  if (isa<ProtocolDecl>(varDC))
-    diagnoseAndRemoveAttr(attr, diag::lazy_not_in_protocol);
-
 
   // 'lazy' is not allowed on a global variable or on a static property (which
   // are already lazily initialized).
@@ -587,25 +548,6 @@ void AttributeEarlyChecker::visitLazyAttr(LazyAttr *attr) {
     diagnoseAndRemoveAttr(attr, diag::lazy_on_already_lazy_global);
   } else if (!VD->getDeclContext()->isTypeContext()) {
     diagnoseAndRemoveAttr(attr, diag::lazy_must_be_property);
-  }
-
-  // lazy must have an initializer, and the pattern binding must be a simple
-  // one.
-  if (!VD->getParentInitializer())
-    diagnoseAndRemoveAttr(attr, diag::lazy_requires_initializer);
-
-  if (!VD->getParentPatternBinding()->getSingleVar())
-    diagnoseAndRemoveAttr(attr, diag::lazy_requires_single_var);
-
-
-  // TODO: Lazy properties can't yet be observed.
-  auto impl = VD->getImplInfo();
-  if (impl.isSimpleStored()) {
-    // ok
-  } else if (VD->hasStorage()) {
-    diagnoseAndRemoveAttr(attr, diag::lazy_not_observable);
-  } else {
-    diagnoseAndRemoveAttr(attr, diag::lazy_not_on_computed);
   }
 }
 
@@ -666,7 +608,7 @@ void AttributeEarlyChecker::visitSetterAccessAttr(
       storageKind = SK_Subscript;
     else if (storage->getDeclContext()->isTypeContext())
       storageKind = SK_Property;
-    else if (cast<VarDecl>(storage)->isImmutable())
+    else if (cast<VarDecl>(storage)->isLet())
       storageKind = SK_Constant;
     else
       storageKind = SK_Variable;
@@ -1028,24 +970,6 @@ bool swift::isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl,
            NTD == TC.Context.getReferenceWritableKeyPathDecl();
   }
   return false;
-}
-
-Optional<std::pair<Type, Type>>
-swift::getRootAndResultTypeOfKeypathDynamicMember(SubscriptDecl *subscript,
-                                                  const DeclContext *DC) {
-  auto &TC = TypeChecker::createForContext(DC->getASTContext());
-
-  if (!isValidKeyPathDynamicMemberLookup(subscript, TC))
-    return None;
-
-  const auto *param = subscript->getIndices()->get(0);
-  auto keyPathType = param->getType()->getAs<BoundGenericType>();
-  if (!keyPathType)
-    return None;
-  auto genericArgs = keyPathType->getGenericArgs();
-  assert(!genericArgs.empty() && genericArgs.size() == 2 &&
-         "invalid keypath dynamic member");
-  return std::pair<Type, Type>{genericArgs[0], genericArgs[1]};
 }
 
 /// The @dynamicMemberLookup attribute is only allowed on types that have at
@@ -2163,6 +2087,9 @@ static FuncDecl *findReplacedAccessor(DeclName replacedVarName,
     Type replacementStorageType = getDynamicComparisonType(replacementStorage);
     results.erase(std::remove_if(results.begin(), results.end(),
         [&](ValueDecl *result) {
+          // Protocol requirements are not replaceable.
+          if (isa<ProtocolDecl>(result->getDeclContext()))
+            return true;
           // Check for static/instance mismatch.
           if (result->isStatic() != replacementStorage->isStatic())
             return true;
@@ -2244,9 +2171,13 @@ findReplacedFunction(DeclName replacedFunctionName,
   lookupReplacedDecl(replacedFunctionName, attr, replacement, results);
 
   for (auto *result : results) {
+    // Protocol requirements are not replaceable.
+    if (isa<ProtocolDecl>(result->getDeclContext()))
+      continue;
     // Check for static/instance mismatch.
     if (result->isStatic() != replacement->isStatic())
       continue;
+
     if (TC)
       TC->validateDecl(result);
     TypeMatchOptions matchMode = TypeMatchFlags::AllowABICompatible;
@@ -2568,8 +2499,8 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
       decl = func;
     } else if (auto storage = dyn_cast<AbstractStorageDecl>(D)) {
       decl = storage;
-      auto getter = storage->getGetter();
-      if (!getter || getter->isImplicit() || !getter->hasBody()) {
+      auto getter = storage->getParsedAccessor(AccessorKind::Get);
+      if (!getter || !getter->hasBody()) {
         TC.diagnose(attr->getLocation(),
                     diag::function_builder_attribute_on_storage_without_getter,
                     nominal->getFullName(),
@@ -2904,7 +2835,9 @@ void TypeChecker::addImplicitDynamicAttribute(Decl *D) {
     // Don't turn stored into computed properties. This could conflict with
     // exclusivity checking.
     // If there is a didSet or willSet function we allow dynamic replacement.
-    if (VD->hasStorage() && !VD->getDidSetFunc() && !VD->getWillSetFunc())
+    if (VD->hasStorage() &&
+        !VD->getParsedAccessor(AccessorKind::DidSet) &&
+        !VD->getParsedAccessor(AccessorKind::WillSet))
       return;
     // Don't add dynamic to local variables.
     if (VD->getDeclContext()->isLocalContext())

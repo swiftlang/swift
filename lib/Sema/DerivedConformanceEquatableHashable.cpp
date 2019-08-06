@@ -86,10 +86,12 @@ static SmallVector<VarDecl *, 3>
 storedPropertiesNotConformingToProtocol(DeclContext *DC, StructDecl *theStruct,
                                         ProtocolDecl *protocol) {
   auto lazyResolver = DC->getASTContext().getLazyResolver();
-  auto storedProperties =
-      theStruct->getStoredProperties(/*skipInaccessible=*/true);
+  auto storedProperties = theStruct->getStoredProperties();
   SmallVector<VarDecl *, 3> nonconformingProperties;
   for (auto propertyDecl : storedProperties) {
+    if (!propertyDecl->isUserAccessible())
+      continue;
+
     if (!propertyDecl->hasInterfaceType())
       lazyResolver->resolveDeclSignature(propertyDecl);
     if (!propertyDecl->hasInterfaceType())
@@ -185,7 +187,7 @@ static VarDecl *indexedVarDecl(char prefixChar, int index, Type type,
   auto indexStr = C.AllocateCopy(indexVal);
   auto indexStrRef = StringRef(indexStr.data(), indexStr.size());
 
-  auto varDecl = new (C) VarDecl(/*IsStatic*/false, VarDecl::Specifier::Let,
+  auto varDecl = new (C) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Let,
                                  /*IsCaptureList*/true, SourceLoc(),
                                  C.getIdentifier(indexStrRef),
                                  varContext);
@@ -273,7 +275,7 @@ static DeclRefExpr *convertEnumToIndex(SmallVectorImpl<ASTNode> &stmts,
   Type enumType = enumVarDecl->getType();
   Type intType = C.getIntDecl()->getDeclaredType();
 
-  auto indexVar = new (C) VarDecl(/*IsStatic*/false, VarDecl::Specifier::Var,
+  auto indexVar = new (C) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Var,
                                   /*IsCaptureList*/false, SourceLoc(),
                                   C.getIdentifier(indexName),
                                   funcDecl);
@@ -364,7 +366,7 @@ static GuardStmt *returnIfNotEqualGuard(ASTContext &C,
   return new (C) GuardStmt(SourceLoc(), C.AllocateCopy(conditions), body);
 }
 
-static void
+static std::pair<BraceStmt *, bool>
 deriveBodyEquatable_enum_uninhabited_eq(AbstractFunctionDecl *eqDecl, void *) {
   auto parentDC = eqDecl->getDeclContext();
   ASTContext &C = parentDC->getASTContext();
@@ -389,13 +391,13 @@ deriveBodyEquatable_enum_uninhabited_eq(AbstractFunctionDecl *eqDecl, void *) {
   statements.push_back(switchStmt);
 
   auto body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
-  eqDecl->setBody(body);
+  return { body, /*isTypeChecked=*/false };
 }
 
 /// Derive the body for an '==' operator for an enum that has no associated
 /// values. This generates code that converts each value to its integer ordinal
 /// and compares them, which produces an optimal single icmp instruction.
-static void
+static std::pair<BraceStmt *, bool>
 deriveBodyEquatable_enum_noAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
                                                void *) {
   auto parentDC = eqDecl->getDeclContext();
@@ -446,12 +448,12 @@ deriveBodyEquatable_enum_noAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
   statements.push_back(new (C) ReturnStmt(SourceLoc(), cmpExpr));
 
   BraceStmt *body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
-  eqDecl->setBody(body);
+  return { body, /*isTypeChecked=*/false };
 }
 
 /// Derive the body for an '==' operator for an enum where at least one of the
 /// cases has associated values.
-static void
+static std::pair<BraceStmt *, bool>
 deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
                                                 void *) {
   auto parentDC = eqDecl->getDeclContext();
@@ -503,7 +505,7 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
       for (unsigned i : indices(lhsPayloadVars)) {
         auto *vOld = lhsPayloadVars[i];
         auto *vNew = new (C) VarDecl(
-            /*IsStatic*/ false, vOld->getSpecifier(), false /*IsCaptureList*/,
+            /*IsStatic*/ false, vOld->getIntroducer(), false /*IsCaptureList*/,
             vOld->getNameLoc(), vOld->getName(), vOld->getDeclContext());
         vNew->setHasNonPatternBindingInit();
         vNew->setImplicit();
@@ -579,12 +581,12 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
   statements.push_back(switchStmt);
 
   auto body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
-  eqDecl->setBody(body);
+  return { body, /*isTypeChecked=*/false };
 }
 
 /// Derive the body for an '==' operator for a struct.
-static void deriveBodyEquatable_struct_eq(AbstractFunctionDecl *eqDecl,
-                                          void *) {
+static std::pair<BraceStmt *, bool>
+deriveBodyEquatable_struct_eq(AbstractFunctionDecl *eqDecl, void *) {
   auto parentDC = eqDecl->getDeclContext();
   ASTContext &C = parentDC->getASTContext();
 
@@ -596,12 +598,14 @@ static void deriveBodyEquatable_struct_eq(AbstractFunctionDecl *eqDecl,
 
   SmallVector<ASTNode, 6> statements;
 
-  auto storedProperties =
-    structDecl->getStoredProperties(/*skipInaccessible=*/true);
+  auto storedProperties = structDecl->getStoredProperties();
 
   // For each stored property element, generate a guard statement that returns
   // false if a property is not pairwise-equal.
   for (auto propertyDecl : storedProperties) {
+    if (!propertyDecl->isUserAccessible())
+      continue;
+
     auto aPropertyRef = new (C) DeclRefExpr(propertyDecl, DeclNameLoc(),
                                             /*implicit*/ true);
     auto aParamRef = new (C) DeclRefExpr(aParam, DeclNameLoc(),
@@ -629,13 +633,15 @@ static void deriveBodyEquatable_struct_eq(AbstractFunctionDecl *eqDecl,
   statements.push_back(returnStmt);
 
   auto body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
-  eqDecl->setBody(body);
+  return { body, /*isTypeChecked=*/false };
 }
 
 /// Derive an '==' operator implementation for an enum or a struct.
 static ValueDecl *
-deriveEquatable_eq(DerivedConformance &derived,
-                   void (*bodySynthesizer)(AbstractFunctionDecl *, void *)) {
+deriveEquatable_eq(
+    DerivedConformance &derived,
+    std::pair<BraceStmt *, bool> (*bodySynthesizer)(AbstractFunctionDecl *,
+                                                    void *)) {
   // enum SomeEnum<T...> {
   //   case A, B(Int), C(String, Int)
   //
@@ -677,7 +683,7 @@ deriveEquatable_eq(DerivedConformance &derived,
   auto selfIfaceTy = parentDC->getDeclaredInterfaceType();
 
   auto getParamDecl = [&](StringRef s) -> ParamDecl * {
-    auto *param = new (C) ParamDecl(VarDecl::Specifier::Default, SourceLoc(),
+    auto *param = new (C) ParamDecl(ParamDecl::Specifier::Default, SourceLoc(),
                                     SourceLoc(), Identifier(), SourceLoc(),
                                     C.getIdentifier(s), parentDC);
     param->setInterfaceType(selfIfaceTy);
@@ -817,9 +823,10 @@ static CallExpr *createHasherCombineCall(ASTContext &C,
 }
 
 static FuncDecl *
-deriveHashable_hashInto(DerivedConformance &derived,
-                        void (*bodySynthesizer)(AbstractFunctionDecl *,
-                                                void *)) {
+deriveHashable_hashInto(
+    DerivedConformance &derived,
+    std::pair<BraceStmt *, bool> (*bodySynthesizer)(AbstractFunctionDecl *,
+                                                    void *)) {
   // @derived func hash(into hasher: inout Hasher)
 
   ASTContext &C = derived.TC.Context;
@@ -842,7 +849,7 @@ deriveHashable_hashInto(DerivedConformance &derived,
   Type hasherType = hasherDecl->getDeclaredType();
 
   // Params: self (implicit), hasher
-  auto *hasherParamDecl = new (C) ParamDecl(VarDecl::Specifier::InOut,
+  auto *hasherParamDecl = new (C) ParamDecl(ParamDecl::Specifier::InOut,
                                             SourceLoc(),
                                             SourceLoc(), C.Id_into, SourceLoc(),
                                             C.Id_hasher, parentDC);
@@ -879,7 +886,7 @@ deriveHashable_hashInto(DerivedConformance &derived,
 
 /// Derive the body for the hash(into:) method when hashValue has a
 /// user-supplied implementation.
-static void
+static std::pair<BraceStmt *, bool>
 deriveBodyHashable_compat_hashInto(AbstractFunctionDecl *hashIntoDecl, void *) {
   // func hash(into hasher: inout Hasher) {
   //   hasher.combine(self.hashValue)
@@ -898,12 +905,12 @@ deriveBodyHashable_compat_hashInto(AbstractFunctionDecl *hashIntoDecl, void *) {
 
   auto body = BraceStmt::create(C, SourceLoc(), {ASTNode(hasherExpr)},
                                 SourceLoc(), /*implicit*/ true);
-  hashIntoDecl->setBody(body);
+  return { body, /*isTypeChecked=*/false };
 }
 
 /// Derive the body for the 'hash(into:)' method for an enum by using its raw
 /// value.
-static void
+static std::pair<BraceStmt *, bool>
 deriveBodyHashable_enum_rawValue_hashInto(
   AbstractFunctionDecl *hashIntoDecl, void *) {
   // enum SomeEnum: Int {
@@ -926,12 +933,12 @@ deriveBodyHashable_enum_rawValue_hashInto(
 
   auto body = BraceStmt::create(C, SourceLoc(), combineStmt, SourceLoc(),
                                 /*implicit*/ true);
-  hashIntoDecl->setBody(body);
+  return { body, /*isTypeChecked=*/false };
 }
 
 /// Derive the body for the 'hash(into:)' method for an enum without associated
 /// values.
-static void
+static std::pair<BraceStmt *, bool>
 deriveBodyHashable_enum_noAssociatedValues_hashInto(
   AbstractFunctionDecl *hashIntoDecl, void *) {
   // enum SomeEnum {
@@ -967,12 +974,12 @@ deriveBodyHashable_enum_noAssociatedValues_hashInto(
 
   auto body = BraceStmt::create(C, SourceLoc(), stmts, SourceLoc(),
                                 /*implicit*/ true);
-  hashIntoDecl->setBody(body);
+  return { body, /*isTypeChecked=*/false };
 }
 
 /// Derive the body for the 'hash(into:)' method for an enum with associated
 /// values.
-static void
+static std::pair<BraceStmt *, bool>
 deriveBodyHashable_enum_hasAssociatedValues_hashInto(
   AbstractFunctionDecl *hashIntoDecl, void *) {
   // enum SomeEnumWithAssociatedValues {
@@ -1049,7 +1056,7 @@ deriveBodyHashable_enum_hasAssociatedValues_hashInto(
       for (unsigned i : indices(payloadVars)) {
         auto *vOld = payloadVars[i];
         auto *vNew = new (C) VarDecl(
-            /*IsStatic*/ false, vOld->getSpecifier(), false /*IsCaptureList*/,
+            /*IsStatic*/ false, vOld->getIntroducer(), false /*IsCaptureList*/,
             vOld->getNameLoc(), vOld->getName(), vOld->getDeclContext());
         vNew->setHasNonPatternBindingInit();
         vNew->setImplicit();
@@ -1072,11 +1079,11 @@ deriveBodyHashable_enum_hasAssociatedValues_hashInto(
 
   auto body = BraceStmt::create(C, SourceLoc(), {ASTNode(switchStmt)},
                                 SourceLoc());
-  hashIntoDecl->setBody(body);
+  return { body, /*isTypeChecked=*/false };
 }
 
 /// Derive the body for the 'hash(into:)' method for a struct.
-static void
+static std::pair<BraceStmt *, bool>
 deriveBodyHashable_struct_hashInto(AbstractFunctionDecl *hashIntoDecl, void *) {
   // struct SomeStruct {
   //   var x: Int
@@ -1096,11 +1103,13 @@ deriveBodyHashable_struct_hashInto(AbstractFunctionDecl *hashIntoDecl, void *) {
   // Extract the decl for the hasher parameter.
   auto hasherParam = hashIntoDecl->getParameters()->get(0);
 
-  auto storedProperties =
-    structDecl->getStoredProperties(/*skipInaccessible=*/true);
+  auto storedProperties = structDecl->getStoredProperties();
 
   // Feed each stored property into the hasher.
   for (auto propertyDecl : storedProperties) {
+    if (!propertyDecl->isUserAccessible())
+      continue;
+
     auto propertyRef = new (C) DeclRefExpr(propertyDecl, DeclNameLoc(),
                                            /*implicit*/ true);
     auto selfRef = new (C) DeclRefExpr(selfDecl, DeclNameLoc(),
@@ -1114,11 +1123,11 @@ deriveBodyHashable_struct_hashInto(AbstractFunctionDecl *hashIntoDecl, void *) {
 
   auto body = BraceStmt::create(C, SourceLoc(), statements,
                                 SourceLoc(), /*implicit*/ true);
-  hashIntoDecl->setBody(body);
+  return { body, /*isTypeChecked=*/false };
 }
 
 /// Derive the body for the 'hashValue' getter.
-static void
+static std::pair<BraceStmt *, bool>
 deriveBodyHashable_hashValue(AbstractFunctionDecl *hashValueDecl, void *) {
   auto parentDC = hashValueDecl->getDeclContext();
   ASTContext &C = parentDC->getASTContext();
@@ -1136,7 +1145,7 @@ deriveBodyHashable_hashValue(AbstractFunctionDecl *hashValueDecl, void *) {
 
   auto body = BraceStmt::create(C, SourceLoc(), {returnStmt}, SourceLoc(),
                                 /*implicit*/ true);
-  hashValueDecl->setBody(body);
+  return { body, /*isTypeChecked=*/false };
 }
 
 /// Derive a 'hashValue' implementation.
@@ -1169,7 +1178,7 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
   }
 
   VarDecl *hashValueDecl =
-    new (C) VarDecl(/*IsStatic*/false, VarDecl::Specifier::Var,
+    new (C) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Var,
                     /*IsCaptureList*/false, SourceLoc(),
                     C.Id_hashValue, parentDC);
   hashValueDecl->setType(intType);
@@ -1185,6 +1194,7 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
       TypeLoc::withoutLoc(intType), parentDC);
   getterDecl->setImplicit();
   getterDecl->setBodySynthesizer(&deriveBodyHashable_hashValue);
+  getterDecl->setIsTransparent(false);
 
   // Compute the interface type of hashValue().
   if (auto env = parentDC->getGenericEnvironmentOfContext())
@@ -1199,8 +1209,8 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
   hashValueDecl->setImplicit();
   hashValueDecl->setInterfaceType(intType);
   hashValueDecl->setValidationToChecked();
-  hashValueDecl->setAccessors(StorageImplInfo::getImmutableComputed(),
-                              SourceLoc(), {getterDecl}, SourceLoc());
+  hashValueDecl->setImplInfo(StorageImplInfo::getImmutableComputed());
+  hashValueDecl->setAccessors(SourceLoc(), {getterDecl}, SourceLoc());
   hashValueDecl->copyFormalAccessFrom(derived.Nominal,
                                       /*sourceIsParentContext*/ true);
 
@@ -1215,7 +1225,7 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
   C.addSynthesizedDecl(hashValueDecl);
   C.addSynthesizedDecl(getterDecl);
 
-  derived.addMembersToConformanceContext({getterDecl, hashValueDecl, patDecl});
+  derived.addMembersToConformanceContext({hashValueDecl, patDecl});
   return hashValueDecl;
 }
 
@@ -1277,7 +1287,7 @@ ValueDecl *DerivedConformance::deriveHashable(ValueDecl *requirement) {
     // Start by resolving hashValue conformance.
     auto hashValueReq = getHashValueRequirement(C);
     auto conformance = getHashableConformance(ConformanceDecl);
-    auto hashValueDecl = conformance->getWitnessDecl(hashValueReq, &TC);
+    auto hashValueDecl = conformance->getWitnessDecl(hashValueReq);
     if (!hashValueDecl) {
       // We won't derive hash(into:) if hashValue cannot be resolved.
       // The hashValue failure will produce a diagnostic elsewhere.
@@ -1309,7 +1319,8 @@ ValueDecl *DerivedConformance::deriveHashable(ValueDecl *requirement) {
         return nullptr;
 
       if (auto ED = dyn_cast<EnumDecl>(Nominal)) {
-        void (*bodySynthesizer)(AbstractFunctionDecl *, void *);
+        std::pair<BraceStmt *, bool> (*bodySynthesizer)(
+            AbstractFunctionDecl *, void *);
         if (ED->isObjC())
           bodySynthesizer = deriveBodyHashable_enum_rawValue_hashInto;
         else if (ED->hasOnlyCasesWithoutAssociatedValues())

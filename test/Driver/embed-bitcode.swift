@@ -4,12 +4,12 @@
 // CHECK-macho: "ld", inputs: ["[[OBJECT]]"], output: {image: "embed-bitcode"}
 // CHECK-coff: "swiftc.EXE", inputs: ["{{.*}}embed-bitcode.swift"], output: {llvm-bc: "[[BC:.*\.bc]]"}
 // CHECK-coff: "swiftc.EXE", inputs: ["[[BC]]"], output: {object: "[[OBJECT:.*\.o]]"}
-// CHECK-coff: "clang++.exe", inputs: ["[[OBJECT]]"], output: {image: "embed-bitcode"}
+// CHECK-coff: "clang.exe", inputs: ["[[OBJECT]]"], output: {image: "embed-bitcode"}
 
 // CHECK-elf: "swift", inputs: ["{{.*}}embed-bitcode.swift"], output: {llvm-bc: "[[BC:.*\.bc]]"}
 // CHECK-elf: "swift", inputs: ["[[BC]]"], output: {object: "[[OBJECT:.*\.o]]"}
 // CHECK-elf: "swift-autolink-extract", inputs: ["[[OBJECT]]"], output: {autolink: "[[AUTOLINK:.*\.autolink]]"}
-// CHECK-elf: "clang++", inputs: ["[[OBJECT]]", "[[AUTOLINK]]"], output: {image: "main"}
+// CHECK-elf: "clang", inputs: ["[[OBJECT]]", "[[AUTOLINK]]"], output: {image: "main"}
 
 // RUN: %target-swiftc_driver -embed-bitcode %s 2>&1 -### | %FileCheck %s -check-prefix=CHECK-FRONT -check-prefix=CHECK-FRONT-%target-object-format
 // CHECK-FRONT: -frontend

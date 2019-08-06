@@ -82,6 +82,17 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_AFTERPAREN_2 | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_AFTERPAREN_2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_SECOND | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_SECOND
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_SKIPPED | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_SKIPPED
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_ARRAY_1_AFTERPAREN_1 | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_AFTERPAREN_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_ARRAY_1_AFTERPAREN_2 | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_AFTERPAREN_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_ARRAY_1_SECOND | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_SECOND
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_ARRAY_1_SKIPPED | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_SKIPPED
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_ARRAY_2_AFTERPAREN_1 | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_AFTERPAREN_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_ARRAY_2_AFTERPAREN_2 | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_AFTERPAREN_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_ARRAY_2_SECOND | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_SECOND
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_ARRAY_2_SKIPPED | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_SKIPPED
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARCHETYPE_GENERIC_1 | %FileCheck %s -check-prefix=ARCHETYPE_GENERIC_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PARAM_WITH_ERROR_AUTOCLOSURE| %FileCheck %s -check-prefix=PARAM_WITH_ERROR_AUTOCLOSURE
 
 var i1 = 1
 var i2 = 2
@@ -181,7 +192,7 @@ class C1 {
 // EXPECT_INT-DAG: Decl[FreeFunction]/CurrModule/TypeRelation[Identical]: intGen()[#Int#]; name=intGen()
 // EXPECT_INT-DAG: Decl[GlobalVar]/CurrModule/TypeRelation[Identical]: i1[#Int#]; name=i1
 // EXPECT_INT-DAG: Decl[GlobalVar]/CurrModule/TypeRelation[Identical]: i2[#Int#]; name=i2
-// EXPECT_INT-DAT: Decl[Struct]/OtherModule[Swift]/TypeRelation[Identical]: Int[#Int#]
+// EXPECT_INT-DAG: Decl[Struct]/OtherModule[Swift]/TypeRelation[Identical]: Int[#Int#]
 // EXPECT_INT-DAG: Decl[FreeFunction]/CurrModule:      ointGen()[#Int?#]; name=ointGen()
 // EXPECT_INT-DAG: Decl[GlobalVar]/CurrModule:         oi1[#Int?#]; name=oi1
 // EXPECT_INT-DAG: Decl[GlobalVar]/CurrModule:         os2[#String?#]; name=os2
@@ -464,9 +475,8 @@ struct TestBoundGeneric1 {
   func test2() {
     takeArray(#^BOUND_GENERIC_1_2^#)
   }
-// FIXME: These should be convertible to [T]. rdar://problem/24570603
-// BOUND_GENERIC_1: Decl[InstanceVar]/CurrNominal:      x[#[Int]#];
-// BOUND_GENERIC_1: Decl[InstanceVar]/CurrNominal:      y[#[Int]#];
+// BOUND_GENERIC_1: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]: x[#[Int]#];
+// BOUND_GENERIC_1: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]: y[#[Int]#];
 }
 
 func whereConvertible<T>(lhs: T, rhs: T) where T: Collection {
@@ -686,4 +696,58 @@ func testImplicitMember() {
 // IMPLICIT_MEMBER_SKIPPED: Keyword/ExprSpecific:               arg3: [#Argument name#];
 // IMPLICIT_MEMBER_SKIPPED: Keyword/ExprSpecific:               arg4: [#Argument name#];
 // IMPLICIT_MEMBER_SKIPPED: End completions
+}
+func testImplicitMemberInArrayLiteral() {
+  struct Receiver {
+    init(_: [TestStaticMemberCall]) {}
+    init(arg1: Int, arg2: [TestStaticMemberCall]) {}
+  }
+
+  Receiver([
+    .create1(x: 1),
+    .create1(#^IMPLICIT_MEMBER_ARRAY_1_AFTERPAREN_1^#),
+    // Same as IMPLICIT_MEMBER_AFTERPAREN_1.
+  ])
+  Receiver([
+    .create2(#^IMPLICIT_MEMBER_ARRAY_1_AFTERPAREN_2^#),
+    // Same as IMPLICIT_MEMBER_AFTERPAREN_2.
+    .create2(1, #^IMPLICIT_MEMBER_ARRAY_1_SECOND^#
+    // Same as IMPLICIT_MEMBER_SECOND.
+  ])
+  Receiver(arg1: 12, arg2: [
+    .create2(1, arg3: 2, #^IMPLICIT_MEMBER_ARRAY_1_SKIPPED^#
+    // Same as IMPLICIT_MEMBER_SKIPPED.
+    .create1(x: 12)
+  ])
+  let _: [TestStaticMemberCall] = [
+    .create1(#^IMPLICIT_MEMBER_ARRAY_2_AFTERPAREN_1^#),
+    // Same as STATIC_METHOD_AFTERPAREN_1.
+    .create2(#^IMPLICIT_MEMBER_ARRAY_2_AFTERPAREN_2^#),
+    // Same as STATIC_METHOD_AFTERPAREN_2.
+    .create2(1, #^IMPLICIT_MEMBER_ARRAY_2_SECOND^#),
+    // Same as STATIC_METHOD_SECOND.
+    .create2(1, arg3: 2, #^IMPLICIT_MEMBER_ARRAY_2_SKIPPED^#),
+    // Same as STATIC_METHOD_SKIPPED.
+  ]
+}
+
+struct Wrap<T> {
+  func method<U>(_ fn: (T) -> U) -> Wrap<U> {}
+}
+func testGenricMethodOnGenericOfArchetype<Wrapped>(value: Wrap<Wrapped>) {
+  value.method(#^ARCHETYPE_GENERIC_1^#)
+// ARCHETYPE_GENERIC_1: Begin completions
+// ARCHETYPE_GENERIC_1: Decl[InstanceMethod]/CurrNominal:   ['(']{#(fn): (Wrapped) -> _##(Wrapped) -> _#}[')'][#Wrap<_>#];
+}
+
+struct TestHasErrorAutoclosureParam {
+  func hasErrorAutoclosureParam(value: @autoclosure () -> Value) {
+    fatalError()
+  }
+  func test() {
+    hasErrorAutoclosureParam(#^PARAM_WITH_ERROR_AUTOCLOSURE^#
+// PARAM_WITH_ERROR_AUTOCLOSURE: Begin completions, 1 items
+// PARAM_WITH_ERROR_AUTOCLOSURE: Decl[InstanceMethod]/CurrNominal:   ['(']{#value: <<error type>>#}[')'][#Void#];
+// PARAM_WITH_ERROR_AUTOCLOSURE: End completions
+  }
 }

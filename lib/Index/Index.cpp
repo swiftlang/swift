@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Index/Index.h"
-#include "swift/Index/Utils.h"
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Comment.h"
@@ -298,6 +297,10 @@ private:
     // Do not handle unavailable decls.
     if (AvailableAttr::isUnavailable(D))
       return false;
+
+    if (!handleCustomAttrInitRefs(D))
+      return false;
+
     if (auto *AD = dyn_cast<AccessorDecl>(D)) {
       if (ManuallyVisitedAccessorStack.empty() ||
           ManuallyVisitedAccessorStack.back() != AD)
@@ -319,6 +322,36 @@ private:
     if (getParentDecl() == D)
       return finishCurrentEntity();
 
+    return true;
+  }
+
+  /// Report calls to the initializers of property wrapper types on wrapped properties.
+  ///
+  /// These may be either explicit:
+  ///     `\@Wrapper(initialialValue: 42) var x: Int`
+  /// or implicit:
+  ///     `\@Wrapper var x = 10`
+  bool handleCustomAttrInitRefs(Decl * D) {
+    for (auto *customAttr : D->getAttrs().getAttributes<CustomAttr, true>()) {
+      if (customAttr->isImplicit())
+        continue;
+
+      auto &Loc = customAttr->getTypeLoc();
+      if (auto *semanticInit = dyn_cast_or_null<CallExpr>(customAttr->getSemanticInit())) {
+        if (auto *CD = semanticInit->getCalledValue()) {
+          if (!shouldIndex(CD, /*IsRef*/true))
+            continue;
+          IndexSymbol Info;
+          if (initIndexSymbol(CD, Loc.getLoc(), /*IsRef=*/true, Info))
+            continue;
+          Info.roles |= (unsigned)SymbolRole::Call;
+          if (semanticInit->isImplicit())
+            Info.roles |= (unsigned)SymbolRole::Implicit;
+          if (!startEntity(CD, Info, /*IsRef=*/true) || !finishCurrentEntity())
+            return false;
+        }
+      }
+    }
     return true;
   }
 
@@ -417,6 +450,18 @@ private:
     if (!reportRef(D, Loc, Info, Data.AccKind))
       return false;
 
+    // If this is a reference to a property wrapper backing property or
+    // projected value, report a reference to the wrapped property too (i.e.
+    // report an occurrence of `foo` in `_foo` and '$foo').
+    if (auto *VD = dyn_cast<VarDecl>(D)) {
+      if (auto *Wrapped = VD->getOriginalWrappedProperty()) {
+        assert(Range.getByteLength() > 1 &&
+               (Range.str().front() == '_' || Range.str().front() == '$'));
+        auto AfterDollar = Loc.getAdvancedLoc(1);
+        reportRef(Wrapped, AfterDollar, Info, None);
+      }
+    }
+
     return true;
   }
 
@@ -432,9 +477,8 @@ private:
     Info.symInfo = getSymbolInfoForModule(Mod);
     getModuleNameAndUSR(Mod, Info.name, Info.USR);
 
-    auto Parent = getParentDecl();
-    if (Parent && isa<AbstractFunctionDecl>(Parent))
-      addRelation(Info, (unsigned)SymbolRole::RelationContainedBy, Parent);
+    if (auto Container = getContainingDecl())
+      addRelation(Info, (unsigned)SymbolRole::RelationContainedBy, Container);
 
     if (!IdxConsumer.startSourceEntity(Info)) {
       Cancelled = true;
@@ -447,6 +491,16 @@ private:
   Decl *getParentDecl() const {
     if (!EntitiesStack.empty())
       return EntitiesStack.back().D;
+    return nullptr;
+  }
+
+  Decl *getContainingDecl() const {
+    for (const auto &Entity: EntitiesStack) {
+      if (isa<AbstractFunctionDecl>(Entity.D) &&
+          (Entity.Roles & (SymbolRoleSet)SymbolRole::Definition)) {
+        return Entity.D;
+      }
+    }
     return nullptr;
   }
 
@@ -544,6 +598,10 @@ private:
     }
 
     if (D->isImplicit() && !isa<ConstructorDecl>(D))
+      return false;
+
+    // Do not handle non-public imported decls.
+    if (IsModuleFile && !D->isAccessibleFrom(nullptr))
       return false;
 
     if (!IdxConsumer.indexLocals() && isLocalSymbol(D))
@@ -707,8 +765,7 @@ bool IndexSwiftASTWalker::handleWitnesses(Decl *D, SmallVectorImpl<IndexedWitnes
     if (!normal)
       continue;
 
-    normal->forEachValueWitness(nullptr,
-                                [&](ValueDecl *req, Witness witness) {
+    normal->forEachValueWitness([&](ValueDecl *req, Witness witness) {
       if (Cancelled)
         return;
 
@@ -723,8 +780,8 @@ bool IndexSwiftASTWalker::handleWitnesses(Decl *D, SmallVectorImpl<IndexedWitnes
       }
     });
 
-    normal->forEachTypeWitness(nullptr,
-                 [&](AssociatedTypeDecl *assoc, Type type, TypeDecl *typeDecl) {
+    normal->forEachTypeWitness(
+                [&](AssociatedTypeDecl *assoc, Type type, TypeDecl *typeDecl) {
       if (Cancelled)
         return true;
       if (typeDecl == nullptr)
@@ -789,7 +846,7 @@ bool IndexSwiftASTWalker::startEntityDecl(ValueDecl *D) {
       return false;
   }
 
-  for (auto Overriden: getOverriddenDecls(D, /*IncludeProtocolReqs=*/false)) {
+  for (auto Overriden: collectAllOverriddenDecls(D, /*IncludeProtocolReqs=*/false)) {
     addRelation(Info, (SymbolRoleSet) SymbolRole::RelationOverrideOf, Overriden);
   }
 
@@ -1005,13 +1062,10 @@ bool IndexSwiftASTWalker::report(ValueDecl *D) {
   if (startEntityDecl(D)) {
     // Pass accessors.
     if (auto StoreD = dyn_cast<AbstractStorageDecl>(D)) {
-      auto isNullOrImplicit = [](const Decl *D) -> bool {
-        return !D || D->isImplicit();
-      };
-
       bool usedPseudoAccessors = false;
-      if (isa<VarDecl>(D) && isNullOrImplicit(StoreD->getGetter()) &&
-          isNullOrImplicit(StoreD->getSetter())) {
+      if (isa<VarDecl>(D) &&
+          !StoreD->getParsedAccessor(AccessorKind::Get) &&
+          !StoreD->getParsedAccessor(AccessorKind::Set)) {
         usedPseudoAccessors = true;
         auto VarD = cast<VarDecl>(D);
         // No actual getter or setter, pass 'pseudo' accessors.
@@ -1161,9 +1215,8 @@ bool IndexSwiftASTWalker::initIndexSymbol(ValueDecl *D, SourceLoc Loc,
 
   if (IsRef) {
     Info.roles |= (unsigned)SymbolRole::Reference;
-    auto Parent = getParentDecl();
-    if (Parent && isa<AbstractFunctionDecl>(Parent))
-      addRelation(Info, (unsigned)SymbolRole::RelationContainedBy, Parent);
+    if (auto Container = getContainingDecl())
+      addRelation(Info, (unsigned)SymbolRole::RelationContainedBy, Container);
   } else {
     Info.roles |= (unsigned)SymbolRole::Definition;
     if (D->isImplicit())
@@ -1506,73 +1559,6 @@ void IndexSwiftASTWalker::collectRecursiveModuleImports(
     collectRecursiveModuleImports(*Import.second, Visited);
   }
 }
-
-static Type getContextFreeInterfaceType(ValueDecl *VD) {
-  if (auto AFD = dyn_cast<AbstractFunctionDecl>(VD)) {
-    return AFD->getMethodInterfaceType();
-  }
-  return VD->getInterfaceType();
-}
-
-ArrayRef<ValueDecl*> swift::
-canDeclProvideDefaultImplementationFor(ValueDecl* VD,
-                                       llvm::SmallVectorImpl<ValueDecl*> &Scratch) {
-
-  // Skip decls that don't have valid names.
-  if (!VD->getFullName())
-    return {};
-
-  // Check if VD is from a protocol extension.
-  auto P = VD->getDeclContext()->getExtendedProtocolDecl();
-  if (!P)
-    return {};
-
-  // Look up all decls in the protocol's inheritance chain for the ones with
-  // the same name with VD.
-  ResolvedMemberResult LookupResult =
-  resolveValueMember(*P->getInnermostDeclContext(),
-                     P->getDeclaredInterfaceType(), VD->getFullName());
-
-  auto VDType = getContextFreeInterfaceType(VD);
-  for (auto Mem : LookupResult.getMemberDecls(InterestedMemberKind::All)) {
-    if (isa<ProtocolDecl>(Mem->getDeclContext())) {
-      if (Mem->isProtocolRequirement() &&
-          getContextFreeInterfaceType(Mem)->isEqual(VDType)) {
-        // We find a protocol requirement VD can provide default
-        // implementation for.
-        Scratch.push_back(Mem);
-      }
-    }
-  }
-  return Scratch;
-}
-
-std::vector<ValueDecl*> swift::
-getOverriddenDecls(ValueDecl *VD, bool IncludeProtocolRequirements,
-                   bool Transitive) {
-  std::vector<ValueDecl*> results;
-
-  if (auto Overridden = VD->getOverriddenDecl()) {
-    results.push_back(Overridden);
-    while (Transitive && (Overridden = Overridden->getOverriddenDecl()))
-      results.push_back(Overridden);
-  }
-
-  // Collect the protocol requirements this decl is a default impl for
-  llvm::SmallVector<ValueDecl*, 2> Buffer;
-  for (auto Req : canDeclProvideDefaultImplementationFor(VD, Buffer)) {
-    results.push_back(Req);
-  }
-
-  if (IncludeProtocolRequirements) {
-    for (auto Satisfied : VD->getSatisfiedProtocolRequirements()) {
-      results.push_back(Satisfied);
-    }
-  }
-
-  return results;
-}
-
 
 //===----------------------------------------------------------------------===//
 // Indexing entry points

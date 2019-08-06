@@ -622,7 +622,7 @@ sil @test_closure : $@convention(thin) (@guaranteed C) -> ()
 // CHECK-NOT:  strong_release
 // CHECK:      bb2:
 // CHECK-NEXT:   strong_release %0
-// CHECK         return
+// CHECK:         return
 sil @dead_closure_elimination : $@convention(thin) (@owned C) -> () {
 bb0(%0 : $C):
   %1 = function_ref @test_closure : $@convention(thin) (@guaranteed C) -> ()

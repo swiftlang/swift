@@ -799,8 +799,10 @@ void ASTMangler::appendType(Type type, const ValueDecl *forDecl) {
     case TypeKind::BuiltinVector:
       appendType(cast<BuiltinVectorType>(tybase)->getElementType(),
                  forDecl);
+      // The mangling calls for using the actual element count, which we have
+      // to adjust by 1 in order to mangle it as an index.
       return appendOperator("Bv",
-                            cast<BuiltinVectorType>(tybase)->getNumElements());
+                  Index(cast<BuiltinVectorType>(tybase)->getNumElements() + 1));
     case TypeKind::TypeAlias: {
       assert(DWARFMangling && "sugared types are only legal for the debugger");
       auto aliasTy = cast<TypeAliasType>(tybase);
@@ -1229,8 +1231,11 @@ void ASTMangler::appendBoundGenericArgs(Type type, bool &isFirstArgList) {
   } else {
     auto boundType = cast<BoundGenericType>(typePtr);
     genericArgs = boundType->getGenericArgs();
-    if (Type parent = boundType->getParent())
-      appendBoundGenericArgs(parent->getDesugaredType(), isFirstArgList);
+    if (Type parent = boundType->getParent()) {
+      GenericTypeDecl *decl = boundType->getAnyGeneric();
+      if (!getSpecialManglingContext(decl, UseObjCProtocolNames))
+        appendBoundGenericArgs(parent->getDesugaredType(), isFirstArgList);
+    }
   }
   if (isFirstArgList) {
     appendOperator("y");
@@ -1484,6 +1489,7 @@ ASTMangler::getSpecialManglingContext(const ValueDecl *decl,
         hasNameForLinkage = !clangDecl->getDeclName().isEmpty();
       if (hasNameForLinkage) {
         auto *clangDC = clangDecl->getDeclContext();
+        if (isa<clang::NamespaceDecl>(clangDC)) return None;
         assert(clangDC->getRedeclContext()->isTranslationUnit() &&
                "non-top-level Clang types not supported yet");
         (void)clangDC;
@@ -1826,6 +1832,10 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl) {
     } else if (isa<clang::TypedefNameDecl>(namedDecl) ||
                isa<clang::ObjCCompatibleAliasDecl>(namedDecl)) {
       appendOperator("a");
+    } else if (isa<clang::NamespaceDecl>(namedDecl)) {
+      // Note: Namespaces are not really structs, but since namespaces are
+      // imported as enums, be consistent.
+      appendOperator("V");
     } else {
       llvm_unreachable("unknown imported Clang type");
     }
@@ -2556,7 +2566,8 @@ void ASTMangler::appendDependentProtocolConformance(
       auto index =
         conformanceRequirementIndex(entry,
                                     CurGenericSignature->getRequirements());
-      appendOperator("HD", index + 1);
+      // This is never an unknown index and so must be adjusted by 2 per ABI.
+      appendOperator("HD", Index(index + 2));
       continue;
     }
 
@@ -2571,7 +2582,8 @@ void ASTMangler::appendDependentProtocolConformance(
       entry.first->isEqual(currentProtocol->getProtocolSelfType());
     if (isInheritedConformance) {
       appendProtocolName(entry.second);
-      appendOperator("HI", index + 1);
+      // For now, this is never an unknown index and so must be adjusted by 2.
+      appendOperator("HI", Index(index + 2));
       continue;
     }
 
@@ -2580,10 +2592,11 @@ void ASTMangler::appendDependentProtocolConformance(
     appendType(entry.first);
     appendProtocolName(entry.second);
 
-    // For non-resilient protocols, encode the index.
+    // For resilient protocols, the index is unknown, so we use the special
+    // value 1; otherwise we adjust by 2.
     bool isResilient =
       currentProtocol->isResilient(Mod, ResilienceExpansion::Maximal);
-    appendOperator("HA", isResilient ? 0 : index + 1);
+    appendOperator("HA", Index(isResilient ? 1 : index + 2));
   }
 }
 

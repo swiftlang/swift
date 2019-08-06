@@ -190,7 +190,7 @@ public:
 
       // point at the for stmt, to look nice
       SourceLoc StartLoc = FES->getStartLoc();
-      SourceLoc EndLoc = FES->getIterator()->getEndLoc();
+      SourceLoc EndLoc = FES->getSequence()->getEndLoc();
       // FIXME: get the 'end' of the for stmt
       // if (FD->getBodyResultTypeLoc().hasLocation()) {
       //   EndLoc = FD->getBodyResultTypeLoc().getSourceRange().End;
@@ -435,7 +435,7 @@ public:
 
               SourceRange SR = PBD->getSourceRange();
               if (!SR.isValid()) {
-                SR = PBD->getOrigInitRange(0);
+                SR = PBD->getOriginalInitRange(0);
               }
 
               Added<Stmt *> LogBefore = buildLoggerCall(SR, true);
@@ -477,7 +477,7 @@ public:
     }
 
     VarDecl *VD =
-        new (Context) VarDecl(/*IsStatic*/false, VarDecl::Specifier::Let,
+        new (Context) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Let,
                               /*IsCaptureList*/false, SourceLoc(),
                               Context.getIdentifier(NameBuf),
                               TypeCheckDC);

@@ -83,7 +83,7 @@
 ///         print("Add more to your cart for free priority shipping!")
 ///     }
 ///     // Prints "You've earned free priority shipping!"
-public protocol OptionSet : SetAlgebra, RawRepresentable {
+public protocol OptionSet: SetAlgebra, RawRepresentable {
   // We can't constrain the associated Element type to be the same as
   // Self, but we can do almost as well with a default and a
   // constrained extension
@@ -326,7 +326,7 @@ extension OptionSet where Element == Self {
 /// - Note: A type conforming to `OptionSet` can implement any of
 ///   these initializers or methods, and those implementations will be
 ///   used in lieu of these defaults.
-extension OptionSet where RawValue : FixedWidthInteger {
+extension OptionSet where RawValue: FixedWidthInteger {
   /// Creates an empty option set.
   ///
   /// This initializer creates an option set with a raw value of zero.

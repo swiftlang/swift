@@ -158,7 +158,7 @@
 ///     print("Average: \(average)°F in \(validTemps.count) " +
 ///           "out of \(tempsFahrenheit.count) observations.")
 ///     // Prints "Average: 74.84°F in 5 out of 7 observations."
-public protocol FloatingPoint : SignedNumeric, Strideable, Hashable
+public protocol FloatingPoint: SignedNumeric, Strideable, Hashable
                                 where Magnitude == Self {
 
   /// A type that can represent any written exponent.
@@ -244,14 +244,14 @@ public protocol FloatingPoint : SignedNumeric, Strideable, Hashable
   /// with more trailing zeros in its significand bit pattern.
   ///
   /// - Parameter value: The integer to convert to a floating-point value.
-  init<Source : BinaryInteger>(_ value: Source)
+  init<Source: BinaryInteger>(_ value: Source)
 
   /// Creates a new value, if the given integer can be represented exactly.
   ///
   /// If the given integer cannot be represented exactly, the result is `nil`.
   ///
   /// - Parameter value: The integer to convert to a floating-point value.
-  init?<Source : BinaryInteger>(exactly value: Source)
+  init?<Source: BinaryInteger>(exactly value: Source)
 
   /// The radix, or base of exponentiation, for a floating-point type.
   ///
@@ -468,7 +468,7 @@ public protocol FloatingPoint : SignedNumeric, Strideable, Hashable
   /// is defined as follows:
   ///
   /// - If `x` is zero, then `x.significand` is 0.0.
-  /// - If `x` is infinity, then `x.significand` is 1.0.
+  /// - If `x` is infinite, then `x.significand` is infinity.
   /// - If `x` is NaN, then `x.significand` is NaN.
   /// - Note: The significand is frequently also called the *mantissa*, but
   ///   significand is the preferred terminology in the [IEEE 754
@@ -1512,7 +1512,7 @@ public protocol BinaryFloatingPoint: FloatingPoint, ExpressibleByFloatLiteral {
   /// with more trailing zeros in its significand bit pattern.
   ///
   /// - Parameter value: A floating-point value to be converted.
-  init<Source : BinaryFloatingPoint>(_ value: Source)
+  init<Source: BinaryFloatingPoint>(_ value: Source)
 
   /// Creates a new instance from the given value, if it can be represented
   /// exactly.
@@ -1522,7 +1522,7 @@ public protocol BinaryFloatingPoint: FloatingPoint, ExpressibleByFloatLiteral {
   /// represented exactly if its payload cannot be encoded exactly.
   ///
   /// - Parameter value: A floating-point value to be converted.
-  init?<Source : BinaryFloatingPoint>(exactly value: Source)
+  init?<Source: BinaryFloatingPoint>(exactly value: Source)
 
   /// The number of bits used to represent the type's exponent.
   ///
@@ -2062,7 +2062,7 @@ extension BinaryFloatingPoint {
 
   @inlinable
   public // @testable
-  static func _convert<Source : BinaryFloatingPoint>(
+  static func _convert<Source: BinaryFloatingPoint>(
     from source: Source
   ) -> (value: Self, exact: Bool) {
     guard _fastPath(!source.isZero) else {
@@ -2203,7 +2203,7 @@ extension BinaryFloatingPoint {
   ///
   /// - Parameter value: A floating-point value to be converted.
   @inlinable
-  public init<Source : BinaryFloatingPoint>(_ value: Source) {
+  public init<Source: BinaryFloatingPoint>(_ value: Source) {
     self = Self._convert(from: value).value
   }
 
@@ -2215,7 +2215,7 @@ extension BinaryFloatingPoint {
   ///
   /// - Parameter value: A floating-point value to be converted.
   @inlinable
-  public init?<Source : BinaryFloatingPoint>(exactly value: Source) {
+  public init?<Source: BinaryFloatingPoint>(exactly value: Source) {
     let (value_, exact) = Self._convert(from: value)
     guard exact else { return nil }
     self = value_
@@ -2268,11 +2268,11 @@ extension BinaryFloatingPoint {
   }
 }
 
-extension BinaryFloatingPoint where Self.RawSignificand : FixedWidthInteger {
+extension BinaryFloatingPoint where Self.RawSignificand: FixedWidthInteger {
   
   @inlinable
   public // @testable
-  static func _convert<Source : BinaryInteger>(
+  static func _convert<Source: BinaryInteger>(
     from source: Source
   ) -> (value: Self, exact: Bool) {
     //  Useful constants:
@@ -2335,7 +2335,7 @@ extension BinaryFloatingPoint where Self.RawSignificand : FixedWidthInteger {
   ///
   /// - Parameter value: The integer to convert to a floating-point value.
   @inlinable
-  public init<Source : BinaryInteger>(_ value: Source) {
+  public init<Source: BinaryInteger>(_ value: Source) {
     self = Self._convert(from: value).value
   }
   
@@ -2345,7 +2345,7 @@ extension BinaryFloatingPoint where Self.RawSignificand : FixedWidthInteger {
   ///
   /// - Parameter value: The integer to convert to a floating-point value.
   @inlinable
-  public init?<Source : BinaryInteger>(exactly value: Source) {
+  public init?<Source: BinaryInteger>(exactly value: Source) {
     let (value_, exact) = Self._convert(from: value)
     guard exact else { return nil }
     self = value_

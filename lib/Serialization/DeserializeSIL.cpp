@@ -1617,6 +1617,13 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                                             encoding.getValue());
     break;
   }
+  case SILInstructionKind::CondFailInst: {
+    SILValue Op = getLocalValue(ValID, getSILType(MF->getType(TyID),                        \
+                               (SILValueCategory)TyCategory));
+    StringRef StringVal = MF->getIdentifierText(ValID2);
+    ResultVal = Builder.createCondFail(Loc, Op, StringVal);
+    break;
+  }
   case SILInstructionKind::MarkFunctionEscapeInst: {
     // Format: a list of typed values. A typed value is expressed by 4 IDs:
     // TypeID, TypeCategory, ValueID, ValueResultNumber.
@@ -1664,7 +1671,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   REFCOUNTING_INSTRUCTION(StrongRetain##Name) \
   UNARY_INSTRUCTION(Copy##Name##Value)
 #include "swift/AST/ReferenceStorage.def"
-  UNARY_INSTRUCTION(CondFail)
   REFCOUNTING_INSTRUCTION(RetainValue)
   REFCOUNTING_INSTRUCTION(RetainValueAddr)
   REFCOUNTING_INSTRUCTION(UnmanagedRetainValue)

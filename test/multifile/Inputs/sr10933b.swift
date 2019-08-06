@@ -1,8 +1,8 @@
 @propertyWrapper
 final class IntWrapper: Wrapper<Int> {
-  override var value: Int {
-    get { super.value }
-    set { super.value = newValue }
+  override var wrappedValue: Int {
+    get { super.wrappedValue }
+    set { super.wrappedValue = newValue }
   }
 }
 

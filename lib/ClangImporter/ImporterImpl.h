@@ -454,9 +454,6 @@ public:
   // Mapping from imported types to their raw value types.
   llvm::DenseMap<const NominalTypeDecl *, Type> RawTypes;
 
-  // Mapping from imported types to their init(rawValue:) initializers.
-  llvm::DenseMap<const NominalTypeDecl *, ConstructorDecl *> RawInits;
-
   clang::CompilerInstance *getClangInstance() {
     return Instance.get();
   }
@@ -1171,10 +1168,6 @@ public:
            "already have a type resolver");
     typeResolver.setPointerAndInt(newResolver, true);
   }
-  bool hasBegunTypeChecking() const { return typeResolver.getInt(); }
-  bool hasFinishedTypeChecking() const {
-    return hasBegunTypeChecking() && !getTypeResolver();
-  }
 
   /// Allocate a new delayed conformance ID with the given set of
   /// conformances.
@@ -1267,6 +1260,11 @@ public:
   /// Returns the generic environment.
   virtual GenericEnvironment *loadGenericEnvironment(const DeclContext *decl,
                                                      uint64_t contextData) override {
+    llvm_unreachable("unimplemented for ClangImporter");
+  }
+
+  void loadRequirementSignature(const ProtocolDecl *decl, uint64_t contextData,
+                                SmallVectorImpl<Requirement> &reqs) override {
     llvm_unreachable("unimplemented for ClangImporter");
   }
 

@@ -467,6 +467,7 @@ SwiftInterfaceGenContext::createForTypeInterface(CompilerInvocation Invocation,
     ErrorMsg = "Error during invocation setup";
     return nullptr;
   }
+  registerIDETypeCheckRequestFunctions(CI.getASTContext().evaluator);
   CI.performSema();
   ASTContext &Ctx = CI.getASTContext();
   CloseClangModuleFiles scopedCloseFiles(*Ctx.getClangModuleLoader());
@@ -775,7 +776,8 @@ void SwiftLangSupport::editorOpenSwiftSourceInterface(StringRef Name,
   auto AstConsumer = std::make_shared<PrimaryFileInterfaceConsumer>(Name,
     SourceName, IFaceGenContexts, Consumer, Invocation);
   static const char OncePerASTToken = 0;
-  getASTManager()->processASTAsync(Invocation, AstConsumer, &OncePerASTToken);
+  getASTManager()->processASTAsync(Invocation, AstConsumer, &OncePerASTToken,
+                                   llvm::vfs::getRealFileSystem());
 }
 
 void SwiftLangSupport::editorOpenHeaderInterface(EditorConsumer &Consumer,

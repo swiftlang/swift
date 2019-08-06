@@ -303,11 +303,21 @@ public:
       llvm::Intrinsic::getDeclaration(getModule(), intrinsicID, typeArgs);
     return CreateCall(intrinsicFn, args, name);
   }
+  
+  /// Create an expect intrinsic call.
+  llvm::CallInst *CreateExpect(llvm::Value *value,
+                               llvm::Value *expected,
+                               const Twine &name = "") {
+    return CreateIntrinsicCall(llvm::Intrinsic::expect,
+                               {value->getType()},
+                               {value, expected},
+                               name);
+  }
 
   /// Call the trap intrinsic. If optimizations are enabled, an inline asm
   /// gadget is emitted before the trap. The gadget inhibits transforms which
   /// merge trap calls together, which makes debugging crashes easier.
-  llvm::CallInst *CreateNonMergeableTrap(IRGenModule &IGM);
+  llvm::CallInst *CreateNonMergeableTrap(IRGenModule &IGM, StringRef failureMsg);
 
   /// Split a first-class aggregate value into its component pieces.
   template <unsigned N>

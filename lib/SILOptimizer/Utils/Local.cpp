@@ -1493,8 +1493,7 @@ bool swift::simplifyUsers(SingleValueInstruction *I) {
   return Changed;
 }
 
-/// True if a type can be expanded
-/// without a significant increase to code size.
+/// True if a type can be expanded without a significant increase to code size.
 bool swift::shouldExpand(SILModule &Module, SILType Ty) {
   // FIXME: Expansion
   auto Expansion = ResilienceExpansion::Minimal;
@@ -1820,7 +1819,7 @@ swift::findLocalApplySites(FunctionRefBaseInst *FRI) {
         f->partialApplySites.push_back(pai);
         // Look to see if we can find a full application of this partial apply
         // as well.
-        copy(pai->getUses(), std::back_inserter(worklist));
+        llvm::copy(pai->getUses(), std::back_inserter(worklist));
         continue;
       }
     }
@@ -1830,21 +1829,22 @@ swift::findLocalApplySites(FunctionRefBaseInst *FRI) {
     case SILInstructionKind::ThinToThickFunctionInst:
     case SILInstructionKind::ConvertFunctionInst:
     case SILInstructionKind::ConvertEscapeToNoEscapeInst:
-      copy(cast<SingleValueInstruction>(user)->getUses(),
-           std::back_inserter(worklist));
+      llvm::copy(cast<SingleValueInstruction>(user)->getUses(),
+                 std::back_inserter(worklist));
       continue;
 
     // A partial_apply [stack] marks its captured arguments with
     // mark_dependence.
     case SILInstructionKind::MarkDependenceInst:
-      copy(cast<SingleValueInstruction>(user)->getUses(),
-           std::back_inserter(worklist));
+      llvm::copy(cast<SingleValueInstruction>(user)->getUses(),
+                 std::back_inserter(worklist));
       continue;
 
     // Look through any reference count instructions since these are not
     // escapes:
     case SILInstructionKind::CopyValueInst:
-      copy(cast<CopyValueInst>(user)->getUses(), std::back_inserter(worklist));
+      llvm::copy(cast<CopyValueInst>(user)->getUses(),
+                 std::back_inserter(worklist));
       continue;
     case SILInstructionKind::StrongRetainInst:
     case SILInstructionKind::StrongReleaseInst:

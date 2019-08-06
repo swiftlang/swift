@@ -134,7 +134,10 @@ bool TypeBase::isUninhabited() {
   // Empty enum declarations are uninhabited
   if (auto nominalDecl = getAnyNominal())
     if (auto enumDecl = dyn_cast<EnumDecl>(nominalDecl))
-      if (enumDecl->getAllElements().empty())
+      // Objective-C enums may be allowed to hold any value representable by
+      // the underlying type, but only if they come from clang.
+      if (enumDecl->getAllElements().empty() &&
+          !(enumDecl->isObjC() && enumDecl->hasClangNode()))
         return true;
   return false;
 }
@@ -404,17 +407,6 @@ Type TypeBase::eraseOpenedExistential(OpenedArchetypeType *opened) {
         return existentialType;
     }
 
-    return t;
-  });
-}
-
-Type TypeBase::eraseDynamicSelfType() {
-  if (!hasDynamicSelfType())
-    return this;
-
-  return Type(this).transform([](Type t) -> Type {
-    if (auto *selfTy = dyn_cast<DynamicSelfType>(t.getPointer()))
-      return selfTy->getSelfType();
     return t;
   });
 }
@@ -1244,16 +1236,23 @@ CanType TypeBase::getCanonicalType(GenericSignature *sig) {
 }
 
 TypeBase *TypeBase::reconstituteSugar(bool Recursive) {
-  auto Func = [](Type Ty) -> Type {
+  auto Func = [Recursive](Type Ty) -> Type {
     if (auto boundGeneric = dyn_cast<BoundGenericType>(Ty.getPointer())) {
+
+      auto getGenericArg = [&](unsigned i) -> Type {
+        auto arg = boundGeneric->getGenericArgs()[i];
+        if (Recursive)
+          arg = arg->reconstituteSugar(Recursive);
+        return arg;
+      };
+
       auto &ctx = boundGeneric->getASTContext();
       if (boundGeneric->getDecl() == ctx.getArrayDecl())
-        return ArraySliceType::get(boundGeneric->getGenericArgs()[0]);
+        return ArraySliceType::get(getGenericArg(0));
       if (boundGeneric->getDecl() == ctx.getDictionaryDecl())
-        return DictionaryType::get(boundGeneric->getGenericArgs()[0],
-                                   boundGeneric->getGenericArgs()[1]);
+        return DictionaryType::get(getGenericArg(0), getGenericArg(1));
       if (boundGeneric->getDecl() == ctx.getOptionalDecl())
-        return OptionalType::get(boundGeneric->getGenericArgs()[0]);
+        return OptionalType::get(getGenericArg(0));
     }
     return Ty;
   };
@@ -1261,6 +1260,15 @@ TypeBase *TypeBase::reconstituteSugar(bool Recursive) {
     return Type(this).transform(Func).getPointer();
   else
     return Func(this).getPointer();
+}
+
+TypeBase *TypeBase::getWithoutSyntaxSugar() {
+  auto Func = [](Type Ty) -> Type {
+    if (auto *syntaxSugarType = dyn_cast<SyntaxSugarType>(Ty.getPointer()))
+      return syntaxSugarType->getSinglyDesugaredType()->getWithoutSyntaxSugar();
+    return Ty;
+  };
+  return Type(this).transform(Func).getPointer();
 }
 
 #define TYPE(Id, Parent)
@@ -1306,7 +1314,9 @@ Type SugarType::getSinglyDesugaredTypeSlow() {
     implDecl = Context->getDictionaryDecl();
     break;
   }
-  assert(implDecl && "Type has not been set yet");
+  if (!implDecl) {
+    return ErrorType::get(*Context);
+  }
 
   Bits.SugarType.HasCachedType = true;
   if (auto Ty = dyn_cast<UnarySyntaxSugarType>(this)) {
@@ -2346,7 +2356,7 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
 
   // Class-to-class.
   if (matchMode.contains(TypeMatchFlags::AllowOverride))
-    if (t2->eraseDynamicSelfType()->isExactSuperclassOf(t1))
+    if (t2->isExactSuperclassOf(t1))
       return true;
 
   if (matchMode.contains(TypeMatchFlags::AllowABICompatible))
@@ -2549,7 +2559,7 @@ bool ReplaceOpaqueTypesWithUnderlyingTypes::shouldPerformSubstitution(
       return true;
     }
   } else if (auto *asd = dyn_cast<AbstractStorageDecl>(namingDecl)) {
-    auto *getter = asd->getGetter();
+    auto *getter = asd->getOpaqueAccessor(AccessorKind::Get);
     if (getter &&
         getter->getResilienceExpansion() == ResilienceExpansion::Minimal) {
       return true;
@@ -2979,7 +2989,8 @@ static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
 
   // Produce a failed result.
   auto failed = [&]() -> Type {
-    if (!options.contains(SubstFlags::UseErrorType)) return Type();
+    if (!options.contains(SubstFlags::UseErrorType))
+      return Type();
 
     Type baseType = ErrorType::get(substBase ? substBase : origBase);
     if (assocType)
@@ -3026,7 +3037,6 @@ static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
     return failed();
 
   // If we know the associated type, look in the witness table.
-  LazyResolver *resolver = substBase->getASTContext().getLazyResolver();
   if (assocType) {
     auto proto = assocType->getProtocol();
     Optional<ProtocolConformanceRef> conformance
@@ -3038,7 +3048,7 @@ static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
 
     // Retrieve the type witness.
     auto witness =
-      conformance->getConcrete()->getTypeWitness(assocType, resolver, options);
+      conformance->getConcrete()->getTypeWitness(assocType, options);
     if (!witness)
       return failed();
 
@@ -3100,9 +3110,7 @@ LookUpConformanceInSignature::operator()(CanType dependentType,
                                conformedProtocol);
 }
 
-Type DependentMemberType::substBaseType(ModuleDecl *module,
-                                        Type substBase,
-                                        LazyResolver *resolver) {
+Type DependentMemberType::substBaseType(ModuleDecl *module, Type substBase) {
   return substBaseType(substBase, LookUpConformanceInModule(module));
 }
 
@@ -3114,6 +3122,19 @@ Type DependentMemberType::substBaseType(Type substBase,
 
   return getMemberForBaseType(lookupConformance, getBase(), substBase,
                               getAssocType(), getName(), None);
+}
+
+Type DependentMemberType::substRootParam(Type newRoot,
+                                         LookupConformanceFn lookupConformance){
+  auto base = getBase();
+  if (auto param = base->getAs<GenericTypeParamType>()) {
+    return substBaseType(newRoot, lookupConformance);
+  }
+  if (auto depMem = base->getAs<DependentMemberType>()) {
+    return substBaseType(depMem->substRootParam(newRoot, lookupConformance),
+                         lookupConformance);
+  }
+  return Type();
 }
 
 static Type substGenericFunctionType(GenericFunctionType *genericFnType,
@@ -3269,8 +3290,9 @@ static Type substType(Type derivedType,
       return None;
 
     // If we have a substitution for this type, use it.
-    if (auto known = substitutions(substOrig))
+    if (auto known = substitutions(substOrig)) {
       return known;
+    }
 
     // If we failed to substitute a generic type parameter, give up.
     if (isa<GenericTypeParamType>(substOrig)) {
@@ -3887,7 +3909,7 @@ case TypeKind::Id:
     }
     
     // Substitute the new root into the root of the interface type.
-    return nestedType->getInterfaceType()->substBaseType(substRoot,
+    return nestedType->getInterfaceType()->substRootParam(substRoot,
         LookUpConformanceInModule(root->getDecl()->getModuleContext()));
   }
 

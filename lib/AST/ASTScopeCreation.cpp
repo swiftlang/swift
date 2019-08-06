@@ -95,43 +95,36 @@ public:
     // Implicit nodes don't have source information for name lookup.
     if (d->isImplicit())
       return false;
-    // Have also seen the following in an AST:
-    // Source::
-    //
-    //  func testInvalidKeyPathComponents() {
-    //    let _ = \.{return 0} // expected-error* {{}}
-    //  }
-    //  class X {
-    //    class var a: Int { return 1 }
-    //  }
-    //
-    // AST:
-    // clang-format off
-    //    (source_file "test.swift"
-    //     (func_decl range=[test.swift:1:3 - line:3:3] "testInvalidKeyPathComponents()" interface type='() -> ()' access=internal
-    //      (parameter_list range=[test.swift:1:36 - line:1:37])
-    //      (brace_stmt range=[test.swift:1:39 - line:3:3]
-    //       (pattern_binding_decl range=[test.swift:2:5 - line:2:11]
-    //        (pattern_any)
-    //        (error_expr implicit type='<null>'))
-    //
-    //       (pattern_binding_decl range=[test.swift:2:5 - line:2:5] <=== SOURCE RANGE WILL CONFUSE SCOPE CODE
-    //        (pattern_typed implicit type='<<error type>>'
-    //         (pattern_named '_')))
-    //      ...
-    // clang-format on
-    //
-    // So test the SourceRange
-    //
-    // But wait!
-    // var z = $x0 + $x1
-    // z
-    //
-    // z has start == end, but must be pushed to expand source range
-    //
-    // So, only check source ranges for PatternBindingDecls
-    if (isa<PatternBindingDecl>(d) && (d->getStartLoc() == d->getEndLoc()))
-      return false;
+    /// In \c Parser::parseDeclVarGetSet fake PBDs are created. Ignore them.
+    /// Example:
+    /// \code
+    /// class SR10903 { static var _: Int { 0 } }
+    /// \endcode
+    if (const auto *PBD = dyn_cast<PatternBindingDecl>(d))
+      if (PBD->isInvalid())
+        return false;
+    /// In
+    /// \code
+    /// @propertyWrapper
+    /// public struct Wrapper<T> {
+    ///   public var value: T
+    ///
+    ///   public init(body: () -> T) {
+    ///     self.value = body()
+    ///   }
+    /// }
+    ///
+    /// let globalInt = 17
+    ///
+    /// @Wrapper(body: { globalInt })
+    /// public var y: Int
+    /// \endcode
+    /// I'm seeing a dumped AST include:
+    /// (pattern_binding_decl range=[test.swift:13:8 - line:12:29]
+    const auto &SM = d->getASTContext().SourceMgr;
+    assert((d->getStartLoc().isInvalid() ||
+            !SM.isBeforeInBuffer(d->getEndLoc(), d->getStartLoc())) &&
+           "end-before-start will break tree search via location");
     return true;
   }
 
@@ -179,9 +172,10 @@ private:
       function_ref<void(NullablePtr<CaptureListExpr>, ClosureExpr *)>
           foundClosure);
 
+  // A safe way to discover this, without creating a circular request.
+  // Cannot call getAttachedPropertyWrappers.
   static bool hasCustomAttribute(VarDecl *vd) {
-    return AttachedPropertyWrapperScope::getCustomAttributesSourceRange(vd)
-        .isValid();
+    return vd->getAttrs().getAttribute<CustomAttr>();
   }
 
 public:
@@ -190,8 +184,9 @@ public:
 
   void createAttachedPropertyWrapperScope(PatternBindingDecl *patternBinding,
                                           ASTScopeImpl *parent) {
+ 
     patternBinding->getPattern(0)->forEachVariable([&](VarDecl *vd) {
-      // assume all same as first
+        // assume all same as first
       if (hasCustomAttribute(vd))
         createSubtree<AttachedPropertyWrapperScope>(parent, vd);
     });
@@ -221,7 +216,7 @@ public:
   void
   forEachSpecializeAttrInSourceOrder(Decl *declBeingSpecialized,
                                      function_ref<void(SpecializeAttr *)> fn) {
-    llvm::SmallVector<SpecializeAttr *, 8> sortedSpecializeAttrs;
+    SmallVector<SpecializeAttr *, 8> sortedSpecializeAttrs;
     for (auto *attr : declBeingSpecialized->getAttrs()) {
       if (auto *specializeAttr = dyn_cast<SpecializeAttr>(attr)) {
         if (!isDuplicate(specializeAttr))
@@ -584,6 +579,8 @@ CREATES_NEW_INSERTION_POINT(TopLevelCodeScope)
 
 NO_NEW_INSERTION_POINT(AbstractFunctionBodyScope)
 NO_NEW_INSERTION_POINT(AbstractFunctionDeclScope)
+NO_NEW_INSERTION_POINT(AttachedPropertyWrapperScope)
+
 NO_NEW_INSERTION_POINT(CaptureListScope)
 NO_NEW_INSERTION_POINT(CaseStmtScope)
 NO_NEW_INSERTION_POINT(CatchStmtScope)
@@ -606,7 +603,6 @@ NO_EXPANSION(ClosureParametersScope)
 NO_EXPANSION(SpecializeAttributeScope)
 // no accessors, unlike PatternEntryUseScope
 NO_EXPANSION(ConditionalClausePatternUseScope)
-NO_EXPANSION(AttachedPropertyWrapperScope)
 NO_EXPANSION(GuardStmtUseScope)
 
 #undef CREATES_NEW_INSERTION_POINT
@@ -633,8 +629,8 @@ ASTScopeImpl *PatternEntryDeclScope::expandAScopeThatCreatesANewInsertionPoint(
   // initializer (because of InterpolatedLiteralStrings and EditorPlaceHolders),
   // so compute it ourselves.
   SourceLoc initializerEnd;
-  if (patternEntry.getInitAsWritten() &&
-      patternEntry.getInitAsWritten()->getSourceRange().isValid()) {
+  if (patternEntry.getOriginalInit() &&
+      patternEntry.getOriginalInit()->getSourceRange().isValid()) {
     auto *initializer =
         scopeCreator.createSubtree<PatternEntryInitializerScope>(
             this, decl, patternEntryIndex, vis);
@@ -653,7 +649,7 @@ ASTScopeImpl *
 PatternEntryInitializerScope::expandAScopeThatCreatesANewInsertionPoint(
     ScopeCreator &scopeCreator) {
   // Create a child for the initializer expression.
-  ASTVisitorForScopeCreation().visitExpr(getPatternEntry().getInitAsWritten(),
+  ASTVisitorForScopeCreation().visitExpr(getPatternEntry().getOriginalInit(),
                                          this, scopeCreator);
   return this;
 }
@@ -744,8 +740,10 @@ void AbstractFunctionDeclScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
     }
   }
   // Create scope for the body.
-  if (decl->getBody()) {
-    if (decl->getDeclContext()->isTypeContext())
+  // We create body scopes when there is no body for source kit to complete
+  // erroneous code in bodies.
+  if (decl->getBodySourceRange().isValid()) {
+    if (AbstractFunctionBodyScope::isAMethod(decl))
       scopeCreator.createSubtree<MethodBodyScope>(leaf, decl);
     else
       scopeCreator.createSubtree<PureFunctionBodyScope>(leaf, decl);
@@ -754,8 +752,10 @@ void AbstractFunctionDeclScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
 
 void AbstractFunctionBodyScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
     ScopeCreator &scopeCreator) {
-  BraceStmt *braceStmt = decl->getBody();
-  ASTVisitorForScopeCreation().visitBraceStmt(braceStmt, this, scopeCreator);
+  // We create body scopes when there is no body for source kit to complete
+  // erroneous code in bodies.
+  if (BraceStmt *braceStmt = decl->getBody())
+    ASTVisitorForScopeCreation().visitBraceStmt(braceStmt, this, scopeCreator);
 }
 
 void IfStmtScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
@@ -856,7 +856,7 @@ void SubscriptDeclScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
   auto *leaf =
       scopeCreator.createGenericParamScopes(sub, sub->getGenericParams(), this);
   auto *params = scopeCreator.createSubtree<AbstractFunctionParamsScope>(
-      leaf, sub->getIndices(), sub->getGetter());
+      leaf, sub->getIndices(), sub->getAccessor(AccessorKind::Get));
   scopeCreator.addChildrenForAllExplicitAccessors(sub, params);
 }
 
@@ -898,6 +898,15 @@ void DefaultArgumentInitializerScope::
   ASTVisitorForScopeCreation().visitExpr(initExpr, this, scopeCreator);
 }
 
+void AttachedPropertyWrapperScope::
+    expandAScopeThatDoesNotCreateANewInsertionPoint(
+        ScopeCreator &scopeCreator) {
+  for (auto *attr : decl->getAttrs().getAttributes<CustomAttr>()) {
+    if (auto *expr = attr->getArg())
+      ASTVisitorForScopeCreation().visitExpr(expr, this, scopeCreator);
+  }
+}
+
 #pragma mark expandScope
 
 ASTScopeImpl *GenericTypeOrExtensionWholePortion::expandScope(
@@ -911,8 +920,7 @@ ASTScopeImpl *GenericTypeOrExtensionWholePortion::expandScope(
       scope->getDecl().get(), scope->getGenericContext()->getGenericParams(),
       scope);
   if (scope->getGenericContext()->getTrailingWhereClause())
-    deepestScope =
-        scope->createTrailingWhereClauseScope(deepestScope, scopeCreator);
+    scope->createTrailingWhereClauseScope(deepestScope, scopeCreator);
   scope->createBodyScope(deepestScope, scopeCreator);
   return scope->getParent().get();
 }

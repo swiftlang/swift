@@ -340,7 +340,7 @@ public class WritableKeyPath<Root, Value>: KeyPath<Root, Value> {
 /// with reference semantics.
 public class ReferenceWritableKeyPath<
   Root, Value
-> : WritableKeyPath<Root, Value> {
+>: WritableKeyPath<Root, Value> {
   // MARK: Implementation detail
 
   internal final override class var kind: Kind { return .reference }
@@ -3052,7 +3052,7 @@ internal func _getKeyPathClassAndInstanceSizeFromPattern(
           alignmentMask: MemoryLayout<Int>._alignmentMask)
 }
 
-internal struct InstantiateKeyPathBuffer : KeyPathPatternVisitor {
+internal struct InstantiateKeyPathBuffer: KeyPathPatternVisitor {
   var destData: UnsafeMutableRawBufferPointer
   var genericEnvironment: UnsafeRawPointer?
   let patternArgs: UnsafeRawPointer?

@@ -17,7 +17,7 @@
 |**[Debian 9.1 (Raspberry Pi)](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/armv7_debian_stretch.json)** | ARMv7 | [![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-debian-9_1/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-debian-9_1)|
 |**[Fedora 27](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/x86_64_fedora_27.json)** | x86_64 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-fedora-27/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-fedora-27)|
 |**[Ubuntu 16.04](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/x86_64_ubuntu_16_04.json)** | x86_64 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04)|
-|**[Ubuntu 16.04 ](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/ppc64le_ubuntu_16_04.json)** | PPC64LE |[![Build Status](https://ci-external.swift.org/job/oss-swift-4.1-RA-linux-ubuntu-16.04-ppc64le/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-4.1-RA-linux-ubuntu-16.04-ppc64le)|
+|**[Ubuntu 16.04 ](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/ppc64le_ubuntu_16_04.json)** | PPC64LE |[![Build Status](https://ci-external.swift.org/job/oss-swift-5.1-RA-linux-ubuntu-16.04-ppc64le/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-5.1-RA-linux-ubuntu-16.04-ppc64le)|
 |**[Ubuntu 16.04 ](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/aarch64_ubuntu_16.04.json)** | AArch64 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-aarch64/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-aarch64)|
 |**[Android](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/x86_64_ubuntu_16_04_LTS_android.json)** | ARMv7 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-android/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-android)|
 |**[Android](https://github.com/apple/swift-community-hosted-continuous-integration/blob/master/nodes/x86_64_ubuntu_16_04_LTS_android.json)** | AArch64 |[![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-android-arm64/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-android-arm64)|
@@ -41,6 +41,17 @@ constructs like objects, protocols, closures, and generics. Swift embraces
 modules, eliminating the need for headers and the code duplication they entail.
 
 To learn more about the programming language, visit [swift.org](https://swift.org/documentation/).
+
+- [Contributing to Swift](#contributing-to-swift)
+- [Getting Started](#getting-started)
+  - [System Requirements](#system-requirements)
+  - [Getting Sources for Swift and Related Projects](#getting-sources-for-swift-and-related-projects)
+  - [Building Swift](#building-swift)
+  - [Swift Toolchains](#swift-toolchains)
+  - [Build Failures](#build-failures)
+- [Testing Swift](#testing-swift)
+- [Learning More](#learning-more)
+- [Build Dependencies](#build-dependencies)
 
 ## Contributing to Swift
 
@@ -76,7 +87,7 @@ Please make sure you use Python 2.x. Python 3.x is not supported currently.
 
 #### macOS
 
-To build for macOS, you need [Xcode 11 beta](https://developer.apple.com/xcode/downloads/).
+To build for macOS, you need [Xcode 11 beta 5](https://developer.apple.com/xcode/downloads/).
 The required version of Xcode changes frequently, and is often a beta release.
 Check this document or the host information on <https://ci.swift.org> for the
 current required version.

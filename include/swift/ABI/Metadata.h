@@ -1495,7 +1495,11 @@ struct TargetTupleTypeMetadata : public TargetMetadata<Runtime> {
     ConstTargetMetadataPointer<Runtime, swift::TargetMetadata> Type;
 
     /// The offset of the tuple element within the tuple.
+#if __APPLE__
     StoredSize Offset;
+#else
+    uint32_t Offset;
+#endif
 
     OpaqueValue *findIn(OpaqueValue *tuple) const {
       return (OpaqueValue*) (((char*) tuple) + Offset);
@@ -1505,6 +1509,9 @@ struct TargetTupleTypeMetadata : public TargetMetadata<Runtime> {
       return Type->getTypeLayout();
     }
   };
+
+  static_assert(sizeof(Element) == sizeof(StoredSize) * 2,
+                "element size should be two words");
 
   Element *getElements() {
     return reinterpret_cast<Element*>(this + 1);
@@ -2478,6 +2485,12 @@ struct TargetContextDescriptor {
               ? genericContext->getGenericContextHeader().NumParams
               : 0;
   }
+
+#ifndef NDEBUG
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const,
+                            "only for use in the debugger");
+#endif
+
 private:
   TargetContextDescriptor(const TargetContextDescriptor &) = delete;
   TargetContextDescriptor(TargetContextDescriptor &&) = delete;
@@ -3642,11 +3655,6 @@ public:
     return cd->getKind() >= ContextDescriptorKind::Type_First
         && cd->getKind() <= ContextDescriptorKind::Type_Last;
   }
-
-#ifndef NDEBUG
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const,
-                            "Only meant for use in the debugger");
-#endif
 };
 
 using TypeContextDescriptor = TargetTypeContextDescriptor<InProcess>;

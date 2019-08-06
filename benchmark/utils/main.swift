@@ -66,6 +66,8 @@ import DictionaryOfAnyHashableStrings
 import DictionaryRemove
 import DictionarySubscriptDefault
 import DictionarySwap
+import Diffing
+import DiffingMyers
 import DropFirst
 import DropLast
 import DropWhile
@@ -159,6 +161,7 @@ import StringEnum
 import StringInterpolation
 import StringMatch
 import StringRemoveDupes
+import StringReplaceSubrange
 import StringTests
 import StringWalk
 import Substring
@@ -240,6 +243,8 @@ registerBenchmark(DictionaryOfAnyHashableStrings)
 registerBenchmark(DictionaryRemove)
 registerBenchmark(DictionarySubscriptDefault)
 registerBenchmark(DictionarySwap)
+registerBenchmark(Diffing)
+registerBenchmark(DiffingMyers)
 registerBenchmark(DropFirst)
 registerBenchmark(DropLast)
 registerBenchmark(DropWhile)
@@ -339,6 +344,7 @@ registerBenchmark(StringInterpolationManySmallSegments)
 registerBenchmark(StringMatch)
 registerBenchmark(StringNormalization)
 registerBenchmark(StringRemoveDupes)
+registerBenchmark(StringReplaceSubrange)
 registerBenchmark(StringTests)
 registerBenchmark(StringWalk)
 registerBenchmark(SubstringTest)

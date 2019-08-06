@@ -413,10 +413,6 @@ def solver_enable_operator_designated_types :
   Flag<["-"], "solver-enable-operator-designated-types">,
   HelpText<"Enable operator designated types in constraint solver">;
 
-def enable_opaque_result_types :
-  Flag<["-"], "enable-opaque-result-types">,
-  HelpText<"Enable experimental opaque result types feature">;
-
 def switch_checking_invocation_threshold_EQ : Joined<["-"],
     "switch-checking-invocation-threshold=">;
 
@@ -503,6 +499,11 @@ def emit_sorted_sil : Flag<["-"], "emit-sorted-sil">,
 
 def emit_syntax : Flag<["-"], "emit-syntax">,
   HelpText<"Parse input file(s) and emit the Syntax tree(s) as JSON">, ModeOpt;
+
+def enable_cxx_interop :
+  Flag<["-"], "enable-cxx-interop">,
+  HelpText<"Enable C++ interop code generation and config directives">,
+  Flags<[FrontendOption, HelpHidden]>;
 
 def use_malloc : Flag<["-"], "use-malloc">,
   HelpText<"Allocate internal data structures using malloc "

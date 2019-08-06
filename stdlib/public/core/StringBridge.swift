@@ -158,11 +158,11 @@ internal func _cocoaGetCStringTrampoline(
 // Conversion from NSString to Swift's native representation.
 //
 
-private var kCFStringEncodingASCII : _swift_shims_CFStringEncoding {
+private var kCFStringEncodingASCII: _swift_shims_CFStringEncoding {
   @inline(__always) get { return 0x0600 }
 }
 
-private var kCFStringEncodingUTF8 : _swift_shims_CFStringEncoding {
+private var kCFStringEncodingUTF8: _swift_shims_CFStringEncoding {
   @inline(__always) get { return 0x8000100 }
 }
 
@@ -321,14 +321,24 @@ extension String {
   @_effects(releasenone)
   public // SPI(Foundation)
   func _bridgeToObjectiveCImpl() -> AnyObject {
-    if _guts.isSmall {
+    // Smol ASCII a) may bridge to tagged pointers, b) can't contain a BOM
+    if _guts.isSmallASCII {
       return _guts.asSmall.withUTF8 { bufPtr in
         return _createCFString(
-            bufPtr.baseAddress._unsafelyUnwrappedUnchecked,
-            bufPtr.count,
-            kCFStringEncodingUTF8
+          bufPtr.baseAddress._unsafelyUnwrappedUnchecked,
+          bufPtr.count,
+          kCFStringEncodingUTF8
         )
       }
+    }
+    if _guts.isSmall {
+        // We can't form a tagged pointer String, so grow to a non-small String,
+        // and bridge that instead. Also avoids CF deleting any BOM that may be
+        // present
+        var copy = self
+        copy._guts.grow(_SmallString.capacity + 1)
+        _internalInvariant(!copy._guts.isSmall)
+        return copy._bridgeToObjectiveCImpl()
     }
     if _guts._object.isImmortal {
       // TODO: We'd rather emit a valid ObjC object statically than create a

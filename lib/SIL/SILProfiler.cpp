@@ -76,7 +76,7 @@ static bool isUnmapped(ASTNode N) {
   auto *D = N.get<Decl *>();
   if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
     // Don't map functions without bodies.
-    if (!AFD->getBody()) {
+    if (!AFD->hasBody()) {
       LLVM_DEBUG(llvm::dbgs() << "Skipping ASTNode: function without body\n");
       return true;
     }
@@ -162,15 +162,6 @@ SILProfiler *SILProfiler::create(SILModule &M, ForDefinition_t forDefinition,
 
 namespace {
 
-/// Walk the non-static initializers in \p PBD.
-static void walkPatternForProfiling(PatternBindingDecl *PBD,
-                                    ASTWalker &Walker) {
-  if (PBD && !PBD->isStatic())
-    for (auto E : PBD->getPatternList())
-      if (auto init = E.getExecutableInit())
-        init->walk(Walker);
-}
-
 /// Special logic for handling function visitation.
 ///
 /// To avoid creating duplicate mappings, a function decl is only profiled if
@@ -235,7 +226,6 @@ struct MapRegionCounters : public ASTWalker {
       mapRegion(RWS->getBody());
     } else if (auto *FES = dyn_cast<ForEachStmt>(S)) {
       mapRegion(FES->getBody());
-      walkPatternForProfiling(FES->getIterator(), *this);
     } else if (auto *SS = dyn_cast<SwitchStmt>(S)) {
       mapRegion(SS);
     } else if (auto *CS = dyn_cast<CaseStmt>(S)) {
@@ -564,7 +554,6 @@ struct PGOMapping : public ASTWalker {
       CounterMap[FES] = parent;
       auto count = loadExecutionCount(FES);
       LoadedCounterMap[FES] = count;
-      walkPatternForProfiling(FES->getIterator(), *this);
     } else if (auto *SS = dyn_cast<SwitchStmt>(S)) {
       CounterMap[SS] = NextCounter++;
       auto ssCount = loadExecutionCount(SS);
@@ -896,7 +885,6 @@ public:
     } else if (auto *FES = dyn_cast<ForEachStmt>(S)) {
       assignCounter(FES, CounterExpr::Zero());
       assignCounter(FES->getBody());
-      walkPatternForProfiling(FES->getIterator(), *this);
 
     } else if (auto *SS = dyn_cast<SwitchStmt>(S)) {
       assignCounter(SS);

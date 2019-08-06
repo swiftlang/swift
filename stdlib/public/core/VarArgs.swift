@@ -53,11 +53,11 @@ public protocol CVarArg {
 /// Floating point types need to be passed differently on x86_64
 /// systems.  CoreGraphics uses this to make CGFloat work properly.
 public // SPI(CoreGraphics)
-protocol _CVarArgPassedAsDouble : CVarArg {}
+protocol _CVarArgPassedAsDouble: CVarArg {}
 
 /// Some types require alignment greater than Int on some architectures.
 public // SPI(CoreGraphics)
-protocol _CVarArgAligned : CVarArg {
+protocol _CVarArgAligned: CVarArg {
   /// Returns the required alignment in bytes of
   /// the value returned by `_cVarArgEncoding`.
   var _cVarArgAlignment: Int { get }
@@ -215,7 +215,7 @@ public func _encodeBitsAsWords<T>(_ x: T) -> [Int] {
 // encoding.
 
 // Signed types
-extension Int : CVarArg {
+extension Int: CVarArg {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
   @inlinable // c-abi
@@ -224,13 +224,13 @@ extension Int : CVarArg {
   }
 }
 
-extension Bool : CVarArg {
+extension Bool: CVarArg {
   public var _cVarArgEncoding: [Int] {
     return _encodeBitsAsWords(_VAInt(self ? 1:0))
   }
 }
 
-extension Int64 : CVarArg, _CVarArgAligned {
+extension Int64: CVarArg, _CVarArgAligned {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
   @inlinable // c-abi
@@ -247,7 +247,7 @@ extension Int64 : CVarArg, _CVarArgAligned {
   }
 }
 
-extension Int32 : CVarArg {
+extension Int32: CVarArg {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
   @inlinable // c-abi
@@ -256,7 +256,7 @@ extension Int32 : CVarArg {
   }
 }
 
-extension Int16 : CVarArg {
+extension Int16: CVarArg {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
   @inlinable // c-abi
@@ -265,7 +265,7 @@ extension Int16 : CVarArg {
   }
 }
 
-extension Int8 : CVarArg {
+extension Int8: CVarArg {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
   @inlinable // c-abi
@@ -275,7 +275,7 @@ extension Int8 : CVarArg {
 }
 
 // Unsigned types
-extension UInt : CVarArg {
+extension UInt: CVarArg {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
   @inlinable // c-abi
@@ -284,7 +284,7 @@ extension UInt : CVarArg {
   }
 }
 
-extension UInt64 : CVarArg, _CVarArgAligned {
+extension UInt64: CVarArg, _CVarArgAligned {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
   @inlinable // c-abi
@@ -301,7 +301,7 @@ extension UInt64 : CVarArg, _CVarArgAligned {
   }
 }
 
-extension UInt32 : CVarArg {
+extension UInt32: CVarArg {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
   @inlinable // c-abi
@@ -310,7 +310,7 @@ extension UInt32 : CVarArg {
   }
 }
 
-extension UInt16 : CVarArg {
+extension UInt16: CVarArg {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
   @inlinable // c-abi
@@ -319,7 +319,7 @@ extension UInt16 : CVarArg {
   }
 }
 
-extension UInt8 : CVarArg {
+extension UInt8: CVarArg {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
   @inlinable // c-abi
@@ -328,7 +328,7 @@ extension UInt8 : CVarArg {
   }
 }
 
-extension OpaquePointer : CVarArg {
+extension OpaquePointer: CVarArg {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
   @inlinable // c-abi
@@ -337,7 +337,7 @@ extension OpaquePointer : CVarArg {
   }
 }
 
-extension UnsafePointer : CVarArg {
+extension UnsafePointer: CVarArg {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
   @inlinable // c-abi
@@ -346,7 +346,7 @@ extension UnsafePointer : CVarArg {
   }
 }
 
-extension UnsafeMutablePointer : CVarArg {
+extension UnsafeMutablePointer: CVarArg {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
   @inlinable // c-abi
@@ -356,7 +356,7 @@ extension UnsafeMutablePointer : CVarArg {
 }
 
 #if _runtime(_ObjC)
-extension AutoreleasingUnsafeMutablePointer : CVarArg {
+extension AutoreleasingUnsafeMutablePointer: CVarArg {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
   @inlinable
@@ -366,7 +366,7 @@ extension AutoreleasingUnsafeMutablePointer : CVarArg {
 }
 #endif
 
-extension Float : _CVarArgPassedAsDouble, _CVarArgAligned {
+extension Float: _CVarArgPassedAsDouble, _CVarArgAligned {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
   @inlinable // c-abi
@@ -383,7 +383,7 @@ extension Float : _CVarArgPassedAsDouble, _CVarArgAligned {
   }
 }
 
-extension Double : _CVarArgPassedAsDouble, _CVarArgAligned {
+extension Double: _CVarArgPassedAsDouble, _CVarArgAligned {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
   @inlinable // c-abi
@@ -401,7 +401,7 @@ extension Double : _CVarArgPassedAsDouble, _CVarArgAligned {
 }
 
 #if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
-extension Float80 : CVarArg, _CVarArgAligned {
+extension Float80: CVarArg, _CVarArgAligned {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
   @inlinable // FIXME(sil-serialize-all)

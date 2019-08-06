@@ -149,6 +149,19 @@ tuplify(true) {
   }
 }
 
+// rdar://50710698
+// CHECK: ("chain5", 8, 9)
+tuplify(true) {
+  "chain5"
+  #if false
+    6
+    $0
+  #else
+    8
+    9
+  #endif
+}
+
 // CHECK: ("getterBuilder", 0, 4, 12)
 @TupleBuilder
 var globalBuilder: (String, Int, Int, Int) {
@@ -288,3 +301,52 @@ func testAcceptColorTagged(b: Bool, i: Int, s: String, d: Double) {
 }
 
 testAcceptColorTagged(b: true, i: 17, s: "Hello", d: 3.14159)
+
+// rdar://53325810
+
+// Test that we don't have problems with expression pre-checking when
+// type-checking an overloaded function-builder call.  In particular,
+// we need to make sure that expressions in the closure are pre-checked
+// before we build constraints for them.  Note that top-level expressions
+// that need to be rewritten by expression prechecking (such as the operator
+// sequences in the boolean conditions and statements below) won't be
+// rewritten in the original closure body if we just precheck the
+// expressions produced by the function-builder transformation.
+struct ForEach1<Data : RandomAccessCollection, Content> {
+  var data: Data
+  var content: (Data.Element) -> Content
+
+  func show() {
+    print(content(data.first!))
+    print(content(data.last!))
+  }
+}
+extension ForEach1 where Data.Element: StringProtocol {
+  // Checking this overload shouldn't trigger inappropriate caching that
+  // affects checking the next overload.
+  init(_ data: Data,
+       @TupleBuilder content: @escaping (Data.Element) -> Content) {
+    self.init(data: data, content: content)
+  }
+}
+extension ForEach1 where Data == Range<Int> {
+  // This is the overload we actually want.
+  init(_ data: Data,
+       @TupleBuilder content: @escaping (Int) -> Content) {
+    self.init(data: data, content: content)
+  }
+}
+let testForEach1 = ForEach1(-10 ..< 10) { i in
+  "testForEach1"
+  if i < 0 {
+    "begin"
+    i < -5
+  } else {
+    i > 5
+    "end"
+  }
+}
+testForEach1.show()
+
+// CHECK: ("testForEach1", main.Either<(Swift.String, Swift.Bool), (Swift.Bool, Swift.String)>.first("begin", true))
+// CHECK: ("testForEach1", main.Either<(Swift.String, Swift.Bool), (Swift.Bool, Swift.String)>.second(true, "end"))

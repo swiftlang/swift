@@ -266,7 +266,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   // A tuple type metadata record has a couple extra fields.
   auto tupleElementTy = createStructType(*this, "swift.tuple_element_type", {
     TypeMetadataPtrTy,      // Metadata *Type;
-    SizeTy                  // size_t Offset;
+    Int32Ty                 // int32_t Offset;
   });
   TupleTypeMetadataPtrTy = createStructPointerType(*this, "swift.tuple_type", {
     TypeMetadataStructTy,   // (base)
@@ -535,6 +535,7 @@ static bool isReturnAttribute(llvm::Attribute::AttrKind Attr);
 namespace RuntimeConstants {
   const auto ReadNone = llvm::Attribute::ReadNone;
   const auto ReadOnly = llvm::Attribute::ReadOnly;
+  const auto ArgMemOnly = llvm::Attribute::ArgMemOnly;
   const auto NoReturn = llvm::Attribute::NoReturn;
   const auto NoUnwind = llvm::Attribute::NoUnwind;
   const auto ZExt = llvm::Attribute::ZExt;
@@ -1009,6 +1010,12 @@ llvm::SmallString<32> getTargetDependentLibraryOption(const llvm::Triple &T,
 void IRGenModule::addLinkLibrary(const LinkLibrary &linkLib) {
   llvm::LLVMContext &ctx = Module.getContext();
 
+  // The debugger gets the autolink information directly from
+  // the LinkLibraries of the module, so there's no reason to
+  // emit it into the IR of debugger expressions.
+  if (Context.LangOpts.DebuggerSupport)
+    return;
+  
   switch (linkLib.getKind()) {
   case LibraryKind::Library: {
     llvm::SmallString<32> opt =

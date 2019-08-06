@@ -454,6 +454,19 @@ SILValue InstSimplifier::visitBeginAccessInst(BeginAccessInst *BAI) {
 }
 
 static SILValue simplifyBuiltin(BuiltinInst *BI) {
+
+  switch (BI->getBuiltinInfo().ID) {
+    case BuiltinValueKind::IntToPtr:
+      if (auto *OpBI = dyn_cast<BuiltinInst>(BI->getOperand(0))) {
+        if (OpBI->getBuiltinInfo().ID == BuiltinValueKind::PtrToInt) {
+          return OpBI->getOperand(0);
+        }
+      }
+      return SILValue();
+    default:
+      break;
+  }
+
   const IntrinsicInfo &Intrinsic = BI->getIntrinsicInfo();
 
   switch (Intrinsic.ID) {

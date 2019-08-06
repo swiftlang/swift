@@ -7,7 +7,7 @@ add_swift_target_library(swiftObjectiveC ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES
   "${SWIFT_SOURCE_DIR}/stdlib/linker-support/magic-symbols-for-install-name.c"
 
   SWIFT_COMPILE_FLAGS "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}" "-Xfrontend"
-                      "-disable-objc-attr-requires-foundation-module"
+                      "-disable-objc-attr-requires-foundation-module" "${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}"
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
 
   SWIFT_MODULE_DEPENDS_OSX Darwin # auto-updated
@@ -19,4 +19,5 @@ add_swift_target_library(swiftObjectiveC ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES
   DEPLOYMENT_VERSION_IOS ${SWIFTLIB_DEPLOYMENT_VERSION_OBJECTIVEC_IOS}
   DEPLOYMENT_VERSION_TVOS ${SWIFTLIB_DEPLOYMENT_VERSION_OBJECTIVEC_TVOS}
   DEPLOYMENT_VERSION_WATCHOS ${SWIFTLIB_DEPLOYMENT_VERSION_OBJECTIVEC_WATCHOS}
+  INSTALL_IN_COMPONENT sdk-overlay
 )

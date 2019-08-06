@@ -1227,7 +1227,23 @@ TypeConverter::TypeConverter(IRGenModule &IGM)
     if (!doesPlatformUseLegacyLayouts(platformName, archName))
       return;
 
-    defaultPath.append(IGM.Context.SearchPathOpts.RuntimeLibraryPath);
+    // Find the first runtime library path that exists.
+    bool found = false;
+    for (auto &RuntimeLibraryPath
+         : IGM.Context.SearchPathOpts.RuntimeLibraryPaths) {
+      if (llvm::sys::fs::exists(RuntimeLibraryPath)) {
+        defaultPath.append(RuntimeLibraryPath);
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      auto joined = llvm::join(IGM.Context.SearchPathOpts.RuntimeLibraryPaths,
+                               "', '");
+      llvm::report_fatal_error("Unable to find a runtime library path at '"
+                               + joined + "'");
+    }
+
     llvm::sys::path::append(defaultPath, "layouts-");
     defaultPath.append(archName);
     defaultPath.append(".yaml");
@@ -2288,9 +2304,8 @@ SILType irgen::getSingletonAggregateFieldType(IRGenModule &IGM, SILType t,
     // If there's only one stored property, we have the layout of its field.
     auto allFields = structDecl->getStoredProperties();
     
-    auto field = allFields.begin();
-    if (!allFields.empty() && std::next(field) == allFields.end()) {
-      auto fieldTy = t.getFieldType(*field, IGM.getSILModule());
+    if (allFields.size() == 1) {
+      auto fieldTy = t.getFieldType(allFields[0], IGM.getSILModule());
       if (!IGM.isTypeABIAccessible(fieldTy))
         return SILType();
       return fieldTy;

@@ -353,6 +353,20 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
       }
       break;
 
+    case OPT_vfs_files:
+      VFSName = VFSName.getValueOr("in-memory-vfs");
+      for (const char *vfsFile : InputArg->getValues()) {
+        StringRef name, target;
+        std::tie(name, target) = StringRef(vfsFile).split('=');
+        bool passAsSourceText = target.consume_front("@");
+        VFSFiles.try_emplace(name, VFSFile(target.str(), passAsSourceText));
+      }
+      break;
+
+    case OPT_vfs_name:
+      VFSName = InputArg->getValue();
+      break;
+
     case OPT_UNKNOWN:
       llvm::errs() << "error: unknown argument: "
                    << InputArg->getAsString(ParsedArgs) << '\n'

@@ -906,8 +906,16 @@ namespace {
       for (auto entry : PBD->getPatternList()) {
         OS << '\n';
         printRec(entry.getPattern());
+        if (entry.getOriginalInit()) {
+          OS << '\n';
+          OS.indent(Indent + 2);
+          OS << "Original init:\n";
+          printRec(entry.getOriginalInit());
+        }
         if (entry.getInit()) {
           OS << '\n';
+          OS.indent(Indent + 2);
+          OS << "Processed init:\n";
           printRec(entry.getInit());
         }
       }
@@ -968,19 +976,16 @@ namespace {
       }
 
       switch (P->getSpecifier()) {
-      case VarDecl::Specifier::Let:
+      case ParamDecl::Specifier::Default:
         /* nothing */
         break;
-      case VarDecl::Specifier::Var:
-        OS << " mutable";
-        break;
-      case VarDecl::Specifier::InOut:
+      case ParamDecl::Specifier::InOut:
         OS << " inout";
         break;
-      case VarDecl::Specifier::Shared:
+      case ParamDecl::Specifier::Shared:
         OS << " shared";
         break;
-      case VarDecl::Specifier::Owned:
+      case ParamDecl::Specifier::Owned:
         OS << " owned";
         break;
       }
@@ -1593,7 +1598,14 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   void visitForEachStmt(ForEachStmt *S) {
-    printCommon(S, "for_each_stmt") << '\n';
+    printCommon(S, "for_each_stmt");
+    PrintWithColorRAII(OS, LiteralValueColor) << " make_generator=";
+    S->getMakeIterator().dump(
+        PrintWithColorRAII(OS, LiteralValueColor).getOS());
+    PrintWithColorRAII(OS, LiteralValueColor) << " next=";
+    S->getIteratorNext().dump(
+        PrintWithColorRAII(OS, LiteralValueColor).getOS());
+    OS << '\n';
     printRec(S->getPattern());
     OS << '\n';
     if (S->getWhere()) {
@@ -1607,12 +1619,20 @@ public:
     OS << '\n';
     printRec(S->getSequence());
     OS << '\n';
-    if (S->getIterator()) {
-      printRec(S->getIterator());
+    if (S->getIteratorVar()) {
+      printRec(S->getIteratorVar());
       OS << '\n';
     }
-    if (S->getIteratorNext()) {
-      printRec(S->getIteratorNext());
+    if (S->getIteratorVarRef()) {
+      printRec(S->getIteratorVarRef());
+      OS << '\n';
+    }
+    if (S->getConvertElementExpr()) {
+      printRec(S->getConvertElementExpr());
+      OS << '\n';
+    }
+    if (S->getElementExpr()) {
+      printRec(S->getElementExpr());
       OS << '\n';
     }
     printRec(S->getBody());
@@ -1934,9 +1954,13 @@ public:
     PrintWithColorRAII(OS, LiteralValueColor)
       << " literal_capacity="
       << E->getLiteralCapacity() << " interpolation_count="
-      << E->getInterpolationCount() << '\n';
+      << E->getInterpolationCount();
+    PrintWithColorRAII(OS, LiteralValueColor) << " builder_init=";
+    E->getBuilderInit().dump(PrintWithColorRAII(OS, LiteralValueColor).getOS());
+    PrintWithColorRAII(OS, LiteralValueColor) << " result_init=";
+    E->getResultInit().dump(PrintWithColorRAII(OS, LiteralValueColor).getOS());
+    OS << "\n";
     printRec(E->getAppendingExpr());
-    printSemanticExpr(E->getSemanticExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   void visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E) {
@@ -1962,7 +1986,6 @@ public:
     printArgumentLabels(E->getArgumentLabels());
     OS << "\n";
     printRec(E->getArg());
-    printSemanticExpr(E->getSemanticExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
@@ -2415,9 +2438,12 @@ public:
     }
     // Printing a function type doesn't indicate whether it's escaping because it doesn't 
     // matter in 99% of contexts. AbstractClosureExpr nodes are one of the only exceptions.
-    if (auto Ty = GetTypeOfExpr(E))
-      if (!Ty->getAs<AnyFunctionType>()->getExtInfo().isNoEscape())
-        PrintWithColorRAII(OS, ClosureModifierColor) << " escaping";
+    if (auto Ty = GetTypeOfExpr(E)) {
+      if (auto fType = Ty->getAs<AnyFunctionType>()) {
+        if (!fType->getExtInfo().isNoEscape())
+          PrintWithColorRAII(OS, ClosureModifierColor) << " escaping";
+      }
+    }
 
     return OS;
   }
@@ -3034,7 +3060,6 @@ static void dumpProtocolConformanceRec(
       out << " lazy";
     } else {
       normal->forEachTypeWitness(
-          nullptr,
           [&](const AssociatedTypeDecl *req, Type ty,
               const TypeDecl *) -> bool {
             out << '\n';
@@ -3045,8 +3070,8 @@ static void dumpProtocolConformanceRec(
             PrintWithColorRAII(out, ParenthesisColor) << ')';
             return false;
           });
-      normal->forEachValueWitness(nullptr, [&](const ValueDecl *req,
-                                               Witness witness) {
+      normal->forEachValueWitness([&](const ValueDecl *req,
+                                      Witness witness) {
         out << '\n';
         out.indent(indent + 2);
         PrintWithColorRAII(out, ParenthesisColor) << '(';

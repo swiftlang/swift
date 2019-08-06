@@ -37,8 +37,6 @@
   DIAG(NOTE,ID,Options,Text,Signature)
 #endif
 
-NOTE(kind_declname_declared_here,none,
-     "%0 %1 declared here", (DescriptiveDeclKind, DeclName))
 NOTE(decl_declared_here,none,
      "%0 declared here", (DeclName))
 NOTE(kind_declared_here,none,
@@ -58,6 +56,15 @@ ERROR(ambiguous_member_overload_set,none,
       "ambiguous reference to member %0", (DeclName))
 ERROR(ambiguous_reference_to_decl,none,
       "ambiguous reference to %0 %1", (DescriptiveDeclKind, DeclName))
+ERROR(no_overloads_match_exactly_in_call,none,
+      "no exact matches in call to %0 %1",
+      (DescriptiveDeclKind, DeclName))
+ERROR(no_overloads_match_exactly_in_call_no_labels,none,
+      "no exact matches in call to %0 %1",
+      (DescriptiveDeclKind, DeclBaseName))
+ERROR(no_overloads_match_exactly_in_call_special,none,
+      "no exact matches in call to %0",
+      (DescriptiveDeclKind))
 
 ERROR(ambiguous_subscript,none,
       "ambiguous subscript with base type %0 and index type %1",
@@ -250,9 +257,6 @@ ERROR(cannot_call_with_params, none,
       "cannot invoke %select{|initializer for type }2'%0' with an argument list"
       " of type '%1'", (StringRef, StringRef, bool))
 
-NOTE(pointer_init_to_type,none,
-      "Pointer conversion restricted: use '.assumingMemoryBound(to:)' or '.bindMemory(to:capacity:)' to view memory as a type.", ())
-
 ERROR(cannot_call_non_function_value,none,
       "cannot call value of non-function type %0", (Type))
 
@@ -350,6 +354,9 @@ ERROR(cannot_convert_default_arg_value,none,
       (Type,Type))
 ERROR(cannot_convert_default_arg_value_protocol,none,
       "default argument value of type %0 does not conform to %1", (Type,Type))
+ERROR(default_argument_literal_cannot_convert, none,
+      "cannot call %0 %1 because default argument of type %2 cannot be "
+      "converted to type %3", (DescriptiveDeclKind, DeclName, Type, Type))
 ERROR(cannot_convert_default_arg_value_nil,none,
       "nil default argument value cannot be converted to type %0", (Type))
 
@@ -997,10 +1004,6 @@ ERROR(missing_address_of,none,
 ERROR(missing_address_of_yield,none,
       "yielding mutable value of type %0 requires explicit '&'",
       (Type))
-ERROR(extraneous_property_wrapper_unwrap,none,
-      "property %0 will be unwrapped to value of type %1, use '_' to refer to "
-      "wrapper type %2",
-      (DeclName, Type, Type))
 ERROR(extraneous_address_of,none,
       "use of extraneous '&'",
       ())
@@ -1014,6 +1017,14 @@ ERROR(cannot_pass_inout_arg_to_subscript,none,
       "cannot pass an inout argument to a subscript; use "
       "'withUnsafeMutablePointer' to explicitly convert argument "
       "to a pointer", ())
+
+ERROR(incorrect_property_wrapper_reference,none,
+      "cannot convert value %0 of type %1 to expected type %2, "
+      "use %select{wrapper|wrapped value}3 instead",
+      (Identifier, Type, Type, bool))
+ERROR(incorrect_property_wrapper_reference_member,none,
+      "referencing %0 %1 requires %select{wrapper|wrapped value of type}2 %3",
+      (DescriptiveDeclKind, DeclName, bool, Type))
 
 ERROR(missing_init_on_metatype_initialization,none,
       "initializing from a metatype value must reference 'init' explicitly",
@@ -1037,6 +1048,9 @@ ERROR(argument_out_of_order_unnamed_named,none,
 ERROR(argument_out_of_order_unnamed_unnamed,none,
       "unnamed argument #%0 must precede unnamed argument #%1",
       (unsigned, unsigned))
+NOTE(candidate_expected_different_labels,none,
+     "incorrect labels for candidate (have: '%0', expected: '%1')",
+     (StringRef, StringRef))
 
 ERROR(member_shadows_global_function,none,
       "use of %0 refers to %1 %2 rather than %3 %4 in %5 %6",
@@ -1117,13 +1131,12 @@ ERROR(c_function_pointer_from_method,none,
 ERROR(c_function_pointer_from_generic_function,none,
       "a C function pointer cannot be formed from a reference to a generic "
       "function", ())
-ERROR(c_function_pointer_from_function_with_context,none,
-      "a C function pointer cannot be formed from a "
-      "%select{local function|closure}0 that captures "
-      "%select{context|generic parameters|dynamic Self type|<<error>}1",
-      (bool, unsigned))
 ERROR(invalid_autoclosure_forwarding,none,
       "add () to forward @autoclosure parameter", ())
+ERROR(invalid_autoclosure_pointer_conversion,none,
+      "cannot perform pointer conversion of value of type %0 to autoclosure "
+      "result type %1",
+      (Type, Type))
 
 //------------------------------------------------------------------------------
 // MARK: Type Check Declarations
@@ -1368,6 +1381,9 @@ WARNING(enum_frozen_nonpublic,none,
         "%0 has no effect on non-public enums", (DeclAttribute))
 
 // Variables (var and let).
+ERROR(getset_init,none,
+      "variable with getter/setter cannot have an initial value", ())
+
 ERROR(unimplemented_static_var,none,
       "%select{ERROR|static|class}1 stored properties not supported"
       "%select{ in this context| in generic types| in classes| in protocol extensions}0"
@@ -2035,8 +2051,6 @@ ERROR(typealias_outside_of_protocol,none,
       "type alias %0 can only be used with a concrete type or "
       "generic parameter base", (Identifier))
 
-ERROR(circular_protocol_def,none,
-      "protocol %0 refines itself", (Identifier))
 ERROR(objc_protocol_inherits_non_objc_protocol,none,
       "@objc protocol %0 cannot refine non-@objc protocol %1", (Type, Type))
 
@@ -2341,6 +2355,10 @@ WARNING(override_swift3_objc_inference,none,
         "override of %0 %1 from extension of %2 depends on deprecated "
         "inference of '@objc'",
         (DescriptiveDeclKind, DeclName, Identifier))
+ERROR(override_method_different_generic_sig,none,
+      "overridden method %0 has generic signature %1 which is incompatible with "
+      "base method's generic signature %2; expected generic signature to be %3",
+      (DeclBaseName, StringRef, StringRef, StringRef))
 
 // Inheritance
 ERROR(duplicate_inheritance,none,
@@ -2591,6 +2609,8 @@ ERROR(dynamic_self_invalid_subscript,none,
       "covariant 'Self' can only appear at the top level of subscript element type", ())
 ERROR(dynamic_self_invalid_method,none,
       "covariant 'Self' can only appear at the top level of method result type", ())
+ERROR(dynamic_self_stored_property_init,none,
+      "covariant 'Self' type cannot be referenced from a stored property initializer", ())
 
 //------------------------------------------------------------------------------
 // MARK: Type Check Attributes
@@ -2794,13 +2814,13 @@ NOTE(convenience_init_here,none,
 ERROR(designated_init_in_extension,none,
       "designated initializer cannot be declared in an extension of %0; "
       "did you mean this to be a convenience initializer?",
-      (Type))
+      (DeclName))
 ERROR(enumstruct_convenience_init,none,
       "delegating initializers in %0 are not marked with 'convenience'",
       (StringRef))
 ERROR(nonclass_convenience_init,none,
       "convenience initializer not allowed in non-class type %0",
-      (Type))
+      (DeclName))
 ERROR(cfclass_convenience_init,none,
       "convenience initializers are not supported in extensions of CF types",
       ())
@@ -3016,14 +3036,6 @@ ERROR(method_call_in_closure_without_explicit_self,none,
 ERROR(implicit_use_of_self_in_closure,none,
       "implicit use of 'self' in closure; use 'self.' to make"
       " capture semantics explicit", ())
-ERROR(capture_before_declaration,none,
-      "cannot capture %0 before it is declared", (Identifier))
-ERROR(transitive_capture_before_declaration,none,
-      "cannot capture %0, which would use %1 before it is declared",
-      (Identifier, Identifier))
-NOTE(transitive_capture_through_here,none,
-     "%0, declared here, captures %1",
-     (Identifier, Identifier))
 
 WARNING(recursive_accessor_reference,none,
         "attempting to %select{access|modify}1 %0 within its own "
@@ -3339,6 +3351,9 @@ ERROR(trailing_closure_requires_parens,none,
       "trailing closure requires parentheses for disambiguation in this"
       " context", ())
 
+ERROR(opaque_type_var_no_init,none,
+      "property declares an opaque return type, but has no initializer "
+      "expression from which to infer an underlying type", ())
 ERROR(opaque_type_no_underlying_type_candidates,none,
       "function declares an opaque return type, but has no return statements "
       "in its body from which to infer an underlying type", ())
@@ -3350,6 +3365,9 @@ NOTE(opaque_type_underlying_type_candidate_here,none,
 ERROR(opaque_type_self_referential_underlying_type,none,
       "function opaque return type was inferred as %0, which defines the "
       "opaque type in terms of itself", (Type))
+ERROR(opaque_type_var_no_underlying_type,none,
+      "property declares an opaque return type, but cannot infer the "
+      "underlying type from its initializer expression", ())
 
 //------------------------------------------------------------------------------
 // MARK: Type Check Patterns
@@ -3389,9 +3407,12 @@ ERROR(closure_tuple_parameter_destructuring_implicit,none,
 ERROR(nested_tuple_parameter_destructuring,none,
       "nested tuple parameter %0 of function %1 "
       "does not support destructuring", (Type, Type))
-ERROR(single_tuple_parameter_mismatch,none,
-      "%0 %select{|%1 }3expects a single parameter of type %2",
-      (DescriptiveDeclKind, Identifier, Type, bool))
+ERROR(single_tuple_parameter_mismatch_special,none,
+      "%0 expects a single parameter of type %1%2",
+      (DescriptiveDeclKind, Type, StringRef))
+ERROR(single_tuple_parameter_mismatch_normal,none,
+      "%0 %1 expects a single parameter of type %2%3",
+      (DescriptiveDeclKind, DeclBaseName, Type, StringRef))
 ERROR(unknown_single_tuple_parameter_mismatch,none,
       "single parameter of type %0 is expected in call", (Type))
 
@@ -4353,16 +4374,15 @@ WARNING(variable_never_used, none,
         "consider replacing with '_' or removing it",
         (Identifier, unsigned))
 WARNING(immutable_value_never_used_but_assigned, none,
-        "immutable value %0 was never used; "
-        "consider removing it",
+        "immutable value %0 was never used; consider removing it",
         (Identifier))
 WARNING(variable_never_mutated, none,
-        "%select{variable|parameter}1 %0 was never mutated; "
-        "consider %select{removing 'var' to make it|changing to 'let'}2 constant",
-        (Identifier, unsigned, bool))
+        "variable %0 was never mutated; "
+        "consider %select{removing 'var' to make it|changing to 'let'}1 constant",
+        (Identifier, bool))
 WARNING(variable_never_read, none,
-        "%select{variable|parameter}1 %0 was written to, but never read",
-        (Identifier, unsigned))
+        "variable %0 was written to, but never read",
+        (Identifier))
 
 //------------------------------------------------------------------------------
 // MARK: Debug diagnostics
@@ -4438,9 +4458,9 @@ ERROR(property_wrapper_ambiguous_value_property, none,
   "property wrapper type %0 has multiple non-static properties "
   "named %1", (Type, Identifier))
 ERROR(property_wrapper_wrong_initial_value_init, none,
-      "'init(initialValue:)' parameter type (%0) must be the same as its "
-      "'wrappedValue' property type (%1) or an @autoclosure thereof",
-      (Type, Type))
+      "%0 parameter type (%1) must be the same as its "
+      "'wrappedValue' property type (%2) or an @autoclosure thereof",
+      (DeclName, Type, Type))
 ERROR(property_wrapper_failable_init, none,
       "%0 cannot be failable", (DeclName))
 ERROR(property_wrapper_ambiguous_initial_value_init, none,
@@ -4452,6 +4472,9 @@ ERROR(property_wrapper_type_requirement_not_accessible,none,
       "more restrictive access than its enclosing property wrapper type %3 "
       "(which is %select{private|fileprivate|internal|public|open}4)",
       (AccessLevel, DescriptiveDeclKind, DeclName, Type, AccessLevel))
+ERROR(property_wrapper_ambiguous_enclosing_self_subscript, none,
+      "property wrapper type %0 has multiple enclosing-self subscripts %1",
+      (Type, DeclName))
 
 ERROR(property_wrapper_attribute_not_on_property, none,
       "property wrapper attribute %0 can only be applied to a property",
@@ -4459,8 +4482,14 @@ ERROR(property_wrapper_attribute_not_on_property, none,
 NOTE(property_wrapper_declared_here,none,
      "property wrapper type %0 declared here", (DeclName))
 
+ERROR(property_wrapper_mutating_get_composed_to_get_only,none,
+      "property wrapper %0 with a mutating getter cannot be composed inside "
+      "get-only property wrapper %1", (TypeLoc, TypeLoc))
+
 ERROR(property_wrapper_local,none,
       "property wrappers are not yet supported on local properties", ())
+ERROR(property_wrapper_top_level,none,
+      "property wrappers are not yet supported in top-level code", ())
 ERROR(property_wrapper_let, none,
       "property wrapper can only be applied to a 'var'",
       ())
@@ -4504,17 +4533,18 @@ ERROR(property_wrapper_type_not_usable_from_inline,none,
       "%select{%select{variable|constant}0|property}1 "
       "must be '@usableFromInline' or public",
       (bool, bool))
-WARNING(property_wrapper_delegateValue,none,
-        "property wrapper's `delegateValue` property should be renamed to "
-        "'projectedValue'; use of 'delegateValue' is deprecated", ())
 WARNING(property_wrapper_wrapperValue,none,
         "property wrapper's `wrapperValue` property should be renamed to "
         "'projectedValue'; use of 'wrapperValue' is deprecated", ())
-WARNING(property_wrapper_value,none,
-        "property wrapper's `value` property should be renamed to "
-        "'wrappedValue'; use of 'value' is deprecated", ())
+WARNING(property_wrapper_init_initialValue,none,
+        "property wrapper's `init(initialValue:)` should be renamed "
+        "to 'init(wrappedValue:)'; use of 'init(initialValue:)' is deprecated",
+        ())
 ERROR(property_wrapper_projection_value_missing,none,
       "could not find projection value property %0", (Identifier))
+ERROR(property_wrapper_missing_arg_init, none, "missing argument for parameter "
+      "%0 in property wrapper initializer; add 'wrappedValue' and %0 "
+      "arguments in '@%1(...)'", (Identifier, StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: function builder diagnostics

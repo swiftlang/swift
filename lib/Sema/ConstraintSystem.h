@@ -192,6 +192,10 @@ class TypeVariableType::Implementation {
   /// The corresponding node in the constraint graph.
   constraints::ConstraintGraphNode *GraphNode = nullptr;
 
+  ///  Index into the list of type variables, as used by the
+  ///  constraint graph.
+  unsigned GraphIndex;
+
   friend class constraints::SavedTypeVariableBinding;
 
 public:
@@ -250,12 +254,12 @@ public:
   /// Retrieve the index into the constraint graph's list of type variables.
   unsigned getGraphIndex() const { 
     assert(GraphNode && "Graph node isn't set");
-    return getTypeVariable()->Bits.TypeVariableType.GraphIndex; 
+    return GraphIndex;
   }
 
   /// Set the index into the constraint graph's list of type variables.
   void setGraphIndex(unsigned newIndex) {
-    getTypeVariable()->Bits.TypeVariableType.GraphIndex = newIndex;
+    GraphIndex = newIndex;
   }
   
   /// Check whether this type variable either has a representative that
@@ -882,9 +886,6 @@ struct MemberLookupResult {
   
   /// This enum tracks reasons why a candidate is not viable.
   enum UnviableReason {
-    /// Argument labels don't match.
-    UR_LabelMismatch,
-
     /// This uses a type like Self in its signature that cannot be used on an
     /// existential box.
     UR_UnavailableInExistential,
@@ -1547,7 +1548,7 @@ public:
   /// we're exploring.
   SolverState *solverState = nullptr;
 
-  struct ArgumentLabelState {
+  struct ArgumentInfo {
     ArrayRef<Identifier> Labels;
     bool HasTrailingClosure;
   };
@@ -1556,7 +1557,15 @@ public:
   /// names (e.g., member references, normal name references, possible
   /// constructions) to the argument labels provided in the call to
   /// that locator.
-  llvm::DenseMap<ConstraintLocator *, ArgumentLabelState> ArgumentLabels;
+  llvm::DenseMap<ConstraintLocator *, ArgumentInfo> ArgumentInfos;
+
+  /// Form a locator with given anchor which then could be used
+  /// to retrieve argument information cached in the constraint system.
+  ConstraintLocator *getArgumentInfoLocator(Expr *anchor);
+
+  /// Retrieve the argument info that is associated with a member
+  /// reference at the given locator.
+  Optional<ArgumentInfo> getArgumentInfo(ConstraintLocator *locator);
 
   ResolvedOverloadSetListItem *getResolvedOverloadSets() const {
     return resolvedOverloadSets;
@@ -1865,14 +1874,6 @@ public:
   Type getType(const ParamDecl *P) const {
     assert(hasType(P) && "Expected type to have been set!");
     return ParamTypes.find(P)->second;
-  }
-
-  Type getType(const VarDecl *D, bool wantInterfaceType = true) const {
-    if (auto *P = dyn_cast<ParamDecl>(D))
-      return getType(P);
-
-    assert(D->hasValidSignature());
-    return wantInterfaceType ? D->getInterfaceType() : D->getType();
   }
 
   Type getType(const KeyPathExpr *KP, unsigned I) const {
@@ -2261,18 +2262,63 @@ public:
     return typeVar->getImpl().getRepresentative(getSavedBindings());
   }
 
-  /// Gets the a VarDecl, and the type of its attached property wrapper if the
-  /// resolved overload has an attached property wrapper.
-  ///
-  /// \return A pair of the VarDecl and the attached property wrapper type if
-  ///         the given resolved overload has an attached property wrapper.
+  /// Gets the VarDecl associateed with resolvedOverload, and the type of the
+  /// storage wrapper if the decl has an associated storage wrapper.
+  Optional<std::pair<VarDecl *, Type>>
+  getStorageWrapperInformation(ResolvedOverloadSetListItem *resolvedOverload) {
+    assert(resolvedOverload);
+    if (resolvedOverload->Choice.isDecl()) {
+      if (auto *decl = dyn_cast<VarDecl>(resolvedOverload->Choice.getDecl())) {
+        if (decl->hasAttachedPropertyWrapper()) {
+          if (auto storageWrapper = decl->getPropertyWrapperStorageWrapper()) {
+            Type type = storageWrapper->getInterfaceType();
+            if (Type baseType = resolvedOverload->Choice.getBaseType()) {
+              type = baseType->getTypeOfMember(DC->getParentModule(),
+                                               storageWrapper, type);
+            }
+            return std::make_pair(decl, type);
+          }
+        }
+      }
+    }
+    return None;
+  }
+
+  /// Gets the VarDecl associateed with resolvedOverload, and the type of the
+  /// backing storage if the decl has an associated property wrapper.
   Optional<std::pair<VarDecl *, Type>>
   getPropertyWrapperInformation(ResolvedOverloadSetListItem *resolvedOverload) {
-    if (resolvedOverload && resolvedOverload->Choice.isDecl()) {
+    assert(resolvedOverload);
+    if (resolvedOverload->Choice.isDecl()) {
       if (auto *decl = dyn_cast<VarDecl>(resolvedOverload->Choice.getDecl())) {
         if (decl->hasAttachedPropertyWrapper()) {
           auto wrapperTy = decl->getPropertyWrapperBackingPropertyType();
+          if (Type baseType = resolvedOverload->Choice.getBaseType()) {
+            wrapperTy = baseType->getTypeOfMember(DC->getParentModule(),
+                                                  decl, wrapperTy);
+          }
           return std::make_pair(decl, wrapperTy);
+        }
+      }
+    }
+    return None;
+  }
+
+  /// Gets the VarDecl, and the type of the type property that it wraps if
+  /// resolved overload has a decl which is the backing storage for a
+  /// property wrapper.
+  Optional<std::pair<VarDecl *, Type>>
+  getWrappedPropertyInformation(ResolvedOverloadSetListItem *resolvedOverload) {
+    assert(resolvedOverload);
+    if (resolvedOverload->Choice.isDecl()) {
+      if (auto *decl = dyn_cast<VarDecl>(resolvedOverload->Choice.getDecl())) {
+        if (auto wrapped = decl->getOriginalWrappedProperty()) {
+          Type type = wrapped->getInterfaceType();
+          if (Type baseType = resolvedOverload->Choice.getBaseType()) {
+            type = baseType->getTypeOfMember(DC->getParentModule(),
+                                             wrapped, type);
+          }
+          return std::make_pair(decl, type);
         }
       }
     }
@@ -2556,15 +2602,11 @@ public:
   /// (as the function parameters) and the expected result type of the
   /// call.
   ///
-  /// \param argumentLabels The argument labels provided at the call site,
-  /// if known.
-  ///
   /// \returns \c fnType, or some simplified form of it if this function
   /// was able to find a single overload or derive some common structure
   /// among the overloads.
   Type simplifyAppliedOverloads(TypeVariableType *fnTypeVar,
                                 const FunctionType *argFnType,
-                                Optional<ArgumentLabelState> argumentLabels,
                                 ConstraintLocatorBuilder locator);
 
   /// Retrieve the type that will be used when matching the given overload.
@@ -3823,20 +3865,13 @@ matchCallArguments(ConstraintSystem &cs,
 /// subscript, etc.), find the underlying target expression.
 Expr *getArgumentLabelTargetExpr(Expr *fn);
 
-/// Returns true if a reference to a member on a given base type will apply its
-/// curried self parameter, assuming it has one.
+/// Returns true if a reference to a member on a given base type will apply
+/// its curried self parameter, assuming it has one.
 ///
-/// This is true for most member references, however isn't true for things like
-/// an instance member being referenced on a metatype, where the curried self
-/// parameter remains unapplied.
+/// This is true for most member references, however isn't true for things
+/// like an instance member being referenced on a metatype, where the
+/// curried self parameter remains unapplied.
 bool doesMemberRefApplyCurriedSelf(Type baseTy, const ValueDecl *decl);
-
-/// Attempt to prove that arguments with the given labels at the
-/// given parameter depth cannot be used with the given value.
-/// If this cannot be proven, conservatively returns true.
-bool areConservativelyCompatibleArgumentLabels(OverloadChoice choice,
-                                               ArrayRef<Identifier> labels,
-                                               bool hasTrailingClosure);
 
 /// Simplify the given locator by zeroing in on the most specific
 /// subexpression described by the locator.
@@ -4217,14 +4252,6 @@ public:
 
   size_t getNumSkippedParameters() const { return NumSkippedParameters; }
 };
-
-/// Diagnose an attempt to recover from a member access into a value of
-/// optional type which needed to be unwrapped for the member to be found.
-///
-/// \returns true if a diagnostic was produced.
-bool diagnoseBaseUnwrapForMemberAccess(Expr *baseExpr, Type baseType,
-                                       DeclName memberName, bool resultOptional,
-                                       SourceRange memberRange);
 
 // Return true if, when replacing "<expr>" with "<expr> ?? T", parentheses need
 // to be added around <expr> first in order to maintain the correct precedence.

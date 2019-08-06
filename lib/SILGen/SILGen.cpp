@@ -613,13 +613,13 @@ static bool isEmittedOnDemand(SILModule &M, SILDeclRef constant) {
   if (isa<ClangModuleUnit>(dc))
     return true;
 
-  if (auto *sf = dyn_cast<SourceFile>(dc))
-    if (M.isWholeModule() || M.getAssociatedContext() == dc)
-      return false;
-
   if (auto *func = dyn_cast<FuncDecl>(d))
     if (func->hasForcedStaticDispatch())
       return true;
+
+  if (auto *sf = dyn_cast<SourceFile>(dc))
+    if (M.isWholeModule() || M.getAssociatedContext() == dc)
+      return false;
 
   return false;
 }
@@ -1132,6 +1132,7 @@ emitStoredPropertyInitialization(PatternBindingDecl *pbd, unsigned i) {
   auto *var = pbdEntry.getAnchoringVarDecl();
   auto *init = pbdEntry.getInit();
   auto *initDC = pbdEntry.getInitContext();
+  auto &captureInfo = pbdEntry.getCaptureInfo();
   assert(!pbdEntry.isInitializerSubsumed());
 
   // If this is the backing storage for a property with an attached wrapper
@@ -1148,12 +1149,23 @@ emitStoredPropertyInitialization(PatternBindingDecl *pbd, unsigned i) {
 
   SILDeclRef constant(var, SILDeclRef::Kind::StoredPropertyInitializer);
   emitOrDelayFunction(*this, constant,
-                      [this,constant,init,initDC](SILFunction *f) {
+                      [this,var,captureInfo,constant,init,initDC](SILFunction *f) {
     preEmitFunction(constant, init, f, init);
     PrettyStackTraceSILFunction X("silgen emitStoredPropertyInitialization", f);
     f->createProfiler(init, constant, ForDefinition);
-    SILGenFunction(*this, *f, initDC)
-        .emitGeneratorFunction(constant, init, /*EmitProfilerIncrement=*/true);
+    SILGenFunction SGF(*this, *f, initDC);
+
+    // If this is a stored property initializer inside a type at global scope,
+    // it may close over a global variable. If we're emitting top-level code,
+    // then emit a "mark_function_escape" that lists the captured global
+    // variables so that definite initialization can reason about this
+    // escape point.
+    if (!var->getDeclContext()->isLocalContext() &&
+        TopLevelSGF && TopLevelSGF->B.hasValidInsertionPoint()) {
+      emitMarkFunctionEscapeForTopLevelCodeGlobals(var, captureInfo);
+    }
+
+    SGF.emitGeneratorFunction(constant, init, /*EmitProfilerIncrement=*/true);
     postEmitFunction(constant, f);
   });
 }
@@ -1228,15 +1240,16 @@ void SILGenModule::emitObjCMethodThunk(FuncDecl *method) {
 }
 
 void SILGenModule::emitObjCPropertyMethodThunks(AbstractStorageDecl *prop) {
+  auto *getter = prop->getOpaqueAccessor(AccessorKind::Get);
+
   // If we don't actually need an entry point for the getter, do nothing.
-  if (!prop->getGetter() || !requiresObjCMethodEntryPoint(prop->getGetter()))
+  if (!getter || !requiresObjCMethodEntryPoint(getter))
     return;
 
-  auto getter = SILDeclRef(prop->getGetter(), SILDeclRef::Kind::Func)
-    .asForeign();
+  auto getterRef = SILDeclRef(getter, SILDeclRef::Kind::Func).asForeign();
 
   // Don't emit the thunks if they already exist.
-  if (hasFunction(getter))
+  if (hasFunction(getterRef))
     return;
 
   RegularLocation ThunkBodyLoc(prop);
@@ -1244,30 +1257,29 @@ void SILGenModule::emitObjCPropertyMethodThunks(AbstractStorageDecl *prop) {
   // ObjC entry points are always externally usable, so emitting can't be
   // delayed.
   {
-    SILFunction *f = getFunction(getter, ForDefinition);
-    preEmitFunction(getter, prop, f, ThunkBodyLoc);
+    SILFunction *f = getFunction(getterRef, ForDefinition);
+    preEmitFunction(getterRef, prop, f, ThunkBodyLoc);
     PrettyStackTraceSILFunction X("silgen objc property getter thunk", f);
     f->setBare(IsBare);
     f->setThunk(IsThunk);
-    SILGenFunction(*this, *f, prop->getGetter())
-      .emitNativeToForeignThunk(getter);
-    postEmitFunction(getter, f);
+    SILGenFunction(*this, *f, getter).emitNativeToForeignThunk(getterRef);
+    postEmitFunction(getterRef, f);
   }
 
   if (!prop->isSettable(prop->getDeclContext()))
     return;
 
   // FIXME: Add proper location.
-  auto setter = SILDeclRef(prop->getSetter(), SILDeclRef::Kind::Func)
-    .asForeign();
+  auto *setter = prop->getOpaqueAccessor(AccessorKind::Set);
+  auto setterRef = SILDeclRef(setter, SILDeclRef::Kind::Func).asForeign();
 
-  SILFunction *f = getFunction(setter, ForDefinition);
-  preEmitFunction(setter, prop, f, ThunkBodyLoc);
+  SILFunction *f = getFunction(setterRef, ForDefinition);
+  preEmitFunction(setterRef, prop, f, ThunkBodyLoc);
   PrettyStackTraceSILFunction X("silgen objc property setter thunk", f);
   f->setBare(IsBare);
   f->setThunk(IsThunk);
-  SILGenFunction(*this, *f, prop->getSetter()).emitNativeToForeignThunk(setter);
-  postEmitFunction(setter, f);
+  SILGenFunction(*this, *f, setter).emitNativeToForeignThunk(setterRef);
+  postEmitFunction(setterRef, f);
 }
 
 void SILGenModule::emitObjCConstructorThunk(ConstructorDecl *constructor) {
@@ -1384,11 +1396,12 @@ static bool canStorageUseTrivialDescriptor(SILGenModule &SGM,
       // property in a fixed-layout type.
       return !decl->isFormallyResilient();
     }
+
     // If the type is computed and doesn't have a setter that's hidden from
     // the public, then external components can form the canonical key path
     // without our help.
-    auto setter = decl->getSetter();
-    if (setter == nullptr)
+    auto *setter = decl->getOpaqueAccessor(AccessorKind::Set);
+    if (!setter)
       return true;
 
     if (setter->getFormalAccessScope(nullptr, true).isPublic())
@@ -1403,8 +1416,8 @@ static bool canStorageUseTrivialDescriptor(SILGenModule &SGM,
   // or a fixed-layout type may not have been.
   // Without availability information, only get-only computed properties
   // can resiliently use trivial descriptors.
-  return !SGM.canStorageUseStoredKeyPathComponent(decl, expansion)
-    && decl->getSetter() == nullptr;
+  return (!SGM.canStorageUseStoredKeyPathComponent(decl, expansion) &&
+          !decl->supportsMutation());
 }
 
 void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {

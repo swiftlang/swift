@@ -38,7 +38,6 @@ class ClassDecl;
 class CanType;
 class EnumDecl;
 class GenericSignature;
-class LazyResolver;
 class ModuleDecl;
 class NominalTypeDecl;
 class GenericTypeDecl;
@@ -612,7 +611,6 @@ inline T *staticCastHelper(const Type &Ty) {
 template <typename T>
 using TypeArrayView = ArrayRefView<Type, T*, staticCastHelper,
                                    /*AllowOrigAccess*/true>;
-
 } // end namespace swift
 
 namespace llvm {

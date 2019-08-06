@@ -1514,16 +1514,56 @@ ManagedValue emitCFunctionPointer(SILGenFunction &SGF,
   } else if (auto memberRef = dyn_cast<MemberRefExpr>(semanticExpr)) {
     setLocFromConcreteDeclRef(memberRef->getMember());
   } else if (auto closure = dyn_cast<AbstractClosureExpr>(semanticExpr)) {
-    loc = closure;
     // Emit the closure body.
     SGF.SGM.emitClosure(closure);
+
+    loc = closure;
+  } else if (auto captureList = dyn_cast<CaptureListExpr>(semanticExpr)) {
+    // Ensure that weak captures are in a separate scope.
+    DebugScope scope(SGF, CleanupLocation(captureList));
+    // CaptureListExprs evaluate their bound variables.
+    for (auto capture : captureList->getCaptureList()) {
+      SGF.visit(capture.Var);
+      SGF.visit(capture.Init);
+    }
+
+    // Emit the closure body.
+    auto *closure = captureList->getClosureBody();
+    SGF.SGM.emitClosure(closure);
+
+    loc = closure;
   } else {
     llvm_unreachable("c function pointer converted from a non-concrete decl ref");
   }
 
   // Produce a reference to the C-compatible entry point for the function.
-  SILDeclRef constant(loc, /*uncurryLevel*/ 0, /*foreign*/ true);
+  SILDeclRef constant(loc, /*curried*/ false, /*foreign*/ true);
   SILConstantInfo constantInfo = SGF.getConstantInfo(constant);
+
+  // C function pointers cannot capture anything from their context.
+  auto captures = SGF.SGM.Types.getLoweredLocalCaptures(
+    *constant.getAnyFunctionRef());
+
+  if (captures.hasGenericParamCaptures() ||
+      captures.hasDynamicSelfCapture() ||
+      captures.hasLocalCaptures() ||
+      captures.hasOpaqueValueCapture()) {
+    unsigned kind;
+    if (captures.hasLocalCaptures())
+      kind = 0;
+    else if (captures.hasGenericParamCaptures())
+      kind = 1;
+    else if (captures.hasLocalCaptures())
+      kind = 2;
+    else
+      kind = 3;
+    SGF.SGM.diagnose(expr->getLoc(),
+                     diag::c_function_pointer_from_function_with_context,
+                     /*closure*/ constant.hasClosureExpr(),
+                     kind);
+
+    return SGF.emitUndef(constantInfo.getSILType());
+  }
 
   return convertCFunctionSignature(
                     SGF, conversionExpr,
@@ -2307,7 +2347,7 @@ RValue RValueEmitter::visitDynamicTypeExpr(DynamicTypeExpr *E, SGFContext C) {
 RValue RValueEmitter::visitCaptureListExpr(CaptureListExpr *E, SGFContext C) {
   // Ensure that weak captures are in a separate scope.
   DebugScope scope(SGF, CleanupLocation(E));
-  // ClosureExpr's evaluate their bound variables.
+  // CaptureListExprs evaluate their bound variables.
   for (auto capture : E->getCaptureList()) {
     SGF.visit(capture.Var);
     SGF.visit(capture.Init);
@@ -2340,7 +2380,59 @@ RValue RValueEmitter::visitAbstractClosureExpr(AbstractClosureExpr *e,
 RValue RValueEmitter::
 visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E,
                                    SGFContext C) {
-  return visit(E->getSemanticExpr(), C);
+  RValue interpolation;
+  {
+    TapExpr *ETap = E->getAppendingExpr();
+    // Inlined from TapExpr:
+    // TODO: This is only necessary because constant evaluation requires that
+    // the box for the var gets defined before the initializer happens.
+    auto Var = ETap->getVar();
+    auto VarType = ETap->getType()->getCanonicalType();
+
+    Scope outerScope(SGF, CleanupLocation(ETap));
+
+    // Initialize the var with our SubExpr.
+    auto VarInit =
+        SGF.emitInitializationForVarDecl(Var, /*forceImmutable=*/false);
+    {
+      // Modified from TapExpr to evaluate the SubExpr directly rather than
+      // indirectly through the OpaqueValue system.
+      PreparedArguments builderInitArgs;
+      RValue literalCapacity = visit(E->getLiteralCapacityExpr(), SGFContext());
+      RValue interpolationCount =
+          visit(E->getInterpolationCountExpr(), SGFContext());
+      builderInitArgs.emplace(
+          {AnyFunctionType::Param(literalCapacity.getType()),
+           AnyFunctionType::Param(interpolationCount.getType())});
+      builderInitArgs.add(E, std::move(literalCapacity));
+      builderInitArgs.add(E, std::move(interpolationCount));
+      RValue subexpr_result = SGF.emitApplyAllocatingInitializer(
+          E, E->getBuilderInit(), std::move(builderInitArgs), Type(),
+          SGFContext(VarInit.get()));
+      if (!subexpr_result.isInContext()) {
+        ArgumentSource(
+            SILLocation(E),
+            std::move(subexpr_result).ensurePlusOne(SGF, SILLocation(E)))
+            .forwardInto(SGF, VarInit.get());
+      }
+    }
+
+    // Emit the body and let it mutate the var if it chooses.
+    SGF.emitStmt(ETap->getBody());
+
+    // Retrieve and return the var, making it +1 so it survives the scope.
+    auto result = SGF.emitRValueForDecl(SILLocation(ETap), Var, VarType,
+                                        AccessSemantics::Ordinary, SGFContext());
+    result = std::move(result).ensurePlusOne(SGF, SILLocation(ETap));
+    interpolation = outerScope.popPreservingValue(std::move(result));
+  }
+
+  PreparedArguments resultInitArgs;
+  resultInitArgs.emplace(AnyFunctionType::Param(interpolation.getType()));
+  resultInitArgs.add(E, std::move(interpolation));
+
+  return SGF.emitApplyAllocatingInitializer(
+      E, E->getResultInit(), std::move(resultInitArgs), Type(), C);
 }
 
 RValue RValueEmitter::
@@ -2512,9 +2604,9 @@ loadIndexValuesForKeyPathComponent(SILGenFunction &SGF, SILLocation loc,
 static AccessorDecl *
 getRepresentativeAccessorForKeyPath(AbstractStorageDecl *storage) {
   if (storage->requiresOpaqueGetter())
-    return storage->getGetter();
+    return storage->getOpaqueAccessor(AccessorKind::Get);
   assert(storage->requiresOpaqueReadCoroutine());
-  return storage->getReadCoroutine();
+  return storage->getOpaqueAccessor(AccessorKind::Read);
 }
 
 static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
@@ -2663,7 +2755,7 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
   // back to the declaration whose setter introduced the witness table
   // entry.
   if (isa<ProtocolDecl>(property->getDeclContext())) {
-    auto setter = property->getSetter();
+    auto setter = property->getOpaqueAccessor(AccessorKind::Set);
     if (!SILDeclRef::requiresNewWitnessTableEntry(setter)) {
       // Find the setter that does have a witness table entry.
       auto wtableSetter =
@@ -3015,7 +3107,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
       branchScope.pop();
       
       auto isEqualI1 = subSGF.B.createStructExtract(loc, isEqual,
-        C.getBoolDecl()->getStoredProperties().front(), i1Ty);
+        C.getBoolDecl()->getStoredProperties()[0], i1Ty);
       
       auto isTrueBB = subSGF.createBasicBlock();
       // Each false condition needs its own block to avoid critical edges.
@@ -3217,49 +3309,6 @@ lowerKeyPathSubscriptIndexTypes(
   }
 };
 
-/// Map the given protocol conformance out of context, replacing archetypes
-/// with their corresponding interface types.
-static ProtocolConformance *mapConformanceOutOfContext(
-                                         ProtocolConformance *conformance) {
-  if (!conformance->getType()->hasArchetype())
-    return conformance;
-
-  ASTContext &ctx = conformance->getProtocol()->getASTContext();
-  switch (conformance->getKind()) {
-  case ProtocolConformanceKind::Normal:
-  case ProtocolConformanceKind::Self:
-    llvm_unreachable("Normal and self conformances never have archetypes");
-
-  case ProtocolConformanceKind::Inherited: {
-    auto inherited = cast<InheritedProtocolConformance>(conformance);
-    return ctx.getInheritedConformance(
-             inherited->getType()->mapTypeOutOfContext(),
-             mapConformanceOutOfContext(inherited->getInheritedConformance()));
-  }
-
-  case ProtocolConformanceKind::Specialized: {
-    auto specialized = cast<SpecializedProtocolConformance>(conformance);
-    return ctx.getSpecializedConformance(
-             specialized->getType()->mapTypeOutOfContext(),
-             mapConformanceOutOfContext(specialized->getGenericConformance()),
-             specialized->getSubstitutionMap()
-               .mapReplacementTypesOutOfContext());
-  }
-  }
-  llvm_unreachable("covered switch");
-}
-
-/// Map the given protocol conformance out of context, replacing archetypes
-/// with their corresponding interface types.
-static ProtocolConformanceRef mapConformanceOutOfContext(
-                                          ProtocolConformanceRef conformance) {
-  if (conformance.isAbstract())
-    return conformance;
-
-  return ProtocolConformanceRef(
-                        mapConformanceOutOfContext(conformance.getConcrete()));
-}
-
 static void
 lowerKeyPathSubscriptIndexPatterns(
                  SmallVectorImpl<KeyPathPatternComponent::Index> &indexPatterns,
@@ -3270,7 +3319,7 @@ lowerKeyPathSubscriptIndexPatterns(
     CanType formalTy;
     SILType loweredTy;
     std::tie(formalTy, loweredTy) = indexTypes[i];
-    auto hashable = mapConformanceOutOfContext(indexHashables[i]);
+    auto hashable = indexHashables[i].mapConformanceOutOfContext();
     assert(hashable.isAbstract() ||
            hashable.getConcrete()->getType()->isEqual(formalTy));
 
@@ -4854,7 +4903,7 @@ RValue RValueEmitter::emitForceValue(ForceValueExpr *loc, Expr *E,
         failureBuilder.setTrackingList(SGF.getBuilder().getTrackingList());
         auto boolTy = SILType::getBuiltinIntegerType(1, SGF.getASTContext());
         auto trueV = failureBuilder.createIntegerLiteral(loc, boolTy, 1);
-        failureBuilder.createCondFail(loc, trueV);
+        failureBuilder.createCondFail(loc, trueV, "force unwrapped a nil value");
         failureBuilder.createUnreachable(loc);
       }
     }
@@ -4993,7 +5042,7 @@ RValue RValueEmitter::visitMakeTemporarilyEscapableExpr(
   auto isEscaping = SGF.B.createIsEscapingClosure(
       loc, borrowedClosure.getValue(),
       IsEscapingClosureInst::WithoutActuallyEscaping);
-  SGF.B.createCondFail(loc, isEscaping);
+  SGF.B.createCondFail(loc, isEscaping, "non-escaping closure has escaped");
   return rvalue;
 }
 

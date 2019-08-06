@@ -1172,7 +1172,7 @@ bb0:
 // CHECK-LABEL: sil @test_thin_convert_function_inline
 // CHECK-NEXT: bb0
 // CHECK-NEXT: [[RES:%.*]] = integer_literal $Builtin.Int32, 1
-// CHECK-NEXT  return [[RES]]
+// CHECK-NEXT:  return [[RES]]
 sil @test_thin_convert_function_inline : $@convention(thin) () -> Builtin.Int32 {
 bb0:
   %0 = function_ref @return_one : $@convention(thin) () -> Builtin.Int32

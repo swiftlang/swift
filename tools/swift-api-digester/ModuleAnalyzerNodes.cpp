@@ -1368,6 +1368,19 @@ SDKNode *swift::ide::api::
 SwiftDeclCollector::constructTypeNode(Type T, TypeInitInfo Info) {
   if (Ctx.checkingABI()) {
     T = T->getCanonicalType();
+    // If the type is a opaque result type (some Type) and we're in the ABI mode,
+    // we should substitute the opaque result type to its underlying type.
+    // Notice this only works if the opaque result type is from an inlinable
+    // function where the function body is present in the swift module file, thus
+    // allowing us to know the concrete type.
+    if (auto OTA = T->getAs<OpaqueTypeArchetypeType>()) {
+      if (auto *D = OTA->getDecl()) {
+        if (auto SubMap = D->getUnderlyingTypeSubstitutions()) {
+          T = Type(D->getUnderlyingInterfaceType()).
+            subst(*SubMap)->getCanonicalType();
+        }
+      }
+    }
   }
 
   if (auto NAT = dyn_cast<TypeAliasType>(T.getPointer())) {
@@ -1680,7 +1693,7 @@ SwiftDeclCollector::constructConformanceNode(ProtocolConformance *Conform) {
     Conform = Conform->getCanonicalConformance();
   auto ConfNode = cast<SDKNodeConformance>(SDKNodeInitInfo(Ctx,
     Conform).createSDKNode(SDKNodeKind::Conformance));
-  Conform->forEachTypeWitness(nullptr,
+  Conform->forEachTypeWitness(
     [&](AssociatedTypeDecl *assoc, Type ty, TypeDecl *typeDecl) -> bool {
       ConfNode->addChild(constructTypeWitnessNode(assoc, ty));
       return false;
@@ -2067,7 +2080,7 @@ swift::ide::api::getSDKNodeRoot(SDKContext &SDKCtx,
     if (Opts.Verbose)
       llvm::errs() << "Loading module: " << Name << "...\n";
     auto *M = Ctx.getModuleByName(Name);
-    if (!M) {
+    if (!M || M->failedToLoad()) {
       llvm::errs() << "Failed to load module: " << Name << '\n';
       if (Opts.AbortOnModuleLoadFailure)
         return nullptr;

@@ -2,11 +2,7 @@
 
 @propertyWrapper
 struct Wrapper<T> {
-  var value: T
-
-  init(initialValue: T) {
-    self.value = initialValue
-  }
+  var wrappedValue: T
 }
 
 protocol DefaultInit {
@@ -33,7 +29,7 @@ struct UseWrapper<T: DefaultInit> {
   // CHECK-NEXT: pattern_typed implicit type='Wrapper<T>'
   // CHECK-NEXT: pattern_named implicit type='Wrapper<T>' '_wrapped'
   // CHECK: constructor_ref_call_expr
-  // CHECK-NEXT: declref_expr{{.*}}Wrapper.init(initialValue:)
+  // CHECK-NEXT: declref_expr{{.*}}Wrapper.init(wrappedValue:)
   init() { }
 }
 
@@ -53,3 +49,42 @@ struct UseWillSetDidSet {
     }
   }
 }
+
+@propertyWrapper
+struct Observable<Value> {
+  private var stored: Value
+
+  init(initialValue: Value) {
+    self.stored = initialValue
+  }
+
+  var wrappedValue: Value {
+    get { fatalError("called wrappedValue getter") }
+    set { fatalError("called wrappedValue setter") }
+  }
+  
+  static subscript<EnclosingSelf>(
+      _enclosingInstance observed: EnclosingSelf,
+      wrapped wrappedKeyPath: ReferenceWritableKeyPath<EnclosingSelf, Value>,
+      storage storageKeyPath: ReferenceWritableKeyPath<EnclosingSelf, Self>
+    ) -> Value {
+    get {
+      observed[keyPath: storageKeyPath].stored
+    }
+    set {
+      observed[keyPath: storageKeyPath].stored = newValue
+    }
+  }
+}
+
+// CHECK-LABEL: class_decl{{.*}}"MyObservedType"
+class MyObservedType {
+  @Observable var observedProperty = 17
+
+  // CHECK: accessor_decl{{.*}}get_for=observedProperty
+  // CHECK:   subscript_expr implicit type='@lvalue Int' decl={{.*}}.Observable.subscript(_enclosingInstance:wrapped:storage:)
+
+  // CHECK: accessor_decl{{.*}}set_for=observedProperty
+  // CHECK:   subscript_expr implicit type='@lvalue Int' decl={{.*}}.Observable.subscript(_enclosingInstance:wrapped:storage:)
+}
+
