@@ -1584,23 +1584,29 @@ static void emitLocalSelfMetadata(IRGenSILFunction &IGF) {
     return;
   
   const SILArgument *selfArg = IGF.CurSILFn->getSelfMetadataArgument();
+  auto selfTy = selfArg->getType().getASTType();
   CanMetatypeType metaTy =
-    dyn_cast<MetatypeType>(selfArg->getType().getASTType());
+    dyn_cast<MetatypeType>(selfTy);
   IRGenFunction::LocalSelfKind selfKind;
   if (!metaTy)
     selfKind = IRGenFunction::ObjectReference;
-  else switch (metaTy->getRepresentation()) {
-  case MetatypeRepresentation::Thin:
-    llvm_unreachable("class metatypes are never thin");
-  case MetatypeRepresentation::Thick:
-    selfKind = IRGenFunction::SwiftMetatype;
-    break;
-  case MetatypeRepresentation::ObjC:
-    selfKind = IRGenFunction::ObjCMetatype;
-    break;
+  else {
+    selfTy = metaTy.getInstanceType();
+    switch (metaTy->getRepresentation()) {
+    case MetatypeRepresentation::Thin:
+      llvm_unreachable("class metatypes are never thin");
+    case MetatypeRepresentation::Thick:
+      selfKind = IRGenFunction::SwiftMetatype;
+      break;
+    case MetatypeRepresentation::ObjC:
+      selfKind = IRGenFunction::ObjCMetatype;
+      break;
+    }
   }
   llvm::Value *value = IGF.getLoweredExplosion(selfArg).claimNext();
-  IGF.setLocalSelfMetadata(value, selfKind);
+  if (auto dynSelfTy = dyn_cast<DynamicSelfType>(selfTy))
+    selfTy = dynSelfTy.getSelfType();
+  IGF.setLocalSelfMetadata(selfTy, value, selfKind);
 }
 
 /// Emit the definition for the given SIL constant.

@@ -644,7 +644,8 @@ public:
   };
 
   llvm::Value *getLocalSelfMetadata();
-  void setLocalSelfMetadata(llvm::Value *value, LocalSelfKind kind);
+  void setLocalSelfMetadata(CanType selfBaseTy,
+                            llvm::Value *value, LocalSelfKind kind);
 
 private:
   LocalTypeDataCache &getOrCreateLocalTypeData();
@@ -660,7 +661,7 @@ private:
   
   /// The value that satisfies metadata lookups for dynamic Self.
   llvm::Value *LocalSelf = nullptr;
-  
+  CanType LocalSelfType;
   LocalSelfKind SelfKind;
 };
 

@@ -2378,6 +2378,13 @@ IRGenFunction::emitTypeMetadataRef(CanType type,
   // Look through any opaque types we're allowed to.
   type = IGM.substOpaqueTypesWithUnderlyingTypes(type);
 
+  // If we're asking for the metadata of the base Self type, and the class
+  // is final, we can use the local self metadata.
+  if (LocalSelfType == type
+      && LocalSelfType.getClassOrBoundGenericClass()->isFinal()) {
+    return MetadataResponse::forComplete(getLocalSelfMetadata());
+  }
+  
   if (type->hasArchetype() ||
       isTypeMetadataAccessTrivial(IGM, type)) {
     // FIXME: propagate metadata request!
