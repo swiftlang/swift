@@ -1209,7 +1209,7 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable
   ///   with the default floating-point environment), Swift interprets
   ///   subnormal `Float` and `Double` values as non-canonical zeros.
   ///   (In Swift 5.1 and earlier, `isCanonical` is `true` for these
-  ///   values. This is a bug.)
+  ///   values, which is the incorrect value.)
   ///
   /// - On i386 and x86_64, `Float80` has a number of non-canonical
   ///   encodings. "Pseudo-NaNs", "pseudo-infinities", and "unnormals" are
