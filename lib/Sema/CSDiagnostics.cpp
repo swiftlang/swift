@@ -313,7 +313,8 @@ Type RequirementFailure::getOwnerType() const {
 const GenericContext *RequirementFailure::getGenericContext() const {
   if (auto *genericCtx = AffectedDecl->getAsGenericContext())
     return genericCtx;
-  return AffectedDecl->getDeclContext()->getAsDecl()->getAsGenericContext();
+  auto decl = AffectedDecl->getDeclContext()->getAsDecl();
+  return decl ? decl->getAsGenericContext() : nullptr;
 }
 
 const Requirement &RequirementFailure::getRequirement() const {
@@ -435,6 +436,8 @@ bool RequirementFailure::diagnoseAsError() {
   auto *anchor = getRawAnchor();
   const auto *reqDC = getRequirementDC();
   auto *genericCtx = getGenericContext();
+  if (!genericCtx)
+    return false;
 
   auto lhs = getLHS();
   auto rhs = getRHS();

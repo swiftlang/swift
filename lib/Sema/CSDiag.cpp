@@ -508,6 +508,9 @@ private:
   bool visitArrayExpr(ArrayExpr *E);
   bool visitDictionaryExpr(DictionaryExpr *E);
   bool visitObjectLiteralExpr(ObjectLiteralExpr *E);
+  bool visitQuoteLiteralExpr(QuoteLiteralExpr *E);
+  bool visitUnquoteExpr(UnquoteExpr *E);
+  bool visitDeclQuoteExpr(DeclQuoteExpr *E);
 
   bool visitForceValueExpr(ForceValueExpr *FVE);
   bool visitBindOptionalExpr(BindOptionalExpr *BOE);
@@ -6128,6 +6131,17 @@ bool FailureDiagnosis::visitObjectLiteralExpr(ObjectLiteralExpr *E) {
   }
   return true;
 }
+
+// No need to do additional diagnostics for quote literals.
+bool FailureDiagnosis::visitQuoteLiteralExpr(QuoteLiteralExpr *E) {
+  return false;
+}
+
+// No need to do additional diagnostics for unquotes.
+bool FailureDiagnosis::visitUnquoteExpr(UnquoteExpr *E) { return false; }
+
+// No need to do additional diagnostics for decl quotes.
+bool FailureDiagnosis::visitDeclQuoteExpr(DeclQuoteExpr *E) { return false; }
 
 bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
   // If we have no contextual type, there is no way to resolve this.  Just

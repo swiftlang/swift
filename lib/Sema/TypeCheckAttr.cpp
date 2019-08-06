@@ -139,6 +139,8 @@ public:
   IGNORED_ATTR(CompilerEvaluable)
   IGNORED_ATTR(NoDerivative)
   IGNORED_ATTR(Transposing)
+  // TODO(#9): Allow @quoted on more decls.
+  IGNORED_ATTR(Quoted)
 #undef IGNORED_ATTR
 
   void visitAlignmentAttr(AlignmentAttr *attr) {
@@ -753,6 +755,8 @@ public:
     IGNORED_ATTR(WeakLinked)
     IGNORED_ATTR(DisfavoredOverload)
     IGNORED_ATTR(ProjectedValueProperty)
+    // TODO(#9): Allow @quoted on more decls.
+    IGNORED_ATTR(Quoted)
 #undef IGNORED_ATTR
 
   void visitAvailableAttr(AvailableAttr *attr);

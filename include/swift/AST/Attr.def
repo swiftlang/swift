@@ -55,6 +55,7 @@ TYPE_ATTR(escaping)
 TYPE_ATTR(differentiable)
 TYPE_ATTR(autodiff)
 TYPE_ATTR(nondiff)
+TYPE_ATTR(quoted)
 
 // SIL-specific attributes
 TYPE_ATTR(block_storage)
@@ -438,6 +439,10 @@ DECL_ATTR(transposing, Transposing,
 SIMPLE_DECL_ATTR(IBSegueAction, IBSegueAction,
   OnFunc,
   95)
+
+DECL_ATTR(quoted, Quoted,
+  OnFunc,
+  96)
 
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS

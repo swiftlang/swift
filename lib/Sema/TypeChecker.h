@@ -1256,6 +1256,76 @@ public:
                                TypeCheckExprOptions(), listener);
   }
 
+  /// Quote the given typed expression by creating a snippet of code that at
+  /// runtime will approximate the given expression using the data structures
+  /// from the Quote module. This functionality implements #quote(...).
+  ///
+  /// The exact runtime representation, and the way how it is constructed are
+  /// not set in stone and are undergoing rapid evolution.
+  ///
+  /// For example, in the current terminology of the Quote model, calling this
+  /// method on an expression representing `42` will return an expression
+  /// representing `Quote<Int>(Literal(42, TypeName("Int", "s:Si")))`.
+  ///
+  /// \param expr Typed expression to be quoted.
+  ///
+  /// \param dc Declaration context in which the result will be typechecked.
+  ///
+  /// \returns If successful, a typechecked expression that at runtime will
+  /// approximate the given expression. If not successful, nullptr (appropriate
+  /// error messages will also be emitted as a side effect).
+  Expr *quoteExpr(Expr *expr, DeclContext *dc);
+
+  /// Compute the type of quoteExpr given the type of expression.
+  ///
+  /// This does not require running quoteExpr and can be expressed
+  /// by the following rules (where on the left we have the type of expression,
+  /// and on the right we have the type of quoteExpr):
+  ///
+  ///   1) (T1, ..., Tn) -> R => FunctionQuoteN<T1, ... Tn, R>
+  ///   2) T                  => Quote<T>
+  ///
+  /// TODO(#6): In the future, we may implement more complicated rules
+  /// based on something like ExpressibleByQuoteLiteral.
+  Type getTypeOfQuoteExpr(Type exprType, SourceLoc loc);
+
+  /// Compute the type of #unquote given the type of expression.
+  ///
+  /// This can be expressed by the following rules (where on the left we have
+  /// the type of expression, and on the right we have the type of #unquote):
+  ///
+  ///   1) FunctionQuoteN<T1, ... Tn, R> => (T1, ..., Tn) -> R
+  ///   2) Quote<T>                      => T
+  ///   3) T                             => <error>
+  ///
+  /// TODO(#6): In the future, we may implement more complicated rules
+  /// based on something like ExpressibleByQuoteLiteral.
+  Type getTypeOfUnquoteExpr(Type exprType, SourceLoc loc);
+
+  /// Quote the given typed declaration by creating a snippet of code that at
+  /// runtime will approximate the given declaration using the data structures
+  /// from the Quote module. This functionality implements @quoted.
+  ///
+  /// The exact runtime representation, and the way how it is constructed are
+  /// not set in stone and are undergoing rapid evolution.
+  ///
+  /// \param decl Typed declaration to be quoted.
+  ///
+  /// \param dc Declaration context in which the result will be typechecked.
+  ///
+  /// \returns If successful, a typechecked expression that at runtime will
+  /// approximate the given declaration. If not successful, nullptr (appropriate
+  /// error messages will also be emitted as a side effect).
+  Expr *quoteDecl(Decl *decl, DeclContext *dc);
+
+  /// Compute the type of quoteDecl.
+  ///
+  /// At the moment, this is simply `Tree` from the Quote model.
+  ///
+  /// TODO(#21): In the future, we may want to infer more precise type
+  /// based on the shape of the quoted declaration.
+  Type getTypeOfQuoteDecl(SourceLoc loc);
+
 private:
   Type typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
                                TypeLoc convertType,

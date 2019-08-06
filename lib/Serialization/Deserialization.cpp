@@ -4306,6 +4306,21 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
         break;
       }
 
+      case decls_block::Quoted_DECL_ATTR: {
+        bool isImplicit;
+        DeclID quoteDeclID;
+        serialization::decls_block::QuotedDeclAttrLayout::readRecord(
+            scratch, isImplicit, quoteDeclID);
+
+        auto quoteDecl = MF.getDeclChecked(quoteDeclID);
+        if (!quoteDecl)
+          return quoteDecl.takeError();
+
+        Attr = QuotedAttr::create(ctx, cast<FuncDecl>(*quoteDecl), SourceLoc(),
+                                  SourceRange(), isImplicit);
+        break;
+      }
+
 #define SIMPLE_DECL_ATTR(NAME, CLASS, ...) \
       case decls_block::CLASS##_DECL_ATTR: { \
         bool isImplicit; \

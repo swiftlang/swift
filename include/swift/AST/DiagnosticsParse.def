@@ -1221,6 +1221,30 @@ ERROR(legacy_object_literal,none,
       "'%select{|[}0#%1(...)%select{|#]}0' has been renamed to '#%2(...)'",
       (bool, StringRef, StringRef))
 
+// Quote literal expressions.
+ERROR(expr_quote_enable_experimental_quasiquotes,PointsToFirstBadToken,
+      "'#quote' is unsupported; pass -enable-experimental-quasiquotes to "
+      "enable support for quasiquotes", ())
+ERROR(expr_quote_expected_lparen_or_lbrace,PointsToFirstBadToken,
+      "expected '(' or '}' following '#quote'", ())
+ERROR(expr_quote_expected_expr,PointsToFirstBadToken,
+      "expected expression within '#quote(...)'", ())
+ERROR(expr_quote_expected_closure,PointsToFirstBadToken,
+      "expected closure within '#quote{...}'", ())
+ERROR(expr_quote_expected_rparen,PointsToFirstBadToken,
+      "expected ')' to complete '#quote' expression", ())
+
+// Unquote expressions.
+ERROR(expr_unquote_enable_experimental_quasiquotes,PointsToFirstBadToken,
+      "'#unquote' is unsupported; pass -enable-experimental-quasiquotes to "
+      "enable support for quasiquotes", ())
+ERROR(expr_unquote_expected_lparen,PointsToFirstBadToken,
+      "expected '(' following '#unquote'", ())
+ERROR(expr_unquote_expected_expr,PointsToFirstBadToken,
+      "expected expression within '#unquote(...)'", ())
+ERROR(expr_unquote_expected_rparen,PointsToFirstBadToken,
+      "expected ')' to complete '#unquote' expression", ())
+
 // Unknown pound expression.
 ERROR(unknown_pound_expr,none,
       "use of unknown directive '#%0'", (StringRef))
@@ -1579,6 +1603,11 @@ ERROR(sil_inst_autodiff_expected_associated_function_kind_attr,PointsToFirstBadT
       "expected an associated function kind attribute, e.g. '[jvp]'", ())
 ERROR(sil_inst_autodiff_expected_function_type_operand,PointsToFirstBadToken,
       "expected an operand of a function type", ())
+
+// Quoted attribute.
+ERROR(attr_quoted_enable_experimental_quasiquotes,PointsToFirstBadToken,
+      "'@quoted' is unsupported; pass -enable-experimental-quasiquotes to "
+      "enable support for quasiquotes", ())
 
 //------------------------------------------------------------------------------
 // MARK: Generics parsing diagnostics

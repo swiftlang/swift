@@ -1645,6 +1645,12 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
   case tok::l_square:
     return parseExprCollection();
 
+  case tok::pound_quote:
+    return parseExprQuoteLiteral();
+
+  case tok::pound_unquote:
+    return parseExprUnquote();
+
   case tok::pound_available: {
     // For better error recovery, parse but reject #available in an expr
     // context.
@@ -3141,6 +3147,105 @@ Parser::parseExprObjectLiteral(ObjectLiteralExpr::LiteralKind LitKind,
     ObjectLiteralExpr::create(Context, PoundLoc, LitKind, lParenLoc, args,
                               argLabels, argLabelLocs, rParenLoc,
                               trailingClosure, /*implicit=*/false));
+}
+
+/// Parse a quote literal expression.
+///
+/// quote-expr:
+///   '#quote' '(' expr ')'
+///   '#quote' '{' expr '}'
+ParserResult<Expr> Parser::parseExprQuoteLiteral() {
+  SyntaxParsingContext RADEContext(SyntaxContext, SyntaxKind::QuoteLiteralExpr);
+  auto poundQuoteLoc = consumeToken();
+  SourceLoc openLoc;
+  SourceLoc closeLoc;
+
+  auto errorAndSkipToEnd = [&]() -> ParserResult<Expr> {
+    skipUntilDeclStmtRBrace(tok::r_paren);
+    closeLoc = Tok.is(tok::r_paren) ? consumeToken() : PreviousLoc;
+    return makeParserResult<Expr>(
+        new (Context) ErrorExpr(SourceRange(poundQuoteLoc, closeLoc)));
+  };
+
+  ParserResult<Expr> subExprResult;
+  if (Tok.is(tok::l_paren)) {
+    openLoc = consumeToken();
+    subExprResult = parseExpr(diag::expr_quote_expected_expr);
+    if (subExprResult.hasCodeCompletion()) {
+      return makeParserCodeCompletionResult<Expr>();
+    }
+    if (subExprResult.isParseError()) {
+      return errorAndSkipToEnd();
+    }
+    if (parseToken(tok::r_paren, closeLoc, diag::expr_quote_expected_rparen)) {
+      return makeParserResult<Expr>(
+          new (Context) ErrorExpr(SourceRange(poundQuoteLoc, PreviousLoc)));
+    }
+  } else if (Tok.is(tok::l_brace)) {
+    openLoc = Tok.getLoc();
+    subExprResult = parseExprClosure();
+    if (subExprResult.hasCodeCompletion()) {
+      return makeParserCodeCompletionResult<Expr>();
+    }
+    if (subExprResult.isParseError()) {
+      diagnose(openLoc, diag::expr_quote_expected_closure);
+      return errorAndSkipToEnd();
+    }
+  } else {
+    diagnose(Tok, diag::expr_quote_expected_lparen_or_lbrace);
+    return errorAndSkipToEnd();
+  }
+
+  if (Context.LangOpts.EnableExperimentalQuasiquotes) {
+    return makeParserResult<Expr>(
+        QuoteLiteralExpr::create(Context, poundQuoteLoc, subExprResult.get()));
+  } else {
+    diagnose(openLoc, diag::expr_quote_enable_experimental_quasiquotes);
+    return makeParserResult<Expr>(
+        new (Context) ErrorExpr(SourceRange(poundQuoteLoc, PreviousLoc)));
+  }
+}
+
+/// Parse an unquote expression.
+///
+/// unquote-expr:
+///   '#unquote' '(' expr ')'
+ParserResult<Expr> Parser::parseExprUnquote() {
+  SyntaxParsingContext RADEContext(SyntaxContext, SyntaxKind::UnquoteExpr);
+  auto poundUnquoteLoc = consumeToken();
+  SourceLoc openLoc;
+  SourceLoc closeLoc;
+
+  auto errorAndSkipToEnd = [&]() -> ParserResult<Expr> {
+    skipUntilDeclStmtRBrace(tok::r_paren);
+    closeLoc = Tok.is(tok::r_paren) ? consumeToken() : PreviousLoc;
+    return makeParserResult<Expr>(
+        new (Context) ErrorExpr(SourceRange(poundUnquoteLoc, closeLoc)));
+  };
+
+  if (parseToken(tok::l_paren, openLoc, diag::expr_unquote_expected_lparen)) {
+    return errorAndSkipToEnd();
+  }
+  auto subExprResult = parseExpr(diag::expr_unquote_expected_expr);
+  if (subExprResult.hasCodeCompletion()) {
+    return makeParserCodeCompletionResult<Expr>();
+  }
+  if (subExprResult.isParseError()) {
+    return errorAndSkipToEnd();
+  }
+  if (parseToken(tok::r_paren, closeLoc, diag::expr_unquote_expected_rparen)) {
+    return makeParserResult<Expr>(
+        new (Context) ErrorExpr(SourceRange(poundUnquoteLoc, PreviousLoc)));
+  }
+
+  if (Context.LangOpts.EnableExperimentalQuasiquotes) {
+    return makeParserResult<Expr>(
+        UnquoteExpr::create(Context, poundUnquoteLoc, subExprResult.get()));
+  } else {
+    diagnose(openLoc, diag::expr_unquote_enable_experimental_quasiquotes);
+    return makeParserResult<Expr>(
+        new (Context) ErrorExpr(SourceRange(poundUnquoteLoc, PreviousLoc)));
+  }
 }
 
 /// Parse and diagnose unknown pound expression

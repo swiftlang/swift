@@ -457,6 +457,9 @@ namespace {
     RValue visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E,
                                               SGFContext C);
     RValue visitObjectLiteralExpr(ObjectLiteralExpr *E, SGFContext C);
+    RValue visitQuoteLiteralExpr(QuoteLiteralExpr *E, SGFContext C);
+    RValue visitUnquoteExpr(UnquoteExpr *E, SGFContext C);
+    RValue visitDeclQuoteExpr(DeclQuoteExpr *E, SGFContext C);
     RValue visitEditorPlaceholderExpr(EditorPlaceholderExpr *E, SGFContext C);
     RValue visitObjCSelectorExpr(ObjCSelectorExpr *E, SGFContext C);
     RValue visitKeyPathExpr(KeyPathExpr *E, SGFContext C);
@@ -2450,6 +2453,18 @@ visitObjectLiteralExpr(ObjectLiteralExpr *E, SGFContext C) {
   PreparedArguments args(fnTy->getParams(), E->getArg());
   return SGF.emitApplyAllocatingInitializer(SILLocation(E), init,
                                             std::move(args), E->getType(), C);
+}
+
+RValue RValueEmitter::visitQuoteLiteralExpr(QuoteLiteralExpr *E, SGFContext C) {
+  return visit(E->getSemanticExpr(), C);
+}
+
+RValue RValueEmitter::visitUnquoteExpr(UnquoteExpr *E, SGFContext C) {
+  llvm_unreachable("invalid code made its way into SILGen");
+}
+
+RValue RValueEmitter::visitDeclQuoteExpr(DeclQuoteExpr *E, SGFContext C) {
+  return visit(E->getSemanticExpr(), C);
 }
 
 RValue RValueEmitter::

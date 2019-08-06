@@ -411,6 +411,11 @@ def disable_bridging_pch : Flag<["-"], "disable-bridging-pch">,
   Flags<[HelpHidden]>,
   HelpText<"Disable automatic generation of bridging PCH files">;
 
+// Experimental feature options
+def enable_experimental_quasiquotes : Flag<["-"], "enable-experimental-quasiquotes">,
+  Flags<[FrontendOption]>,
+  HelpText<"Experimental work-in-progress implementation of quasiquotes">;
+
 // Diagnostic control options
 def suppress_warnings : Flag<["-"], "suppress-warnings">,
   Flags<[FrontendOption]>,

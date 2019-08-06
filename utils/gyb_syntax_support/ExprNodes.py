@@ -462,7 +462,7 @@ EXPR_NODES = [
          traits=['Parenthesized'],
          children=[
              Child('Backslash', kind='BackslashToken'),
-             Child('Delimiter', kind='RawStringDelimiterToken', 
+             Child('Delimiter', kind='RawStringDelimiterToken',
                    is_optional=True),
              Child('LeftParen', kind='LeftParenToken',
                    classification='StringInterpolationAnchor',
@@ -475,7 +475,7 @@ EXPR_NODES = [
     # e.g. "abc \(foo()) def"
     Node('StringLiteralExpr', kind='Expr',
          children=[
-             Child('OpenDelimiter', kind='RawStringDelimiterToken', 
+             Child('OpenDelimiter', kind='RawStringDelimiterToken',
                    is_optional=True),
              Child('OpenQuote', kind='Token',
                    token_choices=[
@@ -489,7 +489,7 @@ EXPR_NODES = [
                        'StringQuoteToken',
                        'MultilineStringQuoteToken',
                    ]),
-             Child('CloseDelimiter', kind='RawStringDelimiterToken', 
+             Child('CloseDelimiter', kind='RawStringDelimiterToken',
                    is_optional=True),
          ]),
 
@@ -566,6 +566,30 @@ EXPR_NODES = [
              Child('LeftParen', kind='LeftParenToken'),
              Child('Arguments', kind='FunctionCallArgumentList',
                    collection_element_name='Argument'),
+             Child('RightParen', kind='RightParenToken'),
+         ]),
+
+    # quote-expr -> '#quote' '(' expr ')'
+    #             | '#quote' '{' expr '}'
+    Node('QuoteLiteralExpr', kind='Expr',
+         children=[
+             Child('Quote', kind='PoundQuoteToken'),
+             Child('LeftParen', kind='LeftParenToken',
+                   is_optional=True),
+             Child('Expr', kind='Expr',
+                   is_optional=True),
+             Child('RightParen', kind='RightParenToken',
+                   is_optional=True),
+             Child('TrailingClosure', kind='ClosureExpr',
+                   is_optional=True),
+         ]),
+
+    # unquote-expr -> '#unquote' '(' expr ')'
+    Node('UnquoteExpr', kind='Expr',
+         children=[
+             Child('Quote', kind='PoundQuoteToken'),
+             Child('LeftParen', kind='LeftParenToken'),
+             Child('Expr', kind='Expr'),
              Child('RightParen', kind='RightParenToken'),
          ]),
 ]
