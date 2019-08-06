@@ -613,9 +613,14 @@ _findContextDescriptor(Demangle::NodePointer node,
   NodePointer symbolicNode = node;
   if (symbolicNode->getKind() == Node::Kind::Type)
     symbolicNode = symbolicNode->getChild(0);
-  if (symbolicNode->getKind() == Node::Kind::TypeSymbolicReference)
+  if (symbolicNode->getKind() == Node::Kind::TypeSymbolicReference) {
     return cast<TypeContextDescriptor>(
       (const ContextDescriptor *)symbolicNode->getIndex());
+  }
+
+  // Nothing to resolve if have a generic parameter.
+  if (symbolicNode->getKind() == Node::Kind::DependentGenericParamType)
+    return nullptr;
 
   StringRef mangledName =
     Demangle::mangleNode(node, ExpandResolvedSymbolicReferences(Dem), Dem);
