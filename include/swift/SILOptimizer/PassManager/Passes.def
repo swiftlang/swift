@@ -231,10 +231,13 @@ PASS(OpaqueArchetypeSpecializer, "opaque-archetype-specializer",
 PASS(Outliner, "outliner",
      "Function Outlining Optimization")
 PASS(OwnershipModelEliminator, "ownership-model-eliminator",
-     "Eliminate Ownership Annotation of SIL")
-PASS(NonTransparentFunctionOwnershipModelEliminator,
-     "non-transparent-func-ownership-model-eliminator",
-     "Eliminate Ownership Annotations from non-transparent SIL Functions")
+     "Lower all SIL functions in ossa into their non-ossa variant")
+PASS(LocalOwnershipModelEliminator,
+     "local-ownership-model-eliminator",
+     "OME for non-serialized SIL Functions (including transparent).")
+PASS(LocalNonTransparentOwnershipModelEliminator,
+     "local-nontransparent-ownership-model-eliminator",
+     "OME for non-transparent, non-serialized SIL Functions")
 PASS(RCIdentityDumper, "rc-id-dumper",
      "Print Reference Count Identities")
 PASS(PerfInliner, "inline",

@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -parse-sil -module-name OMEStripDeserializationInput %S/Inputs/ome_strip_deserialize_input.sil -emit-module -o %t/OMEStripDeserializationInput.swiftmodule
-// RUN: %target-sil-opt -non-transparent-func-ownership-model-eliminator -performance-linker -I %t %s | %FileCheck %s
+// RUN: %target-sil-opt -local-nontransparent-ownership-model-eliminator -performance-linker -I %t %s | %FileCheck %s
 // RUN: %target-sil-opt -ownership-model-eliminator -performance-linker -I %t %s | %FileCheck --check-prefix=CHECK-STRIP-ALL %s
 
 sil_stage canonical
@@ -10,7 +10,7 @@ import OMEStripDeserializationInput
 // Make sure that we properly set the deserialization call back for stripping
 // ownership SIL.
 
-// CHECK-LABEL: sil public_external [serialized] @bar : $@convention(thin) () -> ()
+// CHECK-LABEL: sil public_external [serialized] [ossa] @bar : $@convention(thin) () -> ()
 // CHECK: } // end sil function 'bar'
 
 // CHECK-STRIP-ALL-LABEL: sil public_external [serialized] @bar : $@convention(thin) () -> ()

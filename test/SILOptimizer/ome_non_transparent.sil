@@ -1,10 +1,12 @@
-// RUN: %target-sil-opt -non-transparent-func-ownership-model-eliminator %s | %FileCheck %s
+// RUN: %target-sil-opt -local-nontransparent-ownership-model-eliminator %s | %FileCheck %s
+// RUN: %target-sil-opt -local-ownership-model-eliminator %s | %FileCheck --check-prefix=CHECK-LOCAL %s
 
 sil_stage raw
 
 import Builtin
 
 // CHECK-LABEL: sil [transparent] [ossa] @foo : $@convention(thin) () -> () {
+// CHECK-LOCAL-LABEL: sil [transparent] @foo : $@convention(thin) () -> () {
 sil [transparent] [ossa] @foo : $@convention(thin) () -> () {
 bb0:
   %9999 = tuple()
@@ -12,7 +14,24 @@ bb0:
 }
 
 // CHECK-LABEL: sil @bar : $@convention(thin) () -> () {
+// CHECK-LOCAL-LABEL: sil @bar : $@convention(thin) () -> () {
 sil [ossa] @bar : $@convention(thin) () -> () {
+bb0:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil public_external [transparent] [ossa] @foo_pe : $@convention(thin) () -> () {
+// CHECK-LOCAL-LABEL: sil public_external [transparent] [ossa] @foo_pe : $@convention(thin) () -> () {
+sil public_external [transparent] [ossa] @foo_pe : $@convention(thin) () -> () {
+bb0:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil public_external [ossa] @bar_pe : $@convention(thin) () -> () {
+// CHECK-LOCAL-LABEL: sil public_external [ossa] @bar_pe : $@convention(thin) () -> () {
+sil public_external [ossa] @bar_pe : $@convention(thin) () -> () {
 bb0:
   %9999 = tuple()
   return %9999 : $()

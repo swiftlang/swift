@@ -337,8 +337,7 @@ static bool stripOwnership(SILFunction &F) {
   return MadeChange;
 }
 
-static void prepareNonTransparentSILFunctionForOptimization(ModuleDecl *,
-                                                            SILFunction *F) {
+static void onDeserializationNonTransparentOME(ModuleDecl *, SILFunction *F) {
   if (!F->hasOwnership() || F->isTransparent())
     return;
 
@@ -348,7 +347,7 @@ static void prepareNonTransparentSILFunctionForOptimization(ModuleDecl *,
   stripOwnership(*F);
 }
 
-static void prepareSILFunctionForOptimization(ModuleDecl *, SILFunction *F) {
+static void onDeserializationOME(ModuleDecl *, SILFunction *F) {
   if (!F->hasOwnership())
     return;
 
@@ -361,10 +360,16 @@ static void prepareSILFunctionForOptimization(ModuleDecl *, SILFunction *F) {
 namespace {
 
 struct OwnershipModelEliminator : SILModuleTransform {
-  bool SkipTransparent;
+  /// If set to true, we will only lower ownership for non-serialized functions.
+  bool preserveNonLocal;
 
-  OwnershipModelEliminator(bool SkipTransparent)
-      : SkipTransparent(SkipTransparent) {}
+  /// If set to true, we will only lower ownership for non-transparent
+  /// functions.
+  bool preserveTransparent;
+
+  OwnershipModelEliminator(bool preserveNonLocal, bool preserveTransparent)
+      : preserveNonLocal(preserveNonLocal),
+        preserveTransparent(preserveTransparent) {}
 
   void run() override {
     if (DumpBefore.size()) {
@@ -377,9 +382,10 @@ struct OwnershipModelEliminator : SILModuleTransform {
       if (!F.hasOwnership())
         continue;
 
-      // If we were asked to not strip ownership from transparent functions in
-      // /our/ module, continue.
-      if (SkipTransparent && F.isTransparent())
+      // If we were asked to not lower ownership from transparent or serialized
+      // functions in /our/ module, continue.
+      if ((preserveTransparent && F.isTransparent()) ||
+          (preserveNonLocal && F.isAvailableExternally()))
         continue;
 
       // Verify here to make sure ownership is correct before we strip.
@@ -392,17 +398,22 @@ struct OwnershipModelEliminator : SILModuleTransform {
       }
     }
 
+    // If we were asked to not strip ownership from non-local declarations,
+    // return now. Otherwise, create the appropriate deserialization handler.
+    if (preserveNonLocal) {
+      return;
+    }
+
     // If we were asked to strip transparent, we are at the beginning of the
     // performance pipeline. In such a case, we register a handler so that all
     // future things we deserialize have ownership stripped.
     using NotificationHandlerTy =
         FunctionBodyDeserializationNotificationHandler;
     std::unique_ptr<DeserializationNotificationHandler> ptr;
-    if (SkipTransparent) {
-      ptr.reset(new NotificationHandlerTy(
-          prepareNonTransparentSILFunctionForOptimization));
+    if (preserveTransparent) {
+      ptr.reset(new NotificationHandlerTy(onDeserializationNonTransparentOME));
     } else {
-      ptr.reset(new NotificationHandlerTy(prepareSILFunctionForOptimization));
+      ptr.reset(new NotificationHandlerTy(onDeserializationOME));
     }
     Mod.registerDeserializationNotificationHandler(std::move(ptr));
   }
@@ -411,9 +422,16 @@ struct OwnershipModelEliminator : SILModuleTransform {
 } // end anonymous namespace
 
 SILTransform *swift::createOwnershipModelEliminator() {
-  return new OwnershipModelEliminator(false /*skip transparent*/);
+  return new OwnershipModelEliminator(false /*preserve non-local*/,
+                                      false /*preserve transparent*/);
 }
 
-SILTransform *swift::createNonTransparentFunctionOwnershipModelEliminator() {
-  return new OwnershipModelEliminator(true /*skip transparent*/);
+SILTransform *swift::createLocalOwnershipModelEliminator() {
+  return new OwnershipModelEliminator(true /*preserve non-local*/,
+                                      false /*preserve transparent*/);
+}
+
+SILTransform *swift::createLocalNonTransparentOwnershipModelEliminator() {
+  return new OwnershipModelEliminator(true /*preserve non-local*/,
+                                      true /*preserve transparent*/);
 }

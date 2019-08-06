@@ -105,8 +105,18 @@ static void addMandatoryOptPipeline(SILPassPipelinePlan &P) {
   if (Options.shouldOptimize()) {
     P.addSemanticARCOpts();
   }
-  if (!Options.StripOwnershipAfterSerialization)
-    P.addOwnershipModelEliminator();
+
+  // If we are not lowering ownership after serialization, lower ownership from
+  // all non-external functions and do not set a deserialization callback that
+  // lowers ownership.
+  //
+  // This ensures that when this option is disabled, we always strip local
+  // functions before we serialize implying since this is true for all modules
+  // that we can only deserialize functions with ownership lowered.
+  if (!Options.StripOwnershipAfterSerialization) {
+    P.addLocalOwnershipModelEliminator();
+  }
+
   P.addMandatoryInlining();
   P.addMandatorySILLinker();
 
@@ -311,12 +321,12 @@ void addSSAPasses(SILPassPipelinePlan &P, OptimizationLevelKind OpLevel) {
     // importing this module.
     P.addSerializeSILPass();
 
-    // Now strip any transparent functions that still have ownership.
-    if (P.getOptions().StripOwnershipAfterSerialization)
-      P.addOwnershipModelEliminator();
-
-    if (P.getOptions().StopOptimizationAfterSerialization)
+    if (P.getOptions().StopOptimizationAfterSerialization) {
       return;
+    }
+
+    // Now strip any other functions that still have ownership.
+    P.addLocalOwnershipModelEliminator();
 
     // Does inline semantics-functions (except "availability"), but not
     // global-init functions.
@@ -392,9 +402,10 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
   // we do not spend time optimizing them.
   P.addDeadFunctionElimination();
 
-  // Strip ownership from non-transparent functions.
-  if (P.getOptions().StripOwnershipAfterSerialization)
-    P.addNonTransparentFunctionOwnershipModelEliminator();
+  // Strip ownership from non-transparent functions that are in our module.
+  if (P.getOptions().StripOwnershipAfterSerialization) {
+    P.addLocalNonTransparentOwnershipModelEliminator();
+  }
 
   // Start by cloning functions from stdlib.
   P.addPerformanceSILLinker();
@@ -566,6 +577,7 @@ SILPassPipelinePlan
 SILPassPipelinePlan::getLoweringPassPipeline(const SILOptions &Options) {
   SILPassPipelinePlan P(Options);
   P.startPipeline("Address Lowering");
+  P.addOwnershipModelEliminator();
   P.addIRGenPrepare();
   P.addAddressLowering();
 
@@ -657,9 +669,9 @@ SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
   P.startPipeline("Serialization");
   P.addSerializeSILPass();
 
-  // And then strip ownership...
-  if (Options.StripOwnershipAfterSerialization)
-    P.addOwnershipModelEliminator();
+  // And then always strip ownership of everything now that we have
+  // serialized...
+  P.addOwnershipModelEliminator();
 
   // Finally perform some small transforms.
   P.startPipeline("Rest of Onone");
