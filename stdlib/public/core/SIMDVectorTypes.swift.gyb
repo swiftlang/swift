@@ -200,6 +200,7 @@ extension SIMD${n} : Differentiable
   public func tangentVector(from cotangent: TangentVector) -> TangentVector {
     return cotangent
   }
+  public var zeroTangentVector: TangentVector { .zero }
 }
 
 extension SIMD${n}

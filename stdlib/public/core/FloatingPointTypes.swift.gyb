@@ -1911,6 +1911,8 @@ extension ${Self} : Differentiable {
   public mutating func move(along direction: TangentVector) {
     self += direction
   }
+
+  public var zeroTangentVector: TangentVector { .zero }
 }
 
 //===----------------------------------------------------------------------===//

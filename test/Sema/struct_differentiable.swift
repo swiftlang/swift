@@ -320,6 +320,7 @@ struct VectorSpaceTypeAlias : AdditiveArithmetic, Differentiable {
   var w: Float
   var b: Float
   typealias TangentVector = Simple
+  var zeroTangentVector: TangentVector { .zero }
 }
 // expected-error @+2 {{type 'VectorSpaceCustomStruct' does not conform to protocol 'Differentiable'}}
 // expected-note @+1 {{do you want to add protocol stubs?}}
@@ -331,6 +332,7 @@ struct VectorSpaceCustomStruct : AdditiveArithmetic, Differentiable {
     var b: Float.TangentVector
     typealias TangentVector = VectorSpaceCustomStruct.TangentVector
   }
+  var zeroTangentVector: TangentVector { .zero }
 }
 
 struct StaticNoDerivative : Differentiable {
@@ -371,14 +373,10 @@ extension NoMemberwiseInitializerExtended: Differentiable
 
 // Test derived conformances in disallowed contexts.
 
-// expected-error @+4 {{type 'OtherFileNonconforming' does not conform to protocol 'Differentiable'}}
-// expected-error @+3 {{implementation of 'Differentiable' cannot be automatically synthesized in an extension in a different file to the type}}
-// expected-note @+2 {{do you want to add protocol stubs?}}
-// expected-note @+1 {{do you want to add protocol stubs?}}
+// expected-error @+2 {{type 'OtherFileNonconforming' does not conform to protocol 'Differentiable'}}
+// expected-error @+1 {{implementation of 'Differentiable' cannot be automatically synthesized in an extension in a different file to the type}}
 extension OtherFileNonconforming : Differentiable {}
 
-// expected-error @+4 {{type 'GenericOtherFileNonconforming<T>' does not conform to protocol 'Differentiable'}}
-// expected-error @+3 {{implementation of 'Differentiable' cannot be automatically synthesized in an extension in a different file to the type}}
-// expected-note @+2 {{do you want to add protocol stubs?}}
-// expected-note @+1 {{do you want to add protocol stubs?}}
+// expected-error @+2 {{type 'GenericOtherFileNonconforming<T>' does not conform to protocol 'Differentiable'}}
+// expected-error @+1 {{implementation of 'Differentiable' cannot be automatically synthesized in an extension in a different file to the type}}
 extension GenericOtherFileNonconforming : Differentiable {}

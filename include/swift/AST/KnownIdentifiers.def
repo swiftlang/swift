@@ -159,6 +159,7 @@ IDENTIFIER(AllDifferentiableVariables)
 IDENTIFIER(TangentVector)
 IDENTIFIER(allDifferentiableVariables)
 IDENTIFIER(move)
+IDENTIFIER(zeroTangentVector)
 
 // Kinds of layout constraints
 IDENTIFIER_WITH_NAME(UnknownLayout, "_UnknownLayout")

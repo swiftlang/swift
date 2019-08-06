@@ -290,6 +290,11 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     if (name.isSimpleName(ctx.Id_allDifferentiableVariables))
       return getRequirement(KnownProtocolKind::Differentiable);
 
+    // SWIFT_ENABLE_TENSORFLOW
+    // Differentiable.zeroTangentVector
+    if (name.isSimpleName(ctx.Id_zeroTangentVector))
+      return getRequirement(KnownProtocolKind::Differentiable);
+
     return nullptr;
   }
 

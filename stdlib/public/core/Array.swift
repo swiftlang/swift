@@ -1982,6 +1982,11 @@ extension Array where Element : Differentiable {
         base[i].move(along: direction.base[i])
       }
     }
+
+    public var zeroTangentVector: TangentVector {
+      TangentVector(Array<Element.TangentVector>(repeating: .zero,
+                                                 count: base.count))
+    }
   }
 }
 
@@ -2092,6 +2097,10 @@ extension Array : Differentiable where Element : Differentiable {
     var view = DifferentiableView(self)
     view.move(along: direction)
     self = view.base
+  }
+
+  public var zeroTangentVector: TangentVector {
+    TangentVector(Array<Element.TangentVector>(repeating: .zero, count: count))
   }
 }
 

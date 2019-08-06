@@ -380,6 +380,105 @@ static ValueDecl *getUnderlyingAllDiffableVariables(DeclContext *DC,
   return allDiffableVarsDecl;
 }
 
+// Return the underlying `zeroTangentVector` of a VarDecl `x`. If `x` conforms
+// to `Differentiable`, return `zeroTangentVector`. Otherwise, return
+// `x`.
+static ValueDecl *getUnderlyingZeroTangentVector(DeclContext *DC,
+                                                 VarDecl *varDecl) {
+  auto *module = DC->getParentModule();
+  auto &C = module->getASTContext();
+  auto *diffableProto = C.getProtocol(KnownProtocolKind::Differentiable);
+  auto *zeroTangentVectorReq =
+      getProtocolRequirement(diffableProto, C.Id_zeroTangentVector);
+  if (!varDecl->hasInterfaceType())
+    C.getLazyResolver()->resolveDeclSignature(varDecl);
+  auto varType = DC->mapTypeIntoContext(varDecl->getValueInterfaceType());
+  auto confRef = module->lookupConformance(varType, diffableProto);
+  if (!confRef)
+    return varDecl;
+  // Use protocol requirement as a default for abstract conformances.
+  // If conformance is concrete, get concrete witness declaration instead.
+  ValueDecl *zeroTangentVectorDecl = zeroTangentVectorReq;
+  if (confRef->isConcrete())
+    zeroTangentVectorDecl = confRef->getConcrete()->getWitnessDecl(
+        zeroTangentVectorReq);
+  return zeroTangentVectorDecl;
+}
+
+// Get the effective memberwise initializer of the given nominal type, or create
+// it if it does not exist.
+static ConstructorDecl *getOrCreateEffectiveMemberwiseInitializer(
+    TypeChecker &TC, NominalTypeDecl *nominal) {
+  auto &C = nominal->getASTContext();
+  if (auto *initDecl = nominal->getEffectiveMemberwiseInitializer())
+    return initDecl;
+  auto *initDecl = createImplicitConstructor(
+      TC, nominal, ImplicitConstructorKind::Memberwise);
+  nominal->addMember(initDecl);
+  C.addSynthesizedDecl(initDecl);
+  return initDecl;
+}
+
+// Synthesize getter body for `zeroTangentVector` computed property.
+static std::pair<BraceStmt *, bool>
+derivedBody_zeroTangentVectorGetter(AbstractFunctionDecl *getterDecl, void *) {
+  auto *parentDC = getterDecl->getParent();
+  auto *nominal = parentDC->getSelfNominalTypeDecl();
+  auto &C = nominal->getASTContext();
+
+  auto *tangentVectorStruct =
+      getAssociatedStructDecl(parentDC, C.Id_TangentVector);
+  auto *tangentVectorInitDecl =
+      tangentVectorStruct->getEffectiveMemberwiseInitializer();
+  assert(tangentVectorInitDecl &&
+         "'TangentVector' memberwise initializer not found");
+  auto *selfDecl = getterDecl->getImplicitSelfDecl();
+  auto *selfDRE =
+      new (C) DeclRefExpr(selfDecl, DeclNameLoc(), /*Implicit*/ true);
+
+  auto *initDRE = new (C) DeclRefExpr(tangentVectorInitDecl, DeclNameLoc(),
+                                      /*Implicit*/ true);
+  initDRE->setFunctionRefKind(FunctionRefKind::SingleApply);
+
+  auto tangentVectorType = parentDC->mapTypeIntoContext(
+      tangentVectorStruct->getDeclaredInterfaceType());
+  Expr *baseExpr = TypeExpr::createImplicit(tangentVectorType, C);
+  auto *initExpr = new (C) ConstructorRefCallExpr(initDRE, baseExpr);
+  initExpr->setThrows(false);
+  initExpr->setImplicit();
+
+  SmallVector<Expr *, 2> members;
+  SmallVector<Identifier, 2> memberNames;
+
+  llvm::DenseMap<Identifier, VarDecl *> diffPropertyMap;
+  SmallVector<VarDecl *, 8> diffProperties;
+  getStoredPropertiesForDifferentiation(nominal, parentDC, diffProperties);
+  for (auto *member : diffProperties)
+    diffPropertyMap[member->getName()] = member;
+
+  for (auto initParam : *tangentVectorInitDecl->getParameters()) {
+    auto member = diffPropertyMap[initParam->getName()];
+    member->setInterfaceType(member->getValueInterfaceType());
+    Expr *memberExpr = new (C) MemberRefExpr(selfDRE, SourceLoc(), member,
+                                             DeclNameLoc(), /*Implicit*/ true);
+    auto *memberZeroTangentVector =
+        getUnderlyingZeroTangentVector(parentDC, member);
+    auto *memberZeroTangentExpr =
+        new (C) MemberRefExpr(memberExpr, SourceLoc(), memberZeroTangentVector,
+                              DeclNameLoc(), /*Implicit*/ true);
+    members.push_back(memberZeroTangentExpr);
+    memberNames.push_back(member->getName());
+  }
+  Expr *callExpr = CallExpr::createImplicit(C, initExpr, members, memberNames);
+
+  ASTNode returnStmt =
+      new (C) ReturnStmt(SourceLoc(), callExpr, /*Implicit*/ true);
+  auto *braceStmt =
+      BraceStmt::create(C, SourceLoc(), returnStmt, SourceLoc(),
+                        /*Implicit*/ true);
+  return std::make_pair(braceStmt, false);
+}
+
 // Synthesize getter body for `allDifferentiableVariables` computed property.
 static std::pair<BraceStmt *, bool>
 derivedBody_allDifferentiableVariablesGetter(AbstractFunctionDecl *getterDecl,
@@ -535,6 +634,41 @@ deriveDifferentiable_allDifferentiableVariables(DerivedConformance &derived) {
   triggerAccessorSynthesis(TC, allDiffableVarsDecl);
 
   return allDiffableVarsDecl;
+}
+
+// Synthesize `zeroTangentVector` computed property declaration.
+static ValueDecl *
+deriveDifferentiable_zeroTangentVector(DerivedConformance &derived) {
+  auto *parentDC = derived.getConformanceContext();
+  auto &TC = derived.TC;
+  auto &C = TC.Context;
+
+  // Get `TangentVector` struct.
+  auto *tangentVectorStruct =
+      getAssociatedStructDecl(parentDC, C.Id_TangentVector);
+  // Make sure a memberwise initializer exists because the body synthesizer
+  // needs it.
+  getOrCreateEffectiveMemberwiseInitializer(TC, tangentVectorStruct);
+
+  auto returnInterfaceTy = tangentVectorStruct->getDeclaredInterfaceType();
+  auto returnTy = parentDC->mapTypeIntoContext(returnInterfaceTy);
+
+  VarDecl *zeroTangentVectorDecl;
+  PatternBindingDecl *pbDecl;
+  std::tie(zeroTangentVectorDecl, pbDecl) = derived.declareDerivedProperty(
+      C.Id_zeroTangentVector, returnInterfaceTy, returnTy,
+      /*isStatic*/ false, /*isFinal*/ true);
+
+  auto *getterDecl = derived.addGetterToReadOnlyDerivedProperty(
+      zeroTangentVectorDecl, returnTy);
+  getterDecl->setBodySynthesizer(&derivedBody_zeroTangentVectorGetter);
+  derived.addMembersToConformanceContext(
+      {getterDecl, zeroTangentVectorDecl, pbDecl});
+
+  addExpectedOpaqueAccessorsToStorage(zeroTangentVectorDecl, C);
+  triggerAccessorSynthesis(TC, zeroTangentVectorDecl);
+
+  return zeroTangentVectorDecl;
 }
 
 // Return associated `TangentVector` or `AllDifferentiableVariables` struct for
@@ -1035,6 +1169,8 @@ ValueDecl *DerivedConformance::deriveDifferentiable(ValueDecl *requirement) {
     return deriveDifferentiable_move(*this);
   if (requirement->getBaseName() == TC.Context.Id_allDifferentiableVariables)
     return deriveDifferentiable_allDifferentiableVariables(*this);
+  if (requirement->getBaseName() == TC.Context.Id_zeroTangentVector)
+    return deriveDifferentiable_zeroTangentVector(*this);
   TC.diagnose(requirement->getLoc(), diag::broken_differentiable_requirement);
   return nullptr;
 }
