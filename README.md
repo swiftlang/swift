@@ -109,7 +109,7 @@ Instructions for installing CMake and Ninja directly can be found [below](#build
 
 For Ubuntu, you'll need the following development dependencies:
 
-    sudo apt-get install git cmake ninja-build clang python uuid-dev libicu-dev icu-devtools libedit-dev libxml2-dev libsqlite3-dev swig libpython-dev libncurses5-dev pkg-config libcurl4-openssl-dev systemtap-sdt-dev tzdata rsync
+    sudo apt-get install git cmake ninja-build clang python uuid-dev libicu-dev icu-devtools libedit-dev libxml2-dev libsqlite3-dev swig libpython-dev libncurses5-dev pkg-config libcurl4-openssl-dev systemtap-sdt-dev tzdata rsync libblocksruntime-dev
 
 **Note:** LLDB currently requires at least `swig-1.3.40` but will successfully build
 with version 2 shipped with Ubuntu.
