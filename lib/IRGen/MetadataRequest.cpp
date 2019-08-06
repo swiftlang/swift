@@ -501,8 +501,9 @@ static bool isTypeErasedGenericClassType(CanType type) {
 }
 
 // Get the type that exists at runtime to represent a compile-time type.
-CanType
-irgen::getRuntimeReifiedType(IRGenModule &IGM, CanType type) {
+CanType IRGenModule::getRuntimeReifiedType(CanType type) {
+  // Leave type-erased ObjC generics with their generic arguments unbound, since
+  // the arguments do not exist at runtime.
   return CanType(type.transform([&](Type t) -> Type {
     if (isTypeErasedGenericClassType(CanType(t))) {
       return t->getAnyNominal()->getDeclaredType()->getCanonicalType();
@@ -510,6 +511,53 @@ irgen::getRuntimeReifiedType(IRGenModule &IGM, CanType type) {
     return t;
   }));
 }
+
+CanType IRGenModule::substOpaqueTypesWithUnderlyingTypes(CanType type) {
+  // Substitute away opaque types whose underlying types we're allowed to
+  // assume are constant.
+  if (type->hasOpaqueArchetype()) {
+    ReplaceOpaqueTypesWithUnderlyingTypes replacer(getSwiftModule(),
+                                                  ResilienceExpansion::Maximal);
+    type = type.subst(replacer, replacer,
+                      SubstFlags::SubstituteOpaqueArchetypes)
+      ->getCanonicalType();
+  }
+
+  return type;
+}
+
+SILType IRGenModule::substOpaqueTypesWithUnderlyingTypes(SILType type) {
+  // Substitute away opaque types whose underlying types we're allowed to
+  // assume are constant.
+  if (type.getASTType()->hasOpaqueArchetype()) {
+    ReplaceOpaqueTypesWithUnderlyingTypes replacer(getSwiftModule(),
+                                                  ResilienceExpansion::Maximal);
+    type = type.subst(getSILModule(), replacer, replacer,
+                      CanGenericSignature(),
+                      /*substitute opaque*/ true);
+  }
+
+  return type;
+}
+
+std::pair<CanType, ProtocolConformanceRef>
+IRGenModule::substOpaqueTypesWithUnderlyingTypes(CanType type,
+                                           ProtocolConformanceRef conformance) {
+  // Substitute away opaque types whose underlying types we're allowed to
+  // assume are constant.
+  if (type->hasOpaqueArchetype()) {
+    ReplaceOpaqueTypesWithUnderlyingTypes replacer(getSwiftModule(),
+                                                  ResilienceExpansion::Maximal);
+    conformance = conformance.subst(type, replacer, replacer,
+                                    SubstFlags::SubstituteOpaqueArchetypes);
+    type = type.subst(replacer, replacer,
+                      SubstFlags::SubstituteOpaqueArchetypes)
+      ->getCanonicalType();
+  }
+
+  return std::make_pair(type, conformance);
+}
+
 
 /// Attempts to return a constant heap metadata reference for a
 /// class type.  This is generally only valid for specific kinds of
@@ -2250,7 +2298,9 @@ llvm::Value *IRGenFunction::emitTypeMetadataRef(CanType type) {
 MetadataResponse
 IRGenFunction::emitTypeMetadataRef(CanType type,
                                    DynamicMetadataRequest request) {
-  type = getRuntimeReifiedType(IGM, type);
+  type = IGM.getRuntimeReifiedType(type);
+  // Look through any opaque types we're allowed to.
+  type = IGM.substOpaqueTypesWithUnderlyingTypes(type);
 
   if (type->hasArchetype() ||
       isTypeMetadataAccessTrivial(IGM, type)) {
@@ -2265,7 +2315,7 @@ IRGenFunction::emitTypeMetadataRef(CanType type,
 /// for the given non-dependent type.
 llvm::Function *irgen::getOrCreateTypeMetadataAccessFunction(IRGenModule &IGM,
                                                              CanType type) {
-  type = getRuntimeReifiedType(IGM, type);
+  type = IGM.getRuntimeReifiedType(type);
 
   assert(!type->hasArchetype() &&
          "cannot create global function to return dependent type metadata");

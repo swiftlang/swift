@@ -1612,7 +1612,7 @@ const TypeInfo *TypeConverter::getTypeEntry(CanType canonicalTy) {
       return it->second;
     }
   }
-  
+
   // If the type is dependent, substitute it into our current context.
   auto contextTy = canonicalTy;
   if (contextTy->hasTypeParameter()) {
