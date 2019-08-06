@@ -63,58 +63,6 @@ Expr *buildSelfReference(VarDecl *selfDecl,
 Expr *buildArgumentForwardingExpr(ArrayRef<ParamDecl*> params,
                                   ASTContext &ctx);
 
-/// Describes the kind of implicit constructor that will be
-/// generated.
-enum class ImplicitConstructorKind {
-  /// The default constructor, which default-initializes each
-  /// of the instance variables.
-  Default,
-  /// The memberwise constructor, which initializes each of
-  /// the instance variables from a parameter of the same type and
-  /// name.
-  Memberwise
-};
-
-/// Create an implicit struct or class constructor.
-///
-/// \param decl The struct or class for which a constructor will be created.
-/// \param ICK The kind of implicit constructor to create.
-///
-/// \returns The newly-created constructor, which has already been type-checked
-/// (but has not been added to the containing struct or class).
-ConstructorDecl *createImplicitConstructor(TypeChecker &tc,
-                                           NominalTypeDecl *decl,
-                                           ImplicitConstructorKind ICK);
-
-/// The kind of designated initializer to synthesize.
-enum class DesignatedInitKind {
-  /// A stub initializer, which is not visible to name lookup and
-  /// merely aborts at runtime.
-  Stub,
-
-  /// An initializer that simply chains to the corresponding
-  /// superclass initializer.
-  Chaining
-};
-
-/// Create a new initializer that overrides the given designated
-/// initializer.
-///
-/// \param classDecl The subclass in which the new initializer will
-/// be declared.
-///
-/// \param superclassCtor The superclass initializer for which this
-/// routine will create an override.
-///
-/// \param kind The kind of initializer to synthesize.
-///
-/// \returns the newly-created initializer that overrides \p
-/// superclassCtor.
-ConstructorDecl *createDesignatedInitOverride(TypeChecker &TC,
-                                              ClassDecl *classDecl,
-                                              ConstructorDecl *superclassCtor,
-                                              DesignatedInitKind kind);
-
 } // end namespace swift
 
 #endif
