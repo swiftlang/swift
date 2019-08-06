@@ -544,17 +544,6 @@ public:
   bool diagnoseAsError() override;
 };
 
-/// Diagnose failures related to passing value of some type
-/// to `inout` parameter, without explicitly specifying `&`.
-class MissingAddressOfFailure final : public FailureDiagnostic {
-public:
-  MissingAddressOfFailure(Expr *expr, ConstraintSystem &cs,
-                          ConstraintLocator *locator)
-      : FailureDiagnostic(expr, cs, locator) {}
-
-  bool diagnoseAsError() override;
-};
-
 /// Diagnose failures related attempt to implicitly convert types which
 /// do not support such implicit converstion.
 /// "as" or "as!" has to be specified explicitly in cases like that.
@@ -748,6 +737,17 @@ private:
   /// Try to add a fix-it to convert a stored property into a computed
   /// property
   void tryComputedPropertyFixIts(Expr *expr) const;
+};
+
+/// Diagnose failures related to passing value of some type
+/// to `inout` or pointer parameter, without explicitly specifying `&`.
+class MissingAddressOfFailure final : public ContextualFailure {
+public:
+  MissingAddressOfFailure(Expr *expr, ConstraintSystem &cs, Type argTy,
+                          Type paramTy, ConstraintLocator *locator)
+      : ContextualFailure(expr, cs, argTy, paramTy, locator) {}
+
+  bool diagnoseAsError() override;
 };
 
 /// Diagnose mismatches relating to tuple destructuring.

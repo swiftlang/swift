@@ -2348,6 +2348,20 @@ bool ConstraintSystem::repairFailures(
             rhs)) {
       conversionsOrFixes.push_back(fix);
     }
+
+    // If argument in l-value type and parameter is `inout` or a pointer,
+    // let's see if it's generic parameter matches and suggest adding explicit
+    // `&`.
+    if (lhs->is<LValueType>() &&
+        (rhs->is<InOutType>() || rhs->getAnyPointerElementType())) {
+      auto result = matchTypes(InOutType::get(lhs->getRValueType()), rhs,
+                               ConstraintKind::ArgumentConversion,
+                               TypeMatchFlags::TMF_ApplyingFix, locator);
+
+      if (result.isSuccess())
+        conversionsOrFixes.push_back(AddAddressOf::create(
+            *this, lhs, rhs, getConstraintLocator(locator)));
+    }
     break;
   }
 
@@ -2924,8 +2938,10 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     // T1 is convertible to T2 (by loading the value).  Note that we cannot get
     // a value of inout type as an lvalue though.
     if (type1->is<LValueType>() && !type2->is<InOutType>()) {
-      return matchTypes(type1->getWithoutSpecifierType(), type2,
-                        kind, subflags, locator);
+      auto result = matchTypes(type1->getWithoutSpecifierType(), type2, kind,
+                               subflags, locator);
+      if (result.isSuccess() || !shouldAttemptFixes())
+        return result;
     }
   }
 
@@ -3315,16 +3331,10 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
             ForceDowncast::create(*this, type2, getConstraintLocator(locator)));
     }
 
-    if (type2->is<InOutType>()) {
-      if (type1->is<LValueType>()) {
-        // If we're converting an lvalue to an inout type, add the missing '&'.
-        conversionsOrFixes.push_back(
-          AddAddressOf::create(*this, getConstraintLocator(locator)));
-      } else {
-        // If we have a concrete type that's an rvalue, "fix" it.
-        conversionsOrFixes.push_back(
+    if (!type1->is<LValueType>() && type2->is<InOutType>()) {
+      // If we have a concrete type that's an rvalue, "fix" it.
+      conversionsOrFixes.push_back(
           TreatRValueAsLValue::create(*this, getConstraintLocator(locator)));
-      }
     }
   }
 

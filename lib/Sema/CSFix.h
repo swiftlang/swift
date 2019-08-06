@@ -307,19 +307,6 @@ public:
                            ConstraintLocator *locator);
 };
 
-/// Introduce a '&' to take the address of an lvalue.
-class AddAddressOf final : public ConstraintFix {
-  AddAddressOf(ConstraintSystem &cs, ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::AddressOf, locator) {}
-
-public:
-  std::string getName() const override { return "add address-of"; }
-
-  bool diagnose(Expr *root, bool asNote = false) const override;
-
-  static AddAddressOf *create(ConstraintSystem &cs, ConstraintLocator *locator);
-};
-
 // Treat rvalue as if it was an lvalue
 class TreatRValueAsLValue final : public ConstraintFix {
   TreatRValueAsLValue(ConstraintSystem &cs, ConstraintLocator *locator)
@@ -521,6 +508,21 @@ public:
 
   static ContextualMismatch *create(ConstraintSystem &cs, Type lhs, Type rhs,
                                     ConstraintLocator *locator);
+};
+
+/// Introduce a '&' to take the address of an lvalue.
+class AddAddressOf final : public ContextualMismatch {
+  AddAddressOf(ConstraintSystem &cs, Type argTy, Type paramTy,
+               ConstraintLocator *locator)
+      : ContextualMismatch(cs, FixKind::AddressOf, argTy, paramTy, locator) {}
+
+public:
+  std::string getName() const override { return "add address-of"; }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static AddAddressOf *create(ConstraintSystem &cs, Type argTy, Type paramTy,
+                              ConstraintLocator *locator);
 };
 
 /// Detect situations where two type's generic arguments must
