@@ -59,11 +59,10 @@ struct TF_698 : Differentiable & AdditiveArithmetic {
 // CHECK: [[RESULT:%.*]] = tuple ([[VJP_ORIG_RESULT]] : $TF_698, [[THUNKED_PB]] : {{.*}})
 // CHECK: return [[RESULT]]
 
-// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] @AD__$s4main6TF_698VA2CIeggoo_A3CIeggoo_TR_pullback_self_reordering_thunk : $@convention(thin) (@guaranteed TF_698, @guaranteed @callee_guaranteed (@guaranteed TF_698) -> (@owned TF_698, @owned TF_698))
-// CHECK: bb0([[SEED:%.*]] : $TF_698, [[PB:%.*]] : $@callee_guaranteed (@guaranteed TF_698) -> (@owned TF_698, @owned TF_698)):
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @AD__$s4main6TF_698VA2CIeggoo_A3CIeggoo_TR_pullback_self_reordering_thunk : $@convention(thin) (@guaranteed TF_698, @guaranteed @callee_guaranteed (@guaranteed TF_698) -> (@owned TF_698, @owned TF_698))
+// CHECK: bb0([[SEED:%.*]] : @guaranteed $TF_698, [[PB:%.*]] : @guaranteed $@callee_guaranteed (@guaranteed TF_698) -> (@owned TF_698, @owned TF_698)):
 // CHECK: [[PB_RESULT:%.*]] = apply [[PB]]([[SEED]])
-// CHECK: [[X_ADJ:%.*]] = tuple_extract [[PB_RESULT]] : $(TF_698, TF_698), 0
-// CHECK: [[Y_ADJ:%.*]] = tuple_extract [[PB_RESULT]] : $(TF_698, TF_698), 1
+// CHECK: ([[X_ADJ:%.*]], [[Y_ADJ:%.*]]) = destructure_tuple %2 : $(TF_698, TF_698)
 // CHECK: [[RESULT:%.*]] = tuple ([[Y_ADJ]] : $TF_698, [[X_ADJ]] : $TF_698)
 // CHECK: return [[RESULT]]
 
