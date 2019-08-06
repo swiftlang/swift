@@ -18,7 +18,6 @@
 #ifndef SWIFT_TYPECHECKING_CODESYNTHESIS_H
 #define SWIFT_TYPECHECKING_CODESYNTHESIS_H
 
-#include "TypeCheckObjC.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/Basic/ExternalUnion.h"
 #include "swift/Basic/LLVM.h"
@@ -34,6 +33,7 @@ class ConstructorDecl;
 class FuncDecl;
 class GenericParamList;
 class NominalTypeDecl;
+class ParamDecl;
 class Type;
 class ValueDecl;
 class VarDecl;
@@ -42,8 +42,26 @@ class TypeChecker;
 
 class ObjCReason;
 
-// Implemented in TypeCheckerOverride.cpp
-bool checkOverrides(ValueDecl *decl);
+enum class SelfAccessorKind {
+  /// We're building a derived accessor on top of whatever this
+  /// class provides.
+  Peer,
+
+  /// We're building a setter or something around an underlying
+  /// implementation, which might be storage or inherited from a
+  /// superclass.
+  Super,
+};
+
+Expr *buildSelfReference(VarDecl *selfDecl,
+                         SelfAccessorKind selfAccessorKind,
+                         bool isLValue,
+                         ASTContext &ctx);
+
+/// Build an expression that evaluates the specified parameter list as a tuple
+/// or paren expr, suitable for use in an apply expr.
+Expr *buildArgumentForwardingExpr(ArrayRef<ParamDecl*> params,
+                                  ASTContext &ctx);
 
 /// Describes the kind of implicit constructor that will be
 /// generated.

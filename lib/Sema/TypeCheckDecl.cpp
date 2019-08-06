@@ -19,7 +19,9 @@
 #include "DerivedConformances.h"
 #include "TypeChecker.h"
 #include "TypeCheckAccess.h"
+#include "TypeCheckDecl.h"
 #include "TypeCheckAvailability.h"
+#include "TypeCheckObjC.h"
 #include "TypeCheckType.h"
 #include "MiscDiagnostics.h"
 #include "swift/AST/AccessScope.h"
@@ -604,18 +606,6 @@ static void checkCircularity(TypeChecker &tc, T *decl,
   }
 }
 
-/// Set each bound variable in the pattern to have an error type.
-static void setBoundVarsTypeError(Pattern *pattern, ASTContext &ctx) {
-  pattern->forEachVariable([&](VarDecl *var) {
-    // Don't change the type of a variable that we've been able to
-    // compute a type for.
-    if (var->hasType() && !var->getType()->hasError())
-      return;
-
-    var->markInvalid();
-  });
-}
-
 /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
 GenericEnvironment *
 TypeChecker::handleSILGenericParams(GenericParamList *genericParams,
@@ -639,33 +629,6 @@ TypeChecker::handleSILGenericParams(GenericParamList *genericParams,
                                  /*parentSig=*/nullptr,
                                  /*allowConcreteGenericParams=*/true,
                                  /*ext=*/nullptr);
-}
-
-/// Build a default initializer for the given type.
-Expr *TypeChecker::buildDefaultInitializer(Type type) {
-  // Default-initialize optional types and weak values to 'nil'.
-  if (type->getReferenceStorageReferent()->getOptionalObjectType())
-    return new (Context) NilLiteralExpr(SourceLoc(), /*Implicit=*/true);
-
-  // Build tuple literals for tuple types.
-  if (auto tupleType = type->getAs<TupleType>()) {
-    SmallVector<Expr *, 2> inits;
-    for (const auto &elt : tupleType->getElements()) {
-      if (elt.isVararg())
-        return nullptr;
-
-      auto eltInit = buildDefaultInitializer(elt.getType());
-      if (!eltInit)
-        return nullptr;
-
-      inits.push_back(eltInit);
-    }
-
-    return TupleExpr::createImplicit(Context, inits, { });
-  }
-
-  // We don't default-initialize anything else.
-  return nullptr;
 }
 
 /// Check whether \c current is a redeclaration.
@@ -925,205 +888,6 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
       break;
     }
   }
-}
-
-/// Does the context allow pattern bindings that don't bind any variables?
-static bool contextAllowsPatternBindingWithoutVariables(DeclContext *dc) {
-  
-  // Property decls in type context must bind variables.
-  if (dc->isTypeContext())
-    return false;
-  
-  // Global variable decls must bind variables, except in scripts.
-  if (dc->isModuleScopeContext()) {
-    if (dc->getParentSourceFile()
-        && dc->getParentSourceFile()->isScriptMode())
-      return true;
-    
-    return false;
-  }
-  
-  return true;
-}
-
-static bool hasStoredProperties(NominalTypeDecl *decl) {
-  return (isa<StructDecl>(decl) ||
-          (isa<ClassDecl>(decl) && !decl->hasClangNode()));
-}
-
-static void computeLoweredStoredProperties(NominalTypeDecl *decl) {
-  // Just walk over the members of the type, forcing backing storage
-  // for lazy properties and property wrappers to be synthesized.
-  for (auto *member : decl->getMembers()) {
-    auto *var = dyn_cast<VarDecl>(member);
-    if (!var || var->isStatic())
-      continue;
-
-    if (var->getAttrs().hasAttribute<LazyAttr>())
-      (void) var->getLazyStorageProperty();
-
-    if (var->hasAttachedPropertyWrapper())
-      (void) var->getPropertyWrapperBackingProperty();
-  }
-}
-
-llvm::Expected<ArrayRef<VarDecl *>>
-StoredPropertiesRequest::evaluate(Evaluator &evaluator,
-                                  NominalTypeDecl *decl) const {
-  if (!hasStoredProperties(decl))
-    return ArrayRef<VarDecl *>();
-
-  SmallVector<VarDecl *, 4> results;
-
-  // Unless we're in a source file we don't have to do anything
-  // special to lower lazy properties and property wrappers.
-  if (isa<SourceFile>(decl->getModuleScopeContext()))
-    computeLoweredStoredProperties(decl);
-
-  for (auto *member : decl->getMembers()) {
-    if (auto *var = dyn_cast<VarDecl>(member))
-      if (!var->isStatic() && var->hasStorage())
-        results.push_back(var);
-  }
-
-  return decl->getASTContext().AllocateCopy(results);
-}
-
-llvm::Expected<ArrayRef<Decl *>>
-StoredPropertiesAndMissingMembersRequest::evaluate(Evaluator &evaluator,
-                                                   NominalTypeDecl *decl) const {
-  if (!hasStoredProperties(decl))
-    return ArrayRef<Decl *>();
-
-  SmallVector<Decl *, 4> results;
-
-  // Unless we're in a source file we don't have to do anything
-  // special to lower lazy properties and property wrappers.
-  if (isa<SourceFile>(decl->getModuleScopeContext()))
-    computeLoweredStoredProperties(decl);
-
-  for (auto *member : decl->getMembers()) {
-    if (auto *var = dyn_cast<VarDecl>(member))
-      if (!var->isStatic() && var->hasStorage())
-        results.push_back(var);
-
-    if (auto missing = dyn_cast<MissingMemberDecl>(member))
-      if (missing->getNumberOfFieldOffsetVectorEntries() > 0)
-        results.push_back(missing);
-  }
-
-  return decl->getASTContext().AllocateCopy(results);
-}
-
-/// Validate the \c entryNumber'th entry in \c binding.
-static void validatePatternBindingEntry(TypeChecker &tc,
-                                        PatternBindingDecl *binding,
-                                        unsigned entryNumber) {
-  // If the pattern already has a type, we're done.
-  if (binding->getPattern(entryNumber)->hasType())
-    return;
-
-  // Resolve the pattern.
-  auto *pattern = tc.resolvePattern(binding->getPattern(entryNumber),
-                                    binding->getDeclContext(),
-                                    /*isStmtCondition*/true);
-  if (!pattern) {
-    binding->setInvalid();
-    binding->getPattern(entryNumber)->setType(ErrorType::get(tc.Context));
-    return;
-  }
-
-  binding->setPattern(entryNumber, pattern,
-                      binding->getPatternList()[entryNumber].getInitContext());
-
-  // Validate 'static'/'class' on properties in nominal type decls.
-  auto StaticSpelling = binding->getStaticSpelling();
-  if (StaticSpelling != StaticSpellingKind::None &&
-      isa<ExtensionDecl>(binding->getDeclContext())) {
-    if (auto *NTD = binding->getDeclContext()->getSelfNominalTypeDecl()) {
-      if (!isa<ClassDecl>(NTD)) {
-        if (StaticSpelling == StaticSpellingKind::KeywordClass) {
-          tc.diagnose(binding, diag::class_var_not_in_class, false)
-            .fixItReplace(binding->getStaticLoc(), "static");
-          tc.diagnose(NTD, diag::extended_type_declared_here);
-        }
-      }
-    }
-  }
-
-  // Check the pattern. We treat type-checking a PatternBindingDecl like
-  // type-checking an expression because that's how the initial binding is
-  // checked, and they have the same effect on the file's dependencies.
-  //
-  // In particular, it's /not/ correct to check the PBD's DeclContext because
-  // top-level variables in a script file are accessible from other files,
-  // even though the PBD is inside a TopLevelCodeDecl.
-  TypeResolutionOptions options(TypeResolverContext::PatternBindingDecl);
-
-  if (binding->isInitialized(entryNumber)) {
-    // If we have an initializer, we can also have unknown types.
-    options |= TypeResolutionFlags::AllowUnspecifiedTypes;
-    options |= TypeResolutionFlags::AllowUnboundGenerics;
-  }
-
-  if (tc.typeCheckPattern(pattern, binding->getDeclContext(), options)) {
-    setBoundVarsTypeError(pattern, tc.Context);
-    binding->setInvalid();
-    pattern->setType(ErrorType::get(tc.Context));
-    return;
-  }
-
-  // If the pattern didn't get a type or if it contains an unbound generic type,
-  // we'll need to check the initializer.
-  if (!pattern->hasType() || pattern->getType()->hasUnboundGenericType()) {
-    if (tc.typeCheckPatternBinding(binding, entryNumber))
-      return;
-    
-    // A pattern binding at top level is not allowed to pick up another decl's
-    // opaque result type as its type by type inference.
-    if (!binding->getDeclContext()->isLocalContext()
-        && binding->getInit(entryNumber)->getType()->hasOpaqueArchetype()) {
-      // TODO: Check whether the type is the pattern binding's own opaque type.
-      tc.diagnose(binding, diag::inferred_opaque_type,
-                  binding->getInit(entryNumber)->getType());
-    }
-  }
-
-  // If the pattern binding appears in a type or library file context, then
-  // it must bind at least one variable.
-  if (!contextAllowsPatternBindingWithoutVariables(binding->getDeclContext())) {
-    llvm::SmallVector<VarDecl*, 2> vars;
-    binding->getPattern(entryNumber)->collectVariables(vars);
-    if (vars.empty()) {
-      // Selector for error message.
-      enum : unsigned {
-        Property,
-        GlobalVariable,
-      };
-      tc.diagnose(binding->getPattern(entryNumber)->getLoc(),
-                  diag::pattern_binds_no_variables,
-                  binding->getDeclContext()->isTypeContext()
-                                                   ? Property : GlobalVariable);
-    }
-  }
-
-  // If we have any type-adjusting attributes, apply them here.
-  assert(binding->getPattern(entryNumber)->hasType() && "Type missing?");
-  if (auto var = binding->getSingleVar()) {
-    tc.checkTypeModifyingDeclAttributes(var);
-  }
-}
-
-/// Validate the entries in the given pattern binding declaration.
-static void validatePatternBindingEntries(TypeChecker &tc,
-                                          PatternBindingDecl *binding) {
-  if (binding->hasValidationStarted())
-    return;
-
-  DeclValidationRAII IBV(binding);
-
-  for (unsigned i = 0, e = binding->getNumPatternEntries(); i != e; ++i)
-    validatePatternBindingEntry(tc, binding, i);
 }
 
 namespace {
@@ -2203,7 +1967,7 @@ void TypeChecker::validateDecl(OperatorDecl *OD) {
   }
 }
 
-static bool doesContextHaveValueSemantics(DeclContext *dc) {
+bool swift::doesContextHaveValueSemantics(DeclContext *dc) {
   if (Type contextTy = dc->getDeclaredInterfaceType())
     return !contextTy->hasReferenceSemantics();
   return false;
@@ -2252,139 +2016,6 @@ SelfAccessKindRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
   }
 
   return SelfAccessKind::NonMutating;
-}
-
-llvm::Expected<bool>
-IsGetterMutatingRequest::evaluate(Evaluator &evaluator,
-                                  AbstractStorageDecl *storage) const {
-  bool result = (!storage->isStatic() &&
-                 doesContextHaveValueSemantics(storage->getDeclContext()));
-
-  // 'lazy' overrides the normal accessor-based rules and heavily
-  // restricts what accessors can be used.  The getter is considered
-  // mutating if this is instance storage on a value type.
-  if (storage->getAttrs().hasAttribute<LazyAttr>()) {
-    return result;
-  }
-
-  // If we have an attached property wrapper, the getter's mutating-ness
-  // depends on the composition of the wrappers.
-  if (auto var = dyn_cast<VarDecl>(storage)) {
-    if (auto mut = var->getPropertyWrapperMutability()) {
-      return mut->Getter == PropertyWrapperMutability::Mutating
-        && result;
-    }
-  }
-
-  auto checkMutability = [&](AccessorKind kind) -> bool {
-    auto *accessor = storage->getParsedAccessor(kind);
-    if (!accessor)
-      return false;
-
-    return accessor->isMutating();
-  };
-
-  // Protocol requirements are always written as '{ get }' or '{ get set }';
-  // the @_borrowed attribute determines if getReadImpl() becomes Get or Read.
-  if (isa<ProtocolDecl>(storage->getDeclContext()))
-    return checkMutability(AccessorKind::Get);
-
-  switch (storage->getReadImpl()) {
-  case ReadImplKind::Stored:
-  case ReadImplKind::Inherited:
-    return false;
-
-  case ReadImplKind::Get:
-    return checkMutability(AccessorKind::Get);
-
-  case ReadImplKind::Address:
-    return checkMutability(AccessorKind::Address);
-
-  case ReadImplKind::Read:
-    return checkMutability(AccessorKind::Read);
-  }
-
-  llvm_unreachable("bad impl kind");
-}
-
-llvm::Expected<bool>
-IsSetterMutatingRequest::evaluate(Evaluator &evaluator,
-                                  AbstractStorageDecl *storage) const {
-  // By default, the setter is mutating if we have an instance member of a
-  // value type, but this can be overridden below.
-  bool result = (!storage->isStatic() &&
-                 doesContextHaveValueSemantics(storage->getDeclContext()));
-
-  // If we have an attached property wrapper, the setter is mutating
-  // or not based on the composition of the wrappers.
-  if (auto var = dyn_cast<VarDecl>(storage)) {
-    if (auto mut = var->getPropertyWrapperMutability()) {
-      return mut->Setter == PropertyWrapperMutability::Mutating
-        && result;
-    }
-  }
-
-  auto impl = storage->getImplInfo();
-  switch (impl.getWriteImpl()) {
-  case WriteImplKind::Immutable:
-  case WriteImplKind::Stored:
-    // Instance member setters are mutating; static property setters and
-    // top-level setters are not.
-    // It's important that we use this logic for "immutable" storage
-    // in order to handle initialization of let-properties.
-    return result;
-
-  case WriteImplKind::StoredWithObservers:
-  case WriteImplKind::InheritedWithObservers:
-  case WriteImplKind::Set: {
-    auto *setter = storage->getParsedAccessor(AccessorKind::Set);
-
-    if (setter)
-      result = setter->isMutating();
-
-
-    // As a special extra check, if the user also gave us a modify
-    // coroutine, check that it has the same mutatingness as the setter.
-    // TODO: arguably this should require the spelling to match even when
-    // it's the implied value.
-    auto modifyAccessor = storage->getParsedAccessor(AccessorKind::Modify);
-
-    if (impl.getReadWriteImpl() == ReadWriteImplKind::Modify &&
-        modifyAccessor != nullptr) {
-      auto modifyResult = modifyAccessor->isMutating();
-      if ((result || storage->isGetterMutating()) != modifyResult) {
-        modifyAccessor->diagnose(
-            diag::modify_mutatingness_differs_from_setter,
-            modifyResult ? SelfAccessKind::Mutating
-                         : SelfAccessKind::NonMutating,
-            modifyResult ? SelfAccessKind::NonMutating
-                         : SelfAccessKind::Mutating);
-        if (setter)
-          setter->diagnose(diag::previous_accessor, "setter", 0);
-        modifyAccessor->setInvalid();
-      }
-    }
-
-    return result;
-  }
-
-  case WriteImplKind::MutableAddress:
-    return storage->getParsedAccessor(AccessorKind::MutableAddress)
-      ->isMutating();
-
-  case WriteImplKind::Modify:
-    return storage->getParsedAccessor(AccessorKind::Modify)
-      ->isMutating();
-  }
-  llvm_unreachable("bad storage kind");
-}
-
-llvm::Expected<OpaqueReadOwnership>
-OpaqueReadOwnershipRequest::evaluate(Evaluator &evaluator,
-                                     AbstractStorageDecl *storage) const {
-  return (storage->getAttrs().hasAttribute<BorrowedAttr>()
-          ? OpaqueReadOwnership::Borrowed
-          : OpaqueReadOwnership::Owned);
 }
 
 /// Check the requirements in the where clause of the given \c source
