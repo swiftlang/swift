@@ -582,13 +582,13 @@ TypeRepr *ASTGen::lookupType(TypeSyntax Type) {
 }
 
 TypeRepr *ASTGen::addType(TypeRepr *Type, const SourceLoc &Loc) {
-  return Types.insert({Loc.getOpaquePointerValue(), Type}).first->second;
+  return Types.insert({Loc, Type}).first->second;
 }
 
 bool ASTGen::hasType(const SourceLoc &Loc) const {
-  return Types.find(Loc.getOpaquePointerValue()) != Types.end();
+  return Types.find(Loc) != Types.end();
 }
 
 TypeRepr *ASTGen::getType(const SourceLoc &Loc) const {
-  return Types.find(Loc.getOpaquePointerValue())->second;
+  return Types.find(Loc)->second;
 }

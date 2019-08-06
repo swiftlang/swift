@@ -30,8 +30,9 @@ class ASTGen {
 
   PersistentParserState **ParserState;
 
+  // FIXME: remove when Syntax can represent all types and ASTGen can handle them
   /// Types that are not representable as syntax nodes.
-  llvm::DenseMap<const void *, TypeRepr *> Types;
+  llvm::DenseMap<SourceLoc, TypeRepr *> Types;
 
 public:
   ASTGen(ASTContext &Context, PersistentParserState **ParserState)
