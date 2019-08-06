@@ -17,9 +17,11 @@
 #include "SourceKit/Support/UIdent.h"
 #include "llvm/Support/VersionTuple.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallString.h"
 #include "swift/AST/Type.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include <functional>
 #include <memory>
 #include <unordered_set>
@@ -295,10 +297,21 @@ public:
   virtual bool valueForOption(UIdent Key, unsigned &Val) = 0;
   virtual bool valueForOption(UIdent Key, bool &Val) = 0;
   virtual bool valueForOption(UIdent Key, StringRef &Val) = 0;
+  virtual bool forEach(UIdent key, llvm::function_ref<bool(OptionsDictionary &)> applier) = 0;
 };
 
 struct Statistic;
 typedef std::function<void(ArrayRef<Statistic *> stats)> StatisticsReceiver;
+
+/// Options for configuring a virtual file system provider.
+struct VFSOptions {
+  /// The name of the virtual file system to use.
+  std::string name;
+
+  /// Arguments for the virtual file system provider (may be null).
+  // FIXME: the lifetime is actually limited by the RequestDict.
+  std::unique_ptr<OptionsDictionary> options;
+};
 
 /// Used to wrap the result of a request. There are three possibilities:
 /// - The request succeeded (`value` is valid)
@@ -638,15 +651,17 @@ public:
                            IndexingConsumer &Consumer,
                            ArrayRef<const char *> Args) = 0;
 
-  virtual void codeComplete(llvm::MemoryBuffer *InputBuf, unsigned Offset,
-                            CodeCompletionConsumer &Consumer,
-                            ArrayRef<const char *> Args) = 0;
+  virtual void
+  codeComplete(llvm::MemoryBuffer *InputBuf, unsigned Offset,
+               CodeCompletionConsumer &Consumer, ArrayRef<const char *> Args,
+               Optional<VFSOptions> vfsOptions) = 0;
 
   virtual void codeCompleteOpen(StringRef name, llvm::MemoryBuffer *inputBuf,
                                 unsigned offset, OptionsDictionary *options,
                                 ArrayRef<FilterRule> filterRules,
                                 GroupedCodeCompletionConsumer &consumer,
-                                ArrayRef<const char *> args) = 0;
+                                ArrayRef<const char *> args,
+                                Optional<VFSOptions> vfsOptions) = 0;
 
   virtual void codeCompleteClose(StringRef name, unsigned offset,
                                  GroupedCodeCompletionConsumer &consumer) = 0;
@@ -664,9 +679,9 @@ public:
   virtual void
   codeCompleteSetCustom(ArrayRef<CustomCompletionInfo> completions) = 0;
 
-  virtual void editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
-                          EditorConsumer &Consumer,
-                          ArrayRef<const char *> Args) = 0;
+  virtual void
+  editorOpen(StringRef Name, llvm::MemoryBuffer *Buf, EditorConsumer &Consumer,
+             ArrayRef<const char *> Args, Optional<VFSOptions> vfsOptions) = 0;
 
   virtual void editorOpenInterface(EditorConsumer &Consumer,
                                    StringRef Name,
@@ -715,12 +730,11 @@ public:
                                        unsigned Length,
                                        EditorConsumer &Consumer) = 0;
 
-  virtual void getCursorInfo(StringRef Filename, unsigned Offset,
-                             unsigned Length, bool Actionables,
-                             bool CancelOnSubsequentRequest,
-                             ArrayRef<const char *> Args,
-                      std::function<void(const RequestResult<CursorInfoData> &)> Receiver) = 0;
-
+  virtual void
+  getCursorInfo(StringRef Filename, unsigned Offset, unsigned Length,
+                bool Actionables, bool CancelOnSubsequentRequest,
+                ArrayRef<const char *> Args, Optional<VFSOptions> vfsOptions,
+       std::function<void(const RequestResult<CursorInfoData> &)> Receiver) = 0;
 
   virtual void getNameInfo(StringRef Filename, unsigned Offset,
                            NameTranslatingInfo &Input,
@@ -732,11 +746,10 @@ public:
                             ArrayRef<const char *> Args,
                             std::function<void(const RequestResult<RangeInfo> &)> Receiver) = 0;
 
-  virtual void
-  getCursorInfoFromUSR(StringRef Filename, StringRef USR,
-                       bool CancelOnSubsequentRequest,
-                       ArrayRef<const char *> Args,
-                     std::function<void(const RequestResult<CursorInfoData> &)> Receiver) = 0;
+  virtual void getCursorInfoFromUSR(
+      StringRef Filename, StringRef USR, bool CancelOnSubsequentRequest,
+      ArrayRef<const char *> Args, Optional<VFSOptions> vfsOptions,
+      std::function<void(const RequestResult<CursorInfoData> &)> Receiver) = 0;
 
   virtual void findRelatedIdentifiersInFile(StringRef Filename,
                                             unsigned Offset,

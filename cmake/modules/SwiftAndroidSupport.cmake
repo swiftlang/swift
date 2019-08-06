@@ -1,16 +1,32 @@
 function(swift_android_libcxx_include_paths var)
-  set(${var}
-        "${SWIFT_ANDROID_NDK_PATH}/sources/cxx-stl/llvm-libc++/include"
-        "${SWIFT_ANDROID_NDK_PATH}/sources/cxx-stl/llvm-libc++abi/include"
-      PARENT_SCOPE)
+  if(NOT "${SWIFT_ANDROID_NDK_PATH}" STREQUAL "")
+    set(${var}
+          "${SWIFT_ANDROID_NDK_PATH}/sources/cxx-stl/llvm-libc++/include"
+          "${SWIFT_ANDROID_NDK_PATH}/sources/cxx-stl/llvm-libc++abi/include"
+        PARENT_SCOPE)
+  elseif(NOT "${SWIFT_ANDROID_NATIVE_SYSROOT}" STREQUAL "")
+    set(${var}
+          "${SWIFT_ANDROID_NATIVE_SYSROOT}/usr/include/c++/v1"
+        PARENT_SCOPE)
+  else()
+    message(SEND_ERROR "Couldn't set libc++ include paths for Android")
+  endif()
 endfunction()
 
 function(swift_android_include_for_arch arch var)
   set(paths)
-  list(APPEND paths
-       "${SWIFT_ANDROID_NDK_PATH}/sources/android/support/include"
-       "${SWIFT_ANDROID_NDK_PATH}/sysroot/usr/include"
-       "${SWIFT_ANDROID_NDK_PATH}/sysroot/usr/include/${SWIFT_SDK_ANDROID_ARCH_${arch}_NDK_TRIPLE}") 
+  if(NOT "${SWIFT_ANDROID_NDK_PATH}" STREQUAL "")
+    list(APPEND paths
+         "${SWIFT_ANDROID_NDK_PATH}/sources/android/support/include"
+         "${SWIFT_ANDROID_NDK_PATH}/sysroot/usr/include"
+         "${SWIFT_ANDROID_NDK_PATH}/sysroot/usr/include/${SWIFT_SDK_ANDROID_ARCH_${arch}_NDK_TRIPLE}")
+  elseif(NOT "${SWIFT_ANDROID_NATIVE_SYSROOT}" STREQUAL "")
+    list(APPEND paths
+         "${SWIFT_ANDROID_NATIVE_SYSROOT}/usr/include"
+         "${SWIFT_ANDROID_NATIVE_SYSROOT}/usr/include/${SWIFT_SDK_ANDROID_ARCH_${arch}_NDK_TRIPLE}")
+  else()
+    message(SEND_ERROR "Couldn't set ${arch} include paths for Android")
+  endif()
   set(${var} ${paths} PARENT_SCOPE)
 endfunction()
 
@@ -19,18 +35,68 @@ function(swift_android_lib_for_arch arch var)
   set(_host "${SWIFT_SDK_ANDROID_ARCH_${arch}_NDK_TRIPLE}")
 
   set(paths)
-  if(arch STREQUAL armv7)
-    list(APPEND paths "${_prebuilt}/${_host}/lib/armv7-a")
-  elseif(arch STREQUAL aarch64)
-    list(APPEND paths "${_prebuilt}/${_host}/lib64")
-  elseif(arch STREQUAL i686)
-    list(APPEND paths "${_prebuilt}/${_host}/lib")
-  elseif(arch STREQUAL x86_64)
-    list(APPEND paths "${_prebuilt}/${_host}/lib64")
+  if(NOT "${SWIFT_ANDROID_NDK_PATH}" STREQUAL "")
+    if(arch STREQUAL armv7)
+      list(APPEND paths "${_prebuilt}/${_host}/lib/armv7-a")
+    elseif(arch STREQUAL aarch64)
+      list(APPEND paths "${_prebuilt}/${_host}/lib64")
+    elseif(arch STREQUAL i686)
+      list(APPEND paths "${_prebuilt}/${_host}/lib")
+    elseif(arch STREQUAL x86_64)
+      list(APPEND paths "${_prebuilt}/${_host}/lib64")
+    else()
+      message(SEND_ERROR "unknown architecture (${arch}) for android")
+    endif()
+    list(APPEND paths "${_prebuilt}/lib/gcc/${_host}/${SWIFT_ANDROID_NDK_GCC_VERSION}.x")
+  elseif(NOT "${SWIFT_ANDROID_NATIVE_SYSROOT}" STREQUAL "")
+    list(APPEND paths "${SWIFT_ANDROID_NATIVE_SYSROOT}/usr/lib")
+    if("${arch}" MATCHES armv7)
+      list(APPEND paths "/system/lib")
+    elseif("${arch}" MATCHES aarch64)
+      list(APPEND paths "/system/lib64")
+    else()
+      message(SEND_ERROR "unknown architecture (${arch}) when compiling for Android host")
+    endif()
   else()
-    message(SEND_ERROR "unknown architecture (${arch}) for android")
+    message(SEND_ERROR "Couldn't set ${arch} library paths for Android")
   endif()
-  list(APPEND paths "${_prebuilt}/lib/gcc/${_host}/${SWIFT_ANDROID_NDK_GCC_VERSION}.x")
 
   set(${var} ${paths} PARENT_SCOPE)
+endfunction()
+
+function(swift_android_tools_path arch path_var_name)
+  if(NOT "${SWIFT_ANDROID_NDK_PATH}" STREQUAL "")
+    set(${path_var_name} "${SWIFT_SDK_ANDROID_ARCH_${arch}_NDK_PREBUILT_PATH}/${SWIFT_SDK_ANDROID_ARCH_${arch}_NDK_TRIPLE}/bin" PARENT_SCOPE)
+  elseif(NOT "${SWIFT_ANDROID_NATIVE_SYSROOT}" STREQUAL "")
+    set(${path_var_name} "${SWIFT_ANDROID_NATIVE_SYSROOT}/usr/bin" PARENT_SCOPE)
+  else()
+    message(SEND_ERROR "Couldn't set ${arch} tools path for Android")
+  endif()
+endfunction ()
+
+function(swift_android_cxx_libraries_for_arch arch libraries_var_name)
+  set(link_libraries)
+  if(NOT "${SWIFT_ANDROID_NDK_PATH}" STREQUAL "")
+    if("${arch}" MATCHES armv7)
+      set(cxx_arch armeabi-v7a)
+    elseif("${arch}" MATCHES aarch64)
+      set(cxx_arch arm64-v8a)
+    elseif("${arch}" MATCHES i686)
+      set(cxx_arch x86)
+    elseif("${arch}" MATCHES x86_64)
+      set(cxx_arch x86_64)
+    else()
+      message(SEND_ERROR "unknown architecture (${arch}) when cross-compiling for Android")
+    endif()
+
+    set(android_libcxx_path "${SWIFT_ANDROID_NDK_PATH}/sources/cxx-stl/llvm-libc++/libs/${cxx_arch}")
+    list(APPEND link_libraries ${android_libcxx_path}/libc++abi.a
+                               ${android_libcxx_path}/libc++_shared.so)
+  elseif(NOT "${SWIFT_ANDROID_NATIVE_SYSROOT}" STREQUAL "")
+      list(APPEND link_libraries "${SWIFT_ANDROID_NATIVE_SYSROOT}/usr/lib/libc++_shared.so")
+  else()
+    message(SEND_ERROR "Couldn't set ${arch} libc++ libraries needed for Android")
+  endif()
+
+  set(${libraries_var_name} ${link_libraries} PARENT_SCOPE)
 endfunction()

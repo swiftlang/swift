@@ -77,7 +77,7 @@ deriveRawValueInit(AbstractFunctionDecl *initDecl, void *) {
 
   // rawValue param to init(rawValue:)
   auto *rawValueDecl = new (C) ParamDecl(
-      VarDecl::Specifier::Default, SourceLoc(), SourceLoc(), C.Id_rawValue,
+      ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(), C.Id_rawValue,
       SourceLoc(), C.Id_rawValue, parentDC);
   rawValueDecl->setInterfaceType(C.getIntDecl()->getDeclaredType());
   rawValueDecl->setImplicit();
@@ -119,7 +119,7 @@ static ValueDecl *deriveInitDecl(DerivedConformance &derived, Type paramType,
 
   // rawValue
   auto *rawDecl =
-      new (C) ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+      new (C) ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(),
                         paramName, SourceLoc(), paramName, parentDC);
   rawDecl->setInterfaceType(paramType);
   rawDecl->setImplicit();
@@ -182,7 +182,6 @@ static ValueDecl *deriveProperty(DerivedConformance &derived, Type type,
   synthesizer(getterDecl);
 
   auto *dc = cast<IterableDeclContext>(derived.ConformanceDecl);
-  dc->addMember(getterDecl);
   dc->addMember(propDecl);
   dc->addMember(pbDecl);
   return propDecl;

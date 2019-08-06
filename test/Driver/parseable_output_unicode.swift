@@ -114,8 +114,8 @@
 // CHECK-NEXT: {
 // CHECK-NEXT:   "kind": "began",
 // CHECK-NEXT:   "name": "link",
-// CHECK-NEXT:   "command": "{{.*[\\/](ld|clang\+\+.exe)(\\")?}} {{.*[\\/]}}你好-[[OUTPUT]].o{{(\\")?}}{{.*}}-o {{.*[\\/]}}parseable_output_unicode.swift.tmp.out{{(\\")?}}",
-// CHECK-NEXT:   "command_executable": "{{.*[\\/](ld|clang\+\+.exe)(\\")?}}",
+// CHECK-NEXT:   "command": "{{.*[\\/](ld|clang.exe)(\\")?}} {{.*[\\/]}}你好-[[OUTPUT]].o{{(\\")?}}{{.*}}-o {{.*[\\/]}}parseable_output_unicode.swift.tmp.out{{(\\")?}}",
+// CHECK-NEXT:   "command_executable": "{{.*[\\/](ld|clang.exe)(\\")?}}",
 // CHECK-NEXT:   "command_arguments": [
 // CHECK:          "{{.*[\\/]}}你好-[[OUTPUT]].o",
 // CHECK:          "-o",

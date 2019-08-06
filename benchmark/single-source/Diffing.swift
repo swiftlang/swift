@@ -15,111 +15,55 @@ import TestsUtils
 let t: [BenchmarkCategory] = [.api]
 public let Diffing = [
   BenchmarkInfo(
-    name: "DiffSame",
-    runFunction: run_DiffSame,
+    name: "Diffing.Same",
+    runFunction: { diff($0, from: longPangram, to: longPangram) },
     tags: t,
-    legacyFactor: 10),
+    setUpFunction: { blackHole(longPangram) }),
   BenchmarkInfo(
-    name: "DiffPangramToAlphabet",
-    runFunction: run_DiffPangramToAlphabet,
+    name: "Diffing.PangramToAlphabet",
+    runFunction: { diff($0, from: longPangram, to: alphabets) },
     tags: t,
-    legacyFactor: 10),
+    setUpFunction: { blackHole((longPangram, alphabets)) }),
   BenchmarkInfo(
-    name: "DiffPangrams",
-    runFunction: run_DiffPangrams,
+    name: "Diffing.Pangrams",
+    runFunction: { diff($0, from:typingPangram, to: longPangram) },
     tags: t,
-    legacyFactor: 10),
+    setUpFunction: { blackHole((longPangram, typingPangram)) }),
   BenchmarkInfo(
-    name: "DiffReversedAlphabets",
-    runFunction: run_DiffReversedAlphabets,
+    name: "Diffing.ReversedAlphabets",
+    runFunction: { diff($0, from:alphabets, to: alphabetsReversed) },
     tags: t,
-    legacyFactor: 10),
+    setUpFunction: { blackHole((alphabets, alphabetsReversed)) }),
   BenchmarkInfo(
-    name: "DiffReversedLorem",
-    runFunction: run_DiffReversedLorem,
+    name: "Diffing.ReversedLorem",
+    runFunction: { diff($0, from: loremIpsum, to: loremReversed) },
     tags: t,
-    legacyFactor: 10),
+    setUpFunction: { blackHole((loremIpsum, loremReversed)) }),
   BenchmarkInfo(
-    name: "DiffDisparate",
-    runFunction: run_DiffDisparate,
+    name: "Diffing.Disparate",
+    runFunction: { diff($0, from: numbersAndSymbols, to: alphabets) },
     tags: t,
-    legacyFactor: 10),
+    setUpFunction: { blackHole((numbersAndSymbols, alphabets)) }),
   BenchmarkInfo(
-    name: "DiffSimilar",
-    runFunction: run_DiffSimilar,
+    name: "Diffing.Similar",
+    runFunction: { diff($0, from: unabridgedLorem, to: loremIpsum) },
     tags: t,
-    legacyFactor: 10),
+    setUpFunction: { blackHole((unabridgedLorem, loremIpsum)) }),
 ]
 
 let numbersAndSymbols = Array("0123456789`~!@#$%^&*()+=_-\"'?/<,>.\\{}'")
 let alphabets = Array("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
-let alphabetsReversed = Array("ZYXWVUTSRQPONMLKJIHGFEDCBAzyxwvutsrqponmlkjihgfedcba")
+let alphabetsReversed = Array(alphabets.reversed())
 let longPangram = Array("This pangram contains four As, one B, two Cs, one D, thirty Es, six Fs, five Gs, seven Hs, eleven Is, one J, one K, two Ls, two Ms, eighteen Ns, fifteen Os, two Ps, one Q, five Rs, twenty-seven Ss, eighteen Ts, two Us, seven Vs, eight Ws, two Xs, three Ys, & one Z")
 let typingPangram = Array("The quick brown fox jumps over the lazy dog")
 let loremIpsum = Array("Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.")
 let unabridgedLorem = Array("Lorem ipsum, quia dolor sit amet consectetur adipisci[ng] velit, sed quia non-numquam [do] eius modi tempora inci[di]dunt, ut labore et dolore magnam aliqua.")
-let loremReverse = Array(".auqila angam erolod te erobal tu tnudidicni ropmet domsuie od des ,tile gnicsipida rutetcesnoc ,tema tis rolod muspi meroL")
+let loremReversed = Array(loremIpsum.reversed())
 
-
-@inline(never)
-public func run_DiffSame(_ N: Int) {
+@inline(never) func diff(_ N: Int, from older: [Character], to newer: [Character]) {
   if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
     for _ in 1...N {
-      let _ = longPangram.difference(from: longPangram)
-    }
-  }
-}
-
-@inline(never)
-public func run_DiffPangramToAlphabet(_ N: Int) {
-  if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
-    for _ in 1...N {
-      let _ = longPangram.difference(from: alphabets)
-    }
-  }
-}
-
-@inline(never)
-public func run_DiffPangrams(_ N: Int) {
-  if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
-    for _ in 1...N {
-      let _ = longPangram.difference(from: typingPangram)
-    }
-  }
-}
-
-@inline(never)
-public func run_DiffReversedAlphabets(_ N: Int) {
-  if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
-    for _ in 1...N {
-      let _ = alphabets.difference(from: alphabetsReversed)
-    }
-  }
-}
-
-@inline(never)
-public func run_DiffReversedLorem(_ N: Int) {
-  if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
-    for _ in 1...N {
-      let _ = loremIpsum.difference(from: loremReverse)
-    }
-  }
-}
-
-@inline(never)
-public func run_DiffDisparate(_ N: Int) {
-  if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
-    for _ in 1...N {
-      let _ = alphabets.difference(from: numbersAndSymbols)
-    }
-  }
-}
-
-@inline(never)
-public func run_DiffSimilar(_ N: Int) {
-  if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
-    for _ in 1...N {
-      let _ = loremIpsum.difference(from: unabridgedLorem)
+      blackHole(newer.difference(from: older))
     }
   }
 }

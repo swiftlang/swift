@@ -213,7 +213,7 @@ SourceRange PatternEntryDeclScope::getChildlessSourceRange() const {
 }
 
 SourceRange PatternEntryInitializerScope::getChildlessSourceRange() const {
-  return getPatternEntry().getInitAsWritten()->getSourceRange();
+  return getPatternEntry().getOriginalInit()->getSourceRange();
 }
 
 SourceRange PatternEntryUseScope::getChildlessSourceRange() const {

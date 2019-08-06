@@ -283,8 +283,8 @@ addGetterToReadOnlyDerivedProperty(VarDecl *property,
   auto getter =
     declareDerivedPropertyGetter(property, propertyContextType);
 
-  property->setAccessors(StorageImplInfo::getImmutableComputed(),
-                         SourceLoc(), {getter}, SourceLoc());
+  property->setImplInfo(StorageImplInfo::getImmutableComputed());
+  property->setAccessors(SourceLoc(), {getter}, SourceLoc());
 
   return getter;
 }
@@ -309,6 +309,7 @@ DerivedConformance::declareDerivedPropertyGetter(VarDecl *property,
     TypeLoc::withoutLoc(propertyInterfaceType), parentDC);
   getterDecl->setImplicit();
   getterDecl->setStatic(isStatic);
+  getterDecl->setIsTransparent(false);
 
   // Compute the interface type of the getter.
   if (auto env = parentDC->getGenericEnvironmentOfContext())
@@ -331,7 +332,7 @@ DerivedConformance::declareDerivedProperty(Identifier name,
   auto &C = TC.Context;
   auto parentDC = getConformanceContext();
 
-  VarDecl *propDecl = new (C) VarDecl(/*IsStatic*/isStatic, VarDecl::Specifier::Var,
+  VarDecl *propDecl = new (C) VarDecl(/*IsStatic*/isStatic, VarDecl::Introducer::Var,
                                       /*IsCaptureList*/false, SourceLoc(), name,
                                       parentDC);
   propDecl->setImplicit();

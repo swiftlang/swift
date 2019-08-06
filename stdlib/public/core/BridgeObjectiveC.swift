@@ -16,7 +16,7 @@
 /// or NSDictionary will be the result of calling `_bridgeToObjectiveC`
 /// on each element of the source container.
 public protocol _ObjectiveCBridgeable {
-  associatedtype _ObjectiveCType : AnyObject
+  associatedtype _ObjectiveCType: AnyObject
 
   /// Convert `self` to Objective-C.
   func _bridgeToObjectiveC() -> _ObjectiveCType

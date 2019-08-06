@@ -1876,7 +1876,7 @@ public:
       if (auto *baseIOT = E->getBase()->getType()->getAs<InOutType>()) {
         if (!baseIOT->getObjectType()->is<ArchetypeType>()) {
           auto *VD = dyn_cast<VarDecl>(E->getMember().getDecl());
-          if (!VD || VD->getAllAccessors().empty()) {
+          if (!VD || !VD->requiresOpaqueAccessors()) {
             Out << "member_ref_expr on value of inout type\n";
             E->dump(Out);
             Out << "\n";
@@ -2390,50 +2390,50 @@ public:
     void verifyChecked(AbstractStorageDecl *ASD) {
       if (ASD->hasAccess() && ASD->isSettable(nullptr)) {
         auto setterAccess = ASD->getSetterFormalAccess();
-        if (ASD->getSetter() &&
-            ASD->getSetter()->getFormalAccess() != setterAccess) {
+        auto *setter = ASD->getAccessor(AccessorKind::Set);
+        if (setter && setter->getFormalAccess() != setterAccess) {
           Out << "AbstractStorageDecl's setter access is out of sync"
                  " with the access actually on the setter\n";
           abort();
         }
       }
 
-      if (auto getter = ASD->getGetter()) {
+      if (auto getter = ASD->getAccessor(AccessorKind::Get)) {
         if (getter->isMutating() != ASD->isGetterMutating()) {
           Out << "AbstractStorageDecl::isGetterMutating is out of sync"
                  " with whether the getter is actually mutating\n";
           abort();
         }
       }
-      if (auto setter = ASD->getSetter()) {
+      if (auto setter = ASD->getAccessor(AccessorKind::Set)) {
         if (setter->isMutating() != ASD->isSetterMutating()) {
           Out << "AbstractStorageDecl::isSetterMutating is out of sync"
                  " with whether the setter is actually mutating\n";
           abort();
         }
       }
-      if (auto addressor = ASD->getAddressor()) {
+      if (auto addressor = ASD->getAccessor(AccessorKind::Address)) {
         if (addressor->isMutating() != ASD->isGetterMutating()) {
           Out << "AbstractStorageDecl::isGetterMutating is out of sync"
                  " with whether immutable addressor is mutating";
           abort();
         }
       }
-      if (auto reader = ASD->getReadCoroutine()) {
+      if (auto reader = ASD->getAccessor(AccessorKind::Read)) {
         if (reader->isMutating() != ASD->isGetterMutating()) {
           Out << "AbstractStorageDecl::isGetterMutating is out of sync"
                  " with whether read accessor is mutating";
           abort();
         }
       }
-      if (auto addressor = ASD->getMutableAddressor()) {
+      if (auto addressor = ASD->getAccessor(AccessorKind::MutableAddress)) {
         if (addressor->isMutating() != ASD->isSetterMutating()) {
           Out << "AbstractStorageDecl::isSetterMutating is out of sync"
                  " with whether mutable addressor is mutating";
           abort();
         }
       }
-      if (auto modifier = ASD->getModifyCoroutine()) {
+      if (auto modifier = ASD->getAccessor(AccessorKind::Modify)) {
         if (modifier->isMutating() !=
             (ASD->isSetterMutating() || ASD->isGetterMutating())) {
           Out << "AbstractStorageDecl::isSetterMutating is out of sync"
@@ -2446,25 +2446,17 @@ public:
     }
 
     void verifyChecked(VarDecl *var) {
+      if (!var->hasInterfaceType())
+        return;
+
       PrettyStackTraceDecl debugStack("verifying VarDecl", var);
 
-      // Variables must have materializable type, unless they are parameters,
-      // in which case they must either have l-value type or be anonymous.
+      // Variables must have materializable type.
       if (!var->getInterfaceType()->isMaterializable()) {
-        if (!isa<ParamDecl>(var)) {
-          Out << "VarDecl has non-materializable type: ";
-          var->getType().print(Out);
-          Out << "\n";
-          abort();
-        }
-
-        if (!var->isInOut() && var->hasName()) {
-          Out << "ParamDecl may only have non-materializable tuple type "
-                 "when it is anonymous: ";
-          var->getType().print(Out);
-          Out << "\n";
-          abort();
-        }
+        Out << "VarDecl has non-materializable type: ";
+        var->getInterfaceType().print(Out);
+        Out << "\n";
+        abort();
       }
 
       // The fact that this is *directly* be a reference storage type
@@ -2483,31 +2475,25 @@ public:
       }
 
       Type typeForAccessors = var->getValueInterfaceType();
-      if (!var->getDeclContext()->contextHasLazyGenericEnvironment()) {
-        typeForAccessors =
-            var->getDeclContext()->mapTypeIntoContext(typeForAccessors);
-        if (const FuncDecl *getter = var->getGetter()) {
-          if (getter->getParameters()->size() != 0) {
-            Out << "property getter has parameters\n";
+      if (const FuncDecl *getter = var->getAccessor(AccessorKind::Get)) {
+        if (getter->getParameters()->size() != 0) {
+          Out << "property getter has parameters\n";
+          abort();
+        }
+        if (getter->hasInterfaceType()) {
+          Type getterResultType = getter->getResultInterfaceType();
+          if (!getterResultType->isEqual(typeForAccessors)) {
+            Out << "property and getter have mismatched types: '";
+            typeForAccessors.print(Out);
+            Out << "' vs. '";
+            getterResultType.print(Out);
+            Out << "'\n";
             abort();
-          }
-          if (getter->hasInterfaceType()) {
-            Type getterResultType = getter->getResultInterfaceType();
-            getterResultType =
-                var->getDeclContext()->mapTypeIntoContext(getterResultType);
-            if (!getterResultType->isEqual(typeForAccessors)) {
-              Out << "property and getter have mismatched types: '";
-              typeForAccessors.print(Out);
-              Out << "' vs. '";
-              getterResultType.print(Out);
-              Out << "'\n";
-              abort();
-            }
           }
         }
       }
 
-      if (const FuncDecl *setter = var->getSetter()) {
+      if (const FuncDecl *setter = var->getAccessor(AccessorKind::Set)) {
         if (setter->hasInterfaceType()) {
           if (!setter->getResultInterfaceType()->isVoid()) {
             Out << "property setter has non-Void result type\n";
@@ -2523,15 +2509,12 @@ public:
           }
           const ParamDecl *param = setter->getParameters()->get(0);
           Type paramType = param->getInterfaceType();
-          if (!var->getDeclContext()->contextHasLazyGenericEnvironment()) {
-            paramType = var->getDeclContext()->mapTypeIntoContext(paramType);
-            if (!paramType->isEqual(typeForAccessors)) {
-              Out << "property and setter param have mismatched types:\n";
-              typeForAccessors.dump(Out, 2);
-              Out << "vs.\n";
-              paramType.dump(Out, 2);
-              abort();
-            }
+          if (!paramType->isEqual(typeForAccessors)) {
+            Out << "property and setter param have mismatched types:\n";
+            typeForAccessors.dump(Out, 2);
+            Out << "vs.\n";
+            paramType.dump(Out, 2);
+            abort();
           }
         }
       }
@@ -2874,6 +2857,16 @@ public:
       }
 
       verifyParsedBase(UED);
+    }
+
+    void verifyParsed(EnumCaseDecl *D) {
+      PrettyStackTraceDecl debugStack("verifying EnumCaseDecl", D);
+      if (!D->getAttrs().isEmpty()) {
+        Out << "EnumCaseDecl should not have attributes";
+        abort();
+      }
+
+      verifyParsedBase(D);
     }
 
     void verifyParsed(AbstractFunctionDecl *AFD) {
@@ -3644,8 +3637,8 @@ public:
 
     void checkSourceRanges(Decl *D) {
       PrettyStackTraceDecl debugStack("verifying ranges", D);
-
-      if (!D->getSourceRange().isValid()) {
+      const auto SR = D->getSourceRange();
+      if (!SR.isValid()) {
         // We don't care about source ranges on implicitly-generated
         // decls.
         if (D->isImplicit())
@@ -3656,8 +3649,16 @@ public:
         Out << "\n";
         abort();
       }
-      checkSourceRanges(D->getSourceRange(), Parent,
-                        [&]{ D->print(Out); });
+      // ASTScope lookup depends on Decls having correct ordering.
+      // Move the order check to isGoodSourceRange after extending
+      // the invariant to Exprs, etc., per rdar://53637494
+      if (Ctx.SourceMgr.isBeforeInBuffer(SR.End, SR.Start)) {
+        Out << "backwards source range for decl: ";
+        D->print(Out);
+        Out << "\n";
+        abort();
+      }
+      checkSourceRanges(SR, Parent, [&] { D->print(Out); });
     }
 
     /// Verify that the given source ranges is contained within the

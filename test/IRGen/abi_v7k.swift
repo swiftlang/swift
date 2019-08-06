@@ -144,9 +144,11 @@ func testClike8(t: Int, x: CLike8) -> Int {
 // CHECK: br i1
 // CHECK: switch i64 [[ID:%[0-9]+]]
 // CHECK: [[FIRST:%[0-9]+]] = zext i32 %0 to i64
+// CHECK: [[F1:%[0-9]+]] = and i64 [[FIRST]], 4294967295
 // CHECK: [[SECOND:%[0-9]+]] = zext i32 %1 to i64
 // CHECK: [[TEMP:%[0-9]+]] = shl i64 [[SECOND]], 32
-// CHECK: [[RESULT:%[0-9]+]] = or i64 [[FIRST]], [[TEMP]]
+// CHECK: [[T1:%[0-9]+]] = and i64 [[TEMP]], -4294967296
+// CHECK: [[RESULT:%[0-9]+]] = or i64 [[F1]], [[T1]]
 // CHECK: bitcast i64 [[RESULT]] to double
 // CHECK: phi double [ 0.000000e+00, {{.*}} ]
 // V7K-LABEL: _$s8test_v7k0A7SingleP
@@ -168,9 +170,11 @@ func testSingleP(x: SinglePayload) -> Double {
 
 // CHECK-LABEL: define hidden swiftcc double @"$s8test_v7k0A6MultiP{{.*}}"(i32, i32, i8)
 // CHECK: [[FIRST:%[0-9]+]] = zext i32 %0 to i64
+// CHECK: [[F1:%[0-9]+]] = and i64 [[FIRST]], 4294967295
 // CHECK: [[SECOND:%[0-9]+]] = zext i32 %1 to i64
 // CHECK: [[TEMP:%[0-9]+]] = shl i64 [[SECOND]], 32
-// CHECK: [[RESULT:%[0-9]+]] = or i64 [[FIRST]], [[TEMP]]
+// CHECK: [[T1:%[0-9]+]] = and i64 [[TEMP]], -4294967296
+// CHECK: [[RESULT:%[0-9]+]] = or i64 [[F1]], [[T1]]
 // CHECK: bitcast i64 [[RESULT]] to double
 // CHECK: sitofp i32 {{.*}} to double 
 // CHECK: phi double [ 0.000000e+00, {{.*}} ]

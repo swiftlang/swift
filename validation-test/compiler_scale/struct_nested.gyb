@@ -1,0 +1,10 @@
+// RUN: %scale-test --sum-multi --begin 5 --end 16 --step 5 --select NumDeclsValidated %s
+// REQUIRES: OS=macosx
+// REQUIRES: asserts
+
+struct Struct${N} {
+% if int(N) > 1:
+    var next: Struct${int(N)-1}.Nested? = nil
+% end
+    struct Nested {}
+}

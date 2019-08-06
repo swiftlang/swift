@@ -248,7 +248,9 @@ _Block_release(void) { }\n")
     if("${SDK}" STREQUAL "IOS" OR "${SDK}" STREQUAL "TVOS" OR "${SDK}" STREQUAL "WATCHOS")
       # These are supported testing SDKs, but their implementation of
       # `command_upload_stdlib` is hidden.
-    elseif("${SDK}" STREQUAL "ANDROID")
+    elseif("${SDK}" STREQUAL "ANDROID" AND NOT "${SWIFT_HOST_VARIANT}" STREQUAL "android")
+      # This adb setup is only needed when cross-compiling for Android, so the
+      # second check above makes sure we don't bother when the host is Android.
       if("${SWIFT_ANDROID_DEPLOY_DEVICE_PATH}" STREQUAL "")
         message(FATAL_ERROR
             "When running Android host tests, you must specify the directory on the device "

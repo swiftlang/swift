@@ -1538,8 +1538,6 @@ void CallEmission::emitToUnmappedExplosion(Explosion &out) {
   // for methods that have covariant ABI-compatible overrides.
   auto expectedNativeResultType = nativeSchema.getExpandedType(IGF.IGM);
   if (result->getType() != expectedNativeResultType) {
-    assert(origFnType->getLanguage() == SILFunctionLanguage::C ||
-           origFnType->getRepresentation() == SILFunctionTypeRepresentation::Method);
     result =
         IGF.coerceValue(result, expectedNativeResultType, IGF.IGM.DataLayout);
   }

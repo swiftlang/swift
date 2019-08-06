@@ -187,7 +187,7 @@ static VarDecl *indexedVarDecl(char prefixChar, int index, Type type,
   auto indexStr = C.AllocateCopy(indexVal);
   auto indexStrRef = StringRef(indexStr.data(), indexStr.size());
 
-  auto varDecl = new (C) VarDecl(/*IsStatic*/false, VarDecl::Specifier::Let,
+  auto varDecl = new (C) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Let,
                                  /*IsCaptureList*/true, SourceLoc(),
                                  C.getIdentifier(indexStrRef),
                                  varContext);
@@ -275,7 +275,7 @@ static DeclRefExpr *convertEnumToIndex(SmallVectorImpl<ASTNode> &stmts,
   Type enumType = enumVarDecl->getType();
   Type intType = C.getIntDecl()->getDeclaredType();
 
-  auto indexVar = new (C) VarDecl(/*IsStatic*/false, VarDecl::Specifier::Var,
+  auto indexVar = new (C) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Var,
                                   /*IsCaptureList*/false, SourceLoc(),
                                   C.getIdentifier(indexName),
                                   funcDecl);
@@ -505,7 +505,7 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
       for (unsigned i : indices(lhsPayloadVars)) {
         auto *vOld = lhsPayloadVars[i];
         auto *vNew = new (C) VarDecl(
-            /*IsStatic*/ false, vOld->getSpecifier(), false /*IsCaptureList*/,
+            /*IsStatic*/ false, vOld->getIntroducer(), false /*IsCaptureList*/,
             vOld->getNameLoc(), vOld->getName(), vOld->getDeclContext());
         vNew->setHasNonPatternBindingInit();
         vNew->setImplicit();
@@ -683,7 +683,7 @@ deriveEquatable_eq(
   auto selfIfaceTy = parentDC->getDeclaredInterfaceType();
 
   auto getParamDecl = [&](StringRef s) -> ParamDecl * {
-    auto *param = new (C) ParamDecl(VarDecl::Specifier::Default, SourceLoc(),
+    auto *param = new (C) ParamDecl(ParamDecl::Specifier::Default, SourceLoc(),
                                     SourceLoc(), Identifier(), SourceLoc(),
                                     C.getIdentifier(s), parentDC);
     param->setInterfaceType(selfIfaceTy);
@@ -849,7 +849,7 @@ deriveHashable_hashInto(
   Type hasherType = hasherDecl->getDeclaredType();
 
   // Params: self (implicit), hasher
-  auto *hasherParamDecl = new (C) ParamDecl(VarDecl::Specifier::InOut,
+  auto *hasherParamDecl = new (C) ParamDecl(ParamDecl::Specifier::InOut,
                                             SourceLoc(),
                                             SourceLoc(), C.Id_into, SourceLoc(),
                                             C.Id_hasher, parentDC);
@@ -1056,7 +1056,7 @@ deriveBodyHashable_enum_hasAssociatedValues_hashInto(
       for (unsigned i : indices(payloadVars)) {
         auto *vOld = payloadVars[i];
         auto *vNew = new (C) VarDecl(
-            /*IsStatic*/ false, vOld->getSpecifier(), false /*IsCaptureList*/,
+            /*IsStatic*/ false, vOld->getIntroducer(), false /*IsCaptureList*/,
             vOld->getNameLoc(), vOld->getName(), vOld->getDeclContext());
         vNew->setHasNonPatternBindingInit();
         vNew->setImplicit();
@@ -1178,7 +1178,7 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
   }
 
   VarDecl *hashValueDecl =
-    new (C) VarDecl(/*IsStatic*/false, VarDecl::Specifier::Var,
+    new (C) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Var,
                     /*IsCaptureList*/false, SourceLoc(),
                     C.Id_hashValue, parentDC);
   hashValueDecl->setType(intType);
@@ -1194,6 +1194,7 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
       TypeLoc::withoutLoc(intType), parentDC);
   getterDecl->setImplicit();
   getterDecl->setBodySynthesizer(&deriveBodyHashable_hashValue);
+  getterDecl->setIsTransparent(false);
 
   // Compute the interface type of hashValue().
   if (auto env = parentDC->getGenericEnvironmentOfContext())
@@ -1208,8 +1209,8 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
   hashValueDecl->setImplicit();
   hashValueDecl->setInterfaceType(intType);
   hashValueDecl->setValidationToChecked();
-  hashValueDecl->setAccessors(StorageImplInfo::getImmutableComputed(),
-                              SourceLoc(), {getterDecl}, SourceLoc());
+  hashValueDecl->setImplInfo(StorageImplInfo::getImmutableComputed());
+  hashValueDecl->setAccessors(SourceLoc(), {getterDecl}, SourceLoc());
   hashValueDecl->copyFormalAccessFrom(derived.Nominal,
                                       /*sourceIsParentContext*/ true);
 
@@ -1224,7 +1225,7 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
   C.addSynthesizedDecl(hashValueDecl);
   C.addSynthesizedDecl(getterDecl);
 
-  derived.addMembersToConformanceContext({getterDecl, hashValueDecl, patDecl});
+  derived.addMembersToConformanceContext({hashValueDecl, patDecl});
   return hashValueDecl;
 }
 

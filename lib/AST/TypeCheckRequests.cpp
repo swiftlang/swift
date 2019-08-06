@@ -9,12 +9,12 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/PropertyWrappers.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/Types.h"
@@ -183,6 +183,82 @@ Optional<bool> IsObjCRequest::getCachedResult() const {
 void IsObjCRequest::cacheResult(bool value) const {
   auto decl = std::get<0>(getStorage());
   decl->setIsObjC(value);
+}
+
+//----------------------------------------------------------------------------//
+// requiresClass computation.
+//----------------------------------------------------------------------------//
+
+void ProtocolRequiresClassRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  auto decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::circular_protocol_def, decl->getName());
+}
+
+void ProtocolRequiresClassRequest::noteCycleStep(DiagnosticEngine &diags) const {
+  auto requirement = std::get<0>(getStorage());
+  diags.diagnose(requirement, diag::kind_declname_declared_here,
+                 DescriptiveDeclKind::Protocol,
+                 requirement->getName());
+}
+
+Optional<bool> ProtocolRequiresClassRequest::getCachedResult() const {
+  auto decl = std::get<0>(getStorage());
+  return decl->getCachedRequiresClass();
+}
+
+void ProtocolRequiresClassRequest::cacheResult(bool value) const {
+  auto decl = std::get<0>(getStorage());
+  decl->setCachedRequiresClass(value);
+}
+
+//----------------------------------------------------------------------------//
+// existentialConformsToSelf computation.
+//----------------------------------------------------------------------------//
+
+void ExistentialConformsToSelfRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  auto decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::circular_protocol_def, decl->getName());
+}
+
+void ExistentialConformsToSelfRequest::noteCycleStep(DiagnosticEngine &diags) const {
+  auto requirement = std::get<0>(getStorage());
+  diags.diagnose(requirement, diag::kind_declname_declared_here,
+                 DescriptiveDeclKind::Protocol, requirement->getName());
+}
+
+Optional<bool> ExistentialConformsToSelfRequest::getCachedResult() const {
+  auto decl = std::get<0>(getStorage());
+  return decl->getCachedExistentialConformsToSelf();
+}
+
+void ExistentialConformsToSelfRequest::cacheResult(bool value) const {
+  auto decl = std::get<0>(getStorage());
+  decl->setCachedExistentialConformsToSelf(value);
+}
+
+//----------------------------------------------------------------------------//
+// existentialTypeSupported computation.
+//----------------------------------------------------------------------------//
+
+void ExistentialTypeSupportedRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  auto decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::circular_protocol_def, decl->getName());
+}
+
+void ExistentialTypeSupportedRequest::noteCycleStep(DiagnosticEngine &diags) const {
+  auto requirement = std::get<0>(getStorage());
+  diags.diagnose(requirement, diag::kind_declname_declared_here,
+                 DescriptiveDeclKind::Protocol, requirement->getName());
+}
+
+Optional<bool> ExistentialTypeSupportedRequest::getCachedResult() const {
+  auto decl = std::get<0>(getStorage());
+  return decl->getCachedExistentialTypeSupported();
+}
+
+void ExistentialTypeSupportedRequest::cacheResult(bool value) const {
+  auto decl = std::get<0>(getStorage());
+  decl->setCachedExistentialTypeSupported(value);
 }
 
 //----------------------------------------------------------------------------//
@@ -487,6 +563,11 @@ bool PropertyWrapperBackingPropertyInfoRequest::isCached() const {
   return !var->getAttrs().isEmpty();
 }
 
+bool PropertyWrapperMutabilityRequest::isCached() const {
+  auto var = std::get<0>(getStorage());
+  return !var->getAttrs().isEmpty();
+}
+
 void swift::simple_display(
     llvm::raw_ostream &out, const PropertyWrapperTypeInfo &propertyWrapper) {
   out << "{ ";
@@ -509,6 +590,34 @@ void swift::simple_display(
   if (backingInfo.backingVar)
     backingInfo.backingVar->dumpRef(out);
   out << " }";
+}
+
+void swift::simple_display(
+  llvm::raw_ostream &out, const CtorInitializerKind initKind) {
+  out << "{ ";
+  switch (initKind) {
+  case CtorInitializerKind::Designated:
+    out << "designated"; break;
+  case CtorInitializerKind::Convenience:
+    out << "convenience"; break;
+  case CtorInitializerKind::ConvenienceFactory:
+    out << "convenience_factory"; break;
+  case CtorInitializerKind::Factory:
+    out << "factory"; break;
+  }
+  out << " }";
+}
+
+void swift::simple_display(llvm::raw_ostream &os, PropertyWrapperMutability m) {
+  static const char *names[] =
+    {"is nonmutating", "is mutating", "doesn't exist"};
+  
+  os << "getter " << names[m.Getter] << ", setter " << names[m.Setter];
+}
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           const ResilienceExpansion &value) {
+  out << value;
 }
 
 //----------------------------------------------------------------------------//
@@ -582,4 +691,102 @@ OpaqueReadOwnershipRequest::getCachedResult() const {
 void OpaqueReadOwnershipRequest::cacheResult(OpaqueReadOwnership value) const {
   auto *storage = std::get<0>(getStorage());
   storage->setOpaqueReadOwnership(value);
+}
+
+//----------------------------------------------------------------------------//
+// StorageImplInfoRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<StorageImplInfo>
+StorageImplInfoRequest::getCachedResult() const {
+  auto *storage = std::get<0>(getStorage());
+  if (storage->LazySemanticInfo.ImplInfoComputed)
+    return storage->ImplInfo;
+  return None;
+}
+
+void StorageImplInfoRequest::cacheResult(StorageImplInfo value) const {
+  auto *storage = std::get<0>(getStorage());
+  storage->setImplInfo(value);
+}
+
+//----------------------------------------------------------------------------//
+// RequiresOpaqueAccessorsRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<bool>
+RequiresOpaqueAccessorsRequest::getCachedResult() const {
+  auto *storage = std::get<0>(getStorage());
+  if (storage->LazySemanticInfo.RequiresOpaqueAccessorsComputed)
+    return storage->LazySemanticInfo.RequiresOpaqueAccessors;
+  return None;
+}
+
+void RequiresOpaqueAccessorsRequest::cacheResult(bool value) const {
+  auto *storage = std::get<0>(getStorage());
+  storage->LazySemanticInfo.RequiresOpaqueAccessorsComputed = 1;
+  storage->LazySemanticInfo.RequiresOpaqueAccessors = value;
+}
+
+//----------------------------------------------------------------------------//
+// RequiresOpaqueModifyCoroutineRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<bool>
+RequiresOpaqueModifyCoroutineRequest::getCachedResult() const {
+  auto *storage = std::get<0>(getStorage());
+  if (storage->LazySemanticInfo.RequiresOpaqueModifyCoroutineComputed)
+    return storage->LazySemanticInfo.RequiresOpaqueModifyCoroutine;
+  return None;
+}
+
+void RequiresOpaqueModifyCoroutineRequest::cacheResult(bool value) const {
+  auto *storage = std::get<0>(getStorage());
+  storage->LazySemanticInfo.RequiresOpaqueModifyCoroutineComputed = 1;
+  storage->LazySemanticInfo.RequiresOpaqueModifyCoroutine = value;
+}
+
+//----------------------------------------------------------------------------//
+// IsAccessorTransparentRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<bool>
+IsAccessorTransparentRequest::getCachedResult() const {
+  auto *accessor = std::get<0>(getStorage());
+  return accessor->getCachedIsTransparent();
+}
+
+void IsAccessorTransparentRequest::cacheResult(bool value) const {
+  auto *accessor = std::get<0>(getStorage());
+  accessor->setIsTransparent(value);
+
+  // For interface printing, API diff, etc.
+  if (value) {
+    auto &attrs = accessor->getAttrs();
+    if (!attrs.hasAttribute<TransparentAttr>()) {
+      auto &ctx = accessor->getASTContext();
+      attrs.add(new (ctx) TransparentAttr(/*IsImplicit=*/true));
+    }
+  }
+}
+
+//----------------------------------------------------------------------------//
+// SynthesizeAccessorRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<AccessorDecl *>
+SynthesizeAccessorRequest::getCachedResult() const {
+  auto *storage = std::get<0>(getStorage());
+  auto kind = std::get<1>(getStorage());
+  auto *accessor = storage->getAccessor(kind);
+  if (accessor)
+    return accessor;
+  return None;
+}
+
+void SynthesizeAccessorRequest::cacheResult(AccessorDecl *accessor) const {
+  auto *storage = std::get<0>(getStorage());
+  auto kind = std::get<1>(getStorage());
+
+  storage->setSynthesizedAccessor(kind, accessor);
 }

@@ -185,6 +185,13 @@ protected:
   Optional<FunctionArgApplyInfo>
   getFunctionArgApplyInfo(ConstraintLocator *locator) const;
 
+  /// \returns A new type with all of the type variables associated with
+  /// generic parameters substituted back into being generic parameter type.
+  Type restoreGenericParameters(
+      Type type,
+      llvm::function_ref<void(GenericTypeParamType *, Type)> substitution =
+          [](GenericTypeParamType *, Type) {});
+
 private:
   /// Compute anchor expression associated with current diagnostic.
   std::pair<Expr *, bool> computeAnchor() const;
@@ -215,12 +222,17 @@ protected:
   /// to diagnose failures related to arguments.
   const ApplyExpr *Apply = nullptr;
 
+  /// Types associated with requirement constraint this
+  /// failure originates from.
+  Type LHS, RHS;
+
 public:
   RequirementFailure(ConstraintSystem &cs, Expr *expr, RequirementKind kind,
-                     ConstraintLocator *locator)
+                     Type lhs, Type rhs, ConstraintLocator *locator)
       : FailureDiagnostic(expr, cs, locator),
         Conformance(getConformanceForConditionalReq(locator)),
-        Signature(getSignature(locator)), AffectedDecl(getDeclRef()) {
+        Signature(getSignature(locator)), AffectedDecl(getDeclRef()),
+        LHS(resolveType(lhs)), RHS(resolveType(rhs)) {
     assert(locator);
     assert(isConditional() || Signature);
     assert(AffectedDecl);
@@ -260,8 +272,8 @@ public:
   /// Generic requirement associated with the failure.
   const Requirement &getRequirement() const;
 
-  virtual Type getLHS() const = 0;
-  virtual Type getRHS() const = 0;
+  Type getLHS() const { return LHS; }
+  Type getRHS() const { return RHS; }
 
   bool diagnoseAsError() override;
   bool diagnoseAsNote() override;
@@ -351,26 +363,14 @@ private:
 ///   foo(S())
 /// ```
 class MissingConformanceFailure final : public RequirementFailure {
-  Type NonConformingType;
-  Type ProtocolType;
-
 public:
   MissingConformanceFailure(Expr *expr, ConstraintSystem &cs,
                             ConstraintLocator *locator,
                             std::pair<Type, Type> conformance)
-      : RequirementFailure(cs, expr, RequirementKind::Conformance, locator),
-        NonConformingType(conformance.first), ProtocolType(conformance.second) {
-  }
+      : RequirementFailure(cs, expr, RequirementKind::Conformance,
+                           conformance.first, conformance.second, locator) {}
 
   bool diagnoseAsError() override;
-
-private:
-  /// The type which was expected, by one of the generic requirements,
-  /// to conform to associated protocol.
-  Type getLHS() const override { return NonConformingType; }
-
-  /// The protocol generic requirement expected associated type to conform to.
-  Type getRHS() const override { return ProtocolType; }
 
 protected:
   DiagOnDecl getDiagnosticOnDecl() const override {
@@ -441,16 +441,11 @@ private:
 ///
 /// `S.T` is not the same type as `Int`, which is required by `foo`.
 class SameTypeRequirementFailure final : public RequirementFailure {
-  Type LHS, RHS;
-
 public:
   SameTypeRequirementFailure(Expr *expr, ConstraintSystem &cs, Type lhs,
                              Type rhs, ConstraintLocator *locator)
-      : RequirementFailure(cs, expr, RequirementKind::SameType, locator),
-        LHS(lhs), RHS(rhs) {}
-
-  Type getLHS() const override { return LHS; }
-  Type getRHS() const override { return RHS; }
+      : RequirementFailure(cs, expr, RequirementKind::SameType, lhs, rhs,
+                           locator) {}
 
 protected:
   DiagOnDecl getDiagnosticOnDecl() const override {
@@ -480,16 +475,11 @@ protected:
 ///
 /// `A` is not the superclass of `B`, which is required by `foo<T>`.
 class SuperclassRequirementFailure final : public RequirementFailure {
-  Type LHS, RHS;
-
 public:
   SuperclassRequirementFailure(Expr *expr, ConstraintSystem &cs, Type lhs,
                                Type rhs, ConstraintLocator *locator)
-      : RequirementFailure(cs, expr, RequirementKind::Superclass, locator),
-        LHS(lhs), RHS(rhs) {}
-
-  Type getLHS() const override { return LHS; }
-  Type getRHS() const override { return RHS; }
+      : RequirementFailure(cs, expr, RequirementKind::Superclass, lhs, rhs,
+                           locator) {}
 
 protected:
   DiagOnDecl getDiagnosticOnDecl() const override {
@@ -522,6 +512,7 @@ public:
       : FailureDiagnostic(root, cs, locator), CorrectLabels(labels) {}
 
   bool diagnoseAsError() override;
+  bool diagnoseAsNote() override;
 };
 
 /// Diagnose errors related to converting function type which
@@ -759,12 +750,47 @@ private:
   void tryComputedPropertyFixIts(Expr *expr) const;
 };
 
+/// Diagnose mismatches relating to tuple destructuring.
+class TupleContextualFailure final : public ContextualFailure {
+public:
+  TupleContextualFailure(Expr *root, ConstraintSystem &cs, Type lhs, Type rhs,
+                         ConstraintLocator *locator)
+      : ContextualFailure(root, cs, lhs, rhs, locator) {}
+
+  bool diagnoseAsError() override;
+
+  bool isNumElementsMismatch() const {
+    auto lhsTy = getFromType()->castTo<TupleType>();
+    auto rhsTy = getToType()->castTo<TupleType>();
+    assert(lhsTy && rhsTy);
+    return lhsTy->getNumElements() != rhsTy->getNumElements();
+  }
+};
+
 /// Diagnose situations when @autoclosure argument is passed to @autoclosure
 /// parameter directly without calling it first.
 class AutoClosureForwardingFailure final : public FailureDiagnostic {
 public:
   AutoClosureForwardingFailure(ConstraintSystem &cs, ConstraintLocator *locator)
       : FailureDiagnostic(nullptr, cs, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose invalid pointer conversions for an autoclosure result type.
+///
+/// \code
+/// func foo(_ x: @autoclosure () -> UnsafePointer<Int>) {}
+///
+/// var i = 0
+/// foo(&i) // Invalid conversion to UnsafePointer
+/// \endcode
+class AutoClosurePointerConversionFailure final : public ContextualFailure {
+public:
+  AutoClosurePointerConversionFailure(Expr *root, ConstraintSystem &cs,
+                                      Type pointeeType, Type pointerType,
+                                      ConstraintLocator *locator)
+      : ContextualFailure(root, cs, pointeeType, pointerType, locator) {}
 
   bool diagnoseAsError() override;
 };
@@ -1077,6 +1103,21 @@ private:
   /// If missing arguments come from trailing closure,
   /// let's produce tailored diagnostics.
   bool diagnoseTrailingClosure(ClosureExpr *closure);
+};
+
+class DefaultArgumentTypeMismatch final : public FailureDiagnostic {
+  using Param = AnyFunctionType::Param;
+
+  Type FromType;
+  Type ToType;
+
+public:
+  DefaultArgumentTypeMismatch(Expr *root, ConstraintSystem &cs, Type fromType,
+                              Type toType, ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator), FromType(fromType),
+        ToType(toType) {}
+
+  bool diagnoseAsError() override;
 };
 
 class OutOfOrderArgumentFailure final : public FailureDiagnostic {
@@ -1413,7 +1454,9 @@ public:
 
   DeclContext *getDeclContext() const {
     auto *GP = Parameters.front();
-    return GP->getDecl()->getDeclContext();
+    auto *decl = GP->getDecl();
+
+    return decl ? decl->getDeclContext() : nullptr;
   }
 
   bool diagnoseAsError() override;
@@ -1455,6 +1498,25 @@ public:
 
   bool diagnoseAsError() override;
   bool diagnoseAsNote() override;
+};
+
+/// Diagnose situation when a single "tuple" parameter is given N arguments e.g.
+///
+/// ```swift
+/// func foo<T>(_ x: (T, Bool)) {}
+/// foo(1, false) // foo exptects a single argument of tuple type `(1, false)`
+/// ```
+class InvalidTupleSplatWithSingleParameterFailure final
+    : public FailureDiagnostic {
+  Type ParamType;
+
+public:
+  InvalidTupleSplatWithSingleParameterFailure(Expr *root, ConstraintSystem &cs,
+                                              Type paramTy,
+                                              ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator), ParamType(paramTy) {}
+
+  bool diagnoseAsError() override;
 };
 
 /// Provides information about the application of a function argument to a

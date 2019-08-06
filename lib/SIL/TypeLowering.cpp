@@ -98,14 +98,15 @@ CaptureKind TypeConverter::getDeclCaptureKind(CapturedValue capture,
   // If this is a non-address-only stored 'let' constant, we can capture it
   // by value.  If it is address-only, then we can't load it, so capture it
   // by its address (like a var) instead.
-  if (var->isImmutable() &&
+  if (!var->supportsMutation() &&
       (!SILModuleConventions(M).useLoweredAddresses() ||
        !getTypeLowering(var->getType(), expansion).isAddressOnly()))
     return CaptureKind::Constant;
 
   // In-out parameters are captured by address.
-  if (var->isInOut()) {
-    return CaptureKind::StorageAddress;
+  if (auto *param = dyn_cast<ParamDecl>(var)) {
+    if (param->isInOut())
+      return CaptureKind::StorageAddress;
   }
 
   // Reference storage types can appear in a capture list, which means
@@ -119,8 +120,9 @@ CaptureKind TypeConverter::getDeclCaptureKind(CapturedValue capture,
 
   // If we're capturing into a non-escaping closure, we can generally just
   // capture the address of the value as no-escape.
-  return capture.isNoEscape() ?
-    CaptureKind::StorageAddress : CaptureKind::Box;
+  return (capture.isNoEscape()
+          ? CaptureKind::StorageAddress
+          : CaptureKind::Box);
 }
 
 using RecursiveProperties = TypeLowering::RecursiveProperties;
@@ -237,7 +239,7 @@ namespace {
       llvm_unreachable("shouldn't get an inout type here");
     }
     RetTy visitErrorType(CanErrorType type) {
-      llvm_unreachable("shouldn't get an error type here");
+      return asImpl().handleTrivial(type);
     }
 
     // Dependent types should be contextualized before visiting.
@@ -501,9 +503,6 @@ namespace {
 static RecursiveProperties classifyType(CanType type, SILModule &M,
                                         CanGenericSignature sig,
                                         ResilienceExpansion expansion) {
-  assert(!type->hasError() &&
-         "Error types should not appear in type-checked AST");
-
   return TypeClassifier(M, sig, expansion).visit(type);
 }
 
@@ -1559,9 +1558,6 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
 
 CanType TypeConverter::computeLoweredRValueType(AbstractionPattern origType,
                                                 CanType substType) {
-  assert(!substType->hasError() &&
-         "Error types should not appear in type-checked AST");
-
   // AST function types are turned into SIL function types:
   //   - the type is uncurried as desired
   //   - types are turned into their unbridged equivalents, depending
@@ -2187,6 +2183,11 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
       // If the capture is of a computed property, grab the transitive captures
       // of its accessors.
       if (auto capturedVar = dyn_cast<VarDecl>(capture.getDecl())) {
+        auto collectAccessorCaptures = [&](AccessorKind kind) {
+          if (auto *accessor = capturedVar->getParsedAccessor(kind))
+            collectFunctionCaptures(accessor);
+        };
+
         if (!capture.isDirect()) {
           auto impl = capturedVar->getImplInfo();
 
@@ -2195,13 +2196,13 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
             // Will capture storage later.
             break;
           case ReadImplKind::Address:
-            collectFunctionCaptures(capturedVar->getAddressor());
+            collectAccessorCaptures(AccessorKind::Address);
             break;
           case ReadImplKind::Get:
-            collectFunctionCaptures(capturedVar->getGetter());
+            collectAccessorCaptures(AccessorKind::Get);
             break;
           case ReadImplKind::Read:
-            collectFunctionCaptures(capturedVar->getReadCoroutine());
+            collectAccessorCaptures(AccessorKind::Read);
             break;
           case ReadImplKind::Inherited:
             llvm_unreachable("inherited local variable?");
@@ -2212,14 +2213,17 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
           case WriteImplKind::Stored:
             break;
           case WriteImplKind::StoredWithObservers:
+            collectAccessorCaptures(AccessorKind::WillSet);
+            collectAccessorCaptures(AccessorKind::DidSet);
+            break;
           case WriteImplKind::Set:
-            collectFunctionCaptures(capturedVar->getSetter());
+            collectAccessorCaptures(AccessorKind::Set);
             break;
           case WriteImplKind::MutableAddress:
-            collectFunctionCaptures(capturedVar->getMutableAddressor());
+            collectAccessorCaptures(AccessorKind::MutableAddress);
             break;
           case WriteImplKind::Modify:
-            collectFunctionCaptures(capturedVar->getModifyCoroutine());
+            collectAccessorCaptures(AccessorKind::Modify);
             break;
           case WriteImplKind::InheritedWithObservers:
             llvm_unreachable("inherited local variable");
@@ -2233,10 +2237,10 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
             // We've already processed the read and write operations.
             break;
           case ReadWriteImplKind::MutableAddress:
-            collectFunctionCaptures(capturedVar->getMutableAddressor());
+            collectAccessorCaptures(AccessorKind::MutableAddress);
             break;
           case ReadWriteImplKind::Modify:
-            collectFunctionCaptures(capturedVar->getModifyCoroutine());
+            collectAccessorCaptures(AccessorKind::Modify);
             break;
           }
         }

@@ -52,6 +52,7 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
     case ApplyArgument:
     case ApplyFunction:
     case FunctionArgument:
+    case DefaultArgument:
     case FunctionResult:
     case OptionalPayload:
     case Member:
@@ -169,22 +170,22 @@ bool ConstraintLocator::isForKeyPathComponent() const {
   });
 }
 
-static bool isLastElement(const ConstraintLocator *locator,
-                          ConstraintLocator::PathElementKind expectedKind) {
-  auto path = locator->getPath();
+bool ConstraintLocator::isLastElement(
+    ConstraintLocator::PathElementKind expectedKind) const {
+  auto path = getPath();
   return !path.empty() && path.back().getKind() == expectedKind;
 }
 
 bool ConstraintLocator::isForGenericParameter() const {
-  return isLastElement(this, ConstraintLocator::GenericParameter);
+  return isLastElement(ConstraintLocator::GenericParameter);
 }
 
 bool ConstraintLocator::isForSequenceElementType() const {
-  return isLastElement(this, ConstraintLocator::SequenceElementType);
+  return isLastElement(ConstraintLocator::SequenceElementType);
 }
 
 bool ConstraintLocator::isForContextualType() const {
-  return isLastElement(this, ConstraintLocator::ContextualType);
+  return isLastElement(ConstraintLocator::ContextualType);
 }
 
 GenericTypeParamType *ConstraintLocator::getGenericParameter() const {
@@ -268,6 +269,10 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
 
     case FunctionArgument:
       out << "function argument";
+      break;
+
+    case DefaultArgument:
+      out << "default argument";
       break;
 
     case FunctionResult:

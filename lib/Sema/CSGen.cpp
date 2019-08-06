@@ -267,7 +267,8 @@ namespace {
 
       if (auto DRE = dyn_cast<DeclRefExpr>(expr)) {
         if (auto varDecl = dyn_cast<VarDecl>(DRE->getDecl())) {
-          if (varDecl->isAnonClosureParam()) {
+          if (isa<ParamDecl>(varDecl) &&
+              cast<ParamDecl>(varDecl)->isAnonClosureParam()) {
             LTI.anonClosureParams.push_back(DRE);
           } else if (CS.hasType(DRE)) {
             LTI.collectedTypes.insert(CS.getType(DRE).getPointer());
@@ -532,9 +533,8 @@ namespace {
 
     llvm::SmallSetVector<ProtocolDecl *, 2> literalProtos;
     if (auto argTypeVar = argTy->getAs<TypeVariableType>()) {
-      llvm::SetVector<Constraint *> constraints;
-      CS.getConstraintGraph().gatherConstraints(
-          argTypeVar, constraints,
+      auto constraints = CS.getConstraintGraph().gatherConstraints(
+          argTypeVar,
           ConstraintGraph::GatheringKind::EquivalenceClass,
           [](Constraint *constraint) {
             return constraint->getKind() == ConstraintKind::LiteralConformsTo;
@@ -1223,6 +1223,9 @@ namespace {
     }
 
     Type visitObjectLiteralExpr(ObjectLiteralExpr *expr) {
+      associateArgumentLabels(
+          expr, {expr->getArgumentLabels(), expr->hasTrailingClosure()});
+
       // If the expression has already been assigned a type; just use that type.
       if (expr->getType())
         return expr->getType();
@@ -1500,7 +1503,9 @@ namespace {
                          FunctionType::get(params, outputTy),
                          memberTy,
           CS.getConstraintLocator(expr, ConstraintLocator::ApplyFunction));
-        
+
+        associateArgumentLabels(
+            expr, {expr->getArgumentLabels(), expr->hasTrailingClosure()});
         return baseTy;
       }
 
@@ -1734,6 +1739,10 @@ namespace {
         if (decl->isInvalid())
           return Type();
       }
+
+      associateArgumentLabels(
+          expr, {expr->getArgumentLabels(), expr->hasTrailingClosure()});
+
       return addSubscriptConstraints(expr, CS.getType(expr->getBase()),
                                      expr->getIndex(),
                                      decl);
@@ -1988,9 +1997,10 @@ namespace {
     }
 
     Type visitDynamicSubscriptExpr(DynamicSubscriptExpr *expr) {
+      associateArgumentLabels(
+          expr, {expr->getArgumentLabels(), expr->hasTrailingClosure()});
       return addSubscriptConstraints(expr, CS.getType(expr->getBase()),
-                                     expr->getIndex(),
-                                     nullptr);
+                                     expr->getIndex(), nullptr);
     }
 
     Type visitTupleElementExpr(TupleElementExpr *expr) {
@@ -2477,6 +2487,11 @@ namespace {
 
     Type visitApplyExpr(ApplyExpr *expr) {
       auto fnExpr = expr->getFn();
+
+      SmallVector<Identifier, 4> scratch;
+      associateArgumentLabels(
+          expr, {expr->getArgumentLabels(scratch), expr->hasTrailingClosure()},
+          /*labelsArePermanent=*/isa<CallExpr>(expr));
 
       if (auto *UDE = dyn_cast<UnresolvedDotExpr>(fnExpr)) {
         auto typeOperation = getTypeOperation(UDE, CS.getASTContext());
@@ -3208,6 +3223,16 @@ namespace {
       }
       llvm_unreachable("unhandled operation");
     }
+
+    void associateArgumentLabels(Expr *expr,
+                                 ConstraintSystem::ArgumentInfo info,
+                                 bool labelsArePermanent = true) {
+      assert(expr);
+      // Record the labels.
+      if (!labelsArePermanent)
+        info.Labels = CS.allocateCopy(info.Labels);
+      CS.ArgumentInfos[CS.getArgumentInfoLocator(expr)] = info;
+    }
   };
 
   /// AST walker that "sanitizes" an expression for the
@@ -3641,68 +3666,11 @@ namespace {
     /// Ignore declarations.
     bool walkToDeclPre(Decl *decl) override { return false; }
   };
-
-  /// AST walker that records the keyword arguments provided at each
-  /// call site.
-  class ArgumentLabelWalker : public ASTWalker {
-    ConstraintSystem &CS;
-    llvm::DenseMap<Expr *, Expr *> ParentMap;
-
-  public:
-    ArgumentLabelWalker(ConstraintSystem &cs, Expr *expr) 
-      : CS(cs), ParentMap(expr->getParentMap()) { }
-
-    using State = ConstraintSystem::ArgumentLabelState;
-
-    void associateArgumentLabels(Expr *fn, State labels,
-                                 bool labelsArePermanent) {
-      fn = getArgumentLabelTargetExpr(fn);
-
-      // Record the labels.
-      if (!labelsArePermanent)
-        labels.Labels = CS.allocateCopy(labels.Labels);
-      CS.ArgumentLabels[CS.getConstraintLocator(fn)] = labels;
-    }
-
-    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      if (auto call = dyn_cast<CallExpr>(expr)) {
-        associateArgumentLabels(call->getFn(),
-                                { call->getArgumentLabels(),
-                                  call->hasTrailingClosure() },
-                                /*labelsArePermanent=*/true);
-        return { true, expr };
-      }
-
-      if (auto subscript = dyn_cast<SubscriptExpr>(expr)) {
-        associateArgumentLabels(subscript,
-                                { subscript->getArgumentLabels(),
-                                  subscript->hasTrailingClosure() },
-                                /*labelsArePermanent=*/true);
-        return { true, expr };
-      }
-
-      if (auto unresolvedMember = dyn_cast<UnresolvedMemberExpr>(expr)) {
-        associateArgumentLabels(unresolvedMember,
-                                { unresolvedMember->getArgumentLabels(),
-                                  unresolvedMember->hasTrailingClosure() },
-                                /*labelsArePermanent=*/true);
-        return { true, expr };
-      }
-
-      // FIXME: other expressions have argument labels, but this is an
-      // optimization, so stage it in later.
-      return { true, expr };
-    }
-  };
-
 } // end anonymous namespace
 
 Expr *ConstraintSystem::generateConstraints(Expr *expr, DeclContext *dc) {
   // Remove implicit conversions from the expression.
   expr = expr->walk(SanitizeExpr(*this));
-
-  // Walk the expression to associate labeled arguments.
-  expr->walk(ArgumentLabelWalker(*this, expr));
 
   // Walk the expression, generating constraints.
   ConstraintGenerator cg(*this, dc);
@@ -3742,9 +3710,9 @@ void ConstraintSystem::optimizeConstraints(Expr *e) {
   e->walk(optimizer);
 }
 
-static bool areGenericRequirementsSatisfied(
+bool swift::areGenericRequirementsSatisfied(
     const DeclContext *DC, const GenericSignature *sig,
-    const SubstitutionMap &Substitutions, bool isExtension) {
+    SubstitutionMap Substitutions, bool isExtension) {
 
   TypeChecker &TC = createTypeChecker(DC->getASTContext());
   ConstraintSystemOptions Options;
@@ -3753,7 +3721,9 @@ static bool areGenericRequirementsSatisfied(
 
   // For every requirement, add a constraint.
   for (auto Req : sig->getRequirements()) {
-    if (auto resolved = Req.subst(Substitutions)) {
+    if (auto resolved = Req.subst(
+          QuerySubstitutionMap{Substitutions},
+          LookUpConformanceInModule(DC->getParentModule()))) {
       CS.addConstraint(*resolved, Loc);
     } else if (isExtension) {
       return false;
@@ -3766,71 +3736,12 @@ static bool areGenericRequirementsSatisfied(
   return CS.solveSingle().hasValue();
 }
 
-bool swift::isExtensionApplied(const DeclContext *DC, Type BaseTy,
-                               const ExtensionDecl *ED) {
-  // We can't do anything if the base type has unbound generic parameters.
-  // We can't leak type variables into another constraint system.
-  if (BaseTy->hasTypeVariable() || BaseTy->hasUnboundGenericType() ||
-      BaseTy->hasUnresolvedType() || BaseTy->hasError())
-    return true;
-
-  if (!ED->isConstrainedExtension())
-    return true;
-
-  TypeChecker *TC = &createTypeChecker(DC->getASTContext());
-  TC->validateExtension(const_cast<ExtensionDecl *>(ED));
-
-  GenericSignature *genericSig = ED->getGenericSignature();
-  SubstitutionMap substMap = BaseTy->getContextSubstitutionMap(
-      DC->getParentModule(), ED->getExtendedNominal());
-  return areGenericRequirementsSatisfied(DC, genericSig, substMap,
-                                         /*isExtension=*/true);
-}
-
-bool swift::isMemberDeclApplied(const DeclContext *DC, Type BaseTy,
-                                const ValueDecl *VD) {
-  // We can't leak type variables into another constraint system.
-  // We can't do anything if the base type has unbound generic parameters.
-  if (BaseTy->hasTypeVariable() || BaseTy->hasUnboundGenericType()||
-      BaseTy->hasUnresolvedType() || BaseTy->hasError())
-    return true;
-
-  const GenericContext *genericDecl = VD->getAsGenericContext();
-  if (!genericDecl)
-    return true;
-  const GenericSignature *genericSig = genericDecl->getGenericSignature();
-  if (!genericSig)
-    return true;
-
-  SubstitutionMap substMap = BaseTy->getContextSubstitutionMap(
-      DC->getParentModule(), VD->getDeclContext());
-  return areGenericRequirementsSatisfied(DC, genericSig, substMap,
-                                         /*isExtension=*/false);
-}
-
-static bool canSatisfy(Type type1, Type type2, bool openArchetypes,
+bool swift::canSatisfy(Type type1, Type type2, bool openArchetypes,
                        ConstraintKind kind, DeclContext *dc) {
   std::unique_ptr<TypeChecker> CreatedTC;
   auto &TC = TypeChecker::createForContext(dc->getASTContext());
   return TC.typesSatisfyConstraint(type1, type2, openArchetypes, kind, dc,
                                    /*unwrappedIUO=*/nullptr);
-}
-
-bool swift::canPossiblyEqual(Type T1, Type T2, DeclContext &DC) {
-  return canSatisfy(T1, T2, true, ConstraintKind::Bind, &DC);
-}
-
-bool swift::canPossiblyConvertTo(Type T1, Type T2, DeclContext &DC) {
-  return canSatisfy(T1, T2, true, ConstraintKind::Conversion, &DC);
-}
-
-bool swift::isEqual(Type T1, Type T2, DeclContext &DC) {
-  return T1->isEqual(T2);
-}
-
-bool swift::isConvertibleTo(Type T1, Type T2, bool openArchetypes,
-                            DeclContext &DC) {
-  return canSatisfy(T1, T2, openArchetypes, ConstraintKind::Conversion, &DC);
 }
 
 void swift::eraseOpenedExistentials(ConstraintSystem &CS, Expr *&expr) {

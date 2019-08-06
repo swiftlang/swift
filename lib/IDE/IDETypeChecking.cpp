@@ -24,7 +24,9 @@
 #include "swift/AST/ASTDemangler.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Sema/IDETypeChecking.h"
+#include "swift/Sema/IDETypeCheckingRequests.h"
 #include "swift/IDE/SourceEntityWalker.h"
+#include "swift/IDE/IDERequests.h"
 #include "swift/Parse/Lexer.h"
 
 using namespace swift;
@@ -325,7 +327,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
         case RequirementKind::Superclass:
           // FIXME: This could be more accurate; check
           // conformance instead of subtyping
-          if (!canPossiblyConvertTo(First, Second, *DC))
+          if (!isConvertibleTo(First, Second, /*openArchetypes=*/true, *DC))
             return true;
           else if (!isConvertibleTo(First, Second, /*openArchetypes=*/false,
                                     *DC))
@@ -697,33 +699,10 @@ public:
   }
 };
 
-bool swift::resolveProtocolNames(DeclContext *DC,
-                                 ArrayRef<const char *> names,
-                          llvm::MapVector<ProtocolDecl*, StringRef> &result) {
-  assert(result.empty());
-  auto &ctx = DC->getASTContext();
-  for (auto name : names) {
-    // First try to solve by usr
-    ProtocolDecl *pd = dyn_cast_or_null<ProtocolDecl>(Demangle::
-      getTypeDeclForUSR(ctx, name));
-    if (!pd) {
-      // Second try to solve by mangled symbol name
-      pd = dyn_cast_or_null<ProtocolDecl>(Demangle::getTypeDeclForMangling(ctx, name));
-    }
-    if (!pd) {
-      // Thirdly try to solve by mangled type name
-      if (auto ty = Demangle::getTypeForMangling(ctx, name)) {
-        pd = dyn_cast_or_null<ProtocolDecl>(ty->getAnyGeneric());
-      }
-    }
-    if (pd) {
-      result.insert({pd, name});
-    }
-  }
-  if (names.size() == result.size())
-    return false;
-  // If we resolved none but the given names are not empty, return true for failure.
-  return result.size() == 0;
+ProtocolDecl* swift::resolveProtocolName(DeclContext *dc, StringRef name) {
+  return evaluateOrDefault(dc->getASTContext().evaluator,
+                           ResolveProtocolNameRequest(ProtocolNameOwner(dc, name)),
+                           nullptr);
 }
 
 ArrayRef<ExpressionTypeInfo>
@@ -733,10 +712,78 @@ swift::collectExpressionType(SourceFile &SF,
                              bool CanonicalType,
                              llvm::raw_ostream &OS) {
   llvm::MapVector<ProtocolDecl*, StringRef> InterestedProtocols;
-  if (resolveProtocolNames(&SF, ExpectedProtocols, InterestedProtocols))
-    return {};
+  for (auto Name: ExpectedProtocols) {
+    if (auto *pd = resolveProtocolName(&SF, Name)) {
+      InterestedProtocols.insert({pd, Name});
+    } else {
+      return {};
+    }
+  }
   ExpressionTypeCollector Walker(SF, InterestedProtocols, Scratch,
     CanonicalType, OS);
   Walker.walk(SF);
   return Scratch;
+}
+
+ArrayRef<ValueDecl*> swift::
+canDeclProvideDefaultImplementationFor(ValueDecl* VD) {
+  return evaluateOrDefault(VD->getASTContext().evaluator,
+                           ProvideDefaultImplForRequest(VD),
+                           ArrayRef<ValueDecl*>());
+}
+
+ArrayRef<ValueDecl*> swift::
+collectAllOverriddenDecls(ValueDecl *VD, bool IncludeProtocolRequirements,
+                          bool Transitive) {
+  return evaluateOrDefault(VD->getASTContext().evaluator,
+    CollectOverriddenDeclsRequest(OverridenDeclsOwner(VD,
+      IncludeProtocolRequirements, Transitive)), ArrayRef<ValueDecl*>());
+}
+
+bool swift::isExtensionApplied(const DeclContext *DC, Type BaseTy,
+                               const ExtensionDecl *ED) {
+  return evaluateOrDefault(DC->getASTContext().evaluator,
+    IsDeclApplicableRequest(DeclApplicabilityOwner(DC, BaseTy, ED)), false);
+}
+
+bool swift::isMemberDeclApplied(const DeclContext *DC, Type BaseTy,
+                                const ValueDecl *VD) {
+  return evaluateOrDefault(DC->getASTContext().evaluator,
+    IsDeclApplicableRequest(DeclApplicabilityOwner(DC, BaseTy, VD)), false);
+}
+
+bool swift::canPossiblyEqual(Type T1, Type T2, DeclContext &DC) {
+   return evaluateOrDefault(DC.getASTContext().evaluator,
+     TypeRelationCheckRequest(TypeRelationCheckInput(&DC, T1, T2,
+       TypeRelation::PossiblyEqualTo, true)), false);
+}
+
+
+bool swift::isEqual(Type T1, Type T2, DeclContext &DC) {
+  return evaluateOrDefault(DC.getASTContext().evaluator,
+    TypeRelationCheckRequest(TypeRelationCheckInput(&DC, T1, T2,
+      TypeRelation::EqualTo, true)), false);
+}
+
+bool swift::isConvertibleTo(Type T1, Type T2, bool openArchetypes,
+                            DeclContext &DC) {
+  return evaluateOrDefault(DC.getASTContext().evaluator,
+    TypeRelationCheckRequest(TypeRelationCheckInput(&DC, T1, T2,
+      TypeRelation::ConvertTo, openArchetypes)), false);
+}
+
+Type swift::getRootTypeOfKeypathDynamicMember(SubscriptDecl *SD) {
+  return evaluateOrDefault(SD->getASTContext().evaluator,
+    RootTypeOfKeypathDynamicMemberRequest{SD}, Type());
+}
+
+Type swift::getResultTypeOfKeypathDynamicMember(SubscriptDecl *SD) {
+  return evaluateOrDefault(SD->getASTContext().evaluator,
+    RootAndResultTypeOfKeypathDynamicMemberRequest{SD}, TypePair()).
+      SecondTy;
+}
+
+bool swift::hasDynamicMemberLookupAttribute(Type ty) {
+  return evaluateOrDefault(ty->getASTContext().evaluator,
+    HasDynamicMemberLookupAttributeRequest{ty.getPointer()}, false);
 }

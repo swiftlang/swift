@@ -231,13 +231,13 @@ public func _unsafeReferenceCast<T, U>(_ x: T, to: U.Type) -> U {
 ///   - type: The type `T` to which `x` is cast.
 /// - Returns: The instance `x`, cast to type `T`.
 @_transparent
-public func unsafeDowncast<T : AnyObject>(_ x: AnyObject, to type: T.Type) -> T {
+public func unsafeDowncast<T: AnyObject>(_ x: AnyObject, to type: T.Type) -> T {
   _debugPrecondition(x is T, "invalid unsafeDowncast")
   return Builtin.castReference(x)
 }
 
 @_transparent
-public func _unsafeUncheckedDowncast<T : AnyObject>(_ x: AnyObject, to type: T.Type) -> T {
+public func _unsafeUncheckedDowncast<T: AnyObject>(_ x: AnyObject, to type: T.Type) -> T {
   _internalInvariant(x is T, "invalid unsafeDowncast")
   return Builtin.castReference(x)
 }
@@ -778,7 +778,7 @@ func _trueAfterDiagnostics() -> Builtin.Int1 {
 ///         }
 ///     }
 ///
-///     class EmojiSmiley : Smiley {
+///     class EmojiSmiley: Smiley {
 ///          override class var text: String {
 ///             return "😀"
 ///         }

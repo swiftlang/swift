@@ -49,7 +49,7 @@ static bool cleanFunction(SILFunction &fn) {
       }
 
       switch (bi->getBuiltinInfo().ID) {
-        case BuiltinValueKind::CondFail: {
+        case BuiltinValueKind::CondFailMessage: {
           SILBuilderWithScope Builder(bi);
           Builder.createCondFail(bi->getLoc(), bi->getOperand(0),
             "unknown program error");

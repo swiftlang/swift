@@ -54,6 +54,24 @@ bool swift::tripleIsAnySimulator(const llvm::Triple &triple) {
     tripleIsAppleTVSimulator(triple);
 }
 
+
+bool swift::tripleRequiresRPathForSwiftInOS(const llvm::Triple &triple) {
+  if (triple.isMacOSX()) {
+    // macOS 10.14.4 contains a copy of Swift, but the linker will still use an
+    // rpath-based install name until 10.15.
+    return triple.isMacOSXVersionLT(10, 15);
+
+  } else if (triple.isiOS()) {
+    return triple.isOSVersionLT(12, 2);
+
+  } else if (triple.isWatchOS()) {
+    return triple.isOSVersionLT(5, 2);
+  }
+
+  // Other platforms don't have Swift installed as part of the OS by default.
+  return false;
+}
+
 DarwinPlatformKind swift::getDarwinPlatformKind(const llvm::Triple &triple) {
   if (triple.isiOS()) {
     if (triple.isTvOS()) {
@@ -308,6 +326,16 @@ llvm::Triple swift::getTargetSpecificModuleTriple(const llvm::Triple &triple) {
 
     // Generate an arch-vendor-os-environment triple.
     return llvm::Triple(newArch, newVendor, newOS, *newEnvironment);
+  }
+
+  // android - drop the API level.  That is not pertinent to the module; the API
+  // availability is handled by the clang importer.
+  if (triple.isAndroid()) {
+    StringRef environment =
+        llvm::Triple::getEnvironmentTypeName(triple.getEnvironment());
+
+    return llvm::Triple(triple.getArchName(), triple.getVendorName(),
+                        triple.getOSName(), environment);
   }
 
   // Other platforms get no normalization.

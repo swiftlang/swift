@@ -402,7 +402,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// - Parameter source: A collection of `UInt8` elements. `source.count` must
   ///   be less than or equal to this buffer's `count`.
   @inlinable
-  public func copyBytes<C : Collection>(from source: C
+  public func copyBytes<C: Collection>(from source: C
   ) where C.Element == UInt8 {
     _debugPrecondition(source.count <= self.count,
       "${Self}.copyBytes source has too many elements")
@@ -677,7 +677,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   }
 }
 
-extension Unsafe${Mutable}RawBufferPointer : CustomDebugStringConvertible {
+extension Unsafe${Mutable}RawBufferPointer: CustomDebugStringConvertible {
   /// A textual representation of the buffer, suitable for debugging.
   public var debugDescription: String {
     return "${Self}"

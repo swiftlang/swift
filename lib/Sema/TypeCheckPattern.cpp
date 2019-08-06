@@ -37,7 +37,7 @@ extractEnumElement(TypeChecker &TC, DeclContext *DC, SourceLoc UseLoc,
                    const VarDecl *constant) {
   diagnoseExplicitUnavailability(constant, UseLoc, DC, nullptr);
 
-  const FuncDecl *getter = constant->getGetter();
+  const FuncDecl *getter = constant->getAccessor(AccessorKind::Get);
   if (!getter)
     return nullptr;
 
@@ -809,8 +809,8 @@ static void requestLayoutForMetadataSources(TypeChecker &tc, Type type) {
     // parameter is of dependent type then the body of a function with said
     // parameter could potentially require the generic type's layout to
     // recover them.
-    if (auto *nominalDecl = type->getAnyNominal()) {
-      tc.requestNominalLayout(nominalDecl);
+    if (auto *classDecl = type->getClassOrBoundGenericClass()) {
+      tc.requestClassLayout(classDecl);
     }
   });
 }
@@ -878,11 +878,11 @@ bool TypeChecker::typeCheckParameterList(ParameterList *PL,
       }
 
       if (isa<InOutTypeRepr>(nestedRepr)) {
-        param->setSpecifier(VarDecl::Specifier::InOut);
+        param->setSpecifier(ParamDecl::Specifier::InOut);
       } else if (isa<SharedTypeRepr>(nestedRepr)) {
-        param->setSpecifier(VarDecl::Specifier::Shared);
+        param->setSpecifier(ParamDecl::Specifier::Shared);
       } else if (isa<OwnedTypeRepr>(nestedRepr)) {
-        param->setSpecifier(VarDecl::Specifier::Owned);
+        param->setSpecifier(ParamDecl::Specifier::Owned);
       }
     }
 
@@ -1637,7 +1637,7 @@ void TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
 
   auto handleParameter = [&](ParamDecl *param, Type ty, bool forceMutable) {
     if (forceMutable)
-      param->setSpecifier(VarDecl::Specifier::InOut);
+      param->setSpecifier(ParamDecl::Specifier::InOut);
 
     // If contextual type is invalid and we have a valid argument type
     // trying to coerce argument to contextual type would mean erasing
