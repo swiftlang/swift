@@ -1216,7 +1216,7 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable
   ///   interpreted as non-canonical NaN encodings. "Pseudo-denormals" are
   ///   interpreted as non-canonical encodings of subnormal values.
   ///
-  /// - Decimal floating-point admits a large number of non-canonical
+  /// - Decimal floating-point types admit a large number of non-canonical
   ///   encodings. Consult the IEEE 754 standard for additional details.
   ///
   /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
