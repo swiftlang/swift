@@ -7829,12 +7829,12 @@ bool ApplyInstBase<Impl, Base, false>::isCalleeDynamicallyReplaceable() const {
   SILValue Callee = getCalleeOrigin();
 
   while (true) {
-    if (auto *FRI = dyn_cast<FunctionRefInst>(Callee))
+    if (isa<FunctionRefInst>(Callee))
       return false;
 
-    if (auto *FRI = dyn_cast<DynamicFunctionRefInst>(Callee))
+    if (isa<DynamicFunctionRefInst>(Callee))
       return true;
-    if (auto *FRI = dyn_cast<PreviousDynamicFunctionRefInst>(Callee))
+    if (isa<PreviousDynamicFunctionRefInst>(Callee))
       return true;
 
     if (auto *PAI = dyn_cast<PartialApplyInst>(Callee)) {
