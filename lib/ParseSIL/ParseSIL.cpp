@@ -229,7 +229,6 @@ namespace {
     SILParserTUState &TUState;
     SILFunction *F = nullptr;
     GenericEnvironment *ContextGenericEnv = nullptr;
-    FunctionOwnershipEvaluator OwnershipEvaluator;
 
   private:
     /// HadError - Have we seen an error parsing this function?
@@ -5335,16 +5334,6 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
   do {
     if (parseSILInstruction(B))
       return true;
-    // Evaluate how the just parsed instruction effects this functions Ownership
-    // Qualification. For more details, see the comment on the
-    // FunctionOwnershipEvaluator class.
-    SILInstruction *ParsedInst = &*BB->rbegin();
-    if (BB->getParent()->hasOwnership() &&
-        !OwnershipEvaluator.evaluate(ParsedInst)) {
-      P.diagnose(ParsedInst->getLoc().getSourceLoc(),
-                 diag::found_unqualified_instruction_in_qualified_function,
-                 F->getName());
-    }
   } while (isStartOfSILInstruction());
 
   return false;
@@ -5460,7 +5449,6 @@ bool SILParserTUState::parseDeclSIL(Parser &P) {
       }
 
       // Parse the basic block list.
-      FunctionState.OwnershipEvaluator.reset(FunctionState.F);
       SILOpenedArchetypesTracker OpenedArchetypesTracker(FunctionState.F);
       SILBuilder B(*FunctionState.F);
       // Track the archetypes just like SILGen. This
