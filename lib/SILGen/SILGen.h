@@ -187,7 +187,8 @@ public:
   /// - The last result in the returned pullback.
   SILFunction *getOrCreateAutoDiffAssociatedFunctionThunk(
       SILFunction *original, SILAutoDiffIndices &indices,
-      SILFunction *assocFn, AutoDiffAssociatedFunctionKind assocFnKind);
+      SILFunction *assocFn, AutoDiffAssociatedFunctionKind assocFnKind,
+      bool reorderSelf);
 
   /// Determine whether the given class has any instance variables that
   /// need to be destroyed.

@@ -84,28 +84,27 @@ SILGenModule::getOrCreateAutoDiffThunk(SILDeclRef assocFnDeclRef,
   auto linkage = autodiff::getAutoDiffAssociatedFunctionLinkage(
       originalLinkage, /*isAssocFnExported*/ true);
   auto name = assocFnDeclRef.mangle();
-  auto *F = builder.getOrCreateFunction(
+  auto *thunk = builder.getOrCreateFunction(
       assocFnDecl, name, linkage, assocFnTy, IsBare, IsTransparent,
       assocFnDeclRef.isSerialized(), IsNotDynamic, ProfileCounter(), IsThunk);
+  if (!thunk->empty())
+    return thunk;
 
-  if (F->empty()) {
-    if (auto genSig = assocFnTy->getGenericSignature())
-      F->setGenericEnvironment(genSig->createGenericEnvironment());
-    SILGenFunction SGF(*this, *F, SwiftModule);
-    SmallVector<ManagedValue, 4> params;
-    auto loc = assocFnDeclRef.getAsRegularLocation();
-    SGF.collectThunkParams(loc, params);
-    auto assocFnRef = SGF.B.createFunctionRef(loc, assocFn);
-    auto autoDiffAssocFnSILTy = SILType::getPrimitiveObjectType(assocFnTy);
-    SmallVector<SILValue, 4> args(F->getArguments().begin(),
-                                  F->getArguments().end());
-    auto apply = SGF.emitApplyWithRethrow(
-        loc, assocFnRef, autoDiffAssocFnSILTy,
-        SGF.getForwardingSubstitutionMap(), args);
-    SGF.B.createReturn(loc, apply);
-  }
-
-  return F;
+  if (auto genSig = assocFnTy->getGenericSignature())
+    thunk->setGenericEnvironment(genSig->createGenericEnvironment());
+  SILGenFunction SGF(*this, *thunk, SwiftModule);
+  SmallVector<ManagedValue, 4> params;
+  auto loc = assocFnDeclRef.getAsRegularLocation();
+  SGF.collectThunkParams(loc, params);
+  auto assocFnRef = SGF.B.createFunctionRef(loc, assocFn);
+  auto autoDiffAssocFnSILTy = SILType::getPrimitiveObjectType(assocFnTy);
+  SmallVector<SILValue, 4> args(thunk->getArguments().begin(),
+                                thunk->getArguments().end());
+  auto apply = SGF.emitApplyWithRethrow(
+      loc, assocFnRef, autoDiffAssocFnSILTy,
+      SGF.getForwardingSubstitutionMap(), args);
+  SGF.B.createReturn(loc, apply);
+  return thunk;
 }
 
 // SWIFT_ENABLE_TENSORFLOW
@@ -120,37 +119,38 @@ SILFunction *SILGenModule::getOrCreateAutoDiffClassMethodThunk(
   auto originalLinkage = originalFn.getLinkage(ForDefinition);
   auto linkage = autodiff::getAutoDiffAssociatedFunctionLinkage(
       originalLinkage, /*isAssocFnExported*/ true);
-  auto name = assocFnDeclRef.mangle() + "_thunk";
-  auto *F = builder.getOrCreateFunction(
+  // TODO(TF-685): Use principled thunk mangling.
+  // Do not simply reuse reabstraction thunk mangling.
+  auto name = assocFnDeclRef.mangle() + "_vtable_entry_thunk";
+  auto *thunk = builder.getOrCreateFunction(
       assocFnDecl, name, linkage, constantTy, IsBare, IsTransparent,
       assocFnDeclRef.isSerialized(), IsNotDynamic, ProfileCounter(), IsThunk);
+  if (!thunk->empty())
+    return thunk;
 
-  if (F->empty()) {
-    if (auto genSig = constantTy->getGenericSignature())
-      F->setGenericEnvironment(genSig->createGenericEnvironment());
-    SILGenFunction SGF(*this, *F, SwiftModule);
-    SmallVector<ManagedValue, 4> params;
-    auto loc = assocFnDeclRef.getAsRegularLocation();
-    SGF.collectThunkParams(loc, params);
-    auto originalFnRef = SGF.emitGlobalFunctionRef(loc, originalFn);
-    auto loweredIndices = autoDiffFuncId->getParameterIndices()->getLowered(
-        SGF.getASTContext(),
-        assocFnDecl->getInterfaceType()->castTo<AnyFunctionType>());
-    auto autoDiffFn = SGF.B.createAutoDiffFunction(
-        loc, loweredIndices, /*differentiationOrder*/ 1, originalFnRef);
-    auto autoDiffAssocFn = SGF.B.createAutoDiffFunctionExtract(
-        loc, AutoDiffFunctionExtractInst::Extractee(autoDiffFuncId->getKind()),
-        /*differentiationOrder*/ 1, autoDiffFn);
-    auto autoDiffAssocFnSILTy = SILType::getPrimitiveObjectType(constantTy);
-    SmallVector<SILValue, 4> args(F->getArguments().begin(),
-                                  F->getArguments().end());
-    auto apply = SGF.emitApplyWithRethrow(
-        loc, autoDiffAssocFn, autoDiffAssocFnSILTy,
-        SGF.getForwardingSubstitutionMap(), args);
-    SGF.B.createReturn(loc, apply);
-  }
-
-  return F;
+  if (auto genSig = constantTy->getGenericSignature())
+    thunk->setGenericEnvironment(genSig->createGenericEnvironment());
+  SILGenFunction SGF(*this, *thunk, SwiftModule);
+  SmallVector<ManagedValue, 4> params;
+  auto loc = assocFnDeclRef.getAsRegularLocation();
+  SGF.collectThunkParams(loc, params);
+  auto originalFnRef = SGF.emitGlobalFunctionRef(loc, originalFn);
+  auto loweredIndices = autoDiffFuncId->getParameterIndices()->getLowered(
+      SGF.getASTContext(),
+      assocFnDecl->getInterfaceType()->castTo<AnyFunctionType>());
+  auto autoDiffFn = SGF.B.createAutoDiffFunction(
+      loc, loweredIndices, /*differentiationOrder*/ 1, originalFnRef);
+  auto autoDiffAssocFn = SGF.B.createAutoDiffFunctionExtract(
+      loc, AutoDiffFunctionExtractInst::Extractee(autoDiffFuncId->getKind()),
+      /*differentiationOrder*/ 1, autoDiffFn);
+  auto autoDiffAssocFnSILTy = SILType::getPrimitiveObjectType(constantTy);
+  SmallVector<SILValue, 4> args(thunk->getArguments().begin(),
+                                thunk->getArguments().end());
+  auto apply = SGF.emitApplyWithRethrow(
+      loc, autoDiffAssocFn, autoDiffAssocFnSILTy,
+      SGF.getForwardingSubstitutionMap(), args);
+  SGF.B.createReturn(loc, apply);
+  return thunk;
 }
 
 ManagedValue

@@ -810,13 +810,26 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
           indices.parameters, indices.source, /*differentiationOrder*/ 1,
           AutoDiffAssociatedFunctionKind::VJP, M, lookUpConformance);
 
+      // Self reordering is necessary if wrt at least two parameters, including
+      // self.
+      auto shouldReorderSelf = [&]() {
+        if (!F->hasSelfParam())
+          return false;
+        auto selfParamIndex = origSilFnType->getNumParameters() - 1;
+        if (!indices.isWrtParameter(selfParamIndex))
+          return false;
+        return indices.parameters->getNumIndices() > 1;
+      };
+      bool reorderSelf = shouldReorderSelf();
+
       // Thunk JVP method, if it is defined.
       if (auto *jvpDecl = diffAttr->getJVPFunction()) {
         SILFunction *jvpThunk;
         auto *jvpFn = getFunction(SILDeclRef(jvpDecl), NotForDefinition);
-        if (jvpFn->getLoweredFunctionType() != expectedJVPType) {
+        if (reorderSelf || jvpFn->getLoweredFunctionType() != expectedJVPType) {
           jvpThunk = getOrCreateAutoDiffAssociatedFunctionThunk(
-              F, indices, jvpFn, AutoDiffAssociatedFunctionKind::JVP);
+              F, indices, jvpFn, AutoDiffAssociatedFunctionKind::JVP,
+              reorderSelf);
         } else {
           auto *id = AutoDiffAssociatedFunctionIdentifier::get(
               AutoDiffAssociatedFunctionKind::JVP, /*differentiationOrder*/ 1,
@@ -831,9 +844,10 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
       if (auto *vjpDecl = diffAttr->getVJPFunction()) {
         SILFunction *vjpThunk;
         auto *vjpFn = getFunction(SILDeclRef(vjpDecl), NotForDefinition);
-        if (vjpFn->getLoweredFunctionType() != expectedVJPType) {
+        if (reorderSelf || vjpFn->getLoweredFunctionType() != expectedVJPType) {
           vjpThunk = getOrCreateAutoDiffAssociatedFunctionThunk(
-              F, indices, vjpFn, AutoDiffAssociatedFunctionKind::VJP);
+              F, indices, vjpFn, AutoDiffAssociatedFunctionKind::VJP,
+              reorderSelf);
         } else {
           auto *id = AutoDiffAssociatedFunctionIdentifier::get(
               AutoDiffAssociatedFunctionKind::VJP, /*differentiationOrder*/ 1,

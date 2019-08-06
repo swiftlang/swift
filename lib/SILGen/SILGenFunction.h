@@ -1780,14 +1780,15 @@ public:
   // Differentiation thunks
   //===--------------------------------------------------------------------===//
 
-  /// Get or create a thunk for reabstracting differentials/pullbacks returned
-  /// by user-defined JVP/VJP functions.
+  /// Get or create a thunk for reabstracting and self-reordering
+  /// differentials/pullbacks returned by user-defined JVP/VJP functions, and
+  /// apply it to the given differential/pullback.
   ///
   /// If `reorderSelf` is true, reorder self so that it appears as:
   /// - The last parameter, for differentials.
   /// - The last result, for pullbacks.
-  SILFunction *getOrCreateAutoDiffLinearMapThunk(
-      AutoDiffAssociatedFunctionKind assocFnKind,
+  ManagedValue getThunkedAutoDiffLinearMap(
+      ManagedValue linearMap, AutoDiffAssociatedFunctionKind assocFnKind,
       CanSILFunctionType fromType, CanSILFunctionType toType,
       bool reorderSelf);
 

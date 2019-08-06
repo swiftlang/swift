@@ -157,7 +157,6 @@ static CanGenericSignature getAutoDiffAssociatedFunctionGenericSignature(
     CanGenericSignature assocFnGenSig,
     ArrayRef<SILParameterInfo> originalParameters,
     AutoDiffIndexSubset *parameterIndices, SILModule &module) {
-  // If associated function has no
   if (!assocFnGenSig)
     return nullptr;
   auto &ctx = module.getASTContext();
