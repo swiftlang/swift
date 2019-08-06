@@ -20,6 +20,7 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Ownership.h"
 #include "swift/AST/ParameterList.h"
@@ -2323,6 +2324,12 @@ CanType ASTMangler::getDeclTypeForMangling(
   parentGenericSig = nullptr;
 
   auto &C = decl->getASTContext();
+  if (!decl->hasInterfaceType() && !decl->getDeclContext()->isLocalContext()) {
+    if (auto *resolver = C.getLazyResolver()) {
+      resolver->resolveDeclSignature(const_cast<ValueDecl *>(decl));
+    }
+  }
+
   if (!decl->hasInterfaceType() || decl->getInterfaceType()->is<ErrorType>()) {
     if (isa<AbstractFunctionDecl>(decl))
       return CanFunctionType::get({AnyFunctionType::Param(C.TheErrorType)},
