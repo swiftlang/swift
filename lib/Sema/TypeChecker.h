@@ -1285,7 +1285,7 @@ public:
   ///   1) (T1, ..., Tn) -> R => FunctionQuoteN<T1, ... Tn, R>
   ///   2) T                  => Quote<T>
   ///
-  /// TODO(#6): In the future, we may implement more complicated rules
+  /// TODO(TF-735): In the future, we may implement more complicated rules
   /// based on something like ExpressibleByQuoteLiteral.
   Type getTypeOfQuoteExpr(Type exprType, SourceLoc loc);
 
@@ -1298,7 +1298,7 @@ public:
   ///   2) Quote<T>                      => T
   ///   3) T                             => <error>
   ///
-  /// TODO(#6): In the future, we may implement more complicated rules
+  /// TODO(TF-735): In the future, we may implement more complicated rules
   /// based on something like ExpressibleByQuoteLiteral.
   Type getTypeOfUnquoteExpr(Type exprType, SourceLoc loc);
 
@@ -1322,7 +1322,7 @@ public:
   ///
   /// At the moment, this is simply `Tree` from the Quote model.
   ///
-  /// TODO(#21): In the future, we may want to infer more precise type
+  /// TODO(TF-736): In the future, we may want to infer more precise type
   /// based on the shape of the quoted declaration.
   Type getTypeOfQuoteDecl(SourceLoc loc);
 

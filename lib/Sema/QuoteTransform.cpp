@@ -106,7 +106,7 @@ protected:
     }
   }
 
-  // TODO(#6): Implement ExpressibleByQuoteLiteral.
+  // TODO(TF-735): Implement ExpressibleByQuoteLiteral.
   Expr *makeQuote(const char *name, ArrayRef<Expr *> quotedSubnodes) {
     auto nodeInit = new (ctx) UnresolvedDeclRefExpr(
         ctx.getIdentifier(name), DeclRefKind::Ordinary, DeclNameLoc());
@@ -337,12 +337,12 @@ public:
                                 quoteType(expr->getType())});
   }
 
-  // TODO(#7): Quote optional chaining.
+  // TODO(TF-723): Quote optional chaining.
   UNSUPPORTED_EXPR(BindOptionalExpr)
 
   Expr *visitBooleanLiteralExpr(BooleanLiteralExpr *expr) {
     Breadcrumb bc(bcs, expr);
-    // TODO(#8): Figure out why this is not good enough.
+    // TODO(TF-733): Figure out why this is not good enough.
     // auto type = expr->getType();
     auto type = ctx.getBoolDecl()->getDeclaredType();
     return makeQuote("BooleanLiteral",
@@ -391,7 +391,7 @@ public:
   }
 
   Expr *visitConstructorRefCallExpr(ConstructorRefCallExpr *expr) {
-    // TODO(#9): Allow @quoted on more decls.
+    // TODO(TF-715): Allow @quoted on more decls.
     Breadcrumb bc(bcs, expr);
     if (auto ref = dyn_cast<DeclRefExpr>(expr->getFn())) {
       return makeQuote("Name", {quoteValue(ref->getDeclRef()),
@@ -426,7 +426,7 @@ public:
 
   Expr *visitDefaultArgumentExpr(DefaultArgumentExpr *expr) {
     Breadcrumb bc(bcs, expr);
-    // TODO(#10): Look up the corresponding decl.
+    // TODO(TF-741): Look up the corresponding decl.
     return makeQuote("Default", {quoteString(""), quoteType(expr->getType())});
   }
 
@@ -452,13 +452,13 @@ public:
     return makeQuote("Wildcard", {});
   }
 
-  // TODO(#11): Quote type(of:).
+  // TODO(TF-723): Quote type(of:).
   UNSUPPORTED_EXPR(DynamicTypeExpr)
 
   Expr *visitDotSelfExpr(DotSelfExpr *expr) {
     Breadcrumb bc(bcs, expr);
     if (auto base = dyn_cast<TypeExpr>(expr->getSubExpr())) {
-      // TODO(#12): Figure out why we can't simply do `base->getType()`.
+      // TODO(TF-730): Figure out why we can't simply do `base->getType()`.
       if (auto metaType = expr->getType()->getAs<MetatypeType>()) {
         return makeQuote("PostfixSelf", {quoteType(metaType->getInstanceType()),
                                          quoteType(expr->getType())});
@@ -474,7 +474,7 @@ public:
   Expr *visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *expr) {
     Breadcrumb bc(bcs, expr);
     if (auto ref = dyn_cast<DeclRefExpr>(expr->getRHS())) {
-      // TODO(#12): Figure out why this is not enough.
+      // TODO(TF-730): Figure out why this is not enough.
       auto baseType = expr->getLHS()->getType();
       auto refType = ref->getType();
       if (!baseType || !refType) {
@@ -512,7 +512,7 @@ public:
     Breadcrumb bc(bcs, expr);
     if (auto ref = dyn_cast<DeclRefExpr>(expr->getFn())) {
       if (dyn_cast<TypeExpr>(expr->getBase())) {
-        // TODO(#9): Allow @quoted on more decls.
+        // TODO(TF-715): Allow @quoted on more decls.
         return makeQuote("Name", {quoteValue(ref->getDeclRef()),
                                   quoteSymbol(ref->getDecl()),
                                   quoteType(expr->getType())});
@@ -542,7 +542,7 @@ public:
     }
   }
 
-  // TODO(#7): Quote dynamic lookup exprs.
+  // TODO(TF-723): Quote dynamic lookup exprs.
   UNSUPPORTED_EXPR(DynamicLookupExpr)
 
   // NOTE: There's no point in quoting IDE support artifacts.
@@ -618,7 +618,7 @@ public:
   Expr *
   visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *expr) {
     Breadcrumb bc(bcs, expr);
-    /// TODO(#2): Finish the implementation.
+    /// TODO(TF-723): Finish the implementation.
     return makeQuote("StringInterpolation", {quoteType(expr->getType())});
   }
 
@@ -629,7 +629,7 @@ public:
                             quoteType(expr->getType())});
   }
 
-  // TODO(#14): Quote key paths.
+  // TODO(TF-723): Quote key paths.
   UNSUPPORTED_EXPR(KeyPathApplicationExpr)
   UNSUPPORTED_EXPR(KeyPathDotExpr)
   UNSUPPORTED_EXPR(KeyPathExpr)
@@ -669,7 +669,7 @@ public:
   }
 
   Expr *visitMemberRefExpr(MemberRefExpr *expr) {
-    // TODO(#9): Allow @quoted on more decls.
+    // TODO(TF-715): Allow @quoted on more decls.
     Breadcrumb bc(bcs, expr);
     if (dyn_cast<TypeExpr>(expr->getBase())) {
       return makeQuote("Name", {quoteValue(expr->getMember()),
@@ -688,10 +688,10 @@ public:
     return makeQuote("NilLiteral", {quoteType(expr->getType())});
   }
 
-  // TODO(#15): Quote #selector.
+  // TODO(TF-723): Quote #selector.
   UNSUPPORTED_EXPR(ObjCSelectorExpr)
 
-  // TODO(#16): Quote playground literals.
+  // TODO(TF-723): Quote playground literals.
   UNSUPPORTED_EXPR(ObjectLiteralExpr)
 
   // NOTE: TapExpr nodes are handled during quoting of their parent nodes.
@@ -717,7 +717,7 @@ public:
     return unknownTree(expr);
   }
 
-  // TODO(#7): Quote optional chaining.
+  // TODO(TF-723): Quote optional chaining.
   UNSUPPORTED_EXPR(OptionalEvaluationExpr)
 
   Expr *visitOptionalTryExpr(OptionalTryExpr *expr) {
@@ -726,7 +726,7 @@ public:
                                      quoteType(expr->getType())});
   }
 
-  // TODO(#5): Quote decls.
+  // TODO(TF-724): Quote decls.
   UNSUPPORTED_EXPR(OtherConstructorDeclRefExpr)
 
   // NOTE: If typechecking encountered errors, there's no point in quoting
@@ -758,7 +758,7 @@ public:
         "Meta", {quoteExpr(expr->getSubExpr()), quoteType(expr->getType())});
   }
 
-  // TODO(#5): Quote decls.
+  // TODO(TF-724): Quote decls.
   UNSUPPORTED_EXPR(RebindSelfInConstructorExpr)
 
   // NOTE: If typechecking encountered errors, there's no point in quoting
@@ -767,7 +767,7 @@ public:
 
   Expr *visitStringLiteralExpr(StringLiteralExpr *expr) {
     Breadcrumb bc(bcs, expr);
-    // TODO(#8): Figure out why this is not good enough.
+    // TODO(TF-733): Figure out why this is not good enough.
     // auto type = expr->getType();
     auto type = ctx.getStringDecl()->getDeclaredType();
     return makeQuote("StringLiteral",
@@ -807,7 +807,7 @@ public:
 
   Expr *visitTupleExpr(TupleExpr *expr) {
     Breadcrumb bc(bcs, expr);
-    // TODO(#1): Figure out why expr->getType() is sometimes null.
+    // TODO(TF-731): Figure out why expr->getType() is sometimes null.
     auto quotedType = expr->getType() ? quoteType(expr->getType())
                                       : makeQuote("UnknownTree", {});
     return makeQuote("Tuple", {quoteLabels(expr->getElementNames()),
@@ -860,10 +860,10 @@ public:
     return makeQuote("Break", {quoteLabel(stmt->getTargetName())});
   }
 
-  // TODO(#17): Quote patterns and trees related to pattern matching.
+  // TODO(TF-714): Quote patterns and trees related to pattern matching.
   UNSUPPORTED_STMT(CaseStmt)
 
-  // TODO(#17): Quote patterns and trees related to pattern matching.
+  // TODO(TF-714): Quote patterns and trees related to pattern matching.
   UNSUPPORTED_STMT(CatchStmt)
 
   Expr *visitContinueStmt(ContinueStmt *stmt) {
@@ -876,7 +876,7 @@ public:
     return makeQuote("Defer", {quoteBody(stmt->getBodyAsWritten())});
   }
 
-  // TODO(#17): Quote patterns and trees related to pattern matching.
+  // TODO(TF-714): Quote patterns and trees related to pattern matching.
   UNSUPPORTED_STMT(DoCatchStmt)
 
   Expr *visitDoStmt(DoStmt *stmt) {
@@ -885,10 +885,10 @@ public:
                             quoteBody(stmt->getBody())});
   }
 
-  // TODO(#5): Quote decls.
+  // TODO(TF-724): Quote decls.
   UNSUPPORTED_STMT(FailStmt)
 
-  // TODO(#17): Quote patterns and trees related to pattern matching.
+  // TODO(TF-714): Quote patterns and trees related to pattern matching.
   UNSUPPORTED_STMT(FallthroughStmt)
 
   Expr *visitForEachStmt(ForEachStmt *stmt) {
@@ -942,7 +942,7 @@ public:
     }
   }
 
-  // TODO(#17): Quote patterns and trees related to pattern matching.
+  // TODO(TF-714): Quote patterns and trees related to pattern matching.
   UNSUPPORTED_STMT(SwitchStmt)
 
   Expr *visitThrowStmt(ThrowStmt *stmt) {
@@ -968,7 +968,7 @@ public:
     return unknownTree(decl);                                                  \
   }
 
-  // TODO(#5): Quote decls.
+  // TODO(TF-724): Quote decls.
   UNSUPPORTED_DECL(AccessorDecl)
   UNSUPPORTED_DECL(AssociatedTypeDecl)
   UNSUPPORTED_DECL(ConstructorDecl)
@@ -985,14 +985,14 @@ public:
                       quoteBody(decl->getBody())});
   }
 
-  // TODO(#5): Quote decls.
+  // TODO(TF-724): Quote decls.
   UNSUPPORTED_DECL(GenericTypeParamDecl)
 
   // NOTE: Doesn't have a representation in quotes.
   // We simply take active elements and use them instead of this decl.
   UNSUPPORTED_DECL(IfConfigDecl)
 
-  // TODO(#5): Quote decls.
+  // TODO(TF-724): Quote decls.
   UNSUPPORTED_DECL(ImportDecl)
   UNSUPPORTED_DECL(MissingMemberDecl)
   UNSUPPORTED_DECL(ModuleDecl)
@@ -1013,7 +1013,7 @@ public:
         return makeQuote("Var", {quoteName(var), quoteExpr(decl->getInit(0))});
       }
     } else {
-      // TODO(#17): Quote patterns and trees related to pattern
+      // TODO(TF-714): Quote patterns and trees related to pattern
       // matching.
       return unknownTree(decl);
     }
@@ -1023,7 +1023,7 @@ public:
   // belongs to the compilation stage that precedes quotes.
   UNSUPPORTED_DECL(PoundDiagnosticDecl)
 
-  // TODO(#5): Quote decls.
+  // TODO(TF-724): Quote decls.
   UNSUPPORTED_DECL(PrecedenceGroupDecl)
   UNSUPPORTED_DECL(ProtocolDecl)
   UNSUPPORTED_DECL(OpaqueTypeDecl)
@@ -1098,12 +1098,12 @@ private:
         quotedElement = quoteExpr(element.getBoolean());
         break;
       case StmtConditionElement::ConditionKind::CK_PatternBinding:
-        // TODO(#17): Quote patterns and trees related to pattern
+        // TODO(TF-714): Quote patterns and trees related to pattern
         // matching.
         quotedElement = unknownTree(stmt);
         break;
       case StmtConditionElement::ConditionKind::CK_Availability:
-        // TODO(#18): Quote #available.
+        // TODO(TF-723): Quote #available.
         quotedElement = unknownTree(stmt);
         break;
       }
@@ -1191,7 +1191,7 @@ private:
   }
 
   Expr *quoteValue(ConcreteDeclRef ref) {
-    // TODO(#19): Obtain value exactly as written by the programmer.
+    // TODO(TF-740): Obtain value exactly as written by the programmer.
     // I'm currently not sure how to do that since DeclRefExpr doesn't have
     // a correct source range.
     if (auto ctor = dyn_cast<ConstructorDecl>(ref.getDecl())) {
@@ -1203,7 +1203,7 @@ private:
     return quoteString(ref.getDecl()->getBaseName().userFacingName());
   }
 
-  // TODO(#6): Implement ExpressibleByQuoteLiteral.
+  // TODO(TF-735): Implement ExpressibleByQuoteLiteral.
   Expr *makeQuote(const char *name, ArrayRef<Expr *> quotedSubnodes) {
     auto nodeInit = new (ctx) UnresolvedDeclRefExpr(
         ctx.getIdentifier(name), DeclRefKind::Ordinary, DeclNameLoc());
@@ -1247,12 +1247,12 @@ Expr *TypeChecker::quoteExpr(Expr *expr, DeclContext *dc) {
   Expr *quoteCall =
       CallExpr::createImplicit(Context, quoteInit, {quotedExpr}, {});
 
-  // TODO(#20): Improve error reporting when quoting fails.
+  // TODO(TF-727): Improve error reporting when quoting fails.
   if (!typeCheckExpression(quoteCall, dc)) {
     return nullptr;
   }
 
-  // TODO(#24): Get to the bottom of why we need this workaround.
+  // TODO(TF-734): Get to the bottom of why we need this workaround.
   if (auto call2 = dyn_cast<CallExpr>(quoteCall)) {
     if (auto init2 = dyn_cast<ConstructorRefCallExpr>(call2->getFn())) {
       init2->getBase()->setImplicit();
@@ -1339,7 +1339,7 @@ Expr *TypeChecker::quoteDecl(Decl *decl, DeclContext *dc) {
     return nullptr;
   }
 
-  // TODO(#20): Improve error reporting when quoting fails.
+  // TODO(TF-727): Improve error reporting when quoting fails.
   if (!typeCheckExpression(quotedDecl, dc)) {
     return nullptr;
   }

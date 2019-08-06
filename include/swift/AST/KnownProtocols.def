@@ -107,7 +107,7 @@ EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByUnicodeScalarLiteral, "UnicodeScala
 EXPRESSIBLE_BY_LITERAL_PROTOCOL_(ExpressibleByColorLiteral, "_ColorLiteralType", true)
 EXPRESSIBLE_BY_LITERAL_PROTOCOL_(ExpressibleByImageLiteral, "_ImageLiteralType", true)
 EXPRESSIBLE_BY_LITERAL_PROTOCOL_(ExpressibleByFileReferenceLiteral, "_FileReferenceLiteralType", true)
-// TODO(#6): Implement ExpressibleByQuoteLiteral.
+// TODO(TF-735): Implement ExpressibleByQuoteLiteral.
 // EXPRESSIBLE_BY_LITERAL_PROTOCOL_(ExpressibleByQuoteLiteral, "_QuoteLiteralType", true)
 PROTOCOL(Expression)
 

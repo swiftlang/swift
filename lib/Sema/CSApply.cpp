@@ -7742,7 +7742,7 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
     // visitQuoteLiteralExpr because quoting benefits from having as much
     // information about code possible (hence the need for desugaring quotes
     // after closures and taps have been typechecked).
-    // TODO(#5): Move quote desugaring even further down the pipeline,
+    // TODO(TF-724): Move quote desugaring even further down the pipeline,
     // since at this point local funcs are still not typechecked.
     for (auto tuple : walker.getQuotesToDesugar()) {
       auto quote = std::get<0>(tuple);
@@ -7750,7 +7750,7 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
 
       // If quoted expression is a closure, then its type will still be null.
       // Therefore, it looks like we need to work around via manual setType.
-      // TODO(#5): Perhaps moving desugaring down the pipeline
+      // TODO(TF-724): Perhaps moving desugaring down the pipeline
       // will obviate the necessity of this workaround.
       quote->getSubExpr()->setType(getType(quote->getSubExpr()));
 

@@ -3771,7 +3771,7 @@ Parser::parseDecl(ParseDeclOptions Flags,
       Handler(D);
       if (auto FD = dyn_cast<FuncDecl>(D)) {
         if (auto attr = D->getAttrs().getAttribute<QuotedAttr>()) {
-          // TODO(#13): Properly mangle names for quote decls.
+          // TODO(TF-718): Properly mangle names for quote decls.
           auto originalName = FD->getBaseName().userFacingName();
           SmallString<16> buf;
           buf.append("_quoted");
@@ -3781,8 +3781,8 @@ Parser::parseDecl(ParseDeclOptions Flags,
           SmallVector<Identifier, 4> pieces;
           auto name = DeclName(Context, id, pieces);
 
-          // TODO(#23): Should this perhaps be a let?
-          // TODO(#22): Figure out the overriding story for quote decls.
+          // TODO(TF-716): Should this perhaps be a let?
+          // TODO(TF-717): Figure out the overriding story for quote decls.
           auto kind = CurDeclContext->isTypeContext()
                           ? StaticSpellingKind::KeywordClass
                           : StaticSpellingKind::None;
