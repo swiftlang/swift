@@ -807,7 +807,7 @@ public:
       auto nextResultType =
           OptionalType::get(conformance->getTypeWitnessByName(
                                 sequenceType, TC.Context.Id_Element));
-      auto *genBinding = PatternBindingDecl::createImplicit(
+      PatternBindingDecl::createImplicit(
           TC.Context, StaticSpellingKind::None, genPat,
           new (TC.Context) OpaqueValueExpr(S->getInLoc(), nextResultType), DC,
           /*VarLoc*/ S->getForLoc());
