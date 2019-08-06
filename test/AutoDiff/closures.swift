@@ -13,6 +13,27 @@ func diffableClosureInStruct(s: Foo) {
 // CHECK:   retain_value [[CLOSURE]] : $@differentiable @callee_guaranteed (Float) -> Float
 // CHECK:   autodiff_function_extract [original] [[CLOSURE]] : $@differentiable @callee_guaranteed (Float) -> Float
 
+struct InoutAliasableCapture {
+  var x: Float = .zero
+  mutating func foo() {
+    func capturesMutableSelf(t: Float) -> Float {
+      self.x = .zero
+      return t
+    }
+    _ = gradient(at: .zero, in: capturesMutableSelf)
+  }
+}
+
+// CHECK-LABEL: @{{.*}}InoutAliasableCapture{{.*}}foo{{.*}} : $@convention(method) (@inout InoutAliasableCapture) -> () {
+// CHECK: bb0([[SELF:%.*]] : $*InoutAliasableCapture):
+// CHECK:   [[JVP:%.*]] = function_ref @{{.*}}capturesMutableSelf{{.*}}__jvp_src_0_wrt_0 : $@convention(thin) (Float, @inout_aliasable InoutAliasableCapture) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+// CHECK-NOT:  retain_value_addr [[SELF]]
+// CHECK-NOT:  copy_addr [[SELF]]
+// CHECK:   [[JVP_CAPTURED:%.*]] = partial_apply [callee_guaranteed] [[JVP]]([[SELF]]) : $@convention(thin) (Float, @inout_aliasable InoutAliasableCapture) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+// CHECK:   [[VJP:%.*]] = function_ref @{{.*}}capturesMutableSelf{{.*}}__vjp_src_0_wrt_0 : $@convention(thin) (Float, @inout_aliasable InoutAliasableCapture) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+// CHECK-NOT:  retain_value_addr [[SELF]]
+// CHECK-NOT:  copy_addr [[SELF]]
+// CHECK:   [[VJP_CAPTURED:%.*]] = partial_apply [callee_guaranteed] [[VJP]]([[SELF]]) : $@convention(thin) (Float, @inout_aliasable InoutAliasableCapture) -> (Float, @owned @callee_guaranteed (Float) -> Float)
 
 public func closureCaptureMutable() {
   var val: Float = 10
