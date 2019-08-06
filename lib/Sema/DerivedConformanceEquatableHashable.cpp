@@ -1135,6 +1135,13 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
   hashValueDecl->copyFormalAccessFrom(derived.Nominal,
                                       /*sourceIsParentContext*/ true);
 
+  if (auto *classDecl = dyn_cast<ClassDecl>(parentDC)) {
+    if (classDecl->isFinal()) {
+      getterDecl->getAttrs().add(new (C) FinalAttr(IsImplicit));
+      hashValueDecl->getAttrs().add(new (C) FinalAttr(IsImplicit));
+    }
+  }
+
   Pattern *hashValuePat = new (C) NamedPattern(hashValueDecl, /*implicit*/true);
   hashValuePat->setType(intType);
   hashValuePat = TypedPattern::createImplicit(C, hashValuePat, intType);
