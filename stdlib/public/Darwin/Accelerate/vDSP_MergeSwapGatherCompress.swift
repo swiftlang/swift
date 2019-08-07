@@ -22,7 +22,7 @@ extension vDSP {
     /// - Parameter vectorB: Second input vector.
     /// - Parameter result: Output values.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
     public static func taperedMerge<T, U, V>(_ vectorA: T,
                                              _ vectorB: U,
                                              result: inout V)
@@ -56,7 +56,7 @@ extension vDSP {
     /// - Parameter vectorB: Second input vector.
     /// - Parameter result: Output values.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
     public static func taperedMerge<T, U, V>(_ vectorA: T,
                                              _ vectorB: U,
                                              result: inout V)
@@ -90,7 +90,7 @@ extension vDSP {
     /// - Parameter vectorB: Second input vector.
     /// - Parameter result: Output values.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
     public static func taperedMerge<T, U>(_ vectorA: T,
                                           _ vectorB: U) -> [Float]
         where
@@ -118,7 +118,7 @@ extension vDSP {
     /// - Parameter vectorB: Second input vector.
     /// - Parameter result: Output values.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
     public static func taperedMerge<T, U>(_ vectorA: T,
                                           _ vectorB: U) -> [Double]
         where
@@ -147,7 +147,7 @@ extension vDSP {
     /// - Parameter vectorA: First input-output vector.
     /// - Parameter vectorB: Second input-output vector.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
     public static func swapElements<T, U>(_ vectorA: inout T,
                                           _ vectorB: inout U)
         where
@@ -173,7 +173,7 @@ extension vDSP {
     /// - Parameter vectorA: First input-output vector.
     /// - Parameter vectorB: Second input-output vector.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
     public static func swapElements<T, U>(_ vectorA: inout T,
                                           _ vectorB: inout U)
         where
@@ -207,7 +207,7 @@ extension vDSP {
     /// - Parameter indices: One-based indices to copy selected elements of source vector to sequential locations in result.
     /// - Parameter result: Output values.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
     public static func gather<T, U, V>(_ vector: T,
                                        indices: U,
                                        result: inout V)
@@ -237,7 +237,7 @@ extension vDSP {
     /// - Parameter indices: One-based indices to copy selected elements of source vector to sequential locations in result.
     /// - Parameter result: Output values.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
     public static func gather<T, U, V>(_ vector: T,
                                        indices: U,
                                        result: inout V)
@@ -268,7 +268,7 @@ extension vDSP {
     ///
     /// - Returns: Output values.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
     public static func gather<T, U>(_ vector: T,
                                     indices: U) -> [Float]
         where
@@ -297,7 +297,7 @@ extension vDSP {
     ///
     /// - Returns: Output values.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
     public static func gather<T, U>(_ vector: T,
                                     indices: U) -> [Double]
         where
@@ -327,7 +327,7 @@ extension vDSP {
     /// - Parameter gatingVector: Gating vector; for nonzero elements, corresponding elements of source vector are sequentially copied to output result.
     /// - Parameter result: Output values.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
     public static func compress<T, U, V>(_ vector: T,
                                          gatingVector: U,
                                          result: inout V)
@@ -358,7 +358,7 @@ extension vDSP {
     /// - Parameter gatingVector: Gating vector; for nonzero elements, corresponding elements of source vector are sequentially copied to output result.
     /// - Parameter result: Output values.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
     public static func compress<T, U, V>(_ vector: T,
                                          gatingVector: U,
                                          result: inout V)
@@ -391,7 +391,7 @@ extension vDSP {
     ///
     /// - Returns: Output values.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
     public static func compress<T, U>(_ vector: T,
                                       gatingVector: U,
                                       nonZeroGatingCount: Int?) -> [Float]
@@ -445,7 +445,7 @@ extension vDSP {
     ///
     /// - Returns: Output values.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
     public static func compress<T, U>(_ vector: T,
                                       gatingVector: U,
                                       nonZeroGatingCount: Int?) -> [Double]

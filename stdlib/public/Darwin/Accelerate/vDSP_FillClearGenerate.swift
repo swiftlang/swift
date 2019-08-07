@@ -741,7 +741,7 @@ extension vDSP {
     /// - Parameter indices: The monotonically increasing indices to `result` for the corresponding element in `values`.
     /// - Parameter result: Output values.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
     public static func linearInterpolate<T, U, V>(values: T,
                                                   atIndices indices: U,
                                                   result: inout V)
@@ -775,7 +775,7 @@ extension vDSP {
     ///
     /// - Returns: An array containing the extrapolation and interpolation result with a length of `max(indices) + 1`.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
     public static func linearInterpolate<T, U>(values: T,
                                                atIndices indices: U) -> [Float]
         where
@@ -803,7 +803,7 @@ extension vDSP {
     /// - Parameter indices: The monotonically increasing indices to `result` for the corresponding element in `values`.
     /// - Parameter result: Output values.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
     public static func linearInterpolate<T, U, V>(values: T,
                                                   atIndices indices: U,
                                                   result: inout V)
@@ -837,7 +837,7 @@ extension vDSP {
     ///
     /// - Returns: An array containing the extrapolation and interpolation result with a length of `max(indices) + 1`.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
     public static func linearInterpolate<T, U>(values: T,
                                                atIndices indices: U) -> [Double]
         where
@@ -871,7 +871,7 @@ extension vDSP {
     /// - Parameter baseOffset: The base offset.
     /// - Parameter result: Output values.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
     public static func linearInterpolate<T, U, V>(lookupTable: T,
                                                   withOffsets offsets: U,
                                                   scale: Float = 1,
@@ -909,7 +909,7 @@ extension vDSP {
     ///
     /// - Returns: An array containing the result with a length of `offsets.count`.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
     public static func linearInterpolate<T, U>(lookupTable: T,
                                                withOffsets offsets: U,
                                                scale: Float = 1,
@@ -941,7 +941,7 @@ extension vDSP {
     /// - Parameter baseOffset: The base offset.
     /// - Parameter result: Output values.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
     public static func linearInterpolate<T, U, V>(lookupTable: T,
                                                   withOffsets offsets: U,
                                                   scale: Double = 1,
@@ -979,7 +979,7 @@ extension vDSP {
     ///
     /// - Returns: An array containing the result with a length of `offsets.count`.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+    @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
     public static func linearInterpolate<T, U>(lookupTable: T,
                                                withOffsets offsets: U,
                                                scale: Double = 1,
