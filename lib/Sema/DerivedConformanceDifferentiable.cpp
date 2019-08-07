@@ -386,6 +386,10 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
   SmallVector<VarDecl *, 8> diffProperties;
   getStoredPropertiesForDifferentiation(nominal, parentDC, diffProperties);
 
+  // Add ad-hoc implicit conformances for `TangentVector`.
+  // TODO(TF-632): Remove this implicit conformance logic when synthesized
+  // member types can be extended.
+
   // `TangentVector` struct can derive `PointwiseMultiplicative` if the
   // `TangentVector` types of all stored properties conform to
   // `PointwiseMultiplicative`.
