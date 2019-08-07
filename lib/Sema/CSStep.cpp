@@ -97,30 +97,11 @@ void SplitterStep::computeFollowupSteps(
 
   // Compute the connected components of the constraint graph.
   auto components = CG.computeConnectedComponents(CS.TypeVariables);
-  unsigned numComponents =
-      components.size() + CG.getOrphanedConstraints().size();
+  unsigned numComponents = components.size();
   if (numComponents < 2) {
     componentSteps.push_back(llvm::make_unique<ComponentStep>(
         CS, 0, &CS.InactiveConstraints, Solutions));
     return;
-  }
-
-  Components.resize(numComponents);
-  PartialSolutions = std::unique_ptr<SmallVector<Solution, 4>[]>(
-      new SmallVector<Solution, 4>[numComponents]);
-
-  // Add components.
-  for (unsigned i : indices(components)) {
-    componentSteps.push_back(llvm::make_unique<ComponentStep>(
-        CS, i, &Components[i], std::move(components[i]), PartialSolutions[i]));
-  }
-
-  // Add components for the orphaned constraints.
-  OrphanedConstraints = CG.takeOrphanedConstraints();
-  for (unsigned i : range(components.size(), numComponents)) {
-    auto orphaned = OrphanedConstraints[i - components.size()];
-    componentSteps.push_back(llvm::make_unique<ComponentStep>(
-        CS, i, &Components[i], orphaned, PartialSolutions[i]));
   }
 
   if (isDebugMode()) {
@@ -133,6 +114,19 @@ void SplitterStep::computeFollowupSteps(
 
     log << "---Connected components---\n";
     CG.printConnectedComponents(CS.TypeVariables, log);
+  }
+
+  // Take the orphaned constraints, because they'll go into a component now.
+  OrphanedConstraints = CG.takeOrphanedConstraints();
+
+  Components.resize(numComponents);
+  PartialSolutions = std::unique_ptr<SmallVector<Solution, 4>[]>(
+      new SmallVector<Solution, 4>[numComponents]);
+
+  // Add components.
+  for (unsigned i : indices(components)) {
+    componentSteps.push_back(llvm::make_unique<ComponentStep>(
+        CS, i, &Components[i], std::move(components[i]), PartialSolutions[i]));
   }
 
   // Create component ordering based on the information associated
