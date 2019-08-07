@@ -25,8 +25,7 @@ struct FloatPair : Differentiable & AdditiveArithmetic {
 }
 
 struct Pair<T : Differentiable, U : Differentiable> : Differentiable
-  where T == T.AllDifferentiableVariables, T == T.TangentVector,
-        U == U.AllDifferentiableVariables, U == U.TangentVector
+  where T == T.TangentVector, U == U.TangentVector
 {
   var first: Tracked<T>
   var second: Tracked<U>
@@ -495,9 +494,9 @@ LeakCheckingTests.testWithLeakChecking("ControlFlowWithIfInMethod") {
       return input * w1
     }
   }
-  expectEqual((Dense.AllDifferentiableVariables(w1: 10), 20),
+  expectEqual((Dense.TangentVector(w1: 10), 20),
               Dense(w1: 4, w2: 5).gradient(at: 2, in: { dense, x in dense(x) }))
-  expectEqual((Dense.AllDifferentiableVariables(w1: 2), 4),
+  expectEqual((Dense.TangentVector(w1: 2), 4),
               Dense(w1: 4, w2: nil).gradient(at: 2, in: { dense, x in dense(x) }))
 }
 
