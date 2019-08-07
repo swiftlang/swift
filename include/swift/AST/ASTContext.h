@@ -639,8 +639,10 @@ public:
   /// \param isClang \c true if this module loader is responsible for loading
   ///                Clang modules, which are special-cased in some parts of the
   ///                compiler.
+  /// \param isDWARF \c true if this module loader can load Clang modules
+  ///                from DWARF.
   void addModuleLoader(std::unique_ptr<ModuleLoader> loader,
-                       bool isClang = false);
+                       bool isClang = false, bool isDWARF = false);
 
   /// Load extensions to the given nominal type from the external
   /// module loaders.
@@ -683,6 +685,12 @@ public:
   /// The loader is owned by the AST context.
   ClangModuleLoader *getClangModuleLoader() const;
 
+  /// Retrieve the DWARF module loader for this ASTContext.
+  ///
+  /// If there is no Clang module loader, returns a null pointer.
+  /// The loader is owned by the AST context.
+  ClangModuleLoader *getDWARFModuleLoader() const;
+  
   /// Asks every module loader to verify the ASTs it has loaded.
   ///
   /// Does nothing in non-asserts (NDEBUG) builds.
