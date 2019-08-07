@@ -170,6 +170,12 @@ bool swift::isOverrideBasedOnType(ValueDecl *decl, Type declTy,
   if (declIUOAttr != parentDeclIUOAttr)
     return false;
 
+  // If the generic signatures don't match, then return false because we don't
+  // want to complain if an overridden method matches multiple superclass
+  // methods which differ in generic signature.
+  //
+  // We can still succeed with a subtype match later in
+  // OverrideMatcher::match().
   auto declGenericCtx = decl->getAsGenericContext();
   auto &ctx = decl->getASTContext();
   auto sig = ctx.getOverrideGenericSignature(parentDecl, decl);
