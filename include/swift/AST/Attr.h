@@ -1321,7 +1321,7 @@ public:
   }
 };
 
-/// A limited variant of \c @objc that's used for classes with generic ancestry.
+/// A limited variant of \c \@objc that's used for classes with generic ancestry.
 class ObjCRuntimeNameAttr : public DeclAttribute {
   static StringRef getSimpleName(const ObjCAttr &Original) {
     assert(Original.hasName());

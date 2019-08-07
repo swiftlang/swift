@@ -2528,7 +2528,7 @@ public:
   ///     value.getFormalAccessScope().getDeclContext())</code>
   ///
   /// If \p treatUsableFromInlineAsPublic is true, declarations marked with the
-  /// \c @usableFromInline attribute are treated as public. This is normally
+  /// \c \@usableFromInline attribute are treated as public. This is normally
   /// false for name lookup and other source language concerns, but true when
   /// computing the linkage of generated functions.
   ///
