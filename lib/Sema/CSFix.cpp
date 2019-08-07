@@ -100,13 +100,15 @@ UnwrapOptionalBase *UnwrapOptionalBase::createWithOptionalResult(
 }
 
 bool AddAddressOf::diagnose(Expr *root, bool asNote) const {
-  MissingAddressOfFailure failure(root, getConstraintSystem(), getLocator());
+  auto &cs = getConstraintSystem();
+  MissingAddressOfFailure failure(root, cs, getFromType(), getToType(),
+                                  getLocator());
   return failure.diagnose(asNote);
 }
 
-AddAddressOf *AddAddressOf::create(ConstraintSystem &cs,
-                                   ConstraintLocator *locator) {
-  return new (cs.getAllocator()) AddAddressOf(cs, locator);
+AddAddressOf *AddAddressOf::create(ConstraintSystem &cs, Type argTy,
+                                   Type paramTy, ConstraintLocator *locator) {
+  return new (cs.getAllocator()) AddAddressOf(cs, argTy, paramTy, locator);
 }
 
 bool TreatRValueAsLValue::diagnose(Expr *root, bool asNote) const {

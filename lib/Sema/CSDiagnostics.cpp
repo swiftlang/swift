@@ -886,9 +886,17 @@ bool MissingAddressOfFailure::diagnoseAsError() {
     return false;
 
   auto *anchor = getAnchor();
-  auto type = getType(anchor)->getRValueType();
-  emitDiagnostic(anchor->getLoc(), diag::missing_address_of, type)
-      .fixItInsert(anchor->getStartLoc(), "&");
+  auto argTy = getFromType();
+  auto paramTy = getToType();
+
+  if (paramTy->getAnyPointerElementType()) {
+    emitDiagnostic(anchor->getLoc(), diag::cannot_convert_argument_value, argTy,
+                   paramTy)
+        .fixItInsert(anchor->getStartLoc(), "&");
+  } else {
+    emitDiagnostic(anchor->getLoc(), diag::missing_address_of, argTy)
+        .fixItInsert(anchor->getStartLoc(), "&");
+  }
   return true;
 }
 

@@ -13,9 +13,10 @@
 // This file implements semantic analysis for declaration overrides.
 //
 //===----------------------------------------------------------------------===//
-#include "CodeSynthesis.h"
 #include "MiscDiagnostics.h"
 #include "TypeCheckAvailability.h"
+#include "TypeCheckDecl.h"
+#include "TypeCheckObjC.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Availability.h"
