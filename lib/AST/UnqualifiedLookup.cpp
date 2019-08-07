@@ -486,7 +486,7 @@ void UnqualifiedLookupFactory::performUnqualifiedLookup() {
   const bool compareToASTScopes = Ctx.LangOpts.CompareToASTScopeLookup;
   if (useASTScopesForExperimentalLookup() && !compareToASTScopes) {
     static bool haveWarned = false;
-    if (!haveWarned) {
+    if (!haveWarned && Ctx.LangOpts.WarnIfASTScopeLookup) {
       haveWarned = true;
       llvm::errs() << "WARNING: TRYING Scope exclusively\n";
     }

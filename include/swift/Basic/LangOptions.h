@@ -261,8 +261,12 @@ namespace swift {
     /// Someday, ASTScopeLookup will supplant lookup in the parser
     bool DisableParserLookup = false;
 
-    /// Sound we compare to ASTScope-based resolution for debugging?
+    /// Should  we compare to ASTScope-based resolution for debugging?
     bool CompareToASTScopeLookup = false;
+
+    /// Since some tests fail if the warning is output, use a flag to decide
+    /// whether it is. The warning is useful for testing.
+    bool WarnIfASTScopeLookup = false;
 
     /// Whether to use the import as member inference system
     ///
