@@ -366,24 +366,19 @@ public:
       : SolverStep(cs, solutions), Index(index), IsSingle(false),
         OriginalScore(getCurrentScore()), OriginalBestScore(getBestScore()),
         Constraints(constraints) {
+    if (component.isOrphaned()) {
+      assert(component.constraints.size() == 1);
+      OrphanedConstraint = component.constraints.front();
+    } else {
+      assert(component.typeVars.size() > 0);
+    }
+
     TypeVars = std::move(component.typeVars);
 
     for (auto constraint : component.constraints) {
       constraints->erase(constraint);
       record(constraint);
     }
-  }
-
-  /// Create a component step for an orphaned constraint.
-  ComponentStep(ConstraintSystem &cs, unsigned index,
-                ConstraintList *constraints,
-                Constraint *orphaned,
-                SmallVectorImpl<Solution> &solutions)
-      : SolverStep(cs, solutions), Index(index), IsSingle(false),
-        OriginalScore(getCurrentScore()), OriginalBestScore(getBestScore()),
-        Constraints(constraints), OrphanedConstraint(orphaned) {
-    constraints->erase(orphaned);
-    record(orphaned);
   }
 
 private:
@@ -418,7 +413,8 @@ private:
       getDebugLogger() << "(solving component #" << Index << '\n';
 
     ComponentScope = llvm::make_unique<Scope>(*this);
-    // If this component has oprhaned constraint attached,
+
+    // If this component has orphaned constraint attached,
     // let's return it to the graph.
     CS.CG.setOrphanedConstraint(OrphanedConstraint);
   }
