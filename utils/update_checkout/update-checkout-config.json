@@ -348,14 +348,15 @@
                 "sourcekit-lsp": "swift-5.1-branch"
             }
         },
-        "master-next-apple-stable-20190619" : {
+        "master-rebranch" : {
             "aliases": ["apple/stable/20190619",
-                        "master-next-apple-stable-20190619"],
+                        "master-rebranch-apple-stable-20190619",
+                        "master-rebranch"],
             "repos": {
                 "llvm": "apple/stable/20190619",
                 "clang": "apple/stable/20190619",
                 "compiler-rt": "apple/stable/20190619",
-                "swift": "master-next",
+                "swift": "master-rebranch",
                 "lldb": "upstream-with-swift",
                 "cmark": "master",
                 "llbuild": "master",
