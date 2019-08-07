@@ -597,3 +597,15 @@ class SR_4206_Derived<C: SR_4206_Container> : SR_4206_Base<C.Key> {
   typealias Key = C.Key
   override func foo(forKey key: Key) throws {} // Okay, no generic signature mismatch
 }
+
+// SR-10198
+
+class SR_10198_Base {
+  func a<T>(_ val: T) -> String { return "not equatable" }
+  func a<T: Equatable>(_ val: T) -> String { return "equatable" }
+}
+
+class SR_10198_Derived: SR_10198_Base {
+  override func a<T>(_ val: T) -> String { return super.a(val) }
+  override func a<T: Equatable>(_ val: T) -> String { return super.a(val) }
+}
