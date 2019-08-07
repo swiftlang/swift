@@ -1202,6 +1202,8 @@ public:
   void constructInitialFnAttributes(llvm::AttrBuilder &Attrs,
                                     OptimizationMode FuncOptMode =
                                       OptimizationMode::NotSet);
+  void setHasFramePointer(llvm::AttrBuilder &Attrs, bool HasFP);
+  void setHasFramePointer(llvm::Function *F, bool HasFP);
   llvm::AttributeList constructInitialAttributes();
 
   void emitProtocolDecl(ProtocolDecl *D);
