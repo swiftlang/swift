@@ -132,7 +132,7 @@ bb0(%0 : $*T, %1 : $*T):
 }
 
 // CHECK-LABEL: sil [ossa] @copy_addr2
-sil [ossa] @copy_addr2 : $@convention(thin) <T> (@in T) -> @out T {
+sil [ossa] @copy_addr2 : $@convention(thin) <T> (@in_guaranteed T) -> @out T {
 bb0(%0 : $*T, %1 : $*T):
   %3 = alloc_box $<τ_0_0> { var τ_0_0 } <T>
   %3a = project_box %3 : $<τ_0_0> { var τ_0_0 } <T>, 0
