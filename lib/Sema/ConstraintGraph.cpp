@@ -488,101 +488,103 @@ static void depthFirstSearch(
   visitAdjacencies(node.getFixedBindings());
 }
 
-/// Perform a depth-first search.
-///
-/// \param cg The constraint graph.
-/// \param typeVar The type variable we're searching from.
-/// \param preVisitNode Called before traversing a node. Must return \c
-/// false when the node has already been visited.
-/// \param visitConstraint Called before considering a constraint. If it
-/// returns \c false, that constraint will be skipped.
-static void depthFirstSearch(
-    ConstraintGraph &cg,
+/// Find the representative for the given type variable within the set
+/// of representatives in a union-find data structure.
+static TypeVariableType *findRepresentative(
     TypeVariableType *typeVar,
-    llvm::function_ref<bool(TypeVariableType *)> preVisitNode,
-    llvm::function_ref<bool(Constraint *)> visitConstraint) {
-  llvm::DenseSet<Constraint *> visitedConstraints;
-  depthFirstSearch(cg, typeVar, preVisitNode, visitConstraint,
-                   visitedConstraints);
+    llvm::SmallDenseMap<TypeVariableType *, TypeVariableType *> &representatives) {
+  // If we don't have a record of this type variable, it is it's own
+  // representative.
+  auto known = representatives.find(typeVar);
+  if (known == representatives.end() || known->second == typeVar)
+    return typeVar;
+
+  // Find the representative of the parent.
+  auto parent = known->second;
+  auto rep = findRepresentative(parent, representatives);
+  representatives[typeVar] = rep;
+
+  return rep;
 }
 
 unsigned ConstraintGraph::computeConnectedComponents(
            std::vector<TypeVariableType *> &typeVars,
            std::vector<unsigned> &components) {
-  llvm::SmallDenseMap<TypeVariableType *, unsigned> componentsMap;
+  llvm::SmallDenseMap<TypeVariableType *, TypeVariableType *> representatives;
 
   // Perform a depth-first search from each type variable to identify
   // what component it is in.
-  unsigned numComponents = 0;
+  llvm::DenseSet<Constraint *> visitedConstraints;
   for (auto typeVar : typeVars) {
-    // If we've already assigned a component to this type variable, we're done.
-    if (componentsMap.count(typeVar) > 0)
+    // If we've already assigned a representative to this type variable,
+    // we're done.
+    if (representatives.count(typeVar) > 0)
       continue;
-
-    // Record this component.
-    unsigned component = numComponents++;
 
     // Perform a depth-first search to mark those type variables that are
     // in the same component as this type variable.
     depthFirstSearch(
         *this, typeVar,
-        [&](TypeVariableType *typeVar) {
+        [&](TypeVariableType *found) {
           // If we have already seen this node, we're done.
-          if (componentsMap.count(typeVar) > 0) {
-            assert(componentsMap[typeVar] == component && "Wrong component?");
-            return false;
-          }
+          auto inserted = representatives.insert({found, typeVar});
+          assert((inserted.second || inserted.first->second == typeVar) &&
+                 "Wrong component?");
 
-          componentsMap[typeVar] = component;
-          return true;
+          return inserted.second;
         },
         [&](Constraint *constraint) {
           return true;
-        });
+        },
+        visitedConstraints);
   }
 
-  // Figure out which components have unbound type variables; these
-  // are the only components and type variables we want to report.
-  SmallVector<bool, 4> componentHasUnboundTypeVar(numComponents, false);
+  // Figure out which components have unbound type variables and/or constraints.
+  // These are the only components we want to report.
+  llvm::SmallDenseSet<TypeVariableType *> validComponents;
   for (auto typeVar : typeVars) {
     // If this type variable has a fixed type, skip it.
     if (CS.getFixedType(typeVar))
       continue;
 
-    assert(componentsMap.count(typeVar) > 0);
-    componentHasUnboundTypeVar[componentsMap[typeVar]] = true;
+    auto rep = findRepresentative(typeVar, representatives);
+    validComponents.insert(rep);
   }
 
-  // Renumber the old components to the new components.
-  SmallVector<unsigned, 4> componentRenumbering(numComponents, 0);
-  numComponents = 0;
-  for (unsigned i : indices(componentRenumbering)) {
-    // Skip components that have no unbound type variables.
-    if (!componentHasUnboundTypeVar[i])
-      continue;
-
-    componentRenumbering[i] = numComponents++;
+  for (auto constraint : visitedConstraints) {
+    for (auto typeVar : constraint->getTypeVariables()) {
+      auto rep = findRepresentative(typeVar, representatives);
+      validComponents.insert(rep);
+    }
   }
 
   // Remove type variables in dead components and provide component
   // numbers for those that remain.
+  llvm::SmallDenseMap<TypeVariableType *, unsigned> componentNumbers;
+  auto getComponentNumber = [&](TypeVariableType *typeVar) {
+    assert(typeVar == findRepresentative(typeVar, representatives));
+    auto inserted = componentNumbers.insert({typeVar, componentNumbers.size()});
+    return inserted.first->second;
+  };
+
   typeVars.erase(
       std::remove_if(
         typeVars.begin(), typeVars.end(),
         [&](TypeVariableType *typeVar) {
-          assert(componentsMap.count(typeVar) > 0);
-          unsigned component = componentsMap[typeVar];
+          auto rep = findRepresentative(typeVar, representatives);
+
           // Remove type variables in dead components.
-          if (!componentHasUnboundTypeVar[component])
+          if (validComponents.count(rep) == 0)
             return true;
 
           // Record the (renumbered) component.
-          components.push_back(componentRenumbering[component]);
+          components.push_back(getComponentNumber(rep));
           return false;
         }),
       typeVars.end());
 
-  return numComponents + getOrphanedConstraints().size();
+  assert(typeVars.size() == components.size());
+  return componentNumbers.size() + getOrphanedConstraints().size();
 }
 
 

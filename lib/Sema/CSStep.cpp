@@ -172,6 +172,7 @@ void SplitterStep::computeFollowupSteps(
   while (!workList.empty()) {
     auto *constraint = &workList.front();
     workList.pop_front();
+    assert(constraintComponent.count(constraint) > 0 && "Missed a constraint");
     componentSteps[constraintComponent[constraint]]->record(constraint);
   }
 
