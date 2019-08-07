@@ -488,7 +488,7 @@ void UnqualifiedLookupFactory::performUnqualifiedLookup() {
     static bool haveWarned = false;
     if (!haveWarned) {
       haveWarned = true;
-     //xxx llvm::errs() << "WARNING: TRYING Scope exclusively\n";
+      llvm::errs() << "WARNING: TRYING Scope exclusively\n";
     }
     experimentallyLookInASTScopes();
     return;
