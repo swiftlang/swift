@@ -18,6 +18,7 @@
 #include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/LazyResolver.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/Types.h"
@@ -1919,6 +1920,9 @@ namespace {
         return true;
 
       for (auto field : decl->getStoredProperties()) {
+        if (!field->hasInterfaceType())
+          IGM.Context.getLazyResolver()->resolveDeclSignature(field);
+
         if (visit(field->getInterfaceType()->getCanonicalType()))
           return true;
       }
@@ -1940,9 +1944,13 @@ namespace {
         return false;
 
       for (auto elt : decl->getAllElements()) {
-        if (elt->hasAssociatedValues() &&
-            !elt->isIndirect() &&
-            visit(elt->getArgumentInterfaceType()->getCanonicalType()))
+        if (!elt->hasAssociatedValues() || elt->isIndirect())
+          continue;
+
+        if (!elt->hasInterfaceType())
+          IGM.Context.getLazyResolver()->resolveDeclSignature(elt);
+
+        if (visit(elt->getArgumentInterfaceType()->getCanonicalType()))
           return true;
       }
       return false;
