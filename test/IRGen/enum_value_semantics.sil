@@ -581,7 +581,7 @@ bb0(%0 : $SinglePayloadNontrivial):
 // CHECK-NEXT: [[SPARE_TAG_TMP:%.*]] = and i64 [[SPARE_TAG_TMP2]], -4611686018427387904
 
 //   -- Apply the new spare bits
-// CHECK-NEXT: [[SECOND_NEW:%.*]] = or i64 [[SECOND_PROJ]], [[SPARE_TAG_TMP]]
+// CHECK-NEXT: [[SECOND_NEW:%.*]] = or i64 [[SPARE_TAG_TMP]], [[SECOND_PROJ]]
 
 //   -- Store the payload back
 // CHECK-NEXT: [[PAYLOAD:%.*]] = bitcast %T20enum_value_semantics31MultiPayloadNontrivialSpareBitsO* [[SELF]] to { i64, i64 }*
@@ -647,7 +647,7 @@ bb0(%0 : $SinglePayloadNontrivial):
 // CHECK-NEXT: [[SPARE_TAG_TMP:%.*]] = shl i64 [[SPARE_TAG_TMP2]], 63
 //                                                                -- 0x8000000000000000
 // CHECK-NEXT: [[SPARE_TAG:%.*]] = and i64 [[SPARE_TAG_TMP:%.*]], -9223372036854775808
-// CHECK-NEXT: [[PAYLOAD_NEW:%.*]] = or i64 [[PAYLOAD_PROJ]], [[SPARE_TAG]]
+// CHECK-NEXT: [[PAYLOAD_NEW:%.*]] = or i64 [[SPARE_TAG]], [[PAYLOAD_PROJ]]
 
 //   -- Store the payload
 // CHECK-NEXT: [[PAYLOAD_ADDR:%.*]] = bitcast %T20enum_value_semantics029MultiPayloadSpareBitsAndExtraG0O* %0 to i64*
