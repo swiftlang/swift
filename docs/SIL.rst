@@ -4879,7 +4879,7 @@ convert_escape_to_noescape
   //   (see convert_function)
   // %1 will be of the trivial type $@noescape T -> U
 
-Converts an escaping (non-trivial) function type to an ``@noescape`` trivial
+Converts an escaping (non-trivial) function type to a ``@noescape`` trivial
 function type. Something must guarantee the lifetime of the input ``%0`` for the
 duration of the use ``%1``.
 
