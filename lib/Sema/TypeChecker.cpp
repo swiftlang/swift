@@ -318,6 +318,7 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
     for (unsigned n = TC.definedFunctions.size(); currentFunctionIdx != n;
          ++currentFunctionIdx) {
       auto *AFD = TC.definedFunctions[currentFunctionIdx];
+      assert(!AFD->getDeclContext()->isLocalContext());
 
       TC.typeCheckAbstractFunctionBody(AFD);
     }
@@ -364,13 +365,6 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
 
   for (AbstractFunctionDecl *FD : reversed(TC.definedFunctions)) {
     TypeChecker::computeCaptures(FD);
-  }
-
-  // Check error-handling correctness for all the functions defined in
-  // this file.  This can depend on all of their interior function
-  // bodies having been type-checked.
-  for (AbstractFunctionDecl *FD : TC.definedFunctions) {
-    TC.checkFunctionErrorHandling(FD);
   }
 
   TC.definedFunctions.clear();

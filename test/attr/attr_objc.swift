@@ -106,6 +106,7 @@ class subject_staticVar1 {
 func subject_freeFunc() { // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{1-6=}}
   @objc
   var subject_localVar: Int // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-8=}}
+  // expected-warning@-1 {{variable 'subject_localVar' was never used; consider replacing with '_' or removing it}}
 
   @objc
   func subject_nestedFreeFunc() { // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-8=}}
@@ -116,6 +117,7 @@ func subject_freeFunc() { // expected-error {{@objc can only be used with member
 func subject_genericFunc<T>(t: T) { // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{1-6=}}
   @objc
   var subject_localVar: Int // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-8=}}
+  // expected-warning@-1 {{variable 'subject_localVar' was never used; consider replacing with '_' or removing it}}
 
   @objc
   func subject_instanceFunc() {} // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-8=}}

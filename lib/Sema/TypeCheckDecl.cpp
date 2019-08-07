@@ -3062,6 +3062,9 @@ public:
     if (requiresDefinition(FD) && !FD->hasBody()) {
       // Complain if we should have a body.
       TC.diagnose(FD->getLoc(), diag::func_decl_without_brace);
+    } else if (FD->getDeclContext()->isLocalContext()) {
+      // Check local function bodies right away.
+      TC.typeCheckAbstractFunctionBody(FD);
     } else {
       // Record the body.
       TC.definedFunctions.push_back(FD);
@@ -3283,6 +3286,9 @@ public:
     if (requiresDefinition(CD) && !CD->hasBody()) {
       // Complain if we should have a body.
       TC.diagnose(CD->getLoc(), diag::missing_initializer_def);
+    } else if (CD->getDeclContext()->isLocalContext()) {
+      // Check local function bodies right away.
+      TC.typeCheckAbstractFunctionBody(CD);
     } else {
       TC.definedFunctions.push_back(CD);
     }
@@ -3295,7 +3301,13 @@ public:
   void visitDestructorDecl(DestructorDecl *DD) {
     TC.validateDecl(DD);
     TC.checkDeclAttributes(DD);
-    TC.definedFunctions.push_back(DD);
+
+    if (DD->getDeclContext()->isLocalContext()) {
+      // Check local function bodies right away.
+      TC.typeCheckAbstractFunctionBody(DD);
+    } else {
+      TC.definedFunctions.push_back(DD);
+    }
   }
 };
 } // end anonymous namespace

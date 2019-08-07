@@ -1926,7 +1926,9 @@ static Type getFunctionBuilderType(FuncDecl *FD) {
 }
 
 bool TypeChecker::typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD) {
-  return typeCheckAbstractFunctionBodyUntil(AFD, SourceLoc());
+  auto result = typeCheckAbstractFunctionBodyUntil(AFD, SourceLoc());
+  checkFunctionErrorHandling(AFD);
+  return result;
 }
 
 static Expr* constructCallToSuperInit(ConstructorDecl *ctor,
