@@ -2248,14 +2248,6 @@ public:
       }
     }
 
-    // FIXME: Temporary hack until capture computation has been request-ified.
-    if (VD->getDeclContext()->isLocalContext()) {
-      VD->visitOpaqueAccessors([&](AccessorDecl *accessor) {
-        if (accessor->isImplicit())
-          TC.definedFunctions.push_back(accessor);
-      });
-    }
-
     // Under the Swift 3 inference rules, if we have @IBInspectable or
     // @GKInspectable but did not infer @objc, warn that the attribute is
     if (!VD->isObjC() && TC.Context.LangOpts.EnableSwift3ObjCInference) {
