@@ -2266,17 +2266,6 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
           return true;
         }
       }
-    } else if (contextDecl == CS.TC.Context.getUnsafePointerDecl() ||
-               contextDecl == CS.TC.Context.getUnsafeMutablePointerDecl() ||
-               contextDecl == CS.TC.Context.getUnsafeRawPointerDecl() ||
-               contextDecl == CS.TC.Context.getUnsafeMutableRawPointerDecl()) {
-      for (Type arg : genericType->getGenericArgs()) {
-        if (arg->isEqual(exprType) && CS.getType(expr)->hasLValueType()) {
-          diagnose(expr->getLoc(), diagID, exprType, contextualType).
-            fixItInsert(expr->getStartLoc(), "&");
-          return true;
-        }
-      }
     }
   }
 
