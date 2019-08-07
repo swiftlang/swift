@@ -457,7 +457,7 @@ namespace {
 
     void handleStoreUse(unsigned UseID);
     void handleLoadUse(const DIMemoryUse &Use);
-    void handleLoadForTypeOfSelfUse(const DIMemoryUse &Use);
+    void handleLoadForTypeOfSelfUse(DIMemoryUse &Use);
     void handleInOutUse(const DIMemoryUse &Use);
     void handleEscapeUse(const DIMemoryUse &Use);
 
@@ -829,7 +829,7 @@ void LifetimeChecker::handleLoadUse(const DIMemoryUse &Use) {
     return handleLoadUseFailure(Use, IsSuperInitComplete, FailedSelfUse);
 }
 
-void LifetimeChecker::handleLoadForTypeOfSelfUse(const DIMemoryUse &Use) {
+void LifetimeChecker::handleLoadForTypeOfSelfUse(DIMemoryUse &Use) {
   bool IsSuperInitComplete, FailedSelfUse;
   // If the value is not definitively initialized, replace the
   // value_metatype instruction with the metatype argument that was passed into
@@ -869,6 +869,17 @@ void LifetimeChecker::handleLoadForTypeOfSelfUse(const DIMemoryUse &Use) {
           valueMetatype->getType());
     }
     replaceAllSimplifiedUsesAndErase(valueMetatype, metatypeArgument);
+
+    // Dead loads for type-of-self must be removed.
+    // Otherwise it's a violation of memory lifetime.
+    if (isa<LoadBorrowInst>(load)) {
+      assert(load->hasOneUse() && isa<EndBorrowInst>(load->getSingleUse()->getUser()));
+      load->getSingleUse()->getUser()->eraseFromParent();
+    }
+    assert(load->use_empty());
+    load->eraseFromParent();
+    // Clear the Inst pointer just to be sure to avoid use-after-free.
+    Use.Inst = nullptr;
   }
 }
 
