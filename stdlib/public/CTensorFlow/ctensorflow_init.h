@@ -41,6 +41,10 @@ void *swift_tfc_CreateFloatTensor(int32_t num_dims, int64_t *dims, float *vals,
 void *swift_tfc_CreateScalarStringTensor(char *val, int32_t valLen,
                                          TF_Status *status);
 
+struct TF_Tensor;
+struct TF_ShapeAndTypeList;
+struct TFE_Op;
+
 // We removed a redundant argument in the C shape inference API.
 // This interface function lets us migrate swift-apis without breakages.
 // (This is a temporary function and will be removed.)
