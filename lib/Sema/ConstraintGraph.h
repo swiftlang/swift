@@ -213,7 +213,7 @@ public:
     TinyPtrVector<Constraint *> constraints;
 
     /// Whether this component represents an orphaned constraint.
-    bool isOrphanedConstraint() const {
+    bool isOrphaned() const {
       return typeVars.empty();
     }
   };
