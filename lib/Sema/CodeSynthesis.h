@@ -45,9 +45,6 @@ class ObjCReason;
 // Implemented in TypeCheckerOverride.cpp
 bool checkOverrides(ValueDecl *decl);
 
-// These are implemented in CodeSynthesis.cpp.
-void addExpectedOpaqueAccessorsToStorage(AbstractStorageDecl *storage);
-
 /// Describes the kind of implicit constructor that will be
 /// generated.
 enum class ImplicitConstructorKind {

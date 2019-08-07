@@ -1293,13 +1293,6 @@ SynthesizeAccessorRequest::evaluate(Evaluator &evaluator,
   }
 }
 
-void swift::addExpectedOpaqueAccessorsToStorage(AbstractStorageDecl *storage) {
-  storage->visitExpectedOpaqueAccessors([&](AccessorKind kind) {
-    // Force synthesis if necessary.
-    (void) storage->getSynthesizedAccessor(kind);
-  });
-}
-
 /// Synthesize the body of a setter which just delegates to a mutable
 /// addressor.
 static std::pair<BraceStmt *, bool>
@@ -1717,7 +1710,6 @@ static VarDecl *synthesizePropertyWrapperStorageWrapperProperty(
     property->setImplInfo(StorageImplInfo::getMutableComputed());
   else
     property->setImplInfo(StorageImplInfo::getImmutableComputed());
-  addExpectedOpaqueAccessorsToStorage(property);
 
   var->getAttrs().add(
       new (ctx) ProjectedValuePropertyAttr(name, SourceLoc(), SourceRange(),

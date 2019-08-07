@@ -3360,7 +3360,7 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
             // storage.
             // Properties that are not public don't need property descriptors
             // either.
-            (!baseDecl->hasAnyAccessors() ||
+            (!baseDecl->requiresOpaqueAccessors() ||
              (!getAccessorDeclRef(getRepresentativeAccessorForKeyPath(baseDecl))
                    .isForeign &&
               getAccessorDeclRef(getRepresentativeAccessorForKeyPath(baseDecl))

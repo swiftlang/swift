@@ -516,8 +516,8 @@ ASTScopeImpl *ScopeCreator::createScopeFor(ASTNode n, ASTScopeImpl *parent) {
 
 void ScopeCreator::addChildrenForAllExplicitAccessors(AbstractStorageDecl *asd,
                                                       ASTScopeImpl *parent) {
-  for (auto accessor : asd->getAllAccessors()) {
-    if (!accessor->isImplicit() && accessor->getStartLoc().isValid()) {
+  asd->visitParsedAccessors([&](AccessorDecl *accessor) {
+    if (accessor->getStartLoc().isValid()) {
       // Accessors are always nested within their abstract storage
       // declaration. The nesting may not be immediate, because subscripts may
       // have intervening scopes for generics.
@@ -526,7 +526,7 @@ void ScopeCreator::addChildrenForAllExplicitAccessors(AbstractStorageDecl *asd,
         ASTVisitorForScopeCreation().visitAbstractFunctionDecl(accessor, parent,
                                                                *this);
     }
-  }
+  });
 }
 
 #pragma mark creation helpers

@@ -280,9 +280,9 @@ void TBDGenVisitor::visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
   }
 
   // Explicitly look at each accessor here: see visitAccessorDecl.
-  for (auto accessor : ASD->getAllAccessors()) {
+  ASD->visitEmittedAccessors([&](AccessorDecl *accessor) {
     visitFuncDecl(accessor);
-  }
+  });
 }
 
 void TBDGenVisitor::visitVarDecl(VarDecl *VD) {
