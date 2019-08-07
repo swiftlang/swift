@@ -611,7 +611,15 @@ Optional<Diag<Type, Type>> GenericArgumentsMismatchFailure::getDiagnosticFor(
 }
 
 void GenericArgumentsMismatchFailure::emitNoteForMismatch(int position) {
-  auto genericTypeDecl = getActual()->getCanonicalType()->getAnyGeneric();
+  auto *locator = getLocator();
+  // Since there could be implicit conversions assoicated with argument
+  // to parameter conversions, let's use parameter type as a source of
+  // generic parameter information.
+  auto paramSourceTy =
+      locator->isLastElement(ConstraintLocator::ApplyArgToParam) ? getRequired()
+                                                                 : getActual();
+
+  auto genericTypeDecl = paramSourceTy->getAnyGeneric();
   auto param = genericTypeDecl->getGenericParams()->getParams()[position];
 
   auto lhs = resolveType(getActual()->getGenericArgs()[position])
