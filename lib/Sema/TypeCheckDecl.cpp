@@ -2785,7 +2785,9 @@ public:
     (void) CD->getStoredProperties();
 
     TC.addImplicitConstructors(CD);
-    CD->addImplicitDestructor();
+
+    // Force creation of an implicit destructor, if any.
+    (void) CD->getDestructor();
 
     for (Decl *Member : CD->getMembers())
       visit(Member);
@@ -4224,10 +4226,9 @@ void TypeChecker::finalizeDecl(ClassDecl *CD) {
 
   validateDecl(CD);
 
-  // We need to add implicit initializers and dtors because it
-  // affects vtable layout.
+  // We need to add implicit initializers because they
+  // affect vtable layout.
   addImplicitConstructors(CD);
-  CD->addImplicitDestructor();
 
   // We need the superclass vtable layout as well.
   requestSuperclassLayout(CD);
