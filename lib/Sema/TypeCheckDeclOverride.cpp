@@ -170,6 +170,16 @@ bool swift::isOverrideBasedOnType(ValueDecl *decl, Type declTy,
   if (declIUOAttr != parentDeclIUOAttr)
     return false;
 
+  auto parentGenericCtx = parentDecl->getAsGenericContext();
+  auto declGenericCtx = decl->getAsGenericContext();
+
+  if (parentGenericCtx && declGenericCtx) {
+    if (parentGenericCtx->getGenericSignature()->getCanonicalSignature() !=
+        declGenericCtx->getGenericSignature()->getCanonicalSignature()) {
+      return false;
+    }
+  }
+
   // If this is a constructor, let's compare only parameter types.
   if (isa<ConstructorDecl>(decl)) {
     // Within a protocol context, check for a failability mismatch.
