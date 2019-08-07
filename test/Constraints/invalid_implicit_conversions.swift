@@ -9,7 +9,8 @@ func test(
   _ ptr: UnsafePointer<Int>,
   _ ptrI8: UnsafePointer<Int8>,
   _ ptrU8: UnsafePointer<UInt8>,
-  _ ptrVoid: UnsafePointer<Void> // expected-warning {{UnsafePointer<Void> has been replaced by UnsafeRawPointer}}
+  _ ptrVoid: UnsafePointer<Void>, // expected-warning {{UnsafePointer<Void> has been replaced by UnsafeRawPointer}}
+  _ optPtr: UnsafePointer<Int>?
 ) {
   var i: Int = 0
   var a: [Int] = [0]
@@ -23,6 +24,7 @@ func test(
   takesAutoclosure(mutRawPtr, &a) // expected-error {{cannot perform pointer conversion of value of type '[Int]' to autoclosure result type 'UnsafeMutableRawPointer'}}
   takesAutoclosure(mutPtr, &a) // expected-error {{cannot perform pointer conversion of value of type '[Int]' to autoclosure result type 'UnsafeMutablePointer<Int>'}}
   takesAutoclosure(ptr, &a) // expected-error {{cannot perform pointer conversion of value of type '[Int]' to autoclosure result type 'UnsafePointer<Int>'}}
+  takesAutoclosure(optPtr, &i) // expected-error {{cannot perform pointer conversion of value of type 'Int' to autoclosure result type 'UnsafePointer<Int>?'}}
 
   takesAutoclosure(rawPtr, a) // expected-error {{cannot invoke 'takesAutoclosure' with an argument list of type '(UnsafeRawPointer, [Int])'}}
   // expected-note@-1 {{expected an argument list of type '(T, @autoclosure () throws -> T)'}}

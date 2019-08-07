@@ -715,6 +715,21 @@ public:
     return (getSummaryFlags() & ConstraintLocator::IsFunctionConversion);
   }
 
+  bool isAutoclosureResult() const {
+    SmallVector<LocatorPathElt, 4> path;
+    getLocatorParts(path);
+
+    auto last = std::find_if(
+        path.rbegin(), path.rend(), [](LocatorPathElt &elt) -> bool {
+          return elt.getKind() != ConstraintLocator::OptionalPayload;
+        });
+
+    if (last != path.rend())
+      return last->getKind() == ConstraintLocator::AutoclosureResult;
+
+    return false;
+  }
+
   /// Retrieve the base constraint locator, on which this builder's
   /// path is based.
   ConstraintLocator *getBaseLocator() const {
