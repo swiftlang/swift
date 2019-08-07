@@ -1100,8 +1100,8 @@ public:
     }
 
     if (Begin) {
-      if (const char *CStr =
-          llvm::sys::Process::OutputColor(Col, false, false)) {
+      if (const char *CStr = llvm::sys::Process::OutputColor(
+              static_cast<char>(Col), false, false)) {
         OS << CStr;
       }
     } else {
@@ -1591,8 +1591,8 @@ private:
       Col = llvm::raw_ostream::CYAN; break;
     }
 
-    if (const char *CStr =
-        llvm::sys::Process::OutputColor(Col, false, false)) {
+    if (const char *CStr = llvm::sys::Process::OutputColor(
+            static_cast<char>(Col), false, false)) {
       OS << CStr;
     }
     OS << Text;

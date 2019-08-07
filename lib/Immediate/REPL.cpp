@@ -440,9 +440,8 @@ private:
     PromptString.clear();
 
     if (ShowColors) {
-      const char *colorCode =
-        llvm::sys::Process::OutputColor(llvm::raw_ostream::YELLOW,
-                                        false, false);
+      const char *colorCode = llvm::sys::Process::OutputColor(
+          static_cast<char>(llvm::raw_ostream::YELLOW), false, false);
       if (colorCode)
         appendEscapeSequence(PromptString, colorCode);
     }
