@@ -715,7 +715,7 @@ public:
     return (getSummaryFlags() & ConstraintLocator::IsFunctionConversion);
   }
 
-  bool isAutoclosureResult() const {
+  bool isForAutoclosureResult() const {
     SmallVector<LocatorPathElt, 4> path;
     getLocatorParts(path);
 
