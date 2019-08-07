@@ -721,7 +721,6 @@ internal protocol _AnyDerivativeBox {
   func _subtracting(_ x: _AnyDerivativeBox) -> _AnyDerivativeBox
 
   // `Differentiable` requirements.
-  var _allDifferentiableVariables: _AnyDerivativeBox { get }
   mutating func _move(along direction: _AnyDerivativeBox)
 
   /// The underlying base value, type-erased to `Any`.
@@ -818,10 +817,6 @@ internal struct _ConcreteDerivativeBox<T> : _AnyDerivativeBox
   }
 
   // `Differentiable` requirements.
-
-  var _allDifferentiableVariables: _AnyDerivativeBox {
-    return _ConcreteDerivativeBox(_base.allDifferentiableVariables)
-  }
 
   mutating func _move(along direction: _AnyDerivativeBox) {
     if direction._isOpaqueZero() {
