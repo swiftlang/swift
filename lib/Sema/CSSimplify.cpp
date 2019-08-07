@@ -6624,11 +6624,24 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     auto baseType2 = getBaseTypeForPointer(*this, t2);
 
     increaseScore(ScoreKind::SK_ValueToPointerConversion);
-    return matchTypes(baseType1, baseType2,
-                      ConstraintKind::BindToPointerType,
-                      subflags, locator);
+    auto result = matchTypes(baseType1, baseType2,
+                             ConstraintKind::BindToPointerType,
+                             subflags, locator);
+
+    if (!(result.isFailure() && shouldAttemptFixes()))
+      return result;
+
+    auto *arrTy = obj1->getAs<BoundGenericType>();
+    // Let's dig out underlying pointer type since it could
+    // be wrapped into N (implicit) optionals.
+    auto *ptrTy =
+        type2->lookThroughAllOptionalTypes()->getAs<BoundGenericType>();
+
+    auto *fix = GenericArgumentsMismatch::create(*this, arrTy, ptrTy, {0},
+                                                 getConstraintLocator(locator));
+    return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
-      
+
   // String ===> UnsafePointer<[U]Int8>
   case ConversionRestrictionKind::StringToPointer: {
     addContextualScore();
