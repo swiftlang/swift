@@ -233,74 +233,39 @@ static MultiPayloadLayout getMultiPayloadLayout(const EnumMetadata *enumType) {
 static void storeMultiPayloadTag(OpaqueValue *value,
                                  MultiPayloadLayout layout,
                                  unsigned tag) {
-  auto tagBytes = reinterpret_cast<char *>(value) + layout.payloadSize;
-#if defined(__BIG_ENDIAN__)
-  small_memcpy(tagBytes,
-               reinterpret_cast<char *>(&tag) + 4 - layout.numTagBytes,
-               layout.numTagBytes);
-#else
-  small_memcpy(tagBytes, &tag, layout.numTagBytes);
-#endif
+  auto tagBytes = reinterpret_cast<uint8_t *>(value) + layout.payloadSize;
+  storeEnumElement(tagBytes, tag, layout.numTagBytes);
 }
 
 static void storeMultiPayloadValue(OpaqueValue *value,
                                    MultiPayloadLayout layout,
                                    unsigned payloadValue) {
-  auto bytes = reinterpret_cast<char *>(value);
-#if defined(__BIG_ENDIAN__)
-  unsigned numPayloadValueBytes =
-      std::min(layout.payloadSize, sizeof(payloadValue));
-  memcpy(bytes + sizeof(OpaqueValue *) - numPayloadValueBytes,
-         reinterpret_cast<char *>(&payloadValue) + 4 - numPayloadValueBytes,
-         numPayloadValueBytes);
-  if (layout.payloadSize > sizeof(payloadValue) &&
-      layout.payloadSize > sizeof(OpaqueValue *)) {
-    memset(bytes, 0,
-           sizeof(OpaqueValue *) - numPayloadValueBytes);
-    memset(bytes + sizeof(OpaqueValue *), 0,
-           layout.payloadSize - sizeof(OpaqueValue *));
-  }
-#else
-  memcpy(bytes, &payloadValue,
-         std::min(layout.payloadSize, sizeof(payloadValue)));
-
-  // If the payload is larger than the value, zero out the rest.
-  if (layout.payloadSize > sizeof(payloadValue))
-    memset(bytes + sizeof(payloadValue), 0,
-           layout.payloadSize - sizeof(payloadValue));
-#endif
+  auto bytes = reinterpret_cast<uint8_t *>(value);
+  storeEnumElement(bytes, payloadValue, layout.payloadSize);
 }
 
 static unsigned loadMultiPayloadTag(const OpaqueValue *value,
                                     MultiPayloadLayout layout,
                                     unsigned baseValue = 0) {
-  auto tagBytes = reinterpret_cast<const char *>(value) + layout.payloadSize;
+  auto tagBytes = reinterpret_cast<const uint8_t *>(value) +
+                  layout.payloadSize;
+  auto tag = loadEnumElement(tagBytes, layout.numTagBytes);
 
-  unsigned tag = baseValue;
-#if defined(__BIG_ENDIAN__)
-  small_memcpy(reinterpret_cast<char *>(&tag) + 4 - layout.numTagBytes,
-               tagBytes, layout.numTagBytes);
-#else
-  small_memcpy(&tag, tagBytes, layout.numTagBytes);
-#endif
+  // The maximum number of extra tag bytes is 4.
+  // Note: return early to avoid shifting baseValue by 32 which is
+  // undefined behaviour.
+  if (layout.numTagBytes == 4) {
+    return tag;
+  }
 
-  return tag;
+  // Replace out-of-range bytes with the base value.
+  return tag | (baseValue & (~0u << (layout.numTagBytes * 8)));
 }
 
 static unsigned loadMultiPayloadValue(const OpaqueValue *value,
                                       MultiPayloadLayout layout) {
-  auto bytes = reinterpret_cast<const char *>(value);
-  unsigned payloadValue = 0;
-#if defined(__BIG_ENDIAN__)
-  unsigned numPayloadValueBytes =
-      std::min(layout.payloadSize, sizeof(payloadValue));
-  memcpy(reinterpret_cast<char *>(&payloadValue) + 4 - numPayloadValueBytes,
-         bytes + sizeof(OpaqueValue *) - numPayloadValueBytes, numPayloadValueBytes);
-#else
-  memcpy(&payloadValue, bytes,
-         std::min(layout.payloadSize, sizeof(payloadValue)));
-#endif
-  return payloadValue;
+  auto bytes = reinterpret_cast<const uint8_t *>(value);
+  return loadEnumElement(bytes, layout.payloadSize);
 }
 
 SWIFT_CC(swift)

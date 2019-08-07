@@ -255,3 +255,124 @@ func makeBasic<T : FooProtocol>() -> T { return T() }
 func throwingElement<T : FooProtocol>() throws -> [T] {
   return try [makeBasic(), makeThrowing()]
 }
+
+class TakesDictionaryLiteral<Key, Value> : ExpressibleByDictionaryLiteral {
+  required init(dictionaryLiteral elements: (Key, Value)...) {}
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s8literals23returnsCustomDictionaryAA05TakesD7LiteralCyS2iGyF : $@convention(thin) () -> @owned TakesDictionaryLiteral<Int, Int> {
+// CHECK: [[TMP:%.*]] = apply %2(%0, %1) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
+// CHECK: [[ARRAY_LENGTH:%.*]] = integer_literal $Builtin.Word, 2
+// CHECK: // function_ref _allocateUninitializedArray<A>(_:)
+// CHECK: [[ALLOCATE_VARARGS:%.*]] = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
+// CHECK: [[ARR_TMP:%.*]] = apply [[ALLOCATE_VARARGS]]<(Int, Int)>([[ARRAY_LENGTH]])
+// CHECK: ([[ARR:%.*]], [[ADDRESS:%.*]]) = destructure_tuple [[ARR_TMP]]
+// CHECK: [[TUPLE_ADDR:%.*]] = pointer_to_address %9 : $Builtin.RawPointer to [strict] $*(Int, Int)
+// CHECK: [[KEY_ADDR:%.*]] = tuple_element_addr [[TUPLE_ADDR]] : $*(Int, Int), 0
+// CHECK: [[VALUE_ADDR:%.*]] = tuple_element_addr [[TUPLE_ADDR]] : $*(Int, Int), 1
+// CHECK: store [[TMP]] to [trivial] [[KEY_ADDR]] : $*Int
+// CHECK: store [[TMP]] to [trivial] [[VALUE_ADDR]] : $*Int
+// CHECK: [[IDX1:%.*]] = integer_literal $Builtin.Word, 1
+// CHECK: [[TUPLE_ADDR1:%.*]] = index_addr [[TUPLE_ADDR]] : $*(Int, Int), [[IDX1]] : $Builtin.Word
+// CHECK: [[KEY_ADDR:%.*]] = tuple_element_addr [[TUPLE_ADDR1]] : $*(Int, Int), 0
+// CHECK: [[VALUE_ADDR:%.*]] = tuple_element_addr [[TUPLE_ADDR1]] : $*(Int, Int), 1
+// CHECK: store [[TMP]] to [trivial] [[KEY_ADDR]] : $*Int
+// CHECK: store [[TMP]] to [trivial] [[VALUE_ADDR]] : $*Int
+// CHECK: [[METATYPE:%.*]] = metatype $@thick TakesDictionaryLiteral<Int, Int>.Type
+// CHECK: [[CTOR:%.*]] = class_method [[METATYPE]] : $@thick TakesDictionaryLiteral<Int, Int>.Type, #TakesDictionaryLiteral.init!allocator.1 : <Key, Value> (TakesDictionaryLiteral<Key, Value>.Type) -> ((Key, Value)...) -> TakesDictionaryLiteral<Key, Value>, $@convention(method) <τ_0_0, τ_0_1> (@owned Array<(τ_0_0, τ_0_1)>, @thick TakesDictionaryLiteral<τ_0_0, τ_0_1>.Type) -> @owned TakesDictionaryLiteral<τ_0_0, τ_0_1>
+// CHECK: [[RESULT:%.*]] = apply [[CTOR]]<Int, Int>(%8, %21)
+// CHECK: return [[RESULT]]
+
+func returnsCustomDictionary() -> TakesDictionaryLiteral<Int, Int> {
+  // Use temporary to simplify generated_sil
+  let tmp = 77
+  return [tmp: tmp, tmp : tmp]
+}
+
+struct Color: _ExpressibleByColorLiteral {
+  init(_colorLiteralRed red: Float, green: Float, blue: Float, alpha: Float) {}
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s8literals16makeColorLiteralAA0C0VyF : $@convention(thin) () -> Color {
+// CHECK: [[COLOR_METATYPE:%.*]] = metatype $@thin Color.Type
+// CHECK: [[VALUE:%.*]] = float_literal $Builtin.FPIEEE{{64|80}}, {{0x3FF5BA5E353F7CEE|0x3FFFADD2F1A9FBE76C8B}}
+// CHECK: [[METATYPE:%.*]] = metatype $@thin Float.Type
+// CHECK: [[FN:%.*]] = function_ref @$sSf20_builtinFloatLiteralSfBf{{64|80}}__tcfC
+// CHECK: [[R:%.*]] = apply [[FN]]([[VALUE]], [[METATYPE]]) : $@convention(method) (Builtin.FPIEEE{{64|80}}, @thin Float.Type) -> Float
+
+// CHECK: [[VALUE:%.*]] = float_literal $Builtin.FPIEEE{{64|80}}, {{0xBFB2F1A9FBE76C8B|0xBFFB978D4FDF3B645A1D}}
+// CHECK: [[METATYPE:%.*]] = metatype $@thin Float.Type
+// CHECK: [[FN:%.*]] = function_ref @$sSf20_builtinFloatLiteralSfBf{{64|80}}__tcfC
+// CHECK: [[G:%.*]] = apply [[FN]]([[VALUE]], [[METATYPE]]) : $@convention(method) (Builtin.FPIEEE{{64|80}}, @thin Float.Type) -> Float
+
+// CHECK: [[VALUE:%.*]] = float_literal $Builtin.FPIEEE{{64|80}}, {{0xBF889374BC6A7EFA|0xBFF8C49BA5E353F7CED9}}
+// CHECK: [[METATYPE:%.*]] = metatype $@thin Float.Type
+// CHECK: [[FN:%.*]] = function_ref @$sSf20_builtinFloatLiteralSfBf{{64|80}}__tcfC
+// CHECK: [[B:%.*]] = apply [[FN]]([[VALUE]], [[METATYPE]]) : $@convention(method) (Builtin.FPIEEE{{64|80}}, @thin Float.Type) -> Float
+
+// CHECK: [[VALUE:%.*]] = float_literal $Builtin.FPIEEE{{64|80}}, {{0x3FF0000000000000|0x3FFF8000000000000000}}
+// CHECK: [[METATYPE:%.*]] = metatype $@thin Float.Type
+// CHECK: [[FN:%.*]] = function_ref @$sSf20_builtinFloatLiteralSfBf{{64|80}}__tcfC
+// CHECK: [[A:%.*]] = apply [[FN]]([[VALUE]], [[METATYPE]]) : $@convention(method) (Builtin.FPIEEE{{64|80}}, @thin Float.Type) -> Float
+
+// CHECK: [[FN:%.*]] = function_ref @$s8literals5ColorV16_colorLiteralRed5green4blue5alphaACSf_S3ftcfC : $@convention(method) (Float, Float, Float, Float, @thin Color.Type) -> Color
+// CHECK: [[LIT:%.*]] = apply [[FN]]([[R]], [[G]], [[B]], [[A]], [[COLOR_METATYPE]]) : $@convention(method) (Float, Float, Float, Float, @thin Color.Type) -> Color
+// CHECK: return [[LIT]] : $Color
+func makeColorLiteral() -> Color {
+  return #colorLiteral(red: 1.358, green: -0.074, blue: -0.012, alpha: 1.0)
+}
+
+struct Image: _ExpressibleByImageLiteral {
+  init(imageLiteralResourceName: String) {}
+}
+
+func makeTmpString() -> String { return "" }
+
+// CHECK-LABEL: sil hidden [ossa] @$s8literals16makeImageLiteralAA0C0VyF : $@convention(thin) () -> Image
+// CHECK: [[METATYPE:%.*]] = metatype $@thin Image.Type
+// CHECK: [[FN:%.*]] = function_ref @$s8literals13makeTmpStringSSyF : $@convention(thin) () -> @owned String
+// CHECK: [[STR:%.*]] = apply [[FN]]() : $@convention(thin) () -> @owned String
+// CHECK: [[FN:%.*]] = function_ref @$s8literals5ImageV24imageLiteralResourceNameACSS_tcfC : $@convention(method) (@owned String, @thin Image.Type) -> Image
+// CHECK: [[LIT:%.*]] = apply [[FN]]([[STR]], [[METATYPE]]) : $@convention(method) (@owned String, @thin Image.Type) -> Image
+// CHECK: return [[LIT]] : $Image
+func makeImageLiteral() -> Image {
+  return #imageLiteral(resourceName: makeTmpString())
+}
+
+struct FileReference: _ExpressibleByFileReferenceLiteral {
+  init(fileReferenceLiteralResourceName: String) {}
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s8literals24makeFileReferenceLiteralAA0cD0VyF : $@convention(thin) () -> FileReference
+// CHECK: [[METATYPE:%.*]] = metatype $@thin FileReference.Type
+// CHECK: [[FN:%.*]] = function_ref @$s8literals13makeTmpStringSSyF : $@convention(thin) () -> @owned String
+// CHECK: [[STR:%.*]] = apply [[FN]]() : $@convention(thin) () -> @owned String
+// CHECK: [[FN:%.*]] = function_ref @$s8literals13FileReferenceV04fileC19LiteralResourceNameACSS_tcfC
+// CHECK: [[LIT:%.*]] = apply [[FN]]([[STR]], [[METATYPE]]) : $@convention(method) (@owned String, @thin FileReference.Type) -> FileReference
+// CHECK: return [[LIT]] : $FileReference
+func makeFileReferenceLiteral() -> FileReference {
+  return #fileLiteral(resourceName: makeTmpString())
+}
+
+class ReferenceColor<T> { required init() {} }
+
+protocol Silly {
+  init()
+  init(_colorLiteralRed red: Float, green: Float, blue: Float, alpha: Float)
+}
+
+extension Silly {
+  init(_colorLiteralRed red: Float, green: Float, blue: Float, alpha: Float) {
+    self.init()
+  }
+}
+
+extension ReferenceColor : Silly, _ExpressibleByColorLiteral {}
+
+func makeColorLiteral<T>() -> ReferenceColor<T> {
+  return #colorLiteral(red: 1.358, green: -0.074, blue: -0.012, alpha: 1.0)
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s8literals16makeColorLiteralAA09ReferenceC0CyxGylF : $@convention(thin) <T> () -> @owned ReferenceColor<T>
+// CHECK: [[FN:%.*]] = function_ref @$s8literals5SillyPAAE16_colorLiteralRed5green4blue5alphaxSf_S3ftcfC : $@convention(method) <τ_0_0 where τ_0_0 : Silly> (Float, Float, Float, Float, @thick τ_0_0.Type) -> @out τ_0_0
+// CHECK: apply [[FN]]<ReferenceColor<T>>(

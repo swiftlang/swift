@@ -4,17 +4,17 @@
 
 // REQUIRES: executable_test
 
-@_propertyWrapper
+@propertyWrapper
 struct Wrapper<T> {
-  var value: T {
+  var wrappedValue: T {
     didSet {
-      print("  .. set \(value)")
+      print("  .. set \(wrappedValue)")
     }
   }
 
-  init(initialValue: T) {
+  init(wrappedValue initialValue: T) {
     print("  .. init \(initialValue)")
-    self.value = initialValue
+    self.wrappedValue = initialValue
   }
 }
 
@@ -49,7 +49,7 @@ struct IntStruct {
 
   init(conditional b: Bool) {
      if b {
-       self.$wrapped = Wrapper(initialValue: 32)
+       self._wrapped = Wrapper(wrappedValue: 32)
      } else {
        wrapped = 42
      }
@@ -73,7 +73,7 @@ final class IntClass {
 
   init(conditional b: Bool) {
      if b {
-       self.$wrapped = Wrapper(initialValue: 32)
+       self._wrapped = Wrapper(wrappedValue: 32)
      } else {
        wrapped = 42
      }
@@ -97,7 +97,7 @@ struct RefStruct {
 
   init(conditional b: Bool) {
      if b {
-       self.$wrapped = Wrapper(initialValue: Payload(32))
+       self._wrapped = Wrapper(wrappedValue: Payload(32))
      } else {
        wrapped = Payload(42)
      }
@@ -121,7 +121,7 @@ final class GenericClass<T : IntInitializable> {
 
   init(conditional b: Bool) {
      if b {
-       self.$wrapped = Wrapper(initialValue: T(32))
+       self._wrapped = Wrapper(wrappedValue: T(32))
      } else {
        wrapped = T(42)
      }
@@ -304,7 +304,7 @@ func testGenericClass() {
   }
 }
 
-@_propertyWrapper
+@propertyWrapper
 struct WrapperWithDefaultInit<Value> {
   private var _value: Value? = nil
 
@@ -312,7 +312,7 @@ struct WrapperWithDefaultInit<Value> {
     print("default init called on \(Value.self)")
   }
   
-  var value: Value {
+  var wrappedValue: Value {
     get {
       return _value!
     } set {
@@ -346,8 +346,44 @@ func testDefaultInit() {
   // CHECK: set value hello
 }
 
+// rdar://problem/51581937: DI crash with a property wrapper of an optional
+struct OptIntStruct {
+  @Wrapper var wrapped: Int?
+
+  init() {
+     wrapped = 42
+  }
+}
+
+func testOptIntStruct() {
+  // CHECK: ## OptIntStruct
+  print("\n## OptIntStruct")
+
+  let use = OptIntStruct()
+  // CHECK-NEXT:   .. init nil
+  // CHECK-NEXT:   .. set Optional(42)
+}
+
+// rdar://problem/53504653
+
+struct DefaultNilOptIntStruct {
+  @Wrapper var wrapped: Int?
+
+  init() {
+  }
+}
+func testDefaultNilOptIntStruct() {
+  // CHECK: ## DefaultNilOptIntStruct
+  print("\n## DefaultNilOptIntStruct")
+
+  let use = DefaultNilOptIntStruct()
+  // CHECK-NEXT:   .. init nil
+}
+
 testIntStruct()
 testIntClass()
 testRefStruct()
 testGenericClass()
 testDefaultInit()
+testOptIntStruct()
+testDefaultNilOptIntStruct()

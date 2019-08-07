@@ -357,3 +357,19 @@ struct S {
     }
   }
 }
+
+// rdar://problem/53238058 - Crash in getCalleeLocator while trying to produce a diagnostic about missing optional unwrap
+//                           associated with an argument to a call
+
+func rdar_53238058() {
+  struct S {
+    init(_: Double) {}
+    init<T>(_ value: T) where T : BinaryFloatingPoint {}
+  }
+
+  func test(_ str: String) {
+    _ = S(Double(str)) // expected-error {{value of optional type 'Double?' must be unwrapped to a value of type 'Double'}}
+    // expected-note@-1 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
+    // expected-note@-2 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+  }
+}

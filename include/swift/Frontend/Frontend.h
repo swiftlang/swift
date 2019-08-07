@@ -291,6 +291,12 @@ public:
 
   void setCodeCompletionFactory(CodeCompletionCallbacksFactory *Factory) {
     CodeCompletionFactory = Factory;
+    disableASTScopeLookup();
+  }
+  
+  /// Called from lldb, see rdar://53971116
+  void disableASTScopeLookup() {
+    LangOpts.EnableASTScopeLookup = false;
   }
 
   CodeCompletionCallbacksFactory *getCodeCompletionFactory() const {
@@ -535,6 +541,7 @@ private:
   }
 
   bool setUpInputs();
+  bool setUpASTContextIfNeeded();
   Optional<unsigned> setUpCodeCompletionBuffer();
 
   /// Set up all state in the CompilerInstance to process the given input file.

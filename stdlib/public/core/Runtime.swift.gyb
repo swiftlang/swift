@@ -153,7 +153,7 @@ internal struct _Buffer72 {
 % for bits in [ 32, 64, 80 ]:
 
 % if bits == 80:
-#if !os(Windows) && (arch(i386) || arch(x86_64))
+#if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
 % end
 
 @_silgen_name("swift_float${bits}ToString")
@@ -302,17 +302,6 @@ internal class __SwiftNativeNSEnumerator {
   @nonobjc
   internal init() {}
   @objc public init(coder: AnyObject) {}
-  deinit {}
-}
-
-// FIXME(ABI)#60 : move into the Foundation overlay and remove 'open'
-@_fixed_layout
-@objc @_swift_native_objc_runtime_base(__SwiftNativeNSDataBase)
-open class __SwiftNativeNSData {
-  @inlinable
-  @objc public init() {}
-  @objc public init(coder: AnyObject) {}
-  @inlinable
   deinit {}
 }
 

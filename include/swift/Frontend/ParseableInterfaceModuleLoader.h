@@ -9,6 +9,7 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+///
 /// \file This implements the logic for loading and building parseable module
 /// interfaces.
 ///
@@ -102,19 +103,25 @@
 ///
 //===----------------------------------------------------------------------===//
 
+#ifndef SWIFT_FRONTEND_PARSEABLEINTERFACEMODULELOADER_H
+#define SWIFT_FRONTEND_PARSEABLEINTERFACEMODULELOADER_H
+
 #include "swift/Basic/LLVM.h"
 #include "swift/Frontend/ParseableInterfaceSupport.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 
 namespace clang {
-  class CompilerInstance;
+class CompilerInstance;
 }
 
 namespace unittest {
-  class ParseableInterfaceModuleLoaderTest;
+class ParseableInterfaceModuleLoaderTest;
 }
 
 namespace swift {
+
+class LangOptions;
+class SearchPathOptions;
 
 /// A ModuleLoader that runs a subordinate \c CompilerInvocation and
 /// \c CompilerInstance to convert .swiftinterface files to .swiftmodule
@@ -162,10 +169,11 @@ public:
   /// Unconditionally build \p InPath (a swiftinterface file) to \p OutPath (as
   /// a swiftmodule file).
   ///
-  /// A simplified version of the core logic in #openModuleFiles, mostly for
-  /// testing purposes.
+  /// A simplified version of the core logic in #openModuleFiles.
   static bool buildSwiftModuleFromSwiftInterface(
-    ASTContext &Ctx, StringRef CacheDir, StringRef PrebuiltCacheDir,
+    SourceManager &SourceMgr, DiagnosticEngine &Diags,
+    const SearchPathOptions &SearchPathOpts, const LangOptions &LangOpts,
+    StringRef CacheDir, StringRef PrebuiltCacheDir,
     StringRef ModuleName, StringRef InPath, StringRef OutPath,
     bool SerializeDependencyHashes, bool TrackSystemDependencies,
     bool RemarkOnRebuildFromInterface);
@@ -178,3 +186,5 @@ std::string
 getModuleCachePathFromClang(const clang::CompilerInstance &Instance);
 
 }
+
+#endif

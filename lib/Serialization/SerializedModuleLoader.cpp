@@ -230,6 +230,7 @@ void SerializedModuleLoaderBase::collectVisibleTopLevelModuleNamesImpl(
       return None;
     }
     }
+    llvm_unreachable("covered switch");
   });
 }
 
@@ -474,6 +475,7 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
           return findTargetSpecificModuleFiles();
         }
         }
+        llvm_unreachable("covered switch");
       });
   return result.getValueOr(false);
 }
@@ -718,7 +720,8 @@ void swift::serialization::diagnoseSerializedASTLoadFailure(
   case serialization::Status::FailedToLoadBridgingHeader:
     // We already emitted a diagnostic about the bridging header. Just emit
     // a generic message here.
-    Ctx.Diags.diagnose(diagLoc, diag::serialization_load_failed, ModuleName);
+    Ctx.Diags.diagnose(diagLoc, diag::serialization_load_failed,
+                       ModuleName.str());
     break;
 
   case serialization::Status::NameMismatch: {

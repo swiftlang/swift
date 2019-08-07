@@ -804,7 +804,6 @@ namespace {
                              std::move(WithNoPayload))
     {
       assert(ElementsWithPayload.empty());
-      assert(!ElementsWithNoPayload.empty());
     }
 
     bool needsPayloadSizeInMetadata() const override { return false; }
@@ -1164,7 +1163,6 @@ namespace {
                                       std::move(WithNoPayload))
     {
       assert(ElementsWithPayload.empty());
-      assert(!ElementsWithNoPayload.empty());
     }
 
     TypeInfo *completeEnumTypeLayout(TypeConverter &TC,
@@ -3224,11 +3222,31 @@ namespace {
     getBitMaskForNoPayloadElements() const override {
       // Use the extra inhabitants mask from the payload.
       auto &payloadTI = getFixedPayloadTypeInfo();
-      ClusteredBitVector extraInhabitantsMask;
+      APInt extraInhabitantsMaskInt;
+
+      // If we used extra inhabitants from the payload, then we can use the
+      // payload's mask to find the bits we need to test.
+      auto extraDiscriminatorBits = (~APInt(8, 0));
+      if (payloadTI.getFixedSize().getValueInBits() != 0)
+        extraDiscriminatorBits =
+          extraDiscriminatorBits.zextOrTrunc(
+              payloadTI.getFixedSize().getValueInBits());
+      if (getNumExtraInhabitantTagValues() > 0) {
+        extraInhabitantsMaskInt = payloadTI.getFixedExtraInhabitantMask(IGM);
+        // If we have more no-payload cases than extra inhabitants, also
+        // mask in up to four bytes for discriminators we generate using
+        // extra tag bits.
+        if (ExtraTagBitCount > 0) {
+          extraInhabitantsMaskInt |= extraDiscriminatorBits;
+        }
+      } else {
+        // If we only use extra tag bits, then we need that extra tag plus
+        // up to four bytes of discriminator.
+        extraInhabitantsMaskInt = extraDiscriminatorBits;
+      }
+      auto extraInhabitantsMask
+        = getBitVectorFromAPInt(extraInhabitantsMaskInt);
       
-      if (!payloadTI.isKnownEmpty(ResilienceExpansion::Maximal))
-        extraInhabitantsMask =
-          getBitVectorFromAPInt(payloadTI.getFixedExtraInhabitantMask(IGM));
       // Extend to include the extra tag bits, which are always significant.
       unsigned totalSize
         = cast<FixedTypeInfo>(TI)->getFixedSize().getValueInBits();
@@ -5779,6 +5797,9 @@ EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
   std::vector<Element> elementsWithPayload;
   std::vector<Element> elementsWithNoPayload;
 
+  if (TC.IGM.isResilient(theEnum, ResilienceExpansion::Minimal))
+    alwaysFixedSize = IsNotFixedSize;
+
   // Resilient enums are manipulated as opaque values, except we still
   // make the following assumptions:
   // 1) The indirect-ness of cases won't change
@@ -5800,14 +5821,7 @@ EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
   for (auto elt : theEnum->getAllElements()) {
     numElements++;
 
-    // Compute whether this gives us an apparent payload or dynamic layout.
-    // Note that we do *not* apply substitutions from a bound generic instance
-    // yet. We want all instances of a generic enum to share an implementation
-    // strategy. If the abstract layout of the enum is dependent on generic
-    // parameters, then we additionally need to constrain any layout
-    // optimizations we perform to things that are reproducible by the runtime.
-    Type origArgType = elt->getArgumentInterfaceType();
-    if (origArgType.isNull()) {
+    if (!elt->hasAssociatedValues()) {
       elementsWithNoPayload.push_back({elt, nullptr, nullptr});
       continue;
     }
@@ -5820,6 +5834,13 @@ EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
       continue;
     }
 
+    // Compute whether this gives us an apparent payload or dynamic layout.
+    // Note that we do *not* apply substitutions from a bound generic instance
+    // yet. We want all instances of a generic enum to share an implementation
+    // strategy. If the abstract layout of the enum is dependent on generic
+    // parameters, then we additionally need to constrain any layout
+    // optimizations we perform to things that are reproducible by the runtime.
+    Type origArgType = elt->getArgumentInterfaceType();
     origArgType = theEnum->mapTypeIntoContext(origArgType);
 
     auto origArgLoweredTy = TC.IGM.getLoweredType(origArgType);
@@ -5875,6 +5896,13 @@ EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
                                          numElements,
                                          std::move(elementsWithPayload),
                                          std::move(elementsWithNoPayload)));
+  }
+
+  // namespace-like enums must be imported as empty decls.
+  if (theEnum->hasClangNode() && numElements == 0 && !theEnum->isObjC()) {
+    return std::unique_ptr<EnumImplStrategy>(new SingletonEnumImplStrategy(
+        TC.IGM, tik, alwaysFixedSize, numElements,
+        std::move(elementsWithPayload), std::move(elementsWithNoPayload)));
   }
 
   // Enums imported from Clang or marked with @objc use C-compatible layout.
@@ -6904,6 +6932,24 @@ llvm::Value *irgen::emitScatterBits(IRGenFunction &IGF,
 
     // Update the offset and remaining mask.
     usedBits += partMask.countPopulation();
+  }
+  return result;
+}
+
+/// Pack masked bits into the low bits of an integer value.
+llvm::APInt irgen::gatherBits(const llvm::APInt &mask,
+                              const llvm::APInt &value) {
+  assert(mask.getBitWidth() == value.getBitWidth());
+  llvm::APInt result = llvm::APInt(mask.countPopulation(), 0);
+  unsigned j = 0;
+  for (unsigned i = 0; i < mask.getBitWidth(); ++i) {
+    if (!mask[i]) {
+      continue;
+    }
+    if (value[i]) {
+      result.setBit(j);
+    }
+    ++j;
   }
   return result;
 }

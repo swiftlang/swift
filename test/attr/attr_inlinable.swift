@@ -167,6 +167,7 @@ enum InternalEnum {
   _ = VersionedEnum.persimmon
 }
 
+
 // Inherited initializers - <rdar://problem/34398148>
 @usableFromInline
 @_fixed_layout
@@ -188,6 +189,7 @@ class Derived : Middle {
   }
 }
 
+
 // More inherited initializers
 @_fixed_layout
 public class Base2 {
@@ -207,6 +209,36 @@ class Derived2 : Middle2 {
     super.init(x: y)
   }
 }
+
+
+// Even more inherited initializers - https://bugs.swift.org/browse/SR-10940
+@_fixed_layout
+public class Base3 {}
+// expected-note@-1 {{initializer 'init()' is not '@usableFromInline' or public}}
+
+@_fixed_layout
+public class Derived3 : Base3 {
+  @inlinable
+  public init(_: Int) {}
+  // expected-error@-1 {{initializer 'init()' is internal and cannot be referenced from an '@inlinable' function}}
+}
+
+@_fixed_layout
+public class Base4 {}
+
+@_fixed_layout
+@usableFromInline
+class Middle4 : Base4 {}
+// expected-note@-1 {{initializer 'init()' is not '@usableFromInline' or public}}
+
+@_fixed_layout
+@usableFromInline
+class Derived4 : Middle4 {
+  @inlinable
+  public init(_: Int) {}
+  // expected-error@-1 {{initializer 'init()' is internal and cannot be referenced from an '@inlinable' function}}
+}
+
 
 // Stored property initializer expressions.
 //

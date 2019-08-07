@@ -141,7 +141,7 @@ public:
   /// Emit a switch over specific bit patterns for the payload.
   /// The value will be tested as if AND-ed against the given mask.
   void emitSwitch(IRGenFunction &IGF,
-                  APInt mask,
+                  const APInt &mask,
                   ArrayRef<std::pair<APInt, llvm::BasicBlock*>> cases,
                   SwitchDefaultDest dflt) const;
   
@@ -164,6 +164,10 @@ public:
                                    const SpareBitVector &spareBits,
                                    unsigned firstBitOffset,
                                    unsigned bitWidth) const;
+private:
+  /// Calculate the total number of bits this payload requires.
+  /// This will always be a multiple of 8.
+  unsigned getAllocSizeInBits(const llvm::DataLayout &DL) const;
 };
   
 }

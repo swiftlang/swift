@@ -12,7 +12,7 @@
 
 import SwiftShims
 
-extension String : Hashable {
+extension String: Hashable {
   /// Hashes the essential components of this value by feeding them into the
   /// given hasher.
   ///
@@ -44,7 +44,7 @@ extension StringProtocol {
 }
 
 extension _StringGutsSlice {
-  @inline(never) // slow-path
+  @_effects(releasenone) @inline(never) // slow-path
   internal func _normalizedHash(into hasher: inout Hasher) {
     if self.isNFCFastUTF8 {
       self.withFastUTF8 {

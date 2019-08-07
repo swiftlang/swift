@@ -167,6 +167,26 @@ static void revertDependentTypeLoc(TypeLoc &tl) {
 Type TypeChecker::getOrCreateOpaqueResultType(TypeResolution resolution,
                                               ValueDecl *originatingDecl,
                                               OpaqueReturnTypeRepr *repr) {
+  // Protocol requirements can't have opaque return types.
+  //
+  // TODO: Maybe one day we could treat this as sugar for an associated type.
+  if (isa<ProtocolDecl>(originatingDecl->getDeclContext())
+      && originatingDecl->isProtocolRequirement()) {
+    
+    SourceLoc fixitLoc;
+    if (auto vd = dyn_cast<VarDecl>(originatingDecl)) {
+      fixitLoc = vd->getParentPatternBinding()->getStartLoc();
+    } else {
+      fixitLoc = originatingDecl->getStartLoc();
+    }
+    
+    diagnose(repr->getLoc(), diag::opaque_type_in_protocol_requirement)
+      .fixItInsert(fixitLoc, "associatedtype <#AssocType#>\n")
+      .fixItReplace(repr->getSourceRange(), "<#AssocType#>");
+    
+    return ErrorType::get(Context);
+  }
+  
   // If the decl already has an opaque type decl for its return type, use it.
   if (auto existingDecl = originatingDecl->getOpaqueResultTypeDecl()) {
     return existingDecl->getDeclaredInterfaceType();
@@ -202,6 +222,9 @@ Type TypeChecker::getOrCreateOpaqueResultType(TypeResolution resolution,
              diag::opaque_type_invalid_constraint);
     return constraintTypeLoc.getType();
   }
+  
+  if (constraintType->hasArchetype())
+    constraintType = constraintType->mapTypeOutOfContext();
 
   // Create a generic signature for the opaque environment. This is the outer
   // generic signature with an added generic parameter representing the opaque
@@ -547,15 +570,12 @@ void TypeChecker::validateGenericFuncOrSubscriptSignature(
       decl->getDeclContext()->getGenericSignatureOfContext();
 
   auto params = func ? func->getParameters() : subscr->getIndices();
-  bool hasDynamicSelf = false;
   TypeLoc emptyLoc;
   TypeLoc &resultTyLoc = [&]() -> TypeLoc& {
     if (subscr)
       return subscr->getElementTypeLoc();
-    if (auto fn = dyn_cast<FuncDecl>(func)) {
-      hasDynamicSelf = fn->hasDynamicSelf();
+    if (auto fn = dyn_cast<FuncDecl>(func))
       return fn->getBodyResultTypeLoc();
-    }
     return emptyLoc;
   }();
 
@@ -585,9 +605,8 @@ void TypeChecker::validateGenericFuncOrSubscriptSignature(
     if (!resultTyLoc.isNull() &&
         !(resultTyLoc.getTypeRepr() &&
           isa<OpaqueReturnTypeRepr>(resultTyLoc.getTypeRepr())))
-      validateType(resultTyLoc, resolution, hasDynamicSelf
-                     ? TypeResolverContext::DynamicSelfResult
-                     : TypeResolverContext::FunctionResult);
+      validateType(resultTyLoc, resolution,
+                   TypeResolverContext::FunctionResult);
 
     // Infer requirements from it.
     if (resultTyLoc.getTypeRepr()) {
@@ -638,9 +657,8 @@ void TypeChecker::validateGenericFuncOrSubscriptSignature(
       resultTyLoc.setType(
           getOrCreateOpaqueResultType(resolution, decl, opaqueTy));
     } else {
-      validateType(resultTyLoc, resolution, hasDynamicSelf
-                   ? TypeResolverContext::DynamicSelfResult
-                   : TypeResolverContext::FunctionResult);
+      validateType(resultTyLoc, resolution,
+                   TypeResolverContext::FunctionResult);
     }
   }
 

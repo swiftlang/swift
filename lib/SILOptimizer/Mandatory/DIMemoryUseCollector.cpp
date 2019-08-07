@@ -471,7 +471,7 @@ static void getScalarizedElements(SILValue V,
                                   SmallVectorImpl<SILValue> &ElementVals,
                                   SILLocation Loc, SILBuilder &B) {
   auto *DTI = B.createDestructureTuple(Loc, V);
-  copy(DTI->getResults(), std::back_inserter(ElementVals));
+  llvm::copy(DTI->getResults(), std::back_inserter(ElementVals));
 }
 
 /// Scalarize a load down to its subelements.  If NewLoads is specified, this
@@ -1568,11 +1568,15 @@ collectDelegatingInitUses(const DIMemoryObjectInfo &TheMemory,
     // be an end_borrow use in addition to the value_metatype.
     if (isa<LoadBorrowInst>(User)) {
       auto UserVal = cast<SingleValueInstruction>(User);
-      bool onlyUseIsValueMetatype = true;
+      bool onlyUseIsValueMetatype = false;
       for (auto use : UserVal->getUses()) {
-        if (isa<EndBorrowInst>(use->getUser())
-            || isa<ValueMetatypeInst>(use->getUser()))
+        auto *user = use->getUser();
+        if (isa<EndBorrowInst>(user))
           continue;
+        if (isa<ValueMetatypeInst>(user)) {
+          onlyUseIsValueMetatype = true;
+          continue;
+        }
         onlyUseIsValueMetatype = false;
         break;
       }
@@ -1785,7 +1789,7 @@ collectClassInitSelfLoadUses(MarkUninitializedInst *MUI,
         isa<UpcastInst>(User) ||
         isa<UncheckedRefCastInst>(User)) {
       auto I = cast<SingleValueInstruction>(User);
-      copy(I->getUses(), std::back_inserter(Worklist));
+      llvm::copy(I->getUses(), std::back_inserter(Worklist));
       continue;
     }
 

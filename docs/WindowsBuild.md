@@ -40,7 +40,7 @@ git clone https://github.com/apple/swift-cmark cmark
 git clone https://github.com/apple/swift-clang clang
 git clone https://github.com/apple/swift-llvm llvm
 git clone https://github.com/apple/swift-compiler-rt compiler-rt
-git clone -c core.autocrlf=input https://github.com/apple/swift
+git clone -c core.autocrlf=input -c core.symlinks=true https://github.com/apple/swift
 git clone https://github.com/apple/swift-corelibs-libdispatch
 git clone https://github.com/apple/swift-corelibs-foundation
 git clone https://github.com/apple/swift-corelibs-xctest
@@ -52,11 +52,11 @@ git clone https://gitlab.gnome.org/GNOME/libxml2.git
 ```
 
 ## 3. Acquire ICU
-1. Download ICU from [ICU Project](http://site.icu-project.org) for Windows x64 and extract the binaries.
+1. Download ICU from [ICU Project](http://site.icu-project.org) for Windows x64 and extract the folder to a new folder called `thirdparty`. In other words, there should be a folder `S:\thirdparty\icu4c-64_2-Win64-MSVC2017` with the ICU. 
 1. Add the `bin64` folder to your `Path` environment variable.
 
 ```cmd
-PATH S:\icu\bin64;%PATH%
+PATH S:\thirdparty\icu4c-64_2-Win64-MSVC2017\bin64;%PATH%
 ```
 
 ## 4. Fetch SQLite3
@@ -101,7 +101,7 @@ Warning: Creating the above links usually requires administrator privileges. The
 ## 6. Build LLVM/Clang
 - This must be done from within a developer command prompt. LLVM and Clang are
   large projects, so building might take a few hours. Make sure that the build
-  type for LLVM/Clang is compatbile with the build type for Swift. That is,
+  type for LLVM/Clang is compatible with the build type for Swift. That is,
   either build everything `Debug` or some variant of `Release` (e.g. `Release`,
   `RelWithDebInfo`).
 ```cmd
@@ -204,7 +204,7 @@ ninja
 Running the testsuite on Windows has additional external dependencies.
 
 ```cmd
-path S:\thirdparty\icu4c-63_1-Win64-MSVC2017\bin64;S:\b\swift\bin;S:\b\swift\libdispatch-prefix\bin;%PATH%;%ProgramFiles%\Git\usr\bin
+path S:\thirdparty\icu4c-64_2-Win64-MSVC2017\bin64;S:\b\swift\bin;S:\b\swift\libdispatch-prefix\bin;%PATH%;%ProgramFiles%\Git\usr\bin
 ninja -C S:\b\swift check-swift
 ```
 
@@ -355,8 +355,8 @@ cmake -G Ninja^
   -DFOUNDATION_BUILD_DIR=S:\b\foundation^
   -DLIBDISPATCH_BUILD_DIR=S:\b\libdispatch^
   -DLIBDISPATCH_SOURCE_DIR=S:\swift-corelibs-libdispatch^
-  -DLLBUILD_PATH_TO_SQLITE_SOURCE=S:\sqlite-amalgamation-3270200^
-  -DLLBUILD_PATH_TO_SQLITE_BUILD=S:\b\sqlite^
+  -DSQLite3_INCLUDE_DIR=S:\sqlite-amalgamation-3270200^
+  -DSQLite3_LIBRARY=S:\b\sqlite\sqlite3.lib^
   -DLLBUILD_SUPPORT_BINDINGS=Swift^
   S:\llbuild
 ninja

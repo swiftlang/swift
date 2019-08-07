@@ -3,7 +3,11 @@
 import os
 import sys
 
-blacklist = ["Kernel", "Ruby", "Tk"]
+blacklist = [
+    "Kernel", "Ruby", "Tk",
+    "DriverKit", "HIDDriverKit", "SkywalkDriverKit",  # has C++ code
+    "NetworkingDriverKit", "USBSerialDriverKit",  # has C++ code
+]
 
 
 def get_immediate_subdirectories(a_dir):
@@ -11,16 +15,27 @@ def get_immediate_subdirectories(a_dir):
             if os.path.isdir(os.path.join(a_dir, name))]
 
 
-def get_frameworks(sdk_path):
+def get_frameworks(sdk_path, swift_frameworks_only):
     frameworks_path = sdk_path + "/System/Library/Frameworks"
     names = []
     for frame in os.listdir(frameworks_path):
         if frame.endswith(".framework"):
+            name = frame[:-len(".framework")]
             header_dir_path = frameworks_path + '/' + frame + '/Headers'
             module_dir_path = frameworks_path + '/' + frame + '/Modules'
+            swiftmodule_path = module_dir_path + '/' + name + '.swiftmodule'
             old_modulemap_path = frameworks_path + '/' + frame + '/module.map'
             old_modulemap_private_path = frameworks_path + '/' + frame + \
                 '/module_private.map'
+
+            if os.path.exists(swiftmodule_path):
+                if name not in blacklist:
+                    names.append(name)
+                continue
+            # We only care about Swift frameworks then we are done.
+            if swift_frameworks_only:
+                continue
+
             if not os.path.exists(header_dir_path):
                 if os.path.exists(module_dir_path):
                     print >>sys.stderr, header_dir_path, \
@@ -36,10 +51,21 @@ def get_frameworks(sdk_path):
             if should_exclude_framework(frameworks_path + '/' + frame):
                 continue
 
-            name = frame[:-len(".framework")]
             if name in blacklist:
                 continue
             names.append(name)
+    return names
+
+
+def get_overlays(sdk_path):
+    overlay_path = sdk_path + "/usr/lib/swift/"
+    names = []
+    for overlay in os.listdir(overlay_path):
+        if overlay.endswith(".swiftmodule"):
+            overlay = overlay[:-len(".swiftmodule")]
+            if overlay in blacklist:
+                continue
+            names.append(overlay)
     return names
 
 
@@ -84,7 +110,9 @@ def main():
     parser.add_option("-o", "--output", help="output mode",
                       type=str, dest="out_mode", default="list")
     parser.add_option("--hash", action="store_true", dest="use_hash")
-
+    parser.add_option("--swift-frameworks-only", action="store_true")
+    parser.add_option("--swift-overlay-only", action="store_true")
+    parser.add_option("--v", action="store_true")
     (opts, cmd) = parser.parse_args()
 
     if not opts.sdk:
@@ -94,7 +122,13 @@ def main():
         parser.error(
             "output mode not specified: 'clang-import'/'swift-import'/'list'")
 
-    frames = get_frameworks(opts.sdk)
+    if opts.swift_overlay_only:
+        frames = get_overlays(opts.sdk)
+    else:
+        frames = get_frameworks(opts.sdk, opts.swift_frameworks_only)
+    if opts.v:
+        for name in frames:
+            print >>sys.stderr, 'Including: ', name
     if opts.out_mode == "clang-import":
         print_clang_imports(frames, opts.use_hash)
     elif opts.out_mode == "swift-import":

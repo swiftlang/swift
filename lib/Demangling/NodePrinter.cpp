@@ -228,6 +228,13 @@ private:
     Printer << ">";
   }
 
+  void printOptionalIndex(NodePointer node) {
+    assert(node->getKind() == Node::Kind::Index ||
+           node->getKind() == Node::Kind::UnknownIndex);
+    if (node->hasIndex())
+      Printer << "#" << node->getIndex() << " ";
+  }
+
   static bool isSwiftModule(NodePointer node) {
     return (node->getKind() == Node::Kind::Module &&
             node->getText() == STDLIB_NAME);
@@ -349,6 +356,7 @@ private:
     case Node::Kind::Directness:
     case Node::Kind::DynamicAttribute:
     case Node::Kind::EscapingAutoClosureType:
+    case Node::Kind::EscapingObjCBlock:
     case Node::Kind::NoEscapeFunctionType:
     case Node::Kind::ExplicitClosure:
     case Node::Kind::Extension:
@@ -464,11 +472,13 @@ private:
     case Node::Kind::TypeMetadataInstantiationCache:
     case Node::Kind::TypeMetadataInstantiationFunction:
     case Node::Kind::TypeMetadataSingletonInitializationCache:
+    case Node::Kind::TypeMetadataDemanglingCache:
     case Node::Kind::TypeMetadataLazyCache:
     case Node::Kind::UncurriedFunctionType:
 #define REF_STORAGE(Name, ...) \
     case Node::Kind::Name:
 #include "swift/AST/ReferenceStorage.def"
+    case Node::Kind::UnknownIndex:
     case Node::Kind::UnsafeAddressor:
     case Node::Kind::UnsafeMutableAddressor:
     case Node::Kind::ValueWitness:
@@ -1173,6 +1183,9 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
   case Node::Kind::Index:
     Printer << Node->getIndex();
     return nullptr;
+  case Node::Kind::UnknownIndex:
+    Printer << "unknown index";
+    return nullptr;
   case Node::Kind::NoEscapeFunctionType:
     printFunctionType(nullptr, Node);
     return nullptr;
@@ -1667,6 +1680,10 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     Printer << "type metadata completion function for ";
     print(Node->getChild(0));
     return nullptr;
+  case Node::Kind::TypeMetadataDemanglingCache:
+    Printer << "demangling cache variable for type metadata for ";
+    print(Node->getChild(0));
+    return nullptr;
   case Node::Kind::TypeMetadataLazyCache:
     Printer << "lazy cache variable for type metadata for ";
     print(Node->getChild(0));
@@ -1785,6 +1802,11 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
   }
   case Node::Kind::ObjCBlock: {
     Printer << "@convention(block) ";
+    printFunctionType(nullptr, Node);
+    return nullptr;
+  }
+  case Node::Kind::EscapingObjCBlock: {
+    Printer << "@escaping @convention(block) ";
     printFunctionType(nullptr, Node);
     return nullptr;
   }
@@ -2231,20 +2253,21 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   case Node::Kind::DependentProtocolConformanceAssociated:
     Printer << "dependent associated protocol conformance ";
-    if (Node->hasIndex())
-      Printer << "#" << Node->getIndex() << " ";
-    printChildren(Node);
+    printOptionalIndex(Node->getChild(2));
+    print(Node->getChild(0));
+    print(Node->getChild(1));
     return nullptr;
   case Node::Kind::DependentProtocolConformanceInherited:
     Printer << "dependent inherited protocol conformance ";
-    if (Node->hasIndex())
-      Printer << "#" << Node->getIndex() << " ";
-    printChildren(Node);
+    printOptionalIndex(Node->getChild(2));
+    print(Node->getChild(0));
+    print(Node->getChild(1));
     return nullptr;
   case Node::Kind::DependentProtocolConformanceRoot:
-    Printer << "dependent root protocol conformance #" << Node->getIndex()
-      << " ";
-    printChildren(Node);
+    Printer << "dependent root protocol conformance ";
+    printOptionalIndex(Node->getChild(2));
+    print(Node->getChild(0));
+    print(Node->getChild(1));
     return nullptr;
   case Node::Kind::ProtocolConformanceRefInTypeModule:
     Printer << "protocol conformance ref (type's module) ";

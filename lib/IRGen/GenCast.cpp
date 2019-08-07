@@ -159,6 +159,7 @@ getDynamicCastArguments(IRGenFunction &IGF,
     return llvm::makeArrayRef(argsBuf, n-3);
     break;
   }
+  llvm_unreachable("covered switch");
 }
 
 /// Emit a checked unconditional downcast of a class value.
@@ -468,7 +469,7 @@ emitExistentialScalarCastFn(IRGenModule &IGM,
   }
 
   case CheckedCastMode::Unconditional: {
-    IGF.emitTrap(/*EmitUnreachable=*/true);
+    IGF.emitTrap("type cast failed", /*EmitUnreachable=*/true);
     break;
   }
   }

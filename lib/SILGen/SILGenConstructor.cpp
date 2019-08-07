@@ -42,7 +42,7 @@ static SILValue emitConstructorMetatypeArg(SILGenFunction &SGF,
   auto *DC = ctor->getInnermostDeclContext();
   auto &AC = SGF.getASTContext();
   auto VD =
-      new (AC) ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+      new (AC) ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(),
                          AC.getIdentifier("$metatype"), SourceLoc(),
                          AC.getIdentifier("$metatype"), DC);
   VD->setInterfaceType(metatype);
@@ -69,7 +69,7 @@ static RValue emitImplicitValueConstructorArg(SILGenFunction &SGF,
   }
 
   auto &AC = SGF.getASTContext();
-  auto VD = new (AC) ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+  auto VD = new (AC) ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(),
                                AC.getIdentifier("$implicit_value"),
                                SourceLoc(),
                                AC.getIdentifier("$implicit_value"),
@@ -99,7 +99,7 @@ static RValue emitImplicitValueConstructorArg(SILGenFunction &SGF,
 }
 
 /// If the field has a property wrapper for which we will need to call the
-/// wrapper type's init(initialValue:), set up that evaluation and call the
+/// wrapper type's init(wrapperValue:), set up that evaluation and call the
 /// \c body with the expression to form the property wrapper instance from
 /// the initial value type.
 ///
@@ -112,7 +112,7 @@ static bool maybeEmitPropertyWrapperInitFromValue(
     llvm::function_ref<void(Expr *)> body) {
   auto originalProperty = field->getOriginalWrappedProperty();
   if (!originalProperty ||
-      !originalProperty->isPropertyWrapperInitializedWithInitialValue())
+      !originalProperty->isPropertyMemberwiseInitializedWithWrappedType())
     return false;
 
   auto wrapperInfo = originalProperty->getPropertyWrapperBackingPropertyInfo();
@@ -142,7 +142,7 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
   SILValue resultSlot;
   if (SILModuleConventions::isReturnedIndirectlyInSIL(selfTy, SGF.SGM.M)) {
     auto &AC = SGF.getASTContext();
-    auto VD = new (AC) ParamDecl(VarDecl::Specifier::InOut,
+    auto VD = new (AC) ParamDecl(ParamDecl::Specifier::InOut,
                                  SourceLoc(), SourceLoc(),
                                  AC.getIdentifier("$return_value"),
                                  SourceLoc(),
@@ -447,7 +447,7 @@ void SILGenFunction::emitEnumConstructor(EnumElementDecl *element) {
   std::unique_ptr<Initialization> dest;
   if (enumTI.isAddressOnly() && silConv.useLoweredAddresses()) {
     auto &AC = getASTContext();
-    auto VD = new (AC) ParamDecl(VarDecl::Specifier::InOut,
+    auto VD = new (AC) ParamDecl(ParamDecl::Specifier::InOut,
                                  SourceLoc(), SourceLoc(),
                                  AC.getIdentifier("$return_value"),
                                  SourceLoc(),
@@ -981,11 +981,15 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
         // property wrapper initialized with `=`, inject the value into an
         // instance of the wrapper.
         if (auto singleVar = pbd->getSingleVar()) {
-          (void)maybeEmitPropertyWrapperInitFromValue(
-              *this, init, singleVar, std::move(result),
-              [&](Expr *expr) {
-                result = emitRValue(expr);
-              });
+          auto originalVar = singleVar->getOriginalWrappedProperty();
+          if (originalVar &&
+              originalVar->isPropertyWrapperInitializedWithInitialValue()) {
+            (void)maybeEmitPropertyWrapperInitFromValue(
+                *this, init, singleVar, std::move(result),
+                [&](Expr *expr) {
+                  result = emitRValue(expr);
+                });
+          }
         }
 
         emitMemberInit(*this, selfDecl, entry.getPattern(), std::move(result));

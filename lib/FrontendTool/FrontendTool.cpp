@@ -26,13 +26,13 @@
 #include "TBD.h"
 
 #include "swift/Subsystems.h"
-#include "swift/AST/ASTScope.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExperimentalDependencies.h"
 #include "swift/AST/FileSystem.h"
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/IRGenOptions.h"
+#include "swift/AST/NameLookup.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ReferencedNameTracker.h"
 #include "swift/AST/TypeRefinementContext.h"
@@ -85,6 +85,7 @@
 #include <deque>
 #include <memory>
 #include <unordered_set>
+#include <utility>
 
 #if !defined(_MSC_VER) && !defined(__MINGW32__)
 #include <unistd.h>
@@ -184,34 +185,68 @@ static bool emitMakeDependenciesIfNeeded(DiagnosticEngine &diags,
 }
 
 namespace {
+struct SwiftModuleTraceInfo {
+  Identifier Name;
+  std::string Path;
+  bool IsImportedDirectly;
+  bool SupportsLibraryEvolution;
+};
+
 struct LoadedModuleTraceFormat {
-  std::string Name;
+  static const unsigned CurrentVersion = 2;
+  unsigned Version;
+  Identifier Name;
   std::string Arch;
-  std::vector<std::string> SwiftModules;
+  std::vector<SwiftModuleTraceInfo> SwiftModules;
 };
 }
 
 namespace swift {
 namespace json {
+template <> struct ObjectTraits<SwiftModuleTraceInfo> {
+  static void mapping(Output &out, SwiftModuleTraceInfo &contents) {
+    StringRef name = contents.Name.str();
+    out.mapRequired("name", name);
+    out.mapRequired("path", contents.Path);
+    out.mapRequired("isImportedDirectly", contents.IsImportedDirectly);
+    out.mapRequired("supportsLibraryEvolution",
+                    contents.SupportsLibraryEvolution);
+  }
+};
+
+// Version notes:
+// 1. Keys: name, arch, swiftmodules
+// 2. New keys: version, swiftmodulesDetailedInfo
 template <> struct ObjectTraits<LoadedModuleTraceFormat> {
   static void mapping(Output &out, LoadedModuleTraceFormat &contents) {
-    out.mapRequired("name", contents.Name);
+    out.mapRequired("version", contents.Version);
+
+    StringRef name = contents.Name.str();
+    out.mapRequired("name", name);
+
     out.mapRequired("arch", contents.Arch);
-    out.mapRequired("swiftmodules", contents.SwiftModules);
+
+    // The 'swiftmodules' key is kept for backwards compatibility.
+    std::vector<std::string> moduleNames;
+    for (auto &m : contents.SwiftModules)
+      moduleNames.push_back(m.Path);
+    out.mapRequired("swiftmodules", moduleNames);
+
+    out.mapRequired("swiftmodulesDetailedInfo", contents.SwiftModules);
   }
 };
 }
 }
 
-static bool emitLoadedModuleTraceIfNeeded(ASTContext &ctxt,
+static bool emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
                                           DependencyTracker *depTracker,
-                                          StringRef loadedModuleTracePath,
-                                          StringRef moduleName) {
+                                          StringRef loadedModuleTracePath) {
   if (loadedModuleTracePath.empty())
     return false;
   std::error_code EC;
   llvm::raw_fd_ostream out(loadedModuleTracePath, EC, llvm::sys::fs::F_Append);
 
+  ASTContext &ctxt = mainModule->getASTContext();
   if (out.has_error() || EC) {
     ctxt.Diags.diagnose(SourceLoc(), diag::error_opening_output,
                         loadedModuleTracePath, EC.message());
@@ -219,38 +254,83 @@ static bool emitLoadedModuleTraceIfNeeded(ASTContext &ctxt,
     return true;
   }
 
-  llvm::SmallVector<std::string, 16> swiftModules;
+  ModuleDecl::ImportFilter filter = ModuleDecl::ImportFilterKind::Public;
+  filter |= ModuleDecl::ImportFilterKind::Private;
+  filter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
+  SmallVector<ModuleDecl::ImportedModule, 8> imports;
+  mainModule->getImportedModules(imports, filter);
 
-  // Canonicalise all the paths by opening them.
-  for (auto &dep : depTracker->getDependencies()) {
-    llvm::SmallString<256> buffer;
-    StringRef realPath;
-    int FD;
+  SmallPtrSet<ModuleDecl *, 8> importedModules;
+  for (std::pair<ModuleDecl::AccessPathTy, ModuleDecl *> &import : imports)
+    importedModules.insert(import.second);
+
+  llvm::DenseMap<StringRef, ModuleDecl *> pathToModuleDecl;
+  for (auto &module : ctxt.LoadedModules) {
+    ModuleDecl *loadedDecl = module.second;
+    assert(loadedDecl && "Expected loaded module to be non-null.");
+    assert(!loadedDecl->getModuleFilename().empty()
+           && "Don't know how to handle modules with empty names.");
+    pathToModuleDecl.insert(
+      std::make_pair(loadedDecl->getModuleFilename(), loadedDecl));
+  }
+
+  std::vector<SwiftModuleTraceInfo> swiftModules;
+  SmallString<256> buffer;
+  for (auto &depPath : depTracker->getDependencies()) {
+    StringRef realDepPath;
     // FIXME: appropriate error handling
-    if (llvm::sys::fs::openFileForRead(dep, FD, llvm::sys::fs::OF_None,
-                                       &buffer)) {
-      // Couldn't open the file now, so let's just assume the old path was
+    if (llvm::sys::fs::real_path(depPath, buffer,/*expand_tilde=*/true))
+      // Couldn't find the canonical path, so let's just assume the old one was
       // canonical (enough).
-      realPath = dep;
-    } else {
-      realPath = buffer.str();
-      // Not much we can do about failing to close.
-      (void)close(FD);
-    }
+      realDepPath = depPath;
+    else
+      realDepPath = buffer.str();
 
     // Decide if this is a swiftmodule based on the extension of the raw
     // dependency path, as the true file may have a different one.
-    auto ext = llvm::sys::path::extension(dep);
-    if (file_types::lookupTypeForExtension(ext) ==
-          file_types::TY_SwiftModuleFile) {
-      swiftModules.push_back(realPath);
+    // For example, this might happen when the canonicalized path points to
+    // a Content Addressed Storage (CAS) location.
+    auto moduleFileType =
+      file_types::lookupTypeForExtension(llvm::sys::path::extension(depPath));
+    if (moduleFileType == file_types::TY_SwiftModuleFile
+        || moduleFileType == file_types::TY_SwiftParseableInterfaceFile) {
+      auto dep = pathToModuleDecl.find(depPath);
+      assert(dep != pathToModuleDecl.end()
+             && "Dependency must've been loaded.");
+      ModuleDecl *depMod = dep->second;
+      swiftModules.push_back({
+        /*Name=*/
+        depMod->getName(),
+        /*Path=*/
+        realDepPath,
+        // TODO: There is an edge case which is not handled here.
+        // When we build a framework using -import-underlying-module, or an
+        // app/test using -import-objc-header, we should look at the direct
+        // imports of the bridging modules, and mark those as our direct
+        // imports.
+        /*IsImportedDirectly=*/
+        importedModules.find(depMod) != importedModules.end(),
+        /*SupportsLibraryEvolution=*/
+        depMod->isResilient()
+      });
     }
   }
 
+  // Almost a re-implementation of reversePathSortedFilenames :(.
+  std::sort(
+    swiftModules.begin(), swiftModules.end(),
+    [](const SwiftModuleTraceInfo &m1, const SwiftModuleTraceInfo &m2) -> bool {
+      return std::lexicographical_compare(
+        m1.Path.rbegin(), m1.Path.rend(),
+        m2.Path.rbegin(), m2.Path.rend());
+  });
+
   LoadedModuleTraceFormat trace = {
-      /*name=*/moduleName,
+      /*version=*/LoadedModuleTraceFormat::CurrentVersion,
+      /*name=*/mainModule->getName(),
       /*arch=*/ctxt.LangOpts.Target.getArchName(),
-      /*swiftmodules=*/reversePathSortedFilenames(swiftModules)};
+      swiftModules
+  };
 
   // raw_fd_ostream is unbuffered, and we may have multiple processes writing,
   // so first write the whole thing into memory and dump out that buffer to the
@@ -270,13 +350,13 @@ static bool emitLoadedModuleTraceIfNeeded(ASTContext &ctxt,
 }
 
 static bool
-emitLoadedModuleTraceForAllPrimariesIfNeeded(ASTContext &ctxt,
+emitLoadedModuleTraceForAllPrimariesIfNeeded(ModuleDecl *mainModule,
                                              DependencyTracker *depTracker,
                                              const FrontendOptions &opts) {
   return opts.InputsAndOutputs.forEachInputProducingSupplementaryOutput(
       [&](const InputFile &input) -> bool {
         return emitLoadedModuleTraceIfNeeded(
-            ctxt, depTracker, input.loadedModuleTracePath(), opts.ModuleName);
+            mainModule, depTracker, input.loadedModuleTracePath());
       });
 }
 
@@ -597,7 +677,9 @@ static bool buildModuleFromParseableInterface(CompilerInvocation &Invocation,
   StringRef InputPath = FEOpts.InputsAndOutputs.getFilenameOfFirstInput();
   StringRef PrebuiltCachePath = FEOpts.PrebuiltModuleCachePath;
   return ParseableInterfaceModuleLoader::buildSwiftModuleFromSwiftInterface(
-      Instance.getASTContext(), Invocation.getClangModuleCachePath(),
+      Instance.getSourceMgr(), Instance.getDiags(),
+      Invocation.getSearchPathOptions(), Invocation.getLangOptions(),
+      Invocation.getClangModuleCachePath(),
       PrebuiltCachePath, Invocation.getModuleName(), InputPath,
       Invocation.getOutputFilename(),
       FEOpts.SerializeModuleInterfaceDependencyHashes,
@@ -661,52 +743,19 @@ static void verifyGenericSignaturesIfNeeded(CompilerInvocation &Invocation,
     GenericSignatureBuilder::verifyGenericSignaturesInModule(module);
 }
 
-static void dumpOneScopeMapLocation(unsigned bufferID,
-                                    std::pair<unsigned, unsigned> lineColumn,
-                                    SourceManager &sourceMgr, ASTScope &scope) {
-  SourceLoc loc =
-      sourceMgr.getLocForLineCol(bufferID, lineColumn.first, lineColumn.second);
-  if (loc.isInvalid())
-    return;
-
-  llvm::errs() << "***Scope at " << lineColumn.first << ":" << lineColumn.second
-               << "***\n";
-  auto locScope = scope.findInnermostEnclosingScope(loc);
-  locScope->print(llvm::errs(), 0, false, false);
-
-  // Dump the AST context, too.
-  if (auto dc = locScope->getDeclContext()) {
-    dc->printContext(llvm::errs());
-  }
-
-  // Grab the local bindings introduced by this scope.
-  auto localBindings = locScope->getLocalBindings();
-  if (!localBindings.empty()) {
-    llvm::errs() << "Local bindings: ";
-    interleave(localBindings.begin(), localBindings.end(),
-               [&](ValueDecl *value) { llvm::errs() << value->getFullName(); },
-               [&]() { llvm::errs() << " "; });
-    llvm::errs() << "\n";
-  }
-}
-
 static void dumpAndPrintScopeMap(CompilerInvocation &Invocation,
                                  CompilerInstance &Instance, SourceFile *SF) {
-  ASTScope &scope = SF->getScope();
+  const ASTScope &scope = SF->getScope();
 
   if (Invocation.getFrontendOptions().DumpScopeMapLocations.empty()) {
-    scope.expandAll();
-  } else if (auto bufferID = SF->getBufferID()) {
-    SourceManager &sourceMgr = Instance.getSourceMgr();
-    // Probe each of the locations, and dump what we find.
-    for (auto lineColumn :
-         Invocation.getFrontendOptions().DumpScopeMapLocations)
-      dumpOneScopeMapLocation(*bufferID, lineColumn, sourceMgr, scope);
-
     llvm::errs() << "***Complete scope map***\n";
+    scope.print(llvm::errs());
+    return;
   }
-  // Print the resulting map.
-  scope.print(llvm::errs());
+  // Probe each of the locations, and dump what we find.
+  for (auto lineColumn :
+       Invocation.getFrontendOptions().DumpScopeMapLocations)
+    scope.dumpOneScopeMapLocation(lineColumn);
 }
 
 static SourceFile *getPrimaryOrMainSourceFile(CompilerInvocation &Invocation,
@@ -1038,7 +1087,7 @@ static bool performCompile(CompilerInstance &Instance,
   emitReferenceDependenciesForAllPrimaryInputsIfNeeded(Invocation, Instance);
 
   (void)emitLoadedModuleTraceForAllPrimariesIfNeeded(
-      Context, Instance.getDependencyTracker(), opts);
+      Instance.getMainModule(), Instance.getDependencyTracker(), opts);
 
   if (Context.hadError()) {
     //  Emit the index store data even if there were compiler errors.
@@ -1796,8 +1845,15 @@ int swift::performFrontend(ArrayRef<const char *> Args,
 
   if (Invocation.getFrontendOptions()
           .InputsAndOutputs.hasDependencyTrackerPath() ||
-      !Invocation.getFrontendOptions().IndexStorePath.empty())
-    Instance->createDependencyTracker(Invocation.getFrontendOptions().TrackSystemDeps);
+      !Invocation.getFrontendOptions().IndexStorePath.empty() ||
+      Invocation.getFrontendOptions().TrackSystemDeps) {
+    // Note that we're tracking dependencies even when we don't need to write
+    // them directly; in particular, -track-system-dependencies affects how
+    // module interfaces get loaded, and so we need to be consistently tracking
+    // system dependencies throughout the compiler.
+    Instance->createDependencyTracker(
+        Invocation.getFrontendOptions().TrackSystemDeps);
+  }
 
   if (Instance->setup(Invocation)) {
     return finishDiagProcessing(1);

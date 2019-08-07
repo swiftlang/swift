@@ -88,11 +88,6 @@ public:
   /// Set of delayed conformances that have already been forced.
   llvm::DenseSet<NormalProtocolConformance *> forcedConformances;
 
-  /// Profiler instances for constructors, grouped by associated decl.
-  /// Each profiler is shared by all member initializers for a nominal type.
-  /// Constructors within extensions are profiled separately.
-  llvm::DenseMap<Decl *, SILProfiler *> constructorProfilers;
-
   SILFunction *emitTopLevelFunction(SILLocation Loc);
 
   size_t anonymousSymbolCounter = 0;
@@ -193,11 +188,13 @@ public:
   void visitTypeAliasDecl(TypeAliasDecl *d) {}
   void visitOpaqueTypeDecl(OpaqueTypeDecl *d) {}
   void visitAbstractTypeParamDecl(AbstractTypeParamDecl *d) {}
-  void visitSubscriptDecl(SubscriptDecl *d) {}
   void visitConstructorDecl(ConstructorDecl *d) {}
   void visitDestructorDecl(DestructorDecl *d) {}
   void visitModuleDecl(ModuleDecl *d) { }
   void visitMissingMemberDecl(MissingMemberDecl *d) {}
+
+  // Emitted as part of its storage.
+  void visitAccessorDecl(AccessorDecl *ad) {}
 
   void visitFuncDecl(FuncDecl *fd);
   void visitPatternBindingDecl(PatternBindingDecl *vd);
@@ -207,6 +204,7 @@ public:
   void visitNominalTypeDecl(NominalTypeDecl *ntd);
   void visitExtensionDecl(ExtensionDecl *ed);
   void visitVarDecl(VarDecl *vd);
+  void visitSubscriptDecl(SubscriptDecl *sd);
 
   void emitAbstractFuncDecl(AbstractFunctionDecl *AFD);
   
@@ -454,12 +452,6 @@ public:
 
   /// Emit a property descriptor for the given storage decl if it needs one.
   void tryEmitPropertyDescriptor(AbstractStorageDecl *decl);
-
-  /// Get or create the shared profiler instance for a type's constructors.
-  /// This takes care to create separate profilers for extensions, which may
-  /// reside in a different file than the one where the base type is defined.
-  SILProfiler *getOrCreateProfilerForConstructors(DeclContext *ctx,
-                                                  ConstructorDecl *cd);
 
 private:
   /// Emit the deallocator for a class that uses the objc allocator.

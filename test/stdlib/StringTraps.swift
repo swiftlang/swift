@@ -168,17 +168,5 @@ StringTraps.test("UTF8ViewIndex/offsetCrash")
   _ = s8.utf8[i]
 }
 
-StringTraps.test("String.Index.utf16Offset(in:)/subscalarUTF8")
-  .skip(.custom(
-    { _isFastAssertConfiguration() },
-    reason: "this trap is not guaranteed to happen in -Ounchecked"))
-  .code {
-  let s = "😇"
-  let u8 = s.utf8
-  let i = u8.index(after: u8.startIndex)
-  expectCrashLater()
-  _ = i.utf16Offset(in: s)
-}
-
 runAllTests()
 

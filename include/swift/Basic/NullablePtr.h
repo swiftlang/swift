@@ -55,9 +55,14 @@ public:
     assert(Ptr && "Pointer wasn't checked for null!");
     return Ptr;
   }
-  
-  T *getPtrOrNull() { return Ptr; }
-  const T *getPtrOrNull() const { return Ptr; }
+
+  T *getPtrOrNull() { return getPtrOr(nullptr); }
+  const T *getPtrOrNull() const { return getPtrOr(nullptr); }
+
+  T *getPtrOr(T *defaultValue) { return Ptr ? Ptr : defaultValue; }
+  const T *getPtrOr(const T *defaultValue) const {
+    return Ptr ? Ptr : defaultValue;
+  }
 
   explicit operator bool() const { return Ptr; }
 

@@ -692,6 +692,13 @@ class IterableDeclContext {
   /// member loading, as a key when doing lookup in this IDC.
   serialization::DeclID SerialID;
 
+  /// Because \c parseDelayedDecl and lazy member adding can add members *after*
+  /// an \c ASTScope tree is created, there must be some way for the tree to
+  /// detect when a member has been added. A bit would suffice,
+  /// but would be more fragile, The scope code could count the members each
+  /// time, but I think it's a better trade to just keep a count here.
+  unsigned memberCount = 0;
+
   template<class A, class B, class C>
   friend struct ::llvm::cast_convert_val;
 
@@ -720,6 +727,9 @@ public:
   /// Add a member to this context. If the hint decl is specified, the new decl
   /// is inserted immediately after the hint.
   void addMember(Decl *member, Decl *hint = nullptr);
+
+  /// See \c memberCount
+  unsigned getMemberCount() const { return memberCount; }
 
   /// Check whether there are lazily-loaded members.
   bool hasLazyMembers() const {
@@ -786,6 +796,9 @@ void simple_display(llvm::raw_ostream &out, const ParamT *dc) {
   else
     out << "(null)";
 }
+
+/// Extract the source location from the given declaration context.
+SourceLoc extractNearestSourceLoc(const DeclContext *dc);
 
 } // end namespace swift
 

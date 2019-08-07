@@ -51,6 +51,64 @@ struct Constrained<T : P> {}
 
 func generic<T>(_: Constrained<T>) {}
 
+
+protocol STSTagProtocol {}
+struct STSOuter : STSTagProtocol {}
+
+enum STSContainer<T : STSTagProtocol> {
+  class Superclass {}
+  class Subclass<U>: Superclass where T == STSOuter {
+    class ExtraNested: Superclass {}
+  }
+
+  class GenericSuperclass<U> {}
+  class Subclass2<U>: GenericSuperclass<U> where T == STSOuter {}
+
+  class Subclass3<U: Collection>: Superclass where T == U.Element {}
+
+  class MoreNesting<X> {
+    class Subclass<U>: Superclass where T == STSOuter {}
+  }
+
+  struct Fields<U> where T == STSOuter {
+    var x: T?
+    var y: U?
+  }
+
+  enum Cases<U> where T == STSOuter {
+    case a(T)
+    case b(U)
+  }
+}
+
+// A new type with an easily-recognizable, easily-strippable suffix character.
+enum STSContainer℠<T : STSTagProtocol> {
+  class Superclass {}
+  class GenericSuperclass<U> {}
+}
+extension STSContainer℠ where T == STSOuter {
+  class Subclass<U>: Superclass {
+    class ExtraNested: Superclass {}
+  }
+
+  class Subclass2<U>: GenericSuperclass<U> {}
+
+  class MoreNesting<X> {
+    class Subclass<U>: Superclass {}
+  }
+
+  struct Fields<U> {
+    var x: T?
+    var y: U?
+  }
+
+  enum Cases<U> {
+    case a(T)
+    case b(U)
+  }
+}
+
+
 // DEMANGLE-TYPE: $s13nominal_types5OuterVD
 // CHECK-TYPE: Outer
 
@@ -80,6 +138,38 @@ func generic<T>(_: Constrained<T>) {}
 // DEMANGLE-TYPE: $s13nominal_types11ConstrainedVyxGD
 // CHECK-TYPE: Constrained<τ_0_0>
 
+// DEMANGLE-TYPE: $s13nominal_types12STSContainerO8SubclassCyAA8STSOuterV_SiG
+// CHECK-TYPE: STSContainer<STSOuter>.Subclass<Int>
+// DEMANGLE-TYPE: $s13nominal_types0017STSContainer_swCgOA2A8STSOuterVRszrlE8SubclassCyAE_SiG
+// CHECK-TYPE: STSContainer℠<STSOuter>.Subclass<Int>
+
+// DEMANGLE-TYPE: $s13nominal_types12STSContainerO9Subclass2CyAA8STSOuterV_SiG
+// CHECK-TYPE: STSContainer<STSOuter>.Subclass2<Int>
+// DEMANGLE-TYPE: $s13nominal_types0017STSContainer_swCgOA2A8STSOuterVRszrlE9Subclass2CyAE_SiG
+// CHECK-TYPE: STSContainer℠<STSOuter>.Subclass2<Int>
+
+// DEMANGLE-TYPE: $s13nominal_types12STSContainerO9Subclass3CyAA8STSOuterV_SayAGGG
+// CHECK-TYPE: STSContainer<STSOuter>.Subclass3<Array<STSOuter>>
+
+// DEMANGLE-TYPE: $s13nominal_types12STSContainerO8SubclassC11ExtraNestedCyAA8STSOuterV_Si_G
+// CHECK-TYPE: STSContainer<STSOuter>.Subclass<Int>.ExtraNested
+// DEMANGLE-TYPE: $s13nominal_types0017STSContainer_swCgOA2A8STSOuterVRszrlE8SubclassC11ExtraNestedCyAE_Si_G
+// CHECK-TYPE: STSContainer℠<STSOuter>.Subclass<Int>.ExtraNested
+
+// DEMANGLE-TYPE: $s13nominal_types12STSContainerO11MoreNestingC8SubclassCyAA8STSOuterV_Sb_SiG
+// CHECK-TYPE: STSContainer<STSOuter>.MoreNesting<Bool>.Subclass<Int>
+// DEMANGLE-TYPE: $s13nominal_types0017STSContainer_swCgOA2A8STSOuterVRszrlE11MoreNestingC8SubclassCyAE_Sb_SiG
+// CHECK-TYPE: STSContainer℠<STSOuter>.MoreNesting<Bool>.Subclass<Int>
+
+// DEMANGLE-TYPE: $s13nominal_types12STSContainerO6FieldsVyAA8STSOuterV_SiG
+// CHECK-TYPE: STSContainer<STSOuter>.Fields<Int>
+// DEMANGLE-TYPE: $s13nominal_types0017STSContainer_swCgOA2A8STSOuterVRszrlE6FieldsVyAE_SiG
+// CHECK-TYPE: STSContainer℠<STSOuter>.Fields<Int>
+
+// DEMANGLE-TYPE: $s13nominal_types12STSContainerO5CasesOyAA8STSOuterV_SiG
+// CHECK-TYPE: STSContainer<STSOuter>.Cases<Int>
+// DEMANGLE-TYPE: $s13nominal_types0017STSContainer_swCgOA2A8STSOuterVRszrlE5CasesOyAE_SiG
+// CHECK-TYPE: STSContainer℠<STSOuter>.Cases<Int>
 
 // DEMANGLE-DECL: $s13nominal_types5OuterV
 // DEMANGLE-DECL: $s13nominal_types5OuterV5InnerO

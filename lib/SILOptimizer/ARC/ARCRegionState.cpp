@@ -531,7 +531,9 @@ void ARCRegionState::summarizeBlock(SILBasicBlock *BB) {
   SummarizedInterestingInsts.clear();
 
   for (auto &I : *BB)
-    if (!canNeverUseValues(&I) || I.mayReleaseOrReadRefCount() ||
+    // FIXME: mayReleaseOrReadRefCount should be a strict subset of
+    // canUseObject. If not, there is a bug in canUseObject.
+    if (canUseObject(&I) || I.mayReleaseOrReadRefCount() ||
         isStrongEntranceInstruction(I))
       SummarizedInterestingInsts.push_back(&I);
 }

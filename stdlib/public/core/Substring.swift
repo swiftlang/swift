@@ -97,9 +97,15 @@ public struct Substring {
   @usableFromInline
   internal var _slice: Slice<String>
 
-  @inlinable @inline(__always)
+  @inlinable
   internal init(_ slice: Slice<String>) {
-    self._slice = slice
+    let _guts = slice.base._guts
+    let start = _guts.scalarAlign(slice.startIndex)
+    let end = _guts.scalarAlign(slice.endIndex)
+
+    self._slice = Slice(
+      base: slice.base,
+      bounds: Range(uncheckedBounds: (start, end)))
     _invariantCheck()
   }
 
@@ -123,15 +129,10 @@ extension Substring {
   @inlinable @inline(__always)
   internal var _wholeGuts: _StringGuts { return base._guts }
 
-  @inlinable
+  @inlinable @inline(__always)
   internal var _offsetRange: Range<Int> {
-    @inline(__always) get {
-      let start = _slice.startIndex
-      let end = _slice.endIndex
-      _internalInvariant(start.transcodedOffset == 0 && end.transcodedOffset == 0)
-
-      return Range(uncheckedBounds: (start._encodedOffset, end._encodedOffset))
-    }
+    return Range(
+      uncheckedBounds: (startIndex._encodedOffset, endIndex._encodedOffset))
   }
 
   #if !INTERNAL_CHECKS_ENABLED
@@ -139,6 +140,11 @@ extension Substring {
   #else
   @usableFromInline @inline(never) @_effects(releasenone)
   internal func _invariantCheck() {
+    // Indices are always scalar aligned
+    _internalInvariant(
+      _slice.startIndex == base._guts.scalarAlign(_slice.startIndex) &&
+      _slice.endIndex == base._guts.scalarAlign(_slice.endIndex))
+
     self.base._invariantCheck()
   }
   #endif // INTERNAL_CHECKS_ENABLED
@@ -201,7 +207,7 @@ extension Substring: StringProtocol {
   public mutating func replaceSubrange<C>(
     _ bounds: Range<Index>,
     with newElements: C
-  ) where C : Collection, C.Iterator.Element == Iterator.Element {
+  ) where C: Collection, C.Iterator.Element == Iterator.Element {
     _slice.replaceSubrange(bounds, with: newElements)
   }
 
@@ -301,20 +307,20 @@ extension Substring: StringProtocol {
   }
 }
 
-extension Substring : CustomReflectable {
+extension Substring: CustomReflectable {
  public var customMirror: Mirror { return String(self).customMirror }
 }
 
-extension Substring : CustomStringConvertible {
+extension Substring: CustomStringConvertible {
   @inlinable @inline(__always)
   public var description: String { return String(self) }
 }
 
-extension Substring : CustomDebugStringConvertible {
+extension Substring: CustomDebugStringConvertible {
   public var debugDescription: String { return String(self).debugDescription }
 }
 
-extension Substring : LosslessStringConvertible {
+extension Substring: LosslessStringConvertible {
   @inlinable
   public init(_ content: String) {
     self = content[...]
@@ -329,7 +335,7 @@ extension Substring {
   }
 }
 
-extension Substring.UTF8View : BidirectionalCollection {
+extension Substring.UTF8View: BidirectionalCollection {
   public typealias Index = String.UTF8View.Index
   public typealias Indices = String.UTF8View.Indices
   public typealias Element = String.UTF8View.Element
@@ -455,7 +461,7 @@ extension Substring {
   }
 }
 
-extension Substring.UTF16View : BidirectionalCollection {
+extension Substring.UTF16View: BidirectionalCollection {
   public typealias Index = String.UTF16View.Index
   public typealias Indices = String.UTF16View.Indices
   public typealias Element = String.UTF16View.Element
@@ -581,7 +587,7 @@ extension Substring {
   }
 }
 
-extension Substring.UnicodeScalarView : BidirectionalCollection {
+extension Substring.UnicodeScalarView: BidirectionalCollection {
   public typealias Index = String.UnicodeScalarView.Index
   public typealias Indices = String.UnicodeScalarView.Indices
   public typealias Element = String.UnicodeScalarView.Element
@@ -693,22 +699,22 @@ extension String {
 }
 
 // FIXME: The other String views should be RangeReplaceable too.
-extension Substring.UnicodeScalarView : RangeReplaceableCollection {
+extension Substring.UnicodeScalarView: RangeReplaceableCollection {
   @inlinable
   public init() { _slice = Slice.init() }
 
-  public mutating func replaceSubrange<C : Collection>(
+  public mutating func replaceSubrange<C: Collection>(
     _ target: Range<Index>, with replacement: C
   ) where C.Element == Element {
     _slice.replaceSubrange(target, with: replacement)
   }
 }
 
-extension Substring : RangeReplaceableCollection {
+extension Substring: RangeReplaceableCollection {
   @_specialize(where S == String)
   @_specialize(where S == Substring)
   @_specialize(where S == Array<Character>)
-  public init<S : Sequence>(_ elements: S)
+  public init<S: Sequence>(_ elements: S)
   where S.Element == Character {
     if let str = elements as? String {
       self = str[...]
@@ -722,7 +728,7 @@ extension Substring : RangeReplaceableCollection {
   }
 
   @inlinable // specialize
-  public mutating func append<S : Sequence>(contentsOf elements: S)
+  public mutating func append<S: Sequence>(contentsOf elements: S)
   where S.Element == Character {
     var string = String(self)
     self = Substring() // Keep unique storage if possible
@@ -747,33 +753,33 @@ extension Substring {
   }
 }
 
-extension Substring : TextOutputStream {
+extension Substring: TextOutputStream {
   public mutating func write(_ other: String) {
     append(contentsOf: other)
   }
 }
 
-extension Substring : TextOutputStreamable {
+extension Substring: TextOutputStreamable {
   @inlinable // specializable
-  public func write<Target : TextOutputStream>(to target: inout Target) {
+  public func write<Target: TextOutputStream>(to target: inout Target) {
     target.write(String(self))
   }
 }
 
-extension Substring : ExpressibleByUnicodeScalarLiteral {
+extension Substring: ExpressibleByUnicodeScalarLiteral {
   @inlinable
   public init(unicodeScalarLiteral value: String) {
      self.init(value)
   }
 }
-extension Substring : ExpressibleByExtendedGraphemeClusterLiteral {
+extension Substring: ExpressibleByExtendedGraphemeClusterLiteral {
   @inlinable
   public init(extendedGraphemeClusterLiteral value: String) {
      self.init(value)
   }
 }
 
-extension Substring : ExpressibleByStringLiteral {
+extension Substring: ExpressibleByStringLiteral {
   @inlinable
   public init(stringLiteral value: String) {
      self.init(value)

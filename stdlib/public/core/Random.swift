@@ -94,6 +94,7 @@ extension RandomNumberGenerator {
     upperBound: T
   ) -> T {
     _precondition(upperBound != 0, "upperBound cannot be zero.")
+#if arch(i386) || arch(arm) // TODO(FIXME) SR-10912
     let tmp = (T.max % upperBound) + 1
     let range = tmp == upperBound ? 0 : tmp
     var random: T = 0
@@ -103,6 +104,18 @@ extension RandomNumberGenerator {
     } while random < range
 
     return random % upperBound
+#else
+    var random: T = next()
+    var m = random.multipliedFullWidth(by: upperBound)
+    if m.low < upperBound {
+      let t = (0 &- upperBound) % upperBound
+      while m.low < t {
+        random = next()
+        m = random.multipliedFullWidth(by: upperBound)
+      }
+    }
+    return m.high
+#endif
   }
 }
 
@@ -132,7 +145,7 @@ extension RandomNumberGenerator {
 /// - Linux platforms use `getrandom(2)` when available; otherwise, they read
 ///   from `/dev/urandom`.
 @frozen
-public struct SystemRandomNumberGenerator : RandomNumberGenerator {
+public struct SystemRandomNumberGenerator: RandomNumberGenerator {
   /// Creates a new instance of the system's default random number generator.
   @inlinable
   public init() { }

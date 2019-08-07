@@ -1,0 +1,43 @@
+RUN: %empty-directory(%t)
+RUN: not %swift_build_sdk_interfaces -sdk %S/Inputs/xfails-sdk/ -o %t/output 2> %t/stderr.txt | %FileCheck %s
+RUN: %FileCheck -check-prefix PRINTS-ERROR %s < %t/stderr.txt
+RUN: not %swift_build_sdk_interfaces -sdk %S/Inputs/xfails-sdk/ -v -o %t/output 2> %t/stderr.txt | %FileCheck -check-prefix CHECK-VERBOSE %s
+RUN: %FileCheck -check-prefix PRINTS-ERROR %s < %t/stderr.txt
+
+CHECK: # (FAIL) {{.+}}{{\\|/}}Bad.swiftinterface
+CHECK-VERBOSE-DAG: # (FAIL) {{.+}}{{\\|/}}Bad.swiftinterface
+CHECK-VERBOSE-DAG: # (PASS) {{.+}}{{\\|/}}Good.swiftinterface
+
+PRINTS-ERROR: unresolved identifier 'garbage'
+HIDES-ERROR-NOT: unresolved identifier 'garbage'
+
+RUN: %empty-directory(%t)
+RUN: echo '["Good"]' > %t/xfails-good.json
+RUN: not %swift_build_sdk_interfaces -sdk %S/Inputs/xfails-sdk/ -o %t/output -xfails %t/xfails-good.json 2> %t/stderr.txt | %FileCheck -check-prefix=CHECK-XFAIL-GOOD %s
+RUN: %FileCheck -check-prefix PRINTS-ERROR %s < %t/stderr.txt
+RUN: not %swift_build_sdk_interfaces -sdk %S/Inputs/xfails-sdk/ -v -o %t/output -xfails %t/xfails-good.json 2> %t/stderr.txt | %FileCheck -check-prefix=CHECK-XFAIL-GOOD %s
+RUN: %FileCheck -check-prefix PRINTS-ERROR %s < %t/stderr.txt
+
+CHECK-XFAIL-GOOD-DAG: # (FAIL) {{.+}}{{\\|/}}Bad.swiftinterface
+CHECK-XFAIL-GOOD-DAG: # (UPASS) {{.+}}{{\\|/}}Good.swiftinterface
+
+RUN: %empty-directory(%t)
+RUN: echo '["Good", "Bad"]' > %t/xfails-good-and-bad.json
+RUN: %swift_build_sdk_interfaces -sdk %S/Inputs/xfails-sdk/ -o %t/output -xfails %t/xfails-good-and-bad.json 2> %t/stderr.txt | %FileCheck -check-prefix=CHECK-XFAIL-GOOD-AND-BAD %s
+RUN: %FileCheck -check-prefix HIDES-ERROR -allow-empty %s < %t/stderr.txt
+RUN: %swift_build_sdk_interfaces -sdk %S/Inputs/xfails-sdk/ -v -o %t/output -xfails %t/xfails-good-and-bad.json 2> %t/stderr.txt | %FileCheck -check-prefix=CHECK-XFAIL-GOOD-AND-BAD %s
+RUN: %FileCheck -check-prefix PRINTS-ERROR %s < %t/stderr.txt
+
+CHECK-XFAIL-GOOD-AND-BAD-DAG: # (XFAIL) {{.+}}{{\\|/}}Bad.swiftinterface
+CHECK-XFAIL-GOOD-AND-BAD-DAG: # (UPASS) {{.+}}{{\\|/}}Good.swiftinterface
+
+RUN: %empty-directory(%t)
+RUN: echo '["Bad"]' > %t/xfails-bad.json
+RUN: %swift_build_sdk_interfaces -sdk %S/Inputs/xfails-sdk/ -o %t/output -xfails %t/xfails-bad.json 2> %t/stderr.txt | %FileCheck -check-prefix=CHECK-XFAIL-BAD %s
+RUN: %FileCheck -check-prefix HIDES-ERROR -allow-empty %s < %t/stderr.txt
+RUN: %swift_build_sdk_interfaces -sdk %S/Inputs/xfails-sdk/ -v -o %t/output -xfails %t/xfails-bad.json 2> %t/stderr.txt | %FileCheck -check-prefix=CHECK-XFAIL-BAD-VERBOSE %s
+RUN: %FileCheck -check-prefix PRINTS-ERROR %s < %t/stderr.txt
+
+CHECK-XFAIL-BAD: # (XFAIL) {{.+}}{{\\|/}}Bad.swiftinterface
+CHECK-XFAIL-BAD-VERBOSE-DAG: # (XFAIL) {{.+}}{{\\|/}}Bad.swiftinterface
+CHECK-XFAIL-BAD-VERBOSE-DAG: # (PASS) {{.+}}{{\\|/}}Good.swiftinterface

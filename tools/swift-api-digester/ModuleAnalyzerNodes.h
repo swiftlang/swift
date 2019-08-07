@@ -150,6 +150,7 @@ struct CheckerOptions {
 };
 
 class SDKContext {
+  std::vector<std::unique_ptr<CompilerInstance>> CIs;
   llvm::StringSet<> TextData;
   llvm::BumpPtrAllocator Allocator;
   SourceManager SourceMgr;
@@ -163,7 +164,12 @@ class SDKContext {
   std::vector<BreakingAttributeInfo> BreakingAttrs;
 
 public:
+  // Define the set of known identifiers.
+#define IDENTIFIER_WITH_NAME(Name, IdStr) StringRef Id_##Name = IdStr;
+#include "swift/AST/KnownIdentifiers.def"
+
   SDKContext(CheckerOptions Options);
+
   llvm::BumpPtrAllocator &allocator() {
     return Allocator;
   }
@@ -197,6 +203,11 @@ public:
   bool shouldIgnore(Decl *D, const Decl* Parent = nullptr) const;
   ArrayRef<BreakingAttributeInfo> getBreakingAttributeInfo() const { return BreakingAttrs; }
   Optional<uint8_t> getFixedBinaryOrder(ValueDecl *VD) const;
+
+  CompilerInstance &newCompilerInstance() {
+    CIs.emplace_back(new CompilerInstance());
+    return *CIs.back();
+  }
 
   template<class YAMLNodeTy, typename ...ArgTypes>
   void diagnose(YAMLNodeTy node, Diag<ArgTypes...> ID,
@@ -569,23 +580,22 @@ public:
   static bool classof(const SDKNode *N);
 };
 
+class SDKNodeDeclAccessor;
 class SDKNodeDeclVar : public SDKNodeDecl {
   bool IsLet;
   bool HasStorage;
-  bool HasDidSet;
-  bool HasWillSet;
+  std::vector<SDKNode*> Accessors;
 public:
   SDKNodeDeclVar(SDKNodeInitInfo Info);
   static bool classof(const SDKNode *N);
-  SDKNodeDeclGetter *getGetter() const;
-  SDKNodeDeclSetter *getSetter() const;
+  SDKNodeDeclAccessor *getAccessor(AccessorKind Kind) const;
+  ArrayRef<SDKNode*> getAllAccessors() const { return Accessors; }
   SDKNodeType *getType() const;
   bool isLet() const { return IsLet; }
   void jsonize(json::Output &Out) override;
   void diagnose(SDKNode *Right) override;
   bool hasStorage() const { return HasStorage; }
-  bool hasDidSet() const { return HasDidSet; }
-  bool hasWillSet() const { return HasWillSet; }
+  void addAccessor(SDKNode* AC);
 };
 
 class SDKNodeDeclAbstractFunc : public SDKNodeDecl {
@@ -609,19 +619,16 @@ public:
 };
 
 class SDKNodeDeclSubscript: public SDKNodeDeclAbstractFunc {
-  bool HasSetter;
   bool HasStorage;
-  bool HasDidSet;
-  bool HasWillSet;
+  std::vector<SDKNode*> Accessors;
 public:
   SDKNodeDeclSubscript(SDKNodeInitInfo Info);
   static bool classof(const SDKNode *N);
-  bool hasSetter() const { return HasSetter; }
   bool hasStorage() const { return HasStorage; }
+  SDKNodeDeclAccessor *getAccessor(AccessorKind Kind) const;
+  ArrayRef<SDKNode*> getAllAccessors() const { return Accessors; }
   void jsonize(json::Output &Out) override;
-  void diagnose(SDKNode *Right) override;
-  bool hasDidSet() const { return HasDidSet; }
-  bool hasWillSet() const { return HasWillSet; }
+  void addAccessor(SDKNode* AC);
 };
 
 class SDKNodeDeclFunction: public SDKNodeDeclAbstractFunc {
@@ -641,16 +648,17 @@ public:
   static bool classof(const SDKNode *N);
 };
 
-class SDKNodeDeclGetter: public SDKNodeDeclAbstractFunc {
+class SDKNodeDeclAccessor: public SDKNodeDeclAbstractFunc {
+  SDKNodeDecl *Owner;
+  AccessorKind AccKind;
+  friend class SDKNodeDeclVar;
+  friend class SDKNodeDeclSubscript;
 public:
-  SDKNodeDeclGetter(SDKNodeInitInfo Info);
+  SDKNodeDeclAccessor(SDKNodeInitInfo Info);
+  AccessorKind getAccessorKind() const { return AccKind; }
   static bool classof(const SDKNode *N);
-};
-
-class SDKNodeDeclSetter: public SDKNodeDeclAbstractFunc {
-public:
-  SDKNodeDeclSetter(SDKNodeInitInfo Info);
-  static bool classof(const SDKNode *N);
+  SDKNodeDecl* getStorage() const { return Owner; }
+  void jsonize(json::Output &Out) override;
 };
 
 // The additional information we need for a type node in the digest.
@@ -683,6 +691,7 @@ public:
 
   // Serialize the content of all roots to a given file using JSON format.
   void serialize(StringRef Filename);
+  static void serialize(StringRef Filename, SDKNode *Root);
 
   // After collecting decls, either from imported modules or from a previously
   // serialized JSON file, using this function to get the root of the SDK.
@@ -723,6 +732,11 @@ int dumpSwiftModules(const CompilerInvocation &InitInvok,
                      const std::vector<std::string> PrintApis,
                      CheckerOptions Opts);
 
+SDKNodeRoot *getSDKNodeRoot(SDKContext &SDKCtx,
+                            const CompilerInvocation &InitInvok,
+                            const llvm::StringSet<> &ModuleNames,
+                            CheckerOptions Opts);
+
 int dumpSDKContent(const CompilerInvocation &InitInvok,
                    const llvm::StringSet<> &ModuleNames,
                    StringRef OutputFile, CheckerOptions Opts);
@@ -737,7 +751,6 @@ int findDeclUsr(StringRef dumpPath, CheckerOptions Opts);
 
 void nodeSetDifference(ArrayRef<SDKNode*> Left, ArrayRef<SDKNode*> Right,
   NodeVector &LeftMinusRight, NodeVector &RightMinusLeft);
-
 } // end of abi namespace
 } // end of ide namespace
 } // end of Swift namespace

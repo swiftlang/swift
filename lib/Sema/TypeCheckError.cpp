@@ -55,7 +55,7 @@ public:
   explicit AbstractFunction(AbstractFunctionDecl *fn)
     : TheKind(Kind::Function),
       IsRethrows(fn->getAttrs().hasAttribute<RethrowsAttr>()),
-      ParamCount(fn->hasImplicitSelfDecl() ? 2 : 1) {
+      ParamCount(fn->getNumCurryLevels()) {
     TheFunction = fn;
   }
 
@@ -896,7 +896,7 @@ public:
     }
 
     return Context(getKindForFunctionBody(
-        D->getInterfaceType(), D->hasImplicitSelfDecl() ? 2 : 1));
+        D->getInterfaceType(), D->getNumCurryLevels()));
   }
 
   static Context forDeferBody() {
@@ -1472,8 +1472,8 @@ private:
   ShouldRecurse_t
   checkInterpolatedStringLiteral(InterpolatedStringLiteralExpr *E) {
     ContextScope scope(*this, CurContext.withInterpolatedString(E));
-    if (E->getSemanticExpr())
-      E->getSemanticExpr()->walk(*this);
+    if (E->getAppendingExpr())
+      E->getAppendingExpr()->walk(*this);
     scope.preserveCoverageFromInterpolatedString();
     return ShouldNotRecurse;
   }

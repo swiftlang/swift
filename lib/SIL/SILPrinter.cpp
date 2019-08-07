@@ -653,7 +653,7 @@ public:
       assert(!isa<SingleValueInstruction>(inst) && "SingleValueInstruction was "
                                                    "handled by the previous "
                                                    "value base check.");
-      copy(inst->getResults(), std::back_inserter(values));
+      llvm::copy(inst->getResults(), std::back_inserter(values));
     }
 
     // If the set of values is empty, we need to print the ID of
@@ -1866,7 +1866,8 @@ public:
   }
 
   void visitCondFailInst(CondFailInst *FI) {
-    *this << getIDAndType(FI->getOperand());
+    *this << getIDAndType(FI->getOperand()) << ", "
+          << QuotedString(FI->getMessage());
   }
   
   void visitIndexAddrInst(IndexAddrInst *IAI) {
@@ -2791,10 +2792,6 @@ void SILVTable::print(llvm::raw_ostream &OS, bool Verbose) const {
                                                        QualifiedSILTypeOptions);
       OS << " : ";
     }
-    if (entry.Linkage !=
-        stripExternalFromLinkage(entry.Implementation->getLinkage())) {
-      OS << getLinkageString(entry.Linkage);
-    }
     OS << '@' << entry.Implementation->getName();
     switch (entry.TheKind) {
     case SILVTable::Entry::Kind::Normal:
@@ -3009,6 +3006,12 @@ void SILDebugScope::dump(SourceManager &SM, llvm::raw_ostream &OS,
   }
   OS << "}\n";
 }
+
+void SILDebugScope::dump(SILModule &Mod) const {
+  // We just use the default indent and llvm::errs().
+  dump(Mod.getASTContext().SourceMgr);
+}
+
 #endif
 
 void SILSpecializeAttr::print(llvm::raw_ostream &OS) const {

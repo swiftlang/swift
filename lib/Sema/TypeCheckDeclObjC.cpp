@@ -35,6 +35,7 @@ bool swift::shouldDiagnoseObjCReason(ObjCReason reason, ASTContext &ctx) {
   case ObjCReason::ExplicitlyObjC:
   case ObjCReason::ExplicitlyIBOutlet:
   case ObjCReason::ExplicitlyIBAction:
+  case ObjCReason::ExplicitlyIBSegueAction:
   case ObjCReason::ExplicitlyNSManaged:
   case ObjCReason::MemberOfObjCProtocol:
   case ObjCReason::OverridesObjC:
@@ -63,6 +64,7 @@ unsigned swift::getObjCDiagnosticAttrKind(ObjCReason reason) {
   case ObjCReason::ExplicitlyObjC:
   case ObjCReason::ExplicitlyIBOutlet:
   case ObjCReason::ExplicitlyIBAction:
+  case ObjCReason::ExplicitlyIBSegueAction:
   case ObjCReason::ExplicitlyNSManaged:
   case ObjCReason::MemberOfObjCProtocol:
   case ObjCReason::OverridesObjC:
@@ -366,6 +368,40 @@ static bool checkObjCInForeignClassContext(const ValueDecl *VD,
   return true;
 }
 
+static VersionRange getMinOSVersionForClassStubs(const llvm::Triple &target) {
+  if (target.isMacOSX())
+    return VersionRange::allGTE(llvm::VersionTuple(10, 15, 0));
+  if (target.isiOS()) // also returns true on tvOS
+    return VersionRange::allGTE(llvm::VersionTuple(13, 0, 0));
+  if (target.isWatchOS())
+    return VersionRange::allGTE(llvm::VersionTuple(6, 0, 0));
+  return VersionRange::all();
+}
+
+static bool checkObjCClassStubAvailability(ASTContext &ctx, const Decl *decl) {
+  auto minRange = getMinOSVersionForClassStubs(ctx.LangOpts.Target);
+
+  auto targetRange = AvailabilityContext::forDeploymentTarget(ctx);
+  if (targetRange.getOSVersion().isContainedIn(minRange))
+    return true;
+
+  auto declRange = AvailabilityInference::availableRange(decl, ctx);
+  return declRange.getOSVersion().isContainedIn(minRange);
+}
+
+static const ClassDecl *getResilientAncestor(ModuleDecl *mod,
+                                             const ClassDecl *classDecl) {
+  auto *superclassDecl = classDecl;
+
+  for (;;) {
+    if (superclassDecl->hasResilientMetadata(mod,
+                                             ResilienceExpansion::Maximal))
+      return superclassDecl;
+
+    superclassDecl = superclassDecl->getSuperclassDecl();
+  }
+}
+
 /// Check whether the given declaration occurs within a constrained
 /// extension, or an extension of a generic class, or an
 /// extension of an Objective-C runtime visible class, and
@@ -386,13 +422,21 @@ static bool checkObjCInExtensionContext(const ValueDecl *value,
       auto *mod = value->getModuleContext();
       auto &ctx = mod->getASTContext();
 
-      if (!ctx.LangOpts.EnableObjCResilientClassStubs) {
+      if (!checkObjCClassStubAvailability(ctx, value)) {
         if (classDecl->checkAncestry().contains(
               AncestryFlags::ResilientOther) ||
             classDecl->hasResilientMetadata(mod,
                                             ResilienceExpansion::Maximal)) {
           if (diagnose) {
-            value->diagnose(diag::objc_in_resilient_extension);
+            auto &target = ctx.LangOpts.Target;
+            auto platform = prettyPlatformString(targetPlatform(ctx.LangOpts));
+            auto range = getMinOSVersionForClassStubs(target);
+            auto *ancestor = getResilientAncestor(mod, classDecl);
+            value->diagnose(diag::objc_in_resilient_extension,
+                            value->getDescriptiveKind(),
+                            ancestor->getName(),
+                            platform,
+                            range.getLowerEndpoint());
           }
           return true;
         }
@@ -546,7 +590,6 @@ bool swift::isRepresentableInObjC(
     if (!ResultType->hasError() &&
         !ResultType->isVoid() &&
         !ResultType->isUninhabited() &&
-        !ResultType->hasDynamicSelfType() &&
         !ResultType->isRepresentableIn(ForeignLanguage::ObjectiveC,
                                        const_cast<FuncDecl *>(FD))) {
       if (Diagnose) {
@@ -1050,16 +1093,26 @@ static Optional<ObjCReason> shouldMarkClassAsObjC(const ClassDecl *CD) {
     }
 
     // If the class has resilient ancestry, @objc just controls the runtime
-    // name unless -enable-resilient-objc-class-stubs is enabled.
+    // name unless all targets where the class is available support
+    // class stubs.
     if (ancestry.contains(AncestryFlags::ResilientOther) &&
-        !ctx.LangOpts.EnableObjCResilientClassStubs) {
+        !checkObjCClassStubAvailability(ctx, CD)) {
       if (attr->hasName()) {
         const_cast<ClassDecl *>(CD)->getAttrs().add(
           new (ctx) ObjCRuntimeNameAttr(*attr));
         return None;
       }
 
-      ctx.Diags.diagnose(attr->getLocation(), diag::objc_for_resilient_class)
+
+      auto &target = ctx.LangOpts.Target;
+      auto platform = prettyPlatformString(targetPlatform(ctx.LangOpts));
+      auto range = getMinOSVersionForClassStubs(target);
+      auto *ancestor = getResilientAncestor(CD->getParentModule(), CD);
+      ctx.Diags.diagnose(attr->getLocation(),
+                         diag::objc_for_resilient_class,
+                         ancestor->getName(),
+                         platform,
+                         range.getLowerEndpoint())
         .fixItRemove(attr->getRangeWithAt());
     }
 
@@ -1085,7 +1138,7 @@ static Optional<ObjCReason> shouldMarkClassAsObjC(const ClassDecl *CD) {
     }
 
     if (ancestry.contains(AncestryFlags::ResilientOther) &&
-        !ctx.LangOpts.EnableObjCResilientClassStubs) {
+        !checkObjCClassStubAvailability(ctx, CD)) {
       return None;
     }
 
@@ -1173,7 +1226,8 @@ Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit) {
       return None;
     }
   }
-  // @IBOutlet, @IBAction, @NSManaged, and @GKInspectable imply @objc.
+  // @IBOutlet, @IBAction, @IBSegueAction, @NSManaged, and @GKInspectable imply
+  // @objc.
   //
   // @IBInspectable and @GKInspectable imply @objc quietly in Swift 3
   // (where they warn on failure) and loudly in Swift 4 (error on failure).
@@ -1181,6 +1235,8 @@ Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit) {
     return ObjCReason(ObjCReason::ExplicitlyIBOutlet);
   if (VD->getAttrs().hasAttribute<IBActionAttr>())
     return ObjCReason(ObjCReason::ExplicitlyIBAction);
+  if (VD->getAttrs().hasAttribute<IBSegueActionAttr>())
+    return ObjCReason(ObjCReason::ExplicitlyIBSegueAction);
   if (VD->getAttrs().hasAttribute<IBInspectableAttr>())
     return ObjCReason(ObjCReason::ExplicitlyIBInspectable);
   if (VD->getAttrs().hasAttribute<GKInspectableAttr>())
@@ -2024,7 +2080,7 @@ static AbstractFunctionDecl *lookupObjCMethodInClass(
 
   // Determine whether we are (still) inheriting initializers.
   inheritingInits = inheritingInits &&
-                    classDecl->inheritsSuperclassInitializers(nullptr);
+                    classDecl->inheritsSuperclassInitializers();
   if (isInitializer && !inheritingInits)
     return nullptr;
 

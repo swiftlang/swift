@@ -20,12 +20,14 @@ static StringRef getAttrName(DeclAttrKind Kind) {
   case DAK_Count:
     llvm_unreachable("unrecognized attribute kind.");
   }
+  llvm_unreachable("covered switch");
 }
 } // End of anonymous namespace.
 
 struct swift::ide::api::SDKNodeInitInfo {
   SDKContext &Ctx;
   DeclKind DKind;
+  AccessorKind AccKind;
 
 #define KEY_STRING(X, Y) StringRef X;
 #include "swift/IDE/DigesterEnums.def"
@@ -127,8 +129,7 @@ SDKNodeDeclTypeAlias::SDKNodeDeclTypeAlias(SDKNodeInitInfo Info):
 
 SDKNodeDeclVar::SDKNodeDeclVar(SDKNodeInitInfo Info): 
   SDKNodeDecl(Info, SDKNodeKind::DeclVar), IsLet(Info.IsLet),
-  HasStorage(Info.HasStorage), HasDidSet(Info.HasDidset),
-  HasWillSet(Info.HasWillset) {}
+  HasStorage(Info.HasStorage) {}
 
 SDKNodeDeclAbstractFunc::SDKNodeDeclAbstractFunc(SDKNodeInitInfo Info,
   SDKNodeKind Kind): SDKNodeDecl(Info, Kind), IsThrowing(Info.IsThrowing),
@@ -142,19 +143,16 @@ SDKNodeDeclFunction::SDKNodeDeclFunction(SDKNodeInitInfo Info):
 SDKNodeDeclConstructor::SDKNodeDeclConstructor(SDKNodeInitInfo Info):
   SDKNodeDeclAbstractFunc(Info, SDKNodeKind::DeclConstructor) {}
 
-SDKNodeDeclGetter::SDKNodeDeclGetter(SDKNodeInitInfo Info): 
-  SDKNodeDeclAbstractFunc(Info, SDKNodeKind::DeclGetter) {}
-
-SDKNodeDeclSetter::SDKNodeDeclSetter(SDKNodeInitInfo Info):
-  SDKNodeDeclAbstractFunc(Info, SDKNodeKind::DeclSetter) {}
+SDKNodeDeclAccessor::SDKNodeDeclAccessor(SDKNodeInitInfo Info):
+  SDKNodeDeclAbstractFunc(Info, SDKNodeKind::DeclAccessor),
+  AccKind(Info.AccKind) {}
 
 SDKNodeDeclAssociatedType::SDKNodeDeclAssociatedType(SDKNodeInitInfo Info):
   SDKNodeDecl(Info, SDKNodeKind::DeclAssociatedType) {};
 
 SDKNodeDeclSubscript::SDKNodeDeclSubscript(SDKNodeInitInfo Info):
   SDKNodeDeclAbstractFunc(Info, SDKNodeKind::DeclSubscript),
-  HasSetter(Info.HasSetter), HasStorage(Info.HasStorage),
-  HasDidSet(Info.HasDidset), HasWillSet(Info.HasWillset) {}
+  HasStorage(Info.HasStorage) {}
 
 StringRef SDKNodeDecl::getHeaderName() const {
   if (Location.empty())
@@ -162,22 +160,22 @@ StringRef SDKNodeDecl::getHeaderName() const {
   return llvm::sys::path::filename(Location.split(":").first);
 }
 
-SDKNodeDeclGetter *SDKNodeDeclVar::getGetter() const {
-  auto children = getChildren();
-  for (unsigned I = 1, N = children.size(); I < N; I ++) {
-    if (auto *getter = dyn_cast<SDKNodeDeclGetter>(children[I]))
-      return getter;
+static SDKNodeDeclAccessor *getAccessorInternal(ArrayRef<SDKNode*> Accessors,
+                                                AccessorKind Kind) {
+  for (auto *AC: Accessors) {
+    if (cast<SDKNodeDeclAccessor>(AC)->getAccessorKind() == Kind) {
+      return cast<SDKNodeDeclAccessor>(AC);
+    }
   }
   return nullptr;
 }
 
-SDKNodeDeclSetter *SDKNodeDeclVar::getSetter() const {
-  auto children = getChildren();
-  for (unsigned I = 1, N = children.size(); I < N; I ++) {
-    if (auto *getter = dyn_cast<SDKNodeDeclSetter>(children[I]))
-      return getter;
-  }
-  return nullptr;
+SDKNodeDeclAccessor *SDKNodeDeclVar::getAccessor(AccessorKind Kind) const {
+  return getAccessorInternal(Accessors, Kind);
+}
+
+SDKNodeDeclAccessor *SDKNodeDeclSubscript::getAccessor(AccessorKind Kind) const {
+  return getAccessorInternal(Accessors, Kind);
 }
 
 SDKNodeType *SDKNodeDeclVar::getType() const {
@@ -350,8 +348,7 @@ StringRef SDKNodeType::getTypeRoleDescription() const {
     llvm_unreachable("Type Parent is wrong");
   case SDKNodeKind::DeclFunction:
   case SDKNodeKind::DeclConstructor:
-  case SDKNodeKind::DeclGetter:
-  case SDKNodeKind::DeclSetter:
+  case SDKNodeKind::DeclAccessor:
   case SDKNodeKind::DeclSubscript:
     return SDKNodeDeclAbstractFunc::getTypeRoleDescription(Ctx,
       P->getChildIndex(this));
@@ -398,6 +395,11 @@ StringRef SDKNodeDecl::getScreenInfo() const {
 }
 
 void SDKNodeDecl::printFullyQualifiedName(llvm::raw_ostream &OS) const {
+  if (auto *ACC = dyn_cast<SDKNodeDeclAccessor>(this)) {
+    ACC->getStorage()->printFullyQualifiedName(OS);
+    OS << "." << getPrintedName();
+    return;
+  }
   std::vector<NodePtr> Parent;
   for (auto *P = getParent(); isa<SDKNodeDecl>(P); P = P->getParent())
     Parent.push_back(P);
@@ -453,6 +455,16 @@ void SDKNodeDeclType::addConformance(SDKNode *Conf) {
   Conformances.push_back(Conf);
 }
 
+void SDKNodeDeclSubscript::addAccessor(SDKNode *AC) {
+  cast<SDKNodeDeclAccessor>(AC)->Owner = this;
+  Accessors.push_back(AC);
+}
+
+void SDKNodeDeclVar::addAccessor(SDKNode *AC) {
+  cast<SDKNodeDeclAccessor>(AC)->Owner = this;
+  Accessors.push_back(AC);
+}
+
 SDKNodeType *SDKNodeTypeWitness::getUnderlyingType() const {
   return getOnlyChild()->getAs<SDKNodeType>();
 }
@@ -505,6 +517,7 @@ bool SDKNodeDeclType::isConformingTo(swift::ide::api::KnownProtocolKind Kind) co
           Conformances.end();
 #include "swift/IDE/DigesterEnums.def"
   }
+  llvm_unreachable("covered switch");
 }
 
 StringRef SDKNodeDeclAbstractFunc::getTypeRoleDescription(SDKContext &Ctx,
@@ -529,8 +542,7 @@ static Optional<KeyKind> parseKeyKind(StringRef Content) {
   return llvm::StringSwitch<Optional<KeyKind>>(Content)
 #define KEY(NAME) .Case(#NAME, KeyKind::KK_##NAME)
 #include "swift/IDE/DigesterEnums.def"
-    .Default(None)
-  ;
+    .Default(None);
 }
 
 static StringRef getKeyContent(SDKContext &Ctx, KeyKind Kind) {
@@ -560,6 +572,7 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
   SDKNodeInitInfo Info(Ctx);
   NodeVector Children;
   NodeVector Conformances;
+  NodeVector Accessors;
 
   for (auto &Pair : *Node) {
     auto keyString = GetScalarString(Pair.getKey()); 
@@ -639,6 +652,27 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
           });
         break;
       }
+      case KeyKind::KK_accessors: {
+        for (auto &Mapping : *cast<llvm::yaml::SequenceNode>(Pair.getValue())) {
+          Accessors.push_back(constructSDKNode(Ctx,
+            cast<llvm::yaml::MappingNode>(&Mapping)));
+        }
+        break;
+      }
+      case KeyKind::KK_accessorKind: {
+        AccessorKind unknownKind = (AccessorKind)((uint8_t)(AccessorKind::Last) + 1);
+        Info.AccKind = llvm::StringSwitch<AccessorKind>(
+          GetScalarString(Pair.getValue()))
+#define ACCESSOR(ID)
+#define SINGLETON_ACCESSOR(ID, KEYWORD) .Case(#KEYWORD, AccessorKind::ID)
+#include "swift/AST/AccessorKinds.def"
+          .Default(unknownKind);
+        if (Info.AccKind == unknownKind) {
+          Ctx.diagnose(Pair.getValue(), diag::sdk_node_unrecognized_accessor_kind,
+                       GetScalarString(Pair.getValue()));
+        }
+        break;
+      }
       case KeyKind::KK_declKind: {
         auto dKind = llvm::StringSwitch<Optional<DeclKind>>(
           GetScalarString(Pair.getValue()))
@@ -667,6 +701,13 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
   for (auto *Conf: Conformances) {
     cast<SDKNodeDeclType>(Result)->addConformance(Conf);
   }
+   for (auto *Acc: Accessors) {
+     if (auto *SD = dyn_cast<SDKNodeDeclSubscript>(Result)) {
+       SD->addAccessor(Acc);
+     } else if (auto *VD = dyn_cast<SDKNodeDeclVar>(Result)) {
+       VD->addAccessor(Acc);
+     }
+   }
   return Result;
 }
 
@@ -766,9 +807,7 @@ static bool isSDKNodeEqual(SDKContext &Ctx, const SDKNode &L, const SDKNode &R) 
         return false;
       LLVM_FALLTHROUGH;
     }
-    case SDKNodeKind::DeclConstructor:
-    case SDKNodeKind::DeclGetter:
-    case SDKNodeKind::DeclSetter: {
+    case SDKNodeKind::DeclConstructor: {
       auto Left = L.getAs<SDKNodeDeclAbstractFunc>();
       auto Right = R.getAs<SDKNodeDeclAbstractFunc>();
       if (Left->isThrowing() ^ Right->isThrowing())
@@ -777,18 +816,24 @@ static bool isSDKNodeEqual(SDKContext &Ctx, const SDKNode &L, const SDKNode &R) 
         return false;
       LLVM_FALLTHROUGH;
     }
+    case SDKNodeKind::DeclAccessor: {
+      if (auto *LA = dyn_cast<SDKNodeDeclAccessor>(&L)) {
+        if (auto *RA = dyn_cast<SDKNodeDeclAccessor>(&R)) {
+          if (LA->getAccessorKind() != RA->getAccessorKind())
+            return false;
+        }
+      }
+      LLVM_FALLTHROUGH;
+    }
     case SDKNodeKind::DeclVar: {
-      if (Ctx.checkingABI()) {
-        // If we're checking ABI, the definition order matters.
-        // If they're both members for fixed layout types, we never consider
-        // them equal because we need to check definition orders.
-        if (auto *LV = dyn_cast<SDKNodeDeclVar>(&L)) {
-          if (auto *RV = dyn_cast<SDKNodeDeclVar>(&R)) {
-            if (LV->isLet() != RV->isLet())
-              return false;
+      if (auto *LV = dyn_cast<SDKNodeDeclVar>(&L)) {
+        if (auto *RV = dyn_cast<SDKNodeDeclVar>(&R)) {
+          if (Ctx.checkingABI()) {
             if (LV->hasStorage() != RV->hasStorage())
               return false;
           }
+          if (!hasSameContents(LV->getAllAccessors(), RV->getAllAccessors()))
+            return false;
         }
       }
       LLVM_FALLTHROUGH;
@@ -813,7 +858,7 @@ static bool isSDKNodeEqual(SDKContext &Ctx, const SDKNode &L, const SDKNode &R) 
     case SDKNodeKind::DeclSubscript: {
       if (auto *Left = dyn_cast<SDKNodeDeclSubscript>(&L)) {
         if (auto *Right = dyn_cast<SDKNodeDeclSubscript>(&R)) {
-          if (Left->hasSetter() != Right->hasSetter())
+          if (!hasSameContents(Left->getAllAccessors(), Right->getAllAccessors()))
             return false;
         }
       }
@@ -1297,15 +1342,11 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD)
   if (auto *VAD = dyn_cast<VarDecl>(VD)) {
     IsLet = VAD->isLet();
   }
-  // Record whether a subscript has getter/setter.
-  if (auto *SD = dyn_cast<SubscriptDecl>(VD)) {
-    HasSetter = SD->getSetter();
-  }
-
   if (auto *VAR = dyn_cast<AbstractStorageDecl>(VD)) {
     HasStorage = VAR->hasStorage();
-    HasDidset = VAR->getDidSetFunc();
-    HasWillset = VAR->getWillSetFunc();
+  }
+  if (auto *ACC = dyn_cast<AccessorDecl>(VD)) {
+    AccKind = ACC->getAccessorKind();
   }
 }
 
@@ -1318,6 +1359,7 @@ case SDKNodeKind::X:                                                           \
   break;
 #include "swift/IDE/DigesterEnums.def"
   }
+  llvm_unreachable("covered switch");
 }
 
 // Recursively construct a node that represents a type, for instance,
@@ -1326,6 +1368,19 @@ SDKNode *swift::ide::api::
 SwiftDeclCollector::constructTypeNode(Type T, TypeInitInfo Info) {
   if (Ctx.checkingABI()) {
     T = T->getCanonicalType();
+    // If the type is a opaque result type (some Type) and we're in the ABI mode,
+    // we should substitute the opaque result type to its underlying type.
+    // Notice this only works if the opaque result type is from an inlinable
+    // function where the function body is present in the swift module file, thus
+    // allowing us to know the concrete type.
+    if (auto OTA = T->getAs<OpaqueTypeArchetypeType>()) {
+      if (auto *D = OTA->getDecl()) {
+        if (auto SubMap = D->getUnderlyingTypeSubstitutions()) {
+          T = Type(D->getUnderlyingInterfaceType()).
+            subst(*SubMap)->getCanonicalType();
+        }
+      }
+    }
   }
 
   if (auto NAT = dyn_cast<TypeAliasType>(T.getPointer())) {
@@ -1427,6 +1482,22 @@ SDKContext::shouldIgnore(Decl *D, const Decl* Parent) const {
   if (Opts.SwiftOnly && isFromClang(D)) {
     return true;
   }
+  if (auto *ACC = dyn_cast<AccessorDecl>(D)) {
+    // Only include accessors if they are part of var and subscript decl.
+    if (!isa<AbstractStorageDecl>(Parent)) {
+      return true;
+    }
+    // Only include getter/setter if we are checking source compatibility.
+    if (!checkingABI()) {
+      switch (ACC->getAccessorKind()) {
+      case AccessorKind::Get:
+      case AccessorKind::Set:
+        break;
+      default:
+        return true;
+      }
+    }
+  }
   if (checkingABI()) {
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
       // Private vars with fixed binary orders can have ABI-impact, so we should
@@ -1444,8 +1515,6 @@ SDKContext::shouldIgnore(Decl *D, const Decl* Parent) const {
       return true;
   }
   if (auto VD = dyn_cast<ValueDecl>(D)) {
-    if (VD->getBaseName().empty())
-      return true;
     switch (getAccessLevel(VD)) {
     case AccessLevel::Internal:
     case AccessLevel::Private:
@@ -1529,17 +1598,16 @@ SwiftDeclCollector::constructExternalExtensionNode(NominalTypeDecl *NTD,
 
 SDKNode *swift::ide::api::
 SwiftDeclCollector::constructVarNode(ValueDecl *VD) {
-  auto Var = SDKNodeInitInfo(Ctx, VD).createSDKNode(SDKNodeKind::DeclVar);
+  auto Var = cast<SDKNodeDeclVar>(SDKNodeInitInfo(Ctx, VD).createSDKNode(SDKNodeKind::DeclVar));
   TypeInitInfo Info;
   Info.IsImplicitlyUnwrappedOptional = VD->getAttrs().
     hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
   Var->addChild(constructTypeNode(VD->getInterfaceType(), Info));
   if (auto VAD = dyn_cast<AbstractStorageDecl>(VD)) {
-    if (auto Getter = VAD->getGetter())
-      Var->addChild(constructFunctionNode(Getter, SDKNodeKind::DeclGetter));
-    if (auto Setter = VAD->getSetter()) {
-      if (Setter->getFormalAccess() > AccessLevel::Internal)
-        Var->addChild(constructFunctionNode(Setter, SDKNodeKind::DeclSetter));
+    for(auto *AC: VAD->getAllAccessors()) {
+      if (!Ctx.shouldIgnore(AC, VAD)) {
+        Var->addAccessor(constructFunctionNode(AC, SDKNodeKind::DeclAccessor));
+      }
     }
   }
   return Var;
@@ -1564,10 +1632,17 @@ SwiftDeclCollector::constructAssociatedTypeNode(AssociatedTypeDecl *ATD) {
 
 SDKNode *swift::ide::api::
 SwiftDeclCollector::constructSubscriptDeclNode(SubscriptDecl *SD) {
-  auto Subs = SDKNodeInitInfo(Ctx, SD).createSDKNode(SDKNodeKind::DeclSubscript);
+  auto *Subs = cast<SDKNodeDeclSubscript>(SDKNodeInitInfo(Ctx, SD).
+    createSDKNode(SDKNodeKind::DeclSubscript));
   Subs->addChild(constructTypeNode(SD->getElementInterfaceType()));
-  for (auto *Node: createParameterNodes(SD->getIndices()))
+  for (auto *Node: createParameterNodes(SD->getIndices())) {
     Subs->addChild(Node);
+  }
+  for(auto *AC: SD->getAllAccessors()) {
+    if (!Ctx.shouldIgnore(AC, SD)) {
+      Subs->addAccessor(constructFunctionNode(AC, SDKNodeKind::DeclAccessor));
+    }
+  }
   return Subs;
 }
 
@@ -1618,7 +1693,7 @@ SwiftDeclCollector::constructConformanceNode(ProtocolConformance *Conform) {
     Conform = Conform->getCanonicalConformance();
   auto ConfNode = cast<SDKNodeConformance>(SDKNodeInitInfo(Ctx,
     Conform).createSDKNode(SDKNodeKind::Conformance));
-  Conform->forEachTypeWitness(nullptr,
+  Conform->forEachTypeWitness(
     [&](AssociatedTypeDecl *assoc, Type ty, TypeDecl *typeDecl) -> bool {
       ConfNode->addChild(constructTypeWitnessNode(assoc, ty));
       return false;
@@ -1818,19 +1893,22 @@ void SDKNodeTypeNominal::jsonize(json::Output &out) {
 
 void SDKNodeDeclSubscript::jsonize(json::Output &out) {
   SDKNodeDeclAbstractFunc::jsonize(out);
-  output(out, KeyKind::KK_hasSetter, HasSetter);
   output(out, KeyKind::KK_hasStorage, HasStorage);
-  output(out, KeyKind::KK_hasDidset, HasDidSet);
-  output(out, KeyKind::KK_hasWillset, HasWillSet);
+  out.mapOptional(getKeyContent(Ctx, KeyKind::KK_accessors).data(), Accessors);
 }
 
 void SDKNodeDeclVar::jsonize(json::Output &out) {
   SDKNodeDecl::jsonize(out);
   output(out, KeyKind::KK_isLet, IsLet);
   output(out, KeyKind::KK_hasStorage, HasStorage);
-  output(out, KeyKind::KK_hasDidset, HasDidSet);
-  output(out, KeyKind::KK_hasWillset, HasWillSet);
+  out.mapOptional(getKeyContent(Ctx, KeyKind::KK_accessors).data(), Accessors);
 }
+
+void SDKNodeDeclAccessor::jsonize(json::Output &out) {
+  SDKNodeDeclAbstractFunc::jsonize(out);
+  out.mapRequired(getKeyContent(Ctx, KeyKind::KK_accessorKind).data(), AccKind);
+}
+
 
 namespace swift {
 namespace json {
@@ -1858,6 +1936,16 @@ struct ScalarEnumerationTraits<DeclKind> {
   static void enumeration(Output &out, DeclKind &value) {
 #define DECL(X, PARENT) out.enumCase(value, #X, DeclKind::X);
 #include "swift/AST/DeclNodes.def"
+  }
+};
+
+template<>
+struct ScalarEnumerationTraits<AccessorKind> {
+  static void enumeration(Output &out, AccessorKind &value) {
+#define ACCESSOR(ID)
+#define SINGLETON_ACCESSOR(ID, KEYWORD) \
+  out.enumCase(value, #KEYWORD, AccessorKind::ID);
+#include "swift/AST/AccessorKinds.def"
   }
 };
 
@@ -1914,12 +2002,6 @@ struct ArrayTraits<ArrayRef<StringRef>> {
 } // namespace swift
 
 namespace  {// Anonymous namespace.
-// Serialize a forest of SDKNode trees to the given stream.
-static void emitSDKNodeRoot(llvm::raw_ostream &os, SDKNode *&Root) {
-  json::Output yout(os);
-  yout << Root;
-}
-
 // Deserialize an SDKNode tree.
 std::pair<std::unique_ptr<llvm::MemoryBuffer>, SDKNode*>
 static parseJsonEmit(SDKContext &Ctx, StringRef FileName) {
@@ -1940,22 +2022,8 @@ static parseJsonEmit(SDKContext &Ctx, StringRef FileName) {
     yaml::Node *N = DI->getRoot();
     assert(N && "Failed to find a root");
     Result = SDKNode::constructSDKNode(Ctx, cast<yaml::MappingNode>(N));
-    if (Ctx.getDiags().hadAnyError())
-      exit(1);
   }
   return {std::move(FileBufOrErr.get()), Result};
-}
-
-static std::string getDumpFilePath(StringRef OutputDir, StringRef FileName) {
-  std::string Path = OutputDir;
-  Path += "/";
-  Path += FileName;
-  int Suffix = 0;
-  auto ConstructPath = [&]() {
-    return Path + (Suffix == 0 ? "" : std::to_string(Suffix)) + ".js";
-  };
-  for (; fs::exists(ConstructPath()); Suffix ++);
-  return ConstructPath();
 }
 } // End of anonymous namespace
 
@@ -1968,81 +2036,32 @@ void SwiftDeclCollector::deSerialize(StringRef Filename) {
 }
 
 // Serialize the content of all roots to a given file using JSON format.
-void SwiftDeclCollector::serialize(StringRef Filename) {
+void SwiftDeclCollector::serialize(StringRef Filename, SDKNode *Root) {
   std::error_code EC;
   llvm::raw_fd_ostream fs(Filename, EC, llvm::sys::fs::F_None);
-  emitSDKNodeRoot(fs, RootNode);
+  json::Output yout(fs);
+  yout << Root;
 }
 
-int swift::ide::api::dumpSwiftModules(const CompilerInvocation &InitInvok,
-                                      const llvm::StringSet<> &ModuleNames,
-                                      StringRef OutputDir,
-                                      const std::vector<std::string> PrintApis,
-                                      CheckerOptions Opts) {
-  if (!fs::exists(OutputDir)) {
-    llvm::errs() << "Output directory '" << OutputDir << "' does not exist.\n";
-    return 1;
-  }
+// Serialize the content of all roots to a given file using JSON format.
+void SwiftDeclCollector::serialize(StringRef Filename) {
+  SwiftDeclCollector::serialize(Filename, RootNode);
+}
 
-  std::vector<ModuleDecl*> Modules;
+SDKNodeRoot*
+swift::ide::api::getSDKNodeRoot(SDKContext &SDKCtx,
+                                 const CompilerInvocation &InitInvok,
+                                 const llvm::StringSet<> &ModuleNames,
+                                 CheckerOptions Opts) {
   CompilerInvocation Invocation(InitInvok);
-  CompilerInstance CI;
+
+  CompilerInstance &CI = SDKCtx.newCompilerInstance();
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
   if (CI.setup(Invocation)) {
     llvm::errs() << "Failed to setup the compiler instance\n";
-    return 1;
-  }
-
-  auto &Context = CI.getASTContext();
-
-  for (auto &Entry : ModuleNames) {
-    StringRef Name = Entry.first();
-    if (Opts.Verbose)
-      llvm::errs() << "Loading module: " << Name << "...\n";
-    auto *M = Context.getModuleByName(Name);
-    if (!M) {
-      if (Opts.Verbose)
-        llvm::errs() << "Failed to load module: " << Name << '\n';
-      if (Opts.AbortOnModuleLoadFailure)
-        return 1;
-    }
-    Modules.push_back(M);
-  }
-
-  PrintingDiagnosticConsumer PDC;
-  SDKContext Ctx(Opts);
-  Ctx.getDiags().addConsumer(PDC);
-
-  for (auto M : Modules) {
-    SwiftDeclCollector Collector(Ctx);
-    SmallVector<Decl*, 256> Decls;
-    M->getTopLevelDecls(Decls);
-    for (auto D : Decls) {
-      if (auto VD = dyn_cast<ValueDecl>(D))
-        Collector.foundDecl(VD, DeclVisibilityKind::VisibleAtTopLevel);
-    }
-    std::string Path = getDumpFilePath(OutputDir, M->getName().str());
-    Collector.serialize(Path);
-    if (Opts.Verbose)
-      llvm::errs() << "Dumped to "<< Path << "\n";
-  }
-  return 0;
-}
-
-int swift::ide::api::dumpSDKContent(const CompilerInvocation &InitInvok,
-                                    const llvm::StringSet<> &ModuleNames,
-                                    StringRef OutputFile, CheckerOptions Opts) {
-  CompilerInvocation Invocation(InitInvok);
-
-  CompilerInstance CI;
-  // Display diagnostics to stderr.
-  PrintingDiagnosticConsumer PrintDiags;
-  CI.addDiagnosticConsumer(&PrintDiags);
-  if (CI.setup(Invocation)) {
-    llvm::errs() << "Failed to setup the compiler instance\n";
-    return 1;
+    return nullptr;
   }
 
   auto &Ctx = CI.getASTContext();
@@ -2052,7 +2071,7 @@ int swift::ide::api::dumpSDKContent(const CompilerInvocation &InitInvok,
   auto *Stdlib = Ctx.getStdlibModule(/*loadIfAbsent=*/true);
   if (!Stdlib) {
     llvm::errs() << "Failed to load Swift stdlib\n";
-    return 1;
+    return nullptr;
   }
 
   std::vector<ModuleDecl *> Modules;
@@ -2061,22 +2080,32 @@ int swift::ide::api::dumpSDKContent(const CompilerInvocation &InitInvok,
     if (Opts.Verbose)
       llvm::errs() << "Loading module: " << Name << "...\n";
     auto *M = Ctx.getModuleByName(Name);
-    if (!M) {
+    if (!M || M->failedToLoad()) {
       llvm::errs() << "Failed to load module: " << Name << '\n';
       if (Opts.AbortOnModuleLoadFailure)
-        return 1;
+        return nullptr;
     } else {
       Modules.push_back(M);
     }
   }
   if (Opts.Verbose)
     llvm::errs() << "Scanning symbols...\n";
-  SDKContext SDKCtx(Opts);
+
   SwiftDeclCollector Collector(SDKCtx);
   Collector.lookupVisibleDecls(Modules);
+  return Collector.getSDKRoot();
+}
+
+int swift::ide::api::dumpSDKContent(const CompilerInvocation &InitInvok,
+                                    const llvm::StringSet<> &ModuleNames,
+                                    StringRef OutputFile, CheckerOptions Opts) {
+  SDKContext SDKCtx(Opts);
+  SDKNode *Root = getSDKNodeRoot(SDKCtx, InitInvok, ModuleNames, Opts);
+  if (!Root)
+    return 1;
   if (Opts.Verbose)
     llvm::errs() << "Dumping SDK...\n";
-  Collector.serialize(OutputFile);
+  SwiftDeclCollector::serialize(OutputFile, Root);
   if (Opts.Verbose)
     llvm::errs() << "Dumped to "<< OutputFile << "\n";
   return 0;

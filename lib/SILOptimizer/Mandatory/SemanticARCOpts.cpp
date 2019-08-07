@@ -91,7 +91,7 @@ static bool isConsumed(
         for (SILValue v : user->getResults()) {
           if (v.getOwnershipKind() != ValueOwnershipKind::Owned)
             continue;
-          copy(v->getUses(), std::back_inserter(worklist));
+          llvm::copy(v->getUses(), std::back_inserter(worklist));
         }
         continue;
       }
@@ -388,6 +388,7 @@ static bool isWrittenTo(SILFunction &f, SILValue value) {
   case AccessedStorage::Argument:
     return mayFunctionMutateArgument(storage, f);
   }
+  llvm_unreachable("covered switch");
 }
 
 // Convert a load [copy] from unique storage [read] that has all uses that can

@@ -94,10 +94,6 @@ enum class TypeResolverContext : uint8_t {
   /// tuple return values. See also: TypeResolutionFlags::Direct
   FunctionResult,
 
-  /// Whether we are in the result type of a function body that is
-  /// known to produce dynamic Self.
-  DynamicSelfResult,
-
   /// Whether we are in a protocol's where clause
   ProtocolWhereClause,
 
@@ -211,7 +207,6 @@ public:
     case Context::FunctionInput:
     case Context::VariadicFunctionInput:
     case Context::FunctionResult:
-    case Context::DynamicSelfResult:
     case Context::ProtocolWhereClause:
     case Context::ExtensionBinding:
     case Context::SubscriptDecl:
@@ -376,6 +371,21 @@ public:
   /// type resolution context.
   bool areSameType(Type type1, Type type2) const;
 };
+
+/// Kinds of types for CustomAttr.
+enum class CustomAttrTypeKind {
+  /// The type is required to not be expressed in terms of
+  /// any contextual type parameters.
+  NonGeneric,
+
+  /// Property delegates have some funky rules, like allowing
+  /// unbound generic types.
+  PropertyDelegate,
+};
+
+/// Attempt to resolve a concrete type for a custom attribute.
+Type resolveCustomAttrType(CustomAttr *attr, DeclContext *dc,
+                           CustomAttrTypeKind typeKind);
 
 } // end namespace swift
 

@@ -17,6 +17,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/SourceManager.h"
 #include "llvm/Support/DJB.h"
@@ -354,7 +355,7 @@ static void writeDeclCommentTable(
     DeclGroupNameContext &GroupContext;
     unsigned SourceOrder;
 
-    DeclCommentTableWriter(DeclGroupNameContext &GroupContext) :
+    DeclCommentTableWriter(DeclGroupNameContext &GroupContext):
       GroupContext(GroupContext) {}
 
     void resetSourceOrder() {
@@ -367,7 +368,7 @@ static void writeDeclCommentTable(
       return StringRef(Mem, String.size());
     }
 
-    bool shouldSerializeDoc(Decl *D) {
+    bool shouldIncludeDecl(Decl *D) {
       if (auto *VD = dyn_cast<ValueDecl>(D)) {
         // Skip the decl if it's not visible to clients. The use of
         // getEffectiveAccess is unusual here; we want to take the testability
@@ -377,7 +378,35 @@ static void writeDeclCommentTable(
         if (VD->getEffectiveAccess() < swift::AccessLevel::Public)
           return false;
       }
+      // Exclude decls with double-underscored names, either in arguments or
+      // base names.
+      StringRef Prefix = "__";
+      if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
+        return shouldIncludeDecl(ED->getExtendedNominal());
+      }
 
+      if (auto AFD = dyn_cast<AbstractFunctionDecl>(D)) {
+        // If it's a function with a parameter with leading double underscore,
+        // it's a private function.
+        if (AFD->getParameters()->hasInternalParameter(Prefix))
+          return false;
+      }
+
+      if (auto SubscriptD = dyn_cast<SubscriptDecl>(D)) {
+        if (SubscriptD->getIndices()->hasInternalParameter(Prefix))
+          return false;
+      }
+      if (auto *VD = dyn_cast<ValueDecl>(D)) {
+        auto Name = VD->getBaseName();
+        if (!Name.isSpecial() &&
+            Name.getIdentifier().str().startswith(Prefix)) {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    bool shouldSerializeDoc(Decl *D) {
       // When building the stdlib we intend to serialize unusual comments.
       // This situation is represented by GroupContext.isEnable().  In that
       // case, we perform more serialization to keep track of source order.
@@ -409,6 +438,8 @@ static void writeDeclCommentTable(
     }
 
     bool walkToDeclPre(Decl *D) override {
+      if (!shouldIncludeDecl(D))
+        return false;
       if (!shouldSerializeDoc(D))
         return true;
       if (auto *ED = dyn_cast<ExtensionDecl>(D)) {

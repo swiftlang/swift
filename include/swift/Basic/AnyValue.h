@@ -21,6 +21,7 @@
 #include "swift/Basic/SimpleDisplay.h"
 #include "swift/Basic/TypeID.h"
 #include "llvm/ADT/PointerUnion.h"  // to define hash_value
+#include "llvm/ADT/TinyPtrVector.h"
 
 namespace llvm {
   // FIXME: Belongs in LLVM itself
@@ -145,6 +146,34 @@ public:
 };
 
 } // end namespace swift
+
+namespace llvm {
+  template<typename T>
+  bool operator==(const TinyPtrVector<T> &lhs, const TinyPtrVector<T> &rhs) {
+    if (lhs.size() != rhs.size())
+      return false;
+    
+    for (unsigned i = 0, n = lhs.size(); i != n; ++i) {
+      if (lhs[i] != rhs[i])
+        return false;
+    }
+    
+    return true;
+  }
+  
+  template<typename T>
+  bool operator!=(const TinyPtrVector<T> &lhs, const TinyPtrVector<T> &rhs) {
+    return !(lhs == rhs);
+  }
+
+  template<typename T>
+  void simple_display(raw_ostream &out, const Optional<T> &opt) {
+    if (opt) {
+      simple_display(out, *opt);
+    }
+    out << "None";
+  }
+} // end namespace llvm
 
 #endif //
 

@@ -64,14 +64,22 @@ public:
   /// Path to search for compiler-relative header files.
   std::string RuntimeResourcePath;
 
-  /// Path to search for compiler-relative stdlib dylibs.
-  std::string RuntimeLibraryPath;
+  /// Paths to search for compiler-relative stdlib dylibs, in order of
+  /// preference.
+  std::vector<std::string> RuntimeLibraryPaths;
 
   /// Paths to search for stdlib modules. One of these will be compiler-relative.
   std::vector<std::string> RuntimeLibraryImportPaths;
 
   /// Don't look in for compiler-provided modules.
   bool SkipRuntimeLibraryImportPaths = false;
+
+  /// When set, don't validate module system dependencies.
+  ///
+  /// If a system header is modified and this is not set, the compiler will
+  /// rebuild PCMs and compiled swiftmodules that depend on them, just like it
+  /// would for a non-system header.
+  bool DisableModulesValidateSystemDependencies = false;
 
   /// Return a hash code of any components from these options that should
   /// contribute to a Swift Bridging PCH hash.
@@ -95,6 +103,7 @@ public:
     for (auto RuntimeLibraryImportPath : RuntimeLibraryImportPaths) {
       Code = hash_combine(Code, RuntimeLibraryImportPath);
     }
+    Code = hash_combine(Code, DisableModulesValidateSystemDependencies);
     return Code;
   }
 };

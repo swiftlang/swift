@@ -684,10 +684,10 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
             std::string s(1, '\01');
             s += asmLabel->getLabel();
             return s;
-          } else if (namedClangDecl->hasAttr<clang::OverloadableAttr>()) {
+          } else if (namedClangDecl->hasAttr<clang::OverloadableAttr>() ||
+                     getDecl()->getASTContext().LangOpts.EnableCXXInterop) {
             std::string storage;
             llvm::raw_string_ostream SS(storage);
-            // FIXME: When we can import C++, use Clang's mangler all the time.
             mangleClangDecl(SS, namedClangDecl, getDecl()->getASTContext());
             return SS.str();
           }
@@ -846,6 +846,8 @@ SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {
     if (overridden.kind == SILDeclRef::Kind::Initializer) {
       return SILDeclRef();
     }
+
+    // Overrides of @objc dynamic declarations are not in the vtable.
     if (overridden.getDecl()->isObjCDynamic()) {
       return SILDeclRef();
     }
@@ -1016,10 +1018,10 @@ unsigned SILDeclRef::getParameterListCount() const {
 
   auto *vd = getDecl();
 
-  if (auto *func = dyn_cast<AbstractFunctionDecl>(vd)) {
-    return func->hasImplicitSelfDecl() ? 2 : 1;
-  } else if (auto *ed = dyn_cast<EnumElementDecl>(vd)) {
-    return ed->hasAssociatedValues() ? 2 : 1;
+  if (isa<AbstractFunctionDecl>(vd) || isa<EnumElementDecl>(vd)) {
+    // For functions and enum elements, the number of parameter lists is the
+    // same as in their interface type.
+    return vd->getNumCurryLevels();
   } else if (isa<ClassDecl>(vd)) {
     return 2;
   } else if (isa<VarDecl>(vd)) {

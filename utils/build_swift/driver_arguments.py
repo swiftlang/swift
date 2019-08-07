@@ -189,8 +189,8 @@ def _apply_default_arguments(args):
     if args.test_optimize_for_size:
         args.test = True
 
-    # --test-optimize-none-implicit-dynamic implies --test.
-    if args.test_optimize_none_implicit_dynamic:
+    # --test-optimize-none-with-implicit-dynamic implies --test.
+    if args.test_optimize_none_with_implicit_dynamic:
         args.test = True
 
     # If none of tests specified skip swift stdlib test on all platforms
@@ -510,7 +510,7 @@ def create_argument_parser():
            help='A space separated list of targets to cross-compile host '
                 'Swift tools for. Can be used multiple times.')
 
-    option('--stdlib-deployment-targets', append,
+    option('--stdlib-deployment-targets', store,
            type=argparse.ShellSplitType(),
            default=None,
            help='list of targets to compile or cross-compile the Swift '
@@ -521,6 +521,18 @@ def create_argument_parser():
            default=['all'],
            help='A space-separated list that filters which of the configured '
                 'targets to build the Swift standard library for, or "all".')
+
+    option('--swift-darwin-supported-archs', store,
+           metavar='ARCHS',
+           help='Semicolon-separated list of architectures to configure on '
+                'Darwin platforms. If left empty all default architectures '
+                'are configured.')
+
+    option('--swift-darwin-module-archs', store,
+           metavar='ARCHS',
+           help='Semicolon-separated list of architectures to configure Swift '
+                'module-only targets on Darwin platforms. These targets are '
+                'in addition to the full library targets.')
 
     # -------------------------------------------------------------------------
     in_group('Options to select projects')
@@ -760,10 +772,10 @@ def create_argument_parser():
                 '(implies --test)')
 
     # FIXME: Convert to store_true action
-    option('-y', store('test_optimize_none_implicit_dynamic', const=True),
+    option('-y', store('test_optimize_none_with_implicit_dynamic', const=True),
            help='run the test suite in optimize none with implicit dynamic'
                 ' mode too (implies --test)')
-    option('--test-optimize-none-implicit-dynamic', toggle_true,
+    option('--test-optimize-none-with-implicit-dynamic', toggle_true,
            help='run the test suite in optimize none with implicit dynamic'
                 'mode too (implies --test)')
 
@@ -997,7 +1009,7 @@ def create_argument_parser():
     option('--common-cmake-options', unsupported)
     option('--only-execute', unsupported)
     option('--skip-test-optimize-for-size', unsupported)
-    option('--skip-test-optimize-none-implicit-dynamic', unsupported)
+    option('--skip-test-optimize-none-with-implicit-dynamic', unsupported)
     option('--skip-test-optimized', unsupported)
 
     # -------------------------------------------------------------------------

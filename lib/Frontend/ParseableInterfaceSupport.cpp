@@ -178,11 +178,28 @@ class InheritedProtocolCollector {
   SmallVector<const ProtocolType *, 8> ConditionalConformanceProtocols;
 
   /// Helper to extract the `@available` attributes on a decl.
-  AvailableAttrList getAvailabilityAttrs(const Decl *D) {
-    AvailableAttrList result;
-    auto attrRange = D->getAttrs().getAttributes<AvailableAttr>();
-    result.insert(result.begin(), attrRange.begin(), attrRange.end());
-    return result;
+  static AvailableAttrList
+  getAvailabilityAttrs(const Decl *D, Optional<AvailableAttrList> &cache) {
+    if (cache.hasValue())
+      return cache.getValue();
+
+    cache.emplace();
+    while (D) {
+      for (auto *nextAttr : D->getAttrs().getAttributes<AvailableAttr>()) {
+        // FIXME: This is just approximating the effects of nested availability
+        // attributes for the same platform; formally they'd need to be merged.
+        bool alreadyHasMoreSpecificAttrForThisPlatform =
+            llvm::any_of(*cache, [nextAttr](const AvailableAttr *existingAttr) {
+          return existingAttr->Platform == nextAttr->Platform;
+        });
+        if (alreadyHasMoreSpecificAttrForThisPlatform)
+          continue;
+        cache->push_back(nextAttr);
+      }
+      D = D->getDeclContext()->getAsDecl();
+    }
+
+    return cache.getValue();
   }
 
   /// For each type in \p directlyInherited, classify the protocols it refers to
@@ -197,19 +214,29 @@ class InheritedProtocolCollector {
         continue;
 
       bool canPrintNormally = isPublicOrUsableFromInline(inheritedTy);
-      if (!canPrintNormally && !availableAttrs.hasValue())
-        availableAttrs = getAvailabilityAttrs(D);
-
       ExistentialLayout layout = inheritedTy->getExistentialLayout();
       for (ProtocolType *protoTy : layout.getProtocols()) {
         if (canPrintNormally)
           IncludedProtocols.push_back(protoTy->getDecl());
         else
           ExtraProtocols.push_back({protoTy->getDecl(),
-                                    availableAttrs.getValue()});
+                                    getAvailabilityAttrs(D, availableAttrs)});
       }
       // FIXME: This ignores layout constraints, but currently we don't support
       // any of those besides 'AnyObject'.
+    }
+
+    // Check for synthesized protocols, like Hashable on enums.
+    if (auto *nominal = dyn_cast<NominalTypeDecl>(D)) {
+      SmallVector<ProtocolConformance *, 4> localConformances =
+          nominal->getLocalConformances(ConformanceLookupKind::NonInherited);
+
+      for (auto *conf : localConformances) {
+        if (conf->getSourceKind() != ConformanceEntryKind::Synthesized)
+          continue;
+        ExtraProtocols.push_back({conf->getProtocol(),
+                                  getAvailabilityAttrs(D, availableAttrs)});
+      }
     }
   }
 
@@ -332,8 +359,7 @@ public:
     // a bit more memory.
     // FIXME: This will pick the availability attributes from the first sight
     // of a protocol rather than the maximally available case.
-    SmallVector<std::pair<ProtocolDecl *, AvailableAttrList>, 16>
-        protocolsToPrint;
+    SmallVector<ProtocolAndAvailability, 16> protocolsToPrint;
     for (const auto &protoAndAvailability : ExtraProtocols) {
       protoAndAvailability.first->walkInheritedProtocols(
           [&](ProtocolDecl *inherited) -> TypeWalker::Action {
@@ -354,8 +380,11 @@ public:
 
     for (const auto &protoAndAvailability : protocolsToPrint) {
       StreamPrinter printer(out);
-      for (const AvailableAttr *attr : protoAndAvailability.second)
-        attr->print(printer, printOptions);
+      // FIXME: Shouldn't this be an implicit conversion?
+      TinyPtrVector<const DeclAttribute *> attrs;
+      attrs.insert(attrs.end(), protoAndAvailability.second.begin(),
+                   protoAndAvailability.second.end());
+      DeclAttributes::print(printer, printOptions, attrs);
 
       printer << "extension ";
       nominal->getDeclaredType().print(printer, printOptions);
@@ -411,7 +440,8 @@ bool swift::emitParseableInterface(raw_ostream &out,
   printToolVersionAndFlagsComment(out, Opts, M);
   printImports(out, M);
 
-  const PrintOptions printOptions = PrintOptions::printParseableInterfaceFile();
+  const PrintOptions printOptions = PrintOptions::printParseableInterfaceFile(
+      Opts.PreserveTypesAsWritten);
   InheritedProtocolCollector::PerTypeMap inheritedProtocolMap;
 
   SmallVector<Decl *, 16> topLevelDecls;

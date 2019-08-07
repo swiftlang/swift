@@ -90,53 +90,6 @@ OverloadCandidate::OverloadCandidate(ValueDecl *decl, bool skipCurriedSelf)
   }
 }
 
-ArrayRef<Identifier>
-OverloadCandidate::getArgumentLabels(SmallVectorImpl<Identifier> &scratch) {
-  scratch.clear();
-  if (auto decl = getDecl()) {
-    if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
-      if (func->hasImplicitSelfDecl()) {
-        if (!skipCurriedSelf) {
-          scratch.push_back(Identifier());
-          return scratch;
-        }
-
-        skipCurriedSelf = false;
-      }
-
-      if (!skipCurriedSelf) {
-        // Retrieve the argument labels of the corresponding parameter list.
-        for (auto param : *func->getParameters()) {
-          scratch.push_back(param->getArgumentName());
-        }
-        return scratch;
-      }
-    } else if (auto enumElt = dyn_cast<EnumElementDecl>(decl)) {
-      // 'self'
-      if (!skipCurriedSelf) {
-        scratch.push_back(Identifier());
-        return scratch;
-      }
-      
-      // The associated data of the case.
-      auto *paramList = enumElt->getParameterList();
-      if (!paramList) return { };
-      for (auto param : *paramList) {
-        scratch.push_back(param->getArgumentName());
-      }
-      return scratch;
-    }
-  }
-
-  if (!hasParameters())
-    return {};
-
-  for (const auto &param : getParameters())
-    scratch.push_back(param.getLabel());
-
-  return scratch;
-}
-
 void OverloadCandidate::dump() const {
   if (auto decl = getDecl())
     decl->dumpRef(llvm::errs());
@@ -320,9 +273,8 @@ CalleeCandidateInfo::ClosenessResultTy CalleeCandidateInfo::evaluateCloseness(
     return {CC_GeneralMismatch, {}};
 
   auto candArgs = candidate.getParameters();
-  SmallBitVector candDefaultMap =
-    computeDefaultMap(candArgs, candidate.getDecl(), candidate.skipCurriedSelf);
-  
+  auto candParamInfo = candidate.getParameterListInfo(candArgs);
+
   struct OurListener : public MatchCallArgumentListener {
     CandidateCloseness result = CC_ExactMatch;
   public:
@@ -356,7 +308,7 @@ CalleeCandidateInfo::ClosenessResultTy CalleeCandidateInfo::evaluateCloseness(
       return true;
     }
     bool trailingClosureMismatch(unsigned paramIdx, unsigned argIdx) override {
-      result = CC_ArgumentMismatch;
+      result = CC_ArgumentCountMismatch;
       return true;
     }
   } listener;
@@ -366,7 +318,7 @@ CalleeCandidateInfo::ClosenessResultTy CalleeCandidateInfo::evaluateCloseness(
   // types of the arguments, looking only at the argument labels etc.
   SmallVector<ParamBinding, 4> paramBindings;
   if (matchCallArguments(actualArgs, candArgs,
-                         candDefaultMap,
+                         candParamInfo,
                          hasTrailingClosure,
                          /*allowFixes:*/ true,
                          listener, paramBindings))
@@ -749,8 +701,10 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
     // initializing, provide it.
     if (UDE->getName().getBaseName() == DeclBaseName::createConstructor()) {
       auto selfTy = CS.getType(UDE->getBase())->getWithoutSpecifierType();
+      if (auto *dynamicSelfTy = selfTy->getAs<DynamicSelfType>())
+        selfTy = dynamicSelfTy->getSelfType();
       if (!selfTy->hasTypeVariable())
-        declName = selfTy->eraseDynamicSelfType().getString() + "." + declName;
+        declName = selfTy.getString() + "." + declName;
     }
     
     // Otherwise, look for a disjunction constraint explaining what the set is.
@@ -1059,8 +1013,8 @@ bool CalleeCandidateInfo::diagnoseGenericParameterErrors(Expr *badArgExpr) {
     // FIXME: Add specific error for not subclass, if the archetype has a superclass?
     
     for (auto proto : paramArchetype->getConformsTo()) {
-      if (!CS.TC.conformsToProtocol(substitution, proto, CS.DC,
-                                    ConformanceCheckFlags::InExpression)) {
+      if (!TypeChecker::conformsToProtocol(substitution, proto, CS.DC,
+                                           ConformanceCheckFlags::InExpression)) {
         if (substitution->isEqual(argType)) {
           CS.TC.diagnose(badArgExpr->getLoc(),
                          diag::cannot_convert_argument_value_protocol,

@@ -175,7 +175,7 @@ KNOWN_SETTINGS=(
     skip-test-benchmarks        ""               "set to skip running Swift Benchmark Suite"
     skip-test-optimized         ""               "set to skip testing the test suite in optimized mode"
     skip-test-optimize-for-size ""               "set to skip testing the test suite in optimize for size mode"
-    skip-test-optimize-none-implicit-dynamic ""  "set to skip testing the test suite in optimize none with implicit dynamic mode"
+    skip-test-optimize-none-with-implicit-dynamic ""  "set to skip testing the test suite in optimize none with implicit dynamic mode"
     skip-test-sourcekit         ""               "set to skip testing SourceKit"
     stress-test-sourcekit       ""               "set to run the stress-SourceKit target"
     only-executable-test        ""               "only run the executable variant of the swift lit tests"
@@ -756,14 +756,12 @@ function set_build_options_for_host() {
         -DSWIFT_HOST_VARIANT_ARCH="${SWIFT_HOST_VARIANT_ARCH}"
     )
 
-    if [[ "${LLVM_LIT_ARGS}" ]]; then
-        llvm_cmake_options+=(
-            -DLLVM_LIT_ARGS="${LLVM_LIT_ARGS}"
-        )
-        swift_cmake_options+=(
-            -DLLVM_LIT_ARGS="${LLVM_LIT_ARGS}"
-        )
-    fi
+    llvm_cmake_options+=(
+        -DLLVM_LIT_ARGS="${LLVM_LIT_ARGS} -j ${BUILD_JOBS}"
+    )
+    swift_cmake_options+=(
+        -DLLVM_LIT_ARGS="${LLVM_LIT_ARGS} -j ${BUILD_JOBS}"
+    )
 
     if [[ "${CLANG_PROFILE_INSTR_USE}" ]]; then
         llvm_cmake_options+=(
@@ -1507,8 +1505,8 @@ function calculate_targets_for_host() {
             if [[ $(not ${SKIP_TEST_OPTIMIZE_FOR_SIZE}) && ! -n "${test_host_only}" ]] ; then
                 SWIFT_TEST_TARGETS+=("check-swift${test_subset_target_suffix}-optimize_size-${stdlib_deployment_target}")
             fi
-            if [[ $(not ${SKIP_TEST_OPTIMIZE_NONE_IMPLICIT_DYNAMIC}) && ! -n "${test_host_only}" ]] ; then
-                SWIFT_TEST_TARGETS+=("check-swift${test_subset_target_suffix}-optimize_none_implicit_dynamic-${stdlib_deployment_target}")
+            if [[ $(not ${SKIP_TEST_OPTIMIZE_NONE_WITH_IMPLICIT_DYNAMIC}) && ! -n "${test_host_only}" ]] ; then
+                SWIFT_TEST_TARGETS+=("check-swift${test_subset_target_suffix}-optimize_none_with_implicit_dynamic-${stdlib_deployment_target}")
             fi
         fi
     done
@@ -2402,6 +2400,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DSWIFT_PATH_TO_CMARK_SOURCE:PATH="${CMARK_SOURCE_DIR}"
                     -DSWIFT_PATH_TO_CMARK_BUILD:PATH="$(build_directory ${host} cmark)"
                     -DSWIFT_PATH_TO_LIBDISPATCH_SOURCE:PATH="${LIBDISPATCH_SOURCE_DIR}"
+                    -DSWIFT_PATH_TO_LIBDISPATCH_BUILD:PATH="$(build_directory ${host} libdispatch)"
                 )
 
                 if [[ ! "${SKIP_BUILD_LIBICU}" ]] ; then
@@ -2531,8 +2530,15 @@ for host in "${ALL_HOSTS[@]}"; do
                       call xcodebuild -target desktop -configuration ${LLDB_BUILD_MODE} ${lldb_xcodebuild_options[@]}
                   continue
                 else
+                  if [[ "$(uname -s)" == "Darwin" ]] ; then
+                    cmake_cache="Apple-lldb-macOS.cmake"
+                  else
+                    cmake_cache="Apple-lldb-linux.cmake"
+                  fi
+
                   cmake_options=(
                       "${cmake_options[@]}"
+                      -C${LLDB_SOURCE_DIR}/cmake/caches/${cmake_cache}
                       -DCMAKE_BUILD_TYPE:STRING="${LLDB_BUILD_TYPE}"
                       -DLLDB_SWIFTC:PATH="$(build_directory ${LOCAL_HOST} swift)/bin/swiftc"
                       -DLLDB_SWIFT_LIBS:PATH="$(build_directory ${LOCAL_HOST} swift)/lib/swift"
@@ -2550,10 +2556,8 @@ for host in "${ALL_HOSTS[@]}"; do
 
                   if [[ "$(uname -s)" == "Darwin" ]] ; then
                     cmake_options+=(
-                      -DLLDB_BUILD_FRAMEWORK:BOOL=TRUE
                       -DLLDB_CODESIGN_IDENTITY=""
                       -DLLDB_USE_SYSTEM_DEBUGSERVER:BOOL="${LLDB_USE_SYSTEM_DEBUGSERVER}"
-                      -DLLDB_FRAMEWORK_TOOLS="darwin-debug;lldb-argdumper;lldb-server;repl_swift"
                     )
                   fi
                 fi
@@ -2893,6 +2897,11 @@ for host in "${ALL_HOSTS[@]}"; do
         if [[  "${RECONFIGURE}" || ! -f "${cmake_cache_path}" || \
                     ( ! -z "${generator_output_path}" && ! -f "${generator_output_path}" ) ]] ; then
             call mkdir -p "${build_dir}"
+
+            # Use `cmake-file-api` in case it is available.
+            call mkdir -p "${build_dir}/.cmake/api/v1/query"
+            call touch "${build_dir}/.cmake/api/v1/query/codemodel-v2" "${build_dir}/.cmake/api/v1/query/cache-v2"
+
             if [[ -n "${DISTCC}" ]]; then
                 EXTRA_DISTCC_OPTIONS=("DISTCC_HOSTS=localhost,lzo,cpp")
             fi
@@ -2939,6 +2948,33 @@ for host in "${ALL_HOSTS[@]}"; do
             fi
 
             call "${CMAKE_BUILD[@]}" "${build_dir}" $(cmake_config_opt ${product}) -- "${BUILD_ARGS[@]}" ${build_targets[@]}
+
+            # When we are building LLVM copy over the compiler-rt
+            # builtins for iOS/tvOS/watchOS to ensure that Swift's
+            # stdlib can use compiler-rt builtins when targetting iOS/tvOS/watchOS.
+            if [[ "${product}" == "llvm" && "${BUILD_LLVM}" == "1" ]]; then
+                if [[ "$(uname -s)" == "Darwin" ]] ; then
+                    HOST_CXX_DIR=$(dirname "${HOST_CXX}")
+                    HOST_CXX_BUILTINS_VERSION=$(ls "$HOST_CXX_DIR/../lib/clang" | awk '{print $0}')
+                    HOST_CXX_BUILTINS_DIR="$HOST_CXX_DIR/../lib/clang/$HOST_CXX_BUILTINS_VERSION/lib/darwin"
+                    DEST_CXX_BUILTINS_VERSION=$(ls "$(build_directory_bin ${host} llvm)/../lib/clang" | awk '{print $0}')
+                    DEST_BUILTINS_DIR="$(build_directory_bin ${host} llvm)/../lib/clang/$DEST_CXX_BUILTINS_VERSION/lib/darwin"
+
+                    if [ -d "$DEST_BUILTINS_DIR" ]; then
+                        echo "copying compiler-rt embedded builtins into the local clang build directory $DEST_BUILTINS_DIR."
+
+                        if [ -f "$HOST_CXX_BUILTINS_DIR/libclang_rt.ios.a" ]; then
+                            call cp "$HOST_CXX_BUILTINS_DIR/libclang_rt.ios.a" "$DEST_BUILTINS_DIR/libclang_rt.ios.a"
+                        fi
+                        if [ -f "$HOST_CXX_BUILTINS_DIR/libclang_rt.watchos.a" ]; then
+                            call cp "$HOST_CXX_BUILTINS_DIR/libclang_rt.watchos.a" "$DEST_BUILTINS_DIR/libclang_rt.watchos.a"
+                        fi
+                        if [ -f "$HOST_CXX_BUILTINS_DIR/libclang_rt.tvos.a" ]; then
+                            call cp "$HOST_CXX_BUILTINS_DIR/libclang_rt.tvos.a" "$DEST_BUILTINS_DIR/libclang_rt.tvos.a"
+                        fi
+                    fi
+                fi
+            fi
         fi
     done
 done
@@ -3129,7 +3165,7 @@ for host in "${ALL_HOSTS[@]}"; do
 
                 if [[ "${ENABLE_ASAN}" ]] ; then
                     # Limit the number of parallel tests
-                    LLVM_LIT_ARGS="${LLVM_LIT_ARGS} --threads=$(sysctl hw.physicalcpu | awk '{ print $2 }')"
+                    LLVM_LIT_ARGS="${LLVM_LIT_ARGS} -j $(sysctl hw.physicalcpu | awk -v N=${BUILD_JOBS} '{ print (N < $2) ? N : $2 }')"
                 fi
 
 		if [[ "$(true_false ${LLDB_TEST_SWIFT_ONLY})" == "TRUE" ]]; then
@@ -3140,9 +3176,9 @@ for host in "${ALL_HOSTS[@]}"; do
                 LLVM_LIT_ARGS="${LLVM_LIT_ARGS} -v --time-tests"
                 if [[ "$using_xcodebuild" == "FALSE" ]] ; then
                     with_pushd ${lldb_build_dir} \
-                        call ${NINJA_BIN} unittests/LLDBUnitTests
+                        call ${NINJA_BIN} -j ${BUILD_JOBS} unittests/LLDBUnitTests
                     with_pushd ${lldb_build_dir} \
-                        call ${NINJA_BIN} lldb-test-deps
+                        call ${NINJA_BIN} -j ${BUILD_JOBS} lldb-test-deps
                     with_pushd ${results_dir} \
                         call "${llvm_build_dir}/bin/llvm-lit" \
                              "${lldb_build_dir}/lit" \
@@ -3537,24 +3573,25 @@ for host in "${ALL_HOSTS[@]}"; do
                     echo "--install-destdir is required to install products."
                     exit 1
                 fi
-
-                case ${host} in
-                    linux-*)
+                if [[ "$using_xcodebuild" == "TRUE" ]] ; then
+                    case ${host} in
+                        linux-*)
                         ;;
-                    freebsd-*)
+                        freebsd-*)
                         ;;
-                    cygwin-*)
+                        cygwin-*)
                         ;;
-                    haiku-*)
+                        haiku-*)
                         ;;
-                    macosx-*)
-                        set_lldb_xcodebuild_options
-                        set_lldb_build_mode
-                        with_pushd ${LLDB_SOURCE_DIR} \
-                            call xcodebuild -target toolchain -configuration ${LLDB_BUILD_MODE} install ${lldb_xcodebuild_options[@]} DSTROOT="${host_install_destdir}" LLDB_TOOLCHAIN_PREFIX="${TOOLCHAIN_PREFIX}"
-                        continue
+                        macosx-*)
+                            set_lldb_xcodebuild_options
+                            set_lldb_build_mode
+                            with_pushd ${LLDB_SOURCE_DIR} \
+                                       call xcodebuild -target toolchain -configuration ${LLDB_BUILD_MODE} install ${lldb_xcodebuild_options[@]} DSTROOT="${host_install_destdir}" LLDB_TOOLCHAIN_PREFIX="${TOOLCHAIN_PREFIX}"
+                            continue
                         ;;
-                esac
+                    esac
+                fi
                 ;;
             swiftpm)
                 if [[ -z "${INSTALL_SWIFTPM}" ]] ; then
@@ -3838,11 +3875,12 @@ for host in "${ALL_HOSTS[@]}"; do
 
             # Run dsymutil on executables and shared libraries.
             #
-            # Exclude shell scripts.
+            # Exclude shell scripts and static archives.
             (cd "${INSTALL_SYMROOT}" &&
              find ./"${CURRENT_PREFIX}" -perm -0111 -type f -print | \
                grep -v crashlog.py | \
                grep -v symbolication.py | \
+               grep -v '.a$' | \
                xargs -n 1 -P ${BUILD_JOBS} $(xcrun_find_tool dsymutil))
 
             # Strip executables, shared libraries and static libraries in

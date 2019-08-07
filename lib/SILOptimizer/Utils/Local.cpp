@@ -931,6 +931,9 @@ swift::tryToConcatenateStrings(ApplyInst *AI, SILBuilder &B) {
 //                              Closure Deletion
 //===----------------------------------------------------------------------===//
 
+/// NOTE: Instructions with transitive ownership kind are assumed to not keep
+/// the underlying closure alive as well. This is meant for instructions only
+/// with non-transitive users.
 static bool useDoesNotKeepClosureAlive(const SILInstruction *I) {
   switch (I->getKind()) {
   case SILInstructionKind::StrongRetainInst:
@@ -939,6 +942,7 @@ static bool useDoesNotKeepClosureAlive(const SILInstruction *I) {
   case SILInstructionKind::RetainValueInst:
   case SILInstructionKind::ReleaseValueInst:
   case SILInstructionKind::DebugValueInst:
+  case SILInstructionKind::EndBorrowInst:
     return true;
   default:
     return false;
@@ -951,9 +955,9 @@ static bool useHasTransitiveOwnership(const SILInstruction *I) {
   if (isa<ConvertEscapeToNoEscapeInst>(I))
     return true;
 
-  // Look through copy_value. It is inert for our purposes, but we need to look
-  // through it.
-  return isa<CopyValueInst>(I);
+  // Look through copy_value, begin_borrow. They are inert for our purposes, but
+  // we need to look through it.
+  return isa<CopyValueInst>(I) || isa<BeginBorrowInst>(I);
 }
 
 static SILValue createLifetimeExtendedAllocStack(
@@ -1489,8 +1493,7 @@ bool swift::simplifyUsers(SingleValueInstruction *I) {
   return Changed;
 }
 
-/// True if a type can be expanded
-/// without a significant increase to code size.
+/// True if a type can be expanded without a significant increase to code size.
 bool swift::shouldExpand(SILModule &Module, SILType Ty) {
   // FIXME: Expansion
   auto Expansion = ResilienceExpansion::Minimal;
@@ -1816,7 +1819,7 @@ swift::findLocalApplySites(FunctionRefBaseInst *FRI) {
         f->partialApplySites.push_back(pai);
         // Look to see if we can find a full application of this partial apply
         // as well.
-        copy(pai->getUses(), std::back_inserter(worklist));
+        llvm::copy(pai->getUses(), std::back_inserter(worklist));
         continue;
       }
     }
@@ -1826,21 +1829,22 @@ swift::findLocalApplySites(FunctionRefBaseInst *FRI) {
     case SILInstructionKind::ThinToThickFunctionInst:
     case SILInstructionKind::ConvertFunctionInst:
     case SILInstructionKind::ConvertEscapeToNoEscapeInst:
-      copy(cast<SingleValueInstruction>(user)->getUses(),
-           std::back_inserter(worklist));
+      llvm::copy(cast<SingleValueInstruction>(user)->getUses(),
+                 std::back_inserter(worklist));
       continue;
 
     // A partial_apply [stack] marks its captured arguments with
     // mark_dependence.
     case SILInstructionKind::MarkDependenceInst:
-      copy(cast<SingleValueInstruction>(user)->getUses(),
-           std::back_inserter(worklist));
+      llvm::copy(cast<SingleValueInstruction>(user)->getUses(),
+                 std::back_inserter(worklist));
       continue;
 
     // Look through any reference count instructions since these are not
     // escapes:
     case SILInstructionKind::CopyValueInst:
-      copy(cast<CopyValueInst>(user)->getUses(), std::back_inserter(worklist));
+      llvm::copy(cast<CopyValueInst>(user)->getUses(),
+                 std::back_inserter(worklist));
       continue;
     case SILInstructionKind::StrongRetainInst:
     case SILInstructionKind::StrongReleaseInst:

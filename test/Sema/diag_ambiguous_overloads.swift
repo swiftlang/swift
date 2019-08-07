@@ -20,16 +20,16 @@ fg({x in x}) // expected-error {{generic parameter 'T' could not be inferred}}
 
 
 struct S {
-  func f<T>(_ i: (T) -> T, _ j: Int) -> Void {}
+  func f<T>(_ i: (T) -> T, _ j: Int) -> Void {} // expected-note {{in call to function 'f'}}
   func f(_ d: (Double) -> Double) -> Void {}
   func test() -> Void {
     f({x in x}, 2) // expected-error {{generic parameter 'T' could not be inferred}}
   }
   
-  func g<T>(_ a: T, _ b: Int) -> Void {}
+  func g<T>(_ a: T, _ b: Int) -> Void {} // expected-note {{in call to function 'g'}}
   func g(_ a: String) -> Void {}
   func test2() -> Void {
-    g(.notAThing, 7) // expected-error {{reference to member 'notAThing' cannot be resolved without a contextual type}}
+    g(.notAThing, 7) // expected-error {{generic parameter 'T' could not be inferred}}
   }
   
   func h(_ a: Int, _ b: Int) -> Void {}

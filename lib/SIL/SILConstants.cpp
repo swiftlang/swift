@@ -139,6 +139,7 @@ SymbolicValue::Kind SymbolicValue::getKind() const {
   case RK_DerivedAddress:
     return Address;
   }
+  llvm_unreachable("covered switch");
 }
 
 /// Clone this SymbolicValue into the specified ASTContext and return the new
@@ -179,6 +180,7 @@ SymbolicValue::cloneInto(SymbolicValueAllocator &allocator) const {
     return getAddress(newMemObject, accessPath, allocator);
   }
   }
+  llvm_unreachable("covered switch");
 }
 
 //===----------------------------------------------------------------------===//
@@ -715,9 +717,7 @@ static SymbolicValue getIndexedElement(SymbolicValue aggregate,
   SymbolicValue elt = aggregate.getAggregateValue()[elementNo];
   Type eltType;
   if (auto *decl = type->getStructOrBoundGenericStruct()) {
-    auto it = decl->getStoredProperties().begin();
-    std::advance(it, elementNo);
-    eltType = (*it)->getType();
+    eltType = decl->getStoredProperties()[elementNo]->getType();
   } else if (auto tuple = type->getAs<TupleType>()) {
     assert(elementNo < tuple->getNumElements() && "invalid index");
     eltType = tuple->getElement(elementNo).getType();
@@ -759,8 +759,7 @@ static SymbolicValue setIndexedElement(SymbolicValue aggregate,
     unsigned numMembers;
     // We need to have either a struct or a tuple type.
     if (auto *decl = type->getStructOrBoundGenericStruct()) {
-      numMembers = std::distance(decl->getStoredProperties().begin(),
-                                 decl->getStoredProperties().end());
+      numMembers = decl->getStoredProperties().size();
     } else if (auto tuple = type->getAs<TupleType>()) {
       numMembers = tuple->getNumElements();
     } else {
@@ -780,9 +779,7 @@ static SymbolicValue setIndexedElement(SymbolicValue aggregate,
   ArrayRef<SymbolicValue> oldElts = aggregate.getAggregateValue();
   Type eltType;
   if (auto *decl = type->getStructOrBoundGenericStruct()) {
-    auto it = decl->getStoredProperties().begin();
-    std::advance(it, elementNo);
-    eltType = (*it)->getType();
+    eltType = decl->getStoredProperties()[elementNo]->getType();
   } else if (auto tuple = type->getAs<TupleType>()) {
     assert(elementNo < tuple->getNumElements() && "invalid index");
     eltType = tuple->getElement(elementNo).getType();

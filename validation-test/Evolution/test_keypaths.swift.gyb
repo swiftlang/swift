@@ -3,12 +3,9 @@
 // RUN: %empty-directory(%t/rth)
 // RUN: env PYTHONPATH=%S/Inputs %gyb < %s > %t/test_keypaths.swift
 // RUN: env PYTHONPATH=%S/Inputs %gyb < %S/Inputs/keypaths.swift.gyb > %t/Inputs/keypaths.swift
-// RUN: %rth --target-build-swift "%target-build-swift" --target-run "%target-run" --t "%t/rth" --S "%t" --s "%t/test_keypaths.swift" --lib-prefix "lib" --lib-suffix "%{target-shared-library-suffix}" --target-codesign "%target-codesign" --no-symbol-diff
+// RUN: %target-resilience-test --t "%t/rth" --S "%t" --s "%t/test_keypaths.swift" --no-symbol-diff
 
 // REQUIRES: executable_test
-
-// Uses swift-version 4.
-// UNSUPPORTED: swift_test_mode_optimize_none_with_implicit_dynamic
 
 import keypaths
 import StdlibUnittest

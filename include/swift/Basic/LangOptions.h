@@ -88,13 +88,21 @@ namespace swift {
     bool DisableAvailabilityChecking = false;
 
     /// Maximum number of typo corrections we are allowed to perform.
-    unsigned TypoCorrectionLimit = 10;
+    /// This is disabled by default until we can get typo-correction working within acceptable performance bounds.
+    unsigned TypoCorrectionLimit = 0;
     
     /// Should access control be respected?
     bool EnableAccessControl = true;
 
     /// Enable 'availability' restrictions for App Extensions.
     bool EnableAppExtensionRestrictions = false;
+
+    /// Require public declarations to declare an introduction OS version.
+    bool RequireExplicitAvailability = false;
+
+    /// Introduction platform and version to suggest as fix-it
+    /// when using RequireExplicitAvailability.
+    std::string RequireExplicitAvailabilityTarget;
 
     ///
     /// Support for alternate usage modes
@@ -138,6 +146,12 @@ namespace swift {
     /// Enable Objective-C Runtime interop code generation and build
     /// configuration options.
     bool EnableObjCInterop = true;
+
+    /// Enable C++ interop code generation and build configuration
+    /// options. Disabled by default because there is no way to control the
+    /// language mode of clang on a per-header or even per-module basis. Also
+    /// disabled because it is not complete.
+    bool EnableCXXInterop = false;
 
     /// On Darwin platforms, use the pre-stable ABI's mark bit for Swift
     /// classes instead of the stable ABI's bit. This is needed when
@@ -239,7 +253,16 @@ namespace swift {
     bool EnableDeserializationRecovery = true;
 
     /// Should we use \c ASTScope-based resolution for unqualified name lookup?
+    /// Default is in \c ParseLangArgs
+    ///
+    /// This is a staging flag; eventually it will be removed.
     bool EnableASTScopeLookup = false;
+
+    /// Someday, ASTScopeLookup will supplant lookup in the parser
+    bool DisableParserLookup = false;
+
+    /// Sound we compare to ASTScope-based resolution for debugging?
+    bool CompareToASTScopeLookup = false;
 
     /// Whether to use the import as member inference system
     ///
@@ -297,18 +320,10 @@ namespace swift {
     /// and faster rebuilds.
     bool EnableExperimentalDependencies = false;
     
-    /// Enable the experimental opaque result types feature.
-    bool EnableOpaqueResultTypes = true;
-    
     /// To mimic existing system, set to false.
     /// To experiment with including file-private and private dependency info,
     /// set to true.
     bool ExperimentalDependenciesIncludeIntrafileOnes = false;
-
-    /// Enable experimental support for emitting Objective-C resilient class
-    /// stubs. This is a language option since it also determines if we admit
-    /// @objc members in extensions of classes with resilient ancestry.
-    bool EnableObjCResilientClassStubs = false;
 
     /// Sets the target we are building for and updates platform conditions
     /// to match.
@@ -402,6 +417,15 @@ namespace swift {
     // - tvOS 12.2
     // - watchOS 5.2
     bool doesTargetSupportObjCGetClassHook() const;
+
+    // The following deployment targets ship an Objective-C runtime supporting
+    // the objc_loadClassref() entry point:
+    //
+    // - macOS 10.15
+    // - iOS 13
+    // - tvOS 13
+    // - watchOS 6
+    bool doesTargetSupportObjCClassStubs() const;
 
     /// Returns true if the given platform condition argument represents
     /// a supported target operating system.

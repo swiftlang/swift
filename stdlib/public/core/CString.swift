@@ -140,7 +140,7 @@ extension String {
   @_specialize(where Encoding == Unicode.UTF8)
   @_specialize(where Encoding == Unicode.UTF16)
   @inlinable // Fold away specializations
-  public static func decodeCString<Encoding : _UnicodeEncoding>(
+  public static func decodeCString<Encoding: _UnicodeEncoding>(
     _ cString: UnsafePointer<Encoding.CodeUnit>?,
     as encoding: Encoding.Type,
     repairingInvalidCodeUnits isRepairing: Bool = true

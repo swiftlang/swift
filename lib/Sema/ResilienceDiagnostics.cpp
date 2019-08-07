@@ -228,7 +228,7 @@ static bool diagnoseDeclExportability(SourceLoc loc, const ValueDecl *D,
 
 static bool
 diagnoseGenericArgumentsExportability(SourceLoc loc,
-                                      const SubstitutionMap &subs,
+                                      SubstitutionMap subs,
                                       const SourceFile &userSF) {
   bool hadAnyIssues = false;
   for (ProtocolConformanceRef conformance : subs.getConformances()) {
