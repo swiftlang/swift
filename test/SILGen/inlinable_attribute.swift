@@ -142,7 +142,7 @@ public func bas() {
   }
 
   // CHECK-LABEL: sil shared [serialized] [ossa] @$s19inlinable_attribute3bas{{[_0-9a-zA-Z]*}}U_
-  let zung = {
+  let _ = {
     // CHECK-LABEL: sil shared [serializable] [ossa] @$s19inlinable_attribute3basyyFyycfU_7zippityL_yyF
     func zippity() { }
   }

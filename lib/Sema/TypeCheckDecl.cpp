@@ -2248,14 +2248,6 @@ public:
       }
     }
 
-    // FIXME: Temporary hack until capture computation has been request-ified.
-    if (VD->getDeclContext()->isLocalContext()) {
-      VD->visitOpaqueAccessors([&](AccessorDecl *accessor) {
-        if (accessor->isImplicit())
-          TC.definedFunctions.push_back(accessor);
-      });
-    }
-
     // Under the Swift 3 inference rules, if we have @IBInspectable or
     // @GKInspectable but did not infer @objc, warn that the attribute is
     if (!VD->isObjC() && TC.Context.LangOpts.EnableSwift3ObjCInference) {
@@ -3070,6 +3062,9 @@ public:
     if (requiresDefinition(FD) && !FD->hasBody()) {
       // Complain if we should have a body.
       TC.diagnose(FD->getLoc(), diag::func_decl_without_brace);
+    } else if (FD->getDeclContext()->isLocalContext()) {
+      // Check local function bodies right away.
+      TC.typeCheckAbstractFunctionBody(FD);
     } else {
       // Record the body.
       TC.definedFunctions.push_back(FD);
@@ -3291,6 +3286,9 @@ public:
     if (requiresDefinition(CD) && !CD->hasBody()) {
       // Complain if we should have a body.
       TC.diagnose(CD->getLoc(), diag::missing_initializer_def);
+    } else if (CD->getDeclContext()->isLocalContext()) {
+      // Check local function bodies right away.
+      TC.typeCheckAbstractFunctionBody(CD);
     } else {
       TC.definedFunctions.push_back(CD);
     }
@@ -3303,7 +3301,13 @@ public:
   void visitDestructorDecl(DestructorDecl *DD) {
     TC.validateDecl(DD);
     TC.checkDeclAttributes(DD);
-    TC.definedFunctions.push_back(DD);
+
+    if (DD->getDeclContext()->isLocalContext()) {
+      // Check local function bodies right away.
+      TC.typeCheckAbstractFunctionBody(DD);
+    } else {
+      TC.definedFunctions.push_back(DD);
+    }
   }
 };
 } // end anonymous namespace
