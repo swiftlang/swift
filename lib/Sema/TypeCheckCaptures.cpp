@@ -24,6 +24,7 @@
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/Basic/Defer.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -596,6 +597,8 @@ void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
 
   if (!AFR.getBody())
     return;
+
+  PrettyStackTraceAnyFunctionRef trace("computing captures for", AFR);
 
   auto &Context = AFR.getAsDeclContext()->getASTContext();
   FindCapturedVars finder(Context,
