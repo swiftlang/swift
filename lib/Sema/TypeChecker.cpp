@@ -358,12 +358,12 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
 
   // Compute captures for functions and closures we visited.
   for (auto *closure : TC.ClosuresWithUncomputedCaptures) {
-    TC.computeCaptures(closure);
+    TypeChecker::computeCaptures(closure);
   }
   TC.ClosuresWithUncomputedCaptures.clear();
 
   for (AbstractFunctionDecl *FD : reversed(TC.definedFunctions)) {
-    TC.computeCaptures(FD);
+    TypeChecker::computeCaptures(FD);
   }
 
   // Check error-handling correctness for all the functions defined in
