@@ -5944,6 +5944,46 @@ Expr *swift::findOriginalPropertyWrapperInitialValue(VarDecl *var,
   return initArg;
 }
 
+/// Writes a tuple expression where each element is either `nil` or another such
+/// tuple of nils.
+/// This comes up when printing default arguments for memberwise initializers
+/// that were created implicitly.
+/// For example, this var:
+/// ```
+/// var x: (Int?, (Int?, Int?, ()))
+/// ```
+/// will produce `(nil, (nil, nil, ()))`
+static void writeTupleOfNils(TupleType *type, llvm::raw_ostream &os) {
+  os << '(';
+  for (unsigned i = 0; i < type->getNumElements(); ++i) {
+    auto &elt = type->getElement(i);
+    if (elt.hasName()) {
+      os << elt.getName().str() << ": ";
+    }
+
+    if (elt.getType()->getOptionalObjectType()) {
+      os << "nil";
+    } else {
+      writeTupleOfNils(elt.getType()->castTo<TupleType>(), os);
+    }
+    if (i < type->getNumElements() - 1) {
+      os << ", ";
+    }
+  }
+  os << ')';
+}
+
+/// Determines if the given type is a potentially nested tuple of optional
+/// types.
+static bool isTupleOfOptionals(Type type) {
+  auto tuple = type->getAs<TupleType>();
+  if (!tuple) return false;
+  for (auto elt : tuple->getElementTypes())
+    if (!elt->getOptionalObjectType() && !isTupleOfOptionals(elt))
+      return false;
+  return true;
+}
+
 StringRef
 ParamDecl::getDefaultValueStringRepresentation(
   SmallVectorImpl<char> &scratch) const {
@@ -6010,8 +6050,24 @@ ParamDecl::getDefaultValueStringRepresentation(
       }
     }
 
+    auto init = var->getParentInitializer();
+    if (!init || !init->getSourceRange().isValid()) {
+      // Special case: There are two possible times where we will synthesize a
+      //               default initial value for a stored property: if the type
+      //               is Optional, or if it's a (potentially nested) tuple of
+      //               all Optional elements. If it's Optional, we'll set
+      //               the DefaultArgumentKind to NilLiteral, but if we're still
+      //               handling a StoredProperty, then we know it's a tuple.
+      if (isTupleOfOptionals(getInterfaceType())) {
+        llvm::raw_svector_ostream os(scratch);
+        writeTupleOfNils(getInterfaceType()->castTo<TupleType>(), os);
+        return os.str();
+      }
+      return "<<empty>>";
+    }
+
     return extractInlinableText(getASTContext().SourceMgr,
-                                var->getParentInitializer(),
+                                init,
                                 scratch);
   }
   case DefaultArgumentKind::Inherited: return "super";
