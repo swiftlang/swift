@@ -29,30 +29,19 @@ namespace swift { extern "C" {
 #ifdef __OBJC2__
 #if __LLP64__
 typedef unsigned long long _swift_shims_CFTypeID;
-typedef unsigned long long _swift_shims_CFOptionFlags;
 typedef unsigned long long _swift_shims_CFHashCode;
 typedef signed long long _swift_shims_CFIndex;
 #else
 typedef unsigned long _swift_shims_CFTypeID;
-typedef unsigned long _swift_shims_CFOptionFlags;
 typedef unsigned long _swift_shims_CFHashCode;
 typedef signed long _swift_shims_CFIndex;
 #endif
 
-typedef struct {
-  _swift_shims_CFIndex location;
-  _swift_shims_CFIndex length;
-} _swift_shims_CFRange;
-
 typedef id _swift_shims_CFStringRef;
-typedef const struct _swift_shims_CFAllocator *_swift_shims_CFAllocatorRef;
 typedef __swift_uint32_t _swift_shims_CFStringEncoding;
-typedef _swift_shims_CFOptionFlags _swift_shims_CFStringCompareFlags;
-typedef _swift_shims_CFIndex _swift_shims_CFComparisonResult;
 
 // Consider creating SwiftMacTypes.h for these
 typedef unsigned char _swift_shims_Boolean;
-typedef __swift_uint16_t _swift_shims_UniChar;
 typedef __swift_uint8_t _swift_shims_UInt8;
 
 SWIFT_RUNTIME_STDLIB_API
@@ -62,15 +51,6 @@ _swift_shims_CFStringRef _Nonnull _swift_stdlib_CFStringCreateWithBytes(
     const __swift_uint8_t *_Nonnull bytes, _swift_shims_CFIndex numBytes,
     _swift_shims_CFStringEncoding encoding,
     _swift_shims_Boolean isExternalRepresentation);
-
-SWIFT_RUNTIME_STDLIB_API
-const char *_Nullable _swift_stdlib_CFStringGetCStringPtr(
-    _swift_shims_CFStringRef _Nonnull theString,
-    _swift_shims_CFStringEncoding encoding);
-
-SWIFT_RUNTIME_STDLIB_API
-_swift_shims_CFStringRef _Nonnull _swift_stdlib_objcDebugDescription(
-    id _Nonnull nsObject);
 
 SWIFT_RUNTIME_STDLIB_API
 __swift_uint8_t _swift_stdlib_isNSString(id _Nonnull obj);
