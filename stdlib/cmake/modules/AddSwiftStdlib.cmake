@@ -65,13 +65,11 @@ function(add_swift_target_executable name)
       if(${sdk} IN_LIST SWIFT_APPLE_PLATFORMS)
         add_custom_command_target(unused_var2
          COMMAND "codesign" "-f" "-s" "-" "${SWIFT_RUNTIME_OUTPUT_INTDIR}/${VARIANT_NAME}"
-         CUSTOM_TARGET_NAME "${VARIANT_NAME}_signed"
          OUTPUT "${SWIFT_RUNTIME_OUTPUT_INTDIR}/${VARIANT_NAME}_signed"
          DEPENDS ${VARIANT_NAME})
       else()
         # No code signing on other platforms.
         add_custom_command_target(unused_var2
-         CUSTOM_TARGET_NAME "${VARIANT_NAME}_signed"
          OUTPUT "${SWIFT_RUNTIME_OUTPUT_INTDIR}/${VARIANT_NAME}_signed"
          DEPENDS ${VARIANT_NAME})
        endif()
