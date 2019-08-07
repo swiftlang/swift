@@ -141,7 +141,6 @@ func TF_508() {
 struct TF_523_Struct : Differentiable & AdditiveArithmetic {
   var a: Float = 1
   typealias TangentVector = TF_523_Struct
-  typealias AllDifferentiableVariables = TF_523_Struct
 }
 
 @differentiable
@@ -180,7 +179,6 @@ struct TF_546<T: FloatingPoint>: AdditiveArithmetic {
 }
 extension TF_546: Differentiable where T: Differentiable {
   typealias TangentVector = TF_546
-  typealias AllDifferentiableVariables = TF_546
 }
 extension TF_546 where T: Differentiable, T == T.TangentVector {
   static func _vjpInit(real: T, imaginary: T) -> (TF_546, (TF_546) -> (T, T)) {
@@ -248,7 +246,7 @@ public func TF_688<Scalar: Differentiable>(
 }
 
 // TF-697: Test generic requirements of generated AD associated function.
-protocol TF_697_Module: Differentiable where AllDifferentiableVariables == TangentVector {
+protocol TF_697_Module: Differentiable {
     associatedtype Input
     associatedtype Output: Differentiable
 

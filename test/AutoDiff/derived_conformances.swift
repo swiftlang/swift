@@ -26,8 +26,6 @@ DerivedConformanceTests.test("MemberwiseInitializers") {
     @noDerivative let constant2 = Double(1)
     var x = Float(1)
   }
-  expectEqual(HasNoDerivativeConstant.AllDifferentiableVariables(x: 0),
-              HasNoDerivativeConstant.AllDifferentiableVariables.zero)
   expectEqual(HasNoDerivativeConstant.TangentVector(x: 0),
               HasNoDerivativeConstant.TangentVector.zero)
 }

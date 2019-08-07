@@ -7,7 +7,7 @@
 
 class Super : Differentiable {
   var base: Float
-  // FIXME(TF-648): Dummy to make `Super.AllDifferentiableVariables` be nontrivial.
+  // FIXME(TF-648): Dummy to make `Super.TangentVector` be nontrivial.
   var _nontrivial: [Float] = []
 
   // TODO(TF-654): Uncomment attribute when differentiation supports class initializers.
@@ -99,7 +99,7 @@ class SubSub : Sub {}
 // CHECK-NEXT:   #Super.subscript!getter.1: (Super) -> (Float, Float) -> Float : @$s10vtable_sil5SuperCyS2f_Sftcig
 // CHECK-NEXT:   #Super.subscript!getter.1.jvp.1.SUU: (Super) -> (Float, Float) -> Float : @AD__$s10vtable_sil5SuperCyS2f_Sftcig__jvp_src_0_wrt_0_vtable_entry_thunk
 // CHECK-NEXT:   #Super.subscript!getter.1.vjp.1.SUU: (Super) -> (Float, Float) -> Float : @AD__$s10vtable_sil5SuperCyS2f_Sftcig__vjp_src_0_wrt_0_vtable_entry_thunk
-// CHECK-NEXT:   #Super.move!1: (Super) -> (Super.AllDifferentiableVariables) -> () : @$s10vtable_sil5SuperC4move5alongyAC26AllDifferentiableVariablesV_tF
+// CHECK-NEXT:   #Super.move!1: (Super) -> (Super.TangentVector) -> () : @$s10vtable_sil5SuperC4move5alongyAC13TangentVectorV_tF
 // CHECK-NEXT:   #Super.deinit!deallocator.1: @$s10vtable_sil5SuperCfD
 // CHECK-NEXT: }
 
@@ -120,7 +120,7 @@ class SubSub : Sub {}
 // CHECK-NEXT:   #Super.subscript!getter.1: (Super) -> (Float, Float) -> Float : @$s10vtable_sil3SubCyS2f_Sftcig [override]
 // CHECK-NEXT:   #Super.subscript!getter.1.jvp.1.SUU: (Super) -> (Float, Float) -> Float : @AD__$s10vtable_sil3SubCyS2f_Sftcig__jvp_src_0_wrt_0_vtable_entry_thunk [override]
 // CHECK-NEXT:   #Super.subscript!getter.1.vjp.1.SUU: (Super) -> (Float, Float) -> Float : @AD__$s10vtable_sil3SubCyS2f_Sftcig__vjp_src_0_wrt_0_vtable_entry_thunk [override]
-// CHECK-NEXT:   #Super.move!1: (Super) -> (Super.AllDifferentiableVariables) -> () : @$s10vtable_sil5SuperC4move5alongyAC26AllDifferentiableVariablesV_tF [inherited]
+// CHECK-NEXT:   #Super.move!1: (Super) -> (Super.TangentVector) -> () : @$s10vtable_sil5SuperC4move5alongyAC13TangentVectorV_tF [inherited]
 // CHECK-NEXT:   #Sub.f!1.jvp.1.SSU: (Sub) -> (Float, Float) -> Float : @AD__$s10vtable_sil3SubC1fyS2f_SftF__jvp_src_0_wrt_0_1_vtable_entry_thunk
 // CHECK-NEXT:   #Sub.f!1.vjp.1.SSU: (Sub) -> (Float, Float) -> Float : @AD__$s10vtable_sil3SubC1fyS2f_SftF__vjp_src_0_wrt_0_1_vtable_entry_thunk
 // CHECK-NEXT:   #Sub.deinit!deallocator.1: @$s10vtable_sil3SubCfD
@@ -143,7 +143,7 @@ class SubSub : Sub {}
 // CHECK-NEXT:   #Super.subscript!getter.1: (Super) -> (Float, Float) -> Float : @$s10vtable_sil3SubCyS2f_Sftcig [inherited]
 // CHECK-NEXT:   #Super.subscript!getter.1.jvp.1.SUU: (Super) -> (Float, Float) -> Float : @AD__$s10vtable_sil3SubCyS2f_Sftcig__jvp_src_0_wrt_0_vtable_entry_thunk [inherited]
 // CHECK-NEXT:   #Super.subscript!getter.1.vjp.1.SUU: (Super) -> (Float, Float) -> Float : @AD__$s10vtable_sil3SubCyS2f_Sftcig__vjp_src_0_wrt_0_vtable_entry_thunk [inherited]
-// CHECK-NEXT:   #Super.move!1: (Super) -> (Super.AllDifferentiableVariables) -> () : @$s10vtable_sil5SuperC4move5alongyAC26AllDifferentiableVariablesV_tF [inherited]
+// CHECK-NEXT:   #Super.move!1: (Super) -> (Super.TangentVector) -> () : @$s10vtable_sil5SuperC4move5alongyAC13TangentVectorV_tF [inherited]
 // CHECK-NEXT:   #Sub.f!1.jvp.1.SSU: (Sub) -> (Float, Float) -> Float : @AD__$s10vtable_sil3SubC1fyS2f_SftF__jvp_src_0_wrt_0_1_vtable_entry_thunk [inherited]
 // CHECK-NEXT:   #Sub.f!1.vjp.1.SSU: (Sub) -> (Float, Float) -> Float : @AD__$s10vtable_sil3SubC1fyS2f_SftF__vjp_src_0_wrt_0_1_vtable_entry_thunk [inherited]
 // CHECK-NEXT:   #SubSub.deinit!deallocator.1: @$s10vtable_sil03SubC0CfD
