@@ -2378,10 +2378,9 @@ IRGenFunction::emitTypeMetadataRef(CanType type,
   // Look through any opaque types we're allowed to.
   type = IGM.substOpaqueTypesWithUnderlyingTypes(type);
 
-  // If we're asking for the metadata of the base Self type, and the class
-  // is final, we can use the local self metadata.
-  if (LocalSelfType == type
-      && LocalSelfType.getClassOrBoundGenericClass()->isFinal()) {
+  // If we're asking for the metadata of the type that dynamic Self is known
+  // to be equal to, we can just use the self metadata.
+  if (ExactSelfType == type) {
     return MetadataResponse::forComplete(getLocalSelfMetadata());
   }
   

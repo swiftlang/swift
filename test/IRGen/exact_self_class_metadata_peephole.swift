@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -emit-ir %s | %FileCheck %s --check-prefix=CHECK --check-prefix=ONONE
+// R/UN: %target-swift-frontend -O -disable-llvm-optzns -emit-ir %s | %FileCheck %s --check-prefix=CHECK --check-prefix=ONONE
 
 @_silgen_name("useMetadata")
 func useMetadata<T>(_: T.Type)
@@ -11,28 +12,34 @@ private class PrivateEffectivelyFinal<T, U, V> {
     useMetadata(PrivateEffectivelyFinal<T, U, V>.self)
     useMetadata(PrivateEffectivelyFinal<Int, String, V>.self)
   }
+
+  // CHECK-LABEL: define {{.*}}PrivateEffectivelyFinal{{.*}}cfC
+  // CHECK:         call {{.*}}@swift_allocObject(%swift.type* %0
 }
 
 // The class is not final and has subclasses, so we can only peephole
 // metadata requests in limited circumstances.
 private class PrivateNonfinal<T, U, V> {
-  // TODO: The designated init allocating entry point is always overridden
+  // The designated init allocating entry point is always overridden
   // by subclasses, so it can use the self metadata it was passed.
 
   // Methods in general on nonfinal classes cannot use the self metadata as
   // is.
-  // CHECK-LABEL: define {{.*}}PrivateNonfinal{{.*}}butts
+  // CHECK-LABEL: define {{.*}}15PrivateNonfinal{{.*}}buttsyyF"
   @inline(never)
   final func butts() {
-    // CHECK: [[INSTANTIATED_TYPE_RESPONSE:%.*]] = call {{.*}} @{{.*}}PrivateNonfinal{{.*}}Ma
-    // CHECK: [[INSTANTIATED_TYPE:%.*]] = extractvalue {{.*}} [[INSTANTIATED_TYPE_RESPONSE]]
-    // CHECK: call {{.*}} @useMetadata(%swift.type* [[INSTANTIATED_TYPE]], %swift.type* [[INSTANTIATED_TYPE]])
+    // CHECK: [[INSTANTIATED_TYPE_RESPONSE:%.*]] = call {{.*}} @{{.*}}15PrivateNonfinal{{.*}}Ma
+    // CHECK-NEXT: [[INSTANTIATED_TYPE:%.*]] = extractvalue {{.*}} [[INSTANTIATED_TYPE_RESPONSE]]
+    // CHECK-NEXT: call {{.*}} @useMetadata(%swift.type* [[INSTANTIATED_TYPE]], %swift.type* [[INSTANTIATED_TYPE]])
     useMetadata(PrivateNonfinal<T, U, V>.self)
-    // CHECK: [[INSTANTIATED_TYPE_RESPONSE:%.*]] = call {{.*}} @{{.*}}PrivateNonfinal{{.*}}Ma
-    // CHECK: [[INSTANTIATED_TYPE:%.*]] = extractvalue {{.*}} [[INSTANTIATED_TYPE_RESPONSE]]
-    // CHECK: call {{.*}} @useMetadata(%swift.type* [[INSTANTIATED_TYPE]], %swift.type* [[INSTANTIATED_TYPE]])
+    // CHECK: [[INSTANTIATED_TYPE_RESPONSE:%.*]] = call {{.*}} @{{.*}}15PrivateNonfinal{{.*}}Ma
+    // CHECK-NEXT: [[INSTANTIATED_TYPE:%.*]] = extractvalue {{.*}} [[INSTANTIATED_TYPE_RESPONSE]]
+    // CHECK-NEXT: call {{.*}} @useMetadata(%swift.type* [[INSTANTIATED_TYPE]], %swift.type* [[INSTANTIATED_TYPE]])
     useMetadata(PrivateNonfinal<Int, String, V>.self)
   }
+
+  // CHECK-LABEL: define {{.*}}15PrivateNonfinal{{.*}}cfC
+  // CHECK:         call {{.*}}@swift_allocObject(%swift.type* %0
 }
 
 // TODO: Although this is not explicitly final, class hierarchy analysis
@@ -43,6 +50,9 @@ private class PrivateNonfinalSubclass: PrivateNonfinal<Int, String, Float> {
   final func borts() {
     useMetadata(PrivateNonfinalSubclass.self)
   }
+
+  // CHECK-LABEL: define {{.*}}PrivateNonfinalSubclass{{.*}}cfC
+  // CHECK:         call {{.*}}@swift_allocObject(%swift.type* %0
 }
 
 final private class FinalPrivateNonfinalSubclass<U>: PrivateNonfinal<U, String, Float> {

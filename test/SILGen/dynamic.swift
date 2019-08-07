@@ -66,10 +66,10 @@ protocol Proto {
 // ObjC entry points for @objc and dynamic entry points
 
 // normal and @objc initializing ctors can be statically dispatched
-// CHECK-LABEL: sil hidden [ossa] @$s7dynamic3FooC{{.*}}tcfC
+// CHECK-LABEL: sil hidden [exact_self_class] [ossa] @$s7dynamic3FooC{{.*}}tcfC
 // CHECK:         function_ref @$s7dynamic3FooC{{.*}}tcfc
 
-// CHECK-LABEL: sil hidden [ossa] @$s7dynamic3FooC{{.*}}tcfC
+// CHECK-LABEL: sil hidden [exact_self_class] [ossa] @$s7dynamic3FooC{{.*}}tcfC
 // CHECK:         function_ref @$s7dynamic3FooC{{.*}}tcfc
 
 // CHECK-LABEL: sil hidden [thunk] [ossa] @$s7dynamic3{{[_0-9a-zA-Z]*}}fcTo
@@ -154,7 +154,7 @@ class Subclass: Foo {
   override init(native: Int) {
     super.init(native: native)
   }
-  // CHECK-LABEL: sil hidden [ossa] @$s7dynamic8SubclassC{{[_0-9a-zA-Z]*}}fC
+  // CHECK-LABEL: sil hidden [exact_self_class] [ossa] @$s7dynamic8SubclassC{{[_0-9a-zA-Z]*}}fC
   // CHECK:         function_ref @$s7dynamic8SubclassC{{[_0-9a-zA-Z]*}}fc
 
   override func nativeMethod() {

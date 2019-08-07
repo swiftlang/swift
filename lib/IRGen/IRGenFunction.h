@@ -661,7 +661,8 @@ private:
   
   /// The value that satisfies metadata lookups for dynamic Self.
   llvm::Value *LocalSelf = nullptr;
-  CanType LocalSelfType;
+  /// If set, the dynamic Self type is assumed to be equivalent to this exact class.
+  CanType ExactSelfType;
   LocalSelfKind SelfKind;
 };
 
