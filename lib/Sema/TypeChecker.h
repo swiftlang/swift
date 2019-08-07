@@ -1430,10 +1430,10 @@ public:
   bool typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt);
 
   /// Compute the set of captures for the given function or closure.
-  void computeCaptures(AnyFunctionRef AFR);
+  static void computeCaptures(AnyFunctionRef AFR);
 
   /// Check for invalid captures from stored property initializers.
-  void checkPatternBindingCaptures(NominalTypeDecl *typeDecl);
+  static void checkPatternBindingCaptures(NominalTypeDecl *typeDecl);
 
   /// Change the context of closures in the given initializer
   /// expression to the given context.
