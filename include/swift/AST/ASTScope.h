@@ -177,8 +177,10 @@ public: // for addReusedBodyScopes
   void addChild(ASTScopeImpl *child, ASTContext &);
   std::vector<ASTScopeImpl *> rescueYoungestChildren(unsigned count);
 
-  virtual std::vector<ASTScopeImpl *> rescueScopesToReuse();
-  virtual void addReusedScopes(ArrayRef<ASTScopeImpl *>);
+  /// When reexpanding, do we always create a new body?
+  virtual NullablePtr<ASTScopeImpl> getParentOfRescuedScopes();
+  std::vector<ASTScopeImpl *> rescueScopesToReuse();
+  void addReusedScopes(ArrayRef<ASTScopeImpl *>);
 
 private:
   void removeChildren();
@@ -201,7 +203,8 @@ public:
   /// InterpolatedStringLiteralExprs and EditorPlaceHolders respond to
   /// getSourceRange with the starting point. But we might be asked to lookup an
   /// identifer within one of them. So, find the real source range of them here.
-  ///   /// FIXME: Alter how these are parsed so getSourceRange is enough.
+  ///
+  /// FIXME: Alter how these are parsed so getSourceRange is enough.
   SourceRange getEffectiveSourceRange(ASTNode) const;
 
   void cacheSourceRangeOfMeAndDescendants(bool omitAssertions = false) const;
@@ -302,6 +305,12 @@ protected:
   virtual ASTScopeImpl *expandSpecifically(ScopeCreator &) = 0;
   virtual void beCurrent();
   virtual bool isCurrent() const;
+
+  /// Some scopes can be expanded lazily.
+  /// Such scopes must: not change their source ranges after expansion, and
+  /// their expansion must return an insertion point outside themselves.
+  virtual NullablePtr<ASTScopeImpl> insertionPointForDeferredExpansion();
+  virtual SourceRange sourceRangeForDeferredExpansion() const;
 
 public:
   // Some nodes (VarDecls and Accessors) are created directly from
@@ -548,6 +557,10 @@ public:
 
   virtual void beCurrent(IterableTypeScope *) const;
   virtual bool isCurrent(const IterableTypeScope *) const;
+  virtual NullablePtr<ASTScopeImpl>
+  insertionPointForDeferredExpansion(IterableTypeScope *) const;
+  virtual SourceRange
+  sourceRangeForDeferredExpansion(const IterableTypeScope *) const;
   };
 
   // For the whole Decl scope of a GenericType or an Extension
@@ -623,6 +636,10 @@ public:
 
   void beCurrent(IterableTypeScope *) const override;
   bool isCurrent(const IterableTypeScope *) const override;
+  NullablePtr<ASTScopeImpl>
+  insertionPointForDeferredExpansion(IterableTypeScope *) const override;
+  SourceRange
+  sourceRangeForDeferredExpansion(const IterableTypeScope *) const override;
 };
 
 /// GenericType or Extension scope
@@ -702,7 +719,6 @@ class IterableTypeScope : public GenericTypeScope {
   /// Because of \c parseDelayedDecl members can get added after the tree is
   /// constructed, and they can be out of order. Detect this happening by
   /// remembering the member count.
-  /// TODO: unify with \c numberOfDeclsAlreadySeen
   unsigned memberCount = 0;
 
 public:
@@ -721,6 +737,8 @@ protected:
 public:
   void makeBodyCurrent();
   bool isBodyCurrent() const;
+  NullablePtr<ASTScopeImpl> insertionPointForDeferredExpansion() override;
+  SourceRange sourceRangeForDeferredExpansion() const override;
 };
 
 class NominalTypeScope final : public IterableTypeScope {
@@ -958,8 +976,7 @@ public:
   Decl *getDecl() const { return decl; }
   static bool isAMethod(const AbstractFunctionDecl *);
 
-  std::vector<ASTScopeImpl *> rescueScopesToReuse() override;
-  void addReusedScopes(ArrayRef<ASTScopeImpl *>) override;
+  NullablePtr<ASTScopeImpl> getParentOfRescuedScopes() override;
 
 protected:
   bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
@@ -1122,7 +1139,6 @@ public:
   SourceRange
   getChildlessSourceRange(bool omitAssertions = false) const override;
 
-  static bool isHandledSpecially(const ASTNode n);
   NullablePtr<const void> getReferrent() const override;
 
 protected:
@@ -1372,8 +1388,7 @@ public:
   Decl *getDecl() const { return decl; }
   NullablePtr<const void> getReferrent() const override;
 
-  std::vector<ASTScopeImpl *> rescueScopesToReuse() override;
-  void addReusedScopes(ArrayRef<ASTScopeImpl *>) override;
+  NullablePtr<ASTScopeImpl> getParentOfRescuedScopes() override;
 };
 
 /// The \c _@specialize attribute.

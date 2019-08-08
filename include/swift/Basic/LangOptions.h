@@ -268,6 +268,9 @@ namespace swift {
     /// whether it is. The warning is useful for testing.
     bool WarnIfASTScopeLookup = false;
 
+    /// Build the ASTScope tree lazily
+    bool LazyASTScopes = false;
+
     /// Whether to use the import as member inference system
     ///
     /// When importing a global, try to infer whether we can import it as a

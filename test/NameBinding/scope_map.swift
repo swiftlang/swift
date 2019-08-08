@@ -214,12 +214,12 @@ class LazyProperties {
 // CHECK-EXPANDED-NEXT:     `-EnumElementScope {{.*}}, [17:8 - 17:19]
 // CHECK-EXPANDED-NEXT:       `-ParameterListScope {{.*}}, [17:10 - 17:19]
 // CHECK-EXPANDED-NEXT: |-NominalTypeDeclScope {{.*}}, [20:1 - 21:1] 'GenericS0'
-// CHECK-EXPANDED-NEXT:   `-GenericParamScope {{.*}}, [20:18 - 21:1] param 0 'T'
-// CHECK-EXPANDED-NEXT:     `-GenericParamScope {{.*}}, [20:21 - 21:1] param 1 'U'
+// CHECK-EXPANDED-NEXT:   `-GenericParamScope {{.*}}, [20:17 - 21:1] param 0 'T'
+// CHECK-EXPANDED-NEXT:     `-GenericParamScope {{.*}}, [20:17 - 21:1] param 1 'U'
 // CHECK-EXPANDED-NEXT:       `-NominalTypeBodyScope {{.*}}, [20:24 - 21:1] 'GenericS0'
 // CHECK-EXPANDED-NEXT: |-AbstractFunctionDeclScope {{.*}}, [23:1 - 24:1] 'genericFunc0(t:u:i:)'
-// CHECK-EXPANDED-NEXT:   `-GenericParamScope {{.*}}, [23:19 - 24:1] param 0 'T'
-// CHECK-EXPANDED-NEXT:     `-GenericParamScope {{.*}}, [23:22 - 24:1] param 1 'U'
+// CHECK-EXPANDED-NEXT:   `-GenericParamScope {{.*}}, [23:18 - 24:1] param 0 'T'
+// CHECK-EXPANDED-NEXT:     `-GenericParamScope {{.*}}, [23:18 - 24:1] param 1 'U'
 // CHECK-EXPANDED-NEXT:       `-ParameterListScope {{.*}}, [23:24 - 24:1]
 // CHECK-EXPANDED-NEXT:         |-DefaultArgumentInitializerScope {{.*}}, [23:46 - 23:46]
 // CHECK-EXPANDED-NEXT:         `-PureFunctionBodyScope {{.*}}, [23:50 - 24:1]
@@ -227,8 +227,8 @@ class LazyProperties {
 // CHECK-EXPANDED-NEXT: |-NominalTypeDeclScope {{.*}}, [26:1 - 32:1] 'ContainsGenerics0'
 // CHECK-EXPANDED-NEXT:   `-NominalTypeBodyScope {{.*}}, [26:25 - 32:1] 'ContainsGenerics0'
 // CHECK-EXPANDED-NEXT:     |-AbstractFunctionDeclScope {{.*}}, [27:3 - 28:3] 'init(t:u:)'
-// CHECK-EXPANDED-NEXT:       `-GenericParamScope {{.*}}, [27:8 - 28:3] param 0 'T'
-// CHECK-EXPANDED-NEXT:         `-GenericParamScope {{.*}}, [27:11 - 28:3] param 1 'U'
+// CHECK-EXPANDED-NEXT:       `-GenericParamScope {{.*}}, [27:7 - 28:3] param 0 'T'
+// CHECK-EXPANDED-NEXT:         `-GenericParamScope {{.*}}, [27:7 - 28:3] param 1 'U'
 // CHECK-EXPANDED-NEXT:           `-ParameterListScope {{.*}}, [27:13 - 28:3]
 // CHECK-EXPANDED-NEXT:             `-MethodBodyScope {{.*}}, [27:26 - 28:3]
 // CHECK-EXPANDED-NEXT:               `-BraceStmtScope {{.*}}, [27:26 - 28:3]
@@ -237,7 +237,7 @@ class LazyProperties {
 // CHECK-EXPANDED-NEXT:         `-MethodBodyScope {{.*}}, [30:10 - 31:3]
 // CHECK-EXPANDED-NEXT:           `-BraceStmtScope {{.*}}, [30:10 - 31:3]
 // CHECK-EXPANDED-NEXT: |-TypeAliasDeclScope {{.*}}, [34:1 - 34:32] <no extended nominal?!>
-// CHECK-EXPANDED-NEXT:   `-GenericParamScope {{.*}}, [34:25 - 34:32] param 0 'T'
+// CHECK-EXPANDED-NEXT:   `-GenericParamScope {{.*}}, [34:24 - 34:32] param 0 'T'
 // CHECK-EXPANDED-NEXT: |-NominalTypeDeclScope {{.*}}, [39:1 - 39:26] 'OtherArchStruct'
 // CHECK-EXPANDED-NEXT:   `-NominalTypeBodyScope {{.*}}, [39:24 - 39:26] 'OtherArchStruct'
 // CHECK-EXPANDED-NEXT: |-AbstractFunctionDeclScope {{.*}}, [42:1 - 101:1] 'functionBodies1(a:b:)'
@@ -342,7 +342,7 @@ class LazyProperties {
 // CHECK-EXPANDED-NEXT:     `-EnumElementScope {{.*}}, [112:8 - 112:8]
 // CHECK-EXPANDED-NEXT: |-NominalTypeDeclScope {{.*}}, [115:1 - 131:1] 'StructContainsAbstractStorageDecls'
 // CHECK-EXPANDED-NEXT:   `-NominalTypeBodyScope {{.*}}, [115:43 - 131:1] 'StructContainsAbstractStorageDecls'
-// CHECK-EXPANDED-NEXT:     |-SubscriptDeclScope {{.*}}, [116:3 - 122:3] scope_map.(file).StructContainsAbstractStorageDecls.subscript(_:_:)@SOURCE_DIR{{[/|\\]}}test{{[/|\\]}}NameBinding{{[/|\\]}}scope_map.swift:116:3
+// CHECK-EXPANDED-NEXT:     |-SubscriptDeclScope {{.*}}, [116:3 - 122:3] scope_map.(file).StructContainsAbstractStorageDecls.subscript(_:_:)@SOURCE_DIR/test/NameBinding/scope_map.swift:116:3
 // CHECK-EXPANDED-NEXT:       `-ParameterListScope {{.*}}, [116:13 - 122:3]
 // CHECK-EXPANDED-NEXT:         |-AbstractFunctionDeclScope {{.*}}, [117:5 - 118:5] '_'
 // CHECK-EXPANDED-NEXT:           `-MethodBodyScope {{.*}}, [117:9 - 118:5]
@@ -351,7 +351,7 @@ class LazyProperties {
 // CHECK-EXPANDED-NEXT:           `-MethodBodyScope {{.*}}, [119:9 - 121:5]
 // CHECK-EXPANDED-NEXT:             `-BraceStmtScope {{.*}}, [119:9 - 121:5]
 // CHECK-EXPANDED-NEXT:     `-PatternEntryDeclScope {{.*}}, [124:21 - 130:3] entry 0 'computed'
-// CHECK-EXPANDED-NEXT:       `-VarDeclScope {{.*}}, [124:21 - 130:3] scope_map.(file).StructContainsAbstractStorageDecls.computed@SOURCE_DIR{{[/|\\]}}test{{[/|\\]}}NameBinding{{[/|\\]}}scope_map.swift:124:7
+// CHECK-EXPANDED-NEXT:       `-VarDeclScope {{.*}}, [124:21 - 130:3] scope_map.(file).StructContainsAbstractStorageDecls.computed@SOURCE_DIR/test/NameBinding/scope_map.swift:124:7
 // CHECK-EXPANDED-NEXT:         |-AbstractFunctionDeclScope {{.*}}, [125:5 - 127:5] '_'
 // CHECK-EXPANDED-NEXT:           `-MethodBodyScope {{.*}}, [125:9 - 127:5]
 // CHECK-EXPANDED-NEXT:             `-BraceStmtScope {{.*}}, [125:9 - 127:5]
@@ -362,105 +362,105 @@ class LazyProperties {
 // CHECK-EXPANDED-NEXT:   `-NominalTypeBodyScope {{.*}}, [133:35 - 141:1] 'ClassWithComputedProperties'
 // CHECK-EXPANDED-NEXT:     |-PatternEntryDeclScope {{.*}}, [134:7 - 136:3] entry 0 'willSetProperty'
 // CHECK-EXPANDED-NEXT:       |-PatternEntryInitializerScope {{.*}}, [134:30 - 134:30] entry 0 'willSetProperty'
-// CHECK-EXPANDED-NEXT:       `-VarDeclScope {{.*}}, [134:32 - 136:3] scope_map.(file).ClassWithComputedProperties.willSetProperty@SOURCE_DIR{{[/|\\]}}test{{[/|\\]}}NameBinding{{[/|\\]}}scope_map.swift:134:7
+// CHECK-EXPANDED-NEXT:       `-VarDeclScope {{.*}}, [134:32 - 136:3] scope_map.(file).ClassWithComputedProperties.willSetProperty@SOURCE_DIR/test/NameBinding/scope_map.swift:134:7
 // CHECK-EXPANDED-NEXT:         `-AbstractFunctionDeclScope {{.*}}, [135:5 - 135:15] '_'
 // CHECK-EXPANDED-NEXT:           `-MethodBodyScope {{.*}}, [135:13 - 135:15]
-// CHECK-EXPANDED-NEXT:             `-BraceStmtScope {{.*}}, [135:13 - 135:15]
-// CHECK-EXPANDED-NEXT:     `-PatternEntryDeclScope {{.*}}, [138:7 - 140:3] entry 0 'didSetProperty'
-// CHECK-EXPANDED-NEXT:       |-PatternEntryInitializerScope {{.*}}, [138:29 - 138:29] entry 0 'didSetProperty'
-// CHECK-EXPANDED-NEXT:       `-VarDeclScope {{.*}}, [138:31 - 140:3] scope_map.(file).ClassWithComputedProperties.didSetProperty@SOURCE_DIR{{[/|\\]}}test{{[/|\\]}}NameBinding{{[/|\\]}}scope_map.swift:138:7
-// CHECK-EXPANDED-NEXT:         `-AbstractFunctionDeclScope {{.*}}, [139:5 - 139:14] '_'
-// CHECK-EXPANDED-NEXT:           `-MethodBodyScope {{.*}}, [139:12 - 139:14]
-// CHECK-EXPANDED-NEXT:             `-BraceStmtScope {{.*}}, [139:12 - 139:14]
-// CHECK-EXPANDED-NEXT: |-AbstractFunctionDeclScope {{.*}}, [143:1 - 156:1] 'funcWithComputedProperties(i:)'
-// CHECK-EXPANDED-NEXT:   `-ParameterListScope {{.*}}, [143:32 - 156:1]
-// CHECK-EXPANDED-NEXT:     `-PureFunctionBodyScope {{.*}}, [143:41 - 156:1]
-// CHECK-EXPANDED-NEXT:       `-BraceStmtScope {{.*}}, [143:41 - 156:1]
-// CHECK-EXPANDED-NEXT:         |-PatternEntryDeclScope {{.*}}, [144:21 - 150:3] entry 0 'computed'
-// CHECK-EXPANDED-NEXT:           `-VarDeclScope {{.*}}, [144:21 - 150:3] scope_map.(file).funcWithComputedProperties(i:).computed@SOURCE_DIR{{[/|\\]}}test{{[/|\\]}}NameBinding{{[/|\\]}}scope_map.swift:144:7
-// CHECK-EXPANDED-NEXT:             |-AbstractFunctionDeclScope {{.*}}, [145:5 - 146:5] '_'
-// CHECK-EXPANDED-NEXT:               `-PureFunctionBodyScope {{.*}}, [145:9 - 146:5]
-// CHECK-EXPANDED-NEXT:                 `-BraceStmtScope {{.*}}, [145:9 - 146:5]
-// CHECK-EXPANDED-NEXT:             `-AbstractFunctionDeclScope {{.*}}, [147:5 - 149:5] '_'
-// CHECK-EXPANDED-NEXT:               `-PureFunctionBodyScope {{.*}}, [147:9 - 149:5]
-// CHECK-EXPANDED-NEXT:                 `-BraceStmtScope {{.*}}, [147:9 - 149:5]
-// CHECK-EXPANDED-NEXT:         |-PatternEntryDeclScope {{.*}}, [150:6 - 150:36] entry 1 'stored1' 'stored2'
-// CHECK-EXPANDED-NEXT:           `-PatternEntryInitializerScope {{.*}}, [150:31 - 150:36] entry 1 'stored1' 'stored2'
-// CHECK-EXPANDED-NEXT:         |-PatternEntryDeclScope {{.*}}, [151:25 - 153:3] entry 2 'alsoComputed'
-// CHECK-EXPANDED-NEXT:           `-VarDeclScope {{.*}}, [151:25 - 153:3] scope_map.(file).funcWithComputedProperties(i:).alsoComputed@SOURCE_DIR{{[/|\\]}}test{{[/|\\]}}NameBinding{{[/|\\]}}scope_map.swift:151:7
-// CHECK-EXPANDED-NEXT:             `-AbstractFunctionDeclScope {{.*}}, [151:25 - 153:3] '_'
-// CHECK-EXPANDED-NEXT:               `-PureFunctionBodyScope {{.*}}, [151:25 - 153:3]
-// CHECK-EXPANDED-NEXT:                 `-BraceStmtScope {{.*}}, [151:25 - 153:3]
-// CHECK-EXPANDED-NEXT:         `-BraceStmtScope {{.*}}, [155:6 - 155:8]
-// CHECK-EXPANDED-NEXT: |-AbstractFunctionDeclScope {{.*}}, [158:1 - 163:1] 'closures()'
-// CHECK-EXPANDED-NEXT:   `-ParameterListScope {{.*}}, [158:14 - 163:1]
-// CHECK-EXPANDED-NEXT:     `-PureFunctionBodyScope {{.*}}, [158:17 - 163:1]
-// CHECK-EXPANDED-NEXT:       `-BraceStmtScope {{.*}}, [158:17 - 163:1]
-// CHECK-EXPANDED-NEXT:         |-WholeClosureScope {{.*}}, [159:3 - 161:3]
-// CHECK-EXPANDED-NEXT:           `-ClosureParametersScope {{.*}}, [159:5 - 161:3]
-// CHECK-EXPANDED-NEXT:             `-ClosureBodyScope {{.*}}, [159:10 - 161:3]
-// CHECK-EXPANDED-NEXT:               `-BraceStmtScope {{.*}}, [159:10 - 161:3]
-// CHECK-EXPANDED-NEXT:                 `-WholeClosureScope {{.*}}, [160:12 - 160:22]
-// CHECK-EXPANDED-NEXT:                   `-ClosureBodyScope {{.*}}, [160:12 - 160:22]
-// CHECK-EXPANDED-NEXT:                     `-BraceStmtScope {{.*}}, [160:12 - 160:22]
-// CHECK-EXPANDED-NEXT:         `-WholeClosureScope {{.*}}, [162:3 - 162:19]
-// CHECK-EXPANDED-NEXT:           `-ClosureParametersScope {{.*}}, [162:5 - 162:19]
-// CHECK-EXPANDED-NEXT:             `-ClosureBodyScope {{.*}}, [162:10 - 162:19]
-// CHECK-EXPANDED-NEXT:               `-BraceStmtScope {{.*}}, [162:10 - 162:19]
-// CHECK-EXPANDED-NEXT: `-TopLevelCodeScope {{.*}}, [165:1 - 195:1]
-// CHECK-EXPANDED-NEXT:   `-BraceStmtScope {{.*}}, [165:1 - 195:1]
-// CHECK-EXPANDED-NEXT:     |-WholeClosureScope {{.*}}, [165:1 - 165:14]
-// CHECK-EXPANDED-NEXT:       `-ClosureBodyScope {{.*}}, [165:1 - 165:14]
-// CHECK-EXPANDED-NEXT:         `-BraceStmtScope {{.*}}, [165:1 - 165:14]
-// CHECK-EXPANDED-NEXT:     |-AbstractFunctionDeclScope {{.*}}, [167:1 - 176:1] 'defaultArguments(i:j:)'
-// CHECK-EXPANDED-NEXT:       `-ParameterListScope {{.*}}, [167:22 - 176:1]
-// CHECK-EXPANDED-NEXT:         |-DefaultArgumentInitializerScope {{.*}}, [167:32 - 167:32]
-// CHECK-EXPANDED-NEXT:         |-DefaultArgumentInitializerScope {{.*}}, [168:32 - 168:48]
-// CHECK-EXPANDED-NEXT:           `-WholeClosureScope {{.*}}, [168:32 - 168:42]
-// CHECK-EXPANDED-NEXT:             `-ClosureBodyScope {{.*}}, [168:32 - 168:42]
-// CHECK-EXPANDED-NEXT:               `-BraceStmtScope {{.*}}, [168:32 - 168:42]
-// CHECK-EXPANDED-NEXT:         `-PureFunctionBodyScope {{.*}}, [168:51 - 176:1]
-// CHECK-EXPANDED-NEXT:           `-BraceStmtScope {{.*}}, [168:51 - 176:1]
-// CHECK-EXPANDED-NEXT:             |-AbstractFunctionDeclScope {{.*}}, [170:3 - 172:3] 'localWithDefaults(i:j:)'
-// CHECK-EXPANDED-NEXT:               `-ParameterListScope {{.*}}, [170:25 - 172:3]
-// CHECK-EXPANDED-NEXT:                 |-DefaultArgumentInitializerScope {{.*}}, [170:35 - 170:35]
-// CHECK-EXPANDED-NEXT:                 |-DefaultArgumentInitializerScope {{.*}}, [171:35 - 171:51]
-// CHECK-EXPANDED-NEXT:                   `-WholeClosureScope {{.*}}, [171:35 - 171:45]
-// CHECK-EXPANDED-NEXT:                     `-ClosureBodyScope {{.*}}, [171:35 - 171:45]
-// CHECK-EXPANDED-NEXT:                       `-BraceStmtScope {{.*}}, [171:35 - 171:45]
-// CHECK-EXPANDED-NEXT:                 `-PureFunctionBodyScope {{.*}}, [171:54 - 172:3]
-// CHECK-EXPANDED-NEXT:                   `-BraceStmtScope {{.*}}, [171:54 - 172:3]
-// CHECK-EXPANDED-NEXT:             `-PatternEntryDeclScope {{.*}}, [174:7 - 175:11] entry 0 'a'
-// CHECK-EXPANDED-NEXT:               `-PatternEntryInitializerScope {{.*}}, [174:11 - 175:11] entry 0 'a'
-// CHECK-EXPANDED-NEXT:                 `-WholeClosureScope {{.*}}, [175:3 - 175:8]
-// CHECK-EXPANDED-NEXT:                   `-ClosureBodyScope {{.*}}, [175:3 - 175:8]
-// CHECK-EXPANDED-NEXT:                     `-BraceStmtScope {{.*}}, [175:3 - 175:8]
-// CHECK-EXPANDED-NEXT:     |-NominalTypeDeclScope {{.*}}, [178:1 - 181:1] 'PatternInitializers'
-// CHECK-EXPANDED-NEXT:       `-NominalTypeBodyScope {{.*}}, [178:28 - 181:1] 'PatternInitializers'
-// CHECK-EXPANDED-NEXT:         |-PatternEntryDeclScope {{.*}}, [179:7 - 179:21] entry 0 'a' 'b'
-// CHECK-EXPANDED-NEXT:           `-PatternEntryInitializerScope {{.*}}, [179:16 - 179:21] entry 0 'a' 'b'
-// CHECK-EXPANDED-NEXT:         `-PatternEntryDeclScope {{.*}}, [180:7 - 180:25] entry 1 'c' 'd'
-// CHECK-EXPANDED-NEXT:           `-PatternEntryInitializerScope {{.*}}, [180:16 - 180:25] entry 1 'c' 'd'
-// CHECK-EXPANDED-NEXT:     |-NominalTypeDeclScope {{.*}}, [183:1 - 185:1] 'ProtoWithSubscript'
-// CHECK-EXPANDED-NEXT:       `-GenericParamScope {{.*}}, [183:29 - 185:1] param 0 'Self : ProtoWithSubscript'
-// CHECK-EXPANDED-NEXT:         `-NominalTypeBodyScope {{.*}}, [183:29 - 185:1] 'ProtoWithSubscript'
-// CHECK-EXPANDED-NEXT:           `-SubscriptDeclScope {{.*}}, [184:3 - 184:43] scope_map.(file).ProtoWithSubscript.subscript(_:)@SOURCE_DIR{{[/|\\]}}test{{[/|\\]}}NameBinding{{[/|\\]}}scope_map.swift:184:3
-// CHECK-EXPANDED-NEXT:             `-ParameterListScope {{.*}}, [184:12 - 184:43]
-// CHECK-EXPANDED-NEXT:               |-AbstractFunctionDeclScope {{.*}}, [184:35 - 184:35] '_'
-// CHECK-EXPANDED-NEXT:               `-AbstractFunctionDeclScope {{.*}}, [184:39 - 184:39] '_'
-// CHECK-EXPANDED-NEXT:     |-AbstractFunctionDeclScope {{.*}}, [187:1 - 189:1] 'localPatternsWithSharedType()'
-// CHECK-EXPANDED-NEXT:       `-ParameterListScope {{.*}}, [187:33 - 189:1]
-// CHECK-EXPANDED-NEXT:         `-PureFunctionBodyScope {{.*}}, [187:36 - 189:1]
-// CHECK-EXPANDED-NEXT:           `-BraceStmtScope {{.*}}, [187:36 - 189:1]
-// CHECK-EXPANDED-NEXT:             |-PatternEntryDeclScope {{.*}}, [188:7 - 188:7] entry 0 'i'
-// CHECK-EXPANDED-NEXT:             |-PatternEntryDeclScope {{.*}}, [188:10 - 188:10] entry 1 'j'
-// CHECK-EXPANDED-NEXT:             `-PatternEntryDeclScope {{.*}}, [188:13 - 188:16] entry 2 'k'
-// CHECK-EXPANDED-NEXT:     `-NominalTypeDeclScope {{.*}}, [191:1 - 195:1] 'LazyProperties'
-// CHECK-EXPANDED-NEXT:       `-NominalTypeBodyScope {{.*}}, [191:22 - 195:1] 'LazyProperties'
-// CHECK-EXPANDED-NEXT:         |-PatternEntryDeclScope {{.*}}, [192:7 - 192:20] entry 0 'value'
-// CHECK-EXPANDED-NEXT:           `-PatternEntryInitializerScope {{.*}}, [192:20 - 192:20] entry 0 'value'
-// CHECK-EXPANDED-NEXT:         `-PatternEntryDeclScope {{.*}}, [194:12 - 194:29] entry 0 'prop'
-// CHECK-EXPANDED-NEXT:           `-PatternEntryInitializerScope {{.*}}, [194:24 - 194:29] entry 0 'prop'
+            `-BraceStmtScope {{.*}}, [135:13 - 135:15]
+    `-PatternEntryDeclScope {{.*}}, [138:7 - 140:3] entry 0 'didSetProperty'
+      |-PatternEntryInitializerScope {{.*}}, [138:29 - 138:29] entry 0 'didSetProperty'
+      `-VarDeclScope {{.*}}, [138:31 - 140:3] scope_map.(file).ClassWithComputedProperties.didSetProperty@SOURCE_DIR/test/NameBinding/scope_map.swift:138:7
+        `-AbstractFunctionDeclScope {{.*}}, [139:5 - 139:14] '_'
+          `-MethodBodyScope {{.*}}, [139:12 - 139:14]
+            `-BraceStmtScope {{.*}}, [139:12 - 139:14]
+|-AbstractFunctionDeclScope {{.*}}, [143:1 - 156:1] 'funcWithComputedProperties(i:)'
+  `-ParameterListScope {{.*}}, [143:32 - 156:1]
+    `-PureFunctionBodyScope {{.*}}, [143:41 - 156:1]
+      `-BraceStmtScope {{.*}}, [143:41 - 156:1]
+        |-PatternEntryDeclScope {{.*}}, [144:21 - 150:3] entry 0 'computed'
+          `-VarDeclScope {{.*}}, [144:21 - 150:3] scope_map.(file).funcWithComputedProperties(i:).computed@SOURCE_DIR/test/NameBinding/scope_map.swift:144:7
+            |-AbstractFunctionDeclScope {{.*}}, [145:5 - 146:5] '_'
+              `-PureFunctionBodyScope {{.*}}, [145:9 - 146:5]
+                `-BraceStmtScope {{.*}}, [145:9 - 146:5]
+            `-AbstractFunctionDeclScope {{.*}}, [147:5 - 149:5] '_'
+              `-PureFunctionBodyScope {{.*}}, [147:9 - 149:5]
+                `-BraceStmtScope {{.*}}, [147:9 - 149:5]
+        |-PatternEntryDeclScope {{.*}}, [150:6 - 150:36] entry 1 'stored1' 'stored2'
+          `-PatternEntryInitializerScope {{.*}}, [150:31 - 150:36] entry 1 'stored1' 'stored2'
+        |-PatternEntryDeclScope {{.*}}, [151:25 - 153:3] entry 2 'alsoComputed'
+          `-VarDeclScope {{.*}}, [151:25 - 153:3] scope_map.(file).funcWithComputedProperties(i:).alsoComputed@SOURCE_DIR/test/NameBinding/scope_map.swift:151:7
+            `-AbstractFunctionDeclScope {{.*}}, [151:25 - 153:3] '_'
+              `-PureFunctionBodyScope {{.*}}, [151:25 - 153:3]
+                `-BraceStmtScope {{.*}}, [151:25 - 153:3]
+        `-BraceStmtScope {{.*}}, [155:6 - 155:8]
+|-AbstractFunctionDeclScope {{.*}}, [158:1 - 163:1] 'closures()'
+  `-ParameterListScope {{.*}}, [158:14 - 163:1]
+    `-PureFunctionBodyScope {{.*}}, [158:17 - 163:1]
+      `-BraceStmtScope {{.*}}, [158:17 - 163:1]
+        |-WholeClosureScope {{.*}}, [159:3 - 161:3]
+          `-ClosureParametersScope {{.*}}, [159:5 - 161:3]
+            `-ClosureBodyScope {{.*}}, [159:10 - 161:3]
+              `-BraceStmtScope {{.*}}, [159:10 - 161:3]
+                `-WholeClosureScope {{.*}}, [160:12 - 160:22]
+                  `-ClosureBodyScope {{.*}}, [160:12 - 160:22]
+                    `-BraceStmtScope {{.*}}, [160:12 - 160:22]
+        `-WholeClosureScope {{.*}}, [162:3 - 162:19]
+          `-ClosureParametersScope {{.*}}, [162:5 - 162:19]
+            `-ClosureBodyScope {{.*}}, [162:10 - 162:19]
+              `-BraceStmtScope {{.*}}, [162:10 - 162:19]
+`-TopLevelCodeScope {{.*}}, [165:1 - 195:1]
+  `-BraceStmtScope {{.*}}, [165:1 - 195:1]
+    |-WholeClosureScope {{.*}}, [165:1 - 165:14]
+      `-ClosureBodyScope {{.*}}, [165:1 - 165:14]
+        `-BraceStmtScope {{.*}}, [165:1 - 165:14]
+    |-AbstractFunctionDeclScope {{.*}}, [167:1 - 176:1] 'defaultArguments(i:j:)'
+      `-ParameterListScope {{.*}}, [167:22 - 176:1]
+        |-DefaultArgumentInitializerScope {{.*}}, [167:32 - 167:32]
+        |-DefaultArgumentInitializerScope {{.*}}, [168:32 - 168:48]
+          `-WholeClosureScope {{.*}}, [168:32 - 168:42]
+            `-ClosureBodyScope {{.*}}, [168:32 - 168:42]
+              `-BraceStmtScope {{.*}}, [168:32 - 168:42]
+        `-PureFunctionBodyScope {{.*}}, [168:51 - 176:1]
+          `-BraceStmtScope {{.*}}, [168:51 - 176:1]
+            |-AbstractFunctionDeclScope {{.*}}, [170:3 - 172:3] 'localWithDefaults(i:j:)'
+              `-ParameterListScope {{.*}}, [170:25 - 172:3]
+                |-DefaultArgumentInitializerScope {{.*}}, [170:35 - 170:35]
+                |-DefaultArgumentInitializerScope {{.*}}, [171:35 - 171:51]
+                  `-WholeClosureScope {{.*}}, [171:35 - 171:45]
+                    `-ClosureBodyScope {{.*}}, [171:35 - 171:45]
+                      `-BraceStmtScope {{.*}}, [171:35 - 171:45]
+                `-PureFunctionBodyScope {{.*}}, [171:54 - 172:3]
+                  `-BraceStmtScope {{.*}}, [171:54 - 172:3]
+            `-PatternEntryDeclScope {{.*}}, [174:7 - 175:11] entry 0 'a'
+              `-PatternEntryInitializerScope {{.*}}, [174:11 - 175:11] entry 0 'a'
+                `-WholeClosureScope {{.*}}, [175:3 - 175:8]
+                  `-ClosureBodyScope {{.*}}, [175:3 - 175:8]
+                    `-BraceStmtScope {{.*}}, [175:3 - 175:8]
+    |-NominalTypeDeclScope {{.*}}, [178:1 - 181:1] 'PatternInitializers'
+      `-NominalTypeBodyScope {{.*}}, [178:28 - 181:1] 'PatternInitializers'
+        |-PatternEntryDeclScope {{.*}}, [179:7 - 179:21] entry 0 'a' 'b'
+          `-PatternEntryInitializerScope {{.*}}, [179:16 - 179:21] entry 0 'a' 'b'
+        `-PatternEntryDeclScope {{.*}}, [180:7 - 180:25] entry 1 'c' 'd'
+          `-PatternEntryInitializerScope {{.*}}, [180:16 - 180:25] entry 1 'c' 'd'
+    |-NominalTypeDeclScope {{.*}}, [183:1 - 185:1] 'ProtoWithSubscript'
+      `-GenericParamScope {{.*}}, [183:29 - 185:1] param 0 'Self : ProtoWithSubscript'
+        `-NominalTypeBodyScope {{.*}}, [183:29 - 185:1] 'ProtoWithSubscript'
+          `-SubscriptDeclScope {{.*}}, [184:3 - 184:43] scope_map.(file).ProtoWithSubscript.subscript(_:)@SOURCE_DIR/test/NameBinding/scope_map.swift:184:3
+            `-ParameterListScope {{.*}}, [184:12 - 184:43]
+              |-AbstractFunctionDeclScope {{.*}}, [184:35 - 184:35] '_'
+              `-AbstractFunctionDeclScope {{.*}}, [184:39 - 184:39] '_'
+    |-AbstractFunctionDeclScope {{.*}}, [187:1 - 189:1] 'localPatternsWithSharedType()'
+      `-ParameterListScope {{.*}}, [187:33 - 189:1]
+        `-PureFunctionBodyScope {{.*}}, [187:36 - 189:1]
+          `-BraceStmtScope {{.*}}, [187:36 - 189:1]
+            |-PatternEntryDeclScope {{.*}}, [188:7 - 188:7] entry 0 'i'
+            |-PatternEntryDeclScope {{.*}}, [188:10 - 188:10] entry 1 'j'
+            `-PatternEntryDeclScope {{.*}}, [188:13 - 188:16] entry 2 'k'
+    `-NominalTypeDeclScope {{.*}}, [191:1 - 195:1] 'LazyProperties'
+      `-NominalTypeBodyScope {{.*}}, [191:22 - 195:1] 'LazyProperties'
+        |-PatternEntryDeclScope {{.*}}, [192:7 - 192:20] entry 0 'value'
+          `-PatternEntryInitializerScope {{.*}}, [192:20 - 192:20] entry 0 'value'
+        `-PatternEntryDeclScope {{.*}}, [194:12 - 194:29] entry 0 'prop'
+          `-PatternEntryInitializerScope {{.*}}, [194:24 - 194:29] entry 0 'prop'
 
 
 
