@@ -111,7 +111,6 @@ if(SWIFT_BUILD_STATIC_STDLIB AND "${sdk}" STREQUAL "LINUX")
         "${LibraryLocation}/${CMAKE_STATIC_LIBRARY_PREFIX}swiftImageInspectionShared${CMAKE_STATIC_LIBRARY_SUFFIX}"
       DEPENDS
          ${FragileSupportLibrary})
-    add_dependencies(stdlib ${FragileSupportLibrary})
     swift_install_in_component(FILES $<TARGET_FILE:${FragileSupportLibrary}>
                                DESTINATION "lib/swift_static/${lowercase_sdk}/${arch}"
                                COMPONENT stdlib)
@@ -126,7 +125,6 @@ if(SWIFT_BUILD_STATIC_STDLIB AND "${sdk}" STREQUAL "LINUX")
       "${LibraryLocationPrimary}/${CMAKE_STATIC_LIBRARY_PREFIX}swiftImageInspectionShared${CMAKE_STATIC_LIBRARY_SUFFIX}"
       DEPENDS
          ${FragileSupportLibraryPrimary})
-    add_dependencies(stdlib ${FragileSupportLibraryPrimary})
     swift_install_in_component(FILES $<TARGET_FILE:${FragileSupportLibraryPrimary}>
                                DESTINATION "lib/swift_static/${lowercase_sdk}"
                                COMPONENT stdlib)
@@ -152,7 +150,6 @@ if(SWIFT_BUILD_STATIC_STDLIB AND "${sdk}" STREQUAL "LINUX")
     add_dependencies(static_binary_magic ${swift_image_inspection_${arch}_static})
   endforeach()
   add_dependencies(static_binary_magic ${swift_image_inspection_static_primary_arch})
-  add_dependencies(stdlib static_binary_magic)
 
   add_swift_target_library(swiftImageInspectionSharedObject OBJECT_LIBRARY
     ImageInspectionELF.cpp
@@ -253,7 +250,6 @@ foreach(sdk ${SWIFT_CONFIGURED_SDKS})
       add_custom_target(swiftImageRegistration-${arch_suffix}
                         ALL DEPENDS
                           ${swiftImageRegistration-${arch_suffix}})
-      add_dependencies(stdlib swift-stdlib-${arch_suffix} swiftImageRegistration-${arch_suffix})
     endif()
   endforeach()
 endforeach()

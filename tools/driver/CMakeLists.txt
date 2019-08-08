@@ -37,15 +37,12 @@ if(NOT SWIFT_BUILT_STANDALONE)
   add_dependencies(swift clang-headers)
 endif()
 
-add_dependencies(compiler swift)
 swift_install_in_component(FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swiftc${CMAKE_EXECUTABLE_SUFFIX}"
                            DESTINATION "bin"
                            COMPONENT compiler)
-add_dependencies(autolink-driver swift)
 swift_install_in_component(FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-autolink-extract${CMAKE_EXECUTABLE_SUFFIX}"
                            DESTINATION "bin"
                            COMPONENT autolink-driver)
-add_dependencies(editor-integration swift)
 swift_install_in_component(FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-indent${CMAKE_EXECUTABLE_SUFFIX}"
                            DESTINATION "bin"
                            COMPONENT editor-integration)

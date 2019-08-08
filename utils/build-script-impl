@@ -3552,7 +3552,6 @@ for host in "${ALL_HOSTS[@]}"; do
                 if [[ -z "${INSTALL_SWIFT}" ]] ; then
                     continue
                 fi
-                INSTALL_TARGETS=install-swift-components
                 # Swift syntax parser is currently a sub-product of Swift;
                 # We need to specify the install target separately here.
                 if [ "${BUILD_LIBPARSER_ONLY}" ]; then
