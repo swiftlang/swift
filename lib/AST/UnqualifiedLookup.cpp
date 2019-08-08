@@ -472,6 +472,7 @@ void UnqualifiedLookupFactory::performUnqualifiedLookup() {
   ++lookupCounter;
   stopForDebuggingIfStartingTargetLookup(false);
 #endif
+  SharedTimer timer("UnqualifiedLookupFactory performUnqualifiedLookup");
 
   const Optional<bool> initialIsCascadingUse = getInitialIsCascadingUse();
 
