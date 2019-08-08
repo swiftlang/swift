@@ -10,7 +10,7 @@ In this document, "stdlib" refers to the core standard library (`stdlib/public/c
 
 ## Coding style
 
-### Source Code Formatting
+### Formatting Conventions
 
 The stdlib currently has a hard line length limit of 80 characters. To break long lines, please closely follow the indentation conventions you see in the existing codebase. (FIXME: Describe.)
    
@@ -18,18 +18,23 @@ We use two spaces as the unit of indentation. We don't use tabs.
 
 ### Public APIs
 
-All new public API addition to the core Standard Library must go through the [Swift Evolution Process](https://github.com/apple/swift-evolution/blob/master/process.md). The Core Team must have approved the additions by the time we merge them into the stdlib codebase.
+#### Core Standard Library
+
+All new public API additions to the core Standard Library must go through the [Swift Evolution Process](https://github.com/apple/swift-evolution/blob/master/process.md). The Core Team must have approved the additions by the time we merge them into the stdlib codebase.
+
+All public APIs should come with documentation comments describing their purpose and behavior. It is highly recommended to use big-oh notation to document any guaranteed performance characteristics. (CPU and/or memory use, number of accesses to some underlying collection, etc.)
 
 Note that implementation details are generally outside the scope of the Swift Evolution -- the stdlib is free to change its internal algorithms, internal APIs and data structures etc. from release to release, as long as the documented API (and ABI) remains intact. 
 
 For example, since `hashValue` was always documented to allow changing its return value across different executions of the same program, we were able to switch to randomly seeded hashing in Swift 4.2 without going through the Swift Evolution process. However, the introduction of `hash(into:)` required a formal proposal. (Note though that highly visible behavioral changes like this can be more difficult to implement now that we have a stable ABI -- we can still do them, but in some cases they may require checking the version of the Swift SDK on which the main executable was compiled, to prevent breaking binaries compiled with previous releases.)
 
-We sometimes need to expose some internal APIs as `public` for technical reasons (such as to interoperate with other system frameworks, and/or to enable testing/debugging certain functionality). We use the Leading Underscore Rule (see below) to differentiate these from the documented stdlib API. Underscored APIs aren't considered part of the public API surface, and as such they don't need to follow the Swift Evolution Process. Regular Swift code isn't supposed to directly call these; if necessary, we may change their behavior in incompatible ways or we may even remove them altogether in future releases. Such underscored-but-public API should cou
+We sometimes need to expose some internal APIs as `public` for technical reasons (such as to interoperate with other system frameworks, and/or to enable testing/debugging certain functionality). We use the Leading Underscore Rule (see below) to differentiate these from the documented stdlib API. Underscored APIs aren't considered part of the public API surface, and as such they don't need to go through the Swift Evolution Process. Regular Swift code isn't supposed to directly call these; when necessary, we may change their behavior in incompatible ways or we may even remove them. (However, such changes are technically ABI breaking, so they need to be carefully considered against the risk of breaking existing binaries.)
 
-The platform overlays generally have their own API review processes, outside the scope of Swift Evolution.
+### Overlays and Private Code
+
+The platform overlays generally have their own API review processes. These are outside the scope of Swift Evolution.
+
 Anything under `stdlib/private` can be added/removed/changed with the simple approval of a stdlib code owner.
-
-All public APIs should come with documentation comments describing their purpose and behavior. It is highly recommended to use big-oh notation to document any guaranteed performance characteristics. (CPU and/or memory use, number of accesses to some underlying collection, etc.)
 
 ### The Leading Underscore Rule
 
@@ -60,6 +65,8 @@ extension String {
 ```
     
 This makes it trivial to identify the access level of every definition without having to scan the context it appears in.
+
+For historical reasons, the existing codebase generally uses `internal` as the catch-all non-public access level. However, it is okay to use `private`/`fileprivate` when appropriate.
 
 ## Internals
 
