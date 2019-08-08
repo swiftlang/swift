@@ -26,7 +26,7 @@ var i: Int = b.my_identity()
 
 
 // CHECK-EXPANDED:      ***Complete scope map***
-// CHECK-EXPANDED-NEXT: ASTSourceFileScope {{.*}}, (uncached) [1:1 - 62:1] 'SOURCE_DIR{{[/\\]}}test{{[/\\]}}NameBinding{{[/\\]}}scope_map_top_level.swift'
+// CHECK-EXPANDED-NEXT: ASTSourceFileScope {{.*}}, (uncached) [1:1 - 6{{.*}}:1] 'SOURCE_DIR{{[/\\]}}test{{[/\\]}}NameBinding{{[/\\]}}scope_map_top_level.swift'
 // CHECK-EXPANDED-NEXT: |-NominalTypeDeclScope {{.*}}, [4:1 - 4:13] 'S0'
 // CHECK-EXPANDED-NEXT:   `-NominalTypeBodyScope {{.*}}, [4:11 - 4:13] 'S0'
 // CHECK-EXPANDED-NEXT: `-TopLevelCodeScope {{.*}}, [6:1 - 21:28]
@@ -59,3 +59,6 @@ var i: Int = b.my_identity()
 // CHECK-EXPANDED-NEXT:                   `-BraceStmtScope {{.*}}, [21:1 - 21:28]
 // CHECK-EXPANDED-NEXT:                     `-PatternEntryDeclScope {{.*}}, [21:5 - 21:28] entry 0 'i'
 // CHECK-EXPANDED-NEXT:                       `-PatternEntryInitializerScope {{.*}}, [21:14 - 21:28] entry 0 'i'
+
+// REQUIRES: asserts
+// absence of assertions can change the "uncached" bit and cause failures
