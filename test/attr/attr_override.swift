@@ -606,6 +606,23 @@ class SR_10198_Base {
 }
 
 class SR_10198_Derived: SR_10198_Base {
-  override func a<T>(_ val: T) -> String { return super.a(val) }
-  override func a<T: Equatable>(_ val: T) -> String { return super.a(val) }
+  override func a<T>(_ val: T) -> String { return super.a(val) } // okay
+  override func a<T: Equatable>(_ val: T) -> String { return super.a(val) } // okay
 }
+
+protocol SR_10198_Base_P {
+  associatedtype Bar
+}
+
+struct SR_10198_Base_S: SR_10198_Base_P {
+  typealias Bar = Int
+}
+
+class SR_10198_Base_1 {
+  init<F: SR_10198_Base_P>(_ arg: F) where F.Bar == Int {}
+}
+
+class SR_10198_Derived_1: SR_10198_Base_1 {
+  init(_ arg1: Int) { super.init(SR_10198_Base_S()) } // okay, doesn't crash
+}
+
