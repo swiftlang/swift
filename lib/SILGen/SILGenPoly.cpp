@@ -3603,8 +3603,8 @@ SILGenFunction::getThunkedAutoDiffLinearMap(
     auto fromSelfResult = fromConv.getResults().front();
     auto toSelfResult = toConv.getResults().back();
     assert(fromSelfResult.getType() == toSelfResult.getType());
-    // Before: [dir_res_self, dir_res1, ind_res2, ...]
-    //  After: [dir_res1, ind_res2, ..., dir_res_self]
+    // Before: [dir_res_self, dir_res1, dir_res2, ...]
+    //  After: [dir_res1, dir_res2, ..., dir_res_self]
     if (toSelfResult.isFormalDirect() && fromSelfResult.isFormalDirect() &&
         directResults.size() > 1) {
       std::rotate(directResults.begin(), directResults.begin() + 1,

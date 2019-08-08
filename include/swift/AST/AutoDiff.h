@@ -559,12 +559,7 @@ struct AutoDiffAssociatedFunctionKind {
   explicit AutoDiffAssociatedFunctionKind(StringRef string);
   operator innerty() const { return rawValue; }
   AutoDiffLinearMapKind getLinearMapKind() {
-    switch (*this) {
-    case AutoDiffAssociatedFunctionKind::JVP:
-      return AutoDiffLinearMapKind::Differential;
-    case AutoDiffAssociatedFunctionKind::VJP:
-      return AutoDiffLinearMapKind::Pullback;
-    }
+    return (AutoDiffLinearMapKind::innerty)rawValue;
   }
 };
 
