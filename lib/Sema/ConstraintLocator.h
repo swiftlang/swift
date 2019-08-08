@@ -721,7 +721,8 @@ public:
 
     auto last = std::find_if(
         path.rbegin(), path.rend(), [](LocatorPathElt &elt) -> bool {
-          return elt.getKind() != ConstraintLocator::OptionalPayload;
+          return elt.getKind() != ConstraintLocator::OptionalPayload &&
+                 elt.getKind() != ConstraintLocator::GenericArgument;
         });
 
     if (last != path.rend())

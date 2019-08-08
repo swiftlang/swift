@@ -14,6 +14,7 @@ func test(
 ) {
   var i: Int = 0
   var a: [Int] = [0]
+  var b: [Int]? = [0]
   let s = "string"
 
   takesAutoclosure(rawPtr, &i) // expected-error {{cannot perform pointer conversion of value of type 'Int' to autoclosure result type 'UnsafeRawPointer'}}
@@ -26,17 +27,12 @@ func test(
   takesAutoclosure(ptr, &a) // expected-error {{cannot perform pointer conversion of value of type '[Int]' to autoclosure result type 'UnsafePointer<Int>'}}
   takesAutoclosure(optPtr, &i) // expected-error {{cannot perform pointer conversion of value of type 'Int' to autoclosure result type 'UnsafePointer<Int>?'}}
 
-  takesAutoclosure(rawPtr, a) // expected-error {{cannot invoke 'takesAutoclosure' with an argument list of type '(UnsafeRawPointer, [Int])'}}
-  // expected-note@-1 {{expected an argument list of type '(T, @autoclosure () throws -> T)'}}
-  takesAutoclosure(ptr, a) // expected-error {{cannot invoke 'takesAutoclosure' with an argument list of type '(UnsafePointer<Int>, [Int])'}}
-  // expected-note@-1 {{expected an argument list of type '(T, @autoclosure () throws -> T)'}}
+  takesAutoclosure(rawPtr, a) // expected-error {{cannot perform pointer conversion of value of type '[Int]' to autoclosure result type 'UnsafeRawPointer'}}
+  takesAutoclosure(ptr, a) // expected-error {{cannot perform pointer conversion of value of type '[Int]' to autoclosure result type 'UnsafePointer<Int>'}}
+  takesAutoclosure(optPtr, b) // expected-error {{cannot perform pointer conversion of value of type '[Int]?' to autoclosure result type 'UnsafePointer<Int>?'}}
 
-  takesAutoclosure(rawPtr, s) // expected-error {{cannot invoke 'takesAutoclosure' with an argument list of type '(UnsafeRawPointer, String)'}}
-  // expected-note@-1 {{expected an argument list of type '(T, @autoclosure () throws -> T)'}}
-  takesAutoclosure(ptrI8, s) // expected-error {{cannot invoke 'takesAutoclosure' with an argument list of type '(UnsafePointer<Int8>, String)'}}
-  // expected-note@-1 {{expected an argument list of type '(T, @autoclosure () throws -> T)'}}
-  takesAutoclosure(ptrU8, s) // expected-error {{cannot invoke 'takesAutoclosure' with an argument list of type '(UnsafePointer<UInt8>, String)'}}
-  // expected-note@-1 {{expected an argument list of type '(T, @autoclosure () throws -> T)'}}
-  takesAutoclosure(ptrVoid, s) // expected-error {{cannot invoke 'takesAutoclosure' with an argument list of type '(UnsafePointer<Void>, String)'}}
-  // expected-note@-1 {{expected an argument list of type '(T, @autoclosure () throws -> T)'}}
+  takesAutoclosure(rawPtr, s) // expected-error {{cannot perform pointer conversion of value of type 'String' to autoclosure result type 'UnsafeRawPointer'}}
+  takesAutoclosure(ptrI8, s) // expected-error {{cannot perform pointer conversion of value of type 'String' to autoclosure result type 'UnsafePointer<Int8>'}}
+  takesAutoclosure(ptrU8, s) // expected-error {{cannot perform pointer conversion of value of type 'String' to autoclosure result type 'UnsafePointer<UInt8>'}}
+  takesAutoclosure(ptrVoid, s) // expected-error {{cannot perform pointer conversion of value of type 'String' to autoclosure result type 'UnsafePointer<Void>'}}
 }

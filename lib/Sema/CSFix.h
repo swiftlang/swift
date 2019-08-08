@@ -98,10 +98,6 @@ enum class FixKind : uint8_t {
   /// Swift version 5.
   AutoClosureForwarding,
 
-  /// Allow invalid pointer conversions for autoclosure result types as if the
-  /// pointer type is a function parameter rather than an autoclosure result.
-  AllowAutoClosurePointerConversion,
-
   /// Remove `!` or `?` because base is not an optional type.
   RemoveUnwrap,
 
@@ -627,11 +623,12 @@ public:
                                        ConstraintLocator *locator);
 };
 
+/// Allow invalid pointer conversions for autoclosure result types as if the
+/// pointer type is a function parameter rather than an autoclosure result.
 class AllowAutoClosurePointerConversion final : public ContextualMismatch {
   AllowAutoClosurePointerConversion(ConstraintSystem &cs, Type pointeeType,
                                     Type pointerType, ConstraintLocator *locator)
-      : ContextualMismatch(cs, FixKind::AllowAutoClosurePointerConversion,
-                           pointeeType, pointerType, locator) {}
+      : ContextualMismatch(cs, pointeeType, pointerType, locator) {}
 
 public:
   std::string getName() const override {

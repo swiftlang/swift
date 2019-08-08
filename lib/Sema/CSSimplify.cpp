@@ -2488,6 +2488,14 @@ bool ConstraintSystem::repairFailures(
   case ConstraintLocator::AutoclosureResult: {
     if (repairByInsertingExplicitCall(lhs, rhs))
       return true;
+
+    auto result = matchTypes(lhs, rhs, ConstraintKind::ArgumentConversion,
+        TypeMatchFlags::TMF_ApplyingFix,
+        locator.withPathElement(ConstraintLocator::FunctionArgument));
+
+    if (result.isSuccess())
+      conversionsOrFixes.push_back(AllowAutoClosurePointerConversion::create(
+          *this, lhs, rhs, getConstraintLocator(locator)));
     break;
   }
 
@@ -3116,11 +3124,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
               }
               conversionsOrFixes.push_back(
                   ConversionRestrictionKind::InoutToPointer);
-            } else {
-              Type pointeeType = inoutType1->getObjectType();
-              auto *fix = AllowAutoClosurePointerConversion::create(*this,
-                  pointeeType, type2, getConstraintLocator(locator));
-              conversionsOrFixes.push_back(fix);
             }
           }
 
@@ -7008,13 +7011,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     if (recordFix(fix))
       return SolutionKind::Error;
     return matchTupleTypes(matchingType, smaller, matchKind, subflags, locator);
-  }
-
-  case FixKind::AllowAutoClosurePointerConversion: {
-    if (recordFix(fix))
-      return SolutionKind::Error;
-    return matchTypes(type1, type2, matchKind, subflags,
-        locator.withPathElement(ConstraintLocator::FunctionArgument));
   }
 
   case FixKind::InsertCall:
