@@ -1218,7 +1218,7 @@ public:
                                                   getStoredProtocols(), \
                                                   getValueType(), \
                                                   storageTy, \
-                                                  std::move(spareBits), \
+                                                  spareBits.build(), \
                                                   getFixedSize(), \
                                                   getFixedAlignment(), \
                                                   ReferenceCounting::Native, \
