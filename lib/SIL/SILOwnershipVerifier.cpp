@@ -275,8 +275,11 @@ bool SILValueOwnershipChecker::gatherUsers(
                           "map for user?!\n"
                        << "For terminator users, check that successors have "
                           "compatible ownership kinds.\n"
-                       << "Value: " << op->get() << "User: " << *user
-                       << "Operand Number: " << op->getOperandNumber() << '\n'
+                       << "Value:\n";
+          op->get()->printInContext(llvm::errs());
+          llvm::errs() << "User:\n";
+          user->printInContext(llvm::errs());
+          llvm::errs() << "Operand Number: " << op->getOperandNumber() << '\n'
                        << "Conv: " << ownershipKind << "\n\n";
         });
         continue;
@@ -285,8 +288,11 @@ bool SILValueOwnershipChecker::gatherUsers(
       handleError([&]() {
         llvm::errs() << "Function: '" << user->getFunction()->getName() << "'\n"
                      << "Have operand with incompatible ownership?!\n"
-                     << "Value: " << op->get() << "User: " << *user
-                     << "Operand Number: " << op->getOperandNumber() << '\n'
+                     << "Value:\n";
+        op->get()->printInContext(llvm::errs());
+        llvm::errs() << "User:\n";
+        user->printInContext(llvm::errs());
+        llvm::errs() << "Operand Number: " << op->getOperandNumber() << '\n'
                      << "Conv: " << ownershipKind << '\n'
                      << "OwnershipMap:\n"
                      << opOwnershipKindMap << '\n';
@@ -444,7 +450,9 @@ bool SILValueOwnershipChecker::checkFunctionArgWithoutLifetimeEndingUses(
   return !handleError([&] {
     llvm::errs() << "Function: '" << arg->getFunction()->getName() << "'\n"
                  << "    Owned function parameter without life ending uses!\n"
-                 << "Value: " << *arg << '\n';
+                 << "Value:\n";
+    arg->printInContext(llvm::errs());
+    llvm::errs() << '\n';
   });
 }
 
@@ -465,7 +473,9 @@ bool SILValueOwnershipChecker::checkYieldWithoutLifetimeEndingUses(
   return !handleError([&] {
     llvm::errs() << "Function: '" << yield->getFunction()->getName() << "'\n"
                  << "    Owned yield without life ending uses!\n"
-                 << "Value: " << *yield << '\n';
+                 << "Value:\n";
+    yield->printInContext(llvm::errs());
+    llvm::errs() << '\n';
   });
 }
 bool SILValueOwnershipChecker::checkValueWithoutLifetimeEndingUses() {
@@ -495,11 +505,15 @@ bool SILValueOwnershipChecker::checkValueWithoutLifetimeEndingUses() {
 
   if (auto *parentBlock = value->getParentBlock()) {
     if (deadEndBlocks.isDeadEnd(parentBlock)) {
-      LLVM_DEBUG(llvm::dbgs() << "    Ignoring transitively unreachable value "
-                              << "without users!\n"
-                              << "    Function: '"
-                              << value->getFunction()->getName() << "'\n"
-                              << "    Value: " << *value << '\n');
+      LLVM_DEBUG({
+        llvm::dbgs() << "    Ignoring transitively unreachable value "
+                     << "without users!\n"
+                     << "    Function: '"
+                     << value->getFunction()->getName() << "'\n"
+                     << "    Value:\n";
+        value->printInContext(llvm::dbgs());
+        llvm::dbgs() << '\n';
+      });
       return true;
     }
   }
@@ -515,7 +529,9 @@ bool SILValueOwnershipChecker::checkValueWithoutLifetimeEndingUses() {
                         "guaranteed function args must have at least one "
                         "lifetime ending use?!\n";
       }
-      llvm::errs() << "Value: " << *value << '\n';
+      llvm::errs() << "Value:\n";
+      value->printInContext(llvm::errs());
+      llvm::errs() << '\n';
     });
   }
 
@@ -532,9 +548,11 @@ bool SILValueOwnershipChecker::isGuaranteedFunctionArgWithLifetimeEndingUses(
   return handleError([&] {
     llvm::errs() << "    Function: '" << arg->getFunction()->getName() << "'\n"
                  << "    Guaranteed function parameter with life ending uses!\n"
-                 << "    Value: " << *arg;
+                 << "    Value:\n";
+    arg->printInContext(llvm::errs());
     for (const auto &user : lifetimeEndingUsers) {
-      llvm::errs() << "    Lifetime Ending User: " << *user;
+      llvm::errs() << "    Lifetime Ending User:\n";
+      user.getInst()->printInContext(llvm::errs());
     }
     llvm::errs() << '\n';
   });
@@ -548,9 +566,11 @@ bool SILValueOwnershipChecker::isSubobjectProjectionWithLifetimeEndingUses(
     llvm::errs() << "    Function: '" << value->getFunction()->getName()
                  << "'\n"
                  << "    Subobject projection with life ending uses!\n"
-                 << "    Value: " << *value;
+                 << "    Value:\n";
+    value->printInContext(llvm::errs());
     for (const auto &user : lifetimeEndingUsers) {
-      llvm::errs() << "    Lifetime Ending User: " << *user;
+      llvm::errs() << "    Lifetime Ending User:\n";
+      user.getInst()->printInContext(llvm::errs());
     }
     llvm::errs() << '\n';
   });
@@ -670,9 +690,11 @@ void SILInstruction::verifyOperandOwnership() const {
     if (errorBehavior.shouldPrintMessage()) {
       llvm::errs() << "Found an operand with a value that is not compatible "
                       "with the operand's operand ownership kind map.\n";
-      llvm::errs() << "Value: " << opValue;
+      llvm::errs() << "Value:\n";
+      opValue->printInContext(llvm::errs());
       llvm::errs() << "Value Ownership Kind: " << valueOwnershipKind << "\n";
-      llvm::errs() << "Instruction: " << *this;
+      llvm::errs() << "Instruction:\n";
+      printInContext(llvm::errs());
       llvm::errs() << "Operand Ownership Kind Map: " << operandOwnershipKindMap;
     }
 
