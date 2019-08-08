@@ -3599,7 +3599,7 @@ SILGenFunction::getThunkedAutoDiffLinearMap(
     }
     if (toSelfResult.isFormalDirect() && fromSelfResult.isFormalDirect() &&
         directResults.size() > 1) {
-      std::rotate(directResults.begin(), directResults.end() - 1,
+      std::rotate(directResults.begin(), directResults.begin() + 1,
                   directResults.end());
     }
   }
