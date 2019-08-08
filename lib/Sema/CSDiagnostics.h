@@ -682,6 +682,10 @@ public:
   /// Produce a specialized diagnostic if this is an invalid conversion to Bool.
   bool diagnoseConversionToBool() const;
 
+  /// Produce a specialized diagnostic if this is an attempt to initialize
+  /// or convert an array literal to a dictionary e.g. `let _: [String: Int] = ["A", 0]`
+  bool diagnoseConversionToDictionary() const;
+
   /// Attempt to attach any relevant fix-its to already produced diagnostic.
   void tryFixIts(InFlightDiagnostic &diagnostic) const;
 
@@ -725,7 +729,17 @@ protected:
   /// conversion is possible.
   bool tryTypeCoercionFixIt(InFlightDiagnostic &diagnostic) const;
 
+  /// Check whether this contextual failure represents an invalid
+  /// conversion from array literal to dictionary.
+  static bool isInvalidDictionaryConversion(ConstraintSystem &cs, Expr *anchor,
+                                            Type contextualType);
+
 private:
+  ContextualTypePurpose getContextualTypePurpose() const {
+    auto &cs = getConstraintSystem();
+    return cs.getContextualTypePurpose();
+  }
+
   Type resolve(Type rawType) {
     auto type = resolveType(rawType)->getWithoutSpecifierType();
     if (auto *BGT = type->getAs<BoundGenericType>()) {

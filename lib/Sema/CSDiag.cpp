@@ -5554,45 +5554,10 @@ bool FailureDiagnosis::visitArrayExpr(ArrayExpr *E) {
     return false;
   }
 
-  auto DLC
-    = CS.TC.getProtocol(E->getLoc(),
-                        KnownProtocolKind::ExpressibleByDictionaryLiteral);
-  if (!DLC)
-    return visitExpr(E);
-
-  if (TypeChecker::conformsToProtocol(contextualType, DLC, CS.DC,
-                                      ConformanceCheckFlags::InExpression)) {
-    // If the contextual type conforms to ExpressibleByDictionaryLiteral and
-    // this is an empty array, then they meant "[:]".
-    auto numElements = E->getNumElements();
-    if (numElements == 0) {
-      diagnose(E->getStartLoc(), diag::should_use_empty_dictionary_literal)
-      .fixItInsert(E->getEndLoc(), ":");
-      return true;
-    }
-
-    // If the contextual type conforms to ExpressibleByDictionaryLiteral, then
-    // they wrote "x = [1,2]" but probably meant "x = [1:2]".
-    if ((numElements & 1) == 0 && numElements > 0) {
-      bool isIniting = CS.getContextualTypePurpose() == CTP_Initialization;
-      diagnose(E->getStartLoc(), diag::should_use_dictionary_literal,
-               contextualType, isIniting);
-      auto diag = diagnose(E->getStartLoc(), diag::meant_dictionary_lit);
-
-      // Change every other comma into a colon, only if the number
-      // of commas present matches the number of elements, because
-      // otherwise it might a structural problem with the expression
-      // e.g. ["a""b": 1].
-      const auto commaLocs = E->getCommaLocs();
-      if (commaLocs.size() == numElements - 1) {
-        for (unsigned i = 0, e = numElements / 2; i != e; ++i)
-          diag.fixItReplace(commaLocs[i*2], ":");
-      }
-      return true;
-    }
-
-    return false;
-  }
+  ContextualFailure failure(expr, CS, CS.getType(E), contextualType,
+                            CS.getConstraintLocator(E));
+  if (failure.diagnoseConversionToDictionary())
+    return true;
 
   // If that didn't turn up an issue, then we don't know what to do.
   // TODO: When a contextual type is missing, we could try to diagnose cases

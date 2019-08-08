@@ -1844,6 +1844,9 @@ bool ContextualFailure::diagnoseAsError() {
   if (diagnoseMissingFunctionCall())
     return true;
 
+  if (diagnoseConversionToDictionary())
+    return true;
+
   Diag<Type, Type> diagnostic;
   switch (path.back().getKind()) {
   case ConstraintLocator::ClosureResult: {
@@ -1852,8 +1855,6 @@ bool ContextualFailure::diagnoseAsError() {
   }
 
   case ConstraintLocator::ContextualType: {
-    auto &cs = getConstraintSystem();
-
     if (diagnoseConversionToBool())
       return true;
 
@@ -1870,7 +1871,7 @@ bool ContextualFailure::diagnoseAsError() {
       }
     }
 
-    if (auto msg = getDiagnosticFor(cs.getContextualTypePurpose(),
+    if (auto msg = getDiagnosticFor(getContextualTypePurpose(),
                                     /*forProtocol=*/false)) {
       diagnostic = *msg;
       break;
@@ -1969,6 +1970,61 @@ bool ContextualFailure::diagnoseConversionToBool() const {
   }
 
   return false;
+}
+
+bool ContextualFailure::isInvalidDictionaryConversion(
+    ConstraintSystem &cs, Expr *anchor, Type contextualType) {
+  auto *arrayExpr = dyn_cast<ArrayExpr>(anchor);
+  if (!arrayExpr)
+    return false;
+
+  auto type = contextualType->lookThroughAllOptionalTypes();
+  if (!conformsToKnownProtocol(
+        cs, type, KnownProtocolKind::ExpressibleByDictionaryLiteral))
+    return false;
+
+  return (arrayExpr->getNumElements() & 1) == 0;
+}
+
+bool ContextualFailure::diagnoseConversionToDictionary() const {
+  auto &cs = getConstraintSystem();
+  auto toType = getToType()->lookThroughAllOptionalTypes();
+
+  if (!isInvalidDictionaryConversion(cs, getAnchor(), toType))
+    return false;
+
+  auto *arrayExpr = cast<ArrayExpr>(getAnchor());
+
+  // If the contextual type conforms to ExpressibleByDictionaryLiteral and
+  // this is an empty array, then they meant "[:]".
+  auto numElements = arrayExpr->getNumElements();
+  if (numElements == 0) {
+    emitDiagnostic(arrayExpr->getStartLoc(),
+                   diag::should_use_empty_dictionary_literal)
+        .fixItInsert(arrayExpr->getEndLoc(), ":");
+    return true;
+  }
+
+  // If the contextual type conforms to ExpressibleByDictionaryLiteral, then
+  // they wrote "x = [1,2]" but probably meant "x = [1:2]".
+  bool isIniting = getContextualTypePurpose() == CTP_Initialization;
+  emitDiagnostic(arrayExpr->getStartLoc(), diag::should_use_dictionary_literal,
+                 toType, isIniting);
+
+  auto diagnostic =
+      emitDiagnostic(arrayExpr->getStartLoc(), diag::meant_dictionary_lit);
+
+  // Change every other comma into a colon, only if the number
+  // of commas present matches the number of elements, because
+  // otherwise it might a structural problem with the expression
+  // e.g. ["a""b": 1].
+  const auto commaLocs = arrayExpr->getCommaLocs();
+  if (commaLocs.size() == numElements - 1) {
+    for (unsigned i = 0, e = numElements / 2; i != e; ++i)
+      diagnostic.fixItReplace(commaLocs[i * 2], ":");
+  }
+
+  return true;
 }
 
 bool ContextualFailure::tryRawRepresentableFixIts(
@@ -3557,6 +3613,24 @@ bool ExtraneousReturnFailure::diagnoseAsError() {
 bool CollectionElementContextualFailure::diagnoseAsError() {
   auto *anchor = getAnchor();
   auto *locator = getLocator();
+
+  // Check whether this is situation like `let _: [String: Int] = ["A", 0]`
+  // which attempts to convert an array into a dictionary. We have a tailored
+  // contextual diagnostic for that, so no need to diagnose element mismatches
+  // as well.
+  auto &cs = getConstraintSystem();
+  auto *rawAnchor = getRawAnchor();
+  if (llvm::any_of(cs.getFixes(), [&](const ConstraintFix *fix) -> bool {
+        auto *locator = fix->getLocator();
+        if (!(fix->getKind() == FixKind::ContextualMismatch &&
+              locator->getAnchor() == rawAnchor))
+          return false;
+
+        auto *mismatch = static_cast<const ContextualMismatch *>(fix);
+        return isInvalidDictionaryConversion(cs, rawAnchor,
+                                             mismatch->getToType());
+      }))
+    return false;
 
   auto eltType = getFromType();
   auto contextualType = getToType();
