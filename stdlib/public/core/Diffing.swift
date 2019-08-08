@@ -15,8 +15,8 @@
 @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
 extension CollectionDifference {
   fileprivate func _fastEnumeratedApply(
-    _ consume: (Change) -> Void
-  ) {
+    _ consume: (Change) throws -> Void
+  ) rethrows {
     let totalRemoves = removals.count
     let totalInserts = insertions.count
     var enumeratedRemoves = 0
@@ -41,7 +41,7 @@ extension CollectionDifference {
         preconditionFailure()
       }
 
-      consume(change)
+      try consume(change)
 
       switch change {
       case .remove(_, _, _):
@@ -52,6 +52,9 @@ extension CollectionDifference {
     }
   }
 }
+
+// Error type allows the use of throw to unroll state on application failure
+fileprivate enum _ApplicationError : Error { case failed }
 
 extension RangeReplaceableCollection {
   /// Applies the given difference to this collection.
@@ -76,34 +79,44 @@ extension RangeReplaceableCollection {
       into target: inout Self,
       contentsOf source: Self,
       from index: inout Self.Index, count: Int
-    ) {
+    ) throws {
       let start = index
-      source.formIndex(&index, offsetBy: count)
+      if !source.formIndex(&index, offsetBy: count, limitedBy: source.endIndex) {
+        throw _ApplicationError.failed
+      }
       target.append(contentsOf: source[start..<index])
     }
 
-    difference._fastEnumeratedApply { change in
-      switch change {
-      case .remove(offset: let offset, element: _, associatedWith: _):
-        let origCount = offset - enumeratedOriginals
-        append(into: &result, contentsOf: self, from: &currentIndex, count: origCount)
-        enumeratedOriginals += origCount + 1 // Removal consumes an original element
-        currentIndex = self.index(after: currentIndex)
-        enumeratedRemoves += 1
-      case .insert(offset: let offset, element: let element, associatedWith: _):
-        let origCount = (offset + enumeratedRemoves - enumeratedInserts) - enumeratedOriginals
-        append(into: &result, contentsOf: self, from: &currentIndex, count: origCount)
-        result.append(element)
-        enumeratedOriginals += origCount
-        enumeratedInserts += 1
+    do {
+      try difference._fastEnumeratedApply { change in
+        switch change {
+        case .remove(offset: let offset, element: _, associatedWith: _):
+          let origCount = offset - enumeratedOriginals
+          try append(into: &result, contentsOf: self, from: &currentIndex, count: origCount)
+          if currentIndex == self.endIndex {
+            // Removing nonexistent element off the end of the collection
+            throw _ApplicationError.failed
+          }
+          enumeratedOriginals += origCount + 1 // Removal consumes an original element
+          currentIndex = self.index(after: currentIndex)
+          enumeratedRemoves += 1
+        case .insert(offset: let offset, element: let element, associatedWith: _):
+          let origCount = (offset + enumeratedRemoves - enumeratedInserts) - enumeratedOriginals
+          try append(into: &result, contentsOf: self, from: &currentIndex, count: origCount)
+          result.append(element)
+          enumeratedOriginals += origCount
+          enumeratedInserts += 1
+        }
+        _internalInvariant(enumeratedOriginals <= self.count)
       }
-      _internalInvariant(enumeratedOriginals <= self.count)
+      let origCount = self.count - enumeratedOriginals
+      try append(into: &result, contentsOf: self, from: &currentIndex, count: origCount)
+      _internalInvariant(enumeratedOriginals + origCount == self.count)
+    } catch {
+      return nil
     }
-    let origCount = self.count - enumeratedOriginals
-    append(into: &result, contentsOf: self, from: &currentIndex, count: origCount)
 
     _internalInvariant(currentIndex == self.endIndex)
-    _internalInvariant(enumeratedOriginals + origCount == self.count)
     _internalInvariant(result.count == self.count + enumeratedInserts - enumeratedRemoves)
     return result
   }
