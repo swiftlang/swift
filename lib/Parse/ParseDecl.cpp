@@ -3143,10 +3143,7 @@ Parser::parseDecl(ParseDeclOptions Flags,
   if (auto SF = CurDeclContext->getParentSourceFile()) {
     if (!getScopeInfo().isInactiveConfigBlock()) {
       for (auto Attr : Attributes) {
-        if (isa<ObjCAttr>(Attr) ||
-            /* Pre Swift 5 dymamic implied @objc */
-            (!Context.LangOpts.isSwiftVersionAtLeast(5) &&
-             isa<DynamicAttr>(Attr)))
+        if (isa<ObjCAttr>(Attr))
           SF->AttrsRequiringFoundation.insert(Attr);
       }
     }
