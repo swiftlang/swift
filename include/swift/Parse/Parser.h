@@ -973,6 +973,9 @@ public:
   ParserResult<TransposingAttr> parseTransposingAttribute(SourceLoc AtLoc,
                                                           SourceLoc Loc);
 
+  /// Parse the @quoted attribute.
+  ParserResult<QuotedAttr> parseQuotedAttribute(SourceLoc AtLoc, SourceLoc Loc);
+
   /// Parse a specific attribute.
   ParserStatus parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc);
 
@@ -1463,6 +1466,8 @@ public:
   /// \param LK The literal kind as determined by the first token.
   ParserResult<Expr> parseExprObjectLiteral(ObjectLiteralExpr::LiteralKind LK,
                                             bool isExprBasic);
+  ParserResult<Expr> parseExprQuoteLiteral();
+  ParserResult<Expr> parseExprUnquote();
   ParserResult<Expr> parseExprCallSuffix(ParserResult<Expr> fn,
                                          bool isExprBasic);
   ParserResult<Expr> parseExprCollection();

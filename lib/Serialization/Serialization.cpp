@@ -2586,6 +2586,16 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       S.writeGenericRequirements(attr->getRequirements(), S.DeclTypeAbbrCodes);
       return;
     }
+
+    case DAK_Quoted: {
+      auto abbrCode = S.DeclTypeAbbrCodes[QuotedDeclAttrLayout::Code];
+      auto attr = cast<QuotedAttr>(DA);
+      assert(attr->getQuoteDecl());
+      QuotedDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                       attr->isImplicit(),
+                                       S.addDeclRef(attr->getQuoteDecl()));
+      return;
+    }
     }
   }
 

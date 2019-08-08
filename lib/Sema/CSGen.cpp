@@ -1278,6 +1278,23 @@ namespace {
       return result;
     }
 
+    Type visitQuoteLiteralExpr(QuoteLiteralExpr *expr) {
+      auto &tc = CS.getTypeChecker();
+      auto subExprType = CS.getType(expr->getSubExpr());
+      return tc.getTypeOfQuoteExpr(subExprType, expr->getLoc());
+    }
+
+    Type visitUnquoteExpr(UnquoteExpr *expr) {
+      auto &tc = CS.getTypeChecker();
+      auto subExprType = CS.getType(expr->getSubExpr());
+      return tc.getTypeOfUnquoteExpr(subExprType, expr->getLoc());
+    }
+
+    Type visitDeclQuoteExpr(DeclQuoteExpr *expr) {
+      auto &tc = CS.getTypeChecker();
+      return tc.getTypeOfQuoteDecl(expr->getLoc());
+    }
+
     Type visitDeclRefExpr(DeclRefExpr *E) {
       // If this is a ParamDecl for a closure argument that has an Unresolved
       // type, then this is a situation where CSDiags is trying to perform

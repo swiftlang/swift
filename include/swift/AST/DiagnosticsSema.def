@@ -3078,6 +3078,22 @@ ERROR(interpolation_broken_proto,none,
 ERROR(object_literal_broken_proto,none,
       "object literal protocol is broken", ())
 
+ERROR(quote_literal_no_function_quote_class,none,
+      "cannot expand quote literal: Quote.FunctionQuote%0 not found", (int))
+ERROR(quote_literal_no_quote_class,none,
+      "cannot expand quote literal: Quote.Quote not found", ())
+ERROR(quote_literal_no_quote_module,none,
+      "cannot expand quote literal: Quote not imported", ())
+ERROR(quote_literal_no_tree_proto,none,
+      "cannot expand quote literal: Quote.Tree not found", ())
+WARNING(quote_literal_unsupported_brief,none,
+      "unsupported code snippet", ())
+WARNING(quote_literal_unsupported_detailed,none,
+      "unsupported code snippet\n%0", (StringRef))
+
+ERROR(unquote_wrong_type,none,
+      "can only unquote expressions of type Quote and FunctionQuoteN", ())
+
 ERROR(discard_expr_outside_of_assignment,none,
       "'_' can only appear in a pattern or on the left side of an assignment",
       ())

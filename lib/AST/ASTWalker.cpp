@@ -492,6 +492,35 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return E;
   }
 
+  Expr *visitQuoteLiteralExpr(QuoteLiteralExpr *E) {
+    HANDLE_SEMANTIC_EXPR(E);
+
+    if (Expr *subExpr = E->getSubExpr()) {
+      if (Expr *subExpr2 = doIt(subExpr)) {
+        E->setSubExpr(subExpr2);
+      } else {
+        return nullptr;
+      }
+    }
+    return E;
+  }
+
+  Expr *visitUnquoteExpr(UnquoteExpr *E) {
+    if (Expr *subExpr = E->getSubExpr()) {
+      if (Expr *subExpr2 = doIt(subExpr)) {
+        E->setSubExpr(subExpr2);
+      } else {
+        return nullptr;
+      }
+    }
+    return E;
+  }
+
+  Expr *visitDeclQuoteExpr(DeclQuoteExpr *E) {
+    HANDLE_SEMANTIC_EXPR(E);
+    return E;
+  }
+
   Expr *visitCollectionExpr(CollectionExpr *E) {
     for (auto &elt : E->getElements())
       if (Expr *Sub = doIt(elt))

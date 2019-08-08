@@ -327,6 +327,9 @@ namespace swift {
     /// set to true.
     bool ExperimentalDependenciesIncludeIntrafileOnes = false;
 
+    /// Whether to enable #quote, #unquote and @quoted.
+    bool EnableExperimentalQuasiquotes = false;
+
     /// Sets the target we are building for and updates platform conditions
     /// to match.
     ///

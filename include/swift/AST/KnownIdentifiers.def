@@ -224,6 +224,9 @@ IDENTIFIER_(nsError)
 // Custom string interpolation type used by os log APIs.
 IDENTIFIER(OSLogMessage)
 
+// Module that supports #quote(...) literals.
+IDENTIFIER(Quote)
+
 #undef IDENTIFIER
 #undef IDENTIFIER_
 #undef IDENTIFIER_WITH_NAME

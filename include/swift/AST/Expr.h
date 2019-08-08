@@ -1225,6 +1225,104 @@ public:
   }
 };
 
+/// QuoteLiteralExpr - An expression that produces an abstract syntax tree
+/// that represents its argument.
+///
+/// Examples:
+///   #quote(foo + bar)
+///   #quote{ foo + bar }
+class QuoteLiteralExpr : public LiteralExpr {
+private:
+  SourceLoc PoundLoc;
+  Expr *SubExpr;
+  Expr *SemanticExpr;
+
+public:
+  static QuoteLiteralExpr *create(ASTContext &ctx, SourceLoc poundLoc,
+                                  Expr *subExpr);
+
+  Expr *getSubExpr() const { return SubExpr; }
+  void setSubExpr(Expr *subExpr) { SubExpr = subExpr; }
+
+  Expr *getSemanticExpr() const { return SemanticExpr; }
+  void setSemanticExpr(Expr *semanticExpr) { SemanticExpr = semanticExpr; }
+
+  SourceLoc getSourceLoc() const { return PoundLoc; }
+  SourceRange getSourceRange() const {
+    return SourceRange(PoundLoc, SubExpr->getEndLoc());
+  }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::QuoteLiteral;
+  }
+
+private:
+  explicit QuoteLiteralExpr(SourceLoc poundLoc, Expr *subExpr);
+};
+
+/// UnquoteExpr - An expression that shields an expression from being quoted
+/// when used inside #quote(...)
+///
+/// Examples:
+///   #quote(foo + #unquote(bar))
+class UnquoteExpr : public Expr {
+private:
+  SourceLoc PoundLoc;
+  Expr *SubExpr;
+
+public:
+  static UnquoteExpr *create(ASTContext &ctx, SourceLoc poundLoc,
+                             Expr *subExpr);
+
+  Expr *getSubExpr() const { return SubExpr; }
+  void setSubExpr(Expr *subExpr) { SubExpr = subExpr; }
+
+  SourceLoc getSourceLoc() const { return PoundLoc; }
+  SourceRange getSourceRange() const {
+    return SourceRange(PoundLoc, SubExpr->getEndLoc());
+  }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::Unquote;
+  }
+
+private:
+  explicit UnquoteExpr(SourceLoc poundLoc, Expr *subExpr);
+};
+
+/// DeclQuoteExpr - An expression that produces an abstract syntax tree
+/// that represents the underlying declaration.
+///
+/// This expression does not have Swift syntax and is only used to represent
+/// bodies of quote decls generated for @quoted declarations. See documentation
+/// for QuoteAttr for details.
+class DeclQuoteExpr : public Expr {
+private:
+  ValueDecl *QuotedDecl;
+  Expr *SemanticExpr;
+
+public:
+  static DeclQuoteExpr *create(ASTContext &ctx, ValueDecl *quotedDecl);
+
+  ValueDecl *getQuotedDecl() const { return QuotedDecl; }
+  void setQuotedDecl(ValueDecl *quotedDecl) { QuotedDecl = quotedDecl; }
+
+  Expr *getSemanticExpr() const { return SemanticExpr; }
+  void setSemanticExpr(Expr *semanticExpr) { SemanticExpr = semanticExpr; }
+
+  SourceLoc getSourceLoc() const { return SourceLoc(); }
+  SourceRange getSourceRange() const {
+    return SourceRange(SourceLoc(), SourceLoc());
+  }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::DeclQuote;
+  }
+
+private:
+  explicit DeclQuoteExpr(ValueDecl *quotedDecl);
+};
+
 /// DiscardAssignmentExpr - A '_' in the left-hand side of an assignment, which
 /// discards the corresponding tuple element on the right-hand side.
 class DiscardAssignmentExpr : public Expr {

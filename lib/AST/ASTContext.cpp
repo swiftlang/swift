@@ -192,6 +192,13 @@ struct ASTContext::Implementation {
   /// The declaration of TensorFlow.TensorDataType.
   StructDecl *TensorDataTypeDecl = nullptr;
 
+  /// The declaration of Quote.Tree.
+  ProtocolDecl *TreeDecl = nullptr;
+  /// The declaration of Quote.Quote.
+  ClassDecl *QuoteDecl = nullptr;
+  /// The declarations of Quote.FunctionQuoteN.
+  SmallVector<ClassDecl *, 16> FunctionQuoteDecls;
+
 #define KNOWN_STDLIB_TYPE_DECL(NAME, DECL_CLASS, NUM_GENERIC_PARAMS) \
   /** The declaration of Swift.NAME. */ \
   DECL_CLASS *NAME##Decl = nullptr;
@@ -920,6 +927,85 @@ StructDecl *ASTContext::getTensorDataTypeDecl() const {
   return nullptr;
 }
 
+/// Retrieve the decl for the Quote module iff it has been imported.
+/// Otherwise, this returns null.
+ModuleDecl *ASTContext::getQuoteModule() const {
+  return getLoadedModule(Id_Quote);
+}
+
+/// Retrieve the decl for Quote.Tree iff the Quote module has been imported.
+/// Otherwise, this returns null.
+ProtocolDecl *ASTContext::getTreeDecl() const {
+  if (getImpl().TreeDecl)
+    return getImpl().TreeDecl;
+
+  auto quoteModule = getLoadedModule(Id_Quote);
+  if (!quoteModule)
+    return nullptr;
+
+  SmallVector<ValueDecl *, 1> results;
+  quoteModule->lookupValue({}, getIdentifier("Tree"), NLKind::UnqualifiedLookup,
+                           results);
+
+  for (auto result : results)
+    if (auto CD = dyn_cast<ProtocolDecl>(result))
+      return getImpl().TreeDecl = CD;
+  return nullptr;
+}
+
+/// Retrieve the decl for Quote.Quote iff the Quote module has been imported.
+/// Otherwise, this returns null.
+ClassDecl *ASTContext::getQuoteDecl() const {
+  if (getImpl().QuoteDecl)
+    return getImpl().QuoteDecl;
+
+  auto quoteModule = getLoadedModule(Id_Quote);
+  if (!quoteModule)
+    return nullptr;
+
+  SmallVector<ValueDecl *, 1> results;
+  quoteModule->lookupValue({}, getIdentifier("Quote"),
+                           NLKind::UnqualifiedLookup, results);
+
+  for (auto result : results)
+    if (auto CD = dyn_cast<ClassDecl>(result))
+      return getImpl().QuoteDecl = CD;
+  return nullptr;
+}
+
+/// Retrieve the decl for Quote.FunctionQuoteN iff the Quote module has been
+/// imported. Otherwise, this returns null.
+ClassDecl *ASTContext::getFunctionQuoteDecl(unsigned n) const {
+  auto cache = getImpl().FunctionQuoteDecls;
+  if (cache.size() == 0) {
+    auto quoteModule = getLoadedModule(Id_Quote);
+    if (!quoteModule)
+      return nullptr;
+
+    for (auto i = 0; i < 16; ++i) {
+      llvm::SmallString<16> SS;
+      llvm::raw_svector_ostream OS(SS);
+      OS << "FunctionQuote" << n;
+      auto id = getIdentifier(SS);
+
+      SmallVector<ValueDecl *, 1> results;
+      quoteModule->lookupValue({}, id, NLKind::UnqualifiedLookup, results);
+
+      for (auto result : results) {
+        if (auto CD = dyn_cast<ClassDecl>(result)) {
+          cache.push_back(CD);
+          break;
+        }
+      }
+    }
+  }
+  if (n < cache.size()) {
+    return cache[n];
+  } else {
+    return nullptr;
+  }
+}
+
 CanType ASTContext::getNeverType() const {
   auto neverDecl = getNeverDecl();
   if (!neverDecl)
@@ -999,6 +1085,9 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   case KnownProtocolKind::TensorFlowDataTypeCompatible:
   case KnownProtocolKind::TensorProtocol:
     M = getLoadedModule(Id_TensorFlow);
+    break;
+  case KnownProtocolKind::Expression:
+    M = getLoadedModule(Id_Quote);
     break;
   default:
     M = getStdlibModule();

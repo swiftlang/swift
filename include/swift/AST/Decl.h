@@ -6279,8 +6279,9 @@ AbstractStorageDecl::AccessorRecord::getAccessor(AccessorKind kind) const {
   
 /// This represents a 'case' declaration in an 'enum', which may declare
 /// one or more individual comma-separated EnumElementDecls.
-class EnumCaseDecl final : public Decl,
-    private llvm::TrailingObjects<EnumCaseDecl, EnumElementDecl *> {
+class EnumCaseDecl final
+    : public Decl,
+      private llvm::TrailingObjects<EnumCaseDecl, EnumElementDecl *> {
   friend TrailingObjects;
   SourceLoc CaseLoc;
   
