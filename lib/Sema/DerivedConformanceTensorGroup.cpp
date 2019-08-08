@@ -140,7 +140,7 @@ static ValueDecl *deriveTensorGroup_typeList(DerivedConformance &derived) {
   auto *getterDecl = derived.addGetterToReadOnlyDerivedProperty(
       typeListDecl, returnType);
   getterDecl->setBodySynthesizer(deriveBodyTensorGroup_typeList, nullptr);
-  derived.addMembersToConformanceContext({getterDecl, typeListDecl, patDecl});
+  derived.addMembersToConformanceContext({typeListDecl, patDecl});
 
   return typeListDecl;
 }

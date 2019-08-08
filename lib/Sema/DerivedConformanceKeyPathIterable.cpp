@@ -146,7 +146,7 @@ deriveKeyPathIterable_allKeyPaths(DerivedConformance &derived) {
       allKeyPathsDecl, returnTy);
   getterDecl->setBodySynthesizer(
       deriveBodyKeyPathIterable_allKeyPaths, nullptr);
-  derived.addMembersToConformanceContext({getterDecl, allKeyPathsDecl, pbDecl});
+  derived.addMembersToConformanceContext({allKeyPathsDecl, pbDecl});
 
   return allKeyPathsDecl;
 }
