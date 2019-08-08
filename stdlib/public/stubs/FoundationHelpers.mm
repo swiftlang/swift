@@ -30,13 +30,8 @@ template <class FromTy> struct DestType;
 #define BRIDGE_TYPE(FROM, TO) \
 template <> struct DestType<FROM> { using type = TO; }
 
-BRIDGE_TYPE(_swift_shims_CFAllocatorRef, CFAllocatorRef);
 BRIDGE_TYPE(_swift_shims_CFStringRef, CFStringRef);
-BRIDGE_TYPE(_swift_shims_UniChar *, UniChar *);
 BRIDGE_TYPE(_swift_shims_CFStringEncoding, CFStringEncoding);
-BRIDGE_TYPE(_swift_shims_CFStringCompareFlags, CFStringCompareFlags);
-BRIDGE_TYPE(_swift_shims_CFRange *, CFRange *);
-BRIDGE_TYPE(CFComparisonResult, _swift_shims_CFComparisonResult);
 BRIDGE_TYPE(CFStringRef, _swift_shims_CFStringRef);
 
 template <class FromTy>
@@ -60,11 +55,6 @@ swift::_swift_stdlib_CFStringCreateWithBytes(
   return cast(CFStringCreateWithBytes(kCFAllocatorSystemDefault, bytes, numBytes,
                                       cast(encoding),
                                       isExternalRepresentation));
-}
-
-_swift_shims_CFStringRef
-swift::_swift_stdlib_objcDebugDescription(id _Nonnull nsObject) {
-  return [nsObject debugDescription];
 }
 
 extern "C" CFHashCode CFStringHashCString(const uint8_t *bytes, CFIndex len);
