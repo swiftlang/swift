@@ -531,28 +531,13 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &s,
   return s;
 }
 
-/// The kind of an associated function.
-struct AutoDiffAssociatedFunctionKind {
-  enum innerty : uint8_t {
-     // The Jacobian-vector products function.
-     JVP = 0,
-     // The vector-Jacobian products function.
-     VJP = 1
-  } rawValue;
-
-  AutoDiffAssociatedFunctionKind() = default;
-  AutoDiffAssociatedFunctionKind(innerty rawValue) : rawValue(rawValue) {}
-  explicit AutoDiffAssociatedFunctionKind(StringRef string);
-  operator innerty() const { return rawValue; }
-};
-
 /// The kind of an linear map.
 struct AutoDiffLinearMapKind {
   enum innerty : uint8_t {
-     // The differential function.
-     Differential = 0,
-     // The pullback function.
-     Pullback = 1
+    // The differential function.
+    Differential = 0,
+    // The pullback function.
+    Pullback = 1
   } rawValue;
 
   AutoDiffLinearMapKind() = default;
@@ -560,8 +545,26 @@ struct AutoDiffLinearMapKind {
   operator innerty() const { return rawValue; }
 };
 
-/// In conjunction with the original function decl, identifies an associated
-/// autodiff function.
+/// The kind of an associated function.
+struct AutoDiffAssociatedFunctionKind {
+  enum innerty : uint8_t {
+   // The Jacobian-vector products function.
+   JVP = 0,
+   // The vector-Jacobian products function.
+   VJP = 1
+  } rawValue;
+
+  AutoDiffAssociatedFunctionKind() = default;
+  AutoDiffAssociatedFunctionKind(innerty rawValue) : rawValue(rawValue) {}
+  explicit AutoDiffAssociatedFunctionKind(StringRef string);
+  operator innerty() const { return rawValue; }
+  AutoDiffLinearMapKind getLinearMapKind() {
+    return (AutoDiffLinearMapKind::innerty)rawValue;
+  }
+};
+
+/// In conjunction with the original function declaration, identifies an
+/// autodiff associated function.
 ///
 /// Is uniquely allocated within an ASTContext so that it can be hashed and
 /// compared by opaque pointer value.
