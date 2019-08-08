@@ -299,11 +299,11 @@ void TBDGenVisitor::visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
     auto *jvpId = AutoDiffAssociatedFunctionIdentifier::get(
         AutoDiffAssociatedFunctionKind::JVP, /*differentiationOrder*/ 1,
         DA->getParameterIndices(), ASD->getASTContext());
-    addSymbol(SILDeclRef(ASD->getGetter()).asAutoDiffAssociatedFunction(jvpId));
+    addSymbol(SILDeclRef(ASD->getAccessor(AccessorKind::Get)).asAutoDiffAssociatedFunction(jvpId));
     auto *vjpId = AutoDiffAssociatedFunctionIdentifier::get(
         AutoDiffAssociatedFunctionKind::VJP, /*differentiationOrder*/ 1,
         DA->getParameterIndices(), ASD->getASTContext());
-    addSymbol(SILDeclRef(ASD->getGetter()).asAutoDiffAssociatedFunction(vjpId));
+    addSymbol(SILDeclRef(ASD->getAccessor(AccessorKind::Get)).asAutoDiffAssociatedFunction(vjpId));
   }
 
   // Explicitly look at each accessor here: see visitAccessorDecl.

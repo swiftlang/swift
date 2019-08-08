@@ -466,7 +466,7 @@ static void printDifferentiableAttrArguments(
   auto *original = dyn_cast_or_null<AbstractFunctionDecl>(D);
   // Handle stored/computed properties and subscript methods.
   if (auto *asd = dyn_cast_or_null<AbstractStorageDecl>(D))
-    original = asd->getGetter();
+    original = asd->getAccessor(AccessorKind::Get);
 
   // Print comma if not leading clause.
   bool isLeadingClause = true;

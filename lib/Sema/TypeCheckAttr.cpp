@@ -3179,7 +3179,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     // TODO(TF-129): Infer setter to also be `@differentiable` after
     // differentiation supports inout parameters. This requires refactoring to
     // handle multiple `original` functions (both getter and setter).
-    original = asd->getGetter();
+    original = asd->getAccessor(AccessorKind::Get);
   }
   // Setters are not yet supported.
   // TODO(TF-129): Remove this when differentiation supports inout parameters.
@@ -3458,7 +3458,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     newAttr->setJVPFunction(attr->getJVPFunction());
     newAttr->setVJPFunction(attr->getVJPFunction());
     auto insertion = ctx.DifferentiableAttrs.try_emplace(
-        {asd->getGetter(), newAttr->getParameterIndices()}, newAttr);
+        {asd->getAccessor(AccessorKind::Get), newAttr->getParameterIndices()}, newAttr);
     // Valid `@differentiable` attributes are uniqued by their parameter
     // indices. Reject duplicate attributes for the same decl and parameter
     // indices pair.
@@ -3468,7 +3468,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
                   diag::differentiable_attr_duplicate_note);
       return;
     }
-    asd->getGetter()->getAttrs().add(newAttr);
+    asd->getAccessor(AccessorKind::Get)->getAttrs().add(newAttr);
     return;
   }
   auto insertion = ctx.DifferentiableAttrs.try_emplace(
