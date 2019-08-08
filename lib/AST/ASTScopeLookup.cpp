@@ -62,7 +62,7 @@ const ASTScopeImpl *ASTScopeImpl::findStartingScopeForLookup(
   if (name.isOperator())
     return fileScope; // operators always at file scope
 
-  const auto innermost = fileScope->findInnermostEnclosingScope(loc);
+  const auto innermost = fileScope->findInnermostEnclosingScope(loc, nullptr);
 
   // The legacy lookup code gets passed both a SourceLoc and a starting context.
   // However, our ultimate intent is for clients to not have to pass in a
@@ -93,6 +93,8 @@ const ASTScopeImpl *ASTScopeImpl::findStartingScopeForLookup(
     //    llvm::errs() << "in: \n";
     //    fileScope->dump();
     llvm::errs() << "\n\n";
+
+    assert(fileScope->crossCheckWithAST());
   }
 
   assert(startingScope && "ASTScopeImpl: could not find startingScope");
@@ -100,17 +102,30 @@ const ASTScopeImpl *ASTScopeImpl::findStartingScopeForLookup(
 }
 
 const ASTScopeImpl *
-ASTScopeImpl::findInnermostEnclosingScope(SourceLoc loc) const {
-  SourceManager &sourceMgr = getSourceManager();
-
-  const auto *s = this;
-  for (NullablePtr<const ASTScopeImpl> c;
-       (c = s->findChildContaining(loc, sourceMgr)); s = c.get()) {
-  }
-  return s;
+ASTScopeImpl::findInnermostEnclosingScope(SourceLoc loc,
+                                          NullablePtr<raw_ostream> os) {
+  return findInnermostEnclosingScopeImpl(loc, os, getSourceManager(),
+                                         getScopeCreator());
 }
 
-NullablePtr<const ASTScopeImpl>
+const ASTScopeImpl *ASTScopeImpl::findInnermostEnclosingScopeImpl(
+    SourceLoc loc, NullablePtr<raw_ostream> os, SourceManager &sourceMgr,
+    ScopeCreator &scopeCreator) {
+  reexpandIfObsolete(scopeCreator);
+  auto child = findChildContaining(loc, sourceMgr);
+  if (!child)
+    return this;
+  return child.get()->findInnermostEnclosingScopeImpl(loc, os, sourceMgr,
+                                                      scopeCreator);
+}
+
+bool ASTScopeImpl::checkChildlessSourceRange() const {
+  const auto r = getChildlessSourceRange();
+  assert(!getSourceManager().isBeforeInBuffer(r.End, r.Start));
+  return true;
+}
+
+NullablePtr<ASTScopeImpl>
 ASTScopeImpl::findChildContaining(SourceLoc loc,
                                   SourceManager &sourceMgr) const {
   // Use binary search to find the child that contains this location.
@@ -118,9 +133,11 @@ ASTScopeImpl::findChildContaining(SourceLoc loc,
     SourceManager &sourceMgr;
 
     bool operator()(const ASTScopeImpl *scope, SourceLoc loc) {
+      assert(scope->checkChildlessSourceRange());
       return sourceMgr.isBeforeInBuffer(scope->getSourceRange().End, loc);
     }
     bool operator()(SourceLoc loc, const ASTScopeImpl *scope) {
+      assert(scope->checkChildlessSourceRange());
       return sourceMgr.isBeforeInBuffer(loc, scope->getSourceRange().End);
     }
   };
@@ -322,8 +339,8 @@ bool GenericParamScope::lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
   return consumer.consume({param}, DeclVisibilityKind::GenericParameter);
 }
 
-bool PatternEntryUseScope::lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
-                                                 DeclConsumer consumer) const {
+bool PatternEntryDeclScope::lookupLocalsOrMembers(
+    ArrayRef<const ASTScopeImpl *>, DeclConsumer consumer) const {
   if (vis != DeclVisibilityKind::LocalVariable)
     return false; // look in self type will find this later
   return lookupLocalBindingsInPattern(getPattern(), vis, consumer);
@@ -407,9 +424,8 @@ bool BraceStmtScope::lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
   SmallVector<ValueDecl *, 32> localBindings;
   for (auto braceElement : stmt->getElements()) {
     if (auto localBinding = braceElement.dyn_cast<Decl *>()) {
-      if (isa<AbstractFunctionDecl>(localBinding) ||
-          isa<TypeDecl>(localBinding))
-        localBindings.push_back(cast<ValueDecl>(localBinding));
+      if (auto *vd = dyn_cast<ValueDecl>(localBinding))
+        localBindings.push_back(vd);
     }
   }
   return consumer.consume(localBindings, DeclVisibilityKind::LocalVariable);
@@ -542,7 +558,7 @@ NullablePtr<const ASTScopeImpl> ASTScopeImpl::ancestorWithDeclSatisfying(
     function_ref<bool(const Decl *)> predicate) const {
   for (NullablePtr<const ASTScopeImpl> s = getParent(); s;
        s = s.get()->getParent()) {
-    if (Decl *d = s.get()->getDecl().getPtrOrNull()) {
+    if (Decl *d = s.get()->getDeclIfAny().getPtrOrNull()) {
       if (predicate(d))
         return s;
     }
