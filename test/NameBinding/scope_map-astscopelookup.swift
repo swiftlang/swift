@@ -500,3 +500,6 @@ class LazyProperties {
 
 
 // CHECK-SEARCHES-NOT:  ***Complete scope map***
+
+// REQUIRES: asserts
+// absence of assertions can change the "uncached" bit and cause failures
