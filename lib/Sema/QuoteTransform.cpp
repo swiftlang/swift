@@ -600,6 +600,9 @@ public:
 
   Expr *visitInOutExpr(InOutExpr *expr) {
     Breadcrumb bc(bcs, expr);
+    // NOTE: If this expression is implicit, `expr` stands for a conversion that
+    // is sometimes emitted when inout parameters are used.
+    // Otherwise, `expr` stands for an in-out expression `&foo`.
     if (expr->isImplicit()) {
       return makeQuote("Conversion", {quoteExpr(expr->getSubExpr()),
                                       quoteType(expr->getType())});
