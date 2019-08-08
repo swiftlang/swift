@@ -323,24 +323,6 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
       TC.typeCheckAbstractFunctionBody(AFD);
     }
 
-    // Validate any referenced declarations for SIL's purposes.
-    // Note: if we ever start putting extension members in vtables, we'll need
-    // to validate those members too.
-    // FIXME: If we're not planning to run SILGen, this is wasted effort.
-    while (TC.NextDeclToFinalize < TC.DeclsToFinalize.size()) {
-      auto decl = TC.DeclsToFinalize[TC.NextDeclToFinalize++];
-      if (decl->isInvalid())
-        continue;
-
-      // If we've already encountered an error, don't finalize declarations
-      // from other source files.
-      if (TC.Context.hadError() &&
-          decl->getDeclContext()->getParentSourceFile() != &SF)
-        continue;
-
-      TC.finalizeDecl(decl);
-    }
-
     // Type check synthesized functions and their bodies.
     for (unsigned n = SF.SynthesizedDecls.size();
          currentSynthesizedDecl != n;
@@ -351,7 +333,6 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
 
   } while (currentFunctionIdx < TC.definedFunctions.size() ||
            currentSynthesizedDecl < SF.SynthesizedDecls.size() ||
-           TC.NextDeclToFinalize < TC.DeclsToFinalize.size() ||
            !TC.ConformanceContexts.empty());
 
   // FIXME: Horrible hack. Store this somewhere more appropriate.

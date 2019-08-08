@@ -2763,14 +2763,11 @@ public:
 
 
   void visitClassDecl(ClassDecl *CD) {
-    TC.DeclsToFinalize.insert(CD);
-
     TC.checkDeclAttributesEarly(CD);
 
     checkUnsupportedNestedType(CD);
 
     TC.validateDecl(CD);
-    TC.requestSuperclassLayout(CD);
     checkGenericParams(CD->getGenericParams(), CD, TC);
 
     {
@@ -2784,12 +2781,10 @@ public:
     // Force lowering of stored properties.
     (void) CD->getStoredProperties();
 
-    TC.addImplicitConstructors(CD);
-
     // Force creation of an implicit destructor, if any.
     (void) CD->getDestructor();
 
-    for (Decl *Member : CD->getMembers())
+    for (Decl *Member : CD->getEmittedMembers())
       visit(Member);
 
     TC.checkPatternBindingCaptures(CD);
@@ -3113,8 +3108,6 @@ public:
 
     if (auto nominal = ED->getExtendedNominal()) {
       TC.validateDecl(nominal);
-      if (auto *classDecl = dyn_cast<ClassDecl>(nominal))
-        TC.requestClassLayout(classDecl);
 
       // Check the raw values of an enum, since we might synthesize
       // RawRepresentable while checking conformances on this extension.
@@ -4199,39 +4192,20 @@ void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
   }
 }
 
-void TypeChecker::requestMemberLayout(ValueDecl *member) {
-  auto *dc = member->getDeclContext();
-  if (auto *classDecl = dyn_cast<ClassDecl>(dc))
-    requestClassLayout(classDecl);
-}
+llvm::Expected<DeclRange>
+EmittedMembersRequest::evaluate(Evaluator &evaluator,
+                                ClassDecl *CD) const {
+  if (!CD->getParentSourceFile())
+    return CD->getMembers();
 
-void TypeChecker::requestClassLayout(ClassDecl *classDecl) {
-  if (isa<SourceFile>(classDecl->getModuleScopeContext()))
-    DeclsToFinalize.insert(classDecl);
-}
+  auto &Context = CD->getASTContext();
 
-void TypeChecker::requestSuperclassLayout(ClassDecl *classDecl) {
-  if (auto *superclassDecl = classDecl->getSuperclassDecl()) {
-    if (superclassDecl)
-      requestClassLayout(superclassDecl);
-  }
-}
-
-void TypeChecker::finalizeDecl(ClassDecl *CD) {
-  if (Context.Stats)
-    Context.Stats->getFrontendCounters().NumDeclsFinalized++;
-
-  assert(!CD->hasClangNode());
-  assert(isa<SourceFile>(CD->getModuleScopeContext()));
-
-  validateDecl(CD);
+  // FIXME: Remove TypeChecker dependencies below
+  auto &TC = *(TypeChecker *) Context.getLazyResolver();
 
   // We need to add implicit initializers because they
   // affect vtable layout.
-  addImplicitConstructors(CD);
-
-  // We need the superclass vtable layout as well.
-  requestSuperclassLayout(CD);
+  TC.addImplicitConstructors(CD);
 
   auto forceConformance = [&](ProtocolDecl *protocol) {
     if (auto ref = TypeChecker::conformsToProtocol(
@@ -4241,7 +4215,7 @@ void TypeChecker::finalizeDecl(ClassDecl *CD) {
       auto conformance = ref->getConcrete();
       if (conformance->getDeclContext() == CD &&
           conformance->getState() == ProtocolConformanceState::Incomplete) {
-        checkConformance(conformance->getRootNormalConformance());
+        TC.checkConformance(conformance->getRootNormalConformance());
       }
     }
   };
@@ -4254,6 +4228,8 @@ void TypeChecker::finalizeDecl(ClassDecl *CD) {
   forceConformance(Context.getProtocol(KnownProtocolKind::Decodable));
   forceConformance(Context.getProtocol(KnownProtocolKind::Encodable));
   forceConformance(Context.getProtocol(KnownProtocolKind::Hashable));
+
+  return CD->getMembers();
 }
 
 /// Determine whether this is a "pass-through" typealias, which has the

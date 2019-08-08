@@ -756,8 +756,6 @@ namespace {
             memberLocator);
       auto memberRef = ConcreteDeclRef(member, substitutions);
 
-      cs.TC.requestMemberLayout(member);
-
       auto refTy = solution.simplifyType(openedFullType);
 
       // If we're referring to the member of a module, it's just a simple
@@ -1331,7 +1329,6 @@ namespace {
       }
       
       auto subscript = cast<SubscriptDecl>(choice.getDecl());
-      cs.TC.requestMemberLayout(subscript);
 
       auto &tc = cs.getTypeChecker();
       auto baseTy = cs.getType(base)->getRValueType();
@@ -1480,8 +1477,6 @@ namespace {
         solution.computeSubstitutions(ctor->getGenericSignature(), locator);
 
       auto ref = ConcreteDeclRef(ctor, substitutions);
-
-      tc.requestMemberLayout(ctor);
 
       // The constructor was opened with the allocating type, not the
       // initializer type. Map the former into the latter.
@@ -4524,8 +4519,6 @@ namespace {
         // There is a fix which diagnoses such situation already.
         assert(!varDecl->isStatic());
 
-        cs.TC.requestMemberLayout(property);
-
         auto dc = property->getInnermostDeclContext();
 
         // Compute substitutions to refer to the member.
@@ -4554,8 +4547,6 @@ namespace {
         ArrayRef<Identifier> labels, ConstraintLocator *locator) {
       auto subscript = cast<SubscriptDecl>(overload.choice.getDecl());
       assert(!subscript->isGetterMutating());
-
-      cs.TC.requestMemberLayout(subscript);
 
       auto dc = subscript->getInnermostDeclContext();
 
@@ -7410,10 +7401,6 @@ namespace {
         auto fnType = cs.getType(closure)->castTo<FunctionType>();
         auto *params = closure->getParameters();
         tc.coerceParameterListToType(params, closure, fnType);
-
-        // Require layout of dependent types that could be used to materialize
-        // metadata types/conformances during IRGen.
-        tc.requestRequiredNominalTypeLayoutForParameters(params);
 
         // If this closure had a function builder applied, rewrite it to a
         // closure with a single expression body containing the builder
