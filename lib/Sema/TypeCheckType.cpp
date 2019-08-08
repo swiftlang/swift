@@ -928,19 +928,18 @@ static void maybeDiagnoseBadConformanceRef(DeclContext *dc,
                                            SourceLoc loc,
                                            TypeDecl *typeDecl) {
   auto protocol = dyn_cast<ProtocolDecl>(typeDecl->getDeclContext());
-  if (!protocol)
-    return;
 
   // If we weren't given a conformance, go look it up.
   ProtocolConformance *conformance = nullptr;
-  if (auto conformanceRef = TypeChecker::conformsToProtocol(
-          parentTy, protocol, dc,
-          (ConformanceCheckFlags::InExpression |
-           ConformanceCheckFlags::SuppressDependencyTracking |
-           ConformanceCheckFlags::SkipConditionalRequirements))) {
-    if (conformanceRef->isConcrete())
-      conformance = conformanceRef->getConcrete();
-  }
+  if (protocol)
+    if (auto conformanceRef = TypeChecker::conformsToProtocol(
+            parentTy, protocol, dc,
+            (ConformanceCheckFlags::InExpression |
+             ConformanceCheckFlags::SuppressDependencyTracking |
+             ConformanceCheckFlags::SkipConditionalRequirements))) {
+      if (conformanceRef->isConcrete())
+        conformance = conformanceRef->getConcrete();
+    }
 
   // If any errors have occurred, don't bother diagnosing this cross-file
   // issue.
@@ -949,7 +948,7 @@ static void maybeDiagnoseBadConformanceRef(DeclContext *dc,
     return;
 
   auto diagCode =
-      (conformance && !conformance->getConditionalRequirementsIfAvailable())
+    (!protocol || (conformance && !conformance->getConditionalRequirementsIfAvailable()))
           ? diag::unsupported_recursion_in_associated_type_reference
           : diag::broken_associated_type_witness;
 
