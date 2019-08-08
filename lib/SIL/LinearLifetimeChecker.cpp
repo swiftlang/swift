@@ -205,8 +205,11 @@ void State::initializeConsumingUse(BranchPropagatedUser consumingUser,
   error.handleOverConsume([&] {
     llvm::errs() << "Function: '" << value->getFunction()->getName() << "'\n"
                  << "Found over consume?!\n"
-                 << "Value: " << *value << "User: " << *consumingUser
-                 << "Block: bb" << userBlock->getDebugID() << "\n\n";
+                 << "Value:\n";
+    value->printInContext(llvm::errs());
+    llvm::errs() << *value << "User:\n";
+    consumingUser.getInst()->printInContext(llvm::errs());
+    llvm::errs() << "Block: bb" << userBlock->getDebugID() << "\n\n";
   });
 }
 
@@ -230,10 +233,13 @@ void State::checkForSameBlockUseAfterFree(BranchPropagatedUser consumingUser,
     error.handleUseAfterFree([&]() {
       llvm::errs() << "Function: '" << value->getFunction()->getName() << "'\n"
                    << "Found use after free?!\n"
-                   << "Value: " << *value
-                   << "Consuming User: " << *consumingUser
-                   << "Non Consuming User: " << *iter->second << "Block: bb"
-                   << userBlock->getDebugID() << "\n\n";
+                   << "Value:\n";
+      value->printInContext(llvm::errs());
+      llvm::errs() << "Consuming User:\n";
+      consumingUser.getInst()->printInContext(llvm::errs());
+      llvm::errs() << "Non Consuming User:\n";
+      iter->second.getInst()->printInContext(llvm::errs());
+      llvm::errs() << "Block: bb" << userBlock->getDebugID() << "\n\n";
     });
     return;
   }
@@ -257,9 +263,11 @@ void State::checkForSameBlockUseAfterFree(BranchPropagatedUser consumingUser,
     error.handleUseAfterFree([&] {
       llvm::errs() << "Function: '" << value->getFunction()->getName() << "'\n"
                    << "Found use after free?!\n"
-                   << "Value: " << *value
-                   << "Consuming User: " << *consumingUser
-                   << "Non Consuming User: " << *iter->second << "Block: bb"
+                   << "Value:\n";
+      value->printInContext(llvm::errs());
+      llvm::errs() << "Consuming User: ";
+      consumingUser.getInst()->printInContext(llvm::errs());
+      llvm::errs() << "Non Consuming User: " << *iter->second << "Block: bb"
                    << userBlock->getDebugID() << "\n\n";
     });
     return;
@@ -289,8 +297,11 @@ void State::checkPredsForDoubleConsume(BranchPropagatedUser consumingUser,
   error.handleOverConsume([&] {
     llvm::errs() << "Function: '" << value->getFunction()->getName() << "'\n"
                  << "Found over consume?!\n"
-                 << "Value: " << *value << "User: " << *consumingUser
-                 << "Block: bb" << userBlock->getDebugID() << "\n\n";
+                 << "Value:\n";
+    value->printInContext(llvm::errs());
+    llvm::errs() << "User:\n";
+    consumingUser.getInst()->printInContext(llvm::errs());
+    llvm::errs() << "Block: bb" << userBlock->getDebugID() << "\n\n";
   });
 }
 
@@ -312,8 +323,9 @@ void State::checkPredsForDoubleConsume(SILBasicBlock *userBlock) {
   error.handleOverConsume([&] {
     llvm::errs() << "Function: '" << value->getFunction()->getName() << "'\n"
                  << "Found over consume?!\n"
-                 << "Value: " << *value << "Block: bb"
-                 << userBlock->getDebugID() << "\n\n";
+                 << "Value:\n";
+    value->printInContext(llvm::errs());
+    llvm::errs() << "Block: bb" << userBlock->getDebugID() << "\n\n";
   });
 }
 
@@ -408,8 +420,9 @@ void State::checkDataflowEndState(DeadEndBlocks &deBlocks) {
       llvm::errs() << "Function: '" << value->getFunction()->getName() << "'\n"
                    << "Error! Found a leak due to a consuming post-dominance "
                       "failure!\n"
-                   << "    Value: " << *value
-                   << "    Post Dominating Failure Blocks:\n";
+                   << "    Value:\n";
+      value->printInContext(llvm::errs());
+      llvm::errs() << "    Post Dominating Failure Blocks:\n";
       for (auto *succBlock : successorBlocksThatMustBeVisited) {
         llvm::errs() << "        bb" << succBlock->getDebugID();
       }
@@ -437,9 +450,13 @@ void State::checkDataflowEndState(DeadEndBlocks &deBlocks) {
       llvm::errs() << "Function: '" << value->getFunction()->getName() << "'\n"
                    << "Found use after free due to unvisited non lifetime "
                       "ending uses?!\n"
-                   << "Value: " << *value << "    Remaining Users:\n";
+                   << "Value:\n";
+      value->printInContext(llvm::errs());
+      llvm::errs() << "Remaining Users:\n";
       for (auto &pair : blocksWithNonConsumingUses) {
-        llvm::errs() << "User:" << *pair.second << "Block: bb"
+        llvm::errs() << "User:\n";
+        pair.second.getInst()->printInContext(llvm::errs());
+        llvm::errs() << "Block: bb"
                      << pair.first->getDebugID() << "\n";
       }
       llvm::errs() << "\n";
@@ -498,9 +515,12 @@ LinearLifetimeError swift::valueHasLinearLifetime(
                      << "'\n"
                      << "Found use after free due to unvisited non lifetime "
                         "ending uses?!\n"
-                     << "Value: " << *value << "    Remaining Users:\n";
+                     << "Value:\n";
+        value->printInContext(llvm::errs());
+        llvm::errs() << "Remaining Users:\n";
         for (const auto &user : nonConsumingUses) {
-          llvm::errs() << "User: " << *user.getInst();
+          llvm::errs() << "User:\n";
+          user.getInst()->printInContext(llvm::errs());
         }
         llvm::errs() << "\n";
       });
