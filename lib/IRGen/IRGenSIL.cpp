@@ -857,7 +857,7 @@ public:
   /// TODO: just make sure that we have a path to them that the debug info
   ///       can follow.
   void bindArchetypes(swift::Type Ty) {
-    auto runtimeTy = getRuntimeReifiedType(IGM, Ty->getCanonicalType());
+    auto runtimeTy = IGM.getRuntimeReifiedType(Ty->getCanonicalType());
     if (!IGM.IRGen.Opts.shouldOptimize() && runtimeTy->hasArchetype())
       runtimeTy.visit([&](CanType t) {
         if (auto archetype = dyn_cast<ArchetypeType>(t))

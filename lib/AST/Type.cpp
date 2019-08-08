@@ -2551,6 +2551,10 @@ bool ReplaceOpaqueTypesWithUnderlyingTypes::shouldPerformSubstitution(
     OpaqueTypeDecl *opaque, ModuleDecl *contextModule,
     ResilienceExpansion contextExpansion) {
   auto namingDecl = opaque->getNamingDecl();
+  
+  // Don't allow replacement if the naming decl is dynamically replaceable.
+  if (namingDecl && namingDecl->isDynamic())
+    return false;
 
   // Allow replacement of opaque result types of inlineable function regardless
   // of resilience and in which context.
