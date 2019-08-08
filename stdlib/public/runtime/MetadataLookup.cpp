@@ -32,6 +32,7 @@
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/ADT/TinyPtrVector.h"
 #include "Private.h"
 #include "CompatibilityOverride.h"
 #include "ImageInspection.h"
@@ -195,9 +196,19 @@ namespace {
   };
 } // end anonymous namespace
 
+llvm::hash_code llvm::hash_value(StringRef S) {
+  return hash_combine_range(S.begin(), S.end());
+}
+
 struct TypeMetadataPrivateState {
   ConcurrentMap<NominalTypeDescriptorCacheEntry> NominalCache;
   ConcurrentReadableArray<TypeMetadataSection> SectionsToScan;
+  
+  llvm::DenseMap<llvm::StringRef,
+                 llvm::TinyPtrVector<const ContextDescriptor *>>
+    ContextDescriptorCache;
+  size_t ContextDescriptorLastSectionScanned = 0;
+  Mutex ContextDescriptorCacheLock;
 
   TypeMetadataPrivateState() {
     initializeTypeMetadataRecordLookup();
@@ -603,6 +614,60 @@ _searchTypeMetadataRecords(TypeMetadataPrivateState &T,
   return nullptr;
 }
 
+// Read ContextDescriptors for any loaded images that haven't already been
+// scanned, if any.
+static void
+_scanAdditionalContextDescriptors(TypeMetadataPrivateState &T) {
+  _forEachProtocolConformanceSectionAfter(
+    &T.ContextDescriptorLastSectionScanned,
+    [&T](const ProtocolConformanceRecord *Begin,
+       const ProtocolConformanceRecord *End) {
+    for (const auto *record = Begin; record != End; record++) {
+      if (auto ntd = record[0]->getTypeDescriptor()) {
+        if (auto type = llvm::dyn_cast<TypeContextDescriptor>(ntd)) {
+          auto identity = ParsedTypeIdentity::parse(type);
+          auto name = identity.getABIName();
+          T.ContextDescriptorCache[name].push_back(type);
+        }
+      }
+    }
+  });
+}
+
+// Search for a ContextDescriptor in the context descriptor cache matching the
+// given demangle node. Returns the found node, or nullptr if no match was
+// found.
+static const ContextDescriptor *
+_findContextDescriptorInCache(TypeMetadataPrivateState &T,
+                              Demangle::NodePointer node) {
+  if (node->getNumChildren() < 2)
+    return nullptr;
+
+  auto nameNode = node->getChild(1);
+
+  // Declarations synthesized by the Clang importer get a small tag
+  // string in addition to their name.
+  if (nameNode->getKind() == Demangle::Node::Kind::RelatedEntityDeclName)
+    nameNode = nameNode->getChild(1);
+
+  if (nameNode->getKind() != Demangle::Node::Kind::Identifier)
+    return nullptr;
+
+  auto name = nameNode->getText();
+  
+  auto iter = T.ContextDescriptorCache.find(name);
+  if (iter == T.ContextDescriptorCache.end())
+    return nullptr;
+  
+  for (auto *contextDescriptor : iter->getSecond()) {
+    if (_contextDescriptorMatchesMangling(contextDescriptor, node)) {
+      return contextDescriptor;
+    }
+  }
+  
+  return nullptr;
+}
+
 static const ContextDescriptor *
 _findContextDescriptor(Demangle::NodePointer node,
                            Demangle::Demangler &Dem) {
@@ -630,8 +695,17 @@ _findContextDescriptor(Demangle::NodePointer node,
   if (auto Value = T.NominalCache.find(mangledName))
     return Value->getDescription();
 
+  // Scan any newly loaded images for context descriptors, then try the context
+  // descriptor cache. This must be done with the cache's lock held.
+  {
+    ScopedLock guard(T.ContextDescriptorCacheLock);
+    _scanAdditionalContextDescriptors(T);
+    foundContext = _findContextDescriptorInCache(T, node);
+  }
+
   // Check type metadata records
-  foundContext = _searchTypeMetadataRecords(T, node);
+  if (!foundContext)
+    foundContext = _searchTypeMetadataRecords(T, node);
 
   // Check protocol conformances table. Note that this has no support for
   // resolving generic types yet.
