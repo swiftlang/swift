@@ -508,7 +508,9 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
       // If member or its getter already has a `@differentiable` attribute,
       // continue.
       if (member->getAttrs().hasAttribute<DifferentiableAttr>() ||
-          member->getAccessor(AccessorKind::Get)->getAttrs().hasAttribute<DifferentiableAttr>())
+          member->getAccessor(AccessorKind::Get)
+              ->getAttrs()
+              .hasAttribute<DifferentiableAttr>())
         continue;
       ArrayRef<Requirement> requirements;
       // If the parent declaration context is an extension, the nominal type may
@@ -521,8 +523,9 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
           /*linear*/ false, {}, None, None, requirements);
       member->getAttrs().add(diffableAttr);
       // Compute getter parameter indices.
-      auto *getterType =
-          member->getAccessor(AccessorKind::Get)->getInterfaceType()->castTo<AnyFunctionType>();
+      auto *getterType = member->getAccessor(AccessorKind::Get)
+                             ->getInterfaceType()
+                             ->castTo<AnyFunctionType>();
       AutoDiffParameterIndicesBuilder builder(getterType);
       builder.setParameter(0);
       diffableAttr->setParameterIndices(builder.build(C));

@@ -355,8 +355,7 @@ static ValueDecl *deriveTensorArrayProtocol_tensorHandleCount(
     tensorHandleCountDecl, returnType);
   getterDecl->setBodySynthesizer(
     deriveBodyTensorArrayProtocol_tensorHandleCount, nullptr);
-  derived.addMembersToConformanceContext(
-    {tensorHandleCountDecl, patDecl});
+  derived.addMembersToConformanceContext({tensorHandleCountDecl, patDecl});
 
   return tensorHandleCountDecl;
 }

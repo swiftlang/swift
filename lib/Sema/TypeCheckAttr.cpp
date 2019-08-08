@@ -3458,7 +3458,8 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     newAttr->setJVPFunction(attr->getJVPFunction());
     newAttr->setVJPFunction(attr->getVJPFunction());
     auto insertion = ctx.DifferentiableAttrs.try_emplace(
-        {asd->getAccessor(AccessorKind::Get), newAttr->getParameterIndices()}, newAttr);
+        {asd->getAccessor(AccessorKind::Get), newAttr->getParameterIndices()},
+        newAttr);
     // Valid `@differentiable` attributes are uniqued by their parameter
     // indices. Reject duplicate attributes for the same decl and parameter
     // indices pair.
