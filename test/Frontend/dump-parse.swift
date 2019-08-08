@@ -22,9 +22,9 @@ func bar() {
   // CHECK-NEXT:   (unresolved_decl_ref_expr type='{{[^']+}}' name=foo
   // CHECK-NEXT:   (unresolved_decl_ref_expr type='{{[^']+}}' name=foo
   // CHECK-AST: (brace_stmt
-  // CHECK-AST-NEXT:   (declref_expr type='{{[^']+}}' {{.*}} decl=main.(file).foo{{.*}}
-  // CHECK-AST-NEXT:   (declref_expr type='{{[^']+}}' {{.*}} decl=main.(file).foo{{.*}}
-  // CHECK-AST-NEXT:   (declref_expr type='{{[^']+}}' {{.*}} decl=main.(file).foo{{.*}}
+  // CHECK-AST-NEXT:   (declref_expr type='{{[^']+}}' {{.*}} decl=main.(file).foo
+  // CHECK-AST-NEXT:   (declref_expr type='{{[^']+}}' {{.*}} decl=main.(file).foo
+  // CHECK-AST-NEXT:   (declref_expr type='{{[^']+}}' {{.*}} decl=main.(file).foo
   foo foo foo
 }
 
@@ -58,7 +58,7 @@ enum TrailingSemi {
 // CHECK-AST-LABEL:   (func_decl{{.*}}"generic(_:)" <T : Hashable> interface type='<T where T : Hashable> (T) -> ()' access=internal captures=(<generic> )
 func generic<T: Hashable>(_: T) {}
 // CHECK-AST:       (pattern_binding_decl
-// CHECK-AST:         (declref_expr type='(Int) -> ()' location={{.*}} range={{.*}} decl=main.(file).generic@{{.*}} [with (substitution_map generic_signature=<T where T : Hashable> (substitution T -> Int))] USR={{.*}} function_ref=unapplied))
+// CHECK-AST:         (declref_expr type='(Int) -> ()' location={{.*}} range={{.*}} decl=main.(file).generic@{{.*}} [with (substitution_map generic_signature=<T where T : Hashable> (substitution T -> Int))] function_ref=unapplied))
 let _: (Int) -> () = generic
 
 // Closures should be marked as escaping or not.

@@ -60,9 +60,6 @@ void ConcreteDeclRef::dump(raw_ostream &os) {
     getSubstitutions().dump(os, SubstitutionMap::DumpStyle::Minimal);
     os << ']';
   }
-
-  os << " USR=";
-  ide::printDeclUSR(getDecl(), os);
 }
 
 void ConcreteDeclRef::dump() {
