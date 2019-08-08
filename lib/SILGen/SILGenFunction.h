@@ -1788,7 +1788,7 @@ public:
   /// - The last parameter, for differentials.
   /// - The last result, for pullbacks.
   ManagedValue getThunkedAutoDiffLinearMap(
-      ManagedValue linearMap, AutoDiffAssociatedFunctionKind assocFnKind,
+      ManagedValue linearMap, AutoDiffLinearMapKind linearMapKind,
       CanSILFunctionType fromType, CanSILFunctionType toType,
       bool reorderSelf);
 
