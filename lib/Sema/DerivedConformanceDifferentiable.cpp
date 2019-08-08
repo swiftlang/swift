@@ -489,7 +489,7 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
     newMember->copyFormalAccessFrom(member, /*sourceIsParentContext*/ true);
     newMember->setValidationToChecked();
     newMember->setSetterAccess(member->getFormalAccess());
-    addExpectedOpaqueAccessorsToStorage(newMember, C);
+    addExpectedOpaqueAccessorsToStorage(newMember);
     C.addSynthesizedDecl(newMember);
     C.addSynthesizedDecl(memberBinding);
 
@@ -502,7 +502,7 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
         !member->getAttrs().hasAttribute<DifferentiableAttr>()) {
       // If getter does not exist, trigger synthesis and compute type.
       if (!member->getAccessor(AccessorKind::Get))
-        addExpectedOpaqueAccessorsToStorage(member, C);
+        addExpectedOpaqueAccessorsToStorage(member);
       if (!member->getAccessor(AccessorKind::Get)->hasInterfaceType())
         TC.resolveDeclSignature(member->getAccessor(AccessorKind::Get));
       // If member or its getter already has a `@differentiable` attribute,
