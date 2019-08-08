@@ -468,7 +468,7 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable
   /// is defined as follows:
   ///
   /// - If `x` is zero, then `x.significand` is 0.0.
-  /// - If `x` is infinity, then `x.significand` is 1.0.
+  /// - If `x` is infinite, then `x.significand` is infinity.
   /// - If `x` is NaN, then `x.significand` is NaN.
   /// - Note: The significand is frequently also called the *mantissa*, but
   ///   significand is the preferred terminology in the [IEEE 754

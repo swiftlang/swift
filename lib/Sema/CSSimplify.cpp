@@ -714,48 +714,54 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
   return listener.relabelArguments(actualArgNames);
 }
 
+static bool hasAppliedSelf(ConstraintSystem &cs, const OverloadChoice &choice) {
+  auto *decl = choice.getDeclOrNull();
+  if (!decl)
+    return false;
+
+  auto baseType = choice.getBaseType();
+  if (baseType)
+    baseType = cs.getFixedTypeRecursive(baseType, /*wantRValue=*/true);
+
+  // In most cases where we reference a declaration with a curried self
+  // parameter, it gets dropped from the type of the reference.
+  return decl->hasCurriedSelf() &&
+         doesMemberRefApplyCurriedSelf(baseType, decl);
+}
+
 /// Find the callee declaration and uncurry level for a given call
 /// locator.
 static std::tuple<ValueDecl *, bool, ArrayRef<Identifier>, bool,
                   ConstraintLocator *>
 getCalleeDeclAndArgs(ConstraintSystem &cs,
-                     ConstraintLocatorBuilder callLocator,
-                     SmallVectorImpl<Identifier> &argLabelsScratch) {
+                     ConstraintLocatorBuilder callBuilder) {
   ArrayRef<Identifier> argLabels;
   bool hasTrailingClosure = false;
+  ConstraintLocator *targetLocator = nullptr;
+
+  auto *callLocator = cs.getConstraintLocator(callBuilder);
+  auto *callExpr = callLocator->getAnchor();
 
   // Break down the call.
-  SmallVector<LocatorPathElt, 2> path;
-  auto callExpr = callLocator.getLocatorParts(path);
   if (!callExpr)
     return std::make_tuple(nullptr, /*hasAppliedSelf=*/false, argLabels,
-                           hasTrailingClosure, nullptr);
+                           hasTrailingClosure, targetLocator);
 
+  auto path = callLocator->getPath();
   // Our remaining path can only be 'ApplyArgument'.
   if (!path.empty() &&
       !(path.size() <= 2 &&
         path.back().getKind() == ConstraintLocator::ApplyArgument))
     return std::make_tuple(nullptr, /*hasAppliedSelf=*/false, argLabels,
-                           hasTrailingClosure, nullptr);
+                           hasTrailingClosure, targetLocator);
 
-  // Dig out the callee.
-  ConstraintLocator *targetLocator;
-  if (auto call = dyn_cast<CallExpr>(callExpr)) {
-    targetLocator = cs.getConstraintLocator(call->getDirectCallee());
-    argLabels = call->getArgumentLabels();
-    hasTrailingClosure = call->hasTrailingClosure();
-  } else if (auto unresolved = dyn_cast<UnresolvedMemberExpr>(callExpr)) {
-    targetLocator = cs.getConstraintLocator(callExpr);
-    argLabels = unresolved->getArgumentLabels();
-    hasTrailingClosure = unresolved->hasTrailingClosure();
-  } else if (auto subscript = dyn_cast<SubscriptExpr>(callExpr)) {
-    targetLocator = cs.getConstraintLocator(callExpr);
-    argLabels = subscript->getArgumentLabels();
-    hasTrailingClosure = subscript->hasTrailingClosure();
-  } else if (auto dynSubscript = dyn_cast<DynamicSubscriptExpr>(callExpr)) {
-    targetLocator = cs.getConstraintLocator(callExpr);
-    argLabels = dynSubscript->getArgumentLabels();
-    hasTrailingClosure = dynSubscript->hasTrailingClosure();
+  // Dig out the callee information.
+  if (auto argInfo = cs.getArgumentInfo(callLocator)) {
+    argLabels = argInfo->Labels;
+    hasTrailingClosure = argInfo->HasTrailingClosure;
+    targetLocator = cs.getConstraintLocator(
+        isa<CallExpr>(callExpr) ? cast<CallExpr>(callExpr)->getDirectCallee()
+                                : callExpr);
   } else if (auto keyPath = dyn_cast<KeyPathExpr>(callExpr)) {
     if (path.size() != 2 ||
         path[0].getKind() != ConstraintLocator::KeyPathComponent ||
@@ -788,17 +794,9 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
       return std::make_tuple(nullptr, /*hasAppliedSelf=*/false, argLabels,
                              hasTrailingClosure, nullptr);
     }
-
   } else {
-    if (auto apply = dyn_cast<ApplyExpr>(callExpr)) {
-      argLabels = apply->getArgumentLabels(argLabelsScratch);
-      assert(!apply->hasTrailingClosure());
-    } else if (auto objectLiteral = dyn_cast<ObjectLiteralExpr>(callExpr)) {
-      argLabels = objectLiteral->getArgumentLabels();
-      hasTrailingClosure = objectLiteral->hasTrailingClosure();
-    }
     return std::make_tuple(nullptr, /*hasAppliedSelf=*/false, argLabels,
-                           hasTrailingClosure, nullptr);
+                           hasTrailingClosure, targetLocator);
   }
 
   // Find the overload choice corresponding to the callee locator.
@@ -845,16 +843,8 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
 
   // If there's a declaration, return it.
   if (auto *decl = choice->getDeclOrNull()) {
-    auto baseType = choice->getBaseType();
-    if (baseType)
-      baseType = cs.getFixedTypeRecursive(baseType, /*wantRValue=*/true);
-
-    // In most cases where we reference a declaration with a curried self
-    // parameter, it gets dropped from the type of the reference.
-    bool hasAppliedSelf =
-        decl->hasCurriedSelf() && doesMemberRefApplyCurriedSelf(baseType, decl);
-    return std::make_tuple(decl, hasAppliedSelf, argLabels, hasTrailingClosure,
-                           calleeLocator);
+    return std::make_tuple(decl, hasAppliedSelf(cs, *choice), argLabels,
+                           hasTrailingClosure, calleeLocator);
   }
 
   return std::make_tuple(nullptr, /*hasAppliedSelf=*/false, argLabels,
@@ -941,12 +931,11 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
   ValueDecl *callee;
   bool hasAppliedSelf;
   ArrayRef<Identifier> argLabels;
-  SmallVector<Identifier, 2> argLabelsScratch;
   bool hasTrailingClosure = false;
   ConstraintLocator *calleeLocator;
   std::tie(callee, hasAppliedSelf, argLabels, hasTrailingClosure,
            calleeLocator) =
-    getCalleeDeclAndArgs(cs, locator, argLabelsScratch);
+    getCalleeDeclAndArgs(cs, locator);
 
   ParameterListInfo paramInfo(params, callee, hasAppliedSelf);
 
@@ -2215,8 +2204,33 @@ bool ConstraintSystem::repairFailures(
   //     of the function value e.g. `foo = bar` or `foo = .bar`
   auto repairByInsertingExplicitCall = [&](Type srcType, Type dstType) -> bool {
     auto fnType = srcType->getAs<FunctionType>();
-    if (!fnType || fnType->getNumParams() > 0)
+    if (!fnType)
       return false;
+
+    // If argument is a function type and all of its parameters have
+    // default values, let's see whether error is related to missing
+    // explicit call.
+    if (fnType->getNumParams() > 0) {
+      auto *anchor =
+          simplifyLocatorToAnchor(*this, getConstraintLocator(locator));
+
+      if (!anchor)
+        return false;
+
+      auto *overload = findSelectedOverloadFor(anchor);
+      if (!(overload && overload->Choice.isDecl()))
+        return false;
+
+      const auto &choice = overload->Choice;
+      ParameterListInfo info(fnType->getParams(), choice.getDecl(),
+                             hasAppliedSelf(*this, choice));
+
+      if (llvm::any_of(indices(fnType->getParams()),
+                       [&info](const unsigned idx) {
+                         return !info.hasDefaultArgument(idx);
+                       }))
+        return false;
+    }
 
     auto resultType = fnType->getResult();
     // If this is situation like `x = { ... }` where closure results in
@@ -2435,6 +2449,13 @@ bool ConstraintSystem::repairFailures(
                                              getConstraintLocator(locator));
       conversionsOrFixes.push_back(fix);
     }
+
+    if (purpose == CTP_Initialization && lhs->is<TupleType>() &&
+        rhs->is<TupleType>()) {
+      auto *fix = AllowTupleTypeMismatch::create(*this, lhs, rhs,
+                                                 getConstraintLocator(locator));
+      conversionsOrFixes.push_back(fix);
+    }
     break;
   }
 
@@ -2465,6 +2486,11 @@ bool ConstraintSystem::repairFailures(
 
       conversionsOrFixes.push_back(CollectionElementContextualMismatch::create(
           *this, lhs, rhs, getConstraintLocator(locator)));
+    }
+    if (lhs->is<TupleType>() && rhs->is<TupleType>()) {
+      auto *fix = AllowTupleTypeMismatch::create(*this, lhs, rhs,
+                                                 getConstraintLocator(locator));
+      conversionsOrFixes.push_back(fix);
     }
     break;
   }
@@ -3061,8 +3087,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         case PTK_UnsafeMutablePointer:
           // UnsafeMutablePointer can be converted from an inout reference to a
           // scalar or array.
-          if (!isAutoClosureArgument) {
-            if (auto inoutType1 = dyn_cast<InOutType>(desugar1)) {
+          if (auto inoutType1 = dyn_cast<InOutType>(desugar1)) {
+            if (!isAutoClosureArgument) {
               auto inoutBaseType = inoutType1->getInOutObjectType();
 
               Type simplifiedInoutBaseType = getFixedTypeRecursive(
@@ -3077,6 +3103,11 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
               }
               conversionsOrFixes.push_back(
                   ConversionRestrictionKind::InoutToPointer);
+            } else {
+              Type pointeeType = inoutType1->getObjectType();
+              auto *fix = AllowAutoClosurePointerConversion::create(*this,
+                  pointeeType, type2, getConstraintLocator(locator));
+              conversionsOrFixes.push_back(fix);
             }
           }
 
@@ -3931,55 +3962,12 @@ ConstraintSystem::simplifyFunctionComponentConstraint(
   return SolutionKind::Solved;
 }
 
-/// Retrieve the argument labels that are provided for a member
-/// reference at the given locator.
-static Optional<ConstraintSystem::ArgumentLabelState>
-getArgumentLabels(ConstraintSystem &cs, ConstraintLocatorBuilder locator) {
-  SmallVector<LocatorPathElt, 2> parts;
-  Expr *anchor = locator.getLocatorParts(parts);
-  if (!anchor)
-    return None;
-
-  while (!parts.empty()) {
-    if (parts.back().getKind() == ConstraintLocator::Member ||
-        parts.back().getKind() == ConstraintLocator::SubscriptMember) {
-      parts.pop_back();
-      continue;
-    }
-
-    if (parts.back().getKind() == ConstraintLocator::ApplyFunction) {
-      if (auto applyExpr = dyn_cast<ApplyExpr>(anchor)) {
-        anchor = applyExpr->getSemanticFn();
-      }
-      parts.pop_back();
-      continue;
-    }
-
-    if (parts.back().getKind() == ConstraintLocator::ConstructorMember) {
-      parts.pop_back();
-      continue;
-    }
-    
-    break;
-  }
-  
-  if (!parts.empty())
-    return None;
-
-  anchor = getArgumentLabelTargetExpr(anchor);
-  auto known = cs.ArgumentLabels.find(cs.getConstraintLocator(anchor));
-  if (known == cs.ArgumentLabels.end())
-    return None;
-
-  return known->second;
-}
-
 /// Return true if the specified type or a super-class/super-protocol has the
 /// @dynamicMemberLookup attribute on it.  This implementation is not
 /// particularly fast in the face of deep class hierarchies or lots of protocol
 /// conformances, but this is fine because it doesn't get invoked in the normal
 /// name lookup path (only when lookup is about to fail).
-static bool hasDynamicMemberLookupAttribute(Type type,
+bool swift::hasDynamicMemberLookupAttribute(Type type,
                     llvm::DenseMap<CanType, bool> &DynamicMemberLookupCache) {
   auto canType = type->getCanonicalType();
   auto it = DynamicMemberLookupCache.find(canType);
@@ -4051,12 +4039,6 @@ static bool hasDynamicMemberLookupAttribute(Type type,
   if (!type->hasTypeVariable())
     DynamicMemberLookupCache[canType] = result;
   return result;
-}
-
-// for IDETypeChecking
-bool swift::hasDynamicMemberLookupAttribute(Type type) {
-  llvm::DenseMap<CanType, bool> DynamicMemberLookupCache;
-  return ::hasDynamicMemberLookupAttribute(type, DynamicMemberLookupCache);
 }
 
 static bool isForKeyPathSubscript(ConstraintSystem &cs,
@@ -4194,10 +4176,8 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     // the argument labels into the name: we don't want to look for
     // anything else, because the cost of the general search is so
     // high.
-    if (auto argumentLabels =
-            getArgumentLabels(*this, ConstraintLocatorBuilder(memberLocator))) {
-      memberName = DeclName(TC.Context, memberName.getBaseName(),
-                            argumentLabels->Labels);
+    if (auto info = getArgumentInfo(memberLocator)) {
+      memberName = DeclName(TC.Context, memberName.getBaseName(), info->Labels);
     }
   }
 
@@ -4473,8 +4453,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
       if (::hasDynamicMemberLookupAttribute(instanceTy,
                                             DynamicMemberLookupCache) &&
           isValidKeyPathDynamicMemberLookup(subscript, TC)) {
-        auto info =
-            getArgumentLabels(*this, ConstraintLocatorBuilder(memberLocator));
+        auto info = getArgumentInfo(memberLocator);
 
         if (!(info && info->Labels.size() == 1 &&
               info->Labels[0] == getASTContext().Id_dynamicMember)) {
@@ -5906,7 +5885,7 @@ Type ConstraintSystem::simplifyAppliedOverloads(
       return markFailure();
   };
 
-  auto argumentInfo = getArgumentLabels(*this, locator);
+  auto argumentInfo = getArgumentInfo(getConstraintLocator(locator));
 
   // Consider each of the constraints in the disjunction.
 retry_after_fail:
@@ -7037,6 +7016,52 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     if (recordFix(fix))
       return SolutionKind::Error;
     return matchTypes(type1, type2, matchKind, subflags, locator);
+  }
+
+  case FixKind::AllowTupleTypeMismatch: {
+    auto lhs = type1->castTo<TupleType>();
+    auto rhs = type2->castTo<TupleType>();
+    // Create a new tuple type the size of the smaller tuple with elements
+    // from the larger tuple whenever either side contains a type variable.
+    // For example (A, $0, B, $2) and (X, Y, $1) produces: (X, $0, B).
+    // This allows us to guarentee that the types will match, and all
+    // type variables will get bound to something as long as we default
+    // excess types in the larger tuple to Any. In the prior example,
+    // when the tuples (X, Y, $1) and (X, $0, B) get matched, $0 is equated
+    // to Y, $1 is equated to B, and $2 is defaulted to Any.
+    auto lhsLarger = lhs->getNumElements() >= rhs->getNumElements();
+    auto larger = lhsLarger ? lhs : rhs;
+    auto smaller = lhsLarger ? rhs : lhs;
+    llvm::SmallVector<TupleTypeElt, 4> newTupleTypes;
+
+    for (unsigned i = 0; i < larger->getNumElements(); ++i) {
+      auto largerElt = larger->getElement(i);
+      if (i < smaller->getNumElements()) {
+        auto smallerElt = smaller->getElement(i);
+        if (largerElt.getType()->isTypeVariableOrMember() ||
+            smallerElt.getType()->isTypeVariableOrMember())
+          newTupleTypes.push_back(largerElt);
+        else
+          newTupleTypes.push_back(smallerElt);
+      } else {
+        if (largerElt.getType()->isTypeVariableOrMember())
+          addConstraint(ConstraintKind::Defaultable, largerElt.getType(),
+                        getASTContext().TheAnyType,
+                        getConstraintLocator(locator));
+      }
+    }
+    auto matchingType =
+        TupleType::get(newTupleTypes, getASTContext())->castTo<TupleType>();
+    if (recordFix(fix))
+      return SolutionKind::Error;
+    return matchTupleTypes(matchingType, smaller, matchKind, subflags, locator);
+  }
+
+  case FixKind::AllowAutoClosurePointerConversion: {
+    if (recordFix(fix))
+      return SolutionKind::Error;
+    return matchTypes(type1, type2, matchKind, subflags,
+        locator.withPathElement(ConstraintLocator::FunctionArgument));
   }
 
   case FixKind::InsertCall:

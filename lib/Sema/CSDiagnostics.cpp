@@ -1088,6 +1088,14 @@ bool MissingOptionalUnwrapFailure::diagnoseAsError() {
 
   auto *anchor = getAnchor();
 
+  // If this is an unresolved member expr e.g. `.foo` its
+  // base type is going to be the same as result type minus
+  // r-value adjustment because base could be an l-value type.
+  // We want to fix both cases by only diagnose one of them,
+  // otherwise this is just going to result in a duplcate diagnostic.
+  if (getLocator()->isLastElement(ConstraintLocator::UnresolvedMember))
+    return false;
+
   if (auto assignExpr = dyn_cast<AssignExpr>(anchor))
     anchor = assignExpr->getSrc();
 
@@ -1447,7 +1455,7 @@ bool AssignmentFailure::diagnoseAsError() {
     // If the underlying expression was a read-only subscript, diagnose that.
     if (auto *SD = dyn_cast_or_null<SubscriptDecl>(choice->getDecl())) {
       StringRef message;
-      if (!SD->isSettable())
+      if (!SD->supportsMutation())
         message = "subscript is get-only";
       else if (!SD->isSetterAccessibleFrom(DC))
         message = "subscript setter is inaccessible";
@@ -1949,6 +1957,14 @@ void ContextualFailure::tryComputedPropertyFixIts(Expr *expr) const {
   }
 }
 
+bool TupleContextualFailure::diagnoseAsError() {
+  auto diagnostic = isNumElementsMismatch()
+                        ? diag::tuple_types_not_convertible_nelts
+                        : diag::tuple_types_not_convertible;
+  emitDiagnostic(getAnchor()->getLoc(), diagnostic, getFromType(), getToType());
+  return true;
+}
+
 bool AutoClosureForwardingFailure::diagnoseAsError() {
   auto path = getLocator()->getPath();
   assert(!path.empty());
@@ -1962,6 +1978,14 @@ bool AutoClosureForwardingFailure::diagnoseAsError() {
   emitDiagnostic(argExpr->getLoc(), diag::invalid_autoclosure_forwarding)
       .highlight(argExpr->getSourceRange())
       .fixItInsertAfter(argExpr->getEndLoc(), "()");
+  return true;
+}
+
+bool AutoClosurePointerConversionFailure::diagnoseAsError() {
+  auto *anchor = getAnchor();
+  auto diagnostic = diag::invalid_autoclosure_pointer_conversion;
+  emitDiagnostic(anchor->getLoc(), diagnostic, getFromType(), getToType())
+      .highlight(anchor->getSourceRange());
   return true;
 }
 
@@ -2001,7 +2025,6 @@ bool MissingCallFailure::diagnoseAsError() {
     case ConstraintLocator::ContextualType:
     case ConstraintLocator::ApplyArgToParam: {
       auto fnType = getType(baseExpr)->castTo<FunctionType>();
-      assert(fnType->getNumParams() == 0);
       emitDiagnostic(baseExpr->getLoc(), diag::missing_nullary_call,
                      fnType->getResult())
           .fixItInsertAfter(baseExpr->getEndLoc(), "()");
@@ -3325,6 +3348,9 @@ bool MissingGenericArgumentsFailure::diagnoseForAnchor(
     return false;
 
   auto *DC = getDeclContext();
+  if (!DC)
+    return true;
+
   if (auto *SD = dyn_cast<SubscriptDecl>(DC)) {
     emitDiagnostic(SD, diag::note_call_to_subscript, SD->getFullName());
     return true;
@@ -3374,11 +3400,13 @@ bool MissingGenericArgumentsFailure::diagnoseParameter(
     emitDiagnostic(loc, diag::unbound_generic_parameter, GP);
   }
 
-  if (!hasLoc(GP))
-    return true;
-
   Type baseTyForNote;
   auto *DC = getDeclContext();
+  if (!DC)
+    return true;
+
+  if (!hasLoc(GP))
+    return true;
 
   if (auto *NTD =
           dyn_cast_or_null<NominalTypeDecl>(DC->getSelfNominalTypeDecl())) {
@@ -3399,6 +3427,9 @@ void MissingGenericArgumentsFailure::emitGenericSignatureNote(
   auto &cs = getConstraintSystem();
   auto &TC = getTypeChecker();
   auto *paramDC = getDeclContext();
+
+  if (!paramDC)
+    return;
 
   auto *GTD = dyn_cast<GenericTypeDecl>(paramDC);
   if (!GTD || anchor.is<Expr *>())

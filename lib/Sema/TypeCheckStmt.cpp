@@ -717,7 +717,7 @@ public:
     TypeResolutionOptions options(TypeResolverContext::InExpression);
     options |= TypeResolutionFlags::AllowUnspecifiedTypes;
     options |= TypeResolutionFlags::AllowUnboundGenerics;
-    
+
     if (auto *P = TC.resolvePattern(S->getPattern(), DC,
                                     /*isStmtCondition*/false)) {
       S->setPattern(P);
@@ -777,10 +777,12 @@ public:
         return nullptr;
 
       auto witness = conformance->getWitnessByName(
-          sequenceType->getRValueType(), TC.Context.Id_makeIterator);
+          sequenceType, TC.Context.Id_makeIterator);
       if (!witness)
         return nullptr;
       S->setMakeIterator(witness);
+
+      TC.requestMemberLayout(witness.getDecl());
 
       // Create a local variable to capture the iterator.
       std::string name;
@@ -804,8 +806,7 @@ public:
       // be around.
       auto nextResultType =
           OptionalType::get(conformance->getTypeWitnessByName(
-                                sequenceType, TC.Context.Id_Element))
-              ->getCanonicalType();
+                                sequenceType, TC.Context.Id_Element));
       auto *genBinding = PatternBindingDecl::createImplicit(
           TC.Context, StaticSpellingKind::None, genPat,
           new (TC.Context) OpaqueValueExpr(S->getInLoc(), nextResultType), DC,
@@ -813,7 +814,7 @@ public:
 
       Type newSequenceType = cast<AbstractFunctionDecl>(witness.getDecl())
             ->getInterfaceType()
-            ->getAs<AnyFunctionType>()
+            ->castTo<AnyFunctionType>()
             ->getParams()[0].getPlainType().subst(witness.getSubstitutions());
 
       // Necessary type coersion for method application.
@@ -854,10 +855,11 @@ public:
         genConformance->getWitnessByName(iteratorTy, TC.Context.Id_next);
     S->setIteratorNext(witness);
 
+    TC.requestMemberLayout(witness.getDecl());
+
     auto nextResultType = cast<FuncDecl>(S->getIteratorNext().getDecl())
                               ->getResultInterfaceType()
-                              .subst(S->getIteratorNext().getSubstitutions())
-                              ->getCanonicalType();
+                              .subst(S->getIteratorNext().getSubstitutions());
 
     // Convert that Optional<T> value to Optional<Element>.
     auto optPatternType = OptionalType::get(S->getPattern()->getType());
@@ -2070,7 +2072,6 @@ static void checkClassConstructorBody(ClassDecl *classDecl,
                    ctor->getDeclContext()->getDeclaredInterfaceType())
       .fixItInsert(ctor->getLoc(), "convenience ");
     ctx.Diags.diagnose(initExpr->getLoc(), diag::delegation_here);
-    ctor->setInitKind(CtorInitializerKind::Convenience);
   }
 
   // An inlinable constructor in a class must always be delegating,

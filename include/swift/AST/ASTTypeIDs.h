@@ -24,11 +24,13 @@ class CustomAttr;
 class NominalTypeDecl;
 struct PropertyWrapperBackingPropertyInfo;
 struct PropertyWrapperTypeInfo;
+enum class CtorInitializerKind;
 struct PropertyWrapperMutability;
 class Type;
 class VarDecl;
 class TypeAliasDecl;
 class Type;
+struct TypePair;
 
 #define SWIFT_AST_TYPEID_ZONE 1
 

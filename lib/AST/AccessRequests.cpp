@@ -161,8 +161,7 @@ static bool isStoredWithPrivateSetter(VarDecl *VD) {
     return false;
 
   if (VD->isLet() ||
-      (VD->getSetter() &&
-       !VD->getSetter()->isImplicit()))
+      VD->getParsedAccessor(AccessorKind::Set))
     return false;
 
   return true;

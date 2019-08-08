@@ -257,9 +257,6 @@ ERROR(cannot_call_with_params, none,
       "cannot invoke %select{|initializer for type }2'%0' with an argument list"
       " of type '%1'", (StringRef, StringRef, bool))
 
-NOTE(pointer_init_to_type,none,
-      "Pointer conversion restricted: use '.assumingMemoryBound(to:)' or '.bindMemory(to:capacity:)' to view memory as a type.", ())
-
 ERROR(cannot_call_non_function_value,none,
       "cannot call value of non-function type %0", (Type))
 
@@ -1143,6 +1140,10 @@ NOTE(invalid_differentiable_function_conversion_parameter,none,
      "did you mean to take a '%0' closure?", (StringRef))
 ERROR(invalid_autoclosure_forwarding,none,
       "add () to forward @autoclosure parameter", ())
+ERROR(invalid_autoclosure_pointer_conversion,none,
+      "cannot perform pointer conversion of value of type %0 to autoclosure "
+      "result type %1",
+      (Type, Type))
 
 //------------------------------------------------------------------------------
 // MARK: Type Check Declarations
@@ -2997,13 +2998,13 @@ NOTE(convenience_init_here,none,
 ERROR(designated_init_in_extension,none,
       "designated initializer cannot be declared in an extension of %0; "
       "did you mean this to be a convenience initializer?",
-      (Type))
+      (DeclName))
 ERROR(enumstruct_convenience_init,none,
       "delegating initializers in %0 are not marked with 'convenience'",
       (StringRef))
 ERROR(nonclass_convenience_init,none,
       "convenience initializer not allowed in non-class type %0",
-      (Type))
+      (DeclName))
 ERROR(cfclass_convenience_init,none,
       "convenience initializers are not supported in extensions of CF types",
       ())
@@ -4698,7 +4699,7 @@ NOTE(property_wrapper_declared_here,none,
 
 ERROR(property_wrapper_mutating_get_composed_to_get_only,none,
       "property wrapper %0 with a mutating getter cannot be composed inside "
-      "get-only property wrapper %1", (Type, Type))
+      "get-only property wrapper %1", (TypeLoc, TypeLoc))
 
 ERROR(property_wrapper_local,none,
       "property wrappers are not yet supported on local properties", ())

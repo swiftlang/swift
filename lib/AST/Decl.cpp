@@ -534,10 +534,13 @@ bool AbstractFunctionDecl::isTransparent() const {
   if (getAttrs().hasAttribute<TransparentAttr>())
     return true;
 
-  // If this is an accessor, check if the transparent attribute was set
-  // on the storage decl.
+  // If this is an accessor, the computation is a bit more involved, so we
+  // kick off a request.
   if (const auto *AD = dyn_cast<AccessorDecl>(this)) {
-    return AD->getStorage()->isTransparent();
+    ASTContext &ctx = getASTContext();
+    return evaluateOrDefault(ctx.evaluator,
+      IsAccessorTransparentRequest{const_cast<AccessorDecl *>(AD)},
+      false);
   }
 
   return false;
@@ -1916,6 +1919,19 @@ AbstractStorageDecl::getAccessStrategy(AccessSemantics semantics,
   llvm_unreachable("bad access semantics");
 }
 
+bool AbstractStorageDecl::requiresOpaqueAccessors() const {
+  // Subscripts always require opaque accessors, so don't even kick off
+  // a request.
+  auto *var = dyn_cast<VarDecl>(this);
+  if (var == nullptr)
+    return true;
+
+  ASTContext &ctx = getASTContext();
+  return evaluateOrDefault(ctx.evaluator,
+    RequiresOpaqueAccessorsRequest{const_cast<VarDecl *>(var)},
+    false);
+}
+
 bool AbstractStorageDecl::requiresOpaqueAccessor(AccessorKind kind) const {
   switch (kind) {
   case AccessorKind::Get:
@@ -1938,41 +1954,49 @@ bool AbstractStorageDecl::requiresOpaqueAccessor(AccessorKind kind) const {
 }
 
 bool AbstractStorageDecl::requiresOpaqueModifyCoroutine() const {
-  // Only for mutable storage.
-  if (!supportsMutation())
-    return false;
+  ASTContext &ctx = getASTContext();
+  return evaluateOrDefault(ctx.evaluator,
+    RequiresOpaqueModifyCoroutineRequest{const_cast<AbstractStorageDecl *>(this)},
+    false);
+}
 
-  auto *dc = getDeclContext();
+AccessorDecl *AbstractStorageDecl::getSynthesizedAccessor(AccessorKind kind) const {
+  if (auto *accessor = getAccessor(kind))
+    return accessor;
 
-  // Local properties don't have modify accessors.
-  if (dc->isLocalContext())
-    return false;
+  ASTContext &ctx = getASTContext();
+  return evaluateOrDefault(ctx.evaluator,
+    SynthesizeAccessorRequest{const_cast<AbstractStorageDecl *>(this), kind},
+    nullptr);
+}
 
-  // Fixed-layout global properties don't have modify accessors.
-  if (dc->isModuleScopeContext() && !isResilient())
-    return false;
+AccessorDecl *AbstractStorageDecl::getOpaqueAccessor(AccessorKind kind) const {
+  auto *accessor = getAccessor(kind);
+  if (accessor && !accessor->isImplicit())
+    return accessor;
 
-  // Imported storage declarations don't have eagerly-generated modify
-  // accessors.
-  if (hasClangNode())
-    return false;
+  if (!requiresOpaqueAccessors())
+    return nullptr;
 
-  // Dynamic storage suppresses the modify coroutine.
-  // If we add a Swift-native concept of `dynamic`, this should be restricted
-  // to the ObjC-supported concept.
-  if (isObjCDynamic())
-    return false;
+  if (!requiresOpaqueAccessor(kind))
+    return nullptr;
 
-  // Requirements of ObjC protocols don't support the modify coroutine.
-  if (auto protoDecl = dyn_cast<ProtocolDecl>(dc))
-    if (protoDecl->isObjC())
-      return false;
+  return getSynthesizedAccessor(kind);
+}
 
-  return true;
+AccessorDecl *AbstractStorageDecl::getParsedAccessor(AccessorKind kind) const {
+  auto *accessor = getAccessor(kind);
+  if (accessor && !accessor->isImplicit())
+    return accessor;
+
+  return nullptr;
 }
 
 void AbstractStorageDecl::visitExpectedOpaqueAccessors(
                         llvm::function_ref<void (AccessorKind)> visit) const {
+  if (!requiresOpaqueAccessors())
+    return;
+
   if (requiresOpaqueGetter())
     visit(AccessorKind::Get);
 
@@ -1991,8 +2015,9 @@ void AbstractStorageDecl::visitExpectedOpaqueAccessors(
 void AbstractStorageDecl::visitOpaqueAccessors(
                         llvm::function_ref<void (AccessorDecl*)> visit) const {
   visitExpectedOpaqueAccessors([&](AccessorKind kind) {
-    auto accessor = getAccessor(kind);
-    assert(accessor && "didn't have expected opaque accessor");
+    auto accessor = getSynthesizedAccessor(kind);
+    assert(!accessor->hasForcedStaticDispatch() &&
+            "opaque accessor with forced static dispatch?");
     visit(accessor);
   });
 }
@@ -3576,6 +3601,8 @@ SourceRange TypeAliasDecl::getSourceRange() const {
     return { TypeAliasLoc, TrailingWhereClauseSourceRange.End };
   if (UnderlyingTy.hasLocation())
     return { TypeAliasLoc, UnderlyingTy.getSourceRange().End };
+  if (TypeEndLoc.isValid())
+    return { TypeAliasLoc, TypeEndLoc };
   return { TypeAliasLoc, getNameLoc() };
 }
 
@@ -4069,47 +4096,56 @@ ArtificialMainKind ClassDecl::getArtificialMainKind() const {
   llvm_unreachable("class has no @ApplicationMain attr?!");
 }
 
-AbstractFunctionDecl *
-ClassDecl::findOverridingDecl(const AbstractFunctionDecl *Method) const {
-  auto Members = getMembers();
-  for (auto M : Members) {
-    auto *CurMethod = dyn_cast<AbstractFunctionDecl>(M);
-    if (!CurMethod)
-      continue;
-    if (CurMethod->isOverridingDecl(Method)) {
-      return CurMethod;
-    }
-  }
-  return nullptr;
-}
-
-bool AbstractFunctionDecl::isOverridingDecl(
-    const AbstractFunctionDecl *Method) const {
-  const AbstractFunctionDecl *CurMethod = this;
-  while (CurMethod) {
-    if (CurMethod == Method)
+static bool isOverridingDecl(const ValueDecl *Derived,
+                             const ValueDecl *Base) {
+  while (Derived) {
+    if (Derived == Base)
       return true;
-    CurMethod = CurMethod->getOverriddenDecl();
+    Derived = Derived->getOverriddenDecl();
   }
   return false;
 }
 
+static ValueDecl *findOverridingDecl(const ClassDecl *C,
+                                     const ValueDecl *Base) {
+  // FIXME: This is extremely inefficient. The SILOptimizer should build a
+  // reverse lookup table to answer these types of queries.
+  for (auto M : C->getMembers()) {
+    if (auto *Derived = dyn_cast<ValueDecl>(M))
+      if (::isOverridingDecl(Derived, Base))
+        return Derived;
+  }
+
+  return nullptr;
+}
+
+AbstractFunctionDecl *
+ClassDecl::findOverridingDecl(const AbstractFunctionDecl *Method) const {
+  if (auto *Accessor = dyn_cast<AccessorDecl>(Method)) {
+    auto *Storage = Accessor->getStorage();
+    if (auto *Derived = ::findOverridingDecl(this, Storage)) {
+      auto *DerivedStorage = cast<AbstractStorageDecl>(Derived);
+      return DerivedStorage->getOpaqueAccessor(Accessor->getAccessorKind());
+    }
+
+    return nullptr;
+  }
+
+  return cast_or_null<AbstractFunctionDecl>(::findOverridingDecl(this, Method));
+}
+
 AbstractFunctionDecl *
 ClassDecl::findImplementingMethod(const AbstractFunctionDecl *Method) const {
+  // FIXME: This is extremely inefficient. The SILOptimizer should build a
+  // reverse lookup table to answer these types of queries.
   const ClassDecl *C = this;
   while (C) {
-    auto Members = C->getMembers();
-    for (auto M : Members) {
-      auto *CurMethod = dyn_cast<AbstractFunctionDecl>(M);
-      if (!CurMethod)
-        continue;
-      if (Method == CurMethod)
-        return CurMethod;
-      if (CurMethod->isOverridingDecl(Method)) {
-        // This class implements a method
-        return CurMethod;
-      }
-    }
+    if (C == Method->getDeclContext())
+      return const_cast<AbstractFunctionDecl *>(Method);
+
+    if (auto *Derived = C->findOverridingDecl(Method))
+      return Derived;
+
     // Check the superclass
     C = C->getSuperclassDecl();
   }
@@ -4713,9 +4749,9 @@ bool AbstractStorageDecl::hasPrivateAccessor() const {
 }
 
 bool AbstractStorageDecl::hasDidSetOrWillSetDynamicReplacement() const {
-  if (auto *func = getDidSetFunc())
+  if (auto *func = getParsedAccessor(AccessorKind::DidSet))
     return func->getAttrs().hasAttribute<DynamicReplacementAttr>();
-  if (auto *func = getWillSetFunc())
+  if (auto *func = getParsedAccessor(AccessorKind::WillSet))
     return func->getAttrs().hasAttribute<DynamicReplacementAttr>();
   return false;
 }
@@ -4861,32 +4897,31 @@ AbstractStorageDecl::getSetterFormalAccess() const {
         AccessLevel::Private);
 }
 
-#ifndef NDEBUG
-static bool isAccessor(AccessorDecl *accessor, AccessorKind kind,
-                       AbstractStorageDecl *storage) {
-  // TODO: this should check that the accessor belongs to this storage, but
-  // the Clang importer currently likes to violate that condition.
-  return (accessor && accessor->getAccessorKind() == kind);
+AccessScope
+AbstractStorageDecl::getSetterFormalAccessScope(const DeclContext *useDC,
+                                    bool treatUsableFromInlineAsPublic) const {
+  return getAccessScopeForFormalAccess(this, getSetterFormalAccess(), useDC,
+                                       treatUsableFromInlineAsPublic);
 }
-#endif
 
 void AbstractStorageDecl::setComputedSetter(AccessorDecl *setter) {
   assert(getImplInfo().getReadImpl() == ReadImplKind::Get);
   assert(!getImplInfo().supportsMutation());
-  assert(getGetter() && "sanity check: missing getter");
-  assert(!getSetter() && "already has a setter");
+  assert(getAccessor(AccessorKind::Get) && "invariant check: missing getter");
+  assert(!getAccessor(AccessorKind::Set) && "already has a setter");
   assert(hasClangNode() && "should only be used for ObjC properties");
-  assert(isAccessor(setter, AccessorKind::Set, this));
   assert(setter && "should not be called for readonly properties");
+  assert(setter->getAccessorKind() == AccessorKind::Set);
 
   setImplInfo(StorageImplInfo::getMutableComputed());
   Accessors.getPointer()->addOpaqueAccessor(setter);
 }
 
 void
-AbstractStorageDecl::setSynthesizedGetter(AccessorDecl *accessor) {
-  assert(!getGetter() && "declaration doesn't already have getter!");
-  assert(isAccessor(accessor, AccessorKind::Get, this));
+AbstractStorageDecl::setSynthesizedAccessor(AccessorKind kind,
+                                            AccessorDecl *accessor) {
+  assert(!getAccessor(kind) && "accessor already exists");
+  assert(accessor->getAccessorKind() == kind);
 
   auto accessors = Accessors.getPointer();
   if (!accessors) {
@@ -4895,42 +4930,6 @@ AbstractStorageDecl::setSynthesizedGetter(AccessorDecl *accessor) {
   }
 
   accessors->addOpaqueAccessor(accessor);
-}
-
-void
-AbstractStorageDecl::setSynthesizedReadCoroutine(AccessorDecl *accessor) {
-  assert(!getReadCoroutine() && "already has a read accessor");
-  assert(isAccessor(accessor, AccessorKind::Read, this));
-
-  auto accessors = Accessors.getPointer();
-  if (!accessors) {
-    accessors = AccessorRecord::create(getASTContext(), SourceRange(), {});
-    Accessors.setPointer(accessors);
-  }
-
-  accessors->addOpaqueAccessor(accessor);
-}
-
-void
-AbstractStorageDecl::setSynthesizedSetter(AccessorDecl *accessor) {
-  assert((getGetter() || getReadCoroutine()) &&
-         "declaration doesn't already have getter!");
-  assert(supportsMutation() && "adding setter to immutable storage");
-  assert(isAccessor(accessor, AccessorKind::Set, this));
-
-  Accessors.getPointer()->addOpaqueAccessor(accessor);
-}
-
-void
-AbstractStorageDecl::setSynthesizedModifyCoroutine(AccessorDecl *accessor) {
-  assert((getGetter() || getReadCoroutine()) &&
-         "declaration doesn't already have getter!");
-  assert(getSetter() && "declaration doesn't already have setter!");
-  assert(supportsMutation() && "adding modify to immutable storage");
-  assert(!getModifyCoroutine() && "already has a modify accessor");
-  assert(isAccessor(accessor, AccessorKind::Modify, this));
-
-  Accessors.getPointer()->addOpaqueAccessor(accessor);
 }
 
 static Optional<ObjCSelector>
@@ -4954,7 +4953,7 @@ getNameFromObjcAttribute(const ObjCAttr *attr, DeclName preferredName) {
 ObjCSelector
 AbstractStorageDecl::getObjCGetterSelector(Identifier preferredName) const {
   // If the getter has an @objc attribute with a name, use that.
-  if (auto getter = getGetter()) {
+  if (auto getter = getParsedAccessor(AccessorKind::Get)) {
       if (auto name = getNameFromObjcAttribute(getter->getAttrs().
           getAttribute<ObjCAttr>(), preferredName))
         return *name;
@@ -4984,7 +4983,7 @@ AbstractStorageDecl::getObjCGetterSelector(Identifier preferredName) const {
 ObjCSelector
 AbstractStorageDecl::getObjCSetterSelector(Identifier preferredName) const {
   // If the setter has an @objc attribute with a name, use that.
-  auto setter = getSetter();
+  auto setter = getParsedAccessor(AccessorKind::Set);
   auto objcAttr = setter ? setter->getAttrs().getAttribute<ObjCAttr>()
                          : nullptr;
   if (auto name = getNameFromObjcAttribute(objcAttr, DeclName(preferredName))) {
@@ -5159,10 +5158,6 @@ bool VarDecl::isLazilyInitializedGlobal() const {
     return true;
 
   return !sourceFileContext->isScriptMode();
-}
-
-bool SubscriptDecl::isSettable() const {
-  return supportsMutation();
 }
 
 SourceRange VarDecl::getSourceRange() const {
@@ -6157,15 +6152,7 @@ ObjCSubscriptKind SubscriptDecl::getObjCSubscriptKind() const {
 }
 
 SourceRange SubscriptDecl::getSourceRange() const {
-  if (getBracesRange().isValid()) {
-    return { getSubscriptLoc(), getBracesRange().End };
-  } else if (ElementTy.getSourceRange().End.isValid()) {
-    return { getSubscriptLoc(), ElementTy.getSourceRange().End };
-  } else if (ArrowLoc.isValid()) {
-    return { getSubscriptLoc(), ArrowLoc };
-  } else {
-    return getSubscriptLoc();
-  }
+  return {getSubscriptLoc(), getEndLoc()};
 }
 
 SourceRange SubscriptDecl::getSignatureSourceRange() const {
@@ -6560,6 +6547,12 @@ static bool requiresNewVTableEntry(const AbstractFunctionDecl *decl) {
   // because an @in parameter because @owned, or whatever.
   auto baseInterfaceTy = base->getInterfaceType();
   auto derivedInterfaceTy = decl->getInterfaceType();
+
+  using Direction = ASTContext::OverrideGenericSignatureReqCheck;
+  if (!ctx.overrideGenericSignatureReqsSatisfied(
+          base, decl, Direction::BaseReqSatisfiedByDerived)) {
+    return true;
+  }
 
   auto selfInterfaceTy = decl->getDeclContext()->getDeclaredInterfaceType();
 
@@ -7002,7 +6995,6 @@ ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
   
   Bits.ConstructorDecl.ComputedBodyInitKind = 0;
   Bits.ConstructorDecl.HasStubImplementation = 0;
-  Bits.ConstructorDecl.InitKind = static_cast<unsigned>(CtorInitializerKind::Designated);
   Bits.ConstructorDecl.Failability = static_cast<unsigned>(Failability);
 
   assert(Name.getBaseName() == DeclBaseName::createConstructor());
@@ -7192,6 +7184,12 @@ Type ConstructorDecl::getInitializerInterfaceType() {
   InitializerInterfaceType = initFuncTy;
 
   return InitializerInterfaceType;
+}
+
+CtorInitializerKind ConstructorDecl::getInitKind() const {
+  return evaluateOrDefault(getASTContext().evaluator,
+    InitKindRequest{const_cast<ConstructorDecl *>(this)},
+    CtorInitializerKind::Designated);
 }
 
 ConstructorDecl::BodyInitKind
@@ -7588,6 +7586,20 @@ void swift::simple_display(llvm::raw_ostream &out, const Decl *decl) {
 void swift::simple_display(llvm::raw_ostream &out, const ValueDecl *decl) {
   if (decl) decl->dumpRef(out);
   else out << "(null)";
+}
+
+StringRef swift::getAccessorLabel(AccessorKind kind) {
+  switch (kind) {
+  #define SINGLETON_ACCESSOR(ID, KEYWORD) \
+    case AccessorKind::ID: return #KEYWORD;
+  #define ACCESSOR(ID)
+  #include "swift/AST/AccessorKinds.def"
+    }
+    llvm_unreachable("bad accessor kind");
+}
+
+void swift::simple_display(llvm::raw_ostream &out, AccessorKind kind) {
+  out << getAccessorLabel(kind);
 }
 
 SourceLoc swift::extractNearestSourceLoc(const Decl *decl) {

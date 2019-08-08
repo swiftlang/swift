@@ -52,7 +52,7 @@ Optionals can be unwrapped with `!`, which triggers a trap on nil. Alternatively
 
 #### UnsafeBitCast and Casting References
 
-In general `unsafeBitCast` should be avoided because it's correctness relies on subtle assumptions that will never be enforced, and it indicates a bug in Swift's type system that should be fixed. It's less bad for non-pointer trivial types. Pointer casting should go through one of the memory binding API instead as a last resort.
+In general `unsafeBitCast` should be avoided because its correctness relies on subtle assumptions that will never be enforced, and it indicates a bug in Swift's type system that should be fixed. It's less bad for non-pointer trivial types. Pointer casting should go through one of the memory binding API instead as a last resort.
 
 Reference casting is more interesting. References casting can include converting to an Optional reference and converting from a class constrained existential.
 

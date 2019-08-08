@@ -513,6 +513,10 @@ void Remangler::mangleTypeMetadataCompletionFunction(Node *node) {
   mangleSingleChildNode(node); // type
 }
 
+void Remangler::mangleTypeMetadataDemanglingCache(Node *node) {
+  unreachable("not supported");
+}
+
 void Remangler::mangleTypeMetadataLazyCache(Node *node) {
   Buffer << "ML";
   mangleSingleChildNode(node); // type

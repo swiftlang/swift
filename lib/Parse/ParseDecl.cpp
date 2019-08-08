@@ -199,7 +199,7 @@ void PersistentParserState::parseMembers(IterableDeclContext *IDC) {
   // diagnostic engine here.
   Parser TheParser(BufferID, SF, /*No Lexer Diags*/nullptr, nullptr, this);
   // Disable libSyntax creation in the delayed parsing.
-  TheParser.SyntaxContext->disable();
+  TheParser.SyntaxContext->setDiscard();
   TheParser.parseDeclListDelayed(IDC);
 }
 
@@ -287,9 +287,12 @@ bool Parser::parseTopLevel() {
   }
 
   // Add newly parsed decls to the module.
-  for (auto Item : Items)
-    if (auto *D = Item.dyn_cast<Decl*>())
+  for (auto Item : Items) {
+    if (auto *D = Item.dyn_cast<Decl*>()) {
+      assert(!isa<AccessorDecl>(D) && "accessors should not be added here");
       SF.Decls.push_back(D);
+    }
+  }
 
   // Note that the source file is fully parsed and verify it.
   SF.ASTStage = SourceFile::Parsed;
@@ -4750,6 +4753,7 @@ parseDeclTypeAlias(Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
     }
 
     UnderlyingTy = parseType(diag::expected_type_in_typealias);
+    TAD->setTypeEndLoc(PreviousLoc);
     Status |= UnderlyingTy;
   }
 
@@ -4772,8 +4776,8 @@ parseDeclTypeAlias(Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
     if (EqualLoc.isInvalid()) {
       diagnose(Tok, diag::expected_equal_in_typealias);
       Status.setIsParseError();
+      return Status;
     }
-    return Status;
   }
 
   // Exit the scope introduced for the generic parameters.
@@ -5123,9 +5127,7 @@ struct Parser::ParsedAccessors {
 #define ACCESSOR(ID) AccessorDecl *ID = nullptr;
 #include "swift/AST/AccessorKinds.def"
 
-  void record(Parser &P, AbstractStorageDecl *storage, bool invalid,
-              SmallVectorImpl<Decl *> &decls);
-
+  void record(Parser &P, AbstractStorageDecl *storage, bool invalid);
   void classify(Parser &P, AbstractStorageDecl *storage, bool invalid);
 
   /// Add an accessor.  If there's an existing accessor of this kind,
@@ -5215,11 +5217,9 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags,
   if (peekToken().is(tok::r_brace)) {
     accessors.LBLoc = consumeToken(tok::l_brace);
     // Give syntax node an empty accessor list.
-    if (SyntaxContext->isEnabled()) {
-      SourceLoc listLoc = accessors.LBLoc.getAdvancedLoc(1);
-      SyntaxContext->addSyntax(
-        ParsedSyntaxRecorder::makeBlankAccessorList(listLoc, *SyntaxContext));
-    }
+    SourceLoc listLoc = accessors.LBLoc.getAdvancedLoc(1);
+    SyntaxContext->addSyntax(
+      ParsedSyntaxRecorder::makeBlankAccessorList(listLoc, *SyntaxContext));
     accessors.RBLoc = consumeToken(tok::r_brace);
 
     // In the limited syntax, fall out and let the caller handle it.
@@ -5388,48 +5388,6 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags,
   return Invalid ? makeParserError() : makeParserSuccess();
 }
 
-static void fillInAccessorTypeErrors(Parser &P, FuncDecl *accessor,
-                                     AccessorKind kind) {
-  if (!accessor) return;
-
-  // Fill in the parameter types.
-  if (auto *param = accessor->getImplicitSelfDecl())
-    if (param->getTypeLoc().isNull())
-      param->getTypeLoc().setInvalidType(P.Context);
-
-  for (auto *param : *accessor->getParameters())
-    if (param->getTypeLoc().isNull())
-      param->getTypeLoc().setInvalidType(P.Context);
-
-  // Fill in the result type.
-  switch (kind) {
-  // These have non-trivial returns, so fill in error.
-  case AccessorKind::Get:
-  case AccessorKind::Address:
-  case AccessorKind::MutableAddress:
-    accessor->getBodyResultTypeLoc().setInvalidType(P.Context);
-    return;
-
-  // These return void.
-  case AccessorKind::Set:
-  case AccessorKind::WillSet:
-  case AccessorKind::DidSet:
-  case AccessorKind::Read:
-  case AccessorKind::Modify:
-    return;
-  }
-  llvm_unreachable("bad kind");
-}
-
-/// We weren't able to tie the given accessors to a storage declaration.
-/// Fill in various slots with type errors.
-static void fillInAccessorTypeErrors(Parser &P,
-                                     Parser::ParsedAccessors &accessors) {
-#define ACCESSOR(ID) \
-  fillInAccessorTypeErrors(P, accessors.ID, AccessorKind::ID);
-#include "swift/AST/AccessorKinds.def"
-}
-
 /// Parse the brace-enclosed getter and setter for a variable.
 ParserResult<VarDecl>
 Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
@@ -5519,11 +5477,8 @@ Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
     Invalid = true;
 
   // If we have an invalid case, bail out now.
-  if (!PrimaryVar) {
-    fillInAccessorTypeErrors(*this, accessors);
-    Decls.append(accessors.Accessors.begin(), accessors.Accessors.end());
+  if (!PrimaryVar)
     return nullptr;
-  }
 
   if (!TyLoc.hasLocation()) {
     if (accessors.Get || accessors.Set || accessors.Address ||
@@ -5550,7 +5505,7 @@ Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
     Invalid = true;
   }
 
-  accessors.record(*this, PrimaryVar, Invalid, Decls);
+  accessors.record(*this, PrimaryVar, Invalid);
 
   return makeParserResult(PrimaryVar);
 }
@@ -5577,11 +5532,8 @@ AccessorDecl *Parser::ParsedAccessors::add(AccessorDecl *accessor) {
 
 /// Record a bunch of parsed accessors into the given abstract storage decl.
 void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
-                                     bool invalid,
-                                     SmallVectorImpl<Decl *> &decls) {
+                                     bool invalid) {
   classify(P, storage, invalid);
-
-  decls.append(Accessors.begin(), Accessors.end());
   storage->setAccessors(LBLoc, Accessors, RBLoc);
 }
 
@@ -7079,6 +7031,9 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
                           accessors, Subscript, StaticLoc);
   }
 
+  // Now that it's been parsed, set the end location.
+  Subscript->setEndLoc(PreviousLoc);
+
   bool Invalid = false;
   // Reject 'subscript' functions outside of type decls
   if (!(Flags & PD_HasContainerType)) {
@@ -7086,7 +7041,7 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
     Invalid = true;
   }
 
-  accessors.record(*this, Subscript, (Invalid || !Status.isSuccess()), Decls);
+  accessors.record(*this, Subscript, (Invalid || !Status.isSuccess()));
 
   // No need to setLocalDiscriminator because subscripts cannot
   // validly appear outside of type decls.
@@ -7168,6 +7123,7 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
                                            throwsLoc.isValid(), throwsLoc,
                                            Params.get(), nullptr,
                                            CurDeclContext);
+  CD->getAttrs() = Attributes;
 
   // Parse a 'where' clause if present, adding it to our GenericParamList.
   if (Tok.is(tok::kw_where)) {
@@ -7182,11 +7138,6 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   }
 
   CD->setGenericParams(GenericParams);
-
-  CtorInitializerKind initKind = CtorInitializerKind::Designated;
-  if (Attributes.hasAttribute<ConvenienceAttr>())
-    initKind = CtorInitializerKind::Convenience;
-  CD->setInitKind(initKind);
 
   // No need to setLocalDiscriminator.
 
@@ -7209,8 +7160,6 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   } else {
     parseAbstractFunctionBody(CD);
   }
-
-  CD->getAttrs() = Attributes;
 
   return makeParserResult(CD);
 }

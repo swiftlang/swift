@@ -139,6 +139,7 @@ func funcdecl7(_ a: Int, b: (c: Int, d: Int), third: (c: Int, d: Int)) -> Int {
 
 // Error recovery.
 func testfunc2 (_: ((), Int) -> Int) -> Int {}
+func makeTuple() -> (String, Int) { return ("foo", 42) }
 func errorRecovery() {
   testfunc2({ $0 + 1 }) // expected-error {{contextual closure type '((), Int) -> Int' expects 2 arguments, but 1 was used in closure body}}
 
@@ -149,12 +150,14 @@ func errorRecovery() {
   var a: Int = .hello // expected-error {{type 'Int' has no member 'hello'}}
   var b: union1 = .bar // ok
   var c: union1 = .xyz  // expected-error {{type 'union1' has no member 'xyz'}}
-  var d: (Int,Int,Int) = (1,2) // expected-error {{cannot convert value of type '(Int, Int)' to specified type '(Int, Int, Int)'}}
-  var e: (Int,Int) = (1, 2, 3) // expected-error {{cannot convert value of type '(Int, Int, Int)' to specified type '(Int, Int)'}}
-  var f: (Int,Int) = (1, 2, f : 3) // expected-error {{cannot convert value of type '(Int, Int, f: Int)' to specified type '(Int, Int)'}}
+  var d: (Int,Int,Int) = (1,2) // expected-error {{'(Int, Int)' is not convertible to '(Int, Int, Int)', tuples have a different number of elements}}
+  var e: (Int,Int) = (1, 2, 3) // expected-error {{'(Int, Int, Int)' is not convertible to '(Int, Int)', tuples have a different number of elements}}
+  var f: (Int,Int) = (1, 2, f : 3) // expected-error {{'(Int, Int, f: Int)' is not convertible to '(Int, Int)', tuples have a different number of elements}}
   
   // <rdar://problem/22426860> CrashTracer: [USER] swift at …mous_namespace::ConstraintGenerator::getTypeForPattern + 698
-  var (g1, g2, g3) = (1, 2) // expected-error {{'(Int, Int)' is not convertible to '(_, _, _)', tuples have a different number of elements}}
+  var (g1, g2, g3) = (1, 2) // expected-error {{'(Int, Int)' is not convertible to '(Int, Int, Any)', tuples have a different number of elements}}
+  var (h1, h2) = (1, 2, 3) // expected-error {{'(Int, Int, Int)' is not convertible to '(Int, Int)', tuples have a different number of elements}}
+  var i: (Bool, Bool) = makeTuple() // expected-error {{tuple type '(String, Int)' is not convertible to tuple '(Bool, Bool)'}}
 }
 
 func acceptsInt(_ x: Int) {}
@@ -185,7 +188,7 @@ func test4() -> ((_ arg1: Int, _ arg2: Int) -> Int) {
 func test5() {
   let a: (Int, Int) = (1,2)
   var
-     _: ((Int) -> Int, Int) = a  // expected-error {{cannot convert value of type '(Int, Int)' to specified type '((Int) -> Int, Int)'}}
+     _: ((Int) -> Int, Int) = a  // expected-error {{tuple type '(Int, Int)' is not convertible to tuple '((Int) -> Int, Int)'}}
 
 
   let c: (a: Int, b: Int) = (1,2)

@@ -4077,7 +4077,7 @@ namespace {
         method = func;
       } else if (auto var = dyn_cast<VarDecl>(foundDecl)) {
         // Properties.
-        maybeAddAccessorsToStorage(var);
+        addExpectedOpaqueAccessorsToStorage(var);
 
         // If this isn't a property on a type, complain.
         if (!var->getDeclContext()->isTypeContext()) {
@@ -4123,12 +4123,12 @@ namespace {
           // The property is non-settable, so add "getter:".
           primaryDiag.fixItInsert(modifierLoc, "getter: ");
           E->overrideObjCSelectorKind(ObjCSelectorExpr::Getter, modifierLoc);
-          method = var->getGetter();
+          method = var->getOpaqueAccessor(AccessorKind::Get);
           break;
         }
 
         case ObjCSelectorExpr::Getter:
-          method = var->getGetter();
+          method = var->getOpaqueAccessor(AccessorKind::Get);
           break;
 
         case ObjCSelectorExpr::Setter:
@@ -4149,7 +4149,7 @@ namespace {
             return E;
           }
 
-          method = var->getSetter();
+          method = var->getOpaqueAccessor(AccessorKind::Set);
           break;
         }
       } else {

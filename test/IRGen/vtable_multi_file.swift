@@ -13,3 +13,7 @@ func baseClassVtablesIncludeImplicitInits() {
   // CHECK: load { i64, %swift.bridge* } (%swift.type*)*, { i64, %swift.bridge* } (%swift.type*)** [[T2]]
   markUsed(Subclass.classProp)
 }
+
+func forEachFinalizesVTable(_ h: Holder) {
+  for _ in h.getSillySequence() {}
+}

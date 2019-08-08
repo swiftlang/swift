@@ -161,6 +161,7 @@ import StringEnum
 import StringInterpolation
 import StringMatch
 import StringRemoveDupes
+import StringReplaceSubrange
 import StringTests
 import StringWalk
 import Substring
@@ -343,6 +344,7 @@ registerBenchmark(StringInterpolationManySmallSegments)
 registerBenchmark(StringMatch)
 registerBenchmark(StringNormalization)
 registerBenchmark(StringRemoveDupes)
+registerBenchmark(StringReplaceSubrange)
 registerBenchmark(StringTests)
 registerBenchmark(StringWalk)
 registerBenchmark(SubstringTest)

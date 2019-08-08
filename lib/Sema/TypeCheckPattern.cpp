@@ -37,7 +37,7 @@ extractEnumElement(TypeChecker &TC, DeclContext *DC, SourceLoc UseLoc,
                    const VarDecl *constant) {
   diagnoseExplicitUnavailability(constant, UseLoc, DC, nullptr);
 
-  const FuncDecl *getter = constant->getGetter();
+  const FuncDecl *getter = constant->getAccessor(AccessorKind::Get);
   if (!getter)
     return nullptr;
 
@@ -809,8 +809,8 @@ static void requestLayoutForMetadataSources(TypeChecker &tc, Type type) {
     // parameter is of dependent type then the body of a function with said
     // parameter could potentially require the generic type's layout to
     // recover them.
-    if (auto *nominalDecl = type->getAnyNominal()) {
-      tc.requestNominalLayout(nominalDecl);
+    if (auto *classDecl = type->getClassOrBoundGenericClass()) {
+      tc.requestClassLayout(classDecl);
     }
   });
 }

@@ -539,6 +539,7 @@ static bool isReturnAttribute(llvm::Attribute::AttrKind Attr);
 namespace RuntimeConstants {
   const auto ReadNone = llvm::Attribute::ReadNone;
   const auto ReadOnly = llvm::Attribute::ReadOnly;
+  const auto ArgMemOnly = llvm::Attribute::ArgMemOnly;
   const auto NoReturn = llvm::Attribute::NoReturn;
   const auto NoUnwind = llvm::Attribute::NoUnwind;
   const auto ZExt = llvm::Attribute::ZExt;

@@ -183,8 +183,7 @@ public func concrete_concrete() {
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s34conditional_conformance_with_assoc09concrete_E0yyF"()
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s34conditional_conformance_with_assoc6DoubleVyAA8IsAlsoP2VAA0F2P3VGMa"(i64 0)
-// CHECK-NEXT:    [[X:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
+// CHECK-NEXT:    [[X:%.*]] = call {{.*}} @__swift_instantiateConcreteTypeFromMangledName({{.*}} @"$s34conditional_conformance_with_assoc6DoubleVyAA8IsAlsoP2VAA0F2P3VGMD")
 // CHECK-NEXT:    [[Z:%.*]] = call i8** @"$s34conditional_conformance_with_assoc6DoubleVyAA8IsAlsoP2VAA0F2P3VGACyxq_GAA2P1A2A0I0R_AA0H03AT2RpzAakM_AmaLP3AT3RPzrlWl"()
 // CHECK-NEXT:    call swiftcc void @"$s34conditional_conformance_with_assoc8takes_p1yyxmAA2P1RzlF"(%swift.type* [[X]], %swift.type* [[X]], i8** [[Z]])
 // CHECK-NEXT:    ret void
