@@ -3394,7 +3394,7 @@ static SILValue joinElements(ArrayRef<SILValue> elements, SILBuilder &builder,
 /// Adapted from `SILGenModule::getOrCreateReabstractionThunk`.
 ManagedValue
 SILGenFunction::getThunkedAutoDiffLinearMap(
-    ManagedValue linearMap, AutoDiffAssociatedFunctionKind assocFnKind,
+    ManagedValue linearMap, AutoDiffLinearMapKind linearMapKind,
     CanSILFunctionType fromType, CanSILFunctionType toType,
     bool reorderSelf) {
   // Compute the thunk type.
@@ -3418,11 +3418,11 @@ SILGenFunction::getThunkedAutoDiffLinearMap(
       thunkType, fromInterfaceType, toInterfaceType,
       Type(), getModule().getSwiftModule());
   // TODO(TF-685): Use principled thunk mangling.
-  switch (assocFnKind) {
-  case AutoDiffAssociatedFunctionKind::JVP:
+  switch (linearMapKind) {
+  case AutoDiffLinearMapKind::Differential:
     name += "_differential";
     break;
-  case AutoDiffAssociatedFunctionKind::VJP:
+  case AutoDiffLinearMapKind::Pullback:
     name += "_pullback";
     break;
   }
@@ -3476,20 +3476,30 @@ SILGenFunction::getThunkedAutoDiffLinearMap(
   //   - If self is direct, reorder direct results after `apply` is generated.
   // - For differentials: reorder parameter infos and arguments.
   auto numIndirectResults = thunkIndirectResults.size();
-  if (reorderSelf && assocFnKind == AutoDiffAssociatedFunctionKind::VJP &&
+  if (reorderSelf && linearMapKind == AutoDiffLinearMapKind::Pullback &&
       toResults.size() > 1) {
     auto toSelfResult = toResults.back();
     if (toSelfResult.isFormalIndirect() && numIndirectResults > 1) {
+      // Before: [ind_res1, ind_res2, ..., ind_res_self, arg1, arg2, ..., pb]
+      //  After: [ind_res_self, ind_res1, ind_res2, ..., arg1, arg2, ..., pb]
       std::rotate(thunkArguments.begin(),
                   thunkArguments.begin() + numIndirectResults - 1,
                   thunkArguments.begin() + numIndirectResults);
+      // Before: [ind_res1, ind_res2, ..., ind_res_self]
+      //  After: [ind_res_self, ind_res1, ind_res2, ...]
+      std::rotate(thunkIndirectResults.begin(), thunkIndirectResults.end() - 1,
+                  thunkIndirectResults.end());
     }
     std::rotate(toResults.begin(), toResults.end() - 1, toResults.end());
   }
-  if (reorderSelf && assocFnKind == AutoDiffAssociatedFunctionKind::JVP &&
+  if (reorderSelf && linearMapKind == AutoDiffLinearMapKind::Differential &&
       thunkArguments.size() > 1) {
+    // Before: [ind_res1, ind_res2, ..., arg1, arg2, ..., arg_self, df]
+    //  After: [ind_res1, ind_res2, ..., arg_self, arg1, arg2, ..., df]
     std::rotate(thunkArguments.begin() + numIndirectResults,
                 thunkArguments.end() - 2, thunkArguments.end() - 1);
+    // Before: [arg1, arg2, ..., arg_self]
+    //  After: [arg_self, arg1, arg2, ...]
     std::rotate(toParameters.begin(), toParameters.end() - 1,
                 toParameters.end());
   }
@@ -3589,14 +3599,12 @@ SILGenFunction::getThunkedAutoDiffLinearMap(
 
   // Handle self reordering.
   // For pullbacks: rotate direct results if self is direct.
-  if (reorderSelf && assocFnKind == AutoDiffAssociatedFunctionKind::VJP) {
+  if (reorderSelf && linearMapKind == AutoDiffLinearMapKind::Pullback) {
     auto fromSelfResult = fromConv.getResults().front();
     auto toSelfResult = toConv.getResults().back();
     assert(fromSelfResult.getType() == toSelfResult.getType());
-    if (toSelfResult.isFormalIndirect() && thunkIndirectResults.size() > 1) {
-      std::rotate(thunkIndirectResults.begin(), thunkIndirectResults.end() - 1,
-                  thunkIndirectResults.end());
-    }
+    // Before: [dir_res_self, dir_res1, ind_res2, ...]
+    //  After: [dir_res1, ind_res2, ..., dir_res_self]
     if (toSelfResult.isFormalDirect() && fromSelfResult.isFormalDirect() &&
         directResults.size() > 1) {
       std::rotate(directResults.begin(), directResults.begin() + 1,
@@ -3802,8 +3810,9 @@ SILGenModule::getOrCreateAutoDiffAssociatedFunctionThunk(
   }
 
   // Otherwise, apply reabstraction/self reordering thunk to linear map.
+  auto linearMapKind = assocFnKind.getLinearMapKind();
   linearMap = thunkSGF.getThunkedAutoDiffLinearMap(
-      linearMap, assocFnKind, linearMapFnType, targetLinearMapFnType,
+      linearMap, linearMapKind, linearMapFnType, targetLinearMapFnType,
       reorderSelf);
 
   // Return original results and thunked differential/pullback.
