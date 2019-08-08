@@ -2210,7 +2210,8 @@ bool ContextualFailure::trySequenceSubsequenceFixIts(
   // Wrap in String.init
   if (FromType->isEqual(Substring)) {
     if (ToType->isEqual(String)) {
-      auto range = getAnchor()->getSourceRange();
+      auto *anchor = getAnchor()->getSemanticsProvidingExpr();
+      auto range = anchor->getSourceRange();
       diagnostic.fixItInsert(range.Start, "String(");
       diagnostic.fixItInsertAfter(range.End, ")");
       return true;
