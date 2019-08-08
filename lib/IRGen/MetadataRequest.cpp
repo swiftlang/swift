@@ -2378,6 +2378,12 @@ IRGenFunction::emitTypeMetadataRef(CanType type,
   // Look through any opaque types we're allowed to.
   type = IGM.substOpaqueTypesWithUnderlyingTypes(type);
 
+  // If we're asking for the metadata of the type that dynamic Self is known
+  // to be equal to, we can just use the self metadata.
+  if (ExactSelfType == type) {
+    return MetadataResponse::forComplete(getLocalSelfMetadata());
+  }
+  
   if (type->hasArchetype() ||
       isTypeMetadataAccessTrivial(IGM, type)) {
     // FIXME: propagate metadata request!

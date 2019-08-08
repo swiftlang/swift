@@ -290,6 +290,7 @@ namespace sil_block {
                      BCFixed<1>,  // has qualified ownership
                      BCFixed<1>,  // must be weakly referenced
                      BCFixed<1>,  // is dynamically replacable
+                     BCFixed<1>,  // exact self class
                      TypeIDField, // SILFunctionType
                      DeclIDField,  // SILFunction name or 0 (replaced function)
                      GenericEnvironmentIDField,

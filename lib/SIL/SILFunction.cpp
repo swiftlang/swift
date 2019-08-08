@@ -62,7 +62,9 @@ SILFunction::create(SILModule &M, SILLinkage linkage, StringRef name,
                     GenericEnvironment *genericEnv, Optional<SILLocation> loc,
                     IsBare_t isBareSILFunction, IsTransparent_t isTrans,
                     IsSerialized_t isSerialized, ProfileCounter entryCount,
-                    IsDynamicallyReplaceable_t isDynamic, IsThunk_t isThunk,
+                    IsDynamicallyReplaceable_t isDynamic,
+                    IsExactSelfClass_t isExactSelfClass,
+                    IsThunk_t isThunk,
                     SubclassScope classSubclassScope, Inline_t inlineStrategy,
                     EffectsKind E, SILFunction *insertBefore,
                     const SILDebugScope *debugScope) {
@@ -79,7 +81,8 @@ SILFunction::create(SILModule &M, SILLinkage linkage, StringRef name,
   auto fn = new (M) SILFunction(M, linkage, name, loweredType, genericEnv, loc,
                                 isBareSILFunction, isTrans, isSerialized,
                                 entryCount, isThunk, classSubclassScope,
-                                inlineStrategy, E, insertBefore, debugScope, isDynamic);
+                                inlineStrategy, E, insertBefore, debugScope,
+                                isDynamic, isExactSelfClass);
 
   if (entry) entry->setValue(fn);
   return fn;
@@ -95,7 +98,8 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage, StringRef Name,
                          Inline_t inlineStrategy, EffectsKind E,
                          SILFunction *InsertBefore,
                          const SILDebugScope *DebugScope,
-                         IsDynamicallyReplaceable_t isDynamic)
+                         IsDynamicallyReplaceable_t isDynamic,
+                         IsExactSelfClass_t isExactSelfClass)
     : Module(Module), Name(Name), LoweredType(LoweredType),
       GenericEnv(genericEnv), SpecializationInfo(nullptr),
       DebugScope(DebugScope), Bare(isBareSILFunction), Transparent(isTrans),
@@ -103,7 +107,9 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage, StringRef Name,
       ClassSubclassScope(unsigned(classSubclassScope)), GlobalInitFlag(false),
       InlineStrategy(inlineStrategy), Linkage(unsigned(Linkage)),
       HasCReferences(false), IsWeakLinked(false),
-      IsDynamicReplaceable(isDynamic), OptMode(OptimizationMode::NotSet),
+      IsDynamicReplaceable(isDynamic),
+      ExactSelfClass(isExactSelfClass),
+      OptMode(OptimizationMode::NotSet),
       EffectsKindAttr(E), EntryCount(entryCount) {
   assert(!Transparent || !IsDynamicReplaceable);
   validateSubclassScope(classSubclassScope, isThunk, nullptr);

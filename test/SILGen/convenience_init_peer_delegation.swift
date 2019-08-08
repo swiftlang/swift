@@ -18,7 +18,7 @@ class X {
     self.init(convenience: ())
   }
 
-  // CHECK-LABEL: sil hidden [ossa] @$s32convenience_init_peer_delegation1XC8requiredACyt_tcfC
+  // CHECK-LABEL: sil hidden [exact_self_class] [ossa] @$s32convenience_init_peer_delegation1XC8requiredACyt_tcfC
   required init(required: ()) {
   }
 

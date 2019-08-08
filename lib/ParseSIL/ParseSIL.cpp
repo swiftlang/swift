@@ -982,6 +982,7 @@ static bool parseDeclSILOptional(bool *isTransparent,
                                  bool *hasOwnershipSSA,
                                  IsThunk_t *isThunk,
                                  IsDynamicallyReplaceable_t *isDynamic,
+                                 IsExactSelfClass_t *isExactSelfClass,
                                  SILFunction **dynamicallyReplacedFunction,
                                  Identifier *objCReplacementFor,
                                  bool *isGlobalInit,
@@ -1010,6 +1011,8 @@ static bool parseDeclSILOptional(bool *isTransparent,
       *isSerialized = IsSerialized;
     else if (isDynamic && SP.P.Tok.getText() == "dynamically_replacable")
       *isDynamic = IsDynamic;
+    else if (isExactSelfClass && SP.P.Tok.getText() == "exact_self_class")
+      *isExactSelfClass = IsExactSelfClass;
     else if (isSerialized && SP.P.Tok.getText() == "serializable")
       *isSerialized = IsSerializable;
     else if (isCanonical && SP.P.Tok.getText() == "canonical")
@@ -5363,6 +5366,7 @@ bool SILParserTUState::parseDeclSIL(Parser &P) {
   IsSerialized_t isSerialized = IsNotSerialized;
   bool isCanonical = false;
   IsDynamicallyReplaceable_t isDynamic = IsNotDynamic;
+  IsExactSelfClass_t isExactSelfClass = IsNotExactSelfClass;
   bool hasOwnershipSSA = false;
   IsThunk_t isThunk = IsNotThunk;
   bool isGlobalInit = false, isWeakLinked = false;
@@ -5378,7 +5382,7 @@ bool SILParserTUState::parseDeclSIL(Parser &P) {
   if (parseSILLinkage(FnLinkage, P) ||
       parseDeclSILOptional(
           &isTransparent, &isSerialized, &isCanonical, &hasOwnershipSSA,
-          &isThunk, &isDynamic, &DynamicallyReplacedFunction,
+          &isThunk, &isDynamic, &isExactSelfClass, &DynamicallyReplacedFunction,
           &objCReplacementFor, &isGlobalInit, &inlineStrategy, &optimizationMode, nullptr,
           &isWeakLinked, &isWithoutActuallyEscapingThunk, &Semantics,
           &SpecAttrs, &ClangDecl, &MRK, FunctionState, M) ||
@@ -5409,6 +5413,7 @@ bool SILParserTUState::parseDeclSIL(Parser &P) {
       FunctionState.F->setOwnershipEliminated();
     FunctionState.F->setThunk(IsThunk_t(isThunk));
     FunctionState.F->setIsDynamic(isDynamic);
+    FunctionState.F->setIsExactSelfClass(isExactSelfClass);
     FunctionState.F->setDynamicallyReplacedFunction(
         DynamicallyReplacedFunction);
     if (!objCReplacementFor.empty())
@@ -5594,8 +5599,10 @@ bool SILParserTUState::parseSILGlobal(Parser &P) {
   SILParser State(P);
   if (parseSILLinkage(GlobalLinkage, P) ||
       parseDeclSILOptional(nullptr, &isSerialized, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           &isLet, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, State, M) ||
+                           nullptr, nullptr, nullptr, nullptr, nullptr,
+                           nullptr, nullptr,
+                           &isLet, nullptr, nullptr, nullptr, nullptr, nullptr,
+                           nullptr, State, M) ||
       P.parseToken(tok::at_sign, diag::expected_sil_value_name) ||
       P.parseIdentifier(GlobalName, NameLoc, diag::expected_sil_value_name) ||
       P.parseToken(tok::colon, diag::expected_sil_type))
@@ -5643,7 +5650,8 @@ bool SILParserTUState::parseSILProperty(Parser &P) {
   IsSerialized_t Serialized = IsNotSerialized;
   if (parseDeclSILOptional(nullptr, &Serialized, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, SP, M))
+                           nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                           nullptr, nullptr, SP, M))
     return true;
   
   ValueDecl *VD;
@@ -5711,7 +5719,8 @@ bool SILParserTUState::parseSILVTable(Parser &P) {
   IsSerialized_t Serialized = IsNotSerialized;
   if (parseDeclSILOptional(nullptr, &Serialized, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                           nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                           nullptr, nullptr,
                            VTableState, M))
     return true;
 
@@ -6243,7 +6252,8 @@ bool SILParserTUState::parseSILWitnessTable(Parser &P) {
   IsSerialized_t isSerialized = IsNotSerialized;
   if (parseDeclSILOptional(nullptr, &isSerialized, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                           nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                           nullptr, nullptr,
                            WitnessState, M))
     return true;
 

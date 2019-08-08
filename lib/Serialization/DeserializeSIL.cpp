@@ -471,13 +471,14 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   unsigned rawLinkage, isTransparent, isSerialized, isThunk,
       isWithoutactuallyEscapingThunk, isGlobal, inlineStrategy,
       optimizationMode, effect, numSpecAttrs, hasQualifiedOwnership,
-      isWeakLinked, isDynamic;
+      isWeakLinked, isDynamic, isExactSelfClass;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(
       scratch, rawLinkage, isTransparent, isSerialized, isThunk,
       isWithoutactuallyEscapingThunk, isGlobal, inlineStrategy,
       optimizationMode, effect, numSpecAttrs, hasQualifiedOwnership,
-      isWeakLinked, isDynamic, funcTyID, replacedFunctionID, genericEnvID,
+      isWeakLinked, isDynamic, isExactSelfClass,
+      funcTyID, replacedFunctionID, genericEnvID,
       clangNodeOwnerID, SemanticsIDs);
 
   if (funcTyID == 0) {
@@ -588,6 +589,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     fn->setOptimizationMode(OptimizationMode(optimizationMode));
     fn->setWeakLinked(isWeakLinked);
     fn->setIsDynamic(IsDynamicallyReplaceable_t(isDynamic));
+    fn->setIsExactSelfClass(IsExactSelfClass_t(isExactSelfClass));
     if (replacedFunction)
       fn->setDynamicallyReplacedFunction(replacedFunction);
     if (!replacedObjectiveCFunc.empty())
@@ -2539,13 +2541,14 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
   unsigned rawLinkage, isTransparent, isSerialized, isThunk,
       isWithoutactuallyEscapingThunk, isGlobal, inlineStrategy,
       optimizationMode, effect, numSpecAttrs, hasQualifiedOwnership,
-      isWeakLinked, isDynamic;
+      isWeakLinked, isDynamic, isExactSelfClass;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(
       scratch, rawLinkage, isTransparent, isSerialized, isThunk,
       isWithoutactuallyEscapingThunk, isGlobal, inlineStrategy,
       optimizationMode, effect, numSpecAttrs, hasQualifiedOwnership,
-      isWeakLinked, isDynamic, funcTyID, replacedFunctionID, genericEnvID,
+      isWeakLinked, isDynamic, isExactSelfClass,
+      funcTyID, replacedFunctionID, genericEnvID,
       clangOwnerID, SemanticsIDs);
   auto linkage = fromStableSILLinkage(rawLinkage);
   if (!linkage) {
