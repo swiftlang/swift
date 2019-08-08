@@ -6276,7 +6276,7 @@ AbstractStorageDecl::AccessorRecord::getAccessor(AccessorKind kind) const {
   }
   return nullptr;
 }
-
+  
 /// This represents a 'case' declaration in an 'enum', which may declare
 /// one or more individual comma-separated EnumElementDecls.
 class EnumCaseDecl final
