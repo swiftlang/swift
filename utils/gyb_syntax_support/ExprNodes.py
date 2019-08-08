@@ -462,7 +462,7 @@ EXPR_NODES = [
          traits=['Parenthesized'],
          children=[
              Child('Backslash', kind='BackslashToken'),
-             Child('Delimiter', kind='RawStringDelimiterToken',
+             Child('Delimiter', kind='RawStringDelimiterToken', 
                    is_optional=True),
              Child('LeftParen', kind='LeftParenToken',
                    classification='StringInterpolationAnchor',
@@ -475,7 +475,7 @@ EXPR_NODES = [
     # e.g. "abc \(foo()) def"
     Node('StringLiteralExpr', kind='Expr',
          children=[
-             Child('OpenDelimiter', kind='RawStringDelimiterToken',
+             Child('OpenDelimiter', kind='RawStringDelimiterToken', 
                    is_optional=True),
              Child('OpenQuote', kind='Token',
                    token_choices=[
@@ -489,7 +489,7 @@ EXPR_NODES = [
                        'StringQuoteToken',
                        'MultilineStringQuoteToken',
                    ]),
-             Child('CloseDelimiter', kind='RawStringDelimiterToken',
+             Child('CloseDelimiter', kind='RawStringDelimiterToken', 
                    is_optional=True),
          ]),
 
