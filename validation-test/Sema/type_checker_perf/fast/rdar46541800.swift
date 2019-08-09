@@ -1,5 +1,5 @@
 // RUN: %target-typecheck-verify-swift
-// RUN: %target-typecheck-verify-swift -solver-enable-operator-designated-types
+// RUN: %target-typecheck-verify-swift
 // REQUIRES: OS=macosx
 
 import simd
