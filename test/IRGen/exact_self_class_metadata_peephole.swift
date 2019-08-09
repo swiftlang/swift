@@ -62,7 +62,8 @@ final private class FinalPrivateNonfinalSubclass<U>: PrivateNonfinal<U, String, 
   // CHECK-LABEL: define {{.*}}FinalPrivateNonfinalSubclass{{.*}}burts
   @inline(never)
   final func burts() {
-    // CHECK: [[TYPE:%.*]] = call {{.*}} @swift_getObjectType
+    // CHECK: [[TYPE_GEP:%.*]] = getelementptr {{.*}} %0
+    // CHECK: [[TYPE:%.*]] = load {{.*}} [[TYPE_GEP]]
     // CHECK: call {{.*}} @useMetadata(%swift.type* [[TYPE]], %swift.type* [[TYPE]])
     useMetadata(FinalPrivateNonfinalSubclass<U>.self)
     // CHECK: [[INSTANTIATED_TYPE:%.*]] = call {{.*}} @__swift_instantiateConcreteTypeFromMangledName({{.*}}FinalPrivateNonfinalSubclass
@@ -80,7 +81,8 @@ final private class PrivateFinal<T, U, V> {
 
   // CHECK-LABEL: define {{.*}}PrivateFinal{{.*}}butts
   func butts() {
-    // CHECK: [[TYPE:%.*]] = call {{.*}} @swift_getObjectType
+    // CHECK: [[TYPE_GEP:%.*]] = getelementptr {{.*}} %0
+    // CHECK: [[TYPE:%.*]] = load {{.*}} [[TYPE_GEP]]
     // CHECK: call {{.*}} @useMetadata(%swift.type* [[TYPE]], %swift.type* [[TYPE]])
     useMetadata(PrivateFinal<T, U, V>.self)
     // CHECK: [[INSTANTIATED_TYPE:%.*]] = call {{.*}} @__swift_instantiateConcreteTypeFromMangledName({{.*}}PrivateFinal
