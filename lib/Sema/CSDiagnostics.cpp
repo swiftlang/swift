@@ -2208,6 +2208,7 @@ bool MissingMemberFailure::diagnoseAsError() {
   }
 
   auto baseType = resolveType(getBaseType())->getWithoutSpecifierType();
+  auto baseExprType = getType(baseExpr)->getWithoutSpecifierType();
 
   DeclNameLoc nameLoc(anchor->getStartLoc());
   if (auto *UDE = dyn_cast<UnresolvedDotExpr>(anchor)) {
@@ -2236,6 +2237,13 @@ bool MissingMemberFailure::diagnoseAsError() {
   auto tryTypoCorrection = [&] {
     TC.performTypoCorrection(getDC(), DeclRefKind::Ordinary, baseType,
                              defaultMemberLookupOptions, corrections);
+    // If isForKeyPathDynamicMemberLookup we are including the
+    // typo corrections to the wrapper type too.
+    if (getLocator()->isForKeyPathDynamicMemberLookup()) {
+      TC.performTypoCorrection(getDC(), DeclRefKind::Ordinary,
+                               baseExprType, defaultMemberLookupOptions,
+                               corrections);
+    }
   };
 
   if (getName().getBaseName().getKind() == DeclBaseName::Kind::Subscript) {
@@ -2302,12 +2310,26 @@ bool MissingMemberFailure::diagnoseAsError() {
     tryTypoCorrection();
 
     if (auto correction = corrections.claimUniqueCorrection()) {
-      auto diagnostic = emitDiagnostic(
-          anchor->getLoc(), diag::could_not_find_value_member_corrected,
-          baseType, getName(), correction->CorrectedName);
-      diagnostic.highlight(baseExpr->getSourceRange())
-          .highlight(nameLoc.getSourceRange());
-      correction->addFixits(diagnostic);
+      if (getLocator()->isForKeyPathDynamicMemberLookup()) {
+        auto diagnostic = emitDiagnostic(
+                                         anchor->getLoc(),
+                                         diag::could_not_find_value_dynamic_member_corrected,
+                                         baseExprType, baseType, getName(),
+                                         correction->CorrectedName);
+        diagnostic.highlight(baseExpr->getSourceRange())
+        .highlight(nameLoc.getSourceRange());
+        correction->addFixits(diagnostic);
+        
+      } else {
+        auto diagnostic = emitDiagnostic(
+                                         anchor->getLoc(),
+                                         diag::could_not_find_value_member_corrected,
+                                         baseType, getName(),
+                                         correction->CorrectedName);
+        diagnostic.highlight(baseExpr->getSourceRange())
+        .highlight(nameLoc.getSourceRange());
+        correction->addFixits(diagnostic);
+      }
     } else {
       emitBasicError(baseType);
     }
