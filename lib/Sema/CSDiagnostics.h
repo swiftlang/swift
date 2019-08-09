@@ -544,45 +544,6 @@ public:
   bool diagnoseAsError() override;
 };
 
-/// Diagnose failures related attempt to implicitly convert types which
-/// do not support such implicit converstion.
-/// "as" or "as!" has to be specified explicitly in cases like that.
-class MissingExplicitConversionFailure final : public FailureDiagnostic {
-  Type ConvertingTo;
-
-public:
-  MissingExplicitConversionFailure(Expr *expr, ConstraintSystem &cs,
-                                   ConstraintLocator *locator, Type toType)
-      : FailureDiagnostic(expr, cs, locator), ConvertingTo(toType) {}
-
-  bool diagnoseAsError() override;
-
-private:
-  bool exprNeedsParensBeforeAddingAs(Expr *expr) {
-    auto *DC = getDC();
-    auto &TC = getTypeChecker();
-
-    auto asPG = TC.lookupPrecedenceGroup(
-        DC, DC->getASTContext().Id_CastingPrecedence, SourceLoc());
-    if (!asPG)
-      return true;
-    return exprNeedsParensInsideFollowingOperator(TC, DC, expr, asPG);
-  }
-
-  bool exprNeedsParensAfterAddingAs(Expr *expr, Expr *rootExpr) {
-    auto *DC = getDC();
-    auto &TC = getTypeChecker();
-
-    auto asPG = TC.lookupPrecedenceGroup(
-        DC, DC->getASTContext().Id_CastingPrecedence, SourceLoc());
-    if (!asPG)
-      return true;
-
-    return exprNeedsParensOutsideFollowingOperator(TC, DC, expr, rootExpr,
-                                                   asPG);
-  }
-};
-
 /// Diagnose failures related to attempting member access on optional base
 /// type without optional chaining or force-unwrapping it first.
 class MemberAccessOnOptionalBaseFailure final : public FailureDiagnostic {
@@ -737,6 +698,44 @@ private:
   /// Try to add a fix-it to convert a stored property into a computed
   /// property
   void tryComputedPropertyFixIts(Expr *expr) const;
+};
+
+/// Diagnose failures related attempt to implicitly convert types which
+/// do not support such implicit converstion.
+/// "as" or "as!" has to be specified explicitly in cases like that.
+class MissingExplicitConversionFailure final : public ContextualFailure {
+public:
+  MissingExplicitConversionFailure(Expr *expr, ConstraintSystem &cs,
+                                   Type fromType, Type toType,
+                                   ConstraintLocator *locator)
+      : ContextualFailure(expr, cs, fromType, toType, locator) {}
+
+  bool diagnoseAsError() override;
+
+private:
+  bool exprNeedsParensBeforeAddingAs(Expr *expr) {
+    auto *DC = getDC();
+    auto &TC = getTypeChecker();
+
+    auto asPG = TC.lookupPrecedenceGroup(
+        DC, DC->getASTContext().Id_CastingPrecedence, SourceLoc());
+    if (!asPG)
+      return true;
+    return exprNeedsParensInsideFollowingOperator(TC, DC, expr, asPG);
+  }
+
+  bool exprNeedsParensAfterAddingAs(Expr *expr, Expr *rootExpr) {
+    auto *DC = getDC();
+    auto &TC = getTypeChecker();
+
+    auto asPG = TC.lookupPrecedenceGroup(
+        DC, DC->getASTContext().Id_CastingPrecedence, SourceLoc());
+    if (!asPG)
+      return true;
+
+    return exprNeedsParensOutsideFollowingOperator(TC, DC, expr, rootExpr,
+                                                   asPG);
+  }
 };
 
 /// Diagnose failures related to passing value of some type
