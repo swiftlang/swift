@@ -375,6 +375,8 @@ public:
   void print(llvm::raw_ostream &os) const;
 };
 
+class DifferentiableActivityInfo;
+
 /// Information about the VJP/JVP function produced during VJP/JVP generation,
 /// e.g. mappings from original values to corresponding values in the
 /// pullback/differential struct.
@@ -391,6 +393,9 @@ private:
 
   /// The original function.
   SILFunction *const original;
+
+  /// Activitiy info of the original function.
+  const DifferentiableActivityInfo &activityInfo;
 
   /// Mapping from original basic blocks to linear map structs.
   DenseMap<SILBasicBlock *, StructDecl *> linearMapStructs;
@@ -415,6 +420,8 @@ private:
 
   /// A type converter, used to compute struct/enum SIL types.
   Lowering::TypeConverter &typeConverter;
+
+  SILBuilder &builder;
 
 private:
   VarDecl *addVarDecl(NominalTypeDecl *nominal, StringRef name, Type type) {
@@ -633,6 +640,46 @@ private:
     return linearMapStruct;
   }
 
+  /// Add a linear map to the linear map struct.
+  VarDecl *addLinearMapDecl(SILInstruction *inst, SILType linearMapType) {
+    // IRGen requires decls to have AST types (not `SILFunctionType`), so we
+    // convert the `SILFunctionType` of the linear map to a `FunctionType` with
+    // the same parameters and results.
+    auto silFnTy = linearMapType.castTo<SILFunctionType>();
+    SmallVector<AnyFunctionType::Param, 8> params;
+    for (auto &param : silFnTy->getParameters())
+      params.push_back(AnyFunctionType::Param(param.getType()));
+    AnyFunctionType *astFnTy;
+    if (auto genSig = silFnTy->getGenericSignature())
+      astFnTy = GenericFunctionType::get(
+          genSig, params, silFnTy->getAllResultsType().getASTType());
+    else
+      astFnTy = FunctionType::get(
+          params, silFnTy->getAllResultsType().getASTType());
+
+    auto *origBB = inst->getParent();
+    auto *linMapStruct = getLinearMapStruct(origBB);
+    std::string linearMapName;
+    switch (kind) {
+    case swift::AutoDiffAssociatedFunctionKind::JVP:
+      linearMapName = "differential_" + llvm::itostr(linearMapValueMap.size());
+      break;
+    case swift::AutoDiffAssociatedFunctionKind::VJP:
+      linearMapName = "pullback_" + llvm::itostr(linearMapValueMap.size());
+      break;
+    }
+    auto *linearMapDecl = addVarDecl(linMapStruct, linearMapName, astFnTy);
+    linearMapValueMap.insert({inst, linearMapDecl});
+    return linearMapDecl;
+  }
+
+  void prepareLinearMapStructDeclarations(
+      ADContext &context, const SILAutoDiffIndices &indices,
+      SILFunction *assocFn);
+
+  bool shouldBeDifferentiated(ApplyInst *inst,
+                              const SILAutoDiffIndices &indices);
+
 public:
   LinearMapInfo(const LinearMapInfo &) = delete;
   LinearMapInfo &operator=(const LinearMapInfo &) = delete;
@@ -640,7 +687,9 @@ public:
   explicit LinearMapInfo(ADContext &context,
                          AutoDiffAssociatedFunctionKind kind,
                          SILFunction *original, SILFunction *assocFn,
-                         const SILAutoDiffIndices &indices);
+                         const SILAutoDiffIndices &indices,
+                         const DifferentiableActivityInfo &activityInfo,
+                         SILBuilder &builder);
 
   /// Returns the linear map struct associated with the given original block.
   StructDecl *getLinearMapStruct(SILBasicBlock *origBB) const {
@@ -692,39 +741,6 @@ public:
   VarDecl *lookUpLinearMapStructEnumField(SILBasicBlock *origBB) {
     auto *linearMapStruct = getLinearMapStruct(origBB);
     return linearMapStructEnumFields.lookup(linearMapStruct);
-  }
-
-  /// Add a linear map to the linear map struct.
-  VarDecl *addLinearMapDecl(SILInstruction *inst, SILType linearMapType) {
-    // IRGen requires decls to have AST types (not `SILFunctionType`), so we
-    // convert the `SILFunctionType` of the linear map to a `FunctionType` with
-    // the same parameters and results.
-    auto silFnTy = linearMapType.castTo<SILFunctionType>();
-    SmallVector<AnyFunctionType::Param, 8> params;
-    for (auto &param : silFnTy->getParameters())
-      params.push_back(AnyFunctionType::Param(param.getType()));
-    AnyFunctionType *astFnTy;
-    if (auto genSig = silFnTy->getGenericSignature())
-      astFnTy = GenericFunctionType::get(
-          genSig, params, silFnTy->getAllResultsType().getASTType());
-    else
-      astFnTy = FunctionType::get(
-          params, silFnTy->getAllResultsType().getASTType());
-
-    auto *origBB = inst->getParent();
-    auto *linMapStruct = getLinearMapStruct(origBB);
-    std::string linearMapName;
-    switch (kind) {
-    case swift::AutoDiffAssociatedFunctionKind::JVP:
-      linearMapName = "differential_" + llvm::itostr(linearMapValueMap.size());
-      break;
-    case swift::AutoDiffAssociatedFunctionKind::VJP:
-      linearMapName = "pullback_" + llvm::itostr(linearMapValueMap.size());
-      break;
-    }
-    auto *linearMapDecl = addVarDecl(linMapStruct, linearMapName, astFnTy);
-    linearMapValueMap.insert({inst, linearMapDecl});
-    return linearMapDecl;
   }
 
   /// Finds the linear map declaration in the pullback struct for an `apply` or
@@ -1259,41 +1275,6 @@ ADContext::emitNondifferentiabilityError(SourceLoc loc,
   }
 }
 
-LinearMapInfo::LinearMapInfo(ADContext &context,
-                             AutoDiffAssociatedFunctionKind kind,
-                             SILFunction *original, SILFunction *assocFn,
-                             const SILAutoDiffIndices &indices)
-    : kind(kind), original(original), typeConverter(context.getTypeConverter())
-{
-  auto &astCtx = original->getASTContext();
-  auto *loopAnalysis = context.getPassManager().getAnalysis<SILLoopAnalysis>();
-  auto *loopInfo = loopAnalysis->get(original);
-  // Get the associated function generic signature.
-  CanGenericSignature assocFnGenSig = nullptr;
-  if (auto *assocFnGenEnv = assocFn->getGenericEnvironment())
-    assocFnGenSig = assocFnGenEnv->getGenericSignature()->getCanonicalSignature();
-  // Create branching trace enum and pullback struct for each original block.
-  for (auto &origBB : *original) {
-    auto *linearMapStruct = createLinearMapStruct(&origBB, indices, assocFnGenSig);
-    linearMapStructs.insert({&origBB, linearMapStruct});
-  }
-  for (auto &origBB : *original) {
-    auto *linearMapStruct = getLinearMapStruct(&origBB);
-    auto *traceEnum =
-        createBranchingTraceDecl(&origBB, indices, assocFnGenSig);
-    // If original block is in a loop, mark branching trace enum as indirect.
-    if (loopInfo->getLoopFor(&origBB))
-      traceEnum->getAttrs().add(new (astCtx) IndirectAttr(/*Implicit*/ true));
-    branchingTraceDecls.insert({&origBB, traceEnum});
-    if (origBB.isEntry())
-      continue;
-    auto *traceEnumField =
-        addVarDecl(linearMapStruct, astCtx.getIdentifier("predecessor").str(),
-                   traceEnum->getDeclaredInterfaceType());
-    linearMapStructEnumFields.insert({linearMapStruct, traceEnumField});
-  }
-}
-
 //===----------------------------------------------------------------------===//
 // Activity Analysis
 //===----------------------------------------------------------------------===//
@@ -1465,6 +1446,84 @@ SILAnalysis *swift::createDifferentiableActivityAnalysis(SILModule *m) {
 DifferentiableActivityCollection::DifferentiableActivityCollection(
     SILFunction &f, DominanceInfo *di, PostDominanceInfo *pdi)
     : function(f), domInfo(di), postDomInfo(pdi) {}
+
+/// Given an parameter argument (not indirect result) and some differentiation
+/// indices, figure out whether the parent function is being differentiated with
+/// respect to this parameter, according to the indices.
+static bool isDifferentiationParameter(SILArgument *argument,
+                                       AutoDiffIndexSubset *indices) {
+  if (!argument) return false;
+  auto *function = argument->getFunction();
+  auto paramArgs = function->getArgumentsWithoutIndirectResults();
+  for (unsigned i : indices->getIndices())
+    if (paramArgs[i] == argument)
+      return true;
+  return false;
+}
+
+/// For a nested function call that has results active on the differentiation
+/// path, compute the set of minimal indices for differentiating this function
+/// as required by the data flow.
+static void collectMinimalIndicesForFunctionCall(
+    ApplyInst *ai, SmallVectorImpl<SILValue> &results,
+    const SILAutoDiffIndices &parentIndices,
+    const DifferentiableActivityInfo &activityInfo,
+    SmallVectorImpl<unsigned> &paramIndices,
+    SmallVectorImpl<unsigned> &resultIndices) {
+  // Make sure the function call has active results.
+  assert(llvm::any_of(results, [&](SILValue result) {
+    return activityInfo.isActive(result, parentIndices);
+  }));
+  auto fnTy = ai->getCallee()->getType().castTo<SILFunctionType>();
+  SILFunctionConventions convs(fnTy, ai->getModule());
+  auto arguments = ai->getArgumentOperands();
+  // Parameter indices are indices (in the type signature) of parameter
+  // arguments that are varied or are arguments.
+  unsigned currentParamIdx = 0;
+  for (auto applyArg : ai->getArgumentsWithoutIndirectResults()) {
+    if (activityInfo.isVaried(applyArg, parentIndices.parameters) ||
+        isDifferentiationParameter(dyn_cast<SILArgument>(applyArg),
+                                   parentIndices.parameters))
+      paramIndices.push_back(currentParamIdx);
+    ++currentParamIdx;
+  }
+  // Result indices are indices (in the type signature) of results that are
+  // useful.
+  //
+  // If the function returns only one result, then we just see if that is
+  // useful.
+  if (fnTy->getNumDirectFormalResults() == 1) {
+    if (activityInfo.isUseful(ai, parentIndices.source))
+      resultIndices.push_back(0);
+    return;
+  }
+  // If the function returns more than 1 results, the return type is a tuple. We
+  // need to find all `tuple_extract`s on that tuple, and determine if each
+  // found extracted element is useful.
+  // Collect direct results being retrieved using `tuple_extract`.
+  SmallVector<SILValue, 8> usedDirectResults(convs.getNumDirectSILResults());
+  for (auto *use : ai->getUses())
+    if (auto *tei = dyn_cast<TupleExtractInst>(use->getUser()))
+      usedDirectResults[tei->getFieldNo()] = tei;
+  // Add differentiation indices based on activity analysis.
+  unsigned dirResIdx = 0;
+  unsigned indResIdx = convs.getSILArgIndexOfFirstIndirectResult();
+  for (auto &resAndIdx : enumerate(convs.getResults())) {
+    auto &res = resAndIdx.value();
+    unsigned idx = resAndIdx.index();
+    if (res.isFormalDirect()) {
+      if (auto dirRes = usedDirectResults[dirResIdx])
+        if (dirRes && activityInfo.isUseful(dirRes, parentIndices.source))
+          resultIndices.push_back(idx);
+      ++dirResIdx;
+    } else {
+      if (activityInfo.isUseful(arguments[indResIdx].get(),
+                                parentIndices.source))
+        resultIndices.push_back(idx);
+      ++indResIdx;
+    }
+  }
+}
 
 DifferentiableActivityInfo::DifferentiableActivityInfo(
     DifferentiableActivityCollection &parent, GenericSignature *assocGenSig)
@@ -1829,6 +1888,202 @@ static void dumpActivityInfo(SILFunction &fn,
       for (auto res : inst.getResults())
         dumpActivityInfo(res, indices, activityInfo, s);
     s << '\n';
+  }
+}
+
+LinearMapInfo::LinearMapInfo(ADContext &context,
+                             AutoDiffAssociatedFunctionKind kind,
+                             SILFunction *original, SILFunction *assocFn,
+                             const SILAutoDiffIndices &indices,
+                             const DifferentiableActivityInfo &activityInfo,
+                             SILBuilder &builder)
+    : kind(kind), original(original), activityInfo(activityInfo),
+      typeConverter(context.getTypeConverter()), builder(builder)
+{
+  prepareLinearMapStructDeclarations(context, indices, assocFn);
+}
+
+bool LinearMapInfo::shouldBeDifferentiated(ApplyInst *ai,
+                            const SILAutoDiffIndices &indices) {
+  // Anything with an active result should be differentiated.
+  if (llvm::any_of(ai->getResults(), [&](SILValue val) {
+    return activityInfo.isActive(val, indices);
+  })) {
+    return true;
+  }
+  // Function applications with an active indirect result should be
+  // differentiated.
+  for (auto indRes : ai->getIndirectSILResults())
+    if (activityInfo.isActive(indRes, indices)) {
+      return true;
+    }
+  // Function applications with an inout argument should be differentiated.
+  auto paramInfos = ai->getSubstCalleeConv().getParameters();
+  for (auto i : swift::indices(paramInfos))
+    if (paramInfos[i].isIndirectInOut() &&
+        activityInfo.isActive(
+            ai->getArgumentsWithoutIndirectResults()[i], indices)) {
+      return true;
+    }
+  // Instructions that may write to memory and that have an active operand
+  // should be differentiated.
+  if (ai->mayWriteToMemory())
+    for (auto &op : ai->getAllOperands())
+      if (activityInfo.isActive(op.get(), indices)) {
+        return true;
+      }
+  return false;
+}
+
+void LinearMapInfo::prepareLinearMapStructDeclarations(
+    ADContext &context, const SILAutoDiffIndices &indices,
+    SILFunction *assocFn) {
+
+  auto &astCtx = original->getASTContext();
+  auto *loopAnalysis = context.getPassManager().getAnalysis<SILLoopAnalysis>();
+  auto *loopInfo = loopAnalysis->get(original);
+
+  // Get the associated function generic signature.
+  CanGenericSignature assocFnGenSig = nullptr;
+  if (auto *assocFnGenEnv = assocFn->getGenericEnvironment())
+    assocFnGenSig =
+        assocFnGenEnv->getGenericSignature()->getCanonicalSignature();
+
+  // Create pullback struct for each original block.
+  for (auto &origBB : *original) {
+    auto *linearMapStruct = createLinearMapStruct(&origBB, indices, assocFnGenSig);
+    linearMapStructs.insert({&origBB, linearMapStruct});
+  }
+
+  // Create branching trace enum for each original block and add it to the
+  // corresponding struct.
+  // TODO(bartchr): add support for forward mode.
+  for (auto &origBB : *original) {
+    auto *linearMapStruct = getLinearMapStruct(&origBB);
+    auto *traceEnum =
+        createBranchingTraceDecl(&origBB, indices, assocFnGenSig);
+
+    // If original block is in a loop, mark branching trace enum as indirect.
+    if (loopInfo->getLoopFor(&origBB))
+      traceEnum->getAttrs().add(new (astCtx) IndirectAttr(/*Implicit*/ true));
+    branchingTraceDecls.insert({&origBB, traceEnum});
+    if (origBB.isEntry())
+      continue;
+    auto *traceEnumField =
+        addVarDecl(linearMapStruct, astCtx.getIdentifier("predecessor").str(),
+                   traceEnum->getDeclaredInterfaceType());
+    linearMapStructEnumFields.insert({linearMapStruct, traceEnumField});
+  }
+
+  // Add the differential function fields to the differential structs.
+  for (auto &origBB : *original) {
+    for (auto &inst : origBB) {
+      if (auto *ai = dyn_cast<ApplyInst>(&inst)) {
+        // Check for active 'inout' arguments.
+        bool isInout = false;
+        auto paramInfos = ai->getSubstCalleeConv().getParameters();
+        for (unsigned i : swift::indices(paramInfos)) {
+          if (paramInfos[i].isIndirectInOut() &&
+              activityInfo.isActive(ai->getArgumentsWithoutIndirectResults()[i],
+                                    indices)) {
+            // Reject functions with active inout arguments. It's not yet supported.
+            isInout = true;
+            break;
+          }
+        }
+        if (isInout)
+          break;
+
+        // Add linear map to struct for active instructions.
+        // Do not add it for array functions since those are already linear
+        // and we don't need to add it to the struct.
+        if (shouldBeDifferentiated(ai, indices) &&
+            !ai->hasSemantics("array.uninitialized_intrinsic")) {
+          SmallVector<SILValue, 4> allResults;
+          allResults.push_back(ai);
+          allResults.append(ai->getIndirectSILResults().begin(),
+                            ai->getIndirectSILResults().end());
+
+          // Check if there are any active results or arguments. If not, skip
+          // this instruction.
+          auto hasActiveResults = llvm::any_of(
+              allResults, [&](SILValue res) {
+            return activityInfo.isActive(res, indices);
+          });
+          auto hasActiveArguments = llvm::any_of(
+              ai->getArgumentsWithoutIndirectResults(), [&](SILValue arg) {
+            return activityInfo.isActive(arg, indices);
+          });
+          if (!hasActiveResults || !hasActiveArguments)
+            continue;
+
+          unsigned source;
+          AutoDiffIndexSubset *parameters;
+
+          SmallVector<unsigned, 8> activeParamIndices;
+          SmallVector<unsigned, 8> activeResultIndices;
+          collectMinimalIndicesForFunctionCall(
+              ai, allResults, indices, activityInfo, activeParamIndices,
+              activeResultIndices);
+          source = activeResultIndices.front();
+
+          // If function is already marked differentiable, differentiate WRT
+          // all parameters.
+          auto originalFnSubstTy = ai->getSubstCalleeType();;
+          if (originalFnSubstTy->isDifferentiable()) {
+            parameters = originalFnSubstTy->getDifferentiationParameterIndices();
+          } else {
+            parameters = AutoDiffIndexSubset::get(
+                original->getASTContext(),
+                ai->getArgumentsWithoutIndirectResults().size(),
+                activeParamIndices);
+          }
+          SILAutoDiffIndices curIndices(activeResultIndices.front(),
+          AutoDiffIndexSubset::get(
+              builder.getASTContext(),
+              ai->getArgumentsWithoutIndirectResults().size(),
+              activeParamIndices));
+
+          // Check and diagnose non-differentiable original function type.
+          auto diagnoseNondifferentiableOriginalFunctionType =
+              [&](CanSILFunctionType origFnTy) {
+                // Check and diagnose non-differentiable arguments.
+                for (unsigned paramIndex : range(origFnTy->getNumParameters())) {
+                  if (curIndices.isWrtParameter(paramIndex) &&
+                          !origFnTy->getParameters()[paramIndex]
+                          .getSILStorageType()
+                          .isDifferentiable(builder.getModule())) {
+                    return true;
+                  }
+                }
+                // Check and diagnose non-differentiable results.
+                if (!origFnTy->getResults()[curIndices.source]
+                        .getSILStorageType()
+                        .isDifferentiable(builder.getModule())) {
+                  return true;
+                }
+                return false;
+              };
+          if (diagnoseNondifferentiableOriginalFunctionType(originalFnSubstTy))
+            continue;
+
+          auto JVPType = originalFnSubstTy->getAutoDiffAssociatedFunctionType(
+              parameters, source,
+              /*differentiationOrder*/ 1, kind, builder.getModule(),
+              LookUpConformanceInModule(builder.getModule().getSwiftModule()));
+
+          auto JVPResultTypes = JVPType->getAllResultsType().castTo<TupleType>();
+          JVPResultTypes->getElement(JVPResultTypes->getElements().size() - 1);
+          auto differentialSILType =
+              SILType::getPrimitiveObjectType(
+                  JVPResultTypes->getElement(
+                      JVPResultTypes->getElements().size() - 1)
+              .getType()->getCanonicalType());
+          // TODO: need to call `getOpType`?
+          addLinearMapDecl(ai, differentialSILType);
+        }
+      }
+    }
   }
 }
 
@@ -2759,84 +3014,6 @@ static SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
   return thunk;
 }
 
-/// Given an parameter argument (not indirect result) and some differentiation
-/// indices, figure out whether the parent function is being differentiated with
-/// respect to this parameter, according to the indices.
-static bool isDifferentiationParameter(SILArgument *argument,
-                                       AutoDiffIndexSubset *indices) {
-  if (!argument) return false;
-  auto *function = argument->getFunction();
-  auto paramArgs = function->getArgumentsWithoutIndirectResults();
-  for (unsigned i : indices->getIndices())
-    if (paramArgs[i] == argument)
-      return true;
-  return false;
-}
-
-/// For a nested function call that has results active on the differentiation
-/// path, compute the set of minimal indices for differentiating this function
-/// as required by the data flow.
-static void collectMinimalIndicesForFunctionCall(
-    ApplyInst *ai, SmallVectorImpl<SILValue> &results,
-    const SILAutoDiffIndices &parentIndices,
-    const DifferentiableActivityInfo &activityInfo,
-    SmallVectorImpl<unsigned> &paramIndices,
-    SmallVectorImpl<unsigned> &resultIndices) {
-  // Make sure the function call has active results.
-  assert(llvm::any_of(results, [&](SILValue result) {
-    return activityInfo.isActive(result, parentIndices);
-  }));
-  auto fnTy = ai->getCallee()->getType().castTo<SILFunctionType>();
-  SILFunctionConventions convs(fnTy, ai->getModule());
-  auto arguments = ai->getArgumentOperands();
-  // Parameter indices are indices (in the type signature) of parameter
-  // arguments that are varied or are arguments.
-  unsigned currentParamIdx = 0;
-  for (auto applyArg : ai->getArgumentsWithoutIndirectResults()) {
-    if (activityInfo.isVaried(applyArg, parentIndices.parameters) ||
-        isDifferentiationParameter(dyn_cast<SILArgument>(applyArg),
-                                   parentIndices.parameters))
-      paramIndices.push_back(currentParamIdx);
-    ++currentParamIdx;
-  }
-  // Result indices are indices (in the type signature) of results that are
-  // useful.
-  //
-  // If the function returns only one result, then we just see if that is
-  // useful.
-  if (fnTy->getNumDirectFormalResults() == 1) {
-    if (activityInfo.isUseful(ai, parentIndices.source))
-      resultIndices.push_back(0);
-    return;
-  }
-  // If the function returns more than 1 results, the return type is a tuple. We
-  // need to find all `tuple_extract`s on that tuple, and determine if each
-  // found extracted element is useful.
-  // Collect direct results being retrieved using `tuple_extract`.
-  SmallVector<SILValue, 8> usedDirectResults(convs.getNumDirectSILResults());
-  for (auto *use : ai->getUses())
-    if (auto *tei = dyn_cast<TupleExtractInst>(use->getUser()))
-      usedDirectResults[tei->getFieldNo()] = tei;
-  // Add differentiation indices based on activity analysis.
-  unsigned dirResIdx = 0;
-  unsigned indResIdx = convs.getSILArgIndexOfFirstIndirectResult();
-  for (auto &resAndIdx : enumerate(convs.getResults())) {
-    auto &res = resAndIdx.value();
-    unsigned idx = resAndIdx.index();
-    if (res.isFormalDirect()) {
-      if (auto dirRes = usedDirectResults[dirResIdx])
-        if (dirRes && activityInfo.isUseful(dirRes, parentIndices.source))
-          resultIndices.push_back(idx);
-      ++dirResIdx;
-    } else {
-      if (activityInfo.isUseful(arguments[indResIdx].get(),
-                                parentIndices.source))
-        resultIndices.push_back(idx);
-      ++indResIdx;
-    }
-  }
-}
-
 namespace {
 class VJPEmitter final
     : public TypeSubstCloner<VJPEmitter, SILOptFunctionBuilder> {
@@ -2858,14 +3035,14 @@ private:
   /// The pullback function.
   SILFunction *pullback;
 
-  /// The linear map info.
-  LinearMapInfo linearMapInfo;
-
   /// The differentiation invoker.
   DifferentiationInvoker invoker;
 
   /// Info from activity analysis on the original function.
   const DifferentiableActivityInfo &activityInfo;
+
+  /// The linear map info.
+  LinearMapInfo linearMapInfo;
 
   /// Caches basic blocks whose phi arguments have been remapped (adding a
   /// predecessor enum argument).
@@ -2914,10 +3091,10 @@ public:
                       DifferentiationInvoker invoker)
       : TypeSubstCloner(*vjp, *original, getSubstitutionMap(original, vjp)),
         context(context), original(original), attr(attr), vjp(vjp),
-        linearMapInfo(context, AutoDiffAssociatedFunctionKind::VJP, original,
-                      vjp, attr->getIndices()),
         invoker(invoker), activityInfo(getActivityInfo(
-                              context, original, attr->getIndices(), vjp)) {
+                              context, original, attr->getIndices(), vjp)),
+        linearMapInfo(context, AutoDiffAssociatedFunctionKind::VJP, original,
+          vjp, attr->getIndices(), activityInfo, getBuilder()) {
     // Create empty pullback function.
     pullback = createEmptyPullback();
     context.getGeneratedFunctions().push_back(pullback);
@@ -3489,7 +3666,7 @@ public:
 
     // Checkpoint the pullback.
     auto *pullbackDecl =
-        linearMapInfo.addLinearMapDecl(ai, getOpType(pullback->getType()));
+        linearMapInfo.lookUpLinearMapDecl(ai);
 
     // If actual pullback type does not match lowered pullback type, reabstract
     // the pullback using a thunk.
@@ -3721,16 +3898,16 @@ private:
 
   llvm::BumpPtrAllocator allocator;
 
-  /// The differential info.
-  LinearMapInfo differentialInfo;
-
   /// The differentiation invoker.
   DifferentiationInvoker invoker;
 
-  bool errorOccurred = false;
-
   /// Info from activity analysis on the original function.
   const DifferentiableActivityInfo &activityInfo;
+
+  /// The differential info.
+  LinearMapInfo differentialInfo;
+
+  bool errorOccurred = false;
 
   ///
   /// Differential generation related fields.
@@ -3848,16 +4025,52 @@ private:
     assert(termInst->getFunction() == original);
     auto loc = termInst->getFunction()->getLocation();
     auto *origBB = termInst->getParent();
-    auto *vjpBB = BBMap[origBB];
+    auto *jvpBB = BBMap[origBB];
     auto *diffStruct = differentialInfo.getLinearMapStruct(origBB);
     auto structLoweredTy = getNominalDeclLoweredType(diffStruct);
     auto bbDifferentialValues = differentialValues[origBB];
     if (!origBB->isEntry()) {
-      auto *enumArg = vjpBB->getArguments().back();
+      auto *enumArg = jvpBB->getArguments().back();
       bbDifferentialValues.insert(bbDifferentialValues.begin(), enumArg);
     }
     return getBuilder().createStruct(loc, structLoweredTy,
                                      bbDifferentialValues);
+  }
+
+  bool shouldBeDifferentiated(SILInstruction *inst,
+                              const SILAutoDiffIndices &indices) {
+    // Anything with an active result should be differentiated.
+    if (llvm::any_of(inst->getResults(), [&](SILValue val) {
+      return activityInfo.isActive(val, indices);
+    }))
+      return true;
+    // Anything with an an active argument should be differentiated
+    // (i.e. `return %0`).
+    if (llvm::any_of(inst->getAllOperands(), [&](Operand &val) {
+      return activityInfo.isActive(val.get(), indices);
+    }))
+      return true;
+    if (auto *ai = dyn_cast<ApplyInst>(inst)) {
+      // Function applications with an active indirect result should be
+      // differentiated.
+      for (auto indRes : ai->getIndirectSILResults())
+        if (activityInfo.isActive(indRes, indices))
+          return true;
+      // Function applications with an inout argument should be differentiated.
+      auto paramInfos = ai->getSubstCalleeConv().getParameters();
+      for (auto i : swift::indices(paramInfos))
+        if (paramInfos[i].isIndirectInOut() &&
+            activityInfo.isActive(
+                ai->getArgumentsWithoutIndirectResults()[i], indices))
+          return true;
+    }
+    // Instructions that may write to memory and that have an active operand
+    // should be differentiated.
+    if (inst->mayWriteToMemory())
+      for (auto &op : inst->getAllOperands())
+        if (activityInfo.isActive(op.get(), indices))
+          return true;
+    return false;
   }
 
   //--------------------------------------------------------------------------//
@@ -4157,7 +4370,18 @@ private:
         assert(lastArg->getType() == diffStructLoweredType);
         differentialStructArguments[&origBB] = lastArg;
       }
+
+      LLVM_DEBUG({
+        auto &s = getADDebugStream()
+        << "Original bb" + std::to_string(origBB.getDebugID())
+        << ": To differentiate or not to differentiate?\n";
+        for (auto &inst : origBB) {
+          s << (shouldBeDifferentiated(&inst, getIndices()) ? "[∂] " : "[ ] ")
+          << inst;
+        }
+      });
     }
+
     assert(diffBBMap.size() == 1 &&
            "Can only currently handle single basic block functions");
 
@@ -4211,10 +4435,11 @@ public:
                       DifferentiationInvoker invoker)
       : TypeSubstCloner(*jvp, *original, getSubstitutionMap(original, jvp)),
         context(context), original(original), attr(attr), jvp(jvp),
+        invoker(invoker), activityInfo(
+                              getActivityInfo(context, original,
+                                              attr->getIndices(), jvp)),
         differentialInfo(context, AutoDiffAssociatedFunctionKind::JVP, original,
-                         jvp, attr->getIndices()), invoker(invoker),
-        activityInfo(
-            getActivityInfo(context, original, attr->getIndices(), jvp)),
+            jvp, attr->getIndices(), activityInfo, getBuilder()),
         differentialAndBuilder(initializeDifferentialAndBuilder(
             context, original, attr, &differentialInfo)),
         diffLocalAllocBuilder(getDifferential()) {
@@ -4598,7 +4823,6 @@ public:
     // Add the differential function for when we create the struct we partially
     // apply to the differential we are generating.
     auto diffFunc = jvpDirectResults.back();
-    differentialInfo.addLinearMapDecl(ai, getOpType(diffFunc->getType()));
     differentialValues[ai->getParent()].push_back(diffFunc);
 
     // Differential emission.
