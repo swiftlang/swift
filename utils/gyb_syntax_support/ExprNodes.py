@@ -568,4 +568,28 @@ EXPR_NODES = [
                    collection_element_name='Argument'),
              Child('RightParen', kind='RightParenToken'),
          ]),
+
+    # quote-expr -> '#quote' '(' expr ')'
+    #             | '#quote' '{' expr '}'
+    Node('QuoteLiteralExpr', kind='Expr',
+         children=[
+             Child('Quote', kind='PoundQuoteToken'),
+             Child('LeftParen', kind='LeftParenToken',
+                   is_optional=True),
+             Child('Expr', kind='Expr',
+                   is_optional=True),
+             Child('RightParen', kind='RightParenToken',
+                   is_optional=True),
+             Child('TrailingClosure', kind='ClosureExpr',
+                   is_optional=True),
+         ]),
+
+    # unquote-expr -> '#unquote' '(' expr ')'
+    Node('UnquoteExpr', kind='Expr',
+         children=[
+             Child('Quote', kind='PoundQuoteToken'),
+             Child('LeftParen', kind='LeftParenToken'),
+             Child('Expr', kind='Expr'),
+             Child('RightParen', kind='RightParenToken'),
+         ]),
 ]

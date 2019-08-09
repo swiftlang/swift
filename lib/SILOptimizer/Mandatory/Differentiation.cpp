@@ -2267,21 +2267,40 @@ reapplyFunctionConversion(SILValue newFunc, SILValue oldFunc,
       for (auto *alloc : reversed(copiedIndirectParams))
         builder.createDeallocStack(loc, alloc);
     };
-    for (auto arg : pai->getArguments()) {
-      // Retain the argument since it's to be owned by the newly created
+    // Collect new arguments to for a new `partial_apply`.
+    auto conv = pai->getSubstCalleeConv();
+    unsigned argIndex = conv.getNumSILArguments() - pai->getNumArguments();
+    for (auto argIt = pai->getArguments().begin();
+         argIt != pai->getArguments().end(); ++argIt, ++argIndex) {
+      auto arg = *argIt;
+      // Retain the argument if it's to be owned by the newly created
       // closure.
+      // Objects are to be retained.
       if (arg->getType().isObject()) {
         builder.createRetainValue(loc, arg, builder.getDefaultAtomicity());
         newArgs.push_back(arg);
-      } else if (arg->getType().isLoadable(builder.getFunction())) {
+        continue;
+      }
+      // Addresses depend on argument conventions.
+      // If the argument is an aliasable inout reference, do not retain the
+      // argument since it's a `@noescape` capture.
+      auto argConv = conv.getSILArgumentConvention(argIndex);
+      if (argConv == SILArgumentConvention::Indirect_InoutAliasable) {
+        newArgs.push_back(arg);
+        continue;
+      }
+      // If it's a loadable address, perform a `retain_value_addr`.
+      if (arg->getType().isLoadable(builder.getFunction())) {
         builder.createRetainValueAddr(loc, arg, builder.getDefaultAtomicity());
         newArgs.push_back(arg);
-      } else {
-        auto *argCopy = builder.createAllocStack(loc, arg->getType());
-        copiedIndirectParams.push_back(argCopy);
-        builder.createCopyAddr(loc, arg, argCopy, IsNotTake, IsInitialization);
-        newArgs.push_back(argCopy);
+        continue;
       }
+      // Otherwise, it must be address-only. Create a new buffer and perform
+      // `copy_addr`.
+      auto *argCopy = builder.createAllocStack(loc, arg->getType());
+      copiedIndirectParams.push_back(argCopy);
+      builder.createCopyAddr(loc, arg, argCopy, IsNotTake, IsInitialization);
+      newArgs.push_back(argCopy);
     }
     auto innerNewFunc = reapplyFunctionConversion(
         newFunc, oldFunc, pai->getCallee(), builder, loc, newFuncGenSig);

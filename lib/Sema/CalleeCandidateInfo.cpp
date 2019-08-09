@@ -308,7 +308,7 @@ CalleeCandidateInfo::ClosenessResultTy CalleeCandidateInfo::evaluateCloseness(
       return true;
     }
     bool trailingClosureMismatch(unsigned paramIdx, unsigned argIdx) override {
-      result = CC_ArgumentMismatch;
+      result = CC_ArgumentCountMismatch;
       return true;
     }
   } listener;

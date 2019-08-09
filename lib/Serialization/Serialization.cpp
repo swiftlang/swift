@@ -2586,6 +2586,16 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       S.writeGenericRequirements(attr->getRequirements(), S.DeclTypeAbbrCodes);
       return;
     }
+
+    case DAK_Quoted: {
+      auto abbrCode = S.DeclTypeAbbrCodes[QuotedDeclAttrLayout::Code];
+      auto attr = cast<QuotedAttr>(DA);
+      assert(attr->getQuoteDecl());
+      QuotedDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                       attr->isImplicit(),
+                                       S.addDeclRef(attr->getQuoteDecl()));
+      return;
+    }
     }
   }
 
@@ -2897,6 +2907,16 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[InlinableBodyTextLayout::Code];
     InlinableBodyTextLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode, body);
+  }
+
+  unsigned getNumberOfRequiredVTableEntries(
+      const AbstractStorageDecl *storage) const {
+    unsigned count = 0;
+    for (auto *accessor : storage->getAllAccessors()) {
+      if (accessor->needsNewVTableEntry())
+        count++;
+    }
+    return count;
   }
 
 public:
@@ -3426,6 +3446,8 @@ public:
 
     auto rawIntroducer = getRawStableVarDeclIntroducer(var->getIntroducer());
 
+    unsigned numVTableEntries = getNumberOfRequiredVTableEntries(var);
+
     unsigned abbrCode = S.DeclTypeAbbrCodes[VarLayout::Code];
     VarLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                           S.addDeclBaseNameRef(var->getName()),
@@ -3449,6 +3471,7 @@ public:
                           rawAccessLevel, rawSetterAccessLevel,
                           S.addDeclRef(var->getOpaqueResultTypeDecl()),
                           numBackingProperties,
+                          numVTableEntries,
                           arrayFields);
   }
 
@@ -3613,6 +3636,7 @@ public:
                                rawAccessorKind,
                                rawAccessLevel,
                                fn->needsNewVTableEntry(),
+                               fn->isTransparent(),
                                dependencies);
 
     writeGenericParams(fn->getGenericParams());
@@ -3693,11 +3717,13 @@ public:
     uint8_t rawAccessLevel =
       getRawStableAccessLevel(subscript->getFormalAccess());
     uint8_t rawSetterAccessLevel = rawAccessLevel;
-    if (subscript->isSettable())
+    if (subscript->supportsMutation())
       rawSetterAccessLevel =
         getRawStableAccessLevel(subscript->getSetterFormalAccess());
     uint8_t rawStaticSpelling =
       uint8_t(getStableStaticSpelling(subscript->getStaticSpelling()));
+
+    unsigned numVTableEntries = getNumberOfRequiredVTableEntries(subscript);
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[SubscriptLayout::Code];
     SubscriptLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
@@ -3721,6 +3747,7 @@ public:
                                 subscript->
                                   getFullName().getArgumentNames().size(),
                                 S.addDeclRef(subscript->getOpaqueResultTypeDecl()),
+                                numVTableEntries,
                                 nameComponentsAndDependencies);
 
     writeGenericParams(subscript->getGenericParams());
@@ -4828,33 +4855,27 @@ static void collectInterestingNestedDeclarations(
 
   for (const Decl *member : members) {
     // If there is a corresponding Objective-C method, record it.
-    auto recordObjCMethod = [&] {
+    auto recordObjCMethod = [&](const AbstractFunctionDecl *func) {
       if (isLocal)
         return;
 
-      if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
+      if (auto owningClass = func->getDeclContext()->getSelfClassDecl()) {
         if (func->isObjC()) {
-          if (auto owningClass = func->getDeclContext()->getSelfClassDecl()) {
-            Mangle::ASTMangler mangler;
-            std::string ownerName = mangler.mangleNominalType(owningClass);
-            assert(!ownerName.empty() && "Mangled type came back empty!");
+          Mangle::ASTMangler mangler;
+          std::string ownerName = mangler.mangleNominalType(owningClass);
+          assert(!ownerName.empty() && "Mangled type came back empty!");
 
-            objcMethods[func->getObjCSelector()].push_back(
-              std::make_tuple(ownerName,
-                              func->isObjCInstanceMethod(),
-                              S.addDeclRef(func)));
-          }
+          objcMethods[func->getObjCSelector()].push_back(
+            std::make_tuple(ownerName,
+                            func->isObjCInstanceMethod(),
+                            S.addDeclRef(func)));
         }
       }
     };
 
     if (auto memberValue = dyn_cast<ValueDecl>(member)) {
-      if (!memberValue->hasName()) {
-        recordObjCMethod();
-        continue;
-      }
-
-      if (memberValue->isOperator()) {
+      if (memberValue->hasName() &&
+          memberValue->isOperator()) {
         // Add operator methods.
         // Note that we don't have to add operators that are already in the
         // top-level list.
@@ -4862,6 +4883,17 @@ static void collectInterestingNestedDeclarations(
           /*ignored*/0,
           S.addDeclRef(memberValue)
         });
+      }
+    }
+
+    // Record Objective-C methods.
+    if (auto *func = dyn_cast<AbstractFunctionDecl>(member))
+      recordObjCMethod(func);
+
+    // Handle accessors.
+    if (auto storage = dyn_cast<AbstractStorageDecl>(member)) {
+      for (auto *accessor : storage->getAllAccessors()) {
+        recordObjCMethod(accessor);
       }
     }
 
@@ -4886,9 +4918,6 @@ static void collectInterestingNestedDeclarations(
                                            objcMethods, nestedTypeDecls,
                                            isLocal);
     }
-
-    // Record Objective-C methods.
-    recordObjCMethod();
   }
 }
 
@@ -4950,15 +4979,6 @@ void Serializer::writeAST(ModuleOrSourceFile DC,
       }
 
       orderedTopLevelDecls.push_back(addDeclRef(D));
-
-      // If this is a global variable, force the accessors to be
-      // serialized.
-      if (auto VD = dyn_cast<VarDecl>(D)) {
-        if (VD->getGetter())
-          addDeclRef(VD->getGetter());
-        if (VD->getSetter())
-          addDeclRef(VD->getSetter());
-      }
 
       // If this nominal type has associated top-level decls for a
       // derived conformance (for example, ==), force them to be

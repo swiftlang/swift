@@ -1223,6 +1223,9 @@ namespace {
     }
 
     Type visitObjectLiteralExpr(ObjectLiteralExpr *expr) {
+      associateArgumentLabels(
+          expr, {expr->getArgumentLabels(), expr->hasTrailingClosure()});
+
       // If the expression has already been assigned a type; just use that type.
       if (expr->getType())
         return expr->getType();
@@ -1276,6 +1279,23 @@ namespace {
         result = OptionalType::get(result);
 
       return result;
+    }
+
+    Type visitQuoteLiteralExpr(QuoteLiteralExpr *expr) {
+      auto &tc = CS.getTypeChecker();
+      auto subExprType = CS.getType(expr->getSubExpr());
+      return tc.getTypeOfQuoteExpr(subExprType, expr->getLoc());
+    }
+
+    Type visitUnquoteExpr(UnquoteExpr *expr) {
+      auto &tc = CS.getTypeChecker();
+      auto subExprType = CS.getType(expr->getSubExpr());
+      return tc.getTypeOfUnquoteExpr(subExprType, expr->getLoc());
+    }
+
+    Type visitDeclQuoteExpr(DeclQuoteExpr *expr) {
+      auto &tc = CS.getTypeChecker();
+      return tc.getTypeOfQuoteDecl(expr->getLoc());
     }
 
     Type visitDeclRefExpr(DeclRefExpr *E) {
@@ -1500,7 +1520,9 @@ namespace {
                          FunctionType::get(params, outputTy),
                          memberTy,
           CS.getConstraintLocator(expr, ConstraintLocator::ApplyFunction));
-        
+
+        associateArgumentLabels(
+            expr, {expr->getArgumentLabels(), expr->hasTrailingClosure()});
         return baseTy;
       }
 
@@ -1734,6 +1756,10 @@ namespace {
         if (decl->isInvalid())
           return Type();
       }
+
+      associateArgumentLabels(
+          expr, {expr->getArgumentLabels(), expr->hasTrailingClosure()});
+
       return addSubscriptConstraints(expr, CS.getType(expr->getBase()),
                                      expr->getIndex(),
                                      decl);
@@ -1988,9 +2014,10 @@ namespace {
     }
 
     Type visitDynamicSubscriptExpr(DynamicSubscriptExpr *expr) {
+      associateArgumentLabels(
+          expr, {expr->getArgumentLabels(), expr->hasTrailingClosure()});
       return addSubscriptConstraints(expr, CS.getType(expr->getBase()),
-                                     expr->getIndex(),
-                                     nullptr);
+                                     expr->getIndex(), nullptr);
     }
 
     Type visitTupleElementExpr(TupleElementExpr *expr) {
@@ -2477,6 +2504,11 @@ namespace {
 
     Type visitApplyExpr(ApplyExpr *expr) {
       auto fnExpr = expr->getFn();
+
+      SmallVector<Identifier, 4> scratch;
+      associateArgumentLabels(
+          expr, {expr->getArgumentLabels(scratch), expr->hasTrailingClosure()},
+          /*labelsArePermanent=*/isa<CallExpr>(expr));
 
       if (auto *UDE = dyn_cast<UnresolvedDotExpr>(fnExpr)) {
         auto typeOperation = getTypeOperation(UDE, CS.getASTContext());
@@ -3208,6 +3240,16 @@ namespace {
       }
       llvm_unreachable("unhandled operation");
     }
+
+    void associateArgumentLabels(Expr *expr,
+                                 ConstraintSystem::ArgumentInfo info,
+                                 bool labelsArePermanent = true) {
+      assert(expr);
+      // Record the labels.
+      if (!labelsArePermanent)
+        info.Labels = CS.allocateCopy(info.Labels);
+      CS.ArgumentInfos[CS.getArgumentInfoLocator(expr)] = info;
+    }
   };
 
   /// AST walker that "sanitizes" an expression for the
@@ -3641,68 +3683,11 @@ namespace {
     /// Ignore declarations.
     bool walkToDeclPre(Decl *decl) override { return false; }
   };
-
-  /// AST walker that records the keyword arguments provided at each
-  /// call site.
-  class ArgumentLabelWalker : public ASTWalker {
-    ConstraintSystem &CS;
-    llvm::DenseMap<Expr *, Expr *> ParentMap;
-
-  public:
-    ArgumentLabelWalker(ConstraintSystem &cs, Expr *expr) 
-      : CS(cs), ParentMap(expr->getParentMap()) { }
-
-    using State = ConstraintSystem::ArgumentLabelState;
-
-    void associateArgumentLabels(Expr *fn, State labels,
-                                 bool labelsArePermanent) {
-      fn = getArgumentLabelTargetExpr(fn);
-
-      // Record the labels.
-      if (!labelsArePermanent)
-        labels.Labels = CS.allocateCopy(labels.Labels);
-      CS.ArgumentLabels[CS.getConstraintLocator(fn)] = labels;
-    }
-
-    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      if (auto call = dyn_cast<CallExpr>(expr)) {
-        associateArgumentLabels(call->getFn(),
-                                { call->getArgumentLabels(),
-                                  call->hasTrailingClosure() },
-                                /*labelsArePermanent=*/true);
-        return { true, expr };
-      }
-
-      if (auto subscript = dyn_cast<SubscriptExpr>(expr)) {
-        associateArgumentLabels(subscript,
-                                { subscript->getArgumentLabels(),
-                                  subscript->hasTrailingClosure() },
-                                /*labelsArePermanent=*/true);
-        return { true, expr };
-      }
-
-      if (auto unresolvedMember = dyn_cast<UnresolvedMemberExpr>(expr)) {
-        associateArgumentLabels(unresolvedMember,
-                                { unresolvedMember->getArgumentLabels(),
-                                  unresolvedMember->hasTrailingClosure() },
-                                /*labelsArePermanent=*/true);
-        return { true, expr };
-      }
-
-      // FIXME: other expressions have argument labels, but this is an
-      // optimization, so stage it in later.
-      return { true, expr };
-    }
-  };
-
 } // end anonymous namespace
 
 Expr *ConstraintSystem::generateConstraints(Expr *expr, DeclContext *dc) {
   // Remove implicit conversions from the expression.
   expr = expr->walk(SanitizeExpr(*this));
-
-  // Walk the expression to associate labeled arguments.
-  expr->walk(ArgumentLabelWalker(*this, expr));
 
   // Walk the expression, generating constraints.
   ConstraintGenerator cg(*this, dc);

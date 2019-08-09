@@ -137,7 +137,7 @@ E2EDifferentiablePropertyTests.test("computed property") {
   let actualGrad = gradient(at: TF_544(value: 2.4)) { x in
     return x.computed * x.computed
   }
-  let expectedGrad = TF_544.AllDifferentiableVariables(value: 4.8)
+  let expectedGrad = TF_544.TangentVector(value: 4.8)
   expectEqual(expectedGrad, actualGrad)
 }
 

@@ -489,6 +489,22 @@ public:
   /// has been imported.  Otherwise, this returns null.
   StructDecl *getTensorDataTypeDecl() const;
 
+  /// Retrieve the decl for the Quote module iff it has been imported.
+  /// Otherwise, this returns null.
+  ModuleDecl *getQuoteModule() const;
+
+  /// Retrieve the decl for Quote.Tree iff the Quote module has been imported.
+  /// Otherwise, this returns null.
+  ProtocolDecl *getTreeDecl() const;
+
+  /// Retrieve the decl for Quote.Quote iff the Quote module has been imported.
+  /// Otherwise, this returns null.
+  ClassDecl *getQuoteDecl() const;
+
+  /// Retrieve the decl for Quote.FunctionQuoteN iff the Quote module has been
+  /// imported. Otherwise, this returns null.
+  ClassDecl *getFunctionQuoteDecl(unsigned n) const;
+
   /// Retrieve the type Swift.Never.
   CanType getNeverType() const;
 
@@ -925,8 +941,20 @@ public:
   CanGenericSignature getExistentialSignature(CanType existential,
                                               ModuleDecl *mod);
 
-  GenericSignature *getOverrideGenericSignature(ValueDecl *base,
-                                                ValueDecl *derived);
+  GenericSignature *getOverrideGenericSignature(const ValueDecl *base,
+                                                const ValueDecl *derived);
+
+  enum class OverrideGenericSignatureReqCheck {
+    /// Base method's generic requirements are satisifed by derived method
+    BaseReqSatisfiedByDerived,
+
+    /// Derived method's generic requirements are satisifed by base method
+    DerivedReqSatisfiedByBase
+  };
+
+  bool overrideGenericSignatureReqsSatisfied(
+      const ValueDecl *base, const ValueDecl *derived,
+      const OverrideGenericSignatureReqCheck direction);
 
   /// Whether our effective Swift version is at least 'major'.
   ///

@@ -1,6 +1,6 @@
 set(library_name "swiftCompatibility50")
 
-add_swift_target_library("${library_name}" STATIC TARGET_LIBRARY
+add_swift_target_library("${library_name}" STATIC
   ProtocolConformance.cpp
   Overrides.cpp
 

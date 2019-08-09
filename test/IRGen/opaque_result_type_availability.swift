@@ -18,7 +18,5 @@ public func main() {
   generic(x: foo(), y: foo())
 }
 
-// MAYBE-AVAILABLE: declare{{.*}} extern_weak {{.*}} @swift_getOpaqueTypeMetadata
 // MAYBE-AVAILABLE: declare{{.*}} extern_weak {{.*}} @swift_getOpaqueTypeConformance
-// ALWAYS-AVAILABLE-NOT: declare{{.*}} extern_weak {{.*}} @swift_getOpaqueTypeMetadata
 // ALWAYS-AVAILABLE-NOT: declare{{.*}} extern_weak {{.*}} @swift_getOpaqueTypeConformance

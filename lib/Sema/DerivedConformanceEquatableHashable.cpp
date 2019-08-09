@@ -1194,6 +1194,7 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
       TypeLoc::withoutLoc(intType), parentDC);
   getterDecl->setImplicit();
   getterDecl->setBodySynthesizer(&deriveBodyHashable_hashValue);
+  getterDecl->setIsTransparent(false);
 
   // Compute the interface type of hashValue().
   if (auto env = parentDC->getGenericEnvironmentOfContext())
@@ -1224,7 +1225,7 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
   C.addSynthesizedDecl(hashValueDecl);
   C.addSynthesizedDecl(getterDecl);
 
-  derived.addMembersToConformanceContext({getterDecl, hashValueDecl, patDecl});
+  derived.addMembersToConformanceContext({hashValueDecl, patDecl});
   return hashValueDecl;
 }
 

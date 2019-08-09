@@ -231,6 +231,8 @@ static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
                        options::OPT_enable_experimental_dependencies);
   inputArgs.AddLastArg(arguments,
                        options::OPT_experimental_dependency_include_intrafile);
+  inputArgs.AddLastArg(arguments,
+                       options::OPT_enable_experimental_quasiquotes);
   inputArgs.AddLastArg(arguments, options::OPT_package_description_version);
   inputArgs.AddLastArg(arguments, options::OPT_serialize_diagnostics_path);
   inputArgs.AddLastArg(arguments, options::OPT_enable_astscope_lookup);

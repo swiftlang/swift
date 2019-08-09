@@ -355,8 +355,7 @@ static ValueDecl *deriveTensorArrayProtocol_tensorHandleCount(
     tensorHandleCountDecl, returnType);
   getterDecl->setBodySynthesizer(
     deriveBodyTensorArrayProtocol_tensorHandleCount, nullptr);
-  derived.addMembersToConformanceContext(
-    {getterDecl, tensorHandleCountDecl, patDecl});
+  derived.addMembersToConformanceContext({tensorHandleCountDecl, patDecl});
 
   return tensorHandleCountDecl;
 }
@@ -438,7 +437,7 @@ static ValueDecl *deriveTensorArrayProtocol_typeList(
       typeListDecl, returnType);
   getterDecl->setBodySynthesizer(
       deriveBodyTensorArrayProtocol_typeList, nullptr);
-  derived.addMembersToConformanceContext({getterDecl, typeListDecl, patDecl});
+  derived.addMembersToConformanceContext({typeListDecl, patDecl});
 
   return typeListDecl;
 }

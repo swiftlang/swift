@@ -222,6 +222,9 @@ Type TypeChecker::getOrCreateOpaqueResultType(TypeResolution resolution,
              diag::opaque_type_invalid_constraint);
     return constraintTypeLoc.getType();
   }
+  
+  if (constraintType->hasArchetype())
+    constraintType = constraintType->mapTypeOutOfContext();
 
   // Create a generic signature for the opaque environment. This is the outer
   // generic signature with an added generic parameter representing the opaque

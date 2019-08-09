@@ -110,7 +110,7 @@ ValueDecl *DerivedConformance::deriveCaseIterable(ValueDecl *requirement) {
 
   getterDecl->setBodySynthesizer(&deriveCaseIterable_enum_getter);
 
-  addMembersToConformanceContext({getterDecl, propDecl, pbDecl});
+  addMembersToConformanceContext({propDecl, pbDecl});
 
   return propDecl;
 }

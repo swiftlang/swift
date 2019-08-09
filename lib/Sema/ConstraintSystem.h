@@ -1548,7 +1548,7 @@ public:
   /// we're exploring.
   SolverState *solverState = nullptr;
 
-  struct ArgumentLabelState {
+  struct ArgumentInfo {
     ArrayRef<Identifier> Labels;
     bool HasTrailingClosure;
   };
@@ -1557,7 +1557,15 @@ public:
   /// names (e.g., member references, normal name references, possible
   /// constructions) to the argument labels provided in the call to
   /// that locator.
-  llvm::DenseMap<ConstraintLocator *, ArgumentLabelState> ArgumentLabels;
+  llvm::DenseMap<ConstraintLocator *, ArgumentInfo> ArgumentInfos;
+
+  /// Form a locator with given anchor which then could be used
+  /// to retrieve argument information cached in the constraint system.
+  ConstraintLocator *getArgumentInfoLocator(Expr *anchor);
+
+  /// Retrieve the argument info that is associated with a member
+  /// reference at the given locator.
+  Optional<ArgumentInfo> getArgumentInfo(ConstraintLocator *locator);
 
   ResolvedOverloadSetListItem *getResolvedOverloadSets() const {
     return resolvedOverloadSets;

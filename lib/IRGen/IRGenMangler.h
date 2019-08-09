@@ -32,6 +32,10 @@ struct SymbolicMangling {
   std::string String;
   std::vector<std::pair<Mangle::ASTMangler::SymbolicReferent, unsigned>>
     SymbolicReferences;
+  
+  unsigned runtimeSizeInBytes() const {
+    return String.size();
+  }
 };
 
 /// The mangler for all kind of symbols produced in IRGen.
@@ -85,6 +89,10 @@ public:
 
   std::string mangleTypeMetadataLazyCacheVariable(Type type) {
     return mangleTypeSymbol(type, "ML");
+  }
+
+  std::string mangleTypeMetadataDemanglingCacheVariable(Type type) {
+    return mangleTypeSymbol(type, "MD");
   }
 
   std::string mangleTypeFullMetadataFull(Type type) {

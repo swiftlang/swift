@@ -44,6 +44,7 @@ add_swift_host_library(swiftSema STATIC
   NameBinding.cpp
   PCMacro.cpp
   PlaygroundTransform.cpp
+  QuoteTransform.cpp
   ResilienceDiagnostics.cpp
   SourceLoader.cpp
   TypeCheckAccess.cpp

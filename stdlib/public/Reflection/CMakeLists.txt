@@ -20,7 +20,7 @@ if (LLVM_ENABLE_ASSERTIONS)
 endif(LLVM_ENABLE_ASSERTIONS)
 
 if(SWIFT_BUILD_STDLIB)
-  add_swift_target_library(swiftReflection STATIC TARGET_LIBRARY
+  add_swift_target_library(swiftReflection STATIC
     ${swiftReflection_SOURCES}
     C_COMPILE_FLAGS ${SWIFT_RUNTIME_CXX_FLAGS} -DswiftCore_EXPORTS
     LINK_FLAGS ${SWIFT_RUNTIME_LINK_FLAGS}

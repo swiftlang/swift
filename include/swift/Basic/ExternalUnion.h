@@ -104,8 +104,7 @@ template <class Members>
 class BasicExternalUnion {
 
   /// The value storage.
-  LLVM_ALIGNAS(Members::Info::alignment)
-  char Storage[Members::Info::size];
+  alignas(Members::Info::alignment) char Storage[Members::Info::size];
 
   template <class T>
   static constexpr int maybeIndexOfMember() {

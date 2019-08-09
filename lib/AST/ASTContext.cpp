@@ -192,6 +192,13 @@ struct ASTContext::Implementation {
   /// The declaration of TensorFlow.TensorDataType.
   StructDecl *TensorDataTypeDecl = nullptr;
 
+  /// The declaration of Quote.Tree.
+  ProtocolDecl *TreeDecl = nullptr;
+  /// The declaration of Quote.Quote.
+  ClassDecl *QuoteDecl = nullptr;
+  /// The declarations of Quote.FunctionQuoteN.
+  SmallVector<ClassDecl *, 16> FunctionQuoteDecls;
+
 #define KNOWN_STDLIB_TYPE_DECL(NAME, DECL_CLASS, NUM_GENERIC_PARAMS) \
   /** The declaration of Swift.NAME. */ \
   DECL_CLASS *NAME##Decl = nullptr;
@@ -920,6 +927,85 @@ StructDecl *ASTContext::getTensorDataTypeDecl() const {
   return nullptr;
 }
 
+/// Retrieve the decl for the Quote module iff it has been imported.
+/// Otherwise, this returns null.
+ModuleDecl *ASTContext::getQuoteModule() const {
+  return getLoadedModule(Id_Quote);
+}
+
+/// Retrieve the decl for Quote.Tree iff the Quote module has been imported.
+/// Otherwise, this returns null.
+ProtocolDecl *ASTContext::getTreeDecl() const {
+  if (getImpl().TreeDecl)
+    return getImpl().TreeDecl;
+
+  auto quoteModule = getLoadedModule(Id_Quote);
+  if (!quoteModule)
+    return nullptr;
+
+  SmallVector<ValueDecl *, 1> results;
+  quoteModule->lookupValue({}, getIdentifier("Tree"), NLKind::UnqualifiedLookup,
+                           results);
+
+  for (auto result : results)
+    if (auto CD = dyn_cast<ProtocolDecl>(result))
+      return getImpl().TreeDecl = CD;
+  return nullptr;
+}
+
+/// Retrieve the decl for Quote.Quote iff the Quote module has been imported.
+/// Otherwise, this returns null.
+ClassDecl *ASTContext::getQuoteDecl() const {
+  if (getImpl().QuoteDecl)
+    return getImpl().QuoteDecl;
+
+  auto quoteModule = getLoadedModule(Id_Quote);
+  if (!quoteModule)
+    return nullptr;
+
+  SmallVector<ValueDecl *, 1> results;
+  quoteModule->lookupValue({}, getIdentifier("Quote"),
+                           NLKind::UnqualifiedLookup, results);
+
+  for (auto result : results)
+    if (auto CD = dyn_cast<ClassDecl>(result))
+      return getImpl().QuoteDecl = CD;
+  return nullptr;
+}
+
+/// Retrieve the decl for Quote.FunctionQuoteN iff the Quote module has been
+/// imported. Otherwise, this returns null.
+ClassDecl *ASTContext::getFunctionQuoteDecl(unsigned n) const {
+  auto cache = getImpl().FunctionQuoteDecls;
+  if (cache.size() == 0) {
+    auto quoteModule = getLoadedModule(Id_Quote);
+    if (!quoteModule)
+      return nullptr;
+
+    for (auto i = 0; i < 16; ++i) {
+      llvm::SmallString<16> SS;
+      llvm::raw_svector_ostream OS(SS);
+      OS << "FunctionQuote" << n;
+      auto id = getIdentifier(SS);
+
+      SmallVector<ValueDecl *, 1> results;
+      quoteModule->lookupValue({}, id, NLKind::UnqualifiedLookup, results);
+
+      for (auto result : results) {
+        if (auto CD = dyn_cast<ClassDecl>(result)) {
+          cache.push_back(CD);
+          break;
+        }
+      }
+    }
+  }
+  if (n < cache.size()) {
+    return cache[n];
+  } else {
+    return nullptr;
+  }
+}
+
 CanType ASTContext::getNeverType() const {
   auto neverDecl = getNeverDecl();
   if (!neverDecl)
@@ -999,6 +1085,9 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   case KnownProtocolKind::TensorFlowDataTypeCompatible:
   case KnownProtocolKind::TensorProtocol:
     M = getLoadedModule(Id_TensorFlow);
+    break;
+  case KnownProtocolKind::Expression:
+    M = getLoadedModule(Id_Quote);
     break;
   default:
     M = getStdlibModule();
@@ -3740,6 +3829,14 @@ OpaqueTypeArchetypeType::get(OpaqueTypeDecl *Decl,
   auto opaqueInterfaceTy = Decl->getUnderlyingInterfaceType();
   auto layout = signature->getLayoutConstraint(opaqueInterfaceTy);
   auto superclass = signature->getSuperclassBound(opaqueInterfaceTy);
+  #if !DO_IT_CORRECTLY
+    // Ad-hoc substitute the generic parameters of the superclass.
+    // If we correctly applied the substitutions to the generic signature
+    // constraints above, this would be unnecessary.
+    if (superclass && superclass->hasTypeParameter()) {
+      superclass = superclass.subst(Substitutions);
+    }
+  #endif
   SmallVector<ProtocolDecl*, 4> protos;
   for (auto proto : signature->getConformsTo(opaqueInterfaceTy)) {
     protos.push_back(proto);
@@ -4491,8 +4588,9 @@ CanGenericSignature ASTContext::getExistentialSignature(CanType existential,
   return genericSig;
 }
 
-GenericSignature *ASTContext::getOverrideGenericSignature(ValueDecl *base,
-                                                          ValueDecl *derived) {
+GenericSignature *
+ASTContext::getOverrideGenericSignature(const ValueDecl *base,
+                                        const ValueDecl *derived) {
   auto baseGenericCtx = base->getAsGenericContext();
   auto &ctx = base->getASTContext();
 
@@ -4591,6 +4689,23 @@ GenericSignature *ASTContext::getOverrideGenericSignature(ValueDecl *base,
   auto *genericSig = std::move(builder).computeGenericSignature(SourceLoc());
   getImpl().overrideSigCache.insert(std::make_pair(key, genericSig));
   return genericSig;
+}
+
+bool ASTContext::overrideGenericSignatureReqsSatisfied(
+    const ValueDecl *base, const ValueDecl *derived,
+    const OverrideGenericSignatureReqCheck direction) {
+  auto sig = getOverrideGenericSignature(base, derived);
+  if (!sig)
+    return true;
+
+  auto derivedSig = derived->getAsGenericContext()->getGenericSignature();
+
+  switch (direction) {
+  case OverrideGenericSignatureReqCheck::BaseReqSatisfiedByDerived:
+    return sig->requirementsNotSatisfiedBy(derivedSig).empty();
+  case OverrideGenericSignatureReqCheck::DerivedReqSatisfiedByBase:
+    return derivedSig->requirementsNotSatisfiedBy(sig).empty();
+  }
 }
 
 SILLayout *SILLayout::get(ASTContext &C,

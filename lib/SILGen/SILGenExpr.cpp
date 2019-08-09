@@ -457,6 +457,9 @@ namespace {
     RValue visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E,
                                               SGFContext C);
     RValue visitObjectLiteralExpr(ObjectLiteralExpr *E, SGFContext C);
+    RValue visitQuoteLiteralExpr(QuoteLiteralExpr *E, SGFContext C);
+    RValue visitUnquoteExpr(UnquoteExpr *E, SGFContext C);
+    RValue visitDeclQuoteExpr(DeclQuoteExpr *E, SGFContext C);
     RValue visitEditorPlaceholderExpr(EditorPlaceholderExpr *E, SGFContext C);
     RValue visitObjCSelectorExpr(ObjCSelectorExpr *E, SGFContext C);
     RValue visitKeyPathExpr(KeyPathExpr *E, SGFContext C);
@@ -2452,6 +2455,18 @@ visitObjectLiteralExpr(ObjectLiteralExpr *E, SGFContext C) {
                                             std::move(args), E->getType(), C);
 }
 
+RValue RValueEmitter::visitQuoteLiteralExpr(QuoteLiteralExpr *E, SGFContext C) {
+  return visit(E->getSemanticExpr(), C);
+}
+
+RValue RValueEmitter::visitUnquoteExpr(UnquoteExpr *E, SGFContext C) {
+  llvm_unreachable("invalid code made its way into SILGen");
+}
+
+RValue RValueEmitter::visitDeclQuoteExpr(DeclQuoteExpr *E, SGFContext C) {
+  return visit(E->getSemanticExpr(), C);
+}
+
 RValue RValueEmitter::
 visitEditorPlaceholderExpr(EditorPlaceholderExpr *E, SGFContext C) {
   return visit(E->getSemanticExpr(), C);
@@ -2609,9 +2624,9 @@ loadIndexValuesForKeyPathComponent(SILGenFunction &SGF, SILLocation loc,
 static AccessorDecl *
 getRepresentativeAccessorForKeyPath(AbstractStorageDecl *storage) {
   if (storage->requiresOpaqueGetter())
-    return storage->getGetter();
+    return storage->getOpaqueAccessor(AccessorKind::Get);
   assert(storage->requiresOpaqueReadCoroutine());
-  return storage->getReadCoroutine();
+  return storage->getOpaqueAccessor(AccessorKind::Read);
 }
 
 static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
@@ -2762,7 +2777,7 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
   // back to the declaration whose setter introduced the witness table
   // entry.
   if (isa<ProtocolDecl>(property->getDeclContext())) {
-    auto setter = property->getSetter();
+    auto setter = property->getOpaqueAccessor(AccessorKind::Set);
     if (!SILDeclRef::requiresNewWitnessTableEntry(setter)) {
       // Find the setter that does have a witness table entry.
       auto wtableSetter =

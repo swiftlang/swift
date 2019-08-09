@@ -593,6 +593,10 @@ public:
   /// Determine whether this locator points to the contextual type.
   bool isForContextualType() const;
 
+  /// Check whether the last element in the path of this locator
+  /// is of a given kind.
+  bool isLastElement(ConstraintLocator::PathElementKind kind) const;
+
   /// If this locator points to generic parameter return its type.
   GenericTypeParamType *getGenericParameter() const;
 

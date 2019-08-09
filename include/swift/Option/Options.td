@@ -411,6 +411,11 @@ def disable_bridging_pch : Flag<["-"], "disable-bridging-pch">,
   Flags<[HelpHidden]>,
   HelpText<"Disable automatic generation of bridging PCH files">;
 
+// Experimental feature options
+def enable_experimental_quasiquotes : Flag<["-"], "enable-experimental-quasiquotes">,
+  Flags<[FrontendOption]>,
+  HelpText<"Experimental work-in-progress implementation of quasiquotes">;
+
 // Diagnostic control options
 def suppress_warnings : Flag<["-"], "suppress-warnings">,
   Flags<[FrontendOption]>,
@@ -502,6 +507,12 @@ def static_stdlib: Flag<["-"], "static-stdlib">,
 def no_static_stdlib: Flag<["-"], "no-static-stdlib">,
   Flags<[HelpHidden,DoesNotAffectIncrementalBuild]>,
   HelpText<"Don't statically link the Swift standard library">;
+def toolchain_stdlib_rpath: Flag<["-"], "toolchain-stdlib-rpath">,
+  Flags<[HelpHidden,DoesNotAffectIncrementalBuild]>,
+  HelpText<"Add an rpath entry for the toolchain's standard library, rather than the OS's">;
+def no_stdlib_rpath: Flag<["-"], "no-stdlib-rpath">,
+  Flags<[HelpHidden,DoesNotAffectIncrementalBuild]>,
+  HelpText<"Don't add any rpath entries.">;
 
 def static_executable : Flag<["-"], "static-executable">,
   HelpText<"Statically link the executable">;

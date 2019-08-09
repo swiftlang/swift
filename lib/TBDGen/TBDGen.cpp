@@ -159,8 +159,8 @@ void TBDGenVisitor::addConformances(DeclContext *DC) {
             auto witnessStorage = cast<AbstractStorageDecl>(witnessDecl);
             storage->visitOpaqueAccessors([&](AccessorDecl *reqtAccessor) {
               auto witnessAccessor =
-                witnessStorage->getAccessor(reqtAccessor->getAccessorKind());
-              assert(witnessAccessor && "no corresponding witness accessor?");
+                witnessStorage->getSynthesizedAccessor(
+                  reqtAccessor->getAccessorKind());
               addSymbolIfNecessary(reqtAccessor, witnessAccessor);
             });
           }
@@ -266,10 +266,7 @@ void TBDGenVisitor::visitFuncDecl(FuncDecl *FD) {
 }
 
 void TBDGenVisitor::visitAccessorDecl(AccessorDecl *AD) {
-  // Do nothing: accessors are always nested within the storage decl, but
-  // sometimes appear outside it too. To avoid double-walking them, we
-  // explicitly visit them as members of the storage and ignore them when we
-  // visit them as part of the main walk, here.
+  llvm_unreachable("should not see an accessor here");
 }
 
 void TBDGenVisitor::visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
@@ -302,11 +299,13 @@ void TBDGenVisitor::visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
     auto *jvpId = AutoDiffAssociatedFunctionIdentifier::get(
         AutoDiffAssociatedFunctionKind::JVP, /*differentiationOrder*/ 1,
         DA->getParameterIndices(), ASD->getASTContext());
-    addSymbol(SILDeclRef(ASD->getGetter()).asAutoDiffAssociatedFunction(jvpId));
+    addSymbol(SILDeclRef(ASD->getAccessor(AccessorKind::Get))
+                  .asAutoDiffAssociatedFunction(jvpId));
     auto *vjpId = AutoDiffAssociatedFunctionIdentifier::get(
         AutoDiffAssociatedFunctionKind::VJP, /*differentiationOrder*/ 1,
         DA->getParameterIndices(), ASD->getASTContext());
-    addSymbol(SILDeclRef(ASD->getGetter()).asAutoDiffAssociatedFunction(vjpId));
+    addSymbol(SILDeclRef(ASD->getAccessor(AccessorKind::Get))
+                  .asAutoDiffAssociatedFunction(vjpId));
   }
 
   // Explicitly look at each accessor here: see visitAccessorDecl.

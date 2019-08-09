@@ -139,6 +139,8 @@ public:
   IGNORED_ATTR(CompilerEvaluable)
   IGNORED_ATTR(NoDerivative)
   IGNORED_ATTR(Transposing)
+  // TODO(TF-715): Allow @quoted on more decls.
+  IGNORED_ATTR(Quoted)
 #undef IGNORED_ATTR
 
   void visitAlignmentAttr(AlignmentAttr *attr) {
@@ -753,6 +755,8 @@ public:
     IGNORED_ATTR(WeakLinked)
     IGNORED_ATTR(DisfavoredOverload)
     IGNORED_ATTR(ProjectedValueProperty)
+    // TODO(TF-715): Allow @quoted on more decls.
+    IGNORED_ATTR(Quoted)
 #undef IGNORED_ATTR
 
   void visitAvailableAttr(AvailableAttr *attr);
@@ -982,24 +986,6 @@ bool swift::isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl,
            NTD == TC.Context.getReferenceWritableKeyPathDecl();
   }
   return false;
-}
-
-Optional<std::pair<Type, Type>>
-swift::getRootAndResultTypeOfKeypathDynamicMember(SubscriptDecl *subscript,
-                                                  const DeclContext *DC) {
-  auto &TC = TypeChecker::createForContext(DC->getASTContext());
-
-  if (!isValidKeyPathDynamicMemberLookup(subscript, TC))
-    return None;
-
-  const auto *param = subscript->getIndices()->get(0);
-  auto keyPathType = param->getType()->getAs<BoundGenericType>();
-  if (!keyPathType)
-    return None;
-  auto genericArgs = keyPathType->getGenericArgs();
-  assert(!genericArgs.empty() && genericArgs.size() == 2 &&
-         "invalid keypath dynamic member");
-  return std::pair<Type, Type>{genericArgs[0], genericArgs[1]};
 }
 
 /// The @dynamicMemberLookup attribute is only allowed on types that have at
@@ -2529,8 +2515,8 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
       decl = func;
     } else if (auto storage = dyn_cast<AbstractStorageDecl>(D)) {
       decl = storage;
-      auto getter = storage->getGetter();
-      if (!getter || getter->isImplicit() || !getter->hasBody()) {
+      auto getter = storage->getParsedAccessor(AccessorKind::Get);
+      if (!getter || !getter->hasBody()) {
         TC.diagnose(attr->getLocation(),
                     diag::function_builder_attribute_on_storage_without_getter,
                     nominal->getFullName(),
@@ -3193,7 +3179,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     // TODO(TF-129): Infer setter to also be `@differentiable` after
     // differentiation supports inout parameters. This requires refactoring to
     // handle multiple `original` functions (both getter and setter).
-    original = asd->getGetter();
+    original = asd->getAccessor(AccessorKind::Get);
   }
   // Setters are not yet supported.
   // TODO(TF-129): Remove this when differentiation supports inout parameters.
@@ -3472,7 +3458,8 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     newAttr->setJVPFunction(attr->getJVPFunction());
     newAttr->setVJPFunction(attr->getVJPFunction());
     auto insertion = ctx.DifferentiableAttrs.try_emplace(
-        {asd->getGetter(), newAttr->getParameterIndices()}, newAttr);
+        {asd->getAccessor(AccessorKind::Get), newAttr->getParameterIndices()},
+        newAttr);
     // Valid `@differentiable` attributes are uniqued by their parameter
     // indices. Reject duplicate attributes for the same decl and parameter
     // indices pair.
@@ -3482,7 +3469,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
                   diag::differentiable_attr_duplicate_note);
       return;
     }
-    asd->getGetter()->getAttrs().add(newAttr);
+    asd->getAccessor(AccessorKind::Get)->getAttrs().add(newAttr);
     return;
   }
   auto insertion = ctx.DifferentiableAttrs.try_emplace(
@@ -4425,7 +4412,9 @@ void TypeChecker::addImplicitDynamicAttribute(Decl *D) {
     // Don't turn stored into computed properties. This could conflict with
     // exclusivity checking.
     // If there is a didSet or willSet function we allow dynamic replacement.
-    if (VD->hasStorage() && !VD->getDidSetFunc() && !VD->getWillSetFunc())
+    if (VD->hasStorage() &&
+        !VD->getParsedAccessor(AccessorKind::DidSet) &&
+        !VD->getParsedAccessor(AccessorKind::WillSet))
       return;
     // Don't add dynamic to local variables.
     if (VD->getDeclContext()->isLocalContext())

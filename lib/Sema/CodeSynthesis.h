@@ -46,14 +46,7 @@ class ObjCReason;
 bool checkOverrides(ValueDecl *decl);
 
 // These are implemented in CodeSynthesis.cpp.
-void maybeAddAccessorsToStorage(AbstractStorageDecl *storage);
-
-// SWIFT_ENABLE_TENSORFLOW
-// Made public for use in DerivedConformanceDifferentiable.cpp.
-void addExpectedOpaqueAccessorsToStorage(AbstractStorageDecl *storage,
-                                         ASTContext &ctx);
-
-void triggerAccessorSynthesis(TypeChecker &TC, AbstractStorageDecl *storage);
+void addExpectedOpaqueAccessorsToStorage(AbstractStorageDecl *storage);
 
 /// Describes the kind of implicit constructor that will be
 /// generated.

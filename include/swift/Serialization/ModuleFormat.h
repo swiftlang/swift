@@ -52,7 +52,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 504; // distinguish implicit raw values for enum cases
+const uint16_t SWIFTMODULE_VERSION_MINOR = 506; // transparent accessor bit
 
 using DeclIDField = BCFixed<31>;
 
@@ -1079,6 +1079,7 @@ namespace decls_block {
     AccessLevelField, // setter access, if applicable
     DeclIDField, // opaque return type decl
     BCFixed<2>,  // # of property wrapper backing properties
+    BCVBR<4>, // total number of vtable entries introduced by all accessors
     BCArray<TypeIDField> // accessors, backing properties, and dependencies
   >;
 
@@ -1153,6 +1154,7 @@ namespace decls_block {
     AccessorKindField, // accessor kind
     AccessLevelField, // access level
     BCFixed<1>,   // requires a new vtable slot
+    BCFixed<1>,   // is transparent
     BCArray<IdentifierIDField> // name components,
                                // followed by TypeID dependencies
     // The record is trailed by:
@@ -1239,6 +1241,7 @@ namespace decls_block {
     StaticSpellingKindField,    // is subscript static?
     BCVBR<5>,    // number of parameter name components
     DeclIDField, // opaque return type decl
+    BCFixed<8>, // total number of vtable entries introduced by all accessors
     BCArray<IdentifierIDField> // name components,
                                // followed by DeclID accessors,
                                // followed by TypeID dependencies
@@ -1711,6 +1714,10 @@ namespace decls_block {
     TypeIDField // type referenced by this custom attribute
   >;
 
+  using QuotedDeclAttrLayout = BCRecordLayout<Quoted_DECL_ATTR,
+                                              BCFixed<1>, // implicit flag
+                                              DeclIDField // quote decl
+                                              >;
 }
 
 /// Returns the encoding kind for the given decl.
