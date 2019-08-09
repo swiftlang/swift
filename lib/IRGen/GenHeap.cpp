@@ -1718,7 +1718,7 @@ llvm::Value *IRGenFunction::getLocalSelfMetadata() {
     break;
   case ObjectReference:
     LocalSelf = emitDynamicTypeOfOpaqueHeapObject(*this, LocalSelf,
-                                             MetatypeRepresentation::Thick);
+                                                 MetatypeRepresentation::Thick);
     SelfKind = SwiftMetatype;
     break;
   }

@@ -188,7 +188,6 @@ macro(add_sourcekit_library name)
       set(SOURCEKITLIB_INSTALL_IN_COMPONENT dev)
     endif()
   endif()
-  add_dependencies(${SOURCEKITLIB_INSTALL_IN_COMPONENT} ${name})
   swift_install_in_component(TARGETS ${name}
     LIBRARY
       DESTINATION "lib${LLVM_LIBDIR_SUFFIX}"
@@ -346,7 +345,6 @@ macro(add_sourcekit_framework name)
                           MACOSX_FRAMEWORK_SHORT_VERSION_STRING "1.0"
                           MACOSX_FRAMEWORK_BUNDLE_VERSION "${SOURCEKIT_VERSION_STRING}"
                           PUBLIC_HEADER "${headers}")
-    add_dependencies(${SOURCEKITFW_INSTALL_IN_COMPONENT} ${name})
     swift_install_in_component(TARGETS ${name}
                                FRAMEWORK
                                  DESTINATION lib${LLVM_LIBDIR_SUFFIX}

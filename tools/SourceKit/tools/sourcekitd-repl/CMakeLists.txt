@@ -27,7 +27,6 @@ if(HAVE_UNICODE_LIBEDIT)
       LINK_FLAGS " -fprofile-instr-generate -fcoverage-mapping")
   endif()
 
-  add_dependencies(tools sourcekitd-repl)
   swift_install_in_component(TARGETS sourcekitd-repl
                              RUNTIME
                                DESTINATION bin

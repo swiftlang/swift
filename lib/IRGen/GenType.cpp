@@ -2255,10 +2255,14 @@ unsigned IRGenModule::getBuiltinIntegerWidth(BuiltinIntegerWidth w) {
   llvm_unreachable("impossible width value");
 }
 
-void IRGenFunction::setLocalSelfMetadata(llvm::Value *value,
+void IRGenFunction::setLocalSelfMetadata(CanType exactSelfClass,
+                                         llvm::Value *value,
                                          IRGenFunction::LocalSelfKind kind) {
   assert(!LocalSelf && "already have local self metadata");
   LocalSelf = value;
+  assert((!exactSelfClass || exactSelfClass->getClassOrBoundGenericClass())
+         && "self type not a class?");
+  ExactSelfType = exactSelfClass;
   SelfKind = kind;
 }
 
