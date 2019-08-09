@@ -207,7 +207,7 @@ void State::initializeConsumingUse(BranchPropagatedUser consumingUser,
                  << "Found over consume?!\n"
                  << "Value:\n";
     value->printInContext(llvm::errs());
-    llvm::errs() << *value << "User:\n";
+    llvm::errs() << "User:\n";
     consumingUser.getInst()->printInContext(llvm::errs());
     llvm::errs() << "Block: bb" << userBlock->getDebugID() << "\n\n";
   });
