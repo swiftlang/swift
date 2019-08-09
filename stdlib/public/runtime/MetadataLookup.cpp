@@ -196,10 +196,8 @@ namespace {
   };
 } // end anonymous namespace
 
-namespace {
-  inline llvm::hash_code llvm::hash_value(StringRef S) {
-    return hash_combine_range(S.begin(), S.end());
-  }
+inline llvm::hash_code llvm::hash_value(StringRef S) {
+  return hash_combine_range(S.begin(), S.end());
 }
 
 struct TypeMetadataPrivateState {
