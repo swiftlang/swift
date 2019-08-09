@@ -2380,7 +2380,7 @@ IRGenFunction::emitTypeMetadataRef(CanType type,
 
   // If we're asking for the metadata of the type that dynamic Self is known
   // to be equal to, we can just use the self metadata.
-  if (ExactSelfType == type) {
+  if (LocalSelfIsExact && LocalSelfType == type) {
     return MetadataResponse::forComplete(getLocalSelfMetadata());
   }
   

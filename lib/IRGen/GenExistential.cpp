@@ -1862,11 +1862,13 @@ void irgen::emitMetatypeOfClassExistential(IRGenFunction &IGF, Explosion &value,
   auto metaTy = metatypeTy.castTo<ExistentialMetatypeType>();
   auto repr = metaTy->getRepresentation();
   assert(repr != MetatypeRepresentation::Thin &&
-         "Class metatypes should have a thin representation");
+         "Class metatypes should not have a thin representation");
   assert((IGF.IGM.ObjCInterop || repr != MetatypeRepresentation::ObjC) &&
          "Class metatypes should not have ObjC representation without runtime");
 
-  auto dynamicType = emitDynamicTypeOfOpaqueHeapObject(IGF, instance, repr);
+  auto dynamicType = emitDynamicTypeOfHeapObject(IGF, instance, repr,
+                                                 existentialTy,
+                                                 /*allow artificial*/ false);
   out.add(dynamicType);
 
   // Get the witness tables.
@@ -1904,8 +1906,10 @@ irgen::emitClassExistentialProjection(IRGenFunction &IGF,
   ArrayRef<llvm::Value*> wtables;
   llvm::Value *value;
   std::tie(wtables, value) = baseTI.getWitnessTablesAndValue(base);
-  auto metadata = emitDynamicTypeOfOpaqueHeapObject(IGF, value,
-                                                MetatypeRepresentation::Thick);
+  auto metadata = emitDynamicTypeOfHeapObject(IGF, value,
+                                              MetatypeRepresentation::Thick,
+                                              baseTy,
+                                              /*allow artificial*/ false);
   IGF.bindArchetype(openedArchetype, metadata, MetadataState::Complete,
                     wtables);
 
@@ -2246,8 +2250,10 @@ Address irgen::emitOpaqueBoxedExistentialProjection(
         IGF.getTypeInfo(existentialTy).as<ClassExistentialTypeInfo>();
     auto valueAddr = baseTI.projectValue(IGF, base);
     auto value = IGF.Builder.CreateLoad(valueAddr);
-    auto metadata = emitDynamicTypeOfOpaqueHeapObject(IGF, value,
-                                                MetatypeRepresentation::Thick);
+    auto metadata = emitDynamicTypeOfHeapObject(IGF, value,
+                                                MetatypeRepresentation::Thick,
+                                                existentialTy,
+                                                /*allow artificial*/ false);
 
     // If we are projecting into an opened archetype, capture the
     // witness tables.

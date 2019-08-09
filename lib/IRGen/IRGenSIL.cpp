@@ -1610,12 +1610,10 @@ static void emitLocalSelfMetadata(IRGenSILFunction &IGF) {
   // Specify the exact Self type if we know it, either because the class
   // is final, or because the function we're emitting is a method with the
   // [exact_self_class] attribute set on it during the SIL pipeline.
-  CanType exactSelfTy;
-  if (selfTy->getClassOrBoundGenericClass()->isFinal()
-      || IGF.CurSILFn->isExactSelfClass())
-    exactSelfTy = selfTy;
+  bool isExact = selfTy->getClassOrBoundGenericClass()->isFinal()
+    || IGF.CurSILFn->isExactSelfClass();
 
-  IGF.setLocalSelfMetadata(exactSelfTy, value, selfKind);
+  IGF.setLocalSelfMetadata(selfTy, isExact, value, selfKind);
 }
 
 /// Emit the definition for the given SIL constant.
