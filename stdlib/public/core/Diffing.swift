@@ -54,7 +54,7 @@ extension CollectionDifference {
 }
 
 // Error type allows the use of throw to unroll state on application failure
-fileprivate enum _ApplicationError : Error { case failed }
+private enum _ApplicationError : Error { case failed }
 
 extension RangeReplaceableCollection {
   /// Applies the given difference to this collection.
