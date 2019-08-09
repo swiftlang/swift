@@ -207,7 +207,8 @@ struct TypeMetadataPrivateState {
   llvm::DenseMap<llvm::StringRef,
                  llvm::TinyPtrVector<const ContextDescriptor *>>
     ContextDescriptorCache;
-  size_t ContextDescriptorLastSectionScanned = 0;
+  size_t ConformanceDescriptorLastSectionScanned = 0;
+  size_t TypeContextDescriptorLastSectionScanned = 0;
   Mutex ContextDescriptorCacheLock;
 
   TypeMetadataPrivateState() {
@@ -223,6 +224,28 @@ _registerTypeMetadataRecords(TypeMetadataPrivateState &T,
                              const TypeMetadataRecord *begin,
                              const TypeMetadataRecord *end) {
   T.SectionsToScan.push_back(TypeMetadataSection{begin, end});
+}
+
+/// Iterate over type metadata sections starting from the given index.
+/// The index is updated to the current number of sections. Passing
+/// the same index to the next call will iterate over any sections that were
+/// added after the previous call.
+///
+/// Takes a function to call for each section found. The two parameters are
+/// the start and end of the section.
+static void _forEachTypeMetadataSectionAfter(
+  TypeMetadataPrivateState &T,
+  size_t *start,
+  const std::function<void(const TypeMetadataRecord *,
+                           const TypeMetadataRecord *)> &f) {
+  auto snapshot = T.SectionsToScan.snapshot();
+  if (snapshot.Count > *start) {
+    auto *begin = snapshot.begin() + *start;
+    auto *end = snapshot.end();
+    for (auto *section = begin; section != end; section++) {
+      f(section->Begin, section->End);
+    }
+  }
 }
 
 void swift::addImageTypeMetadataRecordBlockCallback(const void *records,
@@ -618,8 +641,24 @@ _searchTypeMetadataRecords(TypeMetadataPrivateState &T,
 // scanned, if any.
 static void
 _scanAdditionalContextDescriptors(TypeMetadataPrivateState &T) {
+  _forEachTypeMetadataSectionAfter(
+    T,
+    &T.TypeContextDescriptorLastSectionScanned,
+    [&T](const TypeMetadataRecord *Begin,
+         const TypeMetadataRecord *End) {
+      for (const auto *record = Begin; record != End; record++) {
+        if (auto ntd = record->getContextDescriptor()) {
+          if (auto type = llvm::dyn_cast<TypeContextDescriptor>(ntd)) {
+            auto identity = ParsedTypeIdentity::parse(type);
+            auto name = identity.getABIName();
+            T.ContextDescriptorCache[name].push_back(type);
+          }
+        }
+      }
+    });
+
   _forEachProtocolConformanceSectionAfter(
-    &T.ContextDescriptorLastSectionScanned,
+    &T.ConformanceDescriptorLastSectionScanned,
     [&T](const ProtocolConformanceRecord *Begin,
        const ProtocolConformanceRecord *End) {
     for (const auto *record = Begin; record != End; record++) {
