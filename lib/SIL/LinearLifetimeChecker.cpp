@@ -265,10 +265,11 @@ void State::checkForSameBlockUseAfterFree(BranchPropagatedUser consumingUser,
                    << "Found use after free?!\n"
                    << "Value:\n";
       value->printInContext(llvm::errs());
-      llvm::errs() << "Consuming User: ";
+      llvm::errs() << "Consuming User:\n";
       consumingUser.getInst()->printInContext(llvm::errs());
-      llvm::errs() << "Non Consuming User: " << *iter->second << "Block: bb"
-                   << userBlock->getDebugID() << "\n\n";
+      llvm::errs() << "Non Consuming User:\n";
+      iter->second.getInst()->printInContext(llvm::errs());
+      llvm::errs() << "Block: bb" << userBlock->getDebugID() << "\n\n";
     });
     return;
   }
