@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name builtins -parse-stdlib -primary-file %s -emit-ir -o - -disable-objc-attr-requires-foundation-module | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
+// RUN: %target-swift-frontend -module-name builtins -parse-stdlib  -disable-access-control -primary-file %s -emit-ir -o - -disable-objc-attr-requires-foundation-module | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
 
 // REQUIRES: CPU=x86_64
 
@@ -315,11 +315,11 @@ func testStaticReport(_ b: Bool, ptr: Builtin.RawPointer) -> () {
 // CHECK-LABEL: define hidden {{.*}}void @"$s8builtins12testCondFail{{[_0-9a-zA-Z]*}}F"(i1, i1)
 func testCondFail(_ b: Bool, c: Bool) {
   // CHECK: br i1 %0, label %[[FAIL:.*]], label %[[CONT:.*]]
-  Builtin.condfail(b)
-  // CHECK: [[CONT]]:
+  Builtin.condfail_message(b, StaticString("message").unsafeRawPointer)
+  // CHECK: [[CONT]]
   // CHECK: br i1 %1, label %[[FAIL2:.*]], label %[[CONT:.*]]
-  Builtin.condfail(c)
-  // CHECK: [[CONT]]:
+  Builtin.condfail_message(c, StaticString("message").unsafeRawPointer)
+  // CHECK: [[CONT]]
   // CHECK: ret void
 
   // CHECK: [[FAIL]]:
@@ -335,14 +335,15 @@ func testCondFail(_ b: Bool, c: Bool) {
 // CHECK:         [[PRED_PTR:%.*]] = bitcast i8* %0 to [[WORD:i64|i32]]*
 // CHECK-objc:    [[PRED:%.*]] = load {{.*}} [[WORD]]* [[PRED_PTR]]
 // CHECK-objc:    [[IS_DONE:%.*]] = icmp eq [[WORD]] [[PRED]], -1
-// CHECK-objc:    br i1 [[IS_DONE]], label %[[DONE:.*]], label %[[NOT_DONE:.*]]
-// CHECK-objc:  [[NOT_DONE]]:
-// CHECK:         call void @swift_once([[WORD]]* [[PRED_PTR]], i8* %1, i8* undef)
-// CHECK-objc:    br label %[[DONE]]
+// CHECK-objc:    [[IS_DONE_X:%.*]] = call i1 @llvm.expect.i1(i1 [[IS_DONE]], i1 true)
+// CHECK-objc:    br i1 [[IS_DONE_X]], label %[[DONE:.*]], label %[[NOT_DONE:.*]]
 // CHECK-objc:  [[DONE]]:
 // CHECK-objc:    [[PRED:%.*]] = load {{.*}} [[WORD]]* [[PRED_PTR]]
 // CHECK-objc:    [[IS_DONE:%.*]] = icmp eq [[WORD]] [[PRED]], -1
 // CHECK-objc:    call void @llvm.assume(i1 [[IS_DONE]])
+// CHECK-objc:  [[NOT_DONE]]:
+// CHECK:         call void @swift_once([[WORD]]* [[PRED_PTR]], i8* %1, i8* undef)
+// CHECK-objc:    br label %[[DONE]]
 
 func testOnce(_ p: Builtin.RawPointer, f: @escaping @convention(c) () -> ()) {
   Builtin.once(p, f)
@@ -352,14 +353,15 @@ func testOnce(_ p: Builtin.RawPointer, f: @escaping @convention(c) () -> ()) {
 // CHECK:         [[PRED_PTR:%.*]] = bitcast i8* %0 to [[WORD:i64|i32]]*
 // CHECK-objc:    [[PRED:%.*]] = load {{.*}} [[WORD]]* [[PRED_PTR]]
 // CHECK-objc:    [[IS_DONE:%.*]] = icmp eq [[WORD]] [[PRED]], -1
-// CHECK-objc:    br i1 [[IS_DONE]], label %[[DONE:.*]], label %[[NOT_DONE:.*]]
-// CHECK-objc:  [[NOT_DONE]]:
-// CHECK:         call void @swift_once([[WORD]]* [[PRED_PTR]], i8* %1, i8* %2)
-// CHECK-objc:    br label %[[DONE]]
+// CHECK-objc:    [[IS_DONE_X:%.*]] = call i1 @llvm.expect.i1(i1 [[IS_DONE]], i1 true)
+// CHECK-objc:    br i1 [[IS_DONE_X]], label %[[DONE:.*]], label %[[NOT_DONE:.*]]
 // CHECK-objc:  [[DONE]]:
 // CHECK-objc:    [[PRED:%.*]] = load {{.*}} [[WORD]]* [[PRED_PTR]]
 // CHECK-objc:    [[IS_DONE:%.*]] = icmp eq [[WORD]] [[PRED]], -1
 // CHECK-objc:    call void @llvm.assume(i1 [[IS_DONE]])
+// CHECK-objc:  [[NOT_DONE]]:
+// CHECK:         call void @swift_once([[WORD]]* [[PRED_PTR]], i8* %1, i8* %2)
+// CHECK-objc:    br label %[[DONE]]
 func testOnceWithContext(_ p: Builtin.RawPointer, f: @escaping @convention(c) (Builtin.RawPointer) -> (), k: Builtin.RawPointer) {
   Builtin.onceWithContext(p, f, k)
 }
@@ -804,7 +806,16 @@ enum MyError : Error {
 
 throw MyError.A
 
+/// Builtin.globalStringTablePointer must be reduced to a string_literal instruction before IRGen. IRGen
+/// should make this a trap.
+// CHECK-LABEL: define {{.*}}globalStringTablePointer
+// CHECK: call void @llvm.trap()
+// CHECK: ret i8* undef
+@_transparent
+func globalStringTablePointerUse(_ str: String) -> Builtin.RawPointer {
+  return Builtin.globalStringTablePointer(str);
+}
+
 
 
 // CHECK: ![[R]] = !{i64 0, i64 9223372036854775807}
-

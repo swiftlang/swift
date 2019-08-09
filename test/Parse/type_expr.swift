@@ -134,8 +134,7 @@ func typeOfShadowing() {
   }
 
   // TODO: Errors need improving here.
-  _ = type(of: Gen<Foo>.Bar) // expected-error{{argument labels '(of:)' do not match any available overloads}}
-                             // expected-note@-1{{overloads for 'type' exist with these partially matching parameter lists: (T.Type), (fo: T.Type)}}
+  _ = type(of: Gen<Foo>.Bar) // expected-error{{incorrect argument label in call (have 'of:', expected 'fo:')}}
   _ = type(Gen<Foo>.Bar) // expected-error{{expected member name or constructor call after type name}}
   // expected-note@-1{{add arguments after the type to construct a value of the type}}
   // expected-note@-2{{use '.self' to reference the type object}}

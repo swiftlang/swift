@@ -38,7 +38,7 @@ using namespace ast_scope;
 void ASTScopeImpl::dump() const { print(llvm::errs(), 0, false); }
 
 void ASTScopeImpl::dumpOneScopeMapLocation(
-    std::pair<unsigned, unsigned> lineColumn) const {
+    std::pair<unsigned, unsigned> lineColumn) {
   auto bufferID = getSourceFile()->getBufferID();
   if (!bufferID) {
     llvm::errs() << "***No buffer, dumping all scopes***";
@@ -52,7 +52,7 @@ void ASTScopeImpl::dumpOneScopeMapLocation(
 
   llvm::errs() << "***Scope at " << lineColumn.first << ":" << lineColumn.second
                << "***\n";
-  auto *locScope = findInnermostEnclosingScope(loc);
+  auto *locScope = findInnermostEnclosingScope(loc, &llvm::errs());
   locScope->print(llvm::errs(), 0, false, false);
 
   // Dump the AST context, too.
@@ -61,7 +61,7 @@ void ASTScopeImpl::dumpOneScopeMapLocation(
 
   namelookup::ASTScopeDeclGatherer gatherer;
   // Print the local bindings introduced by this scope.
-  locScope->lookupLocalBindings(None, gatherer);
+  locScope->lookupLocalsOrMembers({this}, gatherer);
   if (!gatherer.getDecls().empty()) {
     llvm::errs() << "Local bindings: ";
     interleave(gatherer.getDecls().begin(), gatherer.getDecls().end(),
@@ -92,6 +92,10 @@ void ASTScopeImpl::print(llvm::raw_ostream &out, unsigned level, bool lastChild,
   if (auto *a = addressForPrinting().getPtrOrNull())
     out << " " << a;
   out << ", ";
+  if (auto *d = getDeclIfAny().getPtrOrNull()) {
+    if (d->isImplicit())
+      out << "implicit ";
+  }
   printRange(out);
   out << " ";
   printSpecifics(out);
@@ -120,11 +124,9 @@ static void printSourceRange(llvm::raw_ostream &out, const SourceRange range,
 }
 
 void ASTScopeImpl::printRange(llvm::raw_ostream &out) const {
-  if (!cachedSourceRange)
+  if (!isSourceRangeCached(true))
     out << "(uncached) ";
-  SourceRange range = cachedSourceRange
-                          ? getSourceRange(/*omitAssertions=*/true)
-                          : getUncachedSourceRange(/*omitAssertions=*/true);
+  SourceRange range = getUncachedSourceRange(/*omitAssertions=*/true);
   printSourceRange(out, range, getSourceManager());
 }
 
@@ -137,7 +139,11 @@ void ASTSourceFileScope::printSpecifics(
 }
 
 NullablePtr<const void> ASTScopeImpl::addressForPrinting() const {
-  if (auto *p = getDecl().getPtrOrNull())
+  if (auto *p = getDeclIfAny().getPtrOrNull())
+    return p;
+  if (auto *p = getStmtIfAny().getPtrOrNull())
+    return p;
+  if (auto *p = getExprIfAny().getPtrOrNull())
     return p;
   return nullptr;
 }

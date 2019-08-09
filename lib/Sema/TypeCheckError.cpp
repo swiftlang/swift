@@ -1472,8 +1472,8 @@ private:
   ShouldRecurse_t
   checkInterpolatedStringLiteral(InterpolatedStringLiteralExpr *E) {
     ContextScope scope(*this, CurContext.withInterpolatedString(E));
-    if (E->getSemanticExpr())
-      E->getSemanticExpr()->walk(*this);
+    if (E->getAppendingExpr())
+      E->getAppendingExpr()->walk(*this);
     scope.preserveCoverageFromInterpolatedString();
     return ShouldNotRecurse;
   }

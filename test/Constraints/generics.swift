@@ -161,7 +161,10 @@ class r22409190ManagedBuffer<Value, Element> {
 class MyArrayBuffer<Element>: r22409190ManagedBuffer<UInt, Element> {
   deinit {
     self.withUnsafeMutablePointerToElements { elems -> Void in
-      elems.deinitialize(count: self.value)  // expected-error {{cannot convert value of type 'UInt' to expected argument type 'Int'}}
+      // FIXME(diagnostics): Diagnostic regressed here from `cannot convert value of type 'UInt' to expected argument type 'Int'`.
+      // Once argument-to-parameter mismatch diagnostics are moved to the new diagnostic framework, we'll be able to restore
+      // original contextual conversion failure diagnostic here. Note that this only happens in Swift 4 mode.
+      elems.deinitialize(count: self.value)  // expected-error {{ambiguous reference to member 'deinitialize(count:)'}}
     }
   }
 }
@@ -224,7 +227,7 @@ func test9215114<T: P19215114, U: Q19215114>(_ t: T) -> (U) -> () {
 }
 
 // <rdar://problem/21718970> QoI: [uninferred generic param] cannot invoke 'foo' with an argument list of type '(Int)'
-class Whatever<A: Numeric, B: Numeric> {  // expected-note 2 {{'A' declared as parameter to type 'Whatever'}}
+class Whatever<A: Numeric, B: Numeric> {  // expected-note 2 {{'A' declared as parameter to type 'Whatever'}} expected-note {{'B' declared as parameter to type 'Whatever'}}
   static func foo(a: B) {}
   
   static func bar() {}
@@ -233,7 +236,9 @@ class Whatever<A: Numeric, B: Numeric> {  // expected-note 2 {{'A' declared as p
 Whatever.foo(a: 23) // expected-error {{generic parameter 'A' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{9-9=<<#A: Numeric#>, Int>}}
 
 // <rdar://problem/21718955> Swift useless error: cannot invoke 'foo' with no arguments
-Whatever.bar()  // expected-error {{generic parameter 'A' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{9-9=<<#A: Numeric#>, <#B: Numeric#>>}}
+// TODO(diagnostics): We should try to produce a single note in this case.
+Whatever.bar()  // expected-error {{generic parameter 'A' could not be inferred}} expected-note 2 {{explicitly specify the generic arguments to fix this issue}} {{9-9=<<#A: Numeric#>, <#B: Numeric#>>}}
+// expected-error@-1 {{generic parameter 'B' could not be inferred}}
 
 // <rdar://problem/27515965> Type checker doesn't enforce same-type constraint if associated type is Any
 protocol P27515965 {
@@ -646,7 +651,7 @@ let arr = [BottleLayout]()
 let layout = BottleLayout(count:1)
 let ix = arr.firstIndex(of:layout) // expected-error {{argument type 'BottleLayout' does not conform to expected type 'Equatable'}}
 
-let _: () -> UInt8 = { .init("a" as Unicode.Scalar) } // expected-error {{initializer 'init(_:)' requires that 'Unicode.Scalar' conform to 'BinaryInteger'}}
+let _: () -> UInt8 = { .init("a" as Unicode.Scalar) } // expected-error {{missing argument label 'ascii:' in call}}
 
 // https://bugs.swift.org/browse/SR-9068
 func compare<C: Collection, Key: Hashable, Value: Equatable>(c: C)
@@ -769,4 +774,27 @@ func rdar_50007727() {
   let _ = A.B<S>("hello")
   // expected-error@-1 {{generic parameter 'T' could not be inferred in cast to 'A.B'}}
   // expected-note@-2 {{explicitly specify the generic arguments to fix this issue}} {{12-12=<Any>}}
+}
+
+// rdar://problem/51413254
+
+infix operator ==>
+
+struct Key {
+  init(_ key: String) {}
+}
+
+func ==> (lhs: Any, rhs: Key) throws -> Any {
+  return 0
+}
+
+func ==> <A>(lhs: Any, rhs: Key) throws -> A {
+  fatalError()
+}
+
+struct R_51413254 {
+  var str: String = ""
+  mutating func test(_ anyDict: Any) throws {
+    self.str = try anyDict ==> Key("a") // Ok
+  }
 }

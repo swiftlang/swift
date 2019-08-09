@@ -140,7 +140,7 @@ public struct Bool {
   }
 }
 
-extension Bool : _ExpressibleByBuiltinBooleanLiteral, ExpressibleByBooleanLiteral {
+extension Bool: _ExpressibleByBuiltinBooleanLiteral, ExpressibleByBooleanLiteral {
   @_transparent
   public init(_builtinBooleanLiteral value: Builtin.Int1) {
     self._value = value
@@ -170,7 +170,7 @@ extension Bool : _ExpressibleByBuiltinBooleanLiteral, ExpressibleByBooleanLitera
   }
 }
 
-extension Bool : CustomStringConvertible {
+extension Bool: CustomStringConvertible {
   /// A textual representation of the Boolean value.
   @inlinable
   public var description: String {
@@ -197,7 +197,7 @@ extension Bool: Hashable {
   }
 }
 
-extension Bool : LosslessStringConvertible {
+extension Bool: LosslessStringConvertible {
   /// Creates a new Boolean value from the given string.
   ///
   /// If the `description` value is any string other than `"true"` or

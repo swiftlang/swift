@@ -307,9 +307,10 @@ static void collectPossibleCalleesByQualifiedLookup(
       }
     }
 
-    auto fnType = baseTy->getMetatypeInstanceType()->getTypeOfMember(
-        DC.getParentModule(), VD, declaredMemberType);
-
+    auto subs = baseTy->getMetatypeInstanceType()->getMemberSubstitutionMap(
+        DC.getParentModule(), VD,
+        VD->getInnermostDeclContext()->getGenericEnvironmentOfContext());
+    auto fnType = declaredMemberType.subst(subs, SubstFlags::UseErrorType);
     if (!fnType)
       continue;
 
@@ -353,24 +354,29 @@ static bool collectPossibleCalleesForApply(
   auto *fnExpr = callExpr->getFn();
 
   if (auto type = fnExpr->getType()) {
-    if (auto *funcType = type->getAs<AnyFunctionType>()) {
-      auto refDecl = fnExpr->getReferencedDecl();
-      if (!refDecl)
-        if (auto apply = dyn_cast<ApplyExpr>(fnExpr))
-          refDecl = apply->getFn()->getReferencedDecl();
-      candidates.emplace_back(funcType, refDecl.getDecl());
+    if (!type->hasUnresolvedType() && !type->hasError()) {
+      if (auto *funcType = type->getAs<AnyFunctionType>()) {
+        auto refDecl = fnExpr->getReferencedDecl();
+        if (!refDecl)
+          if (auto apply = dyn_cast<ApplyExpr>(fnExpr))
+            refDecl = apply->getFn()->getReferencedDecl();
+        candidates.emplace_back(funcType, refDecl.getDecl());
+        return true;
+      }
     }
-  } else if (auto *DRE = dyn_cast<DeclRefExpr>(fnExpr)) {
+  }
+
+  if (auto *DRE = dyn_cast<DeclRefExpr>(fnExpr)) {
     if (auto *decl = DRE->getDecl()) {
-      auto declType = decl->getInterfaceType();
-      if (auto *funcType = declType->getAs<AnyFunctionType>())
-        candidates.emplace_back(funcType, decl);
+      if (decl->hasInterfaceType())
+        if (auto *funcType = decl->getInterfaceType()->getAs<AnyFunctionType>())
+          candidates.emplace_back(funcType, decl);
     }
   } else if (auto *OSRE = dyn_cast<OverloadSetRefExpr>(fnExpr)) {
     for (auto *decl : OSRE->getDecls()) {
-      auto declType = decl->getInterfaceType();
-      if (auto *funcType = declType->getAs<AnyFunctionType>())
-        candidates.emplace_back(funcType, decl);
+      if (decl->hasInterfaceType())
+        if (auto *funcType = decl->getInterfaceType()->getAs<AnyFunctionType>())
+          candidates.emplace_back(funcType, decl);
     }
   } else if (auto *UDE = dyn_cast<UnresolvedDotExpr>(fnExpr)) {
     collectPossibleCalleesByQualifiedLookup(
@@ -577,6 +583,15 @@ class ExprContextAnalyzer {
     case ExprKind::Array: {
       if (auto type = ParsedExpr->getType()) {
         recordPossibleType(type);
+        break;
+      }
+
+      // Check context types of the array literal expression.
+      ExprContextInfo arrayCtxtInfo(DC, Parent);
+      for (auto arrayT : arrayCtxtInfo.getPossibleTypes()) {
+        if (auto boundGenericT = arrayT->getAs<BoundGenericType>())
+          if (boundGenericT->getDecl() == Context.getArrayDecl())
+            recordPossibleType(boundGenericT->getGenericArgs()[0]);
       }
       break;
     }
@@ -918,7 +933,13 @@ bool swift::ide::isReferenceableByImplicitMemberExpr(
     // because we are emitting all `.init()`s.
     if (declTy->isEqual(T))
       return false;
-    return swift::isConvertibleTo(declTy, T, *DC);
+
+    // Only non-protocol nominal type can be instantiated.
+    auto nominal = declTy->getAnyNominal();
+    if (!nominal || isa<ProtocolDecl>(nominal))
+      return false;
+
+    return swift::isConvertibleTo(declTy, T, /*openArchetypes=*/true, *DC);
   }
 
   // Only static member can be referenced.
@@ -935,5 +956,6 @@ bool swift::ide::isReferenceableByImplicitMemberExpr(
     // FIXME: This emits just 'factory'. We should emit 'factory()' instead.
     declTy = FT->getResult();
   }
-  return declTy->isEqual(T) || swift::isConvertibleTo(declTy, T, *DC);
+  return declTy->isEqual(T) ||
+         swift::isConvertibleTo(declTy, T, /*openArchetypes=*/true, *DC);
 }

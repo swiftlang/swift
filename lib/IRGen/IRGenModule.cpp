@@ -266,7 +266,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   // A tuple type metadata record has a couple extra fields.
   auto tupleElementTy = createStructType(*this, "swift.tuple_element_type", {
     TypeMetadataPtrTy,      // Metadata *Type;
-    SizeTy                  // size_t Offset;
+    Int32Ty                 // int32_t Offset;
   });
   TupleTypeMetadataPtrTy = createStructPointerType(*this, "swift.tuple_type", {
     TypeMetadataStructTy,   // (base)
@@ -535,16 +535,39 @@ static bool isReturnAttribute(llvm::Attribute::AttrKind Attr);
 namespace RuntimeConstants {
   const auto ReadNone = llvm::Attribute::ReadNone;
   const auto ReadOnly = llvm::Attribute::ReadOnly;
+  const auto ArgMemOnly = llvm::Attribute::ArgMemOnly;
   const auto NoReturn = llvm::Attribute::NoReturn;
   const auto NoUnwind = llvm::Attribute::NoUnwind;
   const auto ZExt = llvm::Attribute::ZExt;
   const auto FirstParamReturned = llvm::Attribute::Returned;
 
-  const auto AlwaysAvailable = RuntimeAvailability::AlwaysAvailable;
-  const auto AvailableByCompatibilityLibrary =
-      RuntimeAvailability::AvailableByCompatibilityLibrary;
-  const auto ConditionallyAvailable =
-      RuntimeAvailability::ConditionallyAvailable;
+  RuntimeAvailability AlwaysAvailable(ASTContext &Context) {
+    return RuntimeAvailability::AlwaysAvailable;
+  }
+
+  bool
+  isDeploymentAvailabilityContainedIn(ASTContext &Context,
+                                      AvailabilityContext featureAvailability) {
+    auto deploymentAvailability =
+      AvailabilityContext::forDeploymentTarget(Context);
+    return deploymentAvailability.isContainedIn(featureAvailability);
+  }
+
+  RuntimeAvailability OpaqueTypeAvailability(ASTContext &Context) {
+    auto featureAvailability = Context.getOpaqueTypeAvailability();
+    if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
+
+  RuntimeAvailability DynamicReplacementAvailability(ASTContext &Context) {
+    auto featureAvailability = Context.getSwift51Availability();
+    if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
+      return RuntimeAvailability::AvailableByCompatibilityLibrary;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
 } // namespace RuntimeConstants
 
 // We don't use enough attributes to justify generalizing the
@@ -589,7 +612,6 @@ llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
                       const char *name,
                       llvm::CallingConv::ID cc,
                       RuntimeAvailability availability,
-                      ASTContext *context,
                       llvm::ArrayRef<llvm::Type*> retTypes,
                       llvm::ArrayRef<llvm::Type*> argTypes,
                       ArrayRef<Attribute::AttrKind> attrs) {
@@ -600,24 +622,16 @@ llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
   bool isWeakLinked = false;
   std::string functionName(name);
 
-  auto isFeatureAvailable = [&]() -> bool {
-    auto deploymentAvailability =
-        AvailabilityContext::forDeploymentTarget(*context);
-    auto featureAvailability = context->getSwift51Availability();
-    return deploymentAvailability.isContainedIn(featureAvailability);
-  };
-
   switch (availability) {
   case RuntimeAvailability::AlwaysAvailable:
     // Nothing to do.
     break;
   case RuntimeAvailability::ConditionallyAvailable: {
-    isWeakLinked = !isFeatureAvailable();
+    isWeakLinked = true;
     break;
   }
   case RuntimeAvailability::AvailableByCompatibilityLibrary: {
-    if (!isFeatureAvailable())
-      functionName.append("50");
+    functionName.append("50");
     break;
   }
   }
@@ -689,7 +703,7 @@ llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
   llvm::Constant *IRGenModule::get##ID##Fn() {                                 \
     using namespace RuntimeConstants;                                          \
     return getRuntimeFn(Module, ID##Fn, #NAME, CC,                             \
-                        AVAILABILITY, &this->Context,                          \
+                        AVAILABILITY(this->Context),                          \
                         RETURNS, ARGS, ATTRS);                                 \
   }
 
@@ -878,17 +892,30 @@ bool swift::irgen::shouldRemoveTargetFeature(StringRef feature) {
   return feature == "+thumb-mode";
 }
 
+void IRGenModule::setHasFramePointer(llvm::AttrBuilder &Attrs,
+                                     bool HasFramePointer) {
+  if (HasFramePointer) {
+    Attrs.addAttribute("no-frame-pointer-elim", "true");
+    Attrs.addAttribute("no-frame-pointer-elim-non-leaf");
+  } else {
+    Attrs.addAttribute("no-frame-pointer-elim", "false");
+    Attrs.removeAttribute("no-frame-pointer-elim-non-leaf");
+  }
+}
+
+void IRGenModule::setHasFramePointer(llvm::Function *F,
+                                     bool HasFramePointer) {
+  llvm::AttrBuilder b;
+  setHasFramePointer(b, HasFramePointer);
+  F->addAttributes(llvm::AttributeList::FunctionIndex, b);
+}
+
 /// Construct initial function attributes from options.
 void IRGenModule::constructInitialFnAttributes(llvm::AttrBuilder &Attrs,
                                                OptimizationMode FuncOptMode) {
-  // Add DisableFPElim. 
-  if (!IRGen.Opts.DisableFPElim) {
-    Attrs.addAttribute("no-frame-pointer-elim", "false");
-  } else {
-    Attrs.addAttribute("no-frame-pointer-elim", "true");
-    Attrs.addAttribute("no-frame-pointer-elim-non-leaf");
-  }
-
+  // Add frame pointer attributes.
+  setHasFramePointer(Attrs, IRGen.Opts.DisableFPElim);
+  
   // Add target-cpu and target-features if they are non-null.
   auto *Clang = static_cast<ClangImporter *>(Context.getClangModuleLoader());
   clang::TargetOptions &ClangOpts = Clang->getTargetInfo().getTargetOpts();
@@ -997,6 +1024,12 @@ llvm::SmallString<32> getTargetDependentLibraryOption(const llvm::Triple &T,
 void IRGenModule::addLinkLibrary(const LinkLibrary &linkLib) {
   llvm::LLVMContext &ctx = Module.getContext();
 
+  // The debugger gets the autolink information directly from
+  // the LinkLibraries of the module, so there's no reason to
+  // emit it into the IR of debugger expressions.
+  if (Context.LangOpts.DebuggerSupport)
+    return;
+  
   switch (linkLib.getKind()) {
   case LibraryKind::Library: {
     llvm::SmallString<32> opt =

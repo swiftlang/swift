@@ -132,6 +132,8 @@ ERROR(sdk_node_unrecognized_decl_attr_kind,none,
       "unrecognized declaration attribute '%0' in SDK node", (StringRef))
 ERROR(sdk_node_unrecognized_decl_kind,none,
       "unrecognized declaration kind '%0' in SDK node", (StringRef))
+ERROR(sdk_node_unrecognized_accessor_kind,none,
+      "unrecognized accessor kind '%0' in SDK node", (StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: Circular reference diagnostics
@@ -150,6 +152,12 @@ ERROR(circular_class_inheritance,none,
 
 ERROR(circular_enum_inheritance,none,
       "%0 has a raw type that depends on itself", (Identifier))
+
+ERROR(circular_protocol_def,none,
+      "protocol %0 refines itself", (Identifier))
+
+NOTE(kind_declname_declared_here,none,
+     "%0 %1 declared here", (DescriptiveDeclKind, DeclName))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

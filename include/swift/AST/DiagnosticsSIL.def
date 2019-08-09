@@ -113,8 +113,22 @@ ERROR(unsupported_c_function_pointer_conversion,none,
       "C function pointer signature %0 is not compatible with expected type %1",
       (Type, Type))
 
+ERROR(c_function_pointer_from_function_with_context,none,
+      "a C function pointer cannot be formed from a "
+      "%select{local function|closure}0 that captures "
+      "%select{context|generic parameters|dynamic Self type|<<error>}1",
+      (bool, unsigned))
+
 ERROR(objc_selector_malformed,none,"the type ObjectiveC.Selector is malformed",
       ())
+
+// Capture before declaration diagnostics.
+ERROR(capture_before_declaration,none,
+      "closure captures %0 before it is declared", (Identifier))
+ERROR(capture_before_declaration_defer,none,
+      "'defer' block captures %0 before it is declared", (Identifier))
+NOTE(captured_value_declared_here,none,
+     "captured value declared here", ())
 
 // Invalid escaping capture diagnostics.
 ERROR(escaping_inout_capture,none,
@@ -470,7 +484,7 @@ NOTE(switch_value_case_doesnt_yield, none, "missing yield in the %0 case",
 NOTE(try_branch_doesnt_yield, none, "missing yield when error is "
      "%select{not |}0thrown", (bool))
 
-// OS log optimization dianostics.
+// OS log optimization diagnostics.
 
 ERROR(oslog_message_argument_not_found, none, "no argument of type %0 in "
   " the os log call", (Identifier))
@@ -490,6 +504,9 @@ ERROR(oslog_non_constant_interpolation, none, "'OSLogInterpolation' struct is "
 
 ERROR(oslog_property_not_constant, none, "'OSLogInterpolation.%0' is not a "
       "constant: formatting and privacy options must be literals", (StringRef))
+
+ERROR(global_string_pointer_on_non_constant, none, "globalStringTablePointer "
+      "builtin must used only on string literals", ())
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

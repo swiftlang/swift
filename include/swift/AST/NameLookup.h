@@ -592,17 +592,18 @@ public:
   /// Takes an array in order to batch the consumption before setting
   /// IndexOfFirstOuterResult when necessary.
   virtual bool consume(ArrayRef<ValueDecl *> values, DeclVisibilityKind vis,
-                       Optional<bool> isCascadingUse,
                        NullablePtr<DeclContext> baseDC = nullptr) = 0;
 
   /// Eventually this functionality should move into ASTScopeLookup
-  virtual std::pair<bool, Optional<bool>>
-  lookupInSelfType(NullablePtr<DeclContext> selfDC, DeclContext *const scopeDC,
-                   NominalTypeDecl *const nominal,
-                   Optional<bool> isCascadingUse) = 0;
+  virtual bool
+  lookInMembers(NullablePtr<DeclContext> selfDC, DeclContext *const scopeDC,
+                NominalTypeDecl *const nominal,
+                function_ref<bool(Optional<bool>)> calculateIsCascadingUse) = 0;
 
 #ifndef NDEBUG
-  virtual void stopForDebuggingIfTargetLookup() = 0;
+  virtual void startingNextLookupStep() = 0;
+  virtual void finishingLookup(std::string) const = 0;
+  virtual bool isTargetLookup() const = 0;
 #endif
 };
   
@@ -615,19 +616,19 @@ public:
   virtual ~ASTScopeDeclGatherer() = default;
 
   bool consume(ArrayRef<ValueDecl *> values, DeclVisibilityKind vis,
-               Optional<bool> isCascadingUse,
                NullablePtr<DeclContext> baseDC = nullptr) override;
 
   /// Eventually this functionality should move into ASTScopeLookup
-  std::pair<bool, Optional<bool>>
-  lookupInSelfType(NullablePtr<DeclContext>, DeclContext *const,
-                   NominalTypeDecl *const,
-                   Optional<bool> isCascadingUse) override {
-    return std::make_pair(false, isCascadingUse);
+  bool lookInMembers(NullablePtr<DeclContext>, DeclContext *const,
+                     NominalTypeDecl *const,
+                     function_ref<bool(Optional<bool>)>) override {
+    return false;
   }
 
 #ifndef NDEBUG
-  void stopForDebuggingIfTargetLookup() override {}
+  void startingNextLookupStep() override {}
+  void finishingLookup(std::string) const override {}
+  bool isTargetLookup() const override { return false; }
 #endif
 
   ArrayRef<ValueDecl *> getDecls() { return values; }
@@ -641,16 +642,21 @@ class ASTScope {
 
 public:
   ASTScope(SourceFile *);
-  static Optional<bool>
+
+  /// \return the scopes traversed
+  static llvm::SmallVector<const ast_scope::ASTScopeImpl *, 0>
   unqualifiedLookup(SourceFile *, DeclName, SourceLoc,
                     const DeclContext *startingContext,
-                    Optional<bool> isCascadingUse,
                     namelookup::AbstractASTScopeDeclConsumer &);
+
+  static Optional<bool>
+  computeIsCascadingUse(ArrayRef<const ast_scope::ASTScopeImpl *> history,
+                        Optional<bool> initialIsCascadingUse);
 
   LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
                             "only for use within the debugger");
   void print(llvm::raw_ostream &) const;
-  void dumpOneScopeMapLocation(std::pair<unsigned, unsigned>) const;
+  void dumpOneScopeMapLocation(std::pair<unsigned, unsigned>);
 
   // Make vanilla new illegal for ASTScopes.
   void *operator new(size_t bytes) = delete;

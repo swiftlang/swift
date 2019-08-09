@@ -140,7 +140,8 @@ function(_add_variant_c_compile_link_flags)
     # lld can handle targeting the android build.  However, if lld is not
     # enabled, then fallback to the linker included in the android NDK.
     if(NOT SWIFT_ENABLE_LLD_LINKER)
-      list(APPEND result "-B" "${SWIFT_SDK_ANDROID_ARCH_${CFLAGS_ARCH}_NDK_PREBUILT_PATH}/${SWIFT_SDK_ANDROID_ARCH_${CFLAGS_ARCH}_NDK_TRIPLE}/bin")
+      swift_android_tools_path(${CFLAGS_ARCH} tools_path)
+      list(APPEND result "-B" "${tools_path}")
     endif()
   endif()
 
@@ -288,6 +289,21 @@ function(_add_variant_c_compile_flags)
     endif()
   endif()
 
+  if(${CFLAGS_SDK} STREQUAL ANDROID)
+    if(${CFLAGS_ARCH} STREQUAL x86_64)
+      # NOTE(compnerd) Android NDK 21 or lower will generate library calls to
+      # `__sync_val_compare_and_swap_16` rather than lowering to the CPU's
+      # `cmpxchg16b` instruction as the `cx16` feature is disabled due to a bug
+      # in Clang.  This is being fixed in the current master Clang and will
+      # hopefully make it into Clang 9.0.  In the mean time, workaround this in
+      # the build.
+      if(CMAKE_C_COMPILER_ID MATCHES Clang AND CMAKE_C_COMPILER_VERSION
+          VERSION_LESS 9.0.0)
+        list(APPEND result -mcx16)
+      endif()
+    endif()
+  endif()
+
   if(CFLAGS_ENABLE_ASSERTIONS)
     list(APPEND result "-UNDEBUG")
   else()
@@ -309,10 +325,11 @@ function(_add_variant_c_compile_flags)
   endif()
 
   if("${CFLAGS_SDK}" STREQUAL "ANDROID")
+    list(APPEND result -nostdinc++)
     swift_android_libcxx_include_paths(CFLAGS_CXX_INCLUDES)
     swift_android_include_for_arch("${CFLAGS_ARCH}" "${CFLAGS_ARCH}_INCLUDE")
     foreach(path IN LISTS CFLAGS_CXX_INCLUDES ${CFLAGS_ARCH}_INCLUDE)
-      list(APPEND result "\"${CMAKE_INCLUDE_FLAG_C}${path}\"")
+      list(APPEND result -isystem;${path})
     endforeach()
     list(APPEND result "-D__ANDROID_API__=${SWIFT_ANDROID_API_LEVEL}")
   elseif(CFLAGS_SDK STREQUAL WINDOWS)
@@ -466,22 +483,9 @@ function(_add_variant_link_flags)
     # We need to add the math library, which is linked implicitly by libc++
     list(APPEND result "-lm")
 
-    if("${LFLAGS_ARCH}" MATCHES armv7)
-      set(android_libcxx_path "${SWIFT_ANDROID_NDK_PATH}/sources/cxx-stl/llvm-libc++/libs/armeabi-v7a")
-    elseif("${LFLAGS_ARCH}" MATCHES aarch64)
-      set(android_libcxx_path "${SWIFT_ANDROID_NDK_PATH}/sources/cxx-stl/llvm-libc++/libs/arm64-v8a")
-    elseif("${LFLAGS_ARCH}" MATCHES i686)
-      set(android_libcxx_path "${SWIFT_ANDROID_NDK_PATH}/sources/cxx-stl/llvm-libc++/libs/x86")
-    elseif("${LFLAGS_ARCH}" MATCHES x86_64)
-      set(android_libcxx_path "${SWIFT_ANDROID_NDK_PATH}/sources/cxx-stl/llvm-libc++/libs/x86_64")
-    else()
-      message(SEND_ERROR "unknown architecture (${LFLAGS_ARCH}) for android")
-    endif()
-
     # link against the custom C++ library
-    list(APPEND link_libraries
-      ${android_libcxx_path}/libc++abi.a
-      ${android_libcxx_path}/libc++_shared.so)
+    swift_android_cxx_libraries_for_arch(${LFLAGS_ARCH} cxx_link_libraries)
+    list(APPEND link_libraries ${cxx_link_libraries})
 
     # link against the ICU libraries
     list(APPEND link_libraries
@@ -989,7 +993,7 @@ function(_add_swift_library_single target name)
               ${SWIFTLIB_SINGLE_XCODE_WORKAROUND_SOURCES})
   if(("${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_OBJECT_FORMAT}" STREQUAL "ELF" OR
       "${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_OBJECT_FORMAT}" STREQUAL "COFF") AND
-     SWIFTLIB_TARGET_LIBRARY)
+     SWIFTLIB_SINGLE_TARGET_LIBRARY)
     if("${libkind}" STREQUAL "SHARED" AND NOT SWIFTLIB_SINGLE_NOSWIFTRT)
       # TODO(compnerd) switch to the generator expression when cmake is upgraded
       # to a version which supports it.
@@ -1088,7 +1092,7 @@ function(_add_swift_library_single target name)
     set_target_properties("${target}"
       PROPERTIES
       INSTALL_NAME_DIR "${install_name_dir}")
-  elseif("${SWIFTLIB_SINGLE_SDK}" STREQUAL "LINUX" AND NOT "${SWIFTLIB_SINGLE_SDK}" STREQUAL "ANDROID")
+  elseif("${SWIFTLIB_SINGLE_SDK}" STREQUAL "LINUX")
     set_target_properties("${target}"
       PROPERTIES
       INSTALL_RPATH "$ORIGIN:/usr/lib/swift/linux")
@@ -1096,6 +1100,18 @@ function(_add_swift_library_single target name)
     set_target_properties("${target}"
       PROPERTIES
       INSTALL_RPATH "$ORIGIN:/usr/lib/swift/cygwin")
+  elseif("${SWIFTLIB_SINGLE_SDK}" STREQUAL "ANDROID")
+    # CMake generates incorrect rule `$SONAME_FLAG $INSTALLNAME_DIR$SONAME` for Android build on macOS cross-compile host.
+    # Proper linker flags constructed manually. See below variable `swiftlib_link_flags_all`.
+    set_target_properties("${target}" PROPERTIES NO_SONAME TRUE)
+    # Only set the install RPATH if cross-compiling the host tools, in which
+    # case both the NDK and Sysroot paths must be set.
+    if(NOT "${SWIFT_ANDROID_NDK_PATH}" STREQUAL "" AND
+       NOT "${SWIFT_ANDROID_NATIVE_SYSROOT}" STREQUAL "")
+      set_target_properties("${target}"
+        PROPERTIES
+        INSTALL_RPATH "$ORIGIN")
+    endif()
   endif()
 
   set_target_properties("${target}" PROPERTIES BUILD_WITH_INSTALL_RPATH YES)
@@ -1490,12 +1506,12 @@ function(add_swift_host_library name)
     INSTALL_IN_COMPONENT "dev"
     )
 
+  add_dependencies(dev ${name})
   if(NOT LLVM_INSTALL_TOOLCHAIN_ONLY)
     swift_install_in_component(TARGETS ${name}
-                               ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX}
-                               LIBRARY DESTINATION lib${LLVM_LIBDIR_SUFFIX}
-                               RUNTIME DESTINATION bin
-                               COMPONENT dev)
+      ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX} COMPONENT dev
+      LIBRARY DESTINATION lib${LLVM_LIBDIR_SUFFIX} COMPONENT dev
+      RUNTIME DESTINATION bin COMPONENT dev)
   endif()
 
   swift_is_installing_component(dev is_installing)
@@ -1530,7 +1546,6 @@ endfunction()
 #     [INSTALL]
 #     [IS_STDLIB]
 #     [IS_STDLIB_CORE]
-#     [TARGET_LIBRARY]
 #     [INSTALL_WITH_SHARED]
 #     INSTALL_IN_COMPONENT comp
 #     DEPLOYMENT_VERSION_OSX version
@@ -1611,17 +1626,13 @@ endfunction()
 #
 # IS_STDLIB
 #   Treat the library as a part of the Swift standard library.
-#   IS_STDLIB implies TARGET_LIBRARY.
 #
 # IS_STDLIB_CORE
 #   Compile as the Swift standard library core.
 #
 # IS_SDK_OVERLAY
 #   Treat the library as a part of the Swift SDK overlay.
-#   IS_SDK_OVERLAY implies TARGET_LIBRARY and IS_STDLIB.
-#
-# TARGET_LIBRARY
-#   Build library for the target SDKs.
+#   IS_SDK_OVERLAY implies IS_STDLIB.
 #
 # INSTALL_IN_COMPONENT comp
 #   The Swift installation component that this library belongs to.
@@ -1655,7 +1666,6 @@ function(add_swift_target_library name)
         OBJECT_LIBRARY
         SHARED
         STATIC
-        TARGET_LIBRARY
         INSTALL_WITH_SHARED)
   set(SWIFTLIB_single_parameter_options
         DEPLOYMENT_VERSION_IOS
@@ -1684,6 +1694,7 @@ function(add_swift_target_library name)
         SWIFT_COMPILE_FLAGS_OSX
         SWIFT_COMPILE_FLAGS_TVOS
         SWIFT_COMPILE_FLAGS_WATCHOS
+        SWIFT_COMPILE_FLAGS_LINUX
         SWIFT_MODULE_DEPENDS
         SWIFT_MODULE_DEPENDS_CYGWIN
         SWIFT_MODULE_DEPENDS_FREEBSD
@@ -1708,22 +1719,11 @@ function(add_swift_target_library name)
   if(SWIFTLIB_IS_SDK_OVERLAY)
     set(SWIFTLIB_HAS_SWIFT_CONTENT TRUE)
     set(SWIFTLIB_IS_STDLIB TRUE)
-    set(SWIFTLIB_TARGET_LIBRARY TRUE)
-
-    # Install to sdk-overlay by default, but don't hardcode it
-    if(NOT SWIFTLIB_INSTALL_IN_COMPONENT)
-      set(SWIFTLIB_INSTALL_IN_COMPONENT sdk-overlay)
-    endif()
   endif()
 
   # Standard library is always a target library.
   if(SWIFTLIB_IS_STDLIB)
     set(SWIFTLIB_HAS_SWIFT_CONTENT TRUE)
-    set(SWIFTLIB_TARGET_LIBRARY TRUE)
-  endif()
-
-  if(NOT SWIFTLIB_TARGET_LIBRARY)
-    set(SWIFTLIB_INSTALL_IN_COMPONENT dev)
   endif()
 
   # If target SDKs are not specified, build for all known SDKs.
@@ -1762,9 +1762,6 @@ function(add_swift_target_library name)
     message(FATAL_ERROR
         "Either SHARED, STATIC, or OBJECT_LIBRARY must be specified")
   endif()
-
-  precondition(SWIFTLIB_TARGET_LIBRARY
-    MESSAGE "TARGET_LIBRARY not inferred in add_swift_target_library?!")
 
   # In the standard library and overlays, warn about implicit overrides
   # as a reminder to consider when inherited protocols need different
@@ -1846,6 +1843,9 @@ function(add_swift_target_library name)
     elseif(${sdk} STREQUAL WATCHOS OR ${sdk} STREQUAL WATCHOS_SIMULATOR)
       list(APPEND swiftlib_swift_compile_flags_all
            ${SWIFTLIB_SWIFT_COMPILE_FLAGS_WATCHOS})
+    elseif(${sdk} STREQUAL LINUX)
+      list(APPEND swiftlib_swift_compile_flags_all
+           ${SWIFTLIB_SWIFT_COMPILE_FLAGS_LINUX})
     elseif(${sdk} STREQUAL WINDOWS)
       # FIXME(SR2005) static and shared are not mutually exclusive; however
       # since we do a single build of the sources, this doesn't work for
@@ -1881,6 +1881,16 @@ function(add_swift_target_library name)
     if(${SWIFT_SDK_${sdk}_OBJECT_FORMAT} STREQUAL ELF AND
        NOT ${name} STREQUAL swiftRemoteMirror)
       list(APPEND swiftlib_link_flags_all "-Wl,-z,defs")
+    endif()
+    # Setting back linker flags which are not supported when making Android build on macOS cross-compile host.
+    if(SWIFTLIB_SHARED)
+      if(sdk IN_LIST SWIFT_APPLE_PLATFORMS)
+        list(APPEND swiftlib_link_flags_all "-dynamiclib -Wl,-headerpad_max_install_names")
+      elseif(${sdk} STREQUAL ANDROID)
+        list(APPEND swiftlib_link_flags_all "-shared")
+        # TODO: Instead of `lib${name}.so` find variable or target property which already have this value.
+        list(APPEND swiftlib_link_flags_all "-Wl,-soname,lib${name}.so")
+      endif()
     endif()
 
     set(sdk_supported_archs
@@ -1947,6 +1957,7 @@ function(add_swift_target_library name)
         ${SWIFTLIB_OBJECT_LIBRARY_keyword}
         ${SWIFTLIB_INSTALL_WITH_SHARED_keyword}
         ${SWIFTLIB_SOURCES}
+        TARGET_LIBRARY
         MODULE_TARGET ${MODULE_VARIANT_NAME}
         SDK ${sdk}
         ARCHITECTURE ${arch}
@@ -1966,7 +1977,6 @@ function(add_swift_target_library name)
         ${SWIFTLIB_IS_STDLIB_keyword}
         ${SWIFTLIB_IS_STDLIB_CORE_keyword}
         ${SWIFTLIB_IS_SDK_OVERLAY_keyword}
-        ${SWIFTLIB_TARGET_LIBRARY_keyword}
         ${SWIFTLIB_FORCE_BUILD_OPTIMIZED_keyword}
         ${SWIFTLIB_NOSWIFTRT_keyword}
         DARWIN_INSTALL_NAME_DIR "${SWIFTLIB_DARWIN_INSTALL_NAME_DIR}"
@@ -2108,13 +2118,22 @@ function(add_swift_target_library name)
       endif()
 
       if(sdk STREQUAL WINDOWS AND CMAKE_SYSTEM_NAME STREQUAL Windows)
+        add_dependencies(${SWIFTLIB_INSTALL_IN_COMPONENT} ${name}-windows-${SWIFT_PRIMARY_VARIANT_ARCH})
         swift_install_in_component(TARGETS ${name}-windows-${SWIFT_PRIMARY_VARIANT_ARCH}
-                                   RUNTIME DESTINATION "bin"
-                                   LIBRARY DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${resource_dir_sdk_subdir}/${SWIFT_PRIMARY_VARIANT_ARCH}"
-                                   ARCHIVE DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${resource_dir_sdk_subdir}/${SWIFT_PRIMARY_VARIANT_ARCH}"
-                                   COMPONENT "${SWIFTLIB_INSTALL_IN_COMPONENT}"
+                                   RUNTIME
+                                     DESTINATION "bin"
+                                     COMPONENT "${SWIFTLIB_INSTALL_IN_COMPONENT}"
+                                   LIBRARY
+                                     DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${resource_dir_sdk_subdir}/${SWIFT_PRIMARY_VARIANT_ARCH}"
+                                     COMPONENT "${SWIFTLIB_INSTALL_IN_COMPONENT}"
+                                   ARCHIVE
+                                     DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${resource_dir_sdk_subdir}/${SWIFT_PRIMARY_VARIANT_ARCH}"
+                                     COMPONENT "${SWIFTLIB_INSTALL_IN_COMPONENT}"
                                    PERMISSIONS ${file_permissions})
       else()
+        # NOTE: ${UNIVERSAL_LIBRARY_NAME} is the output associated with the target
+        # ${lipo_target}
+        add_dependencies(${SWIFTLIB_INSTALL_IN_COMPONENT} ${lipo_target})
         swift_install_in_component(FILES "${UNIVERSAL_LIBRARY_NAME}"
                                    DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${resource_dir_sdk_subdir}"
                                    COMPONENT "${SWIFTLIB_INSTALL_IN_COMPONENT}"
@@ -2125,6 +2144,7 @@ function(add_swift_target_library name)
         foreach(arch ${SWIFT_SDK_WINDOWS_ARCHITECTURES})
           if(TARGET ${name}-windows-${arch}_IMPLIB)
             get_target_property(import_library ${name}-windows-${arch}_IMPLIB IMPORTED_LOCATION)
+            add_dependencies(${SWIFTLIB_INSTALL_IN_COMPONENT} ${name}-windows-${arch}_IMPLIB)
             swift_install_in_component(FILES ${import_library}
                                        DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${resource_dir_sdk_subdir}/${arch}"
                                        COMPONENT ${SWIFTLIB_INSTALL_IN_COMPONENT}
@@ -2191,6 +2211,7 @@ function(add_swift_target_library name)
                                OUTPUT
                                  "${UNIVERSAL_LIBRARY_NAME}"
                                ${THIN_INPUT_TARGETS_STATIC})
+        add_dependencies(${SWIFTLIB_INSTALL_IN_COMPONENT} ${lipo_target_static})
         swift_install_in_component(FILES "${UNIVERSAL_LIBRARY_NAME}"
                                    DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/${install_subdir}/${resource_dir_sdk_subdir}"
                                    PERMISSIONS
@@ -2392,9 +2413,11 @@ function(add_swift_host_tool executable)
     ARCHITECTURE ${SWIFT_HOST_VARIANT_ARCH}
     ${ASHT_UNPARSED_ARGUMENTS})
 
+  add_dependencies(${ASHT_SWIFT_COMPONENT} ${executable})
   swift_install_in_component(TARGETS ${executable}
-                             RUNTIME DESTINATION bin
-                             COMPONENT ${ASHT_SWIFT_COMPONENT})
+                             RUNTIME
+                               DESTINATION bin
+                               COMPONENT ${ASHT_SWIFT_COMPONENT})
 
   swift_is_installing_component(${ASHT_SWIFT_COMPONENT} is_installing)
 

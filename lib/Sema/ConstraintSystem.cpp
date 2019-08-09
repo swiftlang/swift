@@ -205,9 +205,8 @@ void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
 void ConstraintSystem::addTypeVariableConstraintsToWorkList(
        TypeVariableType *typeVar) {
   // Gather the constraints affected by a change to this type variable.
-  llvm::SetVector<Constraint *> inactiveConstraints;
-  CG.gatherConstraints(
-      typeVar, inactiveConstraints, ConstraintGraph::GatheringKind::AllMentions,
+  auto inactiveConstraints = CG.gatherConstraints(
+      typeVar, ConstraintGraph::GatheringKind::AllMentions,
       [](Constraint *constraint) { return !constraint->isActive(); });
 
   // Add any constraints that aren't already active to the worklist.
@@ -375,6 +374,12 @@ getAlternativeLiteralTypes(KnownProtocolKind kind) {
 }
 
 ConstraintLocator *ConstraintSystem::getConstraintLocator(
+    Expr *anchor, ArrayRef<ConstraintLocator::PathElement> path) {
+  auto summaryFlags = ConstraintLocator::getSummaryFlagsForPath(path);
+  return getConstraintLocator(anchor, path, summaryFlags);
+}
+
+ConstraintLocator *ConstraintSystem::getConstraintLocator(
                      Expr *anchor,
                      ArrayRef<ConstraintLocator::PathElement> path,
                      unsigned summaryFlags) {
@@ -427,26 +432,23 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(Expr *expr) {
                                   ConstraintLocator::ConstructorMember);
     }
     // Otherwise fall through and look for locators anchored on the fn expr.
-    expr = fnExpr;
+    expr = fnExpr->getSemanticsProvidingExpr();
   }
 
-  auto *locator = getConstraintLocator(expr);
-  if (auto *ude = dyn_cast<UnresolvedDotExpr>(expr)) {
-    if (TC.getSelfForInitDelegationInConstructor(DC, ude)) {
-      return getConstraintLocator(locator,
-                                  ConstraintLocator::ConstructorMember);
-    } else {
-      return getConstraintLocator(locator, ConstraintLocator::Member);
-    }
+  if (auto *UDE = dyn_cast<UnresolvedDotExpr>(expr)) {
+    return getConstraintLocator(
+        expr, TC.getSelfForInitDelegationInConstructor(DC, UDE)
+                  ? ConstraintLocator::ConstructorMember
+                  : ConstraintLocator::Member);
   }
 
   if (isa<UnresolvedMemberExpr>(expr))
-    return getConstraintLocator(locator, ConstraintLocator::UnresolvedMember);
+    return getConstraintLocator(expr, ConstraintLocator::UnresolvedMember);
 
   if (isa<MemberRefExpr>(expr))
-    return getConstraintLocator(locator, ConstraintLocator::Member);
+    return getConstraintLocator(expr, ConstraintLocator::Member);
 
-  return locator;
+  return getConstraintLocator(expr);
 }
 
 Type ConstraintSystem::openUnboundGenericType(UnboundGenericType *unbound,
@@ -783,7 +785,21 @@ Type ConstraintSystem::getUnopenedTypeOfReference(VarDecl *value, Type baseType,
                                                   bool wantInterfaceType) {
   return TC.getUnopenedTypeOfReference(
       value, baseType, UseDC,
-      [&](VarDecl *var) -> Type { return getType(var, wantInterfaceType); },
+      [&](VarDecl *var) -> Type {
+        if (auto *param = dyn_cast<ParamDecl>(var))
+          return getType(param);
+
+        if (!var->hasValidSignature()) {
+          if (!var->isInvalid()) {
+            TC.diagnose(var->getLoc(), diag::recursive_decl_reference,
+                        var->getDescriptiveKind(), var->getName());
+            var->markInvalid();
+          }
+          return ErrorType::get(TC.Context);
+        }
+
+        return wantInterfaceType ? var->getInterfaceType() : var->getType();
+      },
       base, wantInterfaceType);
 }
 
@@ -901,16 +917,12 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
 
     // If this is a method whose result type is dynamic Self, replace
     // DynamicSelf with the actual object type.
-    if (!func->getDeclContext()->getSelfProtocolDecl()) {
-      if (func->hasDynamicSelf()) {
-        auto params = openedType->getParams();
-        assert(params.size() == 1);
-        Type selfTy = params.front().getPlainType()->getMetatypeInstanceType();
-        openedType = openedType->replaceCovariantResultType(selfTy, 2)
-                         ->castTo<FunctionType>();
-      }
-    } else {
-      openedType = openedType->eraseDynamicSelfType()->castTo<FunctionType>();
+    if (func->getResultInterfaceType()->hasDynamicSelfType()) {
+      auto params = openedType->getParams();
+      assert(params.size() == 1);
+      Type selfTy = params.front().getPlainType()->getMetatypeInstanceType();
+      openedType = openedType->replaceCovariantResultType(selfTy, 2)
+                        ->castTo<FunctionType>();
     }
 
     // The reference implicitly binds 'self'.
@@ -1293,16 +1305,19 @@ ConstraintSystem::getTypeOfMemberReference(
     // Class methods returning Self as well as constructors get the
     // result replaced with the base object type.
     if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
-      if ((isa<FuncDecl>(func) && cast<FuncDecl>(func)->hasDynamicSelf()) ||
-          (isa<ConstructorDecl>(func) && !baseObjTy->getOptionalObjectType())) {
+      if (func->hasDynamicSelfResult() &&
+          !baseObjTy->getOptionalObjectType()) {
         openedType = openedType->replaceCovariantResultType(baseObjTy, 2);
       }
+    } else if (auto *decl = dyn_cast<SubscriptDecl>(value)) {
+      if (decl->getElementInterfaceType()->hasDynamicSelfType()) {
+        openedType = openedType->replaceCovariantResultType(baseObjTy, 2);
+      }
+    } else if (auto *decl = dyn_cast<VarDecl>(value)) {
+      if (decl->getValueInterfaceType()->hasDynamicSelfType()) {
+        openedType = openedType->replaceCovariantResultType(baseObjTy, 1);
+      }
     }
-  } else {
-    // Protocol requirements returning Self have a dynamic Self return
-    // type. Erase the dynamic Self since it only comes into play during
-    // protocol conformance checking.
-    openedType = openedType->eraseDynamicSelfType();
   }
 
   // If we are looking at a member of an existential, open the existential.
@@ -1367,8 +1382,6 @@ ConstraintSystem::getTypeOfMemberReference(
       cast<GenericTypeParamType>(outerDC->getSelfInterfaceType()
                                  ->getCanonicalType())];
     type = type.transform([&](Type t) -> Type {
-      if (auto *selfTy = t->getAs<DynamicSelfType>())
-        t = selfTy->getSelfType();
       if (t->is<TypeVariableType>())
         if (t->isEqual(selfTy))
           return baseObjTy;
@@ -1444,6 +1457,11 @@ Type ConstraintSystem::getEffectiveOverloadType(const OverloadChoice &overload,
 
       if (doesStorageProduceLValue(subscript, overload.getBaseType(), useDC))
         elementTy = LValueType::get(elementTy);
+      else if (elementTy->hasDynamicSelfType()) {
+        Type selfType = overload.getBaseType()->getRValueType()
+            ->getMetatypeInstanceType()->lookThroughAllOptionalTypes();
+        elementTy = elementTy->replaceCovariantResultType(selfType, 0);
+      }
 
       // See ConstraintSystem::resolveOverload() -- optional and dynamic
       // subscripts are a special case, because the optionality is
@@ -1466,16 +1484,25 @@ Type ConstraintSystem::getEffectiveOverloadType(const OverloadChoice &overload,
 
       // Cope with 'Self' returns.
       if (!decl->getDeclContext()->getSelfProtocolDecl()) {
-        if ((isa<FuncDecl>(decl) && cast<FuncDecl>(decl)->hasDynamicSelf()) ||
-            (isa<ConstructorDecl>(decl) &&
-             !overload.getBaseType()->getOptionalObjectType())) {
+        if (isa<AbstractFunctionDecl>(decl) &&
+            cast<AbstractFunctionDecl>(decl)->hasDynamicSelfResult()) {
           if (!overload.getBaseType())
             return Type();
 
-          Type selfType = overload.getBaseType()->getRValueType()
-              ->getMetatypeInstanceType()
-              ->lookThroughAllOptionalTypes();
-          type = type->replaceCovariantResultType(selfType, 2);
+          if (!overload.getBaseType()->getOptionalObjectType()) {
+            Type selfType = overload.getBaseType()
+                                ->getRValueType()
+                                ->getMetatypeInstanceType();
+
+            // `Int??(0)` if we look through all optional types for `Self`
+            // we'll end up with incorrect type `Int?` for result because
+            // the actual result type is `Int??`.
+            if (isa<ConstructorDecl>(decl) && selfType->getOptionalObjectType())
+              return Type();
+
+            type = type->replaceCovariantResultType(
+                selfType->lookThroughAllOptionalTypes(), 2);
+          }
         }
       }
 
@@ -1962,13 +1989,13 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
         increaseScore(SK_KeyPathSubscript);
 
         auto dynamicResultTy = boundType->castTo<TypeVariableType>();
-        llvm::SetVector<Constraint *> constraints;
-        CG.gatherConstraints(dynamicResultTy, constraints,
-                             ConstraintGraph::GatheringKind::EquivalenceClass,
-                             [](Constraint *constraint) {
-                               return constraint->getKind() ==
-                                      ConstraintKind::ApplicableFunction;
-                             });
+        auto constraints = CG.gatherConstraints(
+            dynamicResultTy,
+            ConstraintGraph::GatheringKind::EquivalenceClass,
+            [](Constraint *constraint) {
+              return constraint->getKind() ==
+                     ConstraintKind::ApplicableFunction;
+            });
 
         assert(constraints.size() == 1);
         auto *applicableFn = constraints.front();
@@ -2215,8 +2242,7 @@ Type simplifyTypeImpl(ConstraintSystem &cs, Type type, Fn getFixedTypeFn) {
       if (auto selfType = lookupBaseType->getAs<DynamicSelfType>())
         lookupBaseType = selfType->getSelfType();
 
-      if (lookupBaseType->mayHaveMembers() ||
-          lookupBaseType->is<DynamicSelfType>()) {
+      if (lookupBaseType->mayHaveMembers()) {
         auto *proto = assocType->getProtocol();
         auto conformance = cs.DC->getParentModule()->lookupConformance(
           lookupBaseType, proto);
@@ -2468,8 +2494,29 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
                   diag::could_not_find_subscript_member_did_you_mean,
                   getType(UDE->getBase()));
     } else {
-      TC.diagnose(commonAnchor->getLoc(), diag::ambiguous_reference_to_decl,
-                  decl->getDescriptiveKind(), decl->getFullName());
+      auto name = decl->getFullName();
+      // Three choices here:
+      // 1. If this is a special name avoid printing it because
+      //    printing kind is sufficient;
+      // 2. If all of the labels match, print a full name;
+      // 3. If labels in different choices are different, it means
+      //    that we can only print a base name.
+      if (name.isSpecial()) {
+        TC.diagnose(commonAnchor->getLoc(),
+                    diag::no_overloads_match_exactly_in_call_special,
+                    decl->getDescriptiveKind());
+      } else if (llvm::all_of(distinctChoices,
+                              [&name](const ValueDecl *choice) {
+                                return choice->getFullName() == name;
+                              })) {
+        TC.diagnose(commonAnchor->getLoc(),
+                    diag::no_overloads_match_exactly_in_call,
+                    decl->getDescriptiveKind(), name);
+      } else {
+        TC.diagnose(commonAnchor->getLoc(),
+                    diag::no_overloads_match_exactly_in_call_no_labels,
+                    decl->getDescriptiveKind(), name.getBaseName());
+      }
     }
 
     for (const auto &viable : viableSolutions) {
@@ -2731,6 +2778,28 @@ void ConstraintSystem::generateConstraints(
 
     recordChoice(constraints, index, choices[index]);
   }
+}
+
+ConstraintLocator *ConstraintSystem::getArgumentInfoLocator(Expr *anchor) {
+  if (!anchor)
+    return nullptr;
+
+  if (auto *apply = dyn_cast<ApplyExpr>(anchor)) {
+    auto *fnExpr = getArgumentLabelTargetExpr(apply->getFn());
+    return getConstraintLocator(fnExpr);
+  }
+
+  return getCalleeLocator(anchor);
+}
+
+Optional<ConstraintSystem::ArgumentInfo>
+ConstraintSystem::getArgumentInfo(ConstraintLocator *locator) {
+  if (auto *infoLocator = getArgumentInfoLocator(locator->getAnchor())) {
+    auto known = ArgumentInfos.find(infoLocator);
+    if (known != ArgumentInfos.end())
+      return known->second;
+  }
+  return None;
 }
 
 bool constraints::isKnownKeyPathType(Type type) {

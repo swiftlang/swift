@@ -37,19 +37,23 @@ using namespace ast_scope;
 
 #pragma mark ASTScope
 
-
-Optional<bool> ASTScope::unqualifiedLookup(
+llvm::SmallVector<const ASTScopeImpl *, 0> ASTScope::unqualifiedLookup(
     SourceFile *SF, DeclName name, SourceLoc loc,
-    const DeclContext *startingContext, Optional<bool> isCascadingUse,
+    const DeclContext *startingContext,
     namelookup::AbstractASTScopeDeclConsumer &consumer) {
   return ASTScopeImpl::unqualifiedLookup(SF, name, loc, startingContext,
-                                         isCascadingUse, consumer);
+                                         consumer);
+}
+
+Optional<bool> ASTScope::computeIsCascadingUse(
+    ArrayRef<const ast_scope::ASTScopeImpl *> history,
+    Optional<bool> initialIsCascadingUse) {
+  return ASTScopeImpl::computeIsCascadingUse(history, initialIsCascadingUse);
 }
 
 void ASTScope::dump() const { impl->dump(); }
 void ASTScope::print(llvm::raw_ostream &out) const { impl->print(out); }
-void ASTScope::dumpOneScopeMapLocation(
-    std::pair<unsigned, unsigned> lineCol) const {
+void ASTScope::dumpOneScopeMapLocation(std::pair<unsigned, unsigned> lineCol) {
   impl->dumpOneScopeMapLocation(lineCol);
 }
 
@@ -76,20 +80,9 @@ AbstractClosureScope::getClosureIfClosureScope() const {
   return closureExpr;
 }
 
-Decl *ASTScopeImpl::getEnclosingAbstractFunctionOrSubscriptDecl() const {
-  return getParent().get()->getEnclosingAbstractFunctionOrSubscriptDecl();
-}
-Decl *
-AbstractFunctionDeclScope::getEnclosingAbstractFunctionOrSubscriptDecl() const {
-  return decl;
-}
-Decl *SubscriptDeclScope::getEnclosingAbstractFunctionOrSubscriptDecl() const {
-  return decl;
-}
-
 // Conservative, because using precise info would be circular
-SourceRange AttachedPropertyWrapperScope::getCustomAttributesSourceRange(
-    const VarDecl *const vd) {
+SourceRange
+AttachedPropertyWrapperScope::getSourceRangeFor(const VarDecl *const vd) {
   SourceRange sr;
   for (auto *attr : vd->getAttrs().getAttributes<CustomAttr>()) {
     if (sr.isInvalid())
@@ -108,6 +101,20 @@ Stmt *LabeledConditionalStmtScope::getStmt() const {
   return getLabeledConditionalStmt();
 }
 
+bool AbstractFunctionBodyScope::isAMethod(
+    const AbstractFunctionDecl *const afd) {
+  // What makes this interesting is that a method named "init" which is not
+  // in a nominal type or extension decl body still gets an implicit self
+  // parameter (even though the program is illegal).
+  // So when choosing between creating a MethodBodyScope and a
+  // PureFunctionBodyScope do we go by the enclosing Decl (i.e.
+  // "afd->getDeclContext()->isTypeContext()") or by
+  // "bool(afd->getImplicitSelfDecl())"?
+  //
+  // Since the code uses \c getImplicitSelfDecl, use that.
+  return afd->getImplicitSelfDecl();
+}
+
 #pragma mark getLabeledConditionalStmt
 LabeledConditionalStmt *IfStmtScope::getLabeledConditionalStmt() const {
   return stmt;
@@ -123,7 +130,7 @@ LabeledConditionalStmt *GuardStmtScope::getLabeledConditionalStmt() const {
 #pragma mark getASTContext
 
 ASTContext &ASTScopeImpl::getASTContext() const {
-  if (auto d = getDecl())
+  if (auto d = getDeclIfAny())
     return d.get()->getASTContext();
   if (auto dc = getDeclContext())
     return dc.get()->getASTContext();
@@ -131,6 +138,14 @@ ASTContext &ASTScopeImpl::getASTContext() const {
 }
 
 #pragma mark getDeclContext
+
+NullablePtr<DeclContext> ASTScopeImpl::getDeclContext() const {
+  return nullptr;
+}
+
+NullablePtr<DeclContext> ASTSourceFileScope::getDeclContext() const {
+  return NullablePtr<DeclContext>(SF);
+}
 
 NullablePtr<DeclContext> GenericTypeOrExtensionScope::getDeclContext() const {
   return getGenericContext();
@@ -168,7 +183,11 @@ NullablePtr<DeclContext> AttachedPropertyWrapperScope::getDeclContext() const {
       .getInitContext();
 }
 
-NullablePtr<DeclContext> AbstractFunctionParamsScope::getDeclContext() const {
+NullablePtr<DeclContext> AbstractFunctionDeclScope::getDeclContext() const {
+  return decl;
+}
+
+NullablePtr<DeclContext> ParameterListScope::getDeclContext() const {
   return matchingContext;
 }
 
@@ -184,14 +203,13 @@ std::string GenericTypeOrExtensionScope::getClassName() const {
 DEFINE_GET_CLASS_NAME(ASTSourceFileScope)
 DEFINE_GET_CLASS_NAME(GenericParamScope)
 DEFINE_GET_CLASS_NAME(AbstractFunctionDeclScope)
-DEFINE_GET_CLASS_NAME(AbstractFunctionParamsScope)
+DEFINE_GET_CLASS_NAME(ParameterListScope)
 DEFINE_GET_CLASS_NAME(MethodBodyScope)
 DEFINE_GET_CLASS_NAME(PureFunctionBodyScope)
 DEFINE_GET_CLASS_NAME(DefaultArgumentInitializerScope)
 DEFINE_GET_CLASS_NAME(AttachedPropertyWrapperScope)
 DEFINE_GET_CLASS_NAME(PatternEntryDeclScope)
 DEFINE_GET_CLASS_NAME(PatternEntryInitializerScope)
-DEFINE_GET_CLASS_NAME(PatternEntryUseScope)
 DEFINE_GET_CLASS_NAME(ConditionalClauseScope)
 DEFINE_GET_CLASS_NAME(ConditionalClausePatternUseScope)
 DEFINE_GET_CLASS_NAME(CaptureListScope)
@@ -202,10 +220,11 @@ DEFINE_GET_CLASS_NAME(TopLevelCodeScope)
 DEFINE_GET_CLASS_NAME(SpecializeAttributeScope)
 DEFINE_GET_CLASS_NAME(SubscriptDeclScope)
 DEFINE_GET_CLASS_NAME(VarDeclScope)
+DEFINE_GET_CLASS_NAME(EnumElementScope)
 DEFINE_GET_CLASS_NAME(IfStmtScope)
 DEFINE_GET_CLASS_NAME(WhileStmtScope)
 DEFINE_GET_CLASS_NAME(GuardStmtScope)
-DEFINE_GET_CLASS_NAME(GuardStmtUseScope)
+DEFINE_GET_CLASS_NAME(LookupParentDiversionScope)
 DEFINE_GET_CLASS_NAME(RepeatWhileScope)
 DEFINE_GET_CLASS_NAME(DoCatchStmtScope)
 DEFINE_GET_CLASS_NAME(SwitchStmtScope)
@@ -232,6 +251,12 @@ SourceRange NominalTypeScope::getBraces() const { return decl->getBraces(); }
 NullablePtr<NominalTypeDecl>
 ExtensionScope::getCorrespondingNominalTypeDecl() const {
   return decl->getExtendedNominal();
+}
+
+void ASTScopeImpl::preOrderDo(function_ref<void(ASTScopeImpl *)> fn) {
+  fn(this);
+  for (auto *child : getChildren())
+    child->preOrderDo(fn);
 }
 
 void ASTScopeImpl::postOrderDo(function_ref<void(ASTScopeImpl *)> fn) {

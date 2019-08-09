@@ -31,7 +31,6 @@
 #include "llvm/Option/Option.h"
 #include "llvm/Object/Archive.h"
 #include "llvm/Object/ObjectFile.h"
-#include "llvm/Object/COFF.h"
 #include "llvm/Object/ELFObjectFile.h"
 
 using namespace swift;
@@ -150,9 +149,6 @@ static bool extractLinkerFlags(const llvm::object::Binary *Bin,
                                StringRef BinaryFileName,
                                std::vector<std::string> &LinkerFlags) {
   if (auto *ObjectFile = llvm::dyn_cast<llvm::object::ELFObjectFileBase>(Bin)) {
-    return extractLinkerFlagsFromObjectFile(ObjectFile, LinkerFlags, Instance);
-  } else if (auto *ObjectFile =
-                 llvm::dyn_cast<llvm::object::COFFObjectFile>(Bin)) {
     return extractLinkerFlagsFromObjectFile(ObjectFile, LinkerFlags, Instance);
   } else if (auto *Archive = llvm::dyn_cast<llvm::object::Archive>(Bin)) {
     llvm::Error Error = llvm::Error::success();

@@ -234,9 +234,9 @@ namespace {
     bool useASTScopesForExperimentalLookupIfEnabled() const;
     
     void lookUpTopLevelNamesInModuleScopeContext(DeclContext *);
-    
-    void experimentallyLookInASTScopes(ContextAndUnresolvedIsCascadingUse);
-    
+
+    void experimentallyLookInASTScopes();
+
     /// Can lookup stop searching for results, assuming hasn't looked for outer
     /// results yet?
     bool isFirstResultEnough() const;
@@ -343,7 +343,12 @@ namespace {
     static NLOptions
     computeBaseNLOptions(const UnqualifiedLookup::Options options,
                          const bool isOriginallyTypeLookup);
-    
+
+    Optional<bool> getInitialIsCascadingUse() const {
+      return options.contains(Flags::KnownPrivate) ? Optional<bool>(false)
+                                                   : None;
+    }
+
     static bool resolveIsCascadingUse(const DeclContext *const dc,
                                       Optional<bool> isCascadingUse,
                                       bool onlyCareAboutFunctionBody) {
@@ -377,6 +382,7 @@ namespace {
     StringRef getSourceFileName() const;
 
 #ifndef NDEBUG
+    bool isTargetLookup() const;
     void stopForDebuggingIfStartingTargetLookup(bool isASTScopeLookup) const;
     void stopForDebuggingIfDuringTargetLookup(bool isASTScopeLookup) const;
     void
@@ -400,18 +406,22 @@ public:
   virtual ~ASTScopeDeclConsumerForUnqualifiedLookup() = default;
 
   bool consume(ArrayRef<ValueDecl *> values, DeclVisibilityKind vis,
-               Optional<bool> isCascadingUse,
                NullablePtr<DeclContext> baseDC = nullptr) override;
 
   /// returns true if finished and new value for isCascadingUse
-  std::pair<bool, Optional<bool>>
-  lookupInSelfType(NullablePtr<DeclContext> selfDC, DeclContext *const scopeDC,
-                   NominalTypeDecl *const nominal,
-                   Optional<bool> isCascadingUse) override;
+  bool lookInMembers(NullablePtr<DeclContext> selfDC,
+                     DeclContext *const scopeDC, NominalTypeDecl *const nominal,
+                     function_ref<bool(Optional<bool>)>) override;
 
 #ifndef NDEBUG
-  void stopForDebuggingIfTargetLookup() override {
+  void startingNextLookupStep() override {
     factory.stopForDebuggingIfDuringTargetLookup(true);
+  }
+  bool isTargetLookup() const override { return factory.isTargetLookup(); }
+
+  void finishingLookup(std::string msg) const override {
+    if (isTargetLookup())
+      llvm::errs() << "Finishing lookup: " << msg << "\n";
   }
 #endif
   };
@@ -469,18 +479,18 @@ void UnqualifiedLookupFactory::performUnqualifiedLookup() {
   stopForDebuggingIfStartingTargetLookup(false);
 #endif
 
-  const Optional<bool> isCascadingUseInitial =
-  options.contains(Flags::KnownPrivate) ? Optional<bool>(false) : None;
+  const Optional<bool> initialIsCascadingUse = getInitialIsCascadingUse();
 
   ContextAndUnresolvedIsCascadingUse contextAndIsCascadingUse{
-      DC, isCascadingUseInitial};
-  if (useASTScopesForExperimentalLookup()) {
+      DC, initialIsCascadingUse};
+  const bool compareToASTScopes = Ctx.LangOpts.CompareToASTScopeLookup;
+  if (useASTScopesForExperimentalLookup() && !compareToASTScopes) {
     static bool haveWarned = false;
-    if (!haveWarned) {
+    if (!haveWarned && Ctx.LangOpts.WarnIfASTScopeLookup) {
       haveWarned = true;
       llvm::errs() << "WARNING: TRYING Scope exclusively\n";
     }
-    experimentallyLookInASTScopes(contextAndIsCascadingUse);
+    experimentallyLookInASTScopes();
     return;
   }
 
@@ -489,13 +499,12 @@ void UnqualifiedLookupFactory::performUnqualifiedLookup() {
   else
     lookupNamesIntroducedBy(contextAndIsCascadingUse);
 
-  const bool compareToASTScopes = Ctx.LangOpts.CompareToASTScopeLookup;
   if (compareToASTScopes && useASTScopesForExperimentalLookupIfEnabled()) {
     ResultsVector results;
     size_t indexOfFirstOuterResult = 0;
     UnqualifiedLookupFactory scopeLookup(Name, DC, TypeResolver, Loc, options,
                                          results, indexOfFirstOuterResult);
-    scopeLookup.experimentallyLookInASTScopes(contextAndIsCascadingUse);
+    scopeLookup.experimentallyLookInASTScopes();
     assert(verifyEqualTo(std::move(scopeLookup), "UnqualifedLookup",
                          "Scope lookup"));
   }
@@ -1002,7 +1011,7 @@ void UnqualifiedLookupFactory::addUnavailableInnerResults() {
 void UnqualifiedLookupFactory::lookForAModuleWithTheGivenName(
     DeclContext *const dc) {
   using namespace namelookup;
-  if (!Name.isSimpleName())
+  if (!Name.isSimpleName() || Name.isSpecial())
     return;
 
   // Look for a module with the given name.
@@ -1100,14 +1109,7 @@ UnqualifiedLookupFactory::ResultFinderForTypeContext::findSelfBounds(
 
 #pragma mark ASTScopeImpl support
 
-void UnqualifiedLookupFactory::experimentallyLookInASTScopes(
-    const ContextAndUnresolvedIsCascadingUse contextAndIsCascadingUseArg) {
-  
-  // NOT const--may be changed by the lookup
-  Optional<bool> isCascadingUse = !Name.isOperator()
-    ? contextAndIsCascadingUseArg.isCascadingUse
-    : resolveIsCascadingUse(contextAndIsCascadingUseArg,
-                            /*onlyCareAboutFunctionBody*/ true);
+void UnqualifiedLookupFactory::experimentallyLookInASTScopes() {
 
   ASTScopeDeclConsumerForUnqualifiedLookup consumer(*this);
 
@@ -1115,24 +1117,33 @@ void UnqualifiedLookupFactory::experimentallyLookInASTScopes(
   stopForDebuggingIfStartingTargetLookup(true);
 #endif
 
-  Optional<bool> isCascadingUseResult = ASTScope::unqualifiedLookup(
-      DC->getParentSourceFile(), Name, Loc,
-      contextAndIsCascadingUseArg.whereToLook, isCascadingUse, consumer);
+  const auto history = ASTScope::unqualifiedLookup(DC->getParentSourceFile(),
+                                                   Name, Loc, DC, consumer);
 
   ifNotDoneYet([&] {
     // Copied from lookupInModuleScopeContext
     // If no result has been found yet, the dependency must be on a top-level
     // name, since up to now, the search has been for non-top-level names.
     auto *const moduleScopeContext = DC->getParentSourceFile();
+
+    const Optional<bool> isCascadingUseAtStartOfLookup =
+        !Name.isOperator()
+            ? getInitialIsCascadingUse()
+            : resolveIsCascadingUse(DC, getInitialIsCascadingUse(),
+                                    /*onlyCareAboutFunctionBody*/ true);
+
+    const Optional<bool> isCascadingUseAfterLookup =
+        ASTScope::computeIsCascadingUse(history, isCascadingUseAtStartOfLookup);
+
     recordDependencyOnTopLevelName(moduleScopeContext, Name,
-                                   isCascadingUseResult.getValueOr(true));
+                                   isCascadingUseAfterLookup.getValueOr(true));
     lookUpTopLevelNamesInModuleScopeContext(moduleScopeContext);
   });
 }
 
 bool ASTScopeDeclConsumerForUnqualifiedLookup::consume(
     ArrayRef<ValueDecl *> values, DeclVisibilityKind vis,
-    Optional<bool> isCascadingUse, NullablePtr<DeclContext> baseDC) {
+    NullablePtr<DeclContext> baseDC) {
   for (auto *value: values) {
     if (factory.isOriginallyTypeLookup && !isa<TypeDecl>(value))
       continue;
@@ -1160,7 +1171,7 @@ bool ASTScopeDeclConsumerForUnqualifiedLookup::consume(
 }
 
 bool ASTScopeDeclGatherer::consume(ArrayRef<ValueDecl *> valuesArg,
-                                   DeclVisibilityKind, Optional<bool>,
+                                   DeclVisibilityKind,
                                    NullablePtr<DeclContext>) {
   for (auto *v: valuesArg)
     values.push_back(v);
@@ -1168,28 +1179,24 @@ bool ASTScopeDeclGatherer::consume(ArrayRef<ValueDecl *> valuesArg,
 }
 
 // TODO: in future, migrate this functionality into ASTScopes
-std::pair<bool, Optional<bool>>
-ASTScopeDeclConsumerForUnqualifiedLookup::lookupInSelfType(
+bool ASTScopeDeclConsumerForUnqualifiedLookup::lookInMembers(
     NullablePtr<DeclContext> selfDC, DeclContext *const scopeDC,
-    NominalTypeDecl *const nominal, const Optional<bool> isCascadingUseArg) {
+    NominalTypeDecl *const nominal,
+    function_ref<bool(Optional<bool>)> calculateIsCascadingUse) {
   if (selfDC) {
     if (auto *d = selfDC.get()->getAsDecl()) {
-      if (auto *afd = dyn_cast<AbstractFunctionDecl>(d)) {
+      if (auto *afd = dyn_cast<AbstractFunctionDecl>(d))
         assert(!factory.isOutsideBodyOfFunction(afd) && "Should be inside");
-      }
     }
   }
   auto resultFinder = UnqualifiedLookupFactory::ResultFinderForTypeContext(
       &factory, selfDC ? selfDC.get() : scopeDC, scopeDC);
-  // If we haven't determined whether we have a cascading use, do so now.
-  const bool isCascadingUseResult = factory.resolveIsCascadingUse(
-      scopeDC, isCascadingUseArg, /*onlyCareAboutFunctionBody=*/false);
-
+  const bool isCascadingUse =
+      calculateIsCascadingUse(factory.getInitialIsCascadingUse());
   factory.findResultsAndSaveUnavailables(scopeDC, std::move(resultFinder),
-                                         isCascadingUseResult,
-                                         factory.baseNLOptions);
+                                         isCascadingUse, factory.baseNLOptions);
   factory.recordCompletionOfAScope();
-  return std::make_pair(factory.isFirstResultEnough(), isCascadingUseResult);
+  return factory.isFirstResultEnough();
 }
 
 
@@ -1325,7 +1332,7 @@ bool UnqualifiedLookupFactory::verifyEqualTo(
       e.getValueDecl()->print(as);
       oe.getValueDecl()->print(bs);
       if (a == b)
-        llvm::errs() << "ValueDecls differ but print same";
+        llvm::errs() << "ValueDecls differ but print same\n";
       else {
         writeErr(std::string( "ValueDecls differ at ") + std::to_string(i));
         assert(false && "ASTScopeImpl found different Decl");
@@ -1391,9 +1398,13 @@ bool UnqualifiedLookupFactory::shouldDiffer() const {
 #pragma mark breakpointing
 #ifndef NDEBUG
 
+bool UnqualifiedLookupFactory::isTargetLookup() const {
+  return lookupCounter == targetLookup;
+}
+
 void UnqualifiedLookupFactory::stopForDebuggingIfStartingTargetLookup(
     const bool isASTScopeLookup) const {
-  if (lookupCounter != targetLookup)
+  if (!isTargetLookup())
     return;
   if (isASTScopeLookup)
     llvm::errs() << "starting target ASTScopeImpl lookup\n";
@@ -1403,7 +1414,7 @@ void UnqualifiedLookupFactory::stopForDebuggingIfStartingTargetLookup(
 
 void UnqualifiedLookupFactory::stopForDebuggingIfDuringTargetLookup(
     const bool isASTScopeLookup) const {
-  if (lookupCounter != targetLookup)
+  if (!isTargetLookup())
     return;
   if (isASTScopeLookup)
     llvm::errs() << "during target ASTScopeImpl lookup\n";
@@ -1413,7 +1424,7 @@ void UnqualifiedLookupFactory::stopForDebuggingIfDuringTargetLookup(
 
 void UnqualifiedLookupFactory::stopForDebuggingIfAddingTargetLookupResult(
     const LookupResultEntry &e) const {
-  if (lookupCounter != targetLookup)
+  if (!isTargetLookup())
     return;
   auto &out = llvm::errs();
   out << "\nresult for Target lookup:\n";

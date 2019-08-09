@@ -267,7 +267,8 @@ namespace {
 
       if (auto DRE = dyn_cast<DeclRefExpr>(expr)) {
         if (auto varDecl = dyn_cast<VarDecl>(DRE->getDecl())) {
-          if (varDecl->isAnonClosureParam()) {
+          if (isa<ParamDecl>(varDecl) &&
+              cast<ParamDecl>(varDecl)->isAnonClosureParam()) {
             LTI.anonClosureParams.push_back(DRE);
           } else if (CS.hasType(DRE)) {
             LTI.collectedTypes.insert(CS.getType(DRE).getPointer());
@@ -360,7 +361,7 @@ namespace {
   /// expression, attempt to derive a favored type for it.
   bool computeFavoredTypeForExpr(Expr *expr, ConstraintSystem &CS) {
     LinkedTypeInfo lti;
-    
+
     expr->walk(LinkedExprAnalyzer(lti, CS));
 
     // Link anonymous closure params of the same index.
@@ -381,41 +382,21 @@ namespace {
       }
     }
 
-    // Link integer literal tyvars.
-    if (lti.intLiteralTyvars.size() > 1) {
-      auto rep1 = CS.getRepresentative(lti.intLiteralTyvars[0]);
+    auto mergeTypeVariables = [&](ArrayRef<TypeVariableType *> typeVars) {
+      if (typeVars.size() < 2)
+        return;
 
-      for (size_t i = 1; i < lti.intLiteralTyvars.size(); i++) {
-        auto rep2 = CS.getRepresentative(lti.intLiteralTyvars[i]);
-
+      auto rep1 = CS.getRepresentative(typeVars.front());
+      for (unsigned i = 1, n = typeVars.size(); i != n; ++i) {
+        auto rep2 = CS.getRepresentative(typeVars[i]);
         if (rep1 != rep2)
           CS.mergeEquivalenceClasses(rep1, rep2, /*updateWorkList*/ false);
       }
-    }
+    };
 
-    // Link float literal tyvars.
-    if (lti.floatLiteralTyvars.size() > 1) {
-      auto rep1 = CS.getRepresentative(lti.floatLiteralTyvars[0]);
-
-      for (size_t i = 1; i < lti.floatLiteralTyvars.size(); i++) {
-        auto rep2 = CS.getRepresentative(lti.floatLiteralTyvars[i]);
-        
-        if (rep1 != rep2)
-          CS.mergeEquivalenceClasses(rep1, rep2, /*updateWorkList*/ false);
-      }
-    }
-
-    // Link string literal tyvars.
-    if (lti.stringLiteralTyvars.size() > 1) {
-      auto rep1 = CS.getRepresentative(lti.stringLiteralTyvars[0]);
-
-      for (size_t i = 1; i < lti.stringLiteralTyvars.size(); i++) {
-        auto rep2 = CS.getRepresentative(lti.stringLiteralTyvars[i]);
-
-        if (rep1 != rep2)
-          CS.mergeEquivalenceClasses(rep1, rep2, /*updateWorkList*/ false);
-      }
-    }
+    mergeTypeVariables(lti.intLiteralTyvars);
+    mergeTypeVariables(lti.floatLiteralTyvars);
+    mergeTypeVariables(lti.stringLiteralTyvars);
 
     if (lti.collectedTypes.size() == 1) {
       // TODO: Compute the BCT.
@@ -552,9 +533,8 @@ namespace {
 
     llvm::SmallSetVector<ProtocolDecl *, 2> literalProtos;
     if (auto argTypeVar = argTy->getAs<TypeVariableType>()) {
-      llvm::SetVector<Constraint *> constraints;
-      CS.getConstraintGraph().gatherConstraints(
-          argTypeVar, constraints,
+      auto constraints = CS.getConstraintGraph().gatherConstraints(
+          argTypeVar,
           ConstraintGraph::GatheringKind::EquivalenceClass,
           [](Constraint *constraint) {
             return constraint->getKind() == ConstraintKind::LiteralConformsTo;
@@ -1080,7 +1060,7 @@ namespace {
 
       // Add the member constraint for a subscript declaration.
       // FIXME: weak name!
-      auto memberTy = CS.createTypeVariable(resultLocator, TVO_CanBindToNoEscape);
+      auto memberTy = CS.createTypeVariable(memberLocator, TVO_CanBindToNoEscape);
 
       // FIXME: synthesizeMaterializeForSet() wants to statically dispatch to
       // a known subscript here. This might be cleaner if we split off a new
@@ -1196,14 +1176,7 @@ namespace {
                        interpolationProto->getDeclaredType(),
                        locator);
 
-      if (auto semanticExpr = expr->getSemanticExpr()) {
-        // The semanticExpr must have the same type as this node.
-        auto semanticTV = CS.getType(semanticExpr);
-        auto semanticLocator = CS.getConstraintLocator(semanticExpr);
-        CS.addConstraint(ConstraintKind::Bind, tv, semanticTV,
-                         semanticLocator);
-      }
-      else if (auto appendingExpr = expr->getAppendingExpr()) {
+      if (auto appendingExpr = expr->getAppendingExpr()) {
         auto associatedTypeArray = 
           interpolationProto->lookupDirect(tc.Context.Id_StringInterpolation);
         if (associatedTypeArray.empty()) {
@@ -1250,6 +1223,9 @@ namespace {
     }
 
     Type visitObjectLiteralExpr(ObjectLiteralExpr *expr) {
+      associateArgumentLabels(
+          expr, {expr->getArgumentLabels(), expr->hasTrailingClosure()});
+
       // If the expression has already been assigned a type; just use that type.
       if (expr->getType())
         return expr->getType();
@@ -1527,7 +1503,9 @@ namespace {
                          FunctionType::get(params, outputTy),
                          memberTy,
           CS.getConstraintLocator(expr, ConstraintLocator::ApplyFunction));
-        
+
+        associateArgumentLabels(
+            expr, {expr->getArgumentLabels(), expr->hasTrailingClosure()});
         return baseTy;
       }
 
@@ -1761,6 +1739,10 @@ namespace {
         if (decl->isInvalid())
           return Type();
       }
+
+      associateArgumentLabels(
+          expr, {expr->getArgumentLabels(), expr->hasTrailingClosure()});
+
       return addSubscriptConstraints(expr, CS.getType(expr->getBase()),
                                      expr->getIndex(),
                                      decl);
@@ -2015,9 +1997,10 @@ namespace {
     }
 
     Type visitDynamicSubscriptExpr(DynamicSubscriptExpr *expr) {
+      associateArgumentLabels(
+          expr, {expr->getArgumentLabels(), expr->hasTrailingClosure()});
       return addSubscriptConstraints(expr, CS.getType(expr->getBase()),
-                                     expr->getIndex(),
-                                     nullptr);
+                                     expr->getIndex(), nullptr);
     }
 
     Type visitTupleElementExpr(TupleElementExpr *expr) {
@@ -2504,6 +2487,11 @@ namespace {
 
     Type visitApplyExpr(ApplyExpr *expr) {
       auto fnExpr = expr->getFn();
+
+      SmallVector<Identifier, 4> scratch;
+      associateArgumentLabels(
+          expr, {expr->getArgumentLabels(scratch), expr->hasTrailingClosure()},
+          /*labelsArePermanent=*/isa<CallExpr>(expr));
 
       if (auto *UDE = dyn_cast<UnresolvedDotExpr>(fnExpr)) {
         auto typeOperation = getTypeOperation(UDE, CS.getASTContext());
@@ -3025,7 +3013,7 @@ namespace {
                 
         case KeyPathExpr::Component::Kind::OptionalChain: {
           didOptionalChain = true;
-          
+
           // We can't assign an optional back through an optional chain
           // today. Force the base to an rvalue.
           auto rvalueTy = CS.createTypeVariable(resultLocator,
@@ -3039,10 +3027,9 @@ namespace {
           auto optionalObjTy = CS.createTypeVariable(resultLocator,
                                                      TVO_CanBindToLValue |
                                                      TVO_CanBindToNoEscape);
-          
+
           CS.addConstraint(ConstraintKind::OptionalObject, base, optionalObjTy,
                            resultLocator);
-          
           base = optionalObjTy;
           break;
         }
@@ -3077,20 +3064,14 @@ namespace {
       auto rvalueBase = CS.createTypeVariable(baseLocator,
                                               TVO_CanBindToNoEscape);
       CS.addConstraint(ConstraintKind::Equal, base, rvalueBase, locator);
-      
+
       // The result is a KeyPath from the root to the end component.
-      Type kpTy;
-      if (didOptionalChain) {
-        // Optional-chaining key paths are always read-only.
-        kpTy = BoundGenericType::get(kpDecl, Type(), {root, rvalueBase});
-      } else {
-        // The type of key path depends on the overloads chosen for the key
-        // path components.
-        auto typeLoc =
-            CS.getConstraintLocator(locator, ConstraintLocator::KeyPathType);
-        kpTy = CS.createTypeVariable(typeLoc, TVO_CanBindToNoEscape);
-        CS.addKeyPathConstraint(kpTy, root, rvalueBase, locator);
-      }
+      // The type of key path depends on the overloads chosen for the key
+      // path components.
+      auto typeLoc =
+          CS.getConstraintLocator(locator, ConstraintLocator::KeyPathType);
+      Type kpTy = CS.createTypeVariable(typeLoc, TVO_CanBindToNoEscape);
+      CS.addKeyPathConstraint(kpTy, root, rvalueBase, locator);
       return kpTy;
     }
 
@@ -3235,6 +3216,16 @@ namespace {
       }
       llvm_unreachable("unhandled operation");
     }
+
+    void associateArgumentLabels(Expr *expr,
+                                 ConstraintSystem::ArgumentInfo info,
+                                 bool labelsArePermanent = true) {
+      assert(expr);
+      // Record the labels.
+      if (!labelsArePermanent)
+        info.Labels = CS.allocateCopy(info.Labels);
+      CS.ArgumentInfos[CS.getArgumentInfoLocator(expr)] = info;
+    }
   };
 
   /// AST walker that "sanitizes" an expression for the
@@ -3280,6 +3271,16 @@ namespace {
           return { false, OOE->getSubExpr()->walk(*this) };
         }
 
+        // Hacky, this behaves just like an OpenedExistential in that it changes
+        // the expr tree.
+        if (auto ISLE = dyn_cast<InterpolatedStringLiteralExpr>(expr)) {
+          if (auto subExpr = ISLE->getAppendingExpr()->getSubExpr()) {
+            if (auto opaqueValue = dyn_cast<OpaqueValueExpr>(subExpr)) {
+              ISLE->getAppendingExpr()->setSubExpr(nullptr);
+            }
+          }
+        }
+
         // Substitute OpaqueValue with its representing existental.
         if (auto OVE = dyn_cast<OpaqueValueExpr>(expr)) {
           auto value = OpenExistentials.find(OVE);
@@ -3317,11 +3318,7 @@ namespace {
         }
 
         // Remove any semantic expression injected by typechecking.
-        if (auto ISLE = dyn_cast<InterpolatedStringLiteralExpr>(expr)) {
-          ISLE->setSemanticExpr(nullptr);
-        } else if (auto OLE = dyn_cast<ObjectLiteralExpr>(expr)) {
-          OLE->setSemanticExpr(nullptr);
-        } else if (auto EPE = dyn_cast<EditorPlaceholderExpr>(expr)) {
+        if (auto EPE = dyn_cast<EditorPlaceholderExpr>(expr)) {
           EPE->setSemanticExpr(nullptr);
         }
 
@@ -3662,68 +3659,11 @@ namespace {
     /// Ignore declarations.
     bool walkToDeclPre(Decl *decl) override { return false; }
   };
-
-  /// AST walker that records the keyword arguments provided at each
-  /// call site.
-  class ArgumentLabelWalker : public ASTWalker {
-    ConstraintSystem &CS;
-    llvm::DenseMap<Expr *, Expr *> ParentMap;
-
-  public:
-    ArgumentLabelWalker(ConstraintSystem &cs, Expr *expr) 
-      : CS(cs), ParentMap(expr->getParentMap()) { }
-
-    using State = ConstraintSystem::ArgumentLabelState;
-
-    void associateArgumentLabels(Expr *fn, State labels,
-                                 bool labelsArePermanent) {
-      fn = getArgumentLabelTargetExpr(fn);
-
-      // Record the labels.
-      if (!labelsArePermanent)
-        labels.Labels = CS.allocateCopy(labels.Labels);
-      CS.ArgumentLabels[CS.getConstraintLocator(fn)] = labels;
-    }
-
-    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      if (auto call = dyn_cast<CallExpr>(expr)) {
-        associateArgumentLabels(call->getFn(),
-                                { call->getArgumentLabels(),
-                                  call->hasTrailingClosure() },
-                                /*labelsArePermanent=*/true);
-        return { true, expr };
-      }
-
-      if (auto subscript = dyn_cast<SubscriptExpr>(expr)) {
-        associateArgumentLabels(subscript,
-                                { subscript->getArgumentLabels(),
-                                  subscript->hasTrailingClosure() },
-                                /*labelsArePermanent=*/true);
-        return { true, expr };
-      }
-
-      if (auto unresolvedMember = dyn_cast<UnresolvedMemberExpr>(expr)) {
-        associateArgumentLabels(unresolvedMember,
-                                { unresolvedMember->getArgumentLabels(),
-                                  unresolvedMember->hasTrailingClosure() },
-                                /*labelsArePermanent=*/true);
-        return { true, expr };
-      }
-
-      // FIXME: other expressions have argument labels, but this is an
-      // optimization, so stage it in later.
-      return { true, expr };
-    }
-  };
-
 } // end anonymous namespace
 
 Expr *ConstraintSystem::generateConstraints(Expr *expr, DeclContext *dc) {
   // Remove implicit conversions from the expression.
   expr = expr->walk(SanitizeExpr(*this));
-
-  // Walk the expression to associate labeled arguments.
-  expr->walk(ArgumentLabelWalker(*this, expr));
 
   // Walk the expression, generating constraints.
   ConstraintGenerator cg(*this, dc);
@@ -3763,9 +3703,9 @@ void ConstraintSystem::optimizeConstraints(Expr *e) {
   e->walk(optimizer);
 }
 
-static bool areGenericRequirementsSatisfied(
+bool swift::areGenericRequirementsSatisfied(
     const DeclContext *DC, const GenericSignature *sig,
-    const SubstitutionMap &Substitutions, bool isExtension) {
+    SubstitutionMap Substitutions, bool isExtension) {
 
   TypeChecker &TC = createTypeChecker(DC->getASTContext());
   ConstraintSystemOptions Options;
@@ -3774,7 +3714,9 @@ static bool areGenericRequirementsSatisfied(
 
   // For every requirement, add a constraint.
   for (auto Req : sig->getRequirements()) {
-    if (auto resolved = Req.subst(Substitutions)) {
+    if (auto resolved = Req.subst(
+          QuerySubstitutionMap{Substitutions},
+          LookUpConformanceInModule(DC->getParentModule()))) {
       CS.addConstraint(*resolved, Loc);
     } else if (isExtension) {
       return false;
@@ -3787,70 +3729,12 @@ static bool areGenericRequirementsSatisfied(
   return CS.solveSingle().hasValue();
 }
 
-bool swift::isExtensionApplied(const DeclContext *DC, Type BaseTy,
-                               const ExtensionDecl *ED) {
-  // We can't do anything if the base type has unbound generic parameters.
-  // We can't leak type variables into another constraint system.
-  if (BaseTy->hasTypeVariable() || BaseTy->hasUnboundGenericType() ||
-      BaseTy->hasUnresolvedType() || BaseTy->hasError())
-    return true;
-
-  if (!ED->isConstrainedExtension())
-    return true;
-
-  TypeChecker *TC = &createTypeChecker(DC->getASTContext());
-  TC->validateExtension(const_cast<ExtensionDecl *>(ED));
-
-  GenericSignature *genericSig = ED->getGenericSignature();
-  SubstitutionMap substMap = BaseTy->getContextSubstitutionMap(
-      DC->getParentModule(), ED->getExtendedNominal());
-  return areGenericRequirementsSatisfied(DC, genericSig, substMap,
-                                         /*isExtension=*/true);
-}
-
-bool swift::isMemberDeclApplied(const DeclContext *DC, Type BaseTy,
-                                const ValueDecl *VD) {
-  // We can't leak type variables into another constraint system.
-  // We can't do anything if the base type has unbound generic parameters.
-  if (BaseTy->hasTypeVariable() || BaseTy->hasUnboundGenericType()||
-      BaseTy->hasUnresolvedType() || BaseTy->hasError())
-    return true;
-
-  const GenericContext *genericDecl = VD->getAsGenericContext();
-  if (!genericDecl)
-    return true;
-  const GenericSignature *genericSig = genericDecl->getGenericSignature();
-  if (!genericSig)
-    return true;
-
-  SubstitutionMap substMap = BaseTy->getContextSubstitutionMap(
-      DC->getParentModule(), VD->getDeclContext());
-  return areGenericRequirementsSatisfied(DC, genericSig, substMap,
-                                         /*isExtension=*/false);
-}
-
-static bool canSatisfy(Type type1, Type type2, bool openArchetypes,
+bool swift::canSatisfy(Type type1, Type type2, bool openArchetypes,
                        ConstraintKind kind, DeclContext *dc) {
   std::unique_ptr<TypeChecker> CreatedTC;
   auto &TC = TypeChecker::createForContext(dc->getASTContext());
   return TC.typesSatisfyConstraint(type1, type2, openArchetypes, kind, dc,
                                    /*unwrappedIUO=*/nullptr);
-}
-
-bool swift::canPossiblyEqual(Type T1, Type T2, DeclContext &DC) {
-  return canSatisfy(T1, T2, true, ConstraintKind::Bind, &DC);
-}
-
-bool swift::canPossiblyConvertTo(Type T1, Type T2, DeclContext &DC) {
-  return canSatisfy(T1, T2, true, ConstraintKind::Conversion, &DC);
-}
-
-bool swift::isEqual(Type T1, Type T2, DeclContext &DC) {
-  return T1->isEqual(T2);
-}
-
-bool swift::isConvertibleTo(Type T1, Type T2, DeclContext &DC) {
-  return canSatisfy(T1, T2, false, ConstraintKind::Conversion, &DC);
 }
 
 void swift::eraseOpenedExistentials(ConstraintSystem &CS, Expr *&expr) {

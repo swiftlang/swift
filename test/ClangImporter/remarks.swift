@@ -3,4 +3,4 @@
 import Requires.Swift
 // CHECK-NOT: error
 // CHECK: remark: importing module 'SwiftShims'
-// CHECK-NEXT: remark: importing module 'Requires'
+// CHECK: remark: importing module 'Requires'

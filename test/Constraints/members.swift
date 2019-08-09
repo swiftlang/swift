@@ -465,7 +465,7 @@ struct Outer {
 }
 
 // rdar://problem/39514009 - don't crash when trying to diagnose members with special names
-print("hello")[0] // expected-error {{value of tuple type '()' has no member 'subscript'}}
+print("hello")[0] // expected-error {{value of type '()' has no subscripts}}
 
 
 func rdar40537782() {
@@ -522,7 +522,7 @@ class A {}
 
 enum B {
   static func foo() {
-    bar(A()) // expected-error {{'A' is not convertible to 'B'}}
+    bar(A()) // expected-error {{instance member 'bar' cannot be used on type 'B'}}
   }
 
   func bar(_: A) {}

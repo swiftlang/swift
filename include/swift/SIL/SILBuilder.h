@@ -1775,15 +1775,15 @@ public:
   //===--------------------------------------------------------------------===//
 
   CondFailInst *createCondFail(SILLocation Loc, SILValue Operand,
-                               bool Inverted = false) {
+                               StringRef Message, bool Inverted = false) {
     if (Inverted) {
       SILType Ty = Operand->getType();
       SILValue True(createIntegerLiteral(Loc, Ty, 1));
       Operand =
           createBuiltinBinaryFunction(Loc, "xor", Ty, Ty, {Operand, True});
     }
-    return insert(new (getModule())
-                      CondFailInst(getSILDebugLocation(Loc), Operand));
+    return insert(CondFailInst::create(getSILDebugLocation(Loc), Operand,
+                                       Message, getModule()));
   }
 
   BuiltinInst *createBuiltinTrap(SILLocation Loc) {
@@ -2090,6 +2090,16 @@ public:
       return;
     auto &lowering = getTypeLowering(v->getType());
     lowering.emitDestroyValue(*this, Loc, v);
+  }
+
+  /// Convenience function for destroying objects and addresses.
+  ///
+  /// Objects are destroyed using emitDestroyValueOperation and addresses by
+  /// emitting destroy_addr.
+  void emitDestroyOperation(SILLocation loc, SILValue v) {
+    if (v->getType().isObject())
+      return emitDestroyValueOperation(loc, v);
+    createDestroyAddr(loc, v);
   }
 
   SILValue emitTupleExtract(SILLocation Loc, SILValue Operand, unsigned FieldNo,

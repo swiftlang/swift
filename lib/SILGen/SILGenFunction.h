@@ -1480,6 +1480,10 @@ public:
                                         PreparedArguments &&args, Type overriddenSelfType,
                                         SGFContext ctx);
 
+  RValue emitApplyMethod(SILLocation loc, ConcreteDeclRef declRef,
+                         ArgumentSource &&self, PreparedArguments &&args,
+                         SGFContext C);
+
   RValue emitApplyPropertyWrapperAllocator(SILLocation loc,
                                             SubstitutionMap subs,
                                             SILDeclRef ctorRef,
@@ -1786,6 +1790,9 @@ public:
   void visitDecl(Decl *D) {
     llvm_unreachable("Not yet implemented");
   }
+
+  // Emitted as part of its storage.
+  void visitAccessorDecl(AccessorDecl *D) {}
 
   void visitFuncDecl(FuncDecl *D);
   void visitPatternBindingDecl(PatternBindingDecl *D);

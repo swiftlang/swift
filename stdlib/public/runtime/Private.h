@@ -309,7 +309,8 @@ public:
     ///
     /// \returns a pair containing the number of key generic parameters in
     /// the path up to this point.
-    unsigned buildDescriptorPath(const ContextDescriptor *context) const;
+    unsigned buildDescriptorPath(const ContextDescriptor *context,
+                                 Demangler &demangler) const;
 
     /// Builds a path from the generic environment.
     unsigned buildEnvironmentPath(

@@ -857,7 +857,7 @@ public:
   /// TODO: just make sure that we have a path to them that the debug info
   ///       can follow.
   void bindArchetypes(swift::Type Ty) {
-    auto runtimeTy = getRuntimeReifiedType(IGM, Ty->getCanonicalType());
+    auto runtimeTy = IGM.getRuntimeReifiedType(Ty->getCanonicalType());
     if (!IGM.IRGen.Opts.shouldOptimize() && runtimeTy->hasArchetype())
       runtimeTy.visit([&](CanType t) {
         if (auto archetype = dyn_cast<ArchetypeType>(t))
@@ -1630,6 +1630,9 @@ void IRGenSILFunction::emitSILFunction() {
   
   assert(!CurSILFn->empty() && "function has no basic blocks?!");
 
+  if (CurSILFn->isThunk())
+    IGM.setHasFramePointer(CurFn, false);
+  
   if (CurSILFn->getDynamicallyReplacedFunction())
     IGM.IRGen.addDynamicReplacement(CurSILFn);
 
@@ -3880,7 +3883,7 @@ static bool hasReferenceSemantics(IRGenSILFunction &IGF,
 static llvm::Value *emitIsUnique(IRGenSILFunction &IGF, SILValue operand,
                                  SourceLoc loc) {
   if (!hasReferenceSemantics(IGF, operand->getType())) {
-    IGF.emitTrap(/*EmitUnreachable=*/false);
+    IGF.emitTrap("isUnique called for a non-reference", /*EmitUnreachable=*/false);
     return llvm::UndefValue::get(IGF.IGM.Int1Ty);
   }
 
@@ -4540,7 +4543,7 @@ static void emitTrapAndUndefValue(IRGenSILFunction &IGF,
   IGF.FailBBs.push_back(failBB);
   
   IGF.Builder.emitBlock(failBB);
-  IGF.emitTrap(/*EmitUnreachable=*/true);
+  IGF.emitTrap("mismatching type layouts", /*EmitUnreachable=*/true);
 
   llvm::BasicBlock *contBB = llvm::BasicBlock::Create(IGF.IGM.getLLVMContext());
   IGF.Builder.emitBlock(contBB);
@@ -5441,7 +5444,7 @@ void IRGenSILFunction::visitCondFailInst(swift::CondFailInst *i) {
     // debug location. This is because zero is not an artificial line location
     // in CodeView.
     IGM.DebugInfo->setInlinedTrapLocation(Builder, i->getDebugScope());
-  emitTrap(/*EmitUnreachable=*/true);
+  emitTrap(i->getMessage(), /*EmitUnreachable=*/true);
   Builder.emitBlock(contBB);
   FailBBs.push_back(failBB);
 }

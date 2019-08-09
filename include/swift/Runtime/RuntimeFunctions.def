@@ -638,7 +638,7 @@ FUNCTION(GetGenericMetadata, swift_getGenericMetadata,
 //                                     const OpaqueTypeDescriptor *descriptor,
 //                                     uintptr_t index);
 FUNCTION(GetOpaqueTypeMetadata, swift_getOpaqueTypeMetadata,
-         SwiftCC, ConditionallyAvailable,
+         SwiftCC, OpaqueTypeAvailability,
          RETURNS(TypeMetadataResponseTy),
          ARGS(SizeTy, Int8PtrTy, OpaqueTypeDescriptorPtrTy, SizeTy),
          ATTRS(NoUnwind, ReadOnly))
@@ -647,7 +647,7 @@ FUNCTION(GetOpaqueTypeMetadata, swift_getOpaqueTypeMetadata,
 //                                     const OpaqueTypeDescriptor *descriptor,
 //                                     uintptr_t index);
 FUNCTION(GetOpaqueTypeConformance, swift_getOpaqueTypeConformance,
-         SwiftCC, ConditionallyAvailable,
+         SwiftCC, OpaqueTypeAvailability,
          RETURNS(WitnessTablePtrTy),
          ARGS(Int8PtrTy, OpaqueTypeDescriptorPtrTy, SizeTy),
          ATTRS(NoUnwind, ReadOnly))
@@ -1190,7 +1190,7 @@ FUNCTION(IsOptionalType,
 FUNCTION(Once, swift_once, C_CC, AlwaysAvailable,
          RETURNS(VoidTy),
          ARGS(OnceTy->getPointerTo(), Int8PtrTy, Int8PtrTy),
-         ATTRS())
+         ATTRS(NoUnwind))
 
 // void swift_registerProtocols(const ProtocolRecord *begin,
 //                              const ProtocolRecord *end)
@@ -1226,13 +1226,13 @@ FUNCTION(EndAccess, swift_endAccess, C_CC, AlwaysAvailable,
          ATTRS(NoUnwind))
 
 FUNCTION(GetOrigOfReplaceable, swift_getOrigOfReplaceable, C_CC,
-         AvailableByCompatibilityLibrary,
+         DynamicReplacementAvailability,
          RETURNS(FunctionPtrTy),
          ARGS(FunctionPtrTy->getPointerTo()),
          ATTRS(NoUnwind))
 
 FUNCTION(GetReplacement, swift_getFunctionReplacement, C_CC,
-         AvailableByCompatibilityLibrary,
+         DynamicReplacementAvailability,
          RETURNS(FunctionPtrTy),
          ARGS(FunctionPtrTy->getPointerTo(), FunctionPtrTy),
          ATTRS(NoUnwind))
@@ -1397,6 +1397,17 @@ FUNCTION(IntToFloat64, swift_intToFloat64, SwiftCC, AlwaysAvailable,
          RETURNS(DoubleTy),
          ARGS(SizeTy->getPointerTo(), SizeTy),
          ATTRS(NoUnwind, ReadOnly))
+
+// const Metadata *swift_getTypeByMangledNameInContext(
+//                        const char *typeNameStart,
+//                        size_t typeNameLength,
+//                        const TargetContextDescriptor<InProcess> *context,
+//                        const void * const *genericArgs)
+FUNCTION(GetTypeByMangledNameInContext, swift_getTypeByMangledNameInContext,
+         SwiftCC, AlwaysAvailable,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(Int8PtrTy, SizeTy, TypeContextDescriptorPtrTy, Int8PtrPtrTy),
+         ATTRS(NoUnwind, ArgMemOnly))
 
 #undef RETURNS
 #undef ARGS

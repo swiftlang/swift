@@ -24,6 +24,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/STLExtras.h"
+#include "swift/Sema/IDETypeCheckingRequests.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "llvm/ADT/SetVector.h"
 #include <set>
@@ -197,7 +198,9 @@ static void collectVisibleMemberDecls(const DeclContext *CurrDC, LookupState LS,
       continue;
     if (!isDeclVisibleInLookupMode(VD, LS, CurrDC, TypeResolver))
       continue;
-    if (!isMemberDeclApplied(CurrDC, BaseType, VD))
+    if (!evaluateOrDefault(CurrDC->getASTContext().evaluator,
+        IsDeclApplicableRequest(DeclApplicabilityOwner(CurrDC, BaseType, VD)),
+                           false))
       continue;
     FoundDecls.push_back(VD);
   }
@@ -216,8 +219,9 @@ static void doGlobalExtensionLookup(Type BaseType,
 
   // Look in each extension of this type.
   for (auto extension : nominal->getExtensions()) {
-    if (!isExtensionApplied(const_cast<DeclContext *>(CurrDC), BaseType,
-                            extension))
+    if (!evaluateOrDefault(CurrDC->getASTContext().evaluator,
+        IsDeclApplicableRequest(DeclApplicabilityOwner(CurrDC, BaseType,
+                                                       extension)), false))
       continue;
 
     collectVisibleMemberDecls(CurrDC, LS, BaseType, extension, FoundDecls,
@@ -444,8 +448,8 @@ static void lookupDeclsFromProtocolsBeingConformedTo(
           // Skip value requirements that have corresponding witnesses. This cuts
           // down on duplicates.
           if (!NormalConformance->hasWitness(VD) ||
-              !NormalConformance->getWitness(VD, nullptr) ||
-              NormalConformance->getWitness(VD, nullptr).getDecl()->getFullName()
+              !NormalConformance->getWitness(VD) ||
+              NormalConformance->getWitness(VD).getDecl()->getFullName()
                 != VD->getFullName()) {
             Consumer.foundDecl(VD, ReasonForThisProtocol);
           }
@@ -622,7 +626,7 @@ static void lookupVisibleMemberDeclsImpl(
       Reason = getReasonForSuper(Reason);
 
       bool InheritsSuperclassInitializers =
-          CurClass->inheritsSuperclassInitializers(TypeResolver);
+          CurClass->inheritsSuperclassInitializers();
       if (LS.isOnSuperclass() && !InheritsSuperclassInitializers)
         LS = LS.withoutInheritsSuperclassInitializers();
       else if (!LS.isOnSuperclass()) {
@@ -944,7 +948,7 @@ static void lookupVisibleMemberAndDynamicMemberDecls(
 /// Enumerates all keypath dynamic members of \c baseType, as seen from the
 /// context \c dc.
 ///
-/// If \c baseType is \c @dynamicMemberLookup, this looks up any keypath
+/// If \c baseType is \c \@dynamicMemberLookup, this looks up any keypath
 /// dynamic member subscripts and looks up the members of the keypath's root
 /// type.
 static void lookupVisibleDynamicMemberLookupDecls(
@@ -955,7 +959,8 @@ static void lookupVisibleDynamicMemberLookupDecls(
   if (!seenDynamicLookup.insert(baseType.getPointer()).second)
     return;
 
-  if (!hasDynamicMemberLookupAttribute(baseType))
+  if (!evaluateOrDefault(dc->getASTContext().evaluator,
+         HasDynamicMemberLookupAttributeRequest{baseType.getPointer()}, false))
     return;
 
   auto &ctx = dc->getASTContext();
@@ -973,18 +978,19 @@ static void lookupVisibleDynamicMemberLookupDecls(
     if (!subscript)
       continue;
 
-    auto rootType = getRootTypeOfKeypathDynamicMember(subscript, dc);
-    if (!rootType)
+    auto rootType = evaluateOrDefault(subscript->getASTContext().evaluator,
+      RootTypeOfKeypathDynamicMemberRequest{subscript}, Type());
+    if (rootType.isNull())
       continue;
 
     auto subs =
         baseType->getMemberSubstitutionMap(dc->getParentModule(), subscript);
-    auto memberType = rootType->subst(subs);
+    auto memberType = rootType.subst(subs);
     if (!memberType || !memberType->mayHaveMembers())
       continue;
 
-    KeyPathDynamicMemberConsumer::SubscriptChange(consumer, subscript,
-                                                  baseType);
+    KeyPathDynamicMemberConsumer::SubscriptChange sub(consumer, subscript,
+                                                      baseType);
 
     lookupVisibleMemberAndDynamicMemberDecls(memberType, consumer, consumer, dc,
                                              LS, reason, typeResolver, GSB,

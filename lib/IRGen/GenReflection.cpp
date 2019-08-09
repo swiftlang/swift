@@ -168,7 +168,16 @@ public:
   }
 };
 
-llvm::Constant *IRGenModule::getTypeRef(CanType type, MangledTypeRefRole role) {
+std::pair<llvm::Constant *, unsigned>
+IRGenModule::getTypeRef(Type type, GenericSignature *genericSig,
+                        MangledTypeRefRole role) {
+  return getTypeRef(type->getCanonicalType(genericSig), role);
+}
+
+std::pair<llvm::Constant *, unsigned>
+IRGenModule::getTypeRef(CanType type, MangledTypeRefRole role) {
+  type = substOpaqueTypesWithUnderlyingTypes(type);
+  
   switch (role) {
   case MangledTypeRefRole::DefaultAssociatedTypeWitness:
   case MangledTypeRefRole::Metadata:
@@ -187,7 +196,8 @@ llvm::Constant *IRGenModule::getTypeRef(CanType type, MangledTypeRefRole role) {
 
   IRGenMangler Mangler;
   auto SymbolicName = Mangler.mangleTypeForReflection(*this, type);
-  return getAddrOfStringForTypeRef(SymbolicName, role);
+  return {getAddrOfStringForTypeRef(SymbolicName, role),
+          SymbolicName.runtimeSizeInBytes()};
 }
 
 /// Emit a mangled string referencing a specific protocol conformance, so that
@@ -201,6 +211,9 @@ IRGenModule::emitWitnessTableRefString(CanType type,
                                       ProtocolConformanceRef conformance,
                                       GenericSignature *origGenericSig,
                                       bool shouldSetLowBit) {
+  std::tie(type, conformance)
+    = substOpaqueTypesWithUnderlyingTypes(type, conformance);
+  
   auto origType = type;
   CanGenericSignature genericSig;
   SmallVector<GenericRequirement, 4> requirements;
@@ -365,10 +378,24 @@ protected:
   ///
   /// For reflection records which are demangled to produce type metadata
   /// in-process, pass MangledTypeRefRole::Metadata instead.
+  void addTypeRef(Type type, GenericSignature *genericSig,
+                  MangledTypeRefRole role =
+                      MangledTypeRefRole::Reflection) {
+    addTypeRef(type->getCanonicalType(genericSig), role);
+  }
+
+  /// Add a 32-bit relative offset to a mangled typeref string
+  /// in the typeref reflection section.
+  ///
+  /// By default, we use MangledTypeRefRole::Reflection, which does not
+  /// force emission of any type metadata referenced from the typeref.
+  ///
+  /// For reflection records which are demangled to produce type metadata
+  /// in-process, pass MangledTypeRefRole::Metadata instead.
   void addTypeRef(CanType type,
                   MangledTypeRefRole role =
                       MangledTypeRefRole::Reflection) {
-    B.addRelativeAddress(IGM.getTypeRef(type, role));
+    B.addRelativeAddress(IGM.getTypeRef(type, role).first);
     addBuiltinTypeRefs(type);
   }
 
@@ -387,8 +414,7 @@ protected:
         IGM.getAddrOfStringForTypeRef(mangledStr, role);
       B.addRelativeAddress(mangledName);
     } else {
-      CanType type = nominal->getDeclaredType()->getCanonicalType();
-      addTypeRef(type, role);
+      addTypeRef(nominal->getDeclaredType(), /*genericSig*/nullptr, role);
     }
   }
 
@@ -491,8 +517,8 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
   const uint32_t fieldRecordSize = 12;
   const NominalTypeDecl *NTD;
 
-  void addFieldDecl(const ValueDecl *value, CanType type,
-                    bool indirect=false) {
+  void addFieldDecl(const ValueDecl *value, Type type,
+                    GenericSignature *genericSig, bool indirect=false) {
     reflection::FieldRecordFlags flags;
     flags.setIsIndirectCase(indirect);
     if (auto var = dyn_cast<VarDecl>(value))
@@ -506,7 +532,7 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
       // The standard library's Mirror demangles metadata from field
       // descriptors, so use MangledTypeRefRole::Metadata to ensure
       // runtime metadata is available.
-      addTypeRef(type, MangledTypeRefRole::Metadata);
+      addTypeRef(type, genericSig, MangledTypeRefRole::Metadata);
     }
 
     if (IGM.IRGen.Opts.EnableReflectionNames) {
@@ -534,11 +560,10 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
     B.addInt16(fieldRecordSize);
 
     auto properties = NTD->getStoredProperties();
-    B.addInt32(std::distance(properties.begin(), properties.end()));
+    B.addInt32(properties.size());
     for (auto property : properties)
-      addFieldDecl(property,
-                   property->getInterfaceType()
-                       ->getCanonicalType());
+      addFieldDecl(property, property->getInterfaceType(),
+                   NTD->getGenericSignature());
   }
 
   void layoutEnum() {
@@ -562,14 +587,13 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
     for (auto enumCase : strategy.getElementsWithPayload()) {
       bool indirect = (enumCase.decl->isIndirect() ||
                        enumDecl->isIndirect());
-      addFieldDecl(enumCase.decl,
-                   enumCase.decl->getArgumentInterfaceType()
-                                ->getCanonicalType(),
+      addFieldDecl(enumCase.decl, enumCase.decl->getArgumentInterfaceType(),
+                   enumDecl->getGenericSignature(),
                    indirect);
     }
 
     for (auto enumCase : strategy.getElementsWithNoPayload()) {
-      addFieldDecl(enumCase.decl, CanType());
+      addFieldDecl(enumCase.decl, CanType(), nullptr);
     }
   }
 
@@ -588,7 +612,11 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
   }
 
   void layout() override {
-    assert(!NTD->hasClangNode() || isa<StructDecl>(NTD));
+    if (NTD->hasClangNode()) {
+      auto *enumDecl = dyn_cast<EnumDecl>(NTD);
+      // Structs and namespace-like enums are ok.
+      assert(isa<StructDecl>(NTD) || (enumDecl && !enumDecl->hasCases()));
+    }
 
     PrettyStackTraceDecl DebugStack("emitting field type metadata", NTD);
     addNominalRef(NTD);
@@ -596,9 +624,10 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
     auto *CD = dyn_cast<ClassDecl>(NTD);
     auto *PD = dyn_cast<ProtocolDecl>(NTD);
     if (CD && CD->getSuperclass()) {
-      addTypeRef(CD->getSuperclass()->getCanonicalType());
+      addTypeRef(CD->getSuperclass(), CD->getGenericSignature());
     } else if (PD && PD->getDeclaredType()->getSuperclass()) {
-      addTypeRef(PD->getDeclaredType()->getSuperclass()->getCanonicalType());
+      addTypeRef(PD->getDeclaredType()->getSuperclass(),
+                 PD->getGenericSignature());
     } else {
       B.addInt32(0);
     }
@@ -1047,7 +1076,7 @@ emitAssociatedTypeMetadataRecord(const RootProtocolConformance *conformance) {
     return false;
   };
 
-  normalConf->forEachTypeWitness(/*resolver*/ nullptr, collectTypeWitness);
+  normalConf->forEachTypeWitness(collectTypeWitness);
 
   // If there are no associated types, don't bother emitting any
   // metadata.

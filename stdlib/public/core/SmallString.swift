@@ -218,6 +218,10 @@ extension _SmallString {
       return try f(UnsafeMutableBufferPointer(
         start: ptr, count: _SmallString.capacity))
     }
+    if len == 0 {
+      self = _SmallString()
+      return
+    }
     _internalInvariant(len <= _SmallString.capacity)
 
     let (leading, trailing) = self.zeroTerminatedRawCodeUnits
@@ -260,6 +264,19 @@ extension _SmallString {
 
     self.init(leading: leading, trailing: trailing, count: count)
   }
+  
+  @inline(__always)
+  internal init(
+    initializingUTF8With initializer: (
+      _ buffer: UnsafeMutableBufferPointer<UInt8>
+    ) throws -> Int
+  ) rethrows {
+    self.init()
+    try self.withMutableCapacity {
+      return try initializer($0)
+    }
+    self._invariantCheck()
+  }
 
   @usableFromInline // @testable
   internal init?(_ base: _SmallString, appending other: _SmallString) {
@@ -292,7 +309,7 @@ extension _SmallString {
     self.init()
     self.withMutableCapacity {
       let len = _bridgeTagged(cocoa, intoUTF8: $0)
-      _internalInvariant(len != nil && len! < _SmallString.capacity,
+      _internalInvariant(len != nil && len! <= _SmallString.capacity,
         "Internal invariant violated: large tagged NSStrings")
       return len._unsafelyUnwrappedUnchecked
     }

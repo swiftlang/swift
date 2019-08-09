@@ -17,7 +17,7 @@ var Accelerate_vDSPSingleVectorOpsTests = TestSuite("Accelerate_vDSPSingleVector
 //
 //===----------------------------------------------------------------------===//
 
-if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
+if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
     
     let count = 50
     let n = vDSP_Length(50)
@@ -242,7 +242,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
 //
 //===----------------------------------------------------------------------===//
 
-if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
+if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
     
     let count = 50
     let n = vDSP_Length(50)

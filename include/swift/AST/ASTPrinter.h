@@ -36,6 +36,7 @@ namespace swift {
   class ValueDecl;
   class SourceLoc;
   enum class tok;
+  enum class AccessorKind;
 
 /// Describes the context in which a name is being printed, which
 /// affects the keywords that need to be escaped.
@@ -286,7 +287,6 @@ public:
 
   /// To sanitize a malformed utf8 string to a well-formed one.
   static std::string sanitizeUtf8(StringRef Text);
-  static ValueDecl* findConformancesWithDocComment(ValueDecl *VD);
 
 private:
   virtual void anchor();
@@ -340,6 +340,7 @@ void printEnumElementsAsCases(
 void getInheritedForPrinting(const Decl *decl, const PrintOptions &options,
                              llvm::SmallVectorImpl<TypeLoc> &Results);
 
+StringRef getAccessorKindString(AccessorKind value);
 } // namespace swift
 
 #endif // LLVM_SWIFT_AST_ASTPRINTER_H

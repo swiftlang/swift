@@ -205,3 +205,24 @@ singleExprClosureMultiArg(1) {
 // CHECK: withtrail {
 // CHECK-NEXT: <#code#>
 }
+
+func active() {
+  foo(<#T##value: Foo##Foo#>)
+  // CHECK: foo(Foo)
+}
+func activeWithTrailing() {
+  forEach(<#T##() -> ()#>)
+  // CHECK: forEach {
+  // CHECK-NEXT: <#code#>
+}
+#if false
+func inactive() {
+  foo(<#T##value: Foo##Foo#>)
+  // CHECK: foo(Foo)
+}
+func inactiveWithTrailing() {
+  forEach(<#T##() -> ()#>)
+  // CHECK: forEach {
+  // CHECK-NEXT: <#code#>
+}
+#endif

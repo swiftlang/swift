@@ -318,6 +318,7 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
     for (unsigned n = TC.definedFunctions.size(); currentFunctionIdx != n;
          ++currentFunctionIdx) {
       auto *AFD = TC.definedFunctions[currentFunctionIdx];
+      assert(!AFD->getDeclContext()->isLocalContext());
 
       TC.typeCheckAbstractFunctionBody(AFD);
     }
@@ -348,53 +349,22 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
       TC.typeCheckDecl(decl);
     }
 
-    // Ensure that the requirements of the given conformance are
-    // fully checked.
-    for (unsigned i = 0; i != TC.PartiallyCheckedConformances.size(); ++i) {
-      auto conformance = TC.PartiallyCheckedConformances[i];
-      TC.checkConformanceRequirements(conformance);
-    }
-    TC.PartiallyCheckedConformances.clear();
-
   } while (currentFunctionIdx < TC.definedFunctions.size() ||
            currentSynthesizedDecl < SF.SynthesizedDecls.size() ||
            TC.NextDeclToFinalize < TC.DeclsToFinalize.size() ||
-           !TC.ConformanceContexts.empty() ||
-           !TC.PartiallyCheckedConformances.empty());
+           !TC.ConformanceContexts.empty());
 
   // FIXME: Horrible hack. Store this somewhere more appropriate.
   SF.LastCheckedSynthesizedDecl = currentSynthesizedDecl;
 
-  // Now that all types have been finalized, run any delayed
-  // circularity checks.
-  // This has been written carefully to fail safe + finitely if
-  // for some reason a type gets re-delayed in a non-assertions
-  // build in an otherwise successful build.
-  // Types can be redelayed in a failing build because we won't
-  // type-check required declarations from different files.
-  for (size_t i = 0, e = TC.DelayedCircularityChecks.size(); i != e; ++i) {
-    TC.checkDeclCircularity(TC.DelayedCircularityChecks[i]);
-    assert((e == TC.DelayedCircularityChecks.size() ||
-            TC.Context.hadError()) &&
-           "circularity checking for type was re-delayed!");
-  }
-  TC.DelayedCircularityChecks.clear();
-
   // Compute captures for functions and closures we visited.
   for (auto *closure : TC.ClosuresWithUncomputedCaptures) {
-    TC.computeCaptures(closure);
+    TypeChecker::computeCaptures(closure);
   }
   TC.ClosuresWithUncomputedCaptures.clear();
 
   for (AbstractFunctionDecl *FD : reversed(TC.definedFunctions)) {
-    TC.computeCaptures(FD);
-  }
-
-  // Check error-handling correctness for all the functions defined in
-  // this file.  This can depend on all of their interior function
-  // bodies having been type-checked.
-  for (AbstractFunctionDecl *FD : TC.definedFunctions) {
-    TC.checkFunctionErrorHandling(FD);
+    TypeChecker::computeCaptures(FD);
   }
 
   TC.definedFunctions.clear();
@@ -588,6 +558,9 @@ void swift::checkInconsistentImplementationOnlyImports(ModuleDecl *MainModule) {
         continue;
 
       ModuleDecl *module = nextImport->getModule();
+      if (!module)
+        continue;
+
       if (nextImport->getAttrs().hasAttribute<ImplementationOnlyAttr>()) {
         // We saw an implementation-only import.
         bool isNew =

@@ -124,6 +124,9 @@ def disable_target_os_checking :
   
 def compare_to_astscope_lookup : Flag<["-"], "compare-to-astscope-lookup">,
   HelpText<"Compare legacy to ASTScope-based unqualified name lookup (for debugging)">;
+  
+def warn_if_astscope_lookup : Flag<["-"], "warn-if-astscope-lookup">,
+  HelpText<"Print a warning if ASTScope lookup is used">;
 
 def print_clang_stats : Flag<["-"], "print-clang-stats">,
   HelpText<"Print Clang importer statistics">;
@@ -413,10 +416,6 @@ def solver_enable_operator_designated_types :
   Flag<["-"], "solver-enable-operator-designated-types">,
   HelpText<"Enable operator designated types in constraint solver">;
 
-def enable_opaque_result_types :
-  Flag<["-"], "enable-opaque-result-types">,
-  HelpText<"Enable experimental opaque result types feature">;
-
 def switch_checking_invocation_threshold_EQ : Joined<["-"],
     "switch-checking-invocation-threshold=">;
 
@@ -504,6 +503,11 @@ def emit_sorted_sil : Flag<["-"], "emit-sorted-sil">,
 def emit_syntax : Flag<["-"], "emit-syntax">,
   HelpText<"Parse input file(s) and emit the Syntax tree(s) as JSON">, ModeOpt;
 
+def enable_cxx_interop :
+  Flag<["-"], "enable-cxx-interop">,
+  HelpText<"Enable C++ interop code generation and config directives">,
+  Flags<[FrontendOption, HelpHidden]>;
+
 def use_malloc : Flag<["-"], "use-malloc">,
   HelpText<"Allocate internal data structures using malloc "
            "(for memory debugging)">;
@@ -581,9 +585,5 @@ def read_legacy_type_info_path_EQ : Joined<["-"], "read-legacy-type-info-path=">
 def type_info_dump_filter_EQ : Joined<["-"], "type-info-dump-filter=">,
   Flags<[FrontendOption]>,
   HelpText<"One of 'all', 'resilient' or 'fragile'">;
-
-def enable_objc_resilient_class_stubs : Flag<["-"], "enable-resilient-objc-class-stubs">,
-  HelpText<"Emit Objective-C resilient class stubs for classes with "
-           "resiliently-sized metadata">;
 
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

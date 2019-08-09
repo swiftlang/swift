@@ -13,6 +13,12 @@ open class Derived : Base {
   }
 }
 
+public final class FinalDerived : Base {
+  public override func privateMethod() -> Int {
+    return super.privateMethod() + 1
+  }
+}
+
 public func callBaseMethod(_ b: Base) -> Int {
   return b.privateMethod()
 }

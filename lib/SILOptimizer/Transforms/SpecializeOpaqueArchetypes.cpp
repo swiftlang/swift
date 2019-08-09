@@ -23,6 +23,11 @@
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CFG.h"
 
+#include "llvm/Support/CommandLine.h"
+
+llvm::cl::opt<bool>
+    EnableOpaqueArchetypeSpecializer("enable-opaque-archetype-specializer",
+                                     llvm::cl::init(true));
 
 using namespace swift;
 
@@ -459,6 +464,9 @@ void OpaqueSpecializerCloner::insertOpaqueToConcreteAddressCasts(
 namespace {
 class OpaqueArchetypeSpecializer : public SILFunctionTransform {
   void run() override {
+    if (!EnableOpaqueArchetypeSpecializer)
+      return;
+
     auto *context = getFunction();
 
     if (!context->shouldOptimize())

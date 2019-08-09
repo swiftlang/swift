@@ -1,32 +1,34 @@
-// RUN: %swiftc_driver %s -g -debug-info-format=codeview -emit-ir -o - | %FileCheck %s
+// RUN: %swiftc_driver %s -g -debug-info-format=codeview -Xllvm -enable-trap-debug-info -emit-ir -o - | %FileCheck %s
+// REQUIRES: optimized_stdlib
+
 func markUsed<T>(_ t: T) {}
 func arithmetic(_ a: Int64, _ b: Int64) {
-  markUsed(a + b)             // line 4
-  markUsed(a / b)             // line 5
+  markUsed(a + b)             // line 6
+  markUsed(a / b)             // line 7
 }
 struct SimpleStruct { // NOTE: Classes do not work in Windows yet.
   var myVal1: Float
   var myVal2: Float
-  func sum(myArg: Float) {    // line 10
+  func sum(myArg: Float) {    // line 12
     markUsed(myVal1 + myVal2 + myArg)
   }
 }
 func myLoop() {
-  for index in 0...3 {        // line 15
-    markUsed(index)           // line 16
+  for index in 0...3 {        // line 17
+    markUsed(index)           // line 18
   }
 }
 func mySwitch(_ a: Int64) {
   switch a {
   case 0:
-    markUsed(a-1)             // line 22
+    markUsed(a-1)             // line 24
   default: do {
       markUsed(a+1)
-    }                         // line 25
+    }                         // line 27
   }
 }
 func foo() {
-  var myArray: [Int64] = []   // line 29
+  var myArray: [Int64] = []   // line 31
 }
 
 // func arithmetic(_ a: Int64, _ b: Int64)
@@ -36,9 +38,9 @@ func foo() {
   //       between other instructions for the division. We want to make sure
   //       all instructions from the division have the same debug location and
   //       are contiguous.
-  // CHECK: call {{.*}} @"$ss18_fatalErrorMessage__4file4line5flagss5NeverOs12StaticStringV_A2HSus6UInt32VtF"{{.*}}, !dbg ![[DIV:[0-9]+]]
+  // CHECK: call {{.*}} @"$ss17_assertionFailure__4file4line5flagss5NeverOs12StaticStringV_A2HSus6UInt32VtF"{{.*}}, !dbg ![[DIV:[0-9]+]]
   // CHECK-NEXT: unreachable, !dbg ![[DIV]]
-  // CHECK sdiv i64 %0, %1, !dbg ![[DIV]]
+  // CHECK: sdiv i64 %0, %1, !dbg ![[DIV]]
   // CHECK: call void @llvm.trap(), !dbg ![[INLINEDADD:[0-9]+]]
   // CHECK-NEXT: unreachable, !dbg ![[INLINEDADD]]
 
@@ -74,19 +76,21 @@ func foo() {
   // CHECK-SAME: !dbg ![[ARRAY]]
   // CHECK: ret void
 
-// CHECK-DAG: ![[ADD]] = !DILocation(line: 4, scope:
-// CHECK-DAG: ![[DIV]] = !DILocation(line: 5, scope:
+// CHECK-DAG: ![[ADD]] = !DILocation(line: 6, scope:
+// CHECK-DAG: ![[DIV]] = !DILocation(line: 7, scope:
 // FIXME: The location of ``@llvm.trap`` should be in Integers.swift.gyb
 //        instead of being artificial.
-// CHECK-DAG: ![[INLINEDADD]] = !DILocation(line: 0, scope: !{{[0-9]+}}, inlinedAt: ![[ADD]]
+// CHECK: ![[INLINEDADD]] = !DILocation(line: 0, scope: ![[FAILURE_FUNC:[0-9]+]], inlinedAt: ![[INLINELOC:[0-9]+]]
+// CHECK-DAG: !{{.*}} = distinct !DISubprogram(linkageName: "Swift runtime failure: arithmetic overflow", scope: {{.*}}, flags: DIFlagArtificial, spFlags: DISPFlagDefinition, {{.*}})
+// CHECK-DAG: ![[INLINELOC]] = !DILocation(line: 0, scope: !{{[0-9]+}}, inlinedAt: ![[ADD]]
 
 // NOTE: These prologue instructions are given artificial line locations for
 //       LLDB, but for CodeView they should have the location of the function
 //       to keep the linetables contiguous.
 // CHECK-DAG: ![[SUM]] = distinct !DISubprogram(name: "sum", linkageName: "$s4main12SimpleStructV3sum5myArgySf_tF"
-// CHECK-DAG: ![[PROLOGUE]] = !DILocation(line: 10, scope: ![[SUM]])
-// CHECK-DAG: ![[FORLOOP]] = !DILocation(line: 15, scope:
-// CHECK-DAG: ![[FORBODY]] = !DILocation(line: 16, scope:
-// CHECK-DAG: ![[CASE]] = !DILocation(line: 22, scope:
-// CHECK-DAG: ![[DEFAULTCLEANUP]] = !DILocation(line: 25, scope:
-// CHECK-DAG: ![[ARRAY]] = !DILocation(line: 29, scope:
+// CHECK-DAG: ![[PROLOGUE]] = !DILocation(line: 12, scope: ![[SUM]])
+// CHECK-DAG: ![[FORLOOP]] = !DILocation(line: 17, scope:
+// CHECK-DAG: ![[FORBODY]] = !DILocation(line: 18, scope:
+// CHECK-DAG: ![[CASE]] = !DILocation(line: 24, scope:
+// CHECK-DAG: ![[DEFAULTCLEANUP]] = !DILocation(line: 27, scope:
+// CHECK-DAG: ![[ARRAY]] = !DILocation(line: 31, scope:

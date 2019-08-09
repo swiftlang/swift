@@ -198,7 +198,7 @@ private:
   /// Whether cross-module references to this function should use weak linking.
   unsigned IsWeakLinked : 1;
 
-  // Whether the implementation can be dynamically replaced.
+  /// Whether the implementation can be dynamically replaced.
   unsigned IsDynamicReplaceable : 1;
 
   /// If != OptimizationMode::NotSet, the optimization mode specified with an

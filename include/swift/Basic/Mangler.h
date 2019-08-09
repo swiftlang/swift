@@ -151,11 +151,6 @@ protected:
     Buffer << op;
     recordOpStat(op, OldPos);
   }
-  void appendOperator(StringRef op, int natural) {
-    size_t OldPos = Storage.size();
-    Buffer << op << natural << '_';
-    recordOpStat(op, OldPos);
-  }
   void appendOperator(StringRef op, Index index) {
     size_t OldPos = Storage.size();
     Buffer << op << index;

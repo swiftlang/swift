@@ -513,6 +513,10 @@ void Remangler::mangleTypeMetadataCompletionFunction(Node *node) {
   mangleSingleChildNode(node); // type
 }
 
+void Remangler::mangleTypeMetadataDemanglingCache(Node *node) {
+  unreachable("not supported");
+}
+
 void Remangler::mangleTypeMetadataLazyCache(Node *node) {
   Buffer << "ML";
   mangleSingleChildNode(node); // type
@@ -1607,6 +1611,10 @@ void Remangler::mangleDependentGenericParamType(Node *node) {
 
 void Remangler::mangleIndex(Node *node) {
   mangleIndex(node->getIndex());
+}
+
+void Remangler::mangleUnknownIndex(Node *node) {
+  unreachable("should not be reached in an arbitrary context");
 }
 
 void Remangler::mangleProtocol(Node *node, EntityContext &ctx) {

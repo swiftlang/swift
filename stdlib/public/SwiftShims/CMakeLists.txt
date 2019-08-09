@@ -20,6 +20,7 @@ set(sources
   UnicodeShims.h
   Visibility.h
 
+  CoreMediaOverlayShims.h
   DispatchOverlayShims.h
   NetworkOverlayShims.h
   OSOverlayShims.h

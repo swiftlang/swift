@@ -216,6 +216,8 @@ ERROR(expected_decl,none,
       "expected declaration", ())
 ERROR(expected_identifier_in_decl,none,
       "expected identifier in %0 declaration", (StringRef))
+ERROR(expected_keyword_in_decl,none,
+      "expected '%0' keyword in %1 declaration", (StringRef, DescriptiveDeclKind))
 ERROR(number_cant_start_decl_name,none,
       "%0 name can only start with a letter or underscore, not a number",
       (StringRef))
@@ -302,8 +304,6 @@ ERROR(observing_accessor_conflicts_with_accessor,none,
       (unsigned, StringRef))
 ERROR(observing_accessor_in_subscript,none,
       "%select{'willSet'|'didSet'}0 is not allowed in subscripts", (unsigned))
-ERROR(getset_init,none,
-      "variable with getter/setter cannot have an initial value", ())
 ERROR(getset_cannot_be_implied,none,
       "variable with implied type cannot have implied getter/setter", ())
 
@@ -756,6 +756,17 @@ ERROR(expected_dictionary_value_type,PointsToFirstBadToken,
       "expected dictionary value type", ())
 ERROR(expected_rbracket_dictionary_type,PointsToFirstBadToken,
       "expected ']' in dictionary type", ())
+ERROR(extra_rbracket,PointsToFirstBadToken,
+      "unexpected ']' in type; did you mean to write an array type?", ())
+ERROR(extra_colon,PointsToFirstBadToken,
+      "unexpected ':' in type; did you mean to write a dictionary type?", ())
+WARNING(subscript_array_element, none,
+        "unexpected subscript in array literal; did you mean to write two "
+        "separate elements instead?", ())
+NOTE(subscript_array_element_fix_it_add_comma, none, "add a separator between "
+     "the elements", ())
+NOTE(subscript_array_element_fix_it_remove_space, none,
+     "remove the space between the elements to silence this warning", ())
 
 // Tuple Types
 ERROR(expected_rparen_tuple_type_list,none,
@@ -848,6 +859,8 @@ ERROR(expected_parameter_name,PointsToFirstBadToken,
       "expected parameter name followed by ':'", ())
 ERROR(expected_parameter_colon,PointsToFirstBadToken,
       "expected ':' following argument label and parameter name", ())
+ERROR(expected_assignment_instead_of_comparison_operator,none,
+      "expected '=' instead of '==' to assign default value for parameter", ())
 ERROR(missing_parameter_type,PointsToFirstBadToken,
       "parameter requires an explicit type", ())
 ERROR(multiple_parameter_ellipsis,none,
@@ -1331,6 +1344,9 @@ ERROR(objc_runtime_name_must_be_identifier,none,
 
 ERROR(attr_only_at_non_local_scope, none,
       "attribute '%0' can only be used in a non-local scope", (StringRef))
+
+ERROR(projection_value_property_not_identifier,none,
+      "@_projectedValueProperty name must be an identifier", ())
 
 // Access control
 ERROR(attr_access_expected_set,none,

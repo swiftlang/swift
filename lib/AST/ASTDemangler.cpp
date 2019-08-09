@@ -22,6 +22,7 @@
 #include "swift/AST/ASTDemangler.h"
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/GenericSignatureBuilder.h"
@@ -29,7 +30,6 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
-#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/ManglingMacros.h"
 
@@ -102,7 +102,7 @@ ASTBuilder::createBuiltinType(StringRef builtinName,
 
     ModuleDecl::AccessPathTy accessPath;
     StringRef strippedName =
-          builtinName.drop_front(strlen(BUILTIN_TYPE_NAME_PREFIX));
+        builtinName.drop_front(BUILTIN_TYPE_NAME_PREFIX.size());
     Ctx.TheBuiltinModule->lookupValue(accessPath,
                                       Ctx.getIdentifier(strippedName),
                                       NLKind::QualifiedLookup,
@@ -255,7 +255,7 @@ Type ASTBuilder::createBoundGenericType(GenericTypeDecl *decl,
 }
 
 Type ASTBuilder::resolveOpaqueType(NodePointer opaqueDescriptor,
-                                   ArrayRef<Type> args,
+                                   ArrayRef<ArrayRef<Type>> args,
                                    unsigned ordinal) {
   if (opaqueDescriptor->getKind() == Node::Kind::OpaqueReturnTypeOf) {
     auto definingDecl = opaqueDescriptor->getChild(0);
@@ -278,9 +278,14 @@ Type ASTBuilder::resolveOpaqueType(NodePointer opaqueDescriptor,
     assert(ordinal == 0 && "not implemented");
     if (ordinal != 0)
       return Type();
+    
+    SmallVector<Type, 8> allArgs;
+    for (auto argSet : args) {
+      allArgs.append(argSet.begin(), argSet.end());
+    }
 
     SubstitutionMap subs = createSubstitutionMapFromGenericArgs(
-                         opaqueDecl->getGenericSignature(), args, parentModule);
+                      opaqueDecl->getGenericSignature(), allArgs, parentModule);
     return OpaqueTypeArchetypeType::get(opaqueDecl, subs);
   }
   
@@ -1018,31 +1023,14 @@ ASTBuilder::findTypeDecl(DeclContext *dc,
   return result;
 }
 
-static Optional<ClangTypeKind>
-getClangTypeKindForNodeKind(Demangle::Node::Kind kind) {
-  switch (kind) {
-  case Demangle::Node::Kind::Protocol:
-    return ClangTypeKind::ObjCProtocol;
-  case Demangle::Node::Kind::Class:
-    return ClangTypeKind::ObjCClass;
-  case Demangle::Node::Kind::TypeAlias:
-    return ClangTypeKind::Typedef;
-  case Demangle::Node::Kind::Structure:
-  case Demangle::Node::Kind::Enum:
-    return ClangTypeKind::Tag;
-  default:
-    return None;
-  }
-}
-
-GenericTypeDecl *
-ASTBuilder::findForeignTypeDecl(StringRef name,
-                                StringRef relatedEntityKind,
-                                ForeignModuleKind foreignKind,
-                                Demangle::Node::Kind kind) {
+GenericTypeDecl *ASTBuilder::findForeignTypeDecl(StringRef name,
+                                                 StringRef relatedEntityKind,
+                                                 ForeignModuleKind foreignKind,
+                                                 Demangle::Node::Kind kind) {
   // Check to see if we have an importer loaded.
-  auto importer = static_cast<ClangImporter *>(Ctx.getClangModuleLoader());
-  if (!importer) return nullptr;
+  auto importer = Ctx.getClangModuleLoader();
+  if (!importer)
+    return nullptr;
 
   // Find the unique declaration that has the right kind.
   struct Consumer : VisibleDeclConsumer {
@@ -1054,8 +1042,10 @@ ASTBuilder::findForeignTypeDecl(StringRef name,
 
     void foundDecl(ValueDecl *decl, DeclVisibilityKind reason,
                    DynamicLookupInfo dynamicLookupInfo = {}) override {
-      if (HadError) return;
-      if (decl == Result) return;
+      if (HadError)
+        return;
+      if (decl == Result)
+        return;
       if (!Result) {
         Result = dyn_cast<GenericTypeDecl>(decl);
         HadError |= !Result;
@@ -1066,33 +1056,27 @@ ASTBuilder::findForeignTypeDecl(StringRef name,
     }
   } consumer(kind);
 
+  auto found = [&](TypeDecl *found) {
+    consumer.foundDecl(found, DeclVisibilityKind::VisibleAtTopLevel);
+  };
+
   switch (foreignKind) {
   case ForeignModuleKind::SynthesizedByImporter:
     if (!relatedEntityKind.empty()) {
-      Optional<ClangTypeKind> lookupKind = getClangTypeKindForNodeKind(kind);
-      if (!lookupKind)
-        return nullptr;
-      importer->lookupRelatedEntity(name, lookupKind.getValue(),
-                                    relatedEntityKind, [&](TypeDecl *found) {
-        consumer.foundDecl(found, DeclVisibilityKind::VisibleAtTopLevel);
-      });
+      importer->lookupRelatedEntity(name, relatedEntityKind, found);
       break;
     }
     importer->lookupValue(Ctx.getIdentifier(name), consumer);
-    if (consumer.Result) {
-      consumer.Result =
-          getAcceptableTypeDeclCandidate(consumer.Result,kind);
-    }
+    if (consumer.Result)
+      consumer.Result = getAcceptableTypeDeclCandidate(consumer.Result, kind);
     break;
-  case ForeignModuleKind::Imported: {
-    Optional<ClangTypeKind> lookupKind = getClangTypeKindForNodeKind(kind);
-    if (!lookupKind)
-      return nullptr;
-    importer->lookupTypeDecl(name, lookupKind.getValue(),
-                             [&](TypeDecl *found) {
-      consumer.foundDecl(found, DeclVisibilityKind::VisibleAtTopLevel);
-    });
-  }
+  case ForeignModuleKind::Imported:
+    importer->lookupTypeDecl(name, kind, found);
+
+    // Try the DWARFImporter if it exists.
+    if (!consumer.Result)
+      if (auto *dwarf_importer = Ctx.getDWARFModuleLoader())
+        dwarf_importer->lookupTypeDecl(name, kind, found);
   }
 
   return consumer.Result;

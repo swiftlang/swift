@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -26,9 +26,13 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/LineIterator.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/Process.h"
 
 using namespace swift;
 using namespace llvm::opt;
+
+/// The path for Swift libraries in the OS on Darwin.
+#define DARWIN_OS_LIBRARY_PATH "/usr/lib/swift"
 
 swift::CompilerInvocation::CompilerInvocation() {
   setTargetTriple(llvm::sys::getDefaultTargetTriple());
@@ -66,7 +70,10 @@ static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
   llvm::SmallString<128> LibPath(SearchPathOpts.RuntimeResourcePath);
 
   llvm::sys::path::append(LibPath, getPlatformNameForTriple(Triple));
-  SearchPathOpts.RuntimeLibraryPath = LibPath.str();
+  SearchPathOpts.RuntimeLibraryPaths.clear();
+  SearchPathOpts.RuntimeLibraryPaths.push_back(LibPath.str());
+  if (Triple.isOSDarwin())
+    SearchPathOpts.RuntimeLibraryPaths.push_back(DARWIN_OS_LIBRARY_PATH);
 
   // Set up the import paths containing the swiftmodules for the libraries in
   // RuntimeLibraryPath.
@@ -83,6 +90,10 @@ static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
   if (!SearchPathOpts.SDKPath.empty()) {
     LibPath = SearchPathOpts.SDKPath;
     llvm::sys::path::append(LibPath, "usr", "lib", "swift");
+    if (!Triple.isOSDarwin()) {
+      llvm::sys::path::append(LibPath, getPlatformNameForTriple(Triple));
+      llvm::sys::path::append(LibPath, swift::getMajorArchitectureName(Triple));
+    }
     SearchPathOpts.RuntimeLibraryImportPaths.push_back(LibPath.str());
   }
 }
@@ -266,9 +277,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableOperatorDesignatedTypes |=
       Args.hasArg(OPT_enable_operator_designated_types);
   
-  Opts.EnableOpaqueResultTypes |=
-      Args.hasArg(OPT_enable_opaque_result_types);
-
   // Always enable operator designated types for the standard library.
   Opts.EnableOperatorDesignatedTypes |= FrontendOpts.ParseStdlib;
 
@@ -324,8 +332,14 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       = A->getOption().matches(OPT_enable_target_os_checking);
   }
   
-  Opts.EnableASTScopeLookup |= Args.hasArg(OPT_enable_astscope_lookup) || Args.hasArg(OPT_disable_parser_lookup);
+  Opts.DisableParserLookup |= Args.hasArg(OPT_disable_parser_lookup);
+  Opts.EnableASTScopeLookup =
+      Args.hasFlag(options::OPT_enable_astscope_lookup,
+                   options::OPT_disable_astscope_lookup, Opts.EnableASTScopeLookup) ||
+      Opts.DisableParserLookup;
   Opts.CompareToASTScopeLookup |= Args.hasArg(OPT_compare_to_astscope_lookup);
+  Opts.WarnIfASTScopeLookup |= Args.hasArg(OPT_warn_if_astscope_lookup);
+
   Opts.DebugConstraintSolver |= Args.hasArg(OPT_debug_constraints);
   Opts.NamedLazyMemberLoading &= !Args.hasArg(OPT_disable_named_lazy_member_loading);
   Opts.DebugGenericSignatures |= Args.hasArg(OPT_debug_generic_signatures);
@@ -486,6 +500,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     TargetArg = A->getValue();
   }
 
+  Opts.EnableCXXInterop |= Args.hasArg(OPT_enable_cxx_interop);
   Opts.EnableObjCInterop =
       Args.hasFlag(OPT_enable_objc_interop, OPT_disable_objc_interop,
                    Target.isOSDarwin());
@@ -569,8 +584,6 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
     Opts.BridgingHeader = A->getValue();
   Opts.DisableSwiftBridgeAttr |= Args.hasArg(OPT_disable_swift_bridge_attr);
 
-  Opts.DisableModulesValidateSystemHeaders |= Args.hasArg(OPT_disable_modules_validate_system_headers);
-
   Opts.DisableOverlayModules |= Args.hasArg(OPT_emit_imported_modules);
 
   if (const Arg *A = Args.getLastArg(OPT_pch_output_dir)) {
@@ -623,6 +636,9 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts,
 
   Opts.SkipRuntimeLibraryImportPaths |= Args.hasArg(OPT_nostdimport);
 
+  Opts.DisableModulesValidateSystemDependencies |=
+      Args.hasArg(OPT_disable_modules_validate_system_headers);
+
   // Opts.RuntimeIncludePath is set by calls to
   // setRuntimeIncludePath() or setMainExecutablePath().
   // Opts.RuntimeImportPath is set by calls to
@@ -647,7 +663,10 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
   Opts.SkipDiagnosticPasses |= Args.hasArg(OPT_disable_diagnostic_passes);
   Opts.ShowDiagnosticsAfterFatalError |=
     Args.hasArg(OPT_show_diagnostics_after_fatal);
-  Opts.UseColor |= Args.hasArg(OPT_color_diagnostics);
+  Opts.UseColor |=
+      Args.hasFlag(OPT_color_diagnostics,
+                   OPT_no_color_diagnostics,
+                   /*Default=*/llvm::sys::Process::StandardErrHasColors());
   Opts.FixitCodeForAllDiagnostics |= Args.hasArg(OPT_fixit_all);
   Opts.SuppressWarnings |= Args.hasArg(OPT_suppress_warnings);
   Opts.WarningsAsErrors |= Args.hasArg(OPT_warnings_as_errors);
@@ -1113,9 +1132,14 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
 
     // Automatically set coverage flags, unless coverage type was explicitly
     // requested.
+    // Updated to match clang at Jul 2019.
     Opts.SanitizeCoverage.IndirectCalls = true;
     Opts.SanitizeCoverage.TraceCmp = true;
-    Opts.SanitizeCoverage.TracePCGuard = true;
+    Opts.SanitizeCoverage.PCTable = true;
+    if (Triple.isOSLinux()) {
+      Opts.SanitizeCoverage.StackDepth = true;
+    }
+    Opts.SanitizeCoverage.Inline8bitCounters = true;
     Opts.SanitizeCoverage.CoverageType = llvm::SanitizerCoverageOptions::SCK_Edge;
   }
 

@@ -173,6 +173,8 @@ static void emitMetadataCompletionFunction(IRGenModule &IGM,
   llvm::Function *f =
     IGM.getAddrOfTypeMetadataCompletionFunction(typeDecl, ForDefinition);
   f->setAttributes(IGM.constructInitialAttributes());
+  f->setDoesNotThrow();
+  IGM.setHasFramePointer(f, false);
 
   IRGenFunction IGF(IGM, f);
 
@@ -469,9 +471,9 @@ namespace {
     }
     
     void addExtendedContext() {
-      auto string = IGM.getTypeRef(
-          E->getSelfInterfaceType()->getCanonicalType(),
-          MangledTypeRefRole::Metadata);
+      auto string = IGM.getTypeRef(E->getSelfInterfaceType(),
+                                   E->getGenericSignature(),
+                                   MangledTypeRefRole::Metadata).first;
       B.addRelativeAddress(string);
     }
     
@@ -822,8 +824,7 @@ namespace {
           continue;
 
         auto witness =
-          entry.getAssociatedTypeWitness().Witness->mapTypeOutOfContext()
-            ->getCanonicalType();
+            entry.getAssociatedTypeWitness().Witness->mapTypeOutOfContext();
         return IGM.getAssociatedTypeWitness(witness,
                                             /*inProtocolContext=*/true);
       }
@@ -1253,7 +1254,7 @@ namespace {
       auto properties = getType()->getStoredProperties();
 
       // uint32_t NumFields;
-      B.addInt32(std::distance(properties.begin(), properties.end()));
+      B.addInt32(properties.size());
 
       // uint32_t FieldOffsetVectorOffset;
       B.addInt32(FieldVectorOffset / IGM.getPointerSize());
@@ -1593,8 +1594,11 @@ namespace {
 
       // TargetRelativeDirectPointer<Runtime, const char> SuperclassType;
       if (auto superclassType = getType()->getSuperclass()) {
+        GenericSignature *genericSig = getType()->getGenericSignature();
         B.addRelativeAddress(IGM.getTypeRef(superclassType->getCanonicalType(),
-                                            MangledTypeRefRole::Metadata));
+                                            genericSig,
+                                            MangledTypeRefRole::Metadata)
+                               .first);
       } else {
         B.addInt32(0);
       }
@@ -1640,7 +1644,7 @@ namespace {
       B.addInt32(numImmediateMembers);
 
       // uint32_t NumFields;
-      B.addInt32(std::distance(properties.begin(), properties.end()));
+      B.addInt32(properties.size());
 
       // uint32_t FieldOffsetVectorOffset;
       B.addInt32(getFieldVectorOffset() / IGM.getPointerSize());
@@ -1683,14 +1687,12 @@ namespace {
       auto underlyingType = Type(O->getUnderlyingInterfaceType())
         .subst(*O->getUnderlyingTypeSubstitutions())
         ->getCanonicalType(O->getOpaqueInterfaceGenericSignature());
-      
+
       B.addRelativeAddress(IGM.getTypeRef(underlyingType,
-                                          MangledTypeRefRole::Metadata));
+                                          MangledTypeRefRole::Metadata).first);
       
       auto opaqueType = O->getDeclaredInterfaceType()
                          ->castTo<OpaqueTypeArchetypeType>();
-      
-      
       
       for (auto proto : opaqueType->getConformsTo()) {
         auto conformance = ProtocolConformanceRef(proto);
@@ -2134,6 +2136,8 @@ namespace {
       llvm::Function *f =
         IGM.getAddrOfTypeMetadataInstantiationFunction(Target, ForDefinition);
       f->setAttributes(IGM.constructInitialAttributes());
+      f->setDoesNotThrow();
+      IGM.setHasFramePointer(f, false);
 
       IRGenFunction IGF(IGM, f);
 
@@ -4268,7 +4272,7 @@ static void addGenericRequirement(IRGenModule &IGM, ConstantStructBuilder &B,
 
   B.addInt(IGM.Int32Ty, flags.getIntValue());
   auto typeName =
-    IGM.getTypeRef(paramType->getCanonicalType(), MangledTypeRefRole::Metadata);
+      IGM.getTypeRef(paramType, nullptr, MangledTypeRefRole::Metadata).first;
   B.addRelativeAddress(typeName);
   addReference();
 }
@@ -4335,8 +4339,8 @@ GenericRequirementsMetadata irgen::addGenericRequirements(
 
       auto flags = GenericRequirementFlags(abiKind, false, false);
       auto typeName =
-        IGM.getTypeRef(requirement.getSecondType()->getCanonicalType(),
-                       MangledTypeRefRole::Metadata);
+          IGM.getTypeRef(requirement.getSecondType(), nullptr,
+                         MangledTypeRefRole::Metadata).first;
 
       addGenericRequirement(IGM, B, metadata, sig, flags,
                             requirement.getFirstType(),

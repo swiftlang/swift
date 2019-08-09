@@ -19,6 +19,7 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/Identifier.h"
+#include "swift/AST/Type.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/DenseMap.h"
@@ -43,23 +44,6 @@ class ConstraintSystem;
 
 /// A single node in the constraint graph, which represents a type variable.
 class ConstraintGraphNode {
-  /// Describes information about an adjacency between two type variables.
-  struct Adjacency {
-    /// Index into the vector of adjacent type variables, \c Adjacencies.
-    unsigned Index : 31;
-
-    /// Whether a fixed type binding relates the two type variables.
-    unsigned FixedBinding : 1;
-
-    /// The number of constraints that link this type variable to the
-    /// enclosing node.
-    unsigned NumConstraints;
-
-    bool empty() const {
-      return !FixedBinding && !NumConstraints;
-    }
-  };
-
 public:
   explicit ConstraintGraphNode(TypeVariableType *typeVar) : TypeVar(typeVar) { }
 
@@ -75,9 +59,10 @@ public:
   /// various other nodes.
   ArrayRef<Constraint *> getConstraints() const { return Constraints; }
 
-  /// Retrieve the set of type variables to which this node is adjacent.
-  ArrayRef<TypeVariableType *> getAdjacencies() const {
-    return Adjacencies;
+  /// Retrieve the set of type variables that are adjacent due to fixed
+  /// bindings.
+  ArrayRef<TypeVariableType *> getFixedBindings() const {
+    return FixedBindings;
   }
 
   /// Retrieve all of the type variables in the same equivalence class
@@ -97,21 +82,6 @@ private:
   /// Note that this only removes the constraint itself; it does not
   /// remove the corresponding adjacencies.
   void removeConstraint(Constraint *constraint);
-
-  /// Retrieve adjacency information for the given type variable.
-  Adjacency &getAdjacency(TypeVariableType *typeVar);
-
-  /// Modify the adjacency information for the given type variable
-  /// directly. If the adjacency becomes empty afterward, it will be
-  /// removed.
-  void modifyAdjacency(TypeVariableType *typeVar,
-                       llvm::function_ref<void(Adjacency &adj)> modify);
-
-  /// Add an adjacency to the list of adjacencies.
-  void addAdjacency(TypeVariableType *typeVar);
-
-  /// Remove an adjacency from the list of adjacencies.
-  void removeAdjacency(TypeVariableType *typeVar);
 
   /// Add the given type variables to this node's equivalence class.
   void addToEquivalenceClass(ArrayRef<TypeVariableType *> typeVars);
@@ -134,13 +104,9 @@ private:
   /// to the index within the vector of constraints.
   llvm::SmallDenseMap<Constraint *, unsigned, 2> ConstraintIndex;
 
-  /// The set of adjacent type variables, in a stable order.
-  SmallVector<TypeVariableType *, 2> Adjacencies;
-
-  /// A mapping from each of the type variables adjacent to this
-  /// type variable to the index of the adjacency information in
-  /// \c Adjacencies.
-  llvm::SmallDenseMap<TypeVariableType *, Adjacency, 2> AdjacencyInfo;
+  /// The set of type variables that occur within the fixed binding of
+  /// this type variable.
+  SmallVector<TypeVariableType *, 2> FixedBindings;
 
   /// All of the type variables in the same equivalence class as this
   /// representative type variable.
@@ -222,9 +188,8 @@ public:
   /// Gather the set of constraints that involve the given type variable,
   /// i.e., those constraints that will be affected when the type variable
   /// gets merged or bound to a fixed type.
-  void
+  llvm::TinyPtrVector<Constraint *>
   gatherConstraints(TypeVariableType *typeVar,
-                    llvm::SetVector<Constraint *> &constraints,
                     GatheringKind kind,
                     llvm::function_ref<bool(Constraint *)> acceptConstraint =
                         [](Constraint *constraint) { return true; });
@@ -281,13 +246,15 @@ public:
   }
 
   /// Print the graph.
-  void print(llvm::raw_ostream &out);
+  void print(ArrayRef<TypeVariableType *> typeVars, llvm::raw_ostream &out);
+  void dump(llvm::raw_ostream &out);
 
   LLVM_ATTRIBUTE_DEPRECATED(void dump() LLVM_ATTRIBUTE_USED,
                             "only for use within the debugger");
 
   /// Print the connected components of the graph.
-  void printConnectedComponents(llvm::raw_ostream &out);
+  void printConnectedComponents(ArrayRef<TypeVariableType *> typeVars,
+                                llvm::raw_ostream &out);
 
   LLVM_ATTRIBUTE_DEPRECATED(void dumpConnectedComponents() LLVM_ATTRIBUTE_USED,
                             "only for use within the debugger");
@@ -315,7 +282,6 @@ private:
   /// Note that this change is not recorded and cannot be undone. Use with
   /// caution.
   void unbindTypeVariable(TypeVariableType *typeVar, Type fixedType);
-
 
   /// Perform edge contraction on the constraint graph, merging equivalence
   /// classes until a fixed point is reached.

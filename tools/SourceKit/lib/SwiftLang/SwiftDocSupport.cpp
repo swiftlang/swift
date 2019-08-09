@@ -969,6 +969,7 @@ static bool reportModuleDocInfo(CompilerInvocation Invocation,
     return true;
 
   ASTContext &Ctx = CI.getASTContext();
+  registerIDERequestFunctions(Ctx.evaluator);
   (void)createTypeChecker(Ctx);
 
   SourceTextInfo IFaceInfo;
@@ -1345,7 +1346,8 @@ void SwiftLangSupport::findLocalRenameRanges(
   /// FIXME: When request cancellation is implemented and Xcode adopts it,
   /// don't use 'OncePerASTToken'.
   static const char OncePerASTToken = 0;
-  getASTManager()->processASTAsync(Invok, ASTConsumer, &OncePerASTToken);
+  getASTManager()->processASTAsync(Invok, ASTConsumer, &OncePerASTToken,
+                                   llvm::vfs::getRealFileSystem());
 }
 
 SourceFile *SwiftLangSupport::getSyntacticSourceFile(

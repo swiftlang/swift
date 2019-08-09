@@ -182,8 +182,8 @@ func r22162441(_ lines: [String]) {
 
 func testMap() {
   let a = 42
-  [1,a].map { $0 + 1.0 } // expected-error {{binary operator '+' cannot be applied to operands of type 'Int' and 'Double'}}
-  // expected-note @-1 {{overloads for '+' exist with these partially matching parameter lists: }}
+  [1,a].map { $0 + 1.0 } // expected-error {{binary operator '+' cannot be applied to operands of type 'Any' and 'Double'}}
+  // expected-note @-1 {{expected an argument list of type '(Double, Double)'}}
 }
 
 // <rdar://problem/22414757> "UnresolvedDot" "in wrong phase" assertion from verifier
@@ -475,7 +475,7 @@ func g_2994(arg: Int) -> Double {
 }
 C_2994<S_2994>(arg: { (r: S_2994) in f_2994(arg: g_2994(arg: r.dataOffset)) }) // expected-error {{cannot convert value of type 'Double' to expected argument type 'String'}}
 
-let _ = { $0[$1] }(1, 1) // expected-error {{cannot subscript a value of incorrect or ambiguous type}}
+let _ = { $0[$1] }(1, 1) // expected-error {{value of type 'Int' has no subscripts}}
 let _ = { $0 = ($0 = {}) } // expected-error {{assigning a variable to itself}}
 let _ = { $0 = $0 = 42 } // expected-error {{assigning a variable to itself}}
 

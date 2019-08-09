@@ -32,6 +32,8 @@ if(SWIFT_ANALYZE_CODE_COVERAGE)
     LINK_FLAGS " -fprofile-instr-generate -fcoverage-mapping")
 endif()
 
+add_dependencies(tools sourcekitd-test)
 swift_install_in_component(TARGETS sourcekitd-test
-                           RUNTIME DESTINATION bin
-                           COMPONENT tools)
+                           RUNTIME
+                             DESTINATION bin
+                             COMPONENT tools)

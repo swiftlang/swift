@@ -427,6 +427,77 @@ extension String {
     }
     return
   }
+  
+  /// Creates a new String with the specified capacity in UTF-8 code units then
+  /// calls the given closure with a buffer covering the String's uninitialized
+  /// memory.
+  ///
+  /// The closure should return the number of initialized code units,
+  /// or 0 if it couldn't initialize the buffer (for example if the
+  /// requested capacity was too small).
+  ///
+  /// This method replaces ill-formed UTF-8 sequences with the Unicode
+  /// replacement character (`"\u{FFFD}"`); This may require resizing
+  /// the buffer beyond its original capacity.
+  ///
+  /// The following examples use this initializer with the contents of two
+  /// different `UInt8` arrays---the first with well-formed UTF-8 code unit
+  /// sequences and the second with an ill-formed sequence at the end.
+  ///
+  ///     let validUTF8: [UInt8] = [67, 97, 102, -61, -87, 0]
+  ///     let s = String(uninitializedCapacity: validUTF8.count,
+  ///                    initializingUTF8With: { ptr in
+  ///         ptr.initializeFrom(validUTF8)
+  ///         return validUTF8.count
+  ///     })
+  ///     // Prints "Café"
+  ///
+  ///     let invalidUTF8: [UInt8] = [67, 97, 102, -61, 0]
+  ///     let s = String(uninitializedCapacity: invalidUTF8.count,
+  ///                    initializingUTF8With: { ptr in
+  ///         ptr.initializeFrom(invalidUTF8)
+  ///         return invalidUTF8.count
+  ///     })
+  ///     // Prints "Caf�"
+  ///
+  ///     let s = String(uninitializedCapacity: invalidUTF8.count,
+  ///                    initializingUTF8With: { ptr in
+  ///         ptr.initializeFrom(invalidUTF8)
+  ///         return 0
+  ///     })
+  ///     // Prints ""
+  ///
+  /// - Parameters:
+  ///   - capacity: The number of UTF-8 code units worth of memory to allocate
+  ///       for the String.
+  ///   - initializer: A closure that initializes elements and sets the count of
+  ///       the new String
+  ///     - Parameters:
+  ///       - buffer: A buffer covering uninitialized memory with room for the
+  ///           specified number of UTF-8 code units.
+  @inline(__always)
+  internal init(
+    uninitializedCapacity capacity: Int,
+    initializingUTF8With initializer: (
+      _ buffer: UnsafeMutableBufferPointer<UInt8>
+    ) throws -> Int
+  ) rethrows {
+    if _fastPath(capacity <= _SmallString.capacity) {
+      let smol = try _SmallString(initializingUTF8With: initializer)
+      // Fast case where we fit in a _SmallString and don't need UTF8 validation
+      if _fastPath(smol.isASCII) {
+        self = String(_StringGuts(smol))
+      } else {
+        //We succeeded in making a _SmallString, but may need to repair UTF8
+        self = smol.withUTF8 { String._fromUTF8Repairing($0).result }
+      }
+      return
+    }
+    
+    self = try String._fromLargeUTF8Repairing(
+      uninitializedCapacity: capacity,
+      initializingWith: initializer)
+  }
 
   /// Calls the given closure with a pointer to the contents of the string,
   /// represented as a null-terminated sequence of code units.
@@ -715,13 +786,12 @@ extension String {
   public func lowercased() -> String {
     if _fastPath(_guts.isFastASCII) {
       return _guts.withFastUTF8 { utf8 in
-        // TODO(String performance): We can directly call appendInPlace
-        var result = String()
-        result.reserveCapacity(utf8.count)
-        for u8 in utf8 {
-          result._guts.append(String(Unicode.Scalar(_lowercaseASCII(u8)))._guts)
+        return String(uninitializedCapacity: utf8.count) { buffer in
+          for i in 0 ..< utf8.count {
+            buffer[i] = _lowercaseASCII(utf8[i])
+          }
+          return utf8.count
         }
-        return result
       }
     }
 
@@ -776,13 +846,12 @@ extension String {
   public func uppercased() -> String {
     if _fastPath(_guts.isFastASCII) {
       return _guts.withFastUTF8 { utf8 in
-        // TODO(String performance): code-unit appendInPlace on guts
-        var result = String()
-        result.reserveCapacity(utf8.count)
-        for u8 in utf8 {
-          result._guts.append(String(Unicode.Scalar(_uppercaseASCII(u8)))._guts)
+        return String(uninitializedCapacity: utf8.count) { buffer in
+          for i in 0 ..< utf8.count {
+            buffer[i] = _uppercaseASCII(utf8[i])
+          }
+          return utf8.count
         }
-        return result
       }
     }
 
@@ -825,7 +894,7 @@ extension String {
   /// Creates an instance from the description of a given
   /// `LosslessStringConvertible` instance.
   @inlinable @inline(__always)
-  public init<T : LosslessStringConvertible>(_ value: T) {
+  public init<T: LosslessStringConvertible>(_ value: T) {
     self = value.description
   }
 }

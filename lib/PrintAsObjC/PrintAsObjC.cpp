@@ -257,8 +257,8 @@ private:
   void printDocumentationComment(Decl *D) {
     swift::markup::MarkupContext MC;
     auto DC = getSingleDocComment(MC, D);
-    if (DC.hasValue())
-      ide::getDocumentationCommentAsDoxygen(DC.getValue(), os);
+    if (DC)
+      ide::getDocumentationCommentAsDoxygen(DC, os);
   }
 
   /// Prints an encoded string, escaped properly for C.
@@ -571,7 +571,7 @@ private:
     // Constructors and methods returning DynamicSelf return
     // instancetype.
     if (isa<ConstructorDecl>(AFD) ||
-        (isa<FuncDecl>(AFD) && cast<FuncDecl>(AFD)->hasDynamicSelf())) {
+        (isa<FuncDecl>(AFD) && cast<FuncDecl>(AFD)->hasDynamicSelfResult())) {
       if (errorConvention && errorConvention->stripsResultOptionality()) {
         printNullability(OTK_Optional, NullabilityPrintKind::ContextSensitive);
       } else if (auto ctor = dyn_cast<ConstructorDecl>(AFD)) {
@@ -1256,22 +1256,25 @@ private:
 
     printAvailability(VD);
 
+    auto *getter = VD->getOpaqueAccessor(AccessorKind::Get);
+    auto *setter = VD->getOpaqueAccessor(AccessorKind::Set);
+
     os << ";";
     if (VD->isStatic()) {
       os << ")\n";
       // Older Clangs don't support class properties, so print the accessors as
       // well. This is harmless.
-      printAbstractFunctionAsMethod(VD->getGetter(), true);
+      printAbstractFunctionAsMethod(getter, true);
       if (isSettable) {
-        assert(VD->getSetter() && "settable ObjC property missing setter decl");
-        printAbstractFunctionAsMethod(VD->getSetter(), true);
+        assert(setter && "settable ObjC property missing setter decl");
+        printAbstractFunctionAsMethod(setter, true);
       }
     } else {
       os << "\n";
       if (looksLikeInitMethod(VD->getObjCGetterSelector()))
-        printAbstractFunctionAsMethod(VD->getGetter(), false);
+        printAbstractFunctionAsMethod(getter, false);
       if (isSettable && looksLikeInitMethod(VD->getObjCSetterSelector()))
-        printAbstractFunctionAsMethod(VD->getSetter(), false);
+        printAbstractFunctionAsMethod(setter, false);
     }
   }
 
@@ -1286,8 +1289,10 @@ private:
       isNSUIntegerSubscript = isNSUInteger(indexParam->getType());
     }
 
-    printAbstractFunctionAsMethod(SD->getGetter(), false, isNSUIntegerSubscript);
-    if (auto setter = SD->getSetter())
+    auto *getter = SD->getOpaqueAccessor(AccessorKind::Get);
+    printAbstractFunctionAsMethod(getter, false,
+                                  isNSUIntegerSubscript);
+    if (auto *setter = SD->getOpaqueAccessor(AccessorKind::Set))
       printAbstractFunctionAsMethod(setter, false, isNSUIntegerSubscript);
   }
 
@@ -1928,6 +1933,14 @@ private:
              "constrained extensions or custom generic parameters?");
       type = extendedClass->getGenericEnvironment()->getSugaredType(type);
       decl = type->getDecl();
+    }
+
+    if (auto *proto = dyn_cast<ProtocolDecl>(decl->getDeclContext())) {
+      if (type->isEqual(proto->getSelfInterfaceType())) {
+        printNullability(optionalKind, NullabilityPrintKind::ContextSensitive);
+        os << "instancetype";
+        return;
+      }
     }
 
     assert(decl->getClangDecl() && "can only handle imported ObjC generics");

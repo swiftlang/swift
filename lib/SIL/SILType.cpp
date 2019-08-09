@@ -11,8 +11,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/SILType.h"
+#include "swift/AST/ASTMangler.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Type.h"
 #include "swift/SIL/AbstractionPattern.h"
@@ -98,6 +101,11 @@ bool SILType::isNoReturnFunction() const {
   return false;
 }
 
+std::string SILType::getMangledName() const {
+  Mangle::ASTMangler mangler(false/*use dwarf mangling*/);
+  return mangler.mangleTypeWithoutPrefix(getASTType());
+}
+
 std::string SILType::getAsString() const {
   std::string Result;
   llvm::raw_string_ostream OS(Result);
@@ -132,6 +140,9 @@ bool SILType::canRefCast(SILType operTy, SILType resultTy, SILModule &M) {
 SILType SILType::getFieldType(VarDecl *field, SILModule &M) const {
   auto baseTy = getASTType();
 
+  if (!field->hasInterfaceType())
+    field->getASTContext().getLazyResolver()->resolveDeclSignature(field);
+
   AbstractionPattern origFieldTy = M.Types.getAbstractionPattern(field);
   CanType substFieldTy;
   if (field->hasClangNode()) {
@@ -158,6 +169,9 @@ SILType SILType::getEnumElementType(EnumElementDecl *elt, SILModule &M) const {
     assert(elt == M.getASTContext().getOptionalSomeDecl());
     return SILType(objectType, getCategory());
   }
+
+  if (!elt->hasInterfaceType())
+    elt->getASTContext().getLazyResolver()->resolveDeclSignature(elt);
 
   // If the case is indirect, then the payload is boxed.
   if (elt->isIndirect() || elt->getParentEnum()->isIndirect()) {

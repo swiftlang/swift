@@ -17,6 +17,7 @@
 #ifndef SWIFT_AST_ANYREQUEST_H
 #define SWIFT_AST_ANYREQUEST_H
 
+#include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/TypeID.h"
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/Hashing.h"
@@ -85,6 +86,9 @@ class AnyRequest {
 
     /// Note that this request is part of a cycle.
     virtual void noteCycleStep(DiagnosticEngine &diags) const = 0;
+
+    /// Retrieve the nearest source location to which this request applies.
+    virtual SourceLoc getNearestLoc() const = 0;
   };
 
   /// Holds a value that can be used as a request input/output.
@@ -124,6 +128,11 @@ class AnyRequest {
     /// Note that this request is part of a cycle.
     virtual void noteCycleStep(DiagnosticEngine &diags) const override {
       request.noteCycleStep(diags);
+    }
+
+    /// Retrieve the nearest source location to which this request applies.
+    virtual SourceLoc getNearestLoc() const override {
+      return request.getNearestLoc();
     }
   };
 
@@ -200,6 +209,11 @@ public:
   /// Note that this request is part of a cycle.
   void noteCycleStep(DiagnosticEngine &diags) const {
     stored->noteCycleStep(diags);
+  }
+
+  /// Retrieve the nearest source location to which this request applies.
+  SourceLoc getNearestLoc() const {
+    return stored->getNearestLoc();
   }
 
   /// Compare two instances for equality.

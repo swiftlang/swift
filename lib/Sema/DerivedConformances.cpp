@@ -153,8 +153,7 @@ void DerivedConformance::tryDiagnoseFailedDerivation(DeclContext *DC,
   }
 }
 
-ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
-                                                       NominalTypeDecl *nominal,
+ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
                                                        ValueDecl *requirement) {
   // Note: whenever you update this function, also update
   // TypeChecker::deriveProtocolRequirement.
@@ -279,25 +278,23 @@ DerivedConformance::createSelfDeclRef(AbstractFunctionDecl *fn) {
 }
 
 AccessorDecl *DerivedConformance::
-addGetterToReadOnlyDerivedProperty(TypeChecker &tc,
-                                   VarDecl *property,
+addGetterToReadOnlyDerivedProperty(VarDecl *property,
                                    Type propertyContextType) {
   auto getter =
-    declareDerivedPropertyGetter(tc, property, propertyContextType);
+    declareDerivedPropertyGetter(property, propertyContextType);
 
-  property->setAccessors(StorageImplInfo::getImmutableComputed(),
-                         SourceLoc(), {getter}, SourceLoc());
+  property->setImplInfo(StorageImplInfo::getImmutableComputed());
+  property->setAccessors(SourceLoc(), {getter}, SourceLoc());
 
   return getter;
 }
 
 AccessorDecl *
-DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
-                                                 VarDecl *property,
+DerivedConformance::declareDerivedPropertyGetter(VarDecl *property,
                                                  Type propertyContextType) {
   bool isStatic = property->isStatic();
 
-  auto &C = tc.Context;
+  auto &C = property->getASTContext();
   auto parentDC = property->getDeclContext();
   ParameterList *params = ParameterList::createEmpty(C);
 
@@ -312,6 +309,7 @@ DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
     TypeLoc::withoutLoc(propertyInterfaceType), parentDC);
   getterDecl->setImplicit();
   getterDecl->setStatic(isStatic);
+  getterDecl->setIsTransparent(false);
 
   // Compute the interface type of the getter.
   if (auto env = parentDC->getGenericEnvironmentOfContext())
@@ -321,7 +319,7 @@ DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
   getterDecl->copyFormalAccessFrom(property);
   getterDecl->setValidationToChecked();
 
-  tc.Context.addSynthesizedDecl(getterDecl);
+  C.addSynthesizedDecl(getterDecl);
 
   return getterDecl;
 }
@@ -334,7 +332,7 @@ DerivedConformance::declareDerivedProperty(Identifier name,
   auto &C = TC.Context;
   auto parentDC = getConformanceContext();
 
-  VarDecl *propDecl = new (C) VarDecl(/*IsStatic*/isStatic, VarDecl::Specifier::Var,
+  VarDecl *propDecl = new (C) VarDecl(/*IsStatic*/isStatic, VarDecl::Introducer::Var,
                                       /*IsCaptureList*/false, SourceLoc(), name,
                                       parentDC);
   propDecl->setImplicit();

@@ -1789,7 +1789,7 @@ namespace {
         }
 
         // Don't emit descriptors for properties without accessors.
-        auto getter = var->getGetter();
+        auto getter = var->getOpaqueAccessor(AccessorKind::Get);
         if (!getter)
           return;
 
@@ -1800,7 +1800,7 @@ namespace {
         auto &methods = getMethodList(var);
         methods.push_back(getter);
 
-        if (auto setter = var->getSetter())
+        if (auto setter = var->getOpaqueAccessor(AccessorKind::Set))
           methods.push_back(setter);
       }
     }
@@ -2027,13 +2027,13 @@ namespace {
     void visitSubscriptDecl(SubscriptDecl *subscript) {
       if (!requiresObjCSubscriptDescriptor(IGM, subscript)) return;
 
-      auto getter = subscript->getGetter();
+      auto getter = subscript->getOpaqueAccessor(AccessorKind::Get);
       if (!getter) return;
 
       auto &methods = getMethodList(subscript);
       methods.push_back(getter);
 
-      if (auto setter = subscript->getSetter())
+      if (auto setter = subscript->getOpaqueAccessor(AccessorKind::Set))
         methods.push_back(setter);
     }
   };
@@ -2318,6 +2318,11 @@ IRGenModule::getClassMetadataStrategy(const ClassDecl *theClass) {
   // If we have resiliently-sized fields, we might be able to use the
   // update pattern.
   if (resilientLayout.doesMetadataRequireUpdate()) {
+      
+    // FixedOrUpdate strategy does not work in JIT mode
+    if (IRGen.Opts.UseJIT)
+      return ClassMetadataStrategy::Singleton;
+      
     // The update pattern only benefits us on platforms with an Objective-C
     // runtime, otherwise just use the singleton pattern.
     if (!Context.LangOpts.EnableObjCInterop)

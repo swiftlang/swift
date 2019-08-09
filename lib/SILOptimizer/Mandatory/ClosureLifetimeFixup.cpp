@@ -113,8 +113,93 @@ static void findReachableExitBlocks(SILInstruction *i,
       result.push_back(bb);
       continue;
     }
-    copy_if(bb->getSuccessorBlocks(), std::back_inserter(worklist),
-            [&](SILBasicBlock *bb) { return visitedBlocks.insert(bb).second; });
+    llvm::copy_if(bb->getSuccessorBlocks(), std::back_inserter(worklist),
+                  [&](SILBasicBlock *bb) {
+      return visitedBlocks.insert(bb).second;
+    });
+  }
+}
+
+/// We use this to ensure that we properly handle recursive cases by revisiting
+/// phi nodes that we are tracking. This just makes it easier to reproduce in a
+/// test case.
+static llvm::cl::opt<bool> ReverseInitialWorklist(
+    "sil-closure-lifetime-fixup-reverse-phi-order", llvm::cl::init(false),
+    llvm::cl::desc(
+        "Reverse the order in which we visit phis for testing purposes"),
+    llvm::cl::Hidden);
+
+// Finally, we need to prune phis inserted by the SSA updater that
+// only take the .none from the entry block. This means that they are
+// not actually reachable from the .some() so we know that we do not
+// need to lifetime extend there at all. As an additional benefit, we
+// eliminate the need to balance these arguments to satisfy the
+// ownership verifier. This occurs since arguments are a place in SIL
+// where the trivialness of an enums case is erased.
+static void
+cleanupDeadTrivialPhiArgs(SILValue initialValue,
+                          SmallVectorImpl<SILPhiArgument *> &insertedPhis) {
+  // Just for testing purposes.
+  if (ReverseInitialWorklist) {
+    std::reverse(insertedPhis.begin(), insertedPhis.end());
+  }
+  SmallVector<SILPhiArgument *, 8> worklist(insertedPhis.begin(),
+                                            insertedPhis.end());
+  sortUnique(insertedPhis);
+  SmallVector<SILValue, 8> incomingValues;
+
+  while (!worklist.empty()) {
+    // Clear the incoming values array after each iteration.
+    SWIFT_DEFER { incomingValues.clear(); };
+
+    auto *phi = worklist.pop_back_val();
+    {
+      auto it = lower_bound(insertedPhis, phi);
+      if (it == insertedPhis.end() || *it != phi)
+        continue;
+    }
+
+    // TODO: When we split true phi arguments from transformational terminators,
+    // this will always succeed and the assert can go away.
+    bool foundPhiValues = phi->getIncomingPhiValues(incomingValues);
+    (void)foundPhiValues;
+    assert(foundPhiValues && "Should always have 'true' phi arguments since "
+                             "these were inserted by the SSA updater.");
+    if (llvm::any_of(incomingValues,
+                     [&](SILValue v) { return v != initialValue; }))
+      continue;
+
+    // Remove it from our insertedPhis list to prevent us from re-visiting this.
+    {
+      auto it = lower_bound(insertedPhis, phi);
+      assert((it != insertedPhis.end() && *it == phi) &&
+             "Should have found the phi");
+      insertedPhis.erase(it);
+    }
+
+    // See if any of our users are branch or cond_br. If so, we may have
+    // exposed additional unneeded phis. Add it back to the worklist in such a
+    // case.
+    for (auto *op : phi->getUses()) {
+      auto *user = op->getUser();
+
+      if (!isa<BranchInst>(user) && !isa<CondBranchInst>(user))
+        continue;
+
+      auto *termInst = cast<TermInst>(user);
+      for (auto succBlockArgList : termInst->getSuccessorBlockArguments()) {
+        llvm::copy_if(succBlockArgList, std::back_inserter(worklist),
+                      [&](SILPhiArgument *succArg) -> bool {
+                        auto it = lower_bound(insertedPhis, succArg);
+                        return it != insertedPhis.end() && *it == succArg;
+                      });
+      }
+    }
+
+    // Then RAUW the phi with the entryBlockOptionalNone and erase the
+    // argument.
+    phi->replaceAllUsesWith(initialValue);
+    erasePhiArgument(phi->getParent(), phi->getIndex());
   }
 }
 
@@ -157,7 +242,8 @@ static void extendLifetimeToEndOfFunction(SILFunction &fn,
   // Ok. At this point we know that Cvt is not in the entry block... so we can
   // use SILSSAUpdater::GetValueInMiddleOfBlock() to extend the object's
   // lifetime respecting loops.
-  SILSSAUpdater updater;
+  SmallVector<SILPhiArgument *, 8> insertedPhis;
+  SILSSAUpdater updater(&insertedPhis);
   updater.Initialize(optionalEscapingClosureTy);
 
   // Create an Optional<() -> ()>.none in the entry block of the function and
@@ -166,10 +252,11 @@ static void extendLifetimeToEndOfFunction(SILFunction &fn,
   // Since we know that Cvt is not in the entry block and this must be, we know
   // that it is safe to use the SSAUpdater's getValueInMiddleOfBlock with this
   // value.
-  updater.AddAvailableValue(fn.getEntryBlock(), [&]() -> SILValue {
+  SILValue entryBlockOptionalNone = [&]() -> SILValue {
     SILBuilderWithScope b(fn.getEntryBlock()->begin());
     return b.createOptionalNone(loc, optionalEscapingClosureTy);
-  }());
+  }();
+  updater.AddAvailableValue(fn.getEntryBlock(), entryBlockOptionalNone);
 
   // Create a copy of the convert_escape_to_no_escape and add it as an available
   // value to the SSA updater.
@@ -206,6 +293,14 @@ static void extendLifetimeToEndOfFunction(SILFunction &fn,
     SILValue v = updater.GetValueAtEndOfBlock(block);
     SILBuilderWithScope(safeDestructionPt).createDestroyValue(loc, v);
   }
+
+  // Finally, we need to prune phis inserted by the SSA updater that only take
+  // the .none from the entry block.
+  //
+  // TODO: Should we sort inserted phis before or after we initialize
+  // the worklist or maybe backwards? We should investigate how the
+  // SSA updater adds phi nodes to this list to resolve this question.
+  cleanupDeadTrivialPhiArgs(entryBlockOptionalNone, insertedPhis);
 }
 
 static SILInstruction *lookThroughRebastractionUsers(
@@ -691,7 +786,7 @@ static bool fixupCopyBlockWithoutEscaping(CopyBlockWithoutEscapingInst *cb,
       SILValue v = sentinelClosure;
       SILValue isEscaping = b.createIsEscapingClosure(
           loc, v, IsEscapingClosureInst::ObjCEscaping);
-      b.createCondFail(loc, isEscaping);
+      b.createCondFail(loc, isEscaping, "non-escaping closure has escaped");
       b.createDestroyValue(loc, v);
       return true;
     }
@@ -705,7 +800,7 @@ static bool fixupCopyBlockWithoutEscaping(CopyBlockWithoutEscapingInst *cb,
       SILValue V = sentinelClosure;
       SILValue isEscaping = B.createIsEscapingClosure(
           loc, V, IsEscapingClosureInst::ObjCEscaping);
-      B.createCondFail(loc, isEscaping);
+      B.createCondFail(loc, isEscaping, "non-escaping closure has escaped");
       B.createDestroyValue(loc, V);
     }
 
@@ -724,16 +819,19 @@ static bool fixupCopyBlockWithoutEscaping(CopyBlockWithoutEscapingInst *cb,
   auto optionalEscapingClosureTy =
       SILType::getOptionalType(sentinelClosure->getType());
 
-  SILSSAUpdater updater;
+  SmallVector<SILPhiArgument *, 8> insertedPhis;
+  SILSSAUpdater updater(&insertedPhis);
   updater.Initialize(optionalEscapingClosureTy);
 
   // Create the Optional.none as the beginning available value.
+  SILValue entryBlockOptionalNone;
   {
     SILBuilderWithScope b(fn.getEntryBlock()->begin());
-    updater.AddAvailableValue(
-        fn.getEntryBlock(),
-        b.createOptionalNone(autoGenLoc, optionalEscapingClosureTy));
+    entryBlockOptionalNone =
+        b.createOptionalNone(autoGenLoc, optionalEscapingClosureTy);
+    updater.AddAvailableValue(fn.getEntryBlock(), entryBlockOptionalNone);
   }
+  assert(entryBlockOptionalNone);
 
   // Then create the Optional.some(closure sentinel).
   //
@@ -773,7 +871,7 @@ static bool fixupCopyBlockWithoutEscaping(CopyBlockWithoutEscapingInst *cb,
     SILValue v = updater.GetValueInMiddleOfBlock(singleDestroy->getParent());
     SILValue isEscaping =
         b.createIsEscapingClosure(loc, v, IsEscapingClosureInst::ObjCEscaping);
-    b.createCondFail(loc, isEscaping);
+    b.createCondFail(loc, isEscaping, "non-escaping closure has escaped");
     b.createDestroyValue(loc, v);
   }
 
@@ -785,10 +883,18 @@ static bool fixupCopyBlockWithoutEscaping(CopyBlockWithoutEscapingInst *cb,
 
     for (auto *block : exitingBlocks) {
       auto *safeDestructionPt = getDeinitSafeClosureDestructionPoint(block);
-      SILValue v = updater.GetValueInMiddleOfBlock(block);
+      SILValue v = updater.GetValueAtEndOfBlock(block);
       SILBuilderWithScope(safeDestructionPt).createDestroyValue(autoGenLoc, v);
     }
   }
+
+  // Finally, we need to prune phis inserted by the SSA updater that only take
+  // the .none from the entry block.
+  //
+  // TODO: Should we sort inserted phis before or after we initialize
+  // the worklist or maybe backwards? We should investigate how the
+  // SSA updater adds phi nodes to this list to resolve this question.
+  cleanupDeadTrivialPhiArgs(entryBlockOptionalNone, insertedPhis);
 
   return true;
 }

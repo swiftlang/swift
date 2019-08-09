@@ -143,13 +143,6 @@ public:
   /// left parenthesis.
   virtual void completePostfixExprParen(Expr *E, Expr *CodeCompletionE) {};
 
-  /// Complete expr-super after we have consumed the 'super' keyword.
-  virtual void completeExprSuper(SuperRefExpr *SRE) {};
-
-  /// Complete expr-super after we have consumed the 'super' keyword and
-  /// a dot.
-  virtual void completeExprSuperDot(SuperRefExpr *SRE) {};
-
   /// Complete the argument to an Objective-C #keyPath
   /// expression.
   ///
@@ -175,10 +168,7 @@ public:
   virtual void completeCaseStmtKeyword() {};
 
   /// Complete at the beginning of a case stmt pattern.
-  virtual void completeCaseStmtBeginning() {};
-
-  /// Complete a case stmt pattern that starts with a dot.
-  virtual void completeCaseStmtDotPrefix() {};
+  virtual void completeCaseStmtBeginning(CodeCompletionExpr *E) {};
 
   /// Complete at the beginning of member of a nominal decl member -- no tokens
   /// provided by user.
@@ -189,7 +179,7 @@ public:
   virtual void completeAccessorBeginning(CodeCompletionExpr *E) {};
 
   /// Complete the keyword in attribute, for instance, @available.
-  virtual void completeDeclAttrBeginning(bool Sil) {};
+  virtual void completeDeclAttrBeginning(bool Sil, bool isIndependent) {};
 
   /// Complete the parameters in attribute, for instance, version specifier for
   /// @available.

@@ -13,7 +13,7 @@ class ThisBase1 {
   }
 
   func baseFunc0() {}
-  func baseFunc1(_ a: Int) {}
+  func baseFunc1(_ a: Int) {} // expected-note 2 {{found this candidate}}
 
   subscript(i: Int) -> Double {
     get {
@@ -227,7 +227,10 @@ class ThisDerived1 : ThisBase1 {
     
     self.baseFunc0(ThisDerived1())()
     self.baseFunc1(42) // expected-error {{instance member 'baseFunc1' cannot be used on type 'ThisDerived1'}}
-    self.baseFunc1(ThisBase1())(42) // expected-error {{'ThisBase1' is not convertible to 'ThisDerived1'}}
+    // TODO(diagnostics): Constraint system is not currently set up to handle this case because overload choice
+    // would have a type of `(A) -> (Int) -> Void` which then gets fixed up to be `(B) -> (Int) -> Void` when
+    // the choice is attempted.
+    self.baseFunc1(ThisBase1())(42) // expected-error {{ambiguous reference to member 'baseFunc1'}}
     self.baseFunc1(ThisDerived1())(42)
     self[0] = 42.0 // expected-error {{instance member 'subscript' cannot be used on type 'ThisDerived1'}}
     self.baseStaticVar = 42
@@ -253,7 +256,7 @@ class ThisDerived1 : ThisBase1 {
     self.derivedInstanceVar = 42 // expected-error {{member 'derivedInstanceVar' cannot be used on type 'ThisDerived1'}}
     self.derivedProp = 42 // expected-error {{member 'derivedProp' cannot be used on type 'ThisDerived1'}}
     self.derivedFunc0() // expected-error {{instance member 'derivedFunc0' cannot be used on type 'ThisDerived1'}}
-    self.derivedFunc0(ThisBase1())() // expected-error {{'ThisBase1' is not convertible to 'ThisDerived1'}}
+    self.derivedFunc0(ThisBase1())() // expected-error {{cannot convert value of type 'ThisBase1' to expected argument type 'ThisDerived1'}}
     self.derivedFunc0(ThisDerived1())()
     self.derivedStaticVar = 42
     self.derivedStaticProp = 42
@@ -407,13 +410,14 @@ extension ThisDerived1 {
 
 // <rdar://problem/11554141>
 func shadowbug() {
-  var Foo = 10
+  let Foo = 10
   func g() {
     struct S {
       var x : Foo
       typealias Foo = Int
     }
   }
+  _ = Foo
 }
 func scopebug() {
   let Foo = 10
@@ -609,3 +613,25 @@ class ShadowingGenericParameter<T> {
 }
 
 _ = ShadowingGenericParameter<String>().foo(t: "hi")
+
+// rdar://problem/51266778
+struct PatternBindingWithTwoVars1 { var x = 3, y = x }
+// expected-error@-1 {{cannot use instance member 'x' within property initializer; property initializers run before 'self' is available}}
+
+struct PatternBindingWithTwoVars2 { var x = y, y = 3 }
+// expected-error@-1 {{type 'PatternBindingWithTwoVars2' has no member 'y'}}
+// expected-note@-2 {{did you mean 'x'?}}
+// expected-note@-3 {{did you mean 'y'?}}
+
+// This one should be accepted, but for now PatternBindingDecl validation
+// circularity detection is not fine grained enough.
+struct PatternBindingWithTwoVars3 { var x = y, y = x }
+// expected-error@-1 {{type 'PatternBindingWithTwoVars3' has no member 'y'}}
+// expected-note@-2 {{did you mean 'x'?}}
+// expected-note@-3 {{did you mean 'y'?}}
+
+// https://bugs.swift.org/browse/SR-9015
+func sr9015() {
+  let closure1 = { closure2() } // expected-error {{let 'closure1' references itself}}
+  let closure2 = { closure1() }
+}
