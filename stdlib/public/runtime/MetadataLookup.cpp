@@ -738,24 +738,40 @@ _findContextDescriptor(Demangle::NodePointer node,
     cachedContexts = _findContextDescriptorInCache(T, node);
   }
 
+  bool foundInCache = false;
   for (auto cachedContext : cachedContexts) {
     if (_contextDescriptorMatchesMangling(cachedContext, node)) {
       foundContext = cachedContext;
+      foundInCache = true;
       break;
     }
   }
 
-  // Check type metadata records
-  if (!foundContext)
+  if (!foundContext) {
+    // Slow path, as a fallback if the cache itself isn't capturing everything.
+    (void)foundInCache;
+
+    // Check type metadata records
     foundContext = _searchTypeMetadataRecords(T, node);
 
-  // Check protocol conformances table. Note that this has no support for
-  // resolving generic types yet.
-  if (!foundContext)
-    foundContext = _searchConformancesByMangledTypeName(node);
+    // Check protocol conformances table. Note that this has no support for
+    // resolving generic types yet.
+    if (!foundContext)
+      foundContext = _searchConformancesByMangledTypeName(node);
+  }
 
   if (foundContext) {
     T.NominalCache.getOrInsert(mangledName, foundContext);
+
+#ifndef NDEBUG
+    // If we found something in the slow path but not in the cache, it is a
+    // bug in the cache. Fail in assertions builds.
+    if (!foundInCache) {
+      fatalError(0,
+                 "_findContextDescriptor cache miss for demangled tree:\n%s\n",
+                 getNodeTreeAsString(node).c_str());
+    }
+#endif
   }
 
   return foundContext;
