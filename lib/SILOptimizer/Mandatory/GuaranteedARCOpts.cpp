@@ -143,9 +143,9 @@ bool GuaranteedARCOptsVisitor::visitStrongReleaseInst(StrongReleaseInst *SRI) {
     auto *Inst = &*II;
     ++II;
 
-    if (auto *SRA = dyn_cast<StrongRetainInst>(Inst)) {
-      if (SRA->getOperand() == Operand) {
-        SRA->eraseFromParent();
+    if (isa<StrongRetainInst>(Inst) || isa<RetainValueInst>(Inst)) {
+      if (Inst->getOperand(0) == Operand) {
+        Inst->eraseFromParent();
         SRI->eraseFromParent();
         NumInstsEliminated += 2;
         return true;
@@ -198,9 +198,9 @@ bool GuaranteedARCOptsVisitor::visitReleaseValueInst(ReleaseValueInst *RVI) {
     auto *Inst = &*II;
     ++II;
 
-    if (auto *SRA = dyn_cast<RetainValueInst>(Inst)) {
-      if (SRA->getOperand() == Operand) {
-        SRA->eraseFromParent();
+    if (isa<RetainValueInst>(Inst) || isa<StrongRetainInst>(Inst)) {
+      if (Inst->getOperand(0) == Operand) {
+        Inst->eraseFromParent();
         RVI->eraseFromParent();
         NumInstsEliminated += 2;
         return true;
