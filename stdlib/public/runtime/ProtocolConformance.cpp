@@ -646,6 +646,7 @@ swift::_forEachProtocolConformanceSectionAfter(
     for (auto *section = begin; section != end; section++) {
       f(section->Begin, section->End);
     }
+    *start = snapshot.Count;
   }
 }
 
