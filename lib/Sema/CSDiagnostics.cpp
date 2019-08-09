@@ -3078,6 +3078,15 @@ bool ExtraneousArgumentsFailure::diagnoseAsError() {
     return diagnoseSingleExtraArgument();
   }
 
+  if (ContextualType->getNumParams() == 0) {
+    if (auto argExpr = getArgumentExprFor(getRawAnchor())) {
+      emitDiagnostic(anchor->getLoc(), diag::extra_argument_to_nullary_call)
+          .highlight(argExpr->getSourceRange())
+          .fixItRemove(argExpr->getSourceRange());
+      return true;
+    }
+  }
+
   return false;
 }
 

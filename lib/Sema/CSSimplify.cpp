@@ -879,11 +879,11 @@ public:
     if (!CS.shouldAttemptFixes())
       return true;
 
-    // If alleged extraneous argument has a label, the problem
-    // should be diagnosed as non-matching arguments.
-    if (llvm::any_of(argIndices, [&](const unsigned idx) {
-          return Arguments[idx].hasLabel();
-        }))
+    // This fix is currently limited to situations where
+    // call expects no arguments but N where given. In the future,
+    // once more argument-to-parameter failures are ported, it
+    // could be extended to cover other cases.
+    if (!Parameters.empty())
       return true;
 
     SmallVector<std::pair<unsigned, AnyFunctionType::Param>, 4> extraneous;
@@ -1344,7 +1344,7 @@ static bool fixMissingArguments(ConstraintSystem &cs, Expr *anchor,
 
 static bool fixExtraneousArguments(ConstraintSystem &cs,
                                    FunctionType *contextualType,
-                                   SmallVectorImpl<AnyFunctionType::Param> &args,
+                                   ArrayRef<AnyFunctionType::Param> args,
                                    int numExtraneous,
                                    ConstraintLocatorBuilder locator) {
   auto AnyType = cs.getASTContext().TheAnyType;
@@ -1353,15 +1353,12 @@ static bool fixExtraneousArguments(ConstraintSystem &cs,
   auto argumentLocator =
       locator.withPathElement(ConstraintLocator::FunctionArgument);
 
-  do {
-    auto param = args.pop_back_val();
-    auto index = args.size();
-
-    extraneous.push_back({index, param});
-    cs.addConstraint(ConstraintKind::Defaultable, param.getPlainType(), AnyType,
-                     argumentLocator.withPathElement(
-                         LocatorPathElt::getTupleElement(index)));
-  } while (--numExtraneous);
+  for (unsigned i = args.size() - numExtraneous, n = args.size(); i != n; ++i) {
+    extraneous.push_back({i, args[i]});
+    cs.addConstraint(
+        ConstraintKind::Defaultable, args[i].getPlainType(), AnyType,
+        argumentLocator.withPathElement(LocatorPathElt::getTupleElement(i)));
+  }
 
   return cs.recordFix(RemoveExtraneousArguments::create(
       cs, contextualType, extraneous, cs.getConstraintLocator(locator)));
@@ -1584,10 +1581,22 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
                               abs(diff), locator))
         return getTypeMatchFailure(argumentLocator);
     } else {
+      // TODO(diagnostics): Currently this fix is limited to
+      // "call expects no arguments" situations, but in the
+      // future, when more argument to parameter conversion
+      // failures are ported, this limitation could be lifted.
+      if (!func2Params.empty())
+        return getTypeMatchFailure(argumentLocator);
+
       // If there are extraneous arguments, let's remove
       // them from the list.
       if (fixExtraneousArguments(*this, func2, func1Params, diff, locator))
         return getTypeMatchFailure(argumentLocator);
+
+      // Drop all of the extraneous arguments.
+      auto numParams = func2Params.size();
+      func1Params.erase(func1Params.begin() + numParams, func1Params.end());
+      assert(func1Params.empty());
     }
   }
 
@@ -3564,6 +3573,22 @@ ConstraintSystem::simplifyConstructionConstraint(
     return SolutionKind::Unsolved;
 
   case TypeKind::Tuple: {
+    // If this is an attempt to construct `Void` with arguments,
+    // let's diagnose it.
+    if (shouldAttemptFixes()) {
+      if (valueType->isVoid() && fnType->getNumParams() > 0) {
+        auto contextualType = FunctionType::get({}, fnType->getResult());
+        if (fixExtraneousArguments(
+                *this, contextualType, fnType->getParams(),
+                fnType->getNumParams(),
+                getConstraintLocator(locator,
+                                     ConstraintLocator::FunctionArgument)))
+          return SolutionKind::Error;
+
+        fnType = contextualType;
+      }
+    }
+
     // Tuple construction is simply tuple conversion.
     Type argType = AnyFunctionType::composeInput(getASTContext(),
                                                  fnType->getParams(),
