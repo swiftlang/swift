@@ -31,7 +31,6 @@
 #include "llvm/Option/Option.h"
 #include "llvm/Object/Archive.h"
 #include "llvm/Object/ObjectFile.h"
-#include "llvm/Object/COFF.h"
 #include "llvm/Object/ELFObjectFile.h"
 
 using namespace swift;

@@ -26,7 +26,7 @@ public class MyCls {
 
   // Allocating entry point is [serialized]
 
-  // CHECK-LABEL: sil [serialized] [ossa] @$s19inlinable_attribute5MyClsC14designatedInitACyt_tcfC : $@convention(method) (@thick MyCls.Type) -> @owned MyCls
+  // CHECK-LABEL: sil [serialized] [exact_self_class] [ossa] @$s19inlinable_attribute5MyClsC14designatedInitACyt_tcfC : $@convention(method) (@thick MyCls.Type) -> @owned MyCls
   public init(designatedInit: ()) {}
 
   // Note -- convenience init is intentionally not [serialized]

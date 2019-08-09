@@ -745,7 +745,8 @@ static void verifyGenericSignaturesIfNeeded(CompilerInvocation &Invocation,
 
 static void dumpAndPrintScopeMap(CompilerInvocation &Invocation,
                                  CompilerInstance &Instance, SourceFile *SF) {
-  const ASTScope &scope = SF->getScope();
+  // Not const because may require reexpansion
+  ASTScope &scope = SF->getScope();
 
   if (Invocation.getFrontendOptions().DumpScopeMapLocations.empty()) {
     llvm::errs() << "***Complete scope map***\n";
