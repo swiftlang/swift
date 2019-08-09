@@ -28,11 +28,11 @@
 #include "swift/Runtime/Mutex.h"
 #include "swift/Strings.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/StringExtras.h"
-#include "llvm/ADT/TinyPtrVector.h"
 #include "Private.h"
 #include "CompatibilityOverride.h"
 #include "ImageInspection.h"
@@ -205,7 +205,7 @@ struct TypeMetadataPrivateState {
   ConcurrentReadableArray<TypeMetadataSection> SectionsToScan;
   
   llvm::DenseMap<llvm::StringRef,
-                 llvm::TinyPtrVector<const ContextDescriptor *>>
+                 llvm::SmallDenseSet<const ContextDescriptor *, 1>>
     ContextDescriptorCache;
   size_t ConformanceDescriptorLastSectionScanned = 0;
   size_t TypeContextDescriptorLastSectionScanned = 0;
@@ -652,7 +652,7 @@ _scanAdditionalContextDescriptors(TypeMetadataPrivateState &T) {
           if (auto type = llvm::dyn_cast<TypeContextDescriptor>(ntd)) {
             auto identity = ParsedTypeIdentity::parse(type);
             auto name = identity.getABIName();
-            T.ContextDescriptorCache[name].push_back(type);
+            T.ContextDescriptorCache[name].insert(type);
           }
         }
       }
@@ -667,7 +667,7 @@ _scanAdditionalContextDescriptors(TypeMetadataPrivateState &T) {
         if (auto type = llvm::dyn_cast<TypeContextDescriptor>(ntd)) {
           auto identity = ParsedTypeIdentity::parse(type);
           auto name = identity.getABIName();
-          T.ContextDescriptorCache[name].push_back(type);
+          T.ContextDescriptorCache[name].insert(type);
         }
       }
     }
@@ -677,7 +677,7 @@ _scanAdditionalContextDescriptors(TypeMetadataPrivateState &T) {
 // Search for a ContextDescriptor in the context descriptor cache matching the
 // given demangle node. Returns the found node, or nullptr if no match was
 // found.
-static llvm::TinyPtrVector<const ContextDescriptor *>
+static llvm::SmallDenseSet<const ContextDescriptor *, 1>
 _findContextDescriptorInCache(TypeMetadataPrivateState &T,
                               Demangle::NodePointer node) {
   if (node->getNumChildren() < 2)
@@ -731,7 +731,7 @@ _findContextDescriptor(Demangle::NodePointer node,
 
   // Scan any newly loaded images for context descriptors, then try the context
   // descriptor cache. This must be done with the cache's lock held.
-  llvm::TinyPtrVector<const ContextDescriptor *> cachedContexts;
+  llvm::SmallDenseSet<const ContextDescriptor *, 1> cachedContexts;
   {
     ScopedLock guard(T.ContextDescriptorCacheLock);
     _scanAdditionalContextDescriptors(T);
