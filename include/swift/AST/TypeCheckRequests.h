@@ -178,6 +178,28 @@ public:
   void cacheResult(bool value) const;
 };
 
+void simple_display(llvm::raw_ostream &out, CtorInitializerKind initKind);
+
+/// Computes the kind of initializer for a given \c ConstructorDecl
+class InitKindRequest:
+    public SimpleRequest<InitKindRequest,
+                         CtorInitializerKind(ConstructorDecl *),
+                         CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<CtorInitializerKind>
+      evaluate(Evaluator &evaluator, ConstructorDecl *decl) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
 /// Determine whether the given protocol declaration is class-bounded.
 class ProtocolRequiresClassRequest:
     public SimpleRequest<ProtocolRequiresClassRequest,
@@ -647,6 +669,29 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Request the most optimal resilience expansion for the code in the context.
+class ResilienceExpansionRequest :
+    public SimpleRequest<ResilienceExpansionRequest,
+                         ResilienceExpansion(DeclContext*),
+                         CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<ResilienceExpansion> evaluate(Evaluator &eval,
+                                               DeclContext *context) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
+void simple_display(llvm::raw_ostream &out,
+                    const ResilienceExpansion &value);
+
 /// Request the custom attribute which attaches a function builder to the
 /// given declaration.
 class AttachedFunctionBuilderRequest :
@@ -884,6 +929,92 @@ public:
   bool isCached() const { return true; }
   Optional<StorageImplInfo> getCachedResult() const;
   void cacheResult(StorageImplInfo value) const;
+};
+
+class RequiresOpaqueAccessorsRequest :
+    public SimpleRequest<RequiresOpaqueAccessorsRequest,
+                         bool(VarDecl *),
+                         CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool>
+  evaluate(Evaluator &evaluator, VarDecl *decl) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<bool> getCachedResult() const;
+  void cacheResult(bool value) const;
+};
+
+class RequiresOpaqueModifyCoroutineRequest :
+    public SimpleRequest<RequiresOpaqueModifyCoroutineRequest,
+                         bool(AbstractStorageDecl *),
+                         CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool>
+  evaluate(Evaluator &evaluator, AbstractStorageDecl *decl) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<bool> getCachedResult() const;
+  void cacheResult(bool value) const;
+};
+
+class IsAccessorTransparentRequest :
+    public SimpleRequest<IsAccessorTransparentRequest,
+                         bool(AccessorDecl *),
+                         CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool>
+  evaluate(Evaluator &evaluator, AccessorDecl *decl) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<bool> getCachedResult() const;
+  void cacheResult(bool value) const;
+};
+
+class SynthesizeAccessorRequest :
+    public SimpleRequest<SynthesizeAccessorRequest,
+                         AccessorDecl *(AbstractStorageDecl *,
+                                        AccessorKind),
+                         CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<AccessorDecl *>
+  evaluate(Evaluator &evaluator, AbstractStorageDecl *decl,
+           AccessorKind kind) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<AccessorDecl *> getCachedResult() const;
+  void cacheResult(AccessorDecl *value) const;
 };
 
 // Allow AnyValue to compare two Type values, even though Type doesn't

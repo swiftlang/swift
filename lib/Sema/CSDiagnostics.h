@@ -750,12 +750,47 @@ private:
   void tryComputedPropertyFixIts(Expr *expr) const;
 };
 
+/// Diagnose mismatches relating to tuple destructuring.
+class TupleContextualFailure final : public ContextualFailure {
+public:
+  TupleContextualFailure(Expr *root, ConstraintSystem &cs, Type lhs, Type rhs,
+                         ConstraintLocator *locator)
+      : ContextualFailure(root, cs, lhs, rhs, locator) {}
+
+  bool diagnoseAsError() override;
+
+  bool isNumElementsMismatch() const {
+    auto lhsTy = getFromType()->castTo<TupleType>();
+    auto rhsTy = getToType()->castTo<TupleType>();
+    assert(lhsTy && rhsTy);
+    return lhsTy->getNumElements() != rhsTy->getNumElements();
+  }
+};
+
 /// Diagnose situations when @autoclosure argument is passed to @autoclosure
 /// parameter directly without calling it first.
 class AutoClosureForwardingFailure final : public FailureDiagnostic {
 public:
   AutoClosureForwardingFailure(ConstraintSystem &cs, ConstraintLocator *locator)
       : FailureDiagnostic(nullptr, cs, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose invalid pointer conversions for an autoclosure result type.
+///
+/// \code
+/// func foo(_ x: @autoclosure () -> UnsafePointer<Int>) {}
+///
+/// var i = 0
+/// foo(&i) // Invalid conversion to UnsafePointer
+/// \endcode
+class AutoClosurePointerConversionFailure final : public ContextualFailure {
+public:
+  AutoClosurePointerConversionFailure(Expr *root, ConstraintSystem &cs,
+                                      Type pointeeType, Type pointerType,
+                                      ConstraintLocator *locator)
+      : ContextualFailure(root, cs, pointeeType, pointerType, locator) {}
 
   bool diagnoseAsError() override;
 };
@@ -1419,7 +1454,9 @@ public:
 
   DeclContext *getDeclContext() const {
     auto *GP = Parameters.front();
-    return GP->getDecl()->getDeclContext();
+    auto *decl = GP->getDecl();
+
+    return decl ? decl->getDeclContext() : nullptr;
   }
 
   bool diagnoseAsError() override;

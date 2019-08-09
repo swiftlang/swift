@@ -3829,6 +3829,14 @@ OpaqueTypeArchetypeType::get(OpaqueTypeDecl *Decl,
   auto opaqueInterfaceTy = Decl->getUnderlyingInterfaceType();
   auto layout = signature->getLayoutConstraint(opaqueInterfaceTy);
   auto superclass = signature->getSuperclassBound(opaqueInterfaceTy);
+  #if !DO_IT_CORRECTLY
+    // Ad-hoc substitute the generic parameters of the superclass.
+    // If we correctly applied the substitutions to the generic signature
+    // constraints above, this would be unnecessary.
+    if (superclass && superclass->hasTypeParameter()) {
+      superclass = superclass.subst(Substitutions);
+    }
+  #endif
   SmallVector<ProtocolDecl*, 4> protos;
   for (auto proto : signature->getConformsTo(opaqueInterfaceTy)) {
     protos.push_back(proto);
@@ -4580,8 +4588,9 @@ CanGenericSignature ASTContext::getExistentialSignature(CanType existential,
   return genericSig;
 }
 
-GenericSignature *ASTContext::getOverrideGenericSignature(ValueDecl *base,
-                                                          ValueDecl *derived) {
+GenericSignature *
+ASTContext::getOverrideGenericSignature(const ValueDecl *base,
+                                        const ValueDecl *derived) {
   auto baseGenericCtx = base->getAsGenericContext();
   auto &ctx = base->getASTContext();
 
@@ -4680,6 +4689,23 @@ GenericSignature *ASTContext::getOverrideGenericSignature(ValueDecl *base,
   auto *genericSig = std::move(builder).computeGenericSignature(SourceLoc());
   getImpl().overrideSigCache.insert(std::make_pair(key, genericSig));
   return genericSig;
+}
+
+bool ASTContext::overrideGenericSignatureReqsSatisfied(
+    const ValueDecl *base, const ValueDecl *derived,
+    const OverrideGenericSignatureReqCheck direction) {
+  auto sig = getOverrideGenericSignature(base, derived);
+  if (!sig)
+    return true;
+
+  auto derivedSig = derived->getAsGenericContext()->getGenericSignature();
+
+  switch (direction) {
+  case OverrideGenericSignatureReqCheck::BaseReqSatisfiedByDerived:
+    return sig->requirementsNotSatisfiedBy(derivedSig).empty();
+  case OverrideGenericSignatureReqCheck::DerivedReqSatisfiedByBase:
+    return derivedSig->requirementsNotSatisfiedBy(sig).empty();
+  }
 }
 
 SILLayout *SILLayout::get(ASTContext &C,

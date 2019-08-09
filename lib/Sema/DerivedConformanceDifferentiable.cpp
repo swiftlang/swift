@@ -489,7 +489,7 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
     newMember->copyFormalAccessFrom(member, /*sourceIsParentContext*/ true);
     newMember->setValidationToChecked();
     newMember->setSetterAccess(member->getFormalAccess());
-    addExpectedOpaqueAccessorsToStorage(newMember, C);
+    addExpectedOpaqueAccessorsToStorage(newMember);
     C.addSynthesizedDecl(newMember);
     C.addSynthesizedDecl(memberBinding);
 
@@ -501,14 +501,16 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
     if (member->getEffectiveAccess() > AccessLevel::Internal &&
         !member->getAttrs().hasAttribute<DifferentiableAttr>()) {
       // If getter does not exist, trigger synthesis and compute type.
-      if (!member->getGetter())
-        addExpectedOpaqueAccessorsToStorage(member, C);
-      if (!member->getGetter()->hasInterfaceType())
-        TC.resolveDeclSignature(member->getGetter());
+      if (!member->getAccessor(AccessorKind::Get))
+        addExpectedOpaqueAccessorsToStorage(member);
+      if (!member->getAccessor(AccessorKind::Get)->hasInterfaceType())
+        TC.resolveDeclSignature(member->getAccessor(AccessorKind::Get));
       // If member or its getter already has a `@differentiable` attribute,
       // continue.
       if (member->getAttrs().hasAttribute<DifferentiableAttr>() ||
-          member->getGetter()->getAttrs().hasAttribute<DifferentiableAttr>())
+          member->getAccessor(AccessorKind::Get)
+              ->getAttrs()
+              .hasAttribute<DifferentiableAttr>())
         continue;
       ArrayRef<Requirement> requirements;
       // If the parent declaration context is an extension, the nominal type may
@@ -521,8 +523,9 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
           /*linear*/ false, {}, None, None, requirements);
       member->getAttrs().add(diffableAttr);
       // Compute getter parameter indices.
-      auto *getterType =
-          member->getGetter()->getInterfaceType()->castTo<AnyFunctionType>();
+      auto *getterType = member->getAccessor(AccessorKind::Get)
+                             ->getInterfaceType()
+                             ->castTo<AnyFunctionType>();
       AutoDiffParameterIndicesBuilder builder(getterType);
       builder.setParameter(0);
       diffableAttr->setParameterIndices(builder.build(C));

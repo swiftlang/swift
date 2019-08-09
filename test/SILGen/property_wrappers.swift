@@ -191,7 +191,7 @@ struct WrapperWithStorageValue<T> {
 
 struct UseWrapperWithStorageValue {
   // UseWrapperWithStorageValue._x.getter
-  // CHECK-LABEL: sil hidden [transparent] [ossa] @$s17property_wrappers26UseWrapperWithStorageValueV2$xAA0D0VySiGvg : $@convention(method) (UseWrapperWithStorageValue) -> Wrapper<Int>
+  // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers26UseWrapperWithStorageValueV2$xAA0D0VySiGvg : $@convention(method) (UseWrapperWithStorageValue) -> Wrapper<Int>
   // CHECK-NOT: return
   // CHECK: function_ref @$s17property_wrappers23WrapperWithStorageValueV09projectedF0AA0C0VyxGvg
   @WrapperWithStorageValue(wrappedValue: 17) var x: Int
@@ -408,7 +408,44 @@ class TestResilientDI {
   }
 }
 
+@propertyWrapper
+public struct PublicWrapper<T> {
+  public var wrappedValue: T
 
+  public init(value: T) {
+    wrappedValue = value
+  }
+}
+
+@propertyWrapper
+public struct PublicWrapperWithStorageValue<T> {
+  public var wrappedValue: T
+
+  public init(wrappedValue: T) {
+    self.wrappedValue = wrappedValue
+  }
+
+  public var projectedValue: PublicWrapper<T> {
+    return PublicWrapper(value: wrappedValue)
+  }
+}
+
+public class Container {
+  public init() {
+  }
+
+// The accessor cannot be serializable/transparent because it accesses an
+// internal var.
+// CHECK-LABEL: sil [ossa] @$s17property_wrappers9ContainerC10$dontCrashAA13PublicWrapperVySiGvg : $@convention(method) (@guaranteed Container) -> PublicWrapper<Int> {
+// CHECK: bb0(%0 : @guaranteed $Container):
+// CHECK:   ref_element_addr %0 : $Container, #Container._dontCrash
+  @PublicWrapperWithStorageValue(wrappedValue: 0) public var dontCrash : Int {
+    willSet {
+    }
+    didSet {
+    }
+  }
+}
 
 // CHECK-LABEL: sil_vtable ClassUsingWrapper {
 // CHECK-NEXT:  #ClassUsingWrapper.x!getter.1: (ClassUsingWrapper) -> () -> Int : @$s17property_wrappers17ClassUsingWrapperC1xSivg   // ClassUsingWrapper.x.getter

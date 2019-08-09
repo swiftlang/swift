@@ -105,7 +105,7 @@ TypeRelationCheckRequest::evaluate(Evaluator &evaluator,
   Optional<constraints::ConstraintKind> CKind;
   switch (Owner.Relation) {
   case TypeRelation::EqualTo:
-    return Owner.FirstType->isEqual(Owner.SecondType);
+    return Owner.Pair.FirstTy->isEqual(Owner.Pair.SecondTy);
   case TypeRelation::PossiblyEqualTo:
     CKind = constraints::ConstraintKind::Bind;
     break;
@@ -114,6 +114,31 @@ TypeRelationCheckRequest::evaluate(Evaluator &evaluator,
     break;
   }
   assert(CKind.hasValue());
-  return canSatisfy(Owner.FirstType, Owner.SecondType, Owner.OpenArchetypes,
+  return canSatisfy(Owner.Pair.FirstTy, Owner.Pair.SecondTy, Owner.OpenArchetypes,
                     *CKind, Owner.DC);
+}
+
+llvm::Expected<TypePair>
+RootAndResultTypeOfKeypathDynamicMemberRequest::evaluate(Evaluator &evaluator,
+                                              SubscriptDecl *subscript) const {
+  auto &TC = TypeChecker::createForContext(subscript->getASTContext());
+
+  if (!isValidKeyPathDynamicMemberLookup(subscript, TC))
+    return TypePair();
+
+  const auto *param = subscript->getIndices()->get(0);
+  auto keyPathType = param->getType()->getAs<BoundGenericType>();
+  if (!keyPathType)
+    return TypePair();
+  auto genericArgs = keyPathType->getGenericArgs();
+  assert(!genericArgs.empty() && genericArgs.size() == 2 &&
+         "invalid keypath dynamic member");
+  return TypePair(genericArgs[0], genericArgs[1]);
+}
+
+llvm::Expected<bool>
+HasDynamicMemberLookupAttributeRequest::evaluate(Evaluator &evaluator,
+                                                 TypeBase *ty) const {
+  llvm::DenseMap<CanType, bool> DynamicMemberLookupCache;
+  return hasDynamicMemberLookupAttribute(Type(ty), DynamicMemberLookupCache);
 }

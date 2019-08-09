@@ -303,8 +303,8 @@ enum E7: String {
 // CHECK8-NEXT: (CC.Type) -> (Int) -> CC
 // CHECK8-NEXT: $s1x11cursor_info2CCCSi_tcD
 // CHECK8-NEXT: <Container>$s11cursor_info2CCCD</Container>
-// CHECK8-NEXT: <Declaration>convenience init(x: <Type usr="s:Si">Int</Type>)</Declaration>
-// CHECK8-NEXT: <decl.function.constructor><syntaxtype.keyword>convenience</syntaxtype.keyword> <syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>x</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>
+// CHECK8-NEXT: <Declaration>init(x: <Type usr="s:Si">Int</Type>)</Declaration>
+// CHECK8-NEXT: <decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>x</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>
 
 // RUN: %sourcekitd-test -req=cursor -pos=23:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK9 %s
 // CHECK9:      source.lang.swift.decl.var.global (23:5-23:15)

@@ -22,7 +22,6 @@
     "StringObject.swift",
     "StringGuts.swift",
     "StringGutsSlice.swift",
-    "StringGutsVisitor.swift",
     "StringGraphemeBreaking.swift",
     "StringHashable.swift",
     "StringIndex.swift",

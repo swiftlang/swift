@@ -513,6 +513,7 @@ DerivedConformance::declareDerivedPropertyGetter(VarDecl *property,
     TypeLoc::withoutLoc(propertyInterfaceType), parentDC);
   getterDecl->setImplicit();
   getterDecl->setStatic(isStatic);
+  getterDecl->setIsTransparent(false);
 
   // Compute the interface type of the getter.
   if (auto env = parentDC->getGenericEnvironmentOfContext())

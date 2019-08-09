@@ -413,27 +413,38 @@ void ClangImporter::clearTypeResolver() {
 /// compiling for, and is not included in the resource directory with the other
 /// implicit module maps. It's at {freebsd|linux}/{arch}/glibc.modulemap.
 static Optional<StringRef>
-getGlibcModuleMapPath(StringRef resourceDir, llvm::Triple triple,
-                      SmallVectorImpl<char> &scratch) {
-  if (resourceDir.empty())
-    return None;
+getGlibcModuleMapPath(SearchPathOptions& Opts, llvm::Triple triple,
+                      SmallVectorImpl<char> &buffer) {
+  StringRef platform = swift::getPlatformNameForTriple(triple);
+  StringRef arch = swift::getMajorArchitectureName(triple);
 
-  scratch.append(resourceDir.begin(), resourceDir.end());
-  llvm::sys::path::append(
-      scratch,
-      swift::getPlatformNameForTriple(triple),
-      swift::getMajorArchitectureName(triple),
-      "glibc.modulemap");
+  if (!Opts.SDKPath.empty()) {
+    buffer.clear();
+    buffer.append(Opts.SDKPath.begin(), Opts.SDKPath.end());
+    llvm::sys::path::append(buffer, "usr", "lib", "swift");
+    llvm::sys::path::append(buffer, platform, arch, "glibc.modulemap");
 
-  // Only specify the module map if that file actually exists.
-  // It may not--for example in the case that
-  // `swiftc -target x86_64-unknown-linux-gnu -emit-ir` is invoked using
-  // a Swift compiler not built for Linux targets.
-  if (llvm::sys::fs::exists(scratch)) {
-    return StringRef(scratch.data(), scratch.size());
-  } else {
-    return None;
+    // Only specify the module map if that file actually exists.  It may not;
+    // for example in the case that `swiftc -target x86_64-unknown-linux-gnu
+    // -emit-ir` is invoked using a Swift compiler not built for Linux targets.
+    if (llvm::sys::fs::exists(buffer))
+      return StringRef(buffer.data(), buffer.size());
   }
+
+  if (!Opts.RuntimeResourcePath.empty()) {
+    buffer.clear();
+    buffer.append(Opts.RuntimeResourcePath.begin(),
+                  Opts.RuntimeResourcePath.end());
+    llvm::sys::path::append(buffer, platform, arch, "glibc.modulemap");
+
+    // Only specify the module map if that file actually exists.  It may not;
+    // for example in the case that `swiftc -target x86_64-unknown-linux-gnu
+    // -emit-ir` is invoked using a Swift compiler not built for Linux targets.
+    if (llvm::sys::fs::exists(buffer))
+      return StringRef(buffer.data(), buffer.size());
+  }
+
+  return None;
 }
 
 static void
@@ -606,9 +617,8 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
       }
     }
 
-    SmallString<128> GlibcModuleMapPath;
-    if (auto path = getGlibcModuleMapPath(searchPathOpts.RuntimeResourcePath,
-                                          triple, GlibcModuleMapPath)) {
+    SmallString<128> buffer;
+    if (auto path = getGlibcModuleMapPath(searchPathOpts, triple, buffer)) {
       invocationArgStrs.push_back((Twine("-fmodule-map-file=") + *path).str());
     } else {
       // FIXME: Emit a warning of some kind.
@@ -830,10 +840,15 @@ bool ClangImporter::canReadPCH(StringRef PCHFilename) {
   };
   ctx.InitBuiltinTypes(CI.getTarget());
 
+  auto failureCapabilities =
+    clang::ASTReader::ARR_Missing |
+    clang::ASTReader::ARR_OutOfDate |
+    clang::ASTReader::ARR_VersionMismatch;
+
   auto result = Reader->ReadAST(PCHFilename,
                   clang::serialization::MK_PCH,
                   clang::SourceLocation(),
-                  clang::ASTReader::ARR_None);
+                  failureCapabilities);
   switch (result) {
   case clang::ASTReader::Success:
     return true;
@@ -3668,7 +3683,7 @@ ClangImporter::Implementation::loadNamedMembers(
 
   clang::ASTContext &clangCtx = getClangASTContext();
 
-  assert(isa<clang::ObjCContainerDecl>(CD));
+  assert(isa<clang::ObjCContainerDecl>(CD) || isa<clang::NamespaceDecl>(CD));
 
   TinyPtrVector<ValueDecl *> Members;
   for (auto entry : table->lookup(SerializedSwiftName(N),

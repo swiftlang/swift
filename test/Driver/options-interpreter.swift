@@ -27,7 +27,8 @@
 // RUN: %swift_driver -### -target x86_64-apple-macosx10.9 -L/foo/ -L/bar/ %s | %FileCheck -check-prefix=CHECK-L2 %s
 // CHECK-L2: # DYLD_LIBRARY_PATH={{/foo/:/bar/:[^:]+/lib/swift/macosx$}}
 
-// RUN: env DYLD_LIBRARY_PATH=/abc/ SDKROOT=/sdkroot %swift_driver_plain -### -target x86_64-apple-macosx10.9 -L/foo/ -L/bar/ %s | %FileCheck -check-prefix=CHECK-L2-ENV %s
+// RUN: env DYLD_LIBRARY_PATH=/abc/ SDKROOT=/sdkroot %swift_driver_plain -### -target x86_64-apple-macosx10.9 -L/foo/ -L/bar/ %s 2>&1 | %FileCheck -check-prefix=CHECK-L2-ENV %s 
+// CHECK-L2-ENV: warning: unable to find Objective-C runtime support library 'arclite'; pass '-no-link-objc-runtime' to silence this warning
 // CHECK-L2-ENV: # DYLD_LIBRARY_PATH={{/foo/:/bar/:[^:]+/lib/swift/macosx:/sdkroot/usr/lib/swift:/abc/$}}
 
 // RUN: %swift_driver -### -target x86_64-apple-macosx10.9 %s | %FileCheck -check-prefix=CHECK-NO-FRAMEWORKS %s
@@ -51,7 +52,8 @@
 // CHECK-F2-ENV: #
 // CHECK-F2-ENV: DYLD_FRAMEWORK_PATH=/foo/:/bar/:/abc/{{$}}
 
-// RUN: env DYLD_FRAMEWORK_PATH=/abc/ SDKROOT=/sdkroot %swift_driver_plain -### -target x86_64-apple-macosx10.9 -F/foo/ -F/bar/ -L/foo2/ -L/bar2/ %s | %FileCheck -check-prefix=CHECK-COMPLEX %s
+// RUN: env DYLD_FRAMEWORK_PATH=/abc/ SDKROOT=/sdkroot %swift_driver_plain -### -target x86_64-apple-macosx10.9 -F/foo/ -F/bar/ -L/foo2/ -L/bar2/ %s 2>&1 | %FileCheck -check-prefix=CHECK-COMPLEX %s
+// CHECK-COMPLEX: warning: unable to find Objective-C runtime support library 'arclite'; pass '-no-link-objc-runtime' to silence this warning
 // CHECK-COMPLEX: -F /foo/
 // CHECK-COMPLEX: -F /bar/
 // CHECK-COMPLEX: #

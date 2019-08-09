@@ -2089,6 +2089,11 @@ void Remangler::mangleTypeMetadataCompletionFunction(Node *node) {
   Buffer << "Mr";
 }
 
+void Remangler::mangleTypeMetadataDemanglingCache(Node *node) {
+  mangleChildNodes(node);
+  Buffer << "MD";
+}
+
 void Remangler::mangleTypeMetadataLazyCache(Node *node) {
   mangleChildNodes(node);
   Buffer << "ML";

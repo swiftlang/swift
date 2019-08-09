@@ -388,7 +388,7 @@ deriveRingProperty(DerivedConformance &derived, Identifier propertyName,
   auto *getterDecl =
       derived.addGetterToReadOnlyDerivedProperty(propDecl, returnTy);
   getterDecl->setBodySynthesizer(bodySynthesizer.Fn, bodySynthesizer.Context);
-  derived.addMembersToConformanceContext({getterDecl, propDecl, pbDecl});
+  derived.addMembersToConformanceContext({propDecl, pbDecl});
 
   return propDecl;
 }
