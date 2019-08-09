@@ -308,6 +308,9 @@ void CompilerInstance::setUpDiagnosticOptions() {
   if (Invocation.getDiagnosticOptions().WarningsAsErrors) {
     Diagnostics.setWarningsAsErrors(true);
   }
+  if (Invocation.getDiagnosticOptions().PrintDiagnosticNames) {
+    Diagnostics.setPrintDiagnosticNames(true);
+  }
 }
 
 bool CompilerInstance::setUpModuleLoaders() {
