@@ -637,11 +637,11 @@ _scanAdditionalContextDescriptors(TypeMetadataPrivateState &T) {
 // Search for a ContextDescriptor in the context descriptor cache matching the
 // given demangle node. Returns the found node, or nullptr if no match was
 // found.
-static const ContextDescriptor *
+static llvm::TinyPtrVector<const ContextDescriptor *>
 _findContextDescriptorInCache(TypeMetadataPrivateState &T,
                               Demangle::NodePointer node) {
   if (node->getNumChildren() < 2)
-    return nullptr;
+    return { };
 
   auto nameNode = node->getChild(1);
 
@@ -651,21 +651,15 @@ _findContextDescriptorInCache(TypeMetadataPrivateState &T,
     nameNode = nameNode->getChild(1);
 
   if (nameNode->getKind() != Demangle::Node::Kind::Identifier)
-    return nullptr;
+    return { };
 
   auto name = nameNode->getText();
   
   auto iter = T.ContextDescriptorCache.find(name);
   if (iter == T.ContextDescriptorCache.end())
-    return nullptr;
-  
-  for (auto *contextDescriptor : iter->getSecond()) {
-    if (_contextDescriptorMatchesMangling(contextDescriptor, node)) {
-      return contextDescriptor;
-    }
-  }
-  
-  return nullptr;
+    return { };
+
+  return iter->getSecond();
 }
 
 static const ContextDescriptor *
@@ -697,10 +691,18 @@ _findContextDescriptor(Demangle::NodePointer node,
 
   // Scan any newly loaded images for context descriptors, then try the context
   // descriptor cache. This must be done with the cache's lock held.
+  llvm::TinyPtrVector<const ContextDescriptor *> cachedContexts;
   {
     ScopedLock guard(T.ContextDescriptorCacheLock);
     _scanAdditionalContextDescriptors(T);
-    foundContext = _findContextDescriptorInCache(T, node);
+    cachedContexts = _findContextDescriptorInCache(T, node);
+  }
+
+  for (auto cachedContext : cachedContexts) {
+    if (_contextDescriptorMatchesMangling(cachedContext, node)) {
+      foundContext = cachedContext;
+      break;
+    }
   }
 
   // Check type metadata records
