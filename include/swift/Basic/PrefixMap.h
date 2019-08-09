@@ -66,8 +66,7 @@ public:
 private:
   template <typename T>
   union UninitializedStorage {
-    LLVM_ALIGNAS(alignof(T))
-    char Storage[sizeof(T)];
+    alignas(T) char Storage[sizeof(T)];
 
     template <typename... A>
     void emplace(A && ...value) {

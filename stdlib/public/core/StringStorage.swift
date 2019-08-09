@@ -16,7 +16,7 @@ import SwiftShims
 // want.
 #if _runtime(_ObjC)
 
-internal protocol _AbstractStringStorage : _NSCopying {
+internal protocol _AbstractStringStorage: _NSCopying {
   var asString: String { get }
   var count: Int { get }
   var isASCII: Bool { get }

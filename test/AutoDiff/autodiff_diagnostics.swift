@@ -170,29 +170,76 @@ struct TF_305 : Differentiable {
   }
 }
 
+// TF-676: Test differentiation of protocol requirement with multiple
+// `@differentiable` attributes.
+protocol MultipleDiffAttrsProto : Differentiable {
+  @differentiable(wrt: (self, x))
+  @differentiable(wrt: x)
+  func f(_ x: Float) -> Float
+}
+func testMultipleDiffAttrsProto<P: MultipleDiffAttrsProto>(_ p: P, _ x: Float) {
+  _ = gradient(at: p, x) { p, x in p.f(x) }
+  _ = gradient(at: x) { x in p.f(x) }
+}
+
+// TF-676: Test differentiation of class method with multiple `@differentiable`
+// attributes.
+class MultipleDiffAttrsClass : Differentiable {
+  @differentiable(wrt: (self, x))
+  @differentiable(wrt: x)
+  func f(_ x: Float) -> Float { x }
+}
+func testMultipleDiffAttrsClass<C: MultipleDiffAttrsClass>(_ c: C, _ x: Float) {
+  // TODO(TF-647): Handle differentiation of `upcast` instruction.
+  // expected-error @+2 {{function is not differentiable}}
+  // expected-note @+1 {{expression is not differentiable}}
+  _ = gradient(at: c, x) { c, x in c.f(x) }
+  _ = gradient(at: x) { x in c.f(x) }
+}
+
 //===----------------------------------------------------------------------===//
-// Classes and existentials (not yet supported)
+// Classes
 //===----------------------------------------------------------------------===//
 
-class Foo {
-  // FIXME: Figure out why diagnostics for direct references end up here, and
-  // why they are duplicated.
-  // expected-error @+2 2 {{expression is not differentiable}}
-  // expected-note @+1 2 {{differentiating class members is not yet supported}}
-  func class_method(_ x: Float) -> Float {
+class Foo : Differentiable {
+  @differentiable
+  // expected-note @+1 {{cannot convert a direct method reference to a '@differentiable' function; use an explicit closure instead}}
+  func method(_ x: Float) -> Float {
     return x
+  }
+
+  // Not marked with `@differentiable`.
+  func method2(_ x: Float) -> Float {
+    return x
+  }
+
+  var base: Float = 1
+
+  // TODO(TF-645): Remove when differentiation supports `ref_element_addr`.
+  @differentiable
+  func usesRefElementAddr(_ x: Float) -> Float {
+    // expected-error @+2 {{expression is not differentiable}}
+    // expected-note @+1 {{member is not differentiable because the corresponding class member is not '@differentiable'}}
+    return base * x
   }
 }
 
-// Nested call case.
 @differentiable
-func triesToDifferentiateClassMethod(x: Float) -> Float {
-  // expected-error @+2 {{expression is not differentiable}}
-  // expected-note @+1 {{differentiating class members is not yet supported}}
-  return Foo().class_method(x)
+func differentiateClassMethod(x: Float) -> Float {
+  return Foo().method(x)
 }
 
-let _: @differentiable (Float) -> Float = Foo().class_method
+@differentiable
+func differentiateClassMethod2(x: Float) -> Float {
+  // expected-error @+2 {{expression is not differentiable}}
+  // expected-note @+1 {{member is not differentiable because the corresponding class member is not '@differentiable'}}
+  return Foo().method2(x)
+}
+
+let _: @differentiable (Float) -> Float = Foo().method
+
+// expected-error @+1 {{function is not differentiable}}
+_ = gradient(at: .zero, in: Foo().method)
 
 //===----------------------------------------------------------------------===//
 // Unreachable
@@ -204,6 +251,10 @@ let no_return: @differentiable (Float) -> Float = { x in
 // expected-error @+2 {{missing return in a closure expected to return 'Float'}}
 // expected-note @+1 {{missing return for differentiation}}
 }
+
+//===----------------------------------------------------------------------===//
+// Non-differentiable arguments and results
+//===----------------------------------------------------------------------===//
 
 // expected-error @+1 {{function is not differentiable}}
 @differentiable
@@ -257,3 +308,14 @@ func nondiff(_ f: @differentiable (Float, @nondiff Float) -> Float) -> Float {
   // expected-error @+1 {{function is not differentiable}}
   return gradient(at: 2) { x in f(x * x, x) }
 }
+
+// Test parameter subset thunk + partially-applied original function.
+struct TF_675 : Differentiable {
+  @differentiable
+  // expected-note @+1 {{cannot convert a direct method reference to a '@differentiable' function; use an explicit closure instead}}
+  func method(_ x: Float) -> Float {
+    return x
+  }
+}
+// expected-error @+1 {{function is not differentiable}}
+let _: @differentiable (Float) -> Float = TF_675().method

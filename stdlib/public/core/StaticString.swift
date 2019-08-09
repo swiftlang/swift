@@ -94,6 +94,11 @@ public struct StaticString
     return Int(_utf8CodeUnitCount)
   }
 
+  @_alwaysEmitIntoClient @_transparent
+  internal var unsafeRawPointer: Builtin.RawPointer {
+    return Builtin.inttoptr_Word(_startPtrOrData)
+  }
+
   /// A Boolean value indicating whether the static string stores a pointer to
   /// ASCII or UTF-8 code units.
   @_transparent

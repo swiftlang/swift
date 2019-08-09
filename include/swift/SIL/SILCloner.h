@@ -512,8 +512,8 @@ public:
     // resolve the type mismatch between SILArgument* and SILValue.
     SmallVector<SILValue, 8> entryArgs;
     entryArgs.reserve(newF->getArguments().size());
-    transform(newF->getArguments(), std::back_inserter(entryArgs),
-              [](SILArgument *arg) -> SILValue { return arg; });
+    llvm::transform(newF->getArguments(), std::back_inserter(entryArgs),
+                    [](SILArgument *arg) -> SILValue { return arg; });
 
     SuperTy::cloneFunctionBody(origF, newEntryBB, entryArgs);
   }
@@ -2479,7 +2479,8 @@ SILCloner<ImplClass>::visitCondFailInst(CondFailInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(
       Inst, getBuilder().createCondFail(getOpLocation(Inst->getLoc()),
-                                        getOpValue(Inst->getOperand())));
+                                        getOpValue(Inst->getOperand()),
+                                        Inst->getMessage()));
 }
 
 template<typename ImplClass>

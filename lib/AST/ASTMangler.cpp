@@ -369,6 +369,52 @@ std::string ASTMangler::mangleReabstractionThunkHelper(
   return finalize();
 }
 
+std::string ASTMangler::mangleAutoDiffAssociatedFunctionHelper(
+    StringRef name, AutoDiffAssociatedFunctionKind kind,
+    const SILAutoDiffIndices &indices) {
+  // TODO(TF-20): Make the mangling scheme robust.
+  // TODO(TF-680): Mangle `@differentiable` atttribute requirements as well.
+  beginManglingWithoutPrefix();
+
+  Buffer << "AD__" << name << '_';
+  switch (kind) {
+  case AutoDiffAssociatedFunctionKind::JVP:
+    Buffer << "_jvp_";
+    break;
+  case AutoDiffAssociatedFunctionKind::VJP:
+    Buffer << "_vjp_";
+    break;
+  }
+  Buffer << indices.mangle();
+
+  auto result = Storage.str().str();
+  Storage.clear();
+  return result;
+}
+
+std::string ASTMangler::mangleAutoDiffLinearMapHelper(
+    StringRef name, AutoDiffLinearMapKind kind,
+    const SILAutoDiffIndices &indices) {
+  // TODO(TF-20): Make the mangling scheme robust.
+  // TODO(TF-680): Mangle `@differentiable` atttribute requirements as well.
+  beginManglingWithoutPrefix();
+
+  Buffer << "AD__" << name << '_';
+  switch (kind) {
+  case AutoDiffLinearMapKind::Differential:
+    Buffer << "_differential_";
+    break;
+  case AutoDiffLinearMapKind::Pullback:
+    Buffer << "_pullback_";
+    break;
+  }
+  Buffer << indices.mangle();
+
+  auto result = Storage.str().str();
+  Storage.clear();
+  return result;
+}
+
 std::string ASTMangler::mangleTypeForDebugger(Type Ty, const DeclContext *DC) {
   PrettyStackTraceType prettyStackTrace(Ty->getASTContext(),
                                         "mangling type for debugger", Ty);
@@ -1232,8 +1278,11 @@ void ASTMangler::appendBoundGenericArgs(Type type, bool &isFirstArgList) {
   } else {
     auto boundType = cast<BoundGenericType>(typePtr);
     genericArgs = boundType->getGenericArgs();
-    if (Type parent = boundType->getParent())
-      appendBoundGenericArgs(parent->getDesugaredType(), isFirstArgList);
+    if (Type parent = boundType->getParent()) {
+      GenericTypeDecl *decl = boundType->getAnyGeneric();
+      if (!getSpecialManglingContext(decl, UseObjCProtocolNames))
+        appendBoundGenericArgs(parent->getDesugaredType(), isFirstArgList);
+    }
   }
   if (isFirstArgList) {
     appendOperator("y");
@@ -1486,16 +1535,11 @@ ASTMangler::getSpecialManglingContext(const ValueDecl *decl,
       else
         hasNameForLinkage = !clangDecl->getDeclName().isEmpty();
       if (hasNameForLinkage) {
-        if (!decl->getASTContext().LangOpts.EnableCXXInterop) {
-          // TODO: Mangle namespaces into these ObjC names.
-          // TODO: https://bugs.swift.org/browse/TF-560
-          // Skip checks for c++ interop. This doesn't mangle the names right
-          // though.
-          auto *clangDC = clangDecl->getDeclContext();
-          assert(clangDC->getRedeclContext()->isTranslationUnit() &&
-                 "non-top-level Clang types not supported yet");
-          (void)clangDC;
-        }
+        auto *clangDC = clangDecl->getDeclContext();
+        if (isa<clang::NamespaceDecl>(clangDC)) return None;
+        assert(clangDC->getRedeclContext()->isTranslationUnit() &&
+               "non-top-level Clang types not supported yet");
+        (void)clangDC;
         return ASTMangler::ObjCContext;
       }
     }
@@ -1835,6 +1879,10 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl) {
     } else if (isa<clang::TypedefNameDecl>(namedDecl) ||
                isa<clang::ObjCCompatibleAliasDecl>(namedDecl)) {
       appendOperator("a");
+    } else if (isa<clang::NamespaceDecl>(namedDecl)) {
+      // Note: Namespaces are not really structs, but since namespaces are
+      // imported as enums, be consistent.
+      appendOperator("V");
     } else {
       llvm_unreachable("unknown imported Clang type");
     }

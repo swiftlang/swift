@@ -77,7 +77,7 @@ public struct ${Self} {
   }
 }
 
-extension ${Self} : CustomStringConvertible {
+extension ${Self}: CustomStringConvertible {
   /// A textual representation of the value.
   public var description: String {
     if isNaN {
@@ -92,7 +92,7 @@ extension ${Self} : CustomStringConvertible {
   }
 }
 
-extension ${Self} : CustomDebugStringConvertible {
+extension ${Self}: CustomDebugStringConvertible {
   /// A textual representation of the value, suitable for debugging.
   public var debugDescription: String {
     var (buffer, length) = _float${bits}ToString(self, debug: true)
@@ -103,8 +103,8 @@ extension ${Self} : CustomDebugStringConvertible {
   }
 }
 
-extension ${Self} : TextOutputStreamable {
-  public func write<Target>(to target: inout Target) where Target : TextOutputStream {
+extension ${Self}: TextOutputStreamable {
+  public func write<Target>(to target: inout Target) where Target: TextOutputStream {
     var (buffer, length) = _float${bits}ToString(self, debug: true)
     buffer.withBytes { (bufferPtr) in
       let bufPtr = UnsafeBufferPointer(start: bufferPtr, count: length)
@@ -786,7 +786,7 @@ extension ${Self}: BinaryFloatingPoint {
   /// is defined as follows:
   ///
   /// - If `x` is zero, then `x.significand` is 0.0.
-  /// - If `x` is infinity, then `x.significand` is 1.0.
+  /// - If `x` is infinite, then `x.significand` is infinity.
   /// - If `x` is NaN, then `x.significand` is NaN.
   /// - Note: The significand is frequently also called the *mantissa*, but
   ///   significand is the preferred terminology in the [IEEE 754
@@ -1472,7 +1472,7 @@ extension ${Self}: BinaryFloatingPoint {
   }
 }
 
-extension ${Self} : _ExpressibleByBuiltinIntegerLiteral, ExpressibleByIntegerLiteral {
+extension ${Self}: _ExpressibleByBuiltinIntegerLiteral, ExpressibleByIntegerLiteral {
   @_transparent
   public
   init(_builtinIntegerLiteral value: Builtin.IntLiteral){
@@ -1503,7 +1503,7 @@ extension ${Self} : _ExpressibleByBuiltinIntegerLiteral, ExpressibleByIntegerLit
 % end
 
 % builtinFloatLiteralBits = 80
-extension ${Self} : _ExpressibleByBuiltinFloatLiteral {
+extension ${Self}: _ExpressibleByBuiltinFloatLiteral {
   @_transparent
   public
   init(_builtinFloatLiteral value: Builtin.FPIEEE${builtinFloatLiteralBits}) {
@@ -1522,7 +1522,7 @@ extension ${Self} : _ExpressibleByBuiltinFloatLiteral {
 #else
 
 % builtinFloatLiteralBits = 64
-extension ${Self} : _ExpressibleByBuiltinFloatLiteral {
+extension ${Self}: _ExpressibleByBuiltinFloatLiteral {
   @_transparent
   public
   init(_builtinFloatLiteral value: Builtin.FPIEEE${builtinFloatLiteralBits}) {
@@ -1541,7 +1541,7 @@ extension ${Self} : _ExpressibleByBuiltinFloatLiteral {
 #endif
 % end
 
-extension ${Self} : Hashable {
+extension ${Self}: Hashable {
   /// Hashes the essential components of this value by feeding them into the
   /// given hasher.
   ///
@@ -1665,7 +1665,7 @@ extension ${Self} {
   // falling back on the generic _convert operation otherwise.
   @inlinable // FIXME(inline-always)
   @inline(__always)
-  public init<Source : BinaryInteger>(_ value: Source) {
+  public init<Source: BinaryInteger>(_ value: Source) {
     if value.bitWidth <= ${word_bits} {
       if Source.isSigned {
         let asInt = Int(truncatingIfNeeded: value)
@@ -1874,7 +1874,7 @@ extension ${Self} {
 // Strideable Conformance
 //===----------------------------------------------------------------------===//
 
-extension ${Self} : Strideable {
+extension ${Self}: Strideable {
   /// Returns the distance from this value to the specified value.
   ///
   /// For two values `x` and `y`, the result of `x.distance(to: y)` is equal to
@@ -1951,7 +1951,6 @@ extension ${Self} : VectorProtocol {
 
 extension ${Self} : Differentiable {
   public typealias TangentVector = ${Self}
-  public typealias AllDifferentiableVariables = ${Self}
 
   public mutating func move(along direction: TangentVector) {
     self += direction
@@ -2064,14 +2063,14 @@ public struct ${Self} {
 @_transparent
 @available(*, unavailable,
   message: "For floating point numbers use truncatingRemainder instead")
-public func % <T : BinaryFloatingPoint>(lhs: T, rhs: T) -> T {
+public func % <T: BinaryFloatingPoint>(lhs: T, rhs: T) -> T {
   fatalError("% is not available.")
 }
 
 @_transparent
 @available(*, unavailable,
   message: "For floating point numbers use formTruncatingRemainder instead")
-public func %= <T : BinaryFloatingPoint> (lhs: inout T, rhs: T) {
+public func %= <T: BinaryFloatingPoint> (lhs: inout T, rhs: T) {
   fatalError("%= is not available.")
 }
 

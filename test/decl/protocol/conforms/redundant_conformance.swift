@@ -65,3 +65,24 @@ extension OtherGenericConditionalConformsToP: P1 {
     typealias A = Double
     func f() -> Double { return 0.0 }
 }
+
+// FB6114209: spurious ambiguity errors
+protocol MyUsefulProtocol {
+  var someInt: Int { get }
+}
+
+class Class1 {
+  typealias ProviderOne = MyUsefulProtocol
+}
+
+class Class2 {
+  typealias ProviderTwo = MyUsefulProtocol
+}
+
+class Class3 {
+  typealias ProviderThree = Class1.ProviderOne & Class2.ProviderTwo
+}
+
+class SomeMockClass: Class3.ProviderThree { // okay
+  var someInt: Int = 5
+}

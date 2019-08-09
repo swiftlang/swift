@@ -21,18 +21,18 @@ public protocol StringProtocol
   Hashable, Comparable
   where Iterator.Element == Character,
         Index == String.Index,
-        SubSequence : StringProtocol,
+        SubSequence: StringProtocol,
         StringInterpolation == DefaultStringInterpolation
 {
-  associatedtype UTF8View : /*Bidirectional*/Collection
+  associatedtype UTF8View: /*Bidirectional*/Collection
   where UTF8View.Element == UInt8, // Unicode.UTF8.CodeUnit
         UTF8View.Index == Index
 
-  associatedtype UTF16View : BidirectionalCollection
+  associatedtype UTF16View: BidirectionalCollection
   where UTF16View.Element == UInt16, // Unicode.UTF16.CodeUnit
         UTF16View.Index == Index
 
-  associatedtype UnicodeScalarView : BidirectionalCollection
+  associatedtype UnicodeScalarView: BidirectionalCollection
   where UnicodeScalarView.Element == Unicode.Scalar,
         UnicodeScalarView.Index == Index
 

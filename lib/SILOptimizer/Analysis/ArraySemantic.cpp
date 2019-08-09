@@ -746,7 +746,7 @@ bool swift::ArraySemanticsCall::replaceByAppendingValues(
     StructType *IntType =
       ReserveFnTy->getParameters()[0].getType()->castTo<StructType>();
     StructDecl *IntDecl = IntType->getDecl();
-    VarDecl *field = *IntDecl->getStoredProperties().begin();
+    VarDecl *field = IntDecl->getStoredProperties()[0];
     SILType BuiltinIntTy =SILType::getPrimitiveObjectType(
                                field->getInterfaceType()->getCanonicalType());
     IntegerLiteralInst *CapacityLiteral =

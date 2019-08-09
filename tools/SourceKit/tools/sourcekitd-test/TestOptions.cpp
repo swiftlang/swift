@@ -353,25 +353,6 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
       }
       break;
 
-    case OPT_vfs_files:
-#ifdef SWIFT_SOURCEKIT_USE_INPROC_LIBRARY
-      for (const char *VFSFile : InputArg->getValues()) {
-        auto NameAndTarget = StringRef(VFSFile).split('=');
-        VFSFiles.try_emplace(std::get<0>(NameAndTarget),
-                             std::get<1>(NameAndTarget).str());
-      }
-      break;
-#else
-      // The -vfs-files option operates by making a function call to a function
-      // defined in the SourceKit InProc library
-      // (SourceKit::setGlobalFileSystemProvider). So this option only works
-      // when sourcekitd-test is compiled using that library. It does not work
-      // when sourcekitd-test uses the XPC library.
-      llvm::errs() << "vfs-files only supported when "
-                      "SWIFT_SOURCEKIT_USE_INPROC_LIBRARY is set";
-      return true;
-#endif
-
     // SWIFT_ENABLE_TENSORFLOW
     case OPT_in_memory_clang_module_cache:
 #ifdef SWIFT_SOURCEKIT_USE_INPROC_LIBRARY
@@ -387,6 +368,20 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
                       "SWIFT_SOURCEKIT_USE_INPROC_LIBRARY is set";
       return true;
 #endif
+
+    case OPT_vfs_files:
+      VFSName = VFSName.getValueOr("in-memory-vfs");
+      for (const char *vfsFile : InputArg->getValues()) {
+        StringRef name, target;
+        std::tie(name, target) = StringRef(vfsFile).split('=');
+        bool passAsSourceText = target.consume_front("@");
+        VFSFiles.try_emplace(name, VFSFile(target.str(), passAsSourceText));
+      }
+      break;
+
+    case OPT_vfs_name:
+      VFSName = InputArg->getValue();
+      break;
 
     case OPT_UNKNOWN:
       llvm::errs() << "error: unknown argument: "

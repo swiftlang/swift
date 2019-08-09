@@ -968,19 +968,16 @@ namespace {
       }
 
       switch (P->getSpecifier()) {
-      case VarDecl::Specifier::Let:
+      case ParamDecl::Specifier::Default:
         /* nothing */
         break;
-      case VarDecl::Specifier::Var:
-        OS << " mutable";
-        break;
-      case VarDecl::Specifier::InOut:
+      case ParamDecl::Specifier::InOut:
         OS << " inout";
         break;
-      case VarDecl::Specifier::Shared:
+      case ParamDecl::Specifier::Shared:
         OS << " shared";
         break;
-      case VarDecl::Specifier::Owned:
+      case ParamDecl::Specifier::Owned:
         OS << " owned";
         break;
       }
@@ -1949,9 +1946,13 @@ public:
     PrintWithColorRAII(OS, LiteralValueColor)
       << " literal_capacity="
       << E->getLiteralCapacity() << " interpolation_count="
-      << E->getInterpolationCount() << '\n';
+      << E->getInterpolationCount();
+    PrintWithColorRAII(OS, LiteralValueColor) << " builder_init=";
+    E->getBuilderInit().dump(PrintWithColorRAII(OS, LiteralValueColor).getOS());
+    PrintWithColorRAII(OS, LiteralValueColor) << " result_init=";
+    E->getResultInit().dump(PrintWithColorRAII(OS, LiteralValueColor).getOS());
+    OS << "\n";
     printRec(E->getAppendingExpr());
-    printSemanticExpr(E->getSemanticExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   void visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E) {
@@ -1977,8 +1978,28 @@ public:
     printArgumentLabels(E->getArgumentLabels());
     OS << "\n";
     printRec(E->getArg());
-    printSemanticExpr(E->getSemanticExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
+  void visitQuoteLiteralExpr(QuoteLiteralExpr *E) {
+    printCommon(E, "quote_literal");
+    OS << "\n";
+    printRec(E->getSubExpr());
+    printSemanticExpr(E->getSemanticExpr());
+  }
+
+  void visitUnquoteExpr(UnquoteExpr *E) {
+    printCommon(E, "unquote");
+    OS << "\n";
+    printRec(E->getSubExpr());
+  }
+
+  void visitDeclQuoteExpr(DeclQuoteExpr *E) {
+    printCommon(E, "decl_quote");
+    PrintWithColorRAII(OS, DeclColor) << " decl=";
+    printDeclRef(ConcreteDeclRef(E->getQuotedDecl()));
+    OS << "\n";
+    printSemanticExpr(E->getSemanticExpr());
   }
 
   void visitDiscardAssignmentExpr(DiscardAssignmentExpr *E) {
@@ -2442,9 +2463,12 @@ public:
     }
     // Printing a function type doesn't indicate whether it's escaping because it doesn't 
     // matter in 99% of contexts. AbstractClosureExpr nodes are one of the only exceptions.
-    if (auto Ty = GetTypeOfExpr(E))
-      if (!Ty->getAs<AnyFunctionType>()->getExtInfo().isNoEscape())
-        PrintWithColorRAII(OS, ClosureModifierColor) << " escaping";
+    if (auto Ty = GetTypeOfExpr(E)) {
+      if (auto fType = Ty->getAs<AnyFunctionType>()) {
+        if (!fType->getExtInfo().isNoEscape())
+          PrintWithColorRAII(OS, ClosureModifierColor) << " escaping";
+      }
+    }
 
     return OS;
   }
@@ -2985,6 +3009,13 @@ public:
     printCommon("type_owned") << '\n';
     printRec(T->getBase());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
+  void visitFixedTypeRepr(FixedTypeRepr *T) {
+    printCommon("fixed_type");
+    PrintWithColorRAII(OS, TypeColor) << " type='";
+    T->getType().print(PrintWithColorRAII(OS, TypeColor).getOS());
+    PrintWithColorRAII(OS, TypeColor) << "'";
   }
 };
 

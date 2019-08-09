@@ -189,6 +189,15 @@ bool CompilerInstance::setUpASTContextIfNeeded() {
                                 Diagnostics));
   registerTypeCheckerRequestFunctions(Context->evaluator);
 
+  // Migrator, indexing and typo correction need some IDE requests.
+  // The integrated REPL needs IDE requests for completion.
+  if (Invocation.getMigratorOptions().shouldRunMigrator() ||
+      !Invocation.getFrontendOptions().IndexStorePath.empty() ||
+      Invocation.getLangOptions().TypoCorrectionLimit ||
+      Invocation.getFrontendOptions().RequestedAction ==
+          FrontendOptions::ActionType::REPL) {
+    registerIDERequestFunctions(Context->evaluator);
+  }
   if (setUpModuleLoaders())
     return true;
 

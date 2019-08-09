@@ -1,10 +1,6 @@
 // SWIFT_ENABLE_TENSORFLOW
 // RUN: %target-swift-frontend -typecheck -verify -primary-file %s %S/Inputs/class_differentiable_other_module.swift
 
-// Verify that a `Differentiable` type upholds `AllDifferentiableVariables == TangentVector`.
-func assertAllDifferentiableVariablesEqualsTangentVector<T>(_: T.Type)
-  where T : Differentiable, T.AllDifferentiableVariables == T.TangentVector {}
-
 // Verify that a type `T` conforms to `AdditiveArithmetic`.
 func assertConformsToAdditiveArithmetic<T>(_: T.Type) where T : AdditiveArithmetic {}
 
@@ -34,9 +30,7 @@ extension DummyAdditiveArithmetic {
 
 class Empty : Differentiable {}
 func testEmpty() {
-  assertConformsToAdditiveArithmetic(Empty.AllDifferentiableVariables.self)
   assertConformsToAdditiveArithmetic(Empty.TangentVector.self)
-  assertConformsToElementaryFunctions(Empty.AllDifferentiableVariables.self)
   assertConformsToElementaryFunctions(Empty.TangentVector.self)
 }
 
@@ -119,7 +113,6 @@ final class VectorSpacesEqualSelf : Differentiable & DummyAdditiveArithmetic {
   var w: Float
   var b: Float
   typealias TangentVector = VectorSpacesEqualSelf
-  typealias AllDifferentiableVariables = VectorSpacesEqualSelf
 
   init(w: Float, b: Float) {
     self.w = w
@@ -145,8 +138,7 @@ extension VectorSpacesEqualSelf : Equatable, AdditiveArithmetic {
 
 // Test generic type with vector space types to `Self`.
 class GenericVectorSpacesEqualSelf<T> : Differentiable
-  where T : Differentiable, T == T.TangentVector,
-        T == T.AllDifferentiableVariables
+  where T : Differentiable, T == T.TangentVector
 {
   var w: T
   var b: T
@@ -195,13 +187,9 @@ class AllMembersAdditiveArithmetic : Differentiable {
     self.b = b
   }
 }
-func testAllMembersAdditiveArithmetic() {
-  assertAllDifferentiableVariablesEqualsTangentVector(AllMembersAdditiveArithmetic.self)
-}
 
 // Test type `AllMembersVectorProtocol` whose members conforms to `VectorProtocol`,
-// in which case we should make `AllDifferentiableVariables` and `TangentVector`
-// conform to `VectorProtocol`.
+// in which case we should make `TangentVector` conform to `VectorProtocol`.
 struct MyVector : VectorProtocol, Differentiable {
   var w: Float
   var b: Float
@@ -221,13 +209,11 @@ class AllMembersVectorProtocol : Differentiable {
   }
 }
 func testAllMembersVectorProtocol() {
-  assertConformsToVectorProtocol(AllMembersVectorProtocol.AllDifferentiableVariables.self)
   assertConformsToVectorProtocol(AllMembersVectorProtocol.TangentVector.self)
 }
 
 // Test type `AllMembersElementaryFunctions` whose members conforms to `ElementaryFunctions`,
-// in which case we should make `AllDifferentiableVariables` and `TangentVector`
-// conform to `ElementaryFunctions`.
+// in which case we should make `TangentVector` conform to `ElementaryFunctions`.
 struct MyVector2 : ElementaryFunctions, Differentiable {
   var w: Float
   var b: Float
@@ -247,7 +233,6 @@ class AllMembersElementaryFunctions : Differentiable {
   }
 }
 func testAllMembersElementaryFunctions() {
-  assertConformsToElementaryFunctions(AllMembersElementaryFunctions.AllDifferentiableVariables.self)
   assertConformsToElementaryFunctions(AllMembersElementaryFunctions.TangentVector.self)
 }
 
@@ -265,13 +250,10 @@ class DifferentiableSubset : Differentiable {
   }
 }
 func testDifferentiableSubset() {
-  assertConformsToAdditiveArithmetic(DifferentiableSubset.AllDifferentiableVariables.self)
-  assertConformsToElementaryFunctions(DifferentiableSubset.AllDifferentiableVariables.self)
-  assertConformsToVectorProtocol(DifferentiableSubset.AllDifferentiableVariables.self)
-  assertAllDifferentiableVariablesEqualsTangentVector(DifferentiableSubset.self)
+  assertConformsToElementaryFunctions(DifferentiableSubset.TangentVector.self)
+  assertConformsToVectorProtocol(DifferentiableSubset.TangentVector.self)
   _ = DifferentiableSubset.TangentVector(w: 1, b: 1)
   _ = DifferentiableSubset.TangentVector(w: 1, b: 1)
-  _ = DifferentiableSubset.AllDifferentiableVariables(w: 1, b: 1)
 
   _ = pullback(at: DifferentiableSubset(w: 1, b: 2, flag: false)) { model in
     model.w + model.b
@@ -289,9 +271,6 @@ class NestedDifferentiableSubset : Differentiable {
     self.mixed = mixed
     technicallyDifferentiable = 0
   }
-}
-func testNestedDifferentiableSubset() {
-  assertAllDifferentiableVariablesEqualsTangentVector(NestedDifferentiableSubset.self)
 }
 
 // Test type that uses synthesized vector space types but provides custom
@@ -316,7 +295,7 @@ class HasCustomMethod : Differentiable {
 }
 
 // Test type that conforms to `KeyPathIterable`.
-// The `AllDifferentiableVariables` class should also conform to `KeyPathIterable`.
+// The `TangentVector` class should also conform to `KeyPathIterable`.
 class TestKeyPathIterable : Differentiable, KeyPathIterable {
   var w: Float
   @noDerivative let technicallyDifferentiable: Float = .pi
@@ -332,8 +311,8 @@ class TestKeyPathIterable : Differentiable, KeyPathIterable {
     technicallyDifferentiable = 0
   }
 }
-func testKeyPathIterable(x: TestKeyPathIterable) {
-  _ = x.allDifferentiableVariables.allKeyPaths
+func testKeyPathIterable(x: TestKeyPathIterable.TangentVector) {
+  _ = x.allKeyPaths
 }
 
 // Test type with user-defined memberwise initializer.
@@ -441,7 +420,7 @@ final class TF_260<T : Differentiable> : Differentiable & DummyAdditiveArithmeti
 //   %2 = ref_element_addr %0 : $TF_269, #TF_269.filter // user: %3
 /*
 public protocol TF_269_Layer: Differentiable & KeyPathIterable
-  where AllDifferentiableVariables: KeyPathIterable {
+  where TangentVector: KeyPathIterable {
 
   associatedtype Input: Differentiable
   associatedtype Output: Differentiable
@@ -481,7 +460,7 @@ class MissingInitializer : Differentiable {
 }
 
 // Test manually customizing vector space types.
-// Thees should fail. Synthesis is semantically unsupported if vector space
+// These should fail. Synthesis is semantically unsupported if vector space
 // types are customized.
 final class TangentVectorWB : DummyAdditiveArithmetic, Differentiable {
   var w: Float
@@ -492,6 +471,8 @@ final class TangentVectorWB : DummyAdditiveArithmetic, Differentiable {
     self.b = b
   }
 }
+// expected-error @+4 {{'Differentiable' requires the types 'VectorSpaceTypeAlias.TangentVector' (aka 'TangentVectorWB') and 'TangentVectorWB.TangentVector' be equivalent}}
+// expected-note @+3 {{requirement specified as 'Self.TangentVector' == 'Self.TangentVector.TangentVector' [with Self = VectorSpaceTypeAlias]}}
 // expected-error @+2 {{type 'VectorSpaceTypeAlias' does not conform to protocol 'Differentiable'}}
 // expected-note @+1 {{do you want to add protocol stubs?}}
 final class VectorSpaceTypeAlias : DummyAdditiveArithmetic, Differentiable {
@@ -563,14 +544,12 @@ extension NoMemberwiseInitializerExtended: Differentiable
 
 // Test derived conformances in disallowed contexts.
 
-// expected-error @+4 {{type 'OtherFileNonconforming' does not conform to protocol 'Differentiable'}}
-// expected-error @+3 {{implementation of 'Differentiable' cannot be automatically synthesized in an extension in a different file to the type}}
-// expected-note @+2 {{do you want to add protocol stubs?}}
+// expected-error @+3 {{type 'OtherFileNonconforming' does not conform to protocol 'Differentiable'}}
+// expected-error @+2 {{implementation of 'Differentiable' cannot be automatically synthesized in an extension in a different file to the type}}
 // expected-note @+1 {{do you want to add protocol stubs?}}
 extension OtherFileNonconforming : Differentiable {}
 
-// expected-error @+4 {{type 'GenericOtherFileNonconforming<T>' does not conform to protocol 'Differentiable'}}
-// expected-error @+3 {{implementation of 'Differentiable' cannot be automatically synthesized in an extension in a different file to the type}}
-// expected-note @+2 {{do you want to add protocol stubs?}}
+// expected-error @+3 {{type 'GenericOtherFileNonconforming<T>' does not conform to protocol 'Differentiable'}}
+// expected-error @+2 {{implementation of 'Differentiable' cannot be automatically synthesized in an extension in a different file to the type}}
 // expected-note @+1 {{do you want to add protocol stubs?}}
 extension GenericOtherFileNonconforming : Differentiable {}

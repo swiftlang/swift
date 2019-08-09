@@ -1899,7 +1899,7 @@ internal struct _ArrayAnyHashableBox<Element: Hashable>
     return hasher._finalize()
   }
 
-  internal func _unbox<T : Hashable>() -> T? {
+  internal func _unbox<T: Hashable>() -> T? {
     return _value as? T
   }
 
@@ -1964,26 +1964,6 @@ extension Array where Element : Differentiable {
 
     public typealias TangentVector =
       Array<Element.TangentVector>.DifferentiableView
-    public typealias AllDifferentiableVariables =
-      Array<Element.AllDifferentiableVariables>.DifferentiableView
-
-    public var allDifferentiableVariables: AllDifferentiableVariables {
-      get {
-        return AllDifferentiableVariables(
-          base.map { $0.allDifferentiableVariables })
-      }
-      set {
-        precondition(
-          base.count == newValue.base.count,
-          "cannot set Array.DifferentiableView.AllDifferentiableVariables " +
-            "with count \(base.count) to " +
-            "Array.DifferentiableView.AllDifferentiableVariables with " +
-            "different count \(newValue.base.count)")
-        for i in base.indices {
-          base[i].allDifferentiableVariables = newValue.base[i]
-        }
-      }
-    }
 
     public mutating func move(along direction: TangentVector) {
       precondition(
@@ -2078,27 +2058,13 @@ extension Array.DifferentiableView : AdditiveArithmetic
 /// Makes `Array` differentiable as the product manifold of `Element`
 /// multiplied with itself `count` times.
 extension Array : Differentiable where Element : Differentiable {
-  // In an ideal world, `TangentVector`, `TangentVector`, and
-  // `AllDifferentiableVariables` would all be `Array`s. Unfortunately, we
-  // can't conform `Array` to `AdditiveArithmetic` for `TangentVector` and
-  // `TangentVector`, because `Array` already has a static `+` method with
-  // different semantics from `AdditiveArithmetic` `+`. So we use
+  // In an ideal world, `TangentVector` would be `[Element.TangentVector]`.
+  // Unfortunately, we cannot conform `Array` to `AdditiveArithmetic` for
+  // `TangentVector` because `Array` already has a static `+` method with
+  // different semantics from `AdditiveArithmetic.+`. So we use
   // `Array.DifferentiableView` for all these associated types.
   public typealias TangentVector =
     Array<Element.TangentVector>.DifferentiableView
-  public typealias AllDifferentiableVariables =
-    Array<Element.AllDifferentiableVariables>.DifferentiableView
-
-  public var allDifferentiableVariables: AllDifferentiableVariables {
-    get {
-      return DifferentiableView(self).allDifferentiableVariables
-    }
-    set {
-      var view = DifferentiableView(self)
-      view.allDifferentiableVariables = newValue
-      self = view.base
-    }
-  }
 
   public mutating func move(along direction: TangentVector) {
     var view = DifferentiableView(self)

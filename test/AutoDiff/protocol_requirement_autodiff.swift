@@ -18,7 +18,7 @@ extension DiffReq where TangentVector : AdditiveArithmetic {
   }
 }
 
-struct Quadratic : DiffReq, Equatable {
+struct Quadratic : DiffReq, VectorProtocol {
   typealias TangentVector = Quadratic
 
   @differentiable
@@ -39,20 +39,6 @@ struct Quadratic : DiffReq, Equatable {
   @differentiable(wrt: (self, x))
   func f(_ x: Float) -> Float {
     return a * x * x + b * x + c
-  }
-}
-
-extension Quadratic : VectorProtocol {
-  static var zero: Quadratic { return Quadratic(0, 0, 0) }
-  static func + (lhs: Quadratic, rhs: Quadratic) -> Quadratic {
-    return Quadratic(lhs.a + rhs.a, lhs.b + rhs.b, lhs.c + rhs.c)
-  }
-  static func - (lhs: Quadratic, rhs: Quadratic) -> Quadratic {
-  return Quadratic(lhs.a + rhs.a, lhs.b + rhs.b, lhs.c + rhs.c)
-}
-  typealias Scalar = Float
-  static func * (lhs: Float, rhs: Quadratic) -> Quadratic {
-    return Quadratic(lhs * rhs.a, lhs * rhs.b, lhs * rhs.c)
   }
 }
 

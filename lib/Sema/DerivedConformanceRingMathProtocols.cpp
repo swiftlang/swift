@@ -135,8 +135,8 @@ bool DerivedConformance::canDerivePointwiseMultiplicative(NominalTypeDecl *nomin
 }
 
 // Synthesize body for ring math operator.
-static void deriveBodyMathOperator(AbstractFunctionDecl *funcDecl,
-                                   MathOperator op) {
+static std::pair<BraceStmt *, bool>
+deriveBodyMathOperator(AbstractFunctionDecl *funcDecl, MathOperator op) {
   auto *parentDC = funcDecl->getParent();
   auto *nominal = parentDC->getSelfNominalTypeDecl();
   auto &C = nominal->getASTContext();
@@ -213,8 +213,8 @@ static void deriveBodyMathOperator(AbstractFunctionDecl *funcDecl,
   auto *callExpr =
       CallExpr::createImplicit(C, initExpr, memberOpExprs, memberNames);
   ASTNode returnStmt = new (C) ReturnStmt(SourceLoc(), callExpr, true);
-  funcDecl->setBody(
-      BraceStmt::create(C, SourceLoc(), returnStmt, SourceLoc(), true));
+  return std::pair<BraceStmt *, bool>(
+      BraceStmt::create(C, SourceLoc(), returnStmt, SourceLoc(), true), false);
 }
 
 // Synthesize function declaration for the given math operator.
@@ -228,7 +228,7 @@ static ValueDecl *deriveMathOperator(DerivedConformance &derived,
   // Create parameter declaration with the given name and type.
   auto createParamDecl = [&](StringRef name, Type type) -> ParamDecl * {
     auto *param = new (C)
-        ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+        ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(),
                   Identifier(), SourceLoc(), C.getIdentifier(name), parentDC);
     param->setInterfaceType(type);
     return param;
@@ -247,9 +247,10 @@ static ValueDecl *deriveMathOperator(DerivedConformance &derived,
                        /*GenericParams=*/nullptr, params,
                        TypeLoc::withoutLoc(selfInterfaceType), parentDC);
   operatorDecl->setImplicit();
-  auto bodySynthesizer = [](AbstractFunctionDecl *funcDecl, void *ctx) {
+  auto bodySynthesizer = [](AbstractFunctionDecl *funcDecl,
+                            void *ctx) -> std::pair<BraceStmt *, bool> {
     auto op = (MathOperator) reinterpret_cast<intptr_t>(ctx);
-    deriveBodyMathOperator(funcDecl, op);
+    return deriveBodyMathOperator(funcDecl, op);
   };
   operatorDecl->setBodySynthesizer(bodySynthesizer, (void *) op);
   if (auto env = parentDC->getGenericEnvironmentOfContext())
@@ -265,8 +266,9 @@ static ValueDecl *deriveMathOperator(DerivedConformance &derived,
 }
 
 // Synthesize body for a ring property computed property getter.
-static void deriveBodyRingPropertyGetter(
-    AbstractFunctionDecl *funcDecl, ProtocolDecl *proto, ValueDecl *reqDecl) {
+static std::pair<BraceStmt *, bool>
+deriveBodyRingPropertyGetter(AbstractFunctionDecl *funcDecl,
+                             ProtocolDecl *proto, ValueDecl *reqDecl) {
   auto *parentDC = funcDecl->getParent();
   auto *nominal = parentDC->getSelfNominalTypeDecl();
   auto &C = nominal->getASTContext();
@@ -327,40 +329,41 @@ static void deriveBodyRingPropertyGetter(
   auto *callExpr =
       CallExpr::createImplicit(C, initExpr, memberPropExprs, memberNames);
   ASTNode returnStmt = new (C) ReturnStmt(SourceLoc(), callExpr, true);
-  funcDecl->setBody(
-      BraceStmt::create(C, SourceLoc(), returnStmt, SourceLoc(), true));
+  auto *braceStmt =
+      BraceStmt::create(C, SourceLoc(), returnStmt, SourceLoc(), true);
+  return std::pair<BraceStmt *, bool>(braceStmt, false);
 }
 
 // Synthesize body for the `AdditiveArithmetic.zero` computed property getter.
-static void deriveBodyAdditiveArithmetic_zero(AbstractFunctionDecl *funcDecl,
-                                              void *) {
+static std::pair<BraceStmt *, bool>
+deriveBodyAdditiveArithmetic_zero(AbstractFunctionDecl *funcDecl, void *) {
   auto &C = funcDecl->getASTContext();
   auto *addArithProto = C.getProtocol(KnownProtocolKind::AdditiveArithmetic);
   auto *zeroReq = getProtocolRequirement(addArithProto, C.Id_zero);
-  deriveBodyRingPropertyGetter(funcDecl, addArithProto, zeroReq);
+  return deriveBodyRingPropertyGetter(funcDecl, addArithProto, zeroReq);
 }
 
 // Synthesize body for the `PointwiseMultiplicative.one` computed property
 // getter.
-static void deriveBodyPointwiseMultiplicative_one(
-    AbstractFunctionDecl *funcDecl, void *) {
+static std::pair<BraceStmt *, bool>
+deriveBodyPointwiseMultiplicative_one(AbstractFunctionDecl *funcDecl, void *) {
   auto &C = funcDecl->getASTContext();
   auto *pointMulProto =
       C.getProtocol(KnownProtocolKind::PointwiseMultiplicative);
   auto *oneReq = getProtocolRequirement(pointMulProto, C.Id_one);
-  deriveBodyRingPropertyGetter(funcDecl, pointMulProto, oneReq);
+  return deriveBodyRingPropertyGetter(funcDecl, pointMulProto, oneReq);
 }
 
 // Synthesize body for the `PointwiseMultiplicative.reciprocal` computed
 // property getter.
-static void
+static std::pair<BraceStmt *, bool>
 deriveBodyPointwiseMultiplicative_reciprocal(AbstractFunctionDecl *funcDecl,
                                              void *) {
   auto &C = funcDecl->getASTContext();
   auto *pointMulProto =
       C.getProtocol(KnownProtocolKind::PointwiseMultiplicative);
   auto *reciprocalReq = getProtocolRequirement(pointMulProto, C.Id_reciprocal);
-  deriveBodyRingPropertyGetter(funcDecl, pointMulProto, reciprocalReq);
+  return deriveBodyRingPropertyGetter(funcDecl, pointMulProto, reciprocalReq);
 }
 
 // Synthesize a ring protocol property declaration.
@@ -383,11 +386,9 @@ deriveRingProperty(DerivedConformance &derived, Identifier propertyName,
 
   // Create ring property getter.
   auto *getterDecl =
-      derived.declareDerivedPropertyGetter(propDecl, returnTy);
+      derived.addGetterToReadOnlyDerivedProperty(propDecl, returnTy);
   getterDecl->setBodySynthesizer(bodySynthesizer.Fn, bodySynthesizer.Context);
-  propDecl->setAccessors(StorageImplInfo::getImmutableComputed(), SourceLoc(),
-                         {getterDecl}, SourceLoc());
-  derived.addMembersToConformanceContext({getterDecl, propDecl, pbDecl});
+  derived.addMembersToConformanceContext({propDecl, pbDecl});
 
   return propDecl;
 }

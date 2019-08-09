@@ -24,6 +24,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/STLExtras.h"
+#include "swift/Sema/IDETypeCheckingRequests.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "llvm/ADT/SetVector.h"
 #include <set>
@@ -197,7 +198,9 @@ static void collectVisibleMemberDecls(const DeclContext *CurrDC, LookupState LS,
       continue;
     if (!isDeclVisibleInLookupMode(VD, LS, CurrDC, TypeResolver))
       continue;
-    if (!isMemberDeclApplied(CurrDC, BaseType, VD))
+    if (!evaluateOrDefault(CurrDC->getASTContext().evaluator,
+        IsDeclApplicableRequest(DeclApplicabilityOwner(CurrDC, BaseType, VD)),
+                           false))
       continue;
     FoundDecls.push_back(VD);
   }
@@ -216,8 +219,9 @@ static void doGlobalExtensionLookup(Type BaseType,
 
   // Look in each extension of this type.
   for (auto extension : nominal->getExtensions()) {
-    if (!isExtensionApplied(const_cast<DeclContext *>(CurrDC), BaseType,
-                            extension))
+    if (!evaluateOrDefault(CurrDC->getASTContext().evaluator,
+        IsDeclApplicableRequest(DeclApplicabilityOwner(CurrDC, BaseType,
+                                                       extension)), false))
       continue;
 
     collectVisibleMemberDecls(CurrDC, LS, BaseType, extension, FoundDecls,
@@ -960,7 +964,8 @@ static void lookupVisibleDynamicMemberLookupDecls(
   if (!seenDynamicLookup.insert(baseType.getPointer()).second)
     return;
 
-  if (!hasDynamicMemberLookupAttribute(baseType))
+  if (!evaluateOrDefault(dc->getASTContext().evaluator,
+         HasDynamicMemberLookupAttributeRequest{baseType.getPointer()}, false))
     return;
 
   auto &ctx = dc->getASTContext();
@@ -978,11 +983,10 @@ static void lookupVisibleDynamicMemberLookupDecls(
     if (!subscript)
       continue;
 
-    auto rootAndResult =
-        getRootAndResultTypeOfKeypathDynamicMember(subscript, dc);
-    if (!rootAndResult)
+    auto rootType = evaluateOrDefault(subscript->getASTContext().evaluator,
+      RootTypeOfKeypathDynamicMemberRequest{subscript}, Type());
+    if (rootType.isNull())
       continue;
-    auto rootType = rootAndResult->first;
 
     auto subs =
         baseType->getMemberSubstitutionMap(dc->getParentModule(), subscript);

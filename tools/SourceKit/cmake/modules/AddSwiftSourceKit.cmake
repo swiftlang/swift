@@ -203,10 +203,15 @@ macro(add_sourcekit_library name)
     endif()
   endif()
   swift_install_in_component(TARGETS ${name}
-                             LIBRARY DESTINATION "lib${LLVM_LIBDIR_SUFFIX}"
-                             ARCHIVE DESTINATION "lib${LLVM_LIBDIR_SUFFIX}"
-                             RUNTIME DESTINATION "bin"
-                             COMPONENT "${SOURCEKITLIB_INSTALL_IN_COMPONENT}")
+    LIBRARY
+      DESTINATION "lib${LLVM_LIBDIR_SUFFIX}"
+      COMPONENT "${SOURCEKITLIB_INSTALL_IN_COMPONENT}"
+    ARCHIVE
+      DESTINATION "lib${LLVM_LIBDIR_SUFFIX}"
+      COMPONENT "${SOURCEKITLIB_INSTALL_IN_COMPONENT}"
+    RUNTIME
+      DESTINATION "bin"
+      COMPONENT "${SOURCEKITLIB_INSTALL_IN_COMPONENT}")
   swift_install_in_component(FILES ${SOURCEKITLIB_HEADERS}
                              DESTINATION "include/SourceKit"
                              COMPONENT "${SOURCEKITLIB_INSTALL_IN_COMPONENT}")
@@ -358,11 +363,18 @@ macro(add_sourcekit_framework name)
                           MACOSX_FRAMEWORK_BUNDLE_VERSION "${SOURCEKIT_VERSION_STRING}"
                           PUBLIC_HEADER "${headers}")
     swift_install_in_component(TARGETS ${name}
-                               FRAMEWORK DESTINATION lib${LLVM_LIBDIR_SUFFIX}
-                               LIBRARY DESTINATION lib${LLVM_LIBDIR_SUFFIX}
-                               ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX}
-                               RUNTIME DESTINATION bin
-                               COMPONENT ${SOURCEKITFW_INSTALL_IN_COMPONENT})
+                               FRAMEWORK
+                                 DESTINATION lib${LLVM_LIBDIR_SUFFIX}
+                                 COMPONENT ${SOURCEKITFW_INSTALL_IN_COMPONENT}
+                               LIBRARY
+                                 DESTINATION lib${LLVM_LIBDIR_SUFFIX}
+                                 COMPONENT ${SOURCEKITFW_INSTALL_IN_COMPONENT}
+                               ARCHIVE
+                                 DESTINATION lib${LLVM_LIBDIR_SUFFIX}
+                                 COMPONENT ${SOURCEKITFW_INSTALL_IN_COMPONENT}
+                               RUNTIME
+                                 DESTINATION bin
+                                 COMPONENT ${SOURCEKITFW_INSTALL_IN_COMPONENT})
   else()
     set_output_directory(${name}
         BINARY_DIR ${framework_location}

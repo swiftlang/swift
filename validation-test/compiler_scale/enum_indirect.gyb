@@ -1,0 +1,11 @@
+// RUN: %scale-test --sum-multi --begin 5 --end 16 --step 5 --select NumDeclsValidated %s
+// REQUIRES: OS=macosx
+// REQUIRES: asserts
+
+indirect enum Enum${N} {
+    case OK
+
+% if int(N) > 1:
+    case next(Enum${int(N)-1})
+% end
+}

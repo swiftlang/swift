@@ -327,8 +327,8 @@ _registerProtocolConformances(ConformanceState &C,
   C.SectionsToScan.push_back(ConformanceSection{begin, end});
 }
 
-void swift::addImageProtocolConformanceBlockCallback(const void *conformances,
-                                                   uintptr_t conformancesSize) {
+void swift::addImageProtocolConformanceBlockCallbackUnsafe(
+    const void *conformances, uintptr_t conformancesSize) {
   assert(conformancesSize % sizeof(ProtocolConformanceRecord) == 0 &&
          "conformances section not a multiple of ProtocolConformanceRecord");
 
@@ -343,6 +343,13 @@ void swift::addImageProtocolConformanceBlockCallback(const void *conformances,
   // Conformance cache should always be sufficiently initialized by this point.
   _registerProtocolConformances(Conformances.unsafeGetAlreadyInitialized(),
                                 recordsBegin, recordsEnd);
+}
+
+void swift::addImageProtocolConformanceBlockCallback(
+    const void *conformances, uintptr_t conformancesSize) {
+  Conformances.get();
+  addImageProtocolConformanceBlockCallbackUnsafe(conformances,
+                                                 conformancesSize);
 }
 
 void

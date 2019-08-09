@@ -66,8 +66,8 @@ static ValueDecl *getProtocolRequirement(ProtocolDecl *proto, DeclName name) {
 }
 
 /// Derive the body for the '_typeList' getter.
-static void deriveBodyTensorGroup_typeList(AbstractFunctionDecl *funcDecl,
-                                           void *) {
+static std::pair<BraceStmt *, bool>
+deriveBodyTensorGroup_typeList(AbstractFunctionDecl *funcDecl, void *) {
   auto *parentDC = funcDecl->getParent();
   auto *nominal = funcDecl->getDeclContext()->getSelfNominalTypeDecl();
   auto &C = nominal->getASTContext();
@@ -108,8 +108,9 @@ static void deriveBodyTensorGroup_typeList(AbstractFunctionDecl *funcDecl,
   auto *returnStmt = new (C) ReturnStmt(SourceLoc(), typeListExpr);
   auto *body = BraceStmt::create(C, SourceLoc(), {returnStmt}, SourceLoc(),
                                  /*Implicit*/ true);
-  funcDecl->setBody(BraceStmt::create(C, SourceLoc(), {body}, SourceLoc(),
-                                      /*Implicit*/ true));
+  auto *braceStmt = BraceStmt::create(C, SourceLoc(), {body}, SourceLoc(),
+                                      /*Implicit*/ true);
+  return std::pair<BraceStmt *, bool>(braceStmt, false);
 }
 
 /// Derive a '_typeList' implementation.
@@ -136,18 +137,17 @@ static ValueDecl *deriveTensorGroup_typeList(DerivedConformance &derived) {
     typeListDecl->getAttrs().add(new (C) InlinableAttr(/*implicit*/ true));
 
   // Create `_typeList` getter.
-  auto *getterDecl = derived.declareDerivedPropertyGetter(
+  auto *getterDecl = derived.addGetterToReadOnlyDerivedProperty(
       typeListDecl, returnType);
   getterDecl->setBodySynthesizer(deriveBodyTensorGroup_typeList, nullptr);
-  typeListDecl->setAccessors(StorageImplInfo::getImmutableComputed(),
-                             SourceLoc(), {getterDecl}, SourceLoc());
-  derived.addMembersToConformanceContext({getterDecl, typeListDecl, patDecl});
+  derived.addMembersToConformanceContext({typeListDecl, patDecl});
 
   return typeListDecl;
 }
 
 // Synthesize body for `init(_owning:)`.
-static void deriveBodyTensorGroup_init(AbstractFunctionDecl *funcDecl, void *) {
+static std::pair<BraceStmt *, bool>
+deriveBodyTensorGroup_init(AbstractFunctionDecl *funcDecl, void *) {
   auto *parentDC = funcDecl->getParent();
   auto *nominal = parentDC->getSelfNominalTypeDecl();
   auto &C = nominal->getASTContext();
@@ -170,7 +170,7 @@ static void deriveBodyTensorGroup_init(AbstractFunctionDecl *funcDecl, void *) {
 
   // Create an `if var` statement for the current address.
   VarDecl *currAddressDecl = new (C) VarDecl(
-      /*IsStatic*/ false, VarDecl::Specifier::Var, /*IsCaptureList*/ false,
+      /*IsStatic*/ false, VarDecl::Introducer::Var, /*IsCaptureList*/ false,
       SourceLoc(), C.getIdentifier("currentAddress"), funcDecl);
   currAddressDecl->setImplicit();
   currAddressDecl->setHasNonPatternBindingInit(true);
@@ -309,8 +309,9 @@ static void deriveBodyTensorGroup_init(AbstractFunctionDecl *funcDecl, void *) {
              /*Cond*/ C.AllocateCopy(cond), /*Then*/ thenBody,
              /*ElseLoc*/ SourceLoc(), /*Else*/ elseBody, /*implicit*/ true);
 
-  funcDecl->setBody(BraceStmt::create(C, SourceLoc(), {ifStmt}, SourceLoc(),
-                                      /*implicit*/ true));
+  auto *braceStmt = BraceStmt::create(C, SourceLoc(), {ifStmt}, SourceLoc(),
+                                      /*implicit*/ true);
+  return std::pair<BraceStmt *, bool>(braceStmt, false);
 }
 
 // Synthesize a constructor declaration for a `TensorGroup` method requirement.
@@ -323,7 +324,7 @@ static ValueDecl *deriveTensorGroup_constructor(
   auto parentDC = derived.getConformanceContext();
 
   auto *param =
-      new (C) ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+      new (C) ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(),
                         argumentName, SourceLoc(), parameterName, parentDC);
   param->setInterfaceType(parameterType);
   ParameterList *params = ParameterList::create(C, {param});

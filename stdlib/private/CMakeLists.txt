@@ -19,12 +19,6 @@ if(SWIFT_BUILD_SDK_OVERLAY)
 
   add_subdirectory(OSLog)
 
-  # SWIFT_ENABLE_TENSORFLOW
-  # Only build unittest if we are also building swift apis.
-  if(SWIFT_ENABLE_TENSORFLOW AND TENSORFLOW_SWIFT_APIS)
-    add_subdirectory(TensorFlowUnittest)
-  endif()
-
   if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     add_subdirectory(StdlibUnittestFoundationExtras)
     if (SWIFT_INCLUDE_TESTS)

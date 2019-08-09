@@ -22,7 +22,6 @@
     "StringObject.swift",
     "StringGuts.swift",
     "StringGutsSlice.swift",
-    "StringGutsVisitor.swift",
     "StringGraphemeBreaking.swift",
     "StringHashable.swift",
     "StringIndex.swift",
@@ -203,6 +202,7 @@
   "Misc": [
     "AtomicInt.swift",
     "ErrorType.swift",
+    "Identifiable.swift",
     "InputStream.swift",
     "LifetimeManager.swift",
     "ManagedBuffer.swift",

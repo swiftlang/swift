@@ -91,7 +91,7 @@ static bool isConsumed(
         for (SILValue v : user->getResults()) {
           if (v.getOwnershipKind() != ValueOwnershipKind::Owned)
             continue;
-          copy(v->getUses(), std::back_inserter(worklist));
+          llvm::copy(v->getUses(), std::back_inserter(worklist));
         }
         continue;
       }

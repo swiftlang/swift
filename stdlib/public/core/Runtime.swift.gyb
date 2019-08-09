@@ -305,17 +305,6 @@ internal class __SwiftNativeNSEnumerator {
   deinit {}
 }
 
-// FIXME(ABI)#60 : move into the Foundation overlay and remove 'open'
-@_fixed_layout
-@objc @_swift_native_objc_runtime_base(__SwiftNativeNSDataBase)
-open class __SwiftNativeNSData {
-  @inlinable
-  @objc public init() {}
-  @objc public init(coder: AnyObject) {}
-  @inlinable
-  deinit {}
-}
-
 //===----------------------------------------------------------------------===//
 // Support for reliable testing of the return-autoreleased optimization
 //===----------------------------------------------------------------------===//

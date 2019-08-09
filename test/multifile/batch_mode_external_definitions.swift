@@ -19,8 +19,8 @@
 //
 // CHECK-FIELD1-ONLY: sil_stage canonical
 // CHECK-FIELD1-ONLY: use_extern_struct_field_1
-// CHECK-FIELD1-ONLY: sil shared{{.*}}extern_struct$field$getter
-// CHECK-FIELD1-ONLY-NOT: sil shared{{.*}}extern_struct$field$getter
+// CHECK-FIELD1-ONLY: sil shared{{.*}}@$So13extern_structV$field$getter
+// CHECK-FIELD1-ONLY-NOT: sil shared{{.*}}@$So13extern_structV$field$getter
 // CHECK-FIELD1-ONLY: sil_stage canonical
 // CHECK-FIELD1-ONLY-NOT: use_extern_struct_field_2
 // CHECK-FIELD1-ONLY-NOT: sil shared{{.*}}extern_struct$field$getter
@@ -30,33 +30,33 @@
 // CHECK-FIELD1-ONLY-REORDER-NOT: sil shared{{.*}}extern_struct$field$getter
 // CHECK-FIELD1-ONLY-REORDER: sil_stage canonical
 // CHECK-FIELD1-ONLY-REORDER: use_extern_struct_field_1
-// CHECK-FIELD1-ONLY-REORDER: sil shared{{.*}}extern_struct$field$getter
-// CHECK-FIELD1-ONLY-REORDER-NOT: sil shared{{.*}}extern_struct$field$getter
+// CHECK-FIELD1-ONLY-REORDER: sil shared{{.*}}@$So13extern_structV$field$getter
+// CHECK-FIELD1-ONLY-REORDER-NOT: sil shared{{.*}}@$So13extern_structV$field$getter
 //
 // CHECK-FIELD2-ONLY: sil_stage canonical
 // CHECK-FIELD2-ONLY-NOT: use_extern_struct_field_1
 // CHECK-FIELD2-ONLY-NOT: sil shared{{.*}}extern_struct$field$getter
 // CHECK-FIELD2-ONLY: sil_stage canonical
 // CHECK-FIELD2-ONLY: use_extern_struct_field_2
-// CHECK-FIELD2-ONLY: sil shared{{.*}}extern_struct$field$getter
-// CHECK-FIELD2-ONLY-NOT: sil shared{{.*}}extern_struct$field$getter
+// CHECK-FIELD2-ONLY: sil shared{{.*}}@$So13extern_structV$field$getter
+// CHECK-FIELD2-ONLY-NOT: sil shared{{.*}}@$So13extern_structV$field$getter
 //
 // CHECK-FIELD2-ONLY-REORDER: sil_stage canonical
 // CHECK-FIELD2-ONLY-REORDER: use_extern_struct_field_2
-// CHECK-FIELD2-ONLY-REORDER: sil shared{{.*}}extern_struct$field$getter
-// CHECK-FIELD2-ONLY-REORDER-NOT: sil shared{{.*}}extern_struct$field$getter
+// CHECK-FIELD2-ONLY-REORDER: sil shared{{.*}}@$So13extern_structV$field$getter
+// CHECK-FIELD2-ONLY-REORDER-NOT: sil shared{{.*}}@$So13extern_structV$field$getter
 // CHECK-FIELD2-ONLY-REORDER: sil_stage canonical
 // CHECK-FIELD2-ONLY-REORDER-NOT: use_extern_struct_field_1
 // CHECK-FIELD2-ONLY-REORDER-NOT: sil shared{{.*}}extern_struct$field$getter
 //
 // CHECK-BOTH-FIELDS: sil_stage canonical
 // CHECK-BOTH-FIELDS: use_extern_struct_field_1
-// CHECK-BOTH-FIELDS: sil shared{{.*}}extern_struct$field$getter
-// CHECK-BOTH-FIELDS-NOT: sil shared{{.*}}extern_struct$field$getter
+// CHECK-BOTH-FIELDS: sil shared{{.*}}@$So13extern_structV$field$getter
+// CHECK-BOTH-FIELDS-NOT: sil shared{{.*}}@$So13extern_structV$field$getter
 // CHECK-BOTH-FIELDS: sil_stage canonical
 // CHECK-BOTH-FIELDS: use_extern_struct_field_2
-// CHECK-BOTH-FIELDS: sil shared{{.*}}extern_struct$field$getter
-// CHECK-BOTH-FIELDS-NOT: sil shared{{.*}}extern_struct$field$getter
+// CHECK-BOTH-FIELDS: sil shared{{.*}}@$So13extern_structV$field$getter
+// CHECK-BOTH-FIELDS-NOT: sil shared{{.*}}@$So13extern_structV$field$getter
 //
 // CHECK-NEITHER-FIELD: sil_stage canonical
 // CHECK-NEITHER-FIELD-NOT: use_extern_struct_field_1

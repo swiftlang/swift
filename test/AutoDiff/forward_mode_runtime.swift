@@ -14,7 +14,6 @@ ForwardModeTests.test("Identity") {
   expectEqual(4, y)
   expectEqual(1, differential(1))
 }
-
 ForwardModeTests.test("Unary") {
   func func_to_diff(x: Float) -> Float {
     return x * x
@@ -549,8 +548,7 @@ ForwardModeTests.test("GenericTrackedIdentity") {
 
 ForwardModeTests.test("GenericTrackedBinaryAdd") {
   func add<T>(_ x: Tracked<T>, _ y: Tracked<T>) -> Tracked<T>
-    where T: Differentiable, T == T.TangentVector,
-          T == T.AllDifferentiableVariables {
+    where T: Differentiable, T == T.TangentVector {
     return x + y
   }
   let (y, differential) = valueWithDifferential(at: 4, 5) { 
@@ -565,7 +563,6 @@ ForwardModeTests.test("GenericTrackedBinaryLets") {
   func add<T>(_ x: Tracked<T>, _ y: Tracked<T>) -> Tracked<T>
     where T: Differentiable & SignedNumeric,
           T == T.TangentVector,
-          T == T.AllDifferentiableVariables,
           T == T.Magnitude {
     let a = x * y // xy
     let b = a + a // 2xy
@@ -583,7 +580,6 @@ ForwardModeTests.test("GenericTrackedBinaryVars") {
   func add<T>(_ x: Tracked<T>, _ y: Tracked<T>) -> Tracked<T>
     where T: Differentiable & SignedNumeric,
           T == T.TangentVector,
-          T == T.AllDifferentiableVariables,
           T == T.Magnitude {
     var a = x * y // xy
     a = a + a // 2xy
@@ -598,6 +594,5 @@ ForwardModeTests.test("GenericTrackedBinaryVars") {
   expectEqual(80, y)
   expectEqual(36, differential(1, 1))
 }
-
 
 runAllTests()

@@ -69,8 +69,6 @@ BOOL TestSwiftNativeNSBase_UnwantedCdtors()
       @"__SwiftNativeNSSetBase",
       @"__SwiftNativeNSStringBase",
       @"__SwiftNativeNSEnumeratorBase",
-      @"__SwiftNativeNSDataBase",
-      @"__SwiftNativeNSIndexSetBase",
       nil];
 
   for (unsigned int i = 0; i < classCount; i++) {

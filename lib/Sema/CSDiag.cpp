@@ -508,6 +508,9 @@ private:
   bool visitArrayExpr(ArrayExpr *E);
   bool visitDictionaryExpr(DictionaryExpr *E);
   bool visitObjectLiteralExpr(ObjectLiteralExpr *E);
+  bool visitQuoteLiteralExpr(QuoteLiteralExpr *E);
+  bool visitUnquoteExpr(UnquoteExpr *E);
+  bool visitDeclQuoteExpr(DeclQuoteExpr *E);
 
   bool visitForceValueExpr(ForceValueExpr *FVE);
   bool visitBindOptionalExpr(BindOptionalExpr *BOE);
@@ -741,7 +744,6 @@ void FailureDiagnosis::diagnoseUnviableLookupResults(
       return;
 
     switch (firstProblem) {
-    case MemberLookupResult::UR_LabelMismatch:
     case MemberLookupResult::UR_WritableKeyPathOnReadOnlyMember:
     case MemberLookupResult::UR_ReferenceWritableKeyPathOnMutatingMember:
     case MemberLookupResult::UR_KeyPathWithAnyObjectRootType:
@@ -1147,10 +1149,9 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
   if (auto fromTT = fromType->getAs<TupleType>())
     if (auto toTT = toType->getAs<TupleType>()) {
       if (fromTT->getNumElements() != toTT->getNumElements()) {
-        diagnose(anchor->getLoc(), diag::tuple_types_not_convertible_nelts,
-                 fromTT, toTT)
-        .highlight(anchor->getSourceRange());
-        return true;
+        auto failure = TupleContextualFailure(anchor, CS, fromTT, toTT,
+                                              CS.getConstraintLocator(expr));
+        return failure.diagnoseAsError();
       }
      
       SmallVector<TupleTypeElt, 4> FromElts;
@@ -1166,10 +1167,9 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
       // then we have a type error.
       if (computeTupleShuffle(TEType->castTo<TupleType>()->getElements(),
                               toTT->getElements(), sources)) {
-        diagnose(anchor->getLoc(), diag::tuple_types_not_convertible,
-                 fromTT, toTT)
-        .highlight(anchor->getSourceRange());
-        return true;
+        auto failure = TupleContextualFailure(anchor, CS, fromTT, toTT,
+                                              CS.getConstraintLocator(expr));
+        return failure.diagnoseAsError();
       }
     }
   
@@ -3044,116 +3044,6 @@ bool FailureDiagnosis::diagnoseImplicitSelfErrors(
   return false;
 }
 
-static bool diagnoseTupleParameterMismatch(CalleeCandidateInfo &CCI,
-                                           ArrayRef<AnyFunctionType::Param> params,
-                                           ArrayRef<AnyFunctionType::Param> args,
-                                           Expr *fnExpr, Expr *argExpr,
-                                           bool isTopLevel = true) {
-  // Try to diagnose function call tuple parameter splat only if
-  // there is no trailing or argument closure, because
-  // FailureDiagnosis::visitClosureExpr will produce better
-  // diagnostic and fix-it for trailing closure case.
-  if (isTopLevel) {
-    if (CCI.hasTrailingClosure)
-      return false;
-
-    if (auto *parenExpr = dyn_cast<ParenExpr>(argExpr)) {
-      if (isa<ClosureExpr>(parenExpr->getSubExpr()))
-        return false;
-    }
-  }
-
-  if (params.size() == 1 && args.size() == 1) {
-    auto paramType = params.front().getOldType();
-    auto argType = args.front().getOldType();
-
-    if (auto *paramFnType = paramType->getAs<AnyFunctionType>()) {
-      // Only if both of the parameter and argument types are functions
-      // let's recur into diagnosing their arguments.
-      if (auto *argFnType = argType->getAs<AnyFunctionType>())
-        return diagnoseTupleParameterMismatch(CCI, paramFnType->getParams(),
-                                              argFnType->getParams(), fnExpr,
-                                              argExpr, /* isTopLevel */ false);
-      return false;
-    }
-  }
-
-  if (params.size() != 1 || args.empty())
-    return false;
-
-  auto paramType = params.front().getOldType();
-
-  if (args.size() == 1) {
-    auto argType = args.front().getOldType();
-    if (auto *paramFnType = paramType->getAs<AnyFunctionType>()) {
-      // Only if both of the parameter and argument types are functions
-      // let's recur into diagnosing their arguments.
-      if (auto *argFnType = argType->getAs<AnyFunctionType>())
-        return diagnoseTupleParameterMismatch(CCI, paramFnType->getParams(),
-                                              argFnType->getParams(), fnExpr,
-                                              argExpr, /* isTopLevel */ false);
-    }
-
-    return false;
-  }
-
-  // Let's see if inferred argument is actually a tuple inside of Paren.
-  auto *paramTupleTy = paramType->getAs<TupleType>();
-  if (!paramTupleTy)
-    return false;
-
-  if (paramTupleTy->getNumElements() != args.size())
-    return false;
-
-  // Looks like the number of tuple elements matches number
-  // of function arguments, which means we can we can emit an
-  // error about an attempt to make use of tuple splat or tuple
-  // destructuring, unfortunately we can't provide a fix-it for
-  // this case.
-  auto &TC = CCI.CS.TC;
-  if (isTopLevel) {
-    if (auto *decl = CCI[0].getDecl()) {
-      Identifier name;
-      auto kind = decl->getDescriptiveKind();
-      // Constructors/descructors and subscripts don't really have names.
-      if (!(isa<ConstructorDecl>(decl) || isa<DestructorDecl>(decl) ||
-            isa<SubscriptDecl>(decl))) {
-        name = decl->getBaseName().getIdentifier();
-      }
-
-      TC.diagnose(argExpr->getLoc(), diag::single_tuple_parameter_mismatch,
-                  kind, name, paramTupleTy, !name.empty())
-          .highlight(argExpr->getSourceRange())
-          .fixItInsertAfter(argExpr->getStartLoc(), "(")
-          .fixItInsert(argExpr->getEndLoc(), ")");
-    } else {
-      TC.diagnose(argExpr->getLoc(),
-                  diag::unknown_single_tuple_parameter_mismatch, paramTupleTy)
-          .highlight(argExpr->getSourceRange())
-          .fixItInsertAfter(argExpr->getStartLoc(), "(")
-          .fixItInsert(argExpr->getEndLoc(), ")");
-    }
-  } else {
-    TC.diagnose(argExpr->getLoc(),
-                diag::nested_tuple_parameter_destructuring, paramTupleTy,
-                CCI.CS.getType(fnExpr));
-  }
-
-  return true;
-}
-
-static bool diagnoseTupleParameterMismatch(CalleeCandidateInfo &CCI,
-                                           ArrayRef<FunctionType::Param> params,
-                                           Type argType, Expr *fnExpr,
-                                           Expr *argExpr,
-                                           bool isTopLevel = true) {
-  llvm::SmallVector<AnyFunctionType::Param, 4> args;
-  FunctionType::decomposeInput(argType, args);
-
-  return diagnoseTupleParameterMismatch(CCI, params, args, fnExpr, argExpr,
-                                        isTopLevel);
-}
-
 class ArgumentMatcher : public MatchCallArgumentListener {
   TypeChecker &TC;
   Expr *FnExpr;
@@ -3329,13 +3219,20 @@ public:
 
     assert(insertLoc.isValid() && "missing argument after trailing closure?");
 
-    if (name.empty())
+    if (name.empty()) {
       TC.diagnose(insertLoc, diag::missing_argument_positional,
                   missingParamIdx + 1)
           .fixItInsert(insertLoc, insertText.str());
-    else
-      TC.diagnose(insertLoc, diag::missing_argument_named, name)
-          .fixItInsert(insertLoc, insertText.str());
+    } else {
+      if (isPropertyWrapperImplicitInit()) {
+        auto TE = cast<TypeExpr>(FnExpr);
+        TC.diagnose(TE->getLoc(), diag::property_wrapper_missing_arg_init, name,
+                    TE->getInstanceType()->getString());
+      } else {
+        TC.diagnose(insertLoc, diag::missing_argument_named, name)
+            .fixItInsert(insertLoc, insertText.str());
+      }
+    }
 
     auto candidate = CandidateInfo[0];
     if (candidate.getDecl())
@@ -3343,6 +3240,27 @@ public:
                   candidate.getDecl()->getFullName());
 
     Diagnosed = true;
+  }
+
+  bool isPropertyWrapperImplicitInit() {
+    auto TE = dyn_cast<TypeExpr>(FnExpr);
+    if (!TE)
+      return false;
+
+    auto instanceTy = TE->getInstanceType();
+    if (!instanceTy)
+      return false;
+
+    auto nominalDecl = instanceTy->getAnyNominal();
+    if (!(nominalDecl &&
+          nominalDecl->getAttrs().hasAttribute<PropertyWrapperAttr>()))
+      return false;
+
+    if (auto *parentExpr = CandidateInfo.CS.getParentExpr(FnExpr)) {
+      return parentExpr->isImplicit() && isa<CallExpr>(parentExpr);
+    }
+
+    return false;
   }
 
   bool missingLabel(unsigned paramIdx) override {
@@ -3382,16 +3300,20 @@ public:
     if (tuple)
       arg = tuple->getElement(argIdx);
 
-    auto &param = Parameters[paramIdx];
-    TC.diagnose(arg->getLoc(), diag::trailing_closure_bad_param,
-                param.getPlainType())
-      .highlight(arg->getSourceRange());
+    if (argIdx >= Parameters.size()) {
+      TC.diagnose(arg->getLoc(), diag::extra_trailing_closure_in_call)
+          .highlight(arg->getSourceRange());
+    } else {
+      auto &param = Parameters[paramIdx];
+      TC.diagnose(arg->getLoc(), diag::trailing_closure_bad_param,
+                  param.getPlainType())
+          .highlight(arg->getSourceRange());
 
-    auto candidate = CandidateInfo[0];
-    if (candidate.getDecl())
-      TC.diagnose(candidate.getDecl(), diag::decl_declared_here,
-                  candidate.getDecl()->getFullName());
-
+      auto candidate = CandidateInfo[0];
+      if (candidate.getDecl())
+        TC.diagnose(candidate.getDecl(), diag::decl_declared_here,
+                    candidate.getDecl()->getFullName());
+    }
     Diagnosed = true;
 
     return true;
@@ -3468,10 +3390,6 @@ diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI, Expr *fnExpr,
       return true;
     }
   }
-
-  if (diagnoseTupleParameterMismatch(CCI, candidate.getParameters(),
-                                     CCI.CS.getType(argExpr), fnExpr, argExpr))
-    return true;
 
   // We only handle structural errors here.
   if (CCI.closeness != CC_ArgumentLabelMismatch &&
@@ -3749,7 +3667,7 @@ bool FailureDiagnosis::diagnoseSubscriptErrors(SubscriptExpr *SE,
           // Classify how close this match is.  Non-subscript decls don't match.
           auto subscriptDecl = dyn_cast_or_null<SubscriptDecl>(cand.getDecl());
           if (!subscriptDecl ||
-              (inAssignmentDestination && !subscriptDecl->isSettable()))
+              (inAssignmentDestination && !subscriptDecl->supportsMutation()))
             return {CC_GeneralMismatch, {}};
 
           // Check whether the self type matches.
@@ -4146,44 +4064,6 @@ bool FailureDiagnosis::diagnoseArgumentGenericRequirements(
   return result == RequirementCheckResult::Failure;
 }
 
-/// When initializing Unsafe[Mutable]Pointer<T> from Unsafe[Mutable]RawPointer,
-/// issue a diagnostic that refers to the API for binding memory to a type.
-static bool isCastToTypedPointer(ConstraintSystem &CS, const Expr *Fn,
-                                 const Expr *Arg) {
-  auto &Ctx = CS.DC->getASTContext();
-  auto *TypeExp = dyn_cast<TypeExpr>(Fn);
-  auto *ParenExp = dyn_cast<ParenExpr>(Arg);
-  if (!TypeExp || !ParenExp)
-    return false;
-
-  auto InitType = CS.getInstanceType(TypeExp);
-  auto ArgType = CS.getType(ParenExp->getSubExpr());
-  if (InitType.isNull() || ArgType.isNull())
-    return false;
-
-  // unwrap one level of Optional
-  if (auto ArgOptType = ArgType->getOptionalObjectType())
-    ArgType = ArgOptType;
-
-  auto *InitNom = InitType->getAnyNominal();
-  if (!InitNom)
-    return false;
-
-  if (InitNom != Ctx.getUnsafeMutablePointerDecl()
-      && InitNom != Ctx.getUnsafePointerDecl()) {
-    return false;
-  }
-  auto *ArgNom = ArgType->getAnyNominal();
-  if (!ArgNom)
-    return false;
-
-  if (ArgNom != Ctx.getUnsafeMutableRawPointerDecl()
-      && ArgNom != Ctx.getUnsafeRawPointerDecl()) {
-    return false;
-  }
-  return true;
-}
-
 static bool diagnoseClosureExplicitParameterMismatch(
     ConstraintSystem &CS, SourceLoc loc,
     ArrayRef<AnyFunctionType::Param> params,
@@ -4278,7 +4158,7 @@ bool FailureDiagnosis::diagnoseTrailingClosureErrors(ApplyExpr *callExpr) {
   };
 
   SmallPtrSet<TypeBase *, 4> possibleTypes;
-  auto currentType = CS.getType(fnExpr);
+  auto currentType = CS.simplifyType(CS.getType(fnExpr));
 
   // If current type has type variables or unresolved types
   // let's try to re-typecheck it to see if we can get some
@@ -5070,11 +4950,6 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
              overloadName, argString, isInitializer);
   }
 
-  if (isCastToTypedPointer(CS, fnExpr, argExpr)) {
-    diagnose(fnExpr->getLoc(), diag::pointer_init_to_type)
-      .highlight(argExpr->getSourceRange());
-  }
-  
   // Did the user intend on invoking a different overload?
   calleeInfo.suggestPotentialOverloads(fnExpr->getLoc());
   return true;
@@ -6216,6 +6091,17 @@ bool FailureDiagnosis::visitObjectLiteralExpr(ObjectLiteralExpr *E) {
   return true;
 }
 
+// No need to do additional diagnostics for quote literals.
+bool FailureDiagnosis::visitQuoteLiteralExpr(QuoteLiteralExpr *E) {
+  return false;
+}
+
+// No need to do additional diagnostics for unquotes.
+bool FailureDiagnosis::visitUnquoteExpr(UnquoteExpr *E) { return false; }
+
+// No need to do additional diagnostics for decl quotes.
+bool FailureDiagnosis::visitDeclQuoteExpr(DeclQuoteExpr *E) { return false; }
+
 bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
   // If we have no contextual type, there is no way to resolve this.  Just
   // diagnose this as an ambiguity.
@@ -7028,9 +6914,8 @@ bool FailureDiagnosis::diagnoseAmbiguousGenericParameters() {
     // because type B would have no constraints associated with it.
     unsigned numConstraints = 0;
     {
-      llvm::SetVector<Constraint *> constraints;
-      CS.getConstraintGraph().gatherConstraints(
-          tv, constraints, ConstraintGraph::GatheringKind::EquivalenceClass,
+      auto constraints = CS.getConstraintGraph().gatherConstraints(
+          tv, ConstraintGraph::GatheringKind::EquivalenceClass,
           [&](Constraint *constraint) -> bool {
             // We are not interested in ConformsTo constraints because
             // we can't derive any concrete type information from them.

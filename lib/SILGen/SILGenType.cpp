@@ -24,6 +24,7 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeMemberVisitor.h"
 #include "swift/SIL/FormalLinkage.h"
@@ -85,9 +86,18 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
 
   if (usesObjCDynamicDispatch) {
     implFn = getDynamicThunk(derived, Types.getConstantInfo(derived).SILFnType);
+  // SWIFT_ENABLE_TENSORFLOW
+  } else if (auto *adafi = derived.autoDiffAssociatedFunctionIdentifier) {
+    // For JVP/VJP methods, create a vtable entry thunk. The thunk contains an
+    // `autodiff_function` instruction, which is later filled during the
+    // differentiation transform.
+    implFn = getOrCreateAutoDiffClassMethodThunk(
+        derived, Types.getConstantInfo(derived).SILFnType);
+  // SWIFT_ENABLE_TENSORFLOW END
   } else {
     implFn = getFunction(derived, NotForDefinition);
   }
+
 
   // As a fast path, if there is no override, definitely no thunk is necessary.
   if (derived == base)
@@ -108,13 +118,20 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
   
   auto overrideInfo = M.Types.getConstantOverrideInfo(derived, base);
 
+  // If base method's generic requirements are not satisfied by the derived
+  // method then we need a thunk.
+  using Direction = ASTContext::OverrideGenericSignatureReqCheck;
+  auto doesNotHaveGenericRequirementDifference =
+      getASTContext().overrideGenericSignatureReqsSatisfied(
+          baseDecl, derivedDecl, Direction::BaseReqSatisfiedByDerived);
+
   // The override member type is semantically a subtype of the base
   // member type. If the override is ABI compatible, we do not need
   // a thunk.
-  if (!baseLessVisibleThanDerived &&
+  if (doesNotHaveGenericRequirementDifference && !baseLessVisibleThanDerived &&
       M.Types.checkFunctionForABIDifferences(derivedInfo.SILFnType,
-                                             overrideInfo.SILFnType)
-      == TypeConverter::ABIDifference::Trivial)
+                                             overrideInfo.SILFnType) ==
+          TypeConverter::ABIDifference::Trivial)
     return SILVTable::Entry(base, implFn, implKind);
 
   // Generate the thunk name.
@@ -130,6 +147,18 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
         cast<ConstructorDecl>(baseDecl),
         cast<ConstructorDecl>(derivedDecl),
         base.kind == SILDeclRef::Kind::Allocator);
+    }
+  }
+  // SWIFT_ENABLE_TENSORFLOW
+  // TODO: Use proper mangling.
+  if (auto *adafi = derived.autoDiffAssociatedFunctionIdentifier) {
+    switch (adafi->getKind()) {
+      case AutoDiffAssociatedFunctionKind::JVP:
+        name += "_jvp";
+        break;
+      case AutoDiffAssociatedFunctionKind::VJP:
+        name += "_vjp";
+        break;
     }
   }
 
@@ -351,10 +380,11 @@ public:
       return asDerived().addMissingMethod(requirementRef);
 
     auto witnessStorage = cast<AbstractStorageDecl>(witness.getDecl());
-    auto witnessAccessor =
-      witnessStorage->getAccessor(reqAccessor->getAccessorKind());
-    if (!witnessAccessor)
+    if (reqAccessor->isSetter() && !witnessStorage->supportsMutation())
       return asDerived().addMissingMethod(requirementRef);
+
+    auto witnessAccessor =
+      witnessStorage->getSynthesizedAccessor(reqAccessor->getAccessorKind());
 
     return addMethodImplementation(requirementRef,
                                    // SWIFT_ENABLE_TENSORFLOW
@@ -410,6 +440,10 @@ public:
     // Nothing to do if this wasn't a normal conformance.
     if (!Conformance)
       return nullptr;
+
+    PrettyStackTraceConformance trace(SGM.getASTContext(),
+                                      "generating SIL witness table",
+                                      Conformance);
 
     auto *proto = Conformance->getProtocol();
     visitProtocolDecl(proto);
@@ -790,6 +824,10 @@ public:
   }
 
   void emit() {
+    PrettyStackTraceConformance trace(SGM.getASTContext(),
+                                      "generating SIL witness table",
+                                      conformance);
+
     // Add entries for all the requirements.
     visitProtocolDecl(conformance->getProtocol());
 
@@ -1027,7 +1065,9 @@ public:
     // Collect global variables for static properties.
     // FIXME: We can't statically emit a global variable for generic properties.
     if (vd->isStatic() && vd->hasStorage()) {
-      return emitTypeMemberGlobalVariable(SGM, vd);
+      emitTypeMemberGlobalVariable(SGM, vd);
+      visitAccessors(vd);
+      return;
     }
 
     visitAbstractStorageDecl(vd);
@@ -1035,7 +1075,6 @@ public:
 
   void visitSubscriptDecl(SubscriptDecl *sd) {
     SGM.emitDefaultArgGenerators(sd, sd->getIndices());
-
     visitAbstractStorageDecl(sd);
   }
 
@@ -1043,8 +1082,15 @@ public:
     // FIXME: Default implementations in protocols.
     if (asd->isObjC() && !isa<ProtocolDecl>(asd->getDeclContext()))
       SGM.emitObjCPropertyMethodThunks(asd);
-    
+
     SGM.tryEmitPropertyDescriptor(asd);
+    visitAccessors(asd);
+  }
+
+  void visitAccessors(AbstractStorageDecl *asd) {
+    for (auto *accessor : asd->getAllAccessors())
+      if (!accessor->hasForcedStaticDispatch())
+        visitFuncDecl(accessor);
   }
 };
 
@@ -1113,7 +1159,8 @@ public:
 
       if (hasDidSetOrWillSetDynamicReplacement &&
           isa<ExtensionDecl>(storage->getDeclContext()) &&
-          fd != storage->getDidSetFunc() && fd != storage->getWillSetFunc())
+          fd != storage->getParsedAccessor(AccessorKind::WillSet) &&
+          fd != storage->getParsedAccessor(AccessorKind::DidSet))
         return;
     }
     SGM.emitFunction(fd);
@@ -1145,8 +1192,11 @@ public:
           vd->hasDidSetOrWillSetDynamicReplacement();
       assert((vd->isStatic() || hasDidSetOrWillSetDynamicReplacement) &&
              "stored property in extension?!");
-      if (!hasDidSetOrWillSetDynamicReplacement)
-        return emitTypeMemberGlobalVariable(SGM, vd);
+      if (!hasDidSetOrWillSetDynamicReplacement) {
+        emitTypeMemberGlobalVariable(SGM, vd);
+        visitAccessors(vd);
+        return;
+      }
     }
     visitAbstractStorageDecl(vd);
   }
@@ -1161,11 +1211,18 @@ public:
     llvm_unreachable("enum elements aren't allowed in extensions");
   }
 
-  void visitAbstractStorageDecl(AbstractStorageDecl *vd) {
-    if (vd->isObjC())
-      SGM.emitObjCPropertyMethodThunks(vd);
+  void visitAbstractStorageDecl(AbstractStorageDecl *asd) {
+    if (asd->isObjC())
+      SGM.emitObjCPropertyMethodThunks(asd);
     
-    SGM.tryEmitPropertyDescriptor(vd);
+    SGM.tryEmitPropertyDescriptor(asd);
+    visitAccessors(asd);
+  }
+
+  void visitAccessors(AbstractStorageDecl *asd) {
+    for (auto *accessor : asd->getAllAccessors())
+      if (!accessor->hasForcedStaticDispatch())
+        visitFuncDecl(accessor);
   }
 };
 

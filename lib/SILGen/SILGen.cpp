@@ -615,13 +615,13 @@ static bool isEmittedOnDemand(SILModule &M, SILDeclRef constant) {
   if (isa<ClangModuleUnit>(dc))
     return true;
 
-  if (auto *sf = dyn_cast<SourceFile>(dc))
-    if (M.isWholeModule() || M.getAssociatedContext() == dc)
-      return false;
-
   if (auto *func = dyn_cast<FuncDecl>(d))
     if (func->hasForcedStaticDispatch())
       return true;
+
+  if (auto *sf = dyn_cast<SourceFile>(dc))
+    if (M.isWholeModule() || M.getAssociatedContext() == dc)
+      return false;
 
   return false;
 }
@@ -783,55 +783,80 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
 
   // SWIFT_ENABLE_TENSORFLOW
   // Create self-reordering thunks for JVPs/VJPs of `@differentiable` methods.
-  if (constant.hasDecl()) {
+  if (constant.hasDecl() && constant.getAbstractFunctionDecl()) {
     auto *AFD = constant.getAbstractFunctionDecl();
-    // Continue only if original function is an instance method.
-    if (AFD && AFD->isInstanceMember() &&
-        F->getLoweredFunctionType()->hasSelfParam()) {
-      // Jointly iterate over AST `@differentiable` attributes and SIL
-      // `[differentiable]` attributes.
-      auto diffAttrs = AFD->getAttrs().getAttributes<DifferentiableAttr>();
-      auto silDiffAttrs = F->getDifferentiableAttrs();
-      for (auto pair : llvm::zip(diffAttrs, silDiffAttrs)) {
-        auto *diffAttr = const_cast<DifferentiableAttr *>(std::get<0>(pair));
-        auto *silDiffAttr = std::get<1>(pair);
-        // Compute autodiff indices.
-        auto paramIndices = diffAttr->getParameterIndices();
-        auto loweredParamIndices = paramIndices->getLowered(
-            getASTContext(),
-            AFD->getInterfaceType()->castTo<AnyFunctionType>());
-        SILAutoDiffIndices indices(/*source*/ 0, loweredParamIndices);
-        assert(silDiffAttr->getIndices() == indices &&
-               "Expected matching @differentiable and [differentiable]");
+    auto origFnType = AFD->getInterfaceType()->castTo<AnyFunctionType>();
+    auto origSilFnType = F->getLoweredFunctionType();
+    // Jointly iterate over AST `@differentiable` attributes and SIL
+    // `[differentiable]` attributes.
+    auto diffAttrs = AFD->getAttrs().getAttributes<DifferentiableAttr>();
+    auto silDiffAttrs = F->getDifferentiableAttrs();
+    for (auto pair : llvm::zip(diffAttrs, silDiffAttrs)) {
+      auto *diffAttr = const_cast<DifferentiableAttr *>(std::get<0>(pair));
+      auto *silDiffAttr = std::get<1>(pair);
+      // Compute autodiff indices.
+      auto paramIndices = diffAttr->getParameterIndices();
+      auto loweredParamIndices = paramIndices->getLowered(
+          getASTContext(), origFnType);
+      SILAutoDiffIndices indices(/*source*/ 0, loweredParamIndices);
+      assert(silDiffAttr->getIndices() == indices &&
+             "Expected matching @differentiable and [differentiable]");
 
-        // If user-defined JVP/VJP is not differentiable wrt self or is only
-        // differentiable wrt self, reordering is not necessary. Continue.
-        auto selfParamIndex =
-            F->getArgumentsWithoutIndirectResults().size() - 1;
-        bool isWrtSelf = indices.isWrtParameter(selfParamIndex);
-        if (!isWrtSelf || indices.parameters->getNumIndices() == 1)
-          continue;
+      auto lookUpConformance = LookUpConformanceInModule(M.getSwiftModule());
+      auto expectedJVPType = origSilFnType->getAutoDiffAssociatedFunctionType(
+          indices.parameters, indices.source, /*differentiationOrder*/ 1,
+          AutoDiffAssociatedFunctionKind::JVP, M, lookUpConformance);
+      auto expectedVJPType = origSilFnType->getAutoDiffAssociatedFunctionType(
+          indices.parameters, indices.source, /*differentiationOrder*/ 1,
+          AutoDiffAssociatedFunctionKind::VJP, M, lookUpConformance);
 
-        // Thunk JVP method, if it is defined.
-        if (auto *jvpDecl = diffAttr->getJVPFunction()) {
-          auto *jvpFn = getFunction(SILDeclRef(jvpDecl), NotForDefinition);
-          auto *thunk = getOrCreateAutoDiffAssociatedFunctionReorderingThunk(
+      // Self reordering is necessary if wrt at least two parameters, including
+      // self.
+      auto shouldReorderSelf = [&]() {
+        if (!F->hasSelfParam())
+          return false;
+        auto selfParamIndex = origSilFnType->getNumParameters() - 1;
+        if (!indices.isWrtParameter(selfParamIndex))
+          return false;
+        return indices.parameters->getNumIndices() > 1;
+      };
+      bool reorderSelf = shouldReorderSelf();
+
+      // Thunk JVP method, if it is defined.
+      if (auto *jvpDecl = diffAttr->getJVPFunction()) {
+        SILFunction *jvpThunk;
+        auto *jvpFn = getFunction(SILDeclRef(jvpDecl), NotForDefinition);
+        if (reorderSelf || jvpFn->getLoweredFunctionType() != expectedJVPType) {
+          jvpThunk = getOrCreateAutoDiffAssociatedFunctionThunk(
               F, indices, jvpFn, AutoDiffAssociatedFunctionKind::JVP,
-              jvpFn->isSerialized());
-          silDiffAttr->setJVPName(thunk->getName());
-          // Unset JVP so that TBDGen triggers.
-          diffAttr->setJVPFunction(nullptr);
+              reorderSelf);
+        } else {
+          auto *id = AutoDiffAssociatedFunctionIdentifier::get(
+              AutoDiffAssociatedFunctionKind::JVP, /*differentiationOrder*/ 1,
+              diffAttr->getParameterIndices(), AFD->getASTContext());
+          jvpThunk = getOrCreateAutoDiffThunk(
+              constant.asAutoDiffAssociatedFunction(id), jvpFn,
+              expectedJVPType);
         }
-        // Thunk VJP method, if it is defined.
-        if (auto *vjpDecl = diffAttr->getVJPFunction()) {
-          auto *vjpFn = getFunction(SILDeclRef(vjpDecl), NotForDefinition);
-          auto *thunk = getOrCreateAutoDiffAssociatedFunctionReorderingThunk(
+        silDiffAttr->setJVPName(jvpThunk->getName());
+      }
+      // Thunk VJP method, if it is defined.
+      if (auto *vjpDecl = diffAttr->getVJPFunction()) {
+        SILFunction *vjpThunk;
+        auto *vjpFn = getFunction(SILDeclRef(vjpDecl), NotForDefinition);
+        if (reorderSelf || vjpFn->getLoweredFunctionType() != expectedVJPType) {
+          vjpThunk = getOrCreateAutoDiffAssociatedFunctionThunk(
               F, indices, vjpFn, AutoDiffAssociatedFunctionKind::VJP,
-              vjpFn->isSerialized());
-          silDiffAttr->setVJPName(thunk->getName());
-          // Unset VJP so that TBDGen triggers.
-          diffAttr->setVJPFunction(nullptr);
+              reorderSelf);
+        } else {
+          auto *id = AutoDiffAssociatedFunctionIdentifier::get(
+              AutoDiffAssociatedFunctionKind::VJP, /*differentiationOrder*/ 1,
+              diffAttr->getParameterIndices(), AFD->getASTContext());
+          vjpThunk = getOrCreateAutoDiffThunk(
+              constant.asAutoDiffAssociatedFunction(id), vjpFn,
+              expectedVJPType);
         }
+        silDiffAttr->setVJPName(vjpThunk->getName());
       }
     }
   }
@@ -1301,15 +1326,16 @@ void SILGenModule::emitObjCMethodThunk(FuncDecl *method) {
 }
 
 void SILGenModule::emitObjCPropertyMethodThunks(AbstractStorageDecl *prop) {
+  auto *getter = prop->getOpaqueAccessor(AccessorKind::Get);
+
   // If we don't actually need an entry point for the getter, do nothing.
-  if (!prop->getGetter() || !requiresObjCMethodEntryPoint(prop->getGetter()))
+  if (!getter || !requiresObjCMethodEntryPoint(getter))
     return;
 
-  auto getter = SILDeclRef(prop->getGetter(), SILDeclRef::Kind::Func)
-    .asForeign();
+  auto getterRef = SILDeclRef(getter, SILDeclRef::Kind::Func).asForeign();
 
   // Don't emit the thunks if they already exist.
-  if (hasFunction(getter))
+  if (hasFunction(getterRef))
     return;
 
   RegularLocation ThunkBodyLoc(prop);
@@ -1317,30 +1343,29 @@ void SILGenModule::emitObjCPropertyMethodThunks(AbstractStorageDecl *prop) {
   // ObjC entry points are always externally usable, so emitting can't be
   // delayed.
   {
-    SILFunction *f = getFunction(getter, ForDefinition);
-    preEmitFunction(getter, prop, f, ThunkBodyLoc);
+    SILFunction *f = getFunction(getterRef, ForDefinition);
+    preEmitFunction(getterRef, prop, f, ThunkBodyLoc);
     PrettyStackTraceSILFunction X("silgen objc property getter thunk", f);
     f->setBare(IsBare);
     f->setThunk(IsThunk);
-    SILGenFunction(*this, *f, prop->getGetter())
-      .emitNativeToForeignThunk(getter);
-    postEmitFunction(getter, f);
+    SILGenFunction(*this, *f, getter).emitNativeToForeignThunk(getterRef);
+    postEmitFunction(getterRef, f);
   }
 
   if (!prop->isSettable(prop->getDeclContext()))
     return;
 
   // FIXME: Add proper location.
-  auto setter = SILDeclRef(prop->getSetter(), SILDeclRef::Kind::Func)
-    .asForeign();
+  auto *setter = prop->getOpaqueAccessor(AccessorKind::Set);
+  auto setterRef = SILDeclRef(setter, SILDeclRef::Kind::Func).asForeign();
 
-  SILFunction *f = getFunction(setter, ForDefinition);
-  preEmitFunction(setter, prop, f, ThunkBodyLoc);
+  SILFunction *f = getFunction(setterRef, ForDefinition);
+  preEmitFunction(setterRef, prop, f, ThunkBodyLoc);
   PrettyStackTraceSILFunction X("silgen objc property setter thunk", f);
   f->setBare(IsBare);
   f->setThunk(IsThunk);
-  SILGenFunction(*this, *f, prop->getSetter()).emitNativeToForeignThunk(setter);
-  postEmitFunction(setter, f);
+  SILGenFunction(*this, *f, setter).emitNativeToForeignThunk(setterRef);
+  postEmitFunction(setterRef, f);
 }
 
 void SILGenModule::emitObjCConstructorThunk(ConstructorDecl *constructor) {
@@ -1457,11 +1482,12 @@ static bool canStorageUseTrivialDescriptor(SILGenModule &SGM,
       // property in a fixed-layout type.
       return !decl->isFormallyResilient();
     }
+
     // If the type is computed and doesn't have a setter that's hidden from
     // the public, then external components can form the canonical key path
     // without our help.
-    auto setter = decl->getSetter();
-    if (setter == nullptr)
+    auto *setter = decl->getOpaqueAccessor(AccessorKind::Set);
+    if (!setter)
       return true;
 
     if (setter->getFormalAccessScope(nullptr, true).isPublic())
@@ -1476,8 +1502,8 @@ static bool canStorageUseTrivialDescriptor(SILGenModule &SGM,
   // or a fixed-layout type may not have been.
   // Without availability information, only get-only computed properties
   // can resiliently use trivial descriptors.
-  return !SGM.canStorageUseStoredKeyPathComponent(decl, expansion)
-    && decl->getSetter() == nullptr;
+  return (!SGM.canStorageUseStoredKeyPathComponent(decl, expansion) &&
+          !decl->supportsMutation());
 }
 
 void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {

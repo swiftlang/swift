@@ -139,6 +139,8 @@ public:
   IGNORED_ATTR(CompilerEvaluable)
   IGNORED_ATTR(NoDerivative)
   IGNORED_ATTR(Transposing)
+  // TODO(TF-715): Allow @quoted on more decls.
+  IGNORED_ATTR(Quoted)
 #undef IGNORED_ATTR
 
   void visitAlignmentAttr(AlignmentAttr *attr) {
@@ -507,36 +509,6 @@ void AttributeEarlyChecker::visitNSManagedAttr(NSManagedAttr *attr) {
   // Everything below deals with restrictions on @NSManaged properties.
   auto *VD = cast<VarDecl>(D);
 
-  if (VD->isLet())
-    diagnoseAndRemoveAttr(attr, diag::attr_NSManaged_let_property);
-
-  auto diagnoseNotStored = [&](unsigned kind) {
-    TC.diagnose(attr->getLocation(), diag::attr_NSManaged_not_stored, kind);
-    return attr->setInvalid();
-  };
-
-  // @NSManaged properties must be written as stored.
-  auto impl = VD->getImplInfo();
-  if (impl.isSimpleStored()) {
-    // @NSManaged properties end up being computed; complain if there is
-    // an initializer.
-    if (VD->getParentInitializer()) {
-      TC.diagnose(attr->getLocation(), diag::attr_NSManaged_initial_value)
-        .highlight(VD->getParentInitializer()->getSourceRange());
-      auto PBD = VD->getParentPatternBinding();
-      PBD->setInit(PBD->getPatternEntryIndexForVarDecl(VD), nullptr);
-    }
-    // Otherwise, ok.
-  } else if (impl.getReadImpl() == ReadImplKind::Address ||
-             impl.getWriteImpl() == WriteImplKind::MutableAddress) {
-    return diagnoseNotStored(/*addressed*/ 2);
-  } else if (impl.getWriteImpl() == WriteImplKind::StoredWithObservers ||
-             impl.getWriteImpl() == WriteImplKind::InheritedWithObservers) {
-    return diagnoseNotStored(/*observing*/ 1);
-  } else {
-    return diagnoseNotStored(/*computed*/ 0);
-  }
-
   // @NSManaged properties cannot be @NSCopying
   if (auto *NSCopy = VD->getAttrs().getAttribute<NSCopyingAttr>())
     diagnoseAndRemoveAttr(NSCopy, diag::attr_NSManaged_NSCopying);
@@ -568,21 +540,12 @@ void AttributeEarlyChecker::visitLazyAttr(LazyAttr *attr) {
   // lazy may only be used on properties.
   auto *VD = cast<VarDecl>(D);
 
-  // It cannot currently be used on let's since we don't have a mutability model
-  // that supports it.
-  if (VD->isLet())
-    diagnoseAndRemoveAttr(attr, diag::lazy_not_on_let);
-
   auto attrs = VD->getAttrs();
   // 'lazy' is not allowed to have reference attributes
   if (auto *refAttr = attrs.getAttribute<ReferenceOwnershipAttr>())
     diagnoseAndRemoveAttr(attr, diag::lazy_not_strong, refAttr->get());
 
-  // lazy is not allowed on a protocol requirement.
   auto varDC = VD->getDeclContext();
-  if (isa<ProtocolDecl>(varDC))
-    diagnoseAndRemoveAttr(attr, diag::lazy_not_in_protocol);
-
 
   // 'lazy' is not allowed on a global variable or on a static property (which
   // are already lazily initialized).
@@ -593,25 +556,6 @@ void AttributeEarlyChecker::visitLazyAttr(LazyAttr *attr) {
     diagnoseAndRemoveAttr(attr, diag::lazy_on_already_lazy_global);
   } else if (!VD->getDeclContext()->isTypeContext()) {
     diagnoseAndRemoveAttr(attr, diag::lazy_must_be_property);
-  }
-
-  // lazy must have an initializer, and the pattern binding must be a simple
-  // one.
-  if (!VD->getParentInitializer())
-    diagnoseAndRemoveAttr(attr, diag::lazy_requires_initializer);
-
-  if (!VD->getParentPatternBinding()->getSingleVar())
-    diagnoseAndRemoveAttr(attr, diag::lazy_requires_single_var);
-
-
-  // TODO: Lazy properties can't yet be observed.
-  auto impl = VD->getImplInfo();
-  if (impl.isSimpleStored()) {
-    // ok
-  } else if (VD->hasStorage()) {
-    diagnoseAndRemoveAttr(attr, diag::lazy_not_observable);
-  } else {
-    diagnoseAndRemoveAttr(attr, diag::lazy_not_on_computed);
   }
 }
 
@@ -672,7 +616,7 @@ void AttributeEarlyChecker::visitSetterAccessAttr(
       storageKind = SK_Subscript;
     else if (storage->getDeclContext()->isTypeContext())
       storageKind = SK_Property;
-    else if (cast<VarDecl>(storage)->isImmutable())
+    else if (cast<VarDecl>(storage)->isLet())
       storageKind = SK_Constant;
     else
       storageKind = SK_Variable;
@@ -811,6 +755,8 @@ public:
     IGNORED_ATTR(WeakLinked)
     IGNORED_ATTR(DisfavoredOverload)
     IGNORED_ATTR(ProjectedValueProperty)
+    // TODO(TF-715): Allow @quoted on more decls.
+    IGNORED_ATTR(Quoted)
 #undef IGNORED_ATTR
 
   void visitAvailableAttr(AvailableAttr *attr);
@@ -1040,24 +986,6 @@ bool swift::isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl,
            NTD == TC.Context.getReferenceWritableKeyPathDecl();
   }
   return false;
-}
-
-Optional<std::pair<Type, Type>>
-swift::getRootAndResultTypeOfKeypathDynamicMember(SubscriptDecl *subscript,
-                                                  const DeclContext *DC) {
-  auto &TC = TypeChecker::createForContext(DC->getASTContext());
-
-  if (!isValidKeyPathDynamicMemberLookup(subscript, TC))
-    return None;
-
-  const auto *param = subscript->getIndices()->get(0);
-  auto keyPathType = param->getType()->getAs<BoundGenericType>();
-  if (!keyPathType)
-    return None;
-  auto genericArgs = keyPathType->getGenericArgs();
-  assert(!genericArgs.empty() && genericArgs.size() == 2 &&
-         "invalid keypath dynamic member");
-  return std::pair<Type, Type>{genericArgs[0], genericArgs[1]};
 }
 
 /// The @dynamicMemberLookup attribute is only allowed on types that have at
@@ -2175,6 +2103,9 @@ static FuncDecl *findReplacedAccessor(DeclName replacedVarName,
     Type replacementStorageType = getDynamicComparisonType(replacementStorage);
     results.erase(std::remove_if(results.begin(), results.end(),
         [&](ValueDecl *result) {
+          // Protocol requirements are not replaceable.
+          if (isa<ProtocolDecl>(result->getDeclContext()))
+            return true;
           // Check for static/instance mismatch.
           if (result->isStatic() != replacementStorage->isStatic())
             return true;
@@ -2256,9 +2187,13 @@ findReplacedFunction(DeclName replacedFunctionName,
   lookupReplacedDecl(replacedFunctionName, attr, replacement, results);
 
   for (auto *result : results) {
+    // Protocol requirements are not replaceable.
+    if (isa<ProtocolDecl>(result->getDeclContext()))
+      continue;
     // Check for static/instance mismatch.
     if (result->isStatic() != replacement->isStatic())
       continue;
+
     if (TC)
       TC->validateDecl(result);
     TypeMatchOptions matchMode = TypeMatchFlags::AllowABICompatible;
@@ -2580,8 +2515,8 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
       decl = func;
     } else if (auto storage = dyn_cast<AbstractStorageDecl>(D)) {
       decl = storage;
-      auto getter = storage->getGetter();
-      if (!getter || getter->isImplicit() || !getter->hasBody()) {
+      auto getter = storage->getParsedAccessor(AccessorKind::Get);
+      if (!getter || !getter->hasBody()) {
         TC.diagnose(attr->getLocation(),
                     diag::function_builder_attribute_on_storage_without_getter,
                     nominal->getFullName(),
@@ -2651,9 +2586,14 @@ static bool conformsToDifferentiable(Type type, DeclContext *DC) {
   auto &ctx = type->getASTContext();
   auto *differentiableProto =
       ctx.getProtocol(KnownProtocolKind::Differentiable);
-  return TypeChecker::conformsToProtocol(type, differentiableProto, DC,
-                                         ConformanceCheckFlags::InExpression)
-      .hasValue();
+  auto conf = TypeChecker::conformsToProtocol(
+      type, differentiableProto, DC, ConformanceCheckFlags::InExpression);
+  if (!conf)
+    return false;
+  // Try to get the `TangentVector` type witness, in case the conformance has
+  // not been fully checked and the type witness cannot be resolved.
+  Type tanType = conf->getTypeWitnessByName(type, ctx.Id_TangentVector);
+  return !tanType.isNull();
 };
 
 // SWIFT_ENABLE_TENSORFLOW
@@ -2695,8 +2635,8 @@ TypeChecker::inferDifferentiableParameters(
       paramType = derivativeGenEnv->mapTypeIntoContext(paramType);
     else
       paramType = AFD->mapTypeIntoContext(paramType);
-    // Return false for class/existential types.
-    if (paramType->isAnyClassReferenceType() || paramType->isExistentialType())
+    // Return false for existential types.
+    if (paramType->isExistentialType())
       return false;
     // Return false for function types.
     if (paramType->is<AnyFunctionType>())
@@ -2803,6 +2743,14 @@ static FuncDecl *resolveAutoDiffAssociatedFunction(
 
   if (checkAccessControl(candidate))
     return nullptr;
+
+  // Derivatives of class members must be final.
+  if (original->getDeclContext()->getSelfClassDecl() &&
+      !candidate->isFinal()) {
+    TC.diagnose(nameLoc,
+                diag::differentiable_attr_class_derivative_not_final);
+    return nullptr;
+  }
 
   return candidate;
 }
@@ -3135,13 +3083,10 @@ static bool checkDifferentiationParameters(
           derivativeGenEnv->mapTypeIntoContext(wrtParamType);
     else
       wrtParamType = AFD->mapTypeIntoContext(wrtParamType);
-    // Parameter cannot have a class or existential type.
-    if ((!wrtParamType->hasTypeParameter() &&
-         wrtParamType->isAnyClassReferenceType()) ||
-        wrtParamType->isExistentialType()) {
+    // Parameter cannot have an existential type.
+    if (wrtParamType->isExistentialType()) {
       TC.diagnose(
-           loc,
-           diag::diff_params_clause_cannot_diff_wrt_objects_or_existentials,
+           loc, diag::diff_params_clause_cannot_diff_wrt_existentials,
            wrtParamType);
       return true;
     }
@@ -3183,13 +3128,10 @@ static bool checkTransposingParameters(
     SourceLoc loc = parsedWrtParams.empty()
         ? attrLoc
         : parsedWrtParams[i].getLoc();
-    // Parameter cannot have a class or existential type.
-    if ((!wrtParamType->hasTypeParameter() &&
-         wrtParamType->isAnyClassReferenceType()) ||
-         wrtParamType->isExistentialType()) {
-      TC.diagnose(
-          loc, diag::diff_params_clause_cannot_diff_wrt_objects_or_existentials,
-          wrtParamType);
+    // Parameter cannot have an existential type.
+    if (wrtParamType->isExistentialType()) {
+      TC.diagnose(loc, diag::diff_params_clause_cannot_diff_wrt_existentials,
+                  wrtParamType);
       return true;
     }
     // Parameter cannot have a function type.
@@ -3237,7 +3179,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     // TODO(TF-129): Infer setter to also be `@differentiable` after
     // differentiation supports inout parameters. This requires refactoring to
     // handle multiple `original` functions (both getter and setter).
-    original = asd->getGetter();
+    original = asd->getAccessor(AccessorKind::Get);
   }
   // Setters are not yet supported.
   // TODO(TF-129): Remove this when differentiation supports inout parameters.
@@ -3249,13 +3191,6 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   // this.
   if (!original) {
     diagnoseAndRemoveAttr(attr, diag::invalid_decl_attribute, attr);
-    return;
-  }
-
-  // Class members are not supported by differentiation yet.
-  if (original->getInnermostTypeContext() &&
-      isa<ClassDecl>(original->getInnermostTypeContext())) {
-    diagnoseAndRemoveAttr(attr, diag::differentiable_attr_class_unsupported);
     return;
   }
 
@@ -3276,14 +3211,41 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     return;
   }
 
-  // Start type-checking the arguments of the @differentiable attribute. This
-  // covers 'wrt:', 'jvp:', 'vjp:', and 'where', all of which are optional.
-
-  // `@differentiable` attributes on protocol requirements do not support
-  // JVP/VJP or 'where' clauses.
   bool isOriginalProtocolRequirement =
       isa<ProtocolDecl>(original->getDeclContext()) &&
       original->isProtocolRequirement();
+
+  bool isOriginalClassMember =
+      original->getDeclContext() &&
+      original->getDeclContext()->getSelfClassDecl();
+
+  // Diagnose invalid class conditions.
+  if (isOriginalClassMember) {
+    // Class methods returning dynamic `Self` are not supported.
+    // (For class methods, dynamic `Self` is supported only as the single
+    //  result - JVPs/VJPs would not type-check.
+    if (auto *originalFn = dyn_cast<FuncDecl>(original)) {
+      if (originalFn->hasDynamicSelfResult()) {
+        TC.diagnose(attr->getLocation(),
+                    diag::differentiable_attr_class_member_no_dynamic_self);
+        attr->setInvalid();
+        return;
+      }
+    }
+
+    // TODO(TF-654): Class initializers are not yet supported.
+    // Extra JVP/VJP type calculation logic is necessary because classes have
+    // both allocators and initializers.
+    if (auto *initDecl = dyn_cast<ConstructorDecl>(original)) {
+      TC.diagnose(attr->getLocation(),
+                  diag::differentiable_attr_class_init_not_yet_supported);
+      attr->setInvalid();
+      return;
+    }
+  }
+
+  // Start type-checking the arguments of the @differentiable attribute. This
+  // covers 'wrt:', 'jvp:', 'vjp:', and 'where', all of which are optional.
 
   // Handle 'where' clause, if it exists.
   // - Resolve attribute where clause requirements and store in the attribute
@@ -3496,7 +3458,8 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     newAttr->setJVPFunction(attr->getJVPFunction());
     newAttr->setVJPFunction(attr->getVJPFunction());
     auto insertion = ctx.DifferentiableAttrs.try_emplace(
-        {asd->getGetter(), newAttr->getParameterIndices()}, newAttr);
+        {asd->getAccessor(AccessorKind::Get), newAttr->getParameterIndices()},
+        newAttr);
     // Valid `@differentiable` attributes are uniqued by their parameter
     // indices. Reject duplicate attributes for the same decl and parameter
     // indices pair.
@@ -3506,7 +3469,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
                   diag::differentiable_attr_duplicate_note);
       return;
     }
-    asd->getGetter()->getAttrs().add(newAttr);
+    asd->getAccessor(AccessorKind::Get)->getAttrs().add(newAttr);
     return;
   }
   auto insertion = ctx.DifferentiableAttrs.try_emplace(
@@ -4449,7 +4412,9 @@ void TypeChecker::addImplicitDynamicAttribute(Decl *D) {
     // Don't turn stored into computed properties. This could conflict with
     // exclusivity checking.
     // If there is a didSet or willSet function we allow dynamic replacement.
-    if (VD->hasStorage() && !VD->getDidSetFunc() && !VD->getWillSetFunc())
+    if (VD->hasStorage() &&
+        !VD->getParsedAccessor(AccessorKind::DidSet) &&
+        !VD->getParsedAccessor(AccessorKind::WillSet))
       return;
     // Don't add dynamic to local variables.
     if (VD->getDeclContext()->isLocalContext())

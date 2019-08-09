@@ -13,13 +13,16 @@
 // This file implements semantic analysis for declaration overrides.
 //
 //===----------------------------------------------------------------------===//
-#include "TypeChecker.h"
 #include "CodeSynthesis.h"
 #include "MiscDiagnostics.h"
 #include "TypeCheckAvailability.h"
+#include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Availability.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/GenericSignature.h"
+#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -603,16 +606,20 @@ static bool overridesDifferentiableAttribute(ValueDecl *derivedDecl,
   if (!derivedAFD || !baseAFD)
     return false;
 
-  auto derivedDAs = derivedAFD->getAttrs().getAttributes<DifferentiableAttr>();
+  auto derivedDAs = derivedAFD->getAttrs()
+      .getAttributes<DifferentiableAttr, /*AllowInvalid*/ true>();
   auto baseDAs = baseAFD->getAttrs().getAttributes<DifferentiableAttr>();
 
-  // Make sure all the differentiable attributes in `baseDecl` are
+  // Make sure all the `@differentiable` attributes in `baseDecl` are
   // also declared in `derivedDecl`.
-  for (auto baseDA : baseDAs) {
+  bool diagnosed = false;
+  for (auto *baseDA : baseDAs) {
     auto baseParameters = baseDA->getParameterIndices();
     auto defined = false;
     for (auto derivedDA : derivedDAs) {
       auto derivedParameters = derivedDA->getParameterIndices();
+      // If base and derived parameter indices are both defined, check whether
+      // base parameter indices are a subset of derived parameter indices.
       if (derivedParameters &&
           baseParameters &&
           AutoDiffIndexSubset::get(
@@ -622,43 +629,57 @@ static bool overridesDifferentiableAttribute(ValueDecl *derivedDecl,
         defined = true;
         break;
       }
+      // Parameter indices may not be resolved because override matching happens
+      // before attribute checking for declaration type-checking.
+      // If parameter indices have not been resolved, avoid emitting diagnostic.
+      // Assume that attributes are valid.
+      if (!derivedParameters || !baseParameters) {
+        defined = true;
+        break;
+      }
     }
-    if (!defined) {
-      // Omit printing wrt clause if attribute differentiation parameters match
-      // inferred differentiation parameters.
-      auto *inferredParameters = TypeChecker::inferDifferentiableParameters(
-          derivedAFD, nullptr);
-      bool omitWrtClause = !baseParameters ||
-          baseParameters->parameters.count() ==
-          inferredParameters->parameters.count();
-      // Get `@differentiable` attribute description.
-      std::string baseDAString;
-      llvm::raw_string_ostream stream(baseDAString);
-      baseDA->print(stream, derivedDecl, omitWrtClause,
-                    /*omitAssociatedFunctions*/ true);
-      diags.diagnose(
-          derivedDecl, diag::overriding_decl_missing_differentiable_attr,
-          StringRef(stream.str()).trim());
-      return false;
-    }
+    if (defined)
+      continue;
+    diagnosed = true;
+    // Omit printing wrt clause if attribute differentiation parameters match
+    // inferred differentiation parameters.
+    auto *inferredParameters = TypeChecker::inferDifferentiableParameters(
+        derivedAFD, nullptr);
+    bool omitWrtClause = !baseParameters ||
+        baseParameters->parameters.count() ==
+        inferredParameters->parameters.count();
+    // Get `@differentiable` attribute description.
+    std::string baseDAString;
+    llvm::raw_string_ostream stream(baseDAString);
+    baseDA->print(stream, derivedDecl, omitWrtClause,
+                  /*omitAssociatedFunctions*/ true);
+    diags.diagnose(
+        derivedDecl, diag::overriding_decl_missing_differentiable_attr,
+        StringRef(stream.str()).trim());
+    diags.diagnose(baseDecl, diag::overridden_here);
   }
-
-  // If there is no differentiable attribute in `derivedDecl`, then
-  // overriding is not allowed.
-  if (derivedDAs.empty())
+  // If a diagnostic was produced, return false.
+  if (diagnosed)
     return false;
 
-  // Finally, go through all differentiable attributes in
-  // `derivedDecl` and check if they subsume any of the
-  // differentiable attributes in `baseDecl`.
+  // If there is no `@differentiable` attribute in `derivedDecl`, then
+  // overriding is not allowed.
+  auto *derivedDC = derivedDecl->getDeclContext();
+  auto *baseDC = baseDecl->getDeclContext();
+  if (derivedDC->getSelfClassDecl() && baseDC->getSelfClassDecl())
+    return false;
+
+  // Finally, go through all `@differentiable` attributes in `derivedDecl` and
+  // check if they subsume any of the `@differentiable` attributes in
+  // `baseDecl`.
   for (auto derivedDA : derivedDAs) {
     auto derivedParameters = derivedDA->getParameterIndices();
     auto overrides = true;
     for (auto baseDA : baseDAs) {
       auto baseParameters = baseDA->getParameterIndices();
-      // If the differentiable indices of `derivedDA` are a
-      // subset of those of `baseDA`, then `baseDA` subsumes
-      // `derivedDA` and the function is marked as overridden.
+      // If the parameter indices of `derivedDA` are a subset of those of
+      // `baseDA`, then `baseDA` subsumes `derivedDA` and the function is
+      // marked as overridden.
       if (derivedParameters &&
             baseParameters &&
             AutoDiffIndexSubset::get(
@@ -667,6 +688,9 @@ static bool overridesDifferentiableAttribute(ValueDecl *derivedDecl,
                   ctx, baseParameters->parameters))) {
         overrides = false;
         break;
+      }
+      if (!derivedParameters && !baseParameters) {
+        assert(false);
       }
     }
     if (overrides)
@@ -982,23 +1006,20 @@ static void checkOverrideAccessControl(ValueDecl *baseDecl, ValueDecl *decl,
     bool shouldDiagnose = !decl->isAccessibleFrom(scopeDC);
 
     bool shouldDiagnoseSetter = false;
-    if (!shouldDiagnose && baseDecl->isSettable(dc)){
-      auto matchASD = cast<AbstractStorageDecl>(baseDecl);
-      if (matchASD->isSetterAccessibleFrom(dc)) {
-        // Match sure we've created the setter.
-        if (!matchASD->getSetter())
-          maybeAddAccessorsToStorage(matchASD);
+    if (auto matchASD = dyn_cast<AbstractStorageDecl>(baseDecl)) {
+      if (!shouldDiagnose && matchASD->isSettable(dc)){
+        if (matchASD->isSetterAccessibleFrom(dc)) {
+          auto matchSetterAccessScope =
+            matchASD->getSetterFormalAccessScope(dc);
+          auto requiredSetterAccessScope =
+            matchSetterAccessScope.intersectWith(classAccessScope);
+          auto setterScopeDC = requiredSetterAccessScope->getDeclContext();
 
-        auto matchSetterAccessScope = matchASD->getSetter()
-          ->getFormalAccessScope(dc);
-        auto requiredSetterAccessScope =
-          matchSetterAccessScope.intersectWith(classAccessScope);
-        auto setterScopeDC = requiredSetterAccessScope->getDeclContext();
-
-        const auto *ASD = cast<AbstractStorageDecl>(decl);
-        shouldDiagnoseSetter =
-            ASD->isSettable(setterScopeDC) &&
-            !ASD->isSetterAccessibleFrom(setterScopeDC);
+          const auto *ASD = cast<AbstractStorageDecl>(decl);
+          shouldDiagnoseSetter =
+              ASD->isSettable(setterScopeDC) &&
+              !ASD->isSetterAccessibleFrom(setterScopeDC);
+        }
       }
     }
 
@@ -1035,6 +1056,24 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
                                baseDecl->getFullName());
     fixDeclarationName(diag, decl, baseDecl->getFullName());
     emittedMatchError = true;
+  }
+
+  auto baseGenericCtx = baseDecl->getAsGenericContext();
+  auto derivedGenericCtx = decl->getAsGenericContext();
+
+  using Direction = ASTContext::OverrideGenericSignatureReqCheck;
+  if (baseGenericCtx && derivedGenericCtx) {
+    if (!ctx.overrideGenericSignatureReqsSatisfied(
+            baseDecl, decl, Direction::DerivedReqSatisfiedByBase)) {
+      auto newSig = ctx.getOverrideGenericSignature(baseDecl, decl);
+      diags.diagnose(decl, diag::override_method_different_generic_sig,
+                     decl->getBaseName(),
+                     derivedGenericCtx->getGenericSignature()->getAsString(),
+                     baseGenericCtx->getGenericSignature()->getAsString(),
+                     newSig->getAsString());
+      diags.diagnose(baseDecl, diag::overridden_here);
+      emittedMatchError = true;
+    }
   }
 
   // If we have an explicit ownership modifier and our parent doesn't,
@@ -1115,7 +1154,7 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
     // Otherwise, if this is a subscript, validate that covariance is ok.
     // If the parent is non-mutable, it's okay to be covariant.
     auto parentSubscript = cast<SubscriptDecl>(baseDecl);
-    if (parentSubscript->getSetter()) {
+    if (parentSubscript->supportsMutation()) {
       diags.diagnose(subscript, diag::override_mutable_covariant_subscript,
                      declTy, baseTy);
       diags.diagnose(baseDecl, diag::subscript_override_here);
@@ -1162,7 +1201,7 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
           IsSilentDifference = true;
 
     // The overridden property must not be mutable.
-    if (cast<AbstractStorageDecl>(baseDecl)->getSetter() &&
+    if (cast<AbstractStorageDecl>(baseDecl)->supportsMutation() &&
         !IsSilentDifference) {
       diags.diagnose(property, diag::override_mutable_covariant_property,
                   property->getName(), parentPropertyTy, propertyTy);
@@ -1432,6 +1471,8 @@ namespace  {
     UNINTERESTING_ATTR(DisfavoredOverload)
     UNINTERESTING_ATTR(FunctionBuilder)
     UNINTERESTING_ATTR(ProjectedValueProperty)
+
+    UNINTERESTING_ATTR(Quoted)
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {
@@ -1553,8 +1594,8 @@ isRedundantAccessorOverrideAvailabilityDiagnostic(ValueDecl *override,
   // Returns true if we will already diagnose a bad override
   // on the property's accessor of the given kind.
   auto accessorOverrideAlreadyDiagnosed = [&](AccessorKind kind) {
-    FuncDecl *overrideAccessor = overrideASD->getAccessor(kind);
-    FuncDecl *baseAccessor = baseASD->getAccessor(kind);
+    FuncDecl *overrideAccessor = overrideASD->getOpaqueAccessor(kind);
+    FuncDecl *baseAccessor = baseASD->getOpaqueAccessor(kind);
     if (overrideAccessor && baseAccessor &&
         !isAvailabilitySafeForOverride(overrideAccessor, baseAccessor)) {
       return true;
@@ -1638,7 +1679,8 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
     // Make sure that the overriding property doesn't have storage.
     if ((overrideASD->hasStorage() ||
          overrideASD->getAttrs().hasAttribute<LazyAttr>()) &&
-        !(overrideASD->getWillSetFunc() || overrideASD->getDidSetFunc())) {
+        !(overrideASD->getParsedAccessor(AccessorKind::WillSet) ||
+          overrideASD->getParsedAccessor(AccessorKind::DidSet))) {
       bool downgradeToWarning = false;
       if (!ctx.isSwiftVersionAtLeast(5) &&
           overrideASD->getAttrs().hasAttribute<LazyAttr>()) {
@@ -1676,7 +1718,7 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
     // Make sure we're not overriding a settable property with a non-settable
     // one.  The only reasonable semantics for this would be to inherit the
     // setter but override the getter, and that would be surprising at best.
-    if (baseIsSettable && !override->isSettable(override->getDeclContext())) {
+    if (baseIsSettable && !overrideASD->isSettable(override->getDeclContext())) {
       diags.diagnose(overrideASD, diag::override_mutable_with_readonly_property,
                      overrideASD->getBaseName().getIdentifier());
       diags.diagnose(baseASD, diag::property_override_here);
@@ -1959,7 +2001,7 @@ OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     SmallVector<OverrideMatch, 2> matches;
     for (auto overridden : overridingASD->getOverriddenDecls()) {
       auto baseASD = cast<AbstractStorageDecl>(overridden);
-      maybeAddAccessorsToStorage(baseASD);
+      addExpectedOpaqueAccessorsToStorage(baseASD);
 
       auto kind = accessor->getAccessorKind();
 
@@ -1969,11 +2011,12 @@ OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
         continue;
 
       // Find the base accessor; if there isn't one, we're done.
-      auto baseAccessor = baseASD->getAccessor(kind);
-      if (!baseAccessor) continue;
-
-      if (baseAccessor->hasForcedStaticDispatch())
+      auto baseAccessor = baseASD->getOpaqueAccessor(kind);
+      if (!baseAccessor)
         continue;
+
+      assert(!baseAccessor->hasForcedStaticDispatch() &&
+             "opaque accessor with forced static dispatch?");
 
       switch (kind) {
       case AccessorKind::Get:

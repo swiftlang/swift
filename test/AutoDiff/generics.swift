@@ -141,7 +141,6 @@ func TF_508() {
 struct TF_523_Struct : Differentiable & AdditiveArithmetic {
   var a: Float = 1
   typealias TangentVector = TF_523_Struct
-  typealias AllDifferentiableVariables = TF_523_Struct
 }
 
 @differentiable
@@ -167,6 +166,29 @@ func TF_534<Model: TF_534_Layer>(
   }.0
 }
 
+// TF-546: Test that SILGen linear map thunk performs correct reabstraction.
+struct TF_546<T: FloatingPoint>: AdditiveArithmetic {
+  var real: T
+  var imaginary: T
+
+  @differentiable(vjp: _vjpInit where T: Differentiable, T == T.TangentVector)
+  init(real: T = 0, imaginary: T = 0) {
+    self.real = real
+    self.imaginary = imaginary
+  }
+}
+extension TF_546: Differentiable where T: Differentiable {
+  typealias TangentVector = TF_546
+}
+extension TF_546 where T: Differentiable, T == T.TangentVector {
+  static func _vjpInit(real: T, imaginary: T) -> (TF_546, (TF_546) -> (T, T)) {
+    return (TF_546(real: real, imaginary: imaginary), { ($0.real, $0.imaginary) })
+  }
+}
+let _: @differentiable(Float, Float) -> TF_546<Float> = { r, i in
+  TF_546(real: r, imaginary: i)
+}
+
 // TF-652: Test VJPEmitter substitution map generic signature.
 // The substitution map should have the VJP's generic signature, not the
 // original function's.
@@ -179,6 +201,77 @@ func test<Scalar: Numeric>(x: TF_652<Scalar>) -> TF_652<Scalar> {
     let _ = x
   }
   return x
+}
+
+// TF-682: Test that SILGen linear map thunk performs correct reabstraction.
+protocol TF_682_Proto {
+  associatedtype Scalar
+}
+extension TF_682_Proto where Scalar : FloatingPoint {
+  @differentiable(
+    vjp: vjpFoo
+    where Self : Differentiable, Scalar : Differentiable,
+          // Same-type requirement with dependent member type.
+          Self.TangentVector == Float
+  )
+  func foo(lhs: Self) -> Self {
+    return lhs
+  }
+}
+extension TF_682_Proto where Self : Differentiable,
+                             Scalar : FloatingPoint & Differentiable,
+                             Self.TangentVector == Float {
+  func vjpFoo(lhs: Self)
+      -> (Self, (TangentVector) -> (TangentVector, TangentVector)) {
+    return (lhs, { v in (v, v) })
+  }
+}
+
+// TF-688: Test generic curry thunk cloning.
+public struct TF_688_Struct<Scalar> {
+  var x: Scalar
+}
+extension TF_688_Struct: Differentiable where Scalar: Differentiable {
+  @differentiable
+  public static func id(x: Self) -> Self {
+    return x
+  }
+}
+@differentiable(wrt: x)
+public func TF_688<Scalar: Differentiable>(
+  _ x: TF_688_Struct<Scalar>,
+  reduction: @differentiable (TF_688_Struct<Scalar>) -> TF_688_Struct<Scalar> = TF_688_Struct.id
+) -> TF_688_Struct<Scalar> {
+  reduction(x)
+}
+
+// TF-697: Test generic requirements of generated AD associated function.
+protocol TF_697_Module: Differentiable {
+    associatedtype Input
+    associatedtype Output: Differentiable
+
+    @differentiable(wrt: self)
+    func callModule(_ input: Input) -> Output
+}
+protocol TF_697_Layer: TF_697_Module where Input: Differentiable {
+    @differentiable
+    func callLayer(_ input: Input) -> Output
+}
+struct TF_697_Sequential<Layer1: TF_697_Module, Layer2: TF_697_Layer>: TF_697_Module
+    where Layer1.Output == Layer2.Input {
+    var layer1: Layer1
+    var layer2: Layer2
+
+    @differentiable(wrt: self)
+    func callModule(_ input: Layer1.Input) -> Layer2.Output {
+        layer2.callLayer(layer1.callModule(input))
+    }
+}
+extension TF_697_Sequential: TF_697_Layer where Layer1: TF_697_Layer {
+    @differentiable
+    func callLayer(_ input: Layer1.Input) -> Layer2.Output {
+        layer2.callLayer(layer1.callLayer(input))
+    }
 }
 
 // TODO: add more tests.

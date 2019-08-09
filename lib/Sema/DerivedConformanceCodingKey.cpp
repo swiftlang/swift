@@ -29,7 +29,8 @@ using namespace swift;
 /// Sets the body of the given function to `return nil`.
 ///
 /// \param funcDecl The function whose body to set.
-static void deriveNilReturn(AbstractFunctionDecl *funcDecl, void *) {
+static std::pair<BraceStmt *, bool>
+deriveNilReturn(AbstractFunctionDecl *funcDecl, void *) {
   auto *parentDC = funcDecl->getDeclContext();
   auto &C = parentDC->getASTContext();
 
@@ -37,13 +38,14 @@ static void deriveNilReturn(AbstractFunctionDecl *funcDecl, void *) {
   auto *returnStmt = new (C) ReturnStmt(SourceLoc(), nilExpr);
   auto *body = BraceStmt::create(C, SourceLoc(), ASTNode(returnStmt),
                                  SourceLoc());
-  funcDecl->setBody(body);
+  return { body, /*isTypeChecked=*/false };
 }
 
 /// Sets the body of the given function to `return self.rawValue`.
 ///
 /// \param funcDecl The function whose body to set.
-static void deriveRawValueReturn(AbstractFunctionDecl *funcDecl, void *) {
+static std::pair<BraceStmt *, bool>
+deriveRawValueReturn(AbstractFunctionDecl *funcDecl, void *) {
   auto *parentDC = funcDecl->getDeclContext();
   auto &C = parentDC->getASTContext();
 
@@ -55,14 +57,15 @@ static void deriveRawValueReturn(AbstractFunctionDecl *funcDecl, void *) {
   auto *returnStmt = new (C) ReturnStmt(SourceLoc(), memberRef);
   auto *body = BraceStmt::create(C, SourceLoc(), ASTNode(returnStmt),
                                  SourceLoc());
-  funcDecl->setBody(body);
+  return { body, /*isTypeChecked=*/false };
 }
 
 /// Sets the body of the given function to `self.init(rawValue:)`, passing along
 /// the parameter of the given constructor.
 ///
 /// \param initDecl The constructor whose body to set.
-static void deriveRawValueInit(AbstractFunctionDecl *initDecl, void *) {
+static std::pair<BraceStmt *, bool>
+deriveRawValueInit(AbstractFunctionDecl *initDecl, void *) {
   auto *parentDC = initDecl->getDeclContext();
   auto &C = parentDC->getASTContext();
 
@@ -74,7 +77,7 @@ static void deriveRawValueInit(AbstractFunctionDecl *initDecl, void *) {
 
   // rawValue param to init(rawValue:)
   auto *rawValueDecl = new (C) ParamDecl(
-      VarDecl::Specifier::Default, SourceLoc(), SourceLoc(), C.Id_rawValue,
+      ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(), C.Id_rawValue,
       SourceLoc(), C.Id_rawValue, parentDC);
   rawValueDecl->setInterfaceType(C.getIntDecl()->getDeclaredType());
   rawValueDecl->setImplicit();
@@ -96,7 +99,7 @@ static void deriveRawValueInit(AbstractFunctionDecl *initDecl, void *) {
 
   auto *body = BraceStmt::create(C, SourceLoc(), ASTNode(callExpr),
                                  SourceLoc());
-  initDecl->setBody(body);
+  return { body, /*isTypeChecked=*/false };
 }
 
 /// Synthesizes a constructor declaration with the given parameter name and
@@ -116,7 +119,7 @@ static ValueDecl *deriveInitDecl(DerivedConformance &derived, Type paramType,
 
   // rawValue
   auto *rawDecl =
-      new (C) ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+      new (C) ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(),
                         paramName, SourceLoc(), paramName, parentDC);
   rawDecl->setInterfaceType(paramType);
   rawDecl->setImplicit();
@@ -179,7 +182,6 @@ static ValueDecl *deriveProperty(DerivedConformance &derived, Type type,
   synthesizer(getterDecl);
 
   auto *dc = cast<IterableDeclContext>(derived.ConformanceDecl);
-  dc->addMember(getterDecl);
   dc->addMember(propDecl);
   dc->addMember(pbDecl);
   return propDecl;
@@ -189,7 +191,7 @@ static ValueDecl *deriveProperty(DerivedConformance &derived, Type type,
 /// switching on `self`.
 ///
 /// \param strValDecl The function whose body to set.
-static void
+static std::pair<BraceStmt *, bool>
 deriveBodyCodingKey_enum_stringValue(AbstractFunctionDecl *strValDecl, void *) {
   // enum SomeEnum {
   //   case A, B, C
@@ -247,14 +249,14 @@ deriveBodyCodingKey_enum_stringValue(AbstractFunctionDecl *strValDecl, void *) {
     body = BraceStmt::create(C, SourceLoc(), ASTNode(switchStmt), SourceLoc());
   }
 
-  strValDecl->setBody(body);
+  return { body, /*isTypeChecked=*/false };
 }
 
 /// Sets the body of the given constructor to initialize `self` based on the
 /// value of the given string param.
 ///
 /// \param initDecl The function whose body to set.
-static void
+static std::pair<BraceStmt *, bool>
 deriveBodyCodingKey_init_stringValue(AbstractFunctionDecl *initDecl, void *) {
   // enum SomeEnum {
   //   case A, B, C
@@ -279,8 +281,7 @@ deriveBodyCodingKey_init_stringValue(AbstractFunctionDecl *initDecl, void *) {
 
   auto elements = enumDecl->getAllElements();
   if (elements.empty() /* empty enum */) {
-    deriveNilReturn(initDecl, nullptr);
-    return;
+    return deriveNilReturn(initDecl, nullptr);
   }
 
   auto *selfRef = DerivedConformance::createSelfDeclRef(initDecl);
@@ -327,7 +328,7 @@ deriveBodyCodingKey_init_stringValue(AbstractFunctionDecl *initDecl, void *) {
                                         SourceLoc(), C);
   auto *body = BraceStmt::create(C, SourceLoc(), ASTNode(switchStmt),
                                  SourceLoc());
-  initDecl->setBody(body);
+  return { body, /*isTypeChecked=*/false };
 }
 
 /// Returns whether the given enum is eligible for CodingKey synthesis.

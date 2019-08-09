@@ -121,6 +121,7 @@ IDENTIFIER(type)
 IDENTIFIER(Value)
 IDENTIFIER(value)
 IDENTIFIER_WITH_NAME(value_, "_value")
+IDENTIFIER(Void)
 IDENTIFIER(WinSDK)
 IDENTIFIER(with)
 IDENTIFIER(withArguments)
@@ -154,9 +155,7 @@ IDENTIFIER(by)
 IDENTIFIER(scale)
 IDENTIFIER(x)
 // Differentiable
-IDENTIFIER(AllDifferentiableVariables)
 IDENTIFIER(TangentVector)
-IDENTIFIER(allDifferentiableVariables)
 IDENTIFIER(move)
 
 // Kinds of layout constraints
@@ -224,6 +223,9 @@ IDENTIFIER_(nsError)
 
 // Custom string interpolation type used by os log APIs.
 IDENTIFIER(OSLogMessage)
+
+// Module that supports #quote(...) literals.
+IDENTIFIER(Quote)
 
 #undef IDENTIFIER
 #undef IDENTIFIER_

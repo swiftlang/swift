@@ -240,11 +240,11 @@ static void convertOwnershipConventionsGivenParamInfos(
     llvm::SmallVectorImpl<ManagedValue> &outVar) {
   assert(params.size() == values.size() &&
          "Different number of params from arguments");
-  transform(indices(params), std::back_inserter(outVar),
-            [&](unsigned i) -> ManagedValue {
-              return convertOwnershipConventionGivenParamInfo(
-                  SGF, params[i], values[i], loc, isForCoroutine);
-            });
+  llvm::transform(indices(params), std::back_inserter(outVar),
+                  [&](unsigned i) -> ManagedValue {
+                    return convertOwnershipConventionGivenParamInfo(
+                        SGF, params[i], values[i], loc, isForCoroutine);
+                  });
 }
 
 //===----------------------------------------------------------------------===//
@@ -5690,9 +5690,8 @@ ManagedValue SILGenFunction::emitAddressorAccessor(
   auto pointerType =
     pointer->getType().castTo<BoundGenericStructType>()->getDecl();
   auto props = pointerType->getStoredProperties();
-  assert(props.begin() != props.end());
-  assert(std::next(props.begin()) == props.end());
-  VarDecl *rawPointerField = *props.begin();
+  assert(props.size() == 1);
+  VarDecl *rawPointerField = props[0];
   pointer = B.createStructExtract(loc, pointer, rawPointerField,
                                   SILType::getRawPointerType(getASTContext()));
 
@@ -5812,7 +5811,7 @@ RValue SILGenFunction::emitDynamicMemberRefExpr(DynamicMemberRefExpr *e,
   // Create the branch.
   FuncDecl *memberFunc;
   if (auto *VD = dyn_cast<VarDecl>(e->getMember().getDecl())) {
-    memberFunc = VD->getGetter();
+    memberFunc = VD->getOpaqueAccessor(AccessorKind::Get);
     memberMethodTy = FunctionType::get({}, memberMethodTy);
   } else
     memberFunc = cast<FuncDecl>(e->getMember().getDecl());
@@ -5921,7 +5920,7 @@ RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e,
 
   // Create the branch.
   auto subscriptDecl = cast<SubscriptDecl>(e->getMember().getDecl());
-  auto member = SILDeclRef(subscriptDecl->getGetter(),
+  auto member = SILDeclRef(subscriptDecl->getOpaqueAccessor(AccessorKind::Get),
                            SILDeclRef::Kind::Func)
     .asForeign();
   B.createDynamicMethodBranch(e, base, member, hasMemberBB, noMemberBB);

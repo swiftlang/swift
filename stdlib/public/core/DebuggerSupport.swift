@@ -125,7 +125,7 @@ public enum _DebuggerSupport {
     return true
   }
 
-  private static func printForDebuggerImpl<StreamType : TextOutputStream>(
+  private static func printForDebuggerImpl<StreamType: TextOutputStream>(
     value: Any?,
     mirror: Mirror,
     name: String?,
@@ -261,6 +261,6 @@ public func _debuggerTestingCheckExpect(_: String, _: String) { }
 @_silgen_name("swift_retainCount")
 public func _getRetainCount(_ Value: AnyObject) -> UInt
 @_silgen_name("swift_unownedRetainCount")
-public func _getUnownedRetainCount(_ Value : AnyObject) -> UInt
+public func _getUnownedRetainCount(_ Value: AnyObject) -> UInt
 @_silgen_name("swift_weakRetainCount")
-public func _getWeakRetainCount(_ Value : AnyObject) -> UInt
+public func _getWeakRetainCount(_ Value: AnyObject) -> UInt

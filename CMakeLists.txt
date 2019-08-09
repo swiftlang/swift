@@ -61,6 +61,10 @@ option(SWIFT_BUILD_STATIC_SDK_OVERLAY
     "Build static variants of the Swift SDK overlay"
     FALSE)
 
+option(SWIFT_BUILD_STDLIB_EXTRA_TOOLCHAIN_CONTENT
+    "If not building stdlib, controls whether to build 'stdlib/toolchain' content"
+    TRUE)
+
 option(SWIFT_ENABLE_TENSORFLOW
     "Enable TensorFlow in the compiler and build the Swift TensorFlow library"
     FALSE)
@@ -616,7 +620,13 @@ if(SWIFT_HOST_VARIANT_SDK)
   set(SWIFT_HOST_VARIANT_SDK_default "${SWIFT_HOST_VARIANT_SDK}")
 else()
   if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
-    set(SWIFT_HOST_VARIANT_SDK_default "LINUX")
+    # CMake on an Android host sets this to Linux, so check for the ANDROID_DATA
+    # environment variable to see if we're building on Android.
+    if(NOT "$ENV{ANDROID_DATA}" STREQUAL "")
+      set(SWIFT_HOST_VARIANT_SDK_default "ANDROID")
+    else()
+      set(SWIFT_HOST_VARIANT_SDK_default "LINUX")
+    endif()
   elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "FreeBSD")
     set(SWIFT_HOST_VARIANT_SDK_default "FREEBSD")
   elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "CYGWIN")
@@ -626,6 +636,7 @@ else()
   elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Haiku")
     set(SWIFT_HOST_VARIANT_SDK_default "HAIKU")
   elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Android")
+    # CMAKE_SYSTEM_NAME might be set this way when cross-compiling to Android.
     set(SWIFT_HOST_VARIANT_SDK_default "ANDROID")
   elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
     set(SWIFT_HOST_VARIANT_SDK_default "OSX")
@@ -690,7 +701,7 @@ endif()
 
 # FIXME: the parameters we specify in SWIFT_SDKS are lacking architecture specifics,
 # so we need to hard-code it. For example, the SDK for Android is just 'ANDROID',
-# which we assume below to be armv7.
+# and we have to specify SWIFT_SDK_ANDROID_ARCHITECTURES separately.
 # The iOS SDKs all have their architectures hardcoded because they are just specified by name (e.g. 'IOS' or 'WATCHOS').
 # We can't cross-compile the standard library for another linux architecture,
 # because the SDK list would just be 'LINUX' and we couldn't disambiguate it from the host.
@@ -752,9 +763,16 @@ elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "HAIKU")
 elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "ANDROID")
 
   set(SWIFT_HOST_VARIANT "android" CACHE STRING
-      "Deployment OS for Swift host tools (the compiler) [android].")
+      "Deployment OS for Swift host tools (the compiler) [android]")
 
-  configure_sdk_unix("Android" "${SWIFT_HOST_VARIANT_ARCH}")
+  set(SWIFT_ANDROID_NATIVE_SYSROOT "/data/data/com.termux/files" CACHE STRING
+      "Path to Android sysroot, default initialized to the Termux app's layout")
+
+  if("${SWIFT_SDK_ANDROID_ARCHITECTURES}" STREQUAL "")
+    set(SWIFT_SDK_ANDROID_ARCHITECTURES ${SWIFT_HOST_VARIANT_ARCH})
+  endif()
+
+  configure_sdk_unix("Android" "${SWIFT_SDK_ANDROID_ARCHITECTURES}")
   set(SWIFT_PRIMARY_VARIANT_SDK_default  "${SWIFT_HOST_VARIANT_SDK}")
   set(SWIFT_PRIMARY_VARIANT_ARCH_default "${SWIFT_HOST_VARIANT_ARCH}")
 
@@ -1087,8 +1105,7 @@ endif()
 #
 # We must include stdlib/ before tools/ because stdlib/CMakeLists.txt
 # declares the swift-stdlib-* set of targets. These targets will then
-# implicitly depend on any targets declared with IS_STDLIB or
-# TARGET_LIBRARY.
+# implicitly depend on any targets declared with IS_STDLIB.
 #
 # One such library that declares IS_STDLIB is SwiftSyntax, living in
 # tools/SwiftSyntax. If we include stdlib/ after tools/,
@@ -1100,7 +1117,9 @@ endif()
 if(SWIFT_BUILD_STDLIB)
   add_subdirectory(stdlib)
 else()
-  add_subdirectory(stdlib/public/legacy_layouts)
+  if(SWIFT_BUILD_STDLIB_EXTRA_TOOLCHAIN_CONTENT)
+    add_subdirectory(stdlib/toolchain)
+  endif()
 
   # Some tools (e.g. swift-reflection-dump) rely on a host swiftReflection, so
   # ensure we build that when building tools.

@@ -77,16 +77,11 @@ struct InvocationOptions {
   const std::string PrimaryFile;
   const CompilerInvocation Invok;
 
-  /// All filesystem operations resulting from this invocation should use this
-  /// filesystem.
-  const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem;
-
   InvocationOptions(ArrayRef<const char *> CArgs, StringRef PrimaryFile,
-                    CompilerInvocation Invok,
-                    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem)
-      : Args(_convertArgs(CArgs)), PrimaryFile(PrimaryFile),
-        Invok(std::move(Invok)), FileSystem(FileSystem) {
-    assert(FileSystem);
+                    CompilerInvocation Invok)
+    : Args(_convertArgs(CArgs)),
+      PrimaryFile(PrimaryFile),
+      Invok(std::move(Invok)) {
     // Assert invocation with a primary file. We want to avoid full typechecking
     // for all files.
     assert(!this->PrimaryFile.empty());
@@ -168,7 +163,6 @@ void InvocationOptions::profile(llvm::FoldingSetNodeID &ID) const {
   for (auto &Arg : Args)
     ID.AddString(Arg);
   ID.AddString(PrimaryFile);
-  ID.AddPointer(FileSystem.get());
 }
 
 //===----------------------------------------------------------------------===//
@@ -298,10 +292,13 @@ public:
     return AST;
   }
 
-  void getASTUnitAsync(std::shared_ptr<SwiftASTManager> Mgr,
-                       ArrayRef<ImmutableTextSnapshotRef> Snapshots,
-                std::function<void(ASTUnitRef Unit, StringRef Error)> Receiver);
+  void getASTUnitAsync(
+      std::shared_ptr<SwiftASTManager> Mgr,
+      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fileSystem,
+      ArrayRef<ImmutableTextSnapshotRef> Snapshots,
+      std::function<void(ASTUnitRef Unit, StringRef Error)> Receiver);
   bool shouldRebuild(SwiftASTManager::Implementation &MgrImpl,
+                     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fileSystem,
                      ArrayRef<ImmutableTextSnapshotRef> Snapshots);
 
   void enqueueConsumer(SwiftASTConsumerRef Consumer,
@@ -320,18 +317,23 @@ public:
   }
 
 private:
-  ASTUnitRef getASTUnitImpl(SwiftASTManager::Implementation &MgrImpl,
-                            ArrayRef<ImmutableTextSnapshotRef> Snapshots,
-                            std::string &Error);
+  ASTUnitRef
+  getASTUnitImpl(SwiftASTManager::Implementation &MgrImpl,
+                 llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fileSystem,
+                 ArrayRef<ImmutableTextSnapshotRef> Snapshots,
+                 std::string &Error);
 
-  ASTUnitRef createASTUnit(SwiftASTManager::Implementation &MgrImpl,
-                           ArrayRef<ImmutableTextSnapshotRef> Snapshots,
-                           std::string &Error);
+  ASTUnitRef
+  createASTUnit(SwiftASTManager::Implementation &MgrImpl,
+                llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fileSystem,
+                ArrayRef<ImmutableTextSnapshotRef> Snapshots,
+                std::string &Error);
 
-  void findSnapshotAndOpenFiles(SwiftASTManager::Implementation &MgrImpl,
-                                ArrayRef<ImmutableTextSnapshotRef> Snapshots,
-                                SmallVectorImpl<FileContent> &Contents,
-                                std::string &Error) const;
+  void findSnapshotAndOpenFiles(
+      SwiftASTManager::Implementation &MgrImpl,
+      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fileSystem,
+      ArrayRef<ImmutableTextSnapshotRef> Snapshots,
+      SmallVectorImpl<FileContent> &Contents, std::string &Error) const;
 };
 
 typedef IntrusiveRefCntPtr<ASTProducer> ASTProducerRef;
@@ -613,15 +615,17 @@ SwiftInvocationRef SwiftASTManager::getInvocation(
     return nullptr;
   }
 
-  InvocationOptions Opts(OrigArgs, PrimaryFile, CompInvok, FileSystem);
+  InvocationOptions Opts(OrigArgs, PrimaryFile, CompInvok);
   return new SwiftInvocation(
       *new SwiftInvocation::Implementation(std::move(Opts)));
 }
 
-void SwiftASTManager::processASTAsync(SwiftInvocationRef InvokRef,
-                                      SwiftASTConsumerRef ASTConsumer,
-                                      const void *OncePerASTToken,
-                                 ArrayRef<ImmutableTextSnapshotRef> Snapshots) {
+void SwiftASTManager::processASTAsync(
+    SwiftInvocationRef InvokRef, SwiftASTConsumerRef ASTConsumer,
+    const void *OncePerASTToken,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fileSystem,
+    ArrayRef<ImmutableTextSnapshotRef> Snapshots) {
+  assert(fileSystem);
   ASTProducerRef Producer = Impl.getASTProducer(InvokRef);
 
   if (ASTUnitRef Unit = Producer->getExistingAST()) {
@@ -634,13 +638,13 @@ void SwiftASTManager::processASTAsync(SwiftInvocationRef InvokRef,
 
   Producer->enqueueConsumer(ASTConsumer, Snapshots, OncePerASTToken);
 
-  auto handleAST = [this, Producer, ASTConsumer](ASTUnitRef unit,
-                                                 StringRef error) {
+  auto handleAST = [this, Producer, ASTConsumer, fileSystem](ASTUnitRef unit,
+                                                             StringRef error) {
     auto consumers = Producer->takeConsumers(
         [&](SwiftASTConsumer *consumer,
             ArrayRef<ImmutableTextSnapshotRef> snapshots) {
           return consumer == ASTConsumer.get() ||
-                 !Producer->shouldRebuild(Impl, snapshots) ||
+                 !Producer->shouldRebuild(Impl, fileSystem, snapshots) ||
                  (unit && consumer->canUseASTWithSnapshots(snapshots));
         });
 
@@ -652,7 +656,8 @@ void SwiftASTManager::processASTAsync(SwiftInvocationRef InvokRef,
     }
   };
 
-  Producer->getASTUnitAsync(shared_from_this(), Snapshots, std::move(handleAST));
+  Producer->getASTUnitAsync(shared_from_this(), fileSystem, Snapshots,
+                            std::move(handleAST));
 }
 
 void SwiftASTManager::removeCachedAST(SwiftInvocationRef Invok) {
@@ -729,25 +734,31 @@ SwiftASTManager::Implementation::getMemoryBuffer(
   return nullptr;
 }
 
-void ASTProducer::getASTUnitAsync(std::shared_ptr<SwiftASTManager> Mgr,
-                                  ArrayRef<ImmutableTextSnapshotRef> Snaps,
-               std::function<void(ASTUnitRef Unit, StringRef Error)> Receiver) {
+void ASTProducer::getASTUnitAsync(
+    std::shared_ptr<SwiftASTManager> Mgr,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fileSystem,
+    ArrayRef<ImmutableTextSnapshotRef> Snaps,
+    std::function<void(ASTUnitRef Unit, StringRef Error)> Receiver) {
 
   ASTProducerRef ThisProducer = this;
   SmallVector<ImmutableTextSnapshotRef, 4> Snapshots;
   Snapshots.append(Snaps.begin(), Snaps.end());
 
-  Mgr->Impl.ASTBuildQueue.dispatch([ThisProducer, Mgr, Snapshots, Receiver] {
-    std::string Error;
-    ASTUnitRef Unit = ThisProducer->getASTUnitImpl(Mgr->Impl, Snapshots, Error);
-    Receiver(Unit, Error);
-  }, /*isStackDeep=*/true);
+  Mgr->Impl.ASTBuildQueue.dispatch(
+      [ThisProducer, Mgr, fileSystem, Snapshots, Receiver] {
+        std::string Error;
+        ASTUnitRef Unit = ThisProducer->getASTUnitImpl(Mgr->Impl, fileSystem,
+                                                       Snapshots, Error);
+        Receiver(Unit, Error);
+      },
+      /*isStackDeep=*/true);
 }
 
-ASTUnitRef ASTProducer::getASTUnitImpl(SwiftASTManager::Implementation &MgrImpl,
-                                   ArrayRef<ImmutableTextSnapshotRef> Snapshots,
-                                   std::string &Error) {
-  if (!AST || shouldRebuild(MgrImpl, Snapshots)) {
+ASTUnitRef ASTProducer::getASTUnitImpl(
+    SwiftASTManager::Implementation &MgrImpl,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fileSystem,
+    ArrayRef<ImmutableTextSnapshotRef> Snapshots, std::string &Error) {
+  if (!AST || shouldRebuild(MgrImpl, fileSystem, Snapshots)) {
     bool IsRebuild = AST != nullptr;
     const InvocationOptions &Opts = InvokRef->Impl.Opts;
 
@@ -761,7 +772,7 @@ ASTUnitRef ASTProducer::getASTUnitImpl(SwiftASTManager::Implementation &MgrImpl,
       Log->getOS() << Opts.Invok.getModuleName() << '/' << Opts.PrimaryFile;
     }
 
-    auto NewAST = createASTUnit(MgrImpl, Snapshots, Error);
+    auto NewAST = createASTUnit(MgrImpl, fileSystem, Snapshots, Error);
     {
       // FIXME: ThreadSafeRefCntPtr is racy.
       llvm::sys::ScopedLock L(Mtx);
@@ -814,8 +825,10 @@ ASTProducer::takeConsumers(ConsumerPredicate predicate) {
   return consumers;
 }
 
-bool ASTProducer::shouldRebuild(SwiftASTManager::Implementation &MgrImpl,
-                                ArrayRef<ImmutableTextSnapshotRef> Snapshots) {
+bool ASTProducer::shouldRebuild(
+    SwiftASTManager::Implementation &MgrImpl,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fileSystem,
+    ArrayRef<ImmutableTextSnapshotRef> Snapshots) {
   const SwiftInvocation::Implementation &Invok = InvokRef->Impl;
 
   // Check if the inputs changed.
@@ -834,8 +847,7 @@ bool ASTProducer::shouldRebuild(SwiftASTManager::Implementation &MgrImpl,
       }
     }
     if (!FoundSnapshot)
-      InputStamps.push_back(
-          MgrImpl.getBufferStamp(File, Invok.Opts.FileSystem));
+      InputStamps.push_back(MgrImpl.getBufferStamp(File, fileSystem));
   }
   assert(InputStamps.size() ==
          Invok.Opts.Invok.getFrontendOptions().InputsAndOutputs.inputCount());
@@ -844,7 +856,7 @@ bool ASTProducer::shouldRebuild(SwiftASTManager::Implementation &MgrImpl,
 
   for (auto &Dependency : DependencyStamps) {
     if (Dependency.second !=
-        MgrImpl.getBufferStamp(Dependency.first, Invok.Opts.FileSystem))
+        MgrImpl.getBufferStamp(Dependency.first, fileSystem))
       return true;
   }
 
@@ -910,16 +922,17 @@ static void collectModuleDependencies(ModuleDecl *TopMod,
 
 static std::atomic<uint64_t> ASTUnitGeneration{ 0 };
 
-ASTUnitRef ASTProducer::createASTUnit(SwiftASTManager::Implementation &MgrImpl,
-                                      ArrayRef<ImmutableTextSnapshotRef> Snapshots,
-                                      std::string &Error) {
+ASTUnitRef ASTProducer::createASTUnit(
+    SwiftASTManager::Implementation &MgrImpl,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fileSystem,
+    ArrayRef<ImmutableTextSnapshotRef> Snapshots, std::string &Error) {
   ++MgrImpl.Stats->numASTBuilds;
 
   Stamps.clear();
   DependencyStamps.clear();
 
   SmallVector<FileContent, 8> Contents;
-  findSnapshotAndOpenFiles(MgrImpl, Snapshots, Contents, Error);
+  findSnapshotAndOpenFiles(MgrImpl, fileSystem, Snapshots, Contents, Error);
 
   for (auto &Content : Contents)
     Stamps.push_back(Content.Stamp);
@@ -933,7 +946,6 @@ ASTUnitRef ASTProducer::createASTUnit(SwiftASTManager::Implementation &MgrImpl,
   auto &Consumer = ASTRef->Impl.CollectDiagConsumer;
   // Display diagnostics to stderr.
   CompIns.addDiagnosticConsumer(&Consumer);
-
   trace::TracedOperation TracedOp(trace::OperationKind::PerformSema);
   trace::SwiftInvocation TraceInfo;
   if (TracedOp.enabled()) {
@@ -951,14 +963,18 @@ ASTUnitRef ASTProducer::createASTUnit(SwiftASTManager::Implementation &MgrImpl,
 
   Invocation.getLangOptions().CollectParsedToken = true;
 
-  CompIns.getSourceMgr().setFileSystem(InvokRef->Impl.Opts.FileSystem);
+  if (fileSystem != llvm::vfs::getRealFileSystem()) {
+    CompIns.getSourceMgr().setFileSystem(fileSystem);
+    Invocation.getClangImporterOptions().ForceUseSwiftVirtualFileSystem = true;
+  }
+
   if (CompIns.setup(Invocation)) {
     // FIXME: Report the diagnostic.
     LOG_WARN_FUNC("Compilation setup failed!!!");
     Error = "compilation setup failed";
     return nullptr;
   }
-
+  registerIDERequestFunctions(CompIns.getASTContext().evaluator);
   if (TracedOp.enabled()) {
     TracedOp.start(TraceInfo);
   }
@@ -974,9 +990,8 @@ ASTUnitRef ASTProducer::createASTUnit(SwiftASTManager::Implementation &MgrImpl,
   // FIXME: There exists a small window where the module file may have been
   // modified after compilation finished and before we get its stamp.
   for (auto &Filename : Filenames) {
-    DependencyStamps.push_back(std::make_pair(
-        Filename,
-        MgrImpl.getBufferStamp(Filename, InvokRef->Impl.Opts.FileSystem)));
+    DependencyStamps.push_back(
+        std::make_pair(Filename, MgrImpl.getBufferStamp(Filename, fileSystem)));
   }
 
   // Since we only typecheck the primary file (plus referenced constructs
@@ -1010,6 +1025,7 @@ ASTUnitRef ASTProducer::createASTUnit(SwiftASTManager::Implementation &MgrImpl,
 
 void ASTProducer::findSnapshotAndOpenFiles(
     SwiftASTManager::Implementation &MgrImpl,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fileSystem,
     ArrayRef<ImmutableTextSnapshotRef> Snapshots,
     SmallVectorImpl<FileContent> &Contents, std::string &Error) const {
   const InvocationOptions &Opts = InvokRef->Impl.Opts;
@@ -1028,8 +1044,7 @@ void ASTProducer::findSnapshotAndOpenFiles(
     if (FoundSnapshot)
       continue;
 
-    auto Content =
-        MgrImpl.getFileContent(File, IsPrimary, Opts.FileSystem, Error);
+    auto Content = MgrImpl.getFileContent(File, IsPrimary, fileSystem, Error);
     if (!Content.Buffer) {
       LOG_WARN_FUNC("failed getting file contents for " << File << ": "
                                                         << Error);

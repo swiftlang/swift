@@ -92,18 +92,18 @@ public class Addressable<Element> : TestSubscriptable {
   }
 }
 
-// Addressable.subscript.getter with no attribute
-// CHECK-LABEL: sil [transparent] [serialized] [ossa] @$s15specialize_attr11AddressableCyxSicig : $@convention(method) <Element> (Int, @guaranteed Addressable<Element>) -> @out Element {
-
 // Addressable.subscript.unsafeAddressor with _specialize
 // CHECK-LABEL: sil [_specialize exported: false, kind: full, where Element == Int] [ossa] @$s15specialize_attr11AddressableCyxSicilu : $@convention(method) <Element> (Int, @guaranteed Addressable<Element>) -> UnsafePointer<Element> {
-
-// Addressable.subscript.setter with no attribute
-// CHECK-LABEL: sil [transparent] [serialized] [ossa] @$s15specialize_attr11AddressableCyxSicis : $@convention(method) <Element> (@in Element, Int, @guaranteed Addressable<Element>) -> () {
 
 // Addressable.subscript.unsafeMutableAddressor with _specialize
 // CHECK-LABEL: sil [_specialize exported: false, kind: full, where Element == Int] [ossa] @$s15specialize_attr11AddressableCyxSiciau : $@convention(method) <Element> (Int, @guaranteed Addressable<Element>) -> UnsafeMutablePointer<Element> {
 
-// Addressable.subscript.materializeForSet with no attribute
+// Addressable.subscript.getter with no attribute
+// CHECK-LABEL: sil [transparent] [serialized] [ossa] @$s15specialize_attr11AddressableCyxSicig : $@convention(method) <Element> (Int, @guaranteed Addressable<Element>) -> @out Element {
+
+// Addressable.subscript.setter with no attribute
+// CHECK-LABEL: sil [transparent] [serialized] [ossa] @$s15specialize_attr11AddressableCyxSicis : $@convention(method) <Element> (@in Element, Int, @guaranteed Addressable<Element>) -> () {
+
+// Addressable.subscript.modify with no attribute
 // CHECK-LABEL: sil [transparent] [serialized] [ossa] @$s15specialize_attr11AddressableCyxSiciM : $@yield_once @convention(method) <Element> (Int, @guaranteed Addressable<Element>) -> @yields @inout Element {
 

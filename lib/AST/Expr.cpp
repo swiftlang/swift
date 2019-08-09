@@ -246,6 +246,7 @@ ConcreteDeclRef Expr::getReferencedDecl() const {
   NO_REFERENCE(StringLiteral);
   NO_REFERENCE(InterpolatedStringLiteral);
   NO_REFERENCE(ObjectLiteral);
+  NO_REFERENCE(QuoteLiteral);
   NO_REFERENCE(MagicIdentifierLiteral);
   NO_REFERENCE(DiscardAssignment);
   NO_REFERENCE(LazyInitializer);
@@ -372,6 +373,8 @@ ConcreteDeclRef Expr::getReferencedDecl() const {
   NO_REFERENCE(KeyPath);
   NO_REFERENCE(KeyPathDot);
   NO_REFERENCE(Tap);
+  NO_REFERENCE(Unquote);
+  SIMPLE_REFERENCE(DeclQuote, getQuotedDecl);
 
 #undef SIMPLE_REFERENCE
 #undef NO_REFERENCE
@@ -556,6 +559,7 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
     return true;
 
   case ExprKind::ObjectLiteral:
+  case ExprKind::QuoteLiteral:
     return true;
 
   case ExprKind::DiscardAssignment:
@@ -697,6 +701,8 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
     return false;
 
   case ExprKind::Tap:
+  case ExprKind::Unquote:
+  case ExprKind::DeclQuote:
     return true;
   }
 
@@ -778,104 +784,6 @@ llvm::DenseMap<Expr *, unsigned> Expr::getPreorderIndexMap() {
 //===----------------------------------------------------------------------===//
 // Support methods for Exprs.
 //===----------------------------------------------------------------------===//
-
-static LiteralExpr *
-shallowCloneImpl(const NilLiteralExpr *E, ASTContext &Ctx,
-                 llvm::function_ref<Type(const Expr *)> getType) {
-  return new (Ctx) NilLiteralExpr(E->getLoc());
-}
-
-static LiteralExpr *
-shallowCloneImpl(const IntegerLiteralExpr *E, ASTContext &Ctx,
-                 llvm::function_ref<Type(const Expr *)> getType) {
-  auto res = new (Ctx) IntegerLiteralExpr(E->getDigitsText(),
-                                          E->getSourceRange().End);
-  if (E->isNegative())
-    res->setNegative(E->getSourceRange().Start);
-  return res;
-}
-
-static LiteralExpr *
-shallowCloneImpl(const FloatLiteralExpr *E, ASTContext &Ctx,
-                 llvm::function_ref<Type(const Expr *)> getType) {
-  auto res = new (Ctx) FloatLiteralExpr(E->getDigitsText(),
-                                        E->getSourceRange().End);
-  if (E->isNegative())
-    res->setNegative(E->getSourceRange().Start);
-  return res;
-}
-static LiteralExpr *
-shallowCloneImpl(const BooleanLiteralExpr *E, ASTContext &Ctx,
-                 llvm::function_ref<Type(const Expr *)> getType) {
-  return new (Ctx) BooleanLiteralExpr(E->getValue(), E->getLoc());
-}
-static LiteralExpr *
-shallowCloneImpl(const StringLiteralExpr *E, ASTContext &Ctx,
-                 llvm::function_ref<Type(const Expr *)> getType) {
-  auto res = new (Ctx) StringLiteralExpr(E->getValue(), E->getSourceRange());
-  res->setEncoding(E->getEncoding());
-  return res;
-}
-
-static LiteralExpr *
-shallowCloneImpl(const InterpolatedStringLiteralExpr *E, ASTContext &Ctx,
-                 llvm::function_ref<Type(const Expr *)> getType) {
-  auto res = new (Ctx) InterpolatedStringLiteralExpr(E->getLoc(),
-                                                     E->getTrailingQuoteLoc(),
-                                                     E->getLiteralCapacity(),
-                                                     E->getInterpolationCount(),
-                                                     E->getAppendingExpr());
-  res->setSemanticExpr(E->getSemanticExpr());
-  return res;
-}
-
-static LiteralExpr *
-shallowCloneImpl(const MagicIdentifierLiteralExpr *E, ASTContext &Ctx,
-                 llvm::function_ref<Type(const Expr *)> getType) {
-  auto res = new (Ctx) MagicIdentifierLiteralExpr(E->getKind(),
-                                                  E->getSourceRange().End);
-  if (res->isString())
-    res->setStringEncoding(E->getStringEncoding());
-  return res;
-}
-
-static LiteralExpr *
-shallowCloneImpl(const ObjectLiteralExpr *E, ASTContext &Ctx,
-                 llvm::function_ref<Type(const Expr *)> getType) {
-  auto res =
-      ObjectLiteralExpr::create(Ctx, E->getStartLoc(), E->getLiteralKind(),
-                                E->getArg(), E->isImplicit(), getType);
-  res->setSemanticExpr(E->getSemanticExpr());
-  return res;
-}
-
-// Make an exact copy of this AST node.
-LiteralExpr *LiteralExpr::shallowClone(
-    ASTContext &Ctx, llvm::function_ref<void(Expr *, Type)> setType,
-                     llvm::function_ref<Type(const Expr *)> getType) const {
-  LiteralExpr *Result = nullptr;
-  switch (getKind()) {
-  default: llvm_unreachable("Unknown literal type!");
-#define DISPATCH_CLONE(KIND)                                                   \
-  case ExprKind::KIND:                                                         \
-    Result = shallowCloneImpl(cast<KIND##Expr>(this), Ctx, getType);           \
-    break;
-
-    DISPATCH_CLONE(NilLiteral)
-    DISPATCH_CLONE(IntegerLiteral)
-    DISPATCH_CLONE(FloatLiteral)
-    DISPATCH_CLONE(BooleanLiteral)
-    DISPATCH_CLONE(StringLiteral)
-    DISPATCH_CLONE(InterpolatedStringLiteral)
-    DISPATCH_CLONE(ObjectLiteral)
-    DISPATCH_CLONE(MagicIdentifierLiteral)
-#undef DISPATCH_CLONE
-  }
-
-  setType(Result, getType(this));
-  Result->setImplicit(isImplicit());
-  return Result;
-}
 
 IntegerLiteralExpr * IntegerLiteralExpr::createFromUnsigned(ASTContext &C, unsigned value) {
   llvm::SmallString<8> Scratch;
@@ -1202,7 +1110,7 @@ ObjectLiteralExpr::ObjectLiteralExpr(SourceLoc PoundLoc, LiteralKind LitKind,
                                      bool hasTrailingClosure,
                                      bool implicit)
     : LiteralExpr(ExprKind::ObjectLiteral, implicit), 
-      Arg(Arg), SemanticExpr(nullptr), PoundLoc(PoundLoc) {
+      Arg(Arg), PoundLoc(PoundLoc) {
   Bits.ObjectLiteralExpr.LitKind = static_cast<unsigned>(LitKind);
   assert(getLiteralKind() == LitKind);
   Bits.ObjectLiteralExpr.NumArgLabels = argLabels.size();
@@ -1272,6 +1180,38 @@ StringRef ObjectLiteralExpr::getLiteralKindPlainName() const {
 #include "swift/Syntax/TokenKinds.def"    
   }
   llvm_unreachable("unspecified literal");
+}
+
+QuoteLiteralExpr::QuoteLiteralExpr(SourceLoc poundLoc, Expr *subExpr)
+    : LiteralExpr(ExprKind::QuoteLiteral, /*Implicit=*/false),
+      PoundLoc(poundLoc), SubExpr(subExpr), SemanticExpr(nullptr) {}
+
+QuoteLiteralExpr *QuoteLiteralExpr::create(ASTContext &ctx, SourceLoc poundLoc,
+                                           Expr *subExpr) {
+  size_t size = sizeof(QuoteLiteralExpr);
+  void *memory = ctx.Allocate(size, alignof(QuoteLiteralExpr));
+  return new (memory) QuoteLiteralExpr(poundLoc, subExpr);
+}
+
+UnquoteExpr::UnquoteExpr(SourceLoc poundLoc, Expr *subExpr)
+    : Expr(ExprKind::Unquote, /*Implicit=*/false), PoundLoc(poundLoc),
+      SubExpr(subExpr) {}
+
+UnquoteExpr *UnquoteExpr::create(ASTContext &ctx, SourceLoc poundLoc,
+                                 Expr *subExpr) {
+  size_t size = sizeof(UnquoteExpr);
+  void *memory = ctx.Allocate(size, alignof(UnquoteExpr));
+  return new (memory) UnquoteExpr(poundLoc, subExpr);
+}
+
+DeclQuoteExpr::DeclQuoteExpr(ValueDecl *quotedDecl)
+    : Expr(ExprKind::DeclQuote, /*Implicit=*/true), QuotedDecl(quotedDecl),
+      SemanticExpr(nullptr) {}
+
+DeclQuoteExpr *DeclQuoteExpr::create(ASTContext &ctx, ValueDecl *quotedDecl) {
+  size_t size = sizeof(DeclQuoteExpr);
+  void *memory = ctx.Allocate(size, alignof(DeclQuoteExpr));
+  return new (memory) DeclQuoteExpr(quotedDecl);
 }
 
 ConstructorDecl *OtherConstructorDeclRefExpr::getDecl() const {
@@ -2295,16 +2235,6 @@ void KeyPathExpr::Component::setSubscriptIndexHashableConformances(
 void InterpolatedStringLiteralExpr::forEachSegment(ASTContext &Ctx, 
     llvm::function_ref<void(bool, CallExpr *)> callback) {
   auto appendingExpr = getAppendingExpr();
-  if (SemanticExpr) {
-    SemanticExpr->forEachChildExpr([&](Expr *subExpr) -> Expr * {
-      if (auto tap = dyn_cast_or_null<TapExpr>(subExpr)) {
-        appendingExpr = tap;
-        return nullptr;
-      }
-      return subExpr;
-    });
-  }
-
   for (auto stmt : appendingExpr->getBody()->getElements()) {
     if (auto expr = stmt.dyn_cast<Expr*>()) {
       if (auto call = dyn_cast<CallExpr>(expr)) {

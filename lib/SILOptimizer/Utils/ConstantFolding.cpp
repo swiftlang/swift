@@ -1355,7 +1355,7 @@ static bool constantFoldInstruction(Operand *Op, Optional<bool> &ResultsInError,
   // "use-after-free" from an ownership model perspective.
   if (auto *DSI = dyn_cast<DestructureStructInst>(User)) {
     if (auto *Struct = dyn_cast<StructInst>(DSI->getOperand())) {
-      transform(
+      llvm::transform(
           Struct->getAllOperands(), std::back_inserter(Results),
           [&](Operand &op) -> SILValue {
             SILValue operandValue = op.get();
@@ -1376,7 +1376,7 @@ static bool constantFoldInstruction(Operand *Op, Optional<bool> &ResultsInError,
   // "use-after-free" from the ownership model perspective.
   if (auto *DTI = dyn_cast<DestructureTupleInst>(User)) {
     if (auto *Tuple = dyn_cast<TupleInst>(DTI->getOperand())) {
-      transform(
+      llvm::transform(
           Tuple->getAllOperands(), std::back_inserter(Results),
           [&](Operand &op) -> SILValue {
             SILValue operandValue = op.get();

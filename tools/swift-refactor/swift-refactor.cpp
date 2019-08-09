@@ -53,6 +53,10 @@ Action(llvm::cl::desc("kind:"), llvm::cl::init(RefactoringKind::None),
                      "expand-ternary-expr", "Perform expand ternary expression"),
            clEnumValN(RefactoringKind::ConvertToTernaryExpr,
                       "convert-to-ternary-expr", "Perform convert to ternary expression"),
+		   clEnumValN(RefactoringKind::ConvertIfLetExprToGuardExpr,
+					   "convert-to-guard", "Perform convert to guard expression"),
+           clEnumValN(RefactoringKind::ConvertGuardExprToIfLetExpr,
+                      "convert-to-iflet", "Perform convert to iflet expression"),
            clEnumValN(RefactoringKind::ExtractFunction,
                       "extract-function", "Perform extract function refactoring"),
            clEnumValN(RefactoringKind::MoveMembersToExtension,
@@ -256,7 +260,7 @@ int main(int argc, char *argv[]) {
   CI.addDiagnosticConsumer(&PrintDiags);
   if (CI.setup(Invocation))
     return 1;
-
+  registerIDERequestFunctions(CI.getASTContext().evaluator);
   switch (options::Action) {
     case RefactoringKind::GlobalRename:
     case RefactoringKind::FindGlobalRenameRanges:

@@ -1800,6 +1800,67 @@ public:
   }
 };
 
+/// Attribute that asks the compiler to generate a function that returns a
+/// quoted representation of the attributed declaration.
+///
+///     @quoted
+///     func identity(_ x: Int) -> Int {
+///         return x;
+///     }
+///
+/// The generated function, called "quote decl", looks along the following lines
+/// (the exact representation may change over time since quasiquotes are an
+/// experimental feature, e.g. the name may end up being mangled as per #13):
+///
+///     func _quotedIdentity() -> Tree {
+///         return #quote{
+///             func identity(_ x: Int) -> Int {
+///                 return x;
+///             }
+///         }
+///     }
+///
+/// Quote decls are not supposed to be called manually. Instead,  it is expected
+/// that #quote(...) will be used to obtain representations of @quoted
+/// declarations, by synthesizing calls to quote decls. This way users don't
+/// have to know the details of name mangling in the presence of overloads etc:
+///
+///     #quote(identity)
+///
+///     Unquote(
+///       Name(
+///         "foo",
+///         "s:4main3fooyS2fF",
+///         FunctionType(
+///           [],
+///           [TypeName("Int", "s:Si")],
+///           TypeName("Int", "s:Si"))),
+///       { () -> Tree in quotedIdentity() },
+///       FunctionType(
+///         [],
+///         [TypeName("Int", "s:Si")],
+///         TypeName("Int", "s:Si")))
+class QuotedAttr final : public DeclAttribute {
+  FuncDecl *QuoteDecl;
+
+  explicit QuotedAttr(FuncDecl *quoteDecl, SourceLoc atLoc, SourceRange range,
+                      bool implicit);
+
+public:
+  FuncDecl *getQuoteDecl() const { return QuoteDecl; }
+  void setQuoteDecl(FuncDecl *quoteDecl) { QuoteDecl = quoteDecl; }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_Quoted;
+  }
+
+  static QuotedAttr *create(ASTContext &context, SourceLoc atLoc,
+                            SourceRange range, bool implicit);
+
+  static QuotedAttr *create(ASTContext &context, FuncDecl *quoteDecl,
+                            SourceLoc atLoc, SourceRange range, bool implicit);
+};
+
 /// Attributes that may be applied to declarations.
 class DeclAttributes {
   /// Linked list of declaration attributes.
@@ -1980,6 +2041,10 @@ public:
 };
 
 void simple_display(llvm::raw_ostream &out, const DeclAttribute *attr);
+
+inline SourceLoc extractNearestSourceLoc(const DeclAttribute *attr) {
+  return attr->getLocation();
+}
 
 } // end namespace swift
 

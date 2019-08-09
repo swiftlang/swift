@@ -466,7 +466,7 @@ static void printDifferentiableAttrArguments(
   auto *original = dyn_cast_or_null<AbstractFunctionDecl>(D);
   // Handle stored/computed properties and subscript methods.
   if (auto *asd = dyn_cast_or_null<AbstractStorageDecl>(D))
-    original = asd->getGetter();
+    original = asd->getAccessor(AccessorKind::Get);
 
   // Print comma if not leading clause.
   bool isLeadingClause = true;
@@ -1062,6 +1062,8 @@ StringRef DeclAttribute::getAttrName() const {
     return "differentiating";
   case DAK_Transposing:
     return "transposing";
+  case DAK_Quoted:
+    return "quoted";
   }
   llvm_unreachable("bad DeclAttrKind");
 }
@@ -1685,6 +1687,23 @@ CustomAttr *CustomAttr::create(ASTContext &ctx, SourceLoc atLoc, TypeLoc type,
   void *mem = ctx.Allocate(size, alignof(CustomAttr));
   return new (mem) CustomAttr(atLoc, range, type, initContext, arg, argLabels,
                               argLabelLocs, implicit);
+}
+
+QuotedAttr::QuotedAttr(FuncDecl *quoteDecl, SourceLoc atLoc, SourceRange range,
+                       bool implicit)
+    : DeclAttribute(DAK_Quoted, atLoc, range, implicit), QuoteDecl(quoteDecl) {}
+
+QuotedAttr *QuotedAttr::create(ASTContext &ctx, SourceLoc atLoc,
+                               SourceRange range, bool implicit) {
+  return QuotedAttr::create(ctx, nullptr, atLoc, range, implicit);
+}
+
+QuotedAttr *QuotedAttr::create(ASTContext &ctx, FuncDecl *quoteDecl,
+                               SourceLoc atLoc, SourceRange range,
+                               bool implicit) {
+  size_t size = sizeof(QuotedAttr);
+  void *mem = ctx.Allocate(size, alignof(QuotedAttr));
+  return new (mem) QuotedAttr(quoteDecl, atLoc, range, implicit);
 }
 
 void swift::simple_display(llvm::raw_ostream &out, const DeclAttribute *attr) {

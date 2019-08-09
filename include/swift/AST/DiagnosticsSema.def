@@ -37,8 +37,6 @@
   DIAG(NOTE,ID,Options,Text,Signature)
 #endif
 
-NOTE(kind_declname_declared_here,none,
-     "%0 %1 declared here", (DescriptiveDeclKind, DeclName))
 NOTE(decl_declared_here,none,
      "%0 declared here", (DeclName))
 NOTE(kind_declared_here,none,
@@ -58,6 +56,15 @@ ERROR(ambiguous_member_overload_set,none,
       "ambiguous reference to member %0", (DeclName))
 ERROR(ambiguous_reference_to_decl,none,
       "ambiguous reference to %0 %1", (DescriptiveDeclKind, DeclName))
+ERROR(no_overloads_match_exactly_in_call,none,
+      "no exact matches in call to %0 %1",
+      (DescriptiveDeclKind, DeclName))
+ERROR(no_overloads_match_exactly_in_call_no_labels,none,
+      "no exact matches in call to %0 %1",
+      (DescriptiveDeclKind, DeclBaseName))
+ERROR(no_overloads_match_exactly_in_call_special,none,
+      "no exact matches in call to %0",
+      (DescriptiveDeclKind))
 
 ERROR(ambiguous_subscript,none,
       "ambiguous subscript with base type %0 and index type %1",
@@ -250,9 +257,6 @@ ERROR(cannot_call_with_params, none,
       "cannot invoke %select{|initializer for type }2'%0' with an argument list"
       " of type '%1'", (StringRef, StringRef, bool))
 
-NOTE(pointer_init_to_type,none,
-      "Pointer conversion restricted: use '.assumingMemoryBound(to:)' or '.bindMemory(to:capacity:)' to view memory as a type.", ())
-
 ERROR(cannot_call_non_function_value,none,
       "cannot call value of non-function type %0", (Type))
 
@@ -350,6 +354,9 @@ ERROR(cannot_convert_default_arg_value,none,
       (Type,Type))
 ERROR(cannot_convert_default_arg_value_protocol,none,
       "default argument value of type %0 does not conform to %1", (Type,Type))
+ERROR(default_argument_literal_cannot_convert, none,
+      "cannot call %0 %1 because default argument of type %2 cannot be "
+      "converted to type %3", (DescriptiveDeclKind, DeclName, Type, Type))
 ERROR(cannot_convert_default_arg_value_nil,none,
       "nil default argument value cannot be converted to type %0", (Type))
 
@@ -1041,6 +1048,9 @@ ERROR(argument_out_of_order_unnamed_named,none,
 ERROR(argument_out_of_order_unnamed_unnamed,none,
       "unnamed argument #%0 must precede unnamed argument #%1",
       (unsigned, unsigned))
+NOTE(candidate_expected_different_labels,none,
+     "incorrect labels for candidate (have: '%0', expected: '%1')",
+     (StringRef, StringRef))
 
 ERROR(member_shadows_global_function,none,
       "use of %0 refers to %1 %2 rather than %3 %4 in %5 %6",
@@ -1130,6 +1140,10 @@ NOTE(invalid_differentiable_function_conversion_parameter,none,
      "did you mean to take a '%0' closure?", (StringRef))
 ERROR(invalid_autoclosure_forwarding,none,
       "add () to forward @autoclosure parameter", ())
+ERROR(invalid_autoclosure_pointer_conversion,none,
+      "cannot perform pointer conversion of value of type %0 to autoclosure "
+      "result type %1",
+      (Type, Type))
 
 //------------------------------------------------------------------------------
 // MARK: Type Check Declarations
@@ -1374,6 +1388,9 @@ WARNING(enum_frozen_nonpublic,none,
         "%0 has no effect on non-public enums", (DeclAttribute))
 
 // Variables (var and let).
+ERROR(getset_init,none,
+      "variable with getter/setter cannot have an initial value", ())
+
 ERROR(unimplemented_static_var,none,
       "%select{ERROR|static|class}1 stored properties not supported"
       "%select{ in this context| in generic types| in classes| in protocol extensions}0"
@@ -2041,8 +2058,6 @@ ERROR(typealias_outside_of_protocol,none,
       "type alias %0 can only be used with a concrete type or "
       "generic parameter base", (Identifier))
 
-ERROR(circular_protocol_def,none,
-      "protocol %0 refines itself", (Identifier))
 ERROR(objc_protocol_inherits_non_objc_protocol,none,
       "@objc protocol %0 cannot refine non-@objc protocol %1", (Type, Type))
 
@@ -2347,6 +2362,10 @@ WARNING(override_swift3_objc_inference,none,
         "override of %0 %1 from extension of %2 depends on deprecated "
         "inference of '@objc'",
         (DescriptiveDeclKind, DeclName, Identifier))
+ERROR(override_method_different_generic_sig,none,
+      "overridden method %0 has generic signature %1 which is incompatible with "
+      "base method's generic signature %2; expected generic signature to be %3",
+      (DeclBaseName, StringRef, StringRef, StringRef))
 
 // Inheritance
 ERROR(duplicate_inheritance,none,
@@ -2787,6 +2806,8 @@ ERROR(differentiable_attr_function_not_same_type_context,none,
 ERROR(differentiable_attr_specified_not_function,none,
       "%0 is not a function to be used as associated differentiation function",
       (DeclName))
+ERROR(differentiable_attr_class_derivative_not_final,none,
+      "class member derivative must be final", ())
 ERROR(differentiable_attr_ambiguous_function_identifier,none,
       "ambiguous or overloaded identifier %0 cannot be used in '@differentiable' "
       "attribute", (DeclName))
@@ -2806,14 +2827,19 @@ ERROR(differentiable_attr_protocol_req_assoc_func,none,
 ERROR(differentiable_attr_stored_property_variable_unsupported,none,
       "'@differentiable' attribute on stored property cannot specify "
       "'jvp:' or 'vjp:'", ())
+ERROR(differentiable_attr_class_member_no_dynamic_self,none,
+      "'@differentiable' attribute cannot be declared on class methods "
+      "returning 'Self'", ())
+// TODO(TF-654): Remove when differentiation supports class initializers.
+ERROR(differentiable_attr_class_init_not_yet_supported,none,
+      "'@differentiable' attribute does not yet support class initializers",
+      ())
 ERROR(differentiable_attr_empty_where_clause,none,
       "empty 'where' clause in '@differentiable' attribute", ())
 ERROR(differentiable_attr_nongeneric_trailing_where,none,
       "trailing 'where' clause in '@differentiable' attribute of non-generic function %0", (DeclName))
 ERROR(differentiable_attr_layout_req_unsupported,none,
       "'@differentiable' attribute does not support layout requirements", ())
-ERROR(differentiable_attr_class_unsupported,none,
-      "class members cannot be marked with '@differentiable'", ())
 ERROR(overriding_decl_missing_differentiable_attr,none,
       "overriding declaration is missing attribute '%0'", (StringRef))
 NOTE(protocol_witness_missing_differentiable_attr,none,
@@ -2880,9 +2906,8 @@ ERROR(diff_params_clause_no_inferred_parameters,PointsToFirstBadToken,
       ())
 ERROR(diff_params_clause_inout_argument,none,
       "'inout' parameters (%0) cannot be differentiated with respect to", (Type))
-ERROR(diff_params_clause_cannot_diff_wrt_objects_or_existentials,none,
-      "class objects and protocol existentials (%0) cannot be differentiated "
-      "with respect to", (Type))
+ERROR(diff_params_clause_cannot_diff_wrt_existentials,none,
+      "cannot differentiate with respect to protocol existential (%0)", (Type))
 ERROR(diff_params_clause_cannot_diff_wrt_functions,none,
       "functions (%0) cannot be differentiated with respect to", (Type))
 ERROR(diff_params_clause_param_not_differentiable,none,
@@ -2973,13 +2998,13 @@ NOTE(convenience_init_here,none,
 ERROR(designated_init_in_extension,none,
       "designated initializer cannot be declared in an extension of %0; "
       "did you mean this to be a convenience initializer?",
-      (Type))
+      (DeclName))
 ERROR(enumstruct_convenience_init,none,
       "delegating initializers in %0 are not marked with 'convenience'",
       (StringRef))
 ERROR(nonclass_convenience_init,none,
       "convenience initializer not allowed in non-class type %0",
-      (Type))
+      (DeclName))
 ERROR(cfclass_convenience_init,none,
       "convenience initializers are not supported in extensions of CF types",
       ())
@@ -3053,6 +3078,22 @@ ERROR(interpolation_broken_proto,none,
 
 ERROR(object_literal_broken_proto,none,
       "object literal protocol is broken", ())
+
+ERROR(quote_literal_no_function_quote_class,none,
+      "cannot expand quote literal: Quote.FunctionQuote%0 not found", (int))
+ERROR(quote_literal_no_quote_class,none,
+      "cannot expand quote literal: Quote.Quote not found", ())
+ERROR(quote_literal_no_quote_module,none,
+      "cannot expand quote literal: Quote not imported", ())
+ERROR(quote_literal_no_tree_proto,none,
+      "cannot expand quote literal: Quote.Tree not found", ())
+WARNING(quote_literal_unsupported_brief,none,
+      "unsupported code snippet", ())
+WARNING(quote_literal_unsupported_detailed,none,
+      "unsupported code snippet\n%0", (StringRef))
+
+ERROR(unquote_wrong_type,none,
+      "can only unquote expressions of type Quote and FunctionQuoteN", ())
 
 ERROR(discard_expr_outside_of_assignment,none,
       "'_' can only appear in a pattern or on the left side of an assignment",
@@ -3566,9 +3607,12 @@ ERROR(closure_tuple_parameter_destructuring_implicit,none,
 ERROR(nested_tuple_parameter_destructuring,none,
       "nested tuple parameter %0 of function %1 "
       "does not support destructuring", (Type, Type))
-ERROR(single_tuple_parameter_mismatch,none,
-      "%0 %select{|%1 }3expects a single parameter of type %2",
-      (DescriptiveDeclKind, Identifier, Type, bool))
+ERROR(single_tuple_parameter_mismatch_special,none,
+      "%0 expects a single parameter of type %1%2",
+      (DescriptiveDeclKind, Type, StringRef))
+ERROR(single_tuple_parameter_mismatch_normal,none,
+      "%0 %1 expects a single parameter of type %2%3",
+      (DescriptiveDeclKind, DeclBaseName, Type, StringRef))
 ERROR(unknown_single_tuple_parameter_mismatch,none,
       "single parameter of type %0 is expected in call", (Type))
 
@@ -4545,16 +4589,15 @@ WARNING(variable_never_used, none,
         "consider replacing with '_' or removing it",
         (Identifier, unsigned))
 WARNING(immutable_value_never_used_but_assigned, none,
-        "immutable value %0 was never used; "
-        "consider removing it",
+        "immutable value %0 was never used; consider removing it",
         (Identifier))
 WARNING(variable_never_mutated, none,
-        "%select{variable|parameter}1 %0 was never mutated; "
-        "consider %select{removing 'var' to make it|changing to 'let'}2 constant",
-        (Identifier, unsigned, bool))
+        "variable %0 was never mutated; "
+        "consider %select{removing 'var' to make it|changing to 'let'}1 constant",
+        (Identifier, bool))
 WARNING(variable_never_read, none,
-        "%select{variable|parameter}1 %0 was written to, but never read",
-        (Identifier, unsigned))
+        "variable %0 was written to, but never read",
+        (Identifier))
 
 //------------------------------------------------------------------------------
 // MARK: Debug diagnostics
@@ -4654,6 +4697,10 @@ ERROR(property_wrapper_attribute_not_on_property, none,
 NOTE(property_wrapper_declared_here,none,
      "property wrapper type %0 declared here", (DeclName))
 
+ERROR(property_wrapper_mutating_get_composed_to_get_only,none,
+      "property wrapper %0 with a mutating getter cannot be composed inside "
+      "get-only property wrapper %1", (TypeLoc, TypeLoc))
+
 ERROR(property_wrapper_local,none,
       "property wrappers are not yet supported on local properties", ())
 ERROR(property_wrapper_top_level,none,
@@ -4710,6 +4757,9 @@ WARNING(property_wrapper_init_initialValue,none,
         ())
 ERROR(property_wrapper_projection_value_missing,none,
       "could not find projection value property %0", (Identifier))
+ERROR(property_wrapper_missing_arg_init, none, "missing argument for parameter "
+      "%0 in property wrapper initializer; add 'wrappedValue' and %0 "
+      "arguments in '@%1(...)'", (Identifier, StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: function builder diagnostics

@@ -5823,14 +5823,7 @@ EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
   for (auto elt : theEnum->getAllElements()) {
     numElements++;
 
-    // Compute whether this gives us an apparent payload or dynamic layout.
-    // Note that we do *not* apply substitutions from a bound generic instance
-    // yet. We want all instances of a generic enum to share an implementation
-    // strategy. If the abstract layout of the enum is dependent on generic
-    // parameters, then we additionally need to constrain any layout
-    // optimizations we perform to things that are reproducible by the runtime.
-    Type origArgType = elt->getArgumentInterfaceType();
-    if (origArgType.isNull()) {
+    if (!elt->hasAssociatedValues()) {
       elementsWithNoPayload.push_back({elt, nullptr, nullptr});
       continue;
     }
@@ -5843,6 +5836,13 @@ EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
       continue;
     }
 
+    // Compute whether this gives us an apparent payload or dynamic layout.
+    // Note that we do *not* apply substitutions from a bound generic instance
+    // yet. We want all instances of a generic enum to share an implementation
+    // strategy. If the abstract layout of the enum is dependent on generic
+    // parameters, then we additionally need to constrain any layout
+    // optimizations we perform to things that are reproducible by the runtime.
+    Type origArgType = elt->getArgumentInterfaceType();
     origArgType = theEnum->mapTypeIntoContext(origArgType);
 
     auto origArgLoweredTy = TC.IGM.getLoweredType(origArgType);
@@ -5898,6 +5898,13 @@ EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
                                          numElements,
                                          std::move(elementsWithPayload),
                                          std::move(elementsWithNoPayload)));
+  }
+
+  // namespace-like enums must be imported as empty decls.
+  if (theEnum->hasClangNode() && numElements == 0 && !theEnum->isObjC()) {
+    return std::unique_ptr<EnumImplStrategy>(new SingletonEnumImplStrategy(
+        TC.IGM, tik, alwaysFixedSize, numElements,
+        std::move(elementsWithPayload), std::move(elementsWithNoPayload)));
   }
 
   // Enums imported from Clang or marked with @objc use C-compatible layout.

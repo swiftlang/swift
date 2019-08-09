@@ -156,6 +156,19 @@ public:
 
   // Deferred Token Data =====================================================//
 
+  CharSourceRange getDeferredTokenRangeWithTrivia() const {
+    assert(DK == DataKind::DeferredToken);
+    auto leadTriviaPieces = getDeferredLeadingTriviaPieces();
+    auto trailTriviaPieces = getDeferredTrailingTriviaPieces();
+
+    auto leadTriviaLen = ParsedTriviaPiece::getTotalLength(leadTriviaPieces);
+    auto trailTriviaLen = ParsedTriviaPiece::getTotalLength(trailTriviaPieces);
+
+    SourceLoc begin = DeferredToken.TokLoc.getAdvancedLoc(-leadTriviaLen);
+    unsigned len = leadTriviaLen + DeferredToken.TokLength + trailTriviaLen;
+
+    return CharSourceRange{begin, len};
+  }
   CharSourceRange getDeferredTokenRangeWithoutBackticks() const {
     assert(DK == DataKind::DeferredToken);
     return CharSourceRange{DeferredToken.TokLoc, DeferredToken.TokLength};

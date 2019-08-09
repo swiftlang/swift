@@ -164,6 +164,10 @@ public:
                                    const SpareBitVector &spareBits,
                                    unsigned firstBitOffset,
                                    unsigned bitWidth) const;
+private:
+  /// Calculate the total number of bits this payload requires.
+  /// This will always be a multiple of 8.
+  unsigned getAllocSizeInBits(const llvm::DataLayout &DL) const;
 };
   
 }

@@ -277,7 +277,7 @@ StepResult ComponentStep::take(bool prevFailed) {
   // allowed in the solution.
   if (!CS.solverState->allowsFreeTypeVariables() && CS.hasFreeTypeVariables()) {
     if (!CS.shouldAttemptFixes())
-      return done(/*isSuccess=*/false);
+      return finalize(/*isSuccess=*/false);
 
     // Let's see if all of the free type variables are associated with
     // generic parameters and if so, let's default them to `Any` and continue
@@ -298,7 +298,7 @@ StepResult ComponentStep::take(bool prevFailed) {
 
       auto *anchor = locator->getAnchor();
       if (!(anchor && locator->isForGenericParameter()))
-        return done(/*isSuccess=*/false);
+        return finalize(/*isSuccess=*/false);
 
       // Increment the score for every missing generic argument
       // to make ranking of the solutions with different number
@@ -324,14 +324,14 @@ StepResult ComponentStep::take(bool prevFailed) {
       auto *fix =
           ExplicitlySpecifyGenericArguments::create(CS, missingParams, locator);
       if (CS.recordFix(fix))
-        return done(/*isSuccess=*/false);
+        return finalize(/*isSuccess=*/false);
     }
   }
 
   // If this solution is worse than the best solution we've seen so far,
   // skip it.
   if (CS.worseThanBestSolution())
-    return done(/*isSuccess=*/false);
+    return finalize(/*isSuccess=*/false);
 
   // If we only have relational or member constraints and are allowing
   // free type variables, save the solution.
@@ -341,7 +341,7 @@ StepResult ComponentStep::take(bool prevFailed) {
     case ConstraintClassification::Member:
       continue;
     default:
-      return done(/*isSuccess=*/false);
+      return finalize(/*isSuccess=*/false);
     }
   }
 
@@ -350,30 +350,30 @@ StepResult ComponentStep::take(bool prevFailed) {
     getDebugLogger() << "(found solution " << getCurrentScore() << ")\n";
 
   Solutions.push_back(std::move(solution));
-  return done(/*isSuccess=*/true);
+  return finalize(/*isSuccess=*/true);
 }
 
-StepResult ComponentStep::resume(bool prevFailed) {
+StepResult ComponentStep::finalize(bool isSuccess) {
+  // If this was a single component, there is nothing to be done,
+  // because it represents the whole constraint system at some
+  // point of the solver path.
+  if (IsSingle)
+    return done(isSuccess);
+
   // Rewind all modifications done to constraint system.
   ComponentScope.reset();
 
-  if (!IsSingle && isDebugMode()) {
+  if (isDebugMode()) {
     auto &log = getDebugLogger();
-    log << (prevFailed ? "failed" : "finished") << " component #" << Index
+    log << (isSuccess ? "finished" : "failed") << " component #" << Index
         << ")\n";
   }
 
   // If we came either back to this step and previous
   // (either disjunction or type var) failed, it means
   // that component as a whole has failed.
-  if (prevFailed)
+  if (!isSuccess)
     return done(/*isSuccess=*/false);
-
-  // If this was a single component, there is nothing to be done,
-  // because it represents the whole constraint system at some
-  // point of the solver path.
-  if (IsSingle)
-    return done(/*isSuccess=*/true);
 
   assert(!Solutions.empty() && "No Solutions?");
 
@@ -481,8 +481,8 @@ bool DisjunctionStep::shouldSkip(const DisjunctionChoice &choice) const {
   auto &ctx = CS.getASTContext();
 
   bool attemptFixes = CS.shouldAttemptFixes();
-  // Enable "fixed" overload choices in "diagnostic" mode.
-  if (!(attemptFixes && choice.hasFix()) && choice.isDisabled()) {
+  // Enable all disabled choices in "diagnostic" mode.
+  if (!attemptFixes && choice.isDisabled()) {
     if (isDebugMode()) {
       auto &log = getDebugLogger();
       log << "(skipping ";

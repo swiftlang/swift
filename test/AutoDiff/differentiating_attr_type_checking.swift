@@ -347,3 +347,26 @@ func two6(x: Float, y: Float) -> (value: Float, pullback: (Float) -> (Float, Flo
 func two7(x: Float, y: Float) -> (value: Float, pullback: (Float) -> (Float, Float)) {
   return (x + y, { ($0, $0) })
 }
+
+// Test class methods.
+
+class Super {
+  @differentiable
+  func foo(_ x: Float) -> Float {
+    return x
+  }
+
+  @differentiating(foo)
+  func vjpFoo(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+    return (foo(x), { v in v })
+  }
+}
+
+class Sub : Super {
+  // TODO(TF-649): Enable `@differentiating` to override original functions from superclass.
+  // expected-error @+1 {{'foo' is not defined in the current type context}}
+  @differentiating(foo)
+  override func vjpFoo(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+    return (foo(x), { v in v })
+  }
+}

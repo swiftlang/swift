@@ -299,10 +299,21 @@ public:
   virtual bool valueForOption(UIdent Key, unsigned &Val) = 0;
   virtual bool valueForOption(UIdent Key, bool &Val) = 0;
   virtual bool valueForOption(UIdent Key, StringRef &Val) = 0;
+  virtual bool forEach(UIdent key, llvm::function_ref<bool(OptionsDictionary &)> applier) = 0;
 };
 
 struct Statistic;
 typedef std::function<void(ArrayRef<Statistic *> stats)> StatisticsReceiver;
+
+/// Options for configuring a virtual file system provider.
+struct VFSOptions {
+  /// The name of the virtual file system to use.
+  std::string name;
+
+  /// Arguments for the virtual file system provider (may be null).
+  // FIXME: the lifetime is actually limited by the RequestDict.
+  std::unique_ptr<OptionsDictionary> options;
+};
 
 /// Used to wrap the result of a request. There are three possibilities:
 /// - The request succeeded (`value` is valid)
@@ -651,13 +662,14 @@ public:
   virtual void
   codeComplete(llvm::MemoryBuffer *InputBuf, unsigned Offset,
                CodeCompletionConsumer &Consumer, ArrayRef<const char *> Args,
-               llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem) = 0;
+               Optional<VFSOptions> vfsOptions) = 0;
 
   virtual void codeCompleteOpen(StringRef name, llvm::MemoryBuffer *inputBuf,
                                 unsigned offset, OptionsDictionary *options,
                                 ArrayRef<FilterRule> filterRules,
                                 GroupedCodeCompletionConsumer &consumer,
-                                ArrayRef<const char *> args) = 0;
+                                ArrayRef<const char *> args,
+                                Optional<VFSOptions> vfsOptions) = 0;
 
   virtual void codeCompleteClose(StringRef name, unsigned offset,
                                  GroupedCodeCompletionConsumer &consumer) = 0;
@@ -677,8 +689,7 @@ public:
 
   virtual void
   editorOpen(StringRef Name, llvm::MemoryBuffer *Buf, EditorConsumer &Consumer,
-             ArrayRef<const char *> Args,
-             llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem) = 0;
+             ArrayRef<const char *> Args, Optional<VFSOptions> vfsOptions) = 0;
 
   virtual void editorOpenInterface(EditorConsumer &Consumer,
                                    StringRef Name,
@@ -730,9 +741,8 @@ public:
   virtual void
   getCursorInfo(StringRef Filename, unsigned Offset, unsigned Length,
                 bool Actionables, bool CancelOnSubsequentRequest,
-                ArrayRef<const char *> Args,
-                llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
-                std::function<void(const RequestResult<SourceKit::CursorInfoData> &)> Receiver) = 0;
+                ArrayRef<const char *> Args, Optional<VFSOptions> vfsOptions,
+       std::function<void(const RequestResult<CursorInfoData> &)> Receiver) = 0;
 
   virtual void getNameInfo(StringRef Filename, unsigned Offset,
                            NameTranslatingInfo &Input,
@@ -746,9 +756,8 @@ public:
 
   virtual void getCursorInfoFromUSR(
       StringRef Filename, StringRef USR, bool CancelOnSubsequentRequest,
-      ArrayRef<const char *> Args,
-      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
-      std::function<void(const RequestResult<SourceKit::CursorInfoData> &)> Receiver) = 0;
+      ArrayRef<const char *> Args, Optional<VFSOptions> vfsOptions,
+      std::function<void(const RequestResult<CursorInfoData> &)> Receiver) = 0;
 
   virtual void findRelatedIdentifiersInFile(StringRef Filename,
                                             unsigned Offset,
@@ -809,6 +818,19 @@ public:
                                        ConformingMethodListConsumer &Consumer) = 0;
 
   virtual void getStatistics(StatisticsReceiver) = 0;
+
+  // SWIFT_ENABLE_TENSORFLOW
+  /// Tempoary shim for clients that want to pass the filesystem directly.
+  virtual void
+  codeComplete(llvm::MemoryBuffer *InputBuf, unsigned Offset,
+               CodeCompletionConsumer &Consumer, ArrayRef<const char *> Args,
+               llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS) = 0;
+
+  /// Tempoary shim for clients that want to pass the filesystem directly.
+  virtual void
+  editorOpen(StringRef Name, llvm::MemoryBuffer *Buf, EditorConsumer &Consumer,
+             ArrayRef<const char *> Args,
+             llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS) = 0;
 };
 } // namespace SourceKit
 

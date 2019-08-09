@@ -694,7 +694,7 @@ extension Unsafe${Mutable}BufferPointer {
   }
 }
 
-extension Unsafe${Mutable}BufferPointer : CustomDebugStringConvertible {
+extension Unsafe${Mutable}BufferPointer: CustomDebugStringConvertible {
   /// A textual representation of the buffer, suitable for debugging.
   public var debugDescription: String {
     return "Unsafe${Mutable}BufferPointer"

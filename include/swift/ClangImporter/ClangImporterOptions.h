@@ -92,21 +92,22 @@ public:
   /// If true ignore the swift bridged attribute.
   bool DisableSwiftBridgeAttr = false;
 
-  /// When set, don't validate module system headers. If a header is modified
-  /// and this is not set, clang will rebuild the module.
-  bool DisableModulesValidateSystemHeaders = false;
-
   /// When set, don't look for or load overlays.
   bool DisableOverlayModules = false;
 
   /// When set, don't enforce warnings with -Werror.
   bool DebuggerSupport = false;
 
+  /// When set, clobber the Clang instance's virtual file system with the Swift
+  /// virtual file system.
+  bool ForceUseSwiftVirtualFileSystem = false;
+
   // SWIFT_ENABLE_TENSORFLOW
   /// When set, clang writes its output files (module caches) to this instead
   /// of to the real filesystem.
   llvm::IntrusiveRefCntPtr<clang::InMemoryOutputFileSystem>
       InMemoryOutputFileSystem;
+
 
   /// Return a hash code of any components from these options that should
   /// contribute to a Swift Bridging PCH hash.
@@ -125,7 +126,6 @@ public:
     Code = hash_combine(Code, ImportForwardDeclarations);
     Code = hash_combine(Code, InferImportAsMember);
     Code = hash_combine(Code, DisableSwiftBridgeAttr);
-    Code = hash_combine(Code, DisableModulesValidateSystemHeaders);
     Code = hash_combine(Code, DisableOverlayModules);
     return Code;
   }

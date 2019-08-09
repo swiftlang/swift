@@ -30,7 +30,7 @@ Please make sure you use Python 2.x. Python 3.x is not supported currently.
 
 #### macOS
 
-To build for macOS, you need [Xcode 11 beta](https://developer.apple.com/xcode/downloads/).
+To build for macOS, you need [Xcode 11 beta 5](https://developer.apple.com/xcode/downloads/).
 The required version of Xcode changes frequently, and is often a beta release.
 Check this document for the current required version.
 
@@ -49,7 +49,7 @@ Additionally, [Bazel](https://www.bazel.build) between v0.24.1 and v0.25.2 (incl
 
 For Ubuntu, you'll need the following development dependencies:
 
-    sudo apt-get install git cmake ninja-build clang python uuid-dev libicu-dev icu-devtools libedit-dev libxml2-dev libsqlite3-dev swig libpython-dev libncurses5-dev pkg-config libcurl4-openssl-dev systemtap-sdt-dev tzdata rsync
+    sudo apt-get install git cmake ninja-build clang python uuid-dev libicu-dev icu-devtools libedit-dev libxml2-dev libsqlite3-dev swig libpython-dev libncurses5-dev pkg-config libcurl4-openssl-dev libblocksruntime-dev systemtap-sdt-dev tzdata rsync
 
 Additionally, [Bazel](https://www.bazel.build) between v0.24.1 and v0.25.2 (inclusive) is required to build with TensorFlow support. Ubuntu installation instructions can be found [below](#bazel).
 
@@ -68,7 +68,7 @@ First, create a directory for all of the Swift sources:
 **Note:** This is important since update-checkout (see below) checks out
 repositories next to the Swift source directory. This means that if one clones
 Swift and has other unrelated repositories, update-checkout may not clone those
-repositories and will update them instead. Additionally, ensure Python 2.7 is being 
+repositories and will update them instead. Additionally, ensure Python 2.7 is being
 used for this step, whether via conda environment or other means.
 
 **TensorFlow Support:** To build with TensorFlow support, the `tensorflow`

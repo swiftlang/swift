@@ -457,6 +457,9 @@ namespace {
     RValue visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E,
                                               SGFContext C);
     RValue visitObjectLiteralExpr(ObjectLiteralExpr *E, SGFContext C);
+    RValue visitQuoteLiteralExpr(QuoteLiteralExpr *E, SGFContext C);
+    RValue visitUnquoteExpr(UnquoteExpr *E, SGFContext C);
+    RValue visitDeclQuoteExpr(DeclQuoteExpr *E, SGFContext C);
     RValue visitEditorPlaceholderExpr(EditorPlaceholderExpr *E, SGFContext C);
     RValue visitObjCSelectorExpr(ObjCSelectorExpr *E, SGFContext C);
     RValue visitKeyPathExpr(KeyPathExpr *E, SGFContext C);
@@ -2385,7 +2388,59 @@ RValue RValueEmitter::visitAbstractClosureExpr(AbstractClosureExpr *e,
 RValue RValueEmitter::
 visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E,
                                    SGFContext C) {
-  return visit(E->getSemanticExpr(), C);
+  RValue interpolation;
+  {
+    TapExpr *ETap = E->getAppendingExpr();
+    // Inlined from TapExpr:
+    // TODO: This is only necessary because constant evaluation requires that
+    // the box for the var gets defined before the initializer happens.
+    auto Var = ETap->getVar();
+    auto VarType = ETap->getType()->getCanonicalType();
+
+    Scope outerScope(SGF, CleanupLocation(ETap));
+
+    // Initialize the var with our SubExpr.
+    auto VarInit =
+        SGF.emitInitializationForVarDecl(Var, /*forceImmutable=*/false);
+    {
+      // Modified from TapExpr to evaluate the SubExpr directly rather than
+      // indirectly through the OpaqueValue system.
+      PreparedArguments builderInitArgs;
+      RValue literalCapacity = visit(E->getLiteralCapacityExpr(), SGFContext());
+      RValue interpolationCount =
+          visit(E->getInterpolationCountExpr(), SGFContext());
+      builderInitArgs.emplace(
+          {AnyFunctionType::Param(literalCapacity.getType()),
+           AnyFunctionType::Param(interpolationCount.getType())});
+      builderInitArgs.add(E, std::move(literalCapacity));
+      builderInitArgs.add(E, std::move(interpolationCount));
+      RValue subexpr_result = SGF.emitApplyAllocatingInitializer(
+          E, E->getBuilderInit(), std::move(builderInitArgs), Type(),
+          SGFContext(VarInit.get()));
+      if (!subexpr_result.isInContext()) {
+        ArgumentSource(
+            SILLocation(E),
+            std::move(subexpr_result).ensurePlusOne(SGF, SILLocation(E)))
+            .forwardInto(SGF, VarInit.get());
+      }
+    }
+
+    // Emit the body and let it mutate the var if it chooses.
+    SGF.emitStmt(ETap->getBody());
+
+    // Retrieve and return the var, making it +1 so it survives the scope.
+    auto result = SGF.emitRValueForDecl(SILLocation(ETap), Var, VarType,
+                                        AccessSemantics::Ordinary, SGFContext());
+    result = std::move(result).ensurePlusOne(SGF, SILLocation(ETap));
+    interpolation = outerScope.popPreservingValue(std::move(result));
+  }
+
+  PreparedArguments resultInitArgs;
+  resultInitArgs.emplace(AnyFunctionType::Param(interpolation.getType()));
+  resultInitArgs.add(E, std::move(interpolation));
+
+  return SGF.emitApplyAllocatingInitializer(
+      E, E->getResultInit(), std::move(resultInitArgs), Type(), C);
 }
 
 RValue RValueEmitter::
@@ -2398,6 +2453,18 @@ visitObjectLiteralExpr(ObjectLiteralExpr *E, SGFContext C) {
   PreparedArguments args(fnTy->getParams(), E->getArg());
   return SGF.emitApplyAllocatingInitializer(SILLocation(E), init,
                                             std::move(args), E->getType(), C);
+}
+
+RValue RValueEmitter::visitQuoteLiteralExpr(QuoteLiteralExpr *E, SGFContext C) {
+  return visit(E->getSemanticExpr(), C);
+}
+
+RValue RValueEmitter::visitUnquoteExpr(UnquoteExpr *E, SGFContext C) {
+  llvm_unreachable("invalid code made its way into SILGen");
+}
+
+RValue RValueEmitter::visitDeclQuoteExpr(DeclQuoteExpr *E, SGFContext C) {
+  return visit(E->getSemanticExpr(), C);
 }
 
 RValue RValueEmitter::
@@ -2557,9 +2624,9 @@ loadIndexValuesForKeyPathComponent(SILGenFunction &SGF, SILLocation loc,
 static AccessorDecl *
 getRepresentativeAccessorForKeyPath(AbstractStorageDecl *storage) {
   if (storage->requiresOpaqueGetter())
-    return storage->getGetter();
+    return storage->getOpaqueAccessor(AccessorKind::Get);
   assert(storage->requiresOpaqueReadCoroutine());
-  return storage->getReadCoroutine();
+  return storage->getOpaqueAccessor(AccessorKind::Read);
 }
 
 static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
@@ -2710,7 +2777,7 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
   // back to the declaration whose setter introduced the witness table
   // entry.
   if (isa<ProtocolDecl>(property->getDeclContext())) {
-    auto setter = property->getSetter();
+    auto setter = property->getOpaqueAccessor(AccessorKind::Set);
     if (!SILDeclRef::requiresNewWitnessTableEntry(setter)) {
       // Find the setter that does have a witness table entry.
       auto wtableSetter =
@@ -3066,7 +3133,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
       branchScope.pop();
       
       auto isEqualI1 = subSGF.B.createStructExtract(loc, isEqual,
-        C.getBoolDecl()->getStoredProperties().front(), i1Ty);
+        C.getBoolDecl()->getStoredProperties()[0], i1Ty);
       
       auto isTrueBB = subSGF.createBasicBlock();
       // Each false condition needs its own block to avoid critical edges.
@@ -4864,7 +4931,7 @@ RValue RValueEmitter::emitForceValue(ForceValueExpr *loc, Expr *E,
         failureBuilder.setTrackingList(SGF.getBuilder().getTrackingList());
         auto boolTy = SILType::getBuiltinIntegerType(1, SGF.getASTContext());
         auto trueV = failureBuilder.createIntegerLiteral(loc, boolTy, 1);
-        failureBuilder.createCondFail(loc, trueV);
+        failureBuilder.createCondFail(loc, trueV, "force unwrapped a nil value");
         failureBuilder.createUnreachable(loc);
       }
     }
@@ -5003,7 +5070,7 @@ RValue RValueEmitter::visitMakeTemporarilyEscapableExpr(
   auto isEscaping = SGF.B.createIsEscapingClosure(
       loc, borrowedClosure.getValue(),
       IsEscapingClosureInst::WithoutActuallyEscaping);
-  SGF.B.createCondFail(loc, isEscaping);
+  SGF.B.createCondFail(loc, isEscaping, "non-escaping closure has escaped");
   return rvalue;
 }
 

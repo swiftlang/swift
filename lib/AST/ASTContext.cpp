@@ -100,6 +100,52 @@ using AssociativityCacheType =
   MACRO(NSNumber) \
   MACRO(NSValue)
 
+struct OverrideSignatureKey {
+  GenericSignature *baseMethodSig;
+  GenericSignature *derivedClassSig;
+  Type superclassTy;
+
+  OverrideSignatureKey(GenericSignature *baseMethodSignature,
+                       GenericSignature *derivedClassSignature,
+                       Type superclassType)
+      : baseMethodSig(baseMethodSignature),
+        derivedClassSig(derivedClassSignature), superclassTy(superclassType) {}
+};
+
+namespace llvm {
+template <> struct DenseMapInfo<OverrideSignatureKey> {
+  using Type = swift::Type;
+  using GenericSignature = swift::GenericSignature;
+
+  static bool isEqual(const OverrideSignatureKey lhs,
+                      const OverrideSignatureKey rhs) {
+    return lhs.baseMethodSig == rhs.baseMethodSig &&
+           lhs.derivedClassSig == rhs.derivedClassSig &&
+           lhs.superclassTy.getPointer() == rhs.superclassTy.getPointer();
+  }
+
+  static inline OverrideSignatureKey getEmptyKey() {
+    return OverrideSignatureKey(DenseMapInfo<GenericSignature *>::getEmptyKey(),
+                                DenseMapInfo<GenericSignature *>::getEmptyKey(),
+                                DenseMapInfo<Type>::getEmptyKey());
+  }
+
+  static inline OverrideSignatureKey getTombstoneKey() {
+    return OverrideSignatureKey(
+        DenseMapInfo<GenericSignature *>::getTombstoneKey(),
+        DenseMapInfo<GenericSignature *>::getTombstoneKey(),
+        DenseMapInfo<Type>::getTombstoneKey());
+  }
+
+  static unsigned getHashValue(const OverrideSignatureKey &Val) {
+    return hash_combine(
+        DenseMapInfo<GenericSignature *>::getHashValue(Val.baseMethodSig),
+        DenseMapInfo<GenericSignature *>::getHashValue(Val.derivedClassSig),
+        DenseMapInfo<Type>::getHashValue(Val.superclassTy));
+  }
+};
+} // namespace llvm
+
 struct ASTContext::Implementation {
   Implementation();
   ~Implementation();
@@ -145,6 +191,13 @@ struct ASTContext::Implementation {
   StructDecl *TensorShapeDecl = nullptr;
   /// The declaration of TensorFlow.TensorDataType.
   StructDecl *TensorDataTypeDecl = nullptr;
+
+  /// The declaration of Quote.Tree.
+  ProtocolDecl *TreeDecl = nullptr;
+  /// The declaration of Quote.Quote.
+  ClassDecl *QuoteDecl = nullptr;
+  /// The declarations of Quote.FunctionQuoteN.
+  SmallVector<ClassDecl *, 16> FunctionQuoteDecls;
 
 #define KNOWN_STDLIB_TYPE_DECL(NAME, DECL_CLASS, NUM_GENERIC_PARAMS) \
   /** The declaration of Swift.NAME. */ \
@@ -444,6 +497,8 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   llvm::FoldingSet<SILLayout> SILLayouts;
 
   RC<syntax::SyntaxArena> TheSyntaxArena;
+
+  llvm::DenseMap<OverrideSignatureKey, GenericSignature *> overrideSigCache;
 };
 
 ASTContext::Implementation::Implementation()
@@ -872,6 +927,85 @@ StructDecl *ASTContext::getTensorDataTypeDecl() const {
   return nullptr;
 }
 
+/// Retrieve the decl for the Quote module iff it has been imported.
+/// Otherwise, this returns null.
+ModuleDecl *ASTContext::getQuoteModule() const {
+  return getLoadedModule(Id_Quote);
+}
+
+/// Retrieve the decl for Quote.Tree iff the Quote module has been imported.
+/// Otherwise, this returns null.
+ProtocolDecl *ASTContext::getTreeDecl() const {
+  if (getImpl().TreeDecl)
+    return getImpl().TreeDecl;
+
+  auto quoteModule = getLoadedModule(Id_Quote);
+  if (!quoteModule)
+    return nullptr;
+
+  SmallVector<ValueDecl *, 1> results;
+  quoteModule->lookupValue({}, getIdentifier("Tree"), NLKind::UnqualifiedLookup,
+                           results);
+
+  for (auto result : results)
+    if (auto CD = dyn_cast<ProtocolDecl>(result))
+      return getImpl().TreeDecl = CD;
+  return nullptr;
+}
+
+/// Retrieve the decl for Quote.Quote iff the Quote module has been imported.
+/// Otherwise, this returns null.
+ClassDecl *ASTContext::getQuoteDecl() const {
+  if (getImpl().QuoteDecl)
+    return getImpl().QuoteDecl;
+
+  auto quoteModule = getLoadedModule(Id_Quote);
+  if (!quoteModule)
+    return nullptr;
+
+  SmallVector<ValueDecl *, 1> results;
+  quoteModule->lookupValue({}, getIdentifier("Quote"),
+                           NLKind::UnqualifiedLookup, results);
+
+  for (auto result : results)
+    if (auto CD = dyn_cast<ClassDecl>(result))
+      return getImpl().QuoteDecl = CD;
+  return nullptr;
+}
+
+/// Retrieve the decl for Quote.FunctionQuoteN iff the Quote module has been
+/// imported. Otherwise, this returns null.
+ClassDecl *ASTContext::getFunctionQuoteDecl(unsigned n) const {
+  auto cache = getImpl().FunctionQuoteDecls;
+  if (cache.size() == 0) {
+    auto quoteModule = getLoadedModule(Id_Quote);
+    if (!quoteModule)
+      return nullptr;
+
+    for (auto i = 0; i < 16; ++i) {
+      llvm::SmallString<16> SS;
+      llvm::raw_svector_ostream OS(SS);
+      OS << "FunctionQuote" << n;
+      auto id = getIdentifier(SS);
+
+      SmallVector<ValueDecl *, 1> results;
+      quoteModule->lookupValue({}, id, NLKind::UnqualifiedLookup, results);
+
+      for (auto result : results) {
+        if (auto CD = dyn_cast<ClassDecl>(result)) {
+          cache.push_back(CD);
+          break;
+        }
+      }
+    }
+  }
+  if (n < cache.size()) {
+    return cache[n];
+  } else {
+    return nullptr;
+  }
+}
+
 CanType ASTContext::getNeverType() const {
   auto neverDecl = getNeverDecl();
   if (!neverDecl)
@@ -951,6 +1085,9 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   case KnownProtocolKind::TensorFlowDataTypeCompatible:
   case KnownProtocolKind::TensorProtocol:
     M = getLoadedModule(Id_TensorFlow);
+    break;
+  case KnownProtocolKind::Expression:
+    M = getLoadedModule(Id_Quote);
     break;
   default:
     M = getStdlibModule();
@@ -1266,15 +1403,12 @@ FuncDecl *ASTContext::getArrayReserveCapacityDecl() const {
 
       StructDecl *IntDecl = IntType->getDecl();
       auto StoredProperties = IntDecl->getStoredProperties();
-      auto FieldIter = StoredProperties.begin();
-      if (FieldIter == StoredProperties.end())
+      if (StoredProperties.size() != 1)
         return nullptr;
-      VarDecl *field = *FieldIter;
+      VarDecl *field = StoredProperties[0];
       if (field->hasClangNode())
         return nullptr;
       if (!field->getInterfaceType()->is<BuiltinIntegerType>())
-        return nullptr;
-      if (std::next(FieldIter) != StoredProperties.end())
         return nullptr;
 
       if (!FnDecl->getResultInterfaceType()->isVoid())
@@ -3671,10 +3805,11 @@ OpaqueTypeArchetypeType::get(OpaqueTypeDecl *Decl,
     }
   }
 #else
-  // Assert that there are no same type constraints on the underlying type.
+  // Assert that there are no same type constraints on the underlying type
   // or its associated types.
   //
-  // This should not be possible until we add where clause support.
+  // This should not be possible until we add where clause support, with the
+  // exception of generic base class constraints (handled below).
 # ifndef NDEBUG
   for (auto reqt :
                 Decl->getOpaqueInterfaceGenericSignature()->getRequirements()) {
@@ -3694,6 +3829,14 @@ OpaqueTypeArchetypeType::get(OpaqueTypeDecl *Decl,
   auto opaqueInterfaceTy = Decl->getUnderlyingInterfaceType();
   auto layout = signature->getLayoutConstraint(opaqueInterfaceTy);
   auto superclass = signature->getSuperclassBound(opaqueInterfaceTy);
+  #if !DO_IT_CORRECTLY
+    // Ad-hoc substitute the generic parameters of the superclass.
+    // If we correctly applied the substitutions to the generic signature
+    // constraints above, this would be unnecessary.
+    if (superclass && superclass->hasTypeParameter()) {
+      superclass = superclass.subst(Substitutions);
+    }
+  #endif
   SmallVector<ProtocolDecl*, 4> protos;
   for (auto proto : signature->getConformsTo(opaqueInterfaceTy)) {
     protos.push_back(proto);
@@ -4443,6 +4586,126 @@ CanGenericSignature ASTContext::getExistentialSignature(CanType existential,
   (void) result;
 
   return genericSig;
+}
+
+GenericSignature *
+ASTContext::getOverrideGenericSignature(const ValueDecl *base,
+                                        const ValueDecl *derived) {
+  auto baseGenericCtx = base->getAsGenericContext();
+  auto &ctx = base->getASTContext();
+
+  if (!baseGenericCtx) {
+    return nullptr;
+  }
+
+  auto baseClass = base->getDeclContext()->getSelfClassDecl();
+
+  if (!baseClass) {
+    return nullptr;
+  }
+
+  auto derivedClass = derived->getDeclContext()->getSelfClassDecl();
+  auto *baseClassSig = baseClass->getGenericSignature();
+
+  if (!derivedClass) {
+    return nullptr;
+  }
+
+  if (derivedClass->getSuperclass().isNull()) {
+    return nullptr;
+  }
+
+  if (derivedClass->getGenericSignature() == nullptr &&
+      !baseGenericCtx->isGeneric()) {
+    return nullptr;
+  }
+
+  auto subMap = derivedClass->getSuperclass()->getContextSubstitutionMap(
+      derivedClass->getModuleContext(), baseClass);
+
+  if (baseGenericCtx->getGenericSignature() == nullptr) {
+    return nullptr;
+  }
+  unsigned derivedDepth = 0;
+
+  auto key = OverrideSignatureKey(baseGenericCtx->getGenericSignature(),
+                                  derivedClass->getGenericSignature(),
+                                  derivedClass->getSuperclass());
+
+  if (getImpl().overrideSigCache.find(key) !=
+      getImpl().overrideSigCache.end()) {
+    return getImpl().overrideSigCache.lookup(key);
+  }
+
+  if (auto *derivedSig = derivedClass->getGenericSignature())
+    derivedDepth = derivedSig->getGenericParams().back()->getDepth() + 1;
+
+  GenericSignatureBuilder builder(ctx);
+  builder.addGenericSignature(derivedClass->getGenericSignature());
+
+  if (auto derivedGenericCtx = derived->getAsGenericContext()) {
+    if (derivedGenericCtx->isGeneric()) {
+      for (auto param : *derivedGenericCtx->getGenericParams()) {
+        builder.addGenericParameter(param);
+      }
+    }
+  }
+
+  auto source =
+      GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
+
+  unsigned baseDepth = 0;
+
+  if (baseClassSig) {
+    baseDepth = baseClassSig->getGenericParams().back()->getDepth() + 1;
+  }
+
+  auto substFn = [&](SubstitutableType *type) -> Type {
+    auto *gp = cast<GenericTypeParamType>(type);
+
+    if (gp->getDepth() < baseDepth) {
+      return Type(gp).subst(subMap);
+    }
+
+    return CanGenericTypeParamType::get(
+        gp->getDepth() - baseDepth + derivedDepth, gp->getIndex(), ctx);
+  };
+
+  auto lookupConformanceFn =
+      [&](CanType depTy, Type substTy,
+          ProtocolDecl *proto) -> Optional<ProtocolConformanceRef> {
+    if (auto conf = subMap.lookupConformance(depTy, proto))
+      return conf;
+
+    return ProtocolConformanceRef(proto);
+  };
+
+  for (auto reqt : baseGenericCtx->getGenericSignature()->getRequirements()) {
+    if (auto substReqt = reqt.subst(substFn, lookupConformanceFn)) {
+      builder.addRequirement(*substReqt, source, nullptr);
+    }
+  }
+
+  auto *genericSig = std::move(builder).computeGenericSignature(SourceLoc());
+  getImpl().overrideSigCache.insert(std::make_pair(key, genericSig));
+  return genericSig;
+}
+
+bool ASTContext::overrideGenericSignatureReqsSatisfied(
+    const ValueDecl *base, const ValueDecl *derived,
+    const OverrideGenericSignatureReqCheck direction) {
+  auto sig = getOverrideGenericSignature(base, derived);
+  if (!sig)
+    return true;
+
+  auto derivedSig = derived->getAsGenericContext()->getGenericSignature();
+
+  switch (direction) {
+  case OverrideGenericSignatureReqCheck::BaseReqSatisfiedByDerived:
+    return sig->requirementsNotSatisfiedBy(derivedSig).empty();
+  case OverrideGenericSignatureReqCheck::DerivedReqSatisfiedByBase:
+    return derivedSig->requirementsNotSatisfiedBy(sig).empty();
+  }
 }
 
 SILLayout *SILLayout::get(ASTContext &C,

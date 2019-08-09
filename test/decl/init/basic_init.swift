@@ -23,14 +23,13 @@ class InitClass {
   @objc dynamic init(bar: Int) {}
 }
 class InitSubclass: InitClass {}
-// expected-note@-1 {{'init(bar:)' previously overridden here}}
-// expected-note@-2 {{'init(baz:)' previously overridden here}}
+// expected-error@-1 {{'init(bar:)' has already been overridden}}
+// expected-error@-2 {{'init(baz:)' has already been overridden}}
 extension InitSubclass {
   convenience init(arg: Bool) {} // expected-error{{overriding non-@objc declarations from extensions is not supported}}
-  convenience override init(baz: Int) {}
+  convenience override init(baz: Int) {} // expected-note{{'init(baz:)' previously overridden here}}
   // expected-error@-1 {{cannot override a non-dynamic class declaration from an extension}}
-  // expected-error@-2 {{'init(baz:)' has already been overridden}}
-  convenience override init(bar: Int) {} // expected-error{{'init(bar:)' has already been overridden}}
+  convenience override init(bar: Int) {} // expected-note{{'init(bar:)' previously overridden here}}
 }
 
 struct InitStruct {

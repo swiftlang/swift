@@ -529,6 +529,17 @@ enum class CheckedCastContextKind {
   EnumElementPattern,
 };
 
+enum class FunctionBuilderClosurePreCheck : uint8_t {
+  /// There were no problems pre-checking the closure.
+  Okay,
+
+  /// There was an error pre-checking the closure.
+  Error,
+
+  /// The closure has a return statement.
+  HasReturnStmt,
+};
+
 /// The Swift type checker, which takes a parsed AST and performs name binding,
 /// type checking, and semantic analysis to produce a type-annotated AST.
 class TypeChecker final : public LazyResolver {
@@ -545,14 +556,11 @@ public:
   /// The list of declarations that we've done at least partial validation
   /// of during type-checking, but which will need to be finalized before
   /// we can hand them off to SILGen etc.
-  llvm::SetVector<ValueDecl *> DeclsToFinalize;
+  llvm::SetVector<ClassDecl *> DeclsToFinalize;
 
   /// Track the index of the next declaration that needs to be finalized,
   /// from the \c DeclsToFinalize set.
   unsigned NextDeclToFinalize = 0;
-
-  /// The list of types whose circularity checks were delayed.
-  SmallVector<NominalTypeDecl*, 8> DelayedCircularityChecks;
 
   // Caches whether a given declaration is "as specialized" as another.
   llvm::DenseMap<std::tuple<ValueDecl *, ValueDecl *,
@@ -620,18 +628,16 @@ private:
   /// when executing scripts.
   bool InImmediateMode = false;
 
-  /// Closure expressions that have already been prechecked.
-  llvm::SmallPtrSet<ClosureExpr *, 2> precheckedClosures;
-
-  /// A helper to construct and typecheck call to super.init().
-  ///
-  /// \returns NULL if the constructed expression does not typecheck.
-  Expr* constructCallToSuperInit(ConstructorDecl *ctor, ClassDecl *ClDecl);
+  /// Closure expressions whose bodies have already been prechecked as
+  /// part of trying to apply a function builder.
+  llvm::DenseMap<ClosureExpr *, FunctionBuilderClosurePreCheck>
+    precheckedFunctionBuilderClosures;
 
   TypeChecker(ASTContext &Ctx);
   friend class ASTContext;
   friend class constraints::ConstraintSystem;
-
+  friend class TypeCheckFunctionBodyUntilRequest;
+  
 public:
   /// Create a new type checker instance for the given ASTContext, if it
   /// doesn't already have one.
@@ -804,7 +810,7 @@ public:
 
   /// Request that the given class needs to have all members validated
   /// after everything in the translation unit has been processed.
-  void requestNominalLayout(NominalTypeDecl *nominalDecl);
+  void requestClassLayout(ClassDecl *classDecl);
 
   /// Request that the superclass of the given class, if any, needs to have
   /// all members validated after everything in the translation unit has
@@ -813,7 +819,7 @@ public:
 
   /// Perform final validation of a declaration after everything in the
   /// translation unit has been processed.
-  void finalizeDecl(ValueDecl *D);
+  void finalizeDecl(ClassDecl *CD);
 
   /// Resolve a reference to the given type declaration within a particular
   /// context.
@@ -984,13 +990,10 @@ public:
   bool typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
                                           SourceLoc EndTypeCheckLoc);
   bool typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD);
-  bool typeCheckFunctionBodyUntil(FuncDecl *FD, SourceLoc EndTypeCheckLoc);
-  bool typeCheckConstructorBodyUntil(ConstructorDecl *CD,
-                                     SourceLoc EndTypeCheckLoc);
-  bool typeCheckDestructorBodyUntil(DestructorDecl *DD,
-                                    SourceLoc EndTypeCheckLoc);
 
-  bool typeCheckFunctionBuilderFuncBody(FuncDecl *FD, Type builderType);
+  BraceStmt *applyFunctionBuilderBodyTransform(FuncDecl *FD,
+                                               BraceStmt *body,
+                                               Type builderType);
   bool typeCheckClosureBody(ClosureExpr *closure);
 
   bool typeCheckTapBody(TapExpr *expr, DeclContext *DC);
@@ -1169,15 +1172,19 @@ public:
   /// target.
   void synthesizeMemberForLookup(NominalTypeDecl *target, DeclName member);
 
-  /// The specified AbstractStorageDecl \c storage was just found to satisfy
-  /// the protocol property \c requirement.  Ensure that it has the full
-  /// complement of accessors.
-  void synthesizeWitnessAccessorsForStorage(AbstractStorageDecl *requirement,
-                                            AbstractStorageDecl *storage);
-
   /// Pre-check the expression, validating any types that occur in the
   /// expression and folding sequence expressions.
   bool preCheckExpression(Expr *&expr, DeclContext *dc);
+
+  /// Pre-check the body of the given closure, which we are about to
+  /// generate constraints for.
+  ///
+  /// This mutates the body of the closure, but only in ways that should be
+  /// valid even if we end up not actually applying the function-builder
+  /// transform: it just does a normal pre-check of all the expressions in
+  /// the closure.
+  FunctionBuilderClosurePreCheck
+  preCheckFunctionBuilderClosureBody(ClosureExpr *closure);
 
   /// \name Name lookup
   ///
@@ -1242,6 +1249,76 @@ public:
     return typeCheckExpression(expr, dc, TypeLoc(), CTP_Unused,
                                TypeCheckExprOptions(), listener);
   }
+
+  /// Quote the given typed expression by creating a snippet of code that at
+  /// runtime will approximate the given expression using the data structures
+  /// from the Quote module. This functionality implements #quote(...).
+  ///
+  /// The exact runtime representation, and the way how it is constructed are
+  /// not set in stone and are undergoing rapid evolution.
+  ///
+  /// For example, in the current terminology of the Quote model, calling this
+  /// method on an expression representing `42` will return an expression
+  /// representing `Quote<Int>(Literal(42, TypeName("Int", "s:Si")))`.
+  ///
+  /// \param expr Typed expression to be quoted.
+  ///
+  /// \param dc Declaration context in which the result will be typechecked.
+  ///
+  /// \returns If successful, a typechecked expression that at runtime will
+  /// approximate the given expression. If not successful, nullptr (appropriate
+  /// error messages will also be emitted as a side effect).
+  Expr *quoteExpr(Expr *expr, DeclContext *dc);
+
+  /// Compute the type of quoteExpr given the type of expression.
+  ///
+  /// This does not require running quoteExpr and can be expressed
+  /// by the following rules (where on the left we have the type of expression,
+  /// and on the right we have the type of quoteExpr):
+  ///
+  ///   1) (T1, ..., Tn) -> R => FunctionQuoteN<T1, ... Tn, R>
+  ///   2) T                  => Quote<T>
+  ///
+  /// TODO(TF-735): In the future, we may implement more complicated rules
+  /// based on something like ExpressibleByQuoteLiteral.
+  Type getTypeOfQuoteExpr(Type exprType, SourceLoc loc);
+
+  /// Compute the type of #unquote given the type of expression.
+  ///
+  /// This can be expressed by the following rules (where on the left we have
+  /// the type of expression, and on the right we have the type of #unquote):
+  ///
+  ///   1) FunctionQuoteN<T1, ... Tn, R> => (T1, ..., Tn) -> R
+  ///   2) Quote<T>                      => T
+  ///   3) T                             => <error>
+  ///
+  /// TODO(TF-735): In the future, we may implement more complicated rules
+  /// based on something like ExpressibleByQuoteLiteral.
+  Type getTypeOfUnquoteExpr(Type exprType, SourceLoc loc);
+
+  /// Quote the given typed declaration by creating a snippet of code that at
+  /// runtime will approximate the given declaration using the data structures
+  /// from the Quote module. This functionality implements @quoted.
+  ///
+  /// The exact runtime representation, and the way how it is constructed are
+  /// not set in stone and are undergoing rapid evolution.
+  ///
+  /// \param decl Typed declaration to be quoted.
+  ///
+  /// \param dc Declaration context in which the result will be typechecked.
+  ///
+  /// \returns If successful, a typechecked expression that at runtime will
+  /// approximate the given declaration. If not successful, nullptr (appropriate
+  /// error messages will also be emitted as a side effect).
+  Expr *quoteDecl(Decl *decl, DeclContext *dc);
+
+  /// Compute the type of quoteDecl.
+  ///
+  /// At the moment, this is simply `Tree` from the Quote model.
+  ///
+  /// TODO(TF-736): In the future, we may want to infer more precise type
+  /// based on the shape of the quoted declaration.
+  Type getTypeOfQuoteDecl(SourceLoc loc);
 
 private:
   Type typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
@@ -1535,49 +1612,6 @@ public:
   /// array literals exist.
   bool requireArrayLiteralIntrinsics(SourceLoc loc);
 
-  /// Retrieve the witness type with the given name.
-  ///
-  /// \param type The type that conforms to the given protocol.
-  ///
-  /// \param protocol The protocol through which we're looking.
-  ///
-  /// \param conformance The protocol conformance.
-  ///
-  /// \param name The name of the associated type.
-  ///
-  /// \param brokenProtocolDiag Diagnostic to emit if the type cannot be
-  /// accessed.
-  ///
-  /// \return the witness type, or null if an error occurs or the type
-  /// returned would contain an ErrorType.
-  Type getWitnessType(Type type, ProtocolDecl *protocol,
-                      ProtocolConformanceRef conformance,
-                      Identifier name,
-                      Diag<> brokenProtocolDiag);
-
-  /// Build a call to the witness with the given name and arguments.
-  ///
-  /// \param base The base expression, whose witness will be invoked.
-  ///
-  /// \param protocol The protocol to call through.
-  ///
-  /// \param conformance The conformance of the base type to the given
-  /// protocol.
-  ///
-  /// \param name The name of the method to call.
-  ///
-  /// \param arguments The arguments to the witness.
-  ///
-  /// \param brokenProtocolDiag Diagnostic to emit if the protocol is broken.
-  ///
-  /// \returns a fully type-checked call, or null if the protocol was broken.
-  Expr *callWitness(Expr *base, DeclContext *dc,
-                    ProtocolDecl *protocol,
-                    ProtocolConformanceRef conformance,
-                    DeclName name,
-                    ArrayRef<Expr *> arguments,
-                    Diag<> brokenProtocolDiag);
-
   /// Determine whether the given type contains the given protocol.
   ///
   /// \param DC The context in which to check conformance. This affects, for
@@ -1829,6 +1863,8 @@ public:
                                 FragileFunctionKind Kind,
                                 bool TreatUsableFromInlineAsPublic);
 
+  Expr *buildDefaultInitializer(Type type);
+  
 private:
   bool diagnoseInlinableDeclRefAccess(SourceLoc loc, const ValueDecl *D,
                                       const DeclContext *DC,
@@ -1860,7 +1896,7 @@ public:
   /// declarations are permitted.
   ///
   /// \see FragileFunctionKind
-  std::pair<FragileFunctionKind, bool>
+  static std::pair<FragileFunctionKind, bool>
   getFragileFunctionKind(const DeclContext *DC);
 
   /// \name Availability checking
@@ -2226,6 +2262,16 @@ bool fixDeclarationObjCName(InFlightDiagnostic &diag, ValueDecl *decl,
                             Optional<ObjCSelector> targetNameOpt,
                             bool ignoreImpliedName = false);
 
+bool areGenericRequirementsSatisfied(const DeclContext *DC,
+                                     const GenericSignature *sig,
+                                     SubstitutionMap Substitutions,
+                                     bool isExtension);
+
+bool canSatisfy(Type type1, Type type2, bool openArchetypes,
+                constraints::ConstraintKind kind, DeclContext *dc);
+
+bool hasDynamicMemberLookupAttribute(Type type,
+  llvm::DenseMap<CanType, bool> &DynamicMemberLookupCache);
 } // end namespace swift
 
 #endif

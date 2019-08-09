@@ -87,6 +87,23 @@ template <class T> class SILVTableVisitor {
     assert(!fd->hasClangNode());
 
     maybeAddEntry(SILDeclRef(fd, SILDeclRef::Kind::Func));
+
+    // SWIFT_ENABLE_TENSORFLOW
+    for (auto *DA : fd->getAttrs().getAttributes<DifferentiableAttr>()) {
+      auto constant = SILDeclRef(fd, SILDeclRef::Kind::Func);
+      auto jvpConstant = constant.asAutoDiffAssociatedFunction(
+          AutoDiffAssociatedFunctionIdentifier::get(
+              AutoDiffAssociatedFunctionKind::JVP, /*differentiationOrder*/ 1,
+              DA->getParameterIndices(), fd->getASTContext()));
+      maybeAddEntry(jvpConstant);
+
+      auto vjpConstant = constant.asAutoDiffAssociatedFunction(
+          AutoDiffAssociatedFunctionIdentifier::get(
+              AutoDiffAssociatedFunctionKind::VJP, /*differentiationOrder*/ 1,
+              DA->getParameterIndices(), fd->getASTContext()));
+      maybeAddEntry(vjpConstant);
+    }
+    // SWIFT_ENABLE_TENSORFLOW END
   }
 
   void maybeAddConstructor(ConstructorDecl *cd) {
@@ -97,6 +114,29 @@ template <class T> class SILVTableVisitor {
     // necessary for super.init chaining, which is sufficiently constrained
     // to never need dynamic dispatch.
     maybeAddEntry(SILDeclRef(cd, SILDeclRef::Kind::Allocator));
+
+    // SWIFT_ENABLE_TENSORFLOW
+    for (auto *DA : cd->getAttrs().getAttributes<DifferentiableAttr>()) {
+      auto constant = SILDeclRef(cd, SILDeclRef::Kind::Allocator);
+      auto jvpConstant = constant.asAutoDiffAssociatedFunction(
+          AutoDiffAssociatedFunctionIdentifier::get(
+              AutoDiffAssociatedFunctionKind::JVP, /*differentiationOrder*/ 1,
+              DA->getParameterIndices(), cd->getASTContext()));
+      maybeAddEntry(jvpConstant);
+
+      auto vjpConstant = constant.asAutoDiffAssociatedFunction(
+          AutoDiffAssociatedFunctionIdentifier::get(
+              AutoDiffAssociatedFunctionKind::VJP, /*differentiationOrder*/ 1,
+              DA->getParameterIndices(), cd->getASTContext()));
+      maybeAddEntry(vjpConstant);
+    }
+    // SWIFT_ENABLE_TENSORFLOW END
+  }
+
+  void maybeAddAccessors(AbstractStorageDecl *asd) {
+    asd->visitOpaqueAccessors([&](AccessorDecl *accessor) {
+      maybeAddMethod(accessor);
+    });
   }
 
   void maybeAddEntry(SILDeclRef declRef) {
@@ -134,10 +174,14 @@ template <class T> class SILVTableVisitor {
   }
 
   void maybeAddMember(Decl *member) {
-    if (auto *fd = dyn_cast<FuncDecl>(member))
+    if (auto *ad = dyn_cast<AccessorDecl>(member))
+      /* handled as part of its storage */;
+    else if (auto *fd = dyn_cast<FuncDecl>(member))
       maybeAddMethod(fd);
     else if (auto *cd = dyn_cast<ConstructorDecl>(member))
       maybeAddConstructor(cd);
+    else if (auto *asd = dyn_cast<AbstractStorageDecl>(member))
+      maybeAddAccessors(asd);
     else if (auto *placeholder = dyn_cast<MissingMemberDecl>(member))
       asDerived().addPlaceholder(placeholder);
   }

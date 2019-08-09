@@ -69,15 +69,14 @@ protocol WrtOnlySelfProtocol : Differentiable {
   func method() -> Float
 }
 
-class Class {}
-// expected-error @+1 {{class objects and protocol existentials ('Class') cannot be differentiated with respect to}}
+class Class : Differentiable {}
 @differentiable(wrt: x)
 func invalidDiffWrtClass(_ x: Class) -> Class {
   return x
 }
 
 protocol Proto {}
-// expected-error @+1 {{class objects and protocol existentials ('Proto') cannot be differentiated with respect to}}
+// expected-error @+1 {{cannot differentiate with respect to protocol existential ('Proto')}}
 @differentiable(wrt: x)
 func invalidDiffWrtExistential(_ x: Proto) -> Proto {
   return x
@@ -247,10 +246,8 @@ func jvpAmbiguousVJP(x: Float) -> (Float, (Float) -> Float) {
   return (x, { $0 })
 }
 
-// TF-153: Class methods are not supported yet.
-class Foo {
+class DifferentiableClassMethod {
   // Direct differentiation case.
-  // expected-error @+1 {{class members cannot be marked with '@differentiable'}}
   @differentiable
   func foo(_ x: Float) -> Float {
     return x
@@ -605,7 +602,6 @@ func invalidRequirementConformance<Scalar>(x: Scalar) -> Scalar {
   return x
 }
 
-// expected-error @+1 {{no differentiation parameters could be inferred; must differentiate with respect to at least one parameter conforming to 'Differentiable'}}
 @differentiable(where T : AnyObject)
 func invalidAnyObjectRequirement<T : Differentiable>(x: T) -> T {
   return x
@@ -614,6 +610,12 @@ func invalidAnyObjectRequirement<T : Differentiable>(x: T) -> T {
 // expected-error @+1 {{'@differentiable' attribute does not support layout requirements}}
 @differentiable(where Scalar : _Trivial)
 func invalidRequirementLayout<Scalar>(x: Scalar) -> Scalar {
+  return x
+}
+
+// expected-error @+1 {{no differentiation parameters could be inferred; must differentiate with respect to at least one parameter conforming to 'Differentiable'}}
+@differentiable
+func missingConformance<T>(_ x: T) -> T {
   return x
 }
 
@@ -634,7 +636,8 @@ protocol ProtocolRequirements : Differentiable {
   @differentiable(wrt: x)
   func amb(x: Float, y: Int) -> Float
 
-  // expected-note @+2 {{protocol requires function 'f1'}}
+  // expected-note @+3 {{protocol requires function 'f1'}}
+  // expected-note @+2 {{overridden declaration is here}}
   @differentiable(wrt: (self, x))
   func f1(_ x: Float) -> Float
 
@@ -748,6 +751,36 @@ struct TF285MissingOneDiffAttr : TF285 {
   }
 }
 
+// TF-521: Test invalid `@differentiable` attribute due to invalid
+// `Differentiable` conformance (`TangentVector` does not conform to
+// `AdditiveArithmetic`).
+struct TF_521<T: FloatingPoint> {
+  var real: T
+  var imaginary: T
+
+  // expected-error @+1 {{can only differentiate functions with results that conform to 'Differentiable', but 'TF_521<T>' does not conform to 'Differentiable'}}
+  @differentiable(vjp: _vjpInit where T: Differentiable, T == T.TangentVector)
+  init(real: T = 0, imaginary: T = 0) {
+    self.real = real
+    self.imaginary = imaginary
+  }
+}
+// expected-error @+2 {{type 'TF_521<T>' does not conform to protocol 'Differentiable'}}
+// expected-note @+1 {{do you want to add protocol stubs}}
+extension TF_521: Differentiable where T: Differentiable {
+  // expected-note @+1 {{possibly intended match 'TF_521<T>.TangentVector' does not conform to 'AdditiveArithmetic'}}
+  typealias TangentVector = TF_521
+  typealias AllDifferentiableVariables = TF_521
+}
+extension TF_521 where T: Differentiable, T == T.TangentVector {
+  static func _vjpInit(real: T, imaginary: T) -> (TF_521, (TF_521) -> (T, T)) {
+    return (TF_521(real: real, imaginary: imaginary), { ($0.real, $0.imaginary) })
+  }
+}
+// expected-error @+1 {{result is not differentiable, but the function type is marked '@differentiable'}}
+let _: @differentiable(Float, Float) -> TF_521<Float> = { r, i in
+  TF_521(real: r, imaginary: i)
+}
 
 // TF-296: Infer `@differentiable` wrt parameters to be to all parameters that conform to `Differentiable`.
 
@@ -889,11 +922,13 @@ public protocol Distribution {
 }
 
 public protocol DifferentiableDistribution: Differentiable, Distribution {
+  // expected-note @+2 {{overridden declaration is here}}
   @differentiable(wrt: self)
   func logProbability(of value: Value) -> Float
 }
 
-public protocol MissingDifferentiableDistribution: DifferentiableDistribution
+// Adding a more general `@differentiable` attribute.
+public protocol DoubleDifferentiableDistribution: DifferentiableDistribution
   where Value: Differentiable {
   // expected-error @+1 {{overriding declaration is missing attribute '@differentiable(wrt: self)'}}
   func logProbability(of value: Value) -> Float
@@ -916,4 +951,51 @@ extension ProtocolRequirementUnsupported {
   func dfoo(_ x: Float) -> (Float, (Float) -> Float) {
     (x, { $0 })
   }
+}
+
+// Classes.
+
+class Super : Differentiable {
+  var base: Float
+
+  // NOTE(TF-654): Class initializers are not yet supported.
+  // expected-error @+1 {{'@differentiable' attribute does not yet support class initializers}}
+  @differentiable
+  init(base: Float) {
+    self.base = base
+  }
+
+  @differentiable(wrt: (self, x))
+  @differentiable(wrt: x, vjp: vjp)
+  // expected-note @+1 2 {{overridden declaration is here}}
+  func testMissingAttributes(_ x: Float) -> Float { x }
+
+  @differentiable(wrt: x, vjp: vjp)
+  func testSuperclassDerivatives(_ x: Float) -> Float { x }
+
+  final func vjp(_ x: Float) -> (Float, (Float) -> Float) {
+    fatalError()
+  }
+
+  // expected-error @+1 {{'@differentiable' attribute cannot be declared on class methods returning 'Self'}}
+  @differentiable(vjp: vjpDynamicSelfResult)
+  func dynamicSelfResult() -> Self { self }
+
+  // TODO(TF-632): Fix "'TangentVector' is not a member type of 'Self'" diagnostic.
+  // The underlying error should appear instead:
+  // "covariant 'Self' can only appear at the top level of method result type".
+  // expected-error @+1 2 {{'TangentVector' is not a member type of 'Self'}}
+  func vjpDynamicSelfResult() -> (Self, (Self.TangentVector) -> Self.TangentVector) {
+    return (self, { $0 })
+  }
+}
+
+class Sub : Super {
+  // expected-error @+2 {{overriding declaration is missing attribute '@differentiable(wrt: x)'}}
+  // expected-error @+1 {{overriding declaration is missing attribute '@differentiable'}}
+  override func testMissingAttributes(_ x: Float) -> Float { x }
+
+  // expected-error @+1 {{'vjp' is not defined in the current type context}}
+  @differentiable(wrt: x, vjp: vjp)
+  override func testSuperclassDerivatives(_ x: Float) -> Float { x }
 }

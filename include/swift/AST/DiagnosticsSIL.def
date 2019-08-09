@@ -451,14 +451,17 @@ NOTE(autodiff_cannot_differentiate_writes_to_mutable_captures,none,
 NOTE(autodiff_protocol_member_not_differentiable,none,
      "member is not differentiable because the corresponding protocol "
      "requirement is not '@differentiable'", ())
-NOTE(autodiff_protocol_member_subset_indices_not_differentiable,none,
+NOTE(autodiff_class_member_not_differentiable,none,
+     "member is not differentiable because the corresponding class member "
+     "is not '@differentiable'", ())
+NOTE(autodiff_member_subset_indices_not_differentiable,none,
      "member is differentiable only with respect to a smaller subset of "
      "arguments", ())
 NOTE(autodiff_function_nondiff_parameter_not_differentiable,none,
      "cannot differentiate with respect to a '@nondiff' parameter", ())
-NOTE(autodiff_function_assoc_func_requirements_unmet,none,
+NOTE(autodiff_function_assoc_func_unmet_requirements,none,
      "function call is not differentiable because generic requirements are not "
-     "met", ())
+     "met: '%0'", (StringRef))
 NOTE(autodiff_opaque_function_not_differentiable,none,
      "opaque non-'@differentiable' function is not differentiable", ())
 NOTE(autodiff_property_not_differentiable,none,
@@ -476,8 +479,16 @@ NOTE(autodiff_cannot_differentiate_through_inout_arguments,none,
      "cannot differentiate through 'inout' arguments", ())
 NOTE(autodiff_class_member_not_supported,none,
      "differentiating class members is not yet supported", ())
+// TODO(TF-642): Remove when `partial_apply` works with `@differentiable`
+// functions.
+NOTE(autodiff_cannot_param_subset_thunk_partially_applied_orig_fn,none,
+     "cannot convert a direct method reference to a '@differentiable' "
+     "function; use an explicit closure instead", ())
 NOTE(autodiff_control_flow_not_supported,none,
      "cannot differentiate unsupported control flow", ())
+// TODO(TF-645): Remove when differentiation supports `ref_element_addr`.
+NOTE(autodiff_class_property_not_supported,none,
+     "differentiating class properties is not yet supported", ())
 NOTE(autodiff_missing_return,none,
      "missing return for differentiation", ())
 

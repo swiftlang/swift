@@ -259,7 +259,7 @@ public:
           if (auto lazyVar = init->getInitializedLazyVar()) {
             // If we have a getter with a body, we're already re-parented
             // everything so pretend we're inside the getter.
-            if (auto getter = lazyVar->getGetter()) {
+            if (auto getter = lazyVar->getAccessor(AccessorKind::Get)) {
               if (getter->getBody(/*canSynthesize=*/false)) {
                 TmpDC = getter;
                 continue;

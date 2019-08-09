@@ -22,11 +22,14 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/ForeignInfo.h"
 #include "swift/AST/GenericEnvironment.h"
+// SWIFT_ENABLE_TENSORFLOW
+#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
 #include "clang/AST/Attr.h"
+#include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/Analysis/DomainSpecific/CocoaConventions.h"
 #include "llvm/Support/CommandLine.h"
@@ -148,11 +151,40 @@ CanSILFunctionType SILFunctionType::getWithoutDifferentiability() {
                               getOptionalErrorResult(), getASTContext());
 }
 
+// Returns the canonical generic signature for an autodiff associated function
+// given an existing associated function generic signature. All differentiation
+// parameters are constrained to conform to `Differentiable`.
+static CanGenericSignature getAutoDiffAssociatedFunctionGenericSignature(
+    CanGenericSignature assocFnGenSig,
+    ArrayRef<SILParameterInfo> originalParameters,
+    AutoDiffIndexSubset *parameterIndices, SILModule &module) {
+  if (!assocFnGenSig)
+    return nullptr;
+  auto &ctx = module.getASTContext();
+  GenericSignatureBuilder builder(ctx);
+
+  // Add associated function generic signature.
+  builder.addGenericSignature(assocFnGenSig);
+  // Constrain all wrt parameters to conform to `Differentiable`.
+  auto source =
+      GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
+  auto *diffableProto = ctx.getProtocol(KnownProtocolKind::Differentiable);
+  for (unsigned paramIdx : parameterIndices->getIndices()) {
+    auto paramType = originalParameters[paramIdx].getType();
+    Requirement req(RequirementKind::Conformance, paramType,
+                    diffableProto->getDeclaredType());
+    builder.addRequirement(req, source, module.getSwiftModule());
+  }
+  return std::move(builder)
+      .computeGenericSignature(SourceLoc(), /*allowConcreteGenericParams*/ true)
+      ->getCanonicalSignature();
+}
+
 CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
     AutoDiffIndexSubset *parameterIndices, unsigned resultIndex,
     unsigned differentiationOrder, AutoDiffAssociatedFunctionKind kind,
     SILModule &module, LookupConformanceFn lookupConformance,
-    CanGenericSignature whereClauseGenSig) {
+    CanGenericSignature assocFnGenSig) {
   // JVP: (T...) -> ((R...),
   //                 (T.TangentVector...) -> (R.TangentVector...))
   // VJP: (T...) -> ((R...),
@@ -160,10 +192,26 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
 
   auto &ctx = getASTContext();
   auto &typeConverter = module.Types;
-  if (!whereClauseGenSig)
-    whereClauseGenSig = getGenericSignature();
-  Lowering::GenericContextScope genericContextScope(
-      module.Types, whereClauseGenSig);
+
+  // Helper function testing if we are differentiating wrt this index.
+  auto isWrtIndex = [&](unsigned index) -> bool {
+    return index < parameterIndices->getCapacity() &&
+        parameterIndices->contains(index);
+  };
+
+  // Calculate differentiation parameter infos.
+  SmallVector<SILParameterInfo, 4> wrtParams;
+  for (auto valueAndIndex : enumerate(getParameters()))
+    if (isWrtIndex(valueAndIndex.index()))
+      wrtParams.push_back(valueAndIndex.value());
+
+  // Get the canonical associated function generic signature.
+  if (!assocFnGenSig)
+    assocFnGenSig = getGenericSignature();
+  assocFnGenSig = getAutoDiffAssociatedFunctionGenericSignature(
+      assocFnGenSig, getParameters(), parameterIndices, module);
+  Lowering::GenericContextScope genericContextScope(module.Types,
+                                                    assocFnGenSig);
 
   // Given a type, returns its formal SIL parameter info.
   auto getTangentParameterInfoForOriginalResult = [&](
@@ -213,18 +261,6 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
     }
     return {tanType, conv};
   };
-
-  // Helper function testing if we are differentiating wrt this index.
-  auto isWrtIndex = [&](unsigned index) -> bool {
-    return index < parameterIndices->getCapacity() &&
-        parameterIndices->contains(index);
-  };
-
-  // Calculate differentiation parameter infos.
-  SmallVector<SILParameterInfo, 4> wrtParams;
-  for (auto valueAndIndex : enumerate(getParameters()))
-    if (isWrtIndex(valueAndIndex.index()))
-      wrtParams.push_back(valueAndIndex.value());
 
   CanSILFunctionType closureType;
   switch (kind) {
@@ -280,12 +316,12 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
   newResults.reserve(getNumResults() + 1);
   for (auto &result : getResults()) {
     auto mappedResult = result.getWithType(
-        result.getType()->getCanonicalType(whereClauseGenSig));
+        result.getType()->getCanonicalType(assocFnGenSig));
     newResults.push_back(mappedResult);
   }
-  newResults.push_back({closureType->getCanonicalType(whereClauseGenSig),
+  newResults.push_back({closureType->getCanonicalType(assocFnGenSig),
                         ResultConvention::Owned});
-  return SILFunctionType::get(whereClauseGenSig, getExtInfo(),
+  return SILFunctionType::get(assocFnGenSig, getExtInfo(),
                               getCoroutineKind(), getCalleeConvention(),
                               getParameters(), getYields(), newResults,
                               getOptionalErrorResult(), ctx,
@@ -418,6 +454,7 @@ enum class ConventionsKind : uint8_t {
   ObjCSelectorFamily = 5,
   Deallocator = 6,
   Capture = 7,
+  CXXMethod = 8,
 };
 
 class Conventions {
@@ -1845,6 +1882,28 @@ public:
   }
 };
 
+/// Conventions based on C++ method declarations.
+class CXXMethodConventions : public CFunctionTypeConventions {
+  using super = CFunctionTypeConventions;
+  const clang::CXXMethodDecl *TheDecl;
+
+public:
+  CXXMethodConventions(const clang::CXXMethodDecl *decl)
+      : CFunctionTypeConventions(
+            ConventionsKind::CXXMethod,
+            decl->getType()->castAs<clang::FunctionType>()),
+        TheDecl(decl) {}
+  ParameterConvention
+  getIndirectSelfParameter(const AbstractionPattern &type) const override {
+    if (TheDecl->isConst())
+      return ParameterConvention::Indirect_In_Guaranteed;
+    return ParameterConvention::Indirect_Inout;
+  }
+  static bool classof(const Conventions *C) {
+    return C->getKind() == ConventionsKind::CXXMethod;
+  }
+};
+
 } // end anonymous namespace
 
 /// Given that we have an imported Clang declaration, deduce the
@@ -1862,6 +1921,16 @@ getSILFunctionTypeForClangDecl(SILModule &M, const clang::Decl *clangDecl,
     return getSILFunctionType(M, origPattern, substInterfaceType, extInfo,
                               ObjCMethodConventions(method), foreignInfo,
                               constant, constant, None,
+                              /*witnessMethodConformance=*/None);
+  }
+
+  if (auto method = dyn_cast<clang::CXXMethodDecl>(clangDecl)) {
+    AbstractionPattern origPattern =
+        AbstractionPattern::getCXXMethod(origType, method);
+    auto conventions = CXXMethodConventions(method);
+    return getSILFunctionType(M, origPattern, substInterfaceType, extInfo,
+                              conventions, foreignInfo, constant, constant,
+                              None,
                               /*witnessMethodConformance=*/None);
   }
 
@@ -2822,9 +2891,15 @@ getAbstractionPatternForConstant(ASTContext &ctx, SILDeclRef constant,
       // C function imported as a function.
       return AbstractionPattern(fnType, value->getType().getTypePtr());
     } else {
-      // C function imported as a method.
       assert(numParameterLists == 2);
-      return AbstractionPattern::getCurriedCFunctionAsMethod(fnType, bridgedFn);
+      if (auto method = dyn_cast<clang::CXXMethodDecl>(clangDecl)) {
+        // C++ method.
+        return AbstractionPattern::getCurriedCXXMethod(fnType, bridgedFn);
+      } else {
+        // C function imported as a method.
+        return AbstractionPattern::getCurriedCFunctionAsMethod(fnType,
+                                                               bridgedFn);
+      }
     }
   }
 

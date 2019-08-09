@@ -307,6 +307,13 @@ public:
   addGetterToReadOnlyDerivedProperty(VarDecl *property,
                                      Type propertyContextType);
 
+  // SWIFT_ENABLE_TENSORFLOW
+  /// Add a getter and setter to a derived property. The property becomes
+  /// mutable.
+  static std::pair<AccessorDecl *, AccessorDecl *>
+  addGetterAndSetterToMutableDerivedProperty(VarDecl *property,
+                                             Type propertyContextType);
+
   /// Declare a getter for a derived property.
   /// The getter will not be added to the property yet.
   static AccessorDecl *declareDerivedPropertyGetter(VarDecl *property,
@@ -315,8 +322,7 @@ public:
   /// SWIFT_ENABLE_TENSORFLOW
   /// Declare a setter for a derived property.
   /// The setter will not be added to the property yet.
-  static AccessorDecl *declareDerivedPropertySetter(TypeChecker &tc,
-                                                    VarDecl *property,
+  static AccessorDecl *declareDerivedPropertySetter(VarDecl *property,
                                                     Type propertyContextType);
 
   /// Build a reference to the 'self' decl of a derived function.

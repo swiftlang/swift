@@ -354,6 +354,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_experimental_dependency_include_intrafile))
     Opts.ExperimentalDependenciesIncludeIntrafileOnes = true;
 
+  if (Args.hasArg(OPT_enable_experimental_quasiquotes))
+    Opts.EnableExperimentalQuasiquotes = true;
+
   Opts.DebuggerSupport |= Args.hasArg(OPT_debugger_support);
   if (Opts.DebuggerSupport)
     Opts.EnableDollarIdentifiers = true;
@@ -583,8 +586,6 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
     Opts.BridgingHeader = A->getValue();
   Opts.DisableSwiftBridgeAttr |= Args.hasArg(OPT_disable_swift_bridge_attr);
 
-  Opts.DisableModulesValidateSystemHeaders |= Args.hasArg(OPT_disable_modules_validate_system_headers);
-
   Opts.DisableOverlayModules |= Args.hasArg(OPT_emit_imported_modules);
 
   if (const Arg *A = Args.getLastArg(OPT_pch_output_dir)) {
@@ -636,6 +637,9 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts,
     Opts.RuntimeResourcePath = A->getValue();
 
   Opts.SkipRuntimeLibraryImportPaths |= Args.hasArg(OPT_nostdimport);
+
+  Opts.DisableModulesValidateSystemDependencies |=
+      Args.hasArg(OPT_disable_modules_validate_system_headers);
 
   // Opts.RuntimeIncludePath is set by calls to
   // setRuntimeIncludePath() or setMainExecutablePath().
@@ -1136,9 +1140,14 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
 
     // Automatically set coverage flags, unless coverage type was explicitly
     // requested.
+    // Updated to match clang at Jul 2019.
     Opts.SanitizeCoverage.IndirectCalls = true;
     Opts.SanitizeCoverage.TraceCmp = true;
-    Opts.SanitizeCoverage.TracePCGuard = true;
+    Opts.SanitizeCoverage.PCTable = true;
+    if (Triple.isOSLinux()) {
+      Opts.SanitizeCoverage.StackDepth = true;
+    }
+    Opts.SanitizeCoverage.Inline8bitCounters = true;
     Opts.SanitizeCoverage.CoverageType = llvm::SanitizerCoverageOptions::SCK_Edge;
   }
 

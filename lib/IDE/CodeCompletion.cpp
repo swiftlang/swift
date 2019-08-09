@@ -1994,18 +1994,14 @@ public:
       //     τ_1_0(U) => U }
       auto subs = keyPathInfo.baseType->getMemberSubstitutions(SD);
 
-      // Extract the root and result type of the KeyPath type in the parameter.
-      // i.e. 'T' and 'U'
-      auto rootAndResult =
-          getRootAndResultTypeOfKeypathDynamicMember(SD, CurrDeclContext);
-
       // If the keyPath result type has type parameters, that might affect the
       // subscript result type.
-      auto keyPathResultTy = rootAndResult->second->mapTypeOutOfContext();
+      auto keyPathResultTy = getResultTypeOfKeypathDynamicMember(SD)->
+        mapTypeOutOfContext();
       if (keyPathResultTy->hasTypeParameter()) {
-        auto keyPathRootTy =
-            rootAndResult->first.subst(QueryTypeSubstitutionMap{subs},
-                                       LookUpConformanceInModule(CurrModule));
+        auto keyPathRootTy = getRootTypeOfKeypathDynamicMember(SD).
+          subst(QueryTypeSubstitutionMap{subs},
+                LookUpConformanceInModule(CurrModule));
 
         // The result type of the VD.
         // i.e. 'Circle.center' => 'Point'.
@@ -2135,10 +2131,12 @@ public:
 
     // Add a type annotation.
     Type VarType = getTypeOfMember(VD, dynamicLookupInfo);
-    if (Name != Ctx.Id_self && VD->isInOut()) {
-      // It is useful to show inout for function parameters.
-      // But for 'self' it is just noise.
-      VarType = InOutType::get(VarType);
+    if (auto *PD = dyn_cast<ParamDecl>(VD)) {
+      if (Name != Ctx.Id_self && PD->isInOut()) {
+        // It is useful to show inout for function parameters.
+        // But for 'self' it is just noise.
+        VarType = InOutType::get(VarType);
+      }
     }
     auto DynamicOrOptional =
         IsDynamicLookup || VD->getAttrs().hasAttribute<OptionalAttr>();
