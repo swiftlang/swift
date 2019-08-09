@@ -921,8 +921,9 @@ bool MissingExplicitConversionFailure::diagnoseAsError() {
   if (auto *paren = dyn_cast<ParenExpr>(anchor))
     anchor = paren->getSubExpr();
 
-  auto fromType = getType(anchor)->getRValueType();
-  Type toType = resolveType(ConvertingTo);
+  auto fromType = getFromType();
+  Type toType = getToType();
+
   if (!toType->hasTypeRepr())
     return false;
 
