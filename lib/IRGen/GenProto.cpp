@@ -2739,6 +2739,12 @@ llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
   assert(Lowering::TypeConverter::protocolRequiresWitnessTable(proto)
          && "protocol does not have witness tables?!");
 
+  // Look through any opaque types we're allowed to.
+  if (srcType->hasOpaqueArchetype()) {
+    std::tie(srcType, conformance) =
+      IGF.IGM.substOpaqueTypesWithUnderlyingTypes(srcType, conformance);
+  }
+  
   // If we don't have concrete conformance information, the type must be
   // an archetype and the conformance must be via one of the protocol
   // requirements of the archetype. Look at what's locally bound.

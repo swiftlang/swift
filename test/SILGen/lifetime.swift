@@ -265,7 +265,7 @@ struct Daleth {
 class He {
   
   // -- default allocator:
-  // CHECK-LABEL: sil hidden [ossa] @$s8lifetime2HeC{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thick He.Type) -> @owned He {
+  // CHECK-LABEL: sil hidden [exact_self_class] [ossa] @$s8lifetime2HeC{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thick He.Type) -> @owned He {
   // CHECK: bb0({{%.*}} : $@thick He.Type):
   // CHECK-NEXT:   [[THIS:%.*]] = alloc_ref $He
   // CHECK-NEXT:   // function_ref lifetime.He.init
@@ -385,7 +385,7 @@ class Foo<T> {
   // Class initializer
   init() {
   // -- allocating entry point
-  // CHECK-LABEL: sil hidden [ossa] @$s8lifetime3FooC{{[_0-9a-zA-Z]*}}fC :
+  // CHECK-LABEL: sil hidden [exact_self_class] [ossa] @$s8lifetime3FooC{{[_0-9a-zA-Z]*}}fC :
     // CHECK: bb0([[METATYPE:%[0-9]+]] : $@thick Foo<T>.Type):
     // CHECK: [[THIS:%[0-9]+]] = alloc_ref $Foo<T>
     // CHECK: [[INIT_METHOD:%[0-9]+]] = function_ref @$s8lifetime3FooC{{[_0-9a-zA-Z]*}}fc
@@ -447,7 +447,7 @@ class Foo<T> {
     z = Foo<T>.makeT()
 
   // -- allocating entry point
-  // CHECK-LABEL: sil hidden [ossa] @$s8lifetime3FooC{{[_0-9a-zA-Z]*}}fC :
+  // CHECK-LABEL: sil hidden [exact_self_class] [ossa] @$s8lifetime3FooC{{[_0-9a-zA-Z]*}}fC :
     // CHECK: bb0([[CHI:%[0-9]+]] : $Int, [[METATYPE:%[0-9]+]] : $@thick Foo<T>.Type):
     // CHECK: [[THIS:%[0-9]+]] = alloc_ref $Foo<T>
     // CHECK: [[INIT_METHOD:%[0-9]+]] = function_ref @$s8lifetime3FooC{{[_0-9a-zA-Z]*}}fc
@@ -502,7 +502,7 @@ class Foo<T> {
   }
 
   // -- allocating entry point
-  // CHECK-LABEL: sil hidden [ossa] @$s8lifetime3FooC{{[_0-9a-zA-Z]*}}fC :
+  // CHECK-LABEL: sil hidden [exact_self_class] [ossa] @$s8lifetime3FooC{{[_0-9a-zA-Z]*}}fC :
     // CHECK: [[INIT_METHOD:%[0-9]+]] = function_ref @$s8lifetime3FooC{{[_0-9a-zA-Z]*}}fc
 
   // -- initializing entry point

@@ -176,6 +176,8 @@ IRGenModule::getTypeRef(Type type, GenericSignature *genericSig,
 
 std::pair<llvm::Constant *, unsigned>
 IRGenModule::getTypeRef(CanType type, MangledTypeRefRole role) {
+  type = substOpaqueTypesWithUnderlyingTypes(type);
+  
   switch (role) {
   case MangledTypeRefRole::DefaultAssociatedTypeWitness:
   case MangledTypeRefRole::Metadata:
@@ -209,6 +211,9 @@ IRGenModule::emitWitnessTableRefString(CanType type,
                                       ProtocolConformanceRef conformance,
                                       GenericSignature *origGenericSig,
                                       bool shouldSetLowBit) {
+  std::tie(type, conformance)
+    = substOpaqueTypesWithUnderlyingTypes(type, conformance);
+  
   auto origType = type;
   CanGenericSignature genericSig;
   SmallVector<GenericRequirement, 4> requirements;

@@ -123,10 +123,10 @@ void SplitterStep::computeFollowupSteps(
     CG.verify();
 
     log << "---Constraint graph---\n";
-    CG.print(log);
+    CG.print(CS.TypeVariables, log);
 
     log << "---Connected components---\n";
-    CG.printConnectedComponents(log);
+    CG.printConnectedComponents(CS.TypeVariables, log);
   }
 
   // Map type variables and constraints into appropriate steps.
@@ -164,12 +164,6 @@ void SplitterStep::computeFollowupSteps(
       componentSteps[known->second]->record(typeVar);
       continue;
     }
-
-    // Otherwise, associate it with all of the component steps,
-    // expect for components with orphaned constraints, they are
-    // not supposed to have any type variables.
-    for (unsigned i = 0; i != firstOrphanedComponent; ++i)
-      componentSteps[i]->record(typeVar);
   }
 
   // Transfer all of the constraints from the work list to
@@ -178,6 +172,7 @@ void SplitterStep::computeFollowupSteps(
   while (!workList.empty()) {
     auto *constraint = &workList.front();
     workList.pop_front();
+    assert(constraintComponent.count(constraint) > 0 && "Missed a constraint");
     componentSteps[constraintComponent[constraint]]->record(constraint);
   }
 

@@ -1,4 +1,3 @@
-// XFAIL: enable-astscope-lookup
 // RUN: %target-swift-frontend -typecheck %s -module-name themodule -enable-source-import -I %S/../decl/enum -sdk "" -verify -show-diagnostics-after-fatal -verify-ignore-unknown
 
 // -verify-ignore-unknown is for

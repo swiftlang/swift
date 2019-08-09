@@ -173,6 +173,8 @@ static void emitMetadataCompletionFunction(IRGenModule &IGM,
   llvm::Function *f =
     IGM.getAddrOfTypeMetadataCompletionFunction(typeDecl, ForDefinition);
   f->setAttributes(IGM.constructInitialAttributes());
+  f->setDoesNotThrow();
+  IGM.setHasFramePointer(f, false);
 
   IRGenFunction IGF(IGM, f);
 
@@ -2134,6 +2136,8 @@ namespace {
       llvm::Function *f =
         IGM.getAddrOfTypeMetadataInstantiationFunction(Target, ForDefinition);
       f->setAttributes(IGM.constructInitialAttributes());
+      f->setDoesNotThrow();
+      IGM.setHasFramePointer(f, false);
 
       IRGenFunction IGF(IGM, f);
 

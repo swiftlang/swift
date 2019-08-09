@@ -1060,7 +1060,7 @@ namespace {
 
       // Add the member constraint for a subscript declaration.
       // FIXME: weak name!
-      auto memberTy = CS.createTypeVariable(resultLocator, TVO_CanBindToNoEscape);
+      auto memberTy = CS.createTypeVariable(memberLocator, TVO_CanBindToNoEscape);
 
       // FIXME: synthesizeMaterializeForSet() wants to statically dispatch to
       // a known subscript here. This might be cleaner if we split off a new
@@ -3013,7 +3013,7 @@ namespace {
                 
         case KeyPathExpr::Component::Kind::OptionalChain: {
           didOptionalChain = true;
-          
+
           // We can't assign an optional back through an optional chain
           // today. Force the base to an rvalue.
           auto rvalueTy = CS.createTypeVariable(resultLocator,
@@ -3027,10 +3027,9 @@ namespace {
           auto optionalObjTy = CS.createTypeVariable(resultLocator,
                                                      TVO_CanBindToLValue |
                                                      TVO_CanBindToNoEscape);
-          
+
           CS.addConstraint(ConstraintKind::OptionalObject, base, optionalObjTy,
                            resultLocator);
-          
           base = optionalObjTy;
           break;
         }
@@ -3065,20 +3064,14 @@ namespace {
       auto rvalueBase = CS.createTypeVariable(baseLocator,
                                               TVO_CanBindToNoEscape);
       CS.addConstraint(ConstraintKind::Equal, base, rvalueBase, locator);
-      
+
       // The result is a KeyPath from the root to the end component.
-      Type kpTy;
-      if (didOptionalChain) {
-        // Optional-chaining key paths are always read-only.
-        kpTy = BoundGenericType::get(kpDecl, Type(), {root, rvalueBase});
-      } else {
-        // The type of key path depends on the overloads chosen for the key
-        // path components.
-        auto typeLoc =
-            CS.getConstraintLocator(locator, ConstraintLocator::KeyPathType);
-        kpTy = CS.createTypeVariable(typeLoc, TVO_CanBindToNoEscape);
-        CS.addKeyPathConstraint(kpTy, root, rvalueBase, locator);
-      }
+      // The type of key path depends on the overloads chosen for the key
+      // path components.
+      auto typeLoc =
+          CS.getConstraintLocator(locator, ConstraintLocator::KeyPathType);
+      Type kpTy = CS.createTypeVariable(typeLoc, TVO_CanBindToNoEscape);
+      CS.addKeyPathConstraint(kpTy, root, rvalueBase, locator);
       return kpTy;
     }
 

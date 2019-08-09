@@ -31,7 +31,7 @@
     return self.stringHolder.length;
 }
 
-- (id)copy {
+- (id)copyWithZone:(NSZone *)unused {
 	return self;
 }
 

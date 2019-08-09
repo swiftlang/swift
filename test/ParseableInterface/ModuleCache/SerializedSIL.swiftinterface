@@ -46,7 +46,7 @@ public var readOnlyVar: Int { get }
 public var readWriteVar: Int { get set }
 public func verySimpleFunction()
 
-// CHECK: sil [serialized] [canonical] @$s13SerializedSIL9TestClassCACycfC : $@convention(method) (@thick TestClass.Type) -> @owned TestClass {
+// CHECK: sil [serialized] [exact_self_class] [canonical] @$s13SerializedSIL9TestClassCACycfC : $@convention(method) (@thick TestClass.Type) -> @owned TestClass {
 
 // NEGATIVE-NOT: {{sil .*@.+storedProp}}
 

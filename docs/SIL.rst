@@ -2342,8 +2342,8 @@ assign_by_wrapper
   assign_by_wrapper %0 : $S to %1 : $*T, init %2 : $F, set %3 : $G
   // $S can be a value or address type
   // $T must be the type of a property wrapper.
-  // $F must be a function type, taking $S as a single argument and returning $T
-  // $G must be a function type, taking $S as a single argument and with not return value
+  // $F must be a function type, taking $S as a single argument (or multiple arguments in case of a tuple) and returning $T
+  // $G must be a function type, taking $S as a single argument (or multiple arguments in case of a tuple) and without a return value
 
 Similar to the ``assign`` instruction, but the assignment is done via a
 delegate.

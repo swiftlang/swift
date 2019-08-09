@@ -482,13 +482,14 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   unsigned rawLinkage, isTransparent, isSerialized, isThunk,
       isWithoutactuallyEscapingThunk, isGlobal, inlineStrategy,
       optimizationMode, effect, numSpecAttrs, hasQualifiedOwnership,
-      isWeakLinked, isDynamic;
+      isWeakLinked, isDynamic, isExactSelfClass;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(
       scratch, rawLinkage, isTransparent, isSerialized, isThunk,
       isWithoutactuallyEscapingThunk, isGlobal, inlineStrategy,
       optimizationMode, effect, numSpecAttrs, hasQualifiedOwnership,
-      isWeakLinked, isDynamic, funcTyID, replacedFunctionID, genericEnvID,
+      isWeakLinked, isDynamic, isExactSelfClass,
+      funcTyID, replacedFunctionID, genericEnvID,
       clangNodeOwnerID, SemanticsIDs);
 
   if (funcTyID == 0) {
@@ -577,11 +578,13 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
         linkage == SILLinkage::PublicNonABI) {
       fn->setLinkage(SILLinkage::SharedExternal);
     }
+
     if (fn->isDynamicallyReplaceable() != isDynamic) {
       LLVM_DEBUG(llvm::dbgs() << "SILFunction type mismatch.\n");
       MF->error();
       return nullptr;
     }
+
   } else {
     // Otherwise, create a new function.
     SILSerializationFunctionBuilder builder(SILMod);
@@ -597,6 +600,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     fn->setOptimizationMode(OptimizationMode(optimizationMode));
     fn->setWeakLinked(isWeakLinked);
     fn->setIsDynamic(IsDynamicallyReplaceable_t(isDynamic));
+    fn->setIsExactSelfClass(IsExactSelfClass_t(isExactSelfClass));
     if (replacedFunction)
       fn->setDynamicallyReplacedFunction(replacedFunction);
     if (!replacedObjectiveCFunc.empty())
@@ -606,7 +610,8 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     for (auto ID : SemanticsIDs) {
       fn->addSemanticsAttr(MF->getIdentifierText(ID));
     }
-
+    if (!hasQualifiedOwnership)
+      fn->setOwnershipEliminated();
     if (Callback) Callback->didDeserialize(MF->getAssociatedModule(), fn);
   }
   // Mark this function as deserialized. This avoids rerunning diagnostic
@@ -685,15 +690,15 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     return fn;
   }
 
-  if (!hasQualifiedOwnership)
-    fn->setOwnershipEliminated();
-
   NumDeserializedFunc++;
 
   assert(!(fn->getGenericEnvironment() && !fn->empty())
          && "function already has context generic params?!");
   if (genericEnv)
     fn->setGenericEnvironment(genericEnv);
+  if (!hasQualifiedOwnership) {
+    fn->setOwnershipEliminated();
+  }
 
   scratch.clear();
   maybeKind = SILCursor.readRecord(entry.ID, scratch);
@@ -2576,13 +2581,14 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
   unsigned rawLinkage, isTransparent, isSerialized, isThunk,
       isWithoutactuallyEscapingThunk, isGlobal, inlineStrategy,
       optimizationMode, effect, numSpecAttrs, hasQualifiedOwnership,
-      isWeakLinked, isDynamic;
+      isWeakLinked, isDynamic, isExactSelfClass;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(
       scratch, rawLinkage, isTransparent, isSerialized, isThunk,
       isWithoutactuallyEscapingThunk, isGlobal, inlineStrategy,
       optimizationMode, effect, numSpecAttrs, hasQualifiedOwnership,
-      isWeakLinked, isDynamic, funcTyID, replacedFunctionID, genericEnvID,
+      isWeakLinked, isDynamic, isExactSelfClass,
+      funcTyID, replacedFunctionID, genericEnvID,
       clangOwnerID, SemanticsIDs);
   auto linkage = fromStableSILLinkage(rawLinkage);
   if (!linkage) {
