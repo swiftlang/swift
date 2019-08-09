@@ -704,7 +704,7 @@ struct SR10597_W<T> {
   var wooo: SR10597 { SR10597() } // expected-note {{declared here}}
 }
 
-_ = SR10597_W<SR10597>(SR10597()).wooooo // expected-error {{value of type 'SR10597_W<SR10597>' and dynamic keyPath of type 'SR10597' has no member 'wooooo'; did you mean 'wooo'?}}
+_ = SR10597_W<SR10597>(SR10597()).wooooo // expected-error {{neither the value type 'SR10597_W<SR10597>' and dynamic key path subscript of type 'SR10597' has a member 'wooooo'; did you mean 'wooo'?}}
 
 final class SR10597_1 {
     var woo: Int? // expected-note 2 {{'woo' declared here}}
@@ -719,4 +719,4 @@ struct SR10597_1_W<T> {
   }
 }
 
-_ = SR10597_1_W<SR10597_1>(SR10597_1()).wooo // expected-error {{value of type 'SR10597_1_W<SR10597_1>' and dynamic keyPath of type 'SR10597_1' has no member 'wooo'; did you mean 'woo'?}}
+_ = SR10597_1_W<SR10597_1>(SR10597_1()).wooo // expected-error {{neither the value type 'SR10597_1_W<SR10597_1>' and dynamic key path subscript of type 'SR10597_1' has a member 'wooo'; did you mean 'woo'?}}
