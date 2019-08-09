@@ -1719,6 +1719,8 @@ giveUpFastPath:
         currentSig = fn->getGenericSignature();
       } else if (auto subscript = dyn_cast<SubscriptDecl>(base)) {
         currentSig = subscript->getGenericSignature();
+      } else if (auto opaque = dyn_cast<OpaqueTypeDecl>(base)) {
+        currentSig = opaque->getGenericSignature();
       }
 
       if (!currentSig) {
