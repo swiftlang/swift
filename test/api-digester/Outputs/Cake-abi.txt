@@ -44,6 +44,7 @@ cake: Func Somestruct2.foo1(_:) has parameter 0 type change from C3 to C1
 cake: Func Zoo.getCurrentAnimalInlinable() has return type change from Cat to Dog
 cake: Func ownershipChange(_:_:) has parameter 0 changing from InOut to Default
 cake: Func ownershipChange(_:_:) has parameter 1 changing from Shared to Owned
+cake: Func returnFunctionTypeOwnershipChange() has return type change from (C1) -> () to (__owned C1) -> ()
 cake: Var Zoo.current has declared type change from Cat to Dog
 
 /* Decl Attribute changes */
