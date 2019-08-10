@@ -556,13 +556,9 @@ protected:
 
     /// \see ClassDecl::ForeignKind
     RawForeignKind : 2,
-    
-    /// Whether this class contains a destructor decl.
-    ///
-    /// A fully type-checked class always contains a destructor member, even if
-    /// it is implicit. This bit is used during parsing and type-checking to
-    /// control inserting the implicit destructor.
-    HasDestructorDecl : 1,
+
+    /// \see ClassDecl::getEmittedMembers()
+    HasForcedEmittedMembers : 1,
 
     /// Information about the class's ancestry.
     Ancestry : 7,
@@ -3765,8 +3761,17 @@ class ClassDecl final : public NominalTypeDecl {
     llvm::PointerIntPair<Type, 1, bool> SuperclassType;
   } LazySemanticInfo;
 
+  bool hasForcedEmittedMembers() const {
+    return Bits.ClassDecl.HasForcedEmittedMembers;
+  }
+
+  void setHasForcedEmittedMembers() {
+    Bits.ClassDecl.HasForcedEmittedMembers = true;
+  }
+
   friend class SuperclassDeclRequest;
   friend class SuperclassTypeRequest;
+  friend class EmittedMembersRequest;
   friend class TypeChecker;
 
 public:
@@ -3914,23 +3919,9 @@ public:
   /// either from a class itself or its direct or indirect superclasses.
   AbstractFunctionDecl *findImplementingMethod(
       const AbstractFunctionDecl *method) const;
-
-  /// True if the class has a destructor.
-  ///
-  /// Fully type-checked classes always contain destructors, but during parsing
-  /// or type-checking, the implicit destructor may not have been synthesized
-  /// yet if one was not explicitly declared.
-  bool hasDestructor() const { return Bits.ClassDecl.HasDestructorDecl; }
-
-  /// Set the 'has destructor' flag.
-  void setHasDestructor() { Bits.ClassDecl.HasDestructorDecl = 1; }
   
   /// Retrieve the destructor for this class.
-  DestructorDecl *getDestructor();
-
-  /// Synthesize implicit, trivial destructor, add it to this ClassDecl
-  /// and return it.
-  void addImplicitDestructor();
+  DestructorDecl *getDestructor() const;
 
   /// Determine whether this class inherits the convenience initializers
   /// from its superclass.
@@ -3992,6 +3983,10 @@ public:
 
   /// Record the presence of an @objc method with the given selector.
   void recordObjCMethod(AbstractFunctionDecl *method, ObjCSelector selector);
+
+  /// Get all the members of this class, synthesizing any implicit members
+  /// that appear in the vtable if needed.
+  DeclRange getEmittedMembers() const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {

@@ -553,15 +553,6 @@ public:
   /// Declarations that need their conformances checked.
   llvm::SmallVector<Decl *, 8> ConformanceContexts;
 
-  /// The list of declarations that we've done at least partial validation
-  /// of during type-checking, but which will need to be finalized before
-  /// we can hand them off to SILGen etc.
-  llvm::SetVector<ClassDecl *> DeclsToFinalize;
-
-  /// Track the index of the next declaration that needs to be finalized,
-  /// from the \c DeclsToFinalize set.
-  unsigned NextDeclToFinalize = 0;
-
   // Caches whether a given declaration is "as specialized" as another.
   llvm::DenseMap<std::tuple<ValueDecl *, ValueDecl *,
                             /*isDynamicOverloadComparison*/ unsigned>,
@@ -802,24 +793,6 @@ public:
   /// Validate the given extension declaration, ensuring that it
   /// properly extends the nominal type it names.
   void validateExtension(ExtensionDecl *ext);
-
-  /// Request that type containing the given member needs to have all
-  /// members validated after everythign in the translation unit has
-  /// been processed.
-  void requestMemberLayout(ValueDecl *member);
-
-  /// Request that the given class needs to have all members validated
-  /// after everything in the translation unit has been processed.
-  void requestClassLayout(ClassDecl *classDecl);
-
-  /// Request that the superclass of the given class, if any, needs to have
-  /// all members validated after everything in the translation unit has
-  /// been processed.
-  void requestSuperclassLayout(ClassDecl *classDecl);
-
-  /// Perform final validation of a declaration after everything in the
-  /// translation unit has been processed.
-  void finalizeDecl(ClassDecl *CD);
 
   /// Resolve a reference to the given type declaration within a particular
   /// context.
@@ -1395,10 +1368,6 @@ public:
                         TypeResolutionOptions options);
 
   bool typeCheckCatchPattern(CatchStmt *S, DeclContext *dc);
-
-  /// Request nominal layout for any types that could be sources of typemetadata
-  /// or conformances.
-  void requestRequiredNominalTypeLayoutForParameters(ParameterList *PL);
 
   /// Type check a parameter list.
   bool typeCheckParameterList(ParameterList *PL, TypeResolution resolution,
