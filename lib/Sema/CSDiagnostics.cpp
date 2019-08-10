@@ -2237,8 +2237,8 @@ bool MissingMemberFailure::diagnoseAsError() {
   auto tryTypoCorrection = [&] {
     TC.performTypoCorrection(getDC(), DeclRefKind::Ordinary, baseType,
                              defaultMemberLookupOptions, corrections);
-    // If isForKeyPathDynamicMemberLookup we are including the
-    // typo corrections to the wrapper type too.
+    // If locator points to the member found via key path dynamic member lookup,
+    // emit typo corrections for the wrapper type too.
     if (getLocator()->isForKeyPathDynamicMemberLookup()) {
       TC.performTypoCorrection(getDC(), DeclRefKind::Ordinary,
                                baseExprType, defaultMemberLookupOptions,
@@ -2317,7 +2317,7 @@ bool MissingMemberFailure::diagnoseAsError() {
             baseExprType, baseType, getName(),
             correction->CorrectedName);
         diagnostic.highlight(baseExpr->getSourceRange())
-        .highlight(nameLoc.getSourceRange());
+            .highlight(nameLoc.getSourceRange());
         correction->addFixits(diagnostic);
         
       } else {
@@ -2327,7 +2327,7 @@ bool MissingMemberFailure::diagnoseAsError() {
             baseType, getName(),
             correction->CorrectedName);
         diagnostic.highlight(baseExpr->getSourceRange())
-        .highlight(nameLoc.getSourceRange());
+            .highlight(nameLoc.getSourceRange());
         correction->addFixits(diagnostic);
       }
     } else {
