@@ -83,7 +83,7 @@ ERROR(could_not_find_value_member_corrected,none,
       (Type, DeclName, DeclName))
 ERROR(could_not_find_value_dynamic_member_corrected,none,
       "neither the value type %0 and dynamic key path subscript of type %1 has a member %2; did you mean %3?",
-      (Type,Type, DeclName, DeclName))
+      (Type, Type, DeclName, DeclName))
 
 ERROR(could_not_find_type_member,none,
       "type %0 has no member %1", (Type, DeclName))
