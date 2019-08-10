@@ -516,10 +516,12 @@ Types
   FUNCTION-KIND ::= 'C'                      // C function pointer type
   FUNCTION-KIND ::= 'A'                      // @auto_closure function type (escaping)
   FUNCTION-KIND ::= 'E'                      // function type (noescape)
+  .. SWIFT_ENABLE_TENSORFLOW
   FUNCTION-KIND ::= 'F'                      // @differentiable function type
   FUNCTION-KIND ::= 'G'                      // @differentiable function type (escaping)
   FUNCTION-KIND ::= 'H'                      // @differentiable(linear) function type
   FUNCTION-KIND ::= 'I'                      // @differentiable(linear) function type (escaping)
+  .. SWIFT_ENABLE_TENSORFLOW END
 
   function-signature ::= params-type params-type throws? // results and parameters
 
@@ -583,15 +585,18 @@ mangled in to disambiguate.
   impl-function-type ::= type* 'I' FUNC-ATTRIBUTES '_'
   impl-function-type ::= type* generic-signature 'I' PSEUDO-GENERIC? FUNC-ATTRIBUTES '_'
 
+  .. SWIFT_ENABLE_TENSORFLOW
   FUNC-ATTRIBUTES ::= CALLEE-ESCAPE? DIFFERENTIABILITY-KIND? CALLEE-CONVENTION FUNC-REPRESENTATION? PARAM-CONVENTION* RESULT-CONVENTION* ('z' RESULT-CONVENTION)
 
   PSEUDO-GENERIC ::= 'P'
 
   CALLEE-ESCAPE ::= 'e'                      // @escaping (inverse of SIL @noescape)
 
+  .. SWIFT_ENABLE_TENSORFLOW
   DIFFERENTIABILITY-KIND ::= DIFFERENTIABLE | LINEAR
   DIFFERENTIABLE ::= 'd'                     // @differentiable
   LINEAR ::= 'l'                             // @differentiable(linear)
+  .. SWIFT_ENABLE_TENSORFLOW END
 
   CALLEE-CONVENTION ::= 'y'                  // @callee_unowned
   CALLEE-CONVENTION ::= 'g'                  // @callee_guaranteed
