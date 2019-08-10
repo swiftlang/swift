@@ -3484,13 +3484,14 @@ has an escaping function type (not ``[on_stack]``) the closure context will be
 allocated with retain count 1 and initialized to contain the values ``%1``,
 ``%2``, etc.  The closed-over values will not be retained; that must be done
 separately before the ``partial_apply``. The closure does however take ownership
-of the partially applied arguments; when the closure reference count reaches
-zero, the contained values will be destroyed. If the ``partial_apply`` has a
-``@noescape`` function type (``partial_apply [on_stack]``) the closure context
-is allocated on the stack and initialized to contain the closed-over values. The
-closed-over values are not retained, lifetime of the closed-over values must be
-managed separately. The lifetime of the stack context of a ``partial_apply
-[on_stack]`` must be terminated with a ``dealloc_stack``.
+of the partially applied arguments (except for ``@inout_aliasable`` parameters);
+when the closure reference count reaches zero, the contained values will be
+destroyed. If the ``partial_apply`` has a ``@noescape`` function type
+(``partial_apply [on_stack]``) the closure context is allocated on the stack and
+initialized to contain the closed-over values. The closed-over values are not
+retained, lifetime of the closed-over values must be managed separately. The
+lifetime of the stack context of a ``partial_apply [on_stack]`` must be
+terminated with a ``dealloc_stack``.
 
 If the callee is generic, all of its generic parameters must be bound by the
 given substitution list. The arguments are given with these generic
@@ -3498,6 +3499,11 @@ substitutions applied, and the resulting closure is of concrete function
 type with the given substitutions applied. The generic parameters themselves
 cannot be partially applied; all of them must be bound. The result is always
 a concrete function.
+
+If an address argument has ``@inout_aliasable`` convention, the closure
+obtained from ``partial_apply`` will not own its underlying value.
+The ``@inout_aliasable`` parameter convention is used when a ``@noescape``
+closure captures an ``inout`` argument.
 
 TODO: The instruction, when applied to a generic function,
 currently implicitly performs abstraction difference transformations enabled
