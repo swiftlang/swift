@@ -5787,6 +5787,8 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
         diagnose(TokLoc, diag::keyword_cant_be_identifier, TokText);
         diagnose(TokLoc, diag::backticks_to_escape)
           .fixItReplace(TokLoc, "`" + TokText.str() + "`");
+        if (Tok.isNot(tok::kw_case))
+          consumeToken();
       } else {
         diagnose(CaseLoc, diag::expected_identifier_in_decl, "enum 'case'");
       }

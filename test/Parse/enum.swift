@@ -115,8 +115,8 @@ enum Recovery2 {
 enum Recovery3 {
   case UE2(Void): // expected-error {{'case' label can only appear inside a 'switch' statement}}
 }
-enum Recovery4 { // expected-note {{in declaration of 'Recovery4'}}
-  case Self Self // expected-error {{keyword 'Self' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{8-12=`Self`}} expected-error {{consecutive declarations on a line must be separated by ';'}} {{12-12=;}} expected-error {{expected declaration}}
+enum Recovery4 { 
+  case Self Self // expected-error {{keyword 'Self' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{8-12=`Self`}}
 }
 enum Recovery5 {
   case .UE3 // expected-error {{extraneous '.' in enum 'case' declaration}} {{8-9=}}
@@ -551,4 +551,11 @@ enum SE0155 {
   case emptyArgs() // expected-warning {{enum element with associated values must have at least one associated value}}
   // expected-note@-1 {{did you mean to remove the empty associated value list?}} {{17-18=}}
   // expected-note@-2 {{did you mean to explicitly add a 'Void' associated value?}} {{17-17=Void}}
+}
+
+
+// SR-11261
+enum SR11261 {
+  case identifier
+  case operator // expected-error {{keyword 'operator' cannot be used as an identifier here}} expected-error {{expected pattern}} expected-note {{if this name is unavoidable, use backticks to escape it}} 
 }
