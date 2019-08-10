@@ -2312,20 +2312,20 @@ bool MissingMemberFailure::diagnoseAsError() {
     if (auto correction = corrections.claimUniqueCorrection()) {
       if (getLocator()->isForKeyPathDynamicMemberLookup()) {
         auto diagnostic = emitDiagnostic(
-                                         anchor->getLoc(),
-                                         diag::could_not_find_value_dynamic_member_corrected,
-                                         baseExprType, baseType, getName(),
-                                         correction->CorrectedName);
+            anchor->getLoc(),
+            diag::could_not_find_value_dynamic_member_corrected,
+            baseExprType, baseType, getName(),
+            correction->CorrectedName);
         diagnostic.highlight(baseExpr->getSourceRange())
         .highlight(nameLoc.getSourceRange());
         correction->addFixits(diagnostic);
         
       } else {
         auto diagnostic = emitDiagnostic(
-                                         anchor->getLoc(),
-                                         diag::could_not_find_value_member_corrected,
-                                         baseType, getName(),
-                                         correction->CorrectedName);
+            anchor->getLoc(),
+            diag::could_not_find_value_member_corrected,
+            baseType, getName(),
+            correction->CorrectedName);
         diagnostic.highlight(baseExpr->getSourceRange())
         .highlight(nameLoc.getSourceRange());
         correction->addFixits(diagnostic);
