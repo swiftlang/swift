@@ -69,11 +69,6 @@ extension RangeReplaceableCollection {
   ///   number of changes contained by the parameter.
   @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
   public func applying(_ difference: CollectionDifference<Element>) -> Self? {
-    var result = Self()
-    var enumeratedRemoves = 0
-    var enumeratedInserts = 0
-    var enumeratedOriginals = 0
-    var currentIndex = self.startIndex
 
     func append(
       into target: inout Self,
@@ -87,7 +82,12 @@ extension RangeReplaceableCollection {
       target.append(contentsOf: source[start..<index])
     }
 
+    var result = Self()
     do {
+      var enumeratedRemoves = 0
+      var enumeratedInserts = 0
+      var enumeratedOriginals = 0
+      var currentIndex = self.startIndex
       try difference._fastEnumeratedApply { change in
         switch change {
         case .remove(offset: let offset, element: _, associatedWith: _):
@@ -109,15 +109,14 @@ extension RangeReplaceableCollection {
         }
         _internalInvariant(enumeratedOriginals <= self.count)
       }
-      let origCount = self.count - enumeratedOriginals
-      try append(into: &result, contentsOf: self, from: &currentIndex, count: origCount)
-      _internalInvariant(enumeratedOriginals + origCount == self.count)
+      if currentIndex < self.endIndex {
+        result.append(contentsOf: self[currentIndex...])
+      }
+      _internalInvariant(result.count == self.count + enumeratedInserts - enumeratedRemoves)
     } catch {
       return nil
     }
 
-    _internalInvariant(currentIndex == self.endIndex)
-    _internalInvariant(result.count == self.count + enumeratedInserts - enumeratedRemoves)
     return result
   }
 }
