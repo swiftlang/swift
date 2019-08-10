@@ -1445,6 +1445,18 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn) {
   if (!fn->isNoEscape())
     OpArgs.push_back('e');
 
+  // SWIFT_ENABLE_TENSORFLOW
+  switch (fn->getExtInfo().getDifferentiabilityKind()) {
+  case DifferentiabilityKind::NonDifferentiable:
+    break;
+  case DifferentiabilityKind::Normal:
+    OpArgs.push_back('d');
+    break;
+  case DifferentiabilityKind::Linear:
+    OpArgs.push_back('l');
+    break;
+  }
+
   // <impl-callee-convention>
   if (fn->getExtInfo().hasContext()) {
     OpArgs.push_back(getParamConvention(fn->getCalleeConvention()));
