@@ -197,21 +197,21 @@ FailureDiagnostic::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
   // have to look through other elements that are generated from an argument
   // conversion such as GenericArgument for an optional-to-optional conversion,
   // and OptionalPayload for a value-to-optional conversion.
-  auto applyArgElt =
+  auto applyArgEltIter =
       std::find_if(path.rbegin(), path.rend(), [](LocatorPathElt elt) {
-        return elt.getKind() == ConstraintLocator::ApplyArgToParam;
+        return elt.is<LocatorPathElt::ApplyArgToParam>();
       });
 
-  if (applyArgElt == path.rend())
+  if (applyArgEltIter == path.rend())
     return None;
 
-  assert(std::find_if(applyArgElt + 1, path.rend(), [](LocatorPathElt elt) {
+  assert(std::find_if(applyArgEltIter + 1, path.rend(), [](LocatorPathElt elt) {
     return elt.getKind() == ConstraintLocator::ApplyArgToParam;
   }) == path.rend() && "Multiple ApplyArgToParam components?");
 
   // Form a new locator that ends at the apply-arg-to-param element, and
   // simplify it to get the full argument expression.
-  auto argPath = path.drop_back(applyArgElt - path.rbegin());
+  auto argPath = path.drop_back(applyArgEltIter - path.rbegin());
   auto *argLocator = cs.getConstraintLocator(
       anchor, argPath, ConstraintLocator::getSummaryFlagsForPath(argPath));
 
@@ -271,8 +271,9 @@ FailureDiagnostic::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
     fnInterfaceType = resolveInterfaceType(rawFnType);
   }
 
-  auto argIdx = applyArgElt->getArgIdx();
-  auto paramIdx = applyArgElt->getParamIdx();
+  auto applyArgElt = applyArgEltIter->castTo<LocatorPathElt::ApplyArgToParam>();
+  auto argIdx = applyArgElt.getArgIdx();
+  auto paramIdx = applyArgElt.getParamIdx();
 
   return FunctionArgApplyInfo(argExpr, argIdx, getType(argExpr), paramIdx,
                               fnInterfaceType, fnType, callee);
@@ -331,11 +332,10 @@ ProtocolConformance *RequirementFailure::getConformanceForConditionalReq(
   auto &cs = getConstraintSystem();
   auto path = locator->getPath();
   assert(!path.empty());
+  assert(path.back().is<LocatorPathElt::AnyRequirement>());
 
-  if (!path.back().isConditionalRequirement()) {
-    assert(path.back().isTypeParameterRequirement());
+  if (!path.back().isConditionalRequirement())
     return nullptr;
-  }
 
   auto *typeReqLoc = getConstraintLocator(getRawAnchor(), path.drop_back());
 
@@ -414,8 +414,8 @@ GenericSignature *RequirementFailure::getSignature(ConstraintLocator *locator) {
   auto path = locator->getPath();
   for (auto iter = path.rbegin(); iter != path.rend(); ++iter) {
     const auto &elt = *iter;
-    if (elt.getKind() == ConstraintLocator::OpenedGeneric)
-      return elt.getGenericSignature();
+    if (auto genericElt = elt.getAs<LocatorPathElt::OpenedGeneric>())
+      return genericElt->getSignature();
   }
 
   llvm_unreachable("Type requirement failure should always have signature");
@@ -783,11 +783,9 @@ bool NoEscapeFuncToTypeConversionFailure::diagnoseAsError() {
   GenericTypeParamType *paramTy = nullptr;
 
   auto path = getLocator()->getPath();
-  if (!path.empty()) {
-    auto &last = path.back();
-    if (last.getKind() == ConstraintLocator::GenericParameter)
-      paramTy = last.getGenericParameter();
-  }
+  if (!path.empty())
+    if (auto gpElt = path.back().getAs<LocatorPathElt::GenericParameter>())
+      paramTy = gpElt->getType();
 
   if (paramTy) {
     emitDiagnostic(anchor->getLoc(), diag::converting_noescape_to_type,
@@ -1257,13 +1255,12 @@ bool RValueTreatedAsLValueFailure::diagnoseAsError() {
       diagExpr = argTuple->getElement(0);
     } else if (getLocator()->getPath().size() > 0) {
       auto lastPathElement = getLocator()->getPath().back();
-      assert(lastPathElement.getKind() ==
-             ConstraintLocator::PathElementKind::ApplyArgToParam);
+      auto argElt = lastPathElement.castTo<LocatorPathElt::ApplyArgToParam>();
 
       subElementDiagID = diag::cannot_pass_rvalue_inout_subelement;
       rvalueDiagID = diag::cannot_pass_rvalue_inout;
       if (auto argTuple = dyn_cast<TupleExpr>(argExpr))
-        diagExpr = argTuple->getElement(lastPathElement.getArgIdx());
+        diagExpr = argTuple->getElement(argElt.getArgIdx());
       else if (auto parens = dyn_cast<ParenExpr>(argExpr))
         diagExpr = parens->getSubExpr();
     } else {
@@ -1824,7 +1821,7 @@ AssignmentFailure::getMemberRef(ConstraintLocator *locator) const {
       auto paramTy = fnType->getParams()[0].getPlainType();
       auto keyPath = paramTy->getAnyNominal();
       auto memberLoc = cs.getConstraintLocator(
-          locator, LocatorPathElt::getKeyPathDynamicMember(keyPath));
+          locator, LocatorPathElt::KeyPathDynamicMember(keyPath));
 
       auto memberRef = getOverloadChoiceIfAvailable(memberLoc);
       return memberRef ? Optional<OverloadChoice>(memberRef->choice) : None;
@@ -2412,8 +2409,7 @@ bool AutoClosureForwardingFailure::diagnoseAsError() {
   auto path = getLocator()->getPath();
   assert(!path.empty());
 
-  auto &last = path.back();
-  assert(last.getKind() == ConstraintLocator::ApplyArgToParam);
+  auto last = path.back().castTo<LocatorPathElt::ApplyArgToParam>();
 
   // We need a raw anchor here because `getAnchor()` is simplified
   // to the argument expression.
@@ -3577,8 +3573,8 @@ bool KeyPathSubscriptIndexHashableFailure::diagnoseAsError() {
   if (locator->isKeyPathSubscriptComponent()) {
     auto *KPE = cast<KeyPathExpr>(anchor);
     for (auto &elt : locator->getPath()) {
-      if (elt.isKeyPathComponent()) {
-        loc = KPE->getComponents()[elt.getKeyPathComponentIdx()].getLoc();
+      if (auto kpElt = elt.getAs<LocatorPathElt::KeyPathComponent>()) {
+        loc = KPE->getComponents()[kpElt->getIndex()].getLoc();
         break;
       }
     }
@@ -3594,13 +3590,14 @@ SourceLoc InvalidMemberRefInKeyPath::getLoc() const {
 
   if (auto *KPE = dyn_cast<KeyPathExpr>(anchor)) {
     auto *locator = getLocator();
-    auto component =
+    auto componentIter =
         llvm::find_if(locator->getPath(), [](const LocatorPathElt &elt) {
           return elt.isKeyPathComponent();
         });
 
-    assert(component != locator->getPath().end());
-    return KPE->getComponents()[component->getKeyPathComponentIdx()].getLoc();
+    assert(componentIter != locator->getPath().end());
+    auto component = componentIter->castTo<LocatorPathElt::KeyPathComponent>();
+    return KPE->getComponents()[component.getIndex()].getLoc();
   }
 
   return anchor->getLoc();
@@ -3687,9 +3684,11 @@ bool CollectionElementContextualFailure::diagnoseAsError() {
   }
 
   if (isa<DictionaryExpr>(getRawAnchor())) {
-    const auto &eltLoc = locator->getPath().back();
+    auto path = locator->getPath();
+    assert(!path.empty());
+    auto eltLoc = path.back().castTo<LocatorPathElt::TupleElement>();
 
-    switch (eltLoc.getTupleElementIdx()) {
+    switch (eltLoc.getIndex()) {
     case 0: // key
       diagnostic.emplace(emitDiagnostic(anchor->getLoc(),
                                         diag::cannot_convert_dict_key, eltType,

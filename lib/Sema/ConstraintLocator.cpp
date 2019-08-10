@@ -34,21 +34,22 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
     id.AddInteger(elt.getKind());
     switch (elt.getKind()) {
     case GenericParameter:
-      id.AddPointer(elt.getGenericParameter());
+      id.AddPointer(elt.castTo<LocatorPathElt::GenericParameter>().getType());
       break;
 
     case Requirement:
-      id.AddPointer(elt.getRequirement());
+      id.AddPointer(elt.castTo<LocatorPathElt::Requirement>().getDecl());
       break;
 
     case Witness:
-      id.AddPointer(elt.getWitness());
+      id.AddPointer(elt.castTo<LocatorPathElt::Witness>().getDecl());
       break;
 
-    case KeyPathDynamicMember:
-      id.AddPointer(elt.getKeyPath());
+    case KeyPathDynamicMember: {
+      auto kpElt = elt.castTo<LocatorPathElt::KeyPathDynamicMember>();
+      id.AddPointer(kpElt.getKeyPathDecl());
       break;
-
+    }
     case ApplyArgument:
     case ApplyFunction:
     case FunctionArgument:
@@ -90,6 +91,12 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
       break;
     }
   }
+}
+
+bool LocatorPathElt::isResultOfSingleExprFunction() const {
+  if (auto elt = getAs<ContextualType>())
+    return elt->isForSingleExprFunction();
+  return false;
 }
 
 /// Determine whether given locator points to the subscript reference
@@ -147,10 +154,11 @@ bool ConstraintLocator::isKeyPathSubscriptComponent() const {
 
   using ComponentKind = KeyPathExpr::Component::Kind;
   return llvm::any_of(getPath(), [&](const LocatorPathElt &elt) {
-    if (!elt.isKeyPathComponent())
+    auto keyPathElt = elt.getAs<LocatorPathElt::KeyPathComponent>();
+    if (!keyPathElt)
       return false;
 
-    auto index = elt.getKeyPathComponentIdx();
+    auto index = keyPathElt->getIndex();
     auto &component = KPE->getComponents()[index];
     return component.getKind() == ComponentKind::Subscript ||
            component.getKind() == ComponentKind::UnresolvedSubscript;
@@ -187,9 +195,9 @@ bool ConstraintLocator::isForContextualType() const {
 }
 
 GenericTypeParamType *ConstraintLocator::getGenericParameter() const {
-  assert(isForGenericParameter());
   auto path = getPath();
-  return path.back().getGenericParameter();
+  assert(!path.empty());
+  return path.back().castTo<LocatorPathElt::GenericParameter>().getType();
 }
 
 void ConstraintLocator::dump(SourceManager *sm) {
@@ -236,10 +244,11 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
   for (auto elt : getPath()) {
     out << " -> ";
     switch (elt.getKind()) {
-    case GenericParameter:
-      out << "generic parameter '" << elt.getGenericParameter()->getString() << "'";
+    case GenericParameter: {
+      auto gpElt = elt.castTo<LocatorPathElt::GenericParameter>();
+      out << "generic parameter '" << gpElt.getType()->getString() << "'";
       break;
-
+    }
     case ApplyArgument:
       out << "apply argument";
       break;
@@ -252,11 +261,12 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
       out << "optional payload";
       break;
 
-    case ApplyArgToParam:
-      out << "comparing call argument #" << llvm::utostr(elt.getArgIdx())
-          << " to parameter #" << llvm::utostr(elt.getParamIdx());
+    case ApplyArgToParam: {
+      auto argElt = elt.castTo<LocatorPathElt::ApplyArgToParam>();
+      out << "comparing call argument #" << llvm::utostr(argElt.getArgIdx())
+          << " to parameter #" << llvm::utostr(argElt.getParamIdx());
       break;
-        
+    }
     case ClosureResult:
       out << "closure result";
       break;
@@ -281,10 +291,11 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
       out << "sequence element type";
       break;
 
-    case GenericArgument:
-      out << "generic argument #" << llvm::utostr(elt.getGenericArgIdx());
+    case GenericArgument: {
+      auto genericElt = elt.castTo<LocatorPathElt::GenericArgument>();
+      out << "generic argument #" << llvm::utostr(genericElt.getIndex());
       break;
-
+    }
     case InstanceType:
       out << "instance type";
       break;
@@ -301,10 +312,11 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
       out << "member reference base";
       break;
 
-    case NamedTupleElement:
-      out << "named tuple element #" << llvm::utostr(elt.getTupleElementIdx());
+    case NamedTupleElement: {
+      auto tupleElt = elt.castTo<LocatorPathElt::NamedTupleElement>();
+      out << "named tuple element #" << llvm::utostr(tupleElt.getIndex());
       break;
-
+    }
     case UnresolvedMember:
       out << "unresolved member";
       break;
@@ -329,39 +341,42 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
       out << "subscript member";
       break;
 
-    case TupleElement:
-      out << "tuple element #" << llvm::utostr(elt.getTupleElementIdx());
+    case TupleElement: {
+      auto tupleElt = elt.castTo<LocatorPathElt::TupleElement>();
+      out << "tuple element #" << llvm::utostr(tupleElt.getIndex());
       break;
-
-    case KeyPathComponent:
-      out << "key path component #"
-          << llvm::utostr(elt.getKeyPathComponentIdx());
+    }
+    case KeyPathComponent: {
+      auto kpElt = elt.castTo<LocatorPathElt::KeyPathComponent>();
+      out << "key path component #" << llvm::utostr(kpElt.getIndex());
       break;
-
-    case Requirement:
+    }
+    case Requirement: {
+      auto reqElt = elt.castTo<LocatorPathElt::Requirement>();
       out << "requirement ";
-      elt.getRequirement()->dumpRef(out);
+      reqElt.getDecl()->dumpRef(out);
       break;
-
-    case Witness:
+    }
+    case Witness: {
+      auto witnessElt = elt.castTo<LocatorPathElt::Witness>();
       out << "witness ";
-      elt.getWitness()->dumpRef(out);
+      witnessElt.getDecl()->dumpRef(out);
       break;
-        
+    }
     case OpenedGeneric:
       out << "opened generic";
       break;
 
-    case ConditionalRequirement:
-      out << "conditional requirement #"
-          << llvm::utostr(elt.getRequirementIdx());
-      dumpReqKind(elt.getRequirementKind());
+    case ConditionalRequirement: {
+      auto reqElt = elt.castTo<LocatorPathElt::ConditionalRequirement>();
+      out << "conditional requirement #" << llvm::utostr(reqElt.getIndex());
+      dumpReqKind(reqElt.getRequirementKind());
       break;
-
+    }
     case TypeParameterRequirement: {
-      out << "type parameter requirement #"
-          << llvm::utostr(elt.getRequirementIdx());
-      dumpReqKind(elt.getRequirementKind());
+      auto reqElt = elt.castTo<LocatorPathElt::TypeParameterRequirement>();
+      out << "type parameter requirement #" << llvm::utostr(reqElt.getIndex());
+      dumpReqKind(reqElt.getRequirementKind());
       break;
     }
 
@@ -380,10 +395,11 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
         out << "contextual type";
       break;
 
-    case SynthesizedArgument:
-      out << "synthesized argument #" << llvm::utostr(elt.getArgIdx());
+    case SynthesizedArgument: {
+      auto argElt = elt.castTo<LocatorPathElt::SynthesizedArgument>();
+      out << "synthesized argument #" << llvm::utostr(argElt.getIndex());
       break;
-
+    }
     case KeyPathDynamicMember:
       out << "key path dynamic member lookup";
       break;

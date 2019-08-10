@@ -327,17 +327,43 @@ public:
       assert(value1 == getValue(1) && "value1 truncated");
     }
 
-    PathElement(GenericSignature *sig)
-        : storage((reinterpret_cast<uintptr_t>(sig) >> 3)),
-          storedKind(StoredGenericSignature) {}
+    /// Store a path element with an associated pointer, accessible using
+    /// \c getStoredPointer.
+    template <typename T>
+    PathElement(StoredKind storedKind, T *ptr)
+        : storage((reinterpret_cast<uintptr_t>(ptr) >> 3)),
+          storedKind(storedKind) {
+      assert(ptr == getStoredPointer<T>());
+    }
 
-    PathElement(const NominalTypeDecl *keyPath)
-        : storage((reinterpret_cast<uintptr_t>(keyPath) >> 3)),
-          storedKind(StoredKeyPathDynamicMemberBase) {}
+    /// Retrieve an associated pointer for the element. The type \c T must match
+    /// the type used when creating the path element.
+    template <typename T>
+    T *getStoredPointer() const {
+      assert(storedKind != StoredKindAndValue);
+      return reinterpret_cast<T *>(storage << 3);
+    }
 
     friend class ConstraintLocator;
 
   public:
+    class ApplyArgToParam;
+    class SynthesizedArgument;
+    class AnyTupleElement;
+    class TupleElement;
+    class NamedTupleElement;
+    class KeyPathComponent;
+    class GenericArgument;
+    class AnyRequirement;
+    class ConditionalRequirement;
+    class TypeParameterRequirement;
+    class ContextualType;
+    class Witness;
+    class Requirement;
+    class GenericParameter;
+    class OpenedGeneric;
+    class KeyPathDynamicMember;
+
     PathElement(PathElementKind kind)
       : storage(encodeStorage(kind, 0)), storedKind(StoredKindAndValue)
     {
@@ -345,100 +371,23 @@ public:
              "Path element requires value");
     }
 
-    PathElement(GenericTypeParamType *type)
-      : storage((reinterpret_cast<uintptr_t>(type) >> 3)),
-        storedKind(StoredGenericParameter)
-    {
-      static_assert(alignof(GenericTypeParamType) >= 4,
-                    "archetypes insufficiently aligned");
-      assert(getGenericParameter() == type);
-    }
-
-    PathElement(PathElementKind kind, ValueDecl *decl)
-      : storage((reinterpret_cast<uintptr_t>(decl) >> 3)),
-        storedKind(kind == Witness ? StoredWitness : StoredRequirement)
-    {
-      assert((kind == Witness || kind == Requirement) &&
-             "Not a witness element");
-      assert(((kind == Requirement && getRequirement() == decl) ||
-              (kind == Witness && getWitness() == decl)));
-    }
-
-    /// Retrieve a path element for a tuple element referred to by
-    /// its position.
-    static PathElement getTupleElement(unsigned position) {
-      return PathElement(TupleElement, position);
-    }
-
-    /// Retrieve a path element for a tuple element referred to by
-    /// its name.
-    static PathElement getNamedTupleElement(unsigned position) {
-      return PathElement(NamedTupleElement, position);
-    }
-
-    /// Retrieve a path element for an argument/parameter comparison in a
-    /// function application.
-    static PathElement getApplyArgToParam(unsigned argIdx, unsigned paramIdx) {
-      return PathElement(ApplyArgToParam, argIdx, paramIdx);
-    }
-
-    /// Retrieve a path element for a generic argument referred to by
-    /// its position.
-    static PathElement getGenericArgument(unsigned position) {
-      return PathElement(GenericArgument, position);
-    }
-    
-    /// Get a path element for a key path component.
-    static PathElement getKeyPathComponent(unsigned position) {
-      return PathElement(KeyPathComponent, position);
-    }
-
-    static PathElement getOpenedGeneric(GenericSignature *sig) {
-      return PathElement(sig);
-    }
-
-    /// Get a path element for a conditional requirement.
-    static PathElement
-    getConditionalRequirementComponent(unsigned index, RequirementKind kind) {
-      return PathElement(ConditionalRequirement, index,
-                         static_cast<unsigned>(kind));
-    }
-
-    static PathElement getTypeRequirementComponent(unsigned index,
-                                                   RequirementKind kind) {
-      return PathElement(TypeParameterRequirement, index,
-                         static_cast<unsigned>(kind));
-    }
-
-    static PathElement getSynthesizedArgument(unsigned position) {
-      return PathElement(SynthesizedArgument, position);
-    }
-
-    static PathElement getKeyPathDynamicMember(const NominalTypeDecl *base) {
-      return PathElement(base);
-    }
-
-    static PathElement getContextualType(bool isForSingleExprFunction = false) {
-      return PathElement(ContextualType, isForSingleExprFunction);
-    }
-
     /// Retrieve the kind of path element.
     PathElementKind getKind() const {
       switch (static_cast<StoredKind>(storedKind)) {
       case StoredGenericParameter:
-        return GenericParameter;
+        return PathElementKind::GenericParameter;
 
       case StoredRequirement:
-        return Requirement;
+        return PathElementKind::Requirement;
 
       case StoredWitness:
-        return Witness;
+        return PathElementKind::Witness;
 
       case StoredGenericSignature:
-        return OpenedGeneric;
+        return PathElementKind::OpenedGeneric;
 
       case StoredKeyPathDynamicMemberBase:
-        return KeyPathDynamicMember;
+        return PathElementKind::KeyPathDynamicMember;
 
       case StoredKindAndValue:
         return decodeStorage(storage).first;
@@ -447,101 +396,31 @@ public:
       llvm_unreachable("Unhandled StoredKind in switch.");
     }
 
-    /// Retrieve the index for a function argument path element.
-    unsigned getArgIdx() const {
-      assert((getKind() == ApplyArgToParam || isSynthesizedArgument()) &&
-             "Not an argument path element");
-      return getValue(0);
+    /// Attempts to cast the path element to a specific \c LocatorPathElt
+    /// subclass, returning \c None if unsuccessful.
+    template <class T>
+    Optional<T> getAs() const {
+      if (auto *result = dyn_cast<T>(this))
+        return *result;
+      return None;
     }
 
-    /// Retrieve the parameter index for an apply-arg-to-param path element.
-    unsigned getParamIdx() const {
-      assert(getKind() == ApplyArgToParam && "Not a parameter application");
-      return getValue(1);
-    }
+    /// Cast the path element to a specific \c LocatorPathElt subclass.
+    template <class T>
+    T castTo() const { return *cast<T>(this); }
 
-    /// Retrieve the index for a tuple element.
-    unsigned getTupleElementIdx() const {
-      assert((getKind() == TupleElement || getKind() == NamedTupleElement) &&
-             "Not a tuple element");
-      return getValue(0);
-    }
-
-    /// Retrieve the index for a key path component path element.
-    unsigned getKeyPathComponentIdx() const {
-      assert(isKeyPathComponent() && "Not a key path component");
-      return getValue(0);
-    }
-
-    /// Retrieve the index for a generic argument path element.
-    unsigned getGenericArgIdx() const {
-      assert(getKind() == GenericArgument && "Not a generic argument");
-      return getValue(0);
-    }
-
-    /// Retrieve the index for a generic requirement path element.
-    unsigned getRequirementIdx() const {
-      assert((isTypeParameterRequirement() || isConditionalRequirement()) &&
-             "Not a requirement");
-      return getValue(0);
-    }
-
-    /// Retrieve the kind of generic requirement path element.
-    RequirementKind getRequirementKind() const {
-      assert((isTypeParameterRequirement() || isConditionalRequirement()) &&
-             "Not a requirement");
-      return static_cast<RequirementKind>(getValue(1));
-    }
-
-    /// Retrieve the declaration for a witness path element.
-    ValueDecl *getWitness() const {
-      assert(getKind() == Witness && "Is not a witness");
-      return reinterpret_cast<ValueDecl *>(storage << 3);
-    }
-
-    /// Retrieve the actual archetype for a generic parameter path
-    /// element.
-    GenericTypeParamType *getGenericParameter() const {
-      assert(getKind() == GenericParameter &&
-             "Not a generic parameter path element");
-      return reinterpret_cast<GenericTypeParamType *>(storage << 3);
-    }
-
-    /// Retrieve the declaration for a requirement path element.
-    ValueDecl *getRequirement() const {
-      assert((static_cast<StoredKind>(storedKind) == StoredRequirement) &&
-             "Is not a requirement");
-      return reinterpret_cast<ValueDecl *>(storage << 3);
-    }
-
-    GenericSignature *getGenericSignature() const {
-      assert((static_cast<StoredKind>(storedKind) == StoredGenericSignature) &&
-             "Is not an opened generic");
-      return reinterpret_cast<GenericSignature *>(storage << 3);
-    }
-
-    NominalTypeDecl *getKeyPath() const {
-      assert((static_cast<StoredKind>(storedKind) ==
-              StoredKeyPathDynamicMemberBase) &&
-             "Is not a keypath dynamic member");
-      return reinterpret_cast<NominalTypeDecl *>(storage << 3);
-    }
+    /// Checks whether the path element is a specific \c LocatorPathElt
+    /// subclass.
+    template <class T>
+    bool is() const { return isa<T>(this); }
 
     /// Return the summary flags for this particular element.
     unsigned getNewSummaryFlags() const {
       return getSummaryFlagsForPathElement(getKind());
     }
 
-    bool isTypeParameterRequirement() const {
-      return getKind() == PathElementKind::TypeParameterRequirement;
-    }
-
     bool isConditionalRequirement() const {
       return getKind() == PathElementKind::ConditionalRequirement;
-    }
-
-    bool isSynthesizedArgument() const {
-      return getKind() == PathElementKind::SynthesizedArgument;
     }
 
     bool isKeyPathDynamicMember() const {
@@ -558,10 +437,7 @@ public:
 
     /// Determine whether this element points to the contextual type
     /// associated with result of a single expression function.
-    bool isResultOfSingleExprFunction() const {
-      return getKind() == PathElementKind::ContextualType ? bool(getValue(0))
-                                                          : false;
-    }
+    bool isResultOfSingleExprFunction() const;
   };
 
   /// Return the summary flags for an entire path.
@@ -699,6 +575,244 @@ private:
 };
 
 using LocatorPathElt = ConstraintLocator::PathElement;
+
+// Disallow direct uses of isa/cast/dyn_cast on LocatorPathElt in favor of using
+// is/castTo/getAs. This allows us to work with Optional<T> rather than pointers
+// for getAs.
+template <class X>
+inline bool
+isa(const LocatorPathElt &) = delete; // Use LocatorPathElt::is instead.
+
+template <class X>
+inline typename llvm::cast_retty<X, LocatorPathElt>::ret_type
+cast(const LocatorPathElt &) = delete; // Use LocatorPathElt::castTo instead.
+
+template <class X>
+inline typename llvm::cast_retty<X, LocatorPathElt>::ret_type
+dyn_cast(const LocatorPathElt &) = delete; // Use LocatorPathElt::getAs instead.
+
+
+// The following LocatorPathElt subclasses are used to expose accessors for
+// specific path element information. They shouldn't introduce additional
+// storage, as LocatorPathElt gets passed about by value.
+
+class LocatorPathElt::ApplyArgToParam final : public LocatorPathElt {
+public:
+  ApplyArgToParam(unsigned argIdx, unsigned paramIdx)
+      : LocatorPathElt(ConstraintLocator::ApplyArgToParam, argIdx, paramIdx) {}
+
+  unsigned getArgIdx() const { return getValue(0); }
+  unsigned getParamIdx() const { return getValue(1); }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::ApplyArgToParam;
+  }
+};
+
+class LocatorPathElt::SynthesizedArgument final : public LocatorPathElt {
+public:
+  SynthesizedArgument(unsigned index)
+      : LocatorPathElt(ConstraintLocator::SynthesizedArgument, index) {}
+
+  unsigned getIndex() const { return getValue(0); }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::SynthesizedArgument;
+  }
+};
+
+/// Abstract superclass for any kind of tuple element.
+class LocatorPathElt::AnyTupleElement : public LocatorPathElt {
+protected:
+  AnyTupleElement(PathElementKind kind, unsigned index)
+      : LocatorPathElt(kind, index) {
+    assert(classof(this) && "classof needs updating");
+  }
+
+public:
+  unsigned getIndex() const { return getValue(0); }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->is<LocatorPathElt::TupleElement>() ||
+           elt->is<LocatorPathElt::NamedTupleElement>();
+  }
+};
+
+class LocatorPathElt::TupleElement final
+    : public LocatorPathElt::AnyTupleElement {
+public:
+  TupleElement(unsigned index)
+      : AnyTupleElement(ConstraintLocator::TupleElement, index) {}
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::TupleElement;
+  }
+};
+
+class LocatorPathElt::NamedTupleElement final
+    : public LocatorPathElt::AnyTupleElement {
+public:
+  NamedTupleElement(unsigned index)
+      : AnyTupleElement(ConstraintLocator::NamedTupleElement, index) {}
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::NamedTupleElement;
+  }
+};
+
+class LocatorPathElt::KeyPathComponent final : public LocatorPathElt {
+public:
+  KeyPathComponent(unsigned index)
+      : LocatorPathElt(ConstraintLocator::KeyPathComponent, index) {}
+
+  unsigned getIndex() const { return getValue(0); }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::KeyPathComponent;
+  }
+};
+
+class LocatorPathElt::GenericArgument final : public LocatorPathElt {
+public:
+  GenericArgument(unsigned index)
+      : LocatorPathElt(ConstraintLocator::GenericArgument, index) {}
+
+  unsigned getIndex() const { return getValue(0); }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::GenericArgument;
+  }
+};
+
+/// Abstract superclass for any kind of element that describes a requirement
+/// placed on a type within a requirements clause.
+class LocatorPathElt::AnyRequirement : public LocatorPathElt {
+protected:
+  AnyRequirement(PathElementKind kind, unsigned index, RequirementKind reqKind)
+      : LocatorPathElt(kind, index, static_cast<unsigned>(reqKind)) {
+    assert(classof(this) && "classof needs updating");
+  }
+
+public:
+  unsigned getIndex() const { return getValue(0); }
+  RequirementKind getRequirementKind() const {
+    return static_cast<RequirementKind>(getValue(1));
+  }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->is<LocatorPathElt::ConditionalRequirement>() ||
+           elt->is<LocatorPathElt::TypeParameterRequirement>();
+  }
+};
+
+class LocatorPathElt::ConditionalRequirement final
+    : public LocatorPathElt::AnyRequirement {
+public:
+  ConditionalRequirement(unsigned index, RequirementKind reqKind)
+      : AnyRequirement(ConstraintLocator::ConditionalRequirement, index,
+                       reqKind) {}
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::ConditionalRequirement;
+  }
+};
+
+class LocatorPathElt::TypeParameterRequirement final
+    : public LocatorPathElt::AnyRequirement {
+public:
+  TypeParameterRequirement(unsigned index, RequirementKind reqKind)
+      : AnyRequirement(ConstraintLocator::TypeParameterRequirement, index,
+                       reqKind) {}
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::TypeParameterRequirement;
+  }
+};
+
+class LocatorPathElt::ContextualType final : public LocatorPathElt {
+public:
+  ContextualType(bool isForSingleExprFunction = false)
+      : LocatorPathElt(ConstraintLocator::ContextualType,
+                       isForSingleExprFunction) {}
+
+  /// Whether this element points to the contextual type associated with the
+  /// result of a single expression function.
+  bool isForSingleExprFunction() const { return bool(getValue(0)); }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::ContextualType;
+  }
+};
+
+class LocatorPathElt::Witness final : public LocatorPathElt {
+public:
+  Witness(ValueDecl *witness)
+      : LocatorPathElt(LocatorPathElt::StoredWitness, witness) {}
+
+  ValueDecl *getDecl() const { return getStoredPointer<ValueDecl>(); }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::Witness;
+  }
+};
+
+class LocatorPathElt::Requirement final : public LocatorPathElt {
+public:
+  Requirement(ValueDecl *decl)
+      : LocatorPathElt(LocatorPathElt::StoredRequirement, decl) {}
+
+  ValueDecl *getDecl() const { return getStoredPointer<ValueDecl>(); }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::Requirement;
+  }
+};
+
+class LocatorPathElt::GenericParameter final : public LocatorPathElt {
+public:
+  GenericParameter(GenericTypeParamType *type)
+      : LocatorPathElt(LocatorPathElt::StoredGenericParameter, type) {
+    static_assert(alignof(GenericTypeParamType) >= 4,
+                  "archetypes insufficiently aligned");
+  }
+
+  GenericTypeParamType *getType() const {
+    return getStoredPointer<GenericTypeParamType>();
+  }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::GenericParameter;
+  }
+};
+
+class LocatorPathElt::OpenedGeneric final : public LocatorPathElt {
+public:
+  OpenedGeneric(GenericSignature *sig)
+      : LocatorPathElt(LocatorPathElt::StoredGenericSignature, sig) {}
+
+  GenericSignature *getSignature() const {
+    return getStoredPointer<GenericSignature>();
+  }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::OpenedGeneric;
+  }
+};
+
+class LocatorPathElt::KeyPathDynamicMember final : public LocatorPathElt {
+public:
+  KeyPathDynamicMember(NominalTypeDecl *keyPathDecl)
+      : LocatorPathElt(LocatorPathElt::StoredKeyPathDynamicMemberBase,
+                       keyPathDecl) {}
+
+  NominalTypeDecl *getKeyPathDecl() const {
+    return getStoredPointer<NominalTypeDecl>();
+  }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::KeyPathDynamicMember;
+  }
+};
 
 /// A simple stack-only builder object that constructs a
 /// constraint locator without allocating memory.

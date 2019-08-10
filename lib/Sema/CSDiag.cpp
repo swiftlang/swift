@@ -175,7 +175,8 @@ void constraints::simplifyLocator(Expr *&anchor,
     case ConstraintLocator::NamedTupleElement:
     case ConstraintLocator::TupleElement: {
       // Extract tuple element.
-      unsigned index = path[0].getTupleElementIdx();
+      auto elt = path[0].castTo<LocatorPathElt::AnyTupleElement>();
+      unsigned index = elt.getIndex();
       if (auto tupleExpr = dyn_cast<TupleExpr>(anchor)) {
         if (index < tupleExpr->getNumElements()) {
           anchor = tupleExpr->getElement(index);
@@ -194,10 +195,11 @@ void constraints::simplifyLocator(Expr *&anchor,
       break;
     }
 
-    case ConstraintLocator::ApplyArgToParam:
+    case ConstraintLocator::ApplyArgToParam: {
+      auto elt = path[0].castTo<LocatorPathElt::ApplyArgToParam>();
       // Extract tuple element.
       if (auto tupleExpr = dyn_cast<TupleExpr>(anchor)) {
-        unsigned index = path[0].getArgIdx();
+        unsigned index = elt.getArgIdx();
         if (index < tupleExpr->getNumElements()) {
           anchor = tupleExpr->getElement(index);
           path = path.slice(1);
@@ -207,14 +209,14 @@ void constraints::simplifyLocator(Expr *&anchor,
 
       // Extract subexpression in parentheses.
       if (auto parenExpr = dyn_cast<ParenExpr>(anchor)) {
-        assert(path[0].getArgIdx() == 0);
+        assert(elt.getArgIdx() == 0);
 
         anchor = parenExpr->getSubExpr();
         path = path.slice(1);
         continue;
       }
       break;
-
+    }
     case ConstraintLocator::ConstructorMember:
       if (auto typeExpr = dyn_cast<TypeExpr>(anchor)) {
         // This is really an implicit 'init' MemberRef, so point at the base,
@@ -872,8 +874,8 @@ diagnoseUnresolvedDotExprTypeRequirementFailure(ConstraintSystem &cs,
   if (path.empty())
     return false;
 
-  auto &last = path.back();
-  if (last.getKind() != ConstraintLocator::TypeParameterRequirement)
+  auto reqElt = path.back().getAs<LocatorPathElt::TypeParameterRequirement>();
+  if (!reqElt)
     return false;
 
   auto *anchor = locator->getAnchor();
@@ -901,7 +903,7 @@ diagnoseUnresolvedDotExprTypeRequirementFailure(ConstraintSystem &cs,
 
   auto req = member->getAsGenericContext()
                  ->getGenericSignature()
-                 ->getRequirements()[last.getRequirementIdx()];
+                 ->getRequirements()[reqElt->getIndex()];
 
   Diag<Type, Type, Type, Type, StringRef> note;
   switch (req.getKind()) {
@@ -1845,7 +1847,7 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
 
   ContextualFailure failure(
       expr, CS, CTP, exprType, contextualType,
-      CS.getConstraintLocator(expr, LocatorPathElt::getContextualType()));
+      CS.getConstraintLocator(expr, LocatorPathElt::ContextualType()));
   return failure.diagnoseAsError();
 }
 
@@ -4793,7 +4795,7 @@ bool FailureDiagnosis::diagnoseClosureExpr(
 
       MissingArgumentsFailure failure(
           expr, CS, fnType, inferredArgCount - actualArgCount,
-          CS.getConstraintLocator(CE, LocatorPathElt::getContextualType()));
+          CS.getConstraintLocator(CE, LocatorPathElt::ContextualType()));
       return failure.diagnoseAsError();
     }
 
