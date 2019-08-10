@@ -3630,7 +3630,6 @@ public:
                     rawInheritedAndDependencyIDs.slice(0, numInheritedTypes));
 
     theClass->setMemberLoader(&MF, MF.DeclTypeCursor.GetCurrentBitNo());
-    theClass->setHasDestructor();
     skipRecord(MF.DeclTypeCursor, decls_block::MEMBERS);
     theClass->setConformanceLoader(
       &MF,

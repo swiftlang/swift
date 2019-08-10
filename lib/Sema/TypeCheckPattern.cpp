@@ -801,32 +801,6 @@ static bool validateParameterType(ParamDecl *decl, TypeResolution resolution,
   return hadError;
 }
 
-/// Given a type of a function parameter, request layout for any
-/// nominal types that IRGen could use as metadata sources.
-static void requestLayoutForMetadataSources(TypeChecker &tc, Type type) {
-  type->getCanonicalType().visit([&tc](CanType type) {
-    // Generic types are sources for typemetadata and conformances. If a
-    // parameter is of dependent type then the body of a function with said
-    // parameter could potentially require the generic type's layout to
-    // recover them.
-    if (auto *classDecl = type->getClassOrBoundGenericClass()) {
-      tc.requestClassLayout(classDecl);
-    }
-  });
-}
-
-/// Request nominal layout for any types that could be sources of type metadata
-/// or conformances.
-void TypeChecker::requestRequiredNominalTypeLayoutForParameters(
-    ParameterList *PL) {
-  for (auto param : *PL) {
-    if (!param->hasInterfaceType())
-      continue;
-
-    requestLayoutForMetadataSources(*this, param->getInterfaceType());
-  }
-}
-
 /// Type check a parameter list.
 bool TypeChecker::typeCheckParameterList(ParameterList *PL,
                                          TypeResolution resolution,
