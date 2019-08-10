@@ -19,6 +19,10 @@ func reflectionInfo(arg: namespacedT) -> Any.Type {
 func namespaceManglesIntoName(arg: namespacedT) {
 }
 
+// CHECK: define hidden swiftcc void @"$s6cxx_ir42namespaceManglesIntoNameForUsingShadowDecl3argySo2nsV14NamespacedTypeV_tF"
+func namespaceManglesIntoNameForUsingShadowDecl(arg: NamespacedType) {
+}
+
 // CHECK-LABEL: define hidden swiftcc void @"$s6cxx_ir14accessNSMemberyyF"()
 // CHECK: %0 = call %"class.ns::T"* @{{_ZN2ns7doMakeTEv|"\?doMakeT@ns@@YAPEAVT@1@XZ"}}()
 // CHECK: call void @{{_Z4useTPN2ns1TE|"\?useT@@YAXPE?AVT@ns@@@Z"}}(%"class.ns::T"* %2)
