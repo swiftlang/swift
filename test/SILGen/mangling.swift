@@ -184,3 +184,11 @@ func varargsVsArray(arr: [Int], n: String) { }
 
 // CHECK-LABEL: sil hidden [ossa] @$s8mangling14varargsVsArray3arr1nySaySiGd_SStF : $@convention(thin) (@guaranteed Array<Array<Int>>, @guaranteed String) -> ()
 func varargsVsArray(arr: [Int]..., n: String) { }
+
+// SWIFT_ENABLE_TENSORFLOW
+// CHECK-LABEL: sil hidden [ossa] @$s8mangling15funcVsDiffFunc12fnyS2fXE_tF : $@convention(thin) (@noescape @callee_guaranteed (Float) -> Float) -> ()
+func funcVsDiffFunc1(fn: (Float) -> Float) {}
+
+// SWIFT_ENABLE_TENSORFLOW
+// CHECK-LABEL: sil hidden [ossa] @$s8mangling15funcVsDiffFunc22fnyS2fXF_tF : $@convention(thin) (@differentiable @noescape @callee_guaranteed (Float) -> Float) -> ()
+func funcVsDiffFunc2(fn: @differentiable (Float) -> Float) {}

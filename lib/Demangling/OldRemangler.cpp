@@ -1267,6 +1267,18 @@ void Remangler::mangleImplResult(Node *node) {
   mangleChildNodes(node); // impl convention, type
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+void Remangler::mangleImplDifferentiable(Node *node) {
+  // The old mangler does not encode `@differentiable` function types.
+  Buffer << 'd';
+}
+
+// SWIFT_ENABLE_TENSORFLOW
+void Remangler::mangleImplLinear(Node *node) {
+  // The old mangler does not encode `@differentiable(linear)` function types.
+  Buffer << 'l';
+}
+
 void Remangler::mangleImplEscaping(Node *node) {
   // The old mangler does not encode escaping.
 }

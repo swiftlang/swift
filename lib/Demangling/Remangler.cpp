@@ -1379,6 +1379,16 @@ void Remangler::mangleIVarDestroyer(Node *node) {
   Buffer << "fE";
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+void Remangler::mangleImplDifferentiable(Node *node) {
+  Buffer << 'd';
+}
+
+// SWIFT_ENABLE_TENSORFLOW
+void Remangler::mangleImplLinear(Node *node) {
+  Buffer << 'l';
+}
+
 void Remangler::mangleImplEscaping(Node *node) {
   Buffer << 'e';
 }
@@ -1423,6 +1433,14 @@ void Remangler::mangleImplFunctionType(Node *node) {
   Buffer << 'I' << PseudoGeneric;
   for (NodePointer Child : *node) {
     switch (Child->getKind()) {
+      // SWIFT_ENABLE_TENSORFLOW
+      case Node::Kind::ImplDifferentiable:
+        Buffer << 'd';
+        break;
+      case Node::Kind::ImplLinear:
+        Buffer << 'l';
+        break;
+      // SWIFT_ENABLE_TENSORFLOW END
       case Node::Kind::ImplEscaping:
         Buffer << 'e';
         break;

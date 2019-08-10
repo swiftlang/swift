@@ -393,6 +393,10 @@ private:
     case Node::Kind::Index:
     case Node::Kind::IVarInitializer:
     case Node::Kind::IVarDestroyer:
+    // SWIFT_ENABLE_TENSORFLOW
+    case Node::Kind::ImplDifferentiable:
+    case Node::Kind::ImplLinear:
+    // SWIFT_ENABLE_TENSORFLOW END
     case Node::Kind::ImplEscaping:
     case Node::Kind::ImplConvention:
     case Node::Kind::ImplFunctionAttribute:
@@ -2019,6 +2023,14 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   case Node::Kind::LabelList:
     return nullptr;
+  // SWIFT_ENABLE_TENSORFLOW
+  case Node::Kind::ImplDifferentiable:
+    Printer << "@differentiable";
+    return nullptr;
+  case Node::Kind::ImplLinear:
+    Printer << "@differentiable(linear)";
+    return nullptr;
+  // SWIFT_ENABLE_TENSORFLOW END
   case Node::Kind::ImplEscaping:
     Printer << "@escaping";
     return nullptr;
