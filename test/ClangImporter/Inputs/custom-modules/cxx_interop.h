@@ -3,6 +3,7 @@
 // Ensure c++ features are used.
 namespace ns {
 class T {};
+class NamespacedType {};
 
 T *doMakeT();
 } // namespace ns
@@ -16,7 +17,9 @@ Basic makeA();
 
 ns::T* makeT();
 void useT(ns::T* v);
+
 using namespacedT = ns::T;
+using ns::NamespacedType;
 
 class Methods {
  public:
