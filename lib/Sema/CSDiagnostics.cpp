@@ -2319,7 +2319,6 @@ bool MissingMemberFailure::diagnoseAsError() {
         diagnostic.highlight(baseExpr->getSourceRange())
             .highlight(nameLoc.getSourceRange());
         correction->addFixits(diagnostic);
-        
       } else {
         auto diagnostic = emitDiagnostic(
             anchor->getLoc(),

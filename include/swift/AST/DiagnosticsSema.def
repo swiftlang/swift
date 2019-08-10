@@ -82,7 +82,7 @@ ERROR(could_not_find_value_member_corrected,none,
       "value of type %0 has no member %1; did you mean %2?",
       (Type, DeclName, DeclName))
 ERROR(could_not_find_value_dynamic_member_corrected,none,
-      "neither the value type %0 and dynamic key path subscript of type %1 has a member %2; did you mean %3?",
+      "value of type %0 has no dynamic member %2 using key path from root type %1; did you mean %3?",
       (Type, Type, DeclName, DeclName))
 
 ERROR(could_not_find_type_member,none,
