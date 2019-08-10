@@ -1170,7 +1170,13 @@ void IRGenModule::emitAutolinkInfo() {
     }
     auto EntriesConstant = llvm::ConstantDataArray::getString(
         LLVMContext, EntriesString, /*AddNull=*/false);
-
+    // Mark the swift1_autolink_entries section with the SHF_EXCLUDE attribute
+    // to get the linker to drop it in the final linked binary.
+    // LLVM doesn't provide an interface to specify section attributs in the IR
+    // so we pass the attribute with inline assembly.
+    if (TargetInfo.OutputObjectFormat == llvm::Triple::ELF)
+      Module.appendModuleInlineAsm(".section .swift1_autolink_entries,"
+                                   "\"0x80000000\"");
     auto var =
         new llvm::GlobalVariable(*getModule(), EntriesConstant->getType(), true,
                                  llvm::GlobalValue::PrivateLinkage,
