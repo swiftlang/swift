@@ -3289,16 +3289,11 @@ public:
             NumDestructors++;
           }
         }
-        if (NumDestructors != 1) {
-          Out << "every class should have exactly one destructor, "
+        if (NumDestructors > 1) {
+          Out << "every class should have at most one destructor, "
                  "explicitly provided or created by the type checker\n";
           abort();
         }
-      }
-      
-      if (!CD->hasDestructor()) {
-        Out << "every class's 'has destructor' bit must be set\n";
-        abort();
       }
 
       verifyCheckedBase(CD);

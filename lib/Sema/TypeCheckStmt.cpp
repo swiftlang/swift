@@ -782,8 +782,6 @@ public:
         return nullptr;
       S->setMakeIterator(witness);
 
-      TC.requestMemberLayout(witness.getDecl());
-
       // Create a local variable to capture the iterator.
       std::string name;
       if (auto np = dyn_cast_or_null<NamedPattern>(S->getPattern()))
@@ -854,8 +852,6 @@ public:
     auto witness =
         genConformance->getWitnessByName(iteratorTy, TC.Context.Id_next);
     S->setIteratorNext(witness);
-
-    TC.requestMemberLayout(witness.getDecl());
 
     auto nextResultType = cast<FuncDecl>(S->getIteratorNext().getDecl())
                               ->getResultInterfaceType()
@@ -2144,7 +2140,6 @@ TypeCheckFunctionBodyUntilRequest::evaluate(Evaluator &evaluator,
     timer.emplace(AFD, tc.DebugTimeFunctionBodies, tc.WarnLongFunctionBodies);
 
   tc.validateDecl(AFD);
-  tc.requestRequiredNominalTypeLayoutForParameters(AFD->getParameters());
   tc.checkDefaultArguments(AFD->getParameters(), AFD);
 
   BraceStmt *body = AFD->getBody();

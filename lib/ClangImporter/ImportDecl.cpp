@@ -4634,7 +4634,6 @@ namespace {
         result->setSuperclass(Type());
         result->setAddedImplicitInitializers(); // suppress all initializers
         addObjCAttribute(result, Impl.importIdentifier(decl->getIdentifier()));
-        result->addImplicitDestructor();
         return result;
       };
 
@@ -4802,7 +4801,6 @@ namespace {
         result->setIsIncompatibleWithWeakReferences();
 
       result->setMemberLoader(&Impl, 0);
-      result->addImplicitDestructor();
 
       return result;
     }
@@ -5250,7 +5248,6 @@ SwiftDeclConverter::importCFClassType(const clang::TypedefNameDecl *decl,
     }
   }
 
-  theClass->addImplicitDestructor();
   return theClass;
 }
 
