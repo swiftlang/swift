@@ -719,4 +719,4 @@ struct SR10597_1_W<T> {
   }
 }
 
-_ = SR10597_1_W<SR10597_1>(SR10597_1()).wooo // expected-error {{value of type 'SR10597_1_W<SR10597_1>' has no dynamic member 'wooooo' using key path from root type 'SR10597_1'; did you mean 'woo'?}}
+_ = SR10597_1_W<SR10597_1>(SR10597_1()).wooo // expected-error {{value of type 'SR10597_1_W<SR10597_1>' has no dynamic member 'wooo' using key path from root type 'SR10597_1'; did you mean 'woo'?}}
