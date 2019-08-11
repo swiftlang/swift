@@ -1269,15 +1269,15 @@ void Remangler::mangleImplResult(Node *node) {
 
 // SWIFT_ENABLE_TENSORFLOW
 void Remangler::mangleImplDifferentiable(Node *node) {
-  // The old mangler does not encode `@differentiable` function types.
+  // TODO(TF-750): Check if this code path actually triggers and add a test.
   Buffer << 'd';
 }
 
-// SWIFT_ENABLE_TENSORFLOW
 void Remangler::mangleImplLinear(Node *node) {
-  // The old mangler does not encode `@differentiable(linear)` function types.
+  // TODO(TF-750): Check if this code path actually triggers and add a test.
   Buffer << 'l';
 }
+// SWIFT_ENABLE_TENSORFLOW END
 
 void Remangler::mangleImplEscaping(Node *node) {
   // The old mangler does not encode escaping.

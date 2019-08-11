@@ -27,7 +27,14 @@ public protocol Differentiable {
   associatedtype TangentVector
 }
 
-// This declaration is necessary to reproduce the crash for some reason.
+// This declaration is necessary to reproduce the crash.
+// `Builtin.autodiffApply_vjp` constructs a use of the `tf597ProblematicVarDecl`
+// type, which was mangled without `@differentiable` attribute. The parameter
+// for `blackHole` is of type `$@noescape @callee_guaranteed (@in_guaranteed T) -> @out U`,
+// which matched the mangled name for the type of the parameter of `blackHole`.
+// As a result, the types are uniqued when generating debug info. The type of
+// the parameter of `blackHole` is smaller than the `@differentiable` function
+// type, causing IRGenDebugInfo to crash.
 public func blackHole<T, U>(_: (T) -> U) {}
 
 public func pullback<T, R>(
