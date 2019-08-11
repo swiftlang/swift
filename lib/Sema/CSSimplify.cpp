@@ -5987,6 +5987,7 @@ ConstraintSystem::simplifyApplicableFnConstraint(
                                            Type type2,
                                            TypeMatchOptions flags,
                                            ConstraintLocatorBuilder locator) {
+  auto &ctx = getASTContext();
 
   // By construction, the left hand side is a type that looks like the
   // following: $T1 -> $T2.
@@ -6011,6 +6012,15 @@ ConstraintSystem::simplifyApplicableFnConstraint(
     }
   }
 
+  // Before stripping lvalue-ness and optional types, save original type for
+  // handling `func callAsFunction` and `@dynamicCallable` applications.
+  // This supports the following cases:
+  // - Generating constraints for `mutating func callAsFunction`. The nominal
+  //   type (`type2`) should be an lvalue type.
+  // - Extending `Optional` itself with `func callAsFunction` or
+  //   `@dynamicCallable` functionality. Optional types are stripped below if
+  //   `shouldAttemptFixes()` is true.
+  auto *origType2 = type2->getDesugaredType();
   // Drill down to the concrete type on the right hand side.
   type2 = getFixedTypeRecursive(type2, flags, /*wantRValue=*/true);
   auto desugar2 = type2->getDesugaredType();
@@ -6080,10 +6090,33 @@ ConstraintSystem::simplifyApplicableFnConstraint(
   ConstraintLocatorBuilder outerLocator =
     getConstraintLocator(anchor, parts, locator.getSummaryFlags());
 
-  // Before stripping optional types, save original type for handling
-  // @dynamicCallable applications. This supports the fringe case where
-  // `Optional` itself is extended with @dynamicCallable functionality.
-  auto origType2 = desugar2;
+  // Handle applications of types with `callAsFunction` methods.
+  // Do this before stripping optional types below, when `shouldAttemptFixes()`
+  // is true.
+  auto hasCallAsFunctionMethods =
+      desugar2->mayHaveMembers() &&
+      llvm::any_of(lookupMember(desugar2, DeclName(ctx.Id_callAsFunction)),
+                   [](LookupResultEntry entry) {
+                     return isa<FuncDecl>(entry.getValueDecl());
+                   });
+  if (hasCallAsFunctionMethods) {
+    auto memberLoc = getConstraintLocator(
+        outerLocator.withPathElement(ConstraintLocator::Member));
+    // Add a `callAsFunction` member constraint, binding the member type to a
+    // type variable.
+    auto memberTy = createTypeVariable(memberLoc, TVO_CanBindToLValue |
+                                                  TVO_CanBindToNoEscape |
+                                                  TVO_CanBindToInOut);
+    addValueMemberConstraint(origType2, DeclName(ctx.Id_callAsFunction),
+                             memberTy, DC, FunctionRefKind::SingleApply,
+                             /*outerAlternatives*/ {}, locator);
+    // Add new applicable function constraint based on the member type
+    // variable.
+    addConstraint(ConstraintKind::ApplicableFunction, func1, memberTy,
+                  locator);
+    return SolutionKind::Solved;
+  }
+
   unsigned unwrapCount = 0;
   if (shouldAttemptFixes()) {
     // If we have an optional type, try forcing it to see if that
@@ -6163,60 +6196,6 @@ ConstraintSystem::simplifyApplicableFnConstraint(
     }
 
     return simplified;
-  }
-
-  // Handle applications of types with `callAsFunction` methods.
-  if (desugar2->mayHaveMembers()) {
-    auto &ctx = getASTContext();
-    // Get all `callAsFunction` methods of the nominal type.
-    // Note: Consider caching `callAsFunction` methods.
-    SmallVector<FuncDecl *, 4> callMethods;
-    auto candidates = lookupMember(desugar2, DeclName(ctx.Id_callAsFunction));
-    for (auto entry : candidates) {
-      auto callMethod = dyn_cast<FuncDecl>(entry.getValueDecl());
-      if (!callMethod)
-        continue;
-      callMethods.push_back(callMethod);
-    }
-
-    // Handle `callAsFunction` methods calls.
-    if (!callMethods.empty()) {
-      // Create a type variable for the `callAsFunction` method.
-      auto loc = getConstraintLocator(locator);
-      auto tv = createTypeVariable(loc, TVO_CanBindToLValue);
-
-      // Record the `callAsFunction` method overload set.
-      SmallVector<OverloadChoice, 4> choices;
-      for (auto candidate : callMethods) {
-        TC.validateDecl(candidate);
-        if (candidate->isInvalid()) continue;
-        choices.push_back(
-            OverloadChoice(type2, candidate, FunctionRefKind::SingleApply));
-      }
-      if (choices.empty()) return SolutionKind::Error;
-      addOverloadSet(tv, choices, DC, loc);
-
-      // Create type variables for each parameter type.
-      SmallVector<AnyFunctionType::Param, 4> tvParams;
-      for (unsigned i : range(func1->getNumParams())) {
-        auto param = func1->getParams()[i];
-        auto paramType = param.getPlainType();
-
-        auto *tvParam = createTypeVariable(loc, TVO_CanBindToNoEscape);
-        auto locatorBuilder =
-            locator.withPathElement(LocatorPathElt::getTupleElement(i));
-        addConstraint(ConstraintKind::ArgumentConversion, paramType,
-                      tvParam, locatorBuilder);
-        tvParams.push_back(AnyFunctionType::Param(
-            tvParam, Identifier(), param.getParameterFlags()));
-      }
-      // Create target function type and an applicable function constraint.
-      AnyFunctionType *funcType =
-          FunctionType::get(tvParams, func1->getResult());
-      addConstraint(ConstraintKind::ApplicableFunction, funcType, tv, locator);
-
-      return SolutionKind::Solved;
-    }
   }
 
   // Handle applications of @dynamicCallable types.
@@ -6359,6 +6338,13 @@ getDynamicCallableMethods(Type type, ConstraintSystem &CS,
   return result;
 }
 
+// TODO: Refactor/simplify this function.
+// - It should perform less duplicate work with its caller
+//   `ConstraintSystem::simplifyApplicableFnConstraint`.
+// - It should generate a member constraint instead of manually forming an
+//   overload set for `func dynamicallyCall` candidates.
+// - It should support `mutating func dynamicallyCall`. This should fall out of
+//   using member constraints with an lvalue base type.
 ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyDynamicCallableApplicableFnConstraint(
                                             Type type1,

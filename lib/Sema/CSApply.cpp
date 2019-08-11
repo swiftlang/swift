@@ -6775,17 +6775,6 @@ static Expr *finishApplyCallAsFunctionMethod(
   auto &cs = rewriter.cs;
   auto *fn = apply->getFn();
   auto choice = selected.choice;
-  auto *method = dyn_cast<FuncDecl>(choice.getDecl());
-  auto selfParam = method->getImplicitSelfDecl();
-
-  // Diagnose `mutating` method call on immutable value.
-  if (!cs.getType(fn)->hasLValueType() && selfParam->isInOut()) {
-    AssignmentFailure failure(fn, cs, fn->getLoc(),
-                              diag::cannot_pass_rvalue_mutating_subelement,
-                              diag::cannot_pass_rvalue_mutating);
-    failure.diagnose();
-    return nullptr;
-  }
   // Create direct reference to `callAsFunction` method.
   bool isDynamic = choice.getKind() == OverloadChoiceKind::DeclViaDynamic;
   auto *declRef = rewriter.buildMemberRef(

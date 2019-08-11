@@ -106,8 +106,12 @@ struct Mutating {
   }
 }
 func testMutating(_ x: Mutating, _ y: inout Mutating) {
-  _ = x() // expected-error {{cannot use mutating member on immutable value: 'x' is a 'let' constant}}
-  _ = x.callAsFunction() // expected-error {{cannot use mutating member on immutable value: 'x' is a 'let' constant}}
+  // TODO: Improve this error to match the error using a direct `callAsFunction` member reference.
+  // expected-error @+2 {{cannot call value of non-function type 'Mutating'}}
+  // expected-error @+1 {{cannot invoke 'x' with no arguments}}
+  _ = x()
+  // expected-error @+1 {{cannot use mutating member on immutable value: 'x' is a 'let' constant}}
+  _ = x.callAsFunction()
   _ = y()
   _ = y.callAsFunction()
 }
@@ -120,9 +124,7 @@ struct Inout {
 func testInout(_ x: Inout, _ arg: inout Int) {
   x(&arg)
   x.callAsFunction(&arg)
-  // TODO: Improve this error to match the error using a direct `callAsFunction` member reference.
-  // expected-error @+2 {{cannot invoke 'x' with an argument list of type '(Int)'}}
-  // expected-error @+1 {{cannot call value of non-function type 'Inout'}}
+  // expected-error @+1 {{passing value of type 'Int' to an inout parameter requires explicit '&'}}
   x(arg)
   // expected-error @+1 {{passing value of type 'Int' to an inout parameter requires explicit '&'}}
   x.callAsFunction(arg)
