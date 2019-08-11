@@ -954,3 +954,37 @@ bb0:
 // String.init(_builtinStringLiteral:utf8CodeUnitCount:isASCII:)
 // The semantics attribute is used by the constant folder.
 sil [serialized] [always_inline] [readonly] [_semantics "string.makeUTF8"] @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+
+// CHECK-LABEL: sil @string_ptr_to_int_round_trip : $@convention(thin) () -> Builtin.RawPointer {
+// CHECK-NOT: builtin
+// CHECK: } // end sil function 'string_ptr_to_int_round_trip'
+sil @string_ptr_to_int_round_trip : $@convention(thin) () -> Builtin.RawPointer {
+bb0:
+  %0 = string_literal utf8 "constant"
+  %1 = builtin "ptrtoint_Word"(%0 : $Builtin.RawPointer) : $Builtin.Word
+  %2 = builtin "inttoptr_Word"(%1 : $Builtin.Word) : $Builtin.RawPointer
+  return %2 : $Builtin.RawPointer
+}
+
+// CHECK-LABEL: sil @string_ptr_to_int_round_trip_2 : $@convention(thin) () -> Builtin.Word {
+// CHECK-NOT: builtin
+// CHECK: } // end sil function 'string_ptr_to_int_round_trip_2'
+sil @string_ptr_to_int_round_trip_2 : $@convention(thin) () -> Builtin.Word {
+bb0:
+  %0 = integer_literal $Builtin.Word, 0
+  %1 = builtin "inttoptr_Word"(%0 : $Builtin.Word) : $Builtin.RawPointer
+  %2 = builtin "ptrtoint_Word"(%1 : $Builtin.RawPointer) : $Builtin.Word
+  return %2 : $Builtin.Word
+}
+
+// CHECK-LABEL: sil @string_ptr_to_int_round_trip_no_match : $@convention(thin) () -> Builtin.Int32 {
+// CHECK: builtin
+// CHECK: builtin
+// CHECK: } // end sil function 'string_ptr_to_int_round_trip_no_match'
+sil @string_ptr_to_int_round_trip_no_match : $@convention(thin) () -> Builtin.Int32 {
+bb0:
+  %0 = integer_literal $Builtin.Word, 0
+  %1 = builtin "inttoptr_Word"(%0 : $Builtin.Word) : $Builtin.RawPointer
+  %2 = builtin "ptrtoint_Int32"(%1 : $Builtin.RawPointer) : $Builtin.Int32
+  return %2 : $Builtin.Int32
+}
