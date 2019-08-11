@@ -1491,8 +1491,8 @@ LinearMapInfo::LinearMapInfo(ADContext &context,
   populateLinearMapStructDeclarationFields(context, indices, assocFn);
 }
 
-bool LinearMapInfo::shouldBeDifferentiated(
-  ApplyInst *ai, const SILAutoDiffIndices &indices) {
+bool LinearMapInfo::shouldBeDifferentiated(ApplyInst *ai,
+                                           const SILAutoDiffIndices &indices) {
   // Anything with an active result should be differentiated.
   if (llvm::any_of(ai->getResults(), [&](SILValue val) {
     return activityInfo.isActive(val, indices);
@@ -1618,9 +1618,10 @@ bool LinearMapInfo::shouldBeDifferentiated(
 
           // If function is already marked differentiable, differentiate WRT
           // all parameters.
-          auto originalFnSubstTy = ai->getSubstCalleeType();;
+          auto originalFnSubstTy = ai->getSubstCalleeType();
           if (originalFnSubstTy->isDifferentiable()) {
-            parameters = originalFnSubstTy->getDifferentiationParameterIndices();
+            parameters =
+                originalFnSubstTy->getDifferentiationParameterIndices();
           } else {
             parameters = AutoDiffIndexSubset::get(
                 original->getASTContext(),
@@ -1633,11 +1634,12 @@ bool LinearMapInfo::shouldBeDifferentiated(
               ai->getArgumentsWithoutIndirectResults().size(),
               activeParamIndices));
 
-          // Check and diagnose non-differentiable original function type.
-          auto diagnoseNondifferentiableOriginalFunctionType =
+          // Check for non-differentiable original function type.
+          auto checkNondifferentiableOriginalFunctionType =
               [&](CanSILFunctionType origFnTy) {
                 // Check and diagnose non-differentiable arguments.
-                for (unsigned paramIndex : range(origFnTy->getNumParameters())) {
+                for (unsigned paramIndex :
+                     range(origFnTy->getNumParameters())) {
                   if (curIndices.isWrtParameter(paramIndex) &&
                           !origFnTy->getParameters()[paramIndex]
                           .getSILStorageType()
@@ -1653,23 +1655,25 @@ bool LinearMapInfo::shouldBeDifferentiated(
                 }
                 return false;
               };
-          if (diagnoseNondifferentiableOriginalFunctionType(originalFnSubstTy))
+          if (checkNondifferentiableOriginalFunctionType(originalFnSubstTy))
             continue;
 
-          auto assocFnType = originalFnSubstTy->getAutoDiffAssociatedFunctionType(
-              parameters, source,
-              /*differentiationOrder*/ 1, kind, builder.getModule(),
-              LookUpConformanceInModule(builder.getModule().getSwiftModule()));
+          auto assocFnType =
+              originalFnSubstTy->getAutoDiffAssociatedFunctionType(
+                  parameters, source,
+                  /*differentiationOrder*/ 1, kind, builder.getModule(),
+                  LookUpConformanceInModule(
+                      builder.getModule().getSwiftModule()));
 
           auto assocFnResultTypes =
               assocFnType->getAllResultsType().castTo<TupleType>();
-          assocFnResultTypes
-              ->getElement(assocFnResultTypes->getElements().size() - 1);
-          auto linearMapSILType =
-              SILType::getPrimitiveObjectType(
-                  assocFnResultTypes->getElement(
-                      assocFnResultTypes->getElements().size() - 1)
-              .getType()->getCanonicalType());
+          assocFnResultTypes->getElement(
+              assocFnResultTypes->getElements().size() - 1);
+          auto linearMapSILType = SILType::getPrimitiveObjectType(
+                  assocFnResultTypes
+                      ->getElement(assocFnResultTypes->getElements().size() - 1)
+                      .getType()
+                      ->getCanonicalType());
           addLinearMapDecl(ai, linearMapSILType);
         }
       }
