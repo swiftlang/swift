@@ -354,3 +354,4 @@ $s3red4testyAA7OurTypeOy4them05TheirD0Vy5AssocQzGAjE0F8ProtocolAAxAA0c7DerivedH0
 // SWIFT_ENABLE_TENSORFLOW
 $sxq_Idgnr_D ---> @differentiable @callee_guaranteed (@in_guaranteed A) -> (@out B)
 $sxq_Ilgnr_D ---> @differentiable(linear) @callee_guaranteed (@in_guaranteed A) -> (@out B)
+// SWIFT_ENABLE_TENSORFLOW END
