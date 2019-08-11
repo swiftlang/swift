@@ -1729,6 +1729,12 @@ NodePointer Demangler::demangleImplFunctionType() {
   if (nextIf('e'))
     type->addChild(createNode(Node::Kind::ImplEscaping), *this);
 
+  // SWIFT_ENABLE_TENSORFLOW
+  if (nextIf('d'))
+    type->addChild(createNode(Node::Kind::ImplDifferentiable), *this);
+  if (nextIf('l'))
+    type->addChild(createNode(Node::Kind::ImplLinear), *this);
+
   const char *CAttr = nullptr;
   switch (nextChar()) {
     case 'y': CAttr = "@callee_unowned"; break;

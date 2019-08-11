@@ -5197,8 +5197,9 @@ public:
   // with an `apply` of its JVP.
   void visitApplyInst(ApplyInst *ai) {
     // Handle array uninitialized allocation intrinsic specially.
-    if (ai->hasSemantics("array.uninitialized_intrinsic"))
-      return visitArrayInitializationInst(ai);
+//    if (ai->hasSemantics("array.uninitialized_intrinsic")) {
+//      return visitArrayInitializationInst(ai);
+//    }
 
     // Special handling logic only applies when `apply` has active results or
     // active arguments at an active parameter position. If not, just do

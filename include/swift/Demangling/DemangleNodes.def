@@ -115,6 +115,10 @@ NODE(Identifier)
 NODE(Index)
 CONTEXT_NODE(IVarInitializer)
 CONTEXT_NODE(IVarDestroyer)
+// SWIFT_ENABLE_TENSORFLOW
+NODE(ImplDifferentiable)
+NODE(ImplLinear)
+// SWIFT_ENABLE_TENSORFLOW END
 NODE(ImplEscaping)
 NODE(ImplConvention)
 NODE(ImplFunctionAttribute)

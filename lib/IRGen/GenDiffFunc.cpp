@@ -32,6 +32,7 @@
 using namespace swift;
 using namespace irgen;
 
+/// A pair of `@differentiable` function extractee and differentiation order.
 using DiffFuncIndex =
     std::pair<AutoDiffFunctionExtractInst::Extractee, unsigned>;
 
