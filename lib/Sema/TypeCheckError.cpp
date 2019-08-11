@@ -215,9 +215,13 @@ public:
     } else if (auto optionalTryExpr = dyn_cast<OptionalTryExpr>(E)) {
       recurse = asImpl().checkOptionalTry(optionalTryExpr);
     } else if (auto apply = dyn_cast<ApplyExpr>(E)) {
-      recurse = asImpl().checkApply(apply);
+      recurse = asImpl().checkApply(apply, nullptr);
     } else if (auto interpolated = dyn_cast<InterpolatedStringLiteralExpr>(E)) {
       recurse = asImpl().checkInterpolatedStringLiteral(interpolated);
+    } else if (auto openExistExpr = dyn_cast<OpenExistentialExpr>(E)) {
+      if (auto applyExpr = dyn_cast<ApplyExpr>(openExistExpr->getSubExpr())) {
+        recurse = asImpl().checkApply(applyExpr, openExistExpr);
+      }
     }
     // Error handling validation (via checkTopLevelErrorHandling) happens after
     // type checking. If an unchecked expression is still around, the code was
@@ -594,7 +598,7 @@ private:
     ShouldRecurse_t checkOptionalTry(OptionalTryExpr *E) {
       return ShouldNotRecurse;
     }
-    ShouldRecurse_t checkApply(ApplyExpr *E) {
+    ShouldRecurse_t checkApply(ApplyExpr *E, Expr *BaseExpr) {
       Result = std::max(Result, Self.classifyApply(E).getResult());
       return ShouldRecurse;
     }
@@ -1016,7 +1020,7 @@ public:
     llvm_unreachable("bad reason kind");
   }
 
-  void diagnoseUncoveredThrowSite(TypeChecker &TC, ASTNode E,
+  void diagnoseUncoveredThrowSite(TypeChecker &TC, ASTNode E, Expr *BaseExpr,
                                   const PotentialReason &reason) {
     auto message = diag::throwing_call_without_try;
     auto loc = E.getStartLoc();
@@ -1030,9 +1034,15 @@ public:
         loc = e->getFn()->getStartLoc();
         message = diag::throwing_operator_without_try;
       }
-      insertLoc = loc;
-      highlight = e->getSourceRange();
-      
+
+      if (auto OEE = dyn_cast_or_null<OpenExistentialExpr>(BaseExpr)) {
+        insertLoc = OEE->getExistentialValue()->getStartLoc();
+        highlight = e->getSourceRange();
+      } else {
+        insertLoc = loc;
+        highlight = e->getSourceRange();
+      }
+
       if (InterpolatedString &&
           e->getCalledValue() &&
           e->getCalledValue()->getBaseName() ==
@@ -1444,12 +1454,12 @@ private:
     CurContext = savedContext;
   }
 
-  ShouldRecurse_t checkApply(ApplyExpr *E) {
+  ShouldRecurse_t checkApply(ApplyExpr *E, Expr *BaseExpr) {
     // An apply expression is a potential throw site if the function throws.
     // But if the expression didn't type-check, suppress diagnostics.
     auto classification = Classifier.classifyApply(E);
 
-    checkThrowSite(E, /*requiresTry*/ true, classification);
+    checkThrowSite(E, BaseExpr, /*requiresTry*/ true, classification);
 
     // HACK: functions can get queued multiple times in
     // definedFunctions, so be sure to be idempotent.
@@ -1510,12 +1520,12 @@ private:
   }
 
   ShouldRecurse_t checkThrow(ThrowStmt *S) {
-    checkThrowSite(S, /*requiresTry*/ false,
+    checkThrowSite(S, nullptr, /*requiresTry*/ false,
                    Classification::forThrow(PotentialReason::forThrow()));
     return ShouldRecurse;
   }
 
-  void checkThrowSite(ASTNode E, bool requiresTry,
+  void checkThrowSite(ASTNode E, Expr *BaseExpr, bool requiresTry,
                       const Classification &classification) {
     MaxThrowingKind = std::max(MaxThrowingKind, classification.getResult());
 
@@ -1551,7 +1561,7 @@ private:
         CurContext.diagnoseUnhandledThrowSite(TC, E, isTryCovered,
                                               classification.getThrowsReason());
       } else if (!isTryCovered) {
-        CurContext.diagnoseUncoveredThrowSite(TC, E,
+        CurContext.diagnoseUncoveredThrowSite(TC, E, BaseExpr,
                                               classification.getThrowsReason());
       }
       return;
