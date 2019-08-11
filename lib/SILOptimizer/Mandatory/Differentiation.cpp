@@ -4434,7 +4434,7 @@ private:
              "Should only be handling direct results for return inst");
         auto diffVal = getTangentValue(origResult);
         auto val = materializeTangent(diffVal, diffLoc); // PROBLEM
-        diffBuilder.createRetainValue(diffLoc, val, diffBuilder.getDefaultAtomicity());
+//        diffBuilder.createRetainValue(diffLoc, val, diffBuilder.getDefaultAtomicity());
         retElts.push_back(val);
     };
     // Collect differentiation parameter adjoints.
