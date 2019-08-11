@@ -44,13 +44,15 @@ _ = pullback(at: Vector.zero, in: testOwnedVector)
 // CHECK-LABEL: enum {{.*}}testOwnedVector{{.*}}__Pred__src_0_wrt_0 {
 // CHECK-NEXT: }
 
-// CHECK-LABEL: sil hidden @{{.*}}UsesMethodOfNoDerivativeMember{{.*}}applied2to{{.*}}__pullback_src_0_wrt_0_1
+// CHECK-LABEL: // pullback wrt 0, 1 source 0 for UsesMethodOfNoDerivativeMember.applied(to:)
+// CHECK-NEXT: sil hidden @$s11refcounting30UsesMethodOfNoDerivativeMemberV7applied2toAA6VectorVAG_tFTUp0_1r0
 // CHECK: bb0([[SEED:%.*]] : $Vector, [[PB_STRUCT:%.*]] : ${{.*}}UsesMethodOfNoDerivativeMember{{.*}}applied2to{{.*}}__PB__src_0_wrt_0_1):
 // CHECK:   [[PB:%.*]] = struct_extract [[PB_STRUCT]] : ${{.*}}UsesMethodOfNoDerivativeMember{{.*}}applied2to{{.*}}__PB__src_0_wrt_0_1
 // CHECK:   [[NEEDED_COTAN:%.*]] = apply [[PB]]([[SEED]]) : $@callee_guaranteed (@guaranteed Vector) -> @owned Vector
 // CHECK:   release_value [[SEED:%.*]] : $Vector
 
-// CHECK-LABEL sil hidden @{{.*}}subset_pullback_releases_unused_ones{{.*}}__pullback_src_0_wrt_0
+// CHECK-LABEL: // pullback wrt 0 source 0 for subset_pullback_releases_unused_ones(_:)
+// CHECK-NEXT: sil hidden @$s11refcounting36subset_pullback_releases_unused_onesyAA6VectorVADFTUp0r0
 // CHECK: bb0([[SEED:%.*]] : $Vector, [[PB_STRUCT:%.*]] : ${{.*}}subset_pullback_releases_unused_ones{{.*}}__PB__src_0_wrt_0):
 // CHECK:   [[PB0:%.*]] = struct_extract [[PB_STRUCT]] : ${{.*}}subset_pullback_releases_unused_ones{{.*}}, #{{.*}}subset_pullback_releases_unused_ones{{.*}}__PB__src_0_wrt_0.pullback_1
 // CHECK:   [[NEEDED_COTAN0:%.*]] = apply [[PB0]]([[SEED]]) : $@callee_guaranteed (@guaranteed Vector) -> @owned Vector
@@ -62,7 +64,8 @@ _ = pullback(at: Vector.zero, in: testOwnedVector)
 // CHECK:   release_value [[NEEDED_COTAN1]] : $Vector
 // CHECK:   return [[NEEDED_COTAN1]] : $Vector
 
-// CHECK-LABEL: sil hidden @{{.*}}side_effect_release_zero{{.*}}__pullback_src_0_wrt_0
+// CHECK-LABEL: // pullback wrt 0 source 0 for side_effect_release_zero(_:)
+// CHECK-NEXT: sil hidden @$s11refcounting24side_effect_release_zeroyAA6VectorVADFTUp0r0
 // CHECK: bb0([[SEED:%.*]] : $Vector, %1 : ${{.*}}side_effect_release_zero{{.*}}_bb0__PB__src_0_wrt_0):
 // CHECK:   [[BUF:%.*]] = alloc_stack $Vector
 // CHECK:   [[ZERO_GETTER:%.*]] = function_ref @$s11refcounting6VectorV4zeroACvgZ
@@ -80,10 +83,11 @@ _ = pullback(at: Vector.zero, in: testOwnedVector)
 
 // The vjp should not release pullback values.
 //
-// CHECK-LABEL: sil hidden @{{.*}}testOwnedVector{{.*}}__vjp_src_0_wrt_0 : $@convention(thin) (@guaranteed Vector) -> (@owned Vector, @owned @callee_guaranteed (@guaranteed Vector) -> @owned Vector)
+// CHECK-LABEL: // VJP wrt 0 source 0 for testOwnedVector(_:)
+// CHECK-NEXT: sil hidden @$s11refcounting15testOwnedVectoryAA0D0VADFTZp0r0
 // CHECK:   [[ADD:%.*]] = function_ref @Vector_plus
-// CHECK:   [[ADD_JVP:%.*]] = function_ref @{{.*}}Vector_plus__jvp_src_0_wrt_0_1{{.*}}
-// CHECK:   [[ADD_VJP:%.*]] = function_ref @{{.*}}Vector_plus__vjp_src_0_wrt_0_1{{.*}}
+// CHECK:   [[ADD_JVP:%.*]] = function_ref @$s11Vector_plusTzp0_1r0
+// CHECK:   [[ADD_VJP:%.*]] = function_ref @$s11Vector_plusTZp0_1r0
 // CHECK:   [[ADD_AD_FUNC:%.*]] = autodiff_function [wrt 0 1] [order 1] [[ADD]] {{.*}} with {[[ADD_JVP]] {{.*}}, [[ADD_VJP]] {{.*}}}
 // CHECK:   [[ADD_AD_FUNC_EXTRACT:%.*]] = autodiff_function_extract [vjp] [order 1] [[ADD_AD_FUNC]]
 // CHECK:   [[ADD_VJP_RESULT:%.*]] = apply [[ADD_AD_FUNC_EXTRACT]]({{.*}}, {{.*}}, {{.*}}) : $@convention(method) (@guaranteed Vector, @guaranteed Vector, @thin Vector.Type) -> (@owned Vector, @owned @callee_guaranteed (@guaranteed Vector) -> (@owned Vector, @owned Vector))
@@ -93,7 +97,8 @@ _ = pullback(at: Vector.zero, in: testOwnedVector)
 
 // The pullback should not release pullback struct argument because it has @guaranteed convention.
 //
-// CHECK-LABEL: @{{.*}}testOwnedVector{{.*}}__pullback_src_0_wrt_0
+// CHECK-LABEL: // pullback wrt 0 source 0 for testOwnedVector(_:)
+// CHECK-LABEL: sil hidden @$s11refcounting15testOwnedVectoryAA0D0VADFTUp0r0
 // CHECK: bb0({{%.*}} : $Vector, [[PB_STRUCT:%.*]] : ${{.*}}testOwnedVector{{.*}}__PB__src_0_wrt_0):
 // CHECK:   [[PULLBACK0:%.*]] = struct_extract [[PB_STRUCT]] : ${{.*}}testOwnedVector{{.*}}__PB__src_0_wrt_0, #{{.*}}testOwnedVector{{.*}}__PB__src_0_wrt_0.pullback_0
 // CHECK-NOT:   release_value [[PULLBACK0]]
