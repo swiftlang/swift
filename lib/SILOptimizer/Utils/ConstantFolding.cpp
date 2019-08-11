@@ -1298,6 +1298,34 @@ case BuiltinValueKind::id:
     return foldFPToIntConversion(BI, Builtin, ResultsInError);
   }
 
+  case BuiltinValueKind::IntToPtr: {
+    if (auto *op = dyn_cast<BuiltinInst>(BI->getOperand(0))) {
+      if (auto kind = op->getBuiltinKind()) {
+        // If we have a single int_to_ptr user and all of the types line up, we
+        // can simplify this instruction.
+        if (*kind == BuiltinValueKind::PtrToInt &&
+            op->getOperand(0)->getType() == BI->getResult(0)->getType()) {
+          return op->getOperand(0);
+        }
+      }
+    }
+    break;
+  }
+
+  case BuiltinValueKind::PtrToInt: {
+    if (auto *op = dyn_cast<BuiltinInst>(BI->getOperand(0))) {
+      if (auto kind = op->getBuiltinKind()) {
+        // If we have a single int_to_ptr user and all of the types line up, we
+        // can simplify this instruction.
+        if (*kind == BuiltinValueKind::IntToPtr &&
+            op->getOperand(0)->getType() == BI->getResult(0)->getType()) {
+          return op->getOperand(0);
+        }
+      }
+    }
+    break;
+  }
+
   case BuiltinValueKind::AssumeNonNegative: {
     auto *V = dyn_cast<IntegerLiteralInst>(Args[0]);
     if (!V)
@@ -1418,7 +1446,8 @@ static bool isApplyOfStringConcat(SILInstruction &I) {
 }
 
 static bool isFoldable(SILInstruction *I) {
-  return isa<IntegerLiteralInst>(I) || isa<FloatLiteralInst>(I);
+  return isa<IntegerLiteralInst>(I) || isa<FloatLiteralInst>(I) ||
+         isa<StringLiteralInst>(I);
 }
 
 bool ConstantFolder::constantFoldStringConcatenation(ApplyInst *AI) {
@@ -1548,6 +1577,29 @@ void ConstantFolder::initializeWorklist(SILFunction &F) {
       WorkList.insert(&I);
     }
   }
+}
+
+/// Returns true if \p i is an instruction that has a stateless inverse. We want
+/// to visit such instructions to eliminate such round-trip unnecessary
+/// operations.
+///
+/// As an example, consider casts, inttoptr, ptrtoint and friends.
+static bool isReadNoneAndInvertible(SILInstruction *i) {
+  if (auto *bi = dyn_cast<BuiltinInst>(i)) {
+    // Look for ptrtoint and inttoptr for now.
+    if (auto kind = bi->getBuiltinKind()) {
+      switch (*kind) {
+      default:
+        return false;
+      case BuiltinValueKind::PtrToInt:
+      case BuiltinValueKind::IntToPtr:
+        return true;
+      }
+    }
+  }
+
+  // Be conservative and return false if we do not have any information.
+  return false;
 }
 
 SILAnalysis::InvalidationKind
@@ -1720,6 +1772,17 @@ ConstantFolder::processWorkList() {
         // they can produce (other than empty tuple, which is wasteful).
         if (isa<CondFailInst>(User))
           FoldedUsers.insert(User);
+
+        // See if we have an instruction that is read none and has a stateless
+        // inverse. If we do, add it to the worklist so we can check its users
+        // for the inverse operation and see if we can perform constant folding
+        // on the inverse operation. This can eliminate annoying "round trip"s.
+        //
+        // NOTE: We are assuming on purpose that our inverse will be read none,
+        // since otherwise we wouldn't be able to constant fold it this way.
+        if (isReadNoneAndInvertible(User)) {
+          WorkList.insert(User);
+        }
 
         // Initialize ResultsInError as a None optional.
         //
