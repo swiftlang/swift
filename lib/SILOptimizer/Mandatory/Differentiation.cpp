@@ -388,7 +388,7 @@ private:
   /// The original function.
   SILFunction *const original;
 
-  /// Activitiy info of the original function.
+  /// Activity info of the original function.
   const DifferentiableActivityInfo &activityInfo;
 
   /// Mapping from original basic blocks to linear map structs.
@@ -667,6 +667,8 @@ private:
     linearMapValueMap.insert({inst, linearMapDecl});
     return linearMapDecl;
   }
+
+  void addLinearMapToStruct(ApplyInst *ai, const SILAutoDiffIndices &indices);
 
   /// This takes the declared linear map structs and populates
   /// them with the necessary fields, specifically the linear function (pullback
@@ -1522,6 +1524,92 @@ bool LinearMapInfo::shouldBeDifferentiated(ApplyInst *ai,
   return false;
 }
 
+
+/// Takes an `apply` instruction and adds its linear map function to the
+/// linear map struct if it's active.
+void LinearMapInfo::addLinearMapToStruct(ApplyInst *ai,
+                                         const SILAutoDiffIndices &indices) {
+  SmallVector<SILValue, 4> allResults;
+  allResults.push_back(ai);
+  allResults.append(ai->getIndirectSILResults().begin(),
+                    ai->getIndirectSILResults().end());
+
+  // Check if there are any active results or arguments. If not, skip
+  // this instruction.
+  auto hasActiveResults = llvm::any_of(
+      allResults, [&](SILValue res) {
+    return activityInfo.isActive(res, indices);
+  });
+  auto hasActiveArguments = llvm::any_of(
+      ai->getArgumentsWithoutIndirectResults(), [&](SILValue arg) {
+    return activityInfo.isActive(arg, indices);
+  });
+  if (!hasActiveResults || !hasActiveArguments)
+    return;
+
+  unsigned source;
+  AutoDiffIndexSubset *parameters;
+
+  SmallVector<unsigned, 8> activeParamIndices;
+  SmallVector<unsigned, 8> activeResultIndices;
+  collectMinimalIndicesForFunctionCall(
+      ai, allResults, indices, activityInfo, activeParamIndices,
+      activeResultIndices);
+  source = activeResultIndices.front();
+
+  // If function is already marked differentiable, differentiate W.R.T.
+  // all parameters.
+  auto originalFnSubstTy = ai->getSubstCalleeType();
+  if (originalFnSubstTy->isDifferentiable()) {
+    parameters = originalFnSubstTy->getDifferentiationParameterIndices();
+  } else {
+    parameters = AutoDiffIndexSubset::get(
+        original->getASTContext(),
+        ai->getArgumentsWithoutIndirectResults().size(),
+        activeParamIndices);
+  }
+  SILAutoDiffIndices curIndices(activeResultIndices.front(),
+  AutoDiffIndexSubset::get(
+      builder.getASTContext(),
+      ai->getArgumentsWithoutIndirectResults().size(),
+      activeParamIndices));
+
+  // Check for non-differentiable original function type.
+  auto checkNondifferentiableOriginalFunctionType =
+      [&](CanSILFunctionType origFnTy) {
+        // Check and diagnose non-differentiable arguments.
+        for (unsigned paramIndex : range(origFnTy->getNumParameters())) {
+          if (curIndices.isWrtParameter(paramIndex) &&
+              !origFnTy->getParameters()[paramIndex]
+                  .getSILStorageType()
+                  .isDifferentiable(builder.getModule()))
+            return true;
+        }
+        // Check non-differentiable results.
+        if (!origFnTy->getResults()[curIndices.source]
+                .getSILStorageType()
+                .isDifferentiable(builder.getModule()))
+          return true;
+        return false;
+      };
+  if (checkNondifferentiableOriginalFunctionType(originalFnSubstTy))
+    return;
+
+  auto assocFnType = originalFnSubstTy->getAutoDiffAssociatedFunctionType(
+      parameters, source, /*differentiationOrder*/ 1, kind, builder.getModule(),
+      LookUpConformanceInModule(builder.getModule().getSwiftModule()));
+
+  auto assocFnResultTypes =
+      assocFnType->getAllResultsType().castTo<TupleType>();
+  assocFnResultTypes->getElement(assocFnResultTypes->getElements().size() - 1);
+  auto linearMapSILType = SILType::getPrimitiveObjectType(
+      assocFnResultTypes
+          ->getElement(assocFnResultTypes->getElements().size() - 1)
+          .getType()
+          ->getCanonicalType());
+  addLinearMapDecl(ai, linearMapSILType);
+}
+
 void LinearMapInfo::populateLinearMapStructDeclarationFields(
     ADContext &context, const SILAutoDiffIndices &indices,
     SILFunction *assocFn) {
@@ -1548,8 +1636,7 @@ void LinearMapInfo::populateLinearMapStructDeclarationFields(
   // TODO: add support for forward mode.
   for (auto &origBB : *original) {
     auto *linearMapStruct = getLinearMapStruct(&origBB);
-    auto *traceEnum =
-        createBranchingTraceDecl(&origBB, indices, assocFnGenSig);
+    auto *traceEnum = createBranchingTraceDecl(&origBB, indices, assocFnGenSig);
 
     // If original block is in a loop, mark branching trace enum as indirect.
     if (loopInfo->getLoopFor(&origBB))
@@ -1587,93 +1674,8 @@ void LinearMapInfo::populateLinearMapStructDeclarationFields(
         // Do not add it for array functions since those are already linear
         // and we don't need to add it to the struct.
         if (shouldBeDifferentiated(ai, indices) &&
-            !ai->hasSemantics("array.uninitialized_intrinsic")) {
-          SmallVector<SILValue, 4> allResults;
-          allResults.push_back(ai);
-          allResults.append(ai->getIndirectSILResults().begin(),
-                            ai->getIndirectSILResults().end());
-
-          // Check if there are any active results or arguments. If not, skip
-          // this instruction.
-          auto hasActiveResults = llvm::any_of(
-              allResults, [&](SILValue res) {
-            return activityInfo.isActive(res, indices);
-          });
-          auto hasActiveArguments = llvm::any_of(
-              ai->getArgumentsWithoutIndirectResults(), [&](SILValue arg) {
-            return activityInfo.isActive(arg, indices);
-          });
-          if (!hasActiveResults || !hasActiveArguments)
-            continue;
-
-          unsigned source;
-          AutoDiffIndexSubset *parameters;
-
-          SmallVector<unsigned, 8> activeParamIndices;
-          SmallVector<unsigned, 8> activeResultIndices;
-          collectMinimalIndicesForFunctionCall(
-              ai, allResults, indices, activityInfo, activeParamIndices,
-              activeResultIndices);
-          source = activeResultIndices.front();
-
-          // If function is already marked differentiable, differentiate WRT
-          // all parameters.
-          auto originalFnSubstTy = ai->getSubstCalleeType();
-          if (originalFnSubstTy->isDifferentiable()) {
-            parameters =
-                originalFnSubstTy->getDifferentiationParameterIndices();
-          } else {
-            parameters = AutoDiffIndexSubset::get(
-                original->getASTContext(),
-                ai->getArgumentsWithoutIndirectResults().size(),
-                activeParamIndices);
-          }
-          SILAutoDiffIndices curIndices(activeResultIndices.front(),
-          AutoDiffIndexSubset::get(
-              builder.getASTContext(),
-              ai->getArgumentsWithoutIndirectResults().size(),
-              activeParamIndices));
-
-          // Check for non-differentiable original function type.
-          auto checkNondifferentiableOriginalFunctionType =
-              [&](CanSILFunctionType origFnTy) {
-                // Check and diagnose non-differentiable arguments.
-                for (unsigned paramIndex :
-                     range(origFnTy->getNumParameters())) {
-                  if (curIndices.isWrtParameter(paramIndex) &&
-                          !origFnTy->getParameters()[paramIndex]
-                          .getSILStorageType()
-                          .isDifferentiable(builder.getModule()))
-                    return true;
-                }
-                // Check non-differentiable results.
-                if (!origFnTy->getResults()[curIndices.source]
-                        .getSILStorageType()
-                        .isDifferentiable(builder.getModule()))
-                  return true;
-                return false;
-              };
-          if (checkNondifferentiableOriginalFunctionType(originalFnSubstTy))
-            continue;
-
-          auto assocFnType =
-              originalFnSubstTy->getAutoDiffAssociatedFunctionType(
-                  parameters, source, /*differentiationOrder*/ 1, kind,
-                  builder.getModule(),
-                  LookUpConformanceInModule(
-                      builder.getModule().getSwiftModule()));
-
-          auto assocFnResultTypes =
-              assocFnType->getAllResultsType().castTo<TupleType>();
-          assocFnResultTypes->getElement(
-              assocFnResultTypes->getElements().size() - 1);
-          auto linearMapSILType = SILType::getPrimitiveObjectType(
-              assocFnResultTypes
-                  ->getElement(assocFnResultTypes->getElements().size() - 1)
-                  .getType()
-                  ->getCanonicalType());
-          addLinearMapDecl(ai, linearMapSILType);
-        }
+            !ai->hasSemantics("array.uninitialized_intrinsic"))
+          addLinearMapToStruct(ai, indices);
       }
     }
   }
