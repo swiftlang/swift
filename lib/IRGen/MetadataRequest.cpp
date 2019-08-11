@@ -1729,6 +1729,7 @@ emitGenericTypeMetadataAccessFunction(IRGenFunction &IGF,
                 IGM.Int8PtrTy, // arg 1
                 IGM.Int8PtrTy, // arg 2
                 IGM.TypeContextDescriptorPtrTy) // type context descriptor
+        .getCallee()
         ->stripPointerCasts());
 
     if (thunkFn->empty()) {
