@@ -1267,6 +1267,18 @@ void Remangler::mangleImplResult(Node *node) {
   mangleChildNodes(node); // impl convention, type
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+void Remangler::mangleImplDifferentiable(Node *node) {
+  // TODO(TF-750): Check if this code path actually triggers and add a test.
+  Buffer << 'd';
+}
+
+void Remangler::mangleImplLinear(Node *node) {
+  // TODO(TF-750): Check if this code path actually triggers and add a test.
+  Buffer << 'l';
+}
+// SWIFT_ENABLE_TENSORFLOW END
+
 void Remangler::mangleImplEscaping(Node *node) {
   // The old mangler does not encode escaping.
 }

@@ -140,7 +140,6 @@ do {
   _ = f
 }
 
-// SWIFT_ENABLE_TENSORFLOW
 do {
   let f: (@escaping @differentiable (Float) -> Float) -> () = { _ in }
   // FIXME(TF-123): `@differentiable` function type + opaque abstraction
@@ -151,7 +150,6 @@ do {
 
 // TODO: Uncomment when `@differentiable(linear)` function types are enabled.
 /*
-// SWIFT_ENABLE_TENSORFLOW
 do {
   let f: @differentiable(linear) (Float) -> Float = { $0 }
   // FIXME(TF-123): `@differentiable` function type + opaque abstraction
@@ -160,7 +158,6 @@ do {
   _ = f
 }
 
-// SWIFT_ENABLE_TENSORFLOW
 do {
   let f: (@escaping @differentiable(linear) (Float) -> Float) -> () = { _ in }
   // FIXME(TF-123): `@differentiable` function type + opaque abstraction
@@ -169,6 +166,7 @@ do {
   _ = f
 }
 */
+// SWIFT_ENABLE_TENSORFLOW END
 
 // DEMANGLE: $syycD
 // DEMANGLE: $sySSzcD
@@ -188,10 +186,13 @@ do {
 // DEMANGLE: $syyyccD
 // DEMANGLE: $sSayyyXCGD
 // DEMANGLE: $sSayyyyXL_yyXBtcGD
+
+// SWIFT_ENABLE_TENSORFLOW
 // DEMANGLE: $sS2fXFD
 // DEMANGLE: $sS2fXGD
 // DEMANGLE: $sS2fXHD
 // DEMANGLE: $sS2fXID
+// SWIFT_ENABLE_TENSORFLOW END
 
 // CHECK: () -> ()
 // CHECK: (inout String) -> ()
@@ -211,10 +212,13 @@ do {
 // CHECK: (@escaping () -> ()) -> ()
 // CHECK: Array<@convention(c) () -> ()>
 // CHECK: Array<(@escaping @convention(block) () -> (), @convention(block) () -> ()) -> ()>
+
+// SWIFT_ENABLE_TENSORFLOW
 // CHECK: @differentiable (Float) -> Float
 // CHECK: @differentiable (Float) -> Float
 // CHECK: @differentiable(linear) (Float) -> Float
 // CHECK: @differentiable(linear) (Float) -> Float
+// SWIFT_ENABLE_TENSORFLOW END
 
 // DEMANGLE: $sSimD
 // DEMANGLE: $syycmD
@@ -235,10 +239,13 @@ do {
 // DEMANGLE: $syyyccmD
 // DEMANGLE: $sSayyyXCGmD
 // DEMANGLE: $sSayyyyXL_yyXBtcGmD
+
+// SWIFT_ENABLE_TENSORFLOW
 // DEMANGLE: $sS2fXFmD
 // DEMANGLE: $sS2fXGmD
 // DEMANGLE: $sS2fXHmD
 // DEMANGLE: $sS2fXImD
+// SWIFT_ENABLE_TENSORFLOW END
 
 // CHECK: Int.Type
 // CHECK: ((inout String) -> ()).Type
@@ -258,7 +265,10 @@ do {
 // CHECK: ((@escaping () -> ()) -> ()).Type
 // CHECK: Array<@convention(c) () -> ()>.Type
 // CHECK: Array<(@escaping @convention(block) () -> (), @convention(block) () -> ()) -> ()>.Type
+
+// SWIFT_ENABLE_TENSORFLOW
 // CHECK: (@differentiable (Float) -> Float).Type
 // CHECK: (@differentiable (Float) -> Float).Type
 // CHECK: (@differentiable(linear) (Float) -> Float).Type
 // CHECK: (@differentiable(linear) (Float) -> Float).Type
+// SWIFT_ENABLE_TENSORFLOW END
