@@ -1784,6 +1784,33 @@ ConstantFolder::processWorkList() {
           WorkList.insert(User);
         }
 
+        // See if we have a CondFailMessage. If we do, see if we can transform
+        // it into a UTF8.
+        if (auto *bi = dyn_cast<BuiltinInst>(User)) {
+          if (auto kind = bi->getBuiltinKind()) {
+            if (*kind == BuiltinValueKind::CondFailMessage) {
+              // See if our original instruction was a string literal inst.
+              if (auto *sli = dyn_cast<StringLiteralInst>(I)) {
+                if (sli->getEncoding() == StringLiteralInst::Encoding::UTF8) {
+                  SILBuilderWithScope builder(bi);
+                  auto *cfi = builder.createCondFail(
+                      bi->getLoc(), bi->getOperand(0), sli->getValue());
+                  WorkList.insert(cfi);
+                  recursivelyDeleteTriviallyDeadInstructions(
+                      bi, /*force*/ true,
+                      [&](SILInstruction *DeadI) { WorkList.remove(DeadI); });
+                  InvalidateInstructions = true;
+                  continue;
+                }
+              }
+
+              // If we weren't able to simplify into a cond_fail, add it to the
+              // folded user set to see if the condfail msg is dead.
+              FoldedUsers.insert(bi);
+            }
+          }
+        }
+
         // Initialize ResultsInError as a None optional.
         //
         // We are essentially using this optional to represent 3 states: true,
