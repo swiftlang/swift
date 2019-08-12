@@ -2672,24 +2672,12 @@ bool ValueDecl::canBeAccessedByDynamicLookup() const {
   if (!hasName())
     return false;
 
-  // Dynamic lookup can only find class and protocol members, or extensions of
-  // classes.
-  auto nominalDC = getDeclContext()->getSelfNominalTypeDecl();
-  if (!nominalDC ||
-      (!isa<ClassDecl>(nominalDC) && !isa<ProtocolDecl>(nominalDC)))
-    return false;
-
-  // Dynamic lookup cannot find results within a non-protocol generic context,
-  // because there is no sensible way to infer the generic arguments.
-  if (getDeclContext()->isGenericContext() && !isa<ProtocolDecl>(nominalDC))
+  auto *dc = getDeclContext();
+  if (!dc->mayContainMembersAccessedByDynamicLookup())
     return false;
 
   // Dynamic lookup can find functions, variables, and subscripts.
   if (!isa<FuncDecl>(this) && !isa<VarDecl>(this) && !isa<SubscriptDecl>(this))
-    return false;
-
-  // Dynamic lookup can only find @objc members.
-  if (!isObjC())
     return false;
 
   return true;

@@ -475,6 +475,25 @@ unsigned DeclContext::getSemanticDepth() const {
   return 1 + getParent()->getSemanticDepth();
 }
 
+bool DeclContext::mayContainMembersAccessedByDynamicLookup() const {
+  // Dynamic lookup can only find class and protocol members, or extensions of
+  // classes.
+  if (auto *NTD = dyn_cast<NominalTypeDecl>(this)) {
+    if (isa<ClassDecl>(NTD))
+      if (!isGenericContext())
+        return true;
+    if (auto *PD = dyn_cast<ProtocolDecl>(NTD))
+      if (PD->getAttrs().hasAttribute<ObjCAttr>())
+        return true;
+  } else if (auto *ED = dyn_cast<ExtensionDecl>(this)) {
+    if (auto *CD = dyn_cast<ClassDecl>(ED->getExtendedNominal()))
+      if (!CD->isGenericContext())
+        return true;
+  }
+
+  return false;
+}
+
 bool DeclContext::walkContext(ASTWalker &Walker) {
   switch (getContextKind()) {
   case DeclContextKind::Module:

@@ -214,9 +214,15 @@ void SourceLookupCache::doPopulateCache(Range decls,
 void SourceLookupCache::populateMemberCache(const SourceFile &SF) {
   for (const Decl *D : SF.Decls) {
     if (const auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
-      addToMemberCache(NTD->getMembers());
+      if (!NTD->hasUnparsedMembers() ||
+          NTD->maybeHasNestedClassDeclarations() ||
+          NTD->mayContainMembersAccessedByDynamicLookup())
+        addToMemberCache(NTD->getMembers());
     } else if (const auto *ED = dyn_cast<ExtensionDecl>(D)) {
-      addToMemberCache(ED->getMembers());
+      if (!ED->hasUnparsedMembers() ||
+          ED->maybeHasNestedClassDeclarations() ||
+          ED->mayContainMembersAccessedByDynamicLookup())
+        addToMemberCache(ED->getMembers());
     }
   }
 
@@ -232,7 +238,10 @@ void SourceLookupCache::addToMemberCache(DeclRange decls) {
     if (auto NTD = dyn_cast<NominalTypeDecl>(VD)) {
       assert(!VD->canBeAccessedByDynamicLookup() &&
              "inner types cannot be accessed by dynamic lookup");
-      addToMemberCache(NTD->getMembers());
+      if (!NTD->hasUnparsedMembers() ||
+          NTD->maybeHasNestedClassDeclarations() ||
+          NTD->mayContainMembersAccessedByDynamicLookup())
+        addToMemberCache(NTD->getMembers());
     } else if (VD->canBeAccessedByDynamicLookup()) {
       ClassMembers.add(VD);
     }
