@@ -44,8 +44,8 @@ public:
     if (Kind == swift::DiagnosticKind::Error) {
       error = true;
     }
-    DiagnosticEngine::formatDiagnosticText(llvm::errs(), FormatString,
-                                           FormatArgs);
+    DiagnosticFormatting::formatDiagnosticText(llvm::errs(), FormatString,
+                                               FormatArgs);
     llvm::errs() << "\n";
   }
   bool hadError() { return error; }

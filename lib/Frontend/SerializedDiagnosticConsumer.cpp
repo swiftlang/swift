@@ -533,11 +533,16 @@ emitDiagnosticMessage(SourceManager &SM,
   auto FixItAbbrev = State->Abbrevs.get(RECORD_FIXIT);
   for (const auto &F : Info.FixIts) {
     if (F.getRange().isValid()) {
+      llvm::SmallString<16> Text;
+      llvm::raw_svector_ostream Out(Text);
+      DiagnosticFormatting::formatDiagnosticText(
+          Out, F.getText(), F.getArgs(),
+          DiagnosticFormatOptions::formatForFixits());
       State->Record.clear();
       State->Record.push_back(RECORD_FIXIT);
       addRangeToRecord(F.getRange(), SM, filename, State->Record);
-      State->Record.push_back(F.getText().size());
-      Stream.EmitRecordWithBlob(FixItAbbrev, Record, F.getText());
+      State->Record.push_back(Text.size());
+      Stream.EmitRecordWithBlob(FixItAbbrev, Record, Text);
     }
   }
 }
@@ -570,7 +575,7 @@ void SerializedDiagnosticConsumer::handleDiagnostic(
   llvm::SmallString<256> Text;
   {
     llvm::raw_svector_ostream Out(Text);
-    DiagnosticEngine::formatDiagnosticText(Out, FormatString, FormatArgs);
+    DiagnosticFormatting::formatDiagnosticText(Out, FormatString, FormatArgs);
   }
   
   emitDiagnosticMessage(SM, Loc, Kind, Text, Info);

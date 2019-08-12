@@ -59,7 +59,7 @@ public:
       case DiagnosticKind::Note: OS << "note: "; break;
       case DiagnosticKind::Remark: OS << "remark: "; break;
     }
-    DiagnosticEngine::formatDiagnosticText(OS, FormatString, FormatArgs);
+    DiagnosticFormatting::formatDiagnosticText(OS, FormatString, FormatArgs);
   }
 };
 } // end anonymous namespace

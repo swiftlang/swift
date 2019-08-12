@@ -54,14 +54,18 @@ void FixitApplyDiagnosticConsumer::handleDiagnostic(
     auto Offset = SM.getLocOffsetInBuffer(Fixit.getRange().getStart(),
                                           ThisBufferID);
     auto Length = Fixit.getRange().getByteLength();
-    auto Text = Fixit.getText();
+    llvm::SmallString<16> Text;
+    llvm::raw_svector_ostream Out(Text);
+    DiagnosticFormatting::formatDiagnosticText(
+        Out, Fixit.getText(), Fixit.getArgs(),
+        DiagnosticFormatOptions::formatForFixits());
 
     // Ignore meaningless Fix-its.
     if (Length == 0 && Text.size() == 0)
       continue;
 
     // Ignore pre-applied equivalents.
-    Replacement R { Offset, Length, Text };
+    Replacement R{Offset, Length, Text.str()};
     if (Replacements.count(R)) {
       continue;
     } else {

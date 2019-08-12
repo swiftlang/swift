@@ -256,7 +256,7 @@ struct SynParserDiagConsumer: public DiagnosticConsumer {
       // Print the error message to buffer and record it.
       llvm::raw_svector_ostream OS(Buffer);
       Result.Message = getCurrentText();
-      DiagnosticEngine::formatDiagnosticText(OS, FormatString, FormatArgs);
+      DiagnosticFormatting::formatDiagnosticText(OS, FormatString, FormatArgs);
       OS << NullTerm;
     }
     for (auto R: Info.Ranges) {

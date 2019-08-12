@@ -755,7 +755,8 @@ public:
                    SourceLoc bufferIndirectlyCausingDiagnostic) override {
     std::string DiagMsg;
     llvm::raw_string_ostream DiagOS(DiagMsg);
-    DiagnosticEngine::formatDiagnosticText(DiagOS, FormatString, FormatArgs);
+    DiagnosticFormatting::formatDiagnosticText(DiagOS, FormatString,
+                                               FormatArgs);
     auto LC = SM.getLineAndColumn(Loc);
     std::ostringstream StrOS;
     StrOS << LC.first << ", " << LC.second << ": " << DiagOS.str();

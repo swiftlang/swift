@@ -19,12 +19,12 @@
 #ifndef SWIFT_BASIC_DIAGNOSTICCONSUMER_H
 #define SWIFT_BASIC_DIAGNOSTICCONSUMER_H
 
+#include "swift/AST/DiagnosticFormatting.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/Support/SourceMgr.h"
 
 namespace swift {
-  class DiagnosticArgument;
   class DiagnosticEngine;
   class SourceManager;
   enum class DiagID : uint32_t;
@@ -47,12 +47,17 @@ struct DiagnosticInfo {
   class FixIt {
     CharSourceRange Range;
     std::string Text;
+    SmallVector<DiagnosticArgument, 3> Args;
 
   public:
-    FixIt(CharSourceRange R, StringRef Str, ArrayRef<DiagnosticArgument> Args);
+    FixIt(CharSourceRange R, StringRef Str, ArrayRef<DiagnosticArgument> Args)
+        : Range(R), Text(Str), Args(Args.begin(), Args.end()) {}
 
     CharSourceRange getRange() const { return Range; }
-    StringRef getText() const { return Text; }
+    StringRef getText() const {
+      return Text;
+    }
+    ArrayRef<DiagnosticArgument> getArgs() const { return Args; }
   };
 
   /// Extra source ranges that are attached to the diagnostic.
@@ -71,10 +76,7 @@ protected:
     return llvm::SMRange(getRawLoc(R.getStart()), getRawLoc(R.getEnd()));
   }
 
-  static llvm::SMFixIt getRawFixIt(SourceManager &SM, DiagnosticInfo::FixIt F) {
-    // FIXME: It's unfortunate that we have to copy the replacement text.
-    return llvm::SMFixIt(getRawRange(SM, F.getRange()), F.getText());
-  }
+  static llvm::SMFixIt getRawFixIt(SourceManager &SM, DiagnosticInfo::FixIt F);
 
 public:
   virtual ~DiagnosticConsumer();

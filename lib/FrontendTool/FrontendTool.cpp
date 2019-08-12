@@ -509,7 +509,12 @@ private:
     if (!(FixitAll || shouldTakeFixit(Kind, Info)))
       return;
     for (const auto &Fix : Info.FixIts) {
-      AllEdits.push_back({SM, Fix.getRange(), Fix.getText()});
+      llvm::SmallString<16> Text;
+      llvm::raw_svector_ostream Out(Text);
+      DiagnosticFormatting::formatDiagnosticText(
+          Out, Fix.getText(), Fix.getArgs(),
+          DiagnosticFormatOptions::formatForFixits());
+      AllEdits.push_back({SM, Fix.getRange(), Text.str()});
     }
   }
 

@@ -29,23 +29,19 @@ using namespace swift;
 
 DiagnosticConsumer::~DiagnosticConsumer() = default;
 
-DiagnosticInfo::FixIt::FixIt(CharSourceRange R, StringRef Str,
-                             ArrayRef<DiagnosticArgument> Args): Range(R) {
-  if (!Args.empty()) {
-    // FIXME: Defer text formatting to later in the pipeline.
-    SmallString<16> Buffer;
-    llvm::raw_svector_ostream OS(Buffer);
-    DiagnosticEngine::formatDiagnosticText(OS, Str, Args,
-                                           DiagnosticFormatOptions::
-                                           formatForFixits());
-    Text = OS.str();
-  } else {
-    Text = Str;
-  }
-}
-
 llvm::SMLoc DiagnosticConsumer::getRawLoc(SourceLoc loc) {
   return loc.Value;
+}
+
+llvm::SMFixIt DiagnosticConsumer::getRawFixIt(SourceManager &SM,
+                                              DiagnosticInfo::FixIt F) {
+  // FIXME: It's unfortunate that we have to copy the replacement text.
+  llvm::SmallString<16> Text;
+  llvm::raw_svector_ostream Out(Text);
+  DiagnosticFormatting::formatDiagnosticText(
+      Out, F.getText(), F.getArgs(),
+      DiagnosticFormatOptions::formatForFixits());
+  return llvm::SMFixIt(getRawRange(SM, F.getRange()), Text);
 }
 
 LLVM_ATTRIBUTE_UNUSED
@@ -272,8 +268,8 @@ void NullDiagnosticConsumer::handleDiagnostic(
     const DiagnosticInfo &Info, const SourceLoc) {
   LLVM_DEBUG({
     llvm::dbgs() << "NullDiagnosticConsumer received diagnostic: ";
-    DiagnosticEngine::formatDiagnosticText(llvm::dbgs(), FormatString,
-                                           FormatArgs);
+    DiagnosticFormatting::formatDiagnosticText(llvm::dbgs(), FormatString,
+                                               FormatArgs);
     llvm::dbgs() << "\n";
   });
 }
@@ -288,8 +284,8 @@ void ForwardingDiagnosticConsumer::handleDiagnostic(
     const SourceLoc bufferIndirectlyCausingDiagnostic) {
   LLVM_DEBUG({
     llvm::dbgs() << "ForwardingDiagnosticConsumer received diagnostic: ";
-    DiagnosticEngine::formatDiagnosticText(llvm::dbgs(), FormatString,
-                                           FormatArgs);
+    DiagnosticFormatting::formatDiagnosticText(llvm::dbgs(), FormatString,
+                                               FormatArgs);
     llvm::dbgs() << "\n";
   });
   for (auto *C : TargetEngine.getConsumers()) {

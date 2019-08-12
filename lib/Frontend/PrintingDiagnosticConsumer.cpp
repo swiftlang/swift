@@ -110,7 +110,7 @@ void PrintingDiagnosticConsumer::handleDiagnostic(
   llvm::SmallString<256> Text;
   {
     llvm::raw_svector_ostream Out(Text);
-    DiagnosticEngine::formatDiagnosticText(Out, FormatString, FormatArgs);
+    DiagnosticFormatting::formatDiagnosticText(Out, FormatString, FormatArgs);
   }
 
   auto Msg = SM.GetMessage(Loc, SMKind, Text, Ranges, FixIts);

@@ -47,8 +47,8 @@ private:
         const swift::DiagnosticInfo &Info,
         const SourceLoc bufferIndirectlyCausingDiagnostic) override {
       llvm::errs() << "Parse error: ";
-      DiagnosticEngine::formatDiagnosticText(llvm::errs(), FormatString,
-                                             FormatArgs);
+      DiagnosticFormatting::formatDiagnosticText(llvm::errs(), FormatString,
+                                                 FormatArgs);
       llvm::errs() << "\n";
     }
   } DiagConsumer;
