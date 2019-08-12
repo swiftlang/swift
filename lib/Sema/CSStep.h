@@ -19,6 +19,7 @@
 #define SWIFT_SEMA_CSSTEP_H
 
 #include "Constraint.h"
+#include "ConstraintGraph.h"
 #include "ConstraintSystem.h"
 #include "swift/AST/Types.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -336,49 +337,49 @@ class ComponentStep final : public SolverStep {
   std::unique_ptr<Scope> ComponentScope = nullptr;
 
   /// Type variables and constraints "in scope" of this step.
-  std::vector<TypeVariableType *> TypeVars;
+  TinyPtrVector<TypeVariableType *> TypeVars;
   /// Constraints "in scope" of this step.
   ConstraintList *Constraints;
-
-  /// Number of disjunction constraints associated with this step,
-  /// used to aid in ordering of the components.
-  unsigned NumDisjunctions = 0;
 
   /// Constraint which doesn't have any free type variables associated
   /// with it, which makes it disconnected in the graph.
   Constraint *OrphanedConstraint = nullptr;
 
 public:
-  ComponentStep(ConstraintSystem &cs, unsigned index, bool single,
+  /// Create a single component step.
+  ComponentStep(ConstraintSystem &cs, unsigned index,
                 ConstraintList *constraints,
                 SmallVectorImpl<Solution> &solutions)
-      : SolverStep(cs, solutions), Index(index), IsSingle(single),
+      : SolverStep(cs, solutions), Index(index), IsSingle(true),
         OriginalScore(getCurrentScore()), OriginalBestScore(getBestScore()),
         Constraints(constraints) {}
 
-  /// Record a type variable as associated with this step.
-  void record(TypeVariableType *typeVar) { TypeVars.push_back(typeVar); }
+  /// Create a component step from a constraint graph component.
+  ComponentStep(ConstraintSystem &cs, unsigned index,
+                ConstraintList *constraints,
+                ConstraintGraph::Component &&component,
+                SmallVectorImpl<Solution> &solutions)
+      : SolverStep(cs, solutions), Index(index), IsSingle(false),
+        OriginalScore(getCurrentScore()), OriginalBestScore(getBestScore()),
+        Constraints(constraints) {
+    if (component.isOrphaned()) {
+      assert(component.getConstraints().size() == 1);
+      OrphanedConstraint = component.getConstraints().front();
+    } else {
+      assert(component.typeVars.size() > 0);
+    }
 
-  /// Record a constraint as associated with this step.
-  void record(Constraint *constraint) {
-    Constraints->push_back(constraint);
-    if (constraint->getKind() == ConstraintKind::Disjunction)
-      ++NumDisjunctions;
-  }
+    TypeVars = std::move(component.typeVars);
 
-  /// Record a constraint as associated with this step but which doesn't
-  /// have any free type variables associated with it.
-  void recordOrphan(Constraint *constraint) {
-    assert(!OrphanedConstraint);
-    OrphanedConstraint = constraint;
+    for (auto constraint : component.getConstraints()) {
+      constraints->erase(constraint);
+      Constraints->push_back(constraint);
+    }
   }
 
   StepResult take(bool prevFailed) override;
 
   StepResult resume(bool prevFailed) override { return finalize(!prevFailed); }
-
-  // The number of disjunction constraints associated with this component.
-  unsigned disjunctionCount() const { return NumDisjunctions; }
 
   void print(llvm::raw_ostream &Out) override {
     Out << "ComponentStep with at #" << Index << '\n';
@@ -395,7 +396,8 @@ private:
       getDebugLogger() << "(solving component #" << Index << '\n';
 
     ComponentScope = llvm::make_unique<Scope>(*this);
-    // If this component has oprhaned constraint attached,
+
+    // If this component has orphaned constraint attached,
     // let's return it to the graph.
     CS.CG.setOrphanedConstraint(OrphanedConstraint);
   }
