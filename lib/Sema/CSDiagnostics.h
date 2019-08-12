@@ -764,6 +764,28 @@ protected:
   getDiagnosticFor(ContextualTypePurpose context, bool forProtocol);
 };
 
+/// Diagnose failures related to conversion between throwing function type
+/// and non-throwing one e.g.
+///
+/// ```swift
+/// func foo<T>(_ t: T) throws -> Void {}
+/// let _: (Int) -> Void = foo // `foo` can't be implictly converted to
+///                            // non-throwing type `(Int) -> Void`
+/// ```
+class ThrowingFunctionConversionFailure final : public ContextualFailure {
+public:
+  ThrowingFunctionConversionFailure(Expr *root, ConstraintSystem &cs,
+                                    Type fromType, Type toType,
+                                    ConstraintLocator *locator)
+      : ContextualFailure(root, cs, fromType, toType, locator) {
+    auto fnType1 = fromType->castTo<FunctionType>();
+    auto fnType2 = toType->castTo<FunctionType>();
+    assert(fnType1->throws() != fnType2->throws());
+  }
+
+  bool diagnoseAsError() override;
+};
+
 /// Diagnose failures related attempt to implicitly convert types which
 /// do not support such implicit converstion.
 /// "as" or "as!" has to be specified explicitly in cases like that.

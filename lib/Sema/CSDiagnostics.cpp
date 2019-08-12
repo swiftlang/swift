@@ -1858,19 +1858,6 @@ bool ContextualFailure::diagnoseAsError() {
     if (diagnoseConversionToBool())
       return true;
 
-    auto *fnType1 = getFromType()->getAs<FunctionType>();
-    auto *fnType2 = getToType()->getAs<FunctionType>();
-
-    if (fnType1 && fnType2) {
-      if (fnType1->throws() != fnType2->throws()) {
-        auto throwingTy = fnType1->throws() ? fnType1 : fnType2;
-        emitDiagnostic(anchor->getLoc(), diag::throws_functiontype_mismatch,
-                       throwingTy, throwingTy == fnType1 ? fnType2 : fnType1)
-            .highlight(anchor->getSourceRange());
-        return true;
-      }
-    }
-
     if (auto msg = getDiagnosticFor(getContextualTypePurpose(),
                                     /*forProtocol=*/false)) {
       diagnostic = *msg;
@@ -4082,5 +4069,12 @@ bool InvalidTupleSplatWithSingleParameterFailure::diagnoseAsError() {
   diagnostic.highlight(argExpr->getSourceRange())
       .fixItInsertAfter(argExpr->getStartLoc(), "(")
       .fixItInsert(argExpr->getEndLoc(), ")");
+  return true;
+}
+
+bool ThrowingFunctionConversionFailure::diagnoseAsError() {
+  auto *anchor = getAnchor();
+  emitDiagnostic(anchor->getLoc(), diag::throws_functiontype_mismatch,
+                 getFromType(), getToType());
   return true;
 }

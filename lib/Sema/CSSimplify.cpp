@@ -1323,8 +1323,15 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   // A non-throwing function can be a subtype of a throwing function.
   if (func1->throws() != func2->throws()) {
     // Cannot drop 'throws'.
-    if (func1->throws() || kind < ConstraintKind::Subtype)
-      return getTypeMatchFailure(locator);
+    if (func1->throws() || kind < ConstraintKind::Subtype) {
+      if (!shouldAttemptFixes())
+        return getTypeMatchFailure(locator);
+
+      auto *fix = DropThrowsAttribute::create(*this, func1, func2,
+                                              getConstraintLocator(locator));
+      if (recordFix(fix))
+        return getTypeMatchFailure(locator);
+    }
   }
 
   // A non-@noescape function type can be a subtype of a @noescape function
@@ -7154,8 +7161,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     // been diagnosed as "missing explicit call", let's
     // increase the score to make sure that we don't impede that.
     if (auto *fnType = type1->getAs<FunctionType>()) {
-      auto result =
-          matchTypes(fnType->getResult(), type2, matchKind, subflags, locator);
+      auto result = matchTypes(fnType->getResult(), type2, matchKind,
+                               TMF_ApplyingFix, locator);
       if (result == SolutionKind::Solved)
         increaseScore(SK_Fix);
     }

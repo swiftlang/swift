@@ -744,6 +744,21 @@ bool AllowTupleSplatForSingleParameter::attempt(
   return cs.recordFix(fix);
 }
 
+bool DropThrowsAttribute::diagnose(Expr *root, bool asNote) const {
+  auto &cs = getConstraintSystem();
+  ThrowingFunctionConversionFailure failure(root, cs, getFromType(),
+                                            getToType(), getLocator());
+  return failure.diagnose(asNote);
+}
+
+DropThrowsAttribute *DropThrowsAttribute::create(ConstraintSystem &cs,
+                                                 FunctionType *fromType,
+                                                 FunctionType *toType,
+                                                 ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      DropThrowsAttribute(cs, fromType, toType, locator);
+}
+
 bool IgnoreContextualType::diagnose(Expr *root, bool asNote) const {
   auto &cs = getConstraintSystem();
   ContextualFailure failure(root, cs, getFromType(), getToType(), getLocator());
