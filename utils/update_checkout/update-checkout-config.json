@@ -458,7 +458,9 @@
                 "tensorflow": "fee0b38d6a2ce3e480c8b6643efe466b889036fa",
                 "tensorflow-swift-apis": "085217d35c02e07214f3ac99aab2ed0507cfc803",
                 "indexstore-db": "swift-DEVELOPMENT-SNAPSHOT-2019-08-05-a",
-                "sourcekit-lsp": "swift-DEVELOPMENT-SNAPSHOT-2019-08-05-a"
+                "sourcekit-lsp": "swift-DEVELOPMENT-SNAPSHOT-2019-08-05-a",
+                "swift-format": "master",
+                "llvm-project": "swift/master"
             }
         }
     }
