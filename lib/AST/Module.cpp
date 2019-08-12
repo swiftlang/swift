@@ -189,13 +189,16 @@ template<typename Range>
 void SourceLookupCache::doPopulateCache(Range decls,
                                         bool onlyOperators) {
   for (Decl *D : decls) {
-    if (auto *VD = dyn_cast<ValueDecl>(D))
+    if (auto *VD = dyn_cast<ValueDecl>(D)) {
       if (onlyOperators ? VD->isOperator() : VD->hasName()) {
         // Cache the value under both its compound name and its full name.
         TopLevelValues.add(VD);
       }
+    }
+
     if (auto *NTD = dyn_cast<NominalTypeDecl>(D))
-      doPopulateCache(NTD->getMembers(), true);
+      if (!NTD->hasUnparsedMembers() || NTD->maybeHasOperatorDeclarations())
+        doPopulateCache(NTD->getMembers(), true);
 
     // Avoid populating the cache with the members of invalid extension
     // declarations.  These members can be used to point validation inside of
@@ -203,7 +206,8 @@ void SourceLookupCache::doPopulateCache(Range decls,
     if (D->isInvalid()) continue;
 
     if (auto *ED = dyn_cast<ExtensionDecl>(D))
-      doPopulateCache(ED->getMembers(), true);
+      if (!ED->hasUnparsedMembers() || ED->maybeHasOperatorDeclarations())
+        doPopulateCache(ED->getMembers(), true);
   }
 }
 
