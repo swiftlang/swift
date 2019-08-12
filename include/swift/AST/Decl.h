@@ -1527,6 +1527,17 @@ public:
 
   /// Determine whether this context has generic parameters
   /// of its own.
+  ///
+  /// \code
+  /// class C<T> {
+  ///   func f1() {}    // isGeneric == false
+  ///   func f2<T>() {} // isGeneric == true
+  /// }
+  ///
+  /// protocol P { // isGeneric == true due to implicit Self param
+  ///   func p()   // isGeneric == false
+  /// }
+  /// \endcode
   bool isGeneric() const { return GenericParams != nullptr; }
 
   /// Retrieve the trailing where clause for this extension, if any.
