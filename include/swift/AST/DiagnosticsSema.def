@@ -84,6 +84,9 @@ ERROR(could_not_find_value_member_corrected,none,
 ERROR(could_not_find_value_dynamic_member_corrected,none,
       "value of type %0 has no dynamic member %2 using key path from root type %1; did you mean %3?",
       (Type, Type, DeclName, DeclName))
+ERROR(could_not_find_value_dynamic_member,none,
+      "value of type %0 has no dynamic member %2 using key path from root type %1",
+      (Type, Type, DeclName))
 
 ERROR(could_not_find_type_member,none,
       "type %0 has no member %1", (Type, DeclName))

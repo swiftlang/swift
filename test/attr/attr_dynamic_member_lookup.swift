@@ -705,6 +705,7 @@ struct SR10597_W<T> {
 }
 
 _ = SR10597_W<SR10597>(SR10597()).wooooo // expected-error {{value of type 'SR10597_W<SR10597>' has no dynamic member 'wooooo' using key path from root type 'SR10597'; did you mean 'wooo'?}}
+_ = SR10597_W<SR10597>(SR10597()).bla // expected-error {{value of type 'SR10597_W<SR10597>' has no dynamic member 'bla' using key path from root type 'SR10597'}}
 
 final class SR10597_1 {
     var woo: Int? // expected-note 2 {{'woo' declared here}}
@@ -720,3 +721,4 @@ struct SR10597_1_W<T> {
 }
 
 _ = SR10597_1_W<SR10597_1>(SR10597_1()).wooo // expected-error {{value of type 'SR10597_1_W<SR10597_1>' has no dynamic member 'wooo' using key path from root type 'SR10597_1'; did you mean 'woo'?}}
+_ = SR10597_1_W<SR10597_1>(SR10597_1()).bla // expected-error {{value of type 'SR10597_1_W<SR10597_1>' has no dynamic member 'bla' using key path from root type 'SR10597_1'}}
