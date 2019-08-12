@@ -133,6 +133,10 @@ class SyntaxData final
   }
 
 public:
+  /// Disable sized deallocation for SyntaxData, because it has tail-allocated
+  /// data.
+  void operator delete(void *p) { ::operator delete(p); }
+
   /// Get the node immediately before this current node that does contain a
   /// non-missing token. Return nullptr if we cannot find such node.
   RC<SyntaxData> getPreviousNode() const;
