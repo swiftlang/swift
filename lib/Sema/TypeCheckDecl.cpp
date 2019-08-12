@@ -2930,7 +2930,10 @@ public:
       PD->dumpRef(llvm::errs());
       llvm::errs() << "\n";
       llvm::errs() << "Requirement signature: ";
-      requirementsSig->print(llvm::errs());
+
+      PrintOptions opts;
+      opts.PrintTypeAliasUnderlyingType = true;
+      requirementsSig->print(llvm::errs(), opts);
       llvm::errs() << "\n";
 
       // Note: One cannot canonicalize a requirement signature, because
