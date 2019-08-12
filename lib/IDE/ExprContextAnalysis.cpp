@@ -289,6 +289,8 @@ static void collectPossibleCalleesByQualifiedLookup(
     if (!VD->hasInterfaceType())
       continue;
     Type declaredMemberType = VD->getInterfaceType();
+    if (!declaredMemberType->is<AnyFunctionType>())
+      continue;
     if (VD->getDeclContext()->isTypeContext()) {
       if (isa<FuncDecl>(VD)) {
         if (!isOnMetaType && VD->isStatic())
