@@ -2323,7 +2323,7 @@ bool MissingMemberFailure::diagnoseAsError() {
             diag::could_not_find_value_dynamic_member,
             baseExprType, baseType, getName());
         diagnostic.highlight(baseExpr->getSourceRange())
-        .highlight(nameLoc.getSourceRange());
+            .highlight(nameLoc.getSourceRange());
       }
     } else {
       if (auto correction = corrections.claimUniqueCorrection()) {
