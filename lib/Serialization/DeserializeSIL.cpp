@@ -545,6 +545,8 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   if (SILMod.isSerialized())
     isSerialized = IsNotSerialized;
 
+  SILSerializationFunctionBuilder builder(SILMod);
+
   // If we have an existing function, verify that the types match up.
   if (fn) {
     if (fn->getLoweredType() != ty) {
@@ -576,7 +578,6 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
 
   } else {
     // Otherwise, create a new function.
-    SILSerializationFunctionBuilder builder(SILMod);
     fn = builder.createDeclaration(name, ty, loc);
     fn->setLinkage(linkage.getValue());
     fn->setTransparent(IsTransparent_t(isTransparent == 1));
@@ -599,18 +600,21 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     for (auto ID : SemanticsIDs) {
       fn->addSemanticsAttr(MF->getIdentifierText(ID));
     }
-    if (!hasQualifiedOwnership)
-      fn->setOwnershipEliminated();
     if (Callback) Callback->didDeserialize(MF->getAssociatedModule(), fn);
   }
+
+  // First before we do /anything/ validate that our function is truly empty.
+  assert(fn->empty() && "SILFunction to be deserialized starts being empty.");
+
+  // Given that our original function was empty, just match the deserialized
+  // function. Ownership doesn't really have a meaning without a body.
+  builder.setHasOwnership(fn, hasQualifiedOwnership);
+
   // Mark this function as deserialized. This avoids rerunning diagnostic
   // passes. Certain passes in the madatory pipeline may not work as expected
   // after arbitrary optimization and lowering.
   if (!MF->IsSIB)
     fn->setWasDeserializedCanonical();
-
-  assert(fn->empty() &&
-         "SILFunction to be deserialized starts being empty.");
 
   fn->setBare(IsBare);
   const SILDebugScope *DS = fn->getDebugScope();
@@ -675,9 +679,6 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
          && "function already has context generic params?!");
   if (genericEnv)
     fn->setGenericEnvironment(genericEnv);
-  if (!hasQualifiedOwnership) {
-    fn->setOwnershipEliminated();
-  }
 
   scratch.clear();
   kind = SILCursor.readRecord(entry.ID, scratch);
