@@ -125,19 +125,11 @@ void SplitterStep::computeFollowupSteps(
 
   // Add components.
   for (unsigned i : indices(components)) {
+    unsigned solutionIndex = components[i].solutionIndex;
     componentSteps.push_back(llvm::make_unique<ComponentStep>(
-        CS, i, &Components[i], std::move(components[i]), PartialSolutions[i]));
+        CS, solutionIndex, &Components[i], std::move(components[i]),
+        PartialSolutions[solutionIndex]));
   }
-
-  // Create component ordering based on the information associated
-  // with constraints in each step - e.g. number of disjunctions,
-  // since components are going to be executed in LIFO order, we'd
-  // want to have smaller/faster components at the back of the list.
-  std::sort(componentSteps.begin(), componentSteps.end(),
-            [](const std::unique_ptr<ComponentStep> &lhs,
-               const std::unique_ptr<ComponentStep> &rhs) {
-              return lhs->disjunctionCount() > rhs->disjunctionCount();
-            });
 }
 
 bool SplitterStep::mergePartialSolutions() const {
