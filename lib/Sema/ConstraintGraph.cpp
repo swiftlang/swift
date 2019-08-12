@@ -556,7 +556,7 @@ namespace {
           // We haven't allocated this component yet; do so now.
           knownComponentIdx = componentIdxMap.insert(
               {rep, componentIdxMap.size()}).first;
-          components.push_back({ });
+          components.push_back(Component(components.size()));
         }
 
         // Record this type variabgetConstraintsle as part of the component.
@@ -576,13 +576,24 @@ namespace {
         auto typeVar = constraintTypeVars.front();
         auto rep = findRepresentative(typeVar);
         assert(componentIdxMap.count(rep) > 0);
-        components[componentIdxMap[rep]].constraints.push_back(&constraint);
+        components[componentIdxMap[rep]].addConstraint(&constraint);
       }
 
       // Gather orphaned constraints; each gets its own component.
       for (auto orphaned : cg.getOrphanedConstraints()) {
-        components.push_back({ });
-        components.back().constraints.push_back(orphaned);
+        components.push_back(Component(components.size()));
+        components.back().addConstraint(orphaned);
+      }
+
+      // Create component ordering based on the information associated
+      // with constraints in each step - e.g. number of disjunctions,
+      // since components are going to be executed in LIFO order, we'd
+      // want to have smaller/faster components at the back of the list.
+      if (components.size() > 1) {
+        std::sort(components.begin(), components.end(),
+                  [&](const Component &lhs, const Component &rhs) {
+                    return lhs.getNumDisjunctions() > rhs.getNumDisjunctions();
+                  });
       }
 
       return components;
@@ -635,6 +646,13 @@ namespace {
       }
     }
   };
+}
+
+void ConstraintGraph::Component::addConstraint(Constraint *constraint) {
+  if (constraint->getKind() == ConstraintKind::Disjunction)
+    ++numDisjunctions;
+
+  constraints.push_back(constraint);
 }
 
 SmallVector<ConstraintGraph::Component, 1>

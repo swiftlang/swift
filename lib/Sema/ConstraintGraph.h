@@ -209,13 +209,37 @@ public:
     /// The type variables in this component.
     TinyPtrVector<TypeVariableType *> typeVars;
 
+    /// The original index of this component in the list of components,
+    /// used to provide the index of where the partial solutions will occur.
+    /// FIXME: This is needed due to some ordering dependencies in the
+    /// merging of partial solutions, which appears to also be related
+    /// DisjunctionStep::pruneOverloads() short-circuiting. It should be
+    /// removed.
+    unsigned solutionIndex;
+
+  private:
+    /// The number of disjunctions in this component.
+    unsigned numDisjunctions = 0;
+
     /// The constraints in this component.
     TinyPtrVector<Constraint *> constraints;
+
+  public:
+    Component(unsigned solutionIndex) : solutionIndex(solutionIndex) { }
 
     /// Whether this component represents an orphaned constraint.
     bool isOrphaned() const {
       return typeVars.empty();
     }
+
+    /// Add a constraint.
+    void addConstraint(Constraint *constraint);
+
+    const TinyPtrVector<Constraint *> &getConstraints() const {
+      return constraints;
+    }
+
+    unsigned getNumDisjunctions() const { return numDisjunctions; }
   };
 
   /// Compute the connected components of the graph.

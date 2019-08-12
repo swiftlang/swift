@@ -341,10 +341,6 @@ class ComponentStep final : public SolverStep {
   /// Constraints "in scope" of this step.
   ConstraintList *Constraints;
 
-  /// Number of disjunction constraints associated with this step,
-  /// used to aid in ordering of the components.
-  unsigned NumDisjunctions = 0;
-
   /// Constraint which doesn't have any free type variables associated
   /// with it, which makes it disconnected in the graph.
   Constraint *OrphanedConstraint = nullptr;
@@ -367,35 +363,22 @@ public:
         OriginalScore(getCurrentScore()), OriginalBestScore(getBestScore()),
         Constraints(constraints) {
     if (component.isOrphaned()) {
-      assert(component.constraints.size() == 1);
-      OrphanedConstraint = component.constraints.front();
+      assert(component.getConstraints().size() == 1);
+      OrphanedConstraint = component.getConstraints().front();
     } else {
       assert(component.typeVars.size() > 0);
     }
 
     TypeVars = std::move(component.typeVars);
 
-    for (auto constraint : component.constraints) {
+    for (auto constraint : component.getConstraints()) {
       constraints->erase(constraint);
-      record(constraint);
+      Constraints->push_back(constraint);
     }
   }
 
-private:
-  /// Record a constraint as associated with this step.
-  void record(Constraint *constraint) {
-    Constraints->push_back(constraint);
-    if (constraint->getKind() == ConstraintKind::Disjunction)
-      ++NumDisjunctions;
-  }
-
-public:
-
   StepResult take(bool prevFailed) override;
   StepResult resume(bool prevFailed) override;
-
-  // The number of disjunction constraints associated with this component.
-  unsigned disjunctionCount() const { return NumDisjunctions; }
 
   void print(llvm::raw_ostream &Out) override {
     Out << "ComponentStep with at #" << Index << '\n';
