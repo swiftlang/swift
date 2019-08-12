@@ -22,6 +22,7 @@
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/Unreachable.h"
+#include "llvm/ADT/DenseSet.h"
 #include "CompatibilityOverride.h"
 #include "ImageInspection.h"
 #include "Private.h"
@@ -267,6 +268,12 @@ struct ConformanceState {
   ConcurrentMap<ConformanceCacheEntry> Cache;
   ConcurrentReadableArray<ConformanceSection> SectionsToScan;
   
+  llvm::DenseMap<const ProtocolDescriptor *,
+                 llvm::SmallDenseSet<const ProtocolConformanceDescriptor *, 1>>
+    ConformanceDescriptorCache;
+  size_t ConformanceDescriptorLastSectionScanned = 0;
+  Mutex ConformanceDescriptorCacheLock;
+
   ConformanceState() {
     initializeProtocolConformanceLookup();
   }
@@ -541,6 +548,29 @@ namespace {
   };
 }
 
+static void
+_scanAdditionalConformanceDescriptors(ConformanceState &C) {
+  _forEachProtocolConformanceSectionAfter(
+    &C.ConformanceDescriptorLastSectionScanned,
+    [&C](const ProtocolConformanceRecord *Begin,
+         const ProtocolConformanceRecord *End) {
+    for (const auto *record = Begin; record != End; record++) {
+      auto protocol = record->get()->getProtocol();
+      C.ConformanceDescriptorCache[protocol].insert(record->get());
+    }
+  });
+}
+
+static llvm::SmallDenseSet<const ProtocolConformanceDescriptor *, 1>
+_findConformanceDescriptorsInCache(ConformanceState &C,
+                                   const ProtocolDescriptor *protocol) {
+  auto iter = C.ConformanceDescriptorCache.find(protocol);
+  if (iter == C.ConformanceDescriptorCache.end())
+    return { };
+  
+  return iter->getSecond();
+}
+
 static const ProtocolConformanceDescriptor *
 swift_conformsToSwiftProtocolImpl(const Metadata * const type,
                                   const ProtocolDescriptor *protocol,
@@ -572,25 +602,62 @@ swift_conformsToSwiftProtocolImpl(const Metadata * const type,
     return nullptr;
   }
 
-  // Really scan conformance records.
-  for (size_t i = startIndex; i < endIndex; i++) {
-    auto &section = snapshot.Start[i];
-    // Eagerly pull records for nondependent witnesses into our cache.
-    for (const auto &record : section) {
-      auto &descriptor = *record.get();
+  llvm::SmallDenseSet<const ProtocolConformanceDescriptor *, 1>
+    cachedDescriptors;
+  {
+    ScopedLock guard(C.ConformanceDescriptorCacheLock);
+    _scanAdditionalConformanceDescriptors(C);
+    cachedDescriptors = _findConformanceDescriptorsInCache(C, protocol);
+  }
+  
+  bool foundInCache = false;
+  for (auto cachedDescriptor : cachedDescriptors) {
+    ConformanceCandidate candidate(*cachedDescriptor);
+    if (candidate.getMatchingType(type)) {
+      const Metadata *matchingType = candidate.getConformingTypeAsMetadata();
+      if (!matchingType)
+        matchingType = type;
 
-      // We only care about conformances for this protocol.
-      if (descriptor.getProtocol() != protocol)
-        continue;
+      C.cacheSuccess(matchingType, protocol, cachedDescriptor);
+      foundInCache = true;
+    }
+  }
 
-      // If there's a matching type, record the positive result.
-      ConformanceCandidate candidate(descriptor);
-      if (candidate.getMatchingType(type)) {
-        const Metadata *matchingType = candidate.getConformingTypeAsMetadata();
-        if (!matchingType)
-          matchingType = type;
+  if (!foundInCache) {
+    // Slow path, as a fallback if the cache itself isn't capturing everything.
+    (void)foundInCache;
 
-        C.cacheSuccess(matchingType, protocol, &descriptor);
+    // Really scan conformance records.
+    for (size_t i = startIndex; i < endIndex; i++) {
+      auto &section = snapshot.Start[i];
+      // Eagerly pull records for nondependent witnesses into our cache.
+      for (const auto &record : section) {
+        auto &descriptor = *record.get();
+
+        // We only care about conformances for this protocol.
+        if (descriptor.getProtocol() != protocol)
+          continue;
+
+        // If there's a matching type, record the positive result.
+        ConformanceCandidate candidate(descriptor);
+        if (candidate.getMatchingType(type)) {
+          const Metadata *matchingType = candidate.getConformingTypeAsMetadata();
+          if (!matchingType)
+            matchingType = type;
+
+          C.cacheSuccess(matchingType, protocol, &descriptor);
+#ifndef NDEBUG
+          // If we found something in the slow path but not in the cache, it is
+          // a bug in the cache. Fail in assertions builds.
+          if (!foundInCache) {
+            fatalError(0,
+                       "swift_conformsToSwiftProtocolImpl cache miss for type "
+                       "%s protocol %s.",
+                       type->getTypeContextDescriptor()->Name.get(),
+                       protocol->Name.get());
+          }
+#endif
+        }
       }
     }
   }
