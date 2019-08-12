@@ -65,12 +65,12 @@ public struct Tracked<T> {
   }
   private var handle: Box
 
-  @differentiable(vjp: _vjpInit where T : Differentiable, T == T.TangentVector)
+  @differentiable(jvp: _jvpInit, vjp: _vjpInit where T : Differentiable, T == T.TangentVector)
   public init(_ value: T) {
     self.handle = Box(value)
   }
 
-  @differentiable(vjp: _vjpValue where T : Differentiable, T == T.TangentVector)
+  @differentiable(jvp: _jvpValue, vjp: _vjpValue where T : Differentiable, T == T.TangentVector)
   public var value: T {
     get { handle.value }
     set { handle.value = newValue }
@@ -178,7 +178,7 @@ extension Tracked where T : Differentiable, T == T.TangentVector {
   }
 
   @usableFromInline
-  internal static func _jvpInit(_ value: __owned T)
+  internal static func _jvpInit(_ value: T)
       -> (value: Self, differential: (T.TangentVector) -> (Self.TangentVector)) {
     return (Tracked(value), { v in Tracked(v) })
   }
