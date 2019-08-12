@@ -7098,7 +7098,11 @@ bool ADContext::processDifferentiableAttribute(
     jvp = createEmptyJVP(*this, original, attr, isAssocFnExported);
     getGeneratedFunctions().push_back(jvp);
 
-    if (RunJVPGeneration) {
+    // For now, only run JVP emission if the flag is on and if there is no
+    // user defined VJP. If there is a user defined VJP but no JVP, that means
+    // the user should have provided a custom JVP as well since we likely
+    // cannot derive a custom JVP. Thus create empty body.
+    if (RunJVPGeneration && !vjp) {
       JVPEmitter emitter(*this, original, attr, jvp, invoker);
       if (emitter.run())
         return true;
@@ -7107,14 +7111,29 @@ bool ADContext::processDifferentiableAttribute(
                  << "Generating empty JVP for original @"
                  << original->getName() << '\n');
       // Create empty body of JVP if the user defined their own custom VJP.
-      // Return undef.
       auto *entry = jvp->createBasicBlock();
       createEntryArguments(jvp);
-      auto diffConv = jvp->getConventions();
       SILBuilder builder(entry);
       auto loc = jvp->getLocation();
-      builder.createReturn(loc, SILUndef::get(
-          jvp->mapTypeIntoContext(diffConv.getSILResultType()), *jvp));
+      // Add a fatal error in case this function is called by the user.
+      auto fatalErrrorJvpType = SILFunctionType::get(
+          /*genericSig*/ nullptr,
+          SILFunctionType::ExtInfo().withRepresentation(
+              SILFunctionTypeRepresentation::Thin),
+          SILCoroutineKind::None, ParameterConvention::Direct_Unowned, {},
+          /*interfaceYields*/ {},
+          SILResultInfo(module.getASTContext().getNeverType(),
+                        ResultConvention::Unowned),
+          /*interfaceErrorResults*/ None, getASTContext());
+      auto fnBuilder = SILOptFunctionBuilder(getTransform());
+      auto *fatalErrrorJvpFunc = fnBuilder.getOrCreateFunction(
+          loc, "_printJVPErrorAndExit", SILLinkage::PublicExternal,
+          fatalErrrorJvpType, IsNotBare, IsNotTransparent, IsNotSerialized,
+          IsNotDynamic, ProfileCounter(), IsNotThunk);
+      auto *jvpErrorFuncRef =
+          builder.createFunctionRef(loc, fatalErrrorJvpFunc);
+      builder.createApply(loc, jvpErrorFuncRef, SubstitutionMap(), {});
+      builder.createUnreachable(loc);
       LLVM_DEBUG(getADDebugStream() << "Generated empty JVP for "
                  << original->getName() << ":\n" << *jvp);
     }
