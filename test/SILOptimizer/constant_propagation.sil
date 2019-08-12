@@ -1004,3 +1004,23 @@ bb0(%0 : $Builtin.Int1):
   %9999 = tuple()
   return %9999 : $()
 }
+
+// CHECK-LABEL: sil @simplify_struct_test : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+// CHECK-NOT: struct
+// CHECK: } // end sil function 'simplify_struct_test'
+sil @simplify_struct_test : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64):
+  %1 = struct $Int64 (%0 : $Builtin.Int64)
+  %2 = struct_extract %1 : $Int64, #Int64.value
+  return %2 : $Builtin.Int64
+}
+
+// CHECK-LABEL: sil @simplify_tuple_test : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+// CHECK-NOT: tuple
+// CHECK: } // end sil function 'simplify_tuple_test'
+sil @simplify_tuple_test : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64):
+  %1 = tuple(%0 : $Builtin.Int64, %0 : $Builtin.Int64)
+  %2 = tuple_extract %1 : $(Builtin.Int64, Builtin.Int64), 0
+  return %2 : $Builtin.Int64
+}

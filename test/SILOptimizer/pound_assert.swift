@@ -67,8 +67,9 @@ func test_loops() {
   #assert(infiniteLoop() == 1)
 }
 
-func recursive(a: Int) -> Int {
-   // expected-note@+1 {{limit exceeded here}}
+// NOTE: We currently hit the limit of 512 on a debug_value in the prelude of
+// this function. TODO: What is the right thing to do here?
+func recursive(a: Int) -> Int {  // expected-note {{limit exceeded here}}
   return a == 0 ? 0 : recursive(a: a-1)
 }
 
