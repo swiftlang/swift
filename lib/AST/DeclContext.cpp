@@ -726,7 +726,7 @@ DeclRange IterableDeclContext::getMembers() const {
 void IterableDeclContext::addMember(Decl *member, Decl *Hint) {
   // Add the member to the list of declarations without notification.
   addMemberSilently(member, Hint);
-  ++memberCount;
+  ++MemberCount;
 
   // Notify our parent declaration that we have added the member, which can
   // be used to update the lookup tables.
@@ -794,13 +794,19 @@ void IterableDeclContext::setMemberLoader(LazyMemberLoader *loader,
 }
 
 void IterableDeclContext::loadAllMembers() const {
+  ASTContext &ctx = getASTContext();
+
   // Lazily parse members.
-  getASTContext().parseMembers(const_cast<IterableDeclContext*>(this));
+  if (HasUnparsedMembers) {
+    auto *IDC = const_cast<IterableDeclContext *>(this);
+    ctx.parseMembers(IDC);
+    IDC->HasUnparsedMembers = 0;
+  }
+
   if (!hasLazyMembers())
     return;
 
   // Don't try to load all members re-entrant-ly.
-  ASTContext &ctx = getASTContext();
   auto contextInfo = ctx.getOrCreateLazyIterableContextData(this,
     /*lazyLoader=*/nullptr);
   auto lazyMembers = FirstDeclAndLazyMembers.getInt() & ~LazyMembers::Present;
