@@ -1526,55 +1526,71 @@ constantFoldGlobalStringTablePointerBuiltin(BuiltinInst *bi,
 }
 
 /// Initialize the worklist to all of the constant instructions.
-void ConstantFolder::initializeWorklist(SILFunction &F) {
-  for (auto &BB : F) {
-    for (auto &I : BB) {
+void ConstantFolder::initializeWorklist(SILFunction &f) {
+  for (auto &block : f) {
+    for (auto ii = block.begin(), ie = block.end(); ii != ie; ) {
+      auto *inst = &*ii;
+      ++ii;
+
+      // TODO: Eliminate trivially dead instructions here.
+
       // If `I` is a floating-point literal instruction where the literal is
       // inf, it means the input has a literal that overflows even
       // MaxBuiltinFloatType. Diagnose this error, but allow this instruction
       // to be folded, if needed.
-      if (auto floatLit = dyn_cast<FloatLiteralInst>(&I)) {
+      if (auto *floatLit = dyn_cast<FloatLiteralInst>(inst)) {
         APFloat fpVal = floatLit->getValue();
         if (EnableDiagnostics && fpVal.isInfinity()) {
           SmallString<10> litStr;
           tryExtractLiteralText(floatLit, litStr);
-          diagnose(I.getModule().getASTContext(), I.getLoc().getSourceLoc(),
+          diagnose(inst->getModule().getASTContext(), inst->getLoc().getSourceLoc(),
                    diag::warning_float_overflows_maxbuiltin, litStr,
                    fpVal.isNegative());
         }
       }
 
-      if (isFoldable(&I) && I.hasUsesOfAnyResult()) {
-        WorkList.insert(&I);
+      if (isFoldable(inst) && inst->hasUsesOfAnyResult()) {
+        WorkList.insert(inst);
         continue;
       }
 
       // - Should we replace calls to assert_configuration by the assert
       // configuration and fold calls to any cond_unreachable.
       if (AssertConfiguration != SILOptions::DisableReplacement &&
-          (isApplyOfBuiltin(I, BuiltinValueKind::AssertConf) ||
-           isApplyOfBuiltin(I, BuiltinValueKind::CondUnreachable))) {
-        WorkList.insert(&I);
+          (isApplyOfBuiltin(*inst, BuiltinValueKind::AssertConf) ||
+           isApplyOfBuiltin(*inst, BuiltinValueKind::CondUnreachable))) {
+        WorkList.insert(inst);
         continue;
       }
 
-      if (isApplyOfBuiltin(I, BuiltinValueKind::GlobalStringTablePointer)) {
-        WorkList.insert(&I);
+      if (isApplyOfBuiltin(*inst, BuiltinValueKind::GlobalStringTablePointer)) {
+        WorkList.insert(inst);
         continue;
       }
 
-      if (isa<CheckedCastBranchInst>(&I) ||
-          isa<CheckedCastAddrBranchInst>(&I) ||
-          isa<UnconditionalCheckedCastInst>(&I) ||
-          isa<UnconditionalCheckedCastAddrInst>(&I)) {
-        WorkList.insert(&I);
+      if (isa<CheckedCastBranchInst>(inst) ||
+          isa<CheckedCastAddrBranchInst>(inst) ||
+          isa<UnconditionalCheckedCastInst>(inst) ||
+          isa<UnconditionalCheckedCastAddrInst>(inst)) {
+        WorkList.insert(inst);
         continue;
       }
 
-      if (!isApplyOfStringConcat(I)) {
+      if (isApplyOfStringConcat(*inst)) {
+        WorkList.insert(inst);
         continue;
       }
-      WorkList.insert(&I);
+
+      // If we have nominal type literals like struct, tuple, enum visit them
+      // like we do in the worklist to see if we can fold any projection
+      // manipulation operations.
+      if (isa<StructInst>(inst) || isa<TupleInst>(inst)) {
+        // TODO: Enum.
+        WorkList.insert(inst);
+        continue;
+      }
+
+      // ...
     }
   }
 }
