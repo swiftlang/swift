@@ -668,7 +668,8 @@ namespace {
         opaqueType = LValueType::get(opaqueType);
 
       ASTContext &ctx = tc.Context;
-      auto archetypeVal = new (ctx) OpaqueValueExpr(base->getLoc(), opaqueType);
+      auto archetypeVal =
+          new (ctx) OpaqueValueExpr(base->getStartLoc(), opaqueType);
       cs.cacheType(archetypeVal);
 
       // Record the opened existential.
