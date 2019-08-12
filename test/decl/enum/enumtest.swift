@@ -275,7 +275,7 @@ func testDirection() {
     i = x
     break
 
-  case .NorthEast(let x):
+  case .NorthEast(let x): // expected-warning {{cannot match several associated values at once, implicitly tupling the associated values and trying to match that instead}}
     i = x.distanceEast
     break
   }
