@@ -558,4 +558,9 @@ enum SE0155 {
 enum SR11261 {
   case identifier
   case operator // expected-error {{keyword 'operator' cannot be used as an identifier here}} expected-error {{expected pattern}} expected-note {{if this name is unavoidable, use backticks to escape it}} 
+  case identifier2
+}
+
+enum SR11261_1 {
+  case a, b, c, func, d // expected-error {{expected identifier after comma in enum 'case' declaration}} expected-error {{consecutive declarations on a line must be separated by ';'}} {{16-16=;}} expected-error {{expected identifier in function declaration}} expected-error {{expected pattern}}
 }
