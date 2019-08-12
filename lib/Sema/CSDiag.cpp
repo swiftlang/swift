@@ -487,14 +487,6 @@ private:
 
   bool diagnoseSubscriptErrors(SubscriptExpr *SE, bool performingSet);
 
-  /// Try to diagnose common errors involving implicitly non-escaping parameters
-  /// of function type, giving more specific and simpler diagnostics, attaching
-  /// notes on the parameter, and offering fixits to insert @escaping. Returns
-  /// true if it detects and issues an error, false if it does nothing.
-  bool diagnoseNonEscapingParameterToEscaping(Expr *expr, Type srcType,
-                                              Type dstType,
-                                              ContextualTypePurpose dstPurpose);
-
   bool visitExpr(Expr *E);
   bool visitIdentityExpr(IdentityExpr *E);
   bool visitTryExpr(TryExpr *E);
@@ -1068,10 +1060,6 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
       if (constraint->getKind() == ConstraintKind::ArgumentConversion ||
           constraint->getKind() == ConstraintKind::OperatorArgumentConversion)
         destPurpose = CTP_CallArgument;
-
-      if (diagnoseNonEscapingParameterToEscaping(anchor, fromType, toType,
-                                                 destPurpose))
-        return true;
     }
 
   // If this is a callee that mismatches an expected return type, we can emit a
@@ -1657,34 +1645,6 @@ static bool isIntegerToStringIndexConversion(Type fromType, Type toType,
           toType->getCanonicalType().getString() == "String.CharacterView.Index");
 }
 
-/// Try to diagnose common errors involving implicitly non-escaping parameters
-/// of function type, giving more specific and simpler diagnostics, attaching
-/// notes on the parameter, and offering fixits to insert @escaping. Returns
-/// true if it detects and issues an error, false if it does nothing.
-bool FailureDiagnosis::diagnoseNonEscapingParameterToEscaping(
-    Expr *expr, Type srcType, Type dstType, ContextualTypePurpose dstPurpose) {
-  assert(expr);
-  // Need to be referencing a parameter of function type
-  auto declRef = dyn_cast<DeclRefExpr>(expr);
-  if (!declRef || !isa<ParamDecl>(declRef->getDecl()) ||
-      !CS.getType(declRef)->is<AnyFunctionType>())
-    return false;
-
-  // Must be from non-escaping function to escaping function. For the
-  // destination type, we read through optionality to give better diagnostics in
-  // the event of an implicit promotion.
-  auto srcFT = srcType->getAs<AnyFunctionType>();
-  auto dstFT =
-      dstType->lookThroughAllOptionalTypes()->getAs<AnyFunctionType>();
-
-  if (!srcFT || !dstFT || !srcFT->isNoEscape() || dstFT->isNoEscape())
-    return false;
-
-  NoEscapeFuncToTypeConversionFailure failure(
-      expr, CS, CS.getConstraintLocator(expr), dstType);
-  return failure.diagnoseAsError();
-}
-
 bool FailureDiagnosis::diagnoseContextualConversionError(
     Expr *expr, Type contextualType, ContextualTypePurpose CTP,
     Type suggestedType) {
@@ -1898,36 +1858,14 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
     return false;
   }
 
-  // If we're trying to convert something of type "() -> T" to T, then we
-  // probably meant to call the value.
-  if (auto srcFT = exprType->getAs<AnyFunctionType>()) {
-    if (srcFT->getParams().empty() &&
-        !isUnresolvedOrTypeVarType(srcFT->getResult()) &&
-        CS.TC.isConvertibleTo(srcFT->getResult(), contextualType, CS.DC)) {
-
-      auto locator =
-          CS.getConstraintLocator(expr, LocatorPathElt::getContextualType());
-      ContextualFailure failure =
-          ContextualFailure(nullptr, CS, srcFT, contextualType, locator);
-      auto diagnosed = failure.diagnoseAsError();
-      assert(diagnosed && "Failed to produce contextual failure diagnostic");
-      (void)diagnosed;
-      return true;
-    }
-  }
-
-  // If this is a conversion from T to () in a call argument context, it is
-  // almost certainly an extra argument being passed in.
-  if (CTP == CTP_CallArgument && contextualType->isVoid()) {
-    diagnose(expr->getLoc(), diag::extra_argument_to_nullary_call)
-      .highlight(expr->getSourceRange());
-    return true;
-  }
-  
   // If we're trying to convert something to Bool, check to see if it is for
   // a known reason.
   ContextualFailure failure(expr, CS, exprType, contextualType,
                             CS.getConstraintLocator(expr));
+
+  if (failure.diagnoseMissingFunctionCall())
+    return true;
+
   if (failure.diagnoseConversionToBool())
     return true;
 
@@ -1962,11 +1900,6 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
     }
   }
 
-  // Try for better/more specific diagnostics for non-escaping to @escaping
-  if (diagnoseNonEscapingParameterToEscaping(expr, exprType, contextualType,
-                                             CTP))
-    return true;
-
   // Don't attempt fixits if we have an unsolved type variable, since
   // the recovery path's recursion into the type checker via typeCheckCast()
   // will confuse matters.
@@ -1981,28 +1914,6 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
         CS.getConstraintLocator(expr, LocatorPathElt::getContextualType()));
     return failure.diagnoseAsError();
   }
-
-  // Try to simplify irrelevant details of function types.  For example, if
-  // someone passes a "() -> Float" function to a "() throws -> Int"
-  // parameter, then uttering the "throws" may confuse them into thinking that
-  // that is the problem, even though there is a clear subtype relation.
-  if (auto srcFT = exprType->getAs<FunctionType>())
-    if (auto destFT = contextualType->getAs<FunctionType>()) {
-      auto destExtInfo = destFT->getExtInfo();
-      
-      if (!srcFT->isNoEscape()) destExtInfo = destExtInfo.withNoEscape(false);
-      if (!srcFT->throws()) destExtInfo = destExtInfo.withThrows(false);
-      if (destExtInfo != destFT->getExtInfo())
-        contextualType = FunctionType::get(destFT->getParams(),
-                                           destFT->getResult(), destExtInfo);
-
-      // If this is a function conversion that discards throwability or
-      // noescape, emit a specific diagnostic about that.
-      if (srcFT->throws() && !destFT->throws())
-        diagID = diag::throws_functiontype_mismatch;
-      else if (srcFT->isNoEscape() && !destFT->isNoEscape())
-        diagID = diag::noescape_functiontype_mismatch;
-    }
 
   InFlightDiagnostic diag = diagnose(expr->getLoc(), diagID,
                                      exprType, contextualType);
