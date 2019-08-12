@@ -369,39 +369,53 @@ public:
   void print(llvm::raw_ostream &os) const;
 };
 
-/// Information about the VJP function produced during VJP generation, e.g.
-/// mappings from original values to corresponding values in the pullback
-/// struct.
+class DifferentiableActivityInfo;
+
+/// Information about the VJP/JVP function produced during VJP/JVP generation,
+/// e.g. mappings from original values to corresponding values in the
+/// pullback/differential struct.
 ///
-/// A pullback struct is an aggregate value containing pullbacks checkpointed
-/// during the VJP computation. Pullback structs are generated for every
-/// original function during VJP generation. Pullback struct values are
-/// constructed by VJP functions and consumed by pullback functions.
-class PullbackInfo {
+/// A linear map struct is an aggregate value containing linear maps checkpointed
+/// during the VJP/JVP computation. Linear map structs are generated for every
+/// original function during VJP/JVP generation. Linear map struct values are
+/// constructed by VJP/JVP functions and consumed by pullback/differential
+/// functions.
+class LinearMapInfo {
 private:
+  /// The linear map kind.
+  AutoDiffAssociatedFunctionKind kind;
+
   /// The original function.
   SILFunction *const original;
 
-  /// Mapping from original basic blocks to pullback structs.
-  DenseMap<SILBasicBlock *, StructDecl *> pullbackStructs;
+  /// Activity info of the original function.
+  const DifferentiableActivityInfo &activityInfo;
 
-  /// Mapping from original basic blocks to predecessor enums.
-  DenseMap<SILBasicBlock *, EnumDecl *> predecessorEnums;
+  /// Mapping from original basic blocks to linear map structs.
+  DenseMap<SILBasicBlock *, StructDecl *> linearMapStructs;
+
+  /// Mapping from original basic blocks to branching trace enums.
+  /// For pullbacks: these are predecessor enums.
+  /// For differentials: these are successor enums.
+  DenseMap<SILBasicBlock *, EnumDecl *> branchingTraceDecls;
 
   /// Mapping from `apply` and `struct_extract` instructions in the original
-  /// function to the corresponding pullback declaration in the pullback struct.
-  DenseMap<SILInstruction *, VarDecl *> pullbackValueMap;
+  /// function to the corresponding linear map declaration in the linear map
+  /// struct.
+  DenseMap<SILInstruction *, VarDecl *> linearMapValueMap;
 
   /// Mapping from predecessor+succcessor basic block pairs in original function
-  /// to the corresponding predecessor enum case.
+  /// to the corresponding branching trace enum case.
   DenseMap<std::pair<SILBasicBlock *, SILBasicBlock *>, EnumElementDecl *>
-      predecessorEnumCases;
+      branchingTraceEnumCases;
 
-  /// Mapping from pullback structs to their predecessor enum fields.
-  DenseMap<StructDecl *, VarDecl *> pullbackStructPredecessorFields;
+  /// Mapping from linear map structs to their branching trace enum fields.
+  DenseMap<StructDecl *, VarDecl *> linearMapStructEnumFields;
 
   /// A type converter, used to compute struct/enum SIL types.
   Lowering::TypeConverter &typeConverter;
+
+  SILBuilder &builder;
 
 private:
   VarDecl *addVarDecl(NominalTypeDecl *nominal, StringRef name, Type type) {
@@ -437,7 +451,7 @@ private:
     llvm_unreachable("No files?");
   }
 
-  /// Compute and set the access level for the given pullback data structure,
+  /// Compute and set the access level for the given branching trace or linear map data structure,
   /// given the original function linkage.
   void computeAccessLevel(
       NominalTypeDecl *nominal, SILLinkage originalLinkage) {
@@ -466,185 +480,167 @@ private:
     }
   }
 
-  /// Creates an enum declaration with the given VJP generic signature, whose
-  /// cases represent the predecessors of the given original block.
-  EnumDecl *
-  createBasicBlockPredecessorEnum(SILBasicBlock *originalBB,
-                                  SILAutoDiffIndices indices,
-                                  CanGenericSignature vjpGenericSig) {
+  /// Creates an enum declaration with the given VJP/JVP generic signature, whose
+  /// cases represent the predecessors/successors of the given original block.
+  EnumDecl *createBranchingTraceDecl(SILBasicBlock *originalBB,
+                                     SILAutoDiffIndices indices,
+                                     CanGenericSignature genericSig) {
     assert(originalBB->getParent() == original);
     auto *moduleDecl = original->getModule().getSwiftModule();
     auto &astCtx = original->getASTContext();
     auto &file = getDeclarationFileUnit();
-    // Create a `_AD__<fn_name>_bb<bb_id>__Pred__` predecessor enum.
-    std::string predEnumName =
-        "_AD__" + original->getName().str() +
-        "_bb" + std::to_string(originalBB->getDebugID()) +
-         "__Pred__" + indices.mangle();
-    auto enumId = astCtx.getIdentifier(predEnumName);
+    // Create a branching trace enum.
+    std::string enumName;
+    switch (kind) {
+    case swift::AutoDiffAssociatedFunctionKind::JVP:
+      enumName =
+          "_AD__" + original->getName().str() +
+          "_bb" + std::to_string(originalBB->getDebugID()) +
+          "__Succ__" + indices.mangle();
+      break;
+    case swift::AutoDiffAssociatedFunctionKind::VJP:
+      enumName =
+          "_AD__" + original->getName().str() +
+          "_bb" + std::to_string(originalBB->getDebugID()) +
+          "__Pred__" + indices.mangle();
+      break;
+    }
+
+    auto enumId = astCtx.getIdentifier(enumName);
     auto loc = original->getLocation().getSourceLoc();
-    auto *predecessorEnum = new (astCtx) EnumDecl(
+    auto *branchingTraceDecl = new (astCtx) EnumDecl(
         /*EnumLoc*/ loc, /*Name*/ enumId, /*NameLoc*/ loc, /*Inherited*/ {},
         /*GenericParams*/ /*set later*/ nullptr, /*DC*/ &file);
-    if (vjpGenericSig) {
+    if (genericSig) {
       auto *genericParams =
-          cloneGenericParameters(astCtx, predecessorEnum, vjpGenericSig);
-      predecessorEnum->setGenericParams(genericParams);
-      predecessorEnum->setGenericEnvironment(
-          vjpGenericSig->createGenericEnvironment());
+          cloneGenericParameters(astCtx, branchingTraceDecl, genericSig);
+      branchingTraceDecl->setGenericParams(genericParams);
+      branchingTraceDecl->setGenericEnvironment(
+          genericSig->createGenericEnvironment());
     }
-    predecessorEnum->setBraces(loc);
-    computeAccessLevel(predecessorEnum, original->getEffectiveSymbolLinkage());
-    predecessorEnum->computeType();
-    assert(predecessorEnum->hasInterfaceType());
-    file.addVisibleDecl(predecessorEnum);
-    // Add predecessor block enum cases.
+    branchingTraceDecl->setBraces(loc);
+    computeAccessLevel(branchingTraceDecl, original->getEffectiveSymbolLinkage());
+    branchingTraceDecl->computeType();
+    assert(branchingTraceDecl->hasInterfaceType());
+    file.addVisibleDecl(branchingTraceDecl);
+    // Add basic block enum cases.
     for (auto *predBB : originalBB->getPredecessorBlocks()) {
       auto bbId = "bb" + std::to_string(predBB->getDebugID());
-      auto *predPBStruct = getPullbackStruct(predBB);
-      assert(predPBStruct);
-      auto predPBStructTy =
-          predPBStruct->getDeclaredInterfaceType()->getCanonicalType();
-      // Create dummy declaration representing enum case parameter.
+      auto *linearMapStruct = getLinearMapStruct(predBB);
+      assert(linearMapStruct);
+      auto linearMapStructTy =
+          linearMapStruct->getDeclaredInterfaceType()->getCanonicalType();
+      // Create dummy declaration representing enum case p?arameter.
       auto *decl = new (astCtx)
           ParamDecl(ParamDecl::Specifier::Default, loc, loc, Identifier(), loc,
                     Identifier(), moduleDecl);
-      if (predPBStructTy->hasArchetype())
-        decl->setInterfaceType(predPBStructTy->mapTypeOutOfContext());
+      if (linearMapStructTy->hasArchetype())
+        decl->setInterfaceType(linearMapStructTy->mapTypeOutOfContext());
       else
-        decl->setInterfaceType(predPBStructTy);
-
+        decl->setInterfaceType(linearMapStructTy);
       // Create enum element and enum case declarations.
       auto *paramList = ParameterList::create(astCtx, {decl});
       auto *enumEltDecl = new (astCtx) EnumElementDecl(
           /*IdentifierLoc*/ loc, DeclName(astCtx.getIdentifier(bbId)),
-          paramList, loc, /*RawValueExpr*/ nullptr, predecessorEnum);
+          paramList, loc, /*RawValueExpr*/ nullptr, branchingTraceDecl);
       enumEltDecl->setImplicit();
       enumEltDecl->computeType();
       auto *enumCaseDecl = EnumCaseDecl::create(
-          /*CaseLoc*/ loc, {enumEltDecl}, predecessorEnum);
+          /*CaseLoc*/ loc, {enumEltDecl}, branchingTraceDecl);
       enumCaseDecl->setImplicit();
-      predecessorEnum->addMember(enumEltDecl);
-      predecessorEnum->addMember(enumCaseDecl);
-      // Cache predecessor/successor enum element declarations.
-      predecessorEnumCases.insert({{predBB, originalBB}, enumEltDecl});
+      branchingTraceDecl->addMember(enumEltDecl);
+      branchingTraceDecl->addMember(enumCaseDecl);
+      // Record enum element declaration.
+      branchingTraceEnumCases.insert({{predBB, originalBB}, enumEltDecl});
     }
     LLVM_DEBUG({
       auto &s = getADDebugStream();
-      s << "Predecessor enum created for function @" << original->getName()
-        << " bb" << originalBB->getDebugID() << '\n';
-      predecessorEnum->print(s);
+      std::string enumName;
+      switch (kind) {
+      case AutoDiffAssociatedFunctionKind::JVP:
+        enumName = "Predecessor";
+        break;
+      case AutoDiffAssociatedFunctionKind::VJP:
+        enumName = "Successor";
+        break;
+      }
+      s << enumName << " branching trace enum created for function @"
+        << original->getName() << " bb" << originalBB->getDebugID() << '\n';
+      branchingTraceDecl->print(s);
       s << '\n';
     });
-    return predecessorEnum;
+    return branchingTraceDecl;
   }
 
-  /// Creates a struct declaration with the given VJP generic signature, for
-  /// storing the pullback values and predecessor of the given original block.
+  /// Creates a struct declaration with the given VJP/JVP generic signature, for
+  /// storing the linear map values and predecessor/successor basic block of the
+  /// given original block.
   StructDecl *
-  createPullbackStruct(SILBasicBlock *originalBB, SILAutoDiffIndices indices,
-                       CanGenericSignature vjpGenericSig) {
+  createLinearMapStruct(SILBasicBlock *originalBB, SILAutoDiffIndices indices,
+                        CanGenericSignature genericSig) {
     auto *original = originalBB->getParent();
     auto &astCtx = original->getASTContext();
     auto &file = getDeclarationFileUnit();
-    // Create a `_AD__<fn_name>_bb<bb_id>__PB__` struct.
-    std::string pbStructName =
-        "_AD__" + original->getName().str() +
-        "_bb" + std::to_string(originalBB->getDebugID()) +
-         "__PB__" + indices.mangle();
-    auto structId = astCtx.getIdentifier(pbStructName);
+
+    std::string structName;
+    switch (kind) {
+    case swift::AutoDiffAssociatedFunctionKind::JVP:
+      structName =
+          "_AD__" + original->getName().str() +
+          "_bb" + std::to_string(originalBB->getDebugID()) +
+          "__DF__" + indices.mangle();
+      break;
+    case swift::AutoDiffAssociatedFunctionKind::VJP:
+      structName =
+          "_AD__" + original->getName().str() +
+          "_bb" + std::to_string(originalBB->getDebugID()) +
+          "__PB__" + indices.mangle();
+      break;
+    }
+
+    auto structId = astCtx.getIdentifier(structName);
     SourceLoc loc = original->getLocation().getSourceLoc();
-    auto *pullbackStruct = new (astCtx) StructDecl(
+    auto *linearMapStruct = new (astCtx) StructDecl(
         /*StructLoc*/ loc, /*Name*/ structId, /*NameLoc*/ loc, /*Inherited*/ {},
         /*GenericParams*/ /*set later*/ nullptr, /*DC*/ &file);
-    if (vjpGenericSig) {
+    if (genericSig) {
       auto *genericParams =
-          cloneGenericParameters(astCtx, pullbackStruct, vjpGenericSig);
-      pullbackStruct->setGenericParams(genericParams);
-      pullbackStruct->setGenericEnvironment(
-          vjpGenericSig->createGenericEnvironment());
+          cloneGenericParameters(astCtx, linearMapStruct, genericSig);
+      linearMapStruct->setGenericParams(genericParams);
+      linearMapStruct->setGenericEnvironment(
+          genericSig->createGenericEnvironment());
     }
-    pullbackStruct->setBraces(loc);
+    linearMapStruct->setBraces(loc);
     computeAccessLevel(
-        pullbackStruct, original->getEffectiveSymbolLinkage());
-    pullbackStruct->computeType();
-    assert(pullbackStruct->hasInterfaceType());
-    file.addVisibleDecl(pullbackStruct);
+        linearMapStruct, original->getEffectiveSymbolLinkage());
+    linearMapStruct->computeType();
+    assert(linearMapStruct->hasInterfaceType());
+    file.addVisibleDecl(linearMapStruct);
     LLVM_DEBUG({
       auto &s = getADDebugStream();
-      s << "Pullback struct created for function @" << original->getName()
-        << " bb" << originalBB->getDebugID() << '\n';
-      pullbackStruct->print(s);
+      std::string structName;
+      switch (kind) {
+      case AutoDiffAssociatedFunctionKind::JVP:
+        structName = "Differential";
+        break;
+      case AutoDiffAssociatedFunctionKind::VJP:
+        structName = "Pullback";
+        break;
+      }
+      s << structName << " struct declaration created for function @"
+        << original->getName() << " bb" << originalBB->getDebugID() << '\n';
+      linearMapStruct->print(s);
       s << '\n';
     });
-    return pullbackStruct;
+    return linearMapStruct;
   }
 
-public:
-  PullbackInfo(const PullbackInfo &) = delete;
-  PullbackInfo &operator=(const PullbackInfo &) = delete;
-
-  explicit PullbackInfo(ADContext &context, SILFunction *original,
-                        SILFunction *vjp, const SILAutoDiffIndices &indices);
-
-  /// Returns the pullback struct associated with the given original block.
-  StructDecl *getPullbackStruct(SILBasicBlock *origBB) const {
-    return pullbackStructs.lookup(origBB);
-  }
-
-  /// Returns the lowered SIL type of the pullback struct associated with the
-  /// given original block.
-  SILType getPullbackStructLoweredType(SILBasicBlock *origBB) const {
-    auto *pbStruct = getPullbackStruct(origBB);
-    auto pbStructType =
-        pbStruct->getDeclaredInterfaceType()->getCanonicalType();
-    return typeConverter.getLoweredType(pbStructType,
-                                        ResilienceExpansion::Minimal);
-  }
-
-  /// Returns the predecessor enum associated with the given original block.
-  EnumDecl *getPredecessorEnum(SILBasicBlock *origBB) const {
-    return predecessorEnums.lookup(origBB);
-  }
-
-  /// Returns the lowered SIL type of the predecessor enum associated with the
-  /// given original block.
-  SILType getPredecessorEnumLoweredType(SILBasicBlock *origBB) const {
-    auto *predEnum = getPredecessorEnum(origBB);
-    auto predEnumType =
-        predEnum->getDeclaredInterfaceType()->getCanonicalType();
-    return typeConverter.getLoweredType(predEnumType,
-                                        ResilienceExpansion::Minimal);
-  }
-
-  /// Returns the enum element in the given successor block's predecessor enum
-  /// corresponding to the given predecessor block.
-  EnumElementDecl *
-  lookUpPredecessorEnumElement(SILBasicBlock *origPredBB,
-                               SILBasicBlock *origSuccBB) const {
-    assert(origPredBB->getParent() == original);
-    return predecessorEnumCases.lookup({origPredBB, origSuccBB});
-  }
-
-  /// Returns the mapping from pullback structs to their predecessor enum
-  /// fields.
-  DenseMap<StructDecl *, VarDecl *> &getPullbackStructPredecessorFields() {
-    return pullbackStructPredecessorFields;
-  }
-
-  /// Returns the predecessor enum field for the pullback struct of the given
-  /// original block.
-  VarDecl *lookUpPullbackStructPredecessorField(SILBasicBlock *origBB) {
-    auto *pullbackStruct = getPullbackStruct(origBB);
-    return pullbackStructPredecessorFields.lookup(pullbackStruct);
-  }
-
-  /// Add a pullback to the pullback struct.
-  VarDecl *addPullbackDecl(SILInstruction *inst, SILType pullbackType) {
+  /// Add a linear map to the linear map struct.
+  VarDecl *addLinearMapDecl(SILInstruction *inst, SILType linearMapType) {
     // IRGen requires decls to have AST types (not `SILFunctionType`), so we
-    // convert the `SILFunctionType` of the pullback to a `FunctionType` with
+    // convert the `SILFunctionType` of the linear map to a `FunctionType` with
     // the same parameters and results.
-    auto silFnTy = pullbackType.castTo<SILFunctionType>();
+    auto silFnTy = linearMapType.castTo<SILFunctionType>();
     SmallVector<AnyFunctionType::Param, 8> params;
     for (auto &param : silFnTy->getParameters())
       params.push_back(AnyFunctionType::Param(param.getType()));
@@ -657,19 +653,102 @@ public:
           params, silFnTy->getAllResultsType().getASTType());
 
     auto *origBB = inst->getParent();
-    auto *pbStruct = getPullbackStruct(origBB);
-    auto pullbackName = "pullback_" + llvm::itostr(pullbackValueMap.size());
-    auto *pullbackDecl = addVarDecl(pbStruct, pullbackName, astFnTy);
-    pullbackValueMap.insert({inst, pullbackDecl});
-    return pullbackDecl;
+    auto *linMapStruct = getLinearMapStruct(origBB);
+    std::string linearMapName;
+    switch (kind) {
+    case swift::AutoDiffAssociatedFunctionKind::JVP:
+      linearMapName = "differential_" + llvm::itostr(linearMapValueMap.size());
+      break;
+    case swift::AutoDiffAssociatedFunctionKind::VJP:
+      linearMapName = "pullback_" + llvm::itostr(linearMapValueMap.size());
+      break;
+    }
+    auto *linearMapDecl = addVarDecl(linMapStruct, linearMapName, astFnTy);
+    linearMapValueMap.insert({inst, linearMapDecl});
+    return linearMapDecl;
   }
 
-  /// Finds the pullback declaration in the pullback struct for an `apply` or
+  void addLinearMapToStruct(ApplyInst *ai, const SILAutoDiffIndices &indices);
+
+  /// This takes the declared linear map structs and populates
+  /// them with the necessary fields, specifically the linear function (pullback
+  /// or differential) of the corresponding original function call in the
+  /// original function, and the branching enum.
+  void populateLinearMapStructDeclarationFields(
+      ADContext &context, const SILAutoDiffIndices &indices,
+      SILFunction *assocFn);
+
+  bool shouldBeDifferentiated(ApplyInst *inst,
+                              const SILAutoDiffIndices &indices);
+
+public:
+  LinearMapInfo(const LinearMapInfo &) = delete;
+  LinearMapInfo &operator=(const LinearMapInfo &) = delete;
+
+  explicit LinearMapInfo(ADContext &context,
+                         AutoDiffAssociatedFunctionKind kind,
+                         SILFunction *original, SILFunction *assocFn,
+                         const SILAutoDiffIndices &indices,
+                         const DifferentiableActivityInfo &activityInfo,
+                         SILBuilder &builder);
+
+  /// Returns the linear map struct associated with the given original block.
+  StructDecl *getLinearMapStruct(SILBasicBlock *origBB) const {
+    return linearMapStructs.lookup(origBB);
+  }
+
+  /// Returns the lowered SIL type of the linear map struct associated with the
+  /// given original block.
+  SILType getLinearMapStructLoweredType(SILBasicBlock *origBB) const {
+    auto *linMapStruct = getLinearMapStruct(origBB);
+    auto linMapStructType =
+        linMapStruct->getDeclaredInterfaceType()->getCanonicalType();
+    return typeConverter.getLoweredType(linMapStructType,
+                                        ResilienceExpansion::Minimal);
+  }
+
+  /// Returns the branching trace enum associated with the given original block.
+  EnumDecl *getBranchingTraceDecl(SILBasicBlock *origBB) const {
+    return branchingTraceDecls.lookup(origBB);
+  }
+
+  /// Returns the lowered SIL type of the branching trace enum associated with
+  /// the given original block.
+  SILType getBranchingTraceEnumLoweredType(SILBasicBlock *origBB) const {
+    auto *traceDecl = getBranchingTraceDecl(origBB);
+    auto traceDeclType =
+        traceDecl->getDeclaredInterfaceType()->getCanonicalType();
+    return typeConverter.getLoweredType(traceDeclType,
+                                        ResilienceExpansion::Minimal);
+  }
+
+  /// Returns the enum element in the given successor block's branching trace
+  /// enum corresponding to the given predecessor block.
+  EnumElementDecl *
+  lookUpBranchingTraceEnumElement(SILBasicBlock *origPredBB,
+                                  SILBasicBlock *origSuccBB) const {
+    assert(origPredBB->getParent() == original);
+    return branchingTraceEnumCases.lookup({origPredBB, origSuccBB});
+  }
+
+  /// Returns the mapping from linear map structs to their branching trace enum
+  /// fields.
+  DenseMap<StructDecl *, VarDecl *> &getLinearMapStructEnumFields() {
+    return linearMapStructEnumFields;
+  }
+
+  /// Returns the branching trace enum field for the linear map struct of the
+  /// given original block.
+  VarDecl *lookUpLinearMapStructEnumField(SILBasicBlock *origBB) {
+    auto *linearMapStruct = getLinearMapStruct(origBB);
+    return linearMapStructEnumFields.lookup(linearMapStruct);
+  }
+
+  /// Finds the linear map declaration in the pullback struct for an `apply` or
   /// `struct_extract` in the original function.
-  VarDecl *lookUpPullbackDecl(SILInstruction *inst) {
-    auto lookup = pullbackValueMap.find(inst);
-    return lookup == pullbackValueMap.end() ? nullptr
-                                            : lookup->getSecond();
+  VarDecl *lookUpLinearMapDecl(SILInstruction *inst) {
+    auto lookup = linearMapValueMap.find(inst);
+    return lookup == linearMapValueMap.end() ? nullptr : lookup->getSecond();
   }
 };
 
@@ -1197,38 +1276,6 @@ ADContext::emitNondifferentiabilityError(SourceLoc loc,
   }
 }
 
-PullbackInfo::PullbackInfo(ADContext &context, SILFunction *original,
-                           SILFunction *vjp, const SILAutoDiffIndices &indices)
-    : original(original), typeConverter(context.getTypeConverter()) {
-  auto &astCtx = original->getASTContext();
-  auto *loopAnalysis = context.getPassManager().getAnalysis<SILLoopAnalysis>();
-  auto *loopInfo = loopAnalysis->get(original);
-  // Get VJP generic signature.
-  CanGenericSignature vjpGenSig = nullptr;
-  if (auto *vjpGenEnv = vjp->getGenericEnvironment())
-    vjpGenSig = vjpGenEnv->getGenericSignature()->getCanonicalSignature();
-  // Create predecessor enum and pullback struct for each original block.
-  for (auto &origBB : *original) {
-    auto *pbStruct = createPullbackStruct(&origBB, indices, vjpGenSig);
-    pullbackStructs.insert({&origBB, pbStruct});
-  }
-  for (auto &origBB : *original) {
-    auto *pbStruct = getPullbackStruct(&origBB);
-    auto *predEnum =
-        createBasicBlockPredecessorEnum(&origBB, indices, vjpGenSig);
-    // If original block is in a loop, mark predecessor enum as indirect.
-    if (loopInfo->getLoopFor(&origBB))
-      predEnum->getAttrs().add(new (astCtx) IndirectAttr(/*Implicit*/ true));
-    predecessorEnums.insert({&origBB, predEnum});
-    if (origBB.isEntry())
-      continue;
-    auto *predEnumField =
-        addVarDecl(pbStruct, astCtx.getIdentifier("predecessor").str(),
-                   predEnum->getDeclaredInterfaceType());
-    pullbackStructPredecessorFields.insert({pbStruct, predEnumField});
-  }
-}
-
 //===----------------------------------------------------------------------===//
 // Activity Analysis
 //===----------------------------------------------------------------------===//
@@ -1356,6 +1403,283 @@ public:
   Activity getActivity(SILInstruction *inst,
                        const SILAutoDiffIndices &indices) const;
 };
+
+/// Given a parameter argument (not indirect result) and some differentiation
+/// indices, figure out whether the parent function is being differentiated with
+/// respect to this parameter, according to the indices.
+static bool isDifferentiationParameter(SILArgument *argument,
+                                       AutoDiffIndexSubset *indices) {
+  if (!argument) return false;
+  auto *function = argument->getFunction();
+  auto paramArgs = function->getArgumentsWithoutIndirectResults();
+  for (unsigned i : indices->getIndices())
+    if (paramArgs[i] == argument)
+      return true;
+  return false;
+}
+
+/// For a nested function call that has results active on the differentiation
+/// path, compute the set of minimal indices for differentiating this function
+/// as required by the data flow.
+static void collectMinimalIndicesForFunctionCall(
+    ApplyInst *ai, SmallVectorImpl<SILValue> &results,
+    const SILAutoDiffIndices &parentIndices,
+    const DifferentiableActivityInfo &activityInfo,
+    SmallVectorImpl<unsigned> &paramIndices,
+    SmallVectorImpl<unsigned> &resultIndices) {
+  // Make sure the function call has active results.
+  assert(llvm::any_of(results, [&](SILValue result) {
+    return activityInfo.isActive(result, parentIndices);
+  }));
+  auto fnTy = ai->getCallee()->getType().castTo<SILFunctionType>();
+  SILFunctionConventions convs(fnTy, ai->getModule());
+  auto arguments = ai->getArgumentOperands();
+  // Parameter indices are indices (in the type signature) of parameter
+  // arguments that are varied or are arguments.
+  unsigned currentParamIdx = 0;
+  for (auto applyArg : ai->getArgumentsWithoutIndirectResults()) {
+    if (activityInfo.isVaried(applyArg, parentIndices.parameters) ||
+        isDifferentiationParameter(dyn_cast<SILArgument>(applyArg),
+                                   parentIndices.parameters))
+      paramIndices.push_back(currentParamIdx);
+    ++currentParamIdx;
+  }
+  // Result indices are indices (in the type signature) of results that are
+  // useful.
+  //
+  // If the function returns only one result, then we just see if that is
+  // useful.
+  if (fnTy->getNumDirectFormalResults() == 1) {
+    if (activityInfo.isUseful(ai, parentIndices.source))
+      resultIndices.push_back(0);
+    return;
+  }
+  // If the function returns more than 1 results, the return type is a tuple. We
+  // need to find all `tuple_extract`s on that tuple, and determine if each
+  // found extracted element is useful.
+  // Collect direct results being retrieved using `tuple_extract`.
+  SmallVector<SILValue, 8> usedDirectResults(convs.getNumDirectSILResults());
+  for (auto *use : ai->getUses())
+    if (auto *tei = dyn_cast<TupleExtractInst>(use->getUser()))
+      usedDirectResults[tei->getFieldNo()] = tei;
+  // Add differentiation indices based on activity analysis.
+  unsigned dirResIdx = 0;
+  unsigned indResIdx = convs.getSILArgIndexOfFirstIndirectResult();
+  for (auto &resAndIdx : enumerate(convs.getResults())) {
+    auto &res = resAndIdx.value();
+    unsigned idx = resAndIdx.index();
+    if (res.isFormalDirect()) {
+      if (auto dirRes = usedDirectResults[dirResIdx])
+        if (dirRes && activityInfo.isUseful(dirRes, parentIndices.source))
+          resultIndices.push_back(idx);
+      ++dirResIdx;
+    } else {
+      if (activityInfo.isUseful(arguments[indResIdx].get(),
+                                parentIndices.source))
+        resultIndices.push_back(idx);
+      ++indResIdx;
+    }
+  }
+}
+
+LinearMapInfo::LinearMapInfo(ADContext &context,
+                             AutoDiffAssociatedFunctionKind kind,
+                             SILFunction *original, SILFunction *assocFn,
+                             const SILAutoDiffIndices &indices,
+                             const DifferentiableActivityInfo &activityInfo,
+                             SILBuilder &builder)
+    : kind(kind), original(original), activityInfo(activityInfo),
+      typeConverter(context.getTypeConverter()), builder(builder) {
+  populateLinearMapStructDeclarationFields(context, indices, assocFn);
+}
+
+bool LinearMapInfo::shouldBeDifferentiated(ApplyInst *ai,
+                                           const SILAutoDiffIndices &indices) {
+  // Anything with an active result should be differentiated.
+  if (llvm::any_of(ai->getResults(), [&](SILValue val) {
+    return activityInfo.isActive(val, indices);
+  }))
+    return true;
+
+  // Function applications with an active indirect result should be
+  // differentiated.
+  for (auto indRes : ai->getIndirectSILResults())
+    if (activityInfo.isActive(indRes, indices))
+      return true;
+
+  // Function applications with an inout argument should be differentiated.
+  auto paramInfos = ai->getSubstCalleeConv().getParameters();
+  for (auto i : swift::indices(paramInfos))
+    if (paramInfos[i].isIndirectInOut() &&
+        activityInfo.isActive(
+            ai->getArgumentsWithoutIndirectResults()[i], indices))
+      return true;
+
+  // Instructions that may write to memory and that have an active operand
+  // should be differentiated.
+  if (ai->mayWriteToMemory())
+    for (auto &op : ai->getAllOperands())
+      if (activityInfo.isActive(op.get(), indices))
+        return true;
+  return false;
+}
+
+
+/// Takes an `apply` instruction and adds its linear map function to the
+/// linear map struct if it's active.
+void LinearMapInfo::addLinearMapToStruct(ApplyInst *ai,
+                                         const SILAutoDiffIndices &indices) {
+  SmallVector<SILValue, 4> allResults;
+  allResults.push_back(ai);
+  allResults.append(ai->getIndirectSILResults().begin(),
+                    ai->getIndirectSILResults().end());
+
+  // Check if there are any active results or arguments. If not, skip
+  // this instruction.
+  auto hasActiveResults = llvm::any_of(
+      allResults, [&](SILValue res) {
+    return activityInfo.isActive(res, indices);
+  });
+  auto hasActiveArguments = llvm::any_of(
+      ai->getArgumentsWithoutIndirectResults(), [&](SILValue arg) {
+    return activityInfo.isActive(arg, indices);
+  });
+  if (!hasActiveResults || !hasActiveArguments)
+    return;
+
+  unsigned source;
+  AutoDiffIndexSubset *parameters;
+
+  SmallVector<unsigned, 8> activeParamIndices;
+  SmallVector<unsigned, 8> activeResultIndices;
+  collectMinimalIndicesForFunctionCall(
+      ai, allResults, indices, activityInfo, activeParamIndices,
+      activeResultIndices);
+  source = activeResultIndices.front();
+
+  // If function is already marked differentiable, differentiate W.R.T.
+  // all parameters.
+  auto originalFnSubstTy = ai->getSubstCalleeType();
+  if (originalFnSubstTy->isDifferentiable()) {
+    parameters = originalFnSubstTy->getDifferentiationParameterIndices();
+  } else {
+    parameters = AutoDiffIndexSubset::get(
+        original->getASTContext(),
+        ai->getArgumentsWithoutIndirectResults().size(),
+        activeParamIndices);
+  }
+  SILAutoDiffIndices curIndices(activeResultIndices.front(),
+  AutoDiffIndexSubset::get(
+      builder.getASTContext(),
+      ai->getArgumentsWithoutIndirectResults().size(),
+      activeParamIndices));
+
+  // Check for non-differentiable original function type.
+  auto checkNondifferentiableOriginalFunctionType =
+      [&](CanSILFunctionType origFnTy) {
+        // Check and diagnose non-differentiable arguments.
+        for (unsigned paramIndex : range(origFnTy->getNumParameters())) {
+          if (curIndices.isWrtParameter(paramIndex) &&
+              !origFnTy->getParameters()[paramIndex]
+                  .getSILStorageType()
+                  .isDifferentiable(builder.getModule()))
+            return true;
+        }
+        // Check non-differentiable results.
+        if (!origFnTy->getResults()[curIndices.source]
+                .getSILStorageType()
+                .isDifferentiable(builder.getModule()))
+          return true;
+        return false;
+      };
+  if (checkNondifferentiableOriginalFunctionType(originalFnSubstTy))
+    return;
+
+  auto assocFnType = originalFnSubstTy->getAutoDiffAssociatedFunctionType(
+      parameters, source, /*differentiationOrder*/ 1, kind, builder.getModule(),
+      LookUpConformanceInModule(builder.getModule().getSwiftModule()));
+
+  auto assocFnResultTypes =
+      assocFnType->getAllResultsType().castTo<TupleType>();
+  assocFnResultTypes->getElement(assocFnResultTypes->getElements().size() - 1);
+  auto linearMapSILType = SILType::getPrimitiveObjectType(
+      assocFnResultTypes
+          ->getElement(assocFnResultTypes->getElements().size() - 1)
+          .getType()
+          ->getCanonicalType());
+  addLinearMapDecl(ai, linearMapSILType);
+}
+
+void LinearMapInfo::populateLinearMapStructDeclarationFields(
+    ADContext &context, const SILAutoDiffIndices &indices,
+    SILFunction *assocFn) {
+
+  auto &astCtx = original->getASTContext();
+  auto *loopAnalysis = context.getPassManager().getAnalysis<SILLoopAnalysis>();
+  auto *loopInfo = loopAnalysis->get(original);
+
+  // Get the associated function generic signature.
+  CanGenericSignature assocFnGenSig = nullptr;
+  if (auto *assocFnGenEnv = assocFn->getGenericEnvironment())
+    assocFnGenSig =
+        assocFnGenEnv->getGenericSignature()->getCanonicalSignature();
+
+  // Create linear map struct for each original block.
+  for (auto &origBB : *original) {
+    auto *linearMapStruct =
+        createLinearMapStruct(&origBB, indices, assocFnGenSig);
+    linearMapStructs.insert({&origBB, linearMapStruct});
+  }
+
+  // Create branching trace enum for each original block and add it to the
+  // corresponding struct.
+  // TODO: add support for forward mode.
+  for (auto &origBB : *original) {
+    auto *linearMapStruct = getLinearMapStruct(&origBB);
+    auto *traceEnum = createBranchingTraceDecl(&origBB, indices, assocFnGenSig);
+
+    // If original block is in a loop, mark branching trace enum as indirect.
+    if (loopInfo->getLoopFor(&origBB))
+      traceEnum->getAttrs().add(new (astCtx) IndirectAttr(/*Implicit*/ true));
+    branchingTraceDecls.insert({&origBB, traceEnum});
+    if (origBB.isEntry())
+      continue;
+    auto *traceEnumField =
+        addVarDecl(linearMapStruct, astCtx.getIdentifier("predecessor").str(),
+                   traceEnum->getDeclaredInterfaceType());
+    linearMapStructEnumFields.insert({linearMapStruct, traceEnumField});
+  }
+
+  // Add the linear function fields to the linear map structs.
+  for (auto &origBB : *original) {
+    for (auto &inst : origBB) {
+      if (auto *ai = dyn_cast<ApplyInst>(&inst)) {
+        // Check for active 'inout' arguments.
+        bool isInout = false;
+        auto paramInfos = ai->getSubstCalleeConv().getParameters();
+        for (unsigned i : swift::indices(paramInfos)) {
+          if (paramInfos[i].isIndirectInOut() &&
+              activityInfo.isActive(ai->getArgumentsWithoutIndirectResults()[i],
+                                    indices)) {
+            // Reject functions with active inout arguments. It's not yet
+            // supported.
+            isInout = true;
+            break;
+          }
+        }
+        if (isInout)
+          break;
+
+        // Add linear map to struct for active instructions.
+        // Do not add it for array functions since those are already linear
+        // and we don't need to add it to the struct.
+        if (shouldBeDifferentiated(ai, indices) &&
+            !ai->hasSemantics("array.uninitialized_intrinsic"))
+          addLinearMapToStruct(ai, indices);
+      }
+    }
+  }
+}
 
 class DifferentiableActivityCollection {
 public:
@@ -2713,84 +3037,6 @@ static SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
   return thunk;
 }
 
-/// Given an parameter argument (not indirect result) and some differentiation
-/// indices, figure out whether the parent function is being differentiated with
-/// respect to this parameter, according to the indices.
-static bool isDifferentiationParameter(SILArgument *argument,
-                                       AutoDiffIndexSubset *indices) {
-  if (!argument) return false;
-  auto *function = argument->getFunction();
-  auto paramArgs = function->getArgumentsWithoutIndirectResults();
-  for (unsigned i : indices->getIndices())
-    if (paramArgs[i] == argument)
-      return true;
-  return false;
-}
-
-/// For a nested function call that has results active on the differentiation
-/// path, compute the set of minimal indices for differentiating this function
-/// as required by the data flow.
-static void collectMinimalIndicesForFunctionCall(
-    ApplyInst *ai, SmallVectorImpl<SILValue> &results,
-    const SILAutoDiffIndices &parentIndices,
-    const DifferentiableActivityInfo &activityInfo,
-    SmallVectorImpl<unsigned> &paramIndices,
-    SmallVectorImpl<unsigned> &resultIndices) {
-  // Make sure the function call has active results.
-  assert(llvm::any_of(results, [&](SILValue result) {
-    return activityInfo.isActive(result, parentIndices);
-  }));
-  auto fnTy = ai->getCallee()->getType().castTo<SILFunctionType>();
-  SILFunctionConventions convs(fnTy, ai->getModule());
-  auto arguments = ai->getArgumentOperands();
-  // Parameter indices are indices (in the type signature) of parameter
-  // arguments that are varied or are arguments.
-  unsigned currentParamIdx = 0;
-  for (auto applyArg : ai->getArgumentsWithoutIndirectResults()) {
-    if (activityInfo.isVaried(applyArg, parentIndices.parameters) ||
-        isDifferentiationParameter(dyn_cast<SILArgument>(applyArg),
-                                   parentIndices.parameters))
-      paramIndices.push_back(currentParamIdx);
-    ++currentParamIdx;
-  }
-  // Result indices are indices (in the type signature) of results that are
-  // useful.
-  //
-  // If the function returns only one result, then we just see if that is
-  // useful.
-  if (fnTy->getNumDirectFormalResults() == 1) {
-    if (activityInfo.isUseful(ai, parentIndices.source))
-      resultIndices.push_back(0);
-    return;
-  }
-  // If the function returns more than 1 results, the return type is a tuple. We
-  // need to find all `tuple_extract`s on that tuple, and determine if each
-  // found extracted element is useful.
-  // Collect direct results being retrieved using `tuple_extract`.
-  SmallVector<SILValue, 8> usedDirectResults(convs.getNumDirectSILResults());
-  for (auto *use : ai->getUses())
-    if (auto *tei = dyn_cast<TupleExtractInst>(use->getUser()))
-      usedDirectResults[tei->getFieldNo()] = tei;
-  // Add differentiation indices based on activity analysis.
-  unsigned dirResIdx = 0;
-  unsigned indResIdx = convs.getSILArgIndexOfFirstIndirectResult();
-  for (auto &resAndIdx : enumerate(convs.getResults())) {
-    auto &res = resAndIdx.value();
-    unsigned idx = resAndIdx.index();
-    if (res.isFormalDirect()) {
-      if (auto dirRes = usedDirectResults[dirResIdx])
-        if (dirRes && activityInfo.isUseful(dirRes, parentIndices.source))
-          resultIndices.push_back(idx);
-      ++dirResIdx;
-    } else {
-      if (activityInfo.isUseful(arguments[indResIdx].get(),
-                                parentIndices.source))
-        resultIndices.push_back(idx);
-      ++indResIdx;
-    }
-  }
-}
-
 namespace {
 class VJPEmitter final
     : public TypeSubstCloner<VJPEmitter, SILOptFunctionBuilder> {
@@ -2812,14 +3058,14 @@ private:
   /// The pullback function.
   SILFunction *pullback;
 
-  /// The pullback info.
-  PullbackInfo pullbackInfo;
-
   /// The differentiation invoker.
   DifferentiationInvoker invoker;
 
   /// Info from activity analysis on the original function.
   const DifferentiableActivityInfo &activityInfo;
+
+  /// The linear map info.
+  LinearMapInfo linearMapInfo;
 
   /// Caches basic blocks whose phi arguments have been remapped (adding a
   /// predecessor enum argument).
@@ -2868,9 +3114,10 @@ public:
                       DifferentiationInvoker invoker)
       : TypeSubstCloner(*vjp, *original, getSubstitutionMap(original, vjp)),
         context(context), original(original), attr(attr), vjp(vjp),
-        pullbackInfo(context, original, vjp, attr->getIndices()),
         invoker(invoker), activityInfo(getActivityInfo(
-                              context, original, attr->getIndices(), vjp)) {
+                              context, original, attr->getIndices(), vjp)),
+        linearMapInfo(context, AutoDiffAssociatedFunctionKind::VJP, original,
+          vjp, attr->getIndices(), activityInfo, getBuilder()) {
     // Create empty pullback function.
     pullback = createEmptyPullback();
     context.getGeneratedFunctions().push_back(pullback);
@@ -2937,10 +3184,8 @@ public:
     };
 
     // Parameters of the pullback are:
-    // - a seed,
-    // - a pullback struct,
-    // - original results, and
-    // - the original parameters.
+    // - the tangent vectors of the original results, and
+    // - a pullback struct.
     // Results of the pullback are in the tangent space of the original
     // parameters.
     SmallVector<SILParameterInfo, 8> pbParams;
@@ -2958,7 +3203,7 @@ public:
     // Accept a pullback struct in the pullback parameter list. This is the
     // returned pullback's closure context.
     auto *origExit = &*original->findReturnBB();
-    auto *pbStruct = pullbackInfo.getPullbackStruct(origExit);
+    auto *pbStruct = linearMapInfo.getLinearMapStruct(origExit);
     auto pbStructType = pbStruct->getDeclaredInterfaceType()
         ->getCanonicalType();
     pbParams.push_back({pbStructType, ParameterConvention::Direct_Guaranteed});
@@ -3017,7 +3262,7 @@ public:
     if (errorOccurred || remappedBasicBlocks.count(bb))
       return vjpBB;
     // Add predecessor enum argument to the remapped block.
-    auto *predEnum = pullbackInfo.getPredecessorEnum(bb);
+    auto *predEnum = linearMapInfo.getBranchingTraceDecl(bb);
     auto enumTy = getOpASTType(predEnum->getDeclaredInterfaceType()
                                  ->getCanonicalType());
     auto enumLoweredTy = context.getTypeConverter().getLoweredType(
@@ -3058,7 +3303,7 @@ private:
     auto loc = termInst->getFunction()->getLocation();
     auto *origBB = termInst->getParent();
     auto *vjpBB = BBMap[origBB];
-    auto *pbStruct = pullbackInfo.getPullbackStruct(origBB);
+    auto *pbStruct = linearMapInfo.getLinearMapStruct(origBB);
     auto structLoweredTy = getNominalDeclLoweredType(pbStruct);
     auto bbPullbackValues = pullbackValues[origBB];
     if (!origBB->isEntry()) {
@@ -3075,10 +3320,10 @@ private:
                                       SILBasicBlock *succBB,
                                       StructInst *pbStructVal) {
     auto loc = pbStructVal->getLoc();
-    auto *succEnum = pullbackInfo.getPredecessorEnum(succBB);
+    auto *succEnum = linearMapInfo.getBranchingTraceDecl(succBB);
     auto enumLoweredTy = getNominalDeclLoweredType(succEnum);
     auto *enumEltDecl =
-        pullbackInfo.lookUpPredecessorEnumElement(predBB, succBB);
+        linearMapInfo.lookUpBranchingTraceEnumElement(predBB, succBB);
     auto enumEltType = getOpType(
         enumLoweredTy.getEnumElementType(enumEltDecl, getModule()));
     // If the enum element type does not have a box type (i.e. the enum case is
@@ -3444,7 +3689,7 @@ public:
 
     // Checkpoint the pullback.
     auto *pullbackDecl =
-        pullbackInfo.addPullbackDecl(ai, getOpType(pullback->getType()));
+        linearMapInfo.lookUpLinearMapDecl(ai);
 
     // If actual pullback type does not match lowered pullback type, reabstract
     // the pullback using a thunk.
@@ -3932,7 +4177,7 @@ private:
   SILFunction &getPullback() const { return *vjpEmitter.pullback; }
   SILDifferentiableAttr *getAttr() const { return vjpEmitter.attr; }
   DifferentiationInvoker getInvoker() const { return vjpEmitter.invoker; }
-  PullbackInfo &getPullbackInfo() { return vjpEmitter.pullbackInfo; }
+  LinearMapInfo &getPullbackInfo() { return vjpEmitter.linearMapInfo; }
   const SILAutoDiffIndices &getIndices() const {
     return vjpEmitter.getIndices();
   }
@@ -3943,7 +4188,7 @@ private:
 #ifndef NDEBUG
     auto *pbStruct = pullbackStructArguments[origBB]->getType()
         .getStructOrBoundGenericStruct();
-    assert(pbStruct == getPullbackInfo().getPullbackStruct(origBB));
+    assert(pbStruct == getPullbackInfo().getLinearMapStruct(origBB));
 #endif
     return pullbackStructArguments[origBB];
   }
@@ -4427,7 +4672,7 @@ public:
       auto *pullbackBB = pullback.createBasicBlock();
       pullbackBBMap.insert({origBB, pullbackBB});
       auto pbStructLoweredType =
-          remapType(getPullbackInfo().getPullbackStructLoweredType(origBB));
+          remapType(getPullbackInfo().getLinearMapStructLoweredType(origBB));
       // If the BB is the original exit, then the pullback block that we just
       // created must be the pullback function's entry. For the pullback entry,
       // create entry arguments and continue to the next block.
@@ -4481,9 +4726,9 @@ public:
         // Get the enum element type (i.e. the pullback struct type). The enum
         // element type may be boxed if the enum is indirect.
         auto enumLoweredTy =
-            getPullbackInfo().getPredecessorEnumLoweredType(succBB);
+            getPullbackInfo().getBranchingTraceEnumLoweredType(succBB);
         auto *enumEltDecl =
-            getPullbackInfo().lookUpPredecessorEnumElement(origBB, succBB);
+            getPullbackInfo().lookUpBranchingTraceEnumElement(origBB, succBB);
         auto enumEltType = remapType(
             enumLoweredTy.getEnumElementType(enumEltDecl, getModule()));
         pullbackTrampolineBB->createPhiArgument(enumEltType,
@@ -4750,9 +4995,9 @@ public:
     // 1. Get the pullback struct pullback block argument.
     // 2. Extract the predecessor enum value from the pullback struct value.
     auto *pbStructVal = getPullbackBlockPullbackStructArgument(bb);
-    auto *predEnum = getPullbackInfo().getPredecessorEnum(bb);
+    auto *predEnum = getPullbackInfo().getBranchingTraceDecl(bb);
     auto *predEnumField =
-        getPullbackInfo().lookUpPullbackStructPredecessorField(bb);
+        getPullbackInfo().lookUpLinearMapStructEnumField(bb);
     auto *predEnumVal =
         builder.createStructExtract(pbLoc, pbStructVal, predEnumField);
 
@@ -4789,7 +5034,7 @@ public:
                                                     adjontTrampolineBlockMap);
       pullbackSuccBBs.push_back(pullbackSuccBB);
       auto *enumEltDecl =
-          getPullbackInfo().lookUpPredecessorEnumElement(predBB, bb);
+          getPullbackInfo().lookUpBranchingTraceEnumElement(predBB, bb);
       pullbackSuccessorCases.push_back({enumEltDecl, pullbackSuccBB});
     }
     // Values are trampolined by only a subset of pullback successor blocks.
@@ -5004,7 +5249,7 @@ public:
     auto applyInfo = applyInfoLookup->getSecond();
 
     // Get the pullback.
-    auto *field = getPullbackInfo().lookUpPullbackDecl(ai);
+    auto *field = getPullbackInfo().lookUpLinearMapDecl(ai);
     assert(field);
     auto loc = ai->getLoc();
     SILValue pullback = builder.createStructExtract(
