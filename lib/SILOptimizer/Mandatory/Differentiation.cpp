@@ -7098,7 +7098,9 @@ bool ADContext::processDifferentiableAttribute(
     jvp = createEmptyJVP(*this, original, attr, isAssocFnExported);
     getGeneratedFunctions().push_back(jvp);
 
-    if (RunJVPGeneration) {
+    // For now, only run JVP emission if the flag is on and if there is no
+    // user defined vjp.
+    if (RunJVPGeneration && !vjp) {
       JVPEmitter emitter(*this, original, attr, jvp, invoker);
       if (emitter.run())
         return true;
@@ -7113,6 +7115,22 @@ bool ADContext::processDifferentiableAttribute(
       auto diffConv = jvp->getConventions();
       SILBuilder builder(entry);
       auto loc = jvp->getLocation();
+      // Add a fatal error in case this function is called by the user.
+      auto myType = SILFunctionType::get(
+          nullptr, SILFunctionType::ExtInfo(), SILCoroutineKind::None,
+          ParameterConvention::Direct_Unowned,
+          SILParameterInfo(CanType(), ParameterConvention::Direct_Unowned),
+          /*interfaceYields*/ {}, SILResultInfo(CanType(),
+          ResultConvention::Unowned), /*interfaceErrorResults*/ None,
+          astCtx);
+      myType.dump();
+      auto fnBuilder = SILOptFunctionBuilder(getTransform());
+      auto *jvpErrorFuncName = this->getModule().findFunction(
+          "_printJVPErrorAndExit", SILLinkage::PublicExternal);
+      assert(jvpErrorFuncName && "Should have been able to find fatal "
+             "error function");
+      auto *jvpErrorFuncRef = builder.createFunctionRef(loc, jvpErrorFuncName);
+      builder.createApply(loc, jvpErrorFuncRef, SubstitutionMap(), {});
       builder.createReturn(loc, SILUndef::get(
           jvp->mapTypeIntoContext(diffConv.getSILResultType()), *jvp));
       LLVM_DEBUG(getADDebugStream() << "Generated empty JVP for "
