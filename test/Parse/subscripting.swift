@@ -189,7 +189,7 @@ struct A7 {
 }
 
 class A7b {
-  class static subscript(a: Float) -> Int { // expected-error {{'static' specified twice}} {{9-16=}}
+  class static subscript(a: Float) -> Int { // expected-error {{'static' cannot appear after another 'static' or 'class' pattern}} {{9-16=}}
     get {
       return 42
     }
