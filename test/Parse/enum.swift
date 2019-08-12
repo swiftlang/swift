@@ -125,7 +125,7 @@ enum Recovery5 {
   // expected-error@-2{{extraneous '.' in enum 'case' declaration}} {{14-15=}}
 }
 enum Recovery6 {
-  case Snout, _; // expected-error {{expected identifier after comma in enum 'case' declaration}}
+  case Snout, _; // expected-error {{keyword '_' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{15-16=`_`}}
   case _; // expected-error {{keyword '_' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{8-9=`_`}}
   case Tusk, // expected-error {{expected pattern}}
 } // expected-error {{expected identifier after comma in enum 'case' declaration}}
@@ -562,5 +562,5 @@ enum SR11261 {
 }
 
 enum SR11261_1 {
-  case a, b, c, func, d // expected-error {{expected identifier after comma in enum 'case' declaration}} expected-error {{consecutive declarations on a line must be separated by ';'}} {{16-16=;}} expected-error {{expected identifier in function declaration}} expected-error {{expected pattern}}
+  case a, b, c, func, d // expected-error {{keyword 'func' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{17-21=`func`}} expected-error {{expected pattern}}
 }

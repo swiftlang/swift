@@ -5778,11 +5778,7 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
         Status.setIsParseError();
         return Status;
       }
-      if (CommaLoc.isValid()) {
-        diagnose(Tok, diag::expected_identifier_after_case_comma);
-        Status.setIsParseError();
-        return Status;
-      }
+
       if (NameIsKeyword) {
         diagnose(TokLoc, diag::keyword_cant_be_identifier, TokText);
         diagnose(TokLoc, diag::backticks_to_escape)
@@ -5790,6 +5786,11 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
         if (Tok.isNot(tok::kw_case))
           consumeToken();
       } else {
+        if (CommaLoc.isValid()) {
+          diagnose(Tok, diag::expected_identifier_after_case_comma);
+          Status.setIsParseError();
+          return Status;
+        }
         diagnose(CaseLoc, diag::expected_identifier_in_decl, "enum 'case'");
       }
     }
