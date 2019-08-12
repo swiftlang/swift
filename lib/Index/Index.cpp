@@ -25,6 +25,7 @@
 #include "swift/Basic/StringExtras.h"
 #include "swift/IDE/SourceEntityWalker.h"
 #include "swift/Markup/Markup.h"
+#include "swift/Parse/Lexer.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallVector.h"
@@ -473,6 +474,8 @@ private:
 
     IndexSymbol Info;
     std::tie(Info.line, Info.column) = getLineCol(Loc);
+    std::tie(Info.startOffset, Info.endOffset) =
+        getRangeStartAndEndOffset(Range);
     Info.roles |= (unsigned)SymbolRole::Reference;
     Info.symInfo = getSymbolInfoForModule(Mod);
     getModuleNameAndUSR(Mod, Info.name, Info.USR);
@@ -588,6 +591,21 @@ private:
     if (Loc.isInvalid())
       return std::make_pair(0, 0);
     return SrcMgr.getLineAndColumn(Loc, BufferID);
+  }
+
+  std::pair<unsigned, unsigned> getRangeStartAndEndOffset(CharSourceRange Range) {
+    if (Range.isInvalid())
+      return std::make_pair(0, 0);
+    unsigned offset = SrcMgr.getLocOffsetInBuffer(Range.getStart(), BufferID);
+    unsigned length = SrcMgr.getByteDistance(Range.getStart(), Range.getEnd());
+    return std::make_pair(offset, offset + length);
+  }
+
+  std::pair<unsigned, unsigned> getLocStartAndEndOffset(SourceLoc Loc) {
+    if (Loc.isInvalid())
+      return std::make_pair(0, 0);
+    return getRangeStartAndEndOffset(
+        Lexer::getCharSourceRangeFromSourceRange(SrcMgr, SourceRange(Loc)));
   }
 
   bool shouldIndex(ValueDecl *D, bool IsRef) const {
@@ -1079,7 +1097,7 @@ bool IndexSwiftASTWalker::report(ValueDecl *D) {
           return false;
         if (!reportPseudoSetterDecl(VarD))
           return false;
-      } 
+      }
 
       for (auto accessor : StoreD->getAllAccessors()) {
         // Don't include the implicit getter and setter if we added pseudo
@@ -1225,6 +1243,7 @@ bool IndexSwiftASTWalker::initIndexSymbol(ValueDecl *D, SourceLoc Loc,
     return true;
 
   std::tie(Info.line, Info.column) = getLineCol(Loc);
+  std::tie(Info.startOffset, Info.endOffset) = getLocStartAndEndOffset(Loc);
   if (!IsRef) {
     if (auto Group = D->getGroupName())
       Info.group = Group.getValue();
@@ -1246,6 +1265,7 @@ bool IndexSwiftASTWalker::initIndexSymbol(ExtensionDecl *ExtD, ValueDecl *Extend
     return true;
 
   std::tie(Info.line, Info.column) = getLineCol(Loc);
+  std::tie(Info.startOffset, Info.endOffset) = getLocStartAndEndOffset(Loc);
   if (auto Group = ExtD->getGroupName())
     Info.group = Group.getValue();
   return false;
@@ -1401,7 +1421,7 @@ bool IndexSwiftASTWalker::initVarRefIndexSymbols(Expr *CurrentE, ValueDecl *D,
   case swift::AccessKind::Write:
     Info.roles |= (unsigned)SymbolRole::Write;
   }
-  
+
   return false;
 }
 
@@ -1453,6 +1473,7 @@ bool IndexSwiftASTWalker::indexComment(const Decl *D) {
       Info.USR = stringStorage.copyString(OS.str());
     }
     std::tie(Info.line, Info.column) = getLineCol(loc);
+    std::tie(Info.startOffset, Info.endOffset) = getLocStartAndEndOffset(loc);
     if (!IdxConsumer.startSourceEntity(Info) || !IdxConsumer.finishSourceEntity(Info.symInfo, Info.roles)) {
       Cancelled = true;
       break;
