@@ -685,7 +685,7 @@ static void visitOuterToInner(
 }
 
 /// Retrieve the generic parameter depth of the extended type.
-static unsigned getExtendedTypeGenericDepth(ExtensionDecl *ext) {
+static unsigned getExtendedTypeGenericDepth(const ExtensionDecl *ext) {
   auto nominal = ext->getSelfNominalTypeDecl();
   if (!nominal) return static_cast<unsigned>(-1);
 
@@ -700,7 +700,7 @@ GenericEnvironment *TypeChecker::checkGenericEnvironment(
                       DeclContext *dc,
                       GenericSignature *parentSig,
                       bool allowConcreteGenericParams,
-                      ExtensionDecl *ext,
+                      const ExtensionDecl *ext,
                       llvm::function_ref<void(GenericSignatureBuilder &)>
                         inferRequirements,
                       bool mustInferRequirements) {

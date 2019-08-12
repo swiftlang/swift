@@ -4703,7 +4703,7 @@ void TypeChecker::finalizeDecl(ValueDecl *decl) {
 /// typealias GX2<A> = X<A, A>
 /// typealias GX3<A, B> = X<B, A>
 /// \endcode
-static bool isPassThroughTypealias(TypeAliasDecl *typealias) {
+static bool isPassThroughTypealias(const TypeAliasDecl *typealias) {
   // Pass-through only makes sense when the typealias refers to a nominal
   // type.
   Type underlyingType = typealias->getUnderlyingTypeLoc().getType();
@@ -4759,9 +4759,9 @@ static bool isPassThroughTypealias(TypeAliasDecl *typealias) {
 /// Form the interface type of an extension from the raw type and the
 /// extension's list of generic parameters.
 static Type formExtensionInterfaceType(
-                         TypeChecker &tc, ExtensionDecl *ext,
+                         TypeChecker &tc, const ExtensionDecl *ext,
                          Type type,
-                         GenericParamList *genericParams,
+                         const GenericParamList *genericParams,
                          SmallVectorImpl<std::pair<Type, Type>> &sameTypeReqs,
                          bool &mustInferRequirements) {
   if (type->is<ErrorType>())
@@ -4910,7 +4910,8 @@ public:
 /// Check the generic parameters of an extension, recursively handling all of
 /// the parameter lists within the extension.
 static std::pair<GenericEnvironment *, Type>
-checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
+checkExtensionGenericParams(TypeChecker &tc, const ExtensionDecl *ext,
+                            Type type,
                             const ExtraConformances &&extraConformances,
                             GenericParamList *genericParams) {
   assert(!ext->getGenericEnvironment());

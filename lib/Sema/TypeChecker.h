@@ -1084,7 +1084,7 @@ public:
                         DeclContext *dc,
                         GenericSignature *outerSignature,
                         bool allowConcreteGenericParams,
-                        ExtensionDecl *ext,
+                        const ExtensionDecl *ext,
                         llvm::function_ref<void(GenericSignatureBuilder &)>
                           inferRequirements,
                         bool mustInferRequirements);
@@ -1104,7 +1104,7 @@ public:
                         DeclContext *dc,
                         GenericSignature *outerSignature,
                         bool allowConcreteGenericParams,
-                        ExtensionDecl *ext) {
+                        const ExtensionDecl *ext) {
     return checkGenericEnvironment(genericParams, dc, outerSignature,
                                    allowConcreteGenericParams, ext,
                                    [&](GenericSignatureBuilder &) { },
