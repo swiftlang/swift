@@ -2117,6 +2117,7 @@ for host in "${ALL_HOSTS[@]}"; do
         tmp_product=${product}
         if [[ ${tmp_product} == "libdispatch_static" ]]; then
             tmp_product=libdispatch
+            LIBDISPATCH_STATIC_CMAKE_OPTIONS=${LIBDISPATCH_CMAKE_OPTIONS[@]}
         fi
         if ! [[ $(should_execute_action "${host}-${tmp_product}-build") ]]; then
             continue
