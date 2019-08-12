@@ -557,7 +557,7 @@ enum SE0155 {
 // SR-11261
 enum SR11261 {
   case identifier
-  case operator // expected-error {{keyword 'operator' cannot be used as an identifier here}} expected-error {{expected pattern}} expected-note {{if this name is unavoidable, use backticks to escape it}} 
+  case operator // expected-error {{keyword 'operator' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{8-16=`operator`}} expected-error {{expected pattern}}
   case identifier2
 }
 
