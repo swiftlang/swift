@@ -32,6 +32,7 @@
 #include "llvm/Object/Archive.h"
 #include "llvm/Object/ObjectFile.h"
 #include "llvm/Object/ELFObjectFile.h"
+#include "llvm/Object/COFF.h"
 
 using namespace swift;
 using namespace llvm::opt;
