@@ -988,3 +988,19 @@ bb0:
   %2 = builtin "ptrtoint_Int32"(%1 : $Builtin.RawPointer) : $Builtin.Int32
   return %2 : $Builtin.Int32
 }
+
+// Make sure that we perform the transformation, but do not eliminate the int1,
+// since we do not know what it is.
+//
+// CHECK-LABEL: sil @cond_fail_test : $@convention(thin) (Builtin.Int1) -> () {
+// CHECK-NOT: builtin
+// CHECK: cond_fail
+// CHECK-NOT: builtin
+// CHECK: } // end sil function 'cond_fail_test'
+sil @cond_fail_test : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+  %1 = string_literal utf8 "constant"
+  %2 = builtin "condfail_message"(%0 : $Builtin.Int1, %1 : $Builtin.RawPointer) : $()
+  %9999 = tuple()
+  return %9999 : $()
+}
