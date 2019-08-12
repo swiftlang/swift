@@ -443,7 +443,7 @@ static void depthFirstSearch(
     TypeVariableType *typeVar,
     llvm::function_ref<bool(TypeVariableType *)> preVisitNode,
     llvm::function_ref<bool(Constraint *)> visitConstraint,
-    llvm::DenseSet<Constraint *> &visitedConstraints) {
+    llvm::SmallPtrSet<Constraint *, 8> &visitedConstraints) {
   // Visit this node. If we've already seen it, bail out.
   if (!preVisitNode(typeVar))
     return;
@@ -500,10 +500,9 @@ namespace {
     mutable llvm::SmallDenseMap<TypeVariableType *, TypeVariableType *>
         representatives;
 
-
     /// The complete set of constraints that were visited while computing
     /// connected components.
-    llvm::DenseSet<Constraint *> visitedConstraints;
+    llvm::SmallPtrSet<Constraint *, 8> visitedConstraints;
 
   public:
     using Component = ConstraintGraph::Component;
@@ -542,7 +541,6 @@ namespace {
       // Assign each type variable to its appropriate component.
       SmallVector<Component, 1> components;
       llvm::SmallDenseMap<TypeVariableType *, unsigned> componentIdxMap;
-      SmallPtrSet<Constraint *, 4> knownConstraints;
       for (auto typeVar : typeVars) {
         // Find the representative. If we aren't creating a type variable
         // for this component, skip it.
@@ -559,18 +557,24 @@ namespace {
           components.push_back({ });
         }
 
-        // Record this type variable as part of the component.
+        // Record this type variabgetConstraintsle as part of the component.
         unsigned componentIdx = knownComponentIdx->second;
         auto &component = components[componentIdx];
         component.typeVars.push_back(typeVar);
       }
 
       // Assign each constraint to its appropriate component.
-      for (auto constraint : visitedConstraints) {
-        auto typeVar = constraint->getTypeVariables().front();
+      // Note: we use the inactive constraints so that we maintain the
+      // order of constraints when we re-introduce them.
+      for (auto &constraint : cs.getConstraints()) {
+        auto constraintTypeVars = constraint.getTypeVariables();
+        if (constraintTypeVars.empty())
+          continue;
+
+        auto typeVar = constraintTypeVars.front();
         auto rep = findRepresentative(typeVar);
         assert(componentIdxMap.count(rep) > 0);
-        components[componentIdxMap[rep]].constraints.push_back(constraint);
+        components[componentIdxMap[rep]].constraints.push_back(&constraint);
       }
 
       return components;
