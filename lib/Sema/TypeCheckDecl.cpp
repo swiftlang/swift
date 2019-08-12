@@ -3610,10 +3610,6 @@ static TypeLoc getTypeLocForFunctionResult(FuncDecl *FD) {
 }
 
 void TypeChecker::validateDecl(ValueDecl *D) {
-  // Generic parameters are validated as part of their context.
-  if (isa<GenericTypeParamDecl>(D))
-    return;
-
   // Handling validation failure due to re-entrancy is left
   // up to the caller, who must call hasValidSignature() to
   // check that validateDecl() returned a fully-formed decl.
@@ -3650,6 +3646,10 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     if (!ext->hasValidSignature())
       return;
   }
+
+  // Generic parameters are validated as part of their context.
+  if (isa<GenericTypeParamDecl>(D))
+    return;
 
   // Validating the parent may have triggered validation of this declaration,
   // so just return if that was the case.
