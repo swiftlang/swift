@@ -838,8 +838,7 @@ bool TypeChecker::typeCheckParameterList(ParameterList *PL,
     } else {
       param->setInterfaceType(type);
     }
-    
-    checkTypeModifyingDeclAttributes(param);
+
     if (!hadError) {
       auto *nestedRepr = typeRepr;
 
@@ -1125,19 +1124,25 @@ recur:
     VarDecl *var = NP->getDecl();
     if (var->isInvalid())
       type = ErrorType::get(Context);
-    var->setType(type);
-    // FIXME: wtf
-    if (type->hasTypeParameter())
-      var->setInterfaceType(type);
-    else
-      var->setInterfaceType(type->mapTypeOutOfContext());
 
-    checkTypeModifyingDeclAttributes(var);
-    if (var->getAttrs().hasAttribute<ReferenceOwnershipAttr>())
-      type = var->getType()->getReferenceStorageReferent();
-    else if (!var->isInvalid())
-      type = var->getType();
+    Type interfaceType = type;
+    if (interfaceType->hasArchetype())
+      interfaceType = interfaceType->mapTypeOutOfContext();
+
+    // In SIL mode, VarDecls are written as having reference storage types.
+    if (type->is<ReferenceStorageType>()) {
+      assert(interfaceType->is<ReferenceStorageType>());
+      type = type->getReferenceStorageReferent();
+    } else {
+      if (auto *attr = var->getAttrs().getAttribute<ReferenceOwnershipAttr>())
+        interfaceType = checkReferenceOwnershipAttr(var, interfaceType, attr);
+    }
+
+    // Note that the pattern's type does not include the reference storage type.
     P->setType(type);
+    var->setInterfaceType(interfaceType);
+    var->setType(var->getDeclContext()->mapTypeIntoContext(interfaceType));
+
     var->getTypeLoc() = tyLoc;
     var->getTypeLoc().setType(var->getType());
 
@@ -1663,8 +1668,6 @@ void TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
       param->setType(ty);
       param->setInterfaceType(ty->mapTypeOutOfContext());
     }
-    
-    checkTypeModifyingDeclAttributes(param);
   };
 
   // Coerce each parameter to the respective type.

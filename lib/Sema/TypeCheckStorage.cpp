@@ -251,12 +251,6 @@ static void validatePatternBindingEntry(TypeChecker &tc,
                                                    ? Property : GlobalVariable);
     }
   }
-
-  // If we have any type-adjusting attributes, apply them here.
-  assert(binding->getPattern(entryNumber)->hasType() && "Type missing?");
-  if (auto var = binding->getSingleVar()) {
-    tc.checkTypeModifyingDeclAttributes(var);
-  }
 }
 
 /// Validate the entries in the given pattern binding declaration.
