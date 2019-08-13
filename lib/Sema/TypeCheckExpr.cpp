@@ -416,7 +416,7 @@ namespace {
       if (!group) return false;
       if (storedGroup == group) return !GroupAndIsStrict.getInt();
       return TC.Context.associateInfixOperators(group, storedGroup)
-               == Associativity::Left;
+               != Associativity::Right;
     }
   };
 } // end anonymous namespace
@@ -522,17 +522,8 @@ static Expr *foldSequence(TypeChecker &TC, DeclContext *DC,
       // If we've drained the entire sequence, we're done.
       if (S.empty()) return LHS;
 
-      // Otherwise, we have to check that this next operator actually
-      // associates.
-      if ((op2 = getNextOperator()) && op2.precedence) {
-        associativity =
-            TC.Context.associateInfixOperators(op1.precedence, op2.precedence);
-        RHS = S[1];
-      }
-
-      // If so, start all over with our new LHS.
-      if (associativity != Associativity::None)
-        return foldSequence(TC, DC, LHS, S, precedenceBound);
+      // Otherwise, start all over with our new LHS.
+      return foldSequence(TC, DC, LHS, S, precedenceBound);
     }
 
     // If we ended up here, it's because we're either:
