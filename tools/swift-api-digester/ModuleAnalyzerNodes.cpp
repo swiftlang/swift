@@ -1090,6 +1090,10 @@ StringRef printGenericSignature(SDKContext &Ctx, ArrayRef<Requirement> AllReqs) 
     return StringRef();
   OS << "<";
   bool First = true;
+  PrintOptions Opts = PrintOptions::printInterface();
+  // We always print unqualifed type names to avoid false positives introduced
+  // by the heuristics working differently.
+  Opts.FullyQualifiedTypesIfAmbiguous = false;
   for (auto Req: AllReqs) {
     if (!First) {
       OS << ", ";
@@ -1097,9 +1101,9 @@ StringRef printGenericSignature(SDKContext &Ctx, ArrayRef<Requirement> AllReqs) 
       First = false;
     }
     if (Ctx.checkingABI())
-      getCanonicalRequirement(Req).print(OS, PrintOptions::printInterface());
+      getCanonicalRequirement(Req).print(OS, Opts);
     else
-      Req.print(OS, PrintOptions::printInterface());
+      Req.print(OS, Opts);
   }
   OS << ">";
   return Ctx.buffer(OS.str());

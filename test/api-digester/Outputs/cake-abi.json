@@ -59,7 +59,7 @@
       "declKind": "Protocol",
       "usr": "s:4cake2P3P",
       "moduleName": "cake",
-      "genericSig": "<τ_0_0 : cake.P1, τ_0_0 : cake.P2>",
+      "genericSig": "<τ_0_0 : P1, τ_0_0 : P2>",
       "conformances": [
         {
           "kind": "Conformance",
@@ -1235,7 +1235,7 @@
       "declKind": "Protocol",
       "usr": "s:4cake4PSubP",
       "moduleName": "cake",
-      "genericSig": "<τ_0_0 : cake.PSuper>",
+      "genericSig": "<τ_0_0 : PSuper>",
       "conformances": [
         {
           "kind": "Conformance",
