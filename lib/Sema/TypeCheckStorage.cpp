@@ -1633,8 +1633,6 @@ static AccessorDecl *createGetterPrototype(AbstractStorageDecl *storage,
                                            ASTContext &ctx) {
   SourceLoc loc = storage->getLoc();
 
-  GenericEnvironment *genericEnvironmentOfLazyAccessor = nullptr;
-
   ParamDecl *selfDecl = nullptr;
   if (storage->getDeclContext()->isTypeContext()) {
     if (storage->getAttrs().hasAttribute<LazyAttr>()) {
@@ -1645,8 +1643,6 @@ static AccessorDecl *createGetterPrototype(AbstractStorageDecl *storage,
         bindingDecl->getPatternEntryForVarDecl(varDecl).getInitContext());
 
       selfDecl = bindingInit->getImplicitSelfDecl();
-      genericEnvironmentOfLazyAccessor =
-        bindingInit->getGenericEnvironmentOfContext();
     }
   }
 
@@ -1674,18 +1670,6 @@ static AccessorDecl *createGetterPrototype(AbstractStorageDecl *storage,
   // the getter until we synthesize the body of the getter later.
   if (selfDecl)
     *getter->getImplicitSelfDeclStorage() = selfDecl;
-
-  // We need to install the generic environment here because:
-  // 1) validating the getter will change the implicit self decl's DC to it,
-  // 2) it's likely that the initializer will be type-checked before the
-  //    accessor (and therefore before the normal installation happens), and
-  // 3) type-checking a reference to the self decl will map its type into
-  //    its context, which requires an environment to be installed on that
-  //    context.
-  // We can safely use the enclosing environment because properties are never
-  // differently generic.
-  if (genericEnvironmentOfLazyAccessor)
-    getter->setGenericEnvironment(genericEnvironmentOfLazyAccessor);
 
   if (storage->isGetterMutating())
     getter->setSelfAccessKind(SelfAccessKind::Mutating);
