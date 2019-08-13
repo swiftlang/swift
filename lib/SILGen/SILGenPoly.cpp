@@ -3287,7 +3287,7 @@ static ManagedValue createAutoDiffThunk(SILGenFunction &SGF,
 
   AutoDiffParameterIndicesBuilder paramIndicesBuilder(inputSubstType);
   for (auto i : range(inputSubstType->getNumParams()))
-    if (!inputSubstType->getParams()[i].isNonDifferentiable())
+    if (!inputSubstType->getParams()[i].isNondifferentiable())
       paramIndicesBuilder.setParameter(i);
   auto *parameterIndices =
       paramIndicesBuilder.build(inputSubstType->getASTContext());
@@ -3334,7 +3334,7 @@ static ManagedValue createAutoDiffThunk(SILGenFunction &SGF,
 
   SILValue convertedBundle = SGF.B.createAutoDiffFunction(
       loc, sourceType->getDifferentiationParameterIndices(),
-      /*differentiationOrder*/ 1,
+      sourceType->getDifferentiationResultIndices(), /*differentiationOrder*/ 1,
       originalThunk.forward(SGF),
       {jvpThunk.forward(SGF), vjpThunk.forward(SGF)});
   return SGF.emitManagedRValueWithCleanup(convertedBundle);
@@ -3736,7 +3736,7 @@ SILGenModule::getOrCreateAutoDiffAssociatedFunctionThunk(
 
   auto origFnType = original->getLoweredFunctionType();
   auto origAssocFnType = origFnType->getAutoDiffAssociatedFunctionType(
-      indices.parameters, indices.source, /*differentiationOrder*/ 1,
+      indices.parameters, indices.results, /*differentiationOrder*/ 1,
       assocFnKind, M, LookUpConformanceInModule(M.getSwiftModule()),
       assocFnType->getGenericSignature());
   assert(!origAssocFnType->getExtInfo().hasContext());

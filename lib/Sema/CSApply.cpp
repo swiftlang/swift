@@ -5809,7 +5809,7 @@ maybeDiagnoseUnsupportedDifferentiableConversion(ConstraintSystem &cs,
               attributeString += "(linear)";
               break;
             case DifferentiabilityKind::Normal:
-            case DifferentiabilityKind::NonDifferentiable:
+            case DifferentiabilityKind::Nondifferentiable:
               break;
             }
             auto *funcTypeRepr = cast<FunctionTypeRepr>(typeRepr);

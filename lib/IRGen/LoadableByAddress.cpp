@@ -2733,8 +2733,8 @@ bool LoadableByAddress::recreateConvInstr(SILInstruction &I,
       associatedFunctions.push_back(assocFn.get());
     newInstr = convBuilder.createAutoDiffFunction(
         instr->getLoc(), instr->getParameterIndices(),
-        instr->getDifferentiationOrder(), instr->getOriginalFunction(),
-        associatedFunctions);
+        instr->getResultIndices(), instr->getDifferentiationOrder(),
+        instr->getOriginalFunction(), associatedFunctions);
     break;
   }
   case SILInstructionKind::AutoDiffFunctionExtractInst: {
@@ -2743,6 +2743,9 @@ bool LoadableByAddress::recreateConvInstr(SILInstruction &I,
         instr->getLoc(), instr->getExtractee(),
         instr->getDifferentiationOrder(), instr->getFunctionOperand());
     break;
+  }
+  case SILInstructionKind::LinearFunctionInst: {
+    llvm_unreachable("Unhandled linear_function inst");
   }
   default:
     llvm_unreachable("Unexpected conversion instruction");

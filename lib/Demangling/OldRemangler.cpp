@@ -735,8 +735,8 @@ void Remangler::mangleAutoDiffParameterIndices(Node *node) {
   Buffer << "<autodiff-parameter-indices>";
 }
 
-void Remangler::mangleAutoDiffResultIndex(Node *node) {
-  Buffer << "<autodiff-result-index>";
+void Remangler::mangleAutoDiffResultIndices(Node *node) {
+  Buffer << "<autodiff-result-indices>";
 }
 
 void Remangler::mangleAutoDiffJVP(Node *node) {

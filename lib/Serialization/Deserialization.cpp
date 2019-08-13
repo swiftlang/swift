@@ -4595,21 +4595,6 @@ Optional<swift::ParameterConvention> getActualParameterConvention(uint8_t raw) {
   return None;
 }
 
-/// Translate from the serialization SILParameterDifferentiability enumerators,
-/// which are guaranteed to be stable, to the AST ones.
-static Optional<swift::SILParameterDifferentiability>
-getActualSILParameterDifferentiability(uint8_t raw) {
-  switch (serialization::SILParameterDifferentiability(raw)) {
-#define CASE(ID)                                                               \
-  case serialization::SILParameterDifferentiability::ID:                       \
-    return swift::SILParameterDifferentiability::ID;
-  CASE(DifferentiableOrNotApplicable)
-  CASE(NotDifferentiable)
-  }
-  return None;
-#undef CASE
-}
-
 /// Translate from the serialization ResultConvention enumerators,
 /// which are guaranteed to be stable, to the AST ones.
 static
@@ -4850,7 +4835,7 @@ public:
     // SWIFT_ENABLE_TENSORFLOW
     bool noescape = false, throws = false;
     uint8_t rawDiffKind = 0;
-    auto diffKind = DifferentiabilityKind::NonDifferentiable;
+    auto diffKind = DifferentiabilityKind::Nondifferentiable;
     GenericSignature *genericSig = nullptr;
 
     if (!isGeneric) {
@@ -4902,11 +4887,11 @@ public:
 
       IdentifierID labelID;
       TypeID typeID;
-      bool isVariadic, isAutoClosure, isNonDifferentiable;
+      bool isVariadic, isAutoClosure, isNondifferentiable;
       unsigned rawOwnership;
       decls_block::FunctionParamLayout::readRecord(scratch, labelID, typeID,
                                                    isVariadic, isAutoClosure,
-                                                   rawOwnership, isNonDifferentiable);
+                                                   rawOwnership, isNondifferentiable);
 
       auto ownership =
           getActualValueOwnership((serialization::ValueOwnership)rawOwnership);
@@ -4922,7 +4907,7 @@ public:
       params.emplace_back(paramTy.get(),
                           MF.getIdentifier(labelID),
                           ParameterTypeFlags(isVariadic, isAutoClosure,
-                                             *ownership, isNonDifferentiable));
+                                             *ownership, isNondifferentiable));
     }
 
     if (!isGeneric) {
@@ -5291,16 +5276,13 @@ public:
       if (!type)
         return type.takeError();
       // SWIFT_ENABLE_TENSORFLOW
-      auto paramDiff =
-          swift::SILParameterDifferentiability::DifferentiableOrNotApplicable;
+      auto paramDiff = IsNotNondifferentiable;
       if (differentiable) {
-        auto paramDiffOpt =
-            getActualSILParameterDifferentiability(rawParamDiff);
-        if (!paramDiffOpt) {
+        if (rawParamDiff > 1) {
           MF.error();
           llvm_unreachable("an error is a fatal exit at this point");
         }
-        paramDiff = *paramDiffOpt;
+        paramDiff = (IsNondifferentiable_t)rawParamDiff;
       }
       return SILParameterInfo(type.get()->getCanonicalType(), *convention,
                               paramDiff);

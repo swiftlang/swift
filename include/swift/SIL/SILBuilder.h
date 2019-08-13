@@ -505,11 +505,12 @@ public:
   /// SWIFT_ENABLE_TENSORFLOW
   AutoDiffFunctionInst *createAutoDiffFunction(
       SILLocation loc, AutoDiffIndexSubset *parameterIndices,
-      unsigned differentiationOrder, SILValue original,
-      ArrayRef<SILValue> associatedFunctions = {}) {
+      AutoDiffIndexSubset *resultIndices, unsigned differentiationOrder,
+      SILValue original, ArrayRef<SILValue> associatedFunctions = {}) {
     return insert(AutoDiffFunctionInst::create(getModule(),
                                                getSILDebugLocation(loc),
                                                parameterIndices,
+                                               resultIndices,
                                                differentiationOrder,
                                                original,
                                                associatedFunctions));
@@ -528,6 +529,15 @@ public:
     return insert(new (getModule()) AutoDiffFunctionExtractInst(
         getModule(), getSILDebugLocation(loc),
         AutoDiffFunctionExtractee::Original, 0, theFunction));
+  }
+
+  LinearFunctionInst *createLinearFunction(
+      SILLocation loc, AutoDiffIndexSubset *parameterIndices,
+      AutoDiffIndexSubset *resultIndices, SILValue originalFunction,
+      Optional<SILValue> transposeFunction) {
+    return insert(LinearFunctionInst::create(
+        getModule(), getSILDebugLocation(loc), parameterIndices, resultIndices,
+        originalFunction, transposeFunction));
   }
 
   BuiltinInst *createBuiltin(SILLocation Loc, Identifier Name, SILType ResultTy,

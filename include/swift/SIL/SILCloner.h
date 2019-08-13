@@ -962,6 +962,7 @@ SILCloner<ImplClass>::visitAutoDiffFunctionInst(AutoDiffFunctionInst *Inst) {
   recordClonedInstruction(Inst,
     getBuilder().createAutoDiffFunction(getOpLocation(Inst->getLoc()),
                                         Inst->getParameterIndices(),
+                                        Inst->getResultIndices(),
                                         Inst->getDifferentiationOrder(),
                                         getOpValue(Inst->getOriginalFunction()),
                                         mappedAssocFns));
@@ -977,6 +978,22 @@ visitAutoDiffFunctionExtractInst(AutoDiffFunctionExtractInst *Inst) {
           Inst->getExtractee(),
           Inst->getDifferentiationOrder(),
           getOpValue(Inst->getFunctionOperand())));
+}
+
+template<typename ImplClass>
+void
+SILCloner<ImplClass>::visitLinearFunctionInst(LinearFunctionInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  auto mappedTranspose = Inst->getTransposeFunction();
+  if (mappedTranspose)
+    *mappedTranspose = getOpValue(*mappedTranspose);
+  recordClonedInstruction(Inst,
+      getBuilder().createLinearFunction(
+          getOpLocation(Inst->getLoc()),
+          Inst->getParameterIndices(),
+          Inst->getResultIndices(),
+          getOpValue(Inst->getOriginalFunction()),
+          mappedTranspose));
 }
 
 template<typename ImplClass>

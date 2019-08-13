@@ -450,7 +450,7 @@ SILGenModule::getKeyPathProjectionCoroutine(bool isReadAccess,
                              /*pseudogeneric*/false,
                              // SWIFT_ENABLE_TENSORFLOW
                              /*non-escaping*/false,
-                             DifferentiabilityKind::NonDifferentiable);
+                             DifferentiabilityKind::Nondifferentiable);
 
   auto functionTy = SILFunctionType::get(sig, extInfo,
                                          SILCoroutineKind::YieldOnce,
@@ -804,10 +804,10 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
 
       auto lookUpConformance = LookUpConformanceInModule(M.getSwiftModule());
       auto expectedJVPType = origSilFnType->getAutoDiffAssociatedFunctionType(
-          indices.parameters, indices.source, /*differentiationOrder*/ 1,
+          indices.parameters, indices.results, /*differentiationOrder*/ 1,
           AutoDiffAssociatedFunctionKind::JVP, M, lookUpConformance);
       auto expectedVJPType = origSilFnType->getAutoDiffAssociatedFunctionType(
-          indices.parameters, indices.source, /*differentiationOrder*/ 1,
+          indices.parameters, indices.results, /*differentiationOrder*/ 1,
           AutoDiffAssociatedFunctionKind::VJP, M, lookUpConformance);
 
       // Self reordering is necessary if wrt at least two parameters, including

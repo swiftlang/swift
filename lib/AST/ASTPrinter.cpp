@@ -2456,7 +2456,7 @@ static void printParameterFlags(ASTPrinter &printer, PrintOptions options,
   if (!options.excludeAttrKind(TAK_autoclosure) && flags.isAutoClosure())
     printer << "@autoclosure ";
   // SWIFT_ENABLE_TENSORFLOW
-  if (!options.excludeAttrKind(TAK_nondiff) && flags.isNonDifferentiable())
+  if (!options.excludeAttrKind(TAK_nondiff) && flags.isNondifferentiable())
     printer << "@nondiff ";
 
   switch (flags.getValueOwnership()) {
@@ -4518,7 +4518,7 @@ void SILParameterInfo::print(ASTPrinter &Printer,
                              const PrintOptions &Opts) const {
   /// SWIFT_ENABLE_TENSORFLOW
   switch (getDifferentiability()) {
-    case SILParameterDifferentiability::NotDifferentiable:
+    case IsNondifferentiable:
     Printer << "@nondiff ";
     break;
     default:

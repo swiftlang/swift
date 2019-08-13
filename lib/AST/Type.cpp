@@ -4541,8 +4541,8 @@ Optional<VectorSpace> TypeBase::getAutoDiffAssociatedTangentSpace(
 AnyFunctionType *AnyFunctionType::getAutoDiffAssociatedFunctionType(
     AutoDiffParameterIndices *indices, unsigned resultIndex,
     unsigned differentiationOrder, AutoDiffAssociatedFunctionKind kind,
-    LookupConformanceFn lookupConformance,
-    GenericSignature *whereClauseGenSig, bool makeSelfParamFirst) {
+    LookupConformanceFn lookupConformance, GenericSignature *whereClauseGenSig,
+    bool makeSelfParamFirst) {
   // JVP: (T...) -> ((R...),
   //                 (T.TangentVector...) -> (R.TangentVector...))
   // VJP: (T...) -> ((R...),
@@ -4811,11 +4811,11 @@ AnyFunctionType *AnyFunctionType::getWithoutDifferentiability() const {
   SmallVector<Param, 8> newParams;
   for (auto &param : getParams()) {
     Param newParam(param.getPlainType(), param.getLabel(),
-                   param.getParameterFlags().withNonDifferentiable(false));
+                   param.getParameterFlags().withNondifferentiable(false));
     newParams.push_back(newParam);
   }
   auto nonDiffExtInfo = getExtInfo()
-      .withDifferentiabilityKind(DifferentiabilityKind::NonDifferentiable);
+      .withDifferentiabilityKind(DifferentiabilityKind::Nondifferentiable);
   if (isa<FunctionType>(this))
     return FunctionType::get(newParams, getResult(), nonDiffExtInfo);
   assert(isa<GenericFunctionType>(this));

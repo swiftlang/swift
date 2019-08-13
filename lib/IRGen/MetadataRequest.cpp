@@ -1063,9 +1063,9 @@ namespace {
       // SWIFT_ENABLE_TENSORFLOW
       FunctionMetadataDifferentiabilityKind metadataDifferentiabilityKind;
       switch (type->getDifferentiabilityKind()) {
-      case DifferentiabilityKind::NonDifferentiable:
+      case DifferentiabilityKind::Nondifferentiable:
         metadataDifferentiabilityKind =
-            FunctionMetadataDifferentiabilityKind::NonDifferentiable;
+            FunctionMetadataDifferentiabilityKind::Nondifferentiable;
         break;
       case DifferentiabilityKind::Normal:
         metadataDifferentiabilityKind =

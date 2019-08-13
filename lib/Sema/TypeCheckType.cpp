@@ -2234,7 +2234,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       }
       
       // SWIFT_ENABLE_TENSORFLOW
-      auto diffkind = DifferentiabilityKind::NonDifferentiable;
+      auto diffkind = DifferentiabilityKind::Nondifferentiable;
       if (attrs.has(TAK_differentiable)) {
         diffkind = attrs.linear
             ? DifferentiabilityKind::Linear
@@ -2281,7 +2281,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       }
       
       // SWIFT_ENABLE_TENSORFLOW
-      DifferentiabilityKind diffkind = DifferentiabilityKind::NonDifferentiable;
+      DifferentiabilityKind diffkind = DifferentiabilityKind::Nondifferentiable;
       if (attrs.has(TAK_differentiable)) {
         if (attrs.linear) {
           // FIXME(bartchr): allow types to be marked
@@ -2910,8 +2910,7 @@ SILParameterInfo TypeResolver::resolveSILParameter(
   bool hadError = false;
 
   // SWIFT_ENABLE_TENSORFLOW
-  auto differentiability =
-      SILParameterDifferentiability::DifferentiableOrNotApplicable;
+  auto differentiability = IsNotNondifferentiable;
 
   if (auto attrRepr = dyn_cast<AttributedTypeRepr>(repr)) {
     auto attrs = attrRepr->getAttrs();
@@ -2941,7 +2940,7 @@ SILParameterInfo TypeResolver::resolveSILParameter(
     // SWIFT_ENABLE_TENSORFLOW
     if (attrs.has(TAK_nondiff)) {
       attrs.clearAttribute(TAK_nondiff);
-      differentiability = SILParameterDifferentiability::NotDifferentiable;
+      differentiability = IsNondifferentiable;
     }
 
     type = resolveAttributedType(attrs, attrRepr->getTypeRepr(), options);

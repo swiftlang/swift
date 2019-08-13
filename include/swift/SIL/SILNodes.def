@@ -691,6 +691,13 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                     SingleValueInstruction, None, DoesNotRelease)
   SINGLE_VALUE_INST(AutoDiffFunctionExtractInst, autodiff_function_extract,
                     SingleValueInstruction, None, DoesNotRelease)
+//  SINGLE_VALUE_INST(DestructureDifferentiableFunction,
+//                    destructure_differentiable_function,
+//                    MultipleValueInstruction, None, DoesNotRelease)
+  SINGLE_VALUE_INST(LinearFunctionInst, linear_function,
+                    SingleValueInstruction, None, DoesNotRelease)
+//  SINGLE_VALUE_INST(DestructureLinearFunction, destructure_linear_function,
+//                    MultipleValueInstruction, None, DoesNotRelease)
 
   // Key paths
   // TODO: The only "side effect" is potentially retaining the returned key path

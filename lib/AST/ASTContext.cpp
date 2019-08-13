@@ -3507,8 +3507,7 @@ SILFunctionType::SILFunctionType(GenericSignature *genericSig, ExtInfo ext,
   // functions.
   if (!ext.isDifferentiable())
     for (auto param : getParameters())
-      assert(param.getDifferentiability() ==
-                 SILParameterDifferentiability::DifferentiableOrNotApplicable &&
+      assert(param.getDifferentiability() == IsNotNondifferentiable &&
              "non-differentiable function has NotDifferentiable parameter");
 #endif
 }

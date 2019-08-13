@@ -394,9 +394,9 @@ Type ASTBuilder::createFunctionType(
 
   // SWIFT_ENABLE_TENSORFLOW
   switch (flags.getDifferentiabilityKind()) {
-  case FunctionMetadataDifferentiabilityKind::NonDifferentiable:
+  case FunctionMetadataDifferentiabilityKind::Nondifferentiable:
     einfo =
-        einfo.withDifferentiabilityKind(DifferentiabilityKind::NonDifferentiable);
+        einfo.withDifferentiabilityKind(DifferentiabilityKind::Nondifferentiable);
     break;
   case FunctionMetadataDifferentiabilityKind::Normal:
     einfo = einfo.withDifferentiabilityKind(DifferentiabilityKind::Normal);
@@ -425,7 +425,7 @@ Type ASTBuilder::createFunctionType(
                               .withVariadic(flags.isVariadic())
                               // SWIFT_ENABLE_TENSORFLOW
                               .withAutoClosure(flags.isAutoClosure())
-                              .withNonDifferentiable(flags.isNonDifferentiable());
+                              .withNondifferentiable(flags.isNondifferentiable());
 
     funcParams.push_back(AnyFunctionType::Param(type, label, parameterFlags));
   }
@@ -515,8 +515,9 @@ Type ASTBuilder::createImplFunctionType(
   auto einfo = SILFunctionType::ExtInfo(representation,
                                         flags.isPseudogeneric(),
                                         !flags.isEscaping(),
+                                        // SWIFT_ENABLE_TENSORFLOW
                                         DifferentiabilityKind::
-                                            NonDifferentiable);
+                                            Nondifferentiable);
 
   llvm::SmallVector<SILParameterInfo, 8> funcParams;
   llvm::SmallVector<SILYieldInfo, 8> funcYields;

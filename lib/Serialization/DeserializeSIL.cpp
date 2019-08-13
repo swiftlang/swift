@@ -653,12 +653,15 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
 
     uint64_t jvpNameId;
     uint64_t vjpNameId;
-    unsigned source;
-    ArrayRef<uint64_t> rawParameterIndices;
+    unsigned numParamIndices;
+    ArrayRef<uint64_t> rawIndices;
     SmallVector<Requirement, 8> requirements;
 
     SILDifferentiableAttrLayout::readRecord(scratch, jvpNameId, vjpNameId,
-                                            source, rawParameterIndices);
+                                            numParamIndices,
+                                            rawIndices);
+    auto rawParameterIndices = rawIndices.take_front(numParamIndices);
+    auto rawResultIndices = rawIndices.drop_front(numParamIndices);
 
     StringRef jvpName = MF->getIdentifier(jvpNameId).str();
     StringRef vjpName = MF->getIdentifier(vjpNameId).str();
@@ -668,7 +671,12 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     auto *parameterIndexSubset = AutoDiffIndexSubset::get(
         MF->getContext(), fn->getLoweredFunctionType()->getNumParameters(),
         parameterIndices);
-    SILAutoDiffIndices indices(source, parameterIndexSubset);
+    SmallVector<unsigned, 8> resultIndices(rawResultIndices.begin(),
+                                           rawResultIndices.end());
+    auto *resultIndexSubset = AutoDiffIndexSubset::get(
+        MF->getContext(), fn->getLoweredFunctionType()->getNumResults(),
+        resultIndices);
+    SILAutoDiffIndices indices(parameterIndexSubset, resultIndexSubset);
     MF->readGenericRequirements(requirements, SILCursor);
 
     auto *attr = SILDifferentiableAttr::create(SILMod, indices, requirements,
@@ -1001,7 +1009,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   Builder.setCurrentDebugScope(Fn->getDebugScope());
   unsigned RawOpCode = 0, TyCategory = 0, TyCategory2 = 0, TyCategory3 = 0,
            // SWIFT_ENABLE_TENSORFLOW
-           Attr = 0, Attr2 = 0, NumSubs = 0, NumConformances = 0,
+           Attr = 0, Attr2 = 0, Attr3 = 0, NumSubs = 0, NumConformances = 0,
            IsNonThrowingApply = 0;
   // SWIFT_ENABLE_TENSORFLOW
   unsigned NumArguments = 0;
@@ -1109,6 +1117,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   case SIL_INST_AUTODIFF_FUNCTION:
     SILInstAutoDiffFunctionLayout::readRecord(scratch, /*order*/ Attr,
                                               /*numParams*/ Attr2, NumArguments,
+                                              /*numParameterIndices*/ Attr3,
                                               ListOfValues);
     RawOpCode = (unsigned)SILInstructionKind::AutoDiffFunctionInst;
     break;
@@ -1507,22 +1516,30 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   }
   // SWIFT_ENABLE_TENSORFLOW
   case SILInstructionKind::AutoDiffFunctionInst: {
-    auto numParamIndices = ListOfValues.size() - NumArguments * 3;
+    auto numParamIndices = Attr3;
+    auto numResultIndices =
+        ListOfValues.size() - NumArguments * 3 - numParamIndices;
     auto rawParamIndices =
        map<SmallVector<unsigned, 8>>(ListOfValues.take_front(numParamIndices),
                                      [](uint64_t i) { return (unsigned)i; });
+    auto rawResultIndices = map<SmallVector<unsigned, 8>>(
+        ListOfValues.drop_front(numParamIndices).take_front(numResultIndices),
+        [](uint64_t i) { return (unsigned)i; });
     auto numParams = Attr2;
     auto *paramIndices =
         AutoDiffIndexSubset::get(MF->getContext(), numParams, rawParamIndices);
+    auto *resultIndices =
+        AutoDiffIndexSubset::get(MF->getContext(), numParams, rawResultIndices);
     SmallVector<SILValue, 4> operands;
-    for (auto i = numParamIndices; i < NumArguments * 3; i += 3) {
+    for (auto i = numParamIndices + numResultIndices;
+         i < NumArguments * 3; i += 3) {
       auto astTy = MF->getType(ListOfValues[i]);
       auto silTy = getSILType(astTy, (SILValueCategory)ListOfValues[i+1]);
       operands.push_back(getLocalValue(ListOfValues[i+2], silTy));
     }
-    ResultVal = Builder.createAutoDiffFunction(Loc, paramIndices,
-        /*differentiationOrder*/ Attr, operands[0],
-        ArrayRef<SILValue>(operands).drop_front());
+    ResultVal = Builder.createAutoDiffFunction(
+        Loc, paramIndices, resultIndices, /*differentiationOrder*/ Attr,
+        operands[0], ArrayRef<SILValue>(operands).drop_front());
     break;
   }
   case SILInstructionKind::AutoDiffFunctionExtractInst: {
@@ -1534,6 +1551,9 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     ResultVal =
         Builder.createAutoDiffFunctionExtract(Loc, extractee, order, val);
     break;
+  }
+  case SILInstructionKind::LinearFunctionInst: {
+    llvm_unreachable("Unhandled linear_function inst");
   }
   case SILInstructionKind::AllocGlobalInst: {
     // Format: Name and type. Use SILOneOperandLayout.

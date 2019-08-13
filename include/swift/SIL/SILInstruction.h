@@ -7815,6 +7815,8 @@ private:
   friend SILBuilder;
   /// Differentiation parameter indices.
   AutoDiffIndexSubset *parameterIndices;
+  /// Differentiation result indices.
+  AutoDiffIndexSubset *resultIndices;
   /// The order of differentiation.
   unsigned differentiationOrder;
   /// The number of operands. The first operand is always the original function.
@@ -7824,6 +7826,7 @@ private:
 
   AutoDiffFunctionInst(SILModule &module, SILDebugLocation debugLoc,
                        AutoDiffIndexSubset *parameterIndices,
+                       AutoDiffIndexSubset *resultIndices,
                        unsigned differentiationOrder,
                        SILValue originalFunction,
                        ArrayRef<SILValue> associatedFunctions);
@@ -7832,20 +7835,27 @@ public:
   static AutoDiffFunctionInst *create(SILModule &module,
                                       SILDebugLocation debugLoc,
                                       AutoDiffIndexSubset *parameterIndices,
+                                      AutoDiffIndexSubset *resultIndices,
                                       unsigned differentiationOrder,
                                       SILValue originalFunction,
                                       ArrayRef<SILValue> associatedFunctions);
 
   static SILType getAutoDiffType(SILValue original,
                                  unsigned differentiationOrder,
-                                 AutoDiffIndexSubset *parameterIndices);
+                                 AutoDiffIndexSubset *parameterIndices,
+                                 AutoDiffIndexSubset *resultIndices);
 
   /// Returns the original function.
   SILValue getOriginalFunction() const { return getAllOperands()[0].get(); }
 
-  /// Returns differentiation indices.
+  /// Returns differentiation parameter indices.
   AutoDiffIndexSubset *getParameterIndices() const {
     return parameterIndices;
+  }
+
+  /// Returns differentiation result indices.
+  AutoDiffIndexSubset *getResultIndices() const {
+    return resultIndices;
   }
 
   /// Returns the differentiation order.
@@ -7942,6 +7952,57 @@ public:
 };
 
 typedef AutoDiffFunctionExtractInst::Extractee AutoDiffFunctionExtractee;
+
+// SWIFT_ENABLE_TENSORFLOW
+/// `linear_function` - given a function, parameter indices, result indices, and
+/// its transpose function, create a `@differentiable(linear)` function that
+/// represents a bundle of these functions and configurations.
+class LinearFunctionInst final :
+    public InstructionBaseWithTrailingOperands<
+        SILInstructionKind::LinearFunctionInst,
+        LinearFunctionInst, OwnershipForwardingSingleValueInst> {
+private:
+  /// Differentiation parameter indices.
+  AutoDiffIndexSubset *parameterIndices;
+  /// Differentiation result indices.
+  AutoDiffIndexSubset *resultIndices;
+  /// The original function.
+  SILValue originalFunction;
+  /// The original function.
+  SILValue transposeFunction;
+
+  LinearFunctionInst(SILModule &module, SILDebugLocation debugLoc,
+                     AutoDiffIndexSubset *parameterIndices,
+                     AutoDiffIndexSubset *resultIndices,
+                     SILValue originalFunction, SILValue transposeFunction);
+
+public:
+  static LinearFunctionInst *create(SILModule &module,
+                                    SILDebugLocation debugLoc,
+                                    AutoDiffIndexSubset *parameterIndices,
+                                    AutoDiffIndexSubset *resultIndices,
+                                    SILValue originalFunction,
+                                    Optional<SILValue> transposeFunction);
+
+  AutoDiffIndexSubset *getParameterIndices() const {
+    return parameterIndices;
+  }
+
+  AutoDiffIndexSubset *getResultIndices() const {
+    return resultIndices;
+  }
+
+  SILValue getOriginalFunction() const { return originalFunction; }
+  Optional<SILValue> getTransposeFunction() const {
+    if (transposeFunction)
+      return transposeFunction;
+    return None;
+  }
+
+  /// True if the instruction is canonical, i.e. the transpose function
+  /// as an operand.
+  bool isCanonical() const { return (bool)transposeFunction; }
+};
 
 // This is defined out of line to work around the fact that this depends on
 // PartialApplyInst being defined, but PartialApplyInst is a subclass of

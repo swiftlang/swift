@@ -392,16 +392,18 @@ static NodePointer getMangledAutoDiffAssociatedFunctionNode(
   for (auto funcChild : *funcTopLevel)
     assocFn->addChild(funcChild, D);
 
-  auto paramIndices =
-      D.createNode(Node::Kind::AutoDiffParameterIndices);
+  auto paramIndices = D.createNode(Node::Kind::AutoDiffParameterIndices);
   for (unsigned i : indices.parameters->getIndices()) {
     auto paramIdx = D.createNode(Node::Kind::Index, i);
     paramIndices->addChild(paramIdx, D);
   }
   assocFn->addChild(paramIndices, D);
-  auto resultIdx =
-      D.createNode(Node::Kind::AutoDiffResultIndex, indices.source);
-  assocFn->addChild(resultIdx, D);
+  auto resultIndices = D.createNode(Node::Kind::AutoDiffResultIndices);
+  for (unsigned i : indices.results->getIndices()) {
+    auto resultIdx = D.createNode(Node::Kind::Index, i);
+    resultIndices->addChild(resultIdx, D);
+  }
+  assocFn->addChild(resultIndices, D);
   return topLevel;
 }
 
@@ -1482,7 +1484,7 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn) {
 
   // SWIFT_ENABLE_TENSORFLOW
   switch (fn->getExtInfo().getDifferentiabilityKind()) {
-  case DifferentiabilityKind::NonDifferentiable:
+  case DifferentiabilityKind::Nondifferentiable:
     break;
   case DifferentiabilityKind::Normal:
     OpArgs.push_back('d');

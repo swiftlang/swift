@@ -118,14 +118,18 @@ public:
 class DiffFuncTypeBuilder
     : public RecordTypeBuilder<DiffFuncTypeBuilder, DiffFuncFieldInfo,
                                DiffFuncIndex> {
-
+  DifferentiabilityKind differentiabilitykind;
   SILFunctionType *origFnTy;
   AutoDiffIndexSubset *parameterIndices;
+  AutoDiffIndexSubset *resultIndices;
 
 public:
-  DiffFuncTypeBuilder(IRGenModule &IGM, SILFunctionType *fnTy)
-      : RecordTypeBuilder(IGM), origFnTy(fnTy->getWithoutDifferentiability()),
-        parameterIndices(fnTy->getDifferentiationParameterIndices()) {
+  DiffFuncTypeBuilder(IRGenModule &IGM, DifferentiabilityKind diffKind,
+                      SILFunctionType *fnTy)
+      : RecordTypeBuilder(IGM), differentiabilitykind(diffKind),
+        origFnTy(fnTy->getWithoutDifferentiability()),
+        parameterIndices(fnTy->getDifferentiationParameterIndices()),
+        resultIndices(fnTy->getDifferentiationResultIndices()) {
     assert(fnTy->isDifferentiable());
   }
 
@@ -160,7 +164,7 @@ public:
     auto differentiationOrder = std::get<1>(field);
     auto kind = *std::get<0>(field).getExtracteeAsAssociatedFunction();
     auto assocTy = origFnTy->getAutoDiffAssociatedFunctionType(
-        parameterIndices, /*resultIndex*/ 0, differentiationOrder, kind,
+        parameterIndices, resultIndices, differentiationOrder, kind,
         IGM.getSILModule(), LookUpConformanceInModule(IGM.getSwiftModule()));
     return SILType::getPrimitiveObjectType(assocTy);
   }
@@ -174,14 +178,22 @@ public:
 
 const TypeInfo *
 TypeConverter::convertDifferentiableFunctionType(SILFunctionType *type) {
-  assert(type->isDifferentiable());
-  DiffFuncTypeBuilder builder(IGM, type);
+  auto diffKind = type->getExtInfo().getDifferentiabilityKind();
   SmallVector<DiffFuncIndex, 3> fields;
-  fields.push_back(
-      std::make_pair(AutoDiffFunctionExtractInst::Extractee::Original, 0));
-  fields.push_back(
-      std::make_pair(AutoDiffFunctionExtractInst::Extractee::JVP, 1));
-  fields.push_back(
-      std::make_pair(AutoDiffFunctionExtractInst::Extractee::VJP, 1));
+  switch (diffKind) {
+  case DifferentiabilityKind::Normal:
+    fields.push_back(
+        std::make_pair(AutoDiffFunctionExtractInst::Extractee::Original, 0));
+    fields.push_back(
+        std::make_pair(AutoDiffFunctionExtractInst::Extractee::JVP, 1));
+    fields.push_back(
+        std::make_pair(AutoDiffFunctionExtractInst::Extractee::VJP, 1));
+    break;
+  case DifferentiabilityKind::Linear:
+    llvm_unreachable("'@differentiable(linear)' unhandled!");
+  case DifferentiabilityKind::Nondifferentiable:
+    llvm_unreachable("Expected a '@differentiable' function type");
+  }
+  DiffFuncTypeBuilder builder(IGM, diffKind, type);
   return builder.layout(fields);
 }

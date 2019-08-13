@@ -1165,6 +1165,12 @@ public:
         *this << ' ' << i;
       *this << "] ";
     }
+    if (!adfi->getResultIndices()->isEmpty()) {
+      *this << "[results";
+      for (auto i : adfi->getResultIndices()->getIndices())
+        *this << ' ' << i;
+      *this << "] ";
+    }
     *this << "[order " << adfi->getDifferentiationOrder() << "] ";
     *this << getIDAndType(adfi->getOriginalFunction());
     if (!adfi->getAssociatedFunctions().empty()) {
@@ -1196,6 +1202,10 @@ public:
     if (order > 0)
       *this << "[order " << order << "] ";
     *this << getIDAndType(adfei->getFunctionOperand());
+  }
+
+  void visitLinearFunctionInst(LinearFunctionInst *lfi) {
+    llvm_unreachable("Unhandled linear_function inst");
   }
 
   void visitFunctionRefInst(FunctionRefInst *FRI) {
@@ -3120,7 +3130,11 @@ void SILSpecializeAttr::print(llvm::raw_ostream &OS) const {
 /// SWIFT_ENABLE_TENSORFLOW
 void SILDifferentiableAttr::print(llvm::raw_ostream &OS) const {
   auto &indices = getIndices();
-  OS << "source " << indices.source << " wrt ";
+  OS << "wrt ";
+  interleave(indices.parameters->getIndices(),
+             [&](unsigned index) { OS << index; },
+             [&] { OS << ", "; });
+  OS << "results ";
   interleave(indices.parameters->getIndices(),
              [&](unsigned index) { OS << index; },
              [&] { OS << ", "; });

@@ -361,6 +361,7 @@ FORWARD_ANY_OWNERSHIP_INST(DestructureTuple)
 // SWIFT_ENABLE_TENSORFLOW
 FORWARD_ANY_OWNERSHIP_INST(AutoDiffFunction)
 FORWARD_ANY_OWNERSHIP_INST(AutoDiffFunctionExtract)
+FORWARD_ANY_OWNERSHIP_INST(LinearFunction)
 #undef FORWARD_ANY_OWNERSHIP_INST
 
 // An instruction that forwards a constant ownership or trivial ownership.

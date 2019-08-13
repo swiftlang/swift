@@ -332,7 +332,7 @@ private:
     case Node::Kind::AutoClosureType:
     // SWIFT_ENABLE_TENSORFLOW
     case Node::Kind::AutoDiffParameterIndices:
-    case Node::Kind::AutoDiffResultIndex:
+    case Node::Kind::AutoDiffResultIndices:
     case Node::Kind::AutoDiffJVP:
     case Node::Kind::AutoDiffVJP:
     case Node::Kind::AutoDiffDifferential:
@@ -1663,8 +1663,13 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     Printer << ' ';
     return nullptr;
   }
-  case Node::Kind::AutoDiffResultIndex: {
-    Printer << "source " << Node->getIndex() << ' ';
+  case Node::Kind::AutoDiffResultIndices: {
+    Printer << "results ";
+    interleave(Node->begin(), Node->end(),
+               [&](NodePointer child) {
+      Printer << child->getIndex();
+    }, [&]() { Printer << ", "; });
+    Printer << ' ';
     return nullptr;
   }
   case Node::Kind::AutoDiffJVP:

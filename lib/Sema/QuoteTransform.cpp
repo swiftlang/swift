@@ -166,7 +166,7 @@ public:
   Expr *visitAnyFunctionType(AnyFunctionType *type) {
     SmallVector<Expr *, 4> attrs;
     switch (type->getExtInfo().getDifferentiabilityKind()) {
-    case DifferentiabilityKind::NonDifferentiable:
+    case DifferentiabilityKind::Nondifferentiable:
       break;
     case DifferentiabilityKind::Normal:
       attrs.push_back(makeQuote("Differentiable", {}));

@@ -1966,8 +1966,14 @@ void Remangler::mangleAutoDiffParameterIndices(Node *node) {
   }
 }
 
-void Remangler::mangleAutoDiffResultIndex(Node *node) {
-  Buffer << 'r' << node->getIndex();
+void Remangler::mangleAutoDiffResultIndices(Node *node) {
+  Buffer << 'r';
+  for (unsigned i = 0, n = node->getNumChildren(); i != n; ++i) {
+    auto child = node->getChild(i);
+    Buffer << child->getIndex();
+    if (i != n - 1)
+      Buffer << '_';
+  }
 }
 
 void

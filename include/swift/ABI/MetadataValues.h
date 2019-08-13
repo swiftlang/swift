@@ -736,7 +736,7 @@ enum class FunctionMetadataConvention: uint8_t {
 /// Differentiability kind for function type metadata.
 /// Duplicates `DifferentiabilityKind` in AutoDiff.h.
 enum class FunctionMetadataDifferentiabilityKind: uint8_t {
-  NonDifferentiable = 0b00,
+  Nondifferentiable = 0b00,
   Normal = 0b01,
   Linear = 0b11
 };
@@ -828,7 +828,7 @@ public:
       return FunctionMetadataDifferentiabilityKind::Normal;
     if (bool(Data & LinearMask))
       return FunctionMetadataDifferentiabilityKind::Linear;
-    return FunctionMetadataDifferentiabilityKind::NonDifferentiable;
+    return FunctionMetadataDifferentiabilityKind::Nondifferentiable;
   }
 
   bool hasParameterFlags() const { return bool(Data & ParamFlagsMask); }
@@ -857,7 +857,7 @@ class TargetParameterTypeFlags {
     ValueOwnershipMask    = 0x7F,
     VariadicMask          = 0x80,
     AutoClosureMask       = 0x100,
-    NonDifferentiableMask = 0x200
+    NondifferentiableMask = 0x200
   };
   int_type Data;
 
@@ -888,7 +888,7 @@ public:
   bool isVariadic() const { return Data & VariadicMask; }
   bool isAutoClosure() const { return Data & AutoClosureMask; }
   // SWIFT_ENABLE_TENSORFLOW
-  bool isNonDifferentiable() const { return Data & NonDifferentiableMask; }
+  bool isNondifferentiable() const { return Data & NondifferentiableMask; }
 
   ValueOwnership getValueOwnership() const {
     return (ValueOwnership)(Data & ValueOwnershipMask);

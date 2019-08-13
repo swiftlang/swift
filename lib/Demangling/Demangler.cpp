@@ -2162,12 +2162,18 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
         paramIndices->addChild(createNode(Node::Kind::Index, index), *this);
         nextIf('_');
       }
-      // Demangle result index.
-      nextIf('r');
       addChild(assocFn, paramIndices);
-      int resultIdx = demangleNatural();
-      auto resultIndex = createNode(Node::Kind::AutoDiffResultIndex, resultIdx);
-      addChild(assocFn, resultIndex);
+      // Demangle result index.
+      auto resultIndices = createNode(Node::Kind::AutoDiffResultIndices);
+      nextIf('r');
+      while (true) {
+        auto index = demangleNatural();
+        if (index < 0)
+          break;
+        resultIndices->addChild(createNode(Node::Kind::Index, index), *this);
+        nextIf('_');
+      }
+      addChild(assocFn, resultIndices);
       return assocFn;
     }
     // SWIFT_ENABLE_TENSORFLOW END

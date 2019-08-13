@@ -922,6 +922,7 @@ public:
   // SWIFT_ENABLE_TENSORFLOW
   void visitAutoDiffFunctionInst(AutoDiffFunctionInst *i);
   void visitAutoDiffFunctionExtractInst(AutoDiffFunctionExtractInst *i);
+  void visitLinearFunctionInst(LinearFunctionInst *i);
 
   void visitFunctionRefBaseInst(FunctionRefBaseInst *i);
   void visitFunctionRefInst(FunctionRefInst *i);
@@ -1880,6 +1881,10 @@ visitAutoDiffFunctionExtractInst(AutoDiffFunctionExtractInst *i) {
   e.add(adFnExp.getRange(structFieldOffset, structFieldOffset + fieldSize));
   (void)adFnExp.claimAll();
   setLoweredExplosion(i, e);
+}
+
+void IRGenSILFunction::visitLinearFunctionInst(LinearFunctionInst *i) {
+  llvm_unreachable("Unhandled linear_function");
 }
 
 void IRGenSILFunction::visitFunctionRefBaseInst(FunctionRefBaseInst *i) {

@@ -569,21 +569,23 @@ TryApplyInst *TryApplyInst::create(
 SILType
 AutoDiffFunctionInst::getAutoDiffType(SILValue originalFunction,
                                       unsigned differentiationOrder,
-                                      AutoDiffIndexSubset *parameterIndices) {
+                                      AutoDiffIndexSubset *parameterIndices,
+                                      AutoDiffIndexSubset *resultIndices) {
   auto fnTy = originalFunction->getType().castTo<SILFunctionType>();
-  auto diffTy =
-      fnTy->getWithDifferentiability(differentiationOrder, parameterIndices);
+  auto diffTy = fnTy->getWithDifferentiability(
+      DifferentiabilityKind::Normal, parameterIndices, resultIndices);
   return SILType::getPrimitiveObjectType(diffTy);
 }
 
 AutoDiffFunctionInst::AutoDiffFunctionInst(
     SILModule &module, SILDebugLocation debugLoc,
-    AutoDiffIndexSubset *parameterIndices, unsigned differentiationOrder,
-    SILValue originalFunction, ArrayRef<SILValue> associatedFunctions)
+    AutoDiffIndexSubset *parameterIndices, AutoDiffIndexSubset *resultIndices,
+    unsigned differentiationOrder, SILValue originalFunction,
+    ArrayRef<SILValue> associatedFunctions)
     : InstructionBaseWithTrailingOperands(
           originalFunction, associatedFunctions, debugLoc,
           getAutoDiffType(originalFunction, differentiationOrder,
-                          parameterIndices),
+                          parameterIndices, resultIndices),
           originalFunction.getOwnershipKind()),
       parameterIndices(parameterIndices),
       differentiationOrder(differentiationOrder),
@@ -591,13 +593,14 @@ AutoDiffFunctionInst::AutoDiffFunctionInst(
 
 AutoDiffFunctionInst *AutoDiffFunctionInst::create(
     SILModule &module, SILDebugLocation debugLoc,
-    AutoDiffIndexSubset *parameterIndices,
+    AutoDiffIndexSubset *parameterIndices, AutoDiffIndexSubset *resultIndices,
     unsigned differentiationOrder, SILValue originalFunction,
     ArrayRef<SILValue> associatedFunctions) {
   size_t size = totalSizeToAlloc<Operand>(associatedFunctions.size() + 1);
   void *buffer = module.allocateInst(size, alignof(AutoDiffFunctionInst));
   return ::new (buffer) AutoDiffFunctionInst(module, debugLoc,
                                              parameterIndices,
+                                             resultIndices,
                                              differentiationOrder,
                                              originalFunction,
                                              associatedFunctions);
@@ -687,6 +690,35 @@ AutoDiffFunctionExtractInst::AutoDiffFunctionExtractInst(
                       theFunction.getOwnershipKind()),
       extractee(extractee), differentiationOrder(differentiationOrder),
       operands(this, theFunction) {}
+
+LinearFunctionInst::LinearFunctionInst(
+    SILModule &module, SILDebugLocation debugLoc,
+    AutoDiffIndexSubset *parameterIndices, AutoDiffIndexSubset *resultIndices,
+    SILValue originalFunction, SILValue transposeFunction)
+    : InstructionBaseWithTrailingOperands(
+          originalFunction,
+          transposeFunction ?
+              ArrayRef<SILValue>({transposeFunction}) : ArrayRef<SILValue>(),
+          debugLoc,
+          SILType::getPrimitiveObjectType(
+              originalFunction->getType().castTo<SILFunctionType>()
+                  ->getWithDifferentiability(DifferentiabilityKind::Linear,
+                                             parameterIndices, resultIndices)),
+          originalFunction.getOwnershipKind()),
+      parameterIndices(parameterIndices), resultIndices(resultIndices),
+      originalFunction(originalFunction), transposeFunction(transposeFunction) {
+}
+
+LinearFunctionInst *LinearFunctionInst::create(
+    SILModule &module, SILDebugLocation debugLoc,
+    AutoDiffIndexSubset *parameterIndices, AutoDiffIndexSubset *resultIndices,
+    SILValue originalFunction, Optional<SILValue> transposeFunction) {
+  size_t size = totalSizeToAlloc<Operand>(transposeFunction ? 1 : 0);
+  void *buffer = module.allocateInst(size, alignof(LinearFunctionInst));
+  return ::new (buffer) LinearFunctionInst(
+      module, debugLoc, parameterIndices, resultIndices, originalFunction,
+      transposeFunction.getValueOr(SILValue()));
+}
 
 FunctionRefBaseInst::FunctionRefBaseInst(SILInstructionKind Kind,
                                          SILDebugLocation DebugLoc,

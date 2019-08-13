@@ -2690,7 +2690,7 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
                              /*pseudogeneric*/ false,
                              // SWIFT_ENABLE_TENSORFLOW
                              /*noescape*/ false,
-                             DifferentiabilityKind::NonDifferentiable),
+                             DifferentiabilityKind::Nondifferentiable),
     SILCoroutineKind::None,
     ParameterConvention::Direct_Unowned,
     params, {}, result, None, SGM.getASTContext());
@@ -2832,7 +2832,7 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
                              /*pseudogeneric*/ false,
                              // SWIFT_ENABLE_TENSORFLOW
                              /*noescape*/ false,
-                             DifferentiabilityKind::NonDifferentiable),
+                             DifferentiabilityKind::Nondifferentiable),
     SILCoroutineKind::None,
     ParameterConvention::Direct_Unowned,
     params, {}, {}, None, SGM.getASTContext());
@@ -3008,7 +3008,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
                                /*pseudogeneric*/ false,
                                // SWIFT_ENABLE_TENSORFLOW
                                /*noescape*/ false,
-                               DifferentiabilityKind::NonDifferentiable),
+                               DifferentiabilityKind::Nondifferentiable),
       SILCoroutineKind::None,
       ParameterConvention::Direct_Unowned,
       params, /*yields*/ {}, results, None, C);
@@ -3180,7 +3180,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
                                /*pseudogeneric*/ false,
                                // SWIFT_ENABLE_TENSORFLOW
                                /*noescape*/ false,
-                               DifferentiabilityKind::NonDifferentiable),
+                               DifferentiabilityKind::Nondifferentiable),
       SILCoroutineKind::None,
       ParameterConvention::Direct_Unowned,
       params, /*yields*/ {}, results, None, C);
@@ -5388,9 +5388,9 @@ RValue RValueEmitter::visitAutoDiffFunctionExpr(AutoDiffFunctionExpr *E,
                                                 SGFContext C) {
   auto orig = SGF.emitRValueAsSingleValue(E->getSubExpr());
   auto destTy = SGF.getLoweredType(E->getType()).castTo<SILFunctionType>();
-  // TODO(rxwei): Use the order specified in E's function type.
   auto *diffFunc = SGF.B.createAutoDiffFunction(
-      E, destTy->getDifferentiationParameterIndices(), /*order*/ 1,
+      E, destTy->getDifferentiationParameterIndices(),
+      destTy->getDifferentiationResultIndices(), /*order*/ 1,
       orig.forward(SGF));
   return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(diffFunc));
 }

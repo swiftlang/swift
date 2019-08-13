@@ -883,11 +883,10 @@ namespace {
                               ArrayRef<SILValue> values) const override {
       auto fnTy = getLoweredType().castTo<SILFunctionType>();
       auto paramIndices = fnTy->getDifferentiationParameterIndices();
-      // TODO: Retrieve the differentiation order when that is properly stored
-      // in the function type.
-      unsigned maxOrder = 1;
-      return B.createAutoDiffFunction(loc, paramIndices, maxOrder,
-                                      values.front(), values.drop_front());
+      auto resultIndices = fnTy->getDifferentiationResultIndices();
+      return B.createAutoDiffFunction(loc, paramIndices, resultIndices,
+                                      /*maxOrder*/ 1, values.front(),
+                                      values.drop_front());
     }
 
     void lowerChildren(SILModule &M,

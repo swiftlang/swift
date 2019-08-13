@@ -443,8 +443,9 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
              "JVP and VJP must exist in canonical SIL");
 
     auto &indices = DA->getIndices();
-    SmallVector<unsigned, 8> parameters(indices.parameters->begin(),
-                                        indices.parameters->end());
+    SmallVector<unsigned, 8> rawIndices;
+    rawIndices.append(indices.parameters->begin(), indices.parameters->end());
+    rawIndices.append(indices.results->begin(), indices.results->end());
     SILDifferentiableAttrLayout::emitRecord(
         Out, ScratchRecord, differentiableAttrAbbrCode,
         DA->hasJVP()
@@ -453,7 +454,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
         DA->hasVJP()
             ? S.addDeclBaseNameRef(Ctx.getIdentifier(DA->getVJPName()))
             : IdentifierID(),
-        indices.source, parameters);
+        indices.parameters->getNumIndices(), rawIndices);
     S.writeGenericRequirements(DA->getRequirements(), SILAbbrCodes);
   }
 
@@ -977,6 +978,9 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     auto *paramIndices = adfi->getParameterIndices();
     for (unsigned idx : paramIndices->getIndices())
       trailingInfo.push_back(idx);
+    auto *resultIndices = adfi->getResultIndices();
+    for (unsigned idx : resultIndices->getIndices())
+      trailingInfo.push_back(idx);
     for (auto &op : adfi->getAllOperands()) {
       auto val = op.get();
       trailingInfo.push_back(S.addTypeRef(val->getType().getASTType()));
@@ -986,7 +990,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     SILInstAutoDiffFunctionLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[SILInstAutoDiffFunctionLayout::Code],
         adfi->getDifferentiationOrder(), paramIndices->getCapacity(),
-        adfi->getNumOperands(), trailingInfo);
+        paramIndices->getNumIndices(), adfi->getNumOperands(), trailingInfo);
     break;
   }
   case SILInstructionKind::AutoDiffFunctionExtractInst: {
@@ -1000,6 +1004,9 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         operandTypeRef, (unsigned)operandType.getCategory(), operandRef,
         rawExtractee, adfei->getDifferentiationOrder());
     break;
+  }
+  case SILInstructionKind::LinearFunctionInst: {
+    llvm_unreachable("Unhandled linear_function inst");
   }
   case SILInstructionKind::ApplyInst: {
     // Format: attributes such as transparent and number of substitutions,

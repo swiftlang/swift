@@ -1781,7 +1781,7 @@ class ParameterTypeFlags {
     OwnershipShift = 2,
     Ownership   = 7 << OwnershipShift,
     // SWIFT_ENABLE_TENSORFLOW
-    NonDifferentiable = 1 << 5,
+    Nondifferentiable = 1 << 5,
     NumBits = 6
   };
   OptionSet<ParameterFlags> value;
@@ -1801,13 +1801,13 @@ public:
       : value((variadic ? Variadic : 0) | (autoclosure ? AutoClosure : 0) |
               // SWIFT_ENABLE_TENSORFLOW
               (uint8_t(ownership) << OwnershipShift) |
-              (nonDifferentiable ? NonDifferentiable : 0)) {}
+              (nonDifferentiable ? Nondifferentiable : 0)) {}
 
   /// Create one from what's present in the parameter type
   inline static ParameterTypeFlags
   // SWIFT_ENABLE_TENSORFLOW
   fromParameterType(Type paramTy, bool isVariadic, bool isAutoClosure,
-                    ValueOwnership ownership, bool isNonDifferentiable);
+                    ValueOwnership ownership, bool isNondifferentiable);
 
   bool isNone() const { return !value; }
   bool isVariadic() const { return value.contains(Variadic); }
@@ -1816,7 +1816,7 @@ public:
   bool isShared() const { return getValueOwnership() == ValueOwnership::Shared;}
   bool isOwned() const { return getValueOwnership() == ValueOwnership::Owned; }
   // SWIFT_ENABLE_TENSORFLOW
-  bool isNonDifferentiable() const { return value.contains(NonDifferentiable); }
+  bool isNondifferentiable() const { return value.contains(Nondifferentiable); }
 
   ValueOwnership getValueOwnership() const {
     return ValueOwnership((value.toRaw() & Ownership) >> OwnershipShift);
@@ -1854,10 +1854,10 @@ public:
   }
 
   // SWIFT_ENABLE_TENSORFLOW
-  ParameterTypeFlags withNonDifferentiable(bool nonDifferentiable) const {
+  ParameterTypeFlags withNondifferentiable(bool nonDifferentiable) const {
     return ParameterTypeFlags(nonDifferentiable
-                              ? value | ParameterTypeFlags::NonDifferentiable
-                              : value - ParameterTypeFlags::NonDifferentiable);
+                              ? value | ParameterTypeFlags::Nondifferentiable
+                              : value - ParameterTypeFlags::Nondifferentiable);
   }
 
   bool operator ==(const ParameterTypeFlags &other) const {
@@ -2799,7 +2799,7 @@ public:
 
     // SWIFT_ENABLE_TENSORFLOW
     /// Whether the parameter is marked '@nondiff'.
-    bool isNonDifferentiable() const { return Flags.isNonDifferentiable(); }
+    bool isNondifferentiable() const { return Flags.isNondifferentiable(); }
 
     ValueOwnership getValueOwnership() const {
       return Flags.getValueOwnership();
@@ -3503,32 +3503,18 @@ inline bool isGuaranteedParameter(ParameterConvention conv) {
   llvm_unreachable("bad convention kind");
 }
 
-/// SWIFT_ENABLE_TENSORFLOW
-/// Determines whether a differentiable function type is differentiable with
-/// respect to this parameter.
-enum class SILParameterDifferentiability : unsigned {
-  /// The function type is differentiable with respect to this parameter, or
-  /// differentiability is not applicable because the function is not
-  /// differentiable.
-  DifferentiableOrNotApplicable,
-
-  /// The function type is not differentiable with respect to this parameter.
-  NotDifferentiable,
-};
-
 /// A parameter type and the rules for passing it.
 class SILParameterInfo {
   llvm::PointerIntPair<CanType, 3, ParameterConvention> TypeAndConvention;
 
   // SWIFT_ENABLE_TENSORFLOW
-  SILParameterDifferentiability Differentiability : 1;
+  IsNondifferentiable_t Differentiability : 1;
 public:
   SILParameterInfo() = default;//: Ty(), Convention((ParameterConvention)0) {}
   // SWIFT_ENABLE_TENSORFLOW
   SILParameterInfo(
       CanType type, ParameterConvention conv,
-      SILParameterDifferentiability differentiability =
-          SILParameterDifferentiability::DifferentiableOrNotApplicable)
+      IsNondifferentiable_t differentiability = IsNotNondifferentiable)
     : TypeAndConvention(type, conv), Differentiability(differentiability) {
     assert(type->isLegalSILType() && "SILParameterInfo has illegal SIL type");
   }
@@ -3575,12 +3561,12 @@ public:
   }
 
   // SWIFT_ENABLE_TENSORFLOW
-  SILParameterDifferentiability getDifferentiability() const {
+  IsNondifferentiable_t getDifferentiability() const {
     return Differentiability;
   }
 
   SILParameterInfo getWithDifferentiability(
-      SILParameterDifferentiability differentiability) const {
+      IsNondifferentiable_t differentiability) const {
     return SILParameterInfo(getType(), getConvention(), differentiability);
   }
 
@@ -3674,6 +3660,9 @@ inline bool isIndirectFormalResult(ResultConvention convention) {
 /// A result type and the rules for returning it.
 class SILResultInfo {
   llvm::PointerIntPair<CanType, 3, ResultConvention> TypeAndConvention;
+
+  // SWIFT_ENABLE_TENSORFLOW
+  IsNondifferentiable_t Differentiability : 1;
 public:
   SILResultInfo() = default;
   SILResultInfo(CanType type, ResultConvention conv)
@@ -3686,6 +3675,10 @@ public:
   }
   ResultConvention getConvention() const {
     return TypeAndConvention.getInt();
+  }
+  // SWIFT_ENABLE_TENSORFLOW
+  IsNondifferentiable_t getDifferentiability() const {
+    return Differentiability;
   }
   /// The SIL storage type determines the ABI for arguments based purely on the
   /// formal result conventions. The actual SIL type for the result values may
@@ -4218,14 +4211,16 @@ public:
 
   // SWIFT_ENABLE_TENSORFLOW
   CanSILFunctionType getWithDifferentiability(
-      unsigned differentiationOrder, AutoDiffIndexSubset *parameterIndices);
+      DifferentiabilityKind diffKind,
+      AutoDiffIndexSubset *parameterIndices,
+      AutoDiffIndexSubset *resultIndices);
 
   CanSILFunctionType getWithoutDifferentiability();
 
   /// Returns the type of a differentiation function that is associated with
   /// a function of this type.
   CanSILFunctionType getAutoDiffAssociatedFunctionType(
-      AutoDiffIndexSubset *parameterIndices, unsigned resultIndex,
+      AutoDiffIndexSubset *parameterIndices, AutoDiffIndexSubset *resultIndices,
       unsigned differentiationOrder, AutoDiffAssociatedFunctionKind kind,
       SILModule &module, LookupConformanceFn lookupConformance,
       CanGenericSignature associatedFunctionGenericSignature = nullptr);
@@ -4235,6 +4230,12 @@ public:
   /// which parameters are not `@nondiff`). The function type must be
   /// differentiable.
   AutoDiffIndexSubset *getDifferentiationParameterIndices();
+
+  /// Returns a bit vector that specifices which results you can
+  /// differentiate with respect to for this differentiable function type. (e.g.
+  /// which results are not `@nondiff`). The function type must be
+  /// differentiable.
+  AutoDiffIndexSubset *getDifferentiationResultIndices();
 
   /// If this is a @convention(witness_method) function with a class
   /// constrained self parameter, return the class constraint for the
@@ -5747,7 +5748,7 @@ ParameterTypeFlags::fromParameterType(Type paramTy, bool isVariadic,
                                       bool isAutoClosure,
                                       // SWIFT_ENABLE_TENSORFLOW
                                       ValueOwnership ownership,
-                                      bool isNonDifferentiable) {
+                                      bool isNondifferentiable) {
   // FIXME(Remove InOut): The last caller that needs this is argument
   // decomposition.  Start by enabling the assertion there and fixing up those
   // callers, then remove this, then remove
@@ -5758,7 +5759,7 @@ ParameterTypeFlags::fromParameterType(Type paramTy, bool isVariadic,
     ownership = ValueOwnership::InOut;
   }
   // SWIFT_ENABLE_TENSORFLOW
-  return {isVariadic, isAutoClosure, ownership, isNonDifferentiable};
+  return {isVariadic, isAutoClosure, ownership, isNondifferentiable};
 }
 
 inline const Type *BoundGenericType::getTrailingObjectsPointer() const {

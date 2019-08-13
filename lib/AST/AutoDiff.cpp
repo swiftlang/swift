@@ -22,7 +22,7 @@
 using namespace swift;
 
 bool SILAutoDiffIndices::operator==(const SILAutoDiffIndices &other) const {
-  return source == other.source && parameters == other.parameters;
+  return parameters == other.parameters && results == other.results;
 }
 
 AutoDiffAssociatedFunctionKind::

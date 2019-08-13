@@ -276,14 +276,6 @@ enum class ParameterConvention : uint8_t {
 };
 using ParameterConventionField = BCFixed<4>;
 
-// SWIFT_ENABLE_TENSORFLOW
-// These IDs must \em not be renumbered or reordered without incrementing
-// the module version.
-enum class SILParameterDifferentiability : uint8_t {
-  DifferentiableOrNotApplicable,
-  NotDifferentiable,
-};
-
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
 enum class ResultConvention : uint8_t {

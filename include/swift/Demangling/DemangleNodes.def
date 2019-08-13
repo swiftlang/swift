@@ -37,7 +37,7 @@ NODE(BaseWitnessTableAccessor)
 NODE(AutoClosureType)
 // SWIFT_ENABLE_TENSORFLOW
 NODE(AutoDiffParameterIndices)
-NODE(AutoDiffResultIndex)
+NODE(AutoDiffResultIndices)
 NODE(AutoDiffJVP)
 NODE(AutoDiffVJP)
 NODE(AutoDiffDifferential)

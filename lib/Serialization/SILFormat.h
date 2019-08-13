@@ -318,8 +318,8 @@ namespace sil_block {
     SIL_DIFFERENTIABLE_ATTR,
     IdentifierIDField,    // JVP name.
     IdentifierIDField,    // VJP name.
-    BCVBR<8>,             // Result index.
-    BCArray<ValueIDField> // Parameter indices.
+    BCVBR<8>,             // The number of parameter indices.
+    BCArray<ValueIDField> // Parameter indices and result indices.
   >;
 
   // Has an optional argument list where each argument is a typed valueref.
@@ -413,7 +413,8 @@ namespace sil_block {
     BCVBR<8>,             // differentiation order
     BCVBR<8>,             // number of function parameters
     BCVBR<8>,             // number of operands
-    BCArray<ValueIDField> // parameter indices and operands
+    BCVBR<8>,             // number of parameter indices
+    BCArray<ValueIDField> // parameter indices, result indices and operands
   >;
 
   using SILInstAutoDiffFunctionExtractLayout = BCRecordLayout<

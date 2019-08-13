@@ -106,30 +106,34 @@ SILFunctionType::getDifferentiationParameterIndices() {
   assert(isDifferentiable());
   SmallVector<unsigned, 8> result;
   for (auto valueAndIndex : enumerate(getParameters()))
-    if (valueAndIndex.value().getDifferentiability() !=
-            SILParameterDifferentiability::NotDifferentiable)
+    if (valueAndIndex.value().getDifferentiability() == IsNotNondifferentiable)
       result.push_back(valueAndIndex.index());
   return AutoDiffIndexSubset::get(getASTContext(), getNumParameters(), result);
 }
 
-CanSILFunctionType SILFunctionType::getWithDifferentiability(
-    unsigned differentiationOrder, AutoDiffIndexSubset *parameterIndices) {
-  // FIXME(rxwei): Handle differentiation order.
+AutoDiffIndexSubset *
+SILFunctionType::getDifferentiationResultIndices() {
+  assert(isDifferentiable());
+  SmallVector<unsigned, 8> result;
+  for (auto valueAndIndex : enumerate(getResults()))
+    if (valueAndIndex.value().getDifferentiability() == IsNotNondifferentiable)
+      result.push_back(valueAndIndex.index());
+  return AutoDiffIndexSubset::get(getASTContext(), getNumResults(), result);
+}
 
+CanSILFunctionType SILFunctionType::getWithDifferentiability(
+    DifferentiabilityKind diffKind, AutoDiffIndexSubset *parameterIndices,
+    AutoDiffIndexSubset *resultIndices) {
   SmallVector<SILParameterInfo, 8> newParameters;
   for (auto paramAndIndex : enumerate(getParameters())) {
     auto &param = paramAndIndex.value();
     unsigned index = paramAndIndex.index();
     newParameters.push_back(param.getWithDifferentiability(
-        index < parameterIndices->getCapacity() &&
-            parameterIndices->contains(index)
-                ? SILParameterDifferentiability::DifferentiableOrNotApplicable
-                : SILParameterDifferentiability::NotDifferentiable));
+        IsNondifferentiable_t(
+            !(index < parameterIndices->getCapacity() &&
+              parameterIndices->contains(index)))));
   }
-
-  auto newExtInfo = getExtInfo().withDifferentiabilityKind(
-      DifferentiabilityKind::Normal);
-
+  auto newExtInfo = getExtInfo().withDifferentiabilityKind(diffKind);
   return get(getGenericSignature(), newExtInfo, getCoroutineKind(),
              getCalleeConvention(), newParameters, getYields(), getResults(),
              getOptionalErrorResult(), getASTContext(),
@@ -140,11 +144,10 @@ CanSILFunctionType SILFunctionType::getWithoutDifferentiability() {
   if (!isDifferentiable())
     return CanSILFunctionType(this);
   auto nondiffExtInfo = getExtInfo().withDifferentiabilityKind(
-      DifferentiabilityKind::NonDifferentiable);
+      DifferentiabilityKind::Nondifferentiable);
   SmallVector<SILParameterInfo, 8> newParams;
   for (auto &param : getParameters())
-    newParams.push_back(param.getWithDifferentiability(
-        SILParameterDifferentiability::DifferentiableOrNotApplicable));
+    newParams.push_back(param.getWithDifferentiability(IsNotNondifferentiable));
   return SILFunctionType::get(getGenericSignature(), nondiffExtInfo,
                               getCoroutineKind(), getCalleeConvention(),
                               newParams, getYields(), getResults(),
@@ -181,7 +184,7 @@ static CanGenericSignature getAutoDiffAssociatedFunctionGenericSignature(
 }
 
 CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
-    AutoDiffIndexSubset *parameterIndices, unsigned resultIndex,
+    AutoDiffIndexSubset *parameterIndices, AutoDiffIndexSubset *resultIndices,
     unsigned differentiationOrder, AutoDiffAssociatedFunctionKind kind,
     SILModule &module, LookupConformanceFn lookupConformance,
     CanGenericSignature assocFnGenSig) {
@@ -194,7 +197,7 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
   auto &typeConverter = module.Types;
 
   // Helper function testing if we are differentiating wrt this index.
-  auto isWrtIndex = [&](unsigned index) -> bool {
+  auto containsIndex = [&](AutoDiffIndexSubset *, unsigned index) -> bool {
     return index < parameterIndices->getCapacity() &&
         parameterIndices->contains(index);
   };
@@ -202,8 +205,13 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
   // Calculate differentiation parameter infos.
   SmallVector<SILParameterInfo, 4> wrtParams;
   for (auto valueAndIndex : enumerate(getParameters()))
-    if (isWrtIndex(valueAndIndex.index()))
+    if (containsIndex(parameterIndices, valueAndIndex.index()))
       wrtParams.push_back(valueAndIndex.value());
+  // Calculate differentiation result infos.
+  SmallVector<SILResultInfo, 1> wrtResults;
+  for (auto valueAndIndex : enumerate(getResults()))
+    if (containsIndex(parameterIndices, valueAndIndex.index()))
+      wrtResults.push_back(valueAndIndex.value());
 
   // Get the canonical associated function generic signature.
   if (!assocFnGenSig)
@@ -274,12 +282,13 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
           {paramTan->getCanonicalType(), param.getConvention()});
     }
     SmallVector<SILResultInfo, 8> differentialResults;
-    auto &result = getResults()[resultIndex];
-    auto resultTan =
-        result.getType()->getAutoDiffAssociatedTangentSpace(lookupConformance);
-    assert(resultTan && "Result type does not have a tangent space?");
-    differentialResults.push_back(
-        {resultTan->getCanonicalType(), result.getConvention()});
+    for (auto &result : wrtResults) {
+      auto resultTan = result.getType()
+          ->getAutoDiffAssociatedTangentSpace(lookupConformance);
+      assert(resultTan && "Result type does not have a tangent space?");
+      differentialResults.push_back(
+          {resultTan->getCanonicalType(), result.getConvention()});
+    }
     closureType = SILFunctionType::get(
         /*genericSignature*/ nullptr, ExtInfo(), SILCoroutineKind::None,
         ParameterConvention::Direct_Guaranteed, differentialParams, {},
@@ -288,13 +297,14 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
   }
   case AutoDiffAssociatedFunctionKind::VJP: {
     SmallVector<SILParameterInfo, 8> pullbackParams;
-    auto &origRes = getResults()[resultIndex];
-    auto resultTan =
-        origRes.getType()->getAutoDiffAssociatedTangentSpace(lookupConformance);
-    assert(resultTan && "Result type does not have a tangent space?");
-    pullbackParams.push_back(
-        getTangentParameterInfoForOriginalResult(resultTan->getCanonicalType(),
-                                                 origRes.getConvention()));
+    for (auto &result : wrtResults) {
+      auto resultTan = result.getType()
+          ->getAutoDiffAssociatedTangentSpace(lookupConformance);
+      assert(resultTan && "Result type does not have a tangent space?");
+      pullbackParams.push_back(
+          getTangentParameterInfoForOriginalResult(
+              resultTan->getCanonicalType(), result.getConvention()));
+    }
     SmallVector<SILResultInfo, 8> pullbackResults;
     for (auto &param : wrtParams) {
       auto paramTan =
@@ -767,7 +777,7 @@ private:
 
       visit(flags.getValueOwnership(), /*forSelf=*/false,
             // SWIFT_ENABLE_TENSORFLOW
-            eltPattern, ty, silRepresentation, flags.isNonDifferentiable());
+            eltPattern, ty, silRepresentation, flags.isNondifferentiable());
     }
 
     // Process the self parameter.  Note that we implicitly drop self
@@ -790,7 +800,7 @@ private:
              AbstractionPattern origType, CanType substType,
              // SWIFT_ENABLE_TENSORFLOW
              SILFunctionTypeRepresentation rep,
-             bool isNonDifferentiable = false) {
+             bool isNondifferentiable = false) {
     assert(!isa<InOutType>(substType));
 
     // Tuples get handled specially, in some cases:
@@ -842,9 +852,8 @@ private:
 
     // SWIFT_ENABLE_TENSORFLOW
     SILParameterInfo param(loweredType, convention);
-    if (isNonDifferentiable)
-      param = param.getWithDifferentiability(
-          SILParameterDifferentiability::NotDifferentiable);
+    if (isNondifferentiable)
+      param = param.getWithDifferentiability(IsNondifferentiable);
     Inputs.push_back(param);
 
     maybeAddForeignParameters();

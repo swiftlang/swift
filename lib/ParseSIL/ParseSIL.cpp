@@ -987,36 +987,38 @@ static bool parseDifferentiableAttr(
   SmallVectorImpl<SILDifferentiableAttr *> &DAs, SILParser &SP) {
   auto &P = SP.P;
   SourceLoc LastLoc = P.getEndOfPreviousLoc();
-  // Parse 'source'.
-  unsigned SourceIndex;
-  if (P.parseSpecificIdentifier(
-          "source", diag::sil_attr_differentiable_expected_keyword, "source") ||
-      P.parseUnsignedInteger(SourceIndex, LastLoc,
-           diag::sil_attr_differentiable_expected_source_index))
-    return true;
-  // Parse 'wrt'.
-  if (P.parseSpecificIdentifier(
-        "wrt", diag::sil_attr_differentiable_expected_keyword, "wrt"))
-    return true;
+
   // Parse parameter index list.
-  SmallVector<unsigned, 8> ParamIndices;
-  // Function that parses an index into `ParamIndices`. Returns true on error.
-  auto parseParam = [&]() -> bool {
-    unsigned Index;
-    // TODO: Reject non-ascending parameter index lists.
-    if (P.parseUnsignedInteger(Index, LastLoc,
-            diag::sil_attr_differentiable_expected_parameter_index))
+  auto parseIndexList =
+      [&](StringRef label, SmallVectorImpl<unsigned> &dest) -> bool {
+    // Parse 'wrt'.
+    if (P.parseSpecificIdentifier(
+            label, diag::sil_attr_differentiable_expected_keyword, label))
       return true;
-    ParamIndices.push_back(Index);
-    return false;
-  };
-  // Parse first.
-  if (parseParam())
-    return true;
-  // Parse rest.
-  while (P.consumeIf(tok::comma))
+    // Function that parses an index into `dest`. Returns true on error.
+    auto parseParam = [&]() -> bool {
+      unsigned Index;
+      // TODO: Reject non-ascending index lists.
+      if (P.parseUnsignedInteger(Index, LastLoc,
+              diag::sil_attr_differentiable_expected_parameter_index))
+        return true;
+      dest.push_back(Index);
+      return false;
+    };
+    // Parse first.
     if (parseParam())
       return true;
+    // Parse rest.
+    while (P.consumeIf(tok::comma))
+      if (parseParam())
+        return true;
+    return false;
+  };
+  SmallVector<unsigned, 8> ParamIndices;
+  SmallVector<unsigned, 8> ResultIndices;
+  if (parseIndexList("wrt", ParamIndices) ||
+      parseIndexList("results", ResultIndices))
+    return true;
 
   // Parse a SIL function name, e.g. '@foo'.
   auto parseFnName = [&P, &LastLoc](Identifier &id) -> bool {
@@ -1052,11 +1054,16 @@ static bool parseDifferentiableAttr(
                    diag::sil_attr_differentiable_expected_rsquare))
     return true;
   // Create a SILDifferentiableAttr and we are done.
-  auto maxIndexRef = std::max_element(ParamIndices.begin(), ParamIndices.end());
+  auto maxParamIndexRef =
+      std::max_element(ParamIndices.begin(), ParamIndices.end());
   auto *paramIndicesSubset = AutoDiffIndexSubset::get(
-      P.Context, maxIndexRef ? *maxIndexRef + 1 : 0, ParamIndices);
+      P.Context, maxParamIndexRef ? *maxParamIndexRef + 1 : 0, ParamIndices);
+  auto maxResultIndexRef =
+      std::max_element(ResultIndices.begin(), ResultIndices.end());
+  auto *resultIndicesSubset = AutoDiffIndexSubset::get(
+      P.Context, maxResultIndexRef ? *maxResultIndexRef + 1 : 0, ResultIndices);
   auto *Attr = SILDifferentiableAttr::create(
-      SP.SILMod, {SourceIndex, paramIndicesSubset}, JVPName.str(),
+      SP.SILMod, {paramIndicesSubset, resultIndicesSubset}, JVPName.str(),
       VJPName.str(), WhereClause);
   DAs.push_back(Attr);
   return false;
@@ -2895,13 +2902,14 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
 
   // SWIFT_ENABLE_TENSORFLOW
   case SILInstructionKind::AutoDiffFunctionInst: {
-    // e.g. autodiff_function [wrt 0 1 2] [order 2] %0 : $T
+    // e.g. autodiff_function [wrt 0 1 2] [results 0 1] [order 2] %0 : $T
     //
-    // e.g. autodiff_function [wrt 0 1 2] [order 2] %0 : $T with
+    // e.g. autodiff_function [wrt 0 1 2] [results 0 1] [order 2] %0 : $T with
     //      {%1 : $T, %2 : $T}, {%3 : $T, %4 : $T}
     //        ^ jvp    ^ vjp
     SourceLoc lastLoc;
     SmallVector<unsigned, 8> parameterIndices;
+    SmallVector<unsigned, 8> resultIndices;
     unsigned order = 1;
     // Parse optional `[wrt <integer_literal>...]`
     if (P.Tok.is(tok::l_square) &&
@@ -2920,6 +2928,25 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
       if (P.parseToken(tok::r_square,
                        diag::sil_inst_autodiff_attr_expected_rsquare,
                        "parameter index list"))
+        return true;
+    }
+    // Parse optional `[results <integer_literal>...]`
+    if (P.Tok.is(tok::l_square) &&
+        P.peekToken().is(tok::identifier) &&
+        P.peekToken().getText() == "results") {
+      P.consumeToken(tok::l_square);
+      P.consumeToken(tok::identifier);
+      // Parse indices.
+      while (P.Tok.is(tok::integer_literal)) {
+        unsigned index;
+        if (P.parseUnsignedInteger(index, lastLoc,
+              diag::sil_inst_autodiff_expected_parameter_index))
+          return true;
+        resultIndices.push_back(index);
+      }
+      if (P.parseToken(tok::r_square,
+                       diag::sil_inst_autodiff_attr_expected_rsquare,
+                       "result index list"))
         return true;
     }
     // Parse optional `[order <integer_literal>]`.
@@ -2982,11 +3009,13 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     }
     if (parseSILDebugLocation(InstLoc, B))
       return true;
-    auto *parameterIndicesSubset =
-        AutoDiffIndexSubset::get(P.Context, fnType->getNumParameters(),
-                                 parameterIndices);
-    ResultVal = B.createAutoDiffFunction(InstLoc, parameterIndicesSubset, order,
-                                         original, associatedFunctions);
+    auto *parameterIndicesSubset = AutoDiffIndexSubset::get(
+        P.Context, fnType->getNumParameters(), parameterIndices);
+    auto *resultIndicesSubset = AutoDiffIndexSubset::get(
+        P.Context, fnType->getNumParameters(), resultIndices);
+    ResultVal = B.createAutoDiffFunction(InstLoc, parameterIndicesSubset,
+                                         resultIndicesSubset, order, original,
+                                         associatedFunctions);
     break;
   }
   
@@ -3027,6 +3056,10 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     ResultVal = B.createAutoDiffFunctionExtract(InstLoc, extractee, order,
                                                 functionOperand);
     break;
+  }
+
+  case SILInstructionKind::LinearFunctionInst: {
+    llvm_unreachable("Unhandled linear_function inst");
   }
 
   case SILInstructionKind::DynamicFunctionRefInst: {
@@ -5732,7 +5765,12 @@ bool SILParserTUState::parseDeclSIL(Parser &P) {
       if (indices.parameters->getCapacity() != SILFnType->getNumParameters()) {
         auto *newParamIndices = Attr->getIndices().parameters
             ->extendingCapacity(P.Context, SILFnType->getNumParameters());
-        Attr->setIndices({Attr->getIndices().source, newParamIndices});
+        Attr->setIndices({newParamIndices, Attr->getIndices().results});
+      }
+      if (indices.results->getCapacity() != SILFnType->getNumResults()) {
+        auto *newResultIndices = Attr->getIndices().results
+            ->extendingCapacity(P.Context, SILFnType->getNumResults());
+        Attr->setIndices({Attr->getIndices().parameters, newResultIndices});
       }
       FunctionState.F->addDifferentiableAttr(Attr);
     }

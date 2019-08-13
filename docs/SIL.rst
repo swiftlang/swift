@@ -5566,18 +5566,20 @@ autodiff_function
 
   sil-instruction ::= 'autodiff_function'
                       sil-autodiff-function-parameter-indices?
+                      sil-autodiff-function-result-indices?
                       sil-autodiff-function-order?
                       sil-value ':' sil-type
                       sil-autodiff-associated-functions-clause?
                       
   sil-autodiff-function-parameter-indices ::= '[' 'wrt' [0-9]+ (',', [0-9]+)* ']'
+  sil-autodiff-function-result-indices ::= '[' 'results' [0-9]+ (',', [0-9]+)* ']'
   sil-autodiff-function-differentiation-order ::= '[' 'order' [0-9]+ ']'
   sil-autodiff-associated-functions-clause ::= 'with' sil-autodiff-associated-function-list
                                                (',' sil-autodiff-associated-function-list)*
   sil-autodiff-associated-function-list ::= '{' sil-value ',' sil-value '}'
 
 
-  autodiff_function [wrt 0] [order 1] %0 : $(T) -> T \
+  autodiff_function [wrt 0] [results 0] [order 1] %0 : $(T) -> T \
     with {%1 : $(T) -> (T) -> T, %2 : $(T) -> (T) -> T}
 
 Bundles a function with its associated differentiation functions up to a
@@ -5588,6 +5590,10 @@ specified differentiation order into an ``@differentiable`` function. There are
 ``[wrt ...]`` specifies parameter indices that the original function is
 differentiable with respect to. When not specified, it defaults to all
 parameters.
+
+``[results ...]`` specifies result indices that the original function is
+differentiable with respect to. When not specified, it defaults to all
+results.
 
 ``[order ...]`` specifies the maximum differentiation order for the resulting
 function. The number of lists of associated functions is equal to the order.

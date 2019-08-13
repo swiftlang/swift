@@ -24,8 +24,16 @@
 
 namespace swift {
 
+/// Determines whether a function parameter or result is marked '@nondiff'.
+enum IsNondifferentiable_t : bool {
+  /// '@nondiff'.
+  IsNondifferentiable,
+  /// Not '@nondiff'.
+  IsNotNondifferentiable
+};
+
 enum class DifferentiabilityKind: uint8_t {
-  NonDifferentiable = 0b00,
+  Nondifferentiable = 0b00,
   Normal = 0b01,
   Linear = 0b11
 };
@@ -474,8 +482,6 @@ public:
 /// all parameter lists. When differentiating such functions, we treat them as
 /// fully uncurried.
 struct SILAutoDiffIndices {
-  /// The index of the dependent result to differentiate from.
-  unsigned source;
   /// Independent parameters to differentiate with respect to. The bits
   /// correspond to the function's parameters in order. For example,
   ///
@@ -490,11 +496,12 @@ struct SILAutoDiffIndices {
   ///
   AutoDiffIndexSubset *parameters;
 
-  /// Creates a set of AD indices from the given source index and a bit vector
-  /// representing parameter indices.
-  /*implicit*/ SILAutoDiffIndices(unsigned source,
-                                  AutoDiffIndexSubset *parameters)
-      : source(source), parameters(parameters) {}
+  /// Independent results to differentiate with respect to.
+  AutoDiffIndexSubset *results;
+
+  /*implicit*/ SILAutoDiffIndices(AutoDiffIndexSubset *parameters,
+                                  AutoDiffIndexSubset *results)
+      : parameters(parameters), results(results) {}
 
   bool operator==(const SILAutoDiffIndices &other) const;
 
@@ -509,19 +516,31 @@ struct SILAutoDiffIndices {
            parameters->contains(parameterIndex);
   }
 
+  /// Queries whether the function's result with index `resultIndex` is
+  /// one of the results to differentiate with respect to.
+  bool isWrtResult(unsigned resultIndex) const {
+    return resultIndex < results->getCapacity() &&
+           results->contains(resultIndex);
+  }
+
   void print(llvm::raw_ostream &s = llvm::outs()) const {
-    s << "(source=" << source << " parameters=(";
+    s << "(parameters=(";
     interleave(parameters->getIndices(),
+               [&s](unsigned p) { s << p; }, [&s]{ s << ' '; });
+    s << ") results=(";
+    interleave(results->getIndices(),
                [&s](unsigned p) { s << p; }, [&s]{ s << ' '; });
     s << "))";
   }
 
+  [[deprecated]]
   std::string mangle() const {
-    std::string result = "src_" + llvm::utostr(source) + "_wrt_";
-    interleave(parameters->getIndices(),
-               [&](unsigned idx) { result += llvm::utostr(idx); },
-               [&] { result += '_'; });
-    return result;
+    llvm_unreachable("Don't call me!");
+//    std::string result = "src_" + llvm::utostr(source) + "_wrt_";
+//    interleave(parameters->getIndices(),
+//               [&](unsigned idx) { result += llvm::utostr(idx); },
+//               [&] { result += '_'; });
+//    return result;
   }
 };
 
@@ -714,18 +733,20 @@ template<typename T> struct DenseMapInfo;
 
 template<> struct DenseMapInfo<SILAutoDiffIndices> {
   static SILAutoDiffIndices getEmptyKey() {
-    return { DenseMapInfo<unsigned>::getEmptyKey(), nullptr };
+    return { nullptr, nullptr };
   }
 
   static SILAutoDiffIndices getTombstoneKey() {
-    return { DenseMapInfo<unsigned>::getTombstoneKey(), nullptr };
+    return { nullptr, nullptr };
   }
 
   static unsigned getHashValue(const SILAutoDiffIndices &Val) {
     unsigned combinedHash =
-      hash_combine(~1U, DenseMapInfo<unsigned>::getHashValue(Val.source),
+      hash_combine(~1U,
                    hash_combine_range(Val.parameters->begin(),
-                                      Val.parameters->end()));
+                                      Val.parameters->end()),
+                   hash_combine_range(Val.results->begin(),
+                                      Val.results->end()));
     return combinedHash;
   }
 

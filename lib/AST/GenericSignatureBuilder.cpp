@@ -5305,7 +5305,7 @@ public:
           Builder.addRequirement(req, source, nullptr);
         };
         for (auto &param : fnTy->getParams())
-          if (!param.isNonDifferentiable())
+          if (!param.isNondifferentiable())
             constrainToDifferentiable(param.getPlainType());
         constrainToDifferentiable(fnTy->getResult());
       }
