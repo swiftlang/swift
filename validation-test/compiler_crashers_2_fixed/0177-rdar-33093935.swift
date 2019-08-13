@@ -10,5 +10,5 @@ extension A {
 }
 
 class B: A {
-  @objc var foo = superclass()?.name // expected-error{{property 'foo' references itself}}
+  @objc var foo = superclass()?.name
 }
