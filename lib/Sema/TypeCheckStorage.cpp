@@ -426,21 +426,6 @@ static VarDecl *getFirstParamDecl(FuncDecl *fn) {
   return getParamDeclAtIndex(fn, 0);
 };
 
-
-static ParamDecl *buildArgument(SourceLoc loc, DeclContext *DC,
-                                StringRef name,
-                                Type interfaceType,
-                                ParamDecl::Specifier specifier,
-                                ASTContext &context) {
-  auto *param = new (context) ParamDecl(specifier, SourceLoc(), SourceLoc(),
-                                        Identifier(), loc,
-                                        context.getIdentifier(name),
-                                        DC);
-  param->setImplicit();
-  param->setInterfaceType(interfaceType);
-  return param;
-}
-
 /// Build a parameter list which can forward the formal index parameters of a
 /// declaration.
 ///
@@ -1674,8 +1659,6 @@ static AccessorDecl *createGetterPrototype(AbstractStorageDecl *storage,
   if (storage->isStatic())
     staticLoc = storage->getLoc();
 
-  auto storageInterfaceType = storage->getValueInterfaceType();
-
   auto getter = AccessorDecl::create(
       ctx, loc, /*AccessorKeywordLoc*/ loc,
       AccessorKind::Get, storage,
@@ -1683,7 +1666,7 @@ static AccessorDecl *createGetterPrototype(AbstractStorageDecl *storage,
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
       genericParams,
       getterParams,
-      TypeLoc::withoutLoc(storageInterfaceType),
+      TypeLoc(),
       storage->getDeclContext());
 
   // If we're stealing the 'self' from a lazy initializer, set it now.
@@ -1733,20 +1716,22 @@ static AccessorDecl *createSetterPrototype(AbstractStorageDecl *storage,
   GenericParamList *genericParams = createAccessorGenericParams(storage);
 
   // Add a "(value : T, indices...)" argument list.
-  auto storageInterfaceType = storage->getValueInterfaceType();
-  auto valueDecl = buildArgument(storage->getLoc(), storage->getDeclContext(),
-                                 "value", storageInterfaceType,
-                                 ParamDecl::Specifier::Default, ctx);
-  auto *params = buildIndexForwardingParamList(storage, valueDecl, ctx);
+  auto *param = new (ctx) ParamDecl(ParamDecl::Specifier::Default,
+                                    SourceLoc(), SourceLoc(),
+                                    Identifier(), loc,
+                                    ctx.getIdentifier("value"),
+                                    storage->getDeclContext());
+  param->setImplicit();
 
-  Type setterRetTy = TupleType::getEmpty(ctx);
+  auto *params = buildIndexForwardingParamList(storage, param, ctx);
+
   auto setter = AccessorDecl::create(
       ctx, loc, /*AccessorKeywordLoc*/ SourceLoc(),
       AccessorKind::Set, storage,
       /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
       genericParams, params,
-      TypeLoc::withoutLoc(setterRetTy),
+      TypeLoc(),
       storage->getDeclContext());
 
   if (isMutating)
@@ -1848,9 +1833,6 @@ SynthesizeAccessorRequest::evaluate(Evaluator &evaluator,
                                     AbstractStorageDecl *storage,
                                     AccessorKind kind) const {
   auto &ctx = storage->getASTContext();
-
-  if (!storage->hasInterfaceType())
-    ctx.getLazyResolver()->resolveDeclSignature(storage);
 
   switch (kind) {
   case AccessorKind::Get:
