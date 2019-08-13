@@ -94,7 +94,8 @@ public:
   /// module, it returns it. This is intended for use in reflection / debugging
   /// contexts where access is not a problem.
   virtual void
-  lookupRelatedEntity(StringRef clangName, StringRef relatedEntityKind,
+  lookupRelatedEntity(StringRef clangName, ClangTypeKind kind,
+                      StringRef relatedEntityKind,
                       llvm::function_ref<void(TypeDecl *)> receiver) {}
 };
 

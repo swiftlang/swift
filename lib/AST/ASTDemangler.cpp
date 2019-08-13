@@ -1084,7 +1084,8 @@ GenericTypeDecl *ASTBuilder::findForeignTypeDecl(StringRef name,
   switch (foreignKind) {
   case ForeignModuleKind::SynthesizedByImporter:
     if (!relatedEntityKind.empty()) {
-      importer->lookupRelatedEntity(name, relatedEntityKind, found);
+      importer->lookupRelatedEntity(name, *lookupKind, relatedEntityKind,
+                                    found);
       break;
     }
     importer->lookupValue(Ctx.getIdentifier(name), consumer);

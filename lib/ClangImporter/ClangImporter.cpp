@@ -2533,7 +2533,7 @@ void ClangImporter::lookupTypeDecl(
 }
 
 void ClangImporter::lookupRelatedEntity(
-    StringRef rawName, StringRef relatedEntityKind,
+    StringRef rawName, ClangTypeKind kind, StringRef relatedEntityKind,
     llvm::function_ref<void(TypeDecl *)> receiver) {
   using CISTAttr = ClangImporterSynthesizedTypeAttr;
   if (relatedEntityKind ==
