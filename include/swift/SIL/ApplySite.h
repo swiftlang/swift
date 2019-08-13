@@ -264,7 +264,8 @@ public:
   /// Returns true if \p oper is an argument operand and not the callee
   /// operand.
   bool isArgumentOperand(const Operand &oper) const {
-    return oper.getOperandNumber() >= getOperandIndexOfFirstArgument();
+    return oper.getOperandNumber() >= getOperandIndexOfFirstArgument() &&
+      oper.getOperandNumber() < getOperandIndexOfFirstArgument() + getNumArguments();
   }
 
   /// Return the applied argument index for the given operand.

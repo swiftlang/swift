@@ -988,7 +988,7 @@ bb0(%0 : @owned $Array<NSObject>):
   checked_cast_addr_br copy_on_success Array<NSObject> in %1 : $*Array<NSObject> to NSArray in %2 : $*NSArray, bb1, bb2
 
 bb1:
-  destroy_addr %1 : $*Array<NSObject>
+  destroy_addr %2 : $*NSArray
   br bb3
 
 bb2:
@@ -1013,14 +1013,14 @@ bb0(%0 : @owned $Array<NSObject>):
   checked_cast_addr_br take_on_success Array<NSObject> in %1 : $*Array<NSObject> to NSArray in %2 : $*NSArray, bb1, bb2
 
 bb1:
-  destroy_addr %1 : $*Array<NSObject>
+  destroy_addr %2 : $*NSArray
   br bb3
 
 bb2:
+  destroy_addr %1 : $*Array<NSObject>
   br bb3
 
 bb3:
-  destroy_addr %1 : $*Array<NSObject>
   dealloc_stack %2 : $*NSArray
   dealloc_stack %1 : $*Array<NSObject>
   %9999 = tuple()
@@ -1038,14 +1038,13 @@ bb0(%0 : @owned $Array<NSObject>):
   checked_cast_addr_br take_always Array<NSObject> in %1 : $*Array<NSObject> to NSArray in %2 : $*NSArray, bb1, bb2
 
 bb1:
-  destroy_addr %1 : $*Array<NSObject>
+  destroy_addr %2 : $*NSArray
   br bb3
 
 bb2:
   br bb3
 
 bb3:
-  destroy_addr %1 : $*Array<NSObject>
   dealloc_stack %2 : $*NSArray
   dealloc_stack %1 : $*Array<NSObject>
   %9999 = tuple()
