@@ -1636,15 +1636,6 @@ bool FailureDiagnosis::diagnoseCalleeResultContextualConversionError() {
   }
 }
 
-/// Return true if the conversion from fromType to toType is an invalid string
-/// index operation.
-static bool isIntegerToStringIndexConversion(Type fromType, Type toType,
-                                             ConstraintSystem &CS) {
-  auto kind = KnownProtocolKind::ExpressibleByIntegerLiteral;
-  return (conformsToKnownProtocol(CS, fromType, kind) &&
-          toType->getCanonicalType().getString() == "String.CharacterView.Index");
-}
-
 bool FailureDiagnosis::diagnoseContextualConversionError(
     Expr *expr, Type contextualType, ContextualTypePurpose CTP,
     Type suggestedType) {
@@ -1689,7 +1680,6 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
   // Try to find the contextual type in a variety of ways.  If the constraint
   // system had a contextual type specified, we use it - it will have a purpose
   // indicator which allows us to give a very "to the point" diagnostic.
-  Diag<Type, Type> diagID;
   Diag<Type> nilDiag;
   std::function<void(void)> nilFollowup;
 
@@ -1705,7 +1695,6 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
     llvm_unreachable("CTP_CalleeResult does not actually install a "
                      "contextual type");
   case CTP_Initialization:
-    diagID = diag::cannot_convert_initializer_value;
     nilDiag = diag::cannot_convert_initializer_value_nil;
     nilFollowup = [this] {
       TypeRepr *patternTR = CS.getContextualTypeLoc().getTypeRepr();
@@ -1730,7 +1719,6 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
       return true;
     }
 
-    diagID = diag::cannot_convert_to_return_type;
     nilDiag = diag::cannot_convert_to_return_type_nil;
     break;
   case CTP_ThrowStmt: {
@@ -1777,11 +1765,9 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
   }
 
   case CTP_EnumCaseRawValue:
-    diagID = diag::cannot_convert_raw_initializer_value;
     nilDiag = diag::cannot_convert_raw_initializer_value_nil;
     break;
   case CTP_DefaultParameter:
-    diagID = diag::cannot_convert_default_arg_value;
     nilDiag = diag::cannot_convert_default_arg_value_nil;
     break;
 
@@ -1800,39 +1786,30 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
     }
     return true;
   case CTP_YieldByValue:
-    diagID = diag::cannot_convert_yield_value;
     nilDiag = diag::cannot_convert_yield_value_nil;
     break;
   case CTP_CallArgument:
-    diagID = diag::cannot_convert_argument_value;
     nilDiag = diag::cannot_convert_argument_value_nil;
     break;
   case CTP_ClosureResult:
-    diagID = diag::cannot_convert_closure_result;
     nilDiag = diag::cannot_convert_closure_result_nil;
     break;
   case CTP_ArrayElement:
-    diagID = diag::cannot_convert_array_element;
     nilDiag = diag::cannot_convert_array_element_nil;
     break;
   case CTP_DictionaryKey:
-    diagID = diag::cannot_convert_dict_key;
     nilDiag = diag::cannot_convert_dict_key_nil;
     break;
   case CTP_DictionaryValue:
-    diagID = diag::cannot_convert_dict_value;
     nilDiag = diag::cannot_convert_dict_value_nil;
     break;
   case CTP_CoerceOperand:
-    diagID = diag::cannot_convert_coerce;
     nilDiag = diag::cannot_convert_coerce_nil;
     break;
   case CTP_AssignSource:
-    diagID = diag::cannot_convert_assign;
     nilDiag = diag::cannot_convert_assign_nil;
     break;
   case CTP_SubscriptAssignSource:
-    diagID = diag::cannot_convert_subscript_assign;
     nilDiag = diag::cannot_convert_subscript_assign_nil;
     break;
   }
@@ -1858,47 +1835,7 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
     return false;
   }
 
-  // If we're trying to convert something to Bool, check to see if it is for
-  // a known reason.
-  ContextualFailure failure(expr, CS, exprType, contextualType,
-                            CS.getConstraintLocator(expr));
-
-  if (failure.diagnoseMissingFunctionCall())
-    return true;
-
-  if (failure.diagnoseConversionToBool())
-    return true;
-
   exprType = exprType->getRValueType();
-
-  // Special case of some common conversions involving Swift.String
-  // indexes, catching cases where people attempt to index them with an integer.
-  if (isIntegerToStringIndexConversion(exprType, contextualType, CS)) {
-    diagnose(expr->getLoc(), diag::string_index_not_integer,
-             exprType->getRValueType())
-      .highlight(expr->getSourceRange());
-    diagnose(expr->getLoc(), diag::string_index_not_integer_note);
-    return true;
-  }
-
-  // When converting from T to [T] or UnsafePointer<T>, we can offer fixit to wrap
-  // the expr with brackets.
-  auto *genericType = contextualType->getAs<BoundGenericType>();
-  if (genericType) {
-    auto *contextDecl = genericType->getDecl();
-    if (contextDecl == CS.TC.Context.getArrayDecl()) {
-      for (Type arg : genericType->getGenericArgs()) {
-        if (arg->isEqual(exprType)) {
-          diagnose(expr->getLoc(), diagID, exprType, contextualType)
-              .fixItInsert(expr->getStartLoc(), "[")
-              .fixItInsert(Lexer::getLocForEndOfToken(CS.TC.Context.SourceMgr,
-                                                      expr->getEndLoc()),
-                           "]");
-          return true;
-        }
-      }
-    }
-  }
 
   // Don't attempt fixits if we have an unsolved type variable, since
   // the recovery path's recursion into the type checker via typeCheckCast()
@@ -1906,21 +1843,10 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
   if (exprType->hasTypeVariable())
     return false;
 
-  // When complaining about conversion to a protocol type, complain about
-  // conformance instead of "conversion".
-  if (contextualType->isExistentialType()) {
-    MissingContextualConformanceFailure failure(
-        expr, CS, CTP, exprType, contextualType,
-        CS.getConstraintLocator(expr, LocatorPathElt::getContextualType()));
-    return failure.diagnoseAsError();
-  }
-
-  InFlightDiagnostic diag = diagnose(expr->getLoc(), diagID,
-                                     exprType, contextualType);
-  diag.highlight(expr->getSourceRange());
-
-  failure.tryFixIts(diag);
-  return true;
+  ContextualFailure failure(
+      expr, CS, CTP, exprType, contextualType,
+      CS.getConstraintLocator(expr, LocatorPathElt::getContextualType()));
+  return failure.diagnoseAsError();
 }
 
 //===----------------------------------------------------------------------===//

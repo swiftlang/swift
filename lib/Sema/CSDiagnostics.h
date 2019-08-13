@@ -661,13 +661,20 @@ private:
 /// Intended to diagnose any possible contextual failure
 /// e.g. argument/parameter, closure result, conversions etc.
 class ContextualFailure : public FailureDiagnostic {
+  ContextualTypePurpose CTP;
   Type FromType, ToType;
 
 public:
   ContextualFailure(Expr *root, ConstraintSystem &cs, Type lhs, Type rhs,
                     ConstraintLocator *locator)
-      : FailureDiagnostic(root, cs, locator), FromType(resolve(lhs)),
-        ToType(resolve(rhs)) {}
+      : ContextualFailure(root, cs, cs.getContextualTypePurpose(), lhs, rhs,
+                          locator) {}
+
+  ContextualFailure(Expr *root, ConstraintSystem &cs,
+                    ContextualTypePurpose purpose, Type lhs, Type rhs,
+                    ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator), CTP(purpose),
+        FromType(resolve(lhs)), ToType(resolve(rhs)) {}
 
   Type getFromType() const { return FromType; }
 
@@ -735,10 +742,7 @@ protected:
                                             Type contextualType);
 
 private:
-  ContextualTypePurpose getContextualTypePurpose() const {
-    auto &cs = getConstraintSystem();
-    return cs.getContextualTypePurpose();
-  }
+  ContextualTypePurpose getContextualTypePurpose() const { return CTP; }
 
   Type resolve(Type rawType) {
     auto type = resolveType(rawType)->getWithoutSpecifierType();
@@ -758,6 +762,10 @@ private:
         getConstraintSystem(), type,
         KnownProtocolKind::ExpressibleByIntegerLiteral);
   }
+
+  /// Return true if the conversion from fromType to toType is
+  /// an invalid string index operation.
+  bool isIntegerToStringIndexConversion() const;
 
 protected:
   static Optional<Diag<Type, Type>>

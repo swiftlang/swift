@@ -1847,6 +1847,16 @@ bool ContextualFailure::diagnoseAsError() {
   if (diagnoseConversionToDictionary())
     return true;
 
+  // Special case of some common conversions involving Swift.String
+  // indexes, catching cases where people attempt to index them with an integer.
+  if (isIntegerToStringIndexConversion()) {
+    emitDiagnostic(anchor->getLoc(), diag::string_index_not_integer,
+                   getFromType())
+        .highlight(anchor->getSourceRange());
+    emitDiagnostic(anchor->getLoc(), diag::string_index_not_integer_note);
+    return true;
+  }
+
   Diag<Type, Type> diagnostic;
   switch (path.back().getKind()) {
   case ConstraintLocator::ClosureResult: {
@@ -1858,8 +1868,8 @@ bool ContextualFailure::diagnoseAsError() {
     if (diagnoseConversionToBool())
       return true;
 
-    if (auto msg = getDiagnosticFor(getContextualTypePurpose(),
-                                    /*forProtocol=*/false)) {
+    auto contextualType = getToType();
+    if (auto msg = getDiagnosticFor(CTP, contextualType->isExistentialType())) {
       diagnostic = *msg;
       break;
     }
@@ -2298,6 +2308,16 @@ void ContextualFailure::tryComputedPropertyFixIts(Expr *expr) const {
       }
     }
   }
+}
+
+bool ContextualFailure::isIntegerToStringIndexConversion() const {
+  auto &cs = getConstraintSystem();
+  auto kind = KnownProtocolKind::ExpressibleByIntegerLiteral;
+
+  auto fromType = getFromType();
+  auto toType = getToType()->getCanonicalType();
+  return (conformsToKnownProtocol(cs, fromType, kind) &&
+          toType.getString() == "String.CharacterView.Index");
 }
 
 Optional<Diag<Type, Type>>
