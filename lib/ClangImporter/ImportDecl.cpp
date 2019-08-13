@@ -8626,7 +8626,8 @@ void ClangImporter::Implementation::loadAllMembersOfObjcContainer(
   collectMembersToAdd(objcContainer, D, DC, members);
 
   for (auto member : members) {
-    IDC->addMember(member);
+    if (!isa<AccessorDecl>(member))
+      IDC->addMember(member);
   }
 }
 
