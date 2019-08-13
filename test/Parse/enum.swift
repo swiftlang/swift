@@ -553,7 +553,6 @@ enum SE0155 {
   // expected-note@-2 {{did you mean to explicitly add a 'Void' associated value?}} {{17-17=Void}}
 }
 
-
 // SR-11261
 enum SR11261 {
   case identifier
