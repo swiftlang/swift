@@ -619,7 +619,7 @@ struct WithTrailingClosure {
 
 func keypath_with_trailing_closure_subscript(_ ty: inout SubscriptLens<WithTrailingClosure>) {
   _ = ty[0] { 42 } // expected-error {{subscript index of type '() -> Int' in a key path must be Hashable}}
-  _ = ty[0] { 42 } = 0
+  _ = ty[0] { 42 } = 0 // expected-error {{cannot assign through subscript: subscript is get-only}}
   // expected-error@-1 {{subscript index of type '() -> Int' in a key path must be Hashable}}
   _ = ty[] { 42 }  // expected-error {{subscript index of type '() -> Int' in a key path must be Hashable}}
   _ = ty[] { 42 } = 0 // expected-error {{subscript index of type '() -> Int' in a key path must be Hashable}}
