@@ -807,9 +807,8 @@ public:
     return parseToken(K, L, Diagnostic(ID, Args...));
   }
   
-  /// Parse the specified expected token and return its location
-  /// on success.  On failure, emit the specified error diagnostic, and
-  /// a note at the specified note location.
+  /// Parse the specified expected token and return its location on success.  On failure, emit the specified
+  /// error diagnostic,  a note at the specified note location, and return the location of the previous token.
   bool parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
                           SourceLoc OtherLoc);
 
