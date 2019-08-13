@@ -40,7 +40,7 @@ namespace swift {
 /// Clang AST to ClangImporter to import the type into Swift.
 class DWARFImporterDelegate {
 public:
-  virtual ~DWARFImporterDelegate() {}
+  virtual ~DWARFImporterDelegate() = default;
   /// Perform a qualified lookup of a Clang type with this name.
   /// \param kind  Only return results with this type kind.
   virtual void lookupValue(StringRef name,
