@@ -45,6 +45,9 @@ class Benchmarks(product.Product):
         bench_Osize = os.path.join(self.build_dir, 'bin', 'Benchmark_Osize')
         shell.call([bench_Osize] + cmdline)
 
+    def install(self, host_target):
+        pass
+
 
 def run_build_script_helper(host_target, product, args):
     toolchain_path = args.install_destdir

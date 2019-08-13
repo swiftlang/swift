@@ -155,8 +155,8 @@ getFinalReleases(SILValue Box,
     // If we have a copy value or a mark_uninitialized, add its uses to the work
     // list and continue.
     if (isa<MarkUninitializedInst>(User) || isa<CopyValueInst>(User)) {
-      copy(cast<SingleValueInstruction>(User)->getUses(),
-           std::back_inserter(Worklist));
+      llvm::copy(cast<SingleValueInstruction>(User)->getUses(),
+                 std::back_inserter(Worklist));
       continue;
     }
 
@@ -233,7 +233,7 @@ static bool partialApplyEscapes(SILValue V, bool examineApply) {
     // uses might do so... so add the copy_value's uses to the worklist and
     // continue.
     if (auto CVI = dyn_cast<CopyValueInst>(User)) {
-      copy(CVI->getUses(), std::back_inserter(Worklist));
+      llvm::copy(CVI->getUses(), std::back_inserter(Worklist));
       continue;
     }
 
@@ -331,8 +331,8 @@ findUnexpectedBoxUse(SILValue Box, bool examinePartialApply,
     // If our user instruction is a copy_value or a marked_uninitialized, visit
     // the users recursively.
     if (isa<MarkUninitializedInst>(User) || isa<CopyValueInst>(User)) {
-      copy(cast<SingleValueInstruction>(User)->getUses(),
-           std::back_inserter(Worklist));
+      llvm::copy(cast<SingleValueInstruction>(User)->getUses(),
+                 std::back_inserter(Worklist));
       continue;
     }
 
@@ -407,7 +407,7 @@ static void replaceProjectBoxUsers(SILValue HeapBox, SILValue StackBox) {
     auto *CVI = dyn_cast<CopyValueInst>(Op->getUser());
     if (!CVI)
       continue;
-    copy(CVI->getUses(), std::back_inserter(Worklist));
+    llvm::copy(CVI->getUses(), std::back_inserter(Worklist));
   }
 }
 
@@ -437,7 +437,7 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI) {
          && "rewriting multi-field box not implemented");
   auto *ASI = Builder.createAllocStack(
       ABI->getLoc(), ABI->getBoxType()->getFieldType(ABI->getModule(), 0),
-      ABI->getVarInfo());
+      ABI->getVarInfo(), ABI->hasDynamicLifetime());
 
   // Transfer a mark_uninitialized if we have one.
   SILValue StackBox = ASI;
@@ -478,8 +478,10 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI) {
     // Look through any mark_uninitialized, copy_values.
     if (isa<MarkUninitializedInst>(User) || isa<CopyValueInst>(User)) {
       auto Inst = cast<SingleValueInstruction>(User);
-      transform(Inst->getUses(), std::back_inserter(Worklist),
-                [](Operand *Op) -> SILInstruction * { return Op->getUser(); });
+      llvm::transform(Inst->getUses(), std::back_inserter(Worklist),
+                      [](Operand *Op) -> SILInstruction * {
+        return Op->getUser();
+      });
       Inst->replaceAllUsesWithUndef();
       Inst->eraseFromParent();
       continue;

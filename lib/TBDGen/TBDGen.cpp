@@ -28,6 +28,7 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILVTableVisitor.h"
 #include "swift/SIL/SILWitnessTable.h"
+#include "swift/SIL/SILWitnessVisitor.h"
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Error.h"
@@ -158,8 +159,8 @@ void TBDGenVisitor::addConformances(DeclContext *DC) {
             auto witnessStorage = cast<AbstractStorageDecl>(witnessDecl);
             storage->visitOpaqueAccessors([&](AccessorDecl *reqtAccessor) {
               auto witnessAccessor =
-                witnessStorage->getAccessor(reqtAccessor->getAccessorKind());
-              assert(witnessAccessor && "no corresponding witness accessor?");
+                witnessStorage->getSynthesizedAccessor(
+                  reqtAccessor->getAccessorKind());
               addSymbolIfNecessary(reqtAccessor, witnessAccessor);
             });
           }
@@ -182,6 +183,23 @@ static bool shouldUseAllocatorMangling(const AbstractFunctionDecl *afd) {
          constructor->isConvenienceInit();
 }
 
+void TBDGenVisitor::visitDefaultArguments(ValueDecl *VD, ParameterList *PL) {
+  auto publicDefaultArgGenerators = SwiftModule->isTestingEnabled() ||
+                                    SwiftModule->arePrivateImportsEnabled();
+  if (!publicDefaultArgGenerators)
+    return;
+
+  // In Swift 3 (or under -enable-testing), default arguments (of public
+  // functions) are public symbols, as the default values are computed at the
+  // call site.
+  auto index = 0;
+  for (auto *param : *PL) {
+    if (param->isDefaultArgument())
+      addSymbol(SILDeclRef::getDefaultArgGenerator(VD, index));
+    index++;
+  }
+}
+
 void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
   // A @_silgen_name("...") function without a body only exists
   // to forward-declare a symbol from another library.
@@ -198,7 +216,6 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
         AFD, useAllocator));
     addSymbol(
         LinkEntity::forDynamicallyReplaceableFunctionKey(AFD, useAllocator));
-
   }
   if (AFD->getAttrs().hasAttribute<DynamicReplacementAttr>()) {
     bool useAllocator = shouldUseAllocatorMangling(AFD);
@@ -214,20 +231,7 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
     addSymbol(SILDeclRef(AFD).asForeign());
   }
 
-  auto publicDefaultArgGenerators = SwiftModule->isTestingEnabled() ||
-                                    SwiftModule->arePrivateImportsEnabled();
-  if (!publicDefaultArgGenerators)
-    return;
-
-  // In Swift 3 (or under -enable-testing), default arguments (of public
-  // functions) are public symbols, as the default values are computed at the
-  // call site.
-  auto index = 0;
-  for (auto *param : *AFD->getParameters()) {
-    if (param->isDefaultArgument())
-      addSymbol(SILDeclRef::getDefaultArgGenerator(AFD, index));
-    index++;
-  }
+  visitDefaultArguments(AFD, AFD->getParameters());
 }
 
 void TBDGenVisitor::visitFuncDecl(FuncDecl *FD) {
@@ -250,10 +254,7 @@ void TBDGenVisitor::visitFuncDecl(FuncDecl *FD) {
 }
 
 void TBDGenVisitor::visitAccessorDecl(AccessorDecl *AD) {
-  // Do nothing: accessors are always nested within the storage decl, but
-  // sometimes appear outside it too. To avoid double-walking them, we
-  // explicitly visit them as members of the storage and ignore them when we
-  // visit them as part of the main walk, here.
+  llvm_unreachable("should not see an accessor here");
 }
 
 void TBDGenVisitor::visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
@@ -279,9 +280,9 @@ void TBDGenVisitor::visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
   }
 
   // Explicitly look at each accessor here: see visitAccessorDecl.
-  for (auto accessor : ASD->getAllAccessors()) {
-    visitAbstractFunctionDecl(accessor);
-  }
+  ASD->visitEmittedAccessors([&](AccessorDecl *accessor) {
+    visitFuncDecl(accessor);
+  });
 }
 
 void TBDGenVisitor::visitVarDecl(VarDecl *VD) {
@@ -365,16 +366,8 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
 
   // Some members of classes get extra handling, beyond members of struct/enums,
   // so let's walk over them manually.
-  for (auto *member : CD->getMembers()) {
-    auto value = dyn_cast<ValueDecl>(member);
-    if (!value)
-      continue;
-
-    auto var = dyn_cast<VarDecl>(value);
-    auto hasFieldOffset = var && var->hasStorage() && !var->isStatic();
-    if (hasFieldOffset)
-      addSymbol(LinkEntity::forFieldOffset(var));
-  }
+  for (auto *var : CD->getStoredProperties())
+    addSymbol(LinkEntity::forFieldOffset(var));
 
   visitNominalTypeDecl(CD);
 
@@ -465,28 +458,6 @@ void TBDGenVisitor::visitExtensionDecl(ExtensionDecl *ED) {
     visit(member);
 }
 
-/// Determine whether the protocol descriptor for the given protocol will
-/// contain any protocol requirements.
-static bool protocolDescriptorHasRequirements(ProtocolDecl *proto) {
-  if (!proto->getRequirementSignature().empty())
-    return true;
-
-  for (auto *member : proto->getMembers()) {
-    if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
-      if (SILDeclRef::requiresNewWitnessTableEntry(func))
-        return true;
-    }
-
-    if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
-      if (assocType->getOverriddenDecls().empty()) {
-        return true;
-      }
-    }
-  }
-
-  return false;
-}
-
 #ifndef NDEBUG
 static bool isValidProtocolMemberForTBDGen(const Decl *D) {
   switch (D->getKind()) {
@@ -530,45 +501,45 @@ void TBDGenVisitor::visitProtocolDecl(ProtocolDecl *PD) {
   if (!PD->isObjC()) {
     addSymbol(LinkEntity::forProtocolDescriptor(PD));
 
-    // If there are any requirements, emit a requirements base descriptor.
-    if (protocolDescriptorHasRequirements(PD))
-      addProtocolRequirementsBaseDescriptor(PD);
+    struct WitnessVisitor : public SILWitnessVisitor<WitnessVisitor> {
+      TBDGenVisitor &TBD;
+      ProtocolDecl *PD;
 
-    for (const auto &req : PD->getRequirementSignature()) {
-      if (req.getKind() != RequirementKind::Conformance)
-        continue;
+    public:
+      WitnessVisitor(TBDGenVisitor &TBD, ProtocolDecl *PD)
+          : TBD(TBD), PD(PD) {}
 
-      if (req.getFirstType()->isEqual(PD->getSelfInterfaceType())) {
-        BaseConformance conformance(
-          PD,
-          req.getSecondType()->castTo<ProtocolType>()->getDecl());
-        addBaseConformanceDescriptor(conformance);
-      } else {
-        AssociatedConformance conformance(
-          PD,
-          req.getFirstType()->getCanonicalType(),
-          req.getSecondType()->castTo<ProtocolType>()->getDecl());
-        addAssociatedConformanceDescriptor(conformance);
-      }
-    }
-
-    for (auto *member : PD->getMembers()) {
-      if (PD->isResilient()) {
-        if (auto *funcDecl = dyn_cast<AbstractFunctionDecl>(member)) {
-          if (SILDeclRef::requiresNewWitnessTableEntry(funcDecl)) {
-            addDispatchThunk(SILDeclRef(funcDecl));
-            addMethodDescriptor(SILDeclRef(funcDecl));
-          }
+      void addMethod(SILDeclRef declRef) {
+        if (PD->isResilient()) {
+          TBD.addDispatchThunk(declRef);
+          TBD.addMethodDescriptor(declRef);
         }
       }
 
-      // Always produce associated type descriptors, because they can
-      // be referenced by generic signatures.
-      if (auto *assocType = dyn_cast<AssociatedTypeDecl>(member)) {
-        if (assocType->getOverriddenDecls().empty())
-          addAssociatedTypeDescriptor(assocType);
+      void addAssociatedType(AssociatedType associatedType) {
+        TBD.addAssociatedTypeDescriptor(associatedType.getAssociation());
       }
-    }
+
+      void addProtocolConformanceDescriptor() {
+        TBD.addProtocolRequirementsBaseDescriptor(PD);
+      }
+
+      void addOutOfLineBaseProtocol(ProtocolDecl *proto) {
+        TBD.addBaseConformanceDescriptor(BaseConformance(PD, proto));
+      }
+
+      void addAssociatedConformance(AssociatedConformance associatedConf) {
+        TBD.addAssociatedConformanceDescriptor(associatedConf);
+      }
+
+      void addPlaceholder(MissingMemberDecl *decl) {}
+
+      void doIt() {
+        visitProtocolDecl(PD);
+      }
+    };
+
+    WitnessVisitor(*this, PD).doIt();
 
     // Include the self-conformance.
     addConformances(PD);
@@ -591,12 +562,12 @@ void TBDGenVisitor::visitEnumDecl(EnumDecl *ED) {
 
   if (!ED->isResilient())
     return;
+}
 
-  // Emit resilient tags.
-  for (auto *elt : ED->getAllElements()) {
-    auto entity = LinkEntity::forEnumCase(elt);
-    addSymbol(entity);
-  }
+void TBDGenVisitor::visitEnumElementDecl(EnumElementDecl *EED) {
+  addSymbol(LinkEntity::forEnumCase(EED));
+  if (auto *PL = EED->getParameterList())
+    visitDefaultArguments(EED, PL);
 }
 
 void TBDGenVisitor::addFirstFileSymbols() {

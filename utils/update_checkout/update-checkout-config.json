@@ -38,6 +38,10 @@
             "remote": { "id": "unicode-org/icu" },
             "platforms": [ "Linux" ]
         },
+        "cmake": {
+            "remote": { "id": "KitWare/CMake" },
+            "platforms": [ "Linux" ]
+        },
         "libcxx": {
             "remote": { "id": "apple/swift-libcxx" } },
         "clang-tools-extra": {
@@ -46,6 +50,8 @@
             "remote": { "id": "apple/indexstore-db" } },
         "sourcekit-lsp": {
             "remote": { "id": "apple/sourcekit-lsp" } },
+        "swift-format": {
+            "remote": { "id": "apple/swift-format" } },
         "llvm-project": {
             "remote": { "id": "apple/llvm-project-v1" } }
     },
@@ -71,10 +77,12 @@
                 "swift-xcode-playground-support": "master",
                 "ninja": "release",
                 "icu": "release-61-1",
+                "cmake": "v3.15.0",
                 "clang-tools-extra": "stable",
                 "libcxx": "stable",
                 "indexstore-db": "master",
-                "sourcekit-lsp": "master"
+                "sourcekit-lsp": "master",
+                "swift-format": "master"
             }
         },
         "master-llvm-monorepo": {
@@ -94,6 +102,7 @@
                 "swift-xcode-playground-support": "master",
                 "ninja": "release",
                 "icu": "release-61-1",
+                "cmake": "v3.15.0",
                 "indexstore-db": "master",
                 "sourcekit-lsp": "master"
             }
@@ -120,6 +129,7 @@
                 "swift-xcode-playground-support": "master",
                 "ninja": "release",
                 "icu": "release-61-1",
+                "cmake": "v3.15.0",
                 "clang-tools-extra": "upstream-with-swift",
                 "libcxx": "upstream-with-swift",
                 "indexstore-db": "master",
@@ -143,6 +153,7 @@
                 "swift-xcode-playground-support": "master",
                 "ninja": "release",
                 "icu": "release-61-1",
+                "cmake": "v3.15.0",
                 "indexstore-db": "master",
                 "sourcekit-lsp": "master"
             }
@@ -390,6 +401,35 @@
                 "libcxx": "swift-5.1-branch",
                 "indexstore-db": "swift-5.1-branch",
                 "sourcekit-lsp": "swift-5.1-branch"
+            }
+        },
+        "master-rebranch" : {
+            "aliases": ["apple/stable/20190619",
+                        "master-rebranch-apple-stable-20190619",
+                        "master-rebranch"],
+            "repos": {
+                "llvm": "apple/stable/20190619",
+                "clang": "apple/stable/20190619",
+                "compiler-rt": "apple/stable/20190619",
+                "swift": "master-rebranch",
+                "lldb": "upstream-with-swift",
+                "cmark": "master",
+                "llbuild": "master",
+                "swiftpm": "master",
+                "swift-syntax": "master",
+                "swift-stress-tester": "master",
+                "swift-corelibs-xctest": "master",
+                "swift-corelibs-foundation": "master",
+                "swift-corelibs-libdispatch": "master",
+                "swift-integration-tests": "master",
+                "swift-xcode-playground-support": "master",
+                "ninja": "release",
+                "icu": "release-61-1",
+                "cmake": "v3.15.0",
+                "clang-tools-extra": "apple/stable/20190619",
+                "libcxx": "apple/stable/20190619",
+                "indexstore-db": "master",
+                "sourcekit-lsp": "master"
             }
         },
         "stdlib_standalone" : {

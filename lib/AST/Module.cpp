@@ -189,13 +189,16 @@ template<typename Range>
 void SourceLookupCache::doPopulateCache(Range decls,
                                         bool onlyOperators) {
   for (Decl *D : decls) {
-    if (auto *VD = dyn_cast<ValueDecl>(D))
+    if (auto *VD = dyn_cast<ValueDecl>(D)) {
       if (onlyOperators ? VD->isOperator() : VD->hasName()) {
         // Cache the value under both its compound name and its full name.
         TopLevelValues.add(VD);
       }
+    }
+
     if (auto *NTD = dyn_cast<NominalTypeDecl>(D))
-      doPopulateCache(NTD->getMembers(), true);
+      if (!NTD->hasUnparsedMembers() || NTD->maybeHasOperatorDeclarations())
+        doPopulateCache(NTD->getMembers(), true);
 
     // Avoid populating the cache with the members of invalid extension
     // declarations.  These members can be used to point validation inside of
@@ -203,16 +206,23 @@ void SourceLookupCache::doPopulateCache(Range decls,
     if (D->isInvalid()) continue;
 
     if (auto *ED = dyn_cast<ExtensionDecl>(D))
-      doPopulateCache(ED->getMembers(), true);
+      if (!ED->hasUnparsedMembers() || ED->maybeHasOperatorDeclarations())
+        doPopulateCache(ED->getMembers(), true);
   }
 }
 
 void SourceLookupCache::populateMemberCache(const SourceFile &SF) {
   for (const Decl *D : SF.Decls) {
     if (const auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
-      addToMemberCache(NTD->getMembers());
+      if (!NTD->hasUnparsedMembers() ||
+          NTD->maybeHasNestedClassDeclarations() ||
+          NTD->mayContainMembersAccessedByDynamicLookup())
+        addToMemberCache(NTD->getMembers());
     } else if (const auto *ED = dyn_cast<ExtensionDecl>(D)) {
-      addToMemberCache(ED->getMembers());
+      if (!ED->hasUnparsedMembers() ||
+          ED->maybeHasNestedClassDeclarations() ||
+          ED->mayContainMembersAccessedByDynamicLookup())
+        addToMemberCache(ED->getMembers());
     }
   }
 
@@ -228,7 +238,10 @@ void SourceLookupCache::addToMemberCache(DeclRange decls) {
     if (auto NTD = dyn_cast<NominalTypeDecl>(VD)) {
       assert(!VD->canBeAccessedByDynamicLookup() &&
              "inner types cannot be accessed by dynamic lookup");
-      addToMemberCache(NTD->getMembers());
+      if (!NTD->hasUnparsedMembers() ||
+          NTD->maybeHasNestedClassDeclarations() ||
+          NTD->mayContainMembersAccessedByDynamicLookup())
+        addToMemberCache(NTD->getMembers());
     } else if (VD->canBeAccessedByDynamicLookup()) {
       ClassMembers.add(VD);
     }
@@ -1672,7 +1685,21 @@ bool FileUnit::walk(ASTWalker &walker) {
     
     if (D->walk(walker))
       return true;
+
+    if (walker.shouldWalkAccessorsTheOldWay()) {
+      // Pretend that accessors share a parent with the storage.
+      //
+      // FIXME: Update existing ASTWalkers to deal with accessors appearing as
+      // children of the storage instead.
+      if (auto *ASD = dyn_cast<AbstractStorageDecl>(D)) {
+        for (auto AD : ASD->getAllAccessors()) {
+          if (AD->walk(walker))
+            return true;
+        }
+      }
+    }
   }
+
   return false;
 }
 
@@ -1686,6 +1713,19 @@ bool SourceFile::walk(ASTWalker &walker) {
 
     if (D->walk(walker))
       return true;
+
+    if (walker.shouldWalkAccessorsTheOldWay()) {
+      // Pretend that accessors share a parent with the storage.
+      //
+      // FIXME: Update existing ASTWalkers to deal with accessors appearing as
+      // children of the storage instead.
+      if (auto *ASD = dyn_cast<AbstractStorageDecl>(D)) {
+        for (auto AD : ASD->getAllAccessors()) {
+          if (AD->walk(walker))
+            return true;
+        }
+      }
+    }
   }
   return false;
 }

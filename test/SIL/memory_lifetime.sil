@@ -1,0 +1,139 @@
+// RUN: %target-sil-opt -o /dev/null %s
+// REQUIRES: asserts
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+// A non-trivial type
+class T {
+  init()
+}
+
+struct Inner {
+  var a: T
+  var b: T
+}
+
+struct Outer {
+  var x: T
+  var y: Inner
+  var z: T
+}
+
+sil [ossa] @test_struct : $@convention(thin) (@in Outer) -> @owned T {
+bb0(%0 : $*Outer):
+  %1 = struct_element_addr %0 : $*Outer, #Outer.y
+  %2 = struct_element_addr %0 : $*Outer, #Outer.x
+  %10 = struct_element_addr %0 : $*Outer, #Outer.z
+  %3 = load [copy] %2 : $*T
+  br bb1
+bb1:
+  cond_br undef, bb2, bb6
+bb2:
+  cond_br undef, bb3, bb4
+bb3:
+  %4 = struct_element_addr %1 : $*Inner, #Inner.a
+  %5 = copy_value %3 : $T
+  store %5 to [assign] %4 : $*T
+  br bb5
+bb4:
+  %6 = struct_element_addr %0 : $*Outer, #Outer.y
+  %7 = struct_element_addr %6 : $*Inner, #Inner.b
+  destroy_addr %7 : $*T
+  %8 = copy_value %3 : $T
+  store %8 to [init] %7 : $*T
+  br bb5
+bb5:
+  br bb1
+bb6:
+  destroy_addr %1 : $*Inner
+  destroy_addr %2 : $*T
+  destroy_addr %10 : $*T
+  return %3 : $T
+}
+
+sil [ossa] @test_struct2 : $@convention(thin) (@in Outer, @owned T) -> () {
+bb0(%0 : $*Outer, %1 : $T):
+  %2 = struct_element_addr %0 : $*Outer, #Outer.x
+  store %1 to [assign] %2 : $*T
+  destroy_addr %0 : $*Outer
+  %3 = tuple ()
+  return %3 : $()
+}
+
+sil @throwing_func : $@convention(thin) () -> (@out T, @error Error)
+
+sil [ossa] @test_try_apply : $@convention(thin) () -> (@out T, @error Error) {
+bb0(%0 : $*T):
+  %1 = function_ref @throwing_func : $@convention(thin) () -> (@out T, @error Error)
+  try_apply %1(%0) : $@convention(thin) () -> (@out T, @error Error), normal bb1, error bb2
+
+bb1(%2 : $()):
+  %3 = tuple ()
+  return %3 : $()
+
+bb2(%4 : @owned $Error):
+  throw %4 : $Error
+
+}
+
+sil [ossa] @test_alloc_stack_simple : $@convention(thin) (@in_guaranteed T) -> () {
+bb0(%0 : $*T):
+  %2 = alloc_stack $T
+  copy_addr %0 to [initialization] %2 : $*T
+  br bb1
+
+bb1:
+  destroy_addr %2 : $*T
+  dealloc_stack %2 : $*T
+  %r = tuple ()
+  return %r : $()
+}
+
+sil [ossa] @test_alloc_stack_nested : $@convention(thin) (@in_guaranteed T) -> () {
+bb0(%0 : $*T):
+  %1 = alloc_stack $T
+  copy_addr %0 to [initialization] %1 : $*T
+  %2 = alloc_stack $T
+  copy_addr %0 to [initialization] %2 : $*T
+  destroy_addr %2 : $*T
+  dealloc_stack %2 : $*T
+  cond_br undef, bb1, bb2
+bb1:
+  %3 = alloc_stack $T
+  %4 = alloc_stack $T
+  copy_addr %0 to [initialization] %3 : $*T
+  copy_addr %0 to [initialization] %4 : $*T
+  destroy_addr %3 : $*T
+  destroy_addr %4 : $*T
+  dealloc_stack %4 : $*T
+  dealloc_stack %3 : $*T
+  br bb3
+bb2:
+  br bb3
+bb3:
+  destroy_addr %1 : $*T
+  dealloc_stack %1 : $*T
+  %r = tuple ()
+  return %r : $()
+}
+
+sil [ossa] @test_unreachable_block : $@convention(thin) (@owned T) -> () {
+bb0(%0 : $T):
+  %2 = alloc_stack $T
+  store %0 to [init] %2 : $*T
+  br bb2
+
+bb1:
+  br bb2
+
+bb2:
+  destroy_addr %2 : $*T
+  dealloc_stack %2 : $*T
+  %r = tuple ()
+  return %r : $()
+}
+

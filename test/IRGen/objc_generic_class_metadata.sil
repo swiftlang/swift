@@ -29,8 +29,7 @@ entry:
 
   // All instances of the generic ObjC class are erased to the same metadata
   // at runtime.
-  // CHECK: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$sSo12GenericClassCMa"([[INT]] 0)
-  // CHECK: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
+  // CHECK: [[METADATA:%.*]] = call {{.*}} @__swift_instantiateConcreteTypeFromMangledName({{.*}} @"$sSo12GenericClassCMD")
   %a = metatype $@thick GenericClass<NSString>.Type
   // CHECK: call swiftcc void @metatype_sink(%swift.type* [[METADATA]], %swift.type* [[METADATA]])
   apply %z<GenericClass<NSString>>(%a) : $@convention(thin) <T> (@thick T.Type) -> ()
@@ -46,8 +45,7 @@ entry:
   apply %y<GenericClass<NSString>>(%c) : $@convention(thin) <T: AnyObject> (@objc_metatype T.Type) -> ()
 
   // Check that generic classes are erased at depth.
-  // CHECK: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$sSaySo12GenericClassC_SitGMa"([[INT]] 0)
-  // CHECK: [[TUPLE_METADATA:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
+  // CHECK: [[TUPLE_METADATA:%.*]] = call {{.*}} @__swift_instantiateConcreteTypeFromMangledName({{.*}} @"$sSaySo12GenericClassC_SitGMD")
   %d = metatype $@thick Array<(GenericClass<NSString>, Int)>.Type
   // CHECK: call swiftcc void @metatype_sink(%swift.type* [[TUPLE_METADATA]], %swift.type* [[TUPLE_METADATA]])
   apply %z<Array<(GenericClass<NSString>, Int)>>(%d) : $@convention(thin) <T> (@thick T.Type) -> ()
@@ -78,22 +76,6 @@ entry(%0 : $Subclass, %1 : $NSDictionary):
   unreachable
 }
 
-// CHECK-LABEL: define linkonce_odr hidden swiftcc %swift.metadata_response @"$sSo12GenericClassCMa"(
-// CHECK:         [[T0:%.*]] = load %objc_class*, %objc_class** @"OBJC_CLASS_REF_$_GenericClass",
-// CHECK:         call %objc_class* @swift_getInitializedObjCClass(%objc_class* [[T0]])
-
-// CHECK-LABEL: define linkonce_odr hidden swiftcc %swift.metadata_response @"$sSaySo12GenericClassC_SitGMa"
-// CHECK-SAME:    ([[INT]])
-// CHECK:         [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$sSo12GenericClassC_SitMa"([[INT]] 255)
-// CHECK:         [[TUPLE:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
-// CHECK:         call swiftcc %swift.metadata_response @"$sSaMa"([[INT]] %0, %swift.type* [[TUPLE]])
-
-// CHECK-LABEL: define linkonce_odr hidden swiftcc %swift.metadata_response @"$sSo12GenericClassC_SitMa"
-// CHECK-SAME:    ([[INT]])
-// CHECK:         [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$sSo12GenericClassCMa"([[INT]] 255)
-// CHECK:         [[CLASS:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
-// CHECK:         call swiftcc %swift.metadata_response @swift_getTupleTypeMetadata2([[INT]] %0, %swift.type* [[CLASS]], %swift.type* @"$sSiN", i8* null,
-
 class K<T> {}
 
 sil @$useMeta : $@convention(thin) <P> () -> ()
@@ -117,9 +99,9 @@ public class D {
 }
 
 // CHECK: define void @testDynamicSelfMetatype(i8*, i8*)
-// CHECK:   [[C:%.*]] = bitcast i8* %0 to %T27objc_generic_class_metadata1DC*
-// CHECK:   [[O:%.*]] = bitcast %T27objc_generic_class_metadata1DC* [[C]] to %objc_object*
-// CHECK:   call %swift.type* @swift_getObjectType(%objc_object* [[O]]
+// CHECK:   [[T0:%.*]] = bitcast {{.*}} %0
+// CHECK:   [[T1:%.*]] = bitcast {{.*}} [[T0]]
+// CHECK:   [[TYPE:%.*]] = load {{.*}} [[T1]]
 sil @testDynamicSelfMetatype : $@convention(objc_method) (@owned D) -> () {
 bb0(%0 : $D):
   %1 = metatype $@thick @dynamic_self D.Type

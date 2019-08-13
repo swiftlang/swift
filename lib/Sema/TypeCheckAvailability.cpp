@@ -181,7 +181,7 @@ private:
     // when we process the accessor, we can use this TRC as the
     // parent.
     if (auto *StorageDecl = dyn_cast<AbstractStorageDecl>(D)) {
-      if (StorageDecl->hasAnyAccessors()) {
+      if (StorageDecl->hasParsedAccessors()) {
         StorageContexts[StorageDecl] = NewTRC;
       }
     }
@@ -230,7 +230,7 @@ private:
       // locations and have callers of that method provide appropriate source
       // locations.
       SourceLoc BracesEnd = storageDecl->getBracesRange().End;
-      if (storageDecl->hasAnyAccessors() && BracesEnd.isValid()) {
+      if (storageDecl->hasParsedAccessors() && BracesEnd.isValid()) {
         return SourceRange(storageDecl->getStartLoc(),
                            BracesEnd);
       }
@@ -2314,6 +2314,11 @@ public:
         = TC.getFragileFunctionKind(DC);
   }
 
+  // FIXME: Remove this
+  bool shouldWalkAccessorsTheOldWay() override {
+    return true;
+  }
+
   bool shouldWalkIntoNonSingleExpressionClosure() override {
     return false;
   }
@@ -2514,30 +2519,32 @@ private:
     if (!D)
       return;
 
-    if (!D->hasAnyAccessors()) {
+    if (!D->requiresOpaqueAccessors()) {
       return;
     }
-    
+
     // Check availability of accessor functions.
     // TODO: if we're talking about an inlineable storage declaration,
     // this probably needs to be refined to not assume that the accesses are
     // specifically using the getter/setter.
     switch (AccessContext) {
     case MemberAccessContext::Getter:
-      diagAccessorAvailability(D->getGetter(), ReferenceRange, ReferenceDC,
-                               None);
+      diagAccessorAvailability(D->getOpaqueAccessor(AccessorKind::Get),
+                               ReferenceRange, ReferenceDC, None);
       break;
 
     case MemberAccessContext::Setter:
-      diagAccessorAvailability(D->getSetter(), ReferenceRange, ReferenceDC,
-                               None);
+      diagAccessorAvailability(D->getOpaqueAccessor(AccessorKind::Set),
+                               ReferenceRange, ReferenceDC, None);
       break;
 
     case MemberAccessContext::InOut:
-      diagAccessorAvailability(D->getGetter(), ReferenceRange, ReferenceDC,
+      diagAccessorAvailability(D->getOpaqueAccessor(AccessorKind::Get),
+                               ReferenceRange, ReferenceDC,
                                DeclAvailabilityFlag::ForInout);
 
-      diagAccessorAvailability(D->getSetter(), ReferenceRange, ReferenceDC,
+      diagAccessorAvailability(D->getOpaqueAccessor(AccessorKind::Set),
+                               ReferenceRange, ReferenceDC,
                                DeclAvailabilityFlag::ForInout);
       break;
     }

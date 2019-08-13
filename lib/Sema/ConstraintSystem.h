@@ -886,9 +886,6 @@ struct MemberLookupResult {
   
   /// This enum tracks reasons why a candidate is not viable.
   enum UnviableReason {
-    /// Argument labels don't match.
-    UR_LabelMismatch,
-
     /// This uses a type like Self in its signature that cannot be used on an
     /// existential box.
     UR_UnavailableInExistential,
@@ -1293,6 +1290,7 @@ private:
     ///
     /// \param constraint The newly generated constraint.
     void addGeneratedConstraint(Constraint *constraint) {
+      assert(constraint && "Null generated constraint?");
       generatedConstraints.push_back(constraint);
     }
 
@@ -1551,7 +1549,7 @@ public:
   /// we're exploring.
   SolverState *solverState = nullptr;
 
-  struct ArgumentLabelState {
+  struct ArgumentInfo {
     ArrayRef<Identifier> Labels;
     bool HasTrailingClosure;
   };
@@ -1560,7 +1558,15 @@ public:
   /// names (e.g., member references, normal name references, possible
   /// constructions) to the argument labels provided in the call to
   /// that locator.
-  llvm::DenseMap<ConstraintLocator *, ArgumentLabelState> ArgumentLabels;
+  llvm::DenseMap<ConstraintLocator *, ArgumentInfo> ArgumentInfos;
+
+  /// Form a locator with given anchor which then could be used
+  /// to retrieve argument information cached in the constraint system.
+  ConstraintLocator *getArgumentInfoLocator(Expr *anchor);
+
+  /// Retrieve the argument info that is associated with a member
+  /// reference at the given locator.
+  Optional<ArgumentInfo> getArgumentInfo(ConstraintLocator *locator);
 
   ResolvedOverloadSetListItem *getResolvedOverloadSets() const {
     return resolvedOverloadSets;
@@ -2597,15 +2603,11 @@ public:
   /// (as the function parameters) and the expected result type of the
   /// call.
   ///
-  /// \param argumentLabels The argument labels provided at the call site,
-  /// if known.
-  ///
   /// \returns \c fnType, or some simplified form of it if this function
   /// was able to find a single overload or derive some common structure
   /// among the overloads.
   Type simplifyAppliedOverloads(TypeVariableType *fnTypeVar,
                                 const FunctionType *argFnType,
-                                Optional<ArgumentLabelState> argumentLabels,
                                 ConstraintLocatorBuilder locator);
 
   /// Retrieve the type that will be used when matching the given overload.
@@ -3864,20 +3866,13 @@ matchCallArguments(ConstraintSystem &cs,
 /// subscript, etc.), find the underlying target expression.
 Expr *getArgumentLabelTargetExpr(Expr *fn);
 
-/// Returns true if a reference to a member on a given base type will apply its
-/// curried self parameter, assuming it has one.
+/// Returns true if a reference to a member on a given base type will apply
+/// its curried self parameter, assuming it has one.
 ///
-/// This is true for most member references, however isn't true for things like
-/// an instance member being referenced on a metatype, where the curried self
-/// parameter remains unapplied.
+/// This is true for most member references, however isn't true for things
+/// like an instance member being referenced on a metatype, where the
+/// curried self parameter remains unapplied.
 bool doesMemberRefApplyCurriedSelf(Type baseTy, const ValueDecl *decl);
-
-/// Attempt to prove that arguments with the given labels at the
-/// given parameter depth cannot be used with the given value.
-/// If this cannot be proven, conservatively returns true.
-bool areConservativelyCompatibleArgumentLabels(OverloadChoice choice,
-                                               ArrayRef<Identifier> labels,
-                                               bool hasTrailingClosure);
 
 /// Simplify the given locator by zeroing in on the most specific
 /// subexpression described by the locator.

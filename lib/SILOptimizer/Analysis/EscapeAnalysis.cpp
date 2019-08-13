@@ -1205,7 +1205,7 @@ bool EscapeAnalysis::buildConnectionGraphForDestructor(
   while (auto payloadTy = Ty.getOptionalObjectType())
     Ty = payloadTy;
   auto Class = Ty.getClassOrBoundGenericClass();
-  if (!Class || !Class->hasDestructor())
+  if (!Class || Class->hasClangNode())
     return false;
   auto Destructor = Class->getDestructor();
   SILDeclRef DeallocRef(Destructor, SILDeclRef::Kind::Deallocator);
@@ -1413,8 +1413,13 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
         // the object itself (because it will be a dangling pointer after
         // deallocation).
         CGNode *CapturedByDeinit = ConGraph->getContentNode(AddrNode);
+        // Get the content node for the object's properties. The object header
+        // itself cannot escape from the deinit.
         CapturedByDeinit = ConGraph->getContentNode(CapturedByDeinit);
         if (deinitIsKnownToNotCapture(OpV)) {
+          // Presumably this is necessary because, even though the deinit
+          // doesn't escape the immediate properties of this class, it may
+          // indirectly escape some other memory content(?)
           CapturedByDeinit = ConGraph->getContentNode(CapturedByDeinit);
         }
         ConGraph->setEscapesGlobal(CapturedByDeinit);

@@ -156,9 +156,16 @@ static bool parseIntoSourceFileImpl(SourceFile &SF,
     *Done = P.Tok.is(tok::eof);
   } while (FullParse && !*Done);
 
+  if (!FullParse && !*Done) {
+    // Only parsed a part of the source file.
+    // Add artificial EOF to be able to finalize the tree.
+    P.SyntaxContext->addRawSyntax(
+      ParsedRawSyntaxNode::makeDeferredMissing(tok::eof, P.Tok.getLoc()));
+  }
+
   if (STreeCreator) {
     auto rawNode = P.finalizeSyntaxTree();
-    STreeCreator->acceptSyntaxRoot(rawNode.getOpaqueNode(), SF);
+    STreeCreator->acceptSyntaxRoot(rawNode, SF);
   }
 
   return FoundSideEffects;
@@ -222,7 +229,6 @@ namespace {
     SILParserTUState &TUState;
     SILFunction *F = nullptr;
     GenericEnvironment *ContextGenericEnv = nullptr;
-    FunctionOwnershipEvaluator OwnershipEvaluator;
 
   private:
     /// HadError - Have we seen an error parsing this function?
@@ -976,6 +982,7 @@ static bool parseDeclSILOptional(bool *isTransparent,
                                  bool *hasOwnershipSSA,
                                  IsThunk_t *isThunk,
                                  IsDynamicallyReplaceable_t *isDynamic,
+                                 IsExactSelfClass_t *isExactSelfClass,
                                  SILFunction **dynamicallyReplacedFunction,
                                  Identifier *objCReplacementFor,
                                  bool *isGlobalInit,
@@ -1004,6 +1011,8 @@ static bool parseDeclSILOptional(bool *isTransparent,
       *isSerialized = IsSerialized;
     else if (isDynamic && SP.P.Tok.getText() == "dynamically_replacable")
       *isDynamic = IsDynamic;
+    else if (isExactSelfClass && SP.P.Tok.getText() == "exact_self_class")
+      *isExactSelfClass = IsExactSelfClass;
     else if (isSerialized && SP.P.Tok.getText() == "serializable")
       *isSerialized = IsSerializable;
     else if (isCanonical && SP.P.Tok.getText() == "canonical")
@@ -1184,8 +1193,14 @@ static ValueDecl *lookupMember(Parser &P, Type Ty, DeclBaseName Name,
     CheckTy = MetaTy->getInstanceType();
 
   if (auto nominal = CheckTy->getAnyNominal()) {
-    auto found = nominal->lookupDirect(Name);
-    Lookup.append(found.begin(), found.end());
+    if (Name == DeclBaseName::createDestructor() &&
+        isa<ClassDecl>(nominal)) {
+      auto *classDecl = cast<ClassDecl>(nominal);
+      Lookup.push_back(classDecl->getDestructor());
+    } else {
+      auto found = nominal->lookupDirect(Name);
+      Lookup.append(found.begin(), found.end());
+    }
   } else if (auto moduleTy = CheckTy->getAs<ModuleType>()) {
     moduleTy->getModule()->lookupValue({ }, Name, NLKind::QualifiedLookup,
                                        Lookup);
@@ -1238,7 +1253,7 @@ bool SILParser::parseSILType(SILType &Result,
   }
 
   // Parse attributes.
-  VarDecl::Specifier specifier;
+  ParamDecl::Specifier specifier;
   SourceLoc specifierLoc;
   TypeAttributes attrs;
   P.parseTypeAttributeList(specifier, specifierLoc, attrs);
@@ -1440,7 +1455,7 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
         size_t destI = 0;
         for (size_t srcI = 0, e = values.size(); srcI != e; ++srcI) {
           if (auto storage = dyn_cast<AbstractStorageDecl>(values[srcI]))
-            if (auto accessor = storage->getAccessor(*accessorKind))
+            if (auto accessor = storage->getOpaqueAccessor(*accessorKind))
               values[destI++] = accessor;
         }
         values.resize(destI);
@@ -2459,6 +2474,10 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
   SILInstruction *ResultVal;
   switch (Opcode) {
   case SILInstructionKind::AllocBoxInst: {
+    bool hasDynamicLifetime = false;
+    if (parseSILOptional(hasDynamicLifetime, *this, "dynamic_lifetime"))
+      return true;
+
     SILType Ty;
     if (parseSILType(Ty)) return true;
     SILDebugVariable VarInfo;
@@ -2466,7 +2485,8 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
       return true;
     if (parseSILDebugLocation(InstLoc, B))
       return true;
-    ResultVal = B.createAllocBox(InstLoc, Ty.castTo<SILBoxType>(), VarInfo);
+    ResultVal = B.createAllocBox(InstLoc, Ty.castTo<SILBoxType>(), VarInfo,
+                                 hasDynamicLifetime);
     break;
   }
   case SILInstructionKind::ApplyInst:
@@ -3786,6 +3806,11 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
   case SILInstructionKind::AllocStackInst:
   case SILInstructionKind::MetatypeInst: {
 
+    bool hasDynamicLifetime = false;
+    if (Opcode == SILInstructionKind::AllocStackInst &&
+        parseSILOptional(hasDynamicLifetime, *this, "dynamic_lifetime"))
+      return true;
+
     SILType Ty;
     if (parseSILType(Ty))
       return true;
@@ -3795,7 +3820,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
       if (parseSILDebugVar(VarInfo) ||
           parseSILDebugLocation(InstLoc, B))
         return true;
-      ResultVal = B.createAllocStack(InstLoc, Ty, VarInfo);
+      ResultVal = B.createAllocStack(InstLoc, Ty, VarInfo, hasDynamicLifetime);
     } else {
       assert(Opcode == SILInstructionKind::MetatypeInst);
       if (parseSILDebugLocation(InstLoc, B))
@@ -5328,16 +5353,6 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
   do {
     if (parseSILInstruction(B))
       return true;
-    // Evaluate how the just parsed instruction effects this functions Ownership
-    // Qualification. For more details, see the comment on the
-    // FunctionOwnershipEvaluator class.
-    SILInstruction *ParsedInst = &*BB->rbegin();
-    if (BB->getParent()->hasOwnership() &&
-        !OwnershipEvaluator.evaluate(ParsedInst)) {
-      P.diagnose(ParsedInst->getLoc().getSourceLoc(),
-                 diag::found_unqualified_instruction_in_qualified_function,
-                 F->getName());
-    }
   } while (isStartOfSILInstruction());
 
   return false;
@@ -5367,6 +5382,7 @@ bool SILParserTUState::parseDeclSIL(Parser &P) {
   IsSerialized_t isSerialized = IsNotSerialized;
   bool isCanonical = false;
   IsDynamicallyReplaceable_t isDynamic = IsNotDynamic;
+  IsExactSelfClass_t isExactSelfClass = IsNotExactSelfClass;
   bool hasOwnershipSSA = false;
   IsThunk_t isThunk = IsNotThunk;
   bool isGlobalInit = false, isWeakLinked = false;
@@ -5382,7 +5398,7 @@ bool SILParserTUState::parseDeclSIL(Parser &P) {
   if (parseSILLinkage(FnLinkage, P) ||
       parseDeclSILOptional(
           &isTransparent, &isSerialized, &isCanonical, &hasOwnershipSSA,
-          &isThunk, &isDynamic, &DynamicallyReplacedFunction,
+          &isThunk, &isDynamic, &isExactSelfClass, &DynamicallyReplacedFunction,
           &objCReplacementFor, &isGlobalInit, &inlineStrategy, &optimizationMode, nullptr,
           &isWeakLinked, &isWithoutActuallyEscapingThunk, &Semantics,
           &SpecAttrs, &ClangDecl, &MRK, FunctionState, M) ||
@@ -5413,6 +5429,7 @@ bool SILParserTUState::parseDeclSIL(Parser &P) {
       FunctionState.F->setOwnershipEliminated();
     FunctionState.F->setThunk(IsThunk_t(isThunk));
     FunctionState.F->setIsDynamic(isDynamic);
+    FunctionState.F->setIsExactSelfClass(isExactSelfClass);
     FunctionState.F->setDynamicallyReplacedFunction(
         DynamicallyReplacedFunction);
     if (!objCReplacementFor.empty())
@@ -5453,7 +5470,6 @@ bool SILParserTUState::parseDeclSIL(Parser &P) {
       }
 
       // Parse the basic block list.
-      FunctionState.OwnershipEvaluator.reset(FunctionState.F);
       SILOpenedArchetypesTracker OpenedArchetypesTracker(FunctionState.F);
       SILBuilder B(*FunctionState.F);
       // Track the archetypes just like SILGen. This
@@ -5599,8 +5615,10 @@ bool SILParserTUState::parseSILGlobal(Parser &P) {
   SILParser State(P);
   if (parseSILLinkage(GlobalLinkage, P) ||
       parseDeclSILOptional(nullptr, &isSerialized, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           &isLet, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, State, M) ||
+                           nullptr, nullptr, nullptr, nullptr, nullptr,
+                           nullptr, nullptr,
+                           &isLet, nullptr, nullptr, nullptr, nullptr, nullptr,
+                           nullptr, State, M) ||
       P.parseToken(tok::at_sign, diag::expected_sil_value_name) ||
       P.parseIdentifier(GlobalName, NameLoc, diag::expected_sil_value_name) ||
       P.parseToken(tok::colon, diag::expected_sil_type))
@@ -5648,7 +5666,8 @@ bool SILParserTUState::parseSILProperty(Parser &P) {
   IsSerialized_t Serialized = IsNotSerialized;
   if (parseDeclSILOptional(nullptr, &Serialized, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, SP, M))
+                           nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                           nullptr, nullptr, SP, M))
     return true;
   
   ValueDecl *VD;
@@ -5716,7 +5735,8 @@ bool SILParserTUState::parseSILVTable(Parser &P) {
   IsSerialized_t Serialized = IsNotSerialized;
   if (parseDeclSILOptional(nullptr, &Serialized, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                           nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                           nullptr, nullptr,
                            VTableState, M))
     return true;
 
@@ -6248,7 +6268,8 @@ bool SILParserTUState::parseSILWitnessTable(Parser &P) {
   IsSerialized_t isSerialized = IsNotSerialized;
   if (parseDeclSILOptional(nullptr, &isSerialized, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                           nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                           nullptr, nullptr,
                            WitnessState, M))
     return true;
 

@@ -1,0 +1,20 @@
+// RUN: %scale-test --sum-multi --begin 5 --end 16 --step 5 --select Sema.IsObjCRequest -Xfrontend=-disable-objc-attr-requires-foundation-module %s
+// REQUIRES: OS=macosx
+// REQUIRES: asserts
+
+class C${N} {
+  // This is the member we actually have to validate; we only want there
+  // to be one definition:
+% if int(N) == 1:
+  @objc func isObjCMember() {}
+% end
+
+  // Other random @objc and non-@objc members; the test ensures that we're
+  // not touching these:
+  func isAnotherObjCMember() {}
+  func isNonObjCMember() {}
+}
+
+func f${N}(a: AnyObject) {
+  a.isObjCMember!()
+}

@@ -13,9 +13,10 @@
 // This file implements semantic analysis for declaration overrides.
 //
 //===----------------------------------------------------------------------===//
-#include "CodeSynthesis.h"
 #include "MiscDiagnostics.h"
 #include "TypeCheckAvailability.h"
+#include "TypeCheckDecl.h"
+#include "TypeCheckObjC.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Availability.h"
@@ -169,6 +170,22 @@ bool swift::isOverrideBasedOnType(ValueDecl *decl, Type declTy,
 
   if (declIUOAttr != parentDeclIUOAttr)
     return false;
+
+  // If the generic signatures don't match, then return false because we don't
+  // want to complain if an overridden method matches multiple superclass
+  // methods which differ in generic signature.
+  //
+  // We can still succeed with a subtype match later in
+  // OverrideMatcher::match().
+  auto declGenericCtx = decl->getAsGenericContext();
+  auto &ctx = decl->getASTContext();
+  auto sig = ctx.getOverrideGenericSignature(parentDecl, decl);
+
+  if (sig && declGenericCtx &&
+      declGenericCtx->getGenericSignature()->getCanonicalSignature() !=
+          sig->getCanonicalSignature()) {
+    return false;
+  }
 
   // If this is a constructor, let's compare only parameter types.
   if (isa<ConstructorDecl>(decl)) {
@@ -893,23 +910,20 @@ static void checkOverrideAccessControl(ValueDecl *baseDecl, ValueDecl *decl,
     bool shouldDiagnose = !decl->isAccessibleFrom(scopeDC);
 
     bool shouldDiagnoseSetter = false;
-    if (!shouldDiagnose && baseDecl->isSettable(dc)){
-      auto matchASD = cast<AbstractStorageDecl>(baseDecl);
-      if (matchASD->isSetterAccessibleFrom(dc)) {
-        // Match sure we've created the setter.
-        if (!matchASD->getSetter())
-          maybeAddAccessorsToStorage(matchASD);
+    if (auto matchASD = dyn_cast<AbstractStorageDecl>(baseDecl)) {
+      if (!shouldDiagnose && matchASD->isSettable(dc)){
+        if (matchASD->isSetterAccessibleFrom(dc)) {
+          auto matchSetterAccessScope =
+            matchASD->getSetterFormalAccessScope(dc);
+          auto requiredSetterAccessScope =
+            matchSetterAccessScope.intersectWith(classAccessScope);
+          auto setterScopeDC = requiredSetterAccessScope->getDeclContext();
 
-        auto matchSetterAccessScope = matchASD->getSetter()
-          ->getFormalAccessScope(dc);
-        auto requiredSetterAccessScope =
-          matchSetterAccessScope.intersectWith(classAccessScope);
-        auto setterScopeDC = requiredSetterAccessScope->getDeclContext();
-
-        const auto *ASD = cast<AbstractStorageDecl>(decl);
-        shouldDiagnoseSetter =
-            ASD->isSettable(setterScopeDC) &&
-            !ASD->isSetterAccessibleFrom(setterScopeDC);
+          const auto *ASD = cast<AbstractStorageDecl>(decl);
+          shouldDiagnoseSetter =
+              ASD->isSettable(setterScopeDC) &&
+              !ASD->isSetterAccessibleFrom(setterScopeDC);
+        }
       }
     }
 
@@ -929,98 +943,6 @@ static void checkOverrideAccessControl(ValueDecl *baseDecl, ValueDecl *decl,
       diags.diagnose(baseDecl, diag::overridden_here);
     }
   }
-}
-
-static GenericSignature *getOverrideGenericSignature(ValueDecl *base,
-                                                     ValueDecl *derived) {
-  auto baseGenericCtx = base->getAsGenericContext();
-  auto &ctx = base->getASTContext();
-
-  if (!baseGenericCtx) {
-    return nullptr;
-  }
-
-  auto baseClass = base->getDeclContext()->getSelfClassDecl();
-
-  if (!baseClass) {
-    return nullptr;
-  }
-
-  auto derivedClass = derived->getDeclContext()->getSelfClassDecl();
-  auto *baseClassSig = baseClass->getGenericSignature();
-
-  if (!derivedClass) {
-    return nullptr;
-  }
-
-  if (derivedClass->getSuperclass().isNull()) {
-    return nullptr;
-  }
-
-  if (derivedClass->getGenericSignature() == nullptr &&
-      !baseGenericCtx->isGeneric()) {
-    return nullptr;
-  }
-
-  auto subMap = derivedClass->getSuperclass()->getContextSubstitutionMap(
-      derivedClass->getModuleContext(), baseClass);
-
-  if (baseGenericCtx->getGenericSignature() == nullptr) {
-    return nullptr;
-  }
-  unsigned derivedDepth = 0;
-
-  if (auto *derivedSig = derivedClass->getGenericSignature())
-    derivedDepth = derivedSig->getGenericParams().back()->getDepth() + 1;
-
-  GenericSignatureBuilder builder(ctx);
-  builder.addGenericSignature(derivedClass->getGenericSignature());
-
-  if (auto derivedGenericCtx = derived->getAsGenericContext()) {
-    if (derivedGenericCtx->isGeneric()) {
-      for (auto param : *derivedGenericCtx->getGenericParams()) {
-        builder.addGenericParameter(param);
-      }
-    }
-  }
-
-  auto source =
-      GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
-
-  unsigned baseDepth = 0;
-
-  if (baseClassSig) {
-    baseDepth = baseClassSig->getGenericParams().back()->getDepth() + 1;
-  }
-
-  auto substFn = [&](SubstitutableType *type) -> Type {
-    auto *gp = cast<GenericTypeParamType>(type);
-
-    if (gp->getDepth() < baseDepth) {
-      return Type(gp).subst(subMap);
-    }
-
-    return CanGenericTypeParamType::get(
-        gp->getDepth() - baseDepth + derivedDepth, gp->getIndex(), ctx);
-  };
-
-  auto lookupConformanceFn =
-      [&](CanType depTy, Type substTy,
-          ProtocolDecl *proto) -> Optional<ProtocolConformanceRef> {
-    if (auto conf = subMap.lookupConformance(depTy, proto))
-      return conf;
-
-    return ProtocolConformanceRef(proto);
-  };
-
-  for (auto reqt : baseGenericCtx->getGenericSignature()->getRequirements()) {
-    if (auto substReqt = reqt.subst(substFn, lookupConformanceFn)) {
-      builder.addRequirement(*substReqt, source, nullptr);
-    }
-  }
-
-  auto *genericSig = std::move(builder).computeGenericSignature(SourceLoc());
-  return genericSig;
 }
 
 bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
@@ -1043,24 +965,18 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
   auto baseGenericCtx = baseDecl->getAsGenericContext();
   auto derivedGenericCtx = decl->getAsGenericContext();
 
+  using Direction = ASTContext::OverrideGenericSignatureReqCheck;
   if (baseGenericCtx && derivedGenericCtx) {
-    // If the generic signatures are different, then complain
-    if (auto newSig = getOverrideGenericSignature(baseDecl, decl)) {
-      if (auto derivedSig = derivedGenericCtx->getGenericSignature()) {
-        auto requirementsSatisfied =
-            derivedSig->requirementsNotSatisfiedBy(newSig).empty();
-
-        if (!requirementsSatisfied) {
-          diags.diagnose(
-              decl, diag::override_method_different_generic_sig,
-              decl->getBaseName(),
-              derivedGenericCtx->getGenericSignature()->getAsString(),
-              baseGenericCtx->getGenericSignature()->getAsString(),
-              newSig->getAsString());
-          diags.diagnose(baseDecl, diag::overridden_here);
-          emittedMatchError = true;
-        }
-      }
+    if (!ctx.overrideGenericSignatureReqsSatisfied(
+            baseDecl, decl, Direction::DerivedReqSatisfiedByBase)) {
+      auto newSig = ctx.getOverrideGenericSignature(baseDecl, decl);
+      diags.diagnose(decl, diag::override_method_different_generic_sig,
+                     decl->getBaseName(),
+                     derivedGenericCtx->getGenericSignature()->getAsString(),
+                     baseGenericCtx->getGenericSignature()->getAsString(),
+                     newSig->getAsString());
+      diags.diagnose(baseDecl, diag::overridden_here);
+      emittedMatchError = true;
     }
   }
 
@@ -1142,7 +1058,7 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
     // Otherwise, if this is a subscript, validate that covariance is ok.
     // If the parent is non-mutable, it's okay to be covariant.
     auto parentSubscript = cast<SubscriptDecl>(baseDecl);
-    if (parentSubscript->getSetter()) {
+    if (parentSubscript->supportsMutation()) {
       diags.diagnose(subscript, diag::override_mutable_covariant_subscript,
                      declTy, baseTy);
       diags.diagnose(baseDecl, diag::subscript_override_here);
@@ -1189,7 +1105,7 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
           IsSilentDifference = true;
 
     // The overridden property must not be mutable.
-    if (cast<AbstractStorageDecl>(baseDecl)->getSetter() &&
+    if (cast<AbstractStorageDecl>(baseDecl)->supportsMutation() &&
         !IsSilentDifference) {
       diags.diagnose(property, diag::override_mutable_covariant_property,
                   property->getName(), parentPropertyTy, propertyTy);
@@ -1573,8 +1489,8 @@ isRedundantAccessorOverrideAvailabilityDiagnostic(ValueDecl *override,
   // Returns true if we will already diagnose a bad override
   // on the property's accessor of the given kind.
   auto accessorOverrideAlreadyDiagnosed = [&](AccessorKind kind) {
-    FuncDecl *overrideAccessor = overrideASD->getAccessor(kind);
-    FuncDecl *baseAccessor = baseASD->getAccessor(kind);
+    FuncDecl *overrideAccessor = overrideASD->getOpaqueAccessor(kind);
+    FuncDecl *baseAccessor = baseASD->getOpaqueAccessor(kind);
     if (overrideAccessor && baseAccessor &&
         !isAvailabilitySafeForOverride(overrideAccessor, baseAccessor)) {
       return true;
@@ -1658,7 +1574,8 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
     // Make sure that the overriding property doesn't have storage.
     if ((overrideASD->hasStorage() ||
          overrideASD->getAttrs().hasAttribute<LazyAttr>()) &&
-        !(overrideASD->getWillSetFunc() || overrideASD->getDidSetFunc())) {
+        !(overrideASD->getParsedAccessor(AccessorKind::WillSet) ||
+          overrideASD->getParsedAccessor(AccessorKind::DidSet))) {
       bool downgradeToWarning = false;
       if (!ctx.isSwiftVersionAtLeast(5) &&
           overrideASD->getAttrs().hasAttribute<LazyAttr>()) {
@@ -1696,7 +1613,7 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
     // Make sure we're not overriding a settable property with a non-settable
     // one.  The only reasonable semantics for this would be to inherit the
     // setter but override the getter, and that would be surprising at best.
-    if (baseIsSettable && !override->isSettable(override->getDeclContext())) {
+    if (baseIsSettable && !overrideASD->isSettable(override->getDeclContext())) {
       diags.diagnose(overrideASD, diag::override_mutable_with_readonly_property,
                      overrideASD->getBaseName().getIdentifier());
       diags.diagnose(baseASD, diag::property_override_here);
@@ -1979,8 +1896,6 @@ OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     SmallVector<OverrideMatch, 2> matches;
     for (auto overridden : overridingASD->getOverriddenDecls()) {
       auto baseASD = cast<AbstractStorageDecl>(overridden);
-      maybeAddAccessorsToStorage(baseASD);
-
       auto kind = accessor->getAccessorKind();
 
       // If the base doesn't consider this an opaque accessor,
@@ -1989,11 +1904,12 @@ OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
         continue;
 
       // Find the base accessor; if there isn't one, we're done.
-      auto baseAccessor = baseASD->getAccessor(kind);
-      if (!baseAccessor) continue;
-
-      if (baseAccessor->hasForcedStaticDispatch())
+      auto baseAccessor = baseASD->getOpaqueAccessor(kind);
+      if (!baseAccessor)
         continue;
+
+      assert(!baseAccessor->hasForcedStaticDispatch() &&
+             "opaque accessor with forced static dispatch?");
 
       switch (kind) {
       case AccessorKind::Get:

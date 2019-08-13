@@ -6,8 +6,8 @@ class A {
   func do_b(_ x: Int) {}
   func do_b(_ x: Float) {}
 
-  func do_c(x: Int) {}
-  func do_c(y: Int) {} 
+  func do_c(x: Int) {} // expected-note 2 {{incorrect labels for candidate (have: '(_:)', expected: '(x:)')}}
+  func do_c(y: Int) {} // expected-note 2 {{incorrect labels for candidate (have: '(_:)', expected: '(y:)')}}
 }
 
 func test0(_ a : A!) {
@@ -16,7 +16,7 @@ func test0(_ a : A!) {
   a.do_b(1)
   a.do_b(5.0)
 
-  a.do_c(1) // expected-error {{cannot invoke 'do_c' with an argument list of type '(Int)'}}
+  a.do_c(1) // expected-error {{no exact matches in call to instance method 'do_c'}}
   a.do_c(x: 1)
 }
 
@@ -26,7 +26,7 @@ func test1(_ a : A!) {
   a?.do_b(1)
   a?.do_b(5.0)
 
-  a?.do_c(1) // expected-error {{cannot invoke 'do_c' with an argument list of type '(Int)'}}
+  a?.do_c(1) // expected-error {{no exact matches in call to instance method 'do_c'}}
   a?.do_c(x: 1)
 }
 

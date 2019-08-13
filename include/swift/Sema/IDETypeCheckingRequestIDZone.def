@@ -15,3 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 SWIFT_TYPEID(IsDeclApplicableRequest)
+SWIFT_TYPEID(TypeRelationCheckRequest)
+SWIFT_TYPEID(RootAndResultTypeOfKeypathDynamicMemberRequest)
+SWIFT_TYPEID(RootTypeOfKeypathDynamicMemberRequest)
+SWIFT_TYPEID(HasDynamicMemberLookupAttributeRequest)

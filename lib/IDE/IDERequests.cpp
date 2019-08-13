@@ -13,6 +13,7 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/ASTDemangler.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
@@ -110,9 +111,8 @@ bool CursorInfoResolver::tryResolve(ValueDecl *D, TypeDecl *CtorTyRef,
     // Handle references to the implicitly generated vars in case statements
     // matching multiple patterns
     if (VD->isImplicit()) {
-      if (auto * Parent = VD->getParentVarDecl()) {
+      if (auto *Parent = VD->getParentVarDecl()) {
         D = Parent;
-        VD = Parent;
       }
     }
   }
@@ -1143,4 +1143,29 @@ CollectOverriddenDeclsRequest::evaluate(Evaluator &evaluator,
   }
 
   return copyToContext(VD->getASTContext(), llvm::makeArrayRef(results));
+}
+
+
+//----------------------------------------------------------------------------//
+// ResolveProtocolNameRequest
+//----------------------------------------------------------------------------//
+llvm::Expected<ProtocolDecl*>
+ResolveProtocolNameRequest::evaluate(Evaluator &evaluator,
+                                     ProtocolNameOwner Input) const {
+  auto &ctx = Input.DC->getASTContext();
+  auto name = Input.Name;
+  // First try to solve by usr
+  ProtocolDecl *pd = dyn_cast_or_null<ProtocolDecl>(Demangle::
+    getTypeDeclForUSR(ctx, name));
+  if (!pd) {
+    // Second try to solve by mangled symbol name
+    pd = dyn_cast_or_null<ProtocolDecl>(Demangle::getTypeDeclForMangling(ctx, name));
+  }
+  if (!pd) {
+    // Thirdly try to solve by mangled type name
+    if (auto ty = Demangle::getTypeForMangling(ctx, name)) {
+      pd = dyn_cast_or_null<ProtocolDecl>(ty->getAnyGeneric());
+    }
+  }
+  return pd;
 }

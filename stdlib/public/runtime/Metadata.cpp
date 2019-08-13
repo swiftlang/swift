@@ -3952,9 +3952,15 @@ void Metadata::dump() const {
   printf("Kind: %s.\n", getStringForMetadataKind(getKind()).data());
   printf("Value Witnesses: %p.\n", getValueWitnesses());
 
-  auto *contextDescriptor = getTypeContextDescriptor();
-  printf("Name: %s.\n", contextDescriptor->Name.get());
-  printf("Type Context Description: %p.\n", contextDescriptor);
+  if (auto *contextDescriptor = getTypeContextDescriptor()) {
+    printf("Name: %s.\n", contextDescriptor->Name.get());
+    printf("Type Context Description: %p.\n", contextDescriptor);
+  }
+
+  if (auto *tuple = dyn_cast<TupleTypeMetadata>(this)) {
+    printf("Labels: %s.\n", tuple->Labels);
+  }
+
   printf("Generic Args: %p.\n", getGenericArgs());
 
 #if SWIFT_OBJC_INTEROP
@@ -5034,7 +5040,7 @@ namespace {
 
 // A statically-allocated pool.  It's zero-initialized, so this
 // doesn't cost us anything in binary size.
-LLVM_ALIGNAS(alignof(void*)) static char InitialAllocationPool[64*1024];
+alignas(void *) static char InitialAllocationPool[64 * 1024];
 static std::atomic<PoolRange>
 AllocationPool{PoolRange{InitialAllocationPool,
                          sizeof(InitialAllocationPool)}};

@@ -27,6 +27,7 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
 #include "clang/AST/Attr.h"
+#include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/Analysis/DomainSpecific/CocoaConventions.h"
 #include "llvm/Support/CommandLine.h"
@@ -223,6 +224,7 @@ enum class ConventionsKind : uint8_t {
   ObjCSelectorFamily = 5,
   Deallocator = 6,
   Capture = 7,
+  CXXMethod = 8,
 };
 
 class Conventions {
@@ -1640,6 +1642,28 @@ public:
   }
 };
 
+/// Conventions based on C++ method declarations.
+class CXXMethodConventions : public CFunctionTypeConventions {
+  using super = CFunctionTypeConventions;
+  const clang::CXXMethodDecl *TheDecl;
+
+public:
+  CXXMethodConventions(const clang::CXXMethodDecl *decl)
+      : CFunctionTypeConventions(
+            ConventionsKind::CXXMethod,
+            decl->getType()->castAs<clang::FunctionType>()),
+        TheDecl(decl) {}
+  ParameterConvention
+  getIndirectSelfParameter(const AbstractionPattern &type) const override {
+    if (TheDecl->isConst())
+      return ParameterConvention::Indirect_In_Guaranteed;
+    return ParameterConvention::Indirect_Inout;
+  }
+  static bool classof(const Conventions *C) {
+    return C->getKind() == ConventionsKind::CXXMethod;
+  }
+};
+
 } // end anonymous namespace
 
 /// Given that we have an imported Clang declaration, deduce the
@@ -1657,6 +1681,16 @@ getSILFunctionTypeForClangDecl(SILModule &M, const clang::Decl *clangDecl,
     return getSILFunctionType(M, origPattern, substInterfaceType, extInfo,
                               ObjCMethodConventions(method), foreignInfo,
                               constant, constant, None,
+                              /*witnessMethodConformance=*/None);
+  }
+
+  if (auto method = dyn_cast<clang::CXXMethodDecl>(clangDecl)) {
+    AbstractionPattern origPattern =
+        AbstractionPattern::getCXXMethod(origType, method);
+    auto conventions = CXXMethodConventions(method);
+    return getSILFunctionType(M, origPattern, substInterfaceType, extInfo,
+                              conventions, foreignInfo, constant, constant,
+                              None,
                               /*witnessMethodConformance=*/None);
   }
 
@@ -2592,9 +2626,15 @@ getAbstractionPatternForConstant(ASTContext &ctx, SILDeclRef constant,
       // C function imported as a function.
       return AbstractionPattern(fnType, value->getType().getTypePtr());
     } else {
-      // C function imported as a method.
       assert(numParameterLists == 2);
-      return AbstractionPattern::getCurriedCFunctionAsMethod(fnType, bridgedFn);
+      if (auto method = dyn_cast<clang::CXXMethodDecl>(clangDecl)) {
+        // C++ method.
+        return AbstractionPattern::getCurriedCXXMethod(fnType, bridgedFn);
+      } else {
+        // C function imported as a method.
+        return AbstractionPattern::getCurriedCFunctionAsMethod(fnType,
+                                                               bridgedFn);
+      }
     }
   }
 

@@ -948,7 +948,7 @@ static void lookupVisibleMemberAndDynamicMemberDecls(
 /// Enumerates all keypath dynamic members of \c baseType, as seen from the
 /// context \c dc.
 ///
-/// If \c baseType is \c @dynamicMemberLookup, this looks up any keypath
+/// If \c baseType is \c \@dynamicMemberLookup, this looks up any keypath
 /// dynamic member subscripts and looks up the members of the keypath's root
 /// type.
 static void lookupVisibleDynamicMemberLookupDecls(
@@ -959,7 +959,8 @@ static void lookupVisibleDynamicMemberLookupDecls(
   if (!seenDynamicLookup.insert(baseType.getPointer()).second)
     return;
 
-  if (!hasDynamicMemberLookupAttribute(baseType))
+  if (!evaluateOrDefault(dc->getASTContext().evaluator,
+         HasDynamicMemberLookupAttributeRequest{baseType.getPointer()}, false))
     return;
 
   auto &ctx = dc->getASTContext();
@@ -977,11 +978,10 @@ static void lookupVisibleDynamicMemberLookupDecls(
     if (!subscript)
       continue;
 
-    auto rootAndResult =
-        getRootAndResultTypeOfKeypathDynamicMember(subscript, dc);
-    if (!rootAndResult)
+    auto rootType = evaluateOrDefault(subscript->getASTContext().evaluator,
+      RootTypeOfKeypathDynamicMemberRequest{subscript}, Type());
+    if (rootType.isNull())
       continue;
-    auto rootType = rootAndResult->first;
 
     auto subs =
         baseType->getMemberSubstitutionMap(dc->getParentModule(), subscript);

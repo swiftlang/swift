@@ -1373,7 +1373,7 @@ void LoadableStorageAllocation::insertIndirectReturnArgs() {
 
   auto &ctx = pass.F->getModule().getASTContext();
   auto var = new (ctx) ParamDecl(
-      VarDecl::Specifier::InOut, SourceLoc(), SourceLoc(),
+      ParamDecl::Specifier::InOut, SourceLoc(), SourceLoc(),
       ctx.getIdentifier("$return_value"), SourceLoc(),
       ctx.getIdentifier("$return_value"),
       pass.F->getDeclContext());

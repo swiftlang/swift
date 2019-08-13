@@ -906,8 +906,16 @@ namespace {
       for (auto entry : PBD->getPatternList()) {
         OS << '\n';
         printRec(entry.getPattern());
+        if (entry.getOriginalInit()) {
+          OS << '\n';
+          OS.indent(Indent + 2);
+          OS << "Original init:\n";
+          printRec(entry.getOriginalInit());
+        }
         if (entry.getInit()) {
           OS << '\n';
+          OS.indent(Indent + 2);
+          OS << "Processed init:\n";
           printRec(entry.getInit());
         }
       }
@@ -968,19 +976,16 @@ namespace {
       }
 
       switch (P->getSpecifier()) {
-      case VarDecl::Specifier::Let:
+      case ParamDecl::Specifier::Default:
         /* nothing */
         break;
-      case VarDecl::Specifier::Var:
-        OS << " mutable";
-        break;
-      case VarDecl::Specifier::InOut:
+      case ParamDecl::Specifier::InOut:
         OS << " inout";
         break;
-      case VarDecl::Specifier::Shared:
+      case ParamDecl::Specifier::Shared:
         OS << " shared";
         break;
-      case VarDecl::Specifier::Owned:
+      case ParamDecl::Specifier::Owned:
         OS << " owned";
         break;
       }
@@ -2433,9 +2438,12 @@ public:
     }
     // Printing a function type doesn't indicate whether it's escaping because it doesn't 
     // matter in 99% of contexts. AbstractClosureExpr nodes are one of the only exceptions.
-    if (auto Ty = GetTypeOfExpr(E))
-      if (!Ty->getAs<AnyFunctionType>()->getExtInfo().isNoEscape())
-        PrintWithColorRAII(OS, ClosureModifierColor) << " escaping";
+    if (auto Ty = GetTypeOfExpr(E)) {
+      if (auto fType = Ty->getAs<AnyFunctionType>()) {
+        if (!fType->getExtInfo().isNoEscape())
+          PrintWithColorRAII(OS, ClosureModifierColor) << " escaping";
+      }
+    }
 
     return OS;
   }

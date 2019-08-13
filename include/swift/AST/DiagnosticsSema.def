@@ -81,6 +81,13 @@ ERROR(could_not_find_value_member,none,
 ERROR(could_not_find_value_member_corrected,none,
       "value of type %0 has no member %1; did you mean %2?",
       (Type, DeclName, DeclName))
+ERROR(could_not_find_value_dynamic_member_corrected,none,
+      "value of type %0 has no dynamic member %2 using key path from root type %1; did you mean %3?",
+      (Type, Type, DeclName, DeclName))
+ERROR(could_not_find_value_dynamic_member,none,
+      "value of type %0 has no dynamic member %2 using key path from root type %1",
+      (Type, Type, DeclName))
+
 ERROR(could_not_find_type_member,none,
       "type %0 has no member %1", (Type, DeclName))
 ERROR(could_not_find_type_member_corrected,none,
@@ -256,9 +263,6 @@ ERROR(cannot_call_with_no_params,none,
 ERROR(cannot_call_with_params, none,
       "cannot invoke %select{|initializer for type }2'%0' with an argument list"
       " of type '%1'", (StringRef, StringRef, bool))
-
-NOTE(pointer_init_to_type,none,
-      "Pointer conversion restricted: use '.assumingMemoryBound(to:)' or '.bindMemory(to:capacity:)' to view memory as a type.", ())
 
 ERROR(cannot_call_non_function_value,none,
       "cannot call value of non-function type %0", (Type))
@@ -1051,6 +1055,9 @@ ERROR(argument_out_of_order_unnamed_named,none,
 ERROR(argument_out_of_order_unnamed_unnamed,none,
       "unnamed argument #%0 must precede unnamed argument #%1",
       (unsigned, unsigned))
+NOTE(candidate_expected_different_labels,none,
+     "incorrect labels for candidate (have: '%0', expected: '%1')",
+     (StringRef, StringRef))
 
 ERROR(member_shadows_global_function,none,
       "use of %0 refers to %1 %2 rather than %3 %4 in %5 %6",
@@ -1133,6 +1140,10 @@ ERROR(c_function_pointer_from_generic_function,none,
       "function", ())
 ERROR(invalid_autoclosure_forwarding,none,
       "add () to forward @autoclosure parameter", ())
+ERROR(invalid_autoclosure_pointer_conversion,none,
+      "cannot perform pointer conversion of value of type %0 to autoclosure "
+      "result type %1",
+      (Type, Type))
 
 //------------------------------------------------------------------------------
 // MARK: Type Check Declarations
@@ -1377,6 +1388,9 @@ WARNING(enum_frozen_nonpublic,none,
         "%0 has no effect on non-public enums", (DeclAttribute))
 
 // Variables (var and let).
+ERROR(getset_init,none,
+      "variable with getter/setter cannot have an initial value", ())
+
 ERROR(unimplemented_static_var,none,
       "%select{ERROR|static|class}1 stored properties not supported"
       "%select{ in this context| in generic types| in classes| in protocol extensions}0"
@@ -2807,13 +2821,13 @@ NOTE(convenience_init_here,none,
 ERROR(designated_init_in_extension,none,
       "designated initializer cannot be declared in an extension of %0; "
       "did you mean this to be a convenience initializer?",
-      (Type))
+      (DeclName))
 ERROR(enumstruct_convenience_init,none,
       "delegating initializers in %0 are not marked with 'convenience'",
       (StringRef))
 ERROR(nonclass_convenience_init,none,
       "convenience initializer not allowed in non-class type %0",
-      (Type))
+      (DeclName))
 ERROR(cfclass_convenience_init,none,
       "convenience initializers are not supported in extensions of CF types",
       ())
@@ -3386,6 +3400,18 @@ ERROR(pattern_type_mismatch_context,none,
 
 ERROR(tuple_pattern_in_non_tuple_context,none,
       "tuple pattern cannot match values of the non-tuple type %0", (Type))
+WARNING(matching_pattern_with_many_assoc_values, none,
+        "cannot match several associated values at once, "
+        "implicitly tupling the associated values and trying to match that "
+        "instead", ())
+WARNING(matching_tuple_pattern_with_many_assoc_values,none,
+        "a tuple pattern cannot match several associated values at once, "
+        "implicitly tupling the associated values and trying to match "
+        "that instead", ())
+WARNING(matching_many_patterns_with_tupled_assoc_value,none,
+        "the enum case has a single tuple as an associated value, but "
+        "there are several patterns here, implicitly tupling the patterns "
+        "and trying to match that instead", ())
 ERROR(closure_argument_list_tuple,none,
       "contextual closure type %0 expects %1 argument%s1, "
       "but %2 %select{were|was}3 used in closure body", (Type, unsigned, unsigned, bool))
@@ -4367,16 +4393,15 @@ WARNING(variable_never_used, none,
         "consider replacing with '_' or removing it",
         (Identifier, unsigned))
 WARNING(immutable_value_never_used_but_assigned, none,
-        "immutable value %0 was never used; "
-        "consider removing it",
+        "immutable value %0 was never used; consider removing it",
         (Identifier))
 WARNING(variable_never_mutated, none,
-        "%select{variable|parameter}1 %0 was never mutated; "
-        "consider %select{removing 'var' to make it|changing to 'let'}2 constant",
-        (Identifier, unsigned, bool))
+        "variable %0 was never mutated; "
+        "consider %select{removing 'var' to make it|changing to 'let'}1 constant",
+        (Identifier, bool))
 WARNING(variable_never_read, none,
-        "%select{variable|parameter}1 %0 was written to, but never read",
-        (Identifier, unsigned))
+        "variable %0 was written to, but never read",
+        (Identifier))
 
 //------------------------------------------------------------------------------
 // MARK: Debug diagnostics
@@ -4475,6 +4500,10 @@ ERROR(property_wrapper_attribute_not_on_property, none,
       (DeclName))
 NOTE(property_wrapper_declared_here,none,
      "property wrapper type %0 declared here", (DeclName))
+
+ERROR(property_wrapper_mutating_get_composed_to_get_only,none,
+      "property wrapper %0 with a mutating getter cannot be composed inside "
+      "get-only property wrapper %1", (TypeLoc, TypeLoc))
 
 ERROR(property_wrapper_local,none,
       "property wrappers are not yet supported on local properties", ())

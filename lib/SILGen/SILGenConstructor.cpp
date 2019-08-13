@@ -42,7 +42,7 @@ static SILValue emitConstructorMetatypeArg(SILGenFunction &SGF,
   auto *DC = ctor->getInnermostDeclContext();
   auto &AC = SGF.getASTContext();
   auto VD =
-      new (AC) ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+      new (AC) ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(),
                          AC.getIdentifier("$metatype"), SourceLoc(),
                          AC.getIdentifier("$metatype"), DC);
   VD->setInterfaceType(metatype);
@@ -69,7 +69,7 @@ static RValue emitImplicitValueConstructorArg(SILGenFunction &SGF,
   }
 
   auto &AC = SGF.getASTContext();
-  auto VD = new (AC) ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+  auto VD = new (AC) ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(),
                                AC.getIdentifier("$implicit_value"),
                                SourceLoc(),
                                AC.getIdentifier("$implicit_value"),
@@ -142,7 +142,7 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
   SILValue resultSlot;
   if (SILModuleConventions::isReturnedIndirectlyInSIL(selfTy, SGF.SGM.M)) {
     auto &AC = SGF.getASTContext();
-    auto VD = new (AC) ParamDecl(VarDecl::Specifier::InOut,
+    auto VD = new (AC) ParamDecl(ParamDecl::Specifier::InOut,
                                  SourceLoc(), SourceLoc(),
                                  AC.getIdentifier("$return_value"),
                                  SourceLoc(),
@@ -447,7 +447,7 @@ void SILGenFunction::emitEnumConstructor(EnumElementDecl *element) {
   std::unique_ptr<Initialization> dest;
   if (enumTI.isAddressOnly() && silConv.useLoweredAddresses()) {
     auto &AC = getASTContext();
-    auto VD = new (AC) ParamDecl(VarDecl::Specifier::InOut,
+    auto VD = new (AC) ParamDecl(ParamDecl::Specifier::InOut,
                                  SourceLoc(), SourceLoc(),
                                  AC.getIdentifier("$return_value"),
                                  SourceLoc(),
@@ -556,6 +556,7 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
     // For a designated initializer, we know that the static type being
     // allocated is the type of the class that defines the designated
     // initializer.
+    F.setIsExactSelfClass(IsExactSelfClass);
     selfValue = B.createAllocRef(Loc, selfTy, useObjCAllocation, false,
                                  ArrayRef<SILType>(), ArrayRef<SILValue>());
   }

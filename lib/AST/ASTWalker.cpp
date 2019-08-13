@@ -146,12 +146,24 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     for (Decl *M : ED->getMembers()) {
       if (doIt(M))
         return true;
+
+      if (Walker.shouldWalkAccessorsTheOldWay()) {
+        // Pretend that accessors share a parent with the storage.
+        //
+        // FIXME: Update existing ASTWalkers to deal with accessors appearing as
+        // children of the storage instead.
+        if (auto *ASD = dyn_cast<AbstractStorageDecl>(M)) {
+          for (auto AD : ASD->getAllAccessors()) {
+            if (doIt(AD))
+              return true;
+          }
+        }
+      }
     }
     return false;
   }
 
   bool visitPatternBindingDecl(PatternBindingDecl *PBD) {
-    // If there is a single variable, walk it's attributes.
     bool isPropertyWrapperBackingProperty = false;
     if (auto singleVar = PBD->getSingleVar()) {
       isPropertyWrapperBackingProperty =
@@ -277,9 +289,23 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       }
     }
     
-    for (Decl *Member : NTD->getMembers())
+    for (Decl *Member : NTD->getMembers()) {
       if (doIt(Member))
         return true;
+
+      if (Walker.shouldWalkAccessorsTheOldWay()) {
+        // Pretend that accessors share a parent with the storage.
+        //
+        // FIXME: Update existing ASTWalkers to deal with accessors appearing as
+        // children of the storage instead.
+        if (auto *ASD = dyn_cast<AbstractStorageDecl>(Member)) {
+          for (auto AD : ASD->getAllAccessors()) {
+            if (doIt(AD))
+              return true;
+          }
+        }
+      }
+    }
     return false;
   }
 
@@ -289,6 +315,12 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   bool visitVarDecl(VarDecl *VD) {
+    if (!Walker.shouldWalkAccessorsTheOldWay()) {
+      for (auto *AD : VD->getAllAccessors())
+        if (doIt(AD))
+          return true;
+    }
+
     return false;
   }
 
@@ -309,6 +341,13 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
           return true;
       }
     }
+
+    if (!Walker.shouldWalkAccessorsTheOldWay()) {
+      for (auto *AD : SD->getAllAccessors())
+        if (doIt(AD))
+          return true;
+    }
+
     return false;
   }
 
@@ -1353,8 +1392,22 @@ Stmt *Traversal::visitBraceStmt(BraceStmt *BS) {
       continue;
     }
 
-    if (doIt(Elem.get<Decl*>()))
+    auto *D = Elem.get<Decl*>();
+    if (doIt(D))
       return nullptr;
+
+    if (Walker.shouldWalkAccessorsTheOldWay()) {
+      // Pretend that accessors share a parent with the storage.
+      //
+      // FIXME: Update existing ASTWalkers to deal with accessors appearing as
+      // children of the storage instead.
+      if (auto *ASD = dyn_cast<AbstractStorageDecl>(D)) {
+        for (auto AD : ASD->getAllAccessors()) {
+          if (doIt(AD))
+            return nullptr;
+        }
+      }
+    }
   }
 
   return BS;

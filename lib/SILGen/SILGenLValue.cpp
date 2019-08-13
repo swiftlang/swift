@@ -1307,11 +1307,10 @@ namespace {
           // If we have a nonmutating setter on a value type, the call
           // captures all of 'self' and we cannot rewrite an assignment
           // into an initialization.
-          auto setter = VD->getSetter();
-          if (setter->isNonMutating() &&
-              setter->getDeclContext()->getSelfNominalTypeDecl() &&
-              setter->isInstanceMember() &&
-              !setter->getDeclContext()->getDeclaredInterfaceType()
+          if (!VD->isSetterMutating() &&
+              VD->getDeclContext()->getSelfNominalTypeDecl() &&
+              VD->isInstanceMember() &&
+              !VD->getDeclContext()->getDeclaredInterfaceType()
                   ->hasReferenceSemantics()) {
             return false;
           }
@@ -2485,7 +2484,7 @@ namespace {
 
     void emitUsingAccessor(AccessorKind accessorKind, bool isDirect) {
       auto accessor =
-        SGF.SGM.getAccessorDeclRef(Storage->getAccessor(accessorKind));
+        SGF.SGM.getAccessorDeclRef(Storage->getOpaqueAccessor(accessorKind));
 
       switch (accessorKind) {
       case AccessorKind::Get:
@@ -2915,7 +2914,7 @@ static SGFAccessKind getBaseAccessKind(SILGenModule &SGM,
 
   case AccessStrategy::DirectToAccessor:
   case AccessStrategy::DispatchToAccessor: {
-    auto accessor = member->getAccessor(strategy.getAccessor());
+    auto accessor = member->getOpaqueAccessor(strategy.getAccessor());
     return getBaseAccessKindForAccessor(SGM, accessor, baseFormalType);
   }
     
@@ -2968,10 +2967,10 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
   // dynamic replacement directly call the implementation.
   if (isContextRead && isOnSelfParameter && strategy.hasAccessor() &&
       strategy.getAccessor() == AccessorKind::Get &&
-      var->getAccessor(AccessorKind::Read)) {
+      var->getOpaqueAccessor(AccessorKind::Read)) {
     bool isObjC = false;
     auto readAccessor =
-        SGF.SGM.getAccessorDeclRef(var->getAccessor(AccessorKind::Read));
+        SGF.SGM.getAccessorDeclRef(var->getOpaqueAccessor(AccessorKind::Read));
     if (isCallToReplacedInDynamicReplacement(
             SGF, readAccessor.getAbstractFunctionDecl(), isObjC)) {
       accessSemantics = AccessSemantics::DirectToImplementation;
@@ -3139,10 +3138,10 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e,
   // dynamic replacement directly call the implementation.
   if (isContextRead && isOnSelfParameter && strategy.hasAccessor() &&
       strategy.getAccessor() == AccessorKind::Get &&
-      decl->getAccessor(AccessorKind::Read)) {
+      decl->getOpaqueAccessor(AccessorKind::Read)) {
     bool isObjC = false;
     auto readAccessor =
-        SGF.SGM.getAccessorDeclRef(decl->getAccessor(AccessorKind::Read));
+        SGF.SGM.getAccessorDeclRef(decl->getOpaqueAccessor(AccessorKind::Read));
     if (isCallToReplacedInDynamicReplacement(
             SGF, readAccessor.getAbstractFunctionDecl(), isObjC)) {
       accessSemantics = AccessSemantics::DirectToImplementation;

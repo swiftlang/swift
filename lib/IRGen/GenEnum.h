@@ -90,12 +90,6 @@ void emitStoreEnumTagToAddress(IRGenFunction &IGF,
                                 SILType enumTy,
                                 Address enumAddr,
                                 EnumElementDecl *theCase);
-  
-/// Unpack bits from value and scatter them into the masked bits.
-EnumPayload interleaveSpareBits(IRGenFunction &IGF,
-                                const EnumPayloadSchema &schema,
-                                const SpareBitVector &spareBitVector,
-                                llvm::Value *value);
 
 /// Pack masked bits into the low bits of an integer value.
 /// Equivalent to a parallel bit extract instruction (PEXT),

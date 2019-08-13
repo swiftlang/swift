@@ -75,6 +75,7 @@ set(SWIFTLIB_ESSENTIAL
   Hashing.swift
   HashTable.swift
   ICU.swift
+  Identifiable.swift
   Indices.swift
   InputStream.swift
   IntegerParsing.swift
@@ -142,7 +143,6 @@ set(SWIFTLIB_ESSENTIAL
   StringGuts.swift
   StringGutsSlice.swift
   StringGutsRangeReplaceable.swift
-  StringGutsVisitor.swift
   StringObject.swift
   StringProtocol.swift
   StringIndex.swift
@@ -288,8 +288,11 @@ if(SWIFT_STDLIB_ENABLE_STDLIBCORE_EXCLUSIVITY_CHECKING)
   list(APPEND swift_stdlib_compile_flags "-enforce-exclusivity=checked")
 endif()
 
+list(APPEND swift_stdlib_compile_flags "-Xfrontend" "-enable-ownership-stripping-after-serialization")
+
 if(SWIFT_CHECK_ESSENTIAL_STDLIB)
   add_swift_target_library(swift_stdlib_essential ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB IS_STDLIB_CORE
+      INSTALL_IN_COMPONENT never_install
       ${SWIFTLIB_ESSENTIAL}
       GYB_SOURCES
         ${SWIFTLIB_ESSENTIAL_GYB_SOURCES})

@@ -106,7 +106,7 @@ deriveBridgedNSError_enum_nsErrorDomain(
       propDecl, stringTy);
   getterDecl->setBodySynthesizer(synthesizer);
 
-  derived.addMembersToConformanceContext({getterDecl, propDecl, pbDecl});
+  derived.addMembersToConformanceContext({propDecl, pbDecl});
 
   return propDecl;
 }

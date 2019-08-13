@@ -275,6 +275,8 @@ class NameMatcher: public ASTWalker {
   std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override;
   bool shouldWalkIntoGenericParams() override { return true; }
 
+  // FIXME: Remove this
+  bool shouldWalkAccessorsTheOldWay() override { return true; }
 
 public:
   explicit NameMatcher(SourceFile &SrcFile) : SrcFile(SrcFile) { }

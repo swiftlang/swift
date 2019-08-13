@@ -37,8 +37,8 @@ class C {
     return id(nil)
   }
   // CHECK-LABEL: define hidden swiftcc i64 @"$s21dynamic_self_metadata1CC0A12SelfArgumentACXDSgyF"(%T21dynamic_self_metadata1CC* swiftself)
-  // CHECK: [[CAST1:%.+]] = bitcast %T21dynamic_self_metadata1CC* %0 to [[METATYPE:%.+]]
-  // CHECK: [[TYPE1:%.+]] = call %swift.type* @swift_getObjectType([[METATYPE]] [[CAST1]])
+  // CHECK: [[GEP1:%.+]] = getelementptr {{.*}} %0
+  // CHECK: [[TYPE1:%.+]] = load {{.*}} [[GEP1]]
   // CHECK: [[T0:%.+]] = call swiftcc %swift.metadata_response @"$sSqMa"(i64 0, %swift.type* [[TYPE1]])
   // CHECK: [[TYPE2:%.+]] = extractvalue %swift.metadata_response [[T0]], 0
   // CHECK: call swiftcc void @"$s21dynamic_self_metadata2idyxxlF"({{.*}}, %swift.type* [[TYPE2]])
@@ -48,8 +48,8 @@ class C {
     return nil
   }
   // CHECK-LABEL: define hidden swiftcc i64 @"$s21dynamic_self_metadata1CC0A18SelfConformingTypeACXDSgyF"(%T21dynamic_self_metadata1CC* swiftself)
-  // CHECK: [[SELF:%.*]] = bitcast %T21dynamic_self_metadata1CC* %0 to %objc_object*
-  // CHECK: [[SELF_TYPE:%.*]] = call %swift.type* @swift_getObjectType(%objc_object* [[SELF]])
+  // CHECK: [[SELF_GEP:%.+]] = getelementptr {{.*}} %0
+  // CHECK: [[SELF_TYPE:%.+]] = load {{.*}} [[SELF_GEP]]
   // CHECK: [[METADATA_RESPONSE:%.*]] = call swiftcc %swift.metadata_response @"$s21dynamic_self_metadata1GVMa"(i64 0, %swift.type* [[SELF_TYPE]])
   // CHECK: [[METADATA:%.*]] =  extractvalue %swift.metadata_response [[METADATA_RESPONSE]], 0
   // CHECK: call i8** @swift_getWitnessTable(%swift.protocol_conformance_descriptor* bitcast ({{.*}} @"$s21dynamic_self_metadata1GVyxGAA1PAAMc" to %swift.protocol_conformance_descriptor*), %swift.type* [[METADATA]], i8*** undef)

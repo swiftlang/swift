@@ -756,8 +756,6 @@ namespace {
             memberLocator);
       auto memberRef = ConcreteDeclRef(member, substitutions);
 
-      cs.TC.requestMemberLayout(member);
-
       auto refTy = solution.simplifyType(openedFullType);
 
       // If we're referring to the member of a module, it's just a simple
@@ -1331,7 +1329,6 @@ namespace {
       }
       
       auto subscript = cast<SubscriptDecl>(choice.getDecl());
-      cs.TC.requestMemberLayout(subscript);
 
       auto &tc = cs.getTypeChecker();
       auto baseTy = cs.getType(base)->getRValueType();
@@ -1480,8 +1477,6 @@ namespace {
         solution.computeSubstitutions(ctor->getGenericSignature(), locator);
 
       auto ref = ConcreteDeclRef(ctor, substitutions);
-
-      tc.requestMemberLayout(ctor);
 
       // The constructor was opened with the allocating type, not the
       // initializer type. Map the former into the latter.
@@ -4039,7 +4034,6 @@ namespace {
         method = func;
       } else if (auto var = dyn_cast<VarDecl>(foundDecl)) {
         // Properties.
-        maybeAddAccessorsToStorage(var);
 
         // If this isn't a property on a type, complain.
         if (!var->getDeclContext()->isTypeContext()) {
@@ -4085,12 +4079,12 @@ namespace {
           // The property is non-settable, so add "getter:".
           primaryDiag.fixItInsert(modifierLoc, "getter: ");
           E->overrideObjCSelectorKind(ObjCSelectorExpr::Getter, modifierLoc);
-          method = var->getGetter();
+          method = var->getOpaqueAccessor(AccessorKind::Get);
           break;
         }
 
         case ObjCSelectorExpr::Getter:
-          method = var->getGetter();
+          method = var->getOpaqueAccessor(AccessorKind::Get);
           break;
 
         case ObjCSelectorExpr::Setter:
@@ -4111,7 +4105,7 @@ namespace {
             return E;
           }
 
-          method = var->getSetter();
+          method = var->getOpaqueAccessor(AccessorKind::Set);
           break;
         }
       } else {
@@ -4199,9 +4193,18 @@ namespace {
 
       // Resolve each of the components.
       bool didOptionalChain = false;
-      auto keyPathTy = cs.getType(E)->castTo<BoundGenericType>();
-      Type baseTy = keyPathTy->getGenericArgs()[0];
-      Type leafTy = keyPathTy->getGenericArgs()[1];
+      bool isFunctionType = false;
+      Type baseTy, leafTy;
+      Type exprType = cs.getType(E);
+      if (auto fnTy = exprType->getAs<FunctionType>()) {
+        baseTy = fnTy->getParams()[0].getPlainType();
+        leafTy = fnTy->getResult();
+        isFunctionType = true;
+      } else {
+        auto keyPathTy = exprType->castTo<BoundGenericType>();
+        baseTy = keyPathTy->getGenericArgs()[0];
+        leafTy = keyPathTy->getGenericArgs()[1];
+      }
 
       // Updates the constraint system with the type of the last resolved
       // component. We do it this way because we sometimes insert new
@@ -4406,7 +4409,101 @@ namespace {
       // key path.
       assert(!baseTy || baseTy->hasUnresolvedType()
              || baseTy->getWithoutSpecifierType()->isEqual(leafTy));
-      return E;
+
+      if (!isFunctionType)
+        return E;
+
+      // If we've gotten here, the user has used key path literal syntax to form
+      // a closure. The type checker has given E a function type to indicate
+      // this; we're going to change E's type to KeyPath<baseTy, leafTy> and
+      // then wrap it in a larger closure expression with the appropriate type.
+
+      // baseTy has been overwritten by the loop above; restore it.
+      baseTy = exprType->getAs<FunctionType>()->getParams()[0].getPlainType();
+
+      // Compute KeyPath<baseTy, leafTy> and set E's type back to it.
+      auto kpDecl = cs.getASTContext().getKeyPathDecl();
+      auto keyPathTy =
+          BoundGenericType::get(kpDecl, nullptr, { baseTy, leafTy });
+      E->setType(keyPathTy);
+      cs.cacheType(E);
+
+      // To ensure side effects of the key path expression (mainly indices in
+      // subscripts) are only evaluated once, we construct an outer closure,
+      // which is immediately evaluated, and an inner closure, which it returns.
+      // The result looks like this:
+      //
+      //     return "{ $kp$ in { $0[keyPath: $kp$] } }( \(E) )"
+
+      auto &ctx = cs.getASTContext();
+      auto discriminator = AutoClosureExpr::InvalidDiscriminator;
+
+      // The inner closure.
+      //
+      //     let closure = "{ $0[keyPath: $kp$] }"
+      auto closureTy =
+          FunctionType::get({ FunctionType::Param(baseTy) }, leafTy);
+      auto closure = new (ctx)
+          AutoClosureExpr(E, leafTy, discriminator, cs.DC);
+      auto param = new (ctx) ParamDecl(
+          ParamDecl::Specifier::Default, SourceLoc(),
+          /*argument label*/ SourceLoc(), Identifier(),
+          /*parameter name*/ SourceLoc(), ctx.getIdentifier("$0"), closure);
+      param->setType(baseTy);
+      param->setInterfaceType(baseTy->mapTypeOutOfContext());
+
+      // The outer closure.
+      //
+      //    let outerClosure = "{ $kp$ in \(closure) }"
+      auto outerClosureTy =
+          FunctionType::get({ FunctionType::Param(keyPathTy) }, closureTy);
+      auto outerClosure = new (ctx)
+          AutoClosureExpr(closure, closureTy, discriminator, cs.DC);
+      auto outerParam =
+          new (ctx) ParamDecl(ParamDecl::Specifier::Default, SourceLoc(),
+                              /*argument label*/ SourceLoc(), Identifier(),
+                              /*parameter name*/ SourceLoc(),
+                              ctx.getIdentifier("$kp$"), outerClosure);
+      outerParam->setType(keyPathTy);
+      outerParam->setInterfaceType(keyPathTy->mapTypeOutOfContext());
+
+      // let paramRef = "$0"
+      auto *paramRef = new (ctx)
+          DeclRefExpr(param, DeclNameLoc(E->getLoc()), /*Implicit=*/true);
+      paramRef->setType(baseTy);
+      cs.cacheType(paramRef);
+
+      // let outerParamRef = "$kp$"
+      auto outerParamRef = new (ctx)
+          DeclRefExpr(outerParam, DeclNameLoc(E->getLoc()), /*Implicit=*/true);
+      outerParamRef->setType(keyPathTy);
+      cs.cacheType(outerParamRef);
+
+      // let application = "\(paramRef)[keyPath: \(outerParamRef)]"
+      auto *application = new (ctx)
+          KeyPathApplicationExpr(paramRef,
+                                 E->getStartLoc(), outerParamRef, E->getEndLoc(),
+                                 leafTy, /*implicit=*/true);
+      cs.cacheType(application);
+
+      // Finish up the inner closure.
+      closure->setParameterList(ParameterList::create(ctx, {param}));
+      closure->setBody(application);
+      closure->setType(closureTy);
+      cs.cacheType(closure);
+
+      // Finish up the outer closure.
+      outerClosure->setParameterList(ParameterList::create(ctx, {outerParam}));
+      outerClosure->setBody(closure);
+      outerClosure->setType(outerClosureTy);
+      cs.cacheType(outerClosure);
+
+      // let outerApply = "\( outerClosure )( \(E) )"
+      auto outerApply = CallExpr::createImplicit(ctx, outerClosure, {E}, {});
+      outerApply->setType(closureTy);
+      cs.cacheExprTypes(outerApply);
+
+      return coerceToType(outerApply, exprType, cs.getConstraintLocator(E));
     }
 
     KeyPathExpr::Component
@@ -4421,8 +4518,6 @@ namespace {
         // Key paths don't currently support static members.
         // There is a fix which diagnoses such situation already.
         assert(!varDecl->isStatic());
-
-        cs.TC.requestMemberLayout(property);
 
         auto dc = property->getInnermostDeclContext();
 
@@ -4452,8 +4547,6 @@ namespace {
         ArrayRef<Identifier> labels, ConstraintLocator *locator) {
       auto subscript = cast<SubscriptDecl>(overload.choice.getDecl());
       assert(!subscript->isGetterMutating());
-
-      cs.TC.requestMemberLayout(subscript);
 
       auto dc = subscript->getInnermostDeclContext();
 
@@ -6818,8 +6911,10 @@ ExprRewriter::finishApplyDynamicCallable(const Solution &solution,
       cs.setType(labelExpr, keyType);
       handleStringLiteralExpr(cast<LiteralExpr>(labelExpr));
 
-      Expr *pair =
-        TupleExpr::createImplicit(ctx, { labelExpr, arg->getElement(i) }, {});
+      Expr *valueExpr = coerceToType(arg->getElement(i), valueType, loc);
+      if (!valueExpr)
+        return nullptr;
+      Expr *pair = TupleExpr::createImplicit(ctx, {labelExpr, valueExpr}, {});
       auto eltTypes = { TupleTypeElt(keyType), TupleTypeElt(valueType) };
       cs.setType(pair, TupleType::get(eltTypes, ctx));
       dictElements.push_back(pair);
@@ -7306,10 +7401,6 @@ namespace {
         auto fnType = cs.getType(closure)->castTo<FunctionType>();
         auto *params = closure->getParameters();
         tc.coerceParameterListToType(params, closure, fnType);
-
-        // Require layout of dependent types that could be used to materialize
-        // metadata types/conformances during IRGen.
-        tc.requestRequiredNominalTypeLayoutForParameters(params);
 
         // If this closure had a function builder applied, rewrite it to a
         // closure with a single expression body containing the builder

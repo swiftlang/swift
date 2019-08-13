@@ -96,25 +96,12 @@ void SplitterStep::computeFollowupSteps(
   CG.optimize();
 
   // Compute the connected components of the constraint graph.
-  // FIXME: We're seeding typeVars with TypeVariables so that the
-  // connected-components algorithm only considers those type variables within
-  // our component. There are clearly better ways to do this.
-  std::vector<TypeVariableType *> typeVars(CS.TypeVariables);
-  std::vector<unsigned> components;
-  unsigned numComponents = CG.computeConnectedComponents(typeVars, components);
+  auto components = CG.computeConnectedComponents(CS.TypeVariables);
+  unsigned numComponents = components.size();
   if (numComponents < 2) {
     componentSteps.push_back(llvm::make_unique<ComponentStep>(
-        CS, 0, /*single=*/true, &CS.InactiveConstraints, Solutions));
+        CS, 0, &CS.InactiveConstraints, Solutions));
     return;
-  }
-
-  Components.resize(numComponents);
-  PartialSolutions = std::unique_ptr<SmallVector<Solution, 4>[]>(
-      new SmallVector<Solution, 4>[numComponents]);
-
-  for (unsigned i = 0, n = numComponents; i != n; ++i) {
-    componentSteps.push_back(llvm::make_unique<ComponentStep>(
-        CS, i, /*single=*/false, &Components[i], PartialSolutions[i]));
   }
 
   if (isDebugMode()) {
@@ -123,77 +110,26 @@ void SplitterStep::computeFollowupSteps(
     CG.verify();
 
     log << "---Constraint graph---\n";
-    CG.print(log);
+    CG.print(CS.TypeVariables, log);
 
     log << "---Connected components---\n";
-    CG.printConnectedComponents(log);
+    CG.printConnectedComponents(CS.TypeVariables, log);
   }
 
-  // Map type variables and constraints into appropriate steps.
-  llvm::DenseMap<TypeVariableType *, unsigned> typeVarComponent;
-  llvm::DenseMap<Constraint *, unsigned> constraintComponent;
-  for (unsigned i = 0, n = typeVars.size(); i != n; ++i) {
-    auto *typeVar = typeVars[i];
-    // Record the component of this type variable.
-    typeVarComponent[typeVar] = components[i];
-
-    for (auto *constraint : CG[typeVar].getConstraints())
-      constraintComponent[constraint] = components[i];
-  }
-
-  // Add the orphaned components to the mapping from constraints to components.
-  unsigned firstOrphanedComponent =
-      numComponents - CG.getOrphanedConstraints().size();
-  {
-    unsigned component = firstOrphanedComponent;
-    for (auto *constraint : CG.getOrphanedConstraints()) {
-      // Register this orphan constraint both as associated with
-      // a given component as a regular constrant, as well as an
-      // "orphan" constraint, so it can be proccessed correctly.
-      constraintComponent[constraint] = component;
-      componentSteps[component]->recordOrphan(constraint);
-      ++component;
-    }
-  }
-
-  for (auto *typeVar : CS.TypeVariables) {
-    auto known = typeVarComponent.find(typeVar);
-    // If current type variable is associated with
-    // a certain component step, record it as being so.
-    if (known != typeVarComponent.end()) {
-      componentSteps[known->second]->record(typeVar);
-      continue;
-    }
-
-    // Otherwise, associate it with all of the component steps,
-    // expect for components with orphaned constraints, they are
-    // not supposed to have any type variables.
-    for (unsigned i = 0; i != firstOrphanedComponent; ++i)
-      componentSteps[i]->record(typeVar);
-  }
-
-  // Transfer all of the constraints from the work list to
-  // the appropriate component.
-  auto &workList = CS.InactiveConstraints;
-  while (!workList.empty()) {
-    auto *constraint = &workList.front();
-    workList.pop_front();
-    componentSteps[constraintComponent[constraint]]->record(constraint);
-  }
-
-  // Remove all of the orphaned constraints; they'll be re-introduced
-  // by each component independently.
+  // Take the orphaned constraints, because they'll go into a component now.
   OrphanedConstraints = CG.takeOrphanedConstraints();
 
-  // Create component ordering based on the information associated
-  // with constraints in each step - e.g. number of disjunctions,
-  // since components are going to be executed in LIFO order, we'd
-  // want to have smaller/faster components at the back of the list.
-  std::sort(componentSteps.begin(), componentSteps.end(),
-            [](const std::unique_ptr<ComponentStep> &lhs,
-               const std::unique_ptr<ComponentStep> &rhs) {
-              return lhs->disjunctionCount() > rhs->disjunctionCount();
-            });
+  Components.resize(numComponents);
+  PartialSolutions = std::unique_ptr<SmallVector<Solution, 4>[]>(
+      new SmallVector<Solution, 4>[numComponents]);
+
+  // Add components.
+  for (unsigned i : indices(components)) {
+    unsigned solutionIndex = components[i].solutionIndex;
+    componentSteps.push_back(llvm::make_unique<ComponentStep>(
+        CS, solutionIndex, &Components[i], std::move(components[i]),
+        PartialSolutions[solutionIndex]));
+  }
 }
 
 bool SplitterStep::mergePartialSolutions() const {
@@ -481,8 +417,8 @@ bool DisjunctionStep::shouldSkip(const DisjunctionChoice &choice) const {
   auto &ctx = CS.getASTContext();
 
   bool attemptFixes = CS.shouldAttemptFixes();
-  // Enable "fixed" overload choices in "diagnostic" mode.
-  if (!(attemptFixes && choice.hasFix()) && choice.isDisabled()) {
+  // Enable all disabled choices in "diagnostic" mode.
+  if (!attemptFixes && choice.isDisabled()) {
     if (isDebugMode()) {
       auto &log = getDebugLogger();
       log << "(skipping ";

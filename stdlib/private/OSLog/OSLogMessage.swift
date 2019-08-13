@@ -60,7 +60,7 @@ internal var logBitsPerByte: Int { return 3 }
 /// when you pass a string interpolation to the log APIs.
 /// Extend this type with more `appendInterpolation` overloads to enable
 /// interpolating additional types.
-@_fixed_layout
+@frozen
 public struct OSLogInterpolation : StringInterpolationProtocol {
   /// A format string constructed from the given string interpolation to be
   /// passed to the os_log ABI.
@@ -360,7 +360,7 @@ extension String {
   }
 }
 
-@_fixed_layout
+@frozen
 public struct OSLogMessage :
   ExpressibleByStringInterpolation, ExpressibleByStringLiteral
 {
@@ -402,7 +402,7 @@ public struct OSLogMessage :
 /// are captured within closures and stored in an array. The closures accept an
 /// instance of `OSLogByteBufferBuilder`, and when invoked, serialize the
 /// argument using the passed `OSLogByteBufferBuilder` instance.
-@_fixed_layout
+@frozen
 @usableFromInline
 internal struct OSLogArguments {
   /// An array of closures that captures arguments of possibly different types.

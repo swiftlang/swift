@@ -17,9 +17,9 @@
 #ifndef SWIFT_AST_ASTCONTEXT_H
 #define SWIFT_AST_ASTCONTEXT_H
 
-#include "llvm/Support/DataTypes.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Evaluator.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/SearchPathOptions.h"
 #include "swift/AST/Type.h"
@@ -28,13 +28,14 @@
 #include "swift/Basic/Malloc.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/Allocator.h"
+#include "llvm/Support/DataTypes.h"
 #include <functional>
 #include <memory>
 #include <utility>
@@ -638,8 +639,10 @@ public:
   /// \param isClang \c true if this module loader is responsible for loading
   ///                Clang modules, which are special-cased in some parts of the
   ///                compiler.
+  /// \param isDWARF \c true if this module loader can load Clang modules
+  ///                from DWARF.
   void addModuleLoader(std::unique_ptr<ModuleLoader> loader,
-                       bool isClang = false);
+                       bool isClang = false, bool isDWARF = false);
 
   /// Load extensions to the given nominal type from the external
   /// module loaders.
@@ -682,6 +685,12 @@ public:
   /// The loader is owned by the AST context.
   ClangModuleLoader *getClangModuleLoader() const;
 
+  /// Retrieve the DWARF module loader for this ASTContext.
+  ///
+  /// If there is no Clang module loader, returns a null pointer.
+  /// The loader is owned by the AST context.
+  ClangModuleLoader *getDWARFModuleLoader() const;
+  
   /// Asks every module loader to verify the ASTs it has loaded.
   ///
   /// Does nothing in non-asserts (NDEBUG) builds.
@@ -820,10 +829,6 @@ public:
   /// \param IDC The context whose member decls should be lazily parsed.
   void parseMembers(IterableDeclContext *IDC);
 
-  /// Use the lazy parsers associated with the context to check whether the decl
-  /// context has been parsed.
-  bool hasUnparsedMembers(const IterableDeclContext *IDC) const;
-
   /// Get the lazy function data for the given generic context.
   ///
   /// \param lazyLoader If non-null, the lazy loader to use when creating the
@@ -897,6 +902,21 @@ public:
   /// to the given existential type.
   CanGenericSignature getExistentialSignature(CanType existential,
                                               ModuleDecl *mod);
+
+  GenericSignature *getOverrideGenericSignature(const ValueDecl *base,
+                                                const ValueDecl *derived);
+
+  enum class OverrideGenericSignatureReqCheck {
+    /// Base method's generic requirements are satisifed by derived method
+    BaseReqSatisfiedByDerived,
+
+    /// Derived method's generic requirements are satisifed by base method
+    DerivedReqSatisfiedByBase
+  };
+
+  bool overrideGenericSignatureReqsSatisfied(
+      const ValueDecl *base, const ValueDecl *derived,
+      const OverrideGenericSignatureReqCheck direction);
 
   /// Whether our effective Swift version is at least 'major'.
   ///

@@ -229,7 +229,8 @@ class PerformanceTestResult(object):
     `--quantile`parameter. In both cases, the last column, MAX_RSS is optional.
     """
 
-    def __init__(self, csv_row, quantiles=False, memory=False, delta=False):
+    def __init__(self, csv_row, quantiles=False, memory=False, delta=False,
+                 meta=False):
         """Initialize from a row of multiple columns with benchmark summary.
 
         The row is an iterable, such as a row provided by the CSV parser.
@@ -239,7 +240,8 @@ class PerformanceTestResult(object):
         self.num_samples = int(csv_row[2])  # Number of measurements taken
 
         if quantiles:  # Variable number of columns representing quantiles
-            runtimes = csv_row[3:-1] if memory else csv_row[3:]
+            mem_index = (-1 if memory else 0) + (-3 if meta else 0)
+            runtimes = csv_row[3:mem_index] if memory or meta else csv_row[3:]
             if delta:
                 runtimes = [int(x) if x else 0 for x in runtimes]
                 runtimes = reduce(lambda l, x: l.append(l[-1] + x) or  # runnin
@@ -261,7 +263,7 @@ class PerformanceTestResult(object):
             self.min, self.max, self.median, self.mean, self.sd = \
                 sams.min, sams.max, sams.median, sams.mean, sams.sd
             self.max_rss = (                # Maximum Resident Set Size (B)
-                int(csv_row[-1]) if memory else None)
+                int(csv_row[mem_index]) if memory else None)
         else:  # Legacy format with statistics for normal distribution.
             self.min = int(csv_row[3])      # Minimum runtime (μs)
             self.max = int(csv_row[4])      # Maximum runtime (μs)
@@ -271,6 +273,11 @@ class PerformanceTestResult(object):
             self.max_rss = (                # Maximum Resident Set Size (B)
                 int(csv_row[8]) if len(csv_row) > 8 else None)
             self.samples = None
+
+        # Optional measurement metadata. The number of:
+        # memory pages used, involuntary context switches and voluntary yields
+        self.mem_pages, self.involuntary_cs, self.yield_count = \
+            [int(x) for x in csv_row[-3:]] if meta else (None, None, None)
         self.yields = None
         self.setup = None
 
@@ -352,6 +359,7 @@ class LogParser(object):
         """Create instance of `LogParser`."""
         self.results = []
         self.quantiles, self.delta, self.memory = False, False, False
+        self.meta = False
         self._reset()
 
     def _reset(self):
@@ -371,12 +379,12 @@ class LogParser(object):
         columns = result.split(',') if ',' in result else result.split()
         r = PerformanceTestResult(
             columns, quantiles=self.quantiles, memory=self.memory,
-            delta=self.delta)
+            delta=self.delta, meta=self.meta)
         r.setup = self.setup
         r.max_rss = r.max_rss or self.max_rss
-        r.mem_pages = self.mem_pages
+        r.mem_pages = r.mem_pages or self.mem_pages
         r.voluntary_cs = self.voluntary_cs
-        r.involuntary_cs = self.involuntary_cs
+        r.involuntary_cs = r.involuntary_cs or self.involuntary_cs
         if self.samples:
             r.samples = PerformanceTestSamples(r.name, self.samples)
             r.samples.exclude_outliers()
@@ -391,6 +399,7 @@ class LogParser(object):
     def _configure_format(self, header):
         self.quantiles = 'MEAN' not in header
         self.memory = 'MAX_RSS' in header
+        self.meta = 'PAGES' in header
         self.delta = '𝚫' in header
 
     # Regular expression and action to take when it matches the parsed line

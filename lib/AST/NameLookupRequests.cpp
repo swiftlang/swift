@@ -94,6 +94,23 @@ void ExtendedNominalRequest::cacheResult(NominalTypeDecl *value) const {
     ext->ExtendedNominal = value;
 }
 
+//----------------------------------------------------------------------------//
+// Destructor computation.
+//----------------------------------------------------------------------------//
+Optional<DestructorDecl *> GetDestructorRequest::getCachedResult() const {
+  auto *classDecl = std::get<0>(getStorage());
+  auto results = classDecl->lookupDirect(DeclBaseName::createDestructor());
+  if (results.empty())
+    return None;
+
+  return cast<DestructorDecl>(results.front());
+}
+
+void GetDestructorRequest::cacheResult(DestructorDecl *value) const {
+  auto *classDecl = std::get<0>(getStorage());
+  classDecl->addMember(value);
+}
+
 // Define request evaluation functions for each of the name lookup requests.
 static AbstractRequestFunction *nameLookupRequestFunctions[] = {
 #define SWIFT_TYPEID(Name)                                    \

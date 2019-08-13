@@ -34,6 +34,9 @@ class IndexStoreDB(product.Product):
         if self.args.test and self.args.test_indexstoredb:
             run_build_script_helper('test', host_target, self, self.args)
 
+    def install(self, host_target):
+        pass
+
 
 def run_build_script_helper(action, host_target, product, args):
     script_path = os.path.join(

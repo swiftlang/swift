@@ -1119,3 +1119,403 @@ struct SR_11060_Wrapper {
   }
 }
 
+// SR-11138
+// Check that all possible compositions of nonmutating/mutating accessors
+// on wrappers produce wrapped properties with the correct settability and
+// mutatiness in all compositions.
+
+@propertyWrapper
+struct NonmutatingGetWrapper<T> {
+  var wrappedValue: T {
+    nonmutating get { fatalError() }
+  }
+}
+
+@propertyWrapper
+struct MutatingGetWrapper<T> {
+  var wrappedValue: T {
+    mutating get { fatalError() }
+  }
+}
+
+@propertyWrapper
+struct NonmutatingGetNonmutatingSetWrapper<T> {
+  var wrappedValue: T {
+    nonmutating get { fatalError() }
+    nonmutating set { fatalError() }
+  }
+}
+
+@propertyWrapper
+struct MutatingGetNonmutatingSetWrapper<T> {
+  var wrappedValue: T {
+    mutating get { fatalError() }
+    nonmutating set { fatalError() }
+  }
+}
+
+@propertyWrapper
+struct NonmutatingGetMutatingSetWrapper<T> {
+  var wrappedValue: T {
+    nonmutating get { fatalError() }
+    mutating set { fatalError() }
+  }
+}
+
+@propertyWrapper
+struct MutatingGetMutatingSetWrapper<T> {
+  var wrappedValue: T {
+    mutating get { fatalError() }
+    mutating set { fatalError() }
+  }
+}
+
+struct AllCompositionsStruct {
+  // Should have nonmutating getter, undefined setter
+  @NonmutatingGetWrapper @NonmutatingGetWrapper
+  var ngxs_ngxs: Int
+
+  // Should be disallowed
+  @NonmutatingGetWrapper @MutatingGetWrapper // expected-error{{cannot be composed}}
+  var ngxs_mgxs: Int
+
+  // Should have nonmutating getter, nonmutating setter
+  @NonmutatingGetWrapper @NonmutatingGetNonmutatingSetWrapper
+  var ngxs_ngns: Int
+
+  // Should be disallowed
+  @NonmutatingGetWrapper @MutatingGetNonmutatingSetWrapper // expected-error{{cannot be composed}}
+  var ngxs_mgns: Int
+
+  // Should have nonmutating getter, undefined setter
+  @NonmutatingGetWrapper @NonmutatingGetMutatingSetWrapper
+  var ngxs_ngms: Int
+
+  // Should be disallowed
+  @NonmutatingGetWrapper @MutatingGetMutatingSetWrapper // expected-error{{cannot be composed}}
+  var ngxs_mgms: Int
+
+  ////
+
+  // Should have mutating getter, undefined setter
+  @MutatingGetWrapper @NonmutatingGetWrapper
+  var mgxs_ngxs: Int
+
+  // Should be disallowed
+  @MutatingGetWrapper @MutatingGetWrapper // expected-error{{cannot be composed}}
+  var mgxs_mgxs: Int
+
+  // Should have mutating getter, mutating setter
+  @MutatingGetWrapper @NonmutatingGetNonmutatingSetWrapper
+  var mgxs_ngns: Int
+
+  // Should be disallowed
+  @MutatingGetWrapper @MutatingGetNonmutatingSetWrapper // expected-error{{cannot be composed}}
+  var mgxs_mgns: Int
+
+  // Should have mutating getter, undefined setter
+  @MutatingGetWrapper @NonmutatingGetMutatingSetWrapper
+  var mgxs_ngms: Int
+
+  // Should be disallowed
+  @MutatingGetWrapper @MutatingGetMutatingSetWrapper // expected-error{{cannot be composed}}
+  var mgxs_mgms: Int
+
+  ////
+
+  // Should have nonmutating getter, undefined setter
+  @NonmutatingGetNonmutatingSetWrapper @NonmutatingGetWrapper
+  var ngns_ngxs: Int
+
+  // Should have nonmutating getter, undefined setter
+  @NonmutatingGetNonmutatingSetWrapper @MutatingGetWrapper
+  var ngns_mgxs: Int
+
+  // Should have nonmutating getter, nonmutating setter
+  @NonmutatingGetNonmutatingSetWrapper @NonmutatingGetNonmutatingSetWrapper
+  var ngns_ngns: Int
+
+  // Should have nonmutating getter, nonmutating setter
+  @NonmutatingGetNonmutatingSetWrapper @MutatingGetNonmutatingSetWrapper
+  var ngns_mgns: Int
+
+  // Should have nonmutating getter, nonmutating setter
+  @NonmutatingGetNonmutatingSetWrapper @NonmutatingGetMutatingSetWrapper
+  var ngns_ngms: Int
+
+  // Should have nonmutating getter, nonmutating setter
+  @NonmutatingGetNonmutatingSetWrapper @MutatingGetMutatingSetWrapper
+  var ngns_mgms: Int
+
+  ////
+
+  // Should have mutating getter, undefined setter
+  @MutatingGetNonmutatingSetWrapper @NonmutatingGetWrapper
+  var mgns_ngxs: Int
+
+  // Should have mutating getter, undefined setter
+  @MutatingGetNonmutatingSetWrapper @MutatingGetWrapper
+  var mgns_mgxs: Int
+
+  // Should have mutating getter, mutating setter
+  @MutatingGetNonmutatingSetWrapper @NonmutatingGetNonmutatingSetWrapper
+  var mgns_ngns: Int
+
+  // Should have mutating getter, mutating setter
+  @MutatingGetNonmutatingSetWrapper @MutatingGetNonmutatingSetWrapper
+  var mgns_mgns: Int
+
+  // Should have mutating getter, mutating setter
+  @MutatingGetNonmutatingSetWrapper @NonmutatingGetMutatingSetWrapper
+  var mgns_ngms: Int
+
+  // Should have mutating getter, mutating setter
+  @MutatingGetNonmutatingSetWrapper @MutatingGetMutatingSetWrapper
+  var mgns_mgms: Int
+
+  ////
+
+  // Should have nonmutating getter, undefined setter
+  @NonmutatingGetMutatingSetWrapper @NonmutatingGetWrapper
+  var ngms_ngxs: Int
+
+  // Should have mutating getter, undefined setter
+  @NonmutatingGetMutatingSetWrapper @MutatingGetWrapper
+  var ngms_mgxs: Int
+
+  // Should have nonmutating getter, nonmutating setter
+  @NonmutatingGetMutatingSetWrapper @NonmutatingGetNonmutatingSetWrapper
+  var ngms_ngns: Int
+
+  // Should have mutating getter, nonmutating setter
+  @NonmutatingGetMutatingSetWrapper @MutatingGetNonmutatingSetWrapper
+  var ngms_mgns: Int
+
+  // Should have nonmutating getter, mutating setter
+  @NonmutatingGetMutatingSetWrapper @NonmutatingGetMutatingSetWrapper
+  var ngms_ngms: Int
+
+  // Should have mutating getter, mutating setter
+  @NonmutatingGetMutatingSetWrapper @MutatingGetMutatingSetWrapper
+  var ngms_mgms: Int
+
+  ////
+
+  // Should have mutating getter, undefined setter
+  @MutatingGetMutatingSetWrapper @NonmutatingGetWrapper
+  var mgms_ngxs: Int
+
+  // Should have mutating getter, undefined setter
+  @MutatingGetMutatingSetWrapper @MutatingGetWrapper
+  var mgms_mgxs: Int
+
+  // Should have mutating getter, mutating setter
+  @MutatingGetMutatingSetWrapper @NonmutatingGetNonmutatingSetWrapper
+  var mgms_ngns: Int
+
+  // Should have mutating getter, mutating setter
+  @MutatingGetMutatingSetWrapper @MutatingGetNonmutatingSetWrapper
+  var mgms_mgns: Int
+
+  // Should have mutating getter, mutating setter
+  @MutatingGetMutatingSetWrapper @NonmutatingGetMutatingSetWrapper
+  var mgms_ngms: Int
+
+  // Should have mutating getter, mutating setter
+  @MutatingGetMutatingSetWrapper @MutatingGetMutatingSetWrapper
+  var mgms_mgms: Int
+
+  func readonlyContext(x: Int) { // expected-note *{{}}
+    _ = ngxs_ngxs 
+    // _ = ngxs_mgxs
+    _ = ngxs_ngns
+    // _ = ngxs_mgns
+    _ = ngxs_ngms
+    // _ = ngxs_mgms
+
+    _ = mgxs_ngxs // expected-error{{}}
+    // _ = mgxs_mgxs
+    _ = mgxs_ngns // expected-error{{}}
+    // _ = mgxs_mgns
+    _ = mgxs_ngms // expected-error{{}}
+    // _ = mgxs_mgms
+
+    _ = ngns_ngxs
+    _ = ngns_mgxs
+    _ = ngns_ngns
+    _ = ngns_mgns
+    _ = ngns_ngms
+    _ = ngns_mgms
+
+    _ = mgns_ngxs // expected-error{{}}
+    _ = mgns_mgxs // expected-error{{}}
+    _ = mgns_ngns // expected-error{{}}
+    _ = mgns_mgns // expected-error{{}}
+    _ = mgns_ngms // expected-error{{}}
+    _ = mgns_mgms // expected-error{{}}
+
+    _ = ngms_ngxs
+    _ = ngms_mgxs // expected-error{{}}
+    _ = ngms_ngns
+    _ = ngms_mgns // expected-error{{}}
+    _ = ngms_ngms
+    _ = ngms_mgms // expected-error{{}}
+
+    _ = mgms_ngxs // expected-error{{}}
+    _ = mgms_mgxs // expected-error{{}}
+    _ = mgms_ngns // expected-error{{}}
+    _ = mgms_mgns // expected-error{{}}
+    _ = mgms_ngms // expected-error{{}}
+    _ = mgms_mgms // expected-error{{}}
+
+    ////
+
+    ngxs_ngxs = x // expected-error{{}}
+    // ngxs_mgxs = x
+    ngxs_ngns = x
+    // ngxs_mgns = x
+    ngxs_ngms = x // expected-error{{}}
+    // ngxs_mgms = x
+
+    mgxs_ngxs = x // expected-error{{}}
+    // mgxs_mgxs = x
+    mgxs_ngns = x // expected-error{{}}
+    // mgxs_mgns = x
+    mgxs_ngms = x // expected-error{{}}
+    // mgxs_mgms = x
+
+    ngns_ngxs = x // expected-error{{}}
+    ngns_mgxs = x // expected-error{{}}
+    ngns_ngns = x
+    ngns_mgns = x
+    ngns_ngms = x
+    ngns_mgms = x
+
+    mgns_ngxs = x // expected-error{{}}
+    mgns_mgxs = x // expected-error{{}}
+    mgns_ngns = x // expected-error{{}}
+    mgns_mgns = x // expected-error{{}}
+    mgns_ngms = x // expected-error{{}}
+    mgns_mgms = x // expected-error{{}}
+
+    ngms_ngxs = x // expected-error{{}}
+    ngms_mgxs = x // expected-error{{}}
+    ngms_ngns = x
+    // FIXME: This ought to be allowed because it's a pure set, so the mutating
+    // get should not come into play.
+    ngms_mgns = x // expected-error{{cannot use mutating getter}}
+    ngms_ngms = x // expected-error{{}}
+    ngms_mgms = x // expected-error{{}}
+
+    mgms_ngxs = x // expected-error{{}}
+    mgms_mgxs = x // expected-error{{}}
+    mgms_ngns = x // expected-error{{}}
+    mgms_mgns = x // expected-error{{}}
+    mgms_ngms = x // expected-error{{}}
+    mgms_mgms = x // expected-error{{}}
+  }
+
+  mutating func mutatingContext(x: Int) {
+    _ = ngxs_ngxs 
+    // _ = ngxs_mgxs
+    _ = ngxs_ngns
+    // _ = ngxs_mgns
+    _ = ngxs_ngms
+    // _ = ngxs_mgms
+
+    _ = mgxs_ngxs
+    // _ = mgxs_mgxs
+    _ = mgxs_ngns
+    // _ = mgxs_mgns
+    _ = mgxs_ngms
+    // _ = mgxs_mgms
+
+    _ = ngns_ngxs
+    _ = ngns_mgxs
+    _ = ngns_ngns
+    _ = ngns_mgns
+    _ = ngns_ngms
+    _ = ngns_mgms
+
+    _ = mgns_ngxs
+    _ = mgns_mgxs
+    _ = mgns_ngns
+    _ = mgns_mgns
+    _ = mgns_ngms
+    _ = mgns_mgms
+
+    _ = ngms_ngxs
+    _ = ngms_mgxs
+    _ = ngms_ngns
+    _ = ngms_mgns
+    _ = ngms_ngms
+    _ = ngms_mgms
+
+    _ = mgms_ngxs
+    _ = mgms_mgxs
+    _ = mgms_ngns
+    _ = mgms_mgns
+    _ = mgms_ngms
+    _ = mgms_mgms
+
+    ////
+
+    ngxs_ngxs = x // expected-error{{}}
+    // ngxs_mgxs = x
+    ngxs_ngns = x
+    // ngxs_mgns = x
+    ngxs_ngms = x // expected-error{{}}
+    // ngxs_mgms = x
+
+    mgxs_ngxs = x // expected-error{{}}
+    // mgxs_mgxs = x
+    mgxs_ngns = x
+    // mgxs_mgns = x
+    mgxs_ngms = x // expected-error{{}}
+    // mgxs_mgms = x
+
+    ngns_ngxs = x // expected-error{{}}
+    ngns_mgxs = x // expected-error{{}}
+    ngns_ngns = x
+    ngns_mgns = x
+    ngns_ngms = x
+    ngns_mgms = x
+
+    mgns_ngxs = x // expected-error{{}}
+    mgns_mgxs = x // expected-error{{}}
+    mgns_ngns = x
+    mgns_mgns = x
+    mgns_ngms = x
+    mgns_mgms = x
+
+    ngms_ngxs = x // expected-error{{}}
+    ngms_mgxs = x // expected-error{{}}
+    ngms_ngns = x
+    ngms_mgns = x
+    ngms_ngms = x
+    ngms_mgms = x
+
+    mgms_ngxs = x // expected-error{{}}
+    mgms_mgxs = x // expected-error{{}}
+    mgms_ngns = x
+    mgms_mgns = x
+    mgms_ngms = x
+    mgms_mgms = x
+  }
+}
+
+// rdar://problem/54184846 - crash while trying to retrieve wrapper info on l-value base type
+func test_missing_method_with_lvalue_base() {
+  @propertyWrapper
+  struct Ref<T> {
+    var wrappedValue: T
+  }
+
+  struct S<T> where T: RandomAccessCollection, T.Element: Equatable {
+    @Ref var v: T.Element
+
+    init(items: T, v: Ref<T.Element>) {
+      self.v.binding = v // expected-error {{value of type 'T.Element' has no member 'binding'}}
+    }
+  }
+}

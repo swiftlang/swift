@@ -239,7 +239,8 @@ namespace {
 
     void writeConversionLikeInstruction(const SingleValueInstruction *I,
                                         unsigned attrs);
-    void writeOneTypeLayout(SILInstructionKind valueKind, SILType type);
+    void writeOneTypeLayout(SILInstructionKind valueKind,
+                            unsigned attrs, SILType type);
     void writeOneTypeOneOperandLayout(SILInstructionKind valueKind,
                                       unsigned attrs,
                                       SILType type,
@@ -415,8 +416,9 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
       (unsigned)F.isGlobalInit(), (unsigned)F.getInlineStrategy(),
       (unsigned)F.getOptimizationMode(), (unsigned)F.getEffectsKind(),
       (unsigned)numSpecAttrs, (unsigned)F.hasOwnership(),
-      F.isWeakLinked(), (unsigned)F.isDynamicallyReplaceable(), FnID,
-      replacedFunctionID, genericEnvID, clangNodeOwnerID, SemanticsIDs);
+      F.isWeakLinked(), (unsigned)F.isDynamicallyReplaceable(),
+      (unsigned)F.isExactSelfClass(),
+      FnID, replacedFunctionID, genericEnvID, clangNodeOwnerID, SemanticsIDs);
 
   if (NoBody)
     return;
@@ -536,10 +538,10 @@ void SILSerializer::handleMethodInst(const MethodInst *MI,
 }
 
 void SILSerializer::writeOneTypeLayout(SILInstructionKind valueKind,
-                                       SILType type) {
+                                       unsigned attrs, SILType type) {
   unsigned abbrCode = SILAbbrCodes[SILOneTypeLayout::Code];
   SILOneTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-        (unsigned) valueKind,
+        (unsigned) valueKind, attrs,
         S.addTypeRef(type.getASTType()),
         (unsigned)type.getCategory());
 }
@@ -848,7 +850,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
   case SILInstructionKind::AllocBoxInst: {
     const AllocBoxInst *ABI = cast<AllocBoxInst>(&SI);
-    writeOneTypeLayout(ABI->getKind(), ABI->getType());
+    writeOneTypeLayout(ABI->getKind(), ABI->hasDynamicLifetime() ? 1 : 0,
+                       ABI->getType());
     break;
   }
   case SILInstructionKind::AllocRefInst:
@@ -885,7 +888,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
   case SILInstructionKind::AllocStackInst: {
     const AllocStackInst *ASI = cast<AllocStackInst>(&SI);
-    writeOneTypeLayout(ASI->getKind(), ASI->getElementType());
+    writeOneTypeLayout(ASI->getKind(), ASI->hasDynamicLifetime() ? 1 : 0,
+                       ASI->getElementType());
     break;
   }
   case SILInstructionKind::ProjectValueBufferInst: {
@@ -1463,7 +1467,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
   case SILInstructionKind::MetatypeInst: {
     auto &MI = cast<MetatypeInst>(SI);
-    writeOneTypeLayout(MI.getKind(), MI.getType());
+    writeOneTypeLayout(MI.getKind(), 0, MI.getType());
     break;
   }
   case SILInstructionKind::ObjCProtocolInst: {

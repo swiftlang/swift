@@ -467,7 +467,9 @@ UIdent SwiftLangSupport::getUIDForSyntaxNodeKind(SyntaxNodeKind SC) {
     return KindObjectLiteral;
   }
 
-  llvm_unreachable("Unhandled SyntaxNodeKind in switch.");
+  // Default to a known kind to prevent crashing in non-asserts builds
+  assert(0 && "Unhandled SyntaxNodeKind in switch.");
+  return KindIdentifier;
 }
 
 UIdent SwiftLangSupport::getUIDForSyntaxStructureKind(

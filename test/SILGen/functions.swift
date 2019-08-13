@@ -41,7 +41,7 @@ class SomeClass {
   // -- Constructors and methods are uncurried in 'self'
   // -- Instance methods use 'method' cc
 
-  // CHECK-LABEL: sil hidden [ossa] @$s9functions9SomeClassC{{[_0-9a-zA-Z]*}}fC : $@convention(method) (Builtin.Int64, Builtin.Int64, @thick SomeClass.Type) -> @owned SomeClass
+  // CHECK-LABEL: sil hidden [exact_self_class] [ossa] @$s9functions9SomeClassC{{[_0-9a-zA-Z]*}}fC : $@convention(method) (Builtin.Int64, Builtin.Int64, @thick SomeClass.Type) -> @owned SomeClass
   // CHECK: bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2 : $@thick SomeClass.Type):
 
   // CHECK-LABEL: sil hidden [ossa] @$s9functions9SomeClassC{{[_0-9a-zA-Z]*}}fc : $@convention(method) (Builtin.Int64, Builtin.Int64, @owned SomeClass) -> @owned SomeClass

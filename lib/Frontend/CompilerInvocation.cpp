@@ -338,6 +338,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                    options::OPT_disable_astscope_lookup, Opts.EnableASTScopeLookup) ||
       Opts.DisableParserLookup;
   Opts.CompareToASTScopeLookup |= Args.hasArg(OPT_compare_to_astscope_lookup);
+  Opts.WarnIfASTScopeLookup |= Args.hasArg(OPT_warn_if_astscope_lookup);
 
   Opts.DebugConstraintSolver |= Args.hasArg(OPT_debug_constraints);
   Opts.NamedLazyMemberLoading &= !Args.hasArg(OPT_disable_named_lazy_member_loading);
@@ -583,8 +584,6 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
     Opts.BridgingHeader = A->getValue();
   Opts.DisableSwiftBridgeAttr |= Args.hasArg(OPT_disable_swift_bridge_attr);
 
-  Opts.DisableModulesValidateSystemHeaders |= Args.hasArg(OPT_disable_modules_validate_system_headers);
-
   Opts.DisableOverlayModules |= Args.hasArg(OPT_emit_imported_modules);
 
   if (const Arg *A = Args.getLastArg(OPT_pch_output_dir)) {
@@ -637,6 +636,9 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts,
 
   Opts.SkipRuntimeLibraryImportPaths |= Args.hasArg(OPT_nostdimport);
 
+  Opts.DisableModulesValidateSystemDependencies |=
+      Args.hasArg(OPT_disable_modules_validate_system_headers);
+
   // Opts.RuntimeIncludePath is set by calls to
   // setRuntimeIncludePath() or setMainExecutablePath().
   // Opts.RuntimeImportPath is set by calls to
@@ -668,6 +670,7 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
   Opts.FixitCodeForAllDiagnostics |= Args.hasArg(OPT_fixit_all);
   Opts.SuppressWarnings |= Args.hasArg(OPT_suppress_warnings);
   Opts.WarningsAsErrors |= Args.hasArg(OPT_warnings_as_errors);
+  Opts.PrintDiagnosticNames |= Args.hasArg(OPT_debug_diagnostic_names);
 
   assert(!(Opts.WarningsAsErrors && Opts.SuppressWarnings) &&
          "conflicting arguments; should have been caught by driver");

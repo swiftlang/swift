@@ -166,6 +166,7 @@ set(SWIFT_BENCH_MODULES
     single-source/StringInterpolation
     single-source/StringMatch
     single-source/StringRemoveDupes
+    single-source/StringReplaceSubrange
     single-source/StringTests
     single-source/StringWalk
     single-source/Substring

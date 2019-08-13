@@ -21,15 +21,23 @@ import LibProc
 
 import TestsUtils
 
+struct MeasurementMetadata {
+  let maxRSS: Int /// Maximum Resident Set Size (B)
+  let pages: Int /// Maximum Resident Set Size (pages)
+  let ics: Int /// Involuntary Context Switches
+  let vcs: Int /// Voluntary Context Switches
+  let yields: Int /// Yield Count
+}
+
 struct BenchResults {
   typealias T = Int
   private let samples: [T]
-  let maxRSS: Int?
+  let meta: MeasurementMetadata?
   let stats: Stats
 
-  init(_ samples: [T], maxRSS: Int?) {
+  init(_ samples: [T], _ metadata: MeasurementMetadata?) {
     self.samples = samples.sorted()
-    self.maxRSS = maxRSS
+    self.meta = metadata
     self.stats = self.samples.reduce(into: Stats(), Stats.collect)
   }
 
@@ -78,6 +86,9 @@ struct TestConfig {
   /// The number of samples we should take of each test.
   let numSamples: Int?
 
+  /// The minimum number of samples we should take of each test.
+  let minSamples: Int?
+
   /// Quantiles to report in results.
   let quantile: Int?
 
@@ -89,6 +100,9 @@ struct TestConfig {
 
   // Should we log the test's memory usage?
   let logMemory: Bool
+
+  // Should we log the measurement metadata?
+  let logMeta: Bool
 
   /// After we run the tests, should the harness sleep to allow for utilities
   /// like leaks that require a PID to run on the test harness.
@@ -105,6 +119,7 @@ struct TestConfig {
       var delim: String?
       var tags, skipTags: Set<BenchmarkCategory>?
       var numSamples: UInt?
+      var minSamples: UInt?
       var numIters: UInt?
       var quantile: UInt?
       var delta: Bool?
@@ -112,6 +127,7 @@ struct TestConfig {
       var sampleTime: Double?
       var verbose: Bool?
       var logMemory: Bool?
+      var logMeta: Bool?
       var action: TestAction?
       var tests: [String]?
     }
@@ -136,6 +152,9 @@ struct TestConfig {
                         "default: 1 or auto-scaled to measure for\n" +
                         "`sample-time` if num-iters is also specified\n",
                   parser: { UInt($0) })
+    p.addArgument("--min-samples", \.minSamples,
+                  help: "minimum number of samples to take per benchmark\n",
+                  parser: { UInt($0) })
     p.addArgument("--num-iters", \.numIters,
                   help: "number of iterations averaged in the sample;\n" +
                         "default: auto-scaled to measure for `sample-time`",
@@ -154,6 +173,8 @@ struct TestConfig {
                   help: "increase output verbosity")
     p.addArgument("--memory", \.logMemory, defaultValue: true,
                   help: "log the change in maximum resident set size (MAX_RSS)")
+    p.addArgument("--meta", \.logMeta, defaultValue: true,
+                  help: "log the metadata (memory usage, context switches)")
     p.addArgument("--delim", \.delim,
                   help:"value delimiter used for log output; default: ,",
                   parser: { $0 })
@@ -179,14 +200,16 @@ struct TestConfig {
     sampleTime = c.sampleTime ?? 1.0
     numIters = c.numIters.map { Int($0) }
     numSamples = c.numSamples.map { Int($0) }
+    minSamples = c.minSamples.map { Int($0) }
     quantile = c.quantile.map { Int($0) }
     delta = c.delta ?? false
     verbose = c.verbose ?? false
     logMemory = c.logMemory ?? false
+    logMeta = c.logMeta ?? false
     afterRunSleep = c.afterRunSleep
     action = c.action ?? .run
     tests = TestConfig.filterTests(registeredBenchmarks,
-                                    specifiedTests: Set(c.tests ?? []),
+                                    tests: c.tests ?? [],
                                     tags: c.tags ?? [],
                                     skipTags: c.skipTags ?? [.unstable, .skip])
 
@@ -206,8 +229,10 @@ struct TestConfig {
     let configuration = """
         --- CONFIG ---
         NumSamples: \(numSamples ?? 0)
+        MinSamples: \(minSamples ?? 0)
         Verbose: \(verbose)
         LogMemory: \(logMemory)
+        LogMeta: \(logMeta)
         SampleTime: \(sampleTime)
         NumIters: \(numIters ?? 0)
         Quantile: \(quantile ?? 0)
@@ -232,10 +257,16 @@ struct TestConfig {
   ///     specified filtering conditions.
   static func filterTests(
     _ registeredBenchmarks: [BenchmarkInfo],
-    specifiedTests: Set<String>,
+    tests: [String],
     tags: Set<BenchmarkCategory>,
     skipTags: Set<BenchmarkCategory>
   ) -> [(index: String, info: BenchmarkInfo)] {
+    var t = tests
+    let filtersIndex = t.partition { $0.hasPrefix("+") || $0.hasPrefix("-") }
+    let excludesIndex = t[filtersIndex...].partition { $0.hasPrefix("-") }
+    let specifiedTests = Set(t[..<filtersIndex])
+    let includes = t[filtersIndex..<excludesIndex].map { $0.dropFirst() }
+    let excludes = t[excludesIndex...].map { $0.dropFirst() }
     let allTests = registeredBenchmarks.sorted()
     let indices = Dictionary(uniqueKeysWithValues:
       zip(allTests.map { $0.name },
@@ -247,11 +278,27 @@ struct TestConfig {
     }
     func byNamesOrIndices(b: BenchmarkInfo) -> Bool {
       return specifiedTests.contains(b.name) ||
-        specifiedTests.contains(indices[b.name]!)
-    } // !! "`allTests` have been assigned an index"
+        // !! "`allTests` have been assigned an index"
+        specifiedTests.contains(indices[b.name]!) ||
+        (includes.contains { b.name.contains($0) } &&
+          excludes.allSatisfy { !b.name.contains($0) } )
+    }
     return allTests
-      .filter(specifiedTests.isEmpty ? byTags : byNamesOrIndices)
+      .filter(tests.isEmpty ? byTags : byNamesOrIndices)
       .map { (index: indices[$0.name]!, info: $0) }
+  }
+}
+
+extension String {
+  func contains(_ str: Substring) -> Bool {
+    guard let c = str.first else { return false }
+    var s = self[...]
+    repeat {
+      s = s[(s.firstIndex(of: c) ?? s.endIndex)...]
+      if s.starts(with: str) { return true }
+      s = s.dropFirst()
+    } while s.startIndex != s.endIndex
+    return false
   }
 }
 
@@ -340,6 +387,7 @@ final class TestRunner {
   var start, end, lastYield: Timer.TimeT
   let baseline = TestRunner.getResourceUtilization()
   let schedulerQuantum = UInt64(10_000_000) // nanoseconds (== 10ms, macos)
+  var yieldCount = 0
 
   init(_ config: TestConfig) {
     self.c = config
@@ -350,6 +398,7 @@ final class TestRunner {
   /// Offer to yield CPU to other processes and return current time on resume.
   func yield() -> Timer.TimeT {
     sched_yield()
+    yieldCount += 1
     return timer.getTime()
   }
 
@@ -383,7 +432,17 @@ final class TestRunner {
     var u = rusage(); getrusage(rusageSelf, &u); return u
   }
 
-  /// Returns maximum resident set size (MAX_RSS) delta in bytes.
+  static let pageSize: Int = {
+    #if canImport(Darwin)
+        let pageSize = _SC_PAGESIZE
+    #else
+        let pageSize = Int32(_SC_PAGESIZE)
+    #endif
+        return sysconf(pageSize)
+  }()
+
+  /// Returns metadata about the measurement, such as memory usage and number
+  /// of context switches.
   ///
   /// This method of estimating memory usage is valid only for executing single
   /// benchmark. That's why we don't worry about reseting the `baseline` in
@@ -391,30 +450,34 @@ final class TestRunner {
   ///
   /// FIXME: This current implementation doesn't work on Linux. It is disabled
   /// permanently to avoid linker errors. Feel free to fix.
-  func measureMemoryUsage() -> Int? {
+  func collectMetadata() -> MeasurementMetadata? {
 #if os(Linux)
     return nil
 #else
-    guard c.logMemory else { return nil }
     let current = TestRunner.getResourceUtilization()
-    let maxRSS = current.ru_maxrss - baseline.ru_maxrss
-#if canImport(Darwin)
-    let pageSize = _SC_PAGESIZE
-#else
-    let pageSize = Int32(_SC_PAGESIZE)
-#endif
-    let pages = { maxRSS / sysconf(pageSize) }
+    func delta(_ stat: KeyPath<rusage, Int>) -> Int {
+      return current[keyPath: stat] - baseline[keyPath: stat]
+    }
+    let maxRSS = delta(\rusage.ru_maxrss)
+    let pages = maxRSS / TestRunner.pageSize
     func deltaEquation(_ stat: KeyPath<rusage, Int>) -> String {
       let b = baseline[keyPath: stat], c = current[keyPath: stat]
       return "\(c) - \(b) = \(c - b)"
     }
     logVerbose(
         """
-            MAX_RSS \(deltaEquation(\rusage.ru_maxrss)) (\(pages()) pages)
+            MAX_RSS \(deltaEquation(\rusage.ru_maxrss)) (\(pages) pages)
             ICS \(deltaEquation(\rusage.ru_nivcsw))
             VCS \(deltaEquation(\rusage.ru_nvcsw))
+            yieldCount \(yieldCount)
         """)
-    return maxRSS
+    return MeasurementMetadata(
+      maxRSS: maxRSS,
+      pages: pages,
+      ics: delta(\rusage.ru_nivcsw),
+      vcs: delta(\rusage.ru_nvcsw),
+      yields: yieldCount
+    )
 #endif
   }
 
@@ -438,6 +501,7 @@ final class TestRunner {
   private func resetMeasurements() {
     let now = yield()
     (start, end, lastYield) = (now, now, now)
+    yieldCount = 0
   }
 
   /// Time in nanoseconds spent running the last function
@@ -516,8 +580,11 @@ final class TestRunner {
       Int.max / 10_000, // by the inner loop multiplier inside the `testFn`.
       c.numIters ?? calibrateMeasurements())
 
-    let numSamples = c.numSamples ?? min(200, // Cap the number of samples
-      c.numIters == nil ? 1 : calibrateMeasurements())
+    let numSamples = c.numSamples ??
+      // Compute the number of samples to measure for `sample-time`,
+      // clamped in (`min-samples`, 200) range, if the `num-iters` are fixed.
+      max(c.minSamples ?? 1, min(200, c.numIters == nil ? 1 :
+        calibrateMeasurements()))
 
     samples.reserveCapacity(numSamples)
     logVerbose("    Collecting \(numSamples) samples.")
@@ -532,7 +599,7 @@ final class TestRunner {
       samples = samples.map { $0 * lf }
     }
 
-    return BenchResults(samples, maxRSS: measureMemoryUsage())
+    return BenchResults(samples, collectMetadata())
   }
 
   var header: String {
@@ -554,7 +621,8 @@ final class TestRunner {
       ["#", "TEST", "SAMPLES"] +
       (c.quantile.map(quantiles)
         ?? ["MIN", "MAX", "MEAN", "SD", "MEDIAN"].map(withUnit)) +
-      (c.logMemory ? ["MAX_RSS(B)"] : [])
+      (c.logMemory ? ["MAX_RSS(B)"] : []) +
+      (c.logMeta ? ["PAGES", "ICS", "YIELD"] : [])
     ).joined(separator: c.delim)
   }
 
@@ -571,12 +639,14 @@ final class TestRunner {
               $0.encoded.append($1 - $0.last); $0.last = $1
             }.encoded : qs
         }
-        return (
-          [r.sampleCount] +
+        let values: [Int] = [r.sampleCount] +
           (c.quantile.map(quantiles)
             ?? [r.min,  r.max, r.mean, r.sd, r.median]) +
-          [r.maxRSS].compactMap { $0 }
-        ).map { (c.delta && $0 == 0) ? "" : String($0) } // drop 0s in deltas
+          (c.logMemory ? [r.meta?.maxRSS].compactMap { $0 } : []) +
+          (c.logMeta ? r.meta.map {
+            [$0.pages, $0.ics, $0.yields] } ?? [] : [])
+        return values.map {
+          (c.delta && $0 == 0) ? "" : String($0) } // drop 0s in deltas
       }
       let benchmarkStats = (
         [index, t.name] + (results.map(values) ?? ["Unsupported"])

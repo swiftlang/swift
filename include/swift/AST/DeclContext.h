@@ -459,6 +459,10 @@ public:
   /// are used.
   ResilienceExpansion getResilienceExpansion() const;
 
+  /// Returns true if this context may possibly contain members visible to
+  /// AnyObject dynamic lookup.
+  bool mayContainMembersAccessedByDynamicLookup() const;
+
   /// Returns true if lookups within this context could affect downstream files.
   ///
   /// \param functionsAreNonCascading If true, functions are considered non-
@@ -692,6 +696,24 @@ class IterableDeclContext {
   /// member loading, as a key when doing lookup in this IDC.
   serialization::DeclID SerialID;
 
+  /// Because \c parseDelayedDecl and lazy member adding can add members *after*
+  /// an \c ASTScope tree is created, there must be some way for the tree to
+  /// detect when a member has been added. A bit would suffice,
+  /// but would be more fragile, The scope code could count the members each
+  /// time, but I think it's a better trade to just keep a count here.
+  unsigned MemberCount : 29;
+
+  /// Whether parsing the members of this context has been delayed.
+  unsigned HasUnparsedMembers : 1;
+
+  /// Whether delayed parsing detected a possible operator definition
+  /// while skipping the body of this context.
+  unsigned HasOperatorDeclarations : 1;
+
+  /// Whether delayed parsing detect a possible nested class definition
+  /// while skipping the body of this context.
+  unsigned HasNestedClassDeclarations : 1;
+
   template<class A, class B, class C>
   friend struct ::llvm::cast_convert_val;
 
@@ -702,11 +724,42 @@ class IterableDeclContext {
 
 public:
   IterableDeclContext(IterableDeclContextKind kind)
-    : LastDeclAndKind(nullptr, kind) { }
+    : LastDeclAndKind(nullptr, kind) {
+    MemberCount = 0;
+    HasOperatorDeclarations = 0;
+    HasUnparsedMembers = 0;
+    HasNestedClassDeclarations = 0;
+  }
 
   /// Determine the kind of iterable context we have.
   IterableDeclContextKind getIterableContextKind() const {
     return LastDeclAndKind.getInt();
+  }
+
+  bool hasUnparsedMembers() const {
+    return HasUnparsedMembers;
+  }
+
+  void setHasUnparsedMembers() {
+    HasUnparsedMembers = 1;
+  }
+
+  bool maybeHasOperatorDeclarations() const {
+    return HasOperatorDeclarations;
+  }
+
+  void setMaybeHasOperatorDeclarations() {
+    assert(hasUnparsedMembers());
+    HasOperatorDeclarations = 1;
+  }
+
+  bool maybeHasNestedClassDeclarations() const {
+    return HasNestedClassDeclarations;
+  }
+
+  void setMaybeHasNestedClassDeclarations() {
+    assert(hasUnparsedMembers());
+    HasNestedClassDeclarations = 1;
   }
 
   /// Retrieve the set of members in this context.
@@ -720,6 +773,9 @@ public:
   /// Add a member to this context. If the hint decl is specified, the new decl
   /// is inserted immediately after the hint.
   void addMember(Decl *member, Decl *hint = nullptr);
+
+  /// See \c MemberCount
+  unsigned getMemberCount() const { return MemberCount; }
 
   /// Check whether there are lazily-loaded members.
   bool hasLazyMembers() const {

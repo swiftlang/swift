@@ -717,7 +717,7 @@ public:
     TypeResolutionOptions options(TypeResolverContext::InExpression);
     options |= TypeResolutionFlags::AllowUnspecifiedTypes;
     options |= TypeResolutionFlags::AllowUnboundGenerics;
-    
+
     if (auto *P = TC.resolvePattern(S->getPattern(), DC,
                                     /*isStmtCondition*/false)) {
       S->setPattern(P);
@@ -777,7 +777,7 @@ public:
         return nullptr;
 
       auto witness = conformance->getWitnessByName(
-          sequenceType->getRValueType(), TC.Context.Id_makeIterator);
+          sequenceType, TC.Context.Id_makeIterator);
       if (!witness)
         return nullptr;
       S->setMakeIterator(witness);
@@ -789,8 +789,9 @@ public:
       name += "$generator";
 
       iterator = new (TC.Context) VarDecl(
-          /*IsStatic*/ false, VarDecl::Specifier::Var, /*IsCaptureList*/ false,
-          S->getInLoc(), TC.Context.getIdentifier(name), DC);
+          /*IsStatic*/ false, VarDecl::Introducer::Var,
+          /*IsCaptureList*/ false, S->getInLoc(),
+          TC.Context.getIdentifier(name), DC);
       iterator->setType(iteratorTy);
       iterator->setInterfaceType(iteratorTy->mapTypeOutOfContext());
       iterator->setImplicit();
@@ -803,16 +804,15 @@ public:
       // be around.
       auto nextResultType =
           OptionalType::get(conformance->getTypeWitnessByName(
-                                sequenceType, TC.Context.Id_Element))
-              ->getCanonicalType();
-      auto *genBinding = PatternBindingDecl::createImplicit(
+                                sequenceType, TC.Context.Id_Element));
+      PatternBindingDecl::createImplicit(
           TC.Context, StaticSpellingKind::None, genPat,
           new (TC.Context) OpaqueValueExpr(S->getInLoc(), nextResultType), DC,
           /*VarLoc*/ S->getForLoc());
 
       Type newSequenceType = cast<AbstractFunctionDecl>(witness.getDecl())
             ->getInterfaceType()
-            ->getAs<AnyFunctionType>()
+            ->castTo<AnyFunctionType>()
             ->getParams()[0].getPlainType().subst(witness.getSubstitutions());
 
       // Necessary type coersion for method application.
@@ -855,8 +855,7 @@ public:
 
     auto nextResultType = cast<FuncDecl>(S->getIteratorNext().getDecl())
                               ->getResultInterfaceType()
-                              .subst(S->getIteratorNext().getSubstitutions())
-                              ->getCanonicalType();
+                              .subst(S->getIteratorNext().getSubstitutions());
 
     // Convert that Optional<T> value to Optional<Element>.
     auto optPatternType = OptionalType::get(S->getPattern()->getType());
@@ -1923,7 +1922,9 @@ static Type getFunctionBuilderType(FuncDecl *FD) {
 }
 
 bool TypeChecker::typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD) {
-  return typeCheckAbstractFunctionBodyUntil(AFD, SourceLoc());
+  auto result = typeCheckAbstractFunctionBodyUntil(AFD, SourceLoc());
+  checkFunctionErrorHandling(AFD);
+  return result;
 }
 
 static Expr* constructCallToSuperInit(ConstructorDecl *ctor,
@@ -2067,7 +2068,6 @@ static void checkClassConstructorBody(ClassDecl *classDecl,
                    ctor->getDeclContext()->getDeclaredInterfaceType())
       .fixItInsert(ctor->getLoc(), "convenience ");
     ctx.Diags.diagnose(initExpr->getLoc(), diag::delegation_here);
-    ctor->setInitKind(CtorInitializerKind::Convenience);
   }
 
   // An inlinable constructor in a class must always be delegating,
@@ -2140,7 +2140,6 @@ TypeCheckFunctionBodyUntilRequest::evaluate(Evaluator &evaluator,
     timer.emplace(AFD, tc.DebugTimeFunctionBodies, tc.WarnLongFunctionBodies);
 
   tc.validateDecl(AFD);
-  tc.requestRequiredNominalTypeLayoutForParameters(AFD->getParameters());
   tc.checkDefaultArguments(AFD->getParameters(), AFD);
 
   BraceStmt *body = AFD->getBody();

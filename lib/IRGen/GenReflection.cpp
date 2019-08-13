@@ -168,15 +168,16 @@ public:
   }
 };
 
-llvm::Constant *IRGenModule::getTypeRef(Type type,
-                                        GenericSignature *genericSig,
-                                        MangledTypeRefRole role) {
+std::pair<llvm::Constant *, unsigned>
+IRGenModule::getTypeRef(Type type, GenericSignature *genericSig,
+                        MangledTypeRefRole role) {
   return getTypeRef(type->getCanonicalType(genericSig), role);
 }
 
-llvm::Constant *IRGenModule::getTypeRef(CanType type,
-                                        MangledTypeRefRole role) {
-
+std::pair<llvm::Constant *, unsigned>
+IRGenModule::getTypeRef(CanType type, MangledTypeRefRole role) {
+  type = substOpaqueTypesWithUnderlyingTypes(type);
+  
   switch (role) {
   case MangledTypeRefRole::DefaultAssociatedTypeWitness:
   case MangledTypeRefRole::Metadata:
@@ -195,7 +196,8 @@ llvm::Constant *IRGenModule::getTypeRef(CanType type,
 
   IRGenMangler Mangler;
   auto SymbolicName = Mangler.mangleTypeForReflection(*this, type);
-  return getAddrOfStringForTypeRef(SymbolicName, role);
+  return {getAddrOfStringForTypeRef(SymbolicName, role),
+          SymbolicName.runtimeSizeInBytes()};
 }
 
 /// Emit a mangled string referencing a specific protocol conformance, so that
@@ -209,6 +211,9 @@ IRGenModule::emitWitnessTableRefString(CanType type,
                                       ProtocolConformanceRef conformance,
                                       GenericSignature *origGenericSig,
                                       bool shouldSetLowBit) {
+  std::tie(type, conformance)
+    = substOpaqueTypesWithUnderlyingTypes(type, conformance);
+  
   auto origType = type;
   CanGenericSignature genericSig;
   SmallVector<GenericRequirement, 4> requirements;
@@ -390,7 +395,7 @@ protected:
   void addTypeRef(CanType type,
                   MangledTypeRefRole role =
                       MangledTypeRefRole::Reflection) {
-    B.addRelativeAddress(IGM.getTypeRef(type, role));
+    B.addRelativeAddress(IGM.getTypeRef(type, role).first);
     addBuiltinTypeRefs(type);
   }
 
@@ -607,7 +612,11 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
   }
 
   void layout() override {
-    assert(!NTD->hasClangNode() || isa<StructDecl>(NTD));
+    if (NTD->hasClangNode()) {
+      auto *enumDecl = dyn_cast<EnumDecl>(NTD);
+      // Structs and namespace-like enums are ok.
+      assert(isa<StructDecl>(NTD) || (enumDecl && !enumDecl->hasCases()));
+    }
 
     PrettyStackTraceDecl DebugStack("emitting field type metadata", NTD);
     addNominalRef(NTD);

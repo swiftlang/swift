@@ -28,6 +28,7 @@
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/MemAccessUtils.h"
+#include "swift/SIL/MemoryLifetime.h"
 #include "swift/SIL/PostOrder.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILDebugScope.h"
@@ -491,7 +492,7 @@ struct ImmutableAddressUseVerifier {
   }
 
   bool isMutatingOrConsuming(SILValue address) {
-    copy(address->getUses(), std::back_inserter(worklist));
+    llvm::copy(address->getUses(), std::back_inserter(worklist));
     while (!worklist.empty()) {
       auto *use = worklist.pop_back_val();
       auto *inst = use->getUser();
@@ -584,7 +585,7 @@ struct ImmutableAddressUseVerifier {
       case SILInstructionKind::IndexRawPointerInst:
         // Add these to our worklist.
         for (auto result : inst->getResults()) {
-          copy(result->getUses(), std::back_inserter(worklist));
+          llvm::copy(result->getUses(), std::back_inserter(worklist));
         }
         break;
       default:
@@ -1961,6 +1962,34 @@ public:
             "Store operand type and dest type mismatch");
   }
 
+  // Usually the assign_by_wrapper initializer or setter has a single argument
+  // (the value). But in case of a tuple, the initializer/setter expect the
+  // tuple elements as separate arguments.
+  void checkAssignByWrapperArgsRecursively(SILType ty,
+                               SILFunctionConventions &conv, unsigned &argIdx) {
+    if (auto tupleTy = ty.getAs<TupleType>()) {
+      for (Type et : tupleTy->getElementTypes()) {
+        SILType elTy = SILType::getPrimitiveType(CanType(et), ty.getCategory());
+        checkAssignByWrapperArgsRecursively(elTy, conv, argIdx);
+      }
+      return;
+    }
+    require(argIdx < conv.getNumSILArguments(),
+            "initializer or setter has too few arguments");
+    SILType argTy = conv.getSILArgumentType(argIdx++);
+    if (ty.isAddress() && argTy.isObject())
+      ty = ty.getObjectType();
+    require(ty == argTy,
+            "wrong argument type of initializer or setter");
+  }
+
+  void checkAssignByWrapperArgs(SILType ty, SILFunctionConventions &conv) {
+    unsigned argIdx = conv.getSILArgIndexOfFirstParam();
+    checkAssignByWrapperArgsRecursively(ty, conv, argIdx);
+    require(argIdx == conv.getNumSILArguments(),
+            "initializer or setter has too many arguments");
+  }
+
   void checkAssignByWrapperInst(AssignByWrapperInst *AI) {
     SILValue Src = AI->getSrc(), Dest = AI->getDest();
     require(AI->getModule().getStage() == SILStage::Raw,
@@ -1970,11 +1999,7 @@ public:
     SILValue initFn = AI->getInitializer();
     CanSILFunctionType initTy = initFn->getType().castTo<SILFunctionType>();
     SILFunctionConventions initConv(initTy, AI->getModule());
-    unsigned firstArgIdx = initConv.getSILArgIndexOfFirstParam();
-    require(initConv.getNumSILArguments() == firstArgIdx + 1,
-            "init function has wrong number of arguments");
-    require(Src->getType() == initConv.getSILArgumentType(firstArgIdx),
-            "wrong argument type of init function");
+    checkAssignByWrapperArgs(Src->getType(), initConv);
     switch (initConv.getNumIndirectSILResults()) {
       case 0:
         require(initConv.getNumDirectSILResults() == 1,
@@ -1998,10 +2023,7 @@ public:
     SILFunctionConventions setterConv(setterTy, AI->getModule());
     require(setterConv.getNumIndirectSILResults() == 0,
             "set function has indirect results");
-    require(setterConv.getNumSILArguments() == 1,
-            "init function has wrong number of arguments");
-    require(Src->getType() == setterConv.getSILArgumentType(0),
-            "wrong argument type of init function");
+    checkAssignByWrapperArgs(Src->getType(), setterConv);
   }
 
 #define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
@@ -4944,8 +4966,8 @@ public:
       if (F->hasForeignBody())
         return;
 
-      assert(F->isAvailableExternally() &&
-             "external declaration of internal SILFunction not allowed");
+      require(F->isAvailableExternally(),
+              "external declaration of internal SILFunction not allowed");
       // If F is an external declaration, there is nothing further to do,
       // return.
       return;
@@ -4976,6 +4998,11 @@ public:
     // because we build the map of archetypes as we visit the
     // instructions.
     verifyOpenedArchetypes(F);
+
+    if (F->hasOwnership() && F->shouldVerifyOwnership() &&
+        !F->getModule().getASTContext().hadError()) {
+      verifyMemoryLifetime(F);
+    }
   }
 
   void verify() {

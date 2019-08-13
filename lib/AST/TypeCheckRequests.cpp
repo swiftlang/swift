@@ -237,6 +237,31 @@ void ExistentialConformsToSelfRequest::cacheResult(bool value) const {
 }
 
 //----------------------------------------------------------------------------//
+// existentialTypeSupported computation.
+//----------------------------------------------------------------------------//
+
+void ExistentialTypeSupportedRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  auto decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::circular_protocol_def, decl->getName());
+}
+
+void ExistentialTypeSupportedRequest::noteCycleStep(DiagnosticEngine &diags) const {
+  auto requirement = std::get<0>(getStorage());
+  diags.diagnose(requirement, diag::kind_declname_declared_here,
+                 DescriptiveDeclKind::Protocol, requirement->getName());
+}
+
+Optional<bool> ExistentialTypeSupportedRequest::getCachedResult() const {
+  auto decl = std::get<0>(getStorage());
+  return decl->getCachedExistentialTypeSupported();
+}
+
+void ExistentialTypeSupportedRequest::cacheResult(bool value) const {
+  auto decl = std::get<0>(getStorage());
+  decl->setCachedExistentialTypeSupported(value);
+}
+
+//----------------------------------------------------------------------------//
 // isFinal computation.
 //----------------------------------------------------------------------------//
 
@@ -538,6 +563,11 @@ bool PropertyWrapperBackingPropertyInfoRequest::isCached() const {
   return !var->getAttrs().isEmpty();
 }
 
+bool PropertyWrapperMutabilityRequest::isCached() const {
+  auto var = std::get<0>(getStorage());
+  return !var->getAttrs().isEmpty();
+}
+
 void swift::simple_display(
     llvm::raw_ostream &out, const PropertyWrapperTypeInfo &propertyWrapper) {
   out << "{ ";
@@ -560,6 +590,34 @@ void swift::simple_display(
   if (backingInfo.backingVar)
     backingInfo.backingVar->dumpRef(out);
   out << " }";
+}
+
+void swift::simple_display(
+  llvm::raw_ostream &out, const CtorInitializerKind initKind) {
+  out << "{ ";
+  switch (initKind) {
+  case CtorInitializerKind::Designated:
+    out << "designated"; break;
+  case CtorInitializerKind::Convenience:
+    out << "convenience"; break;
+  case CtorInitializerKind::ConvenienceFactory:
+    out << "convenience_factory"; break;
+  case CtorInitializerKind::Factory:
+    out << "factory"; break;
+  }
+  out << " }";
+}
+
+void swift::simple_display(llvm::raw_ostream &os, PropertyWrapperMutability m) {
+  static const char *names[] =
+    {"is nonmutating", "is mutating", "doesn't exist"};
+  
+  os << "getter " << names[m.Getter] << ", setter " << names[m.Setter];
+}
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           const ResilienceExpansion &value) {
+  out << value;
 }
 
 //----------------------------------------------------------------------------//
@@ -633,4 +691,119 @@ OpaqueReadOwnershipRequest::getCachedResult() const {
 void OpaqueReadOwnershipRequest::cacheResult(OpaqueReadOwnership value) const {
   auto *storage = std::get<0>(getStorage());
   storage->setOpaqueReadOwnership(value);
+}
+
+//----------------------------------------------------------------------------//
+// StorageImplInfoRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<StorageImplInfo>
+StorageImplInfoRequest::getCachedResult() const {
+  auto *storage = std::get<0>(getStorage());
+  if (storage->LazySemanticInfo.ImplInfoComputed)
+    return storage->ImplInfo;
+  return None;
+}
+
+void StorageImplInfoRequest::cacheResult(StorageImplInfo value) const {
+  auto *storage = std::get<0>(getStorage());
+  storage->setImplInfo(value);
+}
+
+//----------------------------------------------------------------------------//
+// RequiresOpaqueAccessorsRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<bool>
+RequiresOpaqueAccessorsRequest::getCachedResult() const {
+  auto *storage = std::get<0>(getStorage());
+  if (storage->LazySemanticInfo.RequiresOpaqueAccessorsComputed)
+    return storage->LazySemanticInfo.RequiresOpaqueAccessors;
+  return None;
+}
+
+void RequiresOpaqueAccessorsRequest::cacheResult(bool value) const {
+  auto *storage = std::get<0>(getStorage());
+  storage->LazySemanticInfo.RequiresOpaqueAccessorsComputed = 1;
+  storage->LazySemanticInfo.RequiresOpaqueAccessors = value;
+}
+
+//----------------------------------------------------------------------------//
+// RequiresOpaqueModifyCoroutineRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<bool>
+RequiresOpaqueModifyCoroutineRequest::getCachedResult() const {
+  auto *storage = std::get<0>(getStorage());
+  if (storage->LazySemanticInfo.RequiresOpaqueModifyCoroutineComputed)
+    return storage->LazySemanticInfo.RequiresOpaqueModifyCoroutine;
+  return None;
+}
+
+void RequiresOpaqueModifyCoroutineRequest::cacheResult(bool value) const {
+  auto *storage = std::get<0>(getStorage());
+  storage->LazySemanticInfo.RequiresOpaqueModifyCoroutineComputed = 1;
+  storage->LazySemanticInfo.RequiresOpaqueModifyCoroutine = value;
+}
+
+//----------------------------------------------------------------------------//
+// IsAccessorTransparentRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<bool>
+IsAccessorTransparentRequest::getCachedResult() const {
+  auto *accessor = std::get<0>(getStorage());
+  return accessor->getCachedIsTransparent();
+}
+
+void IsAccessorTransparentRequest::cacheResult(bool value) const {
+  auto *accessor = std::get<0>(getStorage());
+  accessor->setIsTransparent(value);
+
+  // For interface printing, API diff, etc.
+  if (value) {
+    auto &attrs = accessor->getAttrs();
+    if (!attrs.hasAttribute<TransparentAttr>()) {
+      auto &ctx = accessor->getASTContext();
+      attrs.add(new (ctx) TransparentAttr(/*IsImplicit=*/true));
+    }
+  }
+}
+
+//----------------------------------------------------------------------------//
+// SynthesizeAccessorRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<AccessorDecl *>
+SynthesizeAccessorRequest::getCachedResult() const {
+  auto *storage = std::get<0>(getStorage());
+  auto kind = std::get<1>(getStorage());
+  auto *accessor = storage->getAccessor(kind);
+  if (accessor)
+    return accessor;
+  return None;
+}
+
+void SynthesizeAccessorRequest::cacheResult(AccessorDecl *accessor) const {
+  auto *storage = std::get<0>(getStorage());
+  auto kind = std::get<1>(getStorage());
+
+  storage->setSynthesizedAccessor(kind, accessor);
+}
+
+//----------------------------------------------------------------------------//
+// EmittedMembersRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<DeclRange>
+EmittedMembersRequest::getCachedResult() const {
+  auto *classDecl = std::get<0>(getStorage());
+  if (classDecl->hasForcedEmittedMembers())
+    return classDecl->getMembers();
+  return None;
+}
+
+void EmittedMembersRequest::cacheResult(DeclRange result) const {
+  auto *classDecl = std::get<0>(getStorage());
+  classDecl->setHasForcedEmittedMembers();
 }

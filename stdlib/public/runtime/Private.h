@@ -249,6 +249,19 @@ public:
   const ContextDescriptor *
   _searchConformancesByMangledTypeName(Demangle::NodePointer node);
 
+  /// Iterate over protocol conformance sections starting from the given index.
+  /// The index is updated to the current number of protocol sections. Passing
+  /// the same index to the next call will iterate over any sections that were
+  /// added after the previous call.
+  ///
+  /// Takes a function to call for each section found. The two parameters are
+  /// the start and end of the section.
+  void
+  _forEachProtocolConformanceSectionAfter(
+    size_t *start, 
+    const std::function<void(const ProtocolConformanceRecord *,
+                             const ProtocolConformanceRecord *)> &f);
+
   Demangle::NodePointer _swift_buildDemanglingForMetadata(const Metadata *type,
                                                       Demangle::Demangler &Dem);
 

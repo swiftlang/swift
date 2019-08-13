@@ -44,11 +44,11 @@
 // watchOS_SIM: {{(bin/)?ld(.exe)?"? }}
 // watchOS_SIM: lib{{(\\\\|/)}}swift{{(\\\\|/)}}clang{{(\\\\|/)}}lib{{(\\\\|/)}}darwin{{(\\\\|/)}}libclang_rt.profile_watchossim.a
 
-// LINUX: clang++{{(\.exe)?"? }}
+// LINUX: clang{{(\.exe)?"? }}
 // LINUX: lib{{(\\\\|/)}}swift{{(\\\\|/)}}clang{{(\\\\|/)}}lib{{(\\\\|/)}}linux{{(\\\\|/)}}libclang_rt.profile-x86_64.a
 // LINUX: -u__llvm_profile_runtime
 
-// WINDOWS: clang++{{(\.exe)?"? }}
+// WINDOWS: clang{{(\.exe)?"? }}
 // WINDOWS: lib{{(\\\\|/)}}swift{{(\\\\|/)}}clang{{(\\\\|/)}}lib{{(\\\\|/)}}windows{{(\\\\|/)}}clang_rt.profile-x86_64.lib
 // WINDOWS: -u__llvm_profile_runtime
 

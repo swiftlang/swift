@@ -233,6 +233,7 @@ static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
                        options::OPT_experimental_dependency_include_intrafile);
   inputArgs.AddLastArg(arguments, options::OPT_package_description_version);
   inputArgs.AddLastArg(arguments, options::OPT_serialize_diagnostics_path);
+  inputArgs.AddLastArg(arguments, options::OPT_debug_diagnostic_names);
   inputArgs.AddLastArg(arguments, options::OPT_enable_astscope_lookup);
   inputArgs.AddLastArg(arguments, options::OPT_disable_astscope_lookup);
   inputArgs.AddLastArg(arguments, options::OPT_disable_parser_lookup);
@@ -1172,6 +1173,11 @@ void ToolChain::getResourceDirPath(SmallVectorImpl<char> &resourceDirPath,
   if (const Arg *A = args.getLastArg(options::OPT_resource_dir)) {
     StringRef value = A->getValue();
     resourceDirPath.append(value.begin(), value.end());
+  } else if (!getTriple().isOSDarwin() && args.hasArg(options::OPT_sdk)) {
+    StringRef value = args.getLastArg(options::OPT_sdk)->getValue();
+    resourceDirPath.append(value.begin(), value.end());
+    llvm::sys::path::append(resourceDirPath, "usr", "lib",
+                            shared ? "swift" : "swift_static");
   } else {
     auto programPath = getDriver().getSwiftProgramPath();
     resourceDirPath.append(programPath.begin(), programPath.end());

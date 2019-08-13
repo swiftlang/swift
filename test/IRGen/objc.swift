@@ -40,7 +40,6 @@ struct id {
 class MyBlammo : Blammo {
   func foo() {}
 // CHECK:  define hidden swiftcc void @"$s4objc8MyBlammoC3fooyyF"([[MYBLAMMO]]* swiftself) {{.*}} {
-// CHECK:    call {{.*}} @swift_release
 // CHECK:    ret void
 }
 
@@ -48,7 +47,6 @@ class MyBlammo : Blammo {
 class Test2 : Gizmo {
   func foo() {}
 // CHECK:  define hidden swiftcc void @"$s4objc5Test2C3fooyyF"([[TEST2]]* swiftself) {{.*}} {
-// CHECK:    call {{.*}} @llvm.objc.release
 // CHECK:    ret void
 
   @objc dynamic func bar() {}

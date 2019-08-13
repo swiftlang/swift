@@ -304,8 +304,6 @@ ERROR(observing_accessor_conflicts_with_accessor,none,
       (unsigned, StringRef))
 ERROR(observing_accessor_in_subscript,none,
       "%select{'willSet'|'didSet'}0 is not allowed in subscripts", (unsigned))
-ERROR(getset_init,none,
-      "variable with getter/setter cannot have an initial value", ())
 ERROR(getset_cannot_be_implied,none,
       "variable with implied type cannot have implied getter/setter", ())
 

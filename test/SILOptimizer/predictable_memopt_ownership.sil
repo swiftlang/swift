@@ -27,6 +27,7 @@ struct ComplexStruct {
 }
 
 sil @inout_builtinobject_user : $@convention(thin) (@inout Builtin.NativeObject) -> ()
+sil @in_builtinobject_user : $@convention(thin) (@in Builtin.NativeObject) -> @owned Builtin.NativeObject
 sil @get_builtin_object : $@convention(thin) () -> @owned Builtin.NativeObject
 sil @guaranteed_object_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
 sil @owned_user : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject
@@ -1131,4 +1132,181 @@ bb9:
   dealloc_stack %1 : $*Builtin.NativeObject
   %9999 = tuple()
   return %9999 : $()
+}
+
+// load [take] invalidates load forwarding. Make sure we do not try to promote
+// the load_borrow below. We can promote the load [copy] though since we restore
+// 3a.
+//
+// CHECK-LABEL: sil [ossa] @load_take_invalidates : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Optional<Builtin.NativeObject> {
+// CHECK: load_borrow
+// CHECK: } // end sil function 'load_take_invalidates'
+sil [ossa] @load_take_invalidates : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Optional<Builtin.NativeObject> {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = alloc_stack $Builtin.NativeObject
+  store %0 to [init] %1 : $*Builtin.NativeObject
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb5
+
+bb2:
+  %2 = load [take] %1 : $*Builtin.NativeObject
+  %3 = unchecked_ref_cast %2 : $Builtin.NativeObject to $Builtin.NativeObject
+  %func = function_ref @owned_user : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  %3a = apply %func(%3) : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  cond_br undef, bb3, bb4
+
+bb3:
+  store %3a to [init] %1 : $*Builtin.NativeObject
+  %4 = load [copy] %1 : $*Builtin.NativeObject
+  destroy_addr %1 : $*Builtin.NativeObject
+  dealloc_stack %1 : $*Builtin.NativeObject
+  %5 = enum $Optional<Builtin.NativeObject>, #Optional.some!enumelt.1, %4 : $Builtin.NativeObject
+  br bbEnd(%5 : $Optional<Builtin.NativeObject>)
+
+bb4:
+  store %3a to [init] %1 : $*Builtin.NativeObject
+  br bb5
+
+bb5:
+  %6 = load_borrow %1 : $*Builtin.NativeObject
+  end_borrow %6 : $Builtin.NativeObject
+  // Make version with load [take] here.
+  destroy_addr %1 : $*Builtin.NativeObject
+  dealloc_stack %1 : $*Builtin.NativeObject
+  %7 = enum $Optional<Builtin.NativeObject>, #Optional.none!enumelt
+  br bbEnd(%7 : $Optional<Builtin.NativeObject>)
+
+bbEnd(%8 : @owned $Optional<Builtin.NativeObject>):
+  return %8 : $Optional<Builtin.NativeObject>
+}
+
+// CHECK-LABEL: sil [ossa] @load_take_invalidates_copyaddr : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Optional<Builtin.NativeObject> {
+// CHECK: load_borrow
+// CHECK: } // end sil function 'load_take_invalidates_copyaddr'
+sil [ossa] @load_take_invalidates_copyaddr : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Optional<Builtin.NativeObject> {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = alloc_stack $Builtin.NativeObject
+  store %0 to [init] %1 : $*Builtin.NativeObject
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb5
+
+bb2:
+  %n = alloc_stack $Builtin.NativeObject
+  copy_addr [take] %1 to [initialization] %n : $*Builtin.NativeObject
+  %2 = load [take] %n : $*Builtin.NativeObject
+  %3 = unchecked_ref_cast %2 : $Builtin.NativeObject to $Builtin.NativeObject
+  %func = function_ref @owned_user : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  %3a = apply %func(%3) : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  dealloc_stack %n : $*Builtin.NativeObject
+  cond_br undef, bb3, bb4
+
+bb3:
+  store %3a to [init] %1 : $*Builtin.NativeObject
+  %4 = load [copy] %1 : $*Builtin.NativeObject
+  destroy_addr %1 : $*Builtin.NativeObject
+  dealloc_stack %1 : $*Builtin.NativeObject
+  %5 = enum $Optional<Builtin.NativeObject>, #Optional.some!enumelt.1, %4 : $Builtin.NativeObject
+  br bbEnd(%5 : $Optional<Builtin.NativeObject>)
+
+bb4:
+  store %3a to [init] %1 : $*Builtin.NativeObject
+  br bb5
+
+bb5:
+  %6 = load_borrow %1 : $*Builtin.NativeObject
+  end_borrow %6 : $Builtin.NativeObject
+  // Make version with load [take] here.
+  destroy_addr %1 : $*Builtin.NativeObject
+  dealloc_stack %1 : $*Builtin.NativeObject
+  %7 = enum $Optional<Builtin.NativeObject>, #Optional.none!enumelt
+  br bbEnd(%7 : $Optional<Builtin.NativeObject>)
+
+bbEnd(%8 : @owned $Optional<Builtin.NativeObject>):
+  return %8 : $Optional<Builtin.NativeObject>
+}
+
+// CHECK-LABEL: sil [ossa] @load_take_invalidates_apply_indirectin : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Optional<Builtin.NativeObject> {
+// CHECK: load_borrow
+// CHECK: } // end sil function 'load_take_invalidates_apply_indirectin'
+sil [ossa] @load_take_invalidates_apply_indirectin : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Optional<Builtin.NativeObject> {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = alloc_stack $Builtin.NativeObject
+  store %0 to [init] %1 : $*Builtin.NativeObject
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb5
+
+bb2:
+  %func = function_ref @in_builtinobject_user : $@convention(thin) (@in Builtin.NativeObject) -> @owned Builtin.NativeObject
+  %3a = apply %func(%1) : $@convention(thin) (@in Builtin.NativeObject) -> @owned Builtin.NativeObject
+  cond_br undef, bb3, bb4
+
+bb3:
+  store %3a to [init] %1 : $*Builtin.NativeObject
+  %4 = load [copy] %1 : $*Builtin.NativeObject
+  destroy_addr %1 : $*Builtin.NativeObject
+  dealloc_stack %1 : $*Builtin.NativeObject
+  %5 = enum $Optional<Builtin.NativeObject>, #Optional.some!enumelt.1, %4 : $Builtin.NativeObject
+  br bbEnd(%5 : $Optional<Builtin.NativeObject>)
+
+bb4:
+  store %3a to [init] %1 : $*Builtin.NativeObject
+  br bb5
+
+bb5:
+  %6 = load_borrow %1 : $*Builtin.NativeObject
+  end_borrow %6 : $Builtin.NativeObject
+  // Make version with load [take] here.
+  destroy_addr %1 : $*Builtin.NativeObject
+  dealloc_stack %1 : $*Builtin.NativeObject
+  %7 = enum $Optional<Builtin.NativeObject>, #Optional.none!enumelt
+  br bbEnd(%7 : $Optional<Builtin.NativeObject>)
+
+bbEnd(%8 : @owned $Optional<Builtin.NativeObject>):
+  return %8 : $Optional<Builtin.NativeObject>
+}
+
+// CHECK-LABEL: sil [ossa] @load_take_invalidates_apply_indirectinout : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Optional<Builtin.NativeObject> {
+// CHECK: load_borrow
+// CHECK: } // end sil function 'load_take_invalidates_apply_indirectinout'
+sil [ossa] @load_take_invalidates_apply_indirectinout : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Optional<Builtin.NativeObject> {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = alloc_stack $Builtin.NativeObject
+  store %0 to [init] %1 : $*Builtin.NativeObject
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb5
+
+bb2:
+  %func = function_ref @inout_builtinobject_user : $@convention(thin) (@inout Builtin.NativeObject) -> ()
+  apply %func(%1) : $@convention(thin) (@inout Builtin.NativeObject) -> ()
+  cond_br undef, bb3, bb4
+
+bb3:
+  %4 = load [copy] %1 : $*Builtin.NativeObject
+  destroy_addr %1 : $*Builtin.NativeObject
+  dealloc_stack %1 : $*Builtin.NativeObject
+  %5 = enum $Optional<Builtin.NativeObject>, #Optional.some!enumelt.1, %4 : $Builtin.NativeObject
+  br bbEnd(%5 : $Optional<Builtin.NativeObject>)
+
+bb4:
+  br bb5
+
+bb5:
+  %6 = load_borrow %1 : $*Builtin.NativeObject
+  end_borrow %6 : $Builtin.NativeObject
+  // Make version with load [take] here.
+  destroy_addr %1 : $*Builtin.NativeObject
+  dealloc_stack %1 : $*Builtin.NativeObject
+  %7 = enum $Optional<Builtin.NativeObject>, #Optional.none!enumelt
+  br bbEnd(%7 : $Optional<Builtin.NativeObject>)
+
+bbEnd(%8 : @owned $Optional<Builtin.NativeObject>):
+  return %8 : $Optional<Builtin.NativeObject>
 }
