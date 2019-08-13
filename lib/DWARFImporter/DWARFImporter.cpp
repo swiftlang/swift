@@ -177,7 +177,7 @@ public:
     }
   }
 
-  void lookupTypeDecl(StringRef rawName, Demangle::Node::Kind kind,
+  void lookupTypeDecl(StringRef rawName, ClangTypeKind kind,
                       llvm::function_ref<void(TypeDecl *)> receiver) {
     SmallVector<clang::Decl *, 1> decls;
     delegate->lookupValue(rawName, kind, decls);
@@ -250,7 +250,7 @@ void DWARFImporter::lookupValue(ModuleDecl::AccessPathTy accessPath,
 }
 
 void DWARFImporter::lookupTypeDecl(
-    StringRef rawName, Demangle::Node::Kind kind,
+    StringRef rawName, ClangTypeKind kind,
     llvm::function_ref<void(TypeDecl *)> receiver) {
   Impl.lookupTypeDecl(rawName, kind, receiver);
 }
