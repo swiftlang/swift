@@ -2500,34 +2500,14 @@ void ClangImporter::lookupValue(DeclName name, VisibleDeclConsumer &consumer){
     });
 }
 
-static Optional<ClangTypeKind>
-getClangTypeKindForNodeKind(Demangle::Node::Kind kind) {
-  switch (kind) {
-  case Demangle::Node::Kind::Protocol:
-    return ClangTypeKind::ObjCProtocol;
-  case Demangle::Node::Kind::Class:
-    return ClangTypeKind::ObjCClass;
-  case Demangle::Node::Kind::TypeAlias:
-    return ClangTypeKind::Typedef;
-  case Demangle::Node::Kind::Structure:
-  case Demangle::Node::Kind::Enum:
-    return ClangTypeKind::Tag;
-  default:
-    return None;
-  }
-}
-
 void ClangImporter::lookupTypeDecl(
-    StringRef rawName, Demangle::Node::Kind kind,
+    StringRef rawName, ClangTypeKind kind,
     llvm::function_ref<void(TypeDecl *)> receiver) {
   clang::DeclarationName clangName(
       &Impl.Instance->getASTContext().Idents.get(rawName));
 
   clang::Sema::LookupNameKind lookupKind;
-  auto clang_kind = getClangTypeKindForNodeKind(kind);
-  if (!clang_kind)
-    return;
-  switch (*clang_kind) {
+  switch (kind) {
   case ClangTypeKind::Typedef:
     lookupKind = clang::Sema::LookupOrdinaryName;
     break;
@@ -2558,17 +2538,17 @@ void ClangImporter::lookupTypeDecl(
 }
 
 void ClangImporter::lookupRelatedEntity(
-    StringRef rawName, StringRef relatedEntityKind,
+    StringRef rawName, ClangTypeKind kind, StringRef relatedEntityKind,
     llvm::function_ref<void(TypeDecl *)> receiver) {
   using CISTAttr = ClangImporterSynthesizedTypeAttr;
   if (relatedEntityKind ==
         CISTAttr::manglingNameForKind(CISTAttr::Kind::NSErrorWrapper) ||
       relatedEntityKind ==
         CISTAttr::manglingNameForKind(CISTAttr::Kind::NSErrorWrapperAnon)) {
-    auto underlyingKind = Demangle::Node::Kind::Structure;
+    auto underlyingKind = ClangTypeKind::Tag;
     if (relatedEntityKind ==
           CISTAttr::manglingNameForKind(CISTAttr::Kind::NSErrorWrapperAnon)) {
-      underlyingKind = Demangle::Node::Kind::TypeAlias;
+      underlyingKind = ClangTypeKind::Typedef;
     }
     lookupTypeDecl(rawName, underlyingKind,
                    [this, receiver] (const TypeDecl *foundType) {

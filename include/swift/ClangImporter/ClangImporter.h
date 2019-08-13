@@ -61,17 +61,6 @@ class TypeDecl;
 class VisibleDeclConsumer;
 enum class SelectorSplitKind;
 
-/// Represents the different namespaces for types in C.
-///
-/// A simplified version of clang::Sema::LookupKind.
-enum class ClangTypeKind {
-  Typedef,
-  ObjCClass = Typedef,
-  /// Structs, enums, and unions.
-  Tag,
-  ObjCProtocol,
-};
-
 /// Class that imports Clang modules into Swift, mapping directly
 /// from Clang ASTs over to Swift ASTs.
 class ClangImporter final : public ClangModuleLoader {
@@ -170,8 +159,8 @@ public:
   /// Note that this method does no filtering. If it finds the type in a loaded
   /// module, it returns it. This is intended for use in reflection / debugging
   /// contexts where access is not a problem.
-  void lookupTypeDecl(StringRef clangName, Demangle::Node::Kind kind,
-                      llvm::function_ref<void(TypeDecl*)> receiver) override;
+  void lookupTypeDecl(StringRef clangName, ClangTypeKind kind,
+                      llvm::function_ref<void(TypeDecl *)> receiver) override;
 
   /// Look up type a declaration synthesized by the Clang importer itself, using
   /// a "related entity kind" to determine which type it should be. For example,
@@ -182,7 +171,8 @@ public:
   /// module, it returns it. This is intended for use in reflection / debugging
   /// contexts where access is not a problem.
   void
-  lookupRelatedEntity(StringRef clangName, StringRef relatedEntityKind,
+  lookupRelatedEntity(StringRef clangName, ClangTypeKind kind,
+                      StringRef relatedEntityKind,
                       llvm::function_ref<void(TypeDecl *)> receiver) override;
 
   /// Look for textually included declarations from the bridging header.
