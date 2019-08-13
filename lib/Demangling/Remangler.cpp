@@ -1974,6 +1974,7 @@ void Remangler::mangleAutoDiffResultIndex(Node *node) {
 
 void
 Remangler::mangleAutoDiffAssociatedFunctionHelper(Node *node, StringRef op) {
+  // TODO(TF-680): Mangle `[differentiable]` atttribute requirements as well.
   assert(node->getNumChildren() == 3);
   mangleChildNode(node, 0); // original function
   Buffer << op;
