@@ -2059,12 +2059,12 @@ ConstraintSystem::matchTypesBindTypeVar(
     type.visit([&](Type t) {
       if (auto *tvt = dyn_cast<TypeVariableType>(t.getPointer())) {
         if (!typeVar->getImpl().canBindToLValue()) {
-          typeVar->getImpl().setCanBindToLValue(getSavedBindings(),
-                                                /*enabled=*/false);
+          tvt->getImpl().setCanBindToLValue(getSavedBindings(),
+                                            /*enabled=*/false);
         }
         if (!typeVar->getImpl().canBindToNoEscape()) {
-          typeVar->getImpl().setCanBindToNoEscape(getSavedBindings(),
-                                                  /*enabled=*/false);
+          tvt->getImpl().setCanBindToNoEscape(getSavedBindings(),
+                                              /*enabled=*/false);
         }
       }
     });
