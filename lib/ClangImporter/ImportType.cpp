@@ -189,13 +189,15 @@ namespace {
       return IR;
     }
 
+    ImportResult VisitType(const Type*) = delete;
+
 #define DEPENDENT_TYPE(Class, Base)                               \
     ImportResult Visit##Class##Type(const clang::Class##Type *) { \
       llvm_unreachable("Dependent types cannot be converted");    \
     }
 #define TYPE(Class, Base)
 #include "clang/AST/TypeNodes.def"
-    
+
     // Given a loaded type like CInt, look through the type alias sugar that the
     // stdlib uses to show the underlying type.  We want to import the signature
     // of the exit(3) libc function as "func exit(Int32)", not as
@@ -332,6 +334,11 @@ namespace {
       }
 
       llvm_unreachable("Invalid BuiltinType.");
+    }
+
+    ImportResult VisitPipeType(const clang::PipeType *) {
+      // OpenCL types are not supported in Swift.
+      return Type();
     }
 
     ImportResult VisitComplexType(const clang::ComplexType *type) {
@@ -795,12 +802,11 @@ namespace {
     SUGAR_TYPE(SubstTemplateTypeParm)
     SUGAR_TYPE(TemplateSpecialization)
     SUGAR_TYPE(Auto)
+    SUGAR_TYPE(DeducedTemplateSpecialization)
     SUGAR_TYPE(Adjusted)
     SUGAR_TYPE(PackExpansion)
-
-    ImportResult VisitAttributedType(const clang::AttributedType *type) {
-      return Visit(type->desugar());
-    }
+    SUGAR_TYPE(Attributed)
+    SUGAR_TYPE(MacroQualified)
 
     ImportResult VisitDecayedType(const clang::DecayedType *type) {
       clang::ASTContext &clangCtx = Impl.getClangASTContext();
