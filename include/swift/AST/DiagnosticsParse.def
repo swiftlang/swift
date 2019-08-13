@@ -252,7 +252,7 @@ ERROR(cskeyword_not_attribute,none,
       "'%0' is a declaration modifier, not an attribute", (StringRef))
 
 ERROR(decl_already_static,none,
-      "%0 cannot appear after another 'static' or 'class' pattern", (StaticSpellingKind))
+      "%0 cannot appear after another 'static' or 'class' keyword", (StaticSpellingKind))
 
 ERROR(enum_case_dot_prefix,none,
       "extraneous '.' in enum 'case' declaration", ())
