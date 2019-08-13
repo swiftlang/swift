@@ -2128,10 +2128,29 @@ ExtendedNominalRequest::evaluate(Evaluator &evaluator,
   // Resolve those type declarations to nominal type declarations.
   SmallVector<ModuleDecl *, 2> modulesFound;
   bool anyObject = false;
-  auto nominalTypes
+  auto nominalTypeDecls
     = resolveTypeDeclsToNominal(evaluator, ctx, referenced, modulesFound,
                                 anyObject);
-  return nominalTypes.empty() ? nullptr : nominalTypes.front();
+  switch (nominalTypeDecls.size()) {
+  case 0: return nullptr;
+  case 1: return nominalTypeDecls[0];
+  default:
+    if (ext->getValidationState() == ExtensionDecl::ValidationState::Checked) {
+      // If we're here, we must've encountered an error while validating
+      // the extension, so we're not going to even try to get a protocol.
+      ext->setInvalid();
+      return nullptr;
+    }
+    SmallVector<ProtocolDecl *, 4> protocolDecls;
+    for (auto nom : nominalTypeDecls) {
+      if (auto *pd = dyn_cast<ProtocolDecl>(nom))
+        protocolDecls.push_back(pd);
+    }
+    if (protocolDecls.empty())
+      return nullptr;
+    ProtocolType::canonicalizeProtocols(protocolDecls);
+    return protocolDecls[0];
+  }
 }
 
 llvm::Expected<NominalTypeDecl *>

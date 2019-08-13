@@ -4836,10 +4836,82 @@ static Type formExtensionInterfaceType(
   return resultType;
 }
 
+namespace {
+/// Convenience class for desugaring
+///
+/// \code
+///     extension P1 & (P2 & ...) & Klass & ... where ...
+/// --> extension P1 where Self : Klass, Self : P2, ...
+/// \endcode
+class ExtraConformances {
+  Optional<Type> klass;
+  SmallVector<Type, 4> protocols;
+
+public:
+  bool empty() const {
+    return !klass.hasValue() && protocols.empty();
+  }
+
+  void makeRequirements(
+      Type selfType, SmallVectorImpl<Requirement> &reqs) const {
+    if (klass.hasValue())
+      reqs.push_back(
+        Requirement(RequirementKind::Superclass, selfType, klass.getValue()));
+    for (auto p : protocols)
+      reqs.push_back(
+        Requirement(RequirementKind::Conformance, selfType, p));
+  }
+
+  /// Pre-condition: The argument type should have two or more members.
+  ///
+  /// \returns The new extended type.
+  Type desugarExtendedType(ProtocolCompositionType *oldExtendedType) {
+    ArrayRef<Type> compositionMembers = oldExtendedType->getMembers();
+    assert(compositionMembers.size() >= 2
+           && "Precondition was not satisfied :(.");
+
+    SmallVector<ProtocolDecl *, 4> protocolDecls;
+
+    std::function<void(ArrayRef<Type>)> flattenComposition =
+      [this, &protocolDecls, &flattenComposition] (ArrayRef<Type>
+                                                   compositionMembers) {
+        for (auto type : compositionMembers) {
+          if (type->is<ProtocolType>()) {
+            protocolDecls.push_back(
+              dyn_cast<ProtocolDecl>(type->getNominalOrBoundGenericNominal()));
+          } else if (type->is<ClassType>()) {
+            assert((!klass.hasValue() || klass.getValue()->isEqual(type))
+                   && "Expected 0 or 1 class types overall; otherwise "
+                      " resolveType() would have failed.");
+            klass = Optional<Type>(type);
+          } else if (auto *compType = type->getAs<ProtocolCompositionType>()) {
+            flattenComposition(compType->getMembers());
+          } else {
+            llvm_unreachable("Expected the non-protocol, non-class types would"
+                             " not be present here, as resolveType() removes"
+                             " them before.");
+          }
+        }
+    };
+
+    flattenComposition(compositionMembers);
+    ProtocolType::canonicalizeProtocols(protocolDecls);
+
+    assert(!protocolDecls.empty()
+           && "We would've already exited earlier, as there are 2 or more"
+              " composition members and at least one of them is a protocol.");
+    for (auto *pd = protocolDecls.begin() + 1; pd != protocolDecls.end(); ++pd)
+      protocols.push_back((*pd)->getDeclaredType());
+    return protocolDecls[0]->getDeclaredType();
+  }
+};
+}
+
 /// Check the generic parameters of an extension, recursively handling all of
 /// the parameter lists within the extension.
 static std::pair<GenericEnvironment *, Type>
 checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
+                            const ExtraConformances &&extraConformances,
                             GenericParamList *genericParams) {
   assert(!ext->getGenericEnvironment());
 
@@ -4866,15 +4938,27 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
                     sameTypeReq.second),
         source, ext->getModuleContext());
     }
+
+    // If the declared protocol type was not a composition,
+    // ext->getProtocolSelfType() might fail. So check if we actually had
+    // a legal composition before calling ext->getProtocolSelfType().
+    if (!extraConformances.empty()) {
+      SmallVector<Requirement, 4> reqs;
+      extraConformances.makeRequirements(ext->getProtocolSelfType(), reqs);
+      for (auto &r : reqs)
+        builder.addRequirement(r, source, ext->getModuleContext());
+    }
   };
 
   // Validate the generic type signature.
   auto *env = tc.checkGenericEnvironment(genericParams,
-                                         ext->getDeclContext(), nullptr,
+                                         ext->getDeclContext(),
+                                         /*parentSig=*/nullptr,
                                          /*allowConcreteGenericParams=*/true,
                                          ext, inferExtendedTypeReqs,
-                                         (mustInferRequirements ||
-                                            !sameTypeReqs.empty()));
+                                         (mustInferRequirements
+                                          || !sameTypeReqs.empty()
+                                          || !extraConformances.empty()));
 
   return { env, extInterfaceType };
 }
@@ -4887,37 +4971,37 @@ static bool isNonGenericTypeAliasType(Type type) {
   return false;
 }
 
-static void validateExtendedType(ExtensionDecl *ext, TypeChecker &tc) {
-  // If we didn't parse a type, fill in an error type and bail out.
-  if (!ext->getExtendedTypeLoc().getTypeRepr()) {
+static Type validateExtendedType(
+    ExtensionDecl *ext, TypeChecker &tc,
+    ExtraConformances &extraConformances) {
+  auto error = [&ext, &tc]() -> Type {
     ext->setInvalid();
-    ext->getExtendedTypeLoc().setInvalidType(tc.Context);
-    return;
-  }
+    return ErrorType::get(tc.Context);
+  };
+
+  // If we didn't parse a type, fill in an error type and bail out.
+  if (!ext->getExtendedTypeLoc().getTypeRepr())
+    return error();
 
   // Validate the extended type.
   TypeResolutionOptions options(TypeResolverContext::ExtensionBinding);
   options |= TypeResolutionFlags::AllowUnboundGenerics;
-  if (tc.validateType(ext->getExtendedTypeLoc(),
-                      TypeResolution::forInterface(ext->getDeclContext()),
-                      options)) {
-    ext->setInvalid();
-    ext->getExtendedTypeLoc().setInvalidType(tc.Context);
-    return;
-  }
+  auto tr = TypeResolution::forStructural(ext->getDeclContext());
+  auto extendedType = tr.resolveType(ext->getExtendedTypeLoc().getTypeRepr(),
+                                     options);
 
-  // Dig out the extended type.
-  auto extendedType = ext->getExtendedType();
+  if (extendedType->hasError())
+    return error();
 
   // Hack to allow extending a generic typealias.
   if (auto *unboundGeneric = extendedType->getAs<UnboundGenericType>()) {
     if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(unboundGeneric->getDecl())) {
-      auto extendedNominal = aliasDecl->getDeclaredInterfaceType()->getAnyNominal();
-      if (extendedNominal) {
-        extendedType = extendedNominal->getDeclaredType();
-        if (!isPassThroughTypealias(aliasDecl))
-          ext->getExtendedTypeLoc().setType(extendedType);
-      }
+      auto extendedNominal =
+        aliasDecl->getDeclaredInterfaceType()->getAnyNominal();
+      if (extendedNominal)
+        return (isPassThroughTypealias(aliasDecl)
+                ? extendedType
+                : extendedNominal->getDeclaredType());
     }
   }
 
@@ -4925,18 +5009,7 @@ static void validateExtendedType(ExtensionDecl *ext, TypeChecker &tc) {
   if (extendedType->is<AnyMetatypeType>()) {
     tc.diagnose(ext->getLoc(), diag::extension_metatype, extendedType)
       .highlight(ext->getExtendedTypeLoc().getSourceRange());
-    ext->setInvalid();
-    ext->getExtendedTypeLoc().setInvalidType(tc.Context);
-    return;
-  }
-
-  // Cannot extend function types, tuple types, etc.
-  if (!extendedType->getAnyNominal()) {
-    tc.diagnose(ext->getLoc(), diag::non_nominal_extension, extendedType)
-      .highlight(ext->getExtendedTypeLoc().getSourceRange());
-    ext->setInvalid();
-    ext->getExtendedTypeLoc().setInvalidType(tc.Context);
-    return;
+    return error();
   }
 
   // Cannot extend a bound generic type, unless it's referenced via a
@@ -4946,10 +5019,25 @@ static void validateExtendedType(ExtensionDecl *ext, TypeChecker &tc) {
     tc.diagnose(ext->getLoc(), diag::extension_specialization,
                 extendedType->getAnyNominal()->getName())
     .highlight(ext->getExtendedTypeLoc().getSourceRange());
-    ext->setInvalid();
-    ext->getExtendedTypeLoc().setInvalidType(tc.Context);
-    return;
+    return error();
   }
+
+  if (auto *protoCompType = extendedType->getAs<ProtocolCompositionType>()) {
+    // We do this check here instead of inside desugarExtendedType, so we can
+    // return early if the check passes and go to the non-nominal case if
+    // the check fails (e.g. AnyObject).
+    if (protoCompType->getMembers().size() >= 2)
+      return extraConformances.desugarExtendedType(protoCompType);
+  }
+
+  // Cannot extend function types, tuple types, etc.
+  if (!extendedType->getAnyNominal()) {
+    tc.diagnose(ext->getLoc(), diag::non_nominal_extension, extendedType)
+      .highlight(ext->getExtendedTypeLoc().getSourceRange());
+    return error();
+  }
+
+  return extendedType;
 }
 
 void TypeChecker::validateExtension(ExtensionDecl *ext) {
@@ -4960,7 +5048,8 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
 
   DeclValidationRAII IBV(ext);
 
-  validateExtendedType(ext, *this);
+  ExtraConformances extraSelfReqs;
+  Type extendedType = validateExtendedType(ext, *this, extraSelfReqs);
 
   if (auto *nominal = ext->getExtendedNominal()) {
     // If this extension was not already bound, it means it is either in an
@@ -4975,9 +5064,11 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
 
     if (auto *genericParams = ext->getGenericParams()) {
       GenericEnvironment *env;
-      Type extendedType = ext->getExtendedType();
+      // We need to set the extended type here as checkExtensionGenericParams
+      // transitively calls getExtendedType().
+      ext->getExtendedTypeLoc().setType(extendedType);
       std::tie(env, extendedType) = checkExtensionGenericParams(
-          *this, ext, extendedType,
+          *this, ext, extendedType, std::move(extraSelfReqs),
           genericParams);
 
       ext->getExtendedTypeLoc().setType(extendedType);
