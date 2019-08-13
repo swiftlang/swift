@@ -10,6 +10,7 @@ add_swift_host_library(swiftSIL STATIC
   Linker.cpp
   LinearLifetimeChecker.cpp
   LoopInfo.cpp
+  MemoryLifetime.cpp
   Notifications.cpp
   OperandOwnership.cpp
   OptimizationRemark.cpp

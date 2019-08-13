@@ -1623,6 +1623,7 @@ SILInstruction *CastOptimizer::optimizeUnconditionalCheckedCastAddrInst(
       Builder.emitStoreValueOperation(Loc, undef, dynamicCast.getDest(),
                                       StoreOwnershipQualifier::Init);
     }
+    Builder.emitDestroyAddr(Loc, Inst->getSrc());
     auto *TrapI = Builder.createBuiltinTrap(Loc);
     eraseInstAction(Inst);
     Builder.setInsertionPoint(std::next(TrapI->getIterator()));
