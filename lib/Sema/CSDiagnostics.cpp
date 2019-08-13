@@ -2258,8 +2258,8 @@ bool MissingMemberFailure::diagnoseAsError() {
   };
 
   TypoCorrectionResults corrections(TC, getName(), nameLoc);
-  auto tryTypoCorrection = [&] {
-    TC.performTypoCorrection(getDC(), DeclRefKind::Ordinary, baseType,
+  auto tryTypoCorrection = [&] (Type type) {
+    TC.performTypoCorrection(getDC(), DeclRefKind::Ordinary, type,
                              defaultMemberLookupOptions, corrections);
   };
 
@@ -2279,7 +2279,7 @@ bool MissingMemberFailure::diagnoseAsError() {
         .highlight(baseExpr->getSourceRange());
   } else if (auto metatypeTy = baseType->getAs<MetatypeType>()) {
     auto instanceTy = metatypeTy->getInstanceType();
-    tryTypoCorrection();
+    tryTypoCorrection(baseType);
 
     if (DeclName rightName =
             findCorrectEnumCaseName(instanceTy, corrections, getName())) {
@@ -2323,18 +2323,46 @@ bool MissingMemberFailure::diagnoseAsError() {
           .fixItInsertAfter(baseExpr->getEndLoc(), " as AnyObject)");
       return true;
     }
-
-    tryTypoCorrection();
-
-    if (auto correction = corrections.claimUniqueCorrection()) {
-      auto diagnostic = emitDiagnostic(
-          anchor->getLoc(), diag::could_not_find_value_member_corrected,
-          baseType, getName(), correction->CorrectedName);
-      diagnostic.highlight(baseExpr->getSourceRange())
-          .highlight(nameLoc.getSourceRange());
-      correction->addFixits(diagnostic);
+    
+    tryTypoCorrection(baseType);
+    
+    // If locator points to the member found via key path dynamic member lookup,
+    // we provide a custom diagnostic and emit typo corrections for the wrapper type too.
+    if (getLocator()->isForKeyPathDynamicMemberLookup()) {
+      auto baseExprType = getType(baseExpr)->getWithoutSpecifierType();
+      
+      tryTypoCorrection(baseExprType);
+      
+      if (auto correction = corrections.claimUniqueCorrection()) {
+        auto diagnostic = emitDiagnostic(
+            anchor->getLoc(),
+            diag::could_not_find_value_dynamic_member_corrected,
+            baseExprType, baseType, getName(),
+            correction->CorrectedName);
+        diagnostic.highlight(baseExpr->getSourceRange())
+            .highlight(nameLoc.getSourceRange());
+        correction->addFixits(diagnostic);
+      } else {
+        auto diagnostic = emitDiagnostic(
+            anchor->getLoc(),
+            diag::could_not_find_value_dynamic_member,
+            baseExprType, baseType, getName());
+        diagnostic.highlight(baseExpr->getSourceRange())
+            .highlight(nameLoc.getSourceRange());
+      }
     } else {
-      emitBasicError(baseType);
+      if (auto correction = corrections.claimUniqueCorrection()) {
+        auto diagnostic = emitDiagnostic(
+            anchor->getLoc(),
+            diag::could_not_find_value_member_corrected,
+            baseType, getName(),
+            correction->CorrectedName);
+        diagnostic.highlight(baseExpr->getSourceRange())
+            .highlight(nameLoc.getSourceRange());
+        correction->addFixits(diagnostic);
+      } else {
+        emitBasicError(baseType);
+      }
     }
   }
 
