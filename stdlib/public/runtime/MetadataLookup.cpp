@@ -249,8 +249,8 @@ static void _forEachTypeMetadataSectionAfter(
   }
 }
 
-void swift::addImageTypeMetadataRecordBlockCallback(const void *records,
-                                                    uintptr_t recordsSize) {
+void swift::addImageTypeMetadataRecordBlockCallbackUnsafe(
+    const void *records, uintptr_t recordsSize) {
   assert(recordsSize % sizeof(TypeMetadataRecord) == 0
          && "weird-sized type metadata section?!");
 
@@ -267,6 +267,12 @@ void swift::addImageTypeMetadataRecordBlockCallback(const void *records,
   // TypeMetadataRecords.
   _registerTypeMetadataRecords(TypeMetadataRecords.unsafeGetAlreadyInitialized(),
                                recordsBegin, recordsEnd);
+}
+
+void swift::addImageTypeMetadataRecordBlockCallback(const void *records,
+                                                    uintptr_t recordsSize) {
+  TypeMetadataRecords.get();
+  addImageTypeMetadataRecordBlockCallbackUnsafe(records, recordsSize);
 }
 
 void
@@ -831,8 +837,8 @@ _registerProtocols(ProtocolMetadataPrivateState &C,
   C.SectionsToScan.push_back(ProtocolSection{begin, end});
 }
 
-void swift::addImageProtocolsBlockCallback(const void *protocols,
-                                           uintptr_t protocolsSize) {
+void swift::addImageProtocolsBlockCallbackUnsafe(const void *protocols,
+                                                 uintptr_t protocolsSize) {
   assert(protocolsSize % sizeof(ProtocolRecord) == 0 &&
          "protocols section not a multiple of ProtocolRecord");
 
@@ -846,6 +852,12 @@ void swift::addImageProtocolsBlockCallback(const void *protocols,
   // Conformance cache should always be sufficiently initialized by this point.
   _registerProtocols(Protocols.unsafeGetAlreadyInitialized(),
                      recordsBegin, recordsEnd);
+}
+
+void swift::addImageProtocolsBlockCallback(const void *protocols,
+                                           uintptr_t protocolsSize) {
+  Protocols.get();
+  addImageProtocolsBlockCallbackUnsafe(protocols, protocolsSize);
 }
 
 void swift::swift_registerProtocols(const ProtocolRecord *begin,
