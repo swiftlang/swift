@@ -205,27 +205,6 @@ static void validateSearchPathArgs(DiagnosticEngine &diags,
   }
 }
 
-static void validateAutolinkingArgs(DiagnosticEngine &diags,
-                                    const ArgList &args,
-                                    const llvm::Triple &T) {
-  auto *forceLoadArg = args.getLastArg(options::OPT_autolink_force_load);
-  if (!forceLoadArg)
-    return;
-  auto *incrementalArg = args.getLastArg(options::OPT_incremental);
-  if (!incrementalArg)
-    return;
-
-  if (T.supportsCOMDAT())
-    return;
-
-  // Note: -incremental can itself be overridden by other arguments later
-  // on, but since -autolink-force-load is a rare and not-really-recommended
-  // option it's not worth modeling that complexity here (or moving the
-  // check somewhere else).
-  diags.diagnose(SourceLoc(), diag::error_option_not_supported,
-                 forceLoadArg->getSpelling(), incrementalArg->getSpelling());
-}
-
 /// Perform miscellaneous early validation of arguments.
 static void validateArgs(DiagnosticEngine &diags, const ArgList &args,
                          const llvm::Triple &T) {
@@ -235,7 +214,6 @@ static void validateArgs(DiagnosticEngine &diags, const ArgList &args,
   validateDebugInfoArgs(diags, args);
   validateCompilationConditionArgs(diags, args);
   validateSearchPathArgs(diags, args);
-  validateAutolinkingArgs(diags, args, T);
 }
 
 std::unique_ptr<ToolChain>

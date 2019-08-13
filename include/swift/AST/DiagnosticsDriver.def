@@ -140,9 +140,6 @@ ERROR(error_input_changed_during_build,none,
 ERROR(error_conflicting_options, none,
       "conflicting options '%0' and '%1'",
       (StringRef, StringRef))
-ERROR(error_option_not_supported, none,
-      "'%0' is not supported with '%1'",
-      (StringRef, StringRef))
 
 WARNING(warn_ignore_embed_bitcode, none,
         "ignoring -embed-bitcode since no object file is being generated", ())
