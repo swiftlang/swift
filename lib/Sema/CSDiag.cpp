@@ -4222,6 +4222,21 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     }
   }
 
+  // Let's check whether this is a situation when callee expects
+  // no arguments but N are given. Otherwise, just below
+  // `typeCheckArgumentChild*` is going to use `()` is a contextual type which
+  // is incorrect.
+  if (argType && argType->isVoid()) {
+    auto *argExpr = callExpr->getArg();
+    if (isa<ParenExpr>(argExpr) ||
+        (isa<TupleExpr>(argExpr) &&
+         cast<TupleExpr>(argExpr)->getNumElements() > 0)) {
+      diagnose(callExpr->getLoc(), diag::extra_argument_to_nullary_call)
+          .highlight(argExpr->getSourceRange());
+      return true;
+    }
+  }
+
   // Get the expression result of type checking the arguments to the call
   // independently, so we have some idea of what we're working with.
   //
