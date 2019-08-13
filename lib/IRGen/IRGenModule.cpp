@@ -1188,7 +1188,7 @@ void IRGenModule::emitAutolinkInfo() {
   }
 
   if (!IRGen.Opts.ForceLoadSymbolName.empty() &&
-      isFirstObjectFileInModule(*this)) {
+      (Triple.supportsCOMDAT() || isFirstObjectFileInModule(*this))) {
     llvm::SmallString<64> buf;
     encodeForceLoadSymbolName(buf, IRGen.Opts.ForceLoadSymbolName);
     auto ForceImportThunk =
@@ -1196,6 +1196,9 @@ void IRGenModule::emitAutolinkInfo() {
                                llvm::GlobalValue::ExternalLinkage, buf,
                                &Module);
     ApplyIRLinkage(IRLinkage::ExternalExport).to(ForceImportThunk);
+    if (Triple.supportsCOMDAT())
+      if (auto *GO = cast<llvm::GlobalObject>(ForceImportThunk))
+        GO->setComdat(Module.getOrInsertComdat(ForceImportThunk->getName()));
 
     auto BB = llvm::BasicBlock::Create(getLLVMContext(), "", ForceImportThunk);
     llvm::IRBuilder<> IRB(BB);

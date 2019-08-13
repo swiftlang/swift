@@ -101,10 +101,6 @@
 // ASSUME_SINGLE_THREADED: swift
 // ASSUME_SINGLE_THREADED: -frontend {{.*}} -assume-single-threaded
 
-// RUN: not %swiftc_driver -incremental -autolink-force-load %s 2>&1 | %FileCheck -check-prefix=AUTOLINK_FORCE_LOAD %s
-// RUN: not %swiftc_driver -autolink-force-load -incremental %s 2>&1 | %FileCheck -check-prefix=AUTOLINK_FORCE_LOAD %s
-// AUTOLINK_FORCE_LOAD: error: '-autolink-force-load' is not supported with '-incremental'
-
 // RUN: %swift_driver -### -g -debug-info-format=codeview %s | %FileCheck -check-prefix DEBUG_INFO_FORMAT_CODEVIEW %s
 // RUN: %swift_driver -### -g -debug-info-format=dwarf %s | %FileCheck -check-prefix DEBUG_INFO_FORMAT_DWARF %s
 // RUN: %swiftc_driver -### -g -debug-info-format=codeview %s | %FileCheck -check-prefix DEBUG_INFO_FORMAT_CODEVIEW %s
