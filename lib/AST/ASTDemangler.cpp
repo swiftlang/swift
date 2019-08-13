@@ -1023,6 +1023,23 @@ ASTBuilder::findTypeDecl(DeclContext *dc,
   return result;
 }
 
+static Optional<ClangTypeKind>
+getClangTypeKindForNodeKind(Demangle::Node::Kind kind) {
+  switch (kind) {
+  case Demangle::Node::Kind::Protocol:
+    return ClangTypeKind::ObjCProtocol;
+  case Demangle::Node::Kind::Class:
+    return ClangTypeKind::ObjCClass;
+  case Demangle::Node::Kind::TypeAlias:
+    return ClangTypeKind::Typedef;
+  case Demangle::Node::Kind::Structure:
+  case Demangle::Node::Kind::Enum:
+    return ClangTypeKind::Tag;
+  default:
+    return None;
+  }
+}
+
 GenericTypeDecl *ASTBuilder::findForeignTypeDecl(StringRef name,
                                                  StringRef relatedEntityKind,
                                                  ForeignModuleKind foreignKind,
@@ -1060,6 +1077,10 @@ GenericTypeDecl *ASTBuilder::findForeignTypeDecl(StringRef name,
     consumer.foundDecl(found, DeclVisibilityKind::VisibleAtTopLevel);
   };
 
+  Optional<ClangTypeKind> lookupKind = getClangTypeKindForNodeKind(kind);
+  if (!lookupKind)
+    return nullptr;
+
   switch (foreignKind) {
   case ForeignModuleKind::SynthesizedByImporter:
     if (!relatedEntityKind.empty()) {
@@ -1071,12 +1092,12 @@ GenericTypeDecl *ASTBuilder::findForeignTypeDecl(StringRef name,
       consumer.Result = getAcceptableTypeDeclCandidate(consumer.Result, kind);
     break;
   case ForeignModuleKind::Imported:
-    importer->lookupTypeDecl(name, kind, found);
+    importer->lookupTypeDecl(name, *lookupKind, found);
 
     // Try the DWARFImporter if it exists.
     if (!consumer.Result)
       if (auto *dwarf_importer = Ctx.getDWARFModuleLoader())
-        dwarf_importer->lookupTypeDecl(name, kind, found);
+        dwarf_importer->lookupTypeDecl(name, *lookupKind, found);
   }
 
   return consumer.Result;

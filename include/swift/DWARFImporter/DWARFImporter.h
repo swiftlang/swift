@@ -19,7 +19,6 @@
 
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Module.h"
-#include "swift/Demangling/Demangle.h"
 
 namespace llvm {
 }
@@ -43,8 +42,7 @@ public:
   virtual ~DWARFImporterDelegate() {}
   /// Perform a qualified lookup of a Clang type with this name.
   /// \param kind  Only return results with this type kind.
-  virtual void lookupValue(StringRef name,
-                           llvm::Optional<Demangle::Node::Kind> kind,
+  virtual void lookupValue(StringRef name, llvm::Optional<ClangTypeKind> kind,
                            SmallVectorImpl<clang::Decl *> &results) {}
 };
 
@@ -111,7 +109,7 @@ public:
                    NLKind lookupKind, SmallVectorImpl<ValueDecl *> &results);
   /// Perform a qualified lookup of a Clang type with this name and only return
   /// results with the specified type kind.
-  void lookupTypeDecl(StringRef rawName, Demangle::Node::Kind kind,
+  void lookupTypeDecl(StringRef rawName, ClangTypeKind kind,
                       llvm::function_ref<void(TypeDecl *)> receiver) override;
   bool
   isInOverlayModuleForImportedModule(const DeclContext *overlayDC,
