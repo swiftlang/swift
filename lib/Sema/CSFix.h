@@ -243,22 +243,6 @@ protected:
   ConstraintSystem &getConstraintSystem() const { return CS; }
 };
 
-/// Append 'as! T' to force a downcast to the specified type.
-class ForceDowncast final : public ConstraintFix {
-  Type DowncastTo;
-
-  ForceDowncast(ConstraintSystem &cs, Type toType, ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::ForceDowncast, locator), DowncastTo(toType) {
-  }
-
-public:
-  std::string getName() const override;
-  bool diagnose(Expr *root, bool asNote = false) const override;
-
-  static ForceDowncast *create(ConstraintSystem &cs, Type toType,
-                               ConstraintLocator *locator);
-};
-
 /// Introduce a '!' to force an optional unwrap.
 class ForceOptional final : public ConstraintFix {
   Type BaseType;
@@ -305,19 +289,6 @@ public:
   static UnwrapOptionalBase *
   createWithOptionalResult(ConstraintSystem &cs, DeclName member,
                            ConstraintLocator *locator);
-};
-
-/// Introduce a '&' to take the address of an lvalue.
-class AddAddressOf final : public ConstraintFix {
-  AddAddressOf(ConstraintSystem &cs, ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::AddressOf, locator) {}
-
-public:
-  std::string getName() const override { return "add address-of"; }
-
-  bool diagnose(Expr *root, bool asNote = false) const override;
-
-  static AddAddressOf *create(ConstraintSystem &cs, ConstraintLocator *locator);
 };
 
 // Treat rvalue as if it was an lvalue
@@ -521,6 +492,37 @@ public:
 
   static ContextualMismatch *create(ConstraintSystem &cs, Type lhs, Type rhs,
                                     ConstraintLocator *locator);
+};
+
+/// Append 'as! T' to force a downcast to the specified type.
+class ForceDowncast final : public ContextualMismatch {
+  ForceDowncast(ConstraintSystem &cs, Type fromType, Type toType,
+                ConstraintLocator *locator)
+      : ContextualMismatch(cs, FixKind::ForceDowncast, fromType, toType,
+                           locator) {}
+
+public:
+  std::string getName() const override;
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static ForceDowncast *create(ConstraintSystem &cs, Type fromType, Type toType,
+                               ConstraintLocator *locator);
+};
+
+/// Introduce a '&' to take the address of an lvalue.
+class AddAddressOf final : public ContextualMismatch {
+  AddAddressOf(ConstraintSystem &cs, Type argTy, Type paramTy,
+               ConstraintLocator *locator)
+      : ContextualMismatch(cs, FixKind::AddressOf, argTy, paramTy, locator) {}
+
+public:
+  std::string getName() const override { return "add address-of"; }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static AddAddressOf *create(ConstraintSystem &cs, Type argTy, Type paramTy,
+                              ConstraintLocator *locator);
 };
 
 /// Detect situations where two type's generic arguments must

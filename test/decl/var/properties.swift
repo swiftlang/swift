@@ -96,6 +96,7 @@ var implicitGet1: X {
 
 var implicitGet2: Int {
   var zzz = 0
+  // expected-warning@-1 {{initialization of variable 'zzz' was never used; consider replacing with assignment to '_' or removing it}}
   // For the purpose of this test, any other function attribute work as well.
   @inline(__always)
   func foo() {}
@@ -191,6 +192,7 @@ func disambiguateGetSet4() {
 func disambiguateGetSet4Attr() {
   func set(_ x: Int, fn: () -> ()) {}
   var newValue: Int = 0
+  // expected-warning@-1 {{variable 'newValue' was never mutated; consider changing to 'let' constant}}
   var a: Int = takeTrailingClosure {
     @inline(__always)
     func foo() {}

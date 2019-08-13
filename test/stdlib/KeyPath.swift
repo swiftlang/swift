@@ -926,6 +926,50 @@ keyPath.test("let-ness") {
   expectNotNil(\Point.secretlyMutableHypotenuse as? WritableKeyPath)
 }
 
+keyPath.test("key path literal closures") {
+  // Property access
+  let fnX: (C<String>) -> Int = \C<String>.x
+  let fnY: (C<String>) -> LifetimeTracked? = \C<String>.y
+  let fnZ: (C<String>) -> String = \C<String>.z
+  let fnImmutable: (C<String>) -> String = \C<String>.immutable
+  let fnSecretlyMutable: (C<String>) -> String = \C<String>.secretlyMutable
+  let fnComputed: (C<String>) -> String = \C<String>.computed
+  
+  let lifetime = LifetimeTracked(249)
+  let base = C(x: 1, y: lifetime, z: "SE-0249")
+
+  expectEqual(1, fnX(base))
+  expectEqual(lifetime, fnY(base))
+  expectEqual("SE-0249", fnZ(base))
+  expectEqual("1 Optional(249) SE-0249", fnImmutable(base))
+  expectEqual("1 Optional(249) SE-0249", fnSecretlyMutable(base))
+  expectEqual("SE-0249", fnComputed(base))
+  
+  // Subscripts
+  var callsToComputeIndex = 0
+  func computeIndexWithSideEffect(_ i: Int) -> Int {
+    callsToComputeIndex += 1
+    return -i
+  }
+  
+  let fnSubscriptResultA: (Subscripts<String>) -> SubscriptResult<String, Int>
+    = \Subscripts<String>.["A", computeIndexWithSideEffect(13)]
+  let fnSubscriptResultB: (Subscripts<String>) -> SubscriptResult<String, Int>
+    = \Subscripts<String>.["B", computeIndexWithSideEffect(42)]
+  
+  let subscripts = Subscripts<String>()
+  
+  expectEqual("A", fnSubscriptResultA(subscripts).left)
+  expectEqual(-13, fnSubscriptResultA(subscripts).right)
+  
+  expectEqual("B", fnSubscriptResultB(subscripts).left)
+  expectEqual(-42, fnSubscriptResultB(subscripts).right)
+  
+  // Did we compute the indices once per closure construction, or once per
+  // closure application?
+  expectEqual(2, callsToComputeIndex)
+}
+
 // SR-6096
 
 protocol Protocol6096 {}

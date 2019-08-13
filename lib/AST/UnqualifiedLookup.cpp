@@ -486,7 +486,7 @@ void UnqualifiedLookupFactory::performUnqualifiedLookup() {
   const bool compareToASTScopes = Ctx.LangOpts.CompareToASTScopeLookup;
   if (useASTScopesForExperimentalLookup() && !compareToASTScopes) {
     static bool haveWarned = false;
-    if (!haveWarned) {
+    if (!haveWarned && Ctx.LangOpts.WarnIfASTScopeLookup) {
       haveWarned = true;
       llvm::errs() << "WARNING: TRYING Scope exclusively\n";
     }
@@ -1332,7 +1332,7 @@ bool UnqualifiedLookupFactory::verifyEqualTo(
       e.getValueDecl()->print(as);
       oe.getValueDecl()->print(bs);
       if (a == b)
-        llvm::errs() << "ValueDecls differ but print same";
+        llvm::errs() << "ValueDecls differ but print same\n";
       else {
         writeErr(std::string( "ValueDecls differ at ") + std::to_string(i));
         assert(false && "ASTScopeImpl found different Decl");

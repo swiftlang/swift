@@ -200,7 +200,7 @@ protected:
     // forced at the end.
     SortedFuncList synthesizedMembers;
 
-    for (auto member : theClass->getMembers()) {
+    for (auto member : theClass->getEmittedMembers()) {
       if (auto *afd = dyn_cast<AbstractFunctionDecl>(member)) {
         if (afd->isSynthesized()) {
           synthesizedMembers.add(afd);

@@ -33,7 +33,8 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
 
   auto fn = SILFunction::create(mod, linkage, name, type, nullptr, loc,
                                 isBareSILFunction, isTransparent, isSerialized,
-                                entryCount, isDynamic, isThunk, subclassScope);
+                                entryCount, isDynamic, IsNotExactSelfClass,
+                                isThunk, subclassScope);
   fn->setDebugScope(new (mod) SILDebugScope(loc, fn));
   return fn;
 }
@@ -206,6 +207,7 @@ SILFunctionBuilder::getOrCreateFunction(SILLocation loc, SILDeclRef constant,
 
   auto *F = SILFunction::create(mod, linkage, name, constantType, nullptr, None,
                                 IsNotBare, IsTrans, IsSer, entryCount, IsDyn,
+                                IsNotExactSelfClass,
                                 IsNotThunk, constant.getSubclassScope(),
                                 inlineStrategy, EK);
   F->setDebugScope(new (mod) SILDebugScope(loc, F));
@@ -252,6 +254,7 @@ SILFunction *SILFunctionBuilder::createFunction(
     const SILDebugScope *DebugScope) {
   return SILFunction::create(mod, linkage, name, loweredType, genericEnv, loc,
                              isBareSILFunction, isTrans, isSerialized,
-                             entryCount, isDynamic, isThunk, subclassScope,
+                             entryCount, isDynamic, IsNotExactSelfClass,
+                             isThunk, subclassScope,
                              inlineStrategy, EK, InsertBefore, DebugScope);
 }

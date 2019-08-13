@@ -33,7 +33,7 @@ class FakeNSObject {
 class Cat : FakeNSObject {
   let x: LifetimeTracked
 
-  // CHECK-LABEL: sil hidden @$s40definite_init_failable_initializers_objc3CatC1n5afterACSgSi_SbtcfC
+  // CHECK-LABEL: sil hidden [exact_self_class] @$s40definite_init_failable_initializers_objc3CatC1n5afterACSgSi_SbtcfC
   // CHECK: function_ref @$s40definite_init_failable_initializers_objc3CatC1n5afterACSgSi_Sbtcfc :
   // CHECK: end sil function '$s40definite_init_failable_initializers_objc3CatC1n5afterACSgSi_SbtcfC'
 

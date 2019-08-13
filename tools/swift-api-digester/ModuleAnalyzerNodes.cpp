@@ -796,8 +796,14 @@ static bool isSDKNodeEqual(SDKContext &Ctx, const SDKNode &L, const SDKNode &R) 
         return false;
       if (Left->getPrintedName() == Right->getPrintedName())
         return true;
-      return Left->getName() == Right->getName() &&
-        Left->hasSameChildren(*Right);
+      if (Ctx.checkingABI()) {
+        // For abi checking where we don't have sugar types at all, the printed
+        // name difference is enough to indicate these two types differ.
+        return false;
+      } else {
+        return Left->getName() == Right->getName() &&
+          Left->hasSameChildren(*Right);
+      }
     }
 
     case SDKNodeKind::DeclFunction: {
@@ -2080,7 +2086,7 @@ swift::ide::api::getSDKNodeRoot(SDKContext &SDKCtx,
     if (Opts.Verbose)
       llvm::errs() << "Loading module: " << Name << "...\n";
     auto *M = Ctx.getModuleByName(Name);
-    if (!M) {
+    if (!M || M->failedToLoad()) {
       llvm::errs() << "Failed to load module: " << Name << '\n';
       if (Opts.AbortOnModuleLoadFailure)
         return nullptr;

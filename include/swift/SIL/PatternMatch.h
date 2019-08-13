@@ -68,6 +68,8 @@ template<typename Class>
 struct class_match {
   template<typename ITy>
   bool match(ITy *V) { return isa<Class>(V); }
+
+  bool match(SILValue v) { return isa<Class>(&*v); }
 };
 
 template<typename Class>
@@ -83,6 +85,8 @@ struct bind_ty {
     }
     return false;
   }
+
+  bool match(SILValue v) { return match(&*v); }
 };
 
 //===----------------------------------------------------------------------===//
@@ -104,6 +108,8 @@ struct match_combine_or {
       return true;
     return false;
   }
+
+  bool match(SILValue v) { return match(&*v); }
 };
 
 template<typename LTy, typename RTy>
@@ -112,6 +118,8 @@ struct match_combine_and {
   RTy R;
 
   match_combine_and(const LTy &Left, const RTy &Right) : L(Left), R(Right) { }
+
+  bool match(SILValue v) { return match(&*v); }
 
   template<typename ITy>
   bool match(ITy *V) {
@@ -257,10 +265,10 @@ static inline bool isSameAPIntValue(const APInt &I1, const APInt &I2,
 }
 
 // Builtin Integer Matcher
-struct integerliteral_ty {
+struct specificintegerliteral_ty {
   APInt Value;
   bool isSigned;
-  integerliteral_ty(APInt V, bool S) : Value(V), isSigned(S) { }
+  specificintegerliteral_ty(APInt V, bool S) : Value(V), isSigned(S) {}
 
   template<typename ITy>
   bool match(ITy *V) {
@@ -274,7 +282,8 @@ struct integerliteral_ty {
   }
 };
 
-static inline integerliteral_ty m_IntegerLiteralInst(APInt V, bool isSigned) {
+static inline specificintegerliteral_ty
+m_SpecificIntegerLiteral(APInt V, bool isSigned) {
   return {V, isSigned};
 }
 
@@ -293,179 +302,93 @@ using m_Zero = match_integer<0>;
 using m_One = match_integer<1>;
 
 //===----------------------------------------------------------------------===//
-//                             Unary Instructions
+//                        Instruction Operand Matchers
 //===----------------------------------------------------------------------===//
 
-template<typename OpMatchTy, SILInstructionKind Kind>
-struct UnaryOp_match {
-  OpMatchTy OpMatch;
+namespace detail {
 
-  UnaryOp_match(const OpMatchTy &Op) : OpMatch(Op) { }
+struct GetOperandsFunctor {
+  template <size_t... Idx>
+  std::array<SILValue, sizeof...(Idx)>
+  operator()(SILInstruction *i, llvm::index_sequence<Idx...> seq) const {
+    return {i->getOperand(Idx)...};
+  }
+};
+
+template <typename... MatcherTys> struct MatcherFunctor {
+  std::tuple<MatcherTys...> matchers;
+
+  MatcherFunctor(const MatcherTys &... matchers) : matchers(matchers...) {}
+
+  template <typename MatcherTy> bool individual(MatcherTy matcher, SILValue v) {
+    return matcher.match(v);
+  }
+
+  template <size_t... Idx>
+  std::array<bool, sizeof...(MatcherTys)>
+  matchHelper(const std::array<SILValue, sizeof...(MatcherTys)> &operands,
+              llvm::index_sequence<Idx...> seq) {
+    return {individual(std::get<Idx>(matchers), std::get<Idx>(operands))...};
+  }
+
+  bool match(SILInstruction *i) {
+    std::array<SILValue, sizeof...(MatcherTys)> operands =
+        GetOperandsFunctor{}(i, llvm::index_sequence_for<MatcherTys...>{});
+    auto tmpResult =
+        matchHelper(operands, llvm::index_sequence_for<MatcherTys...>{});
+    for (unsigned i : indices(tmpResult)) {
+      if (!tmpResult[i])
+        return false;
+    }
+    return true;
+  }
+};
+
+} // namespace detail
+
+// NOTE: These matchers only can accept compound, non-fundamental
+// types. This prevents by mistake passing in int, float, etc to these
+// matchers.
+template <SILInstructionKind Kind, typename... MatcherTys>
+struct InstructionOperand_match {
+  // This just makes sure that we catch common mistakes passing
+  // fundamental types (i.e. int, float, etc) to this API.
+  static_assert(
+      are_all_compound<MatcherTys...>::value,
+      "Expected all matcher tys to be non-fundamental compound types?!");
+  detail::MatcherFunctor<MatcherTys...> matcherFunctor;
+
+  static constexpr unsigned NumMatchers = sizeof...(MatcherTys);
+
+  // Only allow for these to be constructed from non-fundamental types.
+  InstructionOperand_match(const MatcherTys &... matchers)
+      : matcherFunctor(matchers...) {}
 
   bool match(SILNode *node) {
     if (node->getKind() != SILNodeKind(Kind))
       return false;
-
     return match(cast<SILInstruction>(node));
   }
 
-  bool match(SILInstruction *I) {
-    if (I->getKind() != Kind)
+  bool match(SILInstruction *i) {
+    if (i->getKind() != Kind || !(i->getNumOperands() <= NumMatchers))
       return false;
 
-    if (I->getNumOperands() != 1)
-      return false;
-
-    return OpMatch.match(I->getOperand(0));
+    return matcherFunctor.match(i);
   }
 };
 
-// XMacro for generating a matcher for unary op instructions that can apply
-// further matchers to the operands of the unary operation.
-#define UNARY_OP_MATCH_WITH_ARG_MATCHER(Class)        \
-  template <typename Ty>                              \
-  UnaryOp_match<Ty, SILInstructionKind::Class>        \
-  m_##Class(const Ty &T) {                            \
-    return T;                                         \
+#define FULL_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE)                   \
+  template <typename... MatcherTys>                                            \
+  InstructionOperand_match<SILInstructionKind::ID, MatcherTys...> m_##ID(      \
+      const MatcherTys &... matchers) {                                        \
+    return {matchers...};                                                      \
   }
-UNARY_OP_MATCH_WITH_ARG_MATCHER(AllocRefDynamicInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(ConvertFunctionInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(UpcastInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(PointerToAddressInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(AddressToPointerInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(UncheckedRefCastInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(UncheckedAddrCastInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(UncheckedTrivialBitCastInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(UncheckedBitwiseCastInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(RawPointerToRefInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(ThinToThickFunctionInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(ThickToObjCMetatypeInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(ObjCToThickMetatypeInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(ObjCMetatypeToObjectInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(ObjCExistentialMetatypeToObjectInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(RetainValueInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(RetainValueAddrInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(ReleaseValueInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(ReleaseValueAddrInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(AutoreleaseValueInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(UncheckedEnumDataInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(InitEnumDataAddrInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(InjectEnumAddrInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(UncheckedTakeEnumDataAddrInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(ValueMetatypeInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(ExistentialMetatypeInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(TupleExtractInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(TupleElementAddrInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(StructExtractInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(StructElementAddrInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(LoadInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(RefElementAddrInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(ClassMethodInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(ObjCMethodInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(SuperMethodInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(ObjCSuperMethodInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(OpenExistentialAddrInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(OpenExistentialRefInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(OpenExistentialValueInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(InitExistentialAddrInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(InitExistentialValueInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(InitExistentialRefInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(DeinitExistentialAddrInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(DeinitExistentialValueInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(ProjectBlockStorageInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(StrongRetainInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(StrongReleaseInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(ClassifyBridgeObjectInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(ValueToBridgeObjectInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(FixLifetimeInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(CopyBlockInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(DeallocStackInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(DeallocRefInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(DeallocPartialRefInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(DeallocBoxInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(DestroyAddrInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(CondFailInst)
-UNARY_OP_MATCH_WITH_ARG_MATCHER(ReturnInst)
-#define LOADABLE_REF_STORAGE_HELPER(Name) \
-  UNARY_OP_MATCH_WITH_ARG_MATCHER(RefTo##Name##Inst) \
-  UNARY_OP_MATCH_WITH_ARG_MATCHER(Name##ToRefInst)
-#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-  UNARY_OP_MATCH_WITH_ARG_MATCHER(Load##Name##Inst)
-#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-  LOADABLE_REF_STORAGE_HELPER(Name) \
-  UNARY_OP_MATCH_WITH_ARG_MATCHER(Name##RetainInst) \
-  UNARY_OP_MATCH_WITH_ARG_MATCHER(Name##ReleaseInst) \
-  UNARY_OP_MATCH_WITH_ARG_MATCHER(StrongRetain##Name##Inst)
-#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-  NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, "...") \
-  ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, "...")
-#define UNCHECKED_REF_STORAGE(Name, ...) \
-  LOADABLE_REF_STORAGE_HELPER(Name)
-#include "swift/AST/ReferenceStorage.def"
-#undef LOADABLE_REF_STORAGE_HELPER
-
-#undef UNARY_OP_MATCH_WITH_ARG_MATCHER
-
-//===----------------------------------------------------------------------===//
-//                            Binary Instructions
-//===----------------------------------------------------------------------===//
-
-template<typename LHSTy, typename RHSTy, SILInstructionKind Kind>
-struct BinaryOp_match {
-  LHSTy L;
-  RHSTy R;
-
-  BinaryOp_match(const LHSTy &LHS, const RHSTy &RHS) : L(LHS), R(RHS) {}
-
-  bool match(SILNode *node) {
-    if (node->getKind() != SILNodeKind(Kind))
-      return false;
-
-    return match(cast<SILInstruction>(node));
-  }
-
-  bool match(SILInstruction *I) {
-    if (I->getKind() != Kind)
-      return false;
-
-    if (I->getNumOperands() != 2)
-      return false;
-
-    return L.match((ValueBase *)I->getOperand(0)) &&
-           R.match((ValueBase *)I->getOperand(1));
-  }
-};
-
-template <typename LTy, typename RTy>
-BinaryOp_match<LTy, RTy, SILInstructionKind::IndexRawPointerInst>
-m_IndexRawPointerInst(const LTy &Left, const RTy &Right) {
-  return {Left, Right};
-}
+#include "swift/SIL/SILNodes.def"
 
 //===----------------------------------------------------------------------===//
 //                         Address/Struct Projections
 //===----------------------------------------------------------------------===//
-
-template <typename LTy>
-struct tupleextract_ty {
-  LTy L;
-  unsigned index;
-  tupleextract_ty(const LTy &Left, unsigned i) : L(Left), index(i) { }
-
-  template <typename ITy>
-  bool match(ITy *V) {
-    auto *TEI = dyn_cast<TupleExtractInst>(V);
-    if (!TEI)
-      return false;
-
-    return TEI->getFieldNo() == index && L.match((ValueBase *)TEI->getOperand());
-  }
-};
-
-template <typename LTy>
-tupleextract_ty<LTy> m_TupleExtractInst(const LTy &Left, unsigned Index) {
-  return tupleextract_ty<LTy>(Left, Index);
-}
 
 /// Match either a tuple_extract that the index field from a tuple or the
 /// indexth destructure_tuple result.
@@ -473,6 +396,8 @@ template <typename LTy> struct tupleextractoperation_ty {
   LTy L;
   unsigned index;
   tupleextractoperation_ty(const LTy &Left, unsigned i) : L(Left), index(i) {}
+
+  bool match(SILValue v) { return match(v->getDefiningInstruction()); }
 
   template <typename ITy> bool match(ITy *V) {
     if (auto *TEI = dyn_cast<TupleExtractInst>(V)) {

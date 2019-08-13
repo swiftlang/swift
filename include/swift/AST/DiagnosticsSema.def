@@ -3593,6 +3593,18 @@ ERROR(pattern_type_mismatch_context,none,
 
 ERROR(tuple_pattern_in_non_tuple_context,none,
       "tuple pattern cannot match values of the non-tuple type %0", (Type))
+WARNING(matching_pattern_with_many_assoc_values, none,
+        "cannot match several associated values at once, "
+        "implicitly tupling the associated values and trying to match that "
+        "instead", ())
+WARNING(matching_tuple_pattern_with_many_assoc_values,none,
+        "a tuple pattern cannot match several associated values at once, "
+        "implicitly tupling the associated values and trying to match "
+        "that instead", ())
+WARNING(matching_many_patterns_with_tupled_assoc_value,none,
+        "the enum case has a single tuple as an associated value, but "
+        "there are several patterns here, implicitly tupling the patterns "
+        "and trying to match that instead", ())
 ERROR(closure_argument_list_tuple,none,
       "contextual closure type %0 expects %1 argument%s1, "
       "but %2 %select{were|was}3 used in closure body", (Type, unsigned, unsigned, bool))

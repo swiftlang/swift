@@ -672,7 +672,8 @@ void SILInstruction::verifyOperandOwnership() const {
                       "with the operand's operand ownership kind map.\n";
       llvm::errs() << "Value: " << opValue;
       llvm::errs() << "Value Ownership Kind: " << valueOwnershipKind << "\n";
-      llvm::errs() << "Instruction: " << *this;
+      llvm::errs() << "Instruction:\n";
+      printInContext(llvm::errs());
       llvm::errs() << "Operand Ownership Kind Map: " << operandOwnershipKindMap;
     }
 

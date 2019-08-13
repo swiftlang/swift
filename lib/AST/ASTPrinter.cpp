@@ -1344,22 +1344,21 @@ void PrintAST::printGenericSignature(const GenericSignature *genericSig,
                         // print everything
                         [&](const Requirement &) { return true; });
 }
+
 void PrintAST::printGenericSignature(
     const GenericSignature *genericSig, unsigned flags,
     llvm::function_ref<bool(const Requirement &)> filter) {
+  auto requirements = genericSig->getRequirements();
+
   if (flags & InnermostOnly) {
     auto genericParams = genericSig->getInnermostGenericParams();
-    unsigned depth = genericParams[0]->getDepth();
-    SmallVector<Requirement, 2> requirementsAtDepth;
-    getRequirementsAtDepth(genericSig, depth, requirementsAtDepth);
 
-    printSingleDepthOfGenericSignature(genericParams, requirementsAtDepth,
-                                       flags, filter);
+    printSingleDepthOfGenericSignature(genericParams, requirements, flags,
+                                       filter);
     return;
   }
 
   auto genericParams = genericSig->getGenericParams();
-  auto requirements = genericSig->getRequirements();
 
   if (!Options.PrintInSILBody) {
     printSingleDepthOfGenericSignature(genericParams, requirements, flags,
@@ -1966,15 +1965,24 @@ void PrintAST::printMembers(ArrayRef<Decl *> members, bool needComma,
 }
 
 void PrintAST::printGenericDeclGenericParams(GenericContext *decl) {
-  if (decl->getGenericParams())
+  if (decl->isGeneric())
     if (auto GenericSig = decl->getGenericSignature())
       printGenericSignature(GenericSig, PrintParams | InnermostOnly);
 }
 
 void PrintAST::printGenericDeclGenericRequirements(GenericContext *decl) {
-  if (decl->getGenericParams())
-    if (auto GenericSig = decl->getGenericSignature())
-      printGenericSignature(GenericSig, PrintRequirements | InnermostOnly);
+  if (decl->isGeneric()) {
+    if (auto genericSig = decl->getGenericSignature()) {
+      auto *baseGenericSig = decl->getParent()
+          ->getGenericSignatureOfContext();
+      printGenericSignature(genericSig, PrintRequirements,
+                            [baseGenericSig](const Requirement &req) {
+                              if (baseGenericSig)
+                                return !baseGenericSig->isRequirementSatisfied(req);
+                              return true;
+                            });
+    }
+  }
 }
 
 void PrintAST::printInherited(const Decl *decl) {
@@ -2115,7 +2123,7 @@ void PrintAST::printExtension(ExtensionDecl *decl) {
       auto *baseGenericSig = decl->getExtendedNominal()->getGenericSignature();
       assert(baseGenericSig &&
              "an extension can't be generic if the base type isn't");
-      printGenericSignature(genericSig, PrintRequirements | InnermostOnly,
+      printGenericSignature(genericSig, PrintRequirements,
                             [baseGenericSig](const Requirement &req) -> bool {
         // Only include constraints that are not satisfied by the base type.
         return !baseGenericSig->isRequirementSatisfied(req);

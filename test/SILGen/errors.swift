@@ -262,7 +262,7 @@ class HasThrowingInit {
   }
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s6errors15HasThrowingInit{{.*}} : $@convention(method) (Int, @thick HasThrowingInit.Type) -> (@owned HasThrowingInit, @error Error)
+// CHECK-LABEL: sil hidden [exact_self_class] [ossa] @$s6errors15HasThrowingInit{{.*}} : $@convention(method) (Int, @thick HasThrowingInit.Type) -> (@owned HasThrowingInit, @error Error)
 // CHECK:      [[SELF:%.*]] = alloc_ref $HasThrowingInit
 // CHECK:      [[T0:%.*]] = function_ref @$s6errors15HasThrowingInit{{.*}}c : $@convention(method) (Int, @owned HasThrowingInit) -> (@owned HasThrowingInit, @error Error)
 // CHECK-NEXT: try_apply [[T0]](%0, [[SELF]]) : $@convention(method) (Int, @owned HasThrowingInit) -> (@owned HasThrowingInit, @error Error), normal bb1, error bb2

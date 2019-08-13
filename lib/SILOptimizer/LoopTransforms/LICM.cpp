@@ -764,6 +764,11 @@ public:
 
   void run() override {
     SILFunction *F = getFunction();
+
+    // If our function has ownership, skip it.
+    if (F->hasOwnership())
+      return;
+
     SILLoopAnalysis *LA = PM->getAnalysis<SILLoopAnalysis>();
     SILLoopInfo *LoopInfo = LA->get(F);
 

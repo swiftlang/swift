@@ -2441,6 +2441,13 @@ public:
           abort();
         }
       }
+      //      if (auto *VD = dyn_cast<VarDecl>(ASD->getStorage())) {
+      //        const bool foundIt =
+      //            llvm::any_of(vd->getAllAccessors(),
+      //                         [&](AccessorDecl *VDA) { return VDA == ASD; });
+      //        Out << "Accessor for a VarDecl must be listed in its accessors";
+      //        abort();
+      //      }
 
       verifyCheckedBase(ASD);
     }
@@ -3282,16 +3289,11 @@ public:
             NumDestructors++;
           }
         }
-        if (NumDestructors != 1) {
-          Out << "every class should have exactly one destructor, "
+        if (NumDestructors > 1) {
+          Out << "every class should have at most one destructor, "
                  "explicitly provided or created by the type checker\n";
           abort();
         }
-      }
-      
-      if (!CD->hasDestructor()) {
-        Out << "every class's 'has destructor' bit must be set\n";
-        abort();
       }
 
       verifyCheckedBase(CD);
@@ -3637,8 +3639,8 @@ public:
 
     void checkSourceRanges(Decl *D) {
       PrettyStackTraceDecl debugStack("verifying ranges", D);
-
-      if (!D->getSourceRange().isValid()) {
+      const auto SR = D->getSourceRange();
+      if (!SR.isValid()) {
         // We don't care about source ranges on implicitly-generated
         // decls.
         if (D->isImplicit())
@@ -3649,8 +3651,16 @@ public:
         Out << "\n";
         abort();
       }
-      checkSourceRanges(D->getSourceRange(), Parent,
-                        [&]{ D->print(Out); });
+      // ASTScope lookup depends on Decls having correct ordering.
+      // Move the order check to isGoodSourceRange after extending
+      // the invariant to Exprs, etc., per rdar://53637494
+      if (Ctx.SourceMgr.isBeforeInBuffer(SR.End, SR.Start)) {
+        Out << "backwards source range for decl: ";
+        D->print(Out);
+        Out << "\n";
+        abort();
+      }
+      checkSourceRanges(SR, Parent, [&] { D->print(Out); });
     }
 
     /// Verify that the given source ranges is contained within the

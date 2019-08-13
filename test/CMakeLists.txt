@@ -60,7 +60,7 @@ function(get_test_dependencies SDK result_var_name)
     list(APPEND deps_binaries FileCheck arcmt-test c-arcmt-test c-index-test
          clang llc llvm-cov llvm-dwarfdump llvm-link llvm-as llvm-dis
          llvm-bcanalyzer llvm-nm llvm-readobj llvm-profdata count not
-         llvm-strings dsymutil)
+         llvm-strings llvm-readelf dsymutil)
   endif()
 
   if(("${SDK}" STREQUAL "IOS") OR

@@ -289,27 +289,6 @@ public class ClassWithResilientThenEmpty {
 // CHECK-NEXT: [[FIELD_VALUE:%.*]] = load i32, i32* [[FIELD_PAYLOAD]]
 // CHECK: ret i32 [[FIELD_VALUE]]
 
-// ClassWithResilientProperty metadata accessor
-
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.metadata_response @"$s16class_resilience26ClassWithResilientPropertyCMa"(
-// CHECK:      [[CACHE:%.*]] = load %swift.type*, %swift.type** getelementptr inbounds ({ %swift.type*, i8* }, { %swift.type*, i8* }* @"$s16class_resilience26ClassWithResilientPropertyCMl", i32 0, i32 0)
-// CHECK-NEXT: [[COND:%.*]] = icmp eq %swift.type* [[CACHE]], null
-// CHECK-NEXT: br i1 [[COND]], label %cacheIsNull, label %cont
-
-// CHECK: cacheIsNull:
-// CHECK-NEXT: [[RESPONSE:%.*]] = call swiftcc %swift.metadata_response @swift_getSingletonMetadata([[INT]] %0, %swift.type_descriptor* bitcast ({{.*}} @"$s16class_resilience26ClassWithResilientPropertyCMn" to %swift.type_descriptor*))
-// CHECK-NEXT: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[RESPONSE]], 0
-// CHECK-NEXT: [[STATUS:%.*]] = extractvalue %swift.metadata_response [[RESPONSE]], 1
-// CHECK-NEXT: br label %cont
-
-// CHECK: cont:
-// CHECK-NEXT: [[NEW_METADATA:%.*]] = phi %swift.type* [ [[CACHE]], %entry ], [ [[METADATA]], %cacheIsNull ]
-// CHECK-NEXT: [[NEW_STATUS:%.*]] = phi [[INT]] [ 0, %entry ], [ [[STATUS]], %cacheIsNull ]
-// CHECK-NEXT: [[T0:%.*]] = insertvalue %swift.metadata_response undef, %swift.type* [[NEW_METADATA]], 0
-// CHECK-NEXT: [[T1:%.*]] = insertvalue %swift.metadata_response [[T0]], [[INT]] [[NEW_STATUS]], 1
-// CHECK-NEXT: ret %swift.metadata_response [[T1]]
-
-
 // ClassWithResilientlySizedProperty.color getter
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i32 @"$s16class_resilience33ClassWithResilientlySizedPropertyC5colors5Int32Vvg"(%T16class_resilience33ClassWithResilientlySizedPropertyC* swiftself)
@@ -320,26 +299,6 @@ public class ClassWithResilientThenEmpty {
 // CHECK-NEXT: [[FIELD_PAYLOAD:%.*]] = getelementptr inbounds %Ts5Int32V, %Ts5Int32V* [[FIELD_PTR]], i32 0, i32 0
 // CHECK-NEXT: [[FIELD_VALUE:%.*]] = load i32, i32* [[FIELD_PAYLOAD]]
 // CHECK:      ret i32 [[FIELD_VALUE]]
-
-// ClassWithResilientlySizedProperty metadata accessor
-
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.metadata_response @"$s16class_resilience33ClassWithResilientlySizedPropertyCMa"(
-// CHECK:      [[CACHE:%.*]] = load %swift.type*, %swift.type** getelementptr inbounds ({ %swift.type*, i8* }, { %swift.type*, i8* }* @"$s16class_resilience33ClassWithResilientlySizedPropertyCMl", i32 0, i32 0)
-// CHECK-NEXT: [[COND:%.*]] = icmp eq %swift.type* [[CACHE]], null
-// CHECK-NEXT: br i1 [[COND]], label %cacheIsNull, label %cont
-
-// CHECK: cacheIsNull:
-// CHECK-NEXT: [[RESPONSE:%.*]] = call swiftcc %swift.metadata_response @swift_getSingletonMetadata([[INT]] %0, %swift.type_descriptor* bitcast ({{.*}} @"$s16class_resilience33ClassWithResilientlySizedPropertyCMn" to %swift.type_descriptor*))
-// CHECK-NEXT: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[RESPONSE]], 0
-// CHECK-NEXT: [[STATUS:%.*]] = extractvalue %swift.metadata_response [[RESPONSE]], 1
-// CHECK-NEXT: br label %cont
-
-// CHECK: cont:
-// CHECK-NEXT: [[NEW_METADATA:%.*]] = phi %swift.type* [ [[CACHE]], %entry ], [ [[METADATA]], %cacheIsNull ]
-// CHECK-NEXT: [[NEW_STATUS:%.*]] = phi [[INT]] [ 0, %entry ], [ [[STATUS]], %cacheIsNull ]
-// CHECK-NEXT: [[T0:%.*]] = insertvalue %swift.metadata_response undef, %swift.type* [[NEW_METADATA]], 0
-// CHECK-NEXT: [[T1:%.*]] = insertvalue %swift.metadata_response [[T0]], [[INT]] [[NEW_STATUS]], 1
-// CHECK-NEXT: ret %swift.metadata_response [[T1]]
 
 
 // ClassWithIndirectResilientEnum.color getter
@@ -402,7 +361,7 @@ public class ClassWithResilientThenEmpty {
 
 // ResilientGenericOutsideParent.genericExtensionMethod()
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.type* @"$s15resilient_class29ResilientGenericOutsideParentC0B11_resilienceE22genericExtensionMethodxmyF"(%T15resilient_class29ResilientGenericOutsideParentC* swiftself) #0 {
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.type* @"$s15resilient_class29ResilientGenericOutsideParentC0B11_resilienceE22genericExtensionMethodxmyF"(%T15resilient_class29ResilientGenericOutsideParentC* swiftself) {{.*}} {
 // CHECK:      [[ISA_ADDR:%.*]] = bitcast %T15resilient_class29ResilientGenericOutsideParentC* %0 to %swift.type**
 // CHECK-NEXT: [[ISA:%.*]] = load %swift.type*, %swift.type** [[ISA_ADDR]]
 // CHECK:      [[BASE:%.*]] = load [[INT]], [[INT]]* getelementptr inbounds ([[BOUNDS]], [[BOUNDS]]* @"$s15resilient_class29ResilientGenericOutsideParentCMo", i32 0, i32 0)
@@ -412,6 +371,27 @@ public class ClassWithResilientThenEmpty {
 // CHECK-NEXT: [[GENERIC_PARAM_ADDR:%.*]] = bitcast i8* [[GENERIC_PARAM_TMP]] to %swift.type**
 // CHECK-NEXT: [[GENERIC_PARAM:%.*]] = load %swift.type*, %swift.type** [[GENERIC_PARAM_ADDR]]
 // CHECK:       ret %swift.type* [[GENERIC_PARAM]]
+
+
+// ClassWithResilientProperty metadata accessor
+
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.metadata_response @"$s16class_resilience26ClassWithResilientPropertyCMa"(
+// CHECK:      [[CACHE:%.*]] = load %swift.type*, %swift.type** getelementptr inbounds ({ %swift.type*, i8* }, { %swift.type*, i8* }* @"$s16class_resilience26ClassWithResilientPropertyCMl", i32 0, i32 0)
+// CHECK-NEXT: [[COND:%.*]] = icmp eq %swift.type* [[CACHE]], null
+// CHECK-NEXT: br i1 [[COND]], label %cacheIsNull, label %cont
+
+// CHECK: cacheIsNull:
+// CHECK-NEXT: [[RESPONSE:%.*]] = call swiftcc %swift.metadata_response @swift_getSingletonMetadata([[INT]] %0, %swift.type_descriptor* bitcast ({{.*}} @"$s16class_resilience26ClassWithResilientPropertyCMn" to %swift.type_descriptor*))
+// CHECK-NEXT: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[RESPONSE]], 0
+// CHECK-NEXT: [[STATUS:%.*]] = extractvalue %swift.metadata_response [[RESPONSE]], 1
+// CHECK-NEXT: br label %cont
+
+// CHECK: cont:
+// CHECK-NEXT: [[NEW_METADATA:%.*]] = phi %swift.type* [ [[CACHE]], %entry ], [ [[METADATA]], %cacheIsNull ]
+// CHECK-NEXT: [[NEW_STATUS:%.*]] = phi [[INT]] [ 0, %entry ], [ [[STATUS]], %cacheIsNull ]
+// CHECK-NEXT: [[T0:%.*]] = insertvalue %swift.metadata_response undef, %swift.type* [[NEW_METADATA]], 0
+// CHECK-NEXT: [[T1:%.*]] = insertvalue %swift.metadata_response [[T0]], [[INT]] [[NEW_STATUS]], 1
+// CHECK-NEXT: ret %swift.metadata_response [[T1]]
 
 
 // ClassWithResilientProperty metadata initialization function
@@ -466,6 +446,28 @@ public class ClassWithResilientThenEmpty {
 // CHECK-NEXT:   [[RESULT:%.*]] = call i8* @swift_lookUpClassMethod(%swift.type* %0, %swift.method_descriptor* %1, %swift.type_descriptor* bitcast (<{{.*}}>* @"$s16class_resilience26ClassWithResilientPropertyCMn" to %swift.type_descriptor*))
 // CHECK-NEXT:   ret i8* [[RESULT]]
 // CHECK-NEXT: }
+
+
+// ClassWithResilientlySizedProperty metadata accessor
+
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.metadata_response @"$s16class_resilience33ClassWithResilientlySizedPropertyCMa"(
+// CHECK:      [[CACHE:%.*]] = load %swift.type*, %swift.type** getelementptr inbounds ({ %swift.type*, i8* }, { %swift.type*, i8* }* @"$s16class_resilience33ClassWithResilientlySizedPropertyCMl", i32 0, i32 0)
+// CHECK-NEXT: [[COND:%.*]] = icmp eq %swift.type* [[CACHE]], null
+// CHECK-NEXT: br i1 [[COND]], label %cacheIsNull, label %cont
+
+// CHECK: cacheIsNull:
+// CHECK-NEXT: [[RESPONSE:%.*]] = call swiftcc %swift.metadata_response @swift_getSingletonMetadata([[INT]] %0, %swift.type_descriptor* bitcast ({{.*}} @"$s16class_resilience33ClassWithResilientlySizedPropertyCMn" to %swift.type_descriptor*))
+// CHECK-NEXT: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[RESPONSE]], 0
+// CHECK-NEXT: [[STATUS:%.*]] = extractvalue %swift.metadata_response [[RESPONSE]], 1
+// CHECK-NEXT: br label %cont
+
+// CHECK: cont:
+// CHECK-NEXT: [[NEW_METADATA:%.*]] = phi %swift.type* [ [[CACHE]], %entry ], [ [[METADATA]], %cacheIsNull ]
+// CHECK-NEXT: [[NEW_STATUS:%.*]] = phi [[INT]] [ 0, %entry ], [ [[STATUS]], %cacheIsNull ]
+// CHECK-NEXT: [[T0:%.*]] = insertvalue %swift.metadata_response undef, %swift.type* [[NEW_METADATA]], 0
+// CHECK-NEXT: [[T1:%.*]] = insertvalue %swift.metadata_response [[T0]], [[INT]] [[NEW_STATUS]], 1
+// CHECK-NEXT: ret %swift.metadata_response [[T1]]
+
 
 
 // ClassWithResilientlySizedProperty metadata initialization function

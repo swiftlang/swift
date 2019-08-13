@@ -418,8 +418,9 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
       // SWIFT_ENABLE_TENSORFLOW
       (unsigned)numSpecAttrs, (unsigned)numDiffAttrs,
       (unsigned)F.hasOwnership(),
-      F.isWeakLinked(), (unsigned)F.isDynamicallyReplaceable(), FnID,
-      replacedFunctionID, genericEnvID, clangNodeOwnerID, SemanticsIDs);
+      F.isWeakLinked(), (unsigned)F.isDynamicallyReplaceable(),
+      (unsigned)F.isExactSelfClass(),
+      FnID, replacedFunctionID, genericEnvID, clangNodeOwnerID, SemanticsIDs);
 
   if (NoBody)
     return;

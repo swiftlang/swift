@@ -318,8 +318,8 @@ ResilienceExpansion DeclContext::getResilienceExpansion() const {
 }
 
 llvm::Expected<ResilienceExpansion>
-  swift::ResilienceExpansionRequest::evaluate(Evaluator &eval,
-                                              DeclContext *context) const {
+swift::ResilienceExpansionRequest::evaluate(Evaluator &evaluator,
+                                            DeclContext *context) const {
   for (const auto *dc = context->getLocalContext(); dc && dc->isLocalContext();
        dc = dc->getParent()) {
     // Default argument initializer contexts have their resilience expansion
