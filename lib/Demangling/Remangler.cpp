@@ -309,6 +309,9 @@ class Remangler : public RemanglerBase {
   void mangleAnyProtocolConformance(Node *node);
 
   void mangleKeyPathThunkHelper(Node *node, StringRef op);
+  // SWIFT_ENABLE_TENSORFLOW
+  void mangleAutoDiffAssociatedFunctionHelper(Node *node, StringRef op);
+  // SWIFT_ENABLE_TENSORFLOW END
 
 #define NODE(ID)                                                        \
   void mangle##ID(Node *node);
@@ -1951,6 +1954,48 @@ void Remangler::mangleReabstractionThunkHelperWithSelf(Node *node) {
   mangleChildNodesReversed(node);
   Buffer << "Ty";
 }
+
+// SWIFT_ENABLE_TENSORFLOW
+void Remangler::mangleAutoDiffParameterIndices(Node *node) {
+  Buffer << 'p';
+  for (unsigned i = 0, n = node->getNumChildren(); i != n; ++i) {
+    auto child = node->getChild(i);
+    Buffer << child->getIndex();
+    if (i != n - 1)
+      Buffer << '_';
+  }
+}
+
+void Remangler::mangleAutoDiffResultIndex(Node *node) {
+  Buffer << 'r' << node->getIndex();
+}
+
+void
+Remangler::mangleAutoDiffAssociatedFunctionHelper(Node *node, StringRef op) {
+  // TODO(TF-680): Mangle `[differentiable]` atttribute requirements as well.
+  assert(node->getNumChildren() == 3);
+  mangleChildNode(node, 0); // original function
+  Buffer << op;
+  mangleChildNode(node, 1); // wrt parameter indices
+  mangleChildNode(node, 2); // result index
+}
+
+void Remangler::mangleAutoDiffJVP(Node *node) {
+  mangleAutoDiffAssociatedFunctionHelper(node, "Tz");
+}
+
+void Remangler::mangleAutoDiffVJP(Node *node) {
+  mangleAutoDiffAssociatedFunctionHelper(node, "TZ");
+}
+
+void Remangler::mangleAutoDiffDifferential(Node *node) {
+  mangleAutoDiffAssociatedFunctionHelper(node, "Tu");
+}
+
+void Remangler::mangleAutoDiffPullback(Node *node) {
+  mangleAutoDiffAssociatedFunctionHelper(node, "TU");
+}
+// SWIFT_ENABLE_TENSORFLOW END
 
 void Remangler::mangleReadAccessor(Node *node) {
   mangleAbstractStorage(node->getFirstChild(), "r");
