@@ -437,7 +437,7 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI) {
          && "rewriting multi-field box not implemented");
   auto *ASI = Builder.createAllocStack(
       ABI->getLoc(), ABI->getBoxType()->getFieldType(ABI->getModule(), 0),
-      ABI->getVarInfo());
+      ABI->getVarInfo(), ABI->hasDynamicLifetime());
 
   // Transfer a mark_uninitialized if we have one.
   SILValue StackBox = ASI;
