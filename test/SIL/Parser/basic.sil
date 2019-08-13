@@ -1191,6 +1191,18 @@ entry(%0 : $Builtin.Int1):
   return %1 : $()
 }
 
+// CHECK-LABEL: sil @test_dynamic_lifetime_flag : $@convention(thin) () -> ()
+sil @test_dynamic_lifetime_flag : $() -> () {
+bb0:
+  // CHECK: alloc_box [dynamic_lifetime] $<τ_0_0> { var τ_0_0 } <AnyObject>
+  %0 = alloc_box [dynamic_lifetime] $<τ_0_0> { var τ_0_0 } <AnyObject>
+  // CHECK: alloc_stack [dynamic_lifetime] $AnyObject
+  %1 = alloc_stack [dynamic_lifetime] $AnyObject
+  dealloc_stack %1 : $*AnyObject
+  %2 = tuple ()
+  return %2 : $()
+}
+
 sil_global @staticProp: $Int
 
 // CHECK-LABEL: sil private @globalinit_func0 : $@convention(thin) () -> () {
