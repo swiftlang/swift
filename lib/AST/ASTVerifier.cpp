@@ -748,17 +748,17 @@ public:
     void cleanup(NODE *fn) {                                    \
       popFunction(fn);                                          \
     }
-#define SCOPE_LIKE(NODE)                                        \
-    bool shouldVerify(NODE *fn) {                               \
-      pushScope(fn);                                            \
-      if (fn->hasLazyMembers())                                 \
+#define TYPE_LIKE(NODE)                                         \
+    bool shouldVerify(NODE *dc) {                               \
+      pushScope(dc);                                            \
+      if (dc->hasLazyMembers())                                 \
         return false;                                           \
-      if (fn->getASTContext().hasUnparsedMembers(fn))           \
+      if (dc->hasUnparsedMembers())                             \
         return false;                                           \
-      return shouldVerify(cast<ASTNodeBase<NODE*>::BaseTy>(fn));\
+      return shouldVerify(cast<ASTNodeBase<NODE*>::BaseTy>(dc));\
     }                                                           \
-    void cleanup(NODE *fn) {                                    \
-      popScope(fn);                                             \
+    void cleanup(NODE *dc) {                                    \
+      popScope(dc);                                             \
     }
 
     FUNCTION_LIKE(AbstractClosureExpr)
@@ -767,10 +767,10 @@ public:
     FUNCTION_LIKE(FuncDecl)
     FUNCTION_LIKE(EnumElementDecl)
     FUNCTION_LIKE(SubscriptDecl)
-    SCOPE_LIKE(NominalTypeDecl)
-    SCOPE_LIKE(ExtensionDecl)
+    TYPE_LIKE(NominalTypeDecl)
+    TYPE_LIKE(ExtensionDecl)
 
-#undef SCOPE_LIKE
+#undef TYPE_LIKE
 #undef FUNCTION_LIKE
 
     bool shouldVerify(BraceStmt *BS) {
