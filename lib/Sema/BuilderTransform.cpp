@@ -52,7 +52,8 @@ private:
   /// Produce a builder call to the given named function with the given arguments.
   Expr *buildCallIfWanted(SourceLoc loc,
                           Identifier fnName, ArrayRef<Expr *> args,
-                          ArrayRef<Identifier> argLabels = {}) {
+                          ArrayRef<Identifier> argLabels,
+                          bool allowOneWay) {
     if (!wantExpr)
       return nullptr;
 
@@ -86,7 +87,7 @@ private:
                                     /*trailing closure*/ nullptr,
                                     /*implicit*/true);
 
-    if (ctx.LangOpts.FunctionBuilderOneWayConstraints) {
+    if (ctx.LangOpts.FunctionBuilderOneWayConstraints && allowOneWay) {
       // Form a one-way constraint to prevent backward propagation.
       result = new (ctx) OneWayExpr(result);
     }
@@ -176,7 +177,9 @@ public:
 
     // Call Builder.buildBlock(... args ...)
     return buildCallIfWanted(braceStmt->getStartLoc(),
-                             ctx.Id_buildBlock, expressions);
+                             ctx.Id_buildBlock, expressions,
+                             /*argLabels=*/{ },
+                             /*allowOneWay=*/true);
   }
 
   Expr *visitReturnStmt(ReturnStmt *stmt) {
@@ -201,7 +204,8 @@ public:
     if (!arg)
       return nullptr;
 
-    return buildCallIfWanted(doStmt->getStartLoc(), ctx.Id_buildDo, arg);
+    return buildCallIfWanted(doStmt->getStartLoc(), ctx.Id_buildDo, arg,
+                             /*argLabels=*/{ }, /*allowOneWay=*/true);
   }
 
   CONTROL_FLOW_STMT(Yield)
@@ -286,7 +290,12 @@ public:
     // so we just need to call `buildIf` now, since we're at the top level.
     if (isOptional) {
       chainExpr = buildCallIfWanted(ifStmt->getStartLoc(),
-                                    ctx.Id_buildIf, chainExpr);
+                                    ctx.Id_buildIf, chainExpr,
+                                    /*argLabels=*/{ },
+                                    /*allowOneWay=*/true);
+    } else if (ctx.LangOpts.FunctionBuilderOneWayConstraints) {
+      // Form a one-way constraint to prevent backward propagation.
+      chainExpr = new (ctx) OneWayExpr(chainExpr);
     }
 
     return chainExpr;
@@ -406,7 +415,8 @@ public:
       bool isSecond = (path & 1);
       operand = buildCallIfWanted(operand->getStartLoc(),
                                   ctx.Id_buildEither, operand,
-                                  {isSecond ? ctx.Id_second : ctx.Id_first});
+                                  {isSecond ? ctx.Id_second : ctx.Id_first},
+                                  /*allowOneWay=*/false);
     }
 
     // Inject into Optional if required.  We'll be adding the call to

@@ -8,6 +8,10 @@ enum Either<T,U> {
 
 @_functionBuilder
 struct TupleBuilder {
+  static func buildBlock<T1>(_ t1: T1) -> T1 {
+    return t1
+  }
+
   static func buildBlock<T1, T2>(_ t1: T1, _ t2: T2) -> (T1, T2) {
     return (t1, t2)
   }
@@ -44,16 +48,18 @@ func tuplify<C: Collection, T>(_ collection: C, @TupleBuilder body: (C.Element) 
 }
 
 // CHECK: ---Connected components---
-// CHECK-NEXT:  0: $T1 $T2 $T3 $T5 $T6 $T7 $T8 $T61 depends on 1
-// CHECK-NEXT:  1: $T9 $T11 $T13 $T16 $T30 $T54 $T55 $T56 $T57 $T58 $T59 $T60 depends on 2, 3, 4, 5, 6
-// CHECK-NEXT:  6: $T31 $T32 $T34 $T35 $T36 $T47 $T48 $T49 $T50 $T51 $T52 $T53 depends on 7
-// CHECK-NEXT:  7: $T37 $T39 $T43 $T44 $T45 $T46 depends on 8, 9
-// CHECK-NEXT:  9: $T40 $T41 $T42
-// CHECK-NEXT:  8: $T38
-// CHECK-NEXT:  5: $T17 $T18 $T19 $T20 $T21 $T22 $T23 $T24 $T25 $T26 $T27 $T28 $T29
-// CHECK-NEXT:  4: $T14 $T15
-// CHECK-NEXT:  3: $T12
-// CHECK-NEXT:  2: $T10
+// CHECK-NEXT: 0: $T1 $T2 $T3 $T5 $T6 $T7 $T8 $T69 depends on 1
+// CHECK-NEXT: 1: $T9 $T11 $T13 $T16 $T30 $T62 $T63 $T64 $T65 $T66 $T67 $T68 depends on 2, 3, 4, 5, 6
+// CHECK-NEXT: 6: $T32 $T43 $T44 $T45 $T46 $T47 $T57 $T58 $T59 $T60 $T61 depends on 7, 10
+// CHECK-NEXT: 10: $T48 $T54 $T55 $T56 depends on 11
+// CHECK-NEXT: 11: $T49 $T50 $T51 $T52 $T53
+// CHECK-NEXT: 7: $T33 $T35 $T39 $T40 $T41 $T42 depends on 8, 9
+// CHECK-NEXT: 9: $T36 $T37 $T38
+// CHECK-NEXT: 8: $T34
+// CHECK-NEXT: 5: $T17 $T18 $T19 $T20 $T21 $T22 $T23 $T24 $T25 $T26 $T27 $T28 $T29
+// CHECK-NEXT: 4: $T14 $T15
+// CHECK-NEXT: 3: $T12
+// CHECK-NEXT: 2: $T10
 let names = ["Alice", "Bob", "Charlie"]
 let b = true
 print(
@@ -67,5 +73,7 @@ print(
     if b {
       2.71828
       ["if", "stmt"]
+    } else {
+      [1, 2, 3, 4]
     }
   })
