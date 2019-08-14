@@ -112,10 +112,12 @@ static bool needToRelocate(SectionRef S) {
       "swift5_typeref", "swift5_reflstr", "swift5_assocty", "swift5_replace",
       "swift5_type_metadata", "swift5_fieldmd", "swift5_capture", "swift5_builtin"
     };
-    StringRef Name;
-    if (auto EC = S.getName(Name))
-      reportError(EC);
-    return ELFSectionsList.count(Name);
+    llvm::Expected<llvm::StringRef> NameOrErr = S.getName();
+    if (!NameOrErr) {
+      reportError(errorToErrorCode(NameOrErr.takeError()));
+      return false;
+    }
+    return ELFSectionsList.count(*NameOrErr);
   }
 
   return true;
