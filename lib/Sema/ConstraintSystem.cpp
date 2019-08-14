@@ -2739,6 +2739,43 @@ bool constraints::isAutoClosureArgument(Expr *argExpr) {
   return false;
 }
 
+bool constraints::conformsToKnownProtocol(ConstraintSystem &cs, Type type,
+                                          KnownProtocolKind protocol) {
+  if (auto *proto = cs.TC.getProtocol(SourceLoc(), protocol))
+    return bool(TypeChecker::conformsToProtocol(
+        type, proto, cs.DC, ConformanceCheckFlags::InExpression));
+  return false;
+}
+
+/// Check whether given type conforms to `RawPepresentable` protocol
+/// and return the witness type.
+Type constraints::isRawRepresentable(ConstraintSystem &cs, Type type) {
+  auto &TC = cs.TC;
+  auto *DC = cs.DC;
+
+  auto rawReprType =
+      TC.getProtocol(SourceLoc(), KnownProtocolKind::RawRepresentable);
+  if (!rawReprType)
+    return Type();
+
+  auto conformance = TypeChecker::conformsToProtocol(
+      type, rawReprType, DC, ConformanceCheckFlags::InExpression);
+  if (!conformance)
+    return Type();
+
+  return conformance->getTypeWitnessByName(type, TC.Context.Id_RawValue);
+}
+
+Type constraints::isRawRepresentable(
+    ConstraintSystem &cs, Type type,
+    KnownProtocolKind rawRepresentableProtocol) {
+  Type rawTy = isRawRepresentable(cs, type);
+  if (!rawTy || !conformsToKnownProtocol(cs, rawTy, rawRepresentableProtocol))
+    return Type();
+
+  return rawTy;
+}
+
 void ConstraintSystem::generateConstraints(
     SmallVectorImpl<Constraint *> &constraints, Type type,
     ArrayRef<OverloadChoice> choices, DeclContext *useDC,

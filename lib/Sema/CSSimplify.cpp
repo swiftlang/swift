@@ -1325,8 +1325,15 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   // A non-throwing function can be a subtype of a throwing function.
   if (func1->throws() != func2->throws()) {
     // Cannot drop 'throws'.
-    if (func1->throws() || kind < ConstraintKind::Subtype)
-      return getTypeMatchFailure(locator);
+    if (func1->throws() || kind < ConstraintKind::Subtype) {
+      if (!shouldAttemptFixes())
+        return getTypeMatchFailure(locator);
+
+      auto *fix = DropThrowsAttribute::create(*this, func1, func2,
+                                              getConstraintLocator(locator));
+      if (recordFix(fix))
+        return getTypeMatchFailure(locator);
+    }
   }
 
   // A non-@noescape function type can be a subtype of a @noescape function
@@ -1768,7 +1775,7 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
 
     if (!recordFix(fix)) {
       // Increase the solution's score for each mismtach this fixes.
-      increaseScore(SK_Fix, mismatches.size());
+      increaseScore(SK_Fix, mismatches.size() - 1);
       return getTypeMatchSuccess();
     }
     return result;
@@ -2533,7 +2540,41 @@ bool ConstraintSystem::repairFailures(
       auto *fix = AllowTupleTypeMismatch::create(*this, lhs, rhs,
                                                  getConstraintLocator(locator));
       conversionsOrFixes.push_back(fix);
+      break;
     }
+
+    // If either side is not yet resolved, it's too early for this fix.
+    if (lhs->isTypeVariableOrMember() || rhs->isTypeVariableOrMember())
+      break;
+
+    // If contextual type is an existential value, it's handled
+    // after conversion restriction is attempted.
+    if (rhs->isExistentialType())
+      break;
+
+    // TODO(diagnostics): This is a problem related to `inout` mismatch,
+    // in argument position, and we got here from CSDiag. Once
+    // argument-to-pararameter conversion failures are implemented,
+    // this check could be removed.
+    if (lhs->is<InOutType>() || rhs->is<InOutType>())
+      break;
+
+    // If there is a deep equality, superclass restriction
+    // already recorded, let's not add bother ignoring
+    // contextual type, because actual fix is going to
+    // be perform once restriction is applied.
+    if (llvm::any_of(conversionsOrFixes,
+                     [](const RestrictionOrFix &entry) -> bool {
+                       return entry.IsRestriction &&
+                              (entry.getRestriction() ==
+                                   ConversionRestrictionKind::Superclass ||
+                               entry.getRestriction() ==
+                                   ConversionRestrictionKind::DeepEquality);
+                     }))
+      break;
+
+    conversionsOrFixes.push_back(IgnoreContextualType::create(
+        *this, lhs, rhs, getConstraintLocator(locator)));
     break;
   }
 
@@ -7130,13 +7171,30 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::RemoveAddressOf:
   case FixKind::SkipSameTypeRequirement:
   case FixKind::SkipSuperclassRequirement:
-  case FixKind::ContextualMismatch:
   case FixKind::AddMissingArguments:
   case FixKind::DefaultArgumentTypeMismatch:
   case FixKind::SkipUnhandledConstructInFunctionBuilder:
   case FixKind::UsePropertyWrapper:
   case FixKind::UseWrappedValue: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
+  }
+
+  case FixKind::ContextualMismatch: {
+    if (recordFix(fix))
+      return SolutionKind::Error;
+
+    // If type produced by expression is a function type
+    // with result type matching contextual, it should have
+    // been diagnosed as "missing explicit call", let's
+    // increase the score to make sure that we don't impede that.
+    if (auto *fnType = type1->getAs<FunctionType>()) {
+      auto result = matchTypes(fnType->getResult(), type2, matchKind,
+                               TMF_ApplyingFix, locator);
+      if (result == SolutionKind::Solved)
+        increaseScore(SK_Fix);
+    }
+
+    return SolutionKind::Solved;
   }
 
   case FixKind::UseSubscriptOperator:

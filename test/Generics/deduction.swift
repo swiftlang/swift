@@ -65,7 +65,7 @@ func takeTuples<T, U>(_: (T, U), _: (U, T)) {
 func useTuples(_ x: Int, y: Float, z: (Float, Int)) {
   takeTuples((x, y), (y, x))
 
-  takeTuples((x, y), (x, y)) // expected-error{{cannot convert value of type 'Int' to expected argument type 'Float'}}
+  takeTuples((x, y), (x, y)) // expected-error{{cannot convert value of type '(Int, Float)' to expected argument type '(Float, Int)'}}
 
   // FIXME: Use 'z', which requires us to fix our tuple-conversion
   // representation.
@@ -267,7 +267,7 @@ func testGetVectorSize(_ vi: MyVector<Int>, vf: MyVector<Float>) {
   i = getVectorSize(vi)
   i = getVectorSize(vf)
 
-  getVectorSize(i) // expected-error{{cannot convert value of type 'Int' to expected argument type 'MyVector<_>'}}
+  getVectorSize(i) // expected-error{{cannot convert value of type 'Int' to expected argument type 'MyVector<T>'}}
 
   var x : X, y : Y
   x = ovlVector(vi)
