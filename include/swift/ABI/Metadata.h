@@ -2340,6 +2340,12 @@ public:
     return TypeRef.getTypeDescriptor(getTypeKind());
   }
 
+  const TargetContextDescriptor<Runtime> **_getTypeDescriptorLocation() const {
+    if (getTypeKind() != TypeReferenceKind::IndirectTypeDescriptor)
+      return nullptr;
+    return TypeRef.IndirectTypeDescriptor.get();
+  }
+
   /// Retrieve the context of a retroactive conformance.
   const TargetContextDescriptor<Runtime> *getRetroactiveContext() const {
     if (!Flags.isRetroactive()) return nullptr;
