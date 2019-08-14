@@ -3724,8 +3724,7 @@ for host in "${ALL_HOSTS[@]}"; do
             # Exclude shell scripts and static archives.
             (cd "${INSTALL_SYMROOT}" &&
              find ./"${CURRENT_PREFIX}" -perm -0111 -type f -print | \
-               grep -v crashlog.py | \
-               grep -v symbolication.py | \
+               grep -v '.py$' | \
                grep -v '.a$' | \
                xargs -n 1 -P ${BUILD_JOBS} $(xcrun_find_tool dsymutil))
 
