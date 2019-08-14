@@ -627,8 +627,7 @@ Parser::TypeResult Parser::parseTypeIdentifier() {
     // If there is a keyword at the start of a new line, we won't want to
     // skip it as a recovery but rather keep it.
     if (Tok.isKeyword() && !Tok.isAtStartOfLine()) {
-      SmallVector<ParsedSyntax, 0> CodeComplete{consumeTokenSyntax(tok::code_complete)};
-      return makeParsedError<ParsedTypeSyntax>(CodeComplete);
+      return makeParsedError<ParsedTypeSyntax>({consumeTokenSyntax()});
     }
 
     return makeParsedErrorEmpty<ParsedTypeSyntax>();
