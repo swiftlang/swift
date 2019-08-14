@@ -126,8 +126,6 @@ TypeRepr *ASTGen::generate(TypeSyntax Type, SourceLoc &Loc) {
   if (!TypeAST && hasType(advanceLocBegin(Loc, Type)))
     TypeAST = getType(advanceLocBegin(Loc, Type));
 
-  assert(TypeAST && "Unhandled type generation!");
-
   return cacheType(Type, TypeAST);
 }
 
