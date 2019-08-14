@@ -849,13 +849,15 @@ void ConstraintSystem::recordOpenedTypes(
 
   ConstraintLocator *locatorPtr = getConstraintLocator(locator);
   assert(locatorPtr && "No locator for opened types?");
+#if false
   assert(std::find_if(OpenedTypes.begin(), OpenedTypes.end(),
                       [&](const std::pair<ConstraintLocator *,
                           ArrayRef<OpenedType>> &entry) {
                         return entry.first == locatorPtr;
                       }) == OpenedTypes.end() &&
          "already registered opened types for this locator");
-
+#endif
+  
   OpenedType* openedTypes
     = Allocator.Allocate<OpenedType>(replacements.size());
   std::copy(replacements.begin(), replacements.end(), openedTypes);
