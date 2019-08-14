@@ -129,7 +129,8 @@ bool ASTScopeImpl::verifyThatThisNodeComeAfterItsPriorSibling() const {
   //                      .getRangeForBuffer(
   //                          getSourceFile()->getBufferID().getValue())
   //                      .str();
-  assert(false && "unexpected out-of-order nodes");
+  llvm_unreachable("unexpected out-of-order nodes");
+  return false;
 }
 
 NullablePtr<ASTScopeImpl> ASTScopeImpl::getPriorSibling() const {
@@ -231,10 +232,7 @@ GenericParamScope::getChildlessSourceRange(const bool omitAssertions) const {
   // is visible from the start of the body.
   if (auto *protoDecl = dyn_cast<ProtocolDecl>(nOrE))
     return SourceRange(protoDecl->getBraces().Start, protoDecl->getEndLoc());
-  // Explicitly-written generic parameters are in scope *following* their
-  // definition and through the end of the body.
-  // ensure that this isn't an extension where there is no end loc
-  auto startLoc = paramList->getParams()[index]->getEndLoc();
+  auto startLoc = paramList->getSourceRange().Start;
   if (startLoc.isInvalid())
     startLoc = holder->getStartLoc();
   return SourceRange(startLoc, holder->getEndLoc());
@@ -457,11 +455,20 @@ void ASTScopeImpl::cacheSourceRangeOfMeAndDescendants(
 
 SourceRange
 ASTScopeImpl::getUncachedSourceRange(const bool omitAssertions) const {
+  const SourceRange rangeForLazyCheck = getASTContext().LangOpts.LazyASTScopes
+                                            ? sourceRangeForDeferredExpansion()
+                                            : SourceRange();
+  (void)rangeForLazyCheck;
   const auto childlessRange = getChildlessSourceRange(omitAssertions);
   const auto rangeIncludingIgnoredNodes =
       widenSourceRangeForIgnoredASTNodes(childlessRange);
-  return widenSourceRangeForChildren(rangeIncludingIgnoredNodes,
-                                     omitAssertions);
+  assert(rangeForLazyCheck.isInvalid() ||
+         rangeForLazyCheck == rangeIncludingIgnoredNodes);
+  auto uncachedSourceRange =
+      widenSourceRangeForChildren(rangeIncludingIgnoredNodes, omitAssertions);
+  assert(rangeForLazyCheck.isInvalid() ||
+         rangeForLazyCheck == uncachedSourceRange);
+  return uncachedSourceRange;
 }
 
 void ASTScopeImpl::clearCachedSourceRangesOfMeAndAncestors() {
@@ -522,7 +529,7 @@ void ASTScopeImpl::widenSourceRangeForIgnoredASTNode(const ASTNode n) {
   // Doing the default here would cause a pattern initializer scope's range
   // to overlap the pattern use scope's range.
 
-  if (PatternEntryDeclScope::isHandledSpecially(n))
+  if (n.isDecl(DeclKind::Var))
     return;
 
   SourceRange r = getEffectiveSourceRange(n);

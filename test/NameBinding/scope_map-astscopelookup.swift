@@ -214,12 +214,12 @@ class LazyProperties {
 // CHECK-EXPANDED-NEXT:     `-EnumElementScope {{.*}}, [17:8 - 17:19]
 // CHECK-EXPANDED-NEXT:       `-ParameterListScope {{.*}}, [17:10 - 17:19]
 // CHECK-EXPANDED-NEXT: |-NominalTypeDeclScope {{.*}}, [20:1 - 21:1] 'GenericS0'
-// CHECK-EXPANDED-NEXT:   `-GenericParamScope {{.*}}, [20:18 - 21:1] param 0 'T'
-// CHECK-EXPANDED-NEXT:     `-GenericParamScope {{.*}}, [20:21 - 21:1] param 1 'U'
+// CHECK-EXPANDED-NEXT:   `-GenericParamScope {{.*}}, [20:17 - 21:1] param 0 'T'
+// CHECK-EXPANDED-NEXT:     `-GenericParamScope {{.*}}, [20:17 - 21:1] param 1 'U'
 // CHECK-EXPANDED-NEXT:       `-NominalTypeBodyScope {{.*}}, [20:24 - 21:1] 'GenericS0'
 // CHECK-EXPANDED-NEXT: |-AbstractFunctionDeclScope {{.*}}, [23:1 - 24:1] 'genericFunc0(t:u:i:)'
-// CHECK-EXPANDED-NEXT:   `-GenericParamScope {{.*}}, [23:19 - 24:1] param 0 'T'
-// CHECK-EXPANDED-NEXT:     `-GenericParamScope {{.*}}, [23:22 - 24:1] param 1 'U'
+// CHECK-EXPANDED-NEXT:   `-GenericParamScope {{.*}}, [23:18 - 24:1] param 0 'T'
+// CHECK-EXPANDED-NEXT:     `-GenericParamScope {{.*}}, [23:18 - 24:1] param 1 'U'
 // CHECK-EXPANDED-NEXT:       `-ParameterListScope {{.*}}, [23:24 - 24:1]
 // CHECK-EXPANDED-NEXT:         |-DefaultArgumentInitializerScope {{.*}}, [23:46 - 23:46]
 // CHECK-EXPANDED-NEXT:         `-PureFunctionBodyScope {{.*}}, [23:50 - 24:1]
@@ -227,8 +227,8 @@ class LazyProperties {
 // CHECK-EXPANDED-NEXT: |-NominalTypeDeclScope {{.*}}, [26:1 - 32:1] 'ContainsGenerics0'
 // CHECK-EXPANDED-NEXT:   `-NominalTypeBodyScope {{.*}}, [26:25 - 32:1] 'ContainsGenerics0'
 // CHECK-EXPANDED-NEXT:     |-AbstractFunctionDeclScope {{.*}}, [27:3 - 28:3] 'init(t:u:)'
-// CHECK-EXPANDED-NEXT:       `-GenericParamScope {{.*}}, [27:8 - 28:3] param 0 'T'
-// CHECK-EXPANDED-NEXT:         `-GenericParamScope {{.*}}, [27:11 - 28:3] param 1 'U'
+// CHECK-EXPANDED-NEXT:       `-GenericParamScope {{.*}}, [27:7 - 28:3] param 0 'T'
+// CHECK-EXPANDED-NEXT:         `-GenericParamScope {{.*}}, [27:7 - 28:3] param 1 'U'
 // CHECK-EXPANDED-NEXT:           `-ParameterListScope {{.*}}, [27:13 - 28:3]
 // CHECK-EXPANDED-NEXT:             `-MethodBodyScope {{.*}}, [27:26 - 28:3]
 // CHECK-EXPANDED-NEXT:               `-BraceStmtScope {{.*}}, [27:26 - 28:3]
@@ -237,7 +237,7 @@ class LazyProperties {
 // CHECK-EXPANDED-NEXT:         `-MethodBodyScope {{.*}}, [30:10 - 31:3]
 // CHECK-EXPANDED-NEXT:           `-BraceStmtScope {{.*}}, [30:10 - 31:3]
 // CHECK-EXPANDED-NEXT: |-TypeAliasDeclScope {{.*}}, [34:1 - 34:32] <no extended nominal?!>
-// CHECK-EXPANDED-NEXT:   `-GenericParamScope {{.*}}, [34:25 - 34:32] param 0 'T'
+// CHECK-EXPANDED-NEXT:   `-GenericParamScope {{.*}}, [34:24 - 34:32] param 0 'T'
 // CHECK-EXPANDED-NEXT: |-NominalTypeDeclScope {{.*}}, [39:1 - 39:26] 'OtherArchStruct'
 // CHECK-EXPANDED-NEXT:   `-NominalTypeBodyScope {{.*}}, [39:24 - 39:26] 'OtherArchStruct'
 // CHECK-EXPANDED-NEXT: |-AbstractFunctionDeclScope {{.*}}, [42:1 - 101:1] 'functionBodies1(a:b:)'
