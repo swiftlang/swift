@@ -298,6 +298,7 @@ tests.test("_isConcrete") {
   func isConcrete_true<T>(_ type: T.Type) -> Bool {
     return _isConcrete(type)
   }
+  @inline(never)
   func isConcrete_false<T>(_ type: T.Type) -> Bool {
     return _isConcrete(type)
   }
