@@ -1715,6 +1715,28 @@ ObjCMethodInst::create(SILDebugLocation DebugLoc, SILValue Operand,
                                        Member, Ty);
 }
 
+CXXVirtualMethodInst::CXXVirtualMethodInst(SILDebugLocation DebugLoc,
+                                           SILValue Operand, SILDeclRef Member,
+                                           SILType Ty)
+    : UnaryInstructionBase(DebugLoc, Operand),
+      MultipleValueInstructionTrailingObjects(
+          this, {Ty, Operand->getType()},
+          { /* extracted method */ ValueOwnershipKind::Any,
+            /* adjusted this */ ValueOwnershipKind::Any}),
+      Member(Member) {}
+
+CXXVirtualMethodInst *CXXVirtualMethodInst::create(SILDebugLocation DebugLoc,
+                                                   SILValue Operand,
+                                                   SILDeclRef Member,
+                                                   SILType Ty) {
+  SILModule *Mod = Operand->getModule();
+  unsigned size =
+      totalSizeToAlloc<MultipleValueInstruction *, CXXVirtualMethodResult>(1,
+                                                                           2);
+  void *Buffer = Mod->allocateInst(size, alignof(CXXVirtualMethodInst));
+  return ::new (Buffer) CXXVirtualMethodInst(DebugLoc, Operand, Member, Ty);
+}
+
 InitExistentialAddrInst *InitExistentialAddrInst::create(
     SILDebugLocation Loc, SILValue Existential, CanType ConcreteType,
     SILType ConcreteLoweredType, ArrayRef<ProtocolConformanceRef> Conformances,

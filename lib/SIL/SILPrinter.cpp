@@ -1693,6 +1693,12 @@ public:
     *this << ", ";
     *this << AMI->getType();
   }
+  void visitCXXVirtualMethodInst(CXXVirtualMethodInst *CXXVMI) {
+    *this << getIDAndType(CXXVMI->getOperand()) << ", " << CXXVMI->getMember();
+    *this << " : " << CXXVMI->getMember().getDecl()->getInterfaceType();
+    *this << ", ";
+    *this << CXXVMI->getExtractedMethod()->getType();
+  }
   void visitWitnessMethodInst(WitnessMethodInst *WMI) {
     PrintOptions QualifiedSILTypeOptions =
         PrintOptions::printQualifiedSILType();

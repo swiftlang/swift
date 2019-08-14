@@ -1,0 +1,42 @@
+// RUN: %target-swift-frontend -module-name cxx_ir -I %S/Inputs/custom-modules -module-cache-path %t -enable-cxx-interop -emit-ir -o - -primary-file %s | %FileCheck %s
+
+import Builtin
+import Swift
+import SwiftShims
+
+import CXXInterop
+
+// CHECK-LABEL: define hidden swiftcc i32 @"$call_cxx_virtual_method"(i8*) #0 {
+// CHECK: [[THIS_PTR1:%.*]] = bitcast i8* %0 to %TSo14MethodsVirtualV*
+// CHECK: [[THIS_PTR2:%.*]] = bitcast %TSo14MethodsVirtualV* [[THIS_PTR1]] to i32 (%class.MethodsVirtual*, i32)***
+// CHECK: [[VTABLE:%.*]] = load i32 (%class.MethodsVirtual*, i32)**, i32 (%class.MethodsVirtual*, i32)*** [[THIS_PTR2]], align 8
+// CHECK: [[VFN_PTR:%.*]] = getelementptr inbounds i32 (%class.MethodsVirtual*, i32)*, i32 (%class.MethodsVirtual*, i32)** [[VTABLE]], i64 0
+// CHECK: [[VFN:%.*]] = load i32 (%class.MethodsVirtual*, i32)*, i32 (%class.MethodsVirtual*, i32)** [[VFN_PTR]], align 8
+// CHECK: [[THIS_PTR3:%.*]] = bitcast %TSo14MethodsVirtualV* [[THIS_PTR1]] to %class.MethodsVirtual*
+// CHECK: [[RESULT:%.*]] = call i32{{( signext)?}} [[VFN]](%class.MethodsVirtual* [[THIS_PTR3]], i32{{( signext)?}} 7)
+// CHECK: ret i32 [[RESULT]]
+sil hidden [ossa] @$call_cxx_virtual_method : $@convention(thin) (UnsafeMutablePointer<MethodsVirtual>) -> Int32 {
+bb0(%0 : $UnsafeMutablePointer<MethodsVirtual>):
+  debug_value %0 : $UnsafeMutablePointer<MethodsVirtual>, let, name "a", argno 1 // id: %1
+  %2 = integer_literal $Builtin.IntLiteral, 7     // user: %5
+  %3 = metatype $@thin Int32.Type                 // user: %5
+  // function_ref Int32.init(_builtinIntegerLiteral:)
+  %4 = function_ref @$ss5Int32V22_builtinIntegerLiteralABBI_tcfC : $@convention(method) (Builtin.IntLiteral, @thin Int32.Type) -> Int32 // user: %5
+  %5 = apply %4(%2, %3) : $@convention(method) (Builtin.IntLiteral, @thin Int32.Type) -> Int32 // user: %13
+  // function_ref UnsafeMutablePointer.pointee.unsafeMutableAddressor
+  %6 = function_ref @$sSp7pointeexvau : $@convention(method) <τ_0_0> (UnsafeMutablePointer<τ_0_0>) -> UnsafeMutablePointer<τ_0_0> // user: %7
+  %7 = apply %6<MethodsVirtual>(%0) : $@convention(method) <τ_0_0> (UnsafeMutablePointer<τ_0_0>) -> UnsafeMutablePointer<τ_0_0> // user: %8
+  %8 = struct_extract %7 : $UnsafeMutablePointer<MethodsVirtual>, #UnsafeMutablePointer._rawValue // user: %9
+  %9 = pointer_to_address %8 : $Builtin.RawPointer to [strict] $*MethodsVirtual // user: %10
+  %10 = begin_access [modify] [unsafe] %9 : $*MethodsVirtual // users: %14, %13, %11
+  (%11, %12) = cxx_virtual_method %10 : $*MethodsVirtual, #MethodsVirtual.SimpleVirtualMethod!1.foreign : (inout MethodsVirtual) -> (Int32) -> Int32, $@convention(c) (@inout MethodsVirtual, Int32) -> Int32 // user: %13
+  %13 = apply %11(%12, %5) : $@convention(c) (@inout MethodsVirtual, Int32) -> Int32 // user: %15
+  end_access %10 : $*MethodsVirtual               // id: %14
+  return %13 : $Int32                             // id: %15
+}
+
+// Int32.init(_builtinIntegerLiteral:)
+sil [transparent] [serialized] @$ss5Int32V22_builtinIntegerLiteralABBI_tcfC : $@convention(method) (Builtin.IntLiteral, @thin Int32.Type) -> Int32
+
+// UnsafeMutablePointer.pointee.unsafeMutableAddressor
+sil [transparent] [serialized] @$sSp7pointeexvau : $@convention(method) <τ_0_0> (UnsafeMutablePointer<τ_0_0>) -> UnsafeMutablePointer<τ_0_0>

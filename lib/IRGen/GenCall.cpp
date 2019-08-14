@@ -247,7 +247,7 @@ namespace {
     /// function type.
     void expandCoroutineContinuationType();
 
-    Signature getSignature();
+    Signature getSignature(llvm::FunctionType *llvmType = nullptr);
 
   private:
     void expand(SILParameterInfo param);
@@ -1424,10 +1424,11 @@ void SignatureExpansion::expandCoroutineContinuationType() {
   expandCoroutineContinuationParameters();
 }
 
-Signature SignatureExpansion::getSignature() {
+Signature SignatureExpansion::getSignature(llvm::FunctionType *llvmType) {
   // Create the appropriate LLVM type.
-  llvm::FunctionType *llvmType =
-    llvm::FunctionType::get(ResultIRType, ParamIRTypes, /*variadic*/ false);
+  if (!llvmType)
+    llvmType =
+        llvm::FunctionType::get(ResultIRType, ParamIRTypes, /*variadic*/ false);
 
   assert((ForeignInfo.ClangInfo != nullptr) ==
            (FnType->getLanguage() == SILFunctionLanguage::C) &&
@@ -1468,6 +1469,17 @@ Signature Signature::forCoroutineContinuation(IRGenModule &IGM,
   SignatureExpansion expansion(IGM, fnType);
   expansion.expandCoroutineContinuationType();
   return expansion.getSignature();
+}
+
+Signature Signature::forCXXMethod(IRGenModule &IGM,
+                                  const clang::CXXMethodDecl *decl,
+                                  CanSILFunctionType fnType) {
+  SignatureExpansion expansion(IGM, fnType);
+  expansion.ForeignInfo.ClangInfo =
+      &clang::CodeGen::arrangeCXXMethodDeclaration(IGM.getClangCGM(), decl);
+  llvm::FunctionType *Ty = clang::CodeGen::getFunctionType(
+      IGM.getClangCGM(), *expansion.ForeignInfo.ClangInfo);
+  return expansion.getSignature(Ty);
 }
 
 void irgen::extractScalarResults(IRGenFunction &IGF, llvm::Type *bodyType,

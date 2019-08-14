@@ -5881,6 +5881,66 @@ class ObjCSuperMethodInst
       : UnaryInstructionBase(DebugLoc, Operand, Ty, Member) {}
 };
 
+/// This is either the extracted method or the adjusted this ptr that
+/// is the result of a CXXVirtualMethodInst.
+class CXXVirtualMethodInst;
+class CXXVirtualMethodResult final : public MultipleValueInstructionResult {
+public:
+  CXXVirtualMethodResult(unsigned index, SILType type,
+                         ValueOwnershipKind ownershipKind)
+      : MultipleValueInstructionResult(ValueKind::CXXVirtualMethodResult, index,
+                                       type, ownershipKind) {}
+
+  CXXVirtualMethodInst *getParent(); // inline below
+  const CXXVirtualMethodInst *getParent() const {
+    return const_cast<CXXVirtualMethodResult *>(this)->getParent();
+  }
+
+  bool isExtractedMethod() const { return getIndex() == 0; }
+  bool isAdjustedThisPtr() const { return getIndex() == 1; }
+
+  static bool classof(const SILNode *N) {
+    return N->getKind() == SILNodeKind::CXXVirtualMethodResult;
+  }
+};
+
+/// Represents looking up a virtual method from a c++ virtual method table and
+/// adjusting the this pointer.
+class CXXVirtualMethodInst final
+    : public UnaryInstructionBase<SILInstructionKind::CXXVirtualMethodInst,
+                                  MultipleValueInstruction>,
+      public MultipleValueInstructionTrailingObjects<CXXVirtualMethodInst,
+                                                     CXXVirtualMethodResult> {
+  SILDeclRef Member;
+  friend SILBuilder;
+
+  template <class, class...> friend class llvm::TrailingObjects;
+  using MultipleValueInstructionTrailingObjects::numTrailingObjects;
+
+  using MultipleValueInstructionTrailingObjects::getTrailingObjects;
+
+  CXXVirtualMethodInst(SILDebugLocation debugLoc, SILValue ThisPtr,
+                       SILDeclRef Member, SILType Ty);
+
+  static CXXVirtualMethodInst *create(SILDebugLocation debugLoc,
+                                      SILValue ThisPtr, SILDeclRef Member,
+                                      SILType Ty);
+
+public:
+  using MultipleValueInstructionTrailingObjects::totalSizeToAlloc;
+
+  SILDeclRef getMember() const { return Member; }
+
+  SILValue getExtractedMethod() const { return &getAllResultsBuffer().front(); }
+
+  SILValue getAdjustedThisPtr() const { return &getAllResultsBuffer().back(); }
+};
+
+inline CXXVirtualMethodInst *CXXVirtualMethodResult::getParent() {
+  auto *Parent = MultipleValueInstructionResult::getParent();
+  return cast<CXXVirtualMethodInst>(Parent);
+}
+
 /// WitnessMethodInst - Given a type, a protocol conformance,
 /// and a protocol method constant, extracts the implementation of that method
 /// for the type.

@@ -569,7 +569,16 @@ public:
   }
 
   ManagedValue getFnValue(SILGenFunction &SGF, bool isCurried,
-                          Optional<ManagedValue> borrowedSelf) const & {
+                          ArrayRef<ManagedValue> args,
+                          ImportAsMemberStatus foreignSelf) const & {
+    Optional<ManagedValue> borrowedSelf;
+    if (requiresSelfValueForDispatch()) {
+      if (foreignSelf.isInstance()) {
+        borrowedSelf = args[foreignSelf.getSelfIndex()];
+      } else {
+        borrowedSelf = args.back();
+      }
+    }
     Optional<SILDeclRef> constant = None;
 
     if (!Constant) {
@@ -612,9 +621,18 @@ public:
         methodVal = SGF.emitClassMethodRef(
             Loc, borrowedSelf->getValue(), *constant, methodTy);
       } else {
-        methodVal = SGF.B.createObjCMethod(
-            Loc, borrowedSelf->getValue(), *constant,
-            SILType::getPrimitiveObjectType(methodTy));
+        if (constant->getAbstractFunctionDecl()->isObjC()) {
+          methodVal =
+              SGF.B.createObjCMethod(Loc, borrowedSelf->getValue(), *constant,
+                                     SILType::getPrimitiveObjectType(methodTy));
+        } else {
+          // TODO: Update borrowedSelf with the updated self-pointer...
+          methodVal = SGF.B
+                          .createCXXVirtualMethod(
+                              Loc, borrowedSelf->getValue(), *constant,
+                              SILType::getPrimitiveObjectType(methodTy))
+                          ->getExtractedMethod();
+        }
       }
       S.pop();
       return ManagedValue::forUnmanaged(methodVal);
@@ -3721,12 +3739,8 @@ CallEmission::applyCoroutine(SmallVectorImpl<ManagedValue> &yields) {
       uncurriedLoc, formalApplyType);
 
   // Now evaluate the callee.
-  Optional<ManagedValue> borrowedSelf;
-  if (callee.requiresSelfValueForDispatch()) {
-    borrowedSelf = uncurriedArgs.back();
-  }
-
-  auto fnValue = callee.getFnValue(SGF, isCurried, borrowedSelf);
+  auto fnValue = callee.getFnValue(SGF, isCurried, uncurriedArgs,
+                                   calleeTypeInfo.foreignSelf);
 
   return SGF.emitBeginApply(uncurriedLoc.getValue(), fnValue,
                             callee.getSubstitutions(), uncurriedArgs,
@@ -3844,12 +3858,8 @@ CallEmission::applyNormalCall(SGFContext C) {
       uncurriedLoc, formalApplyType);
 
   // Now evaluate the callee.
-  Optional<ManagedValue> borrowedSelf;
-  if (callee.requiresSelfValueForDispatch()) {
-    borrowedSelf = uncurriedArgs.back();
-  }
-
-  auto mv = callee.getFnValue(SGF, isCurried, borrowedSelf);
+  auto mv = callee.getFnValue(SGF, isCurried, uncurriedArgs,
+                              calleeTypeInfo.foreignSelf);
 
   // Emit the uncurried call.
   firstLevelResult.value = SGF.emitApply(
@@ -4758,11 +4768,8 @@ SILGenFunction::emitApplyOfLibraryIntrinsic(SILLocation loc,
 
   auto calleeTypeInfo = callee.getTypeInfo(*this, /*isCurried=*/false);
 
-  Optional<ManagedValue> borrowedSelf;
-  if (callee.requiresSelfValueForDispatch())
-    borrowedSelf = args.back();
-  auto mv = callee.getFnValue(*this, /*isCurried=*/false,
-                              borrowedSelf);
+  auto mv = callee.getFnValue(*this, /*isCurried=*/false, args,
+                              calleeTypeInfo.foreignSelf);
 
   assert(!calleeTypeInfo.foreignError);
   assert(!calleeTypeInfo.foreignSelf.isImportAsMember());

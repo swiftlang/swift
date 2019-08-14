@@ -31,6 +31,7 @@ namespace clang {
   namespace CodeGen {
     class CGFunctionInfo;    
   }
+  class CXXMethodDecl;
 }
 
 namespace swift {
@@ -125,6 +126,11 @@ public:
   /// Compute the signature of a coroutine's continuation function.
   static Signature forCoroutineContinuation(IRGenModule &IGM,
                                             CanSILFunctionType coroType);
+
+  /// Compute the singature of a C++ method.
+  static Signature forCXXMethod(IRGenModule &IGM,
+                                const clang::CXXMethodDecl *decl,
+                                CanSILFunctionType fnType);
 
   llvm::FunctionType *getType() const {
     assert(isValid());

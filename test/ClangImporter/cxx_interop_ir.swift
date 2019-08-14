@@ -63,3 +63,16 @@ func basicMethodsStatic() -> Int32 {
 func basicMethods(a: UnsafeMutablePointer<Methods2>) -> Int32 {
   return a.pointee.SimpleMethod(4)
 }
+
+// CHECK-LABEL: define hidden swiftcc i32 @"$s6cxx_ir13virtualMethod1as5Int32VSpySo14MethodsVirtualVG_tF"(i8*) #0 {
+// CHECK: [[THIS_PTR1:%.*]] = bitcast i8* %0 to %TSo14MethodsVirtualV*
+// CHECK: [[THIS_PTR2:%.*]] = bitcast %TSo14MethodsVirtualV* [[THIS_PTR1]] to i32 (%class.MethodsVirtual*, i32)***
+// CHECK: [[VTABLE:%.*]] = load i32 (%class.MethodsVirtual*, i32)**, i32 (%class.MethodsVirtual*, i32)*** [[THIS_PTR2]], align 8
+// CHECK: [[VFN_PTR:%.*]] = getelementptr inbounds i32 (%class.MethodsVirtual*, i32)*, i32 (%class.MethodsVirtual*, i32)** [[VTABLE]], i64 0
+// CHECK: [[VFN:%.*]] = load i32 (%class.MethodsVirtual*, i32)*, i32 (%class.MethodsVirtual*, i32)** [[VFN_PTR]], align 8
+// CHECK: [[THIS_PTR3:%.*]] = bitcast %TSo14MethodsVirtualV* [[THIS_PTR1]] to %class.MethodsVirtual*
+// CHECK: [[RESULT:%.*]] = call i32{{( signext)?}} [[VFN]](%class.MethodsVirtual* [[THIS_PTR3]], i32{{( signext)?}} 7)
+// CHECK: ret i32 [[RESULT]]
+func virtualMethod(a: UnsafeMutablePointer<MethodsVirtual>) -> Int32 {
+  return a.pointee.SimpleVirtualMethod(7);
+}

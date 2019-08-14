@@ -11,20 +11,21 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/SILDeclRef.h"
-#include "swift/SIL/SILLocation.h"
-#include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/SILLinkage.h"
-#include "llvm/Support/Compiler.h"
-#include "llvm/Support/raw_ostream.h"
+#include "swift/SIL/SILLocation.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/Decl.h"
+#include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjC.h"
+#include "llvm/Support/Compiler.h"
+#include "llvm/Support/raw_ostream.h"
 using namespace swift;
 
 /// Get the method dispatch mechanism for a method.
@@ -33,6 +34,13 @@ swift::getMethodDispatch(AbstractFunctionDecl *method) {
   // Some methods are forced to be statically dispatched.
   if (method->hasForcedStaticDispatch())
     return MethodDispatch::Static;
+
+  if (auto *mdecl =
+          dyn_cast_or_null<clang::CXXMethodDecl>(method->getClangDecl())) {
+    if (mdecl->isVirtual()) {
+      return MethodDispatch::Class;
+    }
+  }
 
   // Import-as-member declarations are always statically referenced.
   if (method->isImportAsMember())

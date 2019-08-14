@@ -415,7 +415,8 @@ ABSTRACT_VALUE(MultipleValueInstructionResult, ValueBase)
   MULTIPLE_VALUE_INST_RESULT(BeginApplyResult, MultipleValueInstructionResult)
   MULTIPLE_VALUE_INST_RESULT(DestructureStructResult, MultipleValueInstructionResult)
   MULTIPLE_VALUE_INST_RESULT(DestructureTupleResult, MultipleValueInstructionResult)
-  VALUE_RANGE(MultipleValueInstructionResult, BeginApplyResult, DestructureTupleResult)
+  MULTIPLE_VALUE_INST_RESULT(CXXVirtualMethodResult, MultipleValueInstructionResult)
+  VALUE_RANGE(MultipleValueInstructionResult, BeginApplyResult, CXXVirtualMethodResult)
 
 VALUE(SILUndef, ValueBase)
 
@@ -855,10 +856,12 @@ MULTIPLE_VALUE_INST(DestructureStructInst, destructure_struct,
                     MultipleValueInstruction, None, DoesNotRelease)
 MULTIPLE_VALUE_INST(DestructureTupleInst, destructure_tuple,
                     MultipleValueInstruction, None, DoesNotRelease)
-INST_RANGE(MultipleValueInstruction, BeginApplyInst, DestructureTupleInst)
+MULTIPLE_VALUE_INST(CXXVirtualMethodInst, cxx_virtual_method,
+                    MultipleValueInstruction, None, DoesNotRelease)
+INST_RANGE(MultipleValueInstruction, BeginApplyInst, CXXVirtualMethodInst)
 
-NODE_RANGE(SILInstruction, AllocStackInst, DestructureTupleInst)
-NODE_RANGE(SILNode, SILPhiArgument, DestructureTupleInst)
+NODE_RANGE(SILInstruction, AllocStackInst, CXXVirtualMethodInst)
+NODE_RANGE(SILNode, SILPhiArgument, CXXVirtualMethodInst)
 
 #undef SINGLE_VALUE_INST_RANGE
 #undef INST_RANGE

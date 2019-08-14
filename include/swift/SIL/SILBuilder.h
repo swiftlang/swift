@@ -1472,6 +1472,14 @@ public:
         getSILDebugLocation(Loc), Operand, Member, MethodTy));
   }
 
+  CXXVirtualMethodInst *createCXXVirtualMethod(SILLocation Loc,
+                                               SILValue Operand,
+                                               SILDeclRef Member,
+                                               SILType MethodTy) {
+    return insert(CXXVirtualMethodInst::create(getSILDebugLocation(Loc),
+                                               Operand, Member, MethodTy));
+  }
+
   WitnessMethodInst *createWitnessMethod(SILLocation Loc, CanType LookupTy,
                                          ProtocolConformanceRef Conformance,
                                          SILDeclRef Member, SILType MethodTy) {

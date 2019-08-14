@@ -38,4 +38,9 @@ public:
   int SimpleMethod(int);
 };
 
+class MethodsVirtual {
+public:
+  virtual int SimpleVirtualMethod(int) = 0;
+};
+
 enum __attribute__((enum_extensibility(open))) OpenEmptyEnum : char {};

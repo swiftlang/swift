@@ -2023,6 +2023,17 @@ SILCloner<ImplClass>::visitObjCSuperMethodInst(ObjCSuperMethodInst *Inst) {
                                     Inst->getMember(), Inst->getType()));
 }
 
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitCXXVirtualMethodInst(
+    CXXVirtualMethodInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(
+      Inst,
+      getBuilder().createCXXVirtualMethod(
+          getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()),
+          Inst->getMember(), getOpType(Inst->getExtractedMethod()->getType())));
+}
+
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitWitnessMethodInst(WitnessMethodInst *Inst) {

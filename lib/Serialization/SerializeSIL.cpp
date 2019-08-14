@@ -1888,6 +1888,25 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         UI->hasOperand() ? addValueRef(UI->getOperand()) : ValueID());
     break;
   }
+  case SILInstructionKind::CXXVirtualMethodInst: {
+    // Format: a type, an operand and a SILDeclRef. Use SILOneTypeValuesLayout:
+    // type, Attr, SILDeclRef (DeclID, Kind, uncurryLevel),
+    // and an operand.
+    const auto *VMI = cast<CXXVirtualMethodInst>(&SI);
+    SILType Ty = VMI->getExtractedMethod()->getType();
+    SmallVector<ValueID, 9> ListOfValues;
+    auto operand = VMI->getOperand();
+    handleSILDeclRef(S, VMI->getMember(), ListOfValues);
+    ListOfValues.push_back(S.addTypeRef(operand->getType().getASTType()));
+    ListOfValues.push_back((unsigned)operand->getType().getCategory());
+    ListOfValues.push_back(addValueRef(operand));
+
+    SILOneTypeValuesLayout::emitRecord(
+        Out, ScratchRecord, SILAbbrCodes[SILOneTypeValuesLayout::Code],
+        (unsigned)SI.getKind(), S.addTypeRef(Ty.getASTType()),
+        (unsigned)Ty.getCategory(), ListOfValues);
+    break;
+  }
   case SILInstructionKind::WitnessMethodInst: {
     // Format: a type, an operand and a SILDeclRef. Use SILOneTypeValuesLayout:
     // type, Attr, SILDeclRef (DeclID, Kind, uncurryLevel, IsObjC), and a type.

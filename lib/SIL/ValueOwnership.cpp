@@ -232,11 +232,12 @@ ValueOwnershipKindClassifier::visitForwardingInst(SILInstruction *i,
   return mergedValue.getValue();
 }
 
-#define FORWARDING_OWNERSHIP_INST(INST)                                        \
-  ValueOwnershipKind ValueOwnershipKindClassifier::visit##INST##Inst(          \
-      INST##Inst *I) {                                                         \
-    return I->getOwnershipKind();                                              \
+#define FORWARDING_OWNERSHIP(VALUE)                                        \
+  ValueOwnershipKind ValueOwnershipKindClassifier::visit##VALUE(          \
+      VALUE *v) {                                                         \
+    return v->getOwnershipKind();                                              \
   }
+#define FORWARDING_OWNERSHIP_INST(INST) FORWARDING_OWNERSHIP(INST##Inst)
 FORWARDING_OWNERSHIP_INST(BridgeObjectToRef)
 FORWARDING_OWNERSHIP_INST(ConvertFunction)
 FORWARDING_OWNERSHIP_INST(OpenExistentialRef)
@@ -252,41 +253,20 @@ FORWARDING_OWNERSHIP_INST(MarkUninitialized)
 FORWARDING_OWNERSHIP_INST(UncheckedEnumData)
 FORWARDING_OWNERSHIP_INST(SelectEnum)
 FORWARDING_OWNERSHIP_INST(Enum)
+FORWARDING_OWNERSHIP(SILUndef)
+FORWARDING_OWNERSHIP(SILPhiArgument)
+FORWARDING_OWNERSHIP(DestructureStructResult)
+FORWARDING_OWNERSHIP(DestructureTupleResult)
+FORWARDING_OWNERSHIP(BeginApplyResult)
+FORWARDING_OWNERSHIP(CXXVirtualMethodResult)
+FORWARDING_OWNERSHIP(SILFunctionArgument)
 #undef FORWARDING_OWNERSHIP_INST
+#undef FORWARDING_OWNERSHIP
 
 ValueOwnershipKind
 ValueOwnershipKindClassifier::visitUncheckedOwnershipConversionInst(
     UncheckedOwnershipConversionInst *I) {
   return I->getConversionOwnershipKind();
-}
-
-ValueOwnershipKind ValueOwnershipKindClassifier::visitSILUndef(SILUndef *arg) {
-  return arg->getOwnershipKind();
-}
-
-ValueOwnershipKind
-ValueOwnershipKindClassifier::visitSILPhiArgument(SILPhiArgument *Arg) {
-  return Arg->getOwnershipKind();
-}
-
-ValueOwnershipKind ValueOwnershipKindClassifier::visitDestructureStructResult(
-    DestructureStructResult *Result) {
-  return Result->getOwnershipKind();
-}
-
-ValueOwnershipKind ValueOwnershipKindClassifier::visitDestructureTupleResult(
-    DestructureTupleResult *Result) {
-  return Result->getOwnershipKind();
-}
-
-ValueOwnershipKind ValueOwnershipKindClassifier::visitBeginApplyResult(
-    BeginApplyResult *Result) {
-  return Result->getOwnershipKind();
-}
-
-ValueOwnershipKind ValueOwnershipKindClassifier::visitSILFunctionArgument(
-    SILFunctionArgument *Arg) {
-  return Arg->getOwnershipKind();
 }
 
 // This is a forwarding instruction through only one of its arguments.
