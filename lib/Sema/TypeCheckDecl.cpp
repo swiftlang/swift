@@ -3916,6 +3916,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
         auto newValueParam = valueParams->get(0);
         newValueParam->setInterfaceType(valueIfaceTy);
         newValueParam->getTypeLoc().setType(valueIfaceTy);
+        accessor->getBodyResultTypeLoc().setType(TupleType::getEmpty(Context));
         break;
       }
 
@@ -3932,6 +3933,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       // If we add yield types to the function type, we'll need to update this.
       case AccessorKind::Read:
       case AccessorKind::Modify:
+        accessor->getBodyResultTypeLoc().setType(TupleType::getEmpty(Context));
         break;
       }
     }

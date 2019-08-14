@@ -648,20 +648,27 @@ createDesignatedInitOverride(ClassDecl *classDecl,
   // Determine the initializer parameters.
 
   // Create the initializer parameter patterns.
-  OptionSet<ParameterList::CloneFlags> options = ParameterList::Implicit;
-  options |= ParameterList::Inherited;
-  auto *bodyParams = superclassCtor->getParameters()->clone(ctx, options);
+  OptionSet<ParameterList::CloneFlags> options
+    = (ParameterList::Implicit |
+       ParameterList::Inherited |
+       ParameterList::WithoutTypes);
+  auto *superclassParams = superclassCtor->getParameters();
+  auto *bodyParams = superclassParams->clone(ctx, options);
 
   // If the superclass is generic, we need to map the superclass constructor's
   // parameter types into the generic context of our class.
   //
   // We might have to apply substitutions, if for example we have a declaration
   // like 'class A : B<Int>'.
-  for (auto *decl : *bodyParams) {
-    auto paramTy = decl->getInterfaceType();
+  for (unsigned idx : range(superclassParams->size())) {
+    auto *superclassParam = superclassParams->get(idx);
+    auto *bodyParam = bodyParams->get(idx);
+
+    auto paramTy = superclassParam->getInterfaceType();
     auto substTy = paramTy.subst(subMap, SubstFlags::UseErrorType);
-    decl->setInterfaceType(substTy);
-    decl->getTypeLoc() = TypeLoc::withoutLoc(substTy);
+
+    bodyParam->setInterfaceType(substTy);
+    bodyParam->getTypeLoc() = TypeLoc::withoutLoc(substTy);
   }
 
   // Create the initializer declaration, inheriting the name,

@@ -426,21 +426,6 @@ static VarDecl *getFirstParamDecl(FuncDecl *fn) {
   return getParamDeclAtIndex(fn, 0);
 };
 
-
-static ParamDecl *buildArgument(SourceLoc loc, DeclContext *DC,
-                                StringRef name,
-                                Type interfaceType,
-                                ParamDecl::Specifier specifier,
-                                ASTContext &context) {
-  auto *param = new (context) ParamDecl(specifier, SourceLoc(), SourceLoc(),
-                                        Identifier(), loc,
-                                        context.getIdentifier(name),
-                                        DC);
-  param->setImplicit();
-  param->setInterfaceType(interfaceType);
-  return param;
-}
-
 /// Build a parameter list which can forward the formal index parameters of a
 /// declaration.
 ///
@@ -1648,8 +1633,6 @@ static AccessorDecl *createGetterPrototype(AbstractStorageDecl *storage,
                                            ASTContext &ctx) {
   SourceLoc loc = storage->getLoc();
 
-  GenericEnvironment *genericEnvironmentOfLazyAccessor = nullptr;
-
   ParamDecl *selfDecl = nullptr;
   if (storage->getDeclContext()->isTypeContext()) {
     if (storage->getAttrs().hasAttribute<LazyAttr>()) {
@@ -1660,8 +1643,6 @@ static AccessorDecl *createGetterPrototype(AbstractStorageDecl *storage,
         bindingDecl->getPatternEntryForVarDecl(varDecl).getInitContext());
 
       selfDecl = bindingInit->getImplicitSelfDecl();
-      genericEnvironmentOfLazyAccessor =
-        bindingInit->getGenericEnvironmentOfContext();
     }
   }
 
@@ -1674,8 +1655,6 @@ static AccessorDecl *createGetterPrototype(AbstractStorageDecl *storage,
   if (storage->isStatic())
     staticLoc = storage->getLoc();
 
-  auto storageInterfaceType = storage->getValueInterfaceType();
-
   auto getter = AccessorDecl::create(
       ctx, loc, /*AccessorKeywordLoc*/ loc,
       AccessorKind::Get, storage,
@@ -1683,7 +1662,7 @@ static AccessorDecl *createGetterPrototype(AbstractStorageDecl *storage,
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
       genericParams,
       getterParams,
-      TypeLoc::withoutLoc(storageInterfaceType),
+      TypeLoc(),
       storage->getDeclContext());
 
   // If we're stealing the 'self' from a lazy initializer, set it now.
@@ -1691,18 +1670,6 @@ static AccessorDecl *createGetterPrototype(AbstractStorageDecl *storage,
   // the getter until we synthesize the body of the getter later.
   if (selfDecl)
     *getter->getImplicitSelfDeclStorage() = selfDecl;
-
-  // We need to install the generic environment here because:
-  // 1) validating the getter will change the implicit self decl's DC to it,
-  // 2) it's likely that the initializer will be type-checked before the
-  //    accessor (and therefore before the normal installation happens), and
-  // 3) type-checking a reference to the self decl will map its type into
-  //    its context, which requires an environment to be installed on that
-  //    context.
-  // We can safely use the enclosing environment because properties are never
-  // differently generic.
-  if (genericEnvironmentOfLazyAccessor)
-    getter->setGenericEnvironment(genericEnvironmentOfLazyAccessor);
 
   if (storage->isGetterMutating())
     getter->setSelfAccessKind(SelfAccessKind::Mutating);
@@ -1733,20 +1700,22 @@ static AccessorDecl *createSetterPrototype(AbstractStorageDecl *storage,
   GenericParamList *genericParams = createAccessorGenericParams(storage);
 
   // Add a "(value : T, indices...)" argument list.
-  auto storageInterfaceType = storage->getValueInterfaceType();
-  auto valueDecl = buildArgument(storage->getLoc(), storage->getDeclContext(),
-                                 "value", storageInterfaceType,
-                                 ParamDecl::Specifier::Default, ctx);
-  auto *params = buildIndexForwardingParamList(storage, valueDecl, ctx);
+  auto *param = new (ctx) ParamDecl(ParamDecl::Specifier::Default,
+                                    SourceLoc(), SourceLoc(),
+                                    Identifier(), loc,
+                                    ctx.getIdentifier("value"),
+                                    storage->getDeclContext());
+  param->setImplicit();
 
-  Type setterRetTy = TupleType::getEmpty(ctx);
+  auto *params = buildIndexForwardingParamList(storage, param, ctx);
+
   auto setter = AccessorDecl::create(
       ctx, loc, /*AccessorKeywordLoc*/ SourceLoc(),
       AccessorKind::Set, storage,
       /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
       genericParams, params,
-      TypeLoc::withoutLoc(setterRetTy),
+      TypeLoc(),
       storage->getDeclContext());
 
   if (isMutating)
@@ -1848,9 +1817,6 @@ SynthesizeAccessorRequest::evaluate(Evaluator &evaluator,
                                     AbstractStorageDecl *storage,
                                     AccessorKind kind) const {
   auto &ctx = storage->getASTContext();
-
-  if (!storage->hasInterfaceType())
-    ctx.getLazyResolver()->resolveDeclSignature(storage);
 
   switch (kind) {
   case AccessorKind::Get:
