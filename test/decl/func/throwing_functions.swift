@@ -51,7 +51,7 @@ func partialApply2<T: Parallelogram>(_ t: T) {
 func barG<T>(_ t : T) throws -> T { return t }
 func fooG<T>(_ t : T) -> T { return t }
 
-var bGE: (_ i: Int) -> Int = barG // expected-error{{invalid conversion from throwing function of type '(_) throws -> _' to non-throwing function type '(Int) -> Int'}}
+var bGE: (_ i: Int) -> Int = barG // expected-error{{invalid conversion from throwing function of type '(Int) throws -> Int' to non-throwing function type '(Int) -> Int'}}
 var bg: (_ i: Int) throws -> Int = barG
 var fG: (_ i: Int) throws -> Int = fooG
 
@@ -69,15 +69,15 @@ func fooT(_ callback: () throws -> Bool) {} //OK
 func fooT(_ callback: () -> Bool) {}
 
 // Throwing and non-throwing types are not equivalent.
-struct X<T> { } // expected-note {{arguments to generic parameter 'T' ('(String) -> Int' and '(String) throws -> Int') are expected to be equal}}
-// expected-note@-1 {{arguments to generic parameter 'T' ('(String) throws -> Int' and '(String) -> Int') are expected to be equal}}
+struct X<T> { }
+
 func specializedOnFuncType1(_ x: X<(String) throws -> Int>) { }
 func specializedOnFuncType2(_ x: X<(String) -> Int>) { }
 func testSpecializedOnFuncType(_ xThrows: X<(String) throws -> Int>,
                                xNonThrows: X<(String) -> Int>) {
   specializedOnFuncType1(xThrows) // ok
-  specializedOnFuncType1(xNonThrows) // expected-error{{cannot convert value of type 'X<(String) -> Int>' to expected argument type 'X<(String) throws -> Int>'}}
-  specializedOnFuncType2(xThrows)  // expected-error{{cannot convert value of type 'X<(String) throws -> Int>' to expected argument type 'X<(String) -> Int>'}}
+  specializedOnFuncType1(xNonThrows) // expected-error{{invalid conversion from throwing function of type '(String) -> Int' to non-throwing function type '(String) throws -> Int'}}
+  specializedOnFuncType2(xThrows)  // expected-error{{invalid conversion from throwing function of type '(String) throws -> Int' to non-throwing function type '(String) -> Int'}}
   specializedOnFuncType2(xNonThrows) // ok
 }
 
@@ -85,7 +85,7 @@ func testSpecializedOnFuncType(_ xThrows: X<(String) throws -> Int>,
 func subtypeResult1(_ x: (String) -> ((Int) -> String)) { }
 func testSubtypeResult1(_ x1: (String) -> ((Int) throws -> String),
                         x2: (String) -> ((Int) -> String)) {
-  subtypeResult1(x1) // expected-error{{cannot convert value of type '(String) -> ((Int) throws -> String)' to expected argument type '(String) -> ((Int) -> String)'}}
+  subtypeResult1(x1) // expected-error{{invalid conversion from throwing function of type '(Int) throws -> String' to non-throwing function type '(Int) -> String'}}
   subtypeResult1(x2)
 }
 
@@ -106,7 +106,7 @@ func testSubtypeArgument1(_ x1: (_ fn: ((String) -> Int)) -> Int,
 func subtypeArgument2(_ x: (_ fn: ((String) throws -> Int)) -> Int) { }
 func testSubtypeArgument2(_ x1: (_ fn: ((String) -> Int)) -> Int,
                           x2: (_ fn: ((String) throws -> Int)) -> Int) {
-  subtypeArgument2(x1) // expected-error{{cannot convert value of type '(((String) -> Int)) -> Int' to expected argument type '(((String) throws -> Int)) -> Int'}}
+  subtypeArgument2(x1) // expected-error{{invalid conversion from throwing function of type '(String) throws -> Int' to non-throwing function type '(String) -> Int'}}
   subtypeArgument2(x2)
 }
 
@@ -117,10 +117,10 @@ var c3 : () -> Int = c1 // expected-error{{invalid conversion from throwing func
 var c4 : () -> Int = {() throws -> Int in 0} // expected-error{{invalid conversion from throwing function of type '() throws -> Int' to non-throwing function type '() -> Int'}}
 var c5 : () -> Int = { try c2() } // expected-error{{invalid conversion from throwing function of type '() throws -> Int' to non-throwing function type '() -> Int'}}
 var c6 : () throws -> Int = { do { _ = try c2() } ; return 0 }
-var c7 : () -> Int = { do { try c2() } ; return 0 } // expected-error{{invalid conversion from throwing function of type '() throws -> _' to non-throwing function type '() -> Int'}}
+var c7 : () -> Int = { do { try c2() } ; return 0 } // expected-error{{invalid conversion from throwing function of type '() throws -> Int' to non-throwing function type '() -> Int'}}
 var c8 : () -> Int = { do { _ = try c2()  } catch _ { var x = 0 } ; return 0 } // expected-warning {{initialization of variable 'x' was never used; consider replacing with assignment to '_' or removing it}}
-var c9 : () -> Int = { do { try c2()  } catch Exception.A { var x = 0 } ; return 0 }// expected-error{{invalid conversion from throwing function of type '() throws -> _' to non-throwing function type '() -> Int'}}
-var c10 : () -> Int = { throw Exception.A; return 0 } // expected-error{{invalid conversion from throwing function of type '() throws -> _' to non-throwing function type '() -> Int'}}
+var c9 : () -> Int = { do { try c2()  } catch Exception.A { var x = 0 } ; return 0 }// expected-error{{invalid conversion from throwing function of type '() throws -> Int' to non-throwing function type '() -> Int'}}
+var c10 : () -> Int = { throw Exception.A; return 0 } // expected-error{{invalid conversion from throwing function of type '() throws -> Int' to non-throwing function type '() -> Int'}}
 var c11 : () -> Int = { try! c2() }
 var c12 : () -> Int? = { try? c2() }
 

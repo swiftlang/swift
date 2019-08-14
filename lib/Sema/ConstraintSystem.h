@@ -3928,6 +3928,18 @@ Expr *getArgumentExpr(Expr *expr, unsigned index);
 // }
 bool isAutoClosureArgument(Expr *argExpr);
 
+/// Check whether type conforms to a given known protocol.
+bool conformsToKnownProtocol(ConstraintSystem &cs, Type type,
+                             KnownProtocolKind protocol);
+
+/// Check whether given type conforms to `RawPepresentable` protocol
+/// and return witness type.
+Type isRawRepresentable(ConstraintSystem &cs, Type type);
+/// Check whether given type conforms to a specific known kind
+/// `RawPepresentable` protocol and return witness type.
+Type isRawRepresentable(ConstraintSystem &cs, Type type,
+                        KnownProtocolKind rawRepresentableProtocol);
+
 class DisjunctionChoice {
   unsigned Index;
   Constraint *Choice;

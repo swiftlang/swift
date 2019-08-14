@@ -145,7 +145,7 @@ func eleven_two() {
 enum Twelve { case Payload(Int) }
 func twelve_helper(_ fn: (Int, Int) -> ()) {}
 func twelve() {
-  twelve_helper { (a, b) in // expected-error {{invalid conversion from throwing function of type '(_, _) throws -> ()' to non-throwing function type '(Int, Int) -> ()'}}
+  twelve_helper { (a, b) in // expected-error {{invalid conversion from throwing function of type '(Int, Int) throws -> ()' to non-throwing function type '(Int, Int) -> ()'}}
     do {
       try thrower()
     } catch Twelve.Payload(a...b) {
@@ -158,7 +158,7 @@ func ==(a: Thirteen, b: Thirteen) -> Bool { return true }
 
 func thirteen_helper(_ fn: (Thirteen) -> ()) {}
 func thirteen() {
-  thirteen_helper { (a) in // expected-error {{invalid conversion from throwing function of type '(_) throws -> ()' to non-throwing function type '(Thirteen) -> ()'}}
+  thirteen_helper { (a) in // expected-error {{invalid conversion from throwing function of type '(Thirteen) throws -> ()' to non-throwing function type '(Thirteen) -> ()'}}
     do {
       try thrower()
     } catch a {

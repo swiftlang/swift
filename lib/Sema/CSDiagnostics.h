@@ -661,17 +661,24 @@ private:
 /// Intended to diagnose any possible contextual failure
 /// e.g. argument/parameter, closure result, conversions etc.
 class ContextualFailure : public FailureDiagnostic {
+  ContextualTypePurpose CTP;
   Type FromType, ToType;
 
 public:
   ContextualFailure(Expr *root, ConstraintSystem &cs, Type lhs, Type rhs,
                     ConstraintLocator *locator)
-      : FailureDiagnostic(root, cs, locator), FromType(resolve(lhs)),
-        ToType(resolve(rhs)) {}
+      : ContextualFailure(root, cs, cs.getContextualTypePurpose(), lhs, rhs,
+                          locator) {}
 
-  Type getFromType() const { return resolveType(FromType); }
+  ContextualFailure(Expr *root, ConstraintSystem &cs,
+                    ContextualTypePurpose purpose, Type lhs, Type rhs,
+                    ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator), CTP(purpose),
+        FromType(resolve(lhs)), ToType(resolve(rhs)) {}
 
-  Type getToType() const { return resolveType(ToType); }
+  Type getFromType() const { return FromType; }
+
+  Type getToType() const { return ToType; }
 
   bool diagnoseAsError() override;
 
@@ -679,13 +686,64 @@ public:
   // then we probably meant to call the value.
   bool diagnoseMissingFunctionCall() const;
 
+  /// Produce a specialized diagnostic if this is an invalid conversion to Bool.
+  bool diagnoseConversionToBool() const;
+
+  /// Produce a specialized diagnostic if this is an attempt to initialize
+  /// or convert an array literal to a dictionary e.g. `let _: [String: Int] = ["A", 0]`
+  bool diagnoseConversionToDictionary() const;
+
+  /// Attempt to attach any relevant fix-its to already produced diagnostic.
+  void tryFixIts(InFlightDiagnostic &diagnostic) const;
+
+  /// Attempts to add fix-its for these two mistakes:
+  ///
+  /// - Passing an integer where a type conforming to RawRepresentable is
+  ///   expected, by wrapping the expression in a call to the contextual
+  ///   type's initializer
+  ///
+  /// - Passing a type conforming to RawRepresentable where an integer is
+  ///   expected, by wrapping the expression in a call to the rawValue
+  ///   accessor
+  ///
+  /// - Return true on the fixit is added, false otherwise.
+  ///
+  /// This helps migration with SDK changes.
+  bool
+  tryRawRepresentableFixIts(InFlightDiagnostic &diagnostic,
+                            KnownProtocolKind rawRepresentablePrococol) const;
+
+  /// Attempts to add fix-its for these two mistakes:
+  ///
+  /// - Passing an integer with the right type but which is getting wrapped with
+  ///   a different integer type unnecessarily. The fixit removes the cast.
+  ///
+  /// - Passing an integer but expecting different integer type. The fixit adds
+  ///   a wrapping cast.
+  ///
+  /// - Return true on the fixit is added, false otherwise.
+  ///
+  /// This helps migration with SDK changes.
+  bool tryIntegerCastFixIts(InFlightDiagnostic &diagnostic) const;
+
+protected:
   /// Try to add a fix-it when converting between a collection and its slice
   /// type, such as String <-> Substring or (eventually) Array <-> ArraySlice
-  static bool trySequenceSubsequenceFixIts(InFlightDiagnostic &diag,
-                                           ConstraintSystem &CS, Type fromType,
-                                           Type toType, Expr *expr);
+  bool trySequenceSubsequenceFixIts(InFlightDiagnostic &diagnostic) const;
+
+  /// Try to add a fix-it that suggests to explicitly use `as` or `as!`
+  /// to coerce one type to another if type-checker can prove that such
+  /// conversion is possible.
+  bool tryTypeCoercionFixIt(InFlightDiagnostic &diagnostic) const;
+
+  /// Check whether this contextual failure represents an invalid
+  /// conversion from array literal to dictionary.
+  static bool isInvalidDictionaryConversion(ConstraintSystem &cs, Expr *anchor,
+                                            Type contextualType);
 
 private:
+  ContextualTypePurpose getContextualTypePurpose() const { return CTP; }
+
   Type resolve(Type rawType) {
     auto type = resolveType(rawType)->getWithoutSpecifierType();
     if (auto *BGT = type->getAs<BoundGenericType>()) {
@@ -698,6 +756,42 @@ private:
   /// Try to add a fix-it to convert a stored property into a computed
   /// property
   void tryComputedPropertyFixIts(Expr *expr) const;
+
+  bool isIntegerType(Type type) const {
+    return conformsToKnownProtocol(
+        getConstraintSystem(), type,
+        KnownProtocolKind::ExpressibleByIntegerLiteral);
+  }
+
+  /// Return true if the conversion from fromType to toType is
+  /// an invalid string index operation.
+  bool isIntegerToStringIndexConversion() const;
+
+protected:
+  static Optional<Diag<Type, Type>>
+  getDiagnosticFor(ContextualTypePurpose context, bool forProtocol);
+};
+
+/// Diagnose failures related to conversion between throwing function type
+/// and non-throwing one e.g.
+///
+/// ```swift
+/// func foo<T>(_ t: T) throws -> Void {}
+/// let _: (Int) -> Void = foo // `foo` can't be implictly converted to
+///                            // non-throwing type `(Int) -> Void`
+/// ```
+class ThrowingFunctionConversionFailure final : public ContextualFailure {
+public:
+  ThrowingFunctionConversionFailure(Expr *root, ConstraintSystem &cs,
+                                    Type fromType, Type toType,
+                                    ConstraintLocator *locator)
+      : ContextualFailure(root, cs, fromType, toType, locator) {
+    auto fnType1 = fromType->castTo<FunctionType>();
+    auto fnType2 = toType->castTo<FunctionType>();
+    assert(fnType1->throws() != fnType2->throws());
+  }
+
+  bool diagnoseAsError() override;
 };
 
 /// Diagnose failures related attempt to implicitly convert types which
@@ -1422,10 +1516,6 @@ public:
   }
 
   bool diagnoseAsError() override;
-
-private:
-  static Optional<Diag<Type, Type>>
-  getDiagnosticFor(ContextualTypePurpose purpose);
 };
 
 /// Diagnose generic argument omission e.g.
