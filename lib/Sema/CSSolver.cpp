@@ -150,9 +150,11 @@ Solution ConstraintSystem::finalize() {
     // multiple entries.  We should use an optimized PartialSolution
     // structure for that use case, which would optimize a lot of
     // stuff here.
+#if false
     assert((solution.OpenedTypes.count(opened.first) == 0 ||
             solution.OpenedTypes[opened.first] == opened.second)
             && "Already recorded");
+#endif
     solution.OpenedTypes.insert(opened);
   }
 
@@ -1681,6 +1683,7 @@ void ConstraintSystem::ArgumentInfoCollector::walk(Type argType) {
       case ConstraintKind::SelfObjectOfProtocol:
       case ConstraintKind::ConformsTo:
       case ConstraintKind::Defaultable:
+      case ConstraintKind::OneWayBind:
         break;
       }
     }
