@@ -59,7 +59,7 @@
       "declKind": "Protocol",
       "usr": "s:4cake2P3P",
       "moduleName": "cake",
-      "genericSig": "<Self : P1, Self : P2>",
+      "genericSig": "<Self : cake.P1, Self : cake.P2>",
       "conformances": [
         {
           "kind": "Conformance",
@@ -1137,7 +1137,7 @@
       "declKind": "Protocol",
       "usr": "s:4cake4PSubP",
       "moduleName": "cake",
-      "genericSig": "<Self : PSuper>",
+      "genericSig": "<Self : cake.PSuper>",
       "conformances": [
         {
           "kind": "Conformance",

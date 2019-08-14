@@ -1091,9 +1091,8 @@ StringRef printGenericSignature(SDKContext &Ctx, ArrayRef<Requirement> AllReqs) 
   OS << "<";
   bool First = true;
   PrintOptions Opts = PrintOptions::printInterface();
-  // We always print unqualifed type names to avoid false positives introduced
-  // by the heuristics working differently.
-  Opts.FullyQualifiedTypesIfAmbiguous = false;
+  // We should always print fully qualified type names here
+  Opts.FullyQualifiedTypes = true;
   for (auto Req: AllReqs) {
     if (!First) {
       OS << ", ";
