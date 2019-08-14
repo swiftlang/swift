@@ -794,8 +794,14 @@ static bool isSDKNodeEqual(SDKContext &Ctx, const SDKNode &L, const SDKNode &R) 
         return false;
       if (Left->getPrintedName() == Right->getPrintedName())
         return true;
-      return Left->getName() == Right->getName() &&
-        Left->hasSameChildren(*Right);
+      if (Ctx.checkingABI()) {
+        // For abi checking where we don't have sugar types at all, the printed
+        // name difference is enough to indicate these two types differ.
+        return false;
+      } else {
+        return Left->getName() == Right->getName() &&
+          Left->hasSameChildren(*Right);
+      }
     }
 
     case SDKNodeKind::DeclFunction: {
@@ -1082,6 +1088,10 @@ StringRef printGenericSignature(SDKContext &Ctx, ArrayRef<Requirement> AllReqs) 
     return StringRef();
   OS << "<";
   bool First = true;
+  PrintOptions Opts = PrintOptions::printInterface();
+  // We always print unqualifed type names to avoid false positives introduced
+  // by the heuristics working differently.
+  Opts.FullyQualifiedTypesIfAmbiguous = false;
   for (auto Req: AllReqs) {
     if (!First) {
       OS << ", ";
@@ -1089,9 +1099,9 @@ StringRef printGenericSignature(SDKContext &Ctx, ArrayRef<Requirement> AllReqs) 
       First = false;
     }
     if (Ctx.checkingABI())
-      getCanonicalRequirement(Req).print(OS, PrintOptions::printInterface());
+      getCanonicalRequirement(Req).print(OS, Opts);
     else
-      Req.print(OS, PrintOptions::printInterface());
+      Req.print(OS, Opts);
   }
   OS << ">";
   return Ctx.buffer(OS.str());
@@ -2077,7 +2087,7 @@ swift::ide::api::getSDKNodeRoot(SDKContext &SDKCtx,
     if (Opts.Verbose)
       llvm::errs() << "Loading module: " << Name << "...\n";
     auto *M = Ctx.getModuleByName(Name);
-    if (!M) {
+    if (!M || M->failedToLoad()) {
       llvm::errs() << "Failed to load module: " << Name << '\n';
       if (Opts.AbortOnModuleLoadFailure)
         return nullptr;

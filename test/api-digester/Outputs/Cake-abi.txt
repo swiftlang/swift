@@ -1,7 +1,7 @@
 
 /* Generic Signature Changes */
 cake: Func P1.P1Constraint() has generic signature change from <τ_0_0 where τ_0_0 : P1, τ_0_0 : P2> to <τ_0_0 where τ_0_0 : P1>
-cake: Protocol P3 has generic signature change from <τ_0_0 : cake.P1, τ_0_0 : cake.P2> to <τ_0_0 : cake.P1, τ_0_0 : cake.P4>
+cake: Protocol P3 has generic signature change from <τ_0_0 : P1, τ_0_0 : P2> to <τ_0_0 : P1, τ_0_0 : P4>
 
 /* RawRepresentable Changes */
 
@@ -44,6 +44,7 @@ cake: Func Somestruct2.foo1(_:) has parameter 0 type change from C3 to C1
 cake: Func Zoo.getCurrentAnimalInlinable() has return type change from Cat to Dog
 cake: Func ownershipChange(_:_:) has parameter 0 changing from InOut to Default
 cake: Func ownershipChange(_:_:) has parameter 1 changing from Shared to Owned
+cake: Func returnFunctionTypeOwnershipChange() has return type change from (C1) -> () to (__owned C1) -> ()
 cake: Var Zoo.current has declared type change from Cat to Dog
 
 /* Decl Attribute changes */
