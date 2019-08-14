@@ -1,4 +1,0 @@
-module ObjCModule {
-  header "objc-header.h"
-  export *
-}

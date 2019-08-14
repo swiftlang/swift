@@ -225,10 +225,6 @@ int main(int argc, char **argv) {
       desc("The directory that holds the compiler resource files"),
       cat(Visible));
 
-  opt<bool> EnableDWARFImporter(
-      "enable-dwarf-importer",
-      desc("Import with LangOptions.EnableDWARFImporter = true"), cat(Visible));
-
   ParseCommandLineOptions(argc, argv);
 
   // Unregister our options so they don't interfere with the command line
@@ -295,7 +291,6 @@ int main(int argc, char **argv) {
   Invocation.setModuleName("lldbtest");
   Invocation.getClangImporterOptions().ModuleCachePath = ModuleCachePath;
   Invocation.getLangOptions().EnableMemoryBufferImporter = true;
-  Invocation.getLangOptions().EnableDWARFImporter = EnableDWARFImporter;
 
   if (!ResourceDir.empty()) {
     Invocation.setRuntimeResourcePath(ResourceDir);

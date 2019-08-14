@@ -400,13 +400,13 @@ bool ClangImporter::Implementation::shouldIgnoreBridgeHeaderTopLevelDecl(
   return false;
 }
 
-ClangImporter::ClangImporter(ASTContext &ctx,
-                             const ClangImporterOptions &clangImporterOpts,
-                             DependencyTracker *tracker)
-  : ClangModuleLoader(tracker),
-    Impl(*new Implementation(ctx, clangImporterOpts))
-{
-}
+ClangImporter::ClangImporter(
+    ASTContext &ctx, const ClangImporterOptions &clangImporterOpts,
+    DependencyTracker *tracker,
+    std::unique_ptr<DWARFImporterDelegate> dwarfImporterDelegate)
+    : ClangModuleLoader(tracker),
+      Impl(*new Implementation(ctx, clangImporterOpts,
+                               std::move(dwarfImporterDelegate))) {}
 
 ClangImporter::~ClangImporter() {
   delete &Impl;
@@ -923,14 +923,12 @@ ClangImporter::getOrCreatePCH(const ClangImporterOptions &ImporterOptions,
   return PCHFilename.getValue();
 }
 
-std::unique_ptr<ClangImporter>
-ClangImporter::create(ASTContext &ctx,
-                      const ClangImporterOptions &importerOpts,
-                      std::string swiftPCHHash,
-                      DependencyTracker *tracker) {
-  std::unique_ptr<ClangImporter> importer{
-    new ClangImporter(ctx, importerOpts, tracker)
-  };
+std::unique_ptr<ClangImporter> ClangImporter::create(
+    ASTContext &ctx, const ClangImporterOptions &importerOpts,
+    std::string swiftPCHHash, DependencyTracker *tracker,
+    std::unique_ptr<DWARFImporterDelegate> dwarfImporterDelegate) {
+  std::unique_ptr<ClangImporter> importer{new ClangImporter(
+      ctx, importerOpts, tracker, std::move(dwarfImporterDelegate))};
 
   std::vector<std::string> invocationArgStrs;
 
@@ -1581,7 +1579,7 @@ bool ClangImporter::canImportModule(std::pair<Identifier, SourceLoc> moduleID) {
   return clangModule->isAvailable(ctx.getLangOpts(), getTargetInfo(), r, mh, m);
 }
 
-ModuleDecl *ClangImporter::loadModule(
+ModuleDecl *ClangImporter::loadModuleClang(
     SourceLoc importLoc,
     ArrayRef<std::pair<Identifier, SourceLoc>> path) {
   auto &clangContext = Impl.getClangASTContext();
@@ -1672,6 +1670,15 @@ ModuleDecl *ClangImporter::loadModule(
     return nullptr;
 
   return Impl.finishLoadingClangModule(clangModule, /*preferOverlay=*/false);
+}
+
+ModuleDecl *ClangImporter::loadModule(
+    SourceLoc importLoc,
+    ArrayRef<std::pair<Identifier, SourceLoc>> path) {
+  ModuleDecl *MD = loadModuleClang(importLoc, path);
+  if (!MD)
+    MD = Impl.loadModuleDWARF(importLoc, path);
+  return MD;
 }
 
 ModuleDecl *ClangImporter::Implementation::finishLoadingClangModule(
@@ -1840,8 +1847,9 @@ bool PlatformAvailability::treatDeprecatedAsUnavailable(
   llvm_unreachable("Unexpected platform");
 }
 
-ClangImporter::Implementation::Implementation(ASTContext &ctx,
-                                              const ClangImporterOptions &opts)
+ClangImporter::Implementation::Implementation(
+    ASTContext &ctx, const ClangImporterOptions &opts,
+    std::unique_ptr<DWARFImporterDelegate> dwarfImporterDelegate)
     : SwiftContext(ctx),
       ImportForwardDeclarations(opts.ImportForwardDeclarations),
       InferImportAsMember(opts.InferImportAsMember),
@@ -1851,8 +1859,8 @@ ClangImporter::Implementation::Implementation(ASTContext &ctx,
       IsReadingBridgingPCH(false),
       CurrentVersion(ImportNameVersion::fromOptions(ctx.LangOpts)),
       BridgingHeaderLookupTable(new SwiftLookupTable(nullptr)),
-      platformAvailability(ctx.LangOpts),
-      nameImporter() {}
+      platformAvailability(ctx.LangOpts), nameImporter(),
+      DWARFImporter(std::move(dwarfImporterDelegate)) {}
 
 ClangImporter::Implementation::~Implementation() {
 #ifndef NDEBUG
@@ -2493,11 +2501,11 @@ bool ClangImporter::lookupDeclsFromHeader(StringRef Filename,
   return true; // no info found about that header.
 }
 
-void ClangImporter::lookupValue(DeclName name, VisibleDeclConsumer &consumer){
+void ClangImporter::lookupValue(DeclName name, VisibleDeclConsumer &consumer) {
   Impl.forEachLookupTable([&](SwiftLookupTable &table) -> bool {
-      Impl.lookupValue(table, name, consumer);
-      return false;
-    });
+    Impl.lookupValue(table, name, consumer);
+    return false;
+  });
 }
 
 void ClangImporter::lookupTypeDecl(
@@ -2523,6 +2531,7 @@ void ClangImporter::lookupTypeDecl(
   auto &sema = Impl.Instance->getSema();
   clang::LookupResult lookupResult(sema, clangName, clang::SourceLocation(),
                                    lookupKind);
+  bool foundViaClang = false;
   if (sema.LookupName(lookupResult, /*Scope=*/nullptr)) {
     for (auto clangDecl : lookupResult) {
       if (!isa<clang::TypeDecl>(clangDecl) &&
@@ -2531,10 +2540,16 @@ void ClangImporter::lookupTypeDecl(
         continue;
       }
       auto *imported = Impl.importDecl(clangDecl, Impl.CurrentVersion);
-      if (auto *importedType = dyn_cast_or_null<TypeDecl>(imported))
+      if (auto *importedType = dyn_cast_or_null<TypeDecl>(imported)) {
+        foundViaClang = true;
         receiver(importedType);
+      }
     }
   }
+
+  // If Clang couldn't find the type, query the DWARFImporterDelegate.
+  if (!foundViaClang)
+    Impl.lookupTypeDeclDWARF(rawName, kind, receiver);
 }
 
 void ClangImporter::lookupRelatedEntity(
