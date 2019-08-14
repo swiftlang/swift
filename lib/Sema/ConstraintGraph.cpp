@@ -1211,6 +1211,8 @@ void ConstraintGraph::printConnectedComponents(
 }
 
 void ConstraintGraph::dumpConnectedComponents() {
+  llvm::SaveAndRestore<bool>
+    debug(CS.getASTContext().LangOpts.DebugConstraintSolver, true);
   printConnectedComponents(CS.TypeVariables, llvm::dbgs());
 }
 
