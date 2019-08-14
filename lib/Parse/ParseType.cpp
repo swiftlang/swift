@@ -163,15 +163,15 @@ Parser::TypeResult Parser::parseTypeSimple(Diag<> MessageID,
 
   auto TypeLoc = leadingTriviaLoc();
 
-  Optional<TypeResult> ty;
+  Optional<TypeResult> Result;
   switch (Tok.getKind()) {
   case tok::kw_Self:
   case tok::kw_Any:
   case tok::identifier:
-    ty = parseTypeIdentifier();
+    Result = parseTypeIdentifier();
     break;
   case tok::l_paren:
-    ty = parseTypeTupleBody();
+    Result = parseTypeTupleBody();
     break;
   case tok::code_complete: {
     if (!HandleCodeCompletion)
@@ -183,11 +183,11 @@ Parser::TypeResult Parser::parseTypeSimple(Diag<> MessageID,
     return makeParsedCodeCompletion<ParsedTypeSyntax>({Token});
   }
   case tok::l_square:
-    ty = parseTypeCollection();
+    Result = parseTypeCollection();
     break;
   case tok::kw_protocol:
     if (startsWithLess(peekToken())) {
-      ty = parseOldStyleProtocolComposition();
+      Result = parseOldStyleProtocolComposition();
       break;
     }
     LLVM_FALLTHROUGH;
@@ -209,33 +209,37 @@ Parser::TypeResult Parser::parseTypeSimple(Diag<> MessageID,
   }
 
   // '.Type', '.Protocol', '?', '!', and '[]' still leave us with type-simple.
-  while (ty->isSuccess() || !ty->getUnknownNodes().empty()) {
+  while (Result->isSuccess() || !Result->getUnknownNodes().empty()) {
+    auto PrevType = Result->isSuccess()
+                        ? Result->getResult()
+                        : ParsedSyntaxRecorder::makeUnknownType(
+                              Result->getUnknownNodes(), *SyntaxContext);
     if ((Tok.is(tok::period) || Tok.is(tok::period_prefix)) &&
         (peekToken().isContextualKeyword("Type") ||
          peekToken().isContextualKeyword("Protocol"))) {
-      ty = parseMetatypeType(ty->getResult());
+      Result = parseMetatypeType(PrevType);
       continue;
     }
 
     if (!Tok.isAtStartOfLine()) {
       if (isOptionalToken(Tok)) {
-        ty = parseOptionalType(ty->getResult());
+        Result = parseOptionalType(PrevType);
         continue;
       }
       if (isImplicitlyUnwrappedOptionalToken(Tok)) {
-        ty = parseImplicitlyUnwrappedOptionalType(ty->getResult());
+        Result = parseImplicitlyUnwrappedOptionalType(PrevType);
         continue;
       }
       // Parse legacy array types for migration.
       if (Tok.is(tok::l_square)) {
-        ty = parseTypeArray(ty->getResult(), TypeLoc);
+        Result = parseTypeArray(PrevType, TypeLoc);
         continue;
       }
     }
     break;
   }
 
-  return *ty;
+  return *Result;
 }
 
 Parser::TypeASTResult Parser::parseType() {
@@ -351,7 +355,7 @@ Parser::TypeASTResult Parser::parseType(Diag<> MessageID,
   // In SIL mode, parse box types { ... }.
   if (isInSILMode() && Tok.is(tok::l_brace)) {
     auto SILBoxType = parseSILBoxType(generics, attrs, GenericsScope);
-    Generator.addType(SILBoxType.get(), TypeLoc);
+    Generator.addType(SILBoxType.getPtrOrNull(), TypeLoc);
     return SILBoxType;
   }
 
