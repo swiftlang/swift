@@ -814,19 +814,29 @@ namespace {
     }
 
     /// Perform a depth-first search to produce a from the given type variable,
-    /// notifying the function object \c postVisit after each reachable
-    /// type variable has been visited.
+    /// notifying the function object.
+    ///
+    /// \param getAdjacencies Called to retrieve the set of type variables
+    /// that are adjacent to the given type variable.
+    ///
+    /// \param preVisit Called before visiting the adjacencies of the given
+    /// type variable. When it returns \c true, the adjacencies of this type
+    /// variable will be visited. When \c false, the adjacencies will not be
+    /// visited and \c postVisit will not be called.
+    ///
+    /// \param postVisit Called after visiting the adjacencies of the given
+    /// type variable.
     static void postorderDepthFirstSearchRec(
         TypeVariableType *typeVar,
         llvm::function_ref<
           ArrayRef<TypeVariableType *>(TypeVariableType *)> getAdjacencies,
-        llvm::function_ref<void(TypeVariableType *)> postVisit,
-        SmallPtrSet<TypeVariableType *, 4> &visited) {
-      if (!visited.insert(typeVar).second)
+        llvm::function_ref<bool(TypeVariableType *)> preVisit,
+        llvm::function_ref<void(TypeVariableType *)> postVisit) {
+      if (!preVisit(typeVar))
         return;
 
       for (auto adj : getAdjacencies(typeVar)) {
-        postorderDepthFirstSearchRec(adj, getAdjacencies, postVisit, visited);
+        postorderDepthFirstSearchRec(adj, getAdjacencies, preVisit, postVisit);
       }
 
       postVisit(typeVar);
@@ -855,14 +865,16 @@ namespace {
 
               return oneWayComponent->second.inAdjacencies;
             },
+            [&](TypeVariableType *typeVar) {
+              return visited.insert(typeVar).second;
+            },
             [&](TypeVariableType *dependsOn) {
               // Don't record dependency on ourselves.
               if (dependsOn == inAdj)
                 return;
 
               indirectlyReachable.insert(dependsOn);
-            },
-            visited);
+            });
 
         // Remove any in-adjacency of this component that is indirectly
         // reachable.
@@ -923,12 +935,14 @@ namespace {
               return oneWayComponent->second.outAdjacencies;
             },
             [&](TypeVariableType *typeVar) {
+              return visited.insert(typeVar).second;
+            },
+            [&](TypeVariableType *typeVar) {
               // Record this type variable, if it's one of the representative
               // type variables.
               if (validComponents.count(typeVar) > 0)
                 orderedReps.push_back(typeVar);
-            },
-            visited);
+            });
       }
 
       assert(orderedReps.size() == representativeTypeVars.size());
