@@ -1878,14 +1878,38 @@ static bool onlyForwardsNone(SILBasicBlock *noneBB, SILBasicBlock *someBB,
 ///    \            ... (more bbs?)
 ///     \           /
 ///       ulimateBB
-static bool hasSameUlitmateSuccessor(SILBasicBlock *noneBB, SILBasicBlock *someBB) {
+static bool hasSameUltimateSuccessor(SILBasicBlock *noneBB, SILBasicBlock *someBB) {
+  // Make sure that both our some, none blocks both have single successors that
+  // are not themselves (which can happen due to single block loops).
   auto *someSuccessorBB = someBB->getSingleSuccessorBlock();
-  if (!someSuccessorBB)
+  if (!someSuccessorBB || someSuccessorBB == someBB)
     return false;
   auto *noneSuccessorBB = noneBB->getSingleSuccessorBlock();
-  while (noneSuccessorBB != nullptr && noneSuccessorBB != someSuccessorBB)
-    noneSuccessorBB = noneSuccessorBB->getSingleSuccessorBlock();
-  return noneSuccessorBB == someSuccessorBB;
+  if (!noneSuccessorBB || noneSuccessorBB == noneBB)
+    return false;
+
+  // If we immediately find a diamond, return true. We are done.
+  if (noneSuccessorBB == someSuccessorBB)
+    return true;
+
+  // Otherwise, lets keep looking down the none case.
+  auto *next = noneSuccessorBB;
+  while (next != someSuccessorBB) {
+    noneSuccessorBB = next;
+    next = noneSuccessorBB->getSingleSuccessorBlock();
+
+    // If we find another single successor and it is not our own block (due to a
+    // self-loop), continue.
+    if (next && next != noneSuccessorBB)
+      continue;
+
+    // Otherwise, we either have multiple successors or a self-loop. We do not
+    // support this, return false.
+    return false;
+  }
+
+  // At this point, we know that next must be someSuccessorBB.
+  return true;
 }
 
 /// Simplify switch_enums on class enums that branch to objc_method calls on
@@ -1920,7 +1944,7 @@ bool SimplifyCFG::simplifySwitchEnumOnObjcClassOptional(SwitchEnumInst *SEI) {
   if (SEI->getCaseDestination(someDecl) != someBB)
     std::swap(someBB, noneBB);
 
-  if (!hasSameUlitmateSuccessor(noneBB, someBB))
+  if (!hasSameUltimateSuccessor(noneBB, someBB))
     return false;
 
   if (!onlyForwardsNone(noneBB, someBB, SEI))
