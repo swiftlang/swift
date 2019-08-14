@@ -842,7 +842,7 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID,
 }
 
 Parser::TypeASTResult Parser::parseAnyTypeAST() {
-  auto AnyLoc = Tok.getLoc();
+  auto AnyLoc = leadingTriviaLoc();
   auto ParsedAny = parseAnyType().getResult();
   SyntaxContext->addSyntax(ParsedAny);
   auto Any = SyntaxContext->topNode<SimpleTypeIdentifierSyntax>();
