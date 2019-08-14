@@ -619,13 +619,6 @@ void AttributeEarlyChecker::visitObjCMembersAttr(ObjCMembersAttr *attr) {
 }
 
 void TypeChecker::checkDeclAttributesEarly(Decl *D) {
-  // Don't perform early attribute validation more than once.
-  // FIXME: Crummy way to get idempotency.
-  if (D->didEarlyAttrValidation())
-    return;
-
-  D->setEarlyAttrValidation();
-
   AttributeEarlyChecker Checker(*this, D);
   for (auto attr : D->getAttrs()) {
     if (!attr->isValid()) continue;
@@ -2373,16 +2366,21 @@ void TypeChecker::checkDynamicReplacementAttribute(ValueDecl *D) {
 
 void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
   TypeLoc &ProtoTypeLoc = attr->getProtocolType();
-  TypeResolutionOptions options = None;
-  options |= TypeResolutionFlags::AllowUnboundGenerics;
 
   DeclContext *DC = D->getDeclContext();
-  auto resolution = TypeResolution::forContextual(DC);
-  Type T = resolution.resolveType(ProtoTypeLoc.getTypeRepr(), options);
-  ProtoTypeLoc.setType(T);
+
+  Type T = ProtoTypeLoc.getType();
+  if (!T && ProtoTypeLoc.getTypeRepr()) {
+    TypeResolutionOptions options = None;
+    options |= TypeResolutionFlags::AllowUnboundGenerics;
+
+    auto resolution = TypeResolution::forContextual(DC);
+    T = resolution.resolveType(ProtoTypeLoc.getTypeRepr(), options);
+    ProtoTypeLoc.setType(T);
+  }
 
   // Definite error-types were already diagnosed in resolveType.
-  if (!T || T->hasError())
+  if (T->hasError())
     return;
 
   // Check that we got a ProtocolType.
@@ -2624,6 +2622,7 @@ AttributeChecker::visitImplementationOnlyAttr(ImplementationOnlyAttr *attr) {
 
 void TypeChecker::checkParameterAttributes(ParameterList *params) {
   for (auto param: *params) {
+    checkDeclAttributesEarly(param);
     checkDeclAttributes(param);
   }
 }

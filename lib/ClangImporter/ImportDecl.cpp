@@ -1490,7 +1490,6 @@ static void addSynthesizedTypealias(NominalTypeDecl *nominal, Identifier name,
                                            name, SourceLoc(),
                                            nullptr, nominal);
   typealias->setUnderlyingType(underlyingType);
-  typealias->setEarlyAttrValidation(true);
   typealias->setAccess(AccessLevel::Public);
   typealias->setValidationToChecked();
   typealias->setImplicit();

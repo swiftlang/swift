@@ -2222,6 +2222,10 @@ public:
       }
     }
 
+    TC.checkDeclAttributesEarly(VD);
+    TC.checkDeclAttributes(VD);
+    validateAttributes(TC, VD);
+
     if (!checkOverrides(VD)) {
       // If a property has an override attribute but does not override
       // anything, complain.
@@ -2234,8 +2238,6 @@ public:
         }
       }
     }
-
-    TC.checkDeclAttributes(VD);
 
     if (VD->getDeclContext()->getSelfClassDecl()) {
       checkDynamicSelfType(VD, VD->getValueInterfaceType());
@@ -2454,7 +2456,9 @@ public:
       TC.checkProtocolSelfRequirements(SD);
     }
 
+    TC.checkDeclAttributesEarly(SD);
     TC.checkDeclAttributes(SD);
+    validateAttributes(TC, SD);
 
     checkAccessControl(TC, SD);
 
@@ -2604,8 +2608,6 @@ public:
   }
 
   void visitEnumDecl(EnumDecl *ED) {
-    TC.checkDeclAttributesEarly(ED);
-
     checkUnsupportedNestedType(ED);
     TC.validateDecl(ED);
     checkGenericParams(ED->getGenericParams(), ED, TC);
@@ -2621,7 +2623,9 @@ public:
     for (Decl *member : ED->getMembers())
       visit(member);
 
+    TC.checkDeclAttributesEarly(ED);
     TC.checkDeclAttributes(ED);
+    validateAttributes(TC, ED);
 
     checkInheritanceClause(ED);
 
@@ -2640,8 +2644,6 @@ public:
   }
 
   void visitStructDecl(StructDecl *SD) {
-    TC.checkDeclAttributesEarly(SD);
-
     checkUnsupportedNestedType(SD);
 
     TC.validateDecl(SD);
@@ -2657,7 +2659,9 @@ public:
 
     TC.checkPatternBindingCaptures(SD);
 
+    TC.checkDeclAttributesEarly(SD);
     TC.checkDeclAttributes(SD);
+    validateAttributes(TC, SD);
 
     checkInheritanceClause(SD);
 
@@ -2763,8 +2767,6 @@ public:
 
 
   void visitClassDecl(ClassDecl *CD) {
-    TC.checkDeclAttributesEarly(CD);
-
     checkUnsupportedNestedType(CD);
 
     TC.validateDecl(CD);
@@ -2902,7 +2904,9 @@ public:
       }
     }
 
+    TC.checkDeclAttributesEarly(CD);
     TC.checkDeclAttributes(CD);
+    validateAttributes(TC, CD);
 
     checkInheritanceClause(CD);
 
@@ -2915,8 +2919,6 @@ public:
   }
 
   void visitProtocolDecl(ProtocolDecl *PD) {
-    TC.checkDeclAttributesEarly(PD);
-
     checkUnsupportedNestedType(PD);
 
     TC.validateDecl(PD);
@@ -2945,7 +2947,9 @@ public:
     for (auto Member : PD->getMembers())
       visit(Member);
 
+    TC.checkDeclAttributesEarly(PD);
     TC.checkDeclAttributes(PD);
+    validateAttributes(TC, PD);
 
     checkAccessControl(TC, PD);
 
@@ -3044,6 +3048,11 @@ public:
 
     checkAccessControl(TC, FD);
 
+    TC.checkParameterAttributes(FD->getParameters());
+    TC.checkDeclAttributesEarly(FD);
+    TC.checkDeclAttributes(FD);
+    validateAttributes(TC, FD);
+
     if (!checkOverrides(FD)) {
       // If a method has an 'override' keyword but does not
       // override anything, complain.
@@ -3071,8 +3080,6 @@ public:
       TC.checkDynamicReplacementAttribute(FD);
     }
 
-    TC.checkParameterAttributes(FD->getParameters());
-
     checkExplicitAvailability(FD);
 
     if (FD->getDeclContext()->getSelfClassDecl())
@@ -3086,10 +3093,11 @@ public:
   }
 
   void visitEnumElementDecl(EnumElementDecl *EED) {
-    TC.checkDeclAttributesEarly(EED);
-
     TC.validateDecl(EED);
+
+    TC.checkDeclAttributesEarly(EED);
     TC.checkDeclAttributes(EED);
+    validateAttributes(TC, EED);
 
     if (auto *PL = EED->getParameterList()) {
       TC.checkParameterAttributes(PL);
@@ -3101,8 +3109,6 @@ public:
 
   void visitExtensionDecl(ExtensionDecl *ED) {
     TC.validateExtension(ED);
-
-    TC.checkDeclAttributesEarly(ED);
 
     checkInheritanceClause(ED);
 
@@ -3130,17 +3136,16 @@ public:
 
     checkGenericParams(ED->getGenericParams(), ED, TC);
 
-    validateAttributes(TC, ED);
+    TC.checkDeclAttributesEarly(ED);
 
     for (Decl *Member : ED->getMembers())
       visit(Member);
 
     TC.ConformanceContexts.push_back(ED);
 
-    if (!ED->isInvalid())
-      TC.checkDeclAttributes(ED);
-
+    TC.checkDeclAttributes(ED);
     checkAccessControl(TC, ED);
+    validateAttributes(TC, ED);
 
     checkExplicitAvailability(ED);
   }
@@ -3177,6 +3182,11 @@ public:
       TC.checkReferencedGenericParams(CD);
       TC.checkProtocolSelfRequirements(CD);
     }
+
+    TC.checkDeclAttributesEarly(CD);
+    TC.checkDeclAttributes(CD);
+    validateAttributes(TC, CD);
+    TC.checkParameterAttributes(CD->getParameters());
 
     // Check whether this initializer overrides an initializer in its
     // superclass.
@@ -3273,9 +3283,6 @@ public:
       }
     }
 
-    TC.checkDeclAttributes(CD);
-    TC.checkParameterAttributes(CD->getParameters());
-
     checkAccessControl(TC, CD);
 
     if (requiresDefinition(CD) && !CD->hasBody()) {
@@ -3295,7 +3302,10 @@ public:
 
   void visitDestructorDecl(DestructorDecl *DD) {
     TC.validateDecl(DD);
+
+    TC.checkDeclAttributesEarly(DD);
     TC.checkDeclAttributes(DD);
+    validateAttributes(TC, DD);
 
     if (DD->getDeclContext()->isLocalContext()) {
       // Check local function bodies right away.
@@ -3798,8 +3808,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     validateGenericTypeSignature(nominal);
     nominal->setSignatureIsValidated();
 
-    validateAttributes(*this, D);
-
     if (auto *ED = dyn_cast<EnumDecl>(nominal)) {
       // @objc enums use their raw values as the value representation, so we
       // need to force the values to be checked.
@@ -3846,8 +3854,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
         }
       }
     }
-
-    validateAttributes(*this, D);
 
     break;
   }
@@ -3907,9 +3913,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     // so that it can be considered as a witness.
     D->setValidationToChecked();
 
-    checkDeclAttributesEarly(VD);
-    validateAttributes(*this, VD);
-
     if (VD->getOpaqueResultTypeDecl()) {
       if (auto SF = VD->getInnermostDeclContext()->getParentSourceFile()) {
         SF->markDeclWithOpaqueResultTypeAsValidated(VD);
@@ -3931,8 +3934,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       if (!storage->hasValidSignature())
         return;
     }
-
-    checkDeclAttributesEarly(FD);
 
     DeclValidationRAII IBV(FD);
 
@@ -4033,11 +4034,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     // as it has a valid interface type.
     FD->setSignatureIsValidated();
 
-    if (FD->isInvalid())
-      break;
-
-    validateAttributes(*this, FD);
-
     // Member functions need some special validation logic.
     if (FD->getDeclContext()->isTypeContext()) {
       if (FD->isOperator() && !isMemberOperator(FD, nullptr)) {
@@ -4062,8 +4058,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       }
     }
 
-    checkDeclAttributes(FD);
-
     // Mark the opaque result type as validated, if there is one.
     if (FD->getOpaqueResultTypeDecl()) {
       if (auto sf = FD->getDeclContext()->getParentSourceFile()) {
@@ -4079,15 +4073,11 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     DeclValidationRAII IBV(CD);
 
-    checkDeclAttributesEarly(CD);
-
     validateGenericFuncOrSubscriptSignature(CD, CD, CD);
 
     // We want the constructor to be available for name lookup as soon
     // as it has a valid interface type.
     CD->setSignatureIsValidated();
-
-    validateAttributes(*this, CD);
 
     break;
   }
@@ -4097,13 +4087,9 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     DeclValidationRAII IBV(DD);
 
-    checkDeclAttributesEarly(DD);
-
     validateGenericFuncOrSubscriptSignature(DD, DD, DD);
 
     DD->setSignatureIsValidated();
-
-    validateAttributes(*this, DD);
     break;
   }
 
@@ -4115,10 +4101,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     validateGenericFuncOrSubscriptSignature(SD, SD, SD);
 
     SD->setSignatureIsValidated();
-
-    checkDeclAttributesEarly(SD);
-
-    validateAttributes(*this, SD);
 
     if (SD->getOpaqueResultTypeDecl()) {
       if (auto SF = SD->getInnermostDeclContext()->getParentSourceFile()) {
@@ -4132,8 +4114,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   case DeclKind::EnumElement: {
     auto *EED = cast<EnumElementDecl>(D);
     EnumDecl *ED = EED->getParentEnum();
-
-    validateAttributes(*this, EED);
 
     DeclValidationRAII IBV(EED);
 
