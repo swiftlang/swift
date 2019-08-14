@@ -127,6 +127,9 @@ def compare_to_astscope_lookup : Flag<["-"], "compare-to-astscope-lookup">,
   
 def warn_if_astscope_lookup : Flag<["-"], "warn-if-astscope-lookup">,
   HelpText<"Print a warning if ASTScope lookup is used">;
+  
+def lazy_astscopes : Flag<["-"], "lazy-astscopes">,
+  HelpText<"Build ASTScopes lazily">;
 
 def print_clang_stats : Flag<["-"], "print-clang-stats">,
   HelpText<"Print Clang importer statistics">;
