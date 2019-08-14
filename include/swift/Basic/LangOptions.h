@@ -115,9 +115,6 @@ namespace swift {
     /// Only used by lldb-moduleimport-test.
     bool EnableMemoryBufferImporter = false;
 
-    /// Enable the DWARFImporter. Only used by lldb-moduleimport-test.
-    bool EnableDWARFImporter = false;
-    
     /// Allows using identifiers with a leading dollar.
     bool EnableDollarIdentifiers = false;
 

@@ -60,11 +60,28 @@ class TypeDecl;
 class VisibleDeclConsumer;
 enum class SelectorSplitKind;
 
+/// This interface is implemented by LLDB to serve as a fallback when Clang
+/// modules can't be imported from source in the debugger.
+///
+/// During compile time, ClangImporter-imported Clang modules are compiled with
+/// -gmodules, which emits a DWARF rendition of all types defined in the module
+/// into the .pcm file. On Darwin, these types can be collected by
+/// dsymutil. This delegate allows DWARFImporter to ask LLDB to look up a Clang
+/// type by name, synthesize a Clang AST from it. DWARFImporter then hands this
+/// Clang AST to ClangImporter to import the type into Swift.
+class DWARFImporterDelegate {
+public:
+  virtual ~DWARFImporterDelegate() {}
+  /// Perform a qualified lookup of a Clang type with this name.
+  /// \param kind  Only return results with this type kind.
+  virtual void lookupValue(StringRef name, llvm::Optional<ClangTypeKind> kind,
+                           SmallVectorImpl<clang::Decl *> &results) {}
+};
+
 /// Class that imports Clang modules into Swift, mapping directly
 /// from Clang ASTs over to Swift ASTs.
 class ClangImporter final : public ClangModuleLoader {
   friend class ClangModuleUnit;
-  friend class DWARFImporter;
 
 public:
   class Implementation;
@@ -73,8 +90,11 @@ private:
   Implementation &Impl;
 
   ClangImporter(ASTContext &ctx, const ClangImporterOptions &clangImporterOpts,
-                DependencyTracker *tracker);
+                DependencyTracker *tracker,
+                std::unique_ptr<DWARFImporterDelegate> dwarfImporterDelegate);
 
+  ModuleDecl *loadModuleClang(SourceLoc importLoc,
+                              ArrayRef<std::pair<Identifier, SourceLoc>> path);
 public:
   /// Create a new Clang importer that can import a suitable Clang
   /// module into the given ASTContext.
@@ -89,13 +109,15 @@ public:
   ///
   /// \param tracker The object tracking files this compilation depends on.
   ///
+  /// \param dwarfImporterDelegate A helper object that can synthesize
+  /// Clang Decls from debug info. Used by LLDB.
+  ///
   /// \returns a new Clang module importer, or null (with a diagnostic) if
   /// an error occurred.
   static std::unique_ptr<ClangImporter>
-  create(ASTContext &ctx,
-         const ClangImporterOptions &importerOpts,
-         std::string swiftPCHHash = "",
-         DependencyTracker *tracker = nullptr);
+  create(ASTContext &ctx, const ClangImporterOptions &importerOpts,
+         std::string swiftPCHHash = "", DependencyTracker *tracker = nullptr,
+         std::unique_ptr<DWARFImporterDelegate> dwarfImporterDelegate = {});
 
   ClangImporter(const ClangImporter &) = delete;
   ClangImporter(ClangImporter &&) = delete;
@@ -150,7 +172,7 @@ public:
   /// Look for declarations associated with the given name.
   ///
   /// \param name The name we're searching for.
-  void lookupValue(DeclName name, VisibleDeclConsumer &consumer) override;
+  void lookupValue(DeclName name, VisibleDeclConsumer &consumer);
 
   /// Look up a type declaration by its Clang name.
   ///
@@ -158,7 +180,7 @@ public:
   /// module, it returns it. This is intended for use in reflection / debugging
   /// contexts where access is not a problem.
   void lookupTypeDecl(StringRef clangName, ClangTypeKind kind,
-                      llvm::function_ref<void(TypeDecl *)> receiver) override;
+                      llvm::function_ref<void(TypeDecl *)> receiver);
 
   /// Look up type a declaration synthesized by the Clang importer itself, using
   /// a "related entity kind" to determine which type it should be. For example,
@@ -171,7 +193,7 @@ public:
   void
   lookupRelatedEntity(StringRef clangName, ClangTypeKind kind,
                       StringRef relatedEntityKind,
-                      llvm::function_ref<void(TypeDecl *)> receiver) override;
+                      llvm::function_ref<void(TypeDecl *)> receiver);
 
   /// Look for textually included declarations from the bridging header.
   ///

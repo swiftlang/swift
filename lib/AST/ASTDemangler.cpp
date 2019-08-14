@@ -22,7 +22,6 @@
 #include "swift/AST/ASTDemangler.h"
 
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/GenericSignatureBuilder.h"
@@ -30,6 +29,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -1069,7 +1069,7 @@ GenericTypeDecl *ASTBuilder::findForeignTypeDecl(StringRef name,
                                                  ForeignModuleKind foreignKind,
                                                  Demangle::Node::Kind kind) {
   // Check to see if we have an importer loaded.
-  auto importer = Ctx.getClangModuleLoader();
+  auto importer = static_cast<ClangImporter *>(Ctx.getClangModuleLoader());
   if (!importer)
     return nullptr;
 
@@ -1118,11 +1118,6 @@ GenericTypeDecl *ASTBuilder::findForeignTypeDecl(StringRef name,
     break;
   case ForeignModuleKind::Imported:
     importer->lookupTypeDecl(name, *lookupKind, found);
-
-    // Try the DWARFImporter if it exists.
-    if (!consumer.Result)
-      if (auto *dwarf_importer = Ctx.getDWARFModuleLoader())
-        dwarf_importer->lookupTypeDecl(name, *lookupKind, found);
   }
 
   return consumer.Result;
