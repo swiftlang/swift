@@ -22,7 +22,8 @@
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/Unreachable.h"
-#include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/TinyPtrVector.h"
 #include "CompatibilityOverride.h"
 #include "ImageInspection.h"
 #include "Private.h"
@@ -269,7 +270,7 @@ struct ConformanceState {
   ConcurrentReadableArray<ConformanceSection> SectionsToScan;
   
   llvm::DenseMap<const ProtocolDescriptor *,
-                 llvm::SmallDenseSet<const ProtocolConformanceDescriptor *, 1>>
+                 llvm::TinyPtrVector<const ProtocolConformanceDescriptor *>>
     ConformanceDescriptorCache;
   size_t ConformanceDescriptorLastSectionScanned = 0;
   Mutex ConformanceDescriptorCacheLock;
@@ -556,12 +557,12 @@ _scanAdditionalConformanceDescriptors(ConformanceState &C) {
          const ProtocolConformanceRecord *End) {
     for (const auto *record = Begin; record != End; record++) {
       auto protocol = record->get()->getProtocol();
-      C.ConformanceDescriptorCache[protocol].insert(record->get());
+      C.ConformanceDescriptorCache[protocol].push_back(record->get());
     }
   });
 }
 
-static llvm::SmallDenseSet<const ProtocolConformanceDescriptor *, 1>
+static llvm::TinyPtrVector<const ProtocolConformanceDescriptor *>
 _findConformanceDescriptorsInCache(ConformanceState &C,
                                    const ProtocolDescriptor *protocol) {
   auto iter = C.ConformanceDescriptorCache.find(protocol);
@@ -602,7 +603,7 @@ swift_conformsToSwiftProtocolImpl(const Metadata * const type,
     return nullptr;
   }
 
-  llvm::SmallDenseSet<const ProtocolConformanceDescriptor *, 1>
+  llvm::TinyPtrVector<const ProtocolConformanceDescriptor *>
     cachedDescriptors;
   {
     ScopedLock guard(C.ConformanceDescriptorCacheLock);
