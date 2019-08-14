@@ -91,14 +91,14 @@ class SubSub : Sub {}
 // CHECK-NEXT:   #Super._nontrivial!modify.1: (Super) -> () -> () : @$s10vtable_sil5SuperC11_nontrivialSaySfGvM
 // CHECK-NEXT:   #Super.init!allocator.1: (Super.Type) -> (Float) -> Super : @$s10vtable_sil5SuperC4baseACSf_tcfC
 // CHECK-NEXT:   #Super.property!getter.1: (Super) -> () -> Float : @$s10vtable_sil5SuperC8propertySfvg
-// CHECK-NEXT:   #Super.property!getter.1.jvp.1.S: (Super) -> () -> Float : @$s10vtable_sil5SuperC8propertySfvgTzp0r0_vtable_entry_thunk
-// CHECK-NEXT:   #Super.property!getter.1.vjp.1.S: (Super) -> () -> Float : @$s10vtable_sil5SuperC8propertySfvgTZp0r0_vtable_entry_thunk
+// CHECK-NEXT:   #Super.property!getter.1.jvp.1.S: (Super) -> () -> Float : @AD__$s10vtable_sil5SuperC8propertySfvg__jvp_src_0_wrt_0_vtable_entry_thunk
+// CHECK-NEXT:   #Super.property!getter.1.vjp.1.S: (Super) -> () -> Float : @AD__$s10vtable_sil5SuperC8propertySfvg__vjp_src_0_wrt_0_vtable_entry_thunk
 // CHECK-NEXT:   #Super.f!1: (Super) -> (Float, Float) -> Float : @$s10vtable_sil5SuperC1fyS2f_SftF
-// CHECK-NEXT:   #Super.f!1.jvp.1.SUU: (Super) -> (Float, Float) -> Float : @$s10vtable_sil5SuperC1fyS2f_SftFTzp0r0_vtable_entry_thunk
-// CHECK-NEXT:   #Super.f!1.vjp.1.SUU: (Super) -> (Float, Float) -> Float : @$s10vtable_sil5SuperC1fyS2f_SftFTZp0r0_vtable_entry_thunk
+// CHECK-NEXT:   #Super.f!1.jvp.1.SUU: (Super) -> (Float, Float) -> Float : @AD__$s10vtable_sil5SuperC1fyS2f_SftF__jvp_src_0_wrt_0_vtable_entry_thunk
+// CHECK-NEXT:   #Super.f!1.vjp.1.SUU: (Super) -> (Float, Float) -> Float : @AD__$s10vtable_sil5SuperC1fyS2f_SftF__vjp_src_0_wrt_0_vtable_entry_thunk
 // CHECK-NEXT:   #Super.subscript!getter.1: (Super) -> (Float, Float) -> Float : @$s10vtable_sil5SuperCyS2f_Sftcig
-// CHECK-NEXT:   #Super.subscript!getter.1.jvp.1.SUU: (Super) -> (Float, Float) -> Float : @$s10vtable_sil5SuperCyS2f_SftcigTzp0r0_vtable_entry_thunk
-// CHECK-NEXT:   #Super.subscript!getter.1.vjp.1.SUU: (Super) -> (Float, Float) -> Float : @$s10vtable_sil5SuperCyS2f_SftcigTZp0r0_vtable_entry_thunk
+// CHECK-NEXT:   #Super.subscript!getter.1.jvp.1.SUU: (Super) -> (Float, Float) -> Float : @AD__$s10vtable_sil5SuperCyS2f_Sftcig__jvp_src_0_wrt_0_vtable_entry_thunk
+// CHECK-NEXT:   #Super.subscript!getter.1.vjp.1.SUU: (Super) -> (Float, Float) -> Float : @AD__$s10vtable_sil5SuperCyS2f_Sftcig__vjp_src_0_wrt_0_vtable_entry_thunk
 // CHECK-NEXT:   #Super.move!1: (Super) -> (Super.TangentVector) -> () : @$s10vtable_sil5SuperC4move5alongyAC13TangentVectorV_tF
 // CHECK-NEXT:   #Super.deinit!deallocator.1: @$s10vtable_sil5SuperCfD
 // CHECK-NEXT: }
@@ -112,17 +112,17 @@ class SubSub : Sub {}
 // CHECK-NEXT:   #Super._nontrivial!modify.1: (Super) -> () -> () : @$s10vtable_sil5SuperC11_nontrivialSaySfGvM [inherited]
 // CHECK-NEXT:   #Super.init!allocator.1: (Super.Type) -> (Float) -> Super : @$s10vtable_sil3SubC4baseACSf_tcfC [override]
 // CHECK-NEXT:   #Super.property!getter.1: (Super) -> () -> Float : @$s10vtable_sil3SubC8propertySfvg [override]
-// CHECK-NEXT:   #Super.property!getter.1.jvp.1.S: (Super) -> () -> Float : @$s10vtable_sil3SubC8propertySfvgTzp0r0_vtable_entry_thunk [override]
-// CHECK-NEXT:   #Super.property!getter.1.vjp.1.S: (Super) -> () -> Float : @$s10vtable_sil3SubC8propertySfvgTZp0r0_vtable_entry_thunk [override]
+// CHECK-NEXT:   #Super.property!getter.1.jvp.1.S: (Super) -> () -> Float : @AD__$s10vtable_sil3SubC8propertySfvg__jvp_src_0_wrt_0_vtable_entry_thunk [override]
+// CHECK-NEXT:   #Super.property!getter.1.vjp.1.S: (Super) -> () -> Float : @AD__$s10vtable_sil3SubC8propertySfvg__vjp_src_0_wrt_0_vtable_entry_thunk [override]
 // CHECK-NEXT:   #Super.f!1: (Super) -> (Float, Float) -> Float : @$s10vtable_sil3SubC1fyS2f_SftF [override]
-// CHECK-NEXT:   #Super.f!1.jvp.1.SUU: (Super) -> (Float, Float) -> Float : @$s10vtable_sil3SubC1fyS2f_SftFTzp0r0_vtable_entry_thunk [override]
-// CHECK-NEXT:   #Super.f!1.vjp.1.SUU: (Super) -> (Float, Float) -> Float : @$s10vtable_sil3SubC1fyS2f_SftFTZp0r0_vtable_entry_thunk [override]
+// CHECK-NEXT:   #Super.f!1.jvp.1.SUU: (Super) -> (Float, Float) -> Float : @AD__$s10vtable_sil3SubC1fyS2f_SftF__jvp_src_0_wrt_0_vtable_entry_thunk [override]
+// CHECK-NEXT:   #Super.f!1.vjp.1.SUU: (Super) -> (Float, Float) -> Float : @AD__$s10vtable_sil3SubC1fyS2f_SftF__vjp_src_0_wrt_0_vtable_entry_thunk [override]
 // CHECK-NEXT:   #Super.subscript!getter.1: (Super) -> (Float, Float) -> Float : @$s10vtable_sil3SubCyS2f_Sftcig [override]
-// CHECK-NEXT:   #Super.subscript!getter.1.jvp.1.SUU: (Super) -> (Float, Float) -> Float : @$s10vtable_sil3SubCyS2f_SftcigTzp0r0_vtable_entry_thunk [override]
-// CHECK-NEXT:   #Super.subscript!getter.1.vjp.1.SUU: (Super) -> (Float, Float) -> Float : @$s10vtable_sil3SubCyS2f_SftcigTZp0r0_vtable_entry_thunk [override]
+// CHECK-NEXT:   #Super.subscript!getter.1.jvp.1.SUU: (Super) -> (Float, Float) -> Float : @AD__$s10vtable_sil3SubCyS2f_Sftcig__jvp_src_0_wrt_0_vtable_entry_thunk [override]
+// CHECK-NEXT:   #Super.subscript!getter.1.vjp.1.SUU: (Super) -> (Float, Float) -> Float : @AD__$s10vtable_sil3SubCyS2f_Sftcig__vjp_src_0_wrt_0_vtable_entry_thunk [override]
 // CHECK-NEXT:   #Super.move!1: (Super) -> (Super.TangentVector) -> () : @$s10vtable_sil5SuperC4move5alongyAC13TangentVectorV_tF [inherited]
-// CHECK-NEXT:   #Sub.f!1.jvp.1.SSU: (Sub) -> (Float, Float) -> Float : @$s10vtable_sil3SubC1fyS2f_SftFTzp0_1r0_vtable_entry_thunk
-// CHECK-NEXT:   #Sub.f!1.vjp.1.SSU: (Sub) -> (Float, Float) -> Float : @$s10vtable_sil3SubC1fyS2f_SftFTZp0_1r0_vtable_entry_thunk
+// CHECK-NEXT:   #Sub.f!1.jvp.1.SSU: (Sub) -> (Float, Float) -> Float : @AD__$s10vtable_sil3SubC1fyS2f_SftF__jvp_src_0_wrt_0_1_vtable_entry_thunk
+// CHECK-NEXT:   #Sub.f!1.vjp.1.SSU: (Sub) -> (Float, Float) -> Float : @AD__$s10vtable_sil3SubC1fyS2f_SftF__vjp_src_0_wrt_0_1_vtable_entry_thunk
 // CHECK-NEXT:   #Sub.deinit!deallocator.1: @$s10vtable_sil3SubCfD
 // CHECK-NEXT: }
 
@@ -135,16 +135,16 @@ class SubSub : Sub {}
 // CHECK-NEXT:   #Super._nontrivial!modify.1: (Super) -> () -> () : @$s10vtable_sil5SuperC11_nontrivialSaySfGvM [inherited]
 // CHECK-NEXT:   #Super.init!allocator.1: (Super.Type) -> (Float) -> Super : @$s10vtable_sil03SubC0C4baseACSf_tcfC [override]
 // CHECK-NEXT:   #Super.property!getter.1: (Super) -> () -> Float : @$s10vtable_sil3SubC8propertySfvg [inherited]
-// CHECK-NEXT:   #Super.property!getter.1.jvp.1.S: (Super) -> () -> Float : @$s10vtable_sil3SubC8propertySfvgTzp0r0_vtable_entry_thunk [inherited]
-// CHECK-NEXT:   #Super.property!getter.1.vjp.1.S: (Super) -> () -> Float : @$s10vtable_sil3SubC8propertySfvgTZp0r0_vtable_entry_thunk [inherited]
+// CHECK-NEXT:   #Super.property!getter.1.jvp.1.S: (Super) -> () -> Float : @AD__$s10vtable_sil3SubC8propertySfvg__jvp_src_0_wrt_0_vtable_entry_thunk [inherited]
+// CHECK-NEXT:   #Super.property!getter.1.vjp.1.S: (Super) -> () -> Float : @AD__$s10vtable_sil3SubC8propertySfvg__vjp_src_0_wrt_0_vtable_entry_thunk [inherited]
 // CHECK-NEXT:   #Super.f!1: (Super) -> (Float, Float) -> Float : @$s10vtable_sil3SubC1fyS2f_SftF [inherited]
-// CHECK-NEXT:   #Super.f!1.jvp.1.SUU: (Super) -> (Float, Float) -> Float : @$s10vtable_sil3SubC1fyS2f_SftFTzp0r0_vtable_entry_thunk [inherited]
-// CHECK-NEXT:   #Super.f!1.vjp.1.SUU: (Super) -> (Float, Float) -> Float : @$s10vtable_sil3SubC1fyS2f_SftFTZp0r0_vtable_entry_thunk [inherited]
+// CHECK-NEXT:   #Super.f!1.jvp.1.SUU: (Super) -> (Float, Float) -> Float : @AD__$s10vtable_sil3SubC1fyS2f_SftF__jvp_src_0_wrt_0_vtable_entry_thunk [inherited]
+// CHECK-NEXT:   #Super.f!1.vjp.1.SUU: (Super) -> (Float, Float) -> Float : @AD__$s10vtable_sil3SubC1fyS2f_SftF__vjp_src_0_wrt_0_vtable_entry_thunk [inherited]
 // CHECK-NEXT:   #Super.subscript!getter.1: (Super) -> (Float, Float) -> Float : @$s10vtable_sil3SubCyS2f_Sftcig [inherited]
-// CHECK-NEXT:   #Super.subscript!getter.1.jvp.1.SUU: (Super) -> (Float, Float) -> Float : @$s10vtable_sil3SubCyS2f_SftcigTzp0r0_vtable_entry_thunk [inherited]
-// CHECK-NEXT:   #Super.subscript!getter.1.vjp.1.SUU: (Super) -> (Float, Float) -> Float : @$s10vtable_sil3SubCyS2f_SftcigTZp0r0_vtable_entry_thunk [inherited]
+// CHECK-NEXT:   #Super.subscript!getter.1.jvp.1.SUU: (Super) -> (Float, Float) -> Float : @AD__$s10vtable_sil3SubCyS2f_Sftcig__jvp_src_0_wrt_0_vtable_entry_thunk [inherited]
+// CHECK-NEXT:   #Super.subscript!getter.1.vjp.1.SUU: (Super) -> (Float, Float) -> Float : @AD__$s10vtable_sil3SubCyS2f_Sftcig__vjp_src_0_wrt_0_vtable_entry_thunk [inherited]
 // CHECK-NEXT:   #Super.move!1: (Super) -> (Super.TangentVector) -> () : @$s10vtable_sil5SuperC4move5alongyAC13TangentVectorV_tF [inherited]
-// CHECK-NEXT:   #Sub.f!1.jvp.1.SSU: (Sub) -> (Float, Float) -> Float : @$s10vtable_sil3SubC1fyS2f_SftFTzp0_1r0_vtable_entry_thunk [inherited]
-// CHECK-NEXT:   #Sub.f!1.vjp.1.SSU: (Sub) -> (Float, Float) -> Float : @$s10vtable_sil3SubC1fyS2f_SftFTZp0_1r0_vtable_entry_thunk [inherited]
+// CHECK-NEXT:   #Sub.f!1.jvp.1.SSU: (Sub) -> (Float, Float) -> Float : @AD__$s10vtable_sil3SubC1fyS2f_SftF__jvp_src_0_wrt_0_1_vtable_entry_thunk [inherited]
+// CHECK-NEXT:   #Sub.f!1.vjp.1.SSU: (Sub) -> (Float, Float) -> Float : @AD__$s10vtable_sil3SubC1fyS2f_SftF__vjp_src_0_wrt_0_1_vtable_entry_thunk [inherited]
 // CHECK-NEXT:   #SubSub.deinit!deallocator.1: @$s10vtable_sil03SubC0CfD
 // CHECK-NEXT: }
