@@ -2794,6 +2794,13 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
+  void visitOneWayExpr(OneWayExpr *E) {
+    printCommon(E, "one_way_expr");
+    OS << '\n';
+    printRec(E->getSubExpr());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
   void visitTapExpr(TapExpr *E) {
     printCommon(E, "tap_expr");
     PrintWithColorRAII(OS, DeclColor) << " var=";

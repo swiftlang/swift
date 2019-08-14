@@ -404,6 +404,10 @@ def Rmodule_interface_rebuild : Flag<["-"], "Rmodule-interface-rebuild">,
 
 def solver_expression_time_threshold_EQ : Joined<["-"], "solver-expression-time-threshold=">;
 
+def enable_function_builder_one_way_constraints : Flag<["-"],
+  "enable-function-builder-one-way-constraints">,
+  HelpText<"Enable one-way constraints in the function builder transformation">;
+
 def solver_disable_shrink :
   Flag<["-"], "solver-disable-shrink">,
   HelpText<"Disable the shrink phase of expression type checking">;
