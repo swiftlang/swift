@@ -723,6 +723,26 @@ namespace {
     }
 
   private:
+    /// Perform the union of two type variables in a union-find data structure
+    /// used for connected components.
+    ///
+    /// \returns true if the two components were separate and have now been
+    /// joined, \c false if they were already in the same set.
+    bool unionSets(TypeVariableType *typeVar1, TypeVariableType *typeVar2) {
+      auto rep1 = findRepresentative(typeVar1);
+      auto rep2 = findRepresentative(typeVar2);
+      if (rep1 == rep2)
+        return false;
+
+      // Reparent the type variable with the higher ID. The actual choice doesn't
+      // matter, but this makes debugging easier.
+      if (rep1->getID() < rep2->getID())
+        representatives[rep2] = rep1;
+      else
+        representatives[rep1] = rep2;
+      return true;
+    }
+
     /// Perform the connected components algorithm, skipping one-way
     /// constraints.
     ///
@@ -773,24 +793,24 @@ namespace {
         vector.push_back(typeVar);
     }
 
-    /// Build the directed graph of one-way constraints among components.
-    void buildOneWayConstraintGraph(ArrayRef<Constraint *> oneWayConstraints)  {
-      /// Retrieve the set of representatives for the type variables that
-      /// occur within the given type.
-      auto getRepresentativesInType = [&](Type type) {
-        TinyPtrVector<TypeVariableType *> results;
+    /// Retrieve the (uniqued) set of type variable representations that occur
+    /// within the given type.
+    TinyPtrVector<TypeVariableType *>
+    getRepresentativesInType(Type type) const {
+      TinyPtrVector<TypeVariableType *> results;
 
-        SmallVector<TypeVariableType *, 2> typeVars;
-        type->getTypeVariables(typeVars);
-        for (auto typeVar : typeVars) {
-          auto rep = findRepresentative(typeVar);
-          insertIfUnique(results, rep);
-        }
+      SmallVector<TypeVariableType *, 2> typeVars;
+      type->getTypeVariables(typeVars);
+      for (auto typeVar : typeVars) {
+        auto rep = findRepresentative(typeVar);
+        insertIfUnique(results, rep);
+      }
 
-        return results;
-      };
+      return results;
+    }
 
-      // Add all of the one-way constraint edges to the digraph.
+    /// Add all of the one-way constraints to the one-way digraph
+    void addOneWayConstraintEdges(ArrayRef<Constraint *> oneWayConstraints) {
       for (auto constraint : oneWayConstraints) {
         auto lhsTypeReps =
             getRepresentativesInType(constraint->getFirstType());
@@ -803,14 +823,56 @@ namespace {
         // be solved before the left-hand type variables.
         for (auto lhsTypeRep : lhsTypeReps) {
           for (auto rhsTypeRep : rhsTypeReps) {
+            if (lhsTypeRep == rhsTypeRep)
+              break;
+
             insertIfUnique(oneWayDigraph[rhsTypeRep].outAdjacencies,lhsTypeRep);
             insertIfUnique(oneWayDigraph[lhsTypeRep].inAdjacencies,rhsTypeRep);
           }
         }
       }
+    }
 
-      // Minimize the in-adjacencies.
-      removeIndirectOneWayInAdjacencies();
+    using TypeVariablePair = std::pair<TypeVariableType *, TypeVariableType *>;
+
+    /// Build the directed graph of one-way constraints among components.
+    void buildOneWayConstraintGraph(ArrayRef<Constraint *> oneWayConstraints) {
+      auto &cs = cg.getConstraintSystem();
+      auto &ctx = cs.getASTContext();
+      bool contractedCycle = false;
+      do {
+        // Construct the one-way digraph from scratch.
+        oneWayDigraph.clear();
+        addOneWayConstraintEdges(oneWayConstraints);
+
+        // Minimize the in-adjacencies, detecting cycles along the way.
+        SmallVector<TypeVariablePair, 4> cycleEdges;
+        removeIndirectOneWayInAdjacencies(cycleEdges);
+
+        // For any contractions we need to perform due to cycles, perform a
+        // union the connected components based on the type variable pairs.
+        contractedCycle = false;
+        for (const auto &edge : cycleEdges) {
+          if (unionSets(edge.first, edge.second)) {
+            if (ctx.LangOpts.DebugConstraintSolver) {
+              auto &log = ctx.TypeCheckerDebug->getStream();
+              if (cs.solverState)
+                log.indent(cs.solverState->depth * 2);
+
+              log << "Collapsing one-way components for $T"
+                  << edge.first->getID() << " and $T" << edge.second->getID()
+                  << " due to cycle.\n";
+            }
+
+            if (ctx.Stats) {
+              ctx.Stats->getFrontendCounters()
+                  .NumCyclicOneWayComponentsCollapsed++;
+            }
+
+            contractedCycle = true;
+          }
+        }
+      } while (contractedCycle);
     }
 
     /// Perform a depth-first search to produce a from the given type variable,
@@ -845,14 +907,17 @@ namespace {
     /// Minimize the incoming adjacencies for one of the nodes in the one-way
     /// directed graph by eliminating any in-adjacencies that can also be
     /// found indirectly.
-    void removeIndirectOneWayInAdjacencies(TypeVariableType *typeVar,
-                                           OneWayComponent &component) {
+    void removeIndirectOneWayInAdjacencies(
+        TypeVariableType *typeVar,
+        OneWayComponent &component,
+        SmallVectorImpl<TypeVariablePair> &cycleEdges) {
       // Perform a depth-first search from each of the in adjacencies to
       // this type variable, traversing each of the one-way edges backwards
       // to find all of the components whose type variables must be
       // bound before this component can be solved.
       SmallPtrSet<TypeVariableType *, 4> visited;
       SmallPtrSet<TypeVariableType *, 4> indirectlyReachable;
+      SmallVector<TypeVariableType *, 4> currentPath;
       for (auto inAdj : component.inAdjacencies) {
         postorderDepthFirstSearchRec(
             inAdj,
@@ -866,9 +931,30 @@ namespace {
               return oneWayComponent->second.inAdjacencies;
             },
             [&](TypeVariableType *typeVar) {
-              return visited.insert(typeVar).second;
+              // If we haven't seen this type variable yet, add it to the
+              // path.
+              if (visited.insert(typeVar).second) {
+                currentPath.push_back(typeVar);
+                return true;
+              }
+
+              // Add edges between this type variable and every other type
+              // variable in the path.
+              for (auto otherTypeVar : reversed(currentPath)) {
+                // When we run into our own type variable, we're done.
+                if (otherTypeVar == typeVar)
+                  break;
+
+                cycleEdges.push_back({typeVar, otherTypeVar});
+              }
+
+              return false;
             },
             [&](TypeVariableType *dependsOn) {
+              // Remove this type variable from the path.
+              assert(currentPath.back() == dependsOn);
+              currentPath.pop_back();
+
               // Don't record dependency on ourselves.
               if (dependsOn == inAdj)
                 return;
@@ -891,11 +977,12 @@ namespace {
     /// Minimize the incoming adjacencies for all of the nodes in the one-way
     /// directed graph by eliminating any in-adjacencies that can also be
     /// found indirectly.
-    void removeIndirectOneWayInAdjacencies()  {
+    void removeIndirectOneWayInAdjacencies(
+        SmallVectorImpl<TypeVariablePair> &cycleEdges)  {
       for (auto &oneWayEntry : oneWayDigraph) {
         auto typeVar = oneWayEntry.first;
         auto &component = oneWayEntry.second;
-        removeIndirectOneWayInAdjacencies(typeVar, component);
+        removeIndirectOneWayInAdjacencies(typeVar, component, cycleEdges);
       }
     }
 
