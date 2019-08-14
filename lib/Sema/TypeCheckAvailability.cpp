@@ -16,6 +16,7 @@
 
 #include "TypeCheckAvailability.h"
 #include "TypeChecker.h"
+#include "TypeCheckObjC.h"
 #include "MiscDiagnostics.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Initializer.h"

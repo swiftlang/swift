@@ -20,6 +20,7 @@
 #include "MiscDiagnostics.h"
 #include "TypeAccessScopeChecker.h"
 #include "TypeCheckAvailability.h"
+#include "TypeCheckObjC.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Basic/Statistic.h"

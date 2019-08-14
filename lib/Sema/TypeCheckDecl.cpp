@@ -496,7 +496,7 @@ static void checkGenericParams(GenericParamList *genericParams,
     return;
 
   for (auto gp : *genericParams) {
-    tc.checkDeclAttributesEarly(gp);
+    tc.checkDeclAttributes(gp);
     checkInheritanceClause(gp);
   }
 
@@ -1766,7 +1766,6 @@ lookupPrecedenceGroupPrimitive(DeclContext *dc, Identifier name,
 }
 
 void TypeChecker::validateDecl(PrecedenceGroupDecl *PGD) {
-  checkDeclAttributesEarly(PGD);
   checkDeclAttributes(PGD);
 
   if (PGD->isInvalid() || PGD->hasValidationStarted())
@@ -1882,7 +1881,6 @@ static bool checkDesignatedTypes(OperatorDecl *OD,
 /// reference to its precedence group and the transitive validity of that
 /// group.
 void TypeChecker::validateDecl(OperatorDecl *OD) {
-  checkDeclAttributesEarly(OD);
   checkDeclAttributes(OD);
 
   auto IOD = dyn_cast<InfixOperatorDecl>(OD);
@@ -2128,7 +2126,6 @@ public:
   }
   
   void visitImportDecl(ImportDecl *ID) {
-    TC.checkDeclAttributesEarly(ID);
     TC.checkDeclAttributes(ID);
   }
 
@@ -2222,7 +2219,6 @@ public:
       }
     }
 
-    TC.checkDeclAttributesEarly(VD);
     TC.checkDeclAttributes(VD);
     validateAttributes(TC, VD);
 
@@ -2287,7 +2283,7 @@ public:
     // Check all the pattern/init pairs in the PBD.
     validatePatternBindingEntries(TC, PBD);
 
-    TC.checkDeclAttributesEarly(PBD);
+    TC.checkDeclAttributes(PBD);
 
     for (unsigned i = 0, e = PBD->getNumPatternEntries(); i != e; ++i) {
       // Type check each VarDecl that this PatternBinding handles.
@@ -2456,7 +2452,6 @@ public:
       TC.checkProtocolSelfRequirements(SD);
     }
 
-    TC.checkDeclAttributesEarly(SD);
     TC.checkDeclAttributes(SD);
     validateAttributes(TC, SD);
 
@@ -2502,7 +2497,6 @@ public:
   }
 
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
-    TC.checkDeclAttributesEarly(TAD);
 
     TC.validateDecl(TAD);
     TC.checkDeclAttributes(TAD);
@@ -2511,8 +2505,6 @@ public:
   }
   
   void visitOpaqueTypeDecl(OpaqueTypeDecl *OTD) {
-    TC.checkDeclAttributesEarly(OTD);
-    
     TC.validateDecl(OTD);
     TC.checkDeclAttributes(OTD);
     
@@ -2520,8 +2512,6 @@ public:
   }
   
   void visitAssociatedTypeDecl(AssociatedTypeDecl *AT) {
-    TC.checkDeclAttributesEarly(AT);
-
     TC.validateDecl(AT);
     TC.checkDeclAttributes(AT);
 
@@ -2623,7 +2613,6 @@ public:
     for (Decl *member : ED->getMembers())
       visit(member);
 
-    TC.checkDeclAttributesEarly(ED);
     TC.checkDeclAttributes(ED);
     validateAttributes(TC, ED);
 
@@ -2659,7 +2648,6 @@ public:
 
     TC.checkPatternBindingCaptures(SD);
 
-    TC.checkDeclAttributesEarly(SD);
     TC.checkDeclAttributes(SD);
     validateAttributes(TC, SD);
 
@@ -2904,7 +2892,6 @@ public:
       }
     }
 
-    TC.checkDeclAttributesEarly(CD);
     TC.checkDeclAttributes(CD);
     validateAttributes(TC, CD);
 
@@ -2947,7 +2934,6 @@ public:
     for (auto Member : PD->getMembers())
       visit(Member);
 
-    TC.checkDeclAttributesEarly(PD);
     TC.checkDeclAttributes(PD);
     validateAttributes(TC, PD);
 
@@ -3049,7 +3035,6 @@ public:
     checkAccessControl(TC, FD);
 
     TC.checkParameterAttributes(FD->getParameters());
-    TC.checkDeclAttributesEarly(FD);
     TC.checkDeclAttributes(FD);
     validateAttributes(TC, FD);
 
@@ -3095,7 +3080,6 @@ public:
   void visitEnumElementDecl(EnumElementDecl *EED) {
     TC.validateDecl(EED);
 
-    TC.checkDeclAttributesEarly(EED);
     TC.checkDeclAttributes(EED);
     validateAttributes(TC, EED);
 
@@ -3136,8 +3120,6 @@ public:
 
     checkGenericParams(ED->getGenericParams(), ED, TC);
 
-    TC.checkDeclAttributesEarly(ED);
-
     for (Decl *Member : ED->getMembers())
       visit(Member);
 
@@ -3158,7 +3140,6 @@ public:
   void visitIfConfigDecl(IfConfigDecl *ICD) {
     // The active members of the #if block will be type checked along with
     // their enclosing declaration.
-    TC.checkDeclAttributesEarly(ICD);
     TC.checkDeclAttributes(ICD);
   }
 
@@ -3183,7 +3164,6 @@ public:
       TC.checkProtocolSelfRequirements(CD);
     }
 
-    TC.checkDeclAttributesEarly(CD);
     TC.checkDeclAttributes(CD);
     validateAttributes(TC, CD);
     TC.checkParameterAttributes(CD->getParameters());
@@ -3303,7 +3283,6 @@ public:
   void visitDestructorDecl(DestructorDecl *DD) {
     TC.validateDecl(DD);
 
-    TC.checkDeclAttributesEarly(DD);
     TC.checkDeclAttributes(DD);
     validateAttributes(TC, DD);
 

@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "MiscDiagnostics.h"
+#include "TypeCheckObjC.h"
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
@@ -56,15 +57,14 @@ namespace {
     attr->setInvalid();
   }
 
-/// This visits each attribute on a decl early, before the majority of type
-/// checking has been performed for the decl.  The visitor should return true if
+/// This visits each attribute on a decl.  The visitor should return true if
 /// the attribute is invalid and should be marked as such.
-class AttributeEarlyChecker : public AttributeVisitor<AttributeEarlyChecker> {
+class AttributeChecker : public AttributeVisitor<AttributeChecker> {
   TypeChecker &TC;
   Decl *D;
 
 public:
-  AttributeEarlyChecker(TypeChecker &TC, Decl *D) : TC(TC), D(D) {}
+  AttributeChecker(TypeChecker &TC, Decl *D) : TC(TC), D(D) {}
 
   /// This emits a diagnostic with a fixit to remove the attribute.
   template<typename ...ArgTypes>
@@ -78,59 +78,33 @@ public:
 
 #define IGNORED_ATTR(X) void visit##X##Attr(X##Attr *) {}
   IGNORED_ATTR(AlwaysEmitIntoClient)
-  IGNORED_ATTR(Available)
   IGNORED_ATTR(HasInitialValue)
-  IGNORED_ATTR(CDecl)
   IGNORED_ATTR(ClangImporterSynthesizedType)
   IGNORED_ATTR(Convenience)
-  IGNORED_ATTR(DiscardableResult)
-  IGNORED_ATTR(DynamicCallable)
-  IGNORED_ATTR(DynamicMemberLookup)
   IGNORED_ATTR(Effects)
   IGNORED_ATTR(Exported)
-  IGNORED_ATTR(FixedLayout)
   IGNORED_ATTR(ForbidSerializingReference)
-  IGNORED_ATTR(Frozen)
   IGNORED_ATTR(HasStorage)
-  IGNORED_ATTR(ImplementationOnly)
-  IGNORED_ATTR(Implements)
-  IGNORED_ATTR(Infix)
-  IGNORED_ATTR(Inlinable)
   IGNORED_ATTR(Inline)
   IGNORED_ATTR(NonObjC)
-  IGNORED_ATTR(NSApplicationMain)
-  IGNORED_ATTR(NSCopying)
   IGNORED_ATTR(ObjC)
   IGNORED_ATTR(ObjCBridged)
   IGNORED_ATTR(ObjCNonLazyRealization)
   IGNORED_ATTR(ObjCRuntimeName)
-  IGNORED_ATTR(Optimize)
   IGNORED_ATTR(Optional)
-  IGNORED_ATTR(Postfix)
-  IGNORED_ATTR(Prefix)
   IGNORED_ATTR(RawDocComment)
-  IGNORED_ATTR(Required)
   IGNORED_ATTR(RequiresStoredPropertyInits)
   IGNORED_ATTR(RestatedObjCConformance)
-  IGNORED_ATTR(Rethrows)
   IGNORED_ATTR(Semantics)
   IGNORED_ATTR(ShowInInterface)
   IGNORED_ATTR(SILGenName)
-  IGNORED_ATTR(Specialize)
   IGNORED_ATTR(StaticInitializeObjCMetadata)
-  IGNORED_ATTR(SwiftNativeObjCRuntimeBase)
   IGNORED_ATTR(SynthesizedProtocol)
   IGNORED_ATTR(Testable)
-  IGNORED_ATTR(UIApplicationMain)
-  IGNORED_ATTR(UnsafeNoObjCTaggedPointer)
-  IGNORED_ATTR(UsableFromInline)
   IGNORED_ATTR(WeakLinked)
   IGNORED_ATTR(DynamicReplacement)
   IGNORED_ATTR(PrivateImport)
-  IGNORED_ATTR(Custom)
-  IGNORED_ATTR(PropertyWrapper)
   IGNORED_ATTR(DisfavoredOverload)
-  IGNORED_ATTR(FunctionBuilder)
   IGNORED_ATTR(ProjectedValueProperty)
   IGNORED_ATTR(ReferenceOwnership)
 #undef IGNORED_ATTR
@@ -175,32 +149,6 @@ public:
   void visitConsumingAttr(ConsumingAttr *attr) { visitMutationAttr(attr); }
   void visitDynamicAttr(DynamicAttr *attr);
 
-  void visitFinalAttr(FinalAttr *attr) {
-    // Reject combining 'final' with 'open'.
-    if (auto accessAttr = D->getAttrs().getAttribute<AccessControlAttr>()) {
-      if (accessAttr->getAccess() == AccessLevel::Open) {
-        TC.diagnose(attr->getLocation(), diag::open_decl_cannot_be_final,
-                    D->getDescriptiveKind());
-        return;
-      }
-    }
-
-    if (isa<ClassDecl>(D))
-      return;
-
-    // 'final' only makes sense in the context of a class declaration.
-    // Reject it on global functions, protocols, structs, enums, etc.
-    if (!D->getDeclContext()->getSelfClassDecl()) {
-      TC.diagnose(attr->getLocation(), diag::member_cannot_be_final)
-        .fixItRemove(attr->getRange());
-
-      // Remove the attribute so child declarations are not flagged as final
-      // and duplicate the error message.
-      D->getAttrs().removeAttribute(attr);
-      return;
-    }
-  }
-
   void visitIndirectAttr(IndirectAttr *attr) {
     if (auto caseDecl = dyn_cast<EnumElementDecl>(D)) {
       // An indirect case should have a payload.
@@ -221,6 +169,7 @@ public:
     }
   }
 
+  void visitFinalAttr(FinalAttr *attr);
   void visitIBActionAttr(IBActionAttr *attr);
   void visitIBSegueActionAttr(IBSegueActionAttr *attr);
   void visitLazyAttr(LazyAttr *attr);
@@ -236,10 +185,58 @@ public:
   void visitSetterAccessAttr(SetterAccessAttr *attr);
   bool visitAbstractAccessControlAttr(AbstractAccessControlAttr *attr);
   void visitObjCMembersAttr(ObjCMembersAttr *attr);
+
+  void visitAvailableAttr(AvailableAttr *attr);
+
+  void visitCDeclAttr(CDeclAttr *attr);
+
+  void visitDynamicCallableAttr(DynamicCallableAttr *attr);
+
+  void visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr);
+
+  void visitNSCopyingAttr(NSCopyingAttr *attr);
+  void visitRequiredAttr(RequiredAttr *attr);
+  void visitRethrowsAttr(RethrowsAttr *attr);
+
+  void checkApplicationMainAttribute(DeclAttribute *attr,
+                                     Identifier Id_ApplicationDelegate,
+                                     Identifier Id_Kit,
+                                     Identifier Id_ApplicationMain);
+
+  void visitNSApplicationMainAttr(NSApplicationMainAttr *attr);
+  void visitUIApplicationMainAttr(UIApplicationMainAttr *attr);
+
+  void visitUnsafeNoObjCTaggedPointerAttr(UnsafeNoObjCTaggedPointerAttr *attr);
+  void visitSwiftNativeObjCRuntimeBaseAttr(
+                                         SwiftNativeObjCRuntimeBaseAttr *attr);
+
+  void checkOperatorAttribute(DeclAttribute *attr);
+
+  void visitInfixAttr(InfixAttr *attr) { checkOperatorAttribute(attr); }
+  void visitPostfixAttr(PostfixAttr *attr) { checkOperatorAttribute(attr); }
+  void visitPrefixAttr(PrefixAttr *attr) { checkOperatorAttribute(attr); }
+
+  void visitSpecializeAttr(SpecializeAttr *attr);
+
+  void visitFixedLayoutAttr(FixedLayoutAttr *attr);
+  void visitUsableFromInlineAttr(UsableFromInlineAttr *attr);
+  void visitInlinableAttr(InlinableAttr *attr);
+  void visitOptimizeAttr(OptimizeAttr *attr);
+
+  void visitDiscardableResultAttr(DiscardableResultAttr *attr);
+  void visitImplementsAttr(ImplementsAttr *attr);
+
+  void visitFrozenAttr(FrozenAttr *attr);
+
+  void visitCustomAttr(CustomAttr *attr);
+  void visitPropertyWrapperAttr(PropertyWrapperAttr *attr);
+  void visitFunctionBuilderAttr(FunctionBuilderAttr *attr);
+
+  void visitImplementationOnlyAttr(ImplementationOnlyAttr *attr);
 };
 } // end anonymous namespace
 
-void AttributeEarlyChecker::visitTransparentAttr(TransparentAttr *attr) {
+void AttributeChecker::visitTransparentAttr(TransparentAttr *attr) {
   DeclContext *Ctx = D->getDeclContext();
   // Protocol declarations cannot be transparent.
   if (isa<ProtocolDecl>(Ctx))
@@ -262,7 +259,7 @@ void AttributeEarlyChecker::visitTransparentAttr(TransparentAttr *attr) {
   }
 }
 
-void AttributeEarlyChecker::visitMutationAttr(DeclAttribute *attr) {
+void AttributeChecker::visitMutationAttr(DeclAttribute *attr) {
   FuncDecl *FD = cast<FuncDecl>(D);
 
   SelfAccessKind attrModifier;
@@ -326,7 +323,7 @@ void AttributeEarlyChecker::visitMutationAttr(DeclAttribute *attr) {
     diagnoseAndRemoveAttr(attr, diag::static_functions_not_mutating);
 }
 
-void AttributeEarlyChecker::visitDynamicAttr(DynamicAttr *attr) {
+void AttributeChecker::visitDynamicAttr(DynamicAttr *attr) {
   // Members cannot be both dynamic and @_transparent.
   if (D->getAttrs().hasAttribute<TransparentAttr>())
     diagnoseAndRemoveAttr(attr, diag::dynamic_with_transparent);
@@ -336,23 +333,150 @@ void AttributeEarlyChecker::visitDynamicAttr(DynamicAttr *attr) {
                           diag::dynamic_and_library_evolution_not_supported);
 }
 
-void AttributeEarlyChecker::visitIBActionAttr(IBActionAttr *attr) {
+static bool
+validateIBActionSignature(TypeChecker &TC, DeclAttribute *attr, const FuncDecl *FD,
+                          unsigned minParameters, unsigned maxParameters,
+                          bool hasVoidResult = true) {
+  bool valid = true;
+
+  auto arity = FD->getParameters()->size();
+  auto resultType = FD->getResultInterfaceType();
+
+  if (arity < minParameters || arity > maxParameters) {
+    auto diagID = diag::invalid_ibaction_argument_count;
+    if (minParameters == maxParameters)
+      diagID = diag::invalid_ibaction_argument_count_exact;
+    else if (minParameters == 0)
+      diagID = diag::invalid_ibaction_argument_count_max;
+    TC.diagnose(FD, diagID, attr->getAttrName(), minParameters, maxParameters);
+    valid = false;
+  }
+
+  if (resultType->isVoid() != hasVoidResult) {
+    TC.diagnose(FD, diag::invalid_ibaction_result, attr->getAttrName(),
+                hasVoidResult);
+    valid = false;
+  }
+
+  // We don't need to check here that parameter or return types are
+  // ObjC-representable; IsObjCRequest will validate that.
+
+  if (!valid)
+    attr->setInvalid();
+  return valid;
+}
+
+static bool isiOS(TypeChecker &TC) {
+  return TC.getLangOpts().Target.isiOS();
+}
+
+static bool iswatchOS(TypeChecker &TC) {
+  return TC.getLangOpts().Target.isWatchOS();
+}
+
+static bool isRelaxedIBAction(TypeChecker &TC) {
+  return isiOS(TC) || iswatchOS(TC);
+}
+
+void AttributeChecker::visitIBActionAttr(IBActionAttr *attr) {
+  // Only instance methods can be IBActions.
+  const FuncDecl *FD = cast<FuncDecl>(D);
+  if (!FD->isPotentialIBActionTarget()) {
+    diagnoseAndRemoveAttr(attr, diag::invalid_ibaction_decl,
+                          attr->getAttrName());
+    return;
+  }
+
+  if (isRelaxedIBAction(TC))
+    // iOS, tvOS, and watchOS allow 0-2 parameters to an @IBAction method.
+    validateIBActionSignature(TC, attr, FD, /*minParams=*/0, /*maxParams=*/2);
+  else
+    // macOS allows 1 parameter to an @IBAction method.
+    validateIBActionSignature(TC, attr, FD, /*minParams=*/1, /*maxParams=*/1);
+}
+
+void AttributeChecker::visitIBSegueActionAttr(IBSegueActionAttr *attr) {
   // Only instance methods can be IBActions.
   const FuncDecl *FD = cast<FuncDecl>(D);
   if (!FD->isPotentialIBActionTarget())
     diagnoseAndRemoveAttr(attr, diag::invalid_ibaction_decl,
                           attr->getAttrName());
+
+  if (!validateIBActionSignature(TC, attr, FD,
+                                 /*minParams=*/1, /*maxParams=*/3,
+                                 /*hasVoidResult=*/false))
+    return;
+
+  // If the IBSegueAction method's selector belongs to one of the ObjC method
+  // families (like -newDocumentSegue: or -copyScreen), it would return the
+  // object at +1, but the caller would expect it to be +0 and would therefore
+  // leak it.
+  //
+  // To prevent that, diagnose if the selector belongs to one of the method
+  // families and suggest that the user change the Swift name or Obj-C selector.
+  auto currentSelector = FD->getObjCSelector();
+
+  SmallString<32> prefix("make");
+
+  switch (currentSelector.getSelectorFamily()) {
+  case ObjCSelectorFamily::None:
+    // No error--exit early.
+    return;
+
+  case ObjCSelectorFamily::Alloc:
+  case ObjCSelectorFamily::Init:
+  case ObjCSelectorFamily::New:
+    // Fix-it will replace the "alloc"/"init"/"new" in the selector with "make".
+    break;
+
+  case ObjCSelectorFamily::Copy:
+    // Fix-it will replace the "copy" in the selector with "makeCopy".
+    prefix += "Copy";
+    break;
+
+  case ObjCSelectorFamily::MutableCopy:
+    // Fix-it will replace the "mutable" in the selector with "makeMutable".
+    prefix += "Mutable";
+    break;
+  }
+
+  // Emit the actual error.
+  TC.diagnose(FD, diag::ibsegueaction_objc_method_family,
+              attr->getAttrName(), currentSelector);
+
+  // The rest of this is just fix-it generation.
+
+  /// Replaces the first word of \c oldName with the prefix, where "word" is a
+  /// sequence of lowercase characters.
+  auto replacingPrefix = [&](Identifier oldName) -> Identifier {
+    SmallString<32> scratch = prefix;
+    scratch += oldName.str().drop_while(clang::isLowercase);
+    return TC.Context.getIdentifier(scratch);
+  };
+
+  // Suggest changing the Swift name of the method, unless there is already an
+  // explicit selector.
+  if (!FD->getAttrs().hasAttribute<ObjCAttr>() ||
+      !FD->getAttrs().getAttribute<ObjCAttr>()->hasName()) {
+    auto newSwiftBaseName = replacingPrefix(FD->getBaseName().getIdentifier());
+    auto argumentNames = FD->getFullName().getArgumentNames();
+    DeclName newSwiftName(TC.Context, newSwiftBaseName, argumentNames);
+
+    auto diag = TC.diagnose(FD, diag::fixit_rename_in_swift, newSwiftName);
+    fixDeclarationName(diag, FD, newSwiftName);
+  }
+
+  // Suggest changing just the selector to one with a different first piece.
+  auto oldPieces = currentSelector.getSelectorPieces();
+  SmallVector<Identifier, 4> newPieces(oldPieces.begin(), oldPieces.end());
+  newPieces[0] = replacingPrefix(newPieces[0]);
+  ObjCSelector newSelector(TC.Context, currentSelector.getNumArgs(), newPieces);
+
+  auto diag = TC.diagnose(FD, diag::fixit_rename_in_objc, newSelector);
+  fixDeclarationObjCName(diag, FD, currentSelector, newSelector);
 }
 
-void AttributeEarlyChecker::visitIBSegueActionAttr(IBSegueActionAttr *attr) {
-  // Only instance methods can be IBActions.
-  const FuncDecl *FD = cast<FuncDecl>(D);
-  if (!FD->isPotentialIBActionTarget())
-    diagnoseAndRemoveAttr(attr, diag::invalid_ibaction_decl,
-                          attr->getAttrName());
-}
-
-void AttributeEarlyChecker::visitIBDesignableAttr(IBDesignableAttr *attr) {
+void AttributeChecker::visitIBDesignableAttr(IBDesignableAttr *attr) {
   if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
     if (auto nominalDecl = ED->getExtendedNominal()) {
       if (!isa<ClassDecl>(nominalDecl))
@@ -361,7 +485,7 @@ void AttributeEarlyChecker::visitIBDesignableAttr(IBDesignableAttr *attr) {
   }
 }
 
-void AttributeEarlyChecker::visitIBInspectableAttr(IBInspectableAttr *attr) {
+void AttributeChecker::visitIBInspectableAttr(IBInspectableAttr *attr) {
   // Only instance properties can be 'IBInspectable'.
   auto *VD = cast<VarDecl>(D);
   if (!VD->getDeclContext()->getSelfClassDecl() || VD->isStatic())
@@ -369,7 +493,7 @@ void AttributeEarlyChecker::visitIBInspectableAttr(IBInspectableAttr *attr) {
                                  attr->getAttrName());
 }
 
-void AttributeEarlyChecker::visitGKInspectableAttr(GKInspectableAttr *attr) {
+void AttributeChecker::visitGKInspectableAttr(GKInspectableAttr *attr) {
   // Only instance properties can be 'GKInspectable'.
   auto *VD = cast<VarDecl>(D);
   if (!VD->getDeclContext()->getSelfClassDecl() || VD->isStatic())
@@ -419,7 +543,7 @@ isAcceptableOutletType(Type type, bool &isArray, TypeChecker &TC) {
 }
 
 
-void AttributeEarlyChecker::visitIBOutletAttr(IBOutletAttr *attr) {
+void AttributeChecker::visitIBOutletAttr(IBOutletAttr *attr) {
   // Only instance properties can be 'IBOutlet'.
   auto *VD = cast<VarDecl>(D);
   if (!VD->getDeclContext()->getSelfClassDecl() || VD->isStatic())
@@ -479,7 +603,7 @@ void AttributeEarlyChecker::visitIBOutletAttr(IBOutletAttr *attr) {
   }
 }
 
-void AttributeEarlyChecker::visitNSManagedAttr(NSManagedAttr *attr) {
+void AttributeChecker::visitNSManagedAttr(NSManagedAttr *attr) {
   // @NSManaged only applies to instance methods and properties within a class.
   if (cast<ValueDecl>(D)->isStatic() ||
       !D->getDeclContext()->getSelfClassDecl()) {
@@ -503,28 +627,32 @@ void AttributeEarlyChecker::visitNSManagedAttr(NSManagedAttr *attr) {
 
 }
 
-void AttributeEarlyChecker::
+void AttributeChecker::
 visitLLDBDebuggerFunctionAttr(LLDBDebuggerFunctionAttr *attr) {
   // This is only legal when debugger support is on.
   if (!D->getASTContext().LangOpts.DebuggerSupport)
     diagnoseAndRemoveAttr(attr, diag::attr_for_debugger_support_only);
 }
 
-void AttributeEarlyChecker::visitOverrideAttr(OverrideAttr *attr) {
+void AttributeChecker::visitOverrideAttr(OverrideAttr *attr) {
   if (!isa<ClassDecl>(D->getDeclContext()) &&
       !isa<ProtocolDecl>(D->getDeclContext()) &&
       !isa<ExtensionDecl>(D->getDeclContext()))
     diagnoseAndRemoveAttr(attr, diag::override_nonclass_decl);
 }
 
-void AttributeEarlyChecker::visitNonOverrideAttr(NonOverrideAttr *attr) {
+void AttributeChecker::visitNonOverrideAttr(NonOverrideAttr *attr) {
+  if (auto overrideAttr = D->getAttrs().getAttribute<OverrideAttr>())
+    diagnoseAndRemoveAttr(overrideAttr, diag::nonoverride_and_override_attr);
+
   if (!isa<ClassDecl>(D->getDeclContext()) &&
       !isa<ProtocolDecl>(D->getDeclContext()) &&
-      !isa<ExtensionDecl>(D->getDeclContext()))
+      !isa<ExtensionDecl>(D->getDeclContext())) {
     diagnoseAndRemoveAttr(attr, diag::nonoverride_wrong_decl_context);
+  }
 }
 
-void AttributeEarlyChecker::visitLazyAttr(LazyAttr *attr) {
+void AttributeChecker::visitLazyAttr(LazyAttr *attr) {
   // lazy may only be used on properties.
   auto *VD = cast<VarDecl>(D);
 
@@ -547,7 +675,7 @@ void AttributeEarlyChecker::visitLazyAttr(LazyAttr *attr) {
   }
 }
 
-bool AttributeEarlyChecker::visitAbstractAccessControlAttr(
+bool AttributeChecker::visitAbstractAccessControlAttr(
     AbstractAccessControlAttr *attr) {
   // Access control attr may only be used on value decls and extensions.
   if (!isa<ValueDecl>(D) && !isa<ExtensionDecl>(D)) {
@@ -579,11 +707,85 @@ bool AttributeEarlyChecker::visitAbstractAccessControlAttr(
   return false;
 }
 
-void AttributeEarlyChecker::visitAccessControlAttr(AccessControlAttr *attr) {
+void AttributeChecker::visitAccessControlAttr(AccessControlAttr *attr) {
   visitAbstractAccessControlAttr(attr);
+
+  if (auto extension = dyn_cast<ExtensionDecl>(D)) {
+    if (attr->getAccess() == AccessLevel::Open) {
+      TC.diagnose(attr->getLocation(), diag::access_control_extension_open)
+        .fixItReplace(attr->getRange(), "public");
+      attr->setInvalid();
+      return;
+    }
+
+    NominalTypeDecl *nominal = extension->getExtendedNominal();
+
+    // Extension is ill-formed; suppress the attribute.
+    if (!nominal) {
+      attr->setInvalid();
+      return;
+    }
+
+    AccessLevel typeAccess = nominal->getFormalAccess();
+    if (attr->getAccess() > typeAccess) {
+      TC.diagnose(attr->getLocation(), diag::access_control_extension_more,
+                  typeAccess,
+                  nominal->getDescriptiveKind(),
+                  attr->getAccess())
+        .fixItRemove(attr->getRange());
+      attr->setInvalid();
+      return;
+    }
+
+  } else if (auto extension = dyn_cast<ExtensionDecl>(D->getDeclContext())) {
+    AccessLevel maxAccess = extension->getMaxAccessLevel();
+    if (std::min(attr->getAccess(), AccessLevel::Public) > maxAccess) {
+      // FIXME: It would be nice to say what part of the requirements actually
+      // end up being problematic.
+      auto diag =
+          TC.diagnose(attr->getLocation(),
+                      diag::access_control_ext_requirement_member_more,
+                      attr->getAccess(),
+                      D->getDescriptiveKind(),
+                      maxAccess);
+      swift::fixItAccess(diag, cast<ValueDecl>(D), maxAccess);
+      return;
+    }
+
+    if (auto extAttr =
+        extension->getAttrs().getAttribute<AccessControlAttr>()) {
+      AccessLevel defaultAccess = extension->getDefaultAccessLevel();
+      if (attr->getAccess() > defaultAccess) {
+        auto diag = TC.diagnose(attr->getLocation(),
+                                diag::access_control_ext_member_more,
+                                attr->getAccess(),
+                                extAttr->getAccess());
+        // Don't try to fix this one; it's just a warning, and fixing it can
+        // lead to diagnostic fights between this and "declaration must be at
+        // least this accessible" checking for overrides and protocol
+        // requirements.
+      } else if (attr->getAccess() == defaultAccess) {
+        TC.diagnose(attr->getLocation(),
+                    diag::access_control_ext_member_redundant,
+                    attr->getAccess(),
+                    D->getDescriptiveKind(),
+                    extAttr->getAccess())
+          .fixItRemove(attr->getRange());
+      }
+    }
+  }
+
+  if (attr->getAccess() == AccessLevel::Open) {
+    if (!isa<ClassDecl>(D) && !D->isPotentiallyOverridable() &&
+        !attr->isInvalid()) {
+      TC.diagnose(attr->getLocation(), diag::access_control_open_bad_decl)
+        .fixItReplace(attr->getRange(), "public");
+      attr->setInvalid();
+    }
+  }
 }
 
-void AttributeEarlyChecker::visitSetterAccessAttr(
+void AttributeChecker::visitSetterAccessAttr(
     SetterAccessAttr *attr) {
   auto storage = dyn_cast<AbstractStorageDecl>(D);
   if (!storage)
@@ -611,15 +813,44 @@ void AttributeEarlyChecker::visitSetterAccessAttr(
     diagnoseAndRemoveAttr(attr, diag::access_control_setter_read_only,
                           attr->getAccess(), storageKind);
   }
+
+  auto getterAccess = cast<ValueDecl>(D)->getFormalAccess();
+  if (attr->getAccess() > getterAccess) {
+    // This must stay in sync with diag::access_control_setter_more.
+    enum {
+      SK_Variable = 0,
+      SK_Property,
+      SK_Subscript
+    } storageKind;
+    if (isa<SubscriptDecl>(D))
+      storageKind = SK_Subscript;
+    else if (D->getDeclContext()->isTypeContext())
+      storageKind = SK_Property;
+    else
+      storageKind = SK_Variable;
+    TC.diagnose(attr->getLocation(), diag::access_control_setter_more,
+                getterAccess, storageKind, attr->getAccess());
+    attr->setInvalid();
+    return;
+
+  } else if (attr->getAccess() == getterAccess) {
+    TC.diagnose(attr->getLocation(),
+                diag::access_control_setter_redundant,
+                attr->getAccess(),
+                D->getDescriptiveKind(),
+                getterAccess)
+      .fixItRemove(attr->getRange());
+    return;
+  }
 }
 
-void AttributeEarlyChecker::visitObjCMembersAttr(ObjCMembersAttr *attr) {
+void AttributeChecker::visitObjCMembersAttr(ObjCMembersAttr *attr) {
   if (!isa<ClassDecl>(D))
     diagnoseAndRemoveAttr(attr, diag::objcmembers_attribute_nonclass);
 }
 
-void TypeChecker::checkDeclAttributesEarly(Decl *D) {
-  AttributeEarlyChecker Checker(*this, D);
+void TypeChecker::checkDeclAttributes(Decl *D) {
+  AttributeChecker Checker(*this, D);
   for (auto attr : D->getAttrs()) {
     if (!attr->isValid()) continue;
 
@@ -664,147 +895,6 @@ void TypeChecker::checkDeclAttributesEarly(Decl *D) {
     else
       Checker.diagnoseAndRemoveAttr(attr, diag::invalid_decl_attribute, attr);
   }
-}
-
-namespace {
-class AttributeChecker : public AttributeVisitor<AttributeChecker> {
-  TypeChecker &TC;
-  Decl *D;
-
-  /// This emits a diagnostic with a fixit to remove the attribute.
-  template<typename ...ArgTypes>
-  void diagnoseAndRemoveAttr(DeclAttribute *attr, ArgTypes &&...Args) {
-    ::diagnoseAndRemoveAttr(TC, D, attr, std::forward<ArgTypes>(Args)...);
-  }
-
-public:
-  AttributeChecker(TypeChecker &TC, Decl *D) : TC(TC), D(D) {}
-
-  /// Deleting this ensures that all attributes are covered by the visitor
-  /// below.
-  void visitDeclAttribute(DeclAttribute *A) = delete;
-
-#define IGNORED_ATTR(CLASS)                                              \
-    void visit##CLASS##Attr(CLASS##Attr *) {}
-
-    IGNORED_ATTR(Alignment)
-    IGNORED_ATTR(AlwaysEmitIntoClient)
-    IGNORED_ATTR(Borrowed)
-    IGNORED_ATTR(HasInitialValue)
-    IGNORED_ATTR(ClangImporterSynthesizedType)
-    IGNORED_ATTR(Consuming)
-    IGNORED_ATTR(Convenience)
-    IGNORED_ATTR(Dynamic)
-    IGNORED_ATTR(DynamicReplacement)
-    IGNORED_ATTR(Effects)
-    IGNORED_ATTR(Exported)
-    IGNORED_ATTR(ForbidSerializingReference)
-    IGNORED_ATTR(GKInspectable)
-    IGNORED_ATTR(HasStorage)
-    IGNORED_ATTR(IBDesignable)
-    IGNORED_ATTR(IBInspectable)
-    IGNORED_ATTR(IBOutlet) // checked early.
-    IGNORED_ATTR(Indirect)
-    IGNORED_ATTR(Inline)
-    IGNORED_ATTR(Lazy)      // checked early.
-    IGNORED_ATTR(LLDBDebuggerFunction)
-    IGNORED_ATTR(Mutating)
-    IGNORED_ATTR(NonMutating)
-    IGNORED_ATTR(NonObjC)
-    IGNORED_ATTR(NSManaged) // checked early.
-    IGNORED_ATTR(ObjC)
-    IGNORED_ATTR(ObjCBridged)
-    IGNORED_ATTR(ObjCMembers)
-    IGNORED_ATTR(ObjCNonLazyRealization)
-    IGNORED_ATTR(ObjCRuntimeName)
-    IGNORED_ATTR(Optional)
-    IGNORED_ATTR(Override)
-    IGNORED_ATTR(PrivateImport)
-    IGNORED_ATTR(RawDocComment)
-    IGNORED_ATTR(ReferenceOwnership)
-    IGNORED_ATTR(RequiresStoredPropertyInits)
-    IGNORED_ATTR(RestatedObjCConformance)
-    IGNORED_ATTR(Semantics)
-    IGNORED_ATTR(ShowInInterface)
-    IGNORED_ATTR(SILGenName)
-    IGNORED_ATTR(StaticInitializeObjCMetadata)
-    IGNORED_ATTR(SynthesizedProtocol)
-    IGNORED_ATTR(Testable)
-    IGNORED_ATTR(Transparent)
-    IGNORED_ATTR(WarnUnqualifiedAccess)
-    IGNORED_ATTR(WeakLinked)
-    IGNORED_ATTR(DisfavoredOverload)
-    IGNORED_ATTR(ProjectedValueProperty)
-#undef IGNORED_ATTR
-
-  void visitAvailableAttr(AvailableAttr *attr);
-  
-  void visitCDeclAttr(CDeclAttr *attr);
-
-  void visitDynamicCallableAttr(DynamicCallableAttr *attr);
-
-  void visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr);
-  
-  void visitFinalAttr(FinalAttr *attr);
-  void visitIBActionAttr(IBActionAttr *attr);
-  void visitIBSegueActionAttr(IBSegueActionAttr *attr);
-  void visitNSCopyingAttr(NSCopyingAttr *attr);
-  void visitRequiredAttr(RequiredAttr *attr);
-  void visitRethrowsAttr(RethrowsAttr *attr);
-
-  void visitAccessControlAttr(AccessControlAttr *attr);
-  void visitSetterAccessAttr(SetterAccessAttr *attr);
-
-  void checkApplicationMainAttribute(DeclAttribute *attr,
-                                     Identifier Id_ApplicationDelegate,
-                                     Identifier Id_Kit,
-                                     Identifier Id_ApplicationMain);
-  
-  void visitNSApplicationMainAttr(NSApplicationMainAttr *attr);
-  void visitUIApplicationMainAttr(UIApplicationMainAttr *attr);
-
-  void visitUnsafeNoObjCTaggedPointerAttr(UnsafeNoObjCTaggedPointerAttr *attr);
-  void visitSwiftNativeObjCRuntimeBaseAttr(
-                                         SwiftNativeObjCRuntimeBaseAttr *attr);
-
-  void checkOperatorAttribute(DeclAttribute *attr);
-
-  void visitInfixAttr(InfixAttr *attr) { checkOperatorAttribute(attr); }
-  void visitPostfixAttr(PostfixAttr *attr) { checkOperatorAttribute(attr); }
-  void visitPrefixAttr(PrefixAttr *attr) { checkOperatorAttribute(attr); }
-
-  void visitSpecializeAttr(SpecializeAttr *attr);
-
-  void visitFixedLayoutAttr(FixedLayoutAttr *attr);
-  void visitUsableFromInlineAttr(UsableFromInlineAttr *attr);
-  void visitInlinableAttr(InlinableAttr *attr);
-  void visitOptimizeAttr(OptimizeAttr *attr);
-
-  void visitDiscardableResultAttr(DiscardableResultAttr *attr);
-  void visitImplementsAttr(ImplementsAttr *attr);
-
-  void visitFrozenAttr(FrozenAttr *attr);
-
-  void visitNonOverrideAttr(NonOverrideAttr *attr);
-  void visitCustomAttr(CustomAttr *attr);
-  void visitPropertyWrapperAttr(PropertyWrapperAttr *attr);
-  void visitFunctionBuilderAttr(FunctionBuilderAttr *attr);
-
-  void visitImplementationOnlyAttr(ImplementationOnlyAttr *attr);
-};
-} // end anonymous namespace
-
-
-static bool isiOS(TypeChecker &TC) {
-  return TC.getLangOpts().Target.isiOS();
-}
-
-static bool iswatchOS(TypeChecker &TC) {
-  return TC.getLangOpts().Target.isWatchOS();
-}
-
-static bool isRelaxedIBAction(TypeChecker &TC) {
-  return isiOS(TC) || iswatchOS(TC);
 }
 
 /// Returns true if the given method is an valid implementation of a
@@ -1002,126 +1092,6 @@ visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr) {
   }
 }
 
-static bool
-validateIBActionSignature(TypeChecker &TC, DeclAttribute *attr, FuncDecl *FD,
-                          unsigned minParameters, unsigned maxParameters,
-                          bool hasVoidResult = true) {
-  bool valid = true;
-
-  auto arity = FD->getParameters()->size();
-  auto resultType = FD->getResultInterfaceType();
-
-  if (arity < minParameters || arity > maxParameters) {
-    auto diagID = diag::invalid_ibaction_argument_count;
-    if (minParameters == maxParameters)
-      diagID = diag::invalid_ibaction_argument_count_exact;
-    else if (minParameters == 0)
-      diagID = diag::invalid_ibaction_argument_count_max;
-    TC.diagnose(FD, diagID, attr->getAttrName(), minParameters, maxParameters);
-    valid = false;
-  }
-
-  if (resultType->isVoid() != hasVoidResult) {
-    TC.diagnose(FD, diag::invalid_ibaction_result, attr->getAttrName(),
-                hasVoidResult);
-    valid = false;
-  }
-
-  // We don't need to check here that parameter or return types are
-  // ObjC-representable; IsObjCRequest will validate that.
-
-  if (!valid)
-    attr->setInvalid();
-  return valid;
-}
-
-void AttributeChecker::visitIBActionAttr(IBActionAttr *attr) {
-  auto *FD = cast<FuncDecl>(D);
-
-  if (isRelaxedIBAction(TC))
-    // iOS, tvOS, and watchOS allow 0-2 parameters to an @IBAction method.
-    validateIBActionSignature(TC, attr, FD, /*minParams=*/0, /*maxParams=*/2);
-  else
-    // macOS allows 1 parameter to an @IBAction method.
-    validateIBActionSignature(TC, attr, FD, /*minParams=*/1, /*maxParams=*/1);
-}
-
-void AttributeChecker::visitIBSegueActionAttr(IBSegueActionAttr *attr) {
-  auto *FD = cast<FuncDecl>(D);
-  if (!validateIBActionSignature(TC, attr, FD,
-                                 /*minParams=*/1, /*maxParams=*/3,
-                                 /*hasVoidResult=*/false))
-    return;
-
-  // If the IBSegueAction method's selector belongs to one of the ObjC method
-  // families (like -newDocumentSegue: or -copyScreen), it would return the
-  // object at +1, but the caller would expect it to be +0 and would therefore
-  // leak it.
-  //
-  // To prevent that, diagnose if the selector belongs to one of the method
-  // families and suggest that the user change the Swift name or Obj-C selector.
-  auto currentSelector = FD->getObjCSelector();
-
-  SmallString<32> prefix("make");
-
-  switch (currentSelector.getSelectorFamily()) {
-  case ObjCSelectorFamily::None:
-    // No error--exit early.
-    return;
-
-  case ObjCSelectorFamily::Alloc:
-  case ObjCSelectorFamily::Init:
-  case ObjCSelectorFamily::New:
-    // Fix-it will replace the "alloc"/"init"/"new" in the selector with "make".
-    break;
-
-  case ObjCSelectorFamily::Copy:
-    // Fix-it will replace the "copy" in the selector with "makeCopy".
-    prefix += "Copy";
-    break;
-
-  case ObjCSelectorFamily::MutableCopy:
-    // Fix-it will replace the "mutable" in the selector with "makeMutable".
-    prefix += "Mutable";
-    break;
-  }
-
-  // Emit the actual error.
-  TC.diagnose(FD, diag::ibsegueaction_objc_method_family,
-              attr->getAttrName(), currentSelector);
-
-  // The rest of this is just fix-it generation.
-
-  /// Replaces the first word of \c oldName with the prefix, where "word" is a
-  /// sequence of lowercase characters.
-  auto replacingPrefix = [&](Identifier oldName) -> Identifier {
-    SmallString<32> scratch = prefix;
-    scratch += oldName.str().drop_while(clang::isLowercase);
-    return TC.Context.getIdentifier(scratch);
-  };
-
-  // Suggest changing the Swift name of the method, unless there is already an
-  // explicit selector.
-  if (!FD->getAttrs().hasAttribute<ObjCAttr>() ||
-      !FD->getAttrs().getAttribute<ObjCAttr>()->hasName()) {
-    auto newSwiftBaseName = replacingPrefix(FD->getBaseName().getIdentifier());
-    auto argumentNames = FD->getFullName().getArgumentNames();
-    DeclName newSwiftName(TC.Context, newSwiftBaseName, argumentNames);
-
-    auto diag = TC.diagnose(FD, diag::fixit_rename_in_swift, newSwiftName);
-    fixDeclarationName(diag, FD, newSwiftName);
-  }
-
-  // Suggest changing just the selector to one with a different first piece.
-  auto oldPieces = currentSelector.getSelectorPieces();
-  SmallVector<Identifier, 4> newPieces(oldPieces.begin(), oldPieces.end());
-  newPieces[0] = replacingPrefix(newPieces[0]);
-  ObjCSelector newSelector(TC.Context, currentSelector.getNumArgs(), newPieces);
-
-  auto diag = TC.diagnose(FD, diag::fixit_rename_in_objc, newSelector);
-  fixDeclarationObjCName(diag, FD, currentSelector, newSelector);
-}
-
 /// Get the innermost enclosing declaration for a declaration.
 static Decl *getEnclosingDeclForDecl(Decl *D) {
   // If the declaration is an accessor, treat its storage declaration
@@ -1232,9 +1202,29 @@ void AttributeChecker::visitSwiftNativeObjCRuntimeBaseAttr(
 }
 
 void AttributeChecker::visitFinalAttr(FinalAttr *attr) {
-  // final on classes marks all members with final.
+  // Reject combining 'final' with 'open'.
+  if (auto accessAttr = D->getAttrs().getAttribute<AccessControlAttr>()) {
+    if (accessAttr->getAccess() == AccessLevel::Open) {
+      TC.diagnose(attr->getLocation(), diag::open_decl_cannot_be_final,
+                  D->getDescriptiveKind());
+      return;
+    }
+  }
+
   if (isa<ClassDecl>(D))
     return;
+
+  // 'final' only makes sense in the context of a class declaration.
+  // Reject it on global functions, protocols, structs, enums, etc.
+  if (!D->getDeclContext()->getSelfClassDecl()) {
+    TC.diagnose(attr->getLocation(), diag::member_cannot_be_final)
+      .fixItRemove(attr->getRange());
+
+    // Remove the attribute so child declarations are not flagged as final
+    // and duplicate the error message.
+    D->getAttrs().removeAttribute(attr);
+    return;
+  }
 
   // We currently only support final on var/let, func and subscript
   // declarations.
@@ -1551,114 +1541,6 @@ void AttributeChecker::visitRethrowsAttr(RethrowsAttr *attr) {
 
   TC.diagnose(attr->getLocation(), diag::rethrows_without_throwing_parameter);
   attr->setInvalid();
-}
-
-void AttributeChecker::visitAccessControlAttr(AccessControlAttr *attr) {
-  if (auto extension = dyn_cast<ExtensionDecl>(D)) {
-    if (attr->getAccess() == AccessLevel::Open) {
-      TC.diagnose(attr->getLocation(), diag::access_control_extension_open)
-        .fixItReplace(attr->getRange(), "public");
-      attr->setInvalid();
-      return;
-    }
-
-    NominalTypeDecl *nominal = extension->getExtendedNominal();
-
-    // Extension is ill-formed; suppress the attribute.
-    if (!nominal) {
-      attr->setInvalid();
-      return;
-    }
-
-    AccessLevel typeAccess = nominal->getFormalAccess();
-    if (attr->getAccess() > typeAccess) {
-      TC.diagnose(attr->getLocation(), diag::access_control_extension_more,
-                  typeAccess,
-                  nominal->getDescriptiveKind(),
-                  attr->getAccess())
-        .fixItRemove(attr->getRange());
-      attr->setInvalid();
-      return;
-    }
-
-  } else if (auto extension = dyn_cast<ExtensionDecl>(D->getDeclContext())) {
-    AccessLevel maxAccess = extension->getMaxAccessLevel();
-    if (std::min(attr->getAccess(), AccessLevel::Public) > maxAccess) {
-      // FIXME: It would be nice to say what part of the requirements actually
-      // end up being problematic.
-      auto diag =
-          TC.diagnose(attr->getLocation(),
-                      diag::access_control_ext_requirement_member_more,
-                      attr->getAccess(),
-                      D->getDescriptiveKind(),
-                      maxAccess);
-      swift::fixItAccess(diag, cast<ValueDecl>(D), maxAccess);
-      return;
-    }
-
-    if (auto extAttr =
-        extension->getAttrs().getAttribute<AccessControlAttr>()) {
-      AccessLevel defaultAccess = extension->getDefaultAccessLevel();
-      if (attr->getAccess() > defaultAccess) {
-        auto diag = TC.diagnose(attr->getLocation(),
-                                diag::access_control_ext_member_more,
-                                attr->getAccess(),
-                                extAttr->getAccess());
-        // Don't try to fix this one; it's just a warning, and fixing it can
-        // lead to diagnostic fights between this and "declaration must be at
-        // least this accessible" checking for overrides and protocol
-        // requirements.
-      } else if (attr->getAccess() == defaultAccess) {
-        TC.diagnose(attr->getLocation(),
-                    diag::access_control_ext_member_redundant,
-                    attr->getAccess(),
-                    D->getDescriptiveKind(),
-                    extAttr->getAccess())
-          .fixItRemove(attr->getRange());
-      }
-    }
-  }
-
-  if (attr->getAccess() == AccessLevel::Open) {
-    if (!isa<ClassDecl>(D) && !D->isPotentiallyOverridable() &&
-        !attr->isInvalid()) {
-      TC.diagnose(attr->getLocation(), diag::access_control_open_bad_decl)
-        .fixItReplace(attr->getRange(), "public");
-      attr->setInvalid();
-    }
-  }
-}
-
-void
-AttributeChecker::visitSetterAccessAttr(SetterAccessAttr *attr) {
-  auto getterAccess = cast<ValueDecl>(D)->getFormalAccess();
-  if (attr->getAccess() > getterAccess) {
-    // This must stay in sync with diag::access_control_setter_more.
-    enum {
-      SK_Variable = 0,
-      SK_Property,
-      SK_Subscript
-    } storageKind;
-    if (isa<SubscriptDecl>(D))
-      storageKind = SK_Subscript;
-    else if (D->getDeclContext()->isTypeContext())
-      storageKind = SK_Property;
-    else
-      storageKind = SK_Variable;
-    TC.diagnose(attr->getLocation(), diag::access_control_setter_more,
-                getterAccess, storageKind, attr->getAccess());
-    attr->setInvalid();
-    return;
-
-  } else if (attr->getAccess() == getterAccess) {
-    TC.diagnose(attr->getLocation(),
-                diag::access_control_setter_redundant,
-                attr->getAccess(),
-                D->getDescriptiveKind(),
-                getterAccess)
-      .fixItRemove(attr->getRange());
-    return;
-  }
 }
 
 /// Collect all used generic parameter types from a given type.
@@ -2438,12 +2320,6 @@ void AttributeChecker::visitFrozenAttr(FrozenAttr *attr) {
   }
 }
 
-void AttributeChecker::visitNonOverrideAttr(NonOverrideAttr *attr) {
-  if (auto overrideAttr = D->getAttrs().getAttribute<OverrideAttr>()) {
-    diagnoseAndRemoveAttr(overrideAttr, diag::nonoverride_and_override_attr);
-  }
-}
-
 void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
   auto dc = D->getInnermostDeclContext();
 
@@ -2622,17 +2498,7 @@ AttributeChecker::visitImplementationOnlyAttr(ImplementationOnlyAttr *attr) {
 
 void TypeChecker::checkParameterAttributes(ParameterList *params) {
   for (auto param: *params) {
-    checkDeclAttributesEarly(param);
     checkDeclAttributes(param);
-  }
-}
-
-void TypeChecker::checkDeclAttributes(Decl *D) {
-  AttributeChecker Checker(*this, D);
-
-  for (auto attr : D->getAttrs()) {
-    if (attr->isValid())
-      Checker.visit(attr);
   }
 }
 
