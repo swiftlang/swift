@@ -217,10 +217,10 @@ TypeRepr *ASTGen::generate(AttributedTypeSyntax Type, SourceLoc &Loc) {
       auto Attr = Attribute.castTo<AttributeSyntax>();
       auto AttrNameStr = Attr.getAttributeName().getText();
 
-      auto AttrLoc = generate(Attr.getAttributeName(), Loc);
+      auto AtLoc = advanceLocBegin(Loc, Attr.getAtSignToken());
       auto AttrKind = TypeAttributes::getAttrKindFromString(AttrNameStr);
 
-      TypeAttrs.setAttr(AttrKind, AttrLoc);
+      TypeAttrs.setAttr(AttrKind, AtLoc);
 
       if (AttrKind == TAK_convention) {
         auto Argument = Attr.getArgument()->castTo<TokenSyntax>();
@@ -237,7 +237,7 @@ TypeRepr *ASTGen::generate(AttributedTypeSyntax Type, SourceLoc &Loc) {
       }
 
       if (TypeAttrs.AtLoc.isInvalid())
-        TypeAttrs.AtLoc = AttrLoc;
+        TypeAttrs.AtLoc = AtLoc;
     }
 
     if (!TypeAttrs.empty())
