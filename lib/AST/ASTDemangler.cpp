@@ -22,6 +22,7 @@
 #include "swift/AST/ASTDemangler.h"
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/GenericSignatureBuilder.h"
@@ -29,7 +30,6 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
-#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -1069,7 +1069,7 @@ GenericTypeDecl *ASTBuilder::findForeignTypeDecl(StringRef name,
                                                  ForeignModuleKind foreignKind,
                                                  Demangle::Node::Kind kind) {
   // Check to see if we have an importer loaded.
-  auto importer = static_cast<ClangImporter *>(Ctx.getClangModuleLoader());
+  auto importer = Ctx.getClangModuleLoader();
   if (!importer)
     return nullptr;
 
