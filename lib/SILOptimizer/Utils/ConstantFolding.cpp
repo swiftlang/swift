@@ -1578,8 +1578,8 @@ void ConstantFolder::initializeWorklist(SILFunction &f) {
         continue;
       }
 
-      if (isApplyOfBuiltin(I, BuiltinValueKind::GlobalStringTablePointer) ||
-          isApplyOfBuiltin(I, BuiltinValueKind::IsConcrete)) {
+      if (isApplyOfBuiltin(*inst, BuiltinValueKind::GlobalStringTablePointer) ||
+          isApplyOfBuiltin(*inst, BuiltinValueKind::IsConcrete)) {
         WorkList.insert(inst);
         continue;
       }
