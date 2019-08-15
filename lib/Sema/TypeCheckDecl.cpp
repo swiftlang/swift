@@ -1964,8 +1964,17 @@ void TypeChecker::validateDecl(OperatorDecl *OD) {
 }
 
 bool swift::doesContextHaveValueSemantics(DeclContext *dc) {
-  if (Type contextTy = dc->getDeclaredInterfaceType())
-    return !contextTy->hasReferenceSemantics();
+  if (Type contextTy = dc->getDeclaredInterfaceType()) {
+    // If the decl context is an extension, then it could be imposing a class
+    // constraint (ex: where Self: SomeClass). Make sure we include that
+    // in our check as well.
+    auto extensionRequiresClass = false;
+    if (auto ED = dyn_cast<ExtensionDecl>(dc)) {
+      extensionRequiresClass =
+          ED->getGenericSignature()->requiresClass(ED->getSelfInterfaceType());
+    }
+    return !contextTy->hasReferenceSemantics() && !extensionRequiresClass;
+  }
   return false;
 }
 
