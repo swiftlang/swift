@@ -342,7 +342,7 @@ class LazyProperties {
 // CHECK-EXPANDED-NEXT:     `-EnumElementScope {{.*}}, [112:8 - 112:8]
 // CHECK-EXPANDED-NEXT: |-NominalTypeDeclScope {{.*}}, [115:1 - 131:1] 'StructContainsAbstractStorageDecls'
 // CHECK-EXPANDED-NEXT:   `-NominalTypeBodyScope {{.*}}, [115:43 - 131:1] 'StructContainsAbstractStorageDecls'
-// CHECK-EXPANDED-NEXT:     |-SubscriptDeclScope {{.*}}, [116:3 - 122:3] scope_map.(file).StructContainsAbstractStorageDecls.subscript(_:_:)@SOURCE_DIR/test/NameBinding/scope_map.swift:116:3
+// CHECK-EXPANDED-NEXT:     |-SubscriptDeclScope {{.*}}, [116:3 - 122:3] scope_map.(file).StructContainsAbstractStorageDecls.subscript(_:_:)@SOURCE_DIR{{[/\\]}}test{{[/\\]}}NameBinding{{[/\\]}}scope_map.swift:116:3
 // CHECK-EXPANDED-NEXT:       `-ParameterListScope {{.*}}, [116:13 - 122:3]
 // CHECK-EXPANDED-NEXT:         |-AbstractFunctionDeclScope {{.*}}, [117:5 - 118:5] '_'
 // CHECK-EXPANDED-NEXT:           `-MethodBodyScope {{.*}}, [117:9 - 118:5]
@@ -351,7 +351,7 @@ class LazyProperties {
 // CHECK-EXPANDED-NEXT:           `-MethodBodyScope {{.*}}, [119:9 - 121:5]
 // CHECK-EXPANDED-NEXT:             `-BraceStmtScope {{.*}}, [119:9 - 121:5]
 // CHECK-EXPANDED-NEXT:     `-PatternEntryDeclScope {{.*}}, [124:21 - 130:3] entry 0 'computed'
-// CHECK-EXPANDED-NEXT:       `-VarDeclScope {{.*}}, [124:21 - 130:3] scope_map.(file).StructContainsAbstractStorageDecls.computed@SOURCE_DIR/test/NameBinding/scope_map.swift:124:7
+// CHECK-EXPANDED-NEXT:       `-VarDeclScope {{.*}}, [124:21 - 130:3] scope_map.(file).StructContainsAbstractStorageDecls.computed@SOURCE_DIR{{[/\\]}}test{{[/\\]}}NameBinding{{[/\\]}}scope_map.swift:124:7
 // CHECK-EXPANDED-NEXT:         |-AbstractFunctionDeclScope {{.*}}, [125:5 - 127:5] '_'
 // CHECK-EXPANDED-NEXT:           `-MethodBodyScope {{.*}}, [125:9 - 127:5]
 // CHECK-EXPANDED-NEXT:             `-BraceStmtScope {{.*}}, [125:9 - 127:5]
@@ -362,7 +362,7 @@ class LazyProperties {
 // CHECK-EXPANDED-NEXT:   `-NominalTypeBodyScope {{.*}}, [133:35 - 141:1] 'ClassWithComputedProperties'
 // CHECK-EXPANDED-NEXT:     |-PatternEntryDeclScope {{.*}}, [134:7 - 136:3] entry 0 'willSetProperty'
 // CHECK-EXPANDED-NEXT:       |-PatternEntryInitializerScope {{.*}}, [134:30 - 134:30] entry 0 'willSetProperty'
-// CHECK-EXPANDED-NEXT:       `-VarDeclScope {{.*}}, [134:32 - 136:3] scope_map.(file).ClassWithComputedProperties.willSetProperty@SOURCE_DIR/test/NameBinding/scope_map.swift:134:7
+// CHECK-EXPANDED-NEXT:       `-VarDeclScope {{.*}}, [134:32 - 136:3] scope_map.(file).ClassWithComputedProperties.willSetProperty@SOURCE_DIR{{[/\\]}}test{{[/\\]}}NameBinding{{[/\\]}}scope_map.swift:134:7
 // CHECK-EXPANDED-NEXT:         `-AbstractFunctionDeclScope {{.*}}, [135:5 - 135:15] '_'
 // CHECK-EXPANDED-NEXT:           `-MethodBodyScope {{.*}}, [135:13 - 135:15]
             `-BraceStmtScope {{.*}}, [135:13 - 135:15]
