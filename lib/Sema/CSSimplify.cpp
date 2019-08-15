@@ -4954,12 +4954,18 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
       performMemberLookup(kind, member, baseTy, functionRefKind, locator,
                           /*includeInaccessibleMembers*/ shouldAttemptFixes());
 
-  auto formUnsolved = [&] {
+  auto formUnsolved = [&](bool activate = false) {
     // If requested, generate a constraint.
     if (flags.contains(TMF_GenerateConstraints)) {
-      addUnsolvedConstraint(Constraint::createMemberOrOuterDisjunction(
+      auto *memberRef = Constraint::createMemberOrOuterDisjunction(
           *this, kind, baseTy, memberTy, member, useDC, functionRefKind,
-          outerAlternatives, locator));
+          outerAlternatives, locator);
+
+      addUnsolvedConstraint(memberRef);
+
+      if (activate)
+        activateConstraint(memberRef);
+
       return SolutionKind::Solved;
     }
 
@@ -4989,7 +4995,10 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
       auto &choice = result.ViableCandidates.front();
       if (!solverState && choice.isKeyPathDynamicMemberLookup() &&
           member.getBaseName().isSubscript()) {
-        return formUnsolved();
+        // Let's move this constraint to the active
+        // list so it could be picked up right after
+        // constraint generation is done.
+        return formUnsolved(/*activate=*/true);
       }
     }
 
