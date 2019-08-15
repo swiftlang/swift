@@ -138,9 +138,9 @@ void ClangImporter::Implementation::lookupValueDWARF(
     return;
 
   SmallVector<clang::Decl *, 4> decls;
-  DWARFImporter->lookupValue(name.getBaseIdentifier().str(), llvm::None, decls);
+  DWARFImporter->lookupValue(name.getBaseIdentifier().str(), None, decls);
   for (auto *clangDecl : decls) {
-    auto *namedDecl = dyn_cast_or_null<clang::NamedDecl>(clangDecl);
+    auto *namedDecl = dyn_cast<clang::NamedDecl>(clangDecl);
     if (!namedDecl)
       continue;
     auto *swiftDecl = cast_or_null<ValueDecl>(
@@ -168,9 +168,7 @@ void ClangImporter::Implementation::lookupTypeDeclDWARF(
         !isa<clang::ObjCCompatibleAliasDecl>(clangDecl)) {
       continue;
     }
-    auto *namedDecl = dyn_cast_or_null<clang::NamedDecl>(clangDecl);
-    if (!namedDecl)
-      continue;
+    auto *namedDecl = cast<clang::NamedDecl>(clangDecl);
     Decl *importedDecl = cast_or_null<ValueDecl>(
         importDeclReal(namedDecl->getMostRecentDecl(), CurrentVersion));
 
