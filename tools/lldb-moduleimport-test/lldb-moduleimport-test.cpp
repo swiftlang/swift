@@ -167,8 +167,12 @@ collectASTModules(llvm::cl::list<std::string> &InputNames,
     }
 
     for (auto &Section : Obj->sections()) {
-      llvm::StringRef Name;
-      Section.getName(Name);
+      llvm::Expected<llvm::StringRef> NameOrErr = Section.getName();
+      if (!NameOrErr) {
+        llvm::consumeError(NameOrErr.takeError());
+        continue;
+      }
+      llvm::StringRef Name = *NameOrErr;
       if ((MachO && Name == swift::MachOASTSectionName) ||
           (ELF && Name == swift::ELFASTSectionName) ||
           (COFF && Name == swift::COFFASTSectionName)) {
