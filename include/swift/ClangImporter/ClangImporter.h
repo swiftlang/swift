@@ -93,8 +93,6 @@ private:
                 DependencyTracker *tracker,
                 std::unique_ptr<DWARFImporterDelegate> dwarfImporterDelegate);
 
-  ModuleDecl *loadModuleClang(SourceLoc importLoc,
-                              ArrayRef<std::pair<Identifier, SourceLoc>> path);
 public:
   /// Create a new Clang importer that can import a suitable Clang
   /// module into the given ASTContext.
