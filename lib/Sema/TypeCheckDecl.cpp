@@ -2260,9 +2260,6 @@ public:
       }
     }
 
-    if (VD->getAttrs().hasAttribute<DynamicReplacementAttr>())
-      TC.checkDynamicReplacementAttribute(VD);
-
     // Now check all the accessors.
     VD->visitEmittedAccessors([&](AccessorDecl *accessor) {
       visit(accessor);
@@ -2468,10 +2465,6 @@ public:
     (void) SD->isGetterMutating();
     (void) SD->isSetterMutating();
     (void) SD->getImplInfo();
-
-    if (SD->getAttrs().hasAttribute<DynamicReplacementAttr>()) {
-      TC.checkDynamicReplacementAttribute(SD);
-    }
 
     TC.checkParameterAttributes(SD->getIndices());
     TC.checkDefaultArguments(SD->getIndices(), SD);
@@ -3051,10 +3044,6 @@ public:
       TC.definedFunctions.push_back(FD);
     }
 
-    if (FD->getAttrs().hasAttribute<DynamicReplacementAttr>()) {
-      TC.checkDynamicReplacementAttribute(FD);
-    }
-
     checkExplicitAvailability(FD);
 
     if (FD->getDeclContext()->getSelfClassDecl())
@@ -3260,10 +3249,6 @@ public:
       TC.typeCheckAbstractFunctionBody(CD);
     } else {
       TC.definedFunctions.push_back(CD);
-    }
-
-    if (CD->getAttrs().hasAttribute<DynamicReplacementAttr>()) {
-      TC.checkDynamicReplacementAttribute(CD);
     }
   }
 
