@@ -962,7 +962,7 @@ class MultipleValueInstructionTrailingObjects<Derived, DerivedResult,
                                       MultipleValueInstruction *,
                                       DerivedResult,
                                       FinalOtherTrailingTypes...> {
-  static_assert(LLVM_IS_FINAL(DerivedResult),
+  static_assert(std::is_final<DerivedResult>(),
                 "Expected DerivedResult to be final");
   static_assert(
       std::is_base_of<MultipleValueInstructionResult, DerivedResult>::value,
