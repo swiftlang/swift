@@ -1074,10 +1074,11 @@ public:
   /// value as a previously processed and deleted instruction.
   AutoDiffFunctionInst *createAutoDiffFunction(
       SILBuilder &builder, SILLocation loc,
-      AutoDiffIndexSubset *parameterIndices, unsigned differentiationOrder,
-      SILValue original, ArrayRef<SILValue> associatedFunctions = {}) {
+      AutoDiffIndexSubset *parameterIndices, AutoDiffIndexSubset *resultIndices,
+      unsigned differentiationOrder, SILValue original,
+      ArrayRef<SILValue> associatedFunctions = {}) {
     auto *adfi = builder.createAutoDiffFunction(
-        loc, parameterIndices, differentiationOrder, original,
+        loc, parameterIndices, resultIndices, differentiationOrder, original,
         associatedFunctions);
     processedAutoDiffFunctionInsts.erase(adfi);
     return adfi;
@@ -1396,6 +1397,7 @@ public:
   bool isVaried(SILValue value, unsigned independentVariableIndex) const;
   bool isUseful(SILValue value, unsigned dependentVariableIndex) const;
   bool isVaried(SILValue value, AutoDiffIndexSubset *parameterIndices) const;
+  bool isUseful(SILValue value, AutoDiffIndexSubset *resultIndices) const;
   bool isActive(SILValue value, const SILAutoDiffIndices &indices) const;
 
   Activity getActivity(SILValue value,
@@ -2037,9 +2039,18 @@ bool DifferentiableActivityInfo::isUseful(
   return set.count(value);
 }
 
+bool DifferentiableActivityInfo::isUseful(
+    SILValue value, AutoDiffIndexSubset *resultIndices) const {
+  for (auto resultIdx : resultIndices->getIndices())
+    if (isUseful(value, resultIdx))
+      return true;
+  return false;
+}
+
 bool DifferentiableActivityInfo::isActive(
     SILValue value, const SILAutoDiffIndices &indices) const {
-  return isVaried(value, indices.parameters) && isUseful(value, indices.source);
+  return isVaried(value, indices.parameters) &&
+      isUseful(value, indices.results);
 }
 
 Activity DifferentiableActivityInfo::getActivity(
@@ -2047,7 +2058,7 @@ Activity DifferentiableActivityInfo::getActivity(
   Activity activity;
   if (isVaried(value, indices.parameters))
     activity |= ActivityFlags::Varied;
-  if (isUseful(value, indices.source))
+  if (isUseful(value, indices.results))
     activity |= ActivityFlags::Useful;
   return activity;
 }
@@ -2423,12 +2434,15 @@ emitAssociatedFunctionReference(
         }
       }
       // Check and diagnose non-differentiable results.
-      if (!originalFnTy->getResults()[desiredIndices.source]
-               .getSILStorageType()
-               .isDifferentiable(context.getModule())) {
-        context.emitNondifferentiabilityError(
-            original, invoker, diag::autodiff_nondifferentiable_result);
-        return None;
+      for (unsigned resultIndex : range(originalFnTy->getNumResults())) {
+        if (desiredIndices.isWrtResult(resultIndex) &&
+            !originalFnTy->getResults()[resultIndex]
+                 .getSILStorageType()
+                 .isDifferentiable(context.getModule())) {
+          context.emitNondifferentiabilityError(
+              original, invoker, diag::autodiff_nondifferentiable_result);
+          return None;
+        }
       }
       // Check and diagnose external declarations.
       if (originalFn->isExternalDeclaration()) {
@@ -2516,7 +2530,7 @@ emitAssociatedFunctionReference(
     // Emit a `witness_method` instruction for the associated function.
     auto originalType = witnessMethod->getType().castTo<SILFunctionType>();
     auto assocType = originalType->getAutoDiffAssociatedFunctionType(
-        minimalIndices.parameters, minimalIndices.source,
+        minimalIndices.parameters, minimalIndices.results,
         /*differentiationOrder*/ 1, kind, builder.getModule(),
         LookUpConformanceInModule(builder.getModule().getSwiftModule()));
     auto *autoDiffFuncId = AutoDiffAssociatedFunctionIdentifier::get(
@@ -2563,7 +2577,7 @@ emitAssociatedFunctionReference(
     // Emit a `class_method` instruction for the associated function.
     auto originalType = classMethodInst->getType().castTo<SILFunctionType>();
     auto assocType = originalType->getAutoDiffAssociatedFunctionType(
-        minimalIndices.parameters, minimalIndices.source,
+        minimalIndices.parameters, minimalIndices.results,
         /*differentiationOrder*/ 1, kind, builder.getModule(),
         LookUpConformanceInModule(builder.getModule().getSwiftModule()));
     auto *autoDiffFuncId = AutoDiffAssociatedFunctionIdentifier::get(
@@ -3191,14 +3205,17 @@ public:
     SmallVector<SILParameterInfo, 8> pbParams;
     SmallVector<SILResultInfo, 8> adjResults;
     auto origParams = origTy->getParameters();
+    auto origResults = origTy->getResults();
     auto indices = attr->getIndices();
 
     // Add pullback parameter for the seed.
-    auto origResInfo = origTy->getResults()[indices.source];
-    pbParams.push_back(getTangentParameterInfoForOriginalResult(
-        origResInfo.getType()
-            ->getAutoDiffAssociatedTangentSpace(lookupConformance)
-            ->getCanonicalType(), origResInfo.getConvention()));
+    for (auto i : indices.results->getIndices()) {
+      auto origRes = origResults[i];
+      pbParams.push_back(getTangentParameterInfoForOriginalResult(
+          origRes.getType()
+              ->getAutoDiffAssociatedTangentSpace(lookupConformance)
+              ->getCanonicalType(), origRes.getConvention()));
+    }
 
     // Accept a pullback struct in the pullback parameter list. This is the
     // returned pullback's closure context.
@@ -3535,11 +3552,15 @@ public:
       return;
     }
     // Form expected indices by assuming there's only one result.
-    SILAutoDiffIndices indices(activeResultIndices.front(),
+    SILAutoDiffIndices indices(
         AutoDiffIndexSubset::get(
             getASTContext(),
-            ai->getArgumentsWithoutIndirectResults().size(),
-            activeParamIndices));
+            ai->getSubstCalleeType()->getNumParameters(),
+            activeParamIndices),
+        AutoDiffIndexSubset::get(
+            getASTContext(),
+            ai->getSubstCalleeType()->getNumResults(),
+            activeResultIndices));
 
     // Emit the VJP.
     auto loc = ai->getLoc();
@@ -3581,13 +3602,16 @@ public:
             }
           }
           // Check and diagnose non-differentiable results.
-          if (!originalFnTy->getResults()[indices.source]
-                  .getSILStorageType()
-                  .isDifferentiable(getModule())) {
-            context.emitNondifferentiabilityError(
-                original, invoker, diag::autodiff_nondifferentiable_result);
-            errorOccurred = true;
-            return true;
+          for (unsigned resultIndex : range(originalFnTy->getNumParameters())) {
+            if (indices.isWrtResult(resultIndex) &&
+                !originalFnTy->getResults()[resultIndex]
+                    .getSILStorageType()
+                    .isDifferentiable(getModule())) {
+              context.emitNondifferentiabilityError(
+                  original, invoker, diag::autodiff_nondifferentiable_result);
+              errorOccurred = true;
+              return true;
+            }
           }
           return false;
         };
@@ -3631,7 +3655,8 @@ public:
       }
 
       auto *autoDiffFuncInst = context.createAutoDiffFunction(
-          getBuilder(), loc, indices.parameters, /*differentiationOrder*/ 1,
+          getBuilder(), loc, indices.parameters, indices.results,
+          /*differentiationOrder*/ 1,
           original);
       differentiableFunc = autoDiffFuncInst;
 
