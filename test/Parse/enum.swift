@@ -563,3 +563,15 @@ enum SR11261 {
 enum SR11261_1 {
   case a, b, c, func, d // expected-error {{keyword 'func' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{17-21=`func`}}
 }
+
+enum SR11261_Newline {
+  case identifier1
+  case identifier2
+  case 
+  case identifier // expected-error {{keyword 'case' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{3-7=`case`}}
+}
+
+enum SR11261_Newline2 {
+  case 
+  func foo() {} // expected-error {{keyword 'func' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{3-7=`func`}}
+}
