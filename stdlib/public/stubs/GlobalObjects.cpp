@@ -134,16 +134,3 @@ void swift::_swift_instantiateInertHeapObject(void *address,
                                               const HeapMetadata *metadata) {
   ::new (address) HeapObject{metadata};
 }
-
-namespace llvm { namespace hashing { namespace detail {
-  // An extern variable expected by LLVM's hashing templates. We don't link any
-  // LLVM libs into the runtime, so define it as a weak symbol.
-  //
-  // Systems that compile this code into a dynamic library will do so with
-  // hidden visibility, making this all internal to the dynamic library.
-  // Systems that statically link the Swift runtime into applications (e.g. on
-  // Linux) need this to handle the case when the app already uses LLVM.
-  uint64_t LLVM_ATTRIBUTE_WEAK fixed_seed_override = 0;
-} // namespace detail
-} // namespace hashing
-} // namespace llvm

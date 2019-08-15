@@ -3,6 +3,7 @@
 if(SWIFT_BUILD_DYNAMIC_STDLIB)
   add_swift_target_library(swiftRemoteMirror
                            SHARED DONT_EMBED_BITCODE NOSWIFTRT
+                           ../runtime/LLVMSupport.cpp
                            SwiftRemoteMirror.cpp
                            LINK_LIBRARIES
                              swiftReflection

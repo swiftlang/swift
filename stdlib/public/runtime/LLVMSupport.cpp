@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/Hashing.h"
 
 // ADT uses report_bad_alloc_error to report an error when it can't allocate
 // elements for a data structure. The swift runtime uses ADT without linking
@@ -67,6 +68,32 @@ llvm::SmallVectorBase::grow_pod(void *FirstEl, size_t MinCapacity,
   this->BeginX = NewElts;
   this->Capacity = NewCapacity;
 }
+
+namespace hashing { namespace detail {
+  // An extern variable expected by LLVM's hashing templates. We don't link any
+  // LLVM libs into the runtime, so define it as a weak symbol.
+  //
+  // Systems that compile this code into a dynamic library will do so with
+  // hidden visibility, making this all internal to the dynamic library.
+  // Systems that statically link the Swift runtime into applications (e.g. on
+  // Linux) need this to handle the case when the app already uses LLVM.
+  uint64_t LLVM_ATTRIBUTE_WEAK fixed_seed_override = 0;
+} // namespace detail
+} // namespace hashing
+
+#if defined(_WIN32)
+// Same thing for hash_code as it is required by DenseMap
+extern hash_code hash_value(StringRef S);
+hash_code _hash_value(StringRef S) {
+  return hash_combine_range(S.begin(), S.end());
+}
+#pragma comment(linker, "/alternatename:?hash_value@llvm@@YA?AVhash_code@1@VStringRef@1@@Z=?_hash_value@llvm@@YA?AVhash_code@1@VStringRef@1@@Z")
+#else
+void __attribute__((__weak__, __visibility__("hidden")))
+hash_code hash_value(StringRef S) {
+  return hash_combine_range(S.begin(), S.end());
+}
+#endif
 
 } // end namespace llvm
 #endif // defined(swiftCore_EXPORTS)
