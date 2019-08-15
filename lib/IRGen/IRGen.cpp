@@ -384,7 +384,12 @@ static bool needsRecompile(StringRef OutputFilename, ArrayRef<uint8_t> HashData,
   // Search for the section which holds the hash.
   for (auto &Section : ObjectFile->sections()) {
     StringRef SectionName;
-    Section.getName(SectionName);
+    if (auto nameOrErr = Section.getName())
+      SectionName = *nameOrErr;
+    else {
+      consumeError(nameOrErr.takeError());
+      return true;
+    }
     if (SectionName == HashSectionName) {
       llvm::Expected<llvm::StringRef> SectionData = Section.getContents();
       if (!SectionData) {
