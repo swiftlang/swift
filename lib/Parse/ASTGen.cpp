@@ -480,6 +480,15 @@ TypeRepr *ASTGen::generate(UnknownTypeSyntax Type, SourceLoc &Loc) {
     }
   }
 
+  if (ChildrenCount >= 1) {
+    auto LParen = Type.getChild(0)->getAs<TokenSyntax>();
+    if (LParen && LParen->getTokenKind() == tok::l_paren) {
+      auto LParenLoc = advanceLocBegin(Loc, *LParen);
+      auto EndLoc = advanceLocBegin(Loc, *Type.getChild(Type.getNumChildren() - 1));
+      return TupleTypeRepr::createEmpty(Context, {LParenLoc, EndLoc});
+    }
+  }
+
   // let's hope the main `generate` method can find this node in the type map
   return nullptr;
 }
