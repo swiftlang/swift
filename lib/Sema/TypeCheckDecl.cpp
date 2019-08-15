@@ -3501,7 +3501,9 @@ void bindFuncDeclToOperator(TypeChecker &TC, FuncDecl *FD) {
       for (DeclContext *CurContext = FD->getLocalContext();
            !isa<SourceFile>(CurContext);
            CurContext = CurContext->getParent()) {
-        insertionLoc = CurContext->getAsDecl()->getStartLoc();
+        // Skip over non-decl contexts (e.g. closure expresssions)
+        if (auto *D = CurContext->getAsDecl())
+            insertionLoc = D->getStartLoc();
       }
     }
 
