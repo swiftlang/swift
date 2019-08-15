@@ -5622,7 +5622,7 @@ void Parser::parseAbstractFunctionBody(AbstractFunctionDecl *AFD) {
           AFD->setHasSingleExpressionBody();
           AFD->setSingleExpressionBody(E);
         } else if (auto *F = dyn_cast<ConstructorDecl>(AFD)) {
-          if (F->getFailability() != OTK_None && isa<NilLiteralExpr>(E)) {
+          if (F->isFailable() && isa<NilLiteralExpr>(E)) {
             // If it's a nil literal, just insert return.  This is the only 
             // legal thing to return.
             auto RS = new (Context) ReturnStmt(E->getStartLoc(), E);
@@ -6442,7 +6442,7 @@ ParserResult<ConstructorDecl>
 Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   assert(Tok.is(tok::kw_init));
   SourceLoc ConstructorLoc = consumeToken();
-  OptionalTypeKind Failability = OTK_None;
+  bool Failable = false, IUO = false;
   SourceLoc FailabilityLoc;
 
   const bool ConstructorsNotAllowed = !(Flags & PD_HasContainerType);
@@ -6455,10 +6455,11 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   // Parse the '!' or '?' for a failable initializer.
   if (Tok.isAny(tok::exclaim_postfix, tok::sil_exclamation) ||
       (Tok.isAnyOperator() && Tok.getText() == "!")) {
-    Failability = OTK_ImplicitlyUnwrappedOptional;
+    Failable = true;
+    IUO = true;
     FailabilityLoc = consumeToken();
   } else if (Tok.isAny(tok::question_postfix, tok::question_infix)) {
-    Failability = OTK_Optional;
+    Failable = true;
     FailabilityLoc = consumeToken();
   }
 
@@ -6509,10 +6510,11 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
 
   DeclName FullName(Context, DeclBaseName::createConstructor(), namePieces);
   auto *CD = new (Context) ConstructorDecl(FullName, ConstructorLoc,
-                                           Failability, FailabilityLoc,
+                                           Failable, FailabilityLoc,
                                            throwsLoc.isValid(), throwsLoc,
                                            Params.get(), nullptr,
                                            CurDeclContext);
+  CD->setImplicitlyUnwrappedOptional(IUO);
   CD->getAttrs() = Attributes;
 
   // Parse a 'where' clause if present, adding it to our GenericParamList.

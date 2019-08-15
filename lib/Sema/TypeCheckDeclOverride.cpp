@@ -189,8 +189,11 @@ bool swift::isOverrideBasedOnType(ValueDecl *decl, Type declTy,
   if (isa<ConstructorDecl>(decl)) {
     // Within a protocol context, check for a failability mismatch.
     if (isa<ProtocolDecl>(decl->getDeclContext())) {
-      if (cast<ConstructorDecl>(decl)->getFailability() !=
-            cast<ConstructorDecl>(parentDecl)->getFailability())
+      if (cast<ConstructorDecl>(decl)->isFailable() !=
+          cast<ConstructorDecl>(parentDecl)->isFailable())
+        return false;
+      if (cast<ConstructorDecl>(decl)->isImplicitlyUnwrappedOptional() !=
+          cast<ConstructorDecl>(parentDecl)->isImplicitlyUnwrappedOptional())
         return false;
     }
 

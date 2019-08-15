@@ -1620,20 +1620,6 @@ Serializer::writeConformances(ArrayRef<ProtocolConformance*> conformances,
     writeConformance(conformance, abbrCodes);
 }
 
-static uint8_t getRawStableOptionalTypeKind(swift::OptionalTypeKind kind) {
-  switch (kind) {
-  case swift::OTK_None:
-    return static_cast<uint8_t>(serialization::OptionalTypeKind::None);
-  case swift::OTK_Optional:
-    return static_cast<uint8_t>(serialization::OptionalTypeKind::Optional);
-  case swift::OTK_ImplicitlyUnwrappedOptional:
-    return static_cast<uint8_t>(
-             serialization::OptionalTypeKind::ImplicitlyUnwrappedOptional);
-  }
-
-  llvm_unreachable("Unhandled OptionalTypeKind in switch.");
-}
-
 static bool shouldSerializeMember(Decl *D) {
   switch (D->getKind()) {
   case DeclKind::Import:
@@ -3715,8 +3701,8 @@ public:
     unsigned abbrCode = S.DeclTypeAbbrCodes[ConstructorLayout::Code];
     ConstructorLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                                   contextID,
-                                  getRawStableOptionalTypeKind(
-                                    ctor->getFailability()),
+                                  ctor->isFailable(),
+                                  ctor->isImplicitlyUnwrappedOptional(),
                                   ctor->isImplicit(),
                                   ctor->isObjC(),
                                   ctor->hasStubImplementation(),

@@ -60,6 +60,19 @@ class TypeDecl;
 class VisibleDeclConsumer;
 enum class SelectorSplitKind;
 
+/// Kinds of optional types.
+enum OptionalTypeKind : unsigned {
+  /// The type is not an optional type.
+  OTK_None = 0,
+
+  /// The type is Optional<T>.
+  OTK_Optional,
+
+  /// The type is ImplicitlyUnwrappedOptional<T>.
+  OTK_ImplicitlyUnwrappedOptional
+};
+enum { NumOptionalTypeKinds = 2 };
+
 /// This interface is implemented by LLDB to serve as a fallback when Clang
 /// modules can't be imported from source in the debugger.
 ///

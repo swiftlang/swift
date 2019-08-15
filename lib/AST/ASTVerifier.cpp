@@ -1061,7 +1061,7 @@ public:
         abort();
       }
 
-      if (ctor->getFailability() == OTK_None && !ctor->isInvalid()) {
+      if (!ctor->isFailable() && !ctor->isInvalid()) {
         Out << "non-failable initializer contains a 'fail' statement\n";
         ctor->dump(Out);
         abort();
@@ -2950,8 +2950,9 @@ public:
       if (!CD->isInvalid() &&
           CD->getDeclContext()->getDeclaredInterfaceType()->getAnyNominal() !=
               Ctx.getOptionalDecl()) {
-        bool resultIsOptional = (bool) CD->getResultInterfaceType()->getOptionalObjectType();
-        auto declIsOptional = CD->getFailability() != OTK_None;
+        bool resultIsOptional = (bool) CD->getResultInterfaceType()
+            ->getOptionalObjectType();
+        auto declIsOptional = CD->isFailable();
 
         if (resultIsOptional != declIsOptional) {
           Out << "Initializer has result optionality/failability mismatch\n";
@@ -2974,16 +2975,8 @@ public:
         }
       }
 
-      if (CD->isImplicitlyUnwrappedOptional()) {
-        if (CD->getFailability() != OTK_ImplicitlyUnwrappedOptional) {
-          Out << "Expected IUO failability for constructor with IUO decl "
-                 "attribute!\n";
-          CD->dump(llvm::errs());
-          abort();
-        }
-
+      if (CD->isFailable()) {
         auto resultTy = CD->getResultInterfaceType();
-
         if (!resultTy->getOptionalObjectType()) {
           Out << "implicitly unwrapped optional attribute should only be set "
                  "on constructors with optional return types\n";
@@ -2991,9 +2984,8 @@ public:
           abort();
         }
       } else {
-        if (CD->getFailability() == OTK_ImplicitlyUnwrappedOptional) {
-          Out << "Expected IUO decl attribute for constructor with IUO "
-                 "failability!\n";
+        if (CD->isImplicitlyUnwrappedOptional()) {
+          Out << "Expected failable constructor if result is IUO\n";
           CD->dump(llvm::errs());
           abort();
         }

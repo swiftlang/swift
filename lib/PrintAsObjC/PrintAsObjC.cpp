@@ -575,7 +575,14 @@ private:
       if (errorConvention && errorConvention->stripsResultOptionality()) {
         printNullability(OTK_Optional, NullabilityPrintKind::ContextSensitive);
       } else if (auto ctor = dyn_cast<ConstructorDecl>(AFD)) {
-        printNullability(ctor->getFailability(),
+        OptionalTypeKind kind = OTK_None;
+        if (ctor->isFailable()) {
+          if (ctor->isImplicitlyUnwrappedOptional())
+            kind = OTK_ImplicitlyUnwrappedOptional;
+          else
+            kind = OTK_Optional;
+        }
+        printNullability(kind,
                          NullabilityPrintKind::ContextSensitive);
       } else {
         auto func = cast<FuncDecl>(AFD);

@@ -254,7 +254,7 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
   DeclName name(ctx, DeclBaseName::createConstructor(), paramList);
   auto *ctor =
     new (ctx) ConstructorDecl(name, Loc,
-                              OTK_None, /*FailabilityLoc=*/SourceLoc(),
+                              /*Failable=*/false, /*FailabilityLoc=*/SourceLoc(),
                               /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
                               paramList, /*GenericParams=*/nullptr, decl);
 
@@ -676,7 +676,7 @@ createDesignatedInitOverride(ClassDecl *classDecl,
   auto ctor =
     new (ctx) ConstructorDecl(superclassCtor->getFullName(),
                               classDecl->getBraces().Start,
-                              superclassCtor->getFailability(),
+                              superclassCtor->isFailable(),
                               /*FailabilityLoc=*/SourceLoc(),
                               /*Throws=*/superclassCtor->hasThrows(),
                               /*ThrowsLoc=*/SourceLoc(),
@@ -689,7 +689,7 @@ createDesignatedInitOverride(ClassDecl *classDecl,
   ctor->computeType();
 
   ctor->setImplicitlyUnwrappedOptional(
-    ctor->getFailability() == OTK_ImplicitlyUnwrappedOptional);
+    superclassCtor->isImplicitlyUnwrappedOptional());
 
   ctor->setValidationToChecked();
 

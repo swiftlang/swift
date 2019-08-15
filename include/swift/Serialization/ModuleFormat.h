@@ -52,7 +52,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 510; // serialize isIUO bit on ValueDecls
+const uint16_t SWIFTMODULE_VERSION_MINOR = 511; // ctor failability change
 
 using DeclIDField = BCFixed<31>;
 
@@ -408,15 +408,6 @@ enum class AccessLevel : uint8_t {
   Open,
 };
 using AccessLevelField = BCFixed<3>;
-
-// These IDs must \em not be renumbered or reordered without incrementing
-// the module version.
-enum class OptionalTypeKind : uint8_t {
-  None,
-  Optional,
-  ImplicitlyUnwrappedOptional
-};
-using OptionalTypeKindField = BCFixed<2>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
@@ -1019,7 +1010,8 @@ namespace decls_block {
   using ConstructorLayout = BCRecordLayout<
     CONSTRUCTOR_DECL,
     DeclContextIDField, // context decl
-    OptionalTypeKindField,  // failability
+    BCFixed<1>,  // failable?
+    BCFixed<1>,  // IUO result?
     BCFixed<1>,  // implicit?
     BCFixed<1>,  // objc?
     BCFixed<1>,  // stub implementation?

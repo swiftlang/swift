@@ -1276,7 +1276,7 @@ namespace {
           CS.getConstraintLocator(expr, ConstraintLocator::ApplyArgument));
 
       Type result = tv;
-      if (constr->getFailability() != OTK_None)
+      if (constr->isFailable())
         result = OptionalType::get(result);
 
       return result;

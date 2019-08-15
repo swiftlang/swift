@@ -2697,7 +2697,8 @@ public:
         if (init->shouldHideFromEditor())
           continue;
         if (IsUnresolvedMember &&
-            cast<ConstructorDecl>(init)->getFailability() == OTK_Optional) {
+            cast<ConstructorDecl>(init)->isFailable() &&
+            !cast<ConstructorDecl>(init)->isImplicitlyUnwrappedOptional()) {
           continue;
         }
         addConstructorCall(cast<ConstructorDecl>(init), Reason,
