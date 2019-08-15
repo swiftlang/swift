@@ -15,6 +15,8 @@
 
 using namespace swift;
 
+void DWARFImporterDelegate::anchor() {}
+
 /// Represents a Clang module that was "imported" from debug info. Since all the
 /// loading of types is done on demand, this class is effectively empty.
 class DWARFModuleUnit final : public LoadedFile {

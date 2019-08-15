@@ -71,11 +71,13 @@ enum class SelectorSplitKind;
 /// Clang AST to ClangImporter to import the type into Swift.
 class DWARFImporterDelegate {
 public:
-  virtual ~DWARFImporterDelegate() {}
+  virtual ~DWARFImporterDelegate() = default;
   /// Perform a qualified lookup of a Clang type with this name.
   /// \param kind  Only return results with this type kind.
   virtual void lookupValue(StringRef name, llvm::Optional<ClangTypeKind> kind,
                            SmallVectorImpl<clang::Decl *> &results) {}
+  /// vtable anchor.
+  virtual void anchor();
 };
 
 /// Class that imports Clang modules into Swift, mapping directly
