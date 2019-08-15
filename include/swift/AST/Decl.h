@@ -2425,6 +2425,7 @@ class ValueDecl : public Decl {
   friend class IsObjCRequest;
   friend class IsFinalRequest;
   friend class IsDynamicRequest;
+  friend class IsImplicitlyUnwrappedOptionalRequest;
 
 protected:
   ValueDecl(DeclKind K,

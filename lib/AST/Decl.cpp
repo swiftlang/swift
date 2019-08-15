@@ -2686,7 +2686,10 @@ bool ValueDecl::canBeAccessedByDynamicLookup() const {
 }
 
 bool ValueDecl::isImplicitlyUnwrappedOptional() const {
-  return LazySemanticInfo.isIUO;
+  ASTContext &ctx = getASTContext();
+  return evaluateOrDefault(ctx.evaluator,
+    IsImplicitlyUnwrappedOptionalRequest{const_cast<ValueDecl *>(this)},
+    false);
 }
 
 ArrayRef<ValueDecl *>

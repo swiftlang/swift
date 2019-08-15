@@ -4278,7 +4278,6 @@ static AccessorDecl *createAccessorFunc(SourceLoc DeclLoc,
                                     ParameterList *param,
                                     GenericParamList *GenericParams,
                                     ParameterList *Indices,
-                                    TypeLoc ElementTy,
                                     SourceLoc StaticLoc,
                                     Parser::ParseDeclOptions Flags,
                                     AccessorKind Kind,
@@ -4361,7 +4360,7 @@ static AccessorDecl *createAccessorFunc(SourceLoc DeclLoc,
 static ParamDecl *createSetterAccessorArgument(SourceLoc nameLoc,
                                                Identifier name,
                                                AccessorKind accessorKind,
-                                               Parser &P, TypeLoc elementType) {
+                                               Parser &P) {
   // Add the parameter. If no name was specified, the name defaults to
   // 'value'.
   bool isNameImplicit = name.empty();
@@ -4380,13 +4379,6 @@ static ParamDecl *createSetterAccessorArgument(SourceLoc nameLoc,
   // AST Walker shouldn't go into the type recursively.
   result->setIsTypeLocImplicit(true);
 
-  if (auto *repr = elementType.getTypeRepr()) {
-    if (repr->getKind() ==
-        TypeReprKind::ImplicitlyUnwrappedOptional) {
-      result->setImplicitlyUnwrappedOptional(true);
-    }
-  }
-
   return result;
 }
 
@@ -4395,8 +4387,7 @@ static ParamDecl *createSetterAccessorArgument(SourceLoc nameLoc,
 /// present.
 static ParameterList *parseOptionalAccessorArgument(SourceLoc SpecifierLoc,
                                                     Parser &P,
-                                                    AccessorKind Kind,
-                                                    TypeLoc ElementTy) {
+                                                    AccessorKind Kind) {
   // 'set' and 'willSet' have a (value) parameter, 'didSet' takes an (oldValue)
   // parameter and 'get' and always takes a () parameter.
   if (Kind != AccessorKind::Set && Kind != AccessorKind::WillSet &&
@@ -4435,7 +4426,7 @@ static ParameterList *parseOptionalAccessorArgument(SourceLoc SpecifierLoc,
   }
 
   if (Name.empty()) NameLoc = SpecifierLoc;
-  auto param = createSetterAccessorArgument(NameLoc, Name, Kind, P, ElementTy);
+  auto param = createSetterAccessorArgument(NameLoc, Name, Kind, P);
   return ParameterList::create(P.Context, StartLoc, param, EndLoc);
 }
 
@@ -4598,7 +4589,7 @@ static bool parseAccessorIntroducer(Parser &P,
 ParserStatus Parser::parseGetSet(ParseDeclOptions Flags,
                                  GenericParamList *GenericParams,
                                  ParameterList *Indices,
-                                 TypeLoc ElementTy, ParsedAccessors &accessors,
+                                 ParsedAccessors &accessors,
                                  AbstractStorageDecl *storage,
                                  SourceLoc StaticLoc) {
   assert(Tok.is(tok::l_brace));
@@ -4637,7 +4628,7 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags,
     accessors.LBLoc = Tok.getLoc();
     auto getter =
         createAccessorFunc(Tok.getLoc(), /*ValueNamePattern*/ nullptr,
-                           GenericParams, Indices, ElementTy, StaticLoc, Flags,
+                           GenericParams, Indices, StaticLoc, Flags,
                            AccessorKind::Get, storage, this,
                            /*AccessorKeywordLoc*/ SourceLoc());
     accessors.add(getter);
@@ -4681,7 +4672,7 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags,
             // expression in a multi-statement body.
             auto getter = createAccessorFunc(
                 accessors.LBLoc, /*ValueNamePattern*/ nullptr, GenericParams,
-                Indices, ElementTy, StaticLoc, Flags, AccessorKind::Get,
+                Indices, StaticLoc, Flags, AccessorKind::Get,
                 storage, this, /*AccessorKeywordLoc*/ SourceLoc());
             CCE = new (Context) CodeCompletionExpr(Tok.getLoc());
             getter->setBodyParsed(BraceStmt::create(Context, Tok.getLoc(),
@@ -4737,12 +4728,11 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags,
     if (parsingLimitedSyntax && Tok.is(tok::l_paren)) {
       diagnose(Loc, diag::protocol_setter_name);
     }
-    auto *ValueNamePattern =
-        parseOptionalAccessorArgument(Loc, *this, Kind, ElementTy);
+    auto *ValueNamePattern = parseOptionalAccessorArgument(Loc, *this, Kind);
 
     // Set up a function declaration.
     auto accessor = createAccessorFunc(Loc, ValueNamePattern, GenericParams,
-                                       Indices, ElementTy, StaticLoc, Flags,
+                                       Indices, StaticLoc, Flags,
                                        Kind, storage, this, Loc);
     accessor->getAttrs() = Attributes;
 
@@ -4833,13 +4823,6 @@ Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
     Invalid = true;
   }
 
-  TypeLoc TyLoc;
-  if (auto *TP = dyn_cast<TypedPattern>(pattern)) {
-    TyLoc = TP->getTypeLoc();
-  } else if (!PrimaryVar) {
-    TyLoc = TypeLoc::withoutLoc(ErrorType::get(Context));
-  }
-
   // Create a fake VarDecl and PBD so that we don't have to weaken the
   // formation rule that an AccessorDecl always has a VarDecl.
   VarDecl *storage = PrimaryVar;
@@ -4870,7 +4853,7 @@ Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
   // Parse getter and setter.
   ParsedAccessors accessors;
   auto AccessorStatus = parseGetSet(Flags, /*GenericParams=*/nullptr,
-                                    /*Indices=*/nullptr, TyLoc, accessors,
+                                    /*Indices=*/nullptr, accessors,
                                     storage, StaticLoc);
   if (AccessorStatus.hasCodeCompletion())
     return makeParserCodeCompletionStatus();
@@ -4880,6 +4863,11 @@ Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
   // If we have an invalid case, bail out now.
   if (!PrimaryVar)
     return nullptr;
+
+  TypeLoc TyLoc;
+  if (auto *TP = dyn_cast<TypedPattern>(pattern)) {
+    TyLoc = TP->getTypeLoc();
+  }
 
   if (!TyLoc.hasLocation()) {
     if (accessors.Get || accessors.Set || accessors.Address ||
@@ -6416,8 +6404,7 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
       Status.setIsParseError();
     }
   } else {
-    Status |= parseGetSet(Flags, GenericParams,
-                          Indices.get(), ElementTy.get(),
+    Status |= parseGetSet(Flags, GenericParams, Indices.get(),
                           accessors, Subscript, StaticLoc);
   }
 
