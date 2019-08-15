@@ -386,13 +386,13 @@ bool ClangImporter::Implementation::shouldIgnoreBridgeHeaderTopLevelDecl(
   return false;
 }
 
-ClangImporter::ClangImporter(
-    ASTContext &ctx, const ClangImporterOptions &clangImporterOpts,
-    DependencyTracker *tracker,
-    std::unique_ptr<DWARFImporterDelegate> dwarfImporterDelegate)
+ClangImporter::ClangImporter(ASTContext &ctx,
+                             const ClangImporterOptions &clangImporterOpts,
+                             DependencyTracker *tracker,
+                             DWARFImporterDelegate *dwarfImporterDelegate)
     : ClangModuleLoader(tracker),
-      Impl(*new Implementation(ctx, clangImporterOpts,
-                               std::move(dwarfImporterDelegate))) {}
+      Impl(*new Implementation(ctx, clangImporterOpts, dwarfImporterDelegate)) {
+}
 
 ClangImporter::~ClangImporter() {
   delete &Impl;
@@ -909,12 +909,12 @@ ClangImporter::getOrCreatePCH(const ClangImporterOptions &ImporterOptions,
   return PCHFilename.getValue();
 }
 
-std::unique_ptr<ClangImporter> ClangImporter::create(
-    ASTContext &ctx, const ClangImporterOptions &importerOpts,
-    std::string swiftPCHHash, DependencyTracker *tracker,
-    std::unique_ptr<DWARFImporterDelegate> dwarfImporterDelegate) {
-  std::unique_ptr<ClangImporter> importer{new ClangImporter(
-      ctx, importerOpts, tracker, std::move(dwarfImporterDelegate))};
+std::unique_ptr<ClangImporter>
+ClangImporter::create(ASTContext &ctx, const ClangImporterOptions &importerOpts,
+                      std::string swiftPCHHash, DependencyTracker *tracker,
+                      DWARFImporterDelegate *dwarfImporterDelegate) {
+  std::unique_ptr<ClangImporter> importer{
+      new ClangImporter(ctx, importerOpts, tracker, dwarfImporterDelegate)};
 
   std::vector<std::string> invocationArgStrs;
 
@@ -1843,7 +1843,7 @@ bool PlatformAvailability::treatDeprecatedAsUnavailable(
 
 ClangImporter::Implementation::Implementation(
     ASTContext &ctx, const ClangImporterOptions &opts,
-    std::unique_ptr<DWARFImporterDelegate> dwarfImporterDelegate)
+    DWARFImporterDelegate *dwarfImporterDelegate)
     : SwiftContext(ctx),
       ImportForwardDeclarations(opts.ImportForwardDeclarations),
       InferImportAsMember(opts.InferImportAsMember),
@@ -1854,7 +1854,7 @@ ClangImporter::Implementation::Implementation(
       CurrentVersion(ImportNameVersion::fromOptions(ctx.LangOpts)),
       BridgingHeaderLookupTable(new SwiftLookupTable(nullptr)),
       platformAvailability(ctx.LangOpts), nameImporter(),
-      DWARFImporter(std::move(dwarfImporterDelegate)) {}
+      DWARFImporter(dwarfImporterDelegate) {}
 
 ClangImporter::Implementation::~Implementation() {
 #ifndef NDEBUG
