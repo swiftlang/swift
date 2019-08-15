@@ -606,14 +606,19 @@ public:
 private:
   /// The DWARF importer delegate, if installed.
   DWARFImporterDelegate *DWARFImporter = nullptr;
+public:
+  /// Only used for testing.
+  void setDWARFImporterDelegate(DWARFImporterDelegate &delegate);
+
+private:
   /// The list of Clang modules found in the debug info.
   llvm::DenseMap<Identifier, LoadedFile *> DWARFModuleUnits;
-
 public:
   /// "Import" a module from debug info. Because debug info types are read on
   /// demand, this doesn't really do any work.
   ModuleDecl *loadModuleDWARF(SourceLoc importLoc,
                               ArrayRef<std::pair<Identifier, SourceLoc>> path);
+
   
   void recordImplicitUnwrapForDecl(Decl *decl, bool isIUO) {
 #if !defined(NDEBUG)
