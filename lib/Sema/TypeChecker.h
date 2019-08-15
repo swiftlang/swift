@@ -989,9 +989,9 @@ public:
   void checkParameterAttributes(ParameterList *params);
   void checkDynamicReplacementAttribute(ValueDecl *D);
   static ValueDecl *findReplacedDynamicFunction(const ValueDecl *d);
-  void checkTypeModifyingDeclAttributes(VarDecl *var);
 
-  void checkReferenceOwnershipAttr(VarDecl *D, ReferenceOwnershipAttr *attr);
+  Type checkReferenceOwnershipAttr(VarDecl *D, Type interfaceType,
+                                   ReferenceOwnershipAttr *attr);
 
   /// Check the default arguments that occur within this value decl.
   void checkDefaultArguments(ParameterList *params, ValueDecl *VD);
