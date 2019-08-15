@@ -53,7 +53,7 @@ entry(%b : $(BitfieldOne, @convention(block) (BitfieldOne) -> (BitfieldOne)), %x
   return %r : $BitfieldOne
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @testBigTempStruct(%T22big_types_corner_cases13BigTempStructV* noalias nocapture sret, %swift.bridge*, %swift.type* %Element)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @testBigTempStruct(%T22big_types_corner_cases13BigTempStructV* noalias nocapture sret %0, %swift.bridge* %1, %swift.type* %Element)
 // CHECK: [[ALLOC:%.*]] = alloca %T22big_types_corner_cases13BigTempStructV
 // CHECK: call swiftcc void @testBigTempStruct(%T22big_types_corner_cases13BigTempStructV* noalias nocapture sret [[ALLOC]], %swift.bridge* %1, %swift.type* %Element)
 // CHECK: ret void
@@ -65,7 +65,7 @@ bb0(%0 : $_ArrayBuffer<Element>):
   return %9 : $BigTempStruct<Element>
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @testTryApply(%T22big_types_corner_cases9BigStructV* noalias nocapture sret, i8*, %swift.refcounted*, %swift.refcounted* swiftself, %swift.error** noalias nocapture swifterror dereferenceable(8))
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @testTryApply(%T22big_types_corner_cases9BigStructV* noalias nocapture sret %0, i8* %1, %swift.refcounted* %2, %swift.refcounted* swiftself %3, %swift.error** noalias nocapture swifterror dereferenceable(8) %4)
 // CHECK: [[ALLOC:%.*]] = alloca %T22big_types_corner_cases9BigStructV
 // CHECK: call swiftcc void {{.*}}(%T22big_types_corner_cases9BigStructV* noalias nocapture sret [[ALLOC]]
 // CHECK: ret void
@@ -92,7 +92,7 @@ bb0(%0 : $BigTempStruct<Element>):
   return %ret : $Builtin.RawPointer
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @testFuncWithModBlockStorageApply({ %objc_block, %swift.function }* nocapture dereferenceable({{.*}}), %T22big_types_corner_cases9BigStructV* noalias nocapture dereferenceable({{.*}})
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @testFuncWithModBlockStorageApply({ %objc_block, %swift.function }* nocapture dereferenceable({{.*}}) %0, %T22big_types_corner_cases9BigStructV* noalias nocapture dereferenceable({{.*}})
 // CHECK: call swiftcc void {{.*}}(%T22big_types_corner_cases9BigStructV* noalias nocapture dereferenceable({{.*}}) %1
 // CHECK: ret void
 sil @testFuncWithModBlockStorageApply : $@convention(thin) (@inout_aliasable @block_storage @callee_owned (@owned BigStruct) -> (), BigStruct) -> () {
@@ -119,7 +119,7 @@ sil public_external @c_return_func : $@convention(thin) () -> () -> @owned BigSt
 // CHECK: [[RET:%.*]] = insertvalue { i8*, %swift.refcounted* } { i8* bitcast (void (%T22big_types_corner_cases9BigStructV*, i64, %swift.refcounted*)* @"$s17part_apply_calleeTA" to i8*), %swift.refcounted* undef }, %swift.refcounted*
 // CHECK: ret { i8*, %swift.refcounted* } [[RET]]
 
-// CHECK-LABEL: define internal swiftcc void @"$s17part_apply_calleeTA"(%T22big_types_corner_cases9BigStructV* noalias nocapture sret, i64, %swift.refcounted* swiftself)
+// CHECK-LABEL: define internal swiftcc void @"$s17part_apply_calleeTA"(%T22big_types_corner_cases9BigStructV* noalias nocapture sret %0, i64 %1, %swift.refcounted* swiftself %2)
 // CHECK: bitcast %swift.refcounted* %2 to <{ %swift.refcounted, %swift.function }>*
 // CHECK: ret void
 
@@ -137,7 +137,7 @@ bb0(%0 : $Builtin.Int64, %1 : $() -> @owned BigStruct):
   return undef : $BigStruct
 }
 
-// CHECK-LABEL: define swiftcc void @poninter_to_mod_ret(i8*, %swift.refcounted*)
+// CHECK-LABEL: define swiftcc void @poninter_to_mod_ret(i8* %0, %swift.refcounted* %1)
 // CHECK: [[BITCAST:%.*]] = bitcast i8* %0 to { i8*, %swift.refcounted* } (%swift.refcounted*)*
 // CHECK: [[CALL:%.*]] = call swiftcc { i8*, %swift.refcounted* } [[BITCAST]](%swift.refcounted* swiftself %1)
 // CHECK: extractvalue { i8*, %swift.refcounted* } [[CALL]], 0
@@ -186,7 +186,7 @@ sil @get_optional_none : $@convention(method) <τ_0_0> (@thin Optional<τ_0_0>.T
 sil @short_circuit_operation : $@convention(thin) <τ_0_0> (@in Optional<τ_0_0>, @owned @callee_owned () -> (@out τ_0_0, @error Error)) -> (@out τ_0_0, @error Error)
 sil @autoclosure_partialapply : $@convention(thin) (@owned @callee_owned () -> (BigStruct, @error Error)) -> (@out BigStruct, @error Error)
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @closure(%T22big_types_corner_cases9BigStructV* noalias nocapture sret, %T22big_types_corner_cases8SuperSubC*)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @closure(%T22big_types_corner_cases9BigStructV* noalias nocapture sret %0, %T22big_types_corner_cases8SuperSubC* %1)
 // CHECK-64: [[ALLOC1:%.*]] = alloca %T22big_types_corner_cases9BigStructV
 // CHECK-64: [[ALLOC2:%.*]] = alloca %T22big_types_corner_cases9BigStructV
 // CHECK-64: [[ALLOC3:%.*]] = alloca %T22big_types_corner_cases9BigStructVSg
@@ -258,7 +258,7 @@ bb0:
 
 sil @convertToThickHelper : $@convention(thin) (@owned BigStruct) -> ()
 
-// CHECK-LABAL: define {{.*}} swiftcc void @convertToThick(%T22big_types_corner_cases9BigStructV* noalias nocapture dereferenceable({{.*}}))
+// CHECK-LABAL: define {{.*}} swiftcc void @convertToThick(%T22big_types_corner_cases9BigStructV* noalias nocapture dereferenceable({{.*}}) %0)
 // CHECK: entry:
 // CHECK:   [[ALLOC:%.*]] = alloca %T22big_types_corner_cases9BigStructV, align 4
 // CHECK:   call void @llvm.memcpy.p0i8.p0i8.i64
@@ -296,7 +296,7 @@ bb0(%1 : $X):
 
 sil @$getLargeObjCType : $@convention(thin) () -> BitfieldOne
 
-// CHECK-LABAL: define {{.*}} swiftcc void @"$crash_on_objc_apply"(%objc_object*)
+// CHECK-LABAL: define {{.*}} swiftcc void @"$crash_on_objc_apply"(%objc_object* %0)
 // CHECK: entry:
 // CHECK:   [[LOADS:%.*]] = load i8*, i8** @"\01L_selector(foo)"
 // CHECK:   [[RESS:%.*]] = load i8*, i8** @"\01L_selector(respondsToSelector:)"
@@ -334,7 +334,7 @@ bb3:                                              // Preds: bb2 bb1
 
 sil @slowCallee : $@convention(thin) (@guaranteed String) -> @owned @callee_guaranteed (@guaranteed String) -> @owned @callee_guaranteed (@guaranteed Array<String>) -> @owned @callee_guaranteed (@guaranteed String) -> @owned @callee_guaranteed (@guaranteed String) -> @owned @callee_guaranteed (@guaranteed String) -> @owned @callee_guaranteed (@guaranteed String) -> @owned @callee_guaranteed (@guaranteed String) -> @owned @callee_guaranteed (@guaranteed String) -> @owned @callee_guaranteed (@guaranteed String) -> @owned @callee_guaranteed (@guaranteed String) -> @owned @callee_guaranteed (@guaranteed String) -> @owned @callee_guaranteed (@guaranteed String) -> @owned @callee_guaranteed (@guaranteed String) -> @owned @callee_guaranteed (@guaranteed String) -> @owned @callee_guaranteed (@guaranteed String) -> @owned @callee_guaranteed (@guaranteed String) -> @owned @callee_guaranteed (@guaranteed String) -> @owned @callee_guaranteed (@guaranteed String) -> @owned @callee_guaranteed (@guaranteed String) -> @owned @callee_guaranteed (@guaranteed String) -> @owned @callee_guaranteed (@guaranteed String) -> @owned @callee_guaranteed (@guaranteed String) -> @owned @callee_guaranteed (@guaranteed String) -> @owned @callee_guaranteed (@guaranteed String) -> @owned @callee_guaranteed (@guaranteed String) -> @owned @callee_guaranteed (@guaranteed String) -> @owned BigStruct
 
-// CHECK-LABAL: define {{.*}} swiftcc void @slowCaller(i64, %swift.bridge*)
+// CHECK-LABAL: define {{.*}} swiftcc void @slowCaller(i64 %0, %swift.bridge* %1)
 // CHECK:   call swiftcc { i8*, %swift.refcounted* } @slowCallee(i64 %0, %swift.bridge* %1)
 sil @slowCaller : $@convention(thin) (@guaranteed String) -> () {
 bb0(%0 : $String):

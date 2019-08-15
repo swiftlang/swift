@@ -28,7 +28,7 @@ import gizmo
 // CHECK:   @_PROTOCOL__TtP13generic_casts10ObjCProto1_
 // CHECK: }
 
-// CHECK: define hidden swiftcc i64 @"$s13generic_casts8allToIntySixlF"(%swift.opaque* noalias nocapture, %swift.type* %T)
+// CHECK: define hidden swiftcc i64 @"$s13generic_casts8allToIntySixlF"(%swift.opaque* noalias nocapture %0, %swift.type* %T)
 func allToInt<T>(_ x: T) -> Int {
   return x as! Int
   // CHECK: [[INT_TEMP:%.*]] = alloca %TSi,
@@ -48,7 +48,7 @@ func allToInt<T>(_ x: T) -> Int {
   // CHECK: ret i64 [[INT_RESULT]]
 }
 
-// CHECK: define hidden swiftcc void @"$s13generic_casts8intToAllyxSilF"(%swift.opaque* noalias nocapture sret, i64, %swift.type* %T) {{.*}} {
+// CHECK: define hidden swiftcc void @"$s13generic_casts8intToAllyxSilF"(%swift.opaque* noalias nocapture sret %0, i64 %1, %swift.type* %T) {{.*}} {
 func intToAll<T>(_ x: Int) -> T {
   // CHECK: [[INT_TEMP:%.*]] = alloca %TSi,
   // CHECK: [[T0:%.*]] = getelementptr inbounds %TSi, %TSi* [[INT_TEMP]], i32 0, i32 0
@@ -58,7 +58,7 @@ func intToAll<T>(_ x: Int) -> T {
   return x as! T
 }
 
-// CHECK: define hidden swiftcc i64 @"$s13generic_casts8anyToIntySiypF"(%Any* noalias nocapture dereferenceable({{.*}})) {{.*}} {
+// CHECK: define hidden swiftcc i64 @"$s13generic_casts8anyToIntySiypF"(%Any* noalias nocapture dereferenceable({{.*}}) %0) {{.*}} {
 func anyToInt(_ x: Any) -> Int {
   return x as! Int
 }
@@ -74,7 +74,7 @@ func anyToInt(_ x: Any) -> Int {
 
 @objc class ObjCClass {}
 
-// CHECK: define hidden swiftcc %objc_object* @"$s13generic_casts9protoCastyAA10ObjCProto1_So9NSRuncingpAA0E6CClassCF"(%T13generic_casts9ObjCClassC*) {{.*}} {
+// CHECK: define hidden swiftcc %objc_object* @"$s13generic_casts9protoCastyAA10ObjCProto1_So9NSRuncingpAA0E6CClassCF"(%T13generic_casts9ObjCClassC* %0) {{.*}} {
 func protoCast(_ x: ObjCClass) -> ObjCProto1 & NSRuncing {
   // CHECK: load i8*, i8** @"\01l_OBJC_PROTOCOL_REFERENCE_$__TtP13generic_casts10ObjCProto1_"
   // CHECK: load i8*, i8** @"\01l_OBJC_PROTOCOL_REFERENCE_$_NSRuncing"
@@ -91,7 +91,7 @@ func protoCast(_ x: ObjCClass) -> ObjCProto1 & NSRuncing {
 
 // <rdar://problem/15313840>
 // Class existential to opaque archetype cast
-// CHECK: define hidden swiftcc void @"$s13generic_casts33classExistentialToOpaqueArchetypeyxAA10ObjCProto1_plF"(%swift.opaque* noalias nocapture sret, %objc_object*, %swift.type* %T)
+// CHECK: define hidden swiftcc void @"$s13generic_casts33classExistentialToOpaqueArchetypeyxAA10ObjCProto1_plF"(%swift.opaque* noalias nocapture sret %0, %objc_object* %1, %swift.type* %T)
 func classExistentialToOpaqueArchetype<T>(_ x: ObjCProto1) -> T {
   var x = x
   // CHECK: [[X:%.*]] = alloca %T13generic_casts10ObjCProto1P
@@ -105,7 +105,7 @@ func classExistentialToOpaqueArchetype<T>(_ x: ObjCProto1) -> T {
 protocol P {}
 protocol Q {}
 
-// CHECK: define hidden swiftcc void @"$s13generic_casts19compositionToMemberyAA1P_pAaC_AA1QpF{{.*}}"(%T13generic_casts1PP* noalias nocapture sret, %T13generic_casts1P_AA1Qp* noalias nocapture dereferenceable({{.*}})) {{.*}} {
+// CHECK: define hidden swiftcc void @"$s13generic_casts19compositionToMemberyAA1P_pAaC_AA1QpF{{.*}}"(%T13generic_casts1PP* noalias nocapture sret %0, %T13generic_casts1P_AA1Qp* noalias nocapture dereferenceable({{.*}}) %1) {{.*}} {
 func compositionToMember(_ a: P & Q) -> P {
   return a
 }

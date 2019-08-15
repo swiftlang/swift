@@ -339,7 +339,7 @@ entry(%a : $CChar, %b : $CSignedChar, %c : $CUnsignedChar, %d : $CShort, %e : $C
   return undef : $()
 }
 
-// CHECK-x86_64-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i8 @testIntegerExtensionInBlock(%objc_block*, i8)
+// CHECK-x86_64-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i8 @testIntegerExtensionInBlock(%objc_block* %0, i8 %1)
 sil @testIntegerExtensionInBlock : $@convention(thin) (@owned @convention(block) (CChar) -> CChar, CChar) -> CChar {
 entry(%b : $@convention(block) (CChar) -> CChar, %c : $CChar):
 // CHECK-SYSV-x86_64: call signext i8 {{%.*}}(%objc_block* {{%.*}}, i8 signext {{%.*}})

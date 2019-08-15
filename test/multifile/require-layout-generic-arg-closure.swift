@@ -17,7 +17,7 @@
 public func requestType2<T>(x: T) {
   requestTypeThrough(closure: { x in print(x) }, arg: x)
 }
-// FILE2-LABEL: define internal %swift.type* @"$s4test3SubCMi"(%swift.type_descriptor*, i8**, i8*)
+// FILE2-LABEL: define internal %swift.type* @"$s4test3SubCMi"(%swift.type_descriptor* %0, i8** %1, i8* %2)
 // FILE2:   [[T_ADDR:%.*]] = bitcast i8** %1 to %swift.type**
 // FILE2:   [[T:%.*]] = load %swift.type*, %swift.type** [[T_ADDR]]
 // FILE2:   [[CLASSMETADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata

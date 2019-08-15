@@ -5,7 +5,7 @@
 
 import Builtin
 
-// CHECK-LABEL: define{{( protected| dllexport)?}} swiftcc <4 x i32> @vector_int_add(<4 x i32>, <4 x i32>) {{.*}} {
+// CHECK-LABEL: define{{( protected| dllexport)?}} swiftcc <4 x i32> @vector_int_add(<4 x i32> %0, <4 x i32> %1) {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK-NEXT: %2 = add <4 x i32> %0, %1
 // CHECK-NEXT: ret <4 x i32> %2
@@ -16,7 +16,7 @@ bb0(%0 : $Builtin.Vec4xInt32, %1 : $Builtin.Vec4xInt32):
   return %2 : $Builtin.Vec4xInt32
 }
 
-// CHECK-LABEL: define{{( protected| dllexport)?}} swiftcc <4 x float> @vector_float_add(<4 x float>, <4 x float>) {{.*}} {
+// CHECK-LABEL: define{{( protected| dllexport)?}} swiftcc <4 x float> @vector_float_add(<4 x float> %0, <4 x float> %1) {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK-NEXT: %2 = fadd <4 x float> %0, %1
 // CHECK-NEXT: ret <4 x float> %2

@@ -341,24 +341,24 @@ entry(%c : $RootGeneric<Int32>):
 }
  */
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} internal %swift.type* @"$s15generic_classes11RootGenericCMi"(%swift.type_descriptor*, i8**, i8*) {{.*}} {
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} internal %swift.type* @"$s15generic_classes11RootGenericCMi"(%swift.type_descriptor* %0, i8** %1, i8* %2) {{.*}} {
 // CHECK:   [[METADATA:%.*]] = call{{( tail)?}} %swift.type* @swift_allocateGenericClassMetadata(%swift.type_descriptor* %0, i8** %1, i8* %2)
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} internal swiftcc %swift.metadata_response @"$s15generic_classes11RootGenericCMr"
-// CHECK-SAME:    (%swift.type* [[METADATA:%.*]], i8*, i8**) {{.*}} {
+// CHECK-SAME:    (%swift.type* [[METADATA:%.*]], i8* %0, i8** %1) {{.*}} {
 // -- initialize the dependent field offsets
 // CHECK:   call swiftcc %swift.metadata_response @swift_initClassMetadata2(%swift.type* [[METADATA]], i64 0, i64 3, i8*** {{%.*}}, i64* {{%.*}})
 // CHECK: }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} internal %swift.type* @"$s15generic_classes22RootGenericFixedLayoutCMi"(%swift.type_descriptor*, i8**, i8*) {{.*}} {
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} internal %swift.type* @"$s15generic_classes22RootGenericFixedLayoutCMi"(%swift.type_descriptor* %0, i8** %1, i8* %2) {{.*}} {
 // CHECK:   [[METADATA:%.*]] ={{( tail)?}} call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_descriptor* %0, i8** %1, i8* %2)
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} internal swiftcc %swift.metadata_response @"$s15generic_classes22RootGenericFixedLayoutCMr"
-// CHECK-SAME:    (%swift.type* [[METADATA:%.*]], i8*, i8**) {{.*}} {
+// CHECK-SAME:    (%swift.type* [[METADATA:%.*]], i8* %0, i8** %1) {{.*}} {
 // CHECK:   call swiftcc %swift.metadata_response @swift_initClassMetadata2(%swift.type* [[METADATA]], i64 0, i64 3, i8*** {{%.*}}, i64* {{%.*}})
 // CHECK: }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} internal %swift.type* @"$s15generic_classes015GenericInheritsC0CMi"(%swift.type_descriptor*, i8**, i8*) {{.*}} {
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} internal %swift.type* @"$s15generic_classes015GenericInheritsC0CMi"(%swift.type_descriptor* %0, i8** %1, i8* %2) {{.*}} {
 //   Bind the generic parameters.
 // CHECK:   [[T0:%.*]] = bitcast i8** %1 to %swift.type**
 // CHECK:   %A  = load %swift.type*, %swift.type** [[T0]]
@@ -369,7 +369,7 @@ entry(%c : $RootGeneric<Int32>):
 // CHECK-NEXT:   ret %swift.type* [[METADATA]]
 
 // CHECK-LABEL: define{{( protected)?}} internal swiftcc %swift.metadata_response @"$s15generic_classes015GenericInheritsC0CMr"
-// CHECK-SAME:    (%swift.type* [[METADATA:%.*]], i8*, i8**) {{.*}} {
+// CHECK-SAME:    (%swift.type* [[METADATA:%.*]], i8* %0, i8** %1) {{.*}} {
 
 //   Initialize our own dependent field offsets.
 // CHECK:   [[METADATA_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i64*
@@ -400,5 +400,5 @@ entry(%c : $RootGeneric<Int32>):
 // CHECK:   ret %swift.metadata_response [[T1]]
 // CHECK: }
 
-// OSIZE: define hidden swiftcc %swift.metadata_response @"$s15generic_classes11RootGenericCMa"(i64, %swift.type* {{.*}}) [[ATTRS:#[0-9]+]] {
+// OSIZE: define hidden swiftcc %swift.metadata_response @"$s15generic_classes11RootGenericCMa"(i64 %0, %swift.type* {{.*}}) [[ATTRS:#[0-9]+]] {
 // OSIZE: [[ATTRS]] = {{{.*}}noinline

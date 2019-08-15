@@ -26,17 +26,17 @@ struct G<T> : P {
 
 class C {
   class func fromMetatype() -> Self? { return nil }
-  // CHECK-LABEL: define hidden swiftcc i64 @"$s21dynamic_self_metadata1CC12fromMetatypeACXDSgyFZ"(%swift.type* swiftself)
+  // CHECK-LABEL: define hidden swiftcc i64 @"$s21dynamic_self_metadata1CC12fromMetatypeACXDSgyFZ"(%swift.type* swiftself %0)
   // CHECK: ret i64 0
 
   func fromInstance() -> Self? { return nil }
-  // CHECK-LABEL: define hidden swiftcc i64 @"$s21dynamic_self_metadata1CC12fromInstanceACXDSgyF"(%T21dynamic_self_metadata1CC* swiftself)
+  // CHECK-LABEL: define hidden swiftcc i64 @"$s21dynamic_self_metadata1CC12fromInstanceACXDSgyF"(%T21dynamic_self_metadata1CC* swiftself %0)
   // CHECK: ret i64 0
 
   func dynamicSelfArgument() -> Self? {
     return id(nil)
   }
-  // CHECK-LABEL: define hidden swiftcc i64 @"$s21dynamic_self_metadata1CC0A12SelfArgumentACXDSgyF"(%T21dynamic_self_metadata1CC* swiftself)
+  // CHECK-LABEL: define hidden swiftcc i64 @"$s21dynamic_self_metadata1CC0A12SelfArgumentACXDSgyF"(%T21dynamic_self_metadata1CC* swiftself %0)
   // CHECK: [[GEP1:%.+]] = getelementptr {{.*}} %0
   // CHECK: [[TYPE1:%.+]] = load {{.*}} [[GEP1]]
   // CHECK: [[T0:%.+]] = call swiftcc %swift.metadata_response @"$sSqMa"(i64 0, %swift.type* [[TYPE1]])
@@ -47,7 +47,7 @@ class C {
     _ = G(t: self).f()
     return nil
   }
-  // CHECK-LABEL: define hidden swiftcc i64 @"$s21dynamic_self_metadata1CC0A18SelfConformingTypeACXDSgyF"(%T21dynamic_self_metadata1CC* swiftself)
+  // CHECK-LABEL: define hidden swiftcc i64 @"$s21dynamic_self_metadata1CC0A18SelfConformingTypeACXDSgyF"(%T21dynamic_self_metadata1CC* swiftself %0)
   // CHECK: [[SELF_GEP:%.+]] = getelementptr {{.*}} %0
   // CHECK: [[SELF_TYPE:%.+]] = load {{.*}} [[SELF_GEP]]
   // CHECK: [[METADATA_RESPONSE:%.*]] = call swiftcc %swift.metadata_response @"$s21dynamic_self_metadata1GVMa"(i64 0, %swift.type* [[SELF_TYPE]])
