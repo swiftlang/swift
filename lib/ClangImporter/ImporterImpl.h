@@ -322,7 +322,7 @@ class LLVM_LIBRARY_VISIBILITY ClangImporter::Implementation
 
 public:
   Implementation(ASTContext &ctx, const ClangImporterOptions &opts,
-                 std::unique_ptr<DWARFImporterDelegate> dwarfImporterDelegate);
+                 DWARFImporterDelegate *dwarfImporterDelegate);
   ~Implementation();
 
   /// Swift AST context.
@@ -605,7 +605,7 @@ public:
 
 private:
   /// The DWARF importer delegate, if installed.
-  std::unique_ptr<DWARFImporterDelegate> DWARFImporter;
+  DWARFImporterDelegate *DWARFImporter = nullptr;
   /// The list of Clang modules found in the debug info.
   llvm::DenseMap<Identifier, LoadedFile *> DWARFModuleUnits;
 

@@ -93,7 +93,7 @@ private:
 
   ClangImporter(ASTContext &ctx, const ClangImporterOptions &clangImporterOpts,
                 DependencyTracker *tracker,
-                std::unique_ptr<DWARFImporterDelegate> dwarfImporterDelegate);
+                DWARFImporterDelegate *dwarfImporterDelegate);
 
   ModuleDecl *loadModuleClang(SourceLoc importLoc,
                               ArrayRef<std::pair<Identifier, SourceLoc>> path);
@@ -119,7 +119,7 @@ public:
   static std::unique_ptr<ClangImporter>
   create(ASTContext &ctx, const ClangImporterOptions &importerOpts,
          std::string swiftPCHHash = "", DependencyTracker *tracker = nullptr,
-         std::unique_ptr<DWARFImporterDelegate> dwarfImporterDelegate = {});
+         DWARFImporterDelegate *dwarfImporterDelegate = nullptr);
 
   ClangImporter(const ClangImporter &) = delete;
   ClangImporter(ClangImporter &&) = delete;
