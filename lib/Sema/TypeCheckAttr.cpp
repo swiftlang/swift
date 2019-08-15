@@ -86,12 +86,9 @@ public:
   IGNORED_ATTR(ForbidSerializingReference)
   IGNORED_ATTR(HasStorage)
   IGNORED_ATTR(Inline)
-  IGNORED_ATTR(NonObjC)
-  IGNORED_ATTR(ObjC)
   IGNORED_ATTR(ObjCBridged)
   IGNORED_ATTR(ObjCNonLazyRealization)
   IGNORED_ATTR(ObjCRuntimeName)
-  IGNORED_ATTR(Optional)
   IGNORED_ATTR(RawDocComment)
   IGNORED_ATTR(RequiresStoredPropertyInits)
   IGNORED_ATTR(RestatedObjCConformance)
@@ -184,7 +181,12 @@ public:
   void visitAccessControlAttr(AccessControlAttr *attr);
   void visitSetterAccessAttr(SetterAccessAttr *attr);
   bool visitAbstractAccessControlAttr(AbstractAccessControlAttr *attr);
+
+  void visitObjCAttr(ObjCAttr *attr);
+  void visitNonObjCAttr(NonObjCAttr *attr);
   void visitObjCMembersAttr(ObjCMembersAttr *attr);
+
+  void visitOptionalAttr(OptionalAttr *attr);
 
   void visitAvailableAttr(AvailableAttr *attr);
 
@@ -844,9 +846,161 @@ void AttributeChecker::visitSetterAccessAttr(
   }
 }
 
+static bool checkObjCDeclContext(Decl *D) {
+  DeclContext *DC = D->getDeclContext();
+  if (DC->getSelfClassDecl())
+    return true;
+  if (auto *PD = dyn_cast<ProtocolDecl>(DC))
+    if (PD->isObjC())
+      return true;
+  return false;
+}
+
+void AttributeChecker::visitObjCAttr(ObjCAttr *attr) {
+  // Only certain decls can be ObjC.
+  Optional<Diag<>> error;
+  if (isa<ClassDecl>(D) ||
+      isa<ProtocolDecl>(D)) {
+    /* ok */
+  } else if (auto Ext = dyn_cast<ExtensionDecl>(D)) {
+    if (!Ext->getSelfClassDecl())
+      error = diag::objc_extension_not_class;
+  } else if (auto ED = dyn_cast<EnumDecl>(D)) {
+    if (ED->isGenericContext())
+      error = diag::objc_enum_generic;
+  } else if (auto EED = dyn_cast<EnumElementDecl>(D)) {
+    auto ED = EED->getParentEnum();
+    if (!ED->getAttrs().hasAttribute<ObjCAttr>())
+      error = diag::objc_enum_case_req_objc_enum;
+    else if (attr->hasName() && EED->getParentCase()->getElements().size() > 1)
+      error = diag::objc_enum_case_multi;
+  } else if (auto *func = dyn_cast<FuncDecl>(D)) {
+    if (!checkObjCDeclContext(D))
+      error = diag::invalid_objc_decl_context;
+    else if (auto accessor = dyn_cast<AccessorDecl>(func))
+      if (!accessor->isGetterOrSetter())
+        error = diag::objc_observing_accessor;
+  } else if (isa<ConstructorDecl>(D) ||
+             isa<DestructorDecl>(D) ||
+             isa<SubscriptDecl>(D) ||
+             isa<VarDecl>(D)) {
+    if (!checkObjCDeclContext(D))
+      error = diag::invalid_objc_decl_context;
+    /* ok */
+  } else {
+    error = diag::invalid_objc_decl;
+  }
+
+  if (error) {
+    diagnoseAndRemoveAttr(attr, *error);
+    return;
+  }
+
+  // If there is a name, check whether the kind of name is
+  // appropriate.
+  if (auto objcName = attr->getName()) {
+    if (isa<ClassDecl>(D) || isa<ProtocolDecl>(D) || isa<VarDecl>(D)
+        || isa<EnumDecl>(D) || isa<EnumElementDecl>(D)
+        || isa<ExtensionDecl>(D)) {
+      // Types and properties can only have nullary
+      // names. Complain and recover by chopping off everything
+      // after the first name.
+      if (objcName->getNumArgs() > 0) {
+        SourceLoc firstNameLoc = attr->getNameLocs().front();
+        SourceLoc afterFirstNameLoc =
+          Lexer::getLocForEndOfToken(TC.Context.SourceMgr, firstNameLoc);
+        TC.diagnose(firstNameLoc, diag::objc_name_req_nullary,
+                    D->getDescriptiveKind())
+          .fixItRemoveChars(afterFirstNameLoc, attr->getRParenLoc());
+        const_cast<ObjCAttr *>(attr)->setName(
+          ObjCSelector(TC.Context, 0, objcName->getSelectorPieces()[0]),
+          /*implicit=*/false);
+      }
+    } else if (isa<SubscriptDecl>(D) || isa<DestructorDecl>(D)) {
+      TC.diagnose(attr->getLParenLoc(),
+                  isa<SubscriptDecl>(D)
+                    ? diag::objc_name_subscript
+                    : diag::objc_name_deinit);
+      const_cast<ObjCAttr *>(attr)->clearName();
+    } else {
+      // We have a function. Make sure that the number of parameters
+      // matches the "number of colons" in the name.
+      auto func = cast<AbstractFunctionDecl>(D);
+      auto params = func->getParameters();
+      unsigned numParameters = params->size();
+      if (auto CD = dyn_cast<ConstructorDecl>(func))
+        if (CD->isObjCZeroParameterWithLongSelector())
+          numParameters = 0;  // Something like "init(foo: ())"
+
+      // A throwing method has an error parameter.
+      if (func->hasThrows())
+        ++numParameters;
+
+      unsigned numArgumentNames = objcName->getNumArgs();
+      if (numArgumentNames != numParameters) {
+        TC.diagnose(attr->getNameLocs().front(),
+                    diag::objc_name_func_mismatch,
+                    isa<FuncDecl>(func),
+                    numArgumentNames,
+                    numArgumentNames != 1,
+                    numParameters,
+                    numParameters != 1,
+                    func->hasThrows());
+        D->getAttrs().add(
+          ObjCAttr::createUnnamed(TC.Context,
+                                  attr->AtLoc,
+                                  attr->Range.Start));
+        D->getAttrs().removeAttribute(attr);
+      }
+    }
+  } else if (isa<EnumElementDecl>(D)) {
+    // Enum elements require names.
+    diagnoseAndRemoveAttr(attr, diag::objc_enum_case_req_name);
+  }
+}
+
+void AttributeChecker::visitNonObjCAttr(NonObjCAttr *attr) {
+  // Only extensions of classes; methods, properties, subscripts
+  // and constructors can be NonObjC.
+  // The last three are handled automatically by generic attribute
+  // validation -- for the first one, we have to check FuncDecls
+  // ourselves.
+  auto func = dyn_cast<FuncDecl>(D);
+  if (func &&
+      (isa<DestructorDecl>(func) ||
+       !checkObjCDeclContext(func) ||
+       (isa<AccessorDecl>(func) &&
+        !cast<AccessorDecl>(func)->isGetterOrSetter()))) {
+    diagnoseAndRemoveAttr(attr, diag::invalid_nonobjc_decl);
+  }
+
+  if (auto ext = dyn_cast<ExtensionDecl>(D)) {
+    if (!ext->getSelfClassDecl())
+      diagnoseAndRemoveAttr(attr, diag::invalid_nonobjc_extension);
+  }
+}
+
 void AttributeChecker::visitObjCMembersAttr(ObjCMembersAttr *attr) {
   if (!isa<ClassDecl>(D))
     diagnoseAndRemoveAttr(attr, diag::objcmembers_attribute_nonclass);
+}
+
+void AttributeChecker::visitOptionalAttr(OptionalAttr *attr) {
+  if (!isa<ProtocolDecl>(D->getDeclContext())) {
+    diagnoseAndRemoveAttr(attr, diag::optional_attribute_non_protocol);
+  } else if (!cast<ProtocolDecl>(D->getDeclContext())->isObjC()) {
+    diagnoseAndRemoveAttr(attr, diag::optional_attribute_non_objc_protocol);
+  } else if (isa<ConstructorDecl>(D)) {
+    diagnoseAndRemoveAttr(attr, diag::optional_attribute_initializer);
+  } else {
+    auto objcAttr = D->getAttrs().getAttribute<ObjCAttr>();
+    if (!objcAttr || objcAttr->isImplicit()) {
+      auto diag = TC.diagnose(attr->getLocation(),
+                              diag::optional_attribute_missing_explicit_objc);
+      if (auto VD = dyn_cast<ValueDecl>(D))
+        diag.fixItInsert(VD->getAttributeInsertionLoc(false), "@objc ");
+    }
+  }
 }
 
 void TypeChecker::checkDeclAttributes(Decl *D) {
@@ -1106,6 +1260,26 @@ static Decl *getEnclosingDeclForDecl(Decl *D) {
 void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
   if (TC.getLangOpts().DisableAvailabilityChecking)
     return;
+
+  if (auto *PD = dyn_cast<ProtocolDecl>(D->getDeclContext())) {
+    if (auto *VD = dyn_cast<ValueDecl>(D)) {
+      if (VD->isProtocolRequirement()) {
+        if (attr->isActivePlatform(TC.Context) ||
+            attr->isLanguageVersionSpecific() ||
+            attr->isPackageDescriptionVersionSpecific()) {
+          auto versionAvailability = attr->getVersionAvailability(TC.Context);
+          if (attr->isUnconditionallyUnavailable() ||
+              versionAvailability == AvailableVersionComparison::Obsoleted ||
+              versionAvailability == AvailableVersionComparison::Unavailable) {
+              if (!PD->isObjC()) {
+                diagnoseAndRemoveAttr(attr, diag::unavailable_method_non_objc_protocol);
+                return;
+              }
+            }
+          }
+        }
+    }
+  }
 
   if (!attr->hasPlatform() || !attr->isActivePlatform(TC.Context) ||
       !attr->Introduced.hasValue()) {
