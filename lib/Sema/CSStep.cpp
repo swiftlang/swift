@@ -95,7 +95,7 @@ void SplitterStep::computeFollowupSteps(
   auto components = CG.computeConnectedComponents(CS.TypeVariables);
   unsigned numComponents = components.size();
   if (numComponents < 2) {
-    steps.push_back(llvm::make_unique<ComponentStep>(
+    steps.push_back(std::make_unique<ComponentStep>(
         CS, 0, &CS.InactiveConstraints, Solutions));
     return;
   }
@@ -126,7 +126,7 @@ void SplitterStep::computeFollowupSteps(
 
     // If there are no dependencies, build a normal component step.
     if (components[i].dependsOn.empty()) {
-      steps.push_back(llvm::make_unique<ComponentStep>(
+      steps.push_back(std::make_unique<ComponentStep>(
           CS, solutionIndex, &Components[i], std::move(components[i]),
           PartialSolutions[solutionIndex]));
       continue;
@@ -141,7 +141,7 @@ void SplitterStep::computeFollowupSteps(
 
     // Otherwise, build a dependent component "splitter" step, which
     // handles all combinations of incoming partial solutions.
-    steps.push_back(llvm::make_unique<DependentComponentSplitterStep>(
+    steps.push_back(std::make_unique<DependentComponentSplitterStep>(
         CS, &Components[i], solutionIndex, std::move(components[i]),
         llvm::makeMutableArrayRef(PartialSolutions.get(), numComponents)));
   }
@@ -273,7 +273,7 @@ StepResult DependentComponentSplitterStep::take(bool prevFailed) {
     }
 
     followup.push_back(
-        llvm::make_unique<ComponentStep>(CS, Index, Constraints, Component,
+        std::make_unique<ComponentStep>(CS, Index, Constraints, Component,
                                          std::move(dependsOnSolutions),
                                          Solutions));
   } while (nextCombination(dependsOnSetsRef, indices));
@@ -333,11 +333,11 @@ StepResult ComponentStep::take(bool prevFailed) {
                                         !bestBindings->FullyBound))) {
     // Produce a type variable step.
     return suspend(
-        llvm::make_unique<TypeVariableStep>(CS, *bestBindings, Solutions));
+        std::make_unique<TypeVariableStep>(CS, *bestBindings, Solutions));
   } else if (disjunction) {
     // Produce a disjunction step.
     return suspend(
-        llvm::make_unique<DisjunctionStep>(CS, disjunction, Solutions));
+        std::make_unique<DisjunctionStep>(CS, disjunction, Solutions));
   }
 
   // If there are no disjunctions or type variables to bind

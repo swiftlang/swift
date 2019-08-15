@@ -366,7 +366,7 @@ emitLoadedModuleTraceForAllPrimariesIfNeeded(ModuleDecl *mainModule,
 static std::unique_ptr<llvm::raw_fd_ostream>
 getFileOutputStream(StringRef OutputFilename, ASTContext &Ctx) {
   std::error_code errorCode;
-  auto os = llvm::make_unique<llvm::raw_fd_ostream>(
+  auto os = std::make_unique<llvm::raw_fd_ostream>(
               OutputFilename, errorCode, llvm::sys::fs::F_None);
   if (errorCode) {
     Ctx.Diags.diagnose(SourceLoc(), diag::error_opening_output,
@@ -632,7 +632,7 @@ createOptRecordFile(StringRef Filename, DiagnosticEngine &DE) {
     return nullptr;
 
   std::error_code EC;
-  auto File = llvm::make_unique<llvm::raw_fd_ostream>(Filename, EC,
+  auto File = std::make_unique<llvm::raw_fd_ostream>(Filename, EC,
                                                       llvm::sys::fs::F_None);
   if (EC) {
     DE.diagnose(SourceLoc(), diag::cannot_open_file, Filename, EC.message());
@@ -1310,7 +1310,7 @@ static bool performCompileStepsPostSILGen(
       createOptRecordFile(SILOpts.OptRecordFile, Instance.getDiags());
   if (OptRecordFile) {
     auto Output =
-        llvm::make_unique<llvm::yaml::Output>(*OptRecordFile,
+        std::make_unique<llvm::yaml::Output>(*OptRecordFile,
                                               &Instance.getSourceMgr());
     SM->setOptRecordStream(std::move(Output), std::move(OptRecordFile));
   }
@@ -1585,7 +1585,7 @@ computeStatsReporter(const CompilerInvocation &Invocation, CompilerInstance *Ins
           Instance->getASTContext().getClangModuleLoader())) {
     CSM = &clangImporter->getClangASTContext().getSourceManager();
   }
-  return llvm::make_unique<UnifiedStatsReporter>(
+  return std::make_unique<UnifiedStatsReporter>(
       "swift-frontend", FEOpts.ModuleName, InputName, TripleName, OutputType,
       OptType, StatsOutputDir, SM, CSM, Trace,
       ProfileEvents, ProfileEntities);
@@ -1678,7 +1678,7 @@ createJSONFixItDiagnosticConsumerIfNeeded(
     std::string fixItsOutputPath = input.fixItsOutputPath();
     if (fixItsOutputPath.empty())
       return nullptr;
-    return llvm::make_unique<JSONFixitWriter>(
+    return std::make_unique<JSONFixitWriter>(
         fixItsOutputPath, invocation.getDiagnosticOptions());
   });
 }
@@ -1727,7 +1727,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   }, &diagnoseFatalError);
 
   std::unique_ptr<CompilerInstance> Instance =
-    llvm::make_unique<CompilerInstance>();
+    std::make_unique<CompilerInstance>();
   Instance->addDiagnosticConsumer(&PDC);
 
   struct FinishDiagProcessingCheckRAII {
@@ -1775,7 +1775,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   // dynamically-sized array of optional PrettyStackTraces, which get
   // initialized by iterating over the buffers we collected above.
   auto configurationFileStackTraces =
-      llvm::make_unique<Optional<PrettyStackTraceFileContents>[]>(
+      std::make_unique<Optional<PrettyStackTraceFileContents>[]>(
         configurationFileBuffers.size());
   for_each(configurationFileBuffers.begin(), configurationFileBuffers.end(),
            &configurationFileStackTraces[0],

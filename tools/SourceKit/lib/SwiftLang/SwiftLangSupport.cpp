@@ -266,10 +266,10 @@ SwiftLangSupport::SwiftLangSupport(SourceKit::Context &SKCtx)
   ASTMgr = std::make_shared<SwiftASTManager>(EditorDocuments, Stats,
                                              RuntimeResourcePath);
   // By default, just use the in-memory cache.
-  CCCache->inMemory = llvm::make_unique<ide::CodeCompletionCache>();
+  CCCache->inMemory = std::make_unique<ide::CodeCompletionCache>();
 
   // Provide a default file system provider.
-  setFileSystemProvider("in-memory-vfs", llvm::make_unique<InMemoryFileSystemProvider>());
+  setFileSystemProvider("in-memory-vfs", std::make_unique<InMemoryFileSystemProvider>());
 }
 
 SwiftLangSupport::~SwiftLangSupport() {

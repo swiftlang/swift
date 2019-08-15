@@ -2678,7 +2678,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           std::unique_ptr<DeclMembersTable> &memberTable =
             S.DeclMemberNames[VD->getBaseName()].second;
           if (!memberTable) {
-            memberTable = llvm::make_unique<DeclMembersTable>();
+            memberTable = std::make_unique<DeclMembersTable>();
           }
           (*memberTable)[parentID].push_back(memberID);
         }
@@ -2688,7 +2688,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           std::unique_ptr<DeclMembersTable> &memberTable =
             S.DeclMemberNames[A->getMemberName().getBaseName()].second;
           if (!memberTable) {
-            memberTable = llvm::make_unique<DeclMembersTable>();
+            memberTable = std::make_unique<DeclMembersTable>();
           }
           (*memberTable)[parentID].push_back(memberID);
         }
@@ -5060,7 +5060,7 @@ void swift::serializeToBuffers(
     if (hadError)
       return;
     if (moduleBuffer)
-      *moduleBuffer = llvm::make_unique<llvm::SmallVectorMemoryBuffer>(
+      *moduleBuffer = std::make_unique<llvm::SmallVectorMemoryBuffer>(
                         std::move(buf), options.OutputPath);
   }
 
@@ -5076,7 +5076,7 @@ void swift::serializeToBuffers(
       return false;
     });
     if (moduleDocBuffer)
-      *moduleDocBuffer = llvm::make_unique<llvm::SmallVectorMemoryBuffer>(
+      *moduleDocBuffer = std::make_unique<llvm::SmallVectorMemoryBuffer>(
                            std::move(buf), options.DocOutputPath);
   }
 }

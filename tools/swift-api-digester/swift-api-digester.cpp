@@ -2132,8 +2132,8 @@ static int diagnoseModuleChange(SDKContext &Ctx, SDKNodeRoot *LeftModule,
     OS = FileOS.get();
   }
   std::unique_ptr<DiagnosticConsumer> pConsumer = options::CompilerStyleDiags ?
-    llvm::make_unique<PrintingDiagnosticConsumer>():
-    llvm::make_unique<ModuleDifferDiagsConsumer>(true, *OS);
+    std::make_unique<PrintingDiagnosticConsumer>():
+    std::make_unique<ModuleDifferDiagsConsumer>(true, *OS);
 
   Ctx.getDiags().addConsumer(*pConsumer);
   TypeAliasDiffFinder(LeftModule, RightModule,
@@ -2205,8 +2205,8 @@ static int generateMigrationScript(StringRef LeftPath, StringRef RightPath,
   }
   llvm::errs() << "Diffing: " << LeftPath << " and " << RightPath << "\n";
   std::unique_ptr<DiagnosticConsumer> pConsumer = options::CompilerStyleDiags ?
-    llvm::make_unique<PrintingDiagnosticConsumer>():
-    llvm::make_unique<ModuleDifferDiagsConsumer>(false);
+    std::make_unique<PrintingDiagnosticConsumer>():
+    std::make_unique<ModuleDifferDiagsConsumer>(false);
   SDKContext Ctx(Opts);
   Ctx.getDiags().addConsumer(*pConsumer);
 

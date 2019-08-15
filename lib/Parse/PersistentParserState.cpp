@@ -78,7 +78,7 @@ void PersistentParserState::delayDeclList(IterableDeclContext *D,
                                           SourceRange BodyRange,
                                           SourceLoc PreviousLoc) {
   assert(D->hasUnparsedMembers());
-  DelayedDeclListStates[D] = llvm::make_unique<DelayedDeclListState>(Flags,
+  DelayedDeclListStates[D] = std::make_unique<DelayedDeclListState>(Flags,
     ParentContext, BodyRange, PreviousLoc, ScopeInfo.saveCurrentScope());
 }
 

@@ -150,7 +150,7 @@ Error Registry::writeFile(raw_ostream &os, const File *file) const {
   }*/
 
 void Registry::addYAMLReaders() {
-  auto reader = make_unique<YAMLReader>();
+  auto reader =std::make_unique<YAMLReader>();
   /*reader->add(
       std::unique_ptr<DocumentHandler>(new stub::v1::YAMLDocumentHandler));
   reader->add(
@@ -163,7 +163,7 @@ void Registry::addYAMLReaders() {
 }
 
 void Registry::addYAMLWriters() {
-  auto writer = make_unique<YAMLWriter>();
+  auto writer =std::make_unique<YAMLWriter>();
   /*writer->add(
       std::unique_ptr<DocumentHandler>(new stub::v1::YAMLDocumentHandler));
   writer->add(
@@ -180,7 +180,7 @@ void Registry::addReexportWriters() {
 }
 
 void Registry::addDiagnosticReader() {
-  add(make_unique<DiagnosticReader>());
+  add(std::make_unique<DiagnosticReader>());
 }
 
 TAPI_NAMESPACE_INTERNAL_END

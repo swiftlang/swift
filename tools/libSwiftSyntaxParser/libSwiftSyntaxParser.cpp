@@ -295,7 +295,7 @@ swiftparse_client_node_t SynParser::parse(const char *source) {
   PU.getParser().State->PerformConditionEvaluation = false;
   std::unique_ptr<SynParserDiagConsumer> pConsumer;
   if (DiagHandler) {
-    pConsumer = llvm::make_unique<SynParserDiagConsumer>(*this, bufID);
+    pConsumer = std::make_unique<SynParserDiagConsumer>(*this, bufID);
     PU.getDiagnosticEngine().addConsumer(*pConsumer);
   }
   return PU.parse();

@@ -120,7 +120,7 @@ public:
   
   virtual std::unique_ptr<RCIdentityFunctionInfo>
   newFunctionAnalysis(SILFunction *F) override {
-    return llvm::make_unique<RCIdentityFunctionInfo>(DA);
+    return std::make_unique<RCIdentityFunctionInfo>(DA);
   }
 
   virtual bool shouldInvalidate(SILAnalysis::InvalidationKind K) override {

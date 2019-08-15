@@ -646,7 +646,7 @@ static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
   if (os) {
     tapi::internal::YAMLWriter writer;
     writer.add(
-        llvm::make_unique<tapi::internal::stub::v3::YAMLDocumentHandler>());
+        std::make_unique<tapi::internal::stub::v3::YAMLDocumentHandler>());
 
     assert(writer.canWrite(&file) &&
            "YAML writer should be able to write TBD v3");

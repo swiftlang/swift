@@ -162,7 +162,7 @@ namespace {
         SwiftPCHHash(swiftPCHHash) {}
     std::unique_ptr<clang::ASTConsumer>
     CreateASTConsumer(clang::CompilerInstance &CI, StringRef InFile) override {
-      return llvm::make_unique<HeaderParsingASTConsumer>(Impl);
+      return std::make_unique<HeaderParsingASTConsumer>(Impl);
     }
     bool BeginSourceFileAction(clang::CompilerInstance &CI) override {
       // Prefer frameworks over plain headers.
@@ -796,7 +796,7 @@ bool ClangImporter::canReadPCH(StringRef PCHFilename) {
   // reused when building PCM files for the module cache.
   clang::SourceManager clangSrcMgr(*clangDiags, CI.getFileManager());
   auto FID = clangSrcMgr.createFileID(
-                        llvm::make_unique<ZeroFilledMemoryBuffer>(1, "<main>"));
+                        std::make_unique<ZeroFilledMemoryBuffer>(1, "<main>"));
   clangSrcMgr.setMainFileID(FID);
 
   // Note: Reusing the real HeaderSearch is dangerous, but it's not easy to
@@ -1023,9 +1023,9 @@ std::unique_ptr<ClangImporter> ClangImporter::create(
     auto PCHContainerOperations =
       std::make_shared<clang::PCHContainerOperations>();
     PCHContainerOperations->registerWriter(
-        llvm::make_unique<clang::ObjectFilePCHContainerWriter>());
+        std::make_unique<clang::ObjectFilePCHContainerWriter>());
     PCHContainerOperations->registerReader(
-        llvm::make_unique<clang::ObjectFilePCHContainerReader>());
+        std::make_unique<clang::ObjectFilePCHContainerReader>());
     importer->Impl.Instance.reset(
         new clang::CompilerInstance(std::move(PCHContainerOperations)));
   }
@@ -1038,7 +1038,7 @@ std::unique_ptr<ClangImporter> ClangImporter::create(
   {
     // Now set up the real client for Clang diagnostics---configured with proper
     // options---as opposed to the temporary one we made above.
-    auto actualDiagClient = llvm::make_unique<ClangDiagnosticConsumer>(
+    auto actualDiagClient = std::make_unique<ClangDiagnosticConsumer>(
         importer->Impl, instance.getDiagnosticOpts(),
         importerOpts.DumpClangDiagnostics);
     instance.createDiagnostics(actualDiagClient.release());
@@ -1107,7 +1107,7 @@ std::unique_ptr<ClangImporter> ClangImporter::create(
 
   // Setup Preprocessor callbacks before initialing the parser to make sure
   // we catch implicit includes.
-  auto ppTracker = llvm::make_unique<BridgingPPTracker>(importer->Impl);
+  auto ppTracker = std::make_unique<BridgingPPTracker>(importer->Impl);
   clangPP.addPPCallbacks(std::move(ppTracker));
 
   instance.createModuleManager();
@@ -1226,7 +1226,7 @@ ClangImporter::Implementation::getNextIncludeLoc() {
     // being deterministic.
     includeLoc = includeLoc.getLocWithOffset(1);
     DummyIncludeBuffer = srcMgr.createFileID(
-        llvm::make_unique<ZeroFilledMemoryBuffer>(
+        std::make_unique<ZeroFilledMemoryBuffer>(
           256*1024, StringRef(moduleImportBufferName)),
         clang::SrcMgr::C_User, /*LoadedID*/0, /*LoadedOffset*/0, includeLoc);
   }

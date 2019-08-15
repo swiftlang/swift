@@ -195,7 +195,7 @@ unsigned TaskQueue::getNumberOfParallelTasks() const {
 void TaskQueue::addTask(const char *ExecPath, ArrayRef<const char *> Args,
                         ArrayRef<const char *> Env, void *Context,
                         bool SeparateErrors) {
-  auto T = llvm::make_unique<Task>(ExecPath, Args, Env, Context, SeparateErrors);
+  auto T = std::make_unique<Task>(ExecPath, Args, Env, Context, SeparateErrors);
   QueuedTasks.push(std::move(T));
 }
 

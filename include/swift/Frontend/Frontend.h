@@ -454,7 +454,7 @@ public:
 
   void createDependencyTracker(bool TrackSystemDeps) {
     assert(!Context && "must be called before setup()");
-    DepTracker = llvm::make_unique<DependencyTracker>(TrackSystemDeps);
+    DepTracker = std::make_unique<DependencyTracker>(TrackSystemDeps);
   }
   DependencyTracker *getDependencyTracker() { return DepTracker.get(); }
 

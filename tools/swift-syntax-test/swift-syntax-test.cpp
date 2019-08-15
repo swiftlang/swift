@@ -790,7 +790,7 @@ int doDeserializeRawTree(const char *MainExecutablePath,
 
   auto Buffer = llvm::MemoryBuffer::getFile(InputFile);
   std::error_code errorCode;
-  auto os = llvm::make_unique<llvm::raw_fd_ostream>(
+  auto os = std::make_unique<llvm::raw_fd_ostream>(
               OutputFileName, errorCode, llvm::sys::fs::F_None);
   swift::json::SyntaxDeserializer deserializer(llvm::MemoryBufferRef(*(Buffer.get())));
   deserializer.getSourceFileSyntax()->print(*os);
