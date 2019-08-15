@@ -71,6 +71,33 @@ public:
   virtual bool
   isInOverlayModuleForImportedModule(const DeclContext *overlayDC,
                                      const DeclContext *importedDC) = 0;
+
+  /// Look for declarations associated with the given name.
+  ///
+  /// \param name The name we're searching for.
+  virtual void lookupValue(DeclName name, VisibleDeclConsumer &consumer) = 0;
+
+  /// Look up a type declaration by its Clang name.
+  ///
+  /// Note that this method does no filtering. If it finds the type in a loaded
+  /// module, it returns it. This is intended for use in reflection / debugging
+  /// contexts where access is not a problem.
+  virtual void
+  lookupTypeDecl(StringRef clangName, ClangTypeKind kind,
+                 llvm::function_ref<void(TypeDecl *)> receiver) = 0;
+
+  /// Look up type a declaration synthesized by the Clang importer itself, using
+  /// a "related entity kind" to determine which type it should be. For example,
+  /// this can be used to find the synthesized error struct for an
+  /// NS_ERROR_ENUM.
+  ///
+  /// Note that this method does no filtering. If it finds the type in a loaded
+  /// module, it returns it. This is intended for use in reflection / debugging
+  /// contexts where access is not a problem.
+  virtual void
+  lookupRelatedEntity(StringRef clangName, ClangTypeKind kind,
+                      StringRef relatedEntityKind,
+                      llvm::function_ref<void(TypeDecl *)> receiver) = 0;
 };
 
 } // namespace swift

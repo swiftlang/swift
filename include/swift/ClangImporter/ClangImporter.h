@@ -172,7 +172,7 @@ public:
   /// Look for declarations associated with the given name.
   ///
   /// \param name The name we're searching for.
-  void lookupValue(DeclName name, VisibleDeclConsumer &consumer);
+  void lookupValue(DeclName name, VisibleDeclConsumer &consumer) override;
 
   /// Look up a type declaration by its Clang name.
   ///
@@ -180,7 +180,7 @@ public:
   /// module, it returns it. This is intended for use in reflection / debugging
   /// contexts where access is not a problem.
   void lookupTypeDecl(StringRef clangName, ClangTypeKind kind,
-                      llvm::function_ref<void(TypeDecl *)> receiver);
+                      llvm::function_ref<void(TypeDecl *)> receiver) override;
 
   /// Look up type a declaration synthesized by the Clang importer itself, using
   /// a "related entity kind" to determine which type it should be. For example,
@@ -193,7 +193,7 @@ public:
   void
   lookupRelatedEntity(StringRef clangName, ClangTypeKind kind,
                       StringRef relatedEntityKind,
-                      llvm::function_ref<void(TypeDecl *)> receiver);
+                      llvm::function_ref<void(TypeDecl *)> receiver) override;
 
   /// Look for textually included declarations from the bridging header.
   ///
