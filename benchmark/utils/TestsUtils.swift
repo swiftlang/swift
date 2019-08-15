@@ -28,6 +28,7 @@ public enum BenchmarkCategory : String {
   case runtime, refcount, metadata
   // Other general areas of compiled code validation.
   case abstraction, safetychecks, exceptions, bridging, concurrency, existential
+  case exclusivity
 
   // Algorithms are "micro" that test some well-known algorithm in isolation:
   // sorting, searching, hashing, fibonaci, crypto, etc.
