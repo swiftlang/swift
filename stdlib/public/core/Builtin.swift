@@ -691,7 +691,12 @@ func _isPOD<T>(_ type: T.Type) -> Bool {
   return Bool(Builtin.ispod(type))
 }
 
-/// Returns `true` if `type` is known to refer to a concrete type during IRGen.
+/// Returns `true` if `type` is known to refer to a concrete type once all
+/// optimizations and constant folding has occurred at the call site. Otherwise,
+/// this returns `false` if the check has failed.
+///
+/// Note that there may be cases in which, despite `T` being concrete at some
+/// point in the caller chain, this function will return `false`.
 @_alwaysEmitIntoClient
 public // @testable
 func _isConcrete<T>(_ type: T.Type) -> Bool {
