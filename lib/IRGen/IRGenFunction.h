@@ -663,7 +663,7 @@ private:
   llvm::Value *LocalSelf = nullptr;
   /// If set, the dynamic Self type is assumed to be equivalent to this exact class.
   CanType LocalSelfType;
-  bool LocalSelfIsExact;
+  bool LocalSelfIsExact = false;
   LocalSelfKind SelfKind;
 };
 
