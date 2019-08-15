@@ -145,14 +145,15 @@ ProtocolConformanceDescriptor::getCanonicalTypeMetadata() const {
 
   case TypeReferenceKind::DirectTypeDescriptor:
   case TypeReferenceKind::IndirectTypeDescriptor: {
-    auto anyType = getTypeDescriptor();
-    if (auto type = dyn_cast<TypeContextDescriptor>(anyType)) {
-      if (!type->isGeneric()) {
-        if (auto accessFn = type->getAccessFunction())
-          return accessFn(MetadataState::Abstract).Value;
+    if (auto anyType = getTypeDescriptor()) {
+      if (auto type = dyn_cast<TypeContextDescriptor>(anyType)) {
+        if (!type->isGeneric()) {
+          if (auto accessFn = type->getAccessFunction())
+            return accessFn(MetadataState::Abstract).Value;
+        }
+      } else if (auto protocol = dyn_cast<ProtocolDescriptor>(anyType)) {
+        return _getSimpleProtocolTypeMetadata(protocol);
       }
-    } else if (auto protocol = dyn_cast<ProtocolDescriptor>(anyType)) {
-      return _getSimpleProtocolTypeMetadata(protocol);
     }
 
     return nullptr;
