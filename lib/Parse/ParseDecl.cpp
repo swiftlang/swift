@@ -4383,8 +4383,7 @@ static ParamDecl *createSetterAccessorArgument(SourceLoc nameLoc,
   if (auto *repr = elementType.getTypeRepr()) {
     if (repr->getKind() ==
         TypeReprKind::ImplicitlyUnwrappedOptional) {
-      result->getAttrs().add(
-          new (P.Context) ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true));
+      result->setImplicitlyUnwrappedOptional(true);
     }
   }
 

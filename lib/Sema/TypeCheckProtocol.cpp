@@ -445,10 +445,8 @@ swift::matchWitness(
     // Result types must match.
     // FIXME: Could allow (trivial?) subtyping here.
     if (!ignoreReturnType) {
-      auto reqTypeIsIUO =
-          req->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
-      auto witnessTypeIsIUO =
-          witness->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+      auto reqTypeIsIUO = req->isImplicitlyUnwrappedOptional();
+      auto witnessTypeIsIUO = witness->isImplicitlyUnwrappedOptional();
       auto types =
           getTypesToCompare(req, reqResultType, reqTypeIsIUO, witnessResultType,
                             witnessTypeIsIUO, VarianceKind::Covariant);
@@ -497,12 +495,9 @@ swift::matchWitness(
       auto reqParamDecl = reqParamList->get(i);
       auto witnessParamDecl = witnessParamList->get(i);
 
-      auto reqParamTypeIsIUO =
-          reqParamDecl->getAttrs()
-              .hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+      auto reqParamTypeIsIUO = reqParamDecl->isImplicitlyUnwrappedOptional();
       auto witnessParamTypeIsIUO =
-          witnessParamDecl->getAttrs()
-              .hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+          witnessParamDecl->isImplicitlyUnwrappedOptional();
 
       // Gross hack: strip a level of unchecked-optionality off both
       // sides when matching against a protocol imported from Objective-C.
@@ -532,10 +527,8 @@ swift::matchWitness(
     }
 
   } else {
-    auto reqTypeIsIUO =
-        req->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
-    auto witnessTypeIsIUO =
-        witness->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+    auto reqTypeIsIUO = req->isImplicitlyUnwrappedOptional();
+    auto witnessTypeIsIUO = witness->isImplicitlyUnwrappedOptional();
     auto types = getTypesToCompare(req, reqType, reqTypeIsIUO, witnessType,
                                    witnessTypeIsIUO, VarianceKind::None);
 
@@ -3184,8 +3177,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
           diags.diagnose(diagLoc,
                          diag::witness_initializer_failability,
                          ctor->getFullName(),
-                         witnessCtor->getFailability()
-                           == OTK_ImplicitlyUnwrappedOptional)
+                         witnessCtor->isImplicitlyUnwrappedOptional())
             .highlight(witnessCtor->getFailabilityLoc());
           emitDeclaredHereIfNeeded(diags, diagLoc, witness);
         });

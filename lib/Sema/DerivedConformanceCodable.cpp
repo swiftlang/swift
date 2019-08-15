@@ -127,8 +127,7 @@ static CodableConformanceType varConformsToCodable(TypeChecker &tc,
   if (!varDecl->hasInterfaceType())
     return TypeNotValidated;
 
-  bool isIUO =
-      varDecl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+  bool isIUO = varDecl->isImplicitlyUnwrappedOptional();
   return typeConformsToCodable(context, varDecl->getValueInterfaceType(),
                                isIUO, proto);
 }

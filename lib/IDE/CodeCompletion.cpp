@@ -2145,7 +2145,7 @@ public:
       // Optional<T> type.  Same applies to optional members.
       VarType = OptionalType::get(VarType);
     }
-    if (VD->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
+    if (VD->isImplicitlyUnwrappedOptional())
       addTypeAnnotationForImplicitlyUnwrappedOptional(Builder, VarType,
                                                       DynamicOrOptional);
     else
@@ -2222,7 +2222,7 @@ public:
           continue;
         argName = PD->getArgumentName();
         bodyName = PD->getParameterName();
-        isIUO = PD->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+        isIUO = PD->isImplicitlyUnwrappedOptional();
       } else {
         isIUO = false;
         argName = typeParam.getLabel();
@@ -2368,7 +2368,7 @@ public:
       Builder.addRightBracket();
     else
       Builder.addAnnotatedRightBracket();
-    if (SD && SD->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
+    if (SD && SD->isImplicitlyUnwrappedOptional())
       addTypeAnnotationForImplicitlyUnwrappedOptional(Builder,
                                                       AFT->getResult());
     else
@@ -2415,7 +2415,7 @@ public:
       addThrows(Builder, AFT, AFD);
 
       if (AFD &&
-          AFD->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
+          AFD->isImplicitlyUnwrappedOptional())
         addTypeAnnotationForImplicitlyUnwrappedOptional(Builder,
                                                         AFT->getResult());
       else
@@ -2580,7 +2580,7 @@ public:
           // unwrapped optional results.
           bool IsIUO =
               !IsImplicitlyCurriedInstanceMethod &&
-              FD->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+              FD->isImplicitlyUnwrappedOptional();
 
           PrintOptions PO;
           PO.OpaqueReturnTypePrinting =
@@ -2666,7 +2666,7 @@ public:
 
       addThrows(Builder, ConstructorType, CD);
 
-      if (CD->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>()) {
+      if (CD->isImplicitlyUnwrappedOptional()) {
         addTypeAnnotationForImplicitlyUnwrappedOptional(
             Builder, Result.hasValue() ? Result.getValue()
                                        : ConstructorType->getResult());
@@ -3306,8 +3306,7 @@ public:
       ExprType = OptionalType::get(ExprType);
 
     // Handle special cases
-    bool isIUO = VD && VD->getAttrs()
-        .hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+    bool isIUO = VD && VD->isImplicitlyUnwrappedOptional();
     if (tryFunctionCallCompletions(ExprType, VD))
       return;
     if (tryModuleCompletions(ExprType))

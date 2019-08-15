@@ -52,7 +52,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 509; // [dynamic_lifetime] sil flag
+const uint16_t SWIFTMODULE_VERSION_MINOR = 510; // serialize isIUO bit on ValueDecls
 
 using DeclIDField = BCFixed<31>;
 
@@ -1059,6 +1059,7 @@ namespace decls_block {
     ReadWriteImplKindField,   // read-write implementation
     AccessorCountField, // number of accessors
     TypeIDField,  // interface type
+    BCFixed<1>,   // IUO value?
     DeclIDField,  // overridden decl
     AccessLevelField, // access level
     AccessLevelField, // setter access, if applicable
@@ -1075,6 +1076,7 @@ namespace decls_block {
     DeclContextIDField,      // context decl
     ParamDeclSpecifierField, // specifier
     TypeIDField,             // interface type
+    BCFixed<1>,              // isIUO?
     BCFixed<1>,              // isVariadic?
     BCFixed<1>,              // isAutoClosure?
     DefaultArgumentField,    // default argument kind
@@ -1093,6 +1095,7 @@ namespace decls_block {
     BCFixed<1>,   // throws?
     GenericEnvironmentIDField, // generic environment
     TypeIDField,  // result interface type
+    BCFixed<1>,   // IUO result?
     DeclIDField,  // operator decl
     DeclIDField,  // overridden function
     BCVBR<5>,     // 0 for a simple name, otherwise the number of parameter name
@@ -1134,6 +1137,7 @@ namespace decls_block {
     BCFixed<1>,   // throws?
     GenericEnvironmentIDField, // generic environment
     TypeIDField,  // result interface type
+    BCFixed<1>,   // IUO result?
     DeclIDField,  // overridden function
     DeclIDField,  // AccessorStorageDecl
     AccessorKindField, // accessor kind
@@ -1220,6 +1224,7 @@ namespace decls_block {
     AccessorCountField, // number of accessors
     GenericEnvironmentIDField, // generic environment
     TypeIDField, // element interface type
+    BCFixed<1>,  // IUO element?
     DeclIDField, // overridden decl
     AccessLevelField, // access level
     AccessLevelField, // setter access, if applicable

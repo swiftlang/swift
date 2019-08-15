@@ -3037,8 +3037,7 @@ namespace {
 
         // If the initializer we're calling is not declared as
         // checked, it's an error.
-        bool isError =
-            !ctor->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+        bool isError = !ctor->isImplicitlyUnwrappedOptional();
 
         // If we're suppressing diagnostics, just fail.
         if (isError && SuppressDiagnostics)

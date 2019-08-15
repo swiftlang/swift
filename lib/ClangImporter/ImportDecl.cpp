@@ -1432,8 +1432,7 @@ createValueConstructor(ClangImporter::Implementation &Impl,
                   SourceLoc(), var->getName(), structDecl);
     param->setInterfaceType(var->getInterfaceType());
     param->setValidationToChecked();
-    Impl.recordImplicitUnwrapForDecl(
-        param, var->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>());
+    Impl.recordImplicitUnwrapForDecl(param, var->isImplicitlyUnwrappedOptional());
     valueParameters.push_back(param);
   }
 
@@ -6696,8 +6695,7 @@ SwiftDeclConverter::importSubscript(Decl *decl,
   // If we have a setter, rectify it with the getter.
   ParamDecl *setterIndex;
   bool getterAndSetterInSameType = false;
-  bool isIUO =
-      getter->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+  bool isIUO = getter->isImplicitlyUnwrappedOptional();
   if (setter) {
     // Whether there is an existing read-only subscript for which
     // we have now found a setter.

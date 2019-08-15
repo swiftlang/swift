@@ -688,10 +688,8 @@ createDesignatedInitOverride(ClassDecl *classDecl,
   ctor->setGenericEnvironment(genericEnv);
   ctor->computeType();
 
-  if (ctor->getFailability() == OTK_ImplicitlyUnwrappedOptional) {
-    ctor->getAttrs().add(
-      new (ctx) ImplicitlyUnwrappedOptionalAttr(/*implicit=*/true));
-  }
+  ctor->setImplicitlyUnwrappedOptional(
+    ctor->getFailability() == OTK_ImplicitlyUnwrappedOptional);
 
   ctor->setValidationToChecked();
 

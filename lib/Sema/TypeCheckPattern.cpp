@@ -727,9 +727,7 @@ static bool validateTypedPattern(TypeChecker &TC,
       subPattern = parenPattern->getSubPattern();
 
     if (auto *namedPattern = dyn_cast<NamedPattern>(subPattern)) {
-      auto &C = resolution.getDeclContext()->getASTContext();
-      namedPattern->getDecl()->getAttrs().add(
-          new (C) ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true));
+      namedPattern->getDecl()->setImplicitlyUnwrappedOptional(true);
     } else {
       assert(isa<AnyPattern>(subPattern) &&
              "Unexpected pattern nested in typed pattern!");
@@ -775,9 +773,7 @@ static bool validateParameterType(ParamDecl *decl, TypeResolution resolution,
   // check, then add an attribute to the decl.
   if (!decl->isVariadic() && TR &&
       TR->getKind() == TypeReprKind::ImplicitlyUnwrappedOptional) {
-    auto &C = resolution.getDeclContext()->getASTContext();
-    decl->getAttrs().add(
-          new (C) ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true));
+    decl->setImplicitlyUnwrappedOptional(true);
   }
 
   Type Ty = TL.getType();

@@ -3945,9 +3945,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     if (!isa<AccessorDecl>(FD) || cast<AccessorDecl>(FD)->isGetter()) {
       auto *TyR = getTypeLocForFunctionResult(FD).getTypeRepr();
       if (TyR && TyR->getKind() == TypeReprKind::ImplicitlyUnwrappedOptional) {
-        auto &C = FD->getASTContext();
-        FD->getAttrs().add(
-            new (C) ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true));
+        FD->setImplicitlyUnwrappedOptional(true);
       }
     }
 
@@ -4011,11 +4009,8 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     validateAttributes(*this, CD);
 
-    if (CD->getFailability() == OTK_ImplicitlyUnwrappedOptional) {
-      auto &C = CD->getASTContext();
-      CD->getAttrs().add(
-          new (C) ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true));
-    }
+    if (CD->getFailability() == OTK_ImplicitlyUnwrappedOptional)
+      CD->setImplicitlyUnwrappedOptional(true);
 
     break;
   }
@@ -4049,11 +4044,8 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     validateAttributes(*this, SD);
 
     auto *TyR = SD->getElementTypeLoc().getTypeRepr();
-    if (TyR && TyR->getKind() == TypeReprKind::ImplicitlyUnwrappedOptional) {
-      auto &C = SD->getASTContext();
-      SD->getAttrs().add(
-          new (C) ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true));
-    }
+    if (TyR && TyR->getKind() == TypeReprKind::ImplicitlyUnwrappedOptional)
+      SD->setImplicitlyUnwrappedOptional(true);
 
     // Perform accessor-related validation.
     if (SD->getOpaqueResultTypeDecl()) {

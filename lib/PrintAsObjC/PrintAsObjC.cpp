@@ -300,15 +300,15 @@ private:
   // For a given Decl and Type, if the type is not an optional return
   // the type and OTK_None as the optionality. If the type is
   // optional, return the underlying object type, and an optionality
-  // that is based on the type but overridden by the
-  // ImplicitlyUnwrappedOptionalAttr on the decl.
+  // that is based on the type but overridden by the return value of
+  // isImplicitlyUnwrappedOptional().
   static std::pair<Type, OptionalTypeKind>
-  getObjectTypeAndOptionality(const Decl *D, Type ty) {
+  getObjectTypeAndOptionality(const ValueDecl *D, Type ty) {
     OptionalTypeKind kind;
     if (auto objTy =
             ty->getReferenceStorageReferent()->getOptionalObjectType()) {
       kind = OTK_Optional;
-      if (D->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
+      if (D->isImplicitlyUnwrappedOptional())
         kind = OTK_ImplicitlyUnwrappedOptional;
 
       return {objTy, kind};

@@ -2685,6 +2685,10 @@ bool ValueDecl::canBeAccessedByDynamicLookup() const {
   return true;
 }
 
+bool ValueDecl::isImplicitlyUnwrappedOptional() const {
+  return LazySemanticInfo.isIUO;
+}
+
 ArrayRef<ValueDecl *>
 ValueDecl::getSatisfiedProtocolRequirements(bool Sorted) const {
   // Dig out the nominal type.
@@ -5711,10 +5715,7 @@ ParamDecl::ParamDecl(ParamDecl *PD, bool withTypes)
   if (withTypes && PD->hasInterfaceType())
     setInterfaceType(PD->getInterfaceType());
 
-  // FIXME: We should clone the entire attribute list.
-  if (PD->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
-    getAttrs().add(new (PD->getASTContext())
-                       ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true));
+  setImplicitlyUnwrappedOptional(PD->isImplicitlyUnwrappedOptional());
 }
 
 

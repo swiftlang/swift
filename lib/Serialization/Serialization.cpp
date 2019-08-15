@@ -3399,6 +3399,7 @@ public:
                           accessors.ReadWriteImpl,
                           accessors.Decls.size(),
                           S.addTypeRef(ty),
+                          var->isImplicitlyUnwrappedOptional(),
                           S.addDeclRef(var->getOverriddenDecl()),
                           rawAccessLevel, rawSetterAccessLevel,
                           S.addDeclRef(var->getOpaqueResultTypeDecl()),
@@ -3431,6 +3432,7 @@ public:
         contextID,
         getRawStableParamDeclSpecifier(param->getSpecifier()),
         S.addTypeRef(interfaceType),
+        param->isImplicitlyUnwrappedOptional(),
         param->isVariadic(),
         param->isAutoClosure(),
         getRawStableDefaultArgumentKind(argKind),
@@ -3476,6 +3478,7 @@ public:
                            S.addGenericEnvironmentRef(
                                                   fn->getGenericEnvironment()),
                            S.addTypeRef(fn->getResultInterfaceType()),
+                           fn->isImplicitlyUnwrappedOptional(),
                            S.addDeclRef(fn->getOperatorDecl()),
                            S.addDeclRef(fn->getOverriddenDecl()),
                            fn->getFullName().getArgumentNames().size() +
@@ -3563,6 +3566,7 @@ public:
                                S.addGenericEnvironmentRef(
                                                   fn->getGenericEnvironment()),
                                S.addTypeRef(fn->getResultInterfaceType()),
+                               fn->isImplicitlyUnwrappedOptional(),
                                S.addDeclRef(fn->getOverriddenDecl()),
                                S.addDeclRef(fn->getStorage()),
                                rawAccessorKind,
@@ -3672,6 +3676,7 @@ public:
                                 S.addGenericEnvironmentRef(
                                             subscript->getGenericEnvironment()),
                                 S.addTypeRef(subscript->getElementInterfaceType()),
+                                subscript->isImplicitlyUnwrappedOptional(),
                                 S.addDeclRef(subscript->getOverriddenDecl()),
                                 rawAccessLevel,
                                 rawSetterAccessLevel,

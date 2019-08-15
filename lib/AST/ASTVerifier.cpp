@@ -2526,9 +2526,8 @@ public:
         }
       }
 
-      if (var->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>()) {
-        auto varTy = var->getInterfaceType()
-                         ->getReferenceStorageReferent();
+      if (var->isImplicitlyUnwrappedOptional()) {
+        auto varTy = var->getValueInterfaceType();
 
         // FIXME: Update to look for plain Optional once
         // ImplicitlyUnwrappedOptional is removed
@@ -2975,14 +2974,7 @@ public:
         }
       }
 
-      if (CD->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>()) {
-        if (!CD->getInterfaceType() ||
-            !CD->getInterfaceType()->is<AnyFunctionType>()) {
-          Out << "Expected ConstructorDecl to have a function type!\n";
-          CD->dump(llvm::errs());
-          abort();
-        }
-
+      if (CD->isImplicitlyUnwrappedOptional()) {
         if (CD->getFailability() != OTK_ImplicitlyUnwrappedOptional) {
           Out << "Expected IUO failability for constructor with IUO decl "
                  "attribute!\n";
@@ -2992,8 +2984,6 @@ public:
 
         auto resultTy = CD->getResultInterfaceType();
 
-        // FIXME: Update to look for plain Optional once
-        // ImplicitlyUnwrappedOptional is removed
         if (!resultTy->getOptionalObjectType()) {
           Out << "implicitly unwrapped optional attribute should only be set "
                  "on constructors with optional return types\n";
@@ -3192,17 +3182,8 @@ public:
         }
       }
 
-      if (FD->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>()) {
-        if (!FD->getInterfaceType() ||
-            !FD->getInterfaceType()->is<AnyFunctionType>()) {
-          Out << "Expected FuncDecl to have a function type!\n";
-          abort();
-        }
-
+      if (FD->isImplicitlyUnwrappedOptional()) {
         auto resultTy = FD->getResultInterfaceType();
-
-        // FIXME: Update to look for plain Optional once
-        // ImplicitlyUnwrappedOptional is removed
         if (!resultTy->getOptionalObjectType()) {
           Out << "implicitly unwrapped optional attribute should only be set "
                  "on functions with optional return types\n";

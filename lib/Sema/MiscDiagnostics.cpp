@@ -3567,8 +3567,7 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
     static bool hasImplicitlyUnwrappedResult(Expr *E) {
       auto *decl = getDeclForImplicitlyUnwrappedExpr(E);
 
-      return decl
-        && decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+      return decl && decl->isImplicitlyUnwrappedOptional();
     }
 
     static ValueDecl *getDeclForImplicitlyUnwrappedExpr(Expr *E) {
