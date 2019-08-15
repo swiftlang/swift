@@ -115,8 +115,8 @@ enum Recovery2 {
 enum Recovery3 {
   case UE2(Void): // expected-error {{'case' label can only appear inside a 'switch' statement}}
 }
-enum Recovery4 { 
-  case Self Self // expected-error {{keyword 'Self' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{8-12=`Self`}}
+enum Recovery4 { // expected-note {{in declaration of 'Recovery4'}}
+  case Self Self // expected-error {{keyword 'Self' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{8-12=`Self`}} expected-error {{consecutive declarations on a line must be separated by ';'}} {{12-12=;}} expected-error {{expected declaration}}
 }
 enum Recovery5 {
   case .UE3 // expected-error {{extraneous '.' in enum 'case' declaration}} {{8-9=}}
@@ -556,10 +556,10 @@ enum SE0155 {
 // SR-11261
 enum SR11261 {
   case identifier
-  case operator // expected-error {{keyword 'operator' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{8-16=`operator`}} expected-error {{expected pattern}}
+  case operator // expected-error {{keyword 'operator' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{8-16=`operator`}}
   case identifier2
 }
 
 enum SR11261_1 {
-  case a, b, c, func, d // expected-error {{keyword 'func' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{17-21=`func`}} expected-error {{expected pattern}}
+  case a, b, c, func, d // expected-error {{keyword 'func' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{17-21=`func`}}
 }

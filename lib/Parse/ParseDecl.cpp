@@ -5767,11 +5767,13 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
       SourceLoc TokLoc = Tok.getLoc();
       StringRef TokText = Tok.getText();
 
-      // For recovery, see if the user typed something resembling a switch
-      // "case" label.
-      llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
-      T(InVarOrLetPattern, Parser::IVOLP_InMatchingPattern);
-      parseMatchingPattern(/*isExprBasic*/false);
+      if (!NameIsKeyword || Tok.isIdentifierOrUnderscore()) {
+        // For recovery, see if the user typed something resembling a switch
+        // "case" label.
+        llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
+        T(InVarOrLetPattern, Parser::IVOLP_InMatchingPattern);
+        parseMatchingPattern(/*isExprBasic*/false);
+      }
 
       if (consumeIf(tok::colon)) {
         diagnose(CaseLoc, diag::case_outside_of_switch, "case");
