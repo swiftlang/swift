@@ -614,7 +614,11 @@ private:
   /// The list of Clang modules found in the debug info.
   llvm::DenseMap<Identifier, LoadedFile *> DWARFModuleUnits;
 public:
-  /// "Import" a module from debug info. Because debug info types are read on
+  /// Load a module using the clang::CompilerInstance.
+  ModuleDecl *loadModuleClang(SourceLoc importLoc,
+                              ArrayRef<std::pair<Identifier, SourceLoc>> path);
+  
+  /// "Load" a module from debug info. Because debug info types are read on
   /// demand, this doesn't really do any work.
   ModuleDecl *loadModuleDWARF(SourceLoc importLoc,
                               ArrayRef<std::pair<Identifier, SourceLoc>> path);
