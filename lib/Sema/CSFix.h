@@ -545,19 +545,20 @@ public:
                               ConstraintLocator *locator);
 };
 
-/// Remove the \c & of an argument for a non-inout parameter.
-class RemoveAddressOfArg final : public ContextualMismatch {
-  RemoveAddressOfArg(ConstraintSystem &cs, Type argTy, Type paramTy,
-                     ConstraintLocator *locator)
-      : ContextualMismatch(cs, argTy, paramTy, locator) {}
+class RemoveAddressOf final : public ContextualMismatch {
+  RemoveAddressOf(ConstraintSystem &cs, Type lhs, Type rhs,
+                  ConstraintLocator *locator)
+      : ContextualMismatch(cs, FixKind::RemoveAddressOf, lhs, rhs, locator) {}
 
 public:
-  std::string getName() const override { return "remove address of argument"; }
+  std::string getName() const override {
+    return "remove extraneous use of `&`";
+  }
 
   bool diagnose(Expr *root, bool asNote = false) const override;
 
-  static RemoveAddressOfArg *create(ConstraintSystem &cs, Type argTy,
-                                    Type paramTy, ConstraintLocator *locator);
+  static RemoveAddressOf *create(ConstraintSystem &cs, Type lhs, Type rhs,
+                                 ConstraintLocator *locator);
 };
 
 /// Detect situations where two type's generic arguments must
@@ -1178,21 +1179,6 @@ private:
   static AllowInvalidRefInKeyPath *create(ConstraintSystem &cs, RefKind kind,
                                           ValueDecl *member,
                                           ConstraintLocator *locator);
-};
-
-class RemoveAddressOf final : public ConstraintFix {
-  RemoveAddressOf(ConstraintSystem &cs, ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::RemoveAddressOf, locator) {}
-
-public:
-  std::string getName() const override {
-    return "remove extraneous use of `&`";
-  }
-
-  bool diagnose(Expr *root, bool asNote = false) const override;
-
-  static RemoveAddressOf *create(ConstraintSystem &cs,
-                                 ConstraintLocator *locator);
 };
 
 class RemoveReturn final : public ConstraintFix {

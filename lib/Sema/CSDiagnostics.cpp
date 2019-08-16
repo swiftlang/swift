@@ -908,17 +908,6 @@ bool MissingAddressOfFailure::diagnoseAsError() {
   return true;
 }
 
-bool ExtraAddressOfFailure::diagnoseAsError() {
-  if (hasComplexLocator())
-    return false;
-
-  auto anchor = getAnchor();
-  emitDiagnostic(getAnchor()->getLoc(), diag::extra_address_of, getToType())
-      .highlight(anchor->getSourceRange())
-      .fixItRemove(anchor->getStartLoc());
-  return true;
-}
-
 bool MissingExplicitConversionFailure::diagnoseAsError() {
   if (hasComplexLocator())
     return false;
@@ -3619,6 +3608,16 @@ SourceLoc InvalidUseOfAddressOf::getLoc() const {
 }
 
 bool InvalidUseOfAddressOf::diagnoseAsError() {
+  if (auto argApplyInfo = getFunctionArgApplyInfo(getLocator())) {
+    if (!argApplyInfo->getParameterFlags().isInOut()) {
+      auto anchor = getAnchor();
+      emitDiagnostic(anchor->getLoc(), diag::extra_address_of, getToType())
+          .highlight(anchor->getSourceRange())
+          .fixItRemove(anchor->getStartLoc());
+      return true;
+    }
+  }
+
   emitDiagnostic(getLoc(), diag::extraneous_address_of);
   return true;
 }

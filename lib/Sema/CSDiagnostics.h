@@ -843,14 +843,28 @@ public:
   bool diagnoseAsError() override;
 };
 
-/// Diagnose failures when passing an inout argument to a non-inout parameter.
-class ExtraAddressOfFailure final : public ContextualFailure {
+/// Diagnose extraneous use of address of (`&`) which could only be
+/// associated with arguments to inout parameters e.g.
+///
+/// ```swift
+/// struct S {}
+///
+/// var a: S = ...
+/// var b: S = ...
+///
+/// a = &b
+/// ```
+class InvalidUseOfAddressOf final : public ContextualFailure {
 public:
-  ExtraAddressOfFailure(Expr *expr, ConstraintSystem &cs, Type argTy,
-                        Type paramTy, ConstraintLocator *locator)
-      : ContextualFailure(expr, cs, argTy, paramTy, locator) {}
+  InvalidUseOfAddressOf(Expr *root, ConstraintSystem &cs, Type lhs, Type rhs,
+                        ConstraintLocator *locator)
+      : ContextualFailure(root, cs, lhs, rhs, locator) {}
 
   bool diagnoseAsError() override;
+
+protected:
+  /// Compute location of the failure for diagnostic.
+  SourceLoc getLoc() const;
 };
 
 /// Diagnose mismatches relating to tuple destructuring.
@@ -1453,30 +1467,6 @@ public:
   }
 
   bool diagnoseAsError() override;
-};
-
-/// Diagnose extraneous use of address of (`&`) which could only be
-/// associated with arguments to inout parameters e.g.
-///
-/// ```swift
-/// struct S {}
-///
-/// var a: S = ...
-/// var b: S = ...
-///
-/// a = &b
-/// ```
-class InvalidUseOfAddressOf final : public FailureDiagnostic {
-public:
-  InvalidUseOfAddressOf(Expr *root, ConstraintSystem &cs,
-                        ConstraintLocator *locator)
-      : FailureDiagnostic(root, cs, locator) {}
-
-  bool diagnoseAsError() override;
-
-protected:
-  /// Compute location of the failure for diagnostic.
-  SourceLoc getLoc() const;
 };
 
 /// Diagnose an attempt return something from a function which

@@ -2357,7 +2357,8 @@ bool ConstraintSystem::repairFailures(
 
       if (isa<InOutExpr>(AE->getSrc())) {
         conversionsOrFixes.push_back(
-            RemoveAddressOf::create(*this, getConstraintLocator(locator)));
+            RemoveAddressOf::create(*this, lhs, rhs,
+                                    getConstraintLocator(locator)));
         return true;
       }
 
@@ -2443,7 +2444,7 @@ bool ConstraintSystem::repairFailures(
                                TypeMatchFlags::TMF_ApplyingFix, locator);
 
       if (result.isSuccess())
-        conversionsOrFixes.push_back(RemoveAddressOfArg::create(*this, lhs,
+        conversionsOrFixes.push_back(RemoveAddressOf::create(*this, lhs,
             rhs, getConstraintLocator(locator)));
     }
 
@@ -3005,7 +3006,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       
       if (kind == ConstraintKind::OperatorArgumentConversion) {
         conversionsOrFixes.push_back(
-            RemoveAddressOf::create(*this, getConstraintLocator(locator)));
+            RemoveAddressOf::create(*this, type1, type2,
+                                    getConstraintLocator(locator)));
         break;
       }
 
