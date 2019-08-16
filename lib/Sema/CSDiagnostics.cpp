@@ -1172,9 +1172,7 @@ bool MissingOptionalUnwrapFailure::diagnoseAsError() {
           return true;
 
         if (auto declRefExpr = dyn_cast<DeclRefExpr>(initializer)) {
-          if (declRefExpr->getDecl()
-                  ->getAttrs()
-                  .hasAttribute<ImplicitlyUnwrappedOptionalAttr>()) {
+          if (declRefExpr->getDecl()->isImplicitlyUnwrappedOptional()) {
             emitDiagnostic(declRefExpr->getLoc(), diag::unwrap_iuo_initializer,
                            baseType);
           }

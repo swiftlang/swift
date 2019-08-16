@@ -912,13 +912,7 @@ bool swift::ide::isReferenceableByImplicitMemberExpr(
 
   // Only non-failable constructors are implicitly referenceable.
   if (auto CD = dyn_cast<ConstructorDecl>(VD)) {
-    switch (CD->getFailability()) {
-      case OTK_None:
-      case OTK_ImplicitlyUnwrappedOptional:
-        return true;
-      case OTK_Optional:
-        return false;
-    }
+    return (!CD->isFailable() || CD->isImplicitlyUnwrappedOptional());
   }
 
   // Otherwise, check the result type matches the contextual type.
