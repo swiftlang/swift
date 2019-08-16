@@ -378,18 +378,6 @@ llvm::TinyPtrVector<Constraint *> ConstraintGraph::gatherConstraints(
     llvm::function_ref<bool(Constraint *)> acceptConstraintFn) {
   llvm::TinyPtrVector<Constraint *> constraints;
 
-  // Local function to test whether the given type variable is in the current
-  // interest set for the solver.
-  SmallPtrSet<TypeVariableType *, 4> interestingTypeVars;
-  auto isInterestingTypeVar = [&](TypeVariableType *typeVar) {
-    if (interestingTypeVars.empty()) {
-      interestingTypeVars.insert(CS.TypeVariables.begin(),
-                                 CS.TypeVariables.end());
-    }
-
-    return interestingTypeVars.count(typeVar) > 0;
-  };
-
   // Whether we should consider this constraint at all.
   auto rep = CS.getRepresentative(typeVar);
   auto shouldConsiderConstraint = [&](Constraint *constraint) {
@@ -399,7 +387,7 @@ llvm::TinyPtrVector<Constraint *> ConstraintGraph::gatherConstraints(
     if (constraint->getKind() == ConstraintKind::OneWayBind) {
       auto lhsTypeVar =
           constraint->getFirstType()->castTo<TypeVariableType>();
-      if (!isInterestingTypeVar(lhsTypeVar))
+      if (!CS.isActiveTypeVariable(lhsTypeVar))
         return false;
 
       SmallVector<TypeVariableType *, 2> rhsTypeVars;
@@ -1295,7 +1283,7 @@ void ConstraintGraph::dump() {
 void ConstraintGraph::dump(llvm::raw_ostream &out) {
   llvm::SaveAndRestore<bool>
     debug(CS.getASTContext().LangOpts.DebugConstraintSolver, true);
-  print(CS.TypeVariables, out);
+  print(CS.getTypeVariables(), out);
 }
 
 void ConstraintGraph::printConnectedComponents(
@@ -1334,7 +1322,7 @@ void ConstraintGraph::printConnectedComponents(
 void ConstraintGraph::dumpConnectedComponents() {
   llvm::SaveAndRestore<bool>
     debug(CS.getASTContext().LangOpts.DebugConstraintSolver, true);
-  printConnectedComponents(CS.TypeVariables, llvm::dbgs());
+  printConnectedComponents(CS.getTypeVariables(), llvm::dbgs());
 }
 
 #pragma mark Verification of graph invariants
