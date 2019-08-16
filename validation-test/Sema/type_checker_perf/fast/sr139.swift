@@ -1,5 +1,5 @@
 // RUN: %target-typecheck-verify-swift
-// RUN: %target-swift-frontend -typecheck %s -solver-enable-operator-designated-types
+// RUN: %target-swift-frontend -typecheck %s
 
 // SR-139:
 // Infinite recursion parsing bitwise operators

@@ -802,7 +802,7 @@ static void diagnoseMissingRequiredInitializer(
 
 void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
   // We can only synthesize implicit constructors for classes and structs.
- if (!isa<ClassDecl>(decl) && !isa<StructDecl>(decl))
+  if (!isa<ClassDecl>(decl) && !isa<StructDecl>(decl))
    return;
 
   // If we already added implicit initializers, we're done.

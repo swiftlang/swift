@@ -318,8 +318,8 @@ ResilienceExpansion DeclContext::getResilienceExpansion() const {
 }
 
 llvm::Expected<ResilienceExpansion>
-  swift::ResilienceExpansionRequest::evaluate(Evaluator &eval,
-                                              DeclContext *context) const {
+swift::ResilienceExpansionRequest::evaluate(Evaluator &evaluator,
+                                            DeclContext *context) const {
   for (const auto *dc = context->getLocalContext(); dc && dc->isLocalContext();
        dc = dc->getParent()) {
     // Default argument initializer contexts have their resilience expansion
@@ -473,6 +473,25 @@ unsigned DeclContext::getSemanticDepth() const {
     return 0;
 
   return 1 + getParent()->getSemanticDepth();
+}
+
+bool DeclContext::mayContainMembersAccessedByDynamicLookup() const {
+  // Dynamic lookup can only find class and protocol members, or extensions of
+  // classes.
+  if (auto *NTD = dyn_cast<NominalTypeDecl>(this)) {
+    if (isa<ClassDecl>(NTD))
+      if (!isGenericContext())
+        return true;
+    if (auto *PD = dyn_cast<ProtocolDecl>(NTD))
+      if (PD->getAttrs().hasAttribute<ObjCAttr>())
+        return true;
+  } else if (auto *ED = dyn_cast<ExtensionDecl>(this)) {
+    if (auto *CD = dyn_cast<ClassDecl>(ED->getExtendedNominal()))
+      if (!CD->isGenericContext())
+        return true;
+  }
+
+  return false;
 }
 
 bool DeclContext::walkContext(ASTWalker &Walker) {
@@ -726,7 +745,7 @@ DeclRange IterableDeclContext::getMembers() const {
 void IterableDeclContext::addMember(Decl *member, Decl *Hint) {
   // Add the member to the list of declarations without notification.
   addMemberSilently(member, Hint);
-  ++memberCount;
+  ++MemberCount;
 
   // Notify our parent declaration that we have added the member, which can
   // be used to update the lookup tables.
@@ -794,13 +813,19 @@ void IterableDeclContext::setMemberLoader(LazyMemberLoader *loader,
 }
 
 void IterableDeclContext::loadAllMembers() const {
+  ASTContext &ctx = getASTContext();
+
   // Lazily parse members.
-  getASTContext().parseMembers(const_cast<IterableDeclContext*>(this));
+  if (HasUnparsedMembers) {
+    auto *IDC = const_cast<IterableDeclContext *>(this);
+    ctx.parseMembers(IDC);
+    IDC->HasUnparsedMembers = 0;
+  }
+
   if (!hasLazyMembers())
     return;
 
   // Don't try to load all members re-entrant-ly.
-  ASTContext &ctx = getASTContext();
   auto contextInfo = ctx.getOrCreateLazyIterableContextData(this,
     /*lazyLoader=*/nullptr);
   auto lazyMembers = FirstDeclAndLazyMembers.getInt() & ~LazyMembers::Present;

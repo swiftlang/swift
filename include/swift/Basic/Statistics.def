@@ -176,9 +176,6 @@ FRONTEND_STATISTIC(Sema, NumDeclsValidated)
 /// Number of declarations type checked.
 FRONTEND_STATISTIC(Sema, NumDeclsTypechecked)
 
-/// Number of declarations finalized.
-FRONTEND_STATISTIC(Sema, NumDeclsFinalized)
-
 /// Number of synthesized accessors.
 FRONTEND_STATISTIC(Sema, NumAccessorsSynthesized)
 

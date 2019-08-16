@@ -32,6 +32,7 @@
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/LazyResolver.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SubstitutionMap.h"
@@ -2958,6 +2959,10 @@ NecessaryBindings::forFunctionInvocations(IRGenModule &IGM,
 GenericTypeRequirements::GenericTypeRequirements(IRGenModule &IGM,
                                                  NominalTypeDecl *typeDecl)
     : TheDecl(typeDecl) {
+
+  // FIXME: Remove this once getGenericSignature() is a request.
+  if (!typeDecl->hasInterfaceType())
+    IGM.Context.getLazyResolver()->resolveDeclSignature(typeDecl);
 
   // We only need to do something here if the declaration context is
   // somehow generic.

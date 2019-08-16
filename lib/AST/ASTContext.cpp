@@ -2008,13 +2008,8 @@ LazyContextData *ASTContext::getOrCreateLazyContextData(
   return entry;
 }
 
-bool ASTContext::hasUnparsedMembers(const IterableDeclContext *IDC) const {
-  auto parsers = getImpl().lazyParsers;
-  return std::any_of(parsers.begin(), parsers.end(),
-    [IDC](LazyMemberParser *p) { return p->hasUnparsedMembers(IDC); });
-}
-
 void ASTContext::parseMembers(IterableDeclContext *IDC) {
+  assert(IDC->hasUnparsedMembers());
   for (auto *p: getImpl().lazyParsers) {
     if (p->hasUnparsedMembers(IDC))
       p->parseMembers(IDC);
@@ -4408,6 +4403,7 @@ GenericSignature *
 ASTContext::getOverrideGenericSignature(const ValueDecl *base,
                                         const ValueDecl *derived) {
   auto baseGenericCtx = base->getAsGenericContext();
+  auto derivedGenericCtx = derived->getAsGenericContext();
   auto &ctx = base->getASTContext();
 
   if (!baseGenericCtx) {
@@ -4428,6 +4424,10 @@ ASTContext::getOverrideGenericSignature(const ValueDecl *base,
   }
 
   if (derivedClass->getSuperclass().isNull()) {
+    return nullptr;
+  }
+
+  if (!derivedGenericCtx || !derivedGenericCtx->isGeneric()) {
     return nullptr;
   }
 
@@ -4459,12 +4459,8 @@ ASTContext::getOverrideGenericSignature(const ValueDecl *base,
   GenericSignatureBuilder builder(ctx);
   builder.addGenericSignature(derivedClass->getGenericSignature());
 
-  if (auto derivedGenericCtx = derived->getAsGenericContext()) {
-    if (derivedGenericCtx->isGeneric()) {
-      for (auto param : *derivedGenericCtx->getGenericParams()) {
-        builder.addGenericParameter(param);
-      }
-    }
+  for (auto param : *derivedGenericCtx->getGenericParams()) {
+    builder.addGenericParameter(param);
   }
 
   auto source =

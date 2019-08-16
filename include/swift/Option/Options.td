@@ -306,6 +306,9 @@ def color_diagnostics : Flag<["-"], "color-diagnostics">,
 def no_color_diagnostics : Flag<["-"], "no-color-diagnostics">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Do not print diagnostics in color">;
+def debug_diagnostic_names : Flag<["-"], "debug-diagnostic-names">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild, HelpHidden]>,
+  HelpText<"Include diagnostic names when printing">;
 
 def module_cache_path : Separate<["-"], "module-cache-path">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
