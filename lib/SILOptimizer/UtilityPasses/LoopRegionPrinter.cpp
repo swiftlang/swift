@@ -32,9 +32,9 @@ class LoopRegionViewText : public SILModuleTransform {
     for (auto &Fn : *getModule()) {
       if (Fn.isExternalDeclaration()) continue;
 
-      llvm::outs() << "@" << Fn.getName() << "@\n";
+      llvm::outs() << "Start @" << Fn.getName() << "@\n";
       LRA->get(&Fn)->dump();
-      llvm::outs() << "\n";
+      llvm::outs() << "End @" << Fn.getName() << "@\n";
       llvm::outs().flush();
     }
   }
