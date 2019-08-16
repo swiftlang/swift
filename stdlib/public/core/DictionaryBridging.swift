@@ -313,7 +313,6 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
     let bridgedKeys = bridgeKeys()
     let bridgedValues = bridgeValues()
     var i = 0 // Current position in the output buffers
-    let bucketCount = native._storage._bucketCount
 
     defer { _fixLifetime(self) }
 
