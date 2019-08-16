@@ -1581,7 +1581,7 @@ void ConstraintSystem::ArgumentInfoCollector::walk(Type argType) {
     visited.insert(rep);
 
     auto constraints = CS.getConstraintGraph().gatherConstraints(
-        rep, ConstraintGraph::GatheringKind::EquivalenceClass);
+        rep, ConstraintGraph::GatheringKind::PotentialBindings);
 
     for (auto *constraint : constraints) {
       switch (constraint->getKind()) {

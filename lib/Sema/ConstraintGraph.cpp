@@ -520,10 +520,12 @@ llvm::TinyPtrVector<Constraint *> ConstraintGraph::gatherConstraints(
         constraints.push_back(constraint);
     }
 
-    // For any type variable mentioned in a fixed binding, add adjacent
-    // constraints.
-    for (auto adjTypeVar : node.getFixedBindings()) {
-      addAdjacentConstraints(adjTypeVar);
+    if (kind == GatheringKind::PotentialBindings) {
+      // For any type variable mentioned in a fixed binding, add adjacent
+      // constraints.
+      for (auto adjTypeVar : node.getFixedBindings()) {
+        addAdjacentConstraints(adjTypeVar);
+      }
     }
   }
 

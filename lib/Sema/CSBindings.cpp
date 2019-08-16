@@ -394,7 +394,7 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
   // Gather the constraints associated with this type variable.
   auto constraints =
       getConstraintGraph().gatherConstraints(
-          typeVar, ConstraintGraph::GatheringKind::EquivalenceClass);
+          typeVar, ConstraintGraph::GatheringKind::PotentialBindings);
 
   PotentialBindings result(typeVar);
 

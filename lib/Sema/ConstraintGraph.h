@@ -181,6 +181,10 @@ public:
     /// Gather constraints associated with all of the variables within the
     /// same equivalence class as the given type variable.
     EquivalenceClass,
+    /// Gather constraints that might be useful for potential bindings,
+    /// which also involves gathering constraints for type variables found
+    /// via fixed bindings.
+    PotentialBindings,
     /// Gather all constraints that mention this type variable or type variables
     /// that it is equivalent to.
     AllMentions,
