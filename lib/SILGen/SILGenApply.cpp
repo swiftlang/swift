@@ -38,8 +38,6 @@
 #include "swift/SIL/SILArgument.h"
 #include "llvm/Support/Compiler.h"
 
-#include <iostream>
-
 using namespace swift;
 using namespace Lowering;
 
@@ -146,12 +144,12 @@ static bool canUseStaticDispatch(SILGenFunction &SGF,
 
   if (funcDecl->isFinal())
     return true;
-
+  
   // Native initializing entry points are always statically dispatched.
   if (constant.kind == SILDeclRef::Kind::Initializer
       && !constant.isForeign)
     return true;
-
+  
   // Extension methods currently must be statically dispatched, unless they're
   // @objc or dynamic.
   if (isa<ExtensionDecl>(funcDecl->getDeclContext()) && !constant.isForeign)
@@ -469,13 +467,13 @@ public:
   void setCaptures(SmallVectorImpl<ManagedValue> &&captures) {
     Captures = std::move(captures);
   }
-
+  
   ArrayRef<ManagedValue> getCaptures() const {
     if (Captures)
       return *Captures;
     return {};
   }
-
+  
   bool hasCaptures() const {
     return Captures.hasValue();
   }
@@ -932,7 +930,7 @@ public:
         loc, selfMeta.getValue(),
         SILType::getPrimitiveObjectType(destMetatype));
       break;
-
+    
     case metatypeRepPair(MetatypeRepresentation::ObjC,
                          MetatypeRepresentation::Thick):
       convertedValue = SGF.B.emitObjCToThickMetatype(
@@ -1148,7 +1146,7 @@ public:
       applyCallee->setCaptures(std::move(captures));
     }
   }
-
+  
   void visitAbstractClosureExpr(AbstractClosureExpr *e) {
     // Emit the closure body.
     SGF.SGM.emitClosure(e);
@@ -1159,7 +1157,7 @@ public:
     if (&SGF == SGF.SGM.TopLevelSGF) {
       SGF.SGM.emitMarkFunctionEscapeForTopLevelCodeGlobals(e,e->getCaptureInfo());
     }
-
+    
     // A directly-called closure can be emitted as a direct call instead of
     // really producing a closure object.
     SILDeclRef constant(e);
@@ -1169,7 +1167,7 @@ public:
       subs = SGF.getForwardingSubstitutionMap();
 
     setCallee(Callee::forDirect(SGF, constant, subs, e));
-
+    
     // If the closure requires captures, emit them.
     bool hasCaptures = SGF.SGM.M.Types.hasLoweredLocalCaptures(e);
     if (hasCaptures) {
@@ -1179,7 +1177,7 @@ public:
       applyCallee->setCaptures(std::move(captures));
     }
   }
-
+  
   void visitOtherConstructorDeclRefExpr(OtherConstructorDeclRefExpr *e) {
     auto subs = e->getDeclRef().getSubstitutions();
 
@@ -1328,7 +1326,7 @@ public:
     }
     assert(isa<DeclRefExpr>(selfArg) &&
            "unexpected expr kind in self argument of initializer delegation");
-
+  
     // If the 'self' value is a metatype, update the target type
     // accordingly.
     SILType loweredResultTy;
@@ -1339,7 +1337,7 @@ public:
     } else {
       loweredResultTy = SGF.getLoweredLoadableType(resultTy);
     }
-
+    
     if (loweredResultTy != selfValue.getType()) {
       // Introduce dynamic Self if necessary. A class initializer receives
       // a metatype argument that's formally the non-dynamic base class type
@@ -1431,7 +1429,7 @@ public:
           // initializer is @objc.
           usesObjCAllocation = true;
         }
-
+        
         self = allocateObject(
                       ManagedValue::forUnmanaged(SGF.AllocatorMetatype), arg,
                       usesObjCAllocation);
@@ -1860,7 +1858,7 @@ public:
   Expr *getExpr() const { return ExprAndIsIndirect.getPointer(); }
   bool isIndirect() const { return ExprAndIsIndirect.getInt(); }
 };
-
+  
 /// A possibly-discontiguous slice of function parameters claimed by a
 /// function application.
 class ClaimedParamsRef {
@@ -1868,10 +1866,10 @@ public:
   static constexpr const unsigned NoSkip = (unsigned)-1;
 private:
   ArrayRef<SILParameterInfo> Params;
-
+  
   // The index of the param excluded from this range, if any, or ~0.
   unsigned SkipParamIndex;
-
+  
   friend struct ParamLowering;
   explicit ClaimedParamsRef(ArrayRef<SILParameterInfo> params,
                             unsigned skip)
@@ -1884,7 +1882,7 @@ private:
     }
     assert(!hasSkip() || SkipParamIndex < Params.size());
   }
-
+  
   bool hasSkip() const {
     return SkipParamIndex != (unsigned)NoSkip;
   }
@@ -1899,12 +1897,12 @@ public:
   {
     const SILParameterInfo *Base;
     unsigned I, SkipParamIndex;
-
+    
     iterator(const SILParameterInfo *Base,
              unsigned I, unsigned SkipParamIndex)
       : Base(Base), I(I), SkipParamIndex(SkipParamIndex)
     {}
-
+    
     iterator &operator++() {
       ++I;
       if (I == SkipParamIndex)
@@ -1927,23 +1925,23 @@ public:
       --*this;
       return old;
     }
-
+    
     const SILParameterInfo &operator*() const {
       return Base[I];
     }
     const SILParameterInfo *operator->() const {
       return Base + I;
     }
-
+    
     bool operator==(iterator other) const {
       return Base == other.Base && I == other.I
           && SkipParamIndex == other.SkipParamIndex;
     }
-
+    
     bool operator!=(iterator other) const {
       return !(*this == other);
     }
-
+    
     iterator operator+(std::ptrdiff_t distance) const {
       if (distance > 0)
         return goForward(distance);
@@ -1966,7 +1964,7 @@ public:
         return baseDistance - 1;
       return baseDistance;
     }
-
+    
     iterator goBackward(unsigned distance) const {
       auto result = *this;
       if (I > SkipParamIndex && I <= SkipParamIndex + distance)
@@ -1974,7 +1972,7 @@ public:
       result.I -= distance;
       return result;
     }
-
+    
     iterator goForward(unsigned distance) const {
       auto result = *this;
       if (I < SkipParamIndex && I + distance >= SkipParamIndex)
@@ -1983,23 +1981,23 @@ public:
       return result;
     }
   };
-
+  
   iterator begin() const {
     return iterator{Params.data(), 0, SkipParamIndex};
   }
-
+  
   iterator end() const {
     return iterator{Params.data(), (unsigned)Params.size(), SkipParamIndex};
   }
-
+  
   unsigned size() const {
     return Params.size() - (hasSkip() ? 1 : 0);
   }
-
+  
   bool empty() const { return size() == 0; }
-
+  
   SILParameterInfo front() const { return *begin(); }
-
+  
   ClaimedParamsRef slice(unsigned start) const {
     if (start >= SkipParamIndex)
       return ClaimedParamsRef(Params.slice(start + 1), NoSkip);
@@ -2012,7 +2010,7 @@ public:
     unsigned newSkip = SkipParamIndex;
     if (hasSkip())
       newSkip -= start;
-
+    
     if (newSkip < count)
       return ClaimedParamsRef(Params.slice(start, count+1), newSkip);
     return ClaimedParamsRef(Params.slice(start, count), NoSkip);
@@ -2049,12 +2047,12 @@ public:
 
     /// A string r-value needs to be converted to a pointer type.
     RValueStringToPointer,
-
+    
     /// A function conversion needs to occur.
     FunctionConversion,
-
+    
     LastRVKind = FunctionConversion,
-
+    
     /// This is an immutable borrow from an l-value.
     BorrowedLValue,
 
@@ -2084,7 +2082,7 @@ private:
     AbstractionPattern origResultType;
     ClaimedParamsRef paramsToEmit;
     SILFunctionTypeRepresentation functionRepresentation;
-
+    
     DefaultArgumentStorage(SILLocation loc,
                            ConcreteDeclRef defaultArgsOwner,
                            unsigned destIndex,
@@ -2141,7 +2139,7 @@ private:
 
   using PointerAccessInfo = SILGenFunction::PointerAccessInfo;
   using ArrayAccessInfo = SILGenFunction::ArrayAccessInfo;
-
+  
   using ExtraMembers =
     ExternalUnionMembers<void,
                          ArrayAccessInfo,
@@ -2202,7 +2200,7 @@ public:
     Value.emplaceAggregate<BorrowedLValueStorage>(Kind, std::move(lv), loc,
                                                   origResultType, params);
   }
-
+  
   DelayedArgument(SILLocation loc,
                   ConcreteDeclRef defaultArgsOwner,
                   unsigned destIndex,
@@ -2299,7 +2297,7 @@ private:
 
     return value;
   }
-
+  
   void emitDefaultArgument(SILGenFunction &SGF,
                            const DefaultArgumentStorage &info,
                            SmallVectorImpl<ManagedValue> &args,
@@ -2471,7 +2469,7 @@ static void emitDelayedArguments(SILGenFunction &SGF,
     // NB: siteArgs.size() may change during iteration
     for (size_t i = 0; i < siteArgs.size(); ) {
       auto &siteArg = siteArgs[i];
-
+      
       if (siteArg) {
         ++i;
         continue;
@@ -2978,7 +2976,7 @@ private:
     if (auto stringToPointer = dyn_cast<StringToPointerExpr>(expr)) {
       return emitDelayedConversion(stringToPointer, original);
     }
-
+    
     // Delay function conversions involving the opened Self type of an
     // existential whose opening is itself delayed.
     //
@@ -3002,7 +3000,7 @@ private:
     if (auto funcConv = dyn_cast<FunctionConversionExpr>(expr)) {
       auto destTy = funcConv->getType()->castTo<AnyFunctionType>();
       auto srcTy = funcConv->getSubExpr()->getType()->castTo<AnyFunctionType>();
-
+      
       if (destTy->hasOpenedExistential()
           && !srcTy->hasOpenedExistential()
           && destTy->getRepresentation() == srcTy->getRepresentation()) {
@@ -3090,7 +3088,7 @@ private:
     Args.push_back(ManagedValue());
     return true;
   }
-
+  
   bool emitDelayedConversion(FunctionConversionExpr *funcConv,
                              OriginalArgument original) {
     auto rvalueExpr = lookThroughBindOptionals(funcConv->getSubExpr());
@@ -3123,7 +3121,7 @@ private:
 
     return scope.popPreservingValue(result);
   }
-
+  
   void maybeEmitForeignErrorArgument() {
     if (!ForeignError ||
         ForeignError->getErrorParameterIndex() != Args.size())
@@ -3184,7 +3182,7 @@ void DelayedArgument::emitDefaultArgument(SILGenFunction &SGF,
                         info.origResultType);
   assert(delayedArgs.empty());
   assert(!errorConvention);
-
+  
   // Splice the emitted default argument into the argument list.
   if (loweredArgs.size() == 1) {
     args[argIndex++] = loweredArgs.front();
@@ -4941,14 +4939,11 @@ RValue SILGenFunction::emitApplyMethod(SILLocation loc, ConcreteDeclRef declRef,
   }
 
   auto substFormalType = callee->getSubstFormalType();
-  std::cout << "FORMAL TYPE:" << substFormalType.getString() << std::endl;
 
   // Form the call emission.
   CallEmission emission(*this, std::move(*callee), std::move(writebackScope));
 
-  auto methodType = cast<FunctionType>(isa<FunctionType>(substFormalType.getResult()) ?
-                                                         substFormalType.getResult() :
-                                                         substFormalType);
+  auto methodType = cast<FunctionType>(substFormalType.getResult());
   auto resultType = methodType.getResult();
 
   emission.addSelfParam(loc, std::move(self), substFormalType.getParams()[0],
@@ -5261,7 +5256,7 @@ emitSpecializedAccessorFunctionRef(SILGenFunction &SGF,
   Callee callee = getBaseAccessorFunctionRef(SGF, loc, constant, selfValue,
                                              isSuper, isDirectUse,
                                              substitutions, isOnSelfParameter);
-
+  
   // Collect captures if the accessor has them.
   auto accessorFn = cast<AbstractFunctionDecl>(constant.getDecl());
   if (SGF.SGM.M.Types.hasLoweredLocalCaptures(accessorFn)) {
@@ -5959,7 +5954,7 @@ RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e,
     // Emit the index.
     llvm::SmallVector<ManagedValue, 2> indexArgs;
     std::move(index).getAll(indexArgs);
-
+    
     auto resultRV = emitMonomorphicApply(e, result, indexArgs,
                                          foreignMethodTy.getResult(), valueTy,
                                          ApplyOptions::DoesNotThrow,
