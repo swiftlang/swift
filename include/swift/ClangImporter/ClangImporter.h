@@ -108,8 +108,6 @@ private:
                 DependencyTracker *tracker,
                 DWARFImporterDelegate *dwarfImporterDelegate);
 
-  ModuleDecl *loadModuleClang(SourceLoc importLoc,
-                              ArrayRef<std::pair<Identifier, SourceLoc>> path);
 public:
   /// Create a new Clang importer that can import a suitable Clang
   /// module into the given ASTContext.
@@ -140,6 +138,9 @@ public:
   ClangImporter &operator=(ClangImporter &&) = delete;
 
   ~ClangImporter();
+
+  /// Only to be used by lldb-moduleimport-test.
+  void setDWARFImporterDelegate(DWARFImporterDelegate &delegate);
 
   /// Create a new clang::DependencyCollector customized to
   /// ClangImporter's specific uses.

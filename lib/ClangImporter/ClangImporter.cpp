@@ -1573,11 +1573,10 @@ bool ClangImporter::canImportModule(std::pair<Identifier, SourceLoc> moduleID) {
   return clangModule->isAvailable(ctx.getLangOpts(), getTargetInfo(), r, mh, m);
 }
 
-ModuleDecl *ClangImporter::loadModuleClang(
-    SourceLoc importLoc,
-    ArrayRef<std::pair<Identifier, SourceLoc>> path) {
-  auto &clangContext = Impl.getClangASTContext();
-  auto &clangHeaderSearch = Impl.getClangPreprocessor().getHeaderSearchInfo();
+ModuleDecl *ClangImporter::Implementation::loadModuleClang(
+    SourceLoc importLoc, ArrayRef<std::pair<Identifier, SourceLoc>> path) {
+  auto &clangContext = getClangASTContext();
+  auto &clangHeaderSearch = getClangPreprocessor().getHeaderSearchInfo();
 
   // Look up the top-level module first, to see if it exists at all.
   clang::Module *clangModule = clangHeaderSearch.lookupModule(
@@ -1588,39 +1587,39 @@ ModuleDecl *ClangImporter::loadModuleClang(
 
   // Convert the Swift import path over to a Clang import path.
   SmallVector<std::pair<clang::IdentifierInfo *, clang::SourceLocation>, 4>
-    clangPath;
+      clangPath;
   for (auto component : path) {
-    clangPath.push_back({ &clangContext.Idents.get(component.first.str()),
-                          Impl.exportSourceLoc(component.second) } );
+    clangPath.push_back({&clangContext.Idents.get(component.first.str()),
+                         exportSourceLoc(component.second)});
   }
 
-  auto &rawDiagClient = Impl.Instance->getDiagnosticClient();
+  auto &rawDiagClient = Instance->getDiagnosticClient();
   auto &diagClient = static_cast<ClangDiagnosticConsumer &>(rawDiagClient);
 
   auto loadModule = [&](clang::ModuleIdPath path,
                         bool makeVisible) -> clang::ModuleLoadResult {
     clang::Module::NameVisibilityKind visibility =
-      makeVisible ? clang::Module::AllVisible : clang::Module::Hidden;
+        makeVisible ? clang::Module::AllVisible : clang::Module::Hidden;
 
-    auto importRAII = diagClient.handleImport(clangPath.front().first,
-                                              importLoc);
+    auto importRAII =
+        diagClient.handleImport(clangPath.front().first, importLoc);
 
     std::string preservedIndexStorePathOption;
-    auto &clangFEOpts = Impl.Instance->getFrontendOpts();
+    auto &clangFEOpts = Instance->getFrontendOpts();
     if (!clangFEOpts.IndexStorePath.empty()) {
       StringRef moduleName = path[0].first->getName();
       // Ignore the SwiftShims module for the index data.
-      if (moduleName == Impl.SwiftContext.SwiftShimsModuleName.str()) {
+      if (moduleName == SwiftContext.SwiftShimsModuleName.str()) {
         preservedIndexStorePathOption = clangFEOpts.IndexStorePath;
         clangFEOpts.IndexStorePath.clear();
       }
     }
 
-    clang::SourceLocation clangImportLoc = Impl.getNextIncludeLoc();
+    clang::SourceLocation clangImportLoc = getNextIncludeLoc();
 
     clang::ModuleLoadResult result =
-        Impl.Instance->loadModule(clangImportLoc, path, visibility,
-                                  /*IsInclusionDirective=*/false);
+        Instance->loadModule(clangImportLoc, path, visibility,
+                             /*IsInclusionDirective=*/false);
 
     if (!preservedIndexStorePathOption.empty()) {
       // Restore the -index-store-path option.
@@ -1628,7 +1627,7 @@ ModuleDecl *ClangImporter::loadModuleClang(
     }
 
     if (result && makeVisible)
-      Impl.getClangPreprocessor().makeModuleVisible(result, clangImportLoc);
+      getClangPreprocessor().makeModuleVisible(result, clangImportLoc);
     return result;
   };
 
@@ -1663,13 +1662,13 @@ ModuleDecl *ClangImporter::loadModuleClang(
   if (!clangModule)
     return nullptr;
 
-  return Impl.finishLoadingClangModule(clangModule, /*preferOverlay=*/false);
+  return finishLoadingClangModule(clangModule, /*preferOverlay=*/false);
 }
 
 ModuleDecl *ClangImporter::loadModule(
     SourceLoc importLoc,
     ArrayRef<std::pair<Identifier, SourceLoc>> path) {
-  ModuleDecl *MD = loadModuleClang(importLoc, path);
+  ModuleDecl *MD = Impl.loadModuleClang(importLoc, path);
   if (!MD)
     MD = Impl.loadModuleDWARF(importLoc, path);
   return MD;
