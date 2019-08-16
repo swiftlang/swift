@@ -99,7 +99,7 @@ SILParserTUState::~SILParserTUState() {
 }
 
 SILParserState::SILParserState(SILModule *M)
-    : Impl(M ? llvm::make_unique<SILParserTUState>(*M) : nullptr) {}
+    : Impl(M ? std::make_unique<SILParserTUState>(*M) : nullptr) {}
 
 SILParserState::~SILParserState() = default;
 

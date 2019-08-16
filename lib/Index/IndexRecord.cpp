@@ -216,7 +216,7 @@ public:
     StringRef groupName = findGroupForSymbol(symbol);
     auto &tracker = TrackerByGroup[groupName];
     if (!tracker) {
-      tracker = llvm::make_unique<SymbolTracker>();
+      tracker = std::make_unique<SymbolTracker>();
     }
     tracker->addOccurrence(symbol);
     return true;
@@ -324,7 +324,7 @@ makeRecordingConsumer(std::string Filename, std::string indexStorePath,
                       DiagnosticEngine *diags,
                       std::string *outRecordFile,
                       bool *outFailed) {
-  return llvm::make_unique<IndexRecordingConsumer>([=](SymbolTracker &record) {
+  return std::make_unique<IndexRecordingConsumer>([=](SymbolTracker &record) {
     *outFailed = writeRecord(record, Filename, indexStorePath, diags,
                              *outRecordFile);
   });
@@ -356,7 +356,7 @@ class StringScratchSpace {
 
 public:
   const std::string *createString(StringRef str) {
-    StrsCreated.emplace_back(llvm::make_unique<std::string>(str));
+    StrsCreated.emplace_back(std::make_unique<std::string>(str));
     return StrsCreated.back().get();
   }
 };

@@ -59,9 +59,9 @@ TEST(FileSpecificDiagnosticConsumer, SubconsumersFinishInOrder) {
   (void)sourceMgr.addMemBufferCopy("abcde", "A");
   (void)sourceMgr.addMemBufferCopy("vwxyz", "B");
 
-  auto consumerA = llvm::make_unique<ExpectationDiagnosticConsumer>(
+  auto consumerA = std::make_unique<ExpectationDiagnosticConsumer>(
       nullptr, None);
-  auto consumerUnaffiliated = llvm::make_unique<ExpectationDiagnosticConsumer>(
+  auto consumerUnaffiliated = std::make_unique<ExpectationDiagnosticConsumer>(
       consumerA.get(), None);
 
   SmallVector<FileSpecificDiagnosticConsumer::Subconsumer, 2> consumers;
@@ -79,9 +79,9 @@ TEST(FileSpecificDiagnosticConsumer, InvalidLocDiagsGoToEveryConsumer) {
   (void)sourceMgr.addMemBufferCopy("vwxyz", "B");
 
   ExpectedDiagnostic expected[] = { {SourceLoc(), "dummy"} };
-  auto consumerA = llvm::make_unique<ExpectationDiagnosticConsumer>(
+  auto consumerA = std::make_unique<ExpectationDiagnosticConsumer>(
       nullptr, expected);
-  auto consumerUnaffiliated = llvm::make_unique<ExpectationDiagnosticConsumer>(
+  auto consumerUnaffiliated = std::make_unique<ExpectationDiagnosticConsumer>(
       consumerA.get(), expected);
 
   SmallVector<FileSpecificDiagnosticConsumer::Subconsumer, 2> consumers;
@@ -120,9 +120,9 @@ TEST(FileSpecificDiagnosticConsumer, ErrorsWithLocationsGoToExpectedConsumers) {
     {backOfB, "back"}
   };
 
-  auto consumerA = llvm::make_unique<ExpectationDiagnosticConsumer>(
+  auto consumerA = std::make_unique<ExpectationDiagnosticConsumer>(
       nullptr, expectedA);
-  auto consumerB = llvm::make_unique<ExpectationDiagnosticConsumer>(
+  auto consumerB = std::make_unique<ExpectationDiagnosticConsumer>(
       consumerA.get(), expectedB);
 
   SmallVector<FileSpecificDiagnosticConsumer::Subconsumer, 2> consumers;
@@ -175,9 +175,9 @@ TEST(FileSpecificDiagnosticConsumer,
     {backOfB, "back"}
   };
 
-  auto consumerA = llvm::make_unique<ExpectationDiagnosticConsumer>(
+  auto consumerA = std::make_unique<ExpectationDiagnosticConsumer>(
       nullptr, expectedA);
-  auto consumerUnaffiliated = llvm::make_unique<ExpectationDiagnosticConsumer>(
+  auto consumerUnaffiliated = std::make_unique<ExpectationDiagnosticConsumer>(
       consumerA.get(), expectedUnaffiliated);
 
   SmallVector<FileSpecificDiagnosticConsumer::Subconsumer, 2> consumers;
@@ -221,9 +221,9 @@ TEST(FileSpecificDiagnosticConsumer, WarningsAndRemarksAreTreatedLikeErrors) {
     {frontOfB, "remark"},
   };
 
-  auto consumerA = llvm::make_unique<ExpectationDiagnosticConsumer>(
+  auto consumerA = std::make_unique<ExpectationDiagnosticConsumer>(
       nullptr, expectedA);
-  auto consumerUnaffiliated = llvm::make_unique<ExpectationDiagnosticConsumer>(
+  auto consumerUnaffiliated = std::make_unique<ExpectationDiagnosticConsumer>(
       consumerA.get(), expectedUnaffiliated);
 
   SmallVector<FileSpecificDiagnosticConsumer::Subconsumer, 2> consumers;
@@ -274,9 +274,9 @@ TEST(FileSpecificDiagnosticConsumer, NotesAreAttachedToErrors) {
     {backOfB, "note"},
   };
 
-  auto consumerA = llvm::make_unique<ExpectationDiagnosticConsumer>(
+  auto consumerA = std::make_unique<ExpectationDiagnosticConsumer>(
       nullptr, expectedA);
-  auto consumerUnaffiliated = llvm::make_unique<ExpectationDiagnosticConsumer>(
+  auto consumerUnaffiliated = std::make_unique<ExpectationDiagnosticConsumer>(
       consumerA.get(), expectedUnaffiliated);
 
   SmallVector<FileSpecificDiagnosticConsumer::Subconsumer, 2> consumers;
@@ -337,9 +337,9 @@ TEST(FileSpecificDiagnosticConsumer, NotesAreAttachedToWarningsAndRemarks) {
     {backOfB, "note"},
   };
 
-  auto consumerA = llvm::make_unique<ExpectationDiagnosticConsumer>(
+  auto consumerA = std::make_unique<ExpectationDiagnosticConsumer>(
       nullptr, expectedA);
-  auto consumerUnaffiliated = llvm::make_unique<ExpectationDiagnosticConsumer>(
+  auto consumerUnaffiliated = std::make_unique<ExpectationDiagnosticConsumer>(
       consumerA.get(), expectedUnaffiliated);
 
   SmallVector<FileSpecificDiagnosticConsumer::Subconsumer, 2> consumers;
@@ -397,9 +397,9 @@ TEST(FileSpecificDiagnosticConsumer, NotesAreAttachedToErrorsEvenAcrossFiles) {
     {backOfB, "note"},
   };
 
-  auto consumerA = llvm::make_unique<ExpectationDiagnosticConsumer>(
+  auto consumerA = std::make_unique<ExpectationDiagnosticConsumer>(
       nullptr, expectedA);
-  auto consumerB = llvm::make_unique<ExpectationDiagnosticConsumer>(
+  auto consumerB = std::make_unique<ExpectationDiagnosticConsumer>(
       consumerA.get(), expectedB);
 
   SmallVector<FileSpecificDiagnosticConsumer::Subconsumer, 2> consumers;
@@ -461,9 +461,9 @@ TEST(FileSpecificDiagnosticConsumer,
     {backOfB, "note"},
   };
 
-  auto consumerA = llvm::make_unique<ExpectationDiagnosticConsumer>(
+  auto consumerA = std::make_unique<ExpectationDiagnosticConsumer>(
       nullptr, expectedA);
-  auto consumerUnaffiliated = llvm::make_unique<ExpectationDiagnosticConsumer>(
+  auto consumerUnaffiliated = std::make_unique<ExpectationDiagnosticConsumer>(
       consumerA.get(), expectedUnaffiliated);
 
   SmallVector<FileSpecificDiagnosticConsumer::Subconsumer, 2> consumers;
@@ -517,9 +517,9 @@ TEST(FileSpecificDiagnosticConsumer,
     {SourceLoc(), "note"},
   };
 
-  auto consumerA = llvm::make_unique<ExpectationDiagnosticConsumer>(
+  auto consumerA = std::make_unique<ExpectationDiagnosticConsumer>(
       nullptr, expectedA);
-  auto consumerUnaffiliated = llvm::make_unique<ExpectationDiagnosticConsumer>(
+  auto consumerUnaffiliated = std::make_unique<ExpectationDiagnosticConsumer>(
       consumerA.get(), expectedUnaffiliated);
 
   SmallVector<FileSpecificDiagnosticConsumer::Subconsumer, 2> consumers;

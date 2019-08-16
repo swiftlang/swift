@@ -1308,7 +1308,7 @@ void ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions) {
 
   SmallVector<std::unique_ptr<SolverStep>, 16> workList;
   // First step is always wraps whole constraint system.
-  workList.push_back(llvm::make_unique<SplitterStep>(*this, solutions));
+  workList.push_back(std::make_unique<SplitterStep>(*this, solutions));
 
   // Indicate whether previous step in the stack has failed
   // (returned StepResult::Kind = Error), this is useful to

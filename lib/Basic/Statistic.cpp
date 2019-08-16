@@ -220,7 +220,7 @@ class StatsProfiler {
       if (I != Children.end()) {
         return I->getSecond().get();
       } else {
-        auto N = llvm::make_unique<Node>(this);
+        auto N = std::make_unique<Node>(this);
         auto P = N.get();
         Children.insert(std::make_pair(K, std::move(N)));
         return P;
@@ -343,12 +343,12 @@ UnifiedStatsReporter::UnifiedStatsReporter(StringRef ProgramName,
     ProfileDirname(Directory),
     StartedTime(llvm::TimeRecord::getCurrentTime()),
     MainThreadID(std::this_thread::get_id()),
-    Timer(make_unique<NamedRegionTimer>(AuxName,
+    Timer(std::make_unique<NamedRegionTimer>(AuxName,
                                         "Building Target",
                                         ProgramName, "Running Program")),
     SourceMgr(SM),
     ClangSourceMgr(CSM),
-    RecursiveTimers(llvm::make_unique<RecursionSafeTimers>())
+    RecursiveTimers(std::make_unique<RecursionSafeTimers>())
 {
   path::append(StatsFilename, makeStatsFileName(ProgramName, AuxName));
   path::append(TraceFilename, makeTraceFileName(ProgramName, AuxName));
@@ -360,9 +360,9 @@ UnifiedStatsReporter::UnifiedStatsReporter(StringRef ProgramName,
   if (TraceEvents)
     FrontendStatsEvents.emplace();
   if (ProfileEvents)
-    EventProfilers = make_unique<StatsProfilers>();
+    EventProfilers =std::make_unique<StatsProfilers>();
   if (ProfileEntities)
-    EntityProfilers = make_unique<StatsProfilers>();
+    EntityProfilers =std::make_unique<StatsProfilers>();
 }
 
 void UnifiedStatsReporter::recordJobMaxRSS(long rss) {

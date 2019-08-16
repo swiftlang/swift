@@ -1843,7 +1843,7 @@ const InheritedNameSet *NameImporter::getAllPropertyNames(
   known = allProperties.insert(
             { std::pair<const clang::ObjCInterfaceDecl *, char>(classDecl,
                                                                 forInstance),
-              llvm::make_unique<InheritedNameSet>(parentSet) }).first;
+              std::make_unique<InheritedNameSet>(parentSet) }).first;
 
   // Local function to add properties from the given set.
   auto addProperties = [&](clang::DeclContext::decl_range members) {

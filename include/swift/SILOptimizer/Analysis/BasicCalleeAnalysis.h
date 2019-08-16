@@ -164,14 +164,14 @@ public:
 
   CalleeList getCalleeList(FullApplySite FAS) {
     if (!Cache)
-      Cache = llvm::make_unique<CalleeCache>(M);
+      Cache = std::make_unique<CalleeCache>(M);
 
     return Cache->getCalleeList(FAS);
   }
 
   CalleeList getCalleeList(SILInstruction *I) {
     if (!Cache)
-      Cache = llvm::make_unique<CalleeCache>(M);
+      Cache = std::make_unique<CalleeCache>(M);
 
     return Cache->getCalleeList(I);
   }

@@ -3432,7 +3432,7 @@ GenericSignatureBuilder::Implementation::getOrCreateRewriteTreeRoot(
     return root;
 
   auto &root = RewriteTreeRoots[anchor];
-  root = llvm::make_unique<RewriteTreeNode>(nullptr);
+  root = std::make_unique<RewriteTreeNode>(nullptr);
   return root.get();
 }
 

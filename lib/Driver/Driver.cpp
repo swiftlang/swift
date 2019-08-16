@@ -252,19 +252,19 @@ Driver::buildToolChain(const llvm::opt::InputArgList &ArgList) {
   case llvm::Triple::IOS:
   case llvm::Triple::TvOS:
   case llvm::Triple::WatchOS:
-    return llvm::make_unique<toolchains::Darwin>(*this, target);
+    return std::make_unique<toolchains::Darwin>(*this, target);
   case llvm::Triple::Linux:
     if (target.isAndroid())
-      return llvm::make_unique<toolchains::Android>(*this, target);
-    return llvm::make_unique<toolchains::GenericUnix>(*this, target);
+      return std::make_unique<toolchains::Android>(*this, target);
+    return std::make_unique<toolchains::GenericUnix>(*this, target);
   case llvm::Triple::FreeBSD:
-    return llvm::make_unique<toolchains::GenericUnix>(*this, target);
+    return std::make_unique<toolchains::GenericUnix>(*this, target);
   case llvm::Triple::Win32:
     if (target.isWindowsCygwinEnvironment())
-      return llvm::make_unique<toolchains::Cygwin>(*this, target);
-    return llvm::make_unique<toolchains::Windows>(*this, target);
+      return std::make_unique<toolchains::Cygwin>(*this, target);
+    return std::make_unique<toolchains::Windows>(*this, target);
   case llvm::Triple::Haiku:
-    return llvm::make_unique<toolchains::GenericUnix>(*this, target);
+    return std::make_unique<toolchains::GenericUnix>(*this, target);
   default:
     Diags.diagnose(SourceLoc(), diag::error_unknown_target,
                    ArgList.getLastArg(options::OPT_target)->getValue());
@@ -293,9 +293,9 @@ std::unique_ptr<sys::TaskQueue> Driver::buildTaskQueue(const Compilation &C) {
     ArgList.hasArg(options::OPT_driver_skip_execution,
                    options::OPT_driver_print_jobs);
   if (DriverSkipExecution) {
-    return llvm::make_unique<sys::DummyTaskQueue>(NumberOfParallelCommands);
+    return std::make_unique<sys::DummyTaskQueue>(NumberOfParallelCommands);
   } else {
-    return llvm::make_unique<sys::TaskQueue>(NumberOfParallelCommands,
+    return std::make_unique<sys::TaskQueue>(NumberOfParallelCommands,
                                              C.getStatsReporter());
   }
 }
@@ -726,7 +726,7 @@ createStatsReporter(const llvm::opt::InputArgList *ArgList,
     InputName = Inputs[0].second->getSpelling();
   }
   StringRef OutputType = file_types::getExtension(OI.CompilerOutputType);
-  return llvm::make_unique<UnifiedStatsReporter>("swift-driver",
+  return std::make_unique<UnifiedStatsReporter>("swift-driver",
                                                  OI.ModuleName,
                                                  InputName,
                                                  DefaultTargetTriple,
@@ -920,7 +920,7 @@ Driver::buildCompilation(const ToolChain &TC,
         options::OPT_experimental_dependency_include_intrafile);
 
     // clang-format off
-    C = llvm::make_unique<Compilation>(
+    C = std::make_unique<Compilation>(
         Diags, TC, OI, Level,
         std::move(ArgList),
         std::move(TranslatedArgList),
@@ -1012,7 +1012,7 @@ parseArgsUntil(const llvm::opt::OptTable& Opts,
                unsigned FlagsToExclude,
                llvm::opt::OptSpecifier UntilOption,
                RemainingArgsHandler RemainingHandler) {
-  auto Args = llvm::make_unique<InputArgList>(ArgBegin, ArgEnd);
+  auto Args = std::make_unique<InputArgList>(ArgBegin, ArgEnd);
 
   // FIXME: Handle '@' args (or at least error on them).
 
@@ -1090,7 +1090,7 @@ Driver::parseArgStrings(ArrayRef<const char *> Args) {
         ExcludedFlagsBitmask);
 
   } else {
-    ArgList = llvm::make_unique<InputArgList>(
+    ArgList = std::make_unique<InputArgList>(
         getOpts().ParseArgs(Args, MissingArgIndex, MissingArgCount,
                             IncludedFlagsBitmask, ExcludedFlagsBitmask));
   }

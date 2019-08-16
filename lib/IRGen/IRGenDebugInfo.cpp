@@ -2336,7 +2336,7 @@ SILLocation::DebugLoc IRGenDebugInfoImpl::decodeSourceLoc(SourceLoc SL) {
 std::unique_ptr<IRGenDebugInfo> IRGenDebugInfo::createIRGenDebugInfo(
     const IRGenOptions &Opts, ClangImporter &CI, IRGenModule &IGM,
     llvm::Module &M, StringRef MainOutputFilenameForDebugInfo) {
-  return llvm::make_unique<IRGenDebugInfoImpl>(Opts, CI, IGM, M,
+  return std::make_unique<IRGenDebugInfoImpl>(Opts, CI, IGM, M,
                                                MainOutputFilenameForDebugInfo);
 }
 

@@ -1543,7 +1543,7 @@ void ASTContext::registerGenericSignatureBuilder(
 
   ++NumRegisteredGenericSignatureBuilders;
   genericSignatureBuilders[canSig] =
-    llvm::make_unique<GenericSignatureBuilder>(std::move(builder));
+    std::make_unique<GenericSignatureBuilder>(std::move(builder));
 }
 
 GenericSignatureBuilder *ASTContext::getOrCreateGenericSignatureBuilder(

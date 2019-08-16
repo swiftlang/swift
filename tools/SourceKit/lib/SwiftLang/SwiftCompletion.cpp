@@ -1321,9 +1321,9 @@ SwiftCompletionCache::~SwiftCompletionCache() {}
 
 void SwiftLangSupport::codeCompleteCacheOnDisk(StringRef path) {
   ThreadSafeRefCntPtr<SwiftCompletionCache> newCache(new SwiftCompletionCache);
-  newCache->onDisk = llvm::make_unique<ide::OnDiskCodeCompletionCache>(path);
+  newCache->onDisk = std::make_unique<ide::OnDiskCodeCompletionCache>(path);
   newCache->inMemory =
-      llvm::make_unique<ide::CodeCompletionCache>(newCache->onDisk.get());
+      std::make_unique<ide::CodeCompletionCache>(newCache->onDisk.get());
 
   CCCache = newCache; // replace the old cache.
 }

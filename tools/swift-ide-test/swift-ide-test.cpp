@@ -872,7 +872,7 @@ static int doCodeCompletion(const CompilerInvocation &InitInvok,
 
   std::unique_ptr<ide::OnDiskCodeCompletionCache> OnDiskCache;
   if (!options::CompletionCachePath.empty()) {
-    OnDiskCache = llvm::make_unique<ide::OnDiskCodeCompletionCache>(
+    OnDiskCache = std::make_unique<ide::OnDiskCodeCompletionCache>(
         options::CompletionCachePath);
   }
   ide::CodeCompletionCache CompletionCache(OnDiskCache.get());

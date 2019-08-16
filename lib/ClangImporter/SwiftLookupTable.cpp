@@ -1579,7 +1579,7 @@ SwiftLookupTableReader::create(clang::ModuleFileExtension *extension,
   if (!serializedTable) return nullptr;
 
   // Create the reader.
-  // Note: This doesn't use llvm::make_unique because the constructor is
+  // Note: This doesn't use std::make_unique because the constructor is
   // private.
   return std::unique_ptr<SwiftLookupTableReader>(
            new SwiftLookupTableReader(extension, reader, moduleFile, onRemove,

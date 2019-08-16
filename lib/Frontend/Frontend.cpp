@@ -759,7 +759,7 @@ void CompilerInstance::createREPLFile(const ImplicitImports &implicitImports) {
 std::unique_ptr<DelayedParsingCallbacks>
 CompilerInstance::computeDelayedParsingCallback() {
   if (Invocation.isCodeCompletion())
-    return llvm::make_unique<CodeCompleteDelayedCallbacks>(
+    return std::make_unique<CodeCompleteDelayedCallbacks>(
         SourceMgr.getCodeCompletionLoc());
   return nullptr;
 }
@@ -777,7 +777,7 @@ void CompilerInstance::parseAndCheckTypesUpTo(
   std::unique_ptr<DelayedParsingCallbacks> DelayedCB{
       computeDelayedParsingCallback()};
 
-  PersistentState = llvm::make_unique<PersistentParserState>(getASTContext());
+  PersistentState = std::make_unique<PersistentParserState>(getASTContext());
 
   bool hadLoadError = parsePartialModulesAndLibraryFiles(
       implicitImports, DelayedCB.get());
@@ -1048,7 +1048,7 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals,
                                   MainBufferID);
   }
 
-  PersistentState = llvm::make_unique<PersistentParserState>(getASTContext());
+  PersistentState = std::make_unique<PersistentParserState>(getASTContext());
 
   SWIFT_DEFER {
     if (ParseDelayedBodyOnEnd)

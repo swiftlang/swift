@@ -411,13 +411,13 @@ int main(int argc, char **argv) {
   std::unique_ptr<llvm::raw_fd_ostream> OptRecordFile;
   if (RemarksFilename != "") {
     std::error_code EC;
-    OptRecordFile = llvm::make_unique<llvm::raw_fd_ostream>(
+    OptRecordFile = std::make_unique<llvm::raw_fd_ostream>(
         RemarksFilename, EC, llvm::sys::fs::F_None);
     if (EC) {
       llvm::errs() << EC.message() << '\n';
       return 1;
     }
-    auto Stream = llvm::make_unique<llvm::yaml::Output>(*OptRecordFile,
+    auto Stream = std::make_unique<llvm::yaml::Output>(*OptRecordFile,
                                                         &CI.getSourceMgr());
     CI.getSILModule()->setOptRecordStream(std::move(Stream),
                                           std::move(OptRecordFile));
