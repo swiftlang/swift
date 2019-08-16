@@ -2871,7 +2871,6 @@ public:
 
     auto contextID = S.addDeclContextRef(extension->getDeclContext());
     Type baseTy = extension->getExtendedType();
-    assert(!baseTy->hasUnboundGenericType());
     assert(!baseTy->hasArchetype());
 
     // FIXME: Use the canonical type here in order to minimize circularity

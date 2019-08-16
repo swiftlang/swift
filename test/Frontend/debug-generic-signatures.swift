@@ -73,7 +73,7 @@ struct NonRecur: P2 {
 // Conditional conformance.
 
 struct Generic<T> {}
-// CHECK-LABEL: ExtensionDecl line={{.*}} base=Generic<T>
+// CHECK-LABEL: ExtensionDecl line={{.*}} base=Generic
 // CHECK-NEXT: (normal_conformance type=Generic<T> protocol=P1
 // CHECK-NEXT:   (assoc_type req=A type=T)
 // CHECK-NEXT:   (value req=f() witness=main.(file).Generic extension.f()@{{.*}})
@@ -86,7 +86,7 @@ extension Generic: P1 where T: P1 {
 
 // Satisfying associated types with requirements with generic params
 class Super<T, U> {}
-// CHECK-LABEL: ExtensionDecl line={{.*}} base=Super<T, U>
+// CHECK-LABEL: ExtensionDecl line={{.*}} base=Super
 // CHECK-NEXT: (normal_conformance type=Super<T, U> protocol=P2
 // CHECK-NEXT:   (assoc_type req=A type=T)
 // CHECK-NEXT:   (assoc_type req=B type=T)

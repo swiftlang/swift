@@ -4451,7 +4451,7 @@ static Type formExtensionInterfaceType(
 
 /// Check the generic parameters of an extension, recursively handling all of
 /// the parameter lists within the extension.
-static std::pair<GenericEnvironment *, Type>
+static GenericEnvironment *
 checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
                             GenericParamList *genericParams) {
   assert(!ext->getGenericEnvironment());
@@ -4489,7 +4489,7 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
                                          (mustInferRequirements ||
                                             !sameTypeReqs.empty()));
 
-  return { env, extInterfaceType };
+  return env;
 }
 
 static bool isNonGenericTypeAliasType(Type type) {
@@ -4500,7 +4500,7 @@ static bool isNonGenericTypeAliasType(Type type) {
   return false;
 }
 
-static Type validateExtendedType(ExtensionDecl *ext, DiagnosticEngine &diags) {
+static Type validateExtendedType(ExtensionDecl *ext) {
   auto error = [&ext]() {
     ext->setInvalid();
     return ErrorType::get(ext->getASTContext());
@@ -4525,15 +4525,14 @@ static Type validateExtendedType(ExtensionDecl *ext, DiagnosticEngine &diags) {
   if (auto *unboundGeneric = extendedType->getAs<UnboundGenericType>()) {
     if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(unboundGeneric->getDecl())) {
       auto extendedNominal = aliasDecl->getDeclaredInterfaceType()->getAnyNominal();
-      if (extendedNominal) {
-        if (!isPassThroughTypealias(aliasDecl)) {
-          extendedType = extendedNominal->getDeclaredType();
-          ext->getExtendedTypeLoc().setType(extendedType);
-        }
-        return extendedType;
-      }
+      if (extendedNominal)
+        return isPassThroughTypealias(aliasDecl)
+               ? extendedType
+               : extendedNominal->getDeclaredType();
     }
   }
+
+  auto &diags = ext->getASTContext().Diags;
 
   // Cannot extend a metatype.
   if (extendedType->is<AnyMetatypeType>()) {
@@ -4570,7 +4569,7 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
 
   DeclValidationRAII IBV(ext);
 
-  (void)validateExtendedType(ext, Diags);
+  auto extendedType = validateExtendedType(ext);
 
   if (auto *nominal = ext->getExtendedNominal()) {
     // If this extension was not already bound, it means it is either in an
@@ -4583,14 +4582,11 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
     // Validate the nominal type declaration being extended.
     validateDecl(nominal);
 
-    if (auto *genericParams = ext->getGenericParams()) {
-      GenericEnvironment *env;
-      Type extendedType = ext->getExtendedType();
-      std::tie(env, extendedType) = checkExtensionGenericParams(
-          *this, ext, extendedType,
-          genericParams);
+    ext->getExtendedTypeLoc().setType(extendedType);
 
-      ext->getExtendedTypeLoc().setType(extendedType);
+    if (auto *genericParams = ext->getGenericParams()) {
+      GenericEnvironment *env =
+        checkExtensionGenericParams(*this, ext, extendedType, genericParams);
       ext->setGenericEnvironment(env);
     }
   }

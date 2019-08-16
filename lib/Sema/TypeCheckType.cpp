@@ -536,11 +536,20 @@ Type TypeChecker::resolveTypeInContext(
             parentDC = parentDC->getParent()) {
         if (auto *ext = dyn_cast<ExtensionDecl>(parentDC)) {
           auto extendedType = ext->getExtendedType();
+          if (auto *unboundGeneric = dyn_cast<UnboundGenericType>(extendedType.getPointer())) {
+            if (auto *ugAliasDecl = dyn_cast<TypeAliasDecl>(unboundGeneric->getAnyGeneric())) {
+              if (ugAliasDecl == aliasDecl)
+                return resolution.mapTypeIntoContext(
+                  aliasDecl->getDeclaredInterfaceType());
+
+              extendedType = unboundGeneric->getParent();
+              continue;
+            }
+          }
           if (auto *aliasType = dyn_cast<TypeAliasType>(extendedType.getPointer())) {
-            if (aliasType->getDecl() == aliasDecl) {
+            if (aliasType->getDecl() == aliasDecl)
               return resolution.mapTypeIntoContext(
                   aliasDecl->getDeclaredInterfaceType());
-            }
 
             extendedType = aliasType->getParent();
             continue;

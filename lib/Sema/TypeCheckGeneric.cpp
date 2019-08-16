@@ -76,7 +76,7 @@ static void checkGenericParamList(TypeChecker &tc,
         
         if (auto decl = owner.dc->getAsDecl()) {
           if (auto extDecl = dyn_cast<ExtensionDecl>(decl)) {
-            auto extType = extDecl->getExtendedType();
+            auto extType = extDecl->getDeclaredInterfaceType();
             auto extSelfType = extDecl->getSelfInterfaceType();
             auto reqLHSType = req.getFirstType();
             auto reqRHSType = req.getSecondType();
