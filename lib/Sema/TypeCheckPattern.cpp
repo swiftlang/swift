@@ -727,9 +727,11 @@ static bool validateTypedPattern(TypeChecker &TC,
       subPattern = parenPattern->getSubPattern();
 
     if (auto *namedPattern = dyn_cast<NamedPattern>(subPattern)) {
-      auto &C = resolution.getDeclContext()->getASTContext();
-      namedPattern->getDecl()->getAttrs().add(
-          new (C) ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true));
+      // FIXME: This needs to be done as part of
+      // IsImplicitlyUnwrappedOptionalRequest::evaluate(); we just
+      // need to find the right TypedPattern there for the VarDecl
+      // in order to recover it's TypeRepr.
+      namedPattern->getDecl()->setImplicitlyUnwrappedOptional(true);
     } else {
       assert(isa<AnyPattern>(subPattern) &&
              "Unexpected pattern nested in typed pattern!");
@@ -764,20 +766,6 @@ static bool validateParameterType(ParamDecl *decl, TypeResolution resolution,
   // where parameters are allowed to elide their types.
   if (!TL.isNull()) {
     hadError |= TC.validateType(TL, resolution, options);
-  }
-
-  auto *TR = TL.getTypeRepr();
-  if (auto *STR = dyn_cast_or_null<SpecifierTypeRepr>(TR))
-    TR = STR->getBase();
-
-  // If this is declared with '!' indicating that it is an Optional
-  // that we should implicitly unwrap if doing so is required to type
-  // check, then add an attribute to the decl.
-  if (!decl->isVariadic() && TR &&
-      TR->getKind() == TypeReprKind::ImplicitlyUnwrappedOptional) {
-    auto &C = resolution.getDeclContext()->getASTContext();
-    decl->getAttrs().add(
-          new (C) ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true));
   }
 
   Type Ty = TL.getType();

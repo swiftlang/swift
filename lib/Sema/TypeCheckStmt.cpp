@@ -484,7 +484,7 @@ public:
       }
 
       // "return nil" is only permitted in a failable initializer.
-      if (ctor->getFailability() == OTK_None) {
+      if (!ctor->isFailable()) {
         TC.diagnose(RS->getReturnLoc(), diag::return_non_failable_init)
           .highlight(E->getSourceRange());
         TC.diagnose(ctor->getLoc(), diag::make_init_failable,

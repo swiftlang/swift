@@ -2685,6 +2685,13 @@ bool ValueDecl::canBeAccessedByDynamicLookup() const {
   return true;
 }
 
+bool ValueDecl::isImplicitlyUnwrappedOptional() const {
+  ASTContext &ctx = getASTContext();
+  return evaluateOrDefault(ctx.evaluator,
+    IsImplicitlyUnwrappedOptionalRequest{const_cast<ValueDecl *>(this)},
+    false);
+}
+
 ArrayRef<ValueDecl *>
 ValueDecl::getSatisfiedProtocolRequirements(bool Sorted) const {
   // Dig out the nominal type.
@@ -5711,10 +5718,7 @@ ParamDecl::ParamDecl(ParamDecl *PD, bool withTypes)
   if (withTypes && PD->hasInterfaceType())
     setInterfaceType(PD->getInterfaceType());
 
-  // FIXME: We should clone the entire attribute list.
-  if (PD->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
-    getAttrs().add(new (PD->getASTContext())
-                       ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true));
+  setImplicitlyUnwrappedOptional(PD->isImplicitlyUnwrappedOptional());
 }
 
 
@@ -6726,7 +6730,7 @@ void AbstractFunctionDecl::computeType(AnyFunctionType::ExtInfo info) {
     }
 
     // Adjust result type for failability.
-    if (ctor->getFailability() != OTK_None)
+    if (ctor->isFailable())
       resultTy = OptionalType::get(resultTy);
   } else {
     assert(isa<DestructorDecl>(this));
@@ -7000,8 +7004,7 @@ SelfAccessKind FuncDecl::getSelfAccessKind() const {
 }
 
 ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
-                                 OptionalTypeKind Failability, 
-                                 SourceLoc FailabilityLoc,
+                                 bool Failable, SourceLoc FailabilityLoc,
                                  bool Throws,
                                  SourceLoc ThrowsLoc,
                                  ParameterList *BodyParams,
@@ -7018,7 +7021,7 @@ ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
   
   Bits.ConstructorDecl.ComputedBodyInitKind = 0;
   Bits.ConstructorDecl.HasStubImplementation = 0;
-  Bits.ConstructorDecl.Failability = static_cast<unsigned>(Failability);
+  Bits.ConstructorDecl.Failable = Failable;
 
   assert(Name.getBaseName() == DeclBaseName::createConstructor());
 }

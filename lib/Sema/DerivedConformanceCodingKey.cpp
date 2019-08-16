@@ -131,8 +131,7 @@ static ValueDecl *deriveInitDecl(DerivedConformance &derived, Type paramType,
   // init(rawValue:) decl
   auto *initDecl =
     new (C) ConstructorDecl(name, SourceLoc(),
-                            /*Failability=*/OTK_Optional,
-                            /*FailabilityLoc=*/SourceLoc(),
+                            /*Failable=*/true, /*FailabilityLoc=*/SourceLoc(),
                             /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
                             paramList,
                             /*GenericParams=*/nullptr, parentDC);

@@ -94,7 +94,6 @@ public:
   IGNORED_ATTR(HasStorage)
   IGNORED_ATTR(ImplementationOnly)
   IGNORED_ATTR(Implements)
-  IGNORED_ATTR(ImplicitlyUnwrappedOptional)
   IGNORED_ATTR(Infix)
   IGNORED_ATTR(Inlinable)
   IGNORED_ATTR(Inline)
@@ -712,7 +711,6 @@ public:
     IGNORED_ATTR(IBDesignable)
     IGNORED_ATTR(IBInspectable)
     IGNORED_ATTR(IBOutlet) // checked early.
-    IGNORED_ATTR(ImplicitlyUnwrappedOptional)
     IGNORED_ATTR(Indirect)
     IGNORED_ATTR(Inline)
     IGNORED_ATTR(Lazy)      // checked early.
