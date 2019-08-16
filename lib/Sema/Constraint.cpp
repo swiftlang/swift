@@ -66,7 +66,7 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
   case ConstraintKind::FunctionInput:
   case ConstraintKind::FunctionResult:
   case ConstraintKind::OpaqueUnderlyingType:
-  case ConstraintKind::OneWayBind:
+  case ConstraintKind::OneWayEqual:
     assert(!First.isNull());
     assert(!Second.isNull());
     break;
@@ -135,7 +135,7 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second, Type Third,
   case ConstraintKind::FunctionInput:
   case ConstraintKind::FunctionResult:
   case ConstraintKind::OpaqueUnderlyingType:
-  case ConstraintKind::OneWayBind:
+  case ConstraintKind::OneWayEqual:
     llvm_unreachable("Wrong constructor");
 
   case ConstraintKind::KeyPath:
@@ -239,7 +239,7 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
   case ConstraintKind::FunctionInput:
   case ConstraintKind::FunctionResult:
   case ConstraintKind::OpaqueUnderlyingType:
-  case ConstraintKind::OneWayBind:
+  case ConstraintKind::OneWayEqual:
     return create(cs, getKind(), getFirstType(), getSecondType(), getLocator());
 
   case ConstraintKind::BindOverload:
@@ -312,7 +312,7 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
   case ConstraintKind::DynamicTypeOf: Out << " dynamicType type of "; break;
   case ConstraintKind::EscapableFunctionOf: Out << " @escaping type of "; break;
   case ConstraintKind::OpenedExistentialOf: Out << " opened archetype of "; break;
-  case ConstraintKind::OneWayBind: Out << " one-way bind to "; break;
+  case ConstraintKind::OneWayEqual: Out << " one-way bind to "; break;
   case ConstraintKind::KeyPath:
       Out << " key path from ";
       getSecondType()->print(Out);
@@ -521,7 +521,7 @@ gatherReferencedTypeVars(Constraint *constraint,
   case ConstraintKind::FunctionInput:
   case ConstraintKind::FunctionResult:
   case ConstraintKind::OpaqueUnderlyingType:
-  case ConstraintKind::OneWayBind:
+  case ConstraintKind::OneWayEqual:
     constraint->getFirstType()->getTypeVariables(typeVars);
     constraint->getSecondType()->getTypeVariables(typeVars);
     break;
