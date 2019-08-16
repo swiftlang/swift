@@ -219,6 +219,7 @@ _Block_release(void) { }\n")
       NOSWIFTRT
       ARCHITECTURE ${ARCH}
       SDK ${SDK}
+      TARGET_LIBRARY
       INSTALL_IN_COMPONENT dev
       ${test_bin_dir}/BlocksRuntime.c)
     set_target_properties(BlocksRuntimeStub${VARIANT_SUFFIX} PROPERTIES
@@ -226,6 +227,22 @@ _Block_release(void) { }\n")
       LIBRARY_OUTPUT_DIRECTORY ${test_bin_dir}
       RUNTIME_OUTPUT_DIRECTORY ${test_bin_dir}
       OUTPUT_NAME BlocksRuntime)
+
+    # Hack around LLVM's "helpful" config-specific output directories (they're
+    # not needed).
+    #
+    # This is only relevant for build systems that support multiple
+    # configurations, like Xcode.
+    if(NOT "${CMAKE_CFG_INTDIR}" STREQUAL ".")
+      foreach(config ${CMAKE_CONFIGURATION_TYPES})
+        string(TOUPPER "${config}" config)
+        set_target_properties(BlocksRuntimeStub${VARIANT_SUFFIX} PROPERTIES
+          ARCHIVE_OUTPUT_DIRECTORY_${config} "${test_bin_dir}"
+          LIBRARY_OUTPUT_DIRECTORY_${config} "${test_bin_dir}"
+          RUNTIME_OUTPUT_DIRECTORY_${config} "${test_bin_dir}")
+      endforeach()
+    endif()
+
     list(APPEND test_dependencies BlocksRuntimeStub${VARIANT_SUFFIX})
 
     if(SWIFT_BUILD_STDLIB AND SWIFT_INCLUDE_TESTS)
