@@ -384,7 +384,7 @@ llvm::TinyPtrVector<Constraint *> ConstraintGraph::gatherConstraints(
     // For a one-way constraint, only consider it when the type variable
     // is on the right-hand side of the the binding, and the left-hand side of
     // the binding is one of the type variables currently under consideration.
-    if (constraint->getKind() == ConstraintKind::OneWayBind) {
+    if (constraint->isOneWayConstraint()) {
       auto lhsTypeVar =
           constraint->getFirstType()->castTo<TypeVariableType>();
       if (!CS.isActiveTypeVariable(lhsTypeVar))
@@ -633,7 +633,7 @@ namespace {
           continue;
 
         TypeVariableType *typeVar;
-        if (constraint.getKind() == ConstraintKind::OneWayBind) {
+        if (constraint.isOneWayConstraint()) {
           // For one-way constraints, associate the constraint with the
           // left-hand type variable.
           typeVar = constraint.getFirstType()->castTo<TypeVariableType>();
@@ -780,7 +780,7 @@ namespace {
             },
             [&](Constraint *constraint) {
               // Record and skip one-way constraints.
-              if (constraint->getKind() == ConstraintKind::OneWayBind) {
+              if (constraint->isOneWayConstraint()) {
                 oneWayConstraints.push_back(constraint);
                 return false;
               }

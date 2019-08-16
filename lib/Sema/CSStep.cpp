@@ -312,7 +312,7 @@ StepResult ComponentStep::take(bool prevFailed) {
     // Activate all of the one-way constraints.
     SmallVector<Constraint *, 4> oneWayConstraints;
     for (auto &constraint : CS.InactiveConstraints) {
-      if (constraint.getKind() == ConstraintKind::OneWayBind)
+      if (constraint.isOneWayConstraint())
         oneWayConstraints.push_back(&constraint);
     }
     for (auto constraint : oneWayConstraints) {

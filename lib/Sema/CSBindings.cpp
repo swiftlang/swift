@@ -633,7 +633,7 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
       }
       break;
 
-    case ConstraintKind::OneWayBind: {
+    case ConstraintKind::OneWayEqual: {
       // Don't produce any bindings if this type variable is on the left-hand
       // side of a one-way binding.
       auto firstType = constraint->getFirstType();
