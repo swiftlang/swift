@@ -220,6 +220,10 @@ int main(int argc, char **argv) {
       desc("The directory that holds the compiler resource files"),
       cat(Visible));
 
+  opt<bool> DummyDWARFImporter(
+      "dummy-dwarfimporter",
+      desc("Install a dummy DWARFImporterDelegate"), cat(Visible));
+
   ParseCommandLineOptions(argc, argv);
 
   // Unregister our options so they don't interfere with the command line
@@ -294,6 +298,13 @@ int main(int argc, char **argv) {
   if (CI.setup(Invocation)) {
     llvm::errs() << "error: Failed setup invocation!\n";
     return 1;
+  }
+
+  swift::DWARFImporterDelegate dummyDWARFImporter;
+  if (DummyDWARFImporter) {
+    auto *ClangImporter = static_cast<swift::ClangImporter *>(
+        CI.getASTContext().getClangModuleLoader());
+    ClangImporter->setDWARFImporterDelegate(dummyDWARFImporter);
   }
 
   for (auto &Module : Modules)

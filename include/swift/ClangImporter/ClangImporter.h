@@ -141,6 +141,9 @@ public:
 
   ~ClangImporter();
 
+  /// Only to be used by lldb-moduleimport-test.
+  void setDWARFImporterDelegate(DWARFImporterDelegate &delegate);
+
   /// Create a new clang::DependencyCollector customized to
   /// ClangImporter's specific uses.
   static std::shared_ptr<clang::DependencyCollector>
