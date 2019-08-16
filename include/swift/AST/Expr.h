@@ -3843,11 +3843,12 @@ public:
 /// node (say, an \c OpenExistentialExpr) and can only be used within the
 /// subexpressions of that AST node.
 class OpaqueValueExpr : public Expr {
-  SourceLoc Loc;
+  SourceRange Range;
 
 public:
-  explicit OpaqueValueExpr(SourceLoc Loc, Type Ty, bool isPlaceholder = false)
-    : Expr(ExprKind::OpaqueValue, /*Implicit=*/true, Ty), Loc(Loc) {
+  explicit OpaqueValueExpr(SourceRange Range, Type Ty,
+                           bool isPlaceholder = false)
+      : Expr(ExprKind::OpaqueValue, /*Implicit=*/true, Ty), Range(Range) {
     Bits.OpaqueValueExpr.IsPlaceholder = isPlaceholder;
   }
 
@@ -3856,8 +3857,8 @@ public:
   /// value to be specified later.
   bool isPlaceholder() const { return Bits.OpaqueValueExpr.IsPlaceholder; }
 
-  SourceRange getSourceRange() const { return Loc; }
-  
+  SourceRange getSourceRange() const { return Range; }
+
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::OpaqueValue; 
   }

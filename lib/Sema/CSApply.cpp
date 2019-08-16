@@ -669,7 +669,7 @@ namespace {
 
       ASTContext &ctx = tc.Context;
       auto archetypeVal =
-          new (ctx) OpaqueValueExpr(base->getStartLoc(), opaqueType);
+          new (ctx) OpaqueValueExpr(base->getSourceRange(), opaqueType);
       cs.cacheType(archetypeVal);
 
       // Record the opened existential.
@@ -2170,8 +2170,8 @@ namespace {
 
       // This OpaqueValueExpr represents the result of builderInit above in
       // silgen.
-      OpaqueValueExpr *interpolationExpr =
-          new (tc.Context) OpaqueValueExpr(expr->getLoc(), interpolationType);
+      OpaqueValueExpr *interpolationExpr = new (tc.Context)
+          OpaqueValueExpr(expr->getSourceRange(), interpolationType);
       cs.setType(interpolationExpr, interpolationType);
       expr->setInterpolationExpr(interpolationExpr);
 
@@ -5044,8 +5044,8 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr,
   SmallVector<OpaqueValueExpr *, 4> destructured;
   for (unsigned i = 0, e = sources.size(); i != e; ++i) {
     auto fromEltType = fromTuple->getElementType(i);
-    auto *opaqueElt = new (tc.Context) OpaqueValueExpr(expr->getLoc(),
-                                                       fromEltType);
+    auto *opaqueElt =
+        new (tc.Context) OpaqueValueExpr(expr->getSourceRange(), fromEltType);
     cs.cacheType(opaqueElt);
     destructured.push_back(opaqueElt);
   }
@@ -5139,10 +5139,8 @@ Expr *ExprRewriter::coerceSuperclass(Expr *expr, Type toType,
     // concrete superclass.
     auto fromArchetype = OpenedArchetypeType::getAny(fromType);
 
-    auto *archetypeVal =
-      cs.cacheType(
-        new (tc.Context) OpaqueValueExpr(expr->getLoc(),
-                                         fromArchetype));
+    auto *archetypeVal = cs.cacheType(new (tc.Context) OpaqueValueExpr(
+        expr->getSourceRange(), fromArchetype));
 
     auto *result = coerceSuperclass(archetypeVal, toType, locator);
 
@@ -5205,12 +5203,10 @@ Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
   // For existential-to-existential coercions, open the source existential.
   if (fromType->isAnyExistentialType()) {
     fromType = OpenedArchetypeType::getAny(fromType);
-    
-    auto *archetypeVal =
-      cs.cacheType(
-          new (ctx) OpaqueValueExpr(expr->getLoc(),
-                                    fromType));
-    
+
+    auto *archetypeVal = cs.cacheType(
+        new (ctx) OpaqueValueExpr(expr->getSourceRange(), fromType));
+
     auto *result = cs.cacheType(ErasureExpr::create(ctx, archetypeVal, toType,
                                                     conformances));
     return cs.cacheType(
@@ -5895,10 +5891,8 @@ maybeDiagnoseUnsupportedFunctionConversion(ConstraintSystem &cs, Expr *expr,
 
 /// Build the conversion of an element in a collection upcast.
 static Expr *buildElementConversion(ExprRewriter &rewriter,
-                                    SourceLoc srcLoc,
-                                    Type srcType,
-                                    Type destType,
-                                    bool bridged,
+                                    SourceRange srcRange, Type srcType,
+                                    Type destType, bool bridged,
                                     ConstraintLocatorBuilder locator,
                                     Expr *element) {
   auto &cs = rewriter.getConstraintSystem();
@@ -5918,12 +5912,9 @@ static Expr *buildElementConversion(ExprRewriter &rewriter,
 }
 
 static CollectionUpcastConversionExpr::ConversionPair
-buildOpaqueElementConversion(ExprRewriter &rewriter,
-                             SourceLoc srcLoc,
-                             Type srcCollectionType,
-                             Type destCollectionType,
-                             bool bridged,
-                             ConstraintLocatorBuilder locator,
+buildOpaqueElementConversion(ExprRewriter &rewriter, SourceRange srcRange,
+                             Type srcCollectionType, Type destCollectionType,
+                             bool bridged, ConstraintLocatorBuilder locator,
                              unsigned typeArgIndex) {
   // We don't need this stuff unless we've got generalized casts.
   Type srcType = srcCollectionType->castTo<BoundGenericType>()
@@ -5935,14 +5926,13 @@ buildOpaqueElementConversion(ExprRewriter &rewriter,
   auto &cs = rewriter.getConstraintSystem();
   ASTContext &ctx = cs.getASTContext();
   auto opaque =
-    rewriter.cs.cacheType(new (ctx) OpaqueValueExpr(srcLoc, srcType));
+      rewriter.cs.cacheType(new (ctx) OpaqueValueExpr(srcRange, srcType));
 
-  Expr *conversion =
-    buildElementConversion(rewriter, srcLoc, srcType, destType, bridged,
-                           locator.withPathElement(
-                             ConstraintLocator::PathElement::getGenericArgument(
-                                typeArgIndex)),
-                           opaque);
+  Expr *conversion = buildElementConversion(
+      rewriter, srcRange, srcType, destType, bridged,
+      locator.withPathElement(
+          ConstraintLocator::PathElement::getGenericArgument(typeArgIndex)),
+      opaque);
 
   return { opaque, conversion };
 }
@@ -6997,9 +6987,9 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
           bodyFnTy->withExtInfo(bodyFnTy->getExtInfo().withNoEscape()));
         body = coerceToType(body, bodyFnTy, locator);
         assert(body && "can't make nonescaping?!");
-        
+
         auto escapable = new (tc.Context)
-          OpaqueValueExpr(apply->getFn()->getLoc(), Type());
+            OpaqueValueExpr(apply->getFn()->getSourceRange(), Type());
         cs.setType(escapable, escapableParams[0].getOldType());
 
         auto getType = [&](const Expr *E) -> Type {
@@ -7056,8 +7046,8 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
                    ->getOpenedExistentialType()
                    ->isEqual(existentialInstanceTy));
 
-        auto opaqueValue = new (tc.Context)
-          OpaqueValueExpr(apply->getLoc(), openedTy);
+        auto opaqueValue =
+            new (tc.Context) OpaqueValueExpr(apply->getSourceRange(), openedTy);
         cs.setType(opaqueValue, openedTy);
         
         auto getType = [&](const Expr *E) -> Type {
