@@ -127,7 +127,7 @@ import resilient_objc_class
 
 // -- Metadata update callbacks referenced from class stubs
 
-// CHECK-LABEL: define internal %objc_class* @"$s31class_update_callback_with_stub17ResilientSubclassCMU"(%objc_class*, i8*)
+// CHECK-LABEL: define internal %objc_class* @"$s31class_update_callback_with_stub17ResilientSubclassCMU"(%objc_class* %0, i8* %1)
 // CHECK:       entry:
 // CHECK-NEXT:    [[RESPONSE:%.*]] = call swiftcc %swift.metadata_response @"$s31class_update_callback_with_stub17ResilientSubclassCMa"([[INT]] 0)
 // CHECK-NEXT:    [[METADATA:%.*]] = extractvalue %swift.metadata_response [[RESPONSE]], 0
@@ -135,7 +135,7 @@ import resilient_objc_class
 // CHECK-NEXT:    ret %objc_class* [[CLASS]]
 // CHECK-NEXT:  }
 
-// CHECK-LABEL: define internal %objc_class* @"$s31class_update_callback_with_stub25ResilientNSObjectSubclassCMU"(%objc_class*, i8*)
+// CHECK-LABEL: define internal %objc_class* @"$s31class_update_callback_with_stub25ResilientNSObjectSubclassCMU"(%objc_class* %0, i8* %1)
 // CHECK:       entry:
 // CHECK-NEXT:    [[RESPONSE:%.*]] = call swiftcc %swift.metadata_response @"$s31class_update_callback_with_stub25ResilientNSObjectSubclassCMa"([[INT]] 0)
 // CHECK-NEXT:    [[METADATA:%.*]] = extractvalue %swift.metadata_response [[RESPONSE]], 0

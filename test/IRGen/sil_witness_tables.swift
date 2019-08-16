@@ -57,14 +57,14 @@ struct Conformer2: Q {
   func qMethod() {}
 }
 
-// CHECK-LABEL: define hidden swiftcc void @"$s18sil_witness_tables7erasure1cAA2QQ_pAA9ConformerV_tF"(%T18sil_witness_tables2QQP* noalias nocapture sret)
+// CHECK-LABEL: define hidden swiftcc void @"$s18sil_witness_tables7erasure1cAA2QQ_pAA9ConformerV_tF"(%T18sil_witness_tables2QQP* noalias nocapture sret %0)
 // CHECK:         [[WITNESS_TABLE_ADDR:%.*]] = getelementptr inbounds %T18sil_witness_tables2QQP, %T18sil_witness_tables2QQP* %0, i32 0, i32 2
 // CHECK-NEXT:    store i8** getelementptr inbounds ([2 x i8*], [2 x i8*]* [[CONFORMER_QQ_WITNESS_TABLE:@"\$s.*WP"]], i32 0, i32 0), i8*** [[WITNESS_TABLE_ADDR]], align 8
 func erasure(c: Conformer) -> QQ {
   return c
 }
 
-// CHECK-LABEL: define hidden swiftcc void @"$s18sil_witness_tables15externalErasure1c0a1_b1_c1_D12_conformance9ExternalP_pAD0G9ConformerV_tF"(%T39sil_witness_tables_external_conformance9ExternalPP* noalias nocapture sret)
+// CHECK-LABEL: define hidden swiftcc void @"$s18sil_witness_tables15externalErasure1c0a1_b1_c1_D12_conformance9ExternalP_pAD0G9ConformerV_tF"(%T39sil_witness_tables_external_conformance9ExternalPP* noalias nocapture sret %0)
 // CHECK:         [[WITNESS_TABLE_ADDR:%.*]] = getelementptr inbounds %T39sil_witness_tables_external_conformance9ExternalPP, %T39sil_witness_tables_external_conformance9ExternalPP* %0, i32 0, i32 2
 // CHECK-NEXT:    store i8** [[EXTERNAL_CONFORMER_EXTERNAL_P_WITNESS_TABLE]], i8*** %2, align 8
 func externalErasure(c: ExternalConformer) -> ExternalP {
@@ -73,5 +73,5 @@ func externalErasure(c: ExternalConformer) -> ExternalP {
 
 // FIXME: why do these have different linkages?
 
-// CHECK-LABEL: define hidden swiftcc %swift.metadata_response @"$s18sil_witness_tables14AssocConformerVMa"(i64)
+// CHECK-LABEL: define hidden swiftcc %swift.metadata_response @"$s18sil_witness_tables14AssocConformerVMa"(i64 %0)
 // CHECK:         ret %swift.metadata_response { %swift.type* bitcast (i64* getelementptr inbounds {{.*}} @"$s18sil_witness_tables14AssocConformerVMf", i32 0, i32 1) to %swift.type*), i64 0 }

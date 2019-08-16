@@ -28,7 +28,7 @@ public func endAccess(_ address: Builtin.RawPointer) {
   Builtin.endUnpairedAccess(address)
 }
 
-// CHECK-LABEL: define {{.*}}swiftcc void @"$s20preserve_exclusivity10readAccessyyBp_xmtlF"(i8*, %swift.type*{{.*}}, %swift.type*{{.*}} %T1)
+// CHECK-LABEL: define {{.*}}swiftcc void @"$s20preserve_exclusivity10readAccessyyBp_xmtlF"(i8* %0, %swift.type*{{.*}}, %swift.type*{{.*}} %T1)
 // CHECK:   call void @swift_beginAccess
 // CHECK: ret void
 public func readAccess<T1>(_ address: Builtin.RawPointer, _ ty1: T1.Type) {
@@ -38,7 +38,7 @@ public func readAccess<T1>(_ address: Builtin.RawPointer, _ ty1: T1.Type) {
 
 // Make sure testAccess properly inlines in our functions.
 //
-// CHECK-LABEL: define {{.*}}swiftcc void @"$s20preserve_exclusivity10testAccessyyBpF"(i8*)
+// CHECK-LABEL: define {{.*}}swiftcc void @"$s20preserve_exclusivity10testAccessyyBpF"(i8* %0)
 // CHECK: call swiftcc void @marker1
 // CHECK: call void @swift_beginAccess
 // CHECK: call swiftcc void @marker2

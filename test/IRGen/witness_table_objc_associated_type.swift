@@ -35,7 +35,7 @@ struct SO: C {
 // CHECK:         i8* bitcast {{.*}} @"$s34witness_table_objc_associated_type2SOVAA1CA2aDP3fooyyFTW"
 // CHECK:       ]
 
-// CHECK-LABEL: define hidden swiftcc void @"$s34witness_table_objc_associated_type0A25OffsetAfterAssociatedTypeyyxAA1BRzlF"(%swift.opaque* noalias nocapture, %swift.type* %T, i8** %T.B)
+// CHECK-LABEL: define hidden swiftcc void @"$s34witness_table_objc_associated_type0A25OffsetAfterAssociatedTypeyyxAA1BRzlF"(%swift.opaque* noalias nocapture %0, %swift.type* %T, i8** %T.B)
 func witnessOffsetAfterAssociatedType<T: B>(_ x: T) {
   // CHECK:         [[FOO_ADDR:%.*]] = getelementptr inbounds i8*, i8** %T.B, i32 3
   // CHECK:         [[FOO_OPAQUE:%.*]] = load {{.*}} [[FOO_ADDR]]
@@ -44,7 +44,7 @@ func witnessOffsetAfterAssociatedType<T: B>(_ x: T) {
   x.foo()
 }
 
-// CHECK-LABEL: define hidden swiftcc void @"$s34witness_table_objc_associated_type0A29OffsetAfterAssociatedTypeObjCyyxAA1CRzlF"(%swift.opaque* noalias nocapture, %swift.type* %T, i8** %T.C) {{.*}} {
+// CHECK-LABEL: define hidden swiftcc void @"$s34witness_table_objc_associated_type0A29OffsetAfterAssociatedTypeObjCyyxAA1CRzlF"(%swift.opaque* noalias nocapture %0, %swift.type* %T, i8** %T.C) {{.*}} {
 func witnessOffsetAfterAssociatedTypeObjC<T: C>(_ x: T) {
   // CHECK:         [[FOO_ADDR:%.*]] = getelementptr inbounds i8*, i8** %T.C, i32 2
   // CHECK:         [[FOO_OPAQUE:%.*]] = load {{.*}} [[FOO_ADDR]]

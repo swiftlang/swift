@@ -77,7 +77,7 @@ enum MixedRefcountedWithIndirect {
 // CHECK: }
 
 
-// CHECK-LABEL: define linkonce_odr hidden void @"$s39enum_value_semantics_special_cases_objc27MixedRefcountedWithIndirectOWOe"(i64)
+// CHECK-LABEL: define linkonce_odr hidden void @"$s39enum_value_semantics_special_cases_objc27MixedRefcountedWithIndirectOWOe"(i64 %0)
 // CHECK: entry:
 // CHECK:   %1 = lshr i64 %0, 62
 // CHECK:   %2 = trunc i64 %1 to i8
