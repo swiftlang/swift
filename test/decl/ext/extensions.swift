@@ -124,23 +124,3 @@ struct WrapperContext {
     static let propUsingMember = originalValue
   }
 }
-
-// SR-11298
-
-protocol SR_11298_P {}
-
-class SR_11298_C: SR_11298_P {
-  var property: String = ""
-}
-
-// Self: SR_11298_C requirement constrains this extension to SR_11298C and its subclasses.
-// Since this implies a class constraint, the setter should be implicitly nonmutating.
-extension SR_11298_P where Self: SR_11298_C {
-  var wrappingProperty: String {
-    get { return property }
-    set { property = newValue }
-  }
-}
-
-let instance = SR_11298_C()
-instance.wrappingProperty = "" // Okay
