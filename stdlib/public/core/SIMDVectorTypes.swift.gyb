@@ -216,9 +216,15 @@ extension ${Self}: SIMDScalar {
   /// Storage for a vector of ${spelledNumbers[n]} integers.
   @frozen
   @_alignment(${bytes if bytes <= 16 else 16})
-  public struct SIMD${n}Storage: SIMDStorage {
+  public struct SIMD${n}Storage: _SIMDVectorStorage {
+    public typealias _Vector = Builtin.Vec${n}x${BuiltinName}
 
-    public var _value: Builtin.Vec${n}x${BuiltinName}
+    public var _value: _Vector
+
+    public var _vector: _Vector {
+      @_transparent get { return _value }
+      @_transparent set { _value = newValue }
+    }
 
     @_transparent
     public var scalarCount: Int {
@@ -230,17 +236,22 @@ extension ${Self}: SIMDScalar {
       _value = Builtin.zeroInitializer()
     }
 
+    @_transparent
+    public init(_vector: _Vector) {
+      _value = _vector
+    }
+
     public subscript(index: Int) -> ${Self} {
       @_transparent
       get {
         return ${Self}(Builtin.extractelement_Vec${n}x${BuiltinName}_Int32(
-          _value, Int32(truncatingIfNeeded: index)._value
+          _vector, Int32(truncatingIfNeeded: index)._value
         ))
       }
       @_transparent
       set {
-        _value = Builtin.insertelement_Vec${n}x${BuiltinName}_${BuiltinName}_Int32(
-          _value, newValue._value, Int32(truncatingIfNeeded: index)._value
+        _vector = Builtin.insertelement_Vec${n}x${BuiltinName}_${BuiltinName}_Int32(
+          _vector, newValue._value, Int32(truncatingIfNeeded: index)._value
         )
       }
     }
@@ -261,9 +272,15 @@ extension ${Self}: SIMDScalar {
   /// Storage for a vector of ${spelledNumbers[n]} floating-point values.
   @frozen
   @_alignment(${bytes if bytes <= 16 else 16})
-  public struct SIMD${n}Storage: SIMDStorage {
+  public struct SIMD${n}Storage: _SIMDVectorStorage {
+    public typealias _Vector = Builtin.Vec${n}xFPIEEE${bits}
 
-    public var _value: Builtin.Vec${n}xFPIEEE${bits}
+    public static var _hasVectorRepresentation: Bool {
+      @_transparent
+      get { return true }
+    }
+
+    public var _vector: _Vector
 
     @_transparent
     public var scalarCount: Int {
@@ -272,20 +289,25 @@ extension ${Self}: SIMDScalar {
 
     @_transparent
     public init() {
-      _value = Builtin.zeroInitializer()
+      _vector = Builtin.zeroInitializer()
+    }
+
+    @_transparent
+    public init(_vector: _Vector) {
+      self._vector = _vector
     }
 
     public subscript(index: Int) -> ${Self} {
       @_transparent
       get {
         return ${Self}(Builtin.extractelement_Vec${n}xFPIEEE${bits}_Int32(
-          _value, Int32(truncatingIfNeeded: index)._value
+          _vector, Int32(truncatingIfNeeded: index)._value
         ))
       }
       @_transparent
       set {
-        _value = Builtin.insertelement_Vec${n}xFPIEEE${bits}_FPIEEE${bits}_Int32(
-          _value, newValue._value, Int32(truncatingIfNeeded: index)._value
+        _vector = Builtin.insertelement_Vec${n}xFPIEEE${bits}_FPIEEE${bits}_Int32(
+          _vector, newValue._value, Int32(truncatingIfNeeded: index)._value
         )
       }
     }
