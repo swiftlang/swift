@@ -114,6 +114,19 @@ AddAddressOf *AddAddressOf::create(ConstraintSystem &cs, Type argTy,
   return new (cs.getAllocator()) AddAddressOf(cs, argTy, paramTy, locator);
 }
 
+bool RemoveAddressOfArg::diagnose(Expr *root, bool asNote) const {
+  auto &cs = getConstraintSystem();
+  ExtraAddressOfFailure failure(root, cs, getFromType(), getToType(),
+                                getLocator());
+  return failure.diagnose(asNote);
+}
+
+RemoveAddressOfArg *
+RemoveAddressOfArg::create(ConstraintSystem &cs, Type argTy, Type paramTy,
+                           ConstraintLocator *locator) {
+  return new (cs.getAllocator()) RemoveAddressOfArg(cs, argTy, paramTy, locator);
+}
+
 bool TreatRValueAsLValue::diagnose(Expr *root, bool asNote) const {
   RValueTreatedAsLValueFailure failure(getConstraintSystem(), getLocator());
   return failure.diagnose(asNote);

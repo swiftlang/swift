@@ -545,6 +545,21 @@ public:
                               ConstraintLocator *locator);
 };
 
+/// Remove the \c & of an argument for a non-inout parameter.
+class RemoveAddressOfArg final : public ContextualMismatch {
+  RemoveAddressOfArg(ConstraintSystem &cs, Type argTy, Type paramTy,
+                     ConstraintLocator *locator)
+      : ContextualMismatch(cs, argTy, paramTy, locator) {}
+
+public:
+  std::string getName() const override { return "remove address of argument"; }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static RemoveAddressOfArg *create(ConstraintSystem &cs, Type argTy,
+                                    Type paramTy, ConstraintLocator *locator);
+};
+
 /// Detect situations where two type's generic arguments must
 /// match but are not convertible e.g.
 ///

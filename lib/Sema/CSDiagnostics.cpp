@@ -908,6 +908,17 @@ bool MissingAddressOfFailure::diagnoseAsError() {
   return true;
 }
 
+bool ExtraAddressOfFailure::diagnoseAsError() {
+  if (hasComplexLocator())
+    return false;
+
+  auto anchor = getAnchor();
+  emitDiagnostic(getAnchor()->getLoc(), diag::extra_address_of, getToType())
+      .highlight(anchor->getSourceRange())
+      .fixItRemove(anchor->getStartLoc());
+  return true;
+}
+
 bool MissingExplicitConversionFailure::diagnoseAsError() {
   if (hasComplexLocator())
     return false;

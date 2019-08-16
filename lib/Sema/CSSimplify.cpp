@@ -2430,6 +2430,23 @@ bool ConstraintSystem::repairFailures(
         conversionsOrFixes.push_back(AddAddressOf::create(
             *this, lhs, rhs, getConstraintLocator(locator)));
     }
+
+    // If the argument is inout and the parameter is not inout or a pointer,
+    // suggest removing the &.
+    if (lhs->is<InOutType>() && !rhs->is<InOutType>()) {
+      auto objectType = rhs->lookThroughAllOptionalTypes();
+      if (objectType->getAnyPointerElementType())
+        break;
+
+      auto result = matchTypes(lhs->getInOutObjectType(), rhs,
+                               ConstraintKind::ArgumentConversion,
+                               TypeMatchFlags::TMF_ApplyingFix, locator);
+
+      if (result.isSuccess())
+        conversionsOrFixes.push_back(RemoveAddressOfArg::create(*this, lhs,
+            rhs, getConstraintLocator(locator)));
+    }
+
     break;
   }
 

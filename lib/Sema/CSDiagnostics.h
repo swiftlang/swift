@@ -843,6 +843,16 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Diagnose failures when passing an inout argument to a non-inout parameter.
+class ExtraAddressOfFailure final : public ContextualFailure {
+public:
+  ExtraAddressOfFailure(Expr *expr, ConstraintSystem &cs, Type argTy,
+                        Type paramTy, ConstraintLocator *locator)
+      : ContextualFailure(expr, cs, argTy, paramTy, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
 /// Diagnose mismatches relating to tuple destructuring.
 class TupleContextualFailure final : public ContextualFailure {
 public:
