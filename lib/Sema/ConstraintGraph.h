@@ -337,7 +337,7 @@ private:
   ConstraintSystem &CS;
 
   /// The type variables in this graph, in stable order.
-  SmallVector<TypeVariableType *, 4> TypeVariables;
+  std::vector<TypeVariableType *> TypeVariables;
 
   /// Constraints that are "orphaned" because they contain no type variables.
   SmallVector<Constraint *, 4> OrphanedConstraints;

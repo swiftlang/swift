@@ -342,7 +342,7 @@ class ComponentStep final : public SolverStep {
     ConstraintSystem &CS;
     ConstraintSystem::SolverScope *SolverScope;
 
-    std::vector<TypeVariableType *> TypeVars;
+    SetVector<TypeVariableType *> TypeVars;
     ConstraintSystem::SolverScope *PrevPartialScope = nullptr;
 
     // The component this scope is associated with.
