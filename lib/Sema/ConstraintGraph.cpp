@@ -378,19 +378,37 @@ llvm::TinyPtrVector<Constraint *> ConstraintGraph::gatherConstraints(
     llvm::function_ref<bool(Constraint *)> acceptConstraintFn) {
   llvm::TinyPtrVector<Constraint *> constraints;
 
+  // Local function to test whether the given type variable is in the current
+  // interest set for the solver.
+  SmallPtrSet<TypeVariableType *, 4> interestingTypeVars;
+  auto isInterestingTypeVar = [&](TypeVariableType *typeVar) {
+    if (interestingTypeVars.empty()) {
+      interestingTypeVars.insert(CS.TypeVariables.begin(),
+                                 CS.TypeVariables.end());
+    }
+
+    return interestingTypeVars.count(typeVar) > 0;
+  };
+
   // Whether we should consider this constraint at all.
-  auto &reprNode = (*this)[CS.getRepresentative(typeVar)];
-  auto equivClass = reprNode.getEquivalenceClass();
+  auto rep = CS.getRepresentative(typeVar);
   auto shouldConsiderConstraint = [&](Constraint *constraint) {
     // For a one-way constraint, only consider it when the type variable
-    // is on the left-hand side of the the binding. Otherwise, it is not
-    // relevant.
+    // is on the right-hand side of the the binding, and the left-hand side of
+    // the binding is one of the type variables currently under consideration.
     if (constraint->getKind() == ConstraintKind::OneWayBind) {
       auto lhsTypeVar =
           constraint->getFirstType()->castTo<TypeVariableType>();
-      if (std::find(equivClass.begin(), equivClass.end(), lhsTypeVar)
-            == equivClass.end())
+      if (!isInterestingTypeVar(lhsTypeVar))
         return false;
+
+      SmallVector<TypeVariableType *, 2> rhsTypeVars;
+      constraint->getSecondType()->getTypeVariables(rhsTypeVars);
+      for (auto rhsTypeVar : rhsTypeVars) {
+        if (CS.getRepresentative(rhsTypeVar) == rep)
+          return true;
+      }
+      return false;
     }
 
     return true;
@@ -421,6 +439,8 @@ llvm::TinyPtrVector<Constraint *> ConstraintGraph::gatherConstraints(
     }
   };
 
+  auto &reprNode = (*this)[CS.getRepresentative(typeVar)];
+  auto equivClass = reprNode.getEquivalenceClass();
   for (auto typeVar : equivClass) {
     auto &node = (*this)[typeVar];
     for (auto constraint : node.getConstraints()) {
