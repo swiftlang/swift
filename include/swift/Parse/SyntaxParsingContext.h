@@ -355,7 +355,9 @@ public:
 
   void setShouldDefer(bool Value = true) { ShouldDefer = Value; }
 
-  bool shouldDefer() const { return ShouldDefer || IsBacktracking; }
+  bool shouldDefer() const {
+    return ShouldDefer || IsBacktracking || Mode == AccumulationMode::Discard;
+  }
 
   /// Explicitly finalizing syntax tree creation.
   /// This function will be called during the destroying of a root syntax
