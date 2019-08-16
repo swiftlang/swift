@@ -539,3 +539,10 @@ struct Test : RandomAccessCollection {
         return foos[i.offset].p
     }
 }
+
+@inline(never)
+func useAbstractFunction<T: P>(_ fn: (Int64) -> T) {}
+
+public func testThinToThick() {
+  useAbstractFunction(bar)
+}
