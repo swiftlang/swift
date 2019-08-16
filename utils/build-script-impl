@@ -1968,8 +1968,8 @@ for host in "${ALL_HOSTS[@]}"; do
             # Optionally use the freshly-built host copy of clang to build
             # for foreign hosts.
             common_cmake_options_host+=(
-                -DCMAKE_C_COMPILER="$(build_directory ${LOCAL_HOST} llvm)/bin/clang"
-                -DCMAKE_CXX_COMPILER="$(build_directory ${LOCAL_HOST} llvm)/bin/clang++"
+                -DCMAKE_C_COMPILER="$(build_directory_bin ${LOCAL_HOST} llvm)/clang"
+                -DCMAKE_CXX_COMPILER="$(build_directory_bin ${LOCAL_HOST} llvm)/clang++"
             )
         fi
 
@@ -2180,8 +2180,8 @@ for host in "${ALL_HOSTS[@]}"; do
                 if [[ $(is_cross_tools_host ${host}) ]] ; then
                     cmake_options=(
                         "${cmake_options[@]}"
-                        -DLLVM_TABLEGEN=$(build_directory "${LOCAL_HOST}" llvm)/bin/llvm-tblgen
-                        -DCLANG_TABLEGEN=$(build_directory "${LOCAL_HOST}" llvm)/bin/clang-tblgen
+                        -DLLVM_TABLEGEN=$(build_directory_bin "${LOCAL_HOST}" llvm)/llvm-tblgen
+                        -DCLANG_TABLEGEN=$(build_directory_bin "${LOCAL_HOST}" llvm)/clang-tblgen
                         -DLLVM_NATIVE_BUILD=$(build_directory "${LOCAL_HOST}" llvm)
                     )
                 fi
@@ -2198,7 +2198,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DCMAKE_CXX_FLAGS_RELWITHDEBINFO="-O2 -DNDEBUG"
                     -DCMAKE_BUILD_TYPE:STRING="${LLVM_BUILD_TYPE}"
                     -DLLVM_INCLUDE_DOCS:BOOL=TRUE
-                    -DLLVM_CONFIG_PATH="$(build_directory "${LOCAL_HOST}" llvm)/bin/llvm-config"
+                    -DLLVM_CONFIG_PATH="$(build_directory_bin "${LOCAL_HOST}" llvm)/llvm-config"
                     "${llvm_cmake_options[@]}"
                 )
 
@@ -2244,9 +2244,9 @@ for host in "${ALL_HOSTS[@]}"; do
                     build_external_perf_testsuite_this_time=false
                     build_tests_this_time=false
 
-                    native_llvm_tools_path="$(build_directory "${LOCAL_HOST}" llvm)/bin"
-                    native_clang_tools_path="$(build_directory "${LOCAL_HOST}" llvm)/bin"
-                    native_swift_tools_path="$(build_directory "${LOCAL_HOST}" swift)/bin"
+                    native_llvm_tools_path="$(build_directory_bin "${LOCAL_HOST}" llvm)"
+                    native_clang_tools_path="$(build_directory_bin "${LOCAL_HOST}" llvm)"
+                    native_swift_tools_path="$(build_directory_bin "${LOCAL_HOST}" swift)"
                 else
                     # FIXME: Why is the next line not using false_true?
                     build_perf_testsuite_this_time=$(true_false "$(not ${SKIP_BUILD_BENCHMARKS})")
@@ -2257,7 +2257,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 if [[ $(is_cross_tools_host ${host}) ]] ; then
                     cmake_options=(
                         "${cmake_options[@]}"
-                        -DLLVM_TABLEGEN=$(build_directory "${LOCAL_HOST}" llvm)/bin/llvm-tblgen
+                        -DLLVM_TABLEGEN=$(build_directory_bin "${LOCAL_HOST}" llvm)/llvm-tblgen
                     )
                 fi
 
@@ -2509,8 +2509,8 @@ for host in "${ALL_HOSTS[@]}"; do
                     "${cmake_options[@]}"
                     -C${LLDB_SOURCE_DIR}/cmake/caches/${cmake_cache}
                     -DCMAKE_BUILD_TYPE:STRING="${LLDB_BUILD_TYPE}"
-                    -DLLDB_SWIFTC:PATH="$(build_directory ${LOCAL_HOST} swift)/bin/swiftc"
-                    -DLLDB_SWIFT_LIBS:PATH="$(build_directory ${LOCAL_HOST} swift)/lib/swift"
+                    -DLLDB_SWIFTC:PATH="$(build_directory_bin ${LOCAL_HOST} swift)/swiftc"
+                    -DLLDB_SWIFT_LIBS:PATH="$(build_directory_bin ${LOCAL_HOST} swift)/../lib/swift"
                     -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
                     -DLLDB_FRAMEWORK_INSTALL_DIR="$(get_host_install_prefix ${host})../System/Library/PrivateFrameworks"
                     -DLLVM_DIR:PATH=${llvm_build_dir}/lib/cmake/llvm
@@ -2669,7 +2669,7 @@ for host in "${ALL_HOSTS[@]}"; do
 
                 if [[ ! "${SKIP_BUILD_LIBICU}" ]] ; then
                     ICU_ROOT=$(build_directory ${host} libicu)/tmp_install
-                    ICU_LIBDIR="$(build_directory ${host} swift)/lib/swift/${SWIFT_HOST_VARIANT}/${SWIFT_HOST_VARIANT_ARCH}"
+                    ICU_LIBDIR="$(build_directory_bin ${host} swift)/../lib/swift/${SWIFT_HOST_VARIANT}/${SWIFT_HOST_VARIANT_ARCH}"
                     LIBICU_BUILD_ARGS=(
                         -DICU_ROOT:PATH=${ICU_ROOT}
                         -DICU_INCLUDE_DIR:PATH=${ICU_ROOT}/include
@@ -2770,10 +2770,10 @@ for host in "${ALL_HOSTS[@]}"; do
 
                 ;;
             libicu)
-                SWIFT_BUILD_PATH=$(build_directory ${host} swift)
+                SWIFT_BUILD_LIB_PATH=$(build_directory_bin ${host} swift)/../lib
                 LIBICU_BUILD_DIR=$(build_directory ${host} ${product})
                 ICU_TMPINSTALL=$LIBICU_BUILD_DIR/tmp_install
-                ICU_TMPLIBDIR="${SWIFT_BUILD_PATH}/lib/swift/${SWIFT_HOST_VARIANT}/${SWIFT_HOST_VARIANT_ARCH}"
+                ICU_TMPLIBDIR="${SWIFT_BUILD_LIB_PATH}/swift/${SWIFT_HOST_VARIANT}/${SWIFT_HOST_VARIANT_ARCH}"
                 if [[ "${RECONFIGURE}" || ! -f "${LIBICU_BUILD_DIR}"/config.status ]]; then
                     echo "Reconfiguring libicu"
                     if [[ "$LIBICU_BUILD_TYPE" != "Release" ]] ; then
@@ -2804,9 +2804,9 @@ for host in "${ALL_HOSTS[@]}"; do
                 fi
                 with_pushd "${LIBICU_BUILD_DIR}" \
                     call make -j ${BUILD_JOBS} install
-                ICU_LIBDIR="$(build_directory ${host} swift)/lib/swift/${SWIFT_HOST_VARIANT}/${SWIFT_HOST_VARIANT_ARCH}"
-                ICU_LIBDIR_STATIC="$(build_directory ${host} swift)/lib/swift_static/${SWIFT_HOST_VARIANT}"
-                ICU_LIBDIR_STATIC_ARCH="$(build_directory ${host} swift)/lib/swift_static/${SWIFT_HOST_VARIANT}/${SWIFT_HOST_VARIANT_ARCH}"
+                ICU_LIBDIR="$(build_directory_bin ${host} swift)/../lib/swift/${SWIFT_HOST_VARIANT}/${SWIFT_HOST_VARIANT_ARCH}"
+                ICU_LIBDIR_STATIC="$(build_directory_bin ${host} swift)/../lib/swift_static/${SWIFT_HOST_VARIANT}"
+                ICU_LIBDIR_STATIC_ARCH="$(build_directory_bin ${host} swift)/../lib/swift_static/${SWIFT_HOST_VARIANT}/${SWIFT_HOST_VARIANT_ARCH}"
                 # Add in the ICU renaming config into uconfig.h
                 call sed -e "/^#define __UCONFIG_H__/ r ${LIBICU_BUILD_DIR}/uconfig.h.prepend" -i ${ICU_TMPINSTALL}/include/unicode/uconfig.h
 
@@ -2831,7 +2831,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 fi
 
                 SWIFTC_BIN="$(build_directory_bin ${host} swift)/swiftc"
-                SWIFT_LIB_DIR="$(build_directory ${host} swift)"/lib/swift/
+                SWIFT_LIB_DIR="$(build_directory_bin ${host} swift)"/../lib/swift/
 
                 set -x
                 pushd "${PLAYGROUNDSUPPORT_SOURCE_DIR}"
@@ -3058,7 +3058,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 with_pushd ${lldb_build_dir} \
                     call ${NINJA_BIN} -j ${BUILD_JOBS} lldb-test-deps
                 with_pushd ${results_dir} \
-                    call "${llvm_build_dir}/bin/llvm-lit" \
+                    call "$(build_directory_bin ${host} llvm)/llvm-lit" \
                          "${lldb_build_dir}/lit" \
                          ${LLVM_LIT_ARGS}
 
@@ -3067,7 +3067,7 @@ for host in "${ALL_HOSTS[@]}"; do
                          "${LLDB_TEST_SWIFT_COMPATIBILITY}"
                     DOTEST_ARGS="-G swift-history --swift-compiler \"${LLDB_TEST_SWIFT_COMPATIBILITY}\""
                     with_pushd ${results_dir} \
-                       call "${llvm_build_dir}/bin/llvm-lit" \
+                       call "$(build_directory_bin $LOCAL_HOST llvm)/llvm-lit" \
                             "${lldb_build_dir}/lit" \
                             ${LLVM_LIT_ARGS} \
                             --param dotest-args="${DOTEST_ARGS}" \
@@ -3177,7 +3177,7 @@ for host in "${ALL_HOSTS[@]}"; do
 
                 if [[ ! "${SKIP_BUILD_LIBICU}" ]] ; then
                     ICU_ROOT=$(build_directory ${host} libicu)/tmp_install
-                    ICU_LIBDIR="$(build_directory ${host} swift)/lib/swift/${SWIFT_HOST_VARIANT}/${SWIFT_HOST_VARIANT_ARCH}"
+                    ICU_LIBDIR="$(build_directory_bin ${host} swift)/../lib/swift/${SWIFT_HOST_VARIANT}/${SWIFT_HOST_VARIANT_ARCH}"
                     LIBICU_BUILD_ARGS=(
                         -DICU_ROOT:PATH=${ICU_ROOT}
                         -DICU_INCLUDE_DIR:PATH=${ICU_ROOT}/include
@@ -3287,7 +3287,7 @@ for host in "${ALL_HOSTS[@]}"; do
 
                 PLAYGROUNDSUPPORT_BUILD_DIR=$(build_directory ${host} ${product})
                 SWIFTC_BIN="$(build_directory_bin ${host} swift)/swiftc"
-                SWIFT_LIB_DIR="$(build_directory ${host} swift)"/lib/swift/
+                SWIFT_LIB_DIR="$(build_directory_bin ${host} swift)"/../lib/swift/
 
                 set -x
                 with_pushd "${PLAYGROUNDSUPPORT_SOURCE_DIR}" \
@@ -3457,7 +3457,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     # Create the install dir if it doesn't exist
                     call mkdir -p "${INSTALL_DESTDIR}"
                     # Install libParser is necessary
-                    rsync -a "$(build_directory ${host} swift)/lib/lib_InternalSwiftSyntaxParser.dylib" "${INSTALL_DESTDIR}"
+                    rsync -a "$(build_directory_bin ${host} swift)/../lib/lib_InternalSwiftSyntaxParser.dylib" "${INSTALL_DESTDIR}"
                     # Install module map of libParser so client can import SwiftSyntax
                     rsync -a "${SWIFT_SOURCE_DIR}/include/swift-c/SyntaxParser" "${INSTALL_DESTDIR}"
                 else
@@ -3588,7 +3588,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 echo "--- Installing ${product} ---"
                 ICU_BUILD_DIR=$(build_directory ${host} ${product})
                 ICU_INSTALL_DIR="$(get_host_install_destdir ${host})$(get_host_install_prefix ${host})"
-                ICU_LIBDIR="$(build_directory ${host} swift)/lib/swift/${SWIFT_HOST_VARIANT}/${SWIFT_HOST_VARIANT_ARCH}"
+                ICU_LIBDIR="$(build_directory_bin ${host} swift)/../lib/swift/${SWIFT_HOST_VARIANT}/${SWIFT_HOST_VARIANT_ARCH}"
                 LIBICU_DEST_DIR="${ICU_INSTALL_DIR}lib/swift/${SWIFT_HOST_VARIANT}"
                 call mkdir -p ${LIBICU_DEST_DIR}
 
