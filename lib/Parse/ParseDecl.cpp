@@ -224,43 +224,32 @@ bool Parser::parseTopLevel() {
   // allows type declarations and other things to be parsed, name bound, and
   // type checked in batches, similar to immediate mode.  This also enforces
   // that SIL bodies can only be at the top level.
-  if (Tok.is(tok::kw_sil)) {
-    assert(isInSILMode() && "'sil' should only be a keyword in SIL mode");
-    SIL->parseDeclSIL(*this);
-  } else if (Tok.is(tok::kw_sil_stage)) {
-    assert(isInSILMode() && "'sil_stage' should only be a keyword in SIL mode");
-    SIL->parseDeclSILStage(*this);
-  } else if (Tok.is(tok::kw_sil_vtable)) {
-    assert(isInSILMode() &&
-           "'sil_vtable' should only be a keyword in SIL mode");
-    SIL->parseSILVTable(*this);
-  } else if (Tok.is(tok::kw_sil_global)) {
-    assert(isInSILMode() &&
-           "'sil_global' should only be a keyword in SIL mode");
-    SIL->parseSILGlobal(*this);
-  } else if (Tok.is(tok::kw_sil_witness_table)) {
-    assert(isInSILMode() &&
-           "'sil_witness_table' should only be a keyword in SIL mode");
-    SIL->parseSILWitnessTable(*this);
-  } else if (Tok.is(tok::kw_sil_default_witness_table)) {
-    assert(isInSILMode() &&
-           "'sil_default_witness_table' should only be a keyword in SIL mode");
-    SIL->parseSILDefaultWitnessTable(*this);
-  } else if (Tok.is(tok::kw_sil_coverage_map)) {
-    assert(isInSILMode() &&
-           "'sil_coverage_map' should only be a keyword in SIL mode");
-    SIL->parseSILCoverageMap(*this);
-  } else if (Tok.is(tok::kw_sil_property)) {
-    assert(isInSILMode() &&
-           "'sil_property' should only be a keyword in SIL mode");
-    SIL->parseSILProperty(*this);
-  } else if (Tok.is(tok::kw_sil_scope)) {
-    assert(isInSILMode() && "'sil_scope' should only be a keyword in SIL mode");
-    SIL->parseSILScope(*this);
-  } else {
-    parseBraceItems(Items,
-                    allowTopLevelCode() ? BraceItemListKind::TopLevelCode
-                                        : BraceItemListKind::TopLevelLibrary);
+  switch (Tok.getKind()) {
+  default:
+    parseBraceItems(Items, allowTopLevelCode()
+                               ? BraceItemListKind::TopLevelCode
+                               : BraceItemListKind::TopLevelLibrary);
+    break;
+
+// For now, create 'UnknownDecl' for all SIL declarations.
+#define CASE_SIL(KW, NAME)                                                     \
+  case tok::kw_##KW: {                                                         \
+    assert(isInSILMode() && "'" #KW "' should only be a keyword in SIL mode"); \
+    SyntaxParsingContext itemCtxt(SyntaxContext, SyntaxKind::CodeBlockItem);   \
+    SyntaxParsingContext declCtxt(SyntaxContext, SyntaxContextKind::Decl);     \
+    SIL->parse##NAME(*this);                                                   \
+    break;                                                                     \
+  }
+    CASE_SIL(sil, DeclSIL)
+    CASE_SIL(sil_stage, DeclSILStage)
+    CASE_SIL(sil_vtable, SILVTable)
+    CASE_SIL(sil_global, SILGlobal)
+    CASE_SIL(sil_witness_table, SILWitnessTable)
+    CASE_SIL(sil_default_witness_table, SILDefaultWitnessTable)
+    CASE_SIL(sil_coverage_map, SILCoverageMap)
+    CASE_SIL(sil_property, SILProperty)
+    CASE_SIL(sil_scope, SILScope)
+#undef CASE_SIL
   }
   
   // In the case of a catastrophic parse error, consume any trailing
@@ -270,6 +259,10 @@ bool Parser::parseTopLevel() {
       Tok.is(tok::pound_endif)) {
     diagnose(Tok.getLoc(),
              diag::unexpected_conditional_compilation_block_terminator);
+    // Create 'UnknownDecl' for orphan directives.
+    SyntaxParsingContext itemCtxt(SyntaxContext, SyntaxKind::CodeBlockItem);
+    SyntaxParsingContext declCtxt(SyntaxContext, SyntaxContextKind::Decl);
+
     consumeToken();
   }
 
