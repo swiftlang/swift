@@ -51,3 +51,25 @@ func testFunc() {
   let f = \S.i
   let _: (S) -> Int = f // expected-error {{cannot convert value of type 'KeyPath<S, Int>' to specified type '(S) -> Int'}}
 }
+
+// rdar://problem/54322807
+struct X<T> {
+  init(foo: KeyPath<T, Bool>) { }
+  init(foo: KeyPath<T, Bool?>) { }
+}
+
+struct Wibble {
+  var boolProperty = false
+}
+
+struct Bar {
+  var optWibble: Wibble? = nil
+}
+
+class Foo {
+  var optBar: Bar? = nil
+}
+
+func testFoo<T: Foo>(_: T) {
+  let _: X<T> = .init(foo: \.optBar!.optWibble?.boolProperty)
+}

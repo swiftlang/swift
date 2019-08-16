@@ -373,91 +373,6 @@ void ConstraintGraph::unbindTypeVariable(TypeVariableType *typeVar, Type fixed){
   }
 }
 
-llvm::TinyPtrVector<Constraint *> ConstraintGraph::gatherConstraints(
-    TypeVariableType *typeVar, GatheringKind kind,
-    llvm::function_ref<bool(Constraint *)> acceptConstraintFn) {
-  llvm::TinyPtrVector<Constraint *> constraints;
-
-  // Whether we should consider this constraint at all.
-  auto rep = CS.getRepresentative(typeVar);
-  auto shouldConsiderConstraint = [&](Constraint *constraint) {
-    // For a one-way constraint, only consider it when the type variable
-    // is on the right-hand side of the the binding, and the left-hand side of
-    // the binding is one of the type variables currently under consideration.
-    if (constraint->isOneWayConstraint()) {
-      auto lhsTypeVar =
-          constraint->getFirstType()->castTo<TypeVariableType>();
-      if (!CS.isActiveTypeVariable(lhsTypeVar))
-        return false;
-
-      SmallVector<TypeVariableType *, 2> rhsTypeVars;
-      constraint->getSecondType()->getTypeVariables(rhsTypeVars);
-      for (auto rhsTypeVar : rhsTypeVars) {
-        if (CS.getRepresentative(rhsTypeVar) == rep)
-          return true;
-      }
-      return false;
-    }
-
-    return true;
-  };
-
-  auto acceptConstraint = [&](Constraint *constraint) {
-    return shouldConsiderConstraint(constraint) &&
-        acceptConstraintFn(constraint);
-  };
-
-  // Add constraints for the given adjacent type variable.
-  llvm::SmallPtrSet<TypeVariableType *, 4> typeVars;
-  llvm::SmallPtrSet<Constraint *, 4> visitedConstraints;
-  auto addAdjacentConstraints = [&](TypeVariableType *adjTypeVar) {
-    auto adjTypeVarsToVisit =
-        (*this)[CS.getRepresentative(adjTypeVar)].getEquivalenceClass();
-    for (auto adjTypeVarEquiv : adjTypeVarsToVisit) {
-      if (!typeVars.insert(adjTypeVarEquiv).second)
-        continue;
-
-      for (auto constraint : (*this)[adjTypeVarEquiv].getConstraints()) {
-        if (!visitedConstraints.insert(constraint).second)
-          continue;
-
-        if (acceptConstraint(constraint))
-          constraints.push_back(constraint);
-      }
-    }
-  };
-
-  auto &reprNode = (*this)[CS.getRepresentative(typeVar)];
-  auto equivClass = reprNode.getEquivalenceClass();
-  for (auto typeVar : equivClass) {
-    auto &node = (*this)[typeVar];
-    for (auto constraint : node.getConstraints()) {
-      if (visitedConstraints.insert(constraint).second &&
-          acceptConstraint(constraint))
-        constraints.push_back(constraint);
-
-      // If we want all mentions, visit type variables within each of our
-      // constraints.
-      if (kind == GatheringKind::AllMentions) {
-        if (!shouldConsiderConstraint(constraint))
-          continue;
-
-        for (auto adjTypeVar : constraint->getTypeVariables()) {
-          addAdjacentConstraints(adjTypeVar);
-        }
-      }
-    }
-
-    // For any type variable mentioned in a fixed binding, add adjacent
-    // constraints.
-    for (auto adjTypeVar : node.getFixedBindings()) {
-      addAdjacentConstraints(adjTypeVar);
-    }
-  }
-
-  return constraints;
-}
-
 #pragma mark Algorithms
 
 /// Perform a depth-first search.
@@ -517,6 +432,102 @@ static void depthFirstSearch(
 
   // Walk any type variables related via fixed bindings.
   visitAdjacencies(node.getFixedBindings());
+}
+
+llvm::TinyPtrVector<Constraint *> ConstraintGraph::gatherConstraints(
+    TypeVariableType *typeVar, GatheringKind kind,
+    llvm::function_ref<bool(Constraint *)> acceptConstraintFn) {
+  llvm::TinyPtrVector<Constraint *> constraints;
+
+  // Whether we should consider this constraint at all.
+  auto rep = CS.getRepresentative(typeVar);
+  auto shouldConsiderConstraint = [&](Constraint *constraint) {
+    // For a one-way constraint, only consider it when the type variable
+    // is on the right-hand side of the the binding, and the left-hand side of
+    // the binding is one of the type variables currently under consideration.
+    if (constraint->isOneWayConstraint()) {
+      auto lhsTypeVar =
+          constraint->getFirstType()->castTo<TypeVariableType>();
+      if (!CS.isActiveTypeVariable(lhsTypeVar))
+        return false;
+
+      SmallVector<TypeVariableType *, 2> rhsTypeVars;
+      constraint->getSecondType()->getTypeVariables(rhsTypeVars);
+      for (auto rhsTypeVar : rhsTypeVars) {
+        if (CS.getRepresentative(rhsTypeVar) == rep)
+          return true;
+      }
+      return false;
+    }
+
+    return true;
+  };
+
+  auto acceptConstraint = [&](Constraint *constraint) {
+    return shouldConsiderConstraint(constraint) &&
+        acceptConstraintFn(constraint);
+  };
+
+  if (kind == GatheringKind::AllMentions) {
+    // Perform a depth-first search in the constraint graph to find all of the
+    // constraints that could be affected.
+    SmallPtrSet<TypeVariableType *, 4> typeVariables;
+    llvm::SmallPtrSet<Constraint *, 8> visitedConstraints;
+    depthFirstSearch(*this, typeVar,
+                     [&](TypeVariableType *typeVar) {
+                       return typeVariables.insert(typeVar).second;
+                     },
+                     [&](Constraint *constraint) {
+                       if (!shouldConsiderConstraint(constraint))
+                         return false;
+
+                       if (acceptConstraintFn(constraint))
+                         constraints.push_back(constraint);
+
+                       return true;
+                     },
+                     visitedConstraints);
+    return constraints;
+  }
+
+  // Add constraints for the given adjacent type variable.
+  llvm::SmallPtrSet<TypeVariableType *, 4> typeVars;
+  llvm::SmallPtrSet<Constraint *, 4> visitedConstraints;
+  auto addAdjacentConstraints = [&](TypeVariableType *adjTypeVar) {
+    auto adjTypeVarsToVisit =
+        (*this)[CS.getRepresentative(adjTypeVar)].getEquivalenceClass();
+    for (auto adjTypeVarEquiv : adjTypeVarsToVisit) {
+      if (!typeVars.insert(adjTypeVarEquiv).second)
+        continue;
+
+      for (auto constraint : (*this)[adjTypeVarEquiv].getConstraints()) {
+        if (!visitedConstraints.insert(constraint).second)
+          continue;
+
+        if (acceptConstraint(constraint))
+          constraints.push_back(constraint);
+      }
+    }
+  };
+
+  auto &reprNode = (*this)[CS.getRepresentative(typeVar)];
+  auto equivClass = reprNode.getEquivalenceClass();
+  for (auto typeVar : equivClass) {
+    auto &node = (*this)[typeVar];
+    for (auto constraint : node.getConstraints()) {
+      if (visitedConstraints.insert(constraint).second &&
+          acceptConstraint(constraint))
+        constraints.push_back(constraint);
+    }
+
+    // For any type variable mentioned in a fixed binding, add adjacent
+    // constraints.
+    for (auto adjTypeVar : node.getFixedBindings()) {
+      addAdjacentConstraints(adjTypeVar);
+    }
+  }
+
+  return constraints;
 }
 
 namespace {
