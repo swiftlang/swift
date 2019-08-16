@@ -95,15 +95,15 @@ static HeapObject *_swift_allocObject_(HeapMetadata const *metadata,
 HeapObject *swift::swift_allocObject(HeapMetadata const *metadata,
                                      size_t requiredSize,
                                      size_t requiredAlignmentMask) {
-  if (SWIFT_UNLIKELY(_swift_allocObject))
+  if (SWIFT_UNLIKELY(_swift_allocObject != _swift_allocObject_))
     return _swift_allocObject(metadata, requiredSize, requiredAlignmentMask);
-  else
-    return _swift_allocObject_(metadata, requiredSize, requiredAlignmentMask);
+  return _swift_allocObject_(metadata, requiredSize, requiredAlignmentMask);
 }
 
 HeapObject *(*swift::_swift_allocObject)(HeapMetadata const *metadata,
                                          size_t requiredSize,
-                                         size_t requiredAlignmentMask);
+                                         size_t requiredAlignmentMask) =
+  _swift_allocObject_;
 
 HeapObject *
 swift::swift_initStackObject(HeapMetadata const *metadata,
@@ -305,13 +305,12 @@ static HeapObject *_swift_retain_(HeapObject *object) {
 }
 
 HeapObject *swift::swift_retain(HeapObject *object) {
-  if (SWIFT_UNLIKELY(_swift_retain))
+  if (SWIFT_UNLIKELY(_swift_retain != _swift_retain_))
     return _swift_retain(object);
-  else
-    return _swift_retain_(object);
+  return _swift_retain_(object);
 }
 
-HeapObject *(*swift::_swift_retain)(HeapObject *object);
+HeapObject *(*swift::_swift_retain)(HeapObject *object) = _swift_retain_;
 
 HeapObject *swift::swift_nonatomic_retain(HeapObject *object) {
   SWIFT_RT_TRACK_INVOCATION(object, swift_nonatomic_retain);
@@ -328,13 +327,13 @@ static HeapObject *_swift_retain_n_(HeapObject *object, uint32_t n) {
 }
 
 HeapObject *swift::swift_retain_n(HeapObject *object, uint32_t n) {
-  if (SWIFT_UNLIKELY(_swift_retain_n))
+  if (SWIFT_UNLIKELY(_swift_retain_n != _swift_retain_n_))
     return _swift_retain_n(object, n);
-  else
-    return _swift_retain_n_(object, n);
+  return _swift_retain_n_(object, n);
 }
 
-HeapObject *(*swift::_swift_retain_n)(HeapObject *object, uint32_t n);
+HeapObject *(*swift::_swift_retain_n)(HeapObject *object, uint32_t n) =
+  _swift_retain_n_;
 
 HeapObject *swift::swift_nonatomic_retain_n(HeapObject *object, uint32_t n) {
   SWIFT_RT_TRACK_INVOCATION(object, swift_nonatomic_retain_n);
@@ -350,13 +349,12 @@ static void _swift_release_(HeapObject *object) {
 }
 
 void swift::swift_release(HeapObject *object) {
-  if (SWIFT_UNLIKELY(_swift_release))
+  if (SWIFT_UNLIKELY(_swift_release != _swift_release_))
     _swift_release(object);
-  else
-    _swift_release_(object);
+  _swift_release_(object);
 }
 
-void (*swift::_swift_release)(HeapObject *object);
+void (*swift::_swift_release)(HeapObject *object) = _swift_release_;
 
 void swift::swift_nonatomic_release(HeapObject *object) {
   SWIFT_RT_TRACK_INVOCATION(object, swift_nonatomic_release);
@@ -371,13 +369,13 @@ static void _swift_release_n_(HeapObject *object, uint32_t n) {
 }
 
 void swift::swift_release_n(HeapObject *object, uint32_t n) {
-  if (SWIFT_UNLIKELY(_swift_release_n))
+  if (SWIFT_UNLIKELY(_swift_release_n != _swift_release_n_))
     return _swift_release_n(object, n);
-  else
-    return _swift_release_n_(object, n);
+  return _swift_release_n_(object, n);
 }
 
-void (*swift::_swift_release_n)(HeapObject *object, uint32_t n);
+void (*swift::_swift_release_n)(HeapObject *object, uint32_t n) =
+  _swift_release_n_;
 
 void swift::swift_nonatomic_release_n(HeapObject *object, uint32_t n) {
   SWIFT_RT_TRACK_INVOCATION(object, swift_nonatomic_release_n);
@@ -511,13 +509,12 @@ static HeapObject *_swift_tryRetain_(HeapObject *object) {
 }
 
 HeapObject *swift::swift_tryRetain(HeapObject *object) {
-  if (SWIFT_UNLIKELY(_swift_tryRetain))
+  if (SWIFT_UNLIKELY(_swift_tryRetain != _swift_tryRetain_))
     return _swift_tryRetain(object);
-  else
-    return _swift_tryRetain_(object);
+  return _swift_tryRetain_(object);
 }
 
-HeapObject *(*swift::_swift_tryRetain)(HeapObject *object);
+HeapObject *(*swift::_swift_tryRetain)(HeapObject *object) = _swift_tryRetain_;
 
 bool swift::swift_isDeallocating(HeapObject *object) {
   if (!isValidPointerForNativeRetain(object))
