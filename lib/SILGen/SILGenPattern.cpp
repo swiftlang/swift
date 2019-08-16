@@ -2697,15 +2697,11 @@ static void switchCaseStmtSuccessCallback(SILGenFunction &SGF,
 }
 
 void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
-  std::cout << " \n --- PARSING SWITCH (GEN PATTERN) --- " << std::endl;
-
   LLVM_DEBUG(llvm::dbgs() << "emitting switch stmt\n";
              S->dump(llvm::dbgs());
              llvm::dbgs() << '\n');
 
   auto subjectTy = S->getSubjectExpr()->getType();
-
-  std::cout << "SUBJECT TYPE: " << subjectTy->getString() << std::endl;
 
   // If the subject expression is uninhabited, we're already dead.
   // Emit an unreachable in place of the switch statement.
@@ -2715,10 +2711,12 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
     return;
   }
 
+  // Optimize string switch statements by creating a cache that is searched through.
+  // TODO: how should I do the following? I couldn't find a StringType variable or similar.
   if (subjectTy->getString() == "String") {
-    std::cout << " \n --- STRING SWITCH --- " << std::endl;
-
+    // find the cache function
     SmallVector<ValueDecl *, 1> results;
+    // TODO: replace the following with a cache function
     getModule().getASTContext().lookupInSwiftModule("_findStringSwitchCase", results);
     if (results.size() != 1) return;
 
@@ -2727,138 +2725,60 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
 
     ConcreteDeclRef findFnRef(findFn);
     auto findFnType = findFn->getInterfaceType();
-    auto DRE = new (getModule().getASTContext())
-      DeclRefExpr(findFnRef, DeclNameLoc(), /*IsImplicit=*/true);
-    DRE->setType(findFnType);
 
+    auto findFnDeclRefExpr = new (getModule().getASTContext())
+      DeclRefExpr(findFnRef, DeclNameLoc(), /*IsImplicit=*/true);
+    findFnDeclRefExpr->setType(findFnType);
+
+    // Create a vector of case statements.
+    // We will use this when we create the "new" switch statement to replace this one.
     SmallVector<ASTNode, 4> cases;
     for (auto caseBlock : S->getCases()) {
       cases.push_back(caseBlock);
     }
 
-    llvm::SmallVector<Expr *, 16> stringExprs;
-    for (auto node : S->getRawCases()) { stringExprs.push_back(node.dyn_cast<Expr *>()); }
+    // The string searching function takes an array of strings.
+    // We get those strings here form the case statements.
+    SmallVector<Expr *, 16> stringExprs;
+    for (auto node : S->getRawCases()) {
+      if (auto *strExpr = node.dyn_cast<Expr *>())
+        stringExprs.push_back(strExpr);
+    }
+    // Then we turn them into an array expression so they can be applied to the find function.
     auto *strArray = ArrayExpr::create(getModule().getASTContext(),
                                        SourceLoc(),
                                        stringExprs, {},
                                        SourceLoc());
-
-    // Call _findStringSwitchCaseWithCache with an array of strings as argument.
-    auto *Fun = new (getModule().getASTContext()) UnresolvedDeclRefExpr(
-                  getModule().getASTContext().getIdentifier("_findStringSwitchCase"),
-                  DeclRefKind::Ordinary, DeclNameLoc());
+    if (!strArray) return;
 
     Identifier tableId = getModule().getASTContext().getIdentifier("cases");
     Identifier strId = getModule().getASTContext().getIdentifier("string");
-    auto *Args = TupleExpr::createImplicit(getModule().getASTContext(),
+    auto *findFnArgs = TupleExpr::createImplicit(getModule().getASTContext(),
                                            {strArray, S->getSubjectExpr()},
                                            {tableId, strId});
 
+    // Create a call expression to find the subject in the cases.
     auto *callExpr = CallExpr::create(getModule().getASTContext(),
-                                      DRE, Args,
+                                      findFnDeclRefExpr, findFnArgs,
                                       {}, {},
                                       false, false);
 
     if (auto *fnType = findFnType->getAs<FunctionType>())
       callExpr->setType(fnType->getResult());
 
-    std::cout << callExpr->getType()->getString() << std::endl;
-
-    auto switchStmt = SwitchStmt::create(LabeledStmtInfo(),
+    // Create a new switch statement to replace the current one.
+    // This switch statement will switch on the result of the call
+    // to the find function created above. We give it the cases and
+    // the result of the call to the find function (from above).
+    auto newSwitchStmt = SwitchStmt::create(LabeledStmtInfo(),
                                          SourceLoc(), callExpr, SourceLoc(),
                                          cases, SourceLoc(), getModule().getASTContext());
-    return emitSwitchStmt(switchStmt);
-//
-//     std::cout << "FD TYPE: " << FD->getResultInterfaceType()->getString() << std::endl;
-//
-//     SILDeclRef ref(FD, SILDeclRef::Kind::Func);
+    return emitSwitchStmt(newSwitchStmt);
 
-    // std::string Mangled = ref.mangle();
-//     SILFunction *findCacheFunc = getModule().findFunction(Mangled, SILLinkage::PublicExternal);
-//     if (!findCacheFunc) return;
-//
-//     SILFunctionType *FTy = findCacheFunc->getLoweredFunctionType();
-//     if (FTy->getNumParameters() != 3) return;
-//
-//     SILType cacheType = FTy->getParameters()[2].getSILStorageType().getObjectType();
-//     NominalTypeDecl *cacheDecl = cacheType.getNominalOrBoundGenericNominal();
-//     if (!cacheDecl) return;
-//
-//     SILType wordTy = cacheType.getFieldType(cacheDecl->getStoredProperties().front(), getModule());
-//
-//     std::string globalName = "test_name";
-//
-//     SILGlobalVariable *cacheVar = SILGlobalVariable::create(getModule(),
-//                                                             SILLinkage::Private,
-//                                                             IsNotSerialized,
-//                                                             globalName,
-//                                                             cacheType);
-//     if (!cacheVar) return;
-
-//     SILLocation loc(S);
-//     SILValue cachingFn = emitGlobalFunctionRef(loc, ref);
-
-//     SILBuilder staticInitBuilder(cacheVar);
-//     auto *zero = staticInitBuilder.createIntegerLiteral(loc, wordTy, 0);
-//     staticInitBuilder.createStruct(ArtificialUnreachableLocation(), cacheType, {zero, zero});
-
-//     GlobalAddrInst *cacheAddr = B.createGlobalAddr(loc, cacheVar);
-//     FunctionRefInst *funcRefInst = B.createFunctionRef(loc, findCacheFunc);
-
-//     ManagedValue subjectMV = emitRValueAsSingleValue(S->getSubjectExpr(),
-//                                                      SGFContext::AllowGuaranteedPlusZero);
-
-//     auto rawRef = new (getModule().getASTContext()) DeclRefExpr(S->getSubjectExpr(), loc, true);
-
-//     llvm::SmallVector<Expr *, 16> stringExprs;
-//     for (auto node : S->getRawCases()) { stringExprs.push_back(node.get<Expr *>()); }
-//     auto *strArray = ArrayExpr::create(getModule().getASTContext(),
-//                                        SourceLoc(),
-//                                        stringExprs, {},
-//                                        SourceLoc());
-
-//     Identifier tableId = getModule().getASTContext().getIdentifier("cases");
-//     Identifier strId = getModule().getASTContext().getIdentifier("string");
-//     auto *args = TupleExpr::createImplicit(getModule().getASTContext(),
-//                                            { strArray, rawRef },
-//                                            { tableId, strId });
-//
-//     auto fnRef = new (getModule().getASTContext()) UnresolvedDeclRefExpr();
-//     auto *callExpr = CallExpr::create(getModule().getASTContext(), )
-
-
-//     for (auto *caseBlock : S->getCases()) {
-//       for (auto *caseVar : caseBlock->getCaseBodyVariables()) {
-//         std::cout << caseVar->getType()->getString() << std::endl;
-//       }
-//     }
-
-//     for (auto caseBlock : S->getCases()) {
-//       for (auto &labelItem : caseBlock->getCaseLabelItems()) {
-//           ManagedValue caseMV =
-//             maybeEmitValueOfLocalVarDecl(labelItem.getPattern()->getSingleVar());
-//           std::cout << std::boolalpha << !!(labelItem.getPattern()->getSingleVar()) << std::endl;
-//           auto *casePattern = labelItem.getPattern();
-// //           caseExprs.emplace_back(caseExpr->getSubExpr());
-//           std::cout << "CASE TYPE: " << casePattern->getType()->getString() << std::endl;
-//       }
-//     }
-
-//     ArrayExpr *caseArgs = ArrayExpr::create(getModule().getASTContext(),
-//                                             SourceLoc(),
-//                                             ArrayRef<Expr *>(), ArrayRef<SourceLoc>(),
-//                                             SourceLoc()/* ,
-//                                             subjectTy  */);
-
-//     ManagedValue casesMV = emitRValueAsSingleValue(strArray,
-//                                                    SGFContext::AllowGuaranteedPlusZero);
-//
-//     SILValue result = B.createApply(loc, cachingFn, {}, { casesMV.getValue(),
-//                                                           subjectMV.getValue(),
-//                                                           cachingFn
-//                                                           /* S->getCases(),
-//                                                           S->getSubjectExpr(),
-//                                                           cacheAddr */ });
+    // TODO:
+    // We get an error when trying to apply the find function in the new switch statement:
+    // visitApplyExpr has a segmentation fault. This is called by emitRValueAsSingleValue when
+    // this function tries to get a SILValue form the result of findFnType.
   }
 
   auto completionHandler = [this](PatternMatchEmission &emission,
