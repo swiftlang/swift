@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "patternmatch-silgen"
-#include "ArgumentSource.h"
 #include "Cleanup.h"
 #include "ExitableFullExpr.h"
 #include "Initialization.h"
@@ -36,8 +35,6 @@
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/FormattedStream.h"
-
-#include <iostream>
 
 using namespace swift;
 using namespace Lowering;
