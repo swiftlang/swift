@@ -778,8 +778,8 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
         const auto *currentInit = dyn_cast<ConstructorDecl>(current);
         const auto *otherInit = dyn_cast<ConstructorDecl>(other);
         if (currentInit && otherInit &&
-            ((currentInit->getFailability() == OTK_None) !=
-             (otherInit->getFailability() == OTK_None))) {
+            (currentInit->isFailable() !=
+             otherInit->isFailable())) {
           isAcceptableVersionBasedChange = true;
         }
       }
@@ -3223,9 +3223,9 @@ public:
       // This would normally be diagnosed by the covariance rules;
       // however, those are disabled so that we can provide a more
       // specific diagnostic here.
-      if (CD->getFailability() != OTK_None &&
+      if (CD->isFailable() &&
           CD->getOverriddenDecl() &&
-          CD->getOverriddenDecl()->getFailability() == OTK_None) {
+          !CD->getOverriddenDecl()->isFailable()) {
         TC.diagnose(CD, diag::failable_initializer_override,
                     CD->getFullName());
         TC.diagnose(CD->getOverriddenDecl(),
@@ -3353,6 +3353,107 @@ bool TypeChecker::isAvailabilitySafeForConformance(
 void TypeChecker::typeCheckDecl(Decl *D) {
   checkForForbiddenPrefix(D);
   DeclChecker(*this).visit(D);
+}
+
+llvm::Expected<bool>
+IsImplicitlyUnwrappedOptionalRequest::evaluate(Evaluator &evaluator,
+                                               ValueDecl *decl) const {
+  TypeRepr *TyR = nullptr;
+
+  switch (decl->getKind()) {
+  case DeclKind::Func: {
+    TyR = cast<FuncDecl>(decl)->getBodyResultTypeLoc().getTypeRepr();
+    break;
+  }
+
+  case DeclKind::Accessor: {
+    auto *accessor = cast<AccessorDecl>(decl);
+    if (!accessor->isGetter())
+      break;
+
+    auto *storage = accessor->getStorage();
+    if (auto *subscript = dyn_cast<SubscriptDecl>(storage))
+      TyR = subscript->getElementTypeLoc().getTypeRepr();
+    else
+      TyR = cast<VarDecl>(storage)->getTypeLoc().getTypeRepr();
+    break;
+  }
+
+  case DeclKind::Subscript:
+    TyR = cast<SubscriptDecl>(decl)->getElementTypeLoc().getTypeRepr();
+    break;
+
+  case DeclKind::Param: {
+    auto *param = cast<ParamDecl>(decl);
+    if (param->isSelfParameter())
+      return false;
+
+    // FIXME: This "which accessor parameter am I" dance will come up in
+    // other requests too. Factor it out when needed.
+    if (auto *accessor = dyn_cast<AccessorDecl>(param->getDeclContext())) {
+      auto *storage = accessor->getStorage();
+      auto *accessorParams = accessor->getParameters();
+      unsigned startIndex = 0;
+
+      switch (accessor->getAccessorKind()) {
+      case AccessorKind::DidSet:
+      case AccessorKind::WillSet:
+      case AccessorKind::Set:
+        if (param == accessorParams->get(0)) {
+          // This is the 'newValue' parameter.
+          return storage->isImplicitlyUnwrappedOptional();
+        }
+
+        startIndex = 1;
+        break;
+
+      default:
+        startIndex = 0;
+        break;
+      }
+
+      // If the parameter is not the 'newValue' parameter to a setter, it
+      // must be a subscript index parameter.
+      auto *subscript = cast<SubscriptDecl>(storage);
+      auto *subscriptParams = subscript->getIndices();
+
+      auto where = llvm::find_if(*accessorParams,
+                                  [param](ParamDecl *other) {
+                                    return other == param;
+                                  });
+      assert(where != accessorParams->end());
+      unsigned index = where - accessorParams->begin();
+
+      auto *subscriptParam = subscriptParams->get(index - startIndex);
+
+      if (param != subscriptParam) {
+        // This is the 'subscript(...) { get { ... } set { ... } }' case.
+        // This means we cloned the parameter list for each accessor.
+        // Delegate to the original parameter.
+        return subscriptParam->isImplicitlyUnwrappedOptional();
+      }
+
+      // This is the 'subscript(...) { <<body of getter>> }' case.
+      // The subscript and the getter share their ParamDecls.
+      // Fall through.
+    }
+
+    // Handle eg, 'inout Int!' or '__owned NSObject!'.
+    TyR = param->getTypeLoc().getTypeRepr();
+    if (auto *STR = dyn_cast_or_null<SpecifierTypeRepr>(TyR))
+      TyR = STR->getBase();
+    break;
+  }
+
+  case DeclKind::Var:
+    // FIXME: See the comment in validateTypedPattern().
+    break;
+
+  default:
+    break;
+  }
+
+  return (TyR && TyR->getKind() == TypeReprKind::ImplicitlyUnwrappedOptional);
 }
 
 /// Validate the underlying type of the given typealias.
@@ -3580,22 +3681,6 @@ static Type buildAddressorResultType(TypeChecker &TC,
       ? TC.getUnsafePointerType(addressor->getLoc(), valueType)
       : TC.getUnsafeMutablePointerType(addressor->getLoc(), valueType);
   return pointerType;
-}
-
-static TypeLoc getTypeLocForFunctionResult(FuncDecl *FD) {
-  auto accessor = dyn_cast<AccessorDecl>(FD);
-  if (!accessor) {
-    return FD->getBodyResultTypeLoc();
-  }
-
-  assert(accessor->isGetter());
-  auto *storage = accessor->getStorage();
-  assert(isa<VarDecl>(storage) || isa<SubscriptDecl>(storage));
-
-  if (auto *subscript = dyn_cast<SubscriptDecl>(storage))
-    return subscript->getElementTypeLoc();
-
-  return cast<VarDecl>(storage)->getTypeLoc();
 }
 
 void TypeChecker::validateDecl(ValueDecl *D) {
@@ -3942,15 +4027,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     validateGenericFuncOrSubscriptSignature(FD, FD, FD);
     
-    if (!isa<AccessorDecl>(FD) || cast<AccessorDecl>(FD)->isGetter()) {
-      auto *TyR = getTypeLocForFunctionResult(FD).getTypeRepr();
-      if (TyR && TyR->getKind() == TypeReprKind::ImplicitlyUnwrappedOptional) {
-        auto &C = FD->getASTContext();
-        FD->getAttrs().add(
-            new (C) ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true));
-      }
-    }
-
     // We want the function to be available for name lookup as soon
     // as it has a valid interface type.
     FD->setSignatureIsValidated();
@@ -4011,12 +4087,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     validateAttributes(*this, CD);
 
-    if (CD->getFailability() == OTK_ImplicitlyUnwrappedOptional) {
-      auto &C = CD->getASTContext();
-      CD->getAttrs().add(
-          new (C) ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true));
-    }
-
     break;
   }
 
@@ -4048,14 +4118,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     validateAttributes(*this, SD);
 
-    auto *TyR = SD->getElementTypeLoc().getTypeRepr();
-    if (TyR && TyR->getKind() == TypeReprKind::ImplicitlyUnwrappedOptional) {
-      auto &C = SD->getASTContext();
-      SD->getAttrs().add(
-          new (C) ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true));
-    }
-
-    // Perform accessor-related validation.
     if (SD->getOpaqueResultTypeDecl()) {
       if (auto SF = SD->getInnermostDeclContext()->getParentSourceFile()) {
         SF->markDeclWithOpaqueResultTypeAsValidated(SD);

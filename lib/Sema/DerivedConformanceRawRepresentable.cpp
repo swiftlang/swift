@@ -436,8 +436,7 @@ deriveRawRepresentable_init(DerivedConformance &derived) {
   
   auto initDecl =
     new (C) ConstructorDecl(name, SourceLoc(),
-                            /*Failability=*/ OTK_Optional,
-                            /*FailabilityLoc=*/SourceLoc(),
+                            /*Failable=*/ true, /*FailabilityLoc=*/SourceLoc(),
                             /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
                             paramList,
                             /*GenericParams=*/nullptr, parentDC);

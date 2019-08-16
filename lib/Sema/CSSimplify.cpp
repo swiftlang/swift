@@ -2234,8 +2234,7 @@ repairViaBridgingCast(ConstraintSystem &cs, Type fromType, Type toType,
 
     if (auto *overload = cs.findSelectedOverloadFor(anchor)) {
       auto *decl = overload->Choice.getDeclOrNull();
-      if (decl &&
-          decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
+      if (decl && decl->isImplicitlyUnwrappedOptional())
         fromType = objectType1;
     }
   }

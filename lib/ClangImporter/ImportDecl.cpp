@@ -534,7 +534,7 @@ makeEnumRawValueConstructor(ClangImporter::Implementation &Impl,
   DeclName name(C, DeclBaseName::createConstructor(), paramPL);
   auto *ctorDecl =
     new (C) ConstructorDecl(name, enumDecl->getLoc(),
-                            OTK_Optional, /*FailabilityLoc=*/SourceLoc(),
+                            /*Failable=*/true, /*FailabilityLoc=*/SourceLoc(),
                             /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
                             paramPL,
                             /*GenericParams=*/nullptr, enumDecl);
@@ -1311,7 +1311,8 @@ createDefaultConstructor(ClangImporter::Implementation &Impl,
   // Create the constructor.
   DeclName name(context, DeclBaseName::createConstructor(), emptyPL);
   auto constructor = new (context) ConstructorDecl(
-      name, structDecl->getLoc(), OTK_None, /*FailabilityLoc=*/SourceLoc(),
+      name, structDecl->getLoc(),
+      /*Failable=*/false, /*FailabilityLoc=*/SourceLoc(),
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), emptyPL,
       /*GenericParams=*/nullptr, structDecl);
 
@@ -1431,8 +1432,7 @@ createValueConstructor(ClangImporter::Implementation &Impl,
                   SourceLoc(), var->getName(), structDecl);
     param->setInterfaceType(var->getInterfaceType());
     param->setValidationToChecked();
-    Impl.recordImplicitUnwrapForDecl(
-        param, var->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>());
+    Impl.recordImplicitUnwrapForDecl(param, var->isImplicitlyUnwrappedOptional());
     valueParameters.push_back(param);
   }
 
@@ -1441,7 +1441,8 @@ createValueConstructor(ClangImporter::Implementation &Impl,
   // Create the constructor
   DeclName name(context, DeclBaseName::createConstructor(), paramList);
   auto constructor = new (context) ConstructorDecl(
-      name, structDecl->getLoc(), OTK_None, /*FailabilityLoc=*/SourceLoc(),
+      name, structDecl->getLoc(),
+      /*Failable=*/false, /*FailabilityLoc=*/SourceLoc(),
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), paramList,
       /*GenericParams=*/nullptr, structDecl);
 
@@ -5745,19 +5746,21 @@ Decl *SwiftDeclConverter::importGlobalAsInitializer(
       Impl.importFunctionReturnType(dc, decl, allowNSUIntegerAsInt);
 
   // Update the failability appropriately based on the imported method type.
-  OptionalTypeKind initOptionality = OTK_None;
+  bool failable = false, isIUO = false;
   if (importedType.isImplicitlyUnwrapped()) {
     assert(importedType.getType()->getOptionalObjectType());
-    initOptionality = OTK_ImplicitlyUnwrappedOptional;
+    failable = true;
+    isIUO = true;
   } else if (importedType.getType()->getOptionalObjectType()) {
-    initOptionality = OTK_Optional;
+    failable = true;
   }
 
   auto result = Impl.createDeclWithClangNode<ConstructorDecl>(
       decl, AccessLevel::Public, name, /*NameLoc=*/SourceLoc(),
-      initOptionality, /*FailabilityLoc=*/SourceLoc(),
+      failable, /*FailabilityLoc=*/SourceLoc(),
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), parameterList,
       /*GenericParams=*/nullptr, dc);
+  result->setImplicitlyUnwrappedOptional(isIUO);
   result->getASTContext().evaluator.cacheOutput(InitKindRequest{result},
                                                 std::move(initKind));
   result->setImportAsStaticMember();
@@ -6695,8 +6698,7 @@ SwiftDeclConverter::importSubscript(Decl *decl,
   // If we have a setter, rectify it with the getter.
   ParamDecl *setterIndex;
   bool getterAndSetterInSameType = false;
-  bool isIUO =
-      getter->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+  bool isIUO = getter->isImplicitlyUnwrappedOptional();
   if (setter) {
     // Whether there is an existing read-only subscript for which
     // we have now found a setter.
