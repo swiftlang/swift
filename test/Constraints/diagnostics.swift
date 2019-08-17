@@ -570,8 +570,8 @@ func r22255907_2<T>(_ x : Int, a : T, b: Int) {}
 
 func reachabilityForInternetConnection() {
   var variable: Int = 42
-  r22255907_1(&variable, b: 2.1) // expected-error {{'&' used with non-inout argument of type 'Int'}} {{15-16=}}
-  r22255907_2(1, a: &variable, b: 2.1)// expected-error {{'&' used with non-inout argument of type 'Int'}} {{21-22=}}
+  r22255907_1(&variable, b: 2) // expected-error {{'&' used with non-inout argument of type 'Int'}} {{15-16=}}
+  r22255907_2(1, a: &variable, b: 2)// expected-error {{'&' used with non-inout argument of type 'Int'}} {{21-22=}}
 }
 
 // <rdar://problem/21601687> QoI: Using "=" instead of "==" in if statement leads to incorrect error message

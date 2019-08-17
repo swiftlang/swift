@@ -623,13 +623,14 @@ KeyPathContextualMismatch::create(ConstraintSystem &cs, Type lhs, Type rhs,
 }
 
 bool RemoveAddressOf::diagnose(Expr *root, bool asNote) const {
-  InvalidUseOfAddressOf failure(root, getConstraintSystem(), getLocator());
+  InvalidUseOfAddressOf failure(root, getConstraintSystem(), getFromType(),
+                                getToType(), getLocator());
   return failure.diagnose(asNote);
 }
 
-RemoveAddressOf *RemoveAddressOf::create(ConstraintSystem &cs,
+RemoveAddressOf *RemoveAddressOf::create(ConstraintSystem &cs, Type lhs, Type rhs,
                                          ConstraintLocator *locator) {
-  return new (cs.getAllocator()) RemoveAddressOf(cs, locator);
+  return new (cs.getAllocator()) RemoveAddressOf(cs, lhs, rhs, locator);
 }
 
 bool RemoveReturn::diagnose(Expr *root, bool asNote) const {
