@@ -566,7 +566,7 @@ enum SR11261_var {
   case identifier2
 }
 
-enum SR11261_1 {
+enum SR11261_Comma {
   case a, b, c, func, d // expected-error {{keyword 'func' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{17-21=`func`}}
 }
 
