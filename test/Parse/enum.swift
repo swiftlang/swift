@@ -560,6 +560,12 @@ enum SR11261 {
   case identifier2
 }
 
+enum SR11261_var {
+  case identifier
+  case var // expected-error {{keyword 'var' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{8-11=`var`}}
+  case identifier2
+}
+
 enum SR11261_1 {
   case a, b, c, func, d // expected-error {{keyword 'func' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{17-21=`func`}}
 }

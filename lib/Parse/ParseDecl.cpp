@@ -5782,6 +5782,7 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
           return Status;
         }
       }
+      
       if (NameIsKeyword) {
         diagnose(TokLoc, diag::keyword_cant_be_identifier, TokText);
         diagnose(TokLoc, diag::backticks_to_escape)
