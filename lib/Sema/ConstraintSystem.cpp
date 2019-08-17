@@ -126,33 +126,6 @@ void ConstraintSystem::mergeEquivalenceClasses(TypeVariableType *typeVar1,
   // Merge nodes in the constraint graph.
   CG.mergeNodes(typeVar1, typeVar2);
 
-  // Let's try to de-duplicate any generic requirements
-  // associated with given type variable, if it represents
-  // a generic parameter.
-  if (typeVar1->getImpl().getGenericParameter()) {
-    auto requirements = CG.gatherConstraints(
-        typeVar1, ConstraintGraph::GatheringKind::EquivalenceClass,
-        [](Constraint *constraint) -> bool {
-          if (auto *locator = constraint->getLocator()) {
-            return locator->isLastElement(
-                       ConstraintLocator::TypeParameterRequirement) ||
-                   locator->isLastElement(
-                       ConstraintLocator::ConditionalRequirement);
-          }
-
-          return false;
-        });
-
-    llvm::SmallPtrSet<TypeBase *, 4> existingRequirements;
-    for (auto *req : requirements) {
-      auto constraintTy = req->getSecondType();
-      // If this constraint has already been recorded in the
-      // constraint system, there is no reason to check it twice.
-      if (!existingRequirements.insert(constraintTy.getPointer()).second)
-        retireConstraint(req);
-    }
-  }
-
   if (updateWorkList) {
     addTypeVariableConstraintsToWorkList(typeVar1);
   }

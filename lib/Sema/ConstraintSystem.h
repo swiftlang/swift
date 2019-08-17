@@ -637,8 +637,6 @@ public:
   /// The list of member references which couldn't be resolved,
   /// and had to be assumed based on their use.
   llvm::SmallVector<ConstraintLocator *, 4> MissingMembers;
-  llvm::SmallVector<std::pair<GenericSignature *, unsigned>, 4>
-      FixedRequirements;
 
   /// The set of disjunction choices used to arrive at this solution,
   /// which informs constraint application.
