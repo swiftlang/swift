@@ -5767,32 +5767,32 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
       SourceLoc TokLoc = Tok.getLoc();
       StringRef TokText = Tok.getText();
 
-      if (!NameIsKeyword || Tok.isIdentifierOrUnderscore()) {
-        // For recovery, see if the user typed something resembling a switch
-        // "case" label.
+      // For recovery, see if the user typed something resembling a switch
+      // "case" label.
+      {
+        BacktrackingScope backtrack(*this);
         llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
         T(InVarOrLetPattern, Parser::IVOLP_InMatchingPattern);
         parseMatchingPattern(/*isExprBasic*/false);
+        
+        if (consumeIf(tok::colon)) {
+          backtrack.cancelBacktrack();
+          diagnose(CaseLoc, diag::case_outside_of_switch, "case");
+          Status.setIsParseError();
+          return Status;
+        }
       }
-
-      if (consumeIf(tok::colon)) {
-        diagnose(CaseLoc, diag::case_outside_of_switch, "case");
+      if (CommaLoc.isValid() && !NameIsKeyword) {
+        diagnose(CommaLoc, diag::expected_identifier_after_case_comma);
         Status.setIsParseError();
         return Status;
-      }
-
-      if (NameIsKeyword) {
+      } else if (NameIsKeyword) {
         diagnose(TokLoc, diag::keyword_cant_be_identifier, TokText);
         diagnose(TokLoc, diag::backticks_to_escape)
           .fixItReplace(TokLoc, "`" + TokText.str() + "`");
         if (!Tok.isAtStartOfLine())
           consumeToken();
       } else {
-        if (CommaLoc.isValid()) {
-          diagnose(Tok, diag::expected_identifier_after_case_comma);
-          Status.setIsParseError();
-          return Status;
-        }
         diagnose(CaseLoc, diag::expected_identifier_in_decl, "enum 'case'");
       }
     }

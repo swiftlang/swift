@@ -127,8 +127,8 @@ enum Recovery5 {
 enum Recovery6 {
   case Snout, _; // expected-error {{keyword '_' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{15-16=`_`}}
   case _; // expected-error {{keyword '_' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{8-9=`_`}}
-  case Tusk, // expected-error {{expected pattern}}
-} // expected-error {{expected identifier after comma in enum 'case' declaration}}
+  case Tusk, // expected-error {{expected identifier after comma in enum 'case' declaration}}
+} 
 
 enum RawTypeEmpty : Int {} // expected-error {{an enum with no cases cannot declare a raw type}} expected-note {{do you want to add protocol stubs?}}
 // expected-error@-1{{'RawTypeEmpty' declares raw type 'Int', but does not conform to RawRepresentable and conformance could not be synthesized}}
@@ -574,4 +574,8 @@ enum SR11261_Newline {
 enum SR11261_Newline2 {
   case 
   func foo() {} // expected-error {{keyword 'func' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{3-7=`func`}}
+}
+
+enum SR11261_PatternMatching {
+  case let .foo(x, y): // expected-error {{'case' label can only appear inside a 'switch' statement}}
 }
