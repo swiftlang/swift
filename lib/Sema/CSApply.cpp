@@ -4635,7 +4635,8 @@ namespace {
     }
 
     Expr *visitOneWayExpr(OneWayExpr *E) {
-      return E->getSubExpr();
+      auto type = simplifyType(cs.getType(E));
+      return coerceToType(E->getSubExpr(), type, cs.getConstraintLocator(E));
     }
 
     Expr *visitTapExpr(TapExpr *E) {

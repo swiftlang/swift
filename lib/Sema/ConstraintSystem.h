@@ -1055,7 +1055,7 @@ private:
   /// solution it represents.
   Score CurrentScore;
 
-  std::vector<TypeVariableType *> TypeVariables;
+  llvm::SetVector<TypeVariableType *> TypeVariables;
 
   /// Maps expressions to types for choosing a favored overload
   /// type in a disjunction constraint.
@@ -1766,9 +1766,15 @@ public:
 
   /// Retrieve the set of active type variables.
   ArrayRef<TypeVariableType *> getTypeVariables() const {
-    return TypeVariables;
+    return TypeVariables.getArrayRef();
   }
-  
+
+  /// Whether the given type variable is active in the constraint system at
+  /// the moment.
+  bool isActiveTypeVariable(TypeVariableType *typeVar) const {
+    return TypeVariables.count(typeVar) > 0;
+  }
+
   TypeBase* getFavoredType(Expr *E) {
     assert(E != nullptr);
     return this->FavoredTypes[E];
