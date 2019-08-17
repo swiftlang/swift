@@ -304,31 +304,12 @@ protected:
     if (isConditional())
       return true;
 
-    auto *anchor = getAnchor();
-    // In the situations like this:
-    //
-    // ```swift
-    // enum E<T: P> { case foo(T) }
-    // let _: E = .foo(...)
-    // ```
-    //
-    // `E` is going to be opened twice. First, when
-    // it's used as a contextual type, and when `E.foo`
-    // is found and its function type is opened.
-    // We still want to record both fixes but should
-    // avoid diagnosing the same problem multiple times.
-    if (isa<UnresolvedMemberExpr>(anchor)) {
-      auto path = getLocator()->getPath();
-      if (path.front().getKind() != ConstraintLocator::UnresolvedMember)
-        return false;
-    }
-
     // For static/initializer calls there is going to be
     // a separate fix, attached to the argument, which is
     // much easier to diagnose.
     // For operator calls we can't currently produce a good
     // diagnostic, so instead let's refer to expression diagnostics.
-    return !(Apply && (isOperator(Apply) || isa<TypeExpr>(anchor)));
+    return !(Apply && isOperator(Apply));
   }
 
   static bool isOperator(const ApplyExpr *apply) {

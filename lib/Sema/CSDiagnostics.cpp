@@ -373,8 +373,36 @@ ValueDecl *RequirementFailure::getDeclRef() const {
   if (isFromContextualType())
     return getAffectedDeclFromType(cs.getContextualType());
 
-  if (auto overload = getChoiceFor(getRawAnchor()))
-    return overload->choice.getDecl();
+  if (auto overload = getChoiceFor(getRawAnchor())) {
+    // If there is a declaration associated with this
+    // failure e.g. an overload choice of the call
+    // expression, let's see whether failure is
+    // associated with it directly or rather with
+    // one of its parents.
+    if (auto *decl = overload->choice.getDeclOrNull()) {
+      auto *DC = decl->getDeclContext();
+
+      do {
+        if (auto *parent = DC->getAsDecl()) {
+          if (auto *GC = parent->getAsGenericContext()) {
+            if (GC->getGenericSignature() != Signature)
+              continue;
+
+            // If this is a signature if an extension
+            // then it means that code has referenced
+            // something incorrectly and diagnostic
+            // should point to the referenced declaration.
+            if (isa<ExtensionDecl>(parent))
+              break;
+
+            return cast<ValueDecl>(parent);
+          }
+        }
+      } while ((DC = DC->getParent()));
+
+      return decl;
+    }
+  }
 
   return getAffectedDeclFromType(getOwnerType());
 }

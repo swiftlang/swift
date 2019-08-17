@@ -405,7 +405,7 @@ func test() {
   // expected-error@-1 {{generic parameter 'A' could not be inferred}}
   _ = Claws.Fangs<NotADog>()
   // expected-error@-1 {{generic parameter 'A' could not be inferred}}
-  // expected-error@-2 {{referencing initializer 'init()' on 'Claws.Fangs' requires that 'NotADog' conform to 'ExpressibleByDogLiteral'}}
+  // expected-error@-2 {{generic struct 'Fangs' requires that 'NotADog' conform to 'ExpressibleByDogLiteral'}}
   // expected-note@-3 {{explicitly specify the generic arguments to fix this issue}} {{12-12=<<#A: ExpressibleByCatLiteral#>>}}
 }
 
