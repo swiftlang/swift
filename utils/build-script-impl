@@ -298,6 +298,7 @@ KNOWN_SETTINGS=(
     tensorflow-target-include-dir      ""        "Path to target Tensorflow headers"
     tensorflow-target-lib-dir          ""        "Path to target TensorFlow libraries"
     tensorflow-swift-apis              ""        "Path to TensorFlow deep learning library repository"
+    tensorflow-swift                   ""        "Path to tensorflow/swift repository"
 )
 
 # Centralized access point for traced command invocation.
@@ -1235,6 +1236,7 @@ PLAYGROUNDSUPPORT_SOURCE_DIR="${WORKSPACE}/swift-xcode-playground-support"
 # SWIFT_ENABLE_TENSORFLOW
 TENSORFLOW_SOURCE_DIR="${WORKSPACE}/tensorflow"
 TENSORFLOW_SWIFT_APIS_DIR="${WORKSPACE}/tensorflow-swift-apis"
+TENSORFLOW_SWIFT_DIR="${WORKSPACE}/tensorflow-swift"
 
 if [[ ! "${SKIP_BUILD_PLAYGROUNDSUPPORT}" && ! -d ${PLAYGROUNDSUPPORT_SOURCE_DIR} ]]; then
     echo "Couldn't find PlaygroundSupport source directory."
@@ -1248,6 +1250,10 @@ if [[ "${ENABLE_TENSORFLOW}" ]]; then
     fi
     if [[ "${TENSORFLOW_SWIFT_APIS}" && ! -d "${TENSORFLOW_SWIFT_APIS}" ]]; then
         echo "Invalid TensorFlow high-level APIs repository specified."
+        exit 1
+    fi
+    if [[ "${TENSORFLOW_SWIFT}" && ! -d "${TENSORFLOW_SWIFT}" ]]; then
+        echo "Invalid tensorflow/swift repository specified."
         exit 1
     fi
 fi
@@ -2618,6 +2624,17 @@ for host in "${ALL_HOSTS[@]}"; do
                         cmake_options=(
                             "${cmake_options[@]}"
                             -DTENSORFLOW_SWIFT_APIS:PATH="${TENSORFLOW_SWIFT_APIS}"
+                        )
+                    fi
+
+                    # Handle tensorflow/swift repository.
+                    if [[ ! "${TENSORFLOW_SWIFT}" && -d "${TENSORFLOW_SWIFT_DIR}" ]] ; then
+                        TENSORFLOW_SWIFT="${TENSORFLOW_SWIFT_DIR}"
+                    fi
+                    if [[ "${TENSORFLOW_SWIFT}" ]] ; then
+                        cmake_options=(
+                            "${cmake_options[@]}"
+                            -DTENSORFLOW_SWIFT:PATH="${TENSORFLOW_SWIFT}"
                         )
                     fi
                 fi

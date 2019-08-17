@@ -1063,6 +1063,9 @@ def create_argument_parser():
     option('--tensorflow-swift-apis', store_path,
            default=None,
            help='Path to a TensorFlow deep learning library repository.')
+    option('--tensorflow-swift', store_path,
+           default=None,
+           help='Path to a tensorflow/swift repository.')
     option('--tensorflow-bazel-options', append,
            type=argparse.ShellSplitType(),
            default=[],

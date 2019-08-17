@@ -77,6 +77,11 @@ if(SWIFT_BUILD_STDLIB AND SWIFT_ENABLE_TENSORFLOW)
   add_subdirectory(TensorFlow)
 endif()
 
+# SWIFT_ENABLE_TENSORFLOW
+if(SWIFT_BUILD_STDLIB AND SWIFT_ENABLE_TENSORFLOW)
+  add_subdirectory(Quote)
+endif()
+
 if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_REMOTE_MIRROR)
   add_subdirectory(Reflection)
   add_subdirectory(SwiftRemoteMirror)
