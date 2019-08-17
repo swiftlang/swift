@@ -278,7 +278,7 @@ CalleeList CalleeCache::getCalleeList(SILInstruction *I) const {
   while (auto payloadTy = Ty.getOptionalObjectType())
     Ty = payloadTy;
   auto Class = Ty.getClassOrBoundGenericClass();
-  if (!Class || Class->hasClangNode() || !Class->hasDestructor())
+  if (!Class || Class->hasClangNode())
     return CalleeList();
   SILDeclRef Destructor = SILDeclRef(Class->getDestructor());
   return getCalleeList(Destructor);

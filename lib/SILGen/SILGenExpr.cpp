@@ -3360,7 +3360,7 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
             // storage.
             // Properties that are not public don't need property descriptors
             // either.
-            (!baseDecl->hasAnyAccessors() ||
+            (!baseDecl->requiresOpaqueAccessors() ||
              (!getAccessorDeclRef(getRepresentativeAccessorForKeyPath(baseDecl))
                    .isForeign &&
               getAccessorDeclRef(getRepresentativeAccessorForKeyPath(baseDecl))
@@ -3927,7 +3927,7 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
 
   // If both the delegated-to initializer and our enclosing initializer can
   // fail, deal with the failure.
-  if (outerIsOptional && ctorDecl->getFailability() != OTK_None) {
+  if (outerIsOptional && ctorDecl->isFailable()) {
     SILBasicBlock *someBB = SGF.createBasicBlock();
 
     auto hasValue = SGF.emitDoesOptionalHaveValue(E, newSelf.getValue());

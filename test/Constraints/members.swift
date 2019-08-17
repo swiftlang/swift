@@ -465,7 +465,7 @@ struct Outer {
 }
 
 // rdar://problem/39514009 - don't crash when trying to diagnose members with special names
-print("hello")[0] // expected-error {{value of tuple type '()' has no member 'subscript'}}
+print("hello")[0] // expected-error {{value of type '()' has no subscripts}}
 
 
 func rdar40537782() {

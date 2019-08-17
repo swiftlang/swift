@@ -115,9 +115,6 @@ namespace swift {
     /// Only used by lldb-moduleimport-test.
     bool EnableMemoryBufferImporter = false;
 
-    /// Enable the DWARFImporter. Only used by lldb-moduleimport-test.
-    bool EnableDWARFImporter = false;
-    
     /// Allows using identifiers with a leading dollar.
     bool EnableDollarIdentifiers = false;
 
@@ -215,6 +212,9 @@ namespace swift {
     /// before termination of the shrink phrase of the constraint solver.
     unsigned SolverShrinkUnsolvedThreshold = 10;
 
+    /// Enable one-way constraints in function builders.
+    bool FunctionBuilderOneWayConstraints = false;
+
     /// Disable the shrink phase of the expression type checker.
     bool SolverDisableShrink = false;
 
@@ -261,8 +261,15 @@ namespace swift {
     /// Someday, ASTScopeLookup will supplant lookup in the parser
     bool DisableParserLookup = false;
 
-    /// Sound we compare to ASTScope-based resolution for debugging?
+    /// Should  we compare to ASTScope-based resolution for debugging?
     bool CompareToASTScopeLookup = false;
+
+    /// Since some tests fail if the warning is output, use a flag to decide
+    /// whether it is. The warning is useful for testing.
+    bool WarnIfASTScopeLookup = false;
+
+    /// Build the ASTScope tree lazily
+    bool LazyASTScopes = false;
 
     /// Whether to use the import as member inference system
     ///

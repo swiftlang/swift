@@ -820,6 +820,13 @@ public:
   }
 
   clang::CodeGen::CodeGenModule &getClangCGM() const;
+  
+  CanType getRuntimeReifiedType(CanType type);
+  CanType substOpaqueTypesWithUnderlyingTypes(CanType type);
+  SILType substOpaqueTypesWithUnderlyingTypes(SILType type);
+  std::pair<CanType, ProtocolConformanceRef>
+  substOpaqueTypesWithUnderlyingTypes(CanType type,
+                                      ProtocolConformanceRef conformance);
 
   bool isResilient(NominalTypeDecl *decl, ResilienceExpansion expansion);
   bool hasResilientMetadata(ClassDecl *decl, ResilienceExpansion expansion);
@@ -1059,9 +1066,12 @@ public:
   /// reflection metadata.
   llvm::SetVector<CanType> BuiltinTypes;
 
-  llvm::Constant *getTypeRef(Type type, GenericSignature *genericSig,
-                             MangledTypeRefRole role);
-  llvm::Constant *getTypeRef(CanType type, MangledTypeRefRole role);
+  std::pair<llvm::Constant *, unsigned>
+  getTypeRef(Type type, GenericSignature *genericSig, MangledTypeRefRole role);
+  
+  std::pair<llvm::Constant *, unsigned>
+  getTypeRef(CanType type, MangledTypeRefRole role);
+  
   llvm::Constant *emitWitnessTableRefString(CanType type,
                                             ProtocolConformanceRef conformance,
                                             GenericSignature *genericSig,
@@ -1199,6 +1209,8 @@ public:
   void constructInitialFnAttributes(llvm::AttrBuilder &Attrs,
                                     OptimizationMode FuncOptMode =
                                       OptimizationMode::NotSet);
+  void setHasFramePointer(llvm::AttrBuilder &Attrs, bool HasFP);
+  void setHasFramePointer(llvm::Function *F, bool HasFP);
   llvm::AttributeList constructInitialAttributes();
 
   void emitProtocolDecl(ProtocolDecl *D);
@@ -1293,8 +1305,9 @@ public:
                                              NominalTypeDecl *nominal,
                                              ArrayRef<llvm::Type *> genericArgs,
                                              ForDefinition_t forDefinition);
-  llvm::Constant *getAddrOfTypeMetadataLazyCacheVariable(CanType type,
-                                               ForDefinition_t forDefinition);
+  llvm::Constant *getAddrOfTypeMetadataLazyCacheVariable(CanType type);
+  llvm::Constant *getAddrOfTypeMetadataDemanglingCacheVariable(CanType type,
+                                                       ConstantInit definition);
 
   llvm::Constant *getAddrOfClassMetadataBounds(ClassDecl *D,
                                                ForDefinition_t forDefinition);

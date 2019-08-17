@@ -484,7 +484,7 @@ public:
       }
 
       // "return nil" is only permitted in a failable initializer.
-      if (ctor->getFailability() == OTK_None) {
+      if (!ctor->isFailable()) {
         TC.diagnose(RS->getReturnLoc(), diag::return_non_failable_init)
           .highlight(E->getSourceRange());
         TC.diagnose(ctor->getLoc(), diag::make_init_failable,
@@ -782,8 +782,6 @@ public:
         return nullptr;
       S->setMakeIterator(witness);
 
-      TC.requestMemberLayout(witness.getDecl());
-
       // Create a local variable to capture the iterator.
       std::string name;
       if (auto np = dyn_cast_or_null<NamedPattern>(S->getPattern()))
@@ -807,7 +805,7 @@ public:
       auto nextResultType =
           OptionalType::get(conformance->getTypeWitnessByName(
                                 sequenceType, TC.Context.Id_Element));
-      auto *genBinding = PatternBindingDecl::createImplicit(
+      PatternBindingDecl::createImplicit(
           TC.Context, StaticSpellingKind::None, genPat,
           new (TC.Context) OpaqueValueExpr(S->getInLoc(), nextResultType), DC,
           /*VarLoc*/ S->getForLoc());
@@ -854,8 +852,6 @@ public:
     auto witness =
         genConformance->getWitnessByName(iteratorTy, TC.Context.Id_next);
     S->setIteratorNext(witness);
-
-    TC.requestMemberLayout(witness.getDecl());
 
     auto nextResultType = cast<FuncDecl>(S->getIteratorNext().getDecl())
                               ->getResultInterfaceType()
@@ -1926,7 +1922,9 @@ static Type getFunctionBuilderType(FuncDecl *FD) {
 }
 
 bool TypeChecker::typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD) {
-  return typeCheckAbstractFunctionBodyUntil(AFD, SourceLoc());
+  auto result = typeCheckAbstractFunctionBodyUntil(AFD, SourceLoc());
+  checkFunctionErrorHandling(AFD);
+  return result;
 }
 
 static Expr* constructCallToSuperInit(ConstructorDecl *ctor,
@@ -2142,7 +2140,6 @@ TypeCheckFunctionBodyUntilRequest::evaluate(Evaluator &evaluator,
     timer.emplace(AFD, tc.DebugTimeFunctionBodies, tc.WarnLongFunctionBodies);
 
   tc.validateDecl(AFD);
-  tc.requestRequiredNominalTypeLayoutForParameters(AFD->getParameters());
   tc.checkDefaultArguments(AFD->getParameters(), AFD);
 
   BraceStmt *body = AFD->getBody();

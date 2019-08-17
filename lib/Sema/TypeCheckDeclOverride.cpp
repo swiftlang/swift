@@ -13,9 +13,10 @@
 // This file implements semantic analysis for declaration overrides.
 //
 //===----------------------------------------------------------------------===//
-#include "CodeSynthesis.h"
 #include "MiscDiagnostics.h"
 #include "TypeCheckAvailability.h"
+#include "TypeCheckDecl.h"
+#include "TypeCheckObjC.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Availability.h"
@@ -162,20 +163,37 @@ bool swift::isOverrideBasedOnType(ValueDecl *decl, Type declTy,
   auto canDeclTy = declTy->getCanonicalType(genericSig);
   auto canParentDeclTy = parentDeclTy->getCanonicalType(genericSig);
 
-  auto declIUOAttr =
-      decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
-  auto parentDeclIUOAttr =
-      parentDecl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+  auto declIUOAttr = decl->isImplicitlyUnwrappedOptional();
+  auto parentDeclIUOAttr = parentDecl->isImplicitlyUnwrappedOptional();
 
   if (declIUOAttr != parentDeclIUOAttr)
     return false;
+
+  // If the generic signatures don't match, then return false because we don't
+  // want to complain if an overridden method matches multiple superclass
+  // methods which differ in generic signature.
+  //
+  // We can still succeed with a subtype match later in
+  // OverrideMatcher::match().
+  auto declGenericCtx = decl->getAsGenericContext();
+  auto &ctx = decl->getASTContext();
+  auto sig = ctx.getOverrideGenericSignature(parentDecl, decl);
+
+  if (sig && declGenericCtx &&
+      declGenericCtx->getGenericSignature()->getCanonicalSignature() !=
+          sig->getCanonicalSignature()) {
+    return false;
+  }
 
   // If this is a constructor, let's compare only parameter types.
   if (isa<ConstructorDecl>(decl)) {
     // Within a protocol context, check for a failability mismatch.
     if (isa<ProtocolDecl>(decl->getDeclContext())) {
-      if (cast<ConstructorDecl>(decl)->getFailability() !=
-            cast<ConstructorDecl>(parentDecl)->getFailability())
+      if (cast<ConstructorDecl>(decl)->isFailable() !=
+          cast<ConstructorDecl>(parentDecl)->isFailable())
+        return false;
+      if (cast<ConstructorDecl>(decl)->isImplicitlyUnwrappedOptional() !=
+          cast<ConstructorDecl>(parentDecl)->isImplicitlyUnwrappedOptional())
         return false;
     }
 
@@ -290,8 +308,7 @@ diagnoseMismatchedOptionals(const ValueDecl *member,
       return;
 
     if (!paramIsOptional) {
-      if (parentDecl->getAttrs()
-              .hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
+      if (parentDecl->isImplicitlyUnwrappedOptional())
         if (!treatIUOResultAsError)
           return;
 
@@ -310,7 +327,7 @@ diagnoseMismatchedOptionals(const ValueDecl *member,
       return;
     }
 
-    if (!decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
+    if (!decl->isImplicitlyUnwrappedOptional())
       return;
 
     // Allow silencing this warning using parens.
@@ -355,7 +372,7 @@ diagnoseMismatchedOptionals(const ValueDecl *member,
     TypeRepr *TR = resultTL.getTypeRepr();
 
     bool resultIsPlainOptional = true;
-    if (member->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
+    if (member->isImplicitlyUnwrappedOptional())
       resultIsPlainOptional = false;
 
     if (resultIsPlainOptional || treatIUOResultAsError) {
@@ -578,8 +595,7 @@ static bool parameterTypesMatch(const ValueDecl *derivedDecl,
 
       // Try once more for a match, using the underlying type of an
       // IUO if we're allowing that.
-      if (baseParam->getAttrs()
-              .hasAttribute<ImplicitlyUnwrappedOptionalAttr>() &&
+      if (baseParam->isImplicitlyUnwrappedOptional() &&
           matchMode.contains(TypeMatchFlags::AllowNonOptionalForIUOParam)) {
         baseParamTy = baseParamTy->getOptionalObjectType();
         if (baseParamTy->matches(derivedParamTy, matchMode))
@@ -1002,10 +1018,8 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
       (attempt == OverrideCheckingAttempt::MismatchedOptional ||
        attempt == OverrideCheckingAttempt::BaseNameWithMismatchedOptional);
 
-  auto declIUOAttr =
-      decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
-  auto matchDeclIUOAttr =
-      baseDecl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+  auto declIUOAttr = decl->isImplicitlyUnwrappedOptional();
+  auto matchDeclIUOAttr = baseDecl->isImplicitlyUnwrappedOptional();
 
   // If this is an exact type match, we're successful!
   Type declTy = getDeclComparisonType();
@@ -1340,7 +1354,6 @@ namespace  {
     UNINTERESTING_ATTR(RestatedObjCConformance)
     UNINTERESTING_ATTR(Implements)
     UNINTERESTING_ATTR(StaticInitializeObjCMetadata)
-    UNINTERESTING_ATTR(ImplicitlyUnwrappedOptional)
     UNINTERESTING_ATTR(ClangImporterSynthesizedType)
     UNINTERESTING_ATTR(WeakLinked)
     UNINTERESTING_ATTR(Frozen)
@@ -1879,8 +1892,6 @@ OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     SmallVector<OverrideMatch, 2> matches;
     for (auto overridden : overridingASD->getOverriddenDecls()) {
       auto baseASD = cast<AbstractStorageDecl>(overridden);
-      addExpectedOpaqueAccessorsToStorage(baseASD);
-
       auto kind = accessor->getAccessorKind();
 
       // If the base doesn't consider this an opaque accessor,

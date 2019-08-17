@@ -796,8 +796,14 @@ static bool isSDKNodeEqual(SDKContext &Ctx, const SDKNode &L, const SDKNode &R) 
         return false;
       if (Left->getPrintedName() == Right->getPrintedName())
         return true;
-      return Left->getName() == Right->getName() &&
-        Left->hasSameChildren(*Right);
+      if (Ctx.checkingABI()) {
+        // For abi checking where we don't have sugar types at all, the printed
+        // name difference is enough to indicate these two types differ.
+        return false;
+      } else {
+        return Left->getName() == Right->getName() &&
+          Left->hasSameChildren(*Right);
+      }
     }
 
     case SDKNodeKind::DeclFunction: {
@@ -1084,6 +1090,9 @@ StringRef printGenericSignature(SDKContext &Ctx, ArrayRef<Requirement> AllReqs) 
     return StringRef();
   OS << "<";
   bool First = true;
+  PrintOptions Opts = PrintOptions::printInterface();
+  // We should always print fully qualified type names here
+  Opts.FullyQualifiedTypes = true;
   for (auto Req: AllReqs) {
     if (!First) {
       OS << ", ";
@@ -1091,9 +1100,9 @@ StringRef printGenericSignature(SDKContext &Ctx, ArrayRef<Requirement> AllReqs) 
       First = false;
     }
     if (Ctx.checkingABI())
-      getCanonicalRequirement(Req).print(OS, PrintOptions::printInterface());
+      getCanonicalRequirement(Req).print(OS, Opts);
     else
-      Req.print(OS, PrintOptions::printInterface());
+      Req.print(OS, Opts);
   }
   OS << ">";
   return Ctx.buffer(OS.str());
@@ -1433,8 +1442,7 @@ SwiftDeclCollector::createParameterNodes(ParameterList *PL) {
   std::vector<SDKNode*> Result;
   for (auto param: *PL) {
     TypeInitInfo Info;
-    Info.IsImplicitlyUnwrappedOptional = param->getAttrs().
-      hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+    Info.IsImplicitlyUnwrappedOptional = param->isImplicitlyUnwrappedOptional();
     Info.hasDefaultArgument = param->getDefaultArgumentKind() !=
       DefaultArgumentKind::None;
     switch (param->getValueOwnership()) {
@@ -1459,8 +1467,7 @@ SwiftDeclCollector::constructFunctionNode(FuncDecl* FD,
                                           SDKNodeKind Kind) {
   auto Func = SDKNodeInitInfo(Ctx, FD).createSDKNode(Kind);
   TypeInitInfo Info;
-  Info.IsImplicitlyUnwrappedOptional = FD->getAttrs().
-    hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+  Info.IsImplicitlyUnwrappedOptional = FD->isImplicitlyUnwrappedOptional();
   Func->addChild(constructTypeNode(FD->getResultInterfaceType(), Info));
   for (auto *Node : createParameterNodes(FD->getParameters()))
     Func->addChild(Node);
@@ -1600,8 +1607,7 @@ SDKNode *swift::ide::api::
 SwiftDeclCollector::constructVarNode(ValueDecl *VD) {
   auto Var = cast<SDKNodeDeclVar>(SDKNodeInitInfo(Ctx, VD).createSDKNode(SDKNodeKind::DeclVar));
   TypeInitInfo Info;
-  Info.IsImplicitlyUnwrappedOptional = VD->getAttrs().
-    hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+  Info.IsImplicitlyUnwrappedOptional = VD->isImplicitlyUnwrappedOptional();
   Var->addChild(constructTypeNode(VD->getInterfaceType(), Info));
   if (auto VAD = dyn_cast<AbstractStorageDecl>(VD)) {
     for(auto *AC: VAD->getAllAccessors()) {
@@ -2080,7 +2086,7 @@ swift::ide::api::getSDKNodeRoot(SDKContext &SDKCtx,
     if (Opts.Verbose)
       llvm::errs() << "Loading module: " << Name << "...\n";
     auto *M = Ctx.getModuleByName(Name);
-    if (!M) {
+    if (!M || M->failedToLoad()) {
       llvm::errs() << "Failed to load module: " << Name << '\n';
       if (Opts.AbortOnModuleLoadFailure)
         return nullptr;

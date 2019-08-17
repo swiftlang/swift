@@ -1055,7 +1055,7 @@ private:
   /// solution it represents.
   Score CurrentScore;
 
-  std::vector<TypeVariableType *> TypeVariables;
+  llvm::SetVector<TypeVariableType *> TypeVariables;
 
   /// Maps expressions to types for choosing a favored overload
   /// type in a disjunction constraint.
@@ -1118,6 +1118,23 @@ private:
   /// with that locator.
   SmallVector<std::pair<ConstraintLocator *, ArrayRef<OpenedType>>, 4>
     OpenedTypes;
+
+  /// The list of all generic requirements fixed along the current
+  /// solver path.
+  using FixedRequirement = std::tuple<TypeBase *, RequirementKind, TypeBase *>;
+  SmallVector<FixedRequirement, 4> FixedRequirements;
+
+  bool hasFixedRequirement(Type lhs, RequirementKind kind, Type rhs) {
+    auto reqInfo = std::make_tuple(lhs.getPointer(), kind, rhs.getPointer());
+    return llvm::any_of(
+        FixedRequirements,
+        [&reqInfo](const FixedRequirement &entry) { return entry == reqInfo; });
+  }
+
+  void recordFixedRequirement(Type lhs, RequirementKind kind, Type rhs) {
+    FixedRequirements.push_back(
+        std::make_tuple(lhs.getPointer(), kind, rhs.getPointer()));
+  }
 
   /// A mapping from constraint locators to the opened existential archetype
   /// used for the 'self' of an existential type.
@@ -1290,6 +1307,7 @@ private:
     ///
     /// \param constraint The newly generated constraint.
     void addGeneratedConstraint(Constraint *constraint) {
+      assert(constraint && "Null generated constraint?");
       generatedConstraints.push_back(constraint);
     }
 
@@ -1613,6 +1631,9 @@ public:
     /// The length of \c Fixes.
     unsigned numFixes;
 
+    /// The length of \c FixedRequirements.
+    unsigned numFixedRequirements;
+
     /// The length of \c DisjunctionChoices.
     unsigned numDisjunctionChoices;
 
@@ -1765,9 +1786,15 @@ public:
 
   /// Retrieve the set of active type variables.
   ArrayRef<TypeVariableType *> getTypeVariables() const {
-    return TypeVariables;
+    return TypeVariables.getArrayRef();
   }
-  
+
+  /// Whether the given type variable is active in the constraint system at
+  /// the moment.
+  bool isActiveTypeVariable(TypeVariableType *typeVar) const {
+    return TypeVariables.count(typeVar) > 0;
+  }
+
   TypeBase* getFavoredType(Expr *E) {
     assert(E != nullptr);
     return this->FavoredTypes[E];
@@ -3093,6 +3120,12 @@ private:
                                              TypeMatchOptions flags,
                                              ConstraintLocatorBuilder locator);
 
+  /// Attempt to simplify a one-way constraint.
+  SolutionKind simplifyOneWayConstraint(ConstraintKind kind,
+                                        Type first, Type second,
+                                        TypeMatchOptions flags,
+                                        ConstraintLocatorBuilder locator);
+
   /// Simplify a conversion constraint by applying the given
   /// reduction rule, which is known to apply at the outermost level.
   SolutionKind simplifyRestrictedConstraintImpl(
@@ -3920,6 +3953,18 @@ Expr *getArgumentExpr(Expr *expr, unsigned index);
 //   foo(y)
 // }
 bool isAutoClosureArgument(Expr *argExpr);
+
+/// Check whether type conforms to a given known protocol.
+bool conformsToKnownProtocol(ConstraintSystem &cs, Type type,
+                             KnownProtocolKind protocol);
+
+/// Check whether given type conforms to `RawPepresentable` protocol
+/// and return witness type.
+Type isRawRepresentable(ConstraintSystem &cs, Type type);
+/// Check whether given type conforms to a specific known kind
+/// `RawPepresentable` protocol and return witness type.
+Type isRawRepresentable(ConstraintSystem &cs, Type type,
+                        KnownProtocolKind rawRepresentableProtocol);
 
 class DisjunctionChoice {
   unsigned Index;

@@ -459,7 +459,7 @@ protected:
     IsTransparentComputed : 1
   );
 
-  SWIFT_INLINE_BITFIELD(ConstructorDecl, AbstractFunctionDecl, 3+2+1,
+  SWIFT_INLINE_BITFIELD(ConstructorDecl, AbstractFunctionDecl, 3+1+1,
     /// The body initialization kind (+1), or zero if not yet computed.
     ///
     /// This value is cached but is not serialized, because it is a property
@@ -467,8 +467,8 @@ protected:
     /// analysis and SIL generation.
     ComputedBodyInitKind : 3,
 
-    /// The failability of this initializer, which is an OptionalTypeKind.
-    Failability : 2,
+    /// Whether this constructor can fail, by building an Optional type.
+    Failable : 1,
 
     /// Whether this initializer is a stub placed into a subclass to
     /// catch invalid delegations to a designated initializer not
@@ -559,13 +559,9 @@ protected:
 
     /// \see ClassDecl::ForeignKind
     RawForeignKind : 2,
-    
-    /// Whether this class contains a destructor decl.
-    ///
-    /// A fully type-checked class always contains a destructor member, even if
-    /// it is implicit. This bit is used during parsing and type-checking to
-    /// control inserting the implicit destructor.
-    HasDestructorDecl : 1,
+
+    /// \see ClassDecl::getEmittedMembers()
+    HasForcedEmittedMembers : 1,
 
     /// Information about the class's ancestry.
     Ancestry : 7,
@@ -1530,6 +1526,17 @@ public:
 
   /// Determine whether this context has generic parameters
   /// of its own.
+  ///
+  /// \code
+  /// class C<T> {
+  ///   func f1() {}    // isGeneric == false
+  ///   func f2<T>() {} // isGeneric == true
+  /// }
+  ///
+  /// protocol P { // isGeneric == true due to implicit Self param
+  ///   func p()   // isGeneric == false
+  /// }
+  /// \endcode
   bool isGeneric() const { return GenericParams != nullptr; }
 
   /// Retrieve the trailing where clause for this extension, if any.
@@ -1908,18 +1915,23 @@ class PatternBindingEntry {
   };
   llvm::PointerIntPair<Pattern *, 3, OptionSet<Flags>> PatternAndFlags;
 
-  struct ExprAndEqualLoc {
-    // When the initializer is removed we don't actually clear the pointer
+  struct InitializerAndEqualLoc {
+    // When the initializer is removed we don't actually clear the pointers
     // because we might need to get initializer's source range. Since the
     // initializer is ASTContext-allocated it is safe.
-    Expr *Node;
+    
+    /// Exactly the expr the programmer wrote
+    Expr *originalInit;
+    /// Might be transformed, e.g. for a property wrapper. In the absence of
+    /// transformation or synthesis, holds the expr as parsed.
+    Expr *initAfterSynthesis;
     /// The location of the equal '=' token.
     SourceLoc EqualLoc;
   };
 
   union {
     /// The initializer expression and its '=' token loc.
-    ExprAndEqualLoc InitExpr;
+    InitializerAndEqualLoc InitExpr;
 
     /// The text of the initializer expression if deserialized from a module.
     StringRef InitStringRepresentation;
@@ -1934,9 +1946,10 @@ class PatternBindingEntry {
   friend class PatternBindingInitializer;
 
 public:
+  /// \p E is the initializer as parsed.
   PatternBindingEntry(Pattern *P, SourceLoc EqualLoc, Expr *E,
                       DeclContext *InitContext)
-    : PatternAndFlags(P, {}), InitExpr({E, EqualLoc}),
+    : PatternAndFlags(P, {}), InitExpr({E, E, EqualLoc}),
       InitContextAndIsText({InitContext, false}) {
   }
 
@@ -1950,14 +1963,14 @@ public:
     if (PatternAndFlags.getInt().contains(Flags::Removed) ||
         InitContextAndIsText.getInt())
       return nullptr;
-    return InitExpr.Node;
+    return InitExpr.initAfterSynthesis;
   }
   /// Retrieve the initializer if it should be executed to initialize this
   /// particular pattern binding.
   Expr *getExecutableInit() const {
     return isInitializerSubsumed() ? nullptr : getInit();
   }
-  SourceRange getOrigInitRange() const;
+  SourceRange getOriginalInitRange() const;
   void setInit(Expr *E);
 
   /// Gets the text of the initializer expression, stripping out inactive
@@ -1987,10 +2000,12 @@ public:
     InitExpr.EqualLoc = equalLoc;
   }
 
-  /// Retrieve the initializer as it was written in the source.
-  Expr *getInitAsWritten() const {
-    return InitContextAndIsText.getInt() ? nullptr : InitExpr.Node;
-  }
+  /// Retrieve the initializer after the =, if any, as it was written in the
+  /// source.
+  Expr *getOriginalInit() const;
+
+  /// Set the initializer after the = as it was written in the source.
+  void setOriginalInit(Expr *);
 
   bool isInitializerChecked() const {
     return PatternAndFlags.getInt().contains(Flags::Checked);
@@ -2019,7 +2034,15 @@ public:
     InitContextAndIsText.setPointer(dc);
   }
 
-  /// Retrieve the source range covered by this pattern binding.
+  SourceLoc getStartLoc() const;
+
+  /// Retrieve the end location covered by this pattern binding entry.
+  ///
+  /// \param omitAccessors Whether the computation should omit the accessors
+  /// from the source range.
+  SourceLoc getEndLoc(bool omitAccessors = false) const;
+
+  /// Retrieve the source range covered by this pattern binding entry.
   ///
   /// \param omitAccessors Whether the computation should omit the accessors
   /// from the source range.
@@ -2027,6 +2050,9 @@ public:
 
   const CaptureInfo &getCaptureInfo() const { return Captures; }
   void setCaptureInfo(const CaptureInfo &captures) { Captures = captures; }
+
+private:
+  SourceLoc getLastAccessorEndLoc() const;
 };
 
 /// This decl contains a pattern and optional initializer for a set
@@ -2109,9 +2135,9 @@ public:
   Expr *getExecutableInit(unsigned i) const {
     return getPatternList()[i].getExecutableInit();
   }
-  
-  SourceRange getOrigInitRange(unsigned i) const {
-    return getPatternList()[i].getOrigInitRange();
+
+  SourceRange getOriginalInitRange(unsigned i) const {
+    return getPatternList()[i].getOriginalInitRange();
   }
 
   void setInit(unsigned i, Expr *E) {
@@ -2389,12 +2415,20 @@ class ValueDecl : public Decl {
     /// Whether this declaration is 'final'. A final class can't be subclassed,
     /// a final class member can't be overriden.
     unsigned isFinal : 1;
+
+    /// Whether the "isIUO" bit" has been computed yet.
+    unsigned isIUOComputed : 1;
+
+    /// Whether this declaration produces an implicitly unwrapped
+    /// optional result.
+    unsigned isIUO : 1;
   } LazySemanticInfo = { };
 
   friend class OverriddenDeclsRequest;
   friend class IsObjCRequest;
   friend class IsFinalRequest;
   friend class IsDynamicRequest;
+  friend class IsImplicitlyUnwrappedOptionalRequest;
 
 protected:
   ValueDecl(DeclKind K,
@@ -2512,7 +2546,7 @@ public:
   ///     value.getFormalAccessScope().getDeclContext())</code>
   ///
   /// If \p treatUsableFromInlineAsPublic is true, declarations marked with the
-  /// \c @usableFromInline attribute are treated as public. This is normally
+  /// \c \@usableFromInline attribute are treated as public. This is normally
   /// false for name lookup and other source language concerns, but true when
   /// computing the linkage of generated functions.
   ///
@@ -2662,6 +2696,21 @@ public:
 
   /// Returns true if this decl can be found by id-style dynamic lookup.
   bool canBeAccessedByDynamicLookup() const;
+
+  /// Returns true if this declaration has an implicitly unwrapped optional
+  /// result. The precise meaning depends on the declaration kind:
+  /// - for properties, the value is IUO
+  /// - for subscripts, the element type is IUO
+  /// - for functions, the result type is IUO
+  /// - for constructors, the failability kind is IUO
+  bool isImplicitlyUnwrappedOptional() const;
+
+  /// Should only be set on imported and deserialized declarations; parsed
+  /// declarations compute this lazily via a request.
+  void setImplicitlyUnwrappedOptional(bool isIUO) {
+    LazySemanticInfo.isIUOComputed = 1;
+    LazySemanticInfo.isIUO = isIUO;
+  }
 
   /// Returns the protocol requirements that this decl conforms to.
   ArrayRef<ValueDecl *>
@@ -3175,19 +3224,6 @@ public:
 
 class MemberLookupTable;
 class ConformanceLookupTable;
-
-/// Kinds of optional types.
-enum OptionalTypeKind : unsigned {
-  /// The type is not an optional type.
-  OTK_None = 0,
-
-  /// The type is Optional<T>.
-  OTK_Optional,
-
-  /// The type is ImplicitlyUnwrappedOptional<T>.
-  OTK_ImplicitlyUnwrappedOptional
-};
-enum { NumOptionalTypeKinds = 2 };
   
 // Kinds of pointer types.
 enum PointerTypeKind : unsigned {
@@ -3749,8 +3785,17 @@ class ClassDecl final : public NominalTypeDecl {
     llvm::PointerIntPair<Type, 1, bool> SuperclassType;
   } LazySemanticInfo;
 
+  bool hasForcedEmittedMembers() const {
+    return Bits.ClassDecl.HasForcedEmittedMembers;
+  }
+
+  void setHasForcedEmittedMembers() {
+    Bits.ClassDecl.HasForcedEmittedMembers = true;
+  }
+
   friend class SuperclassDeclRequest;
   friend class SuperclassTypeRequest;
+  friend class EmittedMembersRequest;
   friend class TypeChecker;
 
 public:
@@ -3898,23 +3943,9 @@ public:
   /// either from a class itself or its direct or indirect superclasses.
   AbstractFunctionDecl *findImplementingMethod(
       const AbstractFunctionDecl *method) const;
-
-  /// True if the class has a destructor.
-  ///
-  /// Fully type-checked classes always contain destructors, but during parsing
-  /// or type-checking, the implicit destructor may not have been synthesized
-  /// yet if one was not explicitly declared.
-  bool hasDestructor() const { return Bits.ClassDecl.HasDestructorDecl; }
-
-  /// Set the 'has destructor' flag.
-  void setHasDestructor() { Bits.ClassDecl.HasDestructorDecl = 1; }
   
   /// Retrieve the destructor for this class.
-  DestructorDecl *getDestructor();
-
-  /// Synthesize implicit, trivial destructor, add it to this ClassDecl
-  /// and return it.
-  void addImplicitDestructor();
+  DestructorDecl *getDestructor() const;
 
   /// Determine whether this class inherits the convenience initializers
   /// from its superclass.
@@ -3976,6 +4007,10 @@ public:
 
   /// Record the presence of an @objc method with the given selector.
   void recordObjCMethod(AbstractFunctionDecl *method, ObjCSelector selector);
+
+  /// Get all the members of this class, synthesizing any implicit members
+  /// that appear in the vtable if needed.
+  DeclRange getEmittedMembers() const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
@@ -4549,10 +4584,9 @@ public:
   bool isSettable(const DeclContext *UseDC,
                   const DeclRefExpr *base = nullptr) const;
 
-  /// Are there any accessors for this declaration, including implicit ones?
-  bool hasAnyAccessors() const {
-    return !getAllAccessors().empty();
-  }
+  /// Does this storage declaration have explicitly-defined accessors
+  /// written in the source?
+  bool hasParsedAccessors() const;
 
   /// Return the ownership of values opaquely read from this storage.
   OpaqueReadOwnership getOpaqueReadOwnership() const;
@@ -4612,12 +4646,20 @@ public:
   /// accessor was not explicitly defined by the user.
   AccessorDecl *getParsedAccessor(AccessorKind kind) const;
 
-  /// Visit all the opaque accessors that this storage is expected to have.
+  /// Visit all parsed accessors.
+  void visitParsedAccessors(llvm::function_ref<void (AccessorDecl*)>) const;
+
+  /// Visit all opaque accessor kinds.
   void visitExpectedOpaqueAccessors(
                             llvm::function_ref<void (AccessorKind)>) const;
 
-  /// Visit all the opaque accessors of this storage declaration.
+  /// Visit all opaque accessors.
   void visitOpaqueAccessors(llvm::function_ref<void (AccessorDecl*)>) const;
+
+  /// Visit all eagerly emitted accessors.
+  ///
+  /// This is the union of the parsed and opaque sets.
+  void visitEmittedAccessors(llvm::function_ref<void (AccessorDecl*)>) const;
 
   void setAccessors(SourceLoc lbraceLoc, ArrayRef<AccessorDecl*> accessors,
                     SourceLoc rbraceLoc);
@@ -6472,7 +6514,7 @@ class ConstructorDecl : public AbstractFunctionDecl {
 
 public:
   ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc, 
-                  OptionalTypeKind Failability, SourceLoc FailabilityLoc,
+                  bool Failable, SourceLoc FailabilityLoc,
                   bool Throws, SourceLoc ThrowsLoc,
                   ParameterList *BodyParams,
                   GenericParamList *GenericParams, 
@@ -6572,9 +6614,9 @@ public:
     llvm_unreachable("bad CtorInitializerKind");
   }
 
-  /// Determine the failability of the initializer.
-  OptionalTypeKind getFailability() const {
-    return static_cast<OptionalTypeKind>(Bits.ConstructorDecl.Failability);
+  /// Determine if this is a failable initializer.
+  bool isFailable() const {
+    return Bits.ConstructorDecl.Failable;
   }
 
   /// Retrieve the location of the '!' or '?' in a failable initializer.

@@ -140,7 +140,8 @@ function(_add_variant_c_compile_link_flags)
     # lld can handle targeting the android build.  However, if lld is not
     # enabled, then fallback to the linker included in the android NDK.
     if(NOT SWIFT_ENABLE_LLD_LINKER)
-      list(APPEND result "-B" "${SWIFT_SDK_ANDROID_ARCH_${CFLAGS_ARCH}_NDK_PREBUILT_PATH}/${SWIFT_SDK_ANDROID_ARCH_${CFLAGS_ARCH}_NDK_TRIPLE}/bin")
+      swift_android_tools_path(${CFLAGS_ARCH} tools_path)
+      list(APPEND result "-B" "${tools_path}")
     endif()
   endif()
 
@@ -482,22 +483,9 @@ function(_add_variant_link_flags)
     # We need to add the math library, which is linked implicitly by libc++
     list(APPEND result "-lm")
 
-    if("${LFLAGS_ARCH}" MATCHES armv7)
-      set(android_libcxx_path "${SWIFT_ANDROID_NDK_PATH}/sources/cxx-stl/llvm-libc++/libs/armeabi-v7a")
-    elseif("${LFLAGS_ARCH}" MATCHES aarch64)
-      set(android_libcxx_path "${SWIFT_ANDROID_NDK_PATH}/sources/cxx-stl/llvm-libc++/libs/arm64-v8a")
-    elseif("${LFLAGS_ARCH}" MATCHES i686)
-      set(android_libcxx_path "${SWIFT_ANDROID_NDK_PATH}/sources/cxx-stl/llvm-libc++/libs/x86")
-    elseif("${LFLAGS_ARCH}" MATCHES x86_64)
-      set(android_libcxx_path "${SWIFT_ANDROID_NDK_PATH}/sources/cxx-stl/llvm-libc++/libs/x86_64")
-    else()
-      message(SEND_ERROR "unknown architecture (${LFLAGS_ARCH}) for android")
-    endif()
-
     # link against the custom C++ library
-    list(APPEND link_libraries
-      ${android_libcxx_path}/libc++abi.a
-      ${android_libcxx_path}/libc++_shared.so)
+    swift_android_cxx_libraries_for_arch(${LFLAGS_ARCH} cxx_link_libraries)
+    list(APPEND link_libraries ${cxx_link_libraries})
 
     # link against the ICU libraries
     list(APPEND link_libraries
@@ -1104,7 +1092,7 @@ function(_add_swift_library_single target name)
     set_target_properties("${target}"
       PROPERTIES
       INSTALL_NAME_DIR "${install_name_dir}")
-  elseif("${SWIFTLIB_SINGLE_SDK}" STREQUAL "LINUX" AND NOT "${SWIFTLIB_SINGLE_SDK}" STREQUAL "ANDROID")
+  elseif("${SWIFTLIB_SINGLE_SDK}" STREQUAL "LINUX")
     set_target_properties("${target}"
       PROPERTIES
       INSTALL_RPATH "$ORIGIN:/usr/lib/swift/linux")
@@ -1116,6 +1104,14 @@ function(_add_swift_library_single target name)
     # CMake generates incorrect rule `$SONAME_FLAG $INSTALLNAME_DIR$SONAME` for Android build on macOS cross-compile host.
     # Proper linker flags constructed manually. See below variable `swiftlib_link_flags_all`.
     set_target_properties("${target}" PROPERTIES NO_SONAME TRUE)
+    # Only set the install RPATH if cross-compiling the host tools, in which
+    # case both the NDK and Sysroot paths must be set.
+    if(NOT "${SWIFT_ANDROID_NDK_PATH}" STREQUAL "" AND
+       NOT "${SWIFT_ANDROID_NATIVE_SYSROOT}" STREQUAL "")
+      set_target_properties("${target}"
+        PROPERTIES
+        INSTALL_RPATH "$ORIGIN")
+    endif()
   endif()
 
   set_target_properties("${target}" PROPERTIES BUILD_WITH_INSTALL_RPATH YES)

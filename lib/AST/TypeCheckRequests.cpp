@@ -790,3 +790,37 @@ void SynthesizeAccessorRequest::cacheResult(AccessorDecl *accessor) const {
 
   storage->setSynthesizedAccessor(kind, accessor);
 }
+
+//----------------------------------------------------------------------------//
+// EmittedMembersRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<DeclRange>
+EmittedMembersRequest::getCachedResult() const {
+  auto *classDecl = std::get<0>(getStorage());
+  if (classDecl->hasForcedEmittedMembers())
+    return classDecl->getMembers();
+  return None;
+}
+
+void EmittedMembersRequest::cacheResult(DeclRange result) const {
+  auto *classDecl = std::get<0>(getStorage());
+  classDecl->setHasForcedEmittedMembers();
+}
+
+//----------------------------------------------------------------------------//
+// IsImplicitlyUnwrappedOptionalRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<bool>
+IsImplicitlyUnwrappedOptionalRequest::getCachedResult() const {
+  auto *decl = std::get<0>(getStorage());
+  if (decl->LazySemanticInfo.isIUOComputed)
+    return decl->LazySemanticInfo.isIUO;
+  return None;
+}
+
+void IsImplicitlyUnwrappedOptionalRequest::cacheResult(bool value) const {
+  auto *decl = std::get<0>(getStorage());
+  decl->setImplicitlyUnwrappedOptional(value);
+}

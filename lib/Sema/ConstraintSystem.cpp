@@ -107,7 +107,7 @@ bool ConstraintSystem::hasFreeTypeVariables() {
 }
 
 void ConstraintSystem::addTypeVariable(TypeVariableType *typeVar) {
-  TypeVariables.push_back(typeVar);
+  TypeVariables.insert(typeVar);
   
   // Notify the constraint graph.
   (void)CG[typeVar];
@@ -849,13 +849,15 @@ void ConstraintSystem::recordOpenedTypes(
 
   ConstraintLocator *locatorPtr = getConstraintLocator(locator);
   assert(locatorPtr && "No locator for opened types?");
+#if false
   assert(std::find_if(OpenedTypes.begin(), OpenedTypes.end(),
                       [&](const std::pair<ConstraintLocator *,
                           ArrayRef<OpenedType>> &entry) {
                         return entry.first == locatorPtr;
                       }) == OpenedTypes.end() &&
          "already registered opened types for this locator");
-
+#endif
+  
   OpenedType* openedTypes
     = Allocator.Allocate<OpenedType>(replacements.size());
   std::copy(replacements.begin(), replacements.end(), openedTypes);
@@ -1425,7 +1427,7 @@ Type ConstraintSystem::getEffectiveOverloadType(const OverloadChoice &overload,
 
   // Declarations returning unwrapped optionals don't have a single effective
   // type.
-  if (decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
+  if (decl->isImplicitlyUnwrappedOptional())
     return Type();
 
   // Retrieve the interface type.
@@ -2335,7 +2337,7 @@ bool OverloadChoice::isImplicitlyUnwrappedValueOrReturnValue() const {
     return false;
 
   auto *decl = getDecl();
-  if (!decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
+  if (!decl->isImplicitlyUnwrappedOptional())
     return false;
 
   auto itfType = decl->getInterfaceType();
@@ -2735,6 +2737,43 @@ bool constraints::isAutoClosureArgument(Expr *argExpr) {
   }
 
   return false;
+}
+
+bool constraints::conformsToKnownProtocol(ConstraintSystem &cs, Type type,
+                                          KnownProtocolKind protocol) {
+  if (auto *proto = cs.TC.getProtocol(SourceLoc(), protocol))
+    return bool(TypeChecker::conformsToProtocol(
+        type, proto, cs.DC, ConformanceCheckFlags::InExpression));
+  return false;
+}
+
+/// Check whether given type conforms to `RawPepresentable` protocol
+/// and return the witness type.
+Type constraints::isRawRepresentable(ConstraintSystem &cs, Type type) {
+  auto &TC = cs.TC;
+  auto *DC = cs.DC;
+
+  auto rawReprType =
+      TC.getProtocol(SourceLoc(), KnownProtocolKind::RawRepresentable);
+  if (!rawReprType)
+    return Type();
+
+  auto conformance = TypeChecker::conformsToProtocol(
+      type, rawReprType, DC, ConformanceCheckFlags::InExpression);
+  if (!conformance)
+    return Type();
+
+  return conformance->getTypeWitnessByName(type, TC.Context.Id_RawValue);
+}
+
+Type constraints::isRawRepresentable(
+    ConstraintSystem &cs, Type type,
+    KnownProtocolKind rawRepresentableProtocol) {
+  Type rawTy = isRawRepresentable(cs, type);
+  if (!rawTy || !conformsToKnownProtocol(cs, rawTy, rawRepresentableProtocol))
+    return Type();
+
+  return rawTy;
 }
 
 void ConstraintSystem::generateConstraints(

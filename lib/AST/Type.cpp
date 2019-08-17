@@ -134,7 +134,10 @@ bool TypeBase::isUninhabited() {
   // Empty enum declarations are uninhabited
   if (auto nominalDecl = getAnyNominal())
     if (auto enumDecl = dyn_cast<EnumDecl>(nominalDecl))
-      if (enumDecl->getAllElements().empty())
+      // Objective-C enums may be allowed to hold any value representable by
+      // the underlying type, but only if they come from clang.
+      if (enumDecl->getAllElements().empty() &&
+          !(enumDecl->isObjC() && enumDecl->hasClangNode()))
         return true;
   return false;
 }
@@ -158,7 +161,8 @@ bool TypeBase::isAnyClassReferenceType() {
   return getCanonicalType().isAnyClassReferenceType();
 }
 
-bool CanType::isReferenceTypeImpl(CanType type, bool functionsCount) {
+bool CanType::isReferenceTypeImpl(CanType type, GenericSignature *sig,
+                                  bool functionsCount) {
   switch (type->getKind()) {
 #define SUGARED_TYPE(id, parent) case TypeKind::id:
 #define TYPE(id, parent)
@@ -177,7 +181,7 @@ bool CanType::isReferenceTypeImpl(CanType type, bool functionsCount) {
   // For Self types, recur on the underlying type.
   case TypeKind::DynamicSelf:
     return isReferenceTypeImpl(cast<DynamicSelfType>(type).getSelfType(),
-                               functionsCount);
+                               sig, functionsCount);
 
   // Archetypes and existentials are only class references if class-bounded.
   case TypeKind::PrimaryArchetype:
@@ -228,13 +232,14 @@ bool CanType::isReferenceTypeImpl(CanType type, bool functionsCount) {
 
   case TypeKind::GenericTypeParam:
   case TypeKind::DependentMember:
-    llvm_unreachable("Dependent types can't answer reference-semantics query");
+    assert(sig && "dependent types can't answer reference semantics query");
+    return sig->requiresClass(type);
   }
 
   llvm_unreachable("Unhandled type kind!");
 }
 
-/// hasOwnership - Are variables of this type permitted to have
+/// Are variables of this type permitted to have
 /// ownership attributes?
 ///
 /// This includes:
@@ -243,8 +248,8 @@ bool CanType::isReferenceTypeImpl(CanType type, bool functionsCount) {
 ///   - existentials with class or class protocol bounds
 /// But not:
 ///   - function types
-bool TypeBase::allowsOwnership() {
-  return getCanonicalType().isAnyClassReferenceType();
+bool TypeBase::allowsOwnership(GenericSignature *sig) {
+  return getCanonicalType().allowsOwnership(sig);
 }
 
 ExistentialLayout::ExistentialLayout(ProtocolType *type) {
@@ -2363,7 +2368,8 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
   if (matchMode.contains(TypeMatchFlags::AllowCompatibleOpaqueTypeArchetypes))
     if (auto opaque1 = t1->getAs<OpaqueTypeArchetypeType>())
       if (auto opaque2 = t2->getAs<OpaqueTypeArchetypeType>())
-        return opaque1->getBoundSignature() == opaque2->getBoundSignature() &&
+        return opaque1->getBoundSignature()->getCanonicalSignature() ==
+                   opaque2->getBoundSignature()->getCanonicalSignature() &&
                opaque1->getInterfaceType()->getCanonicalType()->matches(
                    opaque2->getInterfaceType()->getCanonicalType(), matchMode);
 
@@ -2548,6 +2554,10 @@ bool ReplaceOpaqueTypesWithUnderlyingTypes::shouldPerformSubstitution(
     OpaqueTypeDecl *opaque, ModuleDecl *contextModule,
     ResilienceExpansion contextExpansion) {
   auto namingDecl = opaque->getNamingDecl();
+  
+  // Don't allow replacement if the naming decl is dynamically replaceable.
+  if (namingDecl && namingDecl->isDynamic())
+    return false;
 
   // Allow replacement of opaque result types of inlineable function regardless
   // of resilience and in which context.
@@ -3575,6 +3585,14 @@ SubstitutionMap TypeBase::getMemberSubstitutionMap(
 
 Type TypeBase::getTypeOfMember(ModuleDecl *module, const ValueDecl *member,
                                Type memberType) {
+  if (is<ErrorType>())
+    return ErrorType::get(getASTContext());
+
+  if (auto *lvalue = getAs<LValueType>()) {
+    auto objectTy = lvalue->getObjectType();
+    return objectTy->getTypeOfMember(module, member, memberType);
+  }
+
   // If no member type was provided, use the member's type.
   if (!memberType)
     memberType = member->getInterfaceType();

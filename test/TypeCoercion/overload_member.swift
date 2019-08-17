@@ -188,6 +188,7 @@ struct WeirdIvarLookupBehavior {
   static func static_f() {
     // FIXME: These diagnostics still suck.
     var a : X = clams // expected-error{{member 'clams' cannot be used on type 'WeirdIvarLookupBehavior'}}
+    // expected-error@-1 {{cannot convert value of type 'Y' to specified type 'X'}}
     var b : Y = clams // expected-error{{member 'clams' cannot be used on type 'WeirdIvarLookupBehavior'}}
   }
 }

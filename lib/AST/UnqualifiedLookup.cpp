@@ -494,7 +494,7 @@ void UnqualifiedLookupFactory::performUnqualifiedLookup() {
   const bool compareToASTScopes = Ctx.LangOpts.CompareToASTScopeLookup;
   if (useASTScopesForExperimentalLookup() && !compareToASTScopes) {
     static bool haveWarned = false;
-    if (!haveWarned) {
+    if (!haveWarned && Ctx.LangOpts.WarnIfASTScopeLookup) {
       haveWarned = true;
       llvm::errs() << "WARNING: TRYING Scope exclusively\n";
     }
@@ -606,18 +606,17 @@ void UnqualifiedLookupFactory::lookupInModuleScopeContext(
 
 void UnqualifiedLookupFactory::lookupNamesIntroducedByPatternBindingInitializer(
     PatternBindingInitializer *PBI, Optional<bool> isCascadingUse) {
-  assert(PBI->getBinding());
   // Lazy variable initializer contexts have a 'self' parameter for
   // instance member lookup.
   if (auto *selfParam = PBI->getImplicitSelfDecl())
     lookupNamesIntroducedByLazyVariableInitializer(PBI, selfParam,
                                                    isCascadingUse);
-  else if (PBI->getBinding()->getDeclContext()->isTypeContext())
+  else if (PBI->getParent()->isTypeContext())
     lookupNamesIntroducedByInitializerOfStoredPropertyOfAType(PBI,
                                                               isCascadingUse);
   else
     lookupNamesIntroducedByInitializerOfGlobalOrLocal(PBI, isCascadingUse);
-  }
+}
 
   void UnqualifiedLookupFactory::lookupNamesIntroducedByLazyVariableInitializer(
       PatternBindingInitializer *PBI, ParamDecl *selfParam,
@@ -1351,7 +1350,7 @@ bool UnqualifiedLookupFactory::verifyEqualTo(
       e.getValueDecl()->print(as);
       oe.getValueDecl()->print(bs);
       if (a == b)
-        llvm::errs() << "ValueDecls differ but print same";
+        llvm::errs() << "ValueDecls differ but print same\n";
       else {
         writeErr(std::string( "ValueDecls differ at ") + std::to_string(i));
         assert(false && "ASTScopeImpl found different Decl");

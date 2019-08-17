@@ -893,11 +893,6 @@ void MemberLookupTable::updateLookupTable(NominalTypeDecl *nominal) {
 }
 
 void NominalTypeDecl::addedMember(Decl *member) {
-  // Remember if we added a destructor.
-  if (auto *CD = dyn_cast<ClassDecl>(this))
-    if (isa<DestructorDecl>(member))
-      CD->setHasDestructor();
-
   // If we have a lookup table, add the new member to it.
   if (LookupTable.getPointer()) {
     LookupTable.getPointer()->addMember(member);
@@ -1037,6 +1032,7 @@ populateLookupTableEntryFromExtensions(ASTContext &ctx,
   if (!ignoreNewExtensions) {
     for (auto e : nominal->getExtensions()) {
       if (e->wasDeserialized() || e->hasClangNode()) {
+        assert(!e->hasUnparsedMembers());
         if (populateLookupTableEntryFromLazyIDCLoader(ctx, table,
                                                       name, e)) {
           return true;
@@ -1066,6 +1062,8 @@ void NominalTypeDecl::prepareLookupTable(bool ignoreNewExtensions) {
   }
 
   if (hasLazyMembers()) {
+    assert(!hasUnparsedMembers());
+
     // Lazy members: if the table needs population, populate the table _only
     // from those members already in the IDC member list_ such as implicits or
     // globals-as-members, then update table entries from the extensions that
@@ -1197,6 +1195,14 @@ TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
       if (!ignoreNewExtensions) {
         for (auto E : getExtensions())
           (void)E->getMembers();
+      }
+    } else {
+      // We still have to parse any unparsed extensions.
+      if (!ignoreNewExtensions) {
+        for (auto *e : getExtensions()) {
+          if (e->hasUnparsedMembers())
+            e->loadAllMembers();
+        }
       }
     }
 

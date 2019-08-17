@@ -3708,14 +3708,20 @@ public:
   }
 };
 
-
-/// This is a closure of the contained subexpression that is formed
-/// when a scalar expression is converted to @autoclosure function type.
-/// For example:
+/// This is an implicit closure of the contained subexpression that is usually
+/// formed when a scalar expression is converted to @autoclosure function type.
 /// \code
 ///   func f(x : @autoclosure () -> Int)
 ///   f(42)  // AutoclosureExpr convert from Int to ()->Int
 /// \endcode
+///
+///  They are also created when key path expressions are converted to function
+///  type, in which case, a pair of nested implicit closures are formed:
+/// \code
+///   { $kp$ in { $0[keyPath: $kp$] } }( \(E) )
+/// \endcode
+/// This is to ensure side effects of the key path expression (mainly indices in
+/// subscripts) are only evaluated once.
 class AutoClosureExpr : public AbstractClosureExpr {
   BraceStmt *Body;
 
@@ -3857,11 +3863,12 @@ public:
 /// node (say, an \c OpenExistentialExpr) and can only be used within the
 /// subexpressions of that AST node.
 class OpaqueValueExpr : public Expr {
-  SourceLoc Loc;
+  SourceRange Range;
 
 public:
-  explicit OpaqueValueExpr(SourceLoc Loc, Type Ty, bool isPlaceholder = false)
-    : Expr(ExprKind::OpaqueValue, /*Implicit=*/true, Ty), Loc(Loc) {
+  explicit OpaqueValueExpr(SourceRange Range, Type Ty,
+                           bool isPlaceholder = false)
+      : Expr(ExprKind::OpaqueValue, /*Implicit=*/true, Ty), Range(Range) {
     Bits.OpaqueValueExpr.IsPlaceholder = isPlaceholder;
   }
 
@@ -3870,8 +3877,8 @@ public:
   /// value to be specified later.
   bool isPlaceholder() const { return Bits.OpaqueValueExpr.IsPlaceholder; }
 
-  SourceRange getSourceRange() const { return Loc; }
-  
+  SourceRange getSourceRange() const { return Range; }
+
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::OpaqueValue; 
   }
@@ -5332,6 +5339,33 @@ public:
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::KeyPathDot;
+  }
+};
+
+/// Expression node that effects a "one-way" constraint in
+/// the constraint system, allowing type information to flow from the
+/// subexpression outward but not the other way.
+///
+/// One-way expressions are generally implicit and synthetic, introduced by
+/// the type checker. However, there is a built-in expression of the
+/// form \c Builtin.one_way(x) that forms a one-way constraint coming out
+/// of expression `x` that can be used for testing purposes.
+class OneWayExpr : public Expr {
+  Expr *SubExpr;
+
+public:
+  /// Construct an implicit one-way expression from the given subexpression.
+  OneWayExpr(Expr *subExpr)
+     : Expr(ExprKind::OneWay, /*isImplicit=*/true), SubExpr(subExpr) { }
+
+  SourceLoc getLoc() const { return SubExpr->getLoc(); }
+  SourceRange getSourceRange() const { return SubExpr->getSourceRange(); }
+
+  Expr *getSubExpr() const { return SubExpr; }
+  void setSubExpr(Expr *subExpr) { SubExpr = subExpr; }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::OneWay;
   }
 };
 

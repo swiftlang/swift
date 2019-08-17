@@ -145,19 +145,6 @@ TypeChecker::gatherGenericParamBindingsText(
   return result.str().str();
 }
 
-static void revertDependentTypeLoc(TypeLoc &tl) {
-  // If there's no type representation, there's nothing to revert.
-  if (!tl.getTypeRepr())
-    return;
-
-  // Don't revert an error type; we've already complained.
-  if (tl.wasValidated() && tl.isError())
-    return;
-
-  // Make sure we validate the type again.
-  tl.setType(Type());
-}
-
 //
 // Generic functions
 //
@@ -592,41 +579,49 @@ void TypeChecker::validateGenericFuncOrSubscriptSignature(
                               ->getGenericSignatureOfContext(),
                           resolution);
 
-    // Check parameter patterns.
-    typeCheckParameterList(params, resolution, func
-                             ? TypeResolverContext::AbstractFunctionDecl
-                             : TypeResolverContext::SubscriptDecl);
+    // Infer requirements from the parameter list.
+    auto *module = genCtx->getParentModule();
+    TypeResolutionOptions options =
+      (func
+       ? TypeResolverContext::AbstractFunctionDecl
+       : TypeResolverContext::SubscriptDecl);
 
-    // Infer requirements from the pattern.
-    builder.inferRequirements(*genCtx->getParentModule(), params);
+    for (auto param : *params) {
+      auto *typeRepr = param->getTypeLoc().getTypeRepr();
+      if (typeRepr == nullptr)
+        continue;
 
-    // Check the result type, but leave opaque return types alone
-    // for structural checking.
-    if (!resultTyLoc.isNull() &&
-        !(resultTyLoc.getTypeRepr() &&
-          isa<OpaqueReturnTypeRepr>(resultTyLoc.getTypeRepr())))
-      validateType(resultTyLoc, resolution,
-                   TypeResolverContext::FunctionResult);
+      auto paramOptions = options;
+      paramOptions.setContext(param->isVariadic() ?
+                              TypeResolverContext::VariadicFunctionInput :
+                              TypeResolverContext::FunctionInput);
+      paramOptions |= TypeResolutionFlags::Direct;
 
-    // Infer requirements from it.
-    if (resultTyLoc.getTypeRepr()) {
+      auto type = resolution.resolveType(typeRepr, paramOptions);
+
+      if (auto *specifier = dyn_cast_or_null<SpecifierTypeRepr>(typeRepr))
+        typeRepr = specifier->getBase();
+
       auto source = GenericSignatureBuilder::FloatingRequirementSource::
-          forInferred(resultTyLoc.getTypeRepr());
-      builder.inferRequirements(*genCtx->getParentModule(),
-                                resultTyLoc.getType(),
-                                resultTyLoc.getTypeRepr(), source);
+          forInferred(typeRepr);
+      builder.inferRequirements(*module, type, typeRepr, source);
+    }
+
+    // Infer requirements from the result type.
+    auto *resultTypeRepr = resultTyLoc.getTypeRepr();
+    if (resultTypeRepr && !isa<OpaqueReturnTypeRepr>(resultTypeRepr)) {
+      TypeResolutionOptions resultOptions = TypeResolverContext::FunctionResult;
+
+      auto resultType = resolution.resolveType(resultTypeRepr, resultOptions);
+
+      auto source = GenericSignatureBuilder::FloatingRequirementSource::
+          forInferred(resultTypeRepr);
+      builder.inferRequirements(*module, resultType, resultTypeRepr, source);
     }
 
     // The signature is complete and well-formed. Determine
     // the type of the generic function or subscript.
     sig = std::move(builder).computeGenericSignature(decl->getLoc());
-
-    // The generic signature builder now has all of the requirements, although
-    // there might still be errors that have not yet been diagnosed. Revert the
-    // signature and type-check it again, completely.
-    revertDependentTypeLoc(resultTyLoc);
-    for (auto &param : *params)
-      revertDependentTypeLoc(param->getTypeLoc());
 
     // Debugging of the generic signature.
     if (Context.LangOpts.DebugGenericSignatures) {

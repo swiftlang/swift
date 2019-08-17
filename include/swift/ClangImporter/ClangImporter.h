@@ -60,15 +60,37 @@ class TypeDecl;
 class VisibleDeclConsumer;
 enum class SelectorSplitKind;
 
-/// Represents the different namespaces for types in C.
+/// Kinds of optional types.
+enum OptionalTypeKind : unsigned {
+  /// The type is not an optional type.
+  OTK_None = 0,
+
+  /// The type is Optional<T>.
+  OTK_Optional,
+
+  /// The type is ImplicitlyUnwrappedOptional<T>.
+  OTK_ImplicitlyUnwrappedOptional
+};
+enum { NumOptionalTypeKinds = 2 };
+
+/// This interface is implemented by LLDB to serve as a fallback when Clang
+/// modules can't be imported from source in the debugger.
 ///
-/// A simplified version of clang::Sema::LookupKind.
-enum class ClangTypeKind {
-  Typedef,
-  ObjCClass = Typedef,
-  /// Structs, enums, and unions.
-  Tag,
-  ObjCProtocol,
+/// During compile time, ClangImporter-imported Clang modules are compiled with
+/// -gmodules, which emits a DWARF rendition of all types defined in the module
+/// into the .pcm file. On Darwin, these types can be collected by
+/// dsymutil. This delegate allows DWARFImporter to ask LLDB to look up a Clang
+/// type by name, synthesize a Clang AST from it. DWARFImporter then hands this
+/// Clang AST to ClangImporter to import the type into Swift.
+class DWARFImporterDelegate {
+public:
+  virtual ~DWARFImporterDelegate() = default;
+  /// Perform a qualified lookup of a Clang type with this name.
+  /// \param kind  Only return results with this type kind.
+  virtual void lookupValue(StringRef name, llvm::Optional<ClangTypeKind> kind,
+                           SmallVectorImpl<clang::Decl *> &results) {}
+  /// vtable anchor.
+  virtual void anchor();
 };
 
 /// Class that imports Clang modules into Swift, mapping directly
@@ -83,7 +105,8 @@ private:
   Implementation &Impl;
 
   ClangImporter(ASTContext &ctx, const ClangImporterOptions &clangImporterOpts,
-                DependencyTracker *tracker);
+                DependencyTracker *tracker,
+                DWARFImporterDelegate *dwarfImporterDelegate);
 
 public:
   /// Create a new Clang importer that can import a suitable Clang
@@ -99,13 +122,15 @@ public:
   ///
   /// \param tracker The object tracking files this compilation depends on.
   ///
+  /// \param dwarfImporterDelegate A helper object that can synthesize
+  /// Clang Decls from debug info. Used by LLDB.
+  ///
   /// \returns a new Clang module importer, or null (with a diagnostic) if
   /// an error occurred.
   static std::unique_ptr<ClangImporter>
-  create(ASTContext &ctx,
-         const ClangImporterOptions &importerOpts,
-         std::string swiftPCHHash = "",
-         DependencyTracker *tracker = nullptr);
+  create(ASTContext &ctx, const ClangImporterOptions &importerOpts,
+         std::string swiftPCHHash = "", DependencyTracker *tracker = nullptr,
+         DWARFImporterDelegate *dwarfImporterDelegate = nullptr);
 
   ClangImporter(const ClangImporter &) = delete;
   ClangImporter(ClangImporter &&) = delete;
@@ -113,6 +138,9 @@ public:
   ClangImporter &operator=(ClangImporter &&) = delete;
 
   ~ClangImporter();
+
+  /// Only to be used by lldb-moduleimport-test.
+  void setDWARFImporterDelegate(DWARFImporterDelegate &delegate);
 
   /// Create a new clang::DependencyCollector customized to
   /// ClangImporter's specific uses.
@@ -160,7 +188,7 @@ public:
   /// Look for declarations associated with the given name.
   ///
   /// \param name The name we're searching for.
-  void lookupValue(DeclName name, VisibleDeclConsumer &consumer);
+  void lookupValue(DeclName name, VisibleDeclConsumer &consumer) override;
 
   /// Look up a type declaration by its Clang name.
   ///
@@ -168,7 +196,7 @@ public:
   /// module, it returns it. This is intended for use in reflection / debugging
   /// contexts where access is not a problem.
   void lookupTypeDecl(StringRef clangName, ClangTypeKind kind,
-                      llvm::function_ref<void(TypeDecl*)> receiver);
+                      llvm::function_ref<void(TypeDecl *)> receiver) override;
 
   /// Look up type a declaration synthesized by the Clang importer itself, using
   /// a "related entity kind" to determine which type it should be. For example,
@@ -178,9 +206,10 @@ public:
   /// Note that this method does no filtering. If it finds the type in a loaded
   /// module, it returns it. This is intended for use in reflection / debugging
   /// contexts where access is not a problem.
-  void lookupRelatedEntity(StringRef clangName, ClangTypeKind kind,
-                           StringRef relatedEntityKind,
-                           llvm::function_ref<void(TypeDecl*)> receiver);
+  void
+  lookupRelatedEntity(StringRef clangName, ClangTypeKind kind,
+                      StringRef relatedEntityKind,
+                      llvm::function_ref<void(TypeDecl *)> receiver) override;
 
   /// Look for textually included declarations from the bridging header.
   ///

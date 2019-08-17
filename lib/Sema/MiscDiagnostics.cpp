@@ -2218,6 +2218,7 @@ public:
       // If this is a nested function with a capture list, mark any captured
       // variables.
       if (afd->isBodyTypeChecked()) {
+        TypeChecker::computeCaptures(afd);
         for (const auto &capture : afd->getCaptureInfo().getCaptures())
           addMark(capture.getDecl(), RK_Read|RK_Written);
       } else {
@@ -3649,8 +3650,7 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
     static bool hasImplicitlyUnwrappedResult(Expr *E) {
       auto *decl = getDeclForImplicitlyUnwrappedExpr(E);
 
-      return decl
-        && decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+      return decl && decl->isImplicitlyUnwrappedOptional();
     }
 
     static ValueDecl *getDeclForImplicitlyUnwrappedExpr(Expr *E) {

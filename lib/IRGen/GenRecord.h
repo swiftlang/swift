@@ -18,6 +18,7 @@
 #ifndef SWIFT_IRGEN_GENRECORD_H
 #define SWIFT_IRGEN_GENRECORD_H
 
+#include "BitPatternBuilder.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "Explosion.h"
@@ -598,27 +599,32 @@ public:
     // inhabitants.
     auto &field = *asImpl().getFixedExtraInhabitantProvidingField(IGM);
     auto &fieldTI = cast<FixedTypeInfo>(field.getTypeInfo());
-    APInt fieldValue = fieldTI.getFixedExtraInhabitantValue(IGM, bits, index);
-    return fieldValue.shl(field.getFixedByteOffset().getValueInBits());
+    auto fieldSize = fieldTI.getFixedExtraInhabitantMask(IGM).getBitWidth();
+
+    auto value = BitPatternBuilder(IGM.Triple.isLittleEndian());
+    value.appendClearBits(field.getFixedByteOffset().getValueInBits());
+    value.append(fieldTI.getFixedExtraInhabitantValue(IGM, fieldSize, index));
+    value.padWithClearBitsTo(bits);
+    return value.build().getValue();
   }
 
   APInt getFixedExtraInhabitantMask(IRGenModule &IGM) const override {
     auto field = asImpl().getFixedExtraInhabitantProvidingField(IGM);
     if (!field)
       return APInt();
-    
+
     const FixedTypeInfo &fieldTI
       = cast<FixedTypeInfo>(field->getTypeInfo());
     auto targetSize = asImpl().getFixedSize().getValueInBits();
-    
+
     if (fieldTI.isKnownEmpty(ResilienceExpansion::Maximal))
       return APInt(targetSize, 0);
-    
-    APInt fieldMask = fieldTI.getFixedExtraInhabitantMask(IGM);
-    if (targetSize > fieldMask.getBitWidth())
-      fieldMask = fieldMask.zext(targetSize);
-    fieldMask = fieldMask.shl(field->getFixedByteOffset().getValueInBits());
-    return fieldMask;
+
+    auto mask = BitPatternBuilder(IGM.Triple.isLittleEndian());
+    mask.appendClearBits(field->getFixedByteOffset().getValueInBits());
+    mask.append(fieldTI.getFixedExtraInhabitantMask(IGM));
+    mask.padWithClearBitsTo(targetSize);
+    return mask.build().getValue();
   }
 
   llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,

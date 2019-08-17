@@ -370,15 +370,6 @@ static StringRef getCtorInitializerKindString(CtorInitializerKind value) {
 
   llvm_unreachable("Unhandled CtorInitializerKind in switch.");
 }
-static StringRef getOptionalTypeKindString(OptionalTypeKind value) {
-  switch (value) {
-    case OTK_None: return "none";
-    case OTK_Optional: return "Optional";
-    case OTK_ImplicitlyUnwrappedOptional: return "ImplicitlyUnwrappedOptional";
-  }
-
-  llvm_unreachable("Unhandled OptionalTypeKind in switch.");
-}
 static StringRef getAssociativityString(Associativity value) {
   switch (value) {
     case Associativity::None: return "none";
@@ -906,8 +897,16 @@ namespace {
       for (auto entry : PBD->getPatternList()) {
         OS << '\n';
         printRec(entry.getPattern());
+        if (entry.getOriginalInit()) {
+          OS << '\n';
+          OS.indent(Indent + 2);
+          OS << "Original init:\n";
+          printRec(entry.getOriginalInit());
+        }
         if (entry.getInit()) {
           OS << '\n';
+          OS.indent(Indent + 2);
+          OS << "Processed init:\n";
           printRec(entry.getInit());
         }
       }
@@ -1092,9 +1091,11 @@ namespace {
         PrintWithColorRAII(OS, DeclModifierColor) << " required";
       PrintWithColorRAII(OS, DeclModifierColor) << " "
         << getCtorInitializerKindString(CD->getInitKind());
-      if (CD->getFailability() != OTK_None)
+      if (CD->isFailable())
         PrintWithColorRAII(OS, DeclModifierColor) << " failable="
-          << getOptionalTypeKindString(CD->getFailability());
+          << (CD->isImplicitlyUnwrappedOptional()
+              ? "ImplicitlyUnwrappedOptional"
+              : "Optional");
       printAbstractFunctionDecl(CD);
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
@@ -2783,6 +2784,13 @@ public:
 
   void visitKeyPathDotExpr(KeyPathDotExpr *E) {
     printCommon(E, "key_path_dot_expr");
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
+  void visitOneWayExpr(OneWayExpr *E) {
+    printCommon(E, "one_way_expr");
+    OS << '\n';
+    printRec(E->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 

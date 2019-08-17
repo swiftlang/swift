@@ -166,6 +166,11 @@ FRONTEND_STATISTIC(Sema, NumLeafScopes)
 /// This is a measure of complexity of the contraction algorithm.
 FRONTEND_STATISTIC(Sema, NumConstraintsConsideredForEdgeContraction)
 
+/// Number of constraint-solving scopes created in the typechecker, while
+/// solving expression type constraints. A rough proxy for "how much work the
+/// expression typechecker did".
+FRONTEND_STATISTIC(Sema, NumCyclicOneWayComponentsCollapsed)
+
 /// Number of declarations that were deserialized. A rough proxy for the amount
 /// of material loaded from other modules.
 FRONTEND_STATISTIC(Sema, NumDeclsDeserialized)
@@ -175,9 +180,6 @@ FRONTEND_STATISTIC(Sema, NumDeclsValidated)
 
 /// Number of declarations type checked.
 FRONTEND_STATISTIC(Sema, NumDeclsTypechecked)
-
-/// Number of declarations finalized.
-FRONTEND_STATISTIC(Sema, NumDeclsFinalized)
 
 /// Number of synthesized accessors.
 FRONTEND_STATISTIC(Sema, NumAccessorsSynthesized)

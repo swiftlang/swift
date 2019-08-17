@@ -1205,7 +1205,7 @@ bool EscapeAnalysis::buildConnectionGraphForDestructor(
   while (auto payloadTy = Ty.getOptionalObjectType())
     Ty = payloadTy;
   auto Class = Ty.getClassOrBoundGenericClass();
-  if (!Class || !Class->hasDestructor())
+  if (!Class || Class->hasClangNode())
     return false;
   auto Destructor = Class->getDestructor();
   SILDeclRef DeallocRef(Destructor, SILDeclRef::Kind::Deallocator);

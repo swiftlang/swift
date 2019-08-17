@@ -291,6 +291,12 @@ public:
 
   void setCodeCompletionFactory(CodeCompletionCallbacksFactory *Factory) {
     CodeCompletionFactory = Factory;
+    disableASTScopeLookup();
+  }
+  
+  /// Called from lldb, see rdar://53971116
+  void disableASTScopeLookup() {
+    LangOpts.EnableASTScopeLookup = false;
   }
 
   CodeCompletionCallbacksFactory *getCodeCompletionFactory() const {
@@ -367,6 +373,8 @@ class CompilerInstance {
   DiagnosticEngine Diagnostics{SourceMgr};
   std::unique_ptr<ASTContext> Context;
   std::unique_ptr<SILModule> TheSILModule;
+
+  std::unique_ptr<PersistentParserState> PersistentState;
 
   /// Null if no tracker.
   std::unique_ptr<DependencyTracker> DepTracker;
@@ -628,13 +636,11 @@ private:
 
   void parseLibraryFile(unsigned BufferID,
                         const ImplicitImports &implicitImports,
-                        PersistentParserState &PersistentState,
                         DelayedParsingCallbacks *DelayedCB);
 
   /// Return true if had load error
   bool
   parsePartialModulesAndLibraryFiles(const ImplicitImports &implicitImports,
-                                     PersistentParserState &PersistentState,
                                      DelayedParsingCallbacks *DelayedCB);
 
   OptionSet<TypeCheckingFlags> computeTypeCheckingOptions();
@@ -642,7 +648,6 @@ private:
   void forEachFileToTypeCheck(llvm::function_ref<void(SourceFile &)> fn);
 
   void parseAndTypeCheckMainFileUpTo(SourceFile::ASTStage_t LimitStage,
-                                     PersistentParserState &PersistentState,
                                      DelayedParsingCallbacks *DelayedParseCB,
                                      OptionSet<TypeCheckingFlags> TypeCheckOptions);
 

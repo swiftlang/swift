@@ -164,7 +164,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   bool visitPatternBindingDecl(PatternBindingDecl *PBD) {
-    // If there is a single variable, walk it's attributes.
     bool isPropertyWrapperBackingProperty = false;
     if (auto singleVar = PBD->getSingleVar()) {
       isPropertyWrapperBackingProperty =
@@ -1114,6 +1113,18 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   Expr *visitKeyPathDotExpr(KeyPathDotExpr *E) { return E; }
+
+  Expr *visitOneWayExpr(OneWayExpr *E) {
+    if (auto oldSubExpr = E->getSubExpr()) {
+      if (auto subExpr = doIt(oldSubExpr)) {
+        E->setSubExpr(subExpr);
+      } else {
+        return nullptr;
+      }
+    }
+
+    return E;
+  }
 
   Expr *visitTapExpr(TapExpr *E) {
     if (auto oldSubExpr = E->getSubExpr()) {

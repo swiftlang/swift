@@ -748,17 +748,17 @@ public:
     void cleanup(NODE *fn) {                                    \
       popFunction(fn);                                          \
     }
-#define SCOPE_LIKE(NODE)                                        \
-    bool shouldVerify(NODE *fn) {                               \
-      pushScope(fn);                                            \
-      if (fn->hasLazyMembers())                                 \
+#define TYPE_LIKE(NODE)                                         \
+    bool shouldVerify(NODE *dc) {                               \
+      pushScope(dc);                                            \
+      if (dc->hasLazyMembers())                                 \
         return false;                                           \
-      if (fn->getASTContext().hasUnparsedMembers(fn))           \
+      if (dc->hasUnparsedMembers())                             \
         return false;                                           \
-      return shouldVerify(cast<ASTNodeBase<NODE*>::BaseTy>(fn));\
+      return shouldVerify(cast<ASTNodeBase<NODE*>::BaseTy>(dc));\
     }                                                           \
-    void cleanup(NODE *fn) {                                    \
-      popScope(fn);                                             \
+    void cleanup(NODE *dc) {                                    \
+      popScope(dc);                                             \
     }
 
     FUNCTION_LIKE(AbstractClosureExpr)
@@ -767,10 +767,10 @@ public:
     FUNCTION_LIKE(FuncDecl)
     FUNCTION_LIKE(EnumElementDecl)
     FUNCTION_LIKE(SubscriptDecl)
-    SCOPE_LIKE(NominalTypeDecl)
-    SCOPE_LIKE(ExtensionDecl)
+    TYPE_LIKE(NominalTypeDecl)
+    TYPE_LIKE(ExtensionDecl)
 
-#undef SCOPE_LIKE
+#undef TYPE_LIKE
 #undef FUNCTION_LIKE
 
     bool shouldVerify(BraceStmt *BS) {
@@ -1061,7 +1061,7 @@ public:
         abort();
       }
 
-      if (ctor->getFailability() == OTK_None && !ctor->isInvalid()) {
+      if (!ctor->isFailable() && !ctor->isInvalid()) {
         Out << "non-failable initializer contains a 'fail' statement\n";
         ctor->dump(Out);
         abort();
@@ -2441,6 +2441,13 @@ public:
           abort();
         }
       }
+      //      if (auto *VD = dyn_cast<VarDecl>(ASD->getStorage())) {
+      //        const bool foundIt =
+      //            llvm::any_of(vd->getAllAccessors(),
+      //                         [&](AccessorDecl *VDA) { return VDA == ASD; });
+      //        Out << "Accessor for a VarDecl must be listed in its accessors";
+      //        abort();
+      //      }
 
       verifyCheckedBase(ASD);
     }
@@ -2519,9 +2526,8 @@ public:
         }
       }
 
-      if (var->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>()) {
-        auto varTy = var->getInterfaceType()
-                         ->getReferenceStorageReferent();
+      if (var->isImplicitlyUnwrappedOptional()) {
+        auto varTy = var->getValueInterfaceType();
 
         // FIXME: Update to look for plain Optional once
         // ImplicitlyUnwrappedOptional is removed
@@ -2944,8 +2950,9 @@ public:
       if (!CD->isInvalid() &&
           CD->getDeclContext()->getDeclaredInterfaceType()->getAnyNominal() !=
               Ctx.getOptionalDecl()) {
-        bool resultIsOptional = (bool) CD->getResultInterfaceType()->getOptionalObjectType();
-        auto declIsOptional = CD->getFailability() != OTK_None;
+        bool resultIsOptional = (bool) CD->getResultInterfaceType()
+            ->getOptionalObjectType();
+        auto declIsOptional = CD->isFailable();
 
         if (resultIsOptional != declIsOptional) {
           Out << "Initializer has result optionality/failability mismatch\n";
@@ -2968,25 +2975,8 @@ public:
         }
       }
 
-      if (CD->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>()) {
-        if (!CD->getInterfaceType() ||
-            !CD->getInterfaceType()->is<AnyFunctionType>()) {
-          Out << "Expected ConstructorDecl to have a function type!\n";
-          CD->dump(llvm::errs());
-          abort();
-        }
-
-        if (CD->getFailability() != OTK_ImplicitlyUnwrappedOptional) {
-          Out << "Expected IUO failability for constructor with IUO decl "
-                 "attribute!\n";
-          CD->dump(llvm::errs());
-          abort();
-        }
-
+      if (CD->isFailable()) {
         auto resultTy = CD->getResultInterfaceType();
-
-        // FIXME: Update to look for plain Optional once
-        // ImplicitlyUnwrappedOptional is removed
         if (!resultTy->getOptionalObjectType()) {
           Out << "implicitly unwrapped optional attribute should only be set "
                  "on constructors with optional return types\n";
@@ -2994,9 +2984,8 @@ public:
           abort();
         }
       } else {
-        if (CD->getFailability() == OTK_ImplicitlyUnwrappedOptional) {
-          Out << "Expected IUO decl attribute for constructor with IUO "
-                 "failability!\n";
+        if (CD->isImplicitlyUnwrappedOptional()) {
+          Out << "Expected failable constructor if result is IUO\n";
           CD->dump(llvm::errs());
           abort();
         }
@@ -3185,17 +3174,8 @@ public:
         }
       }
 
-      if (FD->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>()) {
-        if (!FD->getInterfaceType() ||
-            !FD->getInterfaceType()->is<AnyFunctionType>()) {
-          Out << "Expected FuncDecl to have a function type!\n";
-          abort();
-        }
-
+      if (FD->isImplicitlyUnwrappedOptional()) {
         auto resultTy = FD->getResultInterfaceType();
-
-        // FIXME: Update to look for plain Optional once
-        // ImplicitlyUnwrappedOptional is removed
         if (!resultTy->getOptionalObjectType()) {
           Out << "implicitly unwrapped optional attribute should only be set "
                  "on functions with optional return types\n";
@@ -3282,16 +3262,11 @@ public:
             NumDestructors++;
           }
         }
-        if (NumDestructors != 1) {
-          Out << "every class should have exactly one destructor, "
+        if (NumDestructors > 1) {
+          Out << "every class should have at most one destructor, "
                  "explicitly provided or created by the type checker\n";
           abort();
         }
-      }
-      
-      if (!CD->hasDestructor()) {
-        Out << "every class's 'has destructor' bit must be set\n";
-        abort();
       }
 
       verifyCheckedBase(CD);
@@ -3637,8 +3612,8 @@ public:
 
     void checkSourceRanges(Decl *D) {
       PrettyStackTraceDecl debugStack("verifying ranges", D);
-
-      if (!D->getSourceRange().isValid()) {
+      const auto SR = D->getSourceRange();
+      if (!SR.isValid()) {
         // We don't care about source ranges on implicitly-generated
         // decls.
         if (D->isImplicit())
@@ -3649,8 +3624,16 @@ public:
         Out << "\n";
         abort();
       }
-      checkSourceRanges(D->getSourceRange(), Parent,
-                        [&]{ D->print(Out); });
+      // ASTScope lookup depends on Decls having correct ordering.
+      // Move the order check to isGoodSourceRange after extending
+      // the invariant to Exprs, etc., per rdar://53637494
+      if (Ctx.SourceMgr.isBeforeInBuffer(SR.End, SR.Start)) {
+        Out << "backwards source range for decl: ";
+        D->print(Out);
+        Out << "\n";
+        abort();
+      }
+      checkSourceRanges(SR, Parent, [&] { D->print(Out); });
     }
 
     /// Verify that the given source ranges is contained within the

@@ -94,7 +94,6 @@ public:
   IGNORED_ATTR(HasStorage)
   IGNORED_ATTR(ImplementationOnly)
   IGNORED_ATTR(Implements)
-  IGNORED_ATTR(ImplicitlyUnwrappedOptional)
   IGNORED_ATTR(Infix)
   IGNORED_ATTR(Inlinable)
   IGNORED_ATTR(Inline)
@@ -133,6 +132,7 @@ public:
   IGNORED_ATTR(DisfavoredOverload)
   IGNORED_ATTR(FunctionBuilder)
   IGNORED_ATTR(ProjectedValueProperty)
+  IGNORED_ATTR(ReferenceOwnership)
 #undef IGNORED_ATTR
 
   void visitAlignmentAttr(AlignmentAttr *attr) {
@@ -174,10 +174,6 @@ public:
   void visitNonMutatingAttr(NonMutatingAttr *attr) { visitMutationAttr(attr); }
   void visitConsumingAttr(ConsumingAttr *attr) { visitMutationAttr(attr); }
   void visitDynamicAttr(DynamicAttr *attr);
-
-  void visitReferenceOwnershipAttr(ReferenceOwnershipAttr *attr) {
-    TC.checkReferenceOwnershipAttr(cast<VarDecl>(D), attr);
-  }
 
   void visitFinalAttr(FinalAttr *attr) {
     // Reject combining 'final' with 'open'.
@@ -715,7 +711,6 @@ public:
     IGNORED_ATTR(IBDesignable)
     IGNORED_ATTR(IBInspectable)
     IGNORED_ATTR(IBOutlet) // checked early.
-    IGNORED_ATTR(ImplicitlyUnwrappedOptional)
     IGNORED_ATTR(Indirect)
     IGNORED_ATTR(Inline)
     IGNORED_ATTR(Lazy)      // checked early.
@@ -2140,23 +2135,24 @@ static FuncDecl *findReplacedAccessor(DeclName replacedVarName,
   }
 
   // Find the accessor in the replaced storage decl.
-  for (auto *origAccessor : origStorage->getAllAccessors()) {
-    TC.validateDecl(origAccessor);
-    if (origAccessor->getAccessorKind() != replacement->getAccessorKind())
-      continue;
+  auto *origAccessor = origStorage->getOpaqueAccessor(
+      replacement->getAccessorKind());
+  if (!origAccessor)
+    return nullptr;
 
-    if (origAccessor->isImplicit() &&
-        !(origStorage->getReadImpl() == ReadImplKind::Stored &&
-          origStorage->getWriteImpl() == WriteImplKind::Stored)) {
-      TC.diagnose(attr->getLocation(),
-                  diag::dynamic_replacement_accessor_not_explicit,
-                  (unsigned)origAccessor->getAccessorKind(), replacedVarName);
-      attr->setInvalid();
-      return nullptr;
-    }
-    return origAccessor;
+  TC.validateDecl(origAccessor);
+
+  if (origAccessor->isImplicit() &&
+      !(origStorage->getReadImpl() == ReadImplKind::Stored &&
+        origStorage->getWriteImpl() == WriteImplKind::Stored)) {
+    TC.diagnose(attr->getLocation(),
+                diag::dynamic_replacement_accessor_not_explicit,
+                (unsigned)origAccessor->getAccessorKind(), replacedVarName);
+    attr->setInvalid();
+    return nullptr;
   }
-  return nullptr;
+
+  return origAccessor;
 }
 
 static AbstractFunctionDecl *
@@ -2298,19 +2294,19 @@ void TypeChecker::checkDynamicReplacementAttribute(ValueDecl *D) {
 
   // Collect the accessor replacement mapping if this is an abstract storage.
   if (auto *var = dyn_cast<AbstractStorageDecl>(D)) {
-     for (auto *accessor : var->getAllAccessors()) {
+    var->visitParsedAccessors([&](AccessorDecl *accessor) {
+      if (attr->isInvalid())
+        return;
+
        validateDecl(accessor);
-       if (accessor->isImplicit())
-         continue;
        auto *orig = findReplacedAccessor(attr->getReplacedFunctionName(),
                                          accessor, attr, *this);
-       if (attr->isInvalid())
-         return;
        if (!orig)
-         continue;
+         return;
+
        origs.push_back(orig);
        replacements.push_back(accessor);
-     }
+     });
   } else {
     // Otherwise, find the matching function.
     auto *fun = cast<AbstractFunctionDecl>(D);
@@ -2641,26 +2637,13 @@ void TypeChecker::checkDeclAttributes(Decl *D) {
   }
 }
 
-void TypeChecker::checkTypeModifyingDeclAttributes(VarDecl *var) {
-  if (!var->hasType())
-    return;
-
-  if (auto *attr = var->getAttrs().getAttribute<ReferenceOwnershipAttr>())
-    checkReferenceOwnershipAttr(var, attr);
-}
-
-void TypeChecker::checkReferenceOwnershipAttr(VarDecl *var,
+Type TypeChecker::checkReferenceOwnershipAttr(VarDecl *var, Type type,
                                               ReferenceOwnershipAttr *attr) {
-  // Don't check ownership attribute if the declaration is already marked invalid.
-  if (var->isInvalid())
-    return;
+  auto *dc = var->getDeclContext();
 
-  Type type = var->getType();
-  Type interfaceType = var->getInterfaceType();
-
-  // Just stop if we've already processed this declaration.
-  if (type->is<ReferenceStorageType>())
-    return;
+  // Don't check ownership attribute if the type is invalid.
+  if (attr->isInvalid() || type->is<ErrorType>())
+    return type;
 
   auto ownershipKind = attr->get();
 
@@ -2712,11 +2695,12 @@ void TypeChecker::checkReferenceOwnershipAttr(VarDecl *var,
   if (!underlyingType)
     underlyingType = type;
 
-  if (!underlyingType->allowsOwnership()) {
+  auto *sig = var->getDeclContext()->getGenericSignatureOfContext();
+  if (!underlyingType->allowsOwnership(sig)) {
     auto D = diag::invalid_ownership_type;
 
     if (underlyingType->isExistentialType() ||
-        underlyingType->is<ArchetypeType>()) {
+        underlyingType->isTypeParameter()) {
       // Suggest the possibility of adding a class bound.
       D = diag::invalid_ownership_protocol_type;
     }
@@ -2734,7 +2718,7 @@ void TypeChecker::checkReferenceOwnershipAttr(VarDecl *var,
     attr->setInvalid();
   }
 
-  auto PDC = dyn_cast<ProtocolDecl>((var->getDeclContext()));
+  auto PDC = dyn_cast<ProtocolDecl>(dc);
   if (PDC && !PDC->isObjC()) {
     // Ownership does not make sense in protocols, except for "weak" on
     // properties of Objective-C protocols.
@@ -2747,13 +2731,10 @@ void TypeChecker::checkReferenceOwnershipAttr(VarDecl *var,
   }
 
   if (attr->isInvalid())
-    return;
+    return type;
 
   // Change the type to the appropriate reference storage type.
-  var->setType(ReferenceStorageType::get(
-      type, ownershipKind, Context));
-  var->setInterfaceType(ReferenceStorageType::get(
-      interfaceType, ownershipKind, Context));
+  return ReferenceStorageType::get(type, ownershipKind, Context);
 }
 
 Optional<Diag<>>
@@ -2823,12 +2804,14 @@ void TypeChecker::addImplicitDynamicAttribute(Decl *D) {
       return;
   }
 
-  // Don't add dynamic if accessor is inlinable or tranparent.
+  // Don't add dynamic if accessor is inlinable or transparent.
   if (auto *asd = dyn_cast<AbstractStorageDecl>(D)) {
-    for (auto *accessor : asd->getAllAccessors()) {
-      if (!accessor->isImplicit() && shouldBlockImplicitDynamic(accessor))
-        return;
-    }
+    bool blocked = false;
+    asd->visitParsedAccessors([&](AccessorDecl *accessor) {
+      blocked |= shouldBlockImplicitDynamic(accessor);
+    });
+    if (blocked)
+      return;
   }
 
   if (auto *VD = dyn_cast<VarDecl>(D)) {

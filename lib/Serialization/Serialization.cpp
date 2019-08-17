@@ -1620,20 +1620,6 @@ Serializer::writeConformances(ArrayRef<ProtocolConformance*> conformances,
     writeConformance(conformance, abbrCodes);
 }
 
-static uint8_t getRawStableOptionalTypeKind(swift::OptionalTypeKind kind) {
-  switch (kind) {
-  case swift::OTK_None:
-    return static_cast<uint8_t>(serialization::OptionalTypeKind::None);
-  case swift::OTK_Optional:
-    return static_cast<uint8_t>(serialization::OptionalTypeKind::Optional);
-  case swift::OTK_ImplicitlyUnwrappedOptional:
-    return static_cast<uint8_t>(
-             serialization::OptionalTypeKind::ImplicitlyUnwrappedOptional);
-  }
-
-  llvm_unreachable("Unhandled OptionalTypeKind in switch.");
-}
-
 static bool shouldSerializeMember(Decl *D) {
   switch (D->getKind()) {
   case DeclKind::Import:
@@ -1731,6 +1717,8 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
   case DeclContextKind::GenericTypeDecl: {
     auto generic = cast<GenericTypeDecl>(DC);
 
+    writeCrossReference(DC->getParent(), pathLen + 1);
+
     // Opaque return types are unnamed and need a special xref.
     if (auto opaque = dyn_cast<OpaqueTypeDecl>(generic)) {
       if (!opaque->hasName()) {
@@ -1744,8 +1732,6 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
     }
       
     assert(generic->hasName());
-    
-    writeCrossReference(DC->getParent(), pathLen + 1);
 
     abbrCode = DeclTypeAbbrCodes[XRefTypePathPieceLayout::Code];
 
@@ -3399,6 +3385,7 @@ public:
                           accessors.ReadWriteImpl,
                           accessors.Decls.size(),
                           S.addTypeRef(ty),
+                          var->isImplicitlyUnwrappedOptional(),
                           S.addDeclRef(var->getOverriddenDecl()),
                           rawAccessLevel, rawSetterAccessLevel,
                           S.addDeclRef(var->getOpaqueResultTypeDecl()),
@@ -3431,6 +3418,7 @@ public:
         contextID,
         getRawStableParamDeclSpecifier(param->getSpecifier()),
         S.addTypeRef(interfaceType),
+        param->isImplicitlyUnwrappedOptional(),
         param->isVariadic(),
         param->isAutoClosure(),
         getRawStableDefaultArgumentKind(argKind),
@@ -3476,6 +3464,7 @@ public:
                            S.addGenericEnvironmentRef(
                                                   fn->getGenericEnvironment()),
                            S.addTypeRef(fn->getResultInterfaceType()),
+                           fn->isImplicitlyUnwrappedOptional(),
                            S.addDeclRef(fn->getOperatorDecl()),
                            S.addDeclRef(fn->getOverriddenDecl()),
                            fn->getFullName().getArgumentNames().size() +
@@ -3563,6 +3552,7 @@ public:
                                S.addGenericEnvironmentRef(
                                                   fn->getGenericEnvironment()),
                                S.addTypeRef(fn->getResultInterfaceType()),
+                               fn->isImplicitlyUnwrappedOptional(),
                                S.addDeclRef(fn->getOverriddenDecl()),
                                S.addDeclRef(fn->getStorage()),
                                rawAccessorKind,
@@ -3672,6 +3662,7 @@ public:
                                 S.addGenericEnvironmentRef(
                                             subscript->getGenericEnvironment()),
                                 S.addTypeRef(subscript->getElementInterfaceType()),
+                                subscript->isImplicitlyUnwrappedOptional(),
                                 S.addDeclRef(subscript->getOverriddenDecl()),
                                 rawAccessLevel,
                                 rawSetterAccessLevel,
@@ -3710,8 +3701,8 @@ public:
     unsigned abbrCode = S.DeclTypeAbbrCodes[ConstructorLayout::Code];
     ConstructorLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                                   contextID,
-                                  getRawStableOptionalTypeKind(
-                                    ctor->getFailability()),
+                                  ctor->isFailable(),
+                                  ctor->isImplicitlyUnwrappedOptional(),
                                   ctor->isImplicit(),
                                   ctor->isObjC(),
                                   ctor->hasStubImplementation(),

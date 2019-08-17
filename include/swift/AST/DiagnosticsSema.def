@@ -81,6 +81,13 @@ ERROR(could_not_find_value_member,none,
 ERROR(could_not_find_value_member_corrected,none,
       "value of type %0 has no member %1; did you mean %2?",
       (Type, DeclName, DeclName))
+ERROR(could_not_find_value_dynamic_member_corrected,none,
+      "value of type %0 has no dynamic member %2 using key path from root type %1; did you mean %3?",
+      (Type, Type, DeclName, DeclName))
+ERROR(could_not_find_value_dynamic_member,none,
+      "value of type %0 has no dynamic member %2 using key path from root type %1",
+      (Type, Type, DeclName))
+
 ERROR(could_not_find_type_member,none,
       "type %0 has no member %1", (Type, DeclName))
 ERROR(could_not_find_type_member_corrected,none,
@@ -1133,6 +1140,10 @@ ERROR(c_function_pointer_from_generic_function,none,
       "function", ())
 ERROR(invalid_autoclosure_forwarding,none,
       "add () to forward @autoclosure parameter", ())
+ERROR(invalid_autoclosure_pointer_conversion,none,
+      "cannot perform pointer conversion of value of type %0 to autoclosure "
+      "result type %1",
+      (Type, Type))
 
 //------------------------------------------------------------------------------
 // MARK: Type Check Declarations
@@ -3398,6 +3409,18 @@ ERROR(pattern_type_mismatch_context,none,
 
 ERROR(tuple_pattern_in_non_tuple_context,none,
       "tuple pattern cannot match values of the non-tuple type %0", (Type))
+WARNING(matching_pattern_with_many_assoc_values, none,
+        "cannot match several associated values at once, "
+        "implicitly tupling the associated values and trying to match that "
+        "instead", ())
+WARNING(matching_tuple_pattern_with_many_assoc_values,none,
+        "a tuple pattern cannot match several associated values at once, "
+        "implicitly tupling the associated values and trying to match "
+        "that instead", ())
+WARNING(matching_many_patterns_with_tupled_assoc_value,none,
+        "the enum case has a single tuple as an associated value, but "
+        "there are several patterns here, implicitly tupling the patterns "
+        "and trying to match that instead", ())
 ERROR(closure_argument_list_tuple,none,
       "contextual closure type %0 expects %1 argument%s1, "
       "but %2 %select{were|was}3 used in closure body", (Type, unsigned, unsigned, bool))

@@ -328,6 +328,16 @@ llvm::Triple swift::getTargetSpecificModuleTriple(const llvm::Triple &triple) {
     return llvm::Triple(newArch, newVendor, newOS, *newEnvironment);
   }
 
+  // android - drop the API level.  That is not pertinent to the module; the API
+  // availability is handled by the clang importer.
+  if (triple.isAndroid()) {
+    StringRef environment =
+        llvm::Triple::getEnvironmentTypeName(triple.getEnvironment());
+
+    return llvm::Triple(triple.getArchName(), triple.getVendorName(),
+                        triple.getOSName(), environment);
+  }
+
   // Other platforms get no normalization.
   return triple;
 }

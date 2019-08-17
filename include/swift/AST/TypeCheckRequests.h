@@ -1010,6 +1010,48 @@ public:
   void cacheResult(AccessorDecl *value) const;
 };
 
+class EmittedMembersRequest :
+    public SimpleRequest<EmittedMembersRequest,
+                         DeclRange(ClassDecl *),
+                         CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<DeclRange>
+  evaluate(Evaluator &evaluator, ClassDecl *classDecl) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<DeclRange> getCachedResult() const;
+  void cacheResult(DeclRange value) const;
+};
+
+class IsImplicitlyUnwrappedOptionalRequest :
+    public SimpleRequest<IsImplicitlyUnwrappedOptionalRequest,
+                         bool(ValueDecl *),
+                         CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool>
+  evaluate(Evaluator &evaluator, ValueDecl *value) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<bool> getCachedResult() const;
+  void cacheResult(bool value) const;
+};
+
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
 template<>

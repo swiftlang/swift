@@ -106,7 +106,15 @@ class SILFunctionBuilder {
 
   void addFunctionAttributes(SILFunction *F, DeclAttributes &Attrs,
                              SILModule &M, SILDeclRef constant = SILDeclRef());
+
+  /// We do not expose this to everyone, instead we allow for our users to opt
+  /// into this if they need to. Please do not do this in general! We only want
+  /// to use this when deserializing a function body.
+  static void setHasOwnership(SILFunction *F, bool newValue) {
+    F->setHasOwnership(newValue);
+  }
 };
+
 } // namespace swift
 
 #endif

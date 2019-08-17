@@ -1328,15 +1328,15 @@ void SILGenModule::visitVarDecl(VarDecl *vd) {
   if (vd->hasStorage())
     addGlobalVariable(vd);
 
-  for (auto *accessor : vd->getAllAccessors())
+  vd->visitEmittedAccessors([&](AccessorDecl *accessor) {
     emitFunction(accessor);
+  });
 
   tryEmitPropertyDescriptor(vd);
 }
 
 void SILGenModule::visitSubscriptDecl(SubscriptDecl *sd) {
-  for (auto *accessor : sd->getAllAccessors())
-    emitFunction(accessor);
+  llvm_unreachable("top-level subscript?");
 }
 
 bool

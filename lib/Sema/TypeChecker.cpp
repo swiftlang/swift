@@ -241,7 +241,7 @@ static void bindExtensionToNominal(ExtensionDecl *ext,
   nominal->addExtension(ext);
 }
 
-static void bindExtensions(SourceFile &SF, TypeChecker &TC) {
+static void bindExtensions(SourceFile &SF) {
   // Utility function to try and resolve the extended type without diagnosing.
   // If we succeed, we go ahead and bind the extension. Otherwise, return false.
   auto tryBindExtension = [&](ExtensionDecl *ext) -> bool {
@@ -318,26 +318,9 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
     for (unsigned n = TC.definedFunctions.size(); currentFunctionIdx != n;
          ++currentFunctionIdx) {
       auto *AFD = TC.definedFunctions[currentFunctionIdx];
+      assert(!AFD->getDeclContext()->isLocalContext());
 
       TC.typeCheckAbstractFunctionBody(AFD);
-    }
-
-    // Validate any referenced declarations for SIL's purposes.
-    // Note: if we ever start putting extension members in vtables, we'll need
-    // to validate those members too.
-    // FIXME: If we're not planning to run SILGen, this is wasted effort.
-    while (TC.NextDeclToFinalize < TC.DeclsToFinalize.size()) {
-      auto decl = TC.DeclsToFinalize[TC.NextDeclToFinalize++];
-      if (decl->isInvalid())
-        continue;
-
-      // If we've already encountered an error, don't finalize declarations
-      // from other source files.
-      if (TC.Context.hadError() &&
-          decl->getDeclContext()->getParentSourceFile() != &SF)
-        continue;
-
-      TC.finalizeDecl(decl);
     }
 
     // Type check synthesized functions and their bodies.
@@ -350,7 +333,6 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
 
   } while (currentFunctionIdx < TC.definedFunctions.size() ||
            currentSynthesizedDecl < SF.SynthesizedDecls.size() ||
-           TC.NextDeclToFinalize < TC.DeclsToFinalize.size() ||
            !TC.ConformanceContexts.empty());
 
   // FIXME: Horrible hack. Store this somewhere more appropriate.
@@ -358,19 +340,12 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
 
   // Compute captures for functions and closures we visited.
   for (auto *closure : TC.ClosuresWithUncomputedCaptures) {
-    TC.computeCaptures(closure);
+    TypeChecker::computeCaptures(closure);
   }
   TC.ClosuresWithUncomputedCaptures.clear();
 
   for (AbstractFunctionDecl *FD : reversed(TC.definedFunctions)) {
-    TC.computeCaptures(FD);
-  }
-
-  // Check error-handling correctness for all the functions defined in
-  // this file.  This can depend on all of their interior function
-  // bodies having been type-checked.
-  for (AbstractFunctionDecl *FD : TC.definedFunctions) {
-    TC.checkFunctionErrorHandling(FD);
+    TypeChecker::computeCaptures(FD);
   }
 
   TC.definedFunctions.clear();
@@ -438,7 +413,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
     // Resolve extensions. This has to occur first during type checking,
     // because the extensions need to be wired into the AST for name lookup
     // to work.
-    bindExtensions(SF, TC);
+    bindExtensions(SF);
 
     // Look for bridging functions. This only matters when
     // -enable-source-import is provided.

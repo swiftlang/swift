@@ -460,9 +460,6 @@ private:
   /// exact expression kind).
   bool diagnoseGeneralConversionFailure(Constraint *constraint);
 
-  /// Produce a specialized diagnostic if this is an invalid conversion to Bool.
-  bool diagnoseConversionToBool(Expr *expr, Type exprType);
-  
   /// Produce a diagnostic for binary comparisons of the nil literal
   /// to other values.
   bool diagnoseNilLiteralComparison(Expr *lhsExpr, Expr *rhsExpr,
@@ -489,14 +486,6 @@ private:
                       llvm::function_ref<bool(Type, Type)> resultTypeProcessor);
 
   bool diagnoseSubscriptErrors(SubscriptExpr *SE, bool performingSet);
-
-  /// Try to diagnose common errors involving implicitly non-escaping parameters
-  /// of function type, giving more specific and simpler diagnostics, attaching
-  /// notes on the parameter, and offering fixits to insert @escaping. Returns
-  /// true if it detects and issues an error, false if it does nothing.
-  bool diagnoseNonEscapingParameterToEscaping(Expr *expr, Type srcType,
-                                              Type dstType,
-                                              ContextualTypePurpose dstPurpose);
 
   bool visitExpr(Expr *E);
   bool visitIdentityExpr(IdentityExpr *E);
@@ -870,45 +859,6 @@ bool FailureDiagnosis::diagnoseGeneralOverloadFailure(Constraint *constraint) {
   return true;
 }
 
-/// Produce a specialized diagnostic if this is an invalid conversion to Bool.
-bool FailureDiagnosis::diagnoseConversionToBool(Expr *expr, Type exprType) {
-  
-  // Check for "=" converting to Bool.  The user probably meant ==.
-  if (auto *AE = dyn_cast<AssignExpr>(expr->getValueProvidingExpr())) {
-    diagnose(AE->getEqualLoc(), diag::use_of_equal_instead_of_equality)
-      .fixItReplace(AE->getEqualLoc(), "==")
-      .highlight(AE->getDest()->getLoc())
-      .highlight(AE->getSrc()->getLoc());
-    return true;
-  }
-  
-  // If we're trying to convert something from optional type to Bool, then a
-  // comparison against nil was probably expected.
-  // TODO: It would be nice to handle "!x" --> x == false, but we have no way
-  // to get to the parent expr at present.
-  if (exprType->getOptionalObjectType()) {
-    StringRef prefix = "((";
-    StringRef suffix = ") != nil)";
-    
-    // Check if we need the inner parentheses.
-    // Technically we only need them if there's something in 'expr' with
-    // lower precedence than '!=', but the code actually comes out nicer
-    // in most cases with parens on anything non-trivial.
-    if (expr->canAppendPostfixExpression()) {
-      prefix = prefix.drop_back();
-      suffix = suffix.drop_front();
-    }
-    // FIXME: The outer parentheses may be superfluous too.
-    
-    diagnose(expr->getLoc(), diag::optional_used_as_boolean, exprType)
-      .fixItInsert(expr->getStartLoc(), prefix)
-      .fixItInsertAfter(expr->getEndLoc(), suffix);
-    return true;
-  }
-
-  return false;
-}
-
 static bool
 diagnoseUnresolvedDotExprTypeRequirementFailure(ConstraintSystem &cs,
                                                 Constraint *constraint) {
@@ -1110,10 +1060,6 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
       if (constraint->getKind() == ConstraintKind::ArgumentConversion ||
           constraint->getKind() == ConstraintKind::OperatorArgumentConversion)
         destPurpose = CTP_CallArgument;
-
-      if (diagnoseNonEscapingParameterToEscaping(anchor, fromType, toType,
-                                                 destPurpose))
-        return true;
     }
 
   // If this is a callee that mismatches an expected return type, we can emit a
@@ -1182,10 +1128,11 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
 
   
   // Check for various issues converting to Bool.
-  if (toType->isBool() && diagnoseConversionToBool(anchor, fromType))
+  ContextualFailure failure(expr, CS, fromType, toType,
+                            constraint->getLocator());
+  if (failure.diagnoseConversionToBool())
     return true;
-  
-  
+
   if (auto PT = toType->getAs<ProtocolType>()) {
     if (isa<NilLiteralExpr>(expr->getValueProvidingExpr())) {
       diagnose(expr->getLoc(), diag::cannot_use_nil_with_this_type, toType)
@@ -1689,311 +1636,6 @@ bool FailureDiagnosis::diagnoseCalleeResultContextualConversionError() {
   }
 }
 
-
-/// Return true if the given type conforms to a known protocol type.
-static bool conformsToKnownProtocol(Type fromType, KnownProtocolKind kind,
-                                    const ConstraintSystem &CS) {
-  auto proto = CS.TC.getProtocol(SourceLoc(), kind);
-  if (!proto)
-    return false;
-
-  if (TypeChecker::conformsToProtocol(fromType, proto, CS.DC,
-                                      ConformanceCheckFlags::InExpression)) {
-    return true;
-  }
-
-  return false;
-}
-
-static bool isIntegerType(Type fromType, const ConstraintSystem &CS) {
-  return conformsToKnownProtocol(fromType,
-                                 KnownProtocolKind::ExpressibleByIntegerLiteral,
-                                 CS);
-}
-
-/// Return true if the given type conforms to RawRepresentable.
-static Type isRawRepresentable(Type fromType, const ConstraintSystem &CS) {
-  auto rawReprType =
-      CS.TC.getProtocol(SourceLoc(), KnownProtocolKind::RawRepresentable);
-  if (!rawReprType)
-    return Type();
-
-  auto conformance = TypeChecker::conformsToProtocol(
-      fromType, rawReprType, CS.DC, ConformanceCheckFlags::InExpression);
-  if (!conformance)
-    return Type();
-
-  Type rawTy = conformance->getTypeWitnessByName(
-      fromType, CS.getASTContext().Id_RawValue);
-  return rawTy;
-}
-
-/// Return true if the given type conforms to RawRepresentable, with an
-/// underlying type conforming to the given known protocol.
-static Type isRawRepresentable(Type fromType, KnownProtocolKind kind,
-                               const ConstraintSystem &CS) {
-  Type rawTy = isRawRepresentable(fromType, CS);
-  if (!rawTy || !conformsToKnownProtocol(rawTy, kind, CS))
-    return Type();
-
-  return rawTy;
-}
-
-/// Return true if the conversion from fromType to toType is an invalid string
-/// index operation.
-static bool isIntegerToStringIndexConversion(Type fromType, Type toType,
-                                             ConstraintSystem &CS) {
-  auto kind = KnownProtocolKind::ExpressibleByIntegerLiteral;
-  return (conformsToKnownProtocol(fromType, kind, CS) &&
-          toType->getCanonicalType().getString() == "String.CharacterView.Index");
-}
-
-static bool isOptionSetType(Type fromType, const ConstraintSystem &CS) {
-  return conformsToKnownProtocol(fromType,
-                                 KnownProtocolKind::OptionSet,
-                                 CS);
-}
-
-/// Attempts to add fix-its for these two mistakes:
-///
-/// - Passing an integer where a type conforming to RawRepresentable is
-///   expected, by wrapping the expression in a call to the contextual
-///   type's initializer
-///
-/// - Passing a type conforming to RawRepresentable where an integer is
-///   expected, by wrapping the expression in a call to the rawValue
-///   accessor
-///
-/// - Return true on the fixit is added, false otherwise.
-///
-/// This helps migration with SDK changes.
-static bool tryRawRepresentableFixIts(InFlightDiagnostic &diag,
-                                      const ConstraintSystem &CS, Type fromType,
-                                      Type toType, KnownProtocolKind kind,
-                                      const Expr *expr) {
-  // The following fixes apply for optional destination types as well.
-  bool toTypeIsOptional = !toType->getOptionalObjectType().isNull();
-  toType = toType->lookThroughAllOptionalTypes();
-
-  Type fromTypeUnwrapped = fromType->getOptionalObjectType();
-  bool fromTypeIsOptional = !fromTypeUnwrapped.isNull();
-  if (fromTypeIsOptional)
-    fromType = fromTypeUnwrapped;
-
-  auto fixIt = [&](StringRef convWrapBefore, StringRef convWrapAfter) {
-    SourceRange exprRange = expr->getSourceRange();
-    if (fromTypeIsOptional && toTypeIsOptional) {
-      // Use optional's map function to convert conditionally, like so:
-      //   expr.map{ T(rawValue: $0) }
-      bool needsParens = !expr->canAppendPostfixExpression();
-      std::string mapCodeFix;
-      if (needsParens) {
-        diag.fixItInsert(exprRange.Start, "(");
-        mapCodeFix += ")";
-      }
-      mapCodeFix += ".map { ";
-      mapCodeFix += convWrapBefore;
-      mapCodeFix += "$0";
-      mapCodeFix += convWrapAfter;
-      mapCodeFix += " }";
-      diag.fixItInsertAfter(exprRange.End, mapCodeFix);
-    } else if (!fromTypeIsOptional) {
-      diag.fixItInsert(exprRange.Start, convWrapBefore);
-      diag.fixItInsertAfter(exprRange.End, convWrapAfter);
-    } else {
-      SmallString<16> fixItBefore(convWrapBefore);
-      SmallString<16> fixItAfter;
-
-      if (!expr->canAppendPostfixExpression(true)) {
-        fixItBefore += "(";
-        fixItAfter = ")";
-      }
-
-      fixItAfter += "!" + convWrapAfter.str();
-
-      diag.flush();
-      CS.TC
-          .diagnose(expr->getLoc(),
-                    diag::construct_raw_representable_from_unwrapped_value,
-                    toType, fromType)
-          .highlight(exprRange)
-          .fixItInsert(exprRange.Start, fixItBefore)
-          .fixItInsertAfter(exprRange.End, fixItAfter);
-    }
-  };
-
-  if (conformsToKnownProtocol(fromType, kind, CS)) {
-    if (isOptionSetType(toType, CS) &&
-        isa<IntegerLiteralExpr>(expr) &&
-        cast<IntegerLiteralExpr>(expr)->getDigitsText() == "0") {
-      diag.fixItReplace(expr->getSourceRange(), "[]");
-      return true;
-    }
-    if (auto rawTy = isRawRepresentable(toType, kind, CS)) {
-      // Produce before/after strings like 'Result(rawValue: RawType(<expr>))'
-      // or just 'Result(rawValue: <expr>)'.
-      std::string convWrapBefore = toType.getString();
-      convWrapBefore += "(rawValue: ";
-      std::string convWrapAfter = ")";
-      if (!isa<LiteralExpr>(expr) &&
-          !CS.TC.isConvertibleTo(fromType, rawTy, CS.DC)) {
-        // Only try to insert a converting construction if the protocol is a
-        // literal protocol and not some other known protocol.
-        switch (kind) {
-#define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(name, _, __, ___)            \
-  case KnownProtocolKind::name:                                                \
-    break;
-#define PROTOCOL_WITH_NAME(name, _) \
-        case KnownProtocolKind::name: return false;
-#include "swift/AST/KnownProtocols.def"
-        }
-        convWrapBefore += rawTy->getString();
-        convWrapBefore += "(";
-        convWrapAfter += ")";
-      }
-      fixIt(convWrapBefore, convWrapAfter);
-      return true;
-    }
-  }
-
-  if (auto rawTy = isRawRepresentable(fromType, kind, CS)) {
-    if (conformsToKnownProtocol(toType, kind, CS)) {
-      std::string convWrapBefore;
-      std::string convWrapAfter = ".rawValue";
-      if (!CS.TC.isConvertibleTo(rawTy, toType, CS.DC)) {
-        // Only try to insert a converting construction if the protocol is a
-        // literal protocol and not some other known protocol.
-        switch (kind) {
-#define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(name, _, __, ___)            \
-  case KnownProtocolKind::name:                                                \
-    break;
-#define PROTOCOL_WITH_NAME(name, _) \
-        case KnownProtocolKind::name: return false;
-#include "swift/AST/KnownProtocols.def"
-        }
-        convWrapBefore += toType->getString();
-        convWrapBefore += "(";
-        convWrapAfter += ")";
-      }
-      fixIt(convWrapBefore, convWrapAfter);
-      return true;
-    }
-  }
-  return false;
-}
-
-/// Attempts to add fix-its for these two mistakes:
-///
-/// - Passing an integer with the right type but which is getting wrapped with a
-///   different integer type unnecessarily. The fixit removes the cast.
-///
-/// - Passing an integer but expecting different integer type. The fixit adds
-///   a wrapping cast.
-///
-/// - Return true on the fixit is added, false otherwise.
-///
-/// This helps migration with SDK changes.
-static bool tryIntegerCastFixIts(InFlightDiagnostic &diag, ConstraintSystem &CS,
-                                 Type fromType, Type toType, Expr *expr) {
-  if (!isIntegerType(fromType, CS) || !isIntegerType(toType, CS))
-    return false;
-
-  auto getInnerCastedExpr = [&]() -> Expr * {
-    if (auto *CE = dyn_cast<CoerceExpr>(expr))
-      return CE->getSubExpr();
-
-    auto *CE = dyn_cast<CallExpr>(expr);
-    if (!CE)
-      return nullptr;
-    if (!isa<ConstructorRefCallExpr>(CE->getFn()))
-      return nullptr;
-    auto *parenE = dyn_cast<ParenExpr>(CE->getArg());
-    if (!parenE)
-      return nullptr;
-    return parenE->getSubExpr();
-  };
-
-  if (Expr *innerE = getInnerCastedExpr()) {
-    Type innerTy = CS.getType(innerE);
-    if (CS.TC.isConvertibleTo(innerTy, toType, CS.DC)) {
-      // Remove the unnecessary cast.
-      diag.fixItRemoveChars(expr->getLoc(), innerE->getStartLoc())
-        .fixItRemove(expr->getEndLoc());
-      return true;
-    }
-  }
-
-  // Add a wrapping integer cast.
-  std::string convWrapBefore = toType.getString();
-  convWrapBefore += "(";
-  std::string convWrapAfter = ")";
-  SourceRange exprRange = expr->getSourceRange();
-  diag.fixItInsert(exprRange.Start, convWrapBefore);
-  diag.fixItInsertAfter(exprRange.End, convWrapAfter);
-  return true;
-}
-
-static bool addTypeCoerceFixit(InFlightDiagnostic &diag, ConstraintSystem &CS,
-                               Type fromType, Type toType, Expr *expr) {
-  // Look through optional types; casts can add them, but can't remove extra
-  // ones.
-  bool bothOptional =
-      fromType->getOptionalObjectType() && toType->getOptionalObjectType();
-  if (bothOptional)
-    fromType = fromType->getOptionalObjectType();
-  toType = toType->lookThroughAllOptionalTypes();
-
-  if (!toType->hasTypeRepr())
-    return false;
-
-  CheckedCastKind Kind = CS.getTypeChecker().typeCheckCheckedCast(
-      fromType, toType, CheckedCastContextKind::None, CS.DC, SourceLoc(),
-      nullptr, SourceRange());
-  if (Kind != CheckedCastKind::Unresolved) {
-    SmallString<32> buffer;
-    llvm::raw_svector_ostream OS(buffer);
-    bool canUseAs = Kind == CheckedCastKind::Coercion ||
-      Kind == CheckedCastKind::BridgingCoercion;
-    if (bothOptional && canUseAs)
-      toType = OptionalType::get(toType);
-    toType->print(OS);
-    diag.fixItInsert(
-        Lexer::getLocForEndOfToken(CS.DC->getASTContext().SourceMgr,
-                                   expr->getEndLoc()),
-        (llvm::Twine(canUseAs ? " as " : " as! ") + OS.str()).str());
-    return true;
-  }
-  return false;
-}
-
-/// Try to diagnose common errors involving implicitly non-escaping parameters
-/// of function type, giving more specific and simpler diagnostics, attaching
-/// notes on the parameter, and offering fixits to insert @escaping. Returns
-/// true if it detects and issues an error, false if it does nothing.
-bool FailureDiagnosis::diagnoseNonEscapingParameterToEscaping(
-    Expr *expr, Type srcType, Type dstType, ContextualTypePurpose dstPurpose) {
-  assert(expr);
-  // Need to be referencing a parameter of function type
-  auto declRef = dyn_cast<DeclRefExpr>(expr);
-  if (!declRef || !isa<ParamDecl>(declRef->getDecl()) ||
-      !CS.getType(declRef)->is<AnyFunctionType>())
-    return false;
-
-  // Must be from non-escaping function to escaping function. For the
-  // destination type, we read through optionality to give better diagnostics in
-  // the event of an implicit promotion.
-  auto srcFT = srcType->getAs<AnyFunctionType>();
-  auto dstFT =
-      dstType->lookThroughAllOptionalTypes()->getAs<AnyFunctionType>();
-
-  if (!srcFT || !dstFT || !srcFT->isNoEscape() || dstFT->isNoEscape())
-    return false;
-
-  NoEscapeFuncToTypeConversionFailure failure(
-      expr, CS, CS.getConstraintLocator(expr), dstType);
-  return failure.diagnoseAsError();
-}
-
 bool FailureDiagnosis::diagnoseContextualConversionError(
     Expr *expr, Type contextualType, ContextualTypePurpose CTP,
     Type suggestedType) {
@@ -2038,7 +1680,6 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
   // Try to find the contextual type in a variety of ways.  If the constraint
   // system had a contextual type specified, we use it - it will have a purpose
   // indicator which allows us to give a very "to the point" diagnostic.
-  Diag<Type, Type> diagID;
   Diag<Type> nilDiag;
   std::function<void(void)> nilFollowup;
 
@@ -2054,7 +1695,6 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
     llvm_unreachable("CTP_CalleeResult does not actually install a "
                      "contextual type");
   case CTP_Initialization:
-    diagID = diag::cannot_convert_initializer_value;
     nilDiag = diag::cannot_convert_initializer_value_nil;
     nilFollowup = [this] {
       TypeRepr *patternTR = CS.getContextualTypeLoc().getTypeRepr();
@@ -2079,7 +1719,6 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
       return true;
     }
 
-    diagID = diag::cannot_convert_to_return_type;
     nilDiag = diag::cannot_convert_to_return_type_nil;
     break;
   case CTP_ThrowStmt: {
@@ -2126,11 +1765,9 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
   }
 
   case CTP_EnumCaseRawValue:
-    diagID = diag::cannot_convert_raw_initializer_value;
     nilDiag = diag::cannot_convert_raw_initializer_value_nil;
     break;
   case CTP_DefaultParameter:
-    diagID = diag::cannot_convert_default_arg_value;
     nilDiag = diag::cannot_convert_default_arg_value_nil;
     break;
 
@@ -2149,39 +1786,30 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
     }
     return true;
   case CTP_YieldByValue:
-    diagID = diag::cannot_convert_yield_value;
     nilDiag = diag::cannot_convert_yield_value_nil;
     break;
   case CTP_CallArgument:
-    diagID = diag::cannot_convert_argument_value;
     nilDiag = diag::cannot_convert_argument_value_nil;
     break;
   case CTP_ClosureResult:
-    diagID = diag::cannot_convert_closure_result;
     nilDiag = diag::cannot_convert_closure_result_nil;
     break;
   case CTP_ArrayElement:
-    diagID = diag::cannot_convert_array_element;
     nilDiag = diag::cannot_convert_array_element_nil;
     break;
   case CTP_DictionaryKey:
-    diagID = diag::cannot_convert_dict_key;
     nilDiag = diag::cannot_convert_dict_key_nil;
     break;
   case CTP_DictionaryValue:
-    diagID = diag::cannot_convert_dict_value;
     nilDiag = diag::cannot_convert_dict_value_nil;
     break;
   case CTP_CoerceOperand:
-    diagID = diag::cannot_convert_coerce;
     nilDiag = diag::cannot_convert_coerce_nil;
     break;
   case CTP_AssignSource:
-    diagID = diag::cannot_convert_assign;
     nilDiag = diag::cannot_convert_assign_nil;
     break;
   case CTP_SubscriptAssignSource:
-    diagID = diag::cannot_convert_subscript_assign;
     nilDiag = diag::cannot_convert_subscript_assign_nil;
     break;
   }
@@ -2207,83 +1835,7 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
     return false;
   }
 
-  // If we're trying to convert something of type "() -> T" to T, then we
-  // probably meant to call the value.
-  if (auto srcFT = exprType->getAs<AnyFunctionType>()) {
-    if (srcFT->getParams().empty() &&
-        !isUnresolvedOrTypeVarType(srcFT->getResult()) &&
-        CS.TC.isConvertibleTo(srcFT->getResult(), contextualType, CS.DC)) {
-
-      auto locator =
-          CS.getConstraintLocator(expr, LocatorPathElt::getContextualType());
-      ContextualFailure failure =
-          ContextualFailure(nullptr, CS, srcFT, contextualType, locator);
-      auto diagnosed = failure.diagnoseAsError();
-      assert(diagnosed && "Failed to produce contextual failure diagnostic");
-      (void)diagnosed;
-      return true;
-    }
-  }
-
-  // If this is a conversion from T to () in a call argument context, it is
-  // almost certainly an extra argument being passed in.
-  if (CTP == CTP_CallArgument && contextualType->isVoid()) {
-    diagnose(expr->getLoc(), diag::extra_argument_to_nullary_call)
-      .highlight(expr->getSourceRange());
-    return true;
-  }
-  
-  // If we're trying to convert something to Bool, check to see if it is for
-  // a known reason.
-  if (contextualType->isBool() && diagnoseConversionToBool(expr, exprType))
-    return true;
-  
   exprType = exprType->getRValueType();
-
-  // Special case of some common conversions involving Swift.String
-  // indexes, catching cases where people attempt to index them with an integer.
-  if (isIntegerToStringIndexConversion(exprType, contextualType, CS)) {
-    diagnose(expr->getLoc(), diag::string_index_not_integer,
-             exprType->getRValueType())
-      .highlight(expr->getSourceRange());
-    diagnose(expr->getLoc(), diag::string_index_not_integer_note);
-    return true;
-  }
-
-  // When converting from T to [T] or UnsafePointer<T>, we can offer fixit to wrap
-  // the expr with brackets.
-  auto *genericType = contextualType->getAs<BoundGenericType>();
-  if (genericType) {
-    auto *contextDecl = genericType->getDecl();
-    if (contextDecl == CS.TC.Context.getArrayDecl()) {
-      for (Type arg : genericType->getGenericArgs()) {
-        if (arg->isEqual(exprType)) {
-          diagnose(expr->getLoc(), diagID, exprType, contextualType)
-              .fixItInsert(expr->getStartLoc(), "[")
-              .fixItInsert(Lexer::getLocForEndOfToken(CS.TC.Context.SourceMgr,
-                                                      expr->getEndLoc()),
-                           "]");
-          return true;
-        }
-      }
-    } else if (contextDecl == CS.TC.Context.getUnsafePointerDecl() ||
-               contextDecl == CS.TC.Context.getUnsafeMutablePointerDecl() ||
-               contextDecl == CS.TC.Context.getUnsafeRawPointerDecl() ||
-               contextDecl == CS.TC.Context.getUnsafeMutableRawPointerDecl()) {
-      for (Type arg : genericType->getGenericArgs()) {
-        if (arg->isEqual(exprType) && CS.getType(expr)->hasLValueType()) {
-          diagnose(expr->getLoc(), diagID, exprType, contextualType).
-            fixItInsert(expr->getStartLoc(), "&");
-          return true;
-        }
-      }
-    }
-  }
-
-  // Try for better/more specific diagnostics for non-escaping to @escaping
-  if (diagnoseNonEscapingParameterToEscaping(expr, exprType, contextualType,
-                                             CTP))
-    return true;
 
   // Don't attempt fixits if we have an unsolved type variable, since
   // the recovery path's recursion into the type checker via typeCheckCast()
@@ -2291,73 +1843,10 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
   if (exprType->hasTypeVariable())
     return false;
 
-  // When complaining about conversion to a protocol type, complain about
-  // conformance instead of "conversion".
-  if (contextualType->isExistentialType()) {
-    MissingContextualConformanceFailure failure(
-        expr, CS, CTP, exprType, contextualType,
-        CS.getConstraintLocator(expr, LocatorPathElt::getContextualType()));
-    return failure.diagnoseAsError();
-  }
-
-  // Try to simplify irrelevant details of function types.  For example, if
-  // someone passes a "() -> Float" function to a "() throws -> Int"
-  // parameter, then uttering the "throws" may confuse them into thinking that
-  // that is the problem, even though there is a clear subtype relation.
-  if (auto srcFT = exprType->getAs<FunctionType>())
-    if (auto destFT = contextualType->getAs<FunctionType>()) {
-      auto destExtInfo = destFT->getExtInfo();
-      
-      if (!srcFT->isNoEscape()) destExtInfo = destExtInfo.withNoEscape(false);
-      if (!srcFT->throws()) destExtInfo = destExtInfo.withThrows(false);
-      if (destExtInfo != destFT->getExtInfo())
-        contextualType = FunctionType::get(destFT->getParams(),
-                                           destFT->getResult(), destExtInfo);
-
-      // If this is a function conversion that discards throwability or
-      // noescape, emit a specific diagnostic about that.
-      if (srcFT->throws() && !destFT->throws())
-        diagID = diag::throws_functiontype_mismatch;
-      else if (srcFT->isNoEscape() && !destFT->isNoEscape())
-        diagID = diag::noescape_functiontype_mismatch;
-    }
-
-  InFlightDiagnostic diag = diagnose(expr->getLoc(), diagID,
-                                     exprType, contextualType);
-  diag.highlight(expr->getSourceRange());
-
-  // Try to convert between a sequence and its subsequence, notably
-  // String <-> Substring.
-  if (ContextualFailure::trySequenceSubsequenceFixIts(diag, CS, exprType,
-                                                      contextualType, expr))
-    return true;
-
-  // Attempt to add a fixit for the error.
-  switch (CTP) {
-  case CTP_CallArgument:
-  case CTP_ArrayElement:
-  case CTP_DictionaryKey:
-  case CTP_DictionaryValue:
-  case CTP_AssignSource:
-  case CTP_SubscriptAssignSource:
-  case CTP_Initialization:
-  case CTP_ReturnStmt:
-    tryRawRepresentableFixIts(diag, CS, exprType, contextualType,
-                              KnownProtocolKind::ExpressibleByIntegerLiteral,
-                              expr) ||
-    tryRawRepresentableFixIts(diag, CS, exprType, contextualType,
-                              KnownProtocolKind::ExpressibleByStringLiteral,
-                              expr) ||
-    tryIntegerCastFixIts(diag, CS, exprType, contextualType, expr) ||
-    addTypeCoerceFixit(diag, CS, exprType, contextualType, expr);
-    break;
-
-  default:
-    // FIXME: Other contextual conversions too?
-    break;
-  }
-
-  return true;
+  ContextualFailure failure(
+      expr, CS, CTP, exprType, contextualType,
+      CS.getConstraintLocator(expr, LocatorPathElt::getContextualType()));
+  return failure.diagnoseAsError();
 }
 
 //===----------------------------------------------------------------------===//
@@ -2709,19 +2198,6 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
           // If there was an error type checking this argument, then we're done.
           if (!exprResult)
             return nullptr;
-
-          // If the caller expected something inout, but we didn't have
-          // something of inout type, diagnose it.
-          if (auto IOE =
-                dyn_cast<InOutExpr>(exprResult->getSemanticsProvidingExpr())) {
-            if (!param.isInOut()) {
-              diagnose(exprResult->getLoc(), diag::extra_address_of,
-                       CS.getType(exprResult)->getInOutObjectType())
-                  .highlight(exprResult->getSourceRange())
-                  .fixItRemove(IOE->getStartLoc());
-              return nullptr;
-            }
-          }
 
           auto resultTy = CS.getType(exprResult);
           resultElts[inArgNo] = exprResult;
@@ -3297,16 +2773,20 @@ public:
     if (tuple)
       arg = tuple->getElement(argIdx);
 
-    auto &param = Parameters[paramIdx];
-    TC.diagnose(arg->getLoc(), diag::trailing_closure_bad_param,
-                param.getPlainType())
-      .highlight(arg->getSourceRange());
+    if (argIdx >= Parameters.size()) {
+      TC.diagnose(arg->getLoc(), diag::extra_trailing_closure_in_call)
+          .highlight(arg->getSourceRange());
+    } else {
+      auto &param = Parameters[paramIdx];
+      TC.diagnose(arg->getLoc(), diag::trailing_closure_bad_param,
+                  param.getPlainType())
+          .highlight(arg->getSourceRange());
 
-    auto candidate = CandidateInfo[0];
-    if (candidate.getDecl())
-      TC.diagnose(candidate.getDecl(), diag::decl_declared_here,
-                  candidate.getDecl()->getFullName());
-
+      auto candidate = CandidateInfo[0];
+      if (candidate.getDecl())
+        TC.diagnose(candidate.getDecl(), diag::decl_declared_here,
+                    candidate.getDecl()->getFullName());
+    }
     Diagnosed = true;
 
     return true;
@@ -3361,7 +2841,7 @@ diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI, Expr *fnExpr,
     AnyFunctionType::Param &arg = args[0];
     auto resTy =
         candidate.getResultType()->lookThroughAllOptionalTypes();
-    auto rawTy = isRawRepresentable(resTy, CCI.CS);
+    auto rawTy = isRawRepresentable(CCI.CS, resTy);
     if (rawTy && arg.getOldType() && resTy->isEqual(arg.getOldType())) {
       auto getInnerExpr = [](Expr *E) -> Expr * {
         auto *parenE = dyn_cast<ParenExpr>(E);
@@ -3407,14 +2887,14 @@ enum class RawRepresentableMismatch {
 static RawRepresentableMismatch
 checkRawRepresentableMismatch(Type fromType, Type toType,
                               KnownProtocolKind kind,
-                              const ConstraintSystem &CS) {
+                              ConstraintSystem &CS) {
   toType = toType->lookThroughAllOptionalTypes();
   fromType = fromType->lookThroughAllOptionalTypes();
 
   // First check if this is an attempt to convert from something to
   // raw representable.
-  if (conformsToKnownProtocol(fromType, kind, CS)) {
-    if (auto rawType = isRawRepresentable(toType, kind, CS)) {
+  if (conformsToKnownProtocol(CS, fromType, kind)) {
+    if (auto rawType = isRawRepresentable(CS, toType, kind)) {
       if (rawType->isEqual(fromType))
         return RawRepresentableMismatch::ExactMatch;
       return RawRepresentableMismatch::Convertible;
@@ -3423,8 +2903,8 @@ checkRawRepresentableMismatch(Type fromType, Type toType,
 
   // Otherwise, it might be an attempt to convert from raw representable
   // to its raw value.
-  if (auto rawType = isRawRepresentable(fromType, kind, CS)) {
-    if (conformsToKnownProtocol(toType, kind, CS)) {
+  if (auto rawType = isRawRepresentable(CS, fromType, kind)) {
+    if (conformsToKnownProtocol(CS, toType, kind)) {
       if (rawType->isEqual(toType))
         return RawRepresentableMismatch::ExactMatch;
       return RawRepresentableMismatch::Convertible;
@@ -3460,7 +2940,7 @@ static bool diagnoseRawRepresentableMismatch(CalleeCandidateInfo &CCI,
       KnownProtocolKind::ExpressibleByStringLiteral,
       KnownProtocolKind::ExpressibleByIntegerLiteral};
 
-  const auto &CS = CCI.CS;
+  auto &CS = CCI.CS;
   auto arguments = decomposeArgType(argType, argLabels);
 
   auto bestMatchKind = RawRepresentableMismatch::NotApplicable;
@@ -3503,7 +2983,7 @@ static bool diagnoseRawRepresentableMismatch(CalleeCandidateInfo &CCI,
   if (bestMatchKind == RawRepresentableMismatch::NotApplicable)
     return false;
 
-  const Expr *expr = argExpr;
+  Expr *expr = argExpr;
   if (auto *tupleArgs = dyn_cast<TupleExpr>(argExpr))
     expr = tupleArgs->getElement(bestMatchIndex);
 
@@ -3517,10 +2997,11 @@ static bool diagnoseRawRepresentableMismatch(CalleeCandidateInfo &CCI,
                              diag::cannot_convert_argument_value,
                              singleArgType, paramType);
 
-  tryRawRepresentableFixIts(diag, CS, singleArgType, paramType,
-                            bestMatchProtocol, expr);
-  return true;
+  ContextualFailure failure(expr, CS, singleArgType, paramType,
+                            CS.getConstraintLocator(expr));
 
+  (void)failure.tryRawRepresentableFixIts(diag, bestMatchProtocol);
+  return true;
 }
 
 // Extract expression for failed argument number
@@ -4654,6 +4135,21 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     }
   }
 
+  // Let's check whether this is a situation when callee expects
+  // no arguments but N are given. Otherwise, just below
+  // `typeCheckArgumentChild*` is going to use `()` is a contextual type which
+  // is incorrect.
+  if (argType && argType->isVoid()) {
+    auto *argExpr = callExpr->getArg();
+    if (isa<ParenExpr>(argExpr) ||
+        (isa<TupleExpr>(argExpr) &&
+         cast<TupleExpr>(argExpr)->getNumElements() > 0)) {
+      diagnose(callExpr->getLoc(), diag::extra_argument_to_nullary_call)
+          .highlight(argExpr->getSourceRange());
+      return true;
+    }
+  }
+
   // Get the expression result of type checking the arguments to the call
   // independently, so we have some idea of what we're working with.
   //
@@ -4805,11 +4301,17 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
         if (!lhsIsCandidate && !rhsIsCandidate)
           return false;
 
-        if (!lhsIsCandidate)
-          return tryIntegerCastFixIts(diag, CS, lhsType, lhsCandidate, lhsExpr);
+        if (!lhsIsCandidate) {
+          ContextualFailure failure(expr, CS, lhsType, lhsCandidate,
+                                    CS.getConstraintLocator(lhsExpr));
+          return failure.tryIntegerCastFixIts(diag);
+        }
 
-        if (!rhsIsCandidate)
-          return tryIntegerCastFixIts(diag, CS, rhsType, rhsCandidate, rhsExpr);
+        if (!rhsIsCandidate) {
+          ContextualFailure failure(expr, CS, rhsType, rhsCandidate,
+                                    CS.getConstraintLocator(rhsExpr));
+          return failure.tryIntegerCastFixIts(diag);
+        }
 
         return false;
       };
@@ -5077,13 +4579,6 @@ bool FailureDiagnosis::visitInOutExpr(InOutExpr *IOE) {
       }
     } else if (contextualType->is<InOutType>()) {
       contextualType = contextualType->getInOutObjectType();
-    } else {
-      // If the caller expected something inout, but we didn't have
-      // something of inout type, diagnose it.
-      diagnose(IOE->getLoc(), diag::extra_address_of, contextualType)
-        .highlight(IOE->getSourceRange())
-        .fixItRemove(IOE->getStartLoc());
-      return true;
     }
   }
 
@@ -5891,45 +5386,10 @@ bool FailureDiagnosis::visitArrayExpr(ArrayExpr *E) {
     return false;
   }
 
-  auto DLC
-    = CS.TC.getProtocol(E->getLoc(),
-                        KnownProtocolKind::ExpressibleByDictionaryLiteral);
-  if (!DLC)
-    return visitExpr(E);
-
-  if (TypeChecker::conformsToProtocol(contextualType, DLC, CS.DC,
-                                      ConformanceCheckFlags::InExpression)) {
-    // If the contextual type conforms to ExpressibleByDictionaryLiteral and
-    // this is an empty array, then they meant "[:]".
-    auto numElements = E->getNumElements();
-    if (numElements == 0) {
-      diagnose(E->getStartLoc(), diag::should_use_empty_dictionary_literal)
-      .fixItInsert(E->getEndLoc(), ":");
-      return true;
-    }
-
-    // If the contextual type conforms to ExpressibleByDictionaryLiteral, then
-    // they wrote "x = [1,2]" but probably meant "x = [1:2]".
-    if ((numElements & 1) == 0 && numElements > 0) {
-      bool isIniting = CS.getContextualTypePurpose() == CTP_Initialization;
-      diagnose(E->getStartLoc(), diag::should_use_dictionary_literal,
-               contextualType, isIniting);
-      auto diag = diagnose(E->getStartLoc(), diag::meant_dictionary_lit);
-
-      // Change every other comma into a colon, only if the number
-      // of commas present matches the number of elements, because
-      // otherwise it might a structural problem with the expression
-      // e.g. ["a""b": 1].
-      const auto commaLocs = E->getCommaLocs();
-      if (commaLocs.size() == numElements - 1) {
-        for (unsigned i = 0, e = numElements / 2; i != e; ++i)
-          diag.fixItReplace(commaLocs[i*2], ":");
-      }
-      return true;
-    }
-
-    return false;
-  }
+  ContextualFailure failure(expr, CS, CS.getType(E), contextualType,
+                            CS.getConstraintLocator(E));
+  if (failure.diagnoseConversionToDictionary())
+    return true;
 
   // If that didn't turn up an issue, then we don't know what to do.
   // TODO: When a contextual type is missing, we could try to diagnose cases
@@ -6535,19 +5995,6 @@ bool FailureDiagnosis::visitTupleExpr(TupleExpr *TE) {
                                     CS.getContextualTypePurpose(), options);
     // If there was an error type checking this argument, then we're done.
     if (!exprResult) return true;
-    
-    // If the caller expected something inout, but we didn't have
-    // something of inout type, diagnose it.
-    if (auto IOE =
-          dyn_cast<InOutExpr>(exprResult->getSemanticsProvidingExpr())) {
-      if (!contextualTT->getElement(i).isInOut()) {
-        diagnose(exprResult->getLoc(), diag::extra_address_of,
-                 CS.getType(exprResult)->getInOutObjectType())
-            .highlight(exprResult->getSourceRange())
-            .fixItRemove(IOE->getStartLoc());
-        return true;
-      }
-    }
   }
   
   return false;

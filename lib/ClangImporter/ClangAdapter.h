@@ -46,6 +46,8 @@ class TypedefNameDecl;
 // TODO: pull more off of the ImportImpl
 
 namespace swift {
+enum OptionalTypeKind : unsigned;
+
 namespace importer {
 struct PlatformAvailability;
 

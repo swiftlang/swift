@@ -939,13 +939,16 @@ public:
   void emitType() {
     SGM.emitLazyConformancesForType(theType);
 
-    for (Decl *member : theType->getMembers())
-      visit(member);
-
     // Build a vtable if this is a class.
     if (auto theClass = dyn_cast<ClassDecl>(theType)) {
+      for (Decl *member : theClass->getEmittedMembers())
+        visit(member);
+
       SILGenVTable genVTable(SGM, theClass);
       genVTable.emitVTable();
+    } else {
+      for (Decl *member : theType->getMembers())
+        visit(member);
     }
 
     // Build a default witness table if this is a protocol that needs one.
@@ -1050,9 +1053,9 @@ public:
   }
 
   void visitAccessors(AbstractStorageDecl *asd) {
-    for (auto *accessor : asd->getAllAccessors())
-      if (!accessor->hasForcedStaticDispatch())
-        visitFuncDecl(accessor);
+    asd->visitEmittedAccessors([&](AccessorDecl *accessor) {
+      visitFuncDecl(accessor);
+    });
   }
 };
 
@@ -1182,9 +1185,9 @@ public:
   }
 
   void visitAccessors(AbstractStorageDecl *asd) {
-    for (auto *accessor : asd->getAllAccessors())
-      if (!accessor->hasForcedStaticDispatch())
-        visitFuncDecl(accessor);
+    asd->visitEmittedAccessors([&](AccessorDecl *accessor) {
+      visitFuncDecl(accessor);
+    });
   }
 };
 

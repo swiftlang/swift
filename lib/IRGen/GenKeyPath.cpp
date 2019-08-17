@@ -651,7 +651,7 @@ getInitializerForComputedComponent(IRGenModule &IGM,
 static llvm::Constant *
 emitMetadataTypeRefForKeyPath(IRGenModule &IGM, CanType type) {
   // Produce a mangled name for the type.
-  auto constant = IGM.getTypeRef(type, MangledTypeRefRole::Metadata);
+  auto constant = IGM.getTypeRef(type, MangledTypeRefRole::Metadata).first;
   
   // Mask the bottom bit to tell the key path runtime this is a mangled name
   // rather than a direct reference.

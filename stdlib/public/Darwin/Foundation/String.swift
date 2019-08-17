@@ -96,3 +96,28 @@ extension Substring : _ObjectiveCBridgeable {
 }
 
 extension String: CVarArg {}
+
+/*
+ This is on NSObject so that the stdlib can call it in StringBridge.swift
+ without having to synthesize a receiver (e.g. lookup a class or allocate)
+ 
+ In the future (once the Foundation overlay can know about SmallString), we
+ should move the caller of this method up into the overlay and avoid this
+ indirection.
+ */
+private extension NSObject {
+  // The ObjC selector has to start with "new" to get ARC to not autorelease
+  @_effects(releasenone)
+  @objc(newTaggedNSStringWithASCIIBytes_:length_:)
+  func createTaggedString(bytes: UnsafePointer<UInt8>,
+                          count: Int) -> AnyObject? {
+    //TODO: update this to use _CFStringCreateTaggedPointerString once we can
+    return CFStringCreateWithBytes(
+      kCFAllocatorSystemDefault,
+      bytes,
+      count,
+      CFStringBuiltInEncodings.UTF8.rawValue,
+      false
+    ) as NSString as NSString? //just "as AnyObject" inserts unwanted bridging
+  }
+}

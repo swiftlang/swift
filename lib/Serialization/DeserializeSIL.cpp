@@ -471,13 +471,14 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   unsigned rawLinkage, isTransparent, isSerialized, isThunk,
       isWithoutactuallyEscapingThunk, isGlobal, inlineStrategy,
       optimizationMode, effect, numSpecAttrs, hasQualifiedOwnership,
-      isWeakLinked, isDynamic;
+      isWeakLinked, isDynamic, isExactSelfClass;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(
       scratch, rawLinkage, isTransparent, isSerialized, isThunk,
       isWithoutactuallyEscapingThunk, isGlobal, inlineStrategy,
       optimizationMode, effect, numSpecAttrs, hasQualifiedOwnership,
-      isWeakLinked, isDynamic, funcTyID, replacedFunctionID, genericEnvID,
+      isWeakLinked, isDynamic, isExactSelfClass,
+      funcTyID, replacedFunctionID, genericEnvID,
       clangNodeOwnerID, SemanticsIDs);
 
   if (funcTyID == 0) {
@@ -544,6 +545,8 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   if (SILMod.isSerialized())
     isSerialized = IsNotSerialized;
 
+  SILSerializationFunctionBuilder builder(SILMod);
+
   // If we have an existing function, verify that the types match up.
   if (fn) {
     if (fn->getLoweredType() != ty) {
@@ -566,14 +569,15 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
         linkage == SILLinkage::PublicNonABI) {
       fn->setLinkage(SILLinkage::SharedExternal);
     }
+
     if (fn->isDynamicallyReplaceable() != isDynamic) {
       LLVM_DEBUG(llvm::dbgs() << "SILFunction type mismatch.\n");
       MF->error();
       return nullptr;
     }
+
   } else {
     // Otherwise, create a new function.
-    SILSerializationFunctionBuilder builder(SILMod);
     fn = builder.createDeclaration(name, ty, loc);
     fn->setLinkage(linkage.getValue());
     fn->setTransparent(IsTransparent_t(isTransparent == 1));
@@ -586,6 +590,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     fn->setOptimizationMode(OptimizationMode(optimizationMode));
     fn->setWeakLinked(isWeakLinked);
     fn->setIsDynamic(IsDynamicallyReplaceable_t(isDynamic));
+    fn->setIsExactSelfClass(IsExactSelfClass_t(isExactSelfClass));
     if (replacedFunction)
       fn->setDynamicallyReplacedFunction(replacedFunction);
     if (!replacedObjectiveCFunc.empty())
@@ -595,17 +600,21 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     for (auto ID : SemanticsIDs) {
       fn->addSemanticsAttr(MF->getIdentifierText(ID));
     }
-
     if (Callback) Callback->didDeserialize(MF->getAssociatedModule(), fn);
   }
+
+  // First before we do /anything/ validate that our function is truly empty.
+  assert(fn->empty() && "SILFunction to be deserialized starts being empty.");
+
+  // Given that our original function was empty, just match the deserialized
+  // function. Ownership doesn't really have a meaning without a body.
+  builder.setHasOwnership(fn, hasQualifiedOwnership);
+
   // Mark this function as deserialized. This avoids rerunning diagnostic
   // passes. Certain passes in the madatory pipeline may not work as expected
   // after arbitrary optimization and lowering.
   if (!MF->IsSIB)
     fn->setWasDeserializedCanonical();
-
-  assert(fn->empty() &&
-         "SILFunction to be deserialized starts being empty.");
 
   fn->setBare(IsBare);
   const SILDebugScope *DS = fn->getDebugScope();
@@ -663,9 +672,6 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   if (isEmptyFunction || declarationOnly) {
     return fn;
   }
-
-  if (!hasQualifiedOwnership)
-    fn->setOwnershipEliminated();
 
   NumDeserializedFunc++;
 
@@ -979,7 +985,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                                             ValID2);
     break;
   case SIL_ONE_TYPE:
-    SILOneTypeLayout::readRecord(scratch, RawOpCode, TyID, TyCategory);
+    SILOneTypeLayout::readRecord(scratch, RawOpCode, Attr, TyID, TyCategory);
     break;
   case SIL_ONE_OPERAND:
     SILOneOperandLayout::readRecord(scratch, RawOpCode, Attr,
@@ -1086,18 +1092,21 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   case SILInstructionKind::AllocBoxInst:
     assert(RecordKind == SIL_ONE_TYPE && "Layout should be OneType.");
     ResultVal = Builder.createAllocBox(Loc,
-                       cast<SILBoxType>(MF->getType(TyID)->getCanonicalType()));
+                       cast<SILBoxType>(MF->getType(TyID)->getCanonicalType()),
+                       None, /*bool hasDynamicLifetime*/ Attr != 0);
     break;
-  
-#define ONETYPE_INST(ID)                      \
-  case SILInstructionKind::ID##Inst:                   \
-    assert(RecordKind == SIL_ONE_TYPE && "Layout should be OneType.");         \
-    ResultVal = Builder.create##ID(Loc,                                        \
-                  getSILType(MF->getType(TyID), (SILValueCategory)TyCategory));\
+  case SILInstructionKind::AllocStackInst:
+    assert(RecordKind == SIL_ONE_TYPE && "Layout should be OneType.");
+    ResultVal = Builder.createAllocStack(Loc,
+                  getSILType(MF->getType(TyID), (SILValueCategory)TyCategory),
+                  None, /*bool hasDynamicLifetime*/ Attr != 0);
     break;
-  ONETYPE_INST(AllocStack)
-  ONETYPE_INST(Metatype)
-#undef ONETYPE_INST
+  case SILInstructionKind::MetatypeInst:
+    assert(RecordKind == SIL_ONE_TYPE && "Layout should be OneType.");
+    ResultVal = Builder.createMetatype(Loc,
+                  getSILType(MF->getType(TyID), (SILValueCategory)TyCategory));
+    break;
+
 #define ONETYPE_ONEOPERAND_INST(ID)           \
   case SILInstructionKind::ID##Inst:                   \
     assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&       \
@@ -2536,13 +2545,14 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
   unsigned rawLinkage, isTransparent, isSerialized, isThunk,
       isWithoutactuallyEscapingThunk, isGlobal, inlineStrategy,
       optimizationMode, effect, numSpecAttrs, hasQualifiedOwnership,
-      isWeakLinked, isDynamic;
+      isWeakLinked, isDynamic, isExactSelfClass;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(
       scratch, rawLinkage, isTransparent, isSerialized, isThunk,
       isWithoutactuallyEscapingThunk, isGlobal, inlineStrategy,
       optimizationMode, effect, numSpecAttrs, hasQualifiedOwnership,
-      isWeakLinked, isDynamic, funcTyID, replacedFunctionID, genericEnvID,
+      isWeakLinked, isDynamic, isExactSelfClass,
+      funcTyID, replacedFunctionID, genericEnvID,
       clangOwnerID, SemanticsIDs);
   auto linkage = fromStableSILLinkage(rawLinkage);
   if (!linkage) {

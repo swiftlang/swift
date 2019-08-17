@@ -1060,7 +1060,8 @@ namespace {
 
       // Add the member constraint for a subscript declaration.
       // FIXME: weak name!
-      auto memberTy = CS.createTypeVariable(resultLocator, TVO_CanBindToNoEscape);
+      auto memberTy = CS.createTypeVariable(
+          memberLocator, TVO_CanBindToLValue | TVO_CanBindToNoEscape);
 
       // FIXME: synthesizeMaterializeForSet() wants to statically dispatch to
       // a known subscript here. This might be cleaner if we split off a new
@@ -1275,7 +1276,7 @@ namespace {
           CS.getConstraintLocator(expr, ConstraintLocator::ApplyArgument));
 
       Type result = tv;
-      if (constr->getFailability() != OTK_None)
+      if (constr->isFailable())
         result = OptionalType::get(result);
 
       return result;
@@ -3013,7 +3014,7 @@ namespace {
                 
         case KeyPathExpr::Component::Kind::OptionalChain: {
           didOptionalChain = true;
-          
+
           // We can't assign an optional back through an optional chain
           // today. Force the base to an rvalue.
           auto rvalueTy = CS.createTypeVariable(resultLocator,
@@ -3027,10 +3028,9 @@ namespace {
           auto optionalObjTy = CS.createTypeVariable(resultLocator,
                                                      TVO_CanBindToLValue |
                                                      TVO_CanBindToNoEscape);
-          
+
           CS.addConstraint(ConstraintKind::OptionalObject, base, optionalObjTy,
                            resultLocator);
-          
           base = optionalObjTy;
           break;
         }
@@ -3065,25 +3065,27 @@ namespace {
       auto rvalueBase = CS.createTypeVariable(baseLocator,
                                               TVO_CanBindToNoEscape);
       CS.addConstraint(ConstraintKind::Equal, base, rvalueBase, locator);
-      
+
       // The result is a KeyPath from the root to the end component.
-      Type kpTy;
-      if (didOptionalChain) {
-        // Optional-chaining key paths are always read-only.
-        kpTy = BoundGenericType::get(kpDecl, Type(), {root, rvalueBase});
-      } else {
-        // The type of key path depends on the overloads chosen for the key
-        // path components.
-        auto typeLoc =
-            CS.getConstraintLocator(locator, ConstraintLocator::KeyPathType);
-        kpTy = CS.createTypeVariable(typeLoc, TVO_CanBindToNoEscape);
-        CS.addKeyPathConstraint(kpTy, root, rvalueBase, locator);
-      }
+      // The type of key path depends on the overloads chosen for the key
+      // path components.
+      auto typeLoc =
+          CS.getConstraintLocator(locator, ConstraintLocator::KeyPathType);
+      Type kpTy = CS.createTypeVariable(typeLoc, TVO_CanBindToNoEscape);
+      CS.addKeyPathConstraint(kpTy, root, rvalueBase, locator);
       return kpTy;
     }
 
     Type visitKeyPathDotExpr(KeyPathDotExpr *E) {
       llvm_unreachable("found KeyPathDotExpr in CSGen");
+    }
+
+    Type visitOneWayExpr(OneWayExpr *expr) {
+      auto locator = CS.getConstraintLocator(expr);
+      auto resultTypeVar = CS.createTypeVariable(locator, 0);
+      CS.addConstraint(ConstraintKind::OneWayEqual, resultTypeVar,
+                       CS.getType(expr->getSubExpr()), locator);
+      return resultTypeVar;
     }
 
     Type visitTapExpr(TapExpr *expr) {
@@ -3119,7 +3121,8 @@ namespace {
                                Join,
                                JoinInout,
                                JoinMeta,
-                               JoinNonexistent
+                               JoinNonexistent,
+                               OneWay,
     };
 
     static TypeOperation getTypeOperation(UnresolvedDotExpr *UDE,
@@ -3133,6 +3136,7 @@ namespace {
 
       return llvm::StringSwitch<TypeOperation>(
                  UDE->getName().getBaseIdentifier().str())
+          .Case("one_way", TypeOperation::OneWay)
           .Case("type_join", TypeOperation::Join)
           .Case("type_join_inout", TypeOperation::JoinInout)
           .Case("type_join_meta", TypeOperation::JoinMeta)
@@ -3141,14 +3145,14 @@ namespace {
     }
 
     Type resultOfTypeOperation(TypeOperation op, Expr *Arg) {
-      auto *tuple = dyn_cast<TupleExpr>(Arg);
-      assert(tuple && "Expected argument tuple for join operations!");
+      auto *tuple = cast<TupleExpr>(Arg);
 
       auto *lhs = tuple->getElement(0);
       auto *rhs = tuple->getElement(1);
 
       switch (op) {
       case TypeOperation::None:
+      case TypeOperation::OneWay:
         llvm_unreachable(
             "We should have a valid type operation at this point!");
 
@@ -3588,10 +3592,7 @@ namespace {
     /// Once we've visited the children of the given expression,
     /// generate constraints from the expression.
     Expr *walkToExprPost(Expr *expr) override {
-
-      // Handle the Builtin.type_join* family of calls by replacing
-      // them with dot_self_expr of type_expr with the type being the
-      // result of the join.
+      // Translate special type-checker Builtin calls into simpler expressions.
       if (auto *apply = dyn_cast<ApplyExpr>(expr)) {
         auto fnExpr = apply->getFn();
         if (auto *UDE = dyn_cast<UnresolvedDotExpr>(fnExpr)) {
@@ -3599,7 +3600,15 @@ namespace {
           auto typeOperation =
               ConstraintGenerator::getTypeOperation(UDE, CS.getASTContext());
 
-          if (typeOperation != ConstraintGenerator::TypeOperation::None) {
+          if (typeOperation == ConstraintGenerator::TypeOperation::OneWay) {
+            // For a one-way constraint, create the OneWayExpr node.
+            auto *arg = cast<ParenExpr>(apply->getArg())->getSubExpr();
+            expr = new (CS.getASTContext()) OneWayExpr(arg);
+          } else if (typeOperation !=
+                         ConstraintGenerator::TypeOperation::None) {
+            // Handle the Builtin.type_join* family of calls by replacing
+            // them with dot_self_expr of type_expr with the type being the
+            // result of the join.
             auto joinMetaTy =
                 CG.resultOfTypeOperation(typeOperation, apply->getArg());
             auto joinTy = joinMetaTy->castTo<MetatypeType>()->getInstanceType();

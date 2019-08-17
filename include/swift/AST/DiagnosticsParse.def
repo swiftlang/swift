@@ -163,7 +163,7 @@ ERROR(lex_illegal_multiline_string_end,none,
       "multi-line string literal closing delimiter must begin on a new line", ())
 ERROR(lex_multiline_string_indent_inconsistent,none,
       "%select{unexpected space in|unexpected tab in|insufficient}2 indentation of "
-      "%select{line|next %1 lines}0 in multi-line string literal", 
+      "%select{line|next %1 lines}0 in multi-line string literal",
       (bool, unsigned, unsigned))
 NOTE(lex_multiline_string_indent_should_match_here,none,
       "should match %select{space|tab}0 here", (unsigned))
@@ -252,7 +252,7 @@ ERROR(cskeyword_not_attribute,none,
       "'%0' is a declaration modifier, not an attribute", (StringRef))
 
 ERROR(decl_already_static,none,
-      "%0 specified twice", (StaticSpellingKind))
+      "%0 cannot appear after another 'static' or 'class' keyword", (StaticSpellingKind))
 
 ERROR(enum_case_dot_prefix,none,
       "extraneous '.' in enum 'case' declaration", ())
@@ -881,7 +881,7 @@ WARNING(parameter_extraneous_double_up,none,
         "extraneous duplicate parameter name; %0 already has an argument "
         "label", (Identifier))
 ERROR(parameter_operator_keyword_argument,none,
-      "%select{operator|closure|enum case}0 cannot have keyword arguments", 
+      "%select{operator|closure|enum case}0 cannot have keyword arguments",
       (unsigned))
 
 ERROR(parameter_unnamed,none,

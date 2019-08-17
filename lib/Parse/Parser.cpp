@@ -968,9 +968,8 @@ bool Parser::parseToken(tok K, SourceLoc &TokLoc, const Diagnostic &D) {
   return true;
 }
 
-/// parseMatchingToken - Parse the specified expected token and return its
-/// location on success.  On failure, emit the specified error diagnostic, and a
-/// note at the specified note location.
+/// Parse the specified expected token and return its location on success.  On failure, emit the specified
+/// error diagnostic,  a note at the specified note location, and return the location of the previous token.
 bool Parser::parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
                                 SourceLoc OtherLoc) {
   Diag<> OtherNote;
