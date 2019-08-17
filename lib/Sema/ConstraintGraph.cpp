@@ -379,18 +379,24 @@ llvm::TinyPtrVector<Constraint *> ConstraintGraph::gatherConstraints(
   llvm::TinyPtrVector<Constraint *> constraints;
 
   // Whether we should consider this constraint at all.
-  auto &reprNode = (*this)[CS.getRepresentative(typeVar)];
-  auto equivClass = reprNode.getEquivalenceClass();
+  auto rep = CS.getRepresentative(typeVar);
   auto shouldConsiderConstraint = [&](Constraint *constraint) {
     // For a one-way constraint, only consider it when the type variable
-    // is on the left-hand side of the the binding. Otherwise, it is not
-    // relevant.
-    if (constraint->getKind() == ConstraintKind::OneWayBind) {
+    // is on the right-hand side of the the binding, and the left-hand side of
+    // the binding is one of the type variables currently under consideration.
+    if (constraint->isOneWayConstraint()) {
       auto lhsTypeVar =
           constraint->getFirstType()->castTo<TypeVariableType>();
-      if (std::find(equivClass.begin(), equivClass.end(), lhsTypeVar)
-            == equivClass.end())
+      if (!CS.isActiveTypeVariable(lhsTypeVar))
         return false;
+
+      SmallVector<TypeVariableType *, 2> rhsTypeVars;
+      constraint->getSecondType()->getTypeVariables(rhsTypeVars);
+      for (auto rhsTypeVar : rhsTypeVars) {
+        if (CS.getRepresentative(rhsTypeVar) == rep)
+          return true;
+      }
+      return false;
     }
 
     return true;
@@ -421,6 +427,8 @@ llvm::TinyPtrVector<Constraint *> ConstraintGraph::gatherConstraints(
     }
   };
 
+  auto &reprNode = (*this)[CS.getRepresentative(typeVar)];
+  auto equivClass = reprNode.getEquivalenceClass();
   for (auto typeVar : equivClass) {
     auto &node = (*this)[typeVar];
     for (auto constraint : node.getConstraints()) {
@@ -625,7 +633,7 @@ namespace {
           continue;
 
         TypeVariableType *typeVar;
-        if (constraint.getKind() == ConstraintKind::OneWayBind) {
+        if (constraint.isOneWayConstraint()) {
           // For one-way constraints, associate the constraint with the
           // left-hand type variable.
           typeVar = constraint.getFirstType()->castTo<TypeVariableType>();
@@ -772,7 +780,7 @@ namespace {
             },
             [&](Constraint *constraint) {
               // Record and skip one-way constraints.
-              if (constraint->getKind() == ConstraintKind::OneWayBind) {
+              if (constraint->isOneWayConstraint()) {
                 oneWayConstraints.push_back(constraint);
                 return false;
               }
@@ -1275,7 +1283,7 @@ void ConstraintGraph::dump() {
 void ConstraintGraph::dump(llvm::raw_ostream &out) {
   llvm::SaveAndRestore<bool>
     debug(CS.getASTContext().LangOpts.DebugConstraintSolver, true);
-  print(CS.TypeVariables, out);
+  print(CS.getTypeVariables(), out);
 }
 
 void ConstraintGraph::printConnectedComponents(
@@ -1314,7 +1322,7 @@ void ConstraintGraph::printConnectedComponents(
 void ConstraintGraph::dumpConnectedComponents() {
   llvm::SaveAndRestore<bool>
     debug(CS.getASTContext().LangOpts.DebugConstraintSolver, true);
-  printConnectedComponents(CS.TypeVariables, llvm::dbgs());
+  printConnectedComponents(CS.getTypeVariables(), llvm::dbgs());
 }
 
 #pragma mark Verification of graph invariants

@@ -3083,7 +3083,7 @@ namespace {
     Type visitOneWayExpr(OneWayExpr *expr) {
       auto locator = CS.getConstraintLocator(expr);
       auto resultTypeVar = CS.createTypeVariable(locator, 0);
-      CS.addConstraint(ConstraintKind::OneWayBind, resultTypeVar,
+      CS.addConstraint(ConstraintKind::OneWayEqual, resultTypeVar,
                        CS.getType(expr->getSubExpr()), locator);
       return resultTypeVar;
     }

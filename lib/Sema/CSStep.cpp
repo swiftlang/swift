@@ -32,7 +32,7 @@ ComponentStep::Scope::Scope(ComponentStep &component)
   TypeVars = std::move(CS.TypeVariables);
 
   for (auto *typeVar : component.TypeVars)
-    CS.TypeVariables.push_back(typeVar);
+    CS.addTypeVariable(typeVar);
 
   auto &workList = CS.InactiveConstraints;
   workList.splice(workList.end(), *component.Constraints);
@@ -92,7 +92,7 @@ void SplitterStep::computeFollowupSteps(
   CG.optimize();
 
   // Compute the connected components of the constraint graph.
-  auto components = CG.computeConnectedComponents(CS.TypeVariables);
+  auto components = CG.computeConnectedComponents(CS.getTypeVariables());
   unsigned numComponents = components.size();
   if (numComponents < 2) {
     steps.push_back(std::make_unique<ComponentStep>(
@@ -106,10 +106,10 @@ void SplitterStep::computeFollowupSteps(
     CG.verify();
 
     log << "---Constraint graph---\n";
-    CG.print(CS.TypeVariables, log);
+    CG.print(CS.getTypeVariables(), log);
 
     log << "---Connected components---\n";
-    CG.printConnectedComponents(CS.TypeVariables, log);
+    CG.printConnectedComponents(CS.getTypeVariables(), log);
   }
 
   // Take the orphaned constraints, because they'll go into a component now.
@@ -312,7 +312,7 @@ StepResult ComponentStep::take(bool prevFailed) {
     // Activate all of the one-way constraints.
     SmallVector<Constraint *, 4> oneWayConstraints;
     for (auto &constraint : CS.InactiveConstraints) {
-      if (constraint.getKind() == ConstraintKind::OneWayBind)
+      if (constraint.isOneWayConstraint())
         oneWayConstraints.push_back(&constraint);
     }
     for (auto constraint : oneWayConstraints) {
