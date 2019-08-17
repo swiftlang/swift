@@ -60,7 +60,6 @@ namespace swift {
   class InfixOperatorDecl;
   class LazyResolver;
   class LinkLibrary;
-  class LookupCache;
   class ModuleLoader;
   class NominalTypeDecl;
   class EnumElementDecl;
@@ -80,6 +79,7 @@ namespace swift {
   class VisibleDeclConsumer;
   class SyntaxParsingCache;
   class ASTScope;
+  class SourceLookupCache;
 
   namespace syntax {
   class SourceFileSyntax;
@@ -203,6 +203,9 @@ private:
   DebuggerClient *DebugClient = nullptr;
 
   SmallVector<FileUnit *, 2> Files;
+
+  std::unique_ptr<SourceLookupCache> Cache;
+  SourceLookupCache &getSourceLookupCache() const;
 
   /// Tracks the file that will generate the module's entry point, either
   /// because it contains a class marked with \@UIApplicationMain
@@ -377,6 +380,12 @@ public:
   void lookupVisibleDecls(AccessPathTy AccessPath,
                           VisibleDeclConsumer &Consumer,
                           NLKind LookupKind) const;
+
+  /// This is a hack for 'main' file parsing and the integrated REPL.
+  ///
+  /// FIXME: Refactor main file parsing to not pump the parser incrementally.
+  /// FIXME: Remove the integrated REPL.
+  void clearLookupCache();
 
   /// @{
 
@@ -913,7 +922,6 @@ static inline unsigned alignOfFileUnit() {
 /// IR generation.
 class SourceFile final : public FileUnit {
 public:
-  class LookupCache;
   class Impl;
   struct SourceFileSyntaxInfo;
 
@@ -962,8 +970,8 @@ public:
   };
 
 private:
-  std::unique_ptr<LookupCache> Cache;
-  LookupCache &getCache() const;
+  std::unique_ptr<SourceLookupCache> Cache;
+  SourceLookupCache &getCache() const;
 
   /// This is the list of modules that are imported by this module.
   ///
@@ -1118,6 +1126,10 @@ public:
 
   bool isImportedImplementationOnly(const ModuleDecl *module) const;
 
+  /// This is a hack for 'main' file parsing and the integrated REPL.
+  ///
+  /// FIXME: Refactor main file parsing to not pump the parser incrementally.
+  /// FIXME: Remove the integrated REPL.
   void clearLookupCache();
 
   void cacheVisibleDecls(SmallVectorImpl<ValueDecl *> &&globals) const;
