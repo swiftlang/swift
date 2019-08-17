@@ -545,6 +545,22 @@ public:
                               ConstraintLocator *locator);
 };
 
+class RemoveAddressOf final : public ContextualMismatch {
+  RemoveAddressOf(ConstraintSystem &cs, Type lhs, Type rhs,
+                  ConstraintLocator *locator)
+      : ContextualMismatch(cs, FixKind::RemoveAddressOf, lhs, rhs, locator) {}
+
+public:
+  std::string getName() const override {
+    return "remove extraneous use of `&`";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static RemoveAddressOf *create(ConstraintSystem &cs, Type lhs, Type rhs,
+                                 ConstraintLocator *locator);
+};
+
 /// Detect situations where two type's generic arguments must
 /// match but are not convertible e.g.
 ///
@@ -1163,21 +1179,6 @@ private:
   static AllowInvalidRefInKeyPath *create(ConstraintSystem &cs, RefKind kind,
                                           ValueDecl *member,
                                           ConstraintLocator *locator);
-};
-
-class RemoveAddressOf final : public ConstraintFix {
-  RemoveAddressOf(ConstraintSystem &cs, ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::RemoveAddressOf, locator) {}
-
-public:
-  std::string getName() const override {
-    return "remove extraneous use of `&`";
-  }
-
-  bool diagnose(Expr *root, bool asNote = false) const override;
-
-  static RemoveAddressOf *create(ConstraintSystem &cs,
-                                 ConstraintLocator *locator);
 };
 
 class RemoveReturn final : public ConstraintFix {

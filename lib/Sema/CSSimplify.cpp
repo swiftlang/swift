@@ -2356,7 +2356,8 @@ bool ConstraintSystem::repairFailures(
 
       if (isa<InOutExpr>(AE->getSrc())) {
         conversionsOrFixes.push_back(
-            RemoveAddressOf::create(*this, getConstraintLocator(locator)));
+            RemoveAddressOf::create(*this, lhs, rhs,
+                                    getConstraintLocator(locator)));
         return true;
       }
 
@@ -2429,6 +2430,23 @@ bool ConstraintSystem::repairFailures(
         conversionsOrFixes.push_back(AddAddressOf::create(
             *this, lhs, rhs, getConstraintLocator(locator)));
     }
+
+    // If the argument is inout and the parameter is not inout or a pointer,
+    // suggest removing the &.
+    if (lhs->is<InOutType>() && !rhs->is<InOutType>()) {
+      auto objectType = rhs->lookThroughAllOptionalTypes();
+      if (objectType->getAnyPointerElementType())
+        break;
+
+      auto result = matchTypes(lhs->getInOutObjectType(), rhs,
+                               ConstraintKind::ArgumentConversion,
+                               TypeMatchFlags::TMF_ApplyingFix, locator);
+
+      if (result.isSuccess())
+        conversionsOrFixes.push_back(RemoveAddressOf::create(*this, lhs,
+            rhs, getConstraintLocator(locator)));
+    }
+
     break;
   }
 
@@ -2987,7 +3005,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       
       if (kind == ConstraintKind::OperatorArgumentConversion) {
         conversionsOrFixes.push_back(
-            RemoveAddressOf::create(*this, getConstraintLocator(locator)));
+            RemoveAddressOf::create(*this, type1, type2,
+                                    getConstraintLocator(locator)));
         break;
       }
 
