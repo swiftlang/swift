@@ -274,7 +274,8 @@ class BuildScriptInvocation(object):
     def apply_default_arguments(toolchain, args):
         # Infer if ninja is required
         ninja_required = (
-            args.cmake_generator == 'Ninja' or args.build_foundation)
+            args.cmake_generator == 'Ninja' or args.build_foundation or
+            args.build_sourcekitlsp or args.build_indexstoredb)
         if ninja_required and toolchain.ninja is None:
             args.build_ninja = True
 
@@ -1015,6 +1016,7 @@ class BuildScriptInvocation(object):
                         host_target, product_name))
                 product.do_build(host_target)
                 product.do_test(host_target)
+                product.install(host_target)
 
         # Extract symbols...
         for host_target in all_hosts:

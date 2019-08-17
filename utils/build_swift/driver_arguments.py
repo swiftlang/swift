@@ -553,6 +553,8 @@ def create_argument_parser():
            help='build IndexStoreDB')
     option(['--sourcekit-lsp'], toggle_true('build_sourcekitlsp'),
            help='build SourceKitLSP')
+    option(['--install-sourcekit-lsp'], toggle_true('install_sourcekitlsp'),
+           help='install SourceKitLSP')
 
     option('--xctest', toggle_true('build_xctest'),
            help='build xctest')
