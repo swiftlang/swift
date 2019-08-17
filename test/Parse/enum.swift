@@ -101,8 +101,8 @@ enum ImproperlyHasIVars {
 
 // We used to crash on this.  rdar://14678675
 enum rdar14678675 {
-  case U1,
-  case U2 // expected-error{{expected identifier after comma in enum 'case' declaration}}
+  case U1, // expected-error{{expected identifier after comma in enum 'case' declaration}}
+  case U2 
   case U3
 }
 

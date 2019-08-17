@@ -5748,7 +5748,7 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
 
     // Handle the likely case someone typed 'case X, case Y'.
     if (Tok.is(tok::kw_case) && CommaLoc.isValid()) {
-      diagnose(Tok, diag::expected_identifier_after_case_comma);
+      diagnose(CommaLoc, diag::expected_identifier_after_case_comma);
       Status.setIsParseError();
       return Status;
     }
@@ -5782,16 +5782,16 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
           return Status;
         }
       }
-      if (CommaLoc.isValid() && !NameIsKeyword) {
-        diagnose(CommaLoc, diag::expected_identifier_after_case_comma);
-        Status.setIsParseError();
-        return Status;
-      } else if (NameIsKeyword) {
+      if (NameIsKeyword) {
         diagnose(TokLoc, diag::keyword_cant_be_identifier, TokText);
         diagnose(TokLoc, diag::backticks_to_escape)
           .fixItReplace(TokLoc, "`" + TokText.str() + "`");
         if (!Tok.isAtStartOfLine())
           consumeToken();
+      } else if (CommaLoc.isValid()) {
+        diagnose(CommaLoc, diag::expected_identifier_after_case_comma);
+        Status.setIsParseError();
+        return Status;
       } else {
         diagnose(CaseLoc, diag::expected_identifier_in_decl, "enum 'case'");
       }
