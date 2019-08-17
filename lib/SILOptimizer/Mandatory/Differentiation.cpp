@@ -2721,6 +2721,7 @@ enum class DifferentiationThunkKind {
 };
 
 /// Build the type of a function transformation thunk.
+/// Adapted from `SILGenFunction::buildThunkType`.
 static CanSILFunctionType buildThunkType(SILFunction *fn,
                                          CanSILFunctionType &sourceType,
                                          CanSILFunctionType &expectedType,
@@ -2866,6 +2867,7 @@ static CanSILFunctionType buildThunkType(SILFunction *fn,
 
 /// Get or create a reabstraction thunk from `fromType` to `toType`, to be
 /// called in `caller`.
+/// Partially adapted from `SILGenModule::getOrCreateReabstractionThunk`.
 static SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
                                                   SILModule &module,
                                                   SILLocation loc,
@@ -3134,55 +3136,6 @@ public:
     Lowering::GenericContextScope genericContextScope(
         module.Types, origTy->getGenericSignature());
 
-    // Given a type, returns its formal SIL parameter info.
-    auto getTangentParameterInfoForOriginalResult = [&](
-        CanType tanType, ResultConvention origResConv) -> SILParameterInfo {
-      auto &tl = context.getTypeConverter().getTypeLowering(
-          tanType, ResilienceExpansion::Minimal);
-      ParameterConvention conv;
-      switch (origResConv) {
-      case ResultConvention::Owned:
-      case ResultConvention::Autoreleased:
-        conv = tl.isTrivial()
-            ? ParameterConvention::Direct_Unowned
-            : ParameterConvention::Direct_Guaranteed;
-        break;
-      case ResultConvention::Unowned:
-      case ResultConvention::UnownedInnerPointer:
-        conv = ParameterConvention::Direct_Unowned;
-        break;
-      case ResultConvention::Indirect:
-        conv = ParameterConvention::Indirect_In_Guaranteed;
-        break;
-      }
-      return {tanType, conv};
-    };
-
-    // Given a type, returns its formal SIL result info.
-    auto getTangentResultInfoForOriginalParameter = [&](
-        CanType tanType, ParameterConvention origParamConv) -> SILResultInfo {
-      auto &tl = context.getTypeConverter().getTypeLowering(
-          tanType, ResilienceExpansion::Minimal);
-      ResultConvention conv;
-      switch (origParamConv) {
-      case ParameterConvention::Direct_Owned:
-      case ParameterConvention::Direct_Guaranteed:
-      case ParameterConvention::Direct_Unowned:
-        conv = tl.isTrivial()
-            ? ResultConvention::Unowned
-            : ResultConvention::Owned;
-        break;
-      case ParameterConvention::Indirect_In:
-      case ParameterConvention::Indirect_Inout:
-      case ParameterConvention::Indirect_In_Constant:
-      case ParameterConvention::Indirect_In_Guaranteed:
-      case ParameterConvention::Indirect_InoutAliasable:
-        conv = ResultConvention::Indirect;
-        break;
-      }
-      return {tanType, conv};
-    };
-
     // Parameters of the pullback are:
     // - the tangent vectors of the original results, and
     // - a pullback struct.
@@ -3195,10 +3148,11 @@ public:
 
     // Add pullback parameter for the seed.
     auto origResInfo = origTy->getResults()[indices.source];
-    pbParams.push_back(getTangentParameterInfoForOriginalResult(
-        origResInfo.getType()
+    pbParams.push_back(
+        {origResInfo.getType()
             ->getAutoDiffAssociatedTangentSpace(lookupConformance)
-            ->getCanonicalType(), origResInfo.getConvention()));
+            ->getCanonicalType(),
+         ParameterConvention::Indirect_In_Guaranteed});
 
     // Accept a pullback struct in the pullback parameter list. This is the
     // returned pullback's closure context.
@@ -3211,10 +3165,11 @@ public:
     // Add pullback results for the requested wrt parameters.
     for (auto i : indices.parameters->getIndices()) {
       auto origParam = origParams[i];
-      adjResults.push_back(getTangentResultInfoForOriginalParameter(
-          origParam.getType()
+      adjResults.push_back(
+          {origParam.getType()
               ->getAutoDiffAssociatedTangentSpace(lookupConformance)
-              ->getCanonicalType(), origParam.getConvention()));
+              ->getCanonicalType(),
+           ResultConvention::Indirect});
     }
 
     Mangle::ASTMangler mangler;
@@ -3617,7 +3572,12 @@ public:
       // function operand is specialized with a remapped version of same
       // substitution map using an argument-less `partial_apply`.
       if (ai->getSubstitutionMap().empty()) {
-        builder.createRetainValue(loc, original, builder.getDefaultAtomicity());
+        // Retain only thick functions, because retain on thin functions is a
+        // no-op. Motivation: LoadableByAddress does not handle `retain` users
+        // of `function_ref` instructions.
+        if (originalFnTy->getExtInfo().hasContext())
+          builder.createRetainValue(loc, original,
+                                    builder.getDefaultAtomicity());
       } else {
         auto substMap = getOpSubstitutionMap(ai->getSubstitutionMap());
         auto vjpPartialApply = getBuilder().createPartialApply(
@@ -3975,8 +3935,7 @@ class AdjointValueBase {
     Value() {}
   } value;
 
-  explicit AdjointValueBase(SILType type,
-                            ArrayRef<AdjointValue> aggregate)
+  explicit AdjointValueBase(SILType type, ArrayRef<AdjointValue> aggregate)
       : kind(AdjointValueKind::Aggregate), type(type), value(aggregate) {}
 
   explicit AdjointValueBase(SILValue v)
@@ -4157,9 +4116,6 @@ private:
   /// A set used to remember local allocations that were destroyed.
   llvm::SmallDenseSet<SILValue> destroyedLocalAllocations;
 
-  /// The seed argument in the pullback function.
-  SILArgument *seed = nullptr;
-
   /// The main builder.
   SILBuilder builder;
 
@@ -4275,8 +4231,8 @@ private:
   SILValue materializeAdjoint(AdjointValue val, SILLocation loc);
 
   /// Given two adjoint values, accumulate them.
-  AdjointValue accumulateAdjointsDirect(AdjointValue lhs, AdjointValue rhs,
-                                        SILLocation loc);
+  AdjointValue accumulateAdjoints(AdjointValue lhs, AdjointValue rhs,
+                                  SILLocation loc);
 
   /// Given two materialized adjoint values, accumulate them. These two
   /// adjoints must be objects of loadable type.
@@ -4336,6 +4292,7 @@ private:
 
   /// Initializes an original value's corresponding adjoint value. It must not
   /// have an adjoint value before this function is called.
+  [[deprecated]]
   void initializeAdjointValue(SILBasicBlock *origBB, SILValue originalValue,
                               AdjointValue adjointValue) {
     assert(origBB->getParent() == &getOriginal());
@@ -4355,6 +4312,7 @@ private:
   ///
   /// This method first tries to find an entry in `adjointMap`. If an adjoint
   /// doesn't exist, create a zero adjoint.
+  [[deprecated]]
   AdjointValue getAdjointValue(SILBasicBlock *origBB, SILValue originalValue) {
     assert(origBB->getParent() == &getOriginal());
     assert(originalValue->getType().isObject());
@@ -4366,6 +4324,7 @@ private:
     return it->getSecond();
   }
 
+  [[deprecated]]
   /// Add an adjoint value for the given original value.
   void addAdjointValue(SILBasicBlock *origBB, SILValue originalValue,
                        AdjointValue newAdjointValue, SILLocation loc) {
@@ -4387,7 +4346,7 @@ private:
     auto it = insertion.first;
     auto existingValue = it->getSecond();
     valueMap.erase(it);
-    auto adjVal = accumulateAdjointsDirect(existingValue, newAdjointValue, loc);
+    auto adjVal = accumulateAdjoints(existingValue, newAdjointValue, loc);
     initializeAdjointValue(origBB, originalValue, adjVal);
   }
 
@@ -4408,11 +4367,11 @@ private:
   //--------------------------------------------------------------------------//
 
   void setAdjointBuffer(SILBasicBlock *origBB,
-                        SILValue originalBuffer,
+                        SILValue valueInOriginal,
                         SILValue adjointBuffer) {
-    assert(originalBuffer->getType().isAddress());
+    // assert(valueInOriginal->getType().isAddress());
     auto insertion =
-        bufferMap.try_emplace({origBB, originalBuffer}, adjointBuffer);
+        bufferMap.try_emplace({origBB, valueInOriginal}, adjointBuffer);
     assert(insertion.second); (void)insertion;
   }
 
@@ -4469,29 +4428,48 @@ private:
     return it;
   }
 
-  SILValue &getAdjointBuffer(SILBasicBlock *origBB, SILValue originalBuffer) {
-    assert(originalBuffer->getType().isAddress());
-    assert(originalBuffer->getFunction() == &getOriginal());
-    auto insertion = bufferMap.try_emplace({origBB, originalBuffer},
+  SILValue makeLocalAllocation(SILLocation loc, SILType type) {
+    // Set insertion point for local allocation builder: before the last local
+    // allocation, or at the start of the adjoint function's entry if no local
+    // allocations exist yet.
+    localAllocBuilder.setInsertionPoint(
+        getPullback().getEntryBlock(),
+        getNextFunctionLocalAllocationInsertionPoint());
+    // Allocate local buffer and initialize to zero.
+    return localAllocBuilder.createAllocStack(loc, type);
+  }
+
+  SILValue &getAdjointBuffer(SILBasicBlock *origBB, SILValue valueInOriginal) {
+    // assert(valueInOriginal->getType().isAddress());
+    assert(valueInOriginal->getFunction() == &getOriginal());
+    auto insertion = bufferMap.try_emplace({origBB, valueInOriginal},
                                            SILValue());
     if (!insertion.second) // not inserted
       return insertion.first->getSecond();
 
-    // Diagnose `struct_element_addr` instructions to `@noDerivative` fields.
-    if (auto *seai = dyn_cast<StructElementAddrInst>(originalBuffer)) {
-      if (seai->getField()->getAttrs().hasAttribute<NoDerivativeAttr>()) {
-        getContext().emitNondifferentiabilityError(
-            originalBuffer, getInvoker(),
-            diag::autodiff_noderivative_stored_property);
-        errorOccurred = true;
-        return (bufferMap[{origBB, originalBuffer}] = SILValue());
-      }
+    // Diagnose `struct_extract` and `struct_element_addr` instructions to
+    // `@noDerivative` fields.
+    VarDecl *noDerivativeField = nullptr;
+    if (auto *seai = dyn_cast<StructElementAddrInst>(valueInOriginal)) {
+      if (seai->getField()->getAttrs().hasAttribute<NoDerivativeAttr>())
+        noDerivativeField = seai->getField();
+    }
+    else if (auto *sei = dyn_cast<StructExtractInst>(valueInOriginal)) {
+      if (sei->getField()->getAttrs().hasAttribute<NoDerivativeAttr>())
+        noDerivativeField = sei->getField();
+    }
+    if (noDerivativeField) {
+      getContext().emitNondifferentiabilityError(
+          valueInOriginal, getInvoker(),
+          diag::autodiff_noderivative_stored_property);
+      errorOccurred = true;
+      return (bufferMap[{origBB, valueInOriginal}] = SILValue());
     }
 
     // If the original buffer is a projection, return a corresponding projection
     // into the adjoint buffer.
-    if (auto adjProj = getAdjointProjection(origBB, originalBuffer))
-      return (bufferMap[{origBB, originalBuffer}] = adjProj);
+    if (auto adjProj = getAdjointProjection(origBB, valueInOriginal))
+      return (bufferMap[{origBB, valueInOriginal}] = adjProj);
 
     // Set insertion point for local allocation builder: before the last local
     // allocation, or at the start of the pullback function's entry if no local
@@ -4500,9 +4478,9 @@ private:
         getPullback().getEntryBlock(),
         getNextFunctionLocalAllocationInsertionPoint());
     // Allocate local buffer and initialize to zero.
-    auto bufObjectType = getRemappedTangentType(originalBuffer->getType());
+    auto bufObjectType = getRemappedTangentType(valueInOriginal->getType());
     auto *newBuf = localAllocBuilder.createAllocStack(
-        originalBuffer.getLoc(), bufObjectType);
+        valueInOriginal.getLoc(), bufObjectType);
     // Temporarily change global builder insertion point and emit zero into the
     // local buffer.
     auto insertionPoint = builder.getInsertionBB();
@@ -4517,17 +4495,15 @@ private:
   }
 
   // Accumulates `rhsBufferAccess` into the adjoint buffer corresponding to
-  // `originalBuffer`.
-  void addToAdjointBuffer(SILBasicBlock *origBB, SILValue originalBuffer,
-                          SILValue rhsBufferAccess, SILLocation loc) {
-    assert(originalBuffer->getType().isAddress() &&
-           rhsBufferAccess->getType().isAddress());
-    assert(originalBuffer->getFunction() == &getOriginal());
-    assert(rhsBufferAccess->getFunction() == &getPullback());
-    auto adjointBuffer = getAdjointBuffer(origBB, originalBuffer);
+  // `valueInOriginal`.
+  void addToAdjointBuffer(SILBasicBlock *origBB, SILValue valueInOriginal,
+                          SILValue rhsBuffer, SILLocation loc) {
+    assert(valueInOriginal->getFunction() == &getOriginal());
+    assert(rhsBuffer->getFunction() == &getPullback());
+    auto adjointBuffer = getAdjointBuffer(origBB, valueInOriginal);
     if (errorOccurred)
       return;
-    accumulateIndirect(adjointBuffer, rhsBufferAccess, loc);
+    accumulateIndirect(adjointBuffer, rhsBuffer, loc);
   }
 
   //--------------------------------------------------------------------------//
@@ -4696,19 +4672,10 @@ public:
       // - For each active value in the original block, add adjoint value
       //   arguments to the pullback block.
       for (auto activeValue : bbActiveValues) {
-        if (activeValue->getType().isAddress()) {
-          // Allocate and zero initialize a new local buffer using
-          // `getAdjointBuffer`.
-          builder.setInsertionPoint(pullback.getEntryBlock());
-          getAdjointBuffer(origBB, activeValue);
-        } else {
-          // Create and register pullback block argument for the active value.
-          auto *pullbackArg = pullbackBB->createPhiArgument(
-              getRemappedTangentType(activeValue->getType()),
-              ValueOwnershipKind::Guaranteed);
-          activeValuePullbackBBArgumentMap[{origBB, activeValue}] = pullbackArg;
-          recordTemporary(pullbackArg);
-        }
+        // Allocate and zero initialize a new local buffer using
+        // `getAdjointBuffer`.
+        builder.setInsertionPoint(pullback.getEntryBlock());
+        getAdjointBuffer(origBB, activeValue);
       }
       // Add a pullback struct argument.
       auto *pbStructArg = pullbackBB->createPhiArgument(
@@ -4740,7 +4707,7 @@ public:
     // The pullback function has type (seed, exit_pbs) -> ([arg0], ..., [argn]).
     auto pbParamArgs = pullback.getArgumentsWithoutIndirectResults();
     assert(pbParamArgs.size() == 2);
-    seed = pbParamArgs[0];
+    auto seed = pbParamArgs[0];
 
     // Assign adjoint for original result.
     SmallVector<SILValue, 8> origFormalResults;
@@ -4761,20 +4728,16 @@ public:
     }
     builder.setInsertionPoint(
         pullbackEntry, getNextFunctionLocalAllocationInsertionPoint());
-    if (seed->getType().isAddress()) {
-      // Create a local copy so that it can be written to by later adjoint
-      // zero'ing logic.
-      auto *seedBufCopy = builder.createAllocStack(pbLoc, seed->getType());
-      builder.createCopyAddr(pbLoc, seed, seedBufCopy, IsNotTake,
-                             IsInitialization);
-      setAdjointBuffer(origExit, origResult, seedBufCopy);
-      functionLocalAllocations.push_back(seedBufCopy);
-    } else {
-      initializeAdjointValue(origExit, origResult,
-                             makeConcreteAdjointValue(seed));
-    }
+    // Create a local copy of the seed so that it can be written to by later
+    // adjoint zero'ing logic. The indirect seed argument should not be written
+    // to.
+    auto *seedBufCopy = builder.createAllocStack(pbLoc, seed->getType());
+    builder.createCopyAddr(pbLoc, seed, seedBufCopy, IsNotTake,
+                           IsInitialization);
+    setAdjointBuffer(origExit, origResult, seedBufCopy);
+    functionLocalAllocations.push_back(seedBufCopy);
     LLVM_DEBUG(getADDebugStream()
-               << "Assigned seed " << *seed
+               << "Assigned seed copy " << *seedBufCopy
                << " as the adjoint of original result " << origResult);
 
     // Visit original blocks blocks in post-order and perform differentiation
@@ -4801,26 +4764,19 @@ public:
     // `parameterIndex` into the `retElts` vector.
     auto addRetElt = [&](unsigned parameterIndex) -> void {
       auto origParam = origParams[parameterIndex];
-      if (origParam->getType().isObject()) {
-        auto pbVal = getAdjointValue(origEntry, origParam);
-        auto val = materializeAdjointDirect(pbVal, pbLoc);
-        builder.createRetainValue(pbLoc, val, builder.getDefaultAtomicity());
-        retElts.push_back(val);
-      } else {
-        auto adjBuf = getAdjointBuffer(origEntry, origParam);
-        if (errorOccurred)
-          return;
-        indParamAdjoints.push_back(adjBuf);
-      }
+      auto adjBuf = getAdjointBuffer(origEntry, origParam);
+      if (errorOccurred)
+        return;
+      indParamAdjoints.push_back(adjBuf);
     };
     // Collect differentiation parameter adjoints.
     for (auto i : getIndices().parameters->getIndices())
       addRetElt(i);
 
-    // Copy them to adjoint indirect results.
-    assert(indParamAdjoints.size() ==
-               getPullback().getIndirectResults().size() &&
+    // Copy them to pullback indirect results.
+    assert(indParamAdjoints.size() == pullback.getIndirectResults().size() &&
            "Indirect parameter adjoint count mismatch");
+
     for (auto pair : zip(indParamAdjoints,
                              getPullback().getIndirectResults())) {
       auto source = std::get<0>(pair);
@@ -4882,7 +4838,8 @@ public:
   SILBasicBlock *buildPullbackSuccessor(
       SILBasicBlock *origBB, SILBasicBlock *origPredBB,
       SmallDenseMap<SILValue, SmallPtrSet<SILBasicBlock *, 4>>
-          &adjointTrampolineBlockMap) {
+          &adjointTrampolineBlockMap,
+      SmallDenseSet<std::pair<SILBasicBlock *, SILValue>, 4> hasAdjointBuffer) {
     // Get the pullback block and optional pullback trampoline block of the
     // predecessor block.
     auto *pullbackBB = getPullbackBlock(origPredBB);
@@ -4902,38 +4859,19 @@ public:
     // predecessor blocks.
     auto &predBBActiveValues = activeValues[origPredBB];
     for (auto activeValue : predBBActiveValues) {
-      LLVM_DEBUG(getADDebugStream() << "Propagating active adjoint "
-                 << activeValue << " to predecessors' pullback blocks\n");
-      if (activeValue->getType().isObject()) {
-        auto activeValueAdj = getAdjointValue(origBB, activeValue);
-        auto concreteActiveValueAdj =
-            materializeAdjointDirect(activeValueAdj, loc);
-        trampolineArguments.push_back(concreteActiveValueAdj);
-        auto insertion = adjointTrampolineBlockMap.try_emplace(
-            concreteActiveValueAdj, SmallPtrSet<SILBasicBlock *, 4>());
-        auto &trampolineSet = insertion.first->getSecond();
-        trampolineSet.insert(pullbackTrampolineBB);
-        if (insertion.second)
-          builder.createRetainValue(loc, concreteActiveValueAdj,
-                                    builder.getDefaultAtomicity());
-        // If the pullback block does not yet have a registered adjoint
-        // value for the active value, set the adjoint value to the
-        // forwarded adjoint value argument.
-        // TODO: Hoist this logic out of loop over predecessor blocks to
-        // remove the `hasAdjointValue` check.
-        if (!hasAdjointValue(origPredBB, activeValue)) {
-          auto *pullbackBBArg =
-              getActiveValuePullbackBlockArgument(origPredBB, activeValue);
-          auto forwardedArgAdj = makeConcreteAdjointValue(pullbackBBArg);
-          initializeAdjointValue(origPredBB, activeValue, forwardedArgAdj);
-        }
-      } else {
-        // Propagate adjoint buffers using `copy_addr`.
-        auto adjBuf = getAdjointBuffer(origBB, activeValue);
-        auto predAdjBuf = getAdjointBuffer(origPredBB, activeValue);
-        builder.createCopyAddr(
-            loc, adjBuf, predAdjBuf, IsNotTake, IsNotInitialization);
-      }
+      // Skip current basic block arguments. They are handled elsewhere (need to
+      // propagate to incoming values).
+      // NOTE: Need a `!hasAdjointValue(origPredBB, activeValue)` check like below
+      if (hasAdjointBuffer.count({origPredBB, activeValue}))
+        continue;
+      LLVM_DEBUG(getADDebugStream()
+                 << "Propagating active adjoint " << activeValue
+                 << " to predecessors' pullback blocks\n");
+      // Propagate adjoint buffers using `copy_addr`.
+      auto adjBuf = getAdjointBuffer(origBB, activeValue);
+      auto predAdjBuf = getAdjointBuffer(origPredBB, activeValue);
+      builder.createCopyAddr(
+          loc, adjBuf, predAdjBuf, IsNotTake, IsNotInitialization);
     }
     // Propagate pullback struct argument.
     SILBuilder pullbackTrampolineBBBuilder(pullbackTrampolineBB);
@@ -5001,6 +4939,11 @@ public:
     auto *predEnumVal =
         builder.createStructExtract(pbLoc, pbStructVal, predEnumField);
 
+    // TODO: This is a hack to prevent duplicate adjoint buffer propagation.
+    // Make it more principled by creating a mapping:
+    // `(pred_bb, value) -> (adjoint buffer)` and update it only once.
+    SmallDenseSet<std::pair<SILBasicBlock *, SILValue>, 4> hasAdjointBuffer;
+
     // Propagate adjoint values from active basic block arguments to
     // predecessor terminator operands.
     for (auto *bbArg : bb->getArguments()) {
@@ -5009,13 +4952,22 @@ public:
       // Get predecessor terminator operands.
       SmallVector<std::pair<SILBasicBlock *, SILValue>, 4> incomingValues;
       bbArg->getSingleTerminatorOperands(incomingValues);
-      // Initialize adjoint value of predecessor terminator operands as
-      // adjoint value of current block arguments.
-      auto bbArgAdj = getAdjointValue(bb, bbArg);
+      // Initialize adjoint buffer of predecessor terminator operands as
+      // adjoint buffer of current block arguments.
+      auto bbArgAdj = getAdjointBuffer(bb, bbArg);
       for (auto pair : incomingValues) {
         auto *predBB = std::get<0>(pair);
         auto incomingValue = std::get<1>(pair);
-        initializeAdjointValue(predBB, incomingValue, bbArgAdj);
+        // Skip non-active incoming values.
+        if (!getActivityInfo().isActive(incomingValue, getIndices()))
+          continue;
+        bool incValHasAdjBuf = bufferMap.count({predBB, incomingValue});
+        assert(incValHasAdjBuf);
+        hasAdjointBuffer.insert({predBB, incomingValue});
+        auto adjBufIncomingValue = getAdjointBuffer(predBB, incomingValue);
+        builder.createCopyAddr(
+            pbLoc, bbArgAdj, adjBufIncomingValue, IsNotTake, IsInitialization);
+        adjBufIncomingValue->printInContext(llvm::errs());
       }
     }
 
@@ -5027,11 +4979,12 @@ public:
     // A map from active values' adjoint values to the trampoline blocks that
     // are using them.
     SmallDenseMap<SILValue, SmallPtrSet<SILBasicBlock *, 4>>
-        adjontTrampolineBlockMap;
+        pullbackTrampolineBlockMap;
     SmallVector<SILBasicBlock *, 8> pullbackSuccBBs;
     for (auto *predBB : bb->getPredecessorBlocks()) {
       auto *pullbackSuccBB = buildPullbackSuccessor(bb, predBB,
-                                                    adjontTrampolineBlockMap);
+                                                    pullbackTrampolineBlockMap,
+                                                    hasAdjointBuffer);
       pullbackSuccBBs.push_back(pullbackSuccBB);
       auto *enumEltDecl =
           getPullbackInfo().lookUpBranchingTraceEnumElement(predBB, bb);
@@ -5040,7 +4993,7 @@ public:
     // Values are trampolined by only a subset of pullback successor blocks.
     // Other successors blocks should destroy the value to balance the reference
     // count.
-    for (auto pair : adjontTrampolineBlockMap) {
+    for (auto pair : pullbackTrampolineBlockMap) {
       auto value = pair.getFirst();
       // The set of trampoline BBs that are users of `value`.
       auto &userTrampolineBBSet = pair.getSecond();
@@ -5107,7 +5060,7 @@ public:
 
   AllocStackInst *
   emitDifferentiableViewSubscript(ApplyInst *ai, SILType eltType,
-                                  SILValue adjointArray, SILValue fnRef,
+                                  SILValue arrayAdjBuf, SILValue fnRef,
                                   CanGenericSignature genericSig, int index) {
     auto &ctx = builder.getASTContext();
     auto astType = eltType.getASTType();
@@ -5115,11 +5068,10 @@ public:
         ai->getLoc(), SILType::getBuiltinIntegerType(64, ctx), index);
     auto intType = SILType::getPrimitiveObjectType(
         ctx.getIntDecl()->getDeclaredType()->getCanonicalType());
-    auto intStruct = builder.createStruct(ai->getLoc(), intType, {literal});
-    AllocStackInst *subscriptBuffer =
-        builder.createAllocStack(ai->getLoc(), eltType);
-    auto swiftModule = getModule().getSwiftModule();
-    auto diffProto = ctx.getProtocol(KnownProtocolKind::Differentiable);
+    auto *intStruct = builder.createStruct(ai->getLoc(), intType, {literal});
+    auto *subscriptBuffer = builder.createAllocStack(ai->getLoc(), eltType);
+    auto *swiftModule = getModule().getSwiftModule();
+    auto *diffProto = ctx.getProtocol(KnownProtocolKind::Differentiable);
     auto diffConf = swiftModule->lookupConformance(astType, diffProto);
     assert(diffConf.hasValue() && "Missing conformance to `Differentiable`");
     auto addArithProto = ctx.getProtocol(KnownProtocolKind::AdditiveArithmetic);
@@ -5128,8 +5080,11 @@ public:
            "Missing conformance to `AdditiveArithmetic`");
     auto subMap =
         SubstitutionMap::get(genericSig, {astType}, {*addArithConf, *diffConf});
+    auto arrayAdjBufLoad = builder.createLoad(
+        ai->getLoc(), arrayAdjBuf, LoadOwnershipQualifier::Unqualified);
     builder.createApply(ai->getLoc(), fnRef, subMap,
-                        {subscriptBuffer, intStruct, adjointArray});
+                        // {subscriptBuffer, intStruct, arrayAdjBuf});
+                        {subscriptBuffer, intStruct, arrayAdjBufLoad});
     return subscriptBuffer;
   }
 
@@ -5137,12 +5092,8 @@ public:
   accumulateDifferentiableViewSubscriptDirect(ApplyInst *ai, SILType eltType,
                                               StoreInst *si,
                                               AllocStackInst *subscriptBuffer) {
-    auto astType = eltType.getASTType();
-    auto newAdjValue = builder.createLoad(ai->getLoc(), subscriptBuffer,
-                                          getBufferLOQ(astType, getPullback()));
-    addAdjointValue(si->getParent(), si->getSrc(),
-                    makeConcreteAdjointValue(newAdjValue), si->getLoc());
-    blockTemporaries[ai->getParent()].push_back(newAdjValue);
+    addToAdjointBuffer(si->getParent(), si->getSrc(), subscriptBuffer,
+                       ai->getLoc());
     builder.createDeallocStack(ai->getLoc(), subscriptBuffer);
   }
 
@@ -5155,16 +5106,16 @@ public:
   }
 
   void visitArrayInitialization(ApplyInst *ai) {
-    SILValue adjointArray;
+    SILValue arrayAdjBuf;
     SILValue fnRef;
     CanGenericSignature genericSig;
     for (auto use : ai->getUses()) {
       auto tei = dyn_cast<TupleExtractInst>(use->getUser()->getResult(0));
       if (!tei || tei->getFieldNo() != 0) continue;
       // The first tuple field of the return value is the `Array`.
-      adjointArray = getAdjointValue(ai->getParent(), tei).getConcreteValue();
-      assert(adjointArray && "Array does not have adjoint value");
-      auto astType = adjointArray->getType().getASTType();
+      arrayAdjBuf = getAdjointBuffer(ai->getParent(), tei);
+      assert(arrayAdjBuf && "Array does not have adjoint buffer");
+      auto astType = arrayAdjBuf->getType().getASTType();
       auto typeDecl = astType->getStructOrBoundGenericStruct();
       auto subscriptDecl = cast<SubscriptDecl>(typeDecl->lookupDirect(
           DeclBaseName::createSubscript()).front());
@@ -5195,13 +5146,13 @@ public:
           if (auto si = dyn_cast<StoreInst>(inst)) {
             auto tanType = getRemappedTangentType(si->getSrc()->getType());
             auto subscriptBuffer = emitDifferentiableViewSubscript(
-                ai, tanType, adjointArray, fnRef, genericSig, 0);
+                ai, tanType, arrayAdjBuf, fnRef, genericSig, 0);
             accumulateDifferentiableViewSubscriptDirect(
                 ai, tanType, si, subscriptBuffer);
           } else if (auto cai = dyn_cast<CopyAddrInst>(inst)) {
             auto tanType = getRemappedTangentType(cai->getSrc()->getType());
             auto subscriptBuffer = emitDifferentiableViewSubscript(
-                ai, tanType, adjointArray, fnRef, genericSig, 0);
+                ai, tanType, arrayAdjBuf, fnRef, genericSig, 0);
             accumulateDifferentiableViewSubscriptIndirect(
                 ai, cai, subscriptBuffer);
           } else if (auto iai = dyn_cast<IndexAddrInst>(inst)) {
@@ -5211,7 +5162,7 @@ public:
                 auto tanType = getRemappedTangentType(
                     si->getSrc()->getType());
                 auto subscriptBuffer = emitDifferentiableViewSubscript(
-                    ai, tanType, adjointArray, fnRef,
+                    ai, tanType, arrayAdjBuf, fnRef,
                     genericSig, literal->getValue().getLimitedValue());
                 accumulateDifferentiableViewSubscriptDirect(
                     ai, tanType, si, subscriptBuffer);
@@ -5220,7 +5171,7 @@ public:
                 auto tanType = getRemappedTangentType(
                     cai->getSrc()->getType());
                 auto subscriptBuffer = emitDifferentiableViewSubscript(
-                    ai, tanType, adjointArray, fnRef,
+                    ai, tanType, arrayAdjBuf, fnRef,
                     genericSig, literal->getValue().getLimitedValue());
                 accumulateDifferentiableViewSubscriptIndirect(
                     ai, cai, subscriptBuffer);
@@ -5269,26 +5220,12 @@ public:
     auto pullbackType =
         remapType(pullback->getType()).castTo<SILFunctionType>();
 
-    // Get the seed (i.e. adjoint value of the original result).
+    // Get the seed (i.e. adjoint buffer of the original result).
     SILValue seed;
     auto *bb = ai->getParent();
-    if (origResult->getType().isObject()) {
-      // If original result is a `tuple_extract`, materialize adjoint value of
-      // `ai` and extract the corresponding element adjoint value.
-      if (auto *tupleExtract = dyn_cast<TupleExtractInst>(origResult)) {
-        auto adjointTuple = materializeAdjoint(getAdjointValue(bb, ai), loc);
-        seed = builder.emitTupleExtract(loc, adjointTuple,
-                                        tupleExtract->getFieldNo());
-      }
-      // Otherwise, materialize adjoint value of `ai`.
-      else {
-        seed = materializeAdjoint(getAdjointValue(bb, origResult), loc);
-      }
-    } else {
-      seed = getAdjointBuffer(bb, origResult);
-      if (errorOccurred)
-        return;
-    }
+    seed = getAdjointBuffer(bb, origResult);
+    if (errorOccurred)
+      return;
 
     // Create allocations for pullback indirect results.
     SmallVector<AllocStackInst *, 4> pullbackIndirectResults;
@@ -5344,25 +5281,8 @@ public:
     for (unsigned i : applyInfo.indices.parameters->getIndices()) {
       auto origArg = ai->getArgument(origNumIndRes + i);
       auto tan = *allResultsIt++;
-      if (tan->getType().isAddress()) {
-        addToAdjointBuffer(bb, origArg, tan, loc);
-        builder.emitDestroyAddrAndFold(loc, tan);
-      } else {
-        if (origArg->getType().isAddress()) {
-          if (errorOccurred)
-            return;
-          auto *tmpBuf = builder.createAllocStack(loc, tan->getType());
-          builder.createStore(loc, tan, tmpBuf,
-              getBufferSOQ(tmpBuf->getType().getASTType(), getPullback()));
-          addToAdjointBuffer(bb, origArg, tmpBuf, loc);
-          builder.emitDestroyAddrAndFold(loc, tmpBuf);
-          builder.createDeallocStack(loc, tmpBuf);
-        }
-        else {
-          recordTemporary(tan);
-          addAdjointValue(bb, origArg, makeConcreteAdjointValue(tan), loc);
-        }
-      }
+      addToAdjointBuffer(bb, origArg, tan, loc);
+      builder.emitDestroyAddrAndFold(loc, tan);
     }
     // Deallocate pullback indirect results.
     for (auto *alloc : reversed(pullbackIndirectResults))
@@ -5379,66 +5299,45 @@ public:
     auto *bb = si->getParent();
     auto loc = si->getLoc();
     auto *structDecl = si->getStructDecl();
-    auto av = getAdjointValue(bb, si);
-    switch (av.getKind()) {
-    case AdjointValueKind::Zero:
-      for (auto *field : structDecl->getStoredProperties()) {
-        auto fv = si->getFieldValue(field);
-        addAdjointValue(bb, fv,
-            makeZeroAdjointValue(getRemappedTangentType(fv->getType())), loc);
-      }
-      break;
-    case AdjointValueKind::Concrete: {
-      auto adjStruct = materializeAdjointDirect(std::move(av), loc);
-      // Find the struct `TangentVector` type.
-      auto structTy = remapType(si->getType()).getASTType();
-      auto tangentVectorTy =
-          getTangentSpace(structTy)->getType()->getCanonicalType();
-      assert(!getModule().Types.getTypeLowering(
-                 tangentVectorTy, ResilienceExpansion::Minimal)
-                     .isAddressOnly());
-      auto *tangentVectorDecl =
-          tangentVectorTy->getStructOrBoundGenericStruct();
-      assert(tangentVectorDecl);
+    auto adjStruct = getAdjointBuffer(bb, si);
+    // Find the struct `TangentVector` type.
+    auto structTy = remapType(si->getType()).getASTType();
+    auto tangentVectorTy =
+        getTangentSpace(structTy)->getType()->getCanonicalType();
+    assert(!getModule().Types.getTypeLowering(
+               tangentVectorTy, ResilienceExpansion::Minimal)
+                   .isAddressOnly());
+    auto *tangentVectorDecl =
+        tangentVectorTy->getStructOrBoundGenericStruct();
+    assert(tangentVectorDecl);
 
-      // Accumulate adjoints for the fields of the `struct` operand.
-      for (auto *field : structDecl->getStoredProperties()) {
-        // There does not exist a corresponding tangent field for original
-        // fields with `@noDerivative` attribute. Emit an error.
-        if (field->getAttrs().hasAttribute<NoDerivativeAttr>())
-          continue;
-        // Find the corresponding field in the tangent space.
-        VarDecl *tanField = nullptr;
-        if (tangentVectorDecl == structDecl)
-          tanField = field;
-        // Otherwise, look up the field by name.
-        else {
-          auto tanFieldLookup =
-              tangentVectorDecl->lookupDirect(field->getName());
-          if (tanFieldLookup.empty()) {
-            getContext().emitNondifferentiabilityError(
-                si, getInvoker(),
-                diag::autodiff_stored_property_no_corresponding_tangent,
-                tangentVectorDecl->getNameStr(), field->getNameStr());
-            errorOccurred = true;
-            return;
-          }
-          tanField = cast<VarDecl>(tanFieldLookup.front());
+    // Accumulate adjoints for the fields of the `struct` operand.
+    for (auto *field : structDecl->getStoredProperties()) {
+      // There does not exist a corresponding tangent field for original
+      // fields with `@noDerivative` attribute. Emit an error.
+      if (field->getAttrs().hasAttribute<NoDerivativeAttr>())
+        continue;
+      // Find the corresponding field in the tangent space.
+      VarDecl *tanField = nullptr;
+      if (tangentVectorDecl == structDecl)
+        tanField = field;
+      // Otherwise, look up the field by name.
+      else {
+        auto tanFieldLookup =
+            tangentVectorDecl->lookupDirect(field->getName());
+        if (tanFieldLookup.empty()) {
+          getContext().emitNondifferentiabilityError(
+              si, getInvoker(),
+              diag::autodiff_stored_property_no_corresponding_tangent,
+              tangentVectorDecl->getNameStr(), field->getNameStr());
+          errorOccurred = true;
+          return;
         }
-        auto *adjStructElt =
-            builder.createStructExtract(loc, adjStruct, tanField);
-        addAdjointValue(bb, si->getFieldValue(field),
-                        makeConcreteAdjointValue(adjStructElt), si->getLoc());
+        tanField = cast<VarDecl>(tanFieldLookup.front());
       }
-      break;
-    }
-    case AdjointValueKind::Aggregate: {
-      // Note: All user-called initializations go through the calls to the
-      // initializer, and synthesized initializers only have one level of struct
-      // formation which will not result into any aggregate adjoint valeus.
-      llvm_unreachable("Aggregate adjoint values should not occur for `struct` "
-                       "instructions");
-    }
+      auto *adjStructElt =
+          builder.createStructElementAddr(loc, adjStruct, tanField);
+      addToAdjointBuffer(bb, si->getFieldValue(field), adjStructElt, loc);
     }
   }
 
@@ -5452,6 +5351,7 @@ public:
            "`struct_extract` with `@noDerivative` field should not be "
            "differentiated; activity analysis should not marked as varied");
     auto *bb = sei->getParent();
+    auto loc = sei->getLoc();
     auto structTy = remapType(sei->getOperand()->getType()).getASTType();
     auto tangentVectorTy =
         getTangentSpace(structTy)->getType()->getCanonicalType();
@@ -5484,34 +5384,13 @@ public:
       tanField = cast<VarDecl>(tanFieldLookup.front());
     }
     // Accumulate adjoint for the `struct_extract` operand.
-    auto av = getAdjointValue(bb, sei);
-    switch (av.getKind()) {
-    case AdjointValueKind::Zero:
-      addAdjointValue(bb, sei->getOperand(),
-                      makeZeroAdjointValue(tangentVectorSILTy), sei->getLoc());
-      break;
-    case AdjointValueKind::Concrete:
-    case AdjointValueKind::Aggregate: {
-      SmallVector<AdjointValue, 8> eltVals;
-      for (auto *field : tangentVectorDecl->getStoredProperties()) {
-        if (field == tanField) {
-          eltVals.push_back(av);
-        } else {
-          auto substMap = tangentVectorTy->getMemberSubstitutionMap(
-              field->getModuleContext(), field);
-          auto fieldTy = field->getType().subst(substMap);
-          auto fieldSILTy =
-              getContext().getTypeConverter().getLoweredType(
-                  fieldTy, ResilienceExpansion::Minimal);
-          assert(fieldSILTy.isObject());
-          eltVals.push_back(makeZeroAdjointValue(fieldSILTy));
-        }
-      }
-      addAdjointValue(bb, sei->getOperand(),
-                      makeAggregateAdjointValue(tangentVectorSILTy, eltVals),
-                      sei->getLoc());
-    }
-    }
+    auto av = getAdjointBuffer(bb, sei);
+    auto tmp = builder.createAllocStack(loc, tangentVectorSILTy);
+    emitZeroIndirect(tangentVectorTy, tmp, loc);
+    auto tmpElement = builder.createStructElementAddr(loc, tmp, tanField);
+    accumulateIndirect(tmpElement, av, loc);
+    addToAdjointBuffer(bb, sei->getOperand(), tmp, loc);
+    builder.createDeallocStack(loc, tmp);
   }
 
   /// Handle `tuple` instruction.
@@ -5520,40 +5399,15 @@ public:
   ///             ...
   void visitTupleInst(TupleInst *ti) {
     auto *bb = ti->getParent();
-    auto av = getAdjointValue(bb, ti);
-    switch (av.getKind()) {
-    case AdjointValueKind::Zero:
-      for (auto eltVal : ti->getElements()) {
-        if (!getTangentSpace(eltVal->getType().getASTType()))
-          continue;
-        addAdjointValue(bb, eltVal,
-            makeZeroAdjointValue(getRemappedTangentType(eltVal->getType())),
-            ti->getLoc());
-      }
-      break;
-    case AdjointValueKind::Concrete: {
-      auto val = av.getConcreteValue();
-      unsigned adjIdx = 0;
-      for (auto i : range(ti->getNumOperands())) {
-        if (!getTangentSpace(ti->getOperand(i)->getType().getASTType()))
-          continue;
-        auto adjElt = val;
-        if (val->getType().is<TupleType>())
-          adjElt = builder.createTupleExtract(ti->getLoc(), val, adjIdx++);
-        addAdjointValue(bb, ti->getOperand(i), makeConcreteAdjointValue(adjElt),
-                        ti->getLoc());
-      }
-      break;
-    }
-    case AdjointValueKind::Aggregate:
-      unsigned adjIdx = 0;
-      for (auto i : range(ti->getElements().size())) {
-        if (!getTangentSpace(ti->getElement(i)->getType().getASTType()))
-          continue;
-        addAdjointValue(bb, ti->getElement(i), av.getAggregateElement(adjIdx++),
-                        ti->getLoc());
-      }
-      break;
+    auto adjBuf = getAdjointBuffer(bb, ti);
+    unsigned adjIdx = 0;
+    for (auto i : range(ti->getNumOperands())) {
+      if (!getTangentSpace(ti->getOperand(i)->getType().getASTType()))
+        continue;
+      auto adjElt = adjBuf;
+      if (adjBuf->getType().is<TupleType>())
+        adjElt = builder.createTupleElementAddr(ti->getLoc(), adjBuf, adjIdx++);
+      addToAdjointBuffer(bb, ti->getOperand(i), adjElt, ti->getLoc());
     }
   }
 
@@ -5565,44 +5419,36 @@ public:
   ///                            index corresponding to n
   void visitTupleExtractInst(TupleExtractInst *tei) {
     auto *bb = tei->getParent();
+    auto loc = tei->getLoc();
+    auto adjBuf = getAdjointBuffer(bb, tei);
+
+    auto tupleTy = tei->getTupleType();
     auto tupleTanTy = getRemappedTangentType(tei->getOperand()->getType());
-    auto av = getAdjointValue(bb, tei);
-    switch (av.getKind()) {
-    case AdjointValueKind::Zero:
-      addAdjointValue(bb, tei->getOperand(), makeZeroAdjointValue(tupleTanTy),
-                      tei->getLoc());
-      break;
-    case AdjointValueKind::Aggregate:
-    case AdjointValueKind::Concrete: {
-      auto tupleTy = tei->getTupleType();
-      auto tupleTanTupleTy = tupleTanTy.getAs<TupleType>();
-      if (!tupleTanTupleTy) {
-        addAdjointValue(bb, tei->getOperand(), av, tei->getLoc());
-        break;
-      }
-      SmallVector<AdjointValue, 8> elements;
-      unsigned adjIdx = 0;
-      for (unsigned i : range(tupleTy->getNumElements())) {
-        if (!getTangentSpace(
-                tupleTy->getElement(i).getType()->getCanonicalType()))
-          continue;
-        if (tei->getFieldNo() == i)
-          elements.push_back(av);
-        else
-          elements.push_back(makeZeroAdjointValue(
-              getRemappedTangentType(SILType::getPrimitiveObjectType(
-                  tupleTanTupleTy->getElementType(adjIdx++)
-                      ->getCanonicalType()))));
-      }
-      if (elements.size() == 1) {
-        addAdjointValue(bb, tei->getOperand(), elements.front(), tei->getLoc());
-        break;
-      }
-      addAdjointValue(bb, tei->getOperand(),
-          makeAggregateAdjointValue(tupleTanTy, elements), tei->getLoc());
-      break;
+    auto tupleTanTupleTy = tupleTanTy.getAs<TupleType>();
+    if (!tupleTanTupleTy) {
+      addToAdjointBuffer(bb, tei->getOperand(), adjBuf, loc);
+      return;
     }
+
+    // Accumulate adjoint for the `tuple_extract` operand.
+    auto tmp = builder.createAllocStack(loc, tupleTanTy);
+    unsigned adjIdx = 0;
+    for (unsigned i : range(tupleTy->getNumElements())) {
+      if (!getTangentSpace(
+              tupleTy->getElement(i).getType()->getCanonicalType()))
+        continue;
+      auto tmpElement = builder.createTupleElementAddr(loc, tmp, adjIdx);
+      if (tei->getFieldNo() == i) {
+        builder.createCopyAddr(
+            loc, adjBuf, tmpElement, IsNotTake, IsInitialization);
+      } else {
+        auto tanEltType =
+            tupleTanTupleTy->getElementType(adjIdx++)->getCanonicalType();
+        emitZeroIndirect(tanEltType, tmpElement, loc);
+      }
     }
+    addToAdjointBuffer(bb, tei->getOperand(), tmp, loc);
+    builder.createDeallocStack(loc, tmp);
   }
 
   /// Handle `load` instruction.
@@ -5610,18 +5456,10 @@ public:
   ///    Adjoint: adj[x] += adj[y]
   void visitLoadInst(LoadInst *li) {
     auto *bb = li->getParent();
-    auto adjVal =
-        materializeAdjointDirect(getAdjointValue(bb, li), li->getLoc());
-    // Allocate a local buffer and store the adjoint value. This buffer will be
-    // used for accumulation into the adjoint buffer.
-    auto *localBuf = builder.createAllocStack(li->getLoc(), adjVal->getType());
-    builder.createStore(li->getLoc(), adjVal, localBuf,
-        getBufferSOQ(localBuf->getType().getASTType(), getPullback()));
-    // Accumulate the adjoint value in the local buffer into the adjoint buffer.
-    addToAdjointBuffer(bb, li->getOperand(), localBuf, li->getLoc());
+    auto &adjBuf = getAdjointBuffer(bb, li);
+    addToAdjointBuffer(bb, li->getOperand(), adjBuf, li->getLoc());
     if (errorOccurred)
       return;
-    builder.createDeallocStack(li->getLoc(), localBuf);
   }
 
   /// Handle `store` instruction.
@@ -5633,11 +5471,9 @@ public:
     if (errorOccurred)
       return;
     auto bufType = remapType(adjBuf->getType());
-    auto adjVal = builder.createLoad(si->getLoc(), adjBuf,
-        getBufferLOQ(bufType.getASTType(), getPullback()));
-    recordTemporary(adjVal);
-    addAdjointValue(bb, si->getSrc(), makeConcreteAdjointValue(adjVal),
-                    si->getLoc());
+    addToAdjointBuffer(bb, si->getSrc(), adjBuf, si->getLoc());
+    if (errorOccurred)
+      return;
     emitZeroIndirect(bufType.getASTType(), adjBuf, si->getLoc());
   }
 
@@ -5735,6 +5571,7 @@ AdjointValue PullbackEmitter::makeAggregateAdjointValue(
   return AdjointValue::createAggregate(allocator, remapType(type), elements);
 }
 
+[[deprecated]]
 SILValue PullbackEmitter::materializeAdjointDirect(
     AdjointValue val, SILLocation loc) {
   assert(val.getType().isObject());
@@ -5759,6 +5596,7 @@ SILValue PullbackEmitter::materializeAdjointDirect(
   }
 }
 
+[[deprecated]]
 SILValue PullbackEmitter::materializeAdjoint(AdjointValue val,
                                              SILLocation loc) {
   if (val.isConcrete()) {
@@ -5861,12 +5699,11 @@ SILValue PullbackEmitter::emitZeroDirect(CanType type, SILLocation loc) {
 }
 
 AdjointValue
-PullbackEmitter::accumulateAdjointsDirect(AdjointValue lhs, AdjointValue rhs,
-                                          SILLocation loc) {
+PullbackEmitter::accumulateAdjoints(AdjointValue lhs, AdjointValue rhs,
+                                    SILLocation loc) {
   LLVM_DEBUG(getADDebugStream()
              << "Materializing adjoint directly.\nLHS: " << lhs
              << "\nRHS: " << rhs << '\n');
-
   switch (lhs.getKind()) {
   // x
   case AdjointValueKind::Concrete: {
@@ -5890,7 +5727,7 @@ PullbackEmitter::accumulateAdjointsDirect(AdjointValue lhs, AdjointValue rhs,
           auto lhsElt = builder.createTupleExtract(
               lhsVal.getLoc(), lhsVal, idx);
           auto rhsElt = rhs.getAggregateElement(idx);
-          newElements.push_back(accumulateAdjointsDirect(
+          newElements.push_back(accumulateAdjoints(
               makeConcreteAdjointValue(lhsElt), rhsElt, loc));
         }
       } else if (auto *structDecl = lhsTy->getStructOrBoundGenericStruct()) {
@@ -5900,9 +5737,8 @@ PullbackEmitter::accumulateAdjointsDirect(AdjointValue lhs, AdjointValue rhs,
           auto lhsElt = builder.createStructExtract(
               lhsVal.getLoc(), lhsVal, *fieldIt);
           auto rhsElt = rhs.getAggregateElement(i);
-          newElements.push_back(
-              accumulateAdjointsDirect(
-                  makeConcreteAdjointValue(lhsElt), rhsElt, loc));
+          newElements.push_back(accumulateAdjoints(
+              makeConcreteAdjointValue(lhsElt), rhsElt, loc));
         }
       } else {
         llvm_unreachable("Not an aggregate type");
@@ -5926,16 +5762,15 @@ PullbackEmitter::accumulateAdjointsDirect(AdjointValue lhs, AdjointValue rhs,
     case AdjointValueKind::Aggregate: {
       SmallVector<AdjointValue, 8> newElements;
       for (auto i : range(lhs.getNumAggregateElements()))
-        newElements.push_back(
-            accumulateAdjointsDirect(lhs.getAggregateElement(i),
-                                     rhs.getAggregateElement(i),
-                                     loc));
+        newElements.push_back(accumulateAdjoints(
+            lhs.getAggregateElement(i), rhs.getAggregateElement(i), loc));
       return makeAggregateAdjointValue(lhs.getType(), newElements);
     }
     }
   }
 }
 
+[[deprecated]]
 SILValue PullbackEmitter::accumulateDirect(SILValue lhs, SILValue rhs,
                                            SILLocation loc) {
   // TODO: Optimize for the case when lhs == rhs.

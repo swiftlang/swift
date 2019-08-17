@@ -42,7 +42,7 @@ func cond(_ x: Float) -> Float {
 // CHECK-DATA-STRUCTURES:   case bb1(_AD__cond_bb1__PB__src_0_wrt_0)
 // CHECK-DATA-STRUCTURES: }
 
-// CHECK-SIL-LABEL: sil hidden @AD__cond__vjp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+// CHECK-SIL-LABEL: sil hidden @AD__cond__vjp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (@in_guaranteed Float) -> @out Float) {
 // CHECK-SIL: bb0([[INPUT_ARG:%.*]] : $Float):
 // CHECK-SIL:   [[BB0_PB_STRUCT:%.*]] = struct $_AD__cond_bb0__PB__src_0_wrt_0 ()
 // CHECK-SIL:   [[BB1_PRED:%.*]] = enum $_AD__cond_bb1__Pred__src_0_wrt_0, #_AD__cond_bb1__Pred__src_0_wrt_0.bb0!enumelt.1, [[BB0_PB_STRUCT]]
@@ -63,53 +63,81 @@ func cond(_ x: Float) -> Float {
 // CHECK-SIL:   [[BB3_PB_STRUCT:%.*]] = struct $_AD__cond_bb3__PB__src_0_wrt_0
 // CHECK-SIL:   [[PULLBACK_REF:%.*]] = function_ref @AD__cond__pullback_src_0_wrt_0
 // CHECK-SIL:   [[PB:%.*]] = partial_apply [callee_guaranteed] [[PULLBACK_REF]]([[BB3_PB_STRUCT]])
-// CHECK-SIL:   [[VJP_RESULT:%.*]] = tuple ([[ORIG_RES]] : $Float, [[PB]] : $@callee_guaranteed (Float) -> Float)
+// CHECK-SIL:   [[VJP_RESULT:%.*]] = tuple ([[ORIG_RES]] : $Float, [[PB]] : $@callee_guaranteed (@in_guaranteed Float) -> @out Float)
 // CHECK-SIL:   return [[VJP_RESULT]]
 
-// CHECK-SIL-LABEL: sil hidden @AD__cond__pullback_src_0_wrt_0 : $@convention(thin) (Float, @guaranteed _AD__cond_bb3__PB__src_0_wrt_0) -> Float {
-// CHECK-SIL: bb0([[SEED:%.*]] : $Float, [[BB3_PB_STRUCT:%.*]] : $_AD__cond_bb3__PB__src_0_wrt_0):
-// CHECK-SIL:   [[BB3_PRED:%.*]] = struct_extract %1 : $_AD__cond_bb3__PB__src_0_wrt_0, #_AD__cond_bb3__PB__src_0_wrt_0.predecessor
+// CHECK-SIL-LABEL: sil hidden @AD__cond__pullback_src_0_wrt_0 : $@convention(thin) (@in_guaranteed Float, @guaranteed _AD__cond_bb3__PB__src_0_wrt_0) -> @out Float {
+// CHECK-SIL: bb0([[PB_RESULT:%.*]] : $*Float, [[SEED:%.*]] : $*Float, [[BB3_PB_STRUCT:%.*]] : $_AD__cond_bb3__PB__src_0_wrt_0):
+// CHECK-SIL:   copy_addr [[SEED]] to [initialization] [[SEED_COPY:%.*]] : $*Float
+// CHECK-SIL:   [[BB3_PRED:%.*]] = struct_extract [[BB3_PB_STRUCT]] : $_AD__cond_bb3__PB__src_0_wrt_0, #_AD__cond_bb3__PB__src_0_wrt_0.predecessor
+// CHECK-SIL:   copy_addr [[SEED_COPY]] to [initialization] [[ADJ_X_BB2:%.*]] : $*Float
+// CHECK-SIL:   copy_addr [[SEED_COPY]] to [initialization] [[ADJ_X_BB1:%.*]] : $*Float
+// CHECK-SIL:   copy_addr {{%.*}} to [[ADJ_BUF2:%.*]] : $*Float
+// CHECK-SIL:   copy_addr {{%.*}} to [[ADJ_BUF3:%.*]] : $*Float
 // CHECK-SIL:   switch_enum [[BB3_PRED]] : $_AD__cond_bb3__Pred__src_0_wrt_0, case #_AD__cond_bb3__Pred__src_0_wrt_0.bb2!enumelt.1: bb3, case #_AD__cond_bb3__Pred__src_0_wrt_0.bb1!enumelt.1: bb1
 
 // CHECK-SIL: bb1([[BB3_PRED1_TRAMP_PB_STRUCT:%.*]] : $_AD__cond_bb1__PB__src_0_wrt_0):
-// CHECK-SIL:   br bb2({{%.*}} : $Float, {{%.*}}: $Float, [[BB3_PRED1_TRAMP_PB_STRUCT]] : $_AD__cond_bb1__PB__src_0_wrt_0)
+// CHECK-SIL:   br bb2([[BB3_PRED1_TRAMP_PB_STRUCT]] : $_AD__cond_bb1__PB__src_0_wrt_0)
 
-// CHECK-SIL: bb2({{%.*}} : $Float, {{%.*}} : $Float, [[BB1_PB_STRUCT:%.*]] : $_AD__cond_bb1__PB__src_0_wrt_0):
+// CHECK-SIL: bb2([[BB1_PB_STRUCT:%.*]] : $_AD__cond_bb1__PB__src_0_wrt_0):
 // CHECK-SIL:   [[BB1_PB:%.*]] = struct_extract [[BB1_PB_STRUCT]]
-// CHECK-SIL:   [[BB1_ADJVALS:%.*]] = apply [[BB1_PB]]([[SEED]]) : $@callee_guaranteed (Float) -> (Float, Float)
+// CHECK-SIL:   [[BUF0:%.*]] = alloc_stack $Float
+// CHECK-SIL:   [[BUF1:%.*]] = alloc_stack $Float
+// CHECK-SIL:   [[REABS_THUNK:%.*]] = function_ref @$sS3fIegydd_S3fIegnrr_TR
+// CHECK-SIL:   [[BB1_PB_REABS:%.*]] = partial_apply [callee_guaranteed] [[REABS_THUNK]]([[BB1_PB]])
+// CHECK-SIL:   [[BB1_ADJVALS:%.*]] = apply [[BB1_PB_REABS]]([[BUF0]], [[BUF1]], [[ADJ_X_BB1]]) : $@callee_guaranteed (@in_guaranteed Float) -> (@out Float, @out Float)
+// CHECK-SIL:   destroy_addr [[BUF0]] : $*Float
+// CHECK-SIL:   destroy_addr [[BUF1]] : $*Float
+// CHECK-SIL:   dealloc_stack [[BUF1]] : $*Float
+// CHECK-SIL:   dealloc_stack [[BUF0]] : $*Float
 // CHECK-SIL:   [[BB1_PRED:%.*]] = struct_extract [[BB1_PB_STRUCT]]
-// CHECK-SIL:   release_value {{%.*}} : $Float
-// CHECK-SIL:   release_value {{%.*}} : $Float
-// CHECK-SIL:   release_value {{%.*}} : $Float
-// CHECK-SIL:   release_value {{%.*}} : $Float
-// CHECK-SIL:   release_value {{%.*}} : $Float
 // CHECK-SIL:   [[BB1_PB_STRUCT_DATA:%.*]] = unchecked_enum_data [[BB1_PRED]]
 // CHECK-SIL:   br bb5([[BB1_PB_STRUCT_DATA]] : $_AD__cond_bb0__PB__src_0_wrt_0)
 
 // CHECK-SIL: bb3([[BB3_PRED2_TRAMP_PB_STRUCT:%.*]] : $_AD__cond_bb2__PB__src_0_wrt_0):
-// CHECK-SIL:   br bb4({{%.*}} : $Float, {{%.*}}: $Float, [[BB3_PRED2_TRAMP_PB_STRUCT]] : $_AD__cond_bb2__PB__src_0_wrt_0)
+// CHECK-SIL:   br bb4([[BB3_PRED2_TRAMP_PB_STRUCT]] : $_AD__cond_bb2__PB__src_0_wrt_0)
 
-// CHECK-SIL: bb4({{%.*}} : $Float, {{%.*}} : $Float, [[BB2_PB_STRUCT:%.*]] : $_AD__cond_bb2__PB__src_0_wrt_0):
+// CHECK-SIL: bb4([[BB2_PB_STRUCT:%.*]] : $_AD__cond_bb2__PB__src_0_wrt_0):
 // CHECK-SIL:   [[BB2_PB:%.*]] = struct_extract [[BB2_PB_STRUCT]]
-// CHECK-SIL:   [[BB2_ADJVALS:%.*]] = apply [[BB2_PB]]([[SEED]]) : $@callee_guaranteed (Float) -> (Float, Float)
+// CHECK-SIL:   [[BUF0:%.*]] = alloc_stack $Float
+// CHECK-SIL:   [[BUF1:%.*]] = alloc_stack $Float
+// CHECK-SIL:   [[REABS_THUNK:%.*]] = function_ref @$sS3fIegydd_S3fIegnrr_TR
+// CHECK-SIL:   [[BB2_PB_REABS:%.*]] = partial_apply [callee_guaranteed] [[REABS_THUNK]]([[BB2_PB]])
+// CHECK-SIL:   [[BB2_ADJVALS:%.*]] = apply [[BB2_PB_REABS]]([[BUF0]], [[BUF1]], [[ADJ_X_BB2]]) : $@callee_guaranteed (@in_guaranteed Float) -> (@out Float, @out Float)
+// CHECK-SIL:   destroy_addr [[BUF0]] : $*Float
+// CHECK-SIL:   destroy_addr [[BUF1]] : $*Float
+// CHECK-SIL:   dealloc_stack [[BUF1]] : $*Float
+// CHECK-SIL:   dealloc_stack [[BUF0]] : $*Float
 // CHECK-SIL:   [[BB2_PRED:%.*]] = struct_extract [[BB2_PB_STRUCT]]
-// CHECK-SIL:   release_value {{%.*}} : $Float
-// CHECK-SIL:   release_value {{%.*}} : $Float
-// CHECK-SIL:   release_value {{%.*}} : $Float
-// CHECK-SIL:   release_value {{%.*}} : $Float
 // CHECK-SIL:   [[BB2_PB_STRUCT_DATA:%.*]] = unchecked_enum_data [[BB2_PRED]]
 // CHECK-SIL:   br bb6([[BB2_PB_STRUCT_DATA]] : $_AD__cond_bb0__PB__src_0_wrt_0)
 
 // CHECK-SIL: bb5([[BB1_PRED0_TRAMP_PB_STRUCT:%.*]] : $_AD__cond_bb0__PB__src_0_wrt_0):
-// CHECK-SIL:   br bb7({{%.*}} : $Float, [[BB1_PRED0_TRAMP_PB_STRUCT]] : $_AD__cond_bb0__PB__src_0_wrt_0)
+// CHECK-SIL:   br bb7([[BB1_PRED0_TRAMP_PB_STRUCT]] : $_AD__cond_bb0__PB__src_0_wrt_0)
 
 // CHECK-SIL: bb6([[BB2_PRED0_TRAMP_PB_STRUCT:%.*]] : $_AD__cond_bb0__PB__src_0_wrt_0):
-// CHECK-SIL:   br bb7({{%.*}} : $Float, [[BB2_PRED0_TRAMP_PB_STRUCT]] : $_AD__cond_bb0__PB__src_0_wrt_0)
+// CHECK-SIL:   br bb7([[BB2_PRED0_TRAMP_PB_STRUCT]] : $_AD__cond_bb0__PB__src_0_wrt_0)
 
-// CHECK-SIL: bb7({{%.*}} : $Float, [[BB0_PB_STRUCT:%.*]] : $_AD__cond_bb0__PB__src_0_wrt_0):
-// CHECK-SIL:   release_value {{%.*}} : $Float
-// CHECK-SIL:   release_value {{%.*}} : $Float
-// CHECK-SIL:   return {{%.*}} : $Float
+// CHECK-SIL: bb7([[BB0_PB_STRUCT:%.*]] : $_AD__cond_bb0__PB__src_0_wrt_0):
+// CHECK-SIL:   destroy_addr {{%.*}} : $*Float
+// CHECK-SIL:   dealloc_stack {{%.*}} : $*Float
+// CHECK-SIL:   destroy_addr {{%.*}} : $*Float
+// CHECK-SIL:   dealloc_stack {{%.*}} : $*Float
+// CHECK-SIL:   destroy_addr {{%.*}} : $*Float
+// CHECK-SIL:   dealloc_stack {{%.*}} : $*Float
+// CHECK-SIL:   destroy_addr {{%.*}} : $*Float
+// CHECK-SIL:   dealloc_stack {{%.*}} : $*Float
+// CHECK-SIL:   destroy_addr {{%.*}} : $*Float
+// CHECK-SIL:   dealloc_stack {{%.*}} : $*Float
+// CHECK-SIL:   destroy_addr {{%.*}} : $*Float
+// CHECK-SIL:   dealloc_stack {{%.*}} : $*Float
+// CHECK-SIL:   destroy_addr {{%.*}} : $*Float
+// CHECK-SIL:   dealloc_stack {{%.*}} : $*Float
+// CHECK-SIL:   destroy_addr {{%.*}} : $*Float
+// CHECK-SIL:   dealloc_stack {{%.*}} : $*Float
+// CHECK-SIL:   copy_addr [take] {{%.*}} to [initialization] [[PB_RESULT]]
+// CHECK-SIL:   [[VOID:%.*]] = tuple ()
+// CHECK-SIL:   return [[VOID]]
 
 @differentiable
 @_silgen_name("nested_cond")
@@ -164,17 +192,16 @@ func cond_tuple_var(_ x: Float) -> Float {
   }
   return y.1
 }
-// CHECK-SIL-LABEL: sil hidden @AD__cond_tuple_var__pullback_src_0_wrt_0 : $@convention(thin) (Float, @guaranteed _AD__cond_tuple_var_bb3__PB__src_0_wrt_0) -> Float {
-// CHECK-SIL: bb0([[SEED:%.*]] : $Float, [[BB3_PB_STRUCT:%.*]] : $_AD__cond_tuple_var_bb3__PB__src_0_wrt_0):
-// CHECK-SIL:   [[BB3_PRED:%.*]] = struct_extract %1 : $_AD__cond_tuple_var_bb3__PB__src_0_wrt_0, #_AD__cond_tuple_var_bb3__PB__src_0_wrt_0.predecessor
+// CHECK-SIL-LABEL: sil hidden @AD__cond_tuple_var__pullback_src_0_wrt_0 : $@convention(thin) (@in_guaranteed Float, @guaranteed _AD__cond_tuple_var_bb3__PB__src_0_wrt_0) -> @out Float {
+// CHECK-SIL: bb0([[PB_RESULT:%.*]] : $*Float, [[SEED:%.*]] : $*Float, [[BB3_PB_STRUCT:%.*]] : $_AD__cond_tuple_var_bb3__PB__src_0_wrt_0):
+// CHECK-SIL:   [[BB3_PRED:%.*]] = struct_extract [[BB3_PB_STRUCT]] : $_AD__cond_tuple_var_bb3__PB__src_0_wrt_0, #_AD__cond_tuple_var_bb3__PB__src_0_wrt_0.predecessor
 // CHECK-SIL:   copy_addr {{%.*}} to {{%.*}} : $*(Float, Float)
-// CHECK-SIL-NOT:   copy_addr {{%.*}} to {{%.*}} : $*Float
 // CHECK-SIL:   switch_enum [[BB3_PRED]] : $_AD__cond_tuple_var_bb3__Pred__src_0_wrt_0, case #_AD__cond_tuple_var_bb3__Pred__src_0_wrt_0.bb2!enumelt.1: bb3, case #_AD__cond_tuple_var_bb3__Pred__src_0_wrt_0.bb1!enumelt.1: bb1
 
 // CHECK-SIL: bb1([[BB3_PRED1_TRAMP_PB_STRUCT:%.*]] : $_AD__cond_tuple_var_bb1__PB__src_0_wrt_0):
-// CHECK-SIL:   br bb2({{%.*}} : $Float, {{%.*}} : $Float, [[BB3_PRED1_TRAMP_PB_STRUCT]] : $_AD__cond_tuple_var_bb1__PB__src_0_wrt_0)
+// CHECK-SIL:   br bb2([[BB3_PRED1_TRAMP_PB_STRUCT]] : $_AD__cond_tuple_var_bb1__PB__src_0_wrt_0)
 
-// CHECK-SIL: bb2({{%.*}} : $Float, {{%.*}} : $Float, [[BB1_PB_STRUCT:%.*]] : $_AD__cond_tuple_var_bb1__PB__src_0_wrt_0):
+// CHECK-SIL: bb2([[BB1_PB_STRUCT:%.*]] : $_AD__cond_tuple_var_bb1__PB__src_0_wrt_0):
 // CHECK-SIL:   [[BB1_PRED:%.*]] = struct_extract [[BB1_PB_STRUCT]]
 // CHECK-SIL:   copy_addr {{%.*}} to {{%.*}} : $*(Float, Float)
 // CHECK-SIL-NOT:   copy_addr {{%.*}} to {{%.*}} : $*Float
@@ -182,9 +209,9 @@ func cond_tuple_var(_ x: Float) -> Float {
 // CHECK-SIL:   br bb5([[BB1_PB_STRUCT_DATA]] : $_AD__cond_tuple_var_bb0__PB__src_0_wrt_0)
 
 // CHECK-SIL: bb3([[BB3_PRED2_TRAMP_PB_STRUCT:%.*]] : $_AD__cond_tuple_var_bb2__PB__src_0_wrt_0):
-// CHECK-SIL:   br bb4({{%.*}} : $Float, {{%.*}} : $Float, [[BB3_PRED2_TRAMP_PB_STRUCT]] : $_AD__cond_tuple_var_bb2__PB__src_0_wrt_0)
+// CHECK-SIL:   br bb4([[BB3_PRED2_TRAMP_PB_STRUCT]] : $_AD__cond_tuple_var_bb2__PB__src_0_wrt_0)
 
-// CHECK-SIL: bb4({{%.*}} : $Float, {{%.*}} : $Float, [[BB2_PB_STRUCT:%.*]] : $_AD__cond_tuple_var_bb2__PB__src_0_wrt_0):
+// CHECK-SIL: bb4([[BB2_PB_STRUCT:%.*]] : $_AD__cond_tuple_var_bb2__PB__src_0_wrt_0):
 // CHECK-SIL:   [[BB2_PRED:%.*]] = struct_extract [[BB2_PB_STRUCT]]
 // CHECK-SIL:   copy_addr {{%.*}} to {{%.*}} : $*(Float, Float)
 // CHECK-SIL-NOT:   copy_addr {{%.*}} to {{%.*}} : $*Float
@@ -192,10 +219,12 @@ func cond_tuple_var(_ x: Float) -> Float {
 // CHECK-SIL:   br bb6([[BB2_PB_STRUCT_DATA]] : $_AD__cond_tuple_var_bb0__PB__src_0_wrt_0)
 
 // CHECK-SIL: bb5([[BB1_PRED0_TRAMP_PB_STRUCT:%.*]] : $_AD__cond_tuple_var_bb0__PB__src_0_wrt_0):
-// CHECK-SIL:   br bb7({{%.*}} : $Float, [[BB1_PRED0_TRAMP_PB_STRUCT]] : $_AD__cond_tuple_var_bb0__PB__src_0_wrt_0)
+// CHECK-SIL:   br bb7([[BB1_PRED0_TRAMP_PB_STRUCT]] : $_AD__cond_tuple_var_bb0__PB__src_0_wrt_0)
 
 // CHECK-SIL: bb6([[BB2_PRED0_TRAMP_PB_STRUCT:%.*]] : $_AD__cond_tuple_var_bb0__PB__src_0_wrt_0):
-// CHECK-SIL:   br bb7({{%.*}} : $Float, [[BB2_PRED0_TRAMP_PB_STRUCT]] : $_AD__cond_tuple_var_bb0__PB__src_0_wrt_0)
+// CHECK-SIL:   br bb7([[BB2_PRED0_TRAMP_PB_STRUCT]] : $_AD__cond_tuple_var_bb0__PB__src_0_wrt_0)
 
-// CHECK-SIL: bb7({{%.*}} : $Float, [[BB0_PB_STRUCT:%.*]] : $_AD__cond_tuple_var_bb0__PB__src_0_wrt_0):
-// CHECK-SIL:   return {{%.*}} : $Float
+// CHECK-SIL: bb7([[BB0_PB_STRUCT:%.*]] : $_AD__cond_tuple_var_bb0__PB__src_0_wrt_0):
+// CHECK-SIL:   copy_addr [take] {{%.*}} to [initialization] [[PB_RESULT]]
+// CHECK-SIL:   [[VOID:%.*]] = tuple ()
+// CHECK-SIL:   return [[VOID]]

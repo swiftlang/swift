@@ -66,8 +66,6 @@ struct TF8Struct<Scalar> : TF8Proto where Scalar : FloatingPoint & Differentiabl
   }
 }
 
-_ = gradient(at: 1.0, in: { x in x.squareRoot() })
-
 //===----------------------------------------------------------------------===//
 // Non-differentiable arguments and results
 //===----------------------------------------------------------------------===//

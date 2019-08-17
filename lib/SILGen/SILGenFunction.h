@@ -1792,6 +1792,11 @@ public:
       CanSILFunctionType fromType, CanSILFunctionType toType,
       bool reorderSelf);
 
+  /// Get or create a thunk for reabstracting JVP/VJP functions, and apply it
+  /// to the given JVP/VJP function.
+  ManagedValue getThunkedAutoDiffAssociatedFunction(
+      ManagedValue fn, CanSILFunctionType fromType, CanSILFunctionType toType);
+
   //===--------------------------------------------------------------------===//
   // NoEscaping to Escaping closure thunk
   //===--------------------------------------------------------------------===//

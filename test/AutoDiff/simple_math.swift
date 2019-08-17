@@ -49,6 +49,7 @@ SimpleMathTests.test("FunctionCall") {
 }
 
 SimpleMathTests.test("ResultSelection") {
+  // Tests differentiation of `tuple_extract` instruction.
   func foo(_ x: Float, _ y: Float) -> (Float, Float) {
     return (x + 1, y + 2)
   }
@@ -188,11 +189,18 @@ SimpleMathTests.test("StructMemberwiseInitializer") {
   }
   expectEqual(8, 𝛁computed)
 
-  let 𝛁product = gradient(at: Float(4)) { input -> Float in
+  let 𝛁product1 = gradient(at: Float(4)) { input -> Float in
     let foo = Foo(stored: input)
+    // Multiply computed and stored property.
     return foo.computed * foo.stored
   }
-  expectEqual(16, 𝛁product)
+  let 𝛁product2 = gradient(at: Float(4)) { input -> Float in
+    let foo = Foo(stored: input)
+    // Multiply inlined body of computed property and stored property.
+    return foo.stored * foo.stored * foo.stored
+  }
+  expectEqual(48, 𝛁product1)
+  expectEqual(48, 𝛁product2)
 
   struct Custom : AdditiveArithmetic, Differentiable {
     var x: Float

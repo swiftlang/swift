@@ -40,39 +40,52 @@ struct SelfReordering : Differentiable & AdditiveArithmetic {
     return (value, { v in (Self(1), Self(2), Self(3)) })
   }
 
-// CHECK-LABEL: sil hidden @AD__$s4main14SelfReorderingV20threeParameterMethodyA2C_ACtF__jvp_src_0_wrt_0_1_2 : $@convention(method) (@guaranteed SelfReordering, @guaranteed SelfReordering, @guaranteed SelfReordering) -> (@owned SelfReordering, @owned @callee_guaranteed (@guaranteed SelfReordering, @guaranteed SelfReordering, @guaranteed SelfReordering) -> @owned SelfReordering)
+// CHECK-LABEL: sil hidden @AD__$s4main14SelfReorderingV20threeParameterMethodyA2C_ACtF__jvp_src_0_wrt_0_1_2 : $@convention(method) (@guaranteed SelfReordering, @guaranteed SelfReordering, @guaranteed SelfReordering) -> (@owned SelfReordering, @owned @callee_guaranteed (@in_guaranteed SelfReordering, @in_guaranteed SelfReordering, @in_guaranteed SelfReordering) -> @out SelfReordering)
 // CHECK: bb0([[X:%.*]] : $SelfReordering, [[Y:%.*]] : $SelfReordering, [[SELF:%.*]] : $SelfReordering):
 // CHECK: [[JVP:%.*]] = function_ref @$s4main14SelfReorderingV23jvpThreeParameterMethodyAC_A2C_A2CtctAC_ACtF
 // CHECK: [[JVP_RESULT:%.*]] = apply [[JVP]]([[X]], [[Y]], [[SELF]])
 // CHECK: [[JVP_ORIG_RESULT:%.*]] = tuple_extract [[JVP_RESULT]] : {{.*}}, 0
 // CHECK: [[DF:%.*]] = tuple_extract [[JVP_RESULT]] : {{.*}}, 1
-// CHECK: [[DF_SELF_REORDER_THUNK:%.*]] = function_ref @AD__$s4main14SelfReorderingVA3CIeggggo_A4CIeggggo_TR_differential_self_reordering_thunk
+// CHECK: [[DF_SELF_REORDER_THUNK:%.*]] = function_ref @AD__$s4main14SelfReorderingVA3CIeggggo_A4CIegnnnr_TR_differential_self_reordering_thunk
 // CHECK: [[THUNKED_DF:%.*]] = partial_apply [callee_guaranteed] [[DF_SELF_REORDER_THUNK]]([[DF]])
 // CHECK: [[RESULT:%.*]] = tuple ([[JVP_ORIG_RESULT]] : $SelfReordering, [[THUNKED_DF]] : {{.*}})
 // CHECK: return [[RESULT]]
 
-// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @AD__$s4main14SelfReorderingVA3CIeggggo_A4CIeggggo_TR_differential_self_reordering_thunk : $@convention(thin) (@guaranteed SelfReordering, @guaranteed SelfReordering, @guaranteed SelfReordering, @guaranteed @callee_guaranteed (@guaranteed SelfReordering, @guaranteed SelfReordering, @guaranteed SelfReordering) -> @owned SelfReordering) -> @owned SelfReordering
-// CHECK: bb0([[DX:%.*]] : @guaranteed $SelfReordering, [[DY:%.*]] : @guaranteed $SelfReordering, [[DSELF:%.*]] : @guaranteed $SelfReordering, [[DF:%.*]] : @guaranteed $@callee_guaranteed (@guaranteed SelfReordering, @guaranteed SelfReordering, @guaranteed SelfReordering) -> @owned SelfReordering)
-// CHECK: [[DF_RESULT:%.*]] = apply [[DF]]([[DSELF]], [[DX]], [[DY]])
-// CHECK: return [[DF_RESULT]]
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @AD__$s4main14SelfReorderingVA3CIeggggo_A4CIegnnnr_TR_differential_self_reordering_thunk : $@convention(thin) (@in_guaranteed SelfReordering, @in_guaranteed SelfReordering, @in_guaranteed SelfReordering, @guaranteed @callee_guaranteed (@guaranteed SelfReordering, @guaranteed SelfReordering, @guaranteed SelfReordering) -> @owned SelfReordering) -> @out SelfReordering
+// CHECK: bb0([[DF_RESULT:%.*]] : $*SelfReordering, [[DX:%.*]] : $*SelfReordering, [[DY:%.*]] : $*SelfReordering, [[DSELF:%.*]] : $*SelfReordering, [[DF:%.*]] : @guaranteed $@callee_guaranteed (@guaranteed SelfReordering, @guaranteed SelfReordering, @guaranteed SelfReordering) -> @owned SelfReordering):
+// CHECK: [[DSELF_LOAD:%.*]] = load_borrow [[DSELF]]
+// CHECK: [[DX_LOAD:%.*]] = load_borrow [[DX]]
+// CHECK: [[DY_LOAD:%.*]] = load_borrow [[DY]]
+// CHECK: [[DF_DIR_RESULT:%.*]] = apply [[DF]]([[DSELF_LOAD]], [[DX_LOAD]], [[DY_LOAD]])
+// CHECK: store [[DF_DIR_RESULT]] to [init] [[DF_RESULT]]
+// CHECK: [[VOID:%.*]] = tuple ()
+// CHECK: end_borrow [[DY_LOAD]]
+// CHECK: end_borrow [[DX_LOAD]]
+// CHECK: end_borrow [[DSELF_LOAD]]
+// CHECK: return [[VOID]]
 
-// CHECK-LABEL: sil hidden @AD__$s4main14SelfReorderingV20threeParameterMethodyA2C_ACtF__vjp_src_0_wrt_0_1_2 : $@convention(method) (@guaranteed SelfReordering, @guaranteed SelfReordering, @guaranteed SelfReordering) -> (@owned SelfReordering, @owned @callee_guaranteed (@guaranteed SelfReordering) -> (@owned SelfReordering, @owned SelfReordering, @owned SelfReordering))
+// CHECK-LABEL: sil hidden @AD__$s4main14SelfReorderingV20threeParameterMethodyA2C_ACtF__vjp_src_0_wrt_0_1_2 : $@convention(method) (@guaranteed SelfReordering, @guaranteed SelfReordering, @guaranteed SelfReordering) -> (@owned SelfReordering, @owned @callee_guaranteed (@in_guaranteed SelfReordering) -> (@out SelfReordering, @out SelfReordering, @out SelfReordering))
 // CHECK: bb0([[X:%.*]] : $SelfReordering, [[Y:%.*]] : $SelfReordering, [[SELF:%.*]] : $SelfReordering):
 // CHECK: [[VJP:%.*]] = function_ref @$s4main14SelfReorderingV23vjpThreeParameterMethodyAC_AC_A2CtACctAC_ACtF
 // CHECK: [[VJP_RESULT:%.*]] = apply [[VJP]]([[X]], [[Y]], [[SELF]])
 // CHECK: [[VJP_ORIG_RESULT:%.*]] = tuple_extract [[VJP_RESULT]] : {{.*}}, 0
 // CHECK: [[PB:%.*]] = tuple_extract [[VJP_RESULT]] : {{.*}}, 1
-// CHECK: [[PB_SELF_REORDER_THUNK:%.*]] = function_ref @AD__$s4main14SelfReorderingVA3CIeggooo_A4CIeggooo_TR_pullback_self_reordering_thunk
+// CHECK: [[PB_SELF_REORDER_THUNK:%.*]] = function_ref @AD__$s4main14SelfReorderingVA3CIeggooo_A4CIegnrrr_TR_pullback_self_reordering_thunk
 // CHECK: [[THUNKED_PB:%.*]] = partial_apply [callee_guaranteed] [[PB_SELF_REORDER_THUNK]]([[PB]])
 // CHECK: [[RESULT:%.*]] = tuple ([[VJP_ORIG_RESULT]] : $SelfReordering, [[THUNKED_PB]] : {{.*}})
 // CHECK: return [[RESULT]]
 
-// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @AD__$s4main14SelfReorderingVA3CIeggooo_A4CIeggooo_TR_pullback_self_reordering_thunk : $@convention(thin) (@guaranteed SelfReordering, @guaranteed @callee_guaranteed (@guaranteed SelfReordering) -> (@owned SelfReordering, @owned SelfReordering, @owned SelfReordering)) -> (@owned SelfReordering, @owned SelfReordering, @owned SelfReordering)
-// CHECK: bb0([[SEED:%.*]] : @guaranteed $SelfReordering, [[PB:%.*]] : @guaranteed $@callee_guaranteed (@guaranteed SelfReordering) -> (@owned SelfReordering, @owned SelfReordering, @owned SelfReordering)):
-// CHECK: [[PB_RESULT:%.*]] = apply [[PB]]([[SEED]])
-// CHECK: ([[SELF_ADJ:%.*]], [[X_ADJ:%.*]], [[Y_ADJ:%.*]]) = destructure_tuple %2 : $(SelfReordering, SelfReordering, SelfReordering)
-// CHECK: [[RESULT:%.*]] = tuple ([[X_ADJ]] : $SelfReordering, [[Y_ADJ]] : $SelfReordering, [[SELF_ADJ]] : $SelfReordering)
-// CHECK: return [[RESULT]]
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @AD__$s4main14SelfReorderingVA3CIeggooo_A4CIegnrrr_TR_pullback_self_reordering_thunk : $@convention(thin) (@in_guaranteed SelfReordering, @guaranteed @callee_guaranteed (@guaranteed SelfReordering) -> (@owned SelfReordering, @owned SelfReordering, @owned SelfReordering)) -> (@out SelfReordering, @out SelfReordering, @out SelfReordering)
+// CHECK: bb0([[X_ADJ:%.*]] : $*SelfReordering, [[Y_ADJ:%.*]] : $*SelfReordering, [[SELF_ADJ:%.*]] : $*SelfReordering, [[SEED:%.*]] : $*SelfReordering, [[PB:%.*]] : @guaranteed $@callee_guaranteed (@guaranteed SelfReordering) -> (@owned SelfReordering, @owned SelfReordering, @owned SelfReordering)):
+// CHECK: [[SEED_LOAD:%.*]] = load_borrow [[SEED]]
+// CHECK: [[PB_RESULT:%.*]] = apply [[PB]]([[SEED_LOAD]])
+// CHECK: ([[SELF_ADJ_DIR:%.*]], [[X_ADJ_DIR:%.*]], [[Y_ADJ_DIR:%.*]]) = destructure_tuple [[PB_RESULT]] : $(SelfReordering, SelfReordering, SelfReordering)
+// CHECK: store [[SELF_ADJ_DIR]] to [init] [[SELF_ADJ]]
+// CHECK: store [[X_ADJ_DIR]] to [init] [[X_ADJ]]
+// CHECK: store [[Y_ADJ_DIR]] to [init] [[Y_ADJ]]
+// CHECK: [[VOID:%.*]] = tuple ()
+// CHECK: end_borrow [[SEED_LOAD]]
+// CHECK: return [[VOID]]
 }
 
 // TF-742: Test thunks that perform self-ordering but not reabstraction.

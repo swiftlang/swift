@@ -191,7 +191,6 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
   //                 (R.TangentVector...) -> (T.TangentVector...))
 
   auto &ctx = getASTContext();
-  auto &typeConverter = module.Types;
 
   // Helper function testing if we are differentiating wrt this index.
   auto isWrtIndex = [&](unsigned index) -> bool {
@@ -213,55 +212,6 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
   Lowering::GenericContextScope genericContextScope(module.Types,
                                                     assocFnGenSig);
 
-  // Given a type, returns its formal SIL parameter info.
-  auto getTangentParameterInfoForOriginalResult = [&](
-      CanType tanType, ResultConvention origResConv) -> SILParameterInfo {
-    auto &tl = typeConverter.getTypeLowering(tanType,
-                                             ResilienceExpansion::Minimal);
-    ParameterConvention conv;
-    switch (origResConv) {
-    case ResultConvention::Owned:
-    case ResultConvention::Autoreleased:
-      conv = tl.isTrivial()
-          ? ParameterConvention::Direct_Unowned
-          : ParameterConvention::Direct_Guaranteed;
-      break;
-    case ResultConvention::Unowned:
-    case ResultConvention::UnownedInnerPointer:
-      conv = ParameterConvention::Direct_Unowned;
-      break;
-    case ResultConvention::Indirect:
-      conv = ParameterConvention::Indirect_In_Guaranteed;
-      break;
-    }
-    return {tanType, conv};
-  };
-
-  // Given a type, returns its formal SIL result info.
-  auto getTangentResultInfoForOriginalParameter = [&](
-      CanType tanType, ParameterConvention origParamConv) -> SILResultInfo {
-    auto &tl = typeConverter.getTypeLowering(tanType,
-                                             ResilienceExpansion::Minimal);
-    ResultConvention conv;
-    switch (origParamConv) {
-    case ParameterConvention::Direct_Owned:
-    case ParameterConvention::Direct_Guaranteed:
-    case ParameterConvention::Direct_Unowned:
-      conv = tl.isTrivial()
-          ? ResultConvention::Unowned
-          : ResultConvention::Owned;
-      break;
-    case ParameterConvention::Indirect_In:
-    case ParameterConvention::Indirect_Inout:
-    case ParameterConvention::Indirect_In_Constant:
-    case ParameterConvention::Indirect_In_Guaranteed:
-    case ParameterConvention::Indirect_InoutAliasable:
-      conv = ResultConvention::Indirect;
-      break;
-    }
-    return {tanType, conv};
-  };
-
   CanSILFunctionType closureType;
   switch (kind) {
   case AutoDiffAssociatedFunctionKind::JVP: {
@@ -271,7 +221,8 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
           param.getType()->getAutoDiffAssociatedTangentSpace(lookupConformance);
       assert(paramTan && "Parameter type does not have a tangent space?");
       differentialParams.push_back(
-          {paramTan->getCanonicalType(), param.getConvention()});
+          {paramTan->getCanonicalType(),
+           ParameterConvention::Indirect_In_Guaranteed});
     }
     SmallVector<SILResultInfo, 8> differentialResults;
     auto &result = getResults()[resultIndex];
@@ -279,7 +230,7 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
         result.getType()->getAutoDiffAssociatedTangentSpace(lookupConformance);
     assert(resultTan && "Result type does not have a tangent space?");
     differentialResults.push_back(
-        {resultTan->getCanonicalType(), result.getConvention()});
+        {resultTan->getCanonicalType(), ResultConvention::Indirect});
     closureType = SILFunctionType::get(
         /*genericSignature*/ nullptr, ExtInfo(), SILCoroutineKind::None,
         ParameterConvention::Direct_Guaranteed, differentialParams, {},
@@ -292,17 +243,15 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
     auto resultTan =
         origRes.getType()->getAutoDiffAssociatedTangentSpace(lookupConformance);
     assert(resultTan && "Result type does not have a tangent space?");
+    auto resultTanTy = resultTan->getCanonicalType();
     pullbackParams.push_back(
-        getTangentParameterInfoForOriginalResult(resultTan->getCanonicalType(),
-                                                 origRes.getConvention()));
+        {resultTanTy, ParameterConvention::Indirect_In_Guaranteed});
     SmallVector<SILResultInfo, 8> pullbackResults;
     for (auto &param : wrtParams) {
-      auto paramTan =
-          param.getType()->getAutoDiffAssociatedTangentSpace(lookupConformance);
-      assert(paramTan && "Parameter type does not have a tangent space?");
-      pullbackResults.push_back(
-          getTangentResultInfoForOriginalParameter(paramTan->getCanonicalType(),
-                                                   param.getConvention()));
+      auto paramTangentTy =
+          param.getType()->getAutoDiffAssociatedTangentSpace(lookupConformance)
+              ->getCanonicalType();
+      pullbackResults.push_back({paramTangentTy, ResultConvention::Indirect});
     }
     closureType = SILFunctionType::get(
         /*genericSignature*/ nullptr, ExtInfo(), SILCoroutineKind::None,
@@ -321,9 +270,20 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
   }
   newResults.push_back({closureType->getCanonicalType(assocFnGenSig),
                         ResultConvention::Owned});
-  return SILFunctionType::get(assocFnGenSig, getExtInfo(),
+
+  // If original function type is `@differentiable`:
+  // - Change `ExtInfo` to be non-differentiable.
+  // - Change `SILParameterInfo`s to have non-applicable differentiability.
+  auto extInfo = getExtInfo().withDifferentiabilityKind(
+      DifferentiabilityKind::NonDifferentiable);
+  auto newParameters = map<SmallVector<SILParameterInfo, 4>>(
+      getParameters(), [](SILParameterInfo param) {
+        return param.getWithDifferentiability(
+            SILParameterDifferentiability::DifferentiableOrNotApplicable);
+      });
+  return SILFunctionType::get(assocFnGenSig, extInfo,
                               getCoroutineKind(), getCalleeConvention(),
-                              getParameters(), getYields(), newResults,
+                              newParameters, getYields(), newResults,
                               getOptionalErrorResult(), ctx,
                               getWitnessMethodConformanceOrNone());
 }
@@ -2496,6 +2456,46 @@ static CanType copyOptionalityFromDerivedToBase(TypeConverter &tc,
   return base;
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+// TODO: Move this to a common location (SILFunctionType.cpp).
+static CanSILFunctionType
+normalizeAutoDiffLinearMapType(CanSILFunctionType assocFnType) {
+  SmallVector<SILParameterInfo, 4> parameters;
+  for (auto param : assocFnType->getParameters())
+    parameters.push_back({param.getType(),
+                          ParameterConvention::Indirect_In_Guaranteed});
+  SmallVector<SILResultInfo, 4> results;
+  for (auto result : assocFnType->getResults())
+    results.push_back({result.getType(), ResultConvention::Indirect});
+  return SILFunctionType::get(
+      assocFnType->getGenericSignature(), assocFnType->getExtInfo(),
+      assocFnType->getCoroutineKind(), assocFnType->getCalleeConvention(),
+      parameters, assocFnType->getYields(), results,
+      assocFnType->getOptionalErrorResult(), assocFnType->getASTContext(),
+      assocFnType->getWitnessMethodConformanceOrNone());
+}
+
+// SWIFT_ENABLE_TENSORFLOW
+// TODO: Move this to a common location (SILFunctionType.cpp).
+static CanSILFunctionType
+normalizeAutoDiffAssociatedFunctionType(CanSILFunctionType assocFnType) {
+  SmallVector<SILResultInfo, 2> results;
+  for (auto result : assocFnType->getResults().drop_back())
+    results.push_back(result);
+  auto linearMapResult = assocFnType->getResults().back();
+  auto linearMapFnType =
+      linearMapResult.getSILStorageType().castTo<SILFunctionType>();
+  linearMapResult = {normalizeAutoDiffLinearMapType(linearMapFnType),
+                     linearMapResult.getConvention()};
+  results.push_back(linearMapResult);
+  return SILFunctionType::get(
+      assocFnType->getGenericSignature(), assocFnType->getExtInfo(),
+      assocFnType->getCoroutineKind(), assocFnType->getCalleeConvention(),
+      assocFnType->getParameters(), assocFnType->getYields(), results,
+      assocFnType->getOptionalErrorResult(), assocFnType->getASTContext(),
+      assocFnType->getWitnessMethodConformanceOrNone());
+}
+
 /// Returns the ConstantInfo corresponding to the VTable thunk for overriding.
 /// Will be the same as getConstantInfo if the declaration does not override.
 const SILConstantInfo &
@@ -2560,6 +2560,11 @@ TypeConverter::getConstantOverrideInfo(SILDeclRef derived, SILDeclRef base) {
   CanSILFunctionType fnTy = getNativeSILFunctionType(
       M, basePattern, overrideLoweredInterfaceTy, base, derived,
       /*reqt subs*/None, /*witnessMethodConformance=*/None);
+
+  // SWIFT_ENABLE_TENSORFLOW
+  // Normalize vtable thunk type.
+  if (auto *autoDiffFuncId = derived.autoDiffAssociatedFunctionIdentifier)
+    fnTy = normalizeAutoDiffAssociatedFunctionType(fnTy);
 
   // Build the SILConstantInfo and cache it.
   auto resultBuf = M.allocate(sizeof(SILConstantInfo),

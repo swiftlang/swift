@@ -602,6 +602,47 @@ SILGenModule::getWitnessTable(NormalProtocolConformance *conformance) {
   return table;
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+// TODO: Move this to a common location (SILFunctionType.cpp).
+static CanSILFunctionType
+normalizeAutoDiffLinearMapType(CanSILFunctionType assocFnType) {
+  SmallVector<SILParameterInfo, 4> parameters;
+  for (auto param : assocFnType->getParameters())
+    parameters.push_back({param.getType(),
+                          ParameterConvention::Indirect_In_Guaranteed});
+  SmallVector<SILResultInfo, 4> results;
+  for (auto result : assocFnType->getResults())
+    results.push_back({result.getType(), ResultConvention::Indirect});
+  return SILFunctionType::get(
+      assocFnType->getGenericSignature(), assocFnType->getExtInfo(),
+      assocFnType->getCoroutineKind(), assocFnType->getCalleeConvention(),
+      parameters, assocFnType->getYields(), results,
+      assocFnType->getOptionalErrorResult(), assocFnType->getASTContext(),
+      assocFnType->getWitnessMethodConformanceOrNone());
+}
+
+// SWIFT_ENABLE_TENSORFLOW
+// TODO: Move this to a common location (SILFunctionType.cpp).
+static CanSILFunctionType
+normalizeAutoDiffAssociatedFunctionType(CanSILFunctionType assocFnType) {
+  SmallVector<SILResultInfo, 2> results;
+  for (auto result : assocFnType->getResults().drop_back())
+    results.push_back(result);
+  auto linearMapResult = assocFnType->getResults().back();
+  auto linearMapFnType =
+      linearMapResult.getSILStorageType().castTo<SILFunctionType>();
+  linearMapResult = {normalizeAutoDiffLinearMapType(linearMapFnType),
+                     linearMapResult.getConvention()};
+  results.push_back(linearMapResult);
+
+  return SILFunctionType::get(
+      assocFnType->getGenericSignature(), assocFnType->getExtInfo(),
+      assocFnType->getCoroutineKind(), assocFnType->getCalleeConvention(),
+      assocFnType->getParameters(), assocFnType->getYields(), results,
+      assocFnType->getOptionalErrorResult(), assocFnType->getASTContext(),
+      assocFnType->getWitnessMethodConformanceOrNone());
+}
+
 SILFunction *SILGenModule::emitProtocolWitness(
     ProtocolConformanceRef conformance, SILLinkage linkage,
     IsSerialized_t isSerialized, SILDeclRef requirement, SILDeclRef witnessRef,
@@ -680,7 +721,7 @@ SILFunction *SILGenModule::emitProtocolWitness(
   std::string nameBuffer =
       NewMangler.mangleWitnessThunk(manglingConformance, requirement.getDecl());
   // SWIFT_ENABLE_TENSORFLOW
-  // TODO: Proper mangling for autodiff witness thunks.
+  // TODO(TF-685): Proper mangling for autodiff witness thunks.
   if (auto *autoDiffFuncId =
           requirement.autoDiffAssociatedFunctionIdentifier) {
     std::string kindString;
@@ -694,6 +735,10 @@ SILFunction *SILGenModule::emitProtocolWitness(
     }
     nameBuffer = "AD__" + nameBuffer + "_" + kindString + "_" +
                  autoDiffFuncId->getParameterIndices()->getString();
+    // Normalize autodiff associated function type so that it always returns
+    // a maximally indirect linear map.
+    witnessSILFnType =
+        normalizeAutoDiffAssociatedFunctionType(witnessSILFnType);
   }
 
   // If the thunked-to function is set to be always inlined, do the
