@@ -390,6 +390,7 @@ static void depthFirstSearch(
     TypeVariableType *typeVar,
     llvm::function_ref<bool(TypeVariableType *)> preVisitNode,
     llvm::function_ref<bool(Constraint *)> visitConstraint,
+    bool visitFixedBindings,
     llvm::SmallPtrSet<Constraint *, 8> &visitedConstraints) {
   // Visit this node. If we've already seen it, bail out.
   if (!preVisitNode(typeVar))
@@ -403,7 +404,7 @@ static void depthFirstSearch(
 
       // Recurse into this node.
       depthFirstSearch(cg, adj, preVisitNode, visitConstraint,
-                       visitedConstraints);
+                       visitFixedBindings, visitedConstraints);
     }
   };
 
@@ -430,8 +431,10 @@ static void depthFirstSearch(
     visitAdjacencies(repTypeVar);
   }
 
-  // Walk any type variables related via fixed bindings.
-  visitAdjacencies(node.getFixedBindings());
+  if (visitFixedBindings) {
+    // Walk any type variables related via fixed bindings.
+    visitAdjacencies(node.getFixedBindings());
+  }
 }
 
 llvm::TinyPtrVector<Constraint *> ConstraintGraph::gatherConstraints(
@@ -468,7 +471,8 @@ llvm::TinyPtrVector<Constraint *> ConstraintGraph::gatherConstraints(
         acceptConstraintFn(constraint);
   };
 
-  if (kind == GatheringKind::AllMentions) {
+  if (kind == GatheringKind::AllMentions ||
+      kind == GatheringKind::EquivalenceClass) {
     // Perform a depth-first search in the constraint graph to find all of the
     // constraints that could be affected.
     SmallPtrSet<TypeVariableType *, 4> typeVariables;
@@ -484,8 +488,9 @@ llvm::TinyPtrVector<Constraint *> ConstraintGraph::gatherConstraints(
                        if (acceptConstraintFn(constraint))
                          constraints.push_back(constraint);
 
-                       return true;
+                       return kind == GatheringKind::AllMentions;
                      },
+                     /*visitFixedBindings=*/kind == GatheringKind::AllMentions,
                      visitedConstraints);
     return constraints;
   }
@@ -800,6 +805,7 @@ namespace {
 
               return true;
             },
+            /*visitFixedBindings=*/true,
             visitedConstraints);
       }
 
