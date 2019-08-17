@@ -452,6 +452,7 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numSavedBindings = cs.solverState->savedBindings.size();
   numConstraintRestrictions = cs.ConstraintRestrictions.size();
   numFixes = cs.Fixes.size();
+  numFixedRequirements = cs.FixedRequirements.size();
   numDisjunctionChoices = cs.DisjunctionChoices.size();
   numOpenedTypes = cs.OpenedTypes.size();
   numOpenedExistentialTypes = cs.OpenedExistentialTypes.size();
@@ -504,6 +505,10 @@ ConstraintSystem::SolverScope::~SolverScope() {
 
   // Remove any opened types.
   truncate(cs.OpenedTypes, numOpenedTypes);
+
+  // Remove any conformances solver had to fix along
+  // the current path.
+  truncate(cs.FixedRequirements, numFixedRequirements);
 
   // Remove any opened existential types.
   truncate(cs.OpenedExistentialTypes, numOpenedExistentialTypes);
