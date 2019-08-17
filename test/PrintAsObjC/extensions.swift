@@ -8,6 +8,7 @@
 // RUN: %check-in-clang %t/extensions.h
 
 // REQUIRES: objc_interop
+// REQUIRES: rdar54414986
 
 import Foundation
 import AppKit
