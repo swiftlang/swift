@@ -1417,14 +1417,10 @@ public:
   ///
   /// \returns true if an error occurred, false otherwise.
   bool parseClosureSignatureIfPresent(
-                                      SourceRange &bracketRange,
-                                SmallVectorImpl<CaptureListEntry> &captureList,
-                                      VarDecl *&capturedSelfParamDecl,
-                                      ParameterList *&params,
-                                      SourceLoc &throwsLoc,
-                                      SourceLoc &arrowLoc,
-                                      TypeRepr *&explicitResultType,
-                                      SourceLoc &inLoc);
+      SourceRange &bracketRange, SmallVectorImpl<CaptureListEntry> &captureList,
+      VarDecl *&capturedSelfParamDecl, ParameterList *&params,
+      SourceLoc &throwsLoc, SourceLoc &arrowLoc, TypeRepr *&explicitResultType,
+      SourceLoc &inLoc);
 
   Expr *parseExprAnonClosureArg();
   ParserResult<Expr> parseExprList(tok LeftTok, tok RightTok,

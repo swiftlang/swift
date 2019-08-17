@@ -293,7 +293,12 @@ public:
   /// resides.
   ///
   /// \param Loc The source location of the beginning of a token.
-  static Token getTokenAtLocation(const SourceManager &SM, SourceLoc Loc);
+  ///
+  /// \param CRM The how comments should be treated by the lexer. Default is to
+  /// return the comments as tokens.
+  static Token getTokenAtLocation(
+      const SourceManager &SM, SourceLoc Loc,
+      CommentRetentionMode CRM = CommentRetentionMode::ReturnAsTokens);
 
 
   /// Retrieve the source location that points just past the

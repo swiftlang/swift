@@ -178,7 +178,6 @@ namespace {
     const bool isOriginallyTypeLookup;
     const NLOptions baseNLOptions;
     // Transputs
-    DeclContext *capturedSelfContext;
 #ifndef NDEBUG
     InstrumentedNamedDeclConsumer Consumer;
 #else
@@ -199,6 +198,13 @@ namespace {
     bool recordedIsCascadingUse = false;
     unsigned resultsSizeBeforeLocalsPass = ~0;
     
+  private:
+    // When performing a lookup, we may come across a capture of 'self'. We will
+    // need to remember the DeclContext of the innermost captured self so that
+    // it can be used as the base DeclContext if we find a lookup result in the
+    // enclosing type.
+    DeclContext *capturedSelfContext;
+
   public:
     // clang-format off
     UnqualifiedLookupFactory(DeclName Name,

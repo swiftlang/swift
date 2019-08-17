@@ -1420,29 +1420,62 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
             return { false, E };
           }
           
+          TC.diagnose(memberLoc, diag::note_reference_self_explicitly)
+            .fixItInsert(memberLoc, "self.");
+
           auto diag = TC.diagnose(CE->getLoc(),
                                   diag::note_capture_self_explicitly);
-          // If there's a token immediately following the opening brace of the
-          // closure, we may need to pad the fix-it with a space.
-          auto nextLoc = CE->getLoc().getAdvancedLoc(1);
-          auto next = Lexer::getTokenAtLocation(TC.Context.SourceMgr,
-                                                CE->getLoc().getAdvancedLoc(1));
-          std::string trailing = next.getLoc() == nextLoc ? " " : "";
-          if (CE->getInLoc().isInvalid())
-            diag.fixItInsertAfter(CE->getLoc(), " [self] in" + trailing);
-          else if (CE->getBracketRange().isInvalid())
-            diag.fixItInsertAfter(CE->getLoc(), " [self]" + trailing);
-          else {
-            // Insert into an existing capture list
-            auto range = CE->getBracketRange();
-            if (range.Start.getAdvancedLoc(1) == range.End)
-              diag.fixItInsertAfter(range.Start, "self");
+
+          // There are four different potential fix-its to offer based on the
+          // closure signature:
+          //   1. The signature empty so far. We must insert the full capture
+          //      list as well as 'in'.
+          //   2. Arguments or types are already specified in the signature,
+          //      but there is no existing capture list. We will need to insert
+          //      the capture list, but 'in' will already be present.
+          //   3. There is an existing capture list which already has some
+          //      entries. We need to insert 'self' into the capture list along
+          //      with a separating comma.
+          //   4. There is an existing capture list, but it is empty. We can
+          //      just insert 'self'.
+          auto brackets = CE->getBracketRange();
+          if (brackets.isInvalid()) {
+            if (CE->getInLoc().isInvalid()) {
+              // If there's a (non-comment) token immediately following the
+              // opening brace of the closure, we may need to pad the fix-it
+              // with a space.
+              auto nextLoc = CE->getLoc().getAdvancedLoc(1);
+              auto next =
+                  Lexer::getTokenAtLocation(TC.Context.SourceMgr, nextLoc,
+                                            CommentRetentionMode::None);
+              std::string trailing = next.getLoc() == nextLoc ? " " : "";
+
+              diag.fixItInsertAfter(CE->getLoc(), " [self] in" + trailing);
+            }
             else
-              diag.fixItInsertAfter(range.Start, "self, ");
+              diag.fixItInsertAfter(CE->getLoc(), " [self]");
           }
+          else {
+            // Similar to above, we look for any non-comment token. If there's
+            // anything before the closing bracket, we assume that it is a valid
+            // capture list entry and insert 'self,'. If it wasn't a valid
+            // entry, then we will at least not be introducing any new
+            // errors/warnings...
+            auto locAfterBracket = brackets.Start.getAdvancedLoc(1);
+            auto nextAfterBracket =
+                Lexer::getTokenAtLocation(TC.Context.SourceMgr, locAfterBracket,
+                                          CommentRetentionMode::None);
+            if (nextAfterBracket.getLoc() != brackets.End)
+              diag.fixItInsertAfter(brackets.Start, "self, ");
+            else
+              diag.fixItInsertAfter(brackets.Start, "self");
+          }
+        } else {
+          // If this wasn't an explicit closure, just offer the fix-it to
+          // reference self explicitly.
+          TC.diagnose(memberLoc, diag::note_reference_self_explicitly)
+            .fixItInsert(memberLoc, "self.");
         }
-        TC.diagnose(memberLoc, diag::note_reference_self_explicitly)
-          .fixItInsert(memberLoc, "self.");
         return { false, E };
       }
       

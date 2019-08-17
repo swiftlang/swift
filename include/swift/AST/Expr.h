@@ -3561,7 +3561,13 @@ class ClosureExpr : public AbstractClosureExpr {
   /// The range of the brackets of the capture list, if present.
   SourceRange BracketRange;
     
-  /// The (possibly null) VarDecl captured with the literal name "self".
+  /// The (possibly null) VarDecl captured by this closure with the literal name
+  /// "self". In order to recover this information at the time of name lookup,
+  /// we must be able to access it from the associated DeclContext.
+  /// Because the DeclContext inside a closure is the closure itself (and not
+  /// the CaptureListExpr which would normally maintain this sort of
+  /// information about captured variables), we need to have some way to access
+  /// this information directly on the ClosureExpr.
   VarDecl *CapturedSelfDecl;
   
   /// The location of the "throws", if present.
