@@ -38,7 +38,7 @@
             "remote": { "id": "tensorflow/tensorflow" } },
         "tensorflow-swift-apis": {
             "remote": { "id": "tensorflow/swift-apis" } },
-        "tensorflow-swift": {
+        "tensorflow-swift-quote": {
             "remote": { "id": "tensorflow/swift" } },
         "icu": {
             "remote": { "id": "unicode-org/icu" },
@@ -488,7 +488,7 @@
                 "libcxx": "swift-DEVELOPMENT-SNAPSHOT-2019-08-12-a",
                 "tensorflow": "c6719f20911f8aa6b6d9cded1c0f7761cb9c69a0",
                 "tensorflow-swift-apis": "3629ddc49b706df89f89fa3e92e495e6e3f42332",
-                "tensorflow-swift": "03a61b10adfff4d08c23ed487b0a0a786932a07d",
+                "tensorflow-swift-quote": "03a61b10adfff4d08c23ed487b0a0a786932a07d",
                 "indexstore-db": "swift-DEVELOPMENT-SNAPSHOT-2019-08-12-a",
                 "sourcekit-lsp": "swift-DEVELOPMENT-SNAPSHOT-2019-08-12-a"
             }

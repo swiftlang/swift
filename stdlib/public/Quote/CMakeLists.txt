@@ -18,8 +18,7 @@ if(NOT SWIFT_ENABLE_TENSORFLOW)
   return()
 endif()
 
-find_package(TensorFlow REQUIRED)
-message(STATUS "Building TensorFlow.")
+message(STATUS "Building Quote.")
 
 set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
 set(swift_stdlib_compile_flags "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}")
@@ -27,12 +26,12 @@ list(APPEND swift_stdlib_compile_flags "-DCOMPILING_QUOTE_MODULE")
 
 set(SOURCES "")
 
-# Copy tensorflow/swift sources, if they exist.
-if (TENSORFLOW_SWIFT)
-  file(GLOB_RECURSE TENSORFLOW_SWIFT_SOURCES
-    "${TENSORFLOW_SWIFT}/Sources/Quote/*.swift")
-  message(STATUS "Using tensorflow/swift library.")
-  list(APPEND SOURCES "${TENSORFLOW_SWIFT_SOURCES}")
+# Copy Quote sources, if they exist.
+if (TENSORFLOW_SWIFT_QUOTE)
+  file(GLOB_RECURSE TENSORFLOW_SWIFT_QUOTE_SOURCES
+    "${TENSORFLOW_SWIFT_QUOTE}/Sources/Quote/*.swift")
+  message(STATUS "Using Quote library.")
+  list(APPEND SOURCES "${TENSORFLOW_SWIFT_QUOTE_SOURCES}")
 endif()
 
 add_swift_target_library(swiftQuote ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB

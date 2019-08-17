@@ -298,7 +298,7 @@ KNOWN_SETTINGS=(
     tensorflow-target-include-dir      ""        "Path to target Tensorflow headers"
     tensorflow-target-lib-dir          ""        "Path to target TensorFlow libraries"
     tensorflow-swift-apis              ""        "Path to TensorFlow deep learning library repository"
-    tensorflow-swift                   ""        "Path to tensorflow/swift repository"
+    tensorflow-swift-quote             ""        "Path to Quote library repository"
 )
 
 # Centralized access point for traced command invocation.
@@ -1236,7 +1236,7 @@ PLAYGROUNDSUPPORT_SOURCE_DIR="${WORKSPACE}/swift-xcode-playground-support"
 # SWIFT_ENABLE_TENSORFLOW
 TENSORFLOW_SOURCE_DIR="${WORKSPACE}/tensorflow"
 TENSORFLOW_SWIFT_APIS_DIR="${WORKSPACE}/tensorflow-swift-apis"
-TENSORFLOW_SWIFT_DIR="${WORKSPACE}/tensorflow-swift"
+TENSORFLOW_SWIFT_QUOTE_DIR="${WORKSPACE}/tensorflow-swift-quote"
 
 if [[ ! "${SKIP_BUILD_PLAYGROUNDSUPPORT}" && ! -d ${PLAYGROUNDSUPPORT_SOURCE_DIR} ]]; then
     echo "Couldn't find PlaygroundSupport source directory."
@@ -1252,8 +1252,8 @@ if [[ "${ENABLE_TENSORFLOW}" ]]; then
         echo "Invalid TensorFlow high-level APIs repository specified."
         exit 1
     fi
-    if [[ "${TENSORFLOW_SWIFT}" && ! -d "${TENSORFLOW_SWIFT}" ]]; then
-        echo "Invalid tensorflow/swift repository specified."
+    if [[ "${TENSORFLOW_SWIFT_QUOTE}" && ! -d "${TENSORFLOW_SWIFT_QUOTE}" ]]; then
+        echo "Invalid Quote repository specified."
         exit 1
     fi
 fi
@@ -2627,14 +2627,14 @@ for host in "${ALL_HOSTS[@]}"; do
                         )
                     fi
 
-                    # Handle tensorflow/swift repository.
-                    if [[ ! "${TENSORFLOW_SWIFT}" && -d "${TENSORFLOW_SWIFT_DIR}" ]] ; then
-                        TENSORFLOW_SWIFT="${TENSORFLOW_SWIFT_DIR}"
+                    # Handle Quote repository.
+                    if [[ ! "${TENSORFLOW_SWIFT_QUOTE}" && -d "${TENSORFLOW_SWIFT_QUOTE_DIR}" ]] ; then
+                        TENSORFLOW_SWIFT_QUOTE="${TENSORFLOW_SWIFT_QUOTE_DIR}"
                     fi
-                    if [[ "${TENSORFLOW_SWIFT}" ]] ; then
+                    if [[ "${TENSORFLOW_SWIFT_QUOTE}" ]] ; then
                         cmake_options=(
                             "${cmake_options[@]}"
-                            -DTENSORFLOW_SWIFT:PATH="${TENSORFLOW_SWIFT}"
+                            -DTENSORFLOW_SWIFT_QUOTE:PATH="${TENSORFLOW_SWIFT_QUOTE}"
                         )
                     fi
                 fi
