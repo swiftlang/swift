@@ -2204,6 +2204,7 @@ static void collectAllExtractedElements(SILValue val,
   for (auto *use : val->getUses()) {
     if (auto *dti = dyn_cast<DestructureTupleInst>(use->getUser())) {
       assert(!visitedDTI && "More than one 'destructure_tuple'!?");
+      visitedDTI = true;
       result.append(dti->getResults().begin(), dti->getResults().end());
     }
   }
@@ -4187,7 +4188,7 @@ private:
   /// Mapping from pullback basic blocks to pullback struct arguments.
   DenseMap<SILBasicBlock *, SILArgument *> pullbackStructArguments;
 
-  /// Mapping from pullback struct field declarations to pullback sturct
+  /// Mapping from pullback struct field declarations to pullback struct
   /// elements destructured from the linear map basic block argument. In the
   /// beginning of each pullback basic block, the block's pullback struct is
   /// destructured into individual elements stored here.
@@ -4286,7 +4287,9 @@ private:
       assert(
           std::get<1>(pair).getOwnershipKind() != ValueOwnershipKind::Guaranteed
               && "Pullback struct elements must be @owned");
-      auto insertion = pullbackStructElements.insert(pair); (void)insertion;
+      auto insertion =
+          pullbackStructElements.insert({std::get<0>(pair), std::get<1>(pair)});
+      (void)insertion;
       assert(insertion.second && "A pullback struct element already exists!");
     }
   }
@@ -5373,18 +5376,8 @@ public:
     SILValue seed;
     auto *bb = ai->getParent();
     if (origResult->getType().isObject()) {
-      // If original result is a `tuple_extract`, materialize adjoint value of
-      // `ai` and extract the corresponding element adjoint value.
-      // TODO: Handle DTI
-      if (auto *tupleExtract = dyn_cast<TupleExtractInst>(origResult)) {
-        auto adjointTuple = materializeAdjoint(getAdjointValue(bb, ai), loc);
-        seed = builder.emitTupleExtract(loc, adjointTuple,
-                                        tupleExtract->getFieldNo());
-      }
       // Otherwise, materialize adjoint value of `ai`.
-      else {
-        seed = materializeAdjoint(getAdjointValue(bb, origResult), loc);
-      }
+      seed = materializeAdjoint(getAdjointValue(bb, origResult), loc);
     } else {
       seed = getAdjointBuffer(bb, origResult);
       if (errorOccurred)
