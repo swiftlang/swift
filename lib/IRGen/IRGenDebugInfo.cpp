@@ -127,17 +127,18 @@ class IRGenDebugInfoImpl : public IRGenDebugInfo {
       LocationStack;
 
 #ifndef NDEBUG
-  using UUSTuple = std::pair<std::pair<unsigned, unsigned>, StringRef>;
+  using UUSTuple = std::pair<unsigned, StringRef>;
   struct DebugLocKey : public UUSTuple {
-    DebugLocKey(SILLocation::DebugLoc DL)
-        : UUSTuple({{DL.Line, DL.Column}, DL.Filename}) {}
-    inline bool operator==(const SILLocation::DebugLoc &DL) const {
-      return first.first == DL.Line && first.second == DL.Column &&
-             second.equals(DL.Filename);
+    DebugLocKey() : UUSTuple({0, ""}) {}
+    DebugLocKey(SILLocation::DebugLoc DL) : UUSTuple({DL.Line, DL.Filename}) {}
+    inline bool operator>=(const SILLocation::DebugLoc &DL) const {
+      return first >= DL.Line && second.equals(DL.Filename);
+    }
+    inline bool sameFile(StringRef &Filename) const {
+      return second.equals(Filename);
     }
   };
-  llvm::DenseSet<UUSTuple> PreviousLineEntries;
-  SILLocation::DebugLoc PreviousDebugLoc;
+  UUSTuple PreviousDebugLoc;
 #endif
   
 public:
@@ -1759,16 +1760,25 @@ bool IRGenDebugInfoImpl::lineEntryIsSane(SILLocation::DebugLoc DL,
   // All bets are off for optimized code.
   if (!VerifyLineTable || Opts.shouldOptimize())
     return true;
-  // We entered a new lexical block.
+
+  // We entered a new lexical block, reset the last
+  // location we keep track of.
   if (DS != LastScope)
-    PreviousLineEntries.clear();
-  if (DL.Line == 0 || DL == PreviousDebugLoc)
+    PreviousDebugLoc = DebugLocKey();
+
+  // Skip line entry zero.
+  if (DL.Line == 0)
     return true;
-  // Save the last non-zero line entry.
-  PreviousDebugLoc = DL;
-  auto ItNew = PreviousLineEntries.insert(DebugLocKey(DL));
-  // Return true iff DL was not yet in PreviousLineEntries.
-  return ItNew.second;
+
+  auto DLK = DebugLocKey(DL);
+
+  if (DLK >= PreviousDebugLoc || !DLK.sameFile(PreviousDebugLoc.second)) {
+    // Save the last non-zero line entry.
+    PreviousDebugLoc = DLK;
+    return true;
+  }
+
+  return false;
 }
 #endif
 
