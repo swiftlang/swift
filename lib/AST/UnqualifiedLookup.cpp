@@ -470,14 +470,14 @@ UnqualifiedLookupFactory::UnqualifiedLookupFactory(
   options(options),
   isOriginallyTypeLookup(options.contains(Flags::TypeLookup)),
   baseNLOptions(computeBaseNLOptions(options, isOriginallyTypeLookup)),
-  capturedSelfContext(nullptr),
   #ifdef NDEBUG
   Consumer(Name, Results, isOriginallyTypeLookup),
   #else
   Consumer(this, Name, Results, isOriginallyTypeLookup),
   #endif
   Results(Results),
-  IndexOfFirstOuterResult(IndexOfFirstOuterResult)
+  IndexOfFirstOuterResult(IndexOfFirstOuterResult),
+  capturedSelfContext(nullptr)
 {}
 // clang-format on
 
