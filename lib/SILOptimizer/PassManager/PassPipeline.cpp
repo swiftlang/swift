@@ -93,6 +93,9 @@ static void addMandatoryOptPipeline(SILPassPipelinePlan &P) {
   P.addAllocBoxToStack();
   P.addNoReturnFolding();
   addDefiniteInitialization(P);
+
+  // SWIFT_ENABLE_TENSORFLOW
+  P.addDifferentiation();
   // Only run semantic arc opts if we are optimizing and if mandatory semantic
   // arc opts is explicitly enabled.
   //
@@ -107,8 +110,6 @@ static void addMandatoryOptPipeline(SILPassPipelinePlan &P) {
   }
   if (!Options.StripOwnershipAfterSerialization)
     P.addOwnershipModelEliminator();
-  // SWIFT_ENABLE_TENSORFLOW
-  P.addDifferentiation();
   P.addMandatoryInlining();
   P.addMandatorySILLinker();
 
