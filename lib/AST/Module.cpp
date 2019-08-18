@@ -435,7 +435,7 @@ void ModuleDecl::removeFile(FileUnit &existingFile) {
 SourceLookupCache &ModuleDecl::getSourceLookupCache() const {
   if (!Cache) {
     const_cast<ModuleDecl *>(this)->Cache =
-        llvm::make_unique<SourceLookupCache>(*this);
+        std::make_unique<SourceLookupCache>(*this);
   }
   return *Cache;
 }
