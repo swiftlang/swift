@@ -197,21 +197,18 @@ FailureDiagnostic::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
   // have to look through other elements that are generated from an argument
   // conversion such as GenericArgument for an optional-to-optional conversion,
   // and OptionalPayload for a value-to-optional conversion.
-  auto applyArgEltIter =
-      std::find_if(path.rbegin(), path.rend(), [](LocatorPathElt elt) {
-        return elt.is<LocatorPathElt::ApplyArgToParam>();
-      });
-
-  if (applyArgEltIter == path.rend())
+  auto iter = path.rbegin();
+  auto applyArgElt = locator->findLast<LocatorPathElt::ApplyArgToParam>(iter);
+  if (!applyArgElt)
     return None;
 
-  assert(std::find_if(applyArgEltIter + 1, path.rend(), [](LocatorPathElt elt) {
-    return elt.getKind() == ConstraintLocator::ApplyArgToParam;
-  }) == path.rend() && "Multiple ApplyArgToParam components?");
+  auto nextIter = iter + 1;
+  assert(!locator->findLast<LocatorPathElt::ApplyArgToParam>(nextIter) &&
+         "Multiple ApplyArgToParam components?");
 
   // Form a new locator that ends at the apply-arg-to-param element, and
   // simplify it to get the full argument expression.
-  auto argPath = path.drop_back(applyArgEltIter - path.rbegin());
+  auto argPath = path.drop_back(iter - path.rbegin());
   auto *argLocator = cs.getConstraintLocator(
       anchor, argPath, ConstraintLocator::getSummaryFlagsForPath(argPath));
 
@@ -271,9 +268,8 @@ FailureDiagnostic::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
     fnInterfaceType = resolveInterfaceType(rawFnType);
   }
 
-  auto applyArgElt = applyArgEltIter->castTo<LocatorPathElt::ApplyArgToParam>();
-  auto argIdx = applyArgElt.getArgIdx();
-  auto paramIdx = applyArgElt.getParamIdx();
+  auto argIdx = applyArgElt->getArgIdx();
+  auto paramIdx = applyArgElt->getParamIdx();
 
   return FunctionArgApplyInfo(argExpr, argIdx, getType(argExpr), paramIdx,
                               fnInterfaceType, fnType, callee);
@@ -409,12 +405,8 @@ GenericSignature *RequirementFailure::getSignature(ConstraintLocator *locator) {
   if (isConditional())
     return Conformance->getGenericSignature();
 
-  auto path = locator->getPath();
-  for (auto iter = path.rbegin(); iter != path.rend(); ++iter) {
-    const auto &elt = *iter;
-    if (auto genericElt = elt.getAs<LocatorPathElt::OpenedGeneric>())
-      return genericElt->getSignature();
-  }
+  if (auto genericElt = locator->findLast<LocatorPathElt::OpenedGeneric>())
+    return genericElt->getSignature();
 
   llvm_unreachable("Type requirement failure should always have signature");
 }
@@ -3563,12 +3555,8 @@ bool KeyPathSubscriptIndexHashableFailure::diagnoseAsError() {
   auto loc = anchor->getLoc();
   if (locator->isKeyPathSubscriptComponent()) {
     auto *KPE = cast<KeyPathExpr>(anchor);
-    for (auto &elt : locator->getPath()) {
-      if (auto kpElt = elt.getAs<LocatorPathElt::KeyPathComponent>()) {
-        loc = KPE->getComponents()[kpElt->getIndex()].getLoc();
-        break;
-      }
-    }
+    if (auto kpElt = locator->findFirst<LocatorPathElt::KeyPathComponent>())
+      loc = KPE->getComponents()[kpElt->getIndex()].getLoc();
   }
 
   emitDiagnostic(loc, diag::expr_keypath_subscript_index_not_hashable,
@@ -3581,14 +3569,9 @@ SourceLoc InvalidMemberRefInKeyPath::getLoc() const {
 
   if (auto *KPE = dyn_cast<KeyPathExpr>(anchor)) {
     auto *locator = getLocator();
-    auto componentIter =
-        llvm::find_if(locator->getPath(), [](const LocatorPathElt &elt) {
-          return elt.isKeyPathComponent();
-        });
-
-    assert(componentIter != locator->getPath().end());
-    auto component = componentIter->castTo<LocatorPathElt::KeyPathComponent>();
-    return KPE->getComponents()[component.getIndex()].getLoc();
+    auto component = locator->findFirst<LocatorPathElt::KeyPathComponent>();
+    assert(component);
+    return KPE->getComponents()[component->getIndex()].getLoc();
   }
 
   return anchor->getLoc();

@@ -531,6 +531,63 @@ public:
     return path.back().castTo<T>();
   }
 
+  using PathIterator = ArrayRef<PathElement>::iterator;
+  using PathReverseIterator = ArrayRef<PathElement>::reverse_iterator;
+
+  /// Attempts to find the first element in the locator's path that is a
+  /// specific \c LocatorPathElt subclass, returning \c None if no such element
+  /// exists.
+  ///
+  /// \param iter A reference to an iterator which will be used to iterate
+  /// over the locator's path.
+  template <class T>
+  Optional<T> findFirst(PathIterator &iter) const {
+    auto path = getPath();
+    auto end = path.end();
+    assert(iter >= path.begin() && iter <= end);
+
+    for (; iter != end; ++iter)
+      if (auto elt = iter->getAs<T>())
+        return elt;
+    return None;
+  }
+
+  /// Attempts to find the first element in the locator's path that is a
+  /// specific \c LocatorPathElt subclass, returning \c None if no such element
+  /// exists.
+  template <class T>
+  Optional<T> findFirst() const {
+    auto iter = getPath().begin();
+    return findFirst<T>(iter);
+  }
+
+  /// Attempts to find the last element in the locator's path that is a
+  /// specific \c LocatorPathElt subclass, returning \c None if no such element
+  /// exists.
+  ///
+  /// \param iter A reference to a reverse iterator which will be used to
+  /// iterate over the locator's path.
+  template <class T>
+  Optional<T> findLast(PathReverseIterator &iter) const {
+    auto path = getPath();
+    auto end = path.rend();
+    assert(iter >= path.rbegin() && iter <= end);
+
+    for (; iter != end; ++iter)
+      if (auto elt = iter->getAs<T>())
+        return elt;
+    return None;
+  }
+
+  /// Attempts to find the last element in the locator's path that is a
+  /// specific \c LocatorPathElt subclass, returning \c None if no such element
+  /// exists.
+  template <class T>
+  Optional<T> findLast() const {
+    auto iter = getPath().rbegin();
+    return findLast<T>(iter);
+  }
+
   /// If this locator points to generic parameter return its type.
   GenericTypeParamType *getGenericParameter() const;
 

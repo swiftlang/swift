@@ -1545,15 +1545,6 @@ namespace {
           LocatorPathElt::KeyPathDynamicMember(keyPathTy->getAnyNominal()));
       auto overload = solution.getOverloadChoice(componentLoc);
 
-      auto getKeyPathComponentIndex =
-          [](ConstraintLocator *locator) -> unsigned {
-        for (const auto &elt : locator->getPath()) {
-          if (auto kpElt = elt.getAs<LocatorPathElt::KeyPathComponent>())
-            return kpElt->getIndex();
-        }
-        llvm_unreachable("no keypath component node");
-      };
-
       // Looks like there is a chain of implicit `subscript(dynamicMember:)`
       // calls necessary to resolve a member reference.
       if (overload.choice.getKind() ==
@@ -1578,8 +1569,9 @@ namespace {
       // of a keypath expression e.g. `\Lens<[Int]>.count` where
       // `count` is referenced using dynamic lookup.
       if (auto *KPE = dyn_cast<KeyPathExpr>(anchor)) {
-        auto componentIdx = getKeyPathComponentIndex(memberLoc);
-        auto &origComponent = KPE->getComponents()[componentIdx];
+        auto kpElt = memberLoc->findFirst<LocatorPathElt::KeyPathComponent>();
+        assert(kpElt && "no keypath component node");
+        auto &origComponent = KPE->getComponents()[kpElt->getIndex()];
 
         using ComponentKind = KeyPathExpr::Component::Kind;
         if (origComponent.getKind() == ComponentKind::UnresolvedProperty) {
