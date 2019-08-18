@@ -195,9 +195,7 @@ bool ConstraintLocator::isForContextualType() const {
 }
 
 GenericTypeParamType *ConstraintLocator::getGenericParameter() const {
-  auto path = getPath();
-  assert(!path.empty());
-  return path.back().castTo<LocatorPathElt::GenericParameter>().getType();
+  return castLastElementTo<LocatorPathElt::GenericParameter>().getType();
 }
 
 void ConstraintLocator::dump(SourceManager *sm) {

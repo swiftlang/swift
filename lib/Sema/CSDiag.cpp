@@ -870,11 +870,9 @@ diagnoseUnresolvedDotExprTypeRequirementFailure(ConstraintSystem &cs,
   if (!locator)
     return false;
 
-  auto path = locator->getPath();
-  if (path.empty())
-    return false;
 
-  auto reqElt = path.back().getAs<LocatorPathElt::TypeParameterRequirement>();
+  auto reqElt =
+      locator->getLastElementAs<LocatorPathElt::TypeParameterRequirement>();
   if (!reqElt)
     return false;
 

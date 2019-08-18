@@ -510,6 +510,27 @@ public:
   /// is of a given kind.
   bool isLastElement(ConstraintLocator::PathElementKind kind) const;
 
+  /// Attempts to cast the last path element of the locator to a specific
+  /// \c LocatorPathElt subclass, returning \c None if either unsuccessful or
+  /// the locator has no path elements.
+  template <class T>
+  Optional<T> getLastElementAs() const {
+    auto path = getPath();
+    if (path.empty())
+      return None;
+
+    return path.back().getAs<T>();
+  }
+
+  /// Casts the last path element of the locator to a specific \c LocatorPathElt
+  /// subclass, asserting that it has at least one element.
+  template <class T>
+  T castLastElementTo() const {
+    auto path = getPath();
+    assert(!path.empty() && "Expected at least one path element!");
+    return path.back().castTo<T>();
+  }
+
   /// If this locator points to generic parameter return its type.
   GenericTypeParamType *getGenericParameter() const;
 
@@ -578,7 +599,8 @@ using LocatorPathElt = ConstraintLocator::PathElement;
 
 // Disallow direct uses of isa/cast/dyn_cast on LocatorPathElt in favor of using
 // is/castTo/getAs. This allows us to work with Optional<T> rather than pointers
-// for getAs.
+// for getAs, and maintains consistency with ConstraintLocator's
+// isLastElement/castLastElementTo/getLastElementAs members.
 template <class X>
 inline bool
 isa(const LocatorPathElt &) = delete; // Use LocatorPathElt::is instead.

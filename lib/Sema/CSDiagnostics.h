@@ -237,11 +237,8 @@ public:
     assert(isConditional() || Signature);
     assert(AffectedDecl);
 
-    auto path = locator->getPath();
-    assert(!path.empty());
-
-    auto last = path.back().castTo<LocatorPathElt::AnyRequirement>();
-    assert(last.getRequirementKind() == kind);
+    auto reqElt = locator->castLastElementTo<LocatorPathElt::AnyRequirement>();
+    assert(reqElt.getRequirementKind() == kind);
 
     // It's possible sometimes not to have no base expression.
     if (!expr)
@@ -252,8 +249,8 @@ public:
   }
 
   unsigned getRequirementIndex() const {
-    auto path = getLocator()->getPath();
-    auto reqElt = path.back().castTo<LocatorPathElt::AnyRequirement>();
+    auto reqElt =
+        getLocator()->castLastElementTo<LocatorPathElt::AnyRequirement>();
     return reqElt.getIndex();
   }
 

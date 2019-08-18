@@ -4518,32 +4518,33 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     // based dynamic member lookup. Since it's unknown upfront
     // what kind of declaration lookup is going to find, let's
     // double check here that given keypath is appropriate for it.
-    if (memberLocator && memberLocator->isForKeyPathDynamicMemberLookup()) {
-      auto path = memberLocator->getPath();
-      auto kpElt = path.back().castTo<LocatorPathElt::KeyPathDynamicMember>();
-      auto *keyPath = kpElt.getKeyPathDecl();
-      if (auto *storage = dyn_cast<AbstractStorageDecl>(decl)) {
-        // If this is an attempt to access read-only member via
-        // writable key path, let's fail this choice early.
-        auto &ctx = getASTContext();
-        if (isReadOnlyKeyPathComponent(storage) &&
-            (keyPath == ctx.getWritableKeyPathDecl() ||
-             keyPath == ctx.getReferenceWritableKeyPathDecl())) {
-          result.addUnviable(
-              candidate,
-              MemberLookupResult::UR_WritableKeyPathOnReadOnlyMember);
-          return;
-        }
+    if (memberLocator) {
+      using KPDynamicMemberElt = LocatorPathElt::KeyPathDynamicMember;
+      if (auto kpElt = memberLocator->getLastElementAs<KPDynamicMemberElt>()) {
+        auto *keyPath = kpElt->getKeyPathDecl();
+        if (auto *storage = dyn_cast<AbstractStorageDecl>(decl)) {
+          // If this is an attempt to access read-only member via
+          // writable key path, let's fail this choice early.
+          auto &ctx = getASTContext();
+          if (isReadOnlyKeyPathComponent(storage) &&
+              (keyPath == ctx.getWritableKeyPathDecl() ||
+               keyPath == ctx.getReferenceWritableKeyPathDecl())) {
+            result.addUnviable(
+                candidate,
+                MemberLookupResult::UR_WritableKeyPathOnReadOnlyMember);
+            return;
+          }
 
-        // A nonmutating setter indicates a reference-writable base,
-        // on the other hand if setter is mutating there is no point
-        // of attempting `ReferenceWritableKeyPath` overload.
-        if (storage->isSetterMutating() &&
-            keyPath == ctx.getReferenceWritableKeyPathDecl()) {
-          result.addUnviable(
-              candidate,
-              MemberLookupResult::UR_ReferenceWritableKeyPathOnMutatingMember);
-          return;
+          // A nonmutating setter indicates a reference-writable base,
+          // on the other hand if setter is mutating there is no point
+          // of attempting `ReferenceWritableKeyPath` overload.
+          if (storage->isSetterMutating() &&
+              keyPath == ctx.getReferenceWritableKeyPathDecl()) {
+            result.addUnviable(candidate,
+                               MemberLookupResult::
+                                   UR_ReferenceWritableKeyPathOnMutatingMember);
+            return;
+          }
         }
       }
     }

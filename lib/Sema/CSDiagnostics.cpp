@@ -330,13 +330,11 @@ const Requirement &RequirementFailure::getRequirement() const {
 ProtocolConformance *RequirementFailure::getConformanceForConditionalReq(
     ConstraintLocator *locator) {
   auto &cs = getConstraintSystem();
-  auto path = locator->getPath();
-  assert(!path.empty());
-  assert(path.back().is<LocatorPathElt::AnyRequirement>());
-
-  if (!path.back().isConditionalRequirement())
+  auto reqElt = locator->castLastElementTo<LocatorPathElt::AnyRequirement>();
+  if (!reqElt.isConditionalRequirement())
     return nullptr;
 
+  auto path = locator->getPath();
   auto *typeReqLoc = getConstraintLocator(getRawAnchor(), path.drop_back());
 
   auto result = llvm::find_if(
@@ -780,14 +778,9 @@ bool NoEscapeFuncToTypeConversionFailure::diagnoseAsError() {
     return true;
   }
 
-  GenericTypeParamType *paramTy = nullptr;
-
-  auto path = getLocator()->getPath();
-  if (!path.empty())
-    if (auto gpElt = path.back().getAs<LocatorPathElt::GenericParameter>())
-      paramTy = gpElt->getType();
-
-  if (paramTy) {
+  auto *loc = getLocator();
+  if (auto gpElt = loc->getLastElementAs<LocatorPathElt::GenericParameter>()) {
+    auto *paramTy = gpElt->getType();
     emitDiagnostic(anchor->getLoc(), diag::converting_noescape_to_type,
                   paramTy);
   } else {
@@ -1254,8 +1247,8 @@ bool RValueTreatedAsLValueFailure::diagnoseAsError() {
       auto argTuple = dyn_cast<TupleExpr>(argExpr);
       diagExpr = argTuple->getElement(0);
     } else if (getLocator()->getPath().size() > 0) {
-      auto lastPathElement = getLocator()->getPath().back();
-      auto argElt = lastPathElement.castTo<LocatorPathElt::ApplyArgToParam>();
+      auto argElt =
+          getLocator()->castLastElementTo<LocatorPathElt::ApplyArgToParam>();
 
       subElementDiagID = diag::cannot_pass_rvalue_inout_subelement;
       rvalueDiagID = diag::cannot_pass_rvalue_inout;
@@ -2406,10 +2399,8 @@ bool TupleContextualFailure::diagnoseAsError() {
 }
 
 bool AutoClosureForwardingFailure::diagnoseAsError() {
-  auto path = getLocator()->getPath();
-  assert(!path.empty());
-
-  auto last = path.back().castTo<LocatorPathElt::ApplyArgToParam>();
+  auto *loc = getLocator();
+  auto last = loc->castLastElementTo<LocatorPathElt::ApplyArgToParam>();
 
   // We need a raw anchor here because `getAnchor()` is simplified
   // to the argument expression.
@@ -3684,10 +3675,7 @@ bool CollectionElementContextualFailure::diagnoseAsError() {
   }
 
   if (isa<DictionaryExpr>(getRawAnchor())) {
-    auto path = locator->getPath();
-    assert(!path.empty());
-    auto eltLoc = path.back().castTo<LocatorPathElt::TupleElement>();
-
+    auto eltLoc = locator->castLastElementTo<LocatorPathElt::TupleElement>();
     switch (eltLoc.getIndex()) {
     case 0: // key
       diagnostic.emplace(emitDiagnostic(anchor->getLoc(),
