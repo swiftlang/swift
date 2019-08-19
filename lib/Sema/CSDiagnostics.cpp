@@ -650,10 +650,8 @@ void GenericArgumentsMismatchFailure::emitNoteForMismatch(int position) {
   auto genericTypeDecl = paramSourceTy->getAnyGeneric();
   auto param = genericTypeDecl->getGenericParams()->getParams()[position];
 
-  auto lhs = resolveType(getActual()->getGenericArgs()[position])
-                 ->reconstituteSugar(/*recursive=*/false);
-  auto rhs = resolveType(getRequired()->getGenericArgs()[position])
-                 ->reconstituteSugar(/*recursive=*/false);
+  auto lhs = getActual()->getGenericArgs()[position];
+  auto rhs = getRequired()->getGenericArgs()[position];
 
   auto noteLocation = param->getLoc();
 
@@ -677,8 +675,8 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
     const auto &last = path.back();
     switch (last.getKind()) {
     case ConstraintLocator::ContextualType: {
-      auto purpose = getConstraintSystem().getContextualTypePurpose();
-      assert(purpose != CTP_Unused);
+      auto purpose = getContextualTypePurpose();
+      assert(!(purpose == CTP_Unused && purpose == CTP_CannotFail));
       diagnostic = getDiagnosticFor(purpose);
       break;
     }
@@ -701,17 +699,14 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
     }
 
     default:
-      break;
+      return false;
     }
   }
 
   if (!diagnostic)
     return false;
 
-  emitDiagnostic(
-      getAnchor()->getLoc(), *diagnostic,
-      resolveType(getActual())->reconstituteSugar(/*recursive=*/false),
-      resolveType(getRequired())->reconstituteSugar(/*recursive=*/false));
+  emitDiagnostic(anchor->getLoc(), *diagnostic, getFromType(), getToType());
   emitNotesForMismatches();
   return true;
 }

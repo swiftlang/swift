@@ -1771,7 +1771,7 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
       return result;
 
     auto *fix = GenericArgumentsMismatch::create(
-        *this, bound1, bound2, mismatches, getConstraintLocator(locator));
+        *this, type1, type2, mismatches, getConstraintLocator(locator));
 
     if (!recordFix(fix)) {
       // Increase the solution's score for each mismtach this fixes.

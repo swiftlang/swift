@@ -569,22 +569,21 @@ public:
 /// let _:F<Int> = F<Bool>()
 /// ```
 class GenericArgumentsMismatch final
-    : public ConstraintFix,
+    : public ContextualMismatch,
       private llvm::TrailingObjects<GenericArgumentsMismatch, unsigned> {
   friend TrailingObjects;
-
-  BoundGenericType *Actual;
-  BoundGenericType *Required;
 
   unsigned NumMismatches;
 
 protected:
-  GenericArgumentsMismatch(ConstraintSystem &cs, BoundGenericType *actual,
-                           BoundGenericType *required,
+  GenericArgumentsMismatch(ConstraintSystem &cs, Type actual, Type required,
                            llvm::ArrayRef<unsigned> mismatches,
                            ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::GenericArgumentsMismatch, locator),
-        Actual(actual), Required(required), NumMismatches(mismatches.size()) {
+      : ContextualMismatch(cs, FixKind::GenericArgumentsMismatch, actual,
+                           required, locator),
+        NumMismatches(mismatches.size()) {
+    assert(actual->is<BoundGenericType>());
+    assert(required->is<BoundGenericType>());
     std::uninitialized_copy(mismatches.begin(), mismatches.end(),
                             getMismatchesBuf().begin());
   }
@@ -594,18 +593,14 @@ public:
     return "fix generic argument mismatch";
   }
 
-  BoundGenericType *getActual() const { return Actual; }
-  BoundGenericType *getRequired() const { return Required; }
-
   ArrayRef<unsigned> getMismatches() const {
     return {getTrailingObjects<unsigned>(), NumMismatches};
   }
 
   bool diagnose(Expr *root, bool asNote = false) const override;
 
-  static GenericArgumentsMismatch *create(ConstraintSystem &cs,
-                                          BoundGenericType *actual,
-                                          BoundGenericType *required,
+  static GenericArgumentsMismatch *create(ConstraintSystem &cs, Type actual,
+                                          Type required,
                                           llvm::ArrayRef<unsigned> mismatches,
                                           ConstraintLocator *locator);
 
