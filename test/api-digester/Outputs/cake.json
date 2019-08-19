@@ -1621,5 +1621,6 @@
         }
       ]
     }
-  ]
+  ],
+  "json_format_version": 1
 }

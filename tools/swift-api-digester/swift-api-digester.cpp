@@ -206,6 +206,11 @@ AvoidLocation("avoid-location",
               llvm::cl::desc("Avoid serializing the file paths of SDK nodes."),
               llvm::cl::cat(Category));
 
+static llvm::cl::opt<bool>
+AvoidToolArgs("avoid-tool-args",
+              llvm::cl::desc("Avoid serializing the arguments for invoking the tool."),
+              llvm::cl::cat(Category));
+
 static llvm::cl::opt<std::string>
 LocationFilter("location",
               llvm::cl::desc("Filter nodes with the given location."),
@@ -2443,9 +2448,10 @@ static int deserializeNameCorrection(APIDiffItemStore &Store,
   return EC.value();
 }
 
-static CheckerOptions getCheckOpts() {
+static CheckerOptions getCheckOpts(int argc, char *argv[]) {
   CheckerOptions Opts;
   Opts.AvoidLocation = options::AvoidLocation;
+  Opts.AvoidToolArgs = options::AvoidToolArgs;
   Opts.ABI = options::Abi;
   Opts.Verbose = options::Verbose;
   Opts.AbortOnModuleLoadFailure = options::AbortOnModuleLoadFailure;
@@ -2453,6 +2459,8 @@ static CheckerOptions getCheckOpts() {
   Opts.PrintModule = options::PrintModule;
   Opts.SwiftOnly = options::SwiftOnly;
   Opts.SkipOSCheck = options::DisableOSChecks;
+  for (int i = 1; i < argc; ++i)
+    Opts.ToolArgs.push_back(StringRef(argv[i]));
   return Opts;
 }
 
@@ -2482,7 +2490,7 @@ int main(int argc, char *argv[]) {
   std::vector<std::string> PrintApis;
   llvm::StringSet<> IgnoredUsrs;
   readIgnoredUsrs(IgnoredUsrs);
-  CheckerOptions Opts = getCheckOpts();
+  CheckerOptions Opts = getCheckOpts(argc, argv);
   for (auto Name : options::ApisPrintUsrs)
     PrintApis.push_back(Name);
   switch (options::Action) {
