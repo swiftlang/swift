@@ -359,7 +359,7 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS,
   switch (SAK) {
   case SelfAccessKind::NonMutating: return OS << "'nonmutating'";
   case SelfAccessKind::Mutating: return OS << "'mutating'";
-  case SelfAccessKind::__Consuming: return OS << "'__consuming'";
+  case SelfAccessKind::Consuming: return OS << "'__consuming'";
   }
   llvm_unreachable("Unknown SelfAccessKind");
 }

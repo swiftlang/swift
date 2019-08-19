@@ -1330,15 +1330,20 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD)
     }
   }
 
-#define CASE(BASE, KIND, KEY) case BASE::KIND: KEY = #KIND; break;
   if (auto *FD = dyn_cast<FuncDecl>(VD)) {
     switch(FD->getSelfAccessKind()) {
-    CASE(SelfAccessKind, Mutating, FuncSelfKind)
-    CASE(SelfAccessKind, __Consuming, FuncSelfKind)
-    CASE(SelfAccessKind, NonMutating, FuncSelfKind)
+    case SelfAccessKind::Mutating:
+      FuncSelfKind = "Mutating";
+      break;
+    case SelfAccessKind::Consuming:
+      // FIXME: Stay consistent with earlier digests that had underscores here.
+      FuncSelfKind = "__Consuming";
+      break;
+    case SelfAccessKind::NonMutating:
+      FuncSelfKind = "NonMutating";
+      break;
     }
   }
-#undef CASE
 
   // Get enum raw type name if this is an enum.
   if (auto *ED = dyn_cast<EnumDecl>(VD)) {
