@@ -63,6 +63,8 @@ Expr *buildSelfReference(VarDecl *selfDecl,
 Expr *buildArgumentForwardingExpr(ArrayRef<ParamDecl*> params,
                                   ASTContext &ctx);
 
+ConstructorDecl *createMemberwiseImplicitConstructor(TypeChecker &tc,
+                                                     NominalTypeDecl *decl);
 } // end namespace swift
 
 #endif

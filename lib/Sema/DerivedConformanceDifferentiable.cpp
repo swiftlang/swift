@@ -489,7 +489,6 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
     newMember->copyFormalAccessFrom(member, /*sourceIsParentContext*/ true);
     newMember->setValidationToChecked();
     newMember->setSetterAccess(member->getFormalAccess());
-    addExpectedOpaqueAccessorsToStorage(newMember);
     C.addSynthesizedDecl(newMember);
     C.addSynthesizedDecl(memberBinding);
 
@@ -501,8 +500,6 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
     if (member->getEffectiveAccess() > AccessLevel::Internal &&
         !member->getAttrs().hasAttribute<DifferentiableAttr>()) {
       // If getter does not exist, trigger synthesis and compute type.
-      if (!member->getAccessor(AccessorKind::Get))
-        addExpectedOpaqueAccessorsToStorage(member);
       if (!member->getAccessor(AccessorKind::Get)->hasInterfaceType())
         TC.resolveDeclSignature(member->getAccessor(AccessorKind::Get));
       // If member or its getter already has a `@differentiable` attribute,
@@ -540,8 +537,7 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
   // The implicit memberwise constructor must be explicitly created so that it
   // can called in `AdditiveArithmetic` and `Differentiable` methods. Normally,
   // the memberwise constructor is synthesized during SILGen, which is too late.
-  auto *initDecl = createImplicitConstructor(
-      TC, structDecl, ImplicitConstructorKind::Memberwise);
+  auto *initDecl = createMemberwiseImplicitConstructor(TC, structDecl);
   structDecl->addMember(initDecl);
   C.addSynthesizedDecl(initDecl);
 

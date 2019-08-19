@@ -282,6 +282,12 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
   return ctor;
 }
 
+ConstructorDecl *swift::createMemberwiseImplicitConstructor(
+    TypeChecker &tc, NominalTypeDecl *decl) {
+  return createImplicitConstructor(decl, ImplicitConstructorKind::Memberwise,
+                                   tc.Context);
+}
+
 /// Create a stub body that emits a fatal error message.
 static std::pair<BraceStmt *, bool>
 synthesizeStubBody(AbstractFunctionDecl *fn, void *) {
