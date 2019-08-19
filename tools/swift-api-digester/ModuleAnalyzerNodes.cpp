@@ -79,7 +79,8 @@ void SDKNodeRoot::registerDescendant(SDKNode *D) {
 SDKNode::SDKNode(SDKNodeInitInfo Info, SDKNodeKind Kind): Ctx(Info.Ctx),
   Name(Info.Name), PrintedName(Info.PrintedName), TheKind(unsigned(Kind)) {}
 
-SDKNodeRoot::SDKNodeRoot(SDKNodeInitInfo Info): SDKNode(Info, SDKNodeKind::Root) {}
+SDKNodeRoot::SDKNodeRoot(SDKNodeInitInfo Info): SDKNode(Info, SDKNodeKind::Root),
+  ToolArgs(Info.ToolArgs) {}
 
 SDKNodeDecl::SDKNodeDecl(SDKNodeInitInfo Info, SDKNodeKind Kind)
       : SDKNode(Info, Kind), DKind(Info.DKind), Usr(Info.Usr),
@@ -367,6 +368,7 @@ SDKNode *SDKNodeRoot::getInstance(SDKContext &Ctx) {
   SDKNodeInitInfo Info(Ctx);
   Info.Name = Ctx.buffer("TopLevel");
   Info.PrintedName = Ctx.buffer("TopLevel");
+  Info.ToolArgs = Ctx.getOpts().ToolArgs;
   return Info.createSDKNode(SDKNodeKind::Root);
 }
 
@@ -1827,6 +1829,12 @@ void SDKNode::jsonize(json::Output &out) {
   output(out, KeyKind::KK_name, Name);
   output(out, KeyKind::KK_printedName, PrintedName);
   out.mapOptional(getKeyContent(Ctx, KeyKind::KK_children).data(), Children);
+}
+
+void SDKNodeRoot::jsonize(json::Output &out) {
+  SDKNode::jsonize(out);
+  if (!Ctx.getOpts().AvoidToolArgs)
+    out.mapOptional(getKeyContent(Ctx, KeyKind::KK_tool_arguments).data(), ToolArgs);
 }
 
 void SDKNodeConformance::jsonize(json::Output &out) {

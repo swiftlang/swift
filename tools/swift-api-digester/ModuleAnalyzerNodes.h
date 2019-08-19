@@ -140,6 +140,7 @@ struct BreakingAttributeInfo {
 
 struct CheckerOptions {
   bool AvoidLocation;
+  bool AvoidToolArgs;
   bool ABI;
   bool Verbose;
   bool AbortOnModuleLoadFailure;
@@ -147,6 +148,7 @@ struct CheckerOptions {
   bool SwiftOnly;
   bool SkipOSCheck;
   StringRef LocationFilter;
+  std::vector<StringRef> ToolArgs;
 };
 
 class SDKContext {
@@ -383,12 +385,15 @@ public:
 class SDKNodeRoot: public SDKNode {
   /// This keeps track of all decl descendants with USRs.
   llvm::StringMap<llvm::SmallSetVector<SDKNodeDecl*, 2>> DescendantDeclTable;
+  /// The tool invocation arguments to generate this root node. We shouldn't need APIs for it.
+  std::vector<StringRef> ToolArgs;
 
 public:
   SDKNodeRoot(SDKNodeInitInfo Info);
   static SDKNode *getInstance(SDKContext &Ctx);
   static bool classof(const SDKNode *N);
   void registerDescendant(SDKNode *D);
+  virtual void jsonize(json::Output &Out) override;
   ArrayRef<SDKNodeDecl*> getDescendantsByUsr(StringRef Usr) {
     return DescendantDeclTable[Usr].getArrayRef();
   }
