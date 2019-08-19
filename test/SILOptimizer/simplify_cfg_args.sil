@@ -411,6 +411,47 @@ bb4(%20 : $Builtin.Int32):                         // Preds: bb1 bb2 bb3
   return %21 : $Int32
 }
 
+enum TwoCases {
+  case A
+  case B
+}
+
+struct S {
+  var x: Builtin.Int32
+}
+
+sil @useSandInt :  $@convention(thin) (S, Builtin.Int32) -> ()
+
+// CHECK-LABEL: sil @dont_opt_switch_enum_with_arg_bb
+sil @dont_opt_switch_enum_with_arg_bb : $@convention(thin) (TwoCases, S, S) -> Builtin.Int32 {
+bb0(%0 : $TwoCases, %1 : $S, %2 : $S):
+  %3 = integer_literal $Builtin.Int32, 3
+  %4 = integer_literal $Builtin.Int32, 4
+  // CHECK: switch_enum
+  switch_enum %0 : $TwoCases, case #TwoCases.A!enumelt: bb1, case #TwoCases.B!enumelt.1: bb2
+
+bb1:
+  br bb3(%1 : $S)
+
+bb2:
+  br bb3(%2 : $S)
+
+bb3(%10 : $S):
+  br bb4(%3 : $Builtin.Int32)
+
+bb4(%20 : $Builtin.Int32):
+  %11 = function_ref @useSandInt :  $@convention(thin) (S, Builtin.Int32) -> ()
+  %12 = apply %11(%10, %20) : $@convention(thin) (S, Builtin.Int32) -> ()
+  cond_br undef, bb5, bb6
+
+bb5:
+  br bb4(%4 : $Builtin.Int32)
+
+bb6:
+  // CHECK: return
+  return %20 : $Builtin.Int32
+}
+
 enum E {
   case Nope, Yup(Builtin.Int1)
 }

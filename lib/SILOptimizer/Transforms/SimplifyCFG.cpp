@@ -3156,6 +3156,11 @@ getSwitchEnumPred(SILBasicBlock *BB, SILBasicBlock *PostBB,
 
   // Check if BB is reachable from multiple enum cases. This means that there is
   // a single-branch block for each enum case which branch to BB.
+  // Usually in this case BB has no arguments. If there are any arguments, bail,
+  // because the argument may be used by other instructions.
+  if (BB->getNumArguments() != 0)
+    return nullptr;
+
   SILBasicBlock *CommonPredPredBB = nullptr;
   for (auto PredBB : BB->getPredecessorBlocks()) {
     TermInst *PredTerm = PredBB->getTerminator();
