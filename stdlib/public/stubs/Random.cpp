@@ -70,11 +70,11 @@ void swift::swift_stdlib_random(void *buf, __swift_size_t nbytes) {
 #else
 
 #undef  WHILE_EINTR
-#define WHILE_EINTR(expression) ({                                             \
+#define WHILE_EINTR(expression) ([&] () -> decltype(expression) {              \
   decltype(expression) result = -1;                                            \
   do { result = (expression); } while (result == -1 && errno == EINTR);        \
-  result;                                                                      \
-})
+  return result;                                                               \
+}())
 
 SWIFT_RUNTIME_STDLIB_API
 void swift::swift_stdlib_random(void *buf, __swift_size_t nbytes) {
