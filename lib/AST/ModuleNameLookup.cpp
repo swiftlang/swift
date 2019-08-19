@@ -454,6 +454,12 @@ void namelookup::lookupInModule(ModuleDecl *startModule,
                                 LazyResolver *typeResolver,
                                 const DeclContext *moduleScopeContext,
                                 ArrayRef<ModuleDecl::ImportedModule> extraImports) {
+  auto *stats = startModule->getASTContext().Stats;
+  if (stats)
+    stats->getFrontendCounters().NumLookupInModule++;
+
+  FrontendStatsTracer tracer(stats, "lookup-in-module");
+
   assert(moduleScopeContext && moduleScopeContext->isModuleScopeContext());
   LookupByName lookup(typeResolver, startModule, resolutionKind, name,
                       lookupKind);

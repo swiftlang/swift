@@ -1464,6 +1464,10 @@ bool DeclContext::lookupQualified(ArrayRef<NominalTypeDecl *> typeDecls,
   using namespace namelookup;
   assert(decls.empty() && "additive lookup not supported");
 
+  auto *stats = getASTContext().Stats;
+  if (stats)
+    stats->getFrontendCounters().NumLookupQualifiedInNominal++;
+
   // Configure lookup and dig out the tracker.
   ReferencedNameTracker *tracker = nullptr;
   bool isLookupCascading;
@@ -1600,6 +1604,10 @@ bool DeclContext::lookupQualified(ModuleDecl *module, DeclName member,
                                   SmallVectorImpl<ValueDecl *> &decls) const {
   using namespace namelookup;
 
+  auto *stats = getASTContext().Stats;
+  if (stats)
+    stats->getFrontendCounters().NumLookupQualifiedInModule++;
+
   // Configure lookup and dig out the tracker.
   ReferencedNameTracker *tracker = nullptr;
   bool isLookupCascading;
@@ -1670,6 +1678,10 @@ bool DeclContext::lookupAnyObject(DeclName member, NLOptions options,
   // Type-only lookup won't find anything on AnyObject.
   if (options & NL_OnlyTypes)
     return false;
+
+  auto *stats = getASTContext().Stats;
+  if (stats)
+    stats->getFrontendCounters().NumLookupQualifiedInAnyObject++;
 
   // Collect all of the visible declarations.
   SmallVector<ValueDecl *, 4> allDecls;

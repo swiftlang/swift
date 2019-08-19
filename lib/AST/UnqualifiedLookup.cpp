@@ -1209,6 +1209,11 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name,
                                      Options options)
     // clang-format on
     : IndexOfFirstOuterResult(0) {
+
+  auto *stats = DC->getASTContext().Stats;
+  if (stats)
+    stats->getFrontendCounters().NumUnqualifiedLookup++;
+
   UnqualifiedLookupFactory factory(Name, DC, TypeResolver, Loc, options, *this);
   factory.performUnqualifiedLookup();
 }
