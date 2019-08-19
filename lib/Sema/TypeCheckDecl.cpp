@@ -3413,8 +3413,10 @@ IsImplicitlyUnwrappedOptionalRequest::evaluate(Evaluator &evaluator,
       }
 
       // If the parameter is not the 'newValue' parameter to a setter, it
-      // must be a subscript index parameter.
-      auto *subscript = cast<SubscriptDecl>(storage);
+      // must be a subscript index parameter (or we have an invalid AST).
+      auto *subscript = dyn_cast<SubscriptDecl>(storage);
+      if (!subscript)
+        return false;
       auto *subscriptParams = subscript->getIndices();
 
       auto where = llvm::find_if(*accessorParams,
