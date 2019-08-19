@@ -270,10 +270,9 @@ bool MemoryLocations::analyzeAddrProjection(
   if (subLocIdx == 0) {
     subLocIdx = locations.size();
     assert(subLocIdx > 0);
-    Location &parentLoc = locations[parentLocIdx];
-
     locations.push_back(Location(projection, subLocIdx, parentLocIdx));
 
+    Location &parentLoc = locations[parentLocIdx];
     locations.back().selfAndParents |= parentLoc.selfAndParents;
 
     int idx = (int)parentLocIdx;
