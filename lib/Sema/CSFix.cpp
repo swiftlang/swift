@@ -247,14 +247,14 @@ AllowTupleTypeMismatch::create(ConstraintSystem &cs, Type lhs, Type rhs,
 }
 
 bool GenericArgumentsMismatch::diagnose(Expr *root, bool asNote) const {
-  auto failure = GenericArgumentsMismatchFailure(root, getConstraintSystem(),
-                                                 getActual(), getRequired(),
-                                                 getMismatches(), getLocator());
+  auto &cs = getConstraintSystem();
+  GenericArgumentsMismatchFailure failure(root, cs, getFromType(), getToType(),
+                                          getMismatches(), getLocator());
   return failure.diagnose(asNote);
 }
 
 GenericArgumentsMismatch *GenericArgumentsMismatch::create(
-    ConstraintSystem &cs, BoundGenericType *actual, BoundGenericType *required,
+    ConstraintSystem &cs, Type actual, Type required,
     llvm::ArrayRef<unsigned> mismatches, ConstraintLocator *locator) {
   unsigned size = totalSizeToAlloc<unsigned>(mismatches.size());
   void *mem =

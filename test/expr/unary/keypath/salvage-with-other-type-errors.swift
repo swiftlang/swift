@@ -4,7 +4,7 @@
 // to diagnose other errors in adjacent exprs.
 
 struct P<T: K> { }
-// expected-note@-1 {{arguments to generic parameter 'T' ('String' and '_') are expected to be equal}}
+// expected-note@-1 {{arguments to generic parameter 'T' ('String' and 'T') are expected to be equal}}
 
 struct S {
     init<B>(_ a: P<B>) {
@@ -28,7 +28,7 @@ struct A {
 }
 
 extension A: K {
-    static let j = S(\A.id + "id") // expected-error {{cannot convert value of type 'P<String>' to expected argument type 'P<_>'}}
+    static let j = S(\A.id + "id") // expected-error {{cannot convert value of type 'P<String>' to expected argument type 'P<T>'}}
 }
 
 // SR-5034
