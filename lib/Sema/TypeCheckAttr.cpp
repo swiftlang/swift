@@ -3180,7 +3180,11 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     // TODO(TF-129): Infer setter to also be `@differentiable` after
     // differentiation supports inout parameters. This requires refactoring to
     // handle multiple `original` functions (both getter and setter).
-    original = asd->getAccessor(AccessorKind::Get);
+    if (!asd->getDeclContext()->isModuleScopeContext()) {
+      original = asd->getSynthesizedAccessor(AccessorKind::Get);
+    } else {
+      original = nullptr;
+    }
   }
   // Setters are not yet supported.
   // TODO(TF-129): Remove this when differentiation supports inout parameters.
