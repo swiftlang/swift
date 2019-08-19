@@ -17,6 +17,7 @@ var da: Array<D> = [d1]
 
 ca = da
 da = ca // expected-error{{cannot assign value of type 'Array<C>' to type 'Array<D>'}}
+// expected-note@-1 {{arguments to generic parameter 'Element' ('C' and 'D') are expected to be equal}}
 
 var caa = [ca]
 var daa = [da]
@@ -29,6 +30,7 @@ var das: [D] = [d1]
 
 cas = das
 das = cas // expected-error{{cannot assign value of type '[C]' to type '[D]'}}
+// expected-note@-1 {{arguments to generic parameter 'Element' ('C' and 'D') are expected to be equal}}
 
 // ArraySlice<T>
 var cs = ca[0...0]

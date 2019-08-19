@@ -1247,6 +1247,20 @@ static bool isSingleTupleParam(ASTContext &ctx,
   return (paramType->is<TupleType>() || paramType->isTypeVariableOrMember());
 }
 
+static ConstraintFix *fixRequirementFailure(ConstraintSystem &cs, Type type1,
+                                            Type type2, Expr *anchor,
+                                            ArrayRef<LocatorPathElt> path);
+
+static ConstraintFix *fixRequirementFailure(ConstraintSystem &cs, Type type1,
+                                            Type type2,
+                                            ConstraintLocatorBuilder locator) {
+  SmallVector<LocatorPathElt, 4> path;
+  if (auto *anchor = locator.getLocatorParts(path)) {
+    return fixRequirementFailure(cs, type1, type2, anchor, path);
+  }
+  return nullptr;
+}
+
 /// Attempt to fix missing arguments by introducing type variables
 /// and inferring their types from parameters.
 static bool fixMissingArguments(ConstraintSystem &cs, Expr *anchor,
@@ -1748,20 +1762,12 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
   // Match up the generic arguments, exactly.
 
   if (shouldAttemptFixes()) {
-    bool forRequirement = false;
-    if (auto last = locator.last()) {
-      forRequirement = last->is<LocatorPathElt::AnyRequirement>();
-    }
-
-    // Optionals and arrays have a lot of special diagnostics and only one
+    // Optionals have a lot of special diagnostics and only one
     // generic argument so if we' re dealing with one, don't produce generic
     // arguments mismatch fixes.
-    // TODO(diagnostics): Move Optional and Array diagnostics over to the
+    // TODO(diagnostics): Move Optional diagnostics over to the
     // new framework.
-    bool isOptional = bound1->getDecl()->isOptionalDecl();
-    bool isArray = isArrayType(bound1).hasValue();
-
-    if (forRequirement || isOptional || isArray)
+    if (bound1->getDecl()->isOptionalDecl())
       return matchDeepTypeArguments(*this, subflags, args1, args2, locator);
 
     SmallVector<unsigned, 4> mismatches;
@@ -1771,6 +1777,18 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
 
     if (mismatches.empty())
       return result;
+
+    if (auto last = locator.last()) {
+      if (last->is<LocatorPathElt::AnyRequirement>()) {
+        if (auto *fix = fixRequirementFailure(*this, type1, type2, locator)) {
+          if (recordFix(fix))
+            return getTypeMatchFailure(locator);
+
+          increaseScore(SK_Fix, mismatches.size());
+          return getTypeMatchSuccess();
+        }
+      }
+    }
 
     auto *fix = GenericArgumentsMismatch::create(
         *this, type1, type2, mismatches, getConstraintLocator(locator));
@@ -2503,8 +2521,16 @@ bool ConstraintSystem::repairFailures(
     if (lhs->hasDependentMember() || rhs->hasDependentMember())
       break;
 
+    // If requirement is something like `T == [Int]` let's let
+    // type matcher a chance to match generic parameters before
+    // recording a fix, because then we'll know exactly how many
+    // generic parameters did not match.
+    if (hasConversionOrRestriction(ConversionRestrictionKind::DeepEquality))
+      break;
+
     auto reqElt = elt.castTo<LocatorPathElt::AnyRequirement>();
     auto reqKind = reqElt.getRequirementKind();
+
     if (hasFixedRequirement(lhs, reqKind, rhs))
       return true;
 
