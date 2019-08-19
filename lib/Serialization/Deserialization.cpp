@@ -2158,8 +2158,8 @@ getActualSelfAccessKind(uint8_t raw) {
     return swift::SelfAccessKind::NonMutating;
   case serialization::SelfAccessKind::Mutating:
     return swift::SelfAccessKind::Mutating;
-  case serialization::SelfAccessKind::__Consuming:
-    return swift::SelfAccessKind::__Consuming;
+  case serialization::SelfAccessKind::Consuming:
+    return swift::SelfAccessKind::Consuming;
   }
   return None;
 }
