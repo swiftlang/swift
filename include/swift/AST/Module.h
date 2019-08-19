@@ -193,7 +193,7 @@ public:
 
     /// This is a convenience function that writes the entire name, in forward
     /// order, to \p out.
-    void printForward(raw_ostream &out) const;
+    void printForward(raw_ostream &out, StringRef delim = ".") const;
   };
 
 private:

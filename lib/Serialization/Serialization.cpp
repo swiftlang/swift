@@ -993,23 +993,19 @@ void Serializer::writeHeader(const SerializationOptions &options) {
   }
 }
 
-using ImportPathBlob = llvm::SmallString<64>;
 static void flattenImportPath(const ModuleDecl::ImportedModule &import,
-                              ImportPathBlob &out) {
-  SmallVector<StringRef, 4> reverseSubmoduleNames(
-      import.second->getReverseFullModuleName(), {});
-
-  interleave(reverseSubmoduleNames.rbegin(), reverseSubmoduleNames.rend(),
-             [&out](StringRef next) { out.append(next); },
-             [&out] { out.push_back('\0'); });
+                              SmallVectorImpl<char> &out) {
+  llvm::raw_svector_ostream outStream(out);
+  import.second->getReverseFullModuleName().printForward(outStream,
+                                                         StringRef("\0", 1));
 
   if (import.first.empty())
     return;
 
-  out.push_back('\0');
+  outStream << '\0';
   assert(import.first.size() == 1 && "can only handle top-level decl imports");
   auto accessPathElem = import.first.front();
-  out.append(accessPathElem.first.str());
+  outStream << accessPathElem.first.str();
 }
 
 uint64_t getRawModTimeOrHash(const SerializationOptions::FileDependency &dep) {
@@ -1122,7 +1118,7 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
       continue;
     }
 
-    ImportPathBlob importPath;
+    SmallString<64> importPath;
     flattenImportPath(import, importPath);
 
     serialization::ImportControl stableImportControl;
