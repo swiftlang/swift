@@ -3598,11 +3598,6 @@ namespace {
                                     CtorInitializerKind initKind,
                                     Optional<ImportedName> correctSwiftName);
 
-    Decl *importGlobalAsMethod(const clang::FunctionDecl *decl, DeclName name,
-                               DeclContext *dc, Optional<unsigned> selfIdx,
-                               Optional<ImportedName> correctSwiftName,
-                               Optional<AccessorInfo> accessorInfo);
-
     /// Create an implicit property given the imported name of one of
     /// the accessors.
     VarDecl *getImplicitProperty(ImportedName importedName,
@@ -3650,7 +3645,12 @@ namespace {
         return nullptr;
 
       DeclName name = accessorInfo ? DeclName() : importedName.getDeclName();
+      auto selfIdx = importedName.getSelfIndex();
 
+      FuncDecl *result = nullptr;
+      ImportedType importedType;
+      bool selfIsInOut = false;
+      ParameterList *bodyParams = nullptr;
       if (!dc->isModuleScopeContext() && !isa<clang::CXXMethodDecl>(decl)) {
         // Handle initializers.
         if (name.getBaseName() == DeclBaseName::createConstructor()) {
@@ -3660,23 +3660,78 @@ namespace {
                                            correctSwiftName);
         }
 
-        // Everything else is a method.
-        return importGlobalAsMethod(decl, name, dc,
-                                    importedName.getSelfIndex(),
-                                    correctSwiftName, accessorInfo);
+        if (dc->getSelfProtocolDecl() && !selfIdx) {
+          // FIXME: source location...
+          Impl.SwiftContext.Diags.diagnose({}, diag::swift_name_protocol_static,
+                                           /*isInit=*/false);
+          Impl.SwiftContext.Diags.diagnose({}, diag::note_while_importing,
+                                           decl->getName());
+          return nullptr;
+        }
+
+        if (!decl->hasPrototype()) {
+          // FIXME: source location...
+          Impl.SwiftContext.Diags.diagnose({}, diag::swift_name_no_prototype);
+          Impl.SwiftContext.Diags.diagnose({}, diag::note_while_importing,
+                                           decl->getName());
+          return nullptr;
+        }
+
+        // There is an inout 'self' when the parameter is a pointer to a
+        // non-const instance of the type we're importing onto. Importing this
+        // as a method means that the method should be treated as mutating in
+        // this situation.
+        if (selfIdx &&
+            !dc->getDeclaredInterfaceType()->hasReferenceSemantics()) {
+          auto selfParam = decl->getParamDecl(*selfIdx);
+          auto selfParamTy = selfParam->getType();
+          if ((selfParamTy->isPointerType() ||
+               selfParamTy->isReferenceType()) &&
+              !selfParamTy->getPointeeType().isConstQualified()) {
+            selfIsInOut = true;
+
+            // If there's a swift_newtype, check the levels of indirection: self
+            // is only inout if this is a pointer to the typedef type (which
+            // itself is a pointer).
+            if (auto nominalTypeDecl = dc->getSelfNominalTypeDecl()) {
+              if (auto clangDCTy = dyn_cast_or_null<clang::TypedefNameDecl>(
+                      nominalTypeDecl->getClangDecl()))
+                if (getSwiftNewtypeAttr(clangDCTy, getVersion()))
+                  if (clangDCTy->getUnderlyingType().getCanonicalType() !=
+                      selfParamTy->getPointeeType().getCanonicalType())
+                    selfIsInOut = false;
+            }
+          }
+        }
+
+        bool allowNSUIntegerAsInt =
+            Impl.shouldAllowNSUIntegerAsInt(isInSystemModule(dc), decl);
+
+        bodyParams =
+            getNonSelfParamList(dc, decl, selfIdx, name.getArgumentNames(),
+                                allowNSUIntegerAsInt, !name);
+
+        importedType =
+            Impl.importFunctionReturnType(dc, decl, allowNSUIntegerAsInt);
+      } else {
+        // Import the function type. If we have parameters, make sure their
+        // names get into the resulting function type.
+        importedType = Impl.importFunctionType(
+            dc, decl, {decl->param_begin(), decl->param_size()},
+            decl->isVariadic(), isInSystemModule(dc), name, bodyParams);
+
+        if (auto *mdecl = dyn_cast<clang::CXXMethodDecl>(decl)) {
+          if (!mdecl->isStatic()) {
+            selfIdx = 0;
+            // Workaround until proper const support is handled: Force
+            // everything to be mutating. This implicitly makes the parameter
+            // indirect.
+            selfIsInOut = true;
+          } else {
+            selfIdx = None;
+          }
+        }
       }
-
-      // Import the function type. If we have parameters, make sure their names
-      // get into the resulting function type.
-      ParameterList *bodyParams = nullptr;
-      auto importedType = Impl.importFunctionType(
-          dc, decl, {decl->param_begin(), decl->param_size()},
-          decl->isVariadic(), isInSystemModule(dc), name, bodyParams);
-      if (!importedType)
-        return nullptr;
-
-      auto resultTy = importedType.getType();
-      auto loc = Impl.importSourceLoc(decl->getLocation());
 
       if (name && name.isSimpleName()) {
         assert(importedName.hasCustomName() &&
@@ -3685,33 +3740,45 @@ namespace {
         name = DeclName(Impl.SwiftContext, name.getBaseName(), bodyParams);
       }
 
+      if (!importedType)
+        return nullptr;
+
+      auto resultTy = importedType.getType();
+      auto loc = Impl.importSourceLoc(decl->getLocation());
+
       // FIXME: Poor location info.
       auto nameLoc = Impl.importSourceLoc(decl->getLocation());
-      FuncDecl *result = createFuncOrAccessor(Impl.SwiftContext, loc,
-                                              accessorInfo, name, nameLoc,
-                                              bodyParams, resultTy,
-                                              /*throws*/ false,
-                                              dc, decl);
+      result = createFuncOrAccessor(Impl.SwiftContext, loc, accessorInfo, name,
+                                    nameLoc, bodyParams, resultTy,
+                                    /*throws*/ false, dc, decl);
 
-      if (auto *mdecl = dyn_cast<clang::CXXMethodDecl>(decl)) {
-        if (!mdecl->isStatic()) {
-          // Workaround until proper const support is handled: Force
-          // everything to be mutating. This implicitly makes the parameter
-          // indirect.
+      result->setGenericEnvironment(dc->getGenericEnvironmentOfContext());
+
+      if (!dc->isModuleScopeContext()) {
+        if (selfIsInOut)
           result->setSelfAccessKind(SelfAccessKind::Mutating);
-          // "self" is the first argument.
-          result->setSelfIndex(0);
+        else
+          result->setSelfAccessKind(SelfAccessKind::NonMutating);
+        if (selfIdx) {
+          result->setSelfIndex(selfIdx.getValue());
         } else {
           result->setStatic();
           result->setImportAsStaticMember();
         }
       }
-      result->computeType();
-      result->setValidationToChecked();
+
       result->setIsObjC(false);
       result->setIsDynamic(false);
+      result->computeType();
+      result->setValidationToChecked();
+
       Impl.recordImplicitUnwrapForDecl(result,
                                        importedType.isImplicitlyUnwrapped());
+
+      if (dc->getSelfClassDecl())
+        // FIXME: only if the class itself is not marked final
+        result->getAttrs().add(new (Impl.SwiftContext)
+                                   FinalAttr(/*IsImplicit=*/true));
 
       // Someday, maybe this will need to be 'open' for C++ virtual methods.
       result->setAccess(AccessLevel::Public);
@@ -5779,105 +5846,6 @@ Decl *SwiftDeclConverter::importGlobalAsInitializer(
   return result;
 }
 
-Decl *SwiftDeclConverter::importGlobalAsMethod(
-    const clang::FunctionDecl *decl,
-    DeclName name,
-    DeclContext *dc,
-    Optional<unsigned> selfIdx,
-    Optional<ImportedName> correctSwiftName,
-    Optional<AccessorInfo> accessorInfo) {
-  if (dc->getSelfProtocolDecl() && !selfIdx) {
-    // FIXME: source location...
-    Impl.SwiftContext.Diags.diagnose({}, diag::swift_name_protocol_static,
-                                     /*isInit=*/false);
-    Impl.SwiftContext.Diags.diagnose({}, diag::note_while_importing,
-                                     decl->getName());
-    return nullptr;
-  }
-
-  if (!decl->hasPrototype()) {
-    // FIXME: source location...
-    Impl.SwiftContext.Diags.diagnose({}, diag::swift_name_no_prototype);
-    Impl.SwiftContext.Diags.diagnose({}, diag::note_while_importing,
-                                     decl->getName());
-    return nullptr;
-  }
-
-  bool allowNSUIntegerAsInt =
-      Impl.shouldAllowNSUIntegerAsInt(isInSystemModule(dc), decl);
-
-  auto &C = Impl.SwiftContext;
-  // There is an inout 'self' when the parameter is a pointer to a non-const
-  // instance of the type we're importing onto. Importing this as a method means
-  // that the method should be treated as mutating in this situation.
-  bool selfIsInOut = false;
-  if (selfIdx && !dc->getDeclaredInterfaceType()->hasReferenceSemantics()) {
-    auto selfParam = decl->getParamDecl(*selfIdx);
-    auto selfParamTy = selfParam->getType();
-    if ((selfParamTy->isPointerType() || selfParamTy->isReferenceType()) &&
-        !selfParamTy->getPointeeType().isConstQualified()) {
-      selfIsInOut = true;
-
-      // If there's a swift_newtype, check the levels of indirection: self is
-      // only inout if this is a pointer to the typedef type (which itself is a
-      // pointer).
-      if (auto nominalTypeDecl = dc->getSelfNominalTypeDecl()) {
-        if (auto clangDCTy = dyn_cast_or_null<clang::TypedefNameDecl>(
-                nominalTypeDecl->getClangDecl()))
-          if (getSwiftNewtypeAttr(clangDCTy, getVersion()))
-            if (clangDCTy->getUnderlyingType().getCanonicalType() !=
-                selfParamTy->getPointeeType().getCanonicalType())
-              selfIsInOut = false;
-      }
-    }
-  }
-
-  auto *bodyParams = getNonSelfParamList(
-      dc, decl, selfIdx, name.getArgumentNames(), allowNSUIntegerAsInt, !name);
-
-  auto importedType =
-      Impl.importFunctionReturnType(dc, decl, allowNSUIntegerAsInt);
-  Type swiftResultTy = importedType.getType();
-
-  auto loc = Impl.importSourceLoc(decl->getLocation());
-  auto nameLoc = Impl.importSourceLoc(decl->getLocation());
-  auto result =
-    createFuncOrAccessor(C, loc, accessorInfo, name, nameLoc,
-                         bodyParams, swiftResultTy,
-                         /*throws*/ false, dc, decl);
-
-  result->setGenericEnvironment(dc->getGenericEnvironmentOfContext());
-
-  result->setAccess(AccessLevel::Public);
-  if (selfIsInOut)
-    result->setSelfAccessKind(SelfAccessKind::Mutating);
-  else
-    result->setSelfAccessKind(SelfAccessKind::NonMutating);
-  if (selfIdx) {
-    result->setSelfIndex(selfIdx.getValue());
-  } else {
-    result->setStatic();
-    result->setImportAsStaticMember();
-  }
-
-  result->computeType();
-  result->setValidationToChecked();
-
-  Impl.recordImplicitUnwrapForDecl(result,
-                                   importedType.isImplicitlyUnwrapped());
-
-  assert(selfIdx ? result->getSelfIndex() == *selfIdx
-                 : result->isImportAsStaticMember());
-
-  if (dc->getSelfClassDecl())
-    // FIXME: only if the class itself is not marked final
-    result->getAttrs().add(new (C) FinalAttr(/*IsImplicit=*/true));
-
-  finishFuncDecl(decl, result);
-  if (correctSwiftName)
-    markAsVariant(result, *correctSwiftName);
-  return result;
-}
 
 /// Create an implicit property given the imported name of one of
 /// the accessors.
