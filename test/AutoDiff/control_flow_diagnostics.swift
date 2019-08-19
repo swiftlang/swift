@@ -113,10 +113,10 @@ enum Tree : Differentiable & AdditiveArithmetic {
 
   // expected-error @+1 {{function is not differentiable}}
   @differentiable
-  // expected-note @+2 {{when differentiating this function definition}}
-  // expected-note @+1 {{differentiating enum values is not yet supported}}
+  // expected-note @+1 {{when differentiating this function definition}}
   static func +(_ lhs: Self, _ rhs: Self) -> Self {
     switch (lhs, rhs) {
+    // expected-note @+1 {{differentiating enum values is not yet supported}}
     case let (.leaf(x), .leaf(y)):
       return .leaf(x + y)
     case let (.branch(x1, x2), .branch(y1, y2)):
@@ -128,10 +128,10 @@ enum Tree : Differentiable & AdditiveArithmetic {
 
   // expected-error @+1 {{function is not differentiable}}
   @differentiable
-  // expected-note @+2 {{when differentiating this function definition}}
-  // expected-note @+1 {{differentiating enum values is not yet supported}}
+  // expected-note @+1 {{when differentiating this function definition}}
   static func -(_ lhs: Self, _ rhs: Self) -> Self {
     switch (lhs, rhs) {
+    // expected-note @+1 {{differentiating enum values is not yet supported}}
     case let (.leaf(x), .leaf(y)):
       return .leaf(x - y)
     case let (.branch(x1, x2), .branch(y1, y2)):

@@ -167,17 +167,4 @@ void *swift_tfc_CreateScalarStringTensor(char *val, int32_t valLen,
   return tensor;
 }
 
-void TFE_InferShapes_Transition(
-  TFE_Op* op, TF_ShapeAndTypeList* input_shapes,
-  TF_Tensor** input_tensors,
-  TF_ShapeAndTypeList* input_tensor_as_shapes,
-  TF_ShapeAndTypeList** input_resource_shapes_and_types,
-  TF_ShapeAndTypeList** output_shapes,
-  TF_ShapeAndTypeList*** output_resource_shapes_and_types, TF_Status* status) {
-  TFE_InferShapes(op, input_shapes, input_tensors, /* num_tensors*/ 0,
-                  input_tensor_as_shapes, input_resource_shapes_and_types,
-                  output_shapes, output_resource_shapes_and_types, status);
-}
-
-
 }  // extern "C"

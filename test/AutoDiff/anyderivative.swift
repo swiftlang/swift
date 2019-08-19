@@ -25,7 +25,6 @@ AnyDerivativeTests.test("Vector") {
   var tan = AnyDerivative(Vector.TangentVector(x: 1, y: 1))
   tan += tan
   expectEqual(AnyDerivative(Vector.TangentVector(x: 2, y: 2)), tan)
-  expectEqual(tan, tan.allDifferentiableVariables)
   expectEqual(AnyDerivative(Vector.TangentVector(x: 4, y: 4)), tan + tan)
   expectEqual(AnyDerivative(Vector.TangentVector(x: 0, y: 0)), tan - tan)
   expectEqual(AnyDerivative(Vector.TangentVector(x: 4, y: 4)), tan.moved(along: tan))
@@ -37,7 +36,6 @@ AnyDerivativeTests.test("Generic") {
   let cotan = AnyDerivative(Generic<Float>.TangentVector(x: 1))
   tan += tan
   expectEqual(AnyDerivative(Generic<Float>.TangentVector(x: 2)), tan)
-  expectEqual(tan, tan.allDifferentiableVariables)
   expectEqual(AnyDerivative(Generic<Float>.TangentVector(x: 4)), tan + tan)
   expectEqual(AnyDerivative(Generic<Float>.TangentVector(x: 0)), tan - tan)
   expectEqual(AnyDerivative(Generic<Float>.TangentVector(x: 4)), tan.moved(along: tan))
@@ -51,7 +49,6 @@ AnyDerivativeTests.test("Zero") {
   expectEqual(zero, zero + zero)
   expectEqual(zero, zero - zero)
   expectEqual(zero, zero.moved(along: zero))
-  expectEqual(zero, zero.allDifferentiableVariables)
 
   var tan = AnyDerivative(Vector.TangentVector(x: 1, y: 1))
   expectEqual(zero, zero)
@@ -125,11 +122,7 @@ AnyDerivativeTests.test("Derivatives") {
 
   // Test `AnyDerivative` initializer.
   func typeErased<T>(_ x: T) -> AnyDerivative
-    where T : Differentiable, T.TangentVector == T,
-          T.AllDifferentiableVariables == T,
-          // NOTE: The requirement below should be defined on `Differentiable`.
-          // But it causes a crash due to generic signature minimization bug.
-          T.TangentVector == T.TangentVector.AllDifferentiableVariables
+    where T : Differentiable, T.TangentVector == T
   {
     let any = AnyDerivative(x)
     return any + any
