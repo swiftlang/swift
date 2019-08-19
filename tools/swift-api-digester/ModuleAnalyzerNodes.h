@@ -58,6 +58,13 @@ class Output;
 namespace ide {
 namespace api {
 
+/// Serialized json format  version number.
+///
+/// When the json format changes in a way that requires version-specific handling, this number should be incremented.
+/// This ensures we could have backward compatibility so that version changes in the format won't stop the checker from working.
+const uint8_t DIGESTER_JSON_VERSION = 1; // Adding digester_version to the format
+const uint8_t DIGESTER_JSON_DEFAULT_VERSION = 0; // Use this version number for files before we have a version number in json.
+
 class SDKNode;
 typedef SDKNode* NodePtr;
 typedef std::map<NodePtr, NodePtr> ParentMap;
@@ -387,13 +394,14 @@ class SDKNodeRoot: public SDKNode {
   llvm::StringMap<llvm::SmallSetVector<SDKNodeDecl*, 2>> DescendantDeclTable;
   /// The tool invocation arguments to generate this root node. We shouldn't need APIs for it.
   std::vector<StringRef> ToolArgs;
-
+  uint8_t JsonFormatVer;
 public:
   SDKNodeRoot(SDKNodeInitInfo Info);
   static SDKNode *getInstance(SDKContext &Ctx);
   static bool classof(const SDKNode *N);
   void registerDescendant(SDKNode *D);
   virtual void jsonize(json::Output &Out) override;
+  Optional<uint8_t> getJsonFormatVersion() const { return JsonFormatVer; }
   ArrayRef<SDKNodeDecl*> getDescendantsByUsr(StringRef Usr) {
     return DescendantDeclTable[Usr].getArrayRef();
   }
