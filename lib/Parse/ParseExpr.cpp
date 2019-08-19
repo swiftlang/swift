@@ -1855,11 +1855,11 @@ parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
       TokReceiver->registerTokenKindChange(Tok.getLoc(),
                                            tok::string_interpolation_anchor);
 
-      auto callee = new (Context) UnresolvedDotExpr(InterpolationVarRef,
-                                                    /*dotloc=*/BackSlashLoc,
-                                                    appendInterpolation,
-                                                    /*nameloc=*/DeclNameLoc(),
-                                                    /*Implicit=*/true);
+      auto callee = new (Context)
+          UnresolvedDotExpr(InterpolationVarRef,
+                            /*dotloc=*/BackSlashLoc, appendInterpolation,
+                            /*nameloc=*/DeclNameLoc(Segment.Loc),
+                            /*Implicit=*/true);
       auto S = parseExprCallSuffix(makeParserResult(callee), true);
 
       // If we stopped parsing the expression before the expression segment is
