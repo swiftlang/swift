@@ -80,7 +80,8 @@ SDKNode::SDKNode(SDKNodeInitInfo Info, SDKNodeKind Kind): Ctx(Info.Ctx),
   Name(Info.Name), PrintedName(Info.PrintedName), TheKind(unsigned(Kind)) {}
 
 SDKNodeRoot::SDKNodeRoot(SDKNodeInitInfo Info): SDKNode(Info, SDKNodeKind::Root),
-  ToolArgs(Info.ToolArgs) {}
+  ToolArgs(Info.ToolArgs),
+  JsonFormatVer(Info.JsonFormatVer.hasValue() ? *Info.JsonFormatVer : DIGESTER_JSON_DEFAULT_VERSION) {}
 
 SDKNodeDecl::SDKNodeDecl(SDKNodeInitInfo Info, SDKNodeKind Kind)
       : SDKNode(Info, Kind), DKind(Info.DKind), Usr(Info.Usr),
@@ -369,6 +370,7 @@ SDKNode *SDKNodeRoot::getInstance(SDKContext &Ctx) {
   Info.Name = Ctx.buffer("TopLevel");
   Info.PrintedName = Ctx.buffer("TopLevel");
   Info.ToolArgs = Ctx.getOpts().ToolArgs;
+  Info.JsonFormatVer = DIGESTER_JSON_VERSION;
   return Info.createSDKNode(SDKNodeKind::Root);
 }
 
@@ -1833,6 +1835,7 @@ void SDKNode::jsonize(json::Output &out) {
 
 void SDKNodeRoot::jsonize(json::Output &out) {
   SDKNode::jsonize(out);
+  out.mapRequired(getKeyContent(Ctx, KeyKind::KK_json_format_version).data(), JsonFormatVer);
   if (!Ctx.getOpts().AvoidToolArgs)
     out.mapOptional(getKeyContent(Ctx, KeyKind::KK_tool_arguments).data(), ToolArgs);
 }
