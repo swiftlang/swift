@@ -280,16 +280,27 @@ TypeRepr *ASTGen::generate(CompositionTypeSyntax Type, SourceLoc &Loc) {
   auto FirstElem = Elements[0];
   auto LastElem = Elements[Elements.size() - 1];
 
-  SmallVector<TypeRepr *, 4> ElemTypes{generate(FirstElem.getType(), Loc)};
-  for (unsigned i = 1; i < Elements.size(); i++) {
+  SmallVector<TypeRepr *, 4> ElemTypes;
+  for (unsigned i = 0; i < Elements.size(); i++) {
     auto ElemType = Elements[i].getType();
 
+    TypeRepr *ElemTypeR = nullptr;
     if (auto Some = ElemType.getAs<SomeTypeSyntax>()) {
       // the invalid `some` after an ampersand was already diagnosed by the
       // parser, handle it gracefully
-      ElemTypes.push_back(generate(Some->getBaseType(), Loc));
+      ElemTypeR = generate(Some->getBaseType(), Loc);
     } else {
-      ElemTypes.push_back(generate(ElemType, Loc));
+      ElemTypeR = generate(ElemType, Loc);
+    }
+
+    if (ElemTypeR) {
+      if (auto Comp = dyn_cast<CompositionTypeRepr>(ElemTypeR)) {
+        // Accept protocol<P1, P2> & P3; explode it.
+        auto TyRs = Comp->getTypes();
+        ElemTypes.append(TyRs.begin(), TyRs.end());
+      } else {
+        ElemTypes.push_back(ElemTypeR);
+      }
     }
   }
 

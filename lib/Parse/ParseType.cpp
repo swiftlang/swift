@@ -746,15 +746,22 @@ Parser::parseTypeSimpleOrCompositionAST(Diag<> MessageID,
       parseTypeSimpleOrComposition(MessageID, HandleCodeCompletion);
 
   if (!CompositionResult.isSuccess()) {
-    auto ParsedUnknown = ParsedSyntaxRecorder::makeUnknownType(
-        CompositionResult.getUnknownNodes(), *SyntaxContext);
-    SyntaxContext->addSyntax(ParsedUnknown);
-    if (CompositionResult.isCodeCompletion())
-      return makeParserCodeCompletionResult<TypeRepr>();
-    auto Unknown = SyntaxContext->topNode<UnknownTypeSyntax>();
-    auto CorrectedAST = Generator.generate(Unknown, Loc);
-    return CorrectedAST ? makeParserResult(CorrectedAST)
-                        : makeParserErrorResult<TypeRepr>();
+    auto nodes = CompositionResult.getUnknownNodes();
+    if (nodes.size() > 0) {
+      if (nodes.size() != 1 || !nodes.front().is<ParsedTypeSyntax>()) {
+        auto ParsedUnknown = ParsedSyntaxRecorder::makeUnknownType(
+            nodes, *SyntaxContext);
+        SyntaxContext->addSyntax(ParsedUnknown);
+      } else {
+        SyntaxContext->addSyntax(nodes.front());
+      }
+    }
+    TypeRepr *CorrectedAST = nullptr;
+    if (SyntaxContext->isTopNode<TypeSyntax>()) {
+      auto Unknown = SyntaxContext->topNode<TypeSyntax>();
+      CorrectedAST = Generator.generate(Unknown, Loc);
+    }
+    return makeParserResult(CompositionResult.getStatus(), CorrectedAST);
   }
 
   SyntaxContext->addSyntax(CompositionResult.getResult());
@@ -806,6 +813,8 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID,
       FirstType, *Ampersand, *SyntaxContext);
   Elements.push_back(FirstElement);
 
+  ParserStatus Status;
+
   do {
     // Diagnose invalid `some` after an ampersand.
     Optional<ParsedTokenSyntax> NextSome;
@@ -819,9 +828,16 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID,
     auto NextTypeResult = parseTypeSimple(diag::expected_identifier_for_type,
                                           HandleCodeCompletion);
 
-    // todo [gsoc]: handle Junk properly here
-    if (!NextTypeResult.isSuccess())
-      return NextTypeResult;
+    if (!NextTypeResult.isSuccess()) {
+      auto following = NextTypeResult.getUnknownNodes();
+      if (following.empty()) {
+        Status |= NextTypeResult.getStatus();
+        break;
+      }
+      SmallVector<ParsedSyntax, 0> nodes = {FirstElement};
+      nodes.append(following.begin(), following.end());
+      return makeParsedResult<ParsedTypeSyntax>(nodes, NextTypeResult.getStatus());
+    }
 
     auto NextType = ApplySome(NextTypeResult.getResult(), NextSome);
     Ampersand = Tok.isContextualPunctuator("&") 
@@ -838,6 +854,12 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID,
       ParsedSyntaxRecorder::makeCompositionTypeElementList(Elements, *SyntaxContext);
   auto Composition =
       ParsedSyntaxRecorder::makeCompositionType(ElementList, *SyntaxContext);
+  if (Status.isSuccess()) {
+    return makeParsedSuccess(ApplySome(Composition, FirstSome));
+  } else {
+    return makeParsedResult<ParsedTypeSyntax>({ApplySome(Composition, FirstSome)}, Status);
+  }
+
   return makeParsedSuccess(ApplySome(Composition, FirstSome));
 }
 
