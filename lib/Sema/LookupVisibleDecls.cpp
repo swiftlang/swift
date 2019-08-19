@@ -1112,7 +1112,9 @@ static void lookupVisibleDeclsImpl(VisibleDeclConsumer &Consumer,
     Reason = DeclVisibilityKind::MemberOfOutsideNominal;
   }
 
-  SmallVector<ModuleDecl::ImportedModule, 8> extraImports;
+  using namespace namelookup;
+  SmallVector<ValueDecl *, 0> moduleResults;
+
   if (auto SF = dyn_cast<SourceFile>(DC)) {
     if (Loc.isValid()) {
       // Look for local variables in top-level code; normally, the parser
@@ -1129,26 +1131,28 @@ static void lookupVisibleDeclsImpl(VisibleDeclConsumer &Consumer,
         return;
       }
 
-      ModuleDecl::ImportFilter importFilter;
-      importFilter |= ModuleDecl::ImportFilterKind::Private;
-      importFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
-      SF->getImportedModules(extraImports, importFilter);
+      auto *mutableSF = const_cast<SourceFile *>(SF);
+      lookupVisibleDeclsInFileUnit(mutableSF, moduleResults,
+                                   NLKind::UnqualifiedLookup,
+                                   ResolutionKind::Overloadable);
+    }
+  } else {
+    if (IncludeTopLevel) {
+      auto &mutableM = const_cast<ModuleDecl&>(M);
+      lookupVisibleDeclsInModule(&mutableM, {}, moduleResults,
+                                 NLKind::UnqualifiedLookup,
+                                 ResolutionKind::Overloadable,
+                                 DC);
     }
   }
 
-  if (IncludeTopLevel) {
-    using namespace namelookup;
-    SmallVector<ValueDecl *, 0> moduleResults;
-    auto &mutableM = const_cast<ModuleDecl&>(M);
-    lookupVisibleDeclsInModule(&mutableM, {}, moduleResults,
-                               NLKind::UnqualifiedLookup,
-                               ResolutionKind::Overloadable,
-                               DC, extraImports);
-    for (auto result : moduleResults)
-      Consumer.foundDecl(result, DeclVisibilityKind::VisibleAtTopLevel);
+  for (auto result : moduleResults)
+    Consumer.foundDecl(result, DeclVisibilityKind::VisibleAtTopLevel);
 
-    if (auto SF = dyn_cast<SourceFile>(DC))
+  if (auto SF = dyn_cast<SourceFile>(DC)) {
+    if (IncludeTopLevel) {
       SF->cacheVisibleDecls(std::move(moduleResults));
+    }
   }
 }
 

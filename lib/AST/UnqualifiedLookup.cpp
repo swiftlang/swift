@@ -960,21 +960,20 @@ void UnqualifiedLookupFactory::recordDependencyOnTopLevelName(
 }
 
 void UnqualifiedLookupFactory::addImportedResults(DeclContext *const dc) {
-  // Add private imports to the extra search list.
-  SmallVector<ModuleDecl::ImportedModule, 8> extraImports;
-  if (auto FU = dyn_cast<FileUnit>(dc)) {
-    ModuleDecl::ImportFilter importFilter;
-    importFilter |= ModuleDecl::ImportFilterKind::Private;
-    importFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
-    FU->getImportedModules(extraImports, importFilter);
-  }
-
   using namespace namelookup;
+
   SmallVector<ValueDecl *, 8> CurModuleResults;
   auto resolutionKind = isOriginallyTypeLookup ? ResolutionKind::TypesOnly
                                                : ResolutionKind::Overloadable;
-  lookupInModule(&M, {}, Name, CurModuleResults, NLKind::UnqualifiedLookup,
-                 resolutionKind, dc, extraImports);
+
+  SmallVector<ModuleDecl::ImportedModule, 8> extraImports;
+  if (auto *FU = dyn_cast<FileUnit>(dc)) {
+    lookupInFileUnit(FU, Name, CurModuleResults, NLKind::UnqualifiedLookup,
+                     resolutionKind);
+  } else {
+    lookupInModule(&M, {}, Name, CurModuleResults, NLKind::UnqualifiedLookup,
+                   resolutionKind, dc);
+  }
 
   // Always perform name shadowing for type lookup.
   if (options.contains(Flags::TypeLookup)) {

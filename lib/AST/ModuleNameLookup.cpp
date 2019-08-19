@@ -109,7 +109,13 @@ public:
       : resolutionKind(resolutionKind),
         respectAccessControl(!ctx.isAccessControlDisabled()) {}
 
-  /// Performs a qualified lookup into the given module and, if necessary, its
+  /// Performs a top-level lookup into the given file unit and, if necessary, its
+  /// imports, observing proper shadowing rules.
+  ///
+  /// The results are appended to \p decls.
+  void lookupInFileUnit(SmallVectorImpl<ValueDecl *> &decls, FileUnit *file);
+
+  /// Performs a top-level lookup into the given module and, if necessary, its
   /// reexports, observing proper shadowing rules.
   ///
   /// The results are appended to \p decls.
@@ -413,6 +419,23 @@ ArrayRef<ValueDecl *> ModuleNameLookup<LookupStrategy>::lookupInModuleUncached(
 }
 
 template <typename LookupStrategy>
+void ModuleNameLookup<LookupStrategy>::lookupInFileUnit(
+    SmallVectorImpl<ValueDecl *> &decls,
+    FileUnit *file) {
+  assert(file);
+
+  // Add private imports to the extra search list.
+  SmallVector<ModuleDecl::ImportedModule, 8> extraImports;
+
+  ModuleDecl::ImportFilter importFilter;
+  importFilter |= ModuleDecl::ImportFilterKind::Private;
+  importFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
+  file->getImportedModules(extraImports, importFilter);
+
+  lookupInModule(decls, file->getParentModule(), {}, file, extraImports);
+}
+
+template <typename LookupStrategy>
 void ModuleNameLookup<LookupStrategy>::lookupInModule(
     SmallVectorImpl<ValueDecl *> &decls,
     ModuleDecl *module, ModuleDecl::AccessPathTy accessPath,
@@ -443,14 +466,27 @@ void ModuleNameLookup<LookupStrategy>::lookupInModule(
   cache.try_emplace(cacheKey, lookupResults);
 }
 
+void namelookup::lookupInFileUnit(FileUnit *file,
+                                  DeclName name,
+                                  SmallVectorImpl<ValueDecl *> &decls,
+                                  NLKind lookupKind,
+                                  ResolutionKind resolutionKind) {
+  auto &ctx = file->getASTContext();
+  auto *stats = ctx.Stats;
+  if (stats)
+    stats->getFrontendCounters().NumLookupInFileUnit++;
+
+  LookupByName lookup(ctx, resolutionKind, name, lookupKind);
+  lookup.lookupInFileUnit(decls, file);
+}
+
 void namelookup::lookupInModule(ModuleDecl *startModule,
                                 ModuleDecl::AccessPathTy topAccessPath,
                                 DeclName name,
                                 SmallVectorImpl<ValueDecl *> &decls,
                                 NLKind lookupKind,
                                 ResolutionKind resolutionKind,
-                                const DeclContext *moduleScopeContext,
-                                ArrayRef<ModuleDecl::ImportedModule> extraImports) {
+                                const DeclContext *moduleScopeContext) {
   auto &ctx = startModule->getASTContext();
   auto *stats = ctx.Stats;
   if (stats)
@@ -460,8 +496,15 @@ void namelookup::lookupInModule(ModuleDecl *startModule,
 
   assert(moduleScopeContext && moduleScopeContext->isModuleScopeContext());
   LookupByName lookup(ctx, resolutionKind, name, lookupKind);
-  lookup.lookupInModule(decls, startModule, topAccessPath, moduleScopeContext,
-                        extraImports);
+  lookup.lookupInModule(decls, startModule, topAccessPath, moduleScopeContext);
+}
+
+void namelookup::lookupVisibleDeclsInFileUnit(
+    FileUnit *file, SmallVectorImpl<ValueDecl *> &decls,
+    NLKind lookupKind, ResolutionKind resolutionKind) {
+  auto &ctx = file->getASTContext();
+  LookupVisibleDecls lookup(ctx, resolutionKind, lookupKind);
+  lookup.lookupInFileUnit(decls, file);
 }
 
 void namelookup::lookupVisibleDeclsInModule(
@@ -470,11 +513,9 @@ void namelookup::lookupVisibleDeclsInModule(
     SmallVectorImpl<ValueDecl *> &decls,
     NLKind lookupKind,
     ResolutionKind resolutionKind,
-    const DeclContext *moduleScopeContext,
-    ArrayRef<ModuleDecl::ImportedModule> extraImports) {
+    const DeclContext *moduleScopeContext) {
   auto &ctx = M->getASTContext();
   assert(moduleScopeContext && moduleScopeContext->isModuleScopeContext());
   LookupVisibleDecls lookup(ctx, resolutionKind, lookupKind);
-  lookup.lookupInModule(decls, M, accessPath, moduleScopeContext, extraImports);
+  lookup.lookupInModule(decls, M, accessPath, moduleScopeContext);
 }
-

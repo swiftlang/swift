@@ -421,6 +421,18 @@ enum class ResolutionKind {
   TypesOnly
 };
 
+/// Performs a lookup into the given file unit and, if necessary, its
+/// parent module and imports, observing proper shadowing rules.
+///
+/// \param file The file unit that will contain the name.
+/// \param name The name to look up.
+/// \param[out] decls Any found decls will be added to this vector.
+/// \param lookupKind Whether this lookup is qualified or unqualified.
+/// \param resolutionKind What sort of decl is expected.
+void lookupInFileUnit(FileUnit *file, DeclName name,
+                      SmallVectorImpl<ValueDecl *> &decls,
+                      NLKind lookupKind, ResolutionKind resolutionKind);
+
 /// Performs a lookup into the given module and, if necessary, its
 /// reexports, observing proper shadowing rules.
 ///
@@ -433,12 +445,10 @@ enum class ResolutionKind {
 /// \param moduleScopeContext The top-level context from which the lookup is
 ///        being performed, for checking access. This must be either a
 ///        FileUnit or a Module.
-/// \param extraImports Private imports to include in this search.
 void lookupInModule(ModuleDecl *module, ModuleDecl::AccessPathTy accessPath,
                     DeclName name, SmallVectorImpl<ValueDecl *> &decls,
                     NLKind lookupKind, ResolutionKind resolutionKind,
-                    const DeclContext *moduleScopeContext,
-                    ArrayRef<ModuleDecl::ImportedModule> extraImports = {});
+                    const DeclContext *moduleScopeContext);
 
 template <typename Fn>
 void forAllVisibleModules(const DeclContext *DC, const Fn &fn) {
@@ -495,6 +505,12 @@ SelfBounds getSelfBoundsFromWhereClause(
 
 namespace namelookup {
 
+/// Performs a qualified lookup into the given file unit and, if necessary, its
+/// parent module and imports, observing proper shadowing rules.
+void
+lookupVisibleDeclsInFileUnit(FileUnit *file, SmallVectorImpl<ValueDecl *> &decls,
+                             NLKind lookupKind, ResolutionKind resolutionKind);
+
 /// Performs a qualified lookup into the given module and, if necessary, its
 /// reexports, observing proper shadowing rules.
 void
@@ -502,8 +518,7 @@ lookupVisibleDeclsInModule(ModuleDecl *M, ModuleDecl::AccessPathTy accessPath,
                            SmallVectorImpl<ValueDecl *> &decls,
                            NLKind lookupKind,
                            ResolutionKind resolutionKind,
-                           const DeclContext *moduleScopeContext,
-                           ArrayRef<ModuleDecl::ImportedModule> extraImports = {});
+                           const DeclContext *moduleScopeContext);
 
 /// Searches through statements and patterns for local variable declarations.
 class FindLocalVal : public StmtVisitor<FindLocalVal> {

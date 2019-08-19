@@ -147,6 +147,9 @@ FRONTEND_STATISTIC(AST, NumLookupQualifiedInModule)
 /// Number of qualified lookups into AnyObject.
 FRONTEND_STATISTIC(AST, NumLookupQualifiedInAnyObject)
 
+/// Number of lookups into a file unit and its imports.
+FRONTEND_STATISTIC(AST, NumLookupInFileUnit)
+
 /// Number of lookups into a module and its imports.
 FRONTEND_STATISTIC(AST, NumLookupInModule)
 
