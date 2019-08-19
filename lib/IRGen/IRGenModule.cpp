@@ -896,13 +896,7 @@ bool swift::irgen::shouldRemoveTargetFeature(StringRef feature) {
 
 void IRGenModule::setHasFramePointer(llvm::AttrBuilder &Attrs,
                                      bool HasFramePointer) {
-  if (HasFramePointer) {
-    Attrs.addAttribute("no-frame-pointer-elim", "true");
-    Attrs.addAttribute("no-frame-pointer-elim-non-leaf");
-  } else {
-    Attrs.addAttribute("no-frame-pointer-elim", "false");
-    Attrs.removeAttribute("no-frame-pointer-elim-non-leaf");
-  }
+  Attrs.addAttribute("frame-pointer", HasFramePointer ? "all" : "none");
 }
 
 void IRGenModule::setHasFramePointer(llvm::Function *F,
