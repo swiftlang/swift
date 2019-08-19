@@ -51,3 +51,11 @@ func testFunc() {
   let f = \S.i
   let _: (S) -> Int = f // expected-error {{cannot convert value of type 'KeyPath<S, Int>' to specified type '(S) -> Int'}}
 }
+
+// SR-11234
+public extension Array {
+    func sorted<C: Comparable, K: KeyPath<Element, C>>(by keyPath: K) -> Array<Element> {
+        let sortedA = self.sorted(by: { $0[keyPath: keyPath] < $1[keyPath: keyPath] })
+        return sortedA
+    }
+}
