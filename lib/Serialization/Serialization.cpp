@@ -459,36 +459,6 @@ static bool shouldSerializeAsLocalContext(const DeclContext *DC) {
         !isa<SubscriptDecl>(DC);
 }
 
-static const Decl *getDeclForContext(const DeclContext *DC) {
-  switch (DC->getContextKind()) {
-  case DeclContextKind::Module:
-    // Use a null decl to represent the module.
-    return nullptr;
-  case DeclContextKind::FileUnit:
-    return getDeclForContext(DC->getParent());
-  case DeclContextKind::SerializedLocal:
-    llvm_unreachable("Serialized local contexts should only come from deserialization");
-  case DeclContextKind::Initializer:
-  case DeclContextKind::AbstractClosureExpr:
-    // FIXME: What about default functions?
-    llvm_unreachable("shouldn't serialize decls from anonymous closures");
-  case DeclContextKind::GenericTypeDecl:
-    return cast<GenericTypeDecl>(DC);
-  case DeclContextKind::ExtensionDecl:
-    return cast<ExtensionDecl>(DC);
-  case DeclContextKind::TopLevelCodeDecl:
-    llvm_unreachable("shouldn't serialize the main module");
-  case DeclContextKind::AbstractFunctionDecl:
-    return cast<AbstractFunctionDecl>(DC);
-  case DeclContextKind::SubscriptDecl:
-    return cast<SubscriptDecl>(DC);
-  case DeclContextKind::EnumElementDecl:
-    return cast<EnumElementDecl>(DC);
-  }
-
-  llvm_unreachable("Unhandled DeclContextKind in switch.");
-}
-
 namespace {
   struct Accessors {
     uint8_t OpaqueReadOwnership;
@@ -634,7 +604,7 @@ DeclContextID Serializer::addDeclContextRef(const DeclContext *DC) {
   if (shouldSerializeAsLocalContext(DC))
     addLocalDeclContextRef(DC);
   else
-    addDeclRef(getDeclForContext(DC));
+    addDeclRef(DC->getAsDecl());
 
   auto &id = DeclContextIDs[DC];
   if (id)
@@ -1538,7 +1508,7 @@ Serializer::writeConformance(ProtocolConformanceRef conformanceRef,
   switch (conformance->getKind()) {
   case ProtocolConformanceKind::Normal: {
     auto normal = cast<NormalProtocolConformance>(conformance);
-    if (!isDeclXRef(getDeclForContext(normal->getDeclContext()))
+    if (!isDeclXRef(normal->getDeclContext()->getAsDecl())
         && !isa<ClangModuleUnit>(normal->getDeclContext()
                                        ->getModuleScopeContext())) {
       // A normal conformance in this module file.
@@ -2046,7 +2016,7 @@ void Serializer::writeDeclContext(const DeclContext *DC) {
   case DeclContextKind::GenericTypeDecl:
   case DeclContextKind::ExtensionDecl:
   case DeclContextKind::EnumElementDecl:
-    declOrDeclContextID = addDeclRef(getDeclForContext(DC));
+    declOrDeclContextID = addDeclRef(DC->getAsDecl());
     isDecl = true;
     break;
 
