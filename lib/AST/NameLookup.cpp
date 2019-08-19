@@ -1437,7 +1437,6 @@ static void extractDirectlyReferencedNominalTypes(
 bool DeclContext::lookupQualified(Type type,
                                   DeclName member,
                                   NLOptions options,
-                                  LazyResolver *typeResolver,
                                   SmallVectorImpl<ValueDecl *> &decls) const {
   using namespace namelookup;
   assert(decls.empty() && "additive lookup not supported");
@@ -1613,7 +1612,6 @@ bool DeclContext::lookupQualified(ModuleDecl *module, DeclName member,
   bool isLookupCascading;
   configureLookup(this, options, tracker, isLookupCascading);
 
-  ASTContext &ctx = getASTContext();
   auto topLevelScope = getModuleScopeContext();
   if (module == topLevelScope->getParentModule()) {
     if (tracker) {
@@ -1621,7 +1619,7 @@ bool DeclContext::lookupQualified(ModuleDecl *module, DeclName member,
     }
     lookupInModule(module, /*accessPath=*/{}, member, decls,
                    NLKind::QualifiedLookup, ResolutionKind::Overloadable,
-                   ctx.getLazyResolver(), topLevelScope);
+                   topLevelScope);
   } else {
     // Note: This is a lookup into another module. Unless we're compiling
     // multiple modules at once, or if the other module re-exports this one,
@@ -1635,7 +1633,7 @@ bool DeclContext::lookupQualified(ModuleDecl *module, DeclName member,
         return true;
       lookupInModule(import.second, import.first, member, decls,
                      NLKind::QualifiedLookup, ResolutionKind::Overloadable,
-                     ctx.getLazyResolver(), topLevelScope);
+                     topLevelScope);
       // If we're able to do an unscoped lookup, we see everything. No need
       // to keep going.
       return !import.first.empty();
@@ -1833,11 +1831,11 @@ resolveTypeDeclsToNominal(Evaluator &evaluator,
 
 /// Perform unqualified name lookup for types at the given location.
 static DirectlyReferencedTypeDecls
-directReferencesForUnqualifiedTypeLookup(ASTContext &ctx, DeclName name,
+directReferencesForUnqualifiedTypeLookup(DeclName name,
                                          SourceLoc loc, DeclContext *dc) {
   DirectlyReferencedTypeDecls results;
   UnqualifiedLookup::Options options = UnqualifiedLookup::Flags::TypeLookup;
-  UnqualifiedLookup lookup(name, dc, ctx.getLazyResolver(), loc, options);
+  UnqualifiedLookup lookup(name, dc, loc, options);
   for (const auto &result : lookup.Results) {
     if (auto typeDecl = dyn_cast<TypeDecl>(result.getValueDecl()))
       results.push_back(typeDecl);
@@ -1909,8 +1907,7 @@ directReferencesForIdentTypeRepr(Evaluator &evaluator,
     // For the first component, perform unqualified name lookup.
     if (current.empty()) {
       current =
-        directReferencesForUnqualifiedTypeLookup(ctx,
-                                                 component->getIdentifier(),
+        directReferencesForUnqualifiedTypeLookup(component->getIdentifier(),
                                                  component->getIdLoc(),
                                                  dc);
 

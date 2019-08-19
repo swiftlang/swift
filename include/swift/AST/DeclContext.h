@@ -487,15 +487,11 @@ public:
   /// \param options Options that control name lookup, based on the
   /// \c NL_* constants in \c NameLookupOptions.
   ///
-  /// \param typeResolver Used to resolve types, usually for overload purposes.
-  /// May be null.
-  ///
   /// \param[out] decls Will be populated with the declarations found by name
   /// lookup.
   ///
   /// \returns true if anything was found.
   bool lookupQualified(Type type, DeclName member, NLOptions options,
-                       LazyResolver *typeResolver,
                        SmallVectorImpl<ValueDecl *> &decls) const;
 
   /// Look for the set of declarations with the given name within the
