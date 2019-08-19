@@ -5,17 +5,17 @@
 set(SWIFT_VERSION @SWIFT_VERSION@)
 set(SWIFT_MAIN_SRC_DIR @SWIFT_SOURCE_DIR@)
 
-set(SWIFT_INCLUDE_DIRS "@SWIFT_INCLUDE_DIRS@")
+set(SWIFT_INCLUDE_DIRS "@SWIFT_CONFIG_INCLUDE_DIRS@")
 set(SWIFT_LIBRARY_DIRS "@SWIFT_CONFIG_LIBRARY_DIRS@")
 
 # These variables are duplicated, but they must match the LLVM variables of the
 # same name. The variables ending in "S" could some day become lists, and are
 # preserved for convention and compatibility.
-set(SWIFT_INCLUDE_DIR "@SWIFT_INCLUDE_DIRS@")
+set(SWIFT_INCLUDE_DIR "@SWIFT_CONFIG_INCLUDE_DIRS@")
 set(SWIFT_LIBRARY_DIR "@SWIFT_CONFIG_LIBRARY_DIRS@")
 
-set(SWIFT_CMAKE_DIR "@SWIFT_CMAKE_DIR@")
-set(SWIFT_BINARY_DIR "@SWIFT_BINARY_DIR@")
+set(SWIFT_CMAKE_DIR "@SWIFT_CONFIG_CMAKE_DIR@")
+set(SWIFT_BINARY_DIR "@SWIFT_CONFIG_BINARY_DIR@")
 
 set(CMARK_TARGETS_FILE @SWIFT_PATH_TO_CMARK_BUILD@/src/CMarkExports.cmake)
 if(NOT TARGET libcmark_static AND EXISTS ${CMARK_TARGETS_FILE})
@@ -24,5 +24,6 @@ endif()
 
 if(NOT TARGET swift)
   set(SWIFT_EXPORTED_TARGETS "@SWIFT_CONFIG_EXPORTS@")
-  include("@SWIFT_EXPORTS_FILE@")
+  include("@SWIFT_CONFIG_EXPORTS_FILE@")
+  @swift_config_include_buildtree_exports@
 endif()
