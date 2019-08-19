@@ -375,6 +375,18 @@ void ConstraintGraph::unbindTypeVariable(TypeVariableType *typeVar, Type fixed){
 
 #pragma mark Algorithms
 
+namespace {
+  /// When to visit the fixed bindings of a type variable.
+  enum class VisitFixedBindings {
+    /// Always visit the fixed bindings
+    Always,
+    /// Never visit the fixed bindings
+    Never,
+    /// Visit fixed bindings one level down, but no further.
+    Once,
+  };
+}
+
 /// Perform a depth-first search.
 ///
 /// \param cg The constraint graph.
@@ -390,14 +402,15 @@ static void depthFirstSearch(
     TypeVariableType *typeVar,
     llvm::function_ref<bool(TypeVariableType *)> preVisitNode,
     llvm::function_ref<bool(Constraint *)> visitConstraint,
-    bool visitFixedBindings,
+    VisitFixedBindings visitFixedBindings,
     llvm::SmallPtrSet<Constraint *, 8> &visitedConstraints) {
   // Visit this node. If we've already seen it, bail out.
   if (!preVisitNode(typeVar))
     return;
 
   // Local function to visit adjacent type variables.
-  auto visitAdjacencies = [&](ArrayRef<TypeVariableType *> adjTypeVars) {
+  auto visitAdjacencies = [&](ArrayRef<TypeVariableType *> adjTypeVars,
+                              VisitFixedBindings visitFixedBindings) {
     for (auto adj : adjTypeVars) {
       if (adj == typeVar)
         continue;
@@ -417,7 +430,7 @@ static void depthFirstSearch(
       continue;
 
     if (visitConstraint(constraint))
-      visitAdjacencies(constraint->getTypeVariables());
+      visitAdjacencies(constraint->getTypeVariables(), visitFixedBindings);
   }
 
   // Visit all of the other nodes in the equivalence class.
@@ -425,15 +438,22 @@ static void depthFirstSearch(
   if (typeVar == repTypeVar) {
     // We are the representative, so visit all of the other type variables
     // in this equivalence class.
-    visitAdjacencies(node.getEquivalenceClass());
+    visitAdjacencies(node.getEquivalenceClass(), visitFixedBindings);
   } else {
     // We are not the representative; visit the representative.
-    visitAdjacencies(repTypeVar);
+    visitAdjacencies(repTypeVar, visitFixedBindings);
   }
 
-  if (visitFixedBindings) {
-    // Walk any type variables related via fixed bindings.
-    visitAdjacencies(node.getFixedBindings());
+  // Walk any type variables related via fixed bindings.
+  switch (visitFixedBindings) {
+  case VisitFixedBindings::Always:
+    visitAdjacencies(node.getFixedBindings(), VisitFixedBindings::Always);
+      break;
+  case VisitFixedBindings::Never:
+      break;
+  case VisitFixedBindings::Once:
+    visitAdjacencies(node.getFixedBindings(), VisitFixedBindings::Never);
+      break;
   }
 }
 
@@ -475,6 +495,18 @@ llvm::TinyPtrVector<Constraint *> ConstraintGraph::gatherConstraints(
       kind == GatheringKind::EquivalenceClass) {
     // Perform a depth-first search in the constraint graph to find all of the
     // constraints that could be affected.
+    VisitFixedBindings visitFixedBindings;
+    switch (kind) {
+    case GatheringKind::AllMentions:
+    case GatheringKind::PotentialBindings:
+      visitFixedBindings = VisitFixedBindings::Once;
+      break;
+
+    case GatheringKind::EquivalenceClass:
+      visitFixedBindings = VisitFixedBindings::Never;
+      break;
+    }
+
     SmallPtrSet<TypeVariableType *, 4> typeVariables;
     llvm::SmallPtrSet<Constraint *, 8> visitedConstraints;
     depthFirstSearch(*this, typeVar,
@@ -490,7 +522,7 @@ llvm::TinyPtrVector<Constraint *> ConstraintGraph::gatherConstraints(
 
                        return kind == GatheringKind::AllMentions;
                      },
-                     /*visitFixedBindings=*/kind == GatheringKind::AllMentions,
+                     visitFixedBindings,
                      visitedConstraints);
     return constraints;
   }
@@ -805,7 +837,7 @@ namespace {
 
               return true;
             },
-            /*visitFixedBindings=*/true,
+            VisitFixedBindings::Always,
             visitedConstraints);
       }
 
