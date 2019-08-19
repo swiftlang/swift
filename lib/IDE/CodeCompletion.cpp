@@ -1279,11 +1279,23 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
     if (CheckKind == CompletionTypeCheckKind::Normal &&
         ParsedExpr->getType() && !ParsedExpr->getType()->is<ErrorType>()) {
       auto refDecl = ParsedExpr->getReferencedDecl();
+      auto exprTy = ParsedExpr->getType();
       if (!refDecl) {
-        if (auto apply = dyn_cast<ApplyExpr>(ParsedExpr))
+        // FIXME: do this in the not-already-type-checked branch too?
+        if (auto *apply = dyn_cast<SelfApplyExpr>(ParsedExpr)) {
           refDecl = apply->getFn()->getReferencedDecl();
+        } else if (auto *apply = dyn_cast<ApplyExpr>(ParsedExpr)) {
+          // If this is an IUO, use the underlying non-optional type instead
+          auto fnDecl = apply->getFn()->getReferencedDecl();
+          if (auto FD = fnDecl.getDecl()) {
+            if (FD->isImplicitlyUnwrappedOptional()) {
+              if (auto OT = exprTy->getOptionalObjectType())
+                exprTy = OT;
+            }
+          }
+        }
       }
-      return std::make_pair(ParsedExpr->getType(), refDecl);
+      return std::make_pair(exprTy, refDecl);
     }
 
     ConcreteDeclRef ReferencedDecl = nullptr;
