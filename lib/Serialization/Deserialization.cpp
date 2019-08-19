@@ -3964,9 +3964,8 @@ public:
     MF.configureGenericEnvironment(extension, genericEnvID);
 
     auto baseTy = MF.getType(baseID);
-    auto nominal = baseTy->getAnyNominal();
-    assert(!baseTy->hasUnboundGenericType());
     extension->getExtendedTypeLoc().setType(baseTy);
+    auto nominal = extension->getExtendedNominal();
 
     if (isImplicit)
       extension->setImplicit();
