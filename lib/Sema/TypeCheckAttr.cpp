@@ -268,7 +268,7 @@ void AttributeEarlyChecker::visitMutationAttr(DeclAttribute *attr) {
   SelfAccessKind attrModifier;
   switch (attr->getKind()) {
   case DeclAttrKind::DAK_Consuming:
-    attrModifier = SelfAccessKind::__Consuming;
+    attrModifier = SelfAccessKind::Consuming;
     break;
   case DeclAttrKind::DAK_Mutating:
     attrModifier = SelfAccessKind::Mutating;
@@ -285,7 +285,7 @@ void AttributeEarlyChecker::visitMutationAttr(DeclAttribute *attr) {
     // 'mutating' and 'nonmutating' are not valid on types
     // with reference semantics.
     if (contextTy->hasReferenceSemantics()) {
-      if (attrModifier != SelfAccessKind::__Consuming)
+      if (attrModifier != SelfAccessKind::Consuming)
         diagnoseAndRemoveAttr(attr, diag::mutating_invalid_classes,
                               attrModifier);
     }
@@ -314,9 +314,9 @@ void AttributeEarlyChecker::visitMutationAttr(DeclAttribute *attr) {
     }
 
     if (auto *CSA = FD->getAttrs().getAttribute<ConsumingAttr>()) {
-      if (attrModifier != SelfAccessKind::__Consuming) {
+      if (attrModifier != SelfAccessKind::Consuming) {
         diagnoseAndRemoveAttr(CSA, diag::functions_mutating_and_not,
-                              SelfAccessKind::__Consuming, attrModifier);
+                              SelfAccessKind::Consuming, attrModifier);
       }
     }
   }

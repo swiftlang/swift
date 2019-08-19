@@ -1984,8 +1984,8 @@ getStableSelfAccessKind(swift::SelfAccessKind MM) {
     return serialization::SelfAccessKind::NonMutating;
   case swift::SelfAccessKind::Mutating:
     return serialization::SelfAccessKind::Mutating;
-  case swift::SelfAccessKind::__Consuming:
-    return serialization::SelfAccessKind::__Consuming;
+  case swift::SelfAccessKind::Consuming:
+    return serialization::SelfAccessKind::Consuming;
   }
 
   llvm_unreachable("Unhandled StaticSpellingKind in switch.");

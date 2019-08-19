@@ -300,7 +300,7 @@ using MetatypeRepresentationField = BCFixed<2>;
 enum class SelfAccessKind : uint8_t {
   NonMutating = 0,
   Mutating,
-  __Consuming,
+  Consuming,
 };
 using SelfAccessKindField = BCFixed<2>;
   

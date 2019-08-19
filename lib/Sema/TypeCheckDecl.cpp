@@ -1980,7 +1980,7 @@ SelfAccessKindRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
   } else if (FD->getAttrs().hasAttribute<NonMutatingAttr>()) {
     return SelfAccessKind::NonMutating;
   } else if (FD->getAttrs().hasAttribute<ConsumingAttr>()) {
-    return SelfAccessKind::__Consuming;
+    return SelfAccessKind::Consuming;
   }
 
   if (auto *AD = dyn_cast<AccessorDecl>(FD)) {

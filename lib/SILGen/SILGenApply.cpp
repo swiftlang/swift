@@ -4277,7 +4277,7 @@ bool SILGenModule::shouldEmitSelfAsRValue(FuncDecl *fn, CanType selfType) {
   switch (fn->getSelfAccessKind()) {
   case SelfAccessKind::Mutating:
     return false;
-  case SelfAccessKind::__Consuming:
+  case SelfAccessKind::Consuming:
     return true;
   case SelfAccessKind::NonMutating:
     // TODO: borrow 'self' for nonmutating methods on methods on value types.
