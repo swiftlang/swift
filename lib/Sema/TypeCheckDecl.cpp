@@ -4451,7 +4451,7 @@ static Type formExtensionInterfaceType(
 
 /// Check the generic parameters of an extension, recursively handling all of
 /// the parameter lists within the extension.
-static std::pair<GenericEnvironment *, Type>
+static GenericEnvironment *
 checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
                             GenericParamList *genericParams) {
   assert(!ext->getGenericEnvironment());
@@ -4489,7 +4489,7 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
                                          (mustInferRequirements ||
                                             !sameTypeReqs.empty()));
 
-  return { env, extInterfaceType };
+  return env;
 }
 
 static bool isNonGenericTypeAliasType(Type type) {
@@ -4500,69 +4500,65 @@ static bool isNonGenericTypeAliasType(Type type) {
   return false;
 }
 
-static void validateExtendedType(ExtensionDecl *ext, TypeChecker &tc) {
-  // If we didn't parse a type, fill in an error type and bail out.
-  if (!ext->getExtendedTypeLoc().getTypeRepr()) {
+static Type validateExtendedType(ExtensionDecl *ext) {
+  auto error = [&ext]() {
     ext->setInvalid();
-    ext->getExtendedTypeLoc().setInvalidType(tc.Context);
-    return;
-  }
+    return ErrorType::get(ext->getASTContext());
+  };
 
-  // Validate the extended type.
+  // If we didn't parse a type, fill in an error type and bail out.
+  if (!ext->getExtendedTypeLoc().getTypeRepr())
+    return error();
+
+  // Compute the extended type.
   TypeResolutionOptions options(TypeResolverContext::ExtensionBinding);
   options |= TypeResolutionFlags::AllowUnboundGenerics;
-  if (tc.validateType(ext->getExtendedTypeLoc(),
-                      TypeResolution::forInterface(ext->getDeclContext()),
-                      options)) {
-    ext->setInvalid();
-    ext->getExtendedTypeLoc().setInvalidType(tc.Context);
-    return;
-  }
+  auto tr = TypeResolution::forStructural(ext->getDeclContext());
+  auto extendedType = tr.resolveType(ext->getExtendedTypeLoc().getTypeRepr(),
+                                     options);
+  ext->getExtendedTypeLoc().setType(extendedType);
 
-  // Dig out the extended type.
-  auto extendedType = ext->getExtendedType();
+  if (extendedType->hasError())
+    return error();
 
   // Hack to allow extending a generic typealias.
   if (auto *unboundGeneric = extendedType->getAs<UnboundGenericType>()) {
     if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(unboundGeneric->getDecl())) {
       auto extendedNominal = aliasDecl->getDeclaredInterfaceType()->getAnyNominal();
-      if (extendedNominal) {
-        extendedType = extendedNominal->getDeclaredType();
-        if (!isPassThroughTypealias(aliasDecl))
-          ext->getExtendedTypeLoc().setType(extendedType);
-      }
+      if (extendedNominal)
+        return isPassThroughTypealias(aliasDecl)
+               ? extendedType
+               : extendedNominal->getDeclaredType();
     }
   }
 
+  auto &diags = ext->getASTContext().Diags;
+
   // Cannot extend a metatype.
   if (extendedType->is<AnyMetatypeType>()) {
-    tc.diagnose(ext->getLoc(), diag::extension_metatype, extendedType)
-      .highlight(ext->getExtendedTypeLoc().getSourceRange());
-    ext->setInvalid();
-    ext->getExtendedTypeLoc().setInvalidType(tc.Context);
-    return;
+    diags.diagnose(ext->getLoc(), diag::extension_metatype, extendedType)
+         .highlight(ext->getExtendedTypeLoc().getSourceRange());
+    return error();
   }
 
   // Cannot extend function types, tuple types, etc.
   if (!extendedType->getAnyNominal()) {
-    tc.diagnose(ext->getLoc(), diag::non_nominal_extension, extendedType)
-      .highlight(ext->getExtendedTypeLoc().getSourceRange());
-    ext->setInvalid();
-    ext->getExtendedTypeLoc().setInvalidType(tc.Context);
-    return;
+    diags.diagnose(ext->getLoc(), diag::non_nominal_extension, extendedType)
+         .highlight(ext->getExtendedTypeLoc().getSourceRange());
+    return error();
   }
 
   // Cannot extend a bound generic type, unless it's referenced via a
   // non-generic typealias type.
   if (extendedType->isSpecialized() &&
       !isNonGenericTypeAliasType(extendedType)) {
-    tc.diagnose(ext->getLoc(), diag::extension_specialization,
-                extendedType->getAnyNominal()->getName())
-    .highlight(ext->getExtendedTypeLoc().getSourceRange());
-    ext->setInvalid();
-    ext->getExtendedTypeLoc().setInvalidType(tc.Context);
-    return;
+    diags.diagnose(ext->getLoc(), diag::extension_specialization,
+                   extendedType->getAnyNominal()->getName())
+         .highlight(ext->getExtendedTypeLoc().getSourceRange());
+    return error();
   }
+
+  return extendedType;
 }
 
 void TypeChecker::validateExtension(ExtensionDecl *ext) {
@@ -4573,7 +4569,7 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
 
   DeclValidationRAII IBV(ext);
 
-  validateExtendedType(ext, *this);
+  auto extendedType = validateExtendedType(ext);
 
   if (auto *nominal = ext->getExtendedNominal()) {
     // If this extension was not already bound, it means it is either in an
@@ -4586,14 +4582,11 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
     // Validate the nominal type declaration being extended.
     validateDecl(nominal);
 
-    if (auto *genericParams = ext->getGenericParams()) {
-      GenericEnvironment *env;
-      Type extendedType = ext->getExtendedType();
-      std::tie(env, extendedType) = checkExtensionGenericParams(
-          *this, ext, extendedType,
-          genericParams);
+    ext->getExtendedTypeLoc().setType(extendedType);
 
-      ext->getExtendedTypeLoc().setType(extendedType);
+    if (auto *genericParams = ext->getGenericParams()) {
+      GenericEnvironment *env =
+        checkExtensionGenericParams(*this, ext, extendedType, genericParams);
       ext->setGenericEnvironment(env);
     }
   }
