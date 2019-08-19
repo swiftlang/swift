@@ -2508,7 +2508,7 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
 
   auto flags = ParameterTypeFlags();
   switch (selfAccess) {
-  case SelfAccessKind::__Consuming:
+  case SelfAccessKind::Consuming:
     flags = flags.withOwned(true);
     break;
   case SelfAccessKind::Mutating:
