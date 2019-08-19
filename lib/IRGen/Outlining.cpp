@@ -35,6 +35,9 @@ void OutliningMetadataCollector::collectTypeMetadataForLayout(SILType type) {
     return;
   }
 
+  // Substitute opaque types if allowed.
+  type = IGF.IGM.substOpaqueTypesWithUnderlyingTypes(type);
+
   auto formalType = type.getASTType();
   auto &ti = IGF.IGM.getTypeInfoForLowered(formalType);
 
