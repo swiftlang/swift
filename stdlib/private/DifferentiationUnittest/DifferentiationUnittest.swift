@@ -221,6 +221,7 @@ extension Tracked where T : Differentiable, T == T.TangentVector {
   internal static func _jvpSubtract(lhs: Self, rhs: Self)
       -> (value: Self, differential: (Self, Self) -> Self) {
     return (lhs - rhs, { $0 - $1 })
+  }
 }
 
 extension Tracked where T : Differentiable & SignedNumeric, T == T.Magnitude,
@@ -250,11 +251,7 @@ extension Tracked where T : Differentiable & FloatingPoint, T == T.TangentVector
 
   @usableFromInline
   @differentiating(/)
-<<<<<<< HEAD
   internal static func _jvpDivide(lhs: Self, rhs: Self)
-=======
-  internal static func _vjpDivide(lhs: Self, rhs: Self)
->>>>>>> tensorflow
       -> (value: Self, differential: (Self, Self) -> (Self)) {
     return (lhs / rhs, { (dx, dy) in dx / rhs - lhs / (rhs * rhs) * dy })
   }
