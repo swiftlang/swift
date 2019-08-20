@@ -604,4 +604,13 @@ LeakCheckingTests.testWithLeakChecking("ControlFlowWithSwitchEnumWithPayload") {
   expectEqual((-2674, 2), Tracked<Float>(-1337).valueWithGradient(in: { x in enum_notactive2(.b(4, 5), x) }))
 }
 
+LeakCheckingTests.testWithLeakChecking("ArrayLiteralInitialization") {
+  func concat(_ x: [Tracked<Float>]) -> Tracked<Float> { return x[0] }
+  func foo(_ x: Tracked<Float>) -> Float {
+    let y = x + x
+    return concat([x, y]).value
+  }
+  expectEqual(Tracked<Float>(1), gradient(at: .zero, in: foo))
+}
+
 runAllTests()

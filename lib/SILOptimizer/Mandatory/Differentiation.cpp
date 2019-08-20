@@ -1461,9 +1461,11 @@ static void collectMinimalIndicesForFunctionCall(
 #endif
   for (auto *use : ai->getUses()) {
     if (auto *dti = dyn_cast<DestructureTupleInst>(use->getUser())) {
+#ifndef NDEBUG
       assert(!foundDestructure &&
              "Found multiple destructure_tuple's on apply's result");
       foundDestructure = true;
+#endif
       directResults = dti->getResults();
     }
   }
@@ -4315,53 +4317,6 @@ private:
     assert(insertion.second); (void)insertion;
   }
 
-  SILValue getTangentProjection(SILBasicBlock *origBB,
-                                SILValue originalProjection) {
-    auto diffBuilder = getDifferentialBuilder();
-
-    // Handle `struct_element_addr`.
-    if (auto *seai = dyn_cast<StructElementAddrInst>(originalProjection)) {
-      auto adjSource = getTangentBuffer(origBB, seai->getOperand());
-      auto *tangentVectorDecl =
-          adjSource->getType().getStructOrBoundGenericStruct();
-      auto tanFieldLookup =
-          tangentVectorDecl->lookupDirect(seai->getField()->getName());
-      assert(tanFieldLookup.size() == 1);
-      auto *tanField = cast<VarDecl>(tanFieldLookup.front());
-      return diffBuilder.createStructElementAddr(
-          seai->getLoc(), adjSource, tanField);
-    }
-
-    // Handle `tuple_element_addr`.
-    if (auto *teai = dyn_cast<TupleElementAddrInst>(originalProjection)) {
-      auto source = teai->getOperand();
-      auto adjSource = getTangentBuffer(origBB, source);
-      // If the adjoint buffer of the source does not have a tuple type, then
-      // it must represent a "single element tuple type". Return it directly.
-      if (!adjSource->getType().is<TupleType>())
-        return adjSource;
-      auto origTupleTy = source->getType().castTo<TupleType>();
-      unsigned adjIndex = 0;
-      for (unsigned i : range(teai->getFieldNo())) {
-        if (getTangentSpace(
-                origTupleTy->getElement(i).getType()->getCanonicalType()))
-          ++adjIndex;
-      }
-      return diffBuilder.createTupleElementAddr(
-          teai->getLoc(), adjSource, adjIndex);
-    }
-
-    // Handle `begin_access`.
-    if (auto *bai = dyn_cast<BeginAccessInst>(originalProjection)) {
-      auto adjBase = getTangentBuffer(origBB, bai->getOperand());
-      if (errorOccurred)
-        return (bufferMap[{origBB, originalProjection}] = SILValue());
-      // Return the base buffer's tangent buffer.
-      return adjBase;
-    }
-    return SILValue();
-  }
-
   SILValue &getTangentBuffer(SILBasicBlock *origBB, SILValue originalBuffer) {
     assert(originalBuffer->getType().isAddress());
     assert(originalBuffer->getFunction() == original);
@@ -4691,15 +4646,15 @@ private:
     auto &diffBuilder = getDifferentialBuilder();
     auto *bb = inst->getParent();
     auto adjVal =
-        materializeTangentDirect(getTangentValue(bb, inst), inst->getLoc());
+        materializeTangentDirect(getTangentValue(inst), inst->getLoc());
     // Allocate a local buffer and store the adjoint value. This buffer will be
     // used for accumulation into the adjoint buffer.
     auto *localBuf = diffBuilder.createAllocStack(inst->getLoc(), adjVal->getType());
     auto copy = diffBuilder.emitCopyValueOperation(inst->getLoc(), adjVal);
     diffBuilder.emitStoreValueOperation(inst->getLoc(), copy, localBuf,
                                     StoreOwnershipQualifier::Init);
-    // Accumulate the adjoint value in the local buffer into the adjoint buffer.
-    addToAdjointBuffer(bb, inst->getOperand(0), localBuf, inst->getLoc());
+    // Set the tangent value in the local buffer into the adjoint buffer.
+    setTangentBuffer(bb, inst->getOperand(0), localBuf);
     if (errorOccurred)
       return;
     diffBuilder.emitDestroyAddr(inst->getLoc(), localBuf);
@@ -4858,163 +4813,163 @@ private:
     setTangentValue(bb, ti, makeConcreteTangentValue(tanTuple));
   }
 
-  void emitTangentForArrayInitializationInst(ApplyInst *ai) {
-    auto indices = getIndices();
-    auto *bb = ai->getParent();
-    auto loc = ai->getLoc();
-    auto &diffBuilder = getDifferentialBuilder();
-
-    assert(ai->getNumArguments() == 1);
-
-    // Step 1: Clone array size operand
-    // TODO: add cast assertion?
-    auto arraySizeOperand = cast<IntegerLiteralInst>(ai->getArgument(0));
-    auto integerLiteral = diffBuilder.createIntegerLiteral(
-        loc, arraySizeOperand->getType(), arraySizeOperand->getValue());
-    SmallVector<SILValue, 8> args;
-    args.push_back(integerLiteral);
-
-    // Step 2: Apply _allocateUninitializedArray<A>, but remapping the
-    // substitution map to use τ_0_0.TangentVector.
-//    auto remappedSubs = ai->getSubstitutionMap().subst(
-//        getDifferential().getForwardingSubstitutionMap());
-
-    // If the original `apply` instruction has a substitution map, then the
-    // applied function is specialized.
-    // In the differential, specialization is also necessary for parity. The
-    // original function operand is specialized with a remapped version of same
-    // substitution map using an argument-less `partial_apply`.
-    SILValue diffArrayInitFuncRef =
-        diffBuilder.createFunctionRefFor(loc, ai->getCalleeFunction());
-    auto remappedSubs = remapSubstitutionMapInDifferential(
-        ai->getSubstitutionMap());
-    if (!ai->getSubstitutionMap().empty()) {
-      diffArrayInitFuncRef = diffBuilder.createPartialApply(
-          ai->getLoc(), diffArrayInitFuncRef, remappedSubs, {},
-          ParameterConvention::Direct_Guaranteed);
-    }
-    auto *diffArrayInitInst =
-        diffBuilder.createApply(loc, diffArrayInitFuncRef, SubstitutionMap(), args);
-
-    // Step 3: Create the non-active `tuple_extract` instruction for the
-    // array pointer (second element in tuple).
-    auto *diffArray =
-        diffBuilder.createTupleExtract(loc, diffArrayInitInst, 0);
-    auto *diffRawPointerInst =
-        diffBuilder.createTupleExtract(loc, diffArrayInitInst, 1);
-
-    // Step 4: Get the `DifferentiableView` of the array.
-    SmallVector<SILValue, 8> diffArgs;
-    diffArgs.push_back(diffArray);
-    auto diffArrayViewType = getRemappedTangentType(ai->getType()).getASTType();
-    auto metatypeType = CanMetatypeType::get(
-        diffArrayViewType, MetatypeRepresentation::Thin);
-    auto metatype = diffBuilder.createMetatype(
-        loc, SILType::getPrimitiveObjectType(metatypeType));
-    diffArgs.push_back(metatype);
-    // Allocate memory for a `DifferentiableView` and add to the differential
-    // arguments for the creation of the returned `DifferentiableView`.
-    auto typeDecl = diffArrayViewType->getStructOrBoundGenericStruct();
-    auto candidates = typeDecl->lookupDirect(DeclBaseName::createConstructor());
-    // Remove any initializer with argument lables, leaving `init(_:)`.
-    llvm::erase_if(candidates, [](ValueDecl *v) {
-      return llvm::any_of(v->getFullName().getArgumentNames(), [](Identifier id) {
-        return !id.empty();
-      });
-    });
-    assert(candidates.size() == 1 &&
-           "Expected single `DifferentiableView` intializer");
-    auto initDecl = cast<ConstructorDecl>(candidates.front());
-    SILDeclRef initRef(initDecl, SILDeclRef::Kind::Allocator);
-
-    // Get a function reference to the `DifferentiableView` intializer.
-    SILOptFunctionBuilder fb(context.getTransform());
-    auto *initFn = fb.getOrCreateFunction(
-        ai->getLoc(), initRef, NotForDefinition);
-    SILValue diffViewInitFuncRef = diffBuilder.createFunctionRefFor(ai->getLoc(), initFn);
-
-    // Because the `DifferentiableView` intializer is generic, we need to
-    // create our own substitution map to replace the generic element type
-    // with a concrete type.
-    // Grab the concret element type.
-    auto elementType = getRemappedTangentASTType(
-        ai->getType().getAs<TupleType>()->getElement(0).getType()
-        ->getAs<BoundGenericStructType>()->getGenericArgs().front());
-    // Grab the `Differentiable` protocol conformance we will need the
-    // generic type to conform to.
-    auto swiftModule = getModule().getSwiftModule();
-    auto diffProto =
-        getASTContext().getProtocol(KnownProtocolKind::Differentiable);
-    auto diffConf = swiftModule->lookupConformance(
-        elementType, diffProto);
-    ArrayRef<ProtocolConformanceRef> conformances = {*diffConf};
-    // Get the `DifferentiableView` intializer's generic signature.
-    auto genericSig = diffViewInitFuncRef->getType().castTo<SILFunctionType>()
-        ->getGenericSignature();
-    // Create the substitution map and apply the generic initializer with it in
-    // order to get the concrete `DifferentiableView` which will have the same
-    // element type as the original `Array`.
-    auto subs = SubstitutionMap::get(
-        genericSig, {elementType}, conformances);
-    auto *diffViewInitInst =
-        diffBuilder.createApply(loc, diffViewInitFuncRef, subs,
-                                diffArgs);
-
-    // Add value map between `Array` init tuple and `DifferentiableView`.
-    setTangentValue(bb, ai, makeConcreteTangentValue(diffViewInitInst));
-
-    // Loop over all uses of the array initialization, making sure to handle
-    // any `tuple_extract` instructions. These instructions can either be
-    // for getting the array, or the `RawPointer`. We are only interested in
-    // adding additional instructions for the `RawPointer`, the second element
-    // in the array tuple as the array is already handled through it being
-    // chosen to be differentiated when using activity analysis.
-    for (auto aiUse : ai->getUses()) {
-      auto tei = dyn_cast<TupleExtractInst>(aiUse->getUser()->getResult(0));
-      // Only handle the `RawPointer` instructions.
-      if (!tei || tei->getFieldNo() != 1) continue;
-
-      // TODO: might not need a loop since there should be one use of `RawPointer`.
-      // Get the `pointer_to_address` instruction which is the instruction
-      // that wraps the `RawPointer` in order to do subsequent instructions
-      for (auto teiUse : tei->getUses()) {
-        // Add tangent map between the `pointer_to_address` result.
-        // TODO: add cast assertion?
-        auto pointerAddrInst = dyn_cast<PointerToAddressInst>(teiUse->getUser()->getResult(0));
-        assert(pointerAddrInst && "RawPointer only use should be a "
-                                  "'pointer_to_address' instruction");
-        auto originalResult =
-            pointerAddrInst->getResults()[indices.source];
-        auto tangentPointerAddrInst = diffBuilder.createPointerToAddress(
-            loc, diffRawPointerInst, pointerAddrInst->getType(),
-            pointerAddrInst->isStrict());
-        auto differentialResult = tangentPointerAddrInst
-            ->SILInstruction::getResults()[indices.source];
-        // Add tangent for original result.
-        // TODO: what about indirect results?
-        assert(indices.source == 0 && "Expected result index to be first.");
-        setTangentBuffer(bb, originalResult, differentialResult);
-
-        // Handle the uses of the array pointer which can be:
-        // - `StoreInst`
-        // - `CopyAddrInst`
-        // - `IndexAddrInst`
-//        for (auto pointerUse : teiUse->getUser()->getResult(0)->getUses()) {
-//          auto inst = pointerUse->getUser();
-//          if (auto si = dyn_cast<StoreInst>(inst)) {
-//            emitTangentForStoreInst(si);
-//          } else if (auto cai = dyn_cast<CopyAddrInst>(inst)) {
-//            llvm_unreachable("Can't handle 'copy_addr' instruction for "
-//                             "array yet");
-//          } else if (auto iai = dyn_cast<IndexAddrInst>(inst)) {
-//            llvm_unreachable("Can't handle 'index_addr' instruction for "
-//                             "array yet");
-//          }
-//        }
-      }
-    }
-
-  }
+//  void emitTangentForArrayInitializationInst(ApplyInst *ai) {
+//    auto indices = getIndices();
+//    auto *bb = ai->getParent();
+//    auto loc = ai->getLoc();
+//    auto &diffBuilder = getDifferentialBuilder();
+//
+//    assert(ai->getNumArguments() == 1);
+//
+//    // Step 1: Clone array size operand
+//    // TODO: add cast assertion?
+//    auto arraySizeOperand = cast<IntegerLiteralInst>(ai->getArgument(0));
+//    auto integerLiteral = diffBuilder.createIntegerLiteral(
+//        loc, arraySizeOperand->getType(), arraySizeOperand->getValue());
+//    SmallVector<SILValue, 8> args;
+//    args.push_back(integerLiteral);
+//
+//    // Step 2: Apply _allocateUninitializedArray<A>, but remapping the
+//    // substitution map to use τ_0_0.TangentVector.
+////    auto remappedSubs = ai->getSubstitutionMap().subst(
+////        getDifferential().getForwardingSubstitutionMap());
+//
+//    // If the original `apply` instruction has a substitution map, then the
+//    // applied function is specialized.
+//    // In the differential, specialization is also necessary for parity. The
+//    // original function operand is specialized with a remapped version of same
+//    // substitution map using an argument-less `partial_apply`.
+//    SILValue diffArrayInitFuncRef =
+//        diffBuilder.createFunctionRefFor(loc, ai->getCalleeFunction());
+//    auto remappedSubs = remapSubstitutionMapInDifferential(
+//        ai->getSubstitutionMap());
+//    if (!ai->getSubstitutionMap().empty()) {
+//      diffArrayInitFuncRef = diffBuilder.createPartialApply(
+//          ai->getLoc(), diffArrayInitFuncRef, remappedSubs, {},
+//          ParameterConvention::Direct_Guaranteed);
+//    }
+//    auto *diffArrayInitInst =
+//        diffBuilder.createApply(loc, diffArrayInitFuncRef, SubstitutionMap(), args);
+//
+//    // Step 3: Create the non-active `tuple_extract` instruction for the
+//    // array pointer (second element in tuple).
+//    auto *diffArray =
+//        diffBuilder.createTupleExtract(loc, diffArrayInitInst, 0);
+//    auto *diffRawPointerInst =
+//        diffBuilder.createTupleExtract(loc, diffArrayInitInst, 1);
+//
+//    // Step 4: Get the `DifferentiableView` of the array.
+//    SmallVector<SILValue, 8> diffArgs;
+//    diffArgs.push_back(diffArray);
+//    auto diffArrayViewType = getRemappedTangentType(ai->getType()).getASTType();
+//    auto metatypeType = CanMetatypeType::get(
+//        diffArrayViewType, MetatypeRepresentation::Thin);
+//    auto metatype = diffBuilder.createMetatype(
+//        loc, SILType::getPrimitiveObjectType(metatypeType));
+//    diffArgs.push_back(metatype);
+//    // Allocate memory for a `DifferentiableView` and add to the differential
+//    // arguments for the creation of the returned `DifferentiableView`.
+//    auto typeDecl = diffArrayViewType->getStructOrBoundGenericStruct();
+//    auto candidates = typeDecl->lookupDirect(DeclBaseName::createConstructor());
+//    // Remove any initializer with argument lables, leaving `init(_:)`.
+//    llvm::erase_if(candidates, [](ValueDecl *v) {
+//      return llvm::any_of(v->getFullName().getArgumentNames(), [](Identifier id) {
+//        return !id.empty();
+//      });
+//    });
+//    assert(candidates.size() == 1 &&
+//           "Expected single `DifferentiableView` intializer");
+//    auto initDecl = cast<ConstructorDecl>(candidates.front());
+//    SILDeclRef initRef(initDecl, SILDeclRef::Kind::Allocator);
+//
+//    // Get a function reference to the `DifferentiableView` intializer.
+//    SILOptFunctionBuilder fb(context.getTransform());
+//    auto *initFn = fb.getOrCreateFunction(
+//        ai->getLoc(), initRef, NotForDefinition);
+//    SILValue diffViewInitFuncRef = diffBuilder.createFunctionRefFor(ai->getLoc(), initFn);
+//
+//    // Because the `DifferentiableView` intializer is generic, we need to
+//    // create our own substitution map to replace the generic element type
+//    // with a concrete type.
+//    // Grab the concret element type.
+//    auto elementType = getRemappedTangentASTType(
+//        ai->getType().getAs<TupleType>()->getElement(0).getType()
+//        ->getAs<BoundGenericStructType>()->getGenericArgs().front());
+//    // Grab the `Differentiable` protocol conformance we will need the
+//    // generic type to conform to.
+//    auto swiftModule = getModule().getSwiftModule();
+//    auto diffProto =
+//        getASTContext().getProtocol(KnownProtocolKind::Differentiable);
+//    auto diffConf = swiftModule->lookupConformance(
+//        elementType, diffProto);
+//    ArrayRef<ProtocolConformanceRef> conformances = {*diffConf};
+//    // Get the `DifferentiableView` intializer's generic signature.
+//    auto genericSig = diffViewInitFuncRef->getType().castTo<SILFunctionType>()
+//        ->getGenericSignature();
+//    // Create the substitution map and apply the generic initializer with it in
+//    // order to get the concrete `DifferentiableView` which will have the same
+//    // element type as the original `Array`.
+//    auto subs = SubstitutionMap::get(
+//        genericSig, {elementType}, conformances);
+//    auto *diffViewInitInst =
+//        diffBuilder.createApply(loc, diffViewInitFuncRef, subs,
+//                                diffArgs);
+//
+//    // Add value map between `Array` init tuple and `DifferentiableView`.
+//    setTangentValue(bb, ai, makeConcreteTangentValue(diffViewInitInst));
+//
+//    // Loop over all uses of the array initialization, making sure to handle
+//    // any `tuple_extract` instructions. These instructions can either be
+//    // for getting the array, or the `RawPointer`. We are only interested in
+//    // adding additional instructions for the `RawPointer`, the second element
+//    // in the array tuple as the array is already handled through it being
+//    // chosen to be differentiated when using activity analysis.
+//    for (auto aiUse : ai->getUses()) {
+//      auto tei = dyn_cast<TupleExtractInst>(aiUse->getUser()->getResult(0));
+//      // Only handle the `RawPointer` instructions.
+//      if (!tei || tei->getFieldNo() != 1) continue;
+//
+//      // TODO: might not need a loop since there should be one use of `RawPointer`.
+//      // Get the `pointer_to_address` instruction which is the instruction
+//      // that wraps the `RawPointer` in order to do subsequent instructions
+//      for (auto teiUse : tei->getUses()) {
+//        // Add tangent map between the `pointer_to_address` result.
+//        // TODO: add cast assertion?
+//        auto pointerAddrInst = dyn_cast<PointerToAddressInst>(teiUse->getUser()->getResult(0));
+//        assert(pointerAddrInst && "RawPointer only use should be a "
+//                                  "'pointer_to_address' instruction");
+//        auto originalResult =
+//            pointerAddrInst->getResults()[indices.source];
+//        auto tangentPointerAddrInst = diffBuilder.createPointerToAddress(
+//            loc, diffRawPointerInst, pointerAddrInst->getType(),
+//            pointerAddrInst->isStrict());
+//        auto differentialResult = tangentPointerAddrInst
+//            ->SILInstruction::getResults()[indices.source];
+//        // Add tangent for original result.
+//        // TODO: what about indirect results?
+//        assert(indices.source == 0 && "Expected result index to be first.");
+//        setTangentBuffer(bb, originalResult, differentialResult);
+//
+//        // Handle the uses of the array pointer which can be:
+//        // - `StoreInst`
+//        // - `CopyAddrInst`
+//        // - `IndexAddrInst`
+////        for (auto pointerUse : teiUse->getUser()->getResult(0)->getUses()) {
+////          auto inst = pointerUse->getUser();
+////          if (auto si = dyn_cast<StoreInst>(inst)) {
+////            emitTangentForStoreInst(si);
+////          } else if (auto cai = dyn_cast<CopyAddrInst>(inst)) {
+////            llvm_unreachable("Can't handle 'copy_addr' instruction for "
+////                             "array yet");
+////          } else if (auto iai = dyn_cast<IndexAddrInst>(inst)) {
+////            llvm_unreachable("Can't handle 'index_addr' instruction for "
+////                             "array yet");
+////          }
+////        }
+//      }
+//    }
+//
+//  }
 
   void emitTangentForTupleElementAddrInst(TupleElementAddrInst *teai) {
     auto *bb = teai->getParent();
@@ -5328,10 +5283,10 @@ public:
     return jvpBB;
   }
 
-  void visitArrayInitializationInst(ApplyInst *ai) {
-    TypeSubstCloner::visitApplyInst(ai);
-    emitTangentForArrayInitializationInst(ai);
-  }
+//  void visitArrayInitializationInst(ApplyInst *ai) {
+//    TypeSubstCloner::visitApplyInst(ai);
+//    emitTangentForArrayInitializationInst(ai);
+//  }
 
   void visitSILInstruction(SILInstruction *inst) {
     context.emitNondifferentiabilityError(inst, invoker,
@@ -5349,16 +5304,14 @@ public:
 
   void visitInstructionsInBlock(SILBasicBlock *bb) {
     // Destructure the differential struct to get the elements.
-    if (bb == original->getEntryBlock()) {
-      auto &diffBuilder = getDifferentialBuilder();
-      auto diffLoc = getDifferential().getLocation();
-      auto *diffBB = diffBBMap.lookup(bb);
-      auto *mainDifferentialStruct = diffBB->getArguments().back();
-      diffBuilder.setInsertionPoint(diffBB);
-      auto *dsi = diffBuilder.createDestructureStruct(
-          diffLoc, mainDifferentialStruct);
-      initializeDifferentialStructElements(bb, dsi->getResults());
-    }
+    auto &diffBuilder = getDifferentialBuilder();
+    auto diffLoc = getDifferential().getLocation();
+    auto *diffBB = diffBBMap.lookup(bb);
+    auto *mainDifferentialStruct = diffBB->getArguments().back();
+    diffBuilder.setInsertionPoint(diffBB);
+    auto *dsi = diffBuilder.createDestructureStruct(
+        diffLoc, mainDifferentialStruct);
+    initializeDifferentialStructElements(bb, dsi->getResults());
     TypeSubstCloner::visitInstructionsInBlock(bb);
   }
 
@@ -6495,7 +6448,7 @@ public:
     } else {
       setAdjointValue(origExit, origResult, makeConcreteAdjointValue(seed));
       LLVM_DEBUG(getADDebugStream()
-                 << "Assigned seed " << seed
+                 << "Assigned seed " << *seed
                  << " as the adjoint of original result " << origResult);
     }
 
