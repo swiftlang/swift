@@ -4885,7 +4885,7 @@ public:
     } else {
       setAdjointValue(origExit, origResult, makeConcreteAdjointValue(seed));
       LLVM_DEBUG(getADDebugStream()
-                 << "Assigned seed " << seed
+                 << "Assigned seed " << *seed
                  << " as the adjoint of original result " << origResult);
     }
 
@@ -5208,9 +5208,9 @@ public:
   }
 
   AllocStackInst *
-  emitDifferentiableViewSubscript(ApplyInst *ai, SILType eltType,
-                                  SILValue adjointArray, SILValue fnRef,
-                                  CanGenericSignature genericSig, int index) {
+  emitArrayTangentSubscript(ApplyInst *ai, SILType eltType,
+                            SILValue adjointArray, SILValue fnRef,
+                            CanGenericSignature genericSig, int index) {
     auto &ctx = builder.getASTContext();
     auto astType = eltType.getASTType();
     auto literal = builder.createIntegerLiteral(
@@ -5235,19 +5235,25 @@ public:
     return subscriptBuffer;
   }
 
-  void
-  accumulateDifferentiableViewSubscriptDirect(ApplyInst *ai, SILType eltType,
-                                              StoreInst *si,
-                                              AllocStackInst *subscriptBuffer) {
+  void accumulateArrayTangentSubscriptDirect(ApplyInst *ai, SILType eltType,
+                                             StoreInst *si,
+                                             AllocStackInst *subscriptBuffer) {
     auto newAdjValue = builder.emitLoadValueOperation(
         ai->getLoc(), subscriptBuffer, LoadOwnershipQualifier::Take);
-    addAdjointValue(si->getParent(), si->getSrc(),
+    recordTemporary(newAdjValue);
+    SILValue src = si->getSrc();
+    // When the store's source is a `copy_value`, the `copy_value` is part of
+    // array literal initialization. In this case, add the adjoint to the source
+    // of the copy directly.
+    if (auto *cvi = dyn_cast<CopyValueInst>(src))
+      src = cvi->getOperand();
+    addAdjointValue(si->getParent(), src,
                     makeConcreteAdjointValue(newAdjValue), si->getLoc());
     blockTemporaries[ai->getParent()].push_back(newAdjValue);
     builder.createDeallocStack(ai->getLoc(), subscriptBuffer);
   }
 
-  void accumulateDifferentiableViewSubscriptIndirect(
+  void accumulateArrayTangentSubscriptIndirect(
       ApplyInst *ai, CopyAddrInst *cai, AllocStackInst *subscriptBuffer) {
     addToAdjointBuffer(cai->getParent(), cai->getSrc(), subscriptBuffer,
                        cai->getLoc());
@@ -5298,15 +5304,15 @@ public:
           auto inst = use->getUser();
           if (auto si = dyn_cast<StoreInst>(inst)) {
             auto tanType = getRemappedTangentType(si->getSrc()->getType());
-            auto subscriptBuffer = emitDifferentiableViewSubscript(
+            auto subscriptBuffer = emitArrayTangentSubscript(
                 ai, tanType, adjointArray, fnRef, genericSig, 0);
-            accumulateDifferentiableViewSubscriptDirect(
+            accumulateArrayTangentSubscriptDirect(
                 ai, tanType, si, subscriptBuffer);
           } else if (auto cai = dyn_cast<CopyAddrInst>(inst)) {
             auto tanType = getRemappedTangentType(cai->getSrc()->getType());
-            auto subscriptBuffer = emitDifferentiableViewSubscript(
+            auto subscriptBuffer = emitArrayTangentSubscript(
                 ai, tanType, adjointArray, fnRef, genericSig, 0);
-            accumulateDifferentiableViewSubscriptIndirect(
+            accumulateArrayTangentSubscriptIndirect(
                 ai, cai, subscriptBuffer);
           } else if (auto iai = dyn_cast<IndexAddrInst>(inst)) {
             for (auto use : iai->getUses()) {
@@ -5314,19 +5320,19 @@ public:
                 auto literal = dyn_cast<IntegerLiteralInst>(iai->getIndex());
                 auto tanType = getRemappedTangentType(
                     si->getSrc()->getType());
-                auto subscriptBuffer = emitDifferentiableViewSubscript(
+                auto subscriptBuffer = emitArrayTangentSubscript(
                     ai, tanType, adjointArray, fnRef,
                     genericSig, literal->getValue().getLimitedValue());
-                accumulateDifferentiableViewSubscriptDirect(
+                accumulateArrayTangentSubscriptDirect(
                     ai, tanType, si, subscriptBuffer);
               } else if (auto cai = dyn_cast<CopyAddrInst>(use->getUser())) {
                 auto literal = dyn_cast<IntegerLiteralInst>(iai->getIndex());
                 auto tanType = getRemappedTangentType(
                     cai->getSrc()->getType());
-                auto subscriptBuffer = emitDifferentiableViewSubscript(
+                auto subscriptBuffer = emitArrayTangentSubscript(
                     ai, tanType, adjointArray, fnRef,
                     genericSig, literal->getValue().getLimitedValue());
-                accumulateDifferentiableViewSubscriptIndirect(
+                accumulateArrayTangentSubscriptIndirect(
                     ai, cai, subscriptBuffer);
               }
             }
@@ -5790,15 +5796,11 @@ public:
 
   /// Handle `copy_value` instruction.
   ///   Original: y = copy_value x
-  ///    Adjoint: adj[x] = copy_value adj[y]
+  ///    Adjoint: adj[x] += adj[y]
   void visitCopyValueInst(CopyValueInst *cvi) {
     auto *bb = cvi->getParent();
     auto adj = getAdjointValue(bb, cvi);
-    auto adjVal = materializeAdjoint(adj, cvi->getLoc());
-    auto adjValCopy = builder.emitCopyValueOperation(cvi->getLoc(), adjVal);
-    recordTemporary(adjValCopy);
-    addAdjointValue(bb, cvi->getOperand(), makeConcreteAdjointValue(adjValCopy),
-                    cvi->getLoc());
+    addAdjointValue(bb, cvi->getOperand(), adj, cvi->getLoc());
   }
 
   /// Handle `begin_borrow` instruction.
