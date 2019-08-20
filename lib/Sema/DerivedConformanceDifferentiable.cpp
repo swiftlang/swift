@@ -489,7 +489,6 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
     newMember->copyFormalAccessFrom(member, /*sourceIsParentContext*/ true);
     newMember->setValidationToChecked();
     newMember->setSetterAccess(member->getFormalAccess());
-    newMember->getSynthesizedAccessor(AccessorKind::Get);
     C.addSynthesizedDecl(newMember);
     C.addSynthesizedDecl(memberBinding);
 
