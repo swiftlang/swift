@@ -1452,7 +1452,6 @@ static bool hasTrivialTrailingClosure(const FuncDecl *FD,
 class CompletionLookup final : public swift::VisibleDeclConsumer {
   CodeCompletionResultSink &Sink;
   ASTContext &Ctx;
-  LazyResolver *TypeResolver = nullptr;
   const DeclContext *CurrDeclContext;
   ModuleDecl *CurrModule;
   ClangImporter *Importer;
@@ -1609,7 +1608,6 @@ public:
           getClangModuleLoader())),
         CompletionContext(CompletionContext) {
     (void)createTypeChecker(Ctx);
-    TypeResolver = Ctx.getLazyResolver();
 
     // Determine if we are doing code completion inside a static method.
     if (CurrDeclContext) {
@@ -2692,7 +2690,7 @@ public:
     SmallVector<ValueDecl *, 16> initializers;
     if (CurrDeclContext->lookupQualified(type, DeclBaseName::createConstructor(),
                                          NL_QualifiedDefault,
-                                         TypeResolver, initializers)) {
+                                         initializers)) {
       for (auto *init : initializers) {
         if (init->shouldHideFromEditor())
           continue;
@@ -2977,11 +2975,7 @@ public:
       return;
 
     if (!D->hasInterfaceType())
-      TypeResolver->resolveDeclSignature(D);
-    else if (isa<TypeAliasDecl>(D)) {
-      // A TypeAliasDecl might have type set, but not the underlying type.
-      TypeResolver->resolveDeclSignature(D);
-    }
+      D->getASTContext().getLazyResolver()->resolveDeclSignature(D);
 
     switch (Kind) {
     case LookupKind::ValueExpr:
@@ -3140,7 +3134,7 @@ public:
   bool handleEnumElement(ValueDecl *D, DeclVisibilityKind Reason,
                          DynamicLookupInfo dynamicLookupInfo) {
     if (!D->hasInterfaceType())
-      TypeResolver->resolveDeclSignature(D);
+      D->getASTContext().getLazyResolver()->resolveDeclSignature(D);
 
     if (auto *EED = dyn_cast<EnumElementDecl>(D)) {
       addEnumElementRef(EED, Reason, dynamicLookupInfo,
@@ -3151,7 +3145,7 @@ public:
       ED->getAllElements(Elements);
       for (auto *Ele : Elements) {
         if (!Ele->hasInterfaceType())
-          TypeResolver->resolveDeclSignature(Ele);
+          D->getASTContext().getLazyResolver()->resolveDeclSignature(Ele);
         addEnumElementRef(Ele, Reason, dynamicLookupInfo,
                           /*HasTypeContext=*/true);
       }
@@ -3227,7 +3221,7 @@ public:
     if (isIUO) {
       if (Type Unwrapped = ExprType->getOptionalObjectType()) {
         lookupVisibleMemberDecls(*this, Unwrapped, CurrDeclContext,
-                                 TypeResolver, IncludeInstanceMembers);
+                                 IncludeInstanceMembers);
         return true;
       }
       assert(IsUnwrappedOptional && "IUOs should be optional if not bound/forced");
@@ -3247,7 +3241,6 @@ public:
           CodeCompletionResult::MaxNumBytesToErase) {
         if (!tryTupleExprCompletions(Unwrapped)) {
           lookupVisibleMemberDecls(*this, Unwrapped, CurrDeclContext,
-                                   TypeResolver,
                                    IncludeInstanceMembers);
         }
       }
@@ -3318,7 +3311,7 @@ public:
     tryUnwrappedCompletions(ExprType, isIUO);
 
     lookupVisibleMemberDecls(*this, ExprType, CurrDeclContext,
-                             TypeResolver, IncludeInstanceMembers);
+                             IncludeInstanceMembers);
   }
 
   template <typename T>
@@ -3774,7 +3767,7 @@ public:
     Kind = LookupKind::ValueInDeclContext;
     NeedLeadingDot = false;
     FilteredDeclConsumer Consumer(*this, Filter);
-    lookupVisibleDecls(Consumer, CurrDeclContext, TypeResolver,
+    lookupVisibleDecls(Consumer, CurrDeclContext,
                        /*IncludeTopLevel=*/IncludeTopLevel, Loc);
     if (RequestCache)
       RequestedCachedResults.push_back(RequestedResultsTy::toplevelResults());
@@ -3838,7 +3831,6 @@ public:
     llvm::SaveAndRestore<Type> SaveType(ExprType, baseType);
     llvm::SaveAndRestore<bool> SaveUnresolved(IsUnresolvedMember, true);
     lookupVisibleMemberDecls(consumer, baseType, CurrDeclContext,
-                             TypeResolver,
                              /*includeInstanceMembers=*/false);
   }
 
@@ -3880,7 +3872,7 @@ public:
     this->BaseType = BaseType;
     NeedLeadingDot = !HaveDot;
     lookupVisibleMemberDecls(*this, MetatypeType::get(BaseType),
-                             CurrDeclContext, TypeResolver,
+                             CurrDeclContext,
                              IncludeInstanceMembers);
     if (BaseType->isAnyExistentialType()) {
       addKeyword("Protocol", MetatypeType::get(BaseType));
@@ -4004,7 +3996,7 @@ public:
 
   void getTypeCompletionsInDeclContext(SourceLoc Loc) {
     Kind = LookupKind::TypeInDeclContext;
-    lookupVisibleDecls(*this, CurrDeclContext, TypeResolver,
+    lookupVisibleDecls(*this, CurrDeclContext,
                        /*IncludeTopLevel=*/false, Loc);
 
     RequestedCachedResults.push_back(
@@ -4047,7 +4039,6 @@ class CompletionOverrideLookup : public swift::VisibleDeclConsumer {
   CodeCompletionResultSink &Sink;
   ASTContext &Ctx;
   const DeclContext *CurrDeclContext;
-  LazyResolver *TypeResolver;
   SmallVectorImpl<StringRef> &ParsedKeywords;
   SourceLoc introducerLoc;
 
@@ -4068,7 +4059,6 @@ public:
       : Sink(Sink), Ctx(Ctx), CurrDeclContext(CurrDeclContext),
         ParsedKeywords(ParsedKeywords), introducerLoc(introducerLoc) {
     (void)createTypeChecker(Ctx);
-    TypeResolver = Ctx.getLazyResolver();
 
     hasFuncIntroducer = isKeywordSpecified("func");
     hasVarIntroducer = isKeywordSpecified("var") ||
@@ -4332,7 +4322,7 @@ public:
       return;
 
     if (!D->hasInterfaceType())
-      TypeResolver->resolveDeclSignature(D);
+      D->getASTContext().getLazyResolver()->resolveDeclSignature(D);
 
     bool hasIntroducer = hasFuncIntroducer ||
                          hasVarIntroducer ||
@@ -4441,7 +4431,6 @@ public:
       // Look for overridable static members too.
       Type Meta = MetatypeType::get(CurrTy);
       lookupVisibleMemberDecls(*this, Meta, CurrDeclContext,
-                               TypeResolver,
                                /*includeInstanceMembers=*/true);
       addDesignatedInitializers(NTD);
       addAssociatedTypes(NTD);

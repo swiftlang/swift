@@ -118,14 +118,13 @@ static bool areTypeDeclsVisibleInLookupMode(LookupState LS) {
 }
 
 static bool isDeclVisibleInLookupMode(ValueDecl *Member, LookupState LS,
-                                      const DeclContext *FromContext,
-                                      LazyResolver *TypeResolver) {
+                                      const DeclContext *FromContext) {
   // Accessors are never visible directly in the source language.
   if (isa<AccessorDecl>(Member))
     return false;
 
-  if (TypeResolver) {
-    TypeResolver->resolveDeclSignature(Member);
+  if (!Member->hasInterfaceType()) {
+    Member->getASTContext().getLazyResolver()->resolveDeclSignature(Member);
   }
 
   // Check access when relevant.
@@ -190,13 +189,12 @@ static bool isDeclVisibleInLookupMode(ValueDecl *Member, LookupState LS,
 static void collectVisibleMemberDecls(const DeclContext *CurrDC, LookupState LS,
                                       Type BaseType,
                                       IterableDeclContext *Parent,
-                                      SmallVectorImpl<ValueDecl *> &FoundDecls,
-                                      LazyResolver *TypeResolver) {
+                                      SmallVectorImpl<ValueDecl *> &FoundDecls) {
   for (auto Member : Parent->getMembers()) {
     auto *VD = dyn_cast<ValueDecl>(Member);
     if (!VD)
       continue;
-    if (!isDeclVisibleInLookupMode(VD, LS, CurrDC, TypeResolver))
+    if (!isDeclVisibleInLookupMode(VD, LS, CurrDC))
       continue;
     if (!evaluateOrDefault(CurrDC->getASTContext().evaluator,
         IsDeclApplicableRequest(DeclApplicabilityOwner(CurrDC, BaseType, VD)),
@@ -213,8 +211,7 @@ static void doGlobalExtensionLookup(Type BaseType,
                                     SmallVectorImpl<ValueDecl *> &FoundDecls,
                                     const DeclContext *CurrDC,
                                     LookupState LS,
-                                    DeclVisibilityKind Reason,
-                                    LazyResolver *TypeResolver) {
+                                    DeclVisibilityKind Reason) {
   auto nominal = LookupType->getAnyNominal();
 
   // Look in each extension of this type.
@@ -224,8 +221,7 @@ static void doGlobalExtensionLookup(Type BaseType,
                                                        extension)), false))
       continue;
 
-    collectVisibleMemberDecls(CurrDC, LS, BaseType, extension, FoundDecls,
-                              TypeResolver);
+    collectVisibleMemberDecls(CurrDC, LS, BaseType, extension, FoundDecls);
   }
 
   // Handle shadowing.
@@ -241,16 +237,14 @@ static void doGlobalExtensionLookup(Type BaseType,
 static void lookupTypeMembers(Type BaseType, Type LookupType,
                               VisibleDeclConsumer &Consumer,
                               const DeclContext *CurrDC, LookupState LS,
-                              DeclVisibilityKind Reason,
-                              LazyResolver *TypeResolver) {
+                              DeclVisibilityKind Reason) {
   NominalTypeDecl *D = LookupType->getAnyNominal();
   assert(D && "should have a nominal type");
 
   SmallVector<ValueDecl*, 2> FoundDecls;
-  collectVisibleMemberDecls(CurrDC, LS, BaseType, D, FoundDecls, TypeResolver);
+  collectVisibleMemberDecls(CurrDC, LS, BaseType, D, FoundDecls);
 
-  doGlobalExtensionLookup(BaseType, LookupType, FoundDecls, CurrDC, LS, Reason,
-                          TypeResolver);
+  doGlobalExtensionLookup(BaseType, LookupType, FoundDecls, CurrDC, LS, Reason);
 
   // Report the declarations we found to the consumer.
   for (auto *VD : FoundDecls)
@@ -260,23 +254,19 @@ static void lookupTypeMembers(Type BaseType, Type LookupType,
 /// Enumerate AnyObject declarations as seen from context \c CurrDC.
 static void doDynamicLookup(VisibleDeclConsumer &Consumer,
                             const DeclContext *CurrDC,
-                            LookupState LS,
-                            LazyResolver *TypeResolver) {
+                            LookupState LS) {
   class DynamicLookupConsumer : public VisibleDeclConsumer {
     VisibleDeclConsumer &ChainedConsumer;
     LookupState LS;
     const DeclContext *CurrDC;
-    LazyResolver *TypeResolver;
     llvm::DenseSet<std::pair<DeclBaseName, CanType>> FunctionsReported;
     llvm::DenseSet<CanType> SubscriptsReported;
     llvm::DenseSet<std::pair<Identifier, CanType>> PropertiesReported;
 
   public:
     explicit DynamicLookupConsumer(VisibleDeclConsumer &ChainedConsumer,
-                                   LookupState LS, const DeclContext *CurrDC,
-                                   LazyResolver *TypeResolver)
-        : ChainedConsumer(ChainedConsumer), LS(LS), CurrDC(CurrDC),
-          TypeResolver(TypeResolver) {}
+                                   LookupState LS, const DeclContext *CurrDC)
+        : ChainedConsumer(ChainedConsumer), LS(LS), CurrDC(CurrDC) {}
 
     void foundDecl(ValueDecl *D, DeclVisibilityKind Reason,
                    DynamicLookupInfo) override {
@@ -292,8 +282,7 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
 
       // Ensure that the declaration has a type.
       if (!D->hasInterfaceType()) {
-        if (!TypeResolver) return;
-        TypeResolver->resolveDeclSignature(D);
+        D->getASTContext().getLazyResolver()->resolveDeclSignature(D);
         if (!D->hasInterfaceType()) return;
       }
 
@@ -366,13 +355,13 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
       }
       }
 
-      if (isDeclVisibleInLookupMode(D, LS, CurrDC, TypeResolver))
+      if (isDeclVisibleInLookupMode(D, LS, CurrDC))
         ChainedConsumer.foundDecl(D, DeclVisibilityKind::DynamicLookup,
                                   DynamicLookupInfo::AnyObject);
     }
   };
 
-  DynamicLookupConsumer ConsumerWrapper(Consumer, LS, CurrDC, TypeResolver);
+  DynamicLookupConsumer ConsumerWrapper(Consumer, LS, CurrDC);
 
   CurrDC->getParentSourceFile()->forAllVisibleModules(
       [&](ModuleDecl::ImportedModule Import) {
@@ -402,7 +391,7 @@ static DeclVisibilityKind getReasonForSuper(DeclVisibilityKind Reason) {
 static void lookupDeclsFromProtocolsBeingConformedTo(
     Type BaseTy, VisibleDeclConsumer &Consumer, LookupState LS,
     const DeclContext *FromContext, DeclVisibilityKind Reason,
-    LazyResolver *TypeResolver, VisitedSet &Visited) {
+    VisitedSet &Visited) {
   NominalTypeDecl *CurrNominal = BaseTy->getAnyNominal();
   if (!CurrNominal)
     return;
@@ -438,7 +427,7 @@ static void lookupDeclsFromProtocolsBeingConformedTo(
           continue;
         }
         if (auto *VD = dyn_cast<ValueDecl>(Member)) {
-          if (TypeResolver) {
+          if (auto *TypeResolver = VD->getASTContext().getLazyResolver()) {
             TypeResolver->resolveDeclSignature(VD);
             if (!NormalConformance->hasWitness(VD) &&
                 (Conformance->getDeclContext()->getParentSourceFile() !=
@@ -460,8 +449,7 @@ static void lookupDeclsFromProtocolsBeingConformedTo(
     // Add members from any extensions.
     SmallVector<ValueDecl *, 2> FoundDecls;
     doGlobalExtensionLookup(BaseTy, Proto->getDeclaredType(), FoundDecls,
-                            FromContext, LS, ReasonForThisProtocol,
-                            TypeResolver);
+                            FromContext, LS, ReasonForThisProtocol);
     for (auto *VD : FoundDecls)
       Consumer.foundDecl(VD, ReasonForThisProtocol);
   }
@@ -471,7 +459,6 @@ static void
 lookupVisibleMemberDeclsImpl(Type BaseTy, VisibleDeclConsumer &Consumer,
                              const DeclContext *CurrDC, LookupState LS,
                              DeclVisibilityKind Reason,
-                             LazyResolver *TypeResolver,
                              GenericSignatureBuilder *GSB,
                              VisitedSet &Visited);
 
@@ -480,7 +467,6 @@ static void
                                    VisibleDeclConsumer &Consumer,
                                    const DeclContext *CurrDC, LookupState LS,
                                    DeclVisibilityKind Reason,
-                                   LazyResolver *TypeResolver,
                                    GenericSignatureBuilder *GSB,
                                    VisitedSet &Visited) {
   if (!Visited.insert(PT->getDecl()).second)
@@ -488,15 +474,15 @@ static void
 
   for (auto Proto : PT->getDecl()->getInheritedProtocols())
     lookupVisibleProtocolMemberDecls(BaseTy, Proto->getDeclaredType(), Consumer, CurrDC,
-                                     LS, getReasonForSuper(Reason), TypeResolver,
+                                     LS, getReasonForSuper(Reason),
                                      GSB, Visited);
-  lookupTypeMembers(BaseTy, PT, Consumer, CurrDC, LS, Reason, TypeResolver);
+  lookupTypeMembers(BaseTy, PT, Consumer, CurrDC, LS, Reason);
 }
 
 static void lookupVisibleMemberDeclsImpl(
     Type BaseTy, VisibleDeclConsumer &Consumer, const DeclContext *CurrDC,
-    LookupState LS, DeclVisibilityKind Reason, LazyResolver *TypeResolver,
-    GenericSignatureBuilder *GSB, VisitedSet &Visited) {
+    LookupState LS, DeclVisibilityKind Reason, GenericSignatureBuilder *GSB,
+    VisitedSet &Visited) {
   // Just look through l-valueness.  It doesn't affect name lookup.
   assert(BaseTy && "lookup into null type");
   assert(!BaseTy->hasLValueType());
@@ -520,7 +506,7 @@ static void lookupVisibleMemberDeclsImpl(
     // functions, and can even look up non-static functions as well (thus
     // getting the address of the member).
     lookupVisibleMemberDeclsImpl(Ty, Consumer, CurrDC, subLS, Reason,
-                                 TypeResolver, GSB, Visited);
+                                 GSB, Visited);
     return;
   }
 
@@ -536,14 +522,14 @@ static void lookupVisibleMemberDeclsImpl(
 
   // If the base is AnyObject, we are doing dynamic lookup.
   if (BaseTy->isAnyObject()) {
-    doDynamicLookup(Consumer, CurrDC, LS, TypeResolver);
+    doDynamicLookup(Consumer, CurrDC, LS);
     return;
   }
 
   // If the base is a protocol, enumerate its members.
   if (ProtocolType *PT = BaseTy->getAs<ProtocolType>()) {
     lookupVisibleProtocolMemberDecls(BaseTy, PT, Consumer, CurrDC, LS, Reason,
-                                     TypeResolver, GSB, Visited);
+                                     GSB, Visited);
     return;
   }
 
@@ -551,7 +537,7 @@ static void lookupVisibleMemberDeclsImpl(
   if (auto PC = BaseTy->getAs<ProtocolCompositionType>()) {
     for (auto Member : PC->getMembers())
       lookupVisibleMemberDeclsImpl(Member, Consumer, CurrDC, LS, Reason,
-                                   TypeResolver, GSB, Visited);
+                                   GSB, Visited);
     return;
   }
 
@@ -560,11 +546,11 @@ static void lookupVisibleMemberDeclsImpl(
     for (auto Proto : Archetype->getConformsTo())
       lookupVisibleProtocolMemberDecls(
           BaseTy, Proto->getDeclaredType(), Consumer, CurrDC, LS,
-          Reason, TypeResolver, GSB, Visited);
+          Reason, GSB, Visited);
 
     if (auto superclass = Archetype->getSuperclass())
       lookupVisibleMemberDeclsImpl(superclass, Consumer, CurrDC, LS,
-                                   Reason, TypeResolver, GSB, Visited);
+                                   Reason, GSB, Visited);
     return;
   }
 
@@ -583,14 +569,14 @@ static void lookupVisibleMemberDeclsImpl(
       for (const auto &Conforms : EquivClass->conformsTo) {
         lookupVisibleProtocolMemberDecls(
             BaseTy, Conforms.first->getDeclaredType(), Consumer, CurrDC,
-            LS, getReasonForSuper(Reason), TypeResolver, GSB, Visited);
+            LS, getReasonForSuper(Reason), GSB, Visited);
       }
 
       // Superclass.
       if (EquivClass->superclass) {
         lookupVisibleMemberDeclsImpl(EquivClass->superclass, Consumer, CurrDC,
                                      LS, getReasonForSuper(Reason),
-                                     TypeResolver, GSB, Visited);
+                                     GSB, Visited);
       }
       return;
     }
@@ -603,10 +589,9 @@ static void lookupVisibleMemberDeclsImpl(
       break;
 
     // Look in for members of a nominal type.
-    lookupTypeMembers(BaseTy, BaseTy, Consumer, CurrDC, LS, Reason,
-                      TypeResolver);
+    lookupTypeMembers(BaseTy, BaseTy, Consumer, CurrDC, LS, Reason);
     lookupDeclsFromProtocolsBeingConformedTo(BaseTy, Consumer, LS, CurrDC,
-                                             Reason, TypeResolver, Visited);
+                                             Reason, Visited);
     // If we have a class type, look into its superclass.
     auto *CurClass = dyn_cast<ClassDecl>(CurNominal);
 
@@ -727,12 +712,10 @@ public:
   llvm::SetVector<FoundDeclTy> DeclsToReport;
   Type BaseTy;
   const DeclContext *DC;
-  LazyResolver *TypeResolver;
 
-  OverrideFilteringConsumer(Type BaseTy, const DeclContext *DC,
-                            LazyResolver *resolver)
+  OverrideFilteringConsumer(Type BaseTy, const DeclContext *DC)
       : BaseTy(BaseTy->getMetatypeInstanceType()),
-        DC(DC), TypeResolver(resolver) {
+        DC(DC) {
     assert(!BaseTy->hasLValueType());
     assert(DC && BaseTy);
   }
@@ -751,8 +734,10 @@ public:
       return;
     }
 
-    if (TypeResolver) {
-      TypeResolver->resolveDeclSignature(VD);
+    if (!VD->hasInterfaceType()) {
+      VD->getASTContext().getLazyResolver()->resolveDeclSignature(VD);
+      if (!VD->hasInterfaceType())
+        return;
     }
 
     if (VD->isInvalid()) {
@@ -924,8 +909,8 @@ struct KeyPathDynamicMemberConsumer : public VisibleDeclConsumer {
 static void lookupVisibleDynamicMemberLookupDecls(
     Type baseType, KeyPathDynamicMemberConsumer &consumer,
     const DeclContext *dc, LookupState LS, DeclVisibilityKind reason,
-    LazyResolver *typeResolver, GenericSignatureBuilder *GSB,
-    VisitedSet &visited, llvm::DenseSet<TypeBase *> &seenDynamicLookup);
+    GenericSignatureBuilder *GSB, VisitedSet &visited,
+    llvm::DenseSet<TypeBase *> &seenDynamicLookup);
 
 /// Enumerates all members of \c baseType, including both directly visible and
 /// members visible by keypath dynamic member lookup.
@@ -935,14 +920,11 @@ static void lookupVisibleDynamicMemberLookupDecls(
 static void lookupVisibleMemberAndDynamicMemberDecls(
     Type baseType, VisibleDeclConsumer &consumer,
     KeyPathDynamicMemberConsumer &dynamicMemberConsumer, const DeclContext *DC,
-    LookupState LS, DeclVisibilityKind reason, LazyResolver *typeResolver,
-    GenericSignatureBuilder *GSB, VisitedSet &visited,
-    llvm::DenseSet<TypeBase *> &seenDynamicLookup) {
-  lookupVisibleMemberDeclsImpl(baseType, consumer, DC, LS, reason, typeResolver,
-                               GSB, visited);
+    LookupState LS, DeclVisibilityKind reason, GenericSignatureBuilder *GSB,
+    VisitedSet &visited, llvm::DenseSet<TypeBase *> &seenDynamicLookup) {
+  lookupVisibleMemberDeclsImpl(baseType, consumer, DC, LS, reason, GSB, visited);
   lookupVisibleDynamicMemberLookupDecls(baseType, dynamicMemberConsumer, DC, LS,
-                                        reason, typeResolver, GSB, visited,
-                                        seenDynamicLookup);
+                                        reason, GSB, visited, seenDynamicLookup);
 }
 
 /// Enumerates all keypath dynamic members of \c baseType, as seen from the
@@ -954,8 +936,8 @@ static void lookupVisibleMemberAndDynamicMemberDecls(
 static void lookupVisibleDynamicMemberLookupDecls(
     Type baseType, KeyPathDynamicMemberConsumer &consumer,
     const DeclContext *dc, LookupState LS, DeclVisibilityKind reason,
-    LazyResolver *typeResolver, GenericSignatureBuilder *GSB,
-    VisitedSet &visited, llvm::DenseSet<TypeBase *> &seenDynamicLookup) {
+    GenericSignatureBuilder *GSB, VisitedSet &visited,
+    llvm::DenseSet<TypeBase *> &seenDynamicLookup) {
   if (!seenDynamicLookup.insert(baseType.getPointer()).second)
     return;
 
@@ -971,7 +953,7 @@ static void lookupVisibleDynamicMemberLookupDecls(
 
   SmallVector<ValueDecl *, 2> subscripts;
   dc->lookupQualified(baseType, subscriptName, NL_QualifiedDefault,
-                      typeResolver, subscripts);
+                      subscripts);
 
   for (ValueDecl *VD : subscripts) {
     auto *subscript = dyn_cast<SubscriptDecl>(VD);
@@ -993,8 +975,8 @@ static void lookupVisibleDynamicMemberLookupDecls(
                                                       baseType);
 
     lookupVisibleMemberAndDynamicMemberDecls(memberType, consumer, consumer, dc,
-                                             LS, reason, typeResolver, GSB,
-                                             visited, seenDynamicLookup);
+                                             LS, reason, GSB, visited,
+                                             seenDynamicLookup);
   }
 }
 
@@ -1006,9 +988,8 @@ static void lookupVisibleDynamicMemberLookupDecls(
 /// binding.
 static void lookupVisibleMemberDecls(
     Type BaseTy, VisibleDeclConsumer &Consumer, const DeclContext *CurrDC,
-    LookupState LS, DeclVisibilityKind Reason, LazyResolver *TypeResolver,
-    GenericSignatureBuilder *GSB) {
-  OverrideFilteringConsumer overrideConsumer(BaseTy, CurrDC, TypeResolver);
+    LookupState LS, DeclVisibilityKind Reason, GenericSignatureBuilder *GSB) {
+  OverrideFilteringConsumer overrideConsumer(BaseTy, CurrDC);
   KeyPathDynamicMemberConsumer dynamicConsumer(
       Consumer,
       [&](DeclBaseName name) { return overrideConsumer.seenBaseName(name); });
@@ -1017,7 +998,7 @@ static void lookupVisibleMemberDecls(
   llvm::DenseSet<TypeBase *> seenDynamicLookup;
   lookupVisibleMemberAndDynamicMemberDecls(
       BaseTy, overrideConsumer, dynamicConsumer, CurrDC, LS, Reason,
-      TypeResolver, GSB, Visited, seenDynamicLookup);
+      GSB, Visited, seenDynamicLookup);
 
   // Report the declarations we found to the real consumer.
   for (const auto &DeclAndReason : overrideConsumer.DeclsToReport)
@@ -1027,7 +1008,6 @@ static void lookupVisibleMemberDecls(
 
 static void lookupVisibleDeclsImpl(VisibleDeclConsumer &Consumer,
                                    const DeclContext *DC,
-                                   LazyResolver *TypeResolver,
                                    bool IncludeTopLevel, SourceLoc Loc) {
   const ModuleDecl &M = *DC->getParentModule();
   const SourceManager &SM = DC->getASTContext().SourceMgr;
@@ -1126,7 +1106,7 @@ static void lookupVisibleDeclsImpl(VisibleDeclConsumer &Consumer,
 
     if (ExtendedType)
       ::lookupVisibleMemberDecls(ExtendedType, Consumer, DC, LS, Reason,
-                                 TypeResolver, nullptr);
+                                 nullptr);
 
     DC = DC->getParent();
     Reason = DeclVisibilityKind::MemberOfOutsideNominal;
@@ -1163,7 +1143,7 @@ static void lookupVisibleDeclsImpl(VisibleDeclConsumer &Consumer,
     lookupVisibleDeclsInModule(&mutableM, {}, moduleResults,
                                NLKind::UnqualifiedLookup,
                                ResolutionKind::Overloadable,
-                               TypeResolver, DC, extraImports);
+                               DC, extraImports);
     for (auto result : moduleResults)
       Consumer.foundDecl(result, DeclVisibilityKind::VisibleAtTopLevel);
 
@@ -1174,11 +1154,10 @@ static void lookupVisibleDeclsImpl(VisibleDeclConsumer &Consumer,
 
 void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
                                const DeclContext *DC,
-                               LazyResolver *TypeResolver,
                                bool IncludeTopLevel,
                                SourceLoc Loc) {
   if (Loc.isInvalid()) {
-    lookupVisibleDeclsImpl(Consumer, DC, TypeResolver, IncludeTopLevel, Loc);
+    lookupVisibleDeclsImpl(Consumer, DC, IncludeTopLevel, Loc);
     return;
   }
 
@@ -1229,12 +1208,11 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
     }
   } LocalConsumer(DC->getASTContext().SourceMgr, Loc, Consumer);
 
-  lookupVisibleDeclsImpl(LocalConsumer, DC, TypeResolver, IncludeTopLevel, Loc);
+  lookupVisibleDeclsImpl(LocalConsumer, DC, IncludeTopLevel, Loc);
 }
 
 void swift::lookupVisibleMemberDecls(VisibleDeclConsumer &Consumer, Type BaseTy,
                                      const DeclContext *CurrDC,
-                                     LazyResolver *TypeResolver,
                                      bool includeInstanceMembers,
                                      GenericSignatureBuilder *GSB) {
   assert(CurrDC);
@@ -1245,5 +1223,5 @@ void swift::lookupVisibleMemberDecls(VisibleDeclConsumer &Consumer, Type BaseTy,
 
   ::lookupVisibleMemberDecls(BaseTy, Consumer, CurrDC, ls,
                              DeclVisibilityKind::MemberOfCurrentNominal,
-                             TypeResolver, GSB);
+                             GSB);
 }

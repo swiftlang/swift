@@ -301,7 +301,7 @@ convertToUnqualifiedLookupOptions(NameLookupOptions options) {
 LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclName name,
                                             SourceLoc loc,
                                             NameLookupOptions options) {
-  UnqualifiedLookup lookup(name, dc, nullptr, loc,
+  UnqualifiedLookup lookup(name, dc, loc,
                            convertToUnqualifiedLookupOptions(options));
 
   LookupResult result;
@@ -336,7 +336,7 @@ TypeChecker::lookupUnqualifiedType(DeclContext *dc, DeclName name,
   {
     // Try lookup without ProtocolMembers first.
     UnqualifiedLookup lookup(
-        name, dc, nullptr, loc,
+        name, dc, loc,
         ulOptions - UnqualifiedLookup::Flags::AllowProtocolMembers);
 
     if (!lookup.Results.empty() ||
@@ -352,7 +352,7 @@ TypeChecker::lookupUnqualifiedType(DeclContext *dc, DeclName name,
     // is called too early, we start resolving extensions -- even those
     // which do provide not conformances.
     UnqualifiedLookup lookup(
-        name, dc, nullptr, loc,
+        name, dc, loc,
         ulOptions | UnqualifiedLookup::Flags::AllowProtocolMembers);
 
     return LookupResult(lookup.Results, lookup.IndexOfFirstOuterResult);
@@ -384,7 +384,7 @@ LookupResult TypeChecker::lookupMember(DeclContext *dc,
   LookupResultBuilder builder(result, dc, options,
                               /*memberLookup*/true);
   SmallVector<ValueDecl *, 4> lookupResults;
-  dc->lookupQualified(type, name, subOptions, nullptr, lookupResults);
+  dc->lookupQualified(type, name, subOptions, lookupResults);
 
   for (auto found : lookupResults)
     builder.add(found, nullptr, type, /*isOuter=*/false);
@@ -448,7 +448,7 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
   if (options.contains(NameLookupFlags::IgnoreAccessControl))
     subOptions |= NL_IgnoreAccessControl;
 
-  if (!dc->lookupQualified(type, name, subOptions, nullptr, decls))
+  if (!dc->lookupQualified(type, name, subOptions, decls))
     return result;
 
   // Look through the declarations, keeping only the unique type declarations.
@@ -670,10 +670,10 @@ void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
   });
 
   if (baseTypeOrNull) {
-    lookupVisibleMemberDecls(consumer, baseTypeOrNull, DC, this,
+    lookupVisibleMemberDecls(consumer, baseTypeOrNull, DC,
                              /*include instance members*/ true, gsb);
   } else {
-    lookupVisibleDecls(consumer, DC, this, /*top level*/ true,
+    lookupVisibleDecls(consumer, DC, /*top level*/ true,
                        corrections.Loc.getBaseNameLoc());
   }
 

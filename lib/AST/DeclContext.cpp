@@ -476,20 +476,15 @@ unsigned DeclContext::getSemanticDepth() const {
 }
 
 bool DeclContext::mayContainMembersAccessedByDynamicLookup() const {
-  // Dynamic lookup can only find class and protocol members, or extensions of
-  // classes.
-  if (auto *NTD = dyn_cast<NominalTypeDecl>(this)) {
-    if (isa<ClassDecl>(NTD))
-      if (!isGenericContext())
-        return true;
-    if (auto *PD = dyn_cast<ProtocolDecl>(NTD))
-      if (PD->getAttrs().hasAttribute<ObjCAttr>())
-        return true;
-  } else if (auto *ED = dyn_cast<ExtensionDecl>(this)) {
-    if (auto *CD = dyn_cast<ClassDecl>(ED->getExtendedNominal()))
-      if (!CD->isGenericContext())
-        return true;
-  }
+  // Members of non-generic classes and class extensions can be found by
+  /// dynamic lookup.
+  if (auto *CD = getSelfClassDecl())
+    return !CD->isGenericContext();
+
+  // Members of @objc protocols (but not protocol extensions) can be
+  // found by dynamic lookup.
+  if (auto *PD = dyn_cast<ProtocolDecl>(this))
+      return PD->getAttrs().hasAttribute<ObjCAttr>();
 
   return false;
 }

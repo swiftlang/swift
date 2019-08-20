@@ -32,7 +32,6 @@ namespace swift {
   class DeclName;
   class Expr;
   class GenericSignatureBuilder;
-  class LazyResolver;
   class TupleType;
   class Type;
   class TypeDecl;
@@ -147,7 +146,7 @@ public:
   ///
   /// If the current DeclContext is nested in a function body, the SourceLoc
   /// is used to determine which declarations in that body are visible.
-  UnqualifiedLookup(DeclName Name, DeclContext *DC, LazyResolver *TypeResolver,
+  UnqualifiedLookup(DeclName Name, DeclContext *DC,
                     SourceLoc Loc = SourceLoc(), Options options = Options());
   
   using ResultsVector = SmallVector<LookupResultEntry, 4>;
@@ -394,7 +393,6 @@ bool removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
 /// are visible.
 void lookupVisibleDecls(VisibleDeclConsumer &Consumer,
                         const DeclContext *DC,
-                        LazyResolver *typeResolver,
                         bool IncludeTopLevel,
                         SourceLoc Loc = SourceLoc());
 
@@ -405,7 +403,6 @@ void lookupVisibleDecls(VisibleDeclConsumer &Consumer,
 void lookupVisibleMemberDecls(VisibleDeclConsumer &Consumer,
                               Type BaseTy,
                               const DeclContext *CurrDC,
-                              LazyResolver *typeResolver,
                               bool includeInstanceMembers,
                               GenericSignatureBuilder *GSB = nullptr);
 
@@ -433,8 +430,6 @@ enum class ResolutionKind {
 /// \param[out] decls Any found decls will be added to this vector.
 /// \param lookupKind Whether this lookup is qualified or unqualified.
 /// \param resolutionKind What sort of decl is expected.
-/// \param typeResolver The type resolver for decls that need to be
-///        type-checked. This is needed for shadowing resolution.
 /// \param moduleScopeContext The top-level context from which the lookup is
 ///        being performed, for checking access. This must be either a
 ///        FileUnit or a Module.
@@ -442,7 +437,6 @@ enum class ResolutionKind {
 void lookupInModule(ModuleDecl *module, ModuleDecl::AccessPathTy accessPath,
                     DeclName name, SmallVectorImpl<ValueDecl *> &decls,
                     NLKind lookupKind, ResolutionKind resolutionKind,
-                    LazyResolver *typeResolver,
                     const DeclContext *moduleScopeContext,
                     ArrayRef<ModuleDecl::ImportedModule> extraImports = {});
 
@@ -508,7 +502,6 @@ lookupVisibleDeclsInModule(ModuleDecl *M, ModuleDecl::AccessPathTy accessPath,
                            SmallVectorImpl<ValueDecl *> &decls,
                            NLKind lookupKind,
                            ResolutionKind resolutionKind,
-                           LazyResolver *typeResolver,
                            const DeclContext *moduleScopeContext,
                            ArrayRef<ModuleDecl::ImportedModule> extraImports = {});
 

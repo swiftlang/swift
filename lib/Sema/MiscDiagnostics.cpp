@@ -525,7 +525,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       }
 
       DeclContext *topLevelContext = DC->getModuleScopeContext();
-      UnqualifiedLookup lookup(VD->getBaseName(), topLevelContext, &TC,
+      UnqualifiedLookup lookup(VD->getBaseName(), topLevelContext,
                                /*Loc=*/SourceLoc(),
                                UnqualifiedLookup::Flags::KnownPrivate);
 
