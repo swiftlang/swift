@@ -3803,11 +3803,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     return result;
   }
 
-  // Let's not try to fix missing conformance for Void
-  // and Never because that doesn't really make sense.
-  if (type->isVoid() || type->isUninhabited())
-    return SolutionKind::Error;
-
   auto protocolTy = protocol->getDeclaredType();
   // If this conformance has been fixed already, let's just consider this done.
   if (hasFixedRequirement(type, RequirementKind::Conformance, protocolTy))
@@ -3819,6 +3814,27 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   {
     SmallVector<LocatorPathElt, 4> path;
     auto *anchor = locator.getLocatorParts(path);
+
+    // If this is a `nil` literal, it would be a contextual failure.
+    if (auto *Nil = dyn_cast_or_null<NilLiteralExpr>(anchor)) {
+      auto *fixLocator = getConstraintLocator(
+          getContextualType(Nil)
+              ? locator.withPathElement(LocatorPathElt::ContextualType())
+              : locator);
+
+      // Here the roles are reversed - `nil` is something we are trying to
+      // convert to `type` by making sure that it conforms to a specific
+      // protocol.
+      auto *fix =
+          ContextualMismatch::create(*this, protocolTy, type, fixLocator);
+
+      return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
+    }
+
+    // Let's not try to fix missing conformance for Void
+    // or Never because that doesn't really make sense.
+    if (type->isVoid() || type->isUninhabited())
+      return SolutionKind::Error;
 
     if (path.empty())
       return SolutionKind::Error;
