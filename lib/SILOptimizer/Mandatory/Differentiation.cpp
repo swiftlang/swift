@@ -1537,7 +1537,21 @@ bool LinearMapInfo::shouldBeDifferentiated(ApplyInst *ai,
 void LinearMapInfo::addLinearMapToStruct(ApplyInst *ai,
                                          const SILAutoDiffIndices &indices) {
   SmallVector<SILValue, 4> allResults;
-  allResults.push_back(ai);
+  // Only append the results from the `destruct_tuple` instruction which are
+  // active, we don't consider the result of the original apply if it's a
+  // tuple.
+  if (ai->getResult(0)->getType().is<TupleType>()) {
+    for (auto *use : ai->getResult(0)->getUses()) {
+      if (auto *destructure =
+              dyn_cast<DestructureTupleInst>(use->getUser())) {
+        for (auto result : destructure->getResults())
+          allResults.push_back(result);
+        break;
+      }
+    }
+  } else {
+    allResults.push_back(ai);
+  }
   allResults.append(ai->getIndirectSILResults().begin(),
                     ai->getIndirectSILResults().end());
 
@@ -1782,8 +1796,21 @@ void DifferentiableActivityInfo::analyze(DominanceInfo *di,
             if (isVaried(arg, i)) {
               for (auto indRes : ai->getIndirectSILResults())
                 setVaried(indRes, i);
-              for (auto dirRes : ai->getResults())
-                setVaried(dirRes, i);
+              // Handle tuple results, in this case only mark the destructured
+              // results from the `destruct_tuple` instruction use as varied.
+              if (ai->getResult(0)->getType().is<TupleType>()) {
+                for (auto *use : ai->getResult(0)->getUses()) {
+                  if (auto *destructure =
+                          dyn_cast<DestructureTupleInst>(use->getUser())) {
+                    for (auto result : destructure->getResults())
+                      setVaried(result, i);
+                    break;
+                  }
+                }
+              } else {
+                for (auto dirRes : ai->getResults())
+                  setVaried(dirRes, i);
+              }
             }
           }
         }
@@ -3565,7 +3592,21 @@ public:
     // active arguments at an active 'inout' parameter position. If not, just do
     // standard cloning.
     SmallVector<SILValue, 4> allResults;
-    allResults.push_back(ai);
+    // Only append the results from the `destruct_tuple` instruction which are
+    // active, we don't consider the result of the original apply if it's a
+    // tuple.
+    if (ai->getResult(0)->getType().is<TupleType>()) {
+      for (auto *use : ai->getResult(0)->getUses()) {
+        if (auto *destructure =
+                dyn_cast<DestructureTupleInst>(use->getUser())) {
+          for (auto result : destructure->getResults())
+            allResults.push_back(result);
+          break;
+        }
+      }
+    } else {
+      allResults.push_back(ai);
+    }
     allResults.append(ai->getIndirectSILResults().begin(),
                       ai->getIndirectSILResults().end());
     auto hasActiveResults = llvm::any_of(
@@ -4201,6 +4242,13 @@ private:
     }))
       return true;
     if (auto *ai = dyn_cast<ApplyInst>(inst)) {
+      for (auto use : ai->getUses())
+        if (auto *dti = dyn_cast<DestructureTupleInst>(use->getUser())) {
+          for (auto result : dti->getResults()) {
+            if (activityInfo.isActive(result, getIndices()))
+              return false;
+          }
+        }
       // Function applications with an active indirect result should be
       // differentiated.
       for (auto indRes : ai->getIndirectSILResults())
@@ -4395,6 +4443,12 @@ private:
   /// Map the tangent value to the given original value.
   void setTangentValue(SILBasicBlock *origBB, SILValue originalValue,
                        AdjointValue newTangentValue) {
+    if (auto *defInst = originalValue->getDefiningInstruction()) {
+      auto *ai = dyn_cast<ApplyInst>(defInst);
+      assert(!(ai && originalValue->getType().is<TupleType>()) &&
+             "Should not be visiting tuple destructure if the operand came "
+             "from an apply");
+    }
     assert(originalValue->getType().isObject());
     assert(newTangentValue.getType().isObject());
     assert(originalValue->getFunction() == original);
@@ -4451,24 +4505,43 @@ private:
     auto diffLoc = differential.getLocation();
     auto &diffBuilder = getDifferentialBuilder();
 
+    SmallVector<SILValue, 2> activeResults;
+
     // This vector will contain all the materialized return elements.
     SmallVector<SILValue, 8> retElts;
-    SmallVector<SILValue, 2> results;
-    collectAllDirectResultsInTypeOrder(*original, results);
+    SmallVector<SILValue, 2> originalResults;
+    collectAllDirectResultsInTypeOrder(*original, originalResults);
 
     // Materializes the return element corresponding to the result
     // `resultIndex` into the `retElts` vector.
-    auto addRetElt = [&](unsigned resultIndex) -> void {
-      auto origResult = results[resultIndex];
+    auto addActiveResult = [&](unsigned resultIndex) -> void {
+      auto origResult = originalResults[resultIndex];
       assert(origResult->getType().isObject() &&
              "Should only be handling direct results for return inst");
-        auto diffVal = getTangentValue(origResult);
-        auto val = materializeTangent(diffVal, diffLoc);
-        retElts.push_back(val);
+      if (activityInfo.isActive(origResult, getIndices())) {
+        activeResults.push_back(origResult);
+      }
     };
-    // Collect differentiation parameter adjoints.
-    for (auto i : range(results.size()))
-      addRetElt(i);
+    // Create an array of the direct tangent values of the original results.
+    for (auto i : range(originalResults.size()))
+      addActiveResult(i);
+    assert(activeResults.size() <= 1);
+
+    if (activeResults.empty() && !originalResults.empty()) {
+      // Create zero tangent value for direct result.
+      auto origResult = originalResults[getIndices().source];
+      assert(origResult->getType().isObject() &&
+             "Should only be handling direct results for return inst");
+      auto zeroType = origResult->getType().getASTType();
+      auto zero =
+          emitZeroDirect(getTangentSpace(zeroType)->getCanonicalType(),
+                         diffLoc);
+      retElts.push_back(zero);
+    } else if (!activeResults.empty()) {
+      auto diffVal = getTangentValue(activeResults.front());
+      auto val = materializeTangent(diffVal, diffLoc);
+      retElts.push_back(val);
+    }
 
     diffBuilder.createReturn(
         diffLoc, joinElements(retElts, diffBuilder, diffLoc));
@@ -4554,13 +4627,30 @@ private:
     collectAllActualResultsInTypeOrder(
         differentialCall, differentialDirResults,
         differentialCall->getIndirectSILResults(), differentialAllResults);
-    auto differentialResult = differentialAllResults[indices.source];
+    auto differentialResult = differentialAllResults.front();
 
     // Add tangent for original result.
-    assert(indices.source == 0 && "Expected result index to be first.");
-    if (origResult->getType().isObject())
-      setTangentValue(bb, origResult,
-                      makeConcreteTangentValue(differentialResult));
+    if (origResult->getType().isObject()) {
+      if (!origResult->getType().is<TupleType>()) {
+        setTangentValue(bb, origResult,
+            makeConcreteTangentValue(differentialResult));
+      } else {
+        bool notSet = true;
+        for (auto use : ai->getUses()) {
+          if (auto *dti = dyn_cast<DestructureTupleInst>(use->getUser())) {
+            for (auto result : dti->getResults()) {
+              if (activityInfo.isActive(result, getIndices())) {
+                assert(notSet && "This hasn't been set yet, should only have "
+                       "one active result from the tuple.");
+                notSet = false;
+                setTangentValue(bb, result,
+                    makeConcreteTangentValue(differentialResult));
+              }
+            }
+          }
+        }
+      }
+    }
   }
 
   /// Find the corresponding struct in the tangent space of the field type.
@@ -4656,10 +4746,10 @@ private:
       tanField = cast<VarDecl>(tanFieldLookup.front());
     }
 
-    // Get the Tangent of the operand (the struct buffer).
+    // Get the tangent of the operand (the struct buffer).
     auto tanOperand = getTangentBuffer(bb, seai->getOperand());
 
-    // Emit the instruction
+    // Emit the instruction.
     auto tangentElemAddrInst =
         diffBuilder.createStructElementAddr(seai->getLoc(), tanOperand, tanField);
 
@@ -4897,7 +4987,23 @@ private:
     auto &diffBuilder = getDifferentialBuilder();
     auto *bb = dti->getParent();
     auto loc = dti->getLoc();
-    auto tanTuple = materializeTangent(getTangentValue(dti->getOperand()), loc);
+
+    SmallVector<SILValue, 2> activeOrigResult;
+    bool hasActiveResult = false;
+    for (auto i : range(dti->getResults().size())) {
+      auto origElem = dti->getResult(i);
+      if (activityInfo.isActive(origElem, getIndices())) {
+        activeOrigResult.push_back(origElem);
+        hasActiveResult = true;
+        break;
+      }
+    }
+    assert(activeOrigResult.size() > 0 &&
+           "original 'destructure_tuple' should have at least one active "
+           "result");
+
+    auto tanTuple =
+        materializeTangent(getTangentValue(dti->getOperand()), loc);
     auto *tupleElements = diffBuilder.createDestructureTuple(loc, tanTuple);
     for (auto i : range(tupleElements->getResults().size())) {
       auto origElem = dti->getResult(i);
@@ -5188,7 +5294,21 @@ public:
     // active arguments at an active parameter position. If not, just do
     // standard cloning.
     SmallVector<SILValue, 4> allResults;
-    allResults.push_back(ai);
+    // Only append the results from the `destruct_tuple` instruction which are
+    // active, we don't consider the result of the original apply if it's a
+    // tuple.
+    if (ai->getResult(0)->getType().is<TupleType>()) {
+      for (auto *use : ai->getResult(0)->getUses()) {
+        if (auto *destructure =
+                dyn_cast<DestructureTupleInst>(use->getUser())) {
+          for (auto result : destructure->getResults())
+            allResults.push_back(result);
+          break;
+        }
+      }
+    } else {
+      allResults.push_back(ai);
+    }
     allResults.append(ai->getIndirectSILResults().begin(),
                       ai->getIndirectSILResults().end());
     auto hasActiveResults = llvm::any_of(allResults, [this](SILValue res) {
@@ -5563,7 +5683,6 @@ public:
   }
 
   void visitTupleExtractInst(TupleExtractInst *tei) {
-    llvm_unreachable("IS THIS STILL SUPPORTED?");
     TypeSubstCloner::visitTupleExtractInst(tei);
     if(shouldBeDifferentiated(tei, getIndices()))
       emitTangentForTupleExtractInst(tei);
@@ -6092,6 +6211,8 @@ private:
     // Anything with an active result should be differentiated.
     if (llvm::any_of(inst->getResults(), [&](SILValue val) {
           return getActivityInfo().isActive(val, indices);
+        }) && llvm::any_of(inst->getAllOperands(), [&](Operand &val) {
+          return getActivityInfo().isActive(val.get(), indices);
         }))
       return true;
     if (auto *ai = dyn_cast<ApplyInst>(inst)) {
@@ -7110,7 +7231,6 @@ public:
   ///                            n'-th element, where n' is tuple tangent space
   ///                            index corresponding to n
   void visitTupleExtractInst(TupleExtractInst *tei) {
-    llvm_unreachable("IS THIS STILL SUPPORTED? PB");
     auto *bb = tei->getParent();
     auto tupleTanTy = getRemappedTangentType(tei->getOperand()->getType());
     auto av = getAdjointValue(bb, tei);

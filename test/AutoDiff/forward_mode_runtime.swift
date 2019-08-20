@@ -3,6 +3,11 @@
 
 import StdlibUnittest
 import DifferentiationUnittest
+#if os(macOS)
+import Darwin.C
+#else
+import Glibc
+#endif
 
 var ForwardModeTests = TestSuite("ForwardMode")
 
@@ -499,19 +504,19 @@ extension TF_508_Struct : Differentiable where Scalar : Differentiable {
   typealias TangentVector = TF_508_Struct
 }
 
-func TF_508() {
-  let x = TF_508_Struct<Float>()
-  // Test conformance requirement with dependent member type.
-  _ = differential(at: x, in: { 
-    (x: TF_508_Struct<Float>) -> TF_508_Struct<Float> in
-    return x + x
-  })
-  // Test same-type requirement with dependent member type.
-  _ = differential(at: x, in: { 
-    (x: TF_508_Struct<Float>) -> TF_508_Struct<Float> in
-    return x - x
-  })
-}
+// func TF_508() {
+//   let x = TF_508_Struct<Float>()
+//   // Test conformance requirement with dependent member type.
+//   _ = differential(at: x, in: { 
+//     (x: TF_508_Struct<Float>) -> TF_508_Struct<Float> in
+//     return x + x
+//   })
+//   // Test same-type requirement with dependent member type.
+//   _ = differential(at: x, in: { 
+//     (x: TF_508_Struct<Float>) -> TF_508_Struct<Float> in
+//     return x - x
+//   })
+// }
 
 // TF-523
 struct TF_523_Struct : Differentiable & AdditiveArithmetic {
@@ -558,7 +563,9 @@ func TF_534<Model: TF_534_Layer>(
 //   return x
 // }
 
+//===----------------------------------------------------------------------===//
 // Tracked Generic.
+//===----------------------------------------------------------------------===//
 
 ForwardModeTests.test("GenericTrackedIdentity") {
   func identity<T : Differentiable>(_ x: Tracked<T>) -> Tracked<T> {
@@ -808,26 +815,25 @@ ForwardModeTests.test("SimpleWrtSelf") {
 //===----------------------------------------------------------------------===//
 // Protocols
 //===----------------------------------------------------------------------===//
-// TODO: add more protocol tests.
-protocol DiffReq : Differentiable {
+
+protocol Prot : Differentiable {
   @differentiable(wrt: x)
   func foo(x: Float) -> Float
 }
+ForwardModeTests.test("Simple Protocol") {
+  struct Linear: Prot, VectorProtocol {
+    typealias TangentVector = Linear
 
-struct Linear: DiffReq, VectorProtocol {
-  typealias TangentVector = Linear
+    let m: Float
+    let b: Float
 
-  let m: Float
-  let b: Float
-
-  @differentiable(wrt: x)
-  func foo(x: Float) -> Float {
-    return m * x + b
+    @differentiable(wrt: x)
+    func foo(x: Float) -> Float {
+      return m * x + b
+    }
   }
-}
 
-ForwardModeTests.test("Protocols") {
-  func genericFoo<T: DiffReq>(_ t: T, _ x: Float) -> Float {
+  func genericFoo<T: Prot>(_ t: T, _ x: Float) -> Float {
     t.foo(x: x)
   }
   let inst = Linear(m: 5, b: -2)
@@ -835,5 +841,484 @@ ForwardModeTests.test("Protocols") {
   expectEqual(23, y1)
   expectEqual(5, diff1(1))
 }
+
+protocol DiffReq : Differentiable {
+  @differentiable(wrt: (self, x))
+  func f(_ x: Float) -> Float
+}
+
+extension DiffReq where TangentVector : AdditiveArithmetic {
+  @inline(never)  // Prevent specialization, to test all witness code.
+  func derivF(at x: Float) -> Float {
+    return (valueWithDifferential(at: x) { x in self.f(x) }).1(1)
+  }
+}
+
+struct Quadratic : DiffReq, VectorProtocol {
+  typealias TangentVector = Quadratic
+
+  @differentiable
+  let a: Float
+
+  @differentiable
+  let b: Float
+
+  @differentiable
+  let c: Float
+
+  init(_ a: Float, _ b: Float, _ c: Float) {
+    self.a = a
+    self.b = b
+    self.c = c
+  }
+
+  @differentiable(wrt: (self, x))
+  func f(_ x: Float) -> Float {
+    return a * x * x + b * x + c
+  }
+}
+
+ForwardModeTests.test("ProtocolFunc") {
+  expectEqual(12, Quadratic(11, 12, 13).derivF(at: 0))
+  expectEqual(2 * 11 + 12, Quadratic(11, 12, 13).derivF(at: 1))
+  expectEqual(2 * 11 * 2 + 12, Quadratic(11, 12, 13).derivF(at: 2))
+}
+
+// MARK: Constructor, accessor, and subscript requirements.
+
+protocol FunctionsOfX: Differentiable {
+  @differentiable
+  init(x: Float)
+
+  @differentiable
+  var x: Float { get }
+
+  @differentiable
+  var y: Float { get }
+
+  @differentiable
+  var z: Float { get }
+
+  @differentiable
+  subscript() -> Float { get }
+}
+
+struct TestFunctionsOfX: FunctionsOfX {
+  @differentiable
+  init(x: Float) {
+    self.x = x
+    self.y = x * x
+  }
+
+  /// x = x
+  var x: Float
+
+  /// y = x * x
+  var y: Float
+
+  /// z = x * x + x
+  var z: Float {
+    return y + x
+  }
+
+  @differentiable
+  subscript() -> Float {
+    return z
+  }
+}
+
+@inline(never)  // Prevent specialization, to test all witness code.
+func derivatives<F: FunctionsOfX>(at x: Float, in: F.Type)
+  -> (Float, Float, Float, Float)
+{
+  let dxdx = derivative(at: x) { x in F(x: x).x }
+  let dydx = derivative(at: x) { x in F(x: x).y }
+  let dzdx = derivative(at: x) { x in F(x: x).z }
+  let dsubscriptdx = derivative(at: x) { x in F(x: x)[] }
+  return (dxdx, dydx, dzdx, dsubscriptdx)
+}
+
+ForwardModeTests.test("constructor, accessor, subscript") {
+  expectEqual(
+    (1.0, 4.0, 5.0, 5.0),
+    derivatives(at: 2.0, in: TestFunctionsOfX.self))
+}
+
+// MARK: - Test witness method SIL type computation.
+
+protocol P : Differentiable {
+  @differentiable(wrt: (x, y))
+  func foo(_ x: Float, _ y: Double) -> Float
+}
+struct S : P {
+  @differentiable(wrt: (x, y))
+  func foo(_ x: Float, _ y: Double) -> Float {
+    return x
+  }
+}
+
+// MARK: - Overridden protocol method adding differentiable attribute.
+
+public protocol Distribution {
+  associatedtype Value
+  func logProbability(of value: Value) -> Float
+}
+
+public protocol DifferentiableDistribution: Differentiable, Distribution {
+  @differentiable(wrt: self)
+  func logProbability(of value: Value) -> Float
+}
+
+struct Foo: DifferentiableDistribution {
+  @differentiable(wrt: self)
+  func logProbability(of value: Float) -> Float {
+    .zero
+  }
+}
+
+@differentiable
+func blah<T: DifferentiableDistribution>(_ x: T) -> Float where T.Value: AdditiveArithmetic {
+  x.logProbability(of: .zero)
+}
+
+// Adding a more general `@differentiable` attribute.
+public protocol DoubleDifferentiableDistribution: DifferentiableDistribution
+  where Value: Differentiable {
+  @differentiable(wrt: self)
+  @differentiable(wrt: (self, value))
+  func logProbability(of value: Value) -> Float
+}
+
+@differentiable
+func blah2<T: DoubleDifferentiableDistribution>(_ x: T, _ value: T.Value) -> Float
+  where T.Value: AdditiveArithmetic {
+  x.logProbability(of: value)
+}
+
+protocol DifferentiableFoo {
+  associatedtype T: Differentiable
+  @differentiable(wrt: x)
+  func foo(_ x: T) -> Float
+}
+
+protocol MoreDifferentiableFoo: Differentiable, DifferentiableFoo {
+  @differentiable(wrt: (self, x))
+  func foo(_ x: T) -> Float
+}
+
+struct MoreDifferentiableFooStruct: MoreDifferentiableFoo {
+  @differentiable(wrt: (self, x))
+  func foo(_ x: Float) -> Float {
+    x
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// Simple Math
+//===----------------------------------------------------------------------===//
+
+ForwardModeTests.test("Arithmetics") {
+  func foo1(x: Float, y: Float) -> Float {
+    return x * y
+  }
+  expectEqual(7, derivative(at: 3, 4, in: foo1))
+  func foo2(x: Float, y: Float) -> Float {
+    return -x * y
+  }
+  expectEqual(-7, derivative(at: 3, 4, in: foo2))
+  func foo3(x: Float, y: Float) -> Float {
+    return -x + y
+  }
+  expectEqual(0, derivative(at: 3, 4, in: foo3))
+}
+
+ForwardModeTests.test("Fanout") {
+  func foo1(x: Float) -> Float {
+     x - x
+  }
+  expectEqual(0, derivative(at: 100, in: foo1))
+  func foo2(x: Float) -> Float {
+     x + x
+  }
+  expectEqual(2, derivative(at: 100, in: foo2))
+  func foo3(x: Float, y: Float) -> Float {
+    x + x + x * y
+  }
+  expectEqual(7, derivative(at: 3, 2, in: foo3))
+}
+
+ForwardModeTests.test("FunctionCall") {
+  func foo(_ x: Float, _ y: Float) -> Float {
+    return 3 * x + { $0 * 3 }(3) * y
+  }
+  expectEqual(12, derivative(at: 3, 4, in: foo))
+  expectEqual(3, derivative(at: 3) { x in foo(x, 4) })
+}
+
+ForwardModeTests.test("ResultSelection") {
+  func foo(_ x: Float, _ y: Float) -> (Float, Float) {
+    return (x + 1, y + 2)
+  }
+  expectEqual(1, derivative(at: 3, 3, in: { x, y in foo(x, y).0 }))
+  expectEqual(1, derivative(at: 3, 3, in: { x, y in foo(x, y).1 }))
+}
+
+// ForwardModeTests.test("CaptureLocal") {
+//   let z: Float = 10
+//   func foo(_ x: Float) -> Float {
+//     return z * x
+//   }
+//   expectEqual(10, derivative(at: 0, in: foo))
+// }
+
+// var globalVar: Float = 10
+// ForwardModeTests.test("CaptureGlobal") {
+//   func foo(x: Float) -> Float {
+//     globalVar += 20
+//     return globalVar * x
+//   }
+//   expectEqual(30, derivative(at: 0, in: foo))
+// }
+
+// var foo_diffable: @differentiable (Float) -> (Float)
+//   = differentiableFunction { x in (x * x, { v in 2 * x * v }) }
+// ForwardModeTests.test("GlobalDiffableFunc") {
+//   expectEqual(2, derivative(at: 1, in: foo_diffable))
+//   expectEqual(2, derivative(at: 1, in: { x in foo_diffable(x) }))
+//   expectEqual(1, derivative(at: 1, in: { (x: Float) -> Float in
+//     foo_diffable = { x in x + 1 }
+//     return foo_diffable(x)
+//   }))
+//   expectEqual(1, derivative(at: 1, in: foo_diffable))
+// }
+
+// ForwardModeTests.test("SideEffects") {
+//   func fourthPower(x: Float) -> Float {
+//     var a = x
+//     a = a * x
+//     a = a * x
+//     return a * x
+//   }
+//   expectEqual(4 * 27, derivative(at: 3, in: fourthPower))
+// }
+
+// ForwardModeTests.test("TupleSideEffects") {
+//   func foo(_ x: Float) -> Float {
+//     var tuple = (x, x)
+//     tuple.0 = tuple.0 * x
+//     return x * tuple.0
+//   }
+//   expectEqual(27, derivative(at: 3, in: foo))
+
+//   func fifthPower(_ x: Float) -> Float {
+//     var tuple = (x, x)
+//     tuple.0 = tuple.0 * x
+//     tuple.1 = tuple.0 * x
+//     return tuple.0 * tuple.1
+//   }
+//   expectEqual(405, derivative(at: 3, in: fifthPower))
+
+//   func nested(_ x: Float) -> Float {
+//     var tuple = ((x, x), x)
+//     tuple.0.0 = tuple.0.0 * x
+//     tuple.0.1 = tuple.0.0 * x
+//     return tuple.0.0 * tuple.0.1
+//   }
+//   expectEqual(405, derivative(at: 3, in: nested))
+
+//   // FIXME(TF-201): Update after reabstraction thunks can be directly differentiated.
+//   /*
+//   func generic<T : Differentiable & AdditiveArithmetic>(_ x: T) -> T {
+//     var tuple = (x, x)
+//     tuple.0 += x
+//     tuple.1 += x
+//     return tuple.0 + tuple.0
+//   }
+//   expectEqual(1, gradient(at: 3.0, in: generic))
+//   */
+// }
+
+// Tests TF-321.
+// ForwardModeTests.test("TupleNonDifferentiableElements") {
+//   func foo(_ x: Float) -> Float {
+//     var tuple = (x, 1)
+//     tuple.0 = x
+//     tuple.1 = 1
+//     return tuple.0
+//   }
+//   expectEqual(1, derivative(at: 1, in: foo))
+
+//   func bar(_ x: Float) -> Float {
+//     var tuple: (Int, Int, Float, Float) = (1, 1, x, x)
+//     tuple.0 = 1
+//     tuple.1 = 1
+//     tuple.3 = x
+//     return tuple.3
+//   }
+//   expectEqual(1, derivative(at: 1, in: bar))
+
+//   struct Wrapper<T> {
+//     @differentiable(where T : Differentiable)
+//     func baz(_ x: T) -> T {
+//       var tuple = (1, 1, x, 1)
+//       tuple.0 = 1
+//       tuple.2 = x
+//       tuple.3 = 1
+//       return tuple.2
+//     }
+//   }
+//   expectEqual(1, derivative(at: Float(1), in: { x -> Float in
+//     let wrapper = Wrapper<Float>()
+//     return wrapper.baz(x)
+//   }))
+// }
+
+// Tests TF-21.
+// ForwardModeTests.test("StructMemberwiseInitializer") {
+//   struct Foo : AdditiveArithmetic, Differentiable {
+//     var stored: Float
+//     var computed: Float {
+//       return stored * stored
+//     }
+//   }
+
+//   let derivFoo = differential(at: Float(4), in: { input -> Foo in
+//     let foo = Foo(stored: input)
+//     let foo2 = foo + foo
+//     return Foo(stored: foo2.stored)
+//   })(1)
+//   expectEqual(Foo.TangentVector(stored: 2), derivFoo)
+
+//   let 𝛁computed = derivative(at: Float(4)) { input -> Float in
+//     let foo = Foo(stored: input)
+//     return foo.computed
+//   }
+//   expectEqual(8, 𝛁computed)
+
+//   let derivProduct = derivative(at: Float(4)) { input -> Float in
+//     let foo = Foo(stored: input)
+//     return foo.computed * foo.stored
+//   }
+//   expectEqual(16, derivProduct)
+
+//   struct Custom : AdditiveArithmetic, Differentiable {
+//     var x: Float
+
+//     // Custom initializer with `@differentiable`.
+//     @differentiable
+//     init(x: Float) {
+//       print(x)
+//       self.x = x
+//     }
+//   }
+
+//   let derivCustom = differential(at: Float(4), in: { input -> Custom in
+//     let foo = Custom(x: input)
+//     return foo + foo
+//   })(1)
+//   expectEqual(Custom.TangentVector(x: 2), derivCustom)
+// }
+
+// Tests TF-319: struct with non-differentiable constant stored property.
+// ForwardModeTests.test("StructConstantStoredProperty") {
+//   struct TF_319 : Differentiable {
+//     var x: Float
+//     @noDerivative let constant = Float(2)
+
+//     @differentiable
+//     init(x: Float) {
+//       self.x = x
+//     }
+
+//     @differentiable(wrt: (self, input))
+//     func applied(to input: Float) -> Float {
+//       return x * constant * input
+//     }
+//   }
+//   func testStructInit(to input: Float) -> Float {
+//     let model = TF_319(x: 10)
+//     return model.applied(to: input)
+//   }
+//   expectEqual(6, derivative(at: TF_319(x: 10), in: { $0.applied(to: 3) }))
+//   expectEqual(20, derivative(at: 3, in: testStructInit))
+// }
+
+// ForwardModeTests.test("StructSideEffects") {
+//   struct Point : AdditiveArithmetic, Differentiable {
+//     var x: Float
+//     var y: Float
+//     var z: Float
+//   }
+
+//   func double(_ input: Float) -> Point {
+//     let point = Point(x: input, y: input, z: input)
+//     return point + point
+//   }
+//   expectEqual(6, differential(at: 4, in: double)(Point(x: 1, y: 1, z: 1)))
+
+//   func fifthPower(_ input: Float) -> Float {
+//     var point = Point(x: input, y: input, z: input)
+//     point.x = point.x * input
+//     point.y = point.x * input
+//     return point.x * point.y
+//   }
+//   expectEqual(405, gradient(at: 3, in: fifthPower))
+
+//   func mix(_ input: Float) -> Float {
+//     var tuple = (point: Point(x: input, y: input, z: input), float: input)
+//     tuple.point.x = tuple.point.x * tuple.float
+//     tuple.point.y = tuple.point.x * input
+//     return tuple.point.x * tuple.point.y
+//   }
+//   expectEqual(405, gradient(at: 3, in: mix))
+
+//   // Test TF-282.
+//   struct Add : Differentiable {
+//     var bias: Float
+//     func applied(to input: Float) -> Float {
+//       var tmp = input
+//       tmp = tmp + bias
+//       return tmp
+//     }
+//   }
+//   let model = Add(bias: 1)
+//   expectEqual(Add.TangentVector(bias: 1),
+//               gradient(at: model) { m in m.applied(to: 1) })
+// }
+
+// SimpleMathTests.test("StructGeneric") {
+//   struct Generic<T : AdditiveArithmetic & Differentiable> : AdditiveArithmetic, Differentiable {
+//     var x: T
+//     var y: T
+//     var z: T
+//   }
+
+//   let 𝛁generic = pullback(at: Float(3), in: { input -> Generic<Float> in
+//     var generic = Generic(x: input, y: input, z: input)
+//     return generic
+//   })(Generic<Float>.TangentVector(x: 1, y: 1, z: 1))
+//   expectEqual(3, 𝛁generic)
+
+//   func fifthPower(_ input: Float) -> Float {
+//     var generic = Generic(x: input, y: input, z: input)
+//     generic.x = generic.x * input
+//     generic.y = generic.x * input
+//     return generic.x * generic.y
+//   }
+//   // FIXME(TF-274): The true expected result is `405`, like other variants of `fifthPower` above.
+//   expectEqual(405, gradient(at: 3, in: fifthPower))
+// }
+
+// SimpleMathTests.test("SubsetIndices") {
+//   func grad(_ lossFunction: @differentiable (Float, Float) -> Float) -> Float {
+//     return gradient(at: 1) { x in lossFunction(x * x, 10.0) }
+//   }
+//   expectEqual(2, grad { x, y in x + y })
+
+//   func gradWRTNonDiff(_ lossFunction: @differentiable (Float, @nondiff Int) -> Float) -> Float {
+//     return gradient(at: 2) { x in lossFunction(x * x, 10) }
+//   }
+//   expectEqual(4, gradWRTNonDiff { x, y in x + Float(y) })
+// }
 
 runAllTests()
