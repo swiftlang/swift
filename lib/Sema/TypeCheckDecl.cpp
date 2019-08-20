@@ -3772,33 +3772,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     validateGenericTypeSignature(proto);
     proto->setSignatureIsValidated();
 
-    // See the comment in validateDeclForNameLookup(); we may have validated
-    // the alias before we built the protocol's generic environment.
-    //
-    // FIXME: Hopefully this can all go away with the ITC.
-    for (auto member : proto->getMembers()) {
-      if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(member)) {
-        if (!aliasDecl->isGeneric()) {
-          aliasDecl->setGenericEnvironment(proto->getGenericEnvironment());
-
-          // The generic environment didn't exist until now, we may have
-          // unresolved types we will need to deal with, and need to record the
-          // appropriate substitutions for that environment. Wipe out the types
-          // and validate them again.
-          aliasDecl->getUnderlyingTypeLoc().setType(Type());
-          aliasDecl->setInterfaceType(Type());
-
-          // Check generic parameters, if needed.
-          if (aliasDecl->hasValidationStarted()) {
-            validateTypealiasType(*this, aliasDecl);
-          } else {
-            DeclValidationRAII IBV(aliasDecl);
-            validateTypealiasType(*this, aliasDecl);
-          }
-        }
-      }
-    }
-
     break;
   }
 
@@ -4101,88 +4074,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   }
 
   assert(D->hasValidSignature());
-}
-
-void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
-  // Validate the context.
-  auto dc = D->getDeclContext();
-  if (auto nominal = dyn_cast<NominalTypeDecl>(dc)) {
-    validateDeclForNameLookup(nominal);
-    if (!nominal->hasInterfaceType())
-      return;
-  } else if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
-    validateExtension(ext);
-    if (!ext->hasValidSignature())
-      return;
-  }
-
-  switch (D->getKind()) {
-  case DeclKind::Protocol: {
-    auto proto = cast<ProtocolDecl>(D);
-    if (proto->hasInterfaceType())
-      return;
-    proto->computeType();
-
-    break;
-  }
-  case DeclKind::AssociatedType: {
-    auto assocType = cast<AssociatedTypeDecl>(D);
-    if (assocType->hasInterfaceType())
-      return;
-    assocType->computeType();
-    break;
-  }
-  case DeclKind::TypeAlias: {
-    auto typealias = cast<TypeAliasDecl>(D);
-    if (typealias->getUnderlyingTypeLoc().getType())
-      return;
-
-    // Perform earlier validation of typealiases in protocols.
-    if (isa<ProtocolDecl>(dc)) {
-      if (!typealias->getGenericParams()) {
-        if (typealias->isBeingValidated()) return;
-
-        auto helper = [&] {
-          TypeResolutionOptions options(
-            (typealias->getGenericParams() ?
-             TypeResolverContext::GenericTypeAliasDecl :
-             TypeResolverContext::TypeAliasDecl));
-          auto &underlyingTL = typealias->getUnderlyingTypeLoc();
-          if (underlyingTL.isNull() ||
-              validateType(underlyingTL,
-                           TypeResolution::forStructural(typealias), options)) {
-            typealias->setInvalid();
-            underlyingTL.setInvalidType(Context);
-          }
-
-          typealias->setUnderlyingType(underlyingTL.getType());
-
-          // Note that this doesn't set the generic environment of the alias yet,
-          // because we haven't built one for the protocol.
-          //
-          // See how validateDecl() sets the generic environment on alias members
-          // explicitly.
-          //
-          // FIXME: Hopefully this can all go away with the ITC.
-        };
-
-        if (typealias->hasValidationStarted()) {
-          helper();
-        } else {
-          DeclValidationRAII IBV(typealias);
-          helper();
-        }
-
-        return;
-      }
-    }
-    LLVM_FALLTHROUGH;
-  }
-
-  default:
-    validateDecl(D);
-    break;
-  }
 }
 
 llvm::Expected<DeclRange>

@@ -1069,7 +1069,7 @@ bool swift::isValidDynamicCallableMethod(FuncDecl *decl, DeclContext *DC,
   //    `ExpressibleByStringLiteral`.
   //    `D.Value` and the return type can be arbitrary.
 
-  TC.validateDeclForNameLookup(decl);
+  TC.validateDecl(decl);
   auto paramList = decl->getParameters();
   if (paramList->size() != 1 || paramList->get(0)->isVariadic()) return false;
   auto argType = paramList->get(0)->getType();
@@ -1235,7 +1235,7 @@ visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr) {
   auto oneCandidate = candidates.front();
   candidates.filter([&](LookupResultEntry entry, bool isOuter) -> bool {
     auto cand = cast<SubscriptDecl>(entry.getValueDecl());
-    TC.validateDeclForNameLookup(cand);
+    TC.validateDecl(cand);
     return isValidDynamicMemberLookupSubscript(cand, decl, TC);
   });
 

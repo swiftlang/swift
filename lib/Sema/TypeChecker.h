@@ -788,9 +788,6 @@ public:
   void validateDecl(OperatorDecl *decl);
   void validateDecl(PrecedenceGroupDecl *decl);
 
-  /// Perform just enough validation for looking up names using the Decl.
-  void validateDeclForNameLookup(ValueDecl *D);
-
   /// Validate the given extension declaration, ensuring that it
   /// properly extends the nominal type it names.
   void validateExtension(ExtensionDecl *ext);
@@ -999,7 +996,7 @@ public:
   void checkDefaultArguments(ParameterList *params, ValueDecl *VD);
 
   virtual void resolveDeclSignature(ValueDecl *VD) override {
-    validateDeclForNameLookup(VD);
+    validateDecl(VD);
   }
 
   virtual void resolveProtocolEnvironment(ProtocolDecl *proto) override {
