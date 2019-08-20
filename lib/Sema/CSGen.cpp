@@ -1787,9 +1787,8 @@ namespace {
           CS.addConstraint(ConstraintKind::Conversion,
                            CS.getType(element),
                            contextualArrayElementType,
-                           CS.getConstraintLocator(expr,
-                                                   LocatorPathElt::
-                                                    getTupleElement(index++)));
+                           CS.getConstraintLocator(
+                               expr, LocatorPathElt::TupleElement(index++)));
         }
         
         return contextualArrayType;
@@ -1816,8 +1815,7 @@ namespace {
                          CS.getType(element),
                          arrayElementTy,
                          CS.getConstraintLocator(
-                           expr,
-                           LocatorPathElt::getTupleElement(index++)));
+                           expr, LocatorPathElt::TupleElement(index++)));
       }
 
       // The array element type defaults to 'Any'.
@@ -1882,9 +1880,8 @@ namespace {
           CS.addConstraint(ConstraintKind::Conversion,
                            CS.getType(element),
                            contextualDictionaryElementType,
-                           CS.getConstraintLocator(expr,
-                                                   LocatorPathElt::
-                                                    getTupleElement(index++)));
+                           CS.getConstraintLocator(
+                               expr, LocatorPathElt::TupleElement(index++)));
         }
         
         return contextualDictionaryType;
@@ -1975,8 +1972,7 @@ namespace {
                            CS.getType(element),
                            elementTy,
                            CS.getConstraintLocator(
-                             expr,
-                             LocatorPathElt::getTupleElement(index++)));
+                               expr, LocatorPathElt::TupleElement(index++)));
       }
 
       // The dictionary key type defaults to 'AnyHashable'.
@@ -2022,7 +2018,7 @@ namespace {
 
       for (auto *param : *paramList) {
         auto *locator = CS.getConstraintLocator(
-            closureExpr, LocatorPathElt::getTupleElement(i++));
+            closureExpr, LocatorPathElt::TupleElement(i++));
         Type paramType, internalType;
 
         // If a type was explicitly specified, use its opened type.
@@ -2138,7 +2134,7 @@ namespace {
           auto &tupleElt = tuplePat->getElement(i);
           Type eltTy = getTypeForPattern(tupleElt.getPattern(),
                                          locator.withPathElement(
-                                           LocatorPathElt::getTupleElement(i)));
+                                           LocatorPathElt::TupleElement(i)));
           tupleTypeElts.push_back(TupleTypeElt(eltTy, tupleElt.getLabel()));
         }
         return TupleType::get(tupleTypeElts, CS.getASTContext());
@@ -2966,7 +2962,7 @@ namespace {
       for (unsigned i : indices(E->getComponents())) {
         auto &component = E->getComponents()[i];
         auto memberLocator = CS.getConstraintLocator(
-            locator, ConstraintLocator::PathElement::getKeyPathComponent(i));
+            locator, LocatorPathElt::KeyPathComponent(i));
         auto resultLocator = CS.getConstraintLocator(
             memberLocator, ConstraintLocator::KeyPathComponentResult);
 
