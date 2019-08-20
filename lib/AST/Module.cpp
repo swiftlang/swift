@@ -458,10 +458,7 @@ void ModuleDecl::lookupValue(AccessPathTy AccessPath, DeclName Name,
   if (stats)
     stats->getFrontendCounters().NumModuleLookupValue++;
 
-  FrontendStatsTracer tracer(stats, "module-lookup-value");
-
   if (isParsedModule(this)) {
-    FrontendStatsTracer tracer(getASTContext().Stats, "source-file-lookup-value");
     getSourceLookupCache().lookupValue(AccessPath, Name, LookupKind, Result);
     return;
   }
