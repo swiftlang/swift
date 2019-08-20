@@ -3397,7 +3397,7 @@ public:
     auto &builder = getBuilder();
     auto *pbStructVal = buildPullbackValueStructValue(ri);
 
-    // Get the VJP value corresponding to the original functions's return value.
+    // Get the value in the VJP corresponding to the original result.
     auto *origRetInst = cast<ReturnInst>(origExit->getTerminator());
     auto origResult = getOpValue(origRetInst->getOperand());
     SmallVector<SILValue, 8> origResults;
@@ -3614,7 +3614,7 @@ public:
     auto &builder = getBuilder();
     auto original = getOpValue(ai->getCallee());
     SILValue vjpValue;
-    // If functionSource is a @differentiable function, just extract it.
+    // If functionSource is a `@differentiable` function, just extract it.
     auto originalFnTy = original->getType().castTo<SILFunctionType>();
     if (originalFnTy->isDifferentiable()) {
       auto paramIndices = originalFnTy->getDifferentiationParameterIndices();
@@ -4395,8 +4395,7 @@ private:
     // TODO: Handle indirect results.
     auto tanParam =
         materializeTangent(getTangentValue(ri->getOperand()), loc);
-    diffBuilder.createReturn(
-        ri->getLoc(), tanParam);
+    diffBuilder.createReturn(ri->getLoc(), tanParam);
   }
 
   void emitTangentForApplyInst(ApplyInst *ai, SILAutoDiffIndices indices) {
@@ -4502,7 +4501,7 @@ private:
            "Can only currently handle single basic block functions");
 
     // The differential function has type:
-    // (arg0', ..., argn', exit_diffs) -> result'.
+    // (arg0', ..., argn', entry_df_struct) -> result'.
     auto diffParamArgs =
         differential.getArgumentsWithoutIndirectResults().drop_back();
     assert(diffParamArgs.size() == attr->getIndices().parameters->getCapacity());
@@ -4576,9 +4575,8 @@ public:
         module.Types, origTy->getGenericSignature());
 
     // Parameters of the differential are:
-    // - the tangent vectors of the parameters we are differentiating with
-    //   respect to
-    // - a differential struct
+    // - the tangent values of the wrt parameters.
+    // - the differential struct for the original entry.
     // Result of the differential is in the tangent space of the original
     // result.
     SmallVector<SILParameterInfo, 8> dfParams;
@@ -4612,10 +4610,11 @@ public:
         dfStruct->getDeclaredInterfaceType()->getCanonicalType();
     dfParams.push_back({dfStructType, ParameterConvention::Direct_Owned});
 
-    auto diffName = original->getASTContext()
-        .getIdentifier("AD__" + original->getName().str() +
-                       "__differential_" + indices.mangle())
-        .str();
+    Mangle::ASTMangler mangler;
+    auto diffName = original->getASTContext().getIdentifier(
+        mangler.mangleAutoDiffLinearMapHelper(
+            original->getName(), AutoDiffLinearMapKind::Differential,
+            indices)).str();
     auto diffGenericSig = getAssociatedFunctionGenericSignature(attr, original);
     auto *diffGenericEnv =
         diffGenericSig ? diffGenericSig->createGenericEnvironment() : nullptr;
@@ -4701,7 +4700,7 @@ public:
     auto &builder = getBuilder();
     auto *diffStructVal = buildDifferentialValueStructValue(ri);
 
-    // Get the JVP value corresponding to the original functions's return value.
+    // Get the value in the JVP corresponding to the original result.
     auto *origRetInst = cast<ReturnInst>(origExit->getTerminator());
     auto origResult = getOpValue(origRetInst->getOperand());
     SmallVector<SILValue, 8> origResults;
@@ -4837,7 +4836,7 @@ public:
     auto &builder = getBuilder();
     auto original = getOpValue(ai->getCallee());
     SILValue jvpValue;
-    // If functionSource is a @differentiable function, just extract it.
+    // If functionSource is a `@differentiable` function, just extract it.
     auto originalFnTy = original->getType().castTo<SILFunctionType>();
     if (originalFnTy->isDifferentiable()) {
       auto paramIndices = originalFnTy->getDifferentiationParameterIndices();
@@ -4854,29 +4853,6 @@ public:
           loc, AutoDiffFunctionExtractInst::Extractee::JVP,
           /*differentiationOrder*/ 1, borrowedDiffFunc);
       jvpValue = builder.emitCopyValueOperation(loc, jvpValue);
-    }
-
-    // Check and diagnose non-differentiable arguments.
-    for (unsigned paramIndex : range(originalFnTy->getNumParameters())) {
-      if (indices.isWrtParameter(paramIndex) &&
-              !originalFnTy->getParameters()[paramIndex]
-              .getSILStorageType()
-              .isDifferentiable(getModule())) {
-        context.emitNondifferentiabilityError(
-            original, invoker, diag::autodiff_nondifferentiable_argument);
-        errorOccurred = true;
-        return;
-      }
-    }
-
-    // Check and diagnose non-differentiable results.
-    if (!originalFnTy->getResults()[indices.source]
-            .getSILStorageType()
-            .isDifferentiable(getModule())) {
-      context.emitNondifferentiabilityError(
-          original, invoker, diag::autodiff_nondifferentiable_result);
-      errorOccurred = true;
-      return;
     }
 
     // If JVP has not yet been found, emit an `autodiff_function` instruction
@@ -4910,6 +4886,36 @@ public:
             ParameterConvention::Direct_Guaranteed);
         original = jvpPartialApply;
       }
+
+      // Check and diagnose non-differentiable original function type.
+      auto diagnoseNondifferentiableOriginalFunctionType =
+          [&](CanSILFunctionType origFnTy) {
+            // Check and diagnose non-differentiable arguments.
+            for (unsigned paramIndex : range(originalFnTy->getNumParameters())) {
+              if (indices.isWrtParameter(paramIndex) &&
+                      !originalFnTy->getParameters()[paramIndex]
+                      .getSILStorageType()
+                      .isDifferentiable(getModule())) {
+                context.emitNondifferentiabilityError(
+                    ai->getArgumentsWithoutIndirectResults()[paramIndex], invoker,
+                    diag::autodiff_nondifferentiable_argument);
+                errorOccurred = true;
+                return true;
+              }
+            }
+            // Check and diagnose non-differentiable results.
+            if (!originalFnTy->getResults()[indices.source]
+                    .getSILStorageType()
+                    .isDifferentiable(getModule())) {
+              context.emitNondifferentiabilityError(
+                  original, invoker, diag::autodiff_nondifferentiable_result);
+              errorOccurred = true;
+              return true;
+            }
+            return false;
+          };
+      if (diagnoseNondifferentiableOriginalFunctionType(originalFnTy))
+        return;
 
       auto *autoDiffFuncInst =
           context.createAutoDiffFunction(builder, loc, indices.parameters,
@@ -4964,8 +4970,8 @@ public:
         recursivelyDeleteTriviallyDeadInstructions(
             getOpValue(origCallee)->getDefiningInstruction());
 
-    // Add the differential function for when we create the struct we partially
-    // apply to the differential we are generating.
+    // Record the callee differential function value.
+    // This is used later to construct a differential struct.
     auto diffFunc = jvpDirectResults.back();
     differentialValues[ai->getParent()].push_back(diffFunc);
 
@@ -7354,19 +7360,19 @@ bool ADContext::processDifferentiableAttribute(
       }
 
       // Add a fatal error in case this function is called by the user.
-      auto fatalErrrorJvpType = SILFunctionType::get(
+      auto neverResultInfo = SILResultInfo(
+          module.getASTContext().getNeverType(), ResultConvention::Unowned);
+      auto fatalErrorJVPType = SILFunctionType::get(
           /*genericSig*/ nullptr,
           SILFunctionType::ExtInfo().withRepresentation(
               SILFunctionTypeRepresentation::Thin),
           SILCoroutineKind::None, ParameterConvention::Direct_Unowned, {},
-          /*interfaceYields*/ {},
-          SILResultInfo(module.getASTContext().getNeverType(),
-                        ResultConvention::Unowned),
+          /*interfaceYields*/ {}, neverResultInfo,
           /*interfaceErrorResults*/ None, getASTContext());
       auto fnBuilder = SILOptFunctionBuilder(getTransform());
       auto *fatalErrrorJvpFunc = fnBuilder.getOrCreateFunction(
           loc, "_printJVPErrorAndExit", SILLinkage::PublicExternal,
-          fatalErrrorJvpType, IsNotBare, IsNotTransparent, IsNotSerialized,
+          fatalErrorJVPType, IsNotBare, IsNotTransparent, IsNotSerialized,
           IsNotDynamic, ProfileCounter(), IsNotThunk);
       auto *jvpErrorFuncRef =
           builder.createFunctionRef(loc, fatalErrrorJvpFunc);
