@@ -615,6 +615,9 @@ public:
 
   bool diagnoseAsError() override;
 
+  /// If we're trying to convert something to `nil`.
+  bool diagnoseConversionToNil() const;
+
   // If we're trying to convert something of type "() -> T" to T,
   // then we probably meant to call the value.
   bool diagnoseMissingFunctionCall() const;
