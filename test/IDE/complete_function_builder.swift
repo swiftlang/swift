@@ -1,13 +1,13 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_CLOSURE_TOP | %FileCheck %s -check-prefix=IN_CLOSURE_TOP
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_CLOSURE_NONTOP | %FileCheck %s -check-prefix=IN_CLOSURE_TOP
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_CLOSURE_COLOR_CONTEXT | %FileCheck %s -check-prefix=IN_CLOSURE_COLOR_CONTEXT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_CLOSURE_COLOR_CONTEXT_DOT | %FileCheck %s -check-prefix=IN_CLOSURE_COLOR_CONTEXT_DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -disable-function-builder-one-way-constraints -code-completion-token=IN_CLOSURE_COLOR_CONTEXT | %FileCheck %s -check-prefix=IN_CLOSURE_COLOR_CONTEXT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -disable-function-builder-one-way-constraints -code-completion-token=IN_CLOSURE_COLOR_CONTEXT_DOT | %FileCheck %s -check-prefix=IN_CLOSURE_COLOR_CONTEXT_DOT
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONTEXTUAL_TYPE_1 | %FileCheck %s -check-prefix=CONTEXTUAL_TYPE_VALID
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONTEXTUAL_TYPE_2 | %FileCheck %s -check-prefix=CONTEXTUAL_TYPE_VALID
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONTEXTUAL_TYPE_3 | %FileCheck %s -check-prefix=CONTEXTUAL_TYPE_VALID
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONTEXTUAL_TYPE_4 | %FileCheck %s -check-prefix=CONTEXTUAL_TYPE_VALID
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONTEXTUAL_TYPE_5 | %FileCheck %s -check-prefix=CONTEXTUAL_TYPE_INVALID
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -disable-function-builder-one-way-constraints -code-completion-token=CONTEXTUAL_TYPE_1 | %FileCheck %s -check-prefix=CONTEXTUAL_TYPE_VALID
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -disable-function-builder-one-way-constraints -code-completion-token=CONTEXTUAL_TYPE_2 | %FileCheck %s -check-prefix=CONTEXTUAL_TYPE_VALID
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -disable-function-builder-one-way-constraints -code-completion-token=CONTEXTUAL_TYPE_3 | %FileCheck %s -check-prefix=CONTEXTUAL_TYPE_VALID
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -disable-function-builder-one-way-constraints -code-completion-token=CONTEXTUAL_TYPE_4 | %FileCheck %s -check-prefix=CONTEXTUAL_TYPE_VALID
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -disable-function-builder-one-way-constraints -code-completion-token=CONTEXTUAL_TYPE_5 | %FileCheck %s -check-prefix=CONTEXTUAL_TYPE_INVALID
 
 struct Tagged<Tag, Entity> {
   let tag: Tag
