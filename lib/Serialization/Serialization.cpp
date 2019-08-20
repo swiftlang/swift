@@ -2814,13 +2814,6 @@ public:
     for (auto Attr : D->getAttrs())
       writeDeclAttribute(Attr);
 
-    if (auto VD = dyn_cast<ValueDecl>(D)) {
-      // Hack: synthesize a 'final' attribute if finality was inferred.
-      if (VD->isFinal() && !D->getAttrs().hasAttribute<FinalAttr>())
-        writeDeclAttribute(
-            new (D->getASTContext()) FinalAttr(/*Implicit=*/false));
-    }
-
     if (auto *value = dyn_cast<ValueDecl>(D))
       writeDiscriminatorsIfNeeded(value);
 
