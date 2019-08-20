@@ -237,13 +237,8 @@ public:
     assert(isConditional() || Signature);
     assert(AffectedDecl);
 
-    auto path = locator->getPath();
-    assert(!path.empty());
-
-    auto &last = path.back();
-    assert(last.isTypeParameterRequirement() ||
-           last.isConditionalRequirement());
-    assert(static_cast<RequirementKind>(last.getValue2()) == kind);
+    auto reqElt = locator->castLastElementTo<LocatorPathElt::AnyRequirement>();
+    assert(reqElt.getRequirementKind() == kind);
 
     // It's possible sometimes not to have no base expression.
     if (!expr)
@@ -254,13 +249,9 @@ public:
   }
 
   unsigned getRequirementIndex() const {
-    auto path = getLocator()->getPath();
-    assert(!path.empty());
-
-    auto &requirementLoc = path.back();
-    assert(requirementLoc.isTypeParameterRequirement() ||
-           requirementLoc.isConditionalRequirement());
-    return requirementLoc.getValue();
+    auto reqElt =
+        getLocator()->castLastElementTo<LocatorPathElt::AnyRequirement>();
+    return reqElt.getIndex();
   }
 
   /// The generic base type where failing requirement comes from.
