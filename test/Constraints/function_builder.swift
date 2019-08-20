@@ -276,18 +276,20 @@ struct TagAccepter<Tag> {
 }
 
 func testAcceptColorTagged(b: Bool, i: Int, s: String, d: Double) {
+  // FIXME: When we support buildExpression, drop the "Color" prefix
   // CHECK: Tagged<
   acceptColorTagged {
-    i.tag(.red)
-    s.tag(.green)
-    d.tag(.blue)
+    i.tag(Color.red)
+    s.tag(Color.green)
+    d.tag(Color.blue)
   }
 
+  // FIXME: When we support buildExpression, drop the "Color" prefix
   // CHECK: Tagged<
   TagAccepter<Color>.acceptTagged {
-    i.tag(.red)
-    s.tag(.green)
-    d.tag(.blue)
+    i.tag(Color.red)
+    s.tag(Color.green)
+    d.tag(Color.blue)
   }
 
   // CHECK: Tagged<
