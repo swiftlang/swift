@@ -1073,8 +1073,15 @@ const AvailableAttr *AvailableAttr::isUnavailable(const Decl *D) {
     return attr;
 
   // If D is an extension member, check if the extension is unavailable.
-  if (auto ext = dyn_cast<ExtensionDecl>(D->getDeclContext()))
-    return AvailableAttr::isUnavailable(ext);
+  //
+  // Skip decls imported from Clang, they could be associated to the wrong
+  // extension and inherit undesired unavailability. The ClangImporter
+  // associates Objective-C protocol members to the first category where the
+  // protocol is directly or indirectly adopted, no matter its availability
+  // and the availability of other categories. rdar://problem/53956555
+  if (!D->getClangNode())
+    if (auto ext = dyn_cast<ExtensionDecl>(D->getDeclContext()))
+        return AvailableAttr::isUnavailable(ext);
 
   return nullptr;
 }
