@@ -4683,6 +4683,29 @@ private:
     setTangentValue(sei->getParent(), sei, tangentResult);
   }
 
+  /// Handle `load` or `load_borrow` instruction
+  ///   Original: y = load/load_borrow x
+  ///    Adjoint: tan[y] = load/load_borrow tan[x]
+  void visitLoadOperation(SingleValueInstruction *inst) {
+    assert(isa<LoadInst>(inst) || isa<LoadBorrowInst>(inst));
+    auto &diffBuilder = getDifferentialBuilder();
+    auto *bb = inst->getParent();
+    auto adjVal =
+        materializeTangentDirect(getTangentValue(bb, inst), inst->getLoc());
+    // Allocate a local buffer and store the adjoint value. This buffer will be
+    // used for accumulation into the adjoint buffer.
+    auto *localBuf = diffBuilder.createAllocStack(inst->getLoc(), adjVal->getType());
+    auto copy = diffBuilder.emitCopyValueOperation(inst->getLoc(), adjVal);
+    diffBuilder.emitStoreValueOperation(inst->getLoc(), copy, localBuf,
+                                    StoreOwnershipQualifier::Init);
+    // Accumulate the adjoint value in the local buffer into the adjoint buffer.
+    addToAdjointBuffer(bb, inst->getOperand(0), localBuf, inst->getLoc());
+    if (errorOccurred)
+      return;
+    diffBuilder.emitDestroyAddr(inst->getLoc(), localBuf);
+    diffBuilder.createDeallocStack(inst->getLoc(), localBuf);
+  }
+
   /// Handle `load` instruction.
   ///   Original: y = load x
   ///    Tangent: tan[y] = load tan[x]
@@ -4696,17 +4719,43 @@ private:
     setTangentValue(bb, li, makeConcreteTangentValue(tanValDest));
   }
 
+  // TODO: verify instruction signature, and update comment.
+  /// Handle `load_borrow` instruction.
+  ///   Original: y = load_borrow x
+  ///    Tangent: tan[y] = load_borrow tan[x]
+  void emitTangentForLoadBorrowInst(LoadBorrowInst *lbi) {
+    visitLoadOperation(lbi);
+  }
+
+  /// Handle `store` or `store_borrow` instruction.
+  ///   Original: store/store_borrow x to y
+  ///   Tangent: store tan[x] to tan[y]
+  void visitStoreOperation(SILBasicBlock *bb, SILLocation loc,
+                           SILValue origSrc, SILValue origDest) {
+    auto &diffBuilder = getDifferentialBuilder();
+    auto tanValSrc = materializeTangent(getTangentValue(origSrc), loc);
+    auto &tanValDest = getTangentBuffer(bb, origDest);
+    if (errorOccurred)
+      return;
+    diffBuilder.emitStoreValueOperation(
+        loc, tanValSrc, tanValDest, StoreOwnershipQualifier::Unqualified);
+  }
+
   /// Handle `store` instruction in the differential.
-  ///   Original: store x to y
+  ///    Original: store x to y
   ///    Tangent: store tan[x] to tan[y]
   void emitTangentForStoreInst(StoreInst *si) {
-    auto *bb = si->getParent();
-    auto &diffBuilder = getDifferentialBuilder();
-    auto tanValSrc = materializeTangent(getTangentValue(si->getSrc()),
-                                        si->getLoc());
-    auto tanValDest = getTangentBuffer(bb, si->getDest());
-    diffBuilder.createStore(si->getLoc(), tanValSrc, tanValDest,
-                            StoreOwnershipQualifier::Unqualified);
+    visitStoreOperation(
+        si->getParent(), si->getLoc(), si->getSrc(), si->getDest());
+  }
+
+  // TODO: verify instruction signature, and update comment.
+  /// Handle `store_borrow` instruction in the differential.
+  ///    Original: store_borrow x to y
+  ///    Tangent: store_borrow tan[x] to tan[y]
+  void emitTangentForStoreBorrowInst(StoreBorrowInst *sbi) {
+      visitStoreOperation(
+          sbi->getParent(), sbi->getLoc(), sbi->getSrc(), sbi->getDest());
   }
 
   /// Handle `copy_addr` instruction.
@@ -5623,10 +5672,22 @@ public:
       emitTangentForLoadInst(li);
   }
 
+  void visitLoadBorrowInst(LoadBorrowInst *lbi) {
+    TypeSubstCloner::visitLoadBorrowInst(lbi);
+    if (shouldBeDifferentiated(lbi, getIndices()))
+      emitTangentForLoadBorrowInst(lbi);
+  }
+
   void visitStoreInst(StoreInst *si) {
     TypeSubstCloner::visitStoreInst(si);
     if (shouldBeDifferentiated(si, getIndices()))
       emitTangentForStoreInst(si);
+  }
+
+  void visitStoreBorrowInst(StoreBorrowInst *sbi) {
+    TypeSubstCloner::visitStoreBorrowInst(sbi);
+    if (shouldBeDifferentiated(sbi, getIndices()))
+      emitTangentForStoreBorrowInst(sbi);
   }
 
   void visitCopyAddrInst(CopyAddrInst *cai) {
