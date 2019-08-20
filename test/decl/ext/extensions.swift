@@ -124,3 +124,32 @@ struct WrapperContext {
     static let propUsingMember = originalValue
   }
 }
+
+// Class-constrained extension where protocol does not impose class requirement
+
+protocol DoesNotImposeClassReq_1 {}
+	
+class JustAClass: DoesNotImposeClassReq_1 {
+  var property: String = ""
+}
+
+extension DoesNotImposeClassReq_1 where Self: JustAClass {
+  var wrappingProperty: String {
+    get { return property }
+    set { property = newValue }
+  }
+}
+	
+let instanceOfJustAClass = JustAClass() // expected-note {{change 'let' to 'var' to make it mutable}}
+instanceOfJustAClass.wrappingProperty = "" // expected-error {{cannot assign to property: 'instanceOfJustAClass' is a 'let' constant}}
+
+protocol DoesNotImposeClassReq_2 {
+  var property: String { get set }
+}
+
+extension DoesNotImposeClassReq_2 where Self : AnyObject {
+  var wrappingProperty: String {
+    get { property }
+    set { property = newValue } // Okay
+  }
+}

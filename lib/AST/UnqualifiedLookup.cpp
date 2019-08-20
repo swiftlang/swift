@@ -598,18 +598,17 @@ void UnqualifiedLookupFactory::lookupInModuleScopeContext(
 
 void UnqualifiedLookupFactory::lookupNamesIntroducedByPatternBindingInitializer(
     PatternBindingInitializer *PBI, Optional<bool> isCascadingUse) {
-  assert(PBI->getBinding());
   // Lazy variable initializer contexts have a 'self' parameter for
   // instance member lookup.
   if (auto *selfParam = PBI->getImplicitSelfDecl())
     lookupNamesIntroducedByLazyVariableInitializer(PBI, selfParam,
                                                    isCascadingUse);
-  else if (PBI->getBinding()->getDeclContext()->isTypeContext())
+  else if (PBI->getParent()->isTypeContext())
     lookupNamesIntroducedByInitializerOfStoredPropertyOfAType(PBI,
                                                               isCascadingUse);
   else
     lookupNamesIntroducedByInitializerOfGlobalOrLocal(PBI, isCascadingUse);
-  }
+}
 
   void UnqualifiedLookupFactory::lookupNamesIntroducedByLazyVariableInitializer(
       PatternBindingInitializer *PBI, ParamDecl *selfParam,

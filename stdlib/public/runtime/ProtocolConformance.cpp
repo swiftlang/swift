@@ -145,14 +145,15 @@ ProtocolConformanceDescriptor::getCanonicalTypeMetadata() const {
 
   case TypeReferenceKind::DirectTypeDescriptor:
   case TypeReferenceKind::IndirectTypeDescriptor: {
-    auto anyType = getTypeDescriptor();
-    if (auto type = dyn_cast<TypeContextDescriptor>(anyType)) {
-      if (!type->isGeneric()) {
-        if (auto accessFn = type->getAccessFunction())
-          return accessFn(MetadataState::Abstract).Value;
+    if (auto anyType = getTypeDescriptor()) {
+      if (auto type = dyn_cast<TypeContextDescriptor>(anyType)) {
+        if (!type->isGeneric()) {
+          if (auto accessFn = type->getAccessFunction())
+            return accessFn(MetadataState::Abstract).Value;
+        }
+      } else if (auto protocol = dyn_cast<ProtocolDescriptor>(anyType)) {
+        return _getSimpleProtocolTypeMetadata(protocol);
       }
-    } else if (auto protocol = dyn_cast<ProtocolDescriptor>(anyType)) {
-      return _getSimpleProtocolTypeMetadata(protocol);
     }
 
     return nullptr;
@@ -327,8 +328,8 @@ _registerProtocolConformances(ConformanceState &C,
   C.SectionsToScan.push_back(ConformanceSection{begin, end});
 }
 
-void swift::addImageProtocolConformanceBlockCallback(const void *conformances,
-                                                   uintptr_t conformancesSize) {
+void swift::addImageProtocolConformanceBlockCallbackUnsafe(
+    const void *conformances, uintptr_t conformancesSize) {
   assert(conformancesSize % sizeof(ProtocolConformanceRecord) == 0 &&
          "conformances section not a multiple of ProtocolConformanceRecord");
 
@@ -343,6 +344,13 @@ void swift::addImageProtocolConformanceBlockCallback(const void *conformances,
   // Conformance cache should always be sufficiently initialized by this point.
   _registerProtocolConformances(Conformances.unsafeGetAlreadyInitialized(),
                                 recordsBegin, recordsEnd);
+}
+
+void swift::addImageProtocolConformanceBlockCallback(
+    const void *conformances, uintptr_t conformancesSize) {
+  Conformances.get();
+  addImageProtocolConformanceBlockCallbackUnsafe(conformances,
+                                                 conformancesSize);
 }
 
 void

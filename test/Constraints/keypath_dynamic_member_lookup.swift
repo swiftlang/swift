@@ -328,3 +328,42 @@ func rdar52779809(_ ref1: Ref<S>, _ ref2: Ref<Q>) {
   // CHECK: function_ref @$s29keypath_dynamic_member_lookup3RefV0B6Memberqd__s7KeyPathCyxqd__G_tcluig
   _ = ref2.bar // Ok
 }
+
+func make_sure_delayed_keypath_dynamic_member_works() {
+  @propertyWrapper @dynamicMemberLookup
+  struct Wrapper<T> {
+    var storage: T? = nil
+
+    var wrappedValue: T {
+      get { storage! }
+    }
+
+    var projectedValue: Wrapper<T> { self }
+
+    init() { }
+
+    init(wrappedValue: T) {
+      storage = wrappedValue
+    }
+
+    subscript<Property>(dynamicMember keyPath: KeyPath<T, Property>) -> Wrapper<Property> {
+      get { .init() }
+    }
+  }
+
+  struct Field {
+    @Wrapper var v: Bool = true
+  }
+
+  struct Arr {
+    var fields: [Field] = []
+  }
+
+  struct Test {
+    @Wrapper var data: Arr
+
+    func test(_ index: Int) {
+      let _ = self.$data.fields[index].v.wrappedValue
+    }
+  }
+}

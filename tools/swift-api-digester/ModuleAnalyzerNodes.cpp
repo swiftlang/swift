@@ -79,7 +79,9 @@ void SDKNodeRoot::registerDescendant(SDKNode *D) {
 SDKNode::SDKNode(SDKNodeInitInfo Info, SDKNodeKind Kind): Ctx(Info.Ctx),
   Name(Info.Name), PrintedName(Info.PrintedName), TheKind(unsigned(Kind)) {}
 
-SDKNodeRoot::SDKNodeRoot(SDKNodeInitInfo Info): SDKNode(Info, SDKNodeKind::Root) {}
+SDKNodeRoot::SDKNodeRoot(SDKNodeInitInfo Info): SDKNode(Info, SDKNodeKind::Root),
+  ToolArgs(Info.ToolArgs),
+  JsonFormatVer(Info.JsonFormatVer.hasValue() ? *Info.JsonFormatVer : DIGESTER_JSON_DEFAULT_VERSION) {}
 
 SDKNodeDecl::SDKNodeDecl(SDKNodeInitInfo Info, SDKNodeKind Kind)
       : SDKNode(Info, Kind), DKind(Info.DKind), Usr(Info.Usr),
@@ -367,6 +369,8 @@ SDKNode *SDKNodeRoot::getInstance(SDKContext &Ctx) {
   SDKNodeInitInfo Info(Ctx);
   Info.Name = Ctx.buffer("TopLevel");
   Info.PrintedName = Ctx.buffer("TopLevel");
+  Info.ToolArgs = Ctx.getOpts().ToolArgs;
+  Info.JsonFormatVer = DIGESTER_JSON_VERSION;
   return Info.createSDKNode(SDKNodeKind::Root);
 }
 
@@ -1090,6 +1094,9 @@ StringRef printGenericSignature(SDKContext &Ctx, ArrayRef<Requirement> AllReqs) 
     return StringRef();
   OS << "<";
   bool First = true;
+  PrintOptions Opts = PrintOptions::printInterface();
+  // We should always print fully qualified type names here
+  Opts.FullyQualifiedTypes = true;
   for (auto Req: AllReqs) {
     if (!First) {
       OS << ", ";
@@ -1097,9 +1104,9 @@ StringRef printGenericSignature(SDKContext &Ctx, ArrayRef<Requirement> AllReqs) 
       First = false;
     }
     if (Ctx.checkingABI())
-      getCanonicalRequirement(Req).print(OS, PrintOptions::printInterface());
+      getCanonicalRequirement(Req).print(OS, Opts);
     else
-      Req.print(OS, PrintOptions::printInterface());
+      Req.print(OS, Opts);
   }
   OS << ">";
   return Ctx.buffer(OS.str());
@@ -1327,15 +1334,20 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ValueDecl *VD)
     }
   }
 
-#define CASE(BASE, KIND, KEY) case BASE::KIND: KEY = #KIND; break;
   if (auto *FD = dyn_cast<FuncDecl>(VD)) {
     switch(FD->getSelfAccessKind()) {
-    CASE(SelfAccessKind, Mutating, FuncSelfKind)
-    CASE(SelfAccessKind, __Consuming, FuncSelfKind)
-    CASE(SelfAccessKind, NonMutating, FuncSelfKind)
+    case SelfAccessKind::Mutating:
+      FuncSelfKind = "Mutating";
+      break;
+    case SelfAccessKind::Consuming:
+      // FIXME: Stay consistent with earlier digests that had underscores here.
+      FuncSelfKind = "__Consuming";
+      break;
+    case SelfAccessKind::NonMutating:
+      FuncSelfKind = "NonMutating";
+      break;
     }
   }
-#undef CASE
 
   // Get enum raw type name if this is an enum.
   if (auto *ED = dyn_cast<EnumDecl>(VD)) {
@@ -1439,8 +1451,7 @@ SwiftDeclCollector::createParameterNodes(ParameterList *PL) {
   std::vector<SDKNode*> Result;
   for (auto param: *PL) {
     TypeInitInfo Info;
-    Info.IsImplicitlyUnwrappedOptional = param->getAttrs().
-      hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+    Info.IsImplicitlyUnwrappedOptional = param->isImplicitlyUnwrappedOptional();
     Info.hasDefaultArgument = param->getDefaultArgumentKind() !=
       DefaultArgumentKind::None;
     switch (param->getValueOwnership()) {
@@ -1465,8 +1476,7 @@ SwiftDeclCollector::constructFunctionNode(FuncDecl* FD,
                                           SDKNodeKind Kind) {
   auto Func = SDKNodeInitInfo(Ctx, FD).createSDKNode(Kind);
   TypeInitInfo Info;
-  Info.IsImplicitlyUnwrappedOptional = FD->getAttrs().
-    hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+  Info.IsImplicitlyUnwrappedOptional = FD->isImplicitlyUnwrappedOptional();
   Func->addChild(constructTypeNode(FD->getResultInterfaceType(), Info));
   for (auto *Node : createParameterNodes(FD->getParameters()))
     Func->addChild(Node);
@@ -1606,8 +1616,7 @@ SDKNode *swift::ide::api::
 SwiftDeclCollector::constructVarNode(ValueDecl *VD) {
   auto Var = cast<SDKNodeDeclVar>(SDKNodeInitInfo(Ctx, VD).createSDKNode(SDKNodeKind::DeclVar));
   TypeInitInfo Info;
-  Info.IsImplicitlyUnwrappedOptional = VD->getAttrs().
-    hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+  Info.IsImplicitlyUnwrappedOptional = VD->isImplicitlyUnwrappedOptional();
   Var->addChild(constructTypeNode(VD->getInterfaceType(), Info));
   if (auto VAD = dyn_cast<AbstractStorageDecl>(VD)) {
     for(auto *AC: VAD->getAllAccessors()) {
@@ -1827,6 +1836,13 @@ void SDKNode::jsonize(json::Output &out) {
   output(out, KeyKind::KK_name, Name);
   output(out, KeyKind::KK_printedName, PrintedName);
   out.mapOptional(getKeyContent(Ctx, KeyKind::KK_children).data(), Children);
+}
+
+void SDKNodeRoot::jsonize(json::Output &out) {
+  SDKNode::jsonize(out);
+  out.mapRequired(getKeyContent(Ctx, KeyKind::KK_json_format_version).data(), JsonFormatVer);
+  if (!Ctx.getOpts().AvoidToolArgs)
+    out.mapOptional(getKeyContent(Ctx, KeyKind::KK_tool_arguments).data(), ToolArgs);
 }
 
 void SDKNodeConformance::jsonize(json::Output &out) {

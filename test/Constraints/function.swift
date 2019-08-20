@@ -53,7 +53,7 @@ func process(_ line: UInt = #line) -> Int { return 0 }
 func dangerous() throws {}
 
 func test() {
-  process {         // expected-error {{invalid conversion from throwing function of type '() throws -> ()' to non-throwing function type '() -> Void'}}
+  process {         // expected-error {{invalid conversion from throwing function of type '() throws -> Void' to non-throwing function type '() -> Void'}}
     try dangerous()
     test()
   }

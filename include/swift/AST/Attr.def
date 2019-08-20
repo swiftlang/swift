@@ -348,10 +348,7 @@ DECL_ATTR(_restatedObjCConformance, RestatedObjCConformance,
   LongAttribute | RejectByParser |
   NotSerialized, 70)
 // NOTE: 71 is unused
-SIMPLE_DECL_ATTR(_implicitly_unwrapped_optional, ImplicitlyUnwrappedOptional,
-  OnFunc | OnAccessor | OnVar | OnParam | OnSubscript | OnConstructor |
-  RejectByParser,
-  72)
+// NOTE: 72 is unused
 DECL_ATTR(_optimize, Optimize,
   OnAbstractFunction | OnSubscript | OnVar |
   UserInaccessible,

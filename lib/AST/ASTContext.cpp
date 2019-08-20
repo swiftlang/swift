@@ -2008,13 +2008,8 @@ LazyContextData *ASTContext::getOrCreateLazyContextData(
   return entry;
 }
 
-bool ASTContext::hasUnparsedMembers(const IterableDeclContext *IDC) const {
-  auto parsers = getImpl().lazyParsers;
-  return std::any_of(parsers.begin(), parsers.end(),
-    [IDC](LazyMemberParser *p) { return p->hasUnparsedMembers(IDC); });
-}
-
 void ASTContext::parseMembers(IterableDeclContext *IDC) {
+  assert(IDC->hasUnparsedMembers());
   for (auto *p: getImpl().lazyParsers) {
     if (p->hasUnparsedMembers(IDC))
       p->parseMembers(IDC);
@@ -2513,7 +2508,7 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
 
   auto flags = ParameterTypeFlags();
   switch (selfAccess) {
-  case SelfAccessKind::__Consuming:
+  case SelfAccessKind::Consuming:
     flags = flags.withOwned(true);
     break;
   case SelfAccessKind::Mutating:

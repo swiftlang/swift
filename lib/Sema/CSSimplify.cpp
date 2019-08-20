@@ -1146,6 +1146,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   case ConstraintKind::BridgingConversion:
   case ConstraintKind::FunctionInput:
   case ConstraintKind::FunctionResult:
+  case ConstraintKind::OneWayEqual:
     llvm_unreachable("Not a conversion");
   }
 
@@ -1208,6 +1209,7 @@ static bool matchFunctionRepresentations(FunctionTypeRepresentation rep1,
   case ConstraintKind::ValueMember:
   case ConstraintKind::FunctionInput:
   case ConstraintKind::FunctionResult:
+  case ConstraintKind::OneWayEqual:
     return false;
   }
 
@@ -1323,8 +1325,15 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   // A non-throwing function can be a subtype of a throwing function.
   if (func1->throws() != func2->throws()) {
     // Cannot drop 'throws'.
-    if (func1->throws() || kind < ConstraintKind::Subtype)
-      return getTypeMatchFailure(locator);
+    if (func1->throws() || kind < ConstraintKind::Subtype) {
+      if (!shouldAttemptFixes())
+        return getTypeMatchFailure(locator);
+
+      auto *fix = DropThrowsAttribute::create(*this, func1, func2,
+                                              getConstraintLocator(locator));
+      if (recordFix(fix))
+        return getTypeMatchFailure(locator);
+    }
   }
 
   // A non-@noescape function type can be a subtype of a @noescape function
@@ -1385,6 +1394,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   case ConstraintKind::BridgingConversion:
   case ConstraintKind::FunctionInput:
   case ConstraintKind::FunctionResult:
+  case ConstraintKind::OneWayEqual:
     llvm_unreachable("Not a relational constraint");
   }
 
@@ -1761,11 +1771,11 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
       return result;
 
     auto *fix = GenericArgumentsMismatch::create(
-        *this, bound1, bound2, mismatches, getConstraintLocator(locator));
+        *this, type1, type2, mismatches, getConstraintLocator(locator));
 
     if (!recordFix(fix)) {
       // Increase the solution's score for each mismtach this fixes.
-      increaseScore(SK_Fix, mismatches.size());
+      increaseScore(SK_Fix, mismatches.size() - 1);
       return getTypeMatchSuccess();
     }
     return result;
@@ -2059,12 +2069,12 @@ ConstraintSystem::matchTypesBindTypeVar(
     type.visit([&](Type t) {
       if (auto *tvt = dyn_cast<TypeVariableType>(t.getPointer())) {
         if (!typeVar->getImpl().canBindToLValue()) {
-          typeVar->getImpl().setCanBindToLValue(getSavedBindings(),
-                                                /*enabled=*/false);
+          tvt->getImpl().setCanBindToLValue(getSavedBindings(),
+                                            /*enabled=*/false);
         }
         if (!typeVar->getImpl().canBindToNoEscape()) {
-          typeVar->getImpl().setCanBindToNoEscape(getSavedBindings(),
-                                                  /*enabled=*/false);
+          tvt->getImpl().setCanBindToNoEscape(getSavedBindings(),
+                                              /*enabled=*/false);
         }
       }
     });
@@ -2224,8 +2234,7 @@ repairViaBridgingCast(ConstraintSystem &cs, Type fromType, Type toType,
 
     if (auto *overload = cs.findSelectedOverloadFor(anchor)) {
       auto *decl = overload->Choice.getDeclOrNull();
-      if (decl &&
-          decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
+      if (decl && decl->isImplicitlyUnwrappedOptional())
         fromType = objectType1;
     }
   }
@@ -2347,7 +2356,8 @@ bool ConstraintSystem::repairFailures(
 
       if (isa<InOutExpr>(AE->getSrc())) {
         conversionsOrFixes.push_back(
-            RemoveAddressOf::create(*this, getConstraintLocator(locator)));
+            RemoveAddressOf::create(*this, lhs, rhs,
+                                    getConstraintLocator(locator)));
         return true;
       }
 
@@ -2420,6 +2430,23 @@ bool ConstraintSystem::repairFailures(
         conversionsOrFixes.push_back(AddAddressOf::create(
             *this, lhs, rhs, getConstraintLocator(locator)));
     }
+
+    // If the argument is inout and the parameter is not inout or a pointer,
+    // suggest removing the &.
+    if (lhs->is<InOutType>() && !rhs->is<InOutType>()) {
+      auto objectType = rhs->lookThroughAllOptionalTypes();
+      if (objectType->getAnyPointerElementType())
+        break;
+
+      auto result = matchTypes(lhs->getInOutObjectType(), rhs,
+                               ConstraintKind::ArgumentConversion,
+                               TypeMatchFlags::TMF_ApplyingFix, locator);
+
+      if (result.isSuccess())
+        conversionsOrFixes.push_back(RemoveAddressOf::create(*this, lhs,
+            rhs, getConstraintLocator(locator)));
+    }
+
     break;
   }
 
@@ -2475,8 +2502,14 @@ bool ConstraintSystem::repairFailures(
     if (lhs->hasDependentMember() || rhs->hasDependentMember())
       break;
 
-    if (auto *fix = fixRequirementFailure(*this, lhs, rhs, anchor, path))
+    auto reqKind = static_cast<RequirementKind>(elt.getValue2());
+    if (hasFixedRequirement(lhs, reqKind, rhs))
+      return true;
+
+    if (auto *fix = fixRequirementFailure(*this, lhs, rhs, anchor, path)) {
+      recordFixedRequirement(lhs, reqKind, rhs);
       conversionsOrFixes.push_back(fix);
+    }
     break;
   }
 
@@ -2530,7 +2563,41 @@ bool ConstraintSystem::repairFailures(
       auto *fix = AllowTupleTypeMismatch::create(*this, lhs, rhs,
                                                  getConstraintLocator(locator));
       conversionsOrFixes.push_back(fix);
+      break;
     }
+
+    // If either side is not yet resolved, it's too early for this fix.
+    if (lhs->isTypeVariableOrMember() || rhs->isTypeVariableOrMember())
+      break;
+
+    // If contextual type is an existential value, it's handled
+    // after conversion restriction is attempted.
+    if (rhs->isExistentialType())
+      break;
+
+    // TODO(diagnostics): This is a problem related to `inout` mismatch,
+    // in argument position, and we got here from CSDiag. Once
+    // argument-to-pararameter conversion failures are implemented,
+    // this check could be removed.
+    if (lhs->is<InOutType>() || rhs->is<InOutType>())
+      break;
+
+    // If there is a deep equality, superclass restriction
+    // already recorded, let's not add bother ignoring
+    // contextual type, because actual fix is going to
+    // be perform once restriction is applied.
+    if (llvm::any_of(conversionsOrFixes,
+                     [](const RestrictionOrFix &entry) -> bool {
+                       return entry.IsRestriction &&
+                              (entry.getRestriction() ==
+                                   ConversionRestrictionKind::Superclass ||
+                               entry.getRestriction() ==
+                                   ConversionRestrictionKind::DeepEquality);
+                     }))
+      break;
+
+    conversionsOrFixes.push_back(IgnoreContextualType::create(
+        *this, lhs, rhs, getConstraintLocator(locator)));
     break;
   }
 
@@ -2768,6 +2835,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::ValueMember:
     case ConstraintKind::FunctionInput:
     case ConstraintKind::FunctionResult:
+    case ConstraintKind::OneWayEqual:
       llvm_unreachable("Not a relational constraint");
     }
   }
@@ -2943,7 +3011,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       
       if (kind == ConstraintKind::OperatorArgumentConversion) {
         conversionsOrFixes.push_back(
-            RemoveAddressOf::create(*this, getConstraintLocator(locator)));
+            RemoveAddressOf::create(*this, type1, type2,
+                                    getConstraintLocator(locator)));
         break;
       }
 
@@ -3712,6 +3781,11 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   if (type->isVoid() || type->isUninhabited())
     return SolutionKind::Error;
 
+  auto protocolTy = protocol->getDeclaredType();
+  // If this conformance has been fixed already, let's just consider this done.
+  if (hasFixedRequirement(type, RequirementKind::Conformance, protocolTy))
+    return SolutionKind::Solved;
+
   // If this is a generic requirement let's try to record that
   // conformance is missing and consider this a success, which
   // makes it much easier to diagnose problems like that.
@@ -3724,10 +3798,14 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
 
     if (path.back().isTypeParameterRequirement() ||
         path.back().isConditionalRequirement()) {
-      if (auto *fix = fixRequirementFailure(
-              *this, type, protocol->getDeclaredType(), anchor, path)) {
-        if (!recordFix(fix))
+      if (auto *fix =
+              fixRequirementFailure(*this, type, protocolTy, anchor, path)) {
+        if (!recordFix(fix)) {
+          // Record this conformance requirement as "fixed".
+          recordFixedRequirement(type, RequirementKind::Conformance,
+                                 protocolTy);
           return SolutionKind::Solved;
+        }
       }
     }
 
@@ -4909,12 +4987,18 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
       performMemberLookup(kind, member, baseTy, functionRefKind, locator,
                           /*includeInaccessibleMembers*/ shouldAttemptFixes());
 
-  auto formUnsolved = [&] {
+  auto formUnsolved = [&](bool activate = false) {
     // If requested, generate a constraint.
     if (flags.contains(TMF_GenerateConstraints)) {
-      addUnsolvedConstraint(Constraint::createMemberOrOuterDisjunction(
+      auto *memberRef = Constraint::createMemberOrOuterDisjunction(
           *this, kind, baseTy, memberTy, member, useDC, functionRefKind,
-          outerAlternatives, locator));
+          outerAlternatives, locator);
+
+      addUnsolvedConstraint(memberRef);
+
+      if (activate)
+        activateConstraint(memberRef);
+
       return SolutionKind::Solved;
     }
 
@@ -4944,7 +5028,10 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
       auto &choice = result.ViableCandidates.front();
       if (!solverState && choice.isKeyPathDynamicMemberLookup() &&
           member.getBaseName().isSubscript()) {
-        return formUnsolved();
+        // Let's move this constraint to the active
+        // list so it could be picked up right after
+        // constraint generation is done.
+        return formUnsolved(/*activate=*/true);
       }
     }
 
@@ -5175,6 +5262,29 @@ ConstraintSystem::simplifyDefaultableConstraint(
   return SolutionKind::Solved;
 }
 
+ConstraintSystem::SolutionKind
+ConstraintSystem::simplifyOneWayConstraint(
+    ConstraintKind kind,
+    Type first, Type second, TypeMatchOptions flags,
+    ConstraintLocatorBuilder locator) {
+  // Determine whether the second type can be fully simplified. Only then
+  // will this constraint be resolved.
+  Type secondSimplified = simplifyType(second);
+  if (secondSimplified->hasTypeVariable()) {
+    if (flags.contains(TMF_GenerateConstraints)) {
+      addUnsolvedConstraint(
+        Constraint::create(*this, kind, first, second,
+                           getConstraintLocator(locator)));
+      return SolutionKind::Solved;
+    }
+
+    return SolutionKind::Unsolved;
+  }
+
+  // Translate this constraint into a one-way binding constraint.
+  return matchTypes(first, secondSimplified, ConstraintKind::Equal, flags,
+                    locator);
+}
 
 ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyDynamicTypeOfConstraint(
@@ -7103,13 +7213,30 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::RemoveAddressOf:
   case FixKind::SkipSameTypeRequirement:
   case FixKind::SkipSuperclassRequirement:
-  case FixKind::ContextualMismatch:
   case FixKind::AddMissingArguments:
   case FixKind::DefaultArgumentTypeMismatch:
   case FixKind::SkipUnhandledConstructInFunctionBuilder:
   case FixKind::UsePropertyWrapper:
   case FixKind::UseWrappedValue: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
+  }
+
+  case FixKind::ContextualMismatch: {
+    if (recordFix(fix))
+      return SolutionKind::Error;
+
+    // If type produced by expression is a function type
+    // with result type matching contextual, it should have
+    // been diagnosed as "missing explicit call", let's
+    // increase the score to make sure that we don't impede that.
+    if (auto *fnType = type1->getAs<FunctionType>()) {
+      auto result = matchTypes(fnType->getResult(), type2, matchKind,
+                               TMF_ApplyingFix, locator);
+      if (result == SolutionKind::Solved)
+        increaseScore(SK_Fix);
+    }
+
+    return SolutionKind::Solved;
   }
 
   case FixKind::UseSubscriptOperator:
@@ -7202,6 +7329,9 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
   case ConstraintKind::FunctionResult:
     return simplifyFunctionComponentConstraint(kind, first, second,
                                                subflags, locator);
+
+  case ConstraintKind::OneWayEqual:
+    return simplifyOneWayConstraint(kind, first, second, subflags, locator);
 
   case ConstraintKind::ValueMember:
   case ConstraintKind::UnresolvedValueMember:
@@ -7558,6 +7688,13 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   case ConstraintKind::Disjunction:
     // Disjunction constraints are never solved here.
     return SolutionKind::Unsolved;
+
+  case ConstraintKind::OneWayEqual:
+    return simplifyOneWayConstraint(constraint.getKind(),
+                                    constraint.getFirstType(),
+                                    constraint.getSecondType(),
+                                    TMF_GenerateConstraints,
+                                    constraint.getLocator());
   }
 
   llvm_unreachable("Unhandled ConstraintKind in switch.");

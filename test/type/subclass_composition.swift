@@ -105,7 +105,8 @@ func basicSubtyping(
   let _: Derived = baseAndP2 // expected-error {{cannot convert value of type 'Base<Int> & P2' to specified type 'Derived'}}
   let _: Derived & P2 = baseAndP2 // expected-error {{value of type 'Base<Int> & P2' does not conform to specified type 'Derived & P2'}}
 
-  let _ = Unrelated() as Derived & P2 // expected-error {{value of type 'Unrelated' does not conform to 'Derived & P2' in coercion}}
+  // TODO(diagnostics): Diagnostic regression, better message is `value of type 'Unrelated' does not conform to 'Derived & P2' in coercion`
+  let _ = Unrelated() as Derived & P2 // expected-error {{cannot convert value of type 'Unrelated' to type 'Derived' in coercion}}
   let _ = Unrelated() as? Derived & P2 // expected-warning {{always fails}}
   let _ = baseAndP2 as Unrelated // expected-error {{cannot convert value of type 'Base<Int> & P2' to type 'Unrelated' in coercion}}
   let _ = baseAndP2 as? Unrelated // expected-warning {{always fails}}
@@ -301,8 +302,8 @@ func conformsToAnyObject<T : AnyObject>(_: T) {}
 func conformsToP1<T : P1>(_: T) {}
 func conformsToP2<T : P2>(_: T) {}
 func conformsToBaseIntAndP2<T : Base<Int> & P2>(_: T) {}
-// expected-note@-1 2 {{where 'T' = 'Base<String>'}}
-// expected-note@-2   {{where 'T' = 'Base<Int>'}}
+// expected-note@-1 {{where 'T' = 'Base<String>'}}
+// expected-note@-2 2 {{where 'T' = 'Base<Int>'}}
 
 func conformsToBaseIntAndP2WithWhereClause<T>(_: T) where T : Base<Int> & P2 {}
 // expected-note@-1 {{where 'T' = 'Base<String>'}}
@@ -420,9 +421,10 @@ func conformsTo<T1 : P2, T2 : Base<Int> & P2>(
   conformsToBaseIntAndP2(base)
   // expected-error@-1 {{argument type 'Base<Int>' does not conform to expected type 'P2'}}
 
+  // TODO(diagnostics): Diagnostic for this problem should mention both `Base<String>` not conforming to `P2`
+  // and invalid generic parameter (Int vs. String)
   conformsToBaseIntAndP2(badBase)
-  // expected-error@-1 {{global function 'conformsToBaseIntAndP2' requires that 'Base<String>' inherit from 'Base<Int>'}}
-  // expected-error@-2 {{argument type 'Base<String>' does not conform to expected type 'P2'}}
+  // expected-error@-1 {{global function 'conformsToBaseIntAndP2' requires that 'Base<Int>' conform to 'P2'}}
 
   conformsToBaseIntAndP2(fakeDerived)
   // expected-error@-1 {{global function 'conformsToBaseIntAndP2' requires that 'Base<String>' inherit from 'Base<Int>'}}

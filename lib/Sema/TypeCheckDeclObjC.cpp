@@ -627,7 +627,7 @@ bool swift::isRepresentableInObjC(
       kind = ForeignErrorConvention::NilResult;
 
       // Only non-failing initializers can throw.
-      if (ctor->getFailability() != OTK_None) {
+      if (ctor->isFailable()) {
         if (Diagnose) {
           AFD->diagnose(diag::objc_invalid_on_failing_init,
                         getObjCDiagnosticAttrKind(Reason))

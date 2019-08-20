@@ -191,8 +191,7 @@ PrintOptions PrintOptions::printParseableInterfaceFile(bool preferTypeRepr) {
   // the default to 'public' and mark the 'internal' things.
   result.PrintAccess = true;
 
-  result.ExcludeAttrList = {DAK_ImplicitlyUnwrappedOptional, DAK_AccessControl,
-                            DAK_SetterAccess, DAK_Lazy};
+  result.ExcludeAttrList = {DAK_AccessControl, DAK_SetterAccess, DAK_Lazy};
 
   return result;
 }
@@ -703,9 +702,9 @@ class PrintAST : public ASTVisitor<PrintAST> {
 
   void printTypeLoc(const TypeLoc &TL) { printTypeLocWithOptions(TL, Options); }
 
-  void printTypeLocForImplicitlyUnwrappedOptional(TypeLoc TL) {
+  void printTypeLocForImplicitlyUnwrappedOptional(TypeLoc TL, bool IUO) {
     PrintOptions options = Options;
-    options.PrintOptionalAsImplicitlyUnwrapped = true;
+    options.PrintOptionalAsImplicitlyUnwrapped = IUO;
     printTypeLocWithOptions(TL, options);
   }
 
@@ -993,12 +992,9 @@ void PrintAST::printTypedPattern(const TypedPattern *TP) {
   bool isIUO = false;
   if (auto *named = dyn_cast<NamedPattern>(TP->getSubPattern()))
     if (auto decl = named->getDecl())
-      isIUO = decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+      isIUO = decl->isImplicitlyUnwrappedOptional();
 
-  if (isIUO)
-    printTypeLocForImplicitlyUnwrappedOptional(TP->getTypeLoc());
-  else
-    printTypeLoc(TP->getTypeLoc());
+  printTypeLocForImplicitlyUnwrappedOptional(TP->getTypeLoc(), isIUO);
 }
 
 /// Determines if we are required to print the name of a property declaration,
@@ -2528,10 +2524,8 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
     x(Options.OpaqueReturnTypePrinting,
       PrintOptions::OpaqueReturnTypePrintingMode::WithOpaqueKeyword);
 
-    if (decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
-      printTypeLocForImplicitlyUnwrappedOptional(tyLoc);
-    else
-      printTypeLoc(tyLoc);
+    printTypeLocForImplicitlyUnwrappedOptional(
+      tyLoc, decl->isImplicitlyUnwrappedOptional());
   }
 
   printAccessors(decl);
@@ -2608,10 +2602,8 @@ void PrintAST::printOneParameter(const ParamDecl *param,
                         isEscaping(type));
   }
 
-  if (param->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
-    printTypeLocForImplicitlyUnwrappedOptional(TheTypeLoc);
-  else
-    printTypeLoc(TheTypeLoc);
+  printTypeLocForImplicitlyUnwrappedOptional(
+    TheTypeLoc, param->isImplicitlyUnwrappedOptional());
 
   if (param->isVariadic())
     Printer << "...";
@@ -2832,10 +2824,8 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
       x(Options.OpaqueReturnTypePrinting,
         PrintOptions::OpaqueReturnTypePrintingMode::WithOpaqueKeyword);
 
-      if (decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
-        printTypeLocForImplicitlyUnwrappedOptional(ResultTyLoc);
-      else
-        printTypeLoc(ResultTyLoc);
+      printTypeLocForImplicitlyUnwrappedOptional(
+          ResultTyLoc, decl->isImplicitlyUnwrappedOptional());
       Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
     }
     printGenericDeclGenericRequirements(decl);
@@ -2982,10 +2972,8 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
   x(Options.OpaqueReturnTypePrinting,
     PrintOptions::OpaqueReturnTypePrintingMode::WithOpaqueKeyword);
 
-  if (decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
-    printTypeLocForImplicitlyUnwrappedOptional(elementTy);
-  else
-    printTypeLoc(elementTy);
+  printTypeLocForImplicitlyUnwrappedOptional(
+    elementTy, decl->isImplicitlyUnwrappedOptional());
   Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
   printGenericDeclGenericRequirements(decl);
   printAccessors(decl);
@@ -3024,17 +3012,11 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
     [&]{
       Printer << "init";
     }, [&] { // Signature
-      switch (decl->getFailability()) {
-      case OTK_None:
-        break;
-
-      case OTK_Optional:
-        Printer << "?";
-        break;
-
-      case OTK_ImplicitlyUnwrappedOptional:
-        Printer << "!";
-        break;
+      if (decl->isFailable()) {
+        if (decl->isImplicitlyUnwrappedOptional())
+          Printer << "!";
+        else
+          Printer << "?";
       }
 
       printGenericDeclGenericParams(decl);

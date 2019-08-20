@@ -304,31 +304,12 @@ protected:
     if (isConditional())
       return true;
 
-    auto *anchor = getAnchor();
-    // In the situations like this:
-    //
-    // ```swift
-    // enum E<T: P> { case foo(T) }
-    // let _: E = .foo(...)
-    // ```
-    //
-    // `E` is going to be opened twice. First, when
-    // it's used as a contextual type, and when `E.foo`
-    // is found and its function type is opened.
-    // We still want to record both fixes but should
-    // avoid diagnosing the same problem multiple times.
-    if (isa<UnresolvedMemberExpr>(anchor)) {
-      auto path = getLocator()->getPath();
-      if (path.front().getKind() != ConstraintLocator::UnresolvedMember)
-        return false;
-    }
-
     // For static/initializer calls there is going to be
     // a separate fix, attached to the argument, which is
     // much easier to diagnose.
     // For operator calls we can't currently produce a good
     // diagnostic, so instead let's refer to expression diagnostics.
-    return !(Apply && (isOperator(Apply) || isa<TypeExpr>(anchor)));
+    return !(Apply && isOperator(Apply));
   }
 
   static bool isOperator(const ApplyExpr *apply) {
@@ -384,45 +365,6 @@ protected:
   DiagAsNote getDiagnosticAsNote() const override {
     return diag::candidate_types_conformance_requirement;
   }
-};
-
-/// Diagnostics for mismatched generic arguments e.g
-/// ```swift
-/// struct F<G> {}
-/// let _:F<Int> = F<Bool>()
-/// ```
-class GenericArgumentsMismatchFailure final : public FailureDiagnostic {
-  BoundGenericType *Actual;
-  BoundGenericType *Required;
-  ArrayRef<unsigned> Mismatches;
-
-public:
-  GenericArgumentsMismatchFailure(Expr *expr, ConstraintSystem &cs,
-                                  BoundGenericType *actual,
-                                  BoundGenericType *required,
-                                  ArrayRef<unsigned> mismatches,
-                                  ConstraintLocator *locator)
-      : FailureDiagnostic(expr, cs, locator), Actual(actual),
-        Required(required), Mismatches(mismatches) {}
-
-  bool diagnoseAsError() override;
-
-private:
-  void emitNotesForMismatches() {
-    for (unsigned position : Mismatches) {
-      emitNoteForMismatch(position);
-    }
-  }
-
-  void emitNoteForMismatch(int mismatchPosition);
-
-  Optional<Diag<Type, Type>> getDiagnosticFor(ContextualTypePurpose context);
-
-  /// The actual type being used.
-  BoundGenericType *getActual() const { return Actual; }
-
-  /// The type needed by the generic requirement.
-  BoundGenericType *getRequired() const { return Required; }
 };
 
 /// Diagnose failures related to same-type generic requirements, e.g.
@@ -661,17 +603,24 @@ private:
 /// Intended to diagnose any possible contextual failure
 /// e.g. argument/parameter, closure result, conversions etc.
 class ContextualFailure : public FailureDiagnostic {
+  ContextualTypePurpose CTP;
   Type FromType, ToType;
 
 public:
   ContextualFailure(Expr *root, ConstraintSystem &cs, Type lhs, Type rhs,
                     ConstraintLocator *locator)
-      : FailureDiagnostic(root, cs, locator), FromType(resolve(lhs)),
-        ToType(resolve(rhs)) {}
+      : ContextualFailure(root, cs, cs.getContextualTypePurpose(), lhs, rhs,
+                          locator) {}
 
-  Type getFromType() const { return resolveType(FromType); }
+  ContextualFailure(Expr *root, ConstraintSystem &cs,
+                    ContextualTypePurpose purpose, Type lhs, Type rhs,
+                    ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator), CTP(purpose),
+        FromType(resolve(lhs)), ToType(resolve(rhs)) {}
 
-  Type getToType() const { return resolveType(ToType); }
+  Type getFromType() const { return FromType; }
+
+  Type getToType() const { return ToType; }
 
   bool diagnoseAsError() override;
 
@@ -679,11 +628,60 @@ public:
   // then we probably meant to call the value.
   bool diagnoseMissingFunctionCall() const;
 
+  /// Produce a specialized diagnostic if this is an invalid conversion to Bool.
+  bool diagnoseConversionToBool() const;
+
+  /// Produce a specialized diagnostic if this is an attempt to initialize
+  /// or convert an array literal to a dictionary e.g. `let _: [String: Int] = ["A", 0]`
+  bool diagnoseConversionToDictionary() const;
+
+  /// Attempt to attach any relevant fix-its to already produced diagnostic.
+  void tryFixIts(InFlightDiagnostic &diagnostic) const;
+
+  /// Attempts to add fix-its for these two mistakes:
+  ///
+  /// - Passing an integer where a type conforming to RawRepresentable is
+  ///   expected, by wrapping the expression in a call to the contextual
+  ///   type's initializer
+  ///
+  /// - Passing a type conforming to RawRepresentable where an integer is
+  ///   expected, by wrapping the expression in a call to the rawValue
+  ///   accessor
+  ///
+  /// - Return true on the fixit is added, false otherwise.
+  ///
+  /// This helps migration with SDK changes.
+  bool
+  tryRawRepresentableFixIts(InFlightDiagnostic &diagnostic,
+                            KnownProtocolKind rawRepresentablePrococol) const;
+
+  /// Attempts to add fix-its for these two mistakes:
+  ///
+  /// - Passing an integer with the right type but which is getting wrapped with
+  ///   a different integer type unnecessarily. The fixit removes the cast.
+  ///
+  /// - Passing an integer but expecting different integer type. The fixit adds
+  ///   a wrapping cast.
+  ///
+  /// - Return true on the fixit is added, false otherwise.
+  ///
+  /// This helps migration with SDK changes.
+  bool tryIntegerCastFixIts(InFlightDiagnostic &diagnostic) const;
+
+protected:
   /// Try to add a fix-it when converting between a collection and its slice
   /// type, such as String <-> Substring or (eventually) Array <-> ArraySlice
-  static bool trySequenceSubsequenceFixIts(InFlightDiagnostic &diag,
-                                           ConstraintSystem &CS, Type fromType,
-                                           Type toType, Expr *expr);
+  bool trySequenceSubsequenceFixIts(InFlightDiagnostic &diagnostic) const;
+
+  /// Try to add a fix-it that suggests to explicitly use `as` or `as!`
+  /// to coerce one type to another if type-checker can prove that such
+  /// conversion is possible.
+  bool tryTypeCoercionFixIt(InFlightDiagnostic &diagnostic) const;
+
+  /// Check whether this contextual failure represents an invalid
+  /// conversion from array literal to dictionary.
+  static bool isInvalidDictionaryConversion(ConstraintSystem &cs, Expr *anchor,
+                                            Type contextualType);
 
 private:
   Type resolve(Type rawType) {
@@ -698,6 +696,87 @@ private:
   /// Try to add a fix-it to convert a stored property into a computed
   /// property
   void tryComputedPropertyFixIts(Expr *expr) const;
+
+  bool isIntegerType(Type type) const {
+    return conformsToKnownProtocol(
+        getConstraintSystem(), type,
+        KnownProtocolKind::ExpressibleByIntegerLiteral);
+  }
+
+  /// Return true if the conversion from fromType to toType is
+  /// an invalid string index operation.
+  bool isIntegerToStringIndexConversion() const;
+
+protected:
+  ContextualTypePurpose getContextualTypePurpose() const { return CTP; }
+
+  static Optional<Diag<Type, Type>>
+  getDiagnosticFor(ContextualTypePurpose context, bool forProtocol);
+};
+
+/// Diagnostics for mismatched generic arguments e.g
+/// ```swift
+/// struct F<G> {}
+/// let _:F<Int> = F<Bool>()
+/// ```
+class GenericArgumentsMismatchFailure final : public ContextualFailure {
+  ArrayRef<unsigned> Mismatches;
+
+public:
+  GenericArgumentsMismatchFailure(Expr *expr, ConstraintSystem &cs,
+                                  Type actualType, Type requiredType,
+                                  ArrayRef<unsigned> mismatches,
+                                  ConstraintLocator *locator)
+      : ContextualFailure(expr, cs, actualType, requiredType, locator),
+        Mismatches(mismatches) {
+    assert(actualType->is<BoundGenericType>());
+    assert(requiredType->is<BoundGenericType>());
+  }
+
+  bool diagnoseAsError() override;
+
+private:
+  void emitNotesForMismatches() {
+    for (unsigned position : Mismatches) {
+      emitNoteForMismatch(position);
+    }
+  }
+
+  void emitNoteForMismatch(int mismatchPosition);
+
+  Optional<Diag<Type, Type>> getDiagnosticFor(ContextualTypePurpose context);
+
+  /// The actual type being used.
+  BoundGenericType *getActual() const {
+    return getFromType()->castTo<BoundGenericType>();
+  }
+
+  /// The type needed by the generic requirement.
+  BoundGenericType *getRequired() const {
+    return getToType()->castTo<BoundGenericType>();
+  }
+};
+
+/// Diagnose failures related to conversion between throwing function type
+/// and non-throwing one e.g.
+///
+/// ```swift
+/// func foo<T>(_ t: T) throws -> Void {}
+/// let _: (Int) -> Void = foo // `foo` can't be implictly converted to
+///                            // non-throwing type `(Int) -> Void`
+/// ```
+class ThrowingFunctionConversionFailure final : public ContextualFailure {
+public:
+  ThrowingFunctionConversionFailure(Expr *root, ConstraintSystem &cs,
+                                    Type fromType, Type toType,
+                                    ConstraintLocator *locator)
+      : ContextualFailure(root, cs, fromType, toType, locator) {
+    auto fnType1 = fromType->castTo<FunctionType>();
+    auto fnType2 = toType->castTo<FunctionType>();
+    assert(fnType1->throws() != fnType2->throws());
+  }
+
+  bool diagnoseAsError() override;
 };
 
 /// Diagnose failures related attempt to implicitly convert types which
@@ -747,6 +826,30 @@ public:
       : ContextualFailure(expr, cs, argTy, paramTy, locator) {}
 
   bool diagnoseAsError() override;
+};
+
+/// Diagnose extraneous use of address of (`&`) which could only be
+/// associated with arguments to inout parameters e.g.
+///
+/// ```swift
+/// struct S {}
+///
+/// var a: S = ...
+/// var b: S = ...
+///
+/// a = &b
+/// ```
+class InvalidUseOfAddressOf final : public ContextualFailure {
+public:
+  InvalidUseOfAddressOf(Expr *root, ConstraintSystem &cs, Type lhs, Type rhs,
+                        ConstraintLocator *locator)
+      : ContextualFailure(root, cs, lhs, rhs, locator) {}
+
+  bool diagnoseAsError() override;
+
+protected:
+  /// Compute location of the failure for diagnostic.
+  SourceLoc getLoc() const;
 };
 
 /// Diagnose mismatches relating to tuple destructuring.
@@ -1351,30 +1454,6 @@ public:
   bool diagnoseAsError() override;
 };
 
-/// Diagnose extraneous use of address of (`&`) which could only be
-/// associated with arguments to inout parameters e.g.
-///
-/// ```swift
-/// struct S {}
-///
-/// var a: S = ...
-/// var b: S = ...
-///
-/// a = &b
-/// ```
-class InvalidUseOfAddressOf final : public FailureDiagnostic {
-public:
-  InvalidUseOfAddressOf(Expr *root, ConstraintSystem &cs,
-                        ConstraintLocator *locator)
-      : FailureDiagnostic(root, cs, locator) {}
-
-  bool diagnoseAsError() override;
-
-protected:
-  /// Compute location of the failure for diagnostic.
-  SourceLoc getLoc() const;
-};
-
 /// Diagnose an attempt return something from a function which
 /// doesn't have a return type specified e.g.
 ///
@@ -1422,10 +1501,6 @@ public:
   }
 
   bool diagnoseAsError() override;
-
-private:
-  static Optional<Diag<Type, Type>>
-  getDiagnosticFor(ContextualTypePurpose purpose);
 };
 
 /// Diagnose generic argument omission e.g.

@@ -3664,7 +3664,7 @@ void ConstraintSystem::print(raw_ostream &out) {
   }
 
   out << "Type Variables:\n";
-  for (auto tv : TypeVariables) {
+  for (auto tv : getTypeVariables()) {
     out.indent(2);
     tv->getImpl().print(out);
     if (tv->getImpl().canBindToLValue())

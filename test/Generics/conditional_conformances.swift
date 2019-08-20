@@ -21,7 +21,7 @@ func takes_P2<X: P2>(_: X) {}
 func takes_P5<X: P5>(_: X) {}
 
 struct Free<T> {}
-// CHECK-LABEL: ExtensionDecl line={{.*}} base=Free<T>
+// CHECK-LABEL: ExtensionDecl line={{.*}} base=Free
 // CHECK-NEXT: (normal_conformance type=Free<T> protocol=P2
 // CHECK-NEXT:   conforms_to: T P1)
 extension Free: P2 where T: P1 {} // expected-note {{requirement from conditional conformance of 'Free<U>' to 'P2'}}
@@ -33,7 +33,7 @@ func free_bad<U>(_: U) {
 }
 
 struct Constrained<T: P1> {}
-// CHECK-LABEL: ExtensionDecl line={{.*}} base=Constrained<T>
+// CHECK-LABEL: ExtensionDecl line={{.*}} base=Constrained
 // CHECK-NEXT: (normal_conformance type=Constrained<T> protocol=P2
 // CHECK-NEXT:   conforms_to: T P3)
 extension Constrained: P2 where T: P3 {} // expected-note {{requirement from conditional conformance of 'Constrained<U>' to 'P2'}}
@@ -45,17 +45,17 @@ func constrained_bad<U: P1>(_: U) {
 }
 
 struct RedundantSame<T: P1> {}
-// CHECK-LABEL: ExtensionDecl line={{.*}} base=RedundantSame<T>
+// CHECK-LABEL: ExtensionDecl line={{.*}} base=RedundantSame
 // CHECK-NEXT: (normal_conformance type=RedundantSame<T> protocol=P2)
 extension RedundantSame: P2 where T: P1 {}
 
 struct RedundantSuper<T: P4> {}
-// CHECK-LABEL: ExtensionDecl line={{.*}} base=RedundantSuper<T>
+// CHECK-LABEL: ExtensionDecl line={{.*}} base=RedundantSuper
 // CHECK-NEXT: (normal_conformance type=RedundantSuper<T> protocol=P2)
 extension RedundantSuper: P2 where T: P1 {}
 
 struct OverlappingSub<T: P1> {}
-// CHECK-LABEL: ExtensionDecl line={{.*}} base=OverlappingSub<T>
+// CHECK-LABEL: ExtensionDecl line={{.*}} base=OverlappingSub
 // CHECK-NEXT: (normal_conformance type=OverlappingSub<T> protocol=P2
 // CHECK-NEXT:   conforms_to: T P4)
 extension OverlappingSub: P2 where T: P4 {} // expected-note {{requirement from conditional conformance of 'OverlappingSub<U>' to 'P2'}}
@@ -68,7 +68,7 @@ func overlapping_sub_bad<U: P1>(_: U) {
 
 
 struct SameType<T> {}
-// CHECK-LABEL: ExtensionDecl line={{.*}} base=SameType<T>
+// CHECK-LABEL: ExtensionDecl line={{.*}} base=SameType
 // CHECK-NEXT: (normal_conformance type=SameType<T> protocol=P2
 // CHECK-NEXT:   same_type: T Int)
 extension SameType: P2 where T == Int {}
@@ -84,7 +84,7 @@ func same_type_bad<U>(_: U) {
 
 
 struct SameTypeGeneric<T, U> {}
-// CHECK-LABEL: ExtensionDecl line={{.*}} base=SameTypeGeneric<T, U>
+// CHECK-LABEL: ExtensionDecl line={{.*}} base=SameTypeGeneric
 // CHECK-NEXT: (normal_conformance type=SameTypeGeneric<T, U> protocol=P2
 // CHECK-NEXT:   same_type: T U)
 extension SameTypeGeneric: P2 where T == U {}
@@ -108,7 +108,7 @@ func same_type_bad<U, V>(_: U, _: V) {
 
 
 struct Infer<T, U> {}
-// CHECK-LABEL: ExtensionDecl line={{.*}} base=Infer<T, U>
+// CHECK-LABEL: ExtensionDecl line={{.*}} base=Infer
 // CHECK-NEXT: (normal_conformance type=Infer<T, U> protocol=P2
 // CHECK-NEXT:   same_type: T Constrained<U>
 // CHECK-NEXT:   conforms_to:  U P1)
@@ -126,7 +126,7 @@ func infer_bad<U: P1, V>(_: U, _: V) {
 }
 
 struct InferRedundant<T, U: P1> {}
-// CHECK-LABEL: ExtensionDecl line={{.*}} base=InferRedundant<T, U>
+// CHECK-LABEL: ExtensionDecl line={{.*}} base=InferRedundant
 // CHECK-NEXT: (normal_conformance type=InferRedundant<T, U> protocol=P2
 // CHECK-NEXT:   same_type: T Constrained<U>)
 extension InferRedundant: P2 where T == Constrained<U> {}
@@ -146,7 +146,7 @@ class C2: C1 {}
 class C3: C2 {}
 
 struct ClassFree<T> {}
-// CHECK-LABEL: ExtensionDecl line={{.*}} base=ClassFree<T>
+// CHECK-LABEL: ExtensionDecl line={{.*}} base=ClassFree
 // CHECK-NEXT: (normal_conformance type=ClassFree<T> protocol=P2
 // CHECK-NEXT:   superclass: T C1)
 extension ClassFree: P2 where T: C1 {}
@@ -159,7 +159,7 @@ func class_free_bad<U>(_: U) {
 }
 
 struct ClassMoreSpecific<T: C1> {}
-// CHECK-LABEL: ExtensionDecl line={{.*}} base=ClassMoreSpecific<T>
+// CHECK-LABEL: ExtensionDecl line={{.*}} base=ClassMoreSpecific
 // CHECK-NEXT: (normal_conformance type=ClassMoreSpecific<T> protocol=P2
 // CHECK-NEXT:   superclass: T C3)
 extension ClassMoreSpecific: P2 where T: C3 {} // expected-note {{requirement from conditional conformance of 'ClassMoreSpecific<U>' to 'P2'}}
@@ -173,7 +173,7 @@ func class_more_specific_bad<U: C1>(_: U) {
 
 
 struct ClassLessSpecific<T: C3> {}
-// CHECK-LABEL: ExtensionDecl line={{.*}} base=ClassLessSpecific<T>
+// CHECK-LABEL: ExtensionDecl line={{.*}} base=ClassLessSpecific
 // CHECK-NEXT: (normal_conformance type=ClassLessSpecific<T> protocol=P2)
 extension ClassLessSpecific: P2 where T: C1 {}
 
@@ -195,11 +195,11 @@ func subclass_bad() {
 // Inheriting conformances:
 
 struct InheritEqual<T> {}
-// CHECK-LABEL: ExtensionDecl line={{.*}} base=InheritEqual<T>
+// CHECK-LABEL: ExtensionDecl line={{.*}} base=InheritEqual
 // CHECK-NEXT:  (normal_conformance type=InheritEqual<T> protocol=P2
 // CHECK-NEXT:    conforms_to: T P1)
 extension InheritEqual: P2 where T: P1 {} // expected-note {{requirement from conditional conformance of 'InheritEqual<U>' to 'P2'}}
-// CHECK-LABEL: ExtensionDecl line={{.*}} base=InheritEqual<T>
+// CHECK-LABEL: ExtensionDecl line={{.*}} base=InheritEqual
 // CHECK-NEXT:  (normal_conformance type=InheritEqual<T> protocol=P5
 // CHECK-NEXT:    (normal_conformance type=InheritEqual<T> protocol=P2
 // CHECK-NEXT:      conforms_to: T P1)
@@ -223,11 +223,11 @@ extension InheritLess: P5 {} // expected-error{{type 'T' does not conform to pro
 
 
 struct InheritMore<T> {}
-// CHECK-LABEL: ExtensionDecl line={{.*}} base=InheritMore<T>
+// CHECK-LABEL: ExtensionDecl line={{.*}} base=InheritMore
 // CHECK-NEXT:  (normal_conformance type=InheritMore<T> protocol=P2
 // CHECK-NEXT:    conforms_to: T P1)
 extension InheritMore: P2 where T: P1 {} // expected-note {{requirement from conditional conformance of 'InheritMore<U>' to 'P2'}}
-// CHECK-LABEL: ExtensionDecl line={{.*}} base=InheritMore<T>
+// CHECK-LABEL: ExtensionDecl line={{.*}} base=InheritMore
 // CHECK-NEXT:  (normal_conformance type=InheritMore<T> protocol=P5
 // CHECK-NEXT:    (normal_conformance type=InheritMore<T> protocol=P2
 // CHECK-NEXT:      conforms_to: T P1)
@@ -310,12 +310,12 @@ extension TwoDisjointConformances: P2 where T == String {}
 // signature, meaning the stored conditional requirement is T: P1, which isn't
 // true in the original type's generic signature.
 struct RedundancyOrderDependenceGood<T: P1, U> {}
-// CHECK-LABEL: ExtensionDecl line={{.*}} base=RedundancyOrderDependenceGood<T, U>
+// CHECK-LABEL: ExtensionDecl line={{.*}} base=RedundancyOrderDependenceGood
 // CHECK-NEXT: (normal_conformance type=RedundancyOrderDependenceGood<T, U> protocol=P2
 // CHECK-NEXT:   same_type: T U)
 extension RedundancyOrderDependenceGood: P2 where U: P1, T == U {}
 struct RedundancyOrderDependenceBad<T, U: P1> {}
-// CHECK-LABEL: ExtensionDecl line={{.*}} base=RedundancyOrderDependenceBad<T, U>
+// CHECK-LABEL: ExtensionDecl line={{.*}} base=RedundancyOrderDependenceBad
 // CHECK-NEXT: (normal_conformance type=RedundancyOrderDependenceBad<T, U> protocol=P2
 // CHECK-NEXT:   conforms_to: T P1
 // CHECK-NEXT:   same_type: T U)

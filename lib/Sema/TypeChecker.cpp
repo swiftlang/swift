@@ -241,7 +241,7 @@ static void bindExtensionToNominal(ExtensionDecl *ext,
   nominal->addExtension(ext);
 }
 
-static void bindExtensions(SourceFile &SF, TypeChecker &TC) {
+static void bindExtensions(SourceFile &SF) {
   // Utility function to try and resolve the extended type without diagnosing.
   // If we succeed, we go ahead and bind the extension. Otherwise, return false.
   auto tryBindExtension = [&](ExtensionDecl *ext) -> bool {
@@ -413,7 +413,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
     // Resolve extensions. This has to occur first during type checking,
     // because the extensions need to be wired into the AST for name lookup
     // to work.
-    bindExtensions(SF, TC);
+    bindExtensions(SF);
 
     // Look for bridging functions. This only matters when
     // -enable-source-import is provided.

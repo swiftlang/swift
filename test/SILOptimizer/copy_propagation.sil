@@ -118,7 +118,7 @@ bb3(%11 : @owned $T):
 //
 // A new copy_value is inserted before the consuming store.
 // CHECK-NEXT:   %3 = copy_value %0 : $T
-// CHECK-NEXT:   store %3 to [init] %1 : $*T
+// CHECK-NEXT:   store %3 to [assign] %1 : $*T
 //
 // The non-consuming use now uses the original value.
 // CHECK-NEXT:   debug_value %0 : $T
@@ -135,7 +135,7 @@ sil [ossa] @testConsume : $@convention(thin) <T> (@in T, @inout T) -> () {
 bb0(%arg : @owned $T, %addr : $*T):
   %copy = copy_value %arg : $T
   debug_value %copy : $T
-  store %copy to [init] %addr : $*T
+  store %copy to [assign] %addr : $*T
   debug_value %arg : $T
   debug_value_addr %addr : $*T
   destroy_value %arg : $T

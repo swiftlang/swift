@@ -258,10 +258,13 @@ ParsedRawSyntaxNode SyntaxParsingContext::finalizeSourceFile() {
   Parts = Parts.drop_back();
 
   for (auto RawNode : Parts) {
-    if (RawNode.getKind() != SyntaxKind::CodeBlockItem)
+    if (RawNode.getKind() != SyntaxKind::CodeBlockItem) {
       // FIXME: Skip toplevel garbage nodes for now. we shouldn't emit them in
       // the first place.
+      if (RawNode.isRecorded())
+        getSyntaxCreator().finalizeNode(RawNode.getOpaqueNode());
       continue;
+    }
 
     AllTopLevel.push_back(RawNode);
   }

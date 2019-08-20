@@ -551,7 +551,7 @@ class d0170_TestAvailability {
 // PASS_EXPLODE_PATTERN-LABEL: {{^}}@objc class d0181_TestIBAttrs {{{$}}
 
   @IBOutlet weak var anOutlet: d0181_TestIBAttrs!
-// PASS_EXPLODE_PATTERN-NEXT: {{^}}  @objc @IBOutlet @_implicitly_unwrapped_optional @_hasInitialValue weak var anOutlet: @sil_weak d0181_TestIBAttrs!{{$}}
+// PASS_EXPLODE_PATTERN-NEXT: {{^}}  @objc @IBOutlet @_hasInitialValue weak var anOutlet: @sil_weak d0181_TestIBAttrs!{{$}}
 
   @IBInspectable var inspectableProp: Int = 0
 // PASS_EXPLODE_PATTERN-NEXT: {{^}}  @objc @IBInspectable @_hasInitialValue var inspectableProp: Int{{$}}

@@ -51,11 +51,7 @@ g(f0) // okay (subtype)
 g(f1) // okay (exact match)
 
 g(f2) // expected-error{{cannot convert value of type '(Float) -> ()' to expected argument type '(Barable & Fooable) -> ()'}}
-
-// FIXME: Workaround for ?? not playing nice with function types.
-infix operator ??*
-func ??*<T>(lhs: T?, rhs: T) -> T { return lhs ?? rhs }
-g(nilFunc ??* f0)
+g(nilFunc ?? f0)
 
 gc(fc0) // okay
 gc(fc1) // okay

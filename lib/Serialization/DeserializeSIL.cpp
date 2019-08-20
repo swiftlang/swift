@@ -985,7 +985,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                                             ValID2);
     break;
   case SIL_ONE_TYPE:
-    SILOneTypeLayout::readRecord(scratch, RawOpCode, TyID, TyCategory);
+    SILOneTypeLayout::readRecord(scratch, RawOpCode, Attr, TyID, TyCategory);
     break;
   case SIL_ONE_OPERAND:
     SILOneOperandLayout::readRecord(scratch, RawOpCode, Attr,
@@ -1092,18 +1092,21 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   case SILInstructionKind::AllocBoxInst:
     assert(RecordKind == SIL_ONE_TYPE && "Layout should be OneType.");
     ResultVal = Builder.createAllocBox(Loc,
-                       cast<SILBoxType>(MF->getType(TyID)->getCanonicalType()));
+                       cast<SILBoxType>(MF->getType(TyID)->getCanonicalType()),
+                       None, /*bool hasDynamicLifetime*/ Attr != 0);
     break;
-  
-#define ONETYPE_INST(ID)                      \
-  case SILInstructionKind::ID##Inst:                   \
-    assert(RecordKind == SIL_ONE_TYPE && "Layout should be OneType.");         \
-    ResultVal = Builder.create##ID(Loc,                                        \
-                  getSILType(MF->getType(TyID), (SILValueCategory)TyCategory));\
+  case SILInstructionKind::AllocStackInst:
+    assert(RecordKind == SIL_ONE_TYPE && "Layout should be OneType.");
+    ResultVal = Builder.createAllocStack(Loc,
+                  getSILType(MF->getType(TyID), (SILValueCategory)TyCategory),
+                  None, /*bool hasDynamicLifetime*/ Attr != 0);
     break;
-  ONETYPE_INST(AllocStack)
-  ONETYPE_INST(Metatype)
-#undef ONETYPE_INST
+  case SILInstructionKind::MetatypeInst:
+    assert(RecordKind == SIL_ONE_TYPE && "Layout should be OneType.");
+    ResultVal = Builder.createMetatype(Loc,
+                  getSILType(MF->getType(TyID), (SILValueCategory)TyCategory));
+    break;
+
 #define ONETYPE_ONEOPERAND_INST(ID)           \
   case SILInstructionKind::ID##Inst:                   \
     assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&       \

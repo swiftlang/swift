@@ -94,7 +94,6 @@ public:
   IGNORED_ATTR(HasStorage)
   IGNORED_ATTR(ImplementationOnly)
   IGNORED_ATTR(Implements)
-  IGNORED_ATTR(ImplicitlyUnwrappedOptional)
   IGNORED_ATTR(Infix)
   IGNORED_ATTR(Inlinable)
   IGNORED_ATTR(Inline)
@@ -133,6 +132,7 @@ public:
   IGNORED_ATTR(DisfavoredOverload)
   IGNORED_ATTR(FunctionBuilder)
   IGNORED_ATTR(ProjectedValueProperty)
+  IGNORED_ATTR(ReferenceOwnership)
 #undef IGNORED_ATTR
 
   void visitAlignmentAttr(AlignmentAttr *attr) {
@@ -174,10 +174,6 @@ public:
   void visitNonMutatingAttr(NonMutatingAttr *attr) { visitMutationAttr(attr); }
   void visitConsumingAttr(ConsumingAttr *attr) { visitMutationAttr(attr); }
   void visitDynamicAttr(DynamicAttr *attr);
-
-  void visitReferenceOwnershipAttr(ReferenceOwnershipAttr *attr) {
-    TC.checkReferenceOwnershipAttr(cast<VarDecl>(D), attr);
-  }
 
   void visitFinalAttr(FinalAttr *attr) {
     // Reject combining 'final' with 'open'.
@@ -272,7 +268,7 @@ void AttributeEarlyChecker::visitMutationAttr(DeclAttribute *attr) {
   SelfAccessKind attrModifier;
   switch (attr->getKind()) {
   case DeclAttrKind::DAK_Consuming:
-    attrModifier = SelfAccessKind::__Consuming;
+    attrModifier = SelfAccessKind::Consuming;
     break;
   case DeclAttrKind::DAK_Mutating:
     attrModifier = SelfAccessKind::Mutating;
@@ -289,7 +285,7 @@ void AttributeEarlyChecker::visitMutationAttr(DeclAttribute *attr) {
     // 'mutating' and 'nonmutating' are not valid on types
     // with reference semantics.
     if (contextTy->hasReferenceSemantics()) {
-      if (attrModifier != SelfAccessKind::__Consuming)
+      if (attrModifier != SelfAccessKind::Consuming)
         diagnoseAndRemoveAttr(attr, diag::mutating_invalid_classes,
                               attrModifier);
     }
@@ -318,9 +314,9 @@ void AttributeEarlyChecker::visitMutationAttr(DeclAttribute *attr) {
     }
 
     if (auto *CSA = FD->getAttrs().getAttribute<ConsumingAttr>()) {
-      if (attrModifier != SelfAccessKind::__Consuming) {
+      if (attrModifier != SelfAccessKind::Consuming) {
         diagnoseAndRemoveAttr(CSA, diag::functions_mutating_and_not,
-                              SelfAccessKind::__Consuming, attrModifier);
+                              SelfAccessKind::Consuming, attrModifier);
       }
     }
   }
@@ -715,7 +711,6 @@ public:
     IGNORED_ATTR(IBDesignable)
     IGNORED_ATTR(IBInspectable)
     IGNORED_ATTR(IBOutlet) // checked early.
-    IGNORED_ATTR(ImplicitlyUnwrappedOptional)
     IGNORED_ATTR(Indirect)
     IGNORED_ATTR(Inline)
     IGNORED_ATTR(Lazy)      // checked early.
@@ -2642,26 +2637,13 @@ void TypeChecker::checkDeclAttributes(Decl *D) {
   }
 }
 
-void TypeChecker::checkTypeModifyingDeclAttributes(VarDecl *var) {
-  if (!var->hasType())
-    return;
-
-  if (auto *attr = var->getAttrs().getAttribute<ReferenceOwnershipAttr>())
-    checkReferenceOwnershipAttr(var, attr);
-}
-
-void TypeChecker::checkReferenceOwnershipAttr(VarDecl *var,
+Type TypeChecker::checkReferenceOwnershipAttr(VarDecl *var, Type type,
                                               ReferenceOwnershipAttr *attr) {
-  // Don't check ownership attribute if the declaration is already marked invalid.
-  if (var->isInvalid())
-    return;
+  auto *dc = var->getDeclContext();
 
-  Type type = var->getType();
-  Type interfaceType = var->getInterfaceType();
-
-  // Just stop if we've already processed this declaration.
-  if (type->is<ReferenceStorageType>())
-    return;
+  // Don't check ownership attribute if the type is invalid.
+  if (attr->isInvalid() || type->is<ErrorType>())
+    return type;
 
   auto ownershipKind = attr->get();
 
@@ -2713,11 +2695,12 @@ void TypeChecker::checkReferenceOwnershipAttr(VarDecl *var,
   if (!underlyingType)
     underlyingType = type;
 
-  if (!underlyingType->allowsOwnership()) {
+  auto *sig = var->getDeclContext()->getGenericSignatureOfContext();
+  if (!underlyingType->allowsOwnership(sig)) {
     auto D = diag::invalid_ownership_type;
 
     if (underlyingType->isExistentialType() ||
-        underlyingType->is<ArchetypeType>()) {
+        underlyingType->isTypeParameter()) {
       // Suggest the possibility of adding a class bound.
       D = diag::invalid_ownership_protocol_type;
     }
@@ -2735,7 +2718,7 @@ void TypeChecker::checkReferenceOwnershipAttr(VarDecl *var,
     attr->setInvalid();
   }
 
-  auto PDC = dyn_cast<ProtocolDecl>((var->getDeclContext()));
+  auto PDC = dyn_cast<ProtocolDecl>(dc);
   if (PDC && !PDC->isObjC()) {
     // Ownership does not make sense in protocols, except for "weak" on
     // properties of Objective-C protocols.
@@ -2748,13 +2731,10 @@ void TypeChecker::checkReferenceOwnershipAttr(VarDecl *var,
   }
 
   if (attr->isInvalid())
-    return;
+    return type;
 
   // Change the type to the appropriate reference storage type.
-  var->setType(ReferenceStorageType::get(
-      type, ownershipKind, Context));
-  var->setInterfaceType(ReferenceStorageType::get(
-      interfaceType, ownershipKind, Context));
+  return ReferenceStorageType::get(type, ownershipKind, Context);
 }
 
 Optional<Diag<>>

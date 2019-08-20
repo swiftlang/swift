@@ -829,10 +829,6 @@ public:
   /// \param IDC The context whose member decls should be lazily parsed.
   void parseMembers(IterableDeclContext *IDC);
 
-  /// Use the lazy parsers associated with the context to check whether the decl
-  /// context has been parsed.
-  bool hasUnparsedMembers(const IterableDeclContext *IDC) const;
-
   /// Get the lazy function data for the given generic context.
   ///
   /// \param lazyLoader If non-null, the lazy loader to use when creating the

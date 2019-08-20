@@ -25,36 +25,11 @@
 
 using namespace swift;
 
-template <class FromTy> struct DestType;
-
-#define BRIDGE_TYPE(FROM, TO) \
-template <> struct DestType<FROM> { using type = TO; }
-
-BRIDGE_TYPE(_swift_shims_CFStringRef, CFStringRef);
-BRIDGE_TYPE(_swift_shims_CFStringEncoding, CFStringEncoding);
-BRIDGE_TYPE(CFStringRef, _swift_shims_CFStringRef);
-
-template <class FromTy>
-static typename DestType<FromTy>::type cast(FromTy value) {
-  return (typename DestType<FromTy>::type) value;
-}
-
 __swift_uint8_t
 swift::_swift_stdlib_isNSString(id obj) {
   //TODO: we can likely get a small perf win by using _NSIsNSString on
   //sufficiently new OSs
   return CFGetTypeID((CFTypeRef)obj) == CFStringGetTypeID() ? 1 : 0;
-}
-
-_swift_shims_CFStringRef
-swift::_swift_stdlib_CFStringCreateWithBytes(
-    const void *unused, const uint8_t *bytes,
-    _swift_shims_CFIndex numBytes, _swift_shims_CFStringEncoding encoding,
-    _swift_shims_Boolean isExternalRepresentation) {
-  assert(unused == NULL);
-  return cast(CFStringCreateWithBytes(kCFAllocatorSystemDefault, bytes, numBytes,
-                                      cast(encoding),
-                                      isExternalRepresentation));
 }
 
 extern "C" CFHashCode CFStringHashCString(const uint8_t *bytes, CFIndex len);
