@@ -1972,12 +1972,6 @@ static void verifyAttrSerializable(const KIND ## Decl *D) {\
 static void verifyAttrSerializable(const Decl *D) {}
 #endif
 
-static inline unsigned getOptionalOrZero(const llvm::Optional<unsigned> &X) {
-  if (X.hasValue())
-    return X.getValue();
-  return 0;
-}
-
 bool Serializer::isDeclXRef(const Decl *D) const {
   const DeclContext *topLevel = D->getDeclContext()->getModuleScopeContext();
   if (topLevel->getParentModule() != M)
@@ -2382,8 +2376,8 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     if (X##_Val.hasValue()) {\
       const auto &Y = X##_Val.getValue();\
       X##_Major = Y.getMajor();\
-      X##_Minor = getOptionalOrZero(Y.getMinor());\
-      X##_Subminor = getOptionalOrZero(Y.getSubminor());\
+      X##_Minor = Y.getMinor().getValueOr(0);\
+      X##_Subminor = Y.getSubminor().getValueOr(0);\
       X##_HasMinor = Y.getMinor().hasValue();\
       X##_HasSubminor = Y.getSubminor().hasValue();\
     }
@@ -2894,8 +2888,7 @@ public:
 
     // Reverse the list, and write the parameter lists, from outermost
     // to innermost.
-    std::reverse(allGenericParams.begin(), allGenericParams.end());
-    for (auto *genericParams : allGenericParams)
+    for (auto *genericParams : swift::reversed(allGenericParams))
       writeGenericParams(genericParams);
 
     writeMembers(id, extension->getMembers(), isClassExtension);
@@ -4994,7 +4987,7 @@ void swift::serializeToBuffers(
   std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
   const SILModule *M) {
 
-  assert(options.OutputPath && options.OutputPath[0] != '\0');
+  assert(!StringRef::withNullAsEmpty(options.OutputPath).empty());
   {
     SharedTimer timer("Serialization, swiftmodule, to buffer");
     llvm::SmallString<1024> buf;
@@ -5013,7 +5006,7 @@ void swift::serializeToBuffers(
                         std::move(buf), options.OutputPath);
   }
 
-  if (options.DocOutputPath && options.DocOutputPath[0] != '\0') {
+  if (!StringRef::withNullAsEmpty(options.DocOutputPath).empty()) {
     SharedTimer timer("Serialization, swiftdoc, to buffer");
     llvm::SmallString<1024> buf;
     llvm::raw_svector_ostream stream(buf);
@@ -5033,12 +5026,12 @@ void swift::serializeToBuffers(
 void swift::serialize(ModuleOrSourceFile DC,
                       const SerializationOptions &options,
                       const SILModule *M) {
-  assert(options.OutputPath && options.OutputPath[0] != '\0');
+  assert(!StringRef::withNullAsEmpty(options.OutputPath).empty());
 
-  if (strcmp("-", options.OutputPath) == 0) {
+  if (StringRef(options.OutputPath) == "-") {
     // Special-case writing to stdout.
     Serializer::writeToStream(llvm::outs(), DC, M, options);
-    assert(!options.DocOutputPath || options.DocOutputPath[0] == '\0');
+    assert(StringRef::withNullAsEmpty(options.DocOutputPath).empty());
     return;
   }
 
@@ -5052,7 +5045,7 @@ void swift::serialize(ModuleOrSourceFile DC,
   if (hadError)
     return;
 
-  if (options.DocOutputPath && options.DocOutputPath[0] != '\0') {
+  if (!StringRef::withNullAsEmpty(options.DocOutputPath).empty()) {
     (void)withOutputFile(getContext(DC).Diags,
                          options.DocOutputPath,
                          [&](raw_ostream &out) {
