@@ -29,7 +29,9 @@ func foo6(a : A) {
 
 func foo7(b : [B]) {}
 func foo8(a : [A]) {
-  foo7(b : a) // expected-error {{cannot convert value of type '[A]' to expected argument type '[B]'}} {{13-13= as! [B]}}
+  // TODO(diagnostics): Since `A` and `B` are related it would make sense to suggest forced downcast.
+  foo7(b : a) // expected-error {{cannot convert value of type '[A]' to expected argument type '[B]'}}
+  // expected-note@-1 {{arguments to generic parameter 'Element' ('A' and 'B') are expected to be equal}}
 }
 
 protocol P1 {}
