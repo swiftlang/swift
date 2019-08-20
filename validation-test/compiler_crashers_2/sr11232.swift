@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s
+// RUN: not --crash %target-swift-emit-silgen %s
 
 protocol Pub {
   associatedtype Other
@@ -24,4 +24,3 @@ extension Pub where Other: ObsObj, Other.NeverPub: Subject<Int, Error> {
     return Subject<Other.NeverPub.Other, Other.NeverPub.Failure>().erase()
   }
 }
-

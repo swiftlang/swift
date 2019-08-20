@@ -1925,9 +1925,8 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
     }
 
     FuncDecl *func = cast<FuncDecl>(vd);
-    auto interfaceTy = func->mapTypeIntoContext(func->getInterfaceType())
-                           ->mapTypeOutOfContext();
-    auto funcTy = cast<AnyFunctionType>(interfaceTy->getCanonicalType());
+    auto funcTy = cast<AnyFunctionType>(
+        func->getInterfaceType()->getCanonicalType());
     return getFunctionInterfaceTypeWithCaptures(funcTy, func);
   }
 
