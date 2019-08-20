@@ -2159,24 +2159,9 @@ public:
     // Reject cases where this is a variable that has storage but it isn't
     // allowed.
     if (VD->hasStorage()) {
-      // Note: Stored properties in protocols are diagnosed in
-      // finishProtocolStorageImplInfo().
+      // Note: Stored properties in protocols, enums, etc are diagnosed in
+      // finishStorageImplInfo().
 
-      // Enums and extensions cannot have stored instance properties.
-      // Static stored properties are allowed, with restrictions
-      // enforced below.
-      if (isa<EnumDecl>(VD->getDeclContext()) &&
-          !VD->isStatic() && !VD->isInvalid()) {
-        // Enums can only have computed properties.
-        TC.diagnose(VD->getLoc(), diag::enum_stored_property);
-        VD->markInvalid();
-      } else if (isa<ExtensionDecl>(VD->getDeclContext()) &&
-                 !VD->isStatic() && !VD->isInvalid() &&
-                 !VD->getAttrs().getAttribute<DynamicReplacementAttr>()) {
-        TC.diagnose(VD->getLoc(), diag::extension_stored_property);
-        VD->markInvalid();
-      }
-      
       // We haven't implemented type-level storage in some contexts.
       if (VD->isStatic()) {
         auto PBD = VD->getParentPatternBinding();
@@ -2197,13 +2182,9 @@ public:
 
         auto DC = VD->getDeclContext();
 
-        // Non-stored properties are fine.
-        if (!PBD->hasStorage()) {
-          // do nothing
-
         // Stored type variables in a generic context need to logically
         // occur once per instantiation, which we don't yet handle.
-        } else if (DC->getExtendedProtocolDecl()) {
+        if (DC->getExtendedProtocolDecl()) {
           unimplementedStatic(ProtocolExtensions);
         } else if (DC->isGenericContext()
                && !DC->getGenericSignatureOfContext()->areAllParamsConcrete()) {
