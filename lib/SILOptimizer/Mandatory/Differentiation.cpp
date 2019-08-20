@@ -4415,18 +4415,7 @@ private:
         continue;
       SILValue tanParam;
       if (origArg->getType().isObject()) {
-        // If original result is a `tuple_extract`, materialize tangent value of
-        // `ai` and extract the corresponding element tangent value.
-        if (auto *tupleExtract =
-                dyn_cast<TupleExtractInst>(origArg)) {
-          auto tangentTuple = materializeTangent(getTangentValue(ai), loc);
-          tanParam = diffBuilder.emitTupleExtract(
-              loc, tangentTuple, tupleExtract->getFieldNo());
-        }
-        // Otherwise, materialize tangent value of `ai`.
-        else {
-          tanParam = materializeTangent(getTangentValue(origArg), loc);
-        }
+        tanParam = materializeTangent(getTangentValue(origArg), loc);
       } else {
         tanParam = getTangentBuffer(ai->getParent(), origArg);
         if (errorOccurred)
@@ -4460,83 +4449,6 @@ private:
     assert(indices.source == 0 && "Expected result index to be first.");
     setTangentValue(bb, origResult,
                     makeConcreteTangentValue(differentialResult));
-  }
-
-  void startDifferentialGeneration() {
-    auto &diffBuilder = getDifferentialBuilder();
-
-    // Create differential blocks and arguments.
-    // TODO: Consider visiting original blocks in pre-order (dominance) order.
-    SmallVector<SILBasicBlock *, 8> preOrderDomOrder;
-    auto &differential = getDifferential();
-    auto *origEntry = original->getEntryBlock();
-    for (auto &origBB : *original) {
-      auto *diffBB = differential.createBasicBlock();
-      diffBBMap.insert({&origBB, diffBB});
-      auto diffStructLoweredType =
-          remapType(differentialInfo.getLinearMapStructLoweredType(&origBB));
-      // If the BB is the original exit, then the differential block that we just
-      // created must be the differential function's entry. Create differential
-      // entry arguments and continue.
-      if (&origBB == origEntry) {
-        assert(diffBB->isEntry());
-        createEntryArguments(&differential);
-        auto *mainDifferentialStruct = diffBB->getArguments().back();
-        assert(mainDifferentialStruct->getType() == diffStructLoweredType);
-        differentialStructArguments[&origBB] = mainDifferentialStruct;
-      }
-
-      LLVM_DEBUG({
-        auto &s = getADDebugStream()
-                  << "Original bb" + std::to_string(origBB.getDebugID())
-                  << ": To differentiate or not to differentiate?\n";
-        for (auto &inst : origBB) {
-          s << (shouldBeDifferentiated(&inst, getIndices()) ? "[∂] " : "[ ] ")
-            << inst;
-        }
-      });
-    }
-
-    assert(diffBBMap.size() == 1 &&
-           "Can only currently handle single basic block functions");
-
-    // The differential function has type:
-    // (arg0', ..., argn', entry_df_struct) -> result'.
-    auto diffParamArgs =
-        differential.getArgumentsWithoutIndirectResults().drop_back();
-    assert(diffParamArgs.size() == attr->getIndices().parameters->getCapacity());
-    auto origParamArgs = original->getArgumentsWithoutIndirectResults();
-
-    // Check if result is not varied.
-    SmallVector<SILValue, 8> origFormalResults;
-    collectAllFormalResultsInTypeOrder(*original, origFormalResults);
-    auto origResult = origFormalResults[getIndices().source];
-    // Emit warning if original result is not varied, because it will always
-    // have a zero derivative.
-    if (!activityInfo.isVaried(origResult, getIndices().parameters)) {
-      // Emit fixit if original result has a valid source location.
-      auto startLoc = origResult.getLoc().getStartSourceLoc();
-      auto endLoc = origResult.getLoc().getEndSourceLoc();
-      if (startLoc.isValid() && endLoc.isValid()) {
-        context.diagnose(startLoc, diag::autodiff_nonvaried_result_fixit)
-            .fixItInsert(startLoc, "withoutDerivative(at:")
-            .fixItInsertAfter(endLoc, ")");
-      }
-    }
-
-    auto *diffEntry = getDifferential().getEntryBlock();
-    diffBuilder.setInsertionPoint(
-        diffEntry, getNextDifferentialLocalAllocationInsertionPoint());
-
-    for (auto index : *getIndices().parameters) {
-      auto diffParam = diffParamArgs[index];
-      auto origParam = origParamArgs[index];
-      setTangentValue(origEntry, origParam,
-                      makeConcreteTangentValue(diffParam));
-      LLVM_DEBUG(getADDebugStream()
-                 << "Assigned parameter " << *diffParam
-                 << " as the tangent of original result " << origParam);
-    }
   }
 
 public:
@@ -4637,6 +4549,88 @@ public:
     return differential;
   }
 
+  /// Set up the differential function. This includes:
+  /// - Creating all the differential blocks.
+  /// - Create arguments for the entry block according to the function type.
+  /// - Adding the tangent values of the parameters to the tangent value map.
+  /// - Checking for unvaried result and emitting related warnings.
+  void prepareForDifferentialGeneration() {
+    auto &diffBuilder = getDifferentialBuilder();
+
+    // Create differential blocks and arguments.
+    // TODO: Consider visiting original blocks in pre-order (dominance) order.
+    auto &differential = getDifferential();
+    auto *origEntry = original->getEntryBlock();
+    for (auto &origBB : *original) {
+      auto *diffBB = differential.createBasicBlock();
+      diffBBMap.insert({&origBB, diffBB});
+      auto diffStructLoweredType =
+          remapType(differentialInfo.getLinearMapStructLoweredType(&origBB));
+      // If the BB is the original entry, then the differential block that we
+      // just created must be the differential function's entry. Create
+      // differential entry arguments and continue.
+      if (&origBB == origEntry) {
+        assert(diffBB->isEntry());
+        createEntryArguments(&differential);
+        auto *mainDifferentialStruct = diffBB->getArguments().back();
+        assert(mainDifferentialStruct->getType() == diffStructLoweredType);
+        differentialStructArguments[&origBB] = mainDifferentialStruct;
+      }
+
+      LLVM_DEBUG({
+        auto &s = getADDebugStream()
+                  << "Original bb" + std::to_string(origBB.getDebugID())
+                  << ": To differentiate or not to differentiate?\n";
+        for (auto &inst : origBB) {
+          s << (shouldBeDifferentiated(&inst, getIndices()) ? "[∂] " : "[ ] ")
+            << inst;
+        }
+      });
+    }
+
+    assert(diffBBMap.size() == 1 &&
+           "Can only currently handle single basic block functions");
+
+    // The differential function has type:
+    // (arg0', ..., argn', entry_df_struct) -> result'.
+    auto diffParamArgs =
+        differential.getArgumentsWithoutIndirectResults().drop_back();
+    assert(diffParamArgs.size() ==
+               attr->getIndices().parameters->getNumIndices());
+    auto origParamArgs = original->getArgumentsWithoutIndirectResults();
+
+    // Check if result is not varied.
+    SmallVector<SILValue, 8> origFormalResults;
+    collectAllFormalResultsInTypeOrder(*original, origFormalResults);
+    auto origResult = origFormalResults[getIndices().source];
+    // Emit warning if original result is not varied, because it will always
+    // have a zero derivative.
+    if (!activityInfo.isVaried(origResult, getIndices().parameters)) {
+      // Emit fixit if original result has a valid source location.
+      auto startLoc = origResult.getLoc().getStartSourceLoc();
+      auto endLoc = origResult.getLoc().getEndSourceLoc();
+      if (startLoc.isValid() && endLoc.isValid()) {
+        context.diagnose(startLoc, diag::autodiff_nonvaried_result_fixit)
+            .fixItInsert(startLoc, "withoutDerivative(at:")
+            .fixItInsertAfter(endLoc, ")");
+      }
+    }
+
+    auto *diffEntry = getDifferential().getEntryBlock();
+    diffBuilder.setInsertionPoint(
+        diffEntry, getNextDifferentialLocalAllocationInsertionPoint());
+
+    for (auto index : *getIndices().parameters) {
+      auto diffParam = diffParamArgs[index];
+      auto origParam = origParamArgs[index];
+      setTangentValue(origEntry, origParam,
+                      makeConcreteTangentValue(diffParam));
+      LLVM_DEBUG(getADDebugStream()
+                 << "Assigned parameter " << *diffParam
+                 << " as the tangent of original result " << origParam);
+    }
+  }
+
   /// Run JVP generation. Returns true on error.
   bool run() {
     LLVM_DEBUG(getADDebugStream()
@@ -4645,7 +4639,7 @@ public:
     // Create JVP and differential entry and arguments.
     auto *entry = jvp->createBasicBlock();
     createEntryArguments(jvp);
-    startDifferentialGeneration();
+    prepareForDifferentialGeneration();
     // Clone.
     SmallVector<SILValue, 4> entryArgs(entry->getArguments().begin(),
                                        entry->getArguments().end());
@@ -4729,16 +4723,14 @@ public:
 
   void visitInstructionsInBlock(SILBasicBlock *bb) {
     // Destructure the differential struct to get the elements.
-    if (bb == original->getEntryBlock()) {
-      auto &diffBuilder = getDifferentialBuilder();
-      auto diffLoc = getDifferential().getLocation();
-      auto *diffBB = diffBBMap.lookup(bb);
-      auto *mainDifferentialStruct = diffBB->getArguments().back();
-      diffBuilder.setInsertionPoint(diffBB);
-      auto *dsi = diffBuilder.createDestructureStruct(
-          diffLoc, mainDifferentialStruct);
-      initializeDifferentialStructElements(bb, dsi->getResults());
-    }
+    auto &diffBuilder = getDifferentialBuilder();
+    auto diffLoc = getDifferential().getLocation();
+    auto *diffBB = diffBBMap.lookup(bb);
+    auto *mainDifferentialStruct = diffBB->getArguments().back();
+    diffBuilder.setInsertionPoint(diffBB);
+    auto *dsi = diffBuilder.createDestructureStruct(
+        diffLoc, mainDifferentialStruct);
+    initializeDifferentialStructElements(bb, dsi->getResults());
     TypeSubstCloner::visitInstructionsInBlock(bb);
   }
 

@@ -999,11 +999,10 @@ public extension Array where Element: Differentiable {
 //===----------------------------------------------------------------------===//
 // JVP Diagnostics
 //===----------------------------------------------------------------------===//
-@inlinable
 @_silgen_name("_printJVPErrorAndExit")
 public func _printJVPErrorAndExit() -> Never {
     fatalError("""
-    JVP does not exist. Differential-first differentiation APIs are \
-    experimental and should not be used.
-    """)
+        JVP does not exist. Differential-first differentiation APIs are \
+        experimental and should not be used.
+        """)
 }
