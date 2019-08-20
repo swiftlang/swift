@@ -87,6 +87,7 @@ set(SWIFT_BENCH_MODULES
     single-source/Exclusivity
     single-source/ExistentialPerformance
     single-source/Fibonacci
+    single-source/FindStringNaive
     single-source/FlattenList
     single-source/FloatingPointParsing
     single-source/FloatingPointPrinting
