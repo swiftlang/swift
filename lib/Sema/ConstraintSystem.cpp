@@ -1089,8 +1089,8 @@ void ConstraintSystem::openGenericParameters(DeclContext *outerDC,
 
   // Create the type variables for the generic parameters.
   for (auto gp : sig->getGenericParams()) {
-    auto *paramLocator =
-        getConstraintLocator(locator.withPathElement(LocatorPathElt(gp)));
+    auto *paramLocator = getConstraintLocator(
+        locator.withPathElement(LocatorPathElt::GenericParameter(gp)));
 
     auto typeVar = createTypeVariable(paramLocator, TVO_PrefersSubtypeBinding);
     auto result = replacements.insert(std::make_pair(
@@ -1101,7 +1101,7 @@ void ConstraintSystem::openGenericParameters(DeclContext *outerDC,
   }
 
   auto *baseLocator = getConstraintLocator(
-      locator.withPathElement(LocatorPathElt::getOpenedGeneric(sig)));
+      locator.withPathElement(LocatorPathElt::OpenedGeneric(sig)));
 
   bindArchetypesFromContext(*this, outerDC, baseLocator, replacements);
 }
@@ -1141,9 +1141,9 @@ void ConstraintSystem::openGenericRequirements(
 
     addConstraint(
         *openedReq,
-        locator.withPathElement(LocatorPathElt::getOpenedGeneric(signature))
+        locator.withPathElement(LocatorPathElt::OpenedGeneric(signature))
             .withPathElement(
-                LocatorPathElt::getTypeRequirementComponent(pos, kind)));
+                LocatorPathElt::TypeParameterRequirement(pos, kind)));
   }
 }
 
@@ -1746,7 +1746,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       addConstraint(ConstraintKind::ConformsTo, argType,
                     hashable->getDeclaredType(),
                     getConstraintLocator(
-                        locator, LocatorPathElt::getTupleElement(index)));
+                        locator, LocatorPathElt::TupleElement(index)));
     }
   };
 
@@ -1959,7 +1959,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
              "parameter is supposed to be a keypath");
 
       auto *keyPathLoc = getConstraintLocator(
-          locator, LocatorPathElt::getKeyPathDynamicMember(keyPathDecl));
+          locator, LocatorPathElt::KeyPathDynamicMember(keyPathDecl));
 
       auto rootTy = keyPathTy->getGenericArgs()[0];
       auto leafTy = keyPathTy->getGenericArgs()[1];
