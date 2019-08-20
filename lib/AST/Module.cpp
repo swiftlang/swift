@@ -1207,11 +1207,12 @@ ModuleDecl::ReverseFullNameIterator::operator++() {
 }
 
 void
-ModuleDecl::ReverseFullNameIterator::printForward(raw_ostream &out) const {
+ModuleDecl::ReverseFullNameIterator::printForward(raw_ostream &out,
+                                                  StringRef delim) const {
   SmallVector<StringRef, 8> elements(*this, {});
   swift::interleave(swift::reversed(elements),
                     [&out](StringRef next) { out << next; },
-                    [&out] { out << '.'; });
+                    [&out, delim] { out << delim; });
 }
 
 void
