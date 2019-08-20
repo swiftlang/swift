@@ -1292,7 +1292,6 @@ public:
                                                   true);
     auto D = ::new (DeclPtr) DeclTy(std::forward<Targs>(Args)...);
     D->setClangNode(ClangN);
-    D->setEarlyAttrValidation(true);
     D->setAccess(access);
     if (auto ASD = dyn_cast<AbstractStorageDecl>(D))
       ASD->setSetterAccess(access);

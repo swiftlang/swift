@@ -719,7 +719,6 @@ deriveEquatable_eq(
                      parentDC);
   eqDecl->setImplicit();
   eqDecl->setUserAccessible(false);
-  eqDecl->getAttrs().add(new (C) InfixAttr(/*implicit*/false));
 
   // Add the @_implements(Equatable, ==(_:_:)) attribute
   if (generatedIdentifier != C.Id_EqualsOperator) {
