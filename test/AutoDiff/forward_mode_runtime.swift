@@ -6,7 +6,10 @@ import DifferentiationUnittest
 
 var ForwardModeTests = TestSuite("ForwardMode")
 
-<<<<<<< HEAD
+//===----------------------------------------------------------------------===//
+// Basic tests.
+//===----------------------------------------------------------------------===//
+
 ForwardModeTests.test("Identity") {
   func func_to_diff(x: Float) -> Float {
     return x
@@ -15,12 +18,7 @@ ForwardModeTests.test("Identity") {
   expectEqual(4, y)
   expectEqual(1, differential(1))
 }
-=======
-//===----------------------------------------------------------------------===//
-// Basic tests.
-//===----------------------------------------------------------------------===//
 
->>>>>>> tensorflow
 ForwardModeTests.test("Unary") {
   func func_to_diff(x: Float) -> Float {
     return x * x
@@ -50,6 +48,35 @@ ForwardModeTests.test("BinaryWithLets") {
   expectEqual(-19, differential(1, 1))
 }
 
+ForwardModeTests.test("SubsetParametersDiff") {
+  func func_to_diff1(x: Int, y: Float, z: Int) -> Float {
+    return y
+  }
+  let (y1, differential1) = valueWithDifferential(at: 5) { y in
+    func_to_diff1(x: 0, y: y, z: 0)
+  }
+  expectEqual(5, y1)
+  expectEqual(1, differential1(1))
+
+  func func_to_diff2(x: Float, y: Int, z: Int) -> Float {
+    return 2 * x
+  }
+  let (y2, differential2) = valueWithDifferential(at: 6) { x in
+    func_to_diff2(x: x, y: 0, z: 0) 
+  }
+  expectEqual(12, y2)
+  expectEqual(2, differential2(1))
+
+  func func_to_diff3(x: Int, y: Int, z: Float) -> Float {
+    return 3 * z
+  }
+  let (y3, differential3) = valueWithDifferential(at: 7) { z in
+    func_to_diff3(x: 0, y: 0, z: z) 
+  }
+  expectEqual(21, y3)
+  expectEqual(3, differential3(1))
+}
+
 //===----------------------------------------------------------------------===//
 // Functions with variables
 //===----------------------------------------------------------------------===//
@@ -76,8 +103,8 @@ ForwardModeTests.test("UnaryWithVars") {
 //===----------------------------------------------------------------------===//
 
 struct A: Differentiable & AdditiveArithmetic {
-    var x: Float
-  }
+  var x: Float
+}
 
 ForwardModeTests.test("StructInit") {
   func structInit(x: Float) -> A {
@@ -605,6 +632,7 @@ ForwardModeTests.test("GenericTrackedBinaryVars") {
   expectEqual(80, y)
   expectEqual(36, differential(1, 1))
 }
+
 ForwardModeTests.test("TrackedDifferentiableFuncType") {
   func valAndDeriv(
     f: @escaping @differentiable (Tracked<Float>) -> Tracked<Float>
@@ -622,6 +650,7 @@ ForwardModeTests.test("TrackedDifferentiableFuncType") {
   expectEqual(400, val1)
   expectEqual(160, dv1)
 }
+
 //===----------------------------------------------------------------------===//
 // Classes
 //===----------------------------------------------------------------------===//
@@ -793,31 +822,31 @@ ForwardModeTests.test("SimpleWrtSelf") {
 // Protocols
 //===----------------------------------------------------------------------===//
 // TODO: add more protocol tests.
-// protocol DiffReq : Differentiable {
-//   @differentiable(wrt: x)
-//   func foo(x: Float) -> Float
-// }
+protocol DiffReq : Differentiable {
+  @differentiable(wrt: x)
+  func foo(x: Float) -> Float
+}
 
-// struct Linear: DiffReq, VectorProtocol {
-//   typealias TangentVector = Linear
+struct Linear: DiffReq, VectorProtocol {
+  typealias TangentVector = Linear
 
-//   let m: Float
-//   let b: Float
+  let m: Float
+  let b: Float
 
-//   @differentiable(wrt: x)
-//   func foo(x: Float) -> Float {
-//     return m * x + b
-//   }
-// }
+  @differentiable(wrt: x)
+  func foo(x: Float) -> Float {
+    return m * x + b
+  }
+}
 
-// ForwardModeTests.test("Protocols") {
-//   func genericFoo<T: DiffReq>(_ t: T, _ x: Float) -> Float {
-//     t.foo(x: x)
-//   }
-//   let inst = Linear(m: 5, b: -2)
-//   let (y1, diff1) = valueWithDifferential(at: 5) { x in genericFoo(inst, x) }
-//   expectEqual(23, y1)
-//   expectEqual(5, diff1(1))
-// }
+ForwardModeTests.test("Protocols") {
+  func genericFoo<T: DiffReq>(_ t: T, _ x: Float) -> Float {
+    t.foo(x: x)
+  }
+  let inst = Linear(m: 5, b: -2)
+  let (y1, diff1) = valueWithDifferential(at: 5) { x in genericFoo(inst, x) }
+  expectEqual(23, y1)
+  expectEqual(5, diff1(1))
+}
 
 runAllTests()
