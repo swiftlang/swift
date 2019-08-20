@@ -44,6 +44,8 @@ def check_output(cmd, verbose=False):
 
 
 def get_sdk_path(platform):
+    if platform.startswith('iosmac'):
+        platform = 'macosx'
     return check_output(['xcrun', '-sdk', platform, '-show-sdk-path'])
 
 
@@ -94,14 +96,24 @@ class DumpConfig:
             'macosx': 'x86_64-apple-macosx10.15',
             'appletvos': 'arm64-apple-tvos13.0',
             'watchos': 'armv7k-apple-watchos6.0',
+            'iosmac': 'x86_64-apple-ios13.0-macabi',
         }
         self.tool_path = get_api_digester_path(tool_path)
         self.platform = platform
         self.target = target_map[platform]
         self.sdk = get_sdk_path(platform)
+        self.inputs = []
+        if self.platform == 'macosx':
+            # We need this input search path for CreateML
+            self.inputs.extend([self.sdk + '/usr/lib/swift/'])
         self.frameworks = [
             self.sdk + '/System/Library/Frameworks/',
             os.path.realpath(self.sdk + '/../../Library/Frameworks/')]
+        if self.platform.startswith('iosmac'):
+            # Catalyst modules need this extra framework dir
+            iOSSupport = self.sdk + \
+                '/System/iOSSupport/System/Library/Frameworks'
+            self.frameworks.extend([iOSSupport])
 
     def run(self, output, module, swift_ver, opts, verbose,
             module_filter_flags, include_fixed_clang_modules,
@@ -110,15 +122,19 @@ class DumpConfig:
                self.target, '-dump-sdk', '-module-cache-path',
                '/tmp/ModuleCache', '-swift-version',
                swift_ver, '-abort-on-module-fail']
+        _environ = dict(os.environ)
+        _environ['SWIFT_FORCE_MODULE_LOADING'] = 'prefer-interface'
         for path in self.frameworks:
             cmd.extend(['-iframework', path])
+        for path in self.inputs:
+            cmd.extend(['-I', path])
         cmd.extend(['-' + o for o in opts])
         if verbose:
             cmd.extend(['-v'])
         if module:
             cmd.extend(['-module', module])
             cmd.extend(['-o', output])
-            check_call(cmd, verbose=verbose)
+            check_call(cmd, env=_environ, verbose=verbose)
         else:
             with tempfile.NamedTemporaryFile() as tmp:
                 prepare_module_list(self.platform, tmp, verbose,
@@ -138,11 +154,11 @@ class DumpConfig:
                         current_cmd = list(cmd)
                         current_cmd.extend(['-module', module])
                         current_cmd.extend(['-o', file_path])
-                        check_call(current_cmd, verbose=verbose)
+                        check_call(current_cmd, env=_environ, verbose=verbose)
                 else:
                     cmd.extend(['-o', output])
                     cmd.extend(['-module-list-file', tmp.name])
-                    check_call(cmd, verbose=verbose)
+                    check_call(cmd, env=_environ, verbose=verbose)
 
 
 class DiagnoseConfig:
