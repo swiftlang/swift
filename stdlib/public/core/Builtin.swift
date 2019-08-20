@@ -698,6 +698,7 @@ func _isPOD<T>(_ type: T.Type) -> Bool {
 /// Note that there may be cases in which, despite `T` being concrete at some
 /// point in the caller chain, this function will return `false`.
 @_alwaysEmitIntoClient
+@_transparent
 public // @testable
 func _isConcrete<T>(_ type: T.Type) -> Bool {
   return Bool(Builtin.isConcrete(type))
