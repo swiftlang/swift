@@ -4153,14 +4153,15 @@ void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
             (typealias->getGenericParams() ?
              TypeResolverContext::GenericTypeAliasDecl :
              TypeResolverContext::TypeAliasDecl));
-          if (validateType(typealias->getUnderlyingTypeLoc(),
+          auto &underlyingTL = typealias->getUnderlyingTypeLoc();
+          if (underlyingTL.isNull() ||
+              validateType(underlyingTL,
                            TypeResolution::forStructural(typealias), options)) {
             typealias->setInvalid();
-            typealias->getUnderlyingTypeLoc().setInvalidType(Context);
+            underlyingTL.setInvalidType(Context);
           }
 
-          typealias->setUnderlyingType(
-                                  typealias->getUnderlyingTypeLoc().getType());
+          typealias->setUnderlyingType(underlyingTL.getType());
 
           // Note that this doesn't set the generic environment of the alias yet,
           // because we haven't built one for the protocol.
