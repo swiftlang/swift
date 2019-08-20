@@ -107,8 +107,8 @@ ForwardModeTests.test("TrackedDifferentiableFuncType") {
     return b * b // 16x^2
   }
   let (val1, dv1) = valAndDeriv(f: func1)
-  expectEqual(val1, 400)
-  expectEqual(dv1, 160)
+  expectEqual(400, val1)
+  expectEqual(160, dv1)
 }
 //===----------------------------------------------------------------------===//
 // Classes
@@ -258,15 +258,17 @@ ForwardModeTests.test("SimpleWrtSelf") {
   }
 
   let (y1, diff1) = classDifferential(Super(base: 5))
-  expectEqual(y1, 50)
-  expectEqual(diff1(Super.TangentVector(base: 1, _nontrivial: []), 1), 1)
+  expectEqual(50, y1)
+  let c1 = Super.TangentVector(base: 1, _nontrivial: [])
+  expectEqual(1, diff1(c1, 1))
   let (y2, diff2) = classDifferential(SubOverride(base: 5))
-  expectEqual(y2, 30)
-  expectEqual(diff2(SubOverride.TangentVector(base: 1, _nontrivial: []), 1), 3)
+  expectEqual(30, y2)
+  let c2 = SubOverride.TangentVector(base: 1, _nontrivial: [])
+  expectEqual(3, diff2(c2, 1))
   let (y3, diff3) = classDifferential(SubOverrideCustomDerivatives(base: 5))
-  expectEqual(y3, 30)
-  expectEqual(diff3(SubOverrideCustomDerivatives
-                      .TangentVector(base: 1, _nontrivial: []), 1), 3)
+  expectEqual(30, y3)
+  let c3 = SubOverrideCustomDerivatives.TangentVector(base: 1, _nontrivial: [])
+  expectEqual(3, diff3(c3, 1))
   expectEqual((Super.TangentVector(base: 10, _nontrivial: []), 2),
               classGradient(Super(base: 2)))
   expectEqual((Super.TangentVector(base: 0, _nontrivial: []), 3),
@@ -279,30 +281,31 @@ ForwardModeTests.test("SimpleWrtSelf") {
 // Protocols
 //===----------------------------------------------------------------------===//
 // TODO: add more protocol tests.
-protocol DiffReq : Differentiable {
-  func foo(x: Float) -> Float
-}
+// protocol DiffReq : Differentiable {
+//   @differentiable(wrt: x)
+//   func foo(x: Float) -> Float
+// }
 
-struct Linear: DiffReq, VectorProtocol {
-  typealias TangentVector = Linear
+// struct Linear: DiffReq, VectorProtocol {
+//   typealias TangentVector = Linear
 
-  @differentiable
-  let m: Float
+//   let m: Float
+//   let b: Float
 
-  @differentiable
-  let b: Float
+//   @differentiable(wrt: x)
+//   func foo(x: Float) -> Float {
+//     return m * x + b
+//   }
+// }
 
-  @differentiable
-  func foo(x: Float) -> Float {
-    return m * x + b
-  }
-}
-
-ForwardModeTests.test("Protocols") {
-  let inst = Linear(m: 5, b: -2)
-  let (y1, diff1) = valueWithDifferential(at: 5) { x in inst.foo(x: x) }
-  expectEqual(y1, 23)
-  expectEqual(diff1(1), 5)
-}
+// ForwardModeTests.test("Protocols") {
+//   func genericFoo<T: DiffReq>(_ t: T, _ x: Float) -> Float {
+//     t.foo(x: x)
+//   }
+//   let inst = Linear(m: 5, b: -2)
+//   let (y1, diff1) = valueWithDifferential(at: 5) { x in genericFoo(inst, x) }
+//   expectEqual(23, y1)
+//   expectEqual(5, diff1(1))
+// }
 
 runAllTests()
