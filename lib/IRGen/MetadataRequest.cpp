@@ -519,8 +519,9 @@ CanType IRGenModule::substOpaqueTypesWithUnderlyingTypes(CanType type) {
     ReplaceOpaqueTypesWithUnderlyingTypes replacer(getSwiftModule(),
                                                   ResilienceExpansion::Maximal);
     type = type.subst(replacer, replacer,
-                      SubstFlags::SubstituteOpaqueArchetypes)
-      ->getCanonicalType();
+                      SubstFlags::SubstituteOpaqueArchetypes |
+                          SubstFlags::AllowLoweredTypes)
+               ->getCanonicalType();
   }
 
   return type;
