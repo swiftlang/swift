@@ -23,15 +23,15 @@ useDictStringInt(["Hello" : 1, "World" : 2.5])
 useDictStringInt([4.5 : 2])
 // expected-error@-1 {{cannot convert value of type 'Double' to expected dictionary key type 'DictStringInt.Key' (aka 'String')}}
 useDictStringInt([nil : 2])
-// expected-error@-1 {{'nil' is not compatible with expected dictionary key type 'String'}}
+// expected-error@-1 {{'nil' is not compatible with expected dictionary key type 'DictStringInt.Key' (aka 'String')}}
 useDictStringInt([7 : 1, "World" : 2])
 // expected-error@-1 {{cannot convert value of type 'Int' to expected dictionary key type 'DictStringInt.Key' (aka 'String')}}
 useDictStringInt(["Hello" : nil])
-// expected-error@-1 {{'nil' is not compatible with expected dictionary value type 'Int'}}
+// expected-error@-1 {{'nil' is not compatible with expected dictionary value type 'DictStringInt.Value' (aka 'Int')}}
 
 typealias FuncBoolToInt = (Bool) -> Int
 let dict1: MyDictionary<String, FuncBoolToInt> = ["Hello": nil]
-// expected-error@-1 {{'nil' is not compatible with expected dictionary value type '(Bool) -> Int'}}
+// expected-error@-1 {{'nil' is not compatible with expected dictionary value type 'FuncBoolToInt' (aka '(Bool) -> Int')}}
 
 // Generic dictionary literals.
 useDict(["Hello" : 1])
