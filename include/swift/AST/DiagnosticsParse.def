@@ -221,7 +221,7 @@ ERROR(expected_keyword_in_decl,none,
 ERROR(number_cant_start_decl_name,none,
       "%0 name can only start with a letter or underscore, not a number",
       (StringRef))
-ERROR(expected_identifier_after_case_comma,none,
+ERROR(expected_identifier_after_case_comma, PointsToFirstBadToken,
       "expected identifier after comma in enum 'case' declaration", ())
 ERROR(decl_redefinition,none,
       "definition conflicts with previous value", ())
