@@ -1437,9 +1437,11 @@ static void collectMinimalIndicesForFunctionCall(
 #endif
   for (auto *use : ai->getUses()) {
     if (auto *dti = dyn_cast<DestructureTupleInst>(use->getUser())) {
+#ifndef NDEBUG
       assert(!foundDestructure &&
              "Found multiple destructure_tuple's on apply's result");
       foundDestructure = true;
+#endif
       directResults = dti->getResults();
     }
   }
