@@ -951,7 +951,7 @@ private:
         return nullptr;
       }
       UnqualifiedLookup lookup(renamedDeclName.getBaseIdentifier(),
-                               declContext->getModuleScopeContext(), nullptr,
+                               declContext->getModuleScopeContext(),
                                SourceLoc(),
                                UnqualifiedLookup::Flags::TypeLookup);
       return lookup.getSingleTypeResult();
@@ -962,7 +962,7 @@ private:
     const ValueDecl *renamedDecl = nullptr;
     SmallVector<ValueDecl *, 4> lookupResults;
     declContext->lookupQualified(typeDecl->getDeclaredInterfaceType(),
-                                 renamedDeclName, NL_QualifiedDefault, nullptr,
+                                 renamedDeclName, NL_QualifiedDefault,
                                  lookupResults);
 
     if (lookupResults.size() == 1) {
@@ -1440,7 +1440,7 @@ private:
              isNSObjectOrAnyHashable(ctx, typeArgs[0])) {
       if (ModuleDecl *M = ctx.getLoadedModule(ctx.Id_Foundation)) {
         if (!NSCopyingType) {
-          UnqualifiedLookup lookup(ctx.getIdentifier("NSCopying"), M, nullptr);
+          UnqualifiedLookup lookup(ctx.getIdentifier("NSCopying"), M);
           auto type = lookup.getSingleTypeResult();
           if (type && isa<ProtocolDecl>(type)) {
             NSCopyingType = type->getDeclaredInterfaceType();

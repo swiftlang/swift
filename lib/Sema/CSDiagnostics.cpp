@@ -1462,8 +1462,7 @@ bool AssignmentFailure::diagnoseAsError() {
       // If there is a masked instance variable of the same type, emit a
       // note to fixit prepend a 'self.'.
       if (auto typeContext = DC->getInnermostTypeContext()) {
-        UnqualifiedLookup lookup(VD->getFullName(), typeContext,
-                                 getASTContext().getLazyResolver());
+        UnqualifiedLookup lookup(VD->getFullName(), typeContext);
         for (auto &result : lookup.Results) {
           const VarDecl *typeVar = dyn_cast<VarDecl>(result.getValueDecl());
           if (typeVar && typeVar != VD && typeVar->isSettable(DC) &&
