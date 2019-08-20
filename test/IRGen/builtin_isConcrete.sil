@@ -22,6 +22,7 @@ bb0(%0 : $@thin MyInt.Type):
 // CHECK-NEXT:  }
 sil @isConcrete_false : $@convention(thin) <T> (@thin T.Type) -> Builtin.Int1 {
 bb0(%0 : $@thin T.Type):
+  // FIXME: Explicit specialization is required here when it shouldn't be
   %1 = builtin "isConcrete"<T>(%0 : $@thin T.Type) : $Builtin.Int1
   return %1 : $Builtin.Int1
 }
