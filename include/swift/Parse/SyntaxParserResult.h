@@ -41,15 +41,15 @@ public:
   explicit ParsedSyntaxResult(ParsedSyntaxNode Node)
       : SuccessNode(Node), DK(ResultDataKind::Success) {}
 
-  ParsedSyntaxResult(llvm::SmallVector<ParsedSyntax, 0> Nodes,
+  ParsedSyntaxResult(ArrayRef<ParsedSyntax> Nodes,
                      ResultDataKind Kind)
       : DK(Kind) {
     switch (DK) {
     case ResultDataKind::Error:
-      ErrorNodes = Nodes;
+      ErrorNodes.emplace(Nodes.begin(), Nodes.end());
       break;
     case ResultDataKind::CodeCompletion:
-      CodeCompletionNodes = Nodes;
+      CodeCompletionNodes.emplace(Nodes.begin(), Nodes.end());
       break;
     default:
       llvm_unreachable("success cannot contain multiple nodes");
@@ -108,7 +108,7 @@ public:
     return *SuccessNode;
   }
 
-  llvm::SmallVector<ParsedSyntax, 0> getUnknownNodes() const {
+  ArrayRef<ParsedSyntax> getUnknownNodes() const {
     assert(!isSuccess() && "successful parse doesn't contain unknown nodes");
     switch (DK) {
     case ResultDataKind::Error:
@@ -138,7 +138,7 @@ makeParsedSuccess(ParsedSyntaxNode Node) {
 
 template <typename ParsedSyntaxNode>
 static ParsedSyntaxResult<ParsedSyntaxNode>
-makeParsedError(llvm::SmallVector<ParsedSyntax, 0> Nodes) {
+makeParsedError(ArrayRef<ParsedSyntax> Nodes) {
   return ParsedSyntaxResult<ParsedSyntaxNode>(Nodes, ResultDataKind::Error);
 }
 
@@ -149,14 +149,14 @@ static ParsedSyntaxResult<ParsedSyntaxNode> makeParsedErrorEmpty() {
 
 template <typename ParsedSyntaxNode>
 static ParsedSyntaxResult<ParsedSyntaxNode>
-makeParsedCodeCompletion(llvm::SmallVector<ParsedSyntax, 0> Nodes) {
+makeParsedCodeCompletion(ArrayRef<ParsedSyntax> Nodes) {
   return ParsedSyntaxResult<ParsedSyntaxNode>(Nodes,
                                               ResultDataKind::CodeCompletion);
 }
 
 template <typename ParsedSyntaxNode>
 static ParsedSyntaxResult<ParsedSyntaxNode>
-makeParsedResult(llvm::SmallVector<ParsedSyntax, 0> Nodes,
+makeParsedResult(ArrayRef<ParsedSyntax> Nodes,
                  ParserStatus Status) {
   return Status.hasCodeCompletion()
              ? makeParsedCodeCompletion<ParsedSyntaxNode>(Nodes)
