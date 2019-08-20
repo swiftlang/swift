@@ -493,9 +493,7 @@ void walkRelatedDecls(const ValueDecl *VD, const FnTy &Fn) {
   // if VD is an initializer, we should extract other initializers etc.
   // For now we use UnqualifiedLookup to fetch other declarations with the same
   // base name.
-  auto TypeResolver = VD->getASTContext().getLazyResolver();
-  UnqualifiedLookup Lookup(VD->getBaseName(), VD->getDeclContext(),
-                           TypeResolver);
+  UnqualifiedLookup Lookup(VD->getBaseName(), VD->getDeclContext());
   for (auto result : Lookup.Results) {
     ValueDecl *RelatedVD = result.getValueDecl();
     if (RelatedVD->getAttrs().isUnavailable(VD->getASTContext()))

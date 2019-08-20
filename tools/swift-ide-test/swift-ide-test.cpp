@@ -2228,7 +2228,7 @@ static int doPrintDecls(const CompilerInvocation &InitInvok,
   for (const auto &name : DeclsToPrint) {
     ASTContext &ctx = CI.getASTContext();
     UnqualifiedLookup lookup(ctx.getIdentifier(name),
-                             CI.getPrimarySourceFile(), nullptr);
+                             CI.getPrimarySourceFile());
     for (auto result : lookup.Results) {
       result.getValueDecl()->print(*Printer, Options);
 

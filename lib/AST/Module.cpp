@@ -454,8 +454,11 @@ static bool isParsedModule(const ModuleDecl *mod) {
 void ModuleDecl::lookupValue(AccessPathTy AccessPath, DeclName Name,
                              NLKind LookupKind, 
                              SmallVectorImpl<ValueDecl*> &Result) const {
+  auto *stats = getASTContext().Stats;
+  if (stats)
+    stats->getFrontendCounters().NumModuleLookupValue++;
+
   if (isParsedModule(this)) {
-    FrontendStatsTracer tracer(getASTContext().Stats, "source-file-lookup-value");
     getSourceLookupCache().lookupValue(AccessPath, Name, LookupKind, Result);
     return;
   }
@@ -604,6 +607,10 @@ void SourceFile::lookupClassMembers(ModuleDecl::AccessPathTy accessPath,
 void ModuleDecl::lookupClassMember(AccessPathTy accessPath,
                                    DeclName name,
                                    SmallVectorImpl<ValueDecl*> &results) const {
+  auto *stats = getASTContext().Stats;
+  if (stats)
+    stats->getFrontendCounters().NumModuleLookupClassMember++;
+
   if (isParsedModule(this)) {
     FrontendStatsTracer tracer(getASTContext().Stats, "source-file-lookup-class-member");
     auto &cache = getSourceLookupCache();

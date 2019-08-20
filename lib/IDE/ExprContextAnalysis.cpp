@@ -273,9 +273,8 @@ static void collectPossibleCalleesByQualifiedLookup(
   bool isOnMetaType = baseTy->is<AnyMetatypeType>();
 
   SmallVector<ValueDecl *, 2> decls;
-  auto resolver = DC.getASTContext().getLazyResolver();
   if (!DC.lookupQualified(baseTy->getMetatypeInstanceType(), name,
-                          NL_QualifiedDefault | NL_ProtocolMembers, resolver,
+                          NL_QualifiedDefault | NL_ProtocolMembers,
                           decls))
     return;
 
@@ -285,9 +284,11 @@ static void collectPossibleCalleesByQualifiedLookup(
       continue;
     if (!isMemberDeclApplied(&DC, baseTy->getMetatypeInstanceType(), VD))
       continue;
-    resolver->resolveDeclSignature(VD);
-    if (!VD->hasInterfaceType())
-      continue;
+    if (!VD->hasInterfaceType()) {
+      VD->getASTContext().getLazyResolver()->resolveDeclSignature(VD);
+      if (!VD->hasInterfaceType())
+        continue;
+    }
     Type declaredMemberType = VD->getInterfaceType();
     if (!declaredMemberType->is<AnyFunctionType>())
       continue;

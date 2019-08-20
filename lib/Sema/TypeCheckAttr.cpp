@@ -2024,7 +2024,7 @@ void lookupReplacedDecl(DeclName replacedDeclName,
 
   auto *moduleScopeCtxt = declCtxt->getModuleScopeContext();
   if (isa<FileUnit>(declCtxt)) {
-    UnqualifiedLookup lookup(replacedDeclName, moduleScopeCtxt, nullptr,
+    UnqualifiedLookup lookup(replacedDeclName, moduleScopeCtxt,
                              attr->getLocation());
     if (lookup.isSuccess()) {
       for (auto entry : lookup.Results) {

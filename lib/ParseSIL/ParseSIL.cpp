@@ -1177,7 +1177,7 @@ lookupTopDecl(Parser &P, DeclBaseName Name) {
          "Unexpected stage during parsing!");
   llvm::SaveAndRestore<SourceFile::ASTStage_t> ASTStage(P.SF.ASTStage,
                                                         SourceFile::Parsed);
-  UnqualifiedLookup DeclLookup(Name, &P.SF, nullptr);
+  UnqualifiedLookup DeclLookup(Name, &P.SF);
   assert(DeclLookup.isSuccess() && DeclLookup.Results.size() == 1);
   ValueDecl *VD = DeclLookup.Results.back().getValueDecl();
   return VD;

@@ -35,7 +35,7 @@ class ClangModuleUnit final : public LoadedFile {
   ClangImporter::Implementation &owner;
   const clang::Module *clangModule;
   llvm::PointerIntPair<ModuleDecl *, 1, bool> overlayModule;
-  mutable ArrayRef<ModuleDecl::ImportedModule> importedModulesForLookup;
+  mutable Optional<ArrayRef<ModuleDecl::ImportedModule>> importedModulesForLookup;
   /// The metadata of the underlying Clang module.
   clang::ExternalASTSource::ASTSourceDescriptor ASTSourceDescriptor;
 
