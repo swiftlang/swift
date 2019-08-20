@@ -459,36 +459,6 @@ static bool shouldSerializeAsLocalContext(const DeclContext *DC) {
         !isa<SubscriptDecl>(DC);
 }
 
-static const Decl *getDeclForContext(const DeclContext *DC) {
-  switch (DC->getContextKind()) {
-  case DeclContextKind::Module:
-    // Use a null decl to represent the module.
-    return nullptr;
-  case DeclContextKind::FileUnit:
-    return getDeclForContext(DC->getParent());
-  case DeclContextKind::SerializedLocal:
-    llvm_unreachable("Serialized local contexts should only come from deserialization");
-  case DeclContextKind::Initializer:
-  case DeclContextKind::AbstractClosureExpr:
-    // FIXME: What about default functions?
-    llvm_unreachable("shouldn't serialize decls from anonymous closures");
-  case DeclContextKind::GenericTypeDecl:
-    return cast<GenericTypeDecl>(DC);
-  case DeclContextKind::ExtensionDecl:
-    return cast<ExtensionDecl>(DC);
-  case DeclContextKind::TopLevelCodeDecl:
-    llvm_unreachable("shouldn't serialize the main module");
-  case DeclContextKind::AbstractFunctionDecl:
-    return cast<AbstractFunctionDecl>(DC);
-  case DeclContextKind::SubscriptDecl:
-    return cast<SubscriptDecl>(DC);
-  case DeclContextKind::EnumElementDecl:
-    return cast<EnumElementDecl>(DC);
-  }
-
-  llvm_unreachable("Unhandled DeclContextKind in switch.");
-}
-
 namespace {
   struct Accessors {
     uint8_t OpaqueReadOwnership;
@@ -634,7 +604,7 @@ DeclContextID Serializer::addDeclContextRef(const DeclContext *DC) {
   if (shouldSerializeAsLocalContext(DC))
     addLocalDeclContextRef(DC);
   else
-    addDeclRef(getDeclForContext(DC));
+    addDeclRef(DC->getAsDecl());
 
   auto &id = DeclContextIDs[DC];
   if (id)
@@ -1023,23 +993,19 @@ void Serializer::writeHeader(const SerializationOptions &options) {
   }
 }
 
-using ImportPathBlob = llvm::SmallString<64>;
 static void flattenImportPath(const ModuleDecl::ImportedModule &import,
-                              ImportPathBlob &out) {
-  SmallVector<StringRef, 4> reverseSubmoduleNames(
-      import.second->getReverseFullModuleName(), {});
-
-  interleave(reverseSubmoduleNames.rbegin(), reverseSubmoduleNames.rend(),
-             [&out](StringRef next) { out.append(next); },
-             [&out] { out.push_back('\0'); });
+                              SmallVectorImpl<char> &out) {
+  llvm::raw_svector_ostream outStream(out);
+  import.second->getReverseFullModuleName().printForward(outStream,
+                                                         StringRef("\0", 1));
 
   if (import.first.empty())
     return;
 
-  out.push_back('\0');
+  outStream << '\0';
   assert(import.first.size() == 1 && "can only handle top-level decl imports");
   auto accessPathElem = import.first.front();
-  out.append(accessPathElem.first.str());
+  outStream << accessPathElem.first.str();
 }
 
 uint64_t getRawModTimeOrHash(const SerializationOptions::FileDependency &dep) {
@@ -1152,7 +1118,7 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
       continue;
     }
 
-    ImportPathBlob importPath;
+    SmallString<64> importPath;
     flattenImportPath(import, importPath);
 
     serialization::ImportControl stableImportControl;
@@ -1538,7 +1504,7 @@ Serializer::writeConformance(ProtocolConformanceRef conformanceRef,
   switch (conformance->getKind()) {
   case ProtocolConformanceKind::Normal: {
     auto normal = cast<NormalProtocolConformance>(conformance);
-    if (!isDeclXRef(getDeclForContext(normal->getDeclContext()))
+    if (!isDeclXRef(normal->getDeclContext()->getAsDecl())
         && !isa<ClangModuleUnit>(normal->getDeclContext()
                                        ->getModuleScopeContext())) {
       // A normal conformance in this module file.
@@ -2006,12 +1972,6 @@ static void verifyAttrSerializable(const KIND ## Decl *D) {\
 static void verifyAttrSerializable(const Decl *D) {}
 #endif
 
-static inline unsigned getOptionalOrZero(const llvm::Optional<unsigned> &X) {
-  if (X.hasValue())
-    return X.getValue();
-  return 0;
-}
-
 bool Serializer::isDeclXRef(const Decl *D) const {
   const DeclContext *topLevel = D->getDeclContext()->getModuleScopeContext();
   if (topLevel->getParentModule() != M)
@@ -2046,7 +2006,7 @@ void Serializer::writeDeclContext(const DeclContext *DC) {
   case DeclContextKind::GenericTypeDecl:
   case DeclContextKind::ExtensionDecl:
   case DeclContextKind::EnumElementDecl:
-    declOrDeclContextID = addDeclRef(getDeclForContext(DC));
+    declOrDeclContextID = addDeclRef(DC->getAsDecl());
     isDecl = true;
     break;
 
@@ -2416,8 +2376,8 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     if (X##_Val.hasValue()) {\
       const auto &Y = X##_Val.getValue();\
       X##_Major = Y.getMajor();\
-      X##_Minor = getOptionalOrZero(Y.getMinor());\
-      X##_Subminor = getOptionalOrZero(Y.getSubminor());\
+      X##_Minor = Y.getMinor().getValueOr(0);\
+      X##_Subminor = Y.getSubminor().getValueOr(0);\
       X##_HasMinor = Y.getMinor().hasValue();\
       X##_HasSubminor = Y.getSubminor().hasValue();\
     }
@@ -2848,13 +2808,6 @@ public:
     for (auto Attr : D->getAttrs())
       writeDeclAttribute(Attr);
 
-    if (auto VD = dyn_cast<ValueDecl>(D)) {
-      // Hack: synthesize a 'final' attribute if finality was inferred.
-      if (VD->isFinal() && !D->getAttrs().hasAttribute<FinalAttr>())
-        writeDeclAttribute(
-            new (D->getASTContext()) FinalAttr(/*Implicit=*/false));
-    }
-
     if (auto *value = dyn_cast<ValueDecl>(D))
       writeDiscriminatorsIfNeeded(value);
 
@@ -2935,8 +2888,7 @@ public:
 
     // Reverse the list, and write the parameter lists, from outermost
     // to innermost.
-    std::reverse(allGenericParams.begin(), allGenericParams.end());
-    for (auto *genericParams : allGenericParams)
+    for (auto *genericParams : swift::reversed(allGenericParams))
       writeGenericParams(genericParams);
 
     writeMembers(id, extension->getMembers(), isClassExtension);
@@ -5035,7 +4987,7 @@ void swift::serializeToBuffers(
   std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
   const SILModule *M) {
 
-  assert(options.OutputPath && options.OutputPath[0] != '\0');
+  assert(!StringRef::withNullAsEmpty(options.OutputPath).empty());
   {
     SharedTimer timer("Serialization, swiftmodule, to buffer");
     llvm::SmallString<1024> buf;
@@ -5054,7 +5006,7 @@ void swift::serializeToBuffers(
                         std::move(buf), options.OutputPath);
   }
 
-  if (options.DocOutputPath && options.DocOutputPath[0] != '\0') {
+  if (!StringRef::withNullAsEmpty(options.DocOutputPath).empty()) {
     SharedTimer timer("Serialization, swiftdoc, to buffer");
     llvm::SmallString<1024> buf;
     llvm::raw_svector_ostream stream(buf);
@@ -5074,12 +5026,12 @@ void swift::serializeToBuffers(
 void swift::serialize(ModuleOrSourceFile DC,
                       const SerializationOptions &options,
                       const SILModule *M) {
-  assert(options.OutputPath && options.OutputPath[0] != '\0');
+  assert(!StringRef::withNullAsEmpty(options.OutputPath).empty());
 
-  if (strcmp("-", options.OutputPath) == 0) {
+  if (StringRef(options.OutputPath) == "-") {
     // Special-case writing to stdout.
     Serializer::writeToStream(llvm::outs(), DC, M, options);
-    assert(!options.DocOutputPath || options.DocOutputPath[0] == '\0');
+    assert(StringRef::withNullAsEmpty(options.DocOutputPath).empty());
     return;
   }
 
@@ -5093,7 +5045,7 @@ void swift::serialize(ModuleOrSourceFile DC,
   if (hadError)
     return;
 
-  if (options.DocOutputPath && options.DocOutputPath[0] != '\0') {
+  if (!StringRef::withNullAsEmpty(options.DocOutputPath).empty()) {
     (void)withOutputFile(getContext(DC).Diags,
                          options.DocOutputPath,
                          [&](raw_ostream &out) {
