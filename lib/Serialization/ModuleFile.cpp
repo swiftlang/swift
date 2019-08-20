@@ -972,8 +972,7 @@ public:
 
   hash_value_type ComputeHash(internal_key_type key) {
     assert(!key.empty());
-    // FIXME: DJB seed=0, audit whether the default seed could be used.
-    return llvm::djbHash(key, 0);
+    return llvm::djbHash(key, SWIFTDOC_HASH_SEED_5_1);
   }
 
   static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
