@@ -2567,6 +2567,8 @@ static void finishNSManagedImplInfo(VarDecl *var,
 
 static void finishStorageImplInfo(AbstractStorageDecl *storage,
                                   StorageImplInfo &info) {
+  auto dc = storage->getDeclContext();
+
   if (auto var = dyn_cast<VarDecl>(storage)) {
     if (!info.hasStorage()) {
       if (auto *init = var->getParentInitializer()) {
@@ -2585,8 +2587,28 @@ static void finishStorageImplInfo(AbstractStorageDecl *storage,
     }
   }
 
-  if (isa<ProtocolDecl>(storage->getDeclContext()))
+  if (isa<ProtocolDecl>(dc))
     finishProtocolStorageImplInfo(storage, info);
+
+  // If we have a stored property in an unsupported context, diagnose
+  // and change it to computed to avoid confusing SILGen.
+
+  // Note: Stored properties in protocols are diagnosed in
+  // finishProtocolStorageImplInfo().
+
+  if (info.hasStorage() && !storage->isStatic()) {
+    if (isa<EnumDecl>(dc)) {
+      storage->diagnose(diag::enum_stored_property);
+      info = StorageImplInfo::getMutableComputed();
+    } else if (isa<ExtensionDecl>(dc) &&
+              !storage->getAttrs().getAttribute<DynamicReplacementAttr>()) {
+      storage->diagnose(diag::extension_stored_property);
+
+      info = (info.supportsMutation()
+              ? StorageImplInfo::getMutableComputed()
+              : StorageImplInfo::getImmutableComputed());
+    }
+  }
 }
 
 /// Gets the storage info of the provided storage decl if it has the
@@ -2634,6 +2656,13 @@ static StorageImplInfo classifyWithHasStorageAttr(VarDecl *var) {
 llvm::Expected<StorageImplInfo>
 StorageImplInfoRequest::evaluate(Evaluator &evaluator,
                                  AbstractStorageDecl *storage) const {
+  if (auto *param = dyn_cast<ParamDecl>(storage)) {
+    return StorageImplInfo::getSimpleStored(
+      param->isInOut()
+      ? StorageIsMutable
+      : StorageIsNotMutable);
+  }
+
   if (auto *var = dyn_cast<VarDecl>(storage)) {
     // Allow the @_hasStorage attribute to override all the accessors we parsed
     // when making the final classification.

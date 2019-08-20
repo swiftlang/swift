@@ -968,12 +968,8 @@ public:
           Overridden->dump(Out);
           abort();
         }
-      }
-      
-      if (D->didEarlyAttrValidation() &&
-          D->getAttrs().hasAttribute<OverrideAttr>()) {
-        if (!D->isInvalid() && D->hasInterfaceType() &&
-            !isa<ClassDecl>(D->getDeclContext()) &&
+
+        if (!isa<ClassDecl>(D->getDeclContext()) &&
             !isa<ProtocolDecl>(D->getDeclContext()) &&
             !isa<ExtensionDecl>(D->getDeclContext())) {
           PrettyStackTraceDecl debugStack("verifying override", D);
@@ -983,7 +979,6 @@ public:
         }
       }
 
-      
       verifyCheckedAlwaysBase(D);
     }
 
