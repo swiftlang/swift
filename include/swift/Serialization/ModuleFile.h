@@ -87,45 +87,10 @@ class ModuleFile
   /// A callback to be invoked every time a type was deserialized.
   std::function<void(Type)> DeserializedTypeCallback;
 
-  /// The number of entities that are currently being deserialized.
-  unsigned NumCurrentDeserializingEntities = 0;
-
   /// Is this module file actually a .sib file? .sib files are serialized SIL at
   /// arbitrary granularity and arbitrary stage; unlike serialized Swift
   /// modules, which are assumed to contain canonical SIL for an entire module.
   bool IsSIB = false;
-
-  /// RAII class to be used when deserializing an entity.
-  class DeserializingEntityRAII {
-    ModuleFile &MF;
-
-  public:
-    DeserializingEntityRAII(ModuleFile &mf)
-        : MF(mf.getModuleFileForDelayedActions()) {
-      ++MF.NumCurrentDeserializingEntities;
-    }
-    ~DeserializingEntityRAII() {
-      assert(MF.NumCurrentDeserializingEntities > 0 &&
-             "Imbalanced currently-deserializing count?");
-      if (MF.NumCurrentDeserializingEntities == 1) {
-        MF.finishPendingActions();
-      }
-
-      --MF.NumCurrentDeserializingEntities;
-    }
-  };
-  friend class DeserializingEntityRAII;
-
-  /// Picks a specific ModuleFile instance to serve as the "delayer" for the
-  /// entire module.
-  ///
-  /// This is usually \c this, but when there are partial swiftmodules all
-  /// loaded for the same module it may be different.
-  ModuleFile &getModuleFileForDelayedActions();
-
-  /// Finish any pending actions that were waiting for the topmost entity to
-  /// be deserialized.
-  void finishPendingActions();
 
 public:
   /// Represents another module that has been imported as a dependency.
