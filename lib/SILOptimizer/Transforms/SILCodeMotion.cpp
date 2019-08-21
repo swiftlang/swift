@@ -32,6 +32,8 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 
+#include <iostream>
+
 STATISTIC(NumSunk, "Number of instructions sunk");
 STATISTIC(NumRefCountOpsSimplified, "Number of enum ref count ops simplified");
 STATISTIC(NumHoisted, "Number of instructions hoisted");
@@ -1702,9 +1704,13 @@ static bool processFunction(SILFunction *F, AliasAnalysis *AA,
                             PostOrderFunctionInfo *PO,
                             RCIdentityFunctionInfo *RCIA,
                             bool HoistReleases) {
-
   bool Changed = false;
-
+  
+  // Hold the string compareison instructions outside of the loop
+  // otherwise we cannot see all case values in aggregate.
+  std::vector<FunctionRefInst*> strCmpInsts;
+  SILBuilder Builder(*F);
+  
   EnumCaseDataflowContext BBToStateMap(PO);
   for (unsigned RPOIdx = 0, RPOEnd = BBToStateMap.size(); RPOIdx < RPOEnd;
        ++RPOIdx) {
@@ -1712,6 +1718,28 @@ static bool processFunction(SILFunction *F, AliasAnalysis *AA,
     LLVM_DEBUG(llvm::dbgs() << "Visiting BB RPO#" << RPOIdx << "\n");
 
     BBEnumTagDataflowState &State = BBToStateMap.getRPOState(RPOIdx);
+    
+    // Loop through the instructions searching for a string compare
+    for (auto& inst : *State.getBB()) {
+      if (inst.getKind() == SILInstructionKind::FunctionRefInst) {
+        if (auto* frInst = cast<FunctionRefInst>(&inst)) {
+          SILFunction *fn = frInst->getInitiallyReferencedFunction();
+          // TODO: find a better way to do this
+          if (fn->getName().str().find("stringCompareWithSmolCheck") != std::string::npos) {
+            strCmpInsts.push_back(frInst);
+          }
+        }
+      }
+      
+      if (inst.getKind() == SILInstructionKind::CondBranchInst) {
+        if (auto *condInst = cast<CondBranchInst>(&inst)) {
+        	// TODO: use this to make sure we are in a switch statement
+          // and not just comparing several strings. We will also need this
+          // later when we want to compare the integer value returned from
+          // the comparison function instead of the string find function.
+        }
+      }
+    }
 
     LLVM_DEBUG(llvm::dbgs() <<"    Predecessors (empty if no predecessors):\n");
     LLVM_DEBUG(for (SILBasicBlock *Pred
@@ -1758,6 +1786,36 @@ static bool processFunction(SILFunction *F, AliasAnalysis *AA,
     // Then perform the dataflow.
     LLVM_DEBUG(llvm::dbgs() << "    Performing the dataflow!\n");
     Changed |= State.process();
+  }
+  
+  if (strCmpInsts.size() > 3 /* some threshold */) {
+    std::vector<SILValue> findStrCaseVals;
+    for (auto& inst : strCmpInsts) {
+      // The first argument is the case value
+      SILFunction *fn = inst->getInitiallyReferencedFunction();
+      if (fn && !fn->empty())
+    		findStrCaseVals.push_back(fn->getArguments().front());
+    }
+    
+    // TODO: turn the findStrCaseVals into an array
+    
+    // Find the function decl
+    SmallVector<ValueDecl *, 1> results;
+    Builder.getASTContext().lookupInSwiftModule("_findStringSwitchCase", results);
+    auto* findFn = dyn_cast<FuncDecl>(results.front());
+    if (!findFn) return Changed;
+
+    // Get a ref to the function
+    auto findFnDeclRef = SILDeclRef(findFn);
+    SILFunction *findFnSIL = F->getModule().lookUpFunction(findFnDeclRef);
+    if (!findFnSIL) return Changed;
+    std::cout << "found in func lookup" << std::endl;
+    
+    // Get the function as a SILValue and apply it
+    auto* findFnVal = Builder.createFunctionRefFor(F->getLocation(), findFnSIL);
+    Builder.createApply(F->getLocation(), findFnVal, {}, {});
+    
+    Changed = true;
   }
 
   return Changed;

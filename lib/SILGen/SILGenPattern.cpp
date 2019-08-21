@@ -2710,7 +2710,7 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
 
   // Optimize string switch statements by creating a cache that is searched through.
   // TODO: how should I do the following? I couldn't find a StringType variable or similar.
-  if (subjectTy->getString() == "String") {
+  if (subjectTy->getString() == "String" && (false)) {
     // find the cache function
     SmallVector<ValueDecl *, 1> results;
     // TODO: replace the following with a cache function
