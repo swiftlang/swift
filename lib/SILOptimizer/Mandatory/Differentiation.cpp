@@ -1578,7 +1578,6 @@ bool LinearMapInfo::shouldDifferentiateInstruction(SILInstruction *inst) {
   return false;
 }
 
-
 /// Takes an `apply` instruction and adds its linear map function to the
 /// linear map struct if it's active.
 void LinearMapInfo::addLinearMapToStruct(ApplyInst *ai,
@@ -5025,7 +5024,8 @@ private:
                   << "Original bb" + std::to_string(origBB.getDebugID())
                   << ": To differentiate or not to differentiate?\n";
         for (auto &inst : origBB) {
-          s << (differentialInfo.shouldDifferentiateInstruction(&inst) ? "[∂] " : "[ ] ")
+          s << (differentialInfo.shouldDifferentiateInstruction(&inst)
+                    ? "[∂] " : "[ ] ")
             << inst;
         }
       });
@@ -5293,7 +5293,6 @@ public:
 
     LLVM_DEBUG(getADDebugStream() << "JVP-transforming:\n" << *ai << '\n');
 
-
     // Get the parameter indices required for differentiating this function.
     SmallVector<SILValue, 4> allResults;
     // Only append the results from the `destruct_tuple` instruction which are
@@ -5335,7 +5334,6 @@ public:
       errorOccurred = true;
       return;
     }
-
     // Form expected indices by assuming there's only one result.
     SILAutoDiffIndices indices(
         activeResultIndices.front(),
@@ -6728,10 +6726,9 @@ public:
     return subscriptBuffer;
   }
 
-  void
-  accumulateArrayTangentSubscriptDirect(ApplyInst *ai, SILType eltType,
-                                        StoreInst *si,
-                                        AllocStackInst *subscriptBuffer) {
+  void accumulateArrayTangentSubscriptDirect(ApplyInst *ai, SILType eltType,
+                                             StoreInst *si,
+                                             AllocStackInst *subscriptBuffer) {
     auto newAdjValue = builder.emitLoadValueOperation(
         ai->getLoc(), subscriptBuffer, LoadOwnershipQualifier::Take);
     recordTemporary(newAdjValue);
@@ -6837,6 +6834,7 @@ public:
   }
 
   void visitApplyInst(ApplyInst *ai) {
+    assert(getPullbackInfo().shouldDifferentiateApplyInst(ai));
     // Handle array uninitialized allocation intrinsic specially.
     if (isArrayLiteralIntrinsic(ai))
       return visitArrayInitialization(ai);
