@@ -6,7 +6,6 @@ cake: Protocol P3 has generic signature change from <τ_0_0 : cake.P1, τ_0_0 : 
 /* RawRepresentable Changes */
 
 /* Removed Decls */
-Swift: Extension Int has been removed
 cake: Accessor GlobalVarChangedToLet.Modify() has been removed
 cake: Accessor GlobalVarChangedToLet.Set() has been removed
 cake: Accessor RemoveSetters.Value.Modify() has been removed
@@ -18,6 +17,7 @@ cake: AssociatedType RequiementChanges.removedType has been removed
 cake: Class C3 has been removed
 cake: Constructor Somestruct2.init(_:) has been removed
 cake: Func C4.foo() has been removed
+cake: Func Int.IntEnhancer() has been removed
 cake: Func RequiementChanges.removedFunc() has been removed
 cake: Var RequiementChanges.removedVar has been removed
 
