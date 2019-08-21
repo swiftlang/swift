@@ -1324,8 +1324,9 @@ public:
 
   /// Look for namespace-scope values with the given name using the
   /// DWARFImporterDelegate.
+  /// \param inModule only return results from this module.
   void lookupValueDWARF(ModuleDecl::AccessPathTy accessPath, DeclName name,
-                        NLKind lookupKind,
+                        NLKind lookupKind, Identifier inModule,
                         SmallVectorImpl<ValueDecl *> &results);
 
   /// Look for top-level scope types with a name and kind using the
