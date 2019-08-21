@@ -3138,7 +3138,7 @@ private:
   const DifferentiableActivityInfo &activityInfo;
 
   /// The linear map info.
-  LinearMapInfo differentialInfo;
+  LinearMapInfo pullbackInfo;
 
   /// Caches basic blocks whose phi arguments have been remapped (adding a
   /// predecessor enum argument).
@@ -3202,7 +3202,7 @@ public:
         context(context), original(original), attr(attr), vjp(vjp),
         invoker(invoker), activityInfo(getActivityInfo(
                               context, original, attr->getIndices(), vjp)),
-        differentialInfo(context, AutoDiffAssociatedFunctionKind::VJP, original,
+        pullbackInfo(context, AutoDiffAssociatedFunctionKind::VJP, original,
           vjp, attr->getIndices(), activityInfo, getBuilder()) {
     // Create empty pullback function.
     pullback = createEmptyPullback();
@@ -3289,7 +3289,7 @@ public:
     // Accept a pullback struct in the pullback parameter list. This is the
     // returned pullback's closure context.
     auto *origExit = &*original->findReturnBB();
-    auto *pbStruct = differentialInfo.getLinearMapStruct(origExit);
+    auto *pbStruct = pullbackInfo.getLinearMapStruct(origExit);
     auto pbStructType = pbStruct->getDeclaredInterfaceType()
         ->getCanonicalType();
     pbParams.push_back({pbStructType, ParameterConvention::Direct_Owned});
@@ -3348,7 +3348,7 @@ public:
     if (errorOccurred || remappedBasicBlocks.count(bb))
       return vjpBB;
     // Add predecessor enum argument to the remapped block.
-    auto *predEnum = differentialInfo.getBranchingTraceDecl(bb);
+    auto *predEnum = pullbackInfo.getBranchingTraceDecl(bb);
     auto enumTy = getOpASTType(predEnum->getDeclaredInterfaceType()
                                  ->getCanonicalType());
     auto enumLoweredTy = context.getTypeConverter().getLoweredType(
@@ -3389,7 +3389,7 @@ private:
     auto loc = termInst->getFunction()->getLocation();
     auto *origBB = termInst->getParent();
     auto *vjpBB = BBMap[origBB];
-    auto *pbStruct = differentialInfo.getLinearMapStruct(origBB);
+    auto *pbStruct = pullbackInfo.getLinearMapStruct(origBB);
     auto structLoweredTy = getNominalDeclLoweredType(pbStruct);
     auto bbPullbackValues = pullbackValues[origBB];
     if (!origBB->isEntry()) {
@@ -3406,10 +3406,10 @@ private:
                                       SILBasicBlock *succBB,
                                       SILValue pbStructVal) {
     auto loc = pbStructVal.getLoc();
-    auto *succEnum = differentialInfo.getBranchingTraceDecl(succBB);
+    auto *succEnum = pullbackInfo.getBranchingTraceDecl(succBB);
     auto enumLoweredTy = getNominalDeclLoweredType(succEnum);
     auto *enumEltDecl =
-        differentialInfo.lookUpBranchingTraceEnumElement(predBB, succBB);
+        pullbackInfo.lookUpBranchingTraceEnumElement(predBB, succBB);
     auto enumEltType = getOpType(
         enumLoweredTy.getEnumElementType(enumEltDecl, getModule()));
     // If the enum element type does not have a box type (i.e. the enum case is
@@ -3581,7 +3581,7 @@ public:
   void visitApplyInst(ApplyInst *ai) {
     // If the function should not be differentiated or its the array literal
     // initialization intrinsic, just do standard cloning.
-    if (!differentialInfo.shouldDifferentiateApplyInst(ai) ||
+    if (!pullbackInfo.shouldDifferentiateApplyInst(ai) ||
         isArrayLiteralIntrinsic(ai)) {
       LLVM_DEBUG(getADDebugStream() << "No active results:\n" << *ai << '\n');
       TypeSubstCloner::visitApplyInst(ai);
@@ -3780,7 +3780,7 @@ public:
     mapValue(ai, originalDirectResult);
 
     // Checkpoint the pullback.
-    auto *pullbackDecl = differentialInfo.lookUpLinearMapDecl(ai);
+    auto *pullbackDecl = pullbackInfo.lookUpLinearMapDecl(ai);
 
     // If actual pullback type does not match lowered pullback type, reabstract
     // the pullback using a thunk.
@@ -5054,7 +5054,7 @@ private:
   SILFunction &getPullback() const { return *vjpEmitter.pullback; }
   SILDifferentiableAttr *getAttr() const { return vjpEmitter.attr; }
   DifferentiationInvoker getInvoker() const { return vjpEmitter.invoker; }
-  LinearMapInfo &getPullbackInfo() { return vjpEmitter.differentialInfo; }
+  LinearMapInfo &getPullbackInfo() { return vjpEmitter.pullbackInfo; }
   const SILAutoDiffIndices &getIndices() const {
     return vjpEmitter.getIndices();
   }
