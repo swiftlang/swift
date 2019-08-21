@@ -1063,262 +1063,248 @@ ForwardModeTests.test("ResultSelection") {
   expectEqual(1, derivative(at: 3, 3, in: { x, y in foo(x, y).1 }))
 }
 
-// ForwardModeTests.test("CaptureLocal") {
-//   let z: Float = 10
-//   func foo(_ x: Float) -> Float {
-//     return z * x
-//   }
-//   expectEqual(10, derivative(at: 0, in: foo))
-// }
+ForwardModeTests.test("CaptureLocal") {
+  let z: Float = 10
+  func foo(_ x: Float) -> Float {
+    return z * x
+  }
+  expectEqual(10, derivative(at: 0, in: foo))
+}
 
-// var globalVar: Float = 10
-// ForwardModeTests.test("CaptureGlobal") {
-//   func foo(x: Float) -> Float {
-//     globalVar += 20
-//     return globalVar * x
-//   }
-//   expectEqual(30, derivative(at: 0, in: foo))
-// }
+var globalVar: Float = 10
+ForwardModeTests.test("CaptureGlobal") {
+  func foo(x: Float) -> Float {
+    globalVar += 20
+    return globalVar * x
+  }
+  expectEqual(30, derivative(at: 0, in: foo))
+}
 
-// var foo_diffable: @differentiable (Float) -> (Float)
-//   = differentiableFunction { x in (x * x, { v in 2 * x * v }) }
-// ForwardModeTests.test("GlobalDiffableFunc") {
-//   expectEqual(2, derivative(at: 1, in: foo_diffable))
-//   expectEqual(2, derivative(at: 1, in: { x in foo_diffable(x) }))
-//   expectEqual(1, derivative(at: 1, in: { (x: Float) -> Float in
-//     foo_diffable = { x in x + 1 }
-//     return foo_diffable(x)
-//   }))
-//   expectEqual(1, derivative(at: 1, in: foo_diffable))
-// }
+ForwardModeTests.test("SideEffects") {
+  func fourthPower(x: Float) -> Float {
+    var a = x
+    a = a * x
+    a = a * x
+    return a * x
+  }
+  expectEqual(4 * 27, derivative(at: 3, in: fourthPower))
+}
 
-// ForwardModeTests.test("SideEffects") {
-//   func fourthPower(x: Float) -> Float {
-//     var a = x
-//     a = a * x
-//     a = a * x
-//     return a * x
-//   }
-//   expectEqual(4 * 27, derivative(at: 3, in: fourthPower))
-// }
+ForwardModeTests.test("TupleSideEffects") {
+  func foo(_ x: Float) -> Float {
+    var tuple = (x, x)
+    tuple.0 = tuple.0 * x
+    return x * tuple.0
+  }
+  expectEqual(27, derivative(at: 3, in: foo))
 
-// ForwardModeTests.test("TupleSideEffects") {
-//   func foo(_ x: Float) -> Float {
-//     var tuple = (x, x)
-//     tuple.0 = tuple.0 * x
-//     return x * tuple.0
-//   }
-//   expectEqual(27, derivative(at: 3, in: foo))
+  func fifthPower(_ x: Float) -> Float {
+    var tuple = (x, x)
+    tuple.0 = tuple.0 * x
+    tuple.1 = tuple.0 * x
+    return tuple.0 * tuple.1
+  }
+  expectEqual(405, derivative(at: 3, in: fifthPower))
 
-//   func fifthPower(_ x: Float) -> Float {
-//     var tuple = (x, x)
-//     tuple.0 = tuple.0 * x
-//     tuple.1 = tuple.0 * x
-//     return tuple.0 * tuple.1
-//   }
-//   expectEqual(405, derivative(at: 3, in: fifthPower))
+  func nested(_ x: Float) -> Float {
+    var tuple = ((x, x), x)
+    tuple.0.0 = tuple.0.0 * x
+    tuple.0.1 = tuple.0.0 * x
+    return tuple.0.0 * tuple.0.1
+  }
+  expectEqual(405, derivative(at: 3, in: nested))
 
-//   func nested(_ x: Float) -> Float {
-//     var tuple = ((x, x), x)
-//     tuple.0.0 = tuple.0.0 * x
-//     tuple.0.1 = tuple.0.0 * x
-//     return tuple.0.0 * tuple.0.1
-//   }
-//   expectEqual(405, derivative(at: 3, in: nested))
-
-//   // FIXME(TF-201): Update after reabstraction thunks can be directly differentiated.
-//   /*
-//   func generic<T : Differentiable & AdditiveArithmetic>(_ x: T) -> T {
-//     var tuple = (x, x)
-//     tuple.0 += x
-//     tuple.1 += x
-//     return tuple.0 + tuple.0
-//   }
-//   expectEqual(1, gradient(at: 3.0, in: generic))
-//   */
-// }
+  // FIXME(TF-201): Update after reabstraction thunks can be directly differentiated.
+  /*
+  func generic<T : Differentiable & AdditiveArithmetic>(_ x: T) -> T {
+    var tuple = (x, x)
+    tuple.0 += x
+    tuple.1 += x
+    return tuple.0 + tuple.0
+  }
+  expectEqual(1, gradient(at: 3.0, in: generic))
+  */
+}
 
 // Tests TF-321.
-// ForwardModeTests.test("TupleNonDifferentiableElements") {
-//   func foo(_ x: Float) -> Float {
-//     var tuple = (x, 1)
-//     tuple.0 = x
-//     tuple.1 = 1
-//     return tuple.0
-//   }
-//   expectEqual(1, derivative(at: 1, in: foo))
+ForwardModeTests.test("TupleNonDifferentiableElements") {
+  func foo(_ x: Float) -> Float {
+    var tuple = (x, 1)
+    tuple.0 = x
+    tuple.1 = 1
+    return tuple.0
+  }
+  expectEqual(1, derivative(at: 1, in: foo))
 
-//   func bar(_ x: Float) -> Float {
-//     var tuple: (Int, Int, Float, Float) = (1, 1, x, x)
-//     tuple.0 = 1
-//     tuple.1 = 1
-//     tuple.3 = x
-//     return tuple.3
-//   }
-//   expectEqual(1, derivative(at: 1, in: bar))
+  func bar(_ x: Float) -> Float {
+    var tuple: (Int, Int, Float, Float) = (1, 1, x, x)
+    tuple.0 = 1
+    tuple.1 = 1
+    tuple.3 = x
+    return tuple.3
+  }
+  expectEqual(1, derivative(at: 1, in: bar))
 
-//   struct Wrapper<T> {
-//     @differentiable(where T : Differentiable)
-//     func baz(_ x: T) -> T {
-//       var tuple = (1, 1, x, 1)
-//       tuple.0 = 1
-//       tuple.2 = x
-//       tuple.3 = 1
-//       return tuple.2
-//     }
-//   }
-//   expectEqual(1, derivative(at: Float(1), in: { x -> Float in
-//     let wrapper = Wrapper<Float>()
-//     return wrapper.baz(x)
-//   }))
-// }
+  struct Wrapper<T> {
+    @differentiable(where T : Differentiable)
+    func baz(_ x: T) -> T {
+      var tuple = (1, 1, x, 1)
+      tuple.0 = 1
+      tuple.2 = x
+      tuple.3 = 1
+      return tuple.2
+    }
+  }
+  expectEqual(1, derivative(at: Float(1), in: { x -> Float in
+    let wrapper = Wrapper<Float>()
+    return wrapper.baz(x)
+  }))
+}
 
 // Tests TF-21.
-// ForwardModeTests.test("StructMemberwiseInitializer") {
-//   struct Foo : AdditiveArithmetic, Differentiable {
-//     var stored: Float
-//     var computed: Float {
-//       return stored * stored
-//     }
-//   }
+ForwardModeTests.test("StructMemberwiseInitializer") {
+  struct Foo : AdditiveArithmetic, Differentiable {
+    var stored: Float
+    var computed: Float {
+      return stored * stored
+    }
+  }
 
-//   let derivFoo = differential(at: Float(4), in: { input -> Foo in
-//     let foo = Foo(stored: input)
-//     let foo2 = foo + foo
-//     return Foo(stored: foo2.stored)
-//   })(1)
-//   expectEqual(Foo.TangentVector(stored: 2), derivFoo)
+  let derivFoo = differential(at: Float(4), in: { input -> Foo in
+    let foo = Foo(stored: input)
+    let foo2 = foo + foo
+    return Foo(stored: foo2.stored)
+  })(1)
+  expectEqual(Foo.TangentVector(stored: 2), derivFoo)
 
-//   let 𝛁computed = derivative(at: Float(4)) { input -> Float in
-//     let foo = Foo(stored: input)
-//     return foo.computed
-//   }
-//   expectEqual(8, 𝛁computed)
+  let 𝛁computed = derivative(at: Float(4)) { input -> Float in
+    let foo = Foo(stored: input)
+    return foo.computed
+  }
+  expectEqual(8, 𝛁computed)
 
-//   let derivProduct = derivative(at: Float(4)) { input -> Float in
-//     let foo = Foo(stored: input)
-//     return foo.computed * foo.stored
-//   }
-//   expectEqual(16, derivProduct)
+  let derivProduct = derivative(at: Float(4)) { input -> Float in
+    let foo = Foo(stored: input)
+    return foo.computed * foo.stored
+  }
+  expectEqual(48, derivProduct)
 
-//   struct Custom : AdditiveArithmetic, Differentiable {
-//     var x: Float
+  struct Custom : AdditiveArithmetic, Differentiable {
+    var x: Float
 
-//     // Custom initializer with `@differentiable`.
-//     @differentiable
-//     init(x: Float) {
-//       print(x)
-//       self.x = x
-//     }
-//   }
+    // Custom initializer with `@differentiable`.
+    @differentiable
+    init(x: Float) {
+      print(x)
+      self.x = x
+    }
+  }
 
-//   let derivCustom = differential(at: Float(4), in: { input -> Custom in
-//     let foo = Custom(x: input)
-//     return foo + foo
-//   })(1)
-//   expectEqual(Custom.TangentVector(x: 2), derivCustom)
-// }
+  let derivCustom = differential(at: Float(4), in: { input -> Custom in
+    let foo = Custom(x: input)
+    return foo + foo
+  })(1)
+  expectEqual(Custom.TangentVector(x: 2), derivCustom)
+}
 
 // Tests TF-319: struct with non-differentiable constant stored property.
-// ForwardModeTests.test("StructConstantStoredProperty") {
-//   struct TF_319 : Differentiable {
-//     var x: Float
-//     @noDerivative let constant = Float(2)
+ForwardModeTests.test("StructConstantStoredProperty") {
+  struct TF_319 : Differentiable {
+    var x: Float
+    @noDerivative let constant = Float(2)
 
-//     @differentiable
-//     init(x: Float) {
-//       self.x = x
-//     }
+    @differentiable
+    init(x: Float) {
+      self.x = x
+    }
 
-//     @differentiable(wrt: (self, input))
-//     func applied(to input: Float) -> Float {
-//       return x * constant * input
-//     }
+    @differentiable(wrt: (self, input))
+    func applied(to input: Float) -> Float {
+      return x * constant * input
+    }
+  }
+  func testStructInit(to input: Float) -> Float {
+    let model = TF_319(x: 10)
+    return model.applied(to: input)
+  }
+  expectEqual(6, derivative(at: 10, in: { TF_319(x: $0).applied(to: 3) }))
+  expectEqual(20, derivative(at: 3, in: testStructInit))
+}
+
+ForwardModeTests.test("StructSideEffects") {
+  struct Point : AdditiveArithmetic, Differentiable {
+    var x: Float
+    var y: Float
+    var z: Float
+  }
+
+  func double(_ input: Float) -> Point {
+    let point = Point(x: input, y: input, z: input)
+    return point + point
+  }
+  expectEqual(Point.zero, differential(at: 4, in: double)(1))
+
+  func fifthPower(_ input: Float) -> Float {
+    var point = Point(x: input, y: input, z: input)
+    point.x = point.x * input
+    point.y = point.x * input
+    return point.x * point.y
+  }
+  expectEqual(405, derivative(at: 3, in: fifthPower))
+
+  func mix(_ input: Float) -> Float {
+    var tuple = (point: Point(x: input, y: input, z: input), float: input)
+    tuple.point.x = tuple.point.x * tuple.float
+    tuple.point.y = tuple.point.x * input
+    return tuple.point.x * tuple.point.y
+  }
+  expectEqual(405, derivative(at: 3, in: mix))
+
+  // Test TF-282.
+  struct Add : Differentiable {
+    var bias: Float
+    func applied(to input: Float) -> Float {
+      var tmp = input
+      tmp = tmp + bias
+      return tmp
+    }
+  }
+  expectEqual(1, derivative(at: 1) { m in Add(bias: m).applied(to: 1) })
+}
+
+ForwardModeTests.test("StructGeneric") {
+  // struct Generic<T : AdditiveArithmetic & Differentiable> : AdditiveArithmetic, Differentiable {
+  //   var x: T
+  //   var y: T
+  //   var z: T
+  // }
+
+  // let deriv = differential(at: Float(3), in: { input -> Generic<Float> in
+  //   var generic = Generic(x: input, y: input, z: input)
+  //   return generic
+  // })(1)
+  // expectEqual(Generic<Float>.TangentVector(x: 1, y: 1, z: 1), deriv)
+
+  // func fifthPower(_ input: Float) -> Float {
+  //   var generic = Generic(x: input, y: input, z: input)
+  //   generic.x = generic.x * input
+  //   generic.y = generic.x * input
+  //   return generic.x * generic.y
+  // }
+  // // FIXME(TF-274): The true expected result is `405`, like other variants of `fifthPower` above.
+  // expectEqual(405, derivative(at: 3, in: fifthPower))
+}
+
+// ForwardModeTests.test("SubsetIndices") {
+//   func deriv(_ lossFunction: @differentiable (Float, Float) -> Float) -> Float {
+//     return derivative(at: 1) { x in lossFunction(x * x, 10.0) }
 //   }
-//   func testStructInit(to input: Float) -> Float {
-//     let model = TF_319(x: 10)
-//     return model.applied(to: input)
-//   }
-//   expectEqual(6, derivative(at: TF_319(x: 10), in: { $0.applied(to: 3) }))
-//   expectEqual(20, derivative(at: 3, in: testStructInit))
-// }
+//   expectEqual(2, deriv { x, y in x + y })
 
-// ForwardModeTests.test("StructSideEffects") {
-//   struct Point : AdditiveArithmetic, Differentiable {
-//     var x: Float
-//     var y: Float
-//     var z: Float
+//   func derivWRTNonDiff(_ lossFunction: @differentiable (Float, @nondiff Int) -> Float) -> Float {
+//     return derivative(at: 2) { x in lossFunction(x * x, 10) }
 //   }
-
-//   func double(_ input: Float) -> Point {
-//     let point = Point(x: input, y: input, z: input)
-//     return point + point
-//   }
-//   expectEqual(6, differential(at: 4, in: double)(Point(x: 1, y: 1, z: 1)))
-
-//   func fifthPower(_ input: Float) -> Float {
-//     var point = Point(x: input, y: input, z: input)
-//     point.x = point.x * input
-//     point.y = point.x * input
-//     return point.x * point.y
-//   }
-//   expectEqual(405, gradient(at: 3, in: fifthPower))
-
-//   func mix(_ input: Float) -> Float {
-//     var tuple = (point: Point(x: input, y: input, z: input), float: input)
-//     tuple.point.x = tuple.point.x * tuple.float
-//     tuple.point.y = tuple.point.x * input
-//     return tuple.point.x * tuple.point.y
-//   }
-//   expectEqual(405, gradient(at: 3, in: mix))
-
-//   // Test TF-282.
-//   struct Add : Differentiable {
-//     var bias: Float
-//     func applied(to input: Float) -> Float {
-//       var tmp = input
-//       tmp = tmp + bias
-//       return tmp
-//     }
-//   }
-//   let model = Add(bias: 1)
-//   expectEqual(Add.TangentVector(bias: 1),
-//               gradient(at: model) { m in m.applied(to: 1) })
-// }
-
-// SimpleMathTests.test("StructGeneric") {
-//   struct Generic<T : AdditiveArithmetic & Differentiable> : AdditiveArithmetic, Differentiable {
-//     var x: T
-//     var y: T
-//     var z: T
-//   }
-
-//   let 𝛁generic = pullback(at: Float(3), in: { input -> Generic<Float> in
-//     var generic = Generic(x: input, y: input, z: input)
-//     return generic
-//   })(Generic<Float>.TangentVector(x: 1, y: 1, z: 1))
-//   expectEqual(3, 𝛁generic)
-
-//   func fifthPower(_ input: Float) -> Float {
-//     var generic = Generic(x: input, y: input, z: input)
-//     generic.x = generic.x * input
-//     generic.y = generic.x * input
-//     return generic.x * generic.y
-//   }
-//   // FIXME(TF-274): The true expected result is `405`, like other variants of `fifthPower` above.
-//   expectEqual(405, gradient(at: 3, in: fifthPower))
-// }
-
-// SimpleMathTests.test("SubsetIndices") {
-//   func grad(_ lossFunction: @differentiable (Float, Float) -> Float) -> Float {
-//     return gradient(at: 1) { x in lossFunction(x * x, 10.0) }
-//   }
-//   expectEqual(2, grad { x, y in x + y })
-
-//   func gradWRTNonDiff(_ lossFunction: @differentiable (Float, @nondiff Int) -> Float) -> Float {
-//     return gradient(at: 2) { x in lossFunction(x * x, 10) }
-//   }
-//   expectEqual(4, gradWRTNonDiff { x, y in x + Float(y) })
+//   expectEqual(4, derivWRTNonDiff { x, y in x + Float(y) })
 // }
 
 runAllTests()
