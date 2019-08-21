@@ -237,3 +237,21 @@ func sr10843() {
   (^^^)(s, s)
   _ = (==)(0, 0)
 }
+
+// SR-10970
+precedencegroup PowerPrecedence {
+  lowerThan: BitwiseShiftPrecedence
+  higherThan: AdditionPrecedence
+  associativity: right
+}
+infix operator ^^ : PowerPrecedence
+
+extension Int {
+  static func ^^ (lhs: Int, rhs: Int) -> Int {
+    var result = 1
+    for _ in 1...rhs { result *= lhs }
+    return result
+  }
+}
+
+_ = 1 ^^ 2 ^^ 3 * 4 // expected-error {{adjacent operators are in unordered precedence groups 'PowerPrecedence' and 'MultiplicationPrecedence'}}

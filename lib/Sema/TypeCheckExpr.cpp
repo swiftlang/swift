@@ -416,7 +416,7 @@ namespace {
       if (!group) return false;
       if (storedGroup == group) return !GroupAndIsStrict.getInt();
       return TC.Context.associateInfixOperators(group, storedGroup)
-               == Associativity::Left;
+               != Associativity::Right;
     }
   };
 } // end anonymous namespace
