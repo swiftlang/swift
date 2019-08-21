@@ -71,25 +71,20 @@ static const PlatformConditionKind AllPublicPlatformConditionKinds[] = {
 #include "swift/AST/PlatformConditionKinds.def"
 };
 
-template <size_t N>
-constexpr int count(const StringRef (&)[N]) {
-  return N;
-}
-
-std::pair<const StringRef*, size_t> getSupportedConditionalCompilationValues(const PlatformConditionKind &Kind) {
+ArrayRef<StringRef> getSupportedConditionalCompilationValues(const PlatformConditionKind &Kind) {
   switch (Kind) {
   case PlatformConditionKind::OS:
-    return { SupportedConditionalCompilationOSs, count(SupportedConditionalCompilationOSs) };
+    return SupportedConditionalCompilationOSs;
   case PlatformConditionKind::Arch:
-    return { SupportedConditionalCompilationArches, count(SupportedConditionalCompilationArches) };
+    return SupportedConditionalCompilationArches;
   case PlatformConditionKind::Endianness:
-    return { SupportedConditionalCompilationEndianness, count(SupportedConditionalCompilationEndianness) };
+    return SupportedConditionalCompilationEndianness;
   case PlatformConditionKind::Runtime:
-    return { SupportedConditionalCompilationRuntimes, count(SupportedConditionalCompilationRuntimes) };
+    return SupportedConditionalCompilationRuntimes;
   case PlatformConditionKind::CanImport:
-    return { {}, 0 };
+    return { };
   case PlatformConditionKind::TargetEnvironment:
-    return { SupportedConditionalCompilationTargetEnvironments, count(SupportedConditionalCompilationTargetEnvironments) };
+    return SupportedConditionalCompilationTargetEnvironments;
   }
 }
 
@@ -99,10 +94,7 @@ PlatformConditionKind suggestedPlatformConditionKind(PlatformConditionKind Kind,
   for (const PlatformConditionKind& candidateKind : AllPublicPlatformConditionKinds) {
     if (candidateKind != Kind) {
       auto supportedValues = getSupportedConditionalCompilationValues(candidateKind);
-      auto supportedValuesArray = supportedValues.first;
-      auto supportedValuesCount = supportedValues.second;
-      for (unsigned i = 0; i < supportedValuesCount; i++) {
-        auto candidateValue = supportedValuesArray[i];
+      for (const StringRef& candidateValue : supportedValues) {
         if (candidateValue.lower() == lower) {
           suggestedValues.clear();
           if (candidateValue != V) {
@@ -123,10 +115,7 @@ bool isMatching(PlatformConditionKind Kind, const StringRef &V,
   unsigned minDistance = std::numeric_limits<unsigned>::max();
   std::string lower = V.lower();
   auto supportedValues = getSupportedConditionalCompilationValues(Kind);
-  auto supportedValuesArray = supportedValues.first;
-  auto supportedValuesCount = supportedValues.second;
-  for (unsigned i = 0; i < supportedValuesCount; i++) {
-    auto candidate = supportedValuesArray[i];
+  for (const StringRef& candidate : supportedValues) {
     if (candidate == V) {
       suggestedKind = Kind;
       suggestions.clear();
