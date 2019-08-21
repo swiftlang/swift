@@ -1378,7 +1378,7 @@ using Activity = OptionSet<ActivityFlags>;
 class DifferentiableActivityInfo {
 private:
   // TODO: temporary hack while we investigate why reverse mode doesn't work
-  // with us handling tuple destructure from `apply` instructions differently.
+  // with us handling `apply` instructions differently.
   AutoDiffAssociatedFunctionKind kind;
 
   DifferentiableActivityCollection &parent;
@@ -1549,7 +1549,7 @@ bool LinearMapInfo::shouldDifferentiateApplyInst(ApplyInst *ai) {
       return true;
 
   // TODO: temporary hack while we investigate why reverse mode doesn't work
-  // with us handling tuple destructure from `apply` instructions differently.
+  // with us handling `apply` instructions differently.
   if (kind == AutoDiffLinearMapKind::Differential) {
     for (auto use : ai->getUses()) {
       if (auto *dti = dyn_cast<DestructureTupleInst>(use->getUser())) {
@@ -1576,6 +1576,17 @@ bool LinearMapInfo::shouldDifferentiateApplyInst(ApplyInst *ai) {
   return hasActiveResults && hasActiveParamArguments;
 }
 
+#define CHECK_INST_TYPE_ACTIVE_OPERANDS(TYPE) \
+if (isa<TYPE>(inst) && hasActiveOperands) \
+  return true;
+
+#define CHECK_INST_TYPE_ACTIVE_DEST(TYPE) \
+if (auto *castInst = dyn_cast<TYPE>(inst)) { \
+  return activityInfo.isActive(castInst->getDest(), indices); \
+}
+
+// TODO: update comment once we figure out why reverse mode requires
+// different conditions.
 /// Returns a flag that indicates whether the instruction should be
 /// differentiated, given the differentiation indices of the instruction's
 /// parent function. Whether the instruction should be differentiated is
@@ -1599,43 +1610,19 @@ bool LinearMapInfo::shouldDifferentiateInstruction(SILInstruction *inst) {
     return true;
 
   // TODO: temporary hack while we investigate why reverse mode doesn't work
-  // with us handling tuple destructure from `apply` instructions differently.
+  // with us handling `apply` instructions differently.
   switch (kind) {
   case AutoDiffLinearMapKind::Differential: {
-    // TODO: put a macro on these 3.
-    if (auto *si = dyn_cast<StoreInst>(inst)) {
-      return// activityInfo.isActive(si->getSrc(), indices) &&
-          activityInfo.isActive(si->getDest(), indices);
-    }
-
-    if (auto *sbi = dyn_cast<StoreBorrowInst>(inst)) {
-      return// activityInfo.isActive(sbi->getSrc(), indices) &&
-          activityInfo.isActive(sbi->getDest(), indices);
-    }
-
-    if (auto *cai = dyn_cast<CopyAddrInst>(inst)) {
-      return// activityInfo.isActive(cai->getSrc(), indices) &&
-          activityInfo.isActive(cai->getDest(), indices);
-    }
-
-    if (isa<RefCountingInst>(inst) && hasActiveOperands)
-      return true;
-
-    if (isa<EndAccessInst>(inst) && hasActiveOperands)
-      return true;
-
-    if (isa<EndBorrowInst>(inst) && hasActiveOperands)
-      return true;
-
+    CHECK_INST_TYPE_ACTIVE_DEST(StoreInst)
+    CHECK_INST_TYPE_ACTIVE_DEST(StoreBorrowInst)
+    CHECK_INST_TYPE_ACTIVE_DEST(CopyAddrInst)
     if ((isa<AllocationInst>(inst) && hasActiveResults))
       return true;
-
-    if  (isa<DeallocationInst>(inst) && hasActiveOperands)
-      return true;
-
-    if (isa<DestroyValueInst>(inst)  && hasActiveOperands)
-      return true;
-
+    CHECK_INST_TYPE_ACTIVE_OPERANDS(RefCountingInst)
+    CHECK_INST_TYPE_ACTIVE_OPERANDS(EndAccessInst)
+    CHECK_INST_TYPE_ACTIVE_OPERANDS(EndBorrowInst)
+    CHECK_INST_TYPE_ACTIVE_OPERANDS(DeallocationInst)
+    CHECK_INST_TYPE_ACTIVE_OPERANDS(DestroyValueInst)
     break;
   }
   case AutoDiffLinearMapKind::Pullback: {
@@ -1648,13 +1635,16 @@ bool LinearMapInfo::shouldDifferentiateInstruction(SILInstruction *inst) {
   return false;
 }
 
+#undef CHECK_INST_TYPE_ACTIVE_OPERANDS
+#undef CHECK_INST_TYPE_ACTIVE_DEST
+
 /// Takes an `apply` instruction and adds its linear map function to the
 /// linear map struct if it's active.
 void LinearMapInfo::addLinearMapToStruct(ApplyInst *ai,
                                          const SILAutoDiffIndices &indices) {
   SmallVector<SILValue, 4> allResults;
   // TODO: temporary hack while we investigate why reverse mode doesn't work
-  // with us handling tuple destructure from `apply` instructions differently.
+  // with us handling `apply` instructions differently.
   if (kind == AutoDiffLinearMapKind::Differential &&
       ai->getResult(0)->getType().is<TupleType>()) {
     // Only append the results from the `destruct_tuple` instruction which are
@@ -4489,13 +4479,6 @@ private:
   }
 
   /// Assuming the given type conforms to `Differentiable` after remapping,
-  /// returns the associated tangent space type.
-  CanType getRemappedTangentASTType(Type type) {
-    auto remappedType = remapTypeInDifferential(type)->getCanonicalType();
-    return getTangentSpace(remappedType)->getCanonicalType();
-  }
-
-  /// Assuming the given type conforms to `Differentiable` after remapping,
   /// returns the associated tangent space SIL type.
   SILType getRemappedTangentType(SILType type) {
     return SILType::getPrimitiveType(
@@ -4529,7 +4512,7 @@ private:
       auto *ai = dyn_cast<ApplyInst>(defInst);
       assert(!(ai && originalValue->getType().is<TupleType>()) &&
              "Should not be visiting tuple destructure if the operand came "
-             "from an apply");
+             "from an 'apply' instruction.");
     }
     assert(originalValue->getType().isObject());
     assert(newTangentValue.getType().isObject());
@@ -4547,15 +4530,24 @@ private:
   //--------------------------------------------------------------------------//
   // Tangent emission helpers
   //--------------------------------------------------------------------------//
+public:
+#define CLONE_AND_EMIT_TANGENT(INST, ID) \
+  void visit##INST##Inst(INST##Inst *inst) { \
+    TypeSubstCloner::visit##INST##Inst(inst); \
+    if (differentialInfo.shouldDifferentiateInstruction(inst)) \
+      emitTangentFor##INST##Inst(inst); \
+  } \
+  void emitTangentFor##INST##Inst(INST##Inst *(ID))
 
-  void emitTangentForDestroyValueInst(DestroyValueInst *dvi) {
+
+  CLONE_AND_EMIT_TANGENT(DestroyValue, dvi) {
     auto &diffBuilder = getDifferentialBuilder();
     auto loc = dvi->getLoc();
     auto tanVal = materializeTangent(getTangentValue(dvi->getOperand()), loc);
     diffBuilder.emitDestroyValue(loc, tanVal);
   }
 
-  void emitTangentForBeginBorrow(BeginBorrowInst *bbi) {
+  CLONE_AND_EMIT_TANGENT(BeginBorrow, bbi) {
     auto &diffBuilder = getDifferentialBuilder();
     auto loc = bbi->getLoc();
     auto tanVal = materializeTangent(getTangentValue(bbi->getOperand()), loc);
@@ -4564,14 +4556,14 @@ private:
                     makeConcreteTangentValue(tanValBorrow));
   }
 
-  void emitTangentForEndBorrow(EndBorrowInst *ebi) {
+  CLONE_AND_EMIT_TANGENT(EndBorrow, ebi) {
     auto &diffBuilder = getDifferentialBuilder();
     auto loc = ebi->getLoc();
     auto tanVal = materializeTangent(getTangentValue(ebi->getOperand()), loc);
     diffBuilder.emitEndBorrowOperation(loc, tanVal);
   }
 
-  void emitTangentForCopyValueInst(CopyValueInst *cvi) {
+  CLONE_AND_EMIT_TANGENT(CopyValue, cvi) {
     auto &diffBuilder = getDifferentialBuilder();
     auto tan = getTangentValue(cvi->getOperand());
     auto tanVal = materializeTangent(tan, cvi->getLoc());
@@ -4599,7 +4591,8 @@ private:
     auto addActiveResult = [&](unsigned resultIndex) -> void {
       auto origResult = originalResults[resultIndex];
       assert(origResult->getType().isObject() &&
-             "Should only be handling direct results for return inst");
+             "Should only be handling direct results for 'return' "
+             "instruction.");
       if (activityInfo.isActive(origResult, getIndices())) {
         activeResults.push_back(origResult);
       }
@@ -4613,7 +4606,8 @@ private:
       // Create zero tangent value for direct result.
       auto origResult = originalResults[getIndices().source];
       assert(origResult->getType().isObject() &&
-             "Should only be handling direct results for return inst");
+             "Should only be handling direct results for 'return' "
+             "instruction.");
       auto zeroType = origResult->getType().getASTType();
       auto zero =
           emitZeroDirect(getTangentSpace(zeroType)->getCanonicalType(),
@@ -4655,9 +4649,11 @@ private:
     }
 
     auto paramArgs = ai->getArgumentsWithoutIndirectResults();
+    // Get the tangent value of the original arguments.
     for (auto i : indices(paramArgs)) {
       auto origArg = paramArgs[i];
-      // Get the tangent value of the original parameter.
+      // If the argument isn't active, either skip that element (if it
+      // isn't differentiable) or add a zero value to that location.
       if (!activityInfo.isActive(origArg, getIndices())) {
         auto origCalleeType = ai->getSubstCalleeType();
         if (!origCalleeType->isDifferentiable())
@@ -4679,18 +4675,10 @@ private:
           }
         }
       } else {
+        // Else handle the argument normally by getting its tangent value.
         SILValue tanParam;
         if (origArg->getType().isObject()) {
-          // If original result is a `tuple_extract`, materialize tangent value of
-          // `ai` and extract the corresponding element tangent value.
-          if (auto *tupleExtract =
-                  dyn_cast<TupleExtractInst>(origArg)) {
-            auto tangentTuple = materializeTangent(getTangentValue(ai), loc);
-            tanParam = diffBuilder.emitTupleExtract(
-                loc, tangentTuple, tupleExtract->getFieldNo());
-          } else {
-            tanParam = materializeTangent(getTangentValue(origArg), loc);
-          }
+          tanParam = materializeTangent(getTangentValue(origArg), loc);
         } else {
           tanParam = getTangentBuffer(ai->getParent(), origArg);
         }
@@ -4745,14 +4733,18 @@ private:
         setTangentValue(bb, origResult,
             makeConcreteTangentValue(differentialResult));
       } else {
-        bool notSet = true;
+        unsigned numberOfDestructureTupleInsts = 0;
+        bool notSetValue = true;
         for (auto use : ai->getUses()) {
           if (auto *dti = dyn_cast<DestructureTupleInst>(use->getUser())) {
+            numberOfDestructureTupleInsts++;
+            assert(numberOfDestructureTupleInsts == 1 && "There should only "
+                   "be one use of the tuple in a 'destructure_tuple' inst.");
             for (auto result : dti->getResults()) {
               if (activityInfo.isActive(result, getIndices())) {
-                assert(notSet && "This hasn't been set yet, should only have "
-                       "one active result from the tuple.");
-                notSet = false;
+                assert(notSetValue && "This was incorrectly set, should only "
+                       "have one active result from the tuple.");
+                notSetValue = false;
                 setTangentValue(bb, result,
                     makeConcreteTangentValue(differentialResult));
               }
@@ -4763,27 +4755,10 @@ private:
     }
   }
 
-  /// Find the corresponding struct in the tangent space of the field type.
-//  StructDecl *getTangentOfStruct(SILValue structOp) {
-//    auto structTy = remapSILTypeInDifferential(
-//        structOp->getType()).getASTType();
-//    auto tangentVectorTy =
-//        getTangentSpace(structTy)->getType()->getCanonicalType();
-//    getModule().Types.getTypeLowering(
-//                                      tangentVectorTy, ResilienceExpansion::Minimal).print(llvm::errs());
-//    assert(!getModule().Types.getTypeLowering(
-//        tangentVectorTy, ResilienceExpansion::Minimal)
-//            .isAddressOnly());
-//    auto *tangentVectorDecl =
-//        tangentVectorTy->getStructOrBoundGenericStruct();
-//    assert(tangentVectorDecl);
-//    return tangentVectorDecl;
-//  }
-
   /// Handle `struct_extract` instruction.
   ///   Original: y = struct_extract x, #field
   ///   Tangent: tan[y] = struct_extract tan[x], tan[#field]]
-  void emitTangentForStructExtractInst(StructExtractInst *sei) {
+  CLONE_AND_EMIT_TANGENT(StructExtract, sei) {
     assert(!sei->getField()->getAttrs().hasAttribute<NoDerivativeAttr>() &&
            "`struct_extract` with `@noDerivative` field should not be "
            "differentiated; activity analysis should not marked as varied.");
@@ -4831,7 +4806,7 @@ private:
   /// Handle `struct_element_addr` instruction.
   ///   Original: y = struct_element_addr x, #field
   ///   Tangent: tan[y] = struct_element_addr tan[x], tan[#field]]
-  void emitTangentForStructElementAddrInst(StructElementAddrInst *seai) {
+  CLONE_AND_EMIT_TANGENT(StructElementAddr, seai) {
     assert(!seai->getField()->getAttrs().hasAttribute<NoDerivativeAttr>() &&
            "`struct_element_addr` with `@noDerivative` field should not be "
            "differentiated; activity analysis should not marked as varied.");
@@ -4878,7 +4853,7 @@ private:
   /// Handle `load` instruction.
   ///   Original: y = load x
   ///   Tangent: tan[y] = load tan[x]
-  void emitTangentForLoadInst(LoadInst *li) {
+  CLONE_AND_EMIT_TANGENT(Load, li) {
     auto &diffBuilder = getDifferentialBuilder();
     auto *bb = li->getParent();
     auto loc = li->getLoc();
@@ -4891,7 +4866,7 @@ private:
   /// Handle `load_borrow` instruction.
   ///   Original: y = load_borrow x
   ///   Tangent: tan[y] = load_borrow tan[x]
-  void emitTangentForLoadBorrowInst(LoadBorrowInst *lbi) {
+  CLONE_AND_EMIT_TANGENT(LoadBorrow, lbi) {
     auto &diffBuilder = getDifferentialBuilder();
     auto *bb = lbi->getParent();
     auto loc = lbi->getLoc();
@@ -4904,7 +4879,7 @@ private:
   /// Handle `store` instruction in the differential.
   ///    Original: store x to y
   ///    Tangent: store tan[x] to tan[y]
-  void emitTangentForStoreInst(StoreInst *si) {
+  CLONE_AND_EMIT_TANGENT(Store, si) {
     auto &diffBuilder = getDifferentialBuilder();
     auto loc = si->getLoc();
     auto tanValSrc = materializeTangent(getTangentValue(si->getSrc()), loc);
@@ -4918,7 +4893,7 @@ private:
   /// Handle `store_borrow` instruction in the differential.
   ///    Original: store_borrow x to y
   ///    Tangent: store_borrow tan[x] to tan[y]
-  void emitTangentForStoreBorrowInst(StoreBorrowInst *sbi) {
+  CLONE_AND_EMIT_TANGENT(StoreBorrow, sbi) {
      auto &diffBuilder = getDifferentialBuilder();
      auto loc = sbi->getLoc();
      auto tanValSrc = materializeTangent(getTangentValue(sbi->getSrc()), loc);
@@ -4931,7 +4906,7 @@ private:
   /// Handle `copy_addr` instruction.
   ///   Original: copy_addr x to y
   ///   Tangent: copy_addr tan[x] to tan[y]
-  void emitTangentForCopyAddrInst(CopyAddrInst *cai) {
+  CLONE_AND_EMIT_TANGENT(CopyAddr, cai) {
     auto *diffGenEnv = getDifferential().getGenericEnvironment();
     auto diffGenSig = diffGenEnv
         ? diffGenEnv->getGenericSignature()->getCanonicalSignature()
@@ -4954,7 +4929,7 @@ private:
   /// Handle `begin_access` instruction (and do differentiability checks).
   ///   Original: y = begin_access x
   ///   Tangent: tan[y] = begin_access tan[x]
-  void emitTangentForBeginAccessInst(BeginAccessInst *bai) {
+  CLONE_AND_EMIT_TANGENT(BeginAccess, bai) {
     // Check for non-differentiable writes.
     if (bai->getAccessKind() == SILAccessKind::Modify) {
       if (auto *gai = dyn_cast<GlobalAddrInst>(bai->getSource())) {
@@ -4984,7 +4959,7 @@ private:
   /// Handle `end_access` instruction.
   ///   Original: begin_access x
   ///   Tangent: end_access tan[x]
-  void emitTangentForEndAccessInst(EndAccessInst *eai) {
+  CLONE_AND_EMIT_TANGENT(EndAccess, eai) {
     auto &diffBuilder = getDifferentialBuilder();
     auto *bb = eai->getParent();
     auto loc = eai->getLoc();
@@ -4995,7 +4970,7 @@ private:
   /// Add the value mapping and emit the same `alloc_stack` instruction.
   ///   Original: y = alloc_stack $T
   ///   Tangent: tan[y] = alloc_stack $T.Tangent
-  void emitTangentForAllocStackInst(AllocStackInst *asi) {
+  CLONE_AND_EMIT_TANGENT(AllocStack, asi) {
     auto &diffBuilder = getDifferentialBuilder();
     auto *mappedAllocStackInst = diffBuilder.createAllocStack(
         asi->getLoc(), getRemappedTangentType(asi->getElementType()));
@@ -5006,7 +4981,7 @@ private:
   /// Handle `dealloc_stack` instruction.
   ///   Original: dealloc_stack x
   ///   Tangent: dealloc_stack tan[x]
-  void emitTangentForDeallocStackInst(DeallocStackInst *dsi) {
+  CLONE_AND_EMIT_TANGENT(DeallocStack, dsi) {
     auto &diffBuilder = getDifferentialBuilder();
     auto tanBuffer = getTangentBuffer(dsi->getParent(), dsi->getOperand());
     diffBuilder.createDeallocStack(dsi->getLoc(), tanBuffer);
@@ -5015,7 +4990,7 @@ private:
   /// Handle `struct` instruction.
   ///   Original: y = struct $T  (x0, x1, x2, ...)
   ///   Tangent: tan[y] = struct $T.Tangent (tan[x0], tan[x1], tan[x2], ...)
-  void emitTangentForStructInst(StructInst *si) {
+  CLONE_AND_EMIT_TANGENT(Struct, si) {
     auto &diffBuilder = getDifferentialBuilder();
     SmallVector<SILValue, 4> tangentElements;
     for (auto elem : si->getElements())
@@ -5028,7 +5003,7 @@ private:
   /// Handle `tuple` instruction.
   ///   Original: y = tuple (x0, x1, x2, ...)
   ///   Tangent: tan[y] = tuple (tan[x0], tan[x1], tan[x2], ...)
-  void emitTangentForTupleInst(TupleInst *ti) {
+  CLONE_AND_EMIT_TANGENT(Tuple, ti) {
     auto diffBuilder = getDifferentialBuilder();
 
     // Get the tangents of all the tuple elements.
@@ -5046,7 +5021,7 @@ private:
   /// Handle `tuple_extract` instruction.
   ///   Original: y = tuple_element_addr x, <n>
   ///   Tangent: tan[y] = tuple_element_addr tan[x], <n>
-  void emitTangentForTupleElementAddrInst(TupleElementAddrInst *teai) {
+  CLONE_AND_EMIT_TANGENT(TupleElementAddr, teai) {
     auto &diffBuilder = getDifferentialBuilder();
     auto origTupleTy = teai->getOperand()->getType().castTo<TupleType>();
     unsigned tanIndex = 0;
@@ -5072,36 +5047,36 @@ private:
   /// Handle `tuple_extract` instruction.
   ///   Original: y = tuple_extract x, <n>
   ///   Tangent: tan[y] = tuple_extract tan[x], <n>
-  void emitTangentForTupleExtractInst(TupleExtractInst *teai) {
+  CLONE_AND_EMIT_TANGENT(TupleExtract, tei) {
     auto &diffBuilder = getDifferentialBuilder();
-    auto loc = teai->getLoc();
-    auto origTupleTy = teai->getOperand()->getType().castTo<TupleType>();
+    auto loc = tei->getLoc();
+    auto origTupleTy = tei->getOperand()->getType().castTo<TupleType>();
     unsigned tanIndex = 0;
-    for (unsigned i : range(teai->getFieldNo())) {
+    for (unsigned i : range(tei->getFieldNo())) {
       if (getTangentSpace(
               origTupleTy->getElement(i).getType()->getCanonicalType()))
         ++tanIndex;
     }
-    auto tanType = getRemappedTangentType(teai->getType());
+    auto tanType = getRemappedTangentType(tei->getType());
     auto tanSource = materializeTangent(
-        getTangentValue(teai->getOperand()), loc);
+        getTangentValue(tei->getOperand()), loc);
     SILValue tanBuffer;
     // If the tangent buffer of the source does not have a tuple type, then
     // it must represent a "single element tuple type". Use it directly.
     if (!tanSource->getType().is<TupleType>()) {
-      setTangentValue(teai->getParent(), teai,
+      setTangentValue(tei->getParent(), tei,
                       makeConcreteTangentValue(tanSource));
     } else {
       tanBuffer =
           diffBuilder.createTupleExtract(loc, tanSource, tanIndex, tanType);
-      bufferMap.try_emplace({teai->getParent(), teai}, tanBuffer);
+      bufferMap.try_emplace({tei->getParent(), tei}, tanBuffer);
     }
   }
 
   /// Handle `destructure_tuple` instruction.
   ///   Original: (y0, y1, y2, ...)  = destructure_tuple x, <n>
   ///   Tangent: (tan[y0], tan[y1], tan[y2], ...) = destructure_tuple tan[x], <n>
-  void emitTangentForDestructureTupleInst(DestructureTupleInst *dti) {
+  CLONE_AND_EMIT_TANGENT(DestructureTuple, dti) {
     auto &diffBuilder = getDifferentialBuilder();
     auto *bb = dti->getParent();
     auto loc = dti->getLoc();
@@ -5130,6 +5105,8 @@ private:
     }
   }
 
+#undef CLONE_AND_EMIT_TANGENT
+private:
   void prepareForDifferentialGeneration() {
     // Create differential blocks and arguments.
     auto *diffGenEnv = getDifferential().getGenericEnvironment();
@@ -5688,126 +5665,6 @@ public:
     directResults.push_back(differentialPartialApply);
     builder.createReturn(
         ri->getLoc(), joinElements(directResults, builder, loc));
-  }
-
-  void visitBeginBorrowInst(BeginBorrowInst *bbi) {
-    TypeSubstCloner::visitBeginBorrowInst(bbi);
-    if (differentialInfo.shouldDifferentiateInstruction(bbi))
-      emitTangentForBeginBorrow(bbi);
-  }
-
-  void visitEndBorrowInst(EndBorrowInst *ebi) {
-    TypeSubstCloner::visitEndBorrowInst(ebi);
-    if (differentialInfo.shouldDifferentiateInstruction(ebi))
-      emitTangentForEndBorrow(ebi);
-  }
-
-  void visitLoadInst(LoadInst *li) {
-    TypeSubstCloner::visitLoadInst(li);
-    if (differentialInfo.shouldDifferentiateInstruction(li))
-      emitTangentForLoadInst(li);
-  }
-
-  void visitLoadBorrowInst(LoadBorrowInst *lbi) {
-    TypeSubstCloner::visitLoadBorrowInst(lbi);
-    if (differentialInfo.shouldDifferentiateInstruction(lbi))
-      emitTangentForLoadBorrowInst(lbi);
-  }
-
-  void visitStoreInst(StoreInst *si) {
-    TypeSubstCloner::visitStoreInst(si);
-    if (differentialInfo.shouldDifferentiateInstruction(si))
-      emitTangentForStoreInst(si);
-  }
-
-  void visitStoreBorrowInst(StoreBorrowInst *sbi) {
-    TypeSubstCloner::visitStoreBorrowInst(sbi);
-    if (differentialInfo.shouldDifferentiateInstruction(sbi))
-      emitTangentForStoreBorrowInst(sbi);
-  }
-
-  void visitCopyValueInst(CopyValueInst *cvi) {
-    TypeSubstCloner::visitCopyValueInst(cvi);
-    if (differentialInfo.shouldDifferentiateInstruction(cvi))
-      emitTangentForCopyValueInst(cvi);
-  }
-
-  void visitDestroyValueInst(DestroyValueInst *dvi) {
-    TypeSubstCloner::visitDestroyValueInst(dvi);
-    if (differentialInfo.shouldDifferentiateInstruction(dvi))
-      emitTangentForDestroyValueInst(dvi);
-  }
-
-  void visitCopyAddrInst(CopyAddrInst *cai) {
-    TypeSubstCloner::visitCopyAddrInst(cai);
-    if (differentialInfo.shouldDifferentiateInstruction(cai))
-      emitTangentForCopyAddrInst(cai);
-  }
-
-  void visitBeginAccessInst(BeginAccessInst *bai) {
-    TypeSubstCloner::visitBeginAccessInst(bai);
-    if (differentialInfo.shouldDifferentiateInstruction(bai))
-      emitTangentForBeginAccessInst(bai);
-  }
-
-  void visitEndAccessInst(EndAccessInst *eai) {
-    TypeSubstCloner::visitEndAccessInst(eai);
-    if (differentialInfo.shouldDifferentiateInstruction(eai))
-      emitTangentForEndAccessInst(eai);
-  }
-
-  void visitAllocStackInst(AllocStackInst *asi) {
-    TypeSubstCloner::visitAllocStackInst(asi);
-    if (differentialInfo.shouldDifferentiateInstruction(asi))
-      emitTangentForAllocStackInst(asi);
-  }
-
-  void visitDeallocStackInst(DeallocStackInst *dsi) {
-    TypeSubstCloner::visitDeallocStackInst(dsi);
-    if (differentialInfo.shouldDifferentiateInstruction(dsi))
-      emitTangentForDeallocStackInst(dsi);
-  }
-
-  void visitStructInst(StructInst *si) {
-    TypeSubstCloner::visitStructInst(si);
-    if (differentialInfo.shouldDifferentiateInstruction(si))
-      emitTangentForStructInst(si);
-  }
-
-  void visitStructExtractInst(StructExtractInst *sei) {
-    TypeSubstCloner::visitStructExtractInst(sei);
-    if (differentialInfo.shouldDifferentiateInstruction(sei))
-      emitTangentForStructExtractInst(sei);
-  }
-
-  void visitStructElementAddrInst(StructElementAddrInst *seai) {
-    TypeSubstCloner::visitStructElementAddrInst(seai);
-    if (differentialInfo.shouldDifferentiateInstruction(seai))
-      emitTangentForStructElementAddrInst(seai);
-  }
-
-  void visitTupleInst(TupleInst *ti) {
-    TypeSubstCloner::visitTupleInst(ti);
-    if (differentialInfo.shouldDifferentiateInstruction(ti))
-      emitTangentForTupleInst(ti);
-  }
-
-  void visitTupleExtractInst(TupleExtractInst *tei) {
-    TypeSubstCloner::visitTupleExtractInst(tei);
-    if (differentialInfo.shouldDifferentiateInstruction(tei))
-      emitTangentForTupleExtractInst(tei);
-  }
-
-  void visitTupleElementAddrInst(TupleElementAddrInst *teai) {
-    TypeSubstCloner::visitTupleElementAddrInst(teai);
-    if (differentialInfo.shouldDifferentiateInstruction(teai))
-      emitTangentForTupleElementAddrInst(teai);
-  }
-
-  void visitDestructureTupleInst(DestructureTupleInst *dti) {
-    TypeSubstCloner::visitDestructureTupleInst(dti);
-    if (differentialInfo.shouldDifferentiateInstruction(dti))
-      emitTangentForDestructureTupleInst(dti);
   }
 
   void visitBranchInst(BranchInst *bi) {
@@ -7490,11 +7347,7 @@ public:
 
   // Memory allocation/access.
   NO_ADJOINT(AllocStack)
-  NO_ADJOINT(AllocBox)
-  NO_ADJOINT(AllocRef)
   NO_ADJOINT(DeallocStack)
-  NO_ADJOINT(DeallocBox)
-  NO_ADJOINT(DeallocRef)
   NO_ADJOINT(EndAccess)
 
   // Debugging/reference counting instructions.
