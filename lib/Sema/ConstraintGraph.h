@@ -246,13 +246,15 @@ public:
   }
 
   /// Print the graph.
-  void print(llvm::raw_ostream &out);
+  void print(ArrayRef<TypeVariableType *> typeVars, llvm::raw_ostream &out);
+  void dump(llvm::raw_ostream &out);
 
   LLVM_ATTRIBUTE_DEPRECATED(void dump() LLVM_ATTRIBUTE_USED,
                             "only for use within the debugger");
 
   /// Print the connected components of the graph.
-  void printConnectedComponents(llvm::raw_ostream &out);
+  void printConnectedComponents(ArrayRef<TypeVariableType *> typeVars,
+                                llvm::raw_ostream &out);
 
   LLVM_ATTRIBUTE_DEPRECATED(void dumpConnectedComponents() LLVM_ATTRIBUTE_USED,
                             "only for use within the debugger");

@@ -111,9 +111,8 @@ bool CursorInfoResolver::tryResolve(ValueDecl *D, TypeDecl *CtorTyRef,
     // Handle references to the implicitly generated vars in case statements
     // matching multiple patterns
     if (VD->isImplicit()) {
-      if (auto * Parent = VD->getParentVarDecl()) {
+      if (auto *Parent = VD->getParentVarDecl()) {
         D = Parent;
-        VD = Parent;
       }
     }
   }

@@ -9,7 +9,7 @@ class SillySequence : Sequence, IteratorProtocol {
   var storedProperty: Int = 0
 
   func makeIterator() -> SillySequence {
-    return sel
+    return self
   }
 
   func next() -> Int? {
@@ -21,4 +21,8 @@ class Holder {
   func getSillySequence() -> SillySequence {
     return SillySequence()
   }
+}
+
+class Base {
+  func method() {}
 }

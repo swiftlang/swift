@@ -135,10 +135,10 @@ static Optional<uint64_t> getMaxLoopTripCount(SILLoop *Loop,
 
   SILValue RecNext = Cmp->getArguments()[0];
   SILPhiArgument *RecArg;
-  if (!match(RecNext,
-             m_TupleExtractInst(m_ApplyInst(BuiltinValueKind::SAddOver,
-                                            m_SILPhiArgument(RecArg), m_One()),
-                                0)))
+  if (!match(RecNext, m_TupleExtractOperation(
+                          m_ApplyInst(BuiltinValueKind::SAddOver,
+                                      m_SILPhiArgument(RecArg), m_One()),
+                          0)))
     return None;
 
   if (RecArg->getParent() != Header)

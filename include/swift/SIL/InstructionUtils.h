@@ -142,48 +142,6 @@ bool onlyUsedByAssignByWrapper(PartialApplyInst *PAI);
 void findClosuresForFunctionValue(SILValue V,
                                   TinyPtrVector<PartialApplyInst *> &results);
 
-/// A utility class for evaluating whether a newly parsed or deserialized
-/// function has qualified or unqualified ownership.
-///
-/// The reason that we are using this is that we would like to avoid needing to
-/// add code to the SILParser or to the Serializer to support this temporary
-/// staging concept of a function having qualified or unqualified
-/// ownership. Once SemanticARC is complete, SILFunctions will always have
-/// qualified ownership, so the notion of an unqualified ownership function will
-/// no longer exist.
-///
-/// Thus we note that there are three sets of instructions in SIL from an
-/// ownership perspective:
-///
-///    a. ownership qualified instructions
-///    b. ownership unqualified instructions
-///    c. instructions that do not have ownership semantics (think literals,
-///       geps, etc).
-///
-/// The set of functions can be split into ownership qualified and ownership
-/// unqualified using the rules that:
-///
-///    a. a function can never contain both ownership qualified and ownership
-///       unqualified instructions.
-///    b. a function that contains only instructions without ownership semantics
-///       is considered ownership qualified.
-///
-/// Thus we can know when parsing/serializing what category of function we have
-/// and set the bit appropriately.
-class FunctionOwnershipEvaluator {
-  NullablePtr<SILFunction> F;
-  bool HasOwnershipQualifiedInstruction = false;
-
-public:
-  FunctionOwnershipEvaluator() {}
-  FunctionOwnershipEvaluator(SILFunction *F) : F(F) {}
-  void reset(SILFunction *NewF) {
-    F = NewF;
-    HasOwnershipQualifiedInstruction = false;
-  }
-  bool evaluate(SILInstruction *I);
-};
-
 } // end namespace swift
 
 #endif

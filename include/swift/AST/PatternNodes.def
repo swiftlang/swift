@@ -32,17 +32,19 @@
 #define LAST_PATTERN(Id)
 #endif
 
-PATTERN(Paren, Pattern)
-PATTERN(Tuple, Pattern)
-PATTERN(Named, Pattern)
-PATTERN(Any, Pattern)
-PATTERN(Typed, Pattern)
-PATTERN(Var, Pattern)
-REFUTABLE_PATTERN(Is, Pattern)
-REFUTABLE_PATTERN(EnumElement, Pattern)
-REFUTABLE_PATTERN(OptionalSome, Pattern)
-REFUTABLE_PATTERN(Bool, Pattern)
-REFUTABLE_PATTERN(Expr, Pattern)
+// Metavars: x (variable), pat (pattern), e (expression)
+PATTERN(Paren, Pattern) // (pat)
+PATTERN(Tuple, Pattern) // (pat1, ..., patN), N >= 1
+PATTERN(Named, Pattern) // let pat, var pat
+PATTERN(Any, Pattern)   // _
+PATTERN(Typed, Pattern) // pat : type
+PATTERN(Var, Pattern)   // x
+REFUTABLE_PATTERN(Is, Pattern)           // x is myclass
+REFUTABLE_PATTERN(EnumElement, Pattern)  // .mycase(pat1, ..., patN)
+                                         // MyType.mycase(pat1, ..., patN)
+REFUTABLE_PATTERN(OptionalSome, Pattern) // pat?  nil
+REFUTABLE_PATTERN(Bool, Pattern)         // true, false
+REFUTABLE_PATTERN(Expr, Pattern)         // e
 LAST_PATTERN(Expr)
 
 #undef REFUTABLE_PATTERN

@@ -68,7 +68,7 @@ constexpr size_t SyntaxAlignInBits = 3;
 ///
 /// e.g.
 ///   parseExprParen() {
-///     SyntaxParsingContext LocalCtxt(SyntaxKind::ParenExpr, SyntaxContext);
+///     SyntaxParsingContext LocalCtxt(SyntaxContext, SyntaxKind::ParenExpr);
 ///     consumeToken(tok::l_paren) // In consumeToken(), a RawTokenSyntax is
 ///                                // added to the context.
 ///     parseExpr(); // On returning from parseExpr(), a Expr Syntax node is

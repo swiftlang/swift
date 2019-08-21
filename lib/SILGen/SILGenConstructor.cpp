@@ -556,6 +556,7 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
     // For a designated initializer, we know that the static type being
     // allocated is the type of the class that defines the designated
     // initializer.
+    F.setIsExactSelfClass(IsExactSelfClass);
     selfValue = B.createAllocRef(Loc, selfTy, useObjCAllocation, false,
                                  ArrayRef<SILType>(), ArrayRef<SILValue>());
   }

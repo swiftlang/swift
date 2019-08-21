@@ -305,3 +305,6 @@ enum FooEnum {
   // CHECK: }</brace></closure></param>)</name></enum-elem></enum-case>
 }
 // CHECK: }</enum>
+
+fourthCall(a: @escaping () -> Int)
+// CHECK: <call><name>fourthCall</name>(<arg><name>a</name>: @escaping () -> Int</arg>)</call>

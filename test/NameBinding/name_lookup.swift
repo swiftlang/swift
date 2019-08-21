@@ -410,13 +410,14 @@ extension ThisDerived1 {
 
 // <rdar://problem/11554141>
 func shadowbug() {
-  var Foo = 10
+  let Foo = 10
   func g() {
     struct S {
       var x : Foo
       typealias Foo = Int
     }
   }
+  _ = Foo
 }
 func scopebug() {
   let Foo = 10

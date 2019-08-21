@@ -164,7 +164,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   bool visitPatternBindingDecl(PatternBindingDecl *PBD) {
-    // If there is a single variable, walk it's attributes.
     bool isPropertyWrapperBackingProperty = false;
     if (auto singleVar = PBD->getSingleVar()) {
       isPropertyWrapperBackingProperty =

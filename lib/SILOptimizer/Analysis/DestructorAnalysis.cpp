@@ -14,6 +14,8 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/Module.h"
+#include "swift/AST/LazyResolver.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/Support/Debug.h"
 
@@ -71,10 +73,15 @@ bool DestructorAnalysis::isSafeType(CanType Ty) {
       return cacheResult(Ty, true);
 
     // Check the stored properties.
-    for (auto SP : Struct->getStoredProperties())
+    for (auto SP : Struct->getStoredProperties()) {
+      // FIXME: Remove this once getInterfaceType() is a request.
+      if (!SP->hasInterfaceType()) {
+        ASTContext &Ctx = Mod->getSwiftModule()->getASTContext();
+        Ctx.getLazyResolver()->resolveDeclSignature(SP);
+      }
       if (!isSafeType(SP->getInterfaceType()->getCanonicalType()))
         return cacheResult(Ty, false);
-
+    }
     return cacheResult(Ty, true);
   }
 

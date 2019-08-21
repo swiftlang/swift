@@ -213,10 +213,11 @@ public:
   ///   SpareBitVector spareBits;
   ///   for (EnumElementDecl *elt : u->getAllElements())
   ///     getFragileTypeInfo(elt->getArgumentType())
-  ///       .applyFixedSpareBitsMask(spareBits);
+  ///       .applyFixedSpareBitsMask(IGM, spareBits);
   ///
   /// and end up with a spare bits mask for the entire enum.
-  void applyFixedSpareBitsMask(SpareBitVector &mask) const;
+  void applyFixedSpareBitsMask(const IRGenModule &IGM,
+                               SpareBitVector &mask) const;
 
   void collectMetadataForOutlining(OutliningMetadataCollector &collector,
                                    SILType T) const override {

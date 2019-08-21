@@ -4,6 +4,7 @@
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
 // REQUIRES: executable_test
+// REQUIRES: objc_interop
 
 // Check if the runtime function swift_getObjectType is not readnone and
 // therefore not re-scheduled with release-calls, which would lead to a crash
