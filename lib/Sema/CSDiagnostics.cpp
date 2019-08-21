@@ -1885,6 +1885,9 @@ bool ContextualFailure::diagnoseAsError() {
     if (diagnoseThrowsTypeMismatch())
       return true;
 
+    if (diagnoseYieldByReferenceMismatch())
+      return true;
+
     auto contextualType = getToType();
     if (auto msg = getDiagnosticFor(CTP, contextualType->isExistentialType())) {
       diagnostic = *msg;
@@ -2235,6 +2238,27 @@ bool ContextualFailure::diagnoseThrowsTypeMismatch() const {
   emitDiagnostic(anchor->getLoc(), diag::cannot_convert_thrown_type,
                  getFromType())
       .highlight(anchor->getSourceRange());
+  return true;
+}
+
+bool ContextualFailure::diagnoseYieldByReferenceMismatch() const {
+  if (CTP != CTP_YieldByReference)
+    return false;
+
+  auto *anchor = getAnchor();
+  auto exprType = getType(anchor);
+  auto contextualType = getToType();
+
+  if (auto exprLV = exprType->getAs<LValueType>()) {
+    emitDiagnostic(anchor->getLoc(), diag::cannot_yield_wrong_type_by_reference,
+                   exprLV->getObjectType(), contextualType);
+  } else if (exprType->isEqual(contextualType)) {
+    emitDiagnostic(anchor->getLoc(),
+                   diag::cannot_yield_rvalue_by_reference_same_type, exprType);
+  } else {
+    emitDiagnostic(anchor->getLoc(), diag::cannot_yield_rvalue_by_reference,
+                   exprType, contextualType);
+  }
   return true;
 }
 
