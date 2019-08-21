@@ -3831,12 +3831,21 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
       return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
     }
 
+    if (path.empty())
+      return SolutionKind::Error;
+
+    // If this is a conformance failure related to a contextual type
+    // let's record it as a "contextual mismatch" because diagnostic
+    // is going to be dependent on other contextual information.
+    if (path.back().is<LocatorPathElt::ContextualType>()) {
+      auto *fix = ContextualMismatch::create(*this, type, protocolTy,
+                                             getConstraintLocator(locator));
+      return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
+    }
+
     // Let's not try to fix missing conformance for Void
     // or Never because that doesn't really make sense.
     if (type->isVoid() || type->isUninhabited())
-      return SolutionKind::Error;
-
-    if (path.empty())
       return SolutionKind::Error;
 
     if (path.back().is<LocatorPathElt::AnyRequirement>()) {
