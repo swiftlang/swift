@@ -3634,8 +3634,8 @@ SILGenFunction::getThunkedAutoDiffLinearMap(
     // Load direct results from indirect results.
     if (fromRes.isFormalIndirect()) {
       auto indRes = *fromIndResultsIter++;
-      auto *load = thunkSGF.B.createLoad(
-          loc, indRes, LoadOwnershipQualifier::Unqualified);
+      auto load = thunkSGF.B.emitLoadValueOperation(
+          loc, indRes, LoadOwnershipQualifier::Take);
       results.push_back(load);
       continue;
     }

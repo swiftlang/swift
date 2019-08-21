@@ -104,10 +104,10 @@ extension Array : KeyPathIterable {
   }
 }
 
-extension Array.DifferentiableView : KeyPathIterable {
-  public typealias AllKeyPaths = [PartialKeyPath<Array.DifferentiableView>]
-  public var allKeyPaths: [PartialKeyPath<Array.DifferentiableView>] {
-    return [\Array.DifferentiableView.base]
+extension Array.TangentVector : KeyPathIterable {
+  public typealias AllKeyPaths = [PartialKeyPath<Array.TangentVector>]
+  public var allKeyPaths: [PartialKeyPath<Array.TangentVector>] {
+    return [\Array.TangentVector.elements]
   }
 }
 

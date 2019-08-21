@@ -958,13 +958,13 @@ public extension Array where Element: Differentiable {
     return (value: result, pullback: { tangent in
       var resultTangent = tangent
       var elementTangents = TangentVector([])
-      elementTangents.base.reserveCapacity(count)
+      elementTangents.elements.reserveCapacity(count)
       for pullback in pullbacks.reversed() {
         let (newResultTangent, elementTangent) = pullback(resultTangent)
         resultTangent = newResultTangent
-        elementTangents.base.append(elementTangent)
+        elementTangents.elements.append(elementTangent)
       }
-      return (TangentVector(elementTangents.base.reversed()), resultTangent)
+      return (TangentVector(elementTangents.elements.reversed()), resultTangent)
     })
   }
 }
@@ -990,7 +990,7 @@ public extension Array where Element: Differentiable {
       pullbacks.append(pb)
     }
     func pullback(_ tans: Array<Result>.TangentVector) -> Array.TangentVector {
-      .init(zip(tans.base, pullbacks).map { tan, pb in pb(tan) })
+      .init(zip(tans.elements, pullbacks).map { tan, pb in pb(tan) })
     }
     return (value: values, pullback: pullback)
   }

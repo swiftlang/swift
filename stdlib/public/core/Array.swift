@@ -1327,7 +1327,7 @@ extension Array: RangeReplaceableCollection {
 extension Array {
   @inlinable
   // SWIFT_ENABLE_TENSORFLOW
-  @differentiable(vjp: _vjpPlus where Element : Differentiable)
+  @differentiable(vjp: _vjpConcat where Element : Differentiable)
   public static func + (lhs: Array, rhs: Array) -> Array {
     var lhs = lhs
     lhs.append(contentsOf: rhs)
@@ -1913,183 +1913,110 @@ internal struct _ArrayAnyHashableBox<Element: Hashable>
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-extension Array where Element : Differentiable {
-  /// The view of an array as the differentiable product manifold of `Element`
-  /// multiplied with itself `count` times.
+extension Array: Differentiable where Element: Differentiable {
   @frozen
-  public struct DifferentiableView : Differentiable {
-    private var _base: [Element]
+  public struct TangentVector
+    : Differentiable, AdditiveArithmetic, ExpressibleByArrayLiteral,
+      CustomStringConvertible {
+    public typealias Element = Array.Element.TangentVector
+    public typealias TangentVector = Self
+    public var elements: [Element]
 
-    /// The viewed array.
-    // I'm implementing this as a computed property instead of directly
-    // exposing `_base` because the `@differentiable` annotation does not make
-    // the stored property actually differentiable. I think this is a bug.
-    // Maybe it's related to `@frozen`?
-    // TODO: Determine if that is a bug, and fix.
-    public var base: [Element] {
-      @differentiable(wrt: self, vjp: _vjpBase)
-      get { return _base }
-      _modify { yield &_base }
+    @available(*, deprecated, renamed: "elements")
+    @inlinable
+    public var base: [Element.TangentVector] {
+      _read { yield elements }
+      _modify { yield &elements }
     }
 
-    @usableFromInline
-    func _vjpBase() ->
-      ([Element], (Array<Element>.TangentVector) -> TangentVector) {
-      return (base, { $0 })
+    @inlinable
+    public init(_ elements: [Element.TangentVector]) {
+      self.elements = elements
     }
-
-    /// Creates a differentiable view of the given array.
-    @differentiable(wrt: base, vjp: _vjpInit)
-    public init(_ base: [Element]) { self._base = base }
-
-    @usableFromInline
-    static func _vjpInit(_ base: [Element]) ->
-      (Array.DifferentiableView, (TangentVector) -> TangentVector) {
-      return (Array.DifferentiableView(base), { $0 })
+    @inlinable
+    public static var zero: Self {
+      TangentVector([])
     }
-
-    // MARK: - Differentiable conformance.
-
-    public typealias TangentVector =
-      Array<Element.TangentVector>.DifferentiableView
-
-    public mutating func move(along direction: TangentVector) {
-      precondition(
-        base.count == direction.base.count,
-        "cannot move Array.DifferentiableView with count \(base.count) along " +
-          "direction with different count \(direction.base.count)")
-      for i in base.indices {
-        base[i].move(along: direction.base[i])
+    @inlinable
+    public static func + (lhs: Self, rhs: Self) -> Self {
+      precondition(lhs.elements.count == 0 || rhs.elements.count == 0 ||
+                   lhs.elements.count == rhs.elements.count)
+      if lhs.elements.isEmpty { return rhs }
+      if rhs.elements.isEmpty { return lhs }
+      return Self(zip(lhs.elements, rhs.elements).map(+))
+    }
+    @inlinable
+    public static func - (lhs: Self, rhs: Self) -> Self {
+      precondition(lhs.elements.count == 0 || rhs.elements.count == 0 ||
+                   lhs.elements.count == rhs.elements.count)
+      if lhs.elements.isEmpty { return rhs }
+      if rhs.elements.isEmpty { return lhs }
+      return Self(zip(lhs.elements, rhs.elements).map(-))
+    }
+    @inlinable
+    public mutating func move(along direction: Self) {
+      self += direction
+    }
+    @inlinable
+    public init(arrayLiteral elements: Element...) {
+      self.init(elements)
+    }
+    @inlinable
+    public var description: String {
+      return elements.description
+    }
+    @inlinable
+    public subscript(_ index: Int) -> Element {
+      if index < elements.count {
+        return elements[index]
       }
+      return .zero
     }
   }
-}
 
-extension Array.DifferentiableView : Equatable where Element : Equatable {
-  public static func == (
-    lhs: Array.DifferentiableView,
-    rhs: Array.DifferentiableView
-  ) -> Bool {
-    return lhs.base == rhs.base
-  }
-}
-
-extension Array.DifferentiableView : ExpressibleByArrayLiteral {
-  public init(arrayLiteral elements: Element...) {
-    self.init(elements)
-  }
-}
-
-extension Array.DifferentiableView : CustomStringConvertible {
-  public var description: String {
-    return base.description
-  }
-}
-
-/// Makes `Array.DifferentiableView` additive as the product space.
-///
-/// Note that `Array.DifferentiableView([])` is the zero in the product spaces
-/// of all counts.
-extension Array.DifferentiableView : AdditiveArithmetic
-  where Element : AdditiveArithmetic {
-
-  public static var zero: Array.DifferentiableView {
-    return Array.DifferentiableView([])
-  }
-
-  public static func + (
-    lhs: Array.DifferentiableView,
-    rhs: Array.DifferentiableView
-  ) -> Array.DifferentiableView {
-    precondition(
-      lhs.base.count == 0 || rhs.base.count == 0 ||
-        lhs.base.count == rhs.base.count,
-      "cannot add Array.DifferentiableViews with different counts: " +
-        "\(lhs.base.count) and \(rhs.base.count)")
-    if lhs.base.count == 0 {
-      return rhs
-    }
-    if rhs.base.count == 0 {
-      return lhs
-    }
-    return Array.DifferentiableView(zip(lhs.base, rhs.base).map(+))
-  }
-
-  public static func - (
-    lhs: Array.DifferentiableView,
-    rhs: Array.DifferentiableView
-  ) -> Array.DifferentiableView {
-    precondition(
-      lhs.base.count == 0 || rhs.base.count == 0 ||
-        lhs.base.count == rhs.base.count,
-      "cannot subtract Array.DifferentiableViews with different counts: " +
-        "\(lhs.base.count) and \(rhs.base.count)")
-    if lhs.base.count == 0 {
-      return rhs
-    }
-    if rhs.base.count == 0 {
-      return lhs
-    }
-    return Array.DifferentiableView(zip(lhs.base, rhs.base).map(-))
-  }
+  @available(*, deprecated, renamed: "TangentVector")
+  public typealias DifferentiableView = TangentVector
 
   @inlinable
-  public subscript(_ index: Int) -> Element {
-    if index < base.count {
-      return base[index]
-    } else {
-      return Element.zero
+  public mutating func move(along direction: TangentVector) {
+    for i in indices {
+      self[i].move(along: direction.elements[i])
     }
   }
 }
 
-/// Makes `Array` differentiable as the product manifold of `Element`
-/// multiplied with itself `count` times.
-extension Array : Differentiable where Element : Differentiable {
-  // In an ideal world, `TangentVector` would be `[Element.TangentVector]`.
-  // Unfortunately, we cannot conform `Array` to `AdditiveArithmetic` for
-  // `TangentVector` because `Array` already has a static `+` method with
-  // different semantics from `AdditiveArithmetic.+`. So we use
-  // `Array.DifferentiableView` for all these associated types.
-  public typealias TangentVector =
-    Array<Element.TangentVector>.DifferentiableView
-
-  public mutating func move(along direction: TangentVector) {
-    var view = DifferentiableView(self)
-    view.move(along: direction)
-    self = view.base
+extension Array.TangentVector: Equatable
+  where Array.Element.TangentVector: Equatable {
+  @inlinable
+  public static func == (lhs: Self, rhs: Self) -> Bool {
+    return lhs.elements == rhs.elements
   }
 }
 
-extension Array where Element : Differentiable {
-  public func _vjpSubscript(index: Int) ->
-    (Element, (Element.TangentVector) -> TangentVector)
-  {
-    func pullback(_ gradientIn: Element.TangentVector) -> TangentVector {
-      var gradientOut = Array<Element.TangentVector>(
-        repeating: .zero,
-        count: count)
-      gradientOut[index] = gradientIn
-      return TangentVector(gradientOut)
+extension Array where Element: Differentiable {
+  @inlinable
+  func _vjpSubscript(
+    index: Int
+  ) -> (Element, (Element.TangentVector) -> TangentVector) {
+    func pullback(_ v: Element.TangentVector) -> TangentVector {
+      var result = [Element.TangentVector](repeating: .zero, count: count)
+      result[index] = v
+      return TangentVector(result)
     }
     return (self[index], pullback)
   }
 
-  public static func _vjpPlus(_ lhs: [Element], _ rhs: [Element]) ->
-    ([Element], (TangentVector) -> (TangentVector, TangentVector)) {
-      func pullback(_ gradientIn: TangentVector) ->
-        (TangentVector, TangentVector) {
-        precondition(
-          gradientIn.base.count == lhs.count + rhs.count,
-          "+ should receive gradient with count equal to sum of operand " +
-            "counts, but counts are: gradient \(gradientIn.base.count), " +
-            "lhs \(lhs.count), rhs \(rhs.count)")
-        return (
-          TangentVector(Array<Element.TangentVector>(
-            gradientIn.base[0..<lhs.count])),
-          TangentVector(Array<Element.TangentVector>(
-            gradientIn.base[lhs.count...])))
-      }
-      return (lhs + rhs, pullback)
+  @inlinable
+  static func _vjpConcat(
+    _ lhs: [Element], _ rhs: [Element]
+  ) -> ([Element], (TangentVector) -> (TangentVector, TangentVector)) {
+    func pullback(_ v: TangentVector) -> (TangentVector, TangentVector) {
+      precondition(v.elements.count == lhs.count + rhs.count)
+      return (
+        TangentVector([Element.TangentVector](v.elements[0..<lhs.count])),
+        TangentVector([Element.TangentVector](v.elements[lhs.count...]))
+      )
+    }
+    return (lhs + rhs, pullback)
   }
 }
