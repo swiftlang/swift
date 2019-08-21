@@ -91,9 +91,13 @@ static bool isWithoutDerivative(SILValue v) {
   return false;
 }
 
+static bool isArrayLiteralIntrinsic(ApplyInst *ai) {
+  return ai->hasSemantics("array.uninitialized_intrinsic");
+}
+
 static ApplyInst *getAllocateUninitializedArrayIntrinsic(SILValue v) {
   if (auto *applyInst = dyn_cast<ApplyInst>(v))
-    if (applyInst->hasSemantics("array.uninitialized_intrinsic"))
+    if (isArrayLiteralIntrinsic(applyInst))
       return applyInst;
   return nullptr;
 }
@@ -391,6 +395,9 @@ private:
   /// Activity info of the original function.
   const DifferentiableActivityInfo &activityInfo;
 
+  /// Differentiation indices of the function.
+  const SILAutoDiffIndices &indices;
+
   /// Mapping from original basic blocks to linear map structs.
   DenseMap<SILBasicBlock *, StructDecl *> linearMapStructs;
 
@@ -678,10 +685,10 @@ private:
       ADContext &context, const SILAutoDiffIndices &indices,
       SILFunction *assocFn);
 
-  bool shouldBeDifferentiated(ApplyInst *inst,
-                              const SILAutoDiffIndices &indices);
-
 public:
+  bool shouldDifferentiateApplyInst(ApplyInst *ai);
+  bool shouldDifferentiateInstruction(SILInstruction *inst);
+
   LinearMapInfo(const LinearMapInfo &) = delete;
   LinearMapInfo &operator=(const LinearMapInfo &) = delete;
 
@@ -1496,38 +1503,78 @@ LinearMapInfo::LinearMapInfo(ADContext &context,
                              const DifferentiableActivityInfo &activityInfo,
                              SILBuilder &builder)
     : kind(kind), original(original), activityInfo(activityInfo),
-      typeConverter(context.getTypeConverter()), builder(builder) {
+      indices(indices), typeConverter(context.getTypeConverter()),
+      builder(builder) {
   populateLinearMapStructDeclarationFields(context, indices, assocFn);
 }
 
-bool LinearMapInfo::shouldBeDifferentiated(ApplyInst *ai,
-                                           const SILAutoDiffIndices &indices) {
-  // Anything with an active result should be differentiated.
-  if (llvm::any_of(ai->getResults(), [&](SILValue val) {
-    return activityInfo.isActive(val, indices);
-  }))
-    return true;
-
-  // Function applications with an active indirect result should be
-  // differentiated.
-  for (auto indRes : ai->getIndirectSILResults())
-    if (activityInfo.isActive(indRes, indices))
-      return true;
-
+/// Returns a flag that indicates whether the `apply` instruction should be
+/// differentiated, given the differentiation indices of the instruction's
+/// parent function. Whether the `apply` should be differentiated is determined
+/// sequentially from the following conditions:
+/// 1. The instruction has an active `inout` argument.
+/// 2. The instruction is a call to the array literal initialization intrinsic
+///    ("array.uninitialized_intrinsic"), where the result is active and where
+///    there is a `store` of an active value into the array's buffer.
+/// 3. The instruction has both an active result (direct or indirect) and an
+///    active argument.
+bool LinearMapInfo::shouldDifferentiateApplyInst(ApplyInst *ai) {
   // Function applications with an inout argument should be differentiated.
   auto paramInfos = ai->getSubstCalleeConv().getParameters();
+  auto paramArgs = ai->getArgumentsWithoutIndirectResults();
   for (auto i : swift::indices(paramInfos))
     if (paramInfos[i].isIndirectInOut() &&
-        activityInfo.isActive(
-            ai->getArgumentsWithoutIndirectResults()[i], indices))
+        activityInfo.isActive(paramArgs[i], indices))
       return true;
 
-  // Instructions that may write to memory and that have an active operand
-  // should be differentiated.
-  if (ai->mayWriteToMemory())
-    for (auto &op : ai->getAllOperands())
-      if (activityInfo.isActive(op.get(), indices))
-        return true;
+  // TODO(bartchr): Check `destructure_tuple` user's results' acvitity.
+//  for (auto use : ai->getUses()) {
+//    if (auto *dti = dyn_cast<DestructureTupleInst>(use->getUser())) {
+//      for (auto result : dti->getResults()) {
+//        if (activityInfo.isActive(result, indices))
+//          return true;
+//      }
+//    }
+//  }
+
+  bool hasActiveDirectResults = activityInfo.isActive(ai, indices);
+  bool hasActiveIndirectResults = llvm::any_of(ai->getIndirectSILResults(),
+      [&](SILValue result) { return activityInfo.isActive(result, indices); });
+  bool hasActiveResults = hasActiveDirectResults || hasActiveIndirectResults;
+
+  // TODO: Perform pattern matching to make sure there's at least one `store` to
+  // the array's buffer that is active.
+  if (isArrayLiteralIntrinsic(ai) && hasActiveResults)
+    return true;
+
+  bool hasActiveParamArguments = llvm::any_of(paramArgs,
+      [&](SILValue arg) { return activityInfo.isActive(arg, indices); });
+  return hasActiveResults && hasActiveParamArguments;
+}
+
+/// Returns a flag that indicates whether the instruction should be
+/// differentiated, given the differentiation indices of the instruction's
+/// parent function. Whether the instruction should be differentiated is
+/// determined sequentially from the following conditions:
+/// 1. The instruction is an `apply` and `shouldDifferentiateApplyInst` returns
+///    true.
+/// 2. The instruction has an active operand and an active result.
+/// 3. The instruction has side effects and an active operand.
+bool LinearMapInfo::shouldDifferentiateInstruction(SILInstruction *inst) {
+  // An `apply` with an active argument and an active result (direct or
+  // indirect) should be differentiated.
+  if (auto *ai = dyn_cast<ApplyInst>(inst))
+    return shouldDifferentiateApplyInst(ai);
+  // Anything with an active result and an active operand should be
+  // differentiated.
+  auto hasActiveOperands = llvm::any_of(inst->getAllOperands(),
+      [&](Operand &op) { return activityInfo.isActive(op.get(), indices); });
+  auto hasActiveResults = llvm::any_of(inst->getResults(),
+      [&](SILValue val) { return activityInfo.isActive(val, indices); });
+  if (hasActiveOperands && hasActiveResults)
+    return true;
+  if (inst->mayHaveSideEffects() && hasActiveOperands)
+    return true;
   return false;
 }
 
@@ -1697,8 +1744,7 @@ void LinearMapInfo::populateLinearMapStructDeclarationFields(
         // Add linear map to struct for active instructions.
         // Do not add it for array functions since those are already linear
         // and we don't need to add it to the struct.
-        if (shouldBeDifferentiated(ai, indices) &&
-            !ai->hasSemantics("array.uninitialized_intrinsic"))
+        if (shouldDifferentiateApplyInst(ai) && !isArrayLiteralIntrinsic(ai))
           addLinearMapToStruct(ai, indices);
       }
     }
@@ -2118,7 +2164,7 @@ static void dumpActivityInfo(SILValue value,
 
 static void dumpActivityInfo(SILFunction &fn,
                              const SILAutoDiffIndices &indices,
-                             DifferentiableActivityInfo &activityInfo,
+                             const DifferentiableActivityInfo &activityInfo,
                              llvm::raw_ostream &s = llvm::dbgs()) {
   s << "Activity info for " << fn.getName() << " at " << indices << '\n';
   for (auto &bb : fn) {
@@ -3147,7 +3193,7 @@ private:
   const DifferentiableActivityInfo &activityInfo;
 
   /// The linear map info.
-  LinearMapInfo linearMapInfo;
+  LinearMapInfo pullbackInfo;
 
   /// Caches basic blocks whose phi arguments have been remapped (adding a
   /// predecessor enum argument).
@@ -3211,7 +3257,7 @@ public:
         context(context), original(original), attr(attr), vjp(vjp),
         invoker(invoker), activityInfo(getActivityInfo(
                               context, original, attr->getIndices(), vjp)),
-        linearMapInfo(context, AutoDiffAssociatedFunctionKind::VJP, original,
+        pullbackInfo(context, AutoDiffAssociatedFunctionKind::VJP, original,
           vjp, attr->getIndices(), activityInfo, getBuilder()) {
     // Create empty pullback function.
     pullback = createEmptyPullback();
@@ -3298,7 +3344,7 @@ public:
     // Accept a pullback struct in the pullback parameter list. This is the
     // returned pullback's closure context.
     auto *origExit = &*original->findReturnBB();
-    auto *pbStruct = linearMapInfo.getLinearMapStruct(origExit);
+    auto *pbStruct = pullbackInfo.getLinearMapStruct(origExit);
     auto pbStructType = pbStruct->getDeclaredInterfaceType()
         ->getCanonicalType();
     pbParams.push_back({pbStructType, ParameterConvention::Direct_Owned});
@@ -3357,7 +3403,7 @@ public:
     if (errorOccurred || remappedBasicBlocks.count(bb))
       return vjpBB;
     // Add predecessor enum argument to the remapped block.
-    auto *predEnum = linearMapInfo.getBranchingTraceDecl(bb);
+    auto *predEnum = pullbackInfo.getBranchingTraceDecl(bb);
     auto enumTy = getOpASTType(predEnum->getDeclaredInterfaceType()
                                  ->getCanonicalType());
     auto enumLoweredTy = context.getTypeConverter().getLoweredType(
@@ -3398,7 +3444,7 @@ private:
     auto loc = termInst->getFunction()->getLocation();
     auto *origBB = termInst->getParent();
     auto *vjpBB = BBMap[origBB];
-    auto *pbStruct = linearMapInfo.getLinearMapStruct(origBB);
+    auto *pbStruct = pullbackInfo.getLinearMapStruct(origBB);
     auto structLoweredTy = getNominalDeclLoweredType(pbStruct);
     auto bbPullbackValues = pullbackValues[origBB];
     if (!origBB->isEntry()) {
@@ -3415,10 +3461,10 @@ private:
                                       SILBasicBlock *succBB,
                                       SILValue pbStructVal) {
     auto loc = pbStructVal.getLoc();
-    auto *succEnum = linearMapInfo.getBranchingTraceDecl(succBB);
+    auto *succEnum = pullbackInfo.getBranchingTraceDecl(succBB);
     auto enumLoweredTy = getNominalDeclLoweredType(succEnum);
     auto *enumEltDecl =
-        linearMapInfo.lookUpBranchingTraceEnumElement(predBB, succBB);
+        pullbackInfo.lookUpBranchingTraceEnumElement(predBB, succBB);
     auto enumEltType = getOpType(
         enumLoweredTy.getEnumElementType(enumEltDecl, getModule()));
     // If the enum element type does not have a box type (i.e. the enum case is
@@ -3588,62 +3634,36 @@ public:
   // If an `apply` has active results or active inout parameters, replace it
   // with an `apply` of its VJP.
   void visitApplyInst(ApplyInst *ai) {
-    // Special handling logic only applies when `apply` has active results or
-    // active arguments at an active 'inout' parameter position. If not, just do
-    // standard cloning.
-    SmallVector<SILValue, 4> allResults;
-    // Only append the results from the `destruct_tuple` instruction which are
-    // active, we don't consider the result of the original apply if it's a
-    // tuple.
-    if (ai->getResult(0)->getType().is<TupleType>()) {
-      for (auto *use : ai->getResult(0)->getUses()) {
-        if (auto *destructure =
-                dyn_cast<DestructureTupleInst>(use->getUser())) {
-          for (auto result : destructure->getResults())
-            allResults.push_back(result);
-          break;
-        }
-      }
-    } else {
-      allResults.push_back(ai);
-    }
-    allResults.append(ai->getIndirectSILResults().begin(),
-                      ai->getIndirectSILResults().end());
-    auto hasActiveResults = llvm::any_of(
-        allResults, [this](SILValue res) {
-      return activityInfo.isActive(res, getIndices());
-    });
-    auto hasActiveArguments = llvm::any_of(
-        ai->getArgumentsWithoutIndirectResults(), [this](SILValue arg) {
-      return activityInfo.isActive(arg, getIndices());
-    });
-    // Check for active 'inout' arguments.
-    auto paramInfos = ai->getSubstCalleeConv().getParameters();
-    bool hasActiveInoutParams = false;
-    for (unsigned i : swift::indices(paramInfos))
-      if (paramInfos[i].isIndirectInOut() &&
-          activityInfo.isActive(ai->getArgumentsWithoutIndirectResults()[i],
-                                getIndices()))
-        hasActiveInoutParams = true;
-    // Reject functions with active inout arguments. It's not yet supported.
-    if (hasActiveInoutParams) {
-      context.emitNondifferentiabilityError(ai, invoker,
-          diag::autodiff_cannot_differentiate_through_inout_arguments);
-      errorOccurred = true;
-      return;
-    }
-    // If there's no active results, this function should not be differentiated.
-    // Do standard cloning.
-    if (!hasActiveResults || !hasActiveArguments) {
-      LLVM_DEBUG(getADDebugStream()
-                 << "No active results nor active arguments:\n"
-                 << *ai << '\n');
+    // If the function should not be differentiated or its the array literal
+    // initialization intrinsic, just do standard cloning.
+    if (!pullbackInfo.shouldDifferentiateApplyInst(ai) ||
+        isArrayLiteralIntrinsic(ai)) {
+      LLVM_DEBUG(getADDebugStream() << "No active results:\n" << *ai << '\n');
       TypeSubstCloner::visitApplyInst(ai);
       return;
     }
 
-    // Get the parameter indices required for differentiating this function.
+    // Check and reject functions with active inout arguments. It's not yet
+    // supported.
+    auto paramInfos = ai->getSubstCalleeConv().getParameters();
+    auto paramArgs = ai->getArgumentsWithoutIndirectResults();
+    for (unsigned i : swift::indices(paramInfos)) {
+      if (paramInfos[i].isIndirectInOut() &&
+          activityInfo.isActive(paramArgs[i], getIndices())) {
+        context.emitNondifferentiabilityError(ai, invoker,
+            diag::autodiff_cannot_differentiate_through_inout_arguments);
+        errorOccurred = true;
+        return;
+      }
+    }
+
     LLVM_DEBUG(getADDebugStream() << "VJP-transforming:\n" << *ai << '\n');
+
+    // Get the parameter indices required for differentiating this function.
+    SmallVector<SILValue, 4> allResults;
+    allResults.push_back(ai);
+    allResults.append(ai->getIndirectSILResults().begin(),
+                      ai->getIndirectSILResults().end());
     SmallVector<unsigned, 8> activeParamIndices;
     SmallVector<unsigned, 8> activeResultIndices;
     collectMinimalIndicesForFunctionCall(ai, allResults, getIndices(),
@@ -3665,6 +3685,7 @@ public:
       errorOccurred = true;
       return;
     }
+
     // Form expected indices by assuming there's only one result.
     SILAutoDiffIndices indices(activeResultIndices.front(),
         AutoDiffIndexSubset::get(
@@ -3815,7 +3836,7 @@ public:
     mapValue(ai, originalDirectResult);
 
     // Checkpoint the pullback.
-    auto *pullbackDecl = linearMapInfo.lookUpLinearMapDecl(ai);
+    auto *pullbackDecl = pullbackInfo.lookUpLinearMapDecl(ai);
 
     // If actual pullback type does not match lowered pullback type, reabstract
     // the pullback using a thunk.
@@ -4227,50 +4248,6 @@ private:
                                      bbDifferentialValues);
   }
 
-  bool shouldBeDifferentiated(SILInstruction *inst,
-                              const SILAutoDiffIndices &indices) {
-    // Anything with an active result should be differentiated.
-    if (llvm::any_of(inst->getResults(), [&](SILValue val) {
-          return activityInfo.isActive(val, indices);
-        }))
-      return true;
-    // Anything with an an active argument should be differentiated
-    // (i.e. `return %0`).
-    if (dyn_cast<ReturnInst>(inst) &&
-        llvm::any_of(inst->getAllOperands(), [&](Operand &val) {
-      return activityInfo.isActive(val.get(), indices);
-    }))
-      return true;
-    if (auto *ai = dyn_cast<ApplyInst>(inst)) {
-      for (auto use : ai->getUses())
-        if (auto *dti = dyn_cast<DestructureTupleInst>(use->getUser())) {
-          for (auto result : dti->getResults()) {
-            if (activityInfo.isActive(result, getIndices()))
-              return false;
-          }
-        }
-      // Function applications with an active indirect result should be
-      // differentiated.
-      for (auto indRes : ai->getIndirectSILResults())
-        if (activityInfo.isActive(indRes, indices))
-          return true;
-      // Function applications with an inout argument should be differentiated.
-      auto paramInfos = ai->getSubstCalleeConv().getParameters();
-      for (auto i : swift::indices(paramInfos))
-        if (paramInfos[i].isIndirectInOut() &&
-            activityInfo.isActive(
-                ai->getArgumentsWithoutIndirectResults()[i], indices))
-          return true;
-    }
-    // Instructions that may write to memory and that have an active operand
-    // should be differentiated.
-    if (inst->mayWriteToMemory())
-      for (auto &op : inst->getAllOperands())
-        if (activityInfo.isActive(op.get(), indices))
-          return true;
-    return false;
-  }
-
   //--------------------------------------------------------------------------//
   // Tangent value factory methods
   //--------------------------------------------------------------------------//
@@ -4550,8 +4527,9 @@ private:
   /// Handle `apply` instruction.
   ///   Original: y = apply f(x)
   ///   Tangent: tan[y] = apply diff_f(tan[x])
-  void emitTangentForApplyInst(ApplyInst *ai, SILAutoDiffIndices indices,
+  void emitTangentForApplyInst(ApplyInst *ai, SILAutoDiffIndices actualIndices,
                                CanSILFunctionType originalDifferentialType) {
+    assert(differentialInfo.shouldDifferentiateApplyInst(ai));
     auto *bb = ai->getParent();
     auto loc = ai->getLoc();
     auto &diffBuilder = getDifferentialBuilder();
@@ -4618,7 +4596,7 @@ private:
     SmallVector<SILValue, 8> origAllResults;
     collectAllActualResultsInTypeOrder(
         ai, origDirResults, ai->getIndirectSILResults(), origAllResults);
-    auto origResult = origAllResults[indices.source];
+    auto origResult = origAllResults[actualIndices.source];
 
     // Get the differential results of the `apply` instructions.
     SmallVector<SILValue, 8> differentialDirResults;
@@ -5047,7 +5025,7 @@ private:
                   << "Original bb" + std::to_string(origBB.getDebugID())
                   << ": To differentiate or not to differentiate?\n";
         for (auto &inst : origBB) {
-          s << (shouldBeDifferentiated(&inst, getIndices()) ? "[∂] " : "[ ] ")
+          s << (differentialInfo.shouldDifferentiateInstruction(&inst) ? "[∂] " : "[ ] ")
             << inst;
         }
       });
@@ -5250,7 +5228,7 @@ public:
     auto diffBuilder = getDifferentialBuilder();
     if (errorOccurred)
       return;
-    if (shouldBeDifferentiated(inst, getIndices())) {
+    if (differentialInfo.shouldDifferentiateInstruction(inst)) {
       LLVM_DEBUG(getADDebugStream() << "JVPEmitter visited:\n[ORIG]"
                  << *inst);
 #ifndef NDEBUG
@@ -5290,9 +5268,33 @@ public:
   // If an `apply` has active results or active inout parameters, replace it
   // with an `apply` of its JVP.
   void visitApplyInst(ApplyInst *ai) {
-    // Special handling logic only applies when `apply` has active results or
-    // active arguments at an active parameter position. If not, just do
-    // standard cloning.
+    // If the function should not be differentiated or its the array literal
+    // initialization intrinsic, just do standard cloning.
+    if (!differentialInfo.shouldDifferentiateApplyInst(ai) ||
+        isArrayLiteralIntrinsic(ai)) {
+      LLVM_DEBUG(getADDebugStream() << "No active results:\n" << *ai << '\n');
+      TypeSubstCloner::visitApplyInst(ai);
+      return;
+    }
+
+    // Check and reject functions with active inout arguments. It's not yet
+    // supported.
+    auto paramInfos = ai->getSubstCalleeConv().getParameters();
+    auto paramArgs = ai->getArgumentsWithoutIndirectResults();
+    for (unsigned i : swift::indices(paramInfos)) {
+      if (paramInfos[i].isIndirectInOut() &&
+          activityInfo.isActive(paramArgs[i], getIndices())) {
+        context.emitNondifferentiabilityError(ai, invoker,
+            diag::autodiff_cannot_differentiate_through_inout_arguments);
+        errorOccurred = true;
+        return;
+      }
+    }
+
+    LLVM_DEBUG(getADDebugStream() << "JVP-transforming:\n" << *ai << '\n');
+
+
+    // Get the parameter indices required for differentiating this function.
     SmallVector<SILValue, 4> allResults;
     // Only append the results from the `destruct_tuple` instruction which are
     // active, we don't consider the result of the original apply if it's a
@@ -5309,41 +5311,9 @@ public:
     } else {
       allResults.push_back(ai);
     }
+
     allResults.append(ai->getIndirectSILResults().begin(),
                       ai->getIndirectSILResults().end());
-    auto hasActiveResults = llvm::any_of(allResults, [this](SILValue res) {
-      return activityInfo.isActive(res, getIndices());
-    });
-    auto hasActiveArguments = llvm::any_of(
-        ai->getArgumentsWithoutIndirectResults(), [this](SILValue arg) {
-      return activityInfo.isActive(arg, getIndices());
-    });
-    // Check for active 'inout' arguments.
-    auto paramInfos = ai->getSubstCalleeConv().getParameters();
-    for (unsigned i : swift::indices(paramInfos)) {
-      if (paramInfos[i].isIndirectInOut() &&
-          activityInfo.isActive(ai->getArgumentsWithoutIndirectResults()[i],
-                                getIndices())) {
-        // Reject functions with active inout arguments. It's not yet supported.
-        context.emitNondifferentiabilityError(
-            ai, invoker,
-            diag::autodiff_cannot_differentiate_through_inout_arguments);
-        errorOccurred = true;
-        return;
-      }
-    }
-
-    // If there's no active results, this function should not be differentiated.
-    // Do standard cloning.
-    if (!hasActiveResults || !hasActiveArguments) {
-      LLVM_DEBUG(getADDebugStream()
-                 << "No active results nor active arguments:\n" << *ai << '\n');
-      TypeSubstCloner::visitApplyInst(ai);
-      return;
-    }
-
-    // Get the parameter indices required for differentiating this function.
-    LLVM_DEBUG(getADDebugStream() << "JVP-transforming:\n" << *ai << '\n');
     SmallVector<unsigned, 8> activeParamIndices;
     SmallVector<unsigned, 8> activeResultIndices;
     collectMinimalIndicesForFunctionCall(ai, allResults, getIndices(),
@@ -5583,37 +5553,37 @@ public:
 
   void visitBeginBorrowInst(BeginBorrowInst *bbi) {
     TypeSubstCloner::visitBeginBorrowInst(bbi);
-    if (shouldBeDifferentiated(bbi, getIndices()))
+    if (differentialInfo.shouldDifferentiateInstruction(bbi))
       emitTangentForBeginBorrow(bbi);
   }
 
   void visitEndBorrowInst(EndBorrowInst *ebi) {
     TypeSubstCloner::visitEndBorrowInst(ebi);
-    if (shouldBeDifferentiated(ebi, getIndices()))
+    if (differentialInfo.shouldDifferentiateInstruction(ebi))
       emitTangentForEndBorrow(ebi);
   }
 
   void visitLoadInst(LoadInst *li) {
     TypeSubstCloner::visitLoadInst(li);
-    if (shouldBeDifferentiated(li, getIndices()))
+    if (differentialInfo.shouldDifferentiateInstruction(li))
       emitTangentForLoadInst(li);
   }
 
   void visitLoadBorrowInst(LoadBorrowInst *lbi) {
     TypeSubstCloner::visitLoadBorrowInst(lbi);
-    if (shouldBeDifferentiated(lbi, getIndices()))
+    if (differentialInfo.shouldDifferentiateInstruction(lbi))
       emitTangentForLoadBorrowInst(lbi);
   }
 
   void visitStoreInst(StoreInst *si) {
     TypeSubstCloner::visitStoreInst(si);
-    if (shouldBeDifferentiated(si, getIndices()))
+    if (differentialInfo.shouldDifferentiateInstruction(si))
       emitTangentForStoreInst(si);
   }
 
   void visitStoreBorrowInst(StoreBorrowInst *sbi) {
     TypeSubstCloner::visitStoreBorrowInst(sbi);
-    if (shouldBeDifferentiated(sbi, getIndices()))
+    if (differentialInfo.shouldDifferentiateInstruction(sbi))
       emitTangentForStoreBorrowInst(sbi);
   }
 
@@ -5624,79 +5594,79 @@ public:
 
   void visitDestroyValueInst(DestroyValueInst *dvi) {
     TypeSubstCloner::visitDestroyValueInst(dvi);
-    if (shouldBeDifferentiated(dvi, getIndices()))
+    if (differentialInfo.shouldDifferentiateInstruction(dvi))
       emitTangentForDestroyValueInst(dvi);
   }
 
   void visitCopyAddrInst(CopyAddrInst *cai) {
     TypeSubstCloner::visitCopyAddrInst(cai);
-    if (shouldBeDifferentiated(cai, getIndices()))
+    if (differentialInfo.shouldDifferentiateInstruction(cai))
       emitTangentForCopyAddrInst(cai);
   }
 
   void visitBeginAccessInst(BeginAccessInst *bai) {
     TypeSubstCloner::visitBeginAccessInst(bai);
-    if (shouldBeDifferentiated(bai, getIndices()))
+    if (differentialInfo.shouldDifferentiateInstruction(bai))
       emitTangentForBeginAccessInst(bai);
   }
 
   void visitEndAccessInst(EndAccessInst *eai) {
     TypeSubstCloner::visitEndAccessInst(eai);
-    if (shouldBeDifferentiated(eai, getIndices()))
+    if (differentialInfo.shouldDifferentiateInstruction(eai))
       emitTangentForEndAccessInst(eai);
   }
 
   void visitAllocStackInst(AllocStackInst *asi) {
     TypeSubstCloner::visitAllocStackInst(asi);
-    if (shouldBeDifferentiated(asi, getIndices()))
+    if (differentialInfo.shouldDifferentiateInstruction(asi))
       emitTangentForAllocStackInst(asi);
   }
 
   void visitDeallocStackInst(DeallocStackInst *dsi) {
     TypeSubstCloner::visitDeallocStackInst(dsi);
-    if (shouldBeDifferentiated(dsi, getIndices()))
+    if (differentialInfo.shouldDifferentiateInstruction(dsi))
       emitTangentForDeallocStackInst(dsi);
   }
 
   void visitStructInst(StructInst *si) {
     TypeSubstCloner::visitStructInst(si);
-    if (shouldBeDifferentiated(si, getIndices()))
+    if (differentialInfo.shouldDifferentiateInstruction(si))
       emitTangentForStructInst(si);
   }
 
   void visitStructExtractInst(StructExtractInst *sei) {
     TypeSubstCloner::visitStructExtractInst(sei);
-    if (shouldBeDifferentiated(sei, getIndices()))
+    if (differentialInfo.shouldDifferentiateInstruction(sei))
       emitTangentForStructExtractInst(sei);
   }
 
   void visitStructElementAddrInst(StructElementAddrInst *seai) {
     TypeSubstCloner::visitStructElementAddrInst(seai);
-    if (shouldBeDifferentiated(seai, getIndices()))
+    if (differentialInfo.shouldDifferentiateInstruction(seai))
       emitTangentForStructElementAddrInst(seai);
   }
 
   void visitTupleInst(TupleInst *ti) {
     TypeSubstCloner::visitTupleInst(ti);
-    if (shouldBeDifferentiated(ti, getIndices()))
+    if (differentialInfo.shouldDifferentiateInstruction(ti))
       emitTangentForTupleInst(ti);
   }
 
   void visitTupleExtractInst(TupleExtractInst *tei) {
     TypeSubstCloner::visitTupleExtractInst(tei);
-    if(shouldBeDifferentiated(tei, getIndices()))
+    if (differentialInfo.shouldDifferentiateInstruction(tei))
       emitTangentForTupleExtractInst(tei);
   }
 
   void visitTupleElementAddrInst(TupleElementAddrInst *teai) {
     TypeSubstCloner::visitTupleElementAddrInst(teai);
-    if(shouldBeDifferentiated(teai, getIndices()))
+    if (differentialInfo.shouldDifferentiateInstruction(teai))
       emitTangentForTupleElementAddrInst(teai);
   }
 
   void visitDestructureTupleInst(DestructureTupleInst *dti) {
     TypeSubstCloner::visitDestructureTupleInst(dti);
-    if(shouldBeDifferentiated(dti, getIndices()))
+    if (differentialInfo.shouldDifferentiateInstruction(dti))
       emitTangentForDestructureTupleInst(dti);
   }
 
@@ -5810,7 +5780,7 @@ private:
   SILFunction &getPullback() const { return *vjpEmitter.pullback; }
   SILDifferentiableAttr *getAttr() const { return vjpEmitter.attr; }
   DifferentiationInvoker getInvoker() const { return vjpEmitter.invoker; }
-  LinearMapInfo &getPullbackInfo() { return vjpEmitter.linearMapInfo; }
+  LinearMapInfo &getPullbackInfo() { return vjpEmitter.pullbackInfo; }
   const SILAutoDiffIndices &getIndices() const {
     return vjpEmitter.getIndices();
   }
@@ -6200,42 +6170,6 @@ private:
   SILBasicBlock *getPullbackTrampolineBlock(
       SILBasicBlock *originalBlock, SILBasicBlock *successorBlock) {
     return pullbackTrampolineBBMap.lookup({originalBlock, successorBlock});
-  }
-
-  //--------------------------------------------------------------------------//
-  // Other utilities
-  //--------------------------------------------------------------------------//
-
-  bool shouldBeDifferentiated(SILInstruction *inst,
-                              const SILAutoDiffIndices &indices) {
-    // Anything with an active result should be differentiated.
-    if (llvm::any_of(inst->getResults(), [&](SILValue val) {
-          return getActivityInfo().isActive(val, indices);
-        }) && llvm::any_of(inst->getAllOperands(), [&](Operand &val) {
-          return getActivityInfo().isActive(val.get(), indices);
-        }))
-      return true;
-    if (auto *ai = dyn_cast<ApplyInst>(inst)) {
-      // Function applications with an active indirect result should be
-      // differentiated.
-      for (auto indRes : ai->getIndirectSILResults())
-        if (getActivityInfo().isActive(indRes, indices))
-          return true;
-      // Function applications with an inout argument should be differentiated.
-      auto paramInfos = ai->getSubstCalleeConv().getParameters();
-      for (auto i : swift::indices(paramInfos))
-        if (paramInfos[i].isIndirectInOut() &&
-            getActivityInfo().isActive(
-                ai->getArgumentsWithoutIndirectResults()[i], indices))
-          return true;
-    }
-    // Instructions that may write to memory and that have an active operand
-    // should be differentiated.
-    if (inst->mayWriteToMemory())
-      for (auto &op : inst->getAllOperands())
-        if (getActivityInfo().isActive(op.get(), indices))
-          return true;
-    return false;
   }
 
 public:
@@ -6645,14 +6579,15 @@ public:
           << "Original bb" + std::to_string(bb->getDebugID())
           << ": To differentiate or not to differentiate?\n";
       for (auto &inst : reversed(*bb)) {
-        s << (shouldBeDifferentiated(&inst, getIndices()) ? "[∂] " : "[ ] ")
+        s << (getPullbackInfo().shouldDifferentiateInstruction(&inst)
+                  ? "[∂] " : "[ ] ")
           << inst;
       }
     });
 
     // Visit each instruction in reverse order.
     for (auto &inst : reversed(*bb)) {
-      if (!shouldBeDifferentiated(&inst, getIndices()))
+      if (!getPullbackInfo().shouldDifferentiateInstruction(&inst))
         continue;
       // Differentiate instruction.
       visit(&inst);
@@ -6903,7 +6838,7 @@ public:
 
   void visitApplyInst(ApplyInst *ai) {
     // Handle array uninitialized allocation intrinsic specially.
-    if (ai->hasSemantics("array.uninitialized_intrinsic"))
+    if (isArrayLiteralIntrinsic(ai))
       return visitArrayInitialization(ai);
     // Replace a call to a function with a call to its pullback.
     auto &nestedApplyInfo = getContext().getNestedApplyInfo();
