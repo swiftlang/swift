@@ -182,26 +182,6 @@ void ModuleFile::fatal(llvm::Error error) {
   abort();
 }
 
-ModuleFile &ModuleFile::getModuleFileForDelayedActions() {
-  assert(FileContext && "cannot delay actions before associating with a file");
-  ModuleDecl *associatedModule = getAssociatedModule();
-
-  // Check for the common case.
-  if (associatedModule->getFiles().size() == 1)
-    return *this;
-
-  for (FileUnit *file : associatedModule->getFiles())
-    if (auto *serialized = dyn_cast<SerializedASTFile>(file))
-      return serialized->File;
-
-  llvm_unreachable("should always have FileContext in the list of files");
-}
-
-void ModuleFile::finishPendingActions() {
-  assert(&getModuleFileForDelayedActions() == this &&
-         "wrong module used for delayed actions");
-}
-
 static Optional<swift::AccessorKind>
 getActualAccessorKind(uint8_t raw) {
   switch (serialization::AccessorKind(raw)) {
@@ -883,7 +863,6 @@ GenericSignature *ModuleFile::getGenericSignature(
   // Read the generic signature.
   BCOffsetRAII restoreOffset(DeclTypeCursor);
   DeclTypeCursor.JumpToBit(sigOrOffset);
-  DeserializingEntityRAII deserializingEntity(*this);
 
   // Read the parameter types.
   SmallVector<GenericTypeParamType *, 4> paramTypes;
@@ -959,7 +938,6 @@ ModuleFile::getGenericSignatureOrEnvironment(
     // Read the generic environment.
     BCOffsetRAII restoreOffset(DeclTypeCursor);
     DeclTypeCursor.JumpToBit(bitOffset);
-    DeserializingEntityRAII deserializingEntity(*this);
 
     SmallVector<GenericTypeParamType *, 4> paramTypes;
     using namespace decls_block;
@@ -1067,7 +1045,6 @@ SubstitutionMap ModuleFile::getSubstitutionMap(
   // Read the substitution map.
   BCOffsetRAII restoreOffset(DeclTypeCursor);
   DeclTypeCursor.JumpToBit(substitutionsOrOffset);
-  DeserializingEntityRAII deserializingEntity(*this);
 
   // Read the substitution map.
   auto entry = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
@@ -4007,7 +3984,6 @@ ModuleFile::getDeclChecked(DeclID DID) {
     BCOffsetRAII restoreOffset(DeclTypeCursor);
     DeclTypeCursor.JumpToBit(declOrOffset);
 
-    ModuleFile::DeserializingEntityRAII deserializingEntity(*this);
     Expected<Decl *> deserialized =
       DeclDeserializer(*this, declOrOffset).getDeclCheckedImpl();
     if (!deserialized)
