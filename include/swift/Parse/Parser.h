@@ -813,9 +813,16 @@ public:
                           SourceLoc OtherLoc);
 
   /// Returns the proper location for a missing right brace, parenthesis, etc.
-  SourceLoc getConfabulatedMatchingTokenLoc() const;
-  
-  SourceLoc getErrorOrMissingLocForLazyASTScopes() const;
+  SourceLoc getLocForMissingMatchingToken() const;
+
+  /// When encountering an error or a missing matching token (e.g. '}') return
+  /// its location. This value should be right at the end of the last token in
+  /// the ASTNode being parsed so that it nests within any enclosing nodes, and,
+  /// for ASTScope lookups, it does not preceed any identifiers to be looked up.
+  /// The latter case obtaines when the parsing an interpolated string literal
+  /// because there may be identifiers to be looked up and they must precede the
+  /// location of a missing close brace.
+  SourceLoc getErrorOrMissingLoc() const;
 
   /// Parse a comma separated list of some elements.
   ParserStatus parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,

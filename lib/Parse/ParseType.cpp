@@ -542,10 +542,8 @@ ParserResult<TypeRepr> Parser::parseDeclResultType(Diag<> MessageID) {
 }
 
 SourceLoc Parser::getTypeErrorLoc() const {
-  /// LazyASTScopes require that the ends of types, etc. which are at the end of
-  /// \c IterableTypeContext \c Decls, such as \c StructDecl not be beyond the
-  /// end of the enclosing \c Decl.
-  return Context.LangOpts.LazyASTScopes ? getErrorOrMissingLocForLazyASTScopes() : Tok.getLoc();
+  // Use the same location as a missing close brace, etc.
+  return getErrorOrMissingLoc();
 }
 
 ParserStatus Parser::parseGenericArguments(SmallVectorImpl<TypeRepr *> &Args,

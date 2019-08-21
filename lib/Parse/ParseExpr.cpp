@@ -3434,7 +3434,7 @@ ParserResult<Expr> Parser::parseExprCollection() {
   if (Status.isError()) {
     // If we've already got errors, don't emit missing RightK diagnostics.
     RSquareLoc = Tok.is(tok::r_square) ? consumeToken()
-                                       : getConfabulatedMatchingTokenLoc();
+                                       : getLocForMissingMatchingToken();
   } else if (parseMatchingToken(tok::r_square, RSquareLoc,
                                 diag::expected_rsquare_array_expr,
                                 LSquareLoc)) {

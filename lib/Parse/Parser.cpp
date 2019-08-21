@@ -980,23 +980,29 @@ bool Parser::parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
   if (parseToken(K, TokLoc, ErrorDiag)) {
     diagnose(OtherLoc, OtherNote);
 
-    TokLoc = getConfabulatedMatchingTokenLoc();
+    TokLoc = getLocForMissingMatchingToken();
     return true;
   }
 
   return false;
 }
 
-SourceLoc Parser::getConfabulatedMatchingTokenLoc() const {
+SourceLoc Parser::getLocForMissingMatchingToken() const {
   // The right brace, parenthesis, etc. must include the whole of the previous
   // token in order so that an unexpanded lazy \c IterableTypeScope includes its
   // contents.
-  return Context.LangOpts.LazyASTScopes
-    ? getErrorOrMissingLocForLazyASTScopes()
-    : PreviousLoc;
+  return getErrorOrMissingLoc();
 }
 
-SourceLoc Parser::getErrorOrMissingLocForLazyASTScopes() const {
+SourceLoc Parser::getErrorOrMissingLoc() const {
+  // LazyASTScopes require that the ends of types, etc. which are at the end of
+  // \c IterableTypeContext \c Decls, such as \c StructDecl not be beyond the
+  // end of the enclosing \c Decl.
+
+  // The missing right brace, parenthesis, etc. must include the whole of the
+  // previous token in order so that an unexpanded lazy \c IterableTypeScope
+  // includes its contents.
+
   auto const PreviousTok = Lexer::getTokenAtLocation(Context.SourceMgr,
                                                      PreviousLoc);
   // If it's a string literal, it might be an InterpolatedStringLiteral.
@@ -1114,7 +1120,7 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
   if (Status.isError()) {
     // If we've already got errors, don't emit missing RightK diagnostics.
     RightLoc =
-        Tok.is(RightK) ? consumeToken() : getConfabulatedMatchingTokenLoc();
+        Tok.is(RightK) ? consumeToken() : getLocForMissingMatchingToken();
   } else if (parseMatchingToken(RightK, RightLoc, ErrorDiag, LeftLoc)) {
     Status.setIsParseError();
   }
