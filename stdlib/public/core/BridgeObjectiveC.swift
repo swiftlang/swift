@@ -376,9 +376,22 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   public var pointee: Pointee {
     /// Retrieve the value the pointer points to.
     @_transparent get {
-      // We can do a strong load normally.
-      return UnsafePointer(self).pointee
+      // The memory addressed by this pointer contains a non-owning reference,
+      // therefore we *must not* point an `UnsafePointer<AnyObject>` to
+      // it---otherwise we would allow the compiler to assume it has a +1
+      // refcount, enabling some optimizations that wouldn't be valid.
+      //
+      // Instead, we need to load the pointee as a +0 unmanaged reference. For
+      // an extra twist, `Pointee` is allowed (but not required) to be an
+      // optional type, so we actually need to load it as an optional, and
+      // explicitly handle the nil case.
+      let unmanaged = UnsafeRawPointer(_rawValue)
+        .load(as: Optional<Unmanaged<AnyObject>>.self)
+      return unsafeBitCast(
+        unmanaged?.takeUnretainedValue(),
+        to: Pointee.self)
     }
+
     /// Set the value the pointer points to, copying over the previous value.
     ///
     /// AutoreleasingUnsafeMutablePointers are assumed to reference a
@@ -387,23 +400,21 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
     /// storing it to the referenced memory.
     @_transparent nonmutating set {
       // Autorelease the object reference.
-      typealias OptionalAnyObject = AnyObject?
-      let newAnyObject = unsafeBitCast(newValue, to: OptionalAnyObject.self)
-      Builtin.retain(newAnyObject)
-      Builtin.autorelease(newAnyObject)
-      // Trivially assign it as an OpaquePointer; the pointer references an
-      // autoreleasing slot, so retains/releases of the original value are
-      // unneeded.
-      typealias OptionalUnmanaged = Unmanaged<AnyObject>?
-      UnsafeMutablePointer<Pointee>(_rawValue).withMemoryRebound(
-        to: OptionalUnmanaged.self, capacity: 1) {
-        if let newAnyObject = newAnyObject {
-          $0.pointee = Unmanaged.passUnretained(newAnyObject)
-        }
-        else {
-          $0.pointee = nil
-        }
+      let object = unsafeBitCast(newValue, to: Optional<AnyObject>.self)
+      Builtin.retain(object)
+      Builtin.autorelease(object)
+
+      // Convert it to an unmanaged reference and trivially assign it to the
+      // memory addressed by this pointer.
+      let unmanaged: Optional<Unmanaged<AnyObject>>
+      if let object = object {
+        unmanaged = Unmanaged.passUnretained(object)
+      } else {
+        unmanaged = nil
       }
+      UnsafeMutableRawPointer(_rawValue).storeBytes(
+        of: unmanaged,
+        as: Optional<Unmanaged<AnyObject>>.self)
     }
   }
 
@@ -415,8 +426,7 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   public subscript(i: Int) -> Pointee {
     @_transparent
     get {
-      // We can do a strong load normally.
-      return (UnsafePointer<Pointee>(self) + i).pointee
+      return self.advanced(by: i).pointee
     }
   }
 
