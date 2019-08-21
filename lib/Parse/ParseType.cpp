@@ -236,6 +236,9 @@ Parser::TypeResult Parser::parseTypeSimple(Diag<> MessageID,
         continue;
       }
     }
+    if (!Result->isSuccess())
+      Result =
+          makeParsedResult<ParsedTypeSyntax>({PrevType}, Result->getStatus());
     break;
   }
 
