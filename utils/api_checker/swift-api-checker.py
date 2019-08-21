@@ -68,9 +68,11 @@ def prepare_module_list(platform, file, verbose, module_filter_flags,
                         include_fixed_clang_modules):
     cmd = [INFER_IMPORT_PATH, '-s', get_sdk_path(platform)]
     cmd.extend(module_filter_flags)
+    if platform.startswith('iosmac'):
+        cmd.extend(['--catalyst'])
     if verbose:
         cmd.extend(['--v'])
-    check_call(cmd, output=file)
+    check_call(cmd, verbose=verbose, output=file)
     # Always include fixed swift modules
     write_fixed_module(file, platform, 'swift', verbose)
     # Check if we need fixed clang modules
