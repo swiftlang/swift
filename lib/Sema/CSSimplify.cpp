@@ -6283,7 +6283,7 @@ ConstraintSystem::simplifyApplicableFnConstraint(
 
   // Don't attempt this optimization in "diagnostic mode" because
   // in such mode we'd like to attempt all of the available
-  // overloads regardless of of problems related to missing or
+  // overloads regardless of problems related to missing or
   // extraneous labels and/or arguments.
   if (!(solverState && shouldAttemptFixes())) {
     // If the right-hand side is a type variable,
