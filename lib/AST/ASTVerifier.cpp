@@ -2362,14 +2362,6 @@ public:
         }
       }
 
-      if (VD->isFinal() != VD->getAttrs().hasAttribute<FinalAttr>()) {
-        Out << "decl should be final iff it has FinalAttr, but isFinal() = "
-            << VD->isFinal() << " and hasAttribute<FinalAttr>() = "
-            << VD->getAttrs().hasAttribute<FinalAttr>() << "\n";
-        VD->dump(Out);
-        abort();
-      }
-
       verifyCheckedBase(VD);
     }
 
