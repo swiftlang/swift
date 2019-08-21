@@ -550,6 +550,7 @@ Parser::parseGenericArgumentClauseSyntax() {
     auto Type = SyntaxContext->popIf<ParsedTypeSyntax>();
     if (Ty.isParseError() || Ty.hasCodeCompletion()) {
       Junk.push_back(LAngle);
+      Junk.append(Args.begin(), Args.end());
       if (Type)
         Junk.push_back(*Type);
       skipUntilGreaterInTypeListSyntax(Junk);
