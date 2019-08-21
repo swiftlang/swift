@@ -648,8 +648,6 @@ ForwardModeTests.test("TrackedDifferentiableFuncType") {
 //===----------------------------------------------------------------------===//
 // Classes
 //===----------------------------------------------------------------------===//
-// NOTE: once forward mode is done, can copy and replace this in 
-// `class_method.swift` as it already calls reverse mode functions.
 
 ForwardModeTests.test("Final") {
   final class Final : Differentiable {
@@ -659,7 +657,6 @@ ForwardModeTests.test("Final") {
   }
 
   for i in -5...5 {
-    expectEqual(Float(i) * 2, gradient(at: Float(i)) { x in Final().method(x) })
     expectEqual(
       Float(i) * 2, 
       derivative(at: Float(i)) { x in Final().method(x) })
@@ -703,16 +700,10 @@ ForwardModeTests.test("Simple") {
   func classValueWithDerivative(_ c: Super) -> (Float, Float) {
     return valueWithDerivative(at: 1) { c.f($0) }
   }
-  func classValueWithGradient(_ c: Super) -> (Float, Float) {
-    return valueWithGradient(at: 1) { c.f($0) }
-  }
 
   expectEqual((2, 2), classValueWithDerivative(Super()))
   expectEqual((3, 3), classValueWithDerivative(SubOverride()))
   expectEqual((3, 3), classValueWithDerivative(SubOverrideCustomDerivatives()))
-  expectEqual((2, 2), classValueWithGradient(Super()))
-  expectEqual((3, 3), classValueWithGradient(SubOverride()))
-  expectEqual((3, 3), classValueWithGradient(SubOverrideCustomDerivatives()))
 }
 
 ForwardModeTests.test("SimpleWrtSelf") {
@@ -776,13 +767,6 @@ ForwardModeTests.test("SimpleWrtSelf") {
   // expectEqual(100, pullback(at: 1337) { x in Super(base: x) }(v))
   // expectEqual(100, pullback(at: 1337) { x in SubOverride(base: x) }(v))
   // expectEqual(100, pullback(at: 1337) { x in SubOverrideCustomDerivatives(base: x) }(v))
-  
-
-  // `valueWithGradient` is not used because nested tuples cannot be compared
-  // with `expectEqual`.
-  func classGradient(_ c: Super) -> (Super.TangentVector, Float) {
-    return gradient(at: c, 10) { c, x in c.f(x) }
-  }
 
   // `valueWithDerivative` is not used because the derivative requires `Super`
   // to conform to `FloatingPoint`.
@@ -804,12 +788,6 @@ ForwardModeTests.test("SimpleWrtSelf") {
   expectEqual(30, y3)
   let c3 = SubOverrideCustomDerivatives.TangentVector(base: 1, _nontrivial: [])
   expectEqual(3, diff3(c3, 1))
-  expectEqual((Super.TangentVector(base: 10, _nontrivial: []), 2),
-              classGradient(Super(base: 2)))
-  expectEqual((Super.TangentVector(base: 0, _nontrivial: []), 3),
-              classGradient(SubOverride(base: 2)))
-  expectEqual((Super.TangentVector(base: 0, _nontrivial: []), 3),
-              classGradient(SubOverrideCustomDerivatives(base: 2)))
 }
 
 //===----------------------------------------------------------------------===//
@@ -1122,7 +1100,7 @@ ForwardModeTests.test("TupleSideEffects") {
     tuple.1 += x
     return tuple.0 + tuple.0
   }
-  expectEqual(1, gradient(at: 3.0, in: generic))
+  expectEqual(1, derivative(at: 3.0, in: generic))
   */
 }
 
@@ -1177,11 +1155,11 @@ ForwardModeTests.test("StructMemberwiseInitializer") {
   })(1)
   expectEqual(Foo.TangentVector(stored: 2), derivFoo)
 
-  let 𝛁computed = derivative(at: Float(4)) { input -> Float in
+  let computed = derivative(at: Float(4)) { input -> Float in
     let foo = Foo(stored: input)
     return foo.computed
   }
-  expectEqual(8, 𝛁computed)
+  expectEqual(8, computed)
 
   let derivProduct = derivative(at: Float(4)) { input -> Float in
     let foo = Foo(stored: input)
@@ -1242,7 +1220,7 @@ ForwardModeTests.test("StructSideEffects") {
     let point = Point(x: input, y: input, z: input)
     return point + point
   }
-  expectEqual(Point.zero, differential(at: 4, in: double)(1))
+  expectEqual(Point(x: 2, y: 2, z: 2), differential(at: 4, in: double)(1))
 
   func fifthPower(_ input: Float) -> Float {
     var point = Point(x: input, y: input, z: input)
@@ -1273,38 +1251,37 @@ ForwardModeTests.test("StructSideEffects") {
 }
 
 ForwardModeTests.test("StructGeneric") {
-  // struct Generic<T : AdditiveArithmetic & Differentiable> : AdditiveArithmetic, Differentiable {
-  //   var x: T
-  //   var y: T
-  //   var z: T
-  // }
+  struct Generic<T : AdditiveArithmetic & Differentiable> : AdditiveArithmetic, Differentiable {
+    var x: T
+    var y: T
+    var z: T
+  }
 
-  // let deriv = differential(at: Float(3), in: { input -> Generic<Float> in
-  //   var generic = Generic(x: input, y: input, z: input)
-  //   return generic
-  // })(1)
-  // expectEqual(Generic<Float>.TangentVector(x: 1, y: 1, z: 1), deriv)
+  let deriv = differential(at: Float(3), in: { input -> Generic<Float> in
+    var generic = Generic(x: input, y: input, z: input)
+    return generic
+  })(1)
+  expectEqual(Generic<Float>.TangentVector(x: 1, y: 1, z: 1), deriv)
 
-  // func fifthPower(_ input: Float) -> Float {
-  //   var generic = Generic(x: input, y: input, z: input)
-  //   generic.x = generic.x * input
-  //   generic.y = generic.x * input
-  //   return generic.x * generic.y
-  // }
-  // // FIXME(TF-274): The true expected result is `405`, like other variants of `fifthPower` above.
-  // expectEqual(405, derivative(at: 3, in: fifthPower))
+  func fifthPower(_ input: Float) -> Float {
+    var generic = Generic(x: input, y: input, z: input)
+    generic.x = generic.x * input
+    generic.y = generic.x * input
+    return generic.x * generic.y
+  }
+  expectEqual(405, derivative(at: 3, in: fifthPower))
 }
 
-// ForwardModeTests.test("SubsetIndices") {
-//   func deriv(_ lossFunction: @differentiable (Float, Float) -> Float) -> Float {
-//     return derivative(at: 1) { x in lossFunction(x * x, 10.0) }
-//   }
-//   expectEqual(2, deriv { x, y in x + y })
+ForwardModeTests.test("SubsetIndices") {
+  func deriv(_ lossFunction: @differentiable (Float, Float) -> Float) -> Float {
+    return derivative(at: 1) { x in lossFunction(x * x, 10.0) }
+  }
+  expectEqual(2, deriv { x, y in x + y })
 
-//   func derivWRTNonDiff(_ lossFunction: @differentiable (Float, @nondiff Int) -> Float) -> Float {
-//     return derivative(at: 2) { x in lossFunction(x * x, 10) }
-//   }
-//   expectEqual(4, derivWRTNonDiff { x, y in x + Float(y) })
-// }
+  func derivWRTNonDiff(_ lossFunction: @differentiable (Float, @nondiff Int) -> Float) -> Float {
+    return derivative(at: 2) { x in lossFunction(x * x, 10) }
+  }
+  expectEqual(4, derivWRTNonDiff { x, y in x + Float(y) })
+}
 
 runAllTests()

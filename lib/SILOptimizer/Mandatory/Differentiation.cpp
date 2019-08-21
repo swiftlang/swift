@@ -403,7 +403,7 @@ class DifferentiableActivityInfo;
 class LinearMapInfo {
 private:
   /// The linear map kind.
-  AutoDiffAssociatedFunctionKind kind;
+  AutoDiffLinearMapKind kind;
 
   /// The original function.
   SILFunction *const original;
@@ -515,13 +515,13 @@ private:
     // Create a branching trace enum.
     std::string enumName;
     switch (kind) {
-    case swift::AutoDiffAssociatedFunctionKind::JVP:
+    case AutoDiffLinearMapKind::Differential:
       enumName =
           "_AD__" + original->getName().str() +
           "_bb" + std::to_string(originalBB->getDebugID()) +
           "__Succ__" + indices.mangle();
       break;
-    case swift::AutoDiffAssociatedFunctionKind::VJP:
+    case AutoDiffLinearMapKind::Pullback:
       enumName =
           "_AD__" + original->getName().str() +
           "_bb" + std::to_string(originalBB->getDebugID()) +
@@ -580,10 +580,10 @@ private:
       auto &s = getADDebugStream();
       std::string enumName;
       switch (kind) {
-      case AutoDiffAssociatedFunctionKind::JVP:
+      case AutoDiffLinearMapKind::Differential:
         enumName = "Predecessor";
         break;
-      case AutoDiffAssociatedFunctionKind::VJP:
+      case AutoDiffLinearMapKind::Pullback:
         enumName = "Successor";
         break;
       }
@@ -607,13 +607,13 @@ private:
 
     std::string structName;
     switch (kind) {
-    case swift::AutoDiffAssociatedFunctionKind::JVP:
+    case swift::AutoDiffLinearMapKind::Differential:
       structName =
           "_AD__" + original->getName().str() +
           "_bb" + std::to_string(originalBB->getDebugID()) +
           "__DF__" + indices.mangle();
       break;
-    case swift::AutoDiffAssociatedFunctionKind::VJP:
+    case swift::AutoDiffLinearMapKind::Pullback:
       structName =
           "_AD__" + original->getName().str() +
           "_bb" + std::to_string(originalBB->getDebugID()) +
@@ -643,10 +643,10 @@ private:
       auto &s = getADDebugStream();
       std::string structName;
       switch (kind) {
-      case AutoDiffAssociatedFunctionKind::JVP:
+      case AutoDiffLinearMapKind::Differential:
         structName = "Differential";
         break;
-      case AutoDiffAssociatedFunctionKind::VJP:
+      case AutoDiffLinearMapKind::Pullback:
         structName = "Pullback";
         break;
       }
@@ -679,10 +679,10 @@ private:
     auto *linMapStruct = getLinearMapStruct(origBB);
     std::string linearMapName;
     switch (kind) {
-    case swift::AutoDiffAssociatedFunctionKind::JVP:
+    case AutoDiffLinearMapKind::Differential:
       linearMapName = "differential_" + llvm::itostr(linearMapValueMap.size());
       break;
-    case swift::AutoDiffAssociatedFunctionKind::VJP:
+    case AutoDiffLinearMapKind::Pullback:
       linearMapName = "pullback_" + llvm::itostr(linearMapValueMap.size());
       break;
     }
@@ -709,7 +709,7 @@ public:
   LinearMapInfo &operator=(const LinearMapInfo &) = delete;
 
   explicit LinearMapInfo(ADContext &context,
-                         AutoDiffAssociatedFunctionKind kind,
+                         AutoDiffLinearMapKind kind,
                          SILFunction *original, SILFunction *assocFn,
                          const SILAutoDiffIndices &indices,
                          const DifferentiableActivityInfo &activityInfo,
@@ -1377,6 +1377,10 @@ using Activity = OptionSet<ActivityFlags>;
 /// indices.
 class DifferentiableActivityInfo {
 private:
+  // TODO: temporary hack while we investigate why reverse mode doesn't work
+  // with us handling tuple destructure from `apply` instructions differently.
+  AutoDiffAssociatedFunctionKind kind;
+
   DifferentiableActivityCollection &parent;
   GenericSignature *assocGenSig = nullptr;
 
@@ -1411,7 +1415,8 @@ private:
 
 public:
   explicit DifferentiableActivityInfo(
-      DifferentiableActivityCollection &parent, GenericSignature *assocGenSig);
+      DifferentiableActivityCollection &parent, GenericSignature *assocGenSig,
+      AutoDiffAssociatedFunctionKind kind);
 
   bool isVaried(SILValue value, unsigned independentVariableIndex) const;
   bool isUseful(SILValue value, unsigned dependentVariableIndex) const;
@@ -1513,7 +1518,7 @@ static void collectMinimalIndicesForFunctionCall(
 }
 
 LinearMapInfo::LinearMapInfo(ADContext &context,
-                             AutoDiffAssociatedFunctionKind kind,
+                             AutoDiffLinearMapKind kind,
                              SILFunction *original, SILFunction *assocFn,
                              const SILAutoDiffIndices &indices,
                              const DifferentiableActivityInfo &activityInfo,
@@ -1543,12 +1548,15 @@ bool LinearMapInfo::shouldDifferentiateApplyInst(ApplyInst *ai) {
         activityInfo.isActive(paramArgs[i], indices))
       return true;
 
-  // TODO(bartchr): Check `destructure_tuple` user's results' acvitity.
-  for (auto use : ai->getUses()) {
-    if (auto *dti = dyn_cast<DestructureTupleInst>(use->getUser())) {
-      for (auto result : dti->getResults()) {
-        if (activityInfo.isActive(result, indices))
-          return true;
+  // TODO: temporary hack while we investigate why reverse mode doesn't work
+  // with us handling tuple destructure from `apply` instructions differently.
+  if (kind == AutoDiffLinearMapKind::Differential) {
+    for (auto use : ai->getUses()) {
+      if (auto *dti = dyn_cast<DestructureTupleInst>(use->getUser())) {
+        for (auto result : dti->getResults()) {
+          if (activityInfo.isActive(result, indices))
+            return true;
+        }
       }
     }
   }
@@ -1590,33 +1598,52 @@ bool LinearMapInfo::shouldDifferentiateInstruction(SILInstruction *inst) {
   if (hasActiveOperands && hasActiveResults)
     return true;
 
-  // TODO: put a macro on these 3.
-  if (auto *si = dyn_cast<StoreInst>(inst)) {
-    return// activityInfo.isActive(si->getSrc(), indices) &&
-        activityInfo.isActive(si->getDest(), indices);
+  // TODO: temporary hack while we investigate why reverse mode doesn't work
+  // with us handling tuple destructure from `apply` instructions differently.
+  switch (kind) {
+  case AutoDiffLinearMapKind::Differential: {
+    // TODO: put a macro on these 3.
+    if (auto *si = dyn_cast<StoreInst>(inst)) {
+      return// activityInfo.isActive(si->getSrc(), indices) &&
+          activityInfo.isActive(si->getDest(), indices);
+    }
+
+    if (auto *sbi = dyn_cast<StoreBorrowInst>(inst)) {
+      return// activityInfo.isActive(sbi->getSrc(), indices) &&
+          activityInfo.isActive(sbi->getDest(), indices);
+    }
+
+    if (auto *cai = dyn_cast<CopyAddrInst>(inst)) {
+      return// activityInfo.isActive(cai->getSrc(), indices) &&
+          activityInfo.isActive(cai->getDest(), indices);
+    }
+
+    if (isa<RefCountingInst>(inst) && hasActiveOperands)
+      return true;
+
+    if (isa<EndAccessInst>(inst) && hasActiveOperands)
+      return true;
+
+    if (isa<EndBorrowInst>(inst) && hasActiveOperands)
+      return true;
+
+    if ((isa<AllocationInst>(inst) && hasActiveResults))
+      return true;
+
+    if  (isa<DeallocationInst>(inst) && hasActiveOperands)
+      return true;
+
+    if (isa<DestroyValueInst>(inst)  && hasActiveOperands)
+      return true;
+
+    break;
   }
-
-  if (auto *sbi = dyn_cast<StoreBorrowInst>(inst)) {
-    return// activityInfo.isActive(sbi->getSrc(), indices) &&
-        activityInfo.isActive(sbi->getDest(), indices);
+  case AutoDiffLinearMapKind::Pullback: {
+    if (inst->mayHaveSideEffects() && hasActiveOperands)
+      return true;
+    break;
   }
-
-  if (auto *cai = dyn_cast<CopyAddrInst>(inst)) {
-    return// activityInfo.isActive(cai->getSrc(), indices) &&
-        activityInfo.isActive(cai->getDest(), indices);
   }
-
-  if (isa<RefCountingInst>(inst) && hasActiveOperands)
-    return true;
-
-  if (isa<EndAccessInst>(inst) && hasActiveOperands)
-    return true;
-
-  if ((isa<AllocationInst>(inst) && hasActiveResults))
-    return true;
-
-  if  (isa<DeallocationInst>(inst) && hasActiveOperands)
-    return true;
 
   return false;
 }
@@ -1626,10 +1653,13 @@ bool LinearMapInfo::shouldDifferentiateInstruction(SILInstruction *inst) {
 void LinearMapInfo::addLinearMapToStruct(ApplyInst *ai,
                                          const SILAutoDiffIndices &indices) {
   SmallVector<SILValue, 4> allResults;
-  // Only append the results from the `destruct_tuple` instruction which are
-  // active, we don't consider the result of the original apply if it's a
-  // tuple.
-  if (ai->getResult(0)->getType().is<TupleType>()) {
+  // TODO: temporary hack while we investigate why reverse mode doesn't work
+  // with us handling tuple destructure from `apply` instructions differently.
+  if (kind == AutoDiffLinearMapKind::Differential &&
+      ai->getResult(0)->getType().is<TupleType>()) {
+    // Only append the results from the `destruct_tuple` instruction which are
+    // active, we don't consider the result of the original apply if it's a
+    // tuple.
     auto *destructure =
         getSingleUseOfTupleInDestructureTupleInst(ai->getResult(0));
     if (destructure) {
@@ -1705,8 +1735,18 @@ void LinearMapInfo::addLinearMapToStruct(ApplyInst *ai,
   if (checkNondifferentiableOriginalFunctionType(originalFnSubstTy))
     return;
 
+  AutoDiffAssociatedFunctionKind funcKind;
+  switch (kind) {
+  case AutoDiffLinearMapKind::Differential:
+    funcKind = AutoDiffAssociatedFunctionKind::JVP;
+    break;
+  case AutoDiffLinearMapKind::Pullback:
+    funcKind = AutoDiffAssociatedFunctionKind::VJP;
+    break;
+  }
   auto assocFnType = originalFnSubstTy->getAutoDiffAssociatedFunctionType(
-      parameters, source, /*differentiationOrder*/ 1, kind, builder.getModule(),
+      parameters, source, /*differentiationOrder*/ 1, funcKind,
+      builder.getModule(),
       LookUpConformanceInModule(builder.getModule().getSwiftModule()));
 
   auto assocFnResultTypes =
@@ -1800,12 +1840,13 @@ public:
   DominanceInfo *domInfo;
   PostDominanceInfo *postDomInfo;
 
-  DifferentiableActivityInfo &getActivityInfo(GenericSignature *assocGenSig) {
+  DifferentiableActivityInfo &getActivityInfo(
+      GenericSignature *assocGenSig, AutoDiffAssociatedFunctionKind kind) {
     auto activityInfoLookup = activityInfoMap.find(assocGenSig);
     if (activityInfoLookup != activityInfoMap.end())
       return activityInfoLookup->getSecond();
     auto insertion = activityInfoMap.insert(
-        {assocGenSig, DifferentiableActivityInfo(*this, assocGenSig)});
+        {assocGenSig, DifferentiableActivityInfo(*this, assocGenSig, kind)});
     return insertion.first->getSecond();
   }
 
@@ -1838,8 +1879,9 @@ DifferentiableActivityCollection::DifferentiableActivityCollection(
     : function(f), domInfo(di), postDomInfo(pdi) {}
 
 DifferentiableActivityInfo::DifferentiableActivityInfo(
-    DifferentiableActivityCollection &parent, GenericSignature *assocGenSig)
-    : parent(parent), assocGenSig(assocGenSig) {
+    DifferentiableActivityCollection &parent, GenericSignature *assocGenSig,
+    AutoDiffAssociatedFunctionKind kind)
+    : kind(kind), parent(parent), assocGenSig(assocGenSig) {
   analyze(parent.domInfo, parent.postDomInfo);
 }
 
@@ -1884,9 +1926,13 @@ void DifferentiableActivityInfo::analyze(DominanceInfo *di,
             if (isVaried(arg, i)) {
               for (auto indRes : ai->getIndirectSILResults())
                 setVaried(indRes, i);
-              // Handle tuple results, in this case only mark the destructured
-              // results from the `destruct_tuple` instruction use as varied.
-              if (ai->getResult(0)->getType().is<TupleType>()) {
+              // TODO: temporary hack while we investigate why reverse mode
+              // doesn't work with us handling tuple destructure from `apply`
+              // instructions differently.
+              if (kind == swift::AutoDiffAssociatedFunctionKind::JVP &&
+                  ai->getResult(0)->getType().is<TupleType>()) {
+                // Handle tuple results, in this case only mark the destructured
+                // results from the `destruct_tuple` instruction use as varied.
                 auto *destInst = getSingleUseOfTupleInDestructureTupleInst(
                     ai->getResult(0));
                 if (destInst) {
@@ -3286,7 +3332,8 @@ private:
         passManager.getAnalysis<DifferentiableActivityAnalysis>();
     auto &activityCollection = *activityAnalysis->get(original);
     auto &activityInfo = activityCollection.getActivityInfo(
-        vjp->getLoweredFunctionType()->getGenericSignature());
+        vjp->getLoweredFunctionType()->getGenericSignature(),
+        AutoDiffAssociatedFunctionKind::VJP);
     LLVM_DEBUG(
         dumpActivityInfo(*original, indices, activityInfo, getADDebugStream()));
     return activityInfo;
@@ -3300,7 +3347,7 @@ public:
         context(context), original(original), attr(attr), vjp(vjp),
         invoker(invoker), activityInfo(getActivityInfo(
                               context, original, attr->getIndices(), vjp)),
-        pullbackInfo(context, AutoDiffAssociatedFunctionKind::VJP, original,
+        pullbackInfo(context, AutoDiffLinearMapKind::Pullback, original,
           vjp, attr->getIndices(), activityInfo, getBuilder()) {
     // Create empty pullback function.
     pullback = createEmptyPullback();
@@ -4216,7 +4263,8 @@ private:
         passManager.getAnalysis<DifferentiableActivityAnalysis>();
     auto &activityCollection = *activityAnalysis->get(original);
     auto &activityInfo = activityCollection.getActivityInfo(
-        jvp->getLoweredFunctionType()->getGenericSignature());
+        jvp->getLoweredFunctionType()->getGenericSignature(),
+        AutoDiffAssociatedFunctionKind::JVP);
     LLVM_DEBUG(
         dumpActivityInfo(*original, indices, activityInfo, getADDebugStream()));
     return activityInfo;
@@ -4584,7 +4632,8 @@ private:
   /// Handle `apply` instruction.
   ///   Original: y = apply f(x)
   ///   Tangent: tan[y] = apply diff_f(tan[x])
-  void emitTangentForApplyInst(ApplyInst *ai, SILAutoDiffIndices actualIndices,
+  void emitTangentForApplyInst(ApplyInst *ai,
+                               const SILAutoDiffIndices &actualIndices,
                                CanSILFunctionType originalDifferentialType) {
     assert(differentialInfo.shouldDifferentiateApplyInst(ai));
     auto *bb = ai->getParent();
@@ -4599,30 +4648,56 @@ private:
         .castTo<SILFunctionType>();
 
     SmallVector<SILValue, 8> diffArgs;
-    for (auto origArg : ai->getArguments()) {
+
+    for (auto indRes : ai->getIndirectSILResults()) {
+      auto tanVal = getTangentBuffer(bb, indRes);
+      diffArgs.push_back(tanVal);
+    }
+
+    auto paramArgs = ai->getArgumentsWithoutIndirectResults();
+    for (auto i : indices(paramArgs)) {
+      auto origArg = paramArgs[i];
       // Get the tangent value of the original parameter.
-      if (!activityInfo.isActive(origArg, getIndices()))
-        continue;
-      SILValue tanParam;
-      if (origArg->getType().isObject()) {
-        // If original result is a `tuple_extract`, materialize tangent value of
-        // `ai` and extract the corresponding element tangent value.
-        if (auto *tupleExtract =
-                dyn_cast<TupleExtractInst>(origArg)) {
-          auto tangentTuple = materializeTangent(getTangentValue(ai), loc);
-          tanParam = diffBuilder.emitTupleExtract(
-              loc, tangentTuple, tupleExtract->getFieldNo());
-        }
-        // Otherwise, materialize tangent value of `ai`.
-        else {
-          tanParam = materializeTangent(getTangentValue(origArg), loc);
+      if (!activityInfo.isActive(origArg, getIndices())) {
+        auto origCalleeType = ai->getSubstCalleeType();
+        if (!origCalleeType->isDifferentiable())
+          continue;
+        auto actualOrigCalleeIndices =
+            origCalleeType->getDifferentiationParameterIndices();
+        if (actualOrigCalleeIndices->contains(i)) {
+          SILValue tanParam;
+          if (origArg->getType().isObject()) {
+            tanParam = emitZeroDirect(
+                getRemappedTangentType(origArg->getType()).getASTType(), loc);
+            diffArgs.push_back(tanParam);
+          } else {
+            tanParam = diffBuilder.createAllocStack(
+                loc, getRemappedTangentType(origArg->getType()));
+            emitZeroIndirect(
+                getRemappedTangentType(origArg->getType()).getASTType(), tanParam,
+                loc);
+          }
         }
       } else {
-        tanParam = getTangentBuffer(ai->getParent(), origArg);
+        SILValue tanParam;
+        if (origArg->getType().isObject()) {
+          // If original result is a `tuple_extract`, materialize tangent value of
+          // `ai` and extract the corresponding element tangent value.
+          if (auto *tupleExtract =
+                  dyn_cast<TupleExtractInst>(origArg)) {
+            auto tangentTuple = materializeTangent(getTangentValue(ai), loc);
+            tanParam = diffBuilder.emitTupleExtract(
+                loc, tangentTuple, tupleExtract->getFieldNo());
+          } else {
+            tanParam = materializeTangent(getTangentValue(origArg), loc);
+          }
+        } else {
+          tanParam = getTangentBuffer(ai->getParent(), origArg);
+        }
+        diffArgs.push_back(tanParam);
         if (errorOccurred)
           return;
       }
-      diffArgs.push_back(tanParam);
     }
 
     // If callee differential was reabstracted in JVP, reabstract the callee
@@ -4689,19 +4764,21 @@ private:
   }
 
   /// Find the corresponding struct in the tangent space of the field type.
-  StructDecl *getTangentOfStruct(SILValue structOp) {
-    auto structTy = remapSILTypeInDifferential(
-        structOp->getType()).getASTType();
-    auto tangentVectorTy =
-        getTangentSpace(structTy)->getType()->getCanonicalType();
-    assert(!getModule().Types.getTypeLowering(
-        tangentVectorTy, ResilienceExpansion::Minimal)
-            .isAddressOnly());
-    auto *tangentVectorDecl =
-        tangentVectorTy->getStructOrBoundGenericStruct();
-    assert(tangentVectorDecl);
-    return tangentVectorDecl;
-  }
+//  StructDecl *getTangentOfStruct(SILValue structOp) {
+//    auto structTy = remapSILTypeInDifferential(
+//        structOp->getType()).getASTType();
+//    auto tangentVectorTy =
+//        getTangentSpace(structTy)->getType()->getCanonicalType();
+//    getModule().Types.getTypeLowering(
+//                                      tangentVectorTy, ResilienceExpansion::Minimal).print(llvm::errs());
+//    assert(!getModule().Types.getTypeLowering(
+//        tangentVectorTy, ResilienceExpansion::Minimal)
+//            .isAddressOnly());
+//    auto *tangentVectorDecl =
+//        tangentVectorTy->getStructOrBoundGenericStruct();
+//    assert(tangentVectorDecl);
+//    return tangentVectorDecl;
+//  }
 
   /// Handle `struct_extract` instruction.
   ///   Original: y = struct_extract x, #field
@@ -4712,7 +4789,10 @@ private:
            "differentiated; activity analysis should not marked as varied.");
 
     auto diffBuilder = getDifferentialBuilder();;
-    auto *tangentVectorDecl = getTangentOfStruct(sei->getOperand());
+    auto tangentVectorTy =
+        getRemappedTangentType(sei->getOperand()->getType());
+    auto *tangentVectorDecl =
+        tangentVectorTy.getStructOrBoundGenericStruct();
 
     // Find the corresponding field in the tangent space.
     VarDecl *tanField = nullptr;
@@ -4758,7 +4838,10 @@ private:
 
     auto diffBuilder = getDifferentialBuilder();
     auto *bb = seai->getParent();
-    auto *tangentVectorDecl = getTangentOfStruct(seai->getOperand());
+    auto tangentVectorTy =
+        getRemappedTangentType(seai->getOperand()->getType());
+    auto *tangentVectorDecl =
+        tangentVectorTy.getStructOrBoundGenericStruct();
 
     // Find the corresponding field in the tangent space.
     VarDecl *tanField = nullptr;
@@ -4824,7 +4907,7 @@ private:
   void emitTangentForStoreInst(StoreInst *si) {
     auto &diffBuilder = getDifferentialBuilder();
     auto loc = si->getLoc();
-    auto tanValSrc = materializeTangent(getTangentValue( si->getSrc()), loc);
+    auto tanValSrc = materializeTangent(getTangentValue(si->getSrc()), loc);
     auto &tanValDest = getTangentBuffer(si->getParent(), si->getDest());
     if (errorOccurred)
       return;
@@ -5154,7 +5237,7 @@ public:
         context(context), original(original), attr(attr), jvp(jvp),
         invoker(invoker), activityInfo(getActivityInfo(
                               context, original, attr->getIndices(), jvp)),
-        differentialInfo(context, AutoDiffAssociatedFunctionKind::JVP, original,
+        differentialInfo(context, AutoDiffLinearMapKind::Differential, original,
                          jvp, attr->getIndices(), activityInfo, getBuilder()),
         differentialAndBuilder(initializeDifferentialAndBuilder(
             context, original, attr, &differentialInfo)),
