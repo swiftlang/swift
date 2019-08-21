@@ -386,7 +386,7 @@ Parser::TypeASTResult Parser::parseType(Diag<> MessageID,
       diagnose(Tok.getLoc(), DiagID)
         .fixItReplace(Tok.getLoc(), "throws");
     }
-    
+
     Throws = consumeTokenSyntax();
   }
 
@@ -403,10 +403,15 @@ Parser::TypeASTResult Parser::parseType(Diag<> MessageID,
     }
     ParserResult<TypeRepr> SecondHalf =
         parseType(diag::expected_type_function_result);
-    if (SecondHalf.hasCodeCompletion())
-      return makeParserCodeCompletionResult<TypeRepr>();
-    if (SecondHalf.isNull())
-      return nullptr;
+    if (SecondHalf.isParseError()) {
+      if (Throws)
+        SyntaxContext->addSyntax(*Throws);
+      SyntaxContext->addSyntax(Arrow);
+      if (SecondHalf.hasCodeCompletion())
+        return makeParserCodeCompletionResult<TypeRepr>();
+      if (SecondHalf.isNull())
+        return nullptr;
+    }
 
     ParsedFunctionTypeSyntaxBuilder Builder(*SyntaxContext);
     Builder.useReturnType(SyntaxContext->popIf<ParsedTypeSyntax>().getValue());
@@ -415,6 +420,7 @@ Parser::TypeASTResult Parser::parseType(Diag<> MessageID,
       Builder.useThrowsOrRethrowsKeyword(*Throws);
 
     auto InputNode = SyntaxContext->popIf<ParsedTypeSyntax>().getValue();
+    bool isVoid = false;
     if (auto TupleTypeNode = InputNode.getAs<ParsedTupleTypeSyntax>()) {
       // Decompose TupleTypeSyntax and repack into FunctionType.
       auto LeftParen = TupleTypeNode->getDeferredLeftParen();
@@ -425,43 +431,40 @@ Parser::TypeASTResult Parser::parseType(Diag<> MessageID,
         .useArguments(Arguments)
         .useRightParen(RightParen);
     } else {
-      Builder.addArgumentsMember(ParsedSyntaxRecorder::makeTupleTypeElement(
-          InputNode, /*TrailingComma=*/None, *SyntaxContext));
-    }
-    SyntaxContext->addSyntax(Builder.build());
-
-    TupleTypeRepr *argsTyR = nullptr;
-    if (!isa<TupleTypeRepr>(tyR)) {
-      bool isVoid = false;
-      if (const auto Void = dyn_cast<SimpleIdentTypeRepr>(tyR)) {
-        if (Void->getIdentifier().str() == "Void") {
-          isVoid = true;
-        }
-      }
+      // FIXME(syntaxparse): Extract 'Void' text from recoreded node.
+      if (const auto Void = dyn_cast<SimpleIdentTypeRepr>(tyR))
+        isVoid =  (Void->getIdentifier().str() == "Void");
 
       if (isVoid) {
         diagnose(tyR->getStartLoc(), diag::function_type_no_parens)
           .fixItReplace(tyR->getStartLoc(), "()");
-        argsTyR = TupleTypeRepr::createEmpty(Context, tyR->getSourceRange());
       } else {
         diagnose(tyR->getStartLoc(), diag::function_type_no_parens)
           .highlight(tyR->getSourceRange())
           .fixItInsert(tyR->getStartLoc(), "(")
           .fixItInsertAfter(tyR->getEndLoc(), ")");
-        argsTyR = TupleTypeRepr::create(Context, {tyR},
-                                        tyR->getSourceRange());
       }
+      Builder.addArgumentsMember(ParsedSyntaxRecorder::makeTupleTypeElement(
+          InputNode, /*TrailingComma=*/None, *SyntaxContext));
     }
+    SyntaxContext->addSyntax(Builder.build());
 
     auto FunctionType = SyntaxContext->topNode<FunctionTypeSyntax>();
     tyR = Generator.generate(FunctionType, RealTypeLoc);
-    auto FunctionTypeAST = dyn_cast<FunctionTypeRepr>(tyR);
 
-    argsTyR = argsTyR != nullptr ? argsTyR : FunctionTypeAST->getArgsTypeRepr();
+    if (generics || isVoid) {
+      auto FunctionTypeAST = cast<FunctionTypeRepr>(tyR);
 
-    tyR = new (Context) FunctionTypeRepr(
-        generics, argsTyR, FunctionTypeAST->getThrowsLoc(),
-        FunctionTypeAST->getArrowLoc(), FunctionTypeAST->getResultTypeRepr());
+      // TODO(syntaxparse): Represent 'Void -> ()' in libSyntax?
+      auto argsTyR = FunctionTypeAST->getArgsTypeRepr();
+      if (isVoid)
+        argsTyR = TupleTypeRepr::createEmpty(Context, tyR->getSourceRange());
+
+      // TODO(syntaxparse): Represent SIL generic type in libSyntax.
+      tyR = new (Context) FunctionTypeRepr(
+          generics, argsTyR, FunctionTypeAST->getThrowsLoc(),
+          FunctionTypeAST->getArrowLoc(), FunctionTypeAST->getResultTypeRepr());
+    }
   } else if (generics) {
     // Only function types may be generic.
     auto brackets = generics->getSourceRange();
