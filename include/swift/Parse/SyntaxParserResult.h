@@ -123,7 +123,7 @@ public:
   ParserStatus getStatus() const {
     ParserStatus S;
     if (isError())
-      S.setHasCodeCompletion();
+      S.setIsParseError();
     if (isCodeCompletion())
       S.setHasCodeCompletion();
     return S;
