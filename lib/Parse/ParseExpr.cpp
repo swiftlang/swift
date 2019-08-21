@@ -1413,7 +1413,7 @@ ParserResult<Expr> Parser::parseExprAST() {
   auto ParsedExpr = parseExprSyntax<SyntaxNode>();
   SyntaxContext->addSyntax(ParsedExpr);
   // todo [gsoc]: improve this somehow
-  if (SyntaxContext->isTopNode<SyntaxKind::UnknownExpr>()) {
+  if (SyntaxContext->isTopNode<UnknownExprSyntax>()) {
     auto Expr = SyntaxContext->topNode<UnknownExprSyntax>();
     auto ExprAST = Generator.generate(Expr, Loc);
     return makeParserResult(ExprAST);

@@ -269,9 +269,10 @@ public:
   /// Add Syntax to the parts.
   void addSyntax(ParsedSyntax Node);
 
-  template <SyntaxKind Kind>
+  template <typename SyntaxNode>
   bool isTopNode() {
-    return getStorage().back().getKind() == Kind;
+    auto parts = getParts();
+    return (!parts.empty() && SyntaxNode::kindof(parts.back().getKind()));
   }
 
   /// Returns the topmost Syntax node.
