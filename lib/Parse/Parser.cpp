@@ -596,7 +596,7 @@ ParsedTokenSyntax Parser::consumeTokenSyntax() {
   return ParsedToken;
 }
 
-SourceLoc Parser::getEndOfPreviousLoc() {
+SourceLoc Parser::getEndOfPreviousLoc() const {
   return Lexer::getLocForEndOfToken(SourceMgr, PreviousLoc);
 }
 
@@ -968,8 +968,6 @@ bool Parser::parseToken(tok K, SourceLoc &TokLoc, const Diagnostic &D) {
   return true;
 }
 
-/// Parse the specified expected token and return its location on success.  On failure, emit the specified
-/// error diagnostic,  a note at the specified note location, and return the location of the previous token.
 bool Parser::parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
                                 SourceLoc OtherLoc) {
   Diag<> OtherNote;
@@ -982,11 +980,32 @@ bool Parser::parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
   if (parseToken(K, TokLoc, ErrorDiag)) {
     diagnose(OtherLoc, OtherNote);
 
-    TokLoc = PreviousLoc;
+    TokLoc = getConfabulatedMatchingTokenLoc();
     return true;
   }
 
   return false;
+}
+
+SourceLoc Parser::getConfabulatedMatchingTokenLoc() const {
+  // The right brace, parenthesis, etc. must include the whole of the previous
+  // token in order so that an unexpanded lazy \c IterableTypeScope includes its
+  // contents.
+  return Context.LangOpts.LazyASTScopes
+    ? getErrorOrMissingLocForLazyASTScopes()
+    : PreviousLoc;
+}
+
+SourceLoc Parser::getErrorOrMissingLocForLazyASTScopes() const {
+  auto const PreviousTok = Lexer::getTokenAtLocation(Context.SourceMgr,
+                                                     PreviousLoc);
+  // If it's a string literal, it might be an InterpolatedStringLiteral.
+  // In that case the missing close paren, etc. needs to go at the end
+  // because there might be things to be looked up for ASTScope in the
+  // middle.
+  return PreviousTok.getKind() != tok::string_literal
+    ? PreviousLoc
+    : PreviousLoc.getAdvancedLoc(PreviousTok.getLength() - 1);
 }
 
 static SyntaxKind getListElementKind(SyntaxKind ListKind) {
@@ -1094,7 +1113,8 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
 
   if (Status.isError()) {
     // If we've already got errors, don't emit missing RightK diagnostics.
-    RightLoc = Tok.is(RightK) ? consumeToken() : PreviousLoc;
+    RightLoc =
+        Tok.is(RightK) ? consumeToken() : getConfabulatedMatchingTokenLoc();
   } else if (parseMatchingToken(RightK, RightLoc, ErrorDiag, LeftLoc)) {
     Status.setIsParseError();
   }
