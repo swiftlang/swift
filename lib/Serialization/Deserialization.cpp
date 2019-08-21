@@ -57,12 +57,12 @@ StringRef swift::getNameOfModule(const ModuleFile *MF) {
 }
 
 namespace {
-  struct OffsetAndKind {
+  struct DeclAndOffset {
     const Decl *D;
     uint64_t offset;
   };
 
-  static raw_ostream &operator<<(raw_ostream &os, OffsetAndKind &&pair) {
+  static raw_ostream &operator<<(raw_ostream &os, DeclAndOffset &&pair) {
     return os << Decl::getKindName(pair.D->getKind())
               << "Decl @ " << pair.offset;
   }
@@ -97,13 +97,13 @@ namespace {
         os << "While deserializing ";
 
         if (auto VD = dyn_cast<ValueDecl>(DeclOrOffset.get())) {
-          os << "'" << VD->getBaseName() << "' (" << OffsetAndKind{VD, offset}
+          os << "'" << VD->getBaseName() << "' (" << DeclAndOffset{VD, offset}
              << ")";
         } else if (auto ED = dyn_cast<ExtensionDecl>(DeclOrOffset.get())) {
           os << "extension of '" << ED->getExtendedType() << "' ("
-             << OffsetAndKind{ED, offset} << ")";
+             << DeclAndOffset{ED, offset} << ")";
         } else {
-          os << OffsetAndKind{DeclOrOffset.get(), offset};
+          os << DeclAndOffset{DeclOrOffset.get(), offset};
         }
       }
       os << " in '" << getNameOfModule(MF) << "'\n";
