@@ -510,6 +510,7 @@ public:
   ArrayRef<SDKNode*> getConformances() const { return Conformances; }
   NodeVector getConformances() { return Conformances; }
   bool isExternal() const { return IsExternal; }
+  bool isExtension() const { return isExternal(); }
   StringRef getSuperClassName() const {
     return SuperclassNames.empty() ? StringRef() : SuperclassNames.front();
   };

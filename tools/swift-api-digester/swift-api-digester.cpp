@@ -1925,6 +1925,21 @@ void DiagnosisEmitter::diagnosis(NodePtr LeftRoot, NodePtr RightRoot,
   SDKNode::postorderVisit(LeftRoot, Emitter);
 }
 
+static bool diagnoseRemovedExtensionMembers(const SDKNode *Node) {
+  // If the removed decl is an extension, diagnose each member as being removed rather than
+  // the extension itself has been removed.
+  if (auto *DT= dyn_cast<SDKNodeDeclType>(Node)) {
+    if (DT->isExtension()) {
+      for (auto *C: DT->getChildren()) {
+        auto *MD = cast<SDKNodeDecl>(C);
+        MD->emitDiag(diag::removed_decl, MD->isDeprecated());
+      }
+      return true;
+    }
+  }
+  return false;
+}
+
 void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
   assert(Node->isAnnotatedAs(Anno));
   auto &Ctx = Node->getSDKContext();
@@ -1992,8 +2007,9 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
         return;
       }
     }
-
-    Node->emitDiag(diag::removed_decl, Node->isDeprecated());
+    bool handled = diagnoseRemovedExtensionMembers(Node);
+    if (!handled)
+      Node->emitDiag(diag::removed_decl, Node->isDeprecated());
     return;
   }
   case NodeAnnotation::Rename: {
