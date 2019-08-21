@@ -1683,43 +1683,6 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
   if (isUnresolvedOrTypeVarType(exprType) || exprType->isEqual(contextualType))
     return false;
 
-  // If this is conversion failure due to a return statement with an argument
-  // that cannot be coerced to the result type of the function, emit a
-  // specific error.
-  if (CTP == CTP_ThrowStmt) {
-    // If we tried to throw the error code of an error type, suggest object
-    // construction.
-    auto &TC = CS.getTypeChecker();
-    if (auto errorCodeProtocol =
-            TC.Context.getProtocol(KnownProtocolKind::ErrorCodeProtocol)) {
-      if (auto conformance = TypeChecker::conformsToProtocol(
-              CS.getType(expr), errorCodeProtocol, CS.DC,
-              ConformanceCheckFlags::InExpression)) {
-        Type errorCodeType = CS.getType(expr);
-        Type errorType =
-            conformance
-                ->getTypeWitnessByName(errorCodeType, TC.Context.Id_ErrorType)
-                ->getCanonicalType();
-        if (errorType) {
-          auto diag = diagnose(expr->getLoc(), diag::cannot_throw_error_code,
-                               errorCodeType, errorType);
-          if (auto unresolvedDot = dyn_cast<UnresolvedDotExpr>(expr)) {
-            diag.fixItInsert(unresolvedDot->getDotLoc(), "(");
-            diag.fixItInsertAfter(unresolvedDot->getEndLoc(), ")");
-          }
-          return true;
-        }
-      }
-    }
-
-    // The conversion destination of throw is always ErrorType (at the moment)
-    // if this ever expands, this should be a specific form like () is for
-    // return.
-    diagnose(expr->getLoc(), diag::cannot_convert_thrown_type, exprType)
-        .highlight(expr->getSourceRange());
-    return true;
-  }
-
   if (CTP == CTP_YieldByReference) {
     if (auto contextualLV = contextualType->getAs<LValueType>())
       contextualType = contextualLV->getObjectType();

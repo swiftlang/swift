@@ -1882,6 +1882,9 @@ bool ContextualFailure::diagnoseAsError() {
     if (diagnoseConversionToBool())
       return true;
 
+    if (diagnoseThrowsTypeMismatch())
+      return true;
+
     auto contextualType = getToType();
     if (auto msg = getDiagnosticFor(CTP, contextualType->isExistentialType())) {
       diagnostic = *msg;
@@ -2188,6 +2191,50 @@ bool ContextualFailure::diagnoseConversionToDictionary() const {
       diagnostic.fixItReplace(commaLocs[i * 2], ":");
   }
 
+  return true;
+}
+
+bool ContextualFailure::diagnoseThrowsTypeMismatch() const {
+  // If this is conversion failure due to a return statement with an argument
+  // that cannot be coerced to the result type of the function, emit a
+  // specific error.
+  if (CTP != CTP_ThrowStmt)
+    return false;
+
+  auto *anchor = getAnchor();
+
+  // If we tried to throw the error code of an error type, suggest object
+  // construction.
+  auto &TC = getTypeChecker();
+  if (auto errorCodeProtocol =
+          TC.Context.getProtocol(KnownProtocolKind::ErrorCodeProtocol)) {
+    Type errorCodeType = getFromType();
+    if (auto conformance = TypeChecker::conformsToProtocol(
+            errorCodeType, errorCodeProtocol, getDC(),
+            ConformanceCheckFlags::InExpression)) {
+      Type errorType = conformance
+                           ->getTypeWitnessByName(errorCodeType,
+                                                  getASTContext().Id_ErrorType)
+                           ->getCanonicalType();
+      if (errorType) {
+        auto diagnostic =
+            emitDiagnostic(anchor->getLoc(), diag::cannot_throw_error_code,
+                           errorCodeType, errorType);
+        if (auto *UDE = dyn_cast<UnresolvedDotExpr>(anchor)) {
+          diagnostic.fixItInsert(UDE->getDotLoc(), "(");
+          diagnostic.fixItInsertAfter(UDE->getEndLoc(), ")");
+        }
+        return true;
+      }
+    }
+  }
+
+  // The conversion destination of throw is always ErrorType (at the moment)
+  // if this ever expands, this should be a specific form like () is for
+  // return.
+  emitDiagnostic(anchor->getLoc(), diag::cannot_convert_thrown_type,
+                 getFromType())
+      .highlight(anchor->getSourceRange());
   return true;
 }
 

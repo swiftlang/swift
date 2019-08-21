@@ -629,6 +629,10 @@ public:
   /// or convert an array literal to a dictionary e.g. `let _: [String: Int] = ["A", 0]`
   bool diagnoseConversionToDictionary() const;
 
+  /// Produce a specialized diagnostic if this is an attempt to throw
+  /// something with doesn't conform to `Error`.
+  bool diagnoseThrowsTypeMismatch() const;
+
   /// Attempt to attach any relevant fix-its to already produced diagnostic.
   void tryFixIts(InFlightDiagnostic &diagnostic) const;
 
