@@ -377,6 +377,9 @@ private:
   /// Activity info of the original function.
   const DifferentiableActivityInfo &activityInfo;
 
+  /// Differentiation indices of the function.
+  const SILAutoDiffIndices &indices;
+
   /// Mapping from original basic blocks to linear map structs.
   DenseMap<SILBasicBlock *, StructDecl *> linearMapStructs;
 
@@ -665,9 +668,8 @@ private:
       SILFunction *assocFn);
 
 public:
-  bool shouldBeDifferentiated(ApplyInst *ai, const SILAutoDiffIndices &indices);
-  bool shouldBeDifferentiated(SILInstruction *inst,
-                              const SILAutoDiffIndices &indices);
+  bool shouldDifferentiateApplyInst(ApplyInst *ai);
+  bool shouldDifferentiateInstruction(SILInstruction *inst);
 
   LinearMapInfo(const LinearMapInfo &) = delete;
   LinearMapInfo &operator=(const LinearMapInfo &) = delete;
@@ -1483,12 +1485,22 @@ LinearMapInfo::LinearMapInfo(ADContext &context,
                              const DifferentiableActivityInfo &activityInfo,
                              SILBuilder &builder)
     : kind(kind), original(original), activityInfo(activityInfo),
-      typeConverter(context.getTypeConverter()), builder(builder) {
+      indices(indices), typeConverter(context.getTypeConverter()),
+      builder(builder) {
   populateLinearMapStructDeclarationFields(context, indices, assocFn);
 }
 
-bool LinearMapInfo::shouldBeDifferentiated(ApplyInst *ai,
-                                           const SILAutoDiffIndices &indices) {
+/// Returns a flag that indicates whether the `apply` instruction should be
+/// differentiated, given the differentiation indices of the instruction's
+/// parent function. Whether the `apply` should be differentiated is determined
+/// sequentially from the following conditions:
+/// 1. The instruction has an active `inout` argument.
+/// 2. The instruction is a call to the array literal initialization intrinsic
+///    ("array.uninitialized_intrinsic"), where the result is active and where
+///    there is a `store` of an active value into the array's buffer.
+/// 3. The instruction has both an active result (direct or indirect) and an
+///    active argument.
+bool LinearMapInfo::shouldDifferentiateApplyInst(ApplyInst *ai) {
   // Function applications with an inout argument should be differentiated.
   auto paramInfos = ai->getSubstCalleeConv().getParameters();
   auto paramArgs = ai->getArgumentsWithoutIndirectResults();
@@ -1504,7 +1516,7 @@ bool LinearMapInfo::shouldBeDifferentiated(ApplyInst *ai,
   bool hasActiveResults = hasActiveDirectResults || hasActiveIndirectResults;
 
   // TODO: Perform pattern matching to make sure there's at least one `store` to
-  // the array's buffer is active.
+  // the array's buffer that is active.
   if (isArrayLiteralIntrinsic(ai) && hasActiveResults)
     return true;
 
@@ -1513,12 +1525,19 @@ bool LinearMapInfo::shouldBeDifferentiated(ApplyInst *ai,
   return hasActiveResults && hasActiveParamArguments;
 }
 
-bool LinearMapInfo::shouldBeDifferentiated(SILInstruction *inst,
-                                           const SILAutoDiffIndices &indices) {
+/// Returns a flag that indicates whether the instruction should be
+/// differentiated, given the differentiation indices of the instruction's
+/// parent function. Whether the instruction should be differentiated is
+/// determined sequentially from the following conditions:
+/// 1. The instruction is an `apply` and `shouldDifferentiateApplyInst` returns
+///    true.
+/// 2. The instruction has an active operand and an active result.
+/// 3. The instruction has side effects and an active operand.
+bool LinearMapInfo::shouldDifferentiateInstruction(SILInstruction *inst) {
   // An `apply` with an active argument and an active result (direct or
   // indirect) should be differentiated.
   if (auto *ai = dyn_cast<ApplyInst>(inst))
-    return shouldBeDifferentiated(ai, indices);
+    return shouldDifferentiateApplyInst(ai);
   // Anything with an active result and an active operand should be
   // differentiated.
   auto hasActiveOperands = llvm::any_of(inst->getAllOperands(),
@@ -1529,12 +1548,6 @@ bool LinearMapInfo::shouldBeDifferentiated(SILInstruction *inst,
     return true;
   if (inst->mayHaveSideEffects() && hasActiveOperands)
     return true;
-  // Instructions that may write to memory and that have an active operand
-  // should be differentiated.
-  if (inst->mayWriteToMemory())
-    for (auto &op : inst->getAllOperands())
-      if (activityInfo.isActive(op.get(), indices))
-        return true;
   return false;
 }
 
@@ -1689,7 +1702,7 @@ void LinearMapInfo::populateLinearMapStructDeclarationFields(
         // Add linear map to struct for active instructions.
         // Do not add it for array functions since those are already linear
         // and we don't need to add it to the struct.
-        if (shouldBeDifferentiated(ai, indices) && !isArrayLiteralIntrinsic(ai))
+        if (shouldDifferentiateApplyInst(ai) && !isArrayLiteralIntrinsic(ai))
           addLinearMapToStruct(ai, indices);
       }
     }
@@ -3568,7 +3581,7 @@ public:
   void visitApplyInst(ApplyInst *ai) {
     // If the function should not be differentiated or its the array literal
     // initialization intrinsic, just do standard cloning.
-    if (!differentialInfo.shouldBeDifferentiated(ai, getIndices()) ||
+    if (!differentialInfo.shouldDifferentiateApplyInst(ai) ||
         isArrayLiteralIntrinsic(ai)) {
       LLVM_DEBUG(getADDebugStream() << "No active results:\n" << *ai << '\n');
       TypeSubstCloner::visitApplyInst(ai);
@@ -4379,7 +4392,7 @@ private:
 
   void emitTangentForApplyInst(ApplyInst *ai,
                                SILAutoDiffIndices &actualIndices) {
-    assert(differentialInfo.shouldBeDifferentiated(ai, getIndices()));
+    assert(differentialInfo.shouldDifferentiateApplyInst(ai));
     auto *bb = ai->getParent();
     auto loc = ai->getLoc();
     auto diffBuilder = getDifferentialBuilder();
@@ -4563,7 +4576,7 @@ public:
                   << "Original bb" + std::to_string(origBB.getDebugID())
                   << ": To differentiate or not to differentiate?\n";
         for (auto &inst : origBB) {
-          s << (differentialInfo.shouldBeDifferentiated(&inst, getIndices())
+          s << (differentialInfo.shouldDifferentiateInstruction(&inst)
                     ? "[∂] " : "[ ] ")
             << inst;
         }
@@ -4718,19 +4731,19 @@ public:
 
   void visitDestroyValueInst(DestroyValueInst *dvi) {
     TypeSubstCloner::visitDestroyValueInst(dvi);
-    if (differentialInfo.shouldBeDifferentiated(dvi, getIndices()))
+    if (differentialInfo.shouldDifferentiateInstruction(dvi))
       emitTangentForDestroyValueInst(dvi);
   }
 
   void visitBeginBorrowInst(BeginBorrowInst *bbi) {
     TypeSubstCloner::visitBeginBorrowInst(bbi);
-    if (differentialInfo.shouldBeDifferentiated(bbi, getIndices()))
+    if (differentialInfo.shouldDifferentiateInstruction(bbi))
       emitTangentForBeginBorrow(bbi);
   }
 
   void visitEndBorrowInst(EndBorrowInst *ebi) {
     TypeSubstCloner::visitEndBorrowInst(ebi);
-    if (differentialInfo.shouldBeDifferentiated(ebi, getIndices()))
+    if (differentialInfo.shouldDifferentiateInstruction(ebi))
       emitTangentForEndBorrow(ebi);
   }
 
@@ -4739,7 +4752,7 @@ public:
   void visitApplyInst(ApplyInst *ai) {
     // If the function should not be differentiated or its the array literal
     // initialization intrinsic, just do standard cloning.
-    if (!differentialInfo.shouldBeDifferentiated(ai, getIndices()) ||
+    if (!differentialInfo.shouldDifferentiateApplyInst(ai) ||
         isArrayLiteralIntrinsic(ai)) {
       LLVM_DEBUG(getADDebugStream() << "No active results:\n" << *ai << '\n');
       TypeSubstCloner::visitApplyInst(ai);
@@ -5840,7 +5853,7 @@ public:
           << "Original bb" + std::to_string(bb->getDebugID())
           << ": To differentiate or not to differentiate?\n";
       for (auto &inst : reversed(*bb)) {
-        s << (getPullbackInfo().shouldBeDifferentiated(&inst, getIndices())
+        s << (getPullbackInfo().shouldDifferentiateInstruction(&inst)
                   ? "[∂] " : "[ ] ")
           << inst;
       }
@@ -5848,7 +5861,7 @@ public:
 
     // Visit each instruction in reverse order.
     for (auto &inst : reversed(*bb)) {
-      if (!getPullbackInfo().shouldBeDifferentiated(&inst, getIndices()))
+      if (!getPullbackInfo().shouldDifferentiateInstruction(&inst))
         continue;
       // Differentiate instruction.
       visit(&inst);
@@ -6097,7 +6110,7 @@ public:
   }
 
   void visitApplyInst(ApplyInst *ai) {
-    assert(getPullbackInfo().shouldBeDifferentiated(ai, getIndices()));
+    assert(getPullbackInfo().shouldDifferentiateApplyInst(ai));
     // Handle array uninitialized allocation intrinsic specially.
     if (ai->hasSemantics("array.uninitialized_intrinsic"))
       return visitArrayInitialization(ai);
