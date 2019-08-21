@@ -33,8 +33,13 @@ def escapeCmdArg(arg):
 def check_call(cmd, cwd=None, env=os.environ, verbose=False, output=None):
     if verbose:
         print(' '.join([escapeCmdArg(arg) for arg in cmd]))
-    return subprocess.check_call(cmd, cwd=cwd, env=env,
-                                 stderr=None, stdout=output)
+    try:
+        subprocess.check_call(cmd, cwd=cwd, env=env,
+                              stderr=None, stdout=output)
+        return 0
+    except Exception as error:
+        printerr(error)
+        return 1
 
 
 def check_output(cmd, verbose=False):
