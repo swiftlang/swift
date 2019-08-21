@@ -4838,6 +4838,42 @@ public:
     }
   }
 
+  void verifyLineTable(SILBasicBlock *BB) {
+    SILFunction *F = BB->getParent();
+    if (F->getEffectiveOptimizationMode() != OptimizationMode::NoOptimization)
+      return;
+
+    if (F->isTransparent())
+      return;
+
+    auto &SrcMgr = BB->getParent()->getModule().getSourceManager();
+    bool Init = false;
+    uint64_t LastLine = 0;
+    std::string LastFilename = "";
+
+    for (SILInstruction &SI : *BB) {
+      if (SI.isMetaInstruction())
+        continue;
+      auto LocKind = SI.getDebugLocation().getLocation().getKind();
+      if (LocKind != SILLocation::LocationKind::RegularKind)
+        continue;
+      auto DL = SI.getDebugLocation().getLocation().decodeDebugLoc(SrcMgr);
+      if (!Init) {
+        LastLine = DL.Line;
+        LastFilename = DL.Filename;
+        Init = true;
+        continue;
+      }
+      if (DL.Line >= LastLine || LastFilename != DL.Filename) {
+        LastLine = DL.Line;
+        LastFilename = DL.Filename;
+        continue;
+      }
+      require(DL.Line >= LastLine, "Line table is not monotonically increasing"
+                                   " within a single basic block");
+    }
+  }
+
   /// This pass verifies that there are no hole in debug scopes at -Onone.
   void verifyDebugScopeHoles(SILBasicBlock *BB) {
     if (!VerifyDIHoles)
@@ -4926,6 +4962,7 @@ public:
     
     SILInstructionVisitor::visitSILBasicBlock(BB);
     verifyDebugScopeHoles(BB);
+    verifyLineTable(BB);
   }
 
   void visitBasicBlockArguments(SILBasicBlock *BB) {
