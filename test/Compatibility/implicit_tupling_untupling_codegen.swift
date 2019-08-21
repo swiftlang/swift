@@ -1,5 +1,7 @@
 // RUN: %target-run-simple-swift | %FileCheck %s
 
+// REQUIRES: executable_test
+
 // Even though we test that type-checking and exhaustiveness checking work fine
 // in the presence of implicit tupling/untupling in exhaustive_switch.swift,
 // make sure that the "patched" patterns do not lead to incorrect codegen.
