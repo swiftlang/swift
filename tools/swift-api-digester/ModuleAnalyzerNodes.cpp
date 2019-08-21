@@ -2079,7 +2079,9 @@ swift::ide::api::getSDKNodeRoot(SDKContext &SDKCtx,
 
   CompilerInstance &CI = SDKCtx.newCompilerInstance();
   // Display diagnostics to stderr.
-  PrintingDiagnosticConsumer PrintDiags;
+  PrintingDiagnosticConsumer PrintDiags(llvm::errs());
+  if (llvm::errs().has_colors())
+    PrintDiags.forceColors();
   CI.addDiagnosticConsumer(&PrintDiags);
   if (CI.setup(Invocation)) {
     llvm::errs() << "Failed to setup the compiler instance\n";
