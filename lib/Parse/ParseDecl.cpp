@@ -5788,6 +5788,7 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
         diagnose(TokLoc, diag::backticks_to_escape)
           .fixItReplace(TokLoc, "`" + TokText.str() + "`");
         if (!Tok.isAtStartOfLine()) {
+          Name = Context.getIdentifier(Tok.getText());
           NameLoc = consumeToken();
         }
       } else if (CommaLoc.isValid()) {

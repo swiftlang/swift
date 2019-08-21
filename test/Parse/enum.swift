@@ -125,8 +125,8 @@ enum Recovery5 {
   // expected-error@-2{{extraneous '.' in enum 'case' declaration}} {{14-15=}}
 }
 enum Recovery6 {
-  case Snout, _; // expected-error {{keyword '_' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{15-16=`_`}}
-  case _; // expected-error {{keyword '_' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{8-9=`_`}}
+  case Snout, _; // expected-error {{keyword '_' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{15-16=`_`}} expected-note {{'_' previously declared here}}
+  case _; // expected-error {{keyword '_' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{8-9=`_`}} expected-error {{invalid redeclaration of '_'}}
   case Tusk, // expected-error {{expected identifier after comma in enum 'case' declaration}}
 } 
 
@@ -563,6 +563,12 @@ enum SR11261 {
 enum SR11261_var {
   case identifier
   case var // expected-error {{keyword 'var' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{8-11=`var`}}
+  case identifier2
+}
+
+enum SR11261_underscore {
+  case identifier
+  case _ // expected-error {{keyword '_' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{8-9=`_`}}
   case identifier2
 }
 
