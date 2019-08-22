@@ -4451,15 +4451,11 @@ ASTContext::getOverrideGenericSignature(const ValueDecl *base,
   if (auto *derivedSig = derivedClass->getGenericSignature())
     derivedDepth = derivedSig->getGenericParams().back()->getDepth() + 1;
 
-  GenericSignatureBuilder builder(ctx);
-  builder.addGenericSignature(derivedClass->getGenericSignature());
-
-  for (auto param : *derivedGenericCtx->getGenericParams()) {
-    builder.addGenericParameter(param);
+  SmallVector<GenericTypeParamType *, 2> addedGenericParams;
+  for (auto gp : *derivedGenericCtx->getGenericParams()) {
+    addedGenericParams.push_back(
+        gp->getDeclaredInterfaceType()->castTo<GenericTypeParamType>());
   }
-
-  auto source =
-      GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
 
   unsigned baseDepth = 0;
 
@@ -4487,13 +4483,20 @@ ASTContext::getOverrideGenericSignature(const ValueDecl *base,
     return ProtocolConformanceRef(proto);
   };
 
+  SmallVector<Requirement, 2> addedRequirements;
   for (auto reqt : baseGenericCtx->getGenericSignature()->getRequirements()) {
     if (auto substReqt = reqt.subst(substFn, lookupConformanceFn)) {
-      builder.addRequirement(*substReqt, source, nullptr);
+      addedRequirements.push_back(*substReqt);
     }
   }
 
-  auto *genericSig = std::move(builder).computeGenericSignature(SourceLoc());
+  auto *genericSig = evaluateOrDefault(
+      ctx.evaluator,
+      AbstractGenericSignatureRequest{
+        derivedClass->getGenericSignature(),
+        std::move(addedGenericParams),
+        std::move(addedRequirements)},
+      nullptr);
   getImpl().overrideSigCache.insert(std::make_pair(key, genericSig));
   return genericSig;
 }
