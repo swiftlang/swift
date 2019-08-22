@@ -369,7 +369,7 @@ static bool isWrittenTo(SILFunction &f, SILValue value) {
   // conservative and assume that the value is written to.
   const auto &storage = findAccessedStorageNonNested(value);
   if (!storage)
-    return false;
+    return true;
 
   // Then see if we ever write to this address in a flow insensitive
   // way (ignoring stores that are obviously the only initializer to
