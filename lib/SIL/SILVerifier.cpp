@@ -4847,30 +4847,44 @@ public:
       return;
 
     auto &SrcMgr = BB->getParent()->getModule().getSourceManager();
-    bool Init = false;
     uint64_t LastLine = 0;
+    uint64_t LastColumn = 0;
     std::string LastFilename = "";
+
+    using UUSTuple = std::pair<std::pair<unsigned, unsigned>, StringRef>;
+    struct DebugLocKey : public UUSTuple {
+      DebugLocKey(SILLocation::DebugLoc DL)
+          : UUSTuple({{DL.Line, DL.Column}, DL.Filename}) {}
+      inline bool operator==(const SILLocation::DebugLoc &DL) const {
+        return first.first == DL.Line && first.second == DL.Column &&
+               second.equals(DL.Filename);
+      }
+    };
+    llvm::DenseSet<UUSTuple> VisitedLocations;
 
     for (SILInstruction &SI : *BB) {
       if (SI.isMetaInstruction())
+        continue;
+      if (isa<MetatypeInst>(&SI))
         continue;
       auto LocKind = SI.getDebugLocation().getLocation().getKind();
       if (LocKind != SILLocation::LocationKind::RegularKind)
         continue;
       auto DL = SI.getDebugLocation().getLocation().decodeDebugLoc(SrcMgr);
-      if (!Init) {
-        LastLine = DL.Line;
-        LastFilename = DL.Filename;
-        Init = true;
+      if (DL.Line == 0)
         continue;
-      }
-      if (DL.Line >= LastLine || LastFilename != DL.Filename) {
-        LastLine = DL.Line;
-        LastFilename = DL.Filename;
+      if (std::tie(LastLine, LastColumn, LastFilename) ==
+          std::tie(DL.Line, DL.Column, DL.Filename))
         continue;
-      }
-      require(DL.Line >= LastLine, "Line table is not monotonically increasing"
-                                   " within a single basic block");
+
+      LastLine = DL.Line;
+      LastColumn = DL.Column;
+      LastFilename = DL.Filename;
+
+      auto ItNew = DebugLocKey(DL);
+
+      require(!VisitedLocations.count(ItNew), "Incorrect location at -Onone");
+      VisitedLocations.insert(ItNew);
     }
   }
 
