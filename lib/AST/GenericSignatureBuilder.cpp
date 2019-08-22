@@ -3817,7 +3817,7 @@ static Type substituteConcreteType(GenericSignatureBuilder &builder,
     subMap = SubstitutionMap::getProtocolSubstitutions(
         proto, parentType, ProtocolConformanceRef(proto));
 
-    type = type.subst(subMap, SubstFlags::UseErrorType);
+    type = type.subst(subMap);
   } else {
     // Substitute in the superclass type.
     auto parentPA = basePA->getEquivalenceClassIfPresent();
@@ -3827,7 +3827,7 @@ static Type substituteConcreteType(GenericSignatureBuilder &builder,
 
     subMap = parentType->getMemberSubstitutionMap(parentDecl->getParentModule(),
                                                   concreteDecl);
-    type = type.subst(subMap, SubstFlags::UseErrorType);
+    type = type.subst(subMap);
   }
 
   // If we had a typealias, form a sugared type.
@@ -5187,7 +5187,7 @@ GenericSignatureBuilder::addRequirement(const Requirement &req,
   // Local substitution for types in the requirement.
   auto subst = [&](Type t) {
     if (subMap)
-      return t.subst(*subMap, SubstFlags::UseErrorType);
+      return t.subst(*subMap);
 
     return t;
   };

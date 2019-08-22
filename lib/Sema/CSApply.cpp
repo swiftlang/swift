@@ -6793,7 +6793,7 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
     // Extract the literal type.
     Type builtinLiteralType =
         conformance->getTypeWitnessByName(type, literalType);
-    if (!builtinLiteralType)
+    if (builtinLiteralType->hasError())
       return nullptr;
 
     // Perform the builtin conversion.
