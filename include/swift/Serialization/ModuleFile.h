@@ -427,6 +427,10 @@ private:
   } Bits = {};
   static_assert(sizeof(ModuleBits) <= 8, "The bit set should be small");
 
+  Status getStatus() const {
+    return static_cast<Status>(Bits.Status);
+  }
+
   void setStatus(Status status) {
     Bits.Status = static_cast<unsigned>(status);
     assert(status == getStatus() && "not enough bits for status");
@@ -449,17 +453,11 @@ private:
              serialization::ExtendedValidationInfo *extInfo);
 
 public:
-  /// Change the status of the current module. Default argument marks the module
-  /// as being malformed.
-  Status error(Status issue = Status::Malformed) {
+  /// Change the status of the current module.
+  Status error(Status issue) {
     assert(issue != Status::Valid);
-    if (FileContext && issue == Status::Malformed) {
-      // This would normally be an assertion but it's more useful to print the
-      // PrettyStackTrace here even in no-asserts builds. Malformed modules are
-      // generally unrecoverable.
-      fatal(llvm::make_error<llvm::StringError>(
-          "(see \"While...\" info below)", llvm::inconvertibleErrorCode()));
-    }
+    assert((issue != Status::Malformed || !FileContext) &&
+           "too late to complain about the well-formedness of the module");
     setStatus(issue);
     return getStatus();
   }
@@ -467,6 +465,11 @@ public:
   /// Emits one last diagnostic, logs the error, and then aborts for the stack
   /// trace.
   LLVM_ATTRIBUTE_NORETURN void fatal(llvm::Error error);
+
+  LLVM_ATTRIBUTE_NORETURN void fatal() {
+    fatal(llvm::make_error<llvm::StringError>(
+        "(see \"While...\" info below)", llvm::inconvertibleErrorCode()));
+  }
 
   ASTContext &getContext() const {
     assert(FileContext && "no associated context yet");
@@ -620,9 +623,7 @@ public:
     theModule.reset(new ModuleFile(std::move(moduleInputBuffer),
                                    std::move(moduleDocInputBuffer),
                                    isFramework, info, extInfo));
-    assert(info.status == Status::Valid ||
-           info.status == theModule->getStatus());
-    info.status = theModule->getStatus();
+    assert(info.status == theModule->getStatus());
     return info;
   }
 
@@ -649,11 +650,6 @@ public:
   /// compiled for a different OS.
   Status associateWithFileContext(FileUnit *file, SourceLoc diagLoc,
                                   bool treatAsPartialModule);
-
-  /// Checks whether this module can be used.
-  Status getStatus() const {
-    return static_cast<Status>(Bits.Status);
-  }
 
   /// Transfers ownership of a buffer that might contain source code where
   /// other parts of the compiler could have emitted diagnostics, to keep them

@@ -259,10 +259,8 @@ Expected<Pattern *> ModuleFile::readPattern(DeclContext *owningDC) {
 
   BCOffsetRAII restoreOffset(DeclTypeCursor);
   auto next = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
-  if (next.Kind != llvm::BitstreamEntry::Record) {
-    error();
-    return nullptr;
-  }
+  if (next.Kind != llvm::BitstreamEntry::Record)
+    fatal();
 
   /// Local function to record the type of this pattern.
   auto recordPatternType = [&](Pattern *pattern, Type type) {
@@ -425,8 +423,7 @@ SILLayout *ModuleFile::readSILLayout(llvm::BitstreamCursor &Cursor) {
     return SILLayout::get(getContext(), canSig, fields);
   }
   default:
-    error();
-    return nullptr;
+    fatal();
   }
 }
 
@@ -559,9 +556,7 @@ ProtocolConformanceRef ModuleFile::readConformance(
 
   // Not a protocol conformance.
   default:
-    error();
-    ProtocolConformance *conformance = nullptr;
-    return ProtocolConformanceRef(conformance); // FIXME: this will assert
+    fatal();
   }
 }
 
@@ -578,10 +573,8 @@ NormalProtocolConformance *ModuleFile::readNormalConformance(
   BCOffsetRAII restoreOffset(DeclTypeCursor);
   DeclTypeCursor.JumpToBit(conformanceEntry);
   auto entry = DeclTypeCursor.advance();
-  if (entry.Kind != llvm::BitstreamEntry::Record) {
-    error();
-    return nullptr;
-  }
+  if (entry.Kind != llvm::BitstreamEntry::Record)
+    fatal();
 
   DeclID protoID;
   DeclContextID contextID;
@@ -590,10 +583,8 @@ NormalProtocolConformance *ModuleFile::readNormalConformance(
   SmallVector<uint64_t, 16> scratch;
 
   unsigned kind = DeclTypeCursor.readRecord(entry.ID, scratch);
-  if (kind != NORMAL_PROTOCOL_CONFORMANCE) {
-    error();
-    return nullptr;
-  }
+  if (kind != NORMAL_PROTOCOL_CONFORMANCE)
+    fatal();
   NormalProtocolConformanceLayout::readRecord(scratch, protoID,
                                               contextID, typeCount,
                                               valueCount, conformanceCount,
@@ -720,9 +711,8 @@ void ModuleFile::readGenericRequirements(
         break;
       }
       default:
-        // Unknown requirement kind. Drop the requirement and continue, but log
-        // an error so that we don't actually try to generate code.
-        error();
+        // Unknown requirement kind.
+        fatal();
       }
       break;
       }
@@ -738,11 +728,9 @@ void ModuleFile::readGenericRequirements(
       LayoutConstraint layout;
       LayoutConstraintKind kind = LayoutConstraintKind::UnknownLayout;
       switch (rawKind) {
-      default: {
+      default:
         // Unknown layout requirement kind.
-        error();
-        break;
-      }
+        fatal();
       case LayoutRequirementKind::NativeRefCountedObject:
         kind = LayoutConstraintKind::NativeRefCountedObject;
         break;
@@ -865,16 +853,12 @@ GenericSignature *ModuleFile::getGenericSignature(
   SmallVector<uint64_t, 8> scratch;
 
   auto entry = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
-  if (entry.Kind != llvm::BitstreamEntry::Record) {
-    error();
-    return nullptr;
-  }
+  if (entry.Kind != llvm::BitstreamEntry::Record)
+    fatal();
 
   unsigned recordID = DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
-  if (recordID != GENERIC_SIGNATURE) {
-    error();
-    return nullptr;
-  }
+  if (recordID != GENERIC_SIGNATURE)
+    fatal();
 
   ArrayRef<uint64_t> rawParamIDs;
   GenericSignatureLayout::readRecord(scratch, rawParamIDs);
@@ -951,19 +935,15 @@ ModuleFile::getGenericSignatureOrEnvironment(
       return result;
 
     unsigned recordID = DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
-    if (recordID != SIL_GENERIC_ENVIRONMENT) {
-      error();
-      return result;
-    }
+    if (recordID != SIL_GENERIC_ENVIRONMENT)
+      fatal();
 
     ArrayRef<uint64_t> rawParamIDs;
     SILGenericEnvironmentLayout::readRecord(scratch, rawParamIDs);
     lastRecordOffset.reset();
 
-    if (rawParamIDs.size() % 2 != 0) {
-      error();
-      return result;
-    }
+    if (rawParamIDs.size() % 2 != 0)
+      fatal();
 
     for (unsigned i = 0, n = rawParamIDs.size(); i != n; i += 2) {
       Identifier name = getIdentifier(rawParamIDs[i]);
@@ -1043,18 +1023,14 @@ SubstitutionMap ModuleFile::getSubstitutionMap(
 
   // Read the substitution map.
   auto entry = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
-  if (entry.Kind != llvm::BitstreamEntry::Record) {
-    error();
-    return SubstitutionMap();
-  }
+  if (entry.Kind != llvm::BitstreamEntry::Record)
+    fatal();
 
   StringRef blobData;
   SmallVector<uint64_t, 8> scratch;
   unsigned recordID = DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
-  if (recordID != SUBSTITUTION_MAP) {
-    error();
-    return SubstitutionMap();
-  }
+  if (recordID != SUBSTITUTION_MAP)
+    fatal();
 
   GenericSignatureID genericSigID;
   uint64_t numConformances;
@@ -1064,10 +1040,8 @@ SubstitutionMap ModuleFile::getSubstitutionMap(
 
   // Generic signature.
   auto genericSig = getGenericSignature(genericSigID);
-  if (!genericSig) {
-    error();
-    return SubstitutionMap();
-  }
+  if (!genericSig)
+    fatal();
 
   // Load the replacement types.
   SmallVector<Type, 4> replacementTypes;
@@ -1251,10 +1225,8 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
   PrettyXRefTrace pathTrace(*baseModule);
 
   auto entry = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
-  if (entry.Kind != llvm::BitstreamEntry::Record) {
-    error();
-    return nullptr;
-  }
+  if (entry.Kind != llvm::BitstreamEntry::Record)
+    fatal();
 
   SmallVector<ValueDecl *, 8> values;
   SmallVector<uint64_t, 8> scratch;
@@ -1351,8 +1323,7 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
       return baseModule->lookupPrecedenceGroup(opName);
     default:
       // Unknown operator kind.
-      error();
-      return nullptr;
+      fatal();
     }
   }
 
@@ -1363,8 +1334,7 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
   default:
     // Unknown xref kind.
     pathTrace.addUnknown(recordID);
-    error();
-    return nullptr;
+    fatal();
   }
 
   auto getXRefDeclNameForError = [&]() -> DeclName {
@@ -1440,10 +1410,8 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
   // For remaining path pieces, filter or drill down into the results we have.
   while (--pathLen) {
     auto entry = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
-    if (entry.Kind != llvm::BitstreamEntry::Record) {
-      error();
-      return nullptr;
-    }
+    if (entry.Kind != llvm::BitstreamEntry::Record)
+      fatal();
 
     scratch.clear();
     unsigned recordID = DeclTypeCursor.readRecord(entry.ID, scratch,
@@ -1622,8 +1590,7 @@ giveUpFastPath:
           auto actualKind = getActualAccessorKind(rawKind);
           if (!actualKind) {
             // Unknown accessor kind.
-            error();
-            return nullptr;
+            fatal();
           }
           values.front() = storage->getAccessor(*actualKind);
           if (!values.front()) {
@@ -1741,8 +1708,7 @@ giveUpFastPath:
     default:
       // Unknown xref path piece.
       pathTrace.addUnknown(recordID);
-      error();
-      return nullptr;
+      fatal();
     }
 
     Optional<PrettyStackTraceModuleFile> traceMsg;
@@ -1766,10 +1732,8 @@ giveUpFastPath:
   // This catches the case where the last path piece we saw was an Extension
   // path piece, which is not a valid way to end a path. (Cross-references to
   // extensions are not allowed because they cannot be uniquely named.)
-  if (M) {
-    error();
-    return nullptr;
-  }
+  if (M)
+    fatal();
 
   // When all is said and done, we should have a single value here to return.
   if (values.size() != 1) {
@@ -1852,10 +1816,8 @@ DeclContext *ModuleFile::getLocalDeclContext(DeclContextID DCID) {
   DeclTypeCursor.JumpToBit(declContextOrOffset);
   auto entry = DeclTypeCursor.advance();
 
-  if (entry.Kind != llvm::BitstreamEntry::Record) {
-    error();
-    return nullptr;
-  }
+  if (entry.Kind != llvm::BitstreamEntry::Record)
+    fatal();
 
   ASTContext &ctx = getContext();
   SmallVector<uint64_t, 64> scratch;
@@ -1944,10 +1906,8 @@ DeclContext *ModuleFile::getDeclContext(DeclContextID DCID) {
   DeclTypeCursor.JumpToBit(declContextOrOffset);
   auto entry = DeclTypeCursor.advance();
 
-  if (entry.Kind != llvm::BitstreamEntry::Record) {
-    error();
-    return nullptr;
-  }
+  if (entry.Kind != llvm::BitstreamEntry::Record)
+    fatal();
 
   SmallVector<uint64_t, 64> scratch;
   StringRef blobData;
@@ -2403,12 +2363,10 @@ public:
 
     alias->setUnderlyingType(MF.getType(underlyingTypeID));
 
-    if (auto accessLevel = getActualAccessLevel(rawAccessLevel)) {
+    if (auto accessLevel = getActualAccessLevel(rawAccessLevel))
       alias->setAccess(*accessLevel);
-    } else {
-      MF.error();
-      return nullptr;
-    }
+    else
+      MF.fatal();
 
     if (isImplicit)
       alias->setImplicit();
@@ -2537,12 +2495,10 @@ public:
     // Read the generic environment.
     MF.configureGenericEnvironment(theStruct, genericEnvID);
 
-    if (auto accessLevel = getActualAccessLevel(rawAccessLevel)) {
+    if (auto accessLevel = getActualAccessLevel(rawAccessLevel))
       theStruct->setAccess(*accessLevel);
-    } else {
-      MF.error();
-      return nullptr;
-    }
+    else
+      MF.fatal();
 
     theStruct->setAddedImplicitInitializers();
     if (isImplicit)
@@ -2641,12 +2597,10 @@ public:
 
     MF.configureGenericEnvironment(ctor, genericEnvID);
 
-    if (auto accessLevel = getActualAccessLevel(rawAccessLevel)) {
+    if (auto accessLevel = getActualAccessLevel(rawAccessLevel))
       ctor->setAccess(*accessLevel);
-    } else {
-      MF.error();
-      return nullptr;
-    }
+    else
+      MF.fatal();
 
     auto *bodyParams = MF.readParameterList();
     assert(bodyParams && "missing parameters for constructor");
@@ -2772,10 +2726,8 @@ public:
 
     auto introducer = getActualVarDeclIntroducer(
         (serialization::VarDeclIntroducer) rawIntroducer);
-    if (!introducer) {
-      MF.error();
-      return nullptr;
-    }
+    if (!introducer)
+      MF.fatal();
 
     auto var = MF.createDecl<VarDecl>(/*IsStatic*/ isStatic, *introducer,
                                       /*IsCaptureList*/ false, SourceLoc(),
@@ -2796,19 +2748,15 @@ public:
     MF.configureStorage(var, opaqueReadOwnership,
                         readImpl, writeImpl, readWriteImpl, accessors);
     auto accessLevel = getActualAccessLevel(rawAccessLevel);
-    if (!accessLevel) {
-      MF.error();
-      return nullptr;
-    }
+    if (!accessLevel)
+      MF.fatal();
 
     var->setAccess(*accessLevel);
 
     if (var->isSettable(nullptr)) {
       auto setterAccess = getActualAccessLevel(rawSetterAccessLevel);
-      if (!setterAccess) {
-        MF.error();
-        return nullptr;
-      }
+      if (!setterAccess)
+        MF.fatal();
       var->setSetterAccess(*setterAccess);
 
       // If we have a less-accessible setter, honor that by adding the
@@ -2892,10 +2840,8 @@ public:
 
     auto specifier = getActualParamDeclSpecifier(
                               (serialization::ParamDeclSpecifier)rawSpecifier);
-    if (!specifier) {
-      MF.error();
-      return nullptr;
-    }
+    if (!specifier)
+      MF.fatal();
 
     auto param = MF.createDecl<ParamDecl>(*specifier, SourceLoc(), SourceLoc(),
                                           MF.getIdentifier(argNameID),
@@ -2910,8 +2856,7 @@ public:
       // error types.
       DC->dumpContext();
       paramTy->dump();
-      MF.error();
-      return nullptr;
+      MF.fatal();
     }
 
     param->setInterfaceType(paramTy);
@@ -2997,12 +2942,10 @@ public:
             errorFlags, numVTableEntries);
       }
 
-      if (auto accessorKindResult = getActualAccessorKind(rawAccessorKind)) {
+      if (auto accessorKindResult = getActualAccessorKind(rawAccessorKind))
         accessorKind = *accessorKindResult;
-      } else {
-        MF.error();
-        return nullptr;
-      }
+      else
+        MF.fatal();
 
       // Deserializing the storage declaration will cause a recurrence
       // into this code.  When we come out, don't create the accessor twice.
@@ -3076,10 +3019,8 @@ public:
     GenericParamList *genericParams = MF.maybeReadGenericParams(DC);
 
     auto staticSpelling = getActualStaticSpellingKind(rawStaticSpelling);
-    if (!staticSpelling.hasValue()) {
-      MF.error();
-      return nullptr;
-    }
+    if (!staticSpelling.hasValue())
+      MF.fatal();
 
     if (declOrOffset.isComplete())
       return declOrOffset;
@@ -3106,19 +3047,15 @@ public:
 
     MF.configureGenericEnvironment(fn, genericEnvID);
 
-    if (auto accessLevel = getActualAccessLevel(rawAccessLevel)) {
+    if (auto accessLevel = getActualAccessLevel(rawAccessLevel))
       fn->setAccess(*accessLevel);
-    } else {
-      MF.error();
-      return nullptr;
-    }
+    else
+      MF.fatal();
 
-    if (auto SelfAccessKind = getActualSelfAccessKind(rawMutModifier)) {
+    if (auto SelfAccessKind = getActualSelfAccessKind(rawMutModifier))
       fn->setSelfAccessKind(*SelfAccessKind);
-    } else {
-      MF.error();
-      return nullptr;
-    }
+    else
+      MF.fatal();
 
     if (!isAccessor) {
       if (Decl *associated = MF.getDecl(associatedDeclID)) {
@@ -3244,10 +3181,8 @@ public:
                                                   numPatterns,
                                                   initContextIDs);
     auto StaticSpelling = getActualStaticSpellingKind(RawStaticSpelling);
-    if (!StaticSpelling.hasValue()) {
-      MF.error();
-      return nullptr;
-    }
+    if (!StaticSpelling.hasValue())
+      MF.fatal();
 
     auto dc = MF.getDeclContext(contextID);
 
@@ -3324,12 +3259,10 @@ public:
     ctx.evaluator.cacheOutput(ExistentialTypeSupportedRequest{proto},
                               std::move(existentialTypeSupported));
 
-    if (auto accessLevel = getActualAccessLevel(rawAccessLevel)) {
+    if (auto accessLevel = getActualAccessLevel(rawAccessLevel))
       proto->setAccess(*accessLevel);
-    } else {
-      MF.error();
-      return nullptr;
-    }
+    else
+      MF.fatal();
 
     auto genericParams = MF.maybeReadGenericParams(DC);
     assert(genericParams && "protocol with no generic parameters?");
@@ -3445,25 +3378,19 @@ public:
     auto DC = MF.getDeclContext(contextID);
 
     auto associativity = getActualAssociativity(rawAssociativity);
-    if (!associativity.hasValue()) {
-      MF.error();
-      return nullptr;
-    }
+    if (!associativity.hasValue())
+      MF.fatal();
 
-    if (numHigherThan > rawRelations.size()) {
-      MF.error();
-      return nullptr;
-    }
+    if (numHigherThan > rawRelations.size())
+      MF.fatal();
 
     SmallVector<PrecedenceGroupDecl::Relation, 4> higherThan;
     for (auto relID : rawRelations.slice(0, numHigherThan)) {
       PrecedenceGroupDecl *rel = nullptr;
       if (relID)
         rel = dyn_cast_or_null<PrecedenceGroupDecl>(MF.getDecl(relID));
-      if (!rel) {
-        MF.error();
-        return nullptr;
-      }
+      if (!rel)
+        MF.fatal();
 
       higherThan.push_back({SourceLoc(), rel->getName(), rel});
     }
@@ -3473,10 +3400,8 @@ public:
       PrecedenceGroupDecl *rel = nullptr;
       if (relID)
         rel = dyn_cast_or_null<PrecedenceGroupDecl>(MF.getDecl(relID));
-      if (!rel) {
-        MF.error();
-        return nullptr;
-      }
+      if (!rel)
+        MF.fatal();
 
       lowerThan.push_back({SourceLoc(), rel->getName(), rel});
     }
@@ -3538,12 +3463,10 @@ public:
 
     MF.configureGenericEnvironment(theClass, genericEnvID);
 
-    if (auto accessLevel = getActualAccessLevel(rawAccessLevel)) {
+    if (auto accessLevel = getActualAccessLevel(rawAccessLevel))
       theClass->setAccess(*accessLevel);
-    } else {
-      MF.error();
-      return nullptr;
-    }
+    else
+      MF.fatal();
 
     theClass->setAddedImplicitInitializers();
     if (isImplicit)
@@ -3612,12 +3535,10 @@ public:
 
     MF.configureGenericEnvironment(theEnum, genericEnvID);
 
-    if (auto accessLevel = getActualAccessLevel(rawAccessLevel)) {
+    if (auto accessLevel = getActualAccessLevel(rawAccessLevel))
       theEnum->setAccess(*accessLevel);
-    } else {
-      MF.error();
-      return nullptr;
-    }
+    else
+      MF.fatal();
 
     theEnum->setAddedImplicitInitializers();
     if (isImplicit)
@@ -3794,10 +3715,8 @@ public:
       return declOrOffset;
     
     auto staticSpelling = getActualStaticSpellingKind(rawStaticSpelling);
-    if (!staticSpelling.hasValue()) {
-      MF.error();
-      return nullptr;
-    }
+    if (!staticSpelling.hasValue())
+      MF.fatal();
 
     auto subscript = MF.createDecl<SubscriptDecl>(name,
                                                   SourceLoc(), *staticSpelling,
@@ -3815,20 +3734,16 @@ public:
     MF.configureStorage(subscript, opaqueReadOwnership,
                         readImpl, writeImpl, readWriteImpl, accessors);
 
-    if (auto accessLevel = getActualAccessLevel(rawAccessLevel)) {
+    if (auto accessLevel = getActualAccessLevel(rawAccessLevel))
       subscript->setAccess(*accessLevel);
-    } else {
-      MF.error();
-      return nullptr;
-    }
+    else
+      MF.fatal();
 
     if (subscript->supportsMutation()) {
-      if (auto setterAccess = getActualAccessLevel(rawSetterAccessLevel)) {
+      if (auto setterAccess = getActualAccessLevel(rawSetterAccessLevel))
         subscript->setSetterAccess(*setterAccess);
-      } else {
-        MF.error();
-        return nullptr;
-      }
+      else
+        MF.fatal();
     }
 
     auto elemInterfaceType = MF.getType(elemInterfaceTypeID);
@@ -4008,8 +3923,7 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
     auto entry = MF.DeclTypeCursor.advance();
     if (entry.Kind != llvm::BitstreamEntry::Record) {
       // We don't know how to serialize decls represented by sub-blocks.
-      MF.error();
-      return llvm::Error::success();
+      MF.fatal();
     }
 
     unsigned recordID = MF.DeclTypeCursor.readRecord(entry.ID, scratch,
@@ -4267,8 +4181,7 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
 
       default:
         // We don't know how to deserialize this kind of attribute.
-        MF.error();
-        return llvm::Error::success();
+        MF.fatal();
       }
 
       if (!Attr)
@@ -4318,8 +4231,7 @@ DeclDeserializer::getDeclCheckedImpl() {
   auto entry = MF.DeclTypeCursor.advance();
   if (entry.Kind != llvm::BitstreamEntry::Record) {
     // We don't know how to serialize decls represented by sub-blocks.
-    MF.error();
-    return nullptr;
+    MF.fatal();
   }
 
   SmallVector<uint64_t, 64> scratch;
@@ -4372,8 +4284,7 @@ DeclDeserializer::getDeclCheckedImpl() {
   
   default:
     // We don't know how to deserialize this kind of decl.
-    MF.error();
-    return nullptr;
+    MF.fatal();
   }
 }
 
@@ -4750,10 +4661,8 @@ public:
     }
 
     auto representation = getActualFunctionTypeRepresentation(rawRepresentation);
-    if (!representation.hasValue()) {
-      MF.error();
-      return nullptr;
-    }
+    if (!representation.hasValue())
+      MF.fatal();
 
     auto info = FunctionType::ExtInfo(*representation, noescape, throws);
 
@@ -4783,10 +4692,8 @@ public:
 
       auto ownership =
           getActualValueOwnership((serialization::ValueOwnership)rawOwnership);
-      if (!ownership) {
-        MF.error();
-        return nullptr;
-      }
+      if (!ownership)
+        MF.fatal();
 
       auto paramTy = MF.getTypeChecked(typeID);
       if (!paramTy)
@@ -4834,10 +4741,8 @@ public:
       return ASTType::get(instanceType.get());
 
     case serialization::MetatypeRepresentation::MR_Thin:
-      if (!CanBeThin) {
-        MF.error();
-        llvm_unreachable("an error is fatal");
-      }
+      if (!CanBeThin)
+        MF.fatal();
       return ASTType::get(instanceType.get(),
                           MetatypeRepresentation::Thin);
 
@@ -4850,8 +4755,7 @@ public:
                           MetatypeRepresentation::ObjC);
 
     default:
-      MF.error();
-      llvm_unreachable("an error is fatal");
+      MF.fatal();
     }
   }
 
@@ -4887,10 +4791,8 @@ public:
 
     auto ownership = getActualReferenceOwnership(
         (serialization::ReferenceOwnership)rawOwnership);
-    if (!ownership.hasValue()) {
-      MF.error();
-      llvm_unreachable("an error is fatal");
-    }
+    if (!ownership.hasValue())
+      MF.fatal();
 
     auto objectTy = MF.getTypeChecked(objectTypeID);
     if (!objectTy)
@@ -4908,18 +4810,14 @@ public:
                                                         depth, index);
 
     auto env = MF.getGenericEnvironment(envID);
-    if (!env) {
-      MF.error();
-      llvm_unreachable("an error is fatal");
-    }
+    if (!env)
+      MF.fatal();
 
     Type interfaceType = GenericTypeParamType::get(depth, index, ctx);
     Type contextType = env->mapTypeIntoContext(interfaceType);
 
-    if (contextType->hasError()) {
-      MF.error();
-      llvm_unreachable("an error is fatal");
-    }
+    if (contextType->hasError())
+      MF.fatal();
 
     return contextType;
   }
@@ -4981,10 +4879,8 @@ public:
       auto genericParam
         = dyn_cast_or_null<GenericTypeParamDecl>(MF.getDecl(declIDOrDepth));
 
-      if (!genericParam) {
-        MF.error();
-        return nullptr;
-      }
+      if (!genericParam)
+        MF.fatal();
 
       return genericParam->getDeclaredInterfaceType();
     }
@@ -5078,10 +4974,8 @@ public:
       BCOffsetRAII saveOffset(MF.DeclTypeCursor);
       MF.DeclTypeCursor.JumpToBit(layoutOrOffset);
       auto layout = MF.readSILLayout(MF.DeclTypeCursor);
-      if (!layout) {
-        MF.error();
-        return nullptr;
-      }
+      if (!layout)
+        MF.fatal();
       layoutOrOffset = layout;
       return layout;
     };
@@ -5124,33 +5018,25 @@ public:
     // Process the ExtInfo.
     auto representation
       = getActualSILFunctionTypeRepresentation(rawRepresentation);
-    if (!representation.hasValue()) {
-      MF.error();
-      return nullptr;
-    }
+    if (!representation.hasValue())
+      MF.fatal();
     SILFunctionType::ExtInfo extInfo(*representation, pseudogeneric, noescape);
 
     // Process the coroutine kind.
     auto coroutineKind = getActualSILCoroutineKind(rawCoroutineKind);
-    if (!coroutineKind.hasValue()) {
-      MF.error();
-      return nullptr;
-    }
+    if (!coroutineKind.hasValue())
+      MF.fatal();
 
     // Process the callee convention.
     auto calleeConvention = getActualParameterConvention(rawCalleeConvention);
-    if (!calleeConvention.hasValue()) {
-      MF.error();
-      return nullptr;
-    }
+    if (!calleeConvention.hasValue())
+      MF.fatal();
 
     auto processParameter = [&](TypeID typeID, uint64_t rawConvention)
                                   -> llvm::Expected<SILParameterInfo> {
       auto convention = getActualParameterConvention(rawConvention);
-      if (!convention) {
-        MF.error();
-        llvm_unreachable("an error is a fatal exit at this point");
-      }
+      if (!convention)
+        MF.fatal();
       auto type = MF.getTypeChecked(typeID);
       if (!type)
         return type.takeError();
@@ -5160,10 +5046,8 @@ public:
     auto processYield = [&](TypeID typeID, uint64_t rawConvention)
                                   -> llvm::Expected<SILYieldInfo> {
       auto convention = getActualParameterConvention(rawConvention);
-      if (!convention) {
-        MF.error();
-        llvm_unreachable("an error is a fatal exit at this point");
-      }
+      if (!convention)
+        MF.fatal();
       auto type = MF.getTypeChecked(typeID);
       if (!type)
         return type.takeError();
@@ -5173,10 +5057,8 @@ public:
     auto processResult = [&](TypeID typeID, uint64_t rawConvention)
                                -> llvm::Expected<SILResultInfo> {
       auto convention = getActualResultConvention(rawConvention);
-      if (!convention) {
-        MF.error();
-        llvm_unreachable("an error is a fatal exit at this point");
-      }
+      if (!convention)
+        MF.fatal();
       auto type = MF.getTypeChecked(typeID);
       if (!type)
         return type.takeError();
@@ -5186,8 +5068,7 @@ public:
     // Bounds check.  FIXME: overflow
     if (2 * numParams + 2 * numResults + 2 * unsigned(hasErrorResult)
           > variableData.size()) {
-      MF.error();
-      return nullptr;
+      MF.fatal();
     }
 
     unsigned nextVariableDataIndex = 0;
@@ -5351,8 +5232,7 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
 
   if (entry.Kind != llvm::BitstreamEntry::Record) {
     // We don't know how to serialize types represented by sub-blocks.
-    MF.error();
-    return nullptr;
+    MF.fatal();
   }
 
   SmallVector<uint64_t, 64> scratch;
@@ -5396,8 +5276,7 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
 
   default:
     // We don't know how to deserialize this kind of type.
-    MF.error();
-    return nullptr;
+    MF.fatal();
   }
 }
 
@@ -5473,10 +5352,8 @@ void ModuleFile::loadAllMembers(Decl *container, uint64_t contextData) {
   BCOffsetRAII restoreOffset(DeclTypeCursor);
   DeclTypeCursor.JumpToBit(contextData);
   auto entry = DeclTypeCursor.advance();
-  if (entry.Kind != llvm::BitstreamEntry::Record) {
-    error();
-    return;
-  }
+  if (entry.Kind != llvm::BitstreamEntry::Record)
+    fatal();
 
   SmallVector<uint64_t, 16> memberIDBuffer;
 
@@ -5844,10 +5721,8 @@ Optional<ForeignErrorConvention> ModuleFile::maybeReadForeignErrorConvention() {
   ForeignErrorConvention::Kind kind;
   if (auto optKind = decodeRawStableForeignErrorConventionKind(rawKind))
     kind = *optKind;
-  else {
-    error();
-    return None;
-  }
+  else
+    fatal();
 
   Type errorParameterType = getType(errorParameterTypeID);
   CanType canErrorParameterType;
