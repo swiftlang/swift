@@ -260,6 +260,7 @@ public:
     Hash = (Hash << 1) | DisableLLVMOptzns;
     Hash = (Hash << 1) | DisableSwiftSpecificLLVMOptzns;
     Hash = (Hash << 1) | GenerateProfile;
+    Hash = (Hash << 1) | Sanitizers.contains(SanitizerKind::Fuzzer);
     return Hash;
   }
 
