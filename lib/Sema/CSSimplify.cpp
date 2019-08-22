@@ -3715,6 +3715,23 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
                                  ConstraintKind kind,
                                  ConstraintLocatorBuilder locator,
                                  TypeMatchOptions flags) {
+  if (shouldAttemptFixes()) {
+    auto *typeVar = type->getAs<TypeVariableType>();
+    // If type variable, associated with this conformance check,
+    // has been determined to be a "hole" in constraint system,
+    // let's consider this check a success without recording
+    // a fix, because it's just a consequence of other failure
+    // e.g.
+    //
+    // func foo<T: BinaryInteger>(_: T) {}
+    // foo(Foo.bar) <- if `Foo` doesn't have `bar` there is
+    //                 no reason to complain about missing conformance.
+    if (typeVar && isHole(typeVar)) {
+      increaseScore(SK_Fix);
+      return SolutionKind::Solved;
+    }
+  }
+
   // Dig out the fixed type to which this type refers.
   type = getFixedTypeRecursive(type, flags, /*wantRValue=*/true);
 
@@ -5266,14 +5283,22 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
     // fake its presence based on use, that makes it possible to diagnose
     // problems related to member lookup more precisely.
 
+    auto defaultTypeVariableToAny = [&](TypeVariableType *typeVar) {
+      // Recording this generic parameter is a potential "hole" in
+      // the constraint system.
+      recordHole(typeVar);
+      // Default all of the generic parameters found in base to `Any`.
+      addConstraint(ConstraintKind::Defaultable, typeVar,
+                    getASTContext().TheAnyType,
+                    typeVar->getImpl().getLocator());
+    };
+
     origBaseTy.transform([&](Type type) -> Type {
       if (auto *typeVar = type->getAs<TypeVariableType>()) {
         if (typeVar->getImpl().hasRepresentativeOrFixed())
           return type;
-        // Default all of the generic parameters found in base to `Any`.
-        addConstraint(ConstraintKind::Defaultable, typeVar,
-                      getASTContext().TheAnyType,
-                      typeVar->getImpl().getLocator());
+
+        defaultTypeVariableToAny(typeVar);
       }
       return type;
     });
@@ -5286,8 +5311,9 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
     // Allow member type to default to `Any` to make it possible to form
     // solutions when contextual type of the result cannot be deduced e.g.
     // `let _ = x.foo`.
-    addConstraint(ConstraintKind::Defaultable, memberTy,
-                  getASTContext().TheAnyType, locator);
+    if (auto *memberTypeVar = memberTy->getAs<TypeVariableType>())
+      defaultTypeVariableToAny(memberTypeVar);
+
     return SolutionKind::Solved;
   }
   return SolutionKind::Error;

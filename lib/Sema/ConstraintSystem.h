@@ -1095,6 +1095,14 @@ private:
 
   /// The set of fixes applied to make the solution work.
   llvm::SmallVector<ConstraintFix *, 4> Fixes;
+
+  /// The set of "holes" in the constraint system encountered
+  /// along the current path identified by locator. A "hole" is
+  /// a type variable which type couldn't be determined due to
+  /// an inference failure e.g. missing member, ambiguous generic
+  /// parameter which hasn't been explicitly specified.
+  llvm::SmallSetVector<ConstraintLocator *, 4> Holes;
+
   /// The set of type variables representing types of missing members.
   llvm::SmallSetVector<ConstraintLocator *, 4> MissingMembers;
 
@@ -1631,6 +1639,9 @@ public:
     /// The length of \c Fixes.
     unsigned numFixes;
 
+    /// The length of \c Holes.
+    unsigned numHoles;
+
     /// The length of \c FixedRequirements.
     unsigned numFixedRequirements;
 
@@ -2033,6 +2044,18 @@ public:
   /// Log and record the application of the fix. Return true iff any
   /// subsequent solution would be worse than the best known solution.
   bool recordFix(ConstraintFix *fix);
+
+  void recordHole(TypeVariableType *typeVar) {
+    Holes.insert(typeVar->getImpl().getLocator());
+  }
+
+  bool isHole(TypeVariableType *typeVar) const {
+    return isHoleAt(typeVar->getImpl().getLocator());
+  }
+
+  bool isHoleAt(ConstraintLocator *locator) const {
+    return bool(Holes.count(locator));
+  }
 
   /// Determine whether constraint system already has a fix recorded
   /// for a particular location.
