@@ -25,7 +25,7 @@ struct YieldVariables {
     }
     _modify {
       var x = 0
-      yield &x // expected-error {{cannot yield immutable value of type 'Int' as an inout yield of type 'String'}}
+      yield &x // expected-error {{cannot yield reference to storage of type 'Int' as an inout yield of type 'String'}}
     }
   }
 

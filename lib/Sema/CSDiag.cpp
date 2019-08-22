@@ -1683,24 +1683,6 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
   if (isUnresolvedOrTypeVarType(exprType) || exprType->isEqual(contextualType))
     return false;
 
-  if (CTP == CTP_YieldByReference) {
-    if (auto contextualLV = contextualType->getAs<LValueType>())
-      contextualType = contextualLV->getObjectType();
-    if (auto exprLV = exprType->getAs<LValueType>()) {
-      diagnose(expr->getLoc(), diag::cannot_yield_wrong_type_by_reference,
-               exprLV->getObjectType(), contextualType);
-    } else if (exprType->isEqual(contextualType)) {
-      diagnose(expr->getLoc(), diag::cannot_yield_rvalue_by_reference_same_type,
-               exprType);
-    } else {
-      diagnose(expr->getLoc(), diag::cannot_yield_rvalue_by_reference, exprType,
-               contextualType);
-    }
-    return true;
-  }
-
-  exprType = exprType->getRValueType();
-
   // Don't attempt fixits if we have an unsolved type variable, since
   // the recovery path's recursion into the type checker via typeCheckCast()
   // will confuse matters.
