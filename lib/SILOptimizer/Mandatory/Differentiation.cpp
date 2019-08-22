@@ -5981,17 +5981,20 @@ public:
   AllocStackInst *
   emitArrayTangentSubscript(ApplyInst *ai, SILType eltType,
                             SILValue adjointArray,
+                            AccessorDecl *subscriptGetter,
                             FunctionRefInst *subscriptRef,
                             CanGenericSignature genericSig, int index) {
     auto &ctx = builder.getASTContext();
     auto astType = eltType.getASTType();
+    auto arrayTanStruct = adjointArray->getType().castTo<StructType>();
+    auto memberSubs = arrayTanStruct->getMemberSubstitutionMap(
+        subscriptGetter->getModuleContext(), subscriptGetter);
     auto literal = builder.createIntegerLiteral(
         ai->getLoc(), SILType::getBuiltinIntegerType(64, ctx), index);
     auto intType = SILType::getPrimitiveObjectType(
         ctx.getIntDecl()->getDeclaredType()->getCanonicalType());
     auto intStruct = builder.createStruct(ai->getLoc(), intType, {literal});
-    AllocStackInst *subscriptBuffer =
-        builder.createAllocStack(ai->getLoc(), eltType);
+    auto *subscriptBuffer = builder.createAllocStack(ai->getLoc(), eltType);
     auto swiftModule = getModule().getSwiftModule();
     auto diffProto = ctx.getProtocol(KnownProtocolKind::Differentiable);
     auto diffConf = swiftModule->lookupConformance(astType, diffProto);
@@ -6000,11 +6003,7 @@ public:
     auto addArithConf = swiftModule->lookupConformance(astType, addArithProto);
     assert(addArithConf.hasValue() &&
            "Missing conformance to `AdditiveArithmetic`");
-//    auto subMap =
-//        SubstitutionMap::get(genericSig, {astType}, {*addArithConf, *diffConf});
-    auto subMap = subscriptRef->getInitiallyReferencedFunction()
-        ->getForwardingSubstitutionMap();
-    builder.createApply(ai->getLoc(), subscriptRef, subMap,
+    builder.createApply(ai->getLoc(), subscriptRef, memberSubs,
                         {subscriptBuffer, intStruct, adjointArray});
     return subscriptBuffer;
   }
@@ -6038,6 +6037,7 @@ public:
   void visitArrayInitialization(ApplyInst *ai) {
     LLVM_DEBUG(getADDebugStream() << "Visiting array initialization:\n" << *ai);
     SILValue adjointArray;
+    AccessorDecl *subsGetter;
     FunctionRefInst *fnRef;
     CanGenericSignature genericSig;
     for (auto use : ai->getUses()) {
@@ -6051,8 +6051,8 @@ public:
       auto typeDecl = astType->getStructOrBoundGenericStruct();
       auto subscriptDecl = cast<SubscriptDecl>(typeDecl->lookupDirect(
           DeclBaseName::createSubscript()).front());
-      auto subscriptGet = subscriptDecl->getAccessor(AccessorKind::Get);
-      SILDeclRef subscriptRef(subscriptGet, SILDeclRef::Kind::Func);
+      subsGetter = subscriptDecl->getAccessor(AccessorKind::Get);
+      SILDeclRef subscriptRef(subsGetter, SILDeclRef::Kind::Func);
       auto fnBuilder = SILOptFunctionBuilder(getContext().getTransform());
       auto fn = fnBuilder.getOrCreateFunction(
           ai->getLoc(), subscriptRef, NotForDefinition);
@@ -6061,6 +6061,7 @@ public:
     }
     assert(adjointArray && "Array does not have adjoint value");
     assert(genericSig && "No generic signature");
+    assert(subsGetter && "No subscript getter");
     assert(fnRef && "cannot create function_ref");
     // Two loops because the tuple_extract instructions can be reached in
     // either order.
@@ -6079,13 +6080,13 @@ public:
           if (auto si = dyn_cast<StoreInst>(inst)) {
             auto tanType = getRemappedTangentType(si->getSrc()->getType());
             auto subscriptBuffer = emitArrayTangentSubscript(
-                ai, tanType, adjointArray, fnRef, genericSig, 0);
+                ai, tanType, adjointArray, subsGetter, fnRef, genericSig, 0);
             accumulateArrayTangentSubscriptDirect(
                 ai, tanType, si, subscriptBuffer);
           } else if (auto cai = dyn_cast<CopyAddrInst>(inst)) {
             auto tanType = getRemappedTangentType(cai->getSrc()->getType());
             auto subscriptBuffer = emitArrayTangentSubscript(
-                ai, tanType, adjointArray, fnRef, genericSig, 0);
+                ai, tanType, adjointArray, subsGetter, fnRef, genericSig, 0);
             accumulateArrayTangentSubscriptIndirect(
                 ai, cai, subscriptBuffer);
           } else if (auto iai = dyn_cast<IndexAddrInst>(inst)) {
@@ -6095,7 +6096,7 @@ public:
                 auto tanType = getRemappedTangentType(
                     si->getSrc()->getType());
                 auto subscriptBuffer = emitArrayTangentSubscript(
-                    ai, tanType, adjointArray, fnRef,
+                    ai, tanType, adjointArray, subsGetter, fnRef,
                     genericSig, literal->getValue().getLimitedValue());
                 accumulateArrayTangentSubscriptDirect(
                     ai, tanType, si, subscriptBuffer);
@@ -6104,7 +6105,7 @@ public:
                 auto tanType = getRemappedTangentType(
                     cai->getSrc()->getType());
                 auto subscriptBuffer = emitArrayTangentSubscript(
-                    ai, tanType, adjointArray, fnRef,
+                    ai, tanType, adjointArray, subsGetter, fnRef,
                     genericSig, literal->getValue().getLimitedValue());
                 accumulateArrayTangentSubscriptIndirect(
                     ai, cai, subscriptBuffer);

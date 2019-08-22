@@ -34,7 +34,7 @@ ArrayAutoDiffTests.test("ArrayLiteral") {
   }
 
   let (gradX, gradY) = pullback(at: Tracked<Float>(1), Tracked<Float>(1), in: twoElementLiteral)(
-    Array<Tracked<Float>>.DifferentiableView([Tracked<Float>(1), Tracked<Float>(2)]))
+    Array<Tracked<Float>>.TangentVector([Tracked<Float>(1), Tracked<Float>(2)]))
 
   expectEqual(Tracked<Float>(1), gradX)
   expectEqual(Tracked<Float>(2), gradY)
@@ -50,7 +50,7 @@ ArrayAutoDiffTests.test("ArrayLiteralIndirect") {
   }
 
   let (gradX, gradY) = pullback(at: Float(1), Float(1), in: twoElementLiteralIndirectWrapper)(
-    Array<Float>.DifferentiableView([Float(1), Float(2)]))
+    Array<Float>.TangentVector([Float(1), Float(2)]))
 
   expectEqual(Float(1), gradX)
   expectEqual(Float(2), gradY)
@@ -90,37 +90,37 @@ ArrayAutoDiffTests.test("ArrayConcat") {
       in: sumFirstThreeConcatted))
 }
 
-ArrayAutoDiffTests.test("Array.DifferentiableView.init") {
-  @differentiable
-  func constructView(_ x: [Float]) -> Array<Float>.DifferentiableView {
-    return Array<Float>.DifferentiableView(x)
-  }
+// TODO(TF-768): Re-enable when `init(_:)` is differentiable.
+// ArrayAutoDiffTests.test("Array.TangentVector.init") {
+//   @differentiable
+//   func constructView(_ x: [Float]) -> Array<Float>.TangentVector {
+//     return Array<Float>.TangentVector(x)
+//   }
+//   let backprop = pullback(at: [5, 6, 7, 8], in: constructView)
+//   expectEqual(
+//     FloatArrayGrad([1, 2, 3, 4]),
+//     backprop(FloatArrayGrad([1, 2, 3, 4])))
+// }
 
-  let backprop = pullback(at: [5, 6, 7, 8], in: constructView)
-  expectEqual(
-    FloatArrayGrad([1, 2, 3, 4]),
-    backprop(FloatArrayGrad([1, 2, 3, 4])))
-}
+// TODO(TF-768): Re-enable when `elements` is differentiable.
+// ArrayAutoDiffTests.test("Array.TangentVector.elements") {
+//   @differentiable
+//   func accessElements(_ x: Array<Float>.TangentVector) -> [Float] {
+//     return x.elements
+//   }
+//   let backprop = pullback(
+//     at: Array<Float>.TangentVector([5, 6, 7, 8]),
+//     in: accessElements)
+//   expectEqual(
+//     FloatArrayGrad([1, 2, 3, 4]),
+//     backprop(FloatArrayGrad([1, 2, 3, 4])))
+// }
 
-ArrayAutoDiffTests.test("Array.DifferentiableView.base") {
-  @differentiable
-  func accessBase(_ x: Array<Float>.DifferentiableView) -> [Float] {
-    return x.base
-  }
-
-  let backprop = pullback(
-    at: Array<Float>.DifferentiableView([5, 6, 7, 8]),
-    in: accessBase)
-  expectEqual(
-    FloatArrayGrad([1, 2, 3, 4]),
-    backprop(FloatArrayGrad([1, 2, 3, 4])))
-}
-
-ArrayAutoDiffTests.test("Array.DifferentiableView : KeyPathIterable") {
+ArrayAutoDiffTests.test("Array.TangentVector : KeyPathIterable") {
   struct Container : KeyPathIterable {
-    let a: Array<Float>.DifferentiableView
+    let a: Array<Float>.TangentVector
   }
-  let container = Container(a: Array<Float>.DifferentiableView([1, 2, 3]))
+  let container = Container(a: Array<Float>.TangentVector([1, 2, 3]))
   expectEqual(
     [1, 2, 3],
     container.recursivelyAllKeyPaths(to: Float.self).map {
