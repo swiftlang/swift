@@ -637,6 +637,6 @@ outerLoop1: repeat { // expected-note {{did you mean 'outerLoop1'?}} {{14-23=out
 
 // Errors in case syntax
 class
-case, // expected-error {{expected identifier in enum 'case' declaration}} expected-error {{expected pattern}}
-case  // expected-error {{expected identifier after comma in enum 'case' declaration}} expected-error {{expected identifier in enum 'case' declaration}} expected-error {{enum 'case' is not allowed outside of an enum}} expected-error {{expected pattern}}
+case, // expected-error {{expected identifier in enum 'case' declaration}} expected-error {{expected identifier after comma in enum 'case' declaration}}
+case  // expected-error {{expected identifier in enum 'case' declaration}} expected-error {{enum 'case' is not allowed outside of an enum}}
 // NOTE: EOF is important here to properly test a code path that used to crash the parser
