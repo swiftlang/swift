@@ -17,19 +17,6 @@
 namespace llvm {
 namespace yaml {
 
-using Impl = ScalarTraits<StringRef>;
-void ScalarTraits<FlowStringRef>::output(const FlowStringRef &value, void *ctx,
-                                         raw_ostream &os) {
-  Impl::output(value, ctx, os);
-}
-StringRef ScalarTraits<FlowStringRef>::input(StringRef value, void *ctx,
-                                             FlowStringRef &out) {
-  return Impl::input(value, ctx, out.value);
-}
-QuotingType ScalarTraits<FlowStringRef>::mustQuote(StringRef name) {
-  return Impl::mustQuote(name);
-}
-
 using tapi::ObjCConstraint;
 void ScalarEnumerationTraits<ObjCConstraint>::enumeration(
     IO &io, ObjCConstraint &constraint) {
@@ -93,46 +80,6 @@ StringRef ScalarTraits<PackedVersion>::input(StringRef scalar, void *,
   return {};
 }
 QuotingType ScalarTraits<PackedVersion>::mustQuote(StringRef) {
-  return QuotingType::None;
-}
-
-void ScalarTraits<SwiftVersion>::output(const SwiftVersion &value, void *,
-                                        raw_ostream &os) {
-  switch (value) {
-  case 1:
-    os << "1.0";
-    break;
-  case 2:
-    os << "1.1";
-    break;
-  case 3:
-    os << "2.0";
-    break;
-  case 4:
-    os << "3.0";
-    break;
-  default:
-    os << (unsigned)value;
-    break;
-  }
-}
-StringRef ScalarTraits<SwiftVersion>::input(StringRef scalar, void *,
-                                            SwiftVersion &value) {
-  value = StringSwitch<SwiftVersion>(scalar)
-              .Case("1.0", 1)
-              .Case("1.1", 2)
-              .Case("2.0", 3)
-              .Case("3.0", 4)
-              .Default(0);
-  if (value != SwiftVersion(0))
-    return {};
-
-  if (scalar.getAsInteger(10, value))
-    return "invalid Swift ABI version.";
-
-  return StringRef();
-}
-QuotingType ScalarTraits<SwiftVersion>::mustQuote(StringRef) {
   return QuotingType::None;
 }
 
