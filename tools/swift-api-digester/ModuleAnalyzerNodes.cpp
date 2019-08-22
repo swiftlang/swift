@@ -2065,11 +2065,17 @@ void SwiftDeclCollector::serialize(StringRef Filename) {
   SwiftDeclCollector::serialize(Filename, RootNode);
 }
 
+SDKNodeRoot *
+swift::ide::api::getEmptySDKNodeRoot(SDKContext &SDKCtx) {
+  SwiftDeclCollector Collector(SDKCtx);
+  return Collector.getSDKRoot();
+}
+
 SDKNodeRoot*
 swift::ide::api::getSDKNodeRoot(SDKContext &SDKCtx,
                                  const CompilerInvocation &InitInvok,
-                                 const llvm::StringSet<> &ModuleNames,
-                                 CheckerOptions Opts) {
+                                 const llvm::StringSet<> &ModuleNames) {
+  CheckerOptions Opts = SDKCtx.getOpts();
   CompilerInvocation Invocation(InitInvok);
 
   CompilerInstance &CI = SDKCtx.newCompilerInstance();
@@ -2115,18 +2121,24 @@ swift::ide::api::getSDKNodeRoot(SDKContext &SDKCtx,
   return Collector.getSDKRoot();
 }
 
-int swift::ide::api::dumpSDKContent(const CompilerInvocation &InitInvok,
-                                    const llvm::StringSet<> &ModuleNames,
-                                    StringRef OutputFile, CheckerOptions Opts) {
-  SDKContext SDKCtx(Opts);
-  SDKNode *Root = getSDKNodeRoot(SDKCtx, InitInvok, ModuleNames, Opts);
-  if (!Root)
-    return 1;
+void swift::ide::api::dumpSDKRoot(SDKNodeRoot *Root, StringRef OutputFile) {
+  assert(Root);
+  auto Opts = Root->getSDKContext().getOpts();
   if (Opts.Verbose)
     llvm::errs() << "Dumping SDK...\n";
   SwiftDeclCollector::serialize(OutputFile, Root);
   if (Opts.Verbose)
     llvm::errs() << "Dumped to "<< OutputFile << "\n";
+}
+
+int swift::ide::api::dumpSDKContent(const CompilerInvocation &InitInvok,
+                                    const llvm::StringSet<> &ModuleNames,
+                                    StringRef OutputFile, CheckerOptions Opts) {
+  SDKContext SDKCtx(Opts);
+  SDKNodeRoot *Root = getSDKNodeRoot(SDKCtx, InitInvok, ModuleNames);
+  if (!Root)
+    return 1;
+  dumpSDKRoot(Root, OutputFile);
   return 0;
 }
 
