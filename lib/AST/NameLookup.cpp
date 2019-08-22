@@ -1834,7 +1834,9 @@ static DirectlyReferencedTypeDecls
 directReferencesForUnqualifiedTypeLookup(DeclName name,
                                          SourceLoc loc, DeclContext *dc) {
   DirectlyReferencedTypeDecls results;
-  UnqualifiedLookup::Options options = UnqualifiedLookup::Flags::TypeLookup;
+  UnqualifiedLookup::Options options =
+      UnqualifiedLookup::Flags::TypeLookup |
+      UnqualifiedLookup::Flags::AllowProtocolMembers;
   UnqualifiedLookup lookup(name, dc, loc, options);
   for (const auto &result : lookup.Results) {
     if (auto typeDecl = dyn_cast<TypeDecl>(result.getValueDecl()))
