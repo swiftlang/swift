@@ -1974,10 +1974,16 @@ extension Array: Differentiable where Element: Differentiable {
     }
     @inlinable
     public subscript(_ index: Int) -> Element {
-      if index < elements.count {
-        return elements[index]
+      get {
+        if index < elements.count {
+          return elements[index]
+        }
+        return .zero
       }
-      return .zero
+      set {
+        precondition(index < elements.count, "Index out of bounds")
+        elements[index] = newValue
+      }
     }
   }
 
