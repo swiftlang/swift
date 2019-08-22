@@ -392,8 +392,8 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
       // an extra twist, `Pointee` is allowed (but not required) to be an
       // optional type, so we actually need to load it as an optional, and
       // explicitly handle the nil case.
-      let unmanaged = UnsafeRawPointer(_rawValue)
-        .load(as: Optional<Unmanaged<AnyObject>>.self)
+      let unmanaged =
+        UnsafePointer<Optional<Unmanaged<AnyObject>>>(_rawValue).pointee
       return unsafeBitCast(
         unmanaged?.takeUnretainedValue(),
         to: Pointee.self)
@@ -413,9 +413,8 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
       } else {
         unmanaged = nil
       }
-      UnsafeMutableRawPointer(_rawValue).storeBytes(
-        of: unmanaged,
-        as: Optional<Unmanaged<AnyObject>>.self)
+      UnsafeMutablePointer<Optional<Unmanaged<AnyObject>>>(_rawValue).pointee =
+        unmanaged
     }
   }
 
