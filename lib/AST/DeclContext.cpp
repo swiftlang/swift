@@ -106,10 +106,8 @@ GenericTypeParamType *DeclContext::getProtocolSelfType() const {
 }
 
 Type DeclContext::getDeclaredTypeInContext() const {
-  if (auto *ED = dyn_cast<ExtensionDecl>(this))
-    return ED->mapTypeIntoContext(getDeclaredInterfaceType());
-  if (auto *NTD = dyn_cast<NominalTypeDecl>(this))
-    return NTD->getDeclaredTypeInContext();
+  if (auto declaredType = getDeclaredInterfaceType())
+    return mapTypeIntoContext(declaredType);
   return Type();
 }
 

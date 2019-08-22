@@ -3319,7 +3319,6 @@ class NominalTypeDecl : public GenericTypeDecl, public IterableDeclContext {
 
 protected:
   Type DeclaredTy;
-  Type DeclaredTyInContext;
   Type DeclaredInterfaceTy;
 
   NominalTypeDecl(DeclKind K, DeclContext *DC, Identifier name,
@@ -3377,10 +3376,6 @@ public:
   /// getDeclaredType - Retrieve the type declared by this entity, without
   /// any generic parameters bound if this is a generic type.
   Type getDeclaredType() const;
-
-  /// getDeclaredTypeInContext - Retrieve the type declared by this entity, with
-  /// context archetypes bound if this is a generic type.
-  Type getDeclaredTypeInContext() const;
 
   /// getDeclaredInterfaceType - Retrieve the type declared by this entity, with
   /// generic parameters bound if this is a generic type.

@@ -3446,18 +3446,6 @@ Type NominalTypeDecl::getDeclaredType() const {
   return DeclaredTy;
 }
 
-Type NominalTypeDecl::getDeclaredTypeInContext() const {
-  if (DeclaredTyInContext)
-    return DeclaredTyInContext;
-
-  auto *decl = const_cast<NominalTypeDecl *>(this);
-
-  auto interfaceType = getDeclaredInterfaceType();
-  decl->DeclaredTyInContext = mapTypeIntoContext(interfaceType);
-
-  return DeclaredTyInContext;
-}
-
 Type NominalTypeDecl::getDeclaredInterfaceType() const {
   if (DeclaredInterfaceTy)
     return DeclaredInterfaceTy;
