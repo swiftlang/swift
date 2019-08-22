@@ -314,7 +314,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
           First = First.subst(subMap);
           Second = Second.subst(subMap);
 
-          if (!First || !Second) {
+          if (First->hasError() || Second->hasError()) {
             // Substitution with interface type bases can only fail
             // if a concrete type fails to conform to a protocol.
             // In this case, just give up on the extension altogether.

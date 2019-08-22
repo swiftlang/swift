@@ -610,8 +610,7 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
       ConcreteDeclRef memberRef(underlyingVar, subs);
       auto *memberRefExpr = new (ctx) MemberRefExpr(
           result, SourceLoc(), memberRef, DeclNameLoc(), /*Implicit=*/true);
-      auto type = underlyingVar->getValueInterfaceType()
-          .subst(subs, SubstFlags::UseErrorType);
+      auto type = underlyingVar->getValueInterfaceType().subst(subs);
       if (isLValue)
         type = LValueType::get(type);
       memberRefExpr->setType(type);
@@ -716,8 +715,7 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
     assert(target != TargetImpl::Super);
     auto *storageDRE = new (ctx) DeclRefExpr(storage, DeclNameLoc(),
                                              /*IsImplicit=*/true, semantics);
-    auto type = storage->getValueInterfaceType()
-        .subst(subs, SubstFlags::UseErrorType);
+    auto type = storage->getValueInterfaceType().subst(subs);
     if (isLValue)
       type = LValueType::get(type);
     storageDRE->setType(type);
@@ -752,8 +750,7 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
 
   Expr *lookupExpr;
   ConcreteDeclRef memberRef(storage, subs);
-  auto type = storage->getValueInterfaceType()
-      .subst(subs, SubstFlags::UseErrorType);
+  auto type = storage->getValueInterfaceType().subst(subs);
   if (isMemberLValue)
     type = LValueType::get(type);
 
@@ -761,8 +758,7 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
   // that accepts the enclosing self along with key paths, form that subscript
   // operation now.
   if (enclosingSelfAccess) {
-    Type storageType = storage->getValueInterfaceType()
-        .subst(subs, SubstFlags::UseErrorType);
+    Type storageType = storage->getValueInterfaceType().subst(subs);
     // Metatype instance for the wrapper type itself.
     TypeExpr *wrapperMetatype = TypeExpr::createImplicit(storageType, ctx);
 
@@ -1396,8 +1392,7 @@ synthesizeObservedSetterBody(AccessorDecl *Set, TargetImpl target,
 
   auto callObserver = [&](AccessorDecl *observer, VarDecl *arg) {
     ConcreteDeclRef ref(observer, subs);
-    auto type = observer->getInterfaceType()
-                  .subst(subs, SubstFlags::UseErrorType);
+    auto type = observer->getInterfaceType().subst(subs);
     Expr *Callee = new (Ctx) DeclRefExpr(ref, DeclNameLoc(), /*imp*/true);
     Callee->setType(type);
     auto *ValueDRE = new (Ctx) DeclRefExpr(arg, DeclNameLoc(), /*imp*/true);

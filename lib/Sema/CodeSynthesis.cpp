@@ -548,8 +548,7 @@ synthesizeDesignatedInitOverride(AbstractFunctionDecl *fn, void *context) {
   subs = SubstitutionMap::getOverrideSubstitutions(superclassCtor, fn, subs);
   ConcreteDeclRef ctorRef(superclassCtor, subs);
 
-  auto type = superclassCtor->getInitializerInterfaceType()
-      .subst(subs, SubstFlags::UseErrorType);
+  auto type = superclassCtor->getInitializerInterfaceType().subst(subs);
   auto *ctorRefExpr =
       new (ctx) OtherConstructorDeclRefExpr(ctorRef, DeclNameLoc(),
                                             IsImplicit, type);
@@ -665,7 +664,7 @@ createDesignatedInitOverride(ClassDecl *classDecl,
     auto *bodyParam = bodyParams->get(idx);
 
     auto paramTy = superclassParam->getInterfaceType();
-    auto substTy = paramTy.subst(subMap, SubstFlags::UseErrorType);
+    auto substTy = paramTy.subst(subMap);
 
     bodyParam->setInterfaceType(substTy);
     bodyParam->getTypeLoc() = TypeLoc::withoutLoc(substTy);

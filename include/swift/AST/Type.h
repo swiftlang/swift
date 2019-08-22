@@ -136,19 +136,16 @@ public:
   
 /// Flags that can be passed when substituting into a type.
 enum class SubstFlags {
-  /// If a type cannot be produced because some member type is
-  /// missing, place an 'error' type into the position of the base.
-  UseErrorType = 0x01,
   /// Allow substitutions to recurse into SILFunctionTypes.
   /// Normally, SILType::subst() should be used for lowered
   /// types, however in special cases where the substitution
   /// is just changing between contextual and interface type
   /// representations, using Type::subst() is allowed.
-  AllowLoweredTypes = 0x02,
+  AllowLoweredTypes = 0x01,
   /// Map member types to their desugared witness type.
-  DesugarMemberTypes = 0x04,
+  DesugarMemberTypes = 0x02,
   /// Substitute types involving opaque type archetypes.
-  SubstituteOpaqueArchetypes = 0x08,
+  SubstituteOpaqueArchetypes = 0x04,
 };
 
 /// Options for performing substitutions into a type.
@@ -295,7 +292,7 @@ public:
   ///
   /// \returns the substituted type, or a null type if an error occurred.
   Type subst(SubstitutionMap substitutions,
-             SubstOptions options = None) const;
+             SubstOptions options=None) const;
 
   /// Replace references to substitutable types with new, concrete types and
   /// return the substituted result.
@@ -310,7 +307,7 @@ public:
   /// \returns the substituted type, or a null type if an error occurred.
   Type subst(TypeSubstitutionFn substitutions,
              LookupConformanceFn conformances,
-             SubstOptions options = None) const;
+             SubstOptions options=None) const;
 
   /// Replace references to substitutable types with error types.
   Type substDependentTypesWithErrorTypes() const;
