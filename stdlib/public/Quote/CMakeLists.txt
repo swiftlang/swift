@@ -18,11 +18,8 @@ if(NOT SWIFT_ENABLE_TENSORFLOW)
   return()
 endif()
 
-message(STATUS "Building Quote.")
-
 set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
 set(swift_stdlib_compile_flags "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}")
-list(APPEND swift_stdlib_compile_flags "-DCOMPILING_QUOTE_MODULE")
 
 set(SOURCES "")
 
@@ -30,7 +27,6 @@ set(SOURCES "")
 if (TENSORFLOW_SWIFT_QUOTE)
   file(GLOB_RECURSE TENSORFLOW_SWIFT_QUOTE_SOURCES
     "${TENSORFLOW_SWIFT_QUOTE}/Sources/Quote/*.swift")
-  message(STATUS "Using Quote library.")
   list(APPEND SOURCES "${TENSORFLOW_SWIFT_QUOTE_SOURCES}")
 endif()
 
