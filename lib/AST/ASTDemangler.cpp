@@ -198,9 +198,6 @@ Type ASTBuilder::createTypeAliasType(GenericTypeDecl *decl, Type parent) {
 
   // FIXME: subst() should build the sugar for us
   declaredType = declaredType.subst(subs);
-  if (!declaredType)
-    return Type();
-
   return TypeAliasType::get(aliasDecl, parent, subs, declaredType);
 }
 
@@ -251,8 +248,7 @@ Type ASTBuilder::createBoundGenericType(GenericTypeDecl *decl,
 
   // FIXME: We're not checking that the type satisfies the generic
   // requirements of the signature here.
-  auto substType = origType.subst(subs);
-  return substType;
+  return origType.subst(subs);
 }
 
 Type ASTBuilder::resolveOpaqueType(NodePointer opaqueDescriptor,
@@ -335,9 +331,6 @@ Type ASTBuilder::createBoundGenericType(GenericTypeDecl *decl,
 
   // FIXME: subst() should build the sugar for us
   auto declaredType = aliasDecl->getDeclaredInterfaceType().subst(subMap);
-  if (!declaredType)
-    return Type();
-
   return TypeAliasType::get(aliasDecl, parent, subMap, declaredType);
 }
 

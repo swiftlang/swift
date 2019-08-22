@@ -1398,7 +1398,6 @@ private:
     Type objcType = ProtocolConformanceRef(conformance).getTypeWitnessByName(
                                            nominal->getDeclaredType(),
                                            ctx.Id_ObjectiveCType);
-    if (!objcType) return nullptr;
 
     // Dig out the Objective-C class.
     return objcType->getClassOrBoundGenericClass();

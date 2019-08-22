@@ -1276,9 +1276,7 @@ namespace {
           M.getASTContext().getLazyResolver()->resolveDeclSignature(field);
 
         auto substFieldType =
-          field->getInterfaceType()
-            .subst(subMap, SubstFlags::UseErrorType)
-            ->getCanonicalType();
+          field->getInterfaceType().subst(subMap)->getCanonicalType();
 
         properties.addSubobject(classifyType(substFieldType->getCanonicalType(),
                                              M, Sig, Expansion));
@@ -1326,9 +1324,7 @@ namespace {
           M.getASTContext().getLazyResolver()->resolveDeclSignature(elt);
 
         auto substEltType =
-          elt->getArgumentInterfaceType()
-            .subst(subMap, SubstFlags::UseErrorType)
-            ->getCanonicalType();
+          elt->getArgumentInterfaceType().subst(subMap)->getCanonicalType();
         
         properties.addSubobject(classifyType(substEltType, M, Sig, Expansion));
       }
