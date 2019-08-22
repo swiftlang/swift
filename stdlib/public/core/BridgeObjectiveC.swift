@@ -336,7 +336,10 @@ public func _getBridgedNonVerbatimObjectiveCType<T>(_: T.Type) -> Any.Type?
 
 // -- Pointer argument bridging
 
-/// A mutable pointer-to-ObjC-pointer argument.
+/// A mutable pointer addressing an Objective-C reference that doesn't own its
+/// target.
+///
+/// `Pointee` must be a class type or `Optional<C>` where `C` is a class.
 ///
 /// This type has implicit conversions to allow passing any of the following
 /// to a C or ObjC API:
@@ -368,13 +371,17 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
     self._rawValue = _rawValue
   }
 
-  /// Access the `Pointee` instance referenced by `self`.
+  /// Retrieve or set the `Pointee` instance referenced by `self`.
+  ///
+  /// `AutoreleasingUnsafeMutablePointer` is assumed to reference a value with
+  /// `__autoreleasing` ownership semantics, like `NSFoo **` declarations in
+  /// ARC. Setting the pointee autoreleases the new value before trivially
+  /// storing it in the referenced memory.
   ///
   /// - Precondition: the pointee has been initialized with an instance of type
   ///   `Pointee`.
   @inlinable
   public var pointee: Pointee {
-    /// Retrieve the value the pointer points to.
     @_transparent get {
       // The memory addressed by this pointer contains a non-owning reference,
       // therefore we *must not* point an `UnsafePointer<AnyObject>` to
@@ -392,12 +399,6 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
         to: Pointee.self)
     }
 
-    /// Set the value the pointer points to, copying over the previous value.
-    ///
-    /// AutoreleasingUnsafeMutablePointers are assumed to reference a
-    /// value with __autoreleasing ownership semantics, like 'NSFoo**'
-    /// in ARC. This autoreleases the argument before trivially
-    /// storing it to the referenced memory.
     @_transparent nonmutating set {
       // Autorelease the object reference.
       let object = unsafeBitCast(newValue, to: Optional<AnyObject>.self)
