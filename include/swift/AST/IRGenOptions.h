@@ -259,6 +259,7 @@ public:
     unsigned Hash = (unsigned)OptMode;
     Hash = (Hash << 1) | DisableLLVMOptzns;
     Hash = (Hash << 1) | DisableSwiftSpecificLLVMOptzns;
+    Hash = (Hash << 1) | GenerateProfile;
     return Hash;
   }
 
