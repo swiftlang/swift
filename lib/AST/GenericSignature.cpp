@@ -1058,3 +1058,9 @@ bool GenericSignature::hasTypeVariable(ArrayRef<Requirement> requirements) {
   return false;
 }
 
+void swift::simple_display(raw_ostream &out, const GenericSignature *sig) {
+  if (sig)
+    sig->print(out);
+  else
+    out << "NULL";
+}

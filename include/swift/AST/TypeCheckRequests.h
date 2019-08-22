@@ -1073,6 +1073,35 @@ public:
 
 void simple_display(llvm::raw_ostream &out, AncestryFlags value);
 
+class AbstractGenericSignatureRequest :
+    public SimpleRequest<AbstractGenericSignatureRequest,
+                         GenericSignature *(GenericSignature *,
+                                            SmallVector<GenericTypeParamType *, 2>,
+                                            SmallVector<Requirement, 2>),
+                         CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<GenericSignature *>
+  evaluate(Evaluator &evaluator,
+           GenericSignature *baseSignature,
+           SmallVector<GenericTypeParamType *, 2> addedParameters,
+           SmallVector<Requirement, 2> addedRequirements) const;
+
+public:
+  // Separate caching.
+  bool isCached() const;
+
+  /// Abstract generic signature requests never have source-location info.
+  SourceLoc getNearestLoc() const {
+    return SourceLoc();
+  }
+};
+
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
 template<>

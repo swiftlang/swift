@@ -7540,3 +7540,40 @@ void GenericSignatureBuilder::verifyGenericSignaturesInModule(
     verifyGenericSignature(context, canGenericSig);
   }
 }
+
+bool AbstractGenericSignatureRequest::isCached() const {
+  return true;
+}
+
+llvm::Expected<GenericSignature *>
+AbstractGenericSignatureRequest::evaluate(
+         Evaluator &evaluator,
+         GenericSignature *baseSignature,
+         SmallVector<GenericTypeParamType *, 2> addedParameters,
+         SmallVector<Requirement, 2> addedRequirements) const {
+  // If nothing is added to the base signature, just return the base
+  // signature.
+  if (addedParameters.empty() && addedRequirements.empty())
+    return baseSignature;
+
+  // Create a generic signature builder that will form the signature.
+  ASTContext &ctx = addedParameters.empty()
+      ? addedRequirements.front().getFirstType()->getASTContext()
+      : addedParameters.front()->getASTContext();
+
+  GenericSignatureBuilder builder(ctx);
+  if (baseSignature)
+    builder.addGenericSignature(baseSignature);
+
+  auto source =
+    GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
+
+  for (auto param : addedParameters)
+    builder.addGenericParameter(param);
+
+  for (const auto &req : addedRequirements)
+    builder.addRequirement(req, source, nullptr);
+
+  return std::move(builder).computeGenericSignature(
+      SourceLoc(), /*allowConcreteGenericParams=*/true);
+}

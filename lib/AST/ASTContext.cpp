@@ -4376,25 +4376,22 @@ CanGenericSignature ASTContext::getExistentialSignature(CanType existential,
 
   assert(existential.isExistentialType());
 
-  GenericSignatureBuilder builder(*this);
-
   auto genericParam = GenericTypeParamType::get(0, 0, *this);
-  builder.addGenericParameter(genericParam);
-
   Requirement requirement(RequirementKind::Conformance, genericParam,
                           existential);
-  auto source =
-    GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
-  builder.addRequirement(requirement, source, nullptr);
+  auto genericSig = evaluateOrDefault(
+      evaluator,
+      AbstractGenericSignatureRequest{nullptr, {genericParam}, {requirement}},
+      nullptr);
 
-  CanGenericSignature genericSig(std::move(builder).computeGenericSignature(SourceLoc()));
+  CanGenericSignature canGenericSig(genericSig);
 
   auto result = getImpl().ExistentialSignatures.insert(
-    std::make_pair(existential, genericSig));
+    std::make_pair(existential, canGenericSig));
   assert(result.second);
   (void) result;
 
-  return genericSig;
+  return canGenericSig;
 }
 
 GenericSignature *

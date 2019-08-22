@@ -18,6 +18,7 @@
 #define SWIFT_AST_REQUIREMENT_H
 
 #include "swift/AST/Type.h"
+#include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/Support/ErrorHandling.h"
 
@@ -123,7 +124,49 @@ public:
   void dump(raw_ostream &out) const;
   void print(raw_ostream &os, const PrintOptions &opts) const;
   void print(ASTPrinter &printer, const PrintOptions &opts) const;
+
+  friend llvm::hash_code hash_value(const Requirement &requirement) {
+    using llvm::hash_value;
+
+    llvm::hash_code first =
+        hash_value(requirement.FirstTypeAndKind.getOpaqueValue());
+    llvm::hash_code second;
+    switch (requirement.getKind()) {
+    case RequirementKind::Conformance:
+    case RequirementKind::Superclass:
+    case RequirementKind::SameType:
+      second = hash_value(requirement.getSecondType());
+      break;
+
+    case RequirementKind::Layout:
+      second = hash_value(requirement.getLayoutConstraint());
+      break;
+    }
+
+    return llvm::hash_combine(first, second);
+  }
+
+  friend bool operator==(const Requirement &lhs, const Requirement &rhs) {
+    if (lhs.FirstTypeAndKind.getOpaqueValue()
+          != rhs.FirstTypeAndKind.getOpaqueValue())
+      return false;
+
+    switch (lhs.getKind()) {
+    case RequirementKind::Conformance:
+    case RequirementKind::Superclass:
+    case RequirementKind::SameType:
+      return lhs.getSecondType().getPointer() ==
+          rhs.getSecondType().getPointer();
+
+    case RequirementKind::Layout:
+      return lhs.getLayoutConstraint() == rhs.getLayoutConstraint();
+    }
+  }
 };
+
+inline void simple_display(llvm::raw_ostream &out, const Requirement &req) {
+  req.print(out, PrintOptions());
+}
 
 } // end namespace swift
 
