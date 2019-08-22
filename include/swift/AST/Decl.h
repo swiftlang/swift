@@ -554,13 +554,7 @@ protected:
     RawForeignKind : 2,
 
     /// \see ClassDecl::getEmittedMembers()
-    HasForcedEmittedMembers : 1,
-
-    /// Information about the class's ancestry.
-    Ancestry : 7,
-
-    /// Whether we have computed the above field or not.
-    AncestryComputed : 1,
+    HasForcedEmittedMembers : 1,     
 
     HasMissingDesignatedInitializers : 1,
     HasMissingVTableEntries : 1,
