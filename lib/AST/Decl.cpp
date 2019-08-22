@@ -3539,10 +3539,10 @@ ConstructorDecl *NominalTypeDecl::getEffectiveMemberwiseInitializer() {
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-void NominalTypeDecl::addFixedLayoutAttr() {
+void NominalTypeDecl::addFrozenAttrIfApplicable() {
   auto &C = getASTContext();
-  // If nominal already has `@_fixed_layout`, return.
-  if (getAttrs().hasAttribute<FixedLayoutAttr>())
+  // If nominal already has `@frozen`, return.
+  if (getAttrs().hasAttribute<FrozenAttr>())
     return;
   auto access = getEffectiveAccess();
   // If nominal does not have at least internal access, return.
@@ -3553,8 +3553,8 @@ void NominalTypeDecl::addFixedLayoutAttr() {
       !getAttrs().hasAttribute<UsableFromInlineAttr>()) {
     getAttrs().add(new (C) UsableFromInlineAttr(/*Implicit*/ true));
   }
-  // Add `@_fixed_layout` to the nominal.
-  getAttrs().add(new (C) FixedLayoutAttr(/*Implicit*/ true));
+  // Add `@frozen` to the nominal.
+  getAttrs().add(new (C) FrozenAttr(/*Implicit*/ true));
 }
 
 Optional<KeyPathTypeKind> NominalTypeDecl::getKeyPathTypeKind() const {

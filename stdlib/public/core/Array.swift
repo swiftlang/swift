@@ -1914,23 +1914,30 @@ internal struct _ArrayAnyHashableBox<Element: Hashable>
 
 // SWIFT_ENABLE_TENSORFLOW
 extension Array: Differentiable where Element: Differentiable {
+  // NOTE: Currently, there is no easy way to add constraint
+  // `[Element.TangentVector].TangentVector == [Element].TangentVector`.
+  // This may become expressible where where-clauses in type declarations
+  // support free type variables.
   @frozen
   public struct TangentVector
     : Differentiable, AdditiveArithmetic, ExpressibleByArrayLiteral,
       CustomStringConvertible {
     public typealias Element = Array.Element.TangentVector
     public typealias TangentVector = Self
+
+    // TODO(TF-768): Make this differentiable.
     public var elements: [Element]
 
     @available(*, deprecated, renamed: "elements")
     @inlinable
-    public var base: [Element.TangentVector] {
+    public var base: [Element] {
       _read { yield elements }
       _modify { yield &elements }
     }
 
+    // TODO(TF-768): Make this differentiable.
     @inlinable
-    public init(_ elements: [Element.TangentVector]) {
+    public init(_ elements: [Element]) {
       self.elements = elements
     }
     @inlinable

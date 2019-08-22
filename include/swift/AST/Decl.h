@@ -3451,8 +3451,8 @@ public:
   ConstructorDecl *getEffectiveMemberwiseInitializer();
 
   // SWIFT_ENABLE_TENSORFLOW
-  /// Add `@_fixed_layout` attribute to the nominal type, if possible.
-  void addFixedLayoutAttr();
+  /// Add `@frozen` attribute to the nominal type, if applicable.
+  void addFrozenAttrIfApplicable();
 
 private:
   /// Predicate used to filter StoredPropertyRange.

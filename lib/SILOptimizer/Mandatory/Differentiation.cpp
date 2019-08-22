@@ -500,6 +500,8 @@ private:
     auto *branchingTraceDecl = new (astCtx) EnumDecl(
         /*EnumLoc*/ loc, /*Name*/ enumId, /*NameLoc*/ loc, /*Inherited*/ {},
         /*GenericParams*/ /*set later*/ nullptr, /*DC*/ &file);
+    branchingTraceDecl->getAttrs().add(
+        new (astCtx) FrozenAttr(/*Implicit*/ true));
     if (genericSig) {
       auto *genericParams =
           cloneGenericParameters(astCtx, branchingTraceDecl, genericSig);
@@ -592,6 +594,7 @@ private:
     auto *linearMapStruct = new (astCtx) StructDecl(
         /*StructLoc*/ loc, /*Name*/ structId, /*NameLoc*/ loc, /*Inherited*/ {},
         /*GenericParams*/ /*set later*/ nullptr, /*DC*/ &file);
+    linearMapStruct->getAttrs().add(new (astCtx) FrozenAttr(/*Implicit*/ true));
     if (genericSig) {
       auto *genericParams =
           cloneGenericParameters(astCtx, linearMapStruct, genericSig);
@@ -3391,6 +3394,7 @@ private:
     auto *vjpBB = BBMap[origBB];
     auto *pbStruct = pullbackInfo.getLinearMapStruct(origBB);
     auto structLoweredTy = getNominalDeclLoweredType(pbStruct);
+    assert(structLoweredTy.isObject() && "Pullback structs must be objects");
     auto bbPullbackValues = pullbackValues[origBB];
     if (!origBB->isEntry()) {
       auto *predEnumArg = vjpBB->getArguments().back();
@@ -5976,7 +5980,8 @@ public:
 
   AllocStackInst *
   emitArrayTangentSubscript(ApplyInst *ai, SILType eltType,
-                            SILValue adjointArray, SILValue fnRef,
+                            SILValue adjointArray,
+                            FunctionRefInst *subscriptRef,
                             CanGenericSignature genericSig, int index) {
     auto &ctx = builder.getASTContext();
     auto astType = eltType.getASTType();
@@ -5995,9 +6000,11 @@ public:
     auto addArithConf = swiftModule->lookupConformance(astType, addArithProto);
     assert(addArithConf.hasValue() &&
            "Missing conformance to `AdditiveArithmetic`");
-    auto subMap =
-        SubstitutionMap::get(genericSig, {astType}, {*addArithConf, *diffConf});
-    builder.createApply(ai->getLoc(), fnRef, subMap,
+//    auto subMap =
+//        SubstitutionMap::get(genericSig, {astType}, {*addArithConf, *diffConf});
+    auto subMap = subscriptRef->getInitiallyReferencedFunction()
+        ->getForwardingSubstitutionMap();
+    builder.createApply(ai->getLoc(), subscriptRef, subMap,
                         {subscriptBuffer, intStruct, adjointArray});
     return subscriptBuffer;
   }
@@ -6031,7 +6038,7 @@ public:
   void visitArrayInitialization(ApplyInst *ai) {
     LLVM_DEBUG(getADDebugStream() << "Visiting array initialization:\n" << *ai);
     SILValue adjointArray;
-    SILValue fnRef;
+    FunctionRefInst *fnRef;
     CanGenericSignature genericSig;
     for (auto use : ai->getUses()) {
       auto dti = dyn_cast<DestructureTupleInst>(use->getUser());
@@ -6375,9 +6382,8 @@ public:
           auto substMap = tangentVectorTy->getMemberSubstitutionMap(
               field->getModuleContext(), field);
           auto fieldTy = field->getType().subst(substMap);
-          auto fieldSILTy =
-              getContext().getTypeConverter().getLoweredType(
-                  fieldTy, ResilienceExpansion::Minimal);
+          auto fieldSILTy = getContext().getTypeConverter().getLoweredType(
+              fieldTy, ResilienceExpansion::Minimal);
           assert(fieldSILTy.isObject());
           eltVals.push_back(makeZeroAdjointValue(fieldSILTy));
         }
