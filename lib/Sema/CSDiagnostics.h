@@ -633,6 +633,10 @@ public:
   /// something with doesn't conform to `Error`.
   bool diagnoseThrowsTypeMismatch() const;
 
+  /// Produce a specialized diagnostic if this is an attempt to `yield`
+  /// something of incorrect type.
+  bool diagnoseYieldByReferenceMismatch() const;
+
   /// Attempt to attach any relevant fix-its to already produced diagnostic.
   void tryFixIts(InFlightDiagnostic &diagnostic) const;
 

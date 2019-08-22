@@ -2028,15 +2028,36 @@ ConstraintSystem::matchTypesBindTypeVar(
     type = type->getRValueType();
   }
 
+  // Attempt to fix situations where type variable can't be bound
+  // to a particular type e.g. `l-value` or `inout`.
+  auto fixReferenceMismatch = [&](TypeVariableType *typeVar,
+                                  Type type) -> bool {
+    if (auto last = locator.last()) {
+      if (last->is<LocatorPathElt::ContextualType>()) {
+        auto *fix = IgnoreContextualType::create(*this, typeVar, type,
+                                                 getConstraintLocator(locator));
+        return !recordFix(fix);
+      }
+    }
+
+    return false;
+  };
+
   // If the left-hand type variable cannot bind to an lvalue,
   // but we still have an lvalue, fail.
   if (!typeVar->getImpl().canBindToLValue() && type->hasLValueType()) {
-      return getTypeMatchFailure(locator);
+    if (shouldAttemptFixes() && fixReferenceMismatch(typeVar, type))
+      return getTypeMatchSuccess();
+
+    return getTypeMatchFailure(locator);
   }
 
   // If the left-hand type variable cannot bind to an inout,
   // but we still have an inout, fail.
   if (!typeVar->getImpl().canBindToInOut() && type->is<InOutType>()) {
+    if (shouldAttemptFixes() && fixReferenceMismatch(typeVar, type))
+      return getTypeMatchSuccess();
+
     return getTypeMatchFailure(locator);
   }
 
@@ -2399,9 +2420,31 @@ bool ConstraintSystem::repairFailures(
                         });
   };
 
-  auto &elt = path.back();
+  auto elt = path.back();
   switch (elt.getKind()) {
-  case ConstraintLocator::LValueConversion:
+  case ConstraintLocator::LValueConversion: {
+    auto CTP = getContextualTypePurpose();
+    // Special case for `CTP_CallArgument` set by CSDiag
+    // while type-checking each argument because we yet
+    // to cover argument-to-parameter conversions in the
+    // new framework.
+    if (CTP != CTP_CallArgument) {
+      // Ignore l-value conversion element since it has already
+      // played its role.
+      path.pop_back();
+      // If this is a contextual mismatch between l-value types e.g.
+      // `@lvalue String vs. @lvalue Int`, let's pretend that it's okay.
+      if (!path.empty() && path.back().is<LocatorPathElt::ContextualType>()) {
+        auto *locator = getConstraintLocator(anchor, path.back());
+        conversionsOrFixes.push_back(
+            IgnoreContextualType::create(*this, lhs, rhs, locator));
+        break;
+      }
+    }
+
+    LLVM_FALLTHROUGH;
+  }
+
   case ConstraintLocator::ApplyArgToParam: {
     auto loc = getConstraintLocator(locator);
     if (repairByInsertingExplicitCall(lhs, rhs))
