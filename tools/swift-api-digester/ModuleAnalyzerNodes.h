@@ -748,8 +748,11 @@ int dumpSwiftModules(const CompilerInvocation &InitInvok,
 
 SDKNodeRoot *getSDKNodeRoot(SDKContext &SDKCtx,
                             const CompilerInvocation &InitInvok,
-                            const llvm::StringSet<> &ModuleNames,
-                            CheckerOptions Opts);
+                            const llvm::StringSet<> &ModuleNames);
+
+SDKNodeRoot *getEmptySDKNodeRoot(SDKContext &SDKCtx);
+
+void dumpSDKRoot(SDKNodeRoot *Root, StringRef OutputFile);
 
 int dumpSDKContent(const CompilerInvocation &InitInvok,
                    const llvm::StringSet<> &ModuleNames,
