@@ -3429,150 +3429,6 @@ static void validateTypealiasType(TypeChecker &tc, TypeAliasDecl *typeAlias) {
   typeAlias->setUnderlyingType(typeAlias->getUnderlyingTypeLoc().getType());
 }
 
-
-/// Bind the given function declaration, which declares an operator, to
-/// the corresponding operator declaration.
-void bindFuncDeclToOperator(TypeChecker &TC, FuncDecl *FD) {
-  OperatorDecl *op = nullptr;
-  auto operatorName = FD->getFullName().getBaseIdentifier();
-
-  // Check for static/final/class when we're in a type.
-  auto dc = FD->getDeclContext();
-  if (dc->isTypeContext()) {
-    if (!FD->isStatic()) {
-      TC.diagnose(FD->getLoc(), diag::nonstatic_operator_in_type,
-                  operatorName,
-                  dc->getDeclaredInterfaceType())
-        .fixItInsert(FD->getAttributeInsertionLoc(/*forModifier=*/true),
-                     "static ");
-
-      FD->setStatic();
-    } else if (auto classDecl = dc->getSelfClassDecl()) {
-      // For a class, we also need the function or class to be 'final'.
-      if (!classDecl->isFinal() && !FD->isFinal() &&
-          FD->getStaticSpelling() != StaticSpellingKind::KeywordStatic) {
-        TC.diagnose(FD->getLoc(), diag::nonfinal_operator_in_class,
-                    operatorName, dc->getDeclaredInterfaceType())
-          .fixItInsert(FD->getAttributeInsertionLoc(/*forModifier=*/true),
-                       "final ");
-        FD->getAttrs().add(new (TC.Context) FinalAttr(/*IsImplicit=*/true));
-      }
-    }
-  } else if (!dc->isModuleScopeContext()) {
-    TC.diagnose(FD, diag::operator_in_local_scope);
-  }
-
-  SourceFile &SF = *FD->getDeclContext()->getParentSourceFile();
-  if (FD->isUnaryOperator()) {
-    if (FD->getAttrs().hasAttribute<PrefixAttr>()) {
-      op = SF.lookupPrefixOperator(operatorName,
-                                   FD->isCascadingContextForLookup(false),
-                                   FD->getLoc());
-    } else if (FD->getAttrs().hasAttribute<PostfixAttr>()) {
-      op = SF.lookupPostfixOperator(operatorName,
-                                    FD->isCascadingContextForLookup(false),
-                                    FD->getLoc());
-    } else {
-      auto prefixOp =
-          SF.lookupPrefixOperator(operatorName,
-                                  FD->isCascadingContextForLookup(false),
-                                  FD->getLoc());
-      auto postfixOp =
-          SF.lookupPostfixOperator(operatorName,
-                                   FD->isCascadingContextForLookup(false),
-                                   FD->getLoc());
-
-      // If we found both prefix and postfix, or neither prefix nor postfix,
-      // complain. We can't fix this situation.
-      if (static_cast<bool>(prefixOp) == static_cast<bool>(postfixOp)) {
-        TC.diagnose(FD, diag::declared_unary_op_without_attribute);
-
-        // If we found both, point at them.
-        if (prefixOp) {
-          TC.diagnose(prefixOp, diag::unary_operator_declaration_here, false)
-            .fixItInsert(FD->getLoc(), "prefix ");
-          TC.diagnose(postfixOp, diag::unary_operator_declaration_here, true)
-            .fixItInsert(FD->getLoc(), "postfix ");
-        } else {
-          // FIXME: Introduce a Fix-It that adds the operator declaration?
-        }
-
-        // FIXME: Errors could cascade here, because name lookup for this
-        // operator won't find this declaration.
-        return;
-      }
-
-      // We found only one operator declaration, so we know whether this
-      // should be a prefix or a postfix operator.
-
-      // Fix the AST and determine the insertion text.
-      const char *insertionText;
-      auto &C = FD->getASTContext();
-      if (postfixOp) {
-        insertionText = "postfix ";
-        op = postfixOp;
-        FD->getAttrs().add(new (C) PostfixAttr(/*implicit*/false));
-      } else {
-        insertionText = "prefix ";
-        op = prefixOp;
-        FD->getAttrs().add(new (C) PrefixAttr(/*implicit*/false));
-      }
-
-      // Emit diagnostic with the Fix-It.
-      TC.diagnose(FD->getFuncLoc(), diag::unary_op_missing_prepos_attribute,
-                  static_cast<bool>(postfixOp))
-        .fixItInsert(FD->getFuncLoc(), insertionText);
-      TC.diagnose(op, diag::unary_operator_declaration_here,
-                  static_cast<bool>(postfixOp));
-    }
-  } else if (FD->isBinaryOperator()) {
-    op = SF.lookupInfixOperator(operatorName,
-                                FD->isCascadingContextForLookup(false),
-                                FD->getLoc());
-  } else {
-    TC.diagnose(FD, diag::invalid_arg_count_for_operator);
-    return;
-  }
-
-  if (!op) {
-    SourceLoc insertionLoc;
-    if (isa<SourceFile>(FD->getParent())) {
-      // Parent context is SourceFile, insertion location is start of func declaration
-      // or unary operator
-      insertionLoc = FD->isUnaryOperator() ? FD->getAttrs().getStartLoc() : FD->getStartLoc();
-    } else {
-      // Finding top-level decl context before SourceFile and inserting before it
-      for (DeclContext *CurContext = FD->getLocalContext();
-           !isa<SourceFile>(CurContext);
-           CurContext = CurContext->getParent()) {
-        // Skip over non-decl contexts (e.g. closure expresssions)
-        if (auto *D = CurContext->getAsDecl())
-            insertionLoc = D->getStartLoc();
-      }
-    }
-
-    SmallString<128> insertion;
-    auto numOfParams = FD->getParameters()->size();
-    if (numOfParams == 1) {
-      if (FD->getAttrs().hasAttribute<PrefixAttr>())
-        insertion += "prefix operator ";
-      else
-        insertion += "postfix operator ";
-    } else if (numOfParams == 2) {
-      insertion += "infix operator ";
-    }
-
-    insertion += operatorName.str();
-    insertion += " : <# Precedence Group #>\n";
-    InFlightDiagnostic opDiagnostic = TC.diagnose(FD, diag::declared_operator_without_operator_decl);
-    if (insertionLoc.isValid())
-      opDiagnostic.fixItInsert(insertionLoc, insertion);
-    return;
-  }
-
-  FD->setOperatorDecl(op);
-}
-
 bool swift::isMemberOperator(FuncDecl *decl, Type type) {
   // Check that member operators reference the type of 'Self'.
   if (decl->isInvalid())
@@ -3868,10 +3724,9 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     DeclValidationRAII IBV(FD);
 
-    // Bind operator functions to the corresponding operator declaration.
-    if (FD->isOperator())
-      bindFuncDeclToOperator(*this, FD);
-
+    // Force computing the operator decl in case it emits diagnostics.
+    (void) FD->getOperatorDecl();
+    
     // Validate 'static'/'class' on functions in extensions.
     auto StaticSpelling = FD->getStaticSpelling();
     if (StaticSpelling != StaticSpellingKind::None &&
@@ -4210,6 +4065,169 @@ EmittedMembersRequest::evaluate(Evaluator &evaluator,
   forceConformance(Context.getProtocol(KnownProtocolKind::Hashable));
 
   return CD->getMembers();
+}
+
+Optional<OperatorDecl *> swift::FunctionOperatorRequest::getCachedResult() const {
+  auto *funcDecl = std::get<0>(getStorage());
+  if (!funcDecl->isOperator()) {
+    return Optional<OperatorDecl *>{nullptr};
+  }
+  if (!funcDecl->Operator.getInt()) {
+    return None;
+  }
+  return funcDecl->Operator.getPointer();
+}
+
+void swift::FunctionOperatorRequest::cacheResult(OperatorDecl *value) const {
+  auto *funcDecl = std::get<0>(getStorage());
+  funcDecl->Operator.setPointerAndInt(value, true);
+}
+
+/// Bind the given function declaration, which declares an operator, to
+/// the corresponding operator declaration.
+llvm::Expected<OperatorDecl *>
+FunctionOperatorRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
+  auto &C = FD->getASTContext();
+  auto &diags = C.Diags;
+  auto operatorName = FD->getFullName().getBaseIdentifier();
+
+  // Check for static/final/class when we're in a type.
+  auto dc = FD->getDeclContext();
+  if (dc->isTypeContext()) {
+    if (!FD->isStatic()) {
+      diags.diagnose(FD->getLoc(), diag::nonstatic_operator_in_type,
+                  operatorName,
+                  dc->getDeclaredInterfaceType())
+        .fixItInsert(FD->getAttributeInsertionLoc(/*forModifier=*/true),
+                     "static ");
+
+      FD->setStatic();
+    } else if (auto classDecl = dc->getSelfClassDecl()) {
+      // For a class, we also need the function or class to be 'final'.
+      if (!classDecl->isFinal() && !FD->isFinal() &&
+          FD->getStaticSpelling() != StaticSpellingKind::KeywordStatic) {
+        diags.diagnose(FD->getLoc(), diag::nonfinal_operator_in_class,
+                    operatorName, dc->getDeclaredInterfaceType())
+          .fixItInsert(FD->getAttributeInsertionLoc(/*forModifier=*/true),
+                       "final ");
+        FD->getAttrs().add(new (C) FinalAttr(/*IsImplicit=*/true));
+      }
+    }
+  } else if (!dc->isModuleScopeContext()) {
+    diags.diagnose(FD, diag::operator_in_local_scope);
+  }
+
+  OperatorDecl *op = nullptr;
+  SourceFile &SF = *FD->getDeclContext()->getParentSourceFile();
+  if (FD->isUnaryOperator()) {
+    if (FD->getAttrs().hasAttribute<PrefixAttr>()) {
+      op = SF.lookupPrefixOperator(operatorName,
+                                   FD->isCascadingContextForLookup(false),
+                                   FD->getLoc());
+    } else if (FD->getAttrs().hasAttribute<PostfixAttr>()) {
+      op = SF.lookupPostfixOperator(operatorName,
+                                    FD->isCascadingContextForLookup(false),
+                                    FD->getLoc());
+    } else {
+      auto prefixOp =
+          SF.lookupPrefixOperator(operatorName,
+                                  FD->isCascadingContextForLookup(false),
+                                  FD->getLoc());
+      auto postfixOp =
+          SF.lookupPostfixOperator(operatorName,
+                                   FD->isCascadingContextForLookup(false),
+                                   FD->getLoc());
+
+      // If we found both prefix and postfix, or neither prefix nor postfix,
+      // complain. We can't fix this situation.
+      if (static_cast<bool>(prefixOp) == static_cast<bool>(postfixOp)) {
+        diags.diagnose(FD, diag::declared_unary_op_without_attribute);
+
+        // If we found both, point at them.
+        if (prefixOp) {
+          diags.diagnose(prefixOp, diag::unary_operator_declaration_here, false)
+            .fixItInsert(FD->getLoc(), "prefix ");
+          diags.diagnose(postfixOp, diag::unary_operator_declaration_here, true)
+            .fixItInsert(FD->getLoc(), "postfix ");
+        } else {
+          // FIXME: Introduce a Fix-It that adds the operator declaration?
+        }
+
+        // FIXME: Errors could cascade here, because name lookup for this
+        // operator won't find this declaration.
+        return nullptr;
+      }
+
+      // We found only one operator declaration, so we know whether this
+      // should be a prefix or a postfix operator.
+
+      // Fix the AST and determine the insertion text.
+      const char *insertionText;
+      if (postfixOp) {
+        insertionText = "postfix ";
+        op = postfixOp;
+        FD->getAttrs().add(new (C) PostfixAttr(/*implicit*/false));
+      } else {
+        insertionText = "prefix ";
+        op = prefixOp;
+        FD->getAttrs().add(new (C) PrefixAttr(/*implicit*/false));
+      }
+
+      // Emit diagnostic with the Fix-It.
+      diags.diagnose(FD->getFuncLoc(), diag::unary_op_missing_prepos_attribute,
+                     static_cast<bool>(postfixOp))
+        .fixItInsert(FD->getFuncLoc(), insertionText);
+      diags.diagnose(op, diag::unary_operator_declaration_here,
+                     static_cast<bool>(postfixOp));
+    }
+  } else if (FD->isBinaryOperator()) {
+    op = SF.lookupInfixOperator(operatorName,
+                                FD->isCascadingContextForLookup(false),
+                                FD->getLoc());
+  } else {
+    diags.diagnose(FD, diag::invalid_arg_count_for_operator);
+    return nullptr;
+  }
+
+  if (!op) {
+    SourceLoc insertionLoc;
+    if (isa<SourceFile>(FD->getParent())) {
+      // Parent context is SourceFile, insertion location is start of func declaration
+      // or unary operator
+      insertionLoc = FD->isUnaryOperator() ? FD->getAttrs().getStartLoc() : FD->getStartLoc();
+    } else {
+      // Finding top-level decl context before SourceFile and inserting before it
+      for (DeclContext *CurContext = FD->getLocalContext();
+           !isa<SourceFile>(CurContext);
+           CurContext = CurContext->getParent()) {
+        // Skip over non-decl contexts (e.g. closure expresssions)
+        if (auto *D = CurContext->getAsDecl())
+          insertionLoc = D->getStartLoc();
+      }
+    }
+
+    SmallString<128> insertion;
+    {
+      llvm::raw_svector_ostream str(insertion);
+      assert(FD->isUnaryOperator() || FD->isBinaryOperator());
+      if (FD->isUnaryOperator()) {
+        if (FD->getAttrs().hasAttribute<PrefixAttr>())
+          str << "prefix operator ";
+        else
+          str << "postfix operator ";
+      } else {
+        str << "infix operator ";
+      }
+
+      str << operatorName.str() << " : <# Precedence Group #>\n";
+    }
+    InFlightDiagnostic opDiagnostic = diags.diagnose(FD, diag::declared_operator_without_operator_decl);
+    if (insertionLoc.isValid())
+      opDiagnostic.fixItInsert(insertionLoc, insertion);
+    return nullptr;
+  }
+
+  return op;
 }
 
 /// Determine whether this is a "pass-through" typealias, which has the

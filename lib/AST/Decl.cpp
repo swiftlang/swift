@@ -6635,6 +6635,16 @@ void AbstractFunctionDecl::computeSelfDeclType() {
 
   selfDecl->setValidationToChecked();
 }
+    
+OperatorDecl *FuncDecl::getOperatorDecl() const {
+  if (!isOperator()) {
+    return nullptr;
+  }
+  return evaluateOrDefault(getASTContext().evaluator,
+                           FunctionOperatorRequest{const_cast<FuncDecl *>(this)},
+                           nullptr);
+}
+
 
 void AbstractFunctionDecl::setParameters(ParameterList *BodyParams) {
 #ifndef NDEBUG

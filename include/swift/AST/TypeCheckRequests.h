@@ -1052,6 +1052,27 @@ public:
   void cacheResult(bool value) const;
 };
 
+class FunctionOperatorRequest :
+    public SimpleRequest<FunctionOperatorRequest,
+                         OperatorDecl *(FuncDecl *),
+                         CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+                           
+private:
+  friend SimpleRequest;
+  
+  // Evaluation.
+  llvm::Expected<OperatorDecl *>
+  evaluate(Evaluator &evaluator, FuncDecl *decl) const;
+                     
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<OperatorDecl *> getCachedResult() const;
+  void cacheResult(OperatorDecl *value) const;
+};
+
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
 template<>

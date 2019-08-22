@@ -5926,13 +5926,15 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SelfAccessKind SAK);
 class FuncDecl : public AbstractFunctionDecl {
   friend class AbstractFunctionDecl;
   friend class SelfAccessKindRequest;
-
+  friend class FunctionOperatorRequest;
+  
   SourceLoc StaticLoc;  // Location of the 'static' token or invalid.
   SourceLoc FuncLoc;    // Location of the 'func' token.
 
   TypeLoc FnRetType;
 
-  OperatorDecl *Operator = nullptr;
+  llvm::PointerIntPair<OperatorDecl *, 1, bool> Operator;
+
   OpaqueTypeDecl *OpaqueReturn = nullptr;
 
 protected:
@@ -5947,7 +5949,7 @@ protected:
                            Name, NameLoc,
                            Throws, ThrowsLoc,
                            HasImplicitSelfDecl, GenericParams),
-      StaticLoc(StaticLoc), FuncLoc(FuncLoc) {
+      StaticLoc(StaticLoc), FuncLoc(FuncLoc), Operator(nullptr, false) {
     assert(!Name.getBaseName().isSpecial());
 
     Bits.FuncDecl.IsStatic =
@@ -6078,13 +6080,7 @@ public:
     return cast_or_null<FuncDecl>(AbstractFunctionDecl::getOverriddenDecl());
   }
 
-  OperatorDecl *getOperatorDecl() const {
-    return Operator;
-  }
-  void setOperatorDecl(OperatorDecl *o) {
-    assert(isOperator() && "can't set an OperatorDecl for a non-operator");
-    Operator = o;
-  }
+  OperatorDecl *getOperatorDecl() const;
   
   OpaqueTypeDecl *getOpaqueResultTypeDecl() const {
     return OpaqueReturn;
