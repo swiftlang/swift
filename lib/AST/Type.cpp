@@ -3481,7 +3481,9 @@ TypeBase::getContextSubstitutions(const DeclContext *dc,
       continue;
     }
 
-    llvm_unreachable("Bad base type");
+    // Assert and break to avoid hanging if we get an unexpected baseTy.
+    assert(0 && "Bad base type");
+    break;
   }
 
   while (n > 0) {
