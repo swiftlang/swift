@@ -19,17 +19,6 @@
 using namespace swift;
 using namespace namelookup;
 
-/// Returns true if this particular ValueDecl is overloadable.
-static bool isOverloadable(const ValueDecl *VD) {
-  // FIXME: This is very suspect; it doesn't really match how the rest of the
-  // compiler works anymore. (With extensions imported from different modules,
-  // properties can have the same base names as methods.) How do we want
-  // cross-module shadowing to work?
-  return isa<FuncDecl>(VD) ||
-         isa<ConstructorDecl>(VD) ||
-         isa<SubscriptDecl>(VD);
-}
-
 namespace {
 
 /// Encapsulates the work done for a recursive qualified lookup into a module.
@@ -39,14 +28,6 @@ namespace {
 /// must be a subclass of ModuleNameLookup.
 template <typename LookupStrategy>
 class ModuleNameLookup {
-  /// An alias for the LookupStrategy subclass's nested OverloadSetTy whose
-  /// resolution can be delayed until after the subclass type is
-  /// considered "complete".
-  template <bool CRTPWorkaround>
-  using OverloadSetTy =
-      typename std::enable_if<CRTPWorkaround,
-                              LookupStrategy>::type::OverloadSetTy;
-
   /// The usable results of a lookup in a particular module may differ based on
   /// where the lookup is happening.
   using ModuleLookupCacheKey = std::pair<ModuleDecl::ImportedModule,
@@ -66,32 +47,26 @@ class ModuleNameLookup {
   }
 
   /// After finding decls by name lookup, filter based on the given
-  /// resolution kind and existing overload set and add them to \p results.
-  ///
-  /// \p overloads is updated based on the new declarations.
+  /// resolution kind and add them to \p results.
   ///
   /// \returns true if lookup is (locally) complete and does not need to recurse
   /// further.
-  template <bool CRTPWorkaround = true>
   bool recordImportDecls(
       SmallVectorImpl<ValueDecl *> &results,
-      ArrayRef<ValueDecl *> newDecls,
-      OverloadSetTy<CRTPWorkaround> &overloads);
+      ArrayRef<ValueDecl *> newDecls);
 
   /// Given a list of imports and an access path to limit by, perform a lookup
   /// into each of them and record the results in \p decls, filtering based on
-  /// the given resolution kind and existing overload set.
-  template <bool CRTPWorkaround = true>
+  /// the given resolution kind.
   void collectLookupResultsFromImports(
       SmallVectorImpl<ValueDecl *> &decls,
       ArrayRef<ModuleDecl::ImportedModule> imports,
       ModuleDecl::AccessPathTy accessPath,
-      const DeclContext *moduleScopeContext,
-      OverloadSetTy<CRTPWorkaround> &overloads);
+      const DeclContext *moduleScopeContext);
 
   /// Performs a qualified lookup into the given module and, if necessary, its
-  /// reexports, observing proper shadowing rules. The lookup into \p module
-  /// itself will not check or update the lookup cache.
+  /// reexports. The lookup into \p module itself will not check or update the
+  /// lookup cache.
   ///
   /// The results are appended to \p decls.
   ///
@@ -111,7 +86,7 @@ public:
         respectAccessControl(!ctx.isAccessControlDisabled()) {}
 
   /// Performs a qualified lookup into the given module and, if necessary, its
-  /// reexports, observing proper shadowing rules.
+  /// reexports.
   ///
   /// The results are appended to \p decls.
   void lookupInModule(SmallVectorImpl<ValueDecl *> &decls,
@@ -138,40 +113,6 @@ public:
       lookupKind(lookupKind) {}
 
 private:
-  class SortCanType {
-  public:
-    bool operator()(CanType lhs, CanType rhs) const {
-      return std::less<TypeBase *>()(lhs.getPointer(), rhs.getPointer());
-    }
-  };
-
-  using OverloadSetTy = llvm::SmallSet<CanType, 4, SortCanType>;
-
-  /// Does \p VD conflict with the \p overloads we've already seen?
-  static bool isValidOverload(const OverloadSetTy &overloads,
-                              const ValueDecl *VD) {
-    if (!isOverloadable(VD))
-      return overloads.empty();
-    return !overloads.count(VD->getInterfaceType()->getCanonicalType());
-  }
-
-  /// Updates \p overloads with the types of the given decls.
-  ///
-  /// \returns true if all of the given decls are overloadable, false if not.
-  static bool updateOverloadSet(OverloadSetTy &overloads,
-                                ArrayRef<ValueDecl *> decls) {
-    for (auto result : decls) {
-      if (!isOverloadable(result))
-        return false;
-      if (!result->hasInterfaceType())
-        continue;
-      // FIXME: This relies on the interface type including argument labels.
-      // FIXME: ...and it doesn't handle different generic requirements.
-      overloads.insert(result->getInterfaceType()->getCanonicalType());
-    }
-    return true;
-  }
-
   /// Returns whether it's okay to stop recursively searching imports, given 
   /// that we found something non-overloadable.
   static bool canReturnEarly() {
@@ -199,45 +140,6 @@ public:
       lookupKind(lookupKind) {}
 
 private:
-  using OverloadSetEntry =
-      std::pair<ResolutionKind, LookupByName::OverloadSetTy>;
-  using OverloadSetTy = llvm::DenseMap<DeclBaseName, OverloadSetEntry>;
-  static_assert(ResolutionKind() == ResolutionKind::Overloadable,
-                "Entries in NamedCanTypeSet should be overloadable initially");
-
-  /// Does \p VD conflict with the \p overloads we've already seen?
-  static bool isValidOverload(OverloadSetTy &overloads, const ValueDecl *VD) {
-    // Note: 'overloads' is not const because it's cheaper to create the empty
-    // set value under this name once and check it repeatedly.
-    const OverloadSetEntry &entry = overloads[VD->getBaseName()];
-    if (entry.first != ResolutionKind::Overloadable)
-      return false;
-    return LookupByName::isValidOverload(entry.second, VD);
-  }
-
-  /// Updates \p overloads with the types of the given decls.
-  ///
-  /// \returns true, since there can always be more overloadable decls.
-  static bool updateOverloadSet(OverloadSetTy &overloads,
-                                ArrayRef<ValueDecl *> decls) {
-    for (auto result : decls) {
-      OverloadSetEntry &entry = overloads[result->getBaseName()];
-      if (!isOverloadable(result)) {
-        entry.first = ResolutionKind::Exact;
-        entry.second.clear();
-        continue;
-      }
-
-      if (!result->hasInterfaceType())
-        continue;
-
-      // FIXME: This relies on the interface type including argument labels.
-      // FIXME: ...and it doesn't handle different generic requirements.
-      entry.second.insert(result->getInterfaceType()->getCanonicalType());
-    }
-    return true;
-  }
-
   /// Returns whether it's okay to stop recursively searching imports, given
   /// that we found something non-overloadable.
   static bool canReturnEarly() {
@@ -254,76 +156,29 @@ private:
 } // end anonymous namespace
 
 template <typename LookupStrategy>
-template <bool CRTPWorkaround>
 bool ModuleNameLookup<LookupStrategy>::recordImportDecls(
     SmallVectorImpl<ValueDecl *> &results,
-    ArrayRef<ValueDecl *> newDecls,
-    OverloadSetTy<CRTPWorkaround> &overloads) {
+    ArrayRef<ValueDecl *> newDecls) {
 
-  static_assert(
-      std::is_same<decltype(overloads),
-                   typename LookupStrategy::OverloadSetTy &>::value,
-      "Template params should be inferred.");
+  results.append(newDecls.begin(), newDecls.end());
 
-  const size_t originalSize = results.size();
-
-  switch (resolutionKind) {
-  case ResolutionKind::Overloadable: {
-    // Add new decls if they provide a new overload. Note that the new decls
-    // may be ambiguous with respect to each other, just not any decls already
-    // in the overload set.
-    llvm::copy_if(newDecls, std::back_inserter(results),
-                  [&](ValueDecl *result) -> bool {
-      if (!result->hasInterfaceType()) {
-        if (auto *typeResolver = result->getASTContext().getLazyResolver()) {
-          typeResolver->resolveDeclSignature(result);
-          if (result->isInvalid())
-            return true;
-        } else {
-          return true;
-        }
-      }
-      return getDerived()->isValidOverload(overloads, result);
-    });
-
-    // Update the overload set.
-    bool stillOverloadable = getDerived()->updateOverloadSet(overloads,
-                                                             newDecls);
-    if (stillOverloadable)
+  if (resolutionKind == ResolutionKind::Overloadable) {
+    // If we only found top-level functions, keep looking, since we may
+    // find additional overloads.
+    if (llvm::all_of(newDecls,
+                     [](ValueDecl *VD) { return isa<FuncDecl>(VD); }))
       return false;
-    break;
   }
 
-  case ResolutionKind::Exact:
-    // Add all decls. If they're ambiguous, they're ambiguous; if we got to this
-    // point, the caller hasn't found anything that shadows these decls.
-    results.append(newDecls.begin(), newDecls.end());
-    break;
-
-  case ResolutionKind::TypesOnly:
-    // Add type decls only. If they're ambiguous, they're ambiguous; if we got
-    // to this point, the caller hasn't found anything that shadows these decls.
-    llvm::copy_if(newDecls, std::back_inserter(results),
-                  [](const ValueDecl *VD) { return isa<TypeDecl>(VD); });
-    break;
-  }
-
-  return results.size() != originalSize && getDerived()->canReturnEarly();
+  return !newDecls.empty() && getDerived()->canReturnEarly();
 }
 
 template <typename LookupStrategy>
-template <bool CRTPWorkaround>
 void ModuleNameLookup<LookupStrategy>::collectLookupResultsFromImports(
     SmallVectorImpl<ValueDecl *> &decls,
     ArrayRef<ModuleDecl::ImportedModule> reexports,
     ModuleDecl::AccessPathTy accessPath,
-    const DeclContext *moduleScopeContext,
-    OverloadSetTy<CRTPWorkaround> &overloads) {
-
-  static_assert(
-      std::is_same<decltype(overloads),
-                   typename LookupStrategy::OverloadSetTy &>::value,
-      "Template params should be inferred.");
+    const DeclContext *moduleScopeContext) {
 
   // Prefer scoped imports (those importing a specific name from a module, like
   // `import func Swift.max`) to whole-module imports.
@@ -352,9 +207,9 @@ void ModuleNameLookup<LookupStrategy>::collectLookupResultsFromImports(
 
   // Add the results from scoped imports, then the results from unscoped
   // imports if needed.
-  const bool canReturnEarly = recordImportDecls(decls, scopedValues, overloads);
+  const bool canReturnEarly = recordImportDecls(decls, scopedValues);
   if (!canReturnEarly)
-    (void)recordImportDecls(decls, unscopedValues, overloads);
+    (void)recordImportDecls(decls, unscopedValues);
 }
 
 template <typename LookupStrategy>
@@ -367,16 +222,18 @@ ArrayRef<ValueDecl *> ModuleNameLookup<LookupStrategy>::lookupInModuleUncached(
   // Do the lookup.
   SmallVector<ValueDecl *, 4> localDecls;
   getDerived()->doLocalLookup(module, accessPath, localDecls);
-  if (respectAccessControl) {
-    llvm::erase_if(localDecls, [=](ValueDecl *VD) {
-      return !VD->isAccessibleFrom(moduleScopeContext);
-    });
-  }
+
+  llvm::erase_if(localDecls, [=](ValueDecl *VD) {
+    if (resolutionKind == ResolutionKind::TypesOnly && !isa<TypeDecl>(VD))
+      return true;
+    if (respectAccessControl && !VD->isAccessibleFrom(moduleScopeContext))
+      return true;
+    return false;
+  });
 
   // Record the decls by overload signature.
   const size_t initialCount = decls.size();
-  typename LookupStrategy::OverloadSetTy overloads;
-  const bool canReturnEarly = recordImportDecls(decls, localDecls, overloads);
+  const bool canReturnEarly = recordImportDecls(decls, localDecls);
 
   // If needed, search for decls in re-exported modules as well.
   if (!canReturnEarly) {
@@ -398,7 +255,7 @@ ArrayRef<ValueDecl *> ModuleNameLookup<LookupStrategy>::lookupInModuleUncached(
       moduleScopeContextForReexports = nullptr;
 
     collectLookupResultsFromImports(decls, reexports, accessPath,
-                                    moduleScopeContextForReexports, overloads);
+                                    moduleScopeContextForReexports);
   }
 
   // Remove duplicated declarations, which can happen when the same module is
