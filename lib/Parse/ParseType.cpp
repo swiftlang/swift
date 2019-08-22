@@ -656,8 +656,13 @@ Parser::TypeResult Parser::parseTypeIdentifier() {
       // FIXME: offer a fixit: 'self' -> 'Self'
       Identifier =
           parseIdentifierSyntax(diag::expected_identifier_in_dotted_type);
-      if (!Identifier)
+      if (!Identifier) {
         Status.setIsParseError();
+        if (Base)
+          Junk.push_back(*Base);
+        if (Period)
+          Junk.push_back(*Period);
+      }
     }
 
     if (Identifier) {
@@ -735,11 +740,8 @@ Parser::TypeResult Parser::parseTypeIdentifier() {
     return makeParsedCodeCompletion<ParsedTypeSyntax>(Junk);
   }
   
-  if (Status.isError()) {
-    if (Base)
-      Junk.push_back(*Base);
+  if (Status.isError())
     return makeParsedError<ParsedTypeSyntax>(Junk);
-  }
 
   return makeParsedSuccess(*Base);
 }
