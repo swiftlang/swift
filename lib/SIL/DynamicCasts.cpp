@@ -292,10 +292,16 @@ CanType swift::getNSBridgedClassOfCFClass(ModuleDecl *M, CanType type) {
 
 static bool isCFBridgingConversion(ModuleDecl *M, SILType sourceType,
                                    SILType targetType) {
-  return (sourceType.getASTType() ==
-            getNSBridgedClassOfCFClass(M, targetType.getASTType()) ||
-          targetType.getASTType() ==
-            getNSBridgedClassOfCFClass(M, sourceType.getASTType()));
+  if (auto bridgedTarget =
+        getNSBridgedClassOfCFClass(M, targetType.getASTType())) {
+    return bridgedTarget->isExactSuperclassOf(sourceType.getASTType());
+  }
+  if (auto bridgedSource =
+        getNSBridgedClassOfCFClass(M, sourceType.getASTType())) {
+    return targetType.getASTType()->isExactSuperclassOf(bridgedSource);
+  }
+  
+  return false;
 }
 
 /// Try to classify the dynamic-cast relationship between two types.
@@ -306,6 +312,10 @@ swift::classifyDynamicCast(ModuleDecl *M,
                            bool isSourceTypeExact,
                            bool isWholeModuleOpts) {
   if (source == target) return DynamicCastFeasibility::WillSucceed;
+
+  // Return a conservative answer for opaque archetypes for now.
+  if (source->hasOpaqueArchetype() || target->hasOpaqueArchetype())
+    return DynamicCastFeasibility::MaySucceed;
 
   auto sourceObject = source.getOptionalObjectType();
   auto targetObject = target.getOptionalObjectType();
@@ -864,7 +874,7 @@ namespace {
         value = getOwnedScalar(source, srcTL);
       }
       auto targetTy = target.LoweredType;
-      if (isCFBridgingConversion(SwiftModule, targetTy, value->getType())) {
+      if (isCFBridgingConversion(SwiftModule, value->getType(), targetTy)) {
         value = B.createUncheckedRefCast(Loc, value, targetTy.getObjectType());
       } else {
         value = B.createUpcast(Loc, value, targetTy.getObjectType());

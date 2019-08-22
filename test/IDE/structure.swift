@@ -293,3 +293,18 @@ myFunc(foo: 0,
        bar: baz == 0)
 // CHECK: <call><name>myFunc</name>(<arg><name>foo</name>: 0</arg>,
 // CHECK:        <arg><name>bar</name>: baz == 0</arg>)</call>
+
+
+enum FooEnum {
+// CHECK: <enum>enum <name>FooEnum</name> {
+  case blah(x: () -> () = {
+  // CHECK: <enum-case>case <enum-elem><name>blah(<param><name>x</name>: <type>() -> ()</type> = <closure><brace>{
+    @Tuples func foo(x: MyStruc) {}
+    // CHECK: @Tuples <ffunc>func <name>foo(<param><name>x</name>: <type>MyStruc</type></param>)</name> {}</ffunc>
+  })
+  // CHECK: }</brace></closure></param>)</name></enum-elem></enum-case>
+}
+// CHECK: }</enum>
+
+fourthCall(a: @escaping () -> Int)
+// CHECK: <call><name>fourthCall</name>(<arg><name>a</name>: @escaping () -> Int</arg>)</call>

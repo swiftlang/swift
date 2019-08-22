@@ -215,6 +215,24 @@ func shortFormMissingParen() { // expected-error {{expected ')' in 'available' a
 func shortFormMissingPlatform() {
 }
 
+@available(iOS 8.0, iDishwasherOS 22.0, *) // expected-warning {{unrecognized platform name 'iDishwasherOS'}}
+func shortFormWithUnrecognizedPlatform() {
+}
+
+@available(iOS 8.0, iDishwasherOS 22.0, iRefrigeratorOS 18.0, *)
+// expected-warning@-1 {{unrecognized platform name 'iDishwasherOS'}}
+// expected-warning@-2 {{unrecognized platform name 'iRefrigeratorOS'}}
+func shortFormWithTwoUnrecognizedPlatforms() {
+}
+
+// Make sure that even after the parser hits an unrecognized
+// platform it validates the availability.
+@available(iOS 8.0, iDishwasherOS 22.0, iOS 9.0, *)
+// expected-warning@-1 {{unrecognized platform name 'iDishwasherOS'}}
+// expected-error@-2 {{version for 'iOS' already specified}}
+func shortFormWithUnrecognizedPlatformContinueValidating() {
+}
+
 @available(iOS 8.0, *
 func shortFormMissingParenAfterWildcard() { // expected-error {{expected ')' in 'available' attribute}}
 }
@@ -1069,3 +1087,16 @@ func rdar46348825_deprecated() {}
 @available(swift, obsoleted: 4.0, obsoleted: 4.0)
 // expected-warning@-1 {{'obsoleted' argument has already been specified}}
 func rdar46348825_obsoleted() {}
+
+// Referencing unavailable types in signatures of unavailable functions should be accepted
+@available(*, unavailable)
+protocol UnavailableProto {
+}
+
+@available(*, unavailable)
+func unavailableFunc(_ arg: UnavailableProto) -> UnavailableProto {}
+
+@available(*, unavailable)
+struct S {
+  var a: UnavailableProto
+}

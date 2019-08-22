@@ -169,8 +169,8 @@ class H : G {
 
   @objc func manyA(_: AnyObject, _: AnyObject) {}
   @objc func manyB(_ a: AnyObject, b: AnyObject) {}
-  @objc func manyC(var a: AnyObject,  // expected-error {{'var' as a parameter attribute is not allowed}}
-                   var b: AnyObject) {} // expected-error {{'var' as a parameter attribute is not allowed}}
+  @objc func manyC(var a: AnyObject,  // expected-warning {{'var' in this position is interpreted as an argument label}} {{20-23=`var`}}
+                   var b: AnyObject) {} // expected-warning {{'var' in this position is interpreted as an argument label}} {{20-23=`var`}}
 
   @objc func result() -> AnyObject? { return nil }
   @objc func both(_ x: AnyObject) -> AnyObject? { return x }
@@ -265,8 +265,8 @@ class Base24646184 {
   func foo(ok: SubTy) { }
 }
 class Derived24646184 : Base24646184 {
-  override init(_: Ty) { } // expected-note {{'init(_:)' previously overridden here}}
-  override init(_: SubTy) { } // expected-error {{'init(_:)' has already been overridden}}
+  override init(_: Ty) { } // expected-error {{'init(_:)' has already been overridden}}
+  override init(_: SubTy) { } // expected-note {{'init(_:)' previously overridden here}}
   override func foo(_: Ty) { } // expected-note {{'foo' previously overridden here}}
   override func foo(_: SubTy) { } // expected-error {{'foo' has already been overridden}}
 

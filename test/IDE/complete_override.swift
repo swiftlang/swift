@@ -169,6 +169,7 @@ protocol ProtocolA {
 // WITH_PA-DAG: Decl[Constructor]/Super:    required init(fromProtocolA: Int) {|}{{; name=.+$}}
 // WITH_PA-DAG: Decl[InstanceMethod]/Super: func protoAFunc() {|}{{; name=.+$}}
 // WITH_PA-DAG: Decl[InstanceMethod]/Super: func protoAFuncOptional() {|}{{; name=.+$}}
+// WITH_PA-DAG: Decl[Subscript]/Super:      subscript(a: TagPA) -> Int {|}{{; name=.+$}}
 // WITH_PA-DAG: Decl[InstanceVar]/Super:    var protoAVarRW: Int{{; name=.+$}}
 // WITH_PA-DAG: Decl[InstanceVar]/Super:    var protoAVarRO: Int{{; name=.+$}}
 // WITH_PA: End completions
@@ -195,6 +196,7 @@ protocol ProtocolB : ProtocolA {
 // WITH_PB-DAG: Decl[Constructor]/Super:    required init(fromProtocolA: Int) {|}{{; name=.+$}}
 // WITH_PB-DAG: Decl[InstanceMethod]/Super: func protoAFunc() {|}{{; name=.+$}}
 // WITH_PB-DAG: Decl[InstanceMethod]/Super: func protoBFunc() {|}{{; name=.+$}}
+// WITH_PB-DAG: Decl[Subscript]/Super:      subscript(a: TagPB) -> Int {|}{{; name=.+$}}
 // WITH_PB-DAG: Decl[InstanceVar]/Super:    var protoBVarRW: Int{{; name=.+$}}
 // WITH_PB-DAG: Decl[InstanceVar]/Super:    var protoBVarRO: Int{{; name=.+$}}
 // WITH_PB: End completions
@@ -213,6 +215,7 @@ protocol ProtocolE {
 // WITH_PE: Begin completions
 // WITH_PE-DAG: Decl[Constructor]/Super:    required init(fromProtocolE: Int) {|}{{; name=.+$}}
 // WITH_PE-DAG: Decl[InstanceMethod]/Super: func protoEFunc() {|}{{; name=.+$}}
+// WITH_PE-DAG: Decl[Subscript]/Super:      subscript(a: TagPE) -> Int {|}{{; name=.+$}}
 // WITH_PE-DAG: Decl[InstanceVar]/Super:    var protoEVarRW: Int{{; name=.+$}}
 // WITH_PE-DAG: Decl[InstanceVar]/Super:    var protoEVarRO: Int{{; name=.+$}}
 // WITH_PE: End completions
@@ -283,6 +286,7 @@ class BaseE : ProtocolE {
 // WITH_BE: Begin completions
 // WITH_BE-DAG: Decl[Constructor]/Super:    required init(fromProtocolE: Int) {|}{{; name=.+$}}
 // WITH_BE-DAG: Decl[InstanceMethod]/Super: override func protoEFunc() {|}{{; name=.+$}}
+// WITH_BE-DAG: Decl[Subscript]/Super:      override subscript(a: TagPE) -> Int {|}{{; name=.+$}}
 // WITH_BE-DAG: Decl[Constructor]/Super:    override init(fromBaseE: Int) {|}{{; name=.+$}}
 // WITH_BE-DAG: Decl[InstanceMethod]/Super: override func baseEFunc() {|}{{; name=.+$}}
 // WITH_BE-DAG: Decl[InstanceVar]/Super:    override var protoEVarRW: Int{{; name=.+$}}
@@ -304,6 +308,7 @@ class ProtocolEImpl /* : ProtocolE but does not implement the protocol */ {
 // WITH_PEI: Begin completions
 // WITH_PEI-DAG: Decl[Constructor]/Super:    override init(fromProtocolE: Int) {|}{{; name=.+$}}
 // WITH_PEI-DAG: Decl[InstanceMethod]/Super: override func protoEFunc() {|}{{; name=.+$}}
+// WITH_PEI-DAG: Decl[Subscript]/Super:      override subscript(a: TagPE) -> Int {|}{{; name=.+$}}
 // WITH_PEI-DAG: Decl[InstanceVar]/Super:    override var protoEVarRW: Int{{; name=.+$}}
 // WITH_PEI-DAG: Decl[InstanceVar]/Super:    override var protoEVarRO: Int{{; name=.+$}}
 // WITH_PEI: End completions
@@ -315,7 +320,7 @@ class TestClass_PA : ProtocolA {
 
   #^CLASS_PA^#
 }
-// CLASS_PA: Begin completions, 5 items
+// CLASS_PA: Begin completions, 6 items
 
 class TestClass_PA_Ext {
   func ERROR1() {}
@@ -329,12 +334,12 @@ extension TestClass_PA_Ext : ProtocolA {
 class TestClass_PB : ProtocolB {
   #^CLASS_PB^#
 }
-// CLASS_PB: Begin completions, 9 items
+// CLASS_PB: Begin completions, 11 items
 
 class TestClass_PA_PB : ProtocolA, ProtocolB {
   #^CLASS_PA_PB^#
 }
-// CLASS_PA_PB: Begin completions, 9 items
+// CLASS_PA_PB: Begin completions, 11 items
 
 class TestClass_BA : BaseA {
   #^CLASS_BA^#
@@ -344,7 +349,7 @@ class TestClass_BA : BaseA {
 class TestClass_BA_PA : BaseA, ProtocolA {
   #^CLASS_BA_PA^#
 }
-// CLASS_BA_PA: Begin completions, 11 items
+// CLASS_BA_PA: Begin completions, 12 items
 
 class TestClass_BA_PA_Ext : BaseA {
   #^CLASS_BA_PA_EXT1^#
@@ -357,7 +362,7 @@ extension TestClass_BA_PA_Ext : ProtocolA {
 class TestClass_BA_PB : BaseA, ProtocolB {
   #^CLASS_BA_PB^#
 }
-// CLASS_BA_PB: Begin completions, 15 items
+// CLASS_BA_PB: Begin completions, 17 items
 
 class TestClass_BB : BaseB {
   #^CLASS_BB^#
@@ -367,17 +372,17 @@ class TestClass_BB : BaseB {
 class TestClass_BE : BaseE {
   #^CLASS_BE^#
 }
-// CLASS_BE: Begin completions, 8 items
+// CLASS_BE: Begin completions, 9 items
 
 class TestClass_BE_PA : BaseE, ProtocolA {
   #^CLASS_BE_PA^#
 }
-// CLASS_BE_PA: Begin completions, 13 items
+// CLASS_BE_PA: Begin completions, 15 items
 
 class TestClass_BE_PA_PE : BaseE, ProtocolA, ProtocolE {
   #^CLASS_BE_PA_PE^#
 }
-// CLASS_BE_PA_PE: Begin completions, 13 items
+// CLASS_BE_PA_PE: Begin completions, 15 items
 
 class TestClass_BE_PA_PE_Ext : BaseE {
   #^CLASS_BE_PA_PE_EXT1^#
@@ -389,7 +394,7 @@ extension TestClass_BE_PA_PE_Ext : ProtocolA, ProtocolE {
 class TestClass_PEI_PE : ProtocolEImpl, ProtocolE {
   #^CLASS_PEI_PE^#
 }
-// CLASS_PEI_PE: Begin completions, 4 items
+// CLASS_PEI_PE: Begin completions, 5 items
 
 protocol TestProtocol_PA : ProtocolA {
   #^PROTOCOL_PA^#
@@ -405,6 +410,7 @@ extension TestProtocol_PA {
 // PROTOCOL_PA_EXT-DAG: Decl[Constructor]/Super:            init(fromProtocolA: Int) {|}; name=init(fromProtocolA: Int)
 // PROTOCOL_PA_EXT-DAG: Decl[InstanceMethod]/Super:         func protoAFunc() {|}; name=protoAFunc()
 // PROTOCOL_PA_EXT-DAG: Decl[InstanceMethod]/Super:         func protoAFuncOptional() {|}; name=protoAFuncOptional()
+// PROTOCOL_PA_EXT-DAG: Decl[Subscript]/Super:              subscript(a: TagPA) -> Int {|}; name=subscript(a: TagPA) -> Int
 // PROTOCOL_PA_EXT-DAG: Decl[InstanceVar]/Super:            var protoAVarRW: Int; name=protoAVarRW: Int
 // PROTOCOL_PA_EXT-DAG: Decl[InstanceVar]/Super:            var protoAVarRO: Int; name=protoAVarRO: Int
 // PROTOCOL_PA_EXT: End completions
@@ -433,10 +439,11 @@ class OmitKW1 : ProtocolA {
   override#^OMIT_KEYWORD1^#
 }
 
-//OMIT_KEYWORD1:         Begin completions
+// OMIT_KEYWORD1:        Begin completions
 // OMIT_KEYWORD1-NOT:    Decl[Constructor]
-//OMIT_KEYWORD1-DAG:     Decl[InstanceMethod]/Super:         func protoAFunc() {|}; name=protoAFunc(){{$}}
-//OMIT_KEYWORD1-DAG:     Decl[InstanceMethod]/Super:         func protoAFuncOptional() {|}; name=protoAFuncOptional(){{$}}
+// OMIT_KEYWORD1-DAG:    Decl[InstanceMethod]/Super:         func protoAFunc() {|}; name=protoAFunc(){{$}}
+// OMIT_KEYWORD1-DAG:    Decl[InstanceMethod]/Super:         func protoAFuncOptional() {|}; name=protoAFuncOptional(){{$}}
+// OMIT_KEYWORD1-DAG:    Decl[Subscript]/Super:              subscript(a: TagPA) -> Int {|}; name=subscript(a: TagPA) -> Int
 // OMIT_KEYWORD1-DAG:    Decl[InstanceVar]/Super:            var protoAVarRW: Int{{; name=.+$}}
 // OMIT_KEYWORD1-NOT:    Decl[Constructor]
 // OMIT_KEYWORD1: End completions
@@ -448,10 +455,12 @@ class OmitKW2 : ProtocolA {
 // OMIT_KEYWORD2:        Begin completions
 // OMIT_KEYWORD2-NOT:    Decl[InstanceVar]/Super:            var protoAVarRW: Int{{; name=.+$}}
 // OMIT_KEYWORD2-NOT:    Decl[Constructor]
+// OMIT_KEYWORD2-NOT:    Decl[Subscript]
 // OMIT_KEYWORD2-DAG:    Decl[InstanceMethod]/Super:         protoAFunc() {|}; name=protoAFunc(){{$}}
 // OMIT_KEYWORD2-DAG:    Decl[InstanceMethod]/Super:         protoAFuncOptional() {|}; name=protoAFuncOptional(){{$}}
 // OMIT_KEYWORD2-NOT:    Decl[InstanceVar]/Super:            var protoAVarRW: Int{{; name=.+$}}
 // OMIT_KEYWORD2-NOT:    Decl[Constructor]
+// OMIT_KEYWORD2-NOT:    Decl[Subscript]
 // OMIT_KEYWORD2: End completions
 
 class OmitKW3 : ProtocolA {
@@ -462,10 +471,12 @@ class OmitKW3 : ProtocolA {
 // FIXME: missing 'override'
 // OMIT_KEYWORD3-NOT:    Decl[InstanceVar]/Super:            var protoAVarRW: Int{{; name=.+$}}
 // OMIT_KEYWORD3-NOT:    Decl[Constructor]
+// OMIT_KEYWORD2-NOT:    Decl[Subscript]
 // OMIT_KEYWORD3-DAG:    Decl[InstanceMethod]/Super:         protoAFunc() {|}; name=protoAFunc(){{$}}
 // OMIT_KEYWORD3-DAG:    Decl[InstanceMethod]/Super:         protoAFuncOptional() {|}; name=protoAFuncOptional(){{$}}
 // OMIT_KEYWORD3-NOT:    Decl[InstanceVar]/Super:            var protoAVarRW: Int{{; name=.+$}}
 // OMIT_KEYWORD3-NOT:    Decl[Constructor]
+// OMIT_KEYWORD2-NOT:    Decl[Subscript]
 // OMIT_KEYWORD3: End completions
 
 class OmitKW4: ProtocolA {
@@ -480,6 +491,7 @@ class OmitKW4_let: ProtocolA {
 // OMIT_KEYWORD4:        Decl[InstanceVar]/Super: protoAVarRW: Int{{; name=.+$}}
 // OMIT_KEYWORD4-NOT:    Decl[InstanceMethod]
 // OMIT_KEYWORD4-NOT:    Decl[Constructor]
+// OMIT_KEYWORD4-NOT:    Decl[Subscript]
 
 class OmitKW5: ProtocolA {
   override

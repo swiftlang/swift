@@ -49,7 +49,7 @@ floating_types = ['Float','Double']
 
 %for scalar in scalar_types:
 % for count in [2, 3, 4]:
-%  vectype = ctype[scalar] + str(count)
+%  vectype = "SIMD" + str(count) + "<" + scalar + ">"
 %  vecsize = (8 if scalar == 'Double' else 4) * (4 if count == 3 else count)
 %  vecalign = (16 if vecsize > 16 else vecsize)
 %  is_floating = scalar in floating_types
@@ -57,7 +57,7 @@ floating_types = ['Float','Double']
 %  wrap = "" if is_floating else "&"
 
 @available(swift, deprecated: 5.1, message: "Use SIMD${count}<${scalar}>")
-public typealias ${vectype} = SIMD${count}<${scalar}>
+public typealias ${ctype[scalar]}${count} = ${vectype}
 
 %  if is_signed:
 /// Elementwise absolute value of a vector.  The result is a vector of the same
@@ -337,8 +337,7 @@ public func step(_ x: ${scalar}, edge: ${scalar}) -> ${scalar} {
 /// Interprets two two-dimensional vectors as three-dimensional vectors in the
 /// xy-plane and computes their cross product, which lies along the z-axis.
 @_transparent
-public func cross(_ x: ${ctype[scalar]}2, _ y: ${ctype[scalar]}2)
-  -> ${ctype[scalar]}3 {
+public func cross(_ x: SIMD2<${scalar}>, _ y: SIMD2<${scalar}>) -> SIMD3<${scalar}> {
   return simd_cross(x,y)
 }
 
@@ -346,8 +345,7 @@ public func cross(_ x: ${ctype[scalar]}2, _ y: ${ctype[scalar]}2)
 /// perpendicular to the plane determined by `x` and `y`, with length equal to
 /// the oriented area of the parallelogram they determine.
 @_transparent
-public func cross(_ x: ${ctype[scalar]}3, _ y: ${ctype[scalar]}3)
-  -> ${ctype[scalar]}3 {
+public func cross(_ x: SIMD3<${scalar}>, _ y: SIMD3<${scalar}>) -> SIMD3<${scalar}> {
   return simd_cross(x,y)
 }
 
@@ -359,9 +357,9 @@ public func cross(_ x: ${ctype[scalar]}3, _ y: ${ctype[scalar]}3)
 %  for cols in [2,3,4]:
 %   mattype = 'simd_' + ctype[type] + str(cols) + 'x' + str(rows)
 %   diagsize = rows if rows < cols else cols
-%   coltype = ctype[type] + str(rows)
-%   rowtype = ctype[type] + str(cols)
-%   diagtype = ctype[type] + str(diagsize)
+%   coltype = "SIMD" + str(rows) + "<" + type + ">"
+%   rowtype = "SIMD" + str(cols) + "<" + type + ">"
+%   diagtype = "SIMD" + str(diagsize) + "<" + type + ">"
 %   transtype = ctype[type] + str(rows) + 'x' + str(cols)
 
 public typealias ${ctype[type]}${cols}x${rows} = ${mattype}

@@ -86,15 +86,12 @@ class ValueDecl;
 enum class ConstantConvertKind {
   /// No conversion required.
   None,
-  /// Coerce the constant to the given type.
-  Coerce,
-  /// Construct the given type from the constant value.
+  /// Construct the given type from the constant value by calling
+  /// init(rawValue:).
   Construction,
-  /// Construct the given type from the constant value, using an
-  /// optional initializer.
-  ConstructionWithUnwrap,
-  /// Perform an unchecked downcast to the given type.
-  Downcast
+  /// Construct the given type from the constant value by force
+  /// unwrapping the result of init(rawValue:).
+  ConstructionWithUnwrap
 };
 
 /// Describes the kind of type import we're performing.
@@ -324,7 +321,8 @@ class LLVM_LIBRARY_VISIBILITY ClangImporter::Implementation
   using Version = importer::ImportNameVersion;
 
 public:
-  Implementation(ASTContext &ctx, const ClangImporterOptions &opts);
+  Implementation(ASTContext &ctx, const ClangImporterOptions &opts,
+                 DWARFImporterDelegate *dwarfImporterDelegate);
   ~Implementation();
 
   /// Swift AST context.
@@ -334,7 +332,7 @@ public:
   const bool InferImportAsMember;
   const bool DisableSwiftBridgeAttr;
   const bool BridgingHeaderExplicitlyRequested;
-  const bool DisableAdapterModules;
+  const bool DisableOverlayModules;
 
   bool IsReadingBridgingPCH;
   llvm::SmallVector<clang::serialization::SubmoduleID, 2> PCHImportedSubmodules;
@@ -454,6 +452,9 @@ public:
   llvm::DenseMap<std::pair<ObjCSelector, char>, unsigned>
     ActiveSelectors;
 
+  // Mapping from imported types to their raw value types.
+  llvm::DenseMap<const NominalTypeDecl *, Type> RawTypes;
+
   clang::CompilerInstance *getClangInstance() {
     return Instance.get();
   }
@@ -520,7 +521,7 @@ private:
   Type NSObjectTy;
 
   /// A pair containing a ClangModuleUnit,
-  /// and whether the adapters of its re-exported modules have all been forced
+  /// and whether the overlays of its re-exported modules have all been forced
   /// to load already.
   using ModuleInitPair = llvm::PointerIntPair<ClangModuleUnit *, 1, bool>;
 
@@ -602,34 +603,44 @@ public:
   void addBridgeHeaderTopLevelDecls(clang::Decl *D);
   bool shouldIgnoreBridgeHeaderTopLevelDecl(clang::Decl *D);
 
+private:
+  /// The DWARF importer delegate, if installed.
+  DWARFImporterDelegate *DWARFImporter = nullptr;
 public:
-  void registerExternalDecl(Decl *D) {
-    if (!hasFinishedTypeChecking())
-      SwiftContext.addExternalDecl(D);
-  }
+  /// Only used for testing.
+  void setDWARFImporterDelegate(DWARFImporterDelegate &delegate);
 
-  void recordImplicitUnwrapForDecl(Decl *decl, bool isIUO) {
+private:
+  /// The list of Clang modules found in the debug info.
+  llvm::DenseMap<Identifier, LoadedFile *> DWARFModuleUnits;
+public:
+  /// Load a module using the clang::CompilerInstance.
+  ModuleDecl *loadModuleClang(SourceLoc importLoc,
+                              ArrayRef<std::pair<Identifier, SourceLoc>> path);
+  
+  /// "Load" a module from debug info. Because debug info types are read on
+  /// demand, this doesn't really do any work.
+  ModuleDecl *loadModuleDWARF(SourceLoc importLoc,
+                              ArrayRef<std::pair<Identifier, SourceLoc>> path);
+
+  
+  void recordImplicitUnwrapForDecl(ValueDecl *decl, bool isIUO) {
+    if (!isIUO)
+      return;
+
 #if !defined(NDEBUG)
     Type ty;
     if (auto *FD = dyn_cast<FuncDecl>(decl)) {
-      assert(FD->getInterfaceType());
       ty = FD->getResultInterfaceType();
     } else if (auto *CD = dyn_cast<ConstructorDecl>(decl)) {
-      assert(CD->getInterfaceType());
       ty = CD->getResultInterfaceType();
     } else {
       ty = cast<AbstractStorageDecl>(decl)->getValueInterfaceType();
     }
+    assert(ty->getOptionalObjectType());
 #endif
 
-    if (!isIUO)
-      return;
-
-    assert(ty->getOptionalObjectType());
-
-    auto *IUOAttr = new (SwiftContext)
-        ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true);
-    decl->getAttrs().add(IUOAttr);
+    decl->setImplicitlyUnwrappedOptional(true);
   }
 
   /// Retrieve the Clang AST context.
@@ -894,7 +905,7 @@ public:
 
   /// Constructs a Swift module for the given Clang module.
   ModuleDecl *finishLoadingClangModule(const clang::Module *clangModule,
-                                       bool preferAdapter);
+                                       bool preferOverlay);
 
   /// Call finishLoadingClangModule on each deferred import collected
   /// while scanning a bridging header or PCH.
@@ -1173,10 +1184,6 @@ public:
            "already have a type resolver");
     typeResolver.setPointerAndInt(newResolver, true);
   }
-  bool hasBegunTypeChecking() const { return typeResolver.getInt(); }
-  bool hasFinishedTypeChecking() const {
-    return hasBegunTypeChecking() && !getTypeResolver();
-  }
 
   /// Allocate a new delayed conformance ID with the given set of
   /// conformances.
@@ -1261,14 +1268,19 @@ public:
                                uint64_t unused) override;
   
   /// Returns the default definition type for \p ATD.
-  TypeLoc loadAssociatedTypeDefault(const AssociatedTypeDecl *ATD,
-                                            uint64_t contextData) override {
+  Type loadAssociatedTypeDefault(const AssociatedTypeDecl *ATD,
+                                 uint64_t contextData) override {
     llvm_unreachable("unimplemented for ClangImporter");
   }
   
   /// Returns the generic environment.
   virtual GenericEnvironment *loadGenericEnvironment(const DeclContext *decl,
                                                      uint64_t contextData) override {
+    llvm_unreachable("unimplemented for ClangImporter");
+  }
+
+  void loadRequirementSignature(const ProtocolDecl *decl, uint64_t contextData,
+                                SmallVectorImpl<Requirement> &reqs) override {
     llvm_unreachable("unimplemented for ClangImporter");
   }
 
@@ -1280,7 +1292,6 @@ public:
                                                   true);
     auto D = ::new (DeclPtr) DeclTy(std::forward<Targs>(Args)...);
     D->setClangNode(ClangN);
-    D->setEarlyAttrValidation(true);
     D->setAccess(access);
     if (auto ASD = dyn_cast<AbstractStorageDecl>(D))
       ASD->setSetterAccess(access);
@@ -1310,6 +1321,18 @@ public:
   /// Swift lookup table.
   void lookupValue(SwiftLookupTable &table, DeclName name,
                    VisibleDeclConsumer &consumer);
+
+  /// Look for namespace-scope values with the given name using the
+  /// DWARFImporterDelegate.
+  /// \param inModule only return results from this module.
+  void lookupValueDWARF(ModuleDecl::AccessPathTy accessPath, DeclName name,
+                        NLKind lookupKind, Identifier inModule,
+                        SmallVectorImpl<ValueDecl *> &results);
+
+  /// Look for top-level scope types with a name and kind using the
+  /// DWARFImporterDelegate.
+  void lookupTypeDeclDWARF(StringRef rawName, ClangTypeKind kind,
+                           llvm::function_ref<void(TypeDecl *)> receiver);
 
   /// Look for namespace-scope values in the given Swift lookup table.
   void lookupVisibleDecls(SwiftLookupTable &table,

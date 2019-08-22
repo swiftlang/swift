@@ -50,7 +50,7 @@ using namespace swift;
 // NOTE: older runtimes called these _SwiftNativeNSXXXBase. The two must
 // coexist, so these were renamed. The old names must not be used in the new
 // runtime.
-% for Class in ('Array', 'Dictionary', 'Set', 'String', 'Enumerator', 'Data', 'IndexSet'):
+% for Class in ('Array', 'Dictionary', 'Set', 'String', 'Enumerator'):
 SWIFT_RUNTIME_STDLIB_API
 @interface __SwiftNativeNS${Class}Base : NS${Class}
 {
@@ -62,6 +62,9 @@ SWIFT_RUNTIME_STDLIB_API
 
 @implementation __SwiftNativeNS${Class}Base
 
+- (id)initWithCoder: (NSCoder *)coder {
+  return [super init];
+}
 - (id)retain {
   auto SELF = reinterpret_cast<HeapObject *>(self);
   swift_retain(SELF);

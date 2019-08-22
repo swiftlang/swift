@@ -249,7 +249,7 @@ static bool isCaptured(AllocStackInst *ASI, bool &inSingleBlock) {
     // Destroys of loadable types can be rewritten as releases, so
     // they are fine.
     if (auto *DAI = dyn_cast<DestroyAddrInst>(II))
-      if (DAI->getOperand()->getType().isLoadable(DAI->getModule()))
+      if (DAI->getOperand()->getType().isLoadable(*DAI->getFunction()))
         continue;
 
     // Other instructions are assumed to capture the AllocStack.
@@ -296,7 +296,7 @@ bool MemoryToRegisters::isWriteOnlyAllocation(AllocStackInst *ASI) {
 /// Promote a DebugValueAddr to a DebugValue of the given value.
 static void
 promoteDebugValueAddr(DebugValueAddrInst *DVAI, SILValue Value, SILBuilder &B) {
-  assert(DVAI->getOperand()->getType().isLoadable(DVAI->getModule()) &&
+  assert(DVAI->getOperand()->getType().isLoadable(*DVAI->getFunction()) &&
          "Unexpected promotion of address-only type!");
   assert(Value && "Expected valid value");
   B.setInsertionPoint(DVAI);
@@ -368,7 +368,9 @@ static void replaceLoad(LoadInst *LI, SILValue val, AllocStackInst *ASI) {
 }
 
 static void replaceDestroy(DestroyAddrInst *DAI, SILValue NewValue) {
-  assert(DAI->getOperand()->getType().isLoadable(DAI->getModule()) &&
+  SILFunction *F = DAI->getFunction();
+
+  assert(DAI->getOperand()->getType().isLoadable(*F) &&
          "Unexpected promotion of address-only type!");
 
   assert(NewValue && "Expected a value to release!");
@@ -376,7 +378,6 @@ static void replaceDestroy(DestroyAddrInst *DAI, SILValue NewValue) {
   SILBuilderWithScope Builder(DAI);
 
   auto Ty = DAI->getOperand()->getType();
-  SILFunction *F = DAI->getFunction();
   auto &TL = F->getTypeLowering(Ty);
 
   bool expand = shouldExpand(DAI->getModule(),

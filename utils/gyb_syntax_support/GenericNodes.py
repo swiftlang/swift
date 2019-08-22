@@ -6,7 +6,8 @@ GENERIC_NODES = [
     Node('GenericWhereClause', kind='Syntax',
          children=[
              Child('WhereKeyword', kind='WhereToken'),
-             Child('RequirementList', kind='GenericRequirementList'),
+             Child('RequirementList', kind='GenericRequirementList',
+                   collection_element_name='Requirement'),
          ]),
 
     Node('GenericRequirementList', kind='SyntaxCollection',
@@ -38,7 +39,7 @@ GENERIC_NODES = [
          traits=['WithTrailingComma'],
          children=[
              Child('Attributes', kind='AttributeList',
-                   is_optional=True),
+                   collection_element_name='Attribute', is_optional=True),
              Child('Name', kind='IdentifierToken'),
              Child('Colon', kind='ColonToken',
                    is_optional=True),
@@ -52,7 +53,8 @@ GENERIC_NODES = [
     Node('GenericParameterClause', kind='Syntax',
          children=[
              Child('LeftAngleBracket', kind='LeftAngleToken'),
-             Child('GenericParameterList', kind='GenericParameterList'),
+             Child('GenericParameterList', kind='GenericParameterList',
+                   collection_element_name='GenericParameter'),
              Child('RightAngleBracket', kind='RightAngleToken'),
          ]),
 

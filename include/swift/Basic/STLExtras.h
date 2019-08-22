@@ -771,22 +771,6 @@ inline bool is_sorted_and_uniqued(const Container &C) {
   return is_sorted_and_uniqued(C.begin(), C.end());
 }
 
-template <typename Container, typename OutputIterator>
-inline void copy(const Container &C, OutputIterator iter) {
-  std::copy(C.begin(), C.end(), iter);
-}
-
-template <typename Container, typename OutputIterator, typename Predicate>
-inline void copy_if(const Container &C, OutputIterator result, Predicate pred) {
-  std::copy_if(C.begin(), C.end(), result, pred);
-}
-
-template <typename Container, typename OutputIterator, typename UnaryOperation>
-inline OutputIterator transform(const Container &C, OutputIterator result,
-                                UnaryOperation op) {
-  return std::transform(C.begin(), C.end(), result, op);
-}
-
 template <typename Container, typename T, typename BinaryOperation>
 inline T accumulate(const Container &C, T init, BinaryOperation op) {
   return std::accumulate(C.begin(), C.end(), init, op);
@@ -833,6 +817,13 @@ public:
     return !(left == right);
   }
 };
+  
+/// Cast a pointer to \c U  to a pointer to a supertype \c T.
+/// Example:  Wobulator *w = up_cast<Wobulator>(coloredWobulator)
+/// Useful with ?: where each arm is a different subtype.
+/// If \c U is not a subtype of \c T, the compiler will complain.
+template <typename T, typename U>
+T *up_cast(U *ptr) { return ptr; }
 
 /// Removes all runs of values that match \p pred from the range of \p begin
 /// to \p end.
@@ -871,6 +862,17 @@ Iterator removeAdjacentIf(const Iterator first, const Iterator last,
   return insertionPoint;
 }
 
+namespace detail {
+template <bool...> struct bool_pack;
+} // namespace detail
+
+template <bool... b>
+using all_true =
+    std::is_same<detail::bool_pack<b..., true>, detail::bool_pack<true, b...>>;
+
+/// traits class for checking whether Ts consists only of compound types.
+template <class... Ts>
+using are_all_compound = all_true<std::is_compound<Ts>::value...>;
 
 } // end namespace swift
 

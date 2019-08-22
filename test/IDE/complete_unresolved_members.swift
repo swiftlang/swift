@@ -103,6 +103,11 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERICPARAM_21 | %FileCheck %s -check-prefix=GENERICPARAM_1
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DECL_MEMBER_INIT_1 | %FileCheck %s -check-prefix=UNRESOLVED_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARG_1 | %FileCheck %s -check-prefix=UNRESOLVED_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARG_2 | %FileCheck %s -check-prefix=UNRESOLVED_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARG_3 | %FileCheck %s -check-prefix=UNRESOLVED_3
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPEPARAM_IN_CONTEXTTYPE_1 | %FileCheck %s -check-prefix=TYPEPARAM_IN_CONTEXTTYPE_1
 
 enum SomeEnum1 {
   case South
@@ -682,4 +687,33 @@ func testingGenericParam2<X>(obj: C<X>) {
 
 struct TestingStruct {
   var value: SomeEnum1 = .#^DECL_MEMBER_INIT_1^#
+}
+
+func testDefaultArgument(arg: SomeEnum1 = .#^DEFAULT_ARG_1^#) {}
+class TestDefalutArg {
+  func method(arg: SomeEnum1 = .#^DEFAULT_ARG_2^#) {}
+  init(arg: SomeEnum1 = .#^DEFAULT_ARG_3^#) {}
+}
+
+
+struct ConcreteMyProtocol: MyProtocol {}
+struct OtherProtocol {}
+struct ConcreteOtherProtocol: OtherProtocol {}
+
+struct MyStruct<T> {}
+extension MyStruct where T: MyProtocol {
+  static var myProtocolOption: MyStruct<ConcreteMyProtocol> { fatalError() }
+}
+extension MyStruct where T: OtherProtocol {
+  static var otherProtocolOption: MyStruct<ConcreteOtherProtocol> { fatalError() }
+}
+
+func receiveMyStructOfMyProtocol<T: MyProtocol>(value: MyStruct<T>) {}
+func testTypeParamInContextType() {
+  receiveMyStructOfMyProtocol(value: .#^TYPEPARAM_IN_CONTEXTTYPE_1^#)
+// TYPEPARAM_IN_CONTEXTTYPE_1: Begin completions, 2 items
+// TYPEPARAM_IN_CONTEXTTYPE_1-NOT: otherProtocolOption
+// TYPEPARAM_IN_CONTEXTTYPE_1-DAG: Decl[Constructor]/CurrNominal:      init()[#MyStruct<MyProtocol>#];
+// TYPEPARAM_IN_CONTEXTTYPE_1-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Convertible]: myProtocolOption[#MyStruct<ConcreteMyProtocol>#];
+// TYPEPARAM_IN_CONTEXTTYPE_1: End completions
 }

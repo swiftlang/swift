@@ -19,6 +19,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Types.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILValue.h"
@@ -389,7 +390,6 @@ llvm::Value *irgen::emitDynamicTypeOfOpaqueArchetype(IRGenFunction &IGF,
                                                      Address addr,
                                                      SILType type) {
   auto archetype = type.castTo<ArchetypeType>();
-
   // Acquire the archetype's static metadata.
   llvm::Value *metadata =
     emitArchetypeTypeMetadataRef(IGF, archetype, MetadataState::Complete)
@@ -450,14 +450,51 @@ withOpaqueTypeGenericArgs(IRGenFunction &IGF,
   }
 }
 
+bool shouldUseOpaqueTypeDescriptorAccessor(OpaqueTypeDecl *opaque) {
+  auto *namingDecl = opaque->getNamingDecl();
+  auto *abstractStorage = dyn_cast<AbstractStorageDecl>(namingDecl);
+
+  // Don't emit accessors for abstract storage that is not dynamic or a dynamic
+  // replacement.
+  if (abstractStorage) {
+    return abstractStorage->hasAnyNativeDynamicAccessors() ||
+           abstractStorage->hasAnyDynamicReplacementAccessors();
+  }
+
+  // Don't emit accessors for functions that are not dynamic or dynamic
+  // replacements.
+  return opaque->getNamingDecl()->isNativeDynamic() ||
+         opaque->getNamingDecl()
+             ->getAttrs()
+             .hasAttribute<DynamicReplacementAttr>();
+}
+
+static llvm::Value *
+getAddressOfOpaqueTypeDescriptor(IRGenFunction &IGF,
+                                 OpaqueTypeDecl *opaqueDecl) {
+  auto &IGM = IGF.IGM;
+
+  // Support dynamically replacing the return type as part of dynamic function
+  // replacement.
+  if (!IGM.getOptions().shouldOptimize() &&
+      shouldUseOpaqueTypeDescriptorAccessor(opaqueDecl)) {
+    auto descriptorAccessor = IGM.getAddrOfOpaqueTypeDescriptorAccessFunction(
+        opaqueDecl, NotForDefinition, false);
+    auto desc = IGF.Builder.CreateCall(descriptorAccessor, {});
+    desc->setDoesNotThrow();
+    desc->setCallingConv(IGM.SwiftCC);
+    return desc;
+  }
+  return IGM.getAddrOfOpaqueTypeDescriptor(opaqueDecl, ConstantInit());
+}
+
 MetadataResponse irgen::emitOpaqueTypeMetadataRef(IRGenFunction &IGF,
                                           CanOpaqueTypeArchetypeType archetype,
                                           DynamicMetadataRequest request) {
   auto accessorFn = IGF.IGM.getGetOpaqueTypeMetadataFn();
   auto opaqueDecl = archetype->getDecl();
-  auto descriptor = IGF.IGM
-   .getAddrOfOpaqueTypeDescriptor(opaqueDecl, ConstantInit());
 
+  auto *descriptor = getAddressOfOpaqueTypeDescriptor(IGF, opaqueDecl);
   auto indexValue = llvm::ConstantInt::get(IGF.IGM.SizeTy, 0);
 
   llvm::CallInst *result = nullptr;
@@ -482,8 +519,9 @@ llvm::Value *irgen::emitOpaqueTypeWitnessTableRef(IRGenFunction &IGF,
                                           ProtocolDecl *protocol) {
   auto accessorFn = IGF.IGM.getGetOpaqueTypeConformanceFn();
   auto opaqueDecl = archetype->getDecl();
-  auto descriptor = IGF.IGM
-    .getAddrOfOpaqueTypeDescriptor(opaqueDecl, ConstantInit());
+
+
+  llvm::Value *descriptor = getAddressOfOpaqueTypeDescriptor(IGF, opaqueDecl);
 
   auto foundProtocol = std::find(archetype->getConformsTo().begin(),
                                  archetype->getConformsTo().end(),

@@ -4,6 +4,7 @@ if (SWIFT_FORCE_OPTIMIZED_TYPECHECKER)
 endif()
 
 add_swift_host_library(swiftSema STATIC
+  BuilderTransform.cpp
   CSApply.cpp
   CSBindings.cpp
   CSDiag.cpp
@@ -51,14 +52,17 @@ add_swift_host_library(swiftSema STATIC
   TypeCheckGeneric.cpp
   TypeCheckNameLookup.cpp
   TypeCheckPattern.cpp
+  TypeCheckPropertyWrapper.cpp
   TypeCheckProtocol.cpp
   TypeCheckProtocolInference.cpp
   TypeCheckREPL.cpp
   TypeCheckRequestFunctions.cpp
   TypeCheckStmt.cpp
+  TypeCheckStorage.cpp
   TypeCheckSwitchStmt.cpp
   TypeCheckType.cpp
   TypeChecker.cpp
+  IDETypeCheckingRequests.cpp
 
   ${EXTRA_TYPECHECKER_FLAGS})
 target_link_libraries(swiftSema PRIVATE

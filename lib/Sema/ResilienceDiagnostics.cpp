@@ -16,12 +16,12 @@
 
 #include "TypeChecker.h"
 #include "TypeCheckAvailability.h"
-#include "swift/AST/AccessScopeChecker.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/TypeDeclFinder.h"
 
 using namespace swift;
 using FragileFunctionKind = TypeChecker::FragileFunctionKind;
@@ -228,7 +228,7 @@ static bool diagnoseDeclExportability(SourceLoc loc, const ValueDecl *D,
 
 static bool
 diagnoseGenericArgumentsExportability(SourceLoc loc,
-                                      const SubstitutionMap &subs,
+                                      SubstitutionMap subs,
                                       const SourceFile &userSF) {
   bool hadAnyIssues = false;
   for (ProtocolConformanceRef conformance : subs.getConformances()) {
@@ -249,7 +249,7 @@ diagnoseGenericArgumentsExportability(SourceLoc loc,
     ASTContext &ctx = M->getASTContext();
     ctx.Diags.diagnose(loc, diag::conformance_from_implementation_only_module,
                        rootConf->getType(),
-                       rootConf->getProtocol()->getFullName(), M->getName());
+                       rootConf->getProtocol()->getFullName(), 0, M->getName());
     hadAnyIssues = true;
   }
   return hadAnyIssues;

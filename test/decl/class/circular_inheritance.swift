@@ -8,13 +8,13 @@
 // Check that we produced superclass type requests.
 // RUN: %{python} %utils/process-stats-dir.py --evaluate 'SuperclassTypeRequest == 17' %t/stats-dir
 
-class Left
-    : Right.Hand {
+class Left // expected-error {{circular reference}}
+    : Right.Hand { // expected-note {{through reference here}}
   class Hand {}
 }
 
-class Right
-  : Left.Hand {
+class Right // expected-note {{through reference here}}
+  : Left.Hand { // expected-note {{through reference here}}
   class Hand {}
 }
 
@@ -35,14 +35,14 @@ class Outer {
   class Inner : Outer {}
 }
 
-class Outer2
-    : Outer2.Inner {
+class Outer2 // expected-error {{circular reference}}
+    : Outer2.Inner { // expected-note {{through reference here}}
 
   class Inner {}
 }
 
-class Outer3
-    : Outer3.Inner<Int> {
+class Outer3 // expected-error {{circular reference}}
+    : Outer3.Inner<Int> { // expected-note {{through reference here}}
   class Inner<T> {}
 }
 

@@ -35,6 +35,7 @@ class ClangImporterOptions;
 class ClassDecl;
 class ModuleDecl;
 class NominalTypeDecl;
+class TypeDecl;
 
 enum class KnownProtocolKind : uint8_t;
 
@@ -81,6 +82,13 @@ protected:
 
 public:
   virtual ~ModuleLoader() = default;
+
+  /// Collect visible module names.
+  ///
+  /// Append visible module names to \p names. Note that names are possibly
+  /// duplicated, and not guaranteed to be ordered in any way.
+  virtual void collectVisibleTopLevelModuleNames(
+      SmallVectorImpl<Identifier> &names) const = 0;
 
   /// Check whether the module with a given name can be imported without
   /// importing it.

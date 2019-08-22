@@ -56,7 +56,7 @@ _swift_mangleSimpleClass(const char *module, const char *class_) {
   size_t moduleLength = strlen(module);
   size_t classLength = strlen(class_);
   char *value = nullptr;
-  if (strcmp(module, swift::STDLIB_NAME) == 0) {
+  if (swift::STDLIB_NAME == llvm::StringRef(module)) {
     int result = asprintf(&value, "_TtCs%zu%s", classLength, class_);
     assert(result > 0);
     (void)result;
@@ -75,7 +75,7 @@ _swift_mangleSimpleProtocol(const char *module, const char *protocol) {
   size_t moduleLength = strlen(module);
   size_t protocolLength = strlen(protocol);
   char *value = nullptr;
-  if (strcmp(module, swift::STDLIB_NAME) == 0) {
+  if (swift::STDLIB_NAME == llvm::StringRef(module)) {
     int result = asprintf(&value, "_TtPs%zu%s_", protocolLength, protocol);
     assert(result > 0);
     (void)result;

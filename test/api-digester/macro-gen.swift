@@ -5,5 +5,5 @@
 // RUN: %swift -emit-module -o %t.mod/macrogenright.swiftmodule %S/Inputs/macro-gen-right.swift -parse-as-library
 // RUN: %api-digester -dump-sdk -module macrogenleft -o %t.dump1.json -module-cache-path %t.module-cache -sdk %t.sdk -swift-version 4 -I %t.mod
 // RUN: %api-digester -dump-sdk -module macrogenright -o %t.dump2.json -module-cache-path %t.module-cache -sdk %t.sdk -swift-version 5 -I %t.mod
-// RUN: %api-digester -compare-sdk --input-paths %t.dump1.json -input-paths %t.dump2.json -o %t.result
+// RUN: %api-digester -generate-migration-script --input-paths %t.dump1.json -input-paths %t.dump2.json -o %t.result
 // RUN: diff -u %S/Outputs/macro-gen.def %t.result

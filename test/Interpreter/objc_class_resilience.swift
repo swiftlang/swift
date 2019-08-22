@@ -36,7 +36,10 @@ func takesMyProtocol(_ p: MyProtocol) -> Int {
   return p.myMethod()
 }
 
-ResilientClassTestSuite.test("Category") {
+ResilientClassTestSuite.test("Category")
+  .xfail(.osxMinor(10, 9, reason:
+         "Category attachment with ARCLite on 10.9 doesn't work currently"))
+  .code {
   expectEqual(42, takesMyProtocol(ResilientFieldWithCategory()))
 }
 

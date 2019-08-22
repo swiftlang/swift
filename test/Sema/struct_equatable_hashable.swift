@@ -120,8 +120,9 @@ func structWithoutExplicitConformance() {
 
 // Structs with non-hashable/equatable stored properties don't derive conformance.
 struct NotHashable {}
-struct StructWithNonHashablePayload: Hashable { // expected-error 2 {{does not conform}}
-  let a: NotHashable
+struct StructWithNonHashablePayload: Hashable { // expected-error 2 {{does not conform}} expected-note {{do you want to add protocol stubs?}}
+  let a: NotHashable // expected-note {{stored property type 'NotHashable' does not conform to protocol 'Hashable', preventing synthesized conformance of 'StructWithNonHashablePayload' to 'Hashable'}}
+  // expected-note@-1 {{stored property type 'NotHashable' does not conform to protocol 'Equatable', preventing synthesized conformance of 'StructWithNonHashablePayload' to 'Equatable'}}
 }
 
 // ...but computed properties and static properties are not considered.
@@ -151,7 +152,7 @@ func genericHashable() {
 // But it should be an error if the generic argument doesn't have the necessary
 // constraints to satisfy the conditions for derivation.
 struct GenericNotHashable<T: Equatable>: Hashable { // expected-error 2 {{does not conform to protocol 'Hashable'}}
-  let value: T
+  let value: T // expected-note 2 {{stored property type 'T' does not conform to protocol 'Hashable', preventing synthesized conformance of 'GenericNotHashable<T>' to 'Hashable'}}
 }
 func genericNotHashable() {
   if GenericNotHashable<String>(value: "a") == GenericNotHashable<String>(value: "b") { }
@@ -178,9 +179,10 @@ extension StructConformsAndImplementsInExtension : Equatable {
 
 // No explicit conformance and it cannot be derived.
 struct NotExplicitlyHashableAndCannotDerive {
-  let v: NotHashable
+  let v: NotHashable // expected-note {{stored property type 'NotHashable' does not conform to protocol 'Hashable', preventing synthesized conformance of 'NotExplicitlyHashableAndCannotDerive' to 'Hashable'}}
+  // expected-note@-1 {{stored property type 'NotHashable' does not conform to protocol 'Equatable', preventing synthesized conformance of 'NotExplicitlyHashableAndCannotDerive' to 'Equatable'}}
 }
-extension NotExplicitlyHashableAndCannotDerive : Hashable {}  // expected-error 2 {{does not conform}}
+extension NotExplicitlyHashableAndCannotDerive : Hashable {}  // expected-error 2 {{does not conform}} expected-note {{do you want to add protocol stubs?}}
 
 // A struct with no stored properties trivially derives conformance.
 struct NoStoredProperties: Hashable {}
@@ -233,10 +235,12 @@ extension GenericDeriveExtension: Hashable where T: Hashable {}
 
 // Incorrectly/insufficiently conditional shouldn't work
 struct BadGenericDeriveExtension<T> {
-    let value: T
+    let value: T // expected-note {{stored property type 'T' does not conform to protocol 'Hashable', preventing synthesized conformance of 'BadGenericDeriveExtension<T>' to 'Hashable'}}
+// expected-note@-1 {{stored property type 'T' does not conform to protocol 'Equatable', preventing synthesized conformance of 'BadGenericDeriveExtension<T>' to 'Equatable'}}
 }
 extension BadGenericDeriveExtension: Equatable {}
 // expected-error@-1 {{type 'BadGenericDeriveExtension<T>' does not conform to protocol 'Equatable'}}
+// expected-note@-2 {{do you want to add protocol stubs?}}
 extension BadGenericDeriveExtension: Hashable where T: Equatable {}
 // expected-error@-1 {{type 'BadGenericDeriveExtension' does not conform to protocol 'Hashable'}}
 

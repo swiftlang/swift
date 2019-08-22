@@ -87,8 +87,17 @@ public:
     Immediate,
   };
 
+  enum class MSVCRuntime {
+    MultiThreaded,
+    MultiThreadedDebug,
+    MultiThreadedDLL,
+    MultiThreadedDebugDLL,
+  };
+
   /// The mode in which the driver should invoke the frontend.
   Mode CompilerMode = Mode::StandardCompile;
+
+  Optional<MSVCRuntime> RuntimeVariant = llvm::None;
 
   /// The output type which should be used for compile actions.
   file_types::ID CompilerOutputType = file_types::ID::TY_INVALID;
@@ -149,7 +158,7 @@ public:
     Interactive,     // swift
     Batch,           // swiftc
     AutolinkExtract, // swift-autolink-extract
-    SwiftFormat      // swift-format
+    SwiftIndent      // swift-indent
   };
 
   class InputInfoMap;

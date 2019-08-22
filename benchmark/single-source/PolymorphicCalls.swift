@@ -22,7 +22,7 @@ applying a jump-threading in combination with the speculative devirtualization.
 
 import TestsUtils
 
-public var PolymorphicCalls = BenchmarkInfo(
+public let PolymorphicCalls = BenchmarkInfo(
   name: "PolymorphicCalls",
   runFunction: run_PolymorphicCalls,
   tags: [.abstraction, .cpubench]

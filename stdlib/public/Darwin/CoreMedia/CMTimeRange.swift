@@ -24,7 +24,7 @@
 // CMTimeRangeFromTimeToTime
 extension CMTimeRange {
   public init(start: CMTime, end: CMTime) {
-    self = CMTimeRangeFromTimeToTime(start, end)
+    self = CMTimeRangeFromTimeToTime(start: start, end: end)
   }
 
   public var isValid: Bool {
@@ -40,7 +40,7 @@ extension CMTimeRange {
   }
 
   public var isEmpty: Bool {
-    return self.isValid && (self.duration == kCMTimeZero)
+    return self.isValid && (self.duration == .zero)
   }
 
   public var end: CMTime {
@@ -48,16 +48,16 @@ extension CMTimeRange {
   }
 
   public func union(_ otherRange: CMTimeRange) -> CMTimeRange {
-    return CMTimeRangeGetUnion(self, otherRange)
+    return CMTimeRangeGetUnion(self, otherRange: otherRange)
   }
   public func intersection(_ otherRange: CMTimeRange) -> CMTimeRange {
-    return CMTimeRangeGetIntersection(self, otherRange)
+    return CMTimeRangeGetIntersection(self, otherRange: otherRange)
   }
   public func containsTime(_ time: CMTime) -> Bool {
-    return CMTimeRangeContainsTime(self, time)
+    return CMTimeRangeContainsTime(self, time: time)
   }
   public func containsTimeRange(_ range: CMTimeRange) -> Bool {
-    return CMTimeRangeContainsTimeRange(self, range)
+    return CMTimeRangeContainsTimeRange(self, otherRange: range)
   }
 }
 

@@ -155,15 +155,11 @@ public struct DateInterval : ReferenceConvertible, Comparable, Hashable, Codable
         return false
     }
     
-    public var hashValue: Int {
-        var buf: (UInt, UInt) = (UInt(start.timeIntervalSinceReferenceDate), UInt(end.timeIntervalSinceReferenceDate))
-        return withUnsafeMutablePointer(to: &buf) {
-            $0.withMemoryRebound(to: UInt8.self, capacity: 2 * MemoryLayout<UInt>.size / MemoryLayout<UInt8>.size) {
-                return Int(bitPattern: CFHashBytes($0, CFIndex(MemoryLayout<UInt>.size * 2)))
-            }
-        }
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(start)
+        hasher.combine(duration)
     }
-    
+
     @available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
     public static func ==(lhs: DateInterval, rhs: DateInterval) -> Bool {
         return lhs.start == rhs.start && lhs.duration == rhs.duration

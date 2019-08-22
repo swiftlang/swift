@@ -41,35 +41,10 @@ TypeLoc &InheritedDeclsReferencedRequest::getTypeLoc(
   return decl.get<ExtensionDecl *>()->getInherited()[index];
 }
 
-void InheritedDeclsReferencedRequest::diagnoseCycle(
-                                              DiagnosticEngine &diags) const {
+SourceLoc InheritedDeclsReferencedRequest::getNearestLoc() const {
   const auto &storage = getStorage();
   auto &typeLoc = getTypeLoc(std::get<0>(storage), std::get<1>(storage));
-  diags.diagnose(typeLoc.getLoc(), diag::circular_reference);
-}
-
-void InheritedDeclsReferencedRequest::noteCycleStep(
-                                                DiagnosticEngine &diags) const {
-  const auto &storage = getStorage();
-  auto &typeLoc = getTypeLoc(std::get<0>(storage), std::get<1>(storage));
-  diags.diagnose(typeLoc.getLoc(), diag::circular_reference_through);
-}
-
-//----------------------------------------------------------------------------//
-// Referenced underlying type declarations computation.
-//----------------------------------------------------------------------------//
-void UnderlyingTypeDeclsReferencedRequest::diagnoseCycle(
-                                               DiagnosticEngine &diags) const {
-  // FIXME: Improve this diagnostic.
-  auto subjectDecl = std::get<0>(getStorage());
-  diags.diagnose(subjectDecl, diag::circular_reference);
-}
-
-void UnderlyingTypeDeclsReferencedRequest::noteCycleStep(
-                                               DiagnosticEngine &diags) const {
-  auto subjectDecl = std::get<0>(getStorage());
-  // FIXME: Customize this further.
-  diags.diagnose(subjectDecl, diag::circular_reference_through);
+  return typeLoc.getLoc();
 }
 
 //----------------------------------------------------------------------------//
@@ -99,18 +74,6 @@ void SuperclassDeclRequest::cacheResult(ClassDecl *value) const {
     protocolDecl->LazySemanticInfo.SuperclassDecl.setPointerAndInt(value, true);
 }
 
-void SuperclassDeclRequest::diagnoseCycle(DiagnosticEngine &diags) const {
-  // FIXME: Improve this diagnostic.
-  auto subjectDecl = std::get<0>(getStorage());
-  diags.diagnose(subjectDecl, diag::circular_reference);
-}
-
-void SuperclassDeclRequest::noteCycleStep(DiagnosticEngine &diags) const {
-  auto subjectDecl = std::get<0>(getStorage());
-  // FIXME: Customize this further.
-  diags.diagnose(subjectDecl, diag::circular_reference_through);
-}
-
 //----------------------------------------------------------------------------//
 // Extended nominal computation.
 //----------------------------------------------------------------------------//
@@ -131,64 +94,21 @@ void ExtendedNominalRequest::cacheResult(NominalTypeDecl *value) const {
     ext->ExtendedNominal = value;
 }
 
-void ExtendedNominalRequest::diagnoseCycle(DiagnosticEngine &diags) const {
-  // FIXME: Improve this diagnostic.
-  auto ext = std::get<0>(getStorage());
-  diags.diagnose(ext, diag::circular_reference);
+//----------------------------------------------------------------------------//
+// Destructor computation.
+//----------------------------------------------------------------------------//
+Optional<DestructorDecl *> GetDestructorRequest::getCachedResult() const {
+  auto *classDecl = std::get<0>(getStorage());
+  auto results = classDecl->lookupDirect(DeclBaseName::createDestructor());
+  if (results.empty())
+    return None;
+
+  return cast<DestructorDecl>(results.front());
 }
 
-void ExtendedNominalRequest::noteCycleStep(DiagnosticEngine &diags) const {
-  auto ext = std::get<0>(getStorage());
-  // FIXME: Customize this further.
-  diags.diagnose(ext, diag::circular_reference_through);
-}
-
-void SelfBoundsFromWhereClauseRequest::diagnoseCycle(
-                                              DiagnosticEngine &diags) const {
-  // FIXME: Improve this diagnostic.
-  auto subject = std::get<0>(getStorage());
-  Decl *decl = subject.dyn_cast<TypeDecl *>();
-  if (decl == nullptr)
-    decl = subject.get<ExtensionDecl *>();
-  diags.diagnose(decl, diag::circular_reference);
-}
-
-void SelfBoundsFromWhereClauseRequest::noteCycleStep(
-                                              DiagnosticEngine &diags) const {
-  // FIXME: Customize this further.
-  auto subject = std::get<0>(getStorage());
-  Decl *decl = subject.dyn_cast<TypeDecl *>();
-  if (decl == nullptr)
-    decl = subject.get<ExtensionDecl *>();
-  diags.diagnose(decl, diag::circular_reference_through);
-}
-
-void TypeDeclsFromWhereClauseRequest::diagnoseCycle(
-                                              DiagnosticEngine &diags) const {
-  // FIXME: Improve this diagnostic.
-  auto ext = std::get<0>(getStorage());
-  diags.diagnose(ext, diag::circular_reference);
-}
-
-void TypeDeclsFromWhereClauseRequest::noteCycleStep(
-                                              DiagnosticEngine &diags) const {
-  auto ext = std::get<0>(getStorage());
-  // FIXME: Customize this further.
-  diags.diagnose(ext, diag::circular_reference_through);
-}
-
-void CustomAttrNominalRequest::diagnoseCycle(
-    DiagnosticEngine &diags) const {
-  auto attr = std::get<0>(getStorage());
-  ASTContext &ctx = std::get<1>(getStorage())->getASTContext();
-  ctx.Diags.diagnose(attr->getLocation(), diag::circular_reference);
-}
-
-void CustomAttrNominalRequest::noteCycleStep(
-    DiagnosticEngine &diags) const {
-  auto attr = std::get<0>(getStorage());
-  ASTContext &ctx = std::get<1>(getStorage())->getASTContext();
-  ctx.Diags.diagnose(attr->getLocation(), diag::circular_reference_through);
+void GetDestructorRequest::cacheResult(DestructorDecl *value) const {
+  auto *classDecl = std::get<0>(getStorage());
+  classDecl->addMember(value);
 }
 
 // Define request evaluation functions for each of the name lookup requests.

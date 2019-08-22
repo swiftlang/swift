@@ -191,3 +191,12 @@ const SILDebugScope *GenericCloner::remapScope(const SILDebugScope *DS) {
   RemappedScopeCache.insert({DS, RemappedScope});
   return RemappedScope;
 }
+
+void GenericCloner::fixUp(SILFunction *f) {
+  for (auto *apply : noReturnApplies) {
+    auto applyBlock = apply->getParent();
+    applyBlock->split(std::next(SILBasicBlock::iterator(apply)));
+    getBuilder().setInsertionPoint(applyBlock);
+    getBuilder().createUnreachable(apply->getLoc());
+  }
+}

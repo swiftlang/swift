@@ -11,7 +11,7 @@
     key.column: 5,
     key.filepath: sema_playground.swift,
     key.severity: source.diagnostic.severity.error,
-    key.description: "expected numeric value following '$'",
+    key.description: "cannot declare entity named '$blah'; the '$' prefix is reserved for implicitly-synthesized declarations",
     key.diagnostic_stage: source.diagnostic.stage.swift.sema
   }
 ]

@@ -174,6 +174,7 @@ struct ValueOwnershipKind {
     case ValueOwnershipKind::Owned:
       return UseLifetimeConstraint::MustBeInvalidated;
     }
+    llvm_unreachable("covered switch");
   }
 
   /// Returns true if \p Other can be merged successfully with this, implying

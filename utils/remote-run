@@ -94,7 +94,7 @@ class CommandRunner(object):
             sys.exit(sftp_proc.returncode)
 
 class RemoteCommandRunner(CommandRunner):
-    def __init__(self, host, identity_path, ssh_options):
+    def __init__(self, host, identity_path, ssh_options, config_file):
         if ':' in host:
             (self.remote_host, self.port) = host.rsplit(':', 1)
         else:
@@ -102,9 +102,11 @@ class RemoteCommandRunner(CommandRunner):
             self.port = None
         self.identity_path = identity_path
         self.ssh_options = ssh_options
+        self.config_file = config_file
 
     def common_options(self, port_flag):
         port_option = [port_flag, self.port] if self.port else []
+        config_option = ['-F', self.config_file] if self.config_file else []
         identity_option = (
             ['-i', self.identity_path] if self.identity_path else [])
         # Interleave '-o' with each custom option.
@@ -113,7 +115,7 @@ class RemoteCommandRunner(CommandRunner):
         # https://spapas.github.io/2016/04/27/python-nested-list-comprehensions/
         extra_options = [arg for option in self.ssh_options
                              for arg in ["-o", option]]
-        return port_option + identity_option + extra_options
+        return port_option + identity_option + config_option + extra_options
 
     def remote_invocation(self, command):
         return (['/usr/bin/ssh', '-n'] +
@@ -122,7 +124,7 @@ class RemoteCommandRunner(CommandRunner):
                 [quote(arg) for arg in command])
 
     def sftp_invocation(self):
-        return (['/usr/bin/sftp', '-b', '-', '-q'] +
+        return (['/usr/bin/sftp', '-b', '-', '-q', '-r'] +
                 self.common_options(port_flag='-P') +
                 [self.remote_host])
 
@@ -172,6 +174,8 @@ def main():
 
     parser.add_argument('-i', '--identity', dest='identity', metavar='FILE',
                         help='an SSH identity file (private key) to use')
+    parser.add_argument('-F', '--config-file', dest='config_file', metavar='FILE',
+                        help='an SSH configuration file')
     parser.add_argument('-o', '--ssh-option', action='append', default=[],
                         dest='ssh_options', metavar='OPTION',
                         help='extra SSH config options (man ssh_config)')
@@ -192,7 +196,10 @@ def main():
         args.command.insert(0, args.host)
         del args.host
     else:
-        runner = RemoteCommandRunner(args.host, args.identity, args.ssh_options)
+        runner = RemoteCommandRunner(args.host,
+                                     args.identity,
+                                     args.ssh_options,
+                                     args.config_file)
     runner.dry_run = args.dry_run
     runner.verbose = args.verbose or args.dry_run
 

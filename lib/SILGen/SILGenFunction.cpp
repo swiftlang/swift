@@ -20,9 +20,11 @@
 #include "SILGenFunctionBuilder.h"
 #include "Scope.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/PropertyWrappers.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILProfiler.h"
 #include "swift/SIL/SILUndef.h"
+#include "swift/AST/DiagnosticsSIL.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -185,6 +187,8 @@ void SILGenFunction::emitCaptures(SILLocation loc,
     break;
   }
   
+  auto expansion = F.getResilienceExpansion();
+
   for (auto capture : captureInfo.getCaptures()) {
     if (capture.isDynamicSelfMetadata()) {
       // The parameter type is the static Self type, but the value we
@@ -198,28 +202,72 @@ void SILGenFunction::emitCaptures(SILLocation loc,
       continue;
     }
 
-    auto *vd = capture.getDecl();
+    if (capture.isOpaqueValue()) {
+      OpaqueValueExpr *opaqueValue = capture.getOpaqueValue();
+      capturedArgs.push_back(
+          emitRValueAsSingleValue(opaqueValue).ensurePlusOne(*this, loc));
+      continue;
+    }
 
-    // FIXME: Expansion
-    auto expansion = ResilienceExpansion::Minimal;
+    auto *vd = cast<VarDecl>(capture.getDecl());
+    auto type = FunctionDC->mapTypeIntoContext(
+      vd->getInterfaceType());
+    auto valueType = FunctionDC->mapTypeIntoContext(
+      vd->getValueInterfaceType());
+
+    //
+    // If we haven't emitted the captured value yet, we're forming a closure
+    // to a local function before all of its captures have been emitted. Eg,
+    //
+    // func f() { g() } // transitive capture of 'x'
+    // f() // closure formed here
+    // var x = 123 // 'x' defined here
+    // func g() { print(x) } // 'x' captured here
+    //
+    auto found = VarLocs.find(vd);
+    if (found == VarLocs.end()) {
+      auto &Diags = getASTContext().Diags;
+
+      Diags.diagnose(closure.getLoc(),
+                     closure.isDeferBody()
+                     ? diag::capture_before_declaration_defer
+                     : diag::capture_before_declaration,
+                     vd->getBaseName().getIdentifier());
+      Diags.diagnose(vd->getLoc(), diag::captured_value_declared_here);
+      Diags.diagnose(capture.getLoc(), diag::value_captured_here);
+
+      // Emit an 'undef' of the correct type.
+      switch (SGM.Types.getDeclCaptureKind(capture, expansion)) {
+      case CaptureKind::Constant:
+        capturedArgs.push_back(emitUndef(getLoweredType(type)));
+        break;
+      case CaptureKind::StorageAddress:
+        capturedArgs.push_back(emitUndef(getLoweredType(type).getAddressType()));
+        break;
+      case CaptureKind::Box: {
+        auto boxTy = SGM.Types.getContextBoxTypeForCapture(vd,
+                                  getLoweredType(type).getASTType(),
+                                  FunctionDC->getGenericEnvironmentOfContext(),
+                                  /*mutable*/ true);
+        capturedArgs.push_back(emitUndef(boxTy));
+        break;
+      }
+      }
+      continue;
+    }
+
+    auto Entry = found->second;
+
     switch (SGM.Types.getDeclCaptureKind(capture, expansion)) {
-    case CaptureKind::None:
-      break;
-
     case CaptureKind::Constant: {
       // let declarations.
-      auto found = VarLocs.find(vd);
-      assert(found != VarLocs.end());
-      auto Entry = found->second;
-
-      auto *var = cast<VarDecl>(vd);
-      auto &tl = getTypeLowering(var->getType()->getReferenceStorageReferent());
+      auto &tl = getTypeLowering(valueType);
       SILValue Val = Entry.value;
 
       if (!Val->getType().isAddress()) {
         // Our 'let' binding can guarantee the lifetime for the callee,
         // if we don't need to do anything more to it.
-        if (canGuarantee && !var->getType()->is<ReferenceStorageType>()) {
+        if (canGuarantee && !vd->getInterfaceType()->is<ReferenceStorageType>()) {
           auto guaranteed = ManagedValue::forUnmanaged(Val).borrow(*this, loc);
           capturedArgs.push_back(guaranteed);
           break;
@@ -236,10 +284,8 @@ void SILGenFunction::emitCaptures(SILLocation loc,
       // If we're capturing an unowned pointer by value, we will have just
       // loaded it into a normal retained class pointer, but we capture it as
       // an unowned pointer.  Convert back now.
-      if (var->getType()->is<ReferenceStorageType>()) {
-        auto type = getLoweredType(var->getType());
-        Val = emitConversionFromSemanticValue(loc, Val, type);
-      }
+      if (vd->getInterfaceType()->is<ReferenceStorageType>())
+        Val = emitConversionFromSemanticValue(loc, Val, getLoweredType(type));
 
       capturedArgs.push_back(emitManagedRValueWithCleanup(Val));
       break;
@@ -248,30 +294,26 @@ void SILGenFunction::emitCaptures(SILLocation loc,
     case CaptureKind::StorageAddress: {
       // No-escaping stored declarations are captured as the
       // address of the value.
-      assert(VarLocs.count(vd) && "no location for captured var!");
-      VarLoc vl = VarLocs[vd];
-      assert(vl.value->getType().isAddress() && "no address for captured var!");
-      capturedArgs.push_back(ManagedValue::forLValue(vl.value));
+      assert(Entry.value->getType().isAddress() && "no address for captured var!");
+      capturedArgs.push_back(ManagedValue::forLValue(Entry.value));
       break;
     }
 
     case CaptureKind::Box: {
       // LValues are captured as both the box owning the value and the
       // address of the value.
-      assert(VarLocs.count(vd) && "no location for captured var!");
-      VarLoc vl = VarLocs[vd];
-      assert(vl.value->getType().isAddress() && "no address for captured var!");
+      assert(Entry.value->getType().isAddress() && "no address for captured var!");
 
       // If this is a boxed variable, we can use it directly.
-      if (vl.box) {
+      if (Entry.box) {
         // We can guarantee our own box to the callee.
         if (canGuarantee) {
           capturedArgs.push_back(
-              ManagedValue::forUnmanaged(vl.box).borrow(*this, loc));
+              ManagedValue::forUnmanaged(Entry.box).borrow(*this, loc));
         } else {
-          capturedArgs.push_back(emitManagedRetain(loc, vl.box));
+          capturedArgs.push_back(emitManagedRetain(loc, Entry.box));
         }
-        escapesToMark.push_back(vl.value);
+        escapesToMark.push_back(Entry.value);
       } else {
         // Address only 'let' values are passed by box.  This isn't great, in
         // that a variable captured by multiple closures will be boxed for each
@@ -285,13 +327,13 @@ void SILGenFunction::emitCaptures(SILLocation loc,
         // in-place.
         // TODO: Use immutable box for immutable captures.
         auto boxTy = SGM.Types.getContextBoxTypeForCapture(vd,
-                                       vl.value->getType().getASTType(),
-                                       F.getGenericEnvironment(),
-                                       /*mutable*/ true);
+                                  Entry.value->getType().getASTType(),
+                                  FunctionDC->getGenericEnvironmentOfContext(),
+                                  /*mutable*/ true);
         
         AllocBoxInst *allocBox = B.createAllocBox(loc, boxTy);
         ProjectBoxInst *boxAddress = B.createProjectBox(loc, allocBox, 0);
-        B.createCopyAddr(loc, vl.value, boxAddress, IsNotTake,
+        B.createCopyAddr(loc, Entry.value, boxAddress, IsNotTake,
                          IsInitialization);
         if (canGuarantee)
           capturedArgs.push_back(
@@ -374,13 +416,9 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
 
   auto calleeConvention = ParameterConvention::Direct_Guaranteed;
 
-  SILType closureTy = SILGenBuilder::getPartialApplyResultType(
-      functionRef->getType(), capturedArgs.size(), SGM.M, subs,
-      calleeConvention);
-
   auto toClosure =
-    B.createPartialApply(loc, functionRef, functionTy,
-                         subs, forwardedArgs, closureTy);
+    B.createPartialApply(loc, functionRef, subs, forwardedArgs,
+                         calleeConvention);
   auto result = emitManagedRValueWithCleanup(toClosure);
 
   // Get the lowered AST types:
@@ -512,8 +550,7 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
                           SILType::getPrimitiveObjectType(anyObjectMetaTy),
                           {});
     SILValue optNameValue = B.createApply(
-        mainClass, NSStringFromClass, NSStringFromClass->getType(),
-        SILType::getPrimitiveObjectType(OptNSStringTy), {}, metaTy);
+        mainClass, NSStringFromClass, {}, metaTy);
     ManagedValue optName = emitManagedRValueWithCleanup(optNameValue);
 
     // Fix up the string parameters to have the right type.
@@ -553,9 +590,7 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
     SILValue args[] = {argc, managedArgv.getValue(), nilValue,
                        optName.getValue()};
 
-    B.createApply(mainClass, UIApplicationMain,
-                  UIApplicationMain->getType(),
-                  argc->getType(), {}, args);
+    B.createApply(mainClass, UIApplicationMain, SubstitutionMap(), args);
     SILValue r = B.createIntegerLiteral(mainClass,
                         SILType::getBuiltinIntegerType(32, ctx), 0);
     auto rType = F.getConventions().getSingleSILResultType();
@@ -600,9 +635,7 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
     auto NSApplicationMain = B.createFunctionRef(mainClass, NSApplicationMainFn);
     SILValue args[] = { argc, argv };
 
-    B.createApply(mainClass, NSApplicationMain,
-                  NSApplicationMain->getType(),
-                  argc->getType(), {}, args);
+    B.createApply(mainClass, NSApplicationMain, SubstitutionMap(), args);
     SILValue r = B.createIntegerLiteral(mainClass,
                         SILType::getBuiltinIntegerType(32, getASTContext()), 0);
     auto rType = F.getConventions().getSingleSILResultType();
@@ -614,7 +647,8 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
   }
 }
 
-void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value) {
+void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value,
+                                           bool EmitProfilerIncrement) {
   MagicFunctionName = SILGenModule::getMagicFunctionName(function);
 
   RegularLocation Loc(value);
@@ -637,6 +671,8 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value) {
   auto interfaceType = value->getType()->mapTypeOutOfContext();
   emitProlog(/*paramList=*/nullptr, /*selfParam=*/nullptr, interfaceType,
              dc, false);
+  if (EmitProfilerIncrement)
+    emitProfilerIncrement(value);
   prepareEpilog(value->getType(), false, CleanupLocation::get(Loc));
   emitReturnExpr(Loc, value);
   emitEpilog(Loc);
@@ -651,14 +687,27 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, VarDecl *var) {
   auto decl = function.getAbstractFunctionDecl();
   auto *dc = decl->getInnermostDeclContext();
   auto interfaceType = var->getValueInterfaceType();
+  auto varType = var->getType();
+
+  // If this is the backing storage for a property with an attached
+  // wrapper that was initialized with '=', the stored property initializer
+  // will be in terms of the original property's type.
+  if (auto originalProperty = var->getOriginalWrappedProperty()) {
+    if (originalProperty->isPropertyWrapperInitializedWithInitialValue()) {
+      interfaceType = originalProperty->getValueInterfaceType();
+      varType = originalProperty->getType();
+    }
+  }
+
   emitProlog(/*paramList*/ nullptr, /*selfParam*/ nullptr, interfaceType, dc,
              false);
-  prepareEpilog(var->getType(), false, CleanupLocation::get(loc));
+  prepareEpilog(varType, false, CleanupLocation::get(loc));
 
   auto pbd = var->getParentPatternBinding();
   auto entry = pbd->getPatternEntryForVarDecl(var);
   auto subs = getForwardingSubstitutionMap();
-  auto resultType = decl->mapTypeIntoContext(interfaceType)->getCanonicalType();
+  auto contextualType = dc->mapTypeIntoContext(interfaceType);
+  auto resultType = contextualType->getCanonicalType();
   auto origResultType = AbstractionPattern(resultType);
 
   SmallVector<SILValue, 4> directResults;
@@ -754,9 +803,8 @@ SILValue SILGenFunction::emitUnwrapIntegerResult(SILLocation loc,
   while (!value->getType().is<BuiltinIntegerType>()) {
     auto structDecl = value->getType().getStructOrBoundGenericStruct();
     assert(structDecl && "value for error result wasn't of struct type!");
-    assert(std::next(structDecl->getStoredProperties().begin())
-           == structDecl->getStoredProperties().end());
-    auto property = *structDecl->getStoredProperties().begin();
+    assert(structDecl->getStoredProperties().size() == 1);
+    auto property = structDecl->getStoredProperties()[0];
     value = B.createStructExtract(loc, value, property);
   }
 

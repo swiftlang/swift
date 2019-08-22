@@ -272,6 +272,10 @@ public:
   /// times) when compiling a module interface?
   bool SerializeModuleInterfaceDependencyHashes = false;
 
+  /// Should we warn if an imported module needed to be rebuilt from a
+  /// module interface file?
+  bool RemarkOnRebuildFromModuleInterface = false;
+
   /// The different modes for validating TBD against the LLVM IR.
   enum class TBDValidationMode {
     Default,        ///< Do the default validation for the current platform.

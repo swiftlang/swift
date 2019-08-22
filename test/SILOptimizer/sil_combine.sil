@@ -622,7 +622,7 @@ sil @test_closure : $@convention(thin) (@guaranteed C) -> ()
 // CHECK-NOT:  strong_release
 // CHECK:      bb2:
 // CHECK-NEXT:   strong_release %0
-// CHECK         return
+// CHECK:         return
 sil @dead_closure_elimination : $@convention(thin) (@owned C) -> () {
 bb0(%0 : $C):
   %1 = function_ref @test_closure : $@convention(thin) (@guaranteed C) -> ()
@@ -2804,6 +2804,32 @@ bb2:                                              // Preds: bb0
 
 bb3(%19 : $Double):                               // Preds: bb1 bb2
   return %19 : $Double                            // id: %20
+}
+
+enum ErrorEnum: Error {
+    case errorCase(label: [Error])
+    case other
+}
+
+// CHECK-LABEL: sil @insert_compensating_release_at_release_of_box
+// CHECK:      [[L:%[0-9]+]] = load
+// CHECK-NEXT: [[T:%[0-9]+]] = tuple
+// CHECK-NEXT: retain_value [[L]]
+// CHECK-NEXT: release_value [[T]]
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @insert_compensating_release_at_release_of_box : $@convention(method) (@in_guaranteed Array<Error>) -> () {
+bb0(%0 : $*Array<Error>):
+  %20 = load %0 : $*Array<Error>
+  %22 = tuple $(label: Array<Error>) (%20)
+  %23 = enum $ErrorEnum, #ErrorEnum.errorCase!enumelt.1, %22 : $(label: Array<Error>)
+  %36 = alloc_existential_box $Error, $ErrorEnum
+  %37 = project_existential_box $ErrorEnum in %36 : $Error
+  store %23 to %37 : $*ErrorEnum
+  retain_value %20 : $Array<Error>
+  strong_release %36 : $Error
+  %52 = tuple ()
+  return %52 : $()
 }
 
 sil [reabstraction_thunk] @_TTRXFo_oSS_dSb_XFo_iSS_iSb_ : $@convention(thin) (@in String, @owned @callee_owned (@owned String) -> Bool) -> @out Bool

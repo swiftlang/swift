@@ -1031,7 +1031,7 @@ bb2:
 //
 // CHECK-LABEL: dead_store_inout_stack_alias
 // CHECK: bb0
-// CHECK : struct_element_addr
+// CHECK: struct_element_addr
 // CHECK-NOT: {{ store}}
 // CHECK: load
 sil hidden @dead_store_inout_stack_alias : $@convention(thin) (@inout A) -> () {

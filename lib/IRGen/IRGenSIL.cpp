@@ -60,6 +60,7 @@
 #include "GenCast.h"
 #include "GenClass.h"
 #include "GenConstant.h"
+#include "GenDecl.h"
 #include "GenEnum.h"
 #include "GenExistential.h"
 #include "GenFunc.h"
@@ -856,7 +857,7 @@ public:
   /// TODO: just make sure that we have a path to them that the debug info
   ///       can follow.
   void bindArchetypes(swift::Type Ty) {
-    auto runtimeTy = getRuntimeReifiedType(IGM, Ty->getCanonicalType());
+    auto runtimeTy = IGM.getRuntimeReifiedType(Ty->getCanonicalType());
     if (!IGM.IRGen.Opts.shouldOptimize() && runtimeTy->hasArchetype())
       runtimeTy.visit([&](CanType t) {
         if (auto archetype = dyn_cast<ArchetypeType>(t))
@@ -932,6 +933,9 @@ public:
   void visitStoreInst(StoreInst *i);
   void visitAssignInst(AssignInst *i) {
     llvm_unreachable("assign is not valid in canonical SIL");
+  }
+  void visitAssignByWrapperInst(AssignByWrapperInst *i) {
+    llvm_unreachable("assign_by_wrapper is not valid in canonical SIL");
   }
   void visitMarkUninitializedInst(MarkUninitializedInst *i) {
     llvm_unreachable("mark_uninitialized is not valid in canonical SIL");
@@ -1222,10 +1226,7 @@ IRGenSILFunction::IRGenSILFunction(IRGenModule &IGM, SILFunction *f)
     CurFn->addFnAttr(llvm::Attribute::SanitizeAddress);
   if (IGM.IRGen.Opts.Sanitizers & SanitizerKind::Thread) {
     auto declContext = f->getDeclContext();
-    if (f->getLoweredFunctionType()->isCoroutine()) {
-      // Disable TSan in coroutines; the instrumentation currently interferes
-      // with coroutine structural invariants.
-    } else if (declContext && isa<DestructorDecl>(declContext)) {
+    if (declContext && isa<DestructorDecl>(declContext)) {
       // Do not report races in deinit and anything called from it
       // because TSan does not observe synchronization between retain
       // count dropping to '0' and the object deinitialization.
@@ -1243,6 +1244,10 @@ IRGenSILFunction::IRGenSILFunction(IRGenModule &IGM, SILFunction *f)
   // replacement.
   if (f->getDynamicallyReplacedFunction()) {
     IGM.emitDynamicReplacementOriginalFunctionThunk(f);
+  }
+
+  if (f->isDynamicallyReplaceable()) {
+    IGM.createReplaceableProlog(*this, f);
   }
 }
 
@@ -1579,23 +1584,36 @@ static void emitLocalSelfMetadata(IRGenSILFunction &IGF) {
     return;
   
   const SILArgument *selfArg = IGF.CurSILFn->getSelfMetadataArgument();
+  auto selfTy = selfArg->getType().getASTType();
   CanMetatypeType metaTy =
-    dyn_cast<MetatypeType>(selfArg->getType().getASTType());
+    dyn_cast<MetatypeType>(selfTy);
   IRGenFunction::LocalSelfKind selfKind;
   if (!metaTy)
     selfKind = IRGenFunction::ObjectReference;
-  else switch (metaTy->getRepresentation()) {
-  case MetatypeRepresentation::Thin:
-    llvm_unreachable("class metatypes are never thin");
-  case MetatypeRepresentation::Thick:
-    selfKind = IRGenFunction::SwiftMetatype;
-    break;
-  case MetatypeRepresentation::ObjC:
-    selfKind = IRGenFunction::ObjCMetatype;
-    break;
+  else {
+    selfTy = metaTy.getInstanceType();
+    switch (metaTy->getRepresentation()) {
+    case MetatypeRepresentation::Thin:
+      llvm_unreachable("class metatypes are never thin");
+    case MetatypeRepresentation::Thick:
+      selfKind = IRGenFunction::SwiftMetatype;
+      break;
+    case MetatypeRepresentation::ObjC:
+      selfKind = IRGenFunction::ObjCMetatype;
+      break;
+    }
   }
   llvm::Value *value = IGF.getLoweredExplosion(selfArg).claimNext();
-  IGF.setLocalSelfMetadata(value, selfKind);
+  if (auto dynSelfTy = dyn_cast<DynamicSelfType>(selfTy))
+    selfTy = dynSelfTy.getSelfType();
+
+  // Specify the exact Self type if we know it, either because the class
+  // is final, or because the function we're emitting is a method with the
+  // [exact_self_class] attribute set on it during the SIL pipeline.
+  bool isExact = selfTy->getClassOrBoundGenericClass()->isFinal()
+    || IGF.CurSILFn->isExactSelfClass();
+
+  IGF.setLocalSelfMetadata(selfTy, isExact, value, selfKind);
 }
 
 /// Emit the definition for the given SIL constant.
@@ -1625,6 +1643,9 @@ void IRGenSILFunction::emitSILFunction() {
   
   assert(!CurSILFn->empty() && "function has no basic blocks?!");
 
+  if (CurSILFn->isThunk())
+    IGM.setHasFramePointer(CurFn, false);
+  
   if (CurSILFn->getDynamicallyReplacedFunction())
     IGM.IRGen.addDynamicReplacement(CurSILFn);
 
@@ -1646,7 +1667,7 @@ void IRGenSILFunction::emitSILFunction() {
     IGM.DebugInfo->emitFunction(*CurSILFn, CurFn);
 
   // Map the entry bb.
-  LoweredBBs[&*CurSILFn->begin()] = LoweredBB(&*CurFn->begin(), {});
+  LoweredBBs[&*CurSILFn->begin()] = LoweredBB(&CurFn->back(), {});
   // Create LLVM basic blocks for the other bbs.
   for (auto bi = std::next(CurSILFn->begin()), be = CurSILFn->end(); bi != be;
        ++bi) {
@@ -1842,7 +1863,7 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
 }
 
 void IRGenSILFunction::visitFunctionRefBaseInst(FunctionRefBaseInst *i) {
-  auto fn = i->getReferencedFunction();
+  auto fn = i->getInitiallyReferencedFunction();
 
   llvm::Constant *fnPtr = IGM.getAddrOfSILFunction(
       fn, NotForDefinition, false /*isDynamicallyReplaceableImplementation*/,
@@ -1870,6 +1891,11 @@ void IRGenSILFunction::visitDynamicFunctionRefInst(DynamicFunctionRefInst *i) {
 
 void IRGenSILFunction::visitPreviousDynamicFunctionRefInst(
     PreviousDynamicFunctionRefInst *i) {
+  if (UseBasicDynamicReplacement) {
+    IGM.unimplemented(i->getLoc().getSourceLoc(),
+      ": calling the original implementation of a dynamic function is not "
+      "supported with -Xllvm -basic-dynamic-replacement");
+  }
   visitFunctionRefBaseInst(i);
 }
 
@@ -3870,7 +3896,7 @@ static bool hasReferenceSemantics(IRGenSILFunction &IGF,
 static llvm::Value *emitIsUnique(IRGenSILFunction &IGF, SILValue operand,
                                  SourceLoc loc) {
   if (!hasReferenceSemantics(IGF, operand->getType())) {
-    IGF.emitTrap(/*EmitUnreachable=*/false);
+    IGF.emitTrap("isUnique called for a non-reference", /*EmitUnreachable=*/false);
     return llvm::UndefValue::get(IGF.IGM.Int1Ty);
   }
 
@@ -4530,7 +4556,7 @@ static void emitTrapAndUndefValue(IRGenSILFunction &IGF,
   IGF.FailBBs.push_back(failBB);
   
   IGF.Builder.emitBlock(failBB);
-  IGF.emitTrap(/*EmitUnreachable=*/true);
+  IGF.emitTrap("mismatching type layouts", /*EmitUnreachable=*/true);
 
   llvm::BasicBlock *contBB = llvm::BasicBlock::Create(IGF.IGM.getLLVMContext());
   IGF.Builder.emitBlock(contBB);
@@ -5431,7 +5457,7 @@ void IRGenSILFunction::visitCondFailInst(swift::CondFailInst *i) {
     // debug location. This is because zero is not an artificial line location
     // in CodeView.
     IGM.DebugInfo->setInlinedTrapLocation(Builder, i->getDebugScope());
-  emitTrap(/*EmitUnreachable=*/true);
+  emitTrap(i->getMessage(), /*EmitUnreachable=*/true);
   Builder.emitBlock(contBB);
   FailBBs.push_back(failBB);
 }

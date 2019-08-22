@@ -1,6 +1,7 @@
 // RUN: %target-swift-frontend -typecheck %s
 
 // REQUIRES: libdispatch
+// UNSUPPORTED: OS=linux-gnu
 
 import Dispatch
 

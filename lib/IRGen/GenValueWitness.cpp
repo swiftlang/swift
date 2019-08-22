@@ -927,25 +927,21 @@ static constexpr uint64_t sizeAndAlignment(Size size, Alignment alignment) {
 /// Return a reference to a known value witness table from the runtime
 /// that's suitable for the given type, if there is one, or return null
 /// if we should emit a new one.
-static llvm::Constant *
-getAddrOfKnownValueWitnessTable(IRGenModule &IGM, CanType type) {
+static ConstantReference
+getAddrOfKnownValueWitnessTable(IRGenModule &IGM, CanType type,
+                                bool relativeReference) {
   // Native PE binaries shouldn't reference data symbols across DLLs, so disable
-  // this on Windows.
-  if (IGM.useDllStorage())
-    return nullptr;
+  // this on Windows, unless we're forming a relative indirectable reference.
+  if (IGM.useDllStorage() && !relativeReference)
+    return {};
   
   if (auto nom = type->getAnyNominal()) {
-    // TODO: Generic metadata patterns relative-reference their VWT, which won't
-    // work if the VWT is in a different module without supporting indirection
-    // through the GOT.
-    if (nom->isGenericContext())
-      return nullptr;
     // TODO: Non-C enums have extra inhabitants and also need additional value
     // witnesses for their tag manipulation (except when they're empty, in
     // which case values never exist to witness).
     if (auto enumDecl = dyn_cast<EnumDecl>(nom))
       if (!enumDecl->isObjC() && !type->isUninhabited())
-        return nullptr;
+        return {};
   }
  
   auto &C = IGM.Context;
@@ -954,20 +950,19 @@ getAddrOfKnownValueWitnessTable(IRGenModule &IGM, CanType type) {
   
   auto &ti = IGM.getTypeInfoForUnlowered(AbstractionPattern::getOpaque(), type);
 
-  // Empty types can use empty tuple witnesses.
-  if (ti.isKnownEmpty(ResilienceExpansion::Maximal))
-    return IGM.getAddrOfValueWitnessTable(TupleType::getEmpty(C));
-
   // We only have witnesses for fixed type info.
   auto *fixedTI = dyn_cast<FixedTypeInfo>(&ti);
   if (!fixedTI)
-    return nullptr;
-  
-  CanType witnessSurrogate;
+    return {};
 
-  // Handle common POD type layouts.
+  CanType witnessSurrogate;
   ReferenceCounting refCounting;
-  if (fixedTI->isPOD(ResilienceExpansion::Maximal)
+
+  // Empty types can use empty tuple witnesses.
+  if (ti.isKnownEmpty(ResilienceExpansion::Maximal)) {
+    witnessSurrogate = TupleType::getEmpty(C);
+  // Handle common POD type layouts.
+  } else if (fixedTI->isPOD(ResilienceExpansion::Maximal)
       && fixedTI->getFixedExtraInhabitantCount(IGM) == 0) {
     // Reuse one of the integer witnesses if applicable.
     switch (sizeAndAlignment(fixedTI->getFixedSize(),
@@ -1015,26 +1010,32 @@ getAddrOfKnownValueWitnessTable(IRGenModule &IGM, CanType type) {
       break;
     }
   }
-  
-  if (witnessSurrogate)
-    return IGM.getAddrOfValueWitnessTable(witnessSurrogate);
-  return nullptr;
+
+  if (witnessSurrogate) {
+    if (relativeReference) {
+      return IGM.getAddrOfLLVMVariableOrGOTEquivalent(
+                            LinkEntity::forValueWitnessTable(witnessSurrogate));
+    } else {
+      return {IGM.getAddrOfValueWitnessTable(witnessSurrogate),
+              ConstantReference::Direct};
+    }
+  }
+  return {};
 }
 
-/// Emit a value-witness table for the given type, which is assumed to
-/// be non-dependent.
-llvm::Constant *irgen::emitValueWitnessTable(IRGenModule &IGM,
+/// Emit a value-witness table for the given type.
+ConstantReference irgen::emitValueWitnessTable(IRGenModule &IGM,
                                              CanType abstractType,
-                                             bool isPattern) {
+                                             bool isPattern,
+                                             bool relativeReference) {
   // We shouldn't emit global value witness tables for generic type instances.
   assert(!isa<BoundGenericType>(abstractType) &&
          "emitting VWT for generic instance");
   
   // See if we can use a prefab witness table from the runtime.
-  // Note that we can't do this on Windows since the PE loader does not support
-  // cross-DLL pointers in data.
   if (!isPattern) {
-    if (auto known = getAddrOfKnownValueWitnessTable(IGM, abstractType)) {
+    if (auto known = getAddrOfKnownValueWitnessTable(IGM, abstractType,
+                                                     relativeReference)) {
       return known;
     }
   }
@@ -1061,7 +1062,8 @@ llvm::Constant *irgen::emitValueWitnessTable(IRGenModule &IGM,
   auto global = cast<llvm::GlobalVariable>(addr);
   global->setConstant(canBeConstant);
 
-  return llvm::ConstantExpr::getBitCast(global, IGM.WitnessTablePtrTy);
+  return {llvm::ConstantExpr::getBitCast(global, IGM.WitnessTablePtrTy),
+          ConstantReference::Direct};
 }
 
 llvm::Constant *IRGenModule::emitFixedTypeLayout(CanType t,

@@ -598,7 +598,7 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
     Builder.createThrow(Loc, ErrorArg);
     Builder.setInsertionPoint(NormalBlock);
   } else {
-    ReturnValue = Builder.createApply(Loc, FRI, Subs, ThunkArgs, false);
+    ReturnValue = Builder.createApply(Loc, FRI, Subs, ThunkArgs);
   }
 
   // Set up the return results.
@@ -632,7 +632,8 @@ bool FunctionSignatureTransform::run(bool hasCaller) {
     return false;
   }
 
-  if (!hasCaller && canBeCalledIndirectly(F->getRepresentation())) {
+  if (!hasCaller && (F->getDynamicallyReplacedFunction() ||
+                     canBeCalledIndirectly(F->getRepresentation()))) {
     LLVM_DEBUG(llvm::dbgs() << "  function has no caller -> abort\n");
     return false;
   }

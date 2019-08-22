@@ -460,11 +460,11 @@ bool ide::getDocumentationCommentAsXML(const Decl *D, raw_ostream &OS) {
 
   swift::markup::MarkupContext MC;
   auto DC = getCascadingDocComment(MC, D);
-  if (!DC.hasValue())
+  if (!DC)
     return false;
 
   CommentToXMLConverter Converter(OS);
-  Converter.visitDocComment(DC.getValue());
+  Converter.visitDocComment(DC);
 
   OS.flush();
   return true;
@@ -473,10 +473,10 @@ bool ide::getDocumentationCommentAsXML(const Decl *D, raw_ostream &OS) {
 bool ide::getLocalizationKey(const Decl *D, raw_ostream &OS) {
   swift::markup::MarkupContext MC;
   auto DC = getCascadingDocComment(MC, D);
-  if (!DC.hasValue())
+  if (!DC)
     return false;
 
-  if (const auto LKF = DC.getValue()->getLocalizationKeyField()) {
+  if (const auto LKF = DC->getLocalizationKeyField()) {
     printInlinesUnder(LKF.getValue(), OS);
     return true;
   }

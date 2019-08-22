@@ -1,4 +1,4 @@
-// swift-tools-version: 4.0
+// swift-compiler-version: Swift 4.0
 // swift-module-flags: 
 
 // RUN: %empty-directory(%t)
@@ -23,7 +23,7 @@ extension MyProto {
 // NEGATIVE-MODULE-NOT: sil_default_witness_table{{.+}}MyProto
 
 
-@_fixed_layout // allow conformance devirtualization
+@frozen // allow conformance devirtualization
 public struct FullStructImpl: MyProto {
   public init()
   public func method()
@@ -37,7 +37,7 @@ public struct FullStructImpl: MyProto {
 // CHECK: function_ref @$s12Conformances14FullStructImplVyS2icig
 // CHECK: end sil function '$s16ConformancesUser8testFullSiyF'
 
-@_fixed_layout // allow conformance devirtualization
+@frozen // allow conformance devirtualization
 public struct OpaqueStructImpl: MyProto {}
 
 // CHECK-LABEL: sil @$s16ConformancesUser10testOpaqueSiyF

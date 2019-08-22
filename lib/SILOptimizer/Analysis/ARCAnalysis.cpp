@@ -91,7 +91,7 @@ bool swift::mayDecrementRefCount(SILInstruction *User,
 //                                Use Analysis
 //===----------------------------------------------------------------------===//
 
-/// Returns true if a builtin apply cannot use reference counted values.
+/// Returns true if a builtin apply can use reference counted values.
 ///
 /// The main case that this handles here are builtins that via read none imply
 /// that they cannot read globals and at the same time do not take any
@@ -106,28 +106,33 @@ static bool canApplyOfBuiltinUseNonTrivialValues(BuiltinInst *BInst) {
     if (II.hasAttribute(llvm::Attribute::ReadNone)) {
       for (auto &Op : BInst->getAllOperands()) {
         if (!Op.get()->getType().isTrivial(*F)) {
-          return false;
+          return true;
         }
       }
     }
 
-    return true;
+    return false;
   }
 
   auto &BI = BInst->getBuiltinInfo();
-  if (BI.isReadNone()) {
-    for (auto &Op : BInst->getAllOperands()) {
-      if (!Op.get()->getType().isTrivial(*F)) {
-        return false;
-      }
+  if (!BI.isReadNone())
+    return true;
+
+  for (auto &Op : BInst->getAllOperands()) {
+    if (!Op.get()->getType().isTrivial(*F)) {
+      return true;
     }
   }
-
-  return true;
+  return false;
 }
 
-/// Returns true if Inst is a function that we know never uses ref count values.
-bool swift::canNeverUseValues(SILInstruction *Inst) {
+/// Returns true if \p Inst may access any indirect object either via an address
+/// or reference.
+///
+/// If these instructions do have an address or reference type operand, then
+/// they only operate on the value of the address itself, not the
+/// memory. i.e. they don't dereference the address.
+bool swift::canUseObject(SILInstruction *Inst) {
   switch (Inst->getKind()) {
   // These instructions do not use other values.
   case SILInstructionKind::FunctionRefInst:
@@ -142,33 +147,36 @@ bool swift::canNeverUseValues(SILInstruction *Inst) {
   case SILInstructionKind::AllocBoxInst:
   case SILInstructionKind::MetatypeInst:
   case SILInstructionKind::WitnessMethodInst:
-    return true;
+    return false;
 
   // DeallocStackInst do not use reference counted values.
   case SILInstructionKind::DeallocStackInst:
-    return true;
+    return false;
 
   // Debug values do not use referenced counted values in a manner we care
   // about.
   case SILInstructionKind::DebugValueInst:
   case SILInstructionKind::DebugValueAddrInst:
-    return true;
+    return false;
 
   // Casts do not use pointers in a manner that we care about since we strip
   // them during our analysis. The reason for this is if the cast is not dead
   // then there must be some other use after the cast that we will protect if a
   // release is not in between the cast and the use.
+  //
+  // Note: UncheckedRefCastAddrInst moves a reference into a new object. While
+  // the net reference count should be zero, there's no guarantee it won't
+  // access the object.
   case SILInstructionKind::UpcastInst:
   case SILInstructionKind::AddressToPointerInst:
   case SILInstructionKind::PointerToAddressInst:
   case SILInstructionKind::UncheckedRefCastInst:
-  case SILInstructionKind::UncheckedRefCastAddrInst:
   case SILInstructionKind::UncheckedAddrCastInst:
   case SILInstructionKind::RefToRawPointerInst:
   case SILInstructionKind::RawPointerToRefInst:
   case SILInstructionKind::UnconditionalCheckedCastInst:
   case SILInstructionKind::UncheckedBitwiseCastInst:
-    return true;
+    return false;
 
   // If we have a trivial bit cast between trivial types, it is not something
   // that can use ref count ops in a way we care about. We do need to be careful
@@ -183,7 +191,7 @@ bool swift::canNeverUseValues(SILInstruction *Inst) {
   // safe.
   case SILInstructionKind::UncheckedTrivialBitCastInst: {
     SILValue Op = cast<UncheckedTrivialBitCastInst>(Inst)->getOperand();
-    return Op->getType().isTrivial(*Inst->getFunction());
+    return !Op->getType().isTrivial(*Inst->getFunction());
   }
 
   // Typed GEPs do not use pointers. The user of the typed GEP may but we will
@@ -198,18 +206,18 @@ bool swift::canNeverUseValues(SILInstruction *Inst) {
   case SILInstructionKind::UncheckedEnumDataInst:
   case SILInstructionKind::IndexAddrInst:
   case SILInstructionKind::IndexRawPointerInst:
-      return true;
+    return false;
 
   // Aggregate formation by themselves do not create new uses since it is their
   // users that would create the appropriate uses.
   case SILInstructionKind::EnumInst:
   case SILInstructionKind::StructInst:
   case SILInstructionKind::TupleInst:
-    return true;
+    return false;
 
   // Only uses non reference counted values.
   case SILInstructionKind::CondFailInst:
-    return true;
+    return false;
 
   case SILInstructionKind::BuiltinInst: {
     auto *BI = cast<BuiltinInst>(Inst);
@@ -221,9 +229,9 @@ bool swift::canNeverUseValues(SILInstruction *Inst) {
   // dead, LLVM will clean it up.
   case SILInstructionKind::BranchInst:
   case SILInstructionKind::CondBranchInst:
-    return true;
-  default:
     return false;
+  default:
+    return true;
   }
 }
 
@@ -268,14 +276,15 @@ static bool canTerminatorUseValue(TermInst *TI, SILValue Ptr,
 
 
 bool swift::mayHaveSymmetricInterference(SILInstruction *User, SILValue Ptr, AliasAnalysis *AA) {
+  // If Inst is an instruction that we know can never use values with reference
+  // semantics, return true. Check this before AliasAnalysis because some memory
+  // operations, like dealloc_stack, don't use ref counted values.
+  if (!canUseObject(User))
+    return false;
+
   // Check whether releasing this value can call deinit and interfere with User.
   if (AA->mayValueReleaseInterfereWithInstruction(User, Ptr))
     return true;
-  
-  // If Inst is an instruction that we know can never use values with reference
-  // semantics, return true.
-  if (canNeverUseValues(User))
-    return false;
 
   // If the user is a load or a store and we can prove that it does not access
   // the object then return true.
@@ -450,6 +459,25 @@ valueHasARCDecrementOrCheckInInstructionRange(SILValue Op,
 bool
 swift::
 mayGuaranteedUseValue(SILInstruction *User, SILValue Ptr, AliasAnalysis *AA) {
+  // Instructions that check the ref count are modeled as both a potential
+  // decrement and a use.
+  if (mayCheckRefCount(User)) {
+    switch (User->getKind()) {
+    case SILInstructionKind::IsUniqueInst:
+      // This instruction takes the address of its referent, so there's no way
+      // for the optimizer to reuse the reference across it (it appears to
+      // mutate the reference itself). In fact it's operand's RC root would be
+      // the parent object. This means we can ignore it as a direct RC user.
+      return false;
+    case SILInstructionKind::IsEscapingClosureInst:
+      // FIXME: this is overly conservative. It should return true only of the
+      // RC identity of the single operand matches Ptr.
+      return true;
+    default:
+      llvm_unreachable("Unexpected check-ref-count instruction.");
+    }
+  }
+
   // Only full apply sites can require a guaranteed lifetime. If we don't have
   // one, bail.
   if (!isa<FullApplySite>(User))

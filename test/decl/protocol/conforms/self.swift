@@ -50,7 +50,7 @@ protocol HasDefault {
 
 extension HasDefault where Self == SillyClass {
   func foo() {}
-  // expected-note@-1 {{candidate has non-matching type '<Self> () -> ()'}}
+  // expected-note@-1 {{candidate would match if 'SillyClass' conformed to 'HasDefault'}}
 }
 
 extension SillyClass : HasDefault {}
@@ -84,14 +84,14 @@ class IntNode: Node {}
 
 // SR-8902
 protocol P8902 {
-    associatedtype A // expected-note {{protocol requires nested type 'A'; do you want to add it?}}
+    associatedtype A
     func f(_ x: A) -> Self
 }
 struct S : P8902 {
     func f(_ x: Bool) -> S { fatalError() }
 }
-class C8902 : P8902 { // expected-error {{type 'C8902' does not conform to protocol 'P8902'}}
-    func f(_ x: Bool) -> C8902 { fatalError() }
+class C8902 : P8902 {
+    func f(_ x: Bool) -> C8902 { fatalError() } // expected-error {{method 'f' in non-final class 'C8902' must return 'Self' to conform to protocol 'P8902'}}
 }
 final class C8902b : P8902 {
     func f(_ x: Bool) -> C8902b { fatalError() }

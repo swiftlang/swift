@@ -21,7 +21,7 @@
 ///     let toAdd = 100
 ///     let b = a + CollectionOfOne(toAdd)
 ///     // b == [1, 2, 3, 4, 100]
-@_fixed_layout // trivial-implementation
+@frozen // trivial-implementation
 public struct CollectionOfOne<Element> {
   @usableFromInline // trivial-implementation
   internal var _element: Element
@@ -39,7 +39,7 @@ extension CollectionOfOne {
   /// An iterator that produces one or zero instances of an element.
   ///
   /// `IteratorOverOne` is the iterator for the `CollectionOfOne` type.
-  @_fixed_layout // trivial-implementation
+  @frozen // trivial-implementation
   public struct Iterator {
     @usableFromInline // trivial-implementation
     internal var _elements: Element?
@@ -158,14 +158,14 @@ extension CollectionOfOne: RandomAccessCollection, MutableCollection {
   }
 }
 
-extension CollectionOfOne : CustomDebugStringConvertible {
+extension CollectionOfOne: CustomDebugStringConvertible {
   /// A textual representation of the collection, suitable for debugging.
   public var debugDescription: String {
     return "CollectionOfOne(\(String(reflecting: _element)))"
   }
 }
 
-extension CollectionOfOne : CustomReflectable {
+extension CollectionOfOne: CustomReflectable {
   public var customMirror: Mirror {
     return Mirror(self, children: ["element": _element])
   }

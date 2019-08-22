@@ -126,27 +126,6 @@ private:
   }
 };
 
-struct UseToEndBorrow {
-  Optional<EndBorrowInst *> operator()(Operand *use) const {
-    if (auto *ebi = dyn_cast<EndBorrowInst>(use->getUser())) {
-      return ebi;
-    }
-    return None;
-  }
-};
-
-using EndBorrowRange =
-    OptionalTransformRange<ValueBase::use_range, UseToEndBorrow,
-                           ValueBase::use_iterator>;
-
-/// Given a value \p v that is a "borrow" introducer, return its associated
-/// end_borrow users.
-inline auto makeEndBorrowRange(SILValue v) -> EndBorrowRange {
-  assert((isa<BeginBorrowInst>(v) || isa<LoadBorrowInst>(v)) &&
-         "Unhandled borrow introducer");
-  return EndBorrowRange(v->getUses(), UseToEndBorrow());
-}
-
 /// Returns true if:
 ///
 /// 1. No consuming uses are reachable from any other consuming use, from any

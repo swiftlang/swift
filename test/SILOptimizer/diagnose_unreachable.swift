@@ -328,7 +328,7 @@ func deferTryNoReturn() throws {
 }
 
 func noReturnInDefer() {
-  defer { // expected-warning {{'defer' statement before end of scope always executes immediately}}{{3-8=do}}
+  defer { // expected-warning {{'defer' statement at end of scope always executes immediately}}{{3-8=do}}
     _ = Lisp()
     die() // expected-note {{a call to a never-returning function}}
     die() // expected-warning {{will never be executed}}

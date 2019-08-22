@@ -22,6 +22,9 @@ class CompilerInvocation;
 }
 
 namespace SourceKit {
+
+  using TypeContextKind = swift::ide::CodeCompletionContext::TypeContextKind;
+
 namespace CodeCompletion {
 
 struct Options {
@@ -75,7 +78,7 @@ class CodeCompletionOrganizer {
   const Options &options;
 public:
   CodeCompletionOrganizer(const Options &options, CompletionKind kind,
-                          bool hasExpectedTypes);
+                          TypeContextKind typeContextKind);
   ~CodeCompletionOrganizer();
 
   static void

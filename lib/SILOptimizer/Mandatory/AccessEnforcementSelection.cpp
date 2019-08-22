@@ -36,6 +36,7 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILUndef.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SILOptimizer/Analysis/ClosureScope.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -106,6 +107,10 @@ public:
   void recordCapture(AddressCapture capture) {
     LLVM_DEBUG(llvm::dbgs() << "Dynamic Capture: " << capture);
 
+    // *NOTE* For dynamically replaceable local functions, getCalleeFunction()
+    // returns nullptr. This assert verifies the assumption that a captured
+    // local variable can never be promoted to capture-by-address for
+    // dynamically replaceable local functions.
     auto callee = capture.site.getCalleeFunction();
     assert(callee && "cannot locate function ref for nonescaping closure");
 
@@ -255,7 +260,8 @@ static void checkUsesOfAccess(BeginAccessInst *access) {
   for (auto *use : access->getUses()) {
     auto user = use->getUser();
     assert(!isa<BeginAccessInst>(user));
-    assert(!isa<PartialApplyInst>(user));
+    assert(!isa<PartialApplyInst>(user) ||
+           onlyUsedByAssignByWrapper(cast<PartialApplyInst>(user)));
   }
 #endif
 }

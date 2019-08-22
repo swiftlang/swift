@@ -16,6 +16,13 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=testInvalid2 | %FileCheck %s -check-prefix=testInvalid2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=testInvalid3 | %FileCheck %s -check-prefix=testInvalid3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=testInvalid4 | %FileCheck %s -check-prefix=testInvalid4
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=testGenericRoot1 | %FileCheck %s -check-prefix=testGenericRoot1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=testGenericResult1 | %FileCheck %s -check-prefix=testGenericResult1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=testAnyObjectRoot1 | %FileCheck %s -check-prefix=testAnyObjectRoot1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=testNested1 | %FileCheck %s -check-prefix=testNested1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=testNested2 | %FileCheck %s -check-prefix=testNested2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=testCycle1 | %FileCheck %s -check-prefix=testCycle1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=testCycle2 | %FileCheck %s -check-prefix=testCycle2
 
 struct Point {
   var x: Int
@@ -45,18 +52,16 @@ func testMembersPostfix1(r: Lens<Rectangle>) {
 // testMembersPostfix1: Begin completions
 // testMembersPostfix1-DAG: Decl[Subscript]/CurrNominal:        [{#dynamicMember: WritableKeyPath<Rectangle, U>#}][#Lens<U>#];
 
-// FIXME: the type should be Lens<Point>
-// testMembersPostfix1-DAG: Decl[InstanceVar]/CurrNominal:      .topLeft[#Point#];
-// testMembersPostfix1-DAG: Decl[InstanceVar]/CurrNominal:      .bottomRight[#Point#];
+// testMembersPostfix1-DAG: Decl[InstanceVar]/CurrNominal:      .topLeft[#Lens<Point>#];
+// testMembersPostfix1-DAG: Decl[InstanceVar]/CurrNominal:      .bottomRight[#Lens<Point>#];
 // testMembersPostfix1: End completions
 
 func testMembersDot1(r: Lens<Rectangle>) {
   r.#^testMembersDot1^#
 }
 // testMembersDot1: Begin completions
-// FIXME: the type should be Lens<Point>
-// testMembersDot1-DAG: Decl[InstanceVar]/CurrNominal:      topLeft[#Point#];
-// testMembersDot1-DAG: Decl[InstanceVar]/CurrNominal:      bottomRight[#Point#];
+// testMembersDot1-DAG: Decl[InstanceVar]/CurrNominal:      topLeft[#Lens<Point>#];
+// testMembersDot1-DAG: Decl[InstanceVar]/CurrNominal:      bottomRight[#Lens<Point>#];
 // testMembersDot1: End completions
 
 func testMembersDot2(r: Lens<Rectangle>) {
@@ -64,9 +69,8 @@ func testMembersDot2(r: Lens<Rectangle>) {
 }
 
 // testMembersDot2: Begin completions
-// FIXME: the type should be Lens<Int>
-// testMembersDot2-DAG: Decl[InstanceVar]/CurrNominal:      x[#Int#];
-// testMembersDot2-DAG: Decl[InstanceVar]/CurrNominal:      y[#Int#];
+// testMembersDot2-DAG: Decl[InstanceVar]/CurrNominal:      x[#Lens<Int>#];
+// testMembersDot2-DAG: Decl[InstanceVar]/CurrNominal:      y[#Lens<Int>#];
 // testMembersDot2: End completions
 
 @dynamicMemberLookup
@@ -136,9 +140,9 @@ func testShadow1(r: Shadow1<Point>) {
   r.#^testShadow1^#
 }
 // testShadow1-NOT: x[#Int#];
-// testShadow1: Decl[InstanceVar]/CurrNominal:      x[#String#];
-// testShadow1-NOT: x[#Int#];
 // testShadow1: Decl[InstanceVar]/CurrNominal:      y[#Int#];
+// testShadow1-NOT: x[#Int#];
+// testShadow1: Decl[InstanceVar]/CurrNominal:      x[#String#];
 
 @dynamicMemberLookup
 protocol P {
@@ -221,7 +225,7 @@ extension Lens where T: HalfRect {
   }
 }
 // testSelfExtension1-NOT: bottomRight
-// testSelfExtension1: Decl[InstanceVar]/CurrNominal:      topLeft[#Point#];
+// testSelfExtension1: Decl[InstanceVar]/CurrNominal:      topLeft[#Lens<Point>#];
 // testSelfExtension1-NOT: bottomRight
 
 struct Invalid1 {
@@ -268,3 +272,116 @@ func testInvalid4(r: Invalid4) {
   r.#^testInvalid4^#
 }
 // testInvalid4-NOT: topLeft
+
+struct Gen1<T> {
+  var foo: T
+}
+
+@dynamicMemberLookup
+struct GenericRoot<T> {
+  subscript<U>(dynamicMember member: KeyPath<Gen1<T>, U>) -> Int {
+    return 1
+  }
+}
+
+func testGenericRoot1(r: GenericRoot<Point>) {
+  r.#^testGenericRoot1^#
+}
+// testGenericRoot1: Decl[InstanceVar]/CurrNominal:      foo[#Int#];
+
+@dynamicMemberLookup
+struct GenericResult<T> {
+  subscript<U>(dynamicMember member: KeyPath<T, Gen1<U>>) -> GenericResult<U> {
+    fatalError()
+  }
+}
+struct BoxedCircle {
+  var center: Gen1<Point>
+  var radius: Gen1<Int>
+}
+func testGenericResult1(r: GenericResult<BoxedCircle>) {
+  r.#^testGenericResult1^#
+}
+// testGenericResult1: Begin completions
+// FIXME: the type should be 'GenericResult<Point>'
+// testGenericResult1-DAG: Decl[InstanceVar]/CurrNominal:      center[#Gen1<Point>#]; name=center
+// testGenericResult1-DAG: Decl[InstanceVar]/CurrNominal:      radius[#Gen1<Int>#]; name=radius
+// testGenericResult1: End completions
+
+class C {
+  var someUniqueName: Int = 0
+}
+
+@dynamicMemberLookup
+struct AnyObjectRoot {
+  subscript<U>(dynamicMember member: KeyPath<AnyObject, U>) -> Int {
+    return 1
+  }
+}
+
+func testAnyObjectRoot1(r: AnyObjectRoot) {
+  r.#^testAnyObjectRoot1^#
+}
+// Do not do find via AnyObject dynamic lookup.
+// testAnyObjectRoot1-NOT: someUniqueName
+
+func testNested1(r: Lens<Lens<Point>>) {
+  r.#^testNested1^#
+// testNested1: Begin completions
+// FIXME: The type should be 'Lens<Lens<Int>>'
+// testNested1-DAG: Decl[InstanceVar]/CurrNominal:      x[#Lens<Int>#];
+// testNested1-DAG: Decl[InstanceVar]/CurrNominal:      y[#Lens<Int>#];
+// testNested1: End completions
+}
+
+func testNested2(r: Lens<Lens<Lens<Point>>>) {
+  r.#^testNested2^#
+// testNested2: Begin completions
+// FIXME: The type should be 'Lens<Lens<Lens<Int>>>'
+// testNested2-DAG: Decl[InstanceVar]/CurrNominal:      x[#Lens<Int>#];
+// testNested2-DAG: Decl[InstanceVar]/CurrNominal:      y[#Lens<Int>#];
+// testNested2: End completions
+}
+
+@dynamicMemberLookup
+struct Recurse<T> {
+  var obj: T
+  init(_ obj: T) { self.obj = obj }
+
+  subscript<U>(dynamicMember member: KeyPath<Recurse<T>, U>) -> Int {
+    return 1
+  }
+}
+
+func testCycle1(r: Recurse<Point>) {
+  r.#^testCycle1^#
+// testCycle1: Begin completions
+// testCycle1-NOT: x[#Int#]
+}
+
+@dynamicMemberLookup
+struct CycleA<T> {
+  var fromA: Int
+  subscript<U>(dynamicMember member: KeyPath<CycleB<T>, U>) -> Int {
+    return 1
+  }
+}
+@dynamicMemberLookup
+struct CycleB<T> {
+  var fromB: Int
+  subscript<U>(dynamicMember member: KeyPath<CycleC<T>, U>) -> Int {
+    return 1
+  }
+}
+@dynamicMemberLookup
+struct CycleC<T> {
+  var fromC: Int
+  subscript<U>(dynamicMember member: KeyPath<CycleA<T>, U>) -> Int {
+    return 1
+  }
+}
+
+func testCycle2(r: CycleA<Point>) {
+  r.#^testCycle2^#
+// testCycle2: Begin completions
+}

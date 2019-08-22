@@ -5,21 +5,21 @@
 func doSomething() { }
 // expected-note @-1{{'doSomething()' was obsoleted in watchOS 2.0}}
 
-doSomething() // expected-error{{'doSomething()' is unavailable: you don't want to do that anyway}}
+doSomething() // expected-error{{'doSomething()' is unavailable in watchOS: you don't want to do that anyway}}
 
 // Preservation of major.minor.micro
 @available(watchOS, introduced: 1.0, deprecated: 1.5, obsoleted: 1.5.3)
 func doSomethingElse() { }
 // expected-note @-1{{'doSomethingElse()' was obsoleted in watchOS 1.5.3}}
 
-doSomethingElse() // expected-error{{'doSomethingElse()' is unavailable}}
+doSomethingElse() // expected-error{{'doSomethingElse()' is unavailable in watchOS}}
 
 // Preservation of minor-only version
 @available(watchOS, introduced: 1.0, deprecated: 1.5, obsoleted: 2)
 func doSomethingReallyOld() { }
 // expected-note @-1{{'doSomethingReallyOld()' was obsoleted in watchOS 2}}
 
-doSomethingReallyOld() // expected-error{{'doSomethingReallyOld()' is unavailable}}
+doSomethingReallyOld() // expected-error{{'doSomethingReallyOld()' is unavailable in watchOS}}
 
 // Test deprecations in 2.0 and later
 
@@ -54,12 +54,12 @@ func functionWithDeprecatedLaterParameter(p: DeprecatedClassIn3_0) { }
 func functionIntroducedOnwatchOS2_2() { }
 
 if #available(iOS 9.3, *) {
-  functionIntroducedOnwatchOS2_2() // expected-error {{'functionIntroducedOnwatchOS2_2()' is only available on watchOS 2.2 or newer}}
+  functionIntroducedOnwatchOS2_2() // expected-error {{'functionIntroducedOnwatchOS2_2()' is only available in watchOS 2.2 or newer}}
       // expected-note@-1 {{add 'if #available' version check}}
 }
 
 if #available(iOS 9.3, watchOS 2.1, *) {
-  functionIntroducedOnwatchOS2_2() // expected-error {{'functionIntroducedOnwatchOS2_2()' is only available on watchOS 2.2 or newer}} {{32-35=2.2}}
+  functionIntroducedOnwatchOS2_2() // expected-error {{'functionIntroducedOnwatchOS2_2()' is only available in watchOS 2.2 or newer}} {{32-35=2.2}}
 }
 
 if #available(iOS 9.1, watchOS 2.2, *) {

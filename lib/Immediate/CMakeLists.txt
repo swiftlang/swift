@@ -1,7 +1,7 @@
 add_swift_host_library(swiftImmediate STATIC
   Immediate.cpp
   REPL.cpp
-  LLVM_COMPONENT_DEPENDS
+  LLVM_LINK_COMPONENTS
     executionengine
     linker
     mcjit

@@ -176,3 +176,15 @@ func ~> (x: inout Int, f: @escaping (_: inout Int, _: Target) -> Target) -> (Tar
   return { f(&x, $0) } // expected-note {{captured here}}
   // expected-error@-1 {{escaping closure captures 'inout' parameter 'x'}}
 }
+
+func addHandler(_: @escaping () -> ()) {}
+
+public struct SelfEscapeFromInit {
+  public init() {
+    addHandler { self.handler() }
+    // expected-error@-1 {{escaping closure captures mutating 'self' parameter}}
+    // expected-note@-2 {{captured here}}
+  }
+
+  public mutating func handler() {}
+}

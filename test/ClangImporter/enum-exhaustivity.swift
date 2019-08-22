@@ -7,7 +7,7 @@
 // CHECK-NEXT: case B
 // CHECK-NEXT: {{^}$}}
 
-// Note that we don't print '@_frozen' here yet.
+// Note that we don't print '@frozen' here yet.
 // CHECK-LABEL: {{^}}enum ExhaustiveEnum : {{.+}} {
 // CHECK:      case A
 // CHECK-NEXT: case B

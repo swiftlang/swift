@@ -97,6 +97,9 @@ public func arraysOfGenericParam<T: AnyObject>(y: Array<T>) {
   x.propertyArrayOfThings = y
 }
 
+// CHECK-LABEL: sil shared [serializable] [thunk] [ossa] @$sSo12GenericClassC13arrayOfThingsAByxGSgSayxG_tcfcTO
+// CHECK:         objc_method {{%.*}} : $GenericClass<T>, #GenericClass.init!initializer.1.foreign {{.*}}, $@convention(objc_method) @pseudogeneric <τ_0_0 where τ_0_0 : AnyObject> (NSArray, @owned GenericClass<τ_0_0>) -> @owned Optional<GenericClass<τ_0_0>>
+
 // CHECK-LABEL: sil private [ossa] @$s21objc_imported_generic0C4FuncyyxmRlzClFyycfU_ : $@convention(thin) <V where V : AnyObject> () -> () {
 // CHECK:  [[META:%.*]] = metatype $@thick GenericClass<V>.Type
 // CHECK:  [[INIT:%.*]] = function_ref @$sSo12GenericClassCAByxGycfC : $@convention(method) <τ_0_0 where τ_0_0 : AnyObject> (@thick GenericClass<τ_0_0>.Type) -> @owned GenericClass<τ_0_0>
@@ -114,11 +117,6 @@ func genericFunc<V: AnyObject>(_ v: V.Type) {
 func configureWithoutOptions() {
   _ = GenericClass<NSObject>(options: nil)
 }
-
-// This gets emitted down here for some reason
-
-// CHECK-LABEL: sil shared [serializable] [thunk] [ossa] @$sSo12GenericClassC13arrayOfThingsAByxGSgSayxG_tcfcTO
-// CHECK:         objc_method {{%.*}} : $GenericClass<T>, #GenericClass.init!initializer.1.foreign {{.*}}, $@convention(objc_method) @pseudogeneric <τ_0_0 where τ_0_0 : AnyObject> (NSArray, @owned GenericClass<τ_0_0>) -> @owned Optional<GenericClass<τ_0_0>>
 
 // foreign to native thunk for init(options:), uses GenericOption : Hashable
 // conformance

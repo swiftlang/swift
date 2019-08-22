@@ -10,6 +10,7 @@
 
 import argparse
 import os
+import platform
 import unittest
 
 from swift_build_support import migration
@@ -54,6 +55,10 @@ class MigrateImplArgsTestCase(unittest.TestCase):
                 build_script_impl_args=[]))
 
     def test_check_impl_args(self):
+        if platform.system() == 'Windows':
+            self.skipTest("build-script-impl cannot run in Windows")
+            return
+
         # Assuming file locations:
         #   utils/swift_build_support/tests/test_migration.py
         #   utils/build-script-impl

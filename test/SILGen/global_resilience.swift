@@ -9,6 +9,10 @@ public struct MyEmptyStruct {}
 
 // CHECK-LABEL: sil_global private @$s17global_resilience13myEmptyGlobalAA02MyD6StructVvp : $MyEmptyStruct
 
+// CHECK-OPT-LABEL: sil_global private @$s17global_resilience13myEmptyGlobalAA02MyD6StructVvp : $MyEmptyStruct = {
+// CHECK-OPT-LABEL:   %initval = struct $MyEmptyStruct ()
+// CHECK-OPT-LABEL: }
+
 public var myEmptyGlobal = MyEmptyStruct()
 
 // CHECK-LABEL: sil_global @$s17global_resilience19myFixedLayoutGlobalAA13MyEmptyStructVvp : $MyEmptyStruct
@@ -39,17 +43,22 @@ public var myEmptyGlobal = MyEmptyStruct()
 
 // Mutable addressor for fixed-layout global
 
+// CHECK-LABEL: sil private [ossa] @globalinit_{{.*}}_func1
+// CHECK:         alloc_global @$s17global_resilience19myFixedLayoutGlobalAA13MyEmptyStructVv
+// CHECK:         return
+
 // CHECK-LABEL: sil [global_init] [ossa] @$s17global_resilience19myFixedLayoutGlobalAA13MyEmptyStructVvau
+// CHECK:         function_ref @globalinit_{{.*}}_func1
 // CHECK:         global_addr @$s17global_resilience19myFixedLayoutGlobalAA13MyEmptyStructVv
 // CHECK:         return
 
-// CHECK-OPT-LABEL: sil private @globalinit_{{.*}}_func0
+// CHECK-OPT-LABEL: sil private @globalinit_{{.*}}_func1
 // CHECK-OPT:     alloc_global @$s17global_resilience19myFixedLayoutGlobalAA13MyEmptyStructVv
 // CHECK-OPT:     return
 
 // CHECK-OPT-LABEL: sil [global_init] @$s17global_resilience19myFixedLayoutGlobalAA13MyEmptyStructVvau
+// CHECK-OPT:     function_ref @globalinit_{{.*}}_func1
 // CHECK-OPT:     global_addr @$s17global_resilience19myFixedLayoutGlobalAA13MyEmptyStructVvp
-// CHECK-OPT:     function_ref @globalinit_{{.*}}_func0
 // CHECK-OPT:     return
 
 // Accessing resilient global from our resilience domain --

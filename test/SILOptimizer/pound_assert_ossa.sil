@@ -372,7 +372,7 @@ bb0:
 
 // Tests that top-level evaluation detects memory that gets written to twice.
 sil [ossa] @doubleWriteTopLevel : $@convention(thin) () -> () {
-  // expected-note @+1 {{could not fold operation}}
+  // expected-note @+1 {{top-level value has multiple assignments}}
   %0 = alloc_stack $Int64
   %1 = integer_literal $Builtin.Int64, 1
   %2 = struct $Int64 (%1 : $Builtin.Int64)
@@ -391,7 +391,7 @@ sil [ossa] @doubleWriteTopLevel : $@convention(thin) () -> () {
 
 // Tests that top-level evaluation detects memory that gets written to twice.
 sil [ossa] @doubleWriteTopLevelDestructure : $@convention(thin) () -> () {
-  // expected-note @+1 {{could not fold operation}}
+  // expected-note @+1 {{top-level value has multiple assignments}}
   %0 = alloc_stack $Int64
   %1 = integer_literal $Builtin.Int64, 1
   %2 = struct $Int64 (%1 : $Builtin.Int64)
@@ -424,7 +424,6 @@ bb0(%arg : $Int64):
   store %7 to [trivial] %2 : $*Int64
 
   // Store %arg, whose value is unknown, to the first element of the tuple.
-  // expected-note @+1 {{could not fold operation}}
   %addr = tuple_element_addr %0 : $*(Int64, Int64), 0
   store %arg to [trivial] %addr : $*Int64
 
@@ -441,6 +440,7 @@ bb0(%arg : $Int64):
   %15 = string_literal utf8 ""
   // expected-error @+1 {{#assert condition not constant}}
   %16 = builtin "poundAssert"(%14 : $Builtin.Int1, %15 : $Builtin.RawPointer) : $()
+    // expected-note @-1 {{cannot evaluate expression as constant here}}
 
   // Deallocate and return.
   dealloc_stack %0 : $*(Int64, Int64)
@@ -464,7 +464,6 @@ bb0(%arg : $Int64):
   store %7 to [trivial] %2 : $*Int64
 
   // Store %arg, whose value is unknown, to the first element of the tuple.
-  // expected-note @+1 {{could not fold operation}}
   %addr = tuple_element_addr %0 : $*(Int64, Int64), 0
   store %arg to [trivial] %addr : $*Int64
 
@@ -481,6 +480,7 @@ bb0(%arg : $Int64):
   %15 = string_literal utf8 ""
   // expected-error @+1 {{#assert condition not constant}}
   %16 = builtin "poundAssert"(%14 : $Builtin.Int1, %15 : $Builtin.RawPointer) : $()
+    // expected-note @-1 {{cannot evaluate expression as constant here}}
 
   // Deallocate and return.
   dealloc_stack %0 : $*(Int64, Int64)

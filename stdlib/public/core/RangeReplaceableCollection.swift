@@ -61,8 +61,8 @@
 /// `replaceSubrange(_:with:)` with an empty collection for the `newElements`
 /// parameter. You can override any of the protocol's required methods to
 /// provide your own custom implementation.
-public protocol RangeReplaceableCollection : Collection
-  where SubSequence : RangeReplaceableCollection {
+public protocol RangeReplaceableCollection: Collection
+  where SubSequence: RangeReplaceableCollection {
   // FIXME: Associated type inference requires this.
   override associatedtype SubSequence
 
@@ -110,7 +110,7 @@ public protocol RangeReplaceableCollection : Collection
   mutating func replaceSubrange<C>(
     _ subrange: Range<Index>,
     with newElements: __owned C
-  ) where C : Collection, C.Element == Element
+  ) where C: Collection, C.Element == Element
 
   /// Prepares the collection to store the specified number of elements, when
   /// doing so is appropriate for the underlying type.
@@ -147,7 +147,7 @@ public protocol RangeReplaceableCollection : Collection
   ///
   /// - Parameter elements: The sequence of elements for the new collection.
   ///   `elements` must be finite.
-  init<S : Sequence>(_ elements: S)
+  init<S: Sequence>(_ elements: S)
     where S.Element == Element
 
   /// Adds an element to the end of the collection.
@@ -185,7 +185,7 @@ public protocol RangeReplaceableCollection : Collection
   /// - Parameter newElements: The elements to append to the collection.
   ///
   /// - Complexity: O(*m*), where *m* is the length of `newElements`.
-  mutating func append<S : Sequence>(contentsOf newElements: __owned S)
+  mutating func append<S: Sequence>(contentsOf newElements: __owned S)
     where S.Element == Element
   // FIXME(ABI)#166 (Evolution): Consider replacing .append(contentsOf) with +=
   // suggestion in SE-91
@@ -240,7 +240,7 @@ public protocol RangeReplaceableCollection : Collection
   /// - Complexity: O(*n* + *m*), where *n* is length of this collection and
   ///   *m* is the length of `newElements`. If `i == endIndex`, this method
   ///   is equivalent to `append(contentsOf:)`.
-  mutating func insert<S : Collection>(contentsOf newElements: __owned S, at i: Index)
+  mutating func insert<S: Collection>(contentsOf newElements: __owned S, at i: Index)
     where S.Element == Element
 
   /// Removes and returns the element at the specified position.
@@ -401,7 +401,7 @@ extension RangeReplaceableCollection {
   ///
   /// - Parameter elements: The sequence of elements for the new collection.
   @inlinable
-  public init<S : Sequence>(_ elements: S)
+  public init<S: Sequence>(_ elements: S)
     where S.Element == Element {
     self.init()
     append(contentsOf: elements)
@@ -446,7 +446,7 @@ extension RangeReplaceableCollection {
   ///
   /// - Complexity: O(*m*), where *m* is the length of `newElements`.
   @inlinable
-  public mutating func append<S : Sequence>(contentsOf newElements: __owned S)
+  public mutating func append<S: Sequence>(contentsOf newElements: __owned S)
     where S.Element == Element {
 
     let approximateCapacity = self.count +
@@ -513,7 +513,7 @@ extension RangeReplaceableCollection {
   ///   *m* is the length of `newElements`. If `i == endIndex`, this method
   ///   is equivalent to `append(contentsOf:)`.
   @inlinable
-  public mutating func insert<C : Collection>(
+  public mutating func insert<C: Collection>(
     contentsOf newElements: __owned C, at i: Index
   ) where C.Element == Element {
     replaceSubrange(i..<i, with: newElements)
@@ -789,7 +789,7 @@ extension RangeReplaceableCollection {
 }
 
 extension RangeReplaceableCollection
-  where Self : BidirectionalCollection, SubSequence == Self {
+  where Self: BidirectionalCollection, SubSequence == Self {
 
   @inlinable
   public mutating func _customRemoveLast() -> Element? {
@@ -805,7 +805,7 @@ extension RangeReplaceableCollection
   }
 }
 
-extension RangeReplaceableCollection where Self : BidirectionalCollection {
+extension RangeReplaceableCollection where Self: BidirectionalCollection {
   /// Removes and returns the last element of the collection.
   ///
   /// Calling this method may invalidate all saved indices of this
@@ -876,7 +876,7 @@ extension RangeReplaceableCollection where Self : BidirectionalCollection {
 
 /// Ambiguity breakers.
 extension RangeReplaceableCollection
-where Self : BidirectionalCollection, SubSequence == Self {
+where Self: BidirectionalCollection, SubSequence == Self {
   /// Removes and returns the last element of the collection.
   ///
   /// Calling this method may invalidate all saved indices of this
@@ -965,7 +965,7 @@ extension RangeReplaceableCollection {
   ///   - rhs: A collection or finite sequence.
   @inlinable
   public static func + <
-    Other : Sequence
+    Other: Sequence
   >(lhs: Self, rhs: Other) -> Self
   where Element == Other.Element {
     var lhs = lhs
@@ -994,7 +994,7 @@ extension RangeReplaceableCollection {
   ///   - rhs: A range-replaceable collection.
   @inlinable
   public static func + <
-    Other : Sequence
+    Other: Sequence
   >(lhs: Other, rhs: Self) -> Self
   where Element == Other.Element {
     var result = Self()
@@ -1023,7 +1023,7 @@ extension RangeReplaceableCollection {
   ///   argument.
   @inlinable
   public static func += <
-    Other : Sequence
+    Other: Sequence
   >(lhs: inout Self, rhs: Other)
   where Element == Other.Element {
     lhs.append(contentsOf: rhs)
@@ -1049,7 +1049,7 @@ extension RangeReplaceableCollection {
   ///   - rhs: Another range-replaceable collection.
   @inlinable
   public static func + <
-    Other : RangeReplaceableCollection
+    Other: RangeReplaceableCollection
   >(lhs: Self, rhs: Other) -> Self
   where Element == Other.Element {
     var lhs = lhs

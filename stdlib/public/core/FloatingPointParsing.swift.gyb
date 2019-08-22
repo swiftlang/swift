@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -39,11 +39,11 @@ internal func _isspace_clocale(_ u: UTF16.CodeUnit) -> Bool {
 %   Self = floatName(bits)
 
 % if bits == 80:
-#if !os(Windows) && (arch(i386) || arch(x86_64))
+#if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
 % end
 
 //===--- Parsing ----------------------------------------------------------===//
-extension ${Self} : LosslessStringConvertible {
+extension ${Self}: LosslessStringConvertible {
   /// Creates a new instance from the given string.
   ///
   /// The string passed as `text` can represent a real number in decimal or
@@ -126,9 +126,9 @@ extension ${Self} : LosslessStringConvertible {
   ///   is `nil`.
   @inlinable // FIXME(sil-serialize-all)
   public init?<S: StringProtocol>(_ text: S) {
-    let u16 = text.utf16
+    let u8 = text.utf8
 
-    let (result, n) : (${Self}, Int) = text.withCString { chars in
+    let (result, n): (${Self}, Int) = text.withCString { chars in
       var result: ${Self} = 0
       let endPtr = withUnsafeMutablePointer(to: &result) {
         _swift_stdlib_strto${cFuncSuffix2[bits]}_clocale(chars, $0)
@@ -136,8 +136,12 @@ extension ${Self} : LosslessStringConvertible {
       return (result, endPtr == nil ? 0 : endPtr! - chars)
     }
 
-    if n == 0 || n != u16.count
-    || u16.contains(where: { $0 > 127 || _isspace_clocale($0) }) {
+    if n == 0 || n != u8.count
+    || u8.contains(where: { codeUnit in
+        // Check if the code unit is either non-ASCII or if isspace(codeUnit)
+        // would return nonzero when the current locale is the C locale.
+        codeUnit > 127 || "\t\n\u{b}\u{c}\r ".utf8.contains(codeUnit) 
+      }) {
       return nil
     }
     self = result

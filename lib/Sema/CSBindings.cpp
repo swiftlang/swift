@@ -209,14 +209,14 @@ bool ConstraintSystem::PotentialBindings::isViable(
 static bool hasNilLiteralConstraint(TypeVariableType *typeVar,
                                     ConstraintSystem &CS) {
   // Look for a literal-conformance constraint on the type variable.
-  llvm::SetVector<Constraint *> constraints;
-  CS.getConstraintGraph().gatherConstraints(
-      typeVar, constraints, ConstraintGraph::GatheringKind::EquivalenceClass,
-      [](Constraint *constraint) -> bool {
-        return constraint->getKind() == ConstraintKind::LiteralConformsTo &&
-               constraint->getProtocol()->isSpecificProtocol(
-                   KnownProtocolKind::ExpressibleByNilLiteral);
-      });
+  auto constraints =
+      CS.getConstraintGraph().gatherConstraints(
+          typeVar, ConstraintGraph::GatheringKind::EquivalenceClass,
+          [](Constraint *constraint) -> bool {
+            return constraint->getKind() == ConstraintKind::LiteralConformsTo &&
+                   constraint->getProtocol()->isSpecificProtocol(
+                       KnownProtocolKind::ExpressibleByNilLiteral);
+          });
 
   for (auto constraint : constraints)
     if (CS.simplifyType(constraint->getFirstType())->isEqual(typeVar))
@@ -275,6 +275,15 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
   // Do not attempt to bind to ErrorType.
   if (type->hasError())
     return None;
+
+  if (auto *locator = typeVar->getImpl().getLocator()) {
+    if (locator->isKeyPathType()) {
+      auto *BGT =
+          type->lookThroughAllOptionalTypes()->getAs<BoundGenericType>();
+      if (!BGT || !isKnownKeyPathDecl(getASTContext(), BGT->getDecl()))
+        return None;
+    }
+  }
 
   // If the source of the binding is 'OptionalObject' constraint
   // and type variable is on the left-hand side, that means
@@ -383,9 +392,9 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
   }
 
   // Gather the constraints associated with this type variable.
-  llvm::SetVector<Constraint *> constraints;
-  getConstraintGraph().gatherConstraints(
-      typeVar, constraints, ConstraintGraph::GatheringKind::EquivalenceClass);
+  auto constraints =
+      getConstraintGraph().gatherConstraints(
+          typeVar, ConstraintGraph::GatheringKind::EquivalenceClass);
 
   PotentialBindings result(typeVar);
 
@@ -623,6 +632,18 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
         result.FullyBound = true;
       }
       break;
+
+    case ConstraintKind::OneWayEqual: {
+      // Don't produce any bindings if this type variable is on the left-hand
+      // side of a one-way binding.
+      auto firstType = constraint->getFirstType();
+      if (auto *tv = firstType->getAs<TypeVariableType>()) {
+        if (tv->getImpl().getRepresentative(nullptr) == typeVar)
+          return {typeVar};
+      }
+
+      break;
+    }
     }
   }
 
@@ -667,7 +688,7 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) {
 
         do {
           // If the type conforms to this protocol, we're covered.
-          if (tc.conformsToProtocol(
+          if (TypeChecker::conformsToProtocol(
                   testType, protocol, DC,
                   (ConformanceCheckFlags::InExpression |
                    ConformanceCheckFlags::SkipConditionalRequirements))) {

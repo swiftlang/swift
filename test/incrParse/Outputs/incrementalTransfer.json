@@ -1,9 +1,9 @@
 {
-  "id": 80,
+  "id": 86,
   "kind": "SourceFile",
   "layout": [
     {
-      "id": 79,
+      "id": 85,
       "kind": "CodeBlockItemList",
       "layout": [
         {
@@ -11,17 +11,17 @@
           "omitted": true
         },
         {
-          "id": 77,
+          "id": 83,
           "kind": "CodeBlockItem",
           "layout": [
             {
-              "id": 76,
+              "id": 82,
               "kind": "FunctionDecl",
               "layout": [
                 null,
                 null,
                 {
-                  "id": 54,
+                  "id": 57,
                   "tokenKind": {
                     "kind": "kw_func"
                   },
@@ -40,7 +40,7 @@
                   "presence": "Present"
                 },
                 {
-                  "id": 55,
+                  "id": 58,
                   "tokenKind": {
                     "kind": "identifier",
                     "text": "bar"
@@ -51,15 +51,15 @@
                 },
                 null,
                 {
-                  "id": 60,
+                  "id": 63,
                   "kind": "FunctionSignature",
                   "layout": [
                     {
-                      "id": 59,
+                      "id": 62,
                       "kind": "ParameterClause",
                       "layout": [
                         {
-                          "id": 56,
+                          "id": 59,
                           "tokenKind": {
                             "kind": "l_paren"
                           },
@@ -68,13 +68,13 @@
                           "presence": "Present"
                         },
                         {
-                          "id": 57,
+                          "id": 60,
                           "kind": "FunctionParameterList",
                           "layout": [],
                           "presence": "Present"
                         },
                         {
-                          "id": 58,
+                          "id": 61,
                           "tokenKind": {
                             "kind": "r_paren"
                           },
@@ -97,11 +97,11 @@
                 },
                 null,
                 {
-                  "id": 75,
+                  "id": 81,
                   "kind": "CodeBlock",
                   "layout": [
                     {
-                      "id": 61,
+                      "id": 64,
                       "tokenKind": {
                         "kind": "l_brace"
                       },
@@ -110,21 +110,21 @@
                       "presence": "Present"
                     },
                     {
-                      "id": 73,
+                      "id": 79,
                       "kind": "CodeBlockItemList",
                       "layout": [
                         {
-                          "id": 72,
+                          "id": 78,
                           "kind": "CodeBlockItem",
                           "layout": [
                             {
-                              "id": 71,
+                              "id": 77,
                               "kind": "VariableDecl",
                               "layout": [
                                 null,
                                 null,
                                 {
-                                  "id": 62,
+                                  "id": 65,
                                   "tokenKind": {
                                     "kind": "kw_let"
                                   },
@@ -147,19 +147,19 @@
                                   "presence": "Present"
                                 },
                                 {
-                                  "id": 70,
+                                  "id": 76,
                                   "kind": "PatternBindingList",
                                   "layout": [
                                     {
-                                      "id": 69,
+                                      "id": 75,
                                       "kind": "PatternBinding",
                                       "layout": [
                                         {
-                                          "id": 64,
+                                          "id": 67,
                                           "kind": "IdentifierPattern",
                                           "layout": [
                                             {
-                                              "id": 63,
+                                              "id": 66,
                                               "tokenKind": {
                                                 "kind": "identifier",
                                                 "text": "x"
@@ -178,11 +178,11 @@
                                         },
                                         null,
                                         {
-                                          "id": 68,
+                                          "id": 74,
                                           "kind": "InitializerClause",
                                           "layout": [
                                             {
-                                              "id": 65,
+                                              "id": 68,
                                               "tokenKind": {
                                                 "kind": "equal"
                                               },
@@ -196,19 +196,53 @@
                                               "presence": "Present"
                                             },
                                             {
-                                              "id": 67,
+                                              "id": 73,
                                               "kind": "StringLiteralExpr",
                                               "layout": [
+                                                null,
                                                 {
-                                                  "id": 66,
+                                                  "id": 69,
                                                   "tokenKind": {
-                                                    "kind": "string_literal",
-                                                    "text": "\"hello world\""
+                                                    "kind": "string_quote"
                                                   },
                                                   "leadingTrivia": [],
                                                   "trailingTrivia": [],
                                                   "presence": "Present"
-                                                }
+                                                },
+                                                {
+                                                  "id": 72,
+                                                  "kind": "StringLiteralSegments",
+                                                  "layout": [
+                                                    {
+                                                      "id": 71,
+                                                      "kind": "StringSegment",
+                                                      "layout": [
+                                                        {
+                                                          "id": 70,
+                                                          "tokenKind": {
+                                                            "kind": "string_segment",
+                                                            "text": "hello world"
+                                                          },
+                                                          "leadingTrivia": [],
+                                                          "trailingTrivia": [],
+                                                          "presence": "Present"
+                                                        }
+                                                      ],
+                                                      "presence": "Present"
+                                                    }
+                                                  ],
+                                                  "presence": "Present"
+                                                },
+                                                {
+                                                  "id": 69,
+                                                  "tokenKind": {
+                                                    "kind": "string_quote"
+                                                  },
+                                                  "leadingTrivia": [],
+                                                  "trailingTrivia": [],
+                                                  "presence": "Present"
+                                                },
+                                                null
                                               ],
                                               "presence": "Present"
                                             }
@@ -232,14 +266,14 @@
                           "presence": "Present"
                         },
                         {
-                          "id": 38,
+                          "id": 41,
                           "omitted": true
                         }
                       ],
                       "presence": "Present"
                     },
                     {
-                      "id": 74,
+                      "id": 80,
                       "tokenKind": {
                         "kind": "r_brace"
                       },
@@ -264,14 +298,14 @@
           "presence": "Present"
         },
         {
-          "id": 50,
+          "id": 53,
           "omitted": true
         }
       ],
       "presence": "Present"
     },
     {
-      "id": 78,
+      "id": 84,
       "tokenKind": {
         "kind": "eof",
         "text": ""

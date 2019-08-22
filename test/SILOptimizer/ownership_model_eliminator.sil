@@ -17,9 +17,9 @@ class C {}
 // CHECK-LABEL: sil @load : $@convention(thin) (@in Builtin.NativeObject, @in Builtin.Int32) -> () {
 // CHECK: bb0([[ARG1:%[0-9]+]] : $*Builtin.NativeObject, [[ARG2:%[0-9]+]] : $*Builtin.Int32):
 // CHECK: [[LOAD2:%[0-9]+]] = load [[ARG1]] : $*Builtin.NativeObject
+// CHECK: strong_retain [[LOAD2]]
 // CHECK: apply {{%[0-9]+}}([[LOAD2]])
 // CHECK: [[LOAD3:%[0-9]+]] = load [[ARG1]] : $*Builtin.NativeObject
-// CHECK: strong_retain [[LOAD3]]
 // CHECK: apply {{%[0-9]+}}([[LOAD3]])
 // CHECK: [[LOAD4:%[0-9]+]] = load [[ARG2]] : $*Builtin.Int32
 // CHECK: apply {{%[0-9]+}}([[LOAD4]])
@@ -28,10 +28,10 @@ bb0(%0 : $*Builtin.NativeObject, %1 : $*Builtin.Int32):
   %use_native_object_func = function_ref @use_native_object : $@convention(thin) (@owned Builtin.NativeObject) -> ()
   %use_int32_func = function_ref @use_int32 : $@convention(thin) (Builtin.Int32) -> ()
 
-  %3 = load [take] %0 : $*Builtin.NativeObject
+  %3 = load [copy] %0 : $*Builtin.NativeObject
   apply %use_native_object_func(%3) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
 
-  %4 = load [copy] %0 : $*Builtin.NativeObject
+  %4 = load [take] %0 : $*Builtin.NativeObject
   apply %use_native_object_func(%4) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
 
   %5 = load [trivial] %1 : $*Builtin.Int32
@@ -41,7 +41,7 @@ bb0(%0 : $*Builtin.NativeObject, %1 : $*Builtin.Int32):
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil @store : $@convention(thin) (@in Builtin.NativeObject, Builtin.NativeObject, @in Builtin.Int32, Builtin.Int32) -> ()
+// CHECK-LABEL: sil @store : $@convention(thin) (Builtin.NativeObject, @in Builtin.Int32, Builtin.Int32) -> @out Builtin.NativeObject {
 // CHECK: bb0([[ARG1:%[0-9]+]] : $*Builtin.NativeObject, [[ARG2:%[0-9]+]] : $Builtin.NativeObject, [[ARG3:%[0-9]+]] : $*Builtin.Int32, [[ARG4:%[0-9]+]] : $Builtin.Int32):
 // CHECK: strong_retain [[ARG2]]
 // CHECK: strong_retain [[ARG2]]
@@ -50,7 +50,7 @@ bb0(%0 : $*Builtin.NativeObject, %1 : $*Builtin.Int32):
 // CHECK: store [[ARG2]] to [[ARG1]] : $*Builtin.NativeObject
 // CHECK: strong_release [[OLDVAL]]
 // CHECK: store [[ARG4]] to [[ARG3]] : $*Builtin.Int32
-sil [ossa] @store : $@convention(thin) (@in Builtin.NativeObject, Builtin.NativeObject, @in Builtin.Int32, Builtin.Int32) -> () {
+sil [ossa] @store : $@convention(thin) (Builtin.NativeObject, @in Builtin.Int32, Builtin.Int32) -> @out Builtin.NativeObject {
 bb0(%0 : $*Builtin.NativeObject, %1 : @unowned $Builtin.NativeObject, %2 : $*Builtin.Int32, %3 : $Builtin.Int32):
   %4 = copy_value %1 : $Builtin.NativeObject
   %5 = copy_value %1 : $Builtin.NativeObject
@@ -61,12 +61,12 @@ bb0(%0 : $*Builtin.NativeObject, %1 : @unowned $Builtin.NativeObject, %2 : $*Bui
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil @borrow : $@convention(thin) (@in Builtin.NativeObject) -> () {
+// CHECK-LABEL: sil @borrow : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> () {
 // CHECK: bb0([[ARG:%[0-9]+]] : $*Builtin.NativeObject):
 // CHECK: [[BORROWED_VALUE:%[0-9]+]] = load [[ARG]] : $*Builtin.NativeObject
 // CHECK: unchecked_ref_cast [[BORROWED_VALUE]]
 // CHECK-NOT: end_borrow
-sil [ossa] @borrow : $@convention(thin) (@in Builtin.NativeObject) -> () {
+sil [ossa] @borrow : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> () {
 bb0(%0 : $*Builtin.NativeObject):
   %1 = load_borrow %0 : $*Builtin.NativeObject
   %2 = unchecked_ref_cast %1 : $Builtin.NativeObject to $Builtin.NativeObject

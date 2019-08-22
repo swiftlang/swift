@@ -141,7 +141,7 @@ public enum NonExhaustivePayload {
   case a(Int), b(Bool)
 }
 
-@_frozen public enum TemporalProxy {
+@frozen public enum TemporalProxy {
   case seconds(Int)
   case milliseconds(Int)
   case microseconds(Int)

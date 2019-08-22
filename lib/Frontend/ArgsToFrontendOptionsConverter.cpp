@@ -83,6 +83,9 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.SerializeModuleInterfaceDependencyHashes |=
     Args.hasArg(OPT_serialize_module_interface_dependency_hashes);
 
+  Opts.RemarkOnRebuildFromModuleInterface |=
+    Args.hasArg(OPT_Rmodule_interface_rebuild);
+
   computePrintStatsOptions();
   computeDebugTimeOptions();
   computeTBDOptions();

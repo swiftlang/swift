@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsSema.h"
@@ -65,7 +66,7 @@ static void printToolVersionAndFlagsComment(raw_ostream &out,
       Ctx.LangOpts.EffectiveLanguageVersion);
   out << "// " SWIFT_INTERFACE_FORMAT_VERSION_KEY ": "
       << InterfaceFormatVersion << "\n";
-  out << "// " SWIFT_TOOLS_VERSION_KEY ": "
+  out << "// " SWIFT_COMPILER_VERSION_KEY ": "
       << ToolsVersion << "\n";
   out << "// " SWIFT_MODULE_FLAGS_KEY ": "
       << Opts.ParseableInterfaceFlags << "\n";
@@ -163,47 +164,96 @@ namespace {
 class InheritedProtocolCollector {
   static const StringLiteral DummyProtocolName;
 
+  using AvailableAttrList = TinyPtrVector<const AvailableAttr *>;
+  using ProtocolAndAvailability =
+    std::pair<ProtocolDecl *, AvailableAttrList>;
+
   /// Protocols that will be included by the ASTPrinter without any extra work.
   SmallVector<ProtocolDecl *, 8> IncludedProtocols;
-  /// Protocols that will not be printed by the ASTPrinter.
-  SmallVector<ProtocolDecl *, 8> ExtraProtocols;
+  /// Protocols that will not be printed by the ASTPrinter, along with the
+  /// availability they were declared with.
+  SmallVector<ProtocolAndAvailability, 8> ExtraProtocols;
   /// Protocols that can be printed, but whose conformances are constrained with
   /// something that \e can't be printed.
   SmallVector<const ProtocolType *, 8> ConditionalConformanceProtocols;
 
+  /// Helper to extract the `@available` attributes on a decl.
+  static AvailableAttrList
+  getAvailabilityAttrs(const Decl *D, Optional<AvailableAttrList> &cache) {
+    if (cache.hasValue())
+      return cache.getValue();
+
+    cache.emplace();
+    while (D) {
+      for (auto *nextAttr : D->getAttrs().getAttributes<AvailableAttr>()) {
+        // FIXME: This is just approximating the effects of nested availability
+        // attributes for the same platform; formally they'd need to be merged.
+        bool alreadyHasMoreSpecificAttrForThisPlatform =
+            llvm::any_of(*cache, [nextAttr](const AvailableAttr *existingAttr) {
+          return existingAttr->Platform == nextAttr->Platform;
+        });
+        if (alreadyHasMoreSpecificAttrForThisPlatform)
+          continue;
+        cache->push_back(nextAttr);
+      }
+      D = D->getDeclContext()->getAsDecl();
+    }
+
+    return cache.getValue();
+  }
+
   /// For each type in \p directlyInherited, classify the protocols it refers to
   /// as included for printing or not, and record them in the appropriate
   /// vectors.
-  void recordProtocols(ArrayRef<TypeLoc> directlyInherited) {
+  void recordProtocols(ArrayRef<TypeLoc> directlyInherited, const Decl *D) {
+    Optional<AvailableAttrList> availableAttrs;
+
     for (TypeLoc inherited : directlyInherited) {
       Type inheritedTy = inherited.getType();
       if (!inheritedTy || !inheritedTy->isExistentialType())
         continue;
 
       bool canPrintNormally = isPublicOrUsableFromInline(inheritedTy);
-      SmallVectorImpl<ProtocolDecl *> &whichProtocols =
-          canPrintNormally ? IncludedProtocols : ExtraProtocols;
-
       ExistentialLayout layout = inheritedTy->getExistentialLayout();
-      for (ProtocolType *protoTy : layout.getProtocols())
-        whichProtocols.push_back(protoTy->getDecl());
+      for (ProtocolType *protoTy : layout.getProtocols()) {
+        if (canPrintNormally)
+          IncludedProtocols.push_back(protoTy->getDecl());
+        else
+          ExtraProtocols.push_back({protoTy->getDecl(),
+                                    getAvailabilityAttrs(D, availableAttrs)});
+      }
       // FIXME: This ignores layout constraints, but currently we don't support
       // any of those besides 'AnyObject'.
     }
+
+    // Check for synthesized protocols, like Hashable on enums.
+    if (auto *nominal = dyn_cast<NominalTypeDecl>(D)) {
+      SmallVector<ProtocolConformance *, 4> localConformances =
+          nominal->getLocalConformances(ConformanceLookupKind::NonInherited);
+
+      for (auto *conf : localConformances) {
+        if (conf->getSourceKind() != ConformanceEntryKind::Synthesized)
+          continue;
+        ExtraProtocols.push_back({conf->getProtocol(),
+                                  getAvailabilityAttrs(D, availableAttrs)});
+      }
+    }
   }
 
-  /// For each type in \p directlyInherited, record any protocols that we would
-  /// have printed in ConditionalConformanceProtocols.
-  void recordConditionalConformances(ArrayRef<TypeLoc> directlyInherited) {
-    for (TypeLoc inherited : directlyInherited) {
+  /// For each type directly inherited by \p extension, record any protocols
+  /// that we would have printed in ConditionalConformanceProtocols.
+  void recordConditionalConformances(const ExtensionDecl *extension) {
+    for (TypeLoc inherited : extension->getInherited()) {
       Type inheritedTy = inherited.getType();
       if (!inheritedTy || !inheritedTy->isExistentialType())
         continue;
 
       ExistentialLayout layout = inheritedTy->getExistentialLayout();
-      for (ProtocolType *protoTy : layout.getProtocols())
-        if (isPublicOrUsableFromInline(protoTy))
-          ConditionalConformanceProtocols.push_back(protoTy);
+      for (ProtocolType *protoTy : layout.getProtocols()) {
+        if (!isPublicOrUsableFromInline(protoTy))
+          continue;
+        ConditionalConformanceProtocols.push_back(protoTy);
+      }
       // FIXME: This ignores layout constraints, but currently we don't support
       // any of those besides 'AnyObject'.
     }
@@ -243,7 +293,7 @@ public:
     if (!isPublicOrUsableFromInline(nominal))
       return;
 
-    map[nominal].recordProtocols(directlyInherited);
+    map[nominal].recordProtocols(directlyInherited, D);
 
     // Recurse to find any nested types.
     for (const Decl *member : memberContext->getMembers())
@@ -264,7 +314,7 @@ public:
     if (!isPublicOrUsableFromInline(nominal))
       return;
 
-    map[nominal].recordConditionalConformances(extension->getInherited());
+    map[nominal].recordConditionalConformances(extension);
     // No recursion here because extensions are never nested.
   }
 
@@ -307,16 +357,18 @@ public:
     // Note: We could do this in one pass, but the logic is easier to
     // understand if we build up the list and then print it, even if it takes
     // a bit more memory.
-    SmallVector<ProtocolDecl *, 16> protocolsToPrint;
-    for (ProtocolDecl *proto : ExtraProtocols) {
-      proto->walkInheritedProtocols(
+    // FIXME: This will pick the availability attributes from the first sight
+    // of a protocol rather than the maximally available case.
+    SmallVector<ProtocolAndAvailability, 16> protocolsToPrint;
+    for (const auto &protoAndAvailability : ExtraProtocols) {
+      protoAndAvailability.first->walkInheritedProtocols(
           [&](ProtocolDecl *inherited) -> TypeWalker::Action {
         if (!handledProtocols.insert(inherited).second)
           return TypeWalker::Action::SkipChildren;
 
         if (isPublicOrUsableFromInline(inherited) &&
             conformanceDeclaredInModule(M, nominal, inherited)) {
-          protocolsToPrint.push_back(inherited);
+          protocolsToPrint.push_back({inherited, protoAndAvailability.second});
           return TypeWalker::Action::SkipChildren;
         }
 
@@ -326,14 +378,23 @@ public:
     if (protocolsToPrint.empty())
       return;
 
-    out << "extension ";
-    nominal->getDeclaredType().print(out, printOptions);
-    out << " : ";
-    swift::interleave(protocolsToPrint,
-                      [&out, &printOptions](ProtocolDecl *proto) {
-                        proto->getDeclaredType()->print(out, printOptions);
-                      }, [&out] { out << ", "; });
-    out << " {}\n";
+    for (const auto &protoAndAvailability : protocolsToPrint) {
+      StreamPrinter printer(out);
+      // FIXME: Shouldn't this be an implicit conversion?
+      TinyPtrVector<const DeclAttribute *> attrs;
+      attrs.insert(attrs.end(), protoAndAvailability.second.begin(),
+                   protoAndAvailability.second.end());
+      DeclAttributes::print(printer, printOptions, attrs);
+
+      printer << "extension ";
+      nominal->getDeclaredType().print(printer, printOptions);
+      printer << " : ";
+
+      ProtocolDecl *proto = protoAndAvailability.first;
+      proto->getDeclaredType()->print(printer, printOptions);
+
+      printer << " {}\n";
+    }
   }
 
   /// If there were any conditional conformances that couldn't be printed,
@@ -346,7 +407,7 @@ public:
       return false;
     assert(nominal->isGenericContext());
 
-    out << "extension ";
+    out << "@available(*, unavailable)\nextension ";
     nominal->getDeclaredType().print(out, printOptions);
     out << " : ";
     swift::interleave(ConditionalConformanceProtocols,
@@ -379,14 +440,17 @@ bool swift::emitParseableInterface(raw_ostream &out,
   printToolVersionAndFlagsComment(out, Opts, M);
   printImports(out, M);
 
-  const PrintOptions printOptions = PrintOptions::printParseableInterfaceFile();
+  const PrintOptions printOptions = PrintOptions::printParseableInterfaceFile(
+      Opts.PreserveTypesAsWritten);
   InheritedProtocolCollector::PerTypeMap inheritedProtocolMap;
 
   SmallVector<Decl *, 16> topLevelDecls;
   M->getTopLevelDecls(topLevelDecls);
   for (const Decl *D : topLevelDecls) {
+    InheritedProtocolCollector::collectProtocols(inheritedProtocolMap, D);
+
     if (!D->shouldPrintInContext(printOptions) ||
-        !printOptions.CurrentPrintabilityChecker->shouldPrint(D, printOptions)){
+        !printOptions.shouldPrint(D)) {
       InheritedProtocolCollector::collectSkippedConditionalConformances(
           inheritedProtocolMap, D);
       continue;
@@ -394,8 +458,6 @@ bool swift::emitParseableInterface(raw_ostream &out,
 
     D->print(out, printOptions);
     out << "\n";
-
-    InheritedProtocolCollector::collectProtocols(inheritedProtocolMap, D);
   }
 
   // Print dummy extensions for any protocols that were indirectly conformed to.

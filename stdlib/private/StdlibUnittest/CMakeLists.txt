@@ -29,7 +29,6 @@ add_swift_target_library(swiftStdlibUnittest ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES}
   StringConvertible.swift
   TestHelpers.swift
   TypeIndexed.swift
-  GetOSVersion.mm
 
   SWIFT_MODULE_DEPENDS SwiftPrivate SwiftPrivateThreadExtras SwiftPrivateLibcExtras
   SWIFT_MODULE_DEPENDS_IOS Darwin Foundation
@@ -41,7 +40,8 @@ add_swift_target_library(swiftStdlibUnittest ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES}
   SWIFT_MODULE_DEPENDS_CYGWIN Glibc
   SWIFT_MODULE_DEPENDS_HAIKU Glibc
   SWIFT_MODULE_DEPENDS_WINDOWS MSVCRT WinSDK
-  SWIFT_COMPILE_FLAGS ${swift_stdlib_unittest_compile_flags}
-  INSTALL_IN_COMPONENT stdlib-experimental)
+  SWIFT_COMPILE_FLAGS ${swift_stdlib_unittest_compile_flags} ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
+  INSTALL_IN_COMPONENT stdlib-experimental
+  DARWIN_INSTALL_NAME_DIR "${SWIFT_DARWIN_STDLIB_PRIVATE_INSTALL_NAME_DIR}")
 set_source_files_properties(InspectValue.cpp PROPERTIES COMPILE_FLAGS -std=c++14)
 

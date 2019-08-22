@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -enable-sil-existential-specializer -existential-specializer   | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -enable-existential-specializer -existential-specializer   | %FileCheck %s
 
 // Additional tests for existential_specializer
 
@@ -69,7 +69,7 @@ bb0:
 // CHECK:  destroy_addr
 // CHECK:  dealloc_stack
 // CHECK:  return
-// CHECK-LABEL :} // end sil function '$s7dealloc20wrap_foo_ncp_another1aSiAA1P_pz_tF'
+// CHECK-LABEL: } // end sil function '$s7dealloc20wrap_foo_ncp_another1aSiAA1P_pz_tF'
 sil public_external [serialized] @$s7dealloc20wrap_foo_ncp_another1aSiAA1P_pz_tF : $@convention(thin) (@inout P) -> Int32 {
 bb0(%0 : $*P):
   debug_value_addr %0 : $*P, var, name "a", argno 1
@@ -146,13 +146,9 @@ bb3:
 // CHECK:   alloc_stack
 // CHECK:   init_existential_addr
 // CHECK:   copy_addr
-// CHECK:   destroy_addr
 // CHECK:   alloc_stack
 // CHECK:   init_existential_addr
 // CHECK:   copy_addr
-// CHECK:   destroy_addr
-// CHECK:   debug_value_addr
-// CHECK:   debug_value_addr
 // CHECK:   alloc_stack
 // CHECK:   copy_addr
 // CHECK:   destroy_addr
@@ -165,14 +161,6 @@ bb3:
 // CHECK:   open_existential_addr
 // CHECK:   witness_method
 // CHECK:   apply
-// CHECK:   struct_extract
-// CHECK:   struct_extract
-// CHECK:   integer_literal
-// CHECK:   builtin
-// CHECK:   tuple_extract
-// CHECK:   tuple_extract
-// CHECK:   cond_fail
-// CHECK:   struct
 // CHECK:   dealloc_stack
 // CHECK:   dealloc_stack
 // CHECK:   dealloc_stack

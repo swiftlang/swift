@@ -59,7 +59,7 @@ takesAny(consumeEscaping)
 
 var noEscapeParam: ((Int) -> Int) -> () = consumeNoEscape
 var escapingParam: (@escaping (Int) -> Int) -> () = consumeEscaping
-noEscapeParam = escapingParam // expected-error {{cannot assign value of type '(@escaping (Int) -> Int) -> ()' to type '((Int) -> Int) -> ()}}
+noEscapeParam = escapingParam // expected-error {{converting non-escaping value to '(Int) -> Int' may allow it to escape}}
 
 escapingParam = takesAny
 noEscapeParam = takesAny // expected-error {{converting non-escaping value to 'Any' may allow it to escape}}

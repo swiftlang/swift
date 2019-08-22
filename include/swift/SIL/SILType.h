@@ -252,17 +252,6 @@ public:
 
   /// True if the type, or the referenced type of an address type, is loadable.
   /// This is the opposite of isAddressOnly.
-  bool isLoadable(SILModule &M) const {
-    return !isAddressOnly(M);
-  }
-
-  /// Like isLoadable(SILModule), but specific to a function.
-  ///
-  /// This takes the resilience expansion of the function into account. If the
-  /// type is not loadable in general (because it's resilient), it still might
-  /// be loadable inside a resilient function in the module.
-  /// In other words: isLoadable(SILModule) is the conservative default, whereas
-  /// isLoadable(SILFunction) might give a more optimistic result.
   bool isLoadable(const SILFunction &F) const {
     return !isAddressOnly(F);
   }
@@ -270,18 +259,10 @@ public:
   /// True if either:
   /// 1) The type, or the referenced type of an address type, is loadable.
   /// 2) The SIL Module conventions uses lowered addresses
-  bool isLoadableOrOpaque(SILModule &M) const;
-
-  /// Like isLoadableOrOpaque(SILModule), but takes the resilience expansion of
-  /// \p F into account (see isLoadable(SILFunction)).
   bool isLoadableOrOpaque(const SILFunction &F) const;
 
   /// True if the type, or the referenced type of an address type, is
   /// address-only. This is the opposite of isLoadable.
-  bool isAddressOnly(SILModule &M) const;
-
-  /// Like isAddressOnly(SILModule), but takes the resilience expansion of
-  /// \p F into account (see isLoadable(SILFunction)).
   bool isAddressOnly(const SILFunction &F) const;
 
   /// True if the type, or the referenced type of an address type, is trivial,
@@ -289,9 +270,7 @@ public:
   bool isTrivial(const SILFunction &F) const;
 
   /// True if the type, or the referenced type of an address type, is known to
-  /// be a scalar reference-counted type. If this is false, then some part of
-  /// the type may be opaque. It may become reference counted later after
-  /// specialization.
+  /// be a scalar reference-counted type.
   bool isReferenceCounted(SILModule &M) const;
 
   /// Returns true if the referenced type is a function type that never
@@ -465,10 +444,10 @@ public:
   ///
   /// If the replacement types are generic, you must push a generic context
   /// first.
-  SILType subst(SILModule &silModule,
-                TypeSubstitutionFn subs,
+  SILType subst(SILModule &silModule, TypeSubstitutionFn subs,
                 LookupConformanceFn conformances,
-                CanGenericSignature genericSig=CanGenericSignature()) const;
+                CanGenericSignature genericSig = CanGenericSignature(),
+                bool shouldSubstituteOpaqueArchetypes = false) const;
 
   SILType subst(SILModule &silModule, SubstitutionMap subs) const;
 
@@ -559,7 +538,11 @@ public:
   bool operator!=(SILType rhs) const {
     return value.getOpaqueValue() != rhs.value.getOpaqueValue();
   }
-  
+
+  /// Return the mangled name of this type, ignoring its prefix. Meant for
+  /// diagnostic purposes.
+  std::string getMangledName() const;
+
   std::string getAsString() const;
   void dump() const;
   void print(raw_ostream &OS) const;

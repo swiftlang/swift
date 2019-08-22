@@ -32,7 +32,7 @@ internal protocol _DictionaryBuffer {
 
 extension Dictionary {
   @usableFromInline
-  @_fixed_layout
+  @frozen
   internal struct _Variant {
     @usableFromInline
     internal var object: _BridgeStorage<__RawDictionaryStorage>

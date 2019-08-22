@@ -132,8 +132,7 @@ func rdar17965209_test() {
 func limitXY(_ xy:Int, toGamut gamut: [Int]) {}
 let someInt = 0
 let intArray = [someInt]
-limitXY(someInt, toGamut: intArray) {}  // expected-error {{extra argument 'toGamut' in call}}
-
+limitXY(someInt, toGamut: intArray) {}  // expected-error{{extra trailing closure passed in call}}
 
 // <rdar://problem/23036383> QoI: Invalid trailing closures in stmt-conditions produce lowsy diagnostics
 func retBool(x: () -> Int) -> Bool {}

@@ -347,7 +347,7 @@ hoistSpecialInstruction(std::unique_ptr<LoopNestSummary> &LoopSummary,
           llvm_unreachable("LICM: Could not perform must-sink instruction");
         }
       }
-      LLVM_DEBUG(llvm::errs() << " Successfully hosited and sank pair\n");
+      LLVM_DEBUG(llvm::errs() << " Successfully hoisted and sank pair\n");
     } else {
       LLVM_DEBUG(llvm::dbgs() << "Hoisted RefElementAddr "
                               << *static_cast<RefElementAddrInst *>(Inst));
@@ -764,6 +764,11 @@ public:
 
   void run() override {
     SILFunction *F = getFunction();
+
+    // If our function has ownership, skip it.
+    if (F->hasOwnership())
+      return;
+
     SILLoopAnalysis *LA = PM->getAnalysis<SILLoopAnalysis>();
     SILLoopInfo *LoopInfo = LA->get(F);
 

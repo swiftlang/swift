@@ -227,8 +227,8 @@ void ClangDiagnosticConsumer::HandleDiagnostic(
       diagKind = diag::note_from_clang;
       break;
     case clang::DiagnosticsEngine::Remark:
-      // FIXME: We don't handle remarks yet.
-      return;
+      diagKind = diag::remark_from_clang;
+      break;
     case clang::DiagnosticsEngine::Warning:
       diagKind = diag::warning_from_clang;
       break;

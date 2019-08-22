@@ -220,6 +220,7 @@ clang::CanQualType GenClangType::visitStructType(CanStructType type) {
   CHECK_NAMED_TYPE(swiftDecl->getASTContext().getSwiftName(
                      KnownFoundationEntity::NSZone),
                    ctx.VoidPtrTy);
+  CHECK_NAMED_TYPE("WindowsBool", ctx.IntTy);
   CHECK_NAMED_TYPE("ObjCBool", ctx.ObjCBuiltinBoolTy);
   CHECK_NAMED_TYPE("Selector", getClangSelectorType(ctx));
   CHECK_NAMED_TYPE("UnsafeRawPointer", ctx.VoidPtrTy);

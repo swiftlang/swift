@@ -72,11 +72,12 @@ void PersistentParserState::delayDecl(DelayedDeclKind Kind,
       ScopeInfo.saveCurrentScope()));
 }
 
-void PersistentParserState::delayDeclList(IterableDeclContext* D,
+void PersistentParserState::delayDeclList(IterableDeclContext *D,
                                           unsigned Flags,
                                           DeclContext *ParentContext,
                                           SourceRange BodyRange,
                                           SourceLoc PreviousLoc) {
+  assert(D->hasUnparsedMembers());
   DelayedDeclListStates[D] = llvm::make_unique<DelayedDeclListState>(Flags,
     ParentContext, BodyRange, PreviousLoc, ScopeInfo.saveCurrentScope());
 }

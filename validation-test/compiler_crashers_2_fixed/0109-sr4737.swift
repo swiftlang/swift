@@ -12,7 +12,7 @@ extension UnicodeScalar {
   }
 }
 //===----------------------------------------------------------------------===//
-@_fixed_layout
+@frozen
 public struct _UIntBuffer<
   Storage: UnsignedInteger & FixedWidthInteger, 
   Element: UnsignedInteger & FixedWidthInteger
@@ -37,7 +37,7 @@ public struct _UIntBuffer<
 }
 
 extension _UIntBuffer : Sequence {
-  @_fixed_layout
+  @frozen
   public struct Iterator : IteratorProtocol, Sequence {
     @inline(__always)
     public init(_ x: _UIntBuffer) { _impl = x }
@@ -412,7 +412,7 @@ extension Unicode.DefaultScalarView : Collection {
 // This should go in the standard library; see
 // https://github.com/apple/swift/pull/9074 and
 // https://bugs.swift.org/browse/SR-4721
-@_fixed_layout
+@frozen
 public struct ReverseIndexingIterator<
   Elements : BidirectionalCollection
 > : IteratorProtocol, Sequence {

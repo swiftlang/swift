@@ -20,7 +20,7 @@ public func inlinableFunction() {
   fn()
 }
 
-@_fixed_layout
+@frozen
 public struct Rectangle : Shape {
   @inlinable
   public func draw() {

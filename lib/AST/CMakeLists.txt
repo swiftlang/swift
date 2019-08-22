@@ -4,9 +4,9 @@ if (SWIFT_FORCE_OPTIMIZED_TYPECHECKER)
 endif()
 
 if(SWIFT_BUILD_ONLY_SYNTAXPARSERLIB)
-  set(SWIFTAST_LLVM_COMPONENT_DEPENDS)
+  set(SWIFTAST_LLVM_LINK_COMPONENTS)
 else()
-  set(SWIFTAST_LLVM_COMPONENT_DEPENDS
+  set(SWIFTAST_LLVM_LINK_COMPONENTS
     bitreader bitwriter coroutines coverage irreader debuginfoDWARF
     profiledata instrumentation object objcarcopts mc mcparser
     bitreader bitwriter lto ipo option core support ${LLVM_TARGETS_TO_BUILD}
@@ -14,7 +14,6 @@ else()
 endif()
 
 add_swift_host_library(swiftAST STATIC
-  AccessScopeChecker.cpp
   AccessRequests.cpp
   ASTContext.cpp
   ASTDemangler.cpp
@@ -23,6 +22,10 @@ add_swift_host_library(swiftAST STATIC
   ASTNode.cpp
   ASTPrinter.cpp
   ASTScope.cpp
+  ASTScopeCreation.cpp
+  ASTScopeLookup.cpp
+  ASTScopePrinting.cpp
+  ASTScopeSourceRange.cpp
   ASTVerifier.cpp
   ASTWalker.cpp
   Attr.cpp
@@ -68,6 +71,7 @@ add_swift_host_library(swiftAST STATIC
   SwiftNameTranslation.cpp
   Type.cpp
   TypeCheckRequests.cpp
+  TypeDeclFinder.cpp
   TypeJoinMeet.cpp
   TypeRefinementContext.cpp
   TypeRepr.cpp
@@ -75,8 +79,8 @@ add_swift_host_library(swiftAST STATIC
   UnqualifiedLookup.cpp
   USRGeneration.cpp
 
-  LLVM_COMPONENT_DEPENDS
-    ${SWIFTAST_LLVM_COMPONENT_DEPENDS}
+  LLVM_LINK_COMPONENTS
+  ${SWIFTAST_LLVM_LINK_COMPONENTS}
 
   ${EXTRA_AST_FLAGS}
   )

@@ -5,9 +5,8 @@
 // UNSUPPORTED: OS=ios
 // UNSUPPORTED: OS=tvos
 // UNSUPPORTED: OS=watchos
-// UNSUPPORTED: OS=linux-androideabi
 
-// REQUIRES: OS=linux-gnu
+// REQUIRES-ANY: OS=linux-gnu, OS=linux-androideabi, OS=linux-android
 
 import Swift
 import StdlibUnittest

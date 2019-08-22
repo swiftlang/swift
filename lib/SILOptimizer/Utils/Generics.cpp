@@ -81,7 +81,7 @@ static std::pair<unsigned, unsigned> getTypeDepthAndWidth(Type t) {
     auto *NTD = BGT->getNominalOrBoundGenericNominal();
     if (NTD) {
       auto StoredProperties = NTD->getStoredProperties();
-      Width += std::distance(StoredProperties.begin(), StoredProperties.end());
+      Width += StoredProperties.size();
     }
     Depth++;
     unsigned MaxTypeDepth = 0;
@@ -2186,7 +2186,7 @@ SILValue ReabstractionThunkGenerator::createReabstractionThunkApply(
   auto Subs = Thunk->getForwardingSubstitutionMap();
   auto specConv = SpecializedFunc->getConventions();
   if (!SpecializedFunc->getLoweredFunctionType()->hasErrorResult()) {
-    return Builder.createApply(Loc, FRI, Subs, Arguments, false);
+    return Builder.createApply(Loc, FRI, Subs, Arguments);
   }
   // Create the logic for calling a throwing function.
   SILBasicBlock *NormalBB = Thunk->createBasicBlock();
@@ -2360,7 +2360,8 @@ void swift::trySpecializeApplyOfGeneric(
     OptRemark::Emitter &ORE) {
   assert(Apply.hasSubstitutions() && "Expected an apply with substitutions!");
   auto *F = Apply.getFunction();
-  auto *RefF = cast<FunctionRefInst>(Apply.getCallee())->getReferencedFunction();
+  auto *RefF =
+      cast<FunctionRefInst>(Apply.getCallee())->getReferencedFunctionOrNull();
 
   LLVM_DEBUG(llvm::dbgs() << "\n\n*** ApplyInst in function " << F->getName()
                           << ":\n";

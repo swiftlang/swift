@@ -96,9 +96,9 @@
 ///   `Stride` type's implementations. If a type conforming to `Strideable` is
 ///   its own `Stride` type, it must provide concrete implementations of the
 ///   two operators to avoid infinite recursion.
-public protocol Strideable : Comparable {
+public protocol Strideable: Comparable {
   /// A type that represents the distance between two values.
-  associatedtype Stride : SignedNumeric, Comparable
+  associatedtype Stride: SignedNumeric, Comparable
 
   /// Returns the distance from this value to the given value, expressed as a 
   /// stride.
@@ -121,7 +121,7 @@ public protocol Strideable : Comparable {
   /// the addition operator (`+`) instead of this method.
   ///
   ///     func addOne<T: Strideable>(to x: T) -> T
-  ///         where T.Stride : ExpressibleByIntegerLiteral
+  ///         where T.Stride: ExpressibleByIntegerLiteral
   ///     {
   ///         return x.advanced(by: 1)
   ///     }
@@ -171,7 +171,7 @@ extension Strideable {
   }
 }
 
-extension Strideable where Stride : FloatingPoint {
+extension Strideable where Stride: FloatingPoint {
   @inlinable // protocol-only
   public static func _step(
     after current: (index: Int?, value: Self),
@@ -186,7 +186,7 @@ extension Strideable where Stride : FloatingPoint {
   }
 }
 
-extension Strideable where Self : FloatingPoint, Self == Stride {
+extension Strideable where Self: FloatingPoint, Self == Stride {
   @inlinable // protocol-only
   public static func _step(
     after current: (index: Int?, value: Self),
@@ -203,8 +203,8 @@ extension Strideable where Self : FloatingPoint, Self == Stride {
 }
 
 /// An iterator for a `StrideTo` instance.
-@_fixed_layout
-public struct StrideToIterator<Element : Strideable> {
+@frozen
+public struct StrideToIterator<Element: Strideable> {
   @usableFromInline
   internal let _start: Element
 
@@ -246,8 +246,8 @@ extension StrideToIterator: IteratorProtocol {
 /// A sequence of values formed by striding over a half-open interval.
 ///
 /// Use the `stride(from:to:by:)` function to create `StrideTo` instances.
-@_fixed_layout
-public struct StrideTo<Element : Strideable> {
+@frozen
+public struct StrideTo<Element: Strideable> {
   @usableFromInline
   internal let _start: Element
 
@@ -308,8 +308,8 @@ extension StrideTo: CustomReflectable {
 
 // FIXME(conditional-conformances): This does not yet compile (SR-6474).
 #if false
-extension StrideTo : RandomAccessCollection
-where Element.Stride : BinaryInteger {
+extension StrideTo: RandomAccessCollection
+where Element.Stride: BinaryInteger {
   public typealias Index = Int
   public typealias SubSequence = Slice<StrideTo<Element>>
   public typealias Indices = Range<Int>
@@ -404,8 +404,8 @@ public func stride<T>(
 }
 
 /// An iterator for a `StrideThrough` instance.
-@_fixed_layout
-public struct StrideThroughIterator<Element : Strideable> {
+@frozen
+public struct StrideThroughIterator<Element: Strideable> {
   @usableFromInline
   internal let _start: Element
 
@@ -458,7 +458,7 @@ extension StrideThroughIterator: IteratorProtocol {
 ///
 /// Use the `stride(from:through:by:)` function to create `StrideThrough` 
 /// instances.
-@_fixed_layout
+@frozen
 public struct StrideThrough<Element: Strideable> {
   @usableFromInline
   internal let _start: Element
@@ -517,8 +517,8 @@ extension StrideThrough: CustomReflectable {
 
 // FIXME(conditional-conformances): This does not yet compile (SR-6474).
 #if false
-extension StrideThrough : RandomAccessCollection
-where Element.Stride : BinaryInteger {
+extension StrideThrough: RandomAccessCollection
+where Element.Stride: BinaryInteger {
   public typealias Index = ClosedRangeIndex<Int>
   public typealias SubSequence = Slice<StrideThrough<Element>>
 

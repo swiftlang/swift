@@ -182,6 +182,21 @@ class TestCharacterSet : TestCharacterSetSuper {
         expectTrue(actualClassForCoder == expectedImmutable || actualClassForCoder == expectedMutable)
     }
 
+    func test_hashing() {
+        let a = CharacterSet(charactersIn: "ABC")
+        let b = CharacterSet(charactersIn: "CBA")
+        let c = CharacterSet(charactersIn: "bad")
+        let d = CharacterSet(charactersIn: "abd")
+        let e = CharacterSet.capitalizedLetters
+        let f = CharacterSet.lowercaseLetters
+        checkHashableGroups(
+            [[a, b], [c, d], [e], [f]],
+            // FIXME: CharacterSet delegates equality and hashing to
+            // CFCharacterSet, which uses unseeded hashing, so it's not
+            // complete.
+            allowIncompleteHashing: true)
+    }
+
     func test_AnyHashableContainingCharacterSet() {
         let values: [CharacterSet] = [
             CharacterSet(charactersIn: "ABC"),
@@ -327,6 +342,7 @@ CharacterSetTests.test("testRanges") { TestCharacterSet().testRanges() }
 CharacterSetTests.test("testInsertAndRemove") { TestCharacterSet().testInsertAndRemove() }
 CharacterSetTests.test("testBasics") { TestCharacterSet().testBasics() }
 CharacterSetTests.test("test_classForCoder") { TestCharacterSet().test_classForCoder() }
+CharacterSetTests.test("test_hashing") { TestCharacterSet().test_hashing() }
 CharacterSetTests.test("test_AnyHashableContainingCharacterSet") { TestCharacterSet().test_AnyHashableContainingCharacterSet() }
 CharacterSetTests.test("test_AnyHashableCreatedFromNSCharacterSet") { TestCharacterSet().test_AnyHashableCreatedFromNSCharacterSet() }
 CharacterSetTests.test("test_superSet") { TestCharacterSet().test_superSet() }

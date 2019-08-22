@@ -198,6 +198,7 @@ public:
     case SILDynamicCastKind::UnconditionalCheckedCastValueInst:
       llvm_unreachable("unsupported");
     }
+    llvm_unreachable("covered switch");
   }
 
   CastConsumptionKind getConsumptionKind() const {
@@ -226,6 +227,7 @@ public:
     case SILDynamicCastKind::UnconditionalCheckedCastValueInst:
       llvm_unreachable("unsupported");
     }
+    llvm_unreachable("covered switch");
   }
 
   Optional<ProfileCounter> getSuccessBlockCount() {
@@ -242,6 +244,7 @@ public:
     case SILDynamicCastKind::UnconditionalCheckedCastValueInst:
       llvm_unreachable("unsupported");
     }
+    llvm_unreachable("covered switch");
   }
 
   const SILBasicBlock *getSuccessBlock() const {
@@ -262,6 +265,7 @@ public:
     case SILDynamicCastKind::UnconditionalCheckedCastValueInst:
       llvm_unreachable("unsupported");
     }
+    llvm_unreachable("covered switch");
   }
 
   Optional<ProfileCounter> getFailureBlockCount() {
@@ -278,6 +282,7 @@ public:
     case SILDynamicCastKind::UnconditionalCheckedCastValueInst:
       llvm_unreachable("unsupported");
     }
+    llvm_unreachable("covered switch");
   }
 
   const SILBasicBlock *getFailureBlock() const {
@@ -299,6 +304,7 @@ public:
     case SILDynamicCastKind::UnconditionalCheckedCastValueInst:
       llvm_unreachable("unsupported");
     }
+    llvm_unreachable("covered switch");
   }
 
   // Returns the success value.
@@ -320,6 +326,7 @@ public:
     case SILDynamicCastKind::UnconditionalCheckedCastValueInst:
       llvm_unreachable("unimplemented");
     }
+    llvm_unreachable("covered switch");
   }
 
   CanType getSourceType() const {
@@ -337,6 +344,7 @@ public:
     case SILDynamicCastKind::UnconditionalCheckedCastValueInst:
       llvm_unreachable("unsupported");
     }
+    llvm_unreachable("covered switch");
   }
 
   SILType getLoweredSourceType() const {
@@ -371,6 +379,7 @@ public:
     case SILDynamicCastKind::UnconditionalCheckedCastValueInst:
       llvm_unreachable("unimplemented");
     }
+    llvm_unreachable("covered switch");
   }
 
   SILType getLoweredTargetType() const {
@@ -391,6 +400,7 @@ public:
     case SILDynamicCastKind::UnconditionalCheckedCastValueInst:
       llvm_unreachable("unsupported");
     }
+    llvm_unreachable("covered switch");
   }
 
   bool isSourceTypeExact() const {
@@ -404,6 +414,7 @@ public:
     case SILDynamicCastKind::UnconditionalCheckedCastValueInst:
       llvm_unreachable("unsupported");
     }
+    llvm_unreachable("covered switch");
   }
 
   SILLocation getLocation() const { return inst->getLoc(); }
@@ -475,6 +486,7 @@ public:
     case SILDynamicCastKind::UnconditionalCheckedCastValueInst:
       llvm_unreachable("unsupported");
     }
+    llvm_unreachable("covered switch");
   }
 
   bool canUseScalarCheckedCastInstructions() const {

@@ -41,7 +41,7 @@ public class PublicClassStoredProperties {
 
 // MARK: Frozen types
 
-@_fixed_layout
+@frozen
 public struct FrozenPublicStructStoredProperties {
   public var publiclyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
   internal var internallyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
@@ -53,8 +53,34 @@ public struct FrozenPublicStructStoredProperties {
   @usableFromInline internal var computedUFIIsNot: BadStruct? { return nil } // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
 }
 
-@_fixed_layout
+@frozen
 @usableFromInline internal struct FrozenUFIStructStoredProperties {
+  @usableFromInline var publiclyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
+  internal var internallyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
+  private var privatelyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
+  private let letIsLikeVar: [BadStruct] = [] // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
+  
+  private var computedIsOkay: BadStruct? { return nil } // okay
+  private static var staticIsOkay: BadStruct? // okay
+  @usableFromInline internal var computedUFIIsNot: BadStruct? { return nil } // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
+}
+
+@_fixed_layout
+// expected-warning@-1 {{'@frozen' attribute is now used for fixed-layout structs}}
+public struct FixedLayoutPublicStructStoredProperties {
+  public var publiclyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
+  internal var internallyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
+  private var privatelyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
+  private let letIsLikeVar: [BadStruct] = [] // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
+  
+  private var computedIsOkay: BadStruct? { return nil } // okay
+  private static var staticIsOkay: BadStruct? // okay
+  @usableFromInline internal var computedUFIIsNot: BadStruct? { return nil } // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
+}
+
+@_fixed_layout
+// expected-warning@-1 {{'@frozen' attribute is now used for fixed-layout structs}}
+@usableFromInline internal struct FixedLayoutUFIStructStoredProperties {
   @usableFromInline var publiclyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
   internal var internallyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}
   private var privatelyBad: BadStruct? // expected-error {{cannot use struct 'BadStruct' here; 'BADLibrary' has been imported as implementation-only}}

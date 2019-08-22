@@ -28,6 +28,12 @@ printType(RenamedError.self)
 printType(RenamedError.Code.self)
 // CHECK: found type: RenamedError.Code{{$}}
 
+printType(Wrapper.MemberError.self)
+// CHECK: found type: Wrapper.MemberError{{$}}
+
+printType(Wrapper.MemberError.Code.self)
+// CHECK: found type: Wrapper.MemberError.Code{{$}}
+
 printType(Wrapper.MemberEnum.self)
 // CHECK: found type: Wrapper.MemberEnum{{$}}
 

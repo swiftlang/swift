@@ -76,7 +76,7 @@ public func run_ArrayOfGenericPOD(_ N: Int) {
 
 // --- ArrayInitFromSlice
 
-var globalArray = Array<UInt8>(repeating: 0, count: 4096)
+let globalArray = Array<UInt8>(repeating: 0, count: 4096)
 
 func createArrayOfPOD() {
   blackHole(globalArray)

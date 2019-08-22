@@ -126,7 +126,7 @@
 /// and discards a resulting array. Instead, use `reduce` for summing 
 /// operations, or `forEach` or a `for`-`in` loop for operations with side 
 /// effects.
-public protocol LazySequenceProtocol : Sequence {
+public protocol LazySequenceProtocol: Sequence {
   /// A `Sequence` that can contain the same elements as this one,
   /// possibly with a simpler type.
   ///
@@ -175,8 +175,8 @@ extension LazySequenceProtocol where Elements: LazySequenceProtocol {
 /// implemented lazily.
 ///
 /// - See also: `LazySequenceProtocol`
-@_fixed_layout // lazy-performance
-public struct LazySequence<Base : Sequence> {
+@frozen // lazy-performance
+public struct LazySequence<Base: Sequence> {
   @usableFromInline
   internal var _base: Base
 

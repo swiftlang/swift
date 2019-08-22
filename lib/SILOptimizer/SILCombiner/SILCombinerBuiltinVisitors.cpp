@@ -263,29 +263,27 @@ matchSizeOfMultiplication(SILValue I, MetatypeInst *RequiredType,
 
   SILValue Dist;
   MetatypeInst *StrideType;
-  if (match(
-          Res->getOperand(1),
-          m_ApplyInst(
-              BuiltinValueKind::TruncOrBitCast,
-              m_TupleExtractInst(
-                  m_ApplyInst(
-                      BuiltinValueKind::SMulOver, m_SILValue(Dist),
-                      m_ApplyInst(BuiltinValueKind::ZExtOrBitCast,
-                                  m_ApplyInst(BuiltinValueKind::Strideof,
-                                              m_MetatypeInst(StrideType)))),
-                  0))) ||
-      match(
-          Res->getOperand(1),
-          m_ApplyInst(
-              BuiltinValueKind::TruncOrBitCast,
-              m_TupleExtractInst(
-                  m_ApplyInst(
-                      BuiltinValueKind::SMulOver,
-                      m_ApplyInst(BuiltinValueKind::ZExtOrBitCast,
-                                  m_ApplyInst(BuiltinValueKind::Strideof,
-                                              m_MetatypeInst(StrideType))),
-                      m_SILValue(Dist)),
-                  0)))) {
+  if (match(Res->getOperand(1),
+            m_ApplyInst(
+                BuiltinValueKind::TruncOrBitCast,
+                m_TupleExtractOperation(
+                    m_ApplyInst(
+                        BuiltinValueKind::SMulOver, m_SILValue(Dist),
+                        m_ApplyInst(BuiltinValueKind::ZExtOrBitCast,
+                                    m_ApplyInst(BuiltinValueKind::Strideof,
+                                                m_MetatypeInst(StrideType)))),
+                    0))) ||
+      match(Res->getOperand(1),
+            m_ApplyInst(
+                BuiltinValueKind::TruncOrBitCast,
+                m_TupleExtractOperation(
+                    m_ApplyInst(
+                        BuiltinValueKind::SMulOver,
+                        m_ApplyInst(BuiltinValueKind::ZExtOrBitCast,
+                                    m_ApplyInst(BuiltinValueKind::Strideof,
+                                                m_MetatypeInst(StrideType))),
+                        m_SILValue(Dist)),
+                    0)))) {
     if (StrideType != RequiredType)
       return nullptr;
     TruncOrBitCast = cast<BuiltinInst>(Res->getOperand(1));
@@ -622,6 +620,15 @@ SILInstruction *SILCombiner::visitBuiltinInst(BuiltinInst *I) {
     }
     break;
   }
+  case BuiltinValueKind::CondFailMessage:
+    if (auto *SLI = dyn_cast<StringLiteralInst>(I->getOperand(1))) {
+      if (SLI->getEncoding() == StringLiteralInst::Encoding::UTF8) {
+        Builder.createCondFail(I->getLoc(), I->getOperand(0), SLI->getValue());
+        eraseInstFromFunction(*I);
+        return nullptr;
+      }
+    }
+    break;
   default:
     break;
   }

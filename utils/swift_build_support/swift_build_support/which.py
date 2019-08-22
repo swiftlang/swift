@@ -35,7 +35,8 @@ def which(cmd):
     been backported to Python 2.7, which we support.
     """
     out = shell.capture(['which', cmd],
-                        dry_run=False, echo=False, optional=True)
+                        dry_run=False, echo=False,
+                        optional=True, stderr=shell.DEVNULL)
     if out is None:
         return None
     return out.rstrip()

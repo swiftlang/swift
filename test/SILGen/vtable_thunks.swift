@@ -129,6 +129,16 @@ class F: D {
   override func i4(x: Int, y: Int) -> Int {}
 }
 
+protocol Proto {}
+
+class G {
+  func foo<T: Proto>(arg: T) {}
+}
+
+class H: G {
+  override func foo<T>(arg: T) {}
+}
+
 // This test is incorrect in semantic SIL today. But it will be fixed in
 // forthcoming commits.
 //
@@ -248,61 +258,65 @@ class Noot : Aap {
 // CHECK:         return [[OUTER]]
 
 // CHECK-LABEL: sil_vtable D {
-// CHECK:         #B.iuo!1: {{.*}} : hidden @$s13vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.iuo!1: {{.*}} : @$s13vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
 // CHECK:         #B.f!1: {{.*}} : @$s13vtable_thunks1D{{[A-Z0-9a-z_]*}}F
 // CHECK:         #B.f2!1: {{.*}} : @$s13vtable_thunks1D{{[A-Z0-9a-z_]*}}F
 // CHECK:         #B.f3!1: {{.*}} : @$s13vtable_thunks1D{{[A-Z0-9a-z_]*}}F
 // CHECK:         #B.f4!1: {{.*}} : @$s13vtable_thunks1D{{[A-Z0-9a-z_]*}}F
-// CHECK:         #B.g!1: {{.*}} : hidden @$s13vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
-// CHECK:         #B.g2!1: {{.*}} : hidden @$s13vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
-// CHECK:         #B.g3!1: {{.*}} : hidden @$s13vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.g!1: {{.*}} : @$s13vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.g2!1: {{.*}} : @$s13vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.g3!1: {{.*}} : @$s13vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
 // CHECK:         #B.g4!1: {{.*}} : @$s13vtable_thunks1D{{[A-Z0-9a-z_]*}}F
-// CHECK:         #B.h!1: {{.*}} : hidden @$s13vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
-// CHECK:         #B.h2!1: {{.*}} : hidden @$s13vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
-// CHECK:         #B.h3!1: {{.*}} : hidden @$s13vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.h!1: {{.*}} : @$s13vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.h2!1: {{.*}} : @$s13vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.h3!1: {{.*}} : @$s13vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
 // CHECK:         #B.h4!1: {{.*}} : @$s13vtable_thunks1D{{[A-Z0-9a-z_]*}}F
-// CHECK:         #B.i!1: {{.*}} : hidden @$s13vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
-// CHECK:         #B.i2!1: {{.*}} : hidden @$s13vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
-// CHECK:         #B.i3!1: {{.*}} : hidden @$s13vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.i!1: {{.*}} : @$s13vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.i2!1: {{.*}} : @$s13vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.i3!1: {{.*}} : @$s13vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
 // CHECK:         #B.i4!1: {{.*}} : @$s13vtable_thunks1D{{[A-Z0-9a-z_]*}}F
 
 // CHECK-LABEL: sil_vtable E {
-// CHECK:         #B.iuo!1: {{.*}} : hidden @$s13vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.iuo!1: {{.*}} : @$s13vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
 // CHECK:         #B.f!1: {{.*}} : @$s13vtable_thunks1D{{[A-Z0-9a-z_]*}}F
 // CHECK:         #B.f2!1: {{.*}} : @$s13vtable_thunks1D{{[A-Z0-9a-z_]*}}F
 // CHECK:         #B.f3!1: {{.*}} : @$s13vtable_thunks1D{{[A-Z0-9a-z_]*}}F
 // CHECK:         #B.f4!1: {{.*}} : @$s13vtable_thunks1D{{[A-Z0-9a-z_]*}}F
-// CHECK:         #B.g!1: {{.*}} : hidden @$s13vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
-// CHECK:         #B.g2!1: {{.*}} : hidden @$s13vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
-// CHECK:         #B.g3!1: {{.*}} : hidden @$s13vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.g!1: {{.*}} : @$s13vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.g2!1: {{.*}} : @$s13vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.g3!1: {{.*}} : @$s13vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
 // CHECK:         #B.g4!1: {{.*}} : @$s13vtable_thunks1D{{[A-Z0-9a-z_]*}}F
-// CHECK:         #B.h!1: {{.*}} : hidden @$s13vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
-// CHECK:         #B.h2!1: {{.*}} : hidden @$s13vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
-// CHECK:         #B.h3!1: {{.*}} : hidden @$s13vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.h!1: {{.*}} : @$s13vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.h2!1: {{.*}} : @$s13vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.h3!1: {{.*}} : @$s13vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
 // CHECK:         #B.h4!1: {{.*}} : @$s13vtable_thunks1D{{[A-Z0-9a-z_]*}}F
-// CHECK:         #B.i!1: {{.*}} : hidden @$s13vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
-// CHECK:         #B.i2!1: {{.*}} : hidden @$s13vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
-// CHECK:         #B.i3!1: {{.*}} : hidden @$s13vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.i!1: {{.*}} : @$s13vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.i2!1: {{.*}} : @$s13vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.i3!1: {{.*}} : @$s13vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
 // CHECK:         #B.i4!1: {{.*}} : @$s13vtable_thunks1D{{[A-Z0-9a-z_]*}}F
 
 // CHECK-LABEL: sil_vtable F {
-// CHECK:         #B.iuo!1: {{.*}} : hidden @$s13vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.iuo!1: {{.*}} : @$s13vtable_thunks1D{{[A-Z0-9a-z_]*}}FTV
 // CHECK:         #B.f!1: {{.*}} : @$s13vtable_thunks1F{{[A-Z0-9a-z_]*}}F
 // CHECK:         #B.f2!1: {{.*}} : @$s13vtable_thunks1F{{[A-Z0-9a-z_]*}}F
 // CHECK:         #B.f3!1: {{.*}} : @$s13vtable_thunks1F{{[A-Z0-9a-z_]*}}F
 // CHECK:         #B.f4!1: {{.*}} : @$s13vtable_thunks1F{{[A-Z0-9a-z_]*}}F
-// CHECK:         #B.g!1: {{.*}} : hidden @$s13vtable_thunks1F{{[A-Z0-9a-z_]*}}FTV
-// CHECK:         #B.g2!1: {{.*}} : hidden @$s13vtable_thunks1F{{[A-Z0-9a-z_]*}}FTV
-// CHECK:         #B.g3!1: {{.*}} : hidden @$s13vtable_thunks1F{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.g!1: {{.*}} : @$s13vtable_thunks1F{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.g2!1: {{.*}} : @$s13vtable_thunks1F{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.g3!1: {{.*}} : @$s13vtable_thunks1F{{[A-Z0-9a-z_]*}}FTV
 // CHECK:         #B.g4!1: {{.*}} : @$s13vtable_thunks1F{{[A-Z0-9a-z_]*}}F
-// CHECK:         #B.h!1: {{.*}} : hidden @$s13vtable_thunks1F{{[A-Z0-9a-z_]*}}FTV
-// CHECK:         #B.h2!1: {{.*}} : hidden @$s13vtable_thunks1F{{[A-Z0-9a-z_]*}}FTV
-// CHECK:         #B.h3!1: {{.*}} : hidden @$s13vtable_thunks1F{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.h!1: {{.*}} : @$s13vtable_thunks1F{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.h2!1: {{.*}} : @$s13vtable_thunks1F{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.h3!1: {{.*}} : @$s13vtable_thunks1F{{[A-Z0-9a-z_]*}}FTV
 // CHECK:         #B.h4!1: {{.*}} : @$s13vtable_thunks1F{{[A-Z0-9a-z_]*}}F
-// CHECK:         #B.i!1: {{.*}} : hidden @$s13vtable_thunks1F{{[A-Z0-9a-z_]*}}FTV
-// CHECK:         #B.i2!1: {{.*}} : hidden @$s13vtable_thunks1F{{[A-Z0-9a-z_]*}}FTV
-// CHECK:         #B.i3!1: {{.*}} : hidden @$s13vtable_thunks1F{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.i!1: {{.*}} : @$s13vtable_thunks1F{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.i2!1: {{.*}} : @$s13vtable_thunks1F{{[A-Z0-9a-z_]*}}FTV
+// CHECK:         #B.i3!1: {{.*}} : @$s13vtable_thunks1F{{[A-Z0-9a-z_]*}}FTV
 // CHECK:         #B.i4!1: {{.*}} : @$s13vtable_thunks1F{{[A-Z0-9a-z_]*}}F
+
+// CHECK-LABEL: sil_vtable H {
+// CHECK:  #G.foo!1: <T where T : Proto> (G) -> (T) -> () : @$s13vtable_thunks1H{{[A-Z0-9a-z_]*}}FTV [override]
+// CHECK:  #H.foo!1: <T> (H) -> (T) -> () : @$s13vtable_thunks1H{{[A-Z0-9a-z_]*}}tlF
 
 // CHECK-LABEL: sil_vtable NoThrowVariance {
 // CHECK:         #ThrowVariance.mightThrow!1: {{.*}} : @$s13vtable_thunks{{[A-Z0-9a-z_]*}}F

@@ -52,6 +52,7 @@
 namespace swift {
 
 class SerializedModuleLoader;
+class MemoryBufferSerializedModuleLoader;
 class SILModule;
 
 /// The abstract configuration of the compiler, including:
@@ -290,6 +291,12 @@ public:
 
   void setCodeCompletionFactory(CodeCompletionCallbacksFactory *Factory) {
     CodeCompletionFactory = Factory;
+    disableASTScopeLookup();
+  }
+  
+  /// Called from lldb, see rdar://53971116
+  void disableASTScopeLookup() {
+    LangOpts.EnableASTScopeLookup = false;
   }
 
   CodeCompletionCallbacksFactory *getCodeCompletionFactory() const {
@@ -367,11 +374,14 @@ class CompilerInstance {
   std::unique_ptr<ASTContext> Context;
   std::unique_ptr<SILModule> TheSILModule;
 
+  std::unique_ptr<PersistentParserState> PersistentState;
+
   /// Null if no tracker.
   std::unique_ptr<DependencyTracker> DepTracker;
 
   ModuleDecl *MainModule = nullptr;
   SerializedModuleLoader *SML = nullptr;
+  MemoryBufferSerializedModuleLoader *MemoryBufferLoader = nullptr;
 
   /// Contains buffer IDs for input source code files.
   std::vector<unsigned> InputSourceCodeBufferIDs;
@@ -465,7 +475,10 @@ public:
 
   ModuleDecl *getMainModule();
 
-  SerializedModuleLoader *getSerializedModuleLoader() const { return SML; }
+  MemoryBufferSerializedModuleLoader *
+  getMemoryBufferSerializedModuleLoader() const {
+    return MemoryBufferLoader;
+  }
 
   ArrayRef<unsigned> getInputBufferIDs() const {
     return InputSourceCodeBufferIDs;
@@ -530,6 +543,7 @@ private:
   }
 
   bool setUpInputs();
+  bool setUpASTContextIfNeeded();
   Optional<unsigned> setUpCodeCompletionBuffer();
 
   /// Set up all state in the CompilerInstance to process the given input file.
@@ -622,13 +636,11 @@ private:
 
   void parseLibraryFile(unsigned BufferID,
                         const ImplicitImports &implicitImports,
-                        PersistentParserState &PersistentState,
                         DelayedParsingCallbacks *DelayedCB);
 
   /// Return true if had load error
   bool
   parsePartialModulesAndLibraryFiles(const ImplicitImports &implicitImports,
-                                     PersistentParserState &PersistentState,
                                      DelayedParsingCallbacks *DelayedCB);
 
   OptionSet<TypeCheckingFlags> computeTypeCheckingOptions();
@@ -636,7 +648,6 @@ private:
   void forEachFileToTypeCheck(llvm::function_ref<void(SourceFile &)> fn);
 
   void parseAndTypeCheckMainFileUpTo(SourceFile::ASTStage_t LimitStage,
-                                     PersistentParserState &PersistentState,
                                      DelayedParsingCallbacks *DelayedParseCB,
                                      OptionSet<TypeCheckingFlags> TypeCheckOptions);
 

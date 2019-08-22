@@ -7,7 +7,7 @@ import Swift
 import SwiftShims
 
 // CHECK-LABEL: @readIdentifiedArg
-// CHECK: [read] Argument index: 0
+// CHECK: [read] Argument %0 = argument of bb0 : $*Int
 sil @readIdentifiedArg : $@convention(thin) (@in Int) -> Int {
 bb0(%0 : $*Int):
   %5 = begin_access [read] [dynamic] %0 : $*Int
@@ -17,7 +17,7 @@ bb0(%0 : $*Int):
 }
 
 // CHECK-LABEL: @writeIdentifiedArg
-// CHECK: [modify] Argument index: 0
+// CHECK: [modify] Argument %0 = argument of bb0 : $*Int
 sil @writeIdentifiedArg : $@convention(thin) (Int) -> (@out Int) {
 bb0(%0 : $*Int, %1 : $Int):
   %3 = begin_access [modify] [dynamic] %0 : $*Int
@@ -28,7 +28,7 @@ bb0(%0 : $*Int, %1 : $Int):
 }
 
 // CHECK-LABEL: @readWriteIdentifiedArg
-// CHECK: [modify] Argument index: 0
+// CHECK: [modify] Argument %0 = argument of bb0 : $*Int
 sil @readWriteIdentifiedArg : $@convention(thin) (Int) -> (@out Int, Int) {
 bb0(%0 : $*Int, %1 : $Int):
   %2 = function_ref @writeIdentifiedArg : $@convention(thin) (Int) -> (@out Int)
@@ -67,7 +67,7 @@ bb0(%0 : $Int):
 }
 
 // CHECK-LABEL: @readIdentifiedBoxArg
-// CHECK: [read] Argument index: 0
+// CHECK: [read] Argument %0 = argument of bb0 : ${ var Int }
 sil @readIdentifiedBoxArg : $@convention(thin) (@guaranteed { var Int }) -> Int {
 bb0(%0 : ${ var Int }):
   %1 = project_box %0 : ${ var Int }, 0
@@ -78,7 +78,7 @@ bb0(%0 : ${ var Int }):
 }
 
 // CHECK-LABEL: @writeIdentifiedBoxArg
-// CHECK: [modify] Argument index: 0
+// CHECK: [modify] Argument %0 = argument of bb0 : ${ var Int }
 sil @writeIdentifiedBoxArg : $@convention(thin) (@guaranteed { var Int }, Int) -> () {
 bb0(%0 : ${ var Int }, %1 : $Int):
   %2 = project_box %0 : ${ var Int }, 0
@@ -90,7 +90,7 @@ bb0(%0 : ${ var Int }, %1 : $Int):
 }
 
 // CHECK-LABEL: @readWriteIdentifiedBoxArg
-// CHECK: [modify] Argument index: 0
+// CHECK: [modify] Argument %0 = argument of bb0 : ${ var Int }
 sil @readWriteIdentifiedBoxArg : $@convention(thin) (@guaranteed { var Int }, Int) -> Int {
 bb0(%0 : ${ var Int }, %1 : $Int):
   %2 = function_ref @writeIdentifiedBoxArg : $@convention(thin) (@guaranteed { var Int }, Int) -> ()
@@ -431,7 +431,7 @@ enum TreeB<T> {
 }
 
 // CHECK-LABEL: @readIndirectEnum
-// CHECK: [read] Argument index: 1
+// CHECK: [read] Argument %1 = argument of bb0 : $*TreeB<T>
 sil @readIndirectEnum : $@convention(thin) <T> (@in TreeB<T>) -> (@out TreeB<T>) {
 bb0(%0 : $*TreeB<T>, %1 : $*TreeB<T>):
   %enumAddr = unchecked_take_enum_data_addr %1 : $*TreeB<T>, #TreeB.Branch!enumelt.1
@@ -448,7 +448,7 @@ bb0(%0 : $*TreeB<T>, %1 : $*TreeB<T>):
 struct SomeError: Error {}
 
 // CHECK-LABEL: @writeIdentifiedArgReadUnidentifiedVarious
-// CHECK: [modify] Argument index: 0
+// CHECK: [modify] Argument %0 = argument of bb0 : $*Int
 // CHECK: unidentified accesses: read
 sil @writeIdentifiedArgReadUnidentifiedVarious : $@convention(thin) (Int, Error) -> (@out Int) {
 bb0(%out : $*Int, %i : $Int, %e : $Error):
@@ -528,7 +528,7 @@ bb0(%0 : $Int):
 }
 
 // CHECK: @testDirectlyAppliedClosure
-// CHECK:   [read] Argument index: 1
+// CHECK:   [read] Argument %1 = argument of bb0 : $*Int
 sil private @testDirectlyAppliedClosure : $@convention(thin) (@inout Int, @inout_aliasable Int) -> () {
 bb0(%0 : $*Int, %1 : $*Int):
   %access = begin_access [read] [dynamic] %1 : $*Int

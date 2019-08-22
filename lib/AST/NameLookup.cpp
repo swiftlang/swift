@@ -16,11 +16,11 @@
 
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/ASTScope.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/DebuggerClient.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookupRequests.h"
@@ -63,14 +63,25 @@ ValueDecl *LookupResultEntry::getBaseDecl() const {
 
 void DebuggerClient::anchor() {}
 
-void AccessFilteringDeclConsumer::foundDecl(ValueDecl *D,
-                                            DeclVisibilityKind reason) {
+void AccessFilteringDeclConsumer::foundDecl(
+    ValueDecl *D, DeclVisibilityKind reason,
+    DynamicLookupInfo dynamicLookupInfo) {
   if (D->isInvalid())
     return;
   if (!D->isAccessibleFrom(DC))
     return;
 
-  ChainedConsumer.foundDecl(D, reason);
+  ChainedConsumer.foundDecl(D, reason, dynamicLookupInfo);
+}
+
+void LookupResultEntry::print(llvm::raw_ostream& out) const {
+  getValueDecl()->print(out);
+  if (auto dc = getBaseDecl()) {
+    out << "\nbase: ";
+    dc->print(out);
+    out << "\n";
+  } else
+    out << "\n(no-base)\n";
 }
 
 
@@ -875,11 +886,6 @@ void MemberLookupTable::updateLookupTable(NominalTypeDecl *nominal) {
 }
 
 void NominalTypeDecl::addedMember(Decl *member) {
-  // Remember if we added a destructor.
-  if (auto *CD = dyn_cast<ClassDecl>(this))
-    if (isa<DestructorDecl>(member))
-      CD->setHasDestructor();
-
   // If we have a lookup table, add the new member to it.
   if (LookupTable.getPointer()) {
     LookupTable.getPointer()->addMember(member);
@@ -1019,6 +1025,7 @@ populateLookupTableEntryFromExtensions(ASTContext &ctx,
   if (!ignoreNewExtensions) {
     for (auto e : nominal->getExtensions()) {
       if (e->wasDeserialized() || e->hasClangNode()) {
+        assert(!e->hasUnparsedMembers());
         if (populateLookupTableEntryFromLazyIDCLoader(ctx, table,
                                                       name, e)) {
           return true;
@@ -1048,6 +1055,8 @@ void NominalTypeDecl::prepareLookupTable(bool ignoreNewExtensions) {
   }
 
   if (hasLazyMembers()) {
+    assert(!hasUnparsedMembers());
+
     // Lazy members: if the table needs population, populate the table _only
     // from those members already in the IDC member list_ such as implicits or
     // globals-as-members, then update table entries from the extensions that
@@ -1180,6 +1189,14 @@ TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
         for (auto E : getExtensions())
           (void)E->getMembers();
       }
+    } else {
+      // We still have to parse any unparsed extensions.
+      if (!ignoreNewExtensions) {
+        for (auto *e : getExtensions()) {
+          if (e->hasUnparsedMembers())
+            e->loadAllMembers();
+        }
+      }
     }
 
     // Next, in all cases, prepare the lookup table for use, possibly
@@ -1257,21 +1274,19 @@ void ClassDecl::recordObjCMethod(AbstractFunctionDecl *method,
   bool isInstanceMethod = method->isObjCInstanceMethod();
   auto &vec = (*ObjCMethodLookup)[{selector, isInstanceMethod}].Methods;
 
-  // In a non-empty vector, we could have duplicates or conflicts.
-  if (!vec.empty()) {
-    // Check whether we have a duplicate. This only checks more than one
-    // element in ill-formed code, so the linear search is acceptable.
-    if (std::find(vec.begin(), vec.end(), method) != vec.end())
-      return;
+  // Check whether we have a duplicate. This only checks more than one
+  // element in ill-formed code, so the linear search is acceptable.
+  if (std::find(vec.begin(), vec.end(), method) != vec.end())
+    return;
 
+  if (auto *sf = method->getParentSourceFile()) {
     if (vec.size() == 1) {
       // We have a conflict.
-      getASTContext().recordObjCMethodConflict(this, selector,
-                                               isInstanceMethod);
+      sf->ObjCMethodConflicts.push_back(std::make_tuple(this, selector,
+                                                        isInstanceMethod));
+    } if (vec.empty()) {
+      sf->ObjCMethodList.push_back(method);
     }
-  } else {
-    // Record the first method that has this selector.
-    getASTContext().recordObjCMethod(method);
   }
 
   vec.push_back(method);
@@ -1422,7 +1437,6 @@ static void extractDirectlyReferencedNominalTypes(
 bool DeclContext::lookupQualified(Type type,
                                   DeclName member,
                                   NLOptions options,
-                                  LazyResolver *typeResolver,
                                   SmallVectorImpl<ValueDecl *> &decls) const {
   using namespace namelookup;
   assert(decls.empty() && "additive lookup not supported");
@@ -1448,6 +1462,10 @@ bool DeclContext::lookupQualified(ArrayRef<NominalTypeDecl *> typeDecls,
                                   SmallVectorImpl<ValueDecl *> &decls) const {
   using namespace namelookup;
   assert(decls.empty() && "additive lookup not supported");
+
+  auto *stats = getASTContext().Stats;
+  if (stats)
+    stats->getFrontendCounters().NumLookupQualifiedInNominal++;
 
   // Configure lookup and dig out the tracker.
   ReferencedNameTracker *tracker = nullptr;
@@ -1522,7 +1540,7 @@ bool DeclContext::lookupQualified(ArrayRef<NominalTypeDecl *> typeDecls,
       // object initializers.
       bool visitSuperclass = true;
       if (member.getBaseName() == DeclBaseName::createConstructor()) {
-        if (classDecl->inheritsSuperclassInitializers(typeResolver))
+        if (classDecl->inheritsSuperclassInitializers())
           onlyCompleteObjectInits = true;
         else
           visitSuperclass = false;
@@ -1585,12 +1603,15 @@ bool DeclContext::lookupQualified(ModuleDecl *module, DeclName member,
                                   SmallVectorImpl<ValueDecl *> &decls) const {
   using namespace namelookup;
 
+  auto *stats = getASTContext().Stats;
+  if (stats)
+    stats->getFrontendCounters().NumLookupQualifiedInModule++;
+
   // Configure lookup and dig out the tracker.
   ReferencedNameTracker *tracker = nullptr;
   bool isLookupCascading;
   configureLookup(this, options, tracker, isLookupCascading);
 
-  ASTContext &ctx = getASTContext();
   auto topLevelScope = getModuleScopeContext();
   if (module == topLevelScope->getParentModule()) {
     if (tracker) {
@@ -1598,7 +1619,7 @@ bool DeclContext::lookupQualified(ModuleDecl *module, DeclName member,
     }
     lookupInModule(module, /*accessPath=*/{}, member, decls,
                    NLKind::QualifiedLookup, ResolutionKind::Overloadable,
-                   ctx.getLazyResolver(), topLevelScope);
+                   topLevelScope);
   } else {
     // Note: This is a lookup into another module. Unless we're compiling
     // multiple modules at once, or if the other module re-exports this one,
@@ -1612,7 +1633,7 @@ bool DeclContext::lookupQualified(ModuleDecl *module, DeclName member,
         return true;
       lookupInModule(import.second, import.first, member, decls,
                      NLKind::QualifiedLookup, ResolutionKind::Overloadable,
-                     ctx.getLazyResolver(), topLevelScope);
+                     topLevelScope);
       // If we're able to do an unscoped lookup, we see everything. No need
       // to keep going.
       return !import.first.empty();
@@ -1655,6 +1676,10 @@ bool DeclContext::lookupAnyObject(DeclName member, NLOptions options,
   // Type-only lookup won't find anything on AnyObject.
   if (options & NL_OnlyTypes)
     return false;
+
+  auto *stats = getASTContext().Stats;
+  if (stats)
+    stats->getFrontendCounters().NumLookupQualifiedInAnyObject++;
 
   // Collect all of the visible declarations.
   SmallVector<ValueDecl *, 4> allDecls;
@@ -1725,12 +1750,17 @@ resolveTypeDeclsToNominal(Evaluator &evaluator,
                           SmallVectorImpl<ModuleDecl *> &modulesFound,
                           bool &anyObject,
                           llvm::SmallPtrSetImpl<TypeAliasDecl *> &typealiases) {
+  SmallPtrSet<NominalTypeDecl *, 4> knownNominalDecls;
   TinyPtrVector<NominalTypeDecl *> nominalDecls;
+  auto addNominalDecl = [&](NominalTypeDecl *nominal) {
+    if (knownNominalDecls.insert(nominal).second)
+      nominalDecls.push_back(nominal);
+  };
 
   for (auto typeDecl : typeDecls) {
     // Nominal type declarations get copied directly.
     if (auto nominalDecl = dyn_cast<NominalTypeDecl>(typeDecl)) {
-      nominalDecls.push_back(nominalDecl);
+      addNominalDecl(nominalDecl);
       continue;
     }
 
@@ -1747,9 +1777,9 @@ resolveTypeDeclsToNominal(Evaluator &evaluator,
       auto underlyingNominalReferences
         = resolveTypeDeclsToNominal(evaluator, ctx, underlyingTypeReferences,
                                     modulesFound, anyObject, typealiases);
-      nominalDecls.insert(nominalDecls.end(),
-                          underlyingNominalReferences.begin(),
-                          underlyingNominalReferences.end());
+      std::for_each(underlyingNominalReferences.begin(),
+                    underlyingNominalReferences.end(),
+                    addNominalDecl);
 
       // Recognize Swift.AnyObject directly.
       if (typealias->getName().is("AnyObject")) {
@@ -1801,11 +1831,11 @@ resolveTypeDeclsToNominal(Evaluator &evaluator,
 
 /// Perform unqualified name lookup for types at the given location.
 static DirectlyReferencedTypeDecls
-directReferencesForUnqualifiedTypeLookup(ASTContext &ctx, DeclName name,
+directReferencesForUnqualifiedTypeLookup(DeclName name,
                                          SourceLoc loc, DeclContext *dc) {
   DirectlyReferencedTypeDecls results;
   UnqualifiedLookup::Options options = UnqualifiedLookup::Flags::TypeLookup;
-  UnqualifiedLookup lookup(name, dc, ctx.getLazyResolver(), loc, options);
+  UnqualifiedLookup lookup(name, dc, loc, options);
   for (const auto &result : lookup.Results) {
     if (auto typeDecl = dyn_cast<TypeDecl>(result.getValueDecl()))
       results.push_back(typeDecl);
@@ -1877,8 +1907,7 @@ directReferencesForIdentTypeRepr(Evaluator &evaluator,
     // For the first component, perform unqualified name lookup.
     if (current.empty()) {
       current =
-        directReferencesForUnqualifiedTypeLookup(ctx,
-                                                 component->getIdentifier(),
+        directReferencesForUnqualifiedTypeLookup(component->getIdentifier(),
                                                  component->getIdLoc(),
                                                  dc);
 
@@ -2052,6 +2081,25 @@ SuperclassDeclRequest::evaluate(Evaluator &evaluator,
                                 NominalTypeDecl *subject) const {
   auto &Ctx = subject->getASTContext();
 
+  // Protocols may get their superclass bound from a `where Self : Superclass`
+  // clause.
+  if (auto *proto = dyn_cast<ProtocolDecl>(subject)) {
+    // If the protocol came from a serialized module, compute the superclass via
+    // its generic signature.
+    if (proto->wasDeserialized()) {
+      auto superTy = proto->getGenericSignature()
+          ->getSuperclassBound(proto->getSelfInterfaceType());
+      if (superTy)
+        return superTy->getClassOrBoundGenericClass();
+    }
+
+    // Otherwise check the where clause.
+    auto selfBounds = getSelfBoundsFromWhereClause(proto);
+    for (auto inheritedNominal : selfBounds.decls)
+      if (auto classDecl = dyn_cast<ClassDecl>(inheritedNominal))
+        return classDecl;
+  }
+
   for (unsigned i : indices(subject->getInherited())) {
     // Find the inherited declarations referenced at this position.
     auto inheritedTypes = evaluateOrDefault(evaluator,
@@ -2071,15 +2119,6 @@ SuperclassDeclRequest::evaluate(Evaluator &evaluator,
     }
   }
 
-  // Protocols also support '... where Self : Superclass'.
-  auto *proto = dyn_cast<ProtocolDecl>(subject);
-  if (proto == nullptr)
-    return nullptr;
-
-  auto selfBounds = getSelfBoundsFromWhereClause(proto);
-  for (auto inheritedNominal : selfBounds.decls)
-    if (auto classDecl = dyn_cast<ClassDecl>(inheritedNominal))
-      return classDecl;
 
   return nullptr;
 }

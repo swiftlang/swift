@@ -113,9 +113,9 @@ visitPointerToAddressInst(PointerToAddressInst *PTAI) {
           m_IndexRawPointerInst(IndexRawPtr))) {
     SILValue Ptr = IndexRawPtr->getOperand(0);
     SILValue TruncOrBitCast = IndexRawPtr->getOperand(1);
-    if (match(TruncOrBitCast,
-              m_ApplyInst(BuiltinValueKind::TruncOrBitCast,
-                          m_TupleExtractInst(m_BuiltinInst(StrideMul), 0)))) {
+    if (match(TruncOrBitCast, m_ApplyInst(BuiltinValueKind::TruncOrBitCast,
+                                          m_TupleExtractOperation(
+                                              m_BuiltinInst(StrideMul), 0)))) {
       if (match(StrideMul,
                 m_ApplyInst(
                     BuiltinValueKind::SMulOver, m_SILValue(Distance),
@@ -166,9 +166,9 @@ visitPointerToAddressInst(PointerToAddressInst *PTAI) {
   //
   BuiltinInst *Bytes;
   if (match(PTAI->getOperand(),
-            m_IndexRawPointerInst(m_ValueBase(),
-                                  m_TupleExtractInst(m_BuiltinInst(Bytes),
-                                                     0)))) {
+            m_IndexRawPointerInst(
+                m_ValueBase(),
+                m_TupleExtractOperation(m_BuiltinInst(Bytes), 0)))) {
     if (match(Bytes, m_ApplyInst(BuiltinValueKind::SMulOver, m_ValueBase(),
                                  m_ApplyInst(BuiltinValueKind::Strideof,
                                              m_MetatypeInst(Metatype)),
@@ -265,11 +265,11 @@ SILCombiner::visitBridgeObjectToRefInst(BridgeObjectToRefInst *BORI) {
 SILInstruction *
 SILCombiner::visitUncheckedRefCastAddrInst(UncheckedRefCastAddrInst *URCI) {
   SILType SrcTy = URCI->getSrc()->getType();
-  if (!SrcTy.isLoadable(URCI->getModule()))
+  if (!SrcTy.isLoadable(*URCI->getFunction()))
     return nullptr;
 
   SILType DestTy = URCI->getDest()->getType();
-  if (!DestTy.isLoadable(URCI->getModule()))
+  if (!DestTy.isLoadable(*URCI->getFunction()))
     return nullptr;
 
   // After promoting unchecked_ref_cast_addr to unchecked_ref_cast, the SIL

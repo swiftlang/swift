@@ -52,7 +52,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 486; // Last change: Opaque result types
+const uint16_t SWIFTMODULE_VERSION_MINOR = 512; // extended types may be left as unbound generic types
 
 using DeclIDField = BCFixed<31>;
 
@@ -247,14 +247,21 @@ using CtorInitializerKindField = BCFixed<2>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
-enum class VarDeclSpecifier : uint8_t {
-  Let = 0,
-  Var,
-  InOut,
-  Shared,
-  Owned,
+enum class ParamDeclSpecifier : uint8_t {
+  Default = 0,
+  InOut = 1,
+  Shared = 2,
+  Owned = 3,
 };
-using VarDeclSpecifierField = BCFixed<3>;
+using ParamDeclSpecifierField = BCFixed<2>;
+
+// These IDs must \em not be renumbered or reordered without incrementing
+// the module version.
+enum class VarDeclIntroducer : uint8_t {
+  Let = 0,
+  Var = 1
+};
+using VarDeclIntroducerField = BCFixed<1>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
@@ -293,7 +300,7 @@ using MetatypeRepresentationField = BCFixed<2>;
 enum class SelfAccessKind : uint8_t {
   NonMutating = 0,
   Mutating,
-  __Consuming,
+  Consuming,
 };
 using SelfAccessKindField = BCFixed<2>;
   
@@ -401,15 +408,6 @@ enum class AccessLevel : uint8_t {
   Open,
 };
 using AccessLevelField = BCFixed<3>;
-
-// These IDs must \em not be renumbered or reordered without incrementing
-// the module version.
-enum class OptionalTypeKind : uint8_t {
-  None,
-  Optional,
-  ImplicitlyUnwrappedOptional
-};
-using OptionalTypeKindField = BCFixed<2>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
@@ -643,7 +641,9 @@ namespace input_block {
     IMPORTED_HEADER_CONTENTS,
     MODULE_FLAGS, // [unused]
     SEARCH_PATH,
-    FILE_DEPENDENCY
+    FILE_DEPENDENCY,
+    DEPENDENCY_DIRECTORY,
+    PARSEABLE_INTERFACE_PATH
   };
 
   using ImportedModuleLayout = BCRecordLayout<
@@ -688,8 +688,20 @@ namespace input_block {
     FileModTimeOrContentHashField, // mtime or content hash (for validation)
     BCFixed<1>,                    // are we reading mtime (0) or hash (1)?
     BCFixed<1>,                    // SDK-relative?
+    BCVBR<8>,                      // subpath-relative index (0=none)
     BCBlob                         // path
   >;
+
+  using DependencyDirectoryLayout = BCRecordLayout<
+    DEPENDENCY_DIRECTORY,
+    BCBlob
+  >;
+
+  using ParseableInterfaceLayout = BCRecordLayout<
+    PARSEABLE_INTERFACE_PATH,
+    BCBlob // file path
+  >;
+
 }
 
 /// The record types within the "decls-and-types" block.
@@ -934,7 +946,8 @@ namespace decls_block {
     GenericEnvironmentIDField, // generic environment
     AccessLevelField,       // access level
     BCVBR<4>,               // number of conformances
-    BCArray<TypeIDField>    // inherited types
+    BCVBR<4>,               // number of inherited types
+    BCArray<TypeIDField>    // inherited types, followed by dependency types
     // Trailed by the generic parameters (if any), the members record, and
     // finally conformance info (if any).
   >;
@@ -961,13 +974,13 @@ namespace decls_block {
     DeclContextIDField,     // context decl
     BCFixed<1>,             // implicit?
     BCFixed<1>,             // explicitly objc?
-    BCFixed<1>,             // requires stored property initial values?
     BCFixed<1>,             // inherits convenience initializers from its superclass?
     GenericEnvironmentIDField, // generic environment
     TypeIDField,            // superclass
     AccessLevelField,       // access level
     BCVBR<4>,               // number of conformances
-    BCArray<TypeIDField>    // inherited types
+    BCVBR<4>,               // number of inherited types
+    BCArray<TypeIDField>    // inherited types, followed by dependency types
     // Trailed by the generic parameters (if any), the members record, and
     // finally conformance info (if any).
   >;
@@ -980,10 +993,9 @@ namespace decls_block {
     BCFixed<1>,             // class-bounded?
     BCFixed<1>,             // objc?
     BCFixed<1>,             // existential-type-supported?
-    GenericEnvironmentIDField, // generic environment
-    TypeIDField,            // superclass
     AccessLevelField,       // access level
-    BCArray<DeclIDField>    // inherited types
+    BCVBR<4>,               // number of inherited types
+    BCArray<TypeIDField>    // inherited types, followed by dependency types
     // Trailed by the generic parameters (if any), the members record, and
     // the default witness table record
   >;
@@ -998,7 +1010,8 @@ namespace decls_block {
   using ConstructorLayout = BCRecordLayout<
     CONSTRUCTOR_DECL,
     DeclContextIDField, // context decl
-    OptionalTypeKindField,  // failability
+    BCFixed<1>,  // failable?
+    BCFixed<1>,  // IUO result?
     BCFixed<1>,  // implicit?
     BCFixed<1>,  // objc?
     BCFixed<1>,  // stub implementation?
@@ -1026,34 +1039,40 @@ namespace decls_block {
     BCFixed<1>,   // implicit?
     BCFixed<1>,   // explicitly objc?
     BCFixed<1>,   // static?
-    VarDeclSpecifierField,   // specifier
+    VarDeclIntroducerField,   // introducer
     BCFixed<1>,   // HasNonPatternBindingInit?
     BCFixed<1>,   // is getter mutating?
     BCFixed<1>,   // is setter mutating?
+    BCFixed<1>,   // is this the backing storage for a lazy property?
+    DeclIDField,  // if this is a lazy property, this is the backing storage
     OpaqueReadOwnershipField,   // opaque read ownership
     ReadImplKindField,   // read implementation
     WriteImplKindField,   // write implementation
     ReadWriteImplKindField,   // read-write implementation
     AccessorCountField, // number of accessors
     TypeIDField,  // interface type
+    BCFixed<1>,   // IUO value?
     DeclIDField,  // overridden decl
     AccessLevelField, // access level
     AccessLevelField, // setter access, if applicable
     DeclIDField, // opaque return type decl
-    BCArray<TypeIDField> // accessors and dependencies
+    BCFixed<2>,  // # of property wrapper backing properties
+    BCVBR<4>, // total number of vtable entries introduced by all accessors
+    BCArray<TypeIDField> // accessors, backing properties, and dependencies
   >;
 
   using ParamLayout = BCRecordLayout<
     PARAM_DECL,
-    IdentifierIDField,     // argument name
-    IdentifierIDField,     // parameter name
-    DeclContextIDField,    // context decl
-    VarDeclSpecifierField, // specifier
-    TypeIDField,           // interface type
-    BCFixed<1>,            // isVariadic?
-    BCFixed<1>,            // isAutoClosure?
-    DefaultArgumentField,  // default argument kind
-    BCBlob                 // default argument text
+    IdentifierIDField,       // argument name
+    IdentifierIDField,       // parameter name
+    DeclContextIDField,      // context decl
+    ParamDeclSpecifierField, // specifier
+    TypeIDField,             // interface type
+    BCFixed<1>,              // isIUO?
+    BCFixed<1>,              // isVariadic?
+    BCFixed<1>,              // isAutoClosure?
+    DefaultArgumentField,    // default argument kind
+    BCBlob                   // default argument text
   >;
 
   using FuncLayout = BCRecordLayout<
@@ -1064,11 +1083,11 @@ namespace decls_block {
     StaticSpellingKindField, // spelling of 'static' or 'class'
     BCFixed<1>,   // isObjC?
     SelfAccessKindField,   // self access kind
-    BCFixed<1>,   // has dynamic self?
     BCFixed<1>,   // has forced static dispatch?
     BCFixed<1>,   // throws?
     GenericEnvironmentIDField, // generic environment
     TypeIDField,  // result interface type
+    BCFixed<1>,   // IUO result?
     DeclIDField,  // operator decl
     DeclIDField,  // overridden function
     BCVBR<5>,     // 0 for a simple name, otherwise the number of parameter name
@@ -1094,6 +1113,7 @@ namespace decls_block {
     TypeIDField, // interface type for opaque type
     GenericEnvironmentIDField, // generic environment
     SubstitutionMapIDField // optional substitution map for underlying type
+    // trailed by generic parameters
   >;
 
   // TODO: remove the unnecessary FuncDecl components here
@@ -1105,16 +1125,17 @@ namespace decls_block {
     StaticSpellingKindField, // spelling of 'static' or 'class'
     BCFixed<1>,   // isObjC?
     SelfAccessKindField,   // self access kind
-    BCFixed<1>,   // has dynamic self?
     BCFixed<1>,   // has forced static dispatch?
     BCFixed<1>,   // throws?
     GenericEnvironmentIDField, // generic environment
     TypeIDField,  // result interface type
+    BCFixed<1>,   // IUO result?
     DeclIDField,  // overridden function
     DeclIDField,  // AccessorStorageDecl
     AccessorKindField, // accessor kind
     AccessLevelField, // access level
     BCFixed<1>,   // requires a new vtable slot
+    BCFixed<1>,   // is transparent
     BCArray<IdentifierIDField> // name components,
                                // followed by TypeID dependencies
     // The record is trailed by:
@@ -1171,6 +1192,7 @@ namespace decls_block {
     BCFixed<1>,  // implicit?
     BCFixed<1>,  // has payload?
     EnumElementRawValueKindField,  // raw value kind
+    BCFixed<1>,  // implicit raw value?
     BCFixed<1>,  // negative raw value?
     IdentifierIDField, // raw value
     BCVBR<5>, // number of parameter name components
@@ -1194,12 +1216,14 @@ namespace decls_block {
     AccessorCountField, // number of accessors
     GenericEnvironmentIDField, // generic environment
     TypeIDField, // element interface type
+    BCFixed<1>,  // IUO element?
     DeclIDField, // overridden decl
     AccessLevelField, // access level
     AccessLevelField, // setter access, if applicable
     StaticSpellingKindField,    // is subscript static?
     BCVBR<5>,    // number of parameter name components
     DeclIDField, // opaque return type decl
+    BCFixed<8>, // total number of vtable entries introduced by all accessors
     BCArray<IdentifierIDField> // name components,
                                // followed by DeclID accessors,
                                // followed by TypeID dependencies
@@ -1416,6 +1440,11 @@ namespace decls_block {
     BCFixed<1>,        // restrict to protocol extension
     BCFixed<1>         // imported from Clang?
   >;
+  
+  using XRefOpaqueReturnTypePathPieceLayout = BCRecordLayout<
+    XREF_OPAQUE_RETURN_TYPE_PATH_PIECE,
+    IdentifierIDField // mangled name of defining decl
+  >;
 
   using XRefValuePathPieceLayout = BCRecordLayout<
     XREF_VALUE_PATH_PIECE,
@@ -1554,6 +1583,11 @@ namespace decls_block {
   using ClangImporterSynthesizedTypeDeclAttrLayout
     = BCRecordLayout<ClangImporterSynthesizedType_DECL_ATTR>;
   using PrivateImportDeclAttrLayout = BCRecordLayout<PrivateImport_DECL_ATTR>;
+  using ProjectedValuePropertyDeclAttrLayout = BCRecordLayout<
+      ProjectedValueProperty_DECL_ATTR,
+      BCFixed<1>,        // isImplicit
+      IdentifierIDField  // name
+  >;
 
   using InlineDeclAttrLayout = BCRecordLayout<
     Inline_DECL_ATTR,

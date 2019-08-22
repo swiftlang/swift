@@ -26,6 +26,7 @@
 // FIXME: This include is just for llvm::SanitizerCoverageOptions. We should
 // split the header upstream so we don't include so much.
 #include "llvm/Transforms/Instrumentation.h"
+#include "llvm/Support/VersionTuple.h"
 #include <string>
 #include <vector>
 
@@ -224,6 +225,10 @@ public:
   };
 
   TypeInfoDumpFilter TypeInfoFilter;
+  
+  /// Pull in runtime compatibility shim libraries by autolinking.
+  Optional<llvm::VersionTuple> AutolinkRuntimeCompatibilityLibraryVersion;
+  Optional<llvm::VersionTuple> AutolinkRuntimeCompatibilityDynamicReplacementLibraryVersion;
 
   IRGenOptions()
       : DWARFVersion(2), OutputKind(IRGenOutputKind::LLVMAssembly),

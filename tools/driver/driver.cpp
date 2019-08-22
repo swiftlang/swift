@@ -16,6 +16,7 @@
 
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/Basic/LLVMInitialize.h"
+#include "swift/Basic/PrettyStackTrace.h"
 #include "swift/Basic/Program.h"
 #include "swift/Basic/TaskQueue.h"
 #include "swift/Basic/SourceManager.h"
@@ -65,8 +66,8 @@ extern int autolink_extract_main(ArrayRef<const char *> Args, const char *Argv0,
 extern int modulewrap_main(ArrayRef<const char *> Args, const char *Argv0,
                            void *MainAddr);
 
-/// Run 'swift-format'
-extern int swift_format_main(ArrayRef<const char *> Args, const char *Argv0,
+/// Run 'swift-indent'
+extern int swift_indent_main(ArrayRef<const char *> Args, const char *Argv0,
                              void *MainAddr);
 
 /// Determine if the given invocation should run as a subcommand.
@@ -147,8 +148,8 @@ static int run_driver(StringRef ExecName,
     return autolink_extract_main(
       TheDriver.getArgsWithoutProgramNameAndDriverMode(argv),
       argv[0], (void *)(intptr_t)getExecutablePath);
-  case Driver::DriverKind::SwiftFormat:
-    return swift_format_main(
+  case Driver::DriverKind::SwiftIndent:
+    return swift_indent_main(
       TheDriver.getArgsWithoutProgramNameAndDriverMode(argv),
       argv[0], (void *)(intptr_t)getExecutablePath);
   default:
@@ -223,6 +224,8 @@ int main(int argc_, const char **argv_) {
   const char **ThrowawayExpandedArgv = ExpandedArgs.data();
   PROGRAM_START(ThrowawayExpandedArgc, ThrowawayExpandedArgv);
   ArrayRef<const char *> argv(ExpandedArgs);
+
+  PrettyStackTraceSwiftVersion versionStackTrace;
 
   // Check if this invocation should execute a subcommand.
   StringRef ExecName = llvm::sys::path::stem(argv[0]);

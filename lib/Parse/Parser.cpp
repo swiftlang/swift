@@ -26,11 +26,15 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/DelayedParsingCallbacks.h"
+#include "swift/Parse/ParsedSyntaxNodes.h"
+#include "swift/Parse/ParsedSyntaxRecorder.h"
 #include "swift/Parse/ParseSILSupport.h"
 #include "swift/Parse/SyntaxParseActions.h"
 #include "swift/Parse/SyntaxParsingContext.h"
+#include "swift/Parse/HiddenLibSyntaxAction.h"
 #include "swift/Syntax/RawSyntax.h"
 #include "swift/Syntax/TokenSyntax.h"
+#include "swift/SyntaxParse/SyntaxTreeCreator.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
@@ -141,7 +145,7 @@ private:
     unsigned BufferID = SourceMgr.findBufferContainingLoc(AFD->getLoc());
     Parser TheParser(BufferID, SF, nullptr, &ParserState, nullptr,
                      /*DelayBodyParsing=*/false);
-    TheParser.SyntaxContext->disable();
+    TheParser.SyntaxContext->setDiscard();
     std::unique_ptr<CodeCompletionCallbacks> CodeCompletion;
     if (CodeCompletionFactory) {
       CodeCompletion.reset(
@@ -168,10 +172,7 @@ static void parseDelayedDecl(
     SourceMgr.findBufferContainingLoc(ParserState.getDelayedDeclLoc());
   Parser TheParser(BufferID, SF, nullptr, &ParserState, nullptr,
                    /*DelayBodyParsing=*/false);
-
-  // Disable libSyntax creation in the delayed parsing.
-  TheParser.SyntaxContext->disable();
-
+  TheParser.SyntaxContext->setDiscard();
   std::unique_ptr<CodeCompletionCallbacks> CodeCompletion;
   if (CodeCompletionFactory) {
     CodeCompletion.reset(
@@ -356,6 +357,7 @@ static LexerMode sourceFileKindToLexerMode(SourceFileKind kind) {
     case swift::SourceFileKind::REPL:
       return LexerMode::Swift;
   }
+  llvm_unreachable("covered switch");
 }
 
 Parser::Parser(unsigned BufferID, SourceFile &SF, SILParserTUStateBase *SIL,
@@ -517,9 +519,16 @@ Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
     TokReceiver(SF.shouldCollectToken() ?
                 new TokenRecorder(SF) :
                 new ConsumeTokenReceiver()),
-    SyntaxContext(new SyntaxParsingContext(SyntaxContext, SF,
-                                           L->getBufferID(),
-                                           std::move(SPActions))) {
+    SyntaxContext(new SyntaxParsingContext(
+                    SyntaxContext, SF, L->getBufferID(),
+                    std::make_shared<HiddenLibSyntaxAction>(
+                        SPActions,
+                        std::make_shared<SyntaxTreeCreator>(
+                            SF.getASTContext().SourceMgr,
+                            L->getBufferID(),
+                            SF.SyntaxParsingCache,
+                            SF.getASTContext().getSyntaxArena())))),
+    Generator(SF.getASTContext()) {
   State = PersistentState;
   if (!State) {
     OwnedState.reset(new PersistentParserState(Context));
@@ -572,6 +581,19 @@ SourceLoc Parser::consumeToken() {
   TokReceiver->receive(Tok);
   SyntaxContext->addToken(Tok, LeadingTrivia, TrailingTrivia);
   return consumeTokenWithoutFeedingReceiver();
+}
+
+ParsedTokenSyntax Parser::consumeTokenSyntax() {
+  TokReceiver->receive(Tok);
+  ParsedTokenSyntax ParsedToken = ParsedSyntaxRecorder::makeToken(
+      Tok, LeadingTrivia, TrailingTrivia, *SyntaxContext);
+
+  // todo [gsoc]: remove when possible
+  // todo [gsoc]: handle backtracking properly
+  Generator.pushLoc(Tok.getLoc());
+
+  consumeTokenWithoutFeedingReceiver();
+  return ParsedToken;
 }
 
 SourceLoc Parser::getEndOfPreviousLoc() {
@@ -741,6 +763,39 @@ void Parser::skipUntilDeclStmtRBrace(tok T1, tok T2) {
   }
 }
 
+void Parser::skipListUntilDeclRBrace(SourceLoc startLoc, tok T1, tok T2) {
+  while (Tok.isNot(T1, T2, tok::eof, tok::r_brace, tok::pound_endif,
+                   tok::pound_else, tok::pound_elseif)) {
+    bool hasDelimiter = Tok.getLoc() == startLoc || consumeIf(tok::comma);
+    bool possibleDeclStartsLine = Tok.isAtStartOfLine();
+    
+    if (isStartOfDecl()) {
+      
+      // Could have encountered something like `_ var:` 
+      // or `let foo:` or `var:`
+      if (Tok.isAny(tok::kw_var, tok::kw_let)) {
+        if (possibleDeclStartsLine && !hasDelimiter) {
+          break;
+        }
+        
+        Parser::BacktrackingScope backtrack(*this);
+        // Consume the let or var
+        consumeToken();
+        
+        // If the following token is either <identifier> or :, it means that
+        // this `var` or `let` shoud be interpreted as a label
+        if ((Tok.canBeArgumentLabel() && peekToken().is(tok::colon)) ||
+             peekToken().is(tok::colon)) {
+          backtrack.cancelBacktrack();
+          continue;
+        }
+      }
+      break;
+    }
+    skipSingle();
+  }
+}
+
 void Parser::skipUntilDeclRBrace(tok T1, tok T2) {
   while (Tok.isNot(T1, T2, tok::eof, tok::r_brace, tok::pound_endif,
                    tok::pound_else, tok::pound_elseif) &&
@@ -864,7 +919,12 @@ bool Parser::parseSpecificIdentifier(StringRef expected, SourceLoc &loc,
 /// its name in Result.  Otherwise, emit an error and return true.
 bool Parser::parseAnyIdentifier(Identifier &Result, SourceLoc &Loc,
                                 const Diagnostic &D) {
-  if (Tok.is(tok::identifier) || Tok.isAnyOperator()) {
+  if (Tok.is(tok::identifier)) {
+    Loc = consumeIdentifier(&Result);
+    return false;
+  }
+
+  if (Tok.isAnyOperator()) {
     Result = Context.getIdentifier(Tok.getText());
     Loc = Tok.getLoc();
     consumeToken();
@@ -908,9 +968,8 @@ bool Parser::parseToken(tok K, SourceLoc &TokLoc, const Diagnostic &D) {
   return true;
 }
 
-/// parseMatchingToken - Parse the specified expected token and return its
-/// location on success.  On failure, emit the specified error diagnostic, and a
-/// note at the specified note location.
+/// Parse the specified expected token and return its location on success.  On failure, emit the specified
+/// error diagnostic,  a note at the specified note location, and return the location of the previous token.
 bool Parser::parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
                                 SourceLoc OtherLoc) {
   Diag<> OtherNote;
@@ -1001,7 +1060,7 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
     // If we haven't made progress, or seeing any error, skip ahead.
     if (Tok.getLoc() == StartLoc || Status.isError()) {
       assert(Status.isError() && "no progress without error");
-      skipUntilDeclRBrace(RightK, tok::comma);
+      skipListUntilDeclRBrace(LeftLoc, RightK, tok::comma);
       if (Tok.is(RightK) || Tok.isNot(tok::comma))
         break;
     }
@@ -1152,11 +1211,7 @@ OpaqueSyntaxNode ParserUnit::parse() {
     P.parseTopLevel();
     Done = P.Tok.is(tok::eof);
   }
-  auto rawNode = P.finalizeSyntaxTree();
-  if (rawNode.isNull()) {
-    return nullptr;
-  }
-  return rawNode.getOpaqueNode();
+  return P.finalizeSyntaxTree();
 }
 
 Parser &ParserUnit::getParser() {

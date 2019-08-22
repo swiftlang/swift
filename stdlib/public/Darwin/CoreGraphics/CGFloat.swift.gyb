@@ -22,7 +22,7 @@ word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
 @_exported import CoreGraphics
 import Darwin
 
-@_fixed_layout
+@frozen
 public struct CGFloat {
 #if arch(i386) || arch(arm)
   /// The native type used to store the CGFloat, which is Float on
@@ -46,7 +46,7 @@ public struct CGFloat {
     self.native = NativeType(value)
   }
 
-#if !os(Windows) && (arch(i386) || arch(x86_64))
+#if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
   @_transparent public init(_ value: Float80) {
     self.native = NativeType(value)
   }
@@ -397,7 +397,7 @@ extension CGFloat : Hashable {
     hasher.combine(native)
   }
 
-  @inlinable @_transparent
+  @_alwaysEmitIntoClient @inlinable // Introduced in 5.1
   public func _rawHashValue(seed: Int) -> Int {
     return native._rawHashValue(seed: seed)
   }
@@ -515,7 +515,7 @@ public func %=(lhs: inout CGFloat, rhs: CGFloat) {
 
 %from SwiftMathFunctions import *
 
-extension CGFloat: Real {
+extension CGFloat: ElementaryFunctions {
 % for func in ElementaryFunctions + RealFunctions:
 
   @_alwaysEmitIntoClient
@@ -553,12 +553,20 @@ extension CGFloat: Real {
     return CGFloat(NativeType.atan2(y: y.native, x: x.native))
   }
 
-#if !os(Windows)
   @_alwaysEmitIntoClient
   public static func logGamma(_ x: CGFloat) -> CGFloat {
     return CGFloat(NativeType.logGamma(x.native))
   }
-#endif
+
+  @_alwaysEmitIntoClient
+  public static func signGamma(_ x: CGFloat) -> FloatingPointSign {
+    if x >= 0 { return .plus }
+    let trunc = x.rounded(.towardZero)
+    if x == trunc { return .plus }
+    let halfTrunc = trunc/2
+    if halfTrunc == halfTrunc.rounded(.towardZero) { return .minus }
+    return .plus
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -581,10 +589,18 @@ BinaryFunctions = [
 }%
 
 %for ufunc in UnaryFunctions:
+% if ufunc in ['rint','nearbyint']:
+@available(swift, deprecated: 5.1, message: "Swift does not model dynamic rounding modes, use x.rounded(.toNearestOrEven) instead.")
+@_transparent
+public func ${ufunc}(_ x: CGFloat) -> CGFloat {
+  return x.rounded(.toNearestOrEven)
+}
+% else:
 @_transparent
 public func ${ufunc}(_ x: CGFloat) -> CGFloat {
   return CGFloat(${ufunc}(x.native))
 }
+% end
 
 %end
 

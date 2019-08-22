@@ -112,8 +112,8 @@ bool swift::getUnderlyingBorrowIntroducers(SILValue inputValue,
     if (isGuaranteedForwardingValue(v)) {
       auto *i = v->getDefiningInstruction();
       assert(i);
-      transform(i->getAllOperands(), std::back_inserter(worklist),
-                [](const Operand &op) -> SILValue { return op.get(); });
+      llvm::transform(i->getAllOperands(), std::back_inserter(worklist),
+                      [](const Operand &op) -> SILValue { return op.get(); });
       continue;
     }
 

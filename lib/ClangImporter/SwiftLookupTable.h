@@ -196,6 +196,8 @@ public:
       DC = omDecl->getCanonicalDecl();
     } else if (auto fDecl = dyn_cast<clang::FunctionDecl>(dc)) {
       DC = fDecl->getCanonicalDecl();
+    } else if (auto nsDecl = dyn_cast<clang::NamespaceDecl>(dc)) {
+      DC = nsDecl->getCanonicalDecl();
     } else {
       assert(isa<clang::TranslationUnitDecl>(dc) ||
              isa<clang::ObjCContainerDecl>(dc) &&

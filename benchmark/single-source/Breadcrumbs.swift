@@ -45,23 +45,6 @@ extension String {
   }
 }
 
-let seed = 0x12345678
-
-/// A linear congruential PRNG.
-struct LCRNG: RandomNumberGenerator {
-  private var state: UInt64
-
-  init(seed: Int) {
-    state = UInt64(truncatingIfNeeded: seed)
-    for _ in 0..<10 { _ = next() }
-  }
-
-  mutating func next() -> UInt64 {
-    state = 2862933555777941757 &* state &+ 3037000493
-    return state
-  }
-}
-
 extension Collection {
   /// Returns a randomly ordered array of random non-overlapping index ranges
   /// that cover this collection entirely.
@@ -254,7 +237,7 @@ class UTF16ToIdx: BenchmarkBase {
 
   override func setUp() {
     super.setUp()
-    var rng = LCRNG(seed: seed)
+    var rng = SplitMix64(seed: 42)
     let range = 0 ..< inputString.utf16.count
     inputOffsets = Array(range.shuffled(using: &rng).prefix(count))
   }
@@ -286,7 +269,7 @@ class IdxToUTF16: BenchmarkBase {
 
   override func setUp() {
     super.setUp()
-    var rng = LCRNG(seed: seed)
+    var rng = SplitMix64(seed: 42)
     inputIndices = Array(inputString.indices.shuffled(using: &rng).prefix(count))
   }
 
@@ -318,7 +301,7 @@ class UTF16ToIdxRange: BenchmarkBase {
 
   override func setUp() {
     super.setUp()
-    var rng = LCRNG(seed: seed)
+    var rng = SplitMix64(seed: 42)
     inputOffsets = (
       0 ..< inputString.utf16.count
     ).randomIndexRanges(count: count, using: &rng)
@@ -352,7 +335,7 @@ class IdxToUTF16Range: BenchmarkBase {
 
   override func setUp() {
     super.setUp()
-    var rng = LCRNG(seed: seed)
+    var rng = SplitMix64(seed: 42)
     inputIndices = self.inputString.randomIndexRanges(count: count, using: &rng)
   }
 
@@ -384,7 +367,7 @@ class CopyUTF16CodeUnits: BenchmarkBase {
 
   override func setUp() {
     super.setUp()
-    var rng = LCRNG(seed: seed)
+    var rng = SplitMix64(seed: 42)
     inputIndices = (
       0 ..< inputString.utf16.count
     ).randomIndexRanges(count: count, using: &rng)
@@ -425,7 +408,7 @@ class MutatedUTF16ToIdx: BenchmarkBase {
 
   override func setUp() {
     super.setUp()
-    var generator = LCRNG(seed: seed)
+    var generator = SplitMix64(seed: 42)
     let range = 0 ..< inputString.utf16.count
     inputOffsets = Array(range.shuffled(using: &generator).prefix(count))
   }
@@ -469,7 +452,7 @@ class MutatedIdxToUTF16: BenchmarkBase {
 
   override func setUp() {
     super.setUp()
-    var rng = LCRNG(seed: seed)
+    var rng = SplitMix64(seed: 42)
     inputIndices = Array(inputString.indices.shuffled(using: &rng).prefix(count))
   }
 

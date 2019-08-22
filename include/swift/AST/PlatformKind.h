@@ -41,7 +41,7 @@ StringRef platformString(PlatformKind platform);
 Optional<PlatformKind> platformFromString(StringRef Name);
 
 /// Returns a human-readable version of the platform name as a string, suitable
-/// for emission in diagnostics (e.g., "OS X").
+/// for emission in diagnostics (e.g., "macOS").
 StringRef prettyPlatformString(PlatformKind platform);
 
 /// Returns whether the passed-in platform is active, given the language

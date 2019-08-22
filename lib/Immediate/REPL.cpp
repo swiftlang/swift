@@ -969,7 +969,7 @@ public:
     ASTContext &Ctx = CI.getASTContext();
     Ctx.LangOpts.EnableAccessControl = false;
     if (!ParseStdlib) {
-      if (!loadSwiftRuntime(Ctx.SearchPathOpts.RuntimeLibraryPath)) {
+      if (!loadSwiftRuntime(Ctx.SearchPathOpts.RuntimeLibraryPaths)) {
         CI.getDiags().diagnose(SourceLoc(),
                                diag::error_immediate_mode_missing_stdlib);
         return;
@@ -1091,8 +1091,7 @@ public:
           ASTContext &ctx = CI.getASTContext();
           SourceFile &SF =
               MostRecentModule->getMainSourceFile(SourceFileKind::REPL);
-          UnqualifiedLookup lookup(ctx.getIdentifier(Tok.getText()), &SF,
-                                   nullptr);
+          UnqualifiedLookup lookup(ctx.getIdentifier(Tok.getText()), &SF);
           for (auto result : lookup.Results) {
             printOrDumpDecl(result.getValueDecl(), doPrint);
               
@@ -1100,7 +1099,6 @@ public:
               if (auto typeAliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
                 TypeDecl *origTypeDecl = typeAliasDecl
                   ->getDeclaredInterfaceType()
-                  ->getDesugaredType()
                   ->getNominalOrBoundGenericNominal();
                 if (origTypeDecl) {
                   printOrDumpDecl(origTypeDecl, doPrint);

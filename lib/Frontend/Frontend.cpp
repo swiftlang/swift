@@ -23,7 +23,6 @@
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
-#include "swift/DWARFImporter/DWARFImporter.h"
 #include "swift/Frontend/ParseableInterfaceModuleLoader.h"
 #include "swift/Parse/DelayedParsingCallbacks.h"
 #include "swift/Parse/Lexer.h"
@@ -124,9 +123,8 @@ CompilerInvocation::getParseableInterfaceOutputPathForWholeModule() const {
       .SupplementaryOutputs.ParseableInterfaceOutputPath;
 }
 
-SerializationOptions
-CompilerInvocation::computeSerializationOptions(const SupplementaryOutputPaths &outs,
-                                                bool moduleIsPublic) {
+SerializationOptions CompilerInvocation::computeSerializationOptions(
+    const SupplementaryOutputPaths &outs, bool moduleIsPublic) {
   const FrontendOptions &opts = getFrontendOptions();
 
   SerializationOptions serializationOpts;
@@ -176,6 +174,35 @@ void CompilerInstance::recordPrimarySourceFile(SourceFile *SF) {
     recordPrimaryInputBuffer(SF->getBufferID().getValue());
 }
 
+bool CompilerInstance::setUpASTContextIfNeeded() {
+  if (Invocation.getFrontendOptions().RequestedAction ==
+      FrontendOptions::ActionType::CompileModuleFromInterface) {
+    // Compiling a module interface from source uses its own CompilerInstance
+    // with options read from the input file. Don't bother setting up an
+    // ASTContext at this level.
+    return false;
+  }
+
+  Context.reset(ASTContext::get(Invocation.getLangOptions(),
+                                Invocation.getSearchPathOptions(), SourceMgr,
+                                Diagnostics));
+  registerTypeCheckerRequestFunctions(Context->evaluator);
+
+  // Migrator, indexing and typo correction need some IDE requests.
+  // The integrated REPL needs IDE requests for completion.
+  if (Invocation.getMigratorOptions().shouldRunMigrator() ||
+      !Invocation.getFrontendOptions().IndexStorePath.empty() ||
+      Invocation.getLangOptions().TypoCorrectionLimit ||
+      Invocation.getFrontendOptions().RequestedAction ==
+          FrontendOptions::ActionType::REPL) {
+    registerIDERequestFunctions(Context->evaluator);
+  }
+  if (setUpModuleLoaders())
+    return true;
+
+  return false;
+}
+
 bool CompilerInstance::setup(const CompilerInvocation &Invok) {
   Invocation = Invok;
 
@@ -197,20 +224,18 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
     Invocation.getLangOptions().AttachCommentsToDecls = true;
   }
 
-  Context.reset(ASTContext::get(Invocation.getLangOptions(),
-                                Invocation.getSearchPathOptions(), SourceMgr,
-                                Diagnostics));
-  registerTypeCheckerRequestFunctions(Context->evaluator);
-
-  if (setUpModuleLoaders())
-    return true;
-
   assert(Lexer::isIdentifier(Invocation.getModuleName()));
 
   if (isInSILMode())
     Invocation.getLangOptions().EnableAccessControl = false;
 
-  return setUpInputs();
+  if (setUpInputs())
+    return true;
+
+  if (setUpASTContextIfNeeded())
+    return true;
+
+  return false;
 }
 
 static bool loadAndValidateVFSOverlay(
@@ -239,19 +264,20 @@ static bool loadAndValidateVFSOverlay(
 }
 
 bool CompilerInstance::setUpVirtualFileSystemOverlays() {
-  auto BaseFS = llvm::vfs::getRealFileSystem();
+  auto BaseFS = SourceMgr.getFileSystem();
   auto OverlayFS = llvm::IntrusiveRefCntPtr<llvm::vfs::OverlayFileSystem>(
                     new llvm::vfs::OverlayFileSystem(BaseFS));
   bool hadAnyFailure = false;
+  bool hasOverlays = false;
   for (const auto &File : Invocation.getSearchPathOptions().VFSOverlayFiles) {
+    hasOverlays = true;
     hadAnyFailure |=
         loadAndValidateVFSOverlay(File, BaseFS, OverlayFS, Diagnostics);
   }
 
   // If we successfully loaded all the overlays, let the source manager and
   // diagnostic engine take advantage of the overlay file system.
-  if (!hadAnyFailure &&
-      (OverlayFS->overlays_begin() != OverlayFS->overlays_end())) {
+  if (!hadAnyFailure && hasOverlays) {
     SourceMgr.setFileSystem(OverlayFS);
   }
 
@@ -280,6 +306,9 @@ void CompilerInstance::setUpDiagnosticOptions() {
   }
   if (Invocation.getDiagnosticOptions().WarningsAsErrors) {
     Diagnostics.setWarningsAsErrors(true);
+  }
+  if (Invocation.getDiagnosticOptions().PrintDiagnosticNames) {
+    Diagnostics.setPrintDiagnosticNames(true);
   }
 }
 
@@ -315,6 +344,13 @@ bool CompilerInstance::setUpModuleLoaders() {
     }
   }
 
+  if (Invocation.getLangOptions().EnableMemoryBufferImporter) {
+    auto MemoryBufferLoader = MemoryBufferSerializedModuleLoader::create(
+        *Context, getDependencyTracker());
+    this->MemoryBufferLoader = MemoryBufferLoader.get();
+    Context->addModuleLoader(std::move(MemoryBufferLoader));
+  }
+
   std::unique_ptr<SerializedModuleLoader> SML =
     SerializedModuleLoader::create(*Context, getDependencyTracker(), MLM);
   this->SML = SML.get();
@@ -333,28 +369,15 @@ bool CompilerInstance::setUpModuleLoaders() {
   if (MLM != ModuleLoadingMode::OnlySerialized) {
     auto const &Clang = clangImporter->getClangInstance();
     std::string ModuleCachePath = getModuleCachePathFromClang(Clang);
-    StringRef PrebuiltModuleCachePath =
-        Invocation.getFrontendOptions().PrebuiltModuleCachePath;
-    auto PIML = ParseableInterfaceModuleLoader::create(*Context,
-                                                       ModuleCachePath,
-                                                       PrebuiltModuleCachePath,
-                                                       getDependencyTracker(),
-                                                       MLM);
+    auto &FEOpts = Invocation.getFrontendOptions();
+    StringRef PrebuiltModuleCachePath = FEOpts.PrebuiltModuleCachePath;
+    auto PIML = ParseableInterfaceModuleLoader::create(
+        *Context, ModuleCachePath, PrebuiltModuleCachePath,
+        getDependencyTracker(), MLM, FEOpts.RemarkOnRebuildFromModuleInterface);
     Context->addModuleLoader(std::move(PIML));
   }
   Context->addModuleLoader(std::move(SML));
   Context->addModuleLoader(std::move(clangImporter), /*isClang*/ true);
-
-  if (Invocation.getLangOptions().EnableDWARFImporter) {
-    auto dwarfImporter =
-        DWARFImporter::create(*Context, Invocation.getClangImporterOptions(),
-                              getDependencyTracker());
-    if (!dwarfImporter) {
-      Diagnostics.diagnose(SourceLoc(), diag::error_clang_importer_create_fail);
-      return true;
-    }
-    Context->addModuleLoader(std::move(dwarfImporter));
-  }
 
   return false;
 }
@@ -757,10 +780,10 @@ void CompilerInstance::parseAndCheckTypesUpTo(
   std::unique_ptr<DelayedParsingCallbacks> DelayedCB{
       computeDelayedParsingCallback()};
 
-  PersistentParserState PersistentState(getASTContext());
+  PersistentState = llvm::make_unique<PersistentParserState>(getASTContext());
 
   bool hadLoadError = parsePartialModulesAndLibraryFiles(
-      implicitImports, PersistentState, DelayedCB.get());
+      implicitImports, DelayedCB.get());
   if (Invocation.isCodeCompletion()) {
     // When we are doing code completion, make sure to emit at least one
     // diagnostic, so that ASTContext is marked as erroneous.  In this case
@@ -778,8 +801,7 @@ void CompilerInstance::parseAndCheckTypesUpTo(
   // In addition, the main file has parsing and type-checking
   // interwined.
   if (MainBufferID != NO_SUCH_BUFFER) {
-    parseAndTypeCheckMainFileUpTo(limitStage, PersistentState,
-                                  DelayedCB.get(), TypeCheckOptions);
+    parseAndTypeCheckMainFileUpTo(limitStage, DelayedCB.get(), TypeCheckOptions);
   }
 
   assert(llvm::all_of(MainModule->getFiles(), [](const FileUnit *File) -> bool {
@@ -797,16 +819,28 @@ void CompilerInstance::parseAndCheckTypesUpTo(
 
   const auto &options = Invocation.getFrontendOptions();
   forEachFileToTypeCheck([&](SourceFile &SF) {
-    performTypeChecking(SF, PersistentState.getTopLevelContext(),
+    performTypeChecking(SF, PersistentState->getTopLevelContext(),
                         TypeCheckOptions, /*curElem*/ 0,
                         options.WarnLongFunctionBodies,
                         options.WarnLongExpressionTypeChecking,
                         options.SolverExpressionTimeThreshold,
                         options.SwitchCheckingInvocationThreshold);
+
+    if (!Context->hadError() && Invocation.getFrontendOptions().PCMacro) {
+      performPCMacro(SF, PersistentState->getTopLevelContext());
+    }
+
+    // Playground transform knows to look out for PCMacro's changes and not
+    // to playground log them.
+    if (!Context->hadError() &&
+        Invocation.getFrontendOptions().PlaygroundTransform) {
+      performPlaygroundTransform(
+          SF, Invocation.getFrontendOptions().PlaygroundHighPerformance);
+    }
   });
 
   if (Invocation.isCodeCompletion()) {
-    performDelayedParsing(MainModule, PersistentState,
+    performDelayedParsing(MainModule, *PersistentState.get(),
                           Invocation.getCodeCompletionFactory());
   }
   finishTypeChecking(TypeCheckOptions);
@@ -814,7 +848,6 @@ void CompilerInstance::parseAndCheckTypesUpTo(
 
 void CompilerInstance::parseLibraryFile(
     unsigned BufferID, const ImplicitImports &implicitImports,
-    PersistentParserState &PersistentState,
     DelayedParsingCallbacks *DelayedCB) {
   FrontendStatsTracer tracer(Context->Stats, "parse-library-file");
 
@@ -832,8 +865,9 @@ void CompilerInstance::parseLibraryFile(
   do {
     // Parser may stop at some erroneous constructions like #else, #endif
     // or '}' in some cases, continue parsing until we are done
-    parseIntoSourceFile(*NextInput, BufferID, &Done, nullptr, &PersistentState,
-                        DelayedCB, /*DelayedBodyParsing=*/!IsPrimary);
+    parseIntoSourceFile(*NextInput, BufferID, &Done, nullptr,
+                        PersistentState.get(), DelayedCB,
+                        /*DelayedBodyParsing=*/!IsPrimary);
   } while (!Done);
 
   Diags.setSuppressWarnings(DidSuppressWarnings);
@@ -861,7 +895,6 @@ OptionSet<TypeCheckingFlags> CompilerInstance::computeTypeCheckingOptions() {
 
 bool CompilerInstance::parsePartialModulesAndLibraryFiles(
     const ImplicitImports &implicitImports,
-    PersistentParserState &PersistentState,
     DelayedParsingCallbacks *DelayedCB) {
   FrontendStatsTracer tracer(Context->Stats,
                              "parse-partial-modules-and-library-files");
@@ -878,7 +911,7 @@ bool CompilerInstance::parsePartialModulesAndLibraryFiles(
   // Then parse all the library files.
   for (auto BufferID : InputSourceCodeBufferIDs) {
     if (BufferID != MainBufferID) {
-      parseLibraryFile(BufferID, implicitImports, PersistentState, DelayedCB);
+      parseLibraryFile(BufferID, implicitImports, DelayedCB);
     }
   }
   return hadLoadError;
@@ -886,7 +919,6 @@ bool CompilerInstance::parsePartialModulesAndLibraryFiles(
 
 void CompilerInstance::parseAndTypeCheckMainFileUpTo(
     SourceFile::ASTStage_t LimitStage,
-    PersistentParserState &PersistentState,
     DelayedParsingCallbacks *DelayedParseCB,
     OptionSet<TypeCheckingFlags> TypeCheckOptions) {
   FrontendStatsTracer tracer(Context->Stats,
@@ -910,8 +942,9 @@ void CompilerInstance::parseAndTypeCheckMainFileUpTo(
     // there are chunks of swift decls (e.g. imports and types) interspersed
     // with 'sil' definitions.
     parseIntoSourceFile(MainFile, MainFile.getBufferID().getValue(), &Done,
-                        TheSILModule ? &SILContext : nullptr, &PersistentState,
-                        DelayedParseCB, /*DelayedBodyParsing=*/false);
+                        TheSILModule ? &SILContext : nullptr,
+                        PersistentState.get(), DelayedParseCB,
+                        /*DelayedBodyParsing=*/false);
 
     if (mainIsPrimary && (Done || CurTUElem < MainFile.Decls.size())) {
       switch (LimitStage) {
@@ -923,7 +956,7 @@ void CompilerInstance::parseAndTypeCheckMainFileUpTo(
         break;
       case SourceFile::TypeChecked:
         const auto &options = Invocation.getFrontendOptions();
-        performTypeChecking(MainFile, PersistentState.getTopLevelContext(),
+        performTypeChecking(MainFile, PersistentState->getTopLevelContext(),
                             TypeCheckOptions, CurTUElem,
                             options.WarnLongFunctionBodies,
                             options.WarnLongExpressionTypeChecking,
@@ -943,17 +976,6 @@ void CompilerInstance::parseAndTypeCheckMainFileUpTo(
     performDebuggerTestingTransform(MainFile);
   }
 
-  if (mainIsPrimary && !Context->hadError() &&
-      Invocation.getFrontendOptions().PCMacro) {
-    performPCMacro(MainFile, PersistentState.getTopLevelContext());
-  }
-
-  // Playground transform knows to look out for PCMacro's changes and not
-  // to playground log them.
-  if (mainIsPrimary && !Context->hadError() &&
-      Invocation.getFrontendOptions().PlaygroundTransform)
-    performPlaygroundTransform(
-        MainFile, Invocation.getFrontendOptions().PlaygroundHighPerformance);
   if (!mainIsPrimary) {
     performNameBinding(MainFile);
   }
@@ -986,6 +1008,8 @@ void CompilerInstance::finishTypeChecking(
       performWholeModuleTypeChecking(SF);
     });
   }
+
+  checkInconsistentImplementationOnlyImports(MainModule);
 }
 
 SourceFile *CompilerInstance::createSourceFileForMainModule(
@@ -1027,12 +1051,13 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals,
                                   MainBufferID);
   }
 
-  PersistentParserState PersistentState(getASTContext());
+  PersistentState = llvm::make_unique<PersistentParserState>(getASTContext());
+
   SWIFT_DEFER {
     if (ParseDelayedBodyOnEnd)
-      PersistentState.parseAllDelayedDeclLists();
+      PersistentState->parseAllDelayedDeclLists();
   };
-  PersistentState.PerformConditionEvaluation = EvaluateConditionals;
+  PersistentState->PerformConditionEvaluation = EvaluateConditionals;
   // Parse all the library files.
   for (auto BufferID : InputSourceCodeBufferIDs) {
     if (BufferID == MainBufferID)
@@ -1044,7 +1069,7 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals,
         SourceFileKind::Library, SourceFile::ImplicitModuleImportKind::None,
         BufferID);
 
-    parseIntoSourceFileFull(*NextInput, BufferID, &PersistentState,
+    parseIntoSourceFileFull(*NextInput, BufferID, PersistentState.get(),
                             nullptr, /*DelayBodyParsing=*/!IsPrimary);
   }
 
@@ -1055,7 +1080,7 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals,
     MainFile.SyntaxParsingCache = Invocation.getMainFileSyntaxParsingCache();
 
     parseIntoSourceFileFull(MainFile, MainFile.getBufferID().getValue(),
-                            &PersistentState, nullptr,
+                            PersistentState.get(), nullptr,
                             /*DelayBodyParsing=*/false);
   }
 
@@ -1064,9 +1089,11 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals,
 }
 
 void CompilerInstance::freeASTContext() {
+  PersistentState.reset();
   Context.reset();
   MainModule = nullptr;
   SML = nullptr;
+  MemoryBufferLoader = nullptr;
   PrimaryBufferIDs.clear();
   PrimarySourceFiles.clear();
 }

@@ -201,7 +201,6 @@ namespace sil_block {
     SIL_VTABLE_ENTRY,
     DeclIDField,  // SILFunction name
     SILVTableEntryKindField,  // Kind
-    SILLinkageField,      // Linkage
     BCArray<ValueIDField> // SILDeclRef
   >;
   
@@ -291,6 +290,7 @@ namespace sil_block {
                      BCFixed<1>,  // has qualified ownership
                      BCFixed<1>,  // must be weakly referenced
                      BCFixed<1>,  // is dynamically replacable
+                     BCFixed<1>,  // exact self class
                      TypeIDField, // SILFunctionType
                      DeclIDField,  // SILFunction name or 0 (replaced function)
                      GenericEnvironmentIDField,
@@ -395,6 +395,7 @@ namespace sil_block {
   using SILOneTypeLayout = BCRecordLayout<
     SIL_ONE_TYPE,
     SILInstOpCodeField,
+    BCFixed<2>,          // Optional attributes
     TypeIDField,
     SILTypeCategoryField
   >;

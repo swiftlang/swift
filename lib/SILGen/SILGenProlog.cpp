@@ -127,7 +127,7 @@ public:
 
     // This can happen if the value is resilient in the calling convention
     // but not resilient locally.
-    if (argType.isLoadable(SGF.SGM.M) && argType.isAddress()) {
+    if (argType.isLoadable(SGF.F) && argType.isAddress()) {
       if (mv.isPlusOne(SGF))
         mv = SGF.B.createLoadTake(loc, mv);
       else
@@ -199,7 +199,7 @@ public:
         if (element.hasCleanup())
           element.forwardInto(SGF, loc, elementBuffer);
         else
-          element.copyInto(SGF, elementBuffer, loc);
+          element.copyInto(SGF, loc, elementBuffer);
       }
       return SGF.emitManagedRValueWithCleanup(buffer);
     }
@@ -245,23 +245,23 @@ struct ArgumentInitHelper {
 
   /// Create a SILArgument and store its value into the given Initialization,
   /// if not null.
-  void makeArgumentIntoBinding(Type ty, SILBasicBlock *parent, VarDecl *vd) {
-    SILLocation loc(vd);
+  void makeArgumentIntoBinding(Type ty, SILBasicBlock *parent, ParamDecl *pd) {
+    SILLocation loc(pd);
     loc.markAsPrologue();
 
-    ManagedValue argrv = makeArgument(ty, vd->isInOut(), parent, loc);
+    ManagedValue argrv = makeArgument(ty, pd->isInOut(), parent, loc);
 
-    if (vd->isInOut()) {
+    if (pd->isInOut()) {
       assert(argrv.getType().isAddress() && "expected inout to be address");
     } else {
-      assert(vd->isImmutable() && "expected parameter to be immutable!");
+      assert(pd->isImmutable() && "expected parameter to be immutable!");
       // If the variable is immutable, we can bind the value as is.
       // Leave the cleanup on the argument, if any, in place to consume the
       // argument if we're responsible for it.
     }
-    SGF.VarLocs[vd] = SILGenFunction::VarLoc::get(argrv.getValue());
+    SGF.VarLocs[pd] = SILGenFunction::VarLoc::get(argrv.getValue());
     SILValue value = argrv.getValue();
-    SILDebugVariable varinfo(vd->isLet(), ArgNo);
+    SILDebugVariable varinfo(pd->isImmutable(), ArgNo);
     if (!argrv.getType().isAddress()) {
       SGF.B.createDebugValue(loc, value, varinfo);
     } else {
@@ -311,8 +311,8 @@ static void makeArgument(Type ty, ParamDecl *decl,
                          SmallVectorImpl<SILValue> &args, SILGenFunction &SGF) {
   assert(ty && "no type?!");
   
-  // Destructure tuple arguments.
-  if (TupleType *tupleTy = ty->getAs<TupleType>()) {
+  // Destructure tuple value arguments.
+  if (TupleType *tupleTy = decl->isInOut() ? nullptr : ty->getAs<TupleType>()) {
     for (auto fieldType : tupleTy->getElementTypes())
       makeArgument(fieldType, decl, args, SGF);
   } else {
@@ -342,7 +342,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
                                  CapturedValue capture,
                                  uint16_t ArgNo) {
 
-  auto *VD = capture.getDecl();
+  auto *VD = cast<VarDecl>(capture.getDecl());
   SILLocation Loc(VD);
   Loc.markAsPrologue();
 
@@ -354,12 +354,8 @@ static void emitCaptureArguments(SILGenFunction &SGF,
       closure.getGenericEnvironment(), interfaceType);
   };
 
-  // FIXME: Expansion
-  auto expansion = ResilienceExpansion::Minimal;
+  auto expansion = SGF.F.getResilienceExpansion();
   switch (SGF.SGM.Types.getDeclCaptureKind(capture, expansion)) {
-  case CaptureKind::None:
-    break;
-
   case CaptureKind::Constant: {
     auto type = getVarTypeInCaptureContext();
     auto &lowering = SGF.getTypeLowering(type);
@@ -455,7 +451,24 @@ void SILGenFunction::emitProlog(AnyFunctionRef TheClosure,
       SILValue val = F.begin()->createFunctionArgument(ty);
       (void) val;
 
-      return;
+      continue;
+    }
+
+    if (capture.isOpaqueValue()) {
+      OpaqueValueExpr *opaqueValue = capture.getOpaqueValue();
+      Type type = opaqueValue->getType()->mapTypeOutOfContext();
+      type = GenericEnvironment::mapTypeIntoContext(
+          TheClosure.getGenericEnvironment(), type);
+      auto &lowering = getTypeLowering(type);
+      SILType ty = lowering.getLoweredType();
+      SILValue val = F.begin()->createFunctionArgument(ty);
+      OpaqueValues[opaqueValue] = ManagedValue::forUnmanaged(val);
+
+      // Opaque values are always passed 'owned', so add a clean up if needed.
+      if (!lowering.isTrivial())
+        enterDestroyCleanup(val);
+
+      continue;
     }
 
     emitCaptureArguments(*this, TheClosure, capture, ++ArgNo);
@@ -483,7 +496,7 @@ static void emitIndirectResultParameters(SILGenFunction &SGF, Type resultType,
     return;
   }
   auto &ctx = SGF.getASTContext();
-  auto var = new (ctx) ParamDecl(VarDecl::Specifier::InOut,
+  auto var = new (ctx) ParamDecl(ParamDecl::Specifier::InOut,
                                  SourceLoc(), SourceLoc(),
                                  ctx.getIdentifier("$return_value"), SourceLoc(),
                                  ctx.getIdentifier("$return_value"),

@@ -13,7 +13,7 @@
 import SwiftShims
 
 /// Command-line arguments for the current process.
-@_frozen // namespace
+@frozen // namespace
 public enum CommandLine {
   /// The backing static variable for argument count may come either from the
   /// entry point or it may need to be computed e.g. if we're in the REPL.
@@ -43,8 +43,9 @@ public enum CommandLine {
     return _unsafeArgv
   }
 
-  /// Access to the swift arguments, also use lazy initialization of static
-  /// properties to safely initialize the swift arguments.
+  /// Access to the Swift command line arguments.
+  // Use lazy initialization of static properties to 
+  // safely initialize the swift arguments.
   public static var arguments: [String]
     = (0..<Int(argc)).map { String(cString: _unsafeArgv[$0]!) }
 }

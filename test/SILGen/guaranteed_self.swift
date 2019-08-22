@@ -243,7 +243,7 @@ struct AO<T>: Fooable {
 
 class C: Fooable, Barrable {
   // Allocating initializer
-  // CHECK-LABEL: sil hidden [ossa] @$s15guaranteed_self1CC{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thick C.Type) -> @owned C
+  // CHECK-LABEL: sil hidden [exact_self_class] [ossa] @$s15guaranteed_self1CC{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thick C.Type) -> @owned C
   // CHECK:         [[SELF1:%.*]] = alloc_ref $C
   // CHECK-NOT:     [[SELF1]]
   // CHECK:         [[SELF2:%.*]] = apply {{.*}}([[SELF1]])
@@ -330,7 +330,7 @@ class C: Fooable, Barrable {
 }
 
 class D: C {
-  // CHECK-LABEL: sil hidden [ossa] @$s15guaranteed_self1DC{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thick D.Type) -> @owned D
+  // CHECK-LABEL: sil hidden [exact_self_class] [ossa] @$s15guaranteed_self1DC{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thick D.Type) -> @owned D
   // CHECK:         [[SELF1:%.*]] = alloc_ref $D
   // CHECK-NOT:     [[SELF1]]
   // CHECK:         [[SELF2:%.*]] = apply {{.*}}([[SELF1]])

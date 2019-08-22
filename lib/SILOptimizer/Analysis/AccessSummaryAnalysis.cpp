@@ -568,9 +568,7 @@ std::string AccessSummaryAnalysis::getSubPathDescription(
     os << ".";
 
     if (StructDecl *D = containingType.getStructOrBoundGenericStruct()) {
-      auto iter = D->getStoredProperties().begin();
-      std::advance(iter, index);
-      VarDecl *var = *iter;
+      VarDecl *var = D->getStoredProperties()[index];
       os << var->getBaseName();
       containingType = containingType.getFieldType(var, M);
       continue;

@@ -57,8 +57,8 @@ class ModuleFile
   /// A reference back to the AST representation of the file.
   FileUnit *FileContext = nullptr;
 
-  /// The module shadowed by this module, if any.
-  ModuleDecl *ShadowedModule = nullptr;
+  /// The module that this module is an overlay of, if any.
+  ModuleDecl *UnderlyingModule = nullptr;
 
   /// The module file data.
   std::unique_ptr<llvm::MemoryBuffer> ModuleInputBuffer;
@@ -87,45 +87,10 @@ class ModuleFile
   /// A callback to be invoked every time a type was deserialized.
   std::function<void(Type)> DeserializedTypeCallback;
 
-  /// The number of entities that are currently being deserialized.
-  unsigned NumCurrentDeserializingEntities = 0;
-
   /// Is this module file actually a .sib file? .sib files are serialized SIL at
   /// arbitrary granularity and arbitrary stage; unlike serialized Swift
   /// modules, which are assumed to contain canonical SIL for an entire module.
   bool IsSIB = false;
-
-  /// RAII class to be used when deserializing an entity.
-  class DeserializingEntityRAII {
-    ModuleFile &MF;
-
-  public:
-    DeserializingEntityRAII(ModuleFile &mf)
-        : MF(mf.getModuleFileForDelayedActions()) {
-      ++MF.NumCurrentDeserializingEntities;
-    }
-    ~DeserializingEntityRAII() {
-      assert(MF.NumCurrentDeserializingEntities > 0 &&
-             "Imbalanced currently-deserializing count?");
-      if (MF.NumCurrentDeserializingEntities == 1) {
-        MF.finishPendingActions();
-      }
-
-      --MF.NumCurrentDeserializingEntities;
-    }
-  };
-  friend class DeserializingEntityRAII;
-
-  /// Picks a specific ModuleFile instance to serve as the "delayer" for the
-  /// entire module.
-  ///
-  /// This is usually \c this, but when there are partial swiftmodules all
-  /// loaded for the same module it may be different.
-  ModuleFile &getModuleFileForDelayedActions();
-
-  /// Finish any pending actions that were waiting for the topmost entity to
-  /// be deserialized.
-  void finishPendingActions();
 
 public:
   /// Represents another module that has been imported as a dependency.
@@ -702,8 +667,8 @@ public:
     return Dependencies;
   }
 
-  /// The module shadowed by this module, if any.
-  ModuleDecl *getShadowedModule() const { return ShadowedModule; }
+  /// The module that this module is an overlay for, if any.
+  ModuleDecl *getUnderlyingModule() const { return UnderlyingModule; }
 
   /// Searches the module's top-level decls for the given identifier.
   void lookupValue(DeclName name, SmallVectorImpl<ValueDecl*> &results);
@@ -827,14 +792,18 @@ public:
   loadAllConformances(const Decl *D, uint64_t contextData,
                     SmallVectorImpl<ProtocolConformance*> &Conforms) override;
 
-  virtual TypeLoc loadAssociatedTypeDefault(const AssociatedTypeDecl *ATD,
-                                            uint64_t contextData) override;
+  virtual Type loadAssociatedTypeDefault(const AssociatedTypeDecl *ATD,
+                                         uint64_t contextData) override;
 
   virtual void finishNormalConformance(NormalProtocolConformance *conformance,
                                        uint64_t contextData) override;
 
   GenericEnvironment *loadGenericEnvironment(const DeclContext *decl,
                                              uint64_t contextData) override;
+
+  void
+  loadRequirementSignature(const ProtocolDecl *proto, uint64_t contextData,
+                           SmallVectorImpl<Requirement> &requirements) override;
 
   Optional<StringRef> getGroupNameById(unsigned Id) const;
   Optional<StringRef> getSourceFileNameById(unsigned Id) const;

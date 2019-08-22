@@ -97,7 +97,7 @@ TEST(DeclSyntaxTests, TypealiasMakeAPIs) {
     auto GenericArgs = GenericArgumentClauseSyntaxBuilder()
       .useLeftAngleBracket(LeftAngle)
       .useRightAngleBracket(SyntaxFactory::makeRightAngleToken({}, {}))
-      .addGenericArgument(ElementArg)
+      .addArgument(ElementArg)
       .build();
 
     auto Array = SyntaxFactory::makeIdentifier("Array", {}, {});
@@ -135,7 +135,7 @@ TEST(DeclSyntaxTests, TypealiasWithAPIs) {
   auto GenericArgs = GenericArgumentClauseSyntaxBuilder()
     .useLeftAngleBracket(LeftAngle)
     .useRightAngleBracket(SyntaxFactory::makeRightAngleToken({}, {}))
-    .addGenericArgument(ElementArg)
+    .addArgument(ElementArg)
     .build();
 
   auto Array = SyntaxFactory::makeIdentifier("Array", {}, {});
@@ -181,7 +181,7 @@ TEST(DeclSyntaxTests, TypealiasBuilderAPIs) {
   auto GenericArgs = GenericArgumentClauseSyntaxBuilder()
     .useLeftAngleBracket(LeftAngle)
     .useRightAngleBracket(SyntaxFactory::makeRightAngleToken({}, {}))
-    .addGenericArgument(ElementArg)
+    .addArgument(ElementArg)
     .build();
 
   auto Array = SyntaxFactory::makeIdentifier("Array", {}, {});

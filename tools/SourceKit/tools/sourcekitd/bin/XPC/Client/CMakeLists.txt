@@ -11,7 +11,7 @@ add_sourcekit_framework(sourcekitd
   ${public_headers}
   sourcekitd.cpp
   LINK_LIBS sourcekitdAPI
-  LLVM_COMPONENT_DEPENDS support
+  LLVM_LINK_COMPONENTS support
   MODULEMAP module.modulemap
   INSTALL_IN_COMPONENT sourcekit-xpc-service
 )

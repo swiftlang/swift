@@ -19,8 +19,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef __SWIFT_AST_ASTDEMANGLER_H__
-#define __SWIFT_AST_ASTDEMANGLER_H__
+#ifndef SWIFT_AST_ASTDEMANGLER_H
+#define SWIFT_AST_ASTDEMANGLER_H
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
@@ -87,7 +87,7 @@ public:
   Type createBoundGenericType(GenericTypeDecl *decl, ArrayRef<Type> args);
   
   Type resolveOpaqueType(NodePointer opaqueDescriptor,
-                         ArrayRef<Type> args,
+                         ArrayRef<ArrayRef<Type>> args,
                          unsigned ordinal);
 
   Type createBoundGenericType(GenericTypeDecl *decl, ArrayRef<Type> args,
@@ -185,4 +185,4 @@ private:
 
 }  // namespace swift
 
-#endif  // __SWIFT_AST_ASTDEMANGLER_H__
+#endif  // SWIFT_AST_ASTDEMANGLER_H

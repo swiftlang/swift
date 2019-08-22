@@ -84,9 +84,10 @@ void simple_display(llvm::raw_ostream &out, ArithmeticExpr *expr) {
 /// Rule to evaluate the value of the expression.
 template<typename Derived, CacheKind Caching>
 struct EvaluationRule
-  : public SimpleRequest<Derived, Caching, double, ArithmeticExpr *>
+  : public SimpleRequest<Derived, double(ArithmeticExpr *), Caching>
 {
-  using SimpleRequest<Derived, Caching, double, ArithmeticExpr *>::SimpleRequest;
+  using SimpleRequest<Derived, double(ArithmeticExpr *), Caching>
+      ::SimpleRequest;
 
   llvm::Expected<double>
   evaluate(Evaluator &evaluator, ArithmeticExpr *expr) const {
@@ -116,8 +117,7 @@ struct EvaluationRule
     }
   }
 
-  void diagnoseCycle(DiagnosticEngine &diags) const { }
-  void noteCycleStep(DiagnosticEngine &diags) const { }
+  SourceLoc getNearestLoc() const { return SourceLoc(); }
 };
 
 struct InternallyCachedEvaluationRule :
@@ -211,7 +211,7 @@ TEST(ArithmeticEvaluator, Simple) {
 
   SourceManager sourceMgr;
   DiagnosticEngine diags(sourceMgr);
-  Evaluator evaluator(diags, CycleDiagnosticKind::FullDiagnose);
+  Evaluator evaluator(diags);
   evaluator.registerRequestFunctions(SWIFT_ARITHMETIC_EVALUATOR_ZONE,
                                      arithmeticRequestFunctions);
 
@@ -334,7 +334,7 @@ TEST(ArithmeticEvaluator, Cycle) {
 
   SourceManager sourceMgr;
   DiagnosticEngine diags(sourceMgr);
-  Evaluator evaluator(diags, CycleDiagnosticKind::FullDiagnose);
+  Evaluator evaluator(diags);
   evaluator.registerRequestFunctions(SWIFT_ARITHMETIC_EVALUATOR_ZONE,
                                      arithmeticRequestFunctions);
 

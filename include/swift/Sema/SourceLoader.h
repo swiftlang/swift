@@ -48,6 +48,11 @@ public:
   SourceLoader &operator=(const SourceLoader &) = delete;
   SourceLoader &operator=(SourceLoader &&) = delete;
 
+  /// Append visible module names to \p names. Note that names are possibly
+  /// duplicated, and not guaranteed to be ordered in any way.
+  void collectVisibleTopLevelModuleNames(
+      SmallVectorImpl<Identifier> &names) const override;
+
   /// Check whether the module with a given name can be imported without
   /// importing it.
   ///

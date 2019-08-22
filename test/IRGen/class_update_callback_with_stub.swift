@@ -3,13 +3,16 @@
 // RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/resilient_struct.swiftmodule -I %t %S/../Inputs/resilient_struct.swift
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -emit-module-path %t/resilient_class.swiftmodule -enable-library-evolution %S/../Inputs/resilient_class.swift
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -emit-module-path %t/resilient_objc_class.swiftmodule -enable-library-evolution %S/../Inputs/resilient_objc_class.swift
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -I %t -emit-ir -enable-library-evolution -enable-resilient-objc-class-stubs %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-%target-runtime -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -I %t -emit-ir -enable-library-evolution -target %target-next-stable-abi-triple %s > %t/out
+// RUN: %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-%target-runtime -DINT=i%target-ptrsize < %t/out
+// RUN: %FileCheck %s --check-prefix=NEGATIVE < %t/out
 
 import Foundation
 import resilient_class
 import resilient_objc_class
 
 // REQUIRES: objc_interop
+// REQUIRES: swift_stable_abi
 
 // -- Nominal type descriptor for ResilientSubclass
 // the interesting part is the 'extra class flags' field has a value of 1.
@@ -49,6 +52,8 @@ import resilient_objc_class
 // CHECK-SAME: @"got.$s15resilient_class22ResilientOutsideParentCMn"
 // CHECK-SAME: @"got.$s15resilient_class22ResilientOutsideParentCACycfCTq"
 // CHECK-SAME: @"$s31class_update_callback_with_stub17ResilientSubclassCACycfC"
+// -- class stub
+// CHECK-SAME: @"$s31class_update_callback_with_stub17ResilientSubclassCMt"
 // CHECK-SAME: }>, section "__TEXT,__const", align 4
 
 
@@ -87,22 +92,27 @@ import resilient_objc_class
 // CHECK-LABEL: @"_CATEGORY__TtC31class_update_callback_with_stub27FixedLayoutNSObjectSubclass_$_class_update_callback_with_stub" = private constant
 // CHECK-SAME:  @"$s31class_update_callback_with_stub27FixedLayoutNSObjectSubclassCMs"
 
+// -- But not if the entire inheritance chain is in a single module
 
-// -- The NSObject-derived class appears on the class list
+// CHECK-LABEL: @"_CATEGORY__TtC15resilient_class22ResilientOutsideParent_$_class_update_callback_with_stub" = private constant
+// CHECK-SAME:  @"$s15resilient_class22ResilientOutsideParentCN"
 
-// CHECK-LABEL: @objc_classes = internal global
-// CHECK-SAME: @"$s31class_update_callback_with_stub25ResilientNSObjectSubclassCMs"
-// CHECK-SAME: @"$s31class_update_callback_with_stub27FixedLayoutNSObjectSubclassCMs"
-// CHECK-SAME: , section "__DATA,__objc_classlist,regular,no_dead_strip"
 
+// -- Class stubs do not appear in the class list
+
+// NEGATIVE-NOT: @objc_classes =
 
 // -- The category list
 
 // CHECK-LABEL: @objc_categories = internal global
+// CHECK-SAME: @"_CATEGORY__TtC15resilient_class22ResilientOutsideParent_$_class_update_callback_with_stub"
+// CHECK-SAME: , section "__DATA,__objc_catlist,regular,no_dead_strip"
+
+// CHECK-LABEL: @objc_categories_stubs = internal global
 // CHECK-SAME: @"_CATEGORY__TtC31class_update_callback_with_stub17ResilientSubclass_$_class_update_callback_with_stub"
 // CHECK-SAME: @"_CATEGORY__TtC31class_update_callback_with_stub25ResilientNSObjectSubclass_$_class_update_callback_with_stub"
 // CHECK-SAME: @"_CATEGORY__TtC31class_update_callback_with_stub27FixedLayoutNSObjectSubclass_$_class_update_callback_with_stub"
-// CHECK-SAME: , section "__DATA,__objc_catlist,regular,no_dead_strip"
+// CHECK-SAME: , section "__DATA,__objc_catlist2,regular,no_dead_strip"
 
 
 // -- Address point for class stubs
@@ -152,4 +162,8 @@ extension ResilientNSObjectSubclass {
 
 extension FixedLayoutNSObjectSubclass {
   @objc public func objcMethod() {}
+}
+
+extension ResilientOutsideParent {
+  @objc public func anObjcMethod() {}
 }

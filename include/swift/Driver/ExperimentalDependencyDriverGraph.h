@@ -468,4 +468,4 @@ private:
 } // namespace experimental_dependencies
 } // namespace swift
 
-#endif /* ExperimentalDependencyGraph_h */
+#endif // ExperimentalDependencyGraph_h

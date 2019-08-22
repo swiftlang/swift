@@ -9,6 +9,7 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+///
 /// \file This implements the logic for loading and building parseable module
 /// interfaces.
 ///
@@ -102,19 +103,25 @@
 ///
 //===----------------------------------------------------------------------===//
 
+#ifndef SWIFT_FRONTEND_PARSEABLEINTERFACEMODULELOADER_H
+#define SWIFT_FRONTEND_PARSEABLEINTERFACEMODULELOADER_H
+
 #include "swift/Basic/LLVM.h"
 #include "swift/Frontend/ParseableInterfaceSupport.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 
 namespace clang {
-  class CompilerInstance;
+class CompilerInstance;
 }
 
 namespace unittest {
-  class ParseableInterfaceModuleLoaderTest;
+class ParseableInterfaceModuleLoaderTest;
 }
 
 namespace swift {
+
+class LangOptions;
+class SearchPathOptions;
 
 /// A ModuleLoader that runs a subordinate \c CompilerInvocation and
 /// \c CompilerInstance to convert .swiftinterface files to .swiftmodule
@@ -122,16 +129,18 @@ namespace swift {
 /// directory, and loading the serialized .swiftmodules from there.
 class ParseableInterfaceModuleLoader : public SerializedModuleLoaderBase {
   friend class unittest::ParseableInterfaceModuleLoaderTest;
-  explicit ParseableInterfaceModuleLoader(ASTContext &ctx, StringRef cacheDir,
-                                          StringRef prebuiltCacheDir,
-                                          DependencyTracker *tracker,
-                                          ModuleLoadingMode loadMode)
+  explicit ParseableInterfaceModuleLoader(
+      ASTContext &ctx, StringRef cacheDir, StringRef prebuiltCacheDir,
+      DependencyTracker *tracker, ModuleLoadingMode loadMode,
+      bool RemarkOnRebuildFromInterface)
   : SerializedModuleLoaderBase(ctx, tracker, loadMode),
-  CacheDir(cacheDir), PrebuiltCacheDir(prebuiltCacheDir)
+  CacheDir(cacheDir), PrebuiltCacheDir(prebuiltCacheDir),
+  RemarkOnRebuildFromInterface(RemarkOnRebuildFromInterface)
   {}
 
   std::string CacheDir;
   std::string PrebuiltCacheDir;
+  bool RemarkOnRebuildFromInterface;
 
   std::error_code findModuleFilesInDirectory(
     AccessPathElem ModuleID, StringRef DirPath, StringRef ModuleFilename,
@@ -144,21 +153,30 @@ class ParseableInterfaceModuleLoader : public SerializedModuleLoaderBase {
 public:
   static std::unique_ptr<ParseableInterfaceModuleLoader>
   create(ASTContext &ctx, StringRef cacheDir, StringRef prebuiltCacheDir,
-         DependencyTracker *tracker, ModuleLoadingMode loadMode) {
+         DependencyTracker *tracker, ModuleLoadingMode loadMode,
+         bool RemarkOnRebuildFromInterface = false) {
     return std::unique_ptr<ParseableInterfaceModuleLoader>(
       new ParseableInterfaceModuleLoader(ctx, cacheDir, prebuiltCacheDir,
-                                         tracker, loadMode));
+                                         tracker, loadMode,
+                                         RemarkOnRebuildFromInterface));
   }
+
+  /// Append visible module names to \p names. Note that names are possibly
+  /// duplicated, and not guaranteed to be ordered in any way.
+  void collectVisibleTopLevelModuleNames(
+      SmallVectorImpl<Identifier> &names) const override;
 
   /// Unconditionally build \p InPath (a swiftinterface file) to \p OutPath (as
   /// a swiftmodule file).
   ///
-  /// A simplified version of the core logic in #openModuleFiles, mostly for
-  /// testing purposes.
+  /// A simplified version of the core logic in #openModuleFiles.
   static bool buildSwiftModuleFromSwiftInterface(
-    ASTContext &Ctx, StringRef CacheDir, StringRef PrebuiltCacheDir,
+    SourceManager &SourceMgr, DiagnosticEngine &Diags,
+    const SearchPathOptions &SearchPathOpts, const LangOptions &LangOpts,
+    StringRef CacheDir, StringRef PrebuiltCacheDir,
     StringRef ModuleName, StringRef InPath, StringRef OutPath,
-    bool SerializeDependencyHashes, bool TrackSystemDependencies);
+    bool SerializeDependencyHashes, bool TrackSystemDependencies,
+    bool RemarkOnRebuildFromInterface);
 };
 
 /// Extract the specified-or-defaulted -module-cache-path that winds up in
@@ -168,3 +186,5 @@ std::string
 getModuleCachePathFromClang(const clang::CompilerInstance &Instance);
 
 }
+
+#endif

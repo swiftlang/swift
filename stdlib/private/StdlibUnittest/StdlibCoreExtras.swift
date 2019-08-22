@@ -268,7 +268,7 @@ public func _isStdlibDebugConfiguration() -> Bool {
 #endif
 }
 
-@_fixed_layout
+@frozen
 public struct LinearCongruentialGenerator: RandomNumberGenerator {
 
   @usableFromInline

@@ -335,7 +335,8 @@ internal enum Colors {
   {
     key.kind: source.lang.swift.ref.module,
     key.offset: 94,
-    key.length: 6
+    key.length: 6,
+    key.is_system: 1
   },
   {
     key.kind: source.lang.swift.ref.struct,
@@ -584,6 +585,26 @@ internal enum Colors {
         key.length: 24,
         key.typename: "(Int, Int)",
         key.nameoffset: 564,
+        key.namelength: 2,
+        key.docoffset: 527,
+        key.doclength: 19,
+        key.attributes: [
+          {
+            key.offset: 550,
+            key.length: 8,
+            key.attribute: source.decl.attribute.internal
+          }
+        ]
+      },
+      {
+        key.kind: source.lang.swift.decl.var.instance,
+        key.accessibility: source.lang.swift.accessibility.internal,
+        key.setter_accessibility: source.lang.swift.accessibility.internal,
+        key.name: "p2",
+        key.offset: 559,
+        key.length: 24,
+        key.typename: "(Int, Int)",
+        key.nameoffset: 568,
         key.namelength: 2,
         key.docoffset: 527,
         key.doclength: 19,

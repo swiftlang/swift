@@ -57,3 +57,21 @@ extension undeclared { // expected-error{{use of undeclared type 'undeclared'}}
   @_dynamicReplacement(for: func) // expected-error{{replaced function 'func' could not be found}}
   func func2() -> Int { return 2 }
 }
+
+extension P {
+  @_dynamicReplacement(for: v)
+  var replacement_v : Int {
+    return 1
+  }
+
+  @_dynamicReplacement(for: subscript(_:))
+  subscript(y y: Int) -> Int {
+    get {
+      return 1
+    }
+  }
+
+  @_dynamicReplacement(for: f())
+  func replacement_f() {
+  }
+}

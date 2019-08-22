@@ -17,8 +17,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if !(defined(DIAG) || (defined(ERROR) && defined(WARNING) && defined(NOTE)))
-#  error Must define either DIAG or the set {ERROR,WARNING,NOTE}
+#if !(defined(DIAG) || (defined(ERROR) && defined(WARNING) && defined(NOTE) && defined(REMARK)))
+#  error Must define either DIAG or the set {ERROR,WARNING,NOTE,REMARK}
 #endif
 
 #ifndef ERROR
@@ -36,11 +36,18 @@
   DIAG(NOTE,ID,Options,Text,Signature)
 #endif
 
+#ifndef REMARK
+#  define REMARK(ID,Options,Text,Signature) \
+  DIAG(REMARK,ID,Options,Text,Signature)
+#endif
+
 WARNING(warning_from_clang,none,
   "%0", (StringRef))
 ERROR(error_from_clang,none,
   "%0", (StringRef))
 NOTE(note_from_clang,none,
+  "%0", (StringRef))
+REMARK(remark_from_clang,none,
   "%0", (StringRef))
 
 ERROR(clang_cannot_build_module,Fatal,
@@ -95,4 +102,5 @@ WARNING(clang_vfs_overlay_is_ignored,none,
 # undef NOTE
 # undef WARNING
 # undef ERROR
+# undef REMARK
 #endif

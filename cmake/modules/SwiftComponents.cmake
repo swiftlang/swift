@@ -127,40 +127,28 @@ function(swift_is_installing_component component result_var_name)
   endif()
 endfunction()
 
-# swift_install_in_component(<COMPONENT NAME>
-#   <same parameters as install()>)
+# swift_install_in_component(<same parameters as install()>)
 #
 # Executes the specified installation actions if the named component is
 # requested to be installed.
 #
 # This function accepts the same parameters as install().
-function(swift_install_in_component component)
-  precondition(component MESSAGE "Component name is required")
+function(swift_install_in_component)
+  cmake_parse_arguments(
+      ARG # prefix
+      "" # options
+      "COMPONENT" # single-value args
+      "" # multi-value args
+      ${ARGN})
 
-  swift_is_installing_component("${component}" is_installing)
+  precondition(ARG_COMPONENT MESSAGE "Component name is required")
+
+  swift_is_installing_component("${ARG_COMPONENT}" is_installing)
   if(NOT is_installing)
     return()
   endif()
 
   install(${ARGN})
-endfunction()
-
-# swift_install_in_either_component(<COMPONENT1 NAME> <COMPONENT2 NAME>
-#   <same parameters as install()>)
-#
-# Executes the specified installation actions if either one of the named
-# components is requested to be installed.
-#
-# This function accepts the same parameters as install().
-function(swift_install_in_either_component comp1 comp2)
-  foreach(component ${comp1} ${comp2})
-    precondition(component MESSAGE "Component name is required")
-    swift_is_installing_component("${component}" is_installing)
-    if(is_installing)
-      install(${ARGN})
-      return()
-    endif()
-  endforeach(component)
 endfunction()
 
 function(swift_install_symlink_component component)

@@ -27,7 +27,7 @@ enum MyEnum {
 // STATIC_PRIMARY: Begin completion
 // STATIC_PRIMARY-DAG: Decl[LocalVar]/Local:               self[#MyEnum.Type#]; name=self
 // STATIC_PRIMARY-DAG: Decl[EnumElement]/CurrNominal:      `class`({#struct: String#})[#MyEnum#]; name=`class`(struct: String)
-// STATIC_PRIMARY-DAG: Decl[EnumElement]/CurrNominal:      `let`({#`var`: String#})[#MyEnum#]; name=`let`(`var`: String)
+// STATIC_PRIMARY-DAG: Decl[EnumElement]/CurrNominal:      `let`({#var: String#})[#MyEnum#]; name=`let`(var: String)
 // STATIC_PRIMARY-DAG: Decl[StaticMethod]/CurrNominal:     `public`({#private: String#})[#Int#]; name=`public`(private: String)
 // STATIC_PRIMARY-DAG: Decl[InstanceMethod]/CurrNominal:   `init`({#(self): MyEnum#})[#(deinit: String) -> Int#]; name=`init`(self: MyEnum)
 // STATIC_PRIMARY-DAG: Decl[InstanceMethod]/CurrNominal:   `if`({#(self): MyEnum#})[#(else: String) -> Int#]; name=`if`(self: MyEnum)
@@ -37,7 +37,7 @@ enum MyEnum {
 // STATIC_SELF_NODOT: Begin completions
 // STATIC_SELF_NODOT-DAG: Keyword[self]/CurrNominal:          .self[#MyEnum.Type#]; name=self
 // STATIC_SELF_NODOT-DAG: Decl[EnumElement]/CurrNominal:      .class({#struct: String#})[#MyEnum#]; name=class(struct: String)
-// STATIC_SELF_NODOT-DAG: Decl[EnumElement]/CurrNominal:      .let({#`var`: String#})[#MyEnum#]; name=let(`var`: String)
+// STATIC_SELF_NODOT-DAG: Decl[EnumElement]/CurrNominal:      .let({#var: String#})[#MyEnum#]; name=let(var: String)
 // STATIC_SELF_NODOT-DAG: Decl[Constructor]/CurrNominal:      .init({#init: String#})[#MyEnum#]; name=init(init: String)
 // STATIC_SELF_NODOT-DAG: Decl[StaticMethod]/CurrNominal:     .public({#private: String#})[#Int#]; name=public(private: String)
 // STATIC_SELF_NODOT-DAG: Decl[InstanceMethod]/CurrNominal:   .`init`({#(self): MyEnum#})[#(deinit: String) -> Int#]; name=`init`(self: MyEnum)
@@ -48,7 +48,7 @@ enum MyEnum {
 // STATIC_SELF_DOT: Begin completions
 // STATIC_SELF_DOT-DAG: Keyword[self]/CurrNominal:          self[#MyEnum.Type#]; name=self
 // STATIC_SELF_DOT-DAG: Decl[EnumElement]/CurrNominal:      class({#struct: String#})[#MyEnum#]; name=class(struct: String)
-// STATIC_SELF_DOT-DAG: Decl[EnumElement]/CurrNominal:      let({#`var`: String#})[#MyEnum#]; name=let(`var`: String)
+// STATIC_SELF_DOT-DAG: Decl[EnumElement]/CurrNominal:      let({#var: String#})[#MyEnum#]; name=let(var: String)
 // STATIC_SELF_DOT-DAG: Decl[Constructor]/CurrNominal:      init({#init: String#})[#MyEnum#]; name=init(init: String)
 // STATIC_SELF_DOT-DAG: Decl[StaticMethod]/CurrNominal:     public({#private: String#})[#Int#]; name=public(private: String)
 // STATIC_SELF_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   `init`({#(self): MyEnum#})[#(deinit: String) -> Int#]; name=`init`(self: MyEnum)

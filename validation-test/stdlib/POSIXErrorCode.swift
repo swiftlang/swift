@@ -1,12 +1,7 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 //
-// REQUIRES: OS=macosx
-// REQUIRES: OS=ios
-// REQUIRES: OS=tvos
-// REQUIRES: OS=watchos
-// REQUIRES: OS=linux-androideabi
-// REQUIRES: OS=linux-gnu
+// REQUIRES-ANY: OS=macosx, OS=ios, OS=tvos, OS=watchos, OS=linux-androideabi, OS=linux-android, OS=linux-gnu
 
 import Swift
 import StdlibUnittest
@@ -163,3 +158,5 @@ POSIXErrorCodeTestSuite.test("Linux POSIX error codes constants") {
 }
 
 #endif
+
+runAllTests()

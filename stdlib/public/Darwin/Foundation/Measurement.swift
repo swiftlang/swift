@@ -36,8 +36,19 @@ public struct Measurement<UnitType : Unit> : ReferenceConvertible, Comparable, E
         self.unit = unit
     }
 
-    public var hashValue: Int {
-        return Int(bitPattern: __CFHashDouble(value))
+    public func hash(into hasher: inout Hasher) {
+        // Warning: The canonicalization performed here needs to be kept in
+        // perfect sync with the definition of == below. The floating point
+        // values that are compared there must match exactly with the values fed
+        // to the hasher here, or hashing would break.
+        if let dimension = unit as? Dimension {
+            // We don't need to feed the base unit to the hasher here; all
+            // dimensional measurements of the same type share the same unit.
+            hasher.combine(dimension.converter.baseUnitValue(fromValue: value))
+        } else {
+            hasher.combine(unit)
+            hasher.combine(value)
+        }
     }
 }
 
@@ -170,6 +181,10 @@ extension Measurement {
     /// If `lhs.unit == rhs.unit`, returns `lhs.value == rhs.value`. Otherwise, converts `rhs` to the same unit as `lhs` and then compares the resulting values.
     /// - returns: `true` if the measurements are equal.
     public static func ==<LeftHandSideType, RightHandSideType>(lhs: Measurement<LeftHandSideType>, rhs: Measurement<RightHandSideType>) -> Bool {
+        // Warning: This defines an equivalence relation that needs to be kept
+        // in perfect sync with the hash(into:) definition above. The floating
+        // point values that are fed to the hasher there must match exactly with
+        // the values compared here, or hashing would break.
         if lhs.unit == rhs.unit {
             return lhs.value == rhs.value
         } else {

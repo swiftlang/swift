@@ -1684,17 +1684,48 @@ void IRGenFunction::emit##ID(llvm::Value *value, Address src) {       \
 
 llvm::Value *IRGenFunction::getLocalSelfMetadata() {
   assert(LocalSelf && "no local self metadata");
+
+  // If we already have a metatype, just return it.
+  if (SelfKind == SwiftMetatype)
+    return LocalSelf;
+
+  // We need to materialize a metatype. Emit the code for that once at the
+  // top of the function and cache the result.
+
+  // This is a slight optimization in the case of repeated access, but also
+  // needed for correctness; when an @objc convenience initializer replaces
+  // the 'self' value, we don't keep track of what the new 'self' value is
+  // in IRGen, so we can't just grab the first function argument and assume
+  // it's a valid 'self' at the point where DynamicSelfType metadata is needed.
+
+  // Note that if DynamicSelfType was modeled properly as an opened archetype,
+  // none of this would be an issue since it would be always be associated
+  // with the correct value.
+
+  llvm::IRBuilderBase::InsertPointGuard guard(Builder);
+  auto insertPt = isa<llvm::Instruction>(LocalSelf)
+                      ? std::next(llvm::BasicBlock::iterator(
+                            cast<llvm::Instruction>(LocalSelf)))
+                      : CurFn->getEntryBlock().begin();
+  Builder.SetInsertPoint(&CurFn->getEntryBlock(), insertPt);
+
   switch (SelfKind) {
   case SwiftMetatype:
-    return LocalSelf;
+    llvm_unreachable("Already handled");
   case ObjCMetatype:
-    return emitObjCMetadataRefForMetadata(*this, LocalSelf);
+    LocalSelf = emitObjCMetadataRefForMetadata(*this, LocalSelf);
+    SelfKind = SwiftMetatype;
+    break;
   case ObjectReference:
-    return emitDynamicTypeOfOpaqueHeapObject(*this, LocalSelf,
-                                             MetatypeRepresentation::Thick);
+    LocalSelf = emitDynamicTypeOfHeapObject(*this, LocalSelf,
+                                MetatypeRepresentation::Thick,
+                                SILType::getPrimitiveObjectType(LocalSelfType),
+                                /*allow artificial*/ false);
+    SelfKind = SwiftMetatype;
+    break;
   }
 
-  llvm_unreachable("Not a valid LocalSelfKind.");
+  return LocalSelf;
 }
 
 /// Given a non-tagged object pointer, load a pointer to its class object.
@@ -1810,9 +1841,25 @@ llvm::Value *irgen::emitHeapMetadataRefForHeapObject(IRGenFunction &IGF,
 
 /// Given an opaque class instance pointer, produce the type metadata reference
 /// as a %type*.
-llvm::Value *irgen::emitDynamicTypeOfOpaqueHeapObject(IRGenFunction &IGF,
+///
+/// You should only use this if you have an untyped object pointer with absolutely no type information.
+/// Generally, it's better to use \c emitDynamicTypeOfHeapObject, which will
+/// use the most efficient possible access pattern to get the dynamic type based on
+/// the static type information.
+static llvm::Value *emitDynamicTypeOfOpaqueHeapObject(IRGenFunction &IGF,
                                                   llvm::Value *object,
                                                   MetatypeRepresentation repr) {
+  if (!IGF.IGM.ObjCInterop) {
+    // Without objc interop, getting the dynamic type of an object is always
+    // just a load of the isa pointer.
+
+    assert(repr == MetatypeRepresentation::Thick
+           && "objc metatypes should not occur without objc interop, "
+              "and thin metadata should not be requested here");
+    return emitLoadOfHeapMetadataRef(IGF, object, IsaEncoding::Pointer,
+                                     /*suppressCast*/ false);
+  }
+  
   object = IGF.Builder.CreateBitCast(object, IGF.IGM.ObjCPtrTy);
   llvm::CallInst *metadata;
   

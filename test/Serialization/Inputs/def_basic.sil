@@ -1036,10 +1036,22 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
 // CHECK: sil public_external [transparent] [serialized] @cond_fail_test : $@convention(thin) (Builtin.Int1) -> () {
 sil [transparent] [serialized] @cond_fail_test : $@convention(thin) (Builtin.Int1) -> () {
 entry(%0 : $Builtin.Int1):
-  // CHECK: cond_fail %0 : $Builtin.Int1
-  cond_fail %0 : $Builtin.Int1
+  // CHECK: cond_fail %0 : $Builtin.Int1, "message"
+  cond_fail %0 : $Builtin.Int1, "message"
   %1 = tuple ()
   return %1 : $()
+}
+
+// CHECK-LABEL: sil public_external [transparent] [serialized] @test_dynamic_lifetime_flag : $@convention(thin) () -> ()
+sil [transparent] [serialized] @test_dynamic_lifetime_flag : $@convention(thin) () -> () {
+bb0:
+  // CHECK: alloc_box [dynamic_lifetime] $<τ_0_0> { var τ_0_0 } <AnyObject>
+  %0 = alloc_box [dynamic_lifetime] $<τ_0_0> { var τ_0_0 } <AnyObject>
+  // CHECK: alloc_stack [dynamic_lifetime] $AnyObject
+  %1 = alloc_stack [dynamic_lifetime] $AnyObject
+  dealloc_stack %1 : $*AnyObject
+  %2 = tuple ()
+  return %2 : $()
 }
 
 // CHECK-LABEL: sil public_external [transparent] [serialized] @block_storage_type
@@ -1502,6 +1514,7 @@ bb0:
   %119 = function_ref @test_pointer_to_address : $@convention(thin) (Builtin.RawPointer, X) -> ()
   %120 = function_ref @test_bind_memory : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> ()
   %121 = function_ref @cond_fail_test : $@convention(thin) (Builtin.Int1) -> ()
+  %122 = function_ref @test_dynamic_lifetime_flag : $@convention(thin) () -> ()
 
   %124 = function_ref @block_storage_type : $@convention(thin) (Int) -> @convention(block) () -> ()
   %127 = function_ref @bitcasts : $@convention(thin) (@owned Class1) -> @owned (Class2, Int)

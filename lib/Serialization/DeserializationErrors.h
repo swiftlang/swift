@@ -38,6 +38,7 @@ class XRefTracePath {
       Extension,
       GenericParam,
       PrivateDiscriminator,
+      OpaqueReturnType,
       Unknown
     };
 
@@ -61,6 +62,7 @@ class XRefTracePath {
       case Kind::Value:
       case Kind::Operator:
       case Kind::PrivateDiscriminator:
+      case Kind::OpaqueReturnType:
         return getDataAs<DeclBaseName>();
       case Kind::Type:
       case Kind::OperatorFilter:
@@ -146,6 +148,9 @@ class XRefTracePath {
       case Kind::PrivateDiscriminator:
         os << "(in " << getDataAs<Identifier>() << ")";
         break;
+      case Kind::OpaqueReturnType:
+        os << "opaque return type of " << getDataAs<DeclBaseName>();
+        break;
       case Kind::Unknown:
         os << "unknown xref kind " << getDataAs<uintptr_t>();
         break;
@@ -196,6 +201,10 @@ public:
   void addUnknown(uintptr_t kind) {
     path.push_back({ PathPiece::Kind::Unknown, kind });
   }
+  
+  void addOpaqueReturnType(Identifier name) {
+    path.push_back({ PathPiece::Kind::OpaqueReturnType, name });
+  }
 
   DeclBaseName getLastName() const {
     for (auto &piece : reversed(path)) {
@@ -227,14 +236,14 @@ class DeclDeserializationError : public llvm::ErrorInfoBase {
 public:
   enum Flag : unsigned {
     DesignatedInitializer = 1 << 0,
-    NeedsVTableEntry = 1 << 1,
-    NeedsFieldOffsetVectorEntry = 1 << 2,
+    NeedsFieldOffsetVectorEntry = 1 << 1,
   };
   using Flags = OptionSet<Flag>;
 
 protected:
   DeclName name;
   Flags flags;
+  uint8_t numVTableEntries = 0;
 
 public:
   DeclName getName() const {
@@ -244,8 +253,8 @@ public:
   bool isDesignatedInitializer() const {
     return flags.contains(Flag::DesignatedInitializer);
   }
-  bool needsVTableEntry() const {
-    return flags.contains(Flag::NeedsVTableEntry);
+  unsigned getNumberOfVTableEntries() const {
+    return numVTableEntries;
   }
   bool needsFieldOffsetVectorEntry() const {
     return flags.contains(Flag::NeedsFieldOffsetVectorEntry);
@@ -310,9 +319,11 @@ private:
   void anchor() override;
 
 public:
-  explicit OverrideError(DeclName name, Flags flags = {}) {
+  explicit OverrideError(DeclName name,
+                         Flags flags={}, unsigned numVTableEntries=0) {
     this->name = name;
     this->flags = flags;
+    this->numVTableEntries = numVTableEntries;
   }
 
   void log(raw_ostream &OS) const override {
@@ -332,10 +343,11 @@ class TypeError : public llvm::ErrorInfo<TypeError, DeclDeserializationError> {
   std::unique_ptr<ErrorInfoBase> underlyingReason;
 public:
   explicit TypeError(DeclName name, std::unique_ptr<ErrorInfoBase> reason,
-                     Flags flags = {})
+                     Flags flags={}, unsigned numVTableEntries=0)
       : underlyingReason(std::move(reason)) {
     this->name = name;
     this->flags = flags;
+    this->numVTableEntries = numVTableEntries;
   }
 
   void log(raw_ostream &OS) const override {

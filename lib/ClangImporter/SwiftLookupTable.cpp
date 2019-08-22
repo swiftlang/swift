@@ -81,6 +81,9 @@ public:
                               llvm::BitstreamWriter &stream) override;
 
   void populateTable(SwiftLookupTable &table, NameImporter &);
+
+  void populateTableWithDecl(SwiftLookupTable &table,
+                             NameImporter &nameImporter, clang::Decl *decl);
 };
 
 /// Module file extension reader for the Swift lookup tables.
@@ -192,6 +195,14 @@ translateDeclToContext(clang::NamedDecl *decl) {
     return None;
   }
 
+  // Namespace declaration.
+  if (auto namespaceDecl = dyn_cast<clang::NamespaceDecl>(decl)) {
+    if (namespaceDecl->getIdentifier())
+      return std::make_pair(SwiftLookupTable::ContextKind::Tag,
+                            namespaceDecl->getName());
+    return None;
+  }
+
   // Objective-C class context.
   if (auto objcClass = dyn_cast<clang::ObjCInterfaceDecl>(decl))
     return std::make_pair(SwiftLookupTable::ContextKind::ObjCClass,
@@ -226,6 +237,11 @@ auto SwiftLookupTable::translateDeclContext(const clang::DeclContext *dc)
   // Tag declaration context.
   if (auto tag = dyn_cast<clang::TagDecl>(dc))
     return translateDeclToContext(const_cast<clang::TagDecl *>(tag));
+
+  // Namespace declaration context.
+  if (auto namespaceDecl = dyn_cast<clang::NamespaceDecl>(dc))
+    return translateDeclToContext(
+        const_cast<clang::NamespaceDecl *>(namespaceDecl));
 
   // Objective-C class context.
   if (auto objcClass = dyn_cast<clang::ObjCInterfaceDecl>(dc))
@@ -1669,7 +1685,7 @@ void importer::addEntryToLookupTable(SwiftLookupTable &table,
   // Walk the members of any context that can have nested members.
   if (isa<clang::TagDecl>(named) || isa<clang::ObjCInterfaceDecl>(named) ||
       isa<clang::ObjCProtocolDecl>(named) ||
-      isa<clang::ObjCCategoryDecl>(named)) {
+      isa<clang::ObjCCategoryDecl>(named) || isa<clang::NamespaceDecl>(named)) {
     clang::DeclContext *dc = cast<clang::DeclContext>(named);
     for (auto member : dc->decls()) {
       if (auto namedMember = dyn_cast<clang::NamedDecl>(member))
@@ -1793,21 +1809,35 @@ void importer::finalizeLookupTable(SwiftLookupTable &table,
   }
 }
 
+void SwiftLookupTableWriter::populateTableWithDecl(SwiftLookupTable &table,
+                                                   NameImporter &nameImporter,
+                                                   clang::Decl *decl) {
+  // Skip anything from an AST file.
+  if (decl->isFromASTFile())
+    return;
+
+  // Iterate into extern "C" {} type declarations.
+  if (auto linkageDecl = dyn_cast<clang::LinkageSpecDecl>(decl)) {
+    for (auto *decl : linkageDecl->noload_decls()) {
+      populateTableWithDecl(table, nameImporter, decl);
+    }
+    return;
+  }
+
+  // Skip non-named declarations.
+  auto named = dyn_cast<clang::NamedDecl>(decl);
+  if (!named)
+    return;
+
+  // Add this entry to the lookup table.
+  addEntryToLookupTable(table, named, nameImporter);
+}
+
 void SwiftLookupTableWriter::populateTable(SwiftLookupTable &table,
                                            NameImporter &nameImporter) {
   auto &sema = nameImporter.getClangSema();
   for (auto decl : sema.Context.getTranslationUnitDecl()->noload_decls()) {
-    // Skip anything from an AST file.
-    if (decl->isFromASTFile())
-      continue;
-
-    // Skip non-named declarations.
-    auto named = dyn_cast<clang::NamedDecl>(decl);
-    if (!named)
-      continue;
-
-    // Add this entry to the lookup table.
-    addEntryToLookupTable(table, named, nameImporter);
+    populateTableWithDecl(table, nameImporter, decl);
   }
 
   // Add macros to the lookup table.

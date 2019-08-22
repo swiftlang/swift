@@ -109,7 +109,10 @@ public:
   virtual Result<OpenedExistential>
   getDynamicTypeAndAddressForExistential(RemoteAddress object,
                                          Type staticType) = 0;
-
+  virtual Result<Type>
+  getUnderlyingTypeForOpaqueType(remote::RemoteAddress opaqueDescriptor,
+                                 SubstitutionMap substitutions,
+                                 unsigned ordinal) = 0;
   Result<uint64_t>
   getOffsetOfMember(Type type, RemoteAddress optMetadata, StringRef memberName){
     // Sanity check: obviously invalid arguments.
@@ -622,6 +625,20 @@ public:
     }
     llvm_unreachable("invalid type kind");
   }
+  
+  Result<Type>
+  getUnderlyingTypeForOpaqueType(remote::RemoteAddress opaqueDescriptor,
+                                 SubstitutionMap substitutions,
+                                 unsigned ordinal) override {
+    auto underlyingType = Reader
+      .readUnderlyingTypeForOpaqueTypeDescriptor(opaqueDescriptor.getAddressData(),
+                                                 ordinal);
+    
+    if (!underlyingType)
+      return getFailure<Type>();
+    
+    return underlyingType.subst(substitutions);
+  }
 };
 
 } // end anonymous namespace
@@ -691,4 +708,13 @@ RemoteASTContext::getDynamicTypeAndAddressForExistential(
     remote::RemoteAddress address, Type staticType) {
   return asImpl(Impl)->getDynamicTypeAndAddressForExistential(address,
                                                               staticType);
+}
+
+Result<Type>
+RemoteASTContext::getUnderlyingTypeForOpaqueType(
+    remote::RemoteAddress opaqueDescriptor,
+    SubstitutionMap substitutions,
+    unsigned ordinal) {
+  return asImpl(Impl)->getUnderlyingTypeForOpaqueType(opaqueDescriptor,
+                                                      substitutions, ordinal);
 }

@@ -242,9 +242,10 @@ private:
   /// Field metadata records that have already been lazily emitted, or are
   /// queued up.
   llvm::SmallPtrSet<NominalTypeDecl *, 4> LazilyEmittedFieldMetadata;
+
   struct LazyOpaqueInfo {
-    bool IsLazy = false;
     bool IsDescriptorUsed = false;
+    bool IsDescriptorEmitted = false;
   };
   /// The set of opaque types enqueued for lazy emission.
   llvm::DenseMap<OpaqueTypeDecl*, LazyOpaqueInfo> LazyOpaqueTypes;
@@ -579,6 +580,7 @@ public:
   };
   llvm::StructType *OffsetPairTy;      /// { iSize, iSize }
   llvm::StructType *FullTypeLayoutTy;  /// %swift.full_type_layout = { ... }
+  llvm::StructType *TypeLayoutTy;  /// %swift.type_layout = { ... }
   llvm::PointerType *TupleTypeMetadataPtrTy; /// %swift.tuple_type*
   llvm::StructType *FullHeapMetadataStructTy; /// %swift.full_heapmetadata = type { ... }
   llvm::PointerType *FullHeapMetadataPtrTy;/// %swift.full_heapmetadata*
@@ -818,6 +820,13 @@ public:
   }
 
   clang::CodeGen::CodeGenModule &getClangCGM() const;
+  
+  CanType getRuntimeReifiedType(CanType type);
+  CanType substOpaqueTypesWithUnderlyingTypes(CanType type);
+  SILType substOpaqueTypesWithUnderlyingTypes(SILType type);
+  std::pair<CanType, ProtocolConformanceRef>
+  substOpaqueTypesWithUnderlyingTypes(CanType type,
+                                      ProtocolConformanceRef conformance);
 
   bool isResilient(NominalTypeDecl *decl, ResilienceExpansion expansion);
   bool hasResilientMetadata(ClassDecl *decl, ResilienceExpansion expansion);
@@ -987,12 +996,14 @@ private:
   SmallVector<llvm::WeakTrackingVH, 4> ObjCNonLazyClasses;
   /// List of Objective-C categories, bitcast to i8*.
   SmallVector<llvm::WeakTrackingVH, 4> ObjCCategories;
+  /// List of Objective-C categories on class stubs, bitcast to i8*.
+  SmallVector<llvm::WeakTrackingVH, 4> ObjCCategoriesOnStubs;
   /// List of non-ObjC protocols described by this module.
   SmallVector<ProtocolDecl *, 4> SwiftProtocols;
   /// List of protocol conformances to generate descriptors for.
   std::vector<ConformanceDescription> ProtocolConformances;
-  /// List of nominal types to generate type metadata records for.
-  SmallVector<NominalTypeDecl *, 4> RuntimeResolvableTypes;
+  /// List of types to generate runtime-resolvable metadata records for.
+  SmallVector<GenericTypeDecl *, 4> RuntimeResolvableTypes;
   /// List of ExtensionDecls corresponding to the generated
   /// categories.
   SmallVector<ExtensionDecl*, 4> ObjCCategoryDecls;
@@ -1055,7 +1066,12 @@ public:
   /// reflection metadata.
   llvm::SetVector<CanType> BuiltinTypes;
 
-  llvm::Constant *getTypeRef(CanType type, MangledTypeRefRole role);
+  std::pair<llvm::Constant *, unsigned>
+  getTypeRef(Type type, GenericSignature *genericSig, MangledTypeRefRole role);
+  
+  std::pair<llvm::Constant *, unsigned>
+  getTypeRef(CanType type, MangledTypeRefRole role);
+  
   llvm::Constant *emitWitnessTableRefString(CanType type,
                                             ProtocolConformanceRef conformance,
                                             GenericSignature *genericSig,
@@ -1096,8 +1112,7 @@ public:
   llvm::Constant *getAddrOfBoxDescriptor(CanType boxedType);
 
   /// Produce an associated type witness that refers to the given type.
-  llvm::Constant *getAssociatedTypeWitness(CanType type,
-                                           bool inProtocolContext);
+  llvm::Constant *getAssociatedTypeWitness(Type type, bool inProtocolContext);
 
   void emitAssociatedTypeMetadataRecord(const RootProtocolConformance *C);
   void emitFieldDescriptor(const NominalTypeDecl *Decl);
@@ -1194,6 +1209,8 @@ public:
   void constructInitialFnAttributes(llvm::AttrBuilder &Attrs,
                                     OptimizationMode FuncOptMode =
                                       OptimizationMode::NotSet);
+  void setHasFramePointer(llvm::AttrBuilder &Attrs, bool HasFP);
+  void setHasFramePointer(llvm::Function *F, bool HasFP);
   llvm::AttributeList constructInitialAttributes();
 
   void emitProtocolDecl(ProtocolDecl *D);
@@ -1201,8 +1218,6 @@ public:
   void emitStructDecl(StructDecl *D);
   void emitClassDecl(ClassDecl *D);
   void emitExtension(ExtensionDecl *D);
-  void emitFuncDecl(FuncDecl *D);
-  void emitAbstractStorageDecl(AbstractStorageDecl *D);
   void emitOpaqueTypeDecl(OpaqueTypeDecl *D);
   void emitSILGlobalVariable(SILGlobalVariable *gv);
   void emitCoverageMapping();
@@ -1266,7 +1281,7 @@ public:
                                         ConstantInitFuture init,
                                         llvm::StringRef section = {});
 
-  TypeEntityReference getTypeEntityReference(NominalTypeDecl *D);
+  TypeEntityReference getTypeEntityReference(GenericTypeDecl *D);
 
   llvm::Constant *getAddrOfTypeMetadata(CanType concreteType);
   ConstantReference getAddrOfTypeMetadata(CanType concreteType,
@@ -1290,16 +1305,18 @@ public:
                                              NominalTypeDecl *nominal,
                                              ArrayRef<llvm::Type *> genericArgs,
                                              ForDefinition_t forDefinition);
-  llvm::Constant *getAddrOfTypeMetadataLazyCacheVariable(CanType type,
-                                               ForDefinition_t forDefinition);
+  llvm::Constant *getAddrOfTypeMetadataLazyCacheVariable(CanType type);
+  llvm::Constant *getAddrOfTypeMetadataDemanglingCacheVariable(CanType type,
+                                                       ConstantInit definition);
 
   llvm::Constant *getAddrOfClassMetadataBounds(ClassDecl *D,
                                                ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfTypeContextDescriptor(NominalTypeDecl *D,
                                       RequireMetadata_t requireMetadata,
                                       ConstantInit definition = ConstantInit());
-  llvm::Constant *getAddrOfAnonymousContextDescriptor(DeclContext *DC,
-                                      ConstantInit definition = ConstantInit());
+  llvm::Constant *getAddrOfAnonymousContextDescriptor(
+                          PointerUnion<DeclContext *, VarDecl *> Name,
+                          ConstantInit definition = ConstantInit());
   llvm::Constant *getAddrOfExtensionContextDescriptor(ExtensionDecl *ED,
                                       ConstantInit definition = ConstantInit());
   llvm::Constant *getAddrOfModuleContextDescriptor(ModuleDecl *D,
@@ -1431,6 +1448,13 @@ public:
   getGlobalForDynamicallyReplaceableThunk(LinkEntity &entity, llvm::Type *type,
                                           ForDefinition_t forDefinition);
 
+  llvm::Function *getAddrOfOpaqueTypeDescriptorAccessFunction(
+      OpaqueTypeDecl *decl, ForDefinition_t forDefinition, bool implementation);
+
+  void createReplaceableProlog(IRGenFunction &IGF, SILFunction *f);
+
+  void emitOpaqueTypeDescriptorAccessor(OpaqueTypeDecl *);
+
 private:
   llvm::Constant *
   getAddrOfSharedContextDescriptor(LinkEntity entity,
@@ -1451,7 +1475,8 @@ private:
                                         llvm::Type *overrideDeclType = nullptr);
 
   void emitLazyPrivateDefinitions();
-  void addRuntimeResolvableType(NominalTypeDecl *nominal);
+  void addRuntimeResolvableType(GenericTypeDecl *nominal);
+  void maybeEmitOpaqueTypeDecl(OpaqueTypeDecl *opaque);
 
   /// Add all conformances of the given \c DeclContext LazyWitnessTables.
   void addLazyConformances(DeclContext *dc);

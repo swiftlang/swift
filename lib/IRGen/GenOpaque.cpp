@@ -343,11 +343,9 @@ llvm::Value *irgen::emitInvariantLoadOfOpaqueWitness(IRGenFunction &IGF,
   return witness;
 }
 
-/// Given a value witness table, load one of the value witnesses.
-/// The result has the appropriate type for the witness.
-static llvm::Value *emitLoadOfValueWitnessValue(IRGenFunction &IGF,
-                                                llvm::Value *table,
-                                                ValueWitness witness) {
+static Address emitAddressOfValueWitnessTableValue(IRGenFunction &IGF,
+                                                   llvm::Value *table,
+                                                   ValueWitness witness) {
   assert(!isValueWitnessFunction(witness));
   assert(unsigned(witness) <= unsigned(ValueWitness::ExtraInhabitantCount) &&
          "extraInhabitantCount not the last non-function value witness");
@@ -368,7 +366,15 @@ static llvm::Value *emitLoadOfValueWitnessValue(IRGenFunction &IGF,
   Address addr = Address(table, IGF.IGM.getPointerAlignment());
   addr = IGF.Builder.CreateBitCast(addr, IGF.IGM.getValueWitnessTablePtrTy());
   addr = IGF.Builder.CreateStructGEP(addr, unsigned(witness), offset);
+  return addr;
+}
 
+/// Given a value witness table, load one of the value witnesses.
+/// The result has the appropriate type for the witness.
+static llvm::Value *emitLoadOfValueWitnessValue(IRGenFunction &IGF,
+                                                llvm::Value *table,
+                                                ValueWitness witness) {
+  auto addr = emitAddressOfValueWitnessTableValue(IGF, table, witness);
   auto load = IGF.Builder.CreateLoad(addr, getValueWitnessLabel(witness));
   IGF.setInvariantLoad(load);
   return load;
@@ -910,6 +916,15 @@ llvm::Value *irgen::emitLoadOfStride(IRGenFunction &IGF, SILType T) {
 llvm::Value *irgen::emitLoadOfExtraInhabitantCount(IRGenFunction &IGF,
                                                    SILType T) {
   return IGF.emitValueWitnessValue(T, ValueWitness::ExtraInhabitantCount);
+}
+
+void irgen::emitStoreOfExtraInhabitantCount(IRGenFunction &IGF,
+                                            llvm::Value *value,
+                                            llvm::Value *metadata) {
+  auto vwTable = IGF.emitValueWitnessTableRefForMetadata(metadata);
+  auto addr = emitAddressOfValueWitnessTableValue(
+      IGF, vwTable, ValueWitness::ExtraInhabitantCount);
+  IGF.Builder.CreateStore(value, addr);
 }
 
 std::pair<llvm::Value *, llvm::Value *>

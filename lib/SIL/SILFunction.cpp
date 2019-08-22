@@ -62,7 +62,9 @@ SILFunction::create(SILModule &M, SILLinkage linkage, StringRef name,
                     GenericEnvironment *genericEnv, Optional<SILLocation> loc,
                     IsBare_t isBareSILFunction, IsTransparent_t isTrans,
                     IsSerialized_t isSerialized, ProfileCounter entryCount,
-                    IsDynamicallyReplaceable_t isDynamic, IsThunk_t isThunk,
+                    IsDynamicallyReplaceable_t isDynamic,
+                    IsExactSelfClass_t isExactSelfClass,
+                    IsThunk_t isThunk,
                     SubclassScope classSubclassScope, Inline_t inlineStrategy,
                     EffectsKind E, SILFunction *insertBefore,
                     const SILDebugScope *debugScope) {
@@ -79,7 +81,8 @@ SILFunction::create(SILModule &M, SILLinkage linkage, StringRef name,
   auto fn = new (M) SILFunction(M, linkage, name, loweredType, genericEnv, loc,
                                 isBareSILFunction, isTrans, isSerialized,
                                 entryCount, isThunk, classSubclassScope,
-                                inlineStrategy, E, insertBefore, debugScope, isDynamic);
+                                inlineStrategy, E, insertBefore, debugScope,
+                                isDynamic, isExactSelfClass);
 
   if (entry) entry->setValue(fn);
   return fn;
@@ -95,7 +98,8 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage, StringRef Name,
                          Inline_t inlineStrategy, EffectsKind E,
                          SILFunction *InsertBefore,
                          const SILDebugScope *DebugScope,
-                         IsDynamicallyReplaceable_t isDynamic)
+                         IsDynamicallyReplaceable_t isDynamic,
+                         IsExactSelfClass_t isExactSelfClass)
     : Module(Module), Name(Name), LoweredType(LoweredType),
       GenericEnv(genericEnv), SpecializationInfo(nullptr),
       DebugScope(DebugScope), Bare(isBareSILFunction), Transparent(isTrans),
@@ -103,7 +107,9 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage, StringRef Name,
       ClassSubclassScope(unsigned(classSubclassScope)), GlobalInitFlag(false),
       InlineStrategy(inlineStrategy), Linkage(unsigned(Linkage)),
       HasCReferences(false), IsWeakLinked(false),
-      IsDynamicReplaceable(isDynamic), OptMode(OptimizationMode::NotSet),
+      IsDynamicReplaceable(isDynamic),
+      ExactSelfClass(isExactSelfClass),
+      OptMode(OptimizationMode::NotSet),
       EffectsKindAttr(E), EntryCount(entryCount) {
   assert(!Transparent || !IsDynamicReplaceable);
   validateSubclassScope(classSubclassScope, isThunk, nullptr);
@@ -151,9 +157,10 @@ SILFunction::~SILFunction() {
          "Function cannot be deleted while function_ref's still exist");
 }
 
-void SILFunction::createProfiler(ASTNode Root, ForDefinition_t forDefinition) {
+void SILFunction::createProfiler(ASTNode Root, SILDeclRef forDecl,
+                                 ForDefinition_t forDefinition) {
   assert(!Profiler && "Function already has a profiler");
-  Profiler = SILProfiler::create(Module, forDefinition, Root);
+  Profiler = SILProfiler::create(Module, forDefinition, Root, forDecl);
 }
 
 bool SILFunction::hasForeignBody() const {
@@ -228,45 +235,34 @@ bool SILFunction::isNoReturnFunction() const {
 
 const TypeLowering &
 SILFunction::getTypeLowering(AbstractionPattern orig, Type subst) {
-  // FIXME: Expansion
   return getModule().Types.getTypeLowering(orig, subst,
-                                            ResilienceExpansion::Minimal);
+                                           getResilienceExpansion());
 }
 
 const TypeLowering &SILFunction::getTypeLowering(Type t) const {
-  // FIXME: Expansion
-  return getModule().Types.getTypeLowering(t, ResilienceExpansion::Minimal);
+  return getModule().Types.getTypeLowering(t, getResilienceExpansion());
 }
 
 SILType
 SILFunction::getLoweredType(AbstractionPattern orig, Type subst) const {
-  // FIXME: Expansion
   return getModule().Types.getLoweredType(orig, subst,
-                                          ResilienceExpansion::Minimal);
+                                          getResilienceExpansion());
 }
 
 SILType SILFunction::getLoweredType(Type t) const {
-  // FIXME: Expansion
-  return getModule().Types.getLoweredType(t,
-                                          ResilienceExpansion::Minimal);
+  return getModule().Types.getLoweredType(t, getResilienceExpansion());
 }
 
 SILType SILFunction::getLoweredLoadableType(Type t) const {
-  // FIXME: Expansion
-  return getModule().Types.getLoweredLoadableType(t,
-                                                  ResilienceExpansion::Minimal);
+  return getModule().Types.getLoweredLoadableType(t, getResilienceExpansion());
 }
 
 const TypeLowering &SILFunction::getTypeLowering(SILType type) const {
-  // FIXME: Expansion
-  return getModule().Types.getTypeLowering(type,
-                                           ResilienceExpansion::Minimal);
+  return getModule().Types.getTypeLowering(type, getResilienceExpansion());
 }
 
 bool SILFunction::isTypeABIAccessible(SILType type) const {
-  // FIXME: Expansion
-  return getModule().isTypeABIAccessible(type,
-                                         ResilienceExpansion::Minimal);
+  return getModule().isTypeABIAccessible(type, getResilienceExpansion());
 }
 
 SILBasicBlock *SILFunction::createBasicBlock() {

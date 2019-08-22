@@ -13,6 +13,8 @@
 import TestsUtils
 #if os(Linux)
 import Glibc
+#elseif os(Windows)
+import MSVCRT
 #else
 import Darwin
 #endif
@@ -23,7 +25,7 @@ public let StringEdits = BenchmarkInfo(
   tags: [.validation, .api, .String],
   legacyFactor: 100)
 
-var editWords: [String] = [
+let editWords: [String] = [
   "woodshed",
   "lakism",
   "gastroperiodynia",

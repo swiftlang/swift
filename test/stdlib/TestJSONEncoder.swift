@@ -1259,8 +1259,6 @@ func expectEqualPaths(_ lhs: [CodingKey], _ rhs: [CodingKey], _ prefix: String) 
             expectUnreachable("\(prefix) CodingKey.intValue mismatch: \(type(of: key1))(\(i1)) != \(type(of: key2))(\(i2))")
             return
         }
-
-        break
     }
 
     expectEqual(key1.stringValue, key2.stringValue, "\(prefix) CodingKey.stringValue mismatch: \(type(of: key1))('\(key1.stringValue)') != \(type(of: key2))('\(key2.stringValue)')")

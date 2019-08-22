@@ -4,7 +4,7 @@
 
 import resilient_struct
 
-// Resilient structs are always address-only
+// Resilient structs from outside our resilience domain are always address-only
 
 // CHECK-LABEL: sil hidden [ossa] @$s17struct_resilience26functionWithResilientTypes_1f010resilient_A04SizeVAF_A2FXEtF : $@convention(thin) (@in_guaranteed Size, @noescape @callee_guaranteed (@in_guaranteed Size) -> @out Size) -> @out Size
 // CHECK:       bb0(%0 : $*Size, %1 : $*Size, %2 : $@noescape @callee_guaranteed (@in_guaranteed Size) -> @out Size):

@@ -40,7 +40,6 @@ struct id {
 class MyBlammo : Blammo {
   func foo() {}
 // CHECK:  define hidden swiftcc void @"$s4objc8MyBlammoC3fooyyF"([[MYBLAMMO]]* swiftself) {{.*}} {
-// CHECK:    call {{.*}} @swift_release
 // CHECK:    ret void
 }
 
@@ -48,7 +47,6 @@ class MyBlammo : Blammo {
 class Test2 : Gizmo {
   func foo() {}
 // CHECK:  define hidden swiftcc void @"$s4objc5Test2C3fooyyF"([[TEST2]]* swiftself) {{.*}} {
-// CHECK:    call {{.*}} @llvm.objc.release
 // CHECK:    ret void
 
   @objc dynamic func bar() {}
@@ -147,7 +145,7 @@ class WeakObjC {
 // CHECK:  i32 1, !"Objective-C Version", i32 2}
 // CHECK:  i32 1, !"Objective-C Image Info Version", i32 0}
 // CHECK:  i32 1, !"Objective-C Image Info Section", !"__DATA,__objc_imageinfo,regular,no_dead_strip"}
-//   83887872 == (5 << 24) | (0 << 16) | (7 << 8). 
+//   83953408 == (5 << 24) | (1 << 16) | (7 << 8). 
 //     5 and 0 is the current major.minor version. 7 is the Swift ABI version.
-// CHECK:  i32 4, !"Objective-C Garbage Collection", i32 83887872}
+// CHECK:  i32 4, !"Objective-C Garbage Collection", i32 83953408}
 // CHECK:  i32 1, !"Swift Version", i32 7}

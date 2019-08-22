@@ -9,14 +9,10 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+
 // RUN: %empty-directory(%t)
-// RUN: if [ %target-runtime == "objc" ]; \
-// RUN: then \
-// RUN:   %target-clang -fobjc-arc %S/Inputs/NSSlowString/NSSlowString.m -c -o %t/NSSlowString.o && \
-// RUN:   %target-build-swift -I %S/Inputs/NSSlowString/ %t/NSSlowString.o %s -o %t/a.out; \
-// RUN: else \
-// RUN:   %target-build-swift %s -o %t/a.out; \
-// RUN: fi
+// RUN: %target-clang -fobjc-arc %S/Inputs/NSSlowString/NSSlowString.m -c -o %t/NSSlowString.o
+// RUN: %target-build-swift -I %S/Inputs/NSSlowString/ %t/NSSlowString.o %s -o %t/a.out
 
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out %S/Inputs/NormalizationTest.txt

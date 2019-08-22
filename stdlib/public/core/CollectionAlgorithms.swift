@@ -36,7 +36,7 @@ extension BidirectionalCollection {
 // firstIndex(of:)/firstIndex(where:)
 //===----------------------------------------------------------------------===//
 
-extension Collection where Element : Equatable {
+extension Collection where Element: Equatable {
   /// Returns the first index where the specified value appears in the
   /// collection.
   ///
@@ -179,7 +179,7 @@ extension BidirectionalCollection {
   }
 }
 
-extension BidirectionalCollection where Element : Equatable {
+extension BidirectionalCollection where Element: Equatable {
   /// Returns the last index where the specified value appears in the
   /// collection.
   ///
@@ -277,7 +277,7 @@ extension MutableCollection {
   }  
 }
 
-extension MutableCollection where Self : BidirectionalCollection {
+extension MutableCollection where Self: BidirectionalCollection {
   /// Reorders the elements of the collection such that all the elements
   /// that match the given predicate are after all the elements that don't
   /// match.
@@ -427,7 +427,7 @@ extension Sequence {
   }
 }
 
-extension MutableCollection where Self : RandomAccessCollection {
+extension MutableCollection where Self: RandomAccessCollection {
   /// Shuffles the collection in place, using the given generator as a source
   /// for randomness.
   ///

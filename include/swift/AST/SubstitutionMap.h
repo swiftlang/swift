@@ -175,10 +175,6 @@ public:
                         LookupConformanceFn conformances,
                         SubstOptions options = None) const;
   
-  /// Replace opaque types in the replacement types in the map with their
-  /// underlying types. Does not change keys.
-  SubstitutionMap substOpaqueTypesWithUnderlyingTypes() const;
-
   /// Create a substitution map for a protocol conformance.
   static SubstitutionMap
   getProtocolSubstitutions(ProtocolDecl *protocol,

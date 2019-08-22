@@ -70,7 +70,6 @@ namespace swift {
   class GenericSignature;
   class GenericTypeParamDecl;
   class GenericTypeParamType;
-  class LazyResolver;
   class ModuleDecl;
   class EnumCaseDecl;
   class EnumElementDecl;
@@ -78,6 +77,9 @@ namespace swift {
   class ParameterTypeFlags;
   class Pattern;
   struct PrintOptions;
+  struct PropertyWrapperBackingPropertyInfo;
+  struct PropertyWrapperTypeInfo;
+  struct PropertyWrapperMutability;
   class ProtocolDecl;
   class ProtocolType;
   struct RawComment;
@@ -88,6 +90,7 @@ namespace swift {
   class UnboundGenericType;
   class ValueDecl;
   class VarDecl;
+  class OpaqueReturnTypeRepr;
 
 enum class DeclKind : uint8_t {
 #define DECL(Id, Parent) Id,
@@ -161,7 +164,8 @@ enum class DescriptiveDeclKind : uint8_t {
   Module,
   MissingMember,
   Requirement,
-  OpaqueType,
+  OpaqueResultType,
+  OpaqueVarType
 };
 
 /// Keeps track of stage of circularity checking for the given protocol.
@@ -232,11 +236,14 @@ struct OverloadSignature {
   /// Whether this signature is of a member defined in an extension of a generic
   /// type.
   unsigned InExtensionOfGenericType : 1;
+  
+  /// Whether this declaration has an opaque return type.
+  unsigned HasOpaqueReturnType : 1;
 
   OverloadSignature()
       : UnaryOperator(UnaryOperatorKind::None), IsInstanceMember(false),
         IsVariable(false), IsFunction(false), InProtocolExtension(false),
-        InExtensionOfGenericType(false) {}
+        InExtensionOfGenericType(false), HasOpaqueReturnType(false) {}
 };
 
 /// Determine whether two overload signatures conflict.
@@ -279,7 +286,7 @@ public:
 protected:
   union { uint64_t OpaqueBits;
 
-  SWIFT_INLINE_BITFIELD_BASE(Decl, bitmax(NumDeclKindBits,8)+1+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD_BASE(Decl, bitmax(NumDeclKindBits,8)+1+1+1+1+2+1,
     Kind : bitmax(NumDeclKindBits,8),
 
     /// Whether this declaration is invalid.
@@ -293,10 +300,6 @@ protected:
     ///
     /// Use getClangNode() to retrieve the corresponding Clang AST.
     FromClang : 1,
-
-    /// Whether we've already performed early attribute validation.
-    /// FIXME: This is ugly.
-    EarlyAttrValidation : 1,
 
     /// The validation state of this declaration.
     ValidationState : 2,
@@ -338,22 +341,7 @@ protected:
     IsUserAccessible : 1
   );
 
-  SWIFT_INLINE_BITFIELD(AbstractStorageDecl, ValueDecl, 1+1+1+1+2+1+1+1,
-    /// Whether the getter is mutating.
-    IsGetterMutating : 1,
-
-    /// Whether the setter is mutating.
-    IsSetterMutating : 1,
-
-    /// Whether this represents physical storage.
-    HasStorage : 1,
-
-    /// Whether this storage supports semantic mutation in some way.
-    SupportsMutation : 1,
-
-    /// Whether an opaque read of this storage produces an owned value.
-    OpaqueReadOwnership : 2,
-
+  SWIFT_INLINE_BITFIELD(AbstractStorageDecl, ValueDecl, 1+1+1,
     /// Whether a keypath component can directly reference this storage,
     /// or if it must use the overridden declaration instead.
     HasComputedValidKeyPathComponent : 1,
@@ -364,10 +352,9 @@ protected:
     IsStatic : 1
   );
 
-  SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 4+1+1+1+1,
-    /// The specifier associated with this variable or parameter.  This
-    /// determines the storage semantics of the value e.g. mutability.
-    Specifier : 4,
+  SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 1+1+1+1+1+1,
+    /// Encodes whether this is a 'let' binding.
+    Introducer : 1,
 
     /// Whether this declaration was an element of a capture list.
     IsCaptureList : 1,
@@ -381,12 +368,18 @@ protected:
     /// It is up to the debugger to instruct SIL how to access this variable.
     IsDebuggerVar : 1,
 
-    /// Whether this is a property defined in the debugger's REPL.
-    /// FIXME: Remove this once LLDB has proper support for resilience.
-    IsREPLVar : 1
+    /// Whether this is the backing storage for a lazy property.
+    IsLazyStorageProperty : 1,
+
+    /// Whether this is the backing storage for a property wrapper.
+    IsPropertyWrapperBackingProperty : 1
   );
 
-  SWIFT_INLINE_BITFIELD(ParamDecl, VarDecl, 1 + NumDefaultArgumentKindBits,
+  SWIFT_INLINE_BITFIELD(ParamDecl, VarDecl, 2+1+NumDefaultArgumentKindBits,
+    /// The specifier associated with this parameter.  This determines
+    /// the storage semantics of the value e.g. mutability.
+    Specifier : 2,
+
     /// True if the type is implicitly specified in the source, but this has an
     /// apparently valid typeRepr.  This is used in accessors, which look like:
     ///    set (value) {
@@ -401,8 +394,7 @@ protected:
   SWIFT_INLINE_BITFIELD(SubscriptDecl, VarDecl, 2,
     StaticSpelling : 2
   );
-
-  SWIFT_INLINE_BITFIELD(AbstractFunctionDecl, ValueDecl, 3+8+1+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(AbstractFunctionDecl, ValueDecl, 3+8+1+1+1+1+1+1+1+1,
     /// \see AbstractFunctionDecl::BodyKind
     BodyKind : 3,
 
@@ -426,7 +418,10 @@ protected:
 
     /// Whether this member was synthesized as part of a derived
     /// protocol conformance.
-    Synthesized : 1
+    Synthesized : 1,
+
+    /// Whether this member's body consists of a single expression.
+    HasSingleExpressionBody : 1
   );
 
   SWIFT_INLINE_BITFIELD(FuncDecl, AbstractFunctionDecl, 1+2+1+1+2,
@@ -439,19 +434,25 @@ protected:
     /// Whether we are statically dispatched even if overridable
     ForcedStaticDispatch : 1,
 
-    /// Whether this function has a dynamic Self return type.
-    HasDynamicSelf : 1,
+    /// Whether we've computed the 'self' access kind yet.
+    SelfAccessComputed : 1,
 
     /// Backing bits for 'self' access kind.
     SelfAccess : 2
   );
 
-  SWIFT_INLINE_BITFIELD(AccessorDecl, FuncDecl, 4,
+  SWIFT_INLINE_BITFIELD(AccessorDecl, FuncDecl, 4+1+1,
     /// The kind of accessor this is.
-    AccessorKind : 4
+    AccessorKind : 4,
+
+    /// Whether the accessor is transparent.
+    IsTransparent : 1,
+
+    /// Whether we have computed the above.
+    IsTransparentComputed : 1
   );
 
-  SWIFT_INLINE_BITFIELD(ConstructorDecl, AbstractFunctionDecl, 3+2+2+1,
+  SWIFT_INLINE_BITFIELD(ConstructorDecl, AbstractFunctionDecl, 3+1+1,
     /// The body initialization kind (+1), or zero if not yet computed.
     ///
     /// This value is cached but is not serialized, because it is a property
@@ -459,11 +460,8 @@ protected:
     /// analysis and SIL generation.
     ComputedBodyInitKind : 3,
 
-    /// The kind of initializer we have.
-    InitKind : 2,
-
-    /// The failability of this initializer, which is an OptionalTypeKind.
-    Failability : 2,
+    /// Whether this constructor can fail, by building an Optional type.
+    Failable : 1,
 
     /// Whether this initializer is a stub placed into a subclass to
     /// catch invalid delegations to a designated initializer not
@@ -503,7 +501,7 @@ protected:
     HasLazyConformances : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+2+1+8+16,
+  SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+2+1+1+8+16,
     /// Whether the \c RequiresClass bit is valid.
     RequiresClassValid : 1,
 
@@ -532,6 +530,9 @@ protected:
     /// Whether we've computed the inherited protocols list yet.
     InheritedProtocolsValid : 1,
 
+    /// Whether we have a lazy-loaded requirement signature.
+    HasLazyRequirementSignature : 1,
+
     : NumPadBits,
 
     /// If this is a compiler-known protocol, this will be a KnownProtocolKind
@@ -542,11 +543,7 @@ protected:
     NumRequirementsInSignature : 16
   );
 
-  SWIFT_INLINE_BITFIELD(ClassDecl, NominalTypeDecl, 1+2+1+2+1+6+1+1+1,
-    /// Whether this class requires all of its instance variables to
-    /// have in-class initializers.
-    RequiresStoredPropertyInits : 1,
-
+  SWIFT_INLINE_BITFIELD(ClassDecl, NominalTypeDecl, 2+1+2+1+7+1+1+1+1,
     /// The stage of the inheritance circularity check for this class.
     Circularity : 2,
 
@@ -555,22 +552,22 @@ protected:
 
     /// \see ClassDecl::ForeignKind
     RawForeignKind : 2,
-    
-    /// Whether this class contains a destructor decl.
-    ///
-    /// A fully type-checked class always contains a destructor member, even if
-    /// it is implicit. This bit is used during parsing and type-checking to
-    /// control inserting the implicit destructor.
-    HasDestructorDecl : 1,
+
+    /// \see ClassDecl::getEmittedMembers()
+    HasForcedEmittedMembers : 1,
 
     /// Information about the class's ancestry.
-    Ancestry : 6,
+    Ancestry : 7,
 
     /// Whether we have computed the above field or not.
     AncestryComputed : 1,
 
     HasMissingDesignatedInitializers : 1,
-    HasMissingVTableEntries : 1
+    HasMissingVTableEntries : 1,
+
+    /// Whether instances of this class are incompatible
+    /// with weak and unowned references.
+    IsIncompatibleWithWeakReferences : 1
   );
 
   SWIFT_INLINE_BITFIELD(StructDecl, NominalTypeDecl, 1,
@@ -591,7 +588,7 @@ protected:
     HasAnyUnavailableValues : 1
   );
 
-  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1,
     /// If the module was or is being compiled with `-enable-testing`.
     TestingEnabled : 1,
 
@@ -606,11 +603,18 @@ protected:
     /// Whether all imports have been resolved. Used to detect circular imports.
     HasResolvedImports : 1,
 
-    // If the module was or is being compiled with `-enable-private-imports`.
+    /// If the module was or is being compiled with `-enable-private-imports`.
     PrivateImportsEnabled : 1,
 
-    // If the module is compiled with `-enable-implicit-dynamic`.
-    ImplicitDynamicEnabled : 1
+    /// If the module is compiled with `-enable-implicit-dynamic`.
+    ImplicitDynamicEnabled : 1,
+
+    /// Whether the module is a system module.
+    IsSystemModule : 1,
+
+    /// Whether the module was imported from Clang (or, someday, maybe another
+    /// language).
+    IsNonSwiftModule : 1
   );
 
   SWIFT_INLINE_BITFIELD(PrecedenceGroupDecl, Decl, 1+2,
@@ -686,7 +690,6 @@ protected:
     Bits.Decl.Invalid = false;
     Bits.Decl.Implicit = false;
     Bits.Decl.FromClang = false;
-    Bits.Decl.EarlyAttrValidation = false;
     Bits.Decl.ValidationState = unsigned(ValidationState::Unchecked);
     Bits.Decl.EscapedFromIfConfig = false;
   }
@@ -828,14 +831,6 @@ public:
   /// Mark this declaration as implicit.
   void setImplicit(bool implicit = true) { Bits.Decl.Implicit = implicit; }
 
-  /// Whether we have already done early attribute validation.
-  bool didEarlyAttrValidation() const { return Bits.Decl.EarlyAttrValidation; }
-
-  /// Set whether we've performed early attribute validation.
-  void setEarlyAttrValidation(bool validated = true) {
-    Bits.Decl.EarlyAttrValidation = validated;
-  }
-  
   /// Get the validation state.
   ValidationState getValidationState() const {
     return ValidationState(Bits.Decl.ValidationState);
@@ -1515,6 +1510,17 @@ public:
 
   /// Determine whether this context has generic parameters
   /// of its own.
+  ///
+  /// \code
+  /// class C<T> {
+  ///   func f1() {}    // isGeneric == false
+  ///   func f2<T>() {} // isGeneric == true
+  /// }
+  ///
+  /// protocol P { // isGeneric == true due to implicit Self param
+  ///   func p()   // isGeneric == false
+  /// }
+  /// \endcode
   bool isGeneric() const { return GenericParams != nullptr; }
 
   /// Retrieve the trailing where clause for this extension, if any.
@@ -1886,22 +1892,30 @@ class PatternBindingEntry {
   enum class Flags {
     Checked = 1 << 0,
     Removed = 1 << 1,
-    Lazy    = 1 << 2
+    /// Whether the contents of this initializer were subsumed by
+    /// some other initialization, e.g., a lazy property's initializer
+    /// gets subsumed by the getter body.
+    Subsumed    = 1 << 2
   };
   llvm::PointerIntPair<Pattern *, 3, OptionSet<Flags>> PatternAndFlags;
 
-  struct ExprAndEqualLoc {
-    // When the initializer is removed we don't actually clear the pointer
+  struct InitializerAndEqualLoc {
+    // When the initializer is removed we don't actually clear the pointers
     // because we might need to get initializer's source range. Since the
     // initializer is ASTContext-allocated it is safe.
-    Expr *Node;
+    
+    /// Exactly the expr the programmer wrote
+    Expr *originalInit;
+    /// Might be transformed, e.g. for a property wrapper. In the absence of
+    /// transformation or synthesis, holds the expr as parsed.
+    Expr *initAfterSynthesis;
     /// The location of the equal '=' token.
     SourceLoc EqualLoc;
   };
 
   union {
     /// The initializer expression and its '=' token loc.
-    ExprAndEqualLoc InitExpr;
+    InitializerAndEqualLoc InitExpr;
 
     /// The text of the initializer expression if deserialized from a module.
     StringRef InitStringRepresentation;
@@ -1910,27 +1924,37 @@ class PatternBindingEntry {
   /// The initializer context used for this pattern binding entry.
   llvm::PointerIntPair<DeclContext *, 1, bool> InitContextAndIsText;
 
+  /// Values captured by this initializer.
+  CaptureInfo Captures;
+
   friend class PatternBindingInitializer;
 
 public:
+  /// \p E is the initializer as parsed.
   PatternBindingEntry(Pattern *P, SourceLoc EqualLoc, Expr *E,
                       DeclContext *InitContext)
-    : PatternAndFlags(P, {}), InitExpr({E, EqualLoc}),
+    : PatternAndFlags(P, {}), InitExpr({E, E, EqualLoc}),
       InitContextAndIsText({InitContext, false}) {
   }
 
   Pattern *getPattern() const { return PatternAndFlags.getPointer(); }
   void setPattern(Pattern *P) { PatternAndFlags.setPointer(P); }
+
+  /// Whether the given pattern binding entry is initialized.
+  bool isInitialized() const;
+
   Expr *getInit() const {
     if (PatternAndFlags.getInt().contains(Flags::Removed) ||
         InitContextAndIsText.getInt())
       return nullptr;
-    return InitExpr.Node;
+    return InitExpr.initAfterSynthesis;
   }
-  Expr *getNonLazyInit() const {
-    return isInitializerLazy() ? nullptr : getInit();
+  /// Retrieve the initializer if it should be executed to initialize this
+  /// particular pattern binding.
+  Expr *getExecutableInit() const {
+    return isInitializerSubsumed() ? nullptr : getInit();
   }
-  SourceRange getOrigInitRange() const;
+  SourceRange getOriginalInitRange() const;
   void setInit(Expr *E);
 
   /// Gets the text of the initializer expression, stripping out inactive
@@ -1960,10 +1984,12 @@ public:
     InitExpr.EqualLoc = equalLoc;
   }
 
-  /// Retrieve the initializer as it was written in the source.
-  Expr *getInitAsWritten() const {
-    return InitContextAndIsText.getInt() ? nullptr : InitExpr.Node;
-  }
+  /// Retrieve the initializer after the =, if any, as it was written in the
+  /// source.
+  Expr *getOriginalInit() const;
+
+  /// Set the initializer after the = as it was written in the source.
+  void setOriginalInit(Expr *);
 
   bool isInitializerChecked() const {
     return PatternAndFlags.getInt().contains(Flags::Checked);
@@ -1972,11 +1998,11 @@ public:
     PatternAndFlags.setInt(PatternAndFlags.getInt() | Flags::Checked);
   }
 
-  bool isInitializerLazy() const {
-    return PatternAndFlags.getInt().contains(Flags::Lazy);
+  bool isInitializerSubsumed() const {
+    return PatternAndFlags.getInt().contains(Flags::Subsumed);
   }
-  void setInitializerLazy() {
-    PatternAndFlags.setInt(PatternAndFlags.getInt() | Flags::Lazy);
+  void setInitializerSubsumed() {
+    PatternAndFlags.setInt(PatternAndFlags.getInt() | Flags::Subsumed);
   }
 
   // Return the first variable initialized by this pattern.
@@ -1992,11 +2018,25 @@ public:
     InitContextAndIsText.setPointer(dc);
   }
 
-  /// Retrieve the source range covered by this pattern binding.
+  SourceLoc getStartLoc() const;
+
+  /// Retrieve the end location covered by this pattern binding entry.
+  ///
+  /// \param omitAccessors Whether the computation should omit the accessors
+  /// from the source range.
+  SourceLoc getEndLoc(bool omitAccessors = false) const;
+
+  /// Retrieve the source range covered by this pattern binding entry.
   ///
   /// \param omitAccessors Whether the computation should omit the accessors
   /// from the source range.
   SourceRange getSourceRange(bool omitAccessors = false) const;
+
+  const CaptureInfo &getCaptureInfo() const { return Captures; }
+  void setCaptureInfo(const CaptureInfo &captures) { Captures = captures; }
+
+private:
+  SourceLoc getLastAccessorEndLoc() const;
 };
 
 /// This decl contains a pattern and optional initializer for a set
@@ -2068,15 +2108,20 @@ public:
     getMutablePatternList()[i].setInitStringRepresentation(str);
   }
 
+  /// Whether the given pattern entry is initialized.
+  bool isInitialized(unsigned i) const {
+    return getPatternList()[i].isInitialized();
+  }
+
   Expr *getInit(unsigned i) const {
     return getPatternList()[i].getInit();
   }
-  Expr *getNonLazyInit(unsigned i) const {
-    return getPatternList()[i].getNonLazyInit();
+  Expr *getExecutableInit(unsigned i) const {
+    return getPatternList()[i].getExecutableInit();
   }
-  
-  SourceRange getOrigInitRange(unsigned i) const {
-    return getPatternList()[i].getOrigInitRange();
+
+  SourceRange getOriginalInitRange(unsigned i) const {
+    return getPatternList()[i].getOriginalInitRange();
   }
 
   void setInit(unsigned i, Expr *E) {
@@ -2088,6 +2133,18 @@ public:
   }
   
   void setPattern(unsigned i, Pattern *Pat, DeclContext *InitContext);
+
+  DeclContext *getInitContext(unsigned i) const {
+    return getPatternList()[i].getInitContext();
+  }
+
+  const CaptureInfo &getCaptureInfo(unsigned i) const {
+    return getPatternList()[i].getCaptureInfo();
+  }
+
+  void setCaptureInfo(unsigned i, const CaptureInfo &captures) {
+    getMutablePatternList()[i].setCaptureInfo(captures);
+  }
 
   /// Given that this PBD is the parent pattern for the specified VarDecl,
   /// return the entry of the VarDecl in our PatternList.  For example, in:
@@ -2113,12 +2170,12 @@ public:
     getMutablePatternList()[i].setInitializerChecked();
   }
 
-  bool isInitializerLazy(unsigned i) const {
-    return getPatternList()[i].isInitializerLazy();
+  bool isInitializerSubsumed(unsigned i) const {
+    return getPatternList()[i].isInitializerSubsumed();
   }
 
-  void setInitializerLazy(unsigned i) {
-    getMutablePatternList()[i].setInitializerLazy();
+  void setInitializerSubsumed(unsigned i) {
+    getMutablePatternList()[i].setInitializerSubsumed();
   }
   
   /// Does this binding declare something that requires storage?
@@ -2126,11 +2183,7 @@ public:
 
   /// Determines whether this binding either has an initializer expression, or is
   /// default initialized, without performing any type checking on it.
-  ///
-  /// This is only valid to check for bindings which have storage.
   bool isDefaultInitializable() const {
-    assert(hasStorage());
-
     for (unsigned i = 0, e = getNumPatternEntries(); i < e; ++i)
       if (!isDefaultInitializable(i))
         return false;
@@ -2339,11 +2392,27 @@ class ValueDecl : public Decl {
     /// the declaration will go through an extra level of indirection that
     /// allows the entity to be replaced at runtime.
     unsigned isDynamic : 1;
-  } LazySemanticInfo;
+
+    /// Whether the "isFinal" bit has been computed yet.
+    unsigned isFinalComputed : 1;
+
+    /// Whether this declaration is 'final'. A final class can't be subclassed,
+    /// a final class member can't be overriden.
+    unsigned isFinal : 1;
+
+    /// Whether the "isIUO" bit" has been computed yet.
+    unsigned isIUOComputed : 1;
+
+    /// Whether this declaration produces an implicitly unwrapped
+    /// optional result.
+    unsigned isIUO : 1;
+  } LazySemanticInfo = { };
 
   friend class OverriddenDeclsRequest;
   friend class IsObjCRequest;
+  friend class IsFinalRequest;
   friend class IsDynamicRequest;
+  friend class IsImplicitlyUnwrappedOptionalRequest;
 
 protected:
   ValueDecl(DeclKind K,
@@ -2353,12 +2422,6 @@ protected:
     Bits.ValueDecl.AlreadyInLookupTable = false;
     Bits.ValueDecl.CheckedRedeclaration = false;
     Bits.ValueDecl.IsUserAccessible = true;
-    LazySemanticInfo.isObjCComputed = false;
-    LazySemanticInfo.isObjC = false;
-    LazySemanticInfo.hasOverriddenComputed = false;
-    LazySemanticInfo.hasOverridden = false;
-    LazySemanticInfo.isDynamicComputed = false;
-    LazySemanticInfo.isDynamic = false;
   }
 
   // MemberLookupTable borrows a bit from this type
@@ -2467,7 +2530,7 @@ public:
   ///     value.getFormalAccessScope().getDeclContext())</code>
   ///
   /// If \p treatUsableFromInlineAsPublic is true, declarations marked with the
-  /// \c @usableFromInline attribute are treated as public. This is normally
+  /// \c \@usableFromInline attribute are treated as public. This is normally
   /// false for name lookup and other source language concerns, but true when
   /// computing the linkage of generated functions.
   ///
@@ -2546,12 +2609,6 @@ public:
   void setInterfaceType(Type type);
 
   bool hasValidSignature() const;
-
-  /// isSettable - Determine whether references to this decl may appear
-  /// on the left-hand side of an assignment or as the operand of a
-  /// `&` or 'inout' operator.
-  bool isSettable(const DeclContext *UseDC,
-                  const DeclRefExpr *base = nullptr) const;
   
   /// isInstanceMember - Determine whether this value is an instance member
   /// of an enum or protocol.
@@ -2599,10 +2656,8 @@ public:
   /// Note whether this declaration is known to be exposed to Objective-C.
   void setIsObjC(bool Value);
 
-  /// Is this declaration marked with 'final'?
-  bool isFinal() const {
-    return getAttrs().hasAttribute<FinalAttr>();
-  }
+  /// Is this declaration 'final'?
+  bool isFinal() const;
 
   /// Is this declaration marked with 'dynamic'?
   bool isDynamic() const;
@@ -2625,6 +2680,21 @@ public:
 
   /// Returns true if this decl can be found by id-style dynamic lookup.
   bool canBeAccessedByDynamicLookup() const;
+
+  /// Returns true if this declaration has an implicitly unwrapped optional
+  /// result. The precise meaning depends on the declaration kind:
+  /// - for properties, the value is IUO
+  /// - for subscripts, the element type is IUO
+  /// - for functions, the result type is IUO
+  /// - for constructors, the failability kind is IUO
+  bool isImplicitlyUnwrappedOptional() const;
+
+  /// Should only be set on imported and deserialized declarations; parsed
+  /// declarations compute this lazily via a request.
+  void setImplicitlyUnwrappedOptional(bool isIUO) {
+    LazySemanticInfo.isIUOComputed = 1;
+    LazySemanticInfo.isIUO = isIUO;
+  }
 
   /// Returns the protocol requirements that this decl conforms to.
   ArrayRef<ValueDecl *>
@@ -2669,15 +2739,39 @@ public:
   /// True if this is a C function that was imported as a member of a type in
   /// Swift.
   bool isImportAsMember() const;
-  
+
+  /// Returns true if the declaration's interface type is a function type with a
+  /// curried self parameter.
+  bool hasCurriedSelf() const;
+
+  /// Returns true if the declaration has a parameter list associated with it.
+  ///
+  /// Note that not all declarations with function interface types have
+  /// parameter lists, for example an enum element without associated values.
+  bool hasParameterList() const;
+
+  /// Returns the number of curry levels in the declaration's interface type.
+  unsigned getNumCurryLevels() const;
+
   /// Get the decl for this value's opaque result type, if it has one.
   OpaqueTypeDecl *getOpaqueResultTypeDecl() const;
-  
+
+  /// Get the representative for this value's opaque result type, if it has one.
+  OpaqueReturnTypeRepr *getOpaqueResultTypeRepr() const;
+
   /// Set the opaque return type decl for this decl.
   ///
   /// `this` must be of a decl type that supports opaque return types, and
   /// must not have previously had an opaque result type set.
   void setOpaqueResultTypeDecl(OpaqueTypeDecl *D);
+
+  /// Retrieve the attribute associating this declaration with a
+  /// function builder, if there is one.
+  CustomAttr *getAttachedFunctionBuilder() const;
+
+  /// Retrieve the @functionBuilder type attached to this declaration,
+  /// if there is one.
+  Type getFunctionBuilderType() const;
 };
 
 /// This is a common base class for declarations which declare a type.
@@ -2787,6 +2881,8 @@ class OpaqueTypeDecl : public GenericTypeDecl {
   /// signature of the original declaration.
   Optional<SubstitutionMap> UnderlyingTypeSubstitutions;
   
+  mutable Identifier OpaqueReturnTypeIdentifier;
+  
 public:
   OpaqueTypeDecl(ValueDecl *NamingDecl,
                  GenericParamList *GenericParams,
@@ -2796,6 +2892,17 @@ public:
   
   ValueDecl *getNamingDecl() const { return NamingDecl; }
   
+  void setNamingDecl(ValueDecl *D) {
+    assert(!NamingDecl && "already have naming decl");
+    NamingDecl = D;
+  }
+
+  /// Is this opaque type the opaque return type of the given function?
+  ///
+  /// This is more complex than just checking `getNamingDecl` because the
+  /// function could also be the getter of a storage declaration.
+  bool isOpaqueReturnTypeOfFunction(const AbstractFunctionDecl *func) const;
+
   GenericSignature *getOpaqueInterfaceGenericSignature() const {
     return OpaqueInterfaceGenericSignature;
   }
@@ -2815,6 +2922,10 @@ public:
   
   // Opaque type decls are currently always implicit
   SourceRange getSourceRange() const { return SourceRange(); }
+  
+  // Get the identifier string that can be used to cross-reference unnamed
+  // opaque return types across files.
+  Identifier getOpaqueReturnTypeIdentifier() const;
   
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::OpaqueType;
@@ -2842,6 +2953,9 @@ class TypeAliasDecl : public GenericTypeDecl {
   /// The location of the equal '=' token
   SourceLoc EqualLoc;
 
+  /// The end of the type, valid even when the type cannot be parsed
+  SourceLoc TypeEndLoc;
+
   /// The location of the right-hand side of the typealias binding
   TypeLoc UnderlyingTy;
 
@@ -2858,6 +2972,8 @@ public:
     return EqualLoc;
   }
 
+  void setTypeEndLoc(SourceLoc e) { TypeEndLoc = e; }
+
   TypeLoc &getUnderlyingTypeLoc() {
     return UnderlyingTy;
   }
@@ -2869,6 +2985,8 @@ public:
 
   /// For generic typealiases, return the unbound generic type.
   UnboundGenericType *getUnboundGenericType() const;
+
+  Type getStructuralType() const;
 
   bool isCompatibilityAlias() const {
     return Bits.TypeAliasDecl.IsCompatibilityAlias;
@@ -3010,7 +3128,7 @@ class AssociatedTypeDecl : public AbstractTypeParamDecl {
   SourceLoc KeywordLoc;
 
   /// The default definition.
-  TypeLoc DefaultDefinition;
+  TypeRepr *DefaultDefinition;
 
   /// The where clause attached to the associated type.
   TrailingWhereClause *TrailingWhere;
@@ -3018,9 +3136,11 @@ class AssociatedTypeDecl : public AbstractTypeParamDecl {
   LazyMemberLoader *Resolver = nullptr;
   uint64_t ResolverContextData;
 
+  friend class DefaultDefinitionTypeRequest;
+
 public:
   AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc, Identifier name,
-                     SourceLoc nameLoc, TypeLoc defaultDefinition,
+                     SourceLoc nameLoc, TypeRepr *defaultDefinition,
                      TrailingWhereClause *trailingWhere);
   AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc, Identifier name,
                      SourceLoc nameLoc, TrailingWhereClause *trailingWhere,
@@ -3032,14 +3152,19 @@ public:
     return cast<ProtocolDecl>(getDeclContext());
   }
 
-  /// Retrieve the default definition type.
-  Type getDefaultDefinitionType() const {
-    return getDefaultDefinitionLoc().getType();
+  /// Check if we have a default definition type.
+  bool hasDefaultDefinitionType() const {
+    // If we have a TypeRepr, return true immediately without kicking off
+    // a request.
+    return DefaultDefinition || getDefaultDefinitionType();
   }
 
-  TypeLoc &getDefaultDefinitionLoc();
-  const TypeLoc &getDefaultDefinitionLoc() const {
-    return const_cast<AssociatedTypeDecl *>(this)->getDefaultDefinitionLoc();
+  /// Retrieve the default definition type.
+  Type getDefaultDefinitionType() const;
+
+  /// Retrieve the default definition as written in the source.
+  TypeRepr *getDefaultDefinitionTypeRepr() const {
+    return DefaultDefinition;
   }
 
   /// Retrieve the trailing where clause for this associated type, if any.
@@ -3050,7 +3175,7 @@ public:
     TrailingWhere = trailingWhereClause;
   }
 
-  /// Set the interface type of this associated type declaration to a dependen
+  /// Set the interface type of this associated type declaration to a dependent
   /// member type of 'Self'.
   void computeType();
 
@@ -3083,19 +3208,6 @@ public:
 
 class MemberLookupTable;
 class ConformanceLookupTable;
-
-/// Kinds of optional types.
-enum OptionalTypeKind : unsigned {
-  /// The type is not an optional type.
-  OTK_None = 0,
-
-  /// The type is Optional<T>.
-  OTK_Optional,
-
-  /// The type is ImplicitlyUnwrappedOptional<T>.
-  OTK_ImplicitlyUnwrappedOptional
-};
-enum { NumOptionalTypeKinds = 2 };
   
 // Kinds of pointer types.
 enum PointerTypeKind : unsigned {
@@ -3352,42 +3464,15 @@ public:
   /// Is this a key path type?
   Optional<KeyPathTypeKind> getKeyPathTypeKind() const;
 
-private:
-  /// Predicate used to filter StoredPropertyRange.
-  struct ToStoredProperty {
-    ToStoredProperty(bool skipInaccessible = false) :
-        skipUserInaccessible(skipInaccessible) {}
-    bool skipUserInaccessible;
-    Optional<VarDecl *> operator()(Decl *decl) const;
-  };
-  
-public:
-  /// A range for iterating the stored member variables of a structure.
-  using StoredPropertyRange = OptionalTransformRange<DeclRange,
-                                                     ToStoredProperty>;
+  /// Retrieve information about this type as a property wrapper.
+  PropertyWrapperTypeInfo getPropertyWrapperTypeInfo() const;
 
   /// Return a collection of the stored member variables of this type.
-  StoredPropertyRange getStoredProperties(bool skipInaccessible = false) const;
+  ArrayRef<VarDecl *> getStoredProperties() const;
 
-private:
-  /// Predicate used to filter StoredPropertyRange.
-  struct ToStoredPropertyOrMissingMemberPlaceholder {
-    Optional<Decl *> operator()(Decl *decl) const;
-  };
-
-public:
-  /// A range for iterating the stored member variables of a structure.
-  using StoredPropertyOrMissingMemberPlaceholderRange
-    = OptionalTransformRange<DeclRange,
-                             ToStoredPropertyOrMissingMemberPlaceholder>;
-  
   /// Return a collection of the stored member variables of this type, along
   /// with placeholders for unimportable stored properties.
-  StoredPropertyOrMissingMemberPlaceholderRange
-  getStoredPropertiesAndMissingMemberPlaceholders() const {
-    return StoredPropertyOrMissingMemberPlaceholderRange(getMembers(),
-                             ToStoredPropertyOrMissingMemberPlaceholder());
-  }
+  ArrayRef<Decl *> getStoredPropertiesAndMissingMemberPlaceholders() const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
@@ -3650,6 +3735,9 @@ enum class AncestryFlags : uint8_t {
 
   /// The class or one of its superclasses is imported from Clang.
   ClangImported = (1<<5),
+
+  /// The class or one of its superclasses requires stored property initializers.
+  RequiresStoredPropertyInits = (1<<6),
 };
 
 /// Return type of ClassDecl::checkAncestry(). Describes a set of interesting
@@ -3681,8 +3769,17 @@ class ClassDecl final : public NominalTypeDecl {
     llvm::PointerIntPair<Type, 1, bool> SuperclassType;
   } LazySemanticInfo;
 
+  bool hasForcedEmittedMembers() const {
+    return Bits.ClassDecl.HasForcedEmittedMembers;
+  }
+
+  void setHasForcedEmittedMembers() {
+    Bits.ClassDecl.HasForcedEmittedMembers = true;
+  }
+
   friend class SuperclassDeclRequest;
   friend class SuperclassTypeRequest;
+  friend class EmittedMembersRequest;
   friend class TypeChecker;
 
 public:
@@ -3747,14 +3844,8 @@ public:
 
   //// Whether this class requires all of its stored properties to
   //// have initializers in the class definition.
-  bool requiresStoredPropertyInits() const { 
-    return Bits.ClassDecl.RequiresStoredPropertyInits;
-  }
-
-  /// Set whether this class requires all of its stored properties to
-  /// have initializers in the class definition.
-  void setRequiresStoredPropertyInits(bool requiresInits) {
-    Bits.ClassDecl.RequiresStoredPropertyInits = requiresInits;
+  bool requiresStoredPropertyInits() const {
+    return checkAncestry(AncestryFlags::RequiresStoredPropertyInits);
   }
 
   /// \see getForeignClassKind
@@ -3815,6 +3906,17 @@ public:
     Bits.ClassDecl.HasMissingVTableEntries = newValue;
   }
 
+  /// Returns true if this class cannot be used with weak or unowned
+  /// references.
+  /// 
+  /// Note that this is true if this class or any of its ancestor classes
+  /// are marked incompatible.
+  bool isIncompatibleWithWeakReferences() const;
+
+  void setIsIncompatibleWithWeakReferences(bool newValue = true) {
+    Bits.ClassDecl.IsIncompatibleWithWeakReferences = newValue;
+  }
+
   /// Find a method of a class that overrides a given method.
   /// Return nullptr, if no such method exists.
   AbstractFunctionDecl *findOverridingDecl(
@@ -3825,30 +3927,13 @@ public:
   /// either from a class itself or its direct or indirect superclasses.
   AbstractFunctionDecl *findImplementingMethod(
       const AbstractFunctionDecl *method) const;
-
-  /// True if the class has a destructor.
-  ///
-  /// Fully type-checked classes always contain destructors, but during parsing
-  /// or type-checking, the implicit destructor may not have been synthesized
-  /// yet if one was not explicitly declared.
-  bool hasDestructor() const { return Bits.ClassDecl.HasDestructorDecl; }
-
-  /// Set the 'has destructor' flag.
-  void setHasDestructor() { Bits.ClassDecl.HasDestructorDecl = 1; }
   
   /// Retrieve the destructor for this class.
-  DestructorDecl *getDestructor();
-
-  /// Synthesize implicit, trivial destructor, add it to this ClassDecl
-  /// and return it.
-  void addImplicitDestructor();
+  DestructorDecl *getDestructor() const;
 
   /// Determine whether this class inherits the convenience initializers
   /// from its superclass.
-  ///
-  /// \param resolver Used to resolve the signatures of initializers, which is
-  /// required for name lookup.
-  bool inheritsSuperclassInitializers(LazyResolver *resolver);
+  bool inheritsSuperclassInitializers();
 
   /// Marks that this class inherits convenience initializers from its
   /// superclass.
@@ -3906,6 +3991,10 @@ public:
 
   /// Record the presence of an @objc method with the given selector.
   void recordObjCMethod(AbstractFunctionDecl *method, ObjCSelector selector);
+
+  /// Get all the members of this class, synthesizing any implicit members
+  /// that appear in the vtable if needed.
+  DeclRange getEmittedMembers() const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
@@ -4028,16 +4117,63 @@ class ProtocolDecl final : public NominalTypeDecl {
   /// by this protocol.
   const Requirement *RequirementSignature = nullptr;
 
-  bool requiresClassSlow();
+  /// Returns the cached result of \c requiresClass or \c None if it hasn't yet
+  /// been computed.
+  Optional<bool> getCachedRequiresClass() const {
+    if (Bits.ProtocolDecl.RequiresClassValid)
+      return Bits.ProtocolDecl.RequiresClass;
 
-  bool existentialConformsToSelfSlow();
+    return None;
+  }
 
-  bool existentialTypeSupportedSlow(LazyResolver *resolver);
+  /// Caches the result of \c requiresClass
+  void setCachedRequiresClass(bool requiresClass) {
+    Bits.ProtocolDecl.RequiresClassValid = true;
+    Bits.ProtocolDecl.RequiresClass = requiresClass;
+  }
+
+  /// Returns the cached result of \c existentialConformsToSelf or \c None if it
+  /// hasn't yet been computed.
+  Optional<bool> getCachedExistentialConformsToSelf() const {
+    if (Bits.ProtocolDecl.ExistentialConformsToSelfValid)
+      return Bits.ProtocolDecl.ExistentialConformsToSelf;
+
+    return None;
+  }
+
+  /// Caches the result of \c existentialConformsToSelf
+  void setCachedExistentialConformsToSelf(bool result) {
+    Bits.ProtocolDecl.ExistentialConformsToSelfValid = true;
+    Bits.ProtocolDecl.ExistentialConformsToSelf = result;
+  }
+
+  /// Returns the cached result of \c existentialTypeSupported or \c None if it
+  /// hasn't yet been computed.
+  Optional<bool> getCachedExistentialTypeSupported() {
+    if (Bits.ProtocolDecl.ExistentialTypeSupportedValid)
+      return Bits.ProtocolDecl.ExistentialTypeSupported;
+
+    return None;
+  }
+
+  /// Caches the result of \c existentialTypeSupported
+  void setCachedExistentialTypeSupported(bool supported) {
+    Bits.ProtocolDecl.ExistentialTypeSupportedValid = true;
+    Bits.ProtocolDecl.ExistentialTypeSupported = supported;
+  }
 
   ArrayRef<ProtocolDecl *> getInheritedProtocolsSlow();
 
+  bool hasLazyRequirementSignature() const {
+    return Bits.ProtocolDecl.HasLazyRequirementSignature;
+  }
+
   friend class SuperclassDeclRequest;
   friend class SuperclassTypeRequest;
+  friend class RequirementSignatureRequest;
+  friend class ProtocolRequiresClassRequest;
+  friend class ExistentialConformsToSelfRequest;
+  friend class ExistentialTypeSupportedRequest;
   friend class TypeChecker;
 
 public:
@@ -4101,32 +4237,14 @@ public:
   }
 
   /// True if this protocol can only be conformed to by class types.
-  bool requiresClass() const {
-    if (Bits.ProtocolDecl.RequiresClassValid)
-      return Bits.ProtocolDecl.RequiresClass;
-
-    return const_cast<ProtocolDecl *>(this)->requiresClassSlow();
-  }
-
-  /// Specify that this protocol is class-bounded, e.g., because it was
-  /// annotated with the 'class' keyword.
-  void setRequiresClass(bool requiresClass = true) {
-    Bits.ProtocolDecl.RequiresClassValid = true;
-    Bits.ProtocolDecl.RequiresClass = requiresClass;
-  }
+  bool requiresClass() const;
 
   /// Determine whether an existential conforming to this protocol can be
   /// matched with a generic type parameter constrained to this protocol.
   /// This is only permitted if there is nothing "non-trivial" that we
   /// can do with the metatype, which means the protocol must not have
   /// any static methods and must be declared @objc.
-  bool existentialConformsToSelf() const {
-    if (Bits.ProtocolDecl.ExistentialConformsToSelfValid)
-      return Bits.ProtocolDecl.ExistentialConformsToSelf;
-
-    return const_cast<ProtocolDecl *>(this)
-             ->existentialConformsToSelfSlow();
-  }
+  bool existentialConformsToSelf() const;
 
   /// Does this protocol require a self-conformance witness table?
   bool requiresSelfConformanceWitnessTable() const;
@@ -4153,21 +4271,7 @@ public:
   /// conforming to this protocol. This is only permitted if the types of
   /// all the members do not contain any associated types, and do not
   /// contain 'Self' in 'parameter' or 'other' position.
-  bool existentialTypeSupported(LazyResolver *resolver) const {
-    if (Bits.ProtocolDecl.ExistentialTypeSupportedValid)
-      return Bits.ProtocolDecl.ExistentialTypeSupported;
-
-    return const_cast<ProtocolDecl *>(this)
-             ->existentialTypeSupportedSlow(resolver);
-  }
-
-  /// Explicitly set the existentialTypeSupported flag, without computing
-  /// it from members. Only called from deserialization, where the flag
-  /// was stored in the serialized record.
-  void setExistentialTypeSupported(bool supported) {
-    Bits.ProtocolDecl.ExistentialTypeSupported = supported;
-    Bits.ProtocolDecl.ExistentialTypeSupportedValid = true;
-  }
+  bool existentialTypeSupported() const;
 
 private:
   void computeKnownProtocolKind() const;
@@ -4259,22 +4363,25 @@ public:
   /// protocol. Requirements implied via any other protocol (e.g., inherited
   /// protocols of the inherited protocols) are not mentioned. The conformance
   /// requirements listed here become entries in the witness table.
-  ArrayRef<Requirement> getRequirementSignature() const {
-    assert(isRequirementSignatureComputed() &&
-           "getting requirement signature before computing it");
-    return llvm::makeArrayRef(RequirementSignature,
-                              Bits.ProtocolDecl.NumRequirementsInSignature);
-  }
+  ArrayRef<Requirement> getRequirementSignature() const;
+
+  /// Is the requirement signature currently being computed?
+  bool isComputingRequirementSignature() const;
 
   /// Has the requirement signature been computed yet?
   bool isRequirementSignatureComputed() const {
     return RequirementSignature != nullptr;
   }
 
-  void computeRequirementSignature();
-
   void setRequirementSignature(ArrayRef<Requirement> requirements);
 
+  void setLazyRequirementSignature(LazyMemberLoader *lazyLoader,
+                                   uint64_t requirementSignatureData);
+
+private:
+  ArrayRef<Requirement> getCachedRequirementSignature() const;
+
+public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Protocol;
@@ -4300,6 +4407,14 @@ public:
 /// SubscriptDecl, representing potentially settable memory locations.
 class AbstractStorageDecl : public ValueDecl {
   friend class SetterAccessLevelRequest;
+  friend class IsGetterMutatingRequest;
+  friend class IsSetterMutatingRequest;
+  friend class OpaqueReadOwnershipRequest;
+  friend class StorageImplInfoRequest;
+  friend class RequiresOpaqueAccessorsRequest;
+  friend class RequiresOpaqueModifyCoroutineRequest;
+  friend class SynthesizeAccessorRequest;
+
 public:
   static const size_t MaxNumAccessors = 255;
 private:
@@ -4314,10 +4429,6 @@ private:
     /// The range of the braces around the accessor clause.
     SourceRange Braces;
 
-    /// The implementation info for the accessors.  If there's no
-    /// AccessorRecord for a storage decl, the decl is just stored.
-    StorageImplInfo ImplInfo;
-
     /// The number of accessors currently stored in this record.
     AccessorIndex NumAccessors;
 
@@ -4331,18 +4442,14 @@ private:
     /// or the index+1 of the accessor in the accessors array.
     AccessorIndex AccessorIndices[NumAccessorKinds];
 
-    AccessorRecord(SourceRange braces, StorageImplInfo implInfo,
+    AccessorRecord(SourceRange braces,
                    ArrayRef<AccessorDecl*> accessors,
                    AccessorIndex accessorsCapacity);
   public:
     static AccessorRecord *create(ASTContext &ctx, SourceRange braces,
-                                  StorageImplInfo implInfo,
                                   ArrayRef<AccessorDecl*> accessors);
 
     SourceRange getBracesRange() const { return Braces; }
-
-    const StorageImplInfo &getImplInfo() const { return ImplInfo; }
-    void overwriteImplInfo(StorageImplInfo newInfo) { ImplInfo = newInfo; }
 
     inline AccessorDecl *getAccessor(AccessorKind kind) const;
 
@@ -4362,33 +4469,33 @@ private:
 
   llvm::PointerIntPair<AccessorRecord*, 3, OptionalEnum<AccessLevel>> Accessors;
 
-  void setFieldsFromImplInfo(StorageImplInfo implInfo) {
-    Bits.AbstractStorageDecl.HasStorage = implInfo.hasStorage();
-    Bits.AbstractStorageDecl.SupportsMutation = implInfo.supportsMutation();
-  }
+  struct {
+    unsigned IsGetterMutatingComputed : 1;
+    unsigned IsGetterMutating : 1;
+    unsigned IsSetterMutatingComputed : 1;
+    unsigned IsSetterMutating : 1;
+    unsigned OpaqueReadOwnershipComputed : 1;
+    unsigned OpaqueReadOwnership : 2;
+    unsigned ImplInfoComputed : 1;
+    unsigned RequiresOpaqueAccessorsComputed : 1;
+    unsigned RequiresOpaqueAccessors : 1;
+    unsigned RequiresOpaqueModifyCoroutineComputed : 1;
+    unsigned RequiresOpaqueModifyCoroutine : 1;
+  } LazySemanticInfo = { };
+
+  /// The implementation info for the accessors.
+  StorageImplInfo ImplInfo;
+
+  /// Add a synthesized accessor.
+  void setSynthesizedAccessor(AccessorKind kind, AccessorDecl *getter);
 
 protected:
   AbstractStorageDecl(DeclKind Kind, bool IsStatic, DeclContext *DC,
                       DeclName Name, SourceLoc NameLoc,
                       StorageIsMutable_t supportsMutation)
-    : ValueDecl(Kind, DC, Name, NameLoc) {
-    Bits.AbstractStorageDecl.HasStorage = true;
-    Bits.AbstractStorageDecl.SupportsMutation = supportsMutation;
-    Bits.AbstractStorageDecl.IsGetterMutating = false;
-    Bits.AbstractStorageDecl.IsSetterMutating = true;
-    Bits.AbstractStorageDecl.OpaqueReadOwnership =
-      unsigned(OpaqueReadOwnership::Owned);
+    : ValueDecl(Kind, DC, Name, NameLoc),
+      ImplInfo(StorageImplInfo::getSimpleStored(supportsMutation)) {
     Bits.AbstractStorageDecl.IsStatic = IsStatic;
-  }
-
-  void setSupportsMutationIfStillStored(StorageIsMutable_t supportsMutation) {
-    if (auto ptr = Accessors.getPointer()) {
-      auto impl = ptr->getImplInfo();
-      if (!impl.isSimpleStored()) return;
-      impl = StorageImplInfo::getSimpleStored(supportsMutation);
-      ptr->overwriteImplInfo(impl);
-    }
-    Bits.AbstractStorageDecl.SupportsMutation = supportsMutation;
   }
 
   void computeIsValidKeyPathComponent();
@@ -4416,10 +4523,13 @@ public:
   Type getValueInterfaceType() const;
 
   /// Determine how this storage is implemented.
-  StorageImplInfo getImplInfo() const {
-    if (auto ptr = Accessors.getPointer())
-      return ptr->getImplInfo();
-    return StorageImplInfo::getSimpleStored(supportsMutation());
+  StorageImplInfo getImplInfo() const;
+
+  /// Overwrite the registered implementation-info.  This should be
+  /// used carefully.
+  void setImplInfo(StorageImplInfo implInfo) {
+    LazySemanticInfo.ImplInfoComputed = 1;
+    ImplInfo = implInfo;
   }
 
   ReadImplKind getReadImpl() const {
@@ -4432,14 +4542,11 @@ public:
     return getImplInfo().getReadWriteImpl();
   }
 
-  /// Overwrite the registered implementation-info.  This should be
-  /// used carefully.
-  void overwriteImplInfo(StorageImplInfo implInfo);
 
   /// Return true if this is a VarDecl that has storage associated with
   /// it.
   bool hasStorage() const {
-    return Bits.AbstractStorageDecl.HasStorage;
+    return getImplInfo().hasStorage();
   }
 
   /// Return true if this storage has the basic accessors/capability
@@ -4452,38 +4559,40 @@ public:
   /// can't mutate things that do support mutation (e.g. because their
   /// setter is private).
   StorageIsMutable_t supportsMutation() const {
-    return StorageIsMutable_t(Bits.AbstractStorageDecl.SupportsMutation);
+    return getImplInfo().supportsMutation();
   }
 
-  /// Are there any accessors for this declaration, including implicit ones?
-  bool hasAnyAccessors() const {
-    return !getAllAccessors().empty();
-  }
+  /// isSettable - Determine whether references to this decl may appear
+  /// on the left-hand side of an assignment or as the operand of a
+  /// `&` or 'inout' operator.
+  bool isSettable(const DeclContext *UseDC,
+                  const DeclRefExpr *base = nullptr) const;
+
+  /// Does this storage declaration have explicitly-defined accessors
+  /// written in the source?
+  bool hasParsedAccessors() const;
 
   /// Return the ownership of values opaquely read from this storage.
-  OpaqueReadOwnership getOpaqueReadOwnership() const {
-    return OpaqueReadOwnership(Bits.AbstractStorageDecl.OpaqueReadOwnership);
-  }
+  OpaqueReadOwnership getOpaqueReadOwnership() const;
   void setOpaqueReadOwnership(OpaqueReadOwnership ownership) {
-    Bits.AbstractStorageDecl.OpaqueReadOwnership = unsigned(ownership);
+    LazySemanticInfo.OpaqueReadOwnership = unsigned(ownership);
+    LazySemanticInfo.OpaqueReadOwnershipComputed = true;
   }
 
   /// Return true if reading this storage requires the ability to
   /// modify the base value.
-  bool isGetterMutating() const {
-    return Bits.AbstractStorageDecl.IsGetterMutating;
-  }
+  bool isGetterMutating() const;
   void setIsGetterMutating(bool isMutating) {
-    Bits.AbstractStorageDecl.IsGetterMutating = isMutating;
+    LazySemanticInfo.IsGetterMutating = isMutating;
+    LazySemanticInfo.IsGetterMutatingComputed = true;
   }
   
   /// Return true if modifying this storage requires the ability to
   /// modify the base value.
-  bool isSetterMutating() const {
-    return Bits.AbstractStorageDecl.IsSetterMutating;
-  }
+  bool isSetterMutating() const;
   void setIsSetterMutating(bool isMutating) {
-    Bits.AbstractStorageDecl.IsSetterMutating = isMutating;
+    LazySemanticInfo.IsSetterMutating = isMutating;
+    LazySemanticInfo.IsSetterMutatingComputed = true;
   }
 
   AccessorDecl *getAccessor(AccessorKind kind) const {
@@ -4498,15 +4607,45 @@ public:
     return {};
   }
 
-  /// Visit all the opaque accessors that this storage is expected to have.
+  /// Return an accessor that this storage is expected to have, synthesizing
+  /// one if necessary. Note that will always synthesize one, even if the
+  /// accessor is not part of the expected opaque set for the storage, so use
+  /// with caution.
+  AccessorDecl *getSynthesizedAccessor(AccessorKind kind) const;
+
+  /// Return an accessor part of the set of opaque accessors dictated by the
+  /// requirements of the ABI.
+  ///
+  /// This will synthesize the accessor if one is required but not specified
+  /// in source; for example, most of the time a mutable property is required
+  /// to have a 'modify' accessor, but if the property was only written with
+  /// 'get' and 'set' accessors, 'modify' will be synthesized to call 'get'
+  /// followed by 'set'.
+  ///
+  /// If the accessor is not needed for ABI reasons, this returns nullptr.
+  /// To ensure an accessor is always returned, use getSynthesizedAccessor().
+  AccessorDecl *getOpaqueAccessor(AccessorKind kind) const;
+
+  /// Return an accessor that was written in source. Returns null if the
+  /// accessor was not explicitly defined by the user.
+  AccessorDecl *getParsedAccessor(AccessorKind kind) const;
+
+  /// Visit all parsed accessors.
+  void visitParsedAccessors(llvm::function_ref<void (AccessorDecl*)>) const;
+
+  /// Visit all opaque accessor kinds.
   void visitExpectedOpaqueAccessors(
                             llvm::function_ref<void (AccessorKind)>) const;
 
-  /// Visit all the opaque accessors of this storage declaration.
+  /// Visit all opaque accessors.
   void visitOpaqueAccessors(llvm::function_ref<void (AccessorDecl*)>) const;
 
-  void setAccessors(StorageImplInfo storageImpl,
-                    SourceLoc lbraceLoc, ArrayRef<AccessorDecl*> accessors,
+  /// Visit all eagerly emitted accessors.
+  ///
+  /// This is the union of the parsed and opaque sets.
+  void visitEmittedAccessors(llvm::function_ref<void (AccessorDecl*)>) const;
+
+  void setAccessors(SourceLoc lbraceLoc, ArrayRef<AccessorDecl*> accessors,
                     SourceLoc rbraceLoc);
 
   /// Add a setter to an existing Computed var.
@@ -4514,17 +4653,8 @@ public:
   /// This should only be used by the ClangImporter.
   void setComputedSetter(AccessorDecl *Set);
 
-  /// Add a synthesized getter.
-  void setSynthesizedGetter(AccessorDecl *getter);
-
-  /// Add a synthesized setter.
-  void setSynthesizedSetter(AccessorDecl *setter);
-
-  /// Add a synthesized read coroutine.
-  void setSynthesizedReadCoroutine(AccessorDecl *read);
-
-  /// Add a synthesized modify coroutine.
-  void setSynthesizedModifyCoroutine(AccessorDecl *modify);
+  /// Does this storage require opaque accessors of any kind?
+  bool requiresOpaqueAccessors() const;
 
   /// Does this storage require an opaque accessor of the given kind?
   bool requiresOpaqueAccessor(AccessorKind kind) const;
@@ -4551,17 +4681,11 @@ public:
     return SourceRange();
   }
 
-  /// Retrieve the getter used to access the value of this variable.
-  AccessorDecl *getGetter() const {
-    return getAccessor(AccessorKind::Get);
-  }
-  
-  /// Retrieve the setter used to mutate the value of this variable.
-  AccessorDecl *getSetter() const {
-    return getAccessor(AccessorKind::Set);
-  }
-
   AccessLevel getSetterFormalAccess() const;
+
+  AccessScope
+  getSetterFormalAccessScope(const DeclContext *useDC = nullptr,
+                             bool treatUsableFromInlineAsPublic = false) const;
 
   void setSetterAccess(AccessLevel accessLevel) {
     assert(!Accessors.getInt().hasValue());
@@ -4569,45 +4693,6 @@ public:
   }
 
   void overwriteSetterAccess(AccessLevel accessLevel);
-
-  /// Return the decl for the immutable addressor if it exists.
-  AccessorDecl *getAddressor() const {
-    return getAccessor(AccessorKind::Address);
-  }
-
-  /// Return the decl for the mutable accessor if it exists.
-  AccessorDecl *getMutableAddressor() const {
-    return getAccessor(AccessorKind::MutableAddress);
-  }
-
-  /// Return the appropriate addressor for the given access kind.
-  AccessorDecl *getAddressorForAccess(AccessKind accessKind) const {
-    if (accessKind == AccessKind::Read)
-      return getAddressor();
-    return getMutableAddressor();
-  }
-
-  /// Return the decl for the 'read' coroutine accessor if it exists.
-  AccessorDecl *getReadCoroutine() const {
-    return getAccessor(AccessorKind::Read);
-  }
-
-  /// Return the decl for the 'modify' coroutine accessor if it exists.
-  AccessorDecl *getModifyCoroutine() const {
-    return getAccessor(AccessorKind::Modify);
-  }
-
-  /// Return the decl for the willSet specifier if it exists, this is
-  /// only valid on a declaration with Observing storage.
-  AccessorDecl *getWillSetFunc() const {
-    return getAccessor(AccessorKind::WillSet);
-  }
-
-  /// Return the decl for the didSet specifier if it exists, this is
-  /// only valid on a declaration with Observing storage.
-  AccessorDecl *getDidSetFunc() const {
-    return getAccessor(AccessorKind::DidSet);
-  }
 
   /// Given that this is an Objective-C property or subscript declaration,
   /// produce its getter selector.
@@ -4679,6 +4764,10 @@ public:
 
   bool hasDidSetOrWillSetDynamicReplacement() const;
 
+  bool hasAnyNativeDynamicAccessors() const;
+
+  bool hasAnyDynamicReplacementAccessors() const;
+
   OpaqueTypeDecl *getOpaqueResultTypeDecl() const {
     return OpaqueReturn;
   }
@@ -4694,37 +4783,31 @@ public:
   }
 };
 
+/// Describes which synthesized property for a property with an attached
+/// wrapper is being referenced.
+enum class PropertyWrapperSynthesizedPropertyKind {
+  /// The backing storage property, which is a stored property of the
+  /// wrapper type.
+  Backing,
+  /// A storage wrapper (e.g., `$foo`), which is a wrapper over the
+  /// wrapper instance's `projectedValue` property.
+  StorageWrapper,
+};
+
 /// VarDecl - 'var' and 'let' declarations.
 class VarDecl : public AbstractStorageDecl {
 public:
-  enum class Specifier : uint8_t {
-    // For Var Decls
-
+  enum class Introducer : uint8_t {
     Let = 0,
-    Var = 1,
-
-    // For Param Decls
-
-    Default = Let,
-    InOut = 2,
-    Shared = 3,
-    Owned = 4,
+    Var = 1
   };
 
 protected:
   PointerUnion3<PatternBindingDecl *, Stmt *, VarDecl *> Parent;
 
-  VarDecl(DeclKind Kind, bool IsStatic, Specifier Sp, bool IsCaptureList,
-          SourceLoc NameLoc, Identifier Name, DeclContext *DC)
-    : AbstractStorageDecl(Kind, IsStatic, DC, Name, NameLoc,
-                          StorageIsMutable_t(!isImmutableSpecifier(Sp)))
-  {
-    Bits.VarDecl.Specifier = static_cast<unsigned>(Sp);
-    Bits.VarDecl.IsCaptureList = IsCaptureList;
-    Bits.VarDecl.IsDebuggerVar = false;
-    Bits.VarDecl.IsREPLVar = false;
-    Bits.VarDecl.HasNonPatternBindingInit = false;
-  }
+  VarDecl(DeclKind kind, bool isStatic, Introducer introducer,
+          bool issCaptureList, SourceLoc nameLoc, Identifier name,
+          DeclContext *dc, StorageIsMutable_t supportsMutation);
 
   /// This is the type specified, including location information.
   TypeLoc typeLoc;
@@ -4732,9 +4815,10 @@ protected:
   Type typeInContext;
 
 public:
-  VarDecl(bool IsStatic, Specifier Sp, bool IsCaptureList, SourceLoc NameLoc,
-          Identifier Name, DeclContext *DC)
-    : VarDecl(DeclKind::Var, IsStatic, Sp, IsCaptureList, NameLoc, Name, DC) {}
+  VarDecl(bool isStatic, Introducer introducer, bool isCaptureList,
+          SourceLoc nameLoc, Identifier name, DeclContext *dc)
+    : VarDecl(DeclKind::Var, isStatic, introducer, isCaptureList, nameLoc,
+              name, dc, StorageIsMutable_t(introducer == Introducer::Var)) {}
 
   SourceRange getSourceRange() const;
 
@@ -4890,92 +4974,37 @@ public:
     return nullptr;
   }
 
+  /// Whether there exists an initializer for this \c VarDecl.
+  bool isParentInitialized() const {
+    if (auto *PBD = getParentPatternBinding())
+      return PBD->getPatternEntryForVarDecl(this).isInitialized();
+    return false;
+  }
+
   // Return whether this VarDecl has an initial value, either by checking
   // if it has an initializer in its parent pattern binding or if it has
   // the @_hasInitialValue attribute.
   bool hasInitialValue() const {
     return getAttrs().hasAttribute<HasInitialValueAttr>() ||
-           getParentInitializer();
+           isParentInitialized();
   }
 
   VarDecl *getOverriddenDecl() const {
     return cast_or_null<VarDecl>(AbstractStorageDecl::getOverriddenDecl());
   }
-
-  /// Determine whether this declaration is an anonymous closure parameter.
-  bool isAnonClosureParam() const;
-
-  /// Return the raw specifier value for this property or parameter.
-  Specifier getSpecifier() const {
-    return static_cast<Specifier>(Bits.VarDecl.Specifier);
-  }
-  void setSpecifier(Specifier Spec);
   
-  /// Is the type of this parameter 'inout'?
-  ///
-  /// FIXME(Remove InOut): This is only valid on ParamDecls but multiple parts
-  /// of the compiler check ParamDecls and VarDecls along the same paths.
-  bool isInOut() const {
-    // FIXME: Re-enable this assertion and fix callers.
-//    assert((getKind() == DeclKind::Param) && "querying 'inout' on var decl?");
-    return getSpecifier() == Specifier::InOut;
-  }
-  
-  bool isImmutable() const {
-    return isImmutableSpecifier(getSpecifier());
-  }
-  static bool isImmutableSpecifier(Specifier sp) {
-    switch (sp) {
-    case Specifier::Let:
-    case Specifier::Shared:
-    case Specifier::Owned:
-      return true;
-    case Specifier::Var:
-    case Specifier::InOut:
-      return false;
-    }
-    llvm_unreachable("unhandled specifier");
-  }
   /// Is this an immutable 'let' property?
-  bool isLet() const { return getSpecifier() == Specifier::Let; }
-  /// Is this an immutable 'shared' property?
-  bool isShared() const { return getSpecifier() == Specifier::Shared; }
-  /// Is this an immutable 'owned' property?
-  bool isOwned() const { return getSpecifier() == Specifier::Owned; }
+  ///
+  /// If this is a ParamDecl, isLet() is true iff
+  /// getSpecifier() == Specifier::Default.
+  bool isLet() const { return getIntroducer() == Introducer::Let; }
 
-  ValueOwnership getValueOwnership() const {
-    return getValueOwnershipForSpecifier(getSpecifier());
+  Introducer getIntroducer() const {
+    return Introducer(Bits.VarDecl.Introducer);
   }
 
-  static ValueOwnership getValueOwnershipForSpecifier(Specifier specifier) {
-    switch (specifier) {
-    case Specifier::Let:
-      return ValueOwnership::Default;
-    case Specifier::Var:
-      return ValueOwnership::Default;
-    case Specifier::InOut:
-      return ValueOwnership::InOut;
-    case Specifier::Shared:
-      return ValueOwnership::Shared;
-    case Specifier::Owned:
-      return ValueOwnership::Owned;
-    }
-    llvm_unreachable("unhandled specifier");
-  }
-
-  static Specifier
-  getParameterSpecifierForValueOwnership(ValueOwnership ownership) {
-    switch (ownership) {
-    case ValueOwnership::Default:
-      return Specifier::Let;
-    case ValueOwnership::Shared:
-      return Specifier::Shared;
-    case ValueOwnership::InOut:
-      return Specifier::InOut;
-    case ValueOwnership::Owned:
-      return Specifier::Owned;
-    }
-    llvm_unreachable("unhandled ownership");
+  void setIntroducer(Introducer value) {
+    Bits.VarDecl.Introducer = uint8_t(value);
   }
 
   /// Is this an element in a capture list?
@@ -4995,7 +5024,7 @@ public:
   /// exposed to clients.
   /// There's a very narrow case when we would: if the decl is an instance
   /// member with an initializer expression and the parent type is
-  /// @_fixed_layout and resides in a resilient module.
+  /// @frozen and resides in a resilient module.
   bool isInitExposedToClients() const;
   
   /// Is this a special debugger variable?
@@ -5003,13 +5032,102 @@ public:
   void setDebuggerVar(bool IsDebuggerVar) {
     Bits.VarDecl.IsDebuggerVar = IsDebuggerVar;
   }
-  
-  /// Is this a special debugger REPL variable?
-  /// FIXME: Remove this once LLDB has proper support for resilience.
-  bool isREPLVar() const { return Bits.VarDecl.IsREPLVar; }
-  void setREPLVar(bool IsREPLVar) {
-    Bits.VarDecl.IsREPLVar = IsREPLVar;
+
+  /// Is this the synthesized storage for a 'lazy' property?
+  bool isLazyStorageProperty() const {
+    return Bits.VarDecl.IsLazyStorageProperty;
   }
+  void setLazyStorageProperty(bool IsLazyStorage) {
+    Bits.VarDecl.IsLazyStorageProperty = IsLazyStorage;
+  }
+
+  /// Retrieve the custom attributes that attach property wrappers to this
+  /// property. The returned list contains all of the attached property wrapper attributes in source order,
+  /// which means the outermost wrapper attribute is provided first.
+  llvm::TinyPtrVector<CustomAttr *> getAttachedPropertyWrappers() const;
+
+  /// Whether this property has any attached property wrappers.
+  bool hasAttachedPropertyWrapper() const;
+  
+  /// Whether all of the attached property wrappers have an init(initialValue:) initializer.
+  bool allAttachedPropertyWrappersHaveInitialValueInit() const;
+  
+  /// Retrieve the type of the attached property wrapper as a contextual
+  /// type.
+  ///
+  /// \param index Which property wrapper type is being computed, where 0
+  /// indicates the first (outermost) attached property wrapper.
+  ///
+  /// \returns a NULL type for properties without attached wrappers,
+  /// an error type when the property wrapper type itself is erroneous,
+  /// or the wrapper type itself, which may involve unbound generic
+  /// types.
+  Type getAttachedPropertyWrapperType(unsigned index) const;
+
+  /// Retrieve information about the attached property wrapper type.
+  ///
+  /// \param i Which attached property wrapper type is being queried, where 0 is the outermost (first)
+  /// attached property wrapper type.
+  PropertyWrapperTypeInfo getAttachedPropertyWrapperTypeInfo(unsigned i) const;
+
+  /// Retrieve the fully resolved attached property wrapper type.
+  ///
+  /// This type will be the fully-resolved form of
+  /// \c getAttachedPropertyWrapperType(0), which will not contain any
+  /// unbound generic types. It will be the type of the backing property.
+  Type getPropertyWrapperBackingPropertyType() const;
+
+  /// Retrieve information about the backing properties of the attached
+  /// property wrapper.
+  PropertyWrapperBackingPropertyInfo
+      getPropertyWrapperBackingPropertyInfo() const;
+
+  /// Retrieve information about the mutability of the composed
+  /// property wrappers.
+  Optional<PropertyWrapperMutability>
+      getPropertyWrapperMutability() const;
+
+  /// Retrieve the backing storage property for a property that has an
+  /// attached property wrapper.
+  ///
+  /// The backing storage property will be a stored property of the
+  /// wrapper's type. This will be equivalent to
+  /// \c getAttachedPropertyWrapperType(0) when it is fully-specified;
+  /// if \c getAttachedPropertyWrapperType(0) involves an unbound
+  /// generic type, the backing storage property will be the appropriate
+  /// bound generic version.
+  VarDecl *getPropertyWrapperBackingProperty() const;
+
+  /// Retreive the storage wrapper for a property that has an attached
+  /// property wrapper.
+  VarDecl *getPropertyWrapperStorageWrapper() const;
+
+  /// Retrieve the backing storage property for a lazy property.
+  VarDecl *getLazyStorageProperty() const;
+
+  /// Whether this is a property with a property wrapper that was initialized
+  /// via a value of the original type, e.g.,
+  ///
+  /// \code
+  /// @Lazy var i = 17
+  /// \end
+  bool isPropertyWrapperInitializedWithInitialValue() const;
+
+  /// Whether the memberwise initializer parameter for a property with a property wrapper type
+  /// uses the wrapped type.
+  bool isPropertyMemberwiseInitializedWithWrappedType() const;
+
+  /// If this property is the backing storage for a property with an attached
+  /// property wrapper, return the original property.
+  ///
+  /// \param kind If not \c None, only returns the original property when
+  /// \c this property is the specified synthesized property.
+  VarDecl *getOriginalWrappedProperty(
+      Optional<PropertyWrapperSynthesizedPropertyKind> kind = None) const;
+
+  /// Set the property that wraps to this property as it's backing
+  /// property.
+  void setOriginalWrappedProperty(VarDecl *originalProperty);
 
   /// Return the Objective-C runtime name for this property.
   Identifier getObjCPropertyName() const;
@@ -5031,7 +5149,17 @@ public:
 
   /// Returns true if the name is the self identifier and is implicit.
   bool isSelfParameter() const;
-  
+
+  /// Determine whether this property will be part of the implicit memberwise
+  /// initializer.
+  ///
+  /// \param preferDeclaredProperties When encountering a `lazy` property
+  /// or a property that has an attached property wrapper, prefer the
+  /// actual declared property (which may or may not be considered "stored"
+  /// as the moment) to the backing storage property. Otherwise, the stored
+  /// backing property will be treated as the member-initialized property.
+  bool isMemberwiseInitialized(bool preferDeclaredProperties) const;
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) { 
     return D->getKind() == DeclKind::Var || D->getKind() == DeclKind::Param; 
@@ -5063,7 +5191,14 @@ class ParamDecl : public VarDecl {
       DefaultValueAndFlags;
 
 public:
-  ParamDecl(VarDecl::Specifier specifier,
+  enum class Specifier : uint8_t {
+    Default = 0,
+    InOut = 1,
+    Shared = 2,
+    Owned = 3,
+  };
+
+  ParamDecl(Specifier specifier,
             SourceLoc specifierLoc, SourceLoc argumentNameLoc,
             Identifier argumentName, SourceLoc parameterNameLoc,
             Identifier parameterName, DeclContext *dc);
@@ -5181,8 +5316,74 @@ public:
     assert(isVariadic());
     return getVarargBaseTy(getInterfaceType());
   }
-  
+
+  /// Determine whether this declaration is an anonymous closure parameter.
+  bool isAnonClosureParam() const;
+
+  /// Return the raw specifier value for this parameter.
+  Specifier getSpecifier() const {
+    return static_cast<Specifier>(Bits.ParamDecl.Specifier);
+  }
+  void setSpecifier(Specifier Spec);
+
+  /// Is the type of this parameter 'inout'?
+  bool isInOut() const { return getSpecifier() == Specifier::InOut; }
+  /// Is this an immutable 'shared' property?
+  bool isShared() const { return getSpecifier() == Specifier::Shared; }
+  /// Is this an immutable 'owned' property?
+  bool isOwned() const { return getSpecifier() == Specifier::Owned; }
+
+  bool isImmutable() const {
+    return isImmutableSpecifier(getSpecifier());
+  }
+  static bool isImmutableSpecifier(Specifier sp) {
+    switch (sp) {
+    case Specifier::Default:
+    case Specifier::Shared:
+    case Specifier::Owned:
+      return true;
+    case Specifier::InOut:
+      return false;
+    }
+    llvm_unreachable("unhandled specifier");
+  }
+
+  ValueOwnership getValueOwnership() const {
+    return getValueOwnershipForSpecifier(getSpecifier());
+  }
+
+  static ValueOwnership getValueOwnershipForSpecifier(Specifier specifier) {
+    switch (specifier) {
+    case Specifier::Default:
+      return ValueOwnership::Default;
+    case Specifier::InOut:
+      return ValueOwnership::InOut;
+    case Specifier::Shared:
+      return ValueOwnership::Shared;
+    case Specifier::Owned:
+      return ValueOwnership::Owned;
+    }
+    llvm_unreachable("unhandled specifier");
+  }
+
+  static Specifier
+  getParameterSpecifierForValueOwnership(ValueOwnership ownership) {
+    switch (ownership) {
+    case ValueOwnership::Default:
+      return Specifier::Default;
+    case ValueOwnership::Shared:
+      return Specifier::Shared;
+    case ValueOwnership::InOut:
+      return Specifier::InOut;
+    case ValueOwnership::Owned:
+      return Specifier::Owned;
+    }
+    llvm_unreachable("unhandled ownership");
+  }
+
   SourceRange getSourceRange() const;
+
+  AnyFunctionType::Param toFunctionParam(Type type = Type()) const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) { 
@@ -5231,6 +5432,7 @@ enum class ObjCSubscriptKind {
 class SubscriptDecl : public GenericContext, public AbstractStorageDecl {
   SourceLoc StaticLoc;
   SourceLoc ArrowLoc;
+  SourceLoc EndLoc;
   ParameterList *Indices;
   TypeLoc ElementTy;
 
@@ -5263,6 +5465,9 @@ public:
   SourceLoc getStartLoc() const {
     return getStaticLoc().isValid() ? getStaticLoc() : getSubscriptLoc();
   }
+  SourceLoc getEndLoc() const { return EndLoc; }
+
+  void setEndLoc(SourceLoc sl) { EndLoc = sl; }
   SourceRange getSourceRange() const;
   SourceRange getSignatureSourceRange() const;
 
@@ -5280,9 +5485,6 @@ public:
   /// Compute the interface type of this subscript from the parameter and
   /// element types.
   void computeType();
-
-  /// Returns whether the result of the subscript operation can be set.
-  bool isSettable() const;
 
   /// Determine the kind of Objective-C subscripting this declaration
   /// implies.
@@ -5375,7 +5577,7 @@ public:
   }
 
   struct BodySynthesizer {
-    void (* Fn)(AbstractFunctionDecl *, void *);
+    std::pair<BraceStmt *, bool> (* Fn)(AbstractFunctionDecl *, void *);
     void *Context;
   };
 
@@ -5423,6 +5625,7 @@ protected:
     Bits.AbstractFunctionDecl.NeedsNewVTableEntry = false;
     Bits.AbstractFunctionDecl.HasComputedNeedsNewVTableEntry = false;
     Bits.AbstractFunctionDecl.Synthesized = false;
+    Bits.AbstractFunctionDecl.HasSingleExpressionBody = false;
   }
 
   void setBodyKind(BodyKind K) {
@@ -5430,6 +5633,17 @@ protected:
   }
 
 public:
+  void setHasSingleExpressionBody(bool Has = true) { 
+    Bits.AbstractFunctionDecl.HasSingleExpressionBody = Has;
+  }
+
+  bool hasSingleExpressionBody() const {
+    return Bits.AbstractFunctionDecl.HasSingleExpressionBody;
+  }
+
+  Expr *getSingleExpressionBody() const;
+  void setSingleExpressionBody(Expr *NewBody);
+
   /// Returns the string for the base name, or "_" if this is unnamed.
   StringRef getNameStr() const {
     assert(!getFullName().isSpecial() && "Cannot get string for special names");
@@ -5496,18 +5710,8 @@ public:
   /// have a body for this function.
   ///
   /// \sa hasBody()
-  BraceStmt *getBody(bool canSynthesize = true) const {
-    if (canSynthesize && getBodyKind() == BodyKind::Synthesize) {
-      const_cast<AbstractFunctionDecl *>(this)->setBodyKind(BodyKind::None);
-      (Synthesizer.Fn)(const_cast<AbstractFunctionDecl *>(this),
-                       Synthesizer.Context);
-    }
-    if (getBodyKind() == BodyKind::Parsed ||
-        getBodyKind() == BodyKind::TypeChecked) {
-      return Body;
-    }
-    return nullptr;
-  }
+  BraceStmt *getBody(bool canSynthesize = true) const;
+
   void setBody(BraceStmt *S, BodyKind NewBodyKind = BodyKind::Parsed) {
     assert(getBodyKind() != BodyKind::Skipped &&
            "cannot set a body if it was skipped");
@@ -5531,9 +5735,18 @@ public:
     setBodyKind(BodyKind::Unparsed);
   }
 
+  /// Provide the parsed body for the function.
+  void setBodyParsed(BraceStmt *S) {
+    setBody(S, BodyKind::Parsed);
+  }
+
   /// Note that parsing for the body was delayed.
-  void setBodySynthesizer(void (* fn)(AbstractFunctionDecl *, void *),
-                         void *context = nullptr) {
+  ///
+  /// The function should return the body statement and a flag indicating
+  /// whether that body is already type-checked.
+  void setBodySynthesizer(
+      std::pair<BraceStmt *, bool> (* fn)(AbstractFunctionDecl *, void *),
+      void *context = nullptr) {
     assert(getBodyKind() == BodyKind::None);
     Synthesizer = {fn, context};
     setBodyKind(BodyKind::Synthesize);
@@ -5545,14 +5758,6 @@ public:
     assert(getBodyKind() == BodyKind::None);
     assert(isa<ConstructorDecl>(this));
     setBodyKind(BodyKind::MemberwiseInitializer);
-  }
-
-  /// If a body has been loaded, flag that it's been type-checked.
-  /// This is kindof a hacky operation, but it avoids some unnecessary
-  /// duplication of work.
-  void setBodyTypeCheckedIfPresent() {
-    if (getBodyKind() == BodyKind::Parsed)
-      setBodyKind(BodyKind::TypeChecked);
   }
 
   /// Gets the body of this function, stripping the unused portions of #if
@@ -5586,6 +5791,11 @@ public:
     return Bits.AbstractFunctionDecl.NeedsNewVTableEntry;
   }
 
+  bool isEffectiveLinkageMoreVisibleThan(ValueDecl *other) const {
+    return (std::min(getEffectiveAccess(), AccessLevel::Public) >
+            std::min(other->getEffectiveAccess(), AccessLevel::Public));
+  }
+
   bool isSynthesized() const {
     return Bits.AbstractFunctionDecl.Synthesized;
   }
@@ -5610,8 +5820,8 @@ public:
   /// Retrieve the source range of the function declaration name + patterns.
   SourceRange getSignatureSourceRange() const;
 
-  CaptureInfo &getCaptureInfo() { return Captures; }
   const CaptureInfo &getCaptureInfo() const { return Captures; }
+  void setCaptureInfo(const CaptureInfo &captures) { Captures = captures; }
 
   /// Retrieve the Objective-C selector that names this method.
   ObjCSelector getObjCSelector(DeclName preferredName = DeclName(),
@@ -5654,10 +5864,6 @@ public:
     return cast_or_null<AbstractFunctionDecl>(ValueDecl::getOverriddenDecl());
   }
 
-  /// Returns true if a function declaration overrides a given
-  /// method from its direct or indirect superclass.
-  bool isOverridingDecl(const AbstractFunctionDecl *method) const;
-
   /// Whether the declaration is later overridden in the module
   ///
   /// Overrides are resolved during type checking; only query this field after
@@ -5698,8 +5904,13 @@ public:
   /// True if the declaration is forced to be statically dispatched.
   bool hasForcedStaticDispatch() const;
 
-  /// Get the interface type of this decl and remove the Self context.
+  /// Get the type of this declaration without the Self clause.
+  /// Asserts if not in type context.
   Type getMethodInterfaceType() const;
+
+  /// Tests if this is a function returning a DynamicSelfType, or a
+  /// constructor.
+  bool hasDynamicSelfResult() const;
 
   using DeclContext::operator new;
   using Decl::getASTContext;
@@ -5710,7 +5921,7 @@ class OperatorDecl;
 enum class SelfAccessKind : uint8_t {
   NonMutating,
   Mutating,
-  __Consuming,
+  Consuming,
 };
 
 /// Diagnostic printing of \c SelfAccessKind.
@@ -5719,6 +5930,7 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SelfAccessKind SAK);
 /// FuncDecl - 'func' declaration.
 class FuncDecl : public AbstractFunctionDecl {
   friend class AbstractFunctionDecl;
+  friend class SelfAccessKindRequest;
 
   SourceLoc StaticLoc;  // Location of the 'static' token or invalid.
   SourceLoc FuncLoc;    // Location of the 'func' token.
@@ -5747,9 +5959,10 @@ protected:
       StaticLoc.isValid() || StaticSpelling != StaticSpellingKind::None;
     Bits.FuncDecl.StaticSpelling = static_cast<unsigned>(StaticSpelling);
 
-    Bits.FuncDecl.HasDynamicSelf = false;
     Bits.FuncDecl.ForcedStaticDispatch = false;
-    Bits.FuncDecl.SelfAccess = static_cast<unsigned>(SelfAccessKind::NonMutating);
+    Bits.FuncDecl.SelfAccess =
+      static_cast<unsigned>(SelfAccessKind::NonMutating);
+    Bits.FuncDecl.SelfAccessComputed = false;
   }
 
 private:
@@ -5761,6 +5974,13 @@ private:
                               GenericParamList *GenericParams,
                               DeclContext *Parent,
                               ClangNode ClangN);
+
+  Optional<SelfAccessKind> getCachedSelfAccessKind() const {
+    if (Bits.FuncDecl.SelfAccessComputed)
+      return static_cast<SelfAccessKind>(Bits.FuncDecl.SelfAccess);
+
+    return None;
+  }
 
 public:
   /// Factory function only for use by deserialization.
@@ -5796,7 +6016,7 @@ public:
   void setStatic(bool IsStatic = true) {
     Bits.FuncDecl.IsStatic = IsStatic;
   }
-      
+
   bool isMutating() const {
     return getSelfAccessKind() == SelfAccessKind::Mutating;
   }
@@ -5804,14 +6024,14 @@ public:
     return getSelfAccessKind() == SelfAccessKind::NonMutating;
   }
   bool isConsuming() const {
-    return getSelfAccessKind() == SelfAccessKind::__Consuming;
+    return getSelfAccessKind() == SelfAccessKind::Consuming;
   }
 
-  SelfAccessKind getSelfAccessKind() const {
-    return static_cast<SelfAccessKind>(Bits.FuncDecl.SelfAccess);
-  }
+  SelfAccessKind getSelfAccessKind() const;
+
   void setSelfAccessKind(SelfAccessKind mod) {
     Bits.FuncDecl.SelfAccess = static_cast<unsigned>(mod);
+    Bits.FuncDecl.SelfAccessComputed = true;
   }
 
   SourceLoc getStaticLoc() const { return StaticLoc; }
@@ -5851,15 +6071,6 @@ public:
   /// This also allows the binary-operator-ness of a func decl to be determined
   /// prior to type checking.
   bool isBinaryOperator() const;
-  
-  /// Determine whether this function has a dynamic \c Self return
-  /// type.
-  bool hasDynamicSelf() const { return Bits.FuncDecl.HasDynamicSelf; }
-
-  /// Set whether this function has a dynamic \c Self return or not.
-  void setDynamicSelf(bool hasDynamicSelf) { 
-    Bits.FuncDecl.HasDynamicSelf = hasDynamicSelf;
-  }
 
   void getLocalCaptures(SmallVectorImpl<CapturedValue> &Result) const {
     return getCaptureInfo().getLocalCaptures(Result);
@@ -5912,8 +6123,8 @@ public:
   /// True if the function is a defer body.
   bool isDeferBody() const;
 
-  /// Perform basic checking to determine whether the @IBAction attribute can
-  /// be applied to this function.
+  /// Perform basic checking to determine whether the @IBAction or
+  /// @IBSegueAction attribute can be applied to this function.
   bool isPotentialIBActionTarget() const;
 };
 
@@ -5950,6 +6161,14 @@ class AccessorDecl final : public FuncDecl {
                                   GenericParamList *genericParams,
                                   DeclContext *parent,
                                   ClangNode clangNode);
+
+  Optional<bool> getCachedIsTransparent() const {
+    if (Bits.AccessorDecl.IsTransparentComputed)
+      return Bits.AccessorDecl.IsTransparent;
+    return None;
+  }
+
+  friend class IsAccessorTransparentRequest;
 
 public:
   static AccessorDecl *createDeserialized(ASTContext &ctx,
@@ -6027,6 +6246,11 @@ public:
 #include "swift/AST/AccessorKinds.def"
     }
     llvm_unreachable("bad accessor kind");
+  }
+
+  void setIsTransparent(bool transparent) {
+    Bits.AccessorDecl.IsTransparent = transparent;
+    Bits.AccessorDecl.IsTransparentComputed = 1;
   }
 
   static bool classof(const Decl *D) {
@@ -6268,7 +6492,7 @@ class ConstructorDecl : public AbstractFunctionDecl {
 
 public:
   ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc, 
-                  OptionalTypeKind Failability, SourceLoc FailabilityLoc,
+                  bool Failable, SourceLoc FailabilityLoc,
                   bool Throws, SourceLoc ThrowsLoc,
                   ParameterList *BodyParams,
                   GenericParamList *GenericParams, 
@@ -6327,14 +6551,7 @@ public:
   }
 
   /// Determine the kind of initializer this is.
-  CtorInitializerKind getInitKind() const {
-    return static_cast<CtorInitializerKind>(Bits.ConstructorDecl.InitKind);
-  }
-
-  /// Set whether this is a convenience initializer.
-  void setInitKind(CtorInitializerKind kind) {
-    Bits.ConstructorDecl.InitKind = static_cast<unsigned>(kind);
-  }
+  CtorInitializerKind getInitKind() const;
 
   /// Whether this is a designated initializer.
   bool isDesignatedInit() const {
@@ -6375,9 +6592,9 @@ public:
     llvm_unreachable("bad CtorInitializerKind");
   }
 
-  /// Determine the failability of the initializer.
-  OptionalTypeKind getFailability() const {
-    return static_cast<OptionalTypeKind>(Bits.ConstructorDecl.Failability);
+  /// Determine if this is a failable initializer.
+  bool isFailable() const {
+    return Bits.ConstructorDecl.Failable;
   }
 
   /// Retrieve the location of the '!' or '?' in a failable initializer.
@@ -6844,22 +7061,14 @@ class MissingMemberDecl : public Decl {
   }
 public:
   static MissingMemberDecl *
-  forMethod(ASTContext &ctx, DeclContext *DC, DeclName name,
-            bool hasNormalVTableEntry) {
-    assert(!name || name.isCompoundName());
-    return new (ctx) MissingMemberDecl(DC, name, hasNormalVTableEntry, 0);
-  }
+  create(ASTContext &ctx, DeclContext *DC, DeclName name,
+         unsigned numVTableEntries, bool hasStorage) {
+    assert(!numVTableEntries || isa<ProtocolDecl>(DC) || isa<ClassDecl>(DC) &&
+           "Only classes and protocols have vtable/witness table entries");
+    assert(!hasStorage || !isa<ProtocolDecl>(DC) &&
+           "Protocols cannot have missing stored properties");
 
-  static MissingMemberDecl *
-  forInitializer(ASTContext &ctx, DeclContext *DC, DeclName name,
-                 bool hasVTableEntry) {
-    unsigned entries = hasVTableEntry ? 1 : 0;
-    return new (ctx) MissingMemberDecl(DC, name, entries, 0);
-  }
-  
-  static MissingMemberDecl *
-  forStoredProperty(ASTContext &ctx, DeclContext *DC, DeclName name) {
-    return new (ctx) MissingMemberDecl(DC, name, 0, 1);
+    return new (ctx) MissingMemberDecl(DC, name, numVTableEntries, hasStorage);
   }
 
   DeclName getFullName() const {
@@ -6887,50 +7096,23 @@ public:
   }
 };
 
-inline bool ValueDecl::isSettable(const DeclContext *UseDC,
-                                  const DeclRefExpr *base) const {
-  if (auto vd = dyn_cast<VarDecl>(this)) {
+inline bool AbstractStorageDecl::isSettable(const DeclContext *UseDC,
+                                            const DeclRefExpr *base) const {
+  if (auto vd = dyn_cast<VarDecl>(this))
     return vd->isSettable(UseDC, base);
-  } else if (auto sd = dyn_cast<SubscriptDecl>(this)) {
-    return sd->isSettable();
-  } else
-    return false;
-}
 
-inline Optional<VarDecl *>
-NominalTypeDecl::ToStoredProperty::operator()(Decl *decl) const {
-  if (auto var = dyn_cast<VarDecl>(decl)) {
-    if (!var->isStatic() && var->hasStorage() &&
-        (!skipUserInaccessible || var->isUserAccessible()))
-      return var;
-  }
-
-  return None;
-}
-
-inline Optional<Decl *>
-NominalTypeDecl::ToStoredPropertyOrMissingMemberPlaceholder
-::operator()(Decl *decl) const {
-  if (auto var = dyn_cast<VarDecl>(decl)) {
-    if (!var->isStatic() && var->hasStorage())
-      return var;
-  }
-  if (auto missing = dyn_cast<MissingMemberDecl>(decl)) {
-    if (missing->getNumberOfFieldOffsetVectorEntries() > 0)
-      return missing;
-  }
-
-  return None;
+  auto sd = cast<SubscriptDecl>(this);
+  return sd->supportsMutation();
 }
 
 inline void
 AbstractStorageDecl::overwriteSetterAccess(AccessLevel accessLevel) {
   Accessors.setInt(accessLevel);
-  if (auto setter = getSetter())
+  if (auto setter = getAccessor(AccessorKind::Set))
     setter->overwriteAccess(accessLevel);
-  if (auto modify = getModifyCoroutine())
+  if (auto modify = getAccessor(AccessorKind::Modify))
     modify->overwriteAccess(accessLevel);
-  if (auto mutableAddressor = getMutableAddressor())
+  if (auto mutableAddressor = getAccessor(AccessorKind::MutableAddress))
     mutableAddressor->overwriteAccess(accessLevel);
 }
 
@@ -6988,13 +7170,35 @@ inline bool ValueDecl::isImportAsMember() const {
   return false;
 }
 
+inline bool ValueDecl::hasCurriedSelf() const {
+  if (auto *afd = dyn_cast<AbstractFunctionDecl>(this))
+    return afd->hasImplicitSelfDecl();
+  if (isa<EnumElementDecl>(this))
+    return true;
+  return false;
+}
+
+inline bool ValueDecl::hasParameterList() const {
+  if (auto *eed = dyn_cast<EnumElementDecl>(this))
+    return eed->hasAssociatedValues();
+  return isa<AbstractFunctionDecl>(this) || isa<SubscriptDecl>(this);
+}
+
+inline unsigned ValueDecl::getNumCurryLevels() const {
+  unsigned curryLevels = 0;
+  if (hasParameterList())
+    curryLevels++;
+  if (hasCurriedSelf())
+    curryLevels++;
+  return curryLevels;
+}
+
 inline bool Decl::isPotentiallyOverridable() const {
   if (isa<VarDecl>(this) ||
       isa<SubscriptDecl>(this) ||
       isa<FuncDecl>(this) ||
       isa<DestructorDecl>(this)) {
-    return getDeclContext()->getSelfClassDecl() ||
-           isa<ProtocolDecl>(getDeclContext());
+    return getDeclContext()->getSelfClassDecl();
   } else {
     return false;
   }
@@ -7053,13 +7257,31 @@ inline EnumElementDecl *EnumDecl::getUniqueElement(bool hasValue) const {
 }
 
 /// Retrieve parameter declaration from the given source at given index.
-const ParamDecl *getParameterAt(ValueDecl *source, unsigned index);
+const ParamDecl *getParameterAt(const ValueDecl *source, unsigned index);
 
 /// Display Decl subclasses.
 void simple_display(llvm::raw_ostream &out, const Decl *decl);
 
 /// Display ValueDecl subclasses.
 void simple_display(llvm::raw_ostream &out, const ValueDecl *decl);
+
+/// Extract the source location from the given declaration.
+SourceLoc extractNearestSourceLoc(const Decl *decl);
+
+/// Extract the source location from the given declaration.
+inline SourceLoc extractNearestSourceLoc(const ExtensionDecl *ext) {
+  return extractNearestSourceLoc(static_cast<const Decl *>(ext));
+}
+
+/// Extract the source location from the given declaration.
+inline SourceLoc extractNearestSourceLoc(const GenericTypeDecl *type) {
+  return extractNearestSourceLoc(static_cast<const Decl *>(type));
+}
+
+/// Extract the source location from the given declaration.
+inline SourceLoc extractNearestSourceLoc(const AbstractFunctionDecl *func) {
+  return extractNearestSourceLoc(static_cast<const Decl *>(func));
+}
 
 } // end namespace swift
 

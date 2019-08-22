@@ -364,6 +364,10 @@ protected:
     NumElements : 32
   );
 
+  SWIFT_INLINE_BITFIELD(OpaqueValueExpr, Expr, 1,
+    IsPlaceholder : 1
+  );
+
   } Bits;
 
 private:
@@ -595,12 +599,6 @@ public:
 class LiteralExpr : public Expr {
 public:
   LiteralExpr(ExprKind Kind, bool Implicit) : Expr(Kind, Implicit) {}
-  
-  // Make an exact copy of this one AST node.
-  LiteralExpr *
-  shallowClone(ASTContext &Ctx,
-               llvm::function_ref<void(Expr *, Type)> setType,
-               llvm::function_ref<Type(const Expr *)> getType) const;
 
   static bool classof(const Expr *E) {
     return E->getKind() >= ExprKind::First_LiteralExpr &&
@@ -949,18 +947,58 @@ public:
 class InterpolatedStringLiteralExpr : public LiteralExpr {
   /// Points at the beginning quote.
   SourceLoc Loc;
+  /// Points at the ending quote.
+  /// Needed for the upcoming \c ASTScope subsystem because lookups can be
+  /// targeted to inside an \c InterpolatedStringLiteralExpr. It would be nicer
+  /// to use \c EndLoc for this value, but then \c Lexer::getLocForEndOfToken()
+  /// would not work for \c stringLiteral->getEndLoc().
+  SourceLoc TrailingQuoteLoc;
   TapExpr *AppendingExpr;
-  Expr *SemanticExpr;
-  
+
+  // Set by Sema:
+  OpaqueValueExpr *interpolationExpr = nullptr;
+  ConcreteDeclRef builderInit;
+  ConcreteDeclRef resultInit;
+  Expr *interpolationCountExpr = nullptr;
+  Expr *literalCapacityExpr = nullptr;
+
 public:
-  InterpolatedStringLiteralExpr(SourceLoc Loc, unsigned LiteralCapacity, 
+  InterpolatedStringLiteralExpr(SourceLoc Loc,
+                                SourceLoc TrailingQuoteLoc,
+                                unsigned LiteralCapacity,
                                 unsigned InterpolationCount,
                                 TapExpr *AppendingExpr)
       : LiteralExpr(ExprKind::InterpolatedStringLiteral, /*Implicit=*/false),
-        Loc(Loc), AppendingExpr(AppendingExpr), SemanticExpr() {
+        Loc(Loc),
+        TrailingQuoteLoc(TrailingQuoteLoc),
+        AppendingExpr(AppendingExpr) {
     Bits.InterpolatedStringLiteralExpr.InterpolationCount = InterpolationCount;
     Bits.InterpolatedStringLiteralExpr.LiteralCapacity = LiteralCapacity;
   }
+
+  // Sets the constructor for the interpolation type.
+  void setBuilderInit(ConcreteDeclRef decl) { builderInit = decl; }
+  ConcreteDeclRef getBuilderInit() const { return builderInit; }
+
+  /// Sets the decl that constructs the final result type after the
+  /// AppendingExpr has been evaluated.
+  void setResultInit(ConcreteDeclRef decl) { resultInit = decl; }
+  ConcreteDeclRef getResultInit() const { return resultInit; }
+
+  /// Sets the OpaqueValueExpr that is passed into AppendingExpr as the SubExpr
+  /// that the tap operates on.
+  void setInterpolationExpr(OpaqueValueExpr *expr) { interpolationExpr = expr; }
+  OpaqueValueExpr *getInterpolationExpr() const { return interpolationExpr; }
+
+  /// Store a builtin integer literal expr wrapping getInterpolationCount().
+  /// This is an arg to builderInit.
+  void setInterpolationCountExpr(Expr *expr) { interpolationCountExpr = expr; }
+  Expr *getInterpolationCountExpr() const { return interpolationCountExpr; }
+
+  /// Store a builtin integer literal expr wrapping getLiteralCapacity().
+  /// This is an arg to builderInit.
+  void setLiteralCapacityExpr(Expr *expr) { literalCapacityExpr = expr; }
+  Expr *getLiteralCapacityExpr() const { return literalCapacityExpr; }
 
   /// Retrieve the value of the literalCapacity parameter to the
   /// initializer.
@@ -981,11 +1019,6 @@ public:
   TapExpr * getAppendingExpr() const { return AppendingExpr; }
   void setAppendingExpr(TapExpr * AE) { AppendingExpr = AE; }
   
-  /// Retrieve the expression that actually evaluates the resulting
-  /// string, typically with a series of '+' operations.
-  Expr *getSemanticExpr() const { return SemanticExpr; }
-  void setSemanticExpr(Expr *SE) { SemanticExpr = SE; }
-  
   SourceLoc getStartLoc() const {
     return Loc;
   }
@@ -993,6 +1026,9 @@ public:
     // SourceLocs are token based, and the interpolated string is one string
     // token, so the range should be (Start == End).
     return Loc;
+  }
+  SourceLoc getTrailingQuoteLoc() const {
+    return TrailingQuoteLoc;
   }
 
   /// Call the \c callback with information about each segment in turn.
@@ -1114,8 +1150,8 @@ public:
 
 private:
   Expr *Arg;
-  Expr *SemanticExpr;
   SourceLoc PoundLoc;
+  ConcreteDeclRef Initializer;
 
   ObjectLiteralExpr(SourceLoc PoundLoc, LiteralKind LitKind,
                     Expr *Arg,
@@ -1163,9 +1199,6 @@ public:
     return Bits.ObjectLiteralExpr.HasTrailingClosure;
   }
 
-  Expr *getSemanticExpr() const { return SemanticExpr; }
-  void setSemanticExpr(Expr *expr) { SemanticExpr = expr; }
-
   SourceLoc getSourceLoc() const { return PoundLoc; }
   SourceRange getSourceRange() const { 
     return SourceRange(PoundLoc, Arg->getEndLoc());
@@ -1175,6 +1208,15 @@ public:
   StringRef getLiteralKindRawName() const;
 
   StringRef getLiteralKindPlainName() const;
+
+  /// Retrieve the initializer that will be used to construct the 'object'
+  /// literal from the result of the initializer.
+  ConcreteDeclRef getInitializer() const { return Initializer; }
+
+  /// Set the initializer that will be used to construct the 'object' literal.
+  void setInitializer(ConcreteDeclRef initializer) {
+    Initializer = initializer;
+  }
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::ObjectLiteral;
@@ -2099,8 +2141,6 @@ class CollectionExpr : public Expr {
   SourceLoc RBracketLoc;
   ConcreteDeclRef Initializer;
 
-  Expr *SemanticExpr = nullptr;
-
   /// Retrieve the intrusive pointer storage from the subtype
   Expr *const *getTrailingObjectsPointer() const;
   Expr **getTrailingObjectsPointer() {
@@ -2165,9 +2205,6 @@ public:
   SourceRange getSourceRange() const {
     return SourceRange(LBracketLoc, RBracketLoc);
   }
-  
-  Expr *getSemanticExpr() const { return SemanticExpr; }
-  void setSemanticExpr(Expr *e) { SemanticExpr = e; }
 
   static bool classof(const Expr *e) {
     return e->getKind() >= ExprKind::First_CollectionExpr &&
@@ -2245,6 +2282,8 @@ public:
   static bool classof(const Expr *e) {
     return e->getKind() == ExprKind::Dictionary;
   }
+
+  Type getElementType();
 };
 
 /// Subscripting expressions like a[i] that refer to an element within a
@@ -2373,14 +2412,31 @@ public:
                                                  : FunctionRefKind::Unapplied);
   }
   
-  SourceLoc getLoc() const { return NameLoc.getBaseNameLoc(); }
+  SourceLoc getLoc() const {
+    if (NameLoc.isValid())
+      return NameLoc.getBaseNameLoc();
+    else if (DotLoc.isValid())
+      return DotLoc;
+    else
+      return SubExpr->getEndLoc();
+  }
 
   SourceLoc getStartLoc() const {
-    return (DotLoc.isInvalid() ? NameLoc.getSourceRange().End 
-                               : SubExpr->getStartLoc());
+    auto SubLoc = SubExpr->getStartLoc();
+    if (SubLoc.isValid())
+      return SubLoc;
+    else if (DotLoc.isValid())
+      return DotLoc;
+    else
+      return NameLoc.getSourceRange().Start;
   }
   SourceLoc getEndLoc() const {
-    return NameLoc.getSourceRange().End;
+    if (NameLoc.isValid())
+      return NameLoc.getSourceRange().End;
+    else if (DotLoc.isValid())
+      return DotLoc;
+    else
+      return SubExpr->getEndLoc();
   }
 
   SourceLoc getDotLoc() const { return DotLoc; }
@@ -3387,8 +3443,8 @@ public:
     Bits.AbstractClosureExpr.Discriminator = Discriminator;
   }
 
-  CaptureInfo &getCaptureInfo() { return Captures; }
   const CaptureInfo &getCaptureInfo() const { return Captures; }
+  void setCaptureInfo(CaptureInfo captures) { Captures = captures; }
 
   /// Retrieve the parameters of this closure.
   ParameterList *getParameters() { return parameterList; }
@@ -3434,6 +3490,12 @@ public:
 
   /// Whether this closure consists of a single expression.
   bool hasSingleExpressionBody() const;
+
+  /// Retrieve the body for closure that has a single expression for
+  /// its body.
+  ///
+  /// Only valid when \c hasSingleExpressionBody() is true.
+  Expr *getSingleExpressionBody() const;
 
   static bool classof(const Expr *E) {
     return E->getKind() >= ExprKind::First_AbstractClosureExpr &&
@@ -3628,14 +3690,20 @@ public:
   }
 };
 
-
-/// This is a closure of the contained subexpression that is formed
-/// when a scalar expression is converted to @autoclosure function type.
-/// For example:
+/// This is an implicit closure of the contained subexpression that is usually
+/// formed when a scalar expression is converted to @autoclosure function type.
 /// \code
 ///   func f(x : @autoclosure () -> Int)
 ///   f(42)  // AutoclosureExpr convert from Int to ()->Int
 /// \endcode
+///
+///  They are also created when key path expressions are converted to function
+///  type, in which case, a pair of nested implicit closures are formed:
+/// \code
+///   { $kp$ in { $0[keyPath: $kp$] } }( \(E) )
+/// \endcode
+/// This is to ensure side effects of the key path expression (mainly indices in
+/// subscripts) are only evaluated once.
 class AutoClosureExpr : public AbstractClosureExpr {
   BraceStmt *Body;
 
@@ -3775,14 +3843,22 @@ public:
 /// node (say, an \c OpenExistentialExpr) and can only be used within the
 /// subexpressions of that AST node.
 class OpaqueValueExpr : public Expr {
-  SourceLoc Loc;
+  SourceRange Range;
 
 public:
-  explicit OpaqueValueExpr(SourceLoc Loc, Type Ty)
-    : Expr(ExprKind::OpaqueValue, /*Implicit=*/true, Ty), Loc(Loc) { }
+  explicit OpaqueValueExpr(SourceRange Range, Type Ty,
+                           bool isPlaceholder = false)
+      : Expr(ExprKind::OpaqueValue, /*Implicit=*/true, Ty), Range(Range) {
+    Bits.OpaqueValueExpr.IsPlaceholder = isPlaceholder;
+  }
 
-  SourceRange getSourceRange() const { return Loc; }
-  
+  /// Whether this opaque value expression represents a placeholder that
+  /// is injected before type checking to act as a placeholder for some
+  /// value to be specified later.
+  bool isPlaceholder() const { return Bits.OpaqueValueExpr.IsPlaceholder; }
+
+  SourceRange getSourceRange() const { return Range; }
+
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::OpaqueValue; 
   }
@@ -4580,7 +4656,8 @@ public:
   }
   SourceLoc getEndLoc() const {
     if (!isFolded()) return EqualLoc;
-    return (Src->getEndLoc().isValid() ? Src->getEndLoc() : Dest->getEndLoc());
+    auto SrcEnd = Src->getEndLoc();
+    return (SrcEnd.isValid() ? SrcEnd : Dest->getEndLoc());
   }
   
   /// True if the node has been processed by binary expression folding.
@@ -4643,6 +4720,9 @@ public:
   SourceRange getSourceRange() const { return Loc; }
   TypeLoc &getTypeLoc() { return PlaceholderTy; }
   TypeLoc getTypeLoc() const { return PlaceholderTy; }
+  SourceLoc getTrailingAngleBracketLoc() const {
+    return Loc.getAdvancedLoc(Placeholder.getLength() - 1);
+  }
 
   /// The TypeRepr to be considered for placeholder expansion.
   TypeRepr *getTypeForExpansion() const { return ExpansionTyR; }
@@ -5240,6 +5320,33 @@ public:
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::KeyPathDot;
+  }
+};
+
+/// Expression node that effects a "one-way" constraint in
+/// the constraint system, allowing type information to flow from the
+/// subexpression outward but not the other way.
+///
+/// One-way expressions are generally implicit and synthetic, introduced by
+/// the type checker. However, there is a built-in expression of the
+/// form \c Builtin.one_way(x) that forms a one-way constraint coming out
+/// of expression `x` that can be used for testing purposes.
+class OneWayExpr : public Expr {
+  Expr *SubExpr;
+
+public:
+  /// Construct an implicit one-way expression from the given subexpression.
+  OneWayExpr(Expr *subExpr)
+     : Expr(ExprKind::OneWay, /*isImplicit=*/true), SubExpr(subExpr) { }
+
+  SourceLoc getLoc() const { return SubExpr->getLoc(); }
+  SourceRange getSourceRange() const { return SubExpr->getSourceRange(); }
+
+  Expr *getSubExpr() const { return SubExpr; }
+  void setSubExpr(Expr *subExpr) { SubExpr = subExpr; }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::OneWay;
   }
 };
 

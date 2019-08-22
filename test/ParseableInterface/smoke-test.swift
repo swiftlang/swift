@@ -4,7 +4,7 @@
 // CHECK: public func verySimpleFunction(){{$}}
 public func verySimpleFunction() {}
 
-// CHECK: public func ownership(_ x: __shared AnyObject){{$}}
+// CHECK: public func ownership(_ x: __shared Swift.AnyObject){{$}}
 public func ownership(_ x: __shared AnyObject) {}
 
 // CHECK-MULTI-FILE: public func otherFileFunction(){{$}}

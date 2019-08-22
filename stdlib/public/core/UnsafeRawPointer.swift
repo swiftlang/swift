@@ -168,7 +168,7 @@
 ///       var number = 5
 ///       let numberPointer = UnsafeRawPointer(&number)
 ///       // Accessing 'numberPointer' is undefined behavior.
-@_fixed_layout
+@frozen
 public struct UnsafeRawPointer: _Pointer {
   
   public typealias Pointee = UInt8
@@ -520,7 +520,7 @@ extension UnsafeRawPointer: Strideable {
 ///       var number = 5
 ///       let numberPointer = UnsafeMutableRawPointer(&number)
 ///       // Accessing 'numberPointer' is undefined behavior.
-@_fixed_layout
+@frozen
 public struct UnsafeMutableRawPointer: _Pointer {
   
   public typealias Pointee = UInt8
@@ -966,14 +966,17 @@ public struct UnsafeMutableRawPointer: _Pointer {
   /// must be properly aligned for accessing `T`, and `byteCount` must be a
   /// multiple of `MemoryLayout<T>.stride`.
   ///
-  /// After calling `copyMemory(from:byteCount:)`, the `byteCount` bytes of memory
-  /// referenced by this pointer are initialized to raw bytes. If the memory
-  /// is bound to type `T`, then it contains values of type `T`.
+  /// The memory in the region `source..<(source + byteCount)` may overlap with
+  /// the memory referenced by this pointer.
+  ///
+  /// After calling `copyMemory(from:byteCount:)`, the `byteCount` bytes of 
+  /// memory referenced by this pointer are initialized to raw bytes. If the
+  /// memory is bound to type `T`, then it contains values of type `T`.
   ///
   /// - Parameters:
   ///   - source: A pointer to the memory to copy bytes from. The memory in the
-  ///     region `source..<(source + byteCount)` must be initialized to a trivial
-  ///     type.
+  ///     region `source..<(source + byteCount)` must be initialized to a
+  ///     trivial type.
   ///   - byteCount: The number of bytes to copy. `byteCount` must not be negative.
   @inlinable
   public func copyMemory(from source: UnsafeRawPointer, byteCount: Int) {

@@ -930,16 +930,16 @@ func s460______________foo<Element>(p: UnsafePointer<Element>) -> UnsafeBufferPo
 // Test emitNativeToCBridgedNonoptionalValue.
 // ---
 // CHECK-objc-LABEL: sil hidden @$s20opaque_values_silgen21s470________nativeToC7fromAnyyXlyp_tF : $@convention(thin) (@in_guaranteed Any) -> @owned AnyObject {
-// CHECK-objc bb0(%0 : $Any):
-// CHECK-objc [[BORROW:%.*]] = begin_borrow %0 : $Any
-// CHECK-objc [[SRC:%.*]] = copy_value [[BORROW]] : $Any
-// CHECK-objc [[OPEN:%.*]] = open_existential_opaque [[SRC]] : $Any to $@opened
-// CHECK-objc [[COPY:%.*]] = copy_value [[OPEN]] : $@opened
-// CHECK-objc [[F:%.*]] = function_ref @$ss27_bridgeAnythingToObjectiveCyyXlxlF : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> @owned AnyObject
-// CHECK-objc [[RET:%.*]] = apply [[F]]<@opened("{{.*}}") Any>([[COPY]]) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> @owned AnyObject
-// CHECK-objc destroy_value [[SRC]] : $Any
-// CHECK-objc destroy_value %0 : $Any
-// CHECK-objc return [[RET]] : $AnyObject
+// CHECK-objc: bb0(%0 : $Any):
+// CHECK-objc: [[BORROW:%.*]] = begin_borrow %0 : $Any
+// CHECK-objc: [[SRC:%.*]] = copy_value [[BORROW]] : $Any
+// CHECK-objc: [[OPEN:%.*]] = open_existential_opaque [[SRC]] : $Any to $@opened
+// CHECK-objc: [[COPY:%.*]] = copy_value [[OPEN]] : $@opened
+// CHECK-objc: [[F:%.*]] = function_ref @$ss27_bridgeAnythingToObjectiveCyyXlxlF : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> @owned AnyObject
+// CHECK-objc: [[RET:%.*]] = apply [[F]]<@opened("{{.*}}") Any>([[COPY]]) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> @owned AnyObject
+// CHECK-objc: destroy_value [[SRC]] : $Any
+// CHECK-objc: destroy_value %0 : $Any
+// CHECK-objc: return [[RET]] : $AnyObject
 // CHECK-objc-LABEL: } // end sil function '$s20opaque_values_silgen21s470________nativeToC7fromAnyyXlyp_tF'
 #if _runtime(_ObjC)
 func s470________nativeToC(fromAny any: Any) -> AnyObject {

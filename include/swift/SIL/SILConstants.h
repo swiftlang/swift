@@ -58,6 +58,46 @@ enum class UnknownReason {
 
   /// Unspecified trap detected.
   Trap,
+
+  /// An operation was applied over operands whose symbolic values were
+  /// constants but were not valid for the operation.
+  InvalidOperandValue,
+
+  /// Encountered an instruction not supported by the interpreter.
+  UnsupportedInstruction,
+
+  /// Encountered a function call where the body of the called function is
+  /// not available.
+  CalleeImplementationUnknown,
+
+  /// Attempted to load from/store into a SIL value that was not tracked by
+  /// the interpreter.
+  UntrackedSILValue,
+
+  /// Attempted to find a concrete protocol conformance for a witness method
+  /// and failed.
+  UnknownWitnessMethodConformance,
+
+  /// Attempted to determine the SIL function of a witness method (based on a
+  /// concrete protocol conformance) and failed.
+  UnresolvableWitnessMethod,
+
+  /// The value of a top-level variable cannot be determined to be a constant.
+  /// This is only relevant in the backward evaluation mode, which is used by
+  /// #assert.
+  NotTopLevelConstant,
+
+  /// A top-level value has multiple writers. This is only relevant in the
+  /// non-flow-sensitive evaluation mode,  which is used by #assert.
+  MutipleTopLevelWriters,
+
+  /// Indicates the return value of an instruction that was not evaluated during
+  /// interpretation.
+  ReturnedByUnevaluatedInstruction,
+
+  /// Indicates that the value was possibly modified by an instruction
+  /// that was not evaluated during the interpretation.
+  MutatedByUnevaluatedInstruction,
 };
 
 /// An abstract class that exposes functions for allocating symbolic values.
@@ -383,6 +423,8 @@ public:
   /// context about what the problem is.  If there is no location for some
   /// reason, we fall back to using the specified location.
   void emitUnknownDiagnosticNotes(SILLocation fallbackLoc);
+
+  bool isUnknownDueToUnevaluatedInstructions();
 
   /// Clone this SymbolicValue into the specified Allocator and return the new
   /// version. This only works for valid constants.

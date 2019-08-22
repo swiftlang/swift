@@ -36,9 +36,9 @@ func f(x: Int) -> Int {
 
 
 
-/* FIXME: blah*/
+/* FIXME: blah */
 
-// CHECK: <comment-block>/* <comment-marker>FIXME: blah*/</comment-marker></comment-block>
+// CHECK: <comment-block>/* <comment-marker>FIXME: blah</comment-marker> */</comment-block>
 
 /*
  * FIXME: blah

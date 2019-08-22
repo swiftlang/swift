@@ -71,10 +71,10 @@ class Subclass : NSObject {
 }
 
 
+// CHECK-AFTER_POUND-NOT: selector
 // CHECK-AFTER_POUND: Keyword/ExprSpecific:               available({#Platform...#}, *); name=available(Platform..., *)
-// CHECK-AFTER_POUND: Keyword/ExprSpecific:               selector({#@objc method#}); name=selector(@objc method)
 
-// CHECK-CONTEXT_SELECTOR: Keyword/None:                  #selector({#@objc method#}); name=#selector(@objc method)
+// CHECK-CONTEXT_SELECTOR: Keyword/None/TypeRelation[Identical]: #selector({#@objc method#})[#Selector#]; name=#selector(@objc method)
 
 // CHECK-SELECTOR_BASIC: Keyword/None:                       getter: {#@objc property#}; name=getter: @objc property
 // CHECK-SELECTOR_BASIC: Keyword/None:                       setter: {#@objc property#}; name=setter: @objc property

@@ -94,7 +94,7 @@ func superclassConformance3<T>(t: T) where T : C, T : P4, T : C2 {}
 
 protocol P5: A { }
 
-protocol P6: A, Other { } // expected-error {{protocol 'P6' cannot be a subclass of both 'Other' and 'A'}}
+protocol P6: A, Other { } // expected-error {{protocol 'P6' cannot require 'Self' to be a subclass of both 'Other' and 'A'}}
 // expected-error@-1{{multiple inheritance from classes 'A' and 'Other'}}
 // expected-note@-2 {{superclass constraint 'Self' : 'A' written here}}
 

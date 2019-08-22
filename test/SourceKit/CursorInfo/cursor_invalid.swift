@@ -44,9 +44,9 @@ func resyncParser2() {}
 // CHECK4: bad
 // CHECK4: <Declaration>var bad: IDontExist</Declaration>
 
-// RUN: %sourcekitd-test -req=cursor -pos=7:12 %s -- %s | %FileCheck -check-prefix=EMPTY %s
-// RUN: %sourcekitd-test -req=cursor -pos=9:7 %s -- %s | %FileCheck -check-prefix=EMPTY %s
-// EMPTY: <empty cursor info>
+// RUN: %sourcekitd-test -req=cursor -pos=7:12 %s -- %s | %FileCheck -check-prefix=DIAG %s
+// RUN: %sourcekitd-test -req=cursor -pos=9:7 %s -- %s | %FileCheck -check-prefix=DIAG %s
+// DIAG: <empty cursor info; internal diagnostic: "Unable to resolve cursor info.">
 
 // RUN: %sourcekitd-test -req=cursor -pos=18:6 %s -- %s | %FileCheck -check-prefix=EQEQ1 %s
 // RUN: %sourcekitd-test -req=cursor -pos=19:6 %s -- %s | %FileCheck -check-prefix=EQEQ1 %s

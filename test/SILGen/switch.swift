@@ -610,7 +610,7 @@ func test_isa_class_2(x: B) -> AnyObject {
     return y
 
   // CHECK: [[NO_CASE3]]:
-  // CHECK    destroy_value [[CAST_E_COPY]]
+  // CHECK:    destroy_value [[CAST_E_COPY]]
   // CHECK:   br [[NEXT_CASE:bb[0-9]+]]
 
   // CHECK: [[IS_NOT_E]]([[NOCAST_E:%.*]] : @guaranteed $B):
@@ -1583,3 +1583,40 @@ enum Storage {
   }
 }
 
+// Make sure that we do not leak tuple elements if we fail to match the first
+// tuple element.
+enum rdar49990484Enum1 {
+  case case1(Klass)
+  case case2(Klass, Int)
+}
+
+enum rdar49990484Enum2 {
+  case case1(Klass)
+  case case2(rdar49990484Enum1, Klass)
+}
+
+struct rdar49990484Struct {
+  var value: rdar49990484Enum2
+
+  func doSomethingIfLet() {
+    if case let .case2(.case2(k, _), _) = value {
+      return
+    }
+  }
+
+  func doSomethingSwitch() {
+    switch value {
+    case let .case2(.case2(k, _), _):
+      return
+    default:
+      return
+    }
+    return
+  }
+
+  func doSomethingGuardLet() {
+    guard case let .case2(.case2(k, _), _) = value else {
+      return
+    }
+  }
+}

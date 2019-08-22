@@ -16,6 +16,7 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
@@ -195,6 +196,10 @@ namespace {
     /// Additional functions we might need to serialize.
     llvm::SmallVector<const SILFunction *, 16> Worklist;
 
+    /// String storage for temporarily created strings which are referenced from
+    /// the tables.
+    llvm::BumpPtrAllocator StringTable;
+
     std::array<unsigned, 256> SILAbbrCodes;
     template <typename Layout>
     void registerSILAbbr() {
@@ -234,7 +239,8 @@ namespace {
 
     void writeConversionLikeInstruction(const SingleValueInstruction *I,
                                         unsigned attrs);
-    void writeOneTypeLayout(SILInstructionKind valueKind, SILType type);
+    void writeOneTypeLayout(SILInstructionKind valueKind,
+                            unsigned attrs, SILType type);
     void writeOneTypeOneOperandLayout(SILInstructionKind valueKind,
                                       unsigned attrs,
                                       SILType type,
@@ -410,8 +416,9 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
       (unsigned)F.isGlobalInit(), (unsigned)F.getInlineStrategy(),
       (unsigned)F.getOptimizationMode(), (unsigned)F.getEffectsKind(),
       (unsigned)numSpecAttrs, (unsigned)F.hasOwnership(),
-      F.isWeakLinked(), (unsigned)F.isDynamicallyReplaceable(), FnID,
-      replacedFunctionID, genericEnvID, clangNodeOwnerID, SemanticsIDs);
+      F.isWeakLinked(), (unsigned)F.isDynamicallyReplaceable(),
+      (unsigned)F.isExactSelfClass(),
+      FnID, replacedFunctionID, genericEnvID, clangNodeOwnerID, SemanticsIDs);
 
   if (NoBody)
     return;
@@ -531,10 +538,10 @@ void SILSerializer::handleMethodInst(const MethodInst *MI,
 }
 
 void SILSerializer::writeOneTypeLayout(SILInstructionKind valueKind,
-                                       SILType type) {
+                                       unsigned attrs, SILType type) {
   unsigned abbrCode = SILAbbrCodes[SILOneTypeLayout::Code];
   SILOneTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-        (unsigned) valueKind,
+        (unsigned) valueKind, attrs,
         S.addTypeRef(type.getASTType()),
         (unsigned)type.getCategory());
 }
@@ -843,7 +850,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
   case SILInstructionKind::AllocBoxInst: {
     const AllocBoxInst *ABI = cast<AllocBoxInst>(&SI);
-    writeOneTypeLayout(ABI->getKind(), ABI->getType());
+    writeOneTypeLayout(ABI->getKind(), ABI->hasDynamicLifetime() ? 1 : 0,
+                       ABI->getType());
     break;
   }
   case SILInstructionKind::AllocRefInst:
@@ -880,7 +888,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
   case SILInstructionKind::AllocStackInst: {
     const AllocStackInst *ASI = cast<AllocStackInst>(&SI);
-    writeOneTypeLayout(ASI->getKind(), ASI->getElementType());
+    writeOneTypeLayout(ASI->getKind(), ASI->hasDynamicLifetime() ? 1 : 0,
+                       ASI->getElementType());
     break;
   }
   case SILInstructionKind::ProjectValueBufferInst: {
@@ -1225,7 +1234,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, "...") \
   ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, "...")
 #include "swift/AST/ReferenceStorage.def"
-  case SILInstructionKind::CondFailInst:
   case SILInstructionKind::RetainValueInst:
   case SILInstructionKind::DestructureStructInst:
   case SILInstructionKind::DestructureTupleInst:
@@ -1305,7 +1313,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     // Use SILOneOperandLayout to specify the function type and the function
     // name (IdentifierID).
     const FunctionRefInst *FRI = cast<FunctionRefInst>(&SI);
-    SILFunction *ReferencedFunction = FRI->getReferencedFunction();
+    SILFunction *ReferencedFunction = FRI->getInitiallyReferencedFunction();
     unsigned abbrCode = SILAbbrCodes[SILOneOperandLayout::Code];
     SILOneOperandLayout::emitRecord(Out, ScratchRecord, abbrCode,
         (unsigned)SI.getKind(), 0,
@@ -1319,7 +1327,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     // Use SILOneOperandLayout to specify the function type and the function
     // name (IdentifierID).
     const auto *FRI = cast<DynamicFunctionRefInst>(&SI);
-    SILFunction *ReferencedFunction = FRI->getReferencedFunction();
+    SILFunction *ReferencedFunction = FRI->getInitiallyReferencedFunction();
     unsigned abbrCode = SILAbbrCodes[SILOneOperandLayout::Code];
     SILOneOperandLayout::emitRecord(Out, ScratchRecord, abbrCode,
         (unsigned)SI.getKind(), 0,
@@ -1333,7 +1341,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     // Use SILOneOperandLayout to specify the function type and the function
     // name (IdentifierID).
     const auto *FRI = cast<PreviousDynamicFunctionRefInst>(&SI);
-    SILFunction *ReferencedFunction = FRI->getReferencedFunction();
+    SILFunction *ReferencedFunction = FRI->getInitiallyReferencedFunction();
     unsigned abbrCode = SILAbbrCodes[SILOneOperandLayout::Code];
     SILOneOperandLayout::emitRecord(Out, ScratchRecord, abbrCode,
         (unsigned)SI.getKind(), 0,
@@ -1394,6 +1402,18 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         S.addTypeRef(TAI->getTailType().getASTType()));
     break;
   }
+  case SILInstructionKind::CondFailInst: {
+    auto *CFI = cast<CondFailInst>(&SI);
+    SILValue operand = CFI->getOperand();
+    SILTwoOperandsLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[SILTwoOperandsLayout::Code],
+        (unsigned)SI.getKind(), /*attributes*/ 0,
+        S.addTypeRef(operand->getType().getASTType()),
+        (unsigned)operand->getType().getCategory(),
+        addValueRef(operand),
+        0, 0, S.addUniquedStringRef(CFI->getMessage()));
+    break;
+  }
   case SILInstructionKind::StringLiteralInst: {
     auto SLI = cast<StringLiteralInst>(&SI);
     StringRef Str = SLI->getValue();
@@ -1447,7 +1467,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
   case SILInstructionKind::MetatypeInst: {
     auto &MI = cast<MetatypeInst>(SI);
-    writeOneTypeLayout(MI.getKind(), MI.getType());
+    writeOneTypeLayout(MI.getKind(), 0, MI.getType());
     break;
   }
   case SILInstructionKind::ObjCProtocolInst: {
@@ -1705,6 +1725,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
                   addValueRef(operand));
     break;
   }
+  case SILInstructionKind::AssignByWrapperInst:
+    llvm_unreachable("not supported");
   case SILInstructionKind::BindMemoryInst: {
     auto *BI = cast<BindMemoryInst>(&SI);
     SILValue baseOperand = BI->getBase();
@@ -2206,7 +2228,17 @@ void SILSerializer::writeSILVTable(const SILVTable &vt) {
   if (!ShouldSerializeAll &&
       vt.getClass()->getEffectiveAccess() < swift::AccessLevel::Public)
     return;
-  VTableList[vt.getClass()->getName().str()] = NextVTableID++;
+
+  // Use the mangled name of the class as a key to distinguish between classes
+  // which have the same name (but are in different contexts).
+  Mangle::ASTMangler mangler;
+  std::string mangledClassName = mangler.mangleNominalType(vt.getClass());
+  size_t nameLength = mangledClassName.size();
+  char *stringStorage = (char *)StringTable.Allocate(nameLength, 1);
+  std::memcpy(stringStorage, mangledClassName.data(), nameLength);
+
+  VTableList[StringRef(stringStorage, nameLength)] = NextVTableID++;
+
   VTableOffset.push_back(Out.GetCurrentBitNo());
   VTableLayout::emitRecord(Out, ScratchRecord, SILAbbrCodes[VTableLayout::Code],
                            S.addDeclRef(vt.getClass()),
@@ -2228,7 +2260,6 @@ void SILSerializer::writeSILVTable(const SILVTable &vt) {
         // SILFunction name
         S.addUniquedStringRef(entry.Implementation->getName()),
         toStableVTableEntryKind(entry.TheKind),
-        toStableSILLinkage(entry.Linkage),
         ListOfValues);
   }
 }

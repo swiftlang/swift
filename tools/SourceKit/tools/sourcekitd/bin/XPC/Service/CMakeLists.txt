@@ -2,7 +2,7 @@ if (NOT SOURCEKIT_INSTALLING_INPROC)
   add_sourcekit_xpc_service(SourceKitService sourcekitd
     XPCService.cpp
     LINK_LIBS SourceKitSwiftLang sourcekitdAPI
-    LLVM_COMPONENT_DEPENDS support coverage
+    LLVM_LINK_COMPONENTS support coverage
   )
 endif()
 

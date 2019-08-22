@@ -46,7 +46,6 @@ namespace clang {
 namespace swift {
   enum class ArtificialMainKind : uint8_t;
   class ASTContext;
-  class ASTScope;
   class ASTWalker;
   class BraceStmt;
   class Decl;
@@ -61,7 +60,6 @@ namespace swift {
   class InfixOperatorDecl;
   class LazyResolver;
   class LinkLibrary;
-  class LookupCache;
   class ModuleLoader;
   class NominalTypeDecl;
   class EnumElementDecl;
@@ -80,9 +78,14 @@ namespace swift {
   class VarDecl;
   class VisibleDeclConsumer;
   class SyntaxParsingCache;
-  
-namespace syntax {
+  class ASTScope;
+  class SourceLookupCache;
+
+  namespace syntax {
   class SourceFileSyntax;
+}
+namespace ast_scope {
+class ASTSourceFileScope;
 }
 
 /// Discriminator for file-units.
@@ -190,7 +193,7 @@ public:
 
     /// This is a convenience function that writes the entire name, in forward
     /// order, to \p out.
-    void printForward(raw_ostream &out) const;
+    void printForward(raw_ostream &out, StringRef delim = ".") const;
   };
 
 private:
@@ -200,6 +203,9 @@ private:
   DebuggerClient *DebugClient = nullptr;
 
   SmallVector<FileUnit *, 2> Files;
+
+  std::unique_ptr<SourceLookupCache> Cache;
+  SourceLookupCache &getSourceLookupCache() const;
 
   /// Tracks the file that will generate the module's entry point, either
   /// because it contains a class marked with \@UIApplicationMain
@@ -325,6 +331,27 @@ public:
     Bits.ModuleDecl.RawResilienceStrategy = unsigned(strategy);
   }
 
+  /// \returns true if this module is a system module; note that the StdLib is
+  /// considered a system module.
+  bool isSystemModule() const {
+    return Bits.ModuleDecl.IsSystemModule;
+  }
+  void setIsSystemModule(bool flag = true) {
+    Bits.ModuleDecl.IsSystemModule = flag;
+  }
+
+  /// Returns true if this module is a non-Swift module that was imported into
+  /// Swift.
+  ///
+  /// Right now that's just Clang modules.
+  bool isNonSwiftModule() const {
+    return Bits.ModuleDecl.IsNonSwiftModule;
+  }
+  /// \see #isNonSwiftModule
+  void setIsNonSwiftModule(bool flag = true) {
+    Bits.ModuleDecl.IsNonSwiftModule = flag;
+  }
+
   bool isResilient() const {
     return getResilienceStrategy() != ResilienceStrategy::Default;
   }
@@ -353,6 +380,12 @@ public:
   void lookupVisibleDecls(AccessPathTy AccessPath,
                           VisibleDeclConsumer &Consumer,
                           NLKind LookupKind) const;
+
+  /// This is a hack for 'main' file parsing and the integrated REPL.
+  ///
+  /// FIXME: Refactor main file parsing to not pump the parser incrementally.
+  /// FIXME: Remove the integrated REPL.
+  void clearLookupCache();
 
   /// @{
 
@@ -552,10 +585,6 @@ public:
 
   /// \returns true if this module is the "SwiftOnoneSupport" module;
   bool isOnoneSupportModule() const;
-
-  /// \returns true if this module is a system module; note that the StdLib is
-  /// considered a system module.
-  bool isSystemModule() const;
 
   /// \returns true if traversal was aborted, false otherwise.
   bool walk(ASTWalker &Walker);
@@ -843,6 +872,10 @@ public:
     return getParentModule()->getName().str();
   }
 
+  /// If this is a module imported from a parseable interface, return the path
+  /// to the interface file, otherwise an empty StringRef.
+  virtual StringRef getParseableInterface() const { return {}; }
+
   /// Traverse the decls within this file.
   ///
   /// \returns true if traversal was aborted, false if it completed
@@ -889,7 +922,6 @@ static inline unsigned alignOfFileUnit() {
 /// IR generation.
 class SourceFile final : public FileUnit {
 public:
-  class LookupCache;
   class Impl;
   struct SourceFileSyntaxInfo;
 
@@ -938,8 +970,8 @@ public:
   };
 
 private:
-  std::unique_ptr<LookupCache> Cache;
-  LookupCache &getCache() const;
+  std::unique_ptr<SourceLookupCache> Cache;
+  SourceLookupCache &getCache() const;
 
   /// This is the list of modules that are imported by this module.
   ///
@@ -979,12 +1011,8 @@ private:
   /// If not, we can fast-path module checks.
   bool HasImplementationOnlyImports = false;
 
-  /// The list of protocol conformances that were "used" within this
-  /// source file.
-  llvm::SetVector<NormalProtocolConformance *> UsedConformances;
-
   /// The scope map that describes this source file.
-  ASTScope *Scope = nullptr;
+  std::unique_ptr<ASTScope> Scope;
 
   friend ASTContext;
   friend Impl;
@@ -1000,6 +1028,7 @@ public:
   llvm::SetVector<TypeDecl *> LocalTypeDecls;
   
   /// The set of validated opaque return type decls in the source file.
+  llvm::SmallVector<OpaqueTypeDecl *, 4> OpaqueReturnTypes;
   llvm::StringMap<OpaqueTypeDecl *> ValidatedOpaqueReturnTypes;
   /// The set of parsed decls with opaque return types that have not yet
   /// been validated.
@@ -1023,6 +1052,22 @@ public:
   /// those selectors.
   llvm::DenseMap<ObjCSelector, llvm::TinyPtrVector<AbstractFunctionDecl *>>
     ObjCMethods;
+
+  /// List of Objective-C methods, which is used for checking unintended
+  /// Objective-C overrides.
+  std::vector<AbstractFunctionDecl *> ObjCMethodList;
+
+  /// An unsatisfied, optional @objc requirement in a protocol conformance.
+  using ObjCUnsatisfiedOptReq = std::pair<DeclContext *, AbstractFunctionDecl *>;
+
+  /// List of optional @objc protocol requirements that have gone
+  /// unsatisfied, which might conflict with other Objective-C methods.
+  std::vector<ObjCUnsatisfiedOptReq> ObjCUnsatisfiedOptReqs;
+
+  using ObjCMethodConflict = std::tuple<ClassDecl *, ObjCSelector, bool>;
+
+  /// List of Objective-C member conflicts we have found during type checking.
+  std::vector<ObjCMethodConflict> ObjCMethodConflicts;
 
   template <typename T>
   using OperatorMap = llvm::DenseMap<Identifier,llvm::PointerIntPair<T,1,bool>>;
@@ -1058,6 +1103,8 @@ public:
              ImplicitModuleImportKind ModImpKind, bool KeepParsedTokens = false,
              bool KeepSyntaxTree = false);
 
+  ~SourceFile();
+
   void addImports(ArrayRef<ImportedModuleDesc> IM);
 
   enum ImportQueryKind {
@@ -1079,6 +1126,10 @@ public:
 
   bool isImportedImplementationOnly(const ModuleDecl *module) const;
 
+  /// This is a hack for 'main' file parsing and the integrated REPL.
+  ///
+  /// FIXME: Refactor main file parsing to not pump the parser incrementally.
+  /// FIXME: Remove the integrated REPL.
   void clearLookupCache();
 
   void cacheVisibleDecls(SmallVectorImpl<ValueDecl *> &&globals) const;
@@ -1125,17 +1176,6 @@ public:
   Identifier getPrivateDiscriminator() const { return PrivateDiscriminator; }
 
   virtual bool walk(ASTWalker &walker) override;
-
-  /// Note that the given conformance was used by this source file.
-  void addUsedConformance(NormalProtocolConformance *conformance) {
-    UsedConformances.insert(conformance);
-  }
-
-  /// Retrieve the set of conformances that were used in this source
-  /// file.
-  ArrayRef<NormalProtocolConformance *> getUsedConformances() const {
-    return UsedConformances.getArrayRef();
-  }
 
   /// @{
 
@@ -1294,7 +1334,7 @@ public:
   }
   
   void markDeclWithOpaqueResultTypeAsValidated(ValueDecl *vd);
-  
+
 private:
 
   /// If not None, the underlying vector should contain tokens of this source file.
@@ -1392,7 +1432,7 @@ public:
   }
 
   /// Returns the Swift module that overlays a Clang module.
-  virtual ModuleDecl *getAdapterModule() const { return nullptr; }
+  virtual ModuleDecl *getOverlayModule() const { return nullptr; }
 
   virtual bool isSystemModule() const { return false; }
 

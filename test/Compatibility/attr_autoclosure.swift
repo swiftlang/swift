@@ -62,3 +62,10 @@ func passAutoClosureToEnumCase(_ fn: @escaping @autoclosure () -> Int) {
   //        somewhere SILGen if `fn` doesn't have `@escaping`.
   let _: E = .baz(fn) // Ok
 }
+
+do {
+  func bar(_ fn: @autoclosure () -> (() -> Int)) {}
+  func foo(_ fn: @autoclosure @escaping () -> (() -> Int)) {
+    bar(fn) // Ok
+  }
+}

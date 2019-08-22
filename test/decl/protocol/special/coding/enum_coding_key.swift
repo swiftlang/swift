@@ -35,16 +35,16 @@ let _ = IntKey(intValue: 3)
 
 // Enums with a different raw value conforming to CodingKey should not get
 // implicit derived conformance.
-enum Int8Key : Int8, CodingKey { // expected-error {{type 'Int8Key' does not conform to protocol 'CodingKey'}}
+enum Int8Key : Int8, CodingKey { // expected-error {{type 'Int8Key' does not conform to protocol 'CodingKey'}} expected-note 4 {{do you want to add protocol stubs?}}
     case a = -1, b = 0, c = 1
 }
 
 // Structs conforming to CodingKey should not get implicit derived conformance.
-struct StructKey : CodingKey { // expected-error {{type 'StructKey' does not conform to protocol 'CodingKey'}}
+struct StructKey : CodingKey { // expected-error {{type 'StructKey' does not conform to protocol 'CodingKey'}} expected-note 4 {{do you want to add protocol stubs?}}
 }
 
 // Classes conforming to CodingKey should not get implict derived conformance.
-class ClassKey : CodingKey { //expected-error {{type 'ClassKey' does not conform to protocol 'CodingKey'}}
+class ClassKey : CodingKey { //expected-error {{type 'ClassKey' does not conform to protocol 'CodingKey'}} expected-note 4 {{do you want to add protocol stubs?}}
 }
 
 // Types which are valid for CodingKey derived conformance should not get that

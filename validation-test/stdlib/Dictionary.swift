@@ -1,12 +1,8 @@
 // RUN: %empty-directory(%t)
 //
 // RUN: %gyb %s -o %t/main.swift
-// RUN: if [ %target-runtime == "objc" ]; then \
-// RUN:   %target-clang -fobjc-arc %S/Inputs/SlurpFastEnumeration/SlurpFastEnumeration.m -c -o %t/SlurpFastEnumeration.o; \
-// RUN:   %line-directive %t/main.swift -- %target-build-swift %S/Inputs/DictionaryKeyValueTypes.swift %S/Inputs/DictionaryKeyValueTypesObjC.swift %t/main.swift -I %S/Inputs/SlurpFastEnumeration/ -Xlinker %t/SlurpFastEnumeration.o -o %t/Dictionary -Xfrontend -disable-access-control; \
-// RUN: else \
-// RUN:   %line-directive %t/main.swift -- %target-build-swift %S/Inputs/DictionaryKeyValueTypes.swift %t/main.swift -o %t/Dictionary -Xfrontend -disable-access-control; \
-// RUN: fi
+// RUN: %target-clang -fobjc-arc %S/Inputs/SlurpFastEnumeration/SlurpFastEnumeration.m -c -o %t/SlurpFastEnumeration.o
+// RUN: %line-directive %t/main.swift -- %target-build-swift %S/Inputs/DictionaryKeyValueTypes.swift %S/Inputs/DictionaryKeyValueTypesObjC.swift %t/main.swift -I %S/Inputs/SlurpFastEnumeration/ -Xlinker %t/SlurpFastEnumeration.o -o %t/Dictionary -Xfrontend -disable-access-control
 //
 // RUN: %target-codesign %t/Dictionary && %line-directive %t/main.swift -- %target-run %t/Dictionary
 // REQUIRES: executable_test
@@ -3004,7 +3000,9 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
 }
 
 DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
-  do {
+  if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+    // Identity of empty dictionaries changed in
+    // https://github.com/apple/swift/pull/22527
     var d = getBridgedNonverbatimDictionary([:])
     assert(isNativeDictionary(d))
     assert(d.count == 0)
@@ -3087,7 +3085,6 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
     assert(d2[TestBridgedKeyTy(10)] == nil)
   }
 }
-
 
 DictionaryTestSuite.test("BridgedFromObjC.Verbatim.Count") {
   let d = getBridgedVerbatimDictionary()
@@ -3298,6 +3295,12 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.EqualityTest_Empty") {
 }
 
 DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.EqualityTest_Empty") {
+  guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else {
+    // Identity of empty dictionaries changed in
+    // https://github.com/apple/swift/pull/22527
+    return
+  }
+
   let d1 = getBridgedNonverbatimEquatableDictionary([:])
   let identity1 = d1._rawIdentifier()
   assert(isNativeDictionary(d1))
@@ -3319,7 +3322,6 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.EqualityTest_Empty") {
   assert(identity1 == d1._rawIdentifier())
   assert(identity2 != d2._rawIdentifier())
 }
-
 
 DictionaryTestSuite.test("BridgedFromObjC.Verbatim.EqualityTest_Small") {
   func helper(_ nd1: Dictionary<Int, Int>, _ nd2: Dictionary<Int, Int>, _ expectedEq: Bool) {

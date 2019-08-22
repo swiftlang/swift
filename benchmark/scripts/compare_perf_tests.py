@@ -229,7 +229,8 @@ class PerformanceTestResult(object):
     `--quantile`parameter. In both cases, the last column, MAX_RSS is optional.
     """
 
-    def __init__(self, csv_row, quantiles=False, memory=False, delta=False):
+    def __init__(self, csv_row, quantiles=False, memory=False, delta=False,
+                 meta=False):
         """Initialize from a row of multiple columns with benchmark summary.
 
         The row is an iterable, such as a row provided by the CSV parser.
@@ -239,7 +240,8 @@ class PerformanceTestResult(object):
         self.num_samples = int(csv_row[2])  # Number of measurements taken
 
         if quantiles:  # Variable number of columns representing quantiles
-            runtimes = csv_row[3:-1] if memory else csv_row[3:]
+            mem_index = (-1 if memory else 0) + (-3 if meta else 0)
+            runtimes = csv_row[3:mem_index] if memory or meta else csv_row[3:]
             if delta:
                 runtimes = [int(x) if x else 0 for x in runtimes]
                 runtimes = reduce(lambda l, x: l.append(l[-1] + x) or  # runnin
@@ -261,7 +263,7 @@ class PerformanceTestResult(object):
             self.min, self.max, self.median, self.mean, self.sd = \
                 sams.min, sams.max, sams.median, sams.mean, sams.sd
             self.max_rss = (                # Maximum Resident Set Size (B)
-                int(csv_row[-1]) if memory else None)
+                int(csv_row[mem_index]) if memory else None)
         else:  # Legacy format with statistics for normal distribution.
             self.min = int(csv_row[3])      # Minimum runtime (μs)
             self.max = int(csv_row[4])      # Maximum runtime (μs)
@@ -271,6 +273,11 @@ class PerformanceTestResult(object):
             self.max_rss = (                # Maximum Resident Set Size (B)
                 int(csv_row[8]) if len(csv_row) > 8 else None)
             self.samples = None
+
+        # Optional measurement metadata. The number of:
+        # memory pages used, involuntary context switches and voluntary yields
+        self.mem_pages, self.involuntary_cs, self.yield_count = \
+            [int(x) for x in csv_row[-3:]] if meta else (None, None, None)
         self.yields = None
         self.setup = None
 
@@ -352,6 +359,7 @@ class LogParser(object):
         """Create instance of `LogParser`."""
         self.results = []
         self.quantiles, self.delta, self.memory = False, False, False
+        self.meta = False
         self._reset()
 
     def _reset(self):
@@ -371,12 +379,12 @@ class LogParser(object):
         columns = result.split(',') if ',' in result else result.split()
         r = PerformanceTestResult(
             columns, quantiles=self.quantiles, memory=self.memory,
-            delta=self.delta)
+            delta=self.delta, meta=self.meta)
         r.setup = self.setup
         r.max_rss = r.max_rss or self.max_rss
-        r.mem_pages = self.mem_pages
+        r.mem_pages = r.mem_pages or self.mem_pages
         r.voluntary_cs = self.voluntary_cs
-        r.involuntary_cs = self.involuntary_cs
+        r.involuntary_cs = r.involuntary_cs or self.involuntary_cs
         if self.samples:
             r.samples = PerformanceTestSamples(r.name, self.samples)
             r.samples.exclude_outliers()
@@ -391,6 +399,7 @@ class LogParser(object):
     def _configure_format(self, header):
         self.quantiles = 'MEAN' not in header
         self.memory = 'MAX_RSS' in header
+        self.meta = 'PAGES' in header
         self.delta = '𝚫' in header
 
     # Regular expression and action to take when it matches the parsed line
@@ -547,15 +556,6 @@ class ReportFormatter(object):
         self.changes_only = changes_only
         self.single_table = single_table
 
-    MARKDOWN_DETAIL = """
-<details {3}>
-  <summary>{0} ({1})</summary>
-  {2}
-</details>
-"""
-    GIT_DETAIL = """
-{0} ({1}): {2}"""
-
     PERFORMANCE_TEST_RESULT_HEADER = ('TEST', 'MIN', 'MAX', 'MEAN', 'MAX_RSS')
     RESULT_COMPARISON_HEADER = ('TEST', 'OLD', 'NEW', 'DELTA', 'RATIO')
 
@@ -589,16 +589,26 @@ class ReportFormatter(object):
     def markdown(self):
         """Report results of benchmark comparisons in Markdown format."""
         return self._formatted_text(
-            ROW='{0} | {1} | {2} | {3} | {4} \n',
-            HEADER_SEPARATOR='---',
-            DETAIL=self.MARKDOWN_DETAIL)
+            label_formatter=lambda s: ('**' + s + '**'),
+            COLUMN_SEPARATOR=' | ',
+            DELIMITER_ROW=([':---'] + ['---:'] * 4),
+            SEPARATOR='&nbsp; | | | | \n',
+            SECTION="""
+<details {3}>
+  <summary>{0} ({1})</summary>
+  {2}
+</details>
+""")
 
     def git(self):
         """Report results of benchmark comparisons in 'git' format."""
         return self._formatted_text(
-            ROW='{0}   {1}   {2}   {3}   {4} \n',
-            HEADER_SEPARATOR='   ',
-            DETAIL=self.GIT_DETAIL)
+            label_formatter=lambda s: s.upper(),
+            COLUMN_SEPARATOR='   ',
+            DELIMITER_ROW=None,
+            SEPARATOR='\n',
+            SECTION="""
+{0} ({1}): \n{2}""")
 
     def _column_widths(self):
         changed = self.comparator.decreased + self.comparator.increased
@@ -614,53 +624,49 @@ class ReportFormatter(object):
         ]
 
         def max_widths(maximum, widths):
-            return tuple(map(max, zip(maximum, widths)))
+            return map(max, zip(maximum, widths))
 
-        return reduce(max_widths, widths, tuple([0] * 5))
+        return reduce(max_widths, widths, [0] * 5)
 
-    def _formatted_text(self, ROW, HEADER_SEPARATOR, DETAIL):
+    def _formatted_text(self, label_formatter, COLUMN_SEPARATOR,
+                        DELIMITER_ROW, SEPARATOR, SECTION):
         widths = self._column_widths()
         self.header_printed = False
 
         def justify_columns(contents):
-            return tuple([c.ljust(w) for w, c in zip(widths, contents)])
+            return [c.ljust(w) for w, c in zip(widths, contents)]
 
         def row(contents):
-            return ROW.format(*justify_columns(contents))
+            return ('' if not contents else
+                    COLUMN_SEPARATOR.join(justify_columns(contents)) + '\n')
 
-        def header(header):
-            return '\n' + row(header) + row(tuple([HEADER_SEPARATOR] * 5))
+        def header(title, column_labels):
+            labels = (column_labels if not self.single_table else
+                      map(label_formatter, (title, ) + column_labels[1:]))
+            h = (('' if not self.header_printed else SEPARATOR) +
+                 row(labels) +
+                 (row(DELIMITER_ROW) if not self.header_printed else ''))
+            if self.single_table and not self.header_printed:
+                self.header_printed = True
+            return h
 
-        def format_columns(r, strong):
-            return (r if not strong else
-                    r[:-1] + ('**{0}**'.format(r[-1]), ))
+        def format_columns(r, is_strong):
+            return (r if not is_strong else
+                    r[:-1] + ('**' + r[-1] + '**', ))
 
         def table(title, results, is_strong=False, is_open=False):
-            rows = [
-                row(format_columns(ReportFormatter.values(r), is_strong))
-                for r in results
-            ]
-            if not rows:
+            if not results:
                 return ''
+            rows = [row(format_columns(ReportFormatter.values(r), is_strong))
+                    for r in results]
+            table = (header(title if self.single_table else '',
+                            ReportFormatter.header_for(results[0])) +
+                     ''.join(rows))
+            return (table if self.single_table else
+                    SECTION.format(
+                        title, len(results), table, 'open' if is_open else ''))
 
-            if self.single_table:
-                t = ''
-                if not self.header_printed:
-                    t += header(ReportFormatter.header_for(results[0]))
-                    self.header_printed = True
-                t += row(('**' + title + '**', '', '', '', ''))
-                t += ''.join(rows)
-                return t
-
-            return DETAIL.format(
-                *[
-                    title, len(results),
-                    (header(ReportFormatter.header_for(results[0])) +
-                     ''.join(rows)),
-                    ('open' if is_open else '')
-                ])
-
-        return ''.join([
+        return '\n' + ''.join([
             table('Regression', self.comparator.decreased, True, True),
             table('Improvement', self.comparator.increased, True),
             ('' if self.changes_only else

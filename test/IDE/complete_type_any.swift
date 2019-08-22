@@ -1,18 +1,8 @@
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ANY_IN_FUNC_PARAM > %t.types.txt
-// RUN: %FileCheck %s -check-prefix=ANY_IN_FUNC_PARAM < %t.types.txt
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ANY_IN_VAR_TYPE > %t.types.txt
-// RUN: %FileCheck %s -check-prefix=ANY_IN_VAR_TYPE < %t.types.txt
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ANY_METATYPE_VARIABLE > %t.types.txt
-// RUN: %FileCheck %s -check-prefix=ANY_METATYPE_VARIABLE < %t.types.txt
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ANY_METATYPE_MEMBER > %t.types.txt
-// RUN: %FileCheck %s -check-prefix=ANY_METATYPE_MEMBER < %t.types.txt
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ANY_IN_TYPEALIAS > %t.types.txt
-// RUN: %FileCheck %s -check-prefix=ANY_IN_TYPEALIAS < %t.types.txt
-
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ANY_IN_FUNC_PARAM | %FileCheck %s -check-prefix=ANY_IN_FUNC_PARAM
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ANY_IN_VAR_TYPE | %FileCheck %s -check-prefix=ANY_IN_VAR_TYPE
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ANY_METATYPE_VARIABLE | %FileCheck %s -check-prefix=ANY_METATYPE_VARIABLE
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ANY_METATYPE_MEMBER | %FileCheck %s -check-prefix=ANY_METATYPE_MEMBER
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ANY_IN_TYPEALIAS | %FileCheck %s -check-prefix=ANY_IN_TYPEALIAS
 
 func testAnyInParamList(a: #^ANY_IN_FUNC_PARAM^#
 // ANY_IN_FUNC_PARAM: Begin completions

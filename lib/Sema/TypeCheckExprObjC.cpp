@@ -395,7 +395,8 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
 
     // Declarations that cannot be part of a key-path.
     diagnose(componentNameLoc, diag::expr_keypath_not_property,
-             found->getDescriptiveKind(), found->getFullName());
+             found->getDescriptiveKind(), found->getFullName(),
+             /*isForDynamicKeyPathMemberLookup=*/false);
     isInvalid = true;
     break;
   }

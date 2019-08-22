@@ -1110,7 +1110,7 @@ struct DynamicTypeStruct {
 }
 
 class InOutInitializer {
-// CHECK-LABEL: sil hidden [ossa] @$s21failable_initializers16InOutInitializerC1xACSiz_tcfC : $@convention(method) (@inout Int, @thick InOutInitializer.Type) -> @owned InOutInitializer {
+// CHECK-LABEL: sil hidden [exact_self_class] [ossa] @$s21failable_initializers16InOutInitializerC1xACSiz_tcfC : $@convention(method) (@inout Int, @thick InOutInitializer.Type) -> @owned InOutInitializer {
 // CHECK: bb0(%0 : $*Int, %1 : $@thick InOutInitializer.Type):
   init(x: inout Int) {}
 }
@@ -1147,3 +1147,10 @@ extension MemberInits {
     // CHECK-NEXT:  = apply [[INIT_FN]]<Array<T>>() : $@convention(thin) <τ_0_0 where τ_0_0 : Equatable> () -> @owned String
   }
 }
+
+// rdar://problem/51302498
+
+class Butt {
+  init(foo: inout (Int, Int)) { }
+}
+

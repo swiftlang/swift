@@ -7,7 +7,7 @@ endif()
 add_sourcekit_executable(complete-test
   complete-test.cpp
   LINK_LIBS ${SOURCEKITD_TEST_LINK_LIBS}
-  LLVM_COMPONENT_DEPENDS support option coverage lto
+  LLVM_LINK_COMPONENTS support option coverage lto
 )
 if(SWIFT_NEED_EXPLICIT_LIBDISPATCH)
   target_link_libraries(complete-test PRIVATE dispatch BlocksRuntime)
@@ -24,6 +24,7 @@ if(SWIFT_ANALYZE_CODE_COVERAGE)
     LINK_FLAGS " -fprofile-instr-generate -fcoverage-mapping")
 endif()
 
-swift_install_in_component(tools
-    TARGETS complete-test
-    RUNTIME DESTINATION bin)
+swift_install_in_component(TARGETS complete-test
+                           RUNTIME
+                             DESTINATION bin
+                             COMPONENT tools)

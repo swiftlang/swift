@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -disable-availability-checking -emit-silgen %s | %FileCheck %s
 
 protocol P {}
 protocol Q: AnyObject {}
@@ -40,7 +40,7 @@ func valueToValue(x: C) -> some Q {
 
 // CHECK-LABEL: sil hidden {{.*}}13reabstraction1xQr
 func reabstraction(x: @escaping () -> ()) -> some Any {
-  // CHECK [[UNDERLYING:%.*]] = unchecked_addr_cast %0 : ${{.*}} to $*@callee_guaranteed () -> @out ()
+  // CHECK: [[UNDERLYING:%.*]] = unchecked_addr_cast %0 : ${{.*}} to $*@callee_guaranteed () -> @out ()
   // CHECK: [[VALUE_COPY:%.*]] = copy_value %1
   // CHECK: [[VALUE_REABSTRACT:%.*]] = partial_apply [callee_guaranteed] {{%.*}}([[VALUE_COPY]])
   // CHECK: store [[VALUE_REABSTRACT]] to [init] [[UNDERLYING]]

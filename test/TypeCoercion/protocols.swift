@@ -43,9 +43,13 @@ func testPrintableCoercion(_ ip1: IsPrintable1,
                            inp2: IsNotPrintable2,
                            op: OtherPrintable) {
   var p : MyPrintable = ip1 // okay
+  let _: MyPrintable & Titled = Book(title: "")
+  // expected-error@-1 {{value of type 'Book' does not conform to specified type 'MyPrintable'}}
   p = ip1 // okay
   p = ip2 // okay
   p = inp1 // expected-error{{value of type 'IsNotPrintable1' does not conform to 'MyPrintable' in assignment}}
+  let _: MyPrintable = inp1
+  // expected-error@-1 {{value of type 'IsNotPrintable1' does not conform to specified type 'MyPrintable'}}
   p = inp2 // expected-error{{value of type 'IsNotPrintable2' does not conform to 'MyPrintable' in assignment}}
   p = op // expected-error{{value of type 'OtherPrintable' does not conform to 'MyPrintable' in assignment}}
   _ = p

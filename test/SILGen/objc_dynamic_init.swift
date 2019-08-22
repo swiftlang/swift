@@ -17,6 +17,16 @@ class Gadget: NSObject, Hoozit {
     }
 }
 
+// CHECK-LABEL: sil hidden [ossa] @$s17objc_dynamic_init6GadgetCACycfC : $@convention(method) (@thick Gadget.Type) -> @owned Gadget
+// CHECK: [[OBJC_METATYPE:%.*]] = thick_to_objc_metatype %0 : $@thick Gadget.Type to $@objc_metatype Gadget.Type
+// CHECK: [[SELF:%.*]] = alloc_ref_dynamic [objc] %1 : $@objc_metatype Gadget.Type, $Gadget
+// CHECK: [[INIT:%.*]] = function_ref @$s17objc_dynamic_init6GadgetCACycfcTD : $@convention(method) (@owned Gadget) -> @owned Gadget
+// CHECK: [[NEW_SELF:%.*]] = apply [[INIT]]([[SELF]]) : $@convention(method) (@owned Gadget) -> @owned Gadget
+// CHECK: return [[NEW_SELF]]
+
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s17objc_dynamic_init6GadgetCAA6HoozitA2aDPxycfCTW : $@convention(witness_method: Hoozit) (@thick Gadget.Type) -> @out Gadget {
+// CHECK:         function_ref @$s17objc_dynamic_init6GadgetCACycfC
+
 class Gizmo: Gadget, Wotsit {
     required init() {
         super.init()
@@ -35,8 +45,16 @@ final class Bobamathing: Thingamabob {
     }
 }
 
-// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s{{.*}}GadgetC{{.*}}CTW
-// CHECK:         function_ref @{{.*}}Gadget{{.*}}fC :
+// CHECK-LABEL: sil hidden [ossa] @$s17objc_dynamic_init8callInityyF : $@convention(thin) () -> ()
+// CHECK: [[METATYPE:%.*]] = metatype $@thick Gadget.Type
+// CHECK: [[CTOR:%.*]] = function_ref @$s17objc_dynamic_init6GadgetCACycfC
+// CHECK: [[INSTANCE:%.*]] = apply [[CTOR]]([[METATYPE]])
+// CHECK: destroy_value [[INSTANCE]]
+
+func callInit() {
+    let metatype = Gadget.self
+    _ = metatype.init()
+}
 
 // CHECK-LABEL: sil_vtable Gadget {
 // CHECK-NOT:     #Gadget.init!allocator.1

@@ -249,10 +249,12 @@ std::string DepGraphNode::humanReadableName(StringRef where) const {
 void SourceFileDepGraph::verifySame(const SourceFileDepGraph &other) const {
   assert(allNodes.size() == other.allNodes.size() &&
          "Both graphs must have same number of nodes.");
+#ifndef NDEBUG
   for (size_t i : indices(allNodes)) {
     assert(*allNodes[i] == *other.allNodes[i] &&
            "Both graphs must have corresponding nodes");
   }
+#endif
 }
 
 //==============================================================================

@@ -1,10 +1,8 @@
-Swift Benchmark Suite
-=====================
+# Swift Benchmark Suite
 
 This directory contains the Swift Benchmark Suite.
 
-Running Swift Benchmarks
-------------------------
+## Running Swift Benchmarks
 
 To run Swift benchmarks, pass the `--benchmark` flag to `build-script`. The
 current benchmark results will be compared to the previous run's results if
@@ -16,8 +14,17 @@ impacting changes, and run the benchmarks again. Upon benchmark completion, the
 benchmark results for the development branch will be compared to the most
 recent benchmark results for `master`.
 
-Building with build-script
---------------------------
+## Building the Swift Benchmarks
+
+The swift benchmark suite currently supports building with CMake and
+SwiftPM. We support the following platforms respectively.
+
+* CMake: macOS, iOS, tvOS, watchOS
+* SwiftPM: macOS, linux
+
+We describe how to build both standalone and with build-script below.
+
+### build-script invoking CMake
 
 By default, Swift benchmarks for OS X are compiled during the Swift build
 process. To build Swift benchmarks for additional platforms, pass the following
@@ -33,8 +40,7 @@ drivers dynamically link Swift standard library dylibs from a path
 relative to their run-time location (../lib/swift) so the standard
 library should be distributed alongside them.
 
-Building Independently
-----------------------
+### CMake Standalone (no build-script)
 
 To build the Swift benchmarks using only an Xcode installation: install an
 Xcode version with Swift support, install cmake 2.8.12, and ensure Xcode is
@@ -110,8 +116,57 @@ installed libraries instead, enable
 This will reflect the performance of the Swift standard library
 installed on the device, not the one included in the Swift root.
 
-Using the Benchmark Driver
---------------------------
+### build-script using SwiftPM+LLBuild
+
+To build the benchmarks using build-script/swiftpm, one must build both
+swiftpm/llbuild as part of one's build and create a "just-built" toolchain. This
+toolchain is then used by build-script to compile the benchmarks. This is
+accomplished by passing to build-script the following options:
+
+```
+swift-source$ swift/utils/build-script --swiftpm --llbuild --install-swift --install-swiftpm --install-llbuild --toolchain-benchmarks
+```
+
+build-script will then compile the toolchain and then build the benchmarks 3
+times, once for each optimization level, at the path
+`./build/benchmarks-$PLATFORM-$ARCH/bin/Benchmark_$OPT`:
+
+### Standalone SwiftPM/LLBuild
+
+The benchmark suite can be built with swiftpm/llbuild without needing any help
+from build-script by invoking swift build in the benchmark directory:
+
+```
+swift-source/swift/benchmark$ swift build -configuration release
+swift-source/swift/benchmark$ .build/release/SwiftBench
+#,TEST,SAMPLES,MIN(μs),MAX(μs),MEAN(μs),SD(μs),MEDIAN(μs)
+1,Ackermann,1,169,169,169,0,169
+2,AngryPhonebook,1,2044,2044,2044,0,2044
+...
+```
+
+## Editing in Xcode
+
+It is now possible to work on swiftpm benchmarks in Xcode! This is done by using
+the ability swiftpm build of the benchmarks to generate an xcodeproject. This is
+done by running the commands:
+
+```
+swift-source/swift/benchmark$ swift package generate-xcodeproj
+generated: ./swiftbench.xcodeproj
+swift-source/swift/benchmark$ open swiftbench.xcodeproj
+```
+
+Assuming that Xcode is installed on ones system, this will open the project in
+Xcode. The benchmark binary is built by the target 'SwiftBench'.
+
+**NOTE: Files added to the Xcode project will not be persisted back to the
+package! To add new benchmarks follow the instructions from the section below!**
+
+**NOTE: By default if one just builds/runs the benchmarks in Xcode, the
+benchmarks will be compiled with -Onone!**
+
+## Using the Benchmark Driver
 
 ### Usage
 
@@ -154,8 +209,7 @@ You can use test numbers instead of test names like this:
 Test numbers are not stable in the long run, adding and removing tests from the
 benchmark suite will reorder them, but they are stable for a given build.
 
-Using the Harness Generator
----------------------------
+## Using the Harness Generator
 
 `scripts/generate_harness/generate_harness.py` runs `gyb` to automate generation
 of some benchmarks.
@@ -163,22 +217,30 @@ of some benchmarks.
 ** FIXME ** `gyb` should be invoked automatically during the
    build so that manually invoking `generate_harness.py` is not required.
 
-Adding New Benchmarks
----------------------
+## Adding New Benchmarks
 
-The harness generator supports both single and multiple file tests.
+Adding a new benchmark requires some boilerplate updates. To ease this (and
+document the behavior), a harness generator script is provided for both
+single/multiple file tests.
 
-To add a new single file test, execute the following script with the new of the benchmark:
+To add a new single file test, execute the following script with the new of the
+benchmark:
 
 ```
 swift-source$ ./swift/benchmark/scripts/create_benchmark.py YourTestNameHere
 ```
 
 The script will automatically:
+
 1.  Add a new Swift file (`YourTestNameHere.swift`), built according to
     the template below, to the `single-source` directory.
 2.  Add the filename of the new Swift file to `CMakeLists.txt`.
 3.  Edit `main.swift` by importing and registering your new Swift module.
+
+No changes are needed to the Package.swift file since the benchmark's
+Package.swift is set to dynamically lookup each Swift file in `single-source`
+and translate each of those individual .swift files into individual modules. So
+the new test file will be automatically found.
 
 To add a new multiple file test:
 
@@ -199,6 +261,9 @@ To add a new multiple file test:
     list of source file paths.
 
 3.  Edit `main.swift`. Import and register your new Swift module.
+
+No changes are needed to the swiftpm build since it knows how to infer
+multi-source libraries automatically from the library structure.
 
 **Note:**
 
@@ -244,8 +309,8 @@ public func run_YourTestName(N: Int) {
 The current set of tags are defined by the `BenchmarkCategory` enum in
 `TestsUtils.swift` .
 
-Testing the Benchmark Drivers
------------------------------
+## Testing the Benchmark Drivers
+
 When working on tests, after the initial build
 ````
 swift-source$ ./swift/utils/build-script -R -B

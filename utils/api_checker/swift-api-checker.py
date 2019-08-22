@@ -33,8 +33,13 @@ def escapeCmdArg(arg):
 def check_call(cmd, cwd=None, env=os.environ, verbose=False, output=None):
     if verbose:
         print(' '.join([escapeCmdArg(arg) for arg in cmd]))
-    return subprocess.check_call(cmd, cwd=cwd, env=env,
-                                 stderr=subprocess.STDOUT, stdout=output)
+    try:
+        subprocess.check_call(cmd, cwd=cwd, env=env,
+                              stderr=None, stdout=output)
+        return 0
+    except Exception as error:
+        printerr(error)
+        return 1
 
 
 def check_output(cmd, verbose=False):
@@ -44,16 +49,40 @@ def check_output(cmd, verbose=False):
 
 
 def get_sdk_path(platform):
+    if platform.startswith('iosmac'):
+        platform = 'macosx'
     return check_output(['xcrun', '-sdk', platform, '-show-sdk-path'])
 
 
-def prepare_module_list(platform, file):
-    check_call([INFER_IMPORT_PATH, '-s', get_sdk_path(platform)], output=file)
-    with open(INFER_IMPORT_DIR + '/fixed-modules-common.txt', 'r') as extra:
+def write_fixed_module(file, platform, infix, verbose):
+    common_modules_path = os.path.join(INFER_IMPORT_DIR, 'fixed-' + infix +
+                                       '-modules-common.txt')
+    platform_modules_path = os.path.join(INFER_IMPORT_DIR, 'fixed-' + infix +
+                                         '-modules-' + platform + '.txt')
+    with open(common_modules_path, 'r') as extra:
+        if verbose:
+            print('Including modules in: ' + common_modules_path)
         file.write(extra.read())
-    with open(INFER_IMPORT_DIR + '/fixed-modules-' + platform + '.txt',
-              'r') as extra:
+    with open(platform_modules_path, 'r') as extra:
+        if verbose:
+            print('Including modules in: ' + platform_modules_path)
         file.write(extra.read())
+
+
+def prepare_module_list(platform, file, verbose, module_filter_flags,
+                        include_fixed_clang_modules):
+    cmd = [INFER_IMPORT_PATH, '-s', get_sdk_path(platform)]
+    cmd.extend(module_filter_flags)
+    if platform.startswith('iosmac'):
+        cmd.extend(['--catalyst'])
+    if verbose:
+        cmd.extend(['--v'])
+    check_call(cmd, verbose=verbose, output=file)
+    # Always include fixed swift modules
+    write_fixed_module(file, platform, 'swift', verbose)
+    # Check if we need fixed clang modules
+    if include_fixed_clang_modules:
+        write_fixed_module(file, platform, 'clang', verbose)
 
 
 def get_api_digester_path(tool_path):
@@ -62,40 +91,81 @@ def get_api_digester_path(tool_path):
     return check_output(['xcrun', '--find', 'swift-api-digester'])
 
 
+def create_directory(path):
+    if not os.path.isdir(path):
+        os.makedirs(path)
+
+
 class DumpConfig:
     def __init__(self, tool_path, platform):
         target_map = {
-            'iphoneos': 'arm64-apple-ios10.0',
-            'macosx': 'x86_64-apple-macosx10.11',
-            'appletvos': 'arm64-apple-tvos10.0',
-            'watchos': 'armv7k-apple-watchos3.0',
+            'iphoneos': 'arm64-apple-ios13.0',
+            'macosx': 'x86_64-apple-macosx10.15',
+            'appletvos': 'arm64-apple-tvos13.0',
+            'watchos': 'armv7k-apple-watchos6.0',
+            'iosmac': 'x86_64-apple-ios13.0-macabi',
         }
         self.tool_path = get_api_digester_path(tool_path)
         self.platform = platform
         self.target = target_map[platform]
         self.sdk = get_sdk_path(platform)
+        self.inputs = []
+        if self.platform == 'macosx':
+            # We need this input search path for CreateML
+            self.inputs.extend([self.sdk + '/usr/lib/swift/'])
         self.frameworks = [
             self.sdk + '/System/Library/Frameworks/',
             os.path.realpath(self.sdk + '/../../Library/Frameworks/')]
+        if self.platform.startswith('iosmac'):
+            # Catalyst modules need this extra framework dir
+            iOSSupport = self.sdk + \
+                '/System/iOSSupport/System/Library/Frameworks'
+            self.frameworks.extend([iOSSupport])
 
-    def run(self, output, module, swift_ver, opts, verbose):
-        cmd = [self.tool_path, '-o', output, '-sdk', self.sdk, '-target',
+    def run(self, output, module, swift_ver, opts, verbose,
+            module_filter_flags, include_fixed_clang_modules,
+            separate_by_module):
+        cmd = [self.tool_path, '-sdk', self.sdk, '-target',
                self.target, '-dump-sdk', '-module-cache-path',
                '/tmp/ModuleCache', '-swift-version',
                swift_ver, '-abort-on-module-fail']
+        _environ = dict(os.environ)
+        _environ['SWIFT_FORCE_MODULE_LOADING'] = 'prefer-interface'
         for path in self.frameworks:
             cmd.extend(['-iframework', path])
+        for path in self.inputs:
+            cmd.extend(['-I', path])
         cmd.extend(['-' + o for o in opts])
         if verbose:
             cmd.extend(['-v'])
         if module:
             cmd.extend(['-module', module])
-            check_call(cmd, verbose=verbose)
+            cmd.extend(['-o', output])
+            check_call(cmd, env=_environ, verbose=verbose)
         else:
             with tempfile.NamedTemporaryFile() as tmp:
-                prepare_module_list(self.platform, tmp)
-                cmd.extend(['-module-list-file', tmp.name])
-                check_call(cmd, verbose=verbose)
+                prepare_module_list(self.platform, tmp, verbose,
+                                    module_filter_flags,
+                                    include_fixed_clang_modules)
+                if separate_by_module:
+                    tmp.seek(0)
+                    create_directory(output)
+                    for module in [name.strip() for name in tmp.readlines()]:
+                        # Skip comments
+                        if module.startswith('//'):
+                            continue
+                        dir_path = os.path.realpath(output + '/' + module)
+                        file_path = os.path.realpath(dir_path + '/' +
+                                                     self.platform + '.json')
+                        create_directory(dir_path)
+                        current_cmd = list(cmd)
+                        current_cmd.extend(['-module', module])
+                        current_cmd.extend(['-o', file_path])
+                        check_call(current_cmd, env=_environ, verbose=verbose)
+                else:
+                    cmd.extend(['-o', output])
+                    cmd.extend(['-module-list-file', tmp.name])
+                    check_call(cmd, env=_environ, verbose=verbose)
 
 
 class DiagnoseConfig:
@@ -104,7 +174,7 @@ class DiagnoseConfig:
 
     def run(self, opts, before, after, output, verbose):
         cmd = [self.tool_path, '-diagnose-sdk', '-input-paths', before,
-               '-input-paths', after]
+               '-input-paths', after, '-print-module']
         if output:
             cmd.extend(['-o', output])
         cmd.extend(['-' + o for o in opts])
@@ -139,12 +209,16 @@ A convenient wrapper for swift-api-digester.
         the output file of the module baseline should end with .json
         ''')
 
-    basic_group.add_argument('--swift-version', default='4', help='''
-        Swift version to use; default is 4
+    basic_group.add_argument('--swift-version', default='5', help='''
+        Swift version to use; default is 5
         ''')
 
     basic_group.add_argument('--module', default=None, help='''
         name of the module/framework to generate baseline, e.g. Foundation
+        ''')
+
+    basic_group.add_argument('--module-filter', default='', help='''
+        the action to perform for swift-api-digester
         ''')
 
     basic_group.add_argument('--opts', nargs='+', default=[], help='''
@@ -167,16 +241,35 @@ A convenient wrapper for swift-api-digester.
         Path to the json file generated after change
         ''')
 
+    basic_group.add_argument('--separate-by-module',
+                             action='store_true',
+                             help='When importing entire SDK, dump content '
+                                  'seprately by module names')
     args = parser.parse_args(sys.argv[1:])
+
     if args.action == 'dump':
         if not args.target:
             fatal_error("Need to specify --target")
         if not args.output:
             fatal_error("Need to specify --output")
+        if args.module_filter == '':
+            module_filter_flags = []
+            include_fixed_clang_modules = True
+        elif args.module_filter == 'swift-frameworks-only':
+            module_filter_flags = ['--swift-frameworks-only']
+            include_fixed_clang_modules = False
+        elif args.module_filter == 'swift-overlay-only':
+            module_filter_flags = ['--swift-overlay-only']
+            include_fixed_clang_modules = False
+        else:
+            fatal_error("cannot recognize --module-filter")
         runner = DumpConfig(tool_path=args.tool_path, platform=args.target)
         runner.run(output=args.output, module=args.module,
                    swift_ver=args.swift_version, opts=args.opts,
-                   verbose=args.v)
+                   verbose=args.v,
+                   module_filter_flags=module_filter_flags,
+                   include_fixed_clang_modules=include_fixed_clang_modules,
+                   separate_by_module=args.separate_by_module)
     elif args.action == 'diagnose':
         if not args.dump_before:
             fatal_error("Need to specify --dump-before")

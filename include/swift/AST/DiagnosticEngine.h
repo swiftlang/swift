@@ -22,6 +22,8 @@
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/DeclNameLoc.h"
 #include "swift/AST/DiagnosticConsumer.h"
+#include "llvm/ADT/StringMap.h"
+#include "llvm/Support/Allocator.h"
 
 namespace swift {
   class Decl;
@@ -292,17 +294,21 @@ namespace swift {
     const std::string OpeningQuotationMark;
     const std::string ClosingQuotationMark;
     const std::string AKAFormatString;
+    const std::string OpaqueResultFormatString;
 
     DiagnosticFormatOptions(std::string OpeningQuotationMark,
                             std::string ClosingQuotationMark,
-                            std::string AKAFormatString)
+                            std::string AKAFormatString,
+                            std::string OpaqueResultFormatString)
         : OpeningQuotationMark(OpeningQuotationMark),
           ClosingQuotationMark(ClosingQuotationMark),
-          AKAFormatString(AKAFormatString) {}
+          AKAFormatString(AKAFormatString),
+          OpaqueResultFormatString(OpaqueResultFormatString) {}
 
     DiagnosticFormatOptions()
         : OpeningQuotationMark("'"), ClosingQuotationMark("'"),
-          AKAFormatString("'%s' (aka '%s')") {}
+          AKAFormatString("'%s' (aka '%s')"),
+          OpaqueResultFormatString("'%s' (%s of '%s')") {}
   };
   
   /// Diagnostic - This is a specific instance of a diagnostic along with all of
@@ -318,6 +324,8 @@ namespace swift {
     SmallVector<FixIt, 2> FixIts;
     SourceLoc Loc;
     const Decl *Decl = nullptr;
+
+    friend DiagnosticEngine;
 
   public:
     // All constructors are intentionally implicit.
@@ -536,10 +544,12 @@ namespace swift {
   /// Class responsible for formatting diagnostics and presenting them
   /// to the user.
   class DiagnosticEngine {
+  public:
     /// The source manager used to interpret source locations and
     /// display diagnostics.
     SourceManager &SourceMgr;
 
+  private:
     /// The diagnostic consumer(s) that will be responsible for actually
     /// emitting diagnostics.
     SmallVector<DiagnosticConsumer *, 2> Consumers;
@@ -558,6 +568,12 @@ namespace swift {
     /// results that we can point to on the command line.
     llvm::DenseMap<const Decl *, SourceLoc> PrettyPrintedDeclarations;
 
+    llvm::BumpPtrAllocator TransactionAllocator;
+    /// A set of all strings involved in current transactional chain.
+    /// This is required because diagnostics are not directly emitted
+    /// but rather stored until all transactions complete.
+    llvm::StringMap<char, llvm::BumpPtrAllocator &> TransactionStrings;
+
     /// The number of open diagnostic transactions. Diagnostics are only
     /// emitted once all transactions have closed.
     unsigned TransactionCount = 0;
@@ -567,14 +583,17 @@ namespace swift {
     /// input being compiled.
     /// May be invalid.
     SourceLoc bufferIndirectlyCausingDiagnostic;
+    
+    /// Print diagnostic names after their messages
+    bool printDiagnosticNames = false;
 
     friend class InFlightDiagnostic;
     friend class DiagnosticTransaction;
     
   public:
     explicit DiagnosticEngine(SourceManager &SourceMgr)
-      : SourceMgr(SourceMgr), ActiveDiagnostic() {
-    }
+        : SourceMgr(SourceMgr), ActiveDiagnostic(),
+          TransactionStrings(TransactionAllocator) {}
 
     /// hadAnyError - return true if any *error* diagnostics have been emitted.
     bool hadAnyError() const { return state.hadAnyError(); }
@@ -600,6 +619,14 @@ namespace swift {
     void setWarningsAsErrors(bool val) { state.setWarningsAsErrors(val); }
     bool getWarningsAsErrors() const {
       return state.getWarningsAsErrors();
+    }
+
+    /// Whether to print diagnostic names after their messages
+    void setPrintDiagnosticNames(bool val) {
+      printDiagnosticNames = val;
+    }
+    bool getPrintDiagnosticNames() const {
+      return printDiagnosticNames;
     }
 
     void ignoreDiagnostic(DiagID id) {
@@ -791,6 +818,11 @@ namespace swift {
         DiagnosticFormatOptions FormatOpts = DiagnosticFormatOptions());
 
   private:
+    /// Called when tentative diagnostic is about to be flushed,
+    /// to apply any required transformations e.g. copy string arguments
+    /// to extend their lifetime.
+    void onTentativeDiagnosticFlush(Diagnostic &diagnostic);
+
     /// Flush the active diagnostic.
     void flushActiveDiagnostic();
     
@@ -805,7 +837,8 @@ namespace swift {
     void emitTentativeDiagnostics();
 
   public:
-    static const char *diagnosticStringFor(const DiagID id);
+    static const char *diagnosticStringFor(const DiagID id,
+                                           bool printDiagnosticName);
 
     /// If there is no clear .dia file for a diagnostic, put it in the one
     /// corresponding to the SourceLoc given here.
@@ -850,6 +883,9 @@ namespace swift {
     bool IsOpen = true;
 
   public:
+    DiagnosticTransaction(const DiagnosticTransaction &) = delete;
+    DiagnosticTransaction &operator=(const DiagnosticTransaction &) = delete;
+
     explicit DiagnosticTransaction(DiagnosticEngine &engine)
       : Engine(engine),
         PrevDiagnostics(Engine.TentativeDiagnostics.size()),
@@ -863,6 +899,11 @@ namespace swift {
     ~DiagnosticTransaction() {
       if (IsOpen) {
         commit();
+      }
+
+      if (Depth == 0) {
+        Engine.TransactionStrings.clear();
+        Engine.TransactionAllocator.Reset();
       }
     }
 

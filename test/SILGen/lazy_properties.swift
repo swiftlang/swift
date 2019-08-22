@@ -34,3 +34,32 @@ func test21057425() {
 struct HasAnonymousParameters {
   lazy var x = { $0 }(0)
 }
+
+class LazyClass {
+  lazy var x = 0
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s15lazy_properties9LazyClassC1xSivg : $@convention(method) (@guaranteed LazyClass) -> Int
+// CHECK: ref_element_addr %0 : $LazyClass, #LazyClass.$__lazy_storage_$_x
+// CHECK: return
+
+// CHECK-LABEL: sil hidden [ossa] @$s15lazy_properties9LazyClassC1xSivs : $@convention(method) (Int, @guaranteed LazyClass) -> ()
+// CHECK: ref_element_addr %1 : $LazyClass, #LazyClass.$__lazy_storage_$_x
+// CHECK: return
+
+// rdar://problem/53956342
+class Butt {
+  func foo() -> Int { return 0 }
+
+  lazy var butt: Int = {
+    func bar() -> Int{
+      return foo()
+    }
+    return bar()
+  }()
+}
+
+// Both the closure and the local function inside of it should capture 'self':
+
+// CHECK-LABEL: sil private [ossa] @$s15lazy_properties4ButtC4buttSivgSiyXEfU_ : $@convention(thin) (@guaranteed Butt) -> Int
+// CHECK-LABEL: sil private [ossa] @$s15lazy_properties4ButtC4buttSivgSiyXEfU_3barL_SiyF : $@convention(thin) (@guaranteed Butt) -> Int

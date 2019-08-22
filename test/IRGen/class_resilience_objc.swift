@@ -98,7 +98,7 @@ func testConstantIndirectFieldAccess<T>(_ o: GenericObjCSubclass<T>) {
   o.field = 10
 }
 
-@_fixed_layout
+@frozen
 public struct Empty {}
 
 public class ClassWithEmptyThenResilient : DummyClass {

@@ -447,7 +447,21 @@ protected:
     return popNode();
   }
 
-  void init(StringRef MangledName);
+  /// This class handles preparing the initial state for a demangle job in a reentrant way, pushing the
+  /// existing state back when a demangle job is completed.
+  class DemangleInitRAII {
+    Demangler &Dem;
+    Vector<NodePointer> NodeStack;
+    Vector<NodePointer> Substitutions;
+    int NumWords;
+    StringRef Text;
+    size_t Pos;
+    
+  public:
+    DemangleInitRAII(Demangler &Dem, StringRef MangledName);
+    ~DemangleInitRAII();
+  };
+  friend DemangleInitRAII;
   
   void addSubstitution(NodePointer Nd) {
     if (Nd)
@@ -477,6 +491,7 @@ protected:
   int demangleNatural();
   int demangleIndex();
   NodePointer demangleIndexAsNode();
+  NodePointer demangleDependentConformanceIndex();
   NodePointer demangleIdentifier();
   NodePointer demangleOperatorIdentifier();
 

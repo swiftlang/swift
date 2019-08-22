@@ -23,12 +23,12 @@ add_swift_host_library(swiftSILGen STATIC
   SILGenForeignError.cpp
   SILGenFunction.cpp
   SILGenGlobalVariable.cpp
+  SILGenLazyConformance.cpp
   SILGenLValue.cpp
   SILGenPattern.cpp
   SILGenPoly.cpp
   SILGenProlog.cpp
   SILGenStmt.cpp
-  SILGenSILBuilder.cpp
   SILGenThunk.cpp
   SILGenType.cpp)
 target_link_libraries(swiftSILGen PRIVATE

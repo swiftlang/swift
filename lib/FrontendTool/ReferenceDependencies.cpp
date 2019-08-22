@@ -437,7 +437,8 @@ void ProvidesEmitter::emitDynamicLookupMembers() const {
       SmallVector<DeclBaseName, 16> names;
 
     public:
-      void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
+      void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason,
+                     DynamicLookupInfo) override {
         names.push_back(VD->getBaseName());
       }
       ArrayRef<DeclBaseName> getNames() {

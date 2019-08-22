@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef ExperimentalDependencies_h
-#define ExperimentalDependencies_h
+#ifndef SWIFT_AST_EXPERIMENTAL_DEPENDENCIES_H
+#define SWIFT_AST_EXPERIMENTAL_DEPENDENCIES_H
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Range.h"
@@ -865,6 +865,7 @@ private:
   void emitDotNode(StringRef id, StringRef label, StringRef shape,
                    StringRef fillColor, StringRef style = StringRef()) {
     auto inserted = nodeIDs.insert(id.str());
+    (void)inserted;
     assert(inserted.second && "NodeIDs must be unique.");
     out << "\"" << id << "\" [ "
         << "label = \"" << label << "\", "
@@ -981,4 +982,4 @@ struct SequenceTraits<
 LLVM_YAML_DECLARE_MAPPING_TRAITS(
     swift::experimental_dependencies::SourceFileDepGraph)
 
-#endif /* ExperimentalDependencies_h */
+#endif // SWIFT_AST_EXPERIMENTAL_DEPENDENCIES_H

@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -emit-ir -profile-generate -sanitize=thread %s | %FileCheck %s
 
-// REQUIRES: OS=macosx
-// REQUIRES: CPU=x86_64
+// TSan is only supported on 64 bit.
+// REQUIRES: PTRSIZE=64
 
 // CHECK: define {{.*}}empty
 // CHECK-NOT: load{{.*}}empty

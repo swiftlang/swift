@@ -32,6 +32,9 @@ roots:
       - name: accctrl.h
         type: file
         external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um/AccCtrl.h"
+      - name: adtgen.h
+        type: file
+        external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um/AdtGen.h"
       - name: commctrl.h
         type: file
         external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um/CommCtrl.h"
@@ -53,6 +56,51 @@ roots:
       - name: knownfolders.h
         type: file
         external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um/KnownFolders.h"
+      - name: lmaccess.h
+        type: file
+        external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um/LMaccess.h"
+      - name: lmalert.h
+        type: file
+        external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um/LMalert.h"
+      - name: lmaudit.h
+        type: file
+        external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um/LMaudit.h"
+      - name: lmconfig.h
+        type: file
+        external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um/LMConfig.h"
+      - name: lmerrlog.h
+        type: file
+        external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um/LMErrlog.h"
+      - name: lmapibuf.h
+        type: file
+        external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um/LMAPIbuf.h"
+      - name: lmjoin.h
+        type: file
+        external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um/LMJoin.h"
+      - name: lmmsg.h
+        type: file
+        external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um/LMMsg.h"
+      - name: lmremutl.h
+        type: file
+        external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um/LMRemUtl.h"
+      - name: lmrepl.h
+        type: file
+        external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um/LMRepl.h"
+      - name: lmserver.h
+        type: file
+        external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um/LMServer.h"
+      - name: lmshare.h
+        type: file
+        external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um/LMShare.h"
+      - name: lmsname.h
+        type: file
+        external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um/LMSName.h"
+      - name: lmsvc.h
+        type: file
+        external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um/LMSvc.h"
+      - name: lmuse.h
+        type: file
+        external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um/LMUse.h"
       - name: oaidl.h
         type: file
         external-contents: "@UniversalCRTSdkDir@/Include/@UCRTVersion@/um/OAIdl.h"

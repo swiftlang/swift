@@ -1,10 +1,9 @@
 // This test verifies that we add the function attributes used by TSan.
 
-// RUN: %target-swift-frontend -emit-ir -disable-llvm-optzns -sanitize=thread %s | %FileCheck %s -check-prefix=TSAN
+// RUN: %target-swift-frontend -emit-ir -sanitize=thread %s | %FileCheck %s -check-prefix=TSAN
 
-// TSan is currently only supported on 64 bit mac and simulators.
-// (We do not test the simulators here.)
-// REQUIRES: CPU=x86_64, OS=macosx
+// TSan is only supported on 64 bit.
+// REQUIRES: PTRSIZE=64
 
 // TSAN: define {{.*}} @"$s4main4testyyF"() [[DEFAULT_ATTRS:#[0-9]+]]
 public func test() {
@@ -22,5 +21,5 @@ public var x: Int {
 // TSAN-SAME: }
 
 // TSAN: attributes [[COROUTINE_ATTRS]] =
-// TSAN-NOT: sanitize_address
+// TSAN-SAME: sanitize_thread
 // TSAN-SAME: }

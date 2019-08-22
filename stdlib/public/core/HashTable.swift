@@ -17,7 +17,7 @@ internal protocol _HashTableDelegate {
 }
 
 @usableFromInline
-@_fixed_layout
+@frozen
 internal struct _HashTable {
   @usableFromInline
   internal typealias Word = _UnsafeBitset.Word
@@ -118,7 +118,7 @@ extension _HashTable {
 }
 
 extension _HashTable {
-  @_fixed_layout
+  @frozen
   @usableFromInline
   internal struct Bucket {
     @usableFromInline
@@ -172,7 +172,7 @@ extension _HashTable.Bucket: Comparable {
 
 extension _HashTable {
   @usableFromInline
-  @_fixed_layout
+  @frozen
   internal struct Index {
     @usableFromInline
     let bucket: Bucket
@@ -217,7 +217,7 @@ extension _HashTable.Index: Comparable {
 
 extension _HashTable: Sequence {
   @usableFromInline
-  @_fixed_layout
+  @frozen
   internal struct Iterator: IteratorProtocol {
     @usableFromInline
     let hashTable: _HashTable
