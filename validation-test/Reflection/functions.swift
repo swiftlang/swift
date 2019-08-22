@@ -7,6 +7,9 @@
 // FIXME: Should not require objc_interop -- please put Objective-C-specific
 // testcases in functions_objc.swift
 
+// rdar://54556791
+// UNSUPPORTED: CPU=armv7k
+
 // REQUIRES: objc_interop
 // REQUIRES: executable_test
 
