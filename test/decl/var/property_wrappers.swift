@@ -1519,3 +1519,19 @@ func test_missing_method_with_lvalue_base() {
     }
   }
 }
+
+// SR-11288
+// Look into the protocols that the type conforms to
+
+@propertyWrapper
+struct SR_11288_S {
+  var wrappedValue: Int
+}
+
+protocol SR_11288_P {
+  typealias Wrapper = SR_11288_S
+}
+
+struct SR_11288_C: SR_11288_P {
+  @Wrapper var answer = 42 // Okay
+}
