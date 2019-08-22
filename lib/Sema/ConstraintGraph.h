@@ -45,6 +45,20 @@ class ConstraintSystem;
 
 /// A single node in the constraint graph, which represents a type variable.
 class ConstraintGraphNode {
+  /// Describes information about an adjacency between two type variables.
+  struct Adjacency {
+    /// Index into the vector of adjacent type variables, \c Adjacencies.
+    unsigned Index;
+
+    /// The number of constraints that link this type variable to the
+    /// enclosing node.
+    unsigned NumConstraints;
+
+    bool empty() const {
+      return NumConstraints == 0;
+    }
+  };
+
 public:
   explicit ConstraintGraphNode(TypeVariableType *typeVar) : TypeVar(typeVar) { }
 
@@ -59,6 +73,11 @@ public:
   /// These are the hyperedges of the graph, connecting this node to
   /// various other nodes.
   ArrayRef<Constraint *> getConstraints() const { return Constraints; }
+
+  /// Retrieve the set of type variables to which this node is adjacent.
+  ArrayRef<TypeVariableType *> getAdjacencies() const {
+    return Adjacencies;
+  }
 
   /// Retrieve the set of type variables that are adjacent due to fixed
   /// bindings.
@@ -84,6 +103,21 @@ private:
   /// remove the corresponding adjacencies.
   void removeConstraint(Constraint *constraint);
 
+  /// Retrieve adjacency information for the given type variable.
+  Adjacency &getAdjacency(TypeVariableType *typeVar);
+
+  /// Modify the adjacency information for the given type variable
+  /// directly. If the adjacency becomes empty afterward, it will be
+  /// removed.
+  void modifyAdjacency(TypeVariableType *typeVar,
+                       llvm::function_ref<void(Adjacency &adj)> modify);
+
+  /// Add an adjacency to the list of adjacencies.
+  void addAdjacency(TypeVariableType *typeVar);
+
+  /// Remove an adjacency from the list of adjacencies.
+  void removeAdjacency(TypeVariableType *typeVar);
+
   /// Add the given type variables to this node's equivalence class.
   void addToEquivalenceClass(ArrayRef<TypeVariableType *> typeVars);
 
@@ -104,6 +138,14 @@ private:
   /// A mapping from the set of constraints that mention this type variable
   /// to the index within the vector of constraints.
   llvm::SmallDenseMap<Constraint *, unsigned, 2> ConstraintIndex;
+
+  /// The set of adjacent type variables, in a stable order.
+  SmallVector<TypeVariableType *, 2> Adjacencies;
+
+  /// A mapping from each of the type variables adjacent to this
+  /// type variable to the index of the adjacency information in
+  /// \c Adjacencies.
+  llvm::SmallDenseMap<TypeVariableType *, Adjacency, 2> AdjacencyInfo;
 
   /// The set of type variables that occur within the fixed binding of
   /// this type variable.
