@@ -468,7 +468,7 @@
                 "llvm": "swift-DEVELOPMENT-SNAPSHOT-2019-08-12-a",
                 "clang": "ecfead281dab91cee05d78a5699c72cd3c93b08f",
                 "swift": "tensorflow",
-                "lldb": "b5cc02923d649665873393734d4b61ea046658d7",
+                "lldb": "swift-DEVELOPMENT-SNAPSHOT-2019-08-12-a",
                 "cmark": "swift-DEVELOPMENT-SNAPSHOT-2019-08-12-a",
                 "llbuild": "swift-DEVELOPMENT-SNAPSHOT-2019-08-12-a",
                 "swiftpm": "swift-DEVELOPMENT-SNAPSHOT-2019-08-12-a",
@@ -485,7 +485,7 @@
                 "clang-tools-extra": "swift-DEVELOPMENT-SNAPSHOT-2019-08-12-a",
                 "libcxx": "swift-DEVELOPMENT-SNAPSHOT-2019-08-12-a",
                 "tensorflow": "c6719f20911f8aa6b6d9cded1c0f7761cb9c69a0",
-                "tensorflow-swift-apis": "3629ddc49b706df89f89fa3e92e495e6e3f42332",
+                "tensorflow-swift-apis": "286bd423b7e514cb1b2674fe414c05d3e1238dd5",
                 "indexstore-db": "swift-DEVELOPMENT-SNAPSHOT-2019-08-12-a",
                 "sourcekit-lsp": "swift-DEVELOPMENT-SNAPSHOT-2019-08-12-a"
             }
