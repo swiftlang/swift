@@ -35,9 +35,6 @@ enum class ResolutionKind {
   /// If non-overloadable decls are returned, this indicates ambiguous lookup.
   Overloadable,
 
-  /// Lookup should match a single decl.
-  Exact,
-
   /// Lookup should match a single decl that declares a type.
   TypesOnly
 };
