@@ -394,14 +394,14 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
       // explicitly handle the nil case.
       let unmanaged =
         UnsafePointer<Optional<Unmanaged<AnyObject>>>(_rawValue).pointee
-      return unsafeBitCast(
+      return _unsafeReferenceCast(
         unmanaged?.takeUnretainedValue(),
         to: Pointee.self)
     }
 
     @_transparent nonmutating set {
       // Autorelease the object reference.
-      let object = unsafeBitCast(newValue, to: Optional<AnyObject>.self)
+      let object = _unsafeReferenceCast(newValue, to: Optional<AnyObject>.self)
       Builtin.retain(object)
       Builtin.autorelease(object)
 
