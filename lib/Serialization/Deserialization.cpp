@@ -143,7 +143,7 @@ static void skipRecord(llvm::BitstreamCursor &cursor, unsigned recordKind) {
       cursor.advance(AF_DontPopBlockAtEnd));
   assert(next.Kind == llvm::BitstreamEntry::Record);
 
-  unsigned kind = cursor.skipRecord(next.ID);
+  unsigned kind = llvm::cantFail<unsigned>(cursor.skipRecord(next.ID));
   assert(kind == recordKind);
   (void)kind;
 }
@@ -876,7 +876,6 @@ GenericSignature *ModuleFile::getGenericSignature(
   // Read the generic signature.
   BCOffsetRAII restoreOffset(DeclTypeCursor);
   fatalIfNotSuccess(DeclTypeCursor.JumpToBit(sigOrOffset));
-  DeserializingEntityRAII deserializingEntity(*this);
 
   // Read the parameter types.
   SmallVector<GenericTypeParamType *, 4> paramTypes;
@@ -954,7 +953,6 @@ ModuleFile::getGenericSignatureOrEnvironment(
     // Read the generic environment.
     BCOffsetRAII restoreOffset(DeclTypeCursor);
     fatalIfNotSuccess(DeclTypeCursor.JumpToBit(bitOffset));
-    DeserializingEntityRAII deserializingEntity(*this);
 
     SmallVector<GenericTypeParamType *, 4> paramTypes;
     using namespace decls_block;
@@ -1064,7 +1062,6 @@ SubstitutionMap ModuleFile::getSubstitutionMap(
   // Read the substitution map.
   BCOffsetRAII restoreOffset(DeclTypeCursor);
   fatalIfNotSuccess(DeclTypeCursor.JumpToBit(substitutionsOrOffset));
-  DeserializingEntityRAII deserializingEntity(*this);
 
   // Read the substitution map.
   llvm::BitstreamEntry entry =
