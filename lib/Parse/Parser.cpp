@@ -988,30 +988,24 @@ bool Parser::parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
 }
 
 SourceLoc Parser::getLocForMissingMatchingToken() const {
-  // The right brace, parenthesis, etc. must include the whole of the previous
-  // token in order so that an unexpanded lazy \c IterableTypeScope includes its
-  // contents.
+  // At present, use the same location whether it's an error or whether
+  // the matching token is missing.
+  // Both cases supply a location for something the user didn't type.
   return getErrorOrMissingLoc();
 }
 
 SourceLoc Parser::getErrorOrMissingLoc() const {
-  // LazyASTScopes require that the ends of types, etc. which are at the end of
-  // \c IterableTypeContext \c Decls, such as \c StructDecl not be beyond the
-  // end of the enclosing \c Decl.
+  // The next token might start a new enclosing construct,
+  // and SourceLoc's are always at the start of a token (for example, for
+  // fixits, so use the previous token's SourceLoc and allow a subnode to end
+  // right at the same place as its supernode.
 
-  // The missing right brace, parenthesis, etc. must include the whole of the
-  // previous token in order so that an unexpanded lazy \c IterableTypeScope
-  // includes its contents.
+  // The tricky case is when the previous token is an InterpolatedStringLiteral.
+  // Then, there will be names in scope whose SourceLoc is *after* the
+  // the location of a missing close brace.
+  // ASTScope tree creation will have to cope.
 
-  auto const PreviousTok = Lexer::getTokenAtLocation(Context.SourceMgr,
-                                                     PreviousLoc);
-  // If it's a string literal, it might be an InterpolatedStringLiteral.
-  // In that case the missing close paren, etc. needs to go at the end
-  // because there might be things to be looked up for ASTScope in the
-  // middle.
-  return PreviousTok.getKind() != tok::string_literal
-    ? PreviousLoc
-    : PreviousLoc.getAdvancedLoc(PreviousTok.getLength() - 1);
+  return PreviousLoc;
 }
 
 static SyntaxKind getListElementKind(SyntaxKind ListKind) {

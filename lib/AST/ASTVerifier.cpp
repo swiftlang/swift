@@ -3655,7 +3655,7 @@ public:
           return;
         // FIXME: This is not working well for decl parents.
         // But it must work when using lazy ASTScopes for IterableDeclContexts
-        if (!Ctx.LangOpts.LazyASTScopes || !isa<IterableDeclContext>(D))
+        if (!isa<IterableDeclContext>(D))
           return;
       } else if (Stmt *S = Parent.getAsStmt()) {
         Enclosing = S->getSourceRange();
