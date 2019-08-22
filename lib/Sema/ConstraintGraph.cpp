@@ -473,7 +473,6 @@ llvm::TinyPtrVector<Constraint *> ConstraintGraph::gatherConstraints(
     TypeVariableType *typeVar, GatheringKind kind,
     llvm::function_ref<bool(Constraint *)> acceptConstraintFn) {
   llvm::TinyPtrVector<Constraint *> constraints;
-
   // Whether we should consider this constraint at all.
   auto rep = CS.getRepresentative(typeVar);
   auto shouldConsiderConstraint = [&](Constraint *constraint) {
@@ -505,19 +504,29 @@ llvm::TinyPtrVector<Constraint *> ConstraintGraph::gatherConstraints(
 
   // Add constraints for the given adjacent type variable.
   llvm::SmallPtrSet<TypeVariableType *, 4> typeVars;
+
+  // Local function to add constraints
   llvm::SmallPtrSet<Constraint *, 4> visitedConstraints;
-  auto addAdjacentConstraints = [&](TypeVariableType *adjTypeVar) {
-    auto adjTypeVarsToVisit =
-        (*this)[CS.getRepresentative(adjTypeVar)].getEquivalenceClass();
+  auto addConstraintsOfAdjacency = [&](TypeVariableType *adjTypeVar) {
+    ArrayRef<TypeVariableType *> adjTypeVarsToVisit;
+    switch (kind) {
+    case GatheringKind::EquivalenceClass:
+      adjTypeVarsToVisit = adjTypeVar;
+      break;
+
+    case GatheringKind::AllMentions:
+      adjTypeVarsToVisit
+        = (*this)[CS.getRepresentative(adjTypeVar)].getEquivalenceClass();
+      break;
+    }
+
     for (auto adjTypeVarEquiv : adjTypeVarsToVisit) {
       if (!typeVars.insert(adjTypeVarEquiv).second)
         continue;
 
       for (auto constraint : (*this)[adjTypeVarEquiv].getConstraints()) {
-        if (!visitedConstraints.insert(constraint).second)
-          continue;
-
-        if (acceptConstraint(constraint))
+        if (visitedConstraints.insert(constraint).second &&
+            acceptConstraint(constraint))
           constraints.push_back(constraint);
       }
     }
@@ -526,29 +535,34 @@ llvm::TinyPtrVector<Constraint *> ConstraintGraph::gatherConstraints(
   auto &reprNode = (*this)[CS.getRepresentative(typeVar)];
   auto equivClass = reprNode.getEquivalenceClass();
   for (auto typeVar : equivClass) {
-    auto &node = (*this)[typeVar];
-    for (auto constraint : node.getConstraints()) {
+    if (!typeVars.insert(typeVar).second)
+      continue;
+
+    for (auto constraint : (*this)[typeVar].getConstraints()) {
       if (visitedConstraints.insert(constraint).second &&
           acceptConstraint(constraint))
         constraints.push_back(constraint);
-
-      // If we want all mentions, visit type variables within each of our
-      // constraints.
-      if (kind == GatheringKind::AllMentions) {
-        if (!shouldConsiderConstraint(constraint))
-          continue;
-
-        for (auto adjTypeVar : constraint->getTypeVariables()) {
-          addAdjacentConstraints(adjTypeVar);
-        }
-      }
     }
 
-    // For any type variable mentioned in a fixed binding, add adjacent
-    // constraints.
+    auto &node = (*this)[typeVar];
+
     for (auto adjTypeVar : node.getFixedBindings()) {
-      addAdjacentConstraints(adjTypeVar);
+      addConstraintsOfAdjacency(adjTypeVar);
     }
+
+    switch (kind) {
+    case GatheringKind::EquivalenceClass:
+      break;
+
+    case GatheringKind::AllMentions:
+      // Retrieve the constraints from adjacent bindings.
+      for (auto adjTypeVar : node.getAdjacencies()) {
+        addConstraintsOfAdjacency(adjTypeVar);
+      }
+
+      break;
+    }
+
   }
 
   return constraints;
