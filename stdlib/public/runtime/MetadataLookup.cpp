@@ -708,20 +708,60 @@ _findContextDescriptorInCache(TypeMetadataPrivateState &T,
   return iter->getSecond();
 }
 
+#define DESCRIPTOR_MANGLING_SUFFIX_Structure Mn
+#define DESCRIPTOR_MANGLING_SUFFIX_Enum Mn
+#define DESCRIPTOR_MANGLING_SUFFIX_Protocol Mp
+
+#define DESCRIPTOR_MANGLING_SUFFIX_(X) X
+#define DESCRIPTOR_MANGLING_SUFFIX(KIND) \
+  DESCRIPTOR_MANGLING_SUFFIX_(DESCRIPTOR_MANGLING_SUFFIX_ ## KIND)
+
+#define DESCRIPTOR_MANGLING_(CHAR, SUFFIX) \
+  $sS ## CHAR ## SUFFIX
+#define DESCRIPTOR_MANGLING(CHAR, SUFFIX) DESCRIPTOR_MANGLING_(CHAR, SUFFIX)
+
+#define STANDARD_TYPE(KIND, MANGLING, TYPENAME) \
+  extern "C" const ContextDescriptor DESCRIPTOR_MANGLING(MANGLING, DESCRIPTOR_MANGLING_SUFFIX(KIND));
+
+#if !SWIFT_OBJC_INTEROP
+# define OBJC_INTEROP_STANDARD_TYPE(KIND, MANGLING, TYPENAME)
+#endif
+
+#include "swift/Demangling/StandardTypesMangling.def"
+
 static const ContextDescriptor *
 _findContextDescriptor(Demangle::NodePointer node,
-                           Demangle::Demangler &Dem) {
-  const ContextDescriptor *foundContext = nullptr;
-  auto &T = TypeMetadataRecords.get();
-
-  // If we have a symbolic reference to a context, resolve it immediately.
+                       Demangle::Demangler &Dem) {
   NodePointer symbolicNode = node;
   if (symbolicNode->getKind() == Node::Kind::Type)
     symbolicNode = symbolicNode->getChild(0);
+
+  // If we have a symbolic reference to a context, resolve it immediately.
   if (symbolicNode->getKind() == Node::Kind::TypeSymbolicReference) {
     return cast<TypeContextDescriptor>(
       (const ContextDescriptor *)symbolicNode->getIndex());
   }
+
+  // Fast-path lookup for standard library type references with short manglings.
+  if (symbolicNode->getNumChildren() >= 2
+      && symbolicNode->getChild(0)->getKind() == Node::Kind::Module
+      && symbolicNode->getChild(0)->getText().equals("Swift")
+      && symbolicNode->getChild(1)->getKind() == Node::Kind::Identifier) {
+    auto name = symbolicNode->getChild(1)->getText();
+
+#define STANDARD_TYPE(KIND, MANGLING, TYPENAME) \
+    if (name.equals(#TYPENAME)) { \
+      return &DESCRIPTOR_MANGLING(MANGLING, DESCRIPTOR_MANGLING_SUFFIX(KIND)); \
+    }
+#if !SWIFT_OBJC_INTEROP
+# define OBJC_INTEROP_STANDARD_TYPE(KIND, MANGLING, TYPENAME)
+#endif
+
+#include "swift/Demangling/StandardTypesMangling.def"
+  }
+  
+  const ContextDescriptor *foundContext = nullptr;
+  auto &T = TypeMetadataRecords.get();
 
   // Nothing to resolve if have a generic parameter.
   if (symbolicNode->getKind() == Node::Kind::DependentGenericParamType)
