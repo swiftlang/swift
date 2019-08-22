@@ -92,10 +92,22 @@ macro(swift_configure_components)
     "A semicolon-separated list of components to install from the set ${_SWIFT_DEFINED_COMPONENTS}")
 
   foreach(component ${_SWIFT_DEFINED_COMPONENTS})
+    add_custom_target(${component})
+    add_llvm_install_targets(install-${component}
+                             DEPENDS ${component}
+                             COMPONENT ${component})
+
     string(TOUPPER "${component}" var_name_piece)
     string(REPLACE "-" "_" var_name_piece "${var_name_piece}")
     set(SWIFT_INSTALL_${var_name_piece} FALSE)
   endforeach()
+
+  # NOTE: never_install is a dummy component to indicate something should not
+  # be installed. We explicitly do not add an install target for this.
+  add_custom_target(never_install)
+
+  add_custom_target(swift-components)
+  add_custom_target(install-swift-components)
 
   foreach(component ${SWIFT_INSTALL_COMPONENTS})
     if(NOT "${component}" IN_LIST _SWIFT_DEFINED_COMPONENTS)
@@ -106,6 +118,8 @@ macro(swift_configure_components)
     string(REPLACE "-" "_" var_name_piece "${var_name_piece}")
     if(NOT SWIFT_INSTALL_EXCLUDE_${var_name_piece})
       set(SWIFT_INSTALL_${var_name_piece} TRUE)
+      add_dependencies(swift-components ${component})
+      add_dependencies(install-swift-components install-${component})
     endif()
   endforeach()
 endmacro()
@@ -173,6 +187,10 @@ function(swift_install_symlink_component component)
   precondition(INSTALL_SYMLINK
     MESSAGE "LLVMInstallSymlink script must be available.")
 
+  # Create the directory if it doesn't exist. It will fail to create a symlink
+  # otherwise.
+  install(DIRECTORY DESTINATION "${ARG_DESTINATION}" COMPONENT ${component})
   install(SCRIPT ${INSTALL_SYMLINK}
-          CODE "install_symlink(${ARG_LINK_NAME} ${ARG_TARGET} ${ARG_DESTINATION})")
+          CODE "install_symlink(${ARG_LINK_NAME} ${ARG_TARGET} ${ARG_DESTINATION})"
+          COMPONENT ${component})
 endfunction()
