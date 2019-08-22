@@ -628,29 +628,93 @@ TypeChecker::handleSILGenericParams(GenericParamList *genericParams,
                                  /*ext=*/nullptr);
 }
 
-/// Check whether \c current is a redeclaration.
-static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
-  // If we've already checked this declaration, don't do it again.
-  if (current->alreadyCheckedRedeclaration())
-    return;
+static void checkRedeclaration(TypeChecker &tc, ValueDecl *VD) {
+  auto result = evaluateOrDefault(VD->getASTContext().evaluator,
+                                  CheckRedeclarationRequest{VD},
+                                  RedeclarationInfo::ignored());
+  const auto *root = result.getRoot();
+  const auto *imposter = result.getImposter();
+  switch (result.getDiagnosticKind()) {
+  case RedeclarationInfo::Ignored:
+    // Nothing to be done.  This can also come up if we've already checked.
+    break;
+  case RedeclarationInfo::AlreadyOverriden: {
+    tc.diagnose(root, diag::multiple_override, root->getFullName());
+    tc.diagnose(imposter, diag::multiple_override_prev,
+                imposter->getFullName());
+  }
+    break;
+  case RedeclarationInfo::InvalidRedeclarationConstructor:
+    tc.diagnose(root, diag::invalid_redecl_init,
+                root->getFullName(),
+                cast<ConstructorDecl>(imposter)->isMemberwiseInitializer());
+    break;
+  case RedeclarationInfo::InvalidRedeclarationWarning:
+    tc.diagnose(root, diag::invalid_redecl_swift5_warning,
+                root->getFullName());
+    tc.diagnose(imposter, diag::invalid_redecl_prev,
+                imposter->getFullName());
+    break;
+  case RedeclarationInfo::InvalidRedeclarationError:
+    tc.diagnose(root, diag::invalid_redecl, root->getFullName());
+    tc.diagnose(imposter, diag::invalid_redecl_prev,
+                imposter->getFullName());
+    break;
+  }
+}
 
-  // If there's no type yet, come back to it later.
-  if (!current->hasInterfaceType())
-    return;
-  
+void swift::simple_display(llvm::raw_ostream &out,
+                           const RedeclarationInfo &owner) {
+  switch (owner.getDiagnosticKind()) {
+  case RedeclarationInfo::Ignored:
+    out << "ignored";
+    break;
+  case RedeclarationInfo::AlreadyOverriden:
+    out << "diagnosing pre-existing override";
+    break;
+  case RedeclarationInfo::InvalidRedeclarationConstructor:
+    out << "diagnosing constructor redeclaration";
+    break;
+  case RedeclarationInfo::InvalidRedeclarationWarning:
+    out << "diagnosing redeclaration as warning";
+    break;
+  case RedeclarationInfo::InvalidRedeclarationError:
+    out << "diagnosing redeclaration as error";
+    break;
+  }
+}
+
+bool CheckRedeclarationRequest::isCached() const {
+  // We're not cached until the interface type exists.
+  const auto *VD = std::get<0>(getStorage());
+  return VD->alreadyCheckedRedeclaration()
+      && VD->hasInterfaceType();
+}
+
+Optional<RedeclarationInfo> CheckRedeclarationRequest::getCachedResult() const {
+  return RedeclarationInfo::ignored();
+}
+
+void CheckRedeclarationRequest::cacheResult(RedeclarationInfo value) const {
+  std::get<0>(getStorage())->setCheckedRedeclaration(true);
+}
+
+/// Check whether \c current is a redeclaration.
+llvm::Expected<RedeclarationInfo>
+CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current) const {
   // Make sure we don't do this checking again.
   current->setCheckedRedeclaration(true);
 
   // Ignore invalid and anonymous declarations.
   if (current->isInvalid() || !current->hasName())
-    return;
+    return RedeclarationInfo::ignored();
 
   // If this declaration isn't from a source file, don't check it.
   // FIXME: Should restrict this to the source file we care about.
   DeclContext *currentDC = current->getDeclContext();
   SourceFile *currentFile = currentDC->getParentSourceFile();
   if (!currentFile || currentDC->isLocalContext())
-    return;
+    return RedeclarationInfo::ignored();
 
   ReferencedNameTracker *tracker = currentFile->getReferencedNameTracker();
   bool isCascading = (current->getFormalAccess() > AccessLevel::FilePrivate);
@@ -700,6 +764,7 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
       continue;
 
     // Validate the declaration but only if it came from a different context.
+    auto &tc = *static_cast<TypeChecker *>(current->getASTContext().getLazyResolver());
     if (other->getDeclContext() != current->getDeclContext())
       tc.validateDecl(other);
 
@@ -715,23 +780,21 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
     if (!other->isAccessibleFrom(currentDC))
       continue;
 
-    const auto markInvalid = [&current]() {
+    const auto markInvalid = [&current, &other](RedeclarationInfo::Diagnostic d) -> RedeclarationInfo {
       current->setInvalid();
       if (auto *varDecl = dyn_cast<VarDecl>(current))
         if (varDecl->hasType())
           varDecl->setType(ErrorType::get(varDecl->getType()));
       if (current->hasInterfaceType())
         current->setInterfaceType(ErrorType::get(current->getInterfaceType()));
+      return RedeclarationInfo::fromInvalidDecl(d, current, other);
     };
 
     // Thwart attempts to override the same declaration more than once.
     const auto *currentOverride = current->getOverriddenDecl();
     const auto *otherOverride = other->getOverriddenDecl();
     if (currentOverride && currentOverride == otherOverride) {
-      tc.diagnose(current, diag::multiple_override, current->getFullName());
-      tc.diagnose(other, diag::multiple_override_prev, other->getFullName());
-      markInvalid();
-      break;
+      return markInvalid(RedeclarationInfo::AlreadyOverriden);
     }
 
     // Get the overload signature type.
@@ -852,12 +915,16 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
         wouldBeSwift5Redeclaration = false;
       }
 
+      // Make sure we don't do this checking again for the same decl. We also
+      // set this at the beginning of the function, but we might have swapped
+      // the decls for diagnostics; so ensure we also set this for the actual
+      // decl we diagnosed on.
+      current->setCheckedRedeclaration(true);
+      
       // If this isn't a redeclaration in the current version of Swift, but
       // would be in Swift 5 mode, emit a warning instead of an error.
       if (wouldBeSwift5Redeclaration) {
-        tc.diagnose(current, diag::invalid_redecl_swift5_warning,
-                    current->getFullName());
-        tc.diagnose(other, diag::invalid_redecl_prev, other->getFullName());
+        return markInvalid(RedeclarationInfo::InvalidRedeclarationWarning);
       } else {
         const auto *otherInit = dyn_cast<ConstructorDecl>(other);
         // Provide a better description for implicit initializers.
@@ -866,25 +933,20 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
           // when the current declaration is within an extension. The override
           // checker should have already taken care of emitting a more
           // productive diagnostic.
-          if (!other->getOverriddenDecl())
-            tc.diagnose(current, diag::invalid_redecl_init,
-                        current->getFullName(),
-                        otherInit->isMemberwiseInitializer());
+          if (!other->getOverriddenDecl()) {
+            return markInvalid(RedeclarationInfo::InvalidRedeclarationConstructor);
+          }
         } else {
-          tc.diagnose(current, diag::invalid_redecl, current->getFullName());
-          tc.diagnose(other, diag::invalid_redecl_prev, other->getFullName());
+          return markInvalid(RedeclarationInfo::InvalidRedeclarationError);
         }
-        markInvalid();
       }
 
-      // Make sure we don't do this checking again for the same decl. We also
-      // set this at the beginning of the function, but we might have swapped
-      // the decls for diagnostics; so ensure we also set this for the actual
-      // decl we diagnosed on.
-      current->setCheckedRedeclaration(true);
       break;
     }
   }
+  
+  // Nothing to report.
+  return RedeclarationInfo::ignored();
 }
 
 namespace {

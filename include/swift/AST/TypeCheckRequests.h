@@ -40,6 +40,7 @@ struct TypeLoc;
 class ValueDecl;
 class AbstractStorageDecl;
 enum class OpaqueReadOwnership: uint8_t;
+struct RedeclarationInfo;
 
 /// Display a nominal type or extension thereof.
 void simple_display(
@@ -1051,6 +1052,97 @@ public:
   Optional<bool> getCachedResult() const;
   void cacheResult(bool value) const;
 };
+
+struct RedeclarationInfo {
+public:
+  /// The specific reason a redeclaration may need to be diagnosed.
+  enum Diagnostic : uint8_t {
+    /// The redeclaration is ignorable.  Either it has already been diagnosed, is in an invalid or uncheckable
+    /// state, or it is not a redeclaration at all.  Both the Root and Imposter are undefined.
+    Ignored = 0,
+    /// This is a redeclaration of an override.  The root points to the declaration that occurs first in the
+    /// current context, the imposter points to the remaining declaration.
+    AlreadyOverriden = 1,
+    /// Swift 4 accidentally allowed VarDecls with the same type through redeclaration checking.  Emit this
+    /// as a warning.  The root points to the declaration that occurs first in the current context, the imposter
+    /// points to the remaining declaration.
+    InvalidRedeclarationWarning = 2,
+    /// This is a general redeclaration. The root points to the declaration that occurs first in the current
+    /// context, the imposter points to the remaining declaration.
+    InvalidRedeclarationError = 3,
+    /// This is a redeclaration of a synthesized (memberwise) initializer, most likely in an extension. The root
+    /// points to the declaration that occurs first in the current context, the imposter is guaranteed to point
+    /// to a \c ConstructorDecl.
+    InvalidRedeclarationConstructor = 4,
+  };
+  
+private:
+  llvm::PointerIntPair<const ValueDecl *, 3, Diagnostic> Root;
+  const ValueDecl * const Imposter;
+  
+  RedeclarationInfo(llvm::PointerIntPair<const ValueDecl *, 3, Diagnostic> Root,
+                    const ValueDecl * Imposter)
+    : Root(Root), Imposter(Imposter) { }
+  
+public:
+  const ValueDecl *getRoot() const {
+    return Root.getPointer();
+  }
+  
+  Diagnostic getDiagnosticKind() const {
+    return Root.getInt();
+  }
+  
+  const ValueDecl *getImposter() const {
+    return Imposter;
+  }
+  
+  static RedeclarationInfo ignored() {
+    return RedeclarationInfo{{nullptr, Ignored}, nullptr};
+  }
+  
+  static RedeclarationInfo fromInvalidDecl(Diagnostic reason,
+                                           const ValueDecl *root,
+                                           const ValueDecl *imposter) {
+    assert(reason != Ignored
+           && "Caller may not ignore diagnosable declaration");
+    assert((reason != InvalidRedeclarationConstructor
+           || isa<ConstructorDecl>(imposter))
+           && "Constructor variant must have constructor decl as imposter");
+    return RedeclarationInfo{{root, reason}, imposter};
+  }
+  
+  friend bool operator==(const RedeclarationInfo &lhs,
+                         const RedeclarationInfo &rhs) {
+    return lhs.Root.getOpaqueValue() == rhs.Root.getOpaqueValue()
+        && lhs.Imposter == rhs.Imposter;
+  }
+};
+
+/// Request information about whether and why a declaration may be a redeclaration.  The request may
+/// return a result indicating a diagnostic should be emitted.
+class CheckRedeclarationRequest :
+    public SimpleRequest<CheckRedeclarationRequest,
+                         RedeclarationInfo (ValueDecl *),
+                         CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<RedeclarationInfo>
+  evaluate(Evaluator &evaluator, ValueDecl *var) const;
+
+public:
+  // Separate caching.
+  bool isCached() const;
+  Optional<RedeclarationInfo> getCachedResult() const;
+  void cacheResult(RedeclarationInfo value) const;
+};
+
+void simple_display(llvm::raw_ostream &out, const RedeclarationInfo &owner);
 
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
