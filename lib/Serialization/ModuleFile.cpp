@@ -1242,7 +1242,7 @@ ModuleFile::ModuleFile(
     : ModuleInputBuffer(std::move(moduleInputBuffer)),
       ModuleDocInputBuffer(std::move(moduleDocInputBuffer)),
       DeserializedTypeCallback([](Type ty) {}) {
-  assert(getStatus() == Status::Valid);
+  assert(!hasError());
   Bits.IsFramework = isFramework;
 
   PrettyStackTraceModuleFile stackEntry(*this);
@@ -1490,7 +1490,7 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
                                             bool treatAsPartialModule) {
   PrettyStackTraceModuleFile stackEntry(*this);
 
-  assert(getStatus() == Status::Valid && "invalid module file");
+  assert(!hasError() && "error already detected; should not call this");
   assert(!FileContext && "already associated with an AST module");
   FileContext = file;
 
@@ -1612,11 +1612,11 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
                                                            None);
   }
 
-  return getStatus();
+  return Status::Valid;
 }
 
 std::unique_ptr<llvm::MemoryBuffer> ModuleFile::takeBufferForDiagnostics() {
-  assert(getStatus() != Status::Valid);
+  assert(hasError());
 
   // Today, the only buffer that might have diagnostics in them is the input
   // buffer, and even then only if it has imported module contents.
