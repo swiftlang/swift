@@ -427,6 +427,22 @@ static void countStatsPostIRGen(UnifiedStatsReporter &Stats,
   }
 }
 
+template<typename ...ArgTypes>
+void
+diagnoseSync(DiagnosticEngine *Diags, llvm::sys::Mutex *DiagMutex,
+             SourceLoc Loc, Diag<ArgTypes...> ID,
+         typename swift::detail::PassArgument<ArgTypes>::type... Args) {
+  if (!Diags)
+    return;
+  if (DiagMutex)
+    DiagMutex->lock();
+
+  Diags->diagnose(Loc, ID, std::move(Args)...);
+
+  if (DiagMutex)
+    DiagMutex->unlock();
+}
+
 /// Run the LLVM passes. In multi-threaded compilation this will be done for
 /// multiple LLVM modules in parallel.
 bool swift::performLLVM(IRGenOptions &Opts, DiagnosticEngine *Diags,
@@ -476,14 +492,9 @@ bool swift::performLLVM(IRGenOptions &Opts, DiagnosticEngine *Diags,
     RawOS.emplace(OutputFilename, EC, OSFlags);
 
     if (RawOS->has_error() || EC) {
-      if (Diags) {
-        if (DiagMutex)
-          DiagMutex->lock();
-        Diags->diagnose(SourceLoc(), diag::error_opening_output,
-                        OutputFilename, EC.message());
-        if (DiagMutex)
-          DiagMutex->unlock();
-      }
+      diagnoseSync(Diags, DiagMutex,
+                   SourceLoc(), diag::error_opening_output,
+                   OutputFilename, EC.message());
       RawOS->clear_error();
       return true;
     }
@@ -525,13 +536,8 @@ bool swift::performLLVM(IRGenOptions &Opts, DiagnosticEngine *Diags,
     bool fail = TargetMachine->addPassesToEmitFile(EmitPasses, *RawOS, nullptr,
                                                    FileType, !Opts.Verify);
     if (fail) {
-      if (Diags) {
-        if (DiagMutex)
-          DiagMutex->lock();
-        Diags->diagnose(SourceLoc(), diag::error_codegen_init_fail);
-        if (DiagMutex)
-          DiagMutex->unlock();
-      }
+      diagnoseSync(Diags, DiagMutex,
+                   SourceLoc(), diag::error_codegen_init_fail);
       return true;
     }
     break;
