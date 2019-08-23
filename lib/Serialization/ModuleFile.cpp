@@ -1383,7 +1383,7 @@ ModuleFile::ModuleFile(
     : ModuleInputBuffer(std::move(moduleInputBuffer)),
       ModuleDocInputBuffer(std::move(moduleDocInputBuffer)),
       DeserializedTypeCallback([](Type ty) {}) {
-  assert(getStatus() == Status::Valid);
+  assert(!hasError());
   Bits.IsFramework = isFramework;
 
   PrettyStackTraceModuleFile stackEntry(*this);
@@ -1392,7 +1392,7 @@ ModuleFile::ModuleFile(
 
   if (!checkModuleSignature(cursor, SWIFTMODULE_SIGNATURE) ||
       !enterTopLevelModuleBlock(cursor, MODULE_BLOCK_ID)) {
-    error();
+    info.status = error(Status::Malformed);
     return;
   }
 
@@ -1409,7 +1409,7 @@ ModuleFile::ModuleFile(
     if (!maybeEntry) {
       // FIXME this drops the error diagnostic on the floor.
       consumeError(maybeEntry.takeError());
-      error();
+      info.status = error(Status::Malformed);
       return;
     }
     topLevelEntry = maybeEntry.get();
@@ -1421,7 +1421,7 @@ ModuleFile::ModuleFile(
       if (llvm::Error Err = cursor.EnterSubBlock(CONTROL_BLOCK_ID)) {
         // FIXME this drops the error on the floor.
         consumeError(std::move(Err));
-        error();
+        info.status = error(Status::Malformed);
         return;
       }
 
@@ -1444,14 +1444,14 @@ ModuleFile::ModuleFile(
 
     case INPUT_BLOCK_ID: {
       if (!hasValidControlBlock) {
-        error();
+        info.status = error(Status::Malformed);
         return;
       }
 
       if (llvm::Error Err = cursor.EnterSubBlock(INPUT_BLOCK_ID)) {
         // FIXME this drops the error on the floor.
         consumeError(std::move(Err));
-        error();
+        info.status = error(Status::Malformed);
         return;
       }
 
@@ -1459,7 +1459,7 @@ ModuleFile::ModuleFile(
       if (!maybeNext) {
         // FIXME this drops the error on the floor.
         consumeError(maybeNext.takeError());
-        error();
+        info.status = error(Status::Malformed);
         return;
       }
       llvm::BitstreamEntry next = maybeNext.get();
@@ -1471,7 +1471,7 @@ ModuleFile::ModuleFile(
         if (!maybeKind) {
           // FIXME this drops the error on the floor.
           consumeError(maybeKind.takeError());
-          error();
+          info.status = error(Status::Malformed);
           return;
         }
         unsigned kind = maybeKind.get();
@@ -1485,7 +1485,7 @@ ModuleFile::ModuleFile(
           auto importKind = getActualImportControl(rawImportControl);
           if (!importKind) {
             // We don't know how to import this dependency.
-            error();
+            info.status = error(Status::Malformed);
             return;
           }
           Dependencies.push_back({blobData, importKind.getValue(), scoped});
@@ -1541,21 +1541,21 @@ ModuleFile::ModuleFile(
         if (!maybeNext) {
           // FIXME this drops the error on the floor.
           consumeError(maybeNext.takeError());
-          error();
+          info.status = error(Status::Malformed);
           return;
         }
         next = maybeNext.get();
       }
 
       if (next.Kind != llvm::BitstreamEntry::EndBlock)
-        error();
+        info.status = error(Status::Malformed);
 
       break;
     }
 
     case DECLS_AND_TYPES_BLOCK_ID: {
       if (!hasValidControlBlock) {
-        error();
+        info.status = error(Status::Malformed);
         return;
       }
 
@@ -1566,7 +1566,7 @@ ModuleFile::ModuleFile(
               DeclTypeCursor.EnterSubBlock(DECLS_AND_TYPES_BLOCK_ID)) {
         // FIXME this drops the error on the floor.
         consumeError(std::move(Err));
-        error();
+        info.status = error(Status::Malformed);
         return;
       }
 
@@ -1574,15 +1574,15 @@ ModuleFile::ModuleFile(
       if (!maybeCursor) {
         // FIXME this drops the error on the floor.
         consumeError(maybeCursor.takeError());
-        error();
+        info.status = error(Status::Malformed);
         return;
       }
       if (maybeCursor.get().Kind == llvm::BitstreamEntry::Error)
-        error();
+        info.status = error(Status::Malformed);
 
       // With the main cursor, skip over the block and continue.
       if (cursor.SkipBlock()) {
-        error();
+        info.status = error(Status::Malformed);
         return;
       }
       break;
@@ -1590,14 +1590,14 @@ ModuleFile::ModuleFile(
 
     case IDENTIFIER_DATA_BLOCK_ID: {
       if (!hasValidControlBlock) {
-        error();
+        info.status = error(Status::Malformed);
         return;
       }
 
       if (llvm::Error Err = cursor.EnterSubBlock(IDENTIFIER_DATA_BLOCK_ID)) {
         // FIXME this drops the error on the floor.
         consumeError(std::move(Err));
-        error();
+        info.status = error(Status::Malformed);
         return;
       }
 
@@ -1606,7 +1606,7 @@ ModuleFile::ModuleFile(
       if (!maybeNext) {
         // FIXME this drops the error on the floor.
         consumeError(maybeNext.takeError());
-        error();
+        info.status = error(Status::Malformed);
         return;
       }
       llvm::BitstreamEntry next = maybeNext.get();
@@ -1618,7 +1618,7 @@ ModuleFile::ModuleFile(
         if (!maybeKind) {
           // FIXME this drops the error on the floor.
           consumeError(maybeKind.takeError());
-          error();
+          info.status = error(Status::Malformed);
           return;
         }
         unsigned kind = maybeKind.get();
@@ -1638,14 +1638,14 @@ ModuleFile::ModuleFile(
         if (!maybeNext) {
           // FIXME this drops the error on the floor.
           consumeError(maybeNext.takeError());
-          error();
+          info.status = error(Status::Malformed);
           return;
         }
         next = maybeNext.get();
       }
 
       if (next.Kind != llvm::BitstreamEntry::EndBlock) {
-        error();
+        info.status = error(Status::Malformed);
         return;
       }
 
@@ -1654,7 +1654,7 @@ ModuleFile::ModuleFile(
 
     case INDEX_BLOCK_ID: {
       if (!hasValidControlBlock || !readIndexBlock(cursor)) {
-        error();
+        info.status = error(Status::Malformed);
         return;
       }
       break;
@@ -1666,13 +1666,13 @@ ModuleFile::ModuleFile(
       if (llvm::Error Err = SILIndexCursor.EnterSubBlock(SIL_INDEX_BLOCK_ID)) {
         // FIXME this drops the error on the floor.
         consumeError(std::move(Err));
-        error();
+        info.status = error(Status::Malformed);
         return;
       }
 
       // With the main cursor, skip over the block and continue.
       if (cursor.SkipBlock()) {
-        error();
+        info.status = error(Status::Malformed);
         return;
       }
       break;
@@ -1684,13 +1684,13 @@ ModuleFile::ModuleFile(
       if (llvm::Error Err = SILCursor.EnterSubBlock(SIL_BLOCK_ID)) {
         // FIXME this drops the error on the floor.
         consumeError(std::move(Err));
-        error();
+        info.status = error(Status::Malformed);
         return;
       }
 
       // With the main cursor, skip over the block and continue.
       if (cursor.SkipBlock()) {
-        error();
+        info.status = error(Status::Malformed);
         return;
       }
       break;
@@ -1700,7 +1700,7 @@ ModuleFile::ModuleFile(
       // Unknown top-level block, possibly for use by a future version of the
       // module format.
       if (cursor.SkipBlock()) {
-        error();
+        info.status = error(Status::Malformed);
         return;
       }
       break;
@@ -1708,12 +1708,12 @@ ModuleFile::ModuleFile(
   }
 
   if (topLevelEntry.Kind != llvm::BitstreamEntry::EndBlock) {
-    error();
+    info.status = error(Status::Malformed);
     return;
   }
 
   if (!readModuleDocIfPresent()) {
-    error(Status::MalformedDocumentation);
+    info.status = error(Status::MalformedDocumentation);
     return;
   }
 }
@@ -1723,7 +1723,7 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
                                             bool treatAsPartialModule) {
   PrettyStackTraceModuleFile stackEntry(*this);
 
-  assert(getStatus() == Status::Valid && "invalid module file");
+  assert(!hasError() && "error already detected; should not call this");
   assert(!FileContext && "already associated with an AST module");
   FileContext = file;
 
@@ -1845,11 +1845,11 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
                                                            None);
   }
 
-  return getStatus();
+  return Status::Valid;
 }
 
 std::unique_ptr<llvm::MemoryBuffer> ModuleFile::takeBufferForDiagnostics() {
-  assert(getStatus() != Status::Valid);
+  assert(hasError());
 
   // Today, the only buffer that might have diagnostics in them is the input
   // buffer, and even then only if it has imported module contents.
@@ -2233,7 +2233,7 @@ ModuleFile::loadNamedMembers(const IterableDeclContext *IDC, DeclBaseName N,
     llvm::BitstreamEntry entry =
         fatalIfUnexpected(DeclMemberTablesCursor.advance());
     if (entry.Kind != llvm::BitstreamEntry::Record) {
-      error();
+      fatal();
       return None;
     }
     SmallVector<uint64_t, 64> scratch;
