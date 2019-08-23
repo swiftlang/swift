@@ -3573,9 +3573,8 @@ OpaqueTypeArchetypeType::get(OpaqueTypeDecl *Decl,
   // It lives in an environment in which the interface generic arguments of the
   // decl have all been same-type-bound to the arguments from our substitution
   // map.
-  GenericSignatureBuilder builder(ctx);
+  SmallVector<Requirement, 2> newRequirements;
 
-  builder.addGenericSignature(Decl->getOpaqueInterfaceGenericSignature());
   // TODO: The proper thing to do to build the environment in which the opaque
   // type's archetype exists would be to take the generic signature of the
   // decl, feed it into a GenericSignatureBuilder, then add same-type
@@ -3607,10 +3606,8 @@ OpaqueTypeArchetypeType::get(OpaqueTypeDecl *Decl,
   if (auto outerSig = Decl->getGenericSignature()) {
     for (auto outerParam : outerSig->getGenericParams()) {
       auto boundType = Type(outerParam).subst(Substitutions);
-      builder.addSameTypeRequirement(Type(outerParam), boundType,
-         GenericSignatureBuilder::FloatingRequirementSource::forAbstract(),
-         GenericSignatureBuilder::UnresolvedHandlingKind::GenerateConstraints,
-         [](Type, Type) { llvm_unreachable("error?"); });
+      newRequirements.push_back(
+          Requirement(RequirementKind::SameType, Type(outerParam), boundType));
     }
   }
 #else
@@ -3619,6 +3616,7 @@ OpaqueTypeArchetypeType::get(OpaqueTypeDecl *Decl,
   //
   // This should not be possible until we add where clause support, with the
   // exception of generic base class constraints (handled below).
+  (void)newRequirements;
 # ifndef NDEBUG
   for (auto reqt :
                 Decl->getOpaqueInterfaceGenericSignature()->getRequirements()) {
@@ -3632,9 +3630,14 @@ OpaqueTypeArchetypeType::get(OpaqueTypeDecl *Decl,
   }
 # endif
 #endif
-  auto signature = std::move(builder)
-    .computeGenericSignature(SourceLoc());
-  
+  auto signature = evaluateOrDefault(
+      ctx.evaluator,
+      AbstractGenericSignatureRequest{
+        Decl->getOpaqueInterfaceGenericSignature(),
+        /*genericParams=*/{ },
+        std::move(newRequirements)},
+      nullptr);
+
   auto opaqueInterfaceTy = Decl->getUnderlyingInterfaceType();
   auto layout = signature->getLayoutConstraint(opaqueInterfaceTy);
   auto superclass = signature->getSuperclassBound(opaqueInterfaceTy);
