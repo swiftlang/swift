@@ -2984,19 +2984,6 @@ for host in "${ALL_HOSTS[@]}"; do
                 lldb_executable="${lldb_build_dir}"/bin/lldb
                 results_dir="${lldb_build_dir}/test-results"
 
-                LLDB_FORMATTER_OPTS="--results-formatter lldbsuite.test_event.formatter.xunit.XunitFormatter \
-                                     --results-file ${results_dir}/results.xml \
-                                     -O--xpass=success \
-                                     -O--xfail=success"
-
-                # Setup the xUnit results formatter.
-                if [[ "$(uname -s)" != "Darwin" ]] ; then
-                    # On non-Darwin, we ignore skipped tests entirely
-                    # so that they don't pollute our xUnit results with
-                    # non-actionable content.
-                    LLDB_FORMATTER_OPTS="${LLDB_FORMATTER_OPTS} -O-ndsym -O-rdebugserver -O-rlibc\\\\+\\\\+ -O-rlong.running -O-rbenchmarks -O-rrequires.one?.of.darwin"
-                fi
-
                 # Figure out which C/C++ compiler we should use for building test inferiors.
                 if [[ "${LLDB_TEST_CC}" == "host-toolchain" ]]; then
                     # Use the host toolchain: i.e. the toolchain specified by HOST_CC
