@@ -1067,7 +1067,6 @@ private:
   // Evaluation.
   llvm::Expected<AncestryFlags>
   evaluate(Evaluator &evaluator, ClassDecl *value) const;
-
 public:
   // Caching.
   bool isCached() const { return true; }
@@ -1116,7 +1115,25 @@ private:
 
   // Evaluation.
   llvm::Expected<Type> evaluate(Evaluator &eval, ExtensionDecl *) const;
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
 
+class FunctionOperatorRequest :
+    public SimpleRequest<FunctionOperatorRequest,
+                         OperatorDecl *(FuncDecl *),
+                         CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+  
+private:
+  friend SimpleRequest;
+  
+  // Evaluation.
+  llvm::Expected<OperatorDecl *>
+  evaluate(Evaluator &evaluator, FuncDecl *value) const;
+  
 public:
   // Caching.
   bool isCached() const { return true; }

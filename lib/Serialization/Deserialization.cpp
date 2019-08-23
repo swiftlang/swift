@@ -3058,7 +3058,8 @@ public:
     if (!isAccessor) {
       if (Decl *associated = MF.getDecl(associatedDeclID)) {
         if (auto op = dyn_cast<OperatorDecl>(associated)) {
-          fn->setOperatorDecl(op);
+          ctx.evaluator.cacheOutput(FunctionOperatorRequest{fn},
+                                    std::move(op));
 
           if (isa<PrefixOperatorDecl>(op))
             fn->getAttrs().add(new (ctx) PrefixAttr(/*implicit*/false));
