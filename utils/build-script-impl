@@ -54,7 +54,6 @@ KNOWN_SETTINGS=(
     cmark-build-type            "Debug"          "the CMake build variant for CommonMark (Debug, RelWithDebInfo, Release, MinSizeRel).  Defaults to Debug."
     lldb-extra-cmake-args       ""               "extra command line args to pass to lldb cmake"
     lldb-test-cc                ""               "CC to use for building LLDB testsuite test inferiors.  Defaults to just-built, in-tree clang.  If set to 'host-toolchain', sets it to same as host-cc."
-    lldb-test-with-curses       ""               "run test lldb test runner using curses terminal control"
     lldb-test-swift-only        "0"              "when running lldb tests, only include Swift-specific tests"
     lldb-no-debugserver         ""               "delete debugserver after building it, and don't try to codesign it"
     lldb-use-system-debugserver ""               "don't try to codesign debugserver, and use the system's debugserver instead"
@@ -2982,42 +2981,23 @@ for host in "${ALL_HOSTS[@]}"; do
                 lldb_build_dir=$(build_directory ${host} lldb)
                 swift_build_dir=$(build_directory ${host} swift)
                 module_cache="${build_dir}/module-cache"
-
                 lldb_executable="${lldb_build_dir}"/bin/lldb
                 results_dir="${lldb_build_dir}/test-results"
 
-                # Handle test results formatter
-                if [[ "${LLDB_TEST_WITH_CURSES}" ]]; then
-                    # Setup the curses results formatter.
-                    LLDB_FORMATTER_OPTS="\
-                                       --results-formatter lldbsuite.test_event.formatter.curses.Curses \
-                                       --results-file /dev/stdout"
-                else
-                    LLDB_FORMATTER_OPTS="\
-                                       --results-formatter lldbsuite.test_event.formatter.xunit.XunitFormatter \
-                                       --results-file ${results_dir}/results.xml \
-                                       -O--xpass=success \
-                                       -O--xfail=success"
-                    # Setup the xUnit results formatter.
-                    if [[ "$(uname -s)" != "Darwin" ]] ; then
-                        # On non-Darwin, we ignore skipped tests entirely
-                        # so that they don't pollute our xUnit results with
-                        # non-actionable content.
-                        LLDB_FORMATTER_OPTS="${LLDB_FORMATTER_OPTS} -O-ndsym -O-rdebugserver -O-rlibc\\\\+\\\\+ -O-rlong.running -O-rbenchmarks -O-rrequires.one?.of.darwin"
-                    fi
+                LLDB_FORMATTER_OPTS="--results-formatter lldbsuite.test_event.formatter.xunit.XunitFormatter \
+                                     --results-file ${results_dir}/results.xml \
+                                     -O--xpass=success \
+                                     -O--xfail=success"
+
+                # Setup the xUnit results formatter.
+                if [[ "$(uname -s)" != "Darwin" ]] ; then
+                    # On non-Darwin, we ignore skipped tests entirely
+                    # so that they don't pollute our xUnit results with
+                    # non-actionable content.
+                    LLDB_FORMATTER_OPTS="${LLDB_FORMATTER_OPTS} -O-ndsym -O-rdebugserver -O-rlibc\\\\+\\\\+ -O-rlong.running -O-rbenchmarks -O-rrequires.one?.of.darwin"
                 fi
 
-                # Optionally specify a test subdirectory and category filters.
-                # Watchpoint testing is currently disabled: see rdar://38566150.
-                if [[ "$(true_false ${LLDB_TEST_SWIFT_ONLY})" == "TRUE" ]]; then
-                    LLDB_TEST_SUBDIR_CLAUSE="--test-subdir lang/swift"
-                    LLDB_TEST_CATEGORIES="--skip-category=watchpoint --skip-category=dwo"
-                else
-                    LLDB_TEST_SUBDIR_CLAUSE=""
-                    LLDB_TEST_CATEGORIES="--skip-category=watchpoint"
-                fi
-
-                # figure out which C/C++ compiler we should use for building test inferiors.
+                # Figure out which C/C++ compiler we should use for building test inferiors.
                 if [[ "${LLDB_TEST_CC}" == "host-toolchain" ]]; then
                     # Use the host toolchain: i.e. the toolchain specified by HOST_CC
                     LLDB_DOTEST_CC_OPTS="-C ${HOST_CC}"
@@ -3027,13 +3007,6 @@ for host in "${ALL_HOSTS[@]}"; do
                 else
                     # Use the clang that was just built in the tree.
                     LLDB_DOTEST_CC_OPTS="-C $(build_directory $LOCAL_HOST llvm)"/bin/clang
-                fi
-
-                # If we need to use the system debugserver, do so explicitly.
-                if [[ "$(uname -s)" == "Darwin" && "${LLDB_USE_SYSTEM_DEBUGSERVER}" ]] ; then
-                    LLDB_TEST_DEBUG_SERVER="--server $(xcode-select -p)/../SharedFrameworks/LLDB.framework/Resources/debugserver --out-of-tree-debugserver"
-                else
-                    LLDB_TEST_DEBUG_SERVER=""
                 fi
 
                 # Options to find the just-built libddispatch and Foundation.
@@ -3054,23 +3027,29 @@ for host in "${ALL_HOSTS[@]}"; do
                     DOTEST_EXTRA="${DOTEST_EXTRA} -Xlinker -rpath -Xlinker ${LIBDISPATCH_BUILD_DIR}"
                     DOTEST_EXTRA="${DOTEST_EXTRA} -Xlinker -rpath -Xlinker ${FOUNDATION_BUILD_DIR}"
                 fi
-                call mkdir -p "${results_dir}"
 
-                # Prefer to use lldb-dotest, as building it guarantees that we build all
-                # test dependencies. Ultimately we want to delete as much lldb-specific logic
-                # from this file as possible and just have a single call to lldb-dotest.
+                call mkdir -p "${results_dir}"
+                LLVM_LIT_ARG="${LLVM_LIT_ARGS} --xunit-xml-output=${results_dir}/results.xml"
 
                 if [[ "${ENABLE_ASAN}" ]] ; then
                     # Limit the number of parallel tests
                     LLVM_LIT_ARGS="${LLVM_LIT_ARGS} -j $(sysctl hw.physicalcpu | awk -v N=${BUILD_JOBS} '{ print (N < $2) ? N : $2 }')"
                 fi
 
+                # Watchpoint testing is currently disabled: see rdar://38566150.
+                LLDB_TEST_CATEGORIES="--skip-category=watchpoint"
+
                 if [[ "$(true_false ${LLDB_TEST_SWIFT_ONLY})" == "TRUE" ]]; then
                     LLVM_LIT_ARGS="${LLVM_LIT_ARGS} --filter=[sS]wift"
+                    LLDB_TEST_CATEGORIES="${LLDB_TEST_CATEGORIES} --skip-category=dwo"
                 fi
+
+                # Construct dotest arguments.
+                DOTEST_ARGS="--build-dir ${lldb_build_dir}/lldb-test-build.noindex ${LLDB_TEST_SUBDIR_CLAUSE} ${LLDB_TEST_CATEGORIES} -t -E \"${DOTEST_EXTRA}\""
 
                 # Record the times test took and report the slowest.
                 LLVM_LIT_ARGS="${LLVM_LIT_ARGS} -v --time-tests"
+
                 with_pushd ${lldb_build_dir} \
                     call ${NINJA_BIN} -j ${BUILD_JOBS} unittests/LLDBUnitTests
                 with_pushd ${lldb_build_dir} \
@@ -3079,17 +3058,18 @@ for host in "${ALL_HOSTS[@]}"; do
                     call "${llvm_build_dir}/bin/llvm-lit" \
                          "${lldb_build_dir}/lit" \
                          ${LLVM_LIT_ARGS} \
-                         --xunit-xml-output=${results_dir}/results.xml \
-                         --param dotest-args="--build-dir ${lldb_build_dir}/lldb-test-build.noindex ${LLDB_TEST_SUBDIR_CLAUSE} ${LLDB_TEST_CATEGORIES} -t -E \"${DOTEST_EXTRA}\""
+                         --param dotest-args="${DOTEST_ARGS}"
+
                 if [[ -x "${LLDB_TEST_SWIFT_COMPATIBILITY}" ]] ; then
                     echo "Running LLDB swift compatibility tests against" \
                          "${LLDB_TEST_SWIFT_COMPATIBILITY}"
+                    DOTEST_ARGS="${DOTEST_ARGS} -G swift-history --swift-compiler \"${LLDB_TEST_SWIFT_COMPATIBILITY}\""
                     with_pushd ${results_dir} \
                        call "${llvm_build_dir}/bin/llvm-lit" \
                             "${lldb_build_dir}/lit" \
                             ${LLVM_LIT_ARGS} \
-                            --xunit-xml-output=${results_dir}/results.xml \
-                            --param dotest-args="--build-dir ${lldb_build_dir}/lldb-test-build.noindex ${LLDB_TEST_SUBDIR_CLAUSE} ${LLDB_TEST_CATEGORIES} -G swift-history --swift-compiler \"${LLDB_TEST_SWIFT_COMPATIBILITY}\" -t -E \"${DOTEST_EXTRA}\"" --filter=compat
+                            --param dotest-args="${DOTEST_ARGS}" \
+                            --filter=compat
                 fi
                 continue
                 ;;
