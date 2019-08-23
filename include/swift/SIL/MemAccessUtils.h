@@ -232,11 +232,11 @@ public:
     case Yield:
     case Nested:
     case Unidentified:
-      return value == other.value;
+      return getValue() == other.getValue();
     case Global:
-      return global == other.global;
+      return getGlobal() == other.getGlobal();
     case Class:
-      return value == other.value
+      return getObject() == other.getObject()
              && getElementIndex() == other.getElementIndex();
     }
     llvm_unreachable("covered switch");
