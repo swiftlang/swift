@@ -4449,6 +4449,9 @@ void InOutConversionFailure::fixItChangeArgumentType() const {
 }
 
 bool ArgumentMismatchFailure::diagnoseAsError() {
+  if (diagnoseConversionToBool())
+    return true;
+
   emitDiagnostic(getLoc(), diag::cannot_convert_argument_value, getFromType(),
                  getToType());
   return true;
