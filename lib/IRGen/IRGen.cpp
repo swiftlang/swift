@@ -349,7 +349,7 @@ static void getHashOfModule(MD5::MD5Result &Result, IRGenOptions &Opts,
 
   // Add all options which influence the llvm compilation but are not yet
   // reflected in the llvm module itself.
-  HashStream << Opts.getLLVMCodeGenOptionsHash();
+  Opts.writeLLVMCodeGenOptionsTo(HashStream);
 
   HashStream.final(Result);
 }
@@ -614,7 +614,7 @@ bool swift::performLLVM(IRGenOptions &Opts, DiagnosticEngine *Diags,
       );
       // Note for future debuggers: If you see this error, either you changed
       // LLVM and need to clean your build folder to rebuild everything with it,
-      // or IRGenOptions::getLLVMCodeGenOptionsHash() doesn't account for a flag
+      // or IRGenOptions::writeLLVMCodeGenOptionsTo() doesn't account for a flag
       // that changed LLVM's output between this compile and the previous one.
 
     case FileDifference::SameContents:
