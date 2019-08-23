@@ -100,10 +100,13 @@ static bool isConsumed(
       return true;
     }
     case UseLifetimeConstraint::MustBeLive:
-      // Ok, this constraint can take something owned as live. Lets
-      // see if it can also take something that is guaranteed. If it
-      // can not, then we bail.
-      map.canAcceptKind(ValueOwnershipKind::Guaranteed);
+      // Ok, this constraint can take something owned as live. Assert that it
+      // can also accept something that is guaranteed. Any non-consuming use of
+      // an owned value should be able to take a guaranteed parameter as well
+      // (modulo bugs). We assert to catch these.
+      assert(map.canAcceptKind(ValueOwnershipKind::Guaranteed) &&
+             "Any non-consuming use of an owned value should be able to take a "
+             "guaranteed value");
       continue;
     }
   }
