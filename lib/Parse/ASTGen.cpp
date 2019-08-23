@@ -474,18 +474,7 @@ TypeRepr *ASTGen::generate(UnknownTypeSyntax Type, SourceLoc &Loc) {
 
   if (ChildrenCount == 1) {
     auto Keyword = Type.getChild(0)->getAs<TokenSyntax>();
-
-    auto IsAtStartOfLine = [](const TokenSyntax Token) {
-      auto LeadingTrivia = Token.getLeadingTrivia();
-      if (LeadingTrivia.empty())
-        return false;
-      auto LastLeadingTriviaKind = Token.getLeadingTrivia().back().getKind();
-      return LastLeadingTriviaKind == TriviaKind::Newline ||
-             LastLeadingTriviaKind == TriviaKind::CarriageReturnLineFeed;
-    };
-
-    if (Keyword && isTokenKeyword(Keyword->getTokenKind()) &&
-        !IsAtStartOfLine(*Keyword)) {
+    if (Keyword && isTokenKeyword(Keyword->getTokenKind())) {
       auto ErrorLoc = generate(*Keyword, Loc);
       return new (Context) ErrorTypeRepr(ErrorLoc);
     }
