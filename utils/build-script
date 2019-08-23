@@ -1042,6 +1042,14 @@ def main_normal():
     if args.cmake is not None:
         toolchain.cmake = args.cmake
 
+    cmake = CMake(args=args, toolchain=toolchain)
+    # Check the CMake version is sufficient on Linux and build from source
+    # if not.
+    cmake_path = cmake.check_cmake_version(SWIFT_SOURCE_ROOT, SWIFT_BUILD_ROOT)
+    if cmake_path is not None:
+        toolchain.cmake = cmake_path
+        args.cmake = cmake_path
+
     # Preprocess the arguments to apply defaults.
     BuildScriptInvocation.apply_default_arguments(toolchain, args)
 
