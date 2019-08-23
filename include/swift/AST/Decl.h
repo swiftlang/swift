@@ -5158,6 +5158,7 @@ public:
 /// A function parameter declaration.
 class ParamDecl : public VarDecl {
   Identifier ArgumentName;
+  SourceLoc ParameterNameLoc;
   SourceLoc ArgumentNameLoc;
   SourceLoc SpecifierLoc;
 
@@ -5208,7 +5209,9 @@ public:
   /// The resulting source location will be valid if the argument name
   /// was specified separately from the parameter name.
   SourceLoc getArgumentNameLoc() const { return ArgumentNameLoc; }
-  
+
+  SourceLoc getParameterNameLoc() const { return ParameterNameLoc; }
+
   SourceLoc getSpecifierLoc() const { return SpecifierLoc; }
     
   bool isTypeLocImplicit() const { return Bits.ParamDecl.IsTypeLocImplicit; }
