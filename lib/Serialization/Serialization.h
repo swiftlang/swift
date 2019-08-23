@@ -193,11 +193,7 @@ class Serializer : public SerializerBase {
                        index_block::TYPE_OFFSETS>
   TypesToSerialize;
 
-  ASTBlockRecordKeeper<const DeclContext *, DeclContextID,
-                       index_block::DECL_CONTEXT_OFFSETS>
-  DeclContextsToSerialize;
-
-  ASTBlockRecordKeeper<const DeclContext *, DeclContextID,
+  ASTBlockRecordKeeper<const DeclContext *, LocalDeclContextID,
                        index_block::LOCAL_DECL_CONTEXT_OFFSETS>
   LocalDeclContextsToSerialize;
 
@@ -304,9 +300,6 @@ private:
 
   /// Writes the given decl.
   void writeDecl(const Decl *D);
-
-  /// Writes the given decl context.
-  void writeDeclContext(const DeclContext *DC);
 
   /// Write a DeclContext as a local DeclContext at the current offset.
   void writeLocalDeclContext(const DeclContext *DC);
@@ -436,7 +429,7 @@ public:
   /// Records the use of the given local DeclContext.
   ///
   /// The DeclContext will be scheduled for serialization if necessary.
-  DeclContextID addLocalDeclContextRef(const DeclContext *DC);
+  LocalDeclContextID addLocalDeclContextRef(const DeclContext *DC);
 
   /// Records the use of the given generic signature.
   ///
