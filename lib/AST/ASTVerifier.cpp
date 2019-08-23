@@ -3646,7 +3646,9 @@ public:
         if (D->isImplicit())
           return;
         // FIXME: This is not working well for decl parents.
-        return;
+        // But it must work when using lazy ASTScopes for IterableDeclContexts
+        if (!isa<IterableDeclContext>(D))
+          return;
       } else if (Stmt *S = Parent.getAsStmt()) {
         Enclosing = S->getSourceRange();
         if (S->isImplicit())

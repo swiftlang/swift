@@ -520,7 +520,8 @@ ParserResult<TypeRepr> Parser::parseDeclResultType(Diag<> MessageID) {
     auto diag = diagnose(Tok, diag::extra_rbracket);
     diag.fixItInsert(result.get()->getStartLoc(), getTokenText(tok::l_square));
     consumeToken();
-    return makeParserErrorResult(new (Context) ErrorTypeRepr(Tok.getLoc()));
+    return makeParserErrorResult(new (Context)
+                                     ErrorTypeRepr(getTypeErrorLoc()));
   } else if (!result.isParseError() && Tok.is(tok::colon)) {
     auto colonTok = consumeToken();
     auto secondType = parseType(diag::expected_dictionary_value_type);
@@ -534,9 +535,15 @@ ParserResult<TypeRepr> Parser::parseDeclResultType(Diag<> MessageID) {
         diag.fixItInsertAfter(secondType.get()->getEndLoc(), getTokenText(tok::r_square));
       }
     }
-    return makeParserErrorResult(new (Context) ErrorTypeRepr(Tok.getLoc()));
+    return makeParserErrorResult(new (Context)
+                                     ErrorTypeRepr(getTypeErrorLoc()));
   }
   return result;
+}
+
+SourceLoc Parser::getTypeErrorLoc() const {
+  // Use the same location as a missing close brace, etc.
+  return getErrorOrMissingLoc();
 }
 
 ParserStatus Parser::parseGenericArguments(SmallVectorImpl<TypeRepr *> &Args,
