@@ -405,11 +405,12 @@ configureGenericDesignatedInitOverride(ASTContext &ctx,
     builder.addGenericSignature(classDecl->getGenericSignature());
 
     // Add the generic parameters.
-    for (auto *newParam : newParams)
-      builder.addGenericParameter(newParam);
+    SmallVector<GenericTypeParamType *, 1> newParamTypes;
+    for (auto *newParam : newParams) {
+      newParamTypes.push_back(
+          newParam->getDeclaredInterfaceType()->castTo<GenericTypeParamType>());
+    }
 
-    auto source =
-      GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
     auto *superclassSig = superclassCtor->getGenericSignature();
 
     unsigned superclassDepth = 0;
@@ -437,16 +438,24 @@ configureGenericDesignatedInitOverride(ASTContext &ctx,
       return ProtocolConformanceRef(proto);
     };
 
+    SmallVector<Requirement, 2> requirements;
     for (auto reqt : superclassSig->getRequirements())
       if (auto substReqt = reqt.subst(substFn, lookupConformanceFn))
-        builder.addRequirement(*substReqt, source, nullptr);
+        requirements.push_back(*substReqt);
 
     // Now form the substitution map that will be used to remap parameter
     // types.
     subMap = SubstitutionMap::get(superclassSig,
                                   substFn, lookupConformanceFn);
 
-    auto *genericSig = std::move(builder).computeGenericSignature(SourceLoc());
+    auto *genericSig = evaluateOrDefault(
+        ctx.evaluator,
+        AbstractGenericSignatureRequest{
+          classDecl->getGenericSignature(),
+          std::move(newParamTypes),
+          std::move(requirements)
+        },
+        nullptr);
     genericEnv = genericSig->createGenericEnvironment();
   } else {
     genericEnv = classDecl->getGenericEnvironment();
