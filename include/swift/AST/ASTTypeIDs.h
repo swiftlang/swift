@@ -31,6 +31,7 @@ class VarDecl;
 class TypeAliasDecl;
 class Type;
 struct TypePair;
+enum class AncestryFlags : uint8_t;
 
 #define SWIFT_AST_TYPEID_ZONE 1
 
