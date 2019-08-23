@@ -2834,18 +2834,6 @@ bool MissingMemberFailure::diagnoseAsError() {
   if (!anchor || !baseExpr)
     return false;
 
-  if (auto *typeVar = getBaseType()->getAs<TypeVariableType>()) {
-    auto &CS = getConstraintSystem();
-    auto *memberLoc = typeVar->getImpl().getLocator();
-    // Don't try to diagnose anything besides first missing
-    // member in the chain. e.g. `x.foo().bar()` let's make
-    // sure to diagnose only `foo()` as missing because we
-    // don't really know much about what `bar()` is supposed
-    // to be.
-    if (CS.MissingMembers.count(memberLoc))
-      return false;
-  }
-
   auto baseType = resolveType(getBaseType())->getWithoutSpecifierType();
 
   DeclNameLoc nameLoc(anchor->getStartLoc());

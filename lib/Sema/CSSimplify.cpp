@@ -2177,6 +2177,9 @@ static ConstraintFix *fixPropertyWrapperFailure(
     if (!decl->hasValidSignature() || !type)
       return nullptr;
 
+    if (baseTy->isEqual(type))
+      return nullptr;
+
     if (!attemptFix(resolvedOverload, decl, type))
       return nullptr;
 
@@ -5143,12 +5146,33 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
   // If the lookup found no hits at all (either viable or unviable), diagnose it
   // as such and try to recover in various ways.
   if (shouldAttemptFixes()) {
-    // Let's record missing member in constraint system, this helps to prevent
-    // stacking up fixes for the same member, because e.g. if its base was of
-    // optional type, we'd re-introduce member constraint with optional stripped
-    // off to see if the problem is related to base not being explicitly unwrapped.
-    if (!MissingMembers.insert(locator))
-      return SolutionKind::Error;
+    auto fixMissingMember = [&](Type baseTy, Type memberTy,
+                                ConstraintLocator *locator) -> SolutionKind {
+      // Let's check whether there are any generic parameters
+      // associated with base type, we'd have to default them
+      // to `Any` and record as potential holes if so.
+      baseTy.transform([&](Type type) -> Type {
+        if (auto *typeVar = type->getAs<TypeVariableType>()) {
+          if (typeVar->getImpl().hasRepresentativeOrFixed())
+            return type;
+          recordHole(typeVar);
+        }
+        return type;
+      });
+
+      auto *fix =
+          DefineMemberBasedOnUse::create(*this, baseTy, member, locator);
+      if (recordFix(fix))
+        return SolutionKind::Error;
+
+      // Allow member type to default to `Any` to make it possible to form
+      // solutions when contextual type of the result cannot be deduced e.g.
+      // `let _ = x.foo`.
+      if (auto *memberTypeVar = memberTy->getAs<TypeVariableType>())
+        recordHole(memberTypeVar);
+
+      return SolutionKind::Solved;
+    };
 
     if (baseObjTy->getOptionalObjectType()) {
       // If the base type was an optional, look through it.
@@ -5169,6 +5193,18 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
           resolvedOverload = resolvedOverload->Previous;
         }
       }
+
+      // Let's check whether the problem is related to optionality of base
+      // type, or there is no member with a given name.
+      result =
+          performMemberLookup(kind, member, baseObjTy->getOptionalObjectType(),
+                              functionRefKind, locator,
+                              /*includeInaccessibleMembers*/ true);
+
+      // If uwrapped type still couldn't find anything for a given name,
+      // let's fallback to a "not such member" fix.
+      if (result.ViableCandidates.empty() && result.UnviableCandidates.empty())
+        return fixMissingMember(origBaseTy, memberTy, locator);
 
       // The result of the member access can either be the expected member type
       // (for '!' or optional members with '?'), or the original member type
@@ -5197,16 +5233,18 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
       return SolutionKind::Solved;
     }
 
-    auto solveWithNewBaseOrName = [&](Type baseType, DeclName memberName,
-                                      bool allowFixes = true) -> SolutionKind {
-      // Let's re-enable fixes for this member, because
-      // the base or member name has been changed.
-      if (allowFixes)
-        MissingMembers.remove(locator);
+    auto solveWithNewBaseOrName = [&](Type baseType,
+                                      DeclName memberName) -> SolutionKind {
       return simplifyMemberConstraint(kind, baseType, memberName, memberTy,
                                       useDC, functionRefKind, outerAlternatives,
-                                      flags, locatorB);
+                                      flags | TMF_ApplyingFix, locatorB);
     };
+
+    // If this member reference is a result of a previous fix, let's not allow
+    // any more fixes expect when base is optional, because it could also be
+    // an IUO which requires a separate fix.
+    if (flags.contains(TMF_ApplyingFix))
+      return SolutionKind::Error;
 
     // Check if any property wrappers on the base of the member lookup have
     // matching members that we can fall back to, or if the type wraps any
@@ -5215,8 +5253,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
             *this, baseTy, locator,
             [&](ResolvedOverloadSetListItem *overload, VarDecl *decl,
                 Type newBase) {
-              return solveWithNewBaseOrName(newBase, member,
-                                            /*allowFixes=*/false) ==
+              return solveWithNewBaseOrName(newBase, member) ==
                      SolutionKind::Solved;
             })) {
       return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
@@ -5283,38 +5320,20 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
     // fake its presence based on use, that makes it possible to diagnose
     // problems related to member lookup more precisely.
 
-    auto defaultTypeVariableToAny = [&](TypeVariableType *typeVar) {
-      // Recording this generic parameter is a potential "hole" in
-      // the constraint system.
-      recordHole(typeVar);
-      // Default all of the generic parameters found in base to `Any`.
-      addConstraint(ConstraintKind::Defaultable, typeVar,
-                    getASTContext().TheAnyType,
-                    typeVar->getImpl().getLocator());
-    };
-
-    origBaseTy.transform([&](Type type) -> Type {
-      if (auto *typeVar = type->getAs<TypeVariableType>()) {
-        if (typeVar->getImpl().hasRepresentativeOrFixed())
-          return type;
-
-        defaultTypeVariableToAny(typeVar);
+    // If base type is a "hole" there is no reason to record any
+    // more "member not found" fixes for chained member references.
+    if (auto *baseType = origBaseTy->getMetatypeInstanceType()
+                             ->getRValueType()
+                             ->getAs<TypeVariableType>()) {
+      if (isHole(baseType)) {
+        increaseScore(SK_Fix);
+        if (auto *memberTypeVar = memberTy->getAs<TypeVariableType>())
+          recordHole(memberTypeVar);
+        return SolutionKind::Solved;
       }
-      return type;
-    });
+    }
 
-    auto *fix =
-        DefineMemberBasedOnUse::create(*this, origBaseTy, member, locator);
-    if (recordFix(fix))
-      return SolutionKind::Error;
-
-    // Allow member type to default to `Any` to make it possible to form
-    // solutions when contextual type of the result cannot be deduced e.g.
-    // `let _ = x.foo`.
-    if (auto *memberTypeVar = memberTy->getAs<TypeVariableType>())
-      defaultTypeVariableToAny(memberTypeVar);
-
-    return SolutionKind::Solved;
+    return fixMissingMember(origBaseTy, memberTy, locator);
   }
   return SolutionKind::Error;
 }
@@ -6260,9 +6279,9 @@ ConstraintSystem::simplifyApplicableFnConstraint(
   // Let's check if this member couldn't be found and is fixed
   // to exist based on its usage.
   if (auto *memberTy = type2->getAs<TypeVariableType>()) {
-    auto *locator = memberTy->getImpl().getLocator();
-    if (MissingMembers.count(locator)) {
+    if (isHole(memberTy)) {
       auto *funcTy = type1->castTo<FunctionType>();
+      auto *locator = memberTy->getImpl().getLocator();
       // Bind type variable associated with member to a type of argument
       // application, which makes it seem like member exists with the
       // types of the parameters matching argument types exactly.
@@ -6270,8 +6289,9 @@ ConstraintSystem::simplifyApplicableFnConstraint(
       // There might be no contextual type for result of the application,
       // in cases like `let _ = x.foo()`, so let's default result to `Any`
       // to make expressions like that type-check.
-      addConstraint(ConstraintKind::Defaultable, funcTy->getResult(),
-                    getASTContext().TheAnyType, locator);
+      auto resultTy = funcTy->getResult();
+      if (auto *typeVar = resultTy->getAs<TypeVariableType>())
+        recordHole(typeVar);
       return SolutionKind::Solved;
     }
   }
@@ -7172,6 +7192,15 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix) {
       Fixes.push_back(fix);
   }
   return false;
+}
+
+void ConstraintSystem::recordHole(TypeVariableType *typeVar) {
+  assert(typeVar);
+  auto *locator = typeVar->getImpl().getLocator();
+  if (Holes.insert(locator)) {
+    addConstraint(ConstraintKind::Defaultable, typeVar,
+                  getASTContext().TheAnyType, locator);
+  }
 }
 
 ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
