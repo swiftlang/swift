@@ -108,6 +108,11 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
     h.log(##"The interpolated value is \##(x)"##)
     h.log(#"Sparkling heart should appear in the next line. \#n \#u{1F496}"#)
   }
+
+  OSLogTestSuite.test("integer types") {
+    let h = Logger()
+    h.log("Smallest 32-bit integer value: \(Int32.min, format: .hex)")
+  }
 }
 
 // The following tests check the correctness of the format string and the
@@ -204,14 +209,14 @@ internal struct OSLogBufferChecker {
 
   /// Check whether the bytes starting from `startIndex` contain the encoding
   /// for an Int.
-  internal func checkInt(
+  internal func checkInt<T>(
     startIndex: Int,
     flag: ArgumentFlag,
-    expectedInt: Int
-  ) {
+    expectedInt: T
+  ) where T : FixedWidthInteger {
     checkArgument(
       startIndex: startIndex,
-      size: UInt8(MemoryLayout<Int>.size),
+      size: UInt8(MemoryLayout<T>.size),
       flag: flag,
       type: .scalar,
       expectedData: expectedInt)
@@ -426,4 +431,24 @@ InterpolationTestSuite.test("string interpolations with percents") {
         hasPrivate: false,
         hasNonScalar: false)
   })
+}
+
+InterpolationTestSuite.test("integer types") {
+  _checkFormatStringAndBuffer("Int32 max: \(Int32.max)") {
+    (formatString, buffer) in
+    expectEqual("Int32 max: %{public}d", formatString)
+
+    let bufferChecker = OSLogBufferChecker(buffer)
+    bufferChecker.checkSummaryBytes(
+      argumentCount: 1,
+      hasPrivate: false,
+      hasNonScalar: false)
+
+    bufferChecker.checkArguments({
+      bufferChecker.checkInt(
+        startIndex: $0,
+        flag: .publicFlag,
+        expectedInt: Int32.max)
+    })
+  }
 }
