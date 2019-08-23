@@ -1141,11 +1141,11 @@ class FunctionSignaturePartialSpecializer {
   ModuleDecl *SM;
   ASTContext &Ctx;
 
-  /// This is a builder for a new partially specialized generic signature.
-  GenericSignatureBuilder Builder;
-
   /// Set of newly created generic type parameters.
-  SmallVector<GenericTypeParamType*, 4> AllGenericParams;
+  SmallVector<GenericTypeParamType*, 2> AllGenericParams;
+
+  /// Set of newly created requirements.
+  SmallVector<Requirement, 2> AllRequirements;
 
   /// Archetypes used in the substitutions of an apply instructions.
   /// These are the contextual archetypes of the caller function, which
@@ -1192,8 +1192,7 @@ public:
                                       SubstitutionMap ParamSubs)
       : CallerGenericSig(CallerGenericSig), CallerGenericEnv(CallerGenericEnv),
         CalleeGenericSig(CalleeGenericSig), CalleeGenericEnv(CalleeGenericEnv),
-        M(M), SM(M.getSwiftModule()), Ctx(M.getASTContext()),
-        Builder(Ctx) {
+        M(M), SM(M.getSwiftModule()), Ctx(M.getASTContext()) {
     SpecializedGenericSig = nullptr;
     SpecializedGenericEnv = nullptr;
     CalleeInterfaceToCallerArchetypeMap = ParamSubs;
@@ -1207,8 +1206,7 @@ public:
                                       ArrayRef<Requirement> Requirements)
       : CallerGenericSig(CalleeGenericSig), CallerGenericEnv(CalleeGenericEnv),
         CalleeGenericSig(CalleeGenericSig), CalleeGenericEnv(CalleeGenericEnv),
-        M(M), SM(M.getSwiftModule()), Ctx(M.getASTContext()),
-        Builder(Ctx) {
+        M(M), SM(M.getSwiftModule()), Ctx(M.getASTContext()) {
 
     // Create the new generic signature using provided requirements.
     std::tie(SpecializedGenericEnv, SpecializedGenericSig) =
@@ -1261,7 +1259,6 @@ GenericTypeParamType *
 FunctionSignaturePartialSpecializer::createGenericParam() {
   auto GP = GenericTypeParamType::get(0, GPIdx++, Ctx);
   AllGenericParams.push_back(GP);
-  Builder.addGenericParameter(GP);
   return GP;
 }
 
@@ -1390,8 +1387,6 @@ void FunctionSignaturePartialSpecializer::
 /// which requires a substitution.
 void FunctionSignaturePartialSpecializer::
     createGenericParamsForCalleeGenericParams() {
-  auto Source =
-      GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
   for (auto GP : CalleeGenericSig->getGenericParams()) {
     auto CanTy = GP->getCanonicalType();
     auto CanTyInContext =
@@ -1454,7 +1449,7 @@ void FunctionSignaturePartialSpecializer::
 
     Requirement Req(RequirementKind::SameType, SubstGenericParamCanTy,
                     SpecializedReplacementCallerInterfaceTy);
-    Builder.addRequirement(Req, Source, SM);
+    AllRequirements.push_back(Req);
 
     LLVM_DEBUG(llvm::dbgs() << "Added a requirement:\n"; Req.dump());
 
@@ -1494,13 +1489,10 @@ void FunctionSignaturePartialSpecializer::
 /// GenericSignatureBuilder. Re-map them using the provided SubstitutionMap.
 void FunctionSignaturePartialSpecializer::addRequirements(
     ArrayRef<Requirement> Reqs, SubstitutionMap &SubsMap) {
-  auto source =
-    GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
-
   for (auto &reqReq : Reqs) {
     LLVM_DEBUG(llvm::dbgs() << "\n\nRe-mapping the requirement:\n";
                reqReq.dump());
-    Builder.addRequirement(*reqReq.subst(SubsMap), source, SM);
+    AllRequirements.push_back(*reqReq.subst(SubsMap));
   }
 }
 
@@ -1538,11 +1530,11 @@ FunctionSignaturePartialSpecializer::
     return { nullptr, nullptr };
 
   // Finalize the archetype builder.
-  auto GenSig =
-      std::move(Builder).computeGenericSignature(
-                                      SourceLoc(),
-                                      /*allowConcreteGenericParams=*/true);
-  auto GenEnv = GenSig->createGenericEnvironment();
+  auto GenSig = evaluateOrDefault(
+      Ctx.evaluator,
+      AbstractGenericSignatureRequest{nullptr, AllGenericParams, AllRequirements},
+      nullptr);
+  auto GenEnv = GenSig ? GenSig->createGenericEnvironment() : nullptr;
   return { GenEnv, GenSig };
 }
 
