@@ -2899,6 +2899,27 @@ bool MissingMemberFailure::diagnoseAsError() {
       diagnostic.highlight(baseExpr->getSourceRange())
           .highlight(nameLoc.getSourceRange());
       correction->addFixits(diagnostic);
+    } else if (instanceTy->getAnyNominal() &&
+               getName().getBaseName() == DeclBaseName::createConstructor()) {
+      auto &cs = getConstraintSystem();
+
+      auto memberName = getName().getBaseName();
+      auto result = cs.performMemberLookup(
+          ConstraintKind::ValueMember, memberName, metatypeTy,
+          FunctionRefKind::DoubleApply, getLocator(),
+          /*includeInaccessibleMembers=*/true);
+
+      // If there are no `init` members at all produce a tailored
+      // diagnostic for that, otherwise fallback to generic
+      // "no such member" one.
+      if (result.ViableCandidates.empty() &&
+          result.UnviableCandidates.empty()) {
+        emitDiagnostic(anchor->getLoc(), diag::no_accessible_initializers,
+                       instanceTy)
+            .highlight(baseExpr->getSourceRange());
+      } else {
+        emitBasicError(baseType);
+      }
     } else {
       emitBasicError(baseType);
     }
