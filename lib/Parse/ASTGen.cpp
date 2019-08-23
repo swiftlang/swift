@@ -423,6 +423,9 @@ TypeRepr *ASTGen::generate(ImplicitlyUnwrappedOptionalTypeSyntax Type,
 TypeRepr *ASTGen::generate(UnknownTypeSyntax Type, SourceLoc &Loc) {
   auto ChildrenCount = Type.getNumChildren();
 
+  // Recover from C-style array type:
+  //   type '[' ']'
+  //   type '[' expr ']'
   if (ChildrenCount == 3 || ChildrenCount == 4) {
     auto Element = Type.getChild(0)->getAs<TypeSyntax>();
     auto LSquare = Type.getChild(1)->getAs<TokenSyntax>();
@@ -436,6 +439,8 @@ TypeRepr *ASTGen::generate(UnknownTypeSyntax Type, SourceLoc &Loc) {
     }
   }
 
+  // Recover from extra `[`:
+  //   type `[`
   if (ChildrenCount == 2) {
     auto Element = Type.getChild(0)->getAs<TypeSyntax>();
     auto LSquare = Type.getChild(1)->getAs<TokenSyntax>();
@@ -445,6 +450,8 @@ TypeRepr *ASTGen::generate(UnknownTypeSyntax Type, SourceLoc &Loc) {
     }
   }
 
+  // Recover from old-style protocol composition:
+  //   `protocol` `<` protocols `>`
   if (ChildrenCount >= 2) {
     auto Protocol = Type.getChild(0)->getAs<TokenSyntax>();
 
@@ -472,6 +479,7 @@ TypeRepr *ASTGen::generate(UnknownTypeSyntax Type, SourceLoc &Loc) {
     }
   }
 
+  // Create ErrorTypeRepr for keywords.
   if (ChildrenCount == 1) {
     auto Keyword = Type.getChild(0)->getAs<TokenSyntax>();
     if (Keyword && isTokenKeyword(Keyword->getTokenKind())) {
@@ -480,6 +488,7 @@ TypeRepr *ASTGen::generate(UnknownTypeSyntax Type, SourceLoc &Loc) {
     }
   }
 
+  // Create empty TupleTypeRepr for types starting with `(`.
   if (ChildrenCount >= 1) {
     auto LParen = Type.getChild(0)->getAs<TokenSyntax>();
     if (LParen && LParen->getTokenKind() == tok::l_paren) {
