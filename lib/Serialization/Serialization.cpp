@@ -1177,7 +1177,7 @@ void Serializer::writeGenericRequirements(ArrayRef<Requirement> requirements,
   }
 }
 
-void Serializer::writeGenericSignature(const GenericSignature *sig) {
+void Serializer::writeASTBlockEntity(const GenericSignature *sig) {
   using namespace decls_block;
 
   assert(sig != nullptr);
@@ -1257,7 +1257,7 @@ void Serializer::writeGenericEnvironment(const GenericEnvironment *env) {
                            DeclTypeAbbrCodes);
 }
 
-void Serializer::writeSubstitutionMap(const SubstitutionMap substitutions) {
+void Serializer::writeASTBlockEntity(const SubstitutionMap substitutions) {
   using namespace decls_block;
   assert(substitutions);
   assert(SubstitutionMapsToSerialize.hasRef(substitutions));
@@ -1277,7 +1277,7 @@ void Serializer::writeSubstitutionMap(const SubstitutionMap substitutions) {
   writeConformances(substitutions.getConformances(), DeclTypeAbbrCodes);
 }
 
-void Serializer::writeSILLayout(const SILLayout *layout) {
+void Serializer::writeASTBlockEntity(const SILLayout *layout) {
   using namespace decls_block;
   assert(SILLayoutsToSerialize.hasRef(layout));
 
@@ -1301,7 +1301,7 @@ void Serializer::writeSILLayout(const SILLayout *layout) {
                         data);
 }
 
-void Serializer::writeNormalConformance(
+void Serializer::writeASTBlockEntity(
     const NormalProtocolConformance *conformance) {
   using namespace decls_block;
 
@@ -1925,11 +1925,11 @@ void Serializer::writeAbstractClosureExpr(const DeclContext *parentContext,
                                         parentID.getOpaqueValue());
 }
 
-void Serializer::writeLocalDeclContext(const DeclContext *DC) {
+void Serializer::writeASTBlockEntity(const DeclContext *DC) {
   using namespace decls_block;
 
   assert(shouldSerializeAsLocalContext(DC) &&
-         "Can't serialize as local context");
+         "should be serialized as a Decl instead");
   assert(LocalDeclContextsToSerialize.hasRef(DC));
 
   switch (DC->getContextKind()) {
@@ -3577,7 +3577,7 @@ public:
   }
 };
 
-void Serializer::writeDecl(const Decl *D) {
+void Serializer::writeASTBlockEntity(const Decl *D) {
   using namespace decls_block;
 
   PrettyStackTraceDecl trace("serializing", D);
@@ -4103,7 +4103,7 @@ public:
   }
 };
 
-void Serializer::writeType(Type ty) {
+void Serializer::writeASTBlockEntity(Type ty) {
   using namespace decls_block;
   PrettyStackTraceType traceRAII(ty->getASTContext(), "serializing", ty);
   assert(TypesToSerialize.hasRef(ty));
@@ -4118,6 +4118,16 @@ void Serializer::writeType(Type ty) {
   };
 
   TypeSerializer(*this).visit(ty);
+}
+
+template <typename SpecificASTBlockRecordKeeper>
+bool Serializer::writeASTBlockEntitiesIfNeeded(
+    SpecificASTBlockRecordKeeper &entities) {
+  if (!entities.hasMoreToSerialize())
+    return false;
+  while (auto next = entities.popNext(Out.GetCurrentBitNo()))
+    writeASTBlockEntity(next.getValue());
+  return true;
 }
 
 void Serializer::writeAllDeclsAndTypes() {
@@ -4234,50 +4244,25 @@ void Serializer::writeAllDeclsAndTypes() {
     // until /all/ of the pending lists are empty.
     wroteSomething = false;
 
-    while (auto next = DeclsToSerialize.popNext(Out.GetCurrentBitNo())) {
-      writeDecl(next.getValue());
-      wroteSomething = true;
-    }
+    wroteSomething |= writeASTBlockEntitiesIfNeeded(DeclsToSerialize);
+    wroteSomething |= writeASTBlockEntitiesIfNeeded(TypesToSerialize);
+    wroteSomething |=
+        writeASTBlockEntitiesIfNeeded(LocalDeclContextsToSerialize);
+    wroteSomething |=
+        writeASTBlockEntitiesIfNeeded(GenericSignaturesToSerialize);
+    wroteSomething |=
+        writeASTBlockEntitiesIfNeeded(SubstitutionMapsToSerialize);
+    wroteSomething |=
+        writeASTBlockEntitiesIfNeeded(NormalConformancesToSerialize);
+    wroteSomething |= writeASTBlockEntitiesIfNeeded(SILLayoutsToSerialize);
 
-    while (auto next = TypesToSerialize.popNext(Out.GetCurrentBitNo())) {
-      writeType(next.getValue());
-      wroteSomething = true;
-    }
-
-    while (auto next =
-            LocalDeclContextsToSerialize.popNext(Out.GetCurrentBitNo())) {
-      writeLocalDeclContext(next.getValue());
-      wroteSomething = true;
-    }
-
-    while (auto next =
-            GenericSignaturesToSerialize.popNext(Out.GetCurrentBitNo())) {
-      writeGenericSignature(next.getValue());
-      wroteSomething = true;
-    }
-
+    // Generic environments are recorded in a funny way; see
+    // writeNextGenericEnvironment() for why they can't just use the same logic
+    // as everything else.
     while (GenericEnvironmentsToSerialize.hasMoreToSerialize()) {
       writeNextGenericEnvironment();
       wroteSomething = true;
     }
-
-    while (auto next =
-            SubstitutionMapsToSerialize.popNext(Out.GetCurrentBitNo())) {
-      writeSubstitutionMap(next.getValue());
-      wroteSomething = true;
-    }
-
-    while (auto next =
-            NormalConformancesToSerialize.popNext(Out.GetCurrentBitNo())) {
-      writeNormalConformance(next.getValue());
-      wroteSomething = true;
-    }
-
-    while (auto next = SILLayoutsToSerialize.popNext(Out.GetCurrentBitNo())) {
-      writeSILLayout(next.getValue());
-      wroteSomething = true;
-    }
-
   } while (wroteSomething);
 }
 
