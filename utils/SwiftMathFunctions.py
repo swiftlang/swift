@@ -18,7 +18,7 @@ class SwiftMathFunction(object):
         return self.swiftName + "(" + self.params("_ ", ": " + type) + \
             ") -> " + type
 
-    def freeDecl(self, constraint):
+    def free_decl(self, constraint="T: ElementaryFunctions"):
         return self.swiftName + "<T>(" + self.params("_ ", ": T") + \
             ") -> T where " + constraint
 
