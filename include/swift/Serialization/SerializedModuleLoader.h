@@ -251,10 +251,6 @@ class SerializedASTFile final : public LoadedFile {
 
   ModuleFile &File;
 
-  /// The parseable interface this module was generated from if any.
-  /// Used for debug info.
-  std::string ParseableInterface;
-
   bool IsSIB;
 
   ~SerializedASTFile() = default;
@@ -351,13 +347,6 @@ public:
 
   virtual const clang::Module *getUnderlyingClangModule() const override;
 
-  /// If this is a module imported from a parseable interface, return the path
-  /// to the interface file, otherwise an empty StringRef.
-  virtual StringRef getParseableInterface() const override {
-    return ParseableInterface;
-  }
-  void setParseableInterface(StringRef PI) { ParseableInterface = PI; }
-  
   virtual bool getAllGenericSignatures(
                    SmallVectorImpl<GenericSignature*> &genericSignatures)
                 override;

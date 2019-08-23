@@ -78,6 +78,11 @@ class ModuleFile
   /// The target the module was built for.
   StringRef TargetTriple;
 
+  /// The name of the module interface this module was compiled from.
+  ///
+  /// Empty if this module didn't come from an interface file.
+  StringRef ModuleInterfacePath;
+
   /// The Swift compatibility version in use when this module was built.
   version::Version CompatibilityVersion;
 
@@ -762,6 +767,8 @@ public:
   void getDisplayDecls(SmallVectorImpl<Decl*> &results);
 
   StringRef getModuleFilename() const {
+    if (!ModuleInterfacePath.empty())
+      return ModuleInterfacePath;
     // FIXME: This seems fragile, maybe store the filename separately ?
     return ModuleInputBuffer->getBufferIdentifier();
   }

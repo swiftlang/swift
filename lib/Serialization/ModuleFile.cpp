@@ -1352,8 +1352,7 @@ ModuleFile::ModuleFile(
           break;
         }
         case input_block::PARSEABLE_INTERFACE_PATH: {
-          if (extInfo)
-            extInfo->setParseableInterface(blobData);
+          ModuleInterfacePath = blobData;
           break;
         }
         default:
