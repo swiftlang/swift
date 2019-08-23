@@ -2227,6 +2227,20 @@ VarDecl * TapExpr::getVar() const {
   return dyn_cast<VarDecl>(Body->getElement(0).dyn_cast<Decl *>());
 }
 
+SourceLoc TapExpr::getEndLoc() const {
+  // Include the body in the range, assuming the body follows the SubExpr.
+  // Also, be (perhaps overly) defensive about null pointers & invalid
+  // locations.
+  if (auto *const b = getBody()) {
+    const auto be = b->getEndLoc();
+    if (be.isValid())
+      return be;
+  }
+  if (auto *const se = getSubExpr())
+    return se->getEndLoc();
+  return SourceLoc();
+}
+
 // See swift/Basic/Statistic.h for declaration: this enables tracing Exprs, is
 // defined here to avoid too much layering violation / circular linkage
 // dependency.
