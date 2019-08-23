@@ -13,7 +13,13 @@
 // Make sure we use an intrinsic for functions such as exp.
 
 // CHECK-LABEL: define {{.*}}test1
-// CHECK: call float @llvm.exp.f32
+// CHECK-ios: call float @llvm.exp.f32
+// CHECK-macosx: call float @llvm.exp.f32
+// CHECK-tvos: call float @llvm.exp.f32
+// CHECK-watchos: call float @llvm.exp.f32
+// CHECK-darwin: call float @llvm.exp.f32
+// CHECK-linux-gnu: call float @expf
+// CHECK-windows: call float @expf
 
 public func test1(f : Float) -> Float {
   return exp(f)
@@ -23,7 +29,7 @@ public func test1(f : Float) -> Float {
 // CHECK: call double @llvm.exp.f64
 
 public func test2(f : Double) -> Double {
-  return .exp(f)
+  return _exp(f)
 }
 
 // CHECK-LABEL: define {{.*}}test3
