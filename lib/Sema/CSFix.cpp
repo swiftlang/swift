@@ -772,3 +772,14 @@ AllowInOutConversion *AllowInOutConversion::create(ConstraintSystem &cs,
   return new (cs.getAllocator())
       AllowInOutConversion(cs, argType, paramType, locator);
 }
+
+bool AllowArgumentMismatch::diagnose(Expr *root, bool asNote) const {
+  return false;
+}
+
+AllowArgumentMismatch *
+AllowArgumentMismatch::create(ConstraintSystem &cs, Type argType,
+                              Type paramType, ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowArgumentMismatch(cs, argType, paramType, locator);
+}

@@ -2552,6 +2552,13 @@ bool ConstraintSystem::repairFailures(
       }
     }
 
+    // If parameter type is `Any` the problem might be related to
+    // invalid escapiness of the argument.
+    if (rhs->isAny())
+      break;
+
+    conversionsOrFixes.push_back(AllowArgumentMismatch::create(
+        *this, lhs, rhs, getConstraintLocator(locator)));
     break;
   }
 

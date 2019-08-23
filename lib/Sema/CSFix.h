@@ -1308,6 +1308,23 @@ public:
                                       ConstraintLocator *locator);
 };
 
+class AllowArgumentMismatch : public ContextualMismatch {
+  AllowArgumentMismatch(ConstraintSystem &cs, Type argType, Type paramType,
+                        ConstraintLocator *locator)
+      : ContextualMismatch(cs, argType, paramType, locator) {}
+
+public:
+  std::string getName() const override {
+    return "allow argument to parameter type conversion mismatch";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static AllowArgumentMismatch *create(ConstraintSystem &cs, Type argType,
+                                       Type paramType,
+                                       ConstraintLocator *locator);
+};
+
 } // end namespace constraints
 } // end namespace swift
 
