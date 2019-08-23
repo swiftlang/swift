@@ -2249,7 +2249,7 @@ TypeAliasType *TypeAliasType::get(TypeAliasDecl *typealias, Type parent,
     return result;
 
   // Build a new type.
-  auto *genericSig = typealias->getGenericSignature();
+  auto *genericSig = substitutions.getGenericSignature();
   auto size = totalSizeToAlloc<Type, SubstitutionMap>(parent ? 1 : 0,
                                                       genericSig ? 1 : 0);
   auto mem = ctx.Allocate(size, alignof(TypeAliasType), arena);
