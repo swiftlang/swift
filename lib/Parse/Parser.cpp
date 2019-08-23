@@ -596,7 +596,7 @@ ParsedTokenSyntax Parser::consumeTokenSyntax() {
   return ParsedToken;
 }
 
-SourceLoc Parser::getEndOfPreviousLoc() {
+SourceLoc Parser::getEndOfPreviousLoc() const {
   return Lexer::getLocForEndOfToken(SourceMgr, PreviousLoc);
 }
 
@@ -968,8 +968,6 @@ bool Parser::parseToken(tok K, SourceLoc &TokLoc, const Diagnostic &D) {
   return true;
 }
 
-/// Parse the specified expected token and return its location on success.  On failure, emit the specified
-/// error diagnostic,  a note at the specified note location, and return the location of the previous token.
 bool Parser::parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
                                 SourceLoc OtherLoc) {
   Diag<> OtherNote;
@@ -982,11 +980,32 @@ bool Parser::parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
   if (parseToken(K, TokLoc, ErrorDiag)) {
     diagnose(OtherLoc, OtherNote);
 
-    TokLoc = PreviousLoc;
+    TokLoc = getLocForMissingMatchingToken();
     return true;
   }
 
   return false;
+}
+
+SourceLoc Parser::getLocForMissingMatchingToken() const {
+  // At present, use the same location whether it's an error or whether
+  // the matching token is missing.
+  // Both cases supply a location for something the user didn't type.
+  return getErrorOrMissingLoc();
+}
+
+SourceLoc Parser::getErrorOrMissingLoc() const {
+  // The next token might start a new enclosing construct,
+  // and SourceLoc's are always at the start of a token (for example, for
+  // fixits, so use the previous token's SourceLoc and allow a subnode to end
+  // right at the same place as its supernode.
+
+  // The tricky case is when the previous token is an InterpolatedStringLiteral.
+  // Then, there will be names in scope whose SourceLoc is *after* the
+  // the location of a missing close brace.
+  // ASTScope tree creation will have to cope.
+
+  return PreviousLoc;
 }
 
 static SyntaxKind getListElementKind(SyntaxKind ListKind) {
@@ -1094,7 +1113,8 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
 
   if (Status.isError()) {
     // If we've already got errors, don't emit missing RightK diagnostics.
-    RightLoc = Tok.is(RightK) ? consumeToken() : PreviousLoc;
+    RightLoc =
+        Tok.is(RightK) ? consumeToken() : getLocForMissingMatchingToken();
   } else if (parseMatchingToken(RightK, RightLoc, ErrorDiag, LeftLoc)) {
     Status.setIsParseError();
   }
