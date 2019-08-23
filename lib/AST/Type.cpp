@@ -18,7 +18,6 @@
 #include "ForeignRepresentationInfo.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ExistentialLayout.h"
-#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/ReferenceCounting.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeVisitor.h"

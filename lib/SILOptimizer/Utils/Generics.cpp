@@ -14,7 +14,6 @@
 
 #include "swift/SILOptimizer/Utils/Generics.h"
 #include "swift/AST/GenericEnvironment.h"
-#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/TypeMatcher.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSIL.h"
@@ -1485,8 +1484,8 @@ void FunctionSignaturePartialSpecializer::
   }
 }
 
-/// Add requirements from a given list of requirements to the
-/// GenericSignatureBuilder. Re-map them using the provided SubstitutionMap.
+/// Add requirements from a given list of requirements re-mapping them using
+/// the provided SubstitutionMap.
 void FunctionSignaturePartialSpecializer::addRequirements(
     ArrayRef<Requirement> Reqs, SubstitutionMap &SubsMap) {
   for (auto &reqReq : Reqs) {

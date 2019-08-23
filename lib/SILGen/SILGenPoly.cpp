@@ -85,7 +85,6 @@
 #include "SILGen.h"
 #include "SILGenFunction.h"
 #include "Scope.h"
-#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -2908,8 +2907,6 @@ buildThunkSignature(SILGenFunction &SGF,
     contextSubs = interfaceSubs;
     return genericSig;
   }
-
-  GenericSignatureBuilder builder(ctx);
 
   // Add the existing generic signature.
   int depth = 0;

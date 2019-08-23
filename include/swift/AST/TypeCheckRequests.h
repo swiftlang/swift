@@ -30,6 +30,8 @@
 namespace swift {
 
 class AbstractStorageDecl;
+class AccessorDecl;
+enum class AccessorKind;
 class GenericParamList;
 struct PropertyWrapperBackingPropertyInfo;
 struct PropertyWrapperMutability;
@@ -38,8 +40,8 @@ class SpecializeAttr;
 class TypeAliasDecl;
 struct TypeLoc;
 class ValueDecl;
-class AbstractStorageDecl;
 enum class OpaqueReadOwnership: uint8_t;
+class StorageImplInfo;
 
 /// Display a nominal type or extension thereof.
 void simple_display(

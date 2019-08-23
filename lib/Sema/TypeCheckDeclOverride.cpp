@@ -23,7 +23,6 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
-#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeCheckRequests.h"

@@ -17,7 +17,6 @@
 #define DEBUG_TYPE "sil-existential-transform"
 #include "ExistentialTransform.h"
 #include "swift/AST/GenericEnvironment.h"
-#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/SIL/OptimizationRemark.h"
 #include "swift/SIL/SILFunction.h"
@@ -311,17 +310,11 @@ ExistentialTransform::createExistentialSpecializedFunctionType() {
   GenericSignature *NewGenericSig;
   GenericEnvironment *NewGenericEnv;
 
-  // Form a new generic signature based on the old one.
-  GenericSignatureBuilder Builder(Ctx);
-
   /// If the original function is generic, then maintain the same.
   auto OrigGenericSig = FTy->getGenericSignature();
 
   SmallVector<GenericTypeParamType *, 2> GenericParams;
   SmallVector<Requirement, 2> Requirements;
-
-  /// First, add the old generic signature.
-  Builder.addGenericSignature(OrigGenericSig);
 
   /// Convert existential argument types to generic argument types.
   convertExistentialArgTypesToGenericArgTypes(GenericParams, Requirements);

@@ -25,7 +25,6 @@
 #include "swift/AST/Availability.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
-#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
@@ -401,8 +400,6 @@ configureGenericDesignatedInitOverride(ASTContext &ctx,
                                              SourceLoc());
 
     // Build a generic signature for the derived class initializer.
-    GenericSignatureBuilder builder(ctx);
-    builder.addGenericSignature(classDecl->getGenericSignature());
 
     // Add the generic parameters.
     SmallVector<GenericTypeParamType *, 1> newParamTypes;
