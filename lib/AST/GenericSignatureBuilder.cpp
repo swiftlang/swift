@@ -7556,11 +7556,25 @@ AbstractGenericSignatureRequest::evaluate(
   if (addedParameters.empty() && addedRequirements.empty())
     return baseSignature;
 
-  // Create a generic signature builder that will form the signature.
   ASTContext &ctx = addedParameters.empty()
       ? addedRequirements.front().getFirstType()->getASTContext()
       : addedParameters.front()->getASTContext();
 
+  // If there are no added requirements, we can form the signature directly
+  // with the added parameters.
+  if (addedRequirements.empty()) {
+    ArrayRef<Requirement> requirements;
+    if (baseSignature) {
+      addedParameters.insert(addedParameters.begin(),
+                             baseSignature->getGenericParams().begin(),
+                             baseSignature->getGenericParams().end());
+      requirements = baseSignature->getRequirements();
+    }
+
+    return GenericSignature::get(addedParameters, requirements);
+  }
+
+  // Create a generic signature that will form the signature.
   GenericSignatureBuilder builder(ctx);
   if (baseSignature)
     builder.addGenericSignature(baseSignature);
