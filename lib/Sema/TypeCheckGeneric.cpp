@@ -216,14 +216,11 @@ Type TypeChecker::getOrCreateOpaqueResultType(TypeResolution resolution,
   // Create a generic signature for the opaque environment. This is the outer
   // generic signature with an added generic parameter representing the opaque
   // type and its interface constraints.
-  GenericSignatureBuilder builder(Context);
-
   auto originatingDC = originatingDecl->getInnermostDeclContext();
   unsigned returnTypeDepth = 0;
   auto outerGenericSignature = originatingDC->getGenericSignatureOfContext();
   
   if (outerGenericSignature) {
-    builder.addGenericSignature(outerGenericSignature);
     returnTypeDepth =
                outerGenericSignature->getGenericParams().back()->getDepth() + 1;
   }
@@ -231,38 +228,37 @@ Type TypeChecker::getOrCreateOpaqueResultType(TypeResolution resolution,
   auto returnTypeParam = GenericTypeParamType::get(returnTypeDepth, 0,
                                                    Context);
 
-  builder.addGenericParameter(returnTypeParam);
+  SmallVector<GenericTypeParamType *, 2> genericParamTypes;
+  genericParamTypes.push_back(returnTypeParam);
 
+  SmallVector<Requirement, 2> requirements;
   if (constraintType->getClassOrBoundGenericClass()) {
-    builder.addRequirement(Requirement(RequirementKind::Superclass,
-                                       returnTypeParam, constraintType),
-             GenericSignatureBuilder::FloatingRequirementSource::forAbstract(),
-             originatingDC->getParentModule());
+    requirements.push_back(Requirement(RequirementKind::Superclass,
+                                       returnTypeParam, constraintType));
   } else {
     auto constraints = constraintType->getExistentialLayout();
     if (auto superclass = constraints.getSuperclass()) {
-      builder.addRequirement(Requirement(RequirementKind::Superclass,
-                                         returnTypeParam, superclass),
-             GenericSignatureBuilder::FloatingRequirementSource::forAbstract(),
-             originatingDC->getParentModule());
+      requirements.push_back(Requirement(RequirementKind::Superclass,
+                                         returnTypeParam, superclass));
     }
     for (auto protocol : constraints.getProtocols()) {
-      builder.addRequirement(Requirement(RequirementKind::Conformance,
-                                         returnTypeParam, protocol),
-             GenericSignatureBuilder::FloatingRequirementSource::forAbstract(),
-             originatingDC->getParentModule());
+      requirements.push_back(Requirement(RequirementKind::Conformance,
+                                         returnTypeParam, protocol));
     }
     if (auto layout = constraints.getLayoutConstraint()) {
-      builder.addRequirement(Requirement(RequirementKind::Layout,
-                                         returnTypeParam, layout),
-             GenericSignatureBuilder::FloatingRequirementSource::forAbstract(),
-             originatingDC->getParentModule());
+      requirements.push_back(Requirement(RequirementKind::Layout,
+                                         returnTypeParam, layout));
     }
   }
   
-  auto interfaceSignature = std::move(builder)
-                                          .computeGenericSignature(SourceLoc());
-  
+  auto interfaceSignature = evaluateOrDefault(
+      Context.evaluator,
+      AbstractGenericSignatureRequest{
+        outerGenericSignature,
+        std::move(genericParamTypes),
+        std::move(requirements)},
+      nullptr);
+
   // Create the OpaqueTypeDecl for the result type.
   // It has the same parent context and generic environment as the originating
   // decl.
