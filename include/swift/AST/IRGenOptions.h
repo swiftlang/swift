@@ -265,7 +265,7 @@ public:
        << 'd' << DisableLLVMOptzns
        << 'D' << DisableSwiftSpecificLLVMOptzns
        << 'p' << GenerateProfile
-       << 's' << Sanitizers.contains(SanitizerKind::Fuzzer);
+       << 's' << Sanitizers.toRaw();
   }
 
   /// Should LLVM IR value names be emitted and preserved?
