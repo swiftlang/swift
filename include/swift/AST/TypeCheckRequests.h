@@ -1052,6 +1052,27 @@ public:
   void cacheResult(bool value) const;
 };
 
+class ClassAncestryFlagsRequest :
+    public SimpleRequest<ClassAncestryFlagsRequest,
+                         AncestryFlags (ClassDecl *),
+                         CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<AncestryFlags>
+  evaluate(Evaluator &evaluator, ClassDecl *value) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
+void simple_display(llvm::raw_ostream &out, AncestryFlags value);
+
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
 template<>
