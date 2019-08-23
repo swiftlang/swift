@@ -2454,15 +2454,48 @@ for host in "${ALL_HOSTS[@]}"; do
                     LLDB_IS_BUILDBOT_BUILD=0
                 fi
 
-                # Get the build date
+                # Get the build date.
                 LLDB_BUILD_DATE=$(date +%Y-%m-%d)
 
-
+                # Pick the right cache.
                 if [[ "$(uname -s)" == "Darwin" ]] ; then
                   cmake_cache="Apple-lldb-macOS.cmake"
                 else
                   cmake_cache="Apple-lldb-Linux.cmake"
                 fi
+
+                # Watchpoint testing is currently disabled: see rdar://38566150.
+                LLDB_TEST_CATEGORIES="--skip-category=watchpoint"
+
+                # Skip DWO to speed up swift testing.
+                if [[ "$(true_false ${LLDB_TEST_SWIFT_ONLY})" == "TRUE" ]]; then
+                    LLDB_TEST_CATEGORIES="${LLDB_TEST_CATEGORIES} --skip-category=dwo"
+                fi
+
+                # Options to find the just-built libddispatch and Foundation.
+                if [[ "$(uname -s)" == "Darwin" || "${SKIP_BUILD_FOUNDATION}" ]] ; then
+                    DOTEST_EXTRA=""
+                else
+                    # This assumes that there are no spaces in any on these paths.
+                    LIBDISPATCH_BUILD_DIR="$(build_directory ${host} libdispatch)"
+                    FOUNDATION_BUILD_DIR=$(build_directory ${host} foundation)
+                    DOTEST_EXTRA="-I${FOUNDATION_BUILD_DIR}"
+                    DOTEST_EXTRA="${DOTEST_EXTRA} -Xcc -F${FOUNDATION_BUILD_DIR}"
+                    DOTEST_EXTRA="${DOTEST_EXTRA} -I${FOUNDATION_BUILD_DIR}/swift"
+                    DOTEST_EXTRA="${DOTEST_EXTRA} -I${LIBDISPATCH_SOURCE_DIR}"
+                    DOTEST_EXTRA="${DOTEST_EXTRA} -L${FOUNDATION_BUILD_DIR}"
+                    DOTEST_EXTRA="${DOTEST_EXTRA} -L${LIBDISPATCH_BUILD_DIR}"
+                    DOTEST_EXTRA="${DOTEST_EXTRA} -L${LIBDISPATCH_BUILD_DIR}/src"
+                    DOTEST_EXTRA="${DOTEST_EXTRA} -Xlinker -rpath -Xlinker ${LIBDISPATCH_BUILD_DIR}/src"
+                    DOTEST_EXTRA="${DOTEST_EXTRA} -Xlinker -rpath -Xlinker ${LIBDISPATCH_BUILD_DIR}"
+                    DOTEST_EXTRA="${DOTEST_EXTRA} -Xlinker -rpath -Xlinker ${FOUNDATION_BUILD_DIR}"
+                fi
+
+                # Construct dotest arguments.
+                DOTEST_ARGS="--build-dir ${lldb_build_dir}/lldb-test-build.noindex \
+                             ${LLDB_TEST_CATEGORIES} \
+                             -t \
+                             -E \"${DOTEST_EXTRA}\""
 
                 cmake_options=(
                     "${cmake_options[@]}"
@@ -2480,6 +2513,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DLLDB_BUILD_DATE:STRING="\"${LLDB_BUILD_DATE}\""
                     -DLLDB_ALLOW_STATIC_BINDINGS:BOOL=1
                     -DLLDB_INCLUDE_TESTS:BOOL=$(false_true ${BUILD_TOOLCHAIN_ONLY})
+                    -DLLDB_TEST_USER_ARGS="${DOTEST_ARGS}"
                 )
 
                 if [[ "$(uname -s)" == "Darwin" ]] ; then
@@ -2979,29 +3013,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 fi
                 llvm_build_dir=$(build_directory ${host} llvm)
                 lldb_build_dir=$(build_directory ${host} lldb)
-                swift_build_dir=$(build_directory ${host} swift)
-                module_cache="${build_dir}/module-cache"
-                lldb_executable="${lldb_build_dir}"/bin/lldb
                 results_dir="${lldb_build_dir}/test-results"
-
-                # Options to find the just-built libddispatch and Foundation.
-                if [[ "$(uname -s)" == "Darwin" || "${SKIP_BUILD_FOUNDATION}" ]] ; then
-                    DOTEST_EXTRA=""
-                else
-                    # This assumes that there are no spaces in any on these paths.
-                    LIBDISPATCH_BUILD_DIR="$(build_directory ${host} libdispatch)"
-                    FOUNDATION_BUILD_DIR=$(build_directory ${host} foundation)
-                    DOTEST_EXTRA="-I${FOUNDATION_BUILD_DIR}"
-                    DOTEST_EXTRA="${DOTEST_EXTRA} -Xcc -F${FOUNDATION_BUILD_DIR}"
-                    DOTEST_EXTRA="${DOTEST_EXTRA} -I${FOUNDATION_BUILD_DIR}/swift"
-                    DOTEST_EXTRA="${DOTEST_EXTRA} -I${LIBDISPATCH_SOURCE_DIR}"
-                    DOTEST_EXTRA="${DOTEST_EXTRA} -L${FOUNDATION_BUILD_DIR}"
-                    DOTEST_EXTRA="${DOTEST_EXTRA} -L${LIBDISPATCH_BUILD_DIR}"
-                    DOTEST_EXTRA="${DOTEST_EXTRA} -L${LIBDISPATCH_BUILD_DIR}/src"
-                    DOTEST_EXTRA="${DOTEST_EXTRA} -Xlinker -rpath -Xlinker ${LIBDISPATCH_BUILD_DIR}/src"
-                    DOTEST_EXTRA="${DOTEST_EXTRA} -Xlinker -rpath -Xlinker ${LIBDISPATCH_BUILD_DIR}"
-                    DOTEST_EXTRA="${DOTEST_EXTRA} -Xlinker -rpath -Xlinker ${FOUNDATION_BUILD_DIR}"
-                fi
 
                 call mkdir -p "${results_dir}"
                 LLVM_LIT_ARG="${LLVM_LIT_ARGS} --xunit-xml-output=${results_dir}/results.xml"
@@ -3011,16 +3023,9 @@ for host in "${ALL_HOSTS[@]}"; do
                     LLVM_LIT_ARGS="${LLVM_LIT_ARGS} -j $(sysctl hw.physicalcpu | awk -v N=${BUILD_JOBS} '{ print (N < $2) ? N : $2 }')"
                 fi
 
-                # Watchpoint testing is currently disabled: see rdar://38566150.
-                LLDB_TEST_CATEGORIES="--skip-category=watchpoint"
-
                 if [[ "$(true_false ${LLDB_TEST_SWIFT_ONLY})" == "TRUE" ]]; then
                     LLVM_LIT_ARGS="${LLVM_LIT_ARGS} --filter=[sS]wift"
-                    LLDB_TEST_CATEGORIES="${LLDB_TEST_CATEGORIES} --skip-category=dwo"
                 fi
-
-                # Construct dotest arguments.
-                DOTEST_ARGS="--build-dir ${lldb_build_dir}/lldb-test-build.noindex ${LLDB_TEST_SUBDIR_CLAUSE} ${LLDB_TEST_CATEGORIES} -t -E \"${DOTEST_EXTRA}\""
 
                 # Record the times test took and report the slowest.
                 LLVM_LIT_ARGS="${LLVM_LIT_ARGS} -v --time-tests"
@@ -3032,13 +3037,12 @@ for host in "${ALL_HOSTS[@]}"; do
                 with_pushd ${results_dir} \
                     call "${llvm_build_dir}/bin/llvm-lit" \
                          "${lldb_build_dir}/lit" \
-                         ${LLVM_LIT_ARGS} \
-                         --param dotest-args="${DOTEST_ARGS}"
+                         ${LLVM_LIT_ARGS}
 
                 if [[ -x "${LLDB_TEST_SWIFT_COMPATIBILITY}" ]] ; then
                     echo "Running LLDB swift compatibility tests against" \
                          "${LLDB_TEST_SWIFT_COMPATIBILITY}"
-                    DOTEST_ARGS="${DOTEST_ARGS} -G swift-history --swift-compiler \"${LLDB_TEST_SWIFT_COMPATIBILITY}\""
+                    DOTEST_ARGS="-G swift-history --swift-compiler \"${LLDB_TEST_SWIFT_COMPATIBILITY}\""
                     with_pushd ${results_dir} \
                        call "${llvm_build_dir}/bin/llvm-lit" \
                             "${lldb_build_dir}/lit" \
