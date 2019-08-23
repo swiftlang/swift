@@ -4447,3 +4447,25 @@ void InOutConversionFailure::fixItChangeArgumentType() const {
                  actualType, neededType)
       .fixItReplaceChars(startLoc, endLoc, scratch);
 }
+
+bool ArgumentMismatchFailure::diagnoseAsError() {
+  emitDiagnostic(getLoc(), diag::cannot_convert_argument_value, getFromType(),
+                 getToType());
+  return true;
+}
+
+bool ArgumentMismatchFailure::diagnoseAsNote() {
+  auto *locator = getLocator();
+  auto argToParam = locator->findFirst<LocatorPathElt::ApplyArgToParam>();
+  assert(argToParam);
+
+  if (auto overload = getChoiceFor(getRawAnchor())) {
+    if (auto *decl = overload->choice.getDeclOrNull()) {
+      emitDiagnostic(decl, diag::candidate_has_invalid_argument_at_position,
+                     getToType(), argToParam->getParamIdx());
+      return true;
+    }
+  }
+
+  return false;
+}

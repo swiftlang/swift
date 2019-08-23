@@ -774,7 +774,10 @@ AllowInOutConversion *AllowInOutConversion::create(ConstraintSystem &cs,
 }
 
 bool AllowArgumentMismatch::diagnose(Expr *root, bool asNote) const {
-  return false;
+  auto &cs = getConstraintSystem();
+  ArgumentMismatchFailure failure(root, cs, getFromType(), getToType(),
+                                  getLocator());
+  return failure.diagnose(asNote);
 }
 
 AllowArgumentMismatch *

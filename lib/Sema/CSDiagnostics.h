@@ -1599,6 +1599,26 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Diagnose a situation there is a mismatch between argument and parameter
+/// types e.g.:
+///
+/// ```swift
+/// func foo(_: String) {}
+/// func bar(_ v: Int) { foo(v) } // `Int` is not convertible to `String`
+/// ```
+class ArgumentMismatchFailure : public ContextualFailure {
+public:
+  ArgumentMismatchFailure(Expr *root, ConstraintSystem &cs, Type argType,
+                          Type paramType, ConstraintLocator *locator)
+      : ContextualFailure(root, cs, argType, paramType, locator) {}
+
+  bool diagnoseAsError() override;
+  bool diagnoseAsNote() override;
+
+protected:
+  SourceLoc getLoc() const { return getAnchor()->getLoc(); }
+};
+
 /// Provides information about the application of a function argument to a
 /// parameter.
 class FunctionArgApplyInfo {

@@ -379,6 +379,11 @@ ERROR(cannot_convert_default_arg_value_nil,none,
 ERROR(cannot_convert_argument_value,none,
       "cannot convert value of type %0 to expected argument type %1",
       (Type,Type))
+
+NOTE(candidate_has_invalid_argument_at_position,none,
+     "candidate expects value of type %0 at psoition #%1",
+     (Type, unsigned))
+
 ERROR(cannot_convert_argument_value_generic,none,
       "cannot convert value of type %0 (%1) to expected argument type %2 (%3)",
       (Type, StringRef, Type, StringRef))
