@@ -152,13 +152,13 @@ public:
 
   /// Retrieve the type witness for the given associated type.
   Type getTypeWitness(AssociatedTypeDecl *assocType,
-                      SubstOptions options=None) const;
+                      SubstOptions options = None) const;
 
   /// Retrieve the type witness and type decl (if one exists)
   /// for the given associated type.
   std::pair<Type, TypeDecl *>
   getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
-                        SubstOptions options=None) const;
+                        SubstOptions options = None) const;
 
   /// Apply the given function object to each type witness within this
   /// protocol conformance.
@@ -311,14 +311,13 @@ public:
 
   /// Substitute the conforming type and produce a ProtocolConformance that
   /// applies to the substituted type.
-  ProtocolConformance *subst(SubstitutionMap subMap,
-                             SubstOptions options=None) const;
+  ProtocolConformance *subst(SubstitutionMap subMap) const;
 
   /// Substitute the conforming type and produce a ProtocolConformance that
   /// applies to the substituted type.
   ProtocolConformance *subst(TypeSubstitutionFn subs,
                              LookupConformanceFn conformances,
-                             SubstOptions options=None) const;
+                             SubstOptions options = None) const;
 
   void dump() const;
   void dump(llvm::raw_ostream &out, unsigned indent = 0) const;
@@ -590,7 +589,7 @@ public:
   /// for the given associated type.
   std::pair<Type, TypeDecl *>
   getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
-                        SubstOptions options=None) const;
+                        SubstOptions options = None) const;
 
   /// Determine whether the protocol conformance has a type witness for the
   /// given associated type.
@@ -715,12 +714,12 @@ public:
 
   std::pair<Type, TypeDecl *>
   getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
-                        SubstOptions options=None) const {
+                        SubstOptions options) const {
     llvm_unreachable("self-conformances never have associated types");
   }
 
   Type getTypeWitness(AssociatedTypeDecl *assocType,
-                      SubstOptions options=None) const {
+                      SubstOptions options) const {
     llvm_unreachable("self-conformances never have associated types");
   }
 
@@ -861,7 +860,7 @@ public:
   /// for the given associated type.
   std::pair<Type, TypeDecl *>
   getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
-                        SubstOptions options=None) const;
+                        SubstOptions options = None) const;
 
   /// Given that the requirement signature of the protocol directly states
   /// that the given dependent type must conform to the given protocol,
@@ -973,7 +972,7 @@ public:
   /// for the given associated type.
   std::pair<Type, TypeDecl *>
   getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
-                        SubstOptions options=None) const {
+                        SubstOptions options = None) const {
     return InheritedConformance->getTypeWitnessAndDecl(assocType, options);
   }
 

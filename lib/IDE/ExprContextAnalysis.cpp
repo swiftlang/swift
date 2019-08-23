@@ -313,7 +313,7 @@ static void collectPossibleCalleesByQualifiedLookup(
     auto subs = baseTy->getMetatypeInstanceType()->getMemberSubstitutionMap(
         DC.getParentModule(), VD,
         VD->getInnermostDeclContext()->getGenericEnvironmentOfContext());
-    auto fnType = declaredMemberType.subst(subs);
+    auto fnType = declaredMemberType.subst(subs, SubstFlags::UseErrorType);
     if (!fnType)
       continue;
 

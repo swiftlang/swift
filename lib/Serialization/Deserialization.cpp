@@ -4537,7 +4537,9 @@ public:
     if (alias &&
         alias->getAttrs().isUnavailable(ctx) &&
         alias->isCompatibilityAlias()) {
-      return alias->getUnderlyingTypeLoc().getType().subst(subMap);
+      underlyingType = alias->getUnderlyingTypeLoc().getType().subst(subMap);
+      assert(underlyingType);
+      return underlyingType;
     }
 
     auto parentType = parentTypeOrError.get();

@@ -873,7 +873,9 @@ void SwiftLangSupport::printMemberDeclDescription(const swift::ValueDecl *VD,
     if (usePlaceholder)
       OS << "<#T##";
 
-    paramTy = paramTy.subst(substMap);
+    if (auto substitutedTy = paramTy.subst(substMap))
+      paramTy = substitutedTy;
+
     if (paramTy->hasError() && param->getTypeLoc().hasLocation()) {
       // Fallback to 'TypeRepr' printing.
       param->getTypeLoc().getTypeRepr()->print(OS);

@@ -672,7 +672,8 @@ class PrintAST : public ASTVisitor<PrintAST> {
           M, cast<ValueDecl>(Current));
       }
 
-      T = T.subst(subMap, SubstFlags::DesugarMemberTypes);
+      T = T.subst(subMap,
+                  SubstFlags::DesugarMemberTypes | SubstFlags::UseErrorType);
     }
 
     printTypeWithOptions(T, options);
@@ -1446,12 +1447,10 @@ void PrintAST::printSingleDepthOfGenericSignature(
         second = req.getSecondType();
 
       if (!subMap.empty()) {
-        Type subFirst = substParam(first);
-        if (!subFirst->hasError())
+        if (Type subFirst = substParam(first))
           first = subFirst;
         if (second) {
-          Type subSecond = substParam(second);
-          if (!subSecond->hasError())
+          if (Type subSecond = substParam(second))
             second = subSecond;
           if (!(first->is<ArchetypeType>() || first->isTypeParameter()) &&
               !(second->is<ArchetypeType>() || second->isTypeParameter()))

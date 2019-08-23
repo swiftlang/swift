@@ -355,7 +355,7 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
       // witness completely.
       if (!allUnresolved.count(result.first)) {
         auto existingWitness =
-          conformance->getTypeWitness(result.first);
+        conformance->getTypeWitness(result.first);
         existingWitness = dc->mapTypeIntoContext(existingWitness);
 
         // If the deduced type contains an irreducible
@@ -547,7 +547,8 @@ static Type getWitnessTypeForMatching(TypeChecker &tc,
 
   ModuleDecl *module = conformance->getDeclContext()->getParentModule();
   auto resultType = type.subst(QueryTypeSubstitutionMap{substitutions},
-                               LookUpConformanceInModule(module));
+                               LookUpConformanceInModule(module),
+                               SubstFlags::UseErrorType);
   if (!resultType->hasError()) return resultType;
 
   // Map error types with original types *back* to the original, dependent type.
@@ -866,7 +867,7 @@ Type AssociatedTypeInference::computeDefaultTypeWitness(
                           QueryTypeSubstitutionMap{substitutions},
                           LookUpConformanceInModule(dc->getParentModule()));
 
-  if (defaultType->hasError())
+  if (!defaultType)
     return Type();
 
   if (auto failed = checkTypeWitness(tc, dc, proto, assocType, defaultType)) {
@@ -961,9 +962,9 @@ Type AssociatedTypeInference::substCurrentTypeWitnesses(Type type) {
       SWIFT_DEFER { recursionCheck.erase(assocType); };
 
       // Try to substitute into the base type.
-      Type result = depMemTy->substBaseType(dc->getParentModule(), baseTy);
-      if (!result->hasError())
+      if (Type result = depMemTy->substBaseType(dc->getParentModule(), baseTy)){
         return result;
+      }
 
       // If that failed, check whether it's because of the conformance we're
       // evaluating.

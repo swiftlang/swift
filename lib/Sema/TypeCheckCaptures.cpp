@@ -229,8 +229,11 @@ public:
     if (!D->getDeclContext()->isLocalContext()) {
       if (!ObjC || !D->isObjC() || isa<ConstructorDecl>(D)) {
         if (auto subMap = DRE->getDeclRef().getSubstitutions()) {
-          for (auto type : subMap.getReplacementTypes()) {
-            checkType(type, DRE->getLoc());
+          auto genericSig = subMap.getGenericSignature();
+          for (auto gp : genericSig->getGenericParams()) {
+            if (auto type = Type(gp).subst(subMap)) {
+              checkType(type, DRE->getLoc());
+            }
           }
         }
       }

@@ -629,8 +629,10 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         return;
 
       auto subMap = DRE->getDeclRef().getSubstitutions();
-      auto fromTy = subMap.getReplacementTypes()[0];
-      auto toTy = subMap.getReplacementTypes()[1];
+      auto fromTy =
+        Type(GenericTypeParamType::get(0, 0, TC.Context)).subst(subMap);
+      auto toTy =
+        Type(GenericTypeParamType::get(0, 1, TC.Context)).subst(subMap);
 
       // Warn about `unsafeBitCast` formulations that are undefined behavior
       // or have better-defined alternative APIs that can be used instead.

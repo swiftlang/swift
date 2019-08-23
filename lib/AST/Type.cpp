@@ -1351,7 +1351,7 @@ SmallVector<Type, 2> TypeAliasType::getInnermostGenericArgs() const {
   result.reserve(numMyGenericParams);
   unsigned startIndex = numAllGenericParams - numMyGenericParams;
   for (auto gp : genericSig->getGenericParams().slice(startIndex)) {
-    result.push_back(Type(gp).subst(subMap));
+    result.push_back(Type(gp).subst(subMap, SubstFlags::UseErrorType));
   }
   return result;
 }
@@ -2953,8 +2953,9 @@ Type ProtocolCompositionType::get(const ASTContext &C,
 
 FunctionType *
 GenericFunctionType::substGenericArgs(SubstitutionMap subs) {
-  return substGenericArgs(
-    [=](Type t) { return t.subst(subs); });
+  auto substFn = Type(this).subst(subs)->castTo<AnyFunctionType>();
+  return FunctionType::get(substFn->getParams(),
+                           substFn->getResult(), getExtInfo());
 }
 
 FunctionType *GenericFunctionType::substGenericArgs(
@@ -2995,6 +2996,9 @@ static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
 
   // Produce a failed result.
   auto failed = [&]() -> Type {
+    if (!options.contains(SubstFlags::UseErrorType))
+      return Type();
+
     Type baseType = ErrorType::get(substBase ? substBase : origBase);
     if (assocType)
       return DependentMemberType::get(baseType, assocType);
@@ -3052,7 +3056,7 @@ static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
     // Retrieve the type witness.
     auto witness =
       conformance->getConcrete()->getTypeWitness(assocType, options);
-    if (!witness || witness->hasError())
+    if (!witness)
       return failed();
 
     // This is a hacky feature allowing code completion to migrate to
@@ -3298,11 +3302,17 @@ static Type substType(Type derivedType,
     }
 
     // If we failed to substitute a generic type parameter, give up.
-    if (isa<GenericTypeParamType>(substOrig))
-      return ErrorType::get(type);
+    if (isa<GenericTypeParamType>(substOrig)) {
+      if (options.contains(SubstFlags::UseErrorType))
+        return ErrorType::get(type);
+      return Type();
+    }
 
-    if (auto primaryArchetype = dyn_cast<PrimaryArchetypeType>(substOrig))
-      return ErrorType::get(type);
+    if (auto primaryArchetype = dyn_cast<PrimaryArchetypeType>(substOrig)) {
+      if (options.contains(SubstFlags::UseErrorType))
+        return ErrorType::get(type);
+      return Type();
+    }
 
     // Opened existentials cannot be substituted in this manner,
     // but if they appear in the original type this is not an
@@ -3349,7 +3359,8 @@ Type Type::substDependentTypesWithErrorTypes() const {
   return substType(*this,
                    [](SubstitutableType *t) -> Type { return Type(); },
                    MakeAbstractConformanceForGenericType(),
-                   SubstFlags::AllowLoweredTypes);
+                   (SubstFlags::AllowLoweredTypes |
+                    SubstFlags::UseErrorType));
 }
 
 const DependentMemberType *TypeBase::findUnresolvedDependentMemberType() {
@@ -3592,7 +3603,7 @@ Type TypeBase::getTypeOfMember(ModuleDecl *module, const ValueDecl *member,
 
   // Perform the substitution.
   auto substitutions = getMemberSubstitutionMap(module, member);
-  return memberType.subst(substitutions);
+  return memberType.subst(substitutions, SubstFlags::UseErrorType);
 }
 
 Type TypeBase::adjustSuperclassMemberDeclType(const ValueDecl *baseDecl,
@@ -3607,7 +3618,7 @@ Type TypeBase::adjustSuperclassMemberDeclType(const ValueDecl *baseDecl,
                                    genericMemberType->getExtInfo());
   }
 
-  auto type = memberType.subst(subs);
+  auto type = memberType.subst(subs, SubstFlags::UseErrorType);
   if (baseDecl->getDeclContext()->getSelfProtocolDecl())
     return type;
 
@@ -3975,19 +3986,25 @@ case TypeKind::Id:
     }
 
     auto subMap = alias->getSubstitutionMap();
-    for (Type oldReplacementType : subMap.getReplacementTypes()) {
-      if (oldReplacementType->hasTypeParameter() ||
-          oldReplacementType->hasArchetype())
-        return newUnderlyingType;
+    if (auto genericSig = subMap.getGenericSignature()) {
+      for (Type gp : genericSig->getGenericParams()) {
+        Type oldReplacementType = gp.subst(subMap);
+        if (!oldReplacementType)
+          return newUnderlyingType;
 
-      Type newReplacementType = oldReplacementType.transformRec(fn);
-      if (!newReplacementType)
-        return newUnderlyingType;
+        if (oldReplacementType->hasTypeParameter() ||
+            oldReplacementType->hasArchetype())
+          return newUnderlyingType;
 
-      // If anything changed with the replacement type, we lose the sugar.
-      // FIXME: This is really unfortunate.
-      if (!newReplacementType->isEqual(oldReplacementType))
-        return newUnderlyingType;
+        Type newReplacementType = oldReplacementType.transformRec(fn);
+        if (!newReplacementType)
+          return newUnderlyingType;
+
+        // If anything changed with the replacement type, we lose the sugar.
+        // FIXME: This is really unfortunate.
+        if (!newReplacementType->isEqual(oldReplacementType))
+          return newUnderlyingType;
+      }
     }
 
     if (oldUnderlyingType.getPointer() == newUnderlyingType.getPointer())

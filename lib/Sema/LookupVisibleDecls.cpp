@@ -804,8 +804,7 @@ public:
     auto FoundSignatureType = VD->getOverloadSignatureType();
     if (FoundSignatureType && shouldSubst) {
       auto subs = BaseTy->getMemberSubstitutionMap(M, VD);
-      auto CT = FoundSignatureType.subst(subs);
-      if (!CT->hasError())
+      if (auto CT = FoundSignatureType.subst(subs))
         FoundSignatureType = CT->getCanonicalType();
     }
 
@@ -823,8 +822,7 @@ public:
       if (OtherSignatureType && shouldSubst) {
         auto ActualBaseTy = getBaseTypeForMember(M, OtherVD, BaseTy);
         auto subs = ActualBaseTy->getMemberSubstitutionMap(M, OtherVD);
-        auto CT = OtherSignatureType.subst(subs);
-        if (!CT->hasError())
+        if (auto CT = OtherSignatureType.subst(subs))
           OtherSignatureType = CT->getCanonicalType();
       }
 
@@ -976,7 +974,7 @@ static void lookupVisibleDynamicMemberLookupDecls(
     auto subs =
         baseType->getMemberSubstitutionMap(dc->getParentModule(), subscript);
     auto memberType = rootType.subst(subs);
-    if (!memberType->mayHaveMembers())
+    if (!memberType || !memberType->mayHaveMembers())
       continue;
 
     KeyPathDynamicMemberConsumer::SubscriptChange sub(consumer, subscript,

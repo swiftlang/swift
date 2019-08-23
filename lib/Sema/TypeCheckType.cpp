@@ -837,10 +837,10 @@ Type TypeChecker::applyUnboundGenericArguments(
     skipRequirementsCheck |= parentType->hasTypeVariable();
   } else if (auto genericEnv =
                  decl->getDeclContext()->getGenericEnvironmentOfContext()) {
-    auto genericSig = genericEnv->getGenericSignature();
-    for (auto gp : genericSig->getGenericParams()) {
+    auto subMap = genericEnv->getForwardingSubstitutionMap();
+    for (auto gp : subMap.getGenericSignature()->getGenericParams()) {
       subs[gp->getCanonicalType()->castTo<GenericTypeParamType>()] =
-        genericEnv->mapTypeIntoContext(gp);
+        Type(gp).subst(subMap);
     }
   }
 
@@ -892,7 +892,8 @@ Type TypeChecker::applyUnboundGenericArguments(
 
   // Apply the substitution map to the interface type of the declaration.
   resultType = resultType.subst(QueryTypeSubstitutionMap{subs},
-                                LookUpConformance(dc));
+                                LookUpConformance(dc),
+                                SubstFlags::UseErrorType);
 
   // Form a sugared typealias reference.
   Type parentType = unboundType->getParent();
@@ -3437,7 +3438,7 @@ Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
       return ErrorType::get(memberType);
 
     subs = baseTy->getContextSubstitutionMap(module, member->getDeclContext());
-    resultType = memberType.subst(subs);
+    resultType = memberType.subst(subs, SubstFlags::UseErrorType);
   } else {
     resultType = memberType;
   }

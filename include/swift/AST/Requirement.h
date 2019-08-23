@@ -94,7 +94,7 @@ public:
   template <typename... Args>
   Optional<Requirement> subst(Args &&... args) const {
     auto newFirst = getFirstType().subst(std::forward<Args>(args)...);
-    if (newFirst->hasError())
+    if (!newFirst)
       return None;
 
     switch (getKind()) {
@@ -102,7 +102,7 @@ public:
     case RequirementKind::Superclass:
     case RequirementKind::SameType: {
       auto newSecond = getSecondType().subst(std::forward<Args>(args)...);
-      if (newSecond->hasError())
+      if (!newSecond)
         return None;
       return Requirement(getKind(), newFirst, newSecond);
     }

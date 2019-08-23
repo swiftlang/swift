@@ -3441,8 +3441,8 @@ LValue SILGenFunction::emitPropertyLValue(SILLocation loc, ManagedValue base,
   lv.add<ValueComponent>(base, None, baseTypeData,
                          /*isRValue=*/!base.isLValue());
 
-  auto substFormalType = ivar->getValueInterfaceType().subst(subMap)
-    ->getCanonicalType();
+  auto substFormalType = ivar->getInterfaceType().subst(subMap)
+    ->getCanonicalType().getReferenceStorageReferent();
 
   lv.addMemberVarComponent(*this, loc, ivar, subMap, options, /*super*/ false,
                            accessKind, strategy, substFormalType);

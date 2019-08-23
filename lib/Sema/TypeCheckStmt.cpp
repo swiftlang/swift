@@ -773,7 +773,7 @@ public:
 
       iteratorTy = conformance->getTypeWitnessByName(sequenceType,
                                                      TC.Context.Id_Iterator);
-      if (iteratorTy->hasError())
+      if (!iteratorTy)
         return nullptr;
 
       auto witness = conformance->getWitnessByName(
@@ -838,7 +838,7 @@ public:
 
     Type elementTy = genConformance->getTypeWitnessByName(iteratorTy,
                                                         TC.Context.Id_Element);
-    if (elementTy->hasError())
+    if (!elementTy)
       return nullptr;
 
     auto *varRef =

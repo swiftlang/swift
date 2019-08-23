@@ -180,7 +180,8 @@ Type GenericEnvironment::mapTypeIntoContext(
 
   Type result = type.subst(QueryInterfaceTypeSubstitutions(this),
                            lookupConformance,
-                           SubstFlags::AllowLoweredTypes);
+                           (SubstFlags::AllowLoweredTypes|
+                            SubstFlags::UseErrorType));
   assert((!result->hasTypeParameter() || result->hasError()) &&
          "not fully substituted");
   return result;
