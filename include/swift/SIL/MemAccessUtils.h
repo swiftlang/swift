@@ -298,6 +298,8 @@ public:
     llvm_unreachable("unhandled kind");
   }
 
+  bool isLetAccess(SILFunction *F) const;
+  
   bool isUniquelyIdentified() const {
     switch (getKind()) {
     case Box:

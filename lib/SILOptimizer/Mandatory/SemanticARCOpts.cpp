@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "sil-semantic-arc-opts"
 #include "swift/Basic/STLExtras.h"
 #include "swift/SIL/BasicBlockUtils.h"
+#include "swift/SIL/BranchPropagatedUser.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILArgument.h"
@@ -122,10 +123,23 @@ namespace {
 
 struct SemanticARCOptVisitor
     : SILInstructionVisitor<SemanticARCOptVisitor, bool> {
+  SILFunction &F;
+  Optional<DeadEndBlocks> TheDeadEndBlocks;
+  
+  explicit SemanticARCOptVisitor(SILFunction &F) : F(F) {}
+      
+  DeadEndBlocks &getDeadEndBlocks() {
+    if (!TheDeadEndBlocks)
+      TheDeadEndBlocks.emplace(&F);
+    return *TheDeadEndBlocks;
+  }
+      
   bool visitSILInstruction(SILInstruction *i) { return false; }
   bool visitCopyValueInst(CopyValueInst *cvi);
   bool visitBeginBorrowInst(BeginBorrowInst *bbi);
   bool visitLoadInst(LoadInst *li);
+      
+  bool isWrittenTo(LoadInst *li);
 };
 
 } // end anonymous namespace
@@ -367,10 +381,12 @@ bool mayFunctionMutateArgument(const AccessedStorage &storage, SILFunction &f) {
   return true;
 }
 
-static bool isWrittenTo(SILFunction &f, SILValue value) {
+bool SemanticARCOptVisitor::isWrittenTo(LoadInst *load) {
+  auto addr = load->getOperand();
+  
   // Then find our accessed storage. If we can not find anything, be
   // conservative and assume that the value is written to.
-  const auto &storage = findAccessedStorageNonNested(value);
+  const auto &storage = findAccessedStorageNonNested(addr);
   if (!storage)
     return true;
 
@@ -379,17 +395,86 @@ static bool isWrittenTo(SILFunction &f, SILValue value) {
   // memory). We have to do this since load_borrow assumes that the
   // underlying memory is never written to.
   switch (storage.getKind()) {
+  case AccessedStorage::Class: {
+    // We know a let property won't be written to if the base object is
+    // guaranteed for the duration of the access.
+    if (!storage.isLetAccess(&F))
+      return true;
+   
+    auto baseObject = stripCasts(storage.getObject());
+    // A guaranteed argument trivially keeps the base alive for the duration of
+    // the projection.
+    if (auto *arg = dyn_cast<SILFunctionArgument>(baseObject)) {
+      if (arg->getArgumentConvention().isGuaranteedConvention()) {
+        return false;
+      }
+    }
+    
+    // See if there's a borrow of the base object our load is based on.
+    SILValue borrowInst;
+    if (isa<BeginBorrowInst>(baseObject)
+        || isa<LoadBorrowInst>(baseObject)) {
+      borrowInst = baseObject;
+    } else {
+      // TODO: We should walk the projection path again to get to the
+      // originating borrow, if any
+      
+      BeginBorrowInst *singleBorrow = nullptr;
+      for (auto *use : baseObject->getUses()) {
+        if (auto *borrow = dyn_cast<BeginBorrowInst>(use->getUser())) {
+          if (!singleBorrow) {
+            singleBorrow = borrow;
+          } else {
+            singleBorrow = nullptr;
+            break;
+          }
+        }
+      }
+      
+      borrowInst = singleBorrow;
+    }
+    
+    // Use the linear lifetime checker to check whether the copied
+    // value is dominated by the lifetime of the borrow it's based on.
+    if (!borrowInst)
+      return true;
+    
+    SmallVector<BranchPropagatedUser, 4> baseEndBorrows;
+    for (auto *use : borrowInst->getUses()) {
+      if (isa<EndBorrowInst>(use->getUser())) {
+        baseEndBorrows.push_back(BranchPropagatedUser(use->getUser()));
+      }
+    }
+    
+    SmallVector<BranchPropagatedUser, 4> valueDestroys;
+    for (auto *use : load->getUses()) {
+      if (isa<DestroyValueInst>(use->getUser())) {
+        valueDestroys.push_back(BranchPropagatedUser(use->getUser()));
+      }
+    }
+    
+    SmallPtrSet<SILBasicBlock *, 4> visitedBlocks;
+    
+    return valueHasLinearLifetime(baseObject, baseEndBorrows, valueDestroys,
+                                  visitedBlocks, getDeadEndBlocks(),
+                                  ownership::ErrorBehaviorKind::ReturnFalse)
+      .getFoundError();
+  }
+  case AccessedStorage::Global:
+    // Any legal load of a global let should have happened after its
+    // initialization, at which point it can't be written to again for the
+    // lifetime of the program.
+    return !storage.isLetAccess(&F);
+
   case AccessedStorage::Box:
   case AccessedStorage::Stack:
-  case AccessedStorage::Global:
-  case AccessedStorage::Class:
   case AccessedStorage::Yield:
   case AccessedStorage::Nested:
   case AccessedStorage::Unidentified:
     return true;
-
+      
   case AccessedStorage::Argument:
-    return mayFunctionMutateArgument(storage, f);
+    return mayFunctionMutateArgument(storage, F);
   }
   llvm_unreachable("covered switch");
 }
@@ -413,7 +498,7 @@ bool SemanticARCOptVisitor::visitLoadInst(LoadInst *li) {
 
   // Then check if our address is ever written to. If it is, then we
   // can not use the load_borrow.
-  if (isWrittenTo(*li->getFunction(), li->getOperand()))
+  if (isWrittenTo(li))
     return false;
 
   // Ok, we can perform our optimization. Convert the load [copy] into a
@@ -462,6 +547,9 @@ struct SemanticARCOpts : SILFunctionTransform {
     //
     // FIXME: Should we iterate or use a RPOT order here?
     bool madeChange = false;
+    
+    SemanticARCOptVisitor visitor(f);
+    
     for (auto &bb : f) {
       auto ii = bb.rend();
       auto start = bb.rbegin();
@@ -482,7 +570,7 @@ struct SemanticARCOpts : SILFunctionTransform {
         // ii. Move ii from the next value back onto the instruction
         // after ii's old value in the block instruction list and then
         // process that.
-        if (SemanticARCOptVisitor().visit(&*ii)) {
+        if (visitor.visit(&*ii)) {
           madeChange = true;
           ii = std::prev(tmp);
           continue;
@@ -493,7 +581,7 @@ struct SemanticARCOpts : SILFunctionTransform {
       }
 
       // Finally visit the first instruction of the block.
-      madeChange |= SemanticARCOptVisitor().visit(&*ii);
+      madeChange |= visitor.visit(&*ii);
     }
 
     if (madeChange) {
