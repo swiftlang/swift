@@ -30,6 +30,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Transforms/Utils/Local.h"
 #include "clang/AST/ASTContext.h"
+#include "clang/AST/DeclCXX.h"
 #include "clang/Basic/TargetInfo.h"
 #include "swift/Basic/ExternalUnion.h"
 #include "swift/Basic/Range.h"
@@ -40,6 +41,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/PrettyStackTrace.h"
@@ -5090,6 +5092,33 @@ void IRGenSILFunction::visitKeyPathInst(swift::KeyPathInst *I) {
 }
 
 void IRGenSILFunction::visitUpcastInst(swift::UpcastInst *i) {
+  auto ToTy = i->getType();
+  auto FromTy = i->getOperand()->getType();
+
+  auto toCXX = dyn_cast<StructType>(ToTy.getASTType());
+  auto fromCXX = dyn_cast<StructType>(FromTy.getASTType());
+  if (toCXX && fromCXX && ToTy.isAddress() && FromTy.isAddress()) {
+    auto *toDecl = dyn_cast_or_null<clang::CXXRecordDecl>(
+        toCXX->getDecl()->getClangDecl());
+    auto *fromDecl = dyn_cast_or_null<clang::CXXRecordDecl>(
+        fromCXX->getDecl()->getClangDecl());
+    if (toDecl && fromDecl) {
+      auto &Sema =
+          static_cast<ClangImporter *>(IGM.Context.getClangModuleLoader())
+              ->getClangSema();
+      Address fromAddr = getLoweredAddress(i->getOperand());
+      llvm::Value *toValue = clang::CodeGen::swiftcall::lowerCXXAddressUpCast(
+          IGM.getClangCGM(), Sema, fromAddr.getAddress(),
+          fromAddr.getAlignment().asCharUnits(), fromDecl, toDecl, &Builder);
+      auto toTy = getTypeInfo(i->getType()).getStorageType();
+      // Bitcast to go from clang type to SIL wrapper type.
+      Address Addr(Builder.CreateBitCast(toValue, toTy->getPointerTo()),
+                   fromAddr.getAlignment());
+      setLoweredAddress(i, Addr);
+      return;
+    }
+  }
+
   auto toTy = getTypeInfo(i->getType()).getSchema()[0].getScalarType();
 
   // If we have an address, just bitcast, don't explode.

@@ -39,6 +39,7 @@
 #include "swift/SIL/SILVTableVisitor.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SIL/TypeLowering.h"
+#include "clang/AST/DeclCXX.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/ADT/StringSet.h"
@@ -3647,6 +3648,20 @@ public:
 
     auto ToTy = UI->getType();
     auto FromTy = UI->getOperand()->getType();
+
+    auto toCXX = dyn_cast<StructType>(ToTy.getASTType());
+    auto fromCXX = dyn_cast<StructType>(FromTy.getASTType());
+    if (toCXX && fromCXX && ToTy.isAddress() && FromTy.isAddress()) {
+      auto *toDecl = dyn_cast_or_null<clang::CXXRecordDecl>(
+          toCXX->getDecl()->getClangDecl());
+      auto *fromDecl = dyn_cast_or_null<clang::CXXRecordDecl>(
+          fromCXX->getDecl()->getClangDecl());
+      if (toDecl && fromDecl) {
+        for (auto &B : fromDecl->bases())
+          if (B.getType()->getAsCXXRecordDecl() == toDecl)
+            return;
+      }
+    }
 
     // Upcast from Optional<B> to Optional<A> is legal as long as B is a
     // subclass of A.

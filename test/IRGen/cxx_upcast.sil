@@ -1,0 +1,22 @@
+// RUN: %target-swift-frontend -module-name cxx_ir -I %S/Inputs/abi -module-cache-path %t -enable-cxx-interop -emit-ir -o - -primary-file %s -O | %FileCheck %s
+
+import Builtin
+import Swift
+import SwiftShims
+import cxx_module
+
+
+// CHECK-LABEL: define protected swiftcc i32 @cxx_upcast(%TSo1CV* nocapture readonly dereferenceable(24))
+// CHECK: [[MEMBER_PTR:%.*]] = getelementptr inbounds %TSo1CV, %TSo1CV* %0, i64 0, i32 0, i64 16
+// CHECK: [[MEMBER_PTR_INT:%.*]] = bitcast i8* [[MEMBER_PTR]] to i32*
+// CHECK: [[RETURN:%.*]] = load i32, i32* [[MEMBER_PTR_INT]], align 8
+// CHECK: ret i32 [[RETURN]]
+sil @cxx_upcast : $@convention(thin) (@inout C) -> Int32 {
+bb0(%0 : $*C):
+  %1 = begin_access [modify] [unsafe] %0 : $*C
+  %2 = upcast %1 : $*C to $*B
+  %3 = struct_element_addr %2 : $*B, #B.v
+  %4 = load %3 : $*Int32
+  end_access %1 : $*C
+  return %4 : $Int32
+}
