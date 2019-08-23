@@ -4877,14 +4877,13 @@ public:
           std::tie(DL.Line, DL.Column, DL.Filename))
         continue;
 
-      LastLine = DL.Line;
-      LastColumn = DL.Column;
-      LastFilename = DL.Filename;
-
       auto ItNew = DebugLocKey(DL);
 
       require(!VisitedLocations.count(ItNew), "Incorrect location at -Onone");
       VisitedLocations.insert(ItNew);
+      LastLine = DL.Line;
+      LastColumn = DL.Column;
+      LastFilename = DL.Filename;
     }
   }
 
