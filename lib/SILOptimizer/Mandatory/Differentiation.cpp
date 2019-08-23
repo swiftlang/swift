@@ -105,13 +105,16 @@ static ApplyInst *getAllocateUninitializedArrayIntrinsic(SILValue v) {
 /// Given a tuple result, find the single use of it in a `destructure_tuple`
 /// instruction.
 static DestructureTupleInst *
-getSingleUseOfTupleInDestructureTupleInst(SILValue tupleResult) {
-  assert(tupleResult->getType().is<TupleType>());
+getSingleDestructureTupleUser(SILValue tuple) {
+  unsigned numDestructureTupleInsts = 0;
+  assert(tuple->getType().is<TupleType>());
   DestructureTupleInst *retVal = nullptr;
-  for (auto *use : tupleResult->getUses()) {
+  for (auto *use : tuple->getUses()) {
     if (auto *destructure =
             dyn_cast<DestructureTupleInst>(use->getUser())) {
-      assert(!retVal);
+      numDestructureTupleInsts++;
+      assert(numDestructureTupleInsts == 1 && "There should only be one use of "
+             "the tuple that is a 'destructure_tuple' inst.");
       retVal = destructure;
     }
   }
@@ -152,8 +155,7 @@ collectAllDirectResultsInTypeOrder(SILFunction &function,
                                function.getModule());
   auto *retInst = cast<ReturnInst>(function.findReturnBB()->getTerminator());
   auto retVal = retInst->getOperand();
-  if (auto *tupleInst =
-      dyn_cast_or_null<TupleInst>(retVal->getDefiningInstruction()))
+  if (auto *tupleInst = dyn_cast<TupleInst>(retVal))
     results.append(tupleInst->getElements().begin(),
                    tupleInst->getElements().end());
   else
@@ -1651,7 +1653,7 @@ void LinearMapInfo::addLinearMapToStruct(ApplyInst *ai,
     // active, we don't consider the result of the original apply if it's a
     // tuple.
     auto *destructure =
-        getSingleUseOfTupleInDestructureTupleInst(ai->getResult(0));
+        getSingleDestructureTupleUser(ai->getResult(0));
     if (destructure) {
       for (auto result : destructure->getResults())
         allResults.push_back(result);
@@ -1923,7 +1925,7 @@ void DifferentiableActivityInfo::analyze(DominanceInfo *di,
                   ai->getResult(0)->getType().is<TupleType>()) {
                 // Handle tuple results, in this case only mark the destructured
                 // results from the `destruct_tuple` instruction use as varied.
-                auto *destInst = getSingleUseOfTupleInDestructureTupleInst(
+                auto *destInst = getSingleDestructureTupleUser(
                     ai->getResult(0));
                 if (destInst) {
                   for (auto result : destInst->getResults())
@@ -3746,7 +3748,7 @@ public:
     // tuple.
     if (ai->getResult(0)->getType().is<TupleType>()) {
       auto *destructure =
-          getSingleUseOfTupleInDestructureTupleInst(ai->getResult(0));
+          getSingleDestructureTupleUser(ai->getResult(0));
       if (destructure) {
         for (auto result : destructure->getResults())
           allResults.push_back(result);
@@ -4573,7 +4575,7 @@ public:
   }
 
   /// Helper that emits the final return instruction in a basic block of the
-  /// differential function. This is needed for when there are indrect outputs.
+  /// differential function.
   void emitReturnInstForDifferential() {
     auto &differential = getDifferential();
     auto diffLoc = differential.getLocation();
@@ -4732,23 +4734,15 @@ public:
       if (!origResult->getType().is<TupleType>()) {
         setTangentValue(bb, origResult,
             makeConcreteTangentValue(differentialResult));
-      } else {
-        unsigned numberOfDestructureTupleInsts = 0;
+      } else if (auto *destructure = getSingleDestructureTupleUser(ai)) {
         bool notSetValue = true;
-        for (auto use : ai->getUses()) {
-          if (auto *dti = dyn_cast<DestructureTupleInst>(use->getUser())) {
-            numberOfDestructureTupleInsts++;
-            assert(numberOfDestructureTupleInsts == 1 && "There should only "
-                   "be one use of the tuple in a 'destructure_tuple' inst.");
-            for (auto result : dti->getResults()) {
-              if (activityInfo.isActive(result, getIndices())) {
-                assert(notSetValue && "This was incorrectly set, should only "
-                       "have one active result from the tuple.");
-                notSetValue = false;
-                setTangentValue(bb, result,
-                    makeConcreteTangentValue(differentialResult));
-              }
-            }
+        for (auto result : destructure->getResults()) {
+          if (activityInfo.isActive(result, getIndices())) {
+            assert(notSetValue && "This was incorrectly set, should only have "
+                   "one active result from the tuple.");
+            notSetValue = false;
+            setTangentValue(bb, result,
+                            makeConcreteTangentValue(differentialResult));
           }
         }
       }
@@ -4805,7 +4799,7 @@ public:
 
   /// Handle `struct_element_addr` instruction.
   ///   Original: y = struct_element_addr x, #field
-  ///   Tangent: tan[y] = struct_element_addr tan[x], tan[#field]]
+  ///   Tangent: tan[y] = struct_element_addr tan[x], tan[#field]
   CLONE_AND_EMIT_TANGENT(StructElementAddr, seai) {
     assert(!seai->getField()->getAttrs().hasAttribute<NoDerivativeAttr>() &&
            "`struct_element_addr` with `@noDerivative` field should not be "
@@ -5081,24 +5075,23 @@ public:
     auto *bb = dti->getParent();
     auto loc = dti->getLoc();
 
-    SmallVector<SILValue, 2> activeOrigResult;
+    SmallVector<SILValue, 2> activeOrigResults;
     bool hasActiveResult = false;
-    for (auto i : range(dti->getResults().size())) {
-      auto origElem = dti->getResult(i);
-      if (activityInfo.isActive(origElem, getIndices())) {
-        activeOrigResult.push_back(origElem);
+    for (auto result : dti->getResults()) {
+      if (activityInfo.isActive(result, getIndices())) {
+        activeOrigResults.push_back(result);
         hasActiveResult = true;
         break;
       }
     }
-    assert(activeOrigResult.size() > 0 &&
+    assert(!activeOrigResults.empty() &&
            "original 'destructure_tuple' should have at least one active "
            "result");
 
     auto tanTuple =
         materializeTangent(getTangentValue(dti->getOperand()), loc);
     auto *tupleElements = diffBuilder.createDestructureTuple(loc, tanTuple);
-    for (auto i : range(tupleElements->getResults().size())) {
+    for (auto i : range(tupleElements->getNumResults())) {
       auto origElem = dti->getResult(i);
       auto tanElem = tupleElements->getResult(i);
       setTangentValue(bb, origElem, makeConcreteTangentValue(tanElem));
@@ -5106,6 +5099,7 @@ public:
   }
 
 #undef CLONE_AND_EMIT_TANGENT
+
 private:
   void prepareForDifferentialGeneration() {
     // Create differential blocks and arguments.
@@ -5200,7 +5194,7 @@ private:
     assert(origIndResults.size() == diffIndResults.size());
 
     for (auto &origBB : *original) {
-      for (auto i : range(diffIndResults.size())) {
+      for (auto i : indices(diffIndResults)) {
         setTangentBuffer(&origBB, origIndResults[i], diffIndResults[i]);
       }
     }
@@ -5418,7 +5412,7 @@ public:
     // tuple.
     if (ai->getResult(0)->getType().is<TupleType>()) {
       auto *destructure =
-          getSingleUseOfTupleInDestructureTupleInst(ai->getResult(0));
+          getSingleDestructureTupleUser(ai->getResult(0));
       if (destructure) {
         for (auto result : destructure->getResults())
           allResults.push_back(result);
