@@ -391,12 +391,6 @@ private:
   /// Clang parser, which is used to load textual headers.
   std::unique_ptr<clang::MangleContext> Mangler;
 
-  /// The active type checker, or null if there is no active type checker.
-  ///
-  /// The flag is \c true if there has ever been a type resolver assigned, i.e.
-  /// if type checking has begun.
-  llvm::PointerIntPair<LazyResolver *, 1, bool> typeResolver;
-
 public:
   /// Mapping of already-imported declarations.
   llvm::DenseMap<std::pair<const clang::Decl *, Version>, Decl *> ImportedDecls;
@@ -1175,15 +1169,6 @@ public:
   /// Return whether a global of the given type should be imported as a
   /// 'let' declaration as opposed to 'var'.
   bool shouldImportGlobalAsLet(clang::QualType type);
-
-  LazyResolver *getTypeResolver() const {
-    return typeResolver.getPointer();
-  }
-  void setTypeResolver(LazyResolver *newResolver) {
-    assert((!typeResolver.getPointer() || !newResolver) &&
-           "already have a type resolver");
-    typeResolver.setPointerAndInt(newResolver, true);
-  }
 
   /// Allocate a new delayed conformance ID with the given set of
   /// conformances.

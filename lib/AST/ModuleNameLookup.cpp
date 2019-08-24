@@ -10,9 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/NameLookup.h"
+#include "swift/AST/ModuleNameLookup.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/LazyResolver.h"
+#include "swift/AST/NameLookup.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
