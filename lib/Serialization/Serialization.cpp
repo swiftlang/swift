@@ -2320,8 +2320,8 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       SpecializeDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode,
           (unsigned)SA->isExported(),
-          (unsigned)SA->getSpecializationKind());
-      S.writeGenericRequirements(SA->getRequirements(), S.DeclTypeAbbrCodes);
+          (unsigned)SA->getSpecializationKind(),
+          S.addGenericSignatureRef(SA->getSpecializedSgnature()));
       return;
     }
 

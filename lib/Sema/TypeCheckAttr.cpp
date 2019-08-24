@@ -1820,22 +1820,6 @@ static void checkSpecializeAttrRequirements(
   }
 }
 
-/// Retrieve the canonical version of the given requirement.
-static Requirement getCanonicalRequirement(const Requirement &req) {
-  switch (req.getKind()) {
-  case RequirementKind::Conformance:
-  case RequirementKind::SameType:
-  case RequirementKind::Superclass:
-    return Requirement(req.getKind(), req.getFirstType()->getCanonicalType(),
-                       req.getSecondType()->getCanonicalType());
-
-  case RequirementKind::Layout:
-    return Requirement(req.getKind(), req.getFirstType()->getCanonicalType(),
-                       req.getLayoutConstraint());
-  }
-  llvm_unreachable("unhandled kind");
-}
-
 /// Require that the given type either not involve type parameters or be
 /// a type parameter.
 static bool diagnoseIndirectGenericTypeParam(SourceLoc loc, Type type,
@@ -1892,7 +1876,6 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
   SmallPtrSet<TypeBase *, 4> constrainedGenericParams;
 
   // Go over the set of requirements, adding them to the builder.
-  SmallVector<Requirement, 4> convertedRequirements;
   RequirementRequest::visitRequirements(
       WhereClauseOwner(FD, attr), TypeResolutionStage::Interface,
       [&](const Requirement &req, RequirementRepr *reqRepr) {
@@ -1982,21 +1965,17 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
         Builder.addRequirement(req, reqRepr,
                                FloatingRequirementSource::forExplicit(reqRepr),
                                nullptr, DC->getParentModule());
-        convertedRequirements.push_back(getCanonicalRequirement(req));
         return false;
       });
 
   // Check the validity of provided requirements.
   checkSpecializeAttrRequirements(attr, FD, constrainedGenericParams, TC);
 
-  // Store the converted requirements in the attribute so that
-  // they are serialized later.
-  attr->setRequirements(DC->getASTContext(), convertedRequirements);
-
   // Check the result.
-  (void)std::move(Builder).computeGenericSignature(
-                                        attr->getLocation(),
-                                        /*allowConcreteGenericParams=*/true);
+  auto specializedSig = std::move(Builder).computeGenericSignature(
+      attr->getLocation(),
+      /*allowConcreteGenericParams=*/true);
+  attr->setSpecializedSignature(specializedSig);
 }
 
 void AttributeChecker::visitFixedLayoutAttr(FixedLayoutAttr *attr) {

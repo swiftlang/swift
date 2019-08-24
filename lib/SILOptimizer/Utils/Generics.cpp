@@ -1202,15 +1202,14 @@ public:
   FunctionSignaturePartialSpecializer(SILModule &M,
                                       GenericSignature *CalleeGenericSig,
                                       GenericEnvironment *CalleeGenericEnv,
-                                      ArrayRef<Requirement> Requirements)
+                                      GenericSignature *SpecializedSig)
       : CallerGenericSig(CalleeGenericSig), CallerGenericEnv(CalleeGenericEnv),
         CalleeGenericSig(CalleeGenericSig), CalleeGenericEnv(CalleeGenericEnv),
+        SpecializedGenericSig(SpecializedSig),
         M(M), SM(M.getSwiftModule()), Ctx(M.getASTContext()) {
 
     // Create the new generic signature using provided requirements.
-    std::tie(SpecializedGenericEnv, SpecializedGenericSig) =
-        getGenericEnvironmentAndSignatureWithRequirements(
-            CalleeGenericSig, CalleeGenericEnv, Requirements, M);
+    SpecializedGenericEnv = SpecializedGenericSig->createGenericEnvironment();
 
     // Compute SubstitutionMaps required for re-mapping.
 
@@ -1748,46 +1747,13 @@ void ReabstractionInfo::finishPartialSpecializationPreparation(
   }
 }
 
-/// Perform some sanity checks for the requirements provided in @_specialize.
-static void
-checkSpecializationRequirements(ArrayRef<Requirement> Requirements) {
-  for (auto &Req : Requirements) {
-    if (Req.getKind() == RequirementKind::SameType) {
-      auto FirstType = Req.getFirstType();
-      auto SecondType = Req.getSecondType();
-      assert(FirstType && SecondType);
-      assert(!FirstType->hasArchetype());
-      assert(!SecondType->hasArchetype());
-
-      // Only one of the types should be concrete.
-      assert(FirstType->hasTypeParameter() != SecondType->hasTypeParameter() &&
-             "Only concrete type same-type requirements are supported by "
-             "generic specialization");
-
-      (void) FirstType;
-      (void) SecondType;
-
-      continue;
-    }
-
-    if (Req.getKind() == RequirementKind::Layout) {
-      continue;
-    }
-
-    llvm_unreachable("Unknown type of requirement in generic specialization");
-  }
-}
-
 /// This constructor is used when processing @_specialize.
 ReabstractionInfo::ReabstractionInfo(SILFunction *Callee,
-                                     ArrayRef<Requirement> Requirements) {
+                                     GenericSignature *SpecializedSig) {
   Serialized = Callee->isSerialized();
 
   if (shouldNotSpecialize(Callee, nullptr))
     return;
-
-  // Perform some sanity checks for the requirements.
-  checkSpecializationRequirements(Requirements);
 
   this->Callee = Callee;
   ConvertIndirectToDirect = true;
@@ -1800,7 +1766,7 @@ ReabstractionInfo::ReabstractionInfo(SILFunction *Callee,
 
   FunctionSignaturePartialSpecializer FSPS(M,
                                            CalleeGenericSig, CalleeGenericEnv,
-                                           Requirements);
+                                           SpecializedSig);
 
   finishPartialSpecializationPreparation(FSPS);
 }

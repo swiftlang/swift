@@ -561,8 +561,11 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
 
     Printer << "exported: "<<  exported << ", ";
     Printer << "kind: " << kind << ", ";
+    ArrayRef<Requirement> requirements;
+    if (auto sig = attr->getSpecializedSgnature())
+      requirements = sig->getRequirements();
 
-    if (!attr->getRequirements().empty()) {
+    if (!requirements.empty()) {
       Printer << "where ";
     }
     std::function<Type(Type)> GetInterfaceType;
@@ -578,7 +581,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
         return GenericEnv->getSugaredType(Ty);
       };
     }
-    interleave(attr->getRequirements(),
+    interleave(requirements,
                [&](Requirement req) {
                  auto FirstTy = GetInterfaceType(req.getFirstType());
                  if (req.getKind() != RequirementKind::Layout) {
@@ -1089,38 +1092,14 @@ const AvailableAttr *AvailableAttr::isUnavailable(const Decl *D) {
 SpecializeAttr::SpecializeAttr(SourceLoc atLoc, SourceRange range,
                                TrailingWhereClause *clause,
                                bool exported,
-                               SpecializationKind kind)
-    : DeclAttribute(DAK_Specialize, atLoc, range, /*Implicit=*/false),
-      trailingWhereClause(clause) {
+                               SpecializationKind kind,
+                               GenericSignature *specializedSignature)
+    : DeclAttribute(DAK_Specialize, atLoc, range,
+                    /*Implicit=*/clause == nullptr),
+      trailingWhereClause(clause),
+      specializedSignature(specializedSignature) {
   Bits.SpecializeAttr.exported = exported;
   Bits.SpecializeAttr.kind = unsigned(kind);
-  Bits.SpecializeAttr.numRequirements = 0;
-}
-
-SpecializeAttr::SpecializeAttr(SourceLoc atLoc, SourceRange range,
-                               ArrayRef<Requirement> requirements,
-                               bool exported,
-                               SpecializationKind kind)
-    : DeclAttribute(DAK_Specialize, atLoc, range, /*Implicit=*/false) {
-  Bits.SpecializeAttr.exported = exported;
-  Bits.SpecializeAttr.kind = unsigned(kind);
-  Bits.SpecializeAttr.numRequirements = requirements.size();
-  std::copy(requirements.begin(), requirements.end(), getRequirementsData());
-}
-
-void SpecializeAttr::setRequirements(ASTContext &Ctx,
-                                     ArrayRef<Requirement> requirements) {
-  unsigned numClauseRequirements =
-      (trailingWhereClause) ? trailingWhereClause->getRequirements().size() : 0;
-  assert(requirements.size() <= numClauseRequirements);
-  if (!numClauseRequirements)
-    return;
-  Bits.SpecializeAttr.numRequirements = requirements.size();
-  std::copy(requirements.begin(), requirements.end(), getRequirementsData());
-}
-
-ArrayRef<Requirement> SpecializeAttr::getRequirements() const {
-  return const_cast<SpecializeAttr*>(this)->getRequirements();
 }
 
 TrailingWhereClause *SpecializeAttr::getTrailingWhereClause() const {
@@ -1131,28 +1110,11 @@ SpecializeAttr *SpecializeAttr::create(ASTContext &Ctx, SourceLoc atLoc,
                                        SourceRange range,
                                        TrailingWhereClause *clause,
                                        bool exported,
-                                       SpecializationKind kind) {
-  unsigned numRequirements = (clause) ? clause->getRequirements().size() : 0;
-  unsigned size =
-      sizeof(SpecializeAttr) + (numRequirements * sizeof(Requirement));
-  void *mem = Ctx.Allocate(size, alignof(SpecializeAttr));
-  return new (mem)
-      SpecializeAttr(atLoc, range, clause, exported, kind);
+                                       SpecializationKind kind,
+                                       GenericSignature *specializedSignature) {
+  return new (Ctx) SpecializeAttr(atLoc, range, clause, exported, kind,
+                                  specializedSignature);
 }
-
-SpecializeAttr *SpecializeAttr::create(ASTContext &Ctx, SourceLoc atLoc,
-                                       SourceRange range,
-                                       ArrayRef<Requirement> requirements,
-                                       bool exported,
-                                       SpecializationKind kind) {
-  unsigned numRequirements = requirements.size();
-  unsigned size =
-      sizeof(SpecializeAttr) + (numRequirements * sizeof(Requirement));
-  void *mem = Ctx.Allocate(size, alignof(SpecializeAttr));
-  return new (mem)
-      SpecializeAttr(atLoc, range, requirements, exported, kind);
-}
-
 
 ImplementsAttr::ImplementsAttr(SourceLoc atLoc, SourceRange range,
                                TypeLoc ProtocolType,
