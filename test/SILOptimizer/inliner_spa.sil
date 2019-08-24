@@ -1,0 +1,167 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-sil-opt %s -inline -print-shortest-path-info 2>%t/log >/dev/null
+// RUN: %FileCheck %s <%t/log
+// REQUIRES: asserts
+
+sil_stage canonical
+
+import Builtin
+
+
+// CHECK-LABEL: SPA @test_simple
+// CHECK-NEXT:    bb0: length=1+0, d-entry=0, d-exit=1
+
+sil @test_simple : $@convention(thin) () -> () {
+bb0:
+  %c1 = builtin "assert_configuration"() : $Builtin.Int32
+  %4 = tuple ()
+  return %4 : $()
+}
+
+// CHECK-LABEL: SPA @test_if_then_else
+// CHECK-NEXT:    bb0: length=1+0, d-entry=0, d-exit=2
+// CHECK-NEXT:    bb1: length=3+0, d-entry=1, d-exit=3
+// CHECK-NEXT:    bb2: length=1+0, d-entry=1, d-exit=1
+// CHECK-NEXT:    bb3: length=0+0, d-entry=2, d-exit=0
+
+sil @test_if_then_else : $@convention(thin) () -> () {
+bb0:
+  cond_br undef, bb1, bb2
+
+bb1:
+  %c1 = builtin "assert_configuration"() : $Builtin.Int32
+  %c2 = builtin "assert_configuration"() : $Builtin.Int32
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %4 = tuple ()
+  return %4 : $()
+}
+
+// CHECK-LABEL: SPA @test_simple_loop
+// CHECK-NEXT:    bb0: length=1+0, d-entry=0, d-exit=34
+// CHECK-NEXT:    bb1: length=3+30, d-entry=1, d-exit=33
+// CHECK-NEXT:    bb2: length=0+0, d-entry=34, d-exit=0
+// CHECK-NEXT:  Loop bb1:
+// CHECK-NEXT:    bb1: length=3+0, d-entry=0, d-exit=3
+
+sil @test_simple_loop : $@convention(thin) () -> () {
+bb0:
+  br bb1
+
+bb1:
+  %c1 = builtin "assert_configuration"() : $Builtin.Int32
+  %c2 = builtin "assert_configuration"() : $Builtin.Int32
+  cond_br undef, bb1, bb2
+
+bb2:
+  %4 = tuple ()
+  return %4 : $()
+}
+
+// CHECK-LABEL: SPA @test_loop_with_bypass_edge
+// CHECK-NEXT:    bb0: length=1+30, d-entry=0, d-exit=31
+// CHECK-NEXT:    bb1: length=1+0, d-entry=31, d-exit=5
+// CHECK-NEXT:    bb2: length=3+0, d-entry=32, d-exit=4
+// CHECK-NEXT:    bb3: length=1+0, d-entry=35, d-exit=1
+// CHECK-NEXT:    bb4: length=0+0, d-entry=31, d-exit=0
+// CHECK-NEXT:  Loop bb2:
+// CHECK-NEXT:    bb2: length=3+0, d-entry=0, d-exit=3
+
+sil @test_loop_with_bypass_edge : $@convention(thin) () -> () {
+bb0:
+  cond_br undef, bb1, bb4
+
+bb1:
+  br bb2
+
+bb2:
+  %c1 = builtin "assert_configuration"() : $Builtin.Int32
+  %c2 = builtin "assert_configuration"() : $Builtin.Int32
+  cond_br undef, bb2, bb3
+
+bb3:
+  br bb4
+
+bb4:
+  %4 = tuple ()
+  return %4 : $()
+}
+
+// CHECK-LABEL: SPA @test_nested_loops
+// CHECK-NEXT:    bb0: length=1+40, d-entry=0, d-exit=41
+// CHECK-NEXT:    bb1: length=1+0, d-entry=41, d-exit=6
+// CHECK-NEXT:    bb2: length=1+0, d-entry=42, d-exit=5
+// CHECK-NEXT:    bb3: length=3+0, d-entry=43, d-exit=5
+// CHECK-NEXT:    bb4: length=2+0, d-entry=43, d-exit=4
+// CHECK-NEXT:    bb5: length=1+0, d-entry=45, d-exit=2
+// CHECK-NEXT:    bb6: length=1+0, d-entry=46, d-exit=1
+// CHECK-NEXT:    bb7: length=0+0, d-entry=41, d-exit=0
+// CHECK-NEXT:  Loop bb2:
+// CHECK-NEXT:    bb2: length=1+0, d-entry=0, d-exit=4
+// CHECK-NEXT:    bb4: length=2+0, d-entry=1, d-exit=3
+// CHECK-NEXT:    bb3: length=3+30, d-entry=1, d-exit=34
+// CHECK-NEXT:    bb5: length=1+0, d-entry=3, d-exit=1
+// CHECK-NEXT:  Loop bb3:
+// CHECK-NEXT:    bb3: length=3+0, d-entry=0, d-exit=3
+
+sil @test_nested_loops : $@convention(thin) () -> () {
+bb0:
+  cond_br undef, bb1, bb7
+
+bb1:
+  br bb2
+
+bb2:
+  cond_br undef, bb3, bb4
+
+bb3:
+  %c1 = builtin "assert_configuration"() : $Builtin.Int32
+  %c2 = builtin "assert_configuration"() : $Builtin.Int32
+  cond_br undef, bb3, bb5
+
+bb4:
+  %c3 = builtin "assert_configuration"() : $Builtin.Int32
+  br bb5
+
+bb5:
+  cond_br undef, bb2, bb6
+
+bb6:
+  br bb7
+
+bb7:
+  %4 = tuple ()
+  return %4 : $()
+}
+
+// CHECK-LABEL: SPA @noreturn_func
+// CHECK-NEXT:    bb0: length=0+0, d-entry=0, d-exit=536870912
+sil @noreturn_func : $@convention(thin) () -> () {
+bb0:
+  unreachable
+}
+
+// CHECK-LABEL: SPA @test_call_of_noreturn_in_loop
+// CHECK-NEXT:    bb0: length=1+0, d-entry=0, d-exit=133
+// CHECK-NEXT:    bb1: length=12+120, d-entry=1, d-exit=132
+// CHECK-NEXT:    bb2: length=0+0, d-entry=133, d-exit=0
+// CHECK-NEXT:  Loop bb1:
+// CHECK-NEXT:    bb1: length=12+0, d-entry=0, d-exit=12
+sil @test_call_of_noreturn_in_loop : $@convention(thin) () -> () {
+bb0:
+  br bb1
+
+bb1:
+  %f = function_ref @noreturn_func : $@convention(thin) () -> ()
+  %a = apply %f() : $@convention(thin) () -> ()
+  %c1 = builtin "assert_configuration"() : $Builtin.Int32
+  cond_br undef, bb1, bb2
+
+bb2:
+  %4 = tuple ()
+  return %4 : $()
+}

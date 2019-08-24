@@ -1,0 +1,30 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -inline %s | %FileCheck %s
+
+// Check cloning of instructions.
+
+sil_stage canonical
+
+import Builtin
+
+class X {
+}
+
+sil [always_inline] @callee_alloc_ref_stack : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref [stack] $X
+  dealloc_ref [stack] %0 : $X
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @caller_alloc_ref_stack : $@convention(thin) () -> ()
+// CHECK: [[X:%[0-9]+]] = alloc_ref [stack] $X
+// CHECK: dealloc_ref [stack] [[X]] : $X
+sil @caller_alloc_ref_stack : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @callee_alloc_ref_stack : $@convention(thin) () -> ()
+  %1 = apply %0() : $@convention(thin) () -> ()
+  %2 = tuple ()
+  return %2 : $()
+}
+

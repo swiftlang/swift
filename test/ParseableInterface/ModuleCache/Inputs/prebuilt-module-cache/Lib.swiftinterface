@@ -1,0 +1,9 @@
+// swift-interface-format-version: 1.0
+// swift-module-flags: -parse-stdlib -module-name Lib
+
+public struct FromInterface {
+  @inlinable public init() {}
+}
+public var testValue: FromInterface {
+  @inlinable get { return FromInterface() }
+}

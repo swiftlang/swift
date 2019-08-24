@@ -1,0 +1,12 @@
+framework module FooHelper {
+  umbrella header "FooHelper.h"
+
+  framework module FooHelperSub {
+    umbrella header "FooHelperSub.h"
+  }
+
+  explicit module FooHelperExplicit {
+    header "FooHelperExplicit.h"
+  }
+}
+

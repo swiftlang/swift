@@ -1,0 +1,6 @@
+module MacrosRedefWithSubmodules {
+  header "Outer.h"
+  explicit module TheSubmodule {
+    header "Inner.h"
+  }
+}

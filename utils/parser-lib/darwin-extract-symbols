@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+#===--- darwin-extract-symbols - Extract symbols part of build-parser-lib --===#
+#
+## This source file is part of the Swift.org open source project
+##
+## Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
+## Licensed under Apache License v2.0 with Runtime Library Exception
+##
+## See https://swift.org/LICENSE.txt for license information
+## See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+#
+#===------------------------------------------------------------------------===#
+
+set -x
+
+if [ -z "$INSTALL_DIR" ]
+then
+  echo "\$INSTALL_DIR is not set"
+  exit 1
+fi
+if [ -z "$INSTALL_PREFIX" ]
+then
+  echo "\$INSTALL_PREFIX is not set"
+  exit 1
+fi
+if [ -z "$INSTALL_SYMROOT" ]
+then
+  echo "\$INSTALL_SYMROOT is not set"
+  exit 1
+fi
+if [ -z "$BUILD_JOBS" ]
+then
+  echo "\$BUILD_JOBS is not set"
+  exit 1
+fi
+
+function xcrun_find_tool() {
+  xcrun --sdk macosx --toolchain default --find "$@"
+}
+
+# Copy executables and shared libraries from the INSTALL_DIR to
+# INSTALL_SYMROOT and run dsymutil on them.
+(cd "${INSTALL_DIR}" &&
+ find ./"${INSTALL_PREFIX}" -perm -0111 -type f -print | cpio --insecure -pdm "${INSTALL_SYMROOT}")
+
+# Run dsymutil on executables and shared libraries.
+#
+# Exclude shell scripts.
+(cd "${INSTALL_SYMROOT}" &&
+ find ./"${INSTALL_PREFIX}" -perm -0111 -type f -print | \
+   grep -v crashlog.py | \
+   grep -v symbolication.py | \
+   xargs -n 1 -P ${BUILD_JOBS} $(xcrun_find_tool dsymutil))
+
+# Strip executables, shared libraries and static libraries in INSTALL_DIR.
+find "${INSTALL_DIR}${INSTALL_PREFIX}/" \
+  '(' -perm -0111 -or -name "*.a" ')' -type f -print | \
+  xargs -n 1 -P ${BUILD_JOBS} $(xcrun_find_tool strip) -S
+
+# Codesign dylibs after strip tool
+# rdar://45388785
+find "${INSTALL_DIR}${INSTALL_PREFIX}/" \
+  '(' -name "*.dylib" ')' -type f -print | \
+  xargs -n 1 -P ${BUILD_JOBS} $(xcrun_find_tool codesign) -f -s -

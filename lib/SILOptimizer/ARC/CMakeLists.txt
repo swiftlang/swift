@@ -1,0 +1,12 @@
+silopt_register_sources(
+  ARCBBState.cpp
+  ARCLoopOpts.cpp
+  ARCMatchingSet.cpp
+  ARCRegionState.cpp
+  ARCSequenceOpts.cpp
+  GlobalARCSequenceDataflow.cpp
+  GlobalLoopARCSequenceDataflow.cpp
+  RCStateTransition.cpp
+  RCStateTransitionVisitors.cpp
+  RefCountState.cpp
+)

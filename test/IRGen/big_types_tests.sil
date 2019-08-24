@@ -1,0 +1,44 @@
+// RUN: %target-swift-frontend -I %S/Inputs/abi %s -emit-ir -enable-large-loadable-types -sil-verify-all | %FileCheck %s
+
+// REQUIRES: CPU=x86_64
+// REQUIRES: OS=macosx
+
+sil_stage lowered
+import Builtin
+import Swift
+
+public struct BigStruct {
+  var i0 : Int32 = 0
+  var i1 : Int32 = 1
+  var i2 : Int32 = 2
+  var i3 : Int32 = 3
+  var i4 : Int32 = 4
+  var i5 : Int32 = 5
+  var i6 : Int32 = 6
+  var i7 : Int32 = 7
+  var i8 : Int32 = 8
+}
+
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @testDestroyValue(%T15big_types_tests9BigStructV* noalias nocapture dereferenceable({{.*}}) #0 {
+// CHECK-NEXT: entry
+// CHECK-NEXT: call %T15big_types_tests9BigStructV* @"$s15big_types_tests9BigStructVWOs"(%T15big_types_tests9BigStructV* %0)
+// CHECK-NEXT: ret void
+sil @testDestroyValue : $@convention(thin) (@owned BigStruct) -> ()  {
+entry(%x : $BigStruct):
+  release_value %x : $BigStruct
+  %ret = tuple ()
+  return %ret : $()
+}
+
+sil @capture : $@convention(thin) (@guaranteed BigStruct, Builtin.Int1) -> ()
+
+sil @test_partial_apply_stack : $@convention(thin) (@owned BigStruct, Builtin.Int1) -> () {
+entry(%x : $BigStruct, %i : $Builtin.Int1):
+  %f = function_ref @capture : $@convention(thin) (@guaranteed BigStruct, Builtin.Int1) -> ()
+  %p = partial_apply [callee_guaranteed] [on_stack] %f(%i) : $@convention(thin) (@guaranteed BigStruct, Builtin.Int1) -> ()
+  %m = mark_dependence %p : $@noescape @callee_guaranteed (@guaranteed BigStruct) -> () on %x : $BigStruct
+  %c = convert_function %m : $@noescape @callee_guaranteed (@guaranteed BigStruct) -> () to $@noescape @callee_guaranteed (@guaranteed BigStruct) -> (@error Error)
+  dealloc_stack %p : $@noescape @callee_guaranteed (@guaranteed BigStruct) -> ()
+  %ret = tuple ()
+  return %ret : $()
+}

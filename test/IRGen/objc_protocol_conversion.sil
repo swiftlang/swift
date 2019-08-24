@@ -1,0 +1,25 @@
+// RUN: %empty-directory(%t)
+// RUN: %build-irgen-test-overlays
+// RUN: %target-swift-frontend -sdk %S/Inputs -I %t %s -emit-ir | %FileCheck %s
+
+// REQUIRES: CPU=x86_64
+// REQUIRES: objc_interop
+
+sil_stage canonical
+
+import Swift
+import ObjectiveC
+
+@objc protocol OP {}
+
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %TSo8ProtocolC* @protocol_conversion() {{.*}} {
+// CHECK:         %0 = load i8*, i8** @"\01l_OBJC_PROTOCOL_REFERENCE_$__TtP24objc_protocol_conversion2OP_", align 8
+// CHECK:         %1 = bitcast i8* %0 to %TSo8ProtocolC*
+// CHECK:         ret %TSo8ProtocolC* %1
+// CHECK:       }
+
+sil @protocol_conversion : $@convention(thin) () -> @owned Protocol {
+entry:
+  %p = objc_protocol #OP : $Protocol
+  return %p : $Protocol
+}

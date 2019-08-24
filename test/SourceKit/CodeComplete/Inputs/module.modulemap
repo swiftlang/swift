@@ -1,0 +1,26 @@
+module ImportsFoo {
+  header "ImportsFoo.h"
+  export *
+}
+module ImportsImportsFoo {
+  header "ImportsImportsFoo.h"
+  export *
+}
+
+module PopularAPI {
+  header "popular.h"
+  export *
+}
+module PopularAPI2 {
+  header "popular2.h"
+  export *
+}
+module PopularAPI3 {
+  header "popular3.h"
+  export *
+}
+
+module ImportedByAuxFile {
+  header "imported_by_aux_file.h"
+  export *
+}

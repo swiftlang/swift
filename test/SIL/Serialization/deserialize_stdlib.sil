@@ -1,0 +1,6 @@
+// Make sure that we can deserialize the stdlib.
+// RUN: %target-sil-opt %platform-module-dir/Swift.swiftmodule/%target-swiftmodule-name -module-name Swift > /dev/null || %target-sil-opt %platform-module-dir/Swift.swiftmodule -module-name Swift > /dev/null
+// RUN: llvm-bcanalyzer %platform-module-dir/Swift.swiftmodule/%target-swiftmodule-name > %t || llvm-bcanalyzer %platform-module-dir/Swift.swiftmodule > %t
+// RUN: %FileCheck %s < %t
+
+// CHECK-NOT: Unknown

@@ -1,0 +1,37 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -early-inline -sil-inline-threshold=50 | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -late-inline -sil-inline-threshold=50 | %FileCheck %s --check-prefix=LATE
+// RUN: %target-sil-opt -enable-sil-verify-all %s -late-inline -sil-inline-threshold=50 -module-name Swift | %FileCheck %s --check-prefix=STDLIBLATE
+
+sil_stage canonical
+
+import Builtin
+
+sil [_semantics "inline_late"] @inline_late_func : $@convention(thin) () -> Builtin.Int32 {
+bb0:
+  %0 = integer_literal $Builtin.Int32, 3
+  return %0 : $Builtin.Int32
+}
+
+//CHECK-LABEL: caller_func5
+//CHECK: function_ref
+//CHECK: apply
+//CHECK-NEXT: ret
+
+//STDLIBLATE-LABEL: caller_func5
+//STDLIBLATE: function_ref
+//STDLIBLATE: apply
+//STDLIBLATE-NEXT: ret
+
+
+//LATE-LABEL: caller_func5
+//LATE: integer_literal
+//LATE-NOT: function_ref
+//LATE-NOT: apply
+//LATE-NEXT: ret
+
+sil @caller_func5 : $@convention(thin) () -> Builtin.Int32 {
+bb0:
+  %0 = function_ref @inline_late_func : $@convention(thin) () -> Builtin.Int32
+  %1 = apply %0() : $@convention(thin) () -> Builtin.Int32
+  return %1 : $Builtin.Int32
+}

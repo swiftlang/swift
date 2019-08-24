@@ -1,0 +1,778 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -remove-redundant-overflow-checks | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+sil [noinline] @sink_unsigned_int : $@convention(thin) () -> ()
+sil [noinline] @sink_signed_int : $@convention(thin) () -> ()
+
+// CHECK-LABEL: @sub_signed_branch_cond
+sil hidden @sub_signed_branch_cond : $@convention(thin) (Int64) -> () {
+bb0(%0 : $Int64):
+  %1 = integer_literal $Builtin.Int64, 2          // users: %3, %12
+  %2 = struct_extract %0 : $Int64, #Int64._value       // users: %3, %7, %12, %17
+  %3 = builtin "cmp_slt_Int64"(%2 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1 // user: %4
+  cond_br %3, bb2, bb1                            // id: %4
+
+bb1:                                              // Preds: bb0
+  %5 = integer_literal $Builtin.Int64, 1          // user: %7
+  %6 = integer_literal $Builtin.Int1, -1          // users: %7, %12, %17
+  %7 = builtin "ssub_with_overflow_Int64"(%2 : $Builtin.Int64, %5 : $Builtin.Int64, %6 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %8
+  %8 = tuple_extract %7 : $(Builtin.Int64, Builtin.Int1), 1 // user: %9
+// CHECK-NOT: cond_fail
+  cond_fail %8 : $Builtin.Int1                    // id: %9
+  %10 = function_ref @sink_unsigned_int : $@convention(thin) () -> () // users: %11, %15, %20
+  %11 = apply %10() : $@convention(thin) () -> ()
+  %12 = builtin "ssub_with_overflow_Int64"(%2 : $Builtin.Int64, %1 : $Builtin.Int64, %6 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %13
+  %13 = tuple_extract %12 : $(Builtin.Int64, Builtin.Int1), 1 // user: %14
+// CHECK-NOT: cond_fail
+  cond_fail %13 : $Builtin.Int1                   // id: %14
+  %15 = apply %10() : $@convention(thin) () -> ()
+
+// CHECK that we do not remove the '3' because it is not guarder by the branch.
+// CHECK: integer_literal $Builtin.Int64, 3
+// CHECK: cond_fail
+  %16 = integer_literal $Builtin.Int64, 3         // user: %17
+  %17 = builtin "ssub_with_overflow_Int64"(%2 : $Builtin.Int64, %16 : $Builtin.Int64, %6 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %18
+  %18 = tuple_extract %17 : $(Builtin.Int64, Builtin.Int1), 1 // user: %19
+  cond_fail %18 : $Builtin.Int1                   // id: %19
+  %20 = apply %10() : $@convention(thin) () -> ()
+  br bb2                                          // id: %21
+
+bb2:                                              // Preds: bb0 bb1
+  %22 = tuple ()                                  // user: %23
+// CHECK: return
+  return %22 : $()                                // id: %23
+}
+
+// CHECK-LABEL: @sub_signed_branch_cond2
+// CHECK-NOT: cond_fail
+// CHECK: return
+sil hidden @sub_signed_branch_cond2: $@convention(thin) (Int64) -> () {
+bb0(%0 : $Int64):
+  %1 = integer_literal $Builtin.Int64, 2          // users: %3, %12
+  %2 = struct_extract %0 : $Int64, #Int64._value       // users: %3, %7, %12, %17
+  %3 = builtin "cmp_sge_Int64"(%2 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1 // user: %4
+  cond_br %3, bb1, bb2                            // id: %4
+
+bb1:                                              // Preds: bb0
+  %5 = integer_literal $Builtin.Int64, 1          // user: %7
+  %6 = integer_literal $Builtin.Int1, -1          // users: %7, %12, %17
+  %7 = builtin "ssub_with_overflow_Int64"(%2 : $Builtin.Int64, %5 : $Builtin.Int64, %6 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %8
+  %8 = tuple_extract %7 : $(Builtin.Int64, Builtin.Int1), 1 // user: %9
+  cond_fail %8 : $Builtin.Int1                    // id: %9
+  %10 = function_ref @sink_unsigned_int : $@convention(thin) () -> () // users: %11, %15, %20
+  %11 = apply %10() : $@convention(thin) () -> ()
+  %12 = builtin "ssub_with_overflow_Int64"(%2 : $Builtin.Int64, %1 : $Builtin.Int64, %6 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %13
+  %13 = tuple_extract %12 : $(Builtin.Int64, Builtin.Int1), 1 // user: %14
+  cond_fail %13 : $Builtin.Int1                   // id: %14
+  %15 = apply %10() : $@convention(thin) () -> ()
+  %16 = integer_literal $Builtin.Int64, 3         // user: %17
+  %17 = builtin "ssub_with_overflow_Int64"(%2 : $Builtin.Int64, %16 : $Builtin.Int64, %6 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %18
+  %18 = tuple_extract %17 : $(Builtin.Int64, Builtin.Int1), 1 // user: %19
+  cond_fail %13 : $Builtin.Int1                   // id: %19
+  %20 = apply %10() : $@convention(thin) () -> ()
+  br bb2                                          // id: %21
+
+bb2:                                              // Preds: bb0 bb1
+  %22 = tuple ()                                  // user: %23
+  return %22 : $()                                // id: %23
+}
+
+// CHECK-LABEL: @sub_unsigned_branch_cond
+// CHECK-NOT: cond_fail
+// CHECK: return
+sil hidden @sub_unsigned_branch_cond : $@convention(thin) (UInt64) -> () {
+bb0(%0 : $UInt64):
+  %1 = integer_literal $Builtin.Int64, 2          // users: %3, %12
+  %2 = struct_extract %0 : $UInt64, #UInt64._value     // users: %3, %7, %12, %17
+  %3 = builtin "cmp_ult_Int64"(%2 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1 // user: %4
+  cond_br %3, bb2, bb1                            // id: %4
+
+bb1:                                              // Preds: bb0
+  %5 = integer_literal $Builtin.Int64, 1          // user: %7
+  %6 = integer_literal $Builtin.Int1, -1          // users: %7, %12, %17
+  %7 = builtin "usub_with_overflow_Int64"(%2 : $Builtin.Int64, %5 : $Builtin.Int64, %6 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %8
+  %8 = tuple_extract %7 : $(Builtin.Int64, Builtin.Int1), 1 // user: %9
+  cond_fail %8 : $Builtin.Int1                    // id: %9
+  %10 = function_ref @sink_signed_int : $@convention(thin) () -> () // users: %11, %15, %20
+  %11 = apply %10() : $@convention(thin) () -> ()
+  %12 = builtin "usub_with_overflow_Int64"(%2 : $Builtin.Int64, %1 : $Builtin.Int64, %6 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %13
+  %13 = tuple_extract %12 : $(Builtin.Int64, Builtin.Int1), 1 // user: %14
+  cond_fail %13 : $Builtin.Int1                   // id: %14
+  %15 = apply %10() : $@convention(thin) () -> ()
+  %16 = integer_literal $Builtin.Int64, 3         // user: %17
+  %17 = builtin "usub_with_overflow_Int64"(%2 : $Builtin.Int64, %16 : $Builtin.Int64, %6 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %18
+  %18 = tuple_extract %17 : $(Builtin.Int64, Builtin.Int1), 1 // user: %19
+  cond_fail %13 : $Builtin.Int1                   // id: %19
+  %20 = apply %10() : $@convention(thin) () -> ()
+  br bb2                                          // id: %21
+
+bb2:                                              // Preds: bb0 bb1
+  %22 = tuple ()                                  // user: %23
+  return %22 : $()                                // id: %23
+}
+
+// CHECK-LABEL: @sub_unsigned_branch_cond2
+// CHECK-NOT: cond_fail
+// CHECK: return
+sil hidden @sub_unsigned_branch_cond2 : $@convention(thin) (UInt64) -> () {
+bb0(%0 : $UInt64):
+  %1 = integer_literal $Builtin.Int64, 2          // users: %3, %12
+  %2 = struct_extract %0 : $UInt64, #UInt64._value     // users: %3, %7, %12, %17
+  %3 = builtin "cmp_uge_Int64"(%2 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1 // user: %4
+  cond_br %3, bb1, bb2                            // id: %4
+
+bb1:                                              // Preds: bb0
+  %5 = integer_literal $Builtin.Int64, 1          // user: %7
+  %6 = integer_literal $Builtin.Int1, -1          // users: %7, %12, %17
+  %7 = builtin "usub_with_overflow_Int64"(%2 : $Builtin.Int64, %5 : $Builtin.Int64, %6 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %8
+  %8 = tuple_extract %7 : $(Builtin.Int64, Builtin.Int1), 1 // user: %9
+  cond_fail %8 : $Builtin.Int1                    // id: %9
+  %10 = function_ref @sink_signed_int : $@convention(thin) () -> () // users: %11, %15, %20
+  %11 = apply %10() : $@convention(thin) () -> ()
+  %12 = builtin "usub_with_overflow_Int64"(%2 : $Builtin.Int64, %1 : $Builtin.Int64, %6 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %13
+  %13 = tuple_extract %12 : $(Builtin.Int64, Builtin.Int1), 1 // user: %14
+  cond_fail %13 : $Builtin.Int1                   // id: %14
+  %15 = apply %10() : $@convention(thin) () -> ()
+  %16 = integer_literal $Builtin.Int64, 3         // user: %17
+  %17 = builtin "usub_with_overflow_Int64"(%2 : $Builtin.Int64, %16 : $Builtin.Int64, %6 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %18
+  %18 = tuple_extract %17 : $(Builtin.Int64, Builtin.Int1), 1 // user: %19
+  cond_fail %13 : $Builtin.Int1                   // id: %19
+  %20 = apply %10() : $@convention(thin) () -> ()
+  br bb2                                          // id: %21
+
+bb2:                                              // Preds: bb0 bb1
+  %22 = tuple ()                                  // user: %23
+  return %22 : $()                                // id: %23
+}
+
+// CHECK-LABEL: @unsigned_sub_previous_traps
+// Keep the first cond-fail
+// CHECK: cond_fail
+// Keep the condfail with +10 because it is not guarded by the first condfail (+9)
+// CHECK: cond_fail
+// CHECK-NOT: cond_fail
+// CHECK: return
+sil hidden @unsigned_sub_previous_traps : $@convention(thin) (UInt64) -> () {
+bb0(%0 : $UInt64):
+  %1 = integer_literal $Builtin.Int64, 9          // user: %4
+  %2 = struct_extract %0 : $UInt64, #UInt64._value     // users: %4, %10, %15, %20, %25
+  %3 = integer_literal $Builtin.Int1, -1          // users: %4, %10, %15, %20, %25
+  %4 = builtin "usub_with_overflow_Int64"(%2 : $Builtin.Int64, %1 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %5
+  %5 = tuple_extract %4 : $(Builtin.Int64, Builtin.Int1), 1 // user: %6
+  cond_fail %5 : $Builtin.Int1                    // id: %6
+  %7 = function_ref @sink_signed_int : $@convention(thin) () -> () // users: %8, %13, %18, %23, %28, %29
+  %8 = apply %7() : $@convention(thin) () -> ()
+  %9 = integer_literal $Builtin.Int64, 2          // user: %10
+  %10 = builtin "usub_with_overflow_Int64"(%2 : $Builtin.Int64, %9 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %11
+  %11 = tuple_extract %10 : $(Builtin.Int64, Builtin.Int1), 1 // user: %12
+  cond_fail %11 : $Builtin.Int1                   // id: %12
+  %13 = apply %7() : $@convention(thin) () -> ()
+  %14 = integer_literal $Builtin.Int64, 3         // user: %15
+  %15 = builtin "usub_with_overflow_Int64"(%2 : $Builtin.Int64, %14 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %16
+  %16 = tuple_extract %15 : $(Builtin.Int64, Builtin.Int1), 1 // user: %17
+  cond_fail %16 : $Builtin.Int1                   // id: %17
+  %18 = apply %7() : $@convention(thin) () -> ()
+  %19 = integer_literal $Builtin.Int64, 5         // user: %20
+  %20 = builtin "usub_with_overflow_Int64"(%2 : $Builtin.Int64, %19 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %21
+  %21 = tuple_extract %20 : $(Builtin.Int64, Builtin.Int1), 1 // user: %22
+  cond_fail %21 : $Builtin.Int1                   // id: %22
+  %23 = apply %7() : $@convention(thin) () -> ()
+  %24 = integer_literal $Builtin.Int64, 10        // user: %25
+  %25 = builtin "usub_with_overflow_Int64"(%2 : $Builtin.Int64, %24 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %26
+  %26 = tuple_extract %25 : $(Builtin.Int64, Builtin.Int1), 1 // user: %27
+  cond_fail %26 : $Builtin.Int1                   // id: %27
+  %28 = apply %7() : $@convention(thin) () -> ()
+  %29 = apply %7() : $@convention(thin) () -> ()
+  %30 = tuple ()                                  // user: %31
+  return %30 : $()                                // id: %31
+}
+
+// CHECK-LABEL: @signed_sub_previous_traps
+sil hidden @signed_sub_previous_traps : $@convention(thin) (Int64) -> () {
+bb0(%0 : $Int64):
+  %1 = integer_literal $Builtin.Int64, 9          // user: %4
+  %2 = struct_extract %0 : $Int64, #Int64._value       // users: %4, %10, %15, %20, %25
+  %3 = integer_literal $Builtin.Int1, -1          // users: %4, %10, %15, %20, %25
+  %4 = builtin "ssub_with_overflow_Int64"(%2 : $Builtin.Int64, %1 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %5
+  %5 = tuple_extract %4 : $(Builtin.Int64, Builtin.Int1), 1 // user: %6
+// Keep this condfail because it is the first one.
+// CHECK: cond_fail
+  cond_fail %5 : $Builtin.Int1                    // id: %6
+  %7 = function_ref @sink_unsigned_int : $@convention(thin) () -> () // users: %8, %13, %18, %23, %28, %29
+  %8 = apply %7() : $@convention(thin) () -> ()
+  %9 = integer_literal $Builtin.Int64, 2          // user: %10
+  %10 = builtin "ssub_with_overflow_Int64"(%2 : $Builtin.Int64, %9 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %11
+  %11 = tuple_extract %10 : $(Builtin.Int64, Builtin.Int1), 1 // user: %12
+  cond_fail %11 : $Builtin.Int1                   // id: %12
+  %13 = apply %7() : $@convention(thin) () -> ()
+  %14 = integer_literal $Builtin.Int64, 3         // user: %15
+  %15 = builtin "ssub_with_overflow_Int64"(%2 : $Builtin.Int64, %14 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %16
+  %16 = tuple_extract %15 : $(Builtin.Int64, Builtin.Int1), 1 // user: %17
+  cond_fail %16 : $Builtin.Int1                   // id: %17
+  %18 = apply %7() : $@convention(thin) () -> ()
+  %19 = integer_literal $Builtin.Int64, 5         // user: %20
+  %20 = builtin "ssub_with_overflow_Int64"(%2 : $Builtin.Int64, %19 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %21
+  %21 = tuple_extract %20 : $(Builtin.Int64, Builtin.Int1), 1 // user: %22
+  cond_fail %21 : $Builtin.Int1                   // id: %22
+  %23 = apply %7() : $@convention(thin) () -> ()
+  %24 = integer_literal $Builtin.Int64, 10        // user: %25
+  %25 = builtin "ssub_with_overflow_Int64"(%2 : $Builtin.Int64, %24 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %26
+  %26 = tuple_extract %25 : $(Builtin.Int64, Builtin.Int1), 1 // user: %27
+// Keep this condfail because it is not in the guarded range.
+// CHECK: cond_fail
+  cond_fail %26 : $Builtin.Int1                   // id: %27
+  %28 = apply %7() : $@convention(thin) () -> ()
+  %29 = apply %7() : $@convention(thin) () -> ()
+  %30 = tuple ()                                  // user: %31
+// CHECK-NOT: cond_fail
+// CHECK: return
+  return %30 : $()                                // id: %31
+}
+
+// CHECK-LABEL: @unsigned_add_previous_traps
+sil hidden @unsigned_add_previous_traps : $@convention(thin) (UInt64) -> () {
+bb0(%0 : $UInt64):
+  %1 = integer_literal $Builtin.Int64, 9          // user: %4
+  %2 = struct_extract %0 : $UInt64, #UInt64._value     // users: %4, %10, %15, %20, %25
+  %3 = integer_literal $Builtin.Int1, -1          // users: %4, %10, %15, %20, %25
+  %4 = builtin "uadd_with_overflow_Int64"(%2 : $Builtin.Int64, %1 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %5
+  %5 = tuple_extract %4 : $(Builtin.Int64, Builtin.Int1), 1 // user: %6
+// Keep the first condfail.
+//CHECK: cond_fail
+  cond_fail %5 : $Builtin.Int1                    // id: %6
+  %7 = function_ref @sink_signed_int : $@convention(thin) () -> () // users: %8, %13, %18, %23, %28, %29
+  %8 = apply %7() : $@convention(thin) () -> ()
+  %9 = integer_literal $Builtin.Int64, 2          // user: %10
+  %10 = builtin "uadd_with_overflow_Int64"(%2 : $Builtin.Int64, %9 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %11
+  %11 = tuple_extract %10 : $(Builtin.Int64, Builtin.Int1), 1 // user: %12
+  cond_fail %11 : $Builtin.Int1                   // id: %12
+  %13 = apply %7() : $@convention(thin) () -> ()
+  %14 = integer_literal $Builtin.Int64, 3         // user: %15
+  %15 = builtin "uadd_with_overflow_Int64"(%2 : $Builtin.Int64, %14 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %16
+  %16 = tuple_extract %15 : $(Builtin.Int64, Builtin.Int1), 1 // user: %17
+  cond_fail %16 : $Builtin.Int1                   // id: %17
+  %18 = apply %7() : $@convention(thin) () -> ()
+  %19 = integer_literal $Builtin.Int64, 5         // user: %20
+  %20 = builtin "uadd_with_overflow_Int64"(%2 : $Builtin.Int64, %19 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %21
+  %21 = tuple_extract %20 : $(Builtin.Int64, Builtin.Int1), 1 // user: %22
+  cond_fail %21 : $Builtin.Int1                   // id: %22
+  %23 = apply %7() : $@convention(thin) () -> ()
+  %24 = integer_literal $Builtin.Int64, 10        // user: %25
+  %25 = builtin "uadd_with_overflow_Int64"(%2 : $Builtin.Int64, %24 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %26
+  %26 = tuple_extract %25 : $(Builtin.Int64, Builtin.Int1), 1 // user: %27
+// Keep the out-of-range condfail.
+//CHECK: cond_fail
+  cond_fail %26 : $Builtin.Int1                   // id: %27
+  %28 = apply %7() : $@convention(thin) () -> ()
+  %29 = apply %7() : $@convention(thin) () -> ()
+  %30 = tuple ()                                  // user: %31
+// CHECK-NOT: cond_fail
+// CHECK: return
+  return %30 : $()                                // id: %31
+}
+
+// CHECK-LABEL: @signed_add_previous_traps
+// Keep the first condfail
+// CHECK: cond_fail
+// Keep out-of-range condfail
+// CHECK: cond_fail
+// CHECK-NOT: cond_fail
+// CHECK: return
+sil hidden @signed_add_previous_traps : $@convention(thin) (Int64) -> () {
+bb0(%0 : $Int64):
+  %1 = integer_literal $Builtin.Int64, 9          // user: %4
+  %2 = struct_extract %0 : $Int64, #Int64._value       // users: %4, %10, %15, %20, %25
+  %3 = integer_literal $Builtin.Int1, -1          // users: %4, %10, %15, %20, %25
+  %4 = builtin "sadd_with_overflow_Int64"(%2 : $Builtin.Int64, %1 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %5
+  %5 = tuple_extract %4 : $(Builtin.Int64, Builtin.Int1), 1 // user: %6
+  cond_fail %5 : $Builtin.Int1                    // id: %6
+  %7 = function_ref @sink_unsigned_int : $@convention(thin) () -> () // users: %8, %13, %18, %23, %28, %29
+  %8 = apply %7() : $@convention(thin) () -> ()
+  %9 = integer_literal $Builtin.Int64, 2          // user: %10
+  %10 = builtin "sadd_with_overflow_Int64"(%2 : $Builtin.Int64, %9 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %11
+  %11 = tuple_extract %10 : $(Builtin.Int64, Builtin.Int1), 1 // user: %12
+  cond_fail %11 : $Builtin.Int1                   // id: %12
+  %13 = apply %7() : $@convention(thin) () -> ()
+  %14 = integer_literal $Builtin.Int64, 3         // user: %15
+  %15 = builtin "sadd_with_overflow_Int64"(%2 : $Builtin.Int64, %14 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %16
+  %16 = tuple_extract %15 : $(Builtin.Int64, Builtin.Int1), 1 // user: %17
+  cond_fail %16 : $Builtin.Int1                   // id: %17
+  %18 = apply %7() : $@convention(thin) () -> ()
+  %19 = integer_literal $Builtin.Int64, 5         // user: %20
+  %20 = builtin "sadd_with_overflow_Int64"(%2 : $Builtin.Int64, %19 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %21
+  %21 = tuple_extract %20 : $(Builtin.Int64, Builtin.Int1), 1 // user: %22
+  cond_fail %21 : $Builtin.Int1                   // id: %22
+  %23 = apply %7() : $@convention(thin) () -> ()
+  %24 = integer_literal $Builtin.Int64, 10        // user: %25
+  %25 = builtin "sadd_with_overflow_Int64"(%2 : $Builtin.Int64, %24 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %26
+  %26 = tuple_extract %25 : $(Builtin.Int64, Builtin.Int1), 1 // user: %27
+  cond_fail %26 : $Builtin.Int1                   // id: %27
+  %28 = apply %7() : $@convention(thin) () -> ()
+  %29 = apply %7() : $@convention(thin) () -> ()
+  %30 = tuple ()                                  // user: %31
+  return %30 : $()                                // id: %31
+}
+
+// CHECK-LABEL: @add1_signed_branch
+// CHECK-NOT: cond_fail
+// CHECK: return
+sil hidden @add1_signed_branch : $@convention(thin) (Int64, Int64) -> () {
+bb0(%0 : $Int64, %1 : $Int64):
+  %2 = struct_extract %0 : $Int64, #Int64._value       // users: %4, %8, %14
+  %3 = struct_extract %1 : $Int64, #Int64._value       // user: %4
+  %4 = builtin "cmp_slt_Int64"(%2 : $Builtin.Int64, %3 : $Builtin.Int64) : $Builtin.Int1 // user: %5
+  cond_br %4, bb1, bb2                            // id: %5
+
+bb1:                                              // Preds: bb0
+  %6 = integer_literal $Builtin.Int64, 1          // user: %8
+  %7 = integer_literal $Builtin.Int1, -1          // users: %8, %14
+  %8 = builtin "sadd_with_overflow_Int64"(%2 : $Builtin.Int64, %6 : $Builtin.Int64, %7 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %9
+  %9 = tuple_extract %8 : $(Builtin.Int64, Builtin.Int1), 1 // user: %10
+  cond_fail %9 : $Builtin.Int1                    // id: %10
+  %11 = function_ref @sink_unsigned_int : $@convention(thin) () -> () // users: %12, %17
+  %12 = apply %11() : $@convention(thin) () -> ()
+  %13 = integer_literal $Builtin.Int64, 2         // user: %14
+  %14 = builtin "sadd_with_overflow_Int64"(%2 : $Builtin.Int64, %13 : $Builtin.Int64, %7 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %15
+  %15 = tuple_extract %14 : $(Builtin.Int64, Builtin.Int1), 1 // user: %16
+  cond_fail %9 : $Builtin.Int1                   // id: %16
+  %17 = apply %11() : $@convention(thin) () -> ()
+  br bb2                                          // id: %18
+
+bb2:                                              // Preds: bb0 bb1
+  %19 = tuple ()                                  // user: %20
+  return %19 : $()                                // id: %20
+}
+
+// CHECK-LABEL: @add1_unsigned_branch
+// CHECK-NOT: cond_fail
+// CHECK: return
+sil hidden @add1_unsigned_branch : $@convention(thin) (UInt64, UInt64) -> () {
+bb0(%0 : $UInt64, %1 : $UInt64):
+  %2 = struct_extract %0 : $UInt64, #UInt64._value     // users: %4, %8, %14
+  %3 = struct_extract %1 : $UInt64, #UInt64._value     // user: %4
+  %4 = builtin "cmp_ult_Int64"(%2 : $Builtin.Int64, %3 : $Builtin.Int64) : $Builtin.Int1 // user: %5
+  cond_br %4, bb1, bb2                            // id: %5
+
+bb1:                                              // Preds: bb0
+  %6 = integer_literal $Builtin.Int64, 1          // user: %8
+  %7 = integer_literal $Builtin.Int1, -1          // users: %8, %14
+  %8 = builtin "uadd_with_overflow_Int64"(%2 : $Builtin.Int64, %6 : $Builtin.Int64, %7 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %9
+  %9 = tuple_extract %8 : $(Builtin.Int64, Builtin.Int1), 1 // user: %10
+  cond_fail %9 : $Builtin.Int1                    // id: %10
+  %11 = function_ref @sink_signed_int : $@convention(thin) () -> () // users: %12, %17
+  %12 = apply %11() : $@convention(thin) () -> ()
+  %13 = integer_literal $Builtin.Int64, 2         // user: %14
+  %14 = builtin "uadd_with_overflow_Int64"(%2 : $Builtin.Int64, %13 : $Builtin.Int64, %7 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %15
+  %15 = tuple_extract %14 : $(Builtin.Int64, Builtin.Int1), 1 // user: %16
+  cond_fail %9 : $Builtin.Int1                   // id: %16
+  %17 = apply %11() : $@convention(thin) () -> ()
+  br bb2                                          // id: %18
+
+bb2:                                              // Preds: bb0 bb1
+  %19 = tuple ()                                  // user: %20
+  return %19 : $()                                // id: %20
+}
+
+// CHECK-LABEL: @remove_past_checks
+sil hidden @remove_past_checks : $@convention(thin) (Int64) -> () {
+bb0(%0 : $Int64):
+  %1 = integer_literal $Builtin.Int64, 1          // user: %4
+  %2 = struct_extract %0 : $Int64, #Int64._value       // users: %4, %8, %12, %16, %20
+  %3 = integer_literal $Builtin.Int1, -1          // users: %4, %8, %12, %16, %20
+// CHECK: sadd_with_overflow_Int64
+  %4 = builtin "sadd_with_overflow_Int64"(%2 : $Builtin.Int64, %1 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %5
+  %5 = tuple_extract %4 : $(Builtin.Int64, Builtin.Int1), 1 // user: %6
+// CHECK-NOT: cond_fail
+  cond_fail %5 : $Builtin.Int1                    // id: %6
+  %7 = integer_literal $Builtin.Int64, 2          // user: %8
+// CHECK: sadd_with_overflow_Int64
+  %8 = builtin "sadd_with_overflow_Int64"(%2 : $Builtin.Int64, %7 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %9
+  %9 = tuple_extract %8 : $(Builtin.Int64, Builtin.Int1), 1 // user: %10
+// CHECK-NOT: cond_fail
+  cond_fail %9 : $Builtin.Int1                    // id: %10
+  %11 = integer_literal $Builtin.Int64, 3         // user: %12
+// CHECK: sadd_with_overflow_Int64
+  %12 = builtin "sadd_with_overflow_Int64"(%2 : $Builtin.Int64, %11 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %13
+  %13 = tuple_extract %12 : $(Builtin.Int64, Builtin.Int1), 1 // user: %14
+// CHECK-NOT: cond_fail
+  cond_fail %13 : $Builtin.Int1                   // id: %14
+  %15 = integer_literal $Builtin.Int64, 4         // user: %16
+// CHECK: sadd_with_overflow_Int64
+  %16 = builtin "sadd_with_overflow_Int64"(%2 : $Builtin.Int64, %15 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %17
+  %17 = tuple_extract %16 : $(Builtin.Int64, Builtin.Int1), 1 // user: %18
+// CHECK-NOT: cond_fail
+  cond_fail %17 : $Builtin.Int1                   // id: %18
+  %19 = integer_literal $Builtin.Int64, 5         // user: %20
+// CHECK: sadd_with_overflow_Int64
+  %20 = builtin "sadd_with_overflow_Int64"(%2 : $Builtin.Int64, %19 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %21
+  %21 = tuple_extract %20 : $(Builtin.Int64, Builtin.Int1), 1 // user: %22
+// We keep the last cond-fail, which is enough to guard all the others.
+// CHECK: cond_fail
+  cond_fail %21 : $Builtin.Int1                   // id: %22
+  %23 = tuple ()                                  // user: %24
+// CHECK: return
+  return %23 : $()                                // id: %24
+}
+
+
+// Make sure we are not crashing on this one (and that we are not removing the condfails)
+// This comes from the following test:
+//func foo(x : Int64, y : Int8) {
+//  3 + x
+//  2 + y
+//}
+// CHECK-LABEL: @bitwidth_crash
+// CHECK: cond_fail
+// CHECK: cond_fail
+// CHECK: return
+sil hidden @bitwidth_crash : $@convention(thin) (Int64, Int8) -> () {
+bb0(%0 : $Int64, %1 : $Int8):
+  %2 = integer_literal $Builtin.Int64, 3          // user: %5
+  %3 = struct_extract %0 : $Int64, #Int64._value       // user: %5
+  %4 = integer_literal $Builtin.Int1, -1          // users: %5, %10
+  %5 = builtin "sadd_with_overflow_Int64"(%2 : $Builtin.Int64, %3 : $Builtin.Int64, %4 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %6
+  %6 = tuple_extract %5 : $(Builtin.Int64, Builtin.Int1), 1 // user: %7
+  cond_fail %6 : $Builtin.Int1                    // id: %7
+  %8 = integer_literal $Builtin.Int8, 2           // user: %10
+  %9 = struct_extract %1 : $Int8, #Int8._value     // user: %10
+  %10 = builtin "sadd_with_overflow_Int8"(%8 : $Builtin.Int8, %9 : $Builtin.Int8, %4 : $Builtin.Int1) : $(Builtin.Int8, Builtin.Int1) // user: %11
+  %11 = tuple_extract %10 : $(Builtin.Int8, Builtin.Int1), 1 // user: %12
+  cond_fail %11 : $Builtin.Int1                   // id: %12
+  %13 = tuple ()                                  // user: %14
+  return %13 : $()                                // id: %14
+}
+
+// CHECK-LABEL: @signed_cmpeq_sub
+// CHECK-NOT: cond_fail
+// CHECK: return
+sil hidden @signed_cmpeq_sub : $@convention(thin) (Int64) -> () {
+bb0(%0 : $Int64):
+  %1 = integer_literal $Builtin.Int64, 3          // users: %3, %12
+  %2 = struct_extract %0 : $Int64, #Int64._value       // users: %3, %7, %12
+  %3 = builtin "cmp_ne_Int64"(%2 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1 // user: %4
+  cond_br %3, bb1, bb2                            // id: %4
+
+bb1:                                              // Preds: bb0
+  %5 = integer_literal $Builtin.Int64, 999        // user: %7
+  %6 = integer_literal $Builtin.Int1, -1          // user: %7
+  %7 = builtin "sadd_with_overflow_Int64"(%2 : $Builtin.Int64, %5 : $Builtin.Int64, %6 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %8
+  %8 = tuple_extract %7 : $(Builtin.Int64, Builtin.Int1), 1 // user: %9
+  %9 = tuple_extract %7 : $(Builtin.Int64, Builtin.Int1), 1 // user: %9
+  br bb3                                          // id: %10
+
+bb2:                                              // Preds: bb0
+  %11 = integer_literal $Builtin.Int1, -1         // user: %12
+  %12 = builtin "ssub_with_overflow_Int64"(%2 : $Builtin.Int64, %1 : $Builtin.Int64, %11 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %13
+  %13 = tuple_extract %12 : $(Builtin.Int64, Builtin.Int1), 1 // user: %14
+  cond_fail %13 : $Builtin.Int1                   // id: %14
+  br bb3                                          // id: %15
+
+bb3:                                              // Preds: bb1 bb2
+  %16 = tuple ()                                  // user: %17
+  return %16 : $()                                // id: %17
+}
+
+
+// CHECK-LABEL: @unsigned_cmpeq_sub
+// CHECK-NOT: cond_fail
+// CHECK: return
+sil hidden @unsigned_cmpeq_sub : $@convention(thin) (UInt64) -> () {
+bb0(%0 : $UInt64):
+  %1 = integer_literal $Builtin.Int64, 3          // users: %3, %12
+  %2 = struct_extract %0 : $UInt64, #UInt64._value // users: %3, %7, %12
+  %3 = builtin "cmp_ne_Int64"(%2 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1 // user: %4
+  cond_br %3, bb1, bb2                            // id: %4
+
+bb1:                                              // Preds: bb0
+  %5 = integer_literal $Builtin.Int64, 999        // user: %7
+  %6 = integer_literal $Builtin.Int1, -1          // user: %7
+  %7 = builtin "uadd_with_overflow_Int64"(%2 : $Builtin.Int64, %5 : $Builtin.Int64, %6 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %8
+  %8 = tuple_extract %7 : $(Builtin.Int64, Builtin.Int1), 1 // user: %9
+  %9 = tuple_extract %7 : $(Builtin.Int64, Builtin.Int1), 1 // user: %9
+  br bb3                                          // id: %10
+
+bb2:                                              // Preds: bb0
+  %11 = integer_literal $Builtin.Int1, -1         // user: %12
+  %12 = builtin "usub_with_overflow_Int64"(%2 : $Builtin.Int64, %1 : $Builtin.Int64, %11 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %13
+  %13 = tuple_extract %12 : $(Builtin.Int64, Builtin.Int1), 1 // user: %14
+  cond_fail %13 : $Builtin.Int1                   // id: %14
+  br bb3                                          // id: %15
+
+bb3:                                              // Preds: bb1 bb2
+  %16 = tuple ()                                  // user: %17
+  return %16 : $()                                // id: %17
+}
+
+
+// CHECK-LABEL: @signed_mul_previous_traps
+// Keep the first condfail but remove the second one.
+// CHECK: cond_fail
+// CHECK-NOT: cond_fail
+// CHECK: return
+sil hidden @signed_mul_previous_traps : $@convention(thin) (Int64) -> () {
+bb0(%0 : $Int64):
+  %1 = integer_literal $Builtin.Int64, 9          // user: %4
+  %2 = struct_extract %0 : $Int64, #Int64._value       // users: %4, %10, %15, %20, %25
+  %3 = integer_literal $Builtin.Int1, -1          // users: %4, %10, %15, %20, %25
+  %4 = builtin "smul_with_overflow_Int64"(%2 : $Builtin.Int64, %1 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %5
+  %5 = tuple_extract %4 : $(Builtin.Int64, Builtin.Int1), 1 // user: %6
+  cond_fail %5 : $Builtin.Int1                    // id: %6
+
+  %7 = integer_literal $Builtin.Int64, 2
+  %8 = builtin "smul_with_overflow_Int64"(%7 : $Builtin.Int64, %2 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %11
+  %9 = tuple_extract %8 : $(Builtin.Int64, Builtin.Int1), 1 // user: %12
+
+  // We can remove this check.
+  cond_fail %9 : $Builtin.Int1
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// CHECK-LABEL: @unsigned_mul_previous_traps
+// Keep the first condfail but remove the second one.
+// CHECK: umul_with_overflow_Int64
+// CHECK: cond_fail
+// CHECK: umul_with_overflow_Int64
+// CHECK-NOT: cond_fail
+// CHECK: return
+sil hidden @unsigned_mul_previous_traps : $@convention(thin) (Int64) -> () {
+bb0(%0 : $Int64):
+  %1 = integer_literal $Builtin.Int64, 9          // user: %4
+  %2 = struct_extract %0 : $Int64, #Int64._value       // users: %4, %10, %15, %20, %25
+  %3 = integer_literal $Builtin.Int1, -1          // users: %4, %10, %15, %20, %25
+  %4 = builtin "umul_with_overflow_Int64"(%2 : $Builtin.Int64, %1 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %5
+  %5 = tuple_extract %4 : $(Builtin.Int64, Builtin.Int1), 1 // user: %6
+  cond_fail %5 : $Builtin.Int1                    // id: %6
+
+  %7 = integer_literal $Builtin.Int64, 2
+  %8 = builtin "umul_with_overflow_Int64"(%7 : $Builtin.Int64, %2 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %11
+  %9 = tuple_extract %8 : $(Builtin.Int64, Builtin.Int1), 1 // user: %12
+
+  // We can remove this check.
+  cond_fail %9 : $Builtin.Int1
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// CHECK-LABEL: @signed_mul_previous_traps_neg
+// CHECK: smul_with_overflow_Int64
+// CHECK: smul_with_overflow_Int64
+// Make sure we keep the last overflow check.
+// CHECK: cond_fail
+// CHECK: return
+sil hidden @signed_mul_previous_traps_neg : $@convention(thin) (Int64) -> () {
+bb0(%0 : $Int64):
+  %1 = integer_literal $Builtin.Int64, 9          // user: %4
+  %2 = struct_extract %0 : $Int64, #Int64._value       // users: %4, %10, %15, %20, %25
+  %3 = integer_literal $Builtin.Int1, -1          // users: %4, %10, %15, %20, %25
+
+  // This is X * 9
+  // We can remove this check because the following check will guard us: abs(-100) > abs(9).
+  %4 = builtin "smul_with_overflow_Int64"(%2 : $Builtin.Int64, %1 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %5
+  %5 = tuple_extract %4 : $(Builtin.Int64, Builtin.Int1), 1 // user: %6
+  cond_fail %5 : $Builtin.Int1                    // id: %6
+
+  %7 = integer_literal $Builtin.Int64, -100
+  %8 = builtin "smul_with_overflow_Int64"(%7 : $Builtin.Int64, %2 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %11
+  %9 = tuple_extract %8 : $(Builtin.Int64, Builtin.Int1), 1 // user: %12
+
+  // This is -100 * X. We can't remove this check because abs(-100) > abs(9).
+  cond_fail %9 : $Builtin.Int1
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// CHECK-LABEL: @signed_mul_previous_traps_abs_neg
+// CHECK: smul_with_overflow_Int64
+// CHECK: cond_fail
+// CHECK: smul_with_overflow_Int64
+// CHECK-NOT: cond_fail
+// CHECK: return
+sil hidden @signed_mul_previous_traps_abs_neg : $@convention(thin) (Int64) -> () {
+bb0(%0 : $Int64):
+  %1 = integer_literal $Builtin.Int64, 1000          // user: %4
+  %2 = struct_extract %0 : $Int64, #Int64._value       // users: %4, %10, %15, %20, %25
+  %3 = integer_literal $Builtin.Int1, -1          // users: %4, %10, %15, %20, %25
+
+  // This is X * 9
+  %4 = builtin "smul_with_overflow_Int64"(%2 : $Builtin.Int64, %1 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %5
+  %5 = tuple_extract %4 : $(Builtin.Int64, Builtin.Int1), 1 // user: %6
+  cond_fail %5 : $Builtin.Int1                    // id: %6
+
+  %7 = integer_literal $Builtin.Int64, -100
+  %8 = builtin "smul_with_overflow_Int64"(%7 : $Builtin.Int64, %2 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %11
+  %9 = tuple_extract %8 : $(Builtin.Int64, Builtin.Int1), 1 // user: %12
+
+  // This is -100 * X. We can remove this check because abs(-100) < abs(1000).
+  cond_fail %9 : $Builtin.Int1
+  %10 = tuple ()
+  return %10 : $()
+}
+
+
+// CHECK-LABEL: @signed_mul_previous_traps_abs_neg2
+// CHECK: smul_with_overflow_Int64
+// CHECK: cond_fail
+// CHECK: smul_with_overflow_Int64
+// CHECK-NOT: cond_fail
+// CHECK: return
+sil hidden @signed_mul_previous_traps_abs_neg2 : $@convention(thin) (Int64) -> () {
+bb0(%0 : $Int64):
+  %1 = integer_literal $Builtin.Int64, 1000          // user: %4
+  %2 = struct_extract %0 : $Int64, #Int64._value       // users: %4, %10, %15, %20, %25
+  %3 = integer_literal $Builtin.Int1, -1          // users: %4, %10, %15, %20, %25
+
+  // This is X * 9
+  %4 = builtin "smul_with_overflow_Int64"(%2 : $Builtin.Int64, %1 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %5
+  %5 = tuple_extract %4 : $(Builtin.Int64, Builtin.Int1), 1 // user: %6
+  cond_fail %5 : $Builtin.Int1                    // id: %6
+
+  %7 = integer_literal $Builtin.Int64, -100
+  %8 = builtin "smul_with_overflow_Int64"(%7 : $Builtin.Int64, %2 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %11
+  %9 = tuple_extract %8 : $(Builtin.Int64, Builtin.Int1), 1 // user: %12
+
+  // This is -100 * X. We can remove this check because abs(-100) < abs(1000).
+  cond_fail %9 : $Builtin.Int1
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// CHECK-LABEL: @signed_mul_traps_min_int
+// CHECK: smul_with_overflow_Int64
+// CHECK: cond_fail
+// CHECK: smul_with_overflow_Int64
+// CHECK: cond_fail
+// CHECK: return
+sil hidden @signed_mul_traps_min_int : $@convention(thin) (Int64) -> () {
+bb0(%0 : $Int64):
+  %1 = integer_literal $Builtin.Int64, 1          // user: %4
+  %2 = struct_extract %0 : $Int64, #Int64._value       // users: %4, %10, %15, %20, %25
+  %3 = integer_literal $Builtin.Int1, -1          // users: %4, %10, %15, %20, %25
+
+  // This is X * 9
+  %4 = builtin "smul_with_overflow_Int64"(%2 : $Builtin.Int64, %1 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %5
+  %5 = tuple_extract %4 : $(Builtin.Int64, Builtin.Int1), 1 // user: %6
+  cond_fail %5 : $Builtin.Int1                    // id: %6
+
+  %7 = integer_literal $Builtin.Int64, -1
+  %8 = builtin "smul_with_overflow_Int64"(%7 : $Builtin.Int64, %2 : $Builtin.Int64, %3 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // user: %11
+  %9 = tuple_extract %8 : $(Builtin.Int64, Builtin.Int1), 1 // user: %12
+
+  // This is -1 * X. We can remove this check because X could be MIN_INT, and the result will overflow.
+  cond_fail %9 : $Builtin.Int1
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// CHECK-LABEL: @signed_min_int_comparison
+// CHECK: smul_with_overflow_Int8
+// CHECK: cond_fail
+// CHECK: smul_with_overflow_Int8
+// CHECK-NOT: cond_fail
+// CHECK: return
+sil hidden @signed_min_int_comparison : $@convention(thin) (Int8) -> () {
+bb0(%0 : $Int8):
+  %1 = integer_literal $Builtin.Int8, -128
+  %2 = struct_extract %0 : $Int8, #Int8._value
+  %3 = integer_literal $Builtin.Int1, -1
+
+  %4 = builtin "smul_with_overflow_Int8"(%2 : $Builtin.Int8, %1 : $Builtin.Int8, %3 : $Builtin.Int1) : $(Builtin.Int8, Builtin.Int1)
+  %5 = tuple_extract %4 : $(Builtin.Int8, Builtin.Int1), 1
+  cond_fail %5 : $Builtin.Int1
+
+  %7 = integer_literal $Builtin.Int8, 127
+  %8 = builtin "smul_with_overflow_Int8"(%2 : $Builtin.Int8, %7 : $Builtin.Int8, %3 : $Builtin.Int1) : $(Builtin.Int8, Builtin.Int1) // user: %11
+  %9 = tuple_extract %8 : $(Builtin.Int8, Builtin.Int1), 1 // user: %12
+
+  cond_fail %9 : $Builtin.Int1
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// CHECK-LABEL: @crash_unary_comparator
+// CHECK: return
+sil hidden @crash_unary_comparator : $@convention(thin) (Builtin.Int32) -> () {
+bb0(%0 : $Builtin.Int32):
+  %1 = builtin "trunc_Int32_Int1"(%0 : $Builtin.Int32) : $Builtin.Int1
+  cond_br %1, bb1, bb2                            // id: %4
+
+bb1:                                              // Preds: bb0
+  br bb3                                          // id: %10
+
+bb2:                                              // Preds: bb0
+  br bb3                                          // id: %15
+
+bb3:                                              // Preds: bb1 bb2
+  %3 = tuple ()                                  // user: %17
+  return %3 : $()                                // id: %17
+}
+
+// Check that we are not crashing on arithmetic of different kinds
+// that makes formulas of different types.
+sil hidden @mixed_types : $@convention(thin) (Int8) -> () {
+bb0(%0 : $Int8):
+  %1 = integer_literal $Builtin.Int8, -128
+  %2 = struct_extract %0 : $Int8, #Int8._value
+  %3 = integer_literal $Builtin.Int1, -1
+  %4 = builtin "smul_with_overflow_Int8"(%2 : $Builtin.Int8, %1 : $Builtin.Int8, %3 : $Builtin.Int1) : $(Builtin.Int8, Builtin.Int1)
+  %5 = tuple_extract %4 : $(Builtin.Int8, Builtin.Int1), 1
+  cond_fail %5 : $Builtin.Int1
+
+  %v0 = integer_literal $Builtin.Int32, 128
+  %v1 = integer_literal $Builtin.Int32, 128
+  %v4 = builtin "smul_with_overflow_Int32"(%v1 : $Builtin.Int32, %v0 : $Builtin.Int32, %3 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %v5 = tuple_extract %v4 : $(Builtin.Int32, Builtin.Int1), 1
+  cond_fail %v5 : $Builtin.Int1
+
+
+  %g0 = integer_literal $Builtin.Int64, 2
+  %g1 = integer_literal $Builtin.Int64, 1
+  %g3 = builtin "cmp_slt_Int64"(%g0 : $Builtin.Int64, %g1 : $Builtin.Int64) : $Builtin.Int1
+  cond_fail %g3 : $Builtin.Int1
+
+  %t0 = integer_literal $Builtin.Int32, 2
+  %t1 = integer_literal $Builtin.Int32, 1
+  %t3 = builtin "cmp_slt_Int32"(%t0 : $Builtin.Int32, %t1 : $Builtin.Int32) : $Builtin.Int1
+  cond_fail %t3 : $Builtin.Int1
+
+  %ret = tuple ()
+  return %ret : $()
+}
+
+//  Check that the optimization can handle even patterns like this:
+//  %cmp_result = builtin "cmp_ult_Int64"(%x : $Builtin.Int64, %y : $Builtin.Int64) : $Builtin.Int1
+//  This cond_fail formula should be registered!
+//  cond_fail %cmp_result : $Builtin.Int1
+//  At this point we know that x >= y
+//  %usub_result = builtin "usub_with_overflow_Int64"(%x : $Builtin.Int64, %y : $Builtin.Int64, %check_overfow : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+//  %usub_val = tuple_extract %usub_result : $(Builtin.Int64, Builtin.Int1), 0
+//  We can figure out that x - y will not underflow because of x >= y
+//  %usub_underverflow = tuple_extract %usub_result : $(Builtin.Int64, Builtin.Int1), 1
+//  cond_fail %usub_underflow : $Builtin.Int1
+
+// CHECK-LABEL: sil @cond_fail_of_cmp
+// CHECK: cond_fail
+// Second cond_fail should be removed, because it never fails.
+// CHECK-NOT: cond_fail
+// CHECK: // end sil function 'cond_fail_of_cmp' 
+sil @cond_fail_of_cmp : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> () {
+bb0(%x : $Builtin.Int64, %y: $Builtin.Int64):
+  %cmp_result = builtin "cmp_ult_Int64"(%x : $Builtin.Int64, %y : $Builtin.Int64) : $Builtin.Int1
+  //  This cond_fail formula should be registered!
+  cond_fail %cmp_result : $Builtin.Int1
+  %check_overflow = integer_literal $Builtin.Int1, -1
+  //  At this point we know that x >= y
+  %usub_result = builtin "usub_with_overflow_Int64"(%x : $Builtin.Int64, %y : $Builtin.Int64, %check_overflow : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %usub_val = tuple_extract %usub_result : $(Builtin.Int64, Builtin.Int1), 0
+  //  We can figure out that x - y will not underflow because of x >= y
+  %usub_underflow = tuple_extract %usub_result : $(Builtin.Int64, Builtin.Int1), 1
+  cond_fail %usub_underflow : $Builtin.Int1
+
+  %ret = tuple ()
+  return %ret : $()
+} // end sil function 'cond_fail_of_cmp'

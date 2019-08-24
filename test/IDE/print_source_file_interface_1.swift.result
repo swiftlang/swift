@@ -1,0 +1,17 @@
+// Copyright (c) 452 Attila the Hun. All rights reserved.
+// Blah Blah.
+
+// More blah blah.
+
+import Swift
+
+internal class FooDisabled {
+}
+internal typealias MyN = Int
+
+public class MyClass {
+
+    internal func doit(x: Int)
+
+    internal func doFooDisabled()
+}

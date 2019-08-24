@@ -1,0 +1,10 @@
+// RUN: %target-typecheck-verify-swift
+
+typealias Int = ()
+
+deinit // expected-error {{deinitializers may only be declared within a class}}
+
+subscript (x : Int, y : Int) -> Int { get }// expected-error{{'subscript' functions may only be declared within a type}}
+
+init(i:Int) // expected-error {{initializers may only be declared within a type}}
+

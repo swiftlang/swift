@@ -1,0 +1,139 @@
+%{
+
+# RUN: %empty-directory(%t) && %gyb %s | %FileCheck %s
+
+from __future__ import print_function
+
+from GYBUnicodeDataUtils import *
+
+def test_trie_generation(property_table, configure_generator=None):
+    trie_generator = UnicodeTrieGenerator()
+    if configure_generator is not None:
+        configure_generator(trie_generator)
+    trie_generator.create_tables()
+    trie_generator.fill_from_unicode_property(property_table)
+    trie_generator.verify(property_table)
+    trie_generator.freeze()
+    trie_generator.verify(property_table)
+    trie_generator.serialize(property_table)
+    print((
+        trie_generator.bmp_first_level_index_bits,
+        trie_generator.bmp_data_offset_bits,
+        trie_generator.supp_first_level_index_bits,
+        trie_generator.supp_second_level_index_bits,
+        trie_generator.supp_data_offset_bits,
+
+        trie_generator.bmp_lookup_bytes_per_entry,
+        trie_generator.bmp_data_bytes_per_entry,
+        trie_generator.supp_lookup1_bytes_per_entry,
+        trie_generator.supp_lookup2_bytes_per_entry,
+        trie_generator.supp_data_bytes_per_entry,
+
+        len(trie_generator.trie_bytes),
+
+        trie_generator.bmp_data_bytes_offset - trie_generator.bmp_lookup_bytes_offset,
+        trie_generator.supp_lookup1_bytes_offset - trie_generator.bmp_data_bytes_offset,
+        trie_generator.supp_lookup2_bytes_offset - trie_generator.supp_lookup1_bytes_offset,
+        trie_generator.supp_data_bytes_offset - trie_generator.supp_lookup2_bytes_offset,
+        len(trie_generator.trie_bytes) - trie_generator.supp_data_bytes_offset))
+
+class PerfectlyCompressableProperty(UnicodeProperty):
+    def __init__(self):
+        pass
+
+    def get_default_value(self):
+        return 'Default'
+
+    def get_value(self, cp):
+        return 'Default'
+
+    def to_numeric_value(self, value):
+        if value == 'Default':
+            return 42
+        assert(False)
+
+    def get_numeric_value(self, cp):
+        return self.to_numeric_value(self.get_value(cp))
+
+print('PerfectlyCompressableProperty')
+test_trie_generation(PerfectlyCompressableProperty())
+# CHECK-LABEL: PerfectlyCompressableProperty
+# CHECK: (8, 8, 5, 8, 8,  1, 1, 1, 1, 1,  1041,  256, 256, 17, 256, 256)
+#
+# Explanation for table sizes above:
+#
+# bmp_lookup:   1-byte words x 256   = 256
+# bmp_data:     1            x 1     = 256
+# supp_lookup1: 1            x 17    = 17
+# supp_lookup2: 1            x 1*256 = 256
+# supp_data:    1            x 1*256 = 256
+
+
+class UncompressableProperty(UnicodeProperty):
+    def __init__(self):
+        pass
+
+    def get_default_value(self):
+        return 42
+
+    def get_value(self, cp):
+        # Split Unicode codespace into 128-entry "pages".  Start each page with
+        # a unique sequence of property values (page number) so that the result
+        # cannot be compressed.
+        page_number = cp >> 7
+        if cp % 0x80 == 1:
+            return page_number & 0xff
+        if cp % 0x80 == 2:
+            return (page_number >> 8) & 0xff
+        if cp % 0x80 == 3:
+            return (page_number >> 16) & 0xff
+        return 42
+
+    def to_numeric_value(self, value):
+        return value
+
+    def get_numeric_value(self, cp):
+        return self.to_numeric_value(self.get_value(cp))
+
+print('UncompressableProperty, default trie parameters')
+test_trie_generation(UncompressableProperty())
+# CHECK-LABEL: UncompressableProperty, default trie parameters
+# CHECK: (8, 8, 5, 8, 8,  2, 1, 1, 2, 1,  1123601,  512, 65536, 17, 8704, 1048832)
+#
+# Explanation for table sizes above:
+#
+# bmp_lookup:   2-byte words x 256            = 512
+# bmp_data:     1            x 256*256        = 65536
+# supp_lookup1: 1            x 17             = 17
+# supp_lookup2: 2            x 17*256         = 8704
+# supp_data:    1            x (16*256+1)*256 = 1048832
+
+def configure_generator_for_16_bit_indexes(trie_generator):
+    trie_generator.bmp_first_level_index_bits = 9
+
+    trie_generator.supp_first_level_index_bits = 10
+    trie_generator.supp_second_level_index_bits = 2
+
+print('UncompressableProperty, 16-bit indexes')
+test_trie_generation(UncompressableProperty(),
+    configure_generator_for_16_bit_indexes)
+# CHECK-LABEL: UncompressableProperty, 16-bit indexes
+# CHECK: (9, 7, 10, 2, 9,  2, 1, 2, 2, 1,  1120840,  1024, 65536, 1088, 4104, 1049088)
+#
+# Explanation for table sizes above:
+#
+# bmp_lookup:   2-byte words x 512            = 1024
+# bmp_data:     1            x 512*128        = 65536
+# supp_lookup1: 2            x 544            = 1088
+# supp_lookup2: 2            x 513*4          = 4104
+# supp_data:    1            x (2048+1)*512   = 1049088
+
+
+# gyb will print line markers after our output, so make sure that those
+# don't accidentally match any other CHECK lines.
+
+print('THE END')
+# CHECK-LABEL: THE END
+
+}%
+

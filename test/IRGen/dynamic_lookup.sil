@@ -1,0 +1,162 @@
+// RUN: %target-swift-frontend -enable-objc-interop -emit-ir %s | %FileCheck %s
+
+// REQUIRES: CPU=i386 || CPU=x86_64
+
+import Swift
+import Builtin
+
+class X {
+  @objc func f() { }
+  @objc class func g() { }
+  @objc var value : Int { get }
+  @objc subscript (i : Int) -> Int { get }
+}
+sil_vtable X {}
+
+sil @$s14dynamic_lookup1XCfD : $@convention(method) (X) -> ()
+
+// [objc] t.X.f (t.X)() -> ()
+sil @$s14dynamic_lookup1XC1fyyFTo : $@convention(objc_method) (X) -> () {
+bb0(%0 : $X):
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// [objc] X.g (ObjectiveC.X.Type)() -> ()
+sil @$s14dynamic_lookup1XC1gyyFZTo : $@convention(thin) (@thick X.Type) -> () {
+bb0(%0 : $@thick X.Type):
+  %14 = tuple ()                                  // user: %15
+  return %14 : $()
+}
+
+sil @$s14dynamic_lookup1XCyS2icigTo : $@convention(objc_method) (Int, X) -> Int {
+bb0(%0 : $Int, %1 : $X):
+  %4 = function_ref @$sSi33_convertFromBuiltinIntegerLiteralySiBi64_3val_tcSimF : $@convention(thin) (Builtin.Int64, @thin Int.Type) -> Int // user: %7
+  %5 = metatype $@thin Int.Type
+  %6 = integer_literal $Builtin.Int64, 5
+  %7 = apply %4(%6, %5) : $@convention(thin) (Builtin.Int64, @thin Int.Type) -> Int // user: %9
+  return %7 : $Int
+}
+
+sil @$sSi33_convertFromBuiltinIntegerLiteralySiBi64_3val_tcSimF : $@convention(thin) (Builtin.Int64, @thin Int.Type) -> Int
+
+// [objc] dynamic_lookup.X.value.getter : Swift.Int
+sil @$s14dynamic_lookup1XC5valueSivgTo : $@convention(objc_method) (X) -> Int {
+bb0(%0 : $X):
+  %4 = function_ref @$sSi33_convertFromBuiltinIntegerLiteralySiBi64_3val_tcSimF : $@convention(thin) (Builtin.Int64, @thin Int.Type) -> Int // user: %7
+  %5 = metatype $@thin Int.Type
+  %6 = integer_literal $Builtin.Int64, 5
+  %7 = apply %4(%6, %5) : $@convention(thin) (Builtin.Int64, @thin Int.Type) -> Int // user: %9
+  return %7 : $Int
+}
+
+// CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @dynamic_lookup_br(%objc_object*)
+sil @dynamic_lookup_br : $@convention(thin) (AnyObject) -> () {
+bb0(%0 : $AnyObject):
+  %1 = alloc_box $<τ_0_0> { var τ_0_0 } <AnyObject>
+  %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
+  store %0 to %1a : $*AnyObject
+  %3 = alloc_box $<τ_0_0> { var τ_0_0 } <Optional<() -> ()>>
+  %4 = load %1a : $*AnyObject
+  strong_retain %4 : $AnyObject
+  %6 = open_existential_ref %4 : $AnyObject to $@opened("01234567-89ab-cdef-0123-000000000000") AnyObject
+  %7 = unchecked_ref_cast %6 : $@opened("01234567-89ab-cdef-0123-000000000000") AnyObject to $Builtin.UnknownObject
+
+  // CHECK: [[SEL:%[0-9]+]] = load i8*, i8** @"\01L_selector(f)"
+  // CHECK: [[RESPONDS:%[0-9]+]] = load i8*, i8** @"\01L_selector(respondsToSelector:)"
+  // CHECK: [[HAS_SEL:%[0-9]]] = call i1 {{.*}}@objc_msgSend {{.*}}(%objc_object* [[OBJECT:%[0-9]+]], i8* [[RESPONDS]], i8* [[SEL]])
+  // CHECK: br i1 [[HAS_SEL]]
+  dynamic_method_br %7 : $Builtin.UnknownObject, #X.f!1.foreign, bb1, bb2
+
+bb1(%8 : $@convention(objc_method) (Builtin.UnknownObject) -> ()):
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  strong_release %1 : $<τ_0_0> { var τ_0_0 } <AnyObject>
+  strong_release %3 : $<τ_0_0> { var τ_0_0 } <Optional<() -> ()>>
+  %43 = tuple ()
+  return %43 : $()
+}
+
+// CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @dynamic_lookup_static_br(%swift.type*)
+sil @dynamic_lookup_static_br : $@convention(thin) (@thick AnyObject.Type) -> () {
+bb0(%0 : $@thick AnyObject.Type):
+  // CHECK: [[SEL:%[0-9]+]] = load i8*, i8** @"\01L_selector(g)", align {{(4|8)}}
+  // CHECK: [[RESPONDS:%[0-9]+]] = load i8*, i8** @"\01L_selector(respondsToSelector:)"
+  // CHECK: [[HAS_SEL:%[0-9]]] = call i1 {{.*}}@objc_msgSend {{.*}}(%objc_object* [[OBJECT:%[0-9]+]], i8* [[RESPONDS]], i8* [[SEL]])
+  // CHECK: br i1 [[HAS_SEL]]
+  %1 = open_existential_metatype %0 : $@thick AnyObject.Type to $@thick (@opened("EF9BE7CA-DFBF-11E4-99CB-28CFE91AF28F") AnyObject).Type
+  dynamic_method_br %1 : $@thick (@opened("EF9BE7CA-DFBF-11E4-99CB-28CFE91AF28F") AnyObject).Type, #X.g!1.foreign, bb1, bb2
+
+bb1(%8 : $@convention(objc_method) (@thick (@opened("EF9BE7CA-DFBF-11E4-99CB-28CFE91AF28F") AnyObject).Type) -> ()):
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %43 = tuple ()
+  return %43 : $()
+}
+
+sil @_T1t23dynamic_lookup_propertyFT1xPSo13AnyObject__T_ : $@convention(thin) (AnyObject) -> () {
+  bb0(%0 : $AnyObject):
+  %1 = alloc_box $<τ_0_0> { var τ_0_0 } <AnyObject>
+  %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
+  store %0 to %1a : $*AnyObject
+  %6 = load %1a : $*AnyObject                // users: %24, %8, %7
+  strong_retain %6 : $AnyObject
+  %8 = open_existential_ref %6 : $AnyObject to $@opened("01234567-89ab-cdef-0123-111111111111") AnyObject // users: %11, %9
+  %9 = unchecked_ref_cast %8 : $@opened("01234567-89ab-cdef-0123-111111111111") AnyObject to $Builtin.UnknownObject
+  dynamic_method_br %9 : $Builtin.UnknownObject, #X.value!getter.1.foreign, bb1, bb2
+
+bb1(%10 : $@convention(objc_method) (Builtin.UnknownObject) -> Int):
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  strong_release %1 : $<τ_0_0> { var τ_0_0 } <AnyObject>
+  %43 = tuple ()
+  return %43 : $()
+}
+
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @_T1t16opt_to_subscriptFT3objPSo13AnyObject_1iSi_T_(%objc_object*, {{(i32|i64)}})
+sil @_T1t16opt_to_subscriptFT3objPSo13AnyObject_1iSi_T_ : $@convention(thin) (AnyObject, Int) -> () {
+bb0(%0 : $AnyObject, %1 : $Int):
+  %2 = alloc_box $<τ_0_0> { var τ_0_0 } <AnyObject>
+  %2a = project_box %2 : $<τ_0_0> { var τ_0_0 } <AnyObject>, 0
+  %3 = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
+  %3a = project_box %3 : $<τ_0_0> { var τ_0_0 } <Int>, 0
+  store %0 to %2a : $*AnyObject
+  store %1 to %3a : $*Int
+  %8 = load %2a : $*AnyObject
+  strong_retain %8 : $AnyObject
+  %10 = open_existential_ref %8 : $AnyObject to $@opened("01234567-89ab-cdef-0123-111111111111") AnyObject
+  %11 = unchecked_ref_cast %10 : $@opened("01234567-89ab-cdef-0123-111111111111") AnyObject to $Builtin.UnknownObject
+  // CHECK: [[SEL:%[0-9]+]] = load i8*, i8** @"\01L_selector(objectAtIndexedSubscript:)", align {{(4|8)}}
+  // CHECK: [[RESPONDS:%[0-9]+]] = load i8*, i8** @"\01L_selector(respondsToSelector:)"
+  // CHECK-NEXT: [[HAS_SEL:%[0-9]]] = call i1 {{.*}}@objc_msgSend {{.*}}(%objc_object* [[OBJECT:%[0-9]+]], i8* [[RESPONDS]], i8* [[SEL]])
+  // CHECK-NEXT: br i1 [[HAS_SEL]], label [[HAS_METHOD:%[0-9]+]], label [[HAS_METHOD:%[0-9]+]]
+
+  dynamic_method_br %11 : $Builtin.UnknownObject, #X.subscript!getter.1.foreign, bb1, bb2
+
+bb1(%13 : $@convention(objc_method) (Int, Builtin.UnknownObject) -> Int): // Preds: bb0
+  %14 = partial_apply %13(%11) : $@convention(objc_method) (Int, Builtin.UnknownObject) -> Int
+  %15 = load %3a : $*Int
+  %16 = apply %14(%15) : $@callee_owned (Int) -> Int
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  strong_release %3 : $<τ_0_0> { var τ_0_0 } <Int>
+  strong_release %2 : $<τ_0_0> { var τ_0_0 } <AnyObject>
+  %30 = tuple ()
+  return %30 : $()
+}

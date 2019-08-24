@@ -1,0 +1,2 @@
+module gadget { header "Gadget.h" }
+module c_layout { header "c_layout.h" }

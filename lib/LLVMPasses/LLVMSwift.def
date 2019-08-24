@@ -1,0 +1,149 @@
+//===--- LLVMSwift.def ----------------------------------*- C++ -*---------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+// KIND(Name, MemBehavior)
+//
+// This represents a specific equivalence class of LLVM instructions that have a
+// Name and the same MemBehavior from a ModRef perspective.
+//
+// Name - The name of the kind.
+// MemBehavior - One of NoModRef or ModRef.
+//
+#ifndef KIND
+#define KIND(Name, MemBehavior)
+#endif
+
+// SWIFT_FUNC(Name, MemBehavior, TextualName)
+//
+// This defines a special swift function known to the optimizer that may be
+// present in either atomic or nonatomic form.
+//
+// Name - The name of the function
+// MemBehavior - The MemBehavior of the instruction that can be known at compile time
+// TextualName - The name of the function in the final binary.
+#ifndef SWIFT_FUNC
+#define SWIFT_FUNC(Name, MemBehavior, TextualName) KIND(Name, MemBehavior)
+#endif
+
+// SWIFT_NEVER_NONATOMIC_FUNC(Name, MemBehavior, TextualName)
+//
+// This defines a special swift function known to the optimizer that does not
+// have a nonatomic form.
+//
+// Name - The name of the function
+// MemBehavior - The MemBehavior of the instruction that can be known at compile time
+// TextualName - The name of the function in the final binary.
+#ifndef SWIFT_NEVER_NONATOMIC_FUNC
+#define SWIFT_NEVER_NONATOMIC_FUNC(Name, MemBehavior, TextualName) SWIFT_FUNC(Name, MemBehavior, TextualName)
+#endif
+
+// SWIFT_INTERNAL_NEVER_NONATOMIC_FUNC(Name, MemBehavior, TextualName)
+//
+// This defines a special swift function known to the optimizer that does not
+// have a nonatomic form and has an internal prefix (i.e. '__').
+//
+// Name - The name of the function
+// MemBehavior - The MemBehavior of the instruction that can be known at compile time
+// TextualName - The name of the function in the final binary.
+#ifndef SWIFT_INTERNAL_FUNC_NEVER_NONATOMIC
+#define SWIFT_INTERNAL_FUNC_NEVER_NONATOMIC(Name, MemBehavior, TextualName) SWIFT_FUNC(Name, MemBehavior, TextualName)
+#endif
+
+// OBJC_FUNC(Name, MemBehavior, TextualName)
+//
+// This defines a special objc function known to the optimizer that may have an
+// atomic and nonatomic form.
+//
+// Name - The name of the function
+// MemBehavior - The MemBehavior of the instruction that can be known at compile time
+// TextualName - The name of the function in the final binary.
+#ifndef OBJC_FUNC
+#define OBJC_FUNC(Name, MemBehavior, TextualName) KIND(Name, MemBehavior)
+#endif
+
+/// An instruction with this classification is known to not access (read or
+/// write) memory.
+KIND(NoMemoryAccessed, NoModRef)
+
+/// void swift_retain(SwiftHeapObject *object)
+SWIFT_FUNC(Retain, NoModRef, retain)
+
+/// void swift_retain_n(SwiftHeapObject *object)
+SWIFT_FUNC(RetainN, NoModRef, retain_n)
+
+/// void swift::swift_retainUnowned(HeapObject *object)
+SWIFT_FUNC(RetainUnowned, NoModRef, retainUnowned)
+
+/// void swift_checkUnowned(HeapObject *object)
+SWIFT_FUNC(CheckUnowned, NoModRef, checkUnowned)
+
+/// void swift_release(SwiftHeapObject *object)
+SWIFT_FUNC(Release, ModRef, release)
+
+/// void swift_release_n(SwiftHeapObject *object)
+SWIFT_FUNC(ReleaseN, ModRef, release_n)
+
+/// SwiftHeapObject *swift_allocObject(SwiftHeapMetadata *metadata,
+///                                    size_t size, size_t alignment)
+SWIFT_NEVER_NONATOMIC_FUNC(AllocObject, NoModRef, allocObject)
+
+/// void objc_release(%objc_object* %P)
+OBJC_FUNC(ObjCRelease, ModRef, release)
+
+/// %objc_object* objc_retain(%objc_object* %P)
+OBJC_FUNC(ObjCRetain, NoModRef, retain)
+
+/// void swift_unknownObjectRetain(%swift.refcounted* %P)
+SWIFT_FUNC(UnknownObjectRetain, NoModRef, unknownObjectRetain)
+
+/// void swift_unknownObjectRetain_n(%swift.refcounted* %P)
+SWIFT_FUNC(UnknownObjectRetainN, NoModRef, unknownObjectRetain_n)
+
+/// void swift_unknownObjectRelease(%swift.refcounted* %P)
+SWIFT_FUNC(UnknownObjectRelease, ModRef, unknownObjectRelease)
+
+/// void swift_unknownObjectRelease_n(%swift.refcounted* %P)
+SWIFT_FUNC(UnknownObjectReleaseN, ModRef, unknownObjectRelease_n)
+
+/// void __swift_fixLifetime(%swift.refcounted* %P)
+SWIFT_INTERNAL_FUNC_NEVER_NONATOMIC(FixLifetime, NoModRef, fixLifetime)
+
+/// void swift_bridgeObjectRetain(%swift.refcounted* %P)
+SWIFT_FUNC(BridgeRetain, NoModRef, bridgeObjectRetain)
+
+/// void swift_bridgeObjectRetain_n(%swift.refcounted* %P)
+SWIFT_FUNC(BridgeRetainN, NoModRef, bridgeObjectRetain_n)
+
+/// void swift_bridgeObjectRelease(%swift.refcounted* %P)
+SWIFT_FUNC(BridgeRelease, ModRef, bridgeObjectRelease)
+
+/// void swift_bridgeObjectRelease_n(%swift.refcounted* %P)
+SWIFT_FUNC(BridgeReleaseN, ModRef, bridgeObjectRelease_n)
+
+/// borrow source is the value that was borrowed from. borrow_dest is the
+/// borrowed ref.
+///
+/// TODO: We may want to communicate to the optimizer that this does not have
+/// global effects.
+///
+/// void __swift_endBorrow(i8* %borrow_source, i8* %borrow_dest)
+SWIFT_INTERNAL_FUNC_NEVER_NONATOMIC(EndBorrow, ModRef, endBorrow)
+
+/// This is not a runtime function that we support.  Maybe it is not a call,
+/// or is a call to something we don't care about.
+KIND(Unknown, ModRef)
+
+#undef SWIFT_INTERNAL_FUNC_NEVER_NONATOMIC
+#undef SWIFT_NEVER_NONATOMIC_FUNC
+#undef OBJC_FUNC
+#undef SWIFT_FUNC
+#undef KIND

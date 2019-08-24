@@ -1,0 +1,24 @@
+// RUN: %target-sil-opt %s | %FileCheck %s
+
+import Swift
+
+public protocol mmOutputStreamType {
+  /// Append the given `string` to this stream.
+  mutating func write(string: String)
+}
+
+public protocol mmStreamable {
+  func writeTo<Target : mmOutputStreamType>(target: inout Target)
+}
+
+// CHECK-LABEL: sil @test : $@convention(thin) () -> () {
+sil @test : $() -> () {
+bb0:
+  %281 = alloc_stack $mmStreamable
+  %282 = open_existential_addr mutable_access %281 : $*mmStreamable to $*@opened("01234567-89ab-cdef-0123-000000000000") mmStreamable
+  // CHECK: witness_method $@opened({{.*}}) mmStreamable, #mmStreamable.writeTo!1
+  %293 = witness_method $@opened("01234567-89ab-cdef-0123-000000000000") mmStreamable, #mmStreamable.writeTo!1, %282 : $*@opened("01234567-89ab-cdef-0123-000000000000") mmStreamable : $@convention(witness_method: mmStreamable) @callee_owned <T_0_0, T_1_0 where T_0_0 : mmStreamable, T_1_0 : mmOutputStreamType> (@inout T_1_0, @inout T_0_0) -> ()
+  dealloc_stack %281 : $*mmStreamable
+  %1 = tuple ()
+  return %1 : $()
+}

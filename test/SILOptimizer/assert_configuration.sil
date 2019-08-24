@@ -1,0 +1,25 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -diagnostic-constant-propagation -assert-conf-id 1 | %FileCheck %s --check-prefix=ONE
+// RUN: %target-sil-opt -enable-sil-verify-all %s -diagnostic-constant-propagation -assert-conf-id 4294967295 | %FileCheck %s --check-prefix=DISABLED
+// RUN: %target-sil-opt -enable-sil-verify-all %s -performance-constant-propagation -assert-conf-id 1 | %FileCheck %s --check-prefix=PERFONE
+
+import Builtin
+
+sil @assert_configuration : $@convention(thin) () -> Builtin.Int32 {
+  %1 = builtin "assert_configuration"() : $Builtin.Int32
+  return %1 : $Builtin.Int32
+}
+
+// Test whether we can enable/disable replacement of the assert configuration
+// id.
+
+// DISABLED-LABEL: @assert_configuration
+// DISABLED: [[AP:%.*]] = builtin "assert_configuration"
+// DISABLED: return [[AP]]
+
+// ONE-LABEL: @assert_configuration
+// ONE: [[RES:%.*]] = integer_literal $Builtin.Int32, 1
+// ONE: return [[RES]]
+
+// PERFONE-LABEL: @assert_configuration
+// PERFONE: [[RES:%.*]] = integer_literal $Builtin.Int32, 1
+// PERFONE: return [[RES]]

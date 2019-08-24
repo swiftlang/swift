@@ -1,0 +1,16 @@
+[
+  {
+    key.kind: source.codecompletion.everything,
+    key.hide: 1
+  },
+  {
+    key.kind: source.codecompletion.identifier,
+    key.hide: 0,
+    key.names: ["local", ".", "="]
+  },
+  {
+    key.kind: source.codecompletion.module,
+    key.hide: 0,
+    key.names: ["Swift"]
+  }
+]

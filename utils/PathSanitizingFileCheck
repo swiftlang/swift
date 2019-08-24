@@ -1,0 +1,101 @@
+#!/usr/bin/env python
+# utils/PathSanitizingFileCheck -*- python -*-
+#
+# This source file is part of the Swift.org open source project
+#
+# Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+# Licensed under Apache License v2.0 with Runtime Library Exception
+#
+# See https://swift.org/LICENSE.txt for license information
+# See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+
+from __future__ import print_function
+
+import argparse
+import re
+import subprocess
+import sys
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description="""
+PathSanitizingFileCheck is a wrapper around LLVM's FileCheck.  In addition
+to all FileCheck features, PathSanitizingFileCheck can replace given
+strings in the input with other strings.  This feature is used to replace
+paths to the source and build directories with path-independent
+constants.""")
+
+    parser.add_argument(
+        "--sanitize",
+        help="replace the given string with another string",
+        metavar="REPLACEMENT=SOURCE",
+        action="append",
+        dest="sanitize_strings",
+        default=[])
+
+    parser.add_argument(
+        "--use-filecheck",
+        help="path to LLVM FileCheck executable",
+        metavar="PATH",
+        action="store",
+        dest="file_check_path",
+        default="FileCheck")
+
+    parser.add_argument(
+        "--enable-windows-compatibility",
+        help="Enable Windows path compatibility, which checks against both "
+             "forward slashes and backward slashes.",
+        action="store_true")
+
+    parser.add_argument(
+        "--enable-yaml-compatibility",
+        help="Enable YAML path compatibility. Since YAML double escapes "
+             "backward slashes, we need to check for them escaped. Only "
+             "available if Windows compatibility is enabled.",
+        action="store_true")
+
+    parser.add_argument(
+        "--dry-run",
+        help="Apply the replacements to the input and print the result "
+             "to standard output",
+        action="store_true")
+
+    args, unknown_args = parser.parse_known_args()
+
+    if args.enable_windows_compatibility:
+        if args.enable_yaml_compatibility:
+            slashes_re = r'(/|\\\\|\\\\\\\\)'
+        else:
+            slashes_re = r'(/|\\\\)'
+    else:
+        slashes_re = r'/'
+
+    stdin = sys.stdin.read()
+
+    for s in args.sanitize_strings:
+        replacement, pattern = s.split('=', 1)
+        # Since we want to use pattern as a regex in some platforms, we need
+        # to escape it first, and then replace the escaped slash
+        # literal (r'\\/') for our platform-dependent slash regex.
+        stdin = re.sub(re.sub(r'\\/', slashes_re, re.escape(pattern)),
+                       replacement,
+                       stdin)
+
+    if args.dry_run:
+        print(stdin)
+        return 0
+    else:
+        p = subprocess.Popen(
+            [args.file_check_path] + unknown_args, stdin=subprocess.PIPE)
+        stdout, stderr = p.communicate(stdin)
+        if stdout is not None:
+            print(stdout)
+        if stderr is not None:
+            print(stderr, file=sys.stderr)
+        return p.wait()
+
+
+if __name__ == '__main__':
+    exit(main())

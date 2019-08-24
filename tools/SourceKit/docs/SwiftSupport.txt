@@ -1,0 +1,57 @@
+================================================
+Entity Kinds
+================================================
+
+-- source.lang.swift.[decl/ref].function.free
+-- source.lang.swift.[decl/ref].function.method.instance
+-- source.lang.swift.[decl/ref].function.method.static
+-- source.lang.swift.[decl/ref].function.constructor
+-- source.lang.swift.[decl/ref].function.destructor
+-- source.lang.swift.[decl/ref].function.operator
+-- source.lang.swift.[decl/ref].function.subscript
+-- source.lang.swift.[decl/ref].function.accessor.getter
+-- source.lang.swift.[decl/ref].function.accessor.setter
+-- source.lang.swift.[decl/ref].class
+-- source.lang.swift.[decl/ref].struct
+-- source.lang.swift.[decl/ref].enum
+-- source.lang.swift.[decl/ref].enumelement
+-- source.lang.swift.[decl/ref].protocol
+-- source.lang.swift.[decl/ref].typealias
+-- source.lang.swift.[decl/ref].var.global
+-- source.lang.swift.[decl/ref].var.instance
+-- source.lang.swift.[decl/ref].var.static
+-- source.lang.swift.[decl/ref].var.local
+-- source.lang.swift.decl.extension.struct
+-- source.lang.swift.decl.extension.class
+-- source.lang.swift.decl.extension.enum
+
+source.lang.swift.decl.function.accessor.* kinds can only be reported as
+child entities of a source.lang.swift.decl.var.* entity.
+
+================================================
+Indexing
+================================================
+
+--- Imports ---
+
+The indexing request will report the imported modules under <key.dependencies>,
+like this:
+
+    {
+      <key.kind>: (UID) // Module kind
+      <key.name>: (string) // module name
+      <key.filepath>: (string) // path to the module file
+      [opt] <key.hash>: (string) // Hash associated with this module import
+    }
+
+The imported module kinds are:
+
+-- source.lang.swift.import.module.clang
+-- source.lang.swift.import.module.swift
+-- source.lang.swift.import.sourcefile
+
+The hash entry is only returned for an import of a swift module/file, not for
+imports of clang modules.
+If the same hash is returned for the module file, it means that the indexed
+symbols will be the same, even if the module file was modified; this can be used
+to avoid re-indexing of the module file.

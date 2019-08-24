@@ -1,0 +1,279 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -cse | %FileCheck %s
+// REQUIRES: objc_interop
+
+import Builtin
+import Swift
+import Foundation
+
+@objc(XX) protocol XX {
+}
+
+// CHECK-LABEL: sil @cse_objc_protocol
+// CHECK: objc_protocol #XX : $Protocol
+// CHECK-NOT: objc_protocol
+// CHECK: tuple (%0 : $Protocol, %0 : $Protocol)
+// CHECK: return
+sil @cse_objc_protocol : $@convention(thin) () -> @owned (Protocol, Protocol) {
+bb0:
+  %0 = objc_protocol #XX : $Protocol
+  %1 = objc_protocol #XX : $Protocol
+  %2 = tuple (%0: $Protocol, %1: $Protocol)
+  return %2 : $(Protocol, Protocol)
+}
+
+@objc protocol Walkable {
+   func walk()
+}
+
+ class Bar : NSObject, Walkable {
+   override init()
+   func walk()
+   deinit
+}
+
+func trytowalk(f: Walkable)
+
+// test.Bar.init (test.Bar.Type)() -> test.Bar
+sil hidden @_TFC4test3BarcfMS0_FT_S0_ : $@convention(method) (@owned Bar) -> @owned Bar {
+bb0(%0 : $Bar):
+  %1 = alloc_stack $Bar, let, name "sf"              // users: %2, %6, %9, %10
+  store %0 to %1 : $*Bar                        // id: %2
+  %3 = upcast %0 : $Bar to $NSObject              // user: %7
+  %4 = objc_super_method %0 : $Bar, #NSObject.init!initializer.1.foreign : (NSObject.Type) -> () -> NSObject, $@convention(objc_method) (@owned NSObject) -> @owned NSObject // user: %7
+  %7 = apply %4(%3) : $@convention(objc_method) (@owned NSObject) -> @owned NSObject // user: %8
+  %8 = unchecked_ref_cast %7 : $NSObject to $Bar  // users: %9, %11
+  store %8 to %1 : $*Bar                        // id: %9
+  dealloc_stack %1 : $*Bar       // id: %10
+  return %8 : $Bar                                // id: %11
+}
+
+// test.Bar.__allocating_init (test.Bar.Type)() -> test.Bar
+sil hidden @_TFC4test3BarCfMS0_FT_S0_ : $@convention(thin) (@thick Bar.Type) -> @owned Bar {
+bb0(%0 : $@thick Bar.Type):
+  %1 = alloc_ref [objc] $Bar                      // user: %3
+  // function_ref test.Bar.init (test.Bar.Type)() -> test.Bar
+  %2 = function_ref @_TFC4test3BarcfMS0_FT_S0_ : $@convention(method) (@owned Bar) -> @owned Bar // user: %3
+  %3 = apply %2(%1) : $@convention(method) (@owned Bar) -> @owned Bar // user: %4
+  return %3 : $Bar                                // id: %4
+}
+
+// @objc test.Bar.init (test.Bar.Type)() -> test.Bar
+sil hidden @_TToFC4test3BarcfMS0_FT_S0_ : $@convention(objc_method) (@owned Bar) -> @owned Bar {
+bb0(%0 : $Bar):
+  // function_ref test.Bar.init (test.Bar.Type)() -> test.Bar
+  %1 = function_ref @_TFC4test3BarcfMS0_FT_S0_ : $@convention(method) (@owned Bar) -> @owned Bar // user: %2
+  %2 = apply %1(%0) : $@convention(method) (@owned Bar) -> @owned Bar // user: %3
+  return %2 : $Bar                                // id: %3
+}
+
+// test.Bar.walk (test.Bar)() -> ()
+sil hidden @_TFC4test3Bar4walkfS0_FT_T_ : $@convention(method) (@guaranteed Bar) -> () {
+bb0(%0 : $Bar):
+  debug_value %0 : $Bar, let, name "self" // id: %1
+  %2 = tuple ()                                   // user: %3
+  return %2 : $()                                 // id: %3
+}
+
+// @objc test.Bar.walk (test.Bar)() -> ()
+sil hidden @_TToFC4test3Bar4walkfS0_FT_T_ : $@convention(objc_method) (Bar) -> () {
+bb0(%0 : $Bar):
+  strong_retain %0 : $Bar                         // id: %1
+  // function_ref test.Bar.walk (test.Bar)() -> ()
+  %2 = function_ref @_TFC4test3Bar4walkfS0_FT_T_ : $@convention(method) (@guaranteed Bar) -> () // user: %3
+  %3 = apply %2(%0) : $@convention(method) (@guaranteed Bar) -> () // user: %5
+  strong_release %0 : $Bar                        // id: %4
+  return %3 : $()                                 // id: %5
+}
+
+// test.Bar.__deallocating_deinit
+sil hidden @_TFC4test3BarD : $@convention(method) (@owned Bar) -> () {
+bb0(%0 : $Bar):
+  debug_value %0 : $Bar, let, name "self" // id: %1
+  %2 = objc_super_method %0 : $Bar, #NSObject.deinit!deallocator.1.foreign : (NSObject) -> () -> (), $@convention(objc_method) (NSObject) -> ()  // user: %4
+  %3 = upcast %0 : $Bar to $NSObject              // user: %4
+  %4 = apply %2(%3) : $@convention(objc_method) (NSObject) -> ()
+  %5 = tuple ()                                   // user: %6
+  return %5 : $()                                 // id: %6
+}
+
+// CHECK-LABEL: _TF4test9trytowalkFPS_8Walkable_T_
+// CHECK:           bb0(%0 : $Walkable):
+// CHECK-NEXT:      {{%.*}} = open_existential_ref
+// CHECK-NEXT:      {{%.*}} = objc_method
+// CHECK-NEXT:      {{%.*}} = apply
+// CHECK-NEXT:      {{%.*}} = objc_method
+// CHECK-NEXT:      {{%.*}} = apply
+// CHECK-NEXT:      strong_release
+// CHECK-NEXT:      {{%.*}} = tuple
+// CHECK-NEXT:      return
+// test.trytowalk (test.Walkable) -> ()
+sil hidden @_TF4test9trytowalkFPS_8Walkable_T_ : $@convention(thin) (@owned Walkable) -> () {
+bb0(%0 : $Walkable):
+  %2 = open_existential_ref %0 : $Walkable to $@opened("7813D5BE-4C48-11E5-BD72-AC87A3294C0A") Walkable // users: %3, %4
+  %3 = objc_method %2 : $@opened("7813D5BE-4C48-11E5-BD72-AC87A3294C0A") Walkable, #Walkable.walk!1.foreign, $@convention(objc_method) <τ_0_0 where τ_0_0 : Walkable> (τ_0_0) -> () // user: %4
+  %4 = apply %3<@opened("7813D5BE-4C48-11E5-BD72-AC87A3294C0A") Walkable>(%2) : $@convention(objc_method) <τ_0_0 where τ_0_0 : Walkable> (τ_0_0) -> ()
+  %5 = objc_method %2 : $@opened("7813D5BE-4C48-11E5-BD72-AC87A3294C0A") Walkable, #Walkable.walk!1.foreign, $@convention(objc_method) <τ_0_0 where τ_0_0 : Walkable> (τ_0_0) -> () // user: %6
+  %6 = apply %5<@opened("7813D5BE-4C48-11E5-BD72-AC87A3294C0A") Walkable>(%2) : $@convention(objc_method) <τ_0_0 where τ_0_0 : Walkable> (τ_0_0) -> ()
+  strong_release %0 : $Walkable                   // id: %8
+  %9 = tuple ()                                   // user: %10
+  return %9 : $()                                 // id: %10
+}
+
+// Check that the open_existential_ref is CSEed not only in instructions, but also in the types
+// of BB arguments. The type of BB2 argument should use the same opened existential as the
+// one opened in the entry block.
+
+// CHECK-LABEL: sil @cse_open_existential_in_bbarg : $@convention(thin) (@owned AnyObject) -> ()
+// CHECK: open_existential_ref %0 : $AnyObject to $[[OPENED:@opened\(.*\) AnyObject]]
+// CHECK: bb1(%{{[0-9]*}} : $@convention(objc_method) ([[OPENED]]) -> @autoreleased Optional<NSString>):
+// CHECK-NOT: open_existential_ref
+// CHECK: bb3(%{{[0-9]*}} : $@convention(objc_method) ([[OPENED]]) -> @autoreleased Optional<NSString>):
+// CHECK-NOT: open_existential_ref
+// CHECK: return
+sil @cse_open_existential_in_bbarg : $@convention(thin) (@owned AnyObject) -> () {
+bb0(%0 : $AnyObject):
+  %1 = open_existential_ref %0 : $AnyObject to $@opened("CCEAC0E2-4BB2-11E6-86F8-B8E856428C60") AnyObject
+  dynamic_method_br %1 : $@opened("CCEAC0E2-4BB2-11E6-86F8-B8E856428C60") AnyObject, #NSProxy.description!getter.1.foreign, bb1, bb2
+
+bb1(%3 : $@convention(objc_method) (@opened("CCEAC0E2-4BB2-11E6-86F8-B8E856428C60") AnyObject) -> @autoreleased Optional<NSString>):
+  strong_retain %1 : $@opened("CCEAC0E2-4BB2-11E6-86F8-B8E856428C60") AnyObject
+  %5 = partial_apply %3(%1) : $@convention(objc_method) (@opened("CCEAC0E2-4BB2-11E6-86F8-B8E856428C60") AnyObject) -> @autoreleased Optional<NSString>
+  %6 = apply %5() : $@callee_owned () -> @owned Optional<NSString>
+  %7 = open_existential_ref %0 : $AnyObject to $@opened("CCEDAF1E-4BB2-11E6-86F8-B8E856428C60") AnyObject
+  dynamic_method_br %7 : $@opened("CCEDAF1E-4BB2-11E6-86F8-B8E856428C60") AnyObject, #NSProxy.description!getter.1.foreign, bb3, bb4
+
+bb2:
+  br bb5
+
+bb3(%9 : $@convention(objc_method) (@opened("CCEDAF1E-4BB2-11E6-86F8-B8E856428C60") AnyObject) -> @autoreleased Optional<NSString>):
+  strong_retain %7 : $@opened("CCEDAF1E-4BB2-11E6-86F8-B8E856428C60") AnyObject
+  %10 = partial_apply %9(%7) : $@convention(objc_method) (@opened("CCEDAF1E-4BB2-11E6-86F8-B8E856428C60") AnyObject) -> @autoreleased Optional<NSString>
+  %11 = apply %10() : $@callee_owned () -> @owned Optional<NSString>
+  br bb5
+
+bb4:
+  br bb5
+
+bb5:
+  strong_release %0 : $AnyObject
+  %13 = tuple ()
+  return %13 : $()
+}
+
+// CHECK-LABEL: sil @cse_value_metatype
+// CHECK: value_metatype $@objc_metatype
+// CHECK: objc_metatype_to_object
+// CHECK-NOT: value_metatype $@objc_metatype
+// CHECK: strong_release
+// CHECK: return
+sil @cse_value_metatype : $@convention(thin) <T where T : AnyObject> (@owned T) -> @owned (AnyObject, AnyObject) {
+bb0(%0 : $T):
+  %2 = value_metatype $@objc_metatype T.Type, %0 : $T
+  %4 = objc_metatype_to_object %2 : $@objc_metatype T.Type to $AnyObject
+  %5 = value_metatype $@objc_metatype T.Type, %0 : $T
+  %7 = objc_metatype_to_object %5 : $@objc_metatype T.Type to $AnyObject
+  strong_release %0 : $T
+  %9 = tuple (%4: $AnyObject, %7: $AnyObject)
+  return %9 : $(AnyObject, AnyObject)
+}
+
+// CHECK-LABEL: sil @cse_existential_metatype
+// CHECK: existential_metatype $@objc_metatype
+// CHECK: objc_existential_metatype_to_object
+// CHECK-NOT: existential_metatype $@objc_metatype
+// CHECK: strong_release
+// CHECK: return
+sil @cse_existential_metatype : $@convention(thin) (@owned XX) -> @owned (AnyObject, AnyObject) {
+bb0(%0 : $XX):
+  %2 = existential_metatype $@objc_metatype XX.Type, %0 : $XX
+  %4 = objc_existential_metatype_to_object %2 : $@objc_metatype XX.Type to $AnyObject
+  %5 = existential_metatype $@objc_metatype XX.Type, %0 : $XX
+  %6 = objc_existential_metatype_to_object %5 : $@objc_metatype XX.Type to $AnyObject
+  strong_release %0 : $XX
+  %7 = tuple (%4: $AnyObject, %6: $AnyObject)
+  return %7 : $(AnyObject, AnyObject)
+}
+
+class B {}
+
+// CHECK-LABEL: sil @nocse_existential_metatype_addr
+// CHECK: store
+// CHECK: existential_metatype $@thick Any.Type
+// CHECK: store
+// CHECK: existential_metatype $@thick Any.Type
+// CHECK: return
+sil @nocse_existential_metatype_addr : $@convention(thin) (@owned B, @owned B) -> (@thick Any.Type, @thick Any.Type) {
+bb0(%0 : $B, %1 : $B):
+  %2 = alloc_stack $Any
+  %3 = init_existential_addr %2 : $*Any, $B
+  store %0 to %3 : $*B
+  %5 = existential_metatype $@thick Any.Type, %2 : $*Any
+  store %1 to %3 : $*B
+  %7 = existential_metatype $@thick Any.Type, %2 : $*Any
+  strong_release %1 : $B
+  strong_release %0 : $B
+  %99 = tuple (%5 : $@thick Any.Type, %7 : $@thick Any.Type)
+  dealloc_stack %2 : $*Any
+  return %99 : $(@thick Any.Type, @thick Any.Type)
+}
+
+
+// CHECK-LABEL: sil @cse_objc_metatype_to_object
+// CHECK: value_metatype $@objc_metatype
+// CHECK: objc_metatype_to_object
+// CHECK-NOT: value_metatype $@objc_metatype
+// CHECK-NOT: objc_metatype_to_object
+// CHECK: strong_release
+// CHECK: return
+sil @cse_objc_metatype_to_object : $@convention(thin) <T where T : AnyObject> (@owned T) -> @owned (AnyObject, AnyObject) {
+bb0(%0 : $T):
+  %2 = value_metatype $@objc_metatype T.Type, %0 : $T
+  %4 = objc_metatype_to_object %2 : $@objc_metatype T.Type to $AnyObject
+  %5 = value_metatype $@objc_metatype T.Type, %0 : $T
+  %7 = objc_metatype_to_object %5 : $@objc_metatype T.Type to $AnyObject
+  strong_release %0 : $T
+  %9 = tuple (%4: $AnyObject, %7: $AnyObject)
+  return %9 : $(AnyObject, AnyObject)
+}
+
+
+// CHECK-LABEL: sil @cse_objc_existential_metatype_to_object
+// CHECK: existential_metatype $@objc_metatype
+// CHECK: objc_existential_metatype_to_object
+// CHECK-NOT: existential_metatype $@objc_metatype
+// CHECK-NOT: objc_existential_metatype_to_object
+// CHECK: strong_release
+// CHECK: return
+sil @cse_objc_existential_metatype_to_object : $@convention(thin) (@owned XX) -> @owned (AnyObject, AnyObject) {
+bb0(%0 : $XX):
+  %2 = existential_metatype $@objc_metatype XX.Type, %0 : $XX
+  %4 = objc_existential_metatype_to_object %2 : $@objc_metatype XX.Type to $AnyObject
+  %5 = existential_metatype $@objc_metatype XX.Type, %0 : $XX
+  %6 = objc_existential_metatype_to_object %5 : $@objc_metatype XX.Type to $AnyObject
+  strong_release %0 : $XX
+  %7 = tuple (%4: $AnyObject, %6: $AnyObject)
+  return %7 : $(AnyObject, AnyObject)
+}
+
+@objc
+class XXX {
+}
+
+// CHECK-LABEL: sil @cse_objc_to_thick_metatype
+// CHECK: objc_to_thick_metatype
+// CHECK-NOT: objc_to_thick_metatype
+// CHECK: tuple
+// CHECK: return
+sil @cse_objc_to_thick_metatype : $@convention(thin) (@objc_metatype XXX.Type) -> (@thick XXX.Type, @thick XXX.Type) {
+bb0(%0 : $@objc_metatype XXX.Type):
+  %1 = objc_to_thick_metatype %0 : $@objc_metatype XXX.Type to $@thick XXX.Type
+  %2 = objc_to_thick_metatype %0 : $@objc_metatype XXX.Type to $@thick XXX.Type
+  %3 = tuple (%1: $@thick XXX.Type, %2: $@thick XXX.Type)
+  return %3: $(@thick XXX.Type, @thick XXX.Type)
+}
+
+sil_vtable Bar {
+  #Bar.init!initializer.1: @_TFC4test3BarcfMS0_FT_S0_	// test.Bar.init (test.Bar.Type)() -> test.Bar
+  #Bar.walk!1: @_TFC4test3Bar4walkfS0_FT_T_	// test.Bar.walk (test.Bar)() -> ()
+  #Bar.deinit!deallocator.1: @_TFC4test3BarD	// test.Bar.__deallocating_deinit
+}

@@ -1,0 +1,5 @@
+module ctypes {
+  header "unions.h"
+  header "bitfields.h"
+  export *
+}

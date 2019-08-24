@@ -1,0 +1,7 @@
+// RUN: not --crash %target-sil-opt %s
+// REQUIRES: asserts
+
+sil @no_terminator : $@convention(thin) () -> () {
+bb0:
+  %1 = tuple()
+}

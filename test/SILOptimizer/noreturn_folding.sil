@@ -1,0 +1,45 @@
+// RUN: %target-sil-opt -module-name Swift -enable-sil-verify-all -noreturn-folding < %s | %FileCheck %s
+
+import Builtin
+
+enum Never {}
+
+struct Int64 {
+  var value: Builtin.Int64
+}
+
+// We used to crash on this IR. We would delete "%4" while there is still a
+// (dead) user "%7" around.
+
+// CHECK-LABEL: unreachable_outside_block_user
+// CHECK: %[[E:.+]] = function_ref @exit
+// CHECK: apply %[[E]]
+// CHECK: unreachable
+
+sil private @unreachable_outside_block_user : $@convention(thin) () -> Int64 {
+bb0:
+  %0 = integer_literal $Builtin.Int1, -1
+  %1 = integer_literal $Builtin.Int32, 3
+  // function_ref exit
+  %2 = function_ref @exit : $@convention(thin) (Builtin.Int32) -> Never
+  %3 = apply %2(%1) : $@convention(thin) (Builtin.Int32) -> Never
+  %4 = integer_literal $Builtin.Int64, 7
+  cond_br %0, bb1, bb2
+
+bb1:
+  %5 = metatype $@thin Int64.Type
+  %6 = integer_literal $Builtin.Int64, 42
+  %7 = struct $Int64 (%4 : $Builtin.Int64)
+  br bb3(%7 : $Int64)
+
+bb2:
+  %8 = metatype $@thin Int64.Type
+  %9 = integer_literal $Builtin.Int64, 17
+  %10 = struct $Int64 (%9 : $Builtin.Int64)
+  br bb3(%10 : $Int64)
+
+bb3 (%11: $Int64):
+  return %11 : $Int64
+}
+
+sil @exit : $@convention(thin) (Builtin.Int32) -> Never

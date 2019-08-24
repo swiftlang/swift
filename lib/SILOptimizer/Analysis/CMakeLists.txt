@@ -1,0 +1,29 @@
+silopt_register_sources(
+  ARCAnalysis.cpp
+  AccessSummaryAnalysis.cpp
+  AccessedStorageAnalysis.cpp
+  AliasAnalysis.cpp
+  Analysis.cpp
+  ArraySemantic.cpp
+  BasicCalleeAnalysis.cpp
+  CallerAnalysis.cpp
+  CFG.cpp
+  ClassHierarchyAnalysis.cpp
+  ClosureScope.cpp
+  ColdBlockInfo.cpp
+  DestructorAnalysis.cpp
+  EscapeAnalysis.cpp
+  EpilogueARCAnalysis.cpp
+  FunctionOrder.cpp
+  IVAnalysis.cpp
+  LoopAnalysis.cpp
+  LoopRegionAnalysis.cpp
+  MemoryBehavior.cpp
+  PassManagerVerifierAnalysis.cpp
+  ProtocolConformanceAnalysis.cpp
+  RCIdentityAnalysis.cpp
+  SideEffectAnalysis.cpp
+  SimplifyInstruction.cpp
+  TypeExpansionAnalysis.cpp
+  ValueTracking.cpp
+)

@@ -1,0 +1,474 @@
+// RUN: %target-run-simple-swiftgyb
+// REQUIRES: executable_test
+
+import StdlibUnittest
+
+
+protocol TestProtocol1 {}
+
+// Check that the generic parameter is called 'Pointee'.
+#if _runtime(_ObjC)
+extension AutoreleasingUnsafeMutablePointer where Pointee : TestProtocol1 {
+  var _memoryIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+#endif
+
+extension UnsafePointer where Pointee : TestProtocol1 {
+  var _memoryIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
+extension UnsafeMutablePointer where Pointee : TestProtocol1 {
+  var _memoryIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
+// Check that the generic parameter is called 'Element'.
+extension UnsafeBufferPointerIterator where Element : TestProtocol1 {
+  var _elementIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
+extension UnsafeBufferPointer where Element : TestProtocol1 {
+  var _elementIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
+extension UnsafeMutableBufferPointer where Element : TestProtocol1 {
+  var _elementIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
+var UnsafePointerTestSuite = TestSuite("UnsafePointer")
+var UnsafeMutablePointerTestSuite = TestSuite("UnsafeMutablePointer")
+var UnsafeRawPointerTestSuite = TestSuite("UnsafeRawPointer")
+var UnsafeMutableRawPointerTestSuite = TestSuite("UnsafeMutableRawPointer")
+var OpaquePointerTestSuite = TestSuite("OpaquePointer")
+
+% for (SelfName, SelfType) in [
+%         ('UnsafePointer', 'UnsafePointer<Float>'),
+%         ('UnsafeMutablePointer', 'UnsafeMutablePointer<Float>'),
+%         ('UnsafeRawPointer', 'UnsafeRawPointer'),
+%         ('UnsafeMutableRawPointer', 'UnsafeMutableRawPointer')]:
+
+${SelfName}TestSuite.test("initFromOpaquePointer") {
+  let other = OpaquePointer(bitPattern: 0x12345678)!
+  let ptr = ${SelfType}(other)
+  expectEqual(0x12345678, unsafeBitCast(ptr, to: Int.self))
+
+  let optionalOther: Optional = other
+  let optionalPointer = ${SelfType}(optionalOther)
+  expectNotNil(optionalPointer)
+  expectEqual(0x12345678, unsafeBitCast(optionalPointer, to: Int.self))
+
+  let nilOther: Optional<OpaquePointer> = nil
+  let nilPointer = ${SelfType}(nilOther)
+  expectNil(nilPointer)
+}
+
+% end
+
+% for (SelfName, SelfType) in [
+%         ('UnsafeRawPointer', 'UnsafeRawPointer'),
+%         ('UnsafeMutableRawPointer', 'UnsafeMutableRawPointer')]:
+UnsafeMutableRawPointerTestSuite.test("initFromMutating") {
+  let other = UnsafeRawPointer(bitPattern: 0x12345678)!
+  let ptr = UnsafeMutableRawPointer(mutating: other)
+  expectEqual(0x12345678, unsafeBitCast(ptr, to: Int.self))
+
+  let optionalOther: Optional = other
+  let optionalPointer = UnsafeMutableRawPointer(mutating: optionalOther)
+  expectNotNil(optionalPointer)
+  expectEqual(0x12345678, unsafeBitCast(optionalPointer, to: Int.self))
+
+  let nilOther: Optional<UnsafeRawPointer> = nil
+  let nilPointer = UnsafeMutableRawPointer(mutating: nilOther)
+  expectNil(nilPointer)
+}
+% end
+
+% for (SelfName, SelfType) in [
+%         ('UnsafePointer', 'UnsafePointer<Float>'),
+%         ('UnsafeMutablePointer', 'UnsafeMutablePointer<Float>'),
+%         ('UnsafeRawPointer', 'UnsafeRawPointer'),
+%         ('UnsafeMutableRawPointer', 'UnsafeMutableRawPointer'),
+%         ('OpaquePointer', 'OpaquePointer')]:
+
+${SelfName}TestSuite.test("convertFromNil") {
+  let ptr: ${SelfType}? = nil
+  expectEqual(0, unsafeBitCast(ptr, to: Int.self))
+}
+
+${SelfName}TestSuite.test("initFromInteger") {
+  do {
+    let word: Int = 0x12345678
+    let ptr = ${SelfType}(bitPattern: word)
+    expectNotNil(ptr)
+    expectEqual(word, unsafeBitCast(ptr, to: Int.self))
+  }
+  do {
+    let uword: UInt = 0x12345678
+    let ptr = ${SelfType}(bitPattern: uword)
+    expectNotNil(ptr)
+    expectEqual(uword, unsafeBitCast(ptr, to: UInt.self))
+  }
+}
+
+${SelfName}TestSuite.test("initFromNilBitPattern") {
+  do {
+    let word = unsafeBitCast(nil as ${SelfType}?, to: Int.self)
+    let ptr = ${SelfType}(bitPattern: word)
+    expectNil(ptr)
+    expectEqual(word, unsafeBitCast(ptr, to: Int.self))
+  }
+  do {
+    let uword = unsafeBitCast(nil as ${SelfType}?, to: UInt.self)
+    let ptr = ${SelfType}(bitPattern: uword)
+    expectNil(ptr)
+    expectEqual(uword, unsafeBitCast(ptr, to: UInt.self))
+  }
+}
+
+${SelfName}TestSuite.test("Hashable") {
+  let ptrs = [
+    ${SelfType}(bitPattern: 0x12345678)!,
+    ${SelfType}(bitPattern: 0x87654321 as UInt)!,
+  ]
+  checkHashable(ptrs, equalityOracle: { $0 == $1 })
+}
+
+${SelfName}TestSuite.test("toInteger") {
+  do {
+    let word: Int = 0x12345678
+    let ptr = ${SelfType}(bitPattern: word)
+    expectEqual(word, Int(bitPattern: ptr))
+  }
+  do {
+    let ptr: ${SelfType}? = nil
+    expectEqual(Int(0), Int(bitPattern: ptr))
+  }
+  do {
+    let uword: UInt = 0x12345678
+    let ptr = ${SelfType}(bitPattern: uword)
+    expectEqual(uword, UInt(bitPattern: ptr))
+  }
+  do {
+    let ptr: ${SelfType}? = nil
+    expectEqual(UInt(0), UInt(bitPattern: ptr))
+  }
+}
+
+% end
+
+% for (SelfName, SelfType) in [
+%         ('UnsafePointer', 'UnsafePointer<Float>'),
+%         ('UnsafeRawPointer', 'UnsafeRawPointer'),
+%         ('UnsafeMutableRawPointer', 'UnsafeMutableRawPointer')]:
+
+${SelfName}TestSuite.test("initFromUnsafeMutablePointer") {
+  let other = UnsafeMutablePointer<Float>(bitPattern: 0x12345678)!
+  let ptr = ${SelfType}(other)
+  expectEqual(0x12345678, unsafeBitCast(ptr, to: Int.self))
+
+  let optionalOther: Optional = other
+  let optionalPointer = ${SelfType}(optionalOther)
+  expectNotNil(optionalPointer)
+  expectEqual(0x12345678, unsafeBitCast(optionalPointer, to: Int.self))
+
+  let nilOther: Optional<UnsafeMutablePointer<Float>> = nil
+  let nilPointer = ${SelfType}(nilOther)
+  expectNil(nilPointer)
+}
+
+% end
+
+% for (SelfName, SelfType) in [
+%         ('UnsafePointer', 'UnsafePointer<Float>'),
+%         ('UnsafeRawPointer', 'UnsafeRawPointer')]:
+
+${SelfName}TestSuite.test("initFromUnsafePointer") {
+  let other = UnsafePointer<Float>(bitPattern: 0x12345678)!
+  let ptr = ${SelfType}(other)
+  expectEqual(0x12345678, unsafeBitCast(ptr, to: Int.self))
+
+  let optionalOther: Optional = other
+  let optionalPointer = ${SelfType}(optionalOther)
+  expectNotNil(optionalPointer)
+  expectEqual(0x12345678, unsafeBitCast(optionalPointer, to: Int.self))
+
+  let nilOther: Optional<UnsafePointer<Float>> = nil
+  let nilPointer = ${SelfType}(nilOther)
+  expectNil(nilPointer)
+}
+
+% end
+
+UnsafeRawPointerTestSuite.test("initFromUnsafeMutableRawPointer") {
+  let other = UnsafeMutableRawPointer(bitPattern: 0x12345678)!
+  let ptr = UnsafeRawPointer(other)
+  expectEqual(0x12345678, unsafeBitCast(ptr, to: Int.self))
+
+  let optionalOther: Optional = other
+  let optionalPointer = UnsafeRawPointer(optionalOther)
+  expectNotNil(optionalPointer)
+  expectEqual(0x12345678, unsafeBitCast(optionalPointer, to: Int.self))
+
+  let nilOther: Optional<UnsafeMutableRawPointer> = nil
+  let nilPointer = UnsafeRawPointer(nilOther)
+  expectNil(nilPointer)
+}
+
+enum Check {
+  case LeftOverlap
+  case RightOverlap
+  case Disjoint
+}
+
+class Missile {
+  static var missilesLaunched = 0
+  let number: Int
+  init(_ number: Int) { self.number = number }
+  deinit { Missile.missilesLaunched += 1 }
+}
+
+func checkPointerCorrectness(_ check: Check,
+  _ withMissiles: Bool = false,
+  _ f: (UnsafeMutablePointer<Missile>) ->
+    (UnsafeMutablePointer<Missile>, _ count: Int) -> Void) {
+  let ptr = UnsafeMutablePointer<Missile>.allocate(capacity: 4)
+  switch check {
+  case .RightOverlap:
+    ptr.initialize(to: Missile(1))
+    (ptr + 1).initialize(to: Missile(2))
+    if withMissiles {
+      (ptr + 2).initialize(to: Missile(3))
+    }
+    f(ptr + 1)(ptr, 2)
+    expectEqual(1, ptr[1].number)
+    expectEqual(2, ptr[2].number)
+  case .LeftOverlap:
+    if withMissiles {
+      ptr.initialize(to: Missile(1))
+    }
+    (ptr + 1).initialize(to: Missile(2))
+    (ptr + 2).initialize(to: Missile(3))
+    f(ptr)(ptr + 1, 2)
+    expectEqual(2, ptr[0].number)
+    expectEqual(3, ptr[1].number)
+  case .Disjoint:
+    if withMissiles {
+      ptr.initialize(to: Missile(0))
+      (ptr + 1).initialize(to: Missile(1))
+    }
+    (ptr + 2).initialize(to: Missile(2))
+    (ptr + 3).initialize(to: Missile(3))
+    f(ptr)(ptr + 2, 2)
+    expectEqual(2, ptr[0].number)
+    expectEqual(3, ptr[1].number)
+    // backwards
+    let ptr2 = UnsafeMutablePointer<Missile>.allocate(capacity: 4)
+    ptr2.initialize(to: Missile(0))
+    (ptr2 + 1).initialize(to: Missile(1))
+    if withMissiles {
+      (ptr2 + 2).initialize(to: Missile(2))
+      (ptr2 + 3).initialize(to: Missile(3))
+    }
+    f(ptr2 + 2)(ptr2, 2)
+    expectEqual(0, ptr2[2].number)
+    expectEqual(1, ptr2[3].number)
+  }
+}
+
+func checkPtr(
+  _ f: @escaping ((UnsafeMutablePointer<Missile>) -> (UnsafeMutablePointer<Missile>, _ count: Int) -> Void),
+  _ m: Bool
+) -> (Check) -> Void {
+  return { checkPointerCorrectness($0, m, f) }
+}
+
+func checkPtr(
+  _ f: @escaping ((UnsafeMutablePointer<Missile>) -> (UnsafePointer<Missile>, _ count: Int) -> Void),
+  _ m: Bool
+) -> (Check) -> Void {
+  return {
+    checkPointerCorrectness($0, m) { destPtr in
+      return { f(destPtr)(UnsafeMutablePointer($0), $1) }
+    }
+  }
+}
+
+UnsafeMutablePointerTestSuite.test("moveAssign:from:") {
+  let check = checkPtr(UnsafeMutablePointer.moveAssign, true)
+  check(Check.Disjoint)
+  // This check relies on _debugPrecondition() so will only trigger in -Onone mode.
+  if _isDebugAssertConfiguration() {
+    expectCrashLater()
+    check(Check.LeftOverlap)
+  }
+}
+
+UnsafeMutablePointerTestSuite.test("moveAssign:from:.Right") {
+  let check = checkPtr(UnsafeMutablePointer.moveAssign, true)
+  // This check relies on _debugPrecondition() so will only trigger in -Onone mode.
+  if _isDebugAssertConfiguration() {
+    expectCrashLater()
+    check(Check.RightOverlap)
+  }
+}
+
+UnsafeMutablePointerTestSuite.test("assign:from:") {
+  let check = checkPtr(UnsafeMutablePointer.assign, true)
+  check(Check.LeftOverlap)
+  check(Check.Disjoint)
+  check(Check.RightOverlap)
+}
+
+UnsafeMutablePointerTestSuite.test("moveInitialize:from:") {
+  let check = checkPtr(UnsafeMutablePointer.moveInitialize, false)
+  check(Check.LeftOverlap)
+  check(Check.Disjoint)
+  check(Check.RightOverlap)
+}
+
+UnsafeMutablePointerTestSuite.test("initialize:from:") {
+  let check = checkPtr(UnsafeMutablePointer.initialize(from:count:), false)
+  check(Check.Disjoint)
+  // This check relies on _debugPrecondition() so will only trigger in -Onone mode.
+  if _isDebugAssertConfiguration() {
+    expectCrashLater()
+    check(Check.LeftOverlap)
+  }
+}
+
+UnsafeMutablePointerTestSuite.test("initialize:from:.Right") {
+  let check = checkPtr(UnsafeMutablePointer.initialize(from:count:), false)
+  // This check relies on _debugPrecondition() so will only trigger in -Onone mode.
+  if _isDebugAssertConfiguration() {
+    expectCrashLater()
+    check(Check.RightOverlap)
+  }
+}
+
+UnsafeMutablePointerTestSuite.test("initialize:from:/immutable") {
+  var ptr = UnsafeMutablePointer<Missile>.allocate(capacity: 3)
+  defer {
+    ptr.deinitialize(count: 3)
+    ptr.deallocate()
+  }
+  let source = (0..<3).map(Missile.init)
+  source.withUnsafeBufferPointer { bufferPtr in
+    ptr.initialize(from: bufferPtr.baseAddress!, count: 3)
+    expectEqual(0, ptr[0].number)
+    expectEqual(1, ptr[1].number)
+    expectEqual(2, ptr[2].number)
+  }
+}
+
+UnsafeMutablePointerTestSuite.test("assign/immutable") {
+  var ptr = UnsafeMutablePointer<Missile>.allocate(capacity: 2)
+  defer {
+    ptr.deinitialize(count: 2)
+    ptr.deallocate()
+  }
+  ptr.initialize(to: Missile(1))
+  (ptr + 1).initialize(to: Missile(2))
+  let source = (3..<5).map(Missile.init)
+  source.withUnsafeBufferPointer { bufferPtr in
+    ptr.assign(from: bufferPtr.baseAddress!, count: 2)
+    expectEqual(3, ptr[0].number)
+    expectEqual(4, ptr[1].number)
+  }
+}
+
+% for (SelfName, SelfType) in [
+%         ('UnsafePointer', 'UnsafePointer<Float>'),
+%         ('UnsafeMutablePointer', 'UnsafeMutablePointer<Float>'),
+%         ('UnsafeRawPointer', 'UnsafeRawPointer'),
+%         ('UnsafeMutableRawPointer', 'UnsafeMutableRawPointer')]:
+
+${SelfName}TestSuite.test("customMirror") {
+  // Ensure that the custom mirror works properly, including when the raw value
+  // is greater than Int.max
+  let reallyBigInt: UInt = UInt(Int.max) + 1
+  let ptr = ${SelfType}(bitPattern: reallyBigInt)!
+  let mirror = ptr.customMirror
+  expectEqual(1, mirror.children.count)
+#if arch(i386) || arch(arm)
+  expectEqual("18446744071562067968", String(describing: mirror.children.first!.1))
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
+  expectEqual("9223372036854775808", String(describing: mirror.children.first!.1))
+#else
+  fatalError("Unimplemented")
+#endif
+}
+
+${SelfName}TestSuite.test("customPlaygroundQuickLook") {
+  // Ensure that the custom playground quicklook works properly, including when
+  // the raw value is greater than Int.max
+  let reallyBigInt: UInt = UInt(Int.max) + 1
+  let ptr = ${SelfType}(bitPattern: reallyBigInt)!
+  if case let .text(desc) = ptr.customPlaygroundQuickLook {
+#if arch(i386) || arch(arm)
+    expectEqual("${SelfName}(0xFFFFFFFF80000000)", desc)
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
+    expectEqual("${SelfName}(0x8000000000000000)", desc)
+#else
+    fatalError("Unimplemented")
+#endif
+  } else {
+    expectTrue(false)
+  }
+}
+
+${SelfName}TestSuite.test("Comparable") {
+  var addresses: [UInt] = [
+    0x00000001,
+    0xFF00FF00,
+    0x00001111,
+    0x00000002,
+    0xFFFFFFFF,
+    0x00001111
+  ]
+
+  #if arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le)
+  addresses += [
+    0xFFFFFFFF80000000,
+    0x8000000000000000
+  ]
+  #endif
+
+  let instances = addresses.map { ($0, ${SelfType}(bitPattern: $0)!) }
+
+  func comparisonOracle(i: Int, j: Int) -> ExpectedComparisonResult {
+    return instances[i].0 <=> instances[j].0
+  }
+  checkComparable(instances.map { $0.1 }, oracle: comparisonOracle)
+}
+
+% end
+
+% for SelfName in ['UnsafePointer', 'UnsafeMutablePointer']:
+
+${SelfName}TestSuite.test("withMemoryRebound") {
+  let mutablePtrI = UnsafeMutablePointer<Int>.allocate(capacity: 4)
+  defer { mutablePtrI.deallocate() }
+  let ptrI = ${SelfName}<Int>(mutablePtrI)
+  ptrI.withMemoryRebound(to: UInt.self, capacity: 4) {
+    // Make sure the closure argument isa $SelfName
+    var ptrU: ${SelfName}<UInt> = $0
+    // and that the element type is UInt.
+    var mutablePtrU = UnsafeMutablePointer(mutating: ptrU)
+    expectType(UInt.self, &mutablePtrU.pointee)
+  }
+}
+
+% end
+
+runAllTests()

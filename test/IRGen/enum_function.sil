@@ -1,0 +1,50 @@
+// RUN: %target-swift-frontend -primary-file %s -gnone -emit-ir | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+
+// REQUIRES: CPU=x86_64
+
+sil_stage canonical
+
+import Swift
+
+sil hidden @test_helper : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}
+
+// CHECK-64:  define hidden swiftcc void @test1([[WORD:i64]], [[WORD]])
+// CHECK-32:  define hidden swiftcc void @test1([[WORD:i32]], [[WORD]])
+sil hidden @test1 : $@convention(thin) (@owned Optional<() -> ()>) -> () {
+bb0(%0 : $Optional<() -> ()>):
+  // CHECK: call void @"$sIey_SgWOy"
+  retain_value %0 : $Optional<() -> ()>
+
+  // CHECK: icmp eq i64 %0, 0
+  switch_enum %0 : $Optional<() -> ()>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2
+
+  // CHECK: [[FNPTR:%.*]] = inttoptr [[WORD]] %0 to i8*
+  // CHECK: [[CTX:%.*]] = inttoptr [[WORD]] %1 to %swift.refcounted*
+  // CHECK: br label
+  // CHECK: [[FNPTR2:%.*]] = phi i8* [ [[FNPTR]], {{%.*}} ]
+  // CHECK: [[CTX2:%.*]] = phi %swift.refcounted* [ [[CTX]], {{%.*}} ]
+bb1(%1 : $() -> ()):
+
+  // CHECK: [[FNPTR3:%.*]] = bitcast i8* [[FNPTR2]] to void (%swift.refcounted*)*
+  // CHECK: call swiftcc void [[FNPTR3]](%swift.refcounted* swiftself [[CTX2]])
+  apply %1() : $() -> ()
+
+  // CHECK: br label [[CONT:%[0-9]+]]
+  br bb3
+
+bb2:
+  %4 = function_ref @test_helper : $@convention(thin) () -> ()
+  apply %4() : $@convention(thin) () -> ()
+  // CHECK: call swiftcc void @test_helper()
+  // CHECK: br label [[CONT]]
+  br bb3
+
+bb3:
+  %5 = tuple ()
+  // CHECK: ret void
+  return %5 : $()
+}

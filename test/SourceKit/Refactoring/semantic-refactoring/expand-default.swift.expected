@@ -1,0 +1,4 @@
+source.edit.kind.active:
+  7:3-7:11 "case .e1: <#code#>
+case .e2: <#code#>
+"

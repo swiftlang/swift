@@ -1,0 +1,32 @@
+// RUN: %target-swift-frontend -emit-ir %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+
+import Swift
+
+// CHECK-64: @"$s13indirect_enum5TreeAOWV" = internal constant %swift.enum_vwtable { {{.*}}, i64 8, i64 8, i32 2162695, 
+// CHECK-32: @"$s13indirect_enum5TreeAOWV" = internal constant %swift.enum_vwtable { {{.*}}, i32 4, i32 4, i32 2162691,
+
+// CHECK-NOT: define{{( protected)?}} private %swift.type** @get_field_types_TreeA
+indirect enum TreeA<T> {
+  case Nil
+  case Leaf(T)
+  case Branch(left: TreeA<T>, right: TreeA<T>)
+}
+
+// CHECK-NOT: define{{( protected)?}} private %swift.type** @get_field_types_TreeB
+enum TreeB<T> {
+  case Nil
+  case Leaf(T)
+  indirect case Branch(left: TreeB<T>, right: TreeB<T>)
+}
+
+// CHECK-NOT: define{{( protected)?}} private %swift.type** @get_field_types_Foo
+enum Foo<T> {
+  indirect case Foo(Int)
+  case Bar(T)
+}
+
+// rdar://problem/22169679
+enum E<T> {
+  indirect case A(E)
+  case B(T)
+}

@@ -1,0 +1,345 @@
+//===--- Join.swift.gyb ---------------------------------------*- swift -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+// RUN: %target-run-simple-swiftgyb
+// REQUIRES: executable_test
+
+import StdlibUnittest
+import StdlibCollectionUnittest
+
+
+public struct JoinWithSeparatorTest {
+  public let elements: [[Int]]
+  public let separator: [Int]
+  public let expected: [Int]
+  public let loc: SourceLoc
+
+  init(
+    elements: [[Int]], separator: [Int], expected: [Int],
+    file: String = #file, line: UInt = #line
+  ) {
+    self.elements = elements
+    self.separator = separator
+    self.expected = expected
+    self.loc = SourceLoc(file, line, comment: "prefix() test data")
+  }
+}
+
+public let joinWithSeparatorTests = [
+  // Empty separator.
+  JoinWithSeparatorTest(
+    elements: [],
+    separator: [],
+    expected: []),
+
+  JoinWithSeparatorTest(
+    elements: [[]],
+    separator: [],
+    expected: []),
+
+  JoinWithSeparatorTest(
+    elements: [[], []],
+    separator: [],
+    expected: []),
+
+  JoinWithSeparatorTest(
+    elements: [[], [], []],
+    separator: [],
+    expected: []),
+
+  JoinWithSeparatorTest(
+    elements: [[ 1010 ]],
+    separator: [],
+    expected: [ 1010 ]),
+
+  JoinWithSeparatorTest(
+    elements: [[ 1010 ], [ 2020 ]],
+    separator: [],
+    expected: [ 1010, 2020 ]),
+
+  JoinWithSeparatorTest(
+    elements: [[ 1010 ], [ 2020 ], [ 3030 ]],
+    separator: [],
+    expected: [ 1010, 2020, 3030 ]),
+
+  JoinWithSeparatorTest(
+    elements: [[], [ 2020 ], [ 3030 ]],
+    separator: [],
+    expected: [ 2020, 3030 ]),
+
+  JoinWithSeparatorTest(
+    elements: [[ 1010 ], [], [ 3030 ]],
+    separator: [],
+    expected: [ 1010, 3030 ]),
+
+  JoinWithSeparatorTest(
+    elements: [[ 1010 ], [ 2020 ], []],
+    separator: [],
+    expected: [ 1010, 2020 ]),
+
+  JoinWithSeparatorTest(
+    elements: [[ 1010, 1011 ], [ 2020, 2021 ], [ 3030, 3031 ]],
+    separator: [],
+    expected: [ 1010, 1011, 2020, 2021, 3030, 3031 ]),
+
+  JoinWithSeparatorTest(
+    elements: [[], [ 2020, 2021 ], [ 3030, 3031 ]],
+    separator: [],
+    expected: [ 2020, 2021, 3030, 3031 ]),
+
+  JoinWithSeparatorTest(
+    elements: [[ 1010, 1011 ], [], [ 3030, 3031 ]],
+    separator: [],
+    expected: [ 1010, 1011, 3030, 3031 ]),
+
+  JoinWithSeparatorTest(
+    elements: [[ 1010, 1011 ], [ 2020, 2021 ], []],
+    separator: [],
+    expected: [ 1010, 1011, 2020, 2021 ]),
+
+  // 1-element separator.
+  JoinWithSeparatorTest(
+    elements: [],
+    separator: [ 99 ],
+    expected: []),
+
+  JoinWithSeparatorTest(
+    elements: [[]],
+    separator: [ 99 ],
+    expected: []),
+
+  JoinWithSeparatorTest(
+    elements: [[], []],
+    separator: [ 99 ],
+    expected: [ 99 ]),
+
+  JoinWithSeparatorTest(
+    elements: [[], [], []],
+    separator: [ 99 ],
+    expected: [ 99, 99 ]),
+
+  JoinWithSeparatorTest(
+    elements: [[ 1010 ]],
+    separator: [ 99 ],
+    expected: [ 1010 ]),
+
+  JoinWithSeparatorTest(
+    elements: [[ 1010 ], [ 2020 ]],
+    separator: [ 99 ],
+    expected: [ 1010, 99, 2020 ]),
+
+  JoinWithSeparatorTest(
+    elements: [[ 1010 ], [ 2020 ], [ 3030 ]],
+    separator: [ 99 ],
+    expected: [ 1010, 99, 2020, 99, 3030 ]),
+
+  JoinWithSeparatorTest(
+    elements: [[], [ 2020 ], [ 3030 ]],
+    separator: [ 99 ],
+    expected: [ 99, 2020, 99, 3030 ]),
+
+  JoinWithSeparatorTest(
+    elements: [[ 1010 ], [], [ 3030 ]],
+    separator: [ 99 ],
+    expected: [ 1010, 99, 99, 3030 ]),
+
+  JoinWithSeparatorTest(
+    elements: [[ 1010 ], [ 2020 ], []],
+    separator: [ 99 ],
+    expected: [ 1010, 99, 2020, 99 ]),
+
+  JoinWithSeparatorTest(
+    elements: [[ 1010, 1011 ], [ 2020, 2021 ], [ 3030, 3031 ]],
+    separator: [ 99 ],
+    expected: [ 1010, 1011, 99, 2020, 2021, 99, 3030, 3031 ]),
+
+  JoinWithSeparatorTest(
+    elements: [[], [ 2020, 2021 ], [ 3030, 3031 ]],
+    separator: [ 99 ],
+    expected: [ 99, 2020, 2021, 99, 3030, 3031 ]),
+
+  JoinWithSeparatorTest(
+    elements: [[ 1010, 1011 ], [], [ 3030, 3031 ]],
+    separator: [ 99 ],
+    expected: [ 1010, 1011, 99, 99, 3030, 3031 ]),
+
+  JoinWithSeparatorTest(
+    elements: [[ 1010, 1011 ], [ 2020, 2021 ], []],
+    separator: [ 99 ],
+    expected: [ 1010, 1011, 99, 2020, 2021, 99 ]),
+
+  // 2-element separator.
+  JoinWithSeparatorTest(
+    elements: [],
+    separator: [ 98, 99 ],
+    expected: []),
+
+  JoinWithSeparatorTest(
+    elements: [[]],
+    separator: [ 98, 99 ],
+    expected: []),
+
+  JoinWithSeparatorTest(
+    elements: [[], []],
+    separator: [ 98, 99 ],
+    expected: [ 98, 99 ]),
+
+  JoinWithSeparatorTest(
+    elements: [[], [], []],
+    separator: [ 98, 99 ],
+    expected: [ 98, 99, 98, 99 ]),
+
+  JoinWithSeparatorTest(
+    elements: [[ 1010 ]],
+    separator: [ 98, 99 ],
+    expected: [ 1010 ]),
+
+  JoinWithSeparatorTest(
+    elements: [[ 1010 ], [ 2020 ]],
+    separator: [ 98, 99 ],
+    expected: [ 1010, 98, 99, 2020 ]),
+
+  JoinWithSeparatorTest(
+    elements: [[ 1010 ], [ 2020 ], [ 3030 ]],
+    separator: [ 98, 99 ],
+    expected: [ 1010, 98, 99, 2020, 98, 99, 3030 ]),
+
+  JoinWithSeparatorTest(
+    elements: [[], [ 2020 ], [ 3030 ]],
+    separator: [ 98, 99 ],
+    expected: [ 98, 99, 2020, 98, 99, 3030 ]),
+
+  JoinWithSeparatorTest(
+    elements: [[ 1010 ], [], [ 3030 ]],
+    separator: [ 98, 99 ],
+    expected: [ 1010, 98, 99, 98, 99, 3030 ]),
+
+  JoinWithSeparatorTest(
+    elements: [[ 1010 ], [ 2020 ], []],
+    separator: [ 98, 99 ],
+    expected: [ 1010, 98, 99, 2020, 98, 99 ]),
+
+  JoinWithSeparatorTest(
+    elements: [[ 1010, 1011 ], [ 2020, 2021 ], [ 3030, 3031 ]],
+    separator: [ 98, 99 ],
+    expected: [ 1010, 1011, 98, 99, 2020, 2021, 98, 99, 3030, 3031 ]),
+
+  JoinWithSeparatorTest(
+    elements: [[], [ 2020, 2021 ], [ 3030, 3031 ]],
+    separator: [ 98, 99 ],
+    expected: [ 98, 99, 2020, 2021, 98, 99, 3030, 3031 ]),
+
+  JoinWithSeparatorTest(
+    elements: [[ 1010, 1011 ], [], [ 3030, 3031 ]],
+    separator: [ 98, 99 ],
+    expected: [ 1010, 1011, 98, 99, 98, 99, 3030, 3031 ]),
+
+  JoinWithSeparatorTest(
+    elements: [[ 1010, 1011 ], [ 2020, 2021 ], []],
+    separator: [ 98, 99 ],
+    expected: [ 1010, 1011, 98, 99, 2020, 2021, 98, 99 ]),
+]
+
+var JoinTestSuite = TestSuite("Join")
+
+%{
+
+from gyb_stdlib_support import (
+    TRAVERSALS,
+    collectionTypeName
+)
+
+from itertools import product
+
+base_kinds = [ 'Defaulted', 'Minimal' ]
+collections = [
+  (base_kind + collectionTypeName(traversal=traversal, mutable=False, rangeReplaceable=True), traversal)
+    for base_kind, traversal in product(base_kinds, TRAVERSALS)
+]
+other_array_types = [ 'Array', 'ArraySlice', 'ContiguousArray' ]
+collections += [(array, 'RandomAccess') for array in other_array_types]
+
+}%
+
+% for Base, TRAVERSALS in collections:
+%   if Base not in other_array_types:
+%     label = 'elements:'
+%   else:
+%     label = ''
+%   end
+
+JoinTestSuite.test("${Base}.joined(separator:)") {
+  for test in joinWithSeparatorTests {
+    let elements = ${Base}(${label} test.elements.map {
+      ${Base}(${label} $0)
+    })
+    let separator = ${Base}(${label} test.separator)
+    let r = Array(elements.joined(separator: separator))
+    checkSequence(test.expected, r)
+  }
+}
+
+JoinTestSuite.test("${Base}.joined(separator:)/_copyToContiguousArray()") {
+  for test in joinWithSeparatorTests {
+    let elements = ${Base}(${label} test.elements.map {
+      ${Base}(${label} $0)
+    })
+    let separator = ${Base}(${label} test.separator)
+    let r = Array(elements.joined(separator: separator))
+    checkSequence(test.expected, r)
+  }
+}
+
+% end
+
+JoinTestSuite.test("Sequence<String>.joined(separator:)") {
+  // Default separator (empty).
+  expectEqual("",       [].joined())
+  expectEqual("",       [""].joined())
+  expectEqual("",       ["", ""].joined())
+  expectEqual("",       ["", "", ""].joined())
+  expectEqual("a",      ["a"].joined())
+  expectEqual("ab",     ["a", "b"].joined())
+  expectEqual("abc",    ["a", "b", "c"].joined())
+  expectEqual("abcdef", ["ab", "cd", "ef"].joined())
+
+  // Empty separator.
+  expectEqual("",       [].joined(separator: ""))
+  expectEqual("",       [""].joined(separator: ""))
+  expectEqual("",       ["", ""].joined(separator: ""))
+  expectEqual("",       ["", "", ""].joined(separator: ""))
+  expectEqual("a",      ["a"].joined(separator: ""))
+  expectEqual("ab",     ["a", "b"].joined(separator: ""))
+  expectEqual("abc",    ["a", "b", "c"].joined(separator: ""))
+  expectEqual("abcdef", ["ab", "cd", "ef"].joined(separator: ""))
+
+  // 1-element separator.
+  expectEqual("",         [""].joined(separator: "x"))
+  expectEqual("x",        ["", ""].joined(separator: "x"))
+  expectEqual("xx",       ["", "", ""].joined(separator: "x"))
+  expectEqual("a",        ["a"].joined(separator: "x"))
+  expectEqual("axb",      ["a", "b"].joined(separator: "x"))
+  expectEqual("axbxc",    ["a", "b", "c"].joined(separator: "x"))
+  expectEqual("abxcdxef", ["ab", "cd", "ef"].joined(separator: "x"))
+
+  // 2-element separator.
+  expectEqual("",           [""].joined(separator: "xy"))
+  expectEqual("xy",         ["", ""].joined(separator: "xy"))
+  expectEqual("xyxy",       ["", "", ""].joined(separator: "xy"))
+  expectEqual("a",          ["a"].joined(separator: "xy"))
+  expectEqual("axyb",       ["a", "b"].joined(separator: "xy"))
+  expectEqual("axybxyc",    ["a", "b", "c"].joined(separator: "xy"))
+  expectEqual("abxycdxyef", ["ab", "cd", "ef"].joined(separator: "xy"))
+}
+
+runAllTests()
+

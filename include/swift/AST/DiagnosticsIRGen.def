@@ -1,0 +1,77 @@
+//===--- DiagnosticsIRGen.def - Diagnostics Text ----------------*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+//  This file defines diagnostics emitted during IR generation.
+//  Each diagnostic is described using one of three kinds (error, warning, or
+//  note) along with a unique identifier, category, options, and text, and is
+//  followed by a signature describing the diagnostic argument kinds.
+//
+//===----------------------------------------------------------------------===//
+
+#if !(defined(DIAG) || (defined(ERROR) && defined(WARNING) && defined(NOTE)))
+#  error Must define either DIAG or the set {ERROR,WARNING,NOTE}
+#endif
+
+#ifndef ERROR
+#  define ERROR(ID,Options,Text,Signature)   \
+  DIAG(ERROR,ID,Options,Text,Signature)
+#endif
+
+#ifndef WARNING
+#  define WARNING(ID,Options,Text,Signature) \
+  DIAG(WARNING,ID,Options,Text,Signature)
+#endif
+
+#ifndef NOTE
+#  define NOTE(ID,Options,Text,Signature) \
+  DIAG(NOTE,ID,Options,Text,Signature)
+#endif
+
+
+ERROR(no_llvm_target,none,
+      "error loading LLVM target for triple '%0': %1", (StringRef, StringRef))
+ERROR(error_codegen_init_fail,none,
+      "cannot initialize code generation passes for target", ())
+
+ERROR(irgen_unimplemented,none,
+      "unimplemented IR generation feature %0", (StringRef))
+ERROR(irgen_failure,none, "IR generation failure: %0", (StringRef))
+
+ERROR(type_to_verify_not_found,none, "unable to find type '%0' to verify",
+      (StringRef))
+ERROR(type_to_verify_ambiguous,none, "type to verify '%0' is ambiguous",
+      (StringRef))
+ERROR(type_to_verify_dependent,none,
+      "type to verify '%0' has unbound generic parameters",
+      (StringRef))
+ERROR(too_few_output_filenames,none,
+      "too few output file names specified", ())
+ERROR(no_input_files_for_mt,none,
+      "no swift input files for multi-threaded compilation", ())
+
+ERROR(alignment_dynamic_type_layout_unsupported,none,
+      "@_alignment is not supported on types with dynamic layout", ())
+ERROR(alignment_less_than_natural,none,
+      "@_alignment cannot decrease alignment below natural alignment of %0",
+      (unsigned))
+ERROR(alignment_more_than_maximum,none,
+      "@_alignment cannot increase alignment above maximum alignment of %0",
+      (unsigned))
+
+#ifndef DIAG_NO_UNDEF
+# if defined(DIAG)
+#  undef DIAG
+# endif
+# undef NOTE
+# undef WARNING
+# undef ERROR
+#endif

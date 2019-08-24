@@ -1,0 +1,21 @@
+[
+  {
+    "key.name": "bar(a:b:_:_:)",
+    "key.newname": "bar(a:b:c:_:)",
+    "key.is_function_like": 1,
+    "key.is_non_protocol_type": 0,
+    "key.locations": [
+      {
+        "key.line": 29,
+        "key.column": 1,
+        "key.nametype": source.syntacticrename.call
+      },
+      {
+        "key.line": 28,
+        "key.column": 6,
+        "key.nametype": source.syntacticrename.definition
+      }
+    ]
+  }
+]
+

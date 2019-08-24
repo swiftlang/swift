@@ -1,0 +1,64 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -high-level-licm | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+sil [_semantics "array.get_count"] @getCount : $@convention(method) (@guaranteed Array<Int>) -> Int
+sil [_semantics "array.get_capacity"] @getCapacity : $@convention(method) (@guaranteed Array<Int>) -> Int
+
+sil @user : $@convention(thin) (Int) -> ()
+
+// CHECK-LABEL:   sil @licm_get_count
+// CHECK:           [[F1:%[0-9]+]] = function_ref @getCount
+// CHECK:           [[F2:%[0-9]+]] = function_ref @user
+// CHECK:           [[C:%[0-9]+]] = apply [[F1]](%0)
+// CHECK:         {{^}}bb1:
+// CHECK-NEXT:      apply [[F2]]([[C]])
+// CHECK-NEXT:      cond_br
+// CHECK:         {{^}}bb2:
+// CHECK:           return
+sil @licm_get_count : $@convention(thin) (@guaranteed Array<Int>) -> () {
+bb0(%0 : $Array<Int>):
+  br bb1
+
+bb1:
+  %f1 = function_ref @getCount : $@convention(method) (@guaranteed Array<Int>) -> Int
+  %f2 = function_ref @user : $@convention(thin) (Int) -> ()
+  %c1 = apply %f1(%0) : $@convention(method) (@guaranteed Array<Int>) -> Int
+  %c2 = apply %f2(%c1) : $@convention(thin) (Int) -> ()
+  cond_br undef, bb1, bb2
+
+bb2:
+  %r1 = tuple ()
+  return %r1 : $()
+}
+
+// CHECK-LABEL:   sil @licm_get_capacity
+// CHECK-DAG:       [[A:%[0-9]+]] = load
+// CHECK-DAG:       [[F1:%[0-9]+]] = function_ref @getCapacity
+// CHECK-DAG:       [[F2:%[0-9]+]] = function_ref @user
+// CHECK:           [[C:%[0-9]+]] = apply [[F1]]([[A]])
+// CHECK:         {{^}}bb1:
+// CHECK-NEXT:      apply [[F2]]([[C]])
+// CHECK-NEXT:      cond_br
+// CHECK:         {{^}}bb2:
+// CHECK:           return
+sil @licm_get_capacity : $@convention(thin) (@inout Array<Int>) -> () {
+bb0(%0 : $*Array<Int>):
+  // Check if it also works if the array is not a function argument.
+  %a1 = load %0 : $*Array<Int>
+  br bb1
+
+bb1:
+  %f1 = function_ref @getCapacity : $@convention(method) (@guaranteed Array<Int>) -> Int
+  %f2 = function_ref @user : $@convention(thin) (Int) -> ()
+  %c1 = apply %f1(%a1) : $@convention(method) (@guaranteed Array<Int>) -> Int
+  %c2 = apply %f2(%c1) : $@convention(thin) (Int) -> ()
+  cond_br undef, bb1, bb2
+
+bb2:
+  %r1 = tuple ()
+  return %r1 : $()
+}

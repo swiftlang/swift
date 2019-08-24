@@ -1,0 +1,307 @@
+<decl:Import>@_exported import <ref:module>Foo</ref>.<ref:module>FooSub</ref></decl>
+<decl:Import>@_exported import <ref:module>FooHelper</ref></decl>
+
+
+<decl:Struct>/// Aaa.  FooEnum1.  Bbb.
+struct <loc>FooEnum1</loc> : <ref:Protocol>RawRepresentable</ref>, <ref:Protocol>Equatable</ref> {
+  <decl:Constructor><loc>init(<decl:Param>_ rawValue: <ref:Struct>UInt32</ref></decl>)</loc></decl>
+  <decl:Constructor><loc>init(<decl:Param>rawValue: <ref:Struct>UInt32</ref></decl>)</loc></decl>
+  <decl:Var>var <loc>rawValue</loc>: <ref:Struct>UInt32</ref></decl>
+}</decl>
+
+<decl:Var>/// Aaa.  FooEnum1X.  Bbb.
+var <loc>FooEnum1X</loc>: <ref:Struct>FooEnum1</ref> { get }</decl>
+<decl:Struct>struct <loc>FooEnum2</loc> : <ref:Protocol>RawRepresentable</ref>, <ref:Protocol>Equatable</ref> {
+  <decl:Constructor><loc>init(<decl:Param>_ rawValue: <ref:Struct>UInt32</ref></decl>)</loc></decl>
+  <decl:Constructor><loc>init(<decl:Param>rawValue: <ref:Struct>UInt32</ref></decl>)</loc></decl>
+  <decl:Var>var <loc>rawValue</loc>: <ref:Struct>UInt32</ref></decl>
+}</decl>
+<decl:Var>var <loc>FooEnum2X</loc>: <ref:Struct>FooEnum2</ref> { get }</decl>
+<decl:Var>var <loc>FooEnum2Y</loc>: <ref:Struct>FooEnum2</ref> { get }</decl>
+<decl:Struct>struct <loc>FooEnum3</loc> : <ref:Protocol>RawRepresentable</ref>, <ref:Protocol>Equatable</ref> {
+  <decl:Constructor><loc>init(<decl:Param>_ rawValue: <ref:Struct>UInt32</ref></decl>)</loc></decl>
+  <decl:Constructor><loc>init(<decl:Param>rawValue: <ref:Struct>UInt32</ref></decl>)</loc></decl>
+  <decl:Var>var <loc>rawValue</loc>: <ref:Struct>UInt32</ref></decl>
+}</decl>
+<decl:Var>var <loc>FooEnum3X</loc>: <ref:Struct>FooEnum3</ref> { get }</decl>
+<decl:Var>var <loc>FooEnum3Y</loc>: <ref:Struct>FooEnum3</ref> { get }</decl>
+
+<decl:Enum>/// Aaa.  FooComparisonResult.  Bbb.
+enum <loc>FooComparisonResult</loc> : <ref:Struct>Int</ref> {
+  <decl:Constructor><loc>init?(<decl:Param>rawValue: <ref:Struct>Int</ref></decl>)</loc></decl>
+  <decl:Var>var <loc>rawValue</loc>: <ref:Struct>Int</ref> { get }</decl>
+  <decl:EnumElement>case <loc>orderedAscending</loc></decl>
+  <decl:EnumElement>case <loc>orderedSame</loc></decl>
+  <decl:EnumElement>case <loc>orderedDescending</loc></decl>
+}</decl>
+
+<decl:Struct>/// Aaa.  FooRuncingOptions.  Bbb.
+struct <loc>FooRuncingOptions</loc> : <ref:Protocol>OptionSet</ref> {
+  <decl:Constructor><loc>init(<decl:Param>rawValue: <ref:Struct>Int</ref></decl>)</loc></decl>
+  <decl:Var>let <loc>rawValue</loc>: <ref:Struct>Int</ref></decl>
+  <decl:Var>static var <loc>enableMince</loc>: <ref:Struct>FooRuncingOptions</ref> { get }</decl>
+  <decl:Var>static var <loc>enableQuince</loc>: <ref:Struct>FooRuncingOptions</ref> { get }</decl>
+}</decl>
+<decl:Struct>struct <loc>FooStruct1</loc> {
+  <decl:Var>var <loc>x</loc>: <ref:Struct>Int32</ref></decl>
+  <decl:Var>var <loc>y</loc>: <ref:Struct>Double</ref></decl>
+  <decl:Constructor><loc>init()</loc></decl>
+  <decl:Constructor><loc>init(<decl:Param>x: <ref:Struct>Int32</ref></decl>, <decl:Param>y: <ref:Struct>Double</ref></decl>)</loc></decl>
+}</decl>
+<decl:TypeAlias>typealias <loc>FooStruct1Pointer</loc> = <ref:Struct>UnsafeMutablePointer</ref><<ref:Struct>FooStruct1</ref>></decl>
+<decl:Struct>struct <loc>FooStruct2</loc> {
+  <decl:Var>var <loc>x</loc>: <ref:Struct>Int32</ref></decl>
+  <decl:Var>var <loc>y</loc>: <ref:Struct>Double</ref></decl>
+  <decl:Constructor><loc>init()</loc></decl>
+  <decl:Constructor><loc>init(<decl:Param>x: <ref:Struct>Int32</ref></decl>, <decl:Param>y: <ref:Struct>Double</ref></decl>)</loc></decl>
+}</decl>
+<decl:TypeAlias>typealias <loc>FooStructTypedef1</loc> = <ref:Struct>FooStruct2</ref></decl>
+<decl:Struct>struct <loc>FooStructTypedef2</loc> {
+  <decl:Var>var <loc>x</loc>: <ref:Struct>Int32</ref></decl>
+  <decl:Var>var <loc>y</loc>: <ref:Struct>Double</ref></decl>
+  <decl:Constructor><loc>init()</loc></decl>
+  <decl:Constructor><loc>init(<decl:Param>x: <ref:Struct>Int32</ref></decl>, <decl:Param>y: <ref:Struct>Double</ref></decl>)</loc></decl>
+}</decl>
+
+<decl:TypeAlias>/// Aaa.  FooTypedef1.  Bbb.
+typealias <loc>FooTypedef1</loc> = <ref:Struct>Int32</ref></decl>
+
+<decl:Var>/// Aaa.  fooIntVar.  Bbb.
+var <loc>fooIntVar</loc>: <ref:Struct>Int32</ref></decl>
+
+<decl:Func>/// Aaa.  fooFunc1.  Bbb.
+func <loc>fooFunc1(<decl:Param>_ a: <ref:Struct>Int32</ref></decl>)</loc> -> <ref:Struct>Int32</ref></decl>
+<decl:Func>func <loc>fooFunc1AnonymousParam(<decl:Param>_: <ref:Struct>Int32</ref></decl>)</loc> -> <ref:Struct>Int32</ref></decl>
+<decl:Func>func <loc>fooFunc3(<decl:Param>_ a: <ref:Struct>Int32</ref></decl>, <decl:Param>_ b: <ref:Struct>Float</ref></decl>, <decl:Param>_ c: <ref:Struct>Double</ref></decl>, <decl:Param>_ d: <ref:Struct>UnsafeMutablePointer</ref><<ref:Struct>Int32</ref>>!</decl>)</loc> -> <ref:Struct>Int32</ref></decl>
+<decl:Func>func <loc>fooFuncWithBlock(<decl:Param>_ blk: (@escaping (<ref:Struct>Float</ref>) -> <ref:Struct>Int32</ref>)!</decl>)</loc></decl>
+<decl:Func>func <loc>fooFuncWithFunctionPointer(<decl:Param>_ fptr: (@escaping @convention(c) (<ref:Struct>Float</ref>) -> <ref:Struct>Int32</ref>)!</decl>)</loc></decl>
+<decl:Func>func <loc>fooFuncNoreturn1()</loc> -> <ref:Enum>Never</ref></decl>
+<decl:Func>func <loc>fooFuncNoreturn2()</loc> -> <ref:Enum>Never</ref></decl>
+
+<decl:Func>/**
+ * Aaa.  fooFuncWithComment1.  Bbb.
+ * Ccc.
+ *
+ * Ddd.
+ */
+func <loc>fooFuncWithComment1()</loc></decl>
+
+<decl:Func>/*!
+  Aaa.  fooFuncWithComment2.  Bbb.
+ */
+func <loc>fooFuncWithComment2()</loc></decl>
+
+<decl:Func>/**
+ * Aaa.  fooFuncWithComment3.  Bbb.
+ */
+/**
+ * Ccc.
+ */
+func <loc>fooFuncWithComment3()</loc></decl>
+
+<decl:Func>/**
+ * Aaa.  fooFuncWithComment4.  Bbb.
+ */
+/// Ddd.
+func <loc>fooFuncWithComment4()</loc></decl>
+
+<decl:Func>/// Aaa.  fooFuncWithComment5.  Bbb.
+/// Ccc.
+///
+/// Ddd.
+func <loc>fooFuncWithComment5()</loc></decl>
+
+<decl:Func>/// Aaa.  redeclaredInMultipleModulesFunc1.  Bbb.
+func <loc>redeclaredInMultipleModulesFunc1(<decl:Param>_ a: <ref:Struct>Int32</ref></decl>)</loc> -> <ref:Struct>Int32</ref></decl>
+<decl:Func>@available(*, unavailable, message: "Variadic function is unavailable")
+func <loc>fooFuncUsingVararg(<decl:Param>_ a: <ref:Struct>Int32</ref></decl>, <decl:Param>_ varargs: Any...</decl>)</loc> -> <ref:Struct>Int32</ref></decl>
+
+<decl:Protocol>/// Aaa.  FooProtocolBase.  Bbb.
+protocol <loc>FooProtocolBase</loc> {
+
+  <decl:Func>/// Aaa.  fooProtoFunc.  Bbb.
+  /// Ccc.
+  func <loc>fooProtoFunc()</loc></decl>
+
+  <decl:Func>/// Aaa.  fooProtoFuncWithExtraIndentation1.  Bbb.
+  /// Ccc.
+  func <loc>fooProtoFuncWithExtraIndentation1()</loc></decl>
+
+  <decl:Func>/**
+   * Aaa.  fooProtoFuncWithExtraIndentation2.  Bbb.
+   * Ccc.
+   */
+  func <loc>fooProtoFuncWithExtraIndentation2()</loc></decl>
+  <decl:Func>static func <loc>fooProtoClassFunc()</loc></decl>
+  <decl:Var>var <loc>fooProperty1</loc>: <ref:Struct>Int32</ref> { get set }</decl>
+  <decl:Var>var <loc>fooProperty2</loc>: <ref:Struct>Int32</ref> { get set }</decl>
+  <decl:Var>var <loc>fooProperty3</loc>: <ref:Struct>Int32</ref> { get }</decl>
+}</decl>
+<decl:Protocol>protocol <loc>FooProtocolDerived</loc> : <ref:Protocol>FooProtocolBase</ref> {
+}</decl>
+<decl:Class>class <loc>FooClassBase</loc> {
+  <decl:Func>class func <loc>fooBaseInstanceFunc0()</loc></decl>
+  <decl:Func>func <loc>fooBaseInstanceFunc0()</loc></decl>
+  <decl:Func>class func <loc>fooBaseInstanceFunc1(<decl:Param>_ anObject: <ref:Protocol>AnyObject</ref>!</decl>)</loc> -> <ref:Class>FooClassBase</ref>!</decl>
+  <decl:Func>func <loc>fooBaseInstanceFunc1(<decl:Param>_ anObject: <ref:Protocol>AnyObject</ref>!</decl>)</loc> -> <ref:Class>FooClassBase</ref>!</decl>
+  <decl:Constructor><loc>init!()</loc></decl>
+  <decl:Constructor>convenience <loc>init!(<decl:Param>float f: <ref:Struct>Float</ref></decl>)</loc></decl>
+  <decl:Func>class func <loc>fooBaseInstanceFuncOverridden()</loc></decl>
+  <decl:Func>func <loc>fooBaseInstanceFuncOverridden()</loc></decl>
+  <decl:Func>class func <loc>fooBaseClassFunc0()</loc></decl>
+  <decl:Constructor>/*not inherited*/ <loc>init!(<decl:Param>_ x: <ref:Struct>Int32</ref></decl>)</loc></decl>
+  <decl:Func>@available(*, unavailable, message: "use object construction 'FooClassBase(_:)'")
+  class func <loc>fooClassBase(<decl:Param>_ x: <ref:Struct>Int32</ref></decl>)</loc> -> <ref:Class>FooClassBase</ref>!</decl>
+}</decl>
+
+<decl:Class>/// Aaa.  FooClassDerived.  Bbb.
+class <loc>FooClassDerived</loc> : <ref:Class>FooClassBase</ref>, <ref:Protocol>FooProtocolDerived</ref> {
+  <decl:Var>var <loc>fooProperty1</loc>: <ref:Struct>Int32</ref></decl>
+  <decl:Var>var <loc>fooProperty2</loc>: <ref:Struct>Int32</ref></decl>
+  <decl:Var>var <loc>fooProperty3</loc>: <ref:Struct>Int32</ref> { get }</decl>
+  <decl:Func>func <loc>fooInstanceFunc0()</loc></decl>
+  <decl:Func>func <loc>fooInstanceFunc1(<decl:Param>_ a: <ref:Struct>Int32</ref></decl>)</loc></decl>
+  <decl:Func>func <loc>fooInstanceFunc2(<decl:Param>_ a: <ref:Struct>Int32</ref></decl>, <decl:Param>withB b: <ref:Struct>Int32</ref></decl>)</loc></decl>
+  <decl:Func>func <loc>fooBaseInstanceFuncOverridden()</loc></decl>
+  <decl:Func>class func <loc>fooClassFunc0()</loc></decl>
+  <decl:Constructor><loc>init!()</loc></decl>
+  <decl:Constructor>convenience <loc>init!(<decl:Param>float f: <ref:Struct>Float</ref></decl>)</loc></decl>
+
+  <decl:Func>/// Aaa.  fooProtoFunc.  Bbb.
+  /// Ccc.
+  func <loc>fooProtoFunc()</loc></decl>
+
+  <decl:Func>/// Aaa.  fooProtoFuncWithExtraIndentation1.  Bbb.
+  /// Ccc.
+  func <loc>fooProtoFuncWithExtraIndentation1()</loc></decl>
+
+  <decl:Func>/**
+   * Aaa.  fooProtoFuncWithExtraIndentation2.  Bbb.
+   * Ccc.
+   */
+  func <loc>fooProtoFuncWithExtraIndentation2()</loc></decl>
+  <decl:Func>class func <loc>fooProtoClassFunc()</loc></decl>
+}</decl>
+<decl:TypeAlias>typealias <loc>typedef_int_t</loc> = <ref:Struct>Int32</ref></decl>
+<decl:Var>var <loc>FOO_MACRO_1</loc>: <ref:Struct>Int32</ref> { get }</decl>
+<decl:Var>var <loc>FOO_MACRO_2</loc>: <ref:Struct>Int32</ref> { get }</decl>
+<decl:Var>var <loc>FOO_MACRO_3</loc>: <ref:Struct>Int32</ref> { get }</decl>
+<decl:Var>var <loc>FOO_MACRO_4</loc>: <ref:Struct>UInt32</ref> { get }</decl>
+<decl:Var>var <loc>FOO_MACRO_5</loc>: <ref:Struct>UInt64</ref> { get }</decl>
+<decl:Var>var <loc>FOO_MACRO_6</loc>: <ref:TypeAlias>typedef_int_t</ref> { get }</decl>
+<decl:Var>var <loc>FOO_MACRO_7</loc>: <ref:TypeAlias>typedef_int_t</ref> { get }</decl>
+<decl:Var>var <loc>FOO_MACRO_8</loc>: <ref:Struct>Int8</ref> { get }</decl>
+<decl:Var>var <loc>FOO_MACRO_9</loc>: <ref:Struct>Int32</ref> { get }</decl>
+<decl:Var>var <loc>FOO_MACRO_10</loc>: <ref:Struct>Int16</ref> { get }</decl>
+<decl:Var>var <loc>FOO_MACRO_11</loc>: <ref:Struct>Int</ref> { get }</decl>
+<decl:Var>var <loc>FOO_MACRO_OR</loc>: <ref:Struct>Int32</ref> { get }</decl>
+<decl:Var>var <loc>FOO_MACRO_AND</loc>: <ref:Struct>Int32</ref> { get }</decl>
+<decl:Var>var <loc>FOO_MACRO_BITWIDTH</loc>: <ref:Struct>UInt64</ref> { get }</decl>
+<decl:Var>var <loc>FOO_MACRO_SIGNED</loc>: <ref:Struct>Int32</ref> { get }</decl>
+<decl:Var>var <loc>FOO_MACRO_REDEF_1</loc>: <ref:Struct>Int32</ref> { get }</decl>
+<decl:Var>var <loc>FOO_MACRO_REDEF_2</loc>: <ref:Struct>Int32</ref> { get }</decl>
+<decl:Func>func <loc>theLastDeclInFoo()</loc></decl>
+<decl:Func>func <loc>_internalTopLevelFunc()</loc></decl>
+<decl:Struct>struct <loc>_InternalStruct</loc> {
+  <decl:Var>var <loc>x</loc>: <ref:Struct>Int32</ref></decl>
+  <decl:Constructor><loc>init()</loc></decl>
+  <decl:Constructor><loc>init(<decl:Param>x: <ref:Struct>Int32</ref></decl>)</loc></decl>
+}</decl>
+<decl:Extension>extension <loc><ref:Class>FooClassBase</ref></loc> {
+  <decl:Func>class func <loc>_internalMeth1()</loc> -> <ref:Protocol>AnyObject</ref>!</decl>
+  <decl:Func>func <loc>_internalMeth1()</loc> -> <ref:Protocol>AnyObject</ref>!</decl>
+}</decl>
+<decl:Extension>extension <loc><ref:Class>FooClassBase</ref></loc> {
+  <decl:Func>class func <loc>_internalMeth2()</loc> -> <ref:Protocol>AnyObject</ref>!</decl>
+  <decl:Func>func <loc>_internalMeth2()</loc> -> <ref:Protocol>AnyObject</ref>!</decl>
+  <decl:Func>class func <loc>nonInternalMeth()</loc> -> <ref:Protocol>AnyObject</ref>!</decl>
+  <decl:Func>func <loc>nonInternalMeth()</loc> -> <ref:Protocol>AnyObject</ref>!</decl>
+}</decl>
+<decl:Extension>extension <loc><ref:Class>FooClassBase</ref></loc> {
+  <decl:Func>class func <loc>_internalMeth3()</loc> -> <ref:Protocol>AnyObject</ref>!</decl>
+  <decl:Func>func <loc>_internalMeth3()</loc> -> <ref:Protocol>AnyObject</ref>!</decl>
+}</decl>
+<decl:Protocol>protocol <loc>_InternalProt</loc> {
+}</decl>
+<decl:Class>class <loc>ClassWithInternalProt</loc> : <ref:Protocol>_InternalProt</ref> {
+}</decl>
+<decl:Class>class <loc>FooClassPropertyOwnership</loc> : <ref:Class>FooClassBase</ref> {
+  <decl:Var>unowned(unsafe) var <loc>assignable</loc>: @sil_unmanaged <ref:Protocol>AnyObject</ref>!</decl>
+  <decl:Var>unowned(unsafe) var <loc>unsafeAssignable</loc>: @sil_unmanaged <ref:Protocol>AnyObject</ref>!</decl>
+  <decl:Var>var <loc>retainable</loc>: <ref:Protocol>AnyObject</ref>!</decl>
+  <decl:Var>var <loc>strongRef</loc>: <ref:Protocol>AnyObject</ref>!</decl>
+  <decl:Var>@NSCopying var <loc>copyable</loc>: <ref:Protocol>AnyObject</ref>!</decl>
+  <decl:Var>weak var <loc>weakRef</loc>: @sil_weak <ref:Protocol>AnyObject</ref>!</decl>
+  <decl:Var>var <loc>scalar</loc>: <ref:Struct>Int32</ref></decl>
+  <decl:Constructor><loc>init!()</loc></decl>
+  <decl:Constructor>convenience <loc>init!(<decl:Param>float f: <ref:Struct>Float</ref></decl>)</loc></decl>
+}</decl>
+<decl:Class>class <loc>FooClassWithClassProperties</loc> : <ref:Class>FooClassBase</ref> {
+  <decl:Var>unowned(unsafe) class var <loc>assignable</loc>: @sil_unmanaged <ref:Protocol>AnyObject</ref>!</decl>
+  <decl:Var>unowned(unsafe) class var <loc>unsafeAssignable</loc>: @sil_unmanaged <ref:Protocol>AnyObject</ref>!</decl>
+  <decl:Var>class var <loc>retainable</loc>: <ref:Protocol>AnyObject</ref>!</decl>
+  <decl:Var>class var <loc>strongRef</loc>: <ref:Protocol>AnyObject</ref>!</decl>
+  <decl:Var>@NSCopying class var <loc>copyable</loc>: <ref:Protocol>AnyObject</ref>!</decl>
+  <decl:Var>weak class var <loc>weakRef</loc>: @sil_weak <ref:Protocol>AnyObject</ref>!</decl>
+  <decl:Var>class var <loc>scalar</loc>: <ref:Struct>Int32</ref></decl>
+  <decl:Constructor><loc>init!()</loc></decl>
+  <decl:Constructor>convenience <loc>init!(<decl:Param>float f: <ref:Struct>Float</ref></decl>)</loc></decl>
+}</decl>
+<decl:Var>@available(*, unavailable, message: "use 'nil' instead of this imported macro")
+var <loc>FOO_NIL</loc>: ()</decl>
+<decl:Class>class <loc>FooUnavailableMembers</loc> : <ref:Class>FooClassBase</ref> {
+  <decl:Constructor>convenience <loc>init!(<decl:Param>int i: <ref:Struct>Int32</ref></decl>)</loc></decl>
+  <decl:Func>@available(*, unavailable, message: "use object construction 'FooUnavailableMembers(int:)'")
+  class func <loc>withInt(<decl:Param>_ i: <ref:Struct>Int32</ref></decl>)</loc> -> <ref:Class>Self</ref>!</decl>
+  <decl:Func>@available(*, unavailable, message: "x")
+  func <loc>unavailable()</loc></decl>
+  <decl:Func>@available(*, unavailable, message: "Not available in Swift")
+  func <loc>swiftUnavailable()</loc></decl>
+  <decl:Func>@available(*, deprecated, message: "x")
+  func <loc>deprecated()</loc></decl>
+  <decl:Func>@available(OSX 10.1, *)
+  func <loc>availabilityIntroduced()</loc></decl>
+  <decl:Func>@available(OSX, unavailable, deprecated: 10.1, message: "APIs deprecated as of OS X 10.9 and earlier are unavailable in Swift")
+  func <loc>availabilityDeprecated()</loc></decl>
+  <decl:Func>@available(OSX, obsoleted: 10.1)
+  func <loc>availabilityObsoleted()</loc></decl>
+  <decl:Func>@available(OSX, unavailable)
+  func <loc>availabilityUnavailable()</loc></decl>
+  <decl:Func>@available(OSX, introduced: 10.1, message: "x")
+  func <loc>availabilityIntroducedMsg()</loc></decl>
+  <decl:Func>@available(OSX, unavailable, deprecated: 10.1, message: "x")
+  func <loc>availabilityDeprecatedMsg()</loc></decl>
+  <decl:Func>@available(OSX, obsoleted: 10.1, message: "x")
+  func <loc>availabilityObsoletedMsg()</loc></decl>
+  <decl:Func>@available(OSX, unavailable, message: "x")
+  func <loc>availabilityUnavailableMsg()</loc></decl>
+  <decl:Constructor><loc>init!()</loc></decl>
+  <decl:Constructor>convenience <loc>init!(<decl:Param>float f: <ref:Struct>Float</ref></decl>)</loc></decl>
+}</decl>
+<decl:Class>class <loc>FooCFType</loc> {
+}</decl>
+<decl:Func>@available(*, unavailable, message: "Core Foundation objects are automatically memory managed")
+func <loc>FooCFTypeRelease(<decl:Param>_: <ref:Class>FooCFType</ref>!</decl>)</loc></decl>
+<decl:Class>class <loc>FooRepeatedMembers</loc> : <ref:Class>FooClassBase</ref> {
+  <decl:Func>func <loc>repeatedMethod()</loc></decl>
+  <decl:Func>func <loc>anotherMethod()</loc></decl>
+  <decl:Constructor><loc>init!()</loc></decl>
+  <decl:Constructor>convenience <loc>init!(<decl:Param>float f: <ref:Struct>Float</ref></decl>)</loc></decl>
+}</decl>
+<decl:Extension>extension <loc><ref:Class>FooRepeatedMembers</ref></loc> {
+  <decl:Var>var <loc>repeatedPropertyInCategory</loc>: <ref:Struct>Int32</ref></decl>
+  <decl:Func>func <loc>repeatedMethodInCategory()</loc></decl>
+}</decl>
+<decl:Extension>extension <loc><ref:Class>FooRepeatedMembers</ref></loc> {
+  <decl:Var>var <loc>repeatedPropertyFromCategory</loc>: <ref:Struct>Int32</ref></decl>
+  <decl:Func>func <loc>repeatedMethodFromCategory()</loc></decl>
+}</decl>
+<decl:Enum>enum <loc>SCNFilterMode</loc> : <ref:Struct>Int</ref> {
+  <decl:Constructor><loc>init?(<decl:Param>rawValue: <ref:Struct>Int</ref></decl>)</loc></decl>
+  <decl:Var>var <loc>rawValue</loc>: <ref:Struct>Int</ref> { get }</decl>
+  <decl:EnumElement>case <loc>none</loc></decl>
+  <decl:EnumElement>case <loc>nearest</loc></decl>
+  <decl:EnumElement>case <loc>linear</loc></decl>
+  <decl:EnumElement>@available(*, unavailable)
+  case <loc>SCNNoFiltering</loc></decl>
+}</decl>

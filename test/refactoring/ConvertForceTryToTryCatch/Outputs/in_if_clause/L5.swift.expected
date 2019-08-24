@@ -1,0 +1,10 @@
+func throwingFunc() throws -> Bool {
+    return true
+}
+do {
+if try throwingFunc() { 
+    let _ = 3
+}
+} catch {
+<#code#>
+}

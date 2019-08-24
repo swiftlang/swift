@@ -1,0 +1,66 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -generic-specializer -sil-partial-specialization=0 -sil-partial-specialization-with-generic-substitutions -debug-only=generic-specializer %s -o /dev/null 2>&1 | %FileCheck %s
+
+// REQUIRES: asserts
+
+// Test the debug messages from Generic Specialization.  It's based on
+// partial_specialization.sil.
+
+// CHECK: *** ApplyInst in function simple_generic_caller1:
+// CHECK:     Partial specialization is not supported.{{$}}
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+@_silgen_name("use")
+public func use<T>(_ t: T)
+
+@inline(never) public func simple_generic_callee<U, V>(_ u: U, _ v: V)
+
+public func simple_generic_caller1<U>(_ u: U)
+
+// use
+sil @use : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
+
+// simple_generic_callee<A, B>(_:_:)
+sil [noinline] @simple_generic_callee : $@convention(thin) <U, V> (@in U, @in V) -> () {
+bb0(%0 : $*U, %1 : $*V):
+  // function_ref use
+  %4 = function_ref @use : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
+  %5 = alloc_stack $U
+  copy_addr %0 to [initialization] %5 : $*U
+  %7 = apply %4<U>(%5) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
+  dealloc_stack %5 : $*U
+  // function_ref use
+  %9 = function_ref @use : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
+  %10 = alloc_stack $V
+  copy_addr %1 to [initialization] %10 : $*V
+  %12 = apply %9<V>(%10) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
+  dealloc_stack %10 : $*V
+  destroy_addr %1 : $*V
+  destroy_addr %0 : $*U
+  %16 = tuple ()
+  return %16 : $()
+} // end sil function 'simple_generic_callee'
+
+// simple_generic_caller1<A>(_:)
+sil @simple_generic_caller1 : $@convention(thin) <U> (@in U) -> () {
+bb0(%0 : $*U):
+  // function_ref simple_generic_callee<A, B>(_:_:)
+  %2 = function_ref @simple_generic_callee : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0, @in τ_0_1) -> ()
+  %3 = alloc_stack $U
+  copy_addr %0 to [initialization] %3 : $*U
+  %5 = integer_literal $Builtin.Int32, 1
+  %6 = struct $Int32 (%5 : $Builtin.Int32)
+  %7 = alloc_stack $Int32
+  store %6 to %7 : $*Int32
+  %9 = apply %2<U, Int32>(%3, %7) : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0, @in τ_0_1) -> ()
+  dealloc_stack %7 : $*Int32
+  dealloc_stack %3 : $*U
+  destroy_addr %0 : $*U
+  %13 = tuple ()
+  return %13 : $()
+} // end sil function 'simple_generic_caller1'
+

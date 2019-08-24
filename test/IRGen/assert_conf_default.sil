@@ -1,0 +1,23 @@
+// RUN: %target-swift-frontend -assert-config DisableReplacement -emit-ir %s   | %FileCheck %s --check-prefix=DISABLED
+// RUN: %target-swift-frontend -assert-config Release -emit-ir %s   | %FileCheck %s --check-prefix=RELEASE
+// RUN: %target-swift-frontend -assert-config Debug -emit-ir %s   | %FileCheck %s --check-prefix=DEBUG
+// RUN: %target-swift-frontend -assert-config Unchecked -emit-ir %s   | %FileCheck %s --check-prefix=UNCHECKED
+
+import Builtin
+
+sil @remove_assert_configuration : $@convention(thin) () -> Builtin.Int32 {
+  %1 = builtin "assert_configuration"() : $Builtin.Int32
+  return %1 : $Builtin.Int32
+}
+
+// DISABLED-LABEL: @remove_assert_configuration
+// DISABLED: ret i32 0
+
+// DEBUG-LABEL: @remove_assert_configuration
+// DEBUG: ret i32 0
+
+// RELEASE-LABEL: @remove_assert_configuration
+// RELEASE: ret i32 1
+
+// UNCHECKED-LABEL: @remove_assert_configuration
+// UNCHECKED: ret i32 2

@@ -1,0 +1,40 @@
+var /*var-y:def*/y = 3
+/*var-y*/y = /*var-y*/y + 2 + /*var-y*/y
+
+struct Struct {
+	let /*ivar-x:def*/x: Int
+	var y: Int
+
+	func sum() -> Int {
+		return /*ivar-x*/x + y
+	}
+}
+
+let aStruct = Struct(x: 10, y: 11)
+print(aStruct . /*ivar-x*/x + aStruct.y)
+var cat = {(a: Int) in aStruct . /*ivar-x*/x}
+
+var aTuple = (1, 1)
+
+switch aTuple {
+case (let /*pattern-a:def*/a, let b):
+	print(/*pattern-a*/a + b)
+}
+
+var opt = Optional.some(1)
+var opt2 = Optional.some(2)
+
+if let i = opt, let /*var-j:def*/j = opt2 {
+	print(i + /*var-j*/j)
+}
+
+var (a, /*pattern-b:def*/bee) = (1, 2)
+print(a + /*pattern-b*/bee)
+
+struct S {
+	lazy var lazyVal: Int = {
+		let /*lazy:def*/myVal = 0
+		return /*lazy:ref*/myVal
+	}()
+}
+

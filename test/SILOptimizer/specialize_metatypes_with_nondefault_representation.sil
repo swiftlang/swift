@@ -1,0 +1,58 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -generic-specializer | %FileCheck %s
+
+// REQUIRES: objc_interop
+
+// This test checks that we properly distinguish in between the specialized
+// functions for the @thick, @thin, and @objc_metatype metatypes.
+//
+// This can occur if we do not properly mangle in the metatype representation
+// into the name of functions and thus reuse the incorrect already specialized
+// method instead of the new specialized method.
+
+sil_stage canonical
+
+import Builtin
+
+protocol AnyObject {}
+
+sil [noinline] @tmp : $@convention(thin) <T> () -> (@out T) {
+bb0(%0 : $*T):
+  %1 = tuple()
+  return %1 : $()
+}
+
+// CHECK-LABEL: sil @tmp2 : $@convention(thin) () -> () {
+// CHECK: [[FUN1:%[0-9]+]] = function_ref @$s3tmp4main9AnyObject_pXmT_Tg5 : $@convention(thin) () -> @thick AnyObject.Type
+// CHECK-NEXT: apply [[FUN1]]
+// CHECK: [[FUN2:%[0-9]+]] = function_ref @$s3tmp4main9AnyObject_pXmo_Tg5 : $@convention(thin) () -> @objc_metatype AnyObject.Type
+// CHECK-NEXT: apply [[FUN2]]
+// CHECK: [[FUN3:%[0-9]+]] = function_ref @$s3tmpBi32_XMT_Tg5 : $@convention(thin) () -> @thick Builtin.Int32.Type
+// CHECK-NEXT: apply [[FUN3]]
+// CHECK: [[FUN4:%[0-9]+]] = function_ref @$s3tmpBi32_XMo_Tg5 : $@convention(thin) () -> @objc_metatype Builtin.Int32.Type
+// CHECK-NEXT: apply [[FUN4]]
+// CHECK: [[FUN5:%[0-9]+]] = function_ref @$s3tmpBi32_XMt_Tg5 : $@convention(thin) () -> @thin Builtin.Int32.Type
+// CHECK-NEXT: apply [[FUN5]]
+
+sil @tmp2 : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @tmp : $@convention(thin) <T> () -> (@out T)
+  %1 = alloc_box $<τ_0_0> { var τ_0_0 } <@thick AnyObject.Type>
+  %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <@thick AnyObject.Type>, 0
+  %2 = alloc_box $<τ_0_0> { var τ_0_0 } <@objc_metatype AnyObject.Type>
+  %2a = project_box %2 : $<τ_0_0> { var τ_0_0 } <@objc_metatype AnyObject.Type>, 0
+  %4 = apply %0<@thick AnyObject.Type>(%1a) : $@convention(thin) <T> () -> (@out T)
+  %5 = apply %0<@objc_metatype AnyObject.Type>(%2a) : $@convention(thin) <T> () -> (@out T)
+
+  %6 = alloc_box $<τ_0_0> { var τ_0_0 } <@thick Builtin.Int32.Type>
+  %6a = project_box %6 : $<τ_0_0> { var τ_0_0 } <@thick Builtin.Int32.Type>, 0
+  %7 = alloc_box $<τ_0_0> { var τ_0_0 } <@objc_metatype Builtin.Int32.Type>
+  %7a = project_box %7 : $<τ_0_0> { var τ_0_0 } <@objc_metatype Builtin.Int32.Type>, 0
+  %8 = alloc_box $<τ_0_0> { var τ_0_0 } <@thin Builtin.Int32.Type>
+  %8a = project_box %8 : $<τ_0_0> { var τ_0_0 } <@thin Builtin.Int32.Type>, 0
+  %9 = apply %0<@thick Builtin.Int32.Type>(%6a) : $@convention(thin) <T> () -> (@out T)
+  %10 = apply %0<@objc_metatype Builtin.Int32.Type>(%7a) : $@convention(thin) <T> () -> (@out T)
+  %11 = apply %0<@thin Builtin.Int32.Type>(%8a) : $@convention(thin) <T> () -> (@out T)
+
+  %9999 = tuple()
+  return %9999 : $()
+}

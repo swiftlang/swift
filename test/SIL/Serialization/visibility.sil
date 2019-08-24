@@ -1,0 +1,275 @@
+// RUN: %target-swift-frontend %s -parse-sil -emit-module -o - -module-name Swift -module-link-name swiftCore -parse-as-library -parse-stdlib | %target-sil-opt -enable-sil-verify-all=false -module-name Swift > %t.sil
+// RUN: %FileCheck %s < %t.sil
+// RUN: %FileCheck -check-prefix=NEG-CHECK %s < %t.sil
+
+import Builtin
+
+// To prevent issues with the SILPrinter ordering things we separate our
+// positive/negative checks to simplify things.
+
+// NEG-CHECK-NOT: sil_global private @private_global : $Builtin.Word
+// NEG-CHECK-NOT: sil private @private_function : $@convention(thin) () -> ()
+// NEG-CHECK-NOT: sil @references_private_global : $@convention(thin) () -> () {
+// NEG-CHECK-NOT: sil @references_private_function : $@convention(thin) () -> () {
+// NEG-CHECK-NOT: sil private @private_function_test : $@convention(thin) () -> ()
+
+// Check Global Variables.
+// CHECK-DAG: sil_global shared [serialized] @shared_global : $Builtin.Word
+// CHECK-DAG: sil_global [serialized] @public_global : $Builtin.Word
+// CHECK-DAG: sil_global hidden [serialized] @hidden_global : $Builtin.Word
+
+// Check that all functions are defined/declared appropriately.
+// NEG-CHECK-NOT: sil [serialized] @public_external_function_test : $@convention(thin) () -> () {
+// CHECK-DAG: sil [serialized] [canonical] @public_external_function_test : $@convention(thin) () -> ()
+// CHECK-DAG: sil hidden [serialized] [canonical] @hidden_function_test : $@convention(thin) () -> () {
+// CHECK-DAG: sil [serialized] [canonical] @references_public_function : $@convention(thin) () -> () {
+// CHECK-DAG: sil [serialized] [canonical] @references_shared_function : $@convention(thin) () -> () {
+// CHECK-DAG: sil [serialized] [canonical] @references_hidden_function : $@convention(thin) () -> () {
+// CHECK-DAG: sil [serialized] [canonical] @references_private_function : $@convention(thin) () -> ()
+// CHECK-DAG: sil [serialized] [canonical] @references_public_global : $@convention(thin) () -> () {
+// CHECK-DAG: sil [serialized] [canonical] @references_shared_global : $@convention(thin) () -> () {
+// CHECK-DAG: sil [serialized] [canonical] @references_hidden_global : $@convention(thin) () -> () {
+// CHECK-DAG: sil [serialized] [canonical] @references_private_global : $@convention(thin) () -> ()
+// CHECK-DAG: sil hidden_external [serialized] [canonical] @hidden_external_function_test : $@convention(thin) () -> ()
+// CHECK-DAG: sil [serialized] [canonical] @public_function_test : $@convention(thin) () -> () {
+// CHECK-DAG: sil [serialized] [canonical] @public_function : $@convention(thin) () -> () {
+// CHECK-DAG: sil hidden [serialized] [canonical] @hidden_function : $@convention(thin) () -> () {
+// CHECK-DAG: sil shared_external [serialized] [canonical] @shared_external_function_test : $@convention(thin) () -> ()
+
+sil_global private [serialized] @private_global : $Builtin.Word
+sil_global [serialized] @public_global : $Builtin.Word
+sil_global shared [serialized] @shared_global : $Builtin.Word
+sil_global hidden [serialized] @hidden_global : $Builtin.Word
+
+sil private [serialized] @private_function : $@convention(thin) () -> () {
+  %0 = integer_literal $Builtin.Int32, 0
+  %1 = tuple()
+  return %1 : $()
+}
+sil [serialized] @references_private_global : $@convention(thin) () -> () {
+  %0 = global_addr @private_global : $*Builtin.Word
+  %1 = tuple()
+  return %1 : $()
+}
+sil [serialized] @references_private_function : $@convention(thin) () -> () {
+  %0 = function_ref @private_function : $@convention(thin) () -> ()
+  %1 = tuple()
+  return %1 : $()
+}
+
+sil shared [serialized] @shared_function : $@convention(thin) () -> () {
+  %0 = integer_literal $Builtin.Int32, 1
+  %1 = tuple()
+  return %1 : $()
+}
+sil [serialized] @references_shared_global : $@convention(thin) () -> () {
+  %0 = global_addr @shared_global : $*Builtin.Word
+  %1 = tuple()
+  return %1 : $()
+}
+sil [serialized] @references_shared_function : $@convention(thin) () -> () {
+  %0 = function_ref @shared_function : $@convention(thin) () -> ()
+  %1 = tuple()
+  return %1 : $()
+}
+
+sil hidden [serialized] @hidden_function : $@convention(thin) () -> () {
+  %0 = integer_literal $Builtin.Int32, 2
+  %1 = tuple()
+  return %1 : $()
+}
+sil [serialized] @references_hidden_global : $@convention(thin) () -> () {
+  %0 = global_addr @hidden_global : $*Builtin.Word
+  %1 = tuple()
+  return %1 : $()
+}
+sil [serialized] @references_hidden_function : $@convention(thin) () -> () {
+  %0 = function_ref @hidden_function : $@convention(thin) () -> ()
+  %1 = tuple()
+  return %1 : $()
+}
+
+sil [serialized] @public_function : $@convention(thin) () -> () {
+  %0 = integer_literal $Builtin.Int32, 4
+  %1 = tuple()
+  return %1 : $()
+}
+
+sil [serialized] @references_public_global : $@convention(thin) () -> () {
+  %0 = global_addr @public_global : $*Builtin.Word
+  %1 = tuple()
+  return %1 : $()
+}
+sil [serialized] @references_public_function : $@convention(thin) () -> () {
+  %0 = function_ref @public_function : $@convention(thin) () -> ()
+  %1 = tuple()
+  return %1 : $()
+}
+
+sil private [serialized] @private_function_test : $@convention(thin) () -> () {
+  %0 = function_ref @references_public_function : $@convention(thin) () -> ()
+  %1 = function_ref @references_shared_function : $@convention(thin) () -> ()
+  %2 = function_ref @references_hidden_function : $@convention(thin) () -> ()
+  %3 = function_ref @references_private_function : $@convention(thin) () -> ()
+  %4 = function_ref @references_public_global : $@convention(thin) () -> ()
+  %5 = function_ref @references_shared_global : $@convention(thin) () -> ()
+  %6 = function_ref @references_hidden_global : $@convention(thin) () -> ()
+  %7 = function_ref @references_private_global : $@convention(thin) () -> ()
+  apply %0() : $@convention(thin) () -> ()
+  apply %1() : $@convention(thin) () -> ()
+  apply %2() : $@convention(thin) () -> ()
+  apply %3() : $@convention(thin) () -> ()
+  apply %4() : $@convention(thin) () -> ()
+  apply %5() : $@convention(thin) () -> ()
+  apply %6() : $@convention(thin) () -> ()
+  apply %7() : $@convention(thin) () -> ()
+  %8 = tuple()
+  return %8 : $()
+}
+
+sil shared [serialized] @shared_function_test : $@convention(thin) () -> () {
+  %0 = function_ref @references_public_function : $@convention(thin) () -> ()
+  %1 = function_ref @references_shared_function : $@convention(thin) () -> ()
+  %2 = function_ref @references_hidden_function : $@convention(thin) () -> ()
+  %3 = function_ref @references_private_function : $@convention(thin) () -> ()
+  %4 = function_ref @references_public_global : $@convention(thin) () -> ()
+  %5 = function_ref @references_shared_global : $@convention(thin) () -> ()
+  %6 = function_ref @references_hidden_global : $@convention(thin) () -> ()
+  %7 = function_ref @references_private_global : $@convention(thin) () -> ()
+  apply %0() : $@convention(thin) () -> ()
+  apply %1() : $@convention(thin) () -> ()
+  apply %2() : $@convention(thin) () -> ()
+  apply %3() : $@convention(thin) () -> ()
+  apply %4() : $@convention(thin) () -> ()
+  apply %5() : $@convention(thin) () -> ()
+  apply %6() : $@convention(thin) () -> ()
+  apply %7() : $@convention(thin) () -> ()
+  %8 = tuple()
+  return %8 : $()
+}
+
+sil hidden [serialized] @hidden_function_test : $@convention(thin) () -> () {
+  %0 = function_ref @references_public_function : $@convention(thin) () -> ()
+  %1 = function_ref @references_shared_function : $@convention(thin) () -> ()
+  %2 = function_ref @references_hidden_function : $@convention(thin) () -> ()
+  %3 = function_ref @references_private_function : $@convention(thin) () -> ()
+  %4 = function_ref @references_public_global : $@convention(thin) () -> ()
+  %5 = function_ref @references_shared_global : $@convention(thin) () -> ()
+  %6 = function_ref @references_hidden_global : $@convention(thin) () -> ()
+  %7 = function_ref @references_private_global : $@convention(thin) () -> ()
+  apply %0() : $@convention(thin) () -> ()
+  apply %1() : $@convention(thin) () -> ()
+  apply %2() : $@convention(thin) () -> ()
+  apply %3() : $@convention(thin) () -> ()
+  apply %4() : $@convention(thin) () -> ()
+  apply %5() : $@convention(thin) () -> ()
+  apply %6() : $@convention(thin) () -> ()
+  apply %7() : $@convention(thin) () -> ()
+  %8 = tuple()
+  return %8 : $()
+}
+
+sil [serialized] @public_function_test : $@convention(thin) () -> () {
+  %0 = function_ref @references_public_function : $@convention(thin) () -> ()
+  %1 = function_ref @references_shared_function : $@convention(thin) () -> ()
+  %2 = function_ref @references_hidden_function : $@convention(thin) () -> ()
+  %3 = function_ref @references_private_function : $@convention(thin) () -> ()
+  %4 = function_ref @references_public_global : $@convention(thin) () -> ()
+  %5 = function_ref @references_shared_global : $@convention(thin) () -> ()
+  %6 = function_ref @references_hidden_global : $@convention(thin) () -> ()
+  %7 = function_ref @references_private_global : $@convention(thin) () -> ()
+  apply %0() : $@convention(thin) () -> ()
+  apply %1() : $@convention(thin) () -> ()
+  apply %2() : $@convention(thin) () -> ()
+  apply %3() : $@convention(thin) () -> ()
+  apply %4() : $@convention(thin) () -> ()
+  apply %5() : $@convention(thin) () -> ()
+  apply %6() : $@convention(thin) () -> ()
+  apply %7() : $@convention(thin) () -> ()
+  %8 = tuple()
+  return %8 : $()
+}
+
+sil hidden_external [serialized] @hidden_external_function_test : $@convention(thin) () -> () {
+  %0 = function_ref @references_public_function : $@convention(thin) () -> ()
+  %1 = function_ref @references_shared_function : $@convention(thin) () -> ()
+  %2 = function_ref @references_hidden_function : $@convention(thin) () -> ()
+  %3 = function_ref @references_private_function : $@convention(thin) () -> ()
+  %4 = function_ref @references_public_global : $@convention(thin) () -> ()
+  %5 = function_ref @references_shared_global : $@convention(thin) () -> ()
+  %6 = function_ref @references_hidden_global : $@convention(thin) () -> ()
+  %7 = function_ref @references_private_global : $@convention(thin) () -> ()
+  apply %0() : $@convention(thin) () -> ()
+  apply %1() : $@convention(thin) () -> ()
+  apply %2() : $@convention(thin) () -> ()
+  apply %3() : $@convention(thin) () -> ()
+  apply %4() : $@convention(thin) () -> ()
+  apply %5() : $@convention(thin) () -> ()
+  apply %6() : $@convention(thin) () -> ()
+  apply %7() : $@convention(thin) () -> ()
+  %8 = tuple()
+  return %8 : $()
+}
+
+sil [serialized] @hidden_external_function_test_caller : $@convention(thin) () -> () {
+  %0 = function_ref @hidden_external_function_test : $@convention(thin) () -> ()
+  %1 = apply %0() : $@convention(thin) () -> ()
+  %2 = tuple()
+  return %2 : $()
+}
+
+sil public_external [serialized] @public_external_function_test : $@convention(thin) () -> () {
+  %0 = function_ref @references_public_function : $@convention(thin) () -> ()
+  %1 = function_ref @references_shared_function : $@convention(thin) () -> ()
+  %2 = function_ref @references_hidden_function : $@convention(thin) () -> ()
+  %3 = function_ref @references_private_function : $@convention(thin) () -> ()
+  %4 = function_ref @references_public_global : $@convention(thin) () -> ()
+  %5 = function_ref @references_shared_global : $@convention(thin) () -> ()
+  %6 = function_ref @references_hidden_global : $@convention(thin) () -> ()
+  %7 = function_ref @references_private_global : $@convention(thin) () -> ()
+  apply %0() : $@convention(thin) () -> ()
+  apply %1() : $@convention(thin) () -> ()
+  apply %2() : $@convention(thin) () -> ()
+  apply %3() : $@convention(thin) () -> ()
+  apply %4() : $@convention(thin) () -> ()
+  apply %5() : $@convention(thin) () -> ()
+  apply %6() : $@convention(thin) () -> ()
+  apply %7() : $@convention(thin) () -> ()
+  %8 = tuple()
+  return %8 : $()
+}
+
+sil [serialized] @public_external_function_test_caller : $@convention(thin) () -> () {
+  %0 = function_ref @public_external_function_test : $@convention(thin) () -> ()
+  %1 = apply %0() : $@convention(thin) () -> ()
+  %2 = tuple()
+  return %2 : $()
+}
+
+sil shared_external [serialized] @shared_external_function_test : $@convention(thin) () -> () {
+  %0 = function_ref @references_public_function : $@convention(thin) () -> ()
+  %1 = function_ref @references_shared_function : $@convention(thin) () -> ()
+  %2 = function_ref @references_hidden_function : $@convention(thin) () -> ()
+  %3 = function_ref @references_private_function : $@convention(thin) () -> ()
+  %4 = function_ref @references_public_global : $@convention(thin) () -> ()
+  %5 = function_ref @references_shared_global : $@convention(thin) () -> ()
+  %6 = function_ref @references_hidden_global : $@convention(thin) () -> ()
+  %7 = function_ref @references_private_global : $@convention(thin) () -> ()
+  apply %0() : $@convention(thin) () -> ()
+  apply %1() : $@convention(thin) () -> ()
+  apply %2() : $@convention(thin) () -> ()
+  apply %3() : $@convention(thin) () -> ()
+  apply %4() : $@convention(thin) () -> ()
+  apply %5() : $@convention(thin) () -> ()
+  apply %6() : $@convention(thin) () -> ()
+  apply %7() : $@convention(thin) () -> ()
+  %8 = tuple()
+  return %8 : $()
+}
+
+sil [serialized] @shared_external_function_test_caller : $@convention(thin) () -> () {
+  %0 = function_ref @shared_external_function_test : $@convention(thin) () -> ()
+  %1 = apply %0() : $@convention(thin) () -> ()
+  %2 = tuple()
+  return %2 : $()
+}

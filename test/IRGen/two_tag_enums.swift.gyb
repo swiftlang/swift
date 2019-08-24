@@ -1,0 +1,62 @@
+// RUN: %empty-directory(%t)
+// RUN: %gyb %s > %t/main.swift
+// RUN: %target-swift-frontend -emit-ir %t/main.swift | %FileCheck %s
+
+// CHECK-NOT: switch i{{[0-9]}}
+class C {}
+
+enum TwoTags {
+  case A, B
+}
+
+enum OneFullPayloadOneTag {
+  case A(Int), B
+}
+
+enum OneXIPayloadOneTag {
+  case A(C), B
+}
+
+enum OneGenericPayloadOneTag<T> {
+  case A(T), B
+}
+
+enum TwoFullPayloads {
+  case A(Int), B(Int)
+}
+
+enum TwoSpareBitPayloads {
+  case A(C), B(C)
+}
+
+enum TwoGenericPayloads<T,U> {
+  case A(T), B(U)
+}
+
+func a() {}
+func b() {}
+
+%{
+Types = [
+  'TwoTags',
+  'OneFullPayloadOneTag',
+  'OneXIPayloadOneTag',
+  'OneGenericPayloadOneTag<T>',
+  'TwoFullPayloads',
+  'TwoSpareBitPayloads',
+  'TwoGenericPayloads<T, U>',
+]
+}%
+
+% for Type in Types:
+
+func switch${Type}(_ x: ${Type}) {
+  switch x {
+  case .A:
+    a()
+  case .B:
+    b()
+  }
+}
+
+% end

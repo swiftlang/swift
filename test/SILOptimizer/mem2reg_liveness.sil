@@ -1,0 +1,65 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -mem2reg | %FileCheck %s
+
+import Builtin
+import Swift
+
+sil @_Ts5printFT3valSi_T_ : $@convention(thin) (Int64) -> ()
+
+// CHECK-LABEL: sil @liveness0
+// CHECK-NOT: alloc_stack
+sil @liveness0 : $@convention(thin) (Int64) -> () {
+bb0(%0 : $Int64):
+  %1 = alloc_stack $Int64, var, name "x"               // users: %39, %2
+  store %0 to %1 : $*Int64                      // id: %2
+  %3 = integer_literal $Builtin.Int64, 10         // user: %6
+  %5 = struct_extract %0 : $Int64, #Int64._value   // user: %6
+  %6 = builtin "cmp_eq_Int64"(%5 : $Builtin.Int64, %3 : $Builtin.Int64) : $Builtin.Int1 // user: %7
+  cond_br %6, bb1, bb5                            // id: %7
+
+bb1:                                              // Preds: bb0
+  %8 = alloc_stack $Int64, var, name "y"               // users: %23, %19, %37, %11, %26
+  %9 = integer_literal $Builtin.Int64, 20         // user: %10
+  %10 = struct $Int64 (%9 : $Builtin.Int64)       // user: %11
+  store %10 to %8 : $*Int64                     // id: %11
+  %12 = integer_literal $Builtin.Int64, 3         // user: %15
+  %14 = struct_extract %0 : $Int64, #Int64._value  // user: %15
+  %15 = builtin "cmp_sgt_Int64"(%14 : $Builtin.Int64, %12 : $Builtin.Int64) : $Builtin.Int1 // user: %16
+  cond_br %15, bb2, bb3                           // id: %16
+
+bb2:                                              // Preds: bb1
+  %17 = integer_literal $Builtin.Int64, 0         // user: %18
+  %18 = struct $Int64 (%17 : $Builtin.Int64)      // user: %19
+  store %18 to %8 : $*Int64                     // id: %19
+  br bb4                                          // id: %20
+
+bb3:                                              // Preds: bb1
+  %21 = integer_literal $Builtin.Int64, 2         // user: %22
+  %22 = struct $Int64 (%21 : $Builtin.Int64)      // user: %23
+  store %22 to %8 : $*Int64                     // id: %23
+  br bb4                                          // id: %24
+
+bb4:                                              // Preds: bb3 bb2
+  // function_ref
+  %25 = function_ref @_Ts5printFT3valSi_T_ : $@convention(thin) (Int64) -> () // user: %36
+  %26 = load %8 : $*Int64                       // user: %30
+  %27 = integer_literal $Builtin.Int64, 2         // user: %31
+  %28 = integer_literal $Builtin.Int1, -1         // user: %31
+  %30 = struct_extract %26 : $Int64, #Int64._value // user: %31
+  %31 = builtin "sadd_with_overflow_Int64"(%30 : $Builtin.Int64, %27 : $Builtin.Int64, %28 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1) // users: %33, %32
+  %32 = tuple_extract %31 : $(Builtin.Int64, Builtin.Int1), 0 // user: %34
+  %33 = tuple_extract %31 : $(Builtin.Int64, Builtin.Int1), 1 // user: %35
+  %34 = struct $Int64 (%32 : $Builtin.Int64)      // user: %36
+  cond_fail %33 : $Builtin.Int1                   // id: %35
+  %36 = apply %25(%34) : $@convention(thin) (Int64) -> ()
+  dealloc_stack %8 : $*Int64     // id: %37
+  br bb5                                          // id: %38
+
+// We don't need a PHI node here because the value is dead!
+// CHECK: bb5:
+bb5:                                              // Preds: bb4 bb0
+  dealloc_stack %1 : $*Int64     // id: %39
+  %40 = tuple ()                                  // user: %41
+// CHECK: return
+  return %40 : $()                                // id: %41
+}
+

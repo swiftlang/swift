@@ -1,0 +1,8 @@
+func testStringLiteral() -> String {
+  return NSLocalizedString("abc", comment: "").foo()
+}
+
+extension String {
+  func foo() -> String { return self }
+}
+

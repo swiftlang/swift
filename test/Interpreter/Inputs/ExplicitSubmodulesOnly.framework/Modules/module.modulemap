@@ -1,0 +1,8 @@
+framework module ExplicitSubmodulesOnly {
+  explicit module A {
+    header "A.h"
+  }
+  explicit module B {
+    header "B.h"
+  }
+}

@@ -1,0 +1,23 @@
+Name: AppKit
+Classes:
+- Name: NSBezierPath
+  Properties:
+  - Name: bezierPathByFlatteningPath
+    SwiftName: flattened
+  - Name: bezierPathByReversingPath
+    SwiftName: reversed
+- Name: NSDocument
+  Methods:
+  - Selector: init
+    MethodKind: Instance
+    DesignatedInit: true
+- Name: NSView
+  Properties:
+  - Name: nextKeyView
+    SwiftName: nextKeyView
+  - Name: previousKeyView
+    SwiftName: previousKeyView
+  - Name: nextValidKeyView
+    SwiftName: nextValidKeyView
+  - Name: previousValidKeyView
+    SwiftName: previousValidKeyView

@@ -1,0 +1,2 @@
+// RUN: %target-sil-opt %s
+sil shared_external@a:$()->()

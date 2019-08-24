@@ -1,0 +1,40 @@
+// RUN: %target-swift-frontend %s -module-name main -emit-ir -o - | %FileCheck -check-prefix=%target-ptrsize %s
+
+import Builtin
+import Swift
+
+// 64: %T4main14Rdar15410780_AV = type <{ i2048, %Ts4Int8V }>
+// 64: %T4main14Rdar15410780_BV = type <{ %T4main14Rdar15410780_AVSg }>
+// 64: %T4main14Rdar15410780_AVSg = type <{ [257 x i8], [1 x i8] }>
+// 64: %T4main14Rdar15410780_CV = type <{ %TSSSg }>
+// 64: %TSSSg = type <{ [16 x i8] }>
+
+// 64: @"$s4main14Rdar15410780_AVWV" = internal constant {{.*}} i64 257
+// 64: @"$s4main14Rdar15410780_BVWV" = internal constant {{.*}} i64 258
+// 64: @"$s4main14Rdar15410780_CVWV" = internal constant {{.*}} i64 16
+
+
+// 32: %T4main14Rdar15410780_AV = type <{ i2048, %Ts4Int8V }>
+// 32: %T4main14Rdar15410780_BV = type <{ %T4main14Rdar15410780_AVSg }>
+// 32: %T4main14Rdar15410780_AVSg = type <{ [257 x i8], [1 x i8] }>
+// 32: %T4main14Rdar15410780_CV = type <{ %TSSSg }>
+// 32: %TSSSg = type <{ [12 x i8] }>
+
+// 32: @"$s4main14Rdar15410780_AVWV" = internal constant {{.*}} i32 257
+// 32: @"$s4main14Rdar15410780_BVWV" = internal constant {{.*}} i32 258
+// 32: @"$s4main14Rdar15410780_CVWV" = internal constant {{.*}} i32 12
+
+
+// <rdar://problem/15410780>
+struct Rdar15410780_A {
+  var a: Builtin.Int2048
+  var b: Int8
+}
+
+struct Rdar15410780_B {
+  var c: Rdar15410780_A?
+}
+
+struct Rdar15410780_C {
+  var d: String?
+}

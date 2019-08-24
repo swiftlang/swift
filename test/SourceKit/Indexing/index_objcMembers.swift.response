@@ -1,0 +1,83 @@
+{
+  key.dependencies: [
+    {
+      key.kind: source.lang.swift.import.module.swift,
+      key.name: "Swift",
+      key.filepath: Swift.swiftmodule,
+      key.is_system: 1
+    }
+  ],
+  key.entities: [
+    {
+      key.kind: source.lang.swift.decl.class,
+      key.name: "FixtureClass25",
+      key.usr: "s:17index_objcMembers14FixtureClass25C",
+      key.line: 5,
+      key.column: 20,
+      key.entities: [
+        {
+          key.kind: source.lang.swift.decl.var.instance,
+          key.name: "someVar",
+          key.usr: "s:17index_objcMembers14FixtureClass25C7someVarSSSgvp",
+          key.line: 6,
+          key.column: 9,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.usr: "s:17index_objcMembers14FixtureClass25C7someVarSSSgvg",
+              key.line: 6,
+              key.column: 9,
+              key.is_dynamic: 1,
+              key.is_implicit: 1
+            },
+            {
+              key.kind: source.lang.swift.decl.function.accessor.setter,
+              key.usr: "s:17index_objcMembers14FixtureClass25C7someVarSSSgvs",
+              key.line: 6,
+              key.column: 9,
+              key.is_dynamic: 1,
+              key.is_implicit: 1
+            }
+          ]
+        },
+        {
+          key.kind: source.lang.swift.ref.struct,
+          key.name: "String",
+          key.usr: "s:SS",
+          key.line: 6,
+          key.column: 18
+        },
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.name: "someMethod()",
+          key.usr: "s:17index_objcMembers14FixtureClass25C10someMethodyyF",
+          key.line: 7,
+          key.column: 10,
+          key.is_dynamic: 1,
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.objc
+            }
+          ]
+        },
+        {
+          key.kind: source.lang.swift.decl.function.constructor,
+          key.usr: "s:17index_objcMembers14FixtureClass25CACycfc",
+          key.line: 5,
+          key.column: 20,
+          key.is_implicit: 1,
+          key.attributes: [
+            {
+              key.attribute: source.decl.attribute.objc
+            }
+          ]
+        }
+      ],
+      key.attributes: [
+        {
+          key.attribute: source.decl.attribute.objcMembers
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+Name: SomeObjCModule
+Classes:
+- Name: NSRuncibleSpoon
+  SwiftBridge: RuncibleSpoon
+SwiftVersions:
+- Version: 4
+  Classes:
+  - Name: NSRuncibleSpoon
+    SwiftBridge: ""

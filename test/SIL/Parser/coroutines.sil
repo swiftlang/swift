@@ -1,0 +1,63 @@
+// RUN: %target-swift-frontend %s -emit-silgen -verify
+
+sil_stage raw
+
+import Swift
+
+sil @use_int : $@convention(thin) (Int) -> ()
+sil @use_float : $@convention(thin) (Float) -> ()
+
+sil @once_signature : $@yield_once () -> (@yields Int, @yields Float) {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}
+
+sil @many_signature : $@yield_many () -> (@yields Int, @yields Float) {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}
+
+sil [ossa] @yield : $@yield_once (Int, Float) -> (@yields Int, @yields Float) {
+bb0(%0 : $Int, %1 : $Float):
+  yield (%0 : $Int, %1 : $Float), resume bb1, unwind bb2
+
+bb1:
+  %r = tuple ()
+  return %r : $()
+
+bb2:
+  unwind
+}
+
+sil [ossa] @yield_many : $@yield_many (Int, Float) -> (@yields Int, @yields Float) {
+bb0(%0 : $Int, %1 : $Float):
+  yield (%0 : $Int, %1 : $Float), resume bb1, unwind bb3
+
+bb1:
+  yield (%0 : $Int, %1 : $Float), resume bb2, unwind bb4
+
+bb2:
+  %r = tuple ()
+  return %r : $()
+
+bb3:
+  br bb5
+
+bb4:
+  br bb5
+
+bb5:
+  unwind
+}
+
+sil [ossa] @begin_apply : $(Int, Float) -> () {
+bb0(%0 : $Int, %1 : $Float):
+  %coro = function_ref @yield : $@convention(thin) @yield_once (Int, Float) -> (@yields Int, @yields Float)
+  (%int, %float, %token) = begin_apply %coro(%0, %1) : $@convention(thin) @yield_once (Int, Float) -> (@yields Int, @yields Float)
+
+  end_apply %token
+  %r = tuple ()
+  return %r : $()
+}

@@ -1,0 +1,10 @@
+func throwingFunc() throws {
+    return
+}
+func foo() {
+    do {
+try throwingFunc()
+} catch {
+<#code#>
+}
+}

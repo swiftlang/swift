@@ -1,0 +1,78 @@
+// RUN: %target-swift-frontend -emit-ir %s | %FileCheck %s
+
+import Swift
+
+@_alignment(16) struct Foo { var x, y, z, w: Float }
+@_alignment(16) enum Empty {}
+@_alignment(16) enum Singleton { case V4(Float, Float, Float, Float) }
+@_alignment(16) enum NoPayload { case A, B, C }
+@_alignment(16) enum SinglePayload { case A(Float), B, C }
+@_alignment(16) enum MultiPayload { case A(Float), B(Float), C }
+
+sil @test_alignment : $@convention(thin) () -> () {
+entry:
+  // CHECK: alloca %T9alignment3FooV, align 16
+  %a = alloc_stack $*Foo
+  // CHECK: alloca %T9alignment9SingletonO, align 16
+  %b = alloc_stack $*Singleton
+  %c = alloc_stack $*Empty
+  // CHECK: alloca %T9alignment9NoPayloadO, align 16
+  %d = alloc_stack $*NoPayload
+  // CHECK: alloca %T9alignment13SinglePayloadO, align 16
+  %e = alloc_stack $*SinglePayload
+  // CHECK: alloca %T9alignment12MultiPayloadO, align 16
+  %f = alloc_stack $*MultiPayload
+
+  // CHECK: load float{{.*}}, align 16
+  // CHECK: load float{{.*}}, align 4
+  // CHECK: load float{{.*}}, align 8
+  // CHECK: load float{{.*}}, align 4
+  %z = load %a : $*Foo
+  // CHECK: store float{{.*}}, align 16
+  // CHECK: store float{{.*}}, align 4
+  // CHECK: store float{{.*}}, align 8
+  // CHECK: store float{{.*}}, align 4
+  store %z to %a : $*Foo
+
+  // CHECK: load float{{.*}}, align 16
+  // CHECK: load float{{.*}}, align 4
+  // CHECK: load float{{.*}}, align 8
+  // CHECK: load float{{.*}}, align 4
+  %y = load %b : $*Singleton
+
+  // CHECK: store float{{.*}}, align 16
+  // CHECK: store float{{.*}}, align 4
+  // CHECK: store float{{.*}}, align 8
+  // CHECK: store float{{.*}}, align 4
+  store %y to %b : $*Singleton
+
+  %x = load %c : $*Empty
+  store %x to %c : $*Empty
+
+  // CHECK: load i8{{.*}}, align 16
+  %w = load %d : $*NoPayload
+  // CHECK: store i8{{.*}}, align 16
+  store %w to %d : $*NoPayload
+
+  // CHECK: load i32{{.*}}, align 16
+  // CHECK: load i1{{.*}}, align 4
+  %v = load %e : $*SinglePayload
+  // CHECK: store i32{{.*}}, align 16
+  // CHECK: store i1{{.*}}, align 4
+  store %v to %e : $*SinglePayload
+
+  // CHECK: load i32{{.*}}, align 16
+  // CHECK: load i8{{.*}}, align 4
+  %u = load %f : $*MultiPayload
+  // CHECK: store i32{{.*}}, align 16
+  // CHECK: store i8{{.*}}, align 4
+  store %u to %f : $*MultiPayload
+
+  dealloc_stack %f : $*MultiPayload
+  dealloc_stack %e : $*SinglePayload
+  dealloc_stack %d : $*NoPayload
+  dealloc_stack %c : $*Empty
+  dealloc_stack %b : $*Singleton
+  dealloc_stack %a : $*Foo
+  return undef : $()
+}

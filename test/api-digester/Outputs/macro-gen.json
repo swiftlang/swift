@@ -1,0 +1,178 @@
+[
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0",
+    "LeftUsr": "s:12macrogenleft2C1C4foo2ySSSi_SitF",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "Int",
+    "ModuleName": "macrogenleft"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "s:12macrogenleft2C1C4foo2ySSSi_SitF",
+    "LeftComment": "Int",
+    "RightUsr": "",
+    "RightComment": "() -> ()",
+    "ModuleName": "macrogenleft"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2",
+    "LeftUsr": "s:12macrogenleft2C1C4foo2ySSSi_SitF",
+    "LeftComment": "Int",
+    "RightUsr": "",
+    "RightComment": "String",
+    "ModuleName": "macrogenleft"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "s:12macrogenleft2S1V4foo51x1yySi_SitF",
+    "LeftComment": "foo5(x:y:)",
+    "RightUsr": "",
+    "RightComment": "foo5(x:y:z:)",
+    "ModuleName": "macrogenleft"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "s:12macrogenleft2S1V4foo61x1yS2i_SitF",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "macrogenleft"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "2",
+    "LeftUsr": "s:12macrogenleft2S1V4foo61x1yS2i_SitF",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "macrogenleft"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "s:12macrogenleft2S1V4foo71x1ySiSgSi_AGtF",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "macrogenleft"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "2",
+    "LeftUsr": "s:12macrogenleft2S1V4foo71x1ySiSgSi_AGtF",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "macrogenleft"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "ImplicitOptionalToOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "s:12macrogenleft2S1V4foo81x1ySiSgSi_AGtF",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "macrogenleft"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "ImplicitOptionalToOptional",
+    "ChildIndex": "2",
+    "LeftUsr": "s:12macrogenleft2S1V4foo81x1ySiSgSi_AGtF",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "macrogenleft"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "2:0",
+    "LeftUsr": "s:12macrogenleft2S1V4foo91x1yySaySDySiSSSgGG_SaySiGtF",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "macrogenleft"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "1:0:1",
+    "LeftUsr": "s:12macrogenleft2S1V4foo91x1yySaySDySiSSSgGG_SaySiGtF",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "macrogenleft"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "1:1:1:1:1:0",
+    "LeftUsr": "s:12macrogenleft2S1V5foo101xySSSi_SDySiSDySSSaySiGGGtXE_tF",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "macrogenleft"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1:1:1:1",
+    "LeftUsr": "s:12macrogenleft2S1V5foo111xySSSi_SDySiSDySSSaySiGGGtXE_tF",
+    "LeftComment": "[String : [Int]]",
+    "RightUsr": "",
+    "RightComment": "Int",
+    "ModuleName": "macrogenleft"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1:1:1:1:1:0:0:0:0",
+    "LeftUsr": "s:12macrogenleft2S1V5foo121xySSSi_SDySiSDySSSaySiGGGtXE_tF",
+    "LeftComment": "Int",
+    "RightUsr": "",
+    "RightComment": "String",
+    "ModuleName": "macrogenleft"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "s:12macrogenleft2S1VyACSicfc",
+    "LeftComment": "Int",
+    "RightUsr": "",
+    "RightComment": "Double",
+    "ModuleName": "macrogenleft"
+  }
+]

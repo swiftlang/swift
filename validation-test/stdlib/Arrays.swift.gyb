@@ -1,0 +1,2549 @@
+// RUN: %empty-directory(%t)
+//
+// RUN: %gyb %s -o %t/main.swift
+// RUN: %target-clang -fobjc-arc %S/Inputs/SlurpFastEnumeration/SlurpFastEnumeration.m -c -o %t/SlurpFastEnumeration.o
+// RUN: %line-directive %t/main.swift -- %target-build-swift %t/main.swift %S/Inputs/ArrayTypesAndHelpers.swift -I %S/Inputs/SlurpFastEnumeration/ -Xlinker %t/SlurpFastEnumeration.o -o %t/Arrays -Xfrontend -disable-access-control
+//
+// RUN: %target-codesign %t/Arrays && %line-directive %t/main.swift -- %target-run %t/Arrays
+// REQUIRES: executable_test
+
+import Swift
+import StdlibUnittest
+import StdlibCollectionUnittest
+
+#if _runtime(_ObjC)
+import Foundation
+import StdlibUnittestFoundationExtras
+#endif
+
+let CopyToNativeArrayBufferTests = TestSuite("CopyToNativeArrayBufferTests")
+
+extension Array {
+  func _rawIdentifier() -> Int {
+    return unsafeBitCast(self, to: Int.self)
+  }
+}
+
+CopyToNativeArrayBufferTests.test("Sequence._copyToContiguousArray()") {
+  do {
+    // Call from a static context.
+    let s =
+      MinimalSequence(elements: LifetimeTracked(10)..<LifetimeTracked(27))
+
+    expectEqual(0, s.timesMakeIteratorCalled.value)
+    let copy = s._copyToContiguousArray()
+    expectEqual(1, s.timesMakeIteratorCalled.value)
+    expectEqualSequence(
+      Array(10..<27),
+      copy.map { $0.value })
+  }
+  do {
+    // Call from a generic context.
+    let wrapped = MinimalSequence(elements: LifetimeTracked(10)..<LifetimeTracked(27))
+    let s = LoggingSequence(wrapping: wrapped)
+
+    expectEqual(0, wrapped.timesMakeIteratorCalled.value)
+    let copy = s._copyToContiguousArray()
+    expectEqual(1, wrapped.timesMakeIteratorCalled.value)
+    expectEqualSequence(
+      Array(10..<27),
+      copy.map { $0.value })
+  }
+}
+
+CopyToNativeArrayBufferTests.test("Collection._copyToContiguousArray()") {
+  // Check that collections are handled with the collection-specific API.  This
+  // means that we are calling the right default implementation (one for
+  // collections, not the one for sequences).
+
+  do {
+    // Call from a static context.
+    let c =
+      DefaultedCollection(elements: LifetimeTracked(10)..<LifetimeTracked(27))
+
+    expectEqual(0, c.timesMakeIteratorCalled.value)
+    expectEqual(0, c.timesStartIndexCalled.value)
+    let copy = c._copyToContiguousArray()
+    // _copyToContiguousArray calls Sequence._copyContents, which makes an iterator.
+    expectEqual(1, c.timesMakeIteratorCalled.value)
+    expectNotEqual(0, c.timesStartIndexCalled.value)
+    expectEqualSequence(
+      Array(10..<27),
+      copy.map { $0.value })
+  }
+  do {
+    // Call from a generic context.
+    let wrapped =
+      DefaultedCollection(elements: LifetimeTracked(10)..<LifetimeTracked(27))
+    let s = LoggingSequence(wrapping: wrapped)
+    expectEqual(0, wrapped.timesMakeIteratorCalled.value)
+    expectEqual(0, wrapped.timesStartIndexCalled.value)
+    let copy = s._copyToContiguousArray()
+    // _copyToContiguousArray calls Sequence._copyContents, which makes an iterator.
+    expectEqual(1, wrapped.timesMakeIteratorCalled.value)
+    expectNotEqual(0, wrapped.timesStartIndexCalled.value)
+
+    expectEqualSequence(
+      Array(10..<27),
+      copy.map { $0.value })
+  }
+}
+
+%{
+all_array_types = ['ContiguousArray', 'ArraySlice', 'Array']
+}%
+
+var ArrayTestSuite = TestSuite("Array")
+
+ArrayTestSuite.test("sizeof") {
+  var a = [ 10, 20, 30 ]
+#if arch(i386) || arch(arm)
+  expectEqual(4, MemoryLayout.size(ofValue: a))
+#else
+  expectEqual(8, MemoryLayout.size(ofValue: a))
+#endif
+}
+
+ArrayTestSuite.test("valueDestruction") {
+  var a = [LifetimeTracked]()
+  for i in 100...110 {
+    a.append(LifetimeTracked(i))
+  }
+}
+
+ArrayTestSuite.test("capacity/reserveCapacity(_:)") {
+  var a1 = [1010, 1020, 1030]
+  expectGE(a1.capacity, 3)
+  a1.append(1040)
+  expectGT(a1.capacity, 3)
+
+  // Reserving new capacity jumps up to next limit.
+  a1.reserveCapacity(7)
+  expectGE(a1.capacity, 7)
+
+  // Can reserve right up to a limit.
+  a1.reserveCapacity(24)
+  expectGE(a1.capacity, 24)
+
+  // Fill up to the limit, no reallocation.
+  for v in stride(from: 50, through: 240, by: 10).lazy.map({ 1000 + $0 }) {
+    a1.append(v)
+  }
+  expectEqual(24, a1.count)
+  expectGE(a1.capacity, 24)
+  a1.append(1250)
+  expectGT(a1.capacity, 24)
+}
+
+ArrayTestSuite.test("init(arrayLiteral:)") {
+  do {
+    let empty = Array<Int>()
+    expectEqual(0, empty.count)
+  }
+  do {
+    let a = Array(arrayLiteral: 1010)
+    expectEqual(1, a.count)
+    expectEqual(1010, a[0])
+  }
+  do {
+    let a = Array(arrayLiteral: 1010, 1020)
+    expectEqual(2, a.count)
+    expectEqual(1010, a[0])
+    expectEqual(1020, a[1])
+  }
+  do {
+    let a = Array(arrayLiteral: 1010, 1020, 1030)
+    expectEqual(3, a.count)
+    expectEqual(1010, a[0])
+    expectEqual(1020, a[1])
+    expectEqual(1030, a[2])
+  }
+  do {
+    let a = Array(arrayLiteral: 1010, 1020, 1030, 1040)
+    expectEqual(4, a.count)
+    expectEqual(1010, a[0])
+    expectEqual(1020, a[1])
+    expectEqual(1030, a[2])
+    expectEqual(1040, a[3])
+  }
+  do {
+    let a: Array<Int> = [ 1010, 1020, 1030 ]
+    expectEqual(3, a.count)
+    expectEqual(1010, a[0])
+    expectEqual(1020, a[1])
+    expectEqual(1030, a[2])
+  }
+}
+
+ArrayTestSuite.test("init(repeating:count:)") {
+  do {
+    let a = Array(repeating: 1010, count: 5)
+    expectEqual(a.count, 5)
+    expectEqual(1010, a[0])
+    expectEqual(1010, a[1])
+    expectEqual(1010, a[2])
+    expectEqual(1010, a[3])
+    expectEqual(1010, a[4])
+  }
+}
+
+ArrayTestSuite.test("Hashable") {
+  let a1: [Array<Int>] = [
+    [1, 2, 3],
+    [1, 3, 2],
+    [3, 1, 2],
+    [1, 2],
+    [1],
+    [],
+    [1, 1, 1]
+  ]
+  checkHashable(a1, equalityOracle: { $0 == $1 })
+
+  let a2: [Array<Array<Int>>] = [
+    [[], [1], [1, 2], [2, 1]],
+    [[], [1], [2, 1], [2, 1]],
+    [[1], [], [2, 1], [2, 1]],
+    [[1], [], [2, 1], [2]],
+    [[1], [], [2, 1]]
+  ]
+  checkHashable(a2, equalityOracle: { $0 == $1 })
+
+  // These arrays share the same sequence of leaf integers, but they must
+  // still all hash differently.
+  let a3: [Array<Array<Int>>] = [
+    // Grouping changes must perturb the hash.
+    [[1], [2], [3], [4], [5]],
+    [[1, 2], [3], [4], [5]],
+
+    [[1], [2, 3], [4], [5]],
+    [[1], [2], [3, 4], [5]],
+    [[1], [2], [3], [4, 5]],
+
+    [[1, 2, 3], [4], [5]],
+    [[1], [2, 3, 4], [5]],
+    [[1], [2], [3, 4, 5]],
+
+    [[1, 2, 3, 4], [5]],
+    [[1], [2, 3, 4, 5]],
+
+    [[1, 2], [3, 4], [5]],
+    [[1], [2, 3], [4, 5]],
+    [[1, 2, 3, 4, 5]],
+
+    // Empty arrays must perturb the hash.
+    [[], [1], [2], [3], [4], [5]],
+    [[1], [], [2], [3], [4], [5]],
+    [[1], [2], [3], [4], [5], []],
+    [[1], [], [], [2], [3], [], [4], [], [5]],
+  ]
+  checkHashable(a3, equalityOracle: { $0 == $1 })
+}
+
+
+#if _runtime(_ObjC)
+//===----------------------------------------------------------------------===//
+// NSArray -> Array bridging tests.
+//===----------------------------------------------------------------------===//
+
+ArrayTestSuite.test("BridgedFromObjC.Verbatim.ArrayIsCopied") {
+  var (a, nsa) = getBridgedVerbatimArrayAndNSMutableArray()
+  expectTrue(isCocoaArray(a))
+
+  // Find an existing value.
+  do {
+    let v = a[0] as! TestObjCValueTy
+    expectEqual(1010, v.value)
+  }
+
+  // Remove the value from the NSMutableArray.
+  nsa.removeObject(at: 0)
+
+  // Find an existing value, again.
+  do {
+    let v = a[0] as! TestObjCValueTy
+    expectEqual(1010, v.value)
+  }
+}
+
+ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.ArrayIsCopied") {
+  var (a, nsa) = getBridgedNonverbatimArrayAndNSMutableArray()
+  expectTrue(isNativeArray(a))
+
+  // Find an existing value.
+  do {
+    let v = a[0]
+    expectEqual(1010, v.value)
+  }
+
+  // Remove the value from the NSMutableArray.
+  nsa.removeObject(at: 0)
+
+  // Find an existing value, again.
+  do {
+    let v = a[0]
+    expectEqual(1010, v.value)
+  }
+}
+
+ArrayTestSuite.test("BridgedFromObjC.Verbatim.NSArrayIsRetained") {
+  let nsa: NSArray = autoreleasepool {
+    NSArray(array: getAsNSArray([1010, 1020, 1030]))
+  }
+  
+  let a: [AnyObject] = convertNSArrayToArray(nsa)
+  
+  let bridgedBack: NSArray = convertArrayToNSArray(a)
+  
+  expectEqual(
+    unsafeBitCast(nsa, to: Int.self),
+    unsafeBitCast(bridgedBack, to: Int.self))
+  
+  _blackHole(nsa)
+  _blackHole(a)
+  _blackHole(bridgedBack)
+}
+
+ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.NSArrayIsCopied") {
+  let nsa: NSArray = autoreleasepool {
+    NSArray(array: getAsNSArray([1010, 1020, 1030]))
+  }
+  
+  let a: [TestBridgedValueTy] = convertNSArrayToArray(nsa)
+  
+  let bridgedBack: NSArray = convertArrayToNSArray(a)
+  
+  expectNotEqual(
+    unsafeBitCast(nsa, to: Int.self),
+    unsafeBitCast(bridgedBack, to: Int.self))
+  
+  _blackHole(nsa)
+  _blackHole(a)
+  _blackHole(bridgedBack)
+}
+
+ArrayTestSuite.test("BridgedFromObjC.Verbatim.ImmutableArrayIsRetained") {
+  let nsa: NSArray = CustomImmutableNSArray(_privateInit: ())
+  
+  CustomImmutableNSArray.timesCopyWithZoneWasCalled = 0
+  CustomImmutableNSArray.timesObjectAtIndexWasCalled = 0
+  CustomImmutableNSArray.timesObjectEnumeratorWasCalled = 0
+  CustomImmutableNSArray.timesCountWasCalled = 0
+  let a: [AnyObject] = convertNSArrayToArray(nsa)
+  expectEqual(1, CustomImmutableNSArray.timesCopyWithZoneWasCalled)
+  expectEqual(0, CustomImmutableNSArray.timesObjectAtIndexWasCalled)
+  expectEqual(0, CustomImmutableNSArray.timesObjectEnumeratorWasCalled)
+  expectEqual(0, CustomImmutableNSArray.timesCountWasCalled)
+  
+  let bridgedBack: NSArray = convertArrayToNSArray(a)
+  expectEqual(
+    unsafeBitCast(nsa, to: Int.self),
+    unsafeBitCast(bridgedBack, to: Int.self))
+  
+  _blackHole(nsa)
+  _blackHole(a)
+  _blackHole(bridgedBack)
+}
+
+ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.ImmutableArrayIsCopied") {
+  let nsa: NSArray = CustomImmutableNSArray(_privateInit: ())
+
+  CustomImmutableNSArray.timesCopyWithZoneWasCalled = 0
+  CustomImmutableNSArray.timesObjectAtIndexWasCalled = 0
+  CustomImmutableNSArray.timesObjectEnumeratorWasCalled = 0
+  CustomImmutableNSArray.timesCountWasCalled = 0
+  TestBridgedValueTy.bridgeOperations = 0
+  let a: [TestBridgedValueTy] = convertNSArrayToArray(nsa)
+  //FIXME: Why is this copied?
+  expectEqual(1, CustomImmutableNSArray.timesCopyWithZoneWasCalled)
+  expectEqual(3, CustomImmutableNSArray.timesObjectAtIndexWasCalled)
+  expectNotEqual(0, CustomImmutableNSArray.timesCountWasCalled)
+  expectEqual(3, TestBridgedValueTy.bridgeOperations)
+
+  let bridgedBack: NSArray = convertArrayToNSArray(a)
+  expectNotEqual(
+    unsafeBitCast(nsa, to: Int.self),
+    unsafeBitCast(bridgedBack, to: Int.self))
+
+  _blackHole(nsa)
+  _blackHole(a)
+  _blackHole(bridgedBack)
+}
+
+ArrayTestSuite.test("BridgedFromObjC.Verbatim.Subscript") {
+  let a = getBridgedVerbatimArray()
+  let identity1 = a._rawIdentifier()
+  expectTrue(isCocoaArray(a))
+
+  // Find an existing value.
+  do {
+    var v = a[0]
+    expectEqual(1010, (v as! TestObjCValueTy).value)
+
+    v = a[1]
+    expectEqual(1020, (v as! TestObjCValueTy).value)
+
+    v = a[2]
+    expectEqual(1030, (v as! TestObjCValueTy).value)
+  }
+  expectEqual(identity1, a._rawIdentifier())
+}
+
+ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.Subscript") {
+  var a = getBridgedNonverbatimArray()
+  let identity1 = a._rawIdentifier()
+  expectTrue(isNativeArray(a))
+
+  // Find an existing value.
+  do {
+    var v = a[0]
+    expectEqual(1010, v.value)
+
+    v = a[1]
+    expectEqual(1020, v.value)
+
+    v = a[2]
+    expectEqual(1030, v.value)
+  }
+  expectEqual(identity1, a._rawIdentifier())
+}
+
+ArrayTestSuite.test("BridgedFromObjC.Verbatim.RemoveAt") {
+  var a = getBridgedVerbatimArray()
+  let identity = a._rawIdentifier()
+  expectTrue(isCocoaArray(a))
+
+  let index = 0
+  expectEqual(1010, (a[index] as! TestObjCValueTy).value)
+  expectEqual(identity, a._rawIdentifier())
+
+  let removedElement = a.remove(at: index)
+  expectNotEqual(identity, a._rawIdentifier())
+  expectTrue(isNativeArray(a))
+  expectEqual(1010, (removedElement as! TestObjCValueTy).value)
+  expectEqual(2, a.count)
+}
+
+ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAt") {
+  var a = getBridgedNonverbatimArray()
+  let identity = a._rawIdentifier()
+  expectTrue(isNativeArray(a))
+
+  let index = 0
+  expectEqual(1010, a[index].value)
+  expectEqual(identity, a._rawIdentifier())
+
+  let removedElement = a.remove(at: index)
+  expectEqual(identity, a._rawIdentifier())
+  expectTrue(isNativeArray(a))
+  expectEqual(1010, removedElement.value)
+  expectEqual(2, a.count)
+}
+
+ArrayTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
+  do {
+    var a = getBridgedVerbatimArray()
+    let identity1 = a._rawIdentifier()
+    expectTrue(isCocoaArray(a))
+    let originalCapacity = a.count
+    expectEqual(3, a.count)
+    expectEqual(1010, (a[0] as! TestObjCValueTy).value)
+
+    a.removeAll()
+    expectNotEqual(identity1, a._rawIdentifier())
+    expectLT(a._buffer.capacity, originalCapacity)
+    expectEqual(0, a.count)
+  }
+
+  do {
+    var a = getBridgedVerbatimArray()
+    let identity1 = a._rawIdentifier()
+    expectTrue(isCocoaArray(a))
+    let originalCapacity = a.count
+    expectEqual(3, a.count)
+    expectEqual(1010, (a[0] as! TestObjCValueTy).value)
+
+    a.removeAll(keepingCapacity: true)
+    expectNotEqual(identity1, a._rawIdentifier())
+    expectGE(a._buffer.capacity, originalCapacity)
+    expectEqual(0, a.count)
+  }
+
+  do {
+    var a1 = getBridgedVerbatimArray()
+    let identity1 = a1._rawIdentifier()
+    expectTrue(isCocoaArray(a1))
+    let originalCapacity = a1.count
+    expectEqual(3, a1.count)
+    expectEqual(1010, (a1[0] as! TestObjCValueTy).value)
+
+    var a2 = a1
+    a2.removeAll()
+    let identity2 = a2._rawIdentifier()
+    expectEqual(identity1, a1._rawIdentifier())
+    expectNotEqual(identity2, identity1)
+    expectEqual(3, a1.count)
+    expectEqual(1010, (a1[0] as! TestObjCValueTy).value)
+    expectLT(a2._buffer.capacity, originalCapacity)
+    expectEqual(0, a2.count)
+  }
+
+  do {
+    var a1 = getBridgedVerbatimArray()
+    let identity1 = a1._rawIdentifier()
+    expectTrue(isCocoaArray(a1))
+    let originalCapacity = a1.count
+    expectEqual(3, a1.count)
+    expectEqual(1010, (a1[0] as! TestObjCValueTy).value)
+
+    var a2 = a1
+    a2.removeAll(keepingCapacity: true)
+    let identity2 = a2._rawIdentifier()
+    expectEqual(identity1, a1._rawIdentifier())
+    expectNotEqual(identity2, identity1)
+    expectEqual(3, a1.count)
+    expectEqual(1010, (a1[0] as! TestObjCValueTy).value)
+    expectGE(a2._buffer.capacity, originalCapacity)
+    expectEqual(0, a2.count)
+  }
+}
+
+ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
+  do {
+    var a = getBridgedNonverbatimArray()
+    let identity1 = a._rawIdentifier()
+    expectTrue(isNativeArray(a))
+    let originalCapacity = a.count
+    expectEqual(3, a.count)
+    expectEqual(1010, a[0].value)
+
+    a.removeAll()
+    expectNotEqual(identity1, a._rawIdentifier())
+    expectLT(a._buffer.capacity, originalCapacity)
+    expectEqual(0, a.count)
+  }
+
+  do {
+    var a = getBridgedNonverbatimArray()
+    let identity1 = a._rawIdentifier()
+    expectTrue(isNativeArray(a))
+    let originalCapacity = a.count
+    expectEqual(3, a.count)
+    expectEqual(1010, a[0].value)
+
+    a.removeAll(keepingCapacity: true)
+    expectEqual(identity1, a._rawIdentifier())
+    expectGE(a._buffer.capacity, originalCapacity)
+    expectEqual(0, a.count)
+  }
+
+  do {
+    var a1 = getBridgedNonverbatimArray()
+    let identity1 = a1._rawIdentifier()
+    expectTrue(isNativeArray(a1))
+    let originalCapacity = a1.count
+    expectEqual(3, a1.count)
+    expectEqual(1010, a1[0].value)
+
+    var a2 = a1
+    a2.removeAll()
+    let identity2 = a2._rawIdentifier()
+    expectEqual(identity1, a1._rawIdentifier())
+    expectNotEqual(identity2, identity1)
+    expectEqual(3, a1.count)
+    expectEqual(1010, a1[0].value)
+    expectLT(a2._buffer.capacity, originalCapacity)
+    expectEqual(0, a2.count)
+  }
+
+  do {
+    var a1 = getBridgedNonverbatimArray()
+    let identity1 = a1._rawIdentifier()
+    expectTrue(isNativeArray(a1))
+    let originalCapacity = a1.count
+    expectEqual(3, a1.count)
+    expectEqual(1010, a1[0].value)
+
+    var a2 = a1
+    a2.removeAll(keepingCapacity: true)
+    let identity2 = a2._rawIdentifier()
+    expectEqual(identity1, a1._rawIdentifier())
+    expectNotEqual(identity2, identity1)
+    expectEqual(3, a1.count)
+    expectEqual(1010, a1[0].value)
+    expectGE(a2._buffer.capacity, originalCapacity)
+    expectEqual(0, a2.count)
+  }
+}
+
+ArrayTestSuite.test("BridgedFromObjC.Verbatim.Count") {
+  let a = getBridgedVerbatimArray()
+  let identity1 = a._rawIdentifier()
+  expectTrue(isCocoaArray(a))
+
+  expectEqual(3, a.count)
+  expectEqual(identity1, a._rawIdentifier())
+}
+
+ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.Count") {
+  let a = getBridgedNonverbatimArray()
+  let identity1 = a._rawIdentifier()
+  expectTrue(isNativeArray(a))
+
+  expectEqual(3, a.count)
+  expectEqual(identity1, a._rawIdentifier())
+}
+
+ArrayTestSuite.test("BridgedFromObjC.Verbatim.Generate") {
+  let a = getBridgedVerbatimArray()
+  let identity1 = a._rawIdentifier()
+  expectTrue(isCocoaArray(a))
+
+  var iter = a.makeIterator()
+  var values = Array<Int>()
+  while let value = iter.next() {
+    values.append((value as! TestObjCValueTy).value)
+  }
+  expectEqual(values, [1010, 1020, 1030])
+  expectNil(iter.next())
+  expectNil(iter.next())
+  expectNil(iter.next())
+  expectEqual(identity1, a._rawIdentifier())
+}
+
+ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.Generate") {
+  let a = getBridgedNonverbatimArray()
+  let identity1 = a._rawIdentifier()
+  expectTrue(isNativeArray(a))
+
+  var iter = a.makeIterator()
+  var values = Array<Int>()
+  while let value = iter.next() {
+    values.append(value.value)
+  }
+  expectEqual(values, [1010, 1020, 1030])
+  expectNil(iter.next())
+  expectNil(iter.next())
+  expectNil(iter.next())
+  expectEqual(identity1, a._rawIdentifier())
+}
+
+ArrayTestSuite.test("BridgedFromObjC.Verbatim.Generate_Empty") {
+  let a = getBridgedVerbatimArray([])
+  let identity1 = a._rawIdentifier()
+  expectTrue(isCocoaArray(a))
+
+  var iter = a.makeIterator()
+  expectNil(iter.next())
+  expectNil(iter.next())
+  expectNil(iter.next())
+  expectNil(iter.next())
+  expectEqual(identity1, a._rawIdentifier())
+}
+
+ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.Generate_Empty") {
+  let a = getBridgedNonverbatimArray([])
+  let identity1 = a._rawIdentifier()
+  expectTrue(isNativeArray(a))
+
+  var iter = a.makeIterator()
+  expectNil(iter.next())
+  expectNil(iter.next())
+  expectNil(iter.next())
+  expectNil(iter.next())
+  expectEqual(identity1, a._rawIdentifier())
+}
+
+ArrayTestSuite.test("BridgedFromObjC.Verbatim.Generate_Huge") {
+  let a = getHugeBridgedVerbatimArray()
+  let identity1 = a._rawIdentifier()
+  expectTrue(isCocoaArray(a))
+
+  var iter = a.makeIterator()
+  var values = Array<Int>()
+  while let value = iter.next() {
+    values.append((value as! TestObjCValueTy).value)
+  }
+  var expectedValues = Array<Int>()
+  for i in 1...32 {
+    expectedValues += [1000 + i]
+  }
+  expectEqual(values, expectedValues)
+  expectNil(iter.next())
+  expectNil(iter.next())
+  expectNil(iter.next())
+  expectEqual(identity1, a._rawIdentifier())
+}
+
+ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.Generate_Huge") {
+  let a = getHugeBridgedNonverbatimArray()
+  let identity1 = a._rawIdentifier()
+  expectTrue(isNativeArray(a))
+
+  var iter = a.makeIterator()
+  var values = Array<Int>()
+  while let value = iter.next() {
+    values.append(value.value)
+  }
+  var expectedValues = Array<Int>()
+  for i in 1...32 {
+    expectedValues += [1000 + i]
+  }
+  expectEqual(values, expectedValues)
+  expectNil(iter.next())
+  expectNil(iter.next())
+  expectNil(iter.next())
+  expectEqual(identity1, a._rawIdentifier())
+}
+
+ArrayTestSuite.test("BridgedFromObjC.Verbatim.EqualityTest_Empty") {
+  let a1 = getBridgedVerbatimEquatableArray([])
+  let identity1 = a1._rawIdentifier()
+  expectTrue(isCocoaArray(a1))
+
+  let a2 = getBridgedVerbatimEquatableArray([])
+  let identity2 = a2._rawIdentifier()
+  expectTrue(isCocoaArray(a2))
+
+  // We can't check that `identity1 != identity2` because Foundation might be
+  // returning the same singleton NSArray for empty arrays.
+
+  expectEqual(a1, a2)
+  expectEqual(identity1, a1._rawIdentifier())
+  expectEqual(identity2, a2._rawIdentifier())
+}
+
+ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.EqualityTest_Empty") {
+  var a1 = getBridgedNonverbatimEquatableArray([])
+  a1.append(TestBridgedEquatableValueTy(1))
+  a1.removeLast()
+  let identity1 = a1._rawIdentifier()
+  expectTrue(isNativeArray(a1))
+
+  let a2 = getBridgedNonverbatimEquatableArray([])
+  let identity2 = a2._rawIdentifier()
+  expectTrue(isNativeArray(a2))
+  expectNotEqual(identity1, identity2)
+
+  expectEqual(a1, a2)
+  expectEqual(identity1, a1._rawIdentifier())
+  expectEqual(identity2, a2._rawIdentifier())
+}
+
+ArrayTestSuite.test("BridgedFromObjC.Verbatim.EqualityTest_Small") {
+  func helper(_ na1: Array<Int>, _ na2: Array<Int>, _ expectedEq: Bool) {
+    let a1 = getBridgedVerbatimEquatableArray(na1)
+    let identity1 = a1._rawIdentifier()
+    expectTrue(isCocoaArray(a1))
+
+    var a2 = getBridgedVerbatimEquatableArray(na2)
+    var identity2 = a2._rawIdentifier()
+    expectTrue(isCocoaArray(a2))
+
+    do {
+      let eq1 = (a1 == a2)
+      expectEqual(eq1, expectedEq)
+
+      let eq2 = (a2 == a1)
+      expectEqual(eq2, expectedEq)
+
+      let neq1 = (a1 != a2)
+      expectNotEqual(neq1, expectedEq)
+
+      let neq2 = (a2 != a1)
+      expectNotEqual(neq2, expectedEq)
+    }
+    expectEqual(identity1, a1._rawIdentifier())
+    expectEqual(identity2, a2._rawIdentifier())
+
+    a2.append(TestObjCEquatableValueTy(1111))
+    a2.removeLast()
+    expectTrue(isNativeArray(a2))
+    expectNotEqual(identity2, a2._rawIdentifier())
+    identity2 = a2._rawIdentifier()
+
+    do {
+      let eq1 = (a1 == a2)
+      expectEqual(eq1, expectedEq)
+
+      let eq2 = (a2 == a1)
+      expectEqual(eq2, expectedEq)
+
+      let neq1 = (a1 != a2)
+      expectNotEqual(neq1, expectedEq)
+
+      let neq2 = (a2 != a1)
+      expectNotEqual(neq2, expectedEq)
+    }
+    expectEqual(identity1, a1._rawIdentifier())
+    expectEqual(identity2, a2._rawIdentifier())
+  }
+
+  helper([], [], true)
+
+  helper([1010],
+         [1010],
+         true)
+
+  helper([1010, 1020],
+         [1010, 1020],
+         true)
+
+  helper([1010, 1020, 1030],
+         [1010, 1020, 1030],
+         true)
+
+  helper([1010, 1020, 1030],
+         [1010, 1020, 1111],
+         false)
+
+  helper([1010, 1020, 1030],
+         [1010, 1020],
+         false)
+
+  helper([1010, 1020, 1030],
+         [1010],
+         false)
+
+  helper([1010, 1020, 1030],
+         [],
+         false)
+
+  helper([1010, 1020, 1030],
+         [1010, 1020, 1030, 1040],
+         false)
+}
+
+//===---
+// Array -> NSArray bridging tests.
+//
+// Values are bridged verbatim.
+//===---
+
+ArrayTestSuite.test("BridgedToObjC.Verbatim.Count") {
+  let d = getBridgedNSArrayOfRefTypesBridgedVerbatim()
+
+  expectEqual(3, d.count)
+}
+
+ArrayTestSuite.test("BridgedToObjC.Verbatim.ObjectForKey") {
+  let a = getBridgedNSArrayOfRefTypesBridgedVerbatim()
+
+  var v: AnyObject? = a.object(at: 0) as AnyObject
+  expectEqual(1010, (v as! TestObjCValueTy).value)
+  let idValue10 = unsafeBitCast(v, to: UInt.self)
+
+  v = a.object(at: 1) as AnyObject
+  expectEqual(1020, (v as! TestObjCValueTy).value)
+  let idValue20 = unsafeBitCast(v, to: UInt.self)
+
+  v = a.object(at: 2) as AnyObject
+  expectEqual(1030, (v as! TestObjCValueTy).value)
+  let idValue30 = unsafeBitCast(v, to: UInt.self)
+
+  for _ in 0..<3 {
+    expectEqual(idValue10, unsafeBitCast(
+      a.object(at: 0) as AnyObject, to: UInt.self))
+
+    expectEqual(idValue20, unsafeBitCast(
+      a.object(at: 1) as AnyObject, to: UInt.self))
+
+    expectEqual(idValue30, unsafeBitCast(
+      a.object(at: 2) as AnyObject, to: UInt.self))
+  }
+
+  expectAutoreleasedValues(unopt: 3)
+}
+
+ArrayTestSuite.test("BridgedToObjC.Verbatim.KeyEnumerator.NextObject") {
+  let a = getBridgedNSArrayOfRefTypesBridgedVerbatim()
+
+  var capturedIdentities = Array<UInt>()
+
+  for _ in 0..<3 {
+    let enumerator = a.objectEnumerator()
+
+    var values = Array<Int>()
+    var identities = Array<UInt>()
+    while let value = enumerator.nextObject() {
+      let valueObj = (value as! TestObjCValueTy)
+      values.append(valueObj.value)
+
+      let identity = unsafeBitCast(valueObj, to: UInt.self)
+      identities.append(identity)
+    }
+    expectEqual([ 1010, 1020, 1030 ], values)
+
+    if capturedIdentities.isEmpty {
+      capturedIdentities = identities
+    } else {
+      expectEqual(capturedIdentities, identities)
+    }
+
+    expectNil(enumerator.nextObject())
+    expectNil(enumerator.nextObject())
+    expectNil(enumerator.nextObject())
+  }
+
+  expectAutoreleasedValues(unopt: 3)
+}
+
+ArrayTestSuite.test("BridgedToObjC.Verbatim.ObjectEnumerator.NextObject_Empty") {
+  let a = getBridgedEmptyNSArray()
+  let enumerator = a.objectEnumerator()
+
+  expectNil(enumerator.nextObject())
+  expectNil(enumerator.nextObject())
+  expectNil(enumerator.nextObject())
+}
+
+ArrayTestSuite.test("BridgedToObjC.Verbatim.ObjectEnumerator.FastEnumeration.UseFromSwift") {
+  let a = getBridgedNSArrayOfRefTypesBridgedVerbatim()
+
+  checkArrayFastEnumerationFromSwift(
+    [ 1010, 1020, 1030 ],
+    a, { a.objectEnumerator() },
+    { ($0 as! TestObjCValueTy).value })
+
+  expectAutoreleasedValues(unopt: 3)
+}
+
+ArrayTestSuite.test("BridgedToObjC.Verbatim.ObjectEnumerator.FastEnumeration.UseFromObjC") {
+  let a = getBridgedNSArrayOfRefTypesBridgedVerbatim()
+
+  checkArrayFastEnumerationFromObjC(
+    [ 1010, 1020, 1030 ],
+    a, { a.objectEnumerator() },
+    { ($0 as! TestObjCValueTy).value })
+
+  expectAutoreleasedValues(unopt: 3)
+}
+
+ArrayTestSuite.test("BridgedToObjC.Verbatim.ObjectEnumerator.FastEnumeration_Empty") {
+  let a = getBridgedEmptyNSArray()
+
+  checkArrayFastEnumerationFromSwift(
+    [], a, { a.objectEnumerator() },
+    { ($0 as! TestObjCValueTy).value })
+
+  checkArrayFastEnumerationFromObjC(
+    [], a, { a.objectEnumerator() },
+    { ($0 as! TestObjCValueTy).value })
+}
+
+ArrayTestSuite.test("BridgedToObjC.Verbatim.FastEnumeration.UseFromSwift") {
+  let a = getBridgedNSArrayOfRefTypesBridgedVerbatim()
+
+  checkArrayFastEnumerationFromSwift(
+    [ 1010, 1020, 1030 ],
+    a, { a },
+    { ($0 as! TestObjCValueTy).value })
+
+  expectAutoreleasedValues(unopt: 3)
+}
+
+ArrayTestSuite.test("BridgedToObjC.Verbatim.FastEnumeration.UseFromObjC") {
+  let a = getBridgedNSArrayOfRefTypesBridgedVerbatim()
+
+  checkArrayFastEnumerationFromObjC(
+    [ 1010, 1020, 1030 ],
+    a, { a },
+    { ($0 as! TestObjCValueTy).value })
+
+  expectAutoreleasedValues(unopt: 3)
+}
+
+ArrayTestSuite.test("BridgedToObjC.Verbatim.FastEnumeration_Empty") {
+  let a = getBridgedEmptyNSArray()
+
+  checkArrayFastEnumerationFromSwift(
+    [], a, { a },
+    { ($0 as! TestObjCValueTy).value })
+
+  checkArrayFastEnumerationFromObjC(
+    [], a, { a },
+    { ($0 as! TestObjCValueTy).value })
+}
+
+//===---
+// Array -> NSArray bridging tests.
+//
+// Values are bridged non-verbatim.
+//===---
+
+ArrayTestSuite.test("BridgedToObjC.KeyValue_ValueTypesCustomBridged") {
+  let a = getBridgedNSArrayOfObjValue_ValueTypesCustomBridged()
+  let enumerator = a.objectEnumerator()
+
+  var values = Array<Int>()
+  while let valueObj = enumerator.nextObject() {
+    let value: AnyObject = valueObj as AnyObject
+    let v = (value as! TestObjCValueTy).value
+    values.append(v)
+  }
+  expectEqual([ 1010, 1020, 1030 ], values)
+
+  expectAutoreleasedValues(unopt: 3)
+}
+
+ArrayTestSuite.test("BridgedToObjC.Custom.ObjectEnumerator.FastEnumeration.UseFromSwift") {
+  let a = getBridgedNSArrayOfObjValue_ValueTypesCustomBridged()
+
+  checkArrayFastEnumerationFromSwift(
+    [ 1010, 1020, 1030 ],
+    a, { a.objectEnumerator() },
+    { ($0 as! TestObjCValueTy).value })
+
+  expectAutoreleasedValues(unopt: 3)
+}
+
+ArrayTestSuite.test("BridgedToObjC.Custom.ObjectEnumerator.FastEnumeration.UseFromSwift.Partial") {
+  let a = getBridgedNSArrayOfObjValue_ValueTypesCustomBridged(
+    numElements: 9)
+
+  checkArrayEnumeratorPartialFastEnumerationFromSwift(
+    [ 1010, 1020, 1030, 1040, 1050,
+      1060, 1070, 1080, 1090 ],
+    a, maxFastEnumerationItems: 5,
+    { ($0 as! TestObjCValueTy).value })
+
+  expectAutoreleasedValues(unopt: 9)
+}
+
+ArrayTestSuite.test("BridgedToObjC.Custom.ObjectEnumerator.FastEnumeration.UseFromObjC") {
+  let a = getBridgedNSArrayOfObjValue_ValueTypesCustomBridged()
+
+  checkArrayFastEnumerationFromObjC(
+    [ 1010, 1020, 1030 ],
+    a, { a.objectEnumerator() },
+    { ($0 as! TestObjCValueTy).value })
+
+  expectAutoreleasedValues(unopt: 3)
+}
+
+ArrayTestSuite.test("BridgedToObjC.Custom.FastEnumeration.UseFromSwift") {
+  let a = getBridgedNSArrayOfObjValue_ValueTypesCustomBridged()
+
+  checkArrayFastEnumerationFromSwift(
+    [ 1010, 1020, 1030 ],
+    a, { a },
+    { ($0 as! TestObjCValueTy).value })
+
+  expectAutoreleasedValues(unopt: 3)
+}
+
+ArrayTestSuite.test("BridgedToObjC.Custom.FastEnumeration.UseFromObjC") {
+  let a = getBridgedNSArrayOfObjValue_ValueTypesCustomBridged()
+
+  checkArrayFastEnumerationFromObjC(
+    [ 1010, 1020, 1030 ],
+    a, { a },
+    { ($0 as! TestObjCValueTy).value })
+
+  expectAutoreleasedValues(unopt: 3)
+}
+
+ArrayTestSuite.test("BridgedToObjC.Custom.FastEnumeration_Empty") {
+  let a = getBridgedNSArrayOfObjValue_ValueTypesCustomBridged(
+    numElements: 0)
+
+  checkArrayFastEnumerationFromSwift(
+    [], a, { a },
+    { ($0 as! TestObjCValueTy).value })
+
+  checkArrayFastEnumerationFromObjC(
+    [], a, { a },
+    { ($0 as! TestObjCValueTy).value })
+}
+
+ArrayTestSuite.test("BridgedToObjC.Key_ValueTypeCustomBridged") {
+  let a = getBridgedNSArrayOfObj_ValueTypeCustomBridged()
+  let enumerator = a.objectEnumerator()
+
+  var values = Array<Int>()
+  while let valueObj = enumerator.nextObject() {
+    let value: AnyObject = valueObj as AnyObject
+    let v = (value as! TestObjCValueTy).value
+    values.append(v)
+  }
+  expectEqual([ 1010, 1020, 1030 ], values)
+
+  expectAutoreleasedValues(unopt: 3)
+}
+
+ArrayTestSuite.test("BridgedToObjC.Value_ValueTypeCustomBridged") {
+  let a = getBridgedNSArrayOfValue_ValueTypeCustomBridged()
+  let enumerator = a.objectEnumerator()
+
+  var values = Array<Int>()
+  while let valueObj = enumerator.nextObject() {
+    let value: AnyObject = valueObj as AnyObject
+    let v = (value as! TestObjCValueTy).value
+    values.append(v)
+  }
+  expectEqual([ 1010, 1020, 1030 ], values)
+
+  expectAutoreleasedValues(unopt: 3)
+}
+
+//===---
+// NSArray -> Array -> NSArray bridging tests.
+//===---
+
+ArrayTestSuite.test("BridgingRoundtrip") {
+  let a = getRoundtripBridgedNSArray()
+  let enumerator = a.objectEnumerator()
+
+  var values = Array<Int>()
+  while let valueObj = enumerator.nextObject() {
+    let value: AnyObject = valueObj as AnyObject
+    let v = (value as! TestObjCValueTy).value
+    values.append(v)
+  }
+  expectEqual([ 1010, 1020, 1030 ], values)
+}
+
+//===---
+// NSArray -> Array implicit conversion.
+//===---
+
+ArrayTestSuite.test("NSArrayToArrayConversion") {
+  let values = [ 1010, 1020, 1030 ].map { TestObjCValueTy($0) }
+
+  let nsa = NSArray(array: values)
+
+  let a: Array = nsa as Array
+
+  var bridgedValues = Array<Int>()
+  for value in a {
+    let v = (value as! TestObjCValueTy).value
+    bridgedValues.append(v)
+  }
+  expectEqual([ 1010, 1020, 1030 ], bridgedValues)
+}
+
+ArrayTestSuite.test("ArrayToNSArrayConversion") {
+  var a = Array<TestObjCValueTy>()
+  a.append(TestObjCValueTy(1010))
+  a.append(TestObjCValueTy(1020))
+  a.append(TestObjCValueTy(1030))
+  let nsa: NSArray = a as NSArray
+
+  checkArrayFastEnumerationFromSwift(
+    [ 1010, 1020, 1030 ],
+    nsa, { a as NSArray },
+    { ($0 as! TestObjCValueTy).value })
+
+  expectAutoreleasedValues(unopt: 3)
+}
+
+//===---
+// Array upcasts
+//===---
+
+ArrayTestSuite.test("ArrayUpcastEntryPoint") {
+  var a = Array<TestObjCValueTy>()
+  a.append(TestObjCValueTy(1010))
+  a.append(TestObjCValueTy(1020))
+  a.append(TestObjCValueTy(1030))
+
+  var aAsAnyObject: Array<AnyObject> = _arrayForceCast(a)
+
+  expectEqual(3, aAsAnyObject.count)
+  var v: AnyObject = aAsAnyObject[0]
+  expectEqual(1010, (v as! TestObjCValueTy).value)
+
+  v = aAsAnyObject[1]
+  expectEqual(1020, (v as! TestObjCValueTy).value)
+
+  v = aAsAnyObject[2]
+  expectEqual(1030, (v as! TestObjCValueTy).value)
+}
+
+ArrayTestSuite.test("ArrayUpcast") {
+  var a = Array<TestObjCValueTy>()
+  a.append(TestObjCValueTy(1010))
+  a.append(TestObjCValueTy(1020))
+  a.append(TestObjCValueTy(1030))
+
+  var dAsAnyObject: Array<AnyObject> = a
+
+  expectEqual(3, dAsAnyObject.count)
+  var v: AnyObject = dAsAnyObject[0]
+  expectEqual(1010, (v as! TestObjCValueTy).value)
+
+  v = dAsAnyObject[1]
+  expectEqual(1020, (v as! TestObjCValueTy).value)
+
+  v = dAsAnyObject[2]
+  expectEqual(1030, (v as! TestObjCValueTy).value)
+}
+
+ArrayTestSuite.test("ArrayUpcastBridgedEntryPoint") {
+  var a = Array<TestBridgedValueTy>()
+  a.append(TestBridgedValueTy(1010))
+  a.append(TestBridgedValueTy(1020))
+  a.append(TestBridgedValueTy(1030))
+
+  do {
+    var aOO: Array<AnyObject> = _arrayConditionalCast(a)!
+
+    expectEqual(3, aOO.count)
+    var v: AnyObject = aOO[0]
+    expectEqual(1010, (v as! TestBridgedValueTy).value)
+
+    v = aOO[1]
+    expectEqual(1020, (v as! TestBridgedValueTy).value)
+
+    v = aOO[2]
+    expectEqual(1030, (v as! TestBridgedValueTy).value)
+  }
+}
+
+ArrayTestSuite.test("ArrayUpcastBridged") {
+  var a = Array<TestBridgedValueTy>()
+  a.append(TestBridgedValueTy(1010))
+  a.append(TestBridgedValueTy(1020))
+  a.append(TestBridgedValueTy(1030))
+
+  do {
+    var aOO = a as Array<AnyObject>
+
+    expectEqual(3, aOO.count)
+    var v: AnyObject = aOO[0]
+    expectEqual(1010, (v as! TestBridgedValueTy).value)
+
+    v = aOO[1]
+    expectEqual(1020, (v as! TestBridgedValueTy).value)
+
+    v = aOO[2]
+    expectEqual(1030, (v as! TestBridgedValueTy).value)
+  }
+}
+
+//===---
+// Array downcasts
+//===---
+
+ArrayTestSuite.test("ArrayDowncastEntryPoint") {
+  var a = Array<AnyObject>()
+  a.append(TestObjCValueTy(1010))
+  a.append(TestObjCValueTy(1020))
+  a.append(TestObjCValueTy(1030))
+
+  // Successful downcast.
+  let aCC: Array<TestObjCValueTy> = _arrayForceCast(a)
+  expectEqual(3, aCC.count)
+  var v = aCC[0]
+  expectEqual(1010, v.value)
+
+  v = aCC[1]
+  expectEqual(1020, v.value)
+
+  v = aCC[2]
+  expectEqual(1030, v.value)
+
+  expectAutoreleasedValues(unopt: 3)
+}
+
+ArrayTestSuite.test("ArrayDowncast") {
+  var a = Array<AnyObject>()
+  a.append(TestObjCValueTy(1010))
+  a.append(TestObjCValueTy(1020))
+  a.append(TestObjCValueTy(1030))
+
+  // Successful downcast.
+  let aCC = a as! Array<TestObjCValueTy>
+  expectEqual(3, aCC.count)
+  var v = aCC[0]
+  expectEqual(1010, v.value)
+
+  v = aCC[1]
+  expectEqual(1020, v.value)
+
+  v = aCC[2]
+  expectEqual(1030, v.value)
+
+  expectAutoreleasedValues(unopt: 3)
+}
+
+ArrayTestSuite.test("ArrayDowncastConditionalEntryPoint") {
+  var a = Array<AnyObject>()
+  a.append(TestObjCValueTy(1010))
+  a.append(TestObjCValueTy(1020))
+  a.append(TestObjCValueTy(1030))
+
+  // Successful downcast.
+  if let aCC
+       = _arrayConditionalCast(a) as Array<TestObjCValueTy>? {
+    expectEqual(3, aCC.count)
+    var v = aCC[0]
+    expectEqual(1010, v.value)
+
+    v = aCC[1]
+    expectEqual(1020, v.value)
+
+    v = aCC[2]
+    expectEqual(1030, v.value)
+  } else {
+    expectTrue(false)
+  }
+
+  // Unsuccessful downcast
+  a[0] = 17 as NSNumber
+  a[1] = "hello" as NSString
+  if let _ = _arrayConditionalCast(a) as Array<TestObjCValueTy>? {
+    expectTrue(false)
+  }
+}
+
+ArrayTestSuite.test("ArrayDowncastConditional") {
+  var a = Array<AnyObject>()
+  a.append(TestObjCValueTy(1010))
+  a.append(TestObjCValueTy(1020))
+  a.append(TestObjCValueTy(1030))
+
+  // Successful downcast.
+  if let aCC = a as? Array<TestObjCValueTy> {
+    expectEqual(3, aCC.count)
+    var v = aCC[0]
+    expectEqual(1010, v.value)
+
+    v = aCC[1]
+    expectEqual(1020, v.value)
+
+    v = aCC[2]
+    expectEqual(1030, v.value)
+  } else {
+    expectTrue(false)
+  }
+
+  // Unsuccessful downcast
+  a[0] = 17 as NSNumber
+  a[1] = "hello" as NSString
+  if let _ = a as? Array<TestObjCValueTy> {
+    expectTrue(false)
+  }
+}
+
+ArrayTestSuite.test("ArrayBridgeFromObjectiveCEntryPoint") {
+  var a = Array<AnyObject>()
+  a.append(TestObjCValueTy(1010))
+  a.append(TestObjCValueTy(1020))
+  a.append(TestObjCValueTy(1030))
+
+  // Successful downcast.
+  let aCV: Array<TestBridgedValueTy> = _arrayConditionalCast(a)!
+  do {
+    expectEqual(3, aCV.count)
+    var v = aCV[0]
+    expectEqual(1010, v.value)
+
+    v = aCV[1]
+    expectEqual(1020, v.value)
+
+    v = aCV[2]
+    expectEqual(1030, v.value)
+  }
+
+  // // Successful downcast.
+  let aVC: Array<TestObjCValueTy> = _arrayConditionalCast(a)!
+  do {
+    expectEqual(3, aVC.count)
+    var v = aVC[0]
+    expectEqual(1010, v.value)
+
+    v = aVC[1]
+    expectEqual(1020, v.value)
+
+    v = aVC[2]
+    expectEqual(1030, v.value)
+  }
+}
+
+ArrayTestSuite.test("ArrayBridgeFromObjectiveC") {
+  var a = Array<AnyObject>()
+  a.append(TestObjCValueTy(1010))
+  a.append(TestObjCValueTy(1020))
+  a.append(TestObjCValueTy(1030))
+
+  // Successful downcast.
+  let aCV = a as! Array<TestBridgedValueTy>
+  do {
+    expectEqual(3, aCV.count)
+    var v = aCV[0]
+    expectEqual(1010, v.value)
+
+    v = aCV[1]
+    expectEqual(1020, v.value)
+
+    v = aCV[2]
+    expectEqual(1030, v.value)
+  }
+
+  // Successful downcast.
+  let aVC = a as! Array<TestObjCValueTy>
+  do {
+    expectEqual(3, aVC.count)
+    var v = aVC[0]
+    expectEqual(1010, v.value)
+
+    v = aVC[1]
+    expectEqual(1020, v.value)
+
+    v = aVC[2]
+    expectEqual(1030, v.value)
+  }
+}
+
+ArrayTestSuite.test("ArrayBridgeFromObjectiveCConditionalEntryPoint") {
+  var a = Array<AnyObject>()
+  a.append(TestObjCValueTy(1010))
+  a.append(TestObjCValueTy(1020))
+  a.append(TestObjCValueTy(1030))
+
+  // Successful downcast.
+  if let aCV = _arrayConditionalCast(a) as Array<TestBridgedValueTy>? {
+    expectEqual(3, aCV.count)
+    var v = aCV[0]
+    expectEqual(1010, v.value)
+
+    v = aCV[1]
+    expectEqual(1020, v.value)
+
+    v = aCV[2]
+    expectEqual(1030, v.value)
+  } else {
+    expectTrue(false)
+  }
+
+  // Successful downcast.
+  if let aVC = _arrayConditionalCast(a) as Array<TestObjCValueTy>? {
+    expectEqual(3, aVC.count)
+    var v = aVC[0]
+    expectEqual(1010, v.value)
+
+    v = aVC[1]
+    expectEqual(1020, v.value)
+
+    v = aVC[2]
+    expectEqual(1030, v.value)
+  } else {
+    expectTrue(false)
+  }
+
+  // Unsuccessful downcasts
+  a[0] = 17 as NSNumber
+  a[1] = "hello" as NSString
+  if let _ = _arrayConditionalCast(a) as Array<TestBridgedValueTy>? {
+    expectTrue(false)
+  }
+  if let _ = _arrayConditionalCast(a) as Array<TestObjCValueTy>? {
+    expectTrue(false)
+  }
+}
+
+ArrayTestSuite.test("ArrayBridgeFromObjectiveCConditional") {
+  var a = Array<AnyObject>()
+  a.append(TestObjCValueTy(1010))
+  a.append(TestObjCValueTy(1020))
+  a.append(TestObjCValueTy(1030))
+
+  // Successful downcast.
+  if let aCV = a as? Array<TestBridgedValueTy> {
+    expectEqual(3, aCV.count)
+    var v = aCV[0]
+    expectEqual(1010, v.value)
+
+    v = aCV[1]
+    expectEqual(1020, v.value)
+
+    v = aCV[2]
+    expectEqual(1030, v.value)
+  } else {
+    expectTrue(false)
+  }
+
+  // Successful downcast.
+  if let aVC = a as? Array<TestObjCValueTy> {
+    expectEqual(3, aVC.count)
+    var v = aVC[0]
+    expectEqual(1010, v.value)
+
+    v = aVC[1]
+    expectEqual(1020, v.value)
+
+    v = aVC[2]
+    expectEqual(1030, v.value)
+  } else {
+    expectTrue(false)
+  }
+
+  // Unsuccessful downcasts
+  a[0] = 17 as NSNumber
+  a[1] = "hello" as NSString
+  if let _ = a as? Array<TestBridgedValueTy> {
+    expectTrue(false)
+  }
+  if let _ = a as? Array<TestObjCValueTy> {
+    expectTrue(false)
+  }
+}
+
+#endif
+
+//===---
+// Check that iterators traverse a snapshot of the collection.
+//===---
+
+ArrayTestSuite.test("mutationDoesNotAffectIterator/subscript/store") {
+  var array = getDerivedAPIsArray()
+  let iter = array.makeIterator()
+  array[0] = 1011
+
+  expectEqual([1010 ,1020, 1030], Array(IteratorSequence(iter)))
+}
+
+ArrayTestSuite.test("mutationDoesNotAffectIterator/removeAt,1") {
+  var array = getDerivedAPIsArray()
+  let iter = array.makeIterator()
+  expectEqual(1010, array.remove(at: 0))
+
+  expectEqual([1010 ,1020, 1030], Array(IteratorSequence(iter)))
+}
+
+ArrayTestSuite.test("mutationDoesNotAffectIterator/removeAt,all") {
+  var array = getDerivedAPIsArray()
+  let iter = array.makeIterator()
+  expectEqual(1010, array.remove(at: 0))
+  expectEqual(1020, array.remove(at: 0))
+  expectEqual(1030, array.remove(at: 0))
+
+  expectEqual([1010 ,1020, 1030], Array(IteratorSequence(iter)))
+}
+
+ArrayTestSuite.test(
+  "mutationDoesNotAffectIterator/removeAll,keepingCapacity=false") {
+  var array = getDerivedAPIsArray()
+  let iter = array.makeIterator()
+  array.removeAll(keepingCapacity: false)
+
+  expectEqual([1010 ,1020, 1030], Array(IteratorSequence(iter)))
+}
+
+ArrayTestSuite.test(
+  "mutationDoesNotAffectIterator/removeAll,keepingCapacity=true") {
+  var array = getDerivedAPIsArray()
+  let iter = array.makeIterator()
+  array.removeAll(keepingCapacity: true)
+
+  expectEqual([1010 ,1020, 1030], Array(IteratorSequence(iter)))
+}
+
+//===----------------------------------------------------------------------===//
+// Native array tests
+// FIXME: incomplete.
+//===----------------------------------------------------------------------===//
+
+ArrayTestSuite.test("Native/count/empty") {
+  let a = [LifetimeTracked]()
+  expectEqual(0, a.count)
+}
+
+ArrayTestSuite.test("Native/count") {
+  let a = [ LifetimeTracked(10), LifetimeTracked(20), LifetimeTracked(30) ]
+  expectEqual(3, a.count)
+}
+
+ArrayTestSuite.test("Native/isEmpty/empty") {
+  let a = [LifetimeTracked]()
+  expectTrue(a.isEmpty)
+}
+
+ArrayTestSuite.test("Native/isEmpty") {
+  let a = [ LifetimeTracked(10), LifetimeTracked(20), LifetimeTracked(30) ]
+  expectFalse(a.isEmpty)
+}
+
+% for Kind in ['Array', 'ContiguousArray', 'ArraySlice']:
+ArrayTestSuite.test("${Kind}/popLast") {
+  // Empty
+  do {
+    var a = ${Kind}<Int>()
+    let popped = a.popLast()
+    expectNil(popped)
+    expectTrue(a.isEmpty)
+  }
+
+  do {
+    var popped = [LifetimeTracked]()
+    var a: ${Kind} = [LifetimeTracked(1010), LifetimeTracked(2020), LifetimeTracked(3030)]
+    while let element = a.popLast() {
+      popped.append(element)
+    }
+    expectEqualSequence([1010, 2020, 3030], popped.reversed().lazy.map({ $0.value }))
+    expectTrue(a.isEmpty)
+  }
+}
+% end
+
+//===----------------------------------------------------------------------===//
+// COW(🐄) tests
+//===----------------------------------------------------------------------===//
+
+class COWBox<
+  T: Equatable & CustomStringConvertible>
+  : Equatable, CustomStringConvertible {
+  var value: T
+  
+  init(_ value: T) {
+    self.value = value
+  }
+  
+  var description: String {
+    return "Boxed: \(value.description)"
+  }
+  
+  static func ==(lhs: COWBox, rhs: COWBox) -> Bool {
+    return lhs.value == rhs.value
+  }
+}
+
+ArrayTestSuite.test("COW.Smoke") {
+  var a1 = Array<COWBox<Int>>(repeating: COWBox(0), count: 10)
+  let identity1 = a1._rawIdentifier()
+  
+  a1[0] = COWBox(1)
+  a1[1] = COWBox(2)
+  a1[2] = COWBox(3)
+  
+  var a2 = a1
+  expectEqual(identity1, a2._rawIdentifier())
+  
+  a2[3] = COWBox(4)
+  expectNotEqual(identity1, a2._rawIdentifier())
+  
+  a1[4] = COWBox(5)
+  expectEqual(identity1, a1._rawIdentifier())
+  
+  _blackHole(a1)
+  _blackHole(a2)  
+}
+
+ArrayTestSuite.test("COW.Fast.SubscriptWithIndexDoesNotReallocate") {
+  var a = getCOWFastArray()
+  let identity1 = a._rawIdentifier()
+  let startIndex = a.startIndex
+
+  expectNotEqual(0, a[startIndex])
+  expectEqual(identity1, a._rawIdentifier())
+}
+
+ArrayTestSuite.test("COW.Slow.SubscriptWithIndexDoesNotReallocate") {
+  var a = getCOWSlowArray()
+  let identity1 = a._rawIdentifier()
+  let startIndex = a.startIndex
+
+  expectNotEqual(0, a[startIndex].value)
+  expectEqual(identity1, a._rawIdentifier())
+}
+
+ArrayTestSuite.test("COW.Fast.RemoveAtDoesNotReallocate") {
+  do {
+    var a = getCOWFastArray()
+    let identity1 = a._rawIdentifier()
+
+    let index1 = 1
+    expectEqual(identity1, a._rawIdentifier())
+
+    expectEqual(2, a[index1])
+
+    let removed = a.remove(at: index1)
+    expectEqual(2, removed)
+
+    expectEqual(identity1, a._rawIdentifier())
+  }
+
+  do {
+    let a1 = getCOWFastArray()
+    let identity1 = a1._rawIdentifier()
+
+    var a2 = a1
+    expectEqual(identity1, a1._rawIdentifier())
+    expectEqual(identity1, a2._rawIdentifier())
+
+    let index1 = 1
+    expectEqual(2, a2[index1])
+    expectEqual(identity1, a1._rawIdentifier())
+    expectEqual(identity1, a2._rawIdentifier())
+
+    let removed = a2.remove(at: index1)
+    expectEqual(2, removed)
+
+    expectEqual(identity1, a1._rawIdentifier())
+    expectNotEqual(identity1, a2._rawIdentifier())
+  }
+}
+
+ArrayTestSuite.test("COW.Slow.RemoveAtDoesNotReallocate") {
+  do {
+    var a = getCOWSlowArray()
+    let identity1 = a._rawIdentifier()
+
+    let index1 = 1
+    expectEqual(identity1, a._rawIdentifier())
+
+    expectEqual(2, a[index1].value)
+
+    let removed = a.remove(at: index1)
+    expectEqual(2, removed.value)
+
+    expectEqual(identity1, a._rawIdentifier())
+  }
+
+  do {
+    let a1 = getCOWSlowArray()
+    let identity1 = a1._rawIdentifier()
+
+    var a2 = a1
+    expectEqual(identity1, a1._rawIdentifier())
+    expectEqual(identity1, a2._rawIdentifier())
+
+    let index1 = 1
+    expectEqual(2, a2[index1].value)
+    expectEqual(identity1, a1._rawIdentifier())
+    expectEqual(identity1, a2._rawIdentifier())
+
+    let removed = a2.remove(at: index1)
+    expectEqual(2, removed.value)
+
+    expectEqual(identity1, a1._rawIdentifier())
+    expectNotEqual(identity1, a2._rawIdentifier())
+  }
+}
+
+ArrayTestSuite.test("COW.Fast.RemoveAllDoesNotReallocate")
+  .skip(.linuxAny(reason: "rdar://problem/34268868")).code {
+  do {
+    var a = getCOWFastArray()
+    let originalCapacity = a.capacity
+    expectEqual(3, a.count)
+    expectEqual(2, a[1])
+
+    a.removeAll()
+    let identity1 = a._rawIdentifier()
+    expectLT(a.capacity, originalCapacity)
+    expectEqual(0, a.count)
+    expectEqual(identity1, a._rawIdentifier())
+  }
+
+  do {
+    var a = getCOWFastArray()
+    let identity1 = a._rawIdentifier()
+    let originalCapacity = a.capacity
+    expectEqual(3, a.count)
+    expectEqual(2, a[1])
+
+    a.removeAll(keepingCapacity: true)
+    expectEqual(identity1, a._rawIdentifier())
+    expectEqual(originalCapacity, a.capacity)
+    expectEqual(0, a.count)
+  }
+
+  do {
+    var a1 = getCOWFastArray()
+    let identity1 = a1._rawIdentifier()
+    expectEqual(3, a1.count)
+    expectEqual(2, a1[1])
+
+    var a2 = a1
+    a2.removeAll()
+    let identity2 = a2._rawIdentifier()
+    expectEqual(identity1, a1._rawIdentifier())
+    expectNotEqual(identity2, identity1)
+    expectEqual(3, a1.count)
+    expectEqual(2, a1[1])
+    expectEqual(0, a2.count)
+
+    // Keep variables alive.
+    _blackHole(a1)
+    _blackHole(a2)
+  }
+
+  do {
+    var a1 = getCOWFastArray()
+    let identity1 = a1._rawIdentifier()
+    let originalCapacity = a1.capacity
+    expectEqual(3, a1.count)
+    expectEqual(2, a1[1])
+
+    var a2 = a1
+    a2.removeAll(keepingCapacity: true)
+    let identity2 = a2._rawIdentifier()
+    expectEqual(identity1, a1._rawIdentifier())
+    expectNotEqual(identity2, identity1)
+    expectEqual(3, a1.count)
+    expectEqual(2, a1[1])
+    expectEqual(originalCapacity, a2.capacity)
+    expectEqual(0, a2.count)
+
+    // Keep variables alive.
+    _blackHole(a1)
+    _blackHole(a2)
+  }
+}
+
+ArrayTestSuite.test("COW.Slow.RemoveAllDoesNotReallocate")
+  .skip(.linuxAny(reason: "rdar://problem/34268868")).code {
+  do {
+    var a = getCOWSlowArray()
+    let originalCapacity = a.capacity
+    expectEqual(3, a.count)
+    expectEqual(2, a[1].value)
+
+    a.removeAll()
+    let identity1 = a._rawIdentifier()
+    expectLT(a.capacity, originalCapacity)
+    expectEqual(0, a.count)
+    expectEqual(identity1, a._rawIdentifier())
+  }
+
+  do {
+    var a = getCOWSlowArray()
+    let identity1 = a._rawIdentifier()
+    let originalCapacity = a.capacity
+    expectEqual(3, a.count)
+    expectEqual(2, a[1].value)
+
+    a.removeAll(keepingCapacity: true)
+    expectEqual(identity1, a._rawIdentifier())
+    expectEqual(originalCapacity, a.capacity)
+    expectEqual(0, a.count)
+  }
+
+  do {
+    var a1 = getCOWSlowArray()
+    let identity1 = a1._rawIdentifier()
+    expectEqual(3, a1.count)
+    expectEqual(2, a1[1].value)
+
+    var a2 = a1
+    a2.removeAll()
+    let identity2 = a2._rawIdentifier()
+    expectEqual(identity1, a1._rawIdentifier())
+    expectNotEqual(identity2, identity1)
+    expectEqual(3, a1.count)
+    expectEqual(2, a1[1].value)
+    expectEqual(0, a2.count)
+
+    // Keep variables alive.
+    _blackHole(a1)
+    _blackHole(a2)
+  }
+
+  do {
+    var a1 = getCOWSlowArray()
+    let identity1 = a1._rawIdentifier()
+    let originalCapacity = a1.capacity
+    expectEqual(3, a1.count)
+    expectEqual(2, a1[1].value)
+
+    var a2 = a1
+    a2.removeAll(keepingCapacity: true)
+    let identity2 = a2._rawIdentifier()
+    expectEqual(identity1, a1._rawIdentifier())
+    expectNotEqual(identity2, identity1)
+    expectEqual(3, a1.count)
+    expectEqual(2, a1[1].value)
+    expectEqual(originalCapacity, a2.capacity)
+    expectEqual(0, a2.count)
+
+    // Keep variables alive.
+    _blackHole(a1)
+    _blackHole(a2)
+  }
+}
+
+ArrayTestSuite.test("COW.Fast.CountDoesNotReallocate") {
+  let a = getCOWFastArray()
+  let identity1 = a._rawIdentifier()
+
+  expectEqual(3, a.count)
+  expectEqual(identity1, a._rawIdentifier())
+}
+
+ArrayTestSuite.test("COW.Slow.CountDoesNotReallocate") {
+  let a = getCOWSlowArray()
+  let identity1 = a._rawIdentifier()
+
+  expectEqual(3, a.count)
+  expectEqual(identity1, a._rawIdentifier())
+}
+
+ArrayTestSuite.test("COW.Fast.GenerateDoesNotReallocate") {
+  let a = getCOWFastArray()
+  let identity1 = a._rawIdentifier()
+
+  var iter = a.makeIterator()
+  var copy = Array<Int>()
+  while let value = iter.next() {
+    copy.append(value)
+  }
+  expectEqual(copy, [ 1, 2, 3 ])
+  expectEqual(identity1, a._rawIdentifier())
+}
+
+ArrayTestSuite.test("COW.Slow.GenerateDoesNotReallocate") {
+  let a = getCOWSlowArray()
+  let identity1 = a._rawIdentifier()
+
+  var iter = a.makeIterator()
+  var copy = Array<Int>()
+  while let value = iter.next() {
+    copy.append(value.value)
+  }
+  expectEqual(copy, [ 1, 2, 3 ])
+  expectEqual(identity1, a._rawIdentifier())
+}
+
+ArrayTestSuite.test("COW.Fast.EqualityTestDoesNotReallocate") {
+  let a1 = getCOWFastArray()
+  let identity1 = a1._rawIdentifier()
+
+  var a2 = getCOWFastArray()
+  let identity2 = a2._rawIdentifier()
+
+  expectEqual(a1, a2)
+  expectEqual(identity1, a1._rawIdentifier())
+  expectEqual(identity2, a2._rawIdentifier())
+
+  a2[1] = 5
+  expectTrue(a1 != a2)
+  expectEqual(identity1, a1._rawIdentifier())
+  expectEqual(identity2, a2._rawIdentifier())
+}
+
+ArrayTestSuite.test("COW.Slow.EqualityTestDoesNotReallocate") {
+  let a1 = getCOWSlowArray()
+  let identity1 = a1._rawIdentifier()
+
+  var a2 = getCOWSlowArray()
+  let identity2 = a2._rawIdentifier()
+
+  expectEqual(a1, a2)
+  expectEqual(identity1, a1._rawIdentifier())
+  expectEqual(identity2, a2._rawIdentifier())
+
+  a2[2] = COWBox(5)
+  expectTrue(a1 != a2)
+  expectEqual(identity1, a1._rawIdentifier())
+  expectEqual(identity2, a2._rawIdentifier())
+}
+
+//===----------------------------------------------------------------------===//
+// Index tests
+//===----------------------------------------------------------------------===//
+public struct ArrayIndexTest<T: Collection> {  
+  public enum Operation {
+    case append(Int)
+    case insert(Int, at: Int)
+    case partition(by: (OpaqueValue<Int>) throws -> Bool)
+    case removeFirst
+    case removeFirstN(Int)
+    case removeLast
+    case removeLastN(Int)
+    case removeAt(Int)
+    case removeAll(Bool)
+    case removeClosedSubrange(ClosedRange<Int>)
+    case removeHalfClosedSubrange(Range<Int>)
+  }
+  
+  public let data: T
+  public let expectedStart: Int
+  public let expectedEnd: Int
+  public let range: Range<Int>?
+  public let operation: Operation
+  public let loc: SourceLoc
+
+  public init(data: T, expectedStart: Int, expectedEnd: Int, 
+        operation: Operation, range: Range<Int>? = nil,
+        file: String = #file, line: UInt = #line) {
+    self.data = data
+    self.expectedStart = expectedStart
+    self.expectedEnd = expectedEnd
+    self.operation = operation
+    self.range = range
+    self.loc = SourceLoc(file, line, comment: "Array index test data")
+  }
+}
+
+let indexTests: [ArrayIndexTest<[Int]>] = [
+  // Check how partition() affects indices.
+  ArrayIndexTest(
+    data: [ 99, 1010, 99 ],
+    expectedStart: 1,
+    expectedEnd: 2,
+    operation: .partition(by: { $0.value > 100 } ),
+    range: 1..<2
+  ),
+  ArrayIndexTest(
+    data: [ 99, 1010, 2020, 99 ],
+    expectedStart: 1,
+    expectedEnd: 3,
+    operation: .partition(by: { $0.value > 0} ),
+    range: 1..<3
+  ),
+  ArrayIndexTest(
+    data: [ 99, 1010, 2020, 99 ],
+    expectedStart: 1,
+    expectedEnd: 3,
+    operation: .partition(by: { $0.value > 3000 }),
+    range: 1..<3
+  ),
+  // Check how partition(by:) affects indices. 
+  ArrayIndexTest(
+    data: [ 10, 2, -33, 44, -5 ],
+    expectedStart: 0,
+    expectedEnd: 5,
+    operation: .partition(by: { $0.value > 0 })
+  ),
+  ArrayIndexTest(
+    data: [ 10, 2, -33, 44, -5 ],
+    expectedStart: 0,
+    expectedEnd: 5,
+    operation: .partition(by: { $0.value > 100 })
+  ),
+  // Check how append affects indices.
+  ArrayIndexTest(
+    data: [ 2 ],
+    expectedStart: 0,
+    expectedEnd: 2,
+    operation: .append(1)
+  ),
+  ArrayIndexTest(
+    data: [],
+    expectedStart: 0,
+    expectedEnd: 1,
+    operation: .append(1)
+  ),
+  // FIXME: re-enable when rdar://problem/33358110 is addressed
+  // ArrayIndexTest(
+  //   data: [ 42, 2525, 3535, 42 ],
+  //   expectedStart: 1,
+  //   expectedEnd: 3,
+  //   operation: .append(1),
+  //   range: 1..<2
+  // ),
+  // Check how insert(_:at:) affects indices.
+  ArrayIndexTest(
+    data: [ 2 ],
+    expectedStart: 0,
+    expectedEnd: 2,
+    operation: .insert(2, at: 0)
+  ),
+  ArrayIndexTest(
+    data: [ 2 ],
+    expectedStart: 0,
+    expectedEnd: 2,
+    operation: .insert(2, at: 1)
+  ),
+  ArrayIndexTest(
+    data: [ 42, 2525, 3535, 42 ],
+    expectedStart: 1,
+    expectedEnd: 3,
+    operation: .insert(2, at: 1),
+    range: 1..<2
+  ),
+  // Check how removeLast() affects indices.
+  ArrayIndexTest(
+    data: [ 1 ],
+    expectedStart: 0,
+    expectedEnd: 0,
+    operation: .removeLast
+  ),
+  ArrayIndexTest(
+    data: [ 1, 2 ],
+    expectedStart: 0,
+    expectedEnd: 0,
+    operation: .removeLast
+  ),
+  ArrayIndexTest(
+    data: [ 99, 1010, 99 ],
+    expectedStart: 1,
+    expectedEnd: 1,
+    operation: .removeLast,
+    range: 1..<2
+  ),
+  ArrayIndexTest(
+    data: [ 99, 1010, 2020, 99 ],
+    expectedStart: 1,
+    expectedEnd: 2,
+    operation: .removeLast,
+    range: 1..<3
+  ),
+  // Check how remove(at:) affects indices.
+  ArrayIndexTest(
+    data: [ 1 ],
+    expectedStart: 0,
+    expectedEnd: 0,
+    operation: .removeAt(0)
+  ),
+  ArrayIndexTest(
+    data: [ 1, 2 ],
+    expectedStart: 0,
+    expectedEnd: 1,
+    operation: .removeAt(1)
+  ),
+  ArrayIndexTest(
+    data: [ 99, 1010, 99 ],
+    expectedStart: 1,
+    expectedEnd: 1,
+    operation: .removeAt(1),
+    range: 1..<2
+  ),
+  ArrayIndexTest(
+    data: [ 99, 1010, 2020, 99 ],
+    expectedStart: 1,
+    expectedEnd: 2,
+    operation: .removeAt(1),
+    range: 1..<3
+  ),
+  // Check how removeAll(keepingCapacity:) affects indices.
+  ArrayIndexTest(
+    data: [ 1, 2, 3 ],
+    expectedStart: 0,
+    expectedEnd: 0,
+    operation: .removeAll(true)
+  ),
+  ArrayIndexTest(
+    data: [ 1, 2 ],
+    expectedStart: 0,
+    expectedEnd: 0,
+    operation: .removeAll(false)
+  ),
+  ArrayIndexTest(
+    data: [ 99, 1010, 99 ],
+    expectedStart: 1,
+    expectedEnd: 1,
+    operation: .removeAll(true),
+    range: 1..<2
+  ),
+  ArrayIndexTest(
+    data: [ 99, 1010, 2020, 99 ],
+    expectedStart: 0,
+    expectedEnd: 0,
+    operation: .removeAll(false),
+    range: 1..<2
+  ),
+  // Check how removeFirst() affects indices.
+  ArrayIndexTest(
+    data: [ 1 ],
+    expectedStart: 0,
+    expectedEnd: 0,
+    operation: .removeFirst
+  ),
+  ArrayIndexTest(
+    data: [ 1, 2 ],
+    expectedStart: 0,
+    expectedEnd: 1,
+    operation: .removeFirst
+  ),
+  ArrayIndexTest(
+    data: [ 99, 1010, 99 ],
+    expectedStart: 2,
+    expectedEnd: 2,
+    operation: .removeFirst,
+    range: 1..<2
+  ),
+  ArrayIndexTest(
+    data: [ 99, 1010, 2020, 99 ],
+    expectedStart: 2,
+    expectedEnd: 3,
+    operation: .removeFirst,
+    range: 1..<3
+  ),
+  // Check how removeFirst(_:) affects indices.
+  ArrayIndexTest(
+    data: [ 1, 2 ],
+    expectedStart: 0,
+    expectedEnd: 0,
+    operation: .removeFirstN(2)
+  ),
+  ArrayIndexTest(
+    data: [ 1, 2, 3, 4 ],
+    expectedStart: 0,
+    expectedEnd: 2,
+    operation: .removeFirstN(2)
+  ),
+  ArrayIndexTest(
+    data: [ 99, 1010, 99 ],
+    expectedStart: 3,
+    expectedEnd: 3,
+    operation: .removeFirstN(2),
+    range: 1..<3
+  ),
+  ArrayIndexTest(
+    data: [ 99, 1010, 2020, 99 ],
+    expectedStart: 3,
+    expectedEnd: 4,
+    operation: .removeFirstN(2),
+    range: 1..<4
+  ),
+  // Check how removeLast() affects indices.
+  ArrayIndexTest(
+    data: [ 1 ],
+    expectedStart: 0,
+    expectedEnd: 0,
+    operation: .removeLast
+  ),
+  ArrayIndexTest(
+    data: [ 1, 2 ],
+    expectedStart: 0,
+    expectedEnd: 1,
+    operation: .removeLast
+  ),
+  ArrayIndexTest(
+    data: [ 99, 1010, 99 ],
+    expectedStart: 1,
+    expectedEnd: 1,
+    operation: .removeLast,
+    range: 1..<2
+  ),
+  ArrayIndexTest(
+    data: [ 99, 1010, 2020, 99 ],
+    expectedStart: 1,
+    expectedEnd: 1,
+    operation: .removeLast,
+    range: 1..<2
+  ),
+  // Check how removeSubrange(_:ClosedRange) affects indices.
+  ArrayIndexTest(
+    data: [ 1 ],
+    expectedStart: 0,
+    expectedEnd: 0,
+    operation: .removeHalfClosedSubrange(0..<1)
+  ),
+  ArrayIndexTest(
+    data: [ 1, 2, 3 ],
+    expectedStart: 0,
+    expectedEnd: 1,
+    operation: .removeHalfClosedSubrange(0..<2)
+  ),
+  ArrayIndexTest(
+    data: [ 1, 2, 3 ],
+    expectedStart: 0,
+    expectedEnd: 1,
+    operation: .removeHalfClosedSubrange(0..<3)
+  ),
+  ArrayIndexTest(
+    data: [ 99, 1010, 99 ],
+    expectedStart: 1,
+    expectedEnd: 1,
+    operation: .removeHalfClosedSubrange(1..<2),
+    range: 1..<2
+  ),
+  ArrayIndexTest(
+    data: [ 99, 1010, 2020, 99 ],
+    expectedStart: 1,
+    expectedEnd: 2,
+    operation: .removeHalfClosedSubrange(1..<2),
+    range: 1..<3
+  ),
+  ArrayIndexTest(
+    data: [ 99, 1010, 2020, 99 ],
+    expectedStart: 1,
+    expectedEnd: 2,
+    operation: .removeHalfClosedSubrange(2..<4),
+    range: 1..<4
+  ),
+  // Check how removeSubrange(_:Range) affects indices.
+  ArrayIndexTest(
+    data: [ 1, 2 ],
+    expectedStart: 0,
+    expectedEnd: 0,
+    operation: .removeClosedSubrange(0...1)
+  ),
+  ArrayIndexTest(
+    data: [ 1, 2, 3 ],
+    expectedStart: 0,
+    expectedEnd: 1,
+    operation: .removeClosedSubrange(0...1)
+  ),
+  ArrayIndexTest(
+    data: [ 1, 2, 3 ],
+    expectedStart: 0,
+    expectedEnd: 1,
+    operation: .removeClosedSubrange(0...2)
+  ),
+  ArrayIndexTest(
+    data: [ 99, 1010, 99 ],
+    expectedStart: 1,
+    expectedEnd: 1,
+    operation: .removeClosedSubrange(1...2),
+    range: 1..<3
+  ),
+  ArrayIndexTest(
+    data: [ 99, 1010, 2020, 99, 44 ],
+    expectedStart: 1,
+    expectedEnd: 2,
+    operation: .removeClosedSubrange(2...3),
+    range: 1..<4
+  ),
+  ArrayIndexTest(
+    data: [ 99, 1010, 2020, 99, 44 ],
+    expectedStart: 1,
+    expectedEnd: 2,
+    operation: .removeClosedSubrange(1...2),
+    range: 1..<4
+  )
+]
+
+% for Kind in ['Array', 'ContiguousArray', 'ArraySlice']:
+ArrayTestSuite.test("ArrayIndexTests") {
+  for test in indexTests {
+    let testData = test.data.map(OpaqueValue.init)
+% if Kind == 'ArraySlice':
+    guard let range = test.range else { continue }
+    var a = testData[range]
+% else:
+    if test.range != nil { continue }
+    var a = ${Kind}(testData)
+% end
+
+    switch test.operation {
+    case let .append(v):
+      a.append(OpaqueValue(v))
+    case let .insert(v, index):
+      a.insert(OpaqueValue(v), at: index)
+    case let .partition(c):
+      expectDoesNotThrow({ 
+        _ = try a.partition(by: c) 
+      })
+    case .removeFirst:
+      a.removeFirst()
+    case let .removeFirstN(n):
+      a.removeFirst(n)
+    case .removeLast:
+      a.removeLast()
+    case let .removeLastN(n):
+      a.removeLast(n)
+    case let .removeAt(index):
+      a.remove(at: index)
+    case let .removeAll(keepCapacity):
+      a.removeAll(keepingCapacity: keepCapacity)
+    case let .removeHalfClosedSubrange(range):
+        a.removeSubrange(range)
+    case let .removeClosedSubrange(range):
+        a.removeSubrange(range)
+    }
+    
+    expectEqual(test.expectedStart, a.startIndex, stackTrace: SourceLocStack().with(test.loc))
+    expectEqual(test.expectedEnd, a.endIndex, stackTrace: SourceLocStack().with(test.loc))
+  }
+}
+% end
+
+//===----------------------------------------------------------------------===//
+// Array and EvilCollection that changes its size while we are not looking
+//===----------------------------------------------------------------------===//
+
+let evilBoundsError = "EvilCollection: index out of range"
+
+final class EvilSequence : Sequence {
+  init(_ growth: Int) {
+    self.growth = growth
+  }
+
+  var growth: Int
+  var _count: Int = 20
+
+  var underestimatedCount: Int {
+    defer { _count += growth }
+    return _count
+  }
+
+  func makeIterator() -> AnyIterator<LifetimeTracked> {
+    var i = 0
+    return AnyIterator {
+      if i >= self._count { return nil }
+      let result = LifetimeTracked(i)
+      i += 1
+      return result
+    }
+  }
+}
+
+final class EvilCollection : Collection {
+  func index(after i: Int) -> Int {
+    return i + 1
+  }
+
+  init(_ growth: Int, boundsChecked: Bool) {
+    self.growth = growth
+    self.boundsChecked = boundsChecked
+  }
+
+  var growth: Int
+  var _count: Int = 20
+  var boundsChecked: Bool
+
+  var startIndex : Int {
+    _count += growth
+    return 0
+  }
+
+  var endIndex : Int {
+    return _count
+  }
+
+  subscript(i: Int) -> LifetimeTracked {
+    if boundsChecked {
+      precondition(i >= 0 && i < _count, evilBoundsError)
+    }
+    return LifetimeTracked(i)
+  }
+
+  // Default implementation will call _failEarlyRangeCheck,
+  // passing in a startIndex that will grow _count faster than
+  // necessary.
+  func formIndex(after i: inout Int) {
+    i += 1
+  }
+}
+
+for (step, evilBoundsCheck) in [ (1, true), (-1, false), (-1, true) ] {
+
+  let message = step < 0 && evilBoundsCheck
+    ? evilBoundsError
+    : "invalid Collection: count differed in successive traversals"
+
+  let constructionMessage = step < 0
+    ? "invalid Collection: less than 'count' elements in collection"
+    : "invalid Collection: more than 'count' elements in collection"
+
+  // The invalid Collection error is a _debugPreconditon that will only fire
+  // in a Debug assert configuration.
+  let expectedToFail = (step < 0 && evilBoundsCheck) ||
+                       _isDebugAssertConfiguration()
+
+  let natureOfEvil = step > 0 ? "Growth" : "Shrinkage"
+  let boundsChecked = evilBoundsCheck ? "BoundsChecked" : "NoBoundsCheck"
+  let testPrefix = "MemorySafety/\(boundsChecked)/Evil\(natureOfEvil)"
+
+  ArrayTestSuite.test("\(testPrefix)/Infrastructure/EvilSequence") {
+    let evil = EvilSequence(step)
+    let count0 = evil.underestimatedCount
+    let count1 = evil.underestimatedCount
+    expectNotEqual(count0, count1)
+   if step > 0 {
+      expectLE(count0, count1)
+    }
+    else {
+      expectGE(count0, count1)
+    }
+  }
+
+  let t1 = ArrayTestSuite.test("\(testPrefix)/Infrastructure/EvilCollection")
+  (evilBoundsCheck && _isDebugAssertConfiguration()
+    ? t1.crashOutputMatches(evilBoundsError) : t1)
+  .code {
+    let evil = EvilCollection(step, boundsChecked: evilBoundsCheck)
+    let count0 = evil.count
+    let count1 = evil.count
+    expectNotEqual(count0, count1)
+   if step > 0 {
+      expectLE(count0, count1)
+    }
+    else {
+      expectGE(count0, count1)
+    }
+    if evilBoundsCheck {
+      expectCrashLater()
+    }
+    let x = evil[-1]
+    _blackHole(x)
+  }
+
+  let t2 = ArrayTestSuite.test("\(testPrefix)/Construction")
+  (_isDebugAssertConfiguration() && expectedToFail
+    ? t2.crashOutputMatches(constructionMessage) : t2)
+  .code {
+    let evil = EvilCollection(step, boundsChecked: evilBoundsCheck)
+
+    if step < 0 || _isDebugAssertConfiguration() {
+      expectCrashLater()
+    }
+
+    let a = Array(evil)
+    _blackHole(a)
+  }
+
+  for (op, rangeMax) in ["Grow":0, "Shrink":200] {
+    let t3 =  ArrayTestSuite.test("\(testPrefix)/replaceSubrange/\(op)Unique")
+    (_isDebugAssertConfiguration() ? t3.crashOutputMatches(message) : t3)
+    .code {
+      let evil = EvilCollection(step, boundsChecked: evilBoundsCheck)
+      var a = Array((0..<200).lazy.map { LifetimeTracked($0) })
+      if expectedToFail {
+        expectCrashLater()
+      }
+      a.replaceSubrange(0..<rangeMax, with: evil)
+    }
+
+    let t4 = ArrayTestSuite.test("\(testPrefix)/replaceSubrange/\(op)NonUnique")
+    (_isDebugAssertConfiguration() ? t4.crashOutputMatches(message) : t4)
+    .code {
+      let evil = EvilCollection(step, boundsChecked: evilBoundsCheck)
+      var a = Array((0..<200).lazy.map { LifetimeTracked($0) })
+      let b = a
+      if expectedToFail {
+        expectCrashLater()
+      }
+      a.replaceSubrange(0..<rangeMax, with: evil)
+      _blackHole(b)
+    }
+  }
+
+  ArrayTestSuite.test("\(testPrefix)/SequenceMap")
+  .skip(.custom(
+    { _isFastAssertConfiguration() },
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
+  .code {
+    let evil = EvilSequence(step)
+
+    if step < 0 {
+      expectCrashLater()
+    }
+    let a = evil.map { $0 }
+    _blackHole(a)
+  }
+
+  ArrayTestSuite.test("\(testPrefix)/CollectionMap")
+  .code {
+    let evil = EvilCollection(step, boundsChecked: evilBoundsCheck)
+
+    if expectedToFail {
+      expectCrashLater()
+    }
+
+    let a = evil.map { $0 }
+    _blackHole(a)
+  }
+
+  ArrayTestSuite.test("\(testPrefix)/FilterAll")
+  .code {
+    let evil = EvilCollection(step, boundsChecked: evilBoundsCheck)
+
+    let a = evil.filter { _ in true }
+    _blackHole(a)
+  }
+
+  ArrayTestSuite.test("\(testPrefix)/FilterNone")
+  .code {
+    let evil = EvilCollection(step, boundsChecked: evilBoundsCheck)
+
+    let a = evil.filter { _ in false }
+    _blackHole(a)
+  }
+}
+
+runAllTests()

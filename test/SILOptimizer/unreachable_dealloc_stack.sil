@@ -1,0 +1,35 @@
+// RUN: %target-sil-opt -module-name Swift -enable-sil-verify-all %s -diagnostics | %FileCheck %s
+
+sil_stage raw
+
+import Builtin
+
+enum Never {}
+class TheClass {}
+
+// Ensure that when we remove the code after the apply of noreturn
+// function nada, we don't fail verification on a dealloc_stack with
+// an undef operand, but that we do later remove it in the diagnostics
+// passes.
+
+// CHECK-LABEL: sil @unreachable_deallocstack
+sil @unreachable_deallocstack: $@convention(method) (@guaranteed TheClass) -> () {
+bb0(%0 : $TheClass):
+  %1 = function_ref @nada : $@convention(c) (Builtin.Int32) -> Never
+  %2 = integer_literal $Builtin.Int32, 0
+  // CHECK: apply{{.*}}
+  %3 = apply %1(%2) : $@convention(c) (Builtin.Int32) -> Never
+  // CHECK-NEXT: unreachable
+  // CHECK-NOT: dealloc_stack
+  %4 = alloc_stack $TheClass
+  store %0 to %4 : $*TheClass
+  br bb1
+
+bb1:
+  dealloc_stack %4 : $*TheClass
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// CHECK-LABEL: sil @nada
+sil @nada : $@convention(c) (Builtin.Int32) -> Never

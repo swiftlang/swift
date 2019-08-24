@@ -1,0 +1,107 @@
+#!/usr/bin/env python
+# check-incremental - Check if incremental compilation works -*- python -*-
+#
+# This source file is part of the Swift.org open source project
+#
+# Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+# Licensed under Apache License v2.0 with Runtime Library Exception
+#
+# See https://swift.org/LICENSE.txt for license information
+# See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+#
+"""
+check-incremental: Check if incremental compilation works.
+
+This is a wrapper for the Swift compiler.  It invokes the compiler
+multiple times and checks if the output object file is only written once.
+The main purpose of the check is to ensure that the compiler is
+deterministic.
+"""
+
+from __future__ import print_function
+
+import os
+import subprocess
+import sys
+import time
+
+
+VERBOSE = False
+NUM_ITERATIONS = 4
+
+
+def compile_and_stat(compile_args, output_file):
+    """Perform a compilation using ``compile_args``, and return a tuple
+    (md5sum, last modified time) for ``output_file`` after the
+    compilation has finished.
+    """
+    subprocess.check_call(compile_args)
+
+    md5 = subprocess.check_output(["md5", "-q", output_file])
+    mtime = time.ctime(os.path.getmtime(output_file))
+
+    if VERBOSE:
+        print(" time = " + str(mtime))
+        print("  md5 = " + md5)
+
+    return (md5, mtime)
+
+
+def main():
+
+    write_obj_file = False
+    next_arg_is_output = False
+    compare_time = True
+    output_file = None
+
+    for arg in sys.argv:
+        if next_arg_is_output:
+            output_file = arg
+            next_arg_is_output = False
+        elif arg == '-c':
+            write_obj_file = True
+        elif arg == '-disable-incremental-llvm-codegen':
+            compare_time = False
+        elif arg == '-o':
+            next_arg_is_output = True
+
+    new_args = sys.argv[1:]
+
+    if not write_obj_file or output_file is None:
+        subprocess.check_call(new_args)
+        return
+
+    if VERBOSE:
+        print("Reference compilation of " + output_file + ":")
+
+    # As a workaround for rdar://problem/43442957 and rdar://problem/43439465
+    # we have to "warm-up" the clang module cache. Without that in some cases
+    # we end up with small differences in the debug info.
+    compile_and_stat(new_args, output_file)
+
+    reference_md5, reference_time = compile_and_stat(new_args, output_file)
+
+    subprocess.check_call(["cp", output_file, output_file + ".ref.o"])
+
+    for iteration in range(1, NUM_ITERATIONS + 1):
+
+        if VERBOSE:
+            print("Iteration {}:".format(iteration))
+
+        second_md5, second_time = compile_and_stat(new_args, output_file)
+
+        # This is the most important check: is the output file exactly the
+        # same.
+        if reference_md5 != second_md5:
+            sys.exit("non-determinism when generating: " + output_file +
+                     "\ncommand line:\n" + " ".join(new_args))
+
+        # This is the bonus check: does the compiler not re-write the output
+        # file. (For compilations < 1sec this check may succeed even if the
+        # file was overwritten).
+        if compare_time and reference_time != second_time:
+            sys.exit("file re-written: " + output_file)
+
+
+if __name__ == '__main__':
+    main()

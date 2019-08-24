@@ -1,0 +1,18 @@
+// RUN: %empty-directory(%t)
+// RUN: not --crash %target-sil-opt -enable-sil-verify-all %s 2> %t/err.txt
+// RUN: %FileCheck %s < %t/err.txt
+
+// REQUIRES: asserts
+
+// The test in this file is meant to fail the verifier, as the entry block of a SIL
+// function can't have a predecessor.
+
+import Builtin
+import Swift
+
+// CHECK: SIL verification failed: entry block cannot have predecessors
+
+sil @patatino : $@convention(thin) () -> Never {
+bb0:
+  br bb0
+}

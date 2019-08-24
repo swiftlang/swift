@@ -1,0 +1,26 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend %s -emit-module -o %t/tmp.swiftmodule
+// RUN: %target-sil-opt %t/tmp.swiftmodule -disable-sil-linking | %FileCheck %s
+
+sil_stage canonical
+
+import Swift
+
+// CHECK-NOT: sil_global hidden @hidden_global_unused
+sil_global hidden @hidden_global_unused : $Int
+
+// CHECK-NOT: sil_global @public_global_unused
+sil_global @public_global_unused : $Int
+
+// CHECK: sil_global @public_global_used
+sil_global @public_global_used : $Int
+
+// CHECK: sil_global [serialized] @serialized_global
+sil_global [serialized] @serialized_global : $Int
+
+sil [serialized] @uses_public_global : $@convention(thin) () -> () {
+bb0:
+  %1 = global_addr @public_global_used : $*Int
+  %2 = tuple ()
+  return %2 : $()
+}

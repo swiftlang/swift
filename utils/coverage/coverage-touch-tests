@@ -1,0 +1,168 @@
+#!/usr/bin/env python
+# utils/coverage/coverage-touch-tests - Touch tests covering git changes
+#
+# This source file is part of the Swift.org open source project
+#
+# Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+# Licensed under Apache License v2.0 with Runtime Library Exception
+#
+# See https://swift.org/LICENSE.txt for license information
+# See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+
+from __future__ import print_function
+
+import argparse
+import logging
+import multiprocessing
+import os
+import re
+import subprocess
+import sys
+
+logging_format = '%(asctime)s %(levelname)s %(message)s'
+logging.basicConfig(level=logging.DEBUG,
+                    format=logging_format,
+                    filename='/tmp/%s.log' % os.path.basename(__file__),
+                    filemode='w')
+console = logging.StreamHandler()
+console.setLevel(logging.INFO)
+formatter = logging.Formatter(logging_format)
+console.setFormatter(formatter)
+logging.getLogger().addHandler(console)
+
+script_path = os.path.realpath(__file__)
+sql_query_covering = '''SELECT DISTINCT test_string.string
+FROM strings as src_string, coverage, strings as test_string
+WHERE src_string.string = '{0}'
+  AND ((istart <= {1} AND {1} <= iend) OR
+       (istart <= {2} AND {2} <= iend) OR
+       ({1} <= istart AND istart <= {2}))
+  AND src_string.id = coverage.src
+  AND test_string.id = coverage.test;'''
+
+
+def worker(args):
+    i, (coverage_db, (filename, (rstart, rend))) = args
+    logging.info('[%s] Finding covering tests for: %s %s',
+                 i + 1, filename, (rstart, rend))
+    tmp_covering_tests = subprocess.check_output(
+        ['sqlite3',
+         coverage_db,
+         sql_query_covering.format(filename, rstart, rend)]
+    ).splitlines()
+    for covering_test in tmp_covering_tests:
+        logging.debug('  %s', covering_test)
+    logging.info('Found %s covering tests', len(tmp_covering_tests))
+    return set(tmp_covering_tests)
+
+
+NUM_CORES = multiprocessing.cpu_count()
+pool = multiprocessing.Pool(NUM_CORES)
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description='Touch tests covering git changes')
+    parser.add_argument('--swift-dir',
+                        metavar='PATH',
+                        help='the path to a swift source directory containing '
+                             'changes',
+                        required=True)
+    parser.add_argument('--coverage-db',
+                        metavar='PATH',
+                        help='the path to a swift coverage database',
+                        required=True)
+    parser.add_argument('--log',
+                        help='the level of information to log (default: info)',
+                        metavar='LEVEL',
+                        default='info',
+                        choices=['info', 'debug', 'warning', 'error',
+                                 'critical'])
+    args = parser.parse_args()
+
+    for path in [args.swift_dir, args.coverage_db]:
+        assert os.path.exists(path), "Unable to find %s. Try absolute" \
+                                     " paths." % path
+
+    console.setLevel(level=args.log.upper())
+    logging.debug(args)
+    environment = os.environ.copy()
+    environment['GIT_EXTERNAL_DIFF'] = script_path
+    logging.info('Getting diff of swift dir: %s', args.swift_dir)
+    output = subprocess.check_output(['git', '-C', args.swift_dir, 'diff'],
+                                     env=environment)
+    changed_ranges = []
+    for line in output.splitlines():
+        logging.debug(line)
+        if line.startswith('FILENAME'):
+            filename = line.split()[1]
+        elif line.startswith('@'):
+            start_line, num_lines = re.match(
+                r'\@\@ \-(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? \@\@',
+                line
+            ).group(1, 2)
+            if num_lines:
+                start_line, num_lines = int(start_line), int(num_lines)
+                changed_range = (start_line, start_line + num_lines - 1)
+                logging.debug('Found changed range: %s %s',
+                              filename, changed_range)
+                changed_ranges.append(
+                    (args.coverage_db, (filename, changed_range)))
+            else:
+                start_line = int(start_line)
+                logging.debug(
+                    'Found changed line: %s %s', filename, start_line)
+                changed_ranges.append(
+                    (args.coverage_db, (filename, (start_line, start_line))))
+
+    logging.info('Found %s changed ranges/lines', len(changed_ranges))
+    relevant_changes = [
+        cr for cr in changed_ranges
+        if cr[1][0].endswith('.cpp') or cr[1][0].endswith('.h')
+    ]
+    relevant_changes_count = len(relevant_changes)
+    logging.info('Finding covering tests for %s relevant ranges/lines...',
+                 relevant_changes_count)
+    covering_tests = set().union(*pool.map_async(
+        worker,
+        enumerate(relevant_changes)
+    ).get(999999))
+
+    logging.info('Combined covering tests:')
+    for covering_test in covering_tests:
+        logging.debug('  %s', covering_test)
+    logging.info('Found %s combined covering tests',
+                 len(covering_tests))
+
+    logging.info('Touching covering tests:')
+    for root, folders, files in os.walk(args.swift_dir):
+        for filename in files:
+            if filename in covering_tests:
+                filepath = os.path.join(root, filename)
+                logging.info('  %s', filepath)
+                os.utime(filepath, None)
+
+    return 0
+
+
+def diff():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('path')
+    parser.add_argument('old_file')
+    parser.add_argument('old_hex')
+    parser.add_argument('old_mode')
+    parser.add_argument('new_file')
+    parser.add_argument('new_hex')
+    parser.add_argument('new_mode')
+    args = parser.parse_args()
+    print('FILENAME', os.path.basename(args.new_file))
+    sys.stdout.flush()
+    subprocess.call(['diff', '-U0', args.old_file, args.new_file])
+    return 0
+
+
+if __name__ == '__main__':
+    if 'GIT_EXTERNAL_DIFF' in os.environ:
+        sys.exit(diff())
+    else:
+        sys.exit(main())

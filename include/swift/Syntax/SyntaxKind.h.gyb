@@ -1,0 +1,160 @@
+%{
+  from gyb_syntax_support import *
+  from gyb_syntax_support.kinds import SYNTAX_BASE_KINDS
+  grouped_nodes = { kind: [] for kind in SYNTAX_BASE_KINDS }
+  for node in SYNTAX_NODES:
+    grouped_nodes[node.base_kind].append(node)
+  # -*- mode: C++ -*-
+  # Ignore the following admonition; it applies to the resulting .h file only
+}%
+//// Automatically Generated From SyntaxKind.h.gyb.
+//// Do Not Edit Directly!
+//===--------------- SyntaxKind.h - Syntax Kind definitions ---------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+#ifndef SWIFT_SYNTAX_KIND_H
+#define SWIFT_SYNTAX_KIND_H
+
+#include "swift/Basic/InlineBitfield.h"
+#include "swift/Basic/ByteTreeSerialization.h"
+#include "swift/Basic/JSONSerialization.h"
+#include "llvm/Support/YAMLTraits.h"
+
+namespace swift {
+namespace syntax {
+
+enum class SyntaxKind {
+  Token,
+% for name, nodes in grouped_nodes.items():
+%   for node in nodes:
+  ${node.syntax_kind},
+%   end
+%   if name not in ["Syntax", "SyntaxCollection"]:
+%     first_kind = nodes[0].syntax_kind
+%     last_kind = nodes[-1].syntax_kind
+  First_${name} = ${first_kind},
+  Last_${name} = ${last_kind},
+%   end
+% end
+
+  // NOTE: Unknown must be the last kind.
+  Unknown,
+};
+enum : unsigned {
+  NumSyntaxKindBits = countBitsUsed(static_cast<unsigned>(SyntaxKind::Unknown))
+};
+
+void dumpSyntaxKind(llvm::raw_ostream &os, const SyntaxKind kind);
+
+/// Whether this kind is a syntax collection.
+bool isCollectionKind(SyntaxKind Kind);
+
+bool isDeclKind(SyntaxKind Kind);
+
+bool isTypeKind(SyntaxKind Kind);
+
+bool isStmtKind(SyntaxKind Kind);
+
+bool isExprKind(SyntaxKind Kind);
+
+bool isPatternKind(SyntaxKind Kind);
+
+bool isTokenKind(SyntaxKind Kind);
+
+bool isUnknownKind(SyntaxKind Kind);
+
+SyntaxKind getUnknownKind(SyntaxKind Kind);
+} // end namespace syntax
+
+bool parserShallOmitWhenNoChildren(syntax::SyntaxKind Kind);
+
+namespace byteTree {
+
+template <>
+struct WrapperTypeTraits<syntax::SyntaxKind> {
+  // Explicitly spell out all SyntaxKinds to keep the serialized value stable
+  // even if its members get reordered or members get removed
+  static uint16_t numericValue(const syntax::SyntaxKind &Kind) {
+    switch (Kind) {
+    case syntax::SyntaxKind::Token:
+      return 0;
+    case syntax::SyntaxKind::Unknown:
+      return 1;
+% for name, nodes in grouped_nodes.items():
+%   for node in nodes:
+    case syntax::SyntaxKind::${node.syntax_kind}: 
+      return ${SYNTAX_NODE_SERIALIZATION_CODES[node.syntax_kind]};
+%   end
+% end
+    }
+    llvm_unreachable("unhandled kind");
+  }
+
+  static void write(ByteTreeWriter &Writer, const syntax::SyntaxKind &Kind,
+                    unsigned Index) {
+    Writer.write(numericValue(Kind), Index);
+  }
+};
+
+} // end namespace byteTree
+
+namespace json {
+
+/// Serialization traits for SyntaxKind.
+template <>
+struct ScalarReferenceTraits<syntax::SyntaxKind> {
+  static StringRef stringRef(const syntax::SyntaxKind &value) {
+    switch (value) {
+      case syntax::SyntaxKind::Token:
+        return "\"Token\"";
+      case syntax::SyntaxKind::Unknown:
+        return "\"Unknown\"";
+% for node in SYNTAX_NODES:
+      case syntax::SyntaxKind::${node.syntax_kind}:
+        return "\"${node.syntax_kind}\"";
+% end
+    }
+    llvm_unreachable("unhandled kind");
+  }
+
+  static bool mustQuote(StringRef) {
+    // The string is already quoted. This is more efficient since it does not
+    // check for characters that need to be escaped
+    return false;
+  }
+};
+
+} // end namespace json
+} // end namespace swift
+
+namespace llvm {
+namespace yaml {
+
+/// Deserialization traits for SyntaxKind.
+template <>
+struct ScalarEnumerationTraits<swift::syntax::SyntaxKind> {
+  static void enumeration(IO &in, swift::syntax::SyntaxKind &value) {
+    in.enumCase(value, "Token", swift::syntax::SyntaxKind::Token);
+    in.enumCase(value, "Unknown", swift::syntax::SyntaxKind::Unknown);
+% for node in SYNTAX_NODES:
+    in.enumCase(value, "${node.syntax_kind}", swift::syntax::SyntaxKind::${node.syntax_kind});
+% end
+  }
+};
+
+} // end namespace yaml
+} // end namespace llvm
+
+namespace llvm {
+  raw_ostream &operator<<(raw_ostream &OS, swift::syntax::SyntaxKind Kind);
+} // end namespace llvm
+#endif // SWIFT_SYNTAX_KIND_H

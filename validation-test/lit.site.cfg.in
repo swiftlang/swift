@@ -1,0 +1,109 @@
+# swift/validation-test/lit.site.cfg.in ---------------------------*- python -*-
+#
+# This source file is part of the Swift.org open source project
+#
+# Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+# Licensed under Apache License v2.0 with Runtime Library Exception
+#
+# See https://swift.org/LICENSE.txt for license information
+# See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+#
+# -----------------------------------------------------------------------------
+
+import sys
+import platform
+
+config.llvm_src_root = "@LLVM_MAIN_SRC_DIR@"
+config.llvm_obj_root = "@LLVM_BINARY_DIR@"
+config.llvm_tools_dir = "@LLVM_TOOLS_DIR@"
+config.llvm_libs_dir = "@LLVM_LIBS_DIR@"
+config.llvm_code_generators = "@LLVM_TARGETS_TO_BUILD@".split(";")
+config.lit_tools_dir = "@LLVM_LIT_TOOLS_DIR@"
+config.swift_src_root = "@SWIFT_SOURCE_DIR@"
+config.swift_obj_root = "@SWIFT_BINARY_DIR@"
+config.target_triple = "@TARGET_TRIPLE@"
+config.variant_triple = "@VARIANT_TRIPLE@"
+config.variant_suffix = "@VARIANT_SUFFIX@"
+config.variant_sdk = "@VARIANT_SDK@"
+config.swift_test_results_dir = \
+    lit_config.params.get("swift_test_results_dir", "@SWIFT_TEST_RESULTS_DIR@")
+
+# --- Darwin Configuration ---
+config.darwin_xcrun_toolchain = "@SWIFT_DARWIN_XCRUN_TOOLCHAIN@"
+
+# --- Android Configuration ---
+config.android_ndk_path = "@SWIFT_ANDROID_NDK_PATH@"
+config.android_ndk_gcc_version = "@SWIFT_ANDROID_NDK_GCC_VERSION@"
+
+# --- Windows MSVC Configuration ---
+config.swift_stdlib_msvc_runtime = None
+if "@SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY@" == "MultiThreaded":
+    config.swift_stdlib_msvc_runtime = 'MT'
+elif "@SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY@" == "MultiThreadedDebug":
+    config.swift_stdlib_msvc_runtime = 'MTd'
+elif "@SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY@" == "MultiThreadedDLL":
+    config.swift_stdlib_msvc_runtime = 'MD'
+elif "@SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY@" == "MultiThreadedDebugDLL":
+    config.swift_stdlib_msvc_runtime = 'MDd'
+else:
+    assert(False)
+
+config.coverage_mode = "@SWIFT_ANALYZE_CODE_COVERAGE@"
+config.lldb_build_root = "@LLDB_BUILD_DIR@"
+config.libdispatch_build_path = "@SWIFT_PATH_TO_LIBDISPATCH_BUILD@"
+
+if "@SWIFT_ASAN_BUILD@" == "TRUE":
+    config.available_features.add("asan")
+else:
+    config.available_features.add('no_asan')
+
+if "@SWIFT_TOOLS_ENABLE_LTO@".lower() in ["full", "thin"]:
+   config.available_features.add("lto")
+else:
+   config.available_features.add("no_lto")
+
+if "@LLVM_ENABLE_ASSERTIONS@" == "TRUE":
+    config.available_features.add('asserts')
+else:
+    config.available_features.add('no_asserts')
+
+# If tools have debug info, set the tools-debuginfo flag.
+if "@CMAKE_BUILD_TYPE@" in ["Debug", "RelWithDebInfo"]:
+    config.available_features.add('tools-debuginfo')
+
+# If tools are release-mode, set the tools-release flag.
+if "@CMAKE_BUILD_TYPE@" in ["Release", "RelWithDebInfo"]:
+    config.available_features.add('tools-release')
+
+if "@SWIFT_STDLIB_ASSERTIONS@" == "TRUE":
+    config.available_features.add('swift_stdlib_asserts')
+else:
+    config.available_features.add('swift_stdlib_no_asserts')
+
+if "@SWIFT_OPTIMIZED@" == "TRUE":
+    config.available_features.add("optimized_stdlib")
+
+if "@SWIFT_ENABLE_SOURCEKIT_TESTS@" == "TRUE":
+    config.available_features.add('sourcekit')
+
+if "@SWIFT_STDLIB_USE_NONATOMIC_RC@" == "TRUE":
+    config.available_features.add("nonatomic_rc")
+
+if "@CMAKE_GENERATOR@" == "Xcode":
+    xcode_bin_dir = os.path.join(config.llvm_obj_root, "@LLVM_BUILD_TYPE@",
+                                 'bin')
+    lit_config.note('Adding to path: ' + xcode_bin_dir)
+    config.environment['PATH'] = \
+      os.path.pathsep.join((xcode_bin_dir, config.environment['PATH']))
+
+config.available_features.add("CMAKE_GENERATOR=@CMAKE_GENERATOR@")
+
+if "@SWIFT_ENABLE_LLD_LINKER@" == "TRUE":
+    config.android_linker_name = "lld"
+else:
+    # even if SWIFT_ENABLE_GOLD_LINKER isn't set, we cannot use BFD for Android
+    config.android_linker_name = "gold"
+
+# Let the main config do the real work.
+config.test_exec_root = os.path.dirname(os.path.realpath(__file__))
+lit_config.load_config(config, "@SWIFT_SOURCE_DIR@/validation-test/lit.cfg")

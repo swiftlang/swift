@@ -1,0 +1,9 @@
+module BrokenClangModule {
+  header "BrokenClangModule.h"
+  export *
+}
+
+module MissingDependencyFromClang {
+  header "MissingDependencyFromClang.h"
+  export *
+}

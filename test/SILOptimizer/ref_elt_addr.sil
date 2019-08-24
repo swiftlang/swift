@@ -1,0 +1,33 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -cse | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+class X {
+ var x : Int64
+  init()
+}
+
+//CHECK: _RefElementAddr
+//CHECK:  ref_element_addr
+//CHECK-NEXT:  store
+//CHECK-NOT:  ref_element_addr
+//CHECK: return
+sil @_RefElementAddr : $@convention(thin) () -> Int64 {
+bb0:
+  %0 = alloc_ref $X                               // users: %5, %7, %3
+  %1 = integer_literal $Builtin.Int64, 0          // user: %2
+  %2 = struct $Int64 (%1 : $Builtin.Int64)        // user: %4
+  %3 = ref_element_addr %0 : $X, #X.x             // user: %4
+  store %2 to %3 : $*Int64                        // id: %4
+  %5 = ref_element_addr %0 : $X, #X.x             // user: %6
+  %6 = load %5 : $*Int64                          // user: %8
+  strong_release %0 : $X                          // id: %7
+  return %6 : $Int64                              // id: %8
+}
+
+sil_vtable X {
+}
+

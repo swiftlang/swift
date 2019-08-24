@@ -1,0 +1,39 @@
+//===--- visualc.modulemap ------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+module visualc [system] {
+  module SAL {
+    header "sal.h"
+    export *
+  }
+
+  module vadefs {
+    header "vadefs.h"
+    export *
+  }
+
+  module vcruntime {
+    header "vcruntime.h"
+    export *
+  }
+
+  module setjmp {
+    header "setjmp.h"
+    export *
+  }
+
+  module stdint {
+    header "stdint.h"
+    export *
+  }
+}
+

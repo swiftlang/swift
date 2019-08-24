@@ -1,0 +1,100 @@
+// RUN: %target-sil-opt -enforce-exclusivity=unchecked -emit-sorted-sil -access-marker-elim %s | %FileCheck %s --check-prefix=UNCHECKED
+// RUN: %target-sil-opt -enforce-exclusivity=checked -emit-sorted-sil -access-marker-elim %s | %FileCheck %s --check-prefix=CHECKED
+
+sil_stage raw
+
+import Builtin
+import Swift
+import SwiftShims
+
+public struct S {
+  @_hasStorage var i: Builtin.Int64 { get set }
+  init(i: Int)
+}
+
+// [unknown] markers are treated like [dynamic] markers by AccessMarkerElimination.
+// We don't remove them for -enforce-exclusivity=checked
+
+// UNCHECKED-LABEL: sil hidden [noinline] [ossa] @f010_initS : $@convention(thin) () -> @owned S {
+// UNCHECKED: bb0:
+// UNCHECKED:  [[BOX:%.*]] = alloc_box ${ var S }, var, name "s"
+// UNCHECKED:  [[ADDRS:%.*]] = project_box [[BOX]] : ${ var S }, 0
+// UNCHECKED:  [[NUM:%.*]] = integer_literal $Builtin.Int64, 1
+// UNCHECKED-NOT: begin_access
+// UNCHECKED:  [[ADDRI:%.*]] = struct_element_addr [[ADDRS]] : $*S, #S.i
+// UNCHECKED:  assign [[NUM]] to [[ADDRI]] : $*Builtin.Int64
+// UNCHECKED-NOT: end_access
+// UNCHECKED-NOT: begin_access
+// UNCHECKED:  [[VALS:%.*]] = load [trivial] [[ADDRS]] : $*S
+// UNCHECKED-NOT: end_access
+// UNCHECKED:  destroy_value [[BOX]] : ${ var S }
+// UNCHECKED:  return [[VALS]] : $S
+// UNCHECKED-LABEL: } // end sil function 'f010_initS'
+//
+// CHECKED-LABEL: sil hidden [noinline] [ossa] @f010_initS : $@convention(thin) () -> @owned S {
+// CHECKED: bb0:
+// CHECKED:  [[BOX:%.*]] = alloc_box ${ var S }, var, name "s"
+// CHECKED:  [[ADDRS:%.*]] = project_box [[BOX]] : ${ var S }, 0
+// CHECKED:  [[NUM:%.*]] = integer_literal $Builtin.Int64, 1
+// CHECKED:  [[ACCESS:%.*]] = begin_access [modify] [unknown] [[ADDRS]]
+// CHECKED:  [[ADDRI:%.*]] = struct_element_addr [[ACCESS]] : $*S, #S.i
+// CHECKED:  assign [[NUM]] to [[ADDRI]] : $*Builtin.Int64
+// CHECKED:  end_access [[ACCESS]]
+// CHECKED:  [[ACCESS:%.*]] = begin_access [read] [unknown] [[ADDRS]]
+// CHECKED:  [[VALS:%.*]] = load [trivial] [[ACCESS]] : $*S
+// CHECKED:  end_access [[ACCESS]]
+// CHECKED:  destroy_value [[BOX]] : ${ var S }
+// CHECKED:  return [[VALS]] : $S
+// CHECKED-LABEL: } // end sil function 'f010_initS'
+sil hidden [noinline] [ossa] @f010_initS : $@convention(thin) () -> @owned S {
+bb0:
+  %0 = alloc_box ${ var S }, var, name "s"
+  %1 = project_box %0 : ${ var S }, 0
+  %2 = integer_literal $Builtin.Int64, 1
+  %3 = begin_access [modify] [unknown] %1 : $*S
+  %4 = struct_element_addr %3 : $*S, #S.i
+  assign %2 to %4 : $*Builtin.Int64
+  end_access %3 : $*S
+  %7 = begin_access [read] [unknown] %1 : $*S
+  %8 = load [trivial] %7 : $*S
+  end_access %7 : $*S
+  destroy_value %0 : ${ var S }
+  return %8 : $S
+}
+
+// Test that box arguments are dynamic.
+// And since inactive elimination currently eliminates all dynamic markers,
+// they are gone from the output.
+//
+// UNCHECKED-LABEL: sil hidden [ossa] @f020_boxArg : $@convention(thin) (@owned { var Builtin.Int64 }) -> () {
+// UNCHECKED: bb0(%0 : @owned ${ var Builtin.Int64 }):
+// UNCHECKED:  [[ADR:%.*]] = project_box %0 : ${ var Builtin.Int64 }, 0
+// UNCHECKED:  [[VAL:%.*]] = integer_literal $Builtin.Int64, 42
+// UNCHECKED-NOT: begin_access
+// UNCHECKED:  store [[VAL]] to [trivial] [[ADR]] : $*Builtin.Int64
+// UNCHECKED-NOT: end_access
+// UNCHECKED:  destroy_value %0 : ${ var Builtin.Int64 }
+// UNCHECKED:  return %{{.*}} : $()
+// UNCHECKED-LABEL: } // end sil function 'f020_boxArg'
+//
+// CHECKED-LABEL: sil hidden [ossa] @f020_boxArg : $@convention(thin) (@owned { var Builtin.Int64 }) -> () {
+// CHECKED: bb0(%0 : @owned ${ var Builtin.Int64 }):
+// CHECKED:  [[ADR:%.*]] = project_box %0 : ${ var Builtin.Int64 }, 0
+// CHECKED:  [[VAL:%.*]] = integer_literal $Builtin.Int64, 42
+// CHECKED:  [[ACCESS:%.*]] = begin_access [modify] [unknown] [[ADR]]
+// CHECKED:  store [[VAL]] to [trivial] [[ACCESS]] : $*Builtin.Int64
+// CHECKED:  end_access [[ACCESS]]
+// CHECKED:  destroy_value %0 : ${ var Builtin.Int64 }
+// CHECKED:  return %{{.*}} : $()
+// CHECKED-LABEL: } // end sil function 'f020_boxArg'
+sil hidden [ossa] @f020_boxArg : $@convention(thin) (@owned { var Builtin.Int64 }) -> () {
+bb0(%0 : @owned ${ var Builtin.Int64 }):
+  %1 = project_box %0 : ${ var Builtin.Int64 }, 0
+  %3 = integer_literal $Builtin.Int64, 42
+  %5 = begin_access [modify] [unknown] %1 : $*Builtin.Int64
+  store %3 to [trivial] %5 : $*Builtin.Int64
+  end_access %5 : $*Builtin.Int64
+  destroy_value %0 : ${ var Builtin.Int64 }
+  %9 = tuple ()
+  return %9 : $()
+}

@@ -1,0 +1,58 @@
+// RUN: %target-swift-frontend -emit-ir %s
+
+// This is a compile-only test. It checks if IRGen does not crash when packing
+// and unpacking enums (e.g. optionals) which contain empty structs as payloads.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+public struct ECurve {
+
+    public func point () -> ECPoint?
+}
+
+public struct ECPoint {
+    public let curve: ECurve
+
+    public var coordinate: Int32
+
+    init(curve: ECurve)
+}
+
+func unpack(ec : ECPoint?) -> ECPoint
+
+// top_level_code
+sil private @top_level_code : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple ()                                   // user: %1
+  return %0 : $()                                 // id: %1
+}
+
+// ECurve.ECurve.point (ECurve.ECurve)() -> Swift.Optional<ECurve.ECPoint>
+sil @_TFV6ECurve6ECurve5pointfS0_FT_GSqVS_7ECPoint_ : $@convention(method) (ECurve) -> Optional<ECPoint> {
+bb0(%0 : $ECurve):
+  %1 = integer_literal $Builtin.Int32, 9          // user: %2
+  %2 = struct $Int32 (%1 : $Builtin.Int32)        // user: %4
+  %3 = struct $ECurve ()                          // user: %4
+  %4 = struct $ECPoint (%3 : $ECurve, %2 : $Int32) // user: %5
+  %5 = enum $Optional<ECPoint>, #Optional.some!enumelt.1, %4 : $ECPoint // user: %6
+  return %5 : $Optional<ECPoint>                  // id: %6
+}
+
+// ECurve.unpack (Swift.Optional<ECurve.ECPoint>) -> ECurve.ECPoint
+sil @_TF6ECurve6unpackFGSqVS_7ECPoint_S0_ : $@convention(thin) (Optional<ECPoint>) -> ECPoint {
+bb0(%0 : $Optional<ECPoint>):
+  switch_enum %0 : $Optional<ECPoint>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2 // id: %1
+
+bb1:                                              // Preds: bb0
+  %2 = unchecked_enum_data %0 : $Optional<ECPoint>, #Optional.some!enumelt.1 // user: %3
+  return %2 : $ECPoint                            // id: %3
+
+bb2:                                              // Preds: bb0
+  %4 = integer_literal $Builtin.Int1, -1          // user: %5
+  cond_fail %4 : $Builtin.Int1                    // id: %5
+  unreachable                                     // id: %6
+}
+

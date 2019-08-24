@@ -1,0 +1,18 @@
+// RUN: %target-swift-frontend -emit-ir %s | %FileCheck %s
+
+// REQUIRES: CPU=x86_64
+
+import Builtin
+
+// CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @undefined() {{.*}} {
+// CHECK: entry:
+// CHECK:   store i64 undef, i64* undef, align 8
+// CHECK:   store i8 undef, i8* undef, align 8
+// CHECK:   store i8* undef, i8** undef, align 8
+// CHECK:   ret void
+// CHECK: }
+sil @undefined : $() -> () {
+entry:
+  store undef to undef : $*(Builtin.Int64, Builtin.Int8, Builtin.RawPointer)
+  return undef : $()
+}

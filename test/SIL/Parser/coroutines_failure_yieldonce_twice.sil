@@ -1,0 +1,25 @@
+// RUN: not --crash %target-swift-frontend %s -emit-silgen -verify
+// REQUIRES: asserts
+
+sil_stage canonical
+
+import Swift
+
+sil [ossa] @yield : $@yield_once (Int, Float) -> (@yields Int, @yields Float) {
+bb0(%0 : $Int, %1 : $Float):
+  yield (%0 : $Int, %1 : $Float), resume bb1, unwind bb3
+
+bb1:
+  yield (%0 : $Int, %1 : $Float), resume bb2, unwind bb4
+
+bb2:
+  %r = tuple ()
+  return %r : $()
+
+bb3:
+  unwind
+
+bb4:
+  unwind
+}
+

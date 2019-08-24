@@ -1,0 +1,25 @@
+module CoreServices {
+  module CarbonCore {
+    umbrella "CarbonCore"
+    export *
+    module * {
+      export *
+    }
+  }
+
+  module OSServices {
+    umbrella "OSServices"
+    export *
+    module * {
+      export *
+    }
+  }
+
+  module LaunchServices {
+    umbrella "LaunchServices"
+    export *
+    module * {
+      export *
+    }
+  }
+}

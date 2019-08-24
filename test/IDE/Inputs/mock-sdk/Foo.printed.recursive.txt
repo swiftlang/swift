@@ -1,0 +1,316 @@
+@_exported import Foo.FooSub
+@_exported import FooHelper
+
+
+/// Aaa.  FooEnum1.  Bbb.
+struct FooEnum1 : RawRepresentable, Equatable {
+  init(_ rawValue: UInt32)
+  init(rawValue: UInt32)
+  var rawValue: UInt32
+}
+
+/// Aaa.  FooEnum1X.  Bbb.
+var FooEnum1X: FooEnum1 { get }
+struct FooEnum2 : RawRepresentable, Equatable {
+  init(_ rawValue: UInt32)
+  init(rawValue: UInt32)
+  var rawValue: UInt32
+}
+var FooEnum2X: FooEnum2 { get }
+var FooEnum2Y: FooEnum2 { get }
+struct FooEnum3 : RawRepresentable, Equatable {
+  init(_ rawValue: UInt32)
+  init(rawValue: UInt32)
+  var rawValue: UInt32
+}
+var FooEnum3X: FooEnum3 { get }
+var FooEnum3Y: FooEnum3 { get }
+
+/// Aaa.  FooComparisonResult.  Bbb.
+enum FooComparisonResult : Int {
+  init?(rawValue: Int)
+  var rawValue: Int { get }
+  case orderedAscending
+  case orderedSame
+  case orderedDescending
+}
+
+/// Aaa.  FooRuncingOptions.  Bbb.
+struct FooRuncingOptions : OptionSet {
+  init(rawValue: Int)
+  let rawValue: Int
+  static var enableMince: FooRuncingOptions { get }
+  static var enableQuince: FooRuncingOptions { get }
+}
+struct FooStruct1 {
+  var x: Int32
+  var y: Double
+  init()
+  init(x: Int32, y: Double)
+}
+typealias FooStruct1Pointer = UnsafeMutablePointer<FooStruct1>
+struct FooStruct2 {
+  var x: Int32
+  var y: Double
+  init()
+  init(x: Int32, y: Double)
+}
+typealias FooStructTypedef1 = FooStruct2
+struct FooStructTypedef2 {
+  var x: Int32
+  var y: Double
+  init()
+  init(x: Int32, y: Double)
+}
+
+/// Aaa.  FooTypedef1.  Bbb.
+typealias FooTypedef1 = Int32
+
+/// Aaa.  fooIntVar.  Bbb.
+var fooIntVar: Int32
+
+/// Aaa.  fooFunc1.  Bbb.
+func fooFunc1(_ a: Int32) -> Int32
+func fooFunc1AnonymousParam(_: Int32) -> Int32
+func fooFunc3(_ a: Int32, _ b: Float, _ c: Double, _ d: UnsafeMutablePointer<Int32>!) -> Int32
+func fooFuncWithBlock(_ blk: (@escaping (Float) -> Int32)!)
+func fooFuncWithFunctionPointer(_ fptr: (@escaping @convention(c) (Float) -> Int32)!)
+func fooFuncNoreturn1() -> Never
+func fooFuncNoreturn2() -> Never
+
+/**
+ * Aaa.  fooFuncWithComment1.  Bbb.
+ * Ccc.
+ *
+ * Ddd.
+ */
+func fooFuncWithComment1()
+
+/*!
+  Aaa.  fooFuncWithComment2.  Bbb.
+ */
+func fooFuncWithComment2()
+
+/**
+ * Aaa.  fooFuncWithComment3.  Bbb.
+ */
+/**
+ * Ccc.
+ */
+func fooFuncWithComment3()
+
+/**
+ * Aaa.  fooFuncWithComment4.  Bbb.
+ */
+/// Ddd.
+func fooFuncWithComment4()
+
+/// Aaa.  fooFuncWithComment5.  Bbb.
+/// Ccc.
+///
+/// Ddd.
+func fooFuncWithComment5()
+
+/// Aaa.  redeclaredInMultipleModulesFunc1.  Bbb.
+func redeclaredInMultipleModulesFunc1(_ a: Int32) -> Int32
+@available(*, unavailable, message: "Variadic function is unavailable")
+func fooFuncUsingVararg(_ a: Int32, _ varargs: Any...) -> Int32
+
+/// Aaa.  FooProtocolBase.  Bbb.
+protocol FooProtocolBase {
+
+  /// Aaa.  fooProtoFunc.  Bbb.
+  /// Ccc.
+  func fooProtoFunc()
+
+  /// Aaa.  fooProtoFuncWithExtraIndentation1.  Bbb.
+  /// Ccc.
+  func fooProtoFuncWithExtraIndentation1()
+
+  /**
+   * Aaa.  fooProtoFuncWithExtraIndentation2.  Bbb.
+   * Ccc.
+   */
+  func fooProtoFuncWithExtraIndentation2()
+  static func fooProtoClassFunc()
+  var fooProperty1: Int32 { get set }
+  var fooProperty2: Int32 { get set }
+  var fooProperty3: Int32 { get }
+}
+protocol FooProtocolDerived : FooProtocolBase {
+}
+class FooClassBase {
+  class func fooBaseInstanceFunc0()
+  func fooBaseInstanceFunc0()
+  class func fooBaseInstanceFunc1(_ anObject: AnyObject!) -> FooClassBase!
+  func fooBaseInstanceFunc1(_ anObject: AnyObject!) -> FooClassBase!
+  init!()
+  convenience init!(float f: Float)
+  class func fooBaseInstanceFuncOverridden()
+  func fooBaseInstanceFuncOverridden()
+  class func fooBaseClassFunc0()
+  /*not inherited*/ init!(_ x: Int32)
+  @available(*, unavailable, message: "use object construction 'FooClassBase(_:)'")
+  class func fooClassBase(_ x: Int32) -> FooClassBase!
+}
+
+/// Aaa.  FooClassDerived.  Bbb.
+class FooClassDerived : FooClassBase, FooProtocolDerived {
+  var fooProperty1: Int32
+  var fooProperty2: Int32
+  var fooProperty3: Int32 { get }
+  func fooInstanceFunc0()
+  func fooInstanceFunc1(_ a: Int32)
+  func fooInstanceFunc2(_ a: Int32, withB b: Int32)
+  func fooBaseInstanceFuncOverridden()
+  class func fooClassFunc0()
+  init!()
+  convenience init!(float f: Float)
+
+  /// Aaa.  fooProtoFunc.  Bbb.
+  /// Ccc.
+  func fooProtoFunc()
+
+  /// Aaa.  fooProtoFuncWithExtraIndentation1.  Bbb.
+  /// Ccc.
+  func fooProtoFuncWithExtraIndentation1()
+
+  /**
+   * Aaa.  fooProtoFuncWithExtraIndentation2.  Bbb.
+   * Ccc.
+   */
+  func fooProtoFuncWithExtraIndentation2()
+  class func fooProtoClassFunc()
+}
+typealias typedef_int_t = Int32
+var FOO_MACRO_1: Int32 { get }
+var FOO_MACRO_2: Int32 { get }
+var FOO_MACRO_3: Int32 { get }
+var FOO_MACRO_4: UInt32 { get }
+var FOO_MACRO_5: UInt64 { get }
+var FOO_MACRO_6: typedef_int_t { get }
+var FOO_MACRO_7: typedef_int_t { get }
+var FOO_MACRO_8: Int8 { get }
+var FOO_MACRO_9: Int32 { get }
+var FOO_MACRO_10: Int16 { get }
+var FOO_MACRO_11: Int { get }
+var FOO_MACRO_OR: Int32 { get }
+var FOO_MACRO_AND: Int32 { get }
+var FOO_MACRO_BITWIDTH: UInt64 { get }
+var FOO_MACRO_SIGNED: Int32 { get }
+var FOO_MACRO_REDEF_1: Int32 { get }
+var FOO_MACRO_REDEF_2: Int32 { get }
+func theLastDeclInFoo()
+func _internalTopLevelFunc()
+struct _InternalStruct {
+  var x: Int32
+  init()
+  init(x: Int32)
+}
+extension FooClassBase {
+  class func _internalMeth1() -> AnyObject!
+  func _internalMeth1() -> AnyObject!
+}
+extension FooClassBase {
+  class func _internalMeth2() -> AnyObject!
+  func _internalMeth2() -> AnyObject!
+  class func nonInternalMeth() -> AnyObject!
+  func nonInternalMeth() -> AnyObject!
+}
+extension FooClassBase {
+  class func _internalMeth3() -> AnyObject!
+  func _internalMeth3() -> AnyObject!
+}
+protocol _InternalProt {
+}
+class ClassWithInternalProt : _InternalProt {
+}
+class FooClassPropertyOwnership : FooClassBase {
+  unowned(unsafe) var assignable: @sil_unmanaged AnyObject!
+  unowned(unsafe) var unsafeAssignable: @sil_unmanaged AnyObject!
+  var retainable: AnyObject!
+  var strongRef: AnyObject!
+  @NSCopying var copyable: AnyObject!
+  weak var weakRef: @sil_weak AnyObject!
+  var scalar: Int32
+  init!()
+  convenience init!(float f: Float)
+}
+class FooClassWithClassProperties : FooClassBase {
+  unowned(unsafe) class var assignable: @sil_unmanaged AnyObject!
+  unowned(unsafe) class var unsafeAssignable: @sil_unmanaged AnyObject!
+  class var retainable: AnyObject!
+  class var strongRef: AnyObject!
+  @NSCopying class var copyable: AnyObject!
+  weak class var weakRef: @sil_weak AnyObject!
+  class var scalar: Int32
+  init!()
+  convenience init!(float f: Float)
+}
+@available(*, unavailable, message: "use 'nil' instead of this imported macro")
+var FOO_NIL: ()
+class FooUnavailableMembers : FooClassBase {
+  convenience init!(int i: Int32)
+  @available(*, unavailable, message: "use object construction 'FooUnavailableMembers(int:)'")
+  class func withInt(_ i: Int32) -> Self!
+  @available(*, unavailable, message: "x")
+  func unavailable()
+  @available(*, unavailable, message: "Not available in Swift")
+  func swiftUnavailable()
+  @available(*, deprecated, message: "x")
+  func deprecated()
+  @available(OSX 10.1, *)
+  func availabilityIntroduced()
+  @available(OSX, unavailable, deprecated: 10.1, message: "APIs deprecated as of OS X 10.9 and earlier are unavailable in Swift")
+  func availabilityDeprecated()
+  @available(OSX, obsoleted: 10.1)
+  func availabilityObsoleted()
+  @available(OSX, unavailable)
+  func availabilityUnavailable()
+  @available(OSX, introduced: 10.1, message: "x")
+  func availabilityIntroducedMsg()
+  @available(OSX, unavailable, deprecated: 10.1, message: "x")
+  func availabilityDeprecatedMsg()
+  @available(OSX, obsoleted: 10.1, message: "x")
+  func availabilityObsoletedMsg()
+  @available(OSX, unavailable, message: "x")
+  func availabilityUnavailableMsg()
+  init!()
+  convenience init!(float f: Float)
+}
+class FooCFType {
+}
+@available(*, unavailable, message: "Core Foundation objects are automatically memory managed")
+func FooCFTypeRelease(_: FooCFType!)
+class FooRepeatedMembers : FooClassBase {
+  func repeatedMethod()
+  func anotherMethod()
+  init!()
+  convenience init!(float f: Float)
+}
+extension FooRepeatedMembers {
+  var repeatedPropertyInCategory: Int32
+  func repeatedMethodInCategory()
+}
+extension FooRepeatedMembers {
+  var repeatedPropertyFromCategory: Int32
+  func repeatedMethodFromCategory()
+}
+enum SCNFilterMode : Int {
+  init?(rawValue: Int)
+  var rawValue: Int { get }
+  case none
+  case nearest
+  case linear
+  @available(*, unavailable)
+  case SCNNoFiltering
+}
+func fooSubFunc1(_ a: Int32) -> Int32
+struct FooSubEnum1 : RawRepresentable, Equatable {
+  init(_ rawValue: UInt32)
+  init(rawValue: UInt32)
+  var rawValue: UInt32
+}
+var FooSubEnum1X: FooSubEnum1 { get }
+var FooSubEnum1Y: FooSubEnum1 { get }
+var FooSubUnnamedEnumeratorA1: Int { get }

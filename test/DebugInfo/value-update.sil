@@ -1,0 +1,45 @@
+// RUN: %target-swift-frontend %s -emit-ir -module-name test -g -o - | %FileCheck %s
+// REQUIRES: CPU=x86_64
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+// test.foo () -> ()
+sil @_TF4test3fooFT_T_ : $@convention(thin) () -> () {
+bb0:
+  %1 = integer_literal $Builtin.Int64, 23
+  %2 = struct $Int (%1 : $Builtin.Int64)
+  debug_value %2 : $Int, var, name "v"
+  // CHECK: call void @llvm.dbg.value(metadata i64 23,
+  // function_ref StdlibUnittest._blackHole <A> (A) -> ()
+  %5 = function_ref @_TF14StdlibUnittest10_blackHoleurFxT_ : $@convention(thin) <τ_0_0> (@in τ_0_0) -> () // user: %8
+  %6 = tuple ()
+  %7 = alloc_stack $()                            // users: %8, %9
+  %8 = apply %5<()>(%7) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
+  dealloc_stack %7 : $*()        // id: %9
+
+  // CHECK: call void @llvm.dbg.value(metadata i64 42,
+  %9 = integer_literal $Builtin.Int64, 42         // user: %10
+  %10 = struct $Int (%9 : $Builtin.Int64)         // user: %11
+  debug_value %10 : $Int, var, name "v"
+
+  // function_ref StdlibUnittest._blackHole <A> (A) -> ()
+  %13 = function_ref @_TF14StdlibUnittest10_blackHoleurFxT_ : $@convention(thin) <τ_0_0> (@in τ_0_0) -> () // user: %16
+  %14 = tuple ()
+  %15 = alloc_stack $()                           // users: %16, %17
+  %16 = apply %13<()>(%15) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
+  dealloc_stack %15 : $*()       // id: %17
+
+  %18 = tuple ()                                  // user: %21
+  return %18 : $()                                // id: %21
+  // CHECK: {{^}}}
+}
+
+// Swift.Int.init (_builtinIntegerLiteral : Builtin.IntLiteral) -> Swift.Int
+sil [transparent] [serialized] @_TFSiCfT22_builtinIntegerLiteralBI__Si : $@convention(thin) (Builtin.IntLiteral, @thin Int.Type) -> Int
+
+// StdlibUnittest._blackHole <A> (A) -> ()
+sil @_TF14StdlibUnittest10_blackHoleurFxT_ : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
+

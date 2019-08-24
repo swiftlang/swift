@@ -1,0 +1,38 @@
+// RUN: %target-run-simple-swiftgyb
+// REQUIRES: executable_test
+// REQUIRES: objc_interop
+
+import Foundation
+import StdlibUnittest
+
+let NSStringTests = TestSuite("NSString")
+
+NSStringTests.test("String.init(_: NSString)")
+  .forEach(in: ["", "a", "abc", "a\u{0301}", "\u{e1}"]) {
+  input in
+  let nss: NSString = NSString(utf8String: input)!
+  expectEqual(input, String(nss))
+}
+
+NSStringTests.test("NSString bridges to String with custom AnyHashable")
+  .forEach(in: ["", "a", "abc", "a\u{0301}", "\u{e1}"]) {
+  input in
+  let s = input._bridgeToObjectiveC()
+  expectNotNil(s._toCustomAnyHashable())
+  expectEqual(String.self, type(of: AnyHashable(s).base))
+}
+
+NSStringTests.test("AnyHashable(NSString) uses Swift String comparison rules") {
+  // U+0301 COMBINING ACUTE ACCENT
+  // U+00E1 LATIN SMALL LETTER A WITH ACUTE
+  let nss1: NSString = NSString(utf8String: "a\u{0301}")!
+  let nss2: NSString = NSString(utf8String: "\u{e1}")!
+  let ah1 = AnyHashable(nss1)
+  let ah2 = AnyHashable(nss2)
+  expectEqual(String.self, type(of: ah1.base))
+  expectEqual(String.self, type(of: ah2.base))
+  checkHashable([ah1, ah2], equalityOracle: { _, _ in true })
+}
+
+runAllTests()
+

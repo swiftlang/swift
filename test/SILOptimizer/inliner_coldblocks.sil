@@ -1,0 +1,313 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-sil-opt -enable-sil-verify-all %s -inline -sil-remarks=sil-inliner -o %t.sil 2>&1 | %FileCheck -check-prefix=REMARKS_PASSED %s
+// RUN: %FileCheck %s < %t.sil
+// RUN: %target-sil-opt -enable-sil-verify-all %s -inline -sil-remarks-missed=sil-inliner -o /dev/null 2>&1 | %FileCheck -check-prefix=REMARKS_MISSED %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -inline -save-optimization-record-path %t.yaml -o /dev/null 2>&1 | %FileCheck -allow-empty -check-prefix=NO_REMARKS %s
+// RUN: %FileCheck -check-prefix=YAML %s < %t.yaml
+
+// REMARKS_PASSED-NOT: remark:
+// REMARKS_MISSED-NOT: remark:
+// NO_REMARKS-NOT: remark:
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+sil_global public @sil_global1 : $Builtin.Int32
+
+sil @update_global: $@convention(thin) () -> () {
+bb0:
+  %sil_global1_addr = global_addr @sil_global1 : $*Builtin.Int32
+  %1 = integer_literal $Builtin.Int32, 1
+  store %1 to %sil_global1_addr : $*Builtin.Int32
+  %4 = tuple ()
+  return %4 : $()
+}
+
+sil @callee : $@convention(thin) () -> () {
+bb0:
+  // make it a non-trivial function
+  %c1 = builtin "assert_configuration"() : $Builtin.Int32
+  %c2 = builtin "assert_configuration"() : $Builtin.Int32
+  %c3 = builtin "assert_configuration"() : $Builtin.Int32
+  %c4 = builtin "assert_configuration"() : $Builtin.Int32
+  %c5 = builtin "assert_configuration"() : $Builtin.Int32
+  %c6 = builtin "assert_configuration"() : $Builtin.Int32
+  %c7 = builtin "assert_configuration"() : $Builtin.Int32
+  %c8 = builtin "assert_configuration"() : $Builtin.Int32
+  %c9 = builtin "assert_configuration"() : $Builtin.Int32
+  %c10 = builtin "assert_configuration"() : $Builtin.Int32
+  %c11 = builtin "assert_configuration"() : $Builtin.Int32
+  %c12 = builtin "assert_configuration"() : $Builtin.Int32
+  %c13 = builtin "assert_configuration"() : $Builtin.Int32
+  %c14 = builtin "assert_configuration"() : $Builtin.Int32
+  %c15 = builtin "assert_configuration"() : $Builtin.Int32
+  %c16 = builtin "assert_configuration"() : $Builtin.Int32
+  %c17 = builtin "assert_configuration"() : $Builtin.Int32
+  %c18 = builtin "assert_configuration"() : $Builtin.Int32
+  %c19 = builtin "assert_configuration"() : $Builtin.Int32
+  %c20 = builtin "assert_configuration"() : $Builtin.Int32
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @inline_into_hotblock
+// CHECK: builtin
+// CHECK: builtin
+// CHECK: return
+sil @inline_into_hotblock : $@convention(thin) () -> () {
+bb0:
+  %i1 = integer_literal $Builtin.Int1, -1
+  %ex = builtin "int_expect_Int1"(undef : $Builtin.Int1, %i1 : $Builtin.Int1) : $Builtin.Int1
+  cond_br %ex, bb1, bb2
+
+bb1:
+  %f = function_ref @callee : $@convention(thin) () -> ()
+  %a = apply %f() : $@convention(thin) () -> ()
+  br bb2
+
+bb2:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @dont_inline_into_coldblock__simple
+// CHECK: function_ref
+// CHECK: apply
+// CHECK: return
+sil @dont_inline_into_coldblock__simple : $@convention(thin) () -> () {
+bb0:
+  %i0 = integer_literal $Builtin.Int1, 0
+  %ex = builtin "int_expect_Int1"(undef : $Builtin.Int1, %i0 : $Builtin.Int1) : $Builtin.Int1
+  cond_br %ex, bb1, bb2
+
+bb1:
+  %f = function_ref @callee : $@convention(thin) () -> ()
+  %a = apply %f() : $@convention(thin) () -> ()
+  br bb2
+
+bb2:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @dont_inline_into_coldblock__condition_is_arg__simple
+// CHECK: function_ref
+// CHECK: apply
+// CHECK: return
+sil @dont_inline_into_coldblock__condition_is_arg__simple : $@convention(thin) () -> () {
+bb0:
+  %i0 = integer_literal $Builtin.Int1, 0
+  %i1 = integer_literal $Builtin.Int1, -1
+  %ex = builtin "int_expect_Int1"(undef : $Builtin.Int1, %i1 : $Builtin.Int1) : $Builtin.Int1
+  cond_br %ex, bb1, bb2
+
+bb1:
+  br bb3(%i0 : $Builtin.Int1)
+
+bb2:
+  br bb3(%i1 : $Builtin.Int1)
+
+bb3(%c : $Builtin.Int1):
+  cond_br %c, bb4, bb5
+
+bb4:
+  %f = function_ref @callee : $@convention(thin) () -> ()
+  %a = apply %f() : $@convention(thin) () -> ()
+  br bb5
+
+bb5:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @dont_inline_into_coldblock__condition_is_arg__complex
+// CHECK: function_ref
+// CHECK: apply
+// CHECK: return
+sil @dont_inline_into_coldblock__condition_is_arg__complex : $@convention(thin) () -> () {
+bb0:
+  %i0 = integer_literal $Builtin.Int1, 0
+  %i1 = integer_literal $Builtin.Int1, -1
+  %ex = builtin "int_expect_Int1"(undef : $Builtin.Int1, %i1 : $Builtin.Int1) : $Builtin.Int1
+  cond_br %ex, bb1, bb4
+
+bb1:
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb5(%i0 : $Builtin.Int1)
+
+bb3:
+  br bb5(%i0 : $Builtin.Int1)
+
+bb4:
+  br bb5(%i1 : $Builtin.Int1)
+
+bb5(%c : $Builtin.Int1):
+  cond_br %c, bb6, bb7
+
+bb6:
+  %f = function_ref @callee : $@convention(thin) () -> ()
+  %a = apply %f() : $@convention(thin) () -> ()
+  br bb7
+
+bb7:
+  %r = tuple ()
+  return %r : $()
+}
+
+sil @regular_large_callee : $@convention(thin) () -> () {
+bb0:
+  // make it a "large" function
+  %c1 = builtin "assert_configuration"() : $Builtin.Int32
+  %c2 = builtin "assert_configuration"() : $Builtin.Int32
+  %c3 = builtin "assert_configuration"() : $Builtin.Int32
+  %c4 = builtin "assert_configuration"() : $Builtin.Int32
+  %c5 = builtin "assert_configuration"() : $Builtin.Int32
+  %c6 = builtin "assert_configuration"() : $Builtin.Int32
+  %c7 = builtin "assert_configuration"() : $Builtin.Int32
+  %c8 = builtin "assert_configuration"() : $Builtin.Int32
+  %c9 = builtin "assert_configuration"() : $Builtin.Int32
+  %c10 = builtin "assert_configuration"() : $Builtin.Int32
+  %c11 = builtin "assert_configuration"() : $Builtin.Int32
+  %c12 = builtin "assert_configuration"() : $Builtin.Int32
+  %c13 = builtin "assert_configuration"() : $Builtin.Int32
+  %c14 = builtin "assert_configuration"() : $Builtin.Int32
+  %c15 = builtin "assert_configuration"() : $Builtin.Int32
+  %c16 = builtin "assert_configuration"() : $Builtin.Int32
+  %c17 = builtin "assert_configuration"() : $Builtin.Int32
+  %c18 = builtin "assert_configuration"() : $Builtin.Int32
+  %c19 = builtin "assert_configuration"() : $Builtin.Int32
+  %c20 = builtin "assert_configuration"() : $Builtin.Int32
+  %c21 = builtin "assert_configuration"() : $Builtin.Int32
+  %c22 = builtin "assert_configuration"() : $Builtin.Int32
+  %c23 = builtin "assert_configuration"() : $Builtin.Int32
+  %c25 = builtin "assert_configuration"() : $Builtin.Int32
+  %c26 = builtin "assert_configuration"() : $Builtin.Int32
+  %c27 = builtin "assert_configuration"() : $Builtin.Int32
+  %c28 = builtin "assert_configuration"() : $Builtin.Int32
+  %c29 = builtin "assert_configuration"() : $Builtin.Int32
+  %c30 = builtin "assert_configuration"() : $Builtin.Int32
+
+  %f = function_ref @update_global: $@convention(thin) () -> ()
+  // REMARKS_PASSED: inliner_coldblocks.sil:223:3: remark: "update_global" inlined into "regular_large_callee" (cost = {{.*}}, benefit = {{.*}})
+  // YAML:      --- !Passed
+  // YAML-NEXT: Pass:            sil-inliner
+  // YAML-NEXT: Name:            sil.Inlined
+  // YAML-NEXT: DebugLoc:
+  // YAML-NEXT:   File:            {{.*}}inliner_coldblocks.sil
+  // YAML-NEXT:   Line:            223
+  // YAML-NEXT:   Column:          3
+  // YAML-NEXT: Function:        regular_large_callee
+  // YAML-NEXT: Args:
+  // YAML-NEXT:   - Callee:          '"update_global"'
+  // YAML-NEXT:     DebugLoc:
+  // YAML-NEXT:       File:            {{.*}}inliner_coldblocks.sil
+  // YAML-NEXT:       Line:            20
+  // YAML-NEXT:       Column:          6
+  // YAML-NEXT:   - String:          ' inlined into '
+  // YAML-NEXT:   - Caller:          '"regular_large_callee"'
+  // YAML-NEXT:     DebugLoc:
+  // YAML-NEXT:       File:            {{.*}}inliner_coldblocks.sil
+  // YAML-NEXT:       Line:            162
+  // YAML-NEXT:       Column:          6
+  // YAML-NEXT:   - String:          ' (cost = '
+  // YAML-NEXT:   - Cost:            '{{.*}}'
+  // YAML-NEXT:   - String:          ', benefit = '
+  // YAML-NEXT:   - Benefit:         '{{.*}}'
+  // YAML-NEXT:   - String:          ')'
+  // YAML-NEXT: ...
+  apply %f() : $@convention(thin) () -> ()
+
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @dont_inline_regular_large_callee
+// CHECK: function_ref
+// CHECK: apply
+// CHECK: return
+sil @dont_inline_regular_large_callee : $@convention(thin) () -> () {
+bb0:
+  %f = function_ref @regular_large_callee : $@convention(thin) () -> ()
+  // REMARKS_MISSED: inliner_coldblocks.sil:258:8: remark: Not profitable to inline function "regular_large_callee" (cost = {{.*}}, benefit = {{.*}})
+  // YAML:      --- !Missed
+  // YAML-NEXT: Pass:            sil-inliner
+  // YAML-NEXT: Name:            sil.NoInlinedCost
+  // YAML-NEXT: DebugLoc:
+  // YAML-NEXT:   File:            {{.*}}inliner_coldblocks.sil
+  // YAML-NEXT:   Line:            258
+  // YAML-NEXT:   Column:          8
+  // YAML-NEXT: Function:        dont_inline_regular_large_callee
+  // YAML-NEXT: Args:
+  // YAML-NEXT:   - String:          'Not profitable to inline function '
+  // YAML-NEXT:   - Callee:          '"regular_large_callee"'
+  // YAML-NEXT:     DebugLoc:
+  // YAML-NEXT:       File:            {{.*}}inliner_coldblocks.sil
+  // YAML-NEXT:       Line:            162
+  // YAML-NEXT:       Column:          6
+  // YAML-NEXT:   - String:          ' (cost = '
+  // YAML-NEXT:   - Cost:            '{{.*}}'
+  // YAML-NEXT:   - String:          ', benefit = '
+  // YAML-NEXT:   - Benefit:         '{{.*}}'
+  // YAML-NEXT:   - String:          ')'
+  // YAML-NEXT: ...
+  %a = apply %f() : $@convention(thin) () -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+sil @large_callee_on_fast_path : $@convention(thin) () -> () {
+bb0:
+  %f = builtin "onFastPath"() : $()
+  // make it a "large" function
+  %c1 = builtin "assert_configuration"() : $Builtin.Int32
+  %c2 = builtin "assert_configuration"() : $Builtin.Int32
+  %c3 = builtin "assert_configuration"() : $Builtin.Int32
+  %c4 = builtin "assert_configuration"() : $Builtin.Int32
+  %c5 = builtin "assert_configuration"() : $Builtin.Int32
+  %c6 = builtin "assert_configuration"() : $Builtin.Int32
+  %c7 = builtin "assert_configuration"() : $Builtin.Int32
+  %c8 = builtin "assert_configuration"() : $Builtin.Int32
+  %c9 = builtin "assert_configuration"() : $Builtin.Int32
+  %c10 = builtin "assert_configuration"() : $Builtin.Int32
+  %c11 = builtin "assert_configuration"() : $Builtin.Int32
+  %c12 = builtin "assert_configuration"() : $Builtin.Int32
+  %c13 = builtin "assert_configuration"() : $Builtin.Int32
+  %c14 = builtin "assert_configuration"() : $Builtin.Int32
+  %c15 = builtin "assert_configuration"() : $Builtin.Int32
+  %c16 = builtin "assert_configuration"() : $Builtin.Int32
+  %c17 = builtin "assert_configuration"() : $Builtin.Int32
+  %c18 = builtin "assert_configuration"() : $Builtin.Int32
+  %c19 = builtin "assert_configuration"() : $Builtin.Int32
+  %c20 = builtin "assert_configuration"() : $Builtin.Int32
+  %c21 = builtin "assert_configuration"() : $Builtin.Int32
+  %c22 = builtin "assert_configuration"() : $Builtin.Int32
+  %c23 = builtin "assert_configuration"() : $Builtin.Int32
+  %c25 = builtin "assert_configuration"() : $Builtin.Int32
+  %c26 = builtin "assert_configuration"() : $Builtin.Int32
+  %c27 = builtin "assert_configuration"() : $Builtin.Int32
+  %c28 = builtin "assert_configuration"() : $Builtin.Int32
+  %c29 = builtin "assert_configuration"() : $Builtin.Int32
+  %c30 = builtin "assert_configuration"() : $Builtin.Int32
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @inline_large_callee_on_fast_path
+// CHECK: builtin
+// CHECK-NOT: apply
+// CHECK: return
+sil @inline_large_callee_on_fast_path : $@convention(thin) () -> () {
+bb0:
+  %f = function_ref @large_callee_on_fast_path : $@convention(thin) () -> ()
+  %a = apply %f() : $@convention(thin) () -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+// REMARKS_PASSED-NOT: remark:
+// REMARKS_MISSED-NOT: remark:

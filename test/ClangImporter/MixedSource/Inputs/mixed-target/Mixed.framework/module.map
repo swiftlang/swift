@@ -1,0 +1,4 @@
+framework module Mixed {
+  header "Mixed.h"
+  export *
+}

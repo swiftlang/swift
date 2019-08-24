@@ -1,0 +1,34 @@
+// RUN: %target-swift-frontend -emit-ir %s | %FileCheck %s
+
+// REQUIRES: CPU=i386 || CPU=x86_64
+
+import Builtin
+
+// Various tests for SIL that doesn't happen to appear in dominance order.
+
+sil @test0 : $@convention(thin) () -> (Builtin.Int8) {
+bb0:
+  br bb1
+bb2:
+  return %0 : $Builtin.Int8
+bb1:
+  %0 = integer_literal $Builtin.Int8, 7
+  br bb2
+}
+// CHECK:   define{{( dllexport)?}}{{( protected)?}} swiftcc i8 @test0()
+// CHECK-NOT: }
+// CHECK:     ret i8 7
+// CHECK-NOT: }
+// CHECK:   }
+
+// Just don't crash on this one.
+sil @test1 : $@convention(thin) () -> (Builtin.Int8) {
+bb0:
+  br bb2
+bb1:
+  br bb2
+bb2:
+  %0 = integer_literal $Builtin.Int8, 7
+  return %0 : $Builtin.Int8
+}
+

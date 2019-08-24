@@ -1,0 +1,36 @@
+{
+  key.request: source.request.codecomplete.setcustom,
+  key.results: [
+    {
+      key.name: "customExpr",
+      key.kind: myuid.customExpr,
+      key.context: [source.lang.swift.expr]
+    },
+    {
+      key.name: "customStmt",
+      key.kind: myuid.customStmt,
+      key.context: [source.lang.swift.stmt]
+    },
+    {
+      key.name: "customType",
+      key.kind: myuid.customType,
+      key.context: [source.lang.swift.type]
+    },
+    {
+      key.name: "customExprOrStmtOrType",
+      key.kind: myuid.customExprOrStmtOrType,
+      key.context: [
+        source.lang.swift.expr,
+        source.lang.swift.stmt,
+        source.lang.swift.type
+      ]
+    },
+    {
+      key.name: "customForEach",
+      key.kind: myuid.customForEach,
+      key.context: [
+        source.lang.swift.foreach.sequence,
+      ]
+    }
+  ]
+}

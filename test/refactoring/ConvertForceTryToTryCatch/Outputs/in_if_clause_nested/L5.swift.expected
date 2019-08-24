@@ -1,0 +1,12 @@
+func throwingFunc() throws -> Bool {
+    return true
+}
+if 4 > 3 {
+    do {
+if try throwingFunc() { 
+        let _ = 3
+    }
+} catch {
+<#code#>
+}
+}

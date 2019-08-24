@@ -1,0 +1,181 @@
+// RUN: %target-run-simple-swiftgyb
+// REQUIRES: executable_test
+
+import StdlibUnittest
+import StdlibCollectionUnittest
+import SwiftPrivate
+
+
+// FIXME(prext): fold this test into Algorithm.swift.gyb.
+
+var Algorithm = TestSuite("Algorithm")
+
+// Check if one array is a correctly sorted version of another array.
+// We can't simply sort both arrays and compare them, because it is needed to
+// check correctness of sorting itself.
+func expectSortedCollection(_ sortedAry: [Int], _ originalAry: [Int]) {
+  expectEqual(sortedAry.count, originalAry.count)
+  var sortedVals = [Int: Int]()
+  var originalVals = [Int: Int]()
+  // Keep track of what values we have in sortedAry.
+  for e in sortedAry {
+    if let v = sortedVals[e] {
+      sortedVals[e] = v + 1
+    } else {
+      sortedVals[e] = 0
+    }
+  }
+  // And do the same for originalAry.
+  for e in originalAry {
+    if let v = originalVals[e] {
+      originalVals[e] = v + 1
+    } else {
+      originalVals[e] = 0
+    }
+  }
+  // Now check if sets of elements are the same in both arrays.
+  for (key, value) in sortedVals {
+    expectNotNil(originalVals[key])
+    expectEqual(originalVals[key]!, value)
+  }
+
+  // Check if values in sortedAry are actually sorted.
+  for i in 1..<sortedAry.count {
+    expectTrue(sortedAry[i - 1] <= sortedAry[i])
+  }
+}
+
+func expectSortedCollection(
+  _ sortedAry: [Int],
+  _ originalAry: ContiguousArray<Int>
+) {
+  expectSortedCollection(sortedAry, Array(originalAry))
+}
+
+func expectSortedCollection(_ sortedAry: ArraySlice<Int>, _ originalAry: ArraySlice<Int>) {
+  expectSortedCollection([Int](sortedAry), [Int](originalAry))
+}
+
+func expectSortedCollection<C: Collection>(_ a: C,
+  by areInIncreasingOrder: (C.Element, C.Element) -> Bool
+) {
+  expectFalse(zip(a.dropFirst(), a).contains(where: areInIncreasingOrder))
+}
+
+class OffsetCollection : MutableCollection, RandomAccessCollection {
+  typealias Indices = Range<Int>
+
+  let offset: Int
+  var data: [Int] = []
+  let forward: Bool
+  var startIndex: Int { return forward ? offset : offset - data.count }
+  var endIndex: Int { return forward ? offset + data.count : offset }
+  subscript (i: Int) -> Int {
+    get { return data[i - startIndex] }
+    set { data[i - startIndex] = newValue }
+  }
+  func toArray() -> [Int] {
+    return data
+  }
+  var count: Int { return data.count }
+  init(_ ary: [Int], offset: Int, forward: Bool) {
+    data = ary
+    self.offset = offset
+    self.forward = forward
+  }
+  typealias Index = Int
+  subscript(bounds: Range<Int>) -> Slice<OffsetCollection> {
+    get {
+      return Slice(base: self, bounds: bounds)
+    }
+    set {
+      for i in bounds {
+        self[i] = newValue[i]
+      }
+    }
+  }
+}
+
+// Generate two versions of tests: one for sort with explicitly passed
+// predicate and the other using default comparison operator.
+% withArrayTypeNames = ["Array", "ContiguousArray"]
+% withPredicateValues = [True, False]
+% for t in withArrayTypeNames:
+// workaround for <rdar://problem/18900352> gyb miscompiles nested loops
+%   for p in withPredicateValues:
+// workaround for <rdar://problem/18900352> gyb miscompiles nested loops
+%     comparePredicate = "<" if p else ""
+%     commaComparePredicate = ", by: <" if p else ""
+%     name = "lessPredicate" if p else "noPredicate"
+
+Algorithm.test("${t}/sorted/${name}") {
+  let count = 1000
+  let ary = ${t}((0 ..< count).map { _ in Int.random(in: .min ... .max) })
+
+  // Similar test for sorting with predicate
+%       if comparePredicate:
+  let sortedAry1 = ary.sorted(by: ${comparePredicate})
+%       else:
+  let sortedAry1 = ary.sorted()
+%       end
+  expectSortedCollection(sortedAry1, ary)
+
+  // Check that sorting works well on intervals
+  let i1 = 400
+  let i2 = 700
+  var sortedAry2 = ary
+  sortedAry2[i1..<i2].sort(by: <)
+  expectEqual(ary[0..<i1], sortedAry2[0..<i1])
+  expectSortedCollection(sortedAry2[i1..<i2], ary[i1..<i2])
+  expectEqual(ary[i2..<count], sortedAry2[i2..<count])
+}
+%   end
+
+Algorithm.test("${t}/sorted/stable") {
+  let count = 1000
+  // Using a small range in the random array so that we have repeated elements
+  let ary = (0 ..< count).map { _ in Int.random(in: 1...20) }
+
+  // Decorate with offset, but sort by value
+  var input = ${t}(ary.enumerated())
+  input.sort(by: { $0.element < $1.element })
+
+  // Offsets should still be ordered for equal values
+  expectSortedCollection(input) {
+    if $0.element == $1.element {
+      return $0.offset < $1.offset
+    }
+    return $0.element < $1.element
+  }
+}
+% end
+
+Algorithm.test("sort/CollectionsWithUnusualIndices") {
+  let count = 1000
+  let ary = (0 ..< count).map { _ in Int.random(in: .min ... .max) }
+
+  // Check if sorting routines work well on collections with startIndex != 0.
+  var offsetAry = OffsetCollection(ary, offset: 500, forward: false)
+  offsetAry.sort()
+  expectSortedCollection(offsetAry.toArray(), ary)
+
+  // Check if sorting routines work well on collections with endIndex = Int.max.
+  // That could expose overflow errors in index computations.
+  offsetAry = OffsetCollection(ary, offset: Int.max, forward: false)
+  offsetAry.sort()
+  expectSortedCollection(offsetAry.toArray(), ary)
+
+  // Check if sorting routines work well on collections with
+  // startIndex = Int.min.
+  offsetAry = OffsetCollection(ary, offset: Int.min, forward: true)
+  offsetAry.sort()
+  expectSortedCollection(offsetAry.toArray(), ary)
+}
+
+Algorithm.test("partition/CrashOnSingleElement") {
+  var a = DefaultedMutableRandomAccessCollection([10])
+  let first = a.first!
+  expectEqual(a.startIndex, a.partition(by: {$0 >= first}))
+}
+
+runAllTests()

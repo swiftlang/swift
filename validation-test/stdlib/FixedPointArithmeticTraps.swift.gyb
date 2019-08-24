@@ -1,0 +1,239 @@
+// RUN: %empty-directory(%t)
+// RUN: %gyb %s -o %t/FixedPointArithmeticTraps.swift
+// RUN: %line-directive %t/FixedPointArithmeticTraps.swift -- %target-build-swift %t/FixedPointArithmeticTraps.swift -o %t/a.out_Debug -Onone
+// RUN: %line-directive %t/FixedPointArithmeticTraps.swift -- %target-build-swift %t/FixedPointArithmeticTraps.swift -o %t/a.out_Release -O
+// RUN: %target-codesign %t/a.out_Debug
+// RUN: %target-codesign %t/a.out_Release
+//
+// RUN: %line-directive %t/FixedPointArithmeticTraps.swift -- %target-run %t/a.out_Debug
+// RUN: %line-directive %t/FixedPointArithmeticTraps.swift -- %target-run %t/a.out_Release
+// REQUIRES: executable_test
+
+import StdlibUnittest
+
+
+// Note: in this file, we need to go through opaque functions to load
+// constants.  This is to check runtime behavior and ensure the constant is
+// not folded.
+
+func expectOverflow<T>(
+  _ res: (partialValue: T, overflow: Bool),
+  //===--- TRACE boilerplate ----------------------------------------------===//
+  _ message: @autoclosure () -> String = "",
+    showFrame: Bool = true,
+    stackTrace: SourceLocStack = SourceLocStack(),
+    file: String = #file, line: UInt = #line
+) {
+  expectTrue(
+    res.overflow, "expected overflow",
+    stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
+}
+
+func expectNoOverflow<T>(
+  _ res: (partialValue: T, overflow: Bool),
+  //===--- TRACE boilerplate ----------------------------------------------===//
+  _ message: @autoclosure () -> String = "",
+    showFrame: Bool = true,
+    stackTrace: SourceLocStack = SourceLocStack(),
+    file: String = #file, line: UInt = #line
+) {
+  expectFalse(
+    res.overflow, "expected no overflow",
+    stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
+}
+
+%{
+
+from SwiftIntTypes import all_integer_types
+
+# Test cases are written in a way that they don't depend on the word size.
+word_bits = 4
+
+}%
+
+var FixedPointArithmeticTraps = TestSuite("FixedPointArithmeticTraps")
+
+% for self_ty in all_integer_types(word_bits):
+%   IntTy = self_ty.stdlib_name
+
+//
+// Test pre- and post-increment/decrement for ${IntTy}
+//
+
+FixedPointArithmeticTraps.test("PreDecrement/${IntTy}") {
+  var x = get${IntTy}(${IntTy}.min)
+  x += 1
+
+  x = get${IntTy}(${IntTy}.min)
+  expectCrashLater()
+  // IntTy.min -= 1
+  x -= 1
+  _blackHole(x)
+}
+
+FixedPointArithmeticTraps.test("PreIncrement/${IntTy}") {
+  var x = get${IntTy}(${IntTy}.max)
+  x -= 1
+
+  x = get${IntTy}(${IntTy}.max)
+  expectCrashLater()
+  // IntTy.max += 1
+  x += 1
+  _blackHole(x)
+}
+
+FixedPointArithmeticTraps.test("PostDecrement/${IntTy}") {
+  var x = get${IntTy}(${IntTy}.min)
+  x += 1
+
+  x = get${IntTy}(${IntTy}.min)
+  expectCrashLater()
+  // IntTy.min -= 1
+  x -= 1
+  _blackHole(x)
+}
+
+FixedPointArithmeticTraps.test("PostIncrement/${IntTy}") {
+  var x = get${IntTy}(${IntTy}.max)
+  x -= 1
+
+  x = get${IntTy}(${IntTy}.max)
+  expectCrashLater()
+  // IntTy.max += 1
+  x += 1
+  _blackHole(x)
+}
+
+//
+// Test addition for ${IntTy}
+//
+
+FixedPointArithmeticTraps.test("Addition/${IntTy}") {
+  var a = get${IntTy}(${IntTy}.max / 3)
+
+  expectNoOverflow(a.addingReportingOverflow(get${IntTy}(${IntTy}.max / 3)))
+  a = a + get${IntTy}(${IntTy}.max / 3)
+
+  expectNoOverflow(a.addingReportingOverflow(get${IntTy}(${IntTy}.max / 3)))
+  a = a + get${IntTy}(${IntTy}.max / 3)
+
+  // Overflow in addition.
+  expectOverflow(a.addingReportingOverflow(get${IntTy}(${IntTy}.max / 3)))
+  expectCrashLater()
+  a = a + get${IntTy}(${IntTy}.max / 3)
+  _blackHole(a)
+}
+
+//
+// Test subtraction for ${IntTy}
+//
+
+FixedPointArithmeticTraps.test("Subtraction/${IntTy}") {
+  var a = get${IntTy}(${IntTy}.min + get${IntTy}(${IntTy}.max / 3))
+
+  expectNoOverflow(a.subtractingReportingOverflow(get${IntTy}(${IntTy}.max / 3)))
+  a = a - get${IntTy}(${IntTy}.max / 3)
+
+  // Overflow in subtraction.
+  expectOverflow(a.subtractingReportingOverflow(get${IntTy}(${IntTy}.max / 3)))
+  expectCrashLater()
+  a = a - get${IntTy}(${IntTy}.max / 3)
+  _blackHole(a)
+}
+
+//
+// Test multiplication for ${IntTy}
+//
+
+FixedPointArithmeticTraps.test("Multiplication/${IntTy}") {
+  var a = get${IntTy}(${IntTy}.max / 3)
+
+  expectNoOverflow(a.multipliedReportingOverflow(by: get${IntTy}(2)))
+  a = a * get${IntTy}(2)
+
+  // Overflow in multiplication.
+  expectOverflow(a.multipliedReportingOverflow(by: get${IntTy}(2)))
+  expectCrashLater()
+  a = a * get${IntTy}(2)
+  _blackHole(a)
+}
+
+//
+// Test division for ${IntTy}
+//
+
+FixedPointArithmeticTraps.test("Division/${IntTy}") {
+  var a = get${IntTy}(${IntTy}.max / 3)
+
+  // x / 3
+  expectNoOverflow(a.dividedReportingOverflow(by: get${IntTy}(3)))
+  a = a / get${IntTy}(3)
+
+  // x / 0
+  expectOverflow(a.dividedReportingOverflow(by: get${IntTy}(0)))
+  expectCrashLater()
+  a = a / get${IntTy}(0)
+}
+
+%   if self_ty.is_signed:
+
+FixedPointArithmeticTraps.test("Division/${IntTy}.min-over-minus-one") {
+  var a = get${IntTy}(${IntTy}.min)
+
+  expectNoOverflow(a.dividedReportingOverflow(by: get${IntTy}(3)))
+  a = a / get${IntTy}(3)
+
+  a = get${IntTy}(${IntTy}.min)
+  expectOverflow(a.dividedReportingOverflow(by: get${IntTy}(-1)))
+  expectCrashLater()
+  a = a / get${IntTy}(-1)
+  // IntTy.min / -1
+  _blackHole(a)
+}
+
+%   end
+
+//
+// Test remainder computation for ${IntTy}
+//
+
+FixedPointArithmeticTraps.test("Remainder/${IntTy}") {
+  var a = get${IntTy}(${IntTy}.max / 3)
+
+  // x % 3
+  expectNoOverflow(a.remainderReportingOverflow(dividingBy: get${IntTy}(3)))
+  a = a % get${IntTy}(3)
+
+  // x % 0
+  expectOverflow(a.remainderReportingOverflow(dividingBy: get${IntTy}(0)))
+  expectCrashLater()
+  a = a % get${IntTy}(0)
+  _blackHole(a)
+}
+
+%   if self_ty.is_signed:
+
+FixedPointArithmeticTraps.test("Remainder/${IntTy}.min-mod-minus-one") {
+  var a = get${IntTy}(${IntTy}.min)
+
+  // Int.min % 3
+  expectNoOverflow(a.remainderReportingOverflow(dividingBy: get${IntTy}(3)))
+  a = a % get${IntTy}(3)
+
+  // Int.min % -1
+  a = get${IntTy}(${IntTy}.min)
+  expectOverflow(a.remainderReportingOverflow(dividingBy: get${IntTy}(-1)))
+  expectCrashLater()
+  a = a % get${IntTy}(-1)
+  _blackHole(a)
+}
+
+%   end
+
+// This comment prevents gyb from miscompiling this file.
+// <rdar://problem/17548877> gyb miscompiles a certain for loop
+
+% end
+
+runAllTests()
+

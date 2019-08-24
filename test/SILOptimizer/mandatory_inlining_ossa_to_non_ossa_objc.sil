@@ -1,0 +1,43 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -mandatory-inlining | %FileCheck %s
+
+// REQUIRES: objc_interop
+
+sil_stage raw
+
+import Builtin
+import Swift
+import ObjectiveC
+
+//////////////////
+// Declarations //
+//////////////////
+
+class Klass : NSObject {}
+
+///////////
+// Tests //
+///////////
+
+// Test out functionality that we use to work around weird semantics of
+// destructors.
+sil [ossa] [transparent] @unmanaged_rr_callee : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  unmanaged_autorelease_value %0 : $Klass
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @unmanaged_rr_caller : $@convention(thin) (@guaranteed Klass) -> () {
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK-NEXT: autorelease_value [[ARG]]
+// CHECK-NEXT: tuple
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+// CHECK: } // end sil function 'unmanaged_rr_caller'
+sil @unmanaged_rr_caller : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : $Klass):
+  %1 = function_ref @unmanaged_rr_callee : $@convention(thin) (@guaranteed Klass) -> ()
+  apply %1(%0) : $@convention(thin) (@guaranteed Klass) -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}

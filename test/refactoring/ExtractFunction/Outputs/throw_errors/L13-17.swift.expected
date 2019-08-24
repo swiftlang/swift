@@ -1,0 +1,23 @@
+func foo1() throws -> Int { return 0 }
+enum MyError : Error {
+  case E1
+  case E2
+}
+
+fileprivate func new_name() throws {
+do {
+    try foo1()
+  } catch MyError.E1 {
+  } catch MyError.E2 {
+  }
+}
+
+func foo2() throws {
+  try foo1()
+  try! foo1()
+  do {
+    try foo1()
+  } catch {}
+  new_name()
+}
+

@@ -1,0 +1,17 @@
+// RUN: %target-swift-frontend %s -emit-silgen | %FileCheck %s
+
+// rdar://16238241
+// Make sure we can parse where clause with conformance & same-type requirements.
+
+protocol Runcible {
+  associatedtype Mince
+  associatedtype Quince
+}
+
+struct Spoon<T: Runcible> {}
+
+// CHECK: sil [ossa] @foo : $@convention(thin) <T where T : Runcible, T == T.Mince> () -> @out Spoon<T>
+sil [ossa] @foo : $@convention(thin) <T where T: Runcible, T == T.Mince> () -> @out Spoon<T> {
+entry(%0 : $*Spoon<T>):
+  return undef : $()
+}

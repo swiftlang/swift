@@ -1,0 +1,88 @@
+{
+  key.offset: 0,
+  key.length: 38,
+  key.diagnostic_stage: source.diagnostic.stage.swift.parse,
+  key.syntaxmap: [
+    {
+      key.kind: source.lang.swift.syntaxtype.comment,
+      key.offset: 1,
+      key.length: 34
+    }
+  ],
+  key.diagnostics: [
+    {
+      key.line: 4,
+      key.column: 1,
+      key.filepath: syntaxmap-edit-del.swift,
+      key.severity: source.diagnostic.severity.error,
+      key.description: "extraneous '}' at top level",
+      key.diagnostic_stage: source.diagnostic.stage.swift.parse,
+      key.fixits: [
+        {
+          key.offset: 36,
+          key.length: 1,
+          key.sourcetext: ""
+        }
+      ]
+    }
+  ]
+}
+{
+  key.offset: 1,
+  key.length: 33,
+  key.diagnostic_stage: source.diagnostic.stage.swift.parse,
+  key.syntaxmap: [
+    {
+      key.kind: source.lang.swift.syntaxtype.keyword,
+      key.offset: 2,
+      key.length: 5
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.identifier,
+      key.offset: 8,
+      key.length: 3
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.keyword,
+      key.offset: 18,
+      key.length: 3
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.identifier,
+      key.offset: 22,
+      key.length: 4
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.typeidentifier,
+      key.offset: 29,
+      key.length: 3
+    }
+  ],
+  key.diagnostics: [
+    {
+      key.line: 3,
+      key.column: 19,
+      key.filepath: syntaxmap-edit-del.swift,
+      key.severity: source.diagnostic.severity.error,
+      key.description: "unexpected end of block comment",
+      key.diagnostic_stage: source.diagnostic.stage.swift.parse
+    },
+    {
+      key.line: 4,
+      key.column: 1,
+      key.filepath: syntaxmap-edit-del.swift,
+      key.severity: source.diagnostic.severity.error,
+      key.description: "expected declaration",
+      key.diagnostic_stage: source.diagnostic.stage.swift.parse,
+      key.diagnostics: [
+        {
+          key.line: 2,
+          key.column: 8,
+          key.filepath: syntaxmap-edit-del.swift,
+          key.severity: source.diagnostic.severity.note,
+          key.description: "in declaration of 'Foo'"
+        }
+      ]
+    }
+  ]
+}

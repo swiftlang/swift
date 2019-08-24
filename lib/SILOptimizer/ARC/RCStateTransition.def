@@ -1,0 +1,79 @@
+//===--- RCStateTransition.def ----------------------------------*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// Declarations for metaprogramming with RCStateTransitionKind.
+//
+//===----------------------------------------------------------------------===//
+
+/// KIND(X)
+///   This represents a specific kind of RCStateTransitionKind equivalence class
+///   that attempts to describe the effect of an operation on a ref count. Some
+///   ways that this can happen are:
+///
+///   1. The introduction of a new strong ref count. (StrongEntrance)
+///   2. The incrementing of a strong ref count. (StrongIncrement)
+///   3. The decrementing of a strong ref count. (StrongDecrement)
+#ifndef KIND
+#define KIND(K)
+#endif
+
+/// ABSTRACT_VALUE(Name, Start, End)
+///
+///   This enables one to form a grouping of Kinds that represent an abstract
+///   operation. Some examples of this include:
+///
+///     1. End Points
+///     2. Mutators.
+///
+///   It is specified by the range of instructions in between Start and End.
+#ifndef ABSTRACT_VALUE
+#define ABSTRACT_VALUE(Name, Start, End)
+#endif
+
+///-------
+/// Misc |
+///-------
+///
+/// An invalid transition kind. This must always be first so that it is zero.
+KIND(Invalid)
+/// An unknown kind.
+KIND(Unknown)
+/// An autorelease pool call.
+KIND(AutoreleasePoolCall)
+
+///-------------
+/// End Points |
+///-------------
+
+/// The introduction of a strong reference count. This can go on SILArguments
+/// and non-terminator instructions.
+KIND(StrongEntrance)
+
+/// Introduces a ref count identity or consumes a ref count identity.
+ABSTRACT_VALUE(EndPoint, StrongEntrance, StrongEntrance)
+
+///-----------
+/// Mutators |
+///-----------
+
+/// The increment of a strong reference count. This can only represent
+/// non-terminator instructions.
+KIND(StrongIncrement)
+
+/// The decrement of a strong reference count. This can only represent
+/// non-terminator instructions.
+KIND(StrongDecrement)
+
+ABSTRACT_VALUE(Mutator, StrongIncrement, StrongDecrement)
+
+#undef ABSTRACT_VALUE
+#undef KIND

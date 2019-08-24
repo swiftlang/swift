@@ -1,0 +1,435 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -sil-epilogue-retain-release-dumper %s | %FileCheck %s
+
+import Builtin
+import Swift
+
+
+/////////////////////
+// Data Structures //
+/////////////////////
+
+class foo {
+  var a: Int
+   deinit
+  init()
+}
+
+class bar {
+  var start: foo
+  var end: foo
+   deinit
+  init()
+}
+
+struct baz {
+  var start: foo
+  var end: foo
+  init()
+}
+
+struct boo {
+  var tbaz = baz()
+  var a = 0
+  init()
+}
+
+// CHECK-LABEL: START: sil @single_release_foo
+// CHECK: [[IN1:%.*]] = argument of bb0 : $foo
+// CHECK: strong_release [[IN1]] : $foo
+// CHECK: END: sil @single_release_foo
+sil @single_release_foo : $@convention(thin) (@owned foo) -> () {
+bb0(%0 : $foo):
+  strong_release %0 : $foo
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: START: sil @single_release_foo_with_epilogue_retain
+// CHECK: [[IN1:%.*]] = argument of bb0 : $foo
+// CHECK: strong_release [[IN1]] : $foo
+// CHECK: END: sil @single_release_foo_with_epilogue_retain
+sil @single_release_foo_with_epilogue_retain : $@convention(thin) (@owned foo) -> () {
+bb0(%0 : $foo):
+  strong_release %0 : $foo
+  strong_retain %0 : $foo
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: START: sil @single_release_foo_with_unknown_release
+// CHECK: [[IN1:%.*]] = argument of bb0 : $foo
+// CHECK-NOT: strong_release [[IN1]] : $foo
+// CHECK: END: sil @single_release_foo_with_unknown_release
+sil @single_release_foo_with_unknown_release : $@convention(thin) (@owned foo, @inout foo) -> () {
+bb0(%0 : $foo, %1 : $*foo):
+  strong_release %0 : $foo
+  %5 = load %1 : $*foo
+  strong_release %5 : $foo
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: START: sil @single_release_foo_with_unknown_retain
+// CHECK: [[IN1:%.*]] = argument of bb0 : $foo
+// CHECK: strong_release [[IN1]] : $foo
+// CHECK: END: sil @single_release_foo_with_unknown_retain
+sil @single_release_foo_with_unknown_retain : $@convention(thin) (@owned foo, @inout foo) -> () {
+bb0(%0 : $foo, %1 : $*foo):
+  strong_release %0 : $foo
+  %5 = load %1 : $*foo
+  strong_retain %5 : $foo
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: START: sil @single_release_foo_with_destroy_addr
+// CHECK: [[IN1:%.*]] = argument of bb0 : $foo
+// CHECK-NOT: strong_release [[IN1]] : $foo
+// CHECK: END: sil @single_release_foo_with_destroy_addr
+sil @single_release_foo_with_destroy_addr : $@convention(thin) (@owned foo, @inout foo) -> () {
+bb0(%0 : $foo, %1 : $*foo):
+  strong_release %0 : $foo
+  destroy_addr %1 : $*foo
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: START: sil @dealloc_ref_after_last_release
+// CHECK: [[IN1:%.*]] = argument of bb0 : $foo
+// CHECK-NOT: strong_release [[IN1]] : $foo
+// CHECK: END: sil @dealloc_ref_after_last_release
+sil @dealloc_ref_after_last_release : $@convention(thin) (@owned foo) -> () {
+bb0(%0 : $foo):
+  strong_retain %0 : $foo
+  strong_release %0 : $foo
+  dealloc_ref %0 : $foo
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: START: sil @single_release_bar
+// CHECK: [[IN1:%.*]] = argument of bb0 : $bar
+// CHECK: strong_release [[IN1]] : $bar
+// CHECK: END: sil @single_release_bar
+sil @single_release_bar : $@convention(thin) (@owned bar) -> () {
+bb0(%0 : $bar):
+  strong_release %0 : $bar
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: START: sil @multiple_release_bar
+// CHECK: [[IN1:%.*]] = argument of bb0 : $bar
+// CHECK: release_value [[IN1]] : $bar
+// CHECK: END: sil @multiple_release_bar
+sil @multiple_release_bar : $@convention(thin) (@owned bar) -> () {
+bb0(%0 : $bar):
+  strong_release %0 : $bar
+  release_value %0 : $bar
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: START: sil @exploded_release_baz
+// CHECK: [[IN1:%.*]] = argument of bb0 : $baz
+// CHECK: strong_release
+// CHECK: strong_release
+// CHECK: END: sil @exploded_release_baz
+sil @exploded_release_baz : $@convention(thin) (@owned baz) -> () {
+bb0(%0 : $baz):
+  %1 = struct_extract %0 : $baz, #baz.start
+  %2 = struct_extract %0 : $baz, #baz.end
+  strong_release %1 : $foo
+  strong_release %2 : $foo
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// Make sure we stop at retain_value   %0.
+//
+// CHECK-LABEL: START: sil @exploded_release_with_interfering_uses
+// CHECK: [[IN1:%.*]] = argument of bb0 : $baz
+// CHECK: strong_release
+// CHECK: strong_release
+// CHECK: END: sil @exploded_release_with_interfering_uses
+sil @exploded_release_with_interfering_uses : $@convention(thin) (@owned baz) -> () {
+bb0(%0 : $baz):
+  %1 = struct_extract %0 : $baz, #baz.start
+  %2 = struct_extract %0 : $baz, #baz.end
+  strong_release %1 : $foo
+  retain_value   %0 : $baz
+  strong_release %2 : $foo
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// Make sure we stop at an overlapping release.
+//
+// CHECK-LABEL: START: sil @exploded_release_with_overlapping_releases
+// CHECK: [[IN1:%.*]] = argument of bb0 : $baz
+// CHECK-NOT: strong_release
+// CHECK: END: sil @exploded_release_with_overlapping_releases
+sil @exploded_release_with_overlapping_releases : $@convention(thin) (@owned baz) -> () {
+bb0(%0 : $baz):
+  %1 = struct_extract %0 : $baz, #baz.start
+  %2 = struct_extract %0 : $baz, #baz.end
+  strong_release %1 : $foo
+  release_value  %0 : $baz
+  strong_release %2 : $foo
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// CHECK-LABEL: START: sil @single_release_on_multiple_args
+// CHECK: [[IN1:%.*]] = argument of bb0 : $foo
+// CHECK: strong_release [[IN1]] : $foo
+// CHECK: [[IN2:%.*]] = argument of bb0 : $bar
+// CHECK: strong_release [[IN2]] : $bar
+// CHECK: END: sil @single_release_on_multiple_args
+sil @single_release_on_multiple_args : $@convention(thin) (@owned foo, @owned bar) -> () {
+bb0(%0 : $foo, %1 : $bar):
+  strong_release %0 : $foo
+  strong_release %1 : $bar
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: START: sil @single_release_on_multiple_args_with_interfering_uses
+// CHECK: [[IN1:%.*]] = argument of bb0 : $foo
+// CHECK: strong_release [[IN1]] : $foo
+// CHECK: [[IN2:%.*]] = argument of bb0 : $bar
+// CHECK: strong_release [[IN2]] : $bar
+// CHECK: END: sil @single_release_on_multiple_args_with_interfering_uses
+sil @single_release_on_multiple_args_with_interfering_uses : $@convention(thin) (@owned foo, @owned bar) -> () {
+bb0(%0 : $foo, %1 : $bar):
+  strong_release %0 : $foo
+  strong_retain %1 : $bar
+  strong_release %1 : $bar
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// Make sure we stop at the redundant release.
+//
+// CHECK-LABEL: START: sil @exploded_release_with_redundant_releases
+// CHECK: [[IN1:%.*]] = argument of bb0 : $baz
+// CHECK: release_value [[IN1]]
+// CHECK: END: sil @exploded_release_with_redundant_releases
+sil @exploded_release_with_redundant_releases : $@convention(thin) (@owned baz) -> () {
+bb0(%0 : $baz):
+  %1 = struct_extract %0 : $baz, #baz.start
+  %2 = struct_extract %0 : $baz, #baz.end
+  strong_release %1 : $foo
+  strong_release %2 : $foo
+  release_value  %0 : $baz
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// Make sure we have an uncovered value type.
+//
+// CHECK-LABEL: START: sil @exploded_release_with_uncovered_value_semantics
+// CHECK: [[IN0:%.*]] = argument of bb0 : $boo
+// CHECK: release_value
+// CHECK: release_value
+// CHECK: END: sil @exploded_release_with_uncovered_value_semantics
+sil @exploded_release_with_uncovered_value_semantics : $@convention(thin) (@owned boo) -> () {
+bb0(%0 : $boo):
+  %1 = struct_extract %0 : $boo, #boo.tbaz
+  %2 = struct_extract %0 : $boo, #boo.a
+  %3 = struct_extract %1 : $baz, #baz.start
+  %4 = struct_extract %1 : $baz, #baz.end
+  release_value  %3 : $foo
+  release_value  %4 : $foo
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// Make sure we have an uncovered reference type.
+//
+// CHECK-LABEL: START: sil @exploded_release_with_uncovered_reference_semantics
+// CHECK: [[IN1:%.*]] = argument of bb0 : $boo
+// CHECK-NOT: release_value
+// CHECK: END: sil @exploded_release_with_uncovered_reference_semantics
+sil @exploded_release_with_uncovered_reference_semantics : $@convention(thin) (@owned boo) -> () {
+bb0(%0 : $boo):
+  %1 = struct_extract %0 : $boo, #boo.tbaz
+  %2 = struct_extract %0 : $boo, #boo.a
+  %3 = struct_extract %1 : $baz, #baz.start
+  %4 = struct_extract %1 : $baz, #baz.end
+  release_value  %3 : $foo
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// Make sure we have an uncovered reference type due to overlapping release.
+//
+// CHECK-LABEL: START: sil @exploded_release_with_uncovered_reference_semantics_overlapping_release
+// CHECK: [[IN1:%.*]] = argument of bb0 : $boo
+// CHECK-NOT: release_value
+// CHECK: END: sil @exploded_release_with_uncovered_reference_semantics_overlapping_release
+sil @exploded_release_with_uncovered_reference_semantics_overlapping_release : $@convention(thin) (@owned boo) -> () {
+bb0(%0 : $boo):
+  %1 = struct_extract %0 : $boo, #boo.tbaz
+  %2 = struct_extract %0 : $boo, #boo.a
+  %3 = struct_extract %1 : $baz, #baz.start
+  %4 = struct_extract %1 : $baz, #baz.end
+  release_value  %4 : $foo
+  release_value  %3 : $foo
+  release_value  %3 : $foo
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// Make sure we can match release with argument when the released value is a silargument
+// and rc-identical to the argument.
+//
+// CHECK-LABEL: START: sil @single_release_foo_with_silargument_one_incoming_value
+// CHECK: [[IN1:%.*]] = argument of bb0 : $foo
+// CHECK: strong_release [[IN2:%.*]] : $foo
+// CHECK: END: sil @single_release_foo_with_silargument_one_incoming_value
+sil @single_release_foo_with_silargument_one_incoming_value : $@convention(thin) (@owned foo) -> () {
+bb0(%0 : $foo):
+  br bb1(%0: $foo)
+bb1(%1 : $foo):
+  strong_release %1 : $foo
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: START: sil @single_release_foo_with_silargument_multiple_incoming_values
+// CHECK: [[IN1:%.*]] = argument of bb0 : $foo
+// CHECK: [[IN2:%.*]] = argument of bb0 : $foo
+// CHECK-NOT: strong_release [[IN1]] : $foo
+// CHECK-NOT: strong_release [[IN2]] : $foo
+// CHECK: END: sil @single_release_foo_with_silargument_multiple_incoming_values
+sil @single_release_foo_with_silargument_multiple_incoming_values : $@convention(thin) (@owned foo, @owned foo) -> () {
+bb0(%0 : $foo, %8 : $foo):
+  cond_br undef, bb1(%0: $foo), bb2(%8 : $foo)
+bb1(%1 : $foo):
+  br bb3(%1 : $foo)
+bb2(%2 : $foo):
+  br bb3( %2 : $foo)
+bb3(%3 : $foo):
+  strong_release %3 : $foo
+  %4 = tuple ()
+  return %4 : $()
+}
+
+// CHECK-LABEL: START: sil @single_retain_foo
+// CHECK: strong_retain [[IN1:%.*]] : $foo
+// CHECK: END: sil @single_retain_foo
+sil @single_retain_foo : $@convention(thin) (@owned foo) -> @owned foo {
+bb0(%0 : $foo):
+  strong_retain %0 : $foo
+  return %0 : $foo
+}
+
+// CHECK-LABEL: START: sil @multiple_retain_foo
+// CHECK: retain_value [[IN1:%.*]] : $foo
+// CHECK: END: sil @multiple_retain_foo
+sil @multiple_retain_foo : $@convention(thin) (@owned foo) -> @owned foo {
+bb0(%0 : $foo):
+  strong_retain %0 : $foo
+  retain_value %0 : $foo
+  return %0 : $foo
+}
+
+// CHECK-LABEL: START: sil @retain_with_interfering_uses
+// CHECK-NOT: retain_value
+// CHECK: END: sil @retain_with_interfering_uses
+sil @retain_with_interfering_uses : $@convention(thin) (@owned baz) -> @owned baz {
+bb0(%0 : $baz):
+  %2 = struct_extract %0 : $baz, #baz.end
+  retain_value   %0 : $baz
+  strong_release %2 : $foo
+  return %0 : $baz
+}
+
+// CHECK-LABEL: START: sil @single_retain_foo_with_silargument_one_incoming_value
+// CHECK: strong_retain [[IN2:%.*]] : $foo
+// CHECK: END: sil @single_retain_foo_with_silargument_one_incoming_value
+sil @single_retain_foo_with_silargument_one_incoming_value : $@convention(thin) (@owned foo) -> @owned foo {
+bb0(%0 : $foo):
+  br bb1(%0: $foo)
+bb1(%1 : $foo):
+  strong_retain %1 : $foo
+  return %0 : $foo
+}
+
+// CHECK-LABEL: START: sil @single_retain_foo_with_silargument_multiple_incoming_values
+// CHECK-NOT: strong_retain [[IN1:%.*]] : $foo
+// CHECK: END: sil @single_retain_foo_with_silargument_multiple_incoming_values
+sil @single_retain_foo_with_silargument_multiple_incoming_values : $@convention(thin) (@owned foo, @owned foo) -> @owned foo {
+bb0(%0 : $foo, %8 : $foo):
+  cond_br undef, bb1(%0: $foo), bb2(%8 : $foo)
+bb1(%1 : $foo):
+  br bb3(%1 : $foo)
+bb2(%2 : $foo):
+  br bb3( %2 : $foo)
+bb3(%3 : $foo):
+  strong_retain %3 : $foo
+  return %0 : $foo
+}
+
+// CHECK-LABEL: START: sil @exploded_retain
+// CHECK-NOT: strong_retain
+// CHECK: END: sil @exploded_retain
+sil @exploded_retain : $@convention(thin) (@owned boo) -> @owned boo {
+bb0(%0 : $boo):
+  %1 = struct_extract %0 : $boo, #boo.tbaz
+  %2 = struct_extract %0 : $boo, #boo.a
+  %3 = struct_extract %1 : $baz, #baz.start
+  %4 = struct_extract %1 : $baz, #baz.end
+  strong_retain  %4 : $foo
+  strong_retain  %3 : $foo
+  return %0 : $boo
+}
+
+// CHECK-LABEL: START: sil @epilogue_retains_in_split_block
+// CHECK: strong_retain [[IN1:%.*]] : $foo
+// CHECK: strong_retain [[IN2:%.*]] : $foo
+// CHECK: END: sil @epilogue_retains_in_split_block
+sil @epilogue_retains_in_split_block : $@convention(thin) (@owned foo) -> @owned foo {
+bb0(%0 : $foo):
+  cond_br undef, bb1(%0: $foo), bb2(%0 : $foo)
+bb1(%1 : $foo):
+  strong_retain %1 : $foo
+  br bb3(%1 : $foo)
+bb2(%2 : $foo):
+  strong_retain %2 : $foo
+  br bb3( %2 : $foo)
+bb3(%3 : $foo):
+  return %0 : $foo
+}
+
+// CHECK-LABEL: START: sil @epilogue_retains_in_diamond_top_block
+// CHECK: strong_retain [[IN1:%.*]] : $foo
+// CHECK: END: sil @epilogue_retains_in_diamond_top_block
+sil @epilogue_retains_in_diamond_top_block : $@convention(thin) (@owned foo) -> @owned foo {
+bb0(%0 : $foo):
+  strong_retain %0 : $foo
+  cond_br undef, bb1(%0: $foo), bb2(%0 : $foo)
+bb1(%1 : $foo):
+  br bb3(%1 : $foo)
+bb2(%2 : $foo):
+  br bb3( %2 : $foo)
+bb3(%3 : $foo):
+  return %0 : $foo
+}
+
+// CHECK-LABEL: START: sil @epilogue_retains_in_diamond_top_and_left_split_block
+// CHECK-NOT: strong_retain [[IN1:%.*]] : $foo
+// CHECK: END: sil @epilogue_retains_in_diamond_top_and_left_split_block
+sil @epilogue_retains_in_diamond_top_and_left_split_block : $@convention(thin) (@owned foo) -> @owned foo {
+bb0(%0 : $foo):
+  strong_retain %0 : $foo
+  cond_br undef, bb1(%0: $foo), bb2(%0 : $foo)
+bb1(%1 : $foo):
+  strong_retain %1 : $foo
+  br bb3(%1 : $foo)
+bb2(%2 : $foo):
+  br bb3( %2 : $foo)
+bb3(%3 : $foo):
+  return %0 : $foo
+}

@@ -1,0 +1,27 @@
+// RUN: %target-sil-opt %s -module-name=witness_specialize | %target-sil-opt -module-name=witness_specialize | %FileCheck %s
+
+sil_stage raw
+
+protocol AssocReqt {
+  func requiredMethod()
+}
+
+struct GenericAssocType<T> : AssocReqt {
+  func requiredMethod()
+}
+
+protocol AssocTypeWithReqt {
+  associatedtype AssocType : AssocReqt
+}
+
+struct ConformsWithDependentAssocType2<DD> : AssocTypeWithReqt {
+  typealias AssocType = GenericAssocType<DD>
+}
+
+// CHECK-LABEL: sil_witness_table <DD> ConformsWithDependentAssocType2<DD>: AssocTypeWithReqt module
+// CHECK: associated_type AssocType: GenericAssocType<DD>
+// CHECK: associated_type_protocol (AssocType: AssocReqt): GenericAssocType<DD>: specialize <DD> (<T> GenericAssocType<T>: AssocReqt module
+sil_witness_table <DD> ConformsWithDependentAssocType2<DD>: AssocTypeWithReqt module witness_specialize {
+  associated_type AssocType: GenericAssocType<DD>
+  associated_type_protocol (AssocType: AssocReqt): GenericAssocType<DD>: specialize <DD> (<T> GenericAssocType<T>: AssocReqt module witness_specialize)
+}

@@ -1,0 +1,82 @@
+// RUN: %empty-directory(%t)
+// RUN: %gyb %s -o %t/main.swift
+// RUN: %line-directive %t/main.swift -- %target-swift-frontend -typecheck -verify -swift-version 4.2 %t/main.swift
+
+func testUnaryMinusInUnsigned() {
+  var a: UInt8 = -(1) // expected-error {{cannot convert value of type 'Int' to specified type 'UInt8'}} expected-note * {{}} expected-warning * {{}}
+
+  var b: UInt16 = -(1) // expected-error {{cannot convert value of type 'Int' to specified type 'UInt16'}} expected-note * {{}} expected-warning * {{}}
+
+  var c: UInt32 = -(1) // expected-error {{cannot convert value of type 'Int' to specified type 'UInt32'}} expected-note * {{}} expected-warning * {{}}
+
+  var d: UInt64 = -(1) // expected-error {{cannot convert value of type 'Int' to specified type 'UInt64'}} expected-note * {{}} expected-warning * {{}}
+}
+
+// Int and UInt are not identical to any fixed-size integer type
+var i   :  Int   = 0
+var i64 :  Int64 = i // expected-error {{}}
+var i32 :  Int32 = i // expected-error {{}}
+var i16 :  Int16 = i // expected-error {{}}
+var i8  :  Int8  = i // expected-error {{}}
+
+var u   : UInt   = 0
+var u64 : UInt64 = u // expected-error {{}}
+var u32 : UInt32 = u // expected-error {{}}
+var u16 : UInt16 = u // expected-error {{}}
+var u8  : UInt8  = u // expected-error {{}}
+
+func testMixedSignArithmetic() {
+  // Ensure that the generic arithmetic operators for Strideable don't
+  // allow mixed-sign arithmetic to compile.  We create a deliberate
+  // ambiguity in these cases.
+% for T in "UInt UInt64 UInt32 UInt16 UInt8".split():
+  do {
+    typealias Stride = ${T}.Stride
+    _ = ${T}(1) + 0     // OK
+    _ = 0 + ${T}(1)     // OK
+    _ = ${T}(1) + Stride(0) // expected-error {{}} expected-note {{}}
+    _ = Stride(1) + ${T}(0) // expected-error {{}} expected-note {{}}
+    _ = ${T}(1) - Stride(0) // expected-error {{}} expected-note {{}}
+    var x: ${T} = 0
+    x += 1              // OK
+    x += Stride(1) // expected-error {{}} expected-note {{}}
+    x -= Stride(1) // expected-error {{}} expected-note {{}}
+
+    _ = (x - x) as Stride // expected-error {{}}
+
+    //===------------------------------------------------------------------===//
+    // The following errors are different because they're not being
+    // disabled by the ambiguity trick.
+    //===------------------------------------------------------------------===//
+
+    (x + x) as Stride   // expected-error {{}}
+    Stride(1) - ${T}(0) // expected-error {{}} expected-note {{}}
+
+    // These tests are expected to start failing when we get improved diagnostics.
+    var y: Stride = 0
+    y += ${T}(1)        // expected-error {{}} expected-note {{}}
+    y -= ${T}(1)        // expected-error {{}} expected-note {{}}
+  }
+% end
+}
+
+func testOps<T : FixedWidthInteger>(_ x: T, _ y: T) -> T {
+  let a = x + y
+  let s = x - y
+  let m = x * y
+  let d = x / y
+  let r = x % y
+  return a + s + m + d + r
+}
+
+let   s_ops:    Int = testOps(5, 2)
+let   u_ops:   UInt = testOps(5, 2)
+let  s8_ops:   Int8 = testOps(5, 2)
+let  u8_ops:  UInt8 = testOps(5, 2)
+let s16_ops:  Int16 = testOps(5, 2)
+let u16_ops: UInt16 = testOps(5, 2)
+let s32_ops:  Int32 = testOps(5, 2)
+let u32_ops: UInt32 = testOps(5, 2)
+let s64_ops:  Int64 = testOps(5, 2)
+let u64_ops: UInt64 = testOps(5, 2)
+

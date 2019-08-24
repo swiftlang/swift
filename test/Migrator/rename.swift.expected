@@ -1,0 +1,26 @@
+// REQUIRES: objc_interop
+// RUN: %empty-directory(%t) && %target-swift-frontend -c -update-code -primary-file %s -F %S/mock-sdk -api-diff-data-file %S/Inputs/API.json -emit-migrated-file-path %t/rename.swift.result -emit-remap-file-path %t/rename.swift.remap -o /dev/null -disable-migrator-fixits
+// RUN: diff -u %S/rename.swift.expected %t/rename.swift.result
+
+import Bar
+
+func foo(_ b: BarForwardDeclaredClass) {
+  b.barNewInstanceFunc1(newlabel1: 0, newlabel2: 1, newlabel3: 2, newlabel4: 3)
+  barGlobalFuncNewName(newlabel: 2)
+  b.barNewInstanceFunc1(newlabel1: 0, newlabel2: 1, newlabel3: 2, newlabel4: 3)
+  barGlobalFuncNewName(newlabel: 2)
+  b.barNewInstanceFunc1(newlabel1: 0, newlabel2: 1, newlabel3: 2, newlabel4: 3)
+  barGlobalFuncNewName(newlabel: 2)
+  b.barNewInstanceFunc1(newlabel1: 0, newlabel2: 1, newlabel3: 2, newlabel4: 3)
+  barGlobalFuncNewName(newlabel: 2)
+  b.barNewInstanceFunc1(newlabel1: 0, newlabel2: 1, newlabel3: 2, newlabel4: 3)
+  barGlobalFuncNewName(newlabel: 2)
+  _ = NewEnum.enumElement
+  _ = PropertyUserInterface.newMethodPlus()!
+  let _: BarBase.Nested
+  _ = AwesomeWrapper.newName(is: 0, at: 1, for: 2)
+}
+
+func foo1(_ b: BarForwardDeclaredClass) {
+  b.barNewInstanceFunc2(0,1,NotToRemove1:2,3)
+}

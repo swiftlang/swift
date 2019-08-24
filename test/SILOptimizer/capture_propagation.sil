@@ -1,0 +1,509 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -capture-prop | %FileCheck %s
+
+// Check the CapturePropagation specialized the reabstraction thunk.
+
+sil_stage raw
+
+import Builtin
+import Swift
+
+sil @capture_helper_2 : $@convention(thin) (Int32) -> ()
+
+// CHECK-LABEL: test_capture_propagation
+// CHECK: %[[FR:[0-9]+]] = function_ref @$sSiytIxyd_SiytIxid_TR22$s8capturep6helperySiFTf3npf_n : $@convention(thin) (@in Int32) -> ()
+// CHECK: thin_to_thick_function %[[FR]] : $@convention(thin) (@in Int32) -> ()
+sil private @test_capture_propagation : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $Int32                           // users: %3, %9, %10
+  %1 = integer_literal $Builtin.Int32, 3           // user: %2
+  %2 = struct $Int32 (%1 : $Builtin.Int32)           // user: %3
+  store %2 to %0 : $*Int32                        // id: %3
+  // function_ref capturep.helper (Swift.Int32) -> ()
+  %4 = function_ref @$s8capturep6helperySiF : $@convention(thin) (Int32) -> () // user: %5
+  %5 = thin_to_thick_function %4 : $@convention(thin) (Int32) -> () to $@callee_owned (Int32) -> () // user: %7
+  // function_ref reabstraction thunk helper from @callee_owned (@unowned Swift.Int32) -> (@unowned ()) to @callee_owned (@in Swift.Int32) -> (@unowned ())
+  %6 = function_ref @$sSiytIxyd_SiytIxid_TR : $@convention(thin) (@in Int32, @owned @callee_owned (Int32) -> ()) -> () // user: %7
+  %7 = partial_apply %6(%5) : $@convention(thin) (@in Int32, @owned @callee_owned (Int32) -> ()) -> () // user: %9
+  // function_ref specialization <Swift.Int32> of capturep.generic <A>(A, (A) -> ()) -> ()
+  %8 = function_ref @_TTSgSi___TF8capturep7genericU__FTQ_FQ_T__T_ : $@convention(thin) (@in Int32, @owned @callee_owned (@in Int32) -> ()) -> () // user: %9
+  %9 = apply %8(%0, %7) : $@convention(thin) (@in Int32, @owned @callee_owned (@in Int32) -> ()) -> ()
+
+  %11 = thin_to_thick_function %4 : $@convention(thin) (Int32) -> () to $@callee_owned (Int32) -> () // user: %7
+  %12 = function_ref @bad_thunk : $@convention(thin) (@in Int32, @owned @callee_owned (Int32) -> ()) -> ()
+  %13 = partial_apply %12(%11) : $@convention(thin) (@in Int32, @owned @callee_owned (Int32) -> ()) -> () // user: %9
+  %14 = apply %8(%0, %13) : $@convention(thin) (@in Int32, @owned @callee_owned (@in Int32) -> ()) -> ()
+
+  dealloc_stack %0 : $*Int32       // id: %10
+  %15 = tuple ()                                  // user: %12
+  return %15 : $()                                // id: %12
+}
+
+// capturep.helper (Swift.Int32) -> ()
+sil @$s8capturep6helperySiF : $@convention(thin) (Int32) -> () {
+bb0(%0 : $Int32):
+  %1 = tuple ()                                   // user: %2
+  return %1 : $()                                 // id: %2
+}
+
+sil @bad_thunk : $@convention(thin) (@in Int32, @owned @callee_owned (Int32) -> ()) -> ()
+
+// reabstraction thunk helper from @callee_owned (@unowned Swift.Int32) -> (@unowned ()) to @callee_owned (@in Swift.Int32) -> (@unowned ())
+sil shared [transparent] @$sSiytIxyd_SiytIxid_TR : $@convention(thin) (@in Int32, @owned @callee_owned (Int32) -> ()) -> () {
+bb0(%0 : $*Int32, %1 : $@callee_owned (Int32) -> ()):
+  %2 = load %0 : $*Int32                            // user: %3
+  %3 = apply %1(%2) : $@callee_owned (Int32) -> ()  // user: %4
+  return %3 : $()                                 // id: %4
+}
+
+// specialization <Swift.Int32> of capturep.generic <A>(A, (A) -> ()) -> ()
+sil shared [noinline] @_TTSgSi___TF8capturep7genericU__FTQ_FQ_T__T_ : $@convention(thin) (@in Int32, @owned @callee_owned (@in Int32) -> ()) -> () {
+bb0(%0 : $*Int32, %1 : $@callee_owned (@in Int32) -> ()):
+  %2 = alloc_stack $Int32                           // users: %4, %5, %6
+  %3 = load %0 : $*Int32                            // user: %4
+  store %3 to %2 : $*Int32                        // id: %4
+  %5 = apply %1(%2) : $@callee_owned (@in Int32) -> ()
+  dealloc_stack %2 : $*Int32       // id: %6
+  %7 = tuple ()                                   // user: %8
+  return %7 : $()                                 // id: %8
+}
+
+/*
+// reabstraction thunk helper from @callee_owned (@unowned Swift.Int32) -> (@unowned ()) to @callee_owned (@in Swift.Int32) -> (@unowned ())
+sil shared [transparent] @$sSiytIxyd_SiytIxid_TR : $@convention(thin) (@in Int32, @owned @callee_owned (Int32) -> ()) -> () {
+bb0(%0 : $*Int32, %1 : $@callee_owned (Int32) -> ()):
+  %2 = load %0 : $*Int32                            // user: %3
+  %3 = apply %1(%2) : $@callee_owned (Int32) -> ()  // user: %4
+  return %3 : $()                                 // id: %4
+}
+*/
+
+sil @_TFtest_capture_propagation2_closure : $@convention(thin) (Builtin.Int32, Builtin.FPIEEE32, Builtin.RawPointer, @in Builtin.Word) -> () {
+bb0(%0 : $Builtin.Int32, %1 : $Builtin.FPIEEE32, %2 : $Builtin.RawPointer, %3 : $*Builtin.Word):
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil_global [serialized] @globalinit_33_06E7F1D906492AE070936A9B58CBAE1C_token8 : $Builtin.Word
+
+sil @test_capture_propagation2_caller : $@convention(thin) () -> () {
+  %0 = integer_literal $Builtin.Int32, 0
+  %1 = float_literal $Builtin.FPIEEE32, 0
+  %2 = string_literal utf8 "123"
+  %3 = global_addr @globalinit_33_06E7F1D906492AE070936A9B58CBAE1C_token8 : $*Builtin.Word
+  %4 = function_ref @_TFtest_capture_propagation2_closure : $@convention(thin) (Builtin.Int32, Builtin.FPIEEE32, Builtin.RawPointer, @in Builtin.Word) -> ()
+  %5 = thin_to_thick_function %4 : $@convention(thin) (Builtin.Int32, Builtin.FPIEEE32, Builtin.RawPointer, @in Builtin.Word) -> () to $@callee_owned (Builtin.Int32, Builtin.FPIEEE32, Builtin.RawPointer, @in Builtin.Word) -> ()
+  %6 = function_ref @test_capture_propagation2_callee : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
+  %7 = function_ref @test_capture_propagation2_thunk : $@convention(thin) (Builtin.Int32, Builtin.FPIEEE32, Builtin.RawPointer, @in Builtin.Word, @owned @callee_owned (Builtin.Int32, Builtin.FPIEEE32, Builtin.RawPointer, @in Builtin.Word) -> ()) -> ()
+  %8 = partial_apply %7(%0, %1, %2, %3, %5) : $@convention(thin) (Builtin.Int32, Builtin.FPIEEE32, Builtin.RawPointer, @in Builtin.Word, @owned @callee_owned (Builtin.Int32, Builtin.FPIEEE32, Builtin.RawPointer, @in Builtin.Word) -> ()) -> ()
+  apply %6(%8) : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil shared @test_capture_propagation2_thunk : $@convention(thin) (Builtin.Int32, Builtin.FPIEEE32, Builtin.RawPointer, @in Builtin.Word, @owned @callee_owned (Builtin.Int32, Builtin.FPIEEE32, Builtin.RawPointer, @in Builtin.Word) -> ()) -> () {
+bb0(%0 : $Builtin.Int32, %1 : $Builtin.FPIEEE32, %2 : $Builtin.RawPointer, %3 : $*Builtin.Word, %4 : $@callee_owned (Builtin.Int32, Builtin.FPIEEE32, Builtin.RawPointer, @in Builtin.Word) -> ()):
+  apply %4(%0, %1, %2, %3) : $@callee_owned (Builtin.Int32, Builtin.FPIEEE32, Builtin.RawPointer, @in Builtin.Word) -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil shared @test_capture_propagation2_callee : $@convention(thin) (@owned @callee_owned () -> ()) -> () {
+bb0(%0 : $@callee_owned () -> ()):
+  apply %0() : $@callee_owned () -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Test dead partial applied arguments
+
+sil @specialized_nonthrowing_closure : $@convention(thin) (Int32, Int32) -> Bool
+
+sil @nonthrowing_closure : $@convention(method) (Int32, Int32, @thin Int32.Type) -> Bool {
+bb0(%0 : $Int32, %1 : $Int32, %2 : $@thin Int32.Type):
+  %3 = function_ref @specialized_nonthrowing_closure : $@convention(thin) (Int32, Int32) -> Bool
+  %4 = apply %3(%0, %1) : $@convention(thin) (Int32, Int32) -> Bool
+  return %4 : $Bool
+}
+
+// CHECK-LABEL: sil @return_nonthrowing_closure
+// CHECK: [[F:%[0-9]+]] = function_ref @specialized_nonthrowing_closure
+// CHECK: [[R:%[0-9]+]] = thin_to_thick_function [[F]]
+// CHECK: return [[R]]
+sil @return_nonthrowing_closure : $@convention(thin) () -> @owned @callee_owned (Int32, Int32) -> Bool {
+bb0:
+  %0 = metatype $@thin Int32.Type
+  %1 = function_ref @nonthrowing_closure : $@convention(method) (Int32, Int32, @thin Int32.Type) -> Bool
+  %2 = partial_apply %1(%0) : $@convention(method) (Int32, Int32, @thin Int32.Type) -> Bool
+  return %2 : $@callee_owned (Int32, Int32) -> Bool
+}
+
+sil @specialized_throwing_closure : $@convention(thin) (Int32, Int32) -> (Bool, @error Error)
+
+sil @throwing_closure : $@convention(method) (Int32, Int32, @thin Int32.Type) -> (Bool, @error Error) {
+bb0(%0 : $Int32, %1 : $Int32, %2 : $@thin Int32.Type):
+  %3 = function_ref @specialized_throwing_closure : $@convention(thin) (Int32, Int32) -> (Bool, @error Error)
+  try_apply %3(%0, %1) : $@convention(thin) (Int32, Int32) -> (Bool, @error Error), normal bb1, error bb2
+
+bb1(%5 : $Bool):
+  return %5 : $Bool
+
+bb2(%7 : $Error):
+  throw %7 : $Error
+}
+
+// CHECK-LABEL: sil @return_throwing_closure
+// CHECK: [[F:%[0-9]+]] = function_ref @specialized_throwing_closure
+// CHECK: [[R:%[0-9]+]] = thin_to_thick_function [[F]]
+// CHECK: return [[R]]
+sil @return_throwing_closure : $@convention(thin) () -> @owned @callee_owned (Int32, Int32) -> (Bool, @error Error) {
+bb0:
+  %0 = metatype $@thin Int32.Type
+  %1 = function_ref @throwing_closure : $@convention(method) (Int32, Int32, @thin Int32.Type) -> (Bool, @error Error)
+  %2 = partial_apply %1(%0) : $@convention(method) (Int32, Int32, @thin Int32.Type) -> (Bool, @error Error)
+  return %2 : $@callee_owned (Int32, Int32) -> (Bool, @error Error)
+}
+
+// Check if we can handle a non-throwing closure which is passed to a thunk accepting a throwing closure.
+
+sil @simple_nonthrowing_closure : $@convention(thin) (Int32) -> Bool
+
+// CHECK-LABEL: sil shared @{{.*}}throwing_thunk{{.*}} : $@convention(thin) (Int32) -> (Bool, @error Error) {
+// CHECK: = function_ref @simple_nonthrowing_closure
+// CHECK-NEXT: thin_to_thick_function
+// CHECK-NEXT: convert_function
+// CHECK-NEXT: try_apply
+// CHECK: return
+// CHECK: throw
+sil @throwing_thunk : $@convention(thin) (Int32, @owned @callee_owned (Int32) -> (Bool, @error Error)) -> (Bool, @error Error) {
+bb0(%0 : $Int32, %1 : $@callee_owned (Int32) -> (Bool, @error Error)):
+  try_apply %1(%0) : $@callee_owned (Int32) -> (Bool, @error Error), normal bb1, error bb2
+
+bb1(%5 : $Bool):
+  return %5 : $Bool
+
+bb2(%7 : $Error):
+  throw %7 : $Error
+}
+
+// CHECK-LABEL: sil @return_throwing_thunk_closure
+// CHECK: [[F:%[0-9]+]] = function_ref @{{.*}}throwing_thunk{{.*}} : $@convention(thin) (Int32) -> (Bool, @error Error)
+// CHECK: [[T:%[0-9]+]] = thin_to_thick_function [[F]]
+// CHECK: return [[T]]
+sil @return_throwing_thunk_closure : $@convention(thin) () -> @owned @callee_owned (Int32) -> (Bool, @error Error) {
+bb0:
+  %c1 = function_ref @simple_nonthrowing_closure : $@convention(thin) (Int32) -> Bool
+  %c2 = thin_to_thick_function %c1 : $@convention(thin) (Int32) -> Bool to $@callee_owned (Int32) -> Bool
+  %c3 = convert_function %c2 : $@callee_owned (Int32) -> Bool to $@callee_owned (Int32) -> (Bool, @error Error)
+  %t1 = function_ref @throwing_thunk : $@convention(thin) (Int32, @owned @callee_owned (Int32) -> (Bool, @error Error)) -> (Bool, @error Error)
+  %2 = partial_apply %t1(%c3) : $@convention(thin) (Int32, @owned @callee_owned (Int32) -> (Bool, @error Error)) -> (Bool, @error Error)
+  return %2 : $@callee_owned (Int32) -> (Bool, @error Error)
+}
+
+// Negative tests
+
+sil @swapped_arguments : $@convention(method) (Int32, Int32, @thin Int32.Type) -> Bool {
+bb0(%0 : $Int32, %1 : $Int32, %2 : $@thin Int32.Type):
+  %3 = function_ref @specialized_nonthrowing_closure : $@convention(thin) (Int32, Int32) -> Bool
+  %4 = apply %3(%1, %0) : $@convention(thin) (Int32, Int32) -> Bool
+  return %4 : $Bool
+}
+
+// CHECK-LABEL: sil @return_swapped_arguments
+// CHECK: [[M:%[0-9]+]] = metatype
+// CHECK: [[F:%[0-9]+]] = function_ref @swapped_arguments
+// CHECK: [[R:%[0-9]+]] = partial_apply [[F]]([[M]])
+// CHECK: return [[R]]
+sil @return_swapped_arguments : $@convention(thin) () -> @owned @callee_owned (Int32, Int32) -> Bool {
+bb0:
+  %0 = metatype $@thin Int32.Type
+  %1 = function_ref @swapped_arguments : $@convention(method) (Int32, Int32, @thin Int32.Type) -> Bool
+  %2 = partial_apply %1(%0) : $@convention(method) (Int32, Int32, @thin Int32.Type) -> Bool
+  return %2 : $@callee_owned (Int32, Int32) -> Bool
+}
+
+
+sil @wrong_return1 : $@convention(method) (Int32, Int32, @thin Int32.Type) -> Bool {
+bb0(%0 : $Int32, %1 : $Int32, %2 : $@thin Int32.Type):
+  %3 = function_ref @specialized_nonthrowing_closure : $@convention(thin) (Int32, Int32) -> Bool
+  %4 = apply %3(%0, %1) : $@convention(thin) (Int32, Int32) -> Bool
+  %i = integer_literal $Builtin.Int1, 0
+  %b = struct $Bool (%i : $Builtin.Int1)
+  return %b : $Bool
+}
+
+// CHECK-LABEL: sil @return_wrong_return1
+// CHECK: [[M:%[0-9]+]] = metatype
+// CHECK: [[F:%[0-9]+]] = function_ref @wrong_return1
+// CHECK: [[R:%[0-9]+]] = partial_apply [[F]]([[M]])
+// CHECK: return [[R]]
+sil @return_wrong_return1 : $@convention(thin) () -> @owned @callee_owned (Int32, Int32) -> Bool {
+bb0:
+  %0 = metatype $@thin Int32.Type
+  %1 = function_ref @wrong_return1 : $@convention(method) (Int32, Int32, @thin Int32.Type) -> Bool
+  %2 = partial_apply %1(%0) : $@convention(method) (Int32, Int32, @thin Int32.Type) -> Bool
+  return %2 : $@callee_owned (Int32, Int32) -> Bool
+}
+
+
+sil @second_apply : $@convention(method) (Int32, Int32, @thin Int32.Type) -> Bool {
+bb0(%0 : $Int32, %1 : $Int32, %2 : $@thin Int32.Type):
+  %3 = function_ref @specialized_nonthrowing_closure : $@convention(thin) (Int32, Int32) -> Bool
+  %u = apply %3(%0, %1) : $@convention(thin) (Int32, Int32) -> Bool
+  %4 = apply %3(%0, %1) : $@convention(thin) (Int32, Int32) -> Bool
+  return %4 : $Bool
+}
+
+// CHECK-LABEL: sil @return_second_apply
+// CHECK: [[M:%[0-9]+]] = metatype
+// CHECK: [[F:%[0-9]+]] = function_ref @second_apply
+// CHECK: [[R:%[0-9]+]] = partial_apply [[F]]([[M]])
+// CHECK: return [[R]]
+sil @return_second_apply : $@convention(thin) () -> @owned @callee_owned (Int32, Int32) -> Bool {
+bb0:
+  %0 = metatype $@thin Int32.Type
+  %1 = function_ref @second_apply : $@convention(method) (Int32, Int32, @thin Int32.Type) -> Bool
+  %2 = partial_apply %1(%0) : $@convention(method) (Int32, Int32, @thin Int32.Type) -> Bool
+  return %2 : $@callee_owned (Int32, Int32) -> Bool
+}
+
+
+class X { }
+
+sil @other_inst : $@convention(method) (Int32, Int32, @thin Int32.Type) -> Bool {
+bb0(%0 : $Int32, %1 : $Int32, %2 : $@thin Int32.Type):
+  %3 = function_ref @specialized_nonthrowing_closure : $@convention(thin) (Int32, Int32) -> Bool
+  %4 = apply %3(%0, %1) : $@convention(thin) (Int32, Int32) -> Bool
+  %r = alloc_ref $X
+  strong_release %r : $X
+  return %4 : $Bool
+}
+
+// CHECK-LABEL: sil @return_other_inst
+// CHECK: [[M:%[0-9]+]] = metatype
+// CHECK: [[F:%[0-9]+]] = function_ref @other_inst
+// CHECK: [[R:%[0-9]+]] = partial_apply [[F]]([[M]])
+// CHECK: return [[R]]
+sil @return_other_inst : $@convention(thin) () -> @owned @callee_owned (Int32, Int32) -> Bool {
+bb0:
+  %0 = metatype $@thin Int32.Type
+  %1 = function_ref @other_inst : $@convention(method) (Int32, Int32, @thin Int32.Type) -> Bool
+  %2 = partial_apply %1(%0) : $@convention(method) (Int32, Int32, @thin Int32.Type) -> Bool
+  return %2 : $@callee_owned (Int32, Int32) -> Bool
+}
+
+
+sil @other_inst_in_returnblock : $@convention(method) (Int32, Int32, @thin Int32.Type) -> (Bool, @error Error) {
+bb0(%0 : $Int32, %1 : $Int32, %2 : $@thin Int32.Type):
+  %3 = function_ref @specialized_throwing_closure : $@convention(thin) (Int32, Int32) -> (Bool, @error Error)
+  try_apply %3(%0, %1) : $@convention(thin) (Int32, Int32) -> (Bool, @error Error), normal bb1, error bb2
+
+bb1(%5 : $Bool):
+  %r = alloc_ref $X
+  strong_release %r : $X
+  return %5 : $Bool
+
+bb2(%7 : $Error):
+  throw %7 : $Error
+}
+
+// CHECK-LABEL: sil @return_other_inst_in_returnblock
+// CHECK: [[M:%[0-9]+]] = metatype
+// CHECK: [[F:%[0-9]+]] = function_ref @other_inst_in_returnblock
+// CHECK: [[R:%[0-9]+]] = partial_apply [[F]]([[M]])
+// CHECK: return [[R]]
+sil @return_other_inst_in_returnblock : $@convention(thin) () -> @owned @callee_owned (Int32, Int32) -> (Bool, @error Error) {
+bb0:
+  %0 = metatype $@thin Int32.Type
+  %1 = function_ref @other_inst_in_returnblock : $@convention(method) (Int32, Int32, @thin Int32.Type) -> (Bool, @error Error)
+  %2 = partial_apply %1(%0) : $@convention(method) (Int32, Int32, @thin Int32.Type) -> (Bool, @error Error)
+  return %2 : $@callee_owned (Int32, Int32) -> (Bool, @error Error)
+}
+
+
+sil @wrong_return2 : $@convention(method) (Int32, Int32, @thin Int32.Type) -> (Bool, @error Error) {
+bb0(%0 : $Int32, %1 : $Int32, %2 : $@thin Int32.Type):
+  %3 = function_ref @specialized_throwing_closure : $@convention(thin) (Int32, Int32) -> (Bool, @error Error)
+  try_apply %3(%0, %1) : $@convention(thin) (Int32, Int32) -> (Bool, @error Error), normal bb1, error bb2
+
+bb1(%5 : $Bool):
+  %i = integer_literal $Builtin.Int1, 0
+  %b = struct $Bool (%i : $Builtin.Int1)
+  return %b : $Bool
+
+bb2(%7 : $Error):
+  throw %7 : $Error
+}
+
+// CHECK-LABEL: sil @return_wrong_return2
+// CHECK: [[M:%[0-9]+]] = metatype
+// CHECK: [[F:%[0-9]+]] = function_ref @wrong_return2
+// CHECK: [[R:%[0-9]+]] = partial_apply [[F]]([[M]])
+// CHECK: return [[R]]
+sil @return_wrong_return2 : $@convention(thin) () -> @owned @callee_owned (Int32, Int32) -> (Bool, @error Error) {
+bb0:
+  %0 = metatype $@thin Int32.Type
+  %1 = function_ref @wrong_return2 : $@convention(method) (Int32, Int32, @thin Int32.Type) -> (Bool, @error Error)
+  %2 = partial_apply %1(%0) : $@convention(method) (Int32, Int32, @thin Int32.Type) -> (Bool, @error Error)
+  return %2 : $@callee_owned (Int32, Int32) -> (Bool, @error Error)
+}
+
+
+sil @wrong_terminator : $@convention(method) (Int32, Int32, @thin Int32.Type) -> (Bool, @error Error) {
+bb0(%0 : $Int32, %1 : $Int32, %2 : $@thin Int32.Type):
+  %3 = function_ref @specialized_throwing_closure : $@convention(thin) (Int32, Int32) -> (Bool, @error Error)
+  try_apply %3(%0, %1) : $@convention(thin) (Int32, Int32) -> (Bool, @error Error), normal bb1, error bb2
+
+bb1(%5 : $Bool):
+  return %5 : $Bool
+
+bb2(%7 : $Error):
+  br bb3
+
+bb3:
+  %i = integer_literal $Builtin.Int1, 1
+  cond_fail %i : $Builtin.Int1
+  unreachable
+}
+
+// CHECK-LABEL: sil @return_wrong_terminator
+// CHECK: [[M:%[0-9]+]] = metatype
+// CHECK: [[F:%[0-9]+]] = function_ref @wrong_terminator
+// CHECK: [[R:%[0-9]+]] = partial_apply [[F]]([[M]])
+// CHECK: return [[R]]
+sil @return_wrong_terminator : $@convention(thin) () -> @owned @callee_owned (Int32, Int32) -> (Bool, @error Error) {
+bb0:
+  %0 = metatype $@thin Int32.Type
+  %1 = function_ref @wrong_terminator : $@convention(method) (Int32, Int32, @thin Int32.Type) -> (Bool, @error Error)
+  %2 = partial_apply %1(%0) : $@convention(method) (Int32, Int32, @thin Int32.Type) -> (Bool, @error Error)
+  return %2 : $@callee_owned (Int32, Int32) -> (Bool, @error Error)
+}
+
+// Test generic capture propagation
+
+sil @_TFtest_generic_capture_propagation2_closure : $@convention(thin) <T> (Builtin.Int32, Builtin.FPIEEE32, Builtin.RawPointer, @in T) -> () {
+bb0(%0 : $Builtin.Int32, %1 : $Builtin.FPIEEE32, %2 : $Builtin.RawPointer, %3 : $*T):
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @test_generic_capture_propagation2_caller
+// CHECK: %[[CALLEE:[0-9]+]] = function_ref @test_generic_capture_propagation2_callee 
+// CHECK: %[[FR:[0-9]+]] = function_ref @{{.*}}test_generic_capture_propagation2_thunk{{.*}} : $@convention(thin) () -> () 
+// CHECK: %[[CONVERTED:[0-9]+]] = thin_to_thick_function %[[FR]] : $@convention(thin) () -> () to $@callee_owned () -> ()
+// CHECK-NOT: partial_apply
+// CHECK: apply %[[CALLEE]](%[[CONVERTED]]) : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
+// CHECL-NOT: partial_apply
+// CHECK: return
+sil @test_generic_capture_propagation2_caller : $@convention(thin) () -> () {
+  %0 = integer_literal $Builtin.Int32, 0
+  %1 = float_literal $Builtin.FPIEEE32, 0
+  %2 = string_literal utf8 "123"
+  %3 = global_addr @globalinit_33_06E7F1D906492AE070936A9B58CBAE1C_token8 : $*Builtin.Word
+  %4 = function_ref @_TFtest_generic_capture_propagation2_closure : $@convention(thin) <T> (Builtin.Int32, Builtin.FPIEEE32, Builtin.RawPointer, @in T) -> ()
+  %5 = thin_to_thick_function %4 : $@convention(thin) <T> (Builtin.Int32, Builtin.FPIEEE32, Builtin.RawPointer, @in T) -> () to $@callee_owned <T> (Builtin.Int32, Builtin.FPIEEE32, Builtin.RawPointer, @in T) -> ()
+  %6 = function_ref @test_generic_capture_propagation2_callee : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
+  %7 = function_ref @test_generic_capture_propagation2_thunk : $@convention(thin) <T> (Builtin.Int32, Builtin.FPIEEE32, Builtin.RawPointer, @in T, @owned @callee_owned <T> (Builtin.Int32, Builtin.FPIEEE32, Builtin.RawPointer, @in T) -> ()) -> ()
+  %8 = partial_apply %7<Builtin.Word>(%0, %1, %2, %3, %5) : $@convention(thin) <T> (Builtin.Int32, Builtin.FPIEEE32, Builtin.RawPointer, @in T, @owned @callee_owned <T> (Builtin.Int32, Builtin.FPIEEE32, Builtin.RawPointer, @in T) -> ()) -> ()
+  apply %6(%8) : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil shared @test_generic_capture_propagation2_thunk : $@convention(thin) <T> (Builtin.Int32, Builtin.FPIEEE32, Builtin.RawPointer, @in T, @owned @callee_owned <T> (Builtin.Int32, Builtin.FPIEEE32, Builtin.RawPointer, @in T) -> ()) -> () {
+bb0(%0 : $Builtin.Int32, %1 : $Builtin.FPIEEE32, %2 : $Builtin.RawPointer, %3 : $*T, %4 : $@callee_owned <T> (Builtin.Int32, Builtin.FPIEEE32, Builtin.RawPointer, @in T) -> ()):
+  apply %4<T>(%0, %1, %2, %3) : $@callee_owned <T> (Builtin.Int32, Builtin.FPIEEE32, Builtin.RawPointer, @in T) -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil shared @test_generic_capture_propagation2_callee : $@convention(thin) (@owned @callee_owned () -> ()) -> () {
+bb0(%0 : $@callee_owned () -> ()):
+  apply %0() : $@callee_owned () -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Test dead partial applied arguments when using generics
+
+sil @specialized_generic_nonthrowing_closure : $@convention(thin) <T> (@in T, @in T) -> Bool {
+bb0(%0 : $*T, %1 : $*T):
+  %10 = integer_literal $Builtin.Int1, -1
+  %9999 = struct $Bool (%10 : $Builtin.Int1)
+  return %9999 : $Bool
+}
+
+sil @nonthrowing_generic_closure : $@convention(method) <T> (@in T, @in T, @thin T.Type) -> Bool {
+bb0(%0 : $*T, %1 : $*T, %2 : $@thin T.Type):
+  %3 = function_ref @specialized_generic_nonthrowing_closure : $@convention(thin) <T> (@in T, @in T) -> Bool
+  %4 = apply %3<T>(%0, %1) : $@convention(thin) <T> (@in T, @in T) -> Bool
+  return %4 : $Bool
+}
+
+// CHECK-LABEL: sil @return_generic_nonthrowing_closure
+// CHECK: [[F:%[0-9]+]] = function_ref @$s39specialized_generic_nonthrowing_closures5Int32V_Tg5
+// CHECK: [[R:%[0-9]+]] = thin_to_thick_function [[F]]
+// CHECK: return [[R]]
+sil @return_generic_nonthrowing_closure : $@convention(thin) () -> @owned @callee_owned (@in Int32, @in Int32) -> Bool {
+bb0:
+  %0 = metatype $@thin Int32.Type
+  %1 = function_ref @nonthrowing_generic_closure : $@convention(method) <T> (@in T, @in T, @thin T.Type) -> Bool
+  %2 = partial_apply %1<Int32>(%0) : $@convention(method) <T>(@in T, @in T, @thin T.Type) -> Bool
+  return %2 : $@callee_owned (@in Int32, @in Int32) -> Bool
+}
+
+sil @cfunc : $@convention(c) (Int32, Int32) -> Bool
+
+sil @call_cfunc : $@convention(method) (Int32, Int32, @thin Int32.Type) -> Bool {
+bb0(%0 : $Int32, %1 : $Int32, %2 : $@thin Int32.Type):
+  %3 = function_ref @cfunc : $@convention(c) (Int32, Int32) -> Bool
+  %4 = apply %3(%0, %1) : $@convention(c) (Int32, Int32) -> Bool
+  return %4 : $Bool
+}
+// CHECK-LABEL: sil @test_cfunc
+// CHECK: function_ref
+// CHECK: partial_apply
+// CHECK: return
+sil @test_cfunc : $@convention(thin) () -> @owned @callee_owned (Int32, Int32) -> Bool {
+bb0:
+  %0 = metatype $@thin Int32.Type
+  %1 = function_ref @call_cfunc : $@convention(method) (Int32, Int32, @thin Int32.Type) -> Bool
+  %2 = partial_apply %1(%0) : $@convention(method) (Int32, Int32, @thin Int32.Type) -> Bool
+  return %2 : $@callee_owned (Int32, Int32) -> Bool
+}
+
+sil shared @test_capture_propagation2_callee_on_stack : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> () {
+bb0(%0 : $@noescape @callee_guaranteed () -> ()):
+  apply %0() : $@noescape @callee_guaranteed () -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil shared @test_capture_propagation2_thunk_on_stack : $@convention(thin) (Builtin.Int32, Builtin.FPIEEE32, Builtin.RawPointer, @in Builtin.Word, @noescape @callee_guaranteed (Builtin.Int32, Builtin.FPIEEE32, Builtin.RawPointer, @in Builtin.Word) -> ()) -> () {
+bb0(%0 : $Builtin.Int32, %1 : $Builtin.FPIEEE32, %2 : $Builtin.RawPointer, %3 : $*Builtin.Word, %4 : $@noescape @callee_guaranteed (Builtin.Int32, Builtin.FPIEEE32, Builtin.RawPointer, @in Builtin.Word) -> ()):
+  apply %4(%0, %1, %2, %3) : $@noescape @callee_guaranteed (Builtin.Int32, Builtin.FPIEEE32, Builtin.RawPointer, @in Builtin.Word) -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK: sil @test_capture_propagation2_caller_on_stack
+// CHECK:  [[F:%.*]] = function_ref @test_capture_propagation2_callee_on_stack : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+// CHECK:  [[F2:%.*]] = function_ref @$s40test_capture_propagation2_thunk_on_stack4_12353globalinit_33_06E7F1D906492AE070936A9B58CBAE1C_token808_TFtest_b1_C8_closureTf3pi0pd0psbpgpf_n : $@convention(thin) @noescape () -> ()
+// CHECK:  [[CL:%.*]] = thin_to_thick_function [[F2]] : $@convention(thin) @noescape () -> () to $@noescape @callee_guaranteed () -> ()
+// CHECK:  apply [[F]]([[CL]]) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+// CHECK:  return
+
+sil @test_capture_propagation2_caller_on_stack : $@convention(thin) () -> () {
+  %0 = integer_literal $Builtin.Int32, 0
+  %1 = float_literal $Builtin.FPIEEE32, 0
+  %2 = string_literal utf8 "123"
+  %3 = global_addr @globalinit_33_06E7F1D906492AE070936A9B58CBAE1C_token8 : $*Builtin.Word
+  %4 = function_ref @_TFtest_capture_propagation2_closure : $@convention(thin) (Builtin.Int32, Builtin.FPIEEE32, Builtin.RawPointer, @in Builtin.Word) -> ()
+  %5 = thin_to_thick_function %4 : $@convention(thin) (Builtin.Int32, Builtin.FPIEEE32, Builtin.RawPointer, @in Builtin.Word) -> () to $@noescape @callee_guaranteed (Builtin.Int32, Builtin.FPIEEE32, Builtin.RawPointer, @in Builtin.Word) -> ()
+  %6 = function_ref @test_capture_propagation2_callee_on_stack : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+  %7 = function_ref @test_capture_propagation2_thunk_on_stack : $@convention(thin) (Builtin.Int32, Builtin.FPIEEE32, Builtin.RawPointer, @in Builtin.Word, @noescape @callee_guaranteed (Builtin.Int32, Builtin.FPIEEE32, Builtin.RawPointer, @in Builtin.Word) -> ()) -> ()
+  %8 = partial_apply [callee_guaranteed] [on_stack] %7(%0, %1, %2, %3, %5) : $@convention(thin) (Builtin.Int32, Builtin.FPIEEE32, Builtin.RawPointer, @in Builtin.Word, @noescape @callee_guaranteed (Builtin.Int32, Builtin.FPIEEE32, Builtin.RawPointer, @in Builtin.Word) -> ()) -> ()
+  apply %6(%8) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+  dealloc_stack %8 : $@noescape @callee_guaranteed () -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}

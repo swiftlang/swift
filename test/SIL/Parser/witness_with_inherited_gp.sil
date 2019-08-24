@@ -1,0 +1,62 @@
+// RUN: %target-sil-opt %s -module-name WitnessTableWithGP | %FileCheck %s
+
+// REQUIRES: disabled
+// FIXME: <rdar://problem/20592011>
+// test/SIL/Parser/witness_with_inherited_gp.sil depends on stdlib
+// implementation details and was XFAIL'ed
+
+import Swift
+
+public struct mmEnumerateGenerator<
+  Base: GeneratorType
+> : GeneratorType, Sequence {
+  public typealias Element = (index: Int, element: Base.Element)
+  var base: Base
+  var count: Int
+
+  public init(_ base: Base)
+  public mutating func next() -> Element?
+  public typealias Generator = mmEnumerateGenerator<Base>
+  public func makeIterator() -> Generator
+}
+
+public struct mmEnumerateSequence<
+  Base: Sequence
+> : Sequence {
+  var base: Base
+  public init(_ base: Base)
+  public func makeIterator() -> mmEnumerateGenerator<Base.Generator>
+}
+
+// CHECK: sil_witness_table <Base where Base : Sequence, Base.Generator : GeneratorType> mmEnumerateSequence<Base>: _Sequence_Type module WitnessTableWithGP {
+// CHECK:  base_protocol _SequenceType: <Base where Base : Sequence, Base.Generator : GeneratorType> mmEnumerateSequence<Base>: _SequenceType module WitnessTableWithGP
+// CHECK:  associated_type Generator: mmEnumerateGenerator<Base.Generator>
+// CHECK:  associated_type_protocol (Generator: GeneratorType): mmEnumerateGenerator<Base.Generator>: specialize <Base = Base.Generator, Base.Element = Base.Generator.Element> (<Base where Base : GeneratorType> mmEnumerateGenerator<Base>: GeneratorType module WitnessTableWithGP)
+sil_witness_table <Base : Sequence> mmEnumerateSequence<Base>: _Sequence_Type module WitnessTableWithGP {
+  base_protocol _SequenceType: <Base : Sequence> mmEnumerateSequence<Base>: _SequenceType module WitnessTableWithGP
+  associated_type Generator: mmEnumerateGenerator<Base.Generator>
+  associated_type_protocol (Generator: GeneratorType): mmEnumerateGenerator<Base.Generator>: specialize <Base = Base.Generator, Base.Element = Base.Generator.Element> (<Base : GeneratorType> mmEnumerateGenerator<Base>: GeneratorType module WitnessTableWithGP)
+}
+
+public struct _mmArrayBuffer<T> : Collection {
+  public typealias Element = T
+  public var startIndex: Int { get }
+  public var endIndex: Int { get }
+  public subscript(i: Int) -> T { get }
+  public func makeIterator() -> IndexingIterator<_mmArrayBuffer>
+}
+
+sil_witness_table <T> _mmArrayBuffer<T>: _Sequence_Type module WitnessTableWithGP {
+  base_protocol _SequenceType: <T> _mmArrayBuffer<T>: _SequenceType module WitnessTableWithGP
+  associated_type Generator: IndexingIterator<_mmArrayBuffer<T>>
+  associated_type_protocol (Generator: GeneratorType): IndexingIterator<_mmArrayBuffer<T>>: specialize <C = _mmArrayBuffer<T>, C.Index = Int, C.Index.Distance = Int, C.Index.Distance.IntegerLiteralType = Int, C.Index._DisabledRangeIndex = Int, C._Element = T> (<C : _CollectionType> IndexingIterator<C>: GeneratorType module Swift)
+}
+
+// CHECK: sil_witness_table <T> _mmArrayBuffer<T>: _Sequence_Type module WitnessTableWithGP {
+// CHECK: base_protocol _SequenceType: <T> _mmArrayBuffer<T>: _SequenceType module WitnessTableWithGP
+// CHECK: associated_type Generator: IndexingIterator<_mmArrayBuffer<T>>
+// CHECK: associated_type_protocol (Generator: GeneratorType):
+// IndexingIterator<_mmArrayBuffer<T>>: specialize <C = _mmArrayBuffer<T>,
+// C.Index = Int, C.Index.Distance = Int, C.Index.Distance.IntegerLiteralType
+// = Int, C.Index._DisabledRangeIndex = Int, C._Element = T> (<C where
+// C : _CollectionType, C.Index : ForwardIndex, C.Index.Distance : _SignedInteger, C.Index.Distance.IntegerLiteralType : _ExpressibleByBuiltinIntegerLiteral> IndexingIterator<C>: GeneratorType module Swift)

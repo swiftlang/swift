@@ -1,0 +1,31 @@
+// First parse this and then emit a *.sib. Then read in the *.sib, then recreate
+// RUN: %empty-directory(%t)
+// RUN: %target-sil-opt %s -emit-sib -o %t/tmp.sib -module-name borrow
+// RUN: %target-sil-opt %t/tmp.sib -o %t/tmp.2.sib -module-name borrow
+// RUN: %target-sil-opt %t/tmp.2.sib -module-name borrow | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+
+// We do not verify here, but just make sure that all of the combinations parse and print correctly.
+// CHECK-LABEL: sil [serialized] [ossa] @borrow_test : $@convention(thin) (@in Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> () {
+// CHECK: bb0([[ARG1:%[0-9]+]] : $*Builtin.NativeObject, [[ARG2:%[0-9]+]] : @guaranteed $Builtin.NativeObject):
+// CHECK: [[BORROWED_ARG2:%.*]] = begin_borrow [[ARG2]]
+// CHECK: end_borrow [[BORROWED_ARG2]]
+// CHECK: [[MEM:%.*]] = alloc_stack $Builtin.NativeObject
+// CHECK: store_borrow [[ARG2]] to [[MEM]] : $*Builtin.NativeObject
+// CHECK: } // end sil function 'borrow_test'
+sil [serialized] [ossa] @borrow_test : $@convention(thin) (@in Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : $*Builtin.NativeObject, %1 : @guaranteed $Builtin.NativeObject):
+  %2 = begin_borrow %1 : $Builtin.NativeObject
+  end_borrow %2 : $Builtin.NativeObject
+
+  %3 = alloc_stack $Builtin.NativeObject
+  store_borrow %1 to %3 : $*Builtin.NativeObject
+  end_borrow %3 : $*Builtin.NativeObject
+  dealloc_stack %3 : $*Builtin.NativeObject
+  destroy_addr %0 : $*Builtin.NativeObject
+  %4 = tuple()
+  return %4 : $()
+}

@@ -1,0 +1,73 @@
+
+%{
+  # -*- mode: C++ -*-
+  from gyb_syntax_support import *
+  NODE_MAP = create_node_map()
+  # Ignore the following admonition; it applies to the resulting .cpp file only
+}%
+//// Automatically Generated From SyntaxBuilders.cpp.gyb.
+//// Do Not Edit Directly!
+//===------------ SyntaxBuilders.cpp - Syntax Builder definitions ---------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+
+#include "swift/Syntax/SyntaxBuilders.h"
+
+using namespace swift;
+using namespace swift::syntax;
+
+% for node in SYNTAX_NODES:
+%   if node.is_buildable():
+%     for child in node.children:
+${node.name}Builder &
+${node.name}Builder::use${child.name}(${child.type_name} ${child.name}) {
+  Layout[cursorIndex(${node.name}::Cursor::${child.name})] =
+    ${child.name}.getRaw();
+  return *this;
+}
+%       child_node = NODE_MAP.get(child.syntax_kind)
+%       if child_node and child_node.is_syntax_collection():
+%         child_elt = child.collection_element_name
+%         child_elt_type = child_node.collection_element_type
+%         if not child_elt:
+%           raise Exception("'collection_element_name' should be set for '%s' of '%s'" % (child.name, node.name))
+%         end
+${node.name}Builder &
+${node.name}Builder::add${child_elt}(${child_elt_type} ${child_elt}) {
+  auto &raw = Layout[cursorIndex(${node.name}::Cursor::${child.name})];
+  if (!raw)
+    raw = RawSyntax::make(SyntaxKind::${child_node.syntax_kind},
+                          {${child_elt}.getRaw()},
+                          SourcePresence::Present, Arena);
+  else
+    raw = raw->append(${child_elt}.getRaw());
+  return *this;
+}
+%       end
+%     end
+${node.name}
+${node.name}Builder::build() {
+% if node.children:
+%   for (idx, child) in enumerate(node.children):
+%     if not child.is_optional:
+  if (!Layout[${idx}])
+    Layout[${idx}] = ${make_missing_child(child)};
+%     end
+%   end
+% end
+  auto raw = RawSyntax::make(SyntaxKind::${node.syntax_kind}, 
+    Layout, SourcePresence::Present, Arena);
+  return make<${node.name}>(raw);
+}
+
+%   end
+% end

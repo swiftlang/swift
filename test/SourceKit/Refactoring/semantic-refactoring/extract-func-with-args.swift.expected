@@ -1,0 +1,13 @@
+source.edit.kind.active:
+  1:1-1:1 "fileprivate func new_name(_ a: inout Int) {
+a = a + 1
+}
+
+"
+  <note>source.refactoring.range.kind.basename 1:18-1:26 "new_name"</note>
+  <note>source.refactoring.range.kind.decl-argument-label 1:27-1:28 arg-index=0 "_"</note>
+  <note>source.refactoring.range.kind.parameter-and-whitespace 1:28-1:30 arg-index=0 " a"</note>
+source.edit.kind.active:
+  3:3-3:12 "new_name(&a)"
+  <note>source.refactoring.range.kind.basename 1:1-1:9 "new_name"</note>
+  <note>source.refactoring.range.kind.call-argument-combined 1:10-1:10 arg-index=0 ""</note>

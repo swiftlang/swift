@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+#===--- toolchain-installer - Creates installer pkg for OS X ---------------===#
+#
+## This source file is part of the Swift.org open source project
+##
+## Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+## Licensed under Apache License v2.0 with Runtime Library Exception
+##
+## See https://swift.org/LICENSE.txt for license information
+## See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+#
+#===------------------------------------------------------------------------===#
+
+TOOLCHAIN_PREFIX=$1
+DARWIN_BUNDLE_IDENTIFIER=$2
+DARWIN_INSTALLER_CERT=$3
+DARWIN_INSTALLER_PACKAGE=$4
+DARWIN_TOOLCHAIN_INSTALL_LOCATION=$5
+DARWIN_TOOLCHAIN_VERSION=$6
+DARWIN_SCRIPTS=$7
+
+pkgbuild --root "${TOOLCHAIN_PREFIX}" --install-location "${DARWIN_TOOLCHAIN_INSTALL_LOCATION}" "${DARWIN_INSTALLER_PACKAGE}" \
+         --version "${DARWIN_TOOLCHAIN_VERSION}" --identifier "${DARWIN_BUNDLE_IDENTIFIER}" --sign "${DARWIN_INSTALLER_CERT}" \
+         --scripts "${DARWIN_SCRIPTS}"

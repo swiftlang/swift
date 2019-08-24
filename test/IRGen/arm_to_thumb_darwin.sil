@@ -1,0 +1,28 @@
+// RUN: %swift -target armv7-apple-ios7 -disable-legacy-type-info %s -gnone -emit-ir -o - | %FileCheck %s -check-prefix=IOS
+// RUN: %swift -target armv7k-apple-watchos2 -disable-legacy-type-info %s -gnone -emit-ir -o - | %FileCheck %s -check-prefix=WATCHOS
+
+// REQUIRES: CODEGENERATOR=ARM
+
+sil_stage canonical
+import Builtin
+
+// IOS: target triple = "thumbv7-apple-ios7
+
+// IOS: define{{( protected)?}} swiftcc i32 @word_literal() {{.*}} {
+// IOS: entry:
+// IOS:   ret i32 12345
+// IOS: }
+
+
+// WATCHOS: target triple = "thumbv7k-apple-watchos2
+
+// WATCHOS: define{{( protected)?}} swiftcc i32 @word_literal() {{.*}} {
+// WATCHOS: entry:
+// WATCHOS:   ret i32 12345
+// WATCHOS: }
+
+sil @word_literal : $() -> Builtin.Word {
+entry:
+  %w = integer_literal $Builtin.Word, 12345
+  return %w : $Builtin.Word
+}

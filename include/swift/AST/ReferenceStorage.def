@@ -1,0 +1,197 @@
+//===--- ReferenceStorage.def - Non-default reference storage ---*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2018 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// This file defines non-default reference storage kind macros used for
+// macro-metaprogramming.
+//
+//===----------------------------------------------------------------------===//
+
+/// There are two fundamental reference storage types: checked and unchecked.
+/// Checked storage types have runtime enforced correctness.
+/// Unchecked storage types have no runtime enforced correctness.
+///
+/// Checked reference storage types are also subcategorized by loadability.
+/// * Always loadable: The compiler may move the reference or use registers.
+/// * Never loadable: The runtime (etc) tracks the address of the reference.
+/// * Sometimes loadable: If the reference is a native object, then it is
+///   always loadable. Otherwise fall back to never loadable semantics, a.k.a.
+///   "address only".
+///
+/// Unchecked reference storage types are always loadable.
+///
+/// The primary macros therefore are:
+/// * ALWAYS_LOADABLE_CHECKED_REF_STORAGE
+/// * SOMETIMES_LOADABLE_CHECKED_REF_STORAGE
+/// * NEVER_LOADABLE_CHECKED_REF_STORAGE
+/// * UNCHECKED_REF_STORAGE
+///
+/// Helper macros include:
+/// * CHECKED_REF_STORAGE -- Any checked reference storage type. Specifically
+///   "always", "sometimes", and "never" -- but not "unchecked".
+/// * LOADABLE_REF_STORAGE -- Any loadable reference storage type. Specifically
+///   "always", "sometimes", and "unchecked" -- but not "never".
+/// * ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE -- self describing.
+/// * NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE -- self describing.
+///
+/// SUBSYSTEMS NOTES
+///
+/// In general, reference storage types are barely visible in the user facing
+/// type system and therefore AST clients above SIL can get away with
+/// just REF_STORAGE, or CHECKED_REF_STORAGE with UNCHECKED_REF_STORAGE.
+///
+/// When it comes to SIL aware AST clients, loadability matters. The best way
+/// to understand how the helper macros are used is to look at SILNodes.def.
+/// What follows is a short -- possibly not up to date -- summary:
+///
+/// UNCHECKED_REF_STORAGE
+///   Name##RetainValueInst
+///   Name##ReleaseValueInst
+/// LOADABLE_REF_STORAGE
+///   Ref*ToNameInst
+///   Name*ToRefInst
+/// NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE
+///   Load##Name##Inst
+///   Store##Name##Inst
+/// ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE
+///   Copy##Name##ValueInst
+///   StrongRetain##Name##Inst
+///   Name##RetainInst
+///   Name##ReleaseInst
+///
+/// After helper macro expansion:
+///
+/// UNCHECKED_REF_STORAGE
+///   Ref*ToNameInst
+///   Name*ToRefInst
+///   Name##RetainValueInst
+///   Name##ReleaseValueInst
+/// ALWAYS_LOADABLE_CHECKED_REF_STORAGE
+///   Ref*ToNameInst
+///   Name*ToRefInst
+///   Copy##Name##ValueInst
+///   StrongRetain##Name##Inst
+///   Name##RetainInst
+///   Name##ReleaseInst
+/// SOMETIMES_LOADABLE_CHECKED_REF_STORAGE
+///   Ref*ToNameInst
+///   Name*ToRefInst
+///   Load##Name##Inst
+///   Store##Name##Inst
+///   Copy##Name##ValueInst
+///   StrongRetain##Name##Inst
+///   Name##RetainInst
+///   Name##ReleaseInst
+/// NEVER_LOADABLE_CHECKED_REF_STORAGE
+///   Load##Name##Inst
+///   Store##Name##Inst
+///
+/// Finally, a note about IRGen: TypeInfos need to be created per reference
+/// storage type, and SOMETIMES_LOADABLE_CHECKED_REF_STORAGE needs *two*
+/// TypeInfos to be created. One for the loadable scenario, and one for the
+/// address-only scenario.
+
+
+#ifndef REF_STORAGE
+#define REF_STORAGE(Name, name, NAME)
+#endif
+
+#ifdef ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE
+  #if defined(ALWAYS_LOADABLE_CHECKED_REF_STORAGE) || \
+      defined(SOMETIMES_LOADABLE_CHECKED_REF_STORAGE)
+    #error Overlapping meta-programming macros
+  #endif
+  #define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, name, NAME) \
+    ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, name, NAME)
+  #define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, name, NAME) \
+    ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, name, NAME)
+#endif
+
+#ifdef NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE
+  #if defined(NEVER_LOADABLE_CHECKED_REF_STORAGE) || \
+      defined(SOMETIMES_LOADABLE_CHECKED_REF_STORAGE)
+    #error Overlapping meta-programming macros
+  #endif
+  #define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, name, NAME) \
+     NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, name, NAME)
+  #define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, name, NAME) \
+     NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, name, NAME)
+#endif
+
+#ifdef LOADABLE_REF_STORAGE
+  #if defined(ALWAYS_LOADABLE_CHECKED_REF_STORAGE) || \
+      defined(SOMETIMES_LOADABLE_CHECKED_REF_STORAGE) || \
+      defined(UNCHECKED_REF_STORAGE)
+    #error Overlapping meta-programming macros
+  #endif
+  #define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, name, NAME) \
+    LOADABLE_REF_STORAGE(Name, name, NAME)
+  #define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, name, NAME) \
+    LOADABLE_REF_STORAGE(Name, name, NAME)
+  #define UNCHECKED_REF_STORAGE(Name, name, NAME) \
+    LOADABLE_REF_STORAGE(Name, name, NAME)
+#endif
+
+#ifdef CHECKED_REF_STORAGE
+  #if defined(SOMETIMES_LOADABLE_CHECKED_REF_STORAGE) || \
+      defined(ALWAYS_LOADABLE_CHECKED_REF_STORAGE) || \
+      defined(NEVER_LOADABLE_CHECKED_REF_STORAGE)
+    #error Overlapping meta-programming macros
+  #endif
+  #define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, name, NAME) \
+    CHECKED_REF_STORAGE(Name, name, NAME)
+  #define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, name, NAME) \
+    CHECKED_REF_STORAGE(Name, name, NAME)
+  #define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, name, NAME) \
+    CHECKED_REF_STORAGE(Name, name, NAME)
+#endif
+
+#ifndef NEVER_LOADABLE_CHECKED_REF_STORAGE
+#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, name, NAME) \
+  REF_STORAGE(Name, name, NAME)
+#endif
+
+#ifndef SOMETIMES_LOADABLE_CHECKED_REF_STORAGE
+#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, name, NAME) \
+  REF_STORAGE(Name, name, NAME)
+#endif
+
+#ifndef ALWAYS_LOADABLE_CHECKED_REF_STORAGE
+#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, name, NAME) \
+  REF_STORAGE(Name, name, NAME)
+#endif
+
+#ifndef UNCHECKED_REF_STORAGE
+#define UNCHECKED_REF_STORAGE(Name, name, NAME) \
+  REF_STORAGE(Name, name, NAME)
+#endif
+
+#ifndef REF_STORAGE_RANGE
+#define REF_STORAGE_RANGE(First, Last)
+#endif
+
+// NOTE: You will need to update ReferenceOwnership in ModuleFormat.h.
+NEVER_LOADABLE_CHECKED_REF_STORAGE(Weak, weak, WEAK)
+SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Unowned, unowned, UNOWNED)
+UNCHECKED_REF_STORAGE(Unmanaged, unmanaged, UNMANAGED)
+REF_STORAGE_RANGE(Weak, Unmanaged)
+
+#undef REF_STORAGE
+#undef NEVER_LOADABLE_CHECKED_REF_STORAGE
+#undef ALWAYS_LOADABLE_CHECKED_REF_STORAGE
+#undef SOMETIMES_LOADABLE_CHECKED_REF_STORAGE
+#undef UNCHECKED_REF_STORAGE
+#undef REF_STORAGE_RANGE
+
+#undef ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE
+#undef NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE
+#undef LOADABLE_REF_STORAGE
+#undef CHECKED_REF_STORAGE

@@ -1,0 +1,30 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/def_public_non_abi.sil
+// RUN: %target-swift-frontend -emit-sil -I %t %s | %FileCheck %s
+
+sil_stage raw
+
+import def_public_non_abi
+import Builtin
+import Swift
+
+// CHECK-LABEL: sil @top_level_code
+// CHECK: function_ref @public_non_abi_function : $@convention(thin) () -> ()
+// CHECK: return
+
+sil @top_level_code : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @public_non_abi_function : $@convention(thin) () -> ()
+  %1 = tuple ()
+  return %1 : $()
+}
+
+// Make sure the function body is deserialized.
+// CHECK-LABEL: sil shared_external [serialized] @public_non_abi_function : $@convention(thin) () -> ()
+// CHECK: function_ref @other_public_non_abi_function
+// CHECK: return
+sil hidden_external [serialized] @public_non_abi_function : $@convention(thin) () -> ()
+
+// Make sure the function body is deserialized.
+// CHECK-LABEL: sil shared_external [serialized] @other_public_non_abi_function : $@convention(thin) () -> ()
+// CHECK: return

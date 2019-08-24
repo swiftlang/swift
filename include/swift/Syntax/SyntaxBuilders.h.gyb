@@ -1,0 +1,69 @@
+%{
+  # -*- mode: C++ -*-
+  from gyb_syntax_support import *
+  NODE_MAP = create_node_map()
+  # Ignore the following admonition; it applies to the resulting .h file only
+}%
+//// Automatically Generated From SyntaxBuilders.h.gyb.
+//// Do Not Edit Directly!
+//===------------- SyntaxBuilders.h - Syntax Node definitions -------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+#ifndef SWIFT_SYNTAX_BUILDERS_H
+#define SWIFT_SYNTAX_BUILDERS_H
+
+#include "swift/Syntax/RawSyntax.h"
+#include "swift/Syntax/SyntaxNodes.h"
+
+namespace swift {
+namespace syntax {
+
+class SyntaxArena;
+
+% for node in SYNTAX_NODES:
+%   if node.is_buildable():
+%     child_count = len(node.children)
+class ${node.name}Builder {
+  RC<SyntaxArena> Arena = nullptr;
+  RC<RawSyntax> Layout[${child_count}] = {
+%     for child in node.children:
+    nullptr,
+%     end
+  };
+
+public:
+  ${node.name}Builder() = default;
+  ${node.name}Builder(const RC<SyntaxArena> &Arena) : Arena(Arena) {}
+
+%     for child in node.children:
+  ${node.name}Builder &use${child.name}(${child.type_name} ${child.name});
+%       child_node = NODE_MAP.get(child.syntax_kind)
+%       if child_node and child_node.is_syntax_collection():
+%         child_elt = child.collection_element_name
+%         child_elt_type = child_node.collection_element_type
+%         if not child_elt:
+%           raise Exception("'collection_element_name' should be set for '%s' of '%s'" % (child.name, node.name))
+%         end
+  ${node.name}Builder &add${child_elt}(${child_elt_type} ${child_elt});
+%       end
+%     end
+
+  ${node.name} build();
+};
+
+%   end
+% end
+
+}
+}
+
+#endif // SWIFT_SYNTAX_BUILDERS_H

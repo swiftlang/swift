@@ -1,0 +1,17 @@
+/* Just add a few things to the default theme. */
+@import "haiku.css";
+
+div.content ul > li {
+  background: none;
+  list-style-type: initial;
+  padding-left: 0;
+  margin-left: 2em;
+}
+
+div.highlight {
+  background-color: inherit; /* highlighting was overflowing boxes */
+}
+
+tt, pre {
+  font-family: "menlo", "Lucida Console", monospace, sans-serif;
+}

@@ -1,0 +1,32 @@
+silopt_register_sources(
+  AADumper.cpp
+  AccessSummaryDumper.cpp
+  AccessedStorageDumper.cpp
+  BasicCalleePrinter.cpp
+  BasicInstructionPropertyDumper.cpp
+  BugReducerTester.cpp
+  CFGPrinter.cpp
+  CallerAnalysisPrinter.cpp
+  ComputeDominanceInfo.cpp
+  ComputeLoopInfo.cpp
+  ConstantEvaluatorTester.cpp
+  EpilogueARCMatcherDumper.cpp
+  EpilogueRetainReleaseMatcherDumper.cpp
+  EscapeAnalysisDumper.cpp
+  FunctionOrderPrinter.cpp
+  IVInfoPrinter.cpp
+  InstCount.cpp
+  LSLocationPrinter.cpp
+  Link.cpp
+  LoopCanonicalizer.cpp
+  LoopInfoPrinter.cpp
+  LoopRegionPrinter.cpp
+  MemBehaviorDumper.cpp
+  RCIdentityDumper.cpp
+  SerializeSILPass.cpp
+  SILDebugInfoGenerator.cpp
+  SideEffectsDumper.cpp
+  SimplifyUnreachableContainingBlocks.cpp
+  StripDebugInfo.cpp
+  OwnershipDumper.cpp
+)

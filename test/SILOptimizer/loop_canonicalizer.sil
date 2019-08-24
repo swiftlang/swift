@@ -1,0 +1,243 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -compute-dominance-info -compute-loop-info -loop-canonicalizer %s | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+
+// CHECK-LABEL: sil @insert_preheader_1 : $@convention(thin) () -> () {
+// CHECK: bb0:
+// CHECK: cond_br undef, bb1, bb4
+// CHECK: bb1:
+// CHECK: br bb2
+// CHECK: bb2:
+// CHECK: cond_br undef, bb2, bb3
+// CHECK: bb3:
+// CHECK: br bb4
+// CHECK: bb4:
+// CHECK: return undef
+sil @insert_preheader_1 : $@convention(thin) () -> () {
+bb0:
+  cond_br undef, bb1, bb3
+
+// A bb will be inserted along the edge from bb0 -> bb1.
+bb1:
+  cond_br undef, bb1, bb2
+
+// This is the exit block of the loop on bb1. We do this so this test *only*
+// tests the preheader insertion vs the exit block canonicalization.
+bb2:
+  br bb3
+
+bb3:
+  return undef : $()
+}
+
+// Make sure that we insert the pre-header correctly given a header with
+// multiple predecessors.
+//
+// CHECK-LABEL: sil @insert_preheader_2 : $@convention(thin) () -> () {
+// CHECK: bb0:
+// CHECK: cond_br undef, bb1, [[PREHEADER:bb[0-9]+]]
+// CHECK: bb1:
+// CHECK: br [[PREHEADER]]
+// CHECK: [[PREHEADER]]:
+// CHECK: br bb3
+// CHECK: bb3:
+// CHECK: cond_br undef, bb3, bb4
+// CHECK: return undef : $()
+sil @insert_preheader_2 : $@convention(thin) () -> () {
+bb0:
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb2
+
+bb2:
+  cond_br undef, bb2, bb3
+
+bb3:
+  return undef : $()
+}
+
+// Make sure that we can handle pre-header insertion for loops in sequence
+// (i.e. where one loop branches into another loop) correctly in terms of
+// updating loop info.
+//
+// CHECK-LABEL: sil @insert_preheader_3 : $@convention(thin) () -> () {
+// CHECK: bb0:
+// CHECK: cond_br undef, bb1, bb4
+// CHECK: bb1:
+// CHECK: br bb2
+// CHECK: bb2:
+// CHECK: cond_br undef, bb2, bb3
+// CHECK: bb3:
+// CHECK: br bb7
+// CHECK: bb4:
+// CHECK: br bb5
+// CHECK: bb5:
+// CHECK: cond_br undef, bb5, bb6
+// CHECK: bb6:
+// CHECK: br bb7
+// CHECK: bb7
+// CHECK: br bb8
+// CHECK: bb8:
+// CHECK: cond_br undef, bb8, bb9
+// CHECK: bb9:
+// CHECK: return undef
+sil @insert_preheader_3 : $@convention(thin) () -> () {
+bb0:
+  cond_br undef, bb1, bb2
+
+bb1:
+  cond_br undef, bb1, bb3
+
+bb2:
+  cond_br undef, bb2, bb3
+
+bb3:
+  cond_br undef, bb3, bb4
+
+bb4:
+  return undef : $()
+}
+
+// Make sure that we insert pre-headers correctly for nested loops I am using
+// patterns in more places than I need to, to make the test case more obvious to
+// the reader.
+//
+// CHECK-LABEL: sil @insert_preheader_4 : $@convention(thin) () -> () {
+// CHECK: bb0:
+// CHECK: br bb1
+// CHECK: bb1:
+// CHECK: cond_br undef, bb2, [[PREHEADER_1:bb[0-9]+]]
+// CHECK: bb2:
+// CHECK: br [[PREHEADER_1]]
+// First pre-header
+// CHECK: [[PREHEADER_1]]:
+// CHECK: br bb4
+// CHECK: bb4:
+// CHECK: cond_br undef, bb8, [[PREHEADER_2:bb[0-9]+]]
+// CHECK: [[PREHEADER_2]]:
+// CHECK: br bb6
+// CHECK: bb6:
+// CHECK: cond_br undef, bb6, bb7
+// This is an exit bb for bb6.
+// CHECK: bb7:
+// CHECK: cond_br undef, bb8, bb9
+// CHECK: bb8:
+// CHECK: br bb4
+// CHECK: bb9:
+// CHECK: return undef
+sil @insert_preheader_4 : $@convention(thin) () -> () {
+bb0:
+  br bb1
+
+bb1:
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb3
+
+bb3:
+  cond_br undef, bb3, bb4
+
+bb4:
+  cond_br undef, bb4, bb5
+
+bb5:
+  cond_br undef, bb3, bb6
+
+bb6:
+  return undef : $()
+}
+
+// Test insertBackedgeBlock.
+//
+// CHECK-LABEL: insert_backedge_block
+// CHECK: bb2:
+// CHECK: cond_br undef, bb3, bb4
+// CHECK: bb3:
+// CHECK: br bb1
+// CHECK: bb4:
+// CHECK: cond_br undef, bb3, bb5
+sil @insert_backedge_block : $@convention(thin) () -> () {
+bb0:
+  br bb1
+
+bb1:
+  br bb2
+
+bb2:
+  cond_br undef, bb1, bb3
+
+bb3:
+  cond_br undef, bb1, bb4
+
+bb4:
+  return undef : $()
+}
+
+// CHECK-LABEL: sil @insert_backedge_block_inner_loop : $@convention(thin) () -> () {
+// CHECK: bb1:
+// CHECK: br bb2
+// CHECK: bb2:
+// CHECK: br bb3
+// CHECK: bb3:
+// CHECK: cond_br undef, bb4, bb5
+// CHECK: bb4:
+// CHECK: br bb2
+// CHECK: bb5:
+// CHECK: cond_br undef, bb4, bb6
+// CHECK: bb6:
+// CHECK: cond_br undef, bb1, bb7
+// CHECK: bb7:
+// CHECK: return undef
+sil @insert_backedge_block_inner_loop : $@convention(thin) () -> () {
+bb0:
+  br bb1
+
+bb1:
+  br bb2
+
+bb2:
+  br bb3
+
+bb3:
+  cond_br undef, bb2, bb4
+
+bb4:
+  cond_br undef, bb2, bb5
+
+bb5:
+  cond_br undef, bb1, bb6
+
+bb6:
+  return undef : $()
+}
+
+// CHECK-LABEL: sil @exit_blocks_should_only_have_exiting_blocks_as_predecessors : $@convention(thin) () -> () {
+// CHECK: bb0:
+// CHECK: cond_br undef, bb1, bb4
+// CHECK: bb1:
+// CHECK: br bb2
+// CHECK: bb2:
+// CHECK: cond_br undef, bb2, bb3
+// CHECK: bb3:
+// CHECK: br bb4
+// CHECK: bb4:
+// CHECK: return undef
+sil @exit_blocks_should_only_have_exiting_blocks_as_predecessors : $@convention(thin) () -> () {
+bb0:
+  cond_br undef, bb1, bb3
+
+// Header
+bb1:
+  br bb2
+
+bb2:
+  cond_br undef, bb2, bb3
+
+// Exit with multiple predecessors. The edge from bb2 -> bb3 will be split.
+bb3:
+  return undef : $()
+}

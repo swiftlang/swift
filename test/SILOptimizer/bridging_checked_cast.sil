@@ -1,0 +1,71 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -inline %s | %FileCheck %s
+// REQUIRES: objc_interop
+
+import Swift
+
+// FIXME: Should go into the standard library.
+public extension _ObjectiveCBridgeable {
+  static func _unconditionallyBridgeFromObjectiveC(_ source: _ObjectiveCType?)
+      -> Self
+}
+
+@objc class NSCloud {}
+
+struct Butt: _ObjectiveCBridgeable {
+  typealias _ObjectiveCType = NSCloud
+  func _bridgeToObjectiveC() -> NSCloud
+  static func _forceBridgeFromObjectiveC(_ source: NSCloud,
+                                         result: inout Butt?)
+  static func _conditionallyBridgeFromObjectiveC(_ source: NSCloud,
+                                         result: inout Butt?) -> Bool
+}
+
+sil @checked_cast_object_to_value : $@convention(thin) () -> () {
+entry:
+  %b = alloc_stack $NSCloud
+  %c = alloc_stack $Butt
+
+  checked_cast_addr_br take_always NSCloud in %b : $*NSCloud to Butt in %c : $*Butt, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  dealloc_stack %c : $*Butt
+  dealloc_stack %b : $*NSCloud
+  return undef : $()
+}
+
+sil @checked_cast_value_to_object : $@convention(thin) () -> () {
+entry:
+  %b = alloc_stack $NSCloud
+  %c = alloc_stack $Butt
+
+  checked_cast_addr_br take_always Butt in %c : $*Butt to NSCloud in %b : $*NSCloud, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  dealloc_stack %c : $*Butt
+  dealloc_stack %b : $*NSCloud
+  return undef : $()
+}
+
+// CHECK-LABEL: sil @inline_into_here
+// CHECK:         checked_cast_addr_br take_always NSCloud in {{%.*}} : $*NSCloud to Butt in {{%.*}} : $*Butt
+// CHECK:         checked_cast_addr_br take_always Butt in {{%.*}} : $*Butt to NSCloud in {{%.*}} : $*NSCloud
+sil @inline_into_here : $@convention(thin) () -> () {
+entry:
+  %f = function_ref @checked_cast_object_to_value : $@convention(thin) () -> ()
+  %y = apply %f() : $@convention(thin) () -> ()
+  %g = function_ref @checked_cast_value_to_object : $@convention(thin) () -> ()
+  %z = apply %g() : $@convention(thin) () -> ()
+  return %z : $()
+}

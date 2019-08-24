@@ -1,0 +1,7 @@
+// RUN: %target-sil-opt -sil-print-debuginfo %s | %FileCheck %s
+
+sil @foo : $@convention(thin) () -> () {
+bb0:
+          return undef : $(), loc "foo.sil":12:34
+// CHECK: return undef : $(), loc "foo.sil":12:34
+}

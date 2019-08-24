@@ -1,0 +1,24 @@
+Name: VersionedFMWK
+SwiftVersions:
+  - Version: 4
+    Classes:
+      - Name: InnerClass
+        SwiftName: InnerClass
+      - Name: NullabilityBase
+        Methods:
+          - Selector: 'initFormerlyFailableValue:'
+            MethodKind: Instance
+            NullabilityOfRet: O
+          - Selector: 'processNowNullableArgument:'
+            MethodKind: Instance
+            Parameters:
+              - Position: 0
+                Nullability: N
+    Tags:
+      - Name: InnerStruct
+        SwiftName: InnerStruct
+    Typedefs:
+      - Name: InnerAlias
+        SwiftName: InnerAlias
+      - Name: InnerAnonStruct
+        SwiftName: InnerAnonStruct

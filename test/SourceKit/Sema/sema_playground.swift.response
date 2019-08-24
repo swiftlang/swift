@@ -1,0 +1,17 @@
+[
+  {
+    key.kind: source.lang.swift.ref.var.global,
+    key.offset: 25,
+    key.length: 1
+  }
+]
+[
+  {
+    key.line: 1,
+    key.column: 5,
+    key.filepath: sema_playground.swift,
+    key.severity: source.diagnostic.severity.error,
+    key.description: "cannot declare entity named '$blah'; the '$' prefix is reserved for implicitly-synthesized declarations",
+    key.diagnostic_stage: source.diagnostic.stage.swift.sema
+  }
+]

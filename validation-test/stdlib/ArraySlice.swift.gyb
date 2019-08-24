@@ -1,0 +1,18 @@
+// RUN: %target-run-simple-swiftgyb
+// REQUIRES: executable_test
+
+import StdlibUnittest
+import StdlibCollectionUnittest
+
+% import os.path
+% import gyb
+% ArrayType = 'ArraySlice'
+
+var ${ArrayType}TestSuite = TestSuite("${ArrayType}")
+
+% CommonTestsTemplate = gyb.parse_template(os.path.join(os.path.dirname(__file__), "Inputs/CommonArrayTests.gyb"))
+% CommonTests = gyb.execute_template(CommonTestsTemplate, Suite=ArrayType+'TestSuite', ArrayType=ArrayType)
+
+${CommonTests}
+
+runAllTests()

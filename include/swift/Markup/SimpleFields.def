@@ -1,0 +1,55 @@
+//===--- SimpleFields.def - Swift Markup ------------------------*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// This file defines simple top-level field extensions for doc comments.
+// These definitions automatically generate the classes and XML printing
+// facilities.
+//
+// There must be a corresponding definition of these nodes
+// in include/swift/Markup/ASTNodes.def.
+//
+//===----------------------------------------------------------------------===//
+
+// MARKUP_SIMPLE_FIELD(Id, Keyword, XMLKind)
+
+MARKUP_SIMPLE_FIELD(AttentionField, attention, Attention)
+MARKUP_SIMPLE_FIELD(AuthorField, author, Author)
+MARKUP_SIMPLE_FIELD(AuthorsField, authors, Authors)
+MARKUP_SIMPLE_FIELD(BugField, bug, Bug)
+MARKUP_SIMPLE_FIELD(Complexity, complexity, Complexity)
+MARKUP_SIMPLE_FIELD(CopyrightField, copyright, Copyright)
+MARKUP_SIMPLE_FIELD(DateField, date, Date)
+MARKUP_SIMPLE_FIELD(ExperimentField, experiment, Experiment)
+MARKUP_SIMPLE_FIELD(ImportantField, important, Important)
+MARKUP_SIMPLE_FIELD(InvariantField, invariant, Invariant)
+MARKUP_SIMPLE_FIELD(LocalizationKeyField, localizationkey, LocalizationKey)
+MARKUP_SIMPLE_FIELD(MutatingvariantField, mutatingvariant, Mutatingvariant)
+MARKUP_SIMPLE_FIELD(NonmutatingvariantField, nonmutatingvariant, Nonmutatingvariant)
+MARKUP_SIMPLE_FIELD(NoteField, note, Note)
+MARKUP_SIMPLE_FIELD(PostconditionField, postcondition, Postcondition)
+MARKUP_SIMPLE_FIELD(PreconditionField, precondition, Precondition)
+MARKUP_SIMPLE_FIELD(RemarkField, remark, Remark)
+MARKUP_SIMPLE_FIELD(RemarksField, remarks, Remarks)
+MARKUP_SIMPLE_FIELD(ReturnsField, returns, Returns)
+MARKUP_SIMPLE_FIELD(ThrowsField, throws, Throws)
+MARKUP_SIMPLE_FIELD(RequiresField, requires, Requires)
+MARKUP_SIMPLE_FIELD(SeeField, seealso, See)
+MARKUP_SIMPLE_FIELD(SinceField, since, Since)
+MARKUP_SIMPLE_FIELD(TagField, tag, Tag)
+MARKUP_SIMPLE_FIELD(TODOField, todo, TODO)
+MARKUP_SIMPLE_FIELD(VersionField, version, Version)
+MARKUP_SIMPLE_FIELD(WarningField, warning, Warning)
+MARKUP_SIMPLE_FIELD(KeywordField, keyword, Keyword)
+MARKUP_SIMPLE_FIELD(RecommendedField, recommended, Recommended)
+MARKUP_SIMPLE_FIELD(RecommendedoverField, recommendedover, Recommendedover)
+
+#undef MARKUP_SIMPLE_FIELD

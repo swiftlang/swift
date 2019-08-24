@@ -1,0 +1,66 @@
+[
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "s:6Cities16setCityProperty1yyA2AC_SitF",
+    "OldPrintedName": "setCityProperty1(_:_:)",
+    "NewPrintedName": "setProperty(Prop:)",
+    "NewTypeName": "Cities",
+    "SelfIndex": 0
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "s:6Cities14globalCityFuncyyF",
+    "OldPrintedName": "globalCityFunc()",
+    "NewPrintedName": "memberFunc()",
+    "NewTypeName": "Cities"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "s:6Cities16setCityProperty2yyA2AC_S2itF",
+    "OldPrintedName": "setCityProperty2(_:_:_:)",
+    "NewPrintedName": "setProperty2(with:using:)",
+    "NewTypeName": "Cities",
+    "SelfIndex": 0
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "s:6Cities15globalCityFunc2yyA2ACF",
+    "OldPrintedName": "globalCityFunc2(_:)",
+    "NewPrintedName": "Property2",
+    "NewTypeName": "Cities",
+    "SelfIndex": 0
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "s:6Cities15globalCityFunc3ySiA2AC_SitF",
+    "OldPrintedName": "globalCityFunc3(_:_:)",
+    "NewPrintedName": "memberFunc3()",
+    "NewTypeName": "Cities",
+    "SelfIndex": 0,
+    "RemovedIndex": 1
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "s:6Cities15globalCityFunc4ySiA2AC_S2itF",
+    "OldPrintedName": "globalCityFunc4(_:_:_:)",
+    "NewPrintedName": "memberFunc4(remaining:)",
+    "NewTypeName": "Cities",
+    "SelfIndex": 0,
+    "RemovedIndex": 1
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "s:6Cities15globalCityFunc5SiyF",
+    "OldPrintedName": "globalCityFunc5()",
+    "NewPrintedName": "property5",
+    "NewTypeName": "Cities.Nested"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "s:6Cities22globalCityPointerTakerySiSPyA2ACG_S2itF",
+    "OldPrintedName": "globalCityPointerTaker(_:_:_:)",
+    "NewPrintedName": "takePointer(Pointer1:Pointer2:)",
+    "NewTypeName": "Cities",
+    "SelfIndex": 0,
+  }
+]

@@ -1,0 +1,87 @@
+% for Kind in Kinds:
+%Minimal = 'Minimal' + Kind
+
+${Test}.test("flatMap/${Kind}/Lazy") {
+  for test in flatMapTests {
+    let s = ${Minimal}<OpaqueValue<Int>>(
+      elements: test.sequence.map(OpaqueValue.init))
+    let closureLifetimeTracker = LifetimeTracked(0)
+    var timesClosureWasCalled = 0
+
+    var result = s.lazy.flatMap {
+      (element: OpaqueValue<Int>) -> ${Minimal}<OpaqueValue<Int32>> in
+      _blackHole(closureLifetimeTracker)
+      timesClosureWasCalled += 1
+      let elements = test.transform(element.value)
+      return ${Minimal}<OpaqueValue<Int32>>(
+        elements: elements.map { OpaqueValue($0) })
+    }
+    expectEqual(0, timesClosureWasCalled, "Unexpected eagerness")
+
+%   if Kind == 'Sequence':
+    let expected = test.expected.map(OpaqueValue.init)
+    check${Kind}(expected, result,
+      stackTrace: SourceLocStack().with(test.loc),
+      resiliencyChecks: .none
+    ) { $0.value == $1.value }
+    expectEqual(
+      test.sequence.count, timesClosureWasCalled,
+      "iterating forward the result of the lazy flatMap() should call "
+      + "the closure only once for element")
+%   else:
+    _ = Array(result)
+    /*
+    FIXME: this check is failing.
+    This is a fundamental problem with lazy flatMap().
+    <rdar://problem/21989896> Investigate other Collection schemes: indices
+    are compositions of offsets
+
+    expectEqual(
+      test.sequence.count, timesClosureWasCalled,
+      "iterating forward the result of the lazy flatMap() should call "
+      + "the closure only once for element")
+    */
+
+    // FIXME: we are not calling check${Kind} because of the same issue again.
+    // <rdar://problem/21989896>
+    let expected = test.expected.map(OpaqueValue.init)
+    expectEqualSequence(
+      expected, result,
+      stackTrace: SourceLocStack().with(test.loc)
+    ) { $0.value == $1.value }
+%   end
+
+    % if Kind == 'Sequence':
+    expectTrue(Array(s).isEmpty, "sequence should be consumed")
+    expectEqual(
+      test.sequence.count, timesClosureWasCalled,
+      "iterating a lazy flatMap() should call the predicate"
+      + "once per element")
+    % end
+  }
+
+  for test in flatMapToOptionalTests {
+    let s = ${Minimal}<OpaqueValue<Int>>(elements:
+      test.sequence.map(OpaqueValue.init))
+    let closureLifetimeTracker = LifetimeTracked(0)
+    var timesClosureWasCalled = 0
+
+    var result = s.lazy.flatMap {
+      (element: OpaqueValue<Int>) -> OpaqueValue<Int32>? in
+      _blackHole(closureLifetimeTracker)
+      timesClosureWasCalled += 1
+      return test.transform(element.value).map(OpaqueValue.init)
+    }
+    expectEqual(0, timesClosureWasCalled, "unexpected eagerness")
+
+    let expected = test.expected.map(OpaqueValue.init)
+    expectEqualSequence(
+      expected, result,
+      stackTrace: SourceLocStack().with(test.loc)
+    ) { $0.value == $1.value }
+    expectEqual(
+      test.sequence.count, timesClosureWasCalled,
+      "iterating lazy flatMap() should call closure once per element")
+  }
+}
+% end

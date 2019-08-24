@@ -1,0 +1,90 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -jumpthread-simplify-cfg | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+enum DupCaseEnum {
+  case firstCase
+  case secondCase
+}
+
+// CHECK-LABEL: sil @performSwitch : $@convention(thin) (Int64, @thin DupCaseEnum.Type) -> DupCaseEnum {
+// CHECK: bb0(%0 : $Int64, %1 : $@thin DupCaseEnum.Type):
+// CHECK:   select_value
+// CHECK:   br bb1
+// CHECK: bb1:
+// CHECK:   return
+sil @performSwitch : $@convention(thin) (Int64, @thin DupCaseEnum.Type) -> DupCaseEnum {
+// %0                                             // users: %9, %5, %3, %2
+bb0(%0 : $Int64, %1 : $@thin DupCaseEnum.Type):
+  %4 = integer_literal $Builtin.Int64, 0 // user: %6
+  %5 = struct_extract %0 : $Int64, #Int64._value // user: %6
+  %6 = builtin "cmp_eq_Int64"(%4 : $Builtin.Int64, %5 : $Builtin.Int64) : $Builtin.Int1 // users: %10, %7
+  cond_br %6, bb6, bb1                   // id: %7
+
+bb1:                                              // Preds: bb0
+  br bb2                                 // id: %8
+
+bb2:                                              // Preds: bb1
+  cond_br %6, bb5, bb3                   // id: %10
+
+bb3:                                              // Preds: bb2
+  br bb4                                 // id: %11
+
+bb4:                                              // Preds: bb3
+  %12 = enum $DupCaseEnum, #DupCaseEnum.secondCase!enumelt // user: %13
+  br bb7(%12 : $DupCaseEnum)                // id: %13
+
+bb5:                                              // Preds: bb2
+  %14 = enum $DupCaseEnum, #DupCaseEnum.firstCase!enumelt // user: %15
+  br bb7(%14 : $DupCaseEnum)                // id: %15
+
+bb6:                                              // Preds: bb0
+  %16 = enum $DupCaseEnum, #DupCaseEnum.firstCase!enumelt // user: %17
+  br bb7(%16 : $DupCaseEnum)                // id: %17
+
+// %18                                            // user: %19
+bb7(%18 : $DupCaseEnum):                             // Preds: bb6 bb5 bb4
+  return %18 : $DupCaseEnum                 // id: %19
+}
+
+// CHECK-LABEL: sil @performSwitch_bail_out : $@convention(thin) (Int64, @thin DupCaseEnum.Type) -> DupCaseEnum {
+// CHECK: bb0(%0 : $Int64, %1 : $@thin DupCaseEnum.Type):
+// CHECK-NOT:   select_value
+// CHECK-NOT:   br bb1
+// CHECK:   cond_br
+sil @performSwitch_bail_out : $@convention(thin) (Int64, @thin DupCaseEnum.Type) -> DupCaseEnum {
+// %0                                             // users: %9, %5, %3, %2
+bb0(%0 : $Int64, %1 : $@thin DupCaseEnum.Type):
+  %4 = integer_literal $Builtin.Int64, 0 // user: %6
+  %5 = struct_extract %0 : $Int64, #Int64._value // user: %6
+  %6 = builtin "cmp_eq_Int64"(%4 : $Builtin.Int64, %5 : $Builtin.Int64) : $Builtin.Int1 // users: %10, %7
+  cond_br %6, bb6, bb1                   // id: %7
+
+bb1:                                              // Preds: bb0
+  br bb2                                 // id: %8
+
+bb2:                                              // Preds: bb1
+  cond_br %6, bb5, bb3                   // id: %10
+
+bb3:                                              // Preds: bb2
+  br bb4                                 // id: %11
+
+bb4:                                              // Preds: bb3
+  %12 = enum $DupCaseEnum, #DupCaseEnum.secondCase!enumelt // user: %13
+  br bb7(%12 : $DupCaseEnum)                // id: %13
+
+bb5:                                              // Preds: bb2
+  %14 = enum $DupCaseEnum, #DupCaseEnum.secondCase!enumelt // user: %15
+  br bb7(%14 : $DupCaseEnum)                // id: %15
+
+bb6:                                              // Preds: bb0
+  %16 = enum $DupCaseEnum, #DupCaseEnum.firstCase!enumelt // user: %17
+  br bb7(%16 : $DupCaseEnum)                // id: %17
+
+// %18                                            // user: %19
+bb7(%18 : $DupCaseEnum):                             // Preds: bb6 bb5 bb4
+  return %18 : $DupCaseEnum                 // id: %19
+}

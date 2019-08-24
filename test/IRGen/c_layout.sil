@@ -1,0 +1,367 @@
+// RUN: %target-swift-frontend -I %S/Inputs/abi %s -emit-ir | %FileCheck %s --check-prefix=CHECK-%target-cpu -check-prefix CHECK-%target-abi-%target-cpu -check-prefix CHECK-%target-sdk-name-%target-cpu
+
+sil_stage canonical
+import c_layout
+import Builtin
+import Swift
+
+// TODO: Provide tests for other architectures
+
+// CHECK-x86_64: %TSo11BitfieldOneV = type <{ %Ts6UInt32V, %TSo6NestedV, [4 x i8], [4 x i8], %TSf, [1 x i8], [7 x i8], %Ts6UInt64V, %Ts6UInt32V, [4 x i8] }>
+// CHECK-x86_64: %TSo6NestedV = type <{ %TSf, [3 x i8], [1 x i8] }>
+
+// CHECK-SYSV-x86_64: %TSo26BitfieldSeparatorReferenceV = type [[BITFIELD_SEP_TYPE:<{ %Ts5UInt8V, \[3 x i8\], %Ts5UInt8V }>]]
+// CHECK-WIN-x86_64: %TSo26BitfieldSeparatorReferenceV = type [[BITFIELD_SEP_TYPE:<{ %Ts5UInt8V, %Ts5UInt8V }>]]
+// CHECK-x86_64: %TSo25BitfieldSeparatorSameNameV = type [[BITFIELD_SEP_TYPE]]
+// CHECK-x86_64: %TSo36BitfieldSeparatorDifferentNameStructV = type [[BITFIELD_SEP_TYPE]]
+// CHECK-x86_64: %TSo21BitfieldSeparatorAnona = type [[BITFIELD_SEP_TYPE]]
+
+sil public_external @createBitfieldOne : $@convention(c) () -> BitfieldOne
+sil public_external @consumeBitfieldOne : $@convention(c) (BitfieldOne) -> ()
+
+sil @test0 : $() -> () {
+bb0:
+  %0 = function_ref @createBitfieldOne : $@convention(c) () -> BitfieldOne
+  %1 = apply %0() : $@convention(c) () -> BitfieldOne
+  %2 = function_ref @consumeBitfieldOne : $@convention(c) (BitfieldOne) -> ()
+  apply %2(%1) : $@convention(c) (BitfieldOne) -> ()
+  %r = tuple ()
+  return %r : $()
+}
+// CHECK-x86_64: define{{( dllexport)?}}{{( protected)?}} swiftcc void @test0()
+// CHECK-x86_64:   [[RESULT:%.*]] = alloca %TSo11BitfieldOneV, align 8
+// CHECK-x86_64:   [[ARG:%.*]] = alloca %TSo11BitfieldOneV, align 8
+//   Make the first call and pull all the values out of the indirect result.
+// CHECK-x86_64:   call void @createBitfieldOne(%TSo11BitfieldOneV* noalias nocapture sret [[RESULT]])
+// CHECK-x86_64:   [[ADDR_A:%.*]] = getelementptr inbounds %TSo11BitfieldOneV, %TSo11BitfieldOneV* [[RESULT]], i32 0, i32 0
+// CHECK-x86_64:   [[ADDR_A_V:%.*]] = getelementptr inbounds %Ts6UInt32V, %Ts6UInt32V* [[ADDR_A]], i32 0, i32 0
+// CHECK-x86_64:   [[A:%.*]] = load i32, i32* [[ADDR_A_V]], align 8
+// CHECK-x86_64:   [[ADDR_B:%.*]] = getelementptr inbounds %TSo11BitfieldOneV, %TSo11BitfieldOneV* [[RESULT]], i32 0, i32 1
+// CHECK-x86_64:   [[ADDR_B_X:%.*]] = getelementptr inbounds %TSo6NestedV, %TSo6NestedV* [[ADDR_B]], i32 0, i32 0
+// CHECK-x86_64:   [[ADDR_B_X_V:%.*]] = getelementptr inbounds %TSf, %TSf* [[ADDR_B_X]], i32 0, i32 0
+// CHECK-x86_64:   [[B_X:%.*]] = load float, float* [[ADDR_B_X_V]], align 4
+// CHECK-x86_64:   [[ADDR_B_YZ:%.*]] = getelementptr inbounds %TSo6NestedV, %TSo6NestedV* [[ADDR_B]], i32 0, i32 1
+// CHECK-x86_64:   [[ADDR_B_YZ_1:%.*]] = bitcast [3 x i8]* [[ADDR_B_YZ]] to i24*
+// CHECK-x86_64:   [[B_YZ:%.*]] = load i24, i24* [[ADDR_B_YZ_1]], align 4
+// CHECK-x86_64:   [[ADDR_CDE:%.*]] = getelementptr inbounds %TSo11BitfieldOneV, %TSo11BitfieldOneV* [[RESULT]], i32 0, i32 2
+// CHECK-x86_64:   [[ADDR_CDE_1:%.*]] = bitcast [4 x i8]* [[ADDR_CDE]] to i32*
+// CHECK-x86_64:   [[CDE:%.*]] = load i32, i32* [[ADDR_CDE_1]], align 4
+// CHECK-x86_64:   [[ADDR_FGH:%.*]] = getelementptr inbounds %TSo11BitfieldOneV, %TSo11BitfieldOneV* [[RESULT]], i32 0, i32 3
+// CHECK-x86_64:   [[ADDR_FGH_1:%.*]] = bitcast [4 x i8]* [[ADDR_FGH]] to i32*
+// CHECK-x86_64:   [[FGH:%.*]] = load i32, i32* [[ADDR_FGH_1]], align 8
+// CHECK-x86_64:   [[ADDR_I:%.*]] = getelementptr inbounds %TSo11BitfieldOneV, %TSo11BitfieldOneV* [[RESULT]], i32 0, i32 4
+// CHECK-x86_64:   [[ADDR_I_V:%.*]] = getelementptr inbounds %TSf, %TSf* [[ADDR_I]], i32 0, i32 0
+// CHECK-x86_64:   [[I:%.*]] = load float, float* [[ADDR_I_V]], align 4
+// CHECK-x86_64:   [[ADDR_JK:%.*]] = getelementptr inbounds %TSo11BitfieldOneV, %TSo11BitfieldOneV* [[RESULT]], i32 0, i32 5
+// CHECK-x86_64:   [[ADDR_JK_1:%.*]] = bitcast [1 x i8]* [[ADDR_JK]] to i8*
+// CHECK-x86_64:   [[JK:%.*]] = load i8, i8* [[ADDR_JK_1]], align 8
+// CHECK-x86_64:   [[ADDR_L:%.*]] = getelementptr inbounds %TSo11BitfieldOneV, %TSo11BitfieldOneV* [[RESULT]], i32 0, i32 7
+// CHECK-x86_64:   [[ADDR_L_V:%.*]] = getelementptr inbounds %Ts6UInt64V, %Ts6UInt64V* [[ADDR_L]], i32 0, i32 0
+// CHECK-x86_64:   [[L:%.*]] = load i64, i64* [[ADDR_L_V]], align 8
+// CHECK-x86_64:   [[ADDR_M:%.*]] = getelementptr inbounds %TSo11BitfieldOneV, %TSo11BitfieldOneV* [[RESULT]], i32 0, i32 8
+// CHECK-x86_64:   [[ADDR_M_V:%.*]] = getelementptr inbounds %Ts6UInt32V, %Ts6UInt32V* [[ADDR_M]], i32 0, i32 0
+// CHECK-x86_64:   [[M:%.*]] = load i32, i32* [[ADDR_M_V]], align 8
+//   Put all of the values into the indirect argument and make the second call.
+// CHECK-x86_64:   [[ADDR_A:%.*]] = getelementptr inbounds %TSo11BitfieldOneV, %TSo11BitfieldOneV* [[ARG]], i32 0, i32 0
+// CHECK-x86_64:   [[ADDR_A_V:%.*]] = getelementptr inbounds %Ts6UInt32V, %Ts6UInt32V* [[ADDR_A]], i32 0, i32 0
+// CHECK-x86_64:   store i32 [[A]], i32* [[ADDR_A_V]], align 8
+// CHECK-x86_64:   [[ADDR_B:%.*]] = getelementptr inbounds %TSo11BitfieldOneV, %TSo11BitfieldOneV* [[ARG]], i32 0, i32 1
+// CHECK-x86_64:   [[ADDR_B_X:%.*]] = getelementptr inbounds %TSo6NestedV, %TSo6NestedV* [[ADDR_B]], i32 0, i32 0
+// CHECK-x86_64:   [[ADDR_B_X_V:%.*]] = getelementptr inbounds %TSf, %TSf* [[ADDR_B_X]], i32 0, i32 0
+// CHECK-x86_64:   store float [[B_X]], float* [[ADDR_B_X_V]], align 4
+// CHECK-x86_64:   [[ADDR_B_YZ:%.*]] = getelementptr inbounds %TSo6NestedV, %TSo6NestedV* [[ADDR_B]], i32 0, i32 1
+// CHECK-x86_64:   [[ADDR_B_YZ_1:%.*]] = bitcast [3 x i8]* [[ADDR_B_YZ]] to i24*
+// CHECK-x86_64:   store i24 [[B_YZ]], i24* [[ADDR_B_YZ_1]], align 4
+// CHECK-x86_64:   [[ADDR_CDE:%.*]] = getelementptr inbounds %TSo11BitfieldOneV, %TSo11BitfieldOneV* [[ARG]], i32 0, i32 2
+// CHECK-x86_64:   [[ADDR_CDE_1:%.*]] = bitcast [4 x i8]* [[ADDR_CDE]] to i32*
+// CHECK-x86_64:   store i32 [[CDE]], i32* [[ADDR_CDE_1]], align 4
+// CHECK-x86_64:   [[ADDR_FGH:%.*]] = getelementptr inbounds %TSo11BitfieldOneV, %TSo11BitfieldOneV* [[ARG]], i32 0, i32 3
+// CHECK-x86_64:   [[ADDR_FGH_1:%.*]] = bitcast [4 x i8]* [[ADDR_FGH]] to i32*
+// CHECK-x86_64:   store i32 [[FGH]], i32* [[ADDR_FGH_1]], align 8
+// CHECK-x86_64:   [[ADDR_I:%.*]] = getelementptr inbounds %TSo11BitfieldOneV, %TSo11BitfieldOneV* [[ARG]], i32 0, i32 4
+// CHECK-x86_64:   [[ADDR_I_V:%.*]] = getelementptr inbounds %TSf, %TSf* [[ADDR_I]], i32 0, i32 0
+// CHECK-x86_64:   store float [[I]], float* [[ADDR_I_V]], align 4
+// CHECK-x86_64:   [[ADDR_JK:%.*]] = getelementptr inbounds %TSo11BitfieldOneV, %TSo11BitfieldOneV* [[ARG]], i32 0, i32 5
+// CHECK-x86_64:   [[ADDR_JK_1:%.*]] = bitcast [1 x i8]* [[ADDR_JK]] to i8*
+// CHECK-x86_64:   store i8 [[JK]], i8* [[ADDR_JK_1]], align 8
+// CHECK-x86_64:   [[ADDR_L:%.*]] = getelementptr inbounds %TSo11BitfieldOneV, %TSo11BitfieldOneV* [[ARG]], i32 0, i32 7
+// CHECK-x86_64:   [[ADDR_L_V:%.*]] = getelementptr inbounds %Ts6UInt64V, %Ts6UInt64V* [[ADDR_L]], i32 0, i32 0
+// CHECK-x86_64:   store i64 [[L]], i64* [[ADDR_L_V]], align 8
+// CHECK-x86_64:   [[ADDR_M:%.*]] = getelementptr inbounds %TSo11BitfieldOneV, %TSo11BitfieldOneV* [[ARG]], i32 0, i32 8
+// CHECK-x86_64:   [[ADDR_M_V:%.*]] = getelementptr inbounds %Ts6UInt32V, %Ts6UInt32V* [[ADDR_M]], i32 0, i32 0
+// CHECK-x86_64:   store i32 [[M]], i32* [[ADDR_M_V]], align 8
+// CHECK-SYSV-x86_64:  call void @consumeBitfieldOne(%TSo11BitfieldOneV* byval align 8 [[ARG]])
+// CHECK-WIN-x86_64:   call void @consumeBitfieldOne(%TSo11BitfieldOneV* [[ARG]])
+// CHECK-x86_64:   ret void
+
+
+sil public_external @testBitfields : $@convention(thin) () -> (BitfieldSeparatorReference, BitfieldSeparatorSameName, BitfieldSeparatorDifferentNameStruct, BitfieldSeparatorAnon)
+
+sil @testTypedefs : $() -> () {
+bb0:
+  %0 = function_ref @testBitfields : $@convention(thin) () -> (BitfieldSeparatorReference, BitfieldSeparatorSameName, BitfieldSeparatorDifferentNameStruct, BitfieldSeparatorAnon)
+  %1 = apply %0() : $@convention(thin) () -> (BitfieldSeparatorReference, BitfieldSeparatorSameName, BitfieldSeparatorDifferentNameStruct, BitfieldSeparatorAnon)
+  %r = tuple ()
+  return %r : $()
+}
+
+sil public_external @createSIMDStruct : $@convention(c) () -> SIMDStruct
+sil public_external @consumeSIMDStruct : $@convention(c) (SIMDStruct) -> ()
+
+// CHECK-x86_64-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @testSIMDStruct()
+// CHECK-SYSV-x86_64:        call <3 x float> @createSIMDStruct
+// CHECK-WIN-x86_64:         call void @createSIMDStruct(%TSo10SIMDStructV* noalias nocapture sret %
+// CHECK-SYSV-x86_64:        call void @consumeSIMDStruct(<3 x float>
+// CHECK-WIN-x86_64:         call void @consumeSIMDStruct(%TSo10SIMDStructV* %
+sil @testSIMDStruct : $() -> () {
+bb0:
+  %f = function_ref @createSIMDStruct : $@convention(c) () -> SIMDStruct
+  %x = apply %f() : $@convention(c) () -> SIMDStruct
+  %g = function_ref @consumeSIMDStruct : $@convention(c) (SIMDStruct) -> ()
+  %z = apply %g(%x) : $@convention(c) (SIMDStruct) -> ()
+  return undef : $()
+}
+
+sil @testRecursive : $@convention(thin) () -> Builtin.Word {
+bb0:
+  %m = metatype $@thin HasRecursivePointers.Type
+  %s = builtin "sizeof"<HasRecursivePointers>(%m : $@thin HasRecursivePointers.Type) : $Builtin.Word
+  return %s : $Builtin.Word
+}
+
+// CHECK-x86_64-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @testIntegerExtension
+// CHECK-SYSV-x86_64:        call signext i8 @chareth(i8 signext
+// CHECK-WIN-x86_64:         call i8 @chareth(i8
+// CHECK-SYSV-x86_64:        call signext i8 @signedChareth(i8 signext
+// CHECK-WIN-x86_64:         call i8 @signedChareth(i8
+// CHECK-SYSV-x86_64:        call zeroext i8 @unsignedChareth(i8 zeroext
+// CHECK-WIN-x86_64:         call i8 @unsignedChareth(i8
+// CHECK-SYSV-x86_64:        call signext i16 @eatMyShorts(i16 signext
+// CHECK-WIN-x86_64:         call i16 @eatMyShorts(i16
+// CHECK-SYSV-x86_64:        call zeroext i16 @eatMyUnsignedShorts(i16 zeroext
+// CHECK-WIN-x86_64:         call i16 @eatMyUnsignedShorts(i16
+// CHECK-x86_64:         call i32 @ints(i32 %5)
+// CHECK-x86_64:         call i32 @unsigneds(i32 %6)
+// CHECK-SYSV-x86_64-LABEL: declare{{( dllimport)?}} signext i8 @chareth(i8 signext)
+// CHECK-WIN-x86_64-LABEL:  declare{{( dllimport)?}} i8 @chareth(i8)
+// CHECK-SYSV-x86_64-LABEL: declare{{( dllimport)?}} signext i8 @signedChareth(i8 signext)
+// CHECK-WIN-x86_64-LABEL:  declare{{( dllimport)?}} i8 @signedChareth(i8)
+// CHECK-SYSV-x86_64-LABEL: declare{{( dllimport)?}} zeroext i8 @unsignedChareth(i8 zeroext)
+// CHECK-WIN-x86_64-LABEL:  declare{{( dllimport)?}} i8 @unsignedChareth(i8)
+// CHECK-SYSV-x86_64-LABEL: declare{{( dllimport)?}} signext i16 @eatMyShorts(i16 signext)
+// CHECK-WIN-x86_64-LABEL:  declare{{( dllimport)?}} i16 @eatMyShorts(i16)
+// CHECK-SYSV-x86_64-LABEL: declare{{( dllimport)?}} zeroext i16 @eatMyUnsignedShorts(i16 zeroext)
+// CHECK-WIN-x86_64-LABEL:  declare{{( dllimport)?}} i16 @eatMyUnsignedShorts(i16)
+// CHECK-SYSV-x86_64-LABEL: declare{{( dllimport)?}} i32 @ints(i32)
+// CHECK-WIN-x86_64-LABEL:  declare{{( dllimport)?}} i32 @ints(i32)
+// CHECK-SYSV-x86_64-LABEL: declare{{( dllimport)?}} i32 @unsigneds(i32)
+// CHECK-WIN-x86_64-LABEL:  declare{{( dllimport)?}} i32 @unsigneds(i32)
+
+// CHECK-i386-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @testIntegerExtension
+// CHECK-i386:         call signext i8 @chareth(i8 signext
+// CHECK-i386:         call signext i8 @signedChareth(i8 signext
+// CHECK-i386:         call zeroext i8 @unsignedChareth(i8 zeroext
+// CHECK-i386:         call signext i16 @eatMyShorts(i16 signext
+// CHECK-i386:         call zeroext i16 @eatMyUnsignedShorts(i16 zeroext
+// CHECK-i386:         call i32 @ints(i32 %5)
+// CHECK-i386:         call i32 @unsigneds(i32 %6)
+// CHECK-i386-LABEL: declare{{( dllimport)?}} signext i8 @chareth(i8 signext)
+// CHECK-i386-LABEL: declare{{( dllimport)?}} signext i8 @signedChareth(i8 signext)
+// CHECK-i386-LABEL: declare{{( dllimport)?}} zeroext i8 @unsignedChareth(i8 zeroext)
+// CHECK-i386-LABEL: declare{{( dllimport)?}} signext i16 @eatMyShorts(i16 signext)
+// CHECK-i386-LABEL: declare{{( dllimport)?}} zeroext i16 @eatMyUnsignedShorts(i16 zeroext)
+// CHECK-i386-LABEL: declare{{( dllimport)?}} i32 @ints(i32)
+// CHECK-i386-LABEL: declare{{( dllimport)?}} i32 @unsigneds(i32)
+
+// CHECK-armv7-LABEL:         define{{( dllexport)?}}{{( protected)?}} swiftcc void @testIntegerExtension
+// CHECK-ios-armv7:             call signext i8 @chareth(i8 signext
+// CHECK-ios-armv7:             call signext i8 @signedChareth(i8 signext
+// CHECK-android-armv7:         call zeroext i8 @chareth(i8 zeroext
+// CHECK-android-armv7:         call zeroext i8 @signedChareth(i8 zeroext
+// CHECK-linux-armv7:           call zeroext i8 @chareth(i8 zeroext
+// CHECK-linux-armv7:           call zeroext i8 @signedChareth(i8 zeroext
+// CHECK-windows-armv7:         call zeroext i8 @chareth(i8 zeroext
+// CHECK-windows-armv7:         call zeroext i8 @signedChareth(i8 zeroext
+// CHECK-armv7:                 call zeroext i8 @unsignedChareth(i8 zeroext
+// CHECK-armv7:                 call signext i16 @eatMyShorts(i16 signext
+// CHECK-armv7:                 call zeroext i16 @eatMyUnsignedShorts(i16 zeroext
+// CHECK-armv7:                 call i32 @ints(i32 %5)
+// CHECK-armv7:                 call i32 @unsigneds(i32 %6)
+// CHECK-ios-armv7-LABEL:     declare{{( dllimport)?}} signext i8 @chareth(i8 signext)
+// CHECK-ios-armv7-LABEL:     declare{{( dllimport)?}} signext i8 @signedChareth(i8 signext)
+// CHECK-android-armv7-LABEL: declare{{( dllimport)?}} zeroext i8 @chareth(i8 zeroext)
+// CHECK-android-armv7-LABEL: declare{{( dllimport)?}} zeroext i8 @signedChareth(i8 zeroext)
+// CHECK-linux-armv7-LABEL:   declare{{( dllimport)?}} zeroext i8 @chareth(i8 zeroext)
+// CHECK-linux-armv7-LABEL:   declare{{( dllimport)?}} zeroext i8 @signedChareth(i8 zeroext)
+// CHECK-windows-armv7-LABEL: declare{{( dllimport)?}} zeroext i8 @chareth(i8 zeroext)
+// CHECK-windows-armv7-LABEL: declare{{( dllimport)?}} zeroext i8 @signedChareth(i8 zeroext)
+// CHECK-armv7-LABEL:         declare{{( dllimport)?}} zeroext i8 @unsignedChareth(i8 zeroext)
+// CHECK-armv7-LABEL:         declare{{( dllimport)?}} signext i16 @eatMyShorts(i16 signext)
+// CHECK-armv7-LABEL:         declare{{( dllimport)?}} zeroext i16 @eatMyUnsignedShorts(i16 zeroext)
+// CHECK-armv7-LABEL:         declare{{( dllimport)?}} i32 @ints(i32)
+// CHECK-armv7-LABEL:         declare{{( dllimport)?}} i32 @unsigneds(i32)
+
+// CHECK-armv7s-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @testIntegerExtension
+// CHECK-armv7s:         call signext i8 @chareth(i8 signext
+// CHECK-armv7s:         call signext i8 @signedChareth(i8 signext
+// CHECK-armv7s:         call zeroext i8 @unsignedChareth(i8 zeroext
+// CHECK-armv7s:         call signext i16 @eatMyShorts(i16 signext
+// CHECK-armv7s:         call zeroext i16 @eatMyUnsignedShorts(i16 zeroext
+// CHECK-armv7s:         call i32 @ints(i32 %5)
+// CHECK-armv7s:         call i32 @unsigneds(i32 %6)
+// CHECK-armv7s-LABEL: declare{{( dllimport)?}} signext i8 @chareth(i8 signext)
+// CHECK-armv7s-LABEL: declare{{( dllimport)?}} signext i8 @signedChareth(i8 signext)
+// CHECK-armv7s-LABEL: declare{{( dllimport)?}} zeroext i8 @unsignedChareth(i8 zeroext)
+// CHECK-armv7s-LABEL: declare{{( dllimport)?}} signext i16 @eatMyShorts(i16 signext)
+// CHECK-armv7s-LABEL: declare{{( dllimport)?}} zeroext i16 @eatMyUnsignedShorts(i16 zeroext)
+// CHECK-armv7s-LABEL: declare{{( dllimport)?}} i32 @ints(i32)
+// CHECK-armv7s-LABEL: declare{{( dllimport)?}} i32 @unsigneds(i32)
+
+// CHECK-armv7k-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @testIntegerExtension
+// CHECK-armv7k:         call signext i8 @chareth(i8 signext
+// CHECK-armv7k:         call signext i8 @signedChareth(i8 signext
+// CHECK-armv7k:         call zeroext i8 @unsignedChareth(i8 zeroext
+// CHECK-armv7k:         call signext i16 @eatMyShorts(i16 signext
+// CHECK-armv7k:         call zeroext i16 @eatMyUnsignedShorts(i16 zeroext
+// CHECK-armv7k:         call i32 @ints(i32 %5)
+// CHECK-armv7k:         call i32 @unsigneds(i32 %6)
+// CHECK-armv7k-LABEL: declare{{( dllimport)?}} signext i8 @chareth(i8 signext)
+// CHECK-armv7k-LABEL: declare{{( dllimport)?}} signext i8 @signedChareth(i8 signext)
+// CHECK-armv7k-LABEL: declare{{( dllimport)?}} zeroext i8 @unsignedChareth(i8 zeroext)
+// CHECK-armv7k-LABEL: declare{{( dllimport)?}} signext i16 @eatMyShorts(i16 signext)
+// CHECK-armv7k-LABEL: declare{{( dllimport)?}} zeroext i16 @eatMyUnsignedShorts(i16 zeroext)
+// CHECK-armv7k-LABEL: declare{{( dllimport)?}} i32 @ints(i32)
+// CHECK-armv7k-LABEL: declare{{( dllimport)?}} i32 @unsigneds(i32)
+
+// CHECK-arm64-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @testIntegerExtension
+// CHECK-arm64:         call signext i8 @chareth(i8 signext
+// CHECK-arm64:         call signext i8 @signedChareth(i8 signext
+// CHECK-arm64:         call zeroext i8 @unsignedChareth(i8 zeroext
+// CHECK-arm64:         call signext i16 @eatMyShorts(i16 signext
+// CHECK-arm64:         call zeroext i16 @eatMyUnsignedShorts(i16 zeroext
+// CHECK-arm64:         call i32 @ints(i32 %5)
+// CHECK-arm64:         call i32 @unsigneds(i32 %6)
+// CHECK-arm64-LABEL: declare{{( dllimport)?}} signext i8 @chareth(i8 signext)
+// CHECK-arm64-LABEL: declare{{( dllimport)?}} signext i8 @signedChareth(i8 signext)
+// CHECK-arm64-LABEL: declare{{( dllimport)?}} zeroext i8 @unsignedChareth(i8 zeroext)
+// CHECK-arm64-LABEL: declare{{( dllimport)?}} signext i16 @eatMyShorts(i16 signext)
+// CHECK-arm64-LABEL: declare{{( dllimport)?}} zeroext i16 @eatMyUnsignedShorts(i16 zeroext)
+// CHECK-arm64-LABEL: declare{{( dllimport)?}} i32 @ints(i32)
+// CHECK-arm64-LABEL: declare{{( dllimport)?}} i32 @unsigneds(i32)
+
+// CHECK-aarch64-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @testIntegerExtension
+// CHECK-aarch64:         call i8 @chareth(i8 %0)
+// CHECK-aarch64:         call i8 @signedChareth(i8 %1)
+// CHECK-aarch64:         call i8 @unsignedChareth(i8 %2)
+// CHECK-aarch64:         call i16 @eatMyShorts(i16 %3)
+// CHECK-aarch64:         call i16 @eatMyUnsignedShorts(i16 %4)
+// CHECK-aarch64:         call i32 @ints(i32 %5)
+// CHECK-aarch64:         call i32 @unsigneds(i32 %6)
+// CHECK-aarch64-LABEL: declare{{( dllimport)?}} i8 @chareth(i8)
+// CHECK-aarch64-LABEL: declare{{( dllimport)?}} i8 @signedChareth(i8)
+// CHECK-aarch64-LABEL: declare{{( dllimport)?}} i8 @unsignedChareth(i8)
+// CHECK-aarch64-LABEL: declare{{( dllimport)?}} i16 @eatMyShorts(i16)
+// CHECK-aarch64-LABEL: declare{{( dllimport)?}} i16 @eatMyUnsignedShorts(i16)
+// CHECK-aarch64-LABEL: declare{{( dllimport)?}} i32 @ints(i32)
+// CHECK-aarch64-LABEL: declare{{( dllimport)?}} i32 @unsigneds(i32)
+
+// CHECK-powerpc64-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @testIntegerExtension
+// CHECK-powerpc64:         call zeroext i8 @chareth(i8 zeroext
+// CHECK-powerpc64:         call zeroext i8 @signedChareth(i8 zeroext
+// CHECK-powerpc64:         call zeroext i8 @unsignedChareth(i8 zeroext
+// CHECK-powerpc64:         call signext i16 @eatMyShorts(i16 signext
+// CHECK-powerpc64:         call zeroext i16 @eatMyUnsignedShorts(i16 zeroext
+// CHECK-powerpc64:         call signext i32 @ints(i32 signext %5)
+// CHECK-powerpc64:         call zeroext i32 @unsigneds(i32 zeroext %6)
+// CHECK-powerpc64-LABEL: declare{{( dllimport)?}} zeroext i8 @chareth(i8 zeroext)
+// CHECK-powerpc64-LABEL: declare{{( dllimport)?}} zeroext i8 @signedChareth(i8 zeroext)
+// CHECK-powerpc64-LABEL: declare{{( dllimport)?}} zeroext i8 @unsignedChareth(i8 zeroext)
+// CHECK-powerpc64-LABEL: declare{{( dllimport)?}} signext i16 @eatMyShorts(i16 signext)
+// CHECK-powerpc64-LABEL: declare{{( dllimport)?}} zeroext i16 @eatMyUnsignedShorts(i16 zeroext)
+// CHECK-powerpc64-LABEL: declare{{( dllimport)?}} signext i32 @ints(i32 signext)
+// CHECK-powerpc64-LABEL: declare{{( dllimport)?}} zeroext i32 @unsigneds(i32 zeroext)
+
+// CHECK-powerpc64le-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @testIntegerExtension
+// CHECK-powerpc64le:         call zeroext i8 @chareth(i8 zeroext
+// CHECK-powerpc64le:         call zeroext i8 @signedChareth(i8 zeroext
+// CHECK-powerpc64le:         call zeroext i8 @unsignedChareth(i8 zeroext
+// CHECK-powerpc64le:         call signext i16 @eatMyShorts(i16 signext
+// CHECK-powerpc64le:         call zeroext i16 @eatMyUnsignedShorts(i16 zeroext
+// CHECK-powerpc64le:         call signext i32 @ints(i32 signext %5)
+// CHECK-powerpc64le:         call zeroext i32 @unsigneds(i32 zeroext %6)
+// CHECK-powerpc64le-LABEL: declare{{( dllimport)?}} zeroext i8 @chareth(i8 zeroext)
+// CHECK-powerpc64le-LABEL: declare{{( dllimport)?}} zeroext i8 @signedChareth(i8 zeroext)
+// CHECK-powerpc64le-LABEL: declare{{( dllimport)?}} zeroext i8 @unsignedChareth(i8 zeroext)
+// CHECK-powerpc64le-LABEL: declare{{( dllimport)?}} signext i16 @eatMyShorts(i16 signext)
+// CHECK-powerpc64le-LABEL: declare{{( dllimport)?}} zeroext i16 @eatMyUnsignedShorts(i16 zeroext)
+// CHECK-powerpc64le-LABEL: declare{{( dllimport)?}} signext i32 @ints(i32 signext)
+// CHECK-powerpc64le-LABEL: declare{{( dllimport)?}} zeroext i32 @unsigneds(i32 zeroext)
+
+// CHECK-s390x-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @testIntegerExtension
+// CHECK-s390x:         call zeroext i8 @chareth(i8 zeroext
+// CHECK-s390x:         call zeroext i8 @signedChareth(i8 zeroext
+// CHECK-s390x:         call zeroext i8 @unsignedChareth(i8 zeroext
+// CHECK-s390x:         call signext i16 @eatMyShorts(i16 signext
+// CHECK-s390x:         call zeroext i16 @eatMyUnsignedShorts(i16 zeroext
+// CHECK-s390x:         call signext i32 @ints(i32 signext %5)
+// CHECK-s390x:         call zeroext i32 @unsigneds(i32 zeroext %6)
+// CHECK-s390x-LABEL: declare{{( dllimport)?}} zeroext i8 @chareth(i8 zeroext)
+// CHECK-s390x-LABEL: declare{{( dllimport)?}} zeroext i8 @signedChareth(i8 zeroext)
+// CHECK-s390x-LABEL: declare{{( dllimport)?}} zeroext i8 @unsignedChareth(i8 zeroext)
+// CHECK-s390x-LABEL: declare{{( dllimport)?}} signext i16 @eatMyShorts(i16 signext)
+// CHECK-s390x-LABEL: declare{{( dllimport)?}} zeroext i16 @eatMyUnsignedShorts(i16 zeroext)
+// CHECK-s390x-LABEL: declare{{( dllimport)?}} signext i32 @ints(i32 signext)
+// CHECK-s390x-LABEL: declare{{( dllimport)?}} zeroext i32 @unsigneds(i32 zeroext)
+
+sil @testIntegerExtension : $@convention(thin) (CChar, CSignedChar, CUnsignedChar, CShort, CUnsignedShort, CInt, CUnsignedInt) -> () {
+entry(%a : $CChar, %b : $CSignedChar, %c : $CUnsignedChar, %d : $CShort, %e : $CUnsignedShort, %f : $CInt, %g : $CUnsignedInt):
+  %h = function_ref @chareth : $@convention(c) (CChar) -> CChar
+  %i = apply %h(%a) : $@convention(c) (CChar) -> CChar
+
+  %j = function_ref @signedChareth : $@convention(c) (CSignedChar) -> CSignedChar
+  %k = apply %j(%b) : $@convention(c) (CSignedChar) -> CSignedChar
+
+  %l = function_ref @unsignedChareth : $@convention(c) (CUnsignedChar) -> CUnsignedChar
+  %m = apply %l(%c) : $@convention(c) (CUnsignedChar) -> CUnsignedChar
+
+  %n = function_ref @eatMyShorts : $@convention(c) (CShort) -> CShort
+  %o = apply %n(%d) : $@convention(c) (CShort) -> CShort
+
+  %p = function_ref @eatMyUnsignedShorts : $@convention(c) (CUnsignedShort) -> CUnsignedShort
+  %q = apply %p(%e) : $@convention(c) (CUnsignedShort) -> CUnsignedShort
+
+  %r = function_ref @ints : $@convention(c) (CInt) -> CInt
+  %s = apply %r(%f) : $@convention(c) (CInt) -> CInt
+
+  %t = function_ref @unsigneds : $@convention(c) (CUnsignedInt) -> CUnsignedInt
+  %u = apply %t(%g) : $@convention(c) (CUnsignedInt) -> CUnsignedInt
+
+  return undef : $()
+}
+
+// CHECK-x86_64-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i8 @testIntegerExtensionInBlock(%objc_block*, i8)
+sil @testIntegerExtensionInBlock : $@convention(thin) (@owned @convention(block) (CChar) -> CChar, CChar) -> CChar {
+entry(%b : $@convention(block) (CChar) -> CChar, %c : $CChar):
+// CHECK-SYSV-x86_64: call signext i8 {{%.*}}(%objc_block* {{%.*}}, i8 signext {{%.*}})
+// CHECK-WIN-x86_64: call i8 {{%.*}}(%objc_block* {{%.*}}, i8 {{%.*}})
+  %r = apply %b(%c) : $@convention(block) (CChar) -> CChar
+  return %r : $CChar
+}
+
+// CHECK-x86_64-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @testBitfieldInBlock
+// CHECK-SYSV-x86_64:        call void {{%.*}}(%TSo11BitfieldOneV* noalias nocapture sret {{%.*}}, %objc_block* {{%.*}}, %TSo11BitfieldOneV* byval align 8 {{%.*}})
+// CHECK-WIN-x86_64:         call void {{%.*}}(%TSo11BitfieldOneV* noalias nocapture sret {{%.*}}, %objc_block* {{%.*}}, %TSo11BitfieldOneV* {{%.*}})
+sil @testBitfieldInBlock : $@convention(thin) (@owned @convention(block) (BitfieldOne) -> BitfieldOne, BitfieldOne) -> BitfieldOne  {
+entry(%b : $@convention(block) (BitfieldOne) -> BitfieldOne, %x : $BitfieldOne):
+  %r = apply %b(%x) : $@convention(block) (BitfieldOne) -> BitfieldOne
+  return %r : $BitfieldOne
+}
+
+sil public_external @chareth : $@convention(c) (CChar) -> CChar
+sil public_external @signedChareth : $@convention(c) (CSignedChar) -> CSignedChar
+sil public_external @unsignedChareth : $@convention(c) (CUnsignedChar) -> CUnsignedChar
+sil public_external @eatMyShorts : $@convention(c) (CShort) -> CShort
+sil public_external @eatMyUnsignedShorts : $@convention(c) (CUnsignedShort) -> CUnsignedShort
+sil public_external @ints : $@convention(c) (CInt) -> CInt
+sil public_external @unsigneds : $@convention(c) (CUnsignedInt) -> CUnsignedInt
+

@@ -1,0 +1,139 @@
+// -*- swift -*-
+// RUN: %target-run-simple-swiftgyb
+// REQUIRES: executable_test
+
+import StdlibUnittest
+import StdlibCollectionUnittest
+
+var RangeReplaceableTestSuite = TestSuite("RangeReplaceable")
+
+RangeReplaceableTestSuite.test("append/dispatch") {
+  var tester = RangeReplaceableCollectionLog.dispatchTester([ OpaqueValue(1) ])
+  tester.append(OpaqueValue(2))
+  expectCustomizable(tester, tester.log.append)
+}
+
+RangeReplaceableTestSuite.test("appendContentsOf/dispatch") {
+  var tester = RangeReplaceableCollectionLog.dispatchTester([ OpaqueValue(1) ])
+  tester.append(contentsOf: [ 2, 3 ].map(OpaqueValue.init))
+  expectCustomizable(tester, tester.log.appendContentsOf)
+}
+
+RangeReplaceableTestSuite.test("insert/dispatch") {
+  var tester = RangeReplaceableCollectionLog.dispatchTester([ OpaqueValue(1) ])
+  tester.insert(OpaqueValue(2), at: tester.base.startIndex)
+  expectCustomizable(tester, tester.log.insert)
+}
+
+RangeReplaceableTestSuite.test("insert(contentsOf:at:)/dispatch") {
+  var tester = RangeReplaceableCollectionLog.dispatchTester([ OpaqueValue(1) ])
+  tester.insert(
+    contentsOf: [ 2, 3 ].map(OpaqueValue.init),
+    at: tester.base.endIndex)
+  expectCustomizable(tester, tester.log.insertContentsOf)
+}
+
+RangeReplaceableTestSuite.test("remove(at:)/dispatch") {
+  var tester = RangeReplaceableCollectionLog.dispatchTester([ OpaqueValue(1) ])
+  tester.remove(at: tester.base.startIndex)
+  expectCustomizable(tester, tester.log.removeAt)
+}
+
+RangeReplaceableTestSuite.test("removeLast/whereSelfIsBidirectionalCollection/dispatch") {
+  var tester = LoggingRangeReplaceableBidirectionalCollection(wrapping:
+    LoggingRangeReplaceableBidirectionalCollection(wrapping: [ OpaqueValue(1) ]))
+  _ = tester.removeLast()
+  expectCustomizable(tester, tester.log._customRemoveLast)
+}
+
+RangeReplaceableTestSuite.test("removeLast(n: Int)/whereSelfIsBidirectionalCollection/dispatch") {
+  var tester = LoggingRangeReplaceableBidirectionalCollection(wrapping:
+    LoggingRangeReplaceableBidirectionalCollection(wrapping: [ OpaqueValue(1) ]))
+  _ = tester.removeLast(1)
+  expectCustomizable(tester, tester.log._customRemoveLastN)
+}
+
+RangeReplaceableTestSuite.test("removeSubrange/dispatch") {
+  var tester = RangeReplaceableCollectionLog.dispatchTester(
+    [ 1, 2, 3 ].map(OpaqueValue.init))
+  tester.removeSubrange(tester.base.startIndex..<tester.base.endIndex)
+  expectCustomizable(tester, tester.log.removeSubrange)
+}
+
+RangeReplaceableTestSuite.test("removeFirst/dispatch") {
+  var tester = RangeReplaceableCollectionLog.dispatchTester([ OpaqueValue(1) ])
+  tester.removeFirst()
+  expectCustomizable(tester, tester.log.removeFirst)
+}
+
+RangeReplaceableTestSuite.test("removeFirst(n)/dispatch") {
+  var tester = RangeReplaceableCollectionLog.dispatchTester([ OpaqueValue(1) ])
+  tester.removeFirst(1)
+  expectCustomizable(tester, tester.log.removeFirstN)
+}
+
+RangeReplaceableTestSuite.test("removeAll/dispatch") {
+  var tester = RangeReplaceableCollectionLog.dispatchTester([ OpaqueValue(1) ])
+  tester.removeAll(keepingCapacity: false)
+  expectCustomizable(tester, tester.log.removeAll)
+}
+
+RangeReplaceableTestSuite.test("replaceSubrange/strideableRange") {
+  for test in replaceRangeTests {
+    var c =
+      MinimalRangeReplaceableRandomAccessCollectionWithStrideableIndex(elements: test.collection)
+    let rangeToReplace = test.rangeSelection.range(in: c)
+    let newElements =
+      MinimalRangeReplaceableRandomAccessCollectionWithStrideableIndex(elements: test.newElements)
+    c.replaceSubrange(rangeToReplace, with: newElements)
+    expectEqualSequence(
+      test.expected,
+      c.map { $0.value },
+      stackTrace: SourceLocStack().with(test.loc))
+  }
+}
+
+RangeReplaceableTestSuite.test("replaceSubrange/strideableClosedRange") {
+  for test in replaceRangeTests {
+    guard let closedExpected = test.closedExpected else { continue }
+    var c =
+      MinimalRangeReplaceableRandomAccessCollectionWithStrideableIndex(elements: test.collection)
+    let rangeToReplace = test.rangeSelection.closedRange(in: c)
+    let newElements =
+      MinimalRangeReplaceableRandomAccessCollectionWithStrideableIndex(elements: test.newElements)
+    c.replaceSubrange(rangeToReplace, with: newElements)
+    expectEqualSequence(
+      closedExpected,
+      c.map { $0.value },
+      stackTrace: SourceLocStack().with(test.loc))
+  }
+}
+
+% withRangeTypes = ["range", "closedRange"]
+% for rangeType in withRangeTypes:
+RangeReplaceableTestSuite.test("removeSubrange/${rangeType}") {
+%   if rangeType is "closedRange":
+  for test in removeRangeTests.filter({ !$0.rangeSelection.isEmpty }) {
+%   else:
+  for test in removeRangeTests {
+%   end
+    var c =
+      MinimalRangeReplaceableRandomAccessCollectionWithStrideableIndex(elements: test.collection)
+    let rangeToRemove = test.rangeSelection.${rangeType}(in: c)
+    c.removeSubrange(rangeToRemove)
+    expectEqualSequence(
+      test.expected,
+      c.map { $0.value },
+      stackTrace: SourceLocStack().with(test.loc))
+  }
+}
+% end
+
+RangeReplaceableTestSuite.test("reserveCapacity/dispatch") {
+  var tester = RangeReplaceableCollectionLog.dispatchTester(Array<Int>())
+  tester.reserveCapacity(10)
+  expectCustomizable(tester, tester.log.reserveCapacity)
+}
+
+runAllTests()
+

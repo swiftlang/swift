@@ -1,0 +1,11 @@
+fileprivate func new_name(_ aaa: inout Int) -> Int {
+aaa = aaa + 3
+  if aaa == 3 { aaa = 4 }
+  return aaa
+}
+
+func foo() -> Int{
+  var aaa = 1 + 2
+  return new_name(&aaa)
+}
+

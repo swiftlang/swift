@@ -1,0 +1,38 @@
+// RUN: %target-swift-frontend -emit-ir %s -module-name main | %FileCheck %s
+
+sil_stage canonical
+
+struct Box<T> {
+  @inline(never)
+  static func foo() {}
+}
+
+// Reference a function in a way that will be specialized.
+sil @test : $@convention(thin) () -> () {
+bb0:
+  // function_ref static Box.foo() -> ()
+  %0 = function_ref @$s4main3BoxV3fooyyFZ : $@convention(thin) <τ_0_0> (@thin Box<τ_0_0>.Type) -> () // user: %2
+  %1 = metatype $@thin Box<()>.Type               // user: %2
+  %2 = apply %0<()>(%1) : $@convention(thin) <τ_0_0> (@thin Box<τ_0_0>.Type) -> ()
+  %3 = tuple ()                                   // user: %4
+  return %3 : $()                                 // id: %4
+}
+
+// This is the unspecialized form.
+sil hidden @$s4main3BoxV3fooyyFZ : $@convention(thin) <T> (@thin Box<T>.Type) -> () {
+bb0(%0 : $@thin Box<T>.Type):
+  %1 = tuple ()
+  return %1 : $()
+}
+
+// generic specialization <()> of static main.Box.foo () -> ()
+// This specialization is one that would be matched by the prespecialization
+// pass.
+sil shared @$s4main3BoxV3fooyyFZyt_Tg5 : $@convention(thin) (@thin Box<()>.Type) -> () {
+bb0(%0 : $@thin Box<()>.Type):
+  %1 = tuple ()
+  return %1 : $()
+}
+
+// CHECK-DAG: define linkonce_odr hidden swiftcc void @"$s4main3BoxV3fooyyFZyt_Tg5"() {{.*}}{
+// CHECK-DAG: call swiftcc void @"$s4main3BoxV3fooyyFZyt_Tg5"()

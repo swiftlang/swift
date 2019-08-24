@@ -1,0 +1,46 @@
+// RUN: %empty-directory(%t)
+// RUN: %gyb -D_runtime=%target-runtime %s -o %t/main.swift
+// RUN: %line-directive %t/main.swift -- %target-swift-frontend -typecheck -verify %t/main.swift
+
+func test_StringSubscriptByInt(
+  x: String,
+  i: Int,
+  r1: Range<Int>,
+  r2: ClosedRange<Int>
+) {
+  _ = x[i] // expected-error {{'subscript(_:)' is unavailable: cannot subscript String with an Int, see the documentation comment for discussion}} {{none}}
+  _ = x[r1] // expected-error {{'subscript(_:)' is unavailable: cannot subscript String with an integer range, see the documentation comment for discussion}} {{none}}
+  _ = x[r2] // expected-error {{'subscript(_:)' is unavailable: cannot subscript String with an integer range, see the documentation comment for discussion}} {{none}}
+}
+
+func test_UTF8View(s: String.UTF8View, i: String.UTF8View.Index, d: Int) {
+  _ = s.index(after: i) // OK
+  _ = s.index(before: i) // OK
+  _ = s.index(i, offsetBy: d) // OK
+  _ = s.index(i, offsetBy: d, limitedBy: i) // OK
+  _ = s.distance(from: i, to: i) // OK
+}
+
+func test_UTF16View(s: String.UTF16View, i: String.UTF16View.Index, d: Int) {
+  _ = s.index(after: i) // OK
+  _ = s.index(before: i) // OK
+  _ = s.index(i, offsetBy: d) // OK
+  _ = s.index(i, offsetBy: d, limitedBy: i) // OK
+  _ = s.distance(from: i, to: i) // OK
+}
+
+func test_UnicodeScalarView(s: String.UnicodeScalarView, i: String.UnicodeScalarView.Index, d: Int) {
+  _ = s.index(after: i) // OK
+  _ = s.index(before: i) // OK
+  _ = s.index(i, offsetBy: d) // OK
+  _ = s.index(i, offsetBy: d, limitedBy: i) // OK
+  _ = s.distance(from: i, to: i) // OK
+}
+
+func test_CharacterView(s: String, i: String.Index, d: Int) {
+  _ = s.index(after: i) // OK
+  _ = s.index(before: i) // OK
+  _ = s.index(i, offsetBy: d) // OK
+  _ = s.index(i, offsetBy: d, limitedBy: i) // OK
+  _ = s.distance(from: i, to: i) // OK
+}

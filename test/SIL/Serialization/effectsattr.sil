@@ -1,0 +1,35 @@
+// RUN: %target-sil-opt %s -o - | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+//CHECK: [readonly] @function1
+sil [readonly] @function1 : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}
+
+//CHECK: [readnone] @function2
+sil [readnone] @function2 : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}
+
+//CHECK: [readwrite] @function3
+sil [readwrite] @function3 : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}
+
+//CHECK: [releasenone] @function4
+sil [releasenone] @function4 : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}

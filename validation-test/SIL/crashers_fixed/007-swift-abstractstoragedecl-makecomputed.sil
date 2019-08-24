@@ -1,0 +1,2 @@
+// RUN: not %target-sil-opt %s
+protocol a{@_hasStorage var e:a{get

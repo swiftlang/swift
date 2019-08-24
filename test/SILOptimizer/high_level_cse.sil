@@ -1,0 +1,68 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -high-level-cse | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+sil [_semantics "array.get_count"] @getCount : $@convention(method) (@guaranteed Array<Int>) -> Int
+sil [_semantics "array.get_capacity"] @getCapacity : $@convention(method) (@guaranteed Array<Int>) -> Int
+sil [_semantics "array.check_subscript"] @checkSubscript : $@convention(method) (Int, Bool, @guaranteed Array<Int>) -> ()
+sil [_semantics "array.check_index"] @checkIndex : $@convention(method) (Int, @guaranteed Array<Int>) -> ()
+
+// CHECK-LABEL:   sil @cse_get_count
+// CHECK:           [[R:%[0-9]+]] = apply
+// CHECK-NOT:       apply
+// CHECK:           tuple ([[R]] : $Int, [[R]] : $Int)
+// CHECK-NEXT:      return
+sil @cse_get_count : $@convention(thin) (@guaranteed Array<Int>) -> (Int, Int) {
+bb0(%0 : $Array<Int>):
+  %f1 = function_ref @getCount : $@convention(method) (@guaranteed Array<Int>) -> Int
+  %c1 = apply %f1(%0) : $@convention(method) (@guaranteed Array<Int>) -> Int
+  %c2 = apply %f1(%0) : $@convention(method) (@guaranteed Array<Int>) -> Int
+  %r1 = tuple (%c1 : $Int, %c2 : $Int)
+  return %r1 : $(Int, Int)
+}
+
+// CHECK-LABEL:   sil @cse_get_capacity
+// CHECK:           [[R:%[0-9]+]] = apply
+// CHECK-NOT:       apply
+// CHECK:           tuple ([[R]] : $Int, [[R]] : $Int)
+// CHECK-NEXT:      return
+sil @cse_get_capacity : $@convention(thin) (@guaranteed Array<Int>) -> (Int, Int) {
+bb0(%0 : $Array<Int>):
+  %f1 = function_ref @getCapacity : $@convention(method) (@guaranteed Array<Int>) -> Int
+  %c1 = apply %f1(%0) : $@convention(method) (@guaranteed Array<Int>) -> Int
+  %c2 = apply %f1(%0) : $@convention(method) (@guaranteed Array<Int>) -> Int
+  %r1 = tuple (%c1 : $Int, %c2 : $Int)
+  return %r1 : $(Int, Int)
+}
+
+// CHECK-LABEL:   sil @cse_check_subscript
+// CHECK:           = function_ref
+// CHECK-NEXT:      apply
+// CHECK-NEXT:      tuple
+// CHECK-NEXT:      return
+sil @cse_check_subscript : $@convention(thin) (@guaranteed Array<Int>, Int, Bool) -> () {
+bb0(%0 : $Array<Int>, %1 : $Int, %2 : $Bool):
+  %f1 = function_ref @checkSubscript : $@convention(method) (Int, Bool, @guaranteed Array<Int>) -> ()
+  %c1 = apply %f1(%1, %2, %0) : $@convention(method) (Int, Bool, @guaranteed Array<Int>) -> ()
+  %c2 = apply %f1(%1, %2, %0) : $@convention(method) (Int, Bool, @guaranteed Array<Int>) -> ()
+  %r1 = tuple ()
+  return %r1 : $()
+}
+
+// CHECK-LABEL:   sil @cse_check_index
+// CHECK:           = function_ref
+// CHECK-NEXT:      apply
+// CHECK-NEXT:      tuple
+// CHECK-NEXT:      return
+sil @cse_check_index : $@convention(thin) (@guaranteed Array<Int>, Int) -> () {
+bb0(%0 : $Array<Int>, %1 : $Int):
+  %f1 = function_ref @checkIndex : $@convention(method) (Int, @guaranteed Array<Int>) -> ()
+  %c1 = apply %f1(%1, %0) : $@convention(method) (Int, @guaranteed Array<Int>) -> ()
+  %c2 = apply %f1(%1, %0) : $@convention(method) (Int, @guaranteed Array<Int>) -> ()
+  %r1 = tuple ()
+  return %r1 : $()
+}
+

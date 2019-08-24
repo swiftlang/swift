@@ -1,0 +1,42 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift %s -emit-module -emit-library -module-name capture_descriptors -o %t/capture_descriptors%{target-shared-library-suffix}
+// RUN: %target-swift-reflection-dump -binary-filename %t/capture_descriptors%{target-shared-library-suffix} | %FileCheck %s
+
+// SR-10758
+// UNSUPPORTED: linux
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+// CHECK:      CAPTURE DESCRIPTORS:
+// CHECK-NEXT: ====================
+
+class C<T> {}
+
+sil_vtable C {}
+
+sil @make_some_boxes : $@convention(thin) <T> () -> (<τ_0_0> { var τ_0_0 } <Int>, <τ_0_0> { var τ_0_0 } <(Int, Int)>, <τ_0_0> { var τ_0_0 } <C<T>>) {
+  %a = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
+  %b = alloc_box $<τ_0_0> { var τ_0_0 } <(Int, Int)>
+  %c = alloc_box $<τ_0_0> { var τ_0_0 } <C<T>>
+  %result = tuple (%a : $<τ_0_0> { var τ_0_0 } <Int>, %b : $<τ_0_0> { var τ_0_0 } <(Int, Int)>, %c : $<τ_0_0> { var τ_0_0 } <C<T>>)
+  return %result : $(<τ_0_0> { var τ_0_0 } <Int>, <τ_0_0> { var τ_0_0 } <(Int, Int)>, <τ_0_0> { var τ_0_0 } <C<T>>)
+}
+
+// CHECK:      - Capture types:
+// CHECK-NEXT: (struct Swift.Int)
+// CHECK-NEXT: - Metadata sources:
+
+// CHECK:      - Capture types:
+// CHECK-NEXT: (tuple
+// CHECK-NEXT:   (struct Swift.Int)
+// CHECK-NEXT:   (struct Swift.Int))
+// CHECK-NEXT: - Metadata sources:
+
+// CHECK:      - Capture types:
+// CHECK-NEXT: (bound_generic_class capture_descriptors.C
+// CHECK-NEXT:   (generic_type_parameter depth=0 index=0))
+// CHECK-NEXT: - Metadata sources:

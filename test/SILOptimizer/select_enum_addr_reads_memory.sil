@@ -1,0 +1,41 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -loop-rotate %s | %FileCheck %s
+
+import Builtin
+
+enum TestEnum {
+  case A
+  case B
+}
+
+// CHECK-LABEL: testit
+sil @testit : $@convention(thin) () -> () {
+bb0:
+  %i0 = integer_literal $Builtin.Int1, 0
+  %i1 = integer_literal $Builtin.Int1, -1
+  %0 = alloc_stack $TestEnum
+  %1 = enum $TestEnum, #TestEnum.A!enumelt
+  store %1 to %0 : $*TestEnum
+  br bb1
+
+// CHECK: bb1:
+bb1:
+
+// Test if this select_enum_addr inst is not moved before the loop but stays in the loop.
+// CHECK: apply
+// CHECK: [[X:%[0-9]+]] = select_enum_addr
+// CHECK: cond_br [[X]]
+  %x1 = select_enum_addr %0 : $*TestEnum, case #TestEnum.A!enumelt: %i0, default %i1 : $Builtin.Int1
+  cond_br %x1, bb2, bb3
+
+bb2:
+  %6 = function_ref @writeEnum: $@convention(thin) (@inout TestEnum) -> ()
+  %7 = apply %6(%0) : $@convention(thin) (@inout TestEnum) -> ()
+  br bb1
+
+bb3:
+  %9 = tuple ()
+  dealloc_stack %0 : $*TestEnum
+  return %9 : $()
+}
+
+sil @writeEnum: $@convention(thin) (@inout TestEnum) -> ()

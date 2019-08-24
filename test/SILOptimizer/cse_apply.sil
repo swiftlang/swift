@@ -1,0 +1,141 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -cse | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+// "return (x + y) + (x + y)"
+// make sure we are only calculating x+y once.
+
+//CHECK-LABEL: simply_arith
+//CHECK: builtin
+//CHECK: cond_fail
+//CHECK: builtin
+//CHECK: cond_fail
+//CHECK-NOT: builtin
+//CHECK-NOT: cond_fail
+//CHECK: return
+sil @simply_arith : $@convention(thin) (Int32, Int32) -> Int32 {
+bb0(%0 : $Int32, %1 : $Int32):
+  debug_value %0 : $Int32, let, name "x" // id: %2
+  debug_value %1 : $Int32, let, name "y" // id: %3
+  %5 = struct_extract %0 : $Int32, #Int32._value       // user: %8
+  %6 = struct_extract %1 : $Int32, #Int32._value       // user: %8
+  %7 = integer_literal $Builtin.Int1, -1          // user: %8
+  %8 = builtin "sadd_with_overflow_Int32"(%5 : $Builtin.Int32, %6 : $Builtin.Int32, %7 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1) // users: %9, %10
+  %9 = tuple_extract %8 : $(Builtin.Int32, Builtin.Int1), 0 // user: %12
+  %10 = tuple_extract %8 : $(Builtin.Int32, Builtin.Int1), 1 // user: %11
+  cond_fail %10 : $Builtin.Int1                   // id: %11
+  %12 = struct $Int32 (%9 : $Builtin.Int32)          // user: %23
+  %14 = struct_extract %0 : $Int32, #Int32._value      // user: %17
+  %15 = struct_extract %1 : $Int32, #Int32._value      // user: %17
+  %16 = integer_literal $Builtin.Int1, -1         // user: %17
+  %17 = builtin "sadd_with_overflow_Int32"(%14 : $Builtin.Int32, %15 : $Builtin.Int32, %16 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1) // users: %18, %19
+  %18 = tuple_extract %17 : $(Builtin.Int32, Builtin.Int1), 0 // user: %21
+  %19 = tuple_extract %17 : $(Builtin.Int32, Builtin.Int1), 1 // user: %20
+  cond_fail %19 : $Builtin.Int1                   // id: %20
+  %21 = struct $Int32 (%18 : $Builtin.Int32)         // user: %24
+  %23 = struct_extract %12 : $Int32, #Int32._value     // user: %26
+  %24 = struct_extract %21 : $Int32, #Int32._value     // user: %26
+  %25 = integer_literal $Builtin.Int1, -1         // user: %26
+  %26 = builtin "sadd_with_overflow_Int32"(%23 : $Builtin.Int32, %24 : $Builtin.Int32, %25 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1) // users: %27, %28
+  %27 = tuple_extract %26 : $(Builtin.Int32, Builtin.Int1), 0 // user: %30
+  %28 = tuple_extract %26 : $(Builtin.Int32, Builtin.Int1), 1 // user: %29
+  cond_fail %28 : $Builtin.Int1                   // id: %29
+  %30 = struct $Int32 (%27 : $Builtin.Int32)         // user: %31
+  return %30 : $Int32                               // id: %31
+}
+
+sil @readnone : $@convention(thin) (Int64, Int64) -> Int64 {
+bb0(%0 : $Int64, %1 : $Int64):
+  return %0 : $Int64
+}
+
+sil_global @gg : $Int64
+
+sil @readsome : $@convention(thin) (Int64, Int64) -> Int64 {
+bb0(%0 : $Int64, %1 : $Int64):
+  %g = global_addr @gg : $*Int64
+  %l = load %g : $*Int64
+  return %l : $Int64
+}
+
+struct Storage {
+	var a: Int64
+	var b: Int64
+	var c: Int64
+}
+
+class XX {
+}
+
+sil_global @ggs : $Storage
+
+sil @retain_only : $@convention(thin) () -> XX {
+bb0:
+  %g = global_addr @ggs : $*Storage
+  %a = address_to_pointer %g : $*Storage to $Builtin.RawPointer
+  %r = raw_pointer_to_ref %a : $Builtin.RawPointer to $XX
+  strong_retain %r : $XX
+  return %r : $XX
+}
+
+
+
+//CHECK-LABEL: sil @cse_readnone_apply
+//CHECK: [[A:%[0-9]+]] = apply
+//CHECK: [[S:%[0-9]+]] = struct_extract [[A]]
+//CHECK: builtin "sadd_with_overflow_Int64"([[S]] : $Builtin.Int64, [[S]] : $Builtin.Int64
+//CHECK: return
+sil @cse_readnone_apply : $@convention(thin) (Int64) -> Int64 {
+bb0(%0 : $Int64):
+  %2 = function_ref @readnone : $@convention(thin) (Int64, Int64) -> Int64
+  %3 = integer_literal $Builtin.Int64, 3
+  %4 = struct $Int64 (%3 : $Builtin.Int64)
+  %5 = apply %2(%0, %4) : $@convention(thin) (Int64, Int64) -> Int64
+  %6 = apply %2(%0, %4) : $@convention(thin) (Int64, Int64) -> Int64
+  %7 = struct_extract %5 : $Int64, #Int64._value
+  %8 = struct_extract %6 : $Int64, #Int64._value
+  %9 = integer_literal $Builtin.Int1, 0
+  %10 = builtin "sadd_with_overflow_Int64"(%7 : $Builtin.Int64, %8 : $Builtin.Int64, %9 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %11 = tuple_extract %10 : $(Builtin.Int64, Builtin.Int1), 0
+  %14 = struct $Int64 (%11 : $Builtin.Int64)
+  return %14 : $Int64
+}
+
+//CHECK-LABEL: sil @dont_cse_readsome_apply
+//CHECK: %{{[0-9]+}} = apply
+//CHECK: %{{[0-9]+}} = apply
+//CHECK: return
+sil @dont_cse_readsome_apply : $@convention(thin) (Int64) -> Int64 {
+bb0(%0 : $Int64):
+  %2 = function_ref @readsome : $@convention(thin) (Int64, Int64) -> Int64
+  %3 = integer_literal $Builtin.Int64, 3
+  %4 = struct $Int64 (%3 : $Builtin.Int64)
+  %5 = apply %2(%0, %4) : $@convention(thin) (Int64, Int64) -> Int64
+  %6 = apply %2(%0, %4) : $@convention(thin) (Int64, Int64) -> Int64
+  %7 = struct_extract %5 : $Int64, #Int64._value
+  %8 = struct_extract %6 : $Int64, #Int64._value
+  %9 = integer_literal $Builtin.Int1, 0
+  %10 = builtin "sadd_with_overflow_Int64"(%7 : $Builtin.Int64, %8 : $Builtin.Int64, %9 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %11 = tuple_extract %10 : $(Builtin.Int64, Builtin.Int1), 0
+  %14 = struct $Int64 (%11 : $Builtin.Int64)
+  return %14 : $Int64
+}
+
+//CHECK-LABEL: sil @dont_cse_retain_only_apply
+//CHECK: %{{[0-9]+}} = apply
+//CHECK: %{{[0-9]+}} = apply
+//CHECK: return
+sil @dont_cse_retain_only_apply : $@convention(thin) () -> () {
+bb0:
+  %f = function_ref @retain_only : $@convention(thin) () -> XX
+  %a1 = apply %f() : $@convention(thin) () -> XX
+  %a2 = apply %f() : $@convention(thin) () -> XX
+  strong_release %a1 : $XX
+  strong_release %a2 : $XX
+  %r = tuple()
+  return %r : $()
+}
+

@@ -1,0 +1,135 @@
+%{
+  # -*- mode: C++ -*-
+  from gyb_syntax_support import *
+  NODE_MAP = create_node_map()
+  # Ignore the following admonition; it applies to the resulting .h file only
+}%
+//// Automatically Generated From SyntaxNodes.h.gyb.
+//// Do Not Edit Directly!
+//===---------------- SyntaxNodes.h - Syntax Node definitions -------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+#ifndef SWIFT_SYNTAX_NODES_H
+#define SWIFT_SYNTAX_NODES_H
+
+#include "swift/Syntax/Syntax.h"
+#include "swift/Syntax/SyntaxCollection.h"
+#include "swift/Syntax/TokenSyntax.h"
+#include "swift/Syntax/UnknownSyntax.h"
+
+namespace swift {
+namespace syntax {
+
+% # Emit the non-collection classes first, then emit the collection classes
+% # that reference these classes.
+
+% for node in SYNTAX_NODES:
+%   if not node.is_syntax_collection():
+class ${node.name};
+%   end
+% end
+
+% for node in SYNTAX_NODES:
+%   if node.is_syntax_collection():
+using ${node.name} =
+  SyntaxCollection<SyntaxKind::${node.syntax_kind},
+                   ${node.collection_element_type}>;
+%   end
+% end
+
+% for node in SYNTAX_NODES:
+%   if not node.is_syntax_collection():
+%     qualifier = "" if node.is_base() else "final"
+%     for line in dedented_lines(node.description):
+/// ${line}
+%     end
+class ${node.name} ${qualifier} : public ${node.base_type} {
+%     if node.is_buildable():
+      friend class ${node.name}Builder;
+%     end
+%     if node.requires_validation():
+  void validate() const;
+%     end
+
+public:
+%     if node.children:
+  enum Cursor : uint32_t {
+%       for child in node.children:
+    ${child.name},
+%       end
+  };
+%     end
+
+  ${node.name}(const RC<SyntaxData> Root, const SyntaxData *Data)
+    : ${node.base_type}(Root, Data) {
+%     if node.requires_validation():
+      this->validate();
+%     end
+    }
+
+%     for child in node.children:
+%       for line in dedented_lines(child.description):
+  /// ${line}
+%       end
+%       if child.is_optional:
+  llvm::Optional<${child.type_name}> get${child.name}();
+%       else:
+  ${child.type_name} get${child.name}();
+%       end
+
+%       child_node = NODE_MAP.get(child.syntax_kind)
+%       if child_node and child_node.is_syntax_collection():
+%         child_elt = child.collection_element_name
+%         child_elt_type = child_node.collection_element_type
+%         if not child_elt:
+%           raise Exception("'collection_element_name' should be set for '%s' of '%s'" % (child.name, node.name))
+%         end
+  /// Adds the provided `${child_elt}` to the node's `${child.name}`
+  /// collection.
+  /// - param element: The new `${child_elt}` to add to the node's
+  ///                  `${child.name}` collection.
+  /// - returns: A copy of the receiver with the provided `${child_elt}`
+  ///            appended to its `${child.name}` collection.
+  ${node.name} add${child_elt}(${child_elt_type} ${child_elt});
+%       end
+
+  /// Returns a copy of the receiver with its `${child.name}` replaced.
+  /// - param newChild: The new `${child.name}` to replace the node's
+  ///                   current `${child.name}`, if present.
+  ${node.name}
+  with${child.name}(llvm::Optional<${child.type_name}> New${child.type_name});
+
+%     end
+
+  static bool kindof(SyntaxKind Kind) {
+%   if node.is_base():
+    return is${node.syntax_kind}Kind(Kind);
+%   else:
+    return Kind == SyntaxKind::${node.syntax_kind};
+%   end
+  }
+
+  static bool classof(const Syntax *S) {
+    return kindof(S->getKind());
+  }
+};
+
+%   end
+% end
+
+/// Calculating an identifier for all syntax nodes' structures for verification
+/// purposes.
+const char* getSyntaxStructureVersioningIdentifier();
+}
+}
+
+#endif // SWIFT_SYNTAX_NODES_H

@@ -1,0 +1,125 @@
+# lit.site.cfg.in - Local configuration for the 'lit' test runner -*- python -*-
+#
+# This source file is part of the Swift.org open source project
+#
+# Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+# Licensed under Apache License v2.0 with Runtime Library Exception
+#
+# See https://swift.org/LICENSE.txt for license information
+# See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+#
+# -----------------------------------------------------------------------------
+
+import os
+import platform
+import sys
+
+config.llvm_src_root = "@LLVM_MAIN_SRC_DIR@"
+config.llvm_obj_root = "@LLVM_BINARY_DIR@"
+config.llvm_tools_dir = "@LLVM_TOOLS_DIR@"
+config.llvm_libs_dir = "@LLVM_LIBS_DIR@"
+config.llvm_code_generators = "@LLVM_TARGETS_TO_BUILD@".split(";")
+config.lit_tools_dir = "@LLVM_LIT_TOOLS_DIR@"
+config.swift_src_root = lit_config.params.get("swift_src_root", "@SWIFT_SOURCE_DIR@")
+config.swift_obj_root = "@SWIFT_BINARY_DIR@"
+config.target_triple = "@TARGET_TRIPLE@"
+config.variant_triple = "@VARIANT_TRIPLE@"
+config.variant_sdk = "@VARIANT_SDK@"
+config.variant_suffix = "@VARIANT_SUFFIX@"
+config.swiftlib_dir = "@LIT_SWIFTLIB_DIR@"
+config.swift_test_results_dir = \
+    lit_config.params.get("swift_test_results_dir", "@SWIFT_TEST_RESULTS_DIR@")
+
+config.coverage_mode = "@SWIFT_ANALYZE_CODE_COVERAGE@"
+config.lldb_build_root = "@LLDB_BUILD_DIR@"
+config.libdispatch_build_path = "@SWIFT_PATH_TO_LIBDISPATCH_BUILD@"
+
+# --- Darwin ---
+config.darwin_xcrun_toolchain = "@SWIFT_DARWIN_XCRUN_TOOLCHAIN@"
+
+# --- android ---
+config.android_ndk_path = "@SWIFT_ANDROID_NDK_PATH@"
+config.android_ndk_gcc_version = "@SWIFT_ANDROID_NDK_GCC_VERSION@"
+
+# --- Windows ---
+msvc_runtime_flags = {
+  'MultiThreaded': 'MT',
+  'MultiThreadedDebug': 'MTd',
+  'MultiThreadedDLL': 'MD',
+  'MultiThreadedDebugDLL': 'MDd',
+}
+config.swift_stdlib_msvc_runtime = \
+    msvc_runtime_flags["@SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY@"]
+
+# Please remember to handle empty strings and/or unset variables correctly.
+
+if "@SWIFT_ASAN_BUILD@" == "TRUE":
+    config.available_features.add("asan")
+else:
+    config.available_features.add('no_asan')
+
+if "@SWIFT_RUNTIME_ENABLE_LEAK_CHECKER@" == "TRUE":
+    config.available_features.add('leak-checker')
+
+if '@SWIFT_TOOLS_ENABLE_LTO@'.lower() in ['full', 'thin']:
+    config.available_features.add('lto')
+else:
+    config.available_features.add('no_lto')
+
+if "@LLVM_ENABLE_ASSERTIONS@" == "TRUE":
+    config.available_features.add('asserts')
+else:
+    config.available_features.add('no_asserts')
+
+if "@SWIFT_STDLIB_ASSERTIONS@" == "TRUE":
+    config.available_features.add('swift_stdlib_asserts')
+else:
+    config.available_features.add('swift_stdlib_no_asserts')
+
+if "@SWIFT_AST_VERIFIER@" == "TRUE":
+    config.available_features.add('swift_ast_verifier')
+
+if "@SWIFT_OPTIMIZED@" == "TRUE":
+    config.available_features.add("optimized_stdlib")
+
+if "@SWIFT_STDLIB_USE_NONATOMIC_RC@" == "TRUE":
+    config.available_features.add("nonatomic_rc")
+
+if "@SWIFT_HAVE_WORKING_STD_REGEX@" == "FALSE":
+    config.available_features.add('broken_std_regex')
+
+if "@SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS@" == "TRUE":
+    config.available_features.add('runtime_function_counters')
+
+if "@CMAKE_GENERATOR@" == "Xcode":
+    xcode_bin_dir = os.path.join(config.llvm_obj_root, "@LLVM_BUILD_TYPE@",
+                                 'bin')
+    lit_config.note('Adding to path: ' + xcode_bin_dir)
+    config.environment['PATH'] = \
+      os.path.pathsep.join((xcode_bin_dir, config.environment['PATH']))
+
+config.available_features.add("CMAKE_GENERATOR=@CMAKE_GENERATOR@")
+
+if "@SWIFT_BUILD_SYNTAXPARSERLIB@" == "TRUE":
+    config.available_features.add('syntax_parser_lib')
+
+if "@SWIFT_ENABLE_SOURCEKIT_TESTS@" == "TRUE":
+    config.available_features.add('sourcekit')
+
+if "@SWIFT_HAVE_LIBXML2@" == "TRUE":
+    config.available_features.add('libxml2')
+
+if "@SWIFT_ENABLE_LLD_LINKER@" == "TRUE":
+    config.android_linker_name = "lld"
+else:
+    # even if SWIFT_ENABLE_GOLD_LINKER isn't set, we cannot use BFD for Android
+    config.android_linker_name = "gold"
+
+if '@SWIFT_INCLUDE_TOOLS@' == 'TRUE':
+    config.available_features.add('swift_tools_extra')
+
+# Let the main config do the real work.
+if config.test_exec_root is None:
+    config.test_exec_root = os.path.dirname(os.path.realpath(__file__))
+lit_config.load_config(
+    config, os.path.join(config.swift_src_root, "test", "lit.cfg"))

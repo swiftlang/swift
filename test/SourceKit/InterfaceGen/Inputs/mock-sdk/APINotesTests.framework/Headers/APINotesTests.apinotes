@@ -1,0 +1,47 @@
+Name: APINotesTests
+Classes:
+- Name:      GlobalToMember_Class_Payload
+  SwiftName: GlobalToMember_Class_Container.Payload
+- Name:      MemberToGlobal_Class_Payload
+  SwiftName: MemberToGlobal_Class_Payload
+- Name:      MemberToMember_Class_Payload
+  SwiftName: MemberToMember_Class_Swift4.PayloadFor4
+- Name:      MemberToMember_SameName_Class_Payload
+  SwiftName: MemberToMember_SameName_Class_Swift4.Payload
+- Name:      MemberToMember_SameContainer_Class_Payload
+  SwiftName: MemberToMember_SameContainer_Class_Container.PayloadFor4
+Typedefs:
+- Name:      GlobalToMember_Typedef_Payload
+  SwiftName: GlobalToMember_Typedef_Container.Payload
+- Name:      MemberToGlobal_Typedef_Payload
+  SwiftName: MemberToGlobal_Typedef_Payload
+- Name:      MemberToMember_Typedef_Payload
+  SwiftName: MemberToMember_Typedef_Swift4.PayloadFor4
+- Name:      MemberToMember_SameName_Typedef_Payload
+  SwiftName: MemberToMember_SameName_Typedef_Swift4.Payload
+- Name:      MemberToMember_SameContainer_Typedef_Payload
+  SwiftName: MemberToMember_SameContainer_Typedef_Container.PayloadFor4
+SwiftVersions:
+- Version: 4
+  Classes:
+  - Name:      GlobalToMember_Class_Payload
+    SwiftName: GlobalToMember_Class_Payload
+  - Name:      MemberToGlobal_Class_Payload
+    SwiftName: MemberToGlobal_Class_Container.Payload
+  - Name:      MemberToMember_Class_Payload
+    SwiftName: MemberToMember_Class_Swift3.PayloadFor3
+  - Name:      MemberToMember_SameContainer_Class_Payload
+    SwiftName: MemberToMember_SameContainer_Class_Container.PayloadFor3
+  - Name:      MemberToMember_SameName_Class_Payload
+    SwiftName: MemberToMember_SameName_Class_Swift3.Payload
+  Typedefs:
+  - Name:      GlobalToMember_Typedef_Payload
+    SwiftName: GlobalToMember_Typedef_Payload
+  - Name:      MemberToGlobal_Typedef_Payload
+    SwiftName: MemberToGlobal_Typedef_Container.Payload
+  - Name:      MemberToMember_Typedef_Payload
+    SwiftName: MemberToMember_Typedef_Swift3.PayloadFor3
+  - Name:      MemberToMember_SameContainer_Typedef_Payload
+    SwiftName: MemberToMember_SameContainer_Typedef_Container.PayloadFor3
+  - Name:      MemberToMember_SameName_Typedef_Payload
+    SwiftName: MemberToMember_SameName_Typedef_Swift3.Payload

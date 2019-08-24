@@ -1,0 +1,36 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -early-inline -sil-inline-threshold=50 | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+
+//CHECK-LABEL: sil @caller_function
+//CHECK-NOT: try_apply
+//CHECK: throw {{.*}} : $Error
+sil @caller_function : $@convention(thin) () -> @error Error {
+bb0:
+  // function_ref main.inner () throws -> ()
+  %0 = function_ref @callee_function : $@convention(thin) () -> @error Error // user: %1
+  try_apply %0() : $@convention(thin) () -> @error Error, normal bb1, error bb2 // id: %1
+
+bb1(%2 : $()):                                    // Preds: bb0
+  %3 = tuple ()                                   // user: %4
+  return %3 : $()                                 // id: %4
+
+bb2(%5 : $Error):                             // Preds: bb0
+  throw %5 : $Error                           // id: %6
+}
+
+//CHECK-LABEL: sil [always_inline] @callee_function
+//CHECK: return
+
+// main.inner () throws -> ()
+sil [always_inline] @callee_function : $@convention(thin) () -> @error Error {
+bb0:
+  %0 = tuple ()                                   // user: %1
+  return %0 : $()                                 // id: %1
+}
+

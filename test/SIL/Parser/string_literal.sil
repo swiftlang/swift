@@ -1,0 +1,11 @@
+// RUN: %target-sil-opt %s
+
+sil @test : $@convention(thin) () -> () {
+bb0:
+// CHECK: string_literal utf8 "\u{0B}"
+  %1 = string_literal utf8 "\u{0B}"
+// CHECK: string_literal bytes "ABCD"
+  %4 = string_literal bytes "ABCD"
+  %6 = tuple ()                                   // user: %7
+  return %6 : $()
+}

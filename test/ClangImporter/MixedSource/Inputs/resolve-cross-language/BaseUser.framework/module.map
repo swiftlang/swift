@@ -1,0 +1,4 @@
+framework module BaseUser {
+  header "BaseUser.h"
+  export *
+}

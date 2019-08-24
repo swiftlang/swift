@@ -1,0 +1,12 @@
+source.edit.kind.active:
+  1:1-1:1 "fileprivate func new_name() -> Int {
+var a = 3
+  a = a + 1
+  return 1
+}
+
+"
+  <note>source.refactoring.range.kind.basename 1:18-1:26 "new_name"</note>
+source.edit.kind.active:
+  2:3-4:11 "return new_name()"
+  <note>source.refactoring.range.kind.basename 1:8-1:16 "new_name"</note>

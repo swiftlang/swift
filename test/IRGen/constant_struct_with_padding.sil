@@ -1,0 +1,19 @@
+// RUN: %target-swift-frontend -module-name main %s -emit-ir -o - | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+struct T {
+  @_hasStorage var a: Builtin.Int1 { get set }
+  @_hasStorage var b: Builtin.Int32 { get set }
+}
+
+// CHECK: @global = hidden global %T4main1TV <{ i1 false, [3 x i8] undef, i32 0 }>, align 4
+sil_global hidden @global : $T = {
+  %2 = integer_literal $Builtin.Int1, 0
+  %3 = integer_literal $Builtin.Int32, 0
+  %initval = struct $T (%2 : $Builtin.Int1, %3 : $Builtin.Int32)
+}
+

@@ -1,0 +1,5 @@
+framework module AutolinkingTest {
+  umbrella header "AutolinkingTest.h"
+  export *
+  module * { export * }
+}

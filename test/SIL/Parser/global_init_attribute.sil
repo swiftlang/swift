@@ -1,0 +1,21 @@
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle %s -emit-silgen | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+// We cannot deserialize a SILDeclRef of kind GlobalAccessor, so this
+// is not a proper addressor. But at least we can parse
+// "[global_init]".
+//
+// CHECK-LABEL: g.MyVar.unsafeMutableAddressor : Swift.Int
+// CHECK-NEXT: sil [global_init] @_TF1gau5MyVarSi
+
+sil [global_init] @_TF1gau5MyVarSi : $@convention(thin) () -> Builtin.RawPointer {
+bb0:
+  %b = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
+  %ba = project_box %b : $<τ_0_0> { var τ_0_0 } <Int>, 0
+  %p = address_to_pointer %ba : $*Int to $Builtin.RawPointer
+  return %p : $Builtin.RawPointer
+}

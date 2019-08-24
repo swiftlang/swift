@@ -1,0 +1,207 @@
+#!/usr/bin/env python
+# utils/coverage/coverage-build-db - Build sqlite3 database from profdata
+#
+# This source file is part of the Swift.org open source project
+#
+# Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+# Licensed under Apache License v2.0 with Runtime Library Exception
+#
+# See https://swift.org/LICENSE.txt for license information
+# See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+
+import Queue
+import argparse
+import logging
+import multiprocessing
+import os
+import re
+import sqlite3
+import sys
+
+logging_format = '%(asctime)s %(levelname)s %(message)s'
+logging.basicConfig(level=logging.DEBUG,
+                    format=logging_format,
+                    filename='/tmp/%s.log' % os.path.basename(__file__),
+                    filemode='w')
+console = logging.StreamHandler()
+console.setLevel(logging.INFO)
+formatter = logging.Formatter(logging_format)
+console.setFormatter(formatter)
+logging.getLogger().addHandler(console)
+
+
+def parse_coverage_log(filepath):
+    """Return parsed coverage intervals from `llvm-profdata show` output at
+    `filepath`"""
+    logging.info('Parsing: %s', filepath)
+    test = os.path.basename(os.path.dirname(filepath)).rsplit('.', 1)[0]
+    with open(filepath) as f:
+        # Initial parse
+        parsed = []
+        for section in [section.split("\n")
+                        for section in f.read().split("\n\n")]:
+            if ".cpp:" in section[0] or ".h:" in section[0]:
+                parsed_section = [section[0].split(":", 1) + [test]]
+                for line in section[1:]:
+                    linedata = linedata_re.match(line).group(1, 2)
+                    parsed_section.append(linedata)
+                parsed.append(parsed_section)
+        # Build intervals
+        parsed_interval = []
+        for section in parsed:
+            new_section = [section[0]]
+            i = 1
+            if len(section) > 2:
+                while i < len(section) - 1:
+                    while i < len(section) - 1 and \
+                            section[i][0] in ['0', None]:
+                        i += 1
+                    if i == len(section) - 1:
+                        if section[i][0] not in ['0', None]:
+                            istart = int(section[i][1])
+                            iend = istart
+                            new_section.append((istart, iend))
+                        break
+                    istart = int(section[i][1])
+                    iend = istart  # single line interval starting
+                    while i < len(section) - 1 and \
+                            int(section[i + 1][1]) == iend + 1 and \
+                            section[i + 1][0] not in ['0', None]:
+                        iend += 1
+                        i += 1
+                    new_section.append((istart, iend))
+                    i += 1
+            else:
+                if section[i][0] not in ['0', None]:
+                    istart = int(section[i][1])
+                    iend = istart
+                    new_section.append((istart, iend))
+            parsed_interval.append(new_section)
+        return parsed_interval
+
+
+def worker(args):
+    """Parse coverage log at path `args[0]` and place in queue `args[1]`"""
+    args[1].put(parse_coverage_log(args[0]))
+
+
+manager = multiprocessing.Manager()
+result_queue = manager.Queue()
+worker_queue = []
+
+linedata_re = re.compile(r"^\s*([^\s]+?)?\|\s*(\d+)\|")
+strings = dict()
+
+pool = multiprocessing.Pool(3)
+
+
+def insert_coverage_section_into_db(db_cursor, section):
+    """Insert parsed intervals in `section` into database at `db_cursor`"""
+    filename = section[0][0]
+    function = section[0][1]
+    test = section[0][2]
+    logging.debug('Inserting section into database for file: %s', filename)
+    if filename not in strings:
+        db_cursor.execute("INSERT INTO strings (string) VALUES (?)",
+                          (filename,))
+        strings[filename] = db_cursor.lastrowid
+    if test not in strings:
+        db_cursor.execute("INSERT INTO strings (string) VALUES (?)", (test,))
+        strings[test] = db_cursor.lastrowid
+    if function not in strings:
+        db_cursor.execute("INSERT INTO strings (string) VALUES (?)",
+                          (function,))
+        strings[function] = db_cursor.lastrowid
+    for istart, iend in section[1:]:
+        logging.debug('%s, %s, %s, %s, %s', function, filename, test, istart,
+                      iend)
+        db_cursor.execute("INSERT INTO coverage VALUES (?,?,?,?,?)",
+                          (strings[function], strings[filename],
+                           strings[test], istart, iend))
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description='Build sqlite3 database from profdata')
+    parser.add_argument('root_directory',
+                        metavar='root-directory',
+                        help='a root directory to recursively search for '
+                             'coverage logs')
+    parser.add_argument('--coverage-filename',
+                        help='a coverage log file name to search for '
+                             '(default: coverage.log.demangled)',
+                        metavar='NAME',
+                        default='coverage.log.demangled')
+    parser.add_argument('--db-filepath',
+                        help='the filepath of the coverage db to build '
+                             '(default: coverage.db)',
+                        metavar='PATH',
+                        default='coverage.db')
+    parser.add_argument('--log',
+                        help='the level of information to log (default: info)',
+                        metavar='LEVEL',
+                        default='info',
+                        choices=['info', 'debug', 'warning', 'error',
+                                 'critical'])
+    args = parser.parse_args()
+
+    console.setLevel(level=args.log.upper())
+    logging.debug(args)
+
+    if not os.path.exists(args.root_directory):
+        logging.critical('Directory not found: %s', args.root_directory)
+        return 1
+
+    if os.path.exists(args.db_filepath):
+        logging.info('Deleting existing database: %s', args.db_filepath)
+        os.unlink(args.db_filepath)
+
+    logging.info('Creating database: %s', args.db_filepath)
+    conn = sqlite3.connect(args.db_filepath)
+
+    try:
+        logging.debug('Creating coverage table')
+        c = conn.cursor()
+        c.execute('''CREATE TABLE strings
+                     (id integer primary key autoincrement, string text)''')
+        c.execute('''CREATE TABLE coverage
+                     (function references strings(id),
+                      src references strings(id),
+                      test references strings(id),
+                      istart integer, iend integer)''')
+        conn.commit()
+
+        for root, folders, files in os.walk(args.root_directory):
+            for f in files:
+                if f == args.coverage_filename:
+                    filepath = os.path.join(root, f)
+                    logging.debug('Adding file to queue: %s', filepath)
+                    worker_queue.append((filepath, result_queue))
+
+        logging.info('Finished adding %s paths to queue', len(worker_queue))
+        pool.map_async(worker, worker_queue)
+
+        while True:
+            parsed = result_queue.get(timeout=60)
+            logging.info('Inserting coverage data into db for %s function(s)',
+                         len(parsed))
+            for section in parsed:
+                insert_coverage_section_into_db(c, section)
+            conn.commit()
+            result_queue.task_done()
+    except Queue.Empty:
+        logging.info('Queue exhausted. Shutting down...')
+    except KeyboardInterrupt:
+        logging.debug('Caught KeyboardInterrupt. Shutting down...')
+    finally:
+        logging.debug('Closing database')
+        conn.commit()
+        conn.close()
+        logging.debug('Terminating pool')
+        pool.terminate()
+
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())

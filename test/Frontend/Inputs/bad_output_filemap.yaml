@@ -1,0 +1,4 @@
+"\316\251-main.swift":
+  object: "main.o"
+  dependencies: "main.d"
+  diagnostics: "main.dia"

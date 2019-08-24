@@ -1,0 +1,61 @@
+// RUN: %swift -disable-legacy-type-info -target i386-apple-ios7 %s -gnone -emit-ir | %FileCheck %s
+// RUN: %swift -disable-legacy-type-info -target armv7-apple-ios7 %s -gnone -emit-ir | %FileCheck %s
+
+// REQUIRES: CODEGENERATOR=X86
+// REQUIRES: CODEGENERATOR=ARM
+
+// Check that we correctly lay out single-payload enums with a class reference
+// payload as nullable pointers. <rdar://problem/16093103>
+
+sil_stage canonical
+
+import Builtin
+
+class C {}
+sil_vtable C {}
+
+sil @$s11enum_32_bit1CCfD : $@convention(thin) (@owned C) -> ()
+
+// CHECK-LABEL: %T11enum_32_bit3FooO = type <{ [4 x i8] }>
+enum Foo {
+  case A(C)
+  case B
+}
+
+@objc protocol ClassExistential {}
+
+// CHECK-LABEL: %T11enum_32_bit3BarO = type <{ [4 x i8] }>
+enum Bar {
+  case A(ClassExistential)
+  case B
+}
+
+// CHECK-LABEL: %T11enum_32_bit3BasO = type <{ [4 x i8] }>
+enum Bas {
+  case A(ClassExistential)
+  case B(C)
+  case Z
+}
+
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @foo(i32)
+sil @foo : $@convention(thin) (@owned Foo) -> () {
+entry(%0 : $Foo):
+  return undef : $()
+}
+
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @bar(i32)
+sil @bar : $@convention(thin) (@owned Bar) -> () {
+entry(%0 : $Bar):
+  return undef : $()
+}
+
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @bas(i32)
+sil @bas : $@convention(thin) (@owned Bas) -> () {
+entry(%0 : $Bas):
+  return undef : $()
+}
+
+// Force instantiation of the IR types
+sil @indirect_foo : $@convention(thin) (@in Foo) -> ()
+sil @indirect_bar : $@convention(thin) (@in Bar) -> ()
+sil @indirect_bas : $@convention(thin) (@in Bas) -> ()

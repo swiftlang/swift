@@ -1,0 +1,8 @@
+source.edit.kind.active:
+  2:7-2:9 source.refactoring.range.kind.basename
+source.edit.kind.active:
+  3:3-3:5 source.refactoring.range.kind.basename
+source.edit.kind.active:
+  3:8-3:10 source.refactoring.range.kind.basename
+source.edit.kind.active:
+  4:17-4:19 source.refactoring.range.kind.basename

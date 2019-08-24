@@ -1,0 +1,26 @@
+# Compile artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution/packaging
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt

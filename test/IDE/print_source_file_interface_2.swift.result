@@ -1,0 +1,19 @@
+/*
+Copyright (c) 452 Attila the Hun. All rights reserved.
+*/
+/* Blah Blah */
+
+/* More Blah Blah */
+
+
+public class MyClass {
+
+    internal func doit(x: Int)
+}
+
+/// This is a very nice extension.
+extension MyClass {
+
+    /// and a nice subscript.
+    internal subscript(i: Int) -> Int { get }
+}

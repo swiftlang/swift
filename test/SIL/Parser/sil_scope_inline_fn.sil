@@ -1,0 +1,17 @@
+// RUN: %target-sil-opt -sil-print-debuginfo -enable-sil-verify-all -O %s | %FileCheck %s
+
+sil_scope 1 { loc "foo.sil":3:4 parent @foo : $@convention(thin) () -> () }
+sil_scope 2 { loc "foo.sil":3:4 parent 1 }
+sil_scope 3 { loc "bar.swift":1:2 parent @bar : $@convention(thin) () -> () }
+sil_scope 4 { loc "bar.swift":1:2 parent 3 inlined_at 2 }
+
+// CHECK: sil_scope 1 { loc "bar.swift":1:2 parent @bar : $@convention(thin) () -> () }
+// CHECK: sil_scope 2 { loc "foo.sil":3:4 parent @foo : $@convention(thin) () -> () }
+// CHECK: sil_scope 3 { loc "foo.sil":3:4 parent 2 }
+// CHECK: sil_scope 4 { loc "bar.swift":1:2 parent 1 inlined_at 3 }
+
+// foo
+sil @foo : $@convention(thin) () -> () {
+bb0:
+  return undef : $(), scope 4 // id: %1
+}

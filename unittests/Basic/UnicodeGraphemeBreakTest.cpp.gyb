@@ -1,0 +1,72 @@
+%# -*- mode: C++ -*-
+
+%# Ignore the following admonition; it applies to the resulting .cpp file only
+//// Automatically Generated From UnicodeExtendedGraphemeClusters.cpp.gyb.
+//// Do Not Edit Directly!
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+%{
+
+from GYBUnicodeDataUtils import get_grapheme_cluster_break_tests_as_utf8
+
+grapheme_cluster_break_tests = \
+    get_grapheme_cluster_break_tests_as_utf8(unicodeGraphemeBreakTestFile)
+
+}%
+
+#include "swift/Basic/Unicode.h"
+#include "gtest/gtest.h"
+#include <vector>
+
+using namespace swift;
+using namespace swift::unicode;
+
+static std::vector<unsigned> FindGraphemeClusterBoundaries(StringRef Str) {
+  std::vector<unsigned> Result;
+  Result.push_back(0);
+
+  unsigned Pos = 0;
+  while (Pos != Str.size()) {
+    Pos += extractFirstExtendedGraphemeCluster(Str.substr(Pos)).size();
+    Result.push_back(Pos);
+  }
+
+  return Result;
+}
+
+TEST(ExtractExtendedGraphemeCluster, TestsFromUnicodeSpec) {
+% for subject_string, expected_boundaries in grapheme_cluster_break_tests:
+  EXPECT_EQ((std::vector<unsigned>{ ${', '.join([str(x) for x in expected_boundaries])} }),
+      FindGraphemeClusterBoundaries("${subject_string}"));
+% end
+}
+
+TEST(ExtractExtendedGraphemeCluster, ExtraTests) {
+  //
+  // Sequences with one continuation byte missing
+  //
+
+  EXPECT_EQ((std::vector<unsigned>{ 0, 1 }),
+            FindGraphemeClusterBoundaries("\xc2"));
+
+  //
+  // Isolated surrogates
+  //
+
+  EXPECT_EQ((std::vector<unsigned>{ 0, 1, 2, 3 }),
+            FindGraphemeClusterBoundaries("\xed\xa0\x80"));
+  EXPECT_EQ((std::vector<unsigned>{ 0, 4, 5, 6, 11 }),
+            FindGraphemeClusterBoundaries(
+                "\xf3\xa0\x84\x80" "\xed\xa0\x80" "\xf3\xa0\x84\x80"));
+}
+

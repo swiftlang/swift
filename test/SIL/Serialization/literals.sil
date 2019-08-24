@@ -1,0 +1,17 @@
+// First parse this and then emit a *.sib. Then read in the *.sib, then recreate
+// RUN: %empty-directory(%t)
+// RUN: %target-sil-opt %s -emit-sib -o %t/tmp.sib -module-name literals
+// RUN: %target-sil-opt %t/tmp.sib -o %t/tmp.2.sib -module-name literals
+// RUN: %target-sil-opt %t/tmp.2.sib -module-name literals | %FileCheck %s
+
+sil_stage canonical
+
+sil [serialized] @test : $@convention(thin) () -> () {
+bb0:
+// CHECK: string_literal utf8 "\u{0B}"
+  %1 = string_literal utf8 "\u{0B}"
+// CHECK: string_literal bytes "ABCD"
+  %4 = string_literal bytes "ABCD"
+  %6 = tuple ()
+  return %6 : $()
+}

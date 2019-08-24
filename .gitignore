@@ -1,0 +1,59 @@
+#==============================================================================#
+# This file specifies intentionally untracked files that git should ignore.
+# See: http://www.kernel.org/pub/software/scm/git/docs/gitignore.html
+#
+# This file is intentionally different from the output of `git svn show-ignore`,
+# as most of those are useless.
+#==============================================================================#
+
+#==============================================================================#
+# File extensions to be ignored anywhere in the tree.
+#==============================================================================#
+# Temp files created by most text editors.
+*~
+# Merge files created by git.
+*.orig
+# Byte compiled Python modules.
+*.pyc
+# vim swap files
+.*.sw[a-z]
+.sw?
+
+#==============================================================================#
+# Explicit files to ignore (only matches one).
+#==============================================================================#
+cscope.files
+cscope.out
+
+#==============================================================================#
+# Directories to ignore (do not add trailing '/'s, they skip symlinks).
+#==============================================================================#
+# Generated docs
+docs/_build
+
+# Finder metadata
+.DS_Store
+
+# Visual Studio metadata
+.vs
+
+#==============================================================================#
+# Ignore CMake temporary files
+#==============================================================================#
+CMakeCache.txt
+CMakeFiles
+.atom-build.json
+
+#==============================================================================#
+# Ignore compile database
+#==============================================================================#
+compile_commands.json
+
+# Ignore generated GYB files until we fix the workaround on Windows
+#==============================================================================#
+8
+4
+SortedCFDatabase.def
+htmlcov
+.coverage
+/benchmark/scripts/Benchmark_Driverc

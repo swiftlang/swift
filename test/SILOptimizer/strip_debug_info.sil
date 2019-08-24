@@ -1,0 +1,18 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -strip-debug-info %s | %FileCheck %s
+
+sil_stage canonical
+
+import Swift
+import Builtin
+
+// CHECK-LABEL: sil @test
+// CHECK: bb0
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @test : $@convention(thin) <T> (@inout T, Builtin.Int64) -> () {
+bb0(%0 : $*T, %1 : $Builtin.Int64):
+  debug_value_addr %0 : $*T
+  debug_value %1 : $Builtin.Int64
+  %2 = tuple ()
+  return %2 : $()
+}

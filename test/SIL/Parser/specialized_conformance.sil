@@ -1,0 +1,47 @@
+// RUN: %target-swift-frontend -emit-ir %s -module-name main
+sil_stage raw
+
+import Builtin
+import Swift
+import SwiftShims
+
+protocol Inner {
+}
+
+protocol Outer {
+  associatedtype T : Inner
+}
+
+protocol Another {
+  associatedtype T : Inner
+}
+
+struct Generic<T> : Inner where T : Inner {
+  init()
+}
+
+struct Concrete<U> : Outer where U : Outer {
+  typealias T = Generic<U.T>
+  init()
+}
+
+sil_witness_table hidden <T where T : Inner> Generic<T>: Inner module sil {
+}
+
+sil_witness_table hidden <U where U : Outer> Concrete<U>: Outer module sil {
+  associated_type_protocol (T: Inner): Generic<U.T>: specialize <U.T> (<T where T : Inner> Generic<T>: Inner module main)
+  associated_type T: Generic<U.T>
+}
+
+sil_default_witness_table hidden Inner {
+}
+
+sil_default_witness_table hidden Outer {
+  no_default
+  no_default
+}
+
+sil_default_witness_table hidden Another {
+  no_default
+  no_default
+}

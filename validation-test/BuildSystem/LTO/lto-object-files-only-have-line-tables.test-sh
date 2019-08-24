@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+
+# This test makes sure that if lto is enabled:
+#
+# 1. We have lto object files for swift in our build tree. We swift and libswiftdemangle.
+# 2. These lto output files all have line tables in the swift include directory,
+#    but do not have full debug info. To check for the latter case, we look for
+#    SmallVector a commonly used data type.
+# 3. We use swift-demangle since it is a much smaller executable than all of
+#    swift.
+
+set -e
+set -u
+
+# REQUIRES: lto
+# REQUIRES: OS=macosx
+# REQUIRES: tools-debuginfo
+# RUN: rm -rf %t
+# RUN: mkdir -p %t
+# RUN: %s %swift_obj_root %t %llvm-dwarfdump
+
+OBJECT_ROOT=$1
+TEMP_DIR=$2
+DWARFDUMP=$3
+
+SWIFT_DEMANGLE_LTO_OBJECT_FILE=$(find ${OBJECT_ROOT} -path '*/swift-demangle/swift-demangle*-lto.o' | head -1)
+
+# Check that we have a temporary lto file for swift.
+if [[ -z "${SWIFT_DEMANGLE_LTO_OBJECT_FILE}" ]]; then
+   echo "Failed to find a temporary debug file for swift-demangle?!"
+   exit 1
+else
+    echo "Found swift-demangle LTO object!"
+fi
+
+${DWARFDUMP} --debug-line ${SWIFT_DEMANGLE_LTO_OBJECT_FILE} > ${TEMP_DIR}/line.info
+
+# Make sure that we found a line table.
+if [[ -z "$(sed -n "/include_directories.*=.*include\/swift/{p;q;}" ${TEMP_DIR}/line.info)" ]] ; then
+  echo "Failed to find line table information for swift-demangle?!"
+  exit 1
+else
+  echo "Found line table information for swift-demangle in swift LTO object"
+fi
+
+${DWARFDUMP} -apple-types ${SWIFT_DEMANGLE_LTO_OBJECT_FILE} > ${TEMP_DIR}/types.info
+
+# And that it does not have full debug info
+if [[ -n "$(sed -n '/Name:.*SmallVector<..*>/{p;q;}' ${TEMP_DIR}/types.info)" ]] ; then
+  echo "Found full debug info in the swift-demangle lto object?!"
+  exit 1
+else
+  echo "Did not find full debug info for swift-demangle lto object!"
+fi
+
+echo "The swift-demangle binary only has line table debug info!"
+
+set +u
+set +e

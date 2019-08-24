@@ -1,0 +1,37 @@
+// RUN: %target-sil-opt %s | %FileCheck %s
+
+// Generated from
+// var x : Int32 = 2
+// public func f() -> Int32 { return x }
+// with swiftc -O -parse-as-library -emit-sil
+
+import Builtin
+import Swift
+
+// CHECK: sil_global private @globalinit_token0 : $Builtin.Word
+sil_global private @globalinit_token0 : $Builtin.Word
+
+// CHECK: sil_global @_Tv2ch1xSi : $Int32 = {
+// CHECK-NEXT:   %0 = integer_literal $Builtin.Int32, 2
+// CHECK-NEXT:   %initval = struct $Int32 (%0 : $Builtin.Int32)
+// CHECK-NEXT: }
+sil_global @_Tv2ch1xSi : $Int32 = {
+  %0 = integer_literal $Builtin.Int32, 2
+  %initval = struct $Int32 (%0 : $Builtin.Int32)
+}
+
+// CHECK-LABEL: sil [global_init] @_TF2cha1xSi : $@convention(thin) () -> Builtin.RawPointer {
+sil [global_init] @_TF2cha1xSi : $@convention(thin) () -> Builtin.RawPointer {
+bb0:
+  %0 = global_addr @_Tv2ch1xSi : $*Int32
+  %1 = address_to_pointer %0 : $*Int32 to $Builtin.RawPointer
+  return %1 : $Builtin.RawPointer
+}
+
+// CHECK-LABEL: sil @_TF2ch1fFT_Si : $@convention(thin) () -> Int32 {
+sil @_TF2ch1fFT_Si : $@convention(thin) () -> Int32 {
+bb0:
+  %0 = global_addr @_Tv2ch1xSi : $*Int32
+  %1 = load %0 : $*Int32
+  return %1 : $Int32
+}

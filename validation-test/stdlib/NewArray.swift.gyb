@@ -1,0 +1,514 @@
+%# -*- mode: swift -*-
+//===--- NewArray.swift.gyb -----------------------------------*- swift -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+// RUN-DISABLED: %target-run-simple-swift | %FileCheck %s
+// RUN: %empty-directory(%t)
+// RUN: %gyb %s -o %t/NewArray.swift
+// RUN: %line-directive %t/NewArray.swift -- %target-build-swift %t/NewArray.swift -o %t/a.out -Xfrontend -disable-access-control
+// RUN: %target-run %t/a.out 2>&1 | %line-directive %t/NewArray.swift -- %FileCheck %t/NewArray.swift --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
+// REQUIRES: executable_test
+// XFAIL: *
+
+import StdlibUnittest
+import StdlibCollectionUnittest
+
+//===----------------------------------------------------------------------===//
+
+func printSequence<T : Sequence>(_ x: T) {
+  print("[", terminator: "")
+  var prefix = ""
+  for a in x {
+    print(prefix, terminator: "")
+    print(a, terminator: "")
+    prefix = ", "
+  }
+  print("]")
+}
+
+typealias _BufferID = UnsafeRawPointer?
+
+protocol MyArrayProtocol
+  : RandomAccessCollection,
+    RangeReplaceableCollection,
+    MutableCollection,
+    ArrayLiteralConvertible {
+
+  associatedtype Iterator : IteratorProtocol
+
+  var _owner: AnyObject? { get }
+
+  var capacity: Int { get }
+
+  func += <
+    S : Sequence
+  >(lhs: inout Self, rhs: S)
+  where S.Iterator.Element == Iterator.Element
+}
+extension MyArrayProtocol {
+  var _bufferID: _BufferID {
+    return unsafeBitCast(_owner, to: _BufferID.self)
+  }
+}
+extension Array : MyArrayProtocol {}
+extension ArraySlice : MyArrayProtocol {}
+extension ContiguousArray : MyArrayProtocol {}
+
+func checkReallocation<T : MyArrayProtocol>(
+  _ x: T, _ lastBuffer: _BufferID, _ reallocationExpected: Bool
+) -> _BufferID {
+  let currentBuffer = x._bufferID
+  if (currentBuffer != lastBuffer) != reallocationExpected {
+    let message = reallocationExpected ? "lack of" : ""
+    print("unexpected \(message) reallocation")
+  }
+  return currentBuffer
+}
+
+func checkEqual<
+  S1 : Sequence, S2 : Sequence
+>(_ a1: S1, _ a2: S2, _ expected: Bool)
+where
+S1.Iterator.Element == S2.Iterator.Element, 
+S1.Iterator.Element : Equatable {
+  if a1.elementsEqual(a2) != expected {
+    let un = expected ? "un" : ""
+    print("unexpectedly \(un)equal sequences!")
+  }
+}
+
+func test<
+  T : MyArrayProtocol
+>(_: T.Type, _ label: String)
+where
+T.Iterator.Element == LifetimeTracked,
+T.Iterator.Element == T.Element,
+T.Index == Int {
+  print("test: \(label)...", terminator: "")
+
+  var x: T = [
+    LifetimeTracked(1),
+    LifetimeTracked(2),
+    LifetimeTracked(3),
+    LifetimeTracked(4),
+    LifetimeTracked(5)
+  ]
+
+  checkEqual(x, LifetimeTracked(1)...LifetimeTracked(5), true)
+
+  x.reserveCapacity(x.count + 2)
+  checkEqual(x, LifetimeTracked(1)...LifetimeTracked(5), true)
+
+  let bufferId0 = x._bufferID
+
+  // Append a range of integers
+  x += LifetimeTracked(0)..<LifetimeTracked(2)
+  let bufferId1 = checkReallocation(x, bufferId0, false)
+
+  for i in x.count..<(x.capacity + 1) {
+    let bufferId1a = checkReallocation(x, bufferId1, false)
+    x.append(LifetimeTracked(13))
+  }
+  let bufferId2 = checkReallocation(x, bufferId1, true)
+
+  let y = x
+  x[x.index(before: x.endIndex)] = LifetimeTracked(17)
+  let bufferId3 = checkReallocation(x, bufferId2, true)
+  checkEqual(x, y, false)
+
+  func checkReallocations(
+    _ a: T, _ growthDescription: String, _ growBy1: (_: inout T) -> ()
+  ) {
+    var a = a
+    var reallocations = 0
+
+    // Note: right now this test is dependent on a growth factor of 2.
+    // It's possible that factor will change, but (cursory) testing
+    // has shown that using 1.5, the other popular growth factor,
+    // slows things down.
+    for _ in a.count..<(a.capacity * 4) {
+      let oldId = a._bufferID
+      growBy1(&a)
+      if oldId != a._bufferID {
+        reallocations += 1
+      }
+    }
+
+    if reallocations > 3 {
+      print(
+        "Unexpectedly found \(reallocations) reallocations "
+        + "of \(label) when growing via \(growthDescription)")
+    }
+  }
+
+  checkReallocations(x, "append") {
+    (x: inout T) -> () in x.append(LifetimeTracked(42))
+  }
+  checkReallocations(x, "+=") {
+    (x: inout T) -> () in x.append(LifetimeTracked(42))
+  }
+  print("done.")
+}
+
+print("testing...")
+// CHECK: testing...
+
+test(ContiguousArray<LifetimeTracked>.self, "ContiguousArray")
+// CHECK-NEXT: test: ContiguousArray...done
+
+
+test(Array<LifetimeTracked>.self, "Array")
+// CHECK-NEXT: test: Array...done
+
+test(ArraySlice<LifetimeTracked>.self, "ArraySlice")
+// CHECK-NEXT: test: ArraySlice...done
+
+func testAsArray() {
+  print("== AsArray ==")
+  var w: ContiguousArray<LifetimeTracked>
+    = [LifetimeTracked(4), LifetimeTracked(2), LifetimeTracked(1)]
+  // CHECK: == AsArray ==
+
+  let x = ContiguousArray(w)
+  print(w._bufferID == x._bufferID)
+  // CHECK-NEXT: true
+
+  let y = Array(x)
+  print(x._bufferID == y._bufferID)
+  // CHECK-NEXT: true
+
+  // Because of their indirection, arrays of classes can share
+  // buffers.
+  let y1 = Array(y)
+  print(y1._bufferID == y._bufferID)
+  // CHECK-NEXT: true
+
+  let z = ArraySlice(y)
+  print(y._bufferID == z._bufferID)
+  // CHECK-NEXT: true
+
+  w = ContiguousArray(z)
+  print(w._bufferID == z._bufferID)
+  // CHECK-NEXT: true
+
+  let zz = y[0..<2]
+  print(zz._bufferID)
+  // CHECK-NEXT: 0x
+}
+testAsArray()
+
+#if _runtime(_ObjC)
+import Foundation
+
+func nsArrayOfStrings() -> Array<NSString> {
+  let src: ContiguousArray<NSString> = ["foo", "bar", "baz"]
+
+  return src.withUnsafeBufferPointer {
+    let ns =  NSArray(
+      objects: unsafeBitCast($0.baseAddress!,
+        to: UnsafeMutablePointer<AnyObject>.self),
+      count: $0.count)
+    return ns as! [NSString]
+  }
+}
+
+func testCocoa() {
+  print("== Cocoa ==")
+  // CHECK-objc: == Cocoa ==
+
+  var a = nsArrayOfStrings()
+  printSequence(a)
+  // CHECK-objc-NEXT: [foo, bar, baz]
+
+  a.append("qux")
+  printSequence(a)
+  // CHECK-objc-NEXT: [foo, bar, baz, qux]
+
+  a = nsArrayOfStrings()
+  printSequence(a)
+  // CHECK-objc-NEXT: [foo, bar, baz]
+
+  let b = a
+
+  a[1] = "garply"
+  printSequence(a)
+  // CHECK-objc-NEXT: [foo, garply, baz]
+
+  // Mutating an element in a has no effect on b
+  printSequence(b)
+  // CHECK-objc-NEXT: [foo, bar, baz]
+
+  a = nsArrayOfStrings()
+  a.insert("bag", at: 2)
+  printSequence(a)
+  // CHECK-objc-NEXT: [foo, bar, bag, baz]
+
+  a = nsArrayOfStrings()
+  a.reserveCapacity(30)
+  printSequence(a)
+  // CHECK-objc-NEXT: [foo, bar, baz]
+
+  print(a.capacity >= 30)
+  // CHECK-objc-NEXT: true
+
+  // Prove that we create contiguous storage for an opaque NSArray
+  a.withUnsafeBufferPointer {
+    (p) -> () in
+    print(p[0])
+    // CHECK-objc-NEXT: foo
+  }
+}
+testCocoa()
+#endif // _runtime(_ObjC)
+
+extension ArraySlice {
+  mutating func qsort(_ compare: @escaping (Element, Element) -> Bool) {
+    _introSort(&self, subRange: Range(self.indices), by: compare)
+  }
+}
+
+func testSlice() {
+  print("== ArraySlice ==")
+  // CHECK: == ArraySlice ==
+
+  // do some tests on the shared semantics
+  var b = ContiguousArray(LifetimeTracked(0)..<LifetimeTracked(10))
+
+  // ArraySlice it
+  var bSlice = b[3..<8]
+  print("<\(bSlice.count)>")
+  // CHECK-NEXT: <5>
+  print("bSlice0: \(bSlice)")      // CHECK-NEXT: bSlice0: [3, 4, 5, 6, 7]
+
+  // bSlice += LifetimeTracked(11)..<LifetimeTracked(13)
+
+  // Writing into b does not change bSlice
+  b[4] = LifetimeTracked(41)
+  print("bSlice1: \(bSlice)")      // CHECK-NEXT: bSlice1: [3, 4, 5, 6, 7]
+
+  // Writing into bSlice does not change b
+  bSlice[3] = LifetimeTracked(32)
+
+  print("bSlice2: \(bSlice)")     // CHECK-NEXT: bSlice2: [32, 4, 5, 6, 7]
+  printSequence(b)                // CHECK-NEXT: [0, 1, 2, 3, 41, 5, 6, 7, 8, 9]
+
+  let c = b
+  b[b.startIndex..<b.endIndex].qsort(<)
+  printSequence(b)                // CHECK-NEXT: [0, 1, 2, 3, 5, 6, 7, 8, 9, 41]
+  printSequence(c)                // CHECK-NEXT: [0, 1, 2, 3, 41, 5, 6, 7, 8, 9]
+
+#if _runtime(_ObjC)
+  // Now a bridged slice
+  var a = Array<NSString>(
+    _ArrayBuffer(nsArray: nsArrayOfStrings()._buffer._asCocoaArray()))
+
+  printSequence(a)                // CHECK-objc-NEXT: [foo, bar, baz]
+
+  var aSlice = a[1..<3]           // CHECK-objc-NEXT: [bar, baz]
+  printSequence(aSlice)
+
+  // Writing into aSlice works
+  aSlice[1] = "buzz"              // CHECK-objc-NEXT: [buzz, baz]
+  printSequence(aSlice)
+
+  // ...and doesn't affect a
+  printSequence(a)                // CHECK-objc-NEXT: [foo, bar, baz]
+
+  // Appending to aSlice works...
+  aSlice.append("fodder")
+  print("<\(aSlice.count)>")      // CHECK-objc-NEXT: <3>
+  printSequence(aSlice)           // CHECK-objc-NEXT: [buzz, baz, fodder]
+
+  // And doesn't change a
+  printSequence(a)                // CHECK-objc-NEXT: [foo, bar, baz]
+#endif
+}
+testSlice()
+
+//===--- sub-range replacement --------------------------------------------===//
+
+// Size of the array on which we're going to test "replace."
+// testing time grows roughly as the cube of this constant
+let testWidth = 11
+
+%arrayTypes = ['ContiguousArray', 'Array', 'ArraySlice']
+%for A in arrayTypes:
+
+func testReplace(_ make: @escaping () -> ${A}<LifetimeTracked>) {
+
+  checkRangeReplaceable(
+    make, { LifetimeTracked(100)..<LifetimeTracked(100 + $0) })
+}
+
+func testReplace${A}(
+  makeOne: @escaping () -> ${A}<LifetimeTracked> = {
+    var x = ${A}<LifetimeTracked>()
+    // make sure some - but not all - replacements will have to grow the buffer
+    x.reserveCapacity(testWidth * 3 / 2)
+    x += LifetimeTracked(0)..<LifetimeTracked(testWidth)
+    return x
+  }
+) {
+  testReplace(makeOne)
+
+  // Create one that will not be uniquely-referenced so we can test
+  // the out-of-place code paths.
+  let r = makeOne()
+  testReplace({ r })
+
+  // This test should ensure r's retain isn't dropped before we start testing.
+  if (r.count != testWidth) {
+    print("something bad happened!")
+  }
+}
+
+print("testing subrange replacement in ${A}")
+testReplace${A}()
+%end
+
+// Also test with a sub-slice of some larger buffer.  The "trailing"
+// case is interesting because when the buffer is uniquely referenced
+// we can expect to expand the slice in-place
+for (maxValue, label) in [(testWidth, "trailing"), (testWidth*2, "interior")] {
+  print("testing subrange replacement in \(label) Sub-ArraySlice")
+  testReplaceArraySlice {
+    var a = ContiguousArray(LifetimeTracked(-testWidth)..<LifetimeTracked(maxValue))
+    a.reserveCapacity(a.count * 3 / 2)
+    return a[testWidth..<(2 * testWidth)]
+  }
+}
+
+// CHECK-NEXT: testing subrange replacement in ContiguousArray
+// CHECK-NEXT: testing subrange replacement in Array
+// CHECK-NEXT: testing subrange replacement in ArraySlice
+// CHECK-NEXT: testing subrange replacement in trailing Sub-ArraySlice
+// CHECK-NEXT: testing subrange replacement in interior Sub-ArraySlice
+
+//===--- inout violations -------------------------------------------------===//
+
+// The user has to obey certain rules when things are passed via
+// inout, but in those cases we only guarantee memory-safety, not
+// coherent semantics.  Let's try to force a memory-safety problem
+// here.  This crashes when withUnsafeMutableBufferPointer is not
+// sufficiently careful.
+func testInoutViolation() {
+  var a: [LifetimeTracked] = [10, 8, 6, 4, 2, 0, 9, 7, 5, 3, 1].map { LifetimeTracked($0) }
+
+%for A in arrayTypes:
+  do {
+    var b = ${A}(a)
+    _ = b.sorted { x, y in
+      b.removeAll()
+      return x < y
+    }
+  }
+%end
+
+  // An overload of sorted for Arrays uses withUnsafeMutableBufferPointer,
+  // which disables bounds checks.
+  _ = a.sorted { x, y in
+    a = []         // Invalidate the whole array during sorting
+    return x < y
+  }
+}
+testInoutViolation()
+
+//===--- single-element modifiers -----------------------------------------===//
+
+%for A in arrayTypes:
+
+func testSingleElementModifiers${A}() {
+  print("testing ${A} single-argument modifiers")
+  // CHECK-NEXT: testing ${A} single-argument modifiers
+
+  var a = ${A}(LifetimeTracked(0)..<LifetimeTracked(10))
+  print(a.removeLast().value)     // CHECK-NEXT: 9
+  printSequence(a)               // CHECK-NEXT: [0, 1, 2, 3, 4, 5, 6, 7, 8]
+
+  a.insert(LifetimeTracked(42), at: 4)
+  printSequence(a)               // CHECK-NEXT: [0, 1, 2, 3, 42, 4, 5, 6, 7, 8]
+
+  print(a.remove(at: 2).value) // CHECK-NEXT: 2
+  printSequence(a)                  // CHECK-NEXT: [0, 1, 3, 42, 4, 5, 6, 7, 8]
+}
+testSingleElementModifiers${A}()
+%end
+
+//===--- isEmpty, first, last ---------------------------------------------===//
+
+%for A in arrayTypes:
+
+func testIsEmptyFirstLast${A}() {
+  print("testing ${A} isEmpty, first, and last")
+  // CHECK-NEXT: testing ${A} isEmpty, first, and last
+
+  print(${A}<Int>().isEmpty)          // CHECK-NEXT: true
+  print(${A}(42...42).isEmpty)   // CHECK-NEXT: false
+
+  print("<\(${A}(3..<43).first!)>")  // CHECK-NEXT: <3>
+  print("<\(${A}(3..<43).last!)>")   // CHECK-NEXT: <42>
+
+  print("<\(${A}<Int>().first)>")    // CHECK-NEXT: nil
+  print("<\(${A}<Int>().last)>")     // CHECK-NEXT: nil
+
+  var a = ${A}(LifetimeTracked(0)..<LifetimeTracked(10))
+  print(a.removeLast().value)     // CHECK-NEXT: 9
+  printSequence(a)               // CHECK-NEXT: [0, 1, 2, 3, 4, 5, 6, 7, 8]
+
+  a.insert(LifetimeTracked(42), at: 4)
+  printSequence(a)               // CHECK-NEXT: [0, 1, 2, 3, 42, 4, 5, 6, 7, 8]
+
+  print(a.remove(at: 2).value) // CHECK-NEXT: 2
+  printSequence(a)                  // CHECK-NEXT: [0, 1, 3, 42, 4, 5, 6, 7, 8]
+}
+testIsEmptyFirstLast${A}()
+%end
+
+//===--- Regression Tests -------------------------------------------------===//
+func rdar16958865() {
+  var a: [Int] = []
+  a += AnySequence([ 42, 4242 ])
+  // CHECK-NEXT: [42, 4242]
+  print(a)
+}
+rdar16958865()
+
+#if _runtime(_ObjC)
+#if os(OSX)
+import AppKit
+typealias OSColor = NSColor
+#else
+import UIKit
+typealias OSColor = UIColor
+#endif
+
+class Rdar16914909 : NSObject {
+  var basicColorSet = [OSColor]()
+
+  func doColorStuff() {
+    basicColorSet.append(OSColor.lightGray)
+    print("appended")
+  }
+}
+
+Rdar16914909().doColorStuff()
+// CHECK-objc-NEXT: appended
+#endif
+
+print("leaks = \(LifetimeTracked.instances)")
+// CHECK-NEXT: leaks = 0
+
+// CHECK-NEXT: all done.
+print("all done.")
+
+// ${'Local Variables'}:
+// eval: (read-only-mode 1)
+// End:

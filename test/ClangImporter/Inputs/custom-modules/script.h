@@ -1,0 +1,3 @@
+struct ScriptTy {
+  int value;
+};

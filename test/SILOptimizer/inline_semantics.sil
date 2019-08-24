@@ -1,0 +1,110 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -early-inline -sil-inline-threshold=50 | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+sil [_semantics "no_inline_plz"] @callee_func : $@convention(thin) () -> Int32 {
+bb0:
+  %0 = integer_literal $Builtin.Int32, 3
+  %1 = struct $Int32 (%0 : $Builtin.Int32)
+  return %1 : $Int32
+}
+
+//Not every @_semantics should be skipped during the early inlining pass, but
+//only those ones which are explicitly listed in shouldSkipApplyDuringEarlyInlining.
+
+//CHECK-LABEL: caller_func
+//CHECK-NOT: function_ref
+//CHECK-NOT: apply
+//CHECK: end sil function 'caller_func'
+sil @caller_func : $@convention(thin) () -> Int32 {
+bb0:
+  %0 = function_ref @callee_func : $@convention(thin) () -> Int32
+  %1 = apply %0() : $@convention(thin) () -> Int32
+  return %1 : $Int32
+}
+
+sil [_semantics "array.make_mutable"] @callee_func_with_to_be_skipped_during_inlining_semantics : $@convention(method) (@inout Int32) -> Int32 {
+bb0(%self : $*Int32):
+  %0 = integer_literal $Builtin.Int32, 3
+  %1 = struct $Int32 (%0 : $Builtin.Int32)
+  return %1 : $Int32
+}
+
+//Not every @_semantics should be skipped during the early inlining pass, but
+//only those ones which are explicitly listed in shouldSkipApplyDuringEarlyInlining.
+
+//CHECK-LABEL: caller_func2
+//CHECK: function_ref
+//CHECK: apply
+//CHECK: end sil function 'caller_func2'
+sil @caller_func2 : $@convention(thin) () -> Int32 {
+bb0:
+  %self = alloc_stack $Int32
+  %0 = function_ref @callee_func_with_to_be_skipped_during_inlining_semantics  : $@convention(method) (@inout Int32) -> Int32 // user: %1
+  %1 = apply %0(%self) : $@convention(method) (@inout Int32) -> Int32
+  dealloc_stack %self : $*Int32
+  return %1 : $Int32
+}
+
+sil [_semantics "pair_no_escaping_closure"] @callee_func_with_pair_no_escaping_closure_semantics : $@convention(method) (@inout Int32) -> Int32 {
+bb0(%self : $*Int32):
+  %0 = integer_literal $Builtin.Int32, 3
+  %1 = struct $Int32 (%0 : $Builtin.Int32)
+  return %1 : $Int32
+}
+
+//CHECK-LABEL: caller_func3
+//CHECK: function_ref
+//CHECK: apply
+//CHECK: end sil function 'caller_func3'
+sil @caller_func3 : $@convention(thin) () -> Int32 {
+bb0:
+  %self = alloc_stack $Int32
+  %0 = function_ref @callee_func_with_pair_no_escaping_closure_semantics  : $@convention(method) (@inout Int32) -> Int32 // user: %1
+  %1 = apply %0(%self) : $@convention(method) (@inout Int32) -> Int32
+  dealloc_stack %self : $*Int32
+  return %1 : $Int32
+}
+
+sil [_semantics "self_no_escaping_closure"] @callee_func_with_self_no_escaping_closure_semantics : $@convention(method) (@inout Int32) -> Int32 {
+bb0(%self : $*Int32):
+  %0 = integer_literal $Builtin.Int32, 3
+  %1 = struct $Int32 (%0 : $Builtin.Int32)
+  return %1 : $Int32
+}
+
+//CHECK-LABEL: caller_func4
+//CHECK: function_ref
+//CHECK: apply
+//CHECK: end sil function 'caller_func4'
+sil @caller_func4 : $@convention(thin) () -> Int32 {
+bb0:
+  %self = alloc_stack $Int32
+  %0 = function_ref @callee_func_with_self_no_escaping_closure_semantics  : $@convention(method) (@inout Int32) -> Int32 // user: %1
+  %1 = apply %0(%self) : $@convention(method) (@inout Int32) -> Int32
+  dealloc_stack %self : $*Int32
+  return %1 : $Int32
+}
+
+// A function annotated with the @_effects(readonly) attribute.
+sil [readonly] @callee_func2 : $@convention(thin) () -> Int32 {
+bb0:
+  %0 = integer_literal $Builtin.Int32, 3
+  %1 = struct $Int32 (%0 : $Builtin.Int32)
+  return %1 : $Int32 
+}
+
+//CHECK-LABEL: caller_func1
+//CHECK: function_ref
+//CHECK: apply
+//CHECK-NEXT: ret
+sil @caller_func1 : $@convention(thin) () -> Int32 {
+bb0:
+  %0 = function_ref @callee_func2 : $@convention(thin) () -> Int32
+  %1 = apply %0() : $@convention(thin) () -> Int32
+  return %1 : $Int32
+}
+

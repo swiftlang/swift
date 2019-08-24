@@ -1,0 +1,30 @@
+// RUN: %target-swift-frontend -emit-module %s -module-name Swift -module-link-name swiftCore -parse-as-library -parse-sil -parse-stdlib -o - | %target-sil-opt -module-name=Swift
+
+struct A {
+  var f : () -> ()
+}
+
+sil @callee_check : $@convention(thin) (@callee_guaranteed () -> ()) -> ()
+
+sil @test1 : $@convention(thin) (@inout A) -> () {
+bb0(%0 : $*A):
+  %1 = struct_element_addr %0 : $*A, #A.f
+  %2 = load %0 : $*A
+  %3 = struct_extract %2 : $A, #A.f
+  %4 = function_ref @callee_check : $@convention(thin) (@callee_guaranteed () -> ()) -> ()
+  apply %4(%3) : $@convention(thin) (@callee_guaranteed () -> ()) -> ()
+  %5 = tuple()
+  return %5 : $()
+}
+
+class B {
+  var f : () -> ()
+  init()
+}
+
+sil @test2 : $@convention(thin) (B) -> () {
+bb0(%0 : $B):
+  %1 = ref_element_addr %0 : $B, #B.f
+  %2 = tuple()
+  return %2 : $()
+}

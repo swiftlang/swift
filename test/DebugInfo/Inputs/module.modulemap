@@ -1,0 +1,22 @@
+module ClangModule {
+  header "ClangModule.h"
+  export *
+  module SubModule {
+    header "SubModule.h"
+    export *
+  }
+}
+
+module OtherClangModule {
+  header "OtherClangModule.h"
+  export *
+  explicit module SubModule {
+    header "OtherSubModule.h"
+    export *
+  }
+}
+
+module Macro {
+  header "Macro.h"
+}
+

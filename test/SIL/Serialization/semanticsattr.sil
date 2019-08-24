@@ -1,0 +1,26 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -parse-sil -emit-sib -parse-as-library -parse-stdlib -module-name SemanticsAttr -o %t/SemanticsAttr.sib %s
+// RUN: %target-sil-opt %t/SemanticsAttr.sib -o - -emit-sorted-sil | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+
+// CHECK: @_semantics("123") @_semantics("456") func semanticsFunction() -> Builtin.Int64
+@_semantics("123") @_semantics("456")
+func semanticsFunction() -> Builtin.Int64
+
+// CHECK: sil [serialized] [_semantics "789"] [_semantics "ABC"] @foo1 : $@convention(thin) () -> () {
+sil public [serialized] [_semantics "789"] [_semantics "ABC"] @foo1 : $@convention(thin) () -> () {
+bb0:
+  return undef : $()
+}
+
+// Make sure that we can parse with multiple generics that are after the semantic attributes.
+//
+// CHECK: sil [serialized] [_semantics "DEF"] [_semantics "GHI"] @foo2 : $@convention(thin) <T1, T2> () -> () {
+sil public [serialized] [_semantics "DEF"] [_semantics "GHI"] @foo2 : $@convention(thin) <T1, T2> () -> () {
+bb0:
+  return undef : $()
+}
+

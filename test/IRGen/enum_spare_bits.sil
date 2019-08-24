@@ -1,0 +1,80 @@
+// RUN: %empty-directory(%t)
+// RUN: %build-irgen-test-overlays
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) %s -emit-ir | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize %s
+
+// REQUIRES: CPU=i386 || CPU=x86_64
+// REQUIRES: objc_interop
+
+import Swift
+import Foundation
+
+class C {}
+sil_vtable C {}
+class D: NSObject {}
+sil_vtable D {}
+
+enum SwiftClass {
+  case A(C), B(D)
+}
+// can use spare bits—both payloads are Swift-defined classes
+// CHECK-32: %T15enum_spare_bits10SwiftClassO = type <{ [4 x i8] }>
+// CHECK-64: %T15enum_spare_bits10SwiftClassO = type <{ [8 x i8] }>
+
+enum ObjCClass {
+  case A(NSObject), B(C)
+}
+// can't use spare bits—NSObject is an ObjC-defined class
+// CHECK-32: %T15enum_spare_bits9ObjCClassO = type <{ [4 x i8] }>
+// CHECK-64: %T15enum_spare_bits9ObjCClassO = type <{ [8 x i8], [1 x i8] }>
+
+@objc @unsafe_no_objc_tagged_pointer
+protocol NoTaggedPointers {}
+
+enum Existential {
+  case A(AnyObject), B(C)
+}
+// can't use spare bits—existential may be bound to tagged pointer type
+// CHECK-32: %T15enum_spare_bits11ExistentialO = type <{ [4 x i8] }>
+// CHECK-64: %T15enum_spare_bits11ExistentialO = type <{ [8 x i8], [1 x i8] }>
+
+enum ExistentialNoTaggedPointers {
+  case A(NoTaggedPointers), B(C)
+}
+// can use spare bits—@unsafe_no_objc_tagged_pointer says it's ok
+// CHECK-32: %T15enum_spare_bits27ExistentialNoTaggedPointersO = type <{ [4 x i8] }>
+// CHECK-64: %T15enum_spare_bits27ExistentialNoTaggedPointersO = type <{ [8 x i8] }>
+
+enum Archetype<T: AnyObject> {
+  case A(T), B(C)
+}
+// can't use spare bits—archetype may be bound to tagged pointer type
+// CHECK-32: [[ARCHETYPE:%T15enum_spare_bits9ArchetypeOyAA1CCG]] = type <{ [4 x i8], [1 x i8] }>
+// CHECK-32: [[ARCHETYPE_OBJC:%T15enum_spare_bits9ArchetypeOySo8NSObjectCG]] = type <{ [4 x i8], [1 x i8] }>
+// CHECK-64: [[ARCHETYPE:%T15enum_spare_bits9ArchetypeOyAA1CCG]] = type <{ [8 x i8], [1 x i8] }>
+// CHECK-64: [[ARCHETYPE_OBJC:%T15enum_spare_bits9ArchetypeOySo8NSObjectCG]] = type <{ [8 x i8], [1 x i8] }>
+
+sil_global @swiftClass: $SwiftClass
+sil_global @objcClass: $ObjCClass
+sil_global @existential: $Existential
+sil_global @existentialntp: $ExistentialNoTaggedPointers
+sil_global @archetypeBoundToSwift: $Archetype<C>
+sil_global @archetypeBoundToObjC: $Archetype<NSObject>
+
+// CHECK: @archetypeBoundToSwift = {{(protected )?}}global [[ARCHETYPE]]
+// CHECK: @archetypeBoundToObjC = {{(protected )?}}global [[ARCHETYPE_OBJC]]
+
+sil @instantiate_globals : $() -> () {
+entry:
+  %a = global_addr @swiftClass : $*SwiftClass
+  %b = global_addr @objcClass : $*ObjCClass
+  %c = global_addr @existential : $*Existential
+  %d = global_addr @existentialntp : $*ExistentialNoTaggedPointers
+  %e = global_addr @archetypeBoundToSwift : $*Archetype<C>
+  %f = global_addr @archetypeBoundToObjC : $*Archetype<NSObject>
+  return undef : $()
+}
+
+sil @$s15enum_spare_bits1DCACycfcTo : $@convention(thin) (@owned D) -> @owned D {
+entry(%x : $D):
+  return undef : $D
+}

@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Swift containers and value types</title>
+</head>
+<body>
+
+<address align=right>
+<a href="mailto:hhinnant@apple.com">Howard Hinnant</a><br>
+2013-09-17
+</address>
+<hr>
+<h1 align=center>Swift containers and value types</h1>
+
+<h2>
+Introduction
+</h2>
+
+<p>
+One of the best things about Cocoa is that it has very strong
+conventions. These conventions allow Cocoa programmers to reason about
+high-level designs without language support. In the case of containers,
+the conventions strongly encourage Cocoa programmers to think of these
+objects as values, despite the Objective-C language not having built-in
+support for value types. This strong convention is best observed in the
+advice we give to class designers. When exposing a container as a
+property, programmers are strongly encouraged to use the immutable
+version of the container, and to specify the "copy" attribute on the
+property. Now, in Swift, we do have formal value types and we should
+strongly consider formalizing the Cocoa conventions and make our
+containers be value types. Now, in theory, formalizing this semantic for
+containers could be disruptive to the day-to-day experience of Cocoa
+programmers and therefore we have been doing research to prove that this
+isn't the case. We will be reviewing the public API implications and the
+internal design implications.
+</p>
+
+<p>
+The public API implications are rather simple. If we model containers as
+value types, we dramatically simplify the life of public API designers.
+We no longer need to specify "copy" on each and every property, and we
+also don't need to model immutability as a subclassing relationship (we
+wouldn't want to either for reasons this paper won't go into).
+Furthermore, computed properties don't need to defensive copy in either
+their getter or setter. This is a huge win for safety, and for
+performance, because we can defer these problems completely to the
+compiler.
+</p>
+
+<p>
+Now, let's consider the implications for class implementors. We have
+been doing a lot of research to prove that value semantics would be a
+net win, with improved syntax and compile-time error detection, and with
+no noticeable performance downside.
+</p>
+
+<h2>
+Swift Parameter Passing Syntax
+</h2>
+
+<p>
+In Swift, function parameters can be passed by value or by reference.  The
+simpler (default) syntax is by value:
+</p>
+
+<blockquote><pre>
+func foo(_ c : Character, i : Int)  <font color="#C80000">// define foo</font>
+
+// ...
+
+foo(c, i)  <font color="#C80000">// call foo</font>
+</pre></blockquote>
+
+<p>
+If one wants <code>foo</code> to pass by reference, both the author of <code>foo</code>
+and the client of <code>foo</code> agree to use an alternate syntax, for each
+individual parameter:
+</p>
+
+<blockquote><pre>
+func foo(_ c : Character, i : [inout] Int)  <font color="#C80000">// define foo</font>
+
+// ...
+
+foo(c, &amp;i)  <font color="#C80000">// call foo</font>
+</pre></blockquote>
+
+<p>
+In the latter example above, the author of <code>foo</code> specifies
+that the second parameter is to be passed by reference, instead of by
+value. And if the caller of <code>foo</code> does not realize which
+arguments of <code>foo</code> the author of <code>foo</code> intends to
+modify (e.g. intends as <i>out-parameters</i>), then the Swift compiler
+will catch this miscommunication and flag a compile-time error.
+</p>
+
+<p>
+For a moment, imagine that Swift <b>did not</b> require modified syntax
+at the call site:
+</p>
+
+<blockquote><pre>
+func doWork() {
+  <font color="#C80000">// ...</font>
+  foo(c, i)
+  bar(i)
+  <font color="#C80000">// ...</font>
+}
+</pre></blockquote>
+
+<p>
+Now, when a human reads the code for <code>doWork()</code>, it is ambiguous
+whether or not <code>i</code> is modified by <code>foo</code>, and thus difficult
+to know what value of <code>i</code> is sent to <code>bar</code>.  One first has to
+first look at the <i>signature</i> of <code>foo</code> to discover that it intends
+to modify its last argument:
+</p>
+
+<blockquote><pre>
+func foo(_ c : Character, i : <b>[inout]</b> Int)
+</pre></blockquote>
+
+<p>
+Or alternatively just trust that the author of <code>foo</code> chose a
+sufficiently descriptive name for the function so that the human reader
+can tell in <code>doWork()</code> whether or not <code>foo</code>
+modifies <code>i</code> without looking up the signature of
+<code>foo</code>.
+</p>
+
+<p>
+An even worse scenario would be for Swift to implicitly pass everything by
+reference:
+</p>
+
+<blockquote><pre>
+func foo(_ c : Character, i : Int)
+</pre></blockquote>
+
+<p>
+Now in <code>doWork</code>:
+</p>
+
+<blockquote><pre>
+func doWork() {
+  <font color="#C80000">// ...</font>
+  foo(c, i)
+  bar(i)
+  <font color="#C80000">// ...</font>
+}
+</pre></blockquote>
+
+<p>
+... we have to not only look at the signature of <code>foo</code>, we
+have to examine the entire <b>definition</b> of <code>foo</code> to
+discover if we are sending a modified <code>i</code> to <code>bar</code>
+or not.  And if <code>foo</code> calls any other functions with
+<code>i</code> each of <i>those</i> function definitions would also have
+to be examined in order to answer this question.
+</p>
+
+<p>
+Effectively, if Swift were designed to implicitly pass <code>i</code> by
+reference in this example, the programmer must effectively and manually
+perform a whole-program-analysis just to reason about the behavior of
+<code>do_Work</code>.
+</p>
+
+<p>
+Fortunately this is <i>not</i> how Swift was designed.  Instead the programmer
+can analyze the behavior of <code>doWork</code> by looking <b>only</b>
+at the definition of <code>doWork</code>.  Either <code>i</code> will be
+explicitly passed by reference, or it will be passed by value, and thus
+one immediately knows whether further uses of <code>i</code> are getting
+a modified value or not:
+</p>
+
+<blockquote><pre>
+func doWork() {
+  <font color="#C80000">// ...</font>
+  foo(c, i)
+  bar(i)  <font color="#C80000">// i is unchanged by foo</font>
+  <font color="#C80000">// ...</font>
+}
+
+func doOtherWork() {
+  <font color="#C80000">// ...</font>
+  foo(c, &amp;i)
+  bar(i)  <font color="#C80000">// i is most likely modified by foo</font>
+  <font color="#C80000">// ...</font>
+}
+</pre></blockquote>
+
+<h2>
+The Impact on Mutable Containers
+</h2>
+
+<p>
+The ability to locally reason about the behavior of <code>doWork</code>
+in the previous section applies to mutable containers such as
+<code>Array</code> and <code>String</code> just as much as it applies
+to the <code>Int</code> parameter.
+</p>
+
+<p>
+For performance reasons, we need to have mutable containers.  Otherwise
+operations such as continuously appending become too expensive.  But we
+need to be able to locally reason about code which uses these
+containers.  If we make <code>Array</code> a reference type, then Swift
+will compile this code:
+</p>
+
+<blockquote><pre>
+func foo(_ v : Array, i : Int)  <font color="#C80000">// define foo</font>
+
+func doWork() {
+  <font color="#C80000">// ...</font>
+  foo(v, i)
+  bar(v)
+  <font color="#C80000">// ...</font>
+}
+</pre></blockquote>
+
+<p>
+But the human reader of this code will have to perform a non-local
+analysis to figure out what <code>doWork</code> is doing with the
+<code>Array</code> (whether or not it is modified in or under
+<code>foo</code>, and thus what value is used in <code>bar</code>). Or
+rely on a high quality and strictly followed naming conventions such as
+those used in Cocoa.  Now there is absolutely nothing wrong with high
+quality, strictly followed naming conventions. But they aren't checked
+by the compiler.  Having the compiler be able to confirm: yes, this
+argument can be modified / no, that argument cannot be modified; is a
+<i>tremendous</i> productivity booster.
+</p>
+
+<p>
+If <code>Array</code> has value semantics, then we only need to glance at
+<code>doWork()</code> to discover that both <code>foo</code> and <code>bar</code>
+receive the same value in <code>v</code> (just like <code>i</code>).
+</p>
+
+<blockquote><p>
+Swift containers should have value semantics to enable programmers to
+locally reason about their code using compiler-enforced syntax.
+</p></blockquote>
+
+<h2>
+The Impact of Value Semantics Containers on Cocoa Programmers
+</h2>
+
+<p>
+I have spent the last couple of weeks looking at a lot of Apple's use of
+<code>NSMutableArray</code>, <code>NSMutableDictionary</code> and
+<code>NSMutableSet</code>.  I've looked at Foundation, AppKit, CoreData,
+Mail, etc.  Everything I've looked at has shown that the programmers are
+going out of their way to reduce and even eliminate sharing between
+containers (avoid reference semantics).  I am seeing customer-written
+DeepCopy methods.
+</p>
+
+<blockquote><pre>
+-(NSMutableArray *)mutableDeepCopy;
+</pre></blockquote>
+
+<p>
+I am seeing factory functions that return mutable containers which
+share with nothing but a local within the factory function.
+</p>
+
+<blockquote><pre>
++ (NSMutableDictionary*) defaultWindowStateForNode: (const TFENode&amp;) inTarget
+{
+    NSMutableDictionary* result = [NSMutableDictionary dictionary];
+
+    <font color="#C80000">// result is just filled, it shares with nothing...</font>
+    if (inTarget.IsVolume()
+        &amp;&amp; (inTarget.IsDiskImage() || inTarget.IsOnReadOnlyVolume())
+        &amp;&amp; inTarget != TFENodeFactory::GetHomeNode()
+        &amp;&amp; !inTarget.IsPlaceholderAliasTarget())
+    {
+        [result setBoolFE: NO forKey: kShowToolbarKey];
+    }
+    else
+    {
+        [result setBoolFE: YES forKey: kShowToolbarKey];
+    }
+
+    [result setBoolFE: [[self class] shouldShowStatusBar]
+               forKey: UDefaults::StrKey(UDefaults::kShowStatusBar).PassNSString()];
+    [result setBoolFE: [[self class] shouldShowTabView]
+               forKey: UDefaults::StrKey(UDefaults::kShowTabView).PassNSString()];
+
+    [result addEntriesFromDictionary: [TBrowserContainerController defaultContainerStateForNode: inTarget]];
+
+    return result;
+}
+</pre></blockquote>
+
+<p>
+For the above factory function, it makes absolutely no difference whether value
+semantics or reference semantics is used for <code>NSMutableDictionary</code>.
+</p>
+
+<p>
+On occasion, I am seeing <code>NSMutable*</code> being passed into
+functions just for the purpose of having in/out parameters, not creating
+any sharing within the function.  For example:
+</p>
+
+<blockquote><pre>
+- (void)_checkPathForArchive:(DVTFilePath *)archivePath andAddToArray:(NSMutableArray *)archives
+{
+   if ([self _couldBeArchivePath: archivePath]) {
+       IDEArchive *archive = [IDEArchive archiveWithArchivePath:archivePath];
+       if (archive != nil) {
+           [archives addObject:archive];
+       }
+   }
+}
+</pre></blockquote>
+
+<p>
+And called like this:
+</p>
+
+<blockquote><pre>
+[self _checkPathForArchive: archivePath andAddToArray: archives];
+</pre></blockquote>
+
+<p>
+Such code is typically used as a private function and called from only
+one or two places.  Note that here is an example that the human reader
+is greatly depending on really good names to make the semantics clear:
+<code>andAddToArray</code>. In Swift such code is easily translated to
+something like:
+</p>
+
+<blockquote><pre>
+_checkPathForArchiveAndAddToArray(archivePath, &amp;archives)
+</pre></blockquote>
+
+<p>
+Note that now the code not only has a great name, but the compiler is helping
+the programmer ensure that both the client and function both agree that
+<code>archives</code> is an in-out argument.  And <i>just as importantly</i>,
+that <code>archivePath</code> is <b>not</b> to be modified within
+<code>_checkPathForArchiveAndAddToArray</code>.  However if
+<code>archivePath</code> is a mutable object with reference semantics, we lose
+that ability to locally reason about this code, even in Swift.
+</p>
+
+<p>
+The most worrisome code I see looks like this:
+</p>
+
+<blockquote><pre>
+- (_FilteredListInfo *)_backgroundSortNewFilteredMessages:(NSMutableArray *)messages {
+   MCAssertNotMainThread();
+   // lots and lots of code here involving messages... and then near the bottom:
+
+   res.filteredMessages = messages;  <font color="#C80000">// share here!</font>
+   ...
+   return res;
+}
+</pre></blockquote>
+
+<p>
+I.e. this <i>is</i> sharing a mutable container!  However if you then
+go to the trouble to track down how this method is used, you find that
+messages is only bound to a temporary, or to a local variable in the
+calling function.  So, actually there is no permanent sharing after all.
+</p>
+
+<p>
+But the programmer has to do non-local code analysis to figure out that
+the above is actually safe.  Additionally there is nothing to stop this
+function from being misused in the future.  This is just a ticking time
+bomb in the code.
+</p>
+
+<p>
+It would be far easier to reason about this code if <code>messages</code> was
+passed, semantically, <i>by-value</i>.
+</p>
+
+<blockquote><pre>
+func _backgroundSortNewFilteredMessages(_ messages : Array) -&gt; _FilteredListInfo {
+    // ...
+    res.filteredMessages = messages;  <font color="#C80000">// copy here!</font>
+    // ...
+    return res
+}
+</pre></blockquote>
+
+<p>
+This need not imply a performance penalty with reference counting and
+copy-on-write.  Especially when the argument is a temporary as is the
+case in this example.
+</p>
+
+<p>
+I'm seeing the same patterns, over and over, after surveying tens of
+thousands of lines of code across multiple applications.  Cocoa programmers are:
+</p>
+
+<ol>
+<li>
+Avoiding accidental sharing with manual deep copies where necessary.
+</li>
+<li>
+Avoiding accidental sharing through the use of simple factory functions and
+ordinary in/out parameters for functions that do not hold lasting
+references internally.
+</li>
+<li>
+In a few cases, being really careful to only pass temporaries or locals to
+a function that does form a permanent reference.  And these functions can
+not be reasoned about by only looking at the local function itself.
+</li>
+</ol>
+
+<p>
+It appears to me that Cocoa programmers are already using value
+semantics for their containers.  But they are getting no help at all
+from their programming environment in doing so.  Instead they are
+relying solely on good coding conventions and very descriptive method
+names.  Cocoa programmers <b>will not</b> undergo a painful paradigm
+shift by giving Swift containers value semantics.
+</p>
+
+<h2>Performance</h2>
+
+<p>
+The most concern I hear when talking about "large" objects having value
+semantics is that of performance.  One understandably does not want to
+be copying tons of data around. The plan for Swift containers is to
+implement them with the reference-counted copy-on-write idiom.  In doing
+so, the Swift programmer is freed from the tedious task of writing "deep
+copy" functions, and yet the type behaves just like an <code>Int</code>.
+ Additionally the type can be passed by reference, just like an
+<code>Int</code>, in the relatively few places where pass-by-reference
+is the desired behavior.
+</p>
+
+<h2>Generics</h2>
+
+<p>
+In making Swift containers behave just like <code>Int</code>, not only
+is the overall Swift API simplified, but this is also a boon to generic
+algorithms. For example one can confidently write a generic sorting
+algorithm that works for sequences of <code>Int</code>, and for
+sequences of <code>Array&lt;Int&gt;</code>. The generic code need not
+concern itself with the question of whether or not the type has value
+semantics or reference semantics.
+</p>
+
+<h2>Summary</h2>
+
+<ul>
+
+<li><p>
+Cocoa programmers already view and use containers as value types, even though
+to achieve this they have to rely <i>only</i> on strong coding conventions.
+They get no help from ObjC in this regard.
+</p></li>
+
+<li><p>
+Swift can have both reference and by-value parameters, and the latter
+has the simpler syntax.  This helps programmers to locally reason about
+their code when using value types by making it clear that most arguments
+passed to functions are not modified.  Function results tend to be
+returned from the function.
+</p></li>
+
+<li><p>
+In the relatively infrequent case that the programmer intends to modify
+a function argument (i.e. as an out-parameter), if value semantics are
+used, Swift makes the modification explicit in the client code through
+use of '<code>&amp;</code>' at the call site.  Thus the programmer can
+more easily spot the few cases where this is desired.
+</p>
+<ul>
+<li>Swift cannot provide such protection for types with reference semantics.</li>
+</ul>
+</li>
+
+<li><p>
+Performance is not compromised by formally adopting value semantics for
+containers in Swift.
+</p></li>
+
+<li><p>
+Swift containers should have value semantics to enable programmers to
+locally reason about their code using compiler-enforced syntax.
+</p></li>
+
+</ul>
+
+</body>
+</html>

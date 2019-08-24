@@ -1,0 +1,292 @@
+// RUN: %target-run-simple-swiftgyb
+// REQUIRES: executable_test
+
+import StdlibUnittest
+
+// Also import modules which are used by StdlibUnittest internally. This
+// workaround is needed to link all required libraries in case we compile
+// StdlibUnittest with -sil-serialize-all.
+import SwiftPrivate
+#if _runtime(_ObjC)
+import ObjectiveC
+#endif
+
+var AssertionsTestSuite = TestSuite("Assertions")
+
+AssertionsTestSuite.test("expectNil(_: T?)") {
+  let none: OpaqueValue<Int>? = nil
+  expectNil(none)
+
+  let some: OpaqueValue<Int>? = OpaqueValue(42)
+  expectFailure {
+    expectNil(some)
+  }
+}
+
+AssertionsTestSuite.test("expectNotNil(_: T?)") {
+  let none: OpaqueValue<Int>? = nil
+  expectFailure {
+    expectNotNil(none)
+  }
+
+  let some: OpaqueValue<Int>? = OpaqueValue(42)
+  expectNotNil(some)
+}
+
+AssertionsTestSuite.test("expectTrapping(_: Bound, in: RangeProtocol)") {
+  _setTrappingExpectationFailedCallback() {}
+  defer {
+    // Reset the callback.
+    expectCrashLater()
+    fatalError()
+  }
+
+% for (Element, Range, ClosedRange) in [
+%   ('MinimalComparableValue', 'Range', 'ClosedRange'),
+%   ('MinimalStrideableValue', 'CountableRange', 'CountableClosedRange'),
+% ]:
+  do {
+    let _0 = ${Element}(0)
+    let _1 = ${Element}(1)
+    let _9 = ${Element}(9)
+    let _10 = ${Element}(10)
+
+    expectTrapping(_0, in: _0..<_10 as ${Range})
+    expectTrapping(_9, in: _0..<_10 as ${Range})
+    expectFailure {
+      expectTrapping(_0, in: _1..<_10 as ${Range})
+    }
+    expectFailure {
+      expectTrapping(_10, in: _1..<_10 as ${Range})
+    }
+
+    expectTrapping(_0, in: _0..._9 as ${ClosedRange})
+    expectTrapping(_9, in: _0..._9 as ${ClosedRange})
+    expectFailure {
+      expectTrapping(_0, in: _1..._9 as ${ClosedRange})
+    }
+    expectFailure {
+      expectTrapping(_10, in: _1..._9 as ${ClosedRange})
+    }
+  }
+% end
+}
+
+AssertionsTestSuite.test("expectTrapping(_: RangeProtocol, in: RangeProtocol)") {
+  _setTrappingExpectationFailedCallback() {}
+  defer {
+    // Reset the callback.
+    expectCrashLater()
+    fatalError()
+  }
+
+% for (Element, Range, ClosedRange) in [
+%   ('MinimalComparableValue', 'Range', 'ClosedRange'),
+%   ('MinimalStrideableValue', 'CountableRange', 'CountableClosedRange'),
+% ]:
+  do {
+    let _0 = ${Element}(0)
+    let _1 = ${Element}(1)
+    let _9 = ${Element}(9)
+    let _10 = ${Element}(10)
+    let _11 = ${Element}(11)
+
+    expectTrapping(_0..<_10 as Range, in: _0..<_10 as Range)
+    expectTrapping(_0..<_9 as Range, in: _0..<_10 as Range)
+    expectTrapping(_1..<_10 as Range, in: _0..<_10 as Range)
+
+    expectFailure {
+      expectTrapping(_0..<_10 as Range, in: _1..<_10 as Range)
+    }
+    expectFailure {
+      expectTrapping(_0..<_10 as Range, in: _0..<_9 as Range)
+    }
+    expectFailure {
+      expectTrapping(_0..<_10 as Range, in: _1..<_9 as Range)
+    }
+
+    expectTrapping(_0..._10 as ClosedRange, in: _0..<_11 as Range)
+    expectTrapping(_0..._10 as ClosedRange, in: _0..._10 as ClosedRange)
+    expectTrapping(_0..._9 as ClosedRange, in: _0..<_10 as Range)
+    expectTrapping(_0..._9 as ClosedRange, in: _0..._10 as ClosedRange)
+    expectTrapping(_1..._10 as ClosedRange, in: _0..<_11 as Range)
+    expectTrapping(_1..._10 as ClosedRange, in: _0..._10 as ClosedRange)
+
+    expectFailure {
+      expectTrapping(_0..._10 as ClosedRange, in: _1..._10 as ClosedRange)
+    }
+    expectFailure {
+      expectTrapping(_0..._10 as ClosedRange, in: _1..<_11 as Range)
+    }
+    expectFailure {
+      expectTrapping(_0..._10 as ClosedRange, in: _0..._9 as ClosedRange)
+    }
+    expectFailure {
+      expectTrapping(_0..._10 as ClosedRange, in: _0..<_10 as Range)
+    }
+    expectFailure {
+      expectTrapping(_0..._10 as ClosedRange, in: _1..._9 as ClosedRange)
+    }
+    expectFailure {
+      expectTrapping(_0..._10 as ClosedRange, in: _1..<_10 as Range)
+    }
+  }
+% end
+}
+
+AssertionsTestSuite.test("expectEqualsUnordered(Range<T>, [T])") {
+% for Range in ['Range', 'CountableRange']:
+  expectEqualsUnordered(0..<0 as ${Range}, [])
+  expectFailure {
+    expectEqualsUnordered(0..<0 as ${Range}, [ 0 ])
+  }
+
+  expectEqualsUnordered(0..<1 as ${Range}, [ 0 ])
+  expectFailure {
+    expectEqualsUnordered(0..<1 as ${Range}, [])
+    expectEqualsUnordered(0..<1 as ${Range}, [ 1 ])
+  }
+
+  expectEqualsUnordered(0..<2 as ${Range}, [ 0, 1 ])
+  expectEqualsUnordered(0..<2 as ${Range}, [ 1, 0 ])
+  expectFailure {
+    expectEqualsUnordered(0..<2 as ${Range}, [])
+    expectEqualsUnordered(0..<2 as ${Range}, [ 0 ])
+    expectEqualsUnordered(0..<2 as ${Range}, [ 1 ])
+    expectEqualsUnordered(0..<2 as ${Range}, [ 0, 2 ])
+    expectEqualsUnordered(0..<2 as ${Range}, [ 2, 0 ])
+  }
+
+  expectEqualsUnordered(0..<3 as ${Range}, [ 0, 1, 2 ])
+  expectEqualsUnordered(0..<3 as ${Range}, [ 0, 2, 1 ])
+  expectEqualsUnordered(0..<3 as ${Range}, [ 1, 0, 2 ])
+  expectEqualsUnordered(0..<3 as ${Range}, [ 1, 2, 0 ])
+  expectEqualsUnordered(0..<3 as ${Range}, [ 2, 0, 1 ])
+  expectEqualsUnordered(0..<3 as ${Range}, [ 2, 1, 0 ])
+  expectFailure {
+    expectEqualsUnordered(0..<3 as ${Range}, [])
+    expectEqualsUnordered(0..<3 as ${Range}, [ 0 ])
+    expectEqualsUnordered(0..<3 as ${Range}, [ 1 ])
+    expectEqualsUnordered(0..<3 as ${Range}, [ 0, 1 ])
+    expectEqualsUnordered(0..<3 as ${Range}, [ 1, 0 ])
+    expectEqualsUnordered(0..<3 as ${Range}, [ 3, 0, 1 ])
+    expectEqualsUnordered(0..<3 as ${Range}, [ 0, 3, 1 ])
+    expectEqualsUnordered(0..<3 as ${Range}, [ 0, 1, 3 ])
+  }
+
+% end
+}
+
+AssertionsTestSuite.test("expectEqual<T : Equatable>") {
+  let _0 = MinimalEquatableValue(0)
+  let _1 = MinimalEquatableValue(1)
+
+  expectEqual(_0, _0)
+  expectEqual(_1, _1)
+  expectFailure {
+    expectEqual(_0, _1)
+    expectEqual(_1, _0)
+  }
+}
+
+AssertionsTestSuite.test("expectEqual<T : Equatable, U : Equatable>") {
+  let _0 = MinimalEquatableValue(0)
+  let _1 = MinimalEquatableValue(1)
+
+  for a in [_0, _1] {
+    for b in [_0, _1] {
+      for c in [_0, _1] {
+        for d in [_0, _1] {
+          let lhs = (a, b)
+          let rhs = (c, d)
+          if lhs == rhs {
+            expectEqual(lhs, rhs)
+          } else {
+            expectFailure {
+              expectEqual(lhs, rhs)
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+AssertionsTestSuite.test("expectEqual<T : Equatable, U : Equatable, V : Equatable>") {
+  let _0 = MinimalEquatableValue(0)
+  let _1 = MinimalEquatableValue(1)
+
+  for a in [_0, _1] {
+    for b in [_0, _1] {
+      for c in [_0, _1] {
+        for d in [_0, _1] {
+          for e in [_0, _1] {
+            for f in [_0, _1] {
+              let lhs = (a, b, c)
+              let rhs = (d, e, f)
+              if lhs == rhs {
+                expectEqual(lhs, rhs)
+              } else {
+                expectFailure {
+                  expectEqual(lhs, rhs)
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+AssertionsTestSuite.test("expectEqual<T : Equatable, U : Equatable, V : Equatable, W : Equatable>") {
+  let _0 = MinimalEquatableValue(0)
+  let _1 = MinimalEquatableValue(1)
+
+  for a in [_0, _1] {
+    for b in [_0, _1] {
+      for c in [_0, _1] {
+        for d in [_0, _1] {
+          for e in [_0, _1] {
+            for f in [_0, _1] {
+              for g in [_0, _1] {
+                for h in [_0, _1] {
+                  let lhs = (a, b, c, d)
+                  let rhs = (e, f, g, h)
+                  if lhs == rhs {
+                    expectEqual(lhs, rhs)
+                  } else {
+                    expectFailure {
+                      expectEqual(lhs, rhs)
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+AssertionsTestSuite.test("expectEqual(_: Any.Type, _: Any.Type)") {
+  expectEqual(Int.self, Int.self)
+  expectFailure {
+    expectEqual(Int.self, Double.self)
+  }
+
+  class B {}
+  class D : B {}
+  expectEqual(B.self, B.self)
+  expectFailure {
+    expectEqual(B.self, D.self)
+  }
+  expectFailure {
+    expectEqual(D.self, B.self)
+  }
+  expectEqual(D.self, D.self)
+}
+
+runAllTests()
+

@@ -1,0 +1,108 @@
+%{
+  # -*- mode: C++ -*-
+  from gyb_syntax_support import *
+  NODE_MAP = create_node_map()
+  # Ignore the following admonition; it applies to the resulting .cpp file only
+}%
+//// Automatically Generated From SyntaxNodes.cpp.gyb.
+//// Do Not Edit Directly!
+//===---------------- SyntaxNodes.cpp - Syntax Node definitions -----------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+
+#include "swift/Syntax/SyntaxNodes.h"
+
+using namespace swift;
+using namespace swift::syntax;
+
+% for node in SYNTAX_NODES:
+%   if node.requires_validation():
+void ${node.name}::validate() const {
+#ifndef NDEBUG
+  auto raw = Data->getRaw();
+  if (isMissing()) return;
+  assert(raw->getLayout().size() == ${len(node.children)});
+%     for child in node.children:
+%       if child.token_choices:
+%         choices = ", ".join("tok::" + choice.kind
+%                             for choice in child.token_choices)
+  syntax_assert_child_token(raw, ${child.name}, ${choices});
+%       end
+%       if child.main_token() and child.text_choices:
+%         token_kind = child.main_token().kind
+%         choices = ", ".join("\"%s\"" % choice
+%                             for choice in child.text_choices)
+  syntax_assert_child_token_text(raw, ${child.name},
+                                 tok::${token_kind}, ${choices});
+%       end
+%       if child.node_choices:
+  if (auto &__Child = raw->getChild(Cursor::${child.name}))
+    assert(${check_child_condition_raw(child)}(__Child));
+%       end
+%     end
+#endif
+}
+%   end
+
+%   for child in node.children:
+%     if child.is_optional:
+llvm::Optional<${child.type_name}> ${node.name}::get${child.name}() {
+  auto ChildData = Data->getChild(Cursor::${child.name});
+  if (!ChildData)
+    return llvm::None;
+  return ${child.type_name} {Root, ChildData.get()};
+}
+%     else:
+${child.type_name} ${node.name}::get${child.name}() {
+  return ${child.type_name} {Root, Data->getChild(Cursor::${child.name}).get()};
+}
+%     end
+
+%     child_node = NODE_MAP.get(child.syntax_kind)
+%     if child_node and child_node.is_syntax_collection():
+%       child_elt = child.collection_element_name
+%       child_elt_type = child_node.collection_element_type
+%       if not child_elt:
+%         raise Exception("'collection_element_name' should be set for '%s' of '%s'" % (child.name, node.name))
+%       end
+${node.name} ${node.name}::add${child_elt}(${child_elt_type} ${child_elt}) {
+  RC<RawSyntax> raw = getRaw()->getChild(Cursor::${child.name});
+  if (raw)
+    raw = raw->append(${child_elt}.getRaw());
+  else
+    raw = RawSyntax::make(SyntaxKind::${child_node.syntax_kind},
+                          {${child_elt}.getRaw()}, SourcePresence::Present);
+  return Data->replaceChild<${node.name}>(raw, Cursor::${child.name});
+}
+%     end
+
+${node.name} ${node.name}::with${child.name}(
+  llvm::Optional<${child.type_name}> New${child.type_name}) {
+  RC<RawSyntax> raw;
+  if (New${child.type_name}.hasValue()) {
+    raw = New${child.type_name}->getRaw();
+  } else {
+% if child.is_optional:
+    raw = nullptr;
+% else:
+    raw = ${make_missing_child(child)};
+% end
+  }
+  return Data->replaceChild<${node.name}>(raw, Cursor::${child.name});
+}
+
+%   end
+% end
+
+const char* swift::syntax::getSyntaxStructureVersioningIdentifier() {
+  return "${calculate_node_hash()}";
+}

@@ -1,0 +1,467 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -mem2reg | %FileCheck %s
+
+import Builtin
+import Swift
+
+//////////////////
+// Declarations //
+//////////////////
+
+class Klass {}
+
+struct SmallCodesizeStruct {
+  var cls1 : Klass
+  var cls2 : Klass
+}
+
+struct LargeCodesizeStruct {
+  var s1: SmallCodesizeStruct
+  var s2: SmallCodesizeStruct
+  var s3: SmallCodesizeStruct
+  var s4: SmallCodesizeStruct
+  var s5: SmallCodesizeStruct
+}
+
+///////////
+// Tests //
+///////////
+
+// CHECK-LABEL: sil @store_only_allocas
+// CHECK-NOT: alloc_stack
+// CHECK: return
+// simple.foo0 (c : Swift.Int64) -> ()
+sil @store_only_allocas : $@convention(thin) (Int64) -> () {
+bb0(%0 : $Int64):
+  %1 = alloc_stack $Int64, var, name "c"               // users: %5, %2
+  store %0 to %1 : $*Int64                      // id: %2
+  // function_ref Swift.print (val : Swift.Int64) -> ()
+  %3 = function_ref @_Ts5printFT3valSi_T_ : $@convention(thin) (Int64) -> () // user: %4
+  %4 = apply %3(%0) : $@convention(thin) (Int64) -> ()
+  dealloc_stack %1 : $*Int64     // id: %5
+  %6 = tuple ()                                   // user: %7
+  return %6 : $()                                 // id: %7
+}
+
+// Swift.print (val : Swift.Int64) -> ()
+sil @_Ts5printFT3valSi_T_ : $@convention(thin) (Int64) -> ()
+
+// CHECK-LABEL: sil @multiple_store_vals
+// CHECK-NOT: alloc_stack
+// CHECK: return
+// simple.foo1 (c : Swift.Int64) -> Swift.Int64
+sil @multiple_store_vals : $@convention(thin) (Int64) -> Int64 {
+bb0(%0 : $Int64):
+  %1 = alloc_stack $Int64, var, name "c"               // users: %14, %2
+  store %0 to %1 : $*Int64                      // id: %2
+  %3 = alloc_stack $Int64, var, name "x"               // users: %12, %11, %13, %6
+  %4 = integer_literal $Builtin.Int64, 2          // user: %5
+  %5 = struct $Int64 (%4 : $Builtin.Int64)        // user: %6
+  store %5 to %3 : $*Int64                      // id: %6
+  %7 = integer_literal $Builtin.Int64, 5          // user: %9
+  %8 = integer_literal $Builtin.Int1, 0           // user: %10
+  %9 = struct $Int64 (%7 : $Builtin.Int64)        // users: %12, %15, %11
+  cond_fail %8 : $Builtin.Int1                    // id: %10
+  store %9 to %3 : $*Int64                      // id: %11
+  store %9 to %3 : $*Int64                      // id: %12
+  dealloc_stack %3 : $*Int64     // id: %13
+  dealloc_stack %1 : $*Int64     // id: %14
+  return %9 : $Int64                              // id: %15
+}
+
+// CHECK-LABEL: sil @multiple_store_vals2
+// CHECK-NOT: alloc_stack
+// CHECK: return
+// simple.foo2 (c : Swift.Int64) -> Swift.Int64
+sil @multiple_store_vals2 : $@convention(thin) (Int64) -> Int64 {
+bb0(%0 : $Int64):
+  %1 = alloc_stack $Int64, var, name "c"               // users: %19, %2
+  store %0 to %1 : $*Int64                      // id: %2
+  %3 = alloc_box $<τ_0_0> { var τ_0_0 } <Int64>, var, name "x"                 // users: %16, %11, %6
+  %3a = project_box %3 : $<τ_0_0> { var τ_0_0 } <Int64>, 0
+  %4 = integer_literal $Builtin.Int64, 2          // users: %9, %5
+  %5 = struct $Int64 (%4 : $Builtin.Int64)        // users: %12, %6
+  store %5 to %3a : $*Int64                      // id: %6
+  %8 = struct_extract %0 : $Int64, #Int64._value   // user: %9
+  %9 = builtin "cmp_sgt_Int64"(%8 : $Builtin.Int64, %4 : $Builtin.Int64) : $Builtin.Int1 // users: %15, %10
+  cond_br %9, bb1, bb2                            // id: %10
+
+bb1:                                              // Preds: bb0
+  strong_release %3 : $<τ_0_0> { var τ_0_0 } <Int64>    // id: %11
+  br bb3(%5 : $Int64)                             // id: %12
+
+bb2:                                              // Preds: bb0
+  %13 = integer_literal $Builtin.Int64, 5         // user: %14
+  %14 = struct $Int64 (%13 : $Builtin.Int64)      // user: %17
+  cond_fail %9 : $Builtin.Int1                    // id: %15
+  strong_release %3 : $<τ_0_0> { var τ_0_0 } <Int64>    // id: %16
+  br bb3(%14 : $Int64)                            // id: %17
+
+bb3(%18 : $Int64):                                // Preds: bb2 bb1
+  dealloc_stack %1 : $*Int64     // id: %19
+  return %18 : $Int64                             // id: %20
+}
+
+// CHECK-LABEL: sil @with_loads
+// simple.foo2 (c : Swift.Int64) -> Swift.Int64
+sil @with_loads : $@convention(thin) (Int64) -> Int64 {
+bb0(%0 : $Int64):
+  %1 = alloc_stack $Int64, var, name "c"               // users: %19, %2, (%20)
+  store %0 to %1 : $*Int64                      // id: %2
+  %3 = alloc_box $<τ_0_0> { var τ_0_0 } <Int64>, var, name "x"                 // users: %16, %11, %6
+  %3a = project_box %3 : $<τ_0_0> { var τ_0_0 } <Int64>, 0
+  %4 = integer_literal $Builtin.Int64, 2          // users: %9, %5
+  %5 = struct $Int64 (%4 : $Builtin.Int64)        // users: %12, %6
+  store %5 to %3a : $*Int64                      // id: %6
+  %8 = struct_extract %0 : $Int64, #Int64._value   // user: %9
+  %9 = builtin "cmp_sgt_Int64"(%8 : $Builtin.Int64, %4 : $Builtin.Int64) : $Builtin.Int1 // users: %15, %10
+  cond_br %9, bb1, bb2                            // id: %10
+
+bb1:                                              // Preds: bb0
+  strong_release %3 : $<τ_0_0> { var τ_0_0 } <Int64>    // id: %11
+  br bb3(%5 : $Int64)                             // id: %12
+
+bb2:                                              // Preds: bb0
+  %13 = integer_literal $Builtin.Int64, 5         // user: %14
+  %14 = struct $Int64 (%13 : $Builtin.Int64)      // user: %17
+  cond_fail %9 : $Builtin.Int1                    // id: %15
+  strong_release %3 : $<τ_0_0> { var τ_0_0 } <Int64>    // id: %16
+  br bb3(%14 : $Int64)                            // id: %17
+
+//CHECK: bb3([[RET:%[0-9]+]] : $Int64):
+bb3(%18 : $Int64):                                // Preds: bb2 bb1
+  dealloc_stack %1 : $*Int64     // id: %19
+  %20 = load %1 : $*Int64
+//CHECK: return [[RET]]
+  return %18 : $Int64                             // id: %20
+}
+
+// CHECK-LABEL: sil @basic_block_with_loads_and_stores
+// CHECK-NOT: alloc_stack
+// CHECK: return
+// test.foo3 (c : Swift.Int64) -> ()
+sil @basic_block_with_loads_and_stores : $@convention(thin) (Int64) -> () {
+bb0(%0 : $Int64):
+  %1 = alloc_stack $Int64, var, name "c"               // users: %20, %2
+  store %0 to %1 : $*Int64                      // id: %2
+  %3 = alloc_stack $Int64, var, name "x"               // users: %14, %19, %6, %17
+  %4 = integer_literal $Builtin.Int64, 3          // user: %5
+  %5 = struct $Int64 (%4 : $Builtin.Int64)        // user: %6
+  store %5 to %3 : $*Int64                      // id: %6
+  %7 = integer_literal $Builtin.Int64, 3          // user: %10
+  %9 = struct_extract %0 : $Int64, #Int64._value   // user: %10
+  %10 = builtin "cmp_sgt_Int64"(%9 : $Builtin.Int64, %7 : $Builtin.Int64) : $Builtin.Int1 // user: %11
+
+  %12 = integer_literal $Builtin.Int64, 2         // user: %13
+  %13 = struct $Int64 (%12 : $Builtin.Int64)      // user: %14
+  store %13 to %3 : $*Int64                     // id: %14
+
+  // function_ref Swift.print (val : Swift.Int64) -> ()
+  %16 = function_ref @_Ts5printFT3valSi_T_ : $@convention(thin) (Int64) -> () // user: %18
+  %17 = load %3 : $*Int64                       // user: %18
+  %18 = apply %16(%17) : $@convention(thin) (Int64) -> ()
+  dealloc_stack %3 : $*Int64     // id: %19
+  dealloc_stack %1 : $*Int64     // id: %20
+  %21 = tuple ()                                  // user: %22
+  return %21 : $()                                // id: %22
+}
+
+// CHECK-LABEL: sil @load_uninitialized_empty
+// CHECK-NOT: load
+// CHECK: return
+sil @load_uninitialized_empty : $@convention(thin) (@inout ()) -> () {
+bb0(%0 : $*()):
+  %1 = alloc_stack $()
+  %2 = load %1 : $*()
+  store %2 to %0 : $*()
+  dealloc_stack %1 : $*()
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: sil @mem2reg_debug_value_addr
+// CHECK-NOT: alloc_stack
+// CHECK-NOT: debug_value_addr
+// CHECK: debug_value %0
+// CHECK: return
+sil @mem2reg_debug_value_addr : $@convention(thin) (Int) -> Int {
+bb0(%0 : $Int):
+  %1 = alloc_stack $Int
+  store %0 to %1 : $*Int
+  debug_value_addr %1 : $*Int
+  %2 = load %1 : $*Int
+  dealloc_stack %1 : $*Int
+  return %2 : $Int
+}
+
+// CHECK-LABEL: sil @mem2reg_struct_addr
+// CHECK-NOT: alloc_stack
+// CHECK: struct_extract
+// CHECK: return
+sil @mem2reg_struct_addr : $@convention(thin) (Int64) -> Builtin.Int64 {
+bb0(%0 : $Int64):
+  %1 = alloc_stack $Int64
+  store %0 to %1 : $*Int64
+  %2 = struct_element_addr %1 : $*Int64, #Int64._value
+  %3 = load %2 : $*Builtin.Int64
+  dealloc_stack %1 : $*Int64
+  return %3 : $Builtin.Int64
+}
+
+// CHECK-LABEL: sil @mem2reg_tuple_addr
+// CHECK-NOT: alloc_stack
+// CHECK: tuple_extract {{.*}}, 0
+// CHECK: return
+sil @mem2reg_tuple_addr : $@convention(thin) (Int64) -> Int64 {
+bb0(%0 : $Int64):
+  %1 = alloc_stack $(Int64, Int64)
+  %2 = tuple (%0 : $Int64, %0 : $Int64)
+  store %2 to %1 : $*(Int64, Int64)
+  %4 = tuple_element_addr %1 : $*(Int64, Int64), 0
+  %5 = load %4 : $*Int64
+  dealloc_stack %1 : $*(Int64, Int64)
+  return %5 : $Int64
+}
+
+// CHECK-LABEL: sil @struct_extract_if_then_else
+// CHECK-NOT: alloc_stack
+sil @struct_extract_if_then_else : $@convention(thin) (Int64) -> Int64 {
+bb0(%0 : $Int64):
+  %1 = alloc_stack $Int64
+  store %0 to %1 : $*Int64
+  %3 = integer_literal $Builtin.Int64, 2
+  %4 = struct_extract %0 : $Int64, #Int64._value
+  %5 = builtin "cmp_sgt_Int64"(%4 : $Builtin.Int64, %3 : $Builtin.Int64) : $Builtin.Int1
+  %6 = struct_element_addr %1 : $*Int64, #Int64._value
+  cond_br %5, bb1, bb2
+
+// CHECK: bb1:
+// CHECK: struct_extract %0
+bb1:
+  %8 = load %6 : $*Builtin.Int64
+  %9 = integer_literal $Builtin.Int64, 1
+  %10 = integer_literal $Builtin.Int1, 0
+  %11 = builtin "sadd_with_overflow_Int64"(%8 : $Builtin.Int64, %9 : $Builtin.Int64, %10 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %12 = tuple_extract %11 : $(Builtin.Int64, Builtin.Int1), 0
+  br bb3(%12 : $Builtin.Int64)
+
+// CHECK: bb2:
+// CHECK: struct_extract %0
+bb2:
+  %14 = load %6 : $*Builtin.Int64
+  %15 = integer_literal $Builtin.Int64, 2
+  %16 = integer_literal $Builtin.Int1, 0
+  %17 = builtin "sadd_with_overflow_Int64"(%14 : $Builtin.Int64, %15 : $Builtin.Int64, %16 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %18 = tuple_extract %17 : $(Builtin.Int64, Builtin.Int1), 0
+  br bb3(%18 : $Builtin.Int64)
+
+// CHECK-NOT: dealloc_stack
+bb3(%20 : $Builtin.Int64):
+  dealloc_stack %1 : $*Int64
+  %22 = struct $Int64 (%20 : $Builtin.Int64)
+  return %22 : $Int64
+}
+
+sil @first : $@convention(thin) () -> Int
+sil @second : $@convention(thin) () -> Int
+
+// CHECK: sil @promote_function_refs
+sil @promote_function_refs : $@convention(thin) (Bool) -> Int {
+// CHECK: bb0
+bb0(%0 : $Bool):
+// CHECK-NOT: [[STACK:%.*]] = alloc_stack
+  %1 = alloc_stack $@callee_owned () -> Int
+  debug_value %0 : $Bool
+  %3 = struct_extract %0 : $Bool, #Bool._value
+  cond_br %3, bb1, bb2
+
+// CHECK: bb1
+bb1:
+// CHECK: [[FIRSTREF:%.*]] = function_ref @first
+  %5 = function_ref @first : $@convention(thin) () -> Int
+// CHECK: [[FIRSTTHICK:%.*]] =  thin_to_thick_function [[FIRSTREF]]
+  %6 = thin_to_thick_function %5 : $@convention(thin) () -> Int to $@callee_owned () -> Int
+// CHECK-NOT: store
+  store %6 to %1 : $*@callee_owned () -> Int
+// CHECK: br bb3([[FIRSTTHICK]] : $@callee_owned () -> Int
+  br bb3
+
+// CHECK: bb2
+bb2:
+// CHECK: [[SECONDREF:%.*]] = function_ref @second
+  %9 = function_ref @second : $@convention(thin) () -> Int
+// CHECK: [[SECONDTHICK:%.*]] =  thin_to_thick_function [[SECONDREF]]
+  %10 = thin_to_thick_function %9 : $@convention(thin) () -> Int to $@callee_owned () -> Int
+// CHECK-NOT: store
+  store %10 to %1 : $*@callee_owned () -> Int
+// CHECK: br bb3([[SECONDTHICK]] : $@callee_owned () -> Int)
+  br bb3
+
+// CHECK: bb3([[ARG:%.*]] : $@callee_owned () -> Int):
+bb3:
+// CHECK-NOT: load [[STACK]]
+  %13 = load %1 : $*@callee_owned () -> Int
+// CHECK: strong_retain [[ARG]]
+  strong_retain %13 : $@callee_owned () -> Int
+// CHECK: [[RESULT:%.*]] = apply [[ARG]]
+  %15 = apply %13() : $@callee_owned () -> Int
+  br bb4
+
+  // NOTE: This block and the branch above exist to ensure that we
+  //       test what happens when %1 hasn't already been loaded in this
+  //       block.
+// CHECK: bb4
+bb4:
+// CHECK-NOT: destroy_addr [[STACK]]
+// CHECK: strong_release [[ARG]]
+  destroy_addr %1 : $*@callee_owned () -> Int
+// CHECK-NOT: dealloc_stack [[STACK]]
+  dealloc_stack %1 : $*@callee_owned () -> Int
+// CHECK: return [[RESULT]]
+  return %15 : $Int
+}
+
+// Test cases where the only use is a debug_value_addr
+// CHECK-LABEL: sil @no_real_uses
+sil @no_real_uses : $@convention(thin) () -> () {
+// CHECK: bb0
+bb0:
+  // CHECK-NOT: alloc_stack
+  %0 = alloc_stack $Builtin.Int32
+  // CHECK-NOT: debug_value_addr
+  debug_value_addr %0 : $*Builtin.Int32, let, name "x", argno 1
+  // CHECK-NOT: dealloc_stack
+  dealloc_stack %0 : $*Builtin.Int32
+  // CHECK: [[VAL:%.*]] = tuple ()
+  %1 = tuple ()
+  // CHECK: return [[VAL]]
+  return %1 : $()
+}
+
+// CHECK-LABEL: sil @keep_release
+// CHECK: strong_release %0
+// CHECK: return
+sil @keep_release : $@convention(thin) (@owned AnyObject) -> () {
+bb0(%0 : $AnyObject):
+  %1 = alloc_stack $AnyObject
+  store %0 to %1 : $*AnyObject
+  destroy_addr %1 : $*AnyObject
+  dealloc_stack %1 : $*AnyObject
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// Test cases where there are dead address instructions.
+// CHECK-LABEL: sil @dead_use
+// CHECK-NOT: alloc_stack
+sil @dead_use : $@convention(thin) () -> () {
+  %0 = alloc_stack $Int64
+  %1 = struct_element_addr %0 : $*Int64, #Int64._value
+  dealloc_stack %0 : $*Int64
+  %2 = alloc_stack $(Int64, Int64)
+  %3 = tuple_element_addr %2 : $*(Int64, Int64), 0
+  dealloc_stack %2 : $*(Int64, Int64)
+  // CHECK: [[VAL:%.*]] = tuple ()
+  %4 = tuple ()
+  // CHECK: return [[VAL]]
+  return %4 : $()
+}
+
+// CHECK-LABEL: sil @dont_crash_on_dead_arg_use
+// CHECK: bb0{{.*}}:
+// CHECK:      tuple ()
+// CHECK-NEXT: return
+sil @dont_crash_on_dead_arg_use : $@convention(thin) (@inout Int64) -> () {
+bb0(%0 : $*Int64):
+  %2 = alloc_stack $Int64
+  %1 = struct_element_addr %0 : $*Int64, #Int64._value
+  %3 = struct_element_addr %2 : $*Int64, #Int64._value
+  dealloc_stack %2 : $*Int64
+  %4 = tuple ()
+  return %4 : $()
+}
+
+// Make sure that we do expand destroy_addr appropriately for code-size
+// trade-offs.
+// CHECK-LABEL: sil @large_struct_test : $@convention(thin) (@owned LargeCodesizeStruct) -> () {
+// CHECK: bb0([[ARG0:%.*]] : $LargeCodesizeStruct):
+// CHECK:   release_value [[ARG0]]
+// CHECK: } // end sil function 'large_struct_test'
+sil @large_struct_test : $@convention(thin) (@owned LargeCodesizeStruct) -> () {
+bb0(%0 : $LargeCodesizeStruct):
+  %1 = alloc_stack $LargeCodesizeStruct
+  store %0 to %1 : $*LargeCodesizeStruct
+  destroy_addr %1 : $*LargeCodesizeStruct
+  dealloc_stack %1 : $*LargeCodesizeStruct
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// CHECK-LABEL: sil @small_struct_test : $@convention(thin) (@owned SmallCodesizeStruct) -> () {
+// CHECK: bb0([[ARG0:%.*]] : $SmallCodesizeStruct):
+// CHECK:   [[ARG0cls1:%.*]] = struct_extract [[ARG0]]
+// CHECK:   strong_release [[ARG0cls1]]
+// CHECK:   [[ARG0cls2:%.*]] = struct_extract [[ARG0]]
+// CHECK:   strong_release [[ARG0cls2]]
+// CHECK: } // end sil function 'small_struct_test'
+sil @small_struct_test : $@convention(thin) (@owned SmallCodesizeStruct) -> () {
+bb0(%0 : $SmallCodesizeStruct):
+  %1 = alloc_stack $SmallCodesizeStruct
+  store %0 to %1 : $*SmallCodesizeStruct
+  destroy_addr %1 : $*SmallCodesizeStruct
+  dealloc_stack %1 : $*SmallCodesizeStruct
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// CHECK-LABEL: sil @dead_address_projections
+// CHECK-NOT: alloc_stack
+// CHECK: } // end sil function 'dead_address_projections'
+sil @dead_address_projections : $@convention(thin) (((), ())) -> ((), ()) {
+bb0(%0 : $((), ())):
+  %1 = alloc_stack $((), ())
+  %200 = tuple_element_addr %1 : $*((), ()), 0
+  %300 = tuple_element_addr %1 : $*((), ()), 1
+  cond_br undef, bb1, bb2
+
+bb1:
+  store %0 to %1 : $*((), ())
+  %16 = load %1 : $*((), ())
+  dealloc_stack %1 : $*((), ())
+  br bb3(%16 : $((), ()))
+
+bb2:
+  dealloc_stack %1 : $*((), ())
+  br bb3(%0 : $((), ()))
+
+bb3(%20 : $((), ())):
+  return %20 : $((), ())
+}
+
+// CHECK-LABEL: sil @load_tuple_of_void
+// CHECK-NOT: alloc_stack
+// CHECK:   return undef : $((), ())
+// CHECK: } // end sil function 'load_tuple_of_void'
+sil @load_tuple_of_void : $@convention(thin) () -> ((), ()) {
+bb0:
+  %1 = alloc_stack $((), ())
+  %16 = load %1 : $*((), ())
+  dealloc_stack %1 : $*((), ())
+  return %16 : $((), ())
+}
+
+// CHECK-LABEL: sil @unchecked_ref_cast
+// CHECK-NOT: alloc_stack
+// CHECK: [[CAST:%.*]] = unchecked_bitwise_cast %0 : $Optional<Klass> to $Klass
+// CHECK: release_value [[CAST]]
+// CHECK: return
+sil @unchecked_ref_cast : $@convention(thin) (@owned Optional<Klass>) -> () {
+bb0(%0 : $Optional<Klass>):
+  %1 = alloc_stack $Optional<Klass>
+  store %0 to %1 : $*Optional<Klass>
+  %2 = unchecked_addr_cast %1 : $*Optional<Klass> to $*Klass
+  %3 = load %2 : $*Klass
+  release_value %3 : $Klass
+  dealloc_stack %1 : $*Optional<Klass>
+  %4 = tuple()
+  return %4 : $()
+}

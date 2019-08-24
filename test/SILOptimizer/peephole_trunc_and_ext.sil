@@ -1,0 +1,222 @@
+// RUN: %target-swift-frontend %s -emit-sil -O -o - -sil-verify-all | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+// top_level_code
+sil private @top_level_code : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple ()                                   // user: %1
+  return %0 : $()                                 // id: %1
+}
+
+struct BuiltinWord {
+  var value: Builtin.Word
+}
+
+struct BuiltinUWord {
+  var value: Builtin.Word
+}
+
+// peephole: UInt16(Int32(x >> 1)) -> (x >> 1)
+// CHECK-LABEL: sil @_TF4test36test_uint16_trunc_u_to_s_zext_lshr_1FVs6UInt16S0_ : $@convention(thin) (UInt16) -> UInt16
+// CHECK: builtin "lshr_Int16"
+// CHECK-NOT: builtin "zext_Int16_Int32"
+// CHECK-NOT: builtin "s_to_u_checked_trunc_Int32_Int16"
+// CHECK-NOT: tuple_extract
+// CHECK: return
+// test.test_uint16_trunc_u_to_s_zext_lshr_1 (Swift.UInt16) -> Swift.UInt16
+sil @_TF4test36test_uint16_trunc_u_to_s_zext_lshr_1FVs6UInt16S0_ : $@convention(thin) (UInt16) -> UInt16 {
+bb0(%0 : $UInt16):
+  debug_value %0 : $UInt16, let, name "x" // id: %1
+  %2 = integer_literal $Builtin.Int16, 1          // user: %7
+  br bb1                                          // id: %3
+
+bb1:                                              // Preds: bb0
+  br bb2                                          // id: %4
+
+bb2:                                              // Preds: bb1
+  %6 = struct_extract %0 : $UInt16, #UInt16._value // user: %7
+  %7 = builtin "lshr_Int16"(%6 : $Builtin.Int16, %2 : $Builtin.Int16) : $Builtin.Int16 // user: %8
+  %8 = struct $UInt16 (%7 : $Builtin.Int16)       // user: %10
+  br bb3                                          // id: %9
+
+bb3:                                              // Preds: bb2
+  %10 = struct_extract %8 : $UInt16, #UInt16._value // user: %12
+  %12 = builtin "zext_Int16_Int32"(%10 : $Builtin.Int16) : $Builtin.Int32 // user: %13
+  %13 = struct $Int32 (%12 : $Builtin.Int32)      // user: %14
+  %14 = struct_extract %13 : $Int32, #Int32._value // user: %16
+  %16 = builtin "s_to_u_checked_trunc_Int32_Int16"(%14 : $Builtin.Int32) : $(Builtin.Int16, Builtin.Int1) // users: %17, %18
+  %17 = tuple_extract %16 : $(Builtin.Int16, Builtin.Int1), 0 // user: %20
+  %18 = tuple_extract %16 : $(Builtin.Int16, Builtin.Int1), 1 // user: %19
+  cond_fail %18 : $Builtin.Int1                   // id: %19
+  %20 = struct $UInt16 (%17 : $Builtin.Int16)     // users: %21, %22
+  debug_value %20 : $UInt16, let, name "v1" // id: %21
+  return %20 : $UInt16                            // id: %22
+}
+
+
+// peephole: Int16(Int32(x >> 1)) -> (x >> 1)
+// CHECK-LABEL: sil @_TF4test35test_int16_trunc_u_to_s_zext_lshr_1FVs6UInt16Vs5Int16 : $@convention(thin) (UInt16) -> Int16
+// CHECK: builtin "lshr_Int16"
+// CHECK-NOT: builtin "zext_Int16_Int32"
+// CHECK-NOT: builtin "s_to_u_checked_trunc_Int32_Int16"
+// CHECK-NOT: tuple_extract
+// CHECK: return
+// test.test_int16_trunc_u_to_s_zext_lshr_1 (Swift.UInt16) -> Swift.Int16
+sil @_TF4test35test_int16_trunc_u_to_s_zext_lshr_1FVs6UInt16Vs5Int16 : $@convention(thin) (UInt16) -> Int16 {
+bb0(%0 : $UInt16):
+  debug_value %0 : $UInt16, let, name "x" // id: %1
+  %2 = integer_literal $Builtin.Int16, 1          // user: %7
+  br bb1                                          // id: %3
+
+bb1:                                              // Preds: bb0
+  br bb2                                          // id: %4
+
+bb2:                                              // Preds: bb1
+  %6 = struct_extract %0 : $UInt16, #UInt16._value // user: %7
+  %7 = builtin "lshr_Int16"(%6 : $Builtin.Int16, %2 : $Builtin.Int16) : $Builtin.Int16 // user: %8
+  %8 = struct $UInt16 (%7 : $Builtin.Int16)       // user: %10
+  br bb3                                          // id: %9
+
+bb3:                                              // Preds: bb2
+  %10 = struct_extract %8 : $UInt16, #UInt16._value // user: %12
+  %12 = builtin "zext_Int16_Int32"(%10 : $Builtin.Int16) : $Builtin.Int32 // user: %13
+  %13 = struct $Int32 (%12 : $Builtin.Int32)      // user: %14
+  %14 = struct_extract %13 : $Int32, #Int32._value // user: %16
+  %16 = builtin "s_to_s_checked_trunc_Int32_Int16"(%14 : $Builtin.Int32) : $(Builtin.Int16, Builtin.Int1) // users: %17, %18
+  %17 = tuple_extract %16 : $(Builtin.Int16, Builtin.Int1), 0 // user: %20
+  %18 = tuple_extract %16 : $(Builtin.Int16, Builtin.Int1), 1 // user: %19
+  cond_fail %18 : $Builtin.Int1                   // id: %19
+  %20 = struct $Int16 (%17 : $Builtin.Int16)      // users: %21, %22
+  debug_value %20 : $Int16, let, name "v1" // id: %21
+  return %20 : $Int16                             // id: %22
+}
+
+// sizeof is known to return strictly positive values
+// But Word ->Int64 is not a safe conversion
+// No peephole for UInt16(UInt32(sizeof(Int.self)))
+// CHECK-LABEL: sil @_TF4test35test_int16_trunc_s_to_u_zext_sizeofFT_Vs6UInt16 : $@convention(thin) () -> UInt16
+// CHECK: builtin "zextOrBitCast_Word_Int64"
+// CHECK: builtin "s_to_u_checked_trunc_Int64_Int32"
+// CHECK: builtin "u_to_u_checked_trunc_Int32_Int16"
+// CHECK: return
+// test.test_int16_trunc_s_to_u_zext_sizeof () -> Swift.UInt16
+sil @_TF4test35test_int16_trunc_s_to_u_zext_sizeofFT_Vs6UInt16 : $@convention(thin) () -> UInt16 {
+bb0:
+  %0 = metatype $@thin Int.Type
+  %2 = metatype $@thick Int.Type                  // user: %3
+  %3 = builtin "sizeof"<(Int)>(%2 : $@thick (Int).Type) : $Builtin.Word // user: %4
+  %4 = tuple ()
+  %6 = tuple ()
+  %7 = builtin "zextOrBitCast_Word_Int64"(%3 : $Builtin.Word) : $Builtin.Int64 // user: %9
+  %9 = builtin "s_to_u_checked_trunc_Int64_Int32"(%7 : $Builtin.Int64) : $(Builtin.Int32, Builtin.Int1) // users: %10, %11
+  %10 = tuple_extract %9 : $(Builtin.Int32, Builtin.Int1), 0 // user: %13
+  %11 = tuple_extract %9 : $(Builtin.Int32, Builtin.Int1), 1 // user: %12
+  cond_fail %11 : $Builtin.Int1                   // id: %12
+  %13 = struct $UInt32 (%10 : $Builtin.Int32)     // user: %14
+  %14 = struct_extract %13 : $UInt32, #UInt32._value // user: %16
+  %16 = builtin "u_to_u_checked_trunc_Int32_Int16"(%14 : $Builtin.Int32) : $(Builtin.Int16, Builtin.Int1) // users: %17, %18
+  %17 = tuple_extract %16 : $(Builtin.Int16, Builtin.Int1), 0 // user: %20
+  %18 = tuple_extract %16 : $(Builtin.Int16, Builtin.Int1), 1 // user: %19
+  cond_fail %18 : $Builtin.Int1                   // id: %19
+  %20 = struct $UInt16 (%17 : $Builtin.Int16)     // user: %21
+  return %20 : $UInt16                            // id: %21
+}
+
+// peephole: Int8(x & 127) -> remove overflow check
+// CHECK-LABEL: sil @_TF22peephole_trunc_and_ext32test_s_to_s_checked_trunc_of_andFVs5Int32Vs4Int8 : $@convention(thin) (Int32) -> Int8
+// CHECK: builtin "and_Int32"
+// CHECK: builtin "s_to_s_checked_trunc_Int32_Int8"
+// CHECK-NOT: cond_fail
+// CHECK: return
+// peephole_trunc_and_ext.test_s_to_s_checked_trunc_of_and (Swift.Int32) -> Swift.Int8
+sil @_TF22peephole_trunc_and_ext32test_s_to_s_checked_trunc_of_andFVs5Int32Vs4Int8 : $@convention(thin) (Int32) -> Int8 {
+bb0(%0 : $Int32):
+  debug_value %0 : $Int32, let, name "x" // id: %1
+  %2 = integer_literal $Builtin.Int32, 127        // user: %5
+  %4 = struct_extract %0 : $Int32, #Int32._value   // user: %5
+  %5 = builtin "and_Int32"(%4 : $Builtin.Int32, %2 : $Builtin.Int32) : $Builtin.Int32 // user: %6
+  %6 = struct $Int32 (%5 : $Builtin.Int32)        // user: %7
+  %7 = struct_extract %6 : $Int32, #Int32._value   // user: %9
+  %9 = builtin "s_to_s_checked_trunc_Int32_Int8"(%7 : $Builtin.Int32) : $(Builtin.Int8, Builtin.Int1) // users: %10, %11
+  %10 = tuple_extract %9 : $(Builtin.Int8, Builtin.Int1), 0 // user: %13
+  %11 = tuple_extract %9 : $(Builtin.Int8, Builtin.Int1), 1 // user: %12
+  cond_fail %11 : $Builtin.Int1                   // id: %12
+  %13 = struct $Int8 (%10 : $Builtin.Int8)        // user: %14
+  return %13 : $Int8                              // id: %14
+}
+
+// peephole: UInt8(x & 255) -> remove overflow check
+// CHECK-LABEL: sil @_TF22peephole_trunc_and_ext32test_s_to_u_checked_trunc_of_andFVs5Int32Vs5UInt8 : $@convention(thin) (Int32) -> UInt8
+// CHECK: builtin "and_Int32"
+// CHECK: builtin "s_to_u_checked_trunc_Int32_Int8"
+// CHECK-NOT: cond_fail
+// CHECK: return
+// peephole_trunc_and_ext.test_s_to_u_checked_trunc_of_and (Swift.Int32) -> Swift.UInt8
+sil @_TF22peephole_trunc_and_ext32test_s_to_u_checked_trunc_of_andFVs5Int32Vs5UInt8 : $@convention(thin) (Int32) -> UInt8 {
+bb0(%0 : $Int32):
+  debug_value %0 : $Int32, let, name "x" // id: %1
+  %2 = integer_literal $Builtin.Int32, 255        // user: %5
+  %4 = struct_extract %0 : $Int32, #Int32._value   // user: %5
+  %5 = builtin "and_Int32"(%4 : $Builtin.Int32, %2 : $Builtin.Int32) : $Builtin.Int32 // user: %6
+  %6 = struct $Int32 (%5 : $Builtin.Int32)        // user: %7
+  %7 = struct_extract %6 : $Int32, #Int32._value   // user: %9
+  %9 = builtin "s_to_u_checked_trunc_Int32_Int8"(%7 : $Builtin.Int32) : $(Builtin.Int8, Builtin.Int1) // users: %10, %11
+  %10 = tuple_extract %9 : $(Builtin.Int8, Builtin.Int1), 0 // user: %13
+  %11 = tuple_extract %9 : $(Builtin.Int8, Builtin.Int1), 1 // user: %12
+  cond_fail %11 : $Builtin.Int1                   // id: %12
+  %13 = struct $UInt8 (%10 : $Builtin.Int8)       // user: %14
+  return %13 : $UInt8                             // id: %14
+}
+
+// peephole: UInt8(x & 255) -> remove overflow check
+// CHECK-LABEL: sil @_TF22peephole_trunc_and_ext32test_u_to_u_checked_trunc_of_andFVs6UInt32Vs5UInt8 : $@convention(thin) (UInt32) -> UInt8
+// CHECK: builtin "and_Int32"
+// CHECK: builtin "u_to_u_checked_trunc_Int32_Int8"
+// CHECK-NOT: cond_fail
+// CHECK: return
+// peephole_trunc_and_ext.test_u_to_u_checked_trunc_of_and (Swift.UInt32) -> Swift.UInt8
+sil @_TF22peephole_trunc_and_ext32test_u_to_u_checked_trunc_of_andFVs6UInt32Vs5UInt8 : $@convention(thin) (UInt32) -> UInt8 {
+bb0(%0 : $UInt32):
+  debug_value %0 : $UInt32, let, name "x" // id: %1
+  %2 = integer_literal $Builtin.Int32, 255        // user: %5
+  %4 = struct_extract %0 : $UInt32, #UInt32._value // user: %5
+  %5 = builtin "and_Int32"(%4 : $Builtin.Int32, %2 : $Builtin.Int32) : $Builtin.Int32 // user: %6
+  %6 = struct $UInt32 (%5 : $Builtin.Int32)       // user: %7
+  %7 = struct_extract %6 : $UInt32, #UInt32._value // user: %9
+  %9 = builtin "u_to_u_checked_trunc_Int32_Int8"(%7 : $Builtin.Int32) : $(Builtin.Int8, Builtin.Int1) // users: %10, %11
+  %10 = tuple_extract %9 : $(Builtin.Int8, Builtin.Int1), 0 // user: %13
+  %11 = tuple_extract %9 : $(Builtin.Int8, Builtin.Int1), 1 // user: %12
+  cond_fail %11 : $Builtin.Int1                   // id: %12
+  %13 = struct $UInt8 (%10 : $Builtin.Int8)       // user: %14
+  return %13 : $UInt8                             // id: %14
+}
+
+// peephole: Int8(x & 127) -> remove overflow check
+// CHECK-LABEL: sil @_TF22peephole_trunc_and_ext32test_u_to_s_checked_trunc_of_andFVs6UInt32Vs4Int8 : $@convention(thin) (UInt32) -> Int8
+// CHECK: builtin "and_Int32"
+// CHECK: builtin "u_to_s_checked_trunc_Int32_Int8"
+// CHECK-NOT: cond_fail
+// CHECK: return
+// peephole_trunc_and_ext.test_u_to_s_checked_trunc_of_and (Swift.UInt32) -> Swift.Int8
+sil @_TF22peephole_trunc_and_ext32test_u_to_s_checked_trunc_of_andFVs6UInt32Vs4Int8 : $@convention(thin) (UInt32) -> Int8 {
+bb0(%0 : $UInt32):
+  debug_value %0 : $UInt32, let, name "x" // id: %1
+  %2 = integer_literal $Builtin.Int32, 127        // user: %5
+  %4 = struct_extract %0 : $UInt32, #UInt32._value // user: %5
+  %5 = builtin "and_Int32"(%4 : $Builtin.Int32, %2 : $Builtin.Int32) : $Builtin.Int32 // user: %6
+  %6 = struct $UInt32 (%5 : $Builtin.Int32)       // user: %7
+  %7 = struct_extract %6 : $UInt32, #UInt32._value // user: %9
+  %9 = builtin "u_to_s_checked_trunc_Int32_Int8"(%7 : $Builtin.Int32) : $(Builtin.Int8, Builtin.Int1) // users: %10, %11
+  %10 = tuple_extract %9 : $(Builtin.Int8, Builtin.Int1), 0 // user: %13
+  %11 = tuple_extract %9 : $(Builtin.Int8, Builtin.Int1), 1 // user: %12
+  cond_fail %11 : $Builtin.Int1                   // id: %12
+  %13 = struct $Int8 (%10 : $Builtin.Int8)       // user: %14
+  return %13 : $Int8                             // id: %14
+}
+
+sil [noinline] @fatalError : $@convention(thin) () -> Never

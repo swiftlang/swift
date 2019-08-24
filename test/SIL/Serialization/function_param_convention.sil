@@ -1,0 +1,22 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -parse-sil -sil-inline-threshold 0 %S/Inputs/function_param_convention_input.sil -o %t/FunctionInput.swiftmodule -emit-module -parse-as-library -parse-stdlib -module-name FunctionInput -O
+// RUN: %target-sil-opt -I %t -performance-linker %s -o - | %FileCheck %s
+
+import Swift
+import FunctionInput
+
+// Make sure we can deserialize a SIL function with these various attributes.
+// CHECK: sil public_external [serialized] [canonical] @foo : $@convention(thin) (@in X, @inout X, @in_guaranteed X, @owned X, X, @guaranteed X) -> @out X {
+
+sil @foo : $@convention(thin) (@in X, @inout X, @in_guaranteed X, @owned X, X, @guaranteed X) -> @out X
+
+sil @foo_caller : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $X
+  %1 = load %0 : $*X
+  %2 = function_ref @foo : $@convention(thin) (@in X, @inout X, @in_guaranteed X, @owned X, X, @guaranteed X) -> @out X
+  apply %2(%0, %0, %0, %0, %1, %1, %1) : $@convention(thin) (@in X, @inout X, @in_guaranteed X, @owned X, X, @guaranteed X) -> @out X
+  dealloc_stack %0 : $*X
+  %9999 = tuple()
+  return %9999 : $()
+}

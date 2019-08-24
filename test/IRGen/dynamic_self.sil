@@ -1,0 +1,27 @@
+// RUN: %target-swift-frontend -emit-ir %s | %FileCheck %s
+
+// REQUIRES: CPU=i386 || CPU=x86_64
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+protocol P {
+  func f() -> Self
+}
+
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @_TF12dynamic_self23testExistentialDispatchFT1pPS_1P__T_
+sil @_TF12dynamic_self23testExistentialDispatchFT1pPS_1P__T_ : $@convention(thin) (@in P) -> () {
+bb0(%0 : $*P):
+  debug_value_addr %0 : $*P, let, name "p" // id: %1
+  %2 = alloc_stack $P                             // users: %3, %4, %12
+  copy_addr %0 to [initialization] %2 : $*P     // id: %3
+  // CHECK: call %swift.opaque*
+  // CHECK: call %swift.opaque*
+  %4 = open_existential_addr immutable_access %2 : $*P to $*@opened("01234567-89ab-cdef-0123-000000000000") P // users: %8, %10
+  dealloc_stack %2 : $*P         // id: %12
+  destroy_addr %0 : $*P                           // id: %13
+  %14 = tuple ()                                  // user: %15
+  return %14 : $()                                // id: %15
+}

@@ -1,0 +1,102 @@
+[
+  {
+    "key.name": "x",
+    "key.newname": "new_x",
+    "key.is_function_like": 0,
+    "key.is_non_protocol_type": 0,
+    "key.locations": [
+      {
+        "key.line": 66,
+        "key.column": 7,
+        "key.nametype": source.syntacticrename.definition
+      },
+      {
+        "key.line": 75,
+        "key.column": 32,
+        "key.nametype": source.syntacticrename.reference
+      },
+      {
+        "key.line": 75,
+        "key.column": 59,
+        "key.nametype": source.syntacticrename.reference
+      }
+    ]
+  },
+  {
+    "key.name": "m",
+    "key.newname": "new_m",
+    "key.is_function_like": 0,
+    "key.is_non_protocol_type": 0,
+    "key.locations": [
+      {
+        "key.line": 71,
+        "key.column": 7,
+        "key.nametype": source.syntacticrename.definition
+      },
+      {
+        "key.line": 75,
+        "key.column": 17,
+        "key.nametype": source.syntacticrename.reference
+      }
+    ]
+  },
+  {
+    "key.name": "n",
+    "key.newname": "new_n",
+    "key.is_function_like": 0,
+    "key.is_non_protocol_type": 0,
+    "key.locations": [
+      {
+        "key.line": 72,
+        "key.column": 7,
+        "key.nametype": source.syntacticrename.definition
+      },
+      {
+        "key.line": 75,
+        "key.column": 39,
+        "key.nametype": source.syntacticrename.reference
+      }
+    ]
+  },
+  {
+    "key.name": "Memberwise1",
+    "key.newname": "NewMemberwise1",
+    "key.is_function_like": 0,
+    "key.is_non_protocol_type": 1,
+    "key.locations": [
+      {
+        "key.line": 65,
+        "key.column": 8,
+        "key.nametype": source.syntacticrename.definition
+      },
+      {
+        "key.line": 75,
+        "key.column": 20,
+        "key.nametype": source.syntacticrename.reference
+      },
+      {
+        "key.line": 75,
+        "key.column": 42,
+        "key.nametype": source.syntacticrename.reference
+      }
+    ]
+  },
+  {
+    "key.name": "Memberwise2",
+    "key.newname": "NewMemberwise2",
+    "key.is_function_like": 0,
+    "key.is_non_protocol_type": 1,
+    "key.locations": [
+      {
+        "key.line": 70,
+        "key.column": 8,
+        "key.nametype": source.syntacticrename.definition
+      },
+      {
+        "key.line": 75,
+        "key.column": 5,
+        "key.nametype": source.syntacticrename.reference
+      }
+    ]
+  }
+]

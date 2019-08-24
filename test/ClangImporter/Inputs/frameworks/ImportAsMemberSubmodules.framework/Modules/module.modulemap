@@ -1,0 +1,5 @@
+framework module ImportAsMemberSubmodules {
+  umbrella header "ImportAsMemberSubmodules.h"
+  export *
+  module * { export * }
+}

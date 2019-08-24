@@ -1,0 +1,34 @@
+// RUN: %target-swift-frontend -emit-ir %s | %FileCheck %s
+sil_stage canonical
+
+enum Optional<T> { case some(T), none }
+
+class AClass {
+}
+
+protocol AProto {
+}
+
+enum AnEnum {
+    case ACase(a: AClass, b: AProto)
+}
+
+// CHECK-LABEL: define {{.*}} @switch_singleton_enum_in_optional
+// CHECK:         [[CAST:%.*]] = bitcast {{.*}} %0 to { [[WORD:i[0-9]+]], [[WORD]], [[WORD]], [[WORD]], [[WORD]], [[WORD]] }*
+// CHECK:         [[GEP:%.*]] = getelementptr {{.*}} %1, i32 0, i32 0
+// CHECK:         [[FIRSTWORD:%.*]] = load [[WORD]], [[WORD]]* [[GEP]]
+// CHECK:         [[TEST:%.*]] = icmp eq [[WORD]] [[FIRSTWORD]], 0
+// CHECK:         br i1 [[TEST]]
+sil public @switch_singleton_enum_in_optional :
+    $@convention(thin) (@in Optional<AnEnum>) -> () {
+entry(%a : $*Optional<AnEnum>):
+  switch_enum_addr %a : $*Optional<AnEnum>,
+    case #Optional.some!enumelt.1: some,
+    case #Optional.none!enumelt: none
+some:
+  unreachable
+none:
+  unreachable
+}
+
+sil_vtable AClass {}

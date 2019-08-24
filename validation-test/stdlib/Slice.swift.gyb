@@ -1,0 +1,142 @@
+// -*- swift -*-
+// RUN: %target-run-simple-swiftgyb
+// REQUIRES: executable_test
+
+%{
+from gyb_stdlib_support import (
+    TRAVERSALS,
+    collectionTypeName
+)
+}%
+
+import StdlibUnittest
+import StdlibCollectionUnittest
+
+
+/// Reference-type collection for testing the `base` property.
+class ReferenceCollection : RandomAccessCollection {
+  typealias Index = Int
+
+  var startIndex: Int {
+    return 0
+  }
+
+  var endIndex: Int {
+    return 1
+  }
+
+  subscript(index: Int) -> String {
+    return ""
+  }
+
+  func index(after i: Int) -> Int {
+    return 1
+  }
+
+  func index(before i: Int) -> Int {
+    return 0
+  }
+}
+
+var SliceTests = TestSuite("Collection")
+
+//===----------------------------------------------------------------------===//
+// Slice<Base>
+//===----------------------------------------------------------------------===//
+
+% for Traversal in TRAVERSALS:
+%   for Mutable in [ False, True ]:
+%     for RangeReplaceable in [ False, True ]:
+%       Collection = 'Minimal' + collectionTypeName(traversal=Traversal, mutable=Mutable, rangeReplaceable=RangeReplaceable)
+
+SliceTests.test("${Collection}.Slice/AssociatedTypes") {
+ do {
+    typealias Collection = ${Collection}<OpaqueValue<Int>>
+    typealias CollectionSlice = Slice<Collection>
+    expectSliceType(CollectionSlice.self)
+    expectCollectionAssociatedTypes(
+      collectionType: CollectionSlice.self,
+      iteratorType: IndexingIterator<CollectionSlice>.self,
+      subSequenceType: CollectionSlice.self,
+      indexType: MinimalIndex.self,
+      indicesType: Collection.Indices.self)
+  }
+
+  func checkStaticTypealiases1<Base : Collection>(_: Base) {
+    expectEqualType(Base.Index.self, Slice<Base>.Index.self)
+  }
+
+  func checkStaticTypealiases2<
+    Base : MutableCollection
+  >(_: Base) {
+    expectEqualType(Base.Index.self, Slice<Base>.Index.self)
+  }
+}
+
+SliceTests.test("${Collection}.Slice/init(base:bounds:)") {
+  for test in subscriptRangeTests {
+    let base = ${Collection}(elements: test.collection)
+    var slice = Slice(base: base, bounds: test.bounds(in: base))
+    expectType(Slice<${Collection}<OpaqueValue<Int>>>.self, &slice)
+    expectType(${Collection}<OpaqueValue<Int>>.SubSequence.self, &slice)
+
+    checkCollection(
+      test.expected,
+      slice,
+      stackTrace: SourceLocStack().with(test.loc))
+      { $0.value == $1.value }
+  }
+}
+
+% if RangeReplaceable == False and Mutable == False:
+SliceTests.test("${Collection}.Slice/baseProperty") {
+  let referenceCollection = ReferenceCollection()
+  let testSlice = Slice(base: referenceCollection, bounds: 0..<1)
+  expectTrue(testSlice.base === referenceCollection)
+}
+% end
+
+SliceTests.test("${Collection}.Slice.{startIndex,endIndex}") {
+  for test in subscriptRangeTests {
+    let c = ${Collection}(elements: test.collection)
+    let bounds = test.bounds(in: c)
+    var slice = Slice(base: c, bounds: bounds)
+    expectType(Slice<${Collection}<OpaqueValue<Int>>>.self, &slice)
+    expectType(${Collection}<OpaqueValue<Int>>.SubSequence.self, &slice)
+
+    expectEqual(bounds.lowerBound, slice.startIndex)
+    expectEqual(bounds.upperBound, slice.endIndex)
+  }
+}
+
+%     end
+%   end
+% end
+
+//===----------------------------------------------------------------------===//
+// MutableSlice<Base>
+//===----------------------------------------------------------------------===//
+
+/*
+FIXME: uncomment this test when the following bug is fixed:
+
+<rdar://problem/21935030> Recast Slice and MutableSlice in terms of Collection
+and MutableCollection
+
+extension MutableSlice {
+  func _checkBaseSubSequenceElementIsElement() {
+      Element.self,
+      Iterator.Element.self)
+    expectEqualType(
+      Element.self,
+      Iterator.Element.self,
+      Base.Iterator.Element.self)
+    expectEqualType(
+      Element.self,
+      Iterator.Element.self,
+      Base.SubSequence.Iterator.Element.self)
+  }
+}
+*/
+
+runAllTests()

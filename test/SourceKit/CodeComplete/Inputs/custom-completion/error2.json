@@ -1,0 +1,4 @@
+{
+  key.request: source.request.codecomplete.setcustom,
+  key.results: {}
+}

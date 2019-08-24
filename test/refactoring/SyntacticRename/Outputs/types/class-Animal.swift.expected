@@ -1,0 +1,54 @@
+class /*/*class-Foo:unknown*/Foo in comment*/ /*class-Foo:def*/Foo {}
+protocol /*protocol-Proto:def*/Proto {
+	associatedtype /*associated-Item:def*/Item
+}
+class /*class-Bar:def*/Bar : /*class-Foo*/Foo, /*protocol-Proto*/Proto {
+	typealias /*associated-Item:def*/Item = Int
+}
+
+let x: /*class-Bar*/Bar = /*class-Bar*/Bar()
+
+func foo(a: /*class-Foo*/Foo, b: /*class-Bar*/Bar, c: inout /*class-Bar*/Bar) -> /*class-Foo*/Foo {
+	return /*class-Bar*/Bar()
+}
+
+typealias /*alias-FuncType:def*/FuncType = (/*class-Foo*/Foo, /*class-Bar*/Bar) -> /*class-Bar*/Bar
+var example: /*alias-FuncType*/FuncType = {a, b in x}
+
+func bar<X:/*protocol-Proto*/Proto, Y>(a: X, b: Y) {}
+
+class /*class-Animal:def*/Gonzo</*generic-T:def*/T, /*generic-U:def*/U> where /*generic-U*/U:/*protocol-Proto*/Proto, /*generic-U*/U . /*associated-Item*/Item == Int {}
+
+var anAnimal: /*class-Animal*/Gonzo<Int, /*class-Bar*/Bar> = /*class-Animal*/Gonzo()
+extension /*class-Animal:def*/Gonzo {
+	func boo(a: /*generic-T*/T, b: /*generic-U*/U) {}
+}
+
+enum /*enum-Barcode:def*/Barcode {
+	case upc(Int, Int, Int, Int)
+	case /*case-qrCode:def*/qrCode(code: String)
+	case /*case-other:def*/other(Int)
+	case /*case-another:def*/another
+}
+var barCode: /*enum-Barcode*/Barcode = /*enum-Barcode*/Barcode.upc(1, 1, 1, 1)
+barCode = . /*case-qrCode:call*/qrCode(code: "ABCDEFG")
+barCode = /*enum-Barcode*/Barcode . /*case-qrCode:call*/qrCode(code: "J")
+barCode = . /*case-other:call*/other(2)
+barCode = . /*case-another*/another
+
+switch barCode {
+case .upc(let a, let b, let c, let d):
+	print(a)
+case . /*case-qrCode*/qrCode(let s):
+	print(s)
+case . /*case-another*/another:
+	print(1)
+case . /*case-other*/other(let x):
+	print(x)
+}
+
+enum /*enum-WithValue:def*/WithValue: Int {
+	case /*case-one:def*/one = 1
+}
+var _ = /*enum-WithValue*/WithValue . /*case-one*/one
+

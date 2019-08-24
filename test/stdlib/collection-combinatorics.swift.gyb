@@ -1,0 +1,70 @@
+// RUN: %empty-directory(%t)
+// RUN: %gyb %s > %t/collection-combinatorics.swift
+// RUN: %target-swift-frontend -typecheck -verify %t/collection-combinatorics.swift
+
+// It should be possible to conform to any combination of
+// (1 + RangeReplaceable) * (1 + Bidirectional + RandomAccess) * (1 + Mutable)
+// Collection and get reasonable default implementations for slicing
+// operations from the standard library.
+
+struct CustomIndex : Comparable {
+  static func <(lhs: CustomIndex, rhs: CustomIndex) -> Bool {
+    return false
+  }
+  static func ==(lhs: CustomIndex, rhs: CustomIndex) -> Bool {
+    return false
+  }
+  static var min: CustomIndex { return CustomIndex() }
+  static var max: CustomIndex { return CustomIndex() }
+}
+
+% for mutable in ['', 'Mutable']:
+%   for rangeReplaceable in ['', 'RangeReplaceable']:
+%     for capability in ['', 'Bidirectional', 'RandomAccess']:
+%       for index in ['Int', 'CustomIndex']:
+%         indexLabel = 'Custom' if index == 'CustomIndex' else ''
+
+/// A rump implementation of Collection.
+struct ${indexLabel}${mutable}${rangeReplaceable}${capability}Butt
+    : ${mutable}Collection
+%         if rangeReplaceable:
+      , ${rangeReplaceable}Collection
+%         end
+%         if capability:
+      , ${capability}Collection
+%         end
+{
+  subscript(i: ${index}) -> Int {
+    get { return 0 }
+%         if mutable:
+    set { }
+%         end
+  }
+
+%         if capability:
+  func index(before i: ${index}) -> ${index} {
+    return i
+  }
+%         end
+  func index(after i: ${index}) -> ${index} {
+    return i
+  }
+
+  var startIndex: ${index} { return .min }
+  var endIndex: ${index} { return .max }
+
+%         if rangeReplaceable:
+  init() {}
+
+  mutating func replaceSubrange<C: Collection>(_: Range<${index}>, with: C)
+    where C.Iterator.Element == Int
+  {}
+%         end
+
+%         if capability == 'RandomAccess' and index == 'CustomIndex':
+  // This type alias is required for some random-access collections with
+  // a custom index type -- without it the default implementation for
+  // `indices` doesn't attach.
+  typealias Indices = DefaultIndices<${indexLabel}${mutable}${rangeReplaceable}${capability}Butt>
+%         end
+}

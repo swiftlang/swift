@@ -1,0 +1,21 @@
+silopt_register_sources(
+  CFG.cpp
+  CanonicalizeInstruction.cpp
+  CastOptimizer.cpp
+  CheckedCastBrJumpThreading.cpp
+  ConstantFolding.cpp
+  ConstExpr.cpp
+  Devirtualize.cpp
+  Existential.cpp
+  GenericCloner.cpp
+  Generics.cpp
+  LoadStoreOptUtils.cpp
+  Local.cpp
+  LoopUtils.cpp
+  OptimizerStatsUtils.cpp
+  PerformanceInlinerUtils.cpp
+  SILInliner.cpp
+  SILSSAUpdater.cpp
+  SpecializationMangler.cpp
+  StackNesting.cpp
+)

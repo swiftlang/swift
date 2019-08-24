@@ -1,0 +1,22 @@
+import Swift
+
+@_silgen_name("public_func") public func public_func<T>() -> T?
+
+
+sil public_external @impl_func : $@convention(thin) <T> () -> @out Optional<T>
+
+sil shared [serialized] [ossa] @shared_func : $@convention(thin) <T> () -> @out Optional<T> {
+bb0(%0 : $*Optional<T>):
+  %1 = function_ref @impl_func : $@convention(thin) <τ_0_0> () -> @out Optional<τ_0_0> // user: %2
+  %2 = apply %1<T>(%0) : $@convention(thin) <τ_0_0> () -> @out Optional<τ_0_0>
+  %3 = tuple ()                                   // user: %4
+  return %3 : $()                                 // id: %4
+}
+
+sil public [serialized] [ossa] @public_func : $@convention(thin) <T> () -> @out Optional<T> {
+bb0(%0 : $*Optional<T>):
+  %1 = function_ref @shared_func : $@convention(thin) <τ_0_0> () -> @out Optional<τ_0_0> // user: %2
+  %2 = apply %1<T>(%0) : $@convention(thin) <τ_0_0> () -> @out Optional<τ_0_0>
+  %3 = tuple ()                                   // user: %4
+  return %3 : $()                                 // id: %4
+}

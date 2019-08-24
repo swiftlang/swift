@@ -1,0 +1,15 @@
+// RUN: %target-sil-opt -sil-print-debuginfo %s | %FileCheck %s
+
+// CHECK: sil_scope 1 { loc "foo.sil":12:34 parent @foo : $@convention(thin) () -> () }
+          sil_scope 1 { loc "foo.sil":12:34 parent @foo : $@convention(thin) () -> () }
+// CHECK: sil_scope 2 { loc "foo.sil":12:34 parent 1 }
+          sil_scope 2 { loc "foo.sil":12:34 parent 1 }
+
+// foo
+sil @foo : $@convention(thin) () -> () {
+bb0:
+  // CHECK: mark_function_escape undef : $*(), loc "undef.sil":3:4, scope 1
+  mark_function_escape undef : $*(), loc "undef.sil":3:4, scope 1
+  // CHECK: return undef : $(), loc {{.*}}, scope 2 // id: %1
+  return undef : $(), scope 2 // id: %1
+}

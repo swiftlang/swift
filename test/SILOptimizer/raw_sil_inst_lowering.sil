@@ -1,0 +1,79 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -raw-sil-inst-lowering | %FileCheck %s
+
+sil_stage raw
+
+import Builtin
+import Swift
+
+class SomeClass {}
+
+// CHECK-LABEL: sil [ossa] @non_box_assign_trivial
+sil [ossa] @non_box_assign_trivial : $@convention(thin) (@inout Bool, Bool) -> () {
+bb0(%0 : $*Bool, %1 : $Bool):
+  // This is parsed with having an unknown init kind which is lowered as
+  // assign [assign], but since this is trivial it's treated as assign [init].
+  //
+  // CHECK: store %1 to [trivial] %0 : $*Bool
+  assign %1 to %0 : $*Bool
+
+  %9 = tuple ()
+  // CHECK: return
+  return %9 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @non_box_assign
+sil [ossa] @non_box_assign : $@convention(thin) (@inout SomeClass, @owned SomeClass) -> () {
+bb0(%0 : $*SomeClass, %1 : @owned $SomeClass):
+  // This is parsed with having an unknown init kind which is lowered as
+  // assign [assign].
+  //
+  // CHECK: store %1 to [assign] %0 : $*SomeClass
+  assign %1 to %0 : $*SomeClass
+
+  %9 = tuple ()
+  // CHECK: return
+  return %9 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @non_box_assign_init
+sil [ossa] @non_box_assign_init : $@convention(thin) (@owned SomeClass) -> @out SomeClass {
+bb0(%0 : $*SomeClass, %1 : @owned $SomeClass):
+  // Explicitly check that assign [init] is treated as store [init]
+  //
+  // CHECK: store %1 to [init] %0 : $*SomeClass
+  assign %1 to [init] %0 : $*SomeClass
+
+  %9 = tuple ()
+  // CHECK: return
+  return %9 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @non_box_assign_reassign
+sil [ossa] @non_box_assign_reassign : $@convention(thin) (@inout SomeClass, @owned SomeClass) -> () {
+bb0(%0 : $*SomeClass, %1 : @owned $SomeClass):
+  // Explicitly check that assign [reassign] is treated as store [assign]
+  //
+  // CHECK: store %1 to [assign] %0 : $*SomeClass
+  assign %1 to [reassign] %0 : $*SomeClass
+
+  %9 = tuple ()
+  // CHECK: return
+  return %9 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @non_box_assign_reinit
+sil [ossa] @non_box_assign_reinit : $@convention(thin) (@inout SomeClass, @owned SomeClass) -> () {
+bb0(%0 : $*SomeClass, %1 : @owned $SomeClass):
+  // Explicitly check that assign [reinit] is treated as load [take], store [init],
+  // and dealloc_partial_ref
+  //
+  // CHECK: [[LOAD:%[0-9]+]] = load [take] %0 : $*SomeClass
+  // CHECK-NEXT: store %1 to [init] %0 : $*SomeClass
+  // CHECK-NEXT: [[METATYPE:%[0-9]+]] = value_metatype $@thick SomeClass.Type, [[LOAD]] : $SomeClass
+  // CHECK-NEXT: dealloc_partial_ref [[LOAD]] : $SomeClass, [[METATYPE]] : $@thick SomeClass.Type
+  assign %1 to [reinit] %0 : $*SomeClass
+
+  %9 = tuple ()
+  // CHECK: return
+  return %9 : $()
+}

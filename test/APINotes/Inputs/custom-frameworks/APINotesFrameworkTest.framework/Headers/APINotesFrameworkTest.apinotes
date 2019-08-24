@@ -1,0 +1,329 @@
+Name: APINotesFrameworkTest
+Classes:
+  - Name: A
+    SwiftObjCMembers: true
+  - Name: PrintingInterference
+    Methods:
+      - Selector: 'print:'
+        MethodKind: Instance
+        SwiftName: 'printDocument(_:)'
+  - Name: PrintingRenamed
+    Methods:
+      - Selector: 'print'
+        MethodKind: Instance
+        SwiftName: 'printDocument()'
+      - Selector: 'print:'
+        MethodKind: Instance
+        SwiftName: 'printDocument(_:)'
+      - Selector: 'print:options:'
+        MethodKind: Instance
+        SwiftName: 'printDocument(_:options:)'
+      - Selector: 'print'
+        MethodKind: Class
+        SwiftName: 'printDocument()'
+      - Selector: 'print:'
+        MethodKind: Class
+        SwiftName: 'printDocument(_:)'
+      - Selector: 'print:options:'
+        MethodKind: Class
+        SwiftName: 'printDocument(_:options:)'
+  - Name: TestProperties
+    Properties:
+      - Name: accessorsOnly
+        PropertyKind:    Instance
+        SwiftImportAsAccessors: true
+      - Name: accessorsOnlyForClass
+        PropertyKind:    Class
+        SwiftImportAsAccessors: true
+      - Name: accessorsOnlyRO
+        PropertyKind:    Instance
+        SwiftImportAsAccessors: true
+      - Name: accessorsOnlyWeak
+        PropertyKind:    Instance
+        SwiftImportAsAccessors: true
+      - Name: accessorsOnlyExceptInVersion4
+        PropertyKind:    Instance
+        SwiftImportAsAccessors: true
+      - Name: accessorsOnlyForClassExceptInVersion4
+        PropertyKind:    Class
+        SwiftImportAsAccessors: true
+      - Name: accessorsOnlyWithNewType
+        PropertyKind:    Instance
+        SwiftImportAsAccessors: true
+        Type: '__kindof Base * _Nonnull'
+  - Name: TypeChanges
+    Methods:
+      - Selector: 'methodWithA:'
+        MethodKind: Instance
+        ResultType: 'A * _Nonnull'
+        Parameters:
+          - Position: 0
+            Type: 'A * _Nullable'
+Functions:
+  - Name: jumpToLocation
+    SwiftName: 'jumpTo(x:y:z:)'
+Tags:
+  - Name: InnerInSwift5
+    SwiftName: Outer.Inner
+Globals:
+  - Name: multiVersionedGlobal34Notes
+    SwiftName: multiVersionedGlobal34Notes_NEW
+  - Name: multiVersionedGlobal34Both
+    SwiftName: multiVersionedGlobal34Both_NEW
+  - Name: multiVersionedGlobal345Notes
+    SwiftName: multiVersionedGlobal345Notes_NEW
+  - Name: multiVersionedGlobal345Both
+    SwiftName: multiVersionedGlobal345Both_NEW
+  - Name: multiVersionedGlobal4Notes
+    SwiftName: multiVersionedGlobal4Notes_NEW
+  - Name: multiVersionedGlobal4Both
+    SwiftName: multiVersionedGlobal4Both_NEW
+  - Name: multiVersionedGlobal45Notes
+    SwiftName: multiVersionedGlobal45Notes_NEW
+  - Name: multiVersionedGlobal45Both
+    SwiftName: multiVersionedGlobal45Both_NEW
+SwiftVersions:
+  - Version: 3.0
+    Globals:
+      - Name: multiVersionedGlobal34
+        SwiftName: multiVersionedGlobal34_3
+      - Name: multiVersionedGlobal34Header
+        SwiftName: multiVersionedGlobal34Header_3
+      - Name: multiVersionedGlobal34Notes
+        SwiftName: multiVersionedGlobal34Notes_3
+      - Name: multiVersionedGlobal34Both
+        SwiftName: multiVersionedGlobal34Both_3
+      - Name: multiVersionedGlobal345
+        SwiftName: multiVersionedGlobal345_3
+      - Name: multiVersionedGlobal345Header
+        SwiftName: multiVersionedGlobal345Header_3
+      - Name: multiVersionedGlobal345Notes
+        SwiftName: multiVersionedGlobal345Notes_3
+      - Name: multiVersionedGlobal345Both
+        SwiftName: multiVersionedGlobal345Both_3
+  - Version: 5
+    Globals:
+      - Name: multiVersionedGlobal345
+        SwiftName: multiVersionedGlobal345_5
+      - Name: multiVersionedGlobal345Header
+        SwiftName: multiVersionedGlobal345Header_5
+      - Name: multiVersionedGlobal345Notes
+        SwiftName: multiVersionedGlobal345Notes_5
+      - Name: multiVersionedGlobal345Both
+        SwiftName: multiVersionedGlobal345Both_5
+      - Name: multiVersionedGlobal45
+        SwiftName: multiVersionedGlobal45_5
+      - Name: multiVersionedGlobal45Header
+        SwiftName: multiVersionedGlobal45Header_5
+      - Name: multiVersionedGlobal45Notes
+        SwiftName: multiVersionedGlobal45Notes_5
+      - Name: multiVersionedGlobal45Both
+        SwiftName: multiVersionedGlobal45Both_5
+  - Version: 4 # Versions are deliberately ordered as "3, 5, 4, 4.2" to catch bugs.
+    Classes:
+      - Name: ClassWithManyRenames
+        Methods:
+          - Selector: "classWithManyRenamesForInt:"
+            MethodKind: Class
+            SwiftName: "init(swift4Factory:)"
+          - Selector: "initWithBoolean:"
+            MethodKind: Instance
+            SwiftName: "init(swift4Boolean:)"
+          - Selector: "doImportantThings"
+            MethodKind: Instance
+            SwiftName: "swift4DoImportantThings()"
+        Properties:
+          - Name: "importantClassProperty"
+            PropertyKind: Class
+            SwiftName: "swift4ClassProperty"
+          - Name: "importantInstanceProperty"
+            PropertyKind: Instance
+            SwiftName: "swift4InstanceProperty"
+      - Name: NewlyGenericSub
+        SwiftImportAsNonGeneric: true
+      - Name: PrintingInterference
+        Methods:
+          - Selector: 'print:'
+            MethodKind: Instance
+            SwiftName: 'print(_:)'
+      - Name: PrintingRenamed
+        Methods:
+          - Selector: 'print'
+            MethodKind: Instance
+            SwiftName: 'print()'
+          - Selector: 'print:'
+            MethodKind: Instance
+            SwiftName: 'print(_:)'
+          - Selector: 'print:options:'
+            MethodKind: Instance
+            SwiftName: 'print(_:options:)'
+          - Selector: 'print'
+            MethodKind: Class
+            SwiftName: 'print()'
+          - Selector: 'print:'
+            MethodKind: Class
+            SwiftName: 'print(_:)'
+          - Selector: 'print:options:'
+            MethodKind: Class
+            SwiftName: 'print(_:options:)'
+      - Name: RenamedGeneric
+        SwiftName: OldRenamedGeneric
+      - Name: TestProperties
+        Methods:
+          - Selector: accessorsOnlyRenamedRetyped
+            MethodKind: Instance
+            SwiftName: 'renamedAndRetyped()'
+            ResultType: 'id _Nonnull'
+          - Selector: 'setAccessorsOnlyRenamedRetyped:'
+            MethodKind: Instance
+            SwiftName: 'setRenamedAndRetyped(_:)'
+            Parameters:
+              - Position: 0
+                Type: 'id _Nullable'
+          - Selector: accessorsOnlyRenamedRetypedClass
+            MethodKind: Class
+            SwiftName: 'renamedAndRetypedClass()'
+            ResultType: 'id _Nonnull'
+          - Selector: 'setAccessorsOnlyRenamedRetypedClass:'
+            MethodKind: Class
+            SwiftName: 'setRenamedAndRetypedClass(_:)'
+            Parameters:
+              - Position: 0
+                Type: 'id _Nullable'
+        Properties:
+          - Name: accessorsOnlyInVersion4
+            PropertyKind:    Instance
+            SwiftImportAsAccessors: true
+          - Name: accessorsOnlyForClassInVersion4
+            PropertyKind:    Class
+            SwiftImportAsAccessors: true
+          - Name: accessorsOnlyExceptInVersion4
+            PropertyKind:    Instance
+            SwiftImportAsAccessors: false
+          - Name: accessorsOnlyForClassExceptInVersion4
+            PropertyKind:    Class
+            SwiftImportAsAccessors: false
+          - Name: accessorsOnlyRenamedRetyped
+            PropertyKind:    Instance
+            SwiftImportAsAccessors: true
+          - Name: accessorsOnlyRenamedRetypedClass
+            PropertyKind:    Class
+            SwiftImportAsAccessors: true
+    Protocols:
+      - Name: ProtoWithManyRenames
+        Methods:
+          - Selector: "initWithBoolean:"
+            MethodKind: Instance
+            SwiftName: "init(swift4Boolean:)"
+          - Selector: "doImportantThings"
+            MethodKind: Instance
+            SwiftName: "swift4DoImportantThings()"
+        Properties:
+          - Name: "importantClassProperty"
+            PropertyKind: Class
+            SwiftName: "swift4ClassProperty"
+      - Name: ProtoWithVersionedUnavailableMember
+        Methods:
+          - Selector: requirement
+            MethodKind: Instance
+            ResultType: 'ForwardClass * _Nullable'
+    Tags:
+      - Name: InnerInSwift5
+        SwiftName: InnerInSwift5
+      - Name: NormallyChangedOriginalWrapper
+        SwiftName: NormallyChangedButSpecialInSwift4Wrapper
+      - Name: NormallyUnchangedWrapper
+        SwiftName: NormallyUnchangedButChangedInSwift4Wrapper
+      - Name: SomeCStruct
+        SwiftName: ImportantCStruct
+    Enumerators:
+      - Name: AnonymousEnumRenamed
+        SwiftName: AnonymousEnumRenamedSwift4
+      - Name: UnknownEnumRenamed
+        SwiftName: UnknownEnumRenamedSwift4
+      - Name: TrueEnumRenamed
+        SwiftName: renamedSwift4
+      - Name: TrueEnumAliasRenamed
+        SwiftName: aliasRenamedSwift4
+      - Name: OptionyEnumRenamed
+        SwiftName: renamedSwift4
+    Typedefs:
+      - Name: SomeCAlias
+        SwiftName: ImportantCAlias
+    Functions:
+      - Name: acceptDoublePointer
+        SwiftName: 'acceptPointer(_:)'
+        Nullability: [ O ]
+      - Name: normallyUnchanged
+        SwiftName: normallyUnchangedButChangedInSwift4()
+      - Name: normallyChangedOriginal
+        SwiftName: normallyChangedButSpecialInSwift4()
+    Globals:
+      - Name: multiVersionedGlobal34
+        SwiftName: multiVersionedGlobal34_4
+      - Name: multiVersionedGlobal34Header
+        SwiftName: multiVersionedGlobal34Header_4
+      - Name: multiVersionedGlobal34Notes
+        SwiftName: multiVersionedGlobal34Notes_4
+      - Name: multiVersionedGlobal34Both
+        SwiftName: multiVersionedGlobal34Both_4
+      - Name: multiVersionedGlobal345
+        SwiftName: multiVersionedGlobal345_4
+      - Name: multiVersionedGlobal345Header
+        SwiftName: multiVersionedGlobal345Header_4
+      - Name: multiVersionedGlobal345Notes
+        SwiftName: multiVersionedGlobal345Notes_4
+      - Name: multiVersionedGlobal345Both
+        SwiftName: multiVersionedGlobal345Both_4
+      - Name: multiVersionedGlobal4
+        SwiftName: multiVersionedGlobal4_4
+      - Name: multiVersionedGlobal4Header
+        SwiftName: multiVersionedGlobal4Header_4
+      - Name: multiVersionedGlobal4Notes
+        SwiftName: multiVersionedGlobal4Notes_4
+      - Name: multiVersionedGlobal4Both
+        SwiftName: multiVersionedGlobal4Both_4
+      - Name: multiVersionedGlobal45
+        SwiftName: multiVersionedGlobal45_4
+      - Name: multiVersionedGlobal45Header
+        SwiftName: multiVersionedGlobal45Header_4
+      - Name: multiVersionedGlobal45Notes
+        SwiftName: multiVersionedGlobal45Notes_4
+      - Name: multiVersionedGlobal45Both
+        SwiftName: multiVersionedGlobal45Both_4
+  - Version: 4.2
+    Globals:
+      - Name: multiVersionedGlobal34
+        SwiftName: multiVersionedGlobal34_4_2
+      - Name: multiVersionedGlobal34Header
+        SwiftName: multiVersionedGlobal34Header_4_2
+      - Name: multiVersionedGlobal34Notes
+        SwiftName: multiVersionedGlobal34Notes_4_2
+      - Name: multiVersionedGlobal34Both
+        SwiftName: multiVersionedGlobal34Both_4_2
+      - Name: multiVersionedGlobal345
+        SwiftName: multiVersionedGlobal345_4_2
+      - Name: multiVersionedGlobal345Header
+        SwiftName: multiVersionedGlobal345Header_4_2
+      - Name: multiVersionedGlobal345Notes
+        SwiftName: multiVersionedGlobal345Notes_4_2
+      - Name: multiVersionedGlobal345Both
+        SwiftName: multiVersionedGlobal345Both_4_2
+      - Name: multiVersionedGlobal4
+        SwiftName: multiVersionedGlobal4_4_2
+      - Name: multiVersionedGlobal4Header
+        SwiftName: multiVersionedGlobal4Header_4_2
+      - Name: multiVersionedGlobal4Notes
+        SwiftName: multiVersionedGlobal4Notes_4_2
+      - Name: multiVersionedGlobal4Both
+        SwiftName: multiVersionedGlobal4Both_4_2
+      - Name: multiVersionedGlobal45
+        SwiftName: multiVersionedGlobal45_4_2
+      - Name: multiVersionedGlobal45Header
+        SwiftName: multiVersionedGlobal45Header_4_2
+      - Name: multiVersionedGlobal45Notes
+        SwiftName: multiVersionedGlobal45Notes_4_2
+      - Name: multiVersionedGlobal45Both
+        SwiftName: multiVersionedGlobal45Both_4_2
+      - Name: multiVersionedGlobal34_4_2
+        SwiftName: multiVersionedGlobal34_4_2_not_5

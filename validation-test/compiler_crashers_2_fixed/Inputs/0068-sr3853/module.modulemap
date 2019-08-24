@@ -1,0 +1,4 @@
+module BaseLib {
+  header "BaseLib.h"
+  export *
+}

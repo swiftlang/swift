@@ -1,0 +1,2 @@
+// RUN: not %target-sil-opt %s
+@objc protocol P{func t throw

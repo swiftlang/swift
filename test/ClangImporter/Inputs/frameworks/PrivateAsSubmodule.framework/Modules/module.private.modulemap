@@ -1,0 +1,7 @@
+explicit module PrivateAsSubmodule.Private {
+  umbrella header "PrivateAsSubmodule_Priv.h"
+  export *
+  module * {
+    export *
+  }
+}

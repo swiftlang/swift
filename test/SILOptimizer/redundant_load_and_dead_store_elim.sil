@@ -1,0 +1,201 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -redundant-load-elim -dead-store-elim | %FileCheck %s
+
+// NOTE, the order redundant-load and dead-store are ran is important. we have a pass dependence for some
+// of the tests to work.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+struct A {
+  var i : Builtin.Int32
+}
+
+struct AA {
+  var a : A
+  var i : Builtin.Int32
+}
+
+class B {
+  var i : Builtin.Int32
+  init()
+}
+
+struct X {
+  var c : B
+  init()
+}
+
+enum Optional<T> {
+  case none
+  case some(T)
+}
+
+class E : B { }
+
+struct C {
+  var i : Builtin.Int16
+}
+
+struct D {
+  var p : Builtin.RawPointer
+}
+
+sil @use : $@convention(thin) (Builtin.Int32) -> ()
+sil @use_a : $@convention(thin) (@in A) -> ()
+sil @escaped_a_ptr : $@convention(thin) () -> @out A
+sil @escaped_a : $@convention(thin) () -> Builtin.RawPointer
+
+
+struct Agg2 {
+  var t : (Builtin.Int64, Builtin.Int32)
+}
+
+struct Agg1 {
+  var a : Agg2
+}
+
+struct Wrapper {
+  var value : Builtin.Int32
+}
+
+
+
+sil_global @test_global : $Int64
+
+/// Make sure we don't ignore aliasing stores.
+//
+// CHECK-LABEL: sil @aliasing_store
+// CHECK: {{store }}
+// CHECK-NOT: {{store }}
+// CHECK-NOT: {{load }}
+// CHECK: return
+sil @aliasing_store : $@convention(thin) (@inout A) -> () {
+bb0(%0: $*A):
+  %1 = alloc_stack $A
+  %2 = integer_literal $Builtin.Int32, 0
+  %3 = struct $A (%2 : $Builtin.Int32)
+  store %3 to %1 : $*A
+  %4 = struct_element_addr %1 : $*A, #A.i
+  %5 = integer_literal $Builtin.Int32, 1
+  store  %5 to %4 : $*Builtin.Int32
+  %6 = load %1 : $*A
+  store %6 to %0: $*A
+  dealloc_stack %1 : $*A
+  %7 = tuple()
+  return %7 : $()
+}
+
+
+
+// Test that the optimization does not crash when deleting a previous
+// dead store in another block.
+// In this case deleting 'store %32 to %11' when visiting 'store %22 to %11'.
+
+// CHECK-LABEL: sil @testit
+// CHECK: {{^bb1:}}
+// CHECK-NOT: {{load  }}
+// CHECK: {{^bb2(.*):}}
+// CHECK-NOT: {{store }}
+// CHECK: bb3:
+sil @testit : $@convention(thin) () -> () {
+bb0:
+  %11 = global_addr @test_global : $*Int64
+  %12 = integer_literal $Builtin.Int64, 0
+  %13 = struct $Int64 (%12 : $Builtin.Int64)
+  store %13 to %11 : $*Int64
+  %15 = integer_literal $Builtin.Int64, 10
+  %16 = integer_literal $Builtin.Int1, -1
+  %18 = struct_element_addr %11 : $*Int64, #Int64._value
+  br bb2(%12 : $Builtin.Int64)
+
+bb1:
+  %21 = load %18 : $*Builtin.Int64
+  %22 = struct $Int64 (%21 : $Builtin.Int64)
+  store %22 to %11 : $*Int64
+  %r = tuple ()
+  return %r : $()
+
+bb2(%25 : $Builtin.Int64):
+  %28 = load %18 : $*Builtin.Int64
+  %29 = builtin "sadd_with_overflow_Int64"(%28 : $Builtin.Int64, %25 : $Builtin.Int64, %16 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %30 = tuple_extract %29 : $(Builtin.Int64, Builtin.Int1), 0
+  %32 = struct $Int64 (%30 : $Builtin.Int64)
+  store %32 to %11 : $*Int64
+  %35 = builtin "cmp_eq_Int64"(%30 : $Builtin.Int64, %15 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %35, bb1, bb3
+
+bb3:
+  br bb2(%30 : $Builtin.Int64)
+
+}
+
+// CHECK-LABEL: sil @dead_store_removal_not_stopped_by_nonaliasing_readwrites : $@convention(thin) (@inout Builtin.Int32) -> (Builtin.Int32, Builtin.Int32, Builtin.Int32) {
+// CHECK: bb0([[INPUT_PTR1:%[0-9]+]] : $*Builtin.Int32):
+// CHECK: {{load }}
+// CHECK-NOT: {{store }}
+// CHECK: return
+sil @dead_store_removal_not_stopped_by_nonaliasing_readwrites : $@convention(thin) (@inout Builtin.Int32) -> (Builtin.Int32, Builtin.Int32, Builtin.Int32) {
+bb0(%0 : $*Builtin.Int32):
+  %1 = alloc_stack $Builtin.Int32
+  %2 = alloc_stack $Builtin.Int32
+  %3 = integer_literal $Builtin.Int32, 32
+  store %3 to %2 : $*Builtin.Int32
+  %4 = load %0 : $*Builtin.Int32
+  store %3 to %1 : $*Builtin.Int32
+  store %3 to %2 : $*Builtin.Int32
+  %5 = load %0 : $*Builtin.Int32
+  store %3 to %1 : $*Builtin.Int32
+  %6 = load %2 : $*Builtin.Int32
+  dealloc_stack %2 : $*Builtin.Int32
+  dealloc_stack %1 : $*Builtin.Int32
+  %7 = tuple(%4 : $Builtin.Int32, %5 : $Builtin.Int32, %6 : $Builtin.Int32)
+  return %7 : $(Builtin.Int32, Builtin.Int32, Builtin.Int32)
+}
+
+
+// Check that we can perform partial load forwarding.
+// CHECK-LABEL: sil @forward_partial_aliasing_loads : $@convention(thin) (@in AA) -> () {
+// CHECK: bb0([[INPUT_PTR:%.*]] : $*AA):
+// CHECK: {{load }}
+// CHECK: {{load }}
+// CHECK: {{load }}
+// CHECK-NOT: {{load }}
+// CHECK: return
+sil @forward_partial_aliasing_loads : $@convention(thin) (@in AA) -> () {
+bb0(%0 : $*AA):
+  %1 = struct_element_addr %0 : $*AA, #AA.a
+  %2 = struct_element_addr %1 : $*A, #A.i
+  %3 = load %2 : $*Builtin.Int32
+
+  %4 = load %0 : $*AA
+  %5 = struct_extract %4 : $AA, #AA.a
+  %6 = struct_extract %5 : $A, #A.i
+  %7 = function_ref @use : $@convention(thin) (Builtin.Int32) -> ()
+  apply %7(%3) : $@convention(thin) (Builtin.Int32) -> ()
+  apply %7(%6) : $@convention(thin) (Builtin.Int32) -> ()
+
+  %8 = struct_extract %4 : $AA, #AA.i
+  apply %7(%8) : $@convention(thin) (Builtin.Int32) -> ()
+
+  %9 = alloc_stack $AA
+
+  %13 = load %9 : $*AA
+  %10 = struct_element_addr %9 : $*AA, #AA.a
+  %11 = struct_element_addr %10 : $*A, #A.i
+  %12 = load %11 : $*Builtin.Int32
+
+  %14 = struct_extract %13 : $AA, #AA.a
+  %15 = struct_extract %14 : $A, #A.i
+
+  apply %7(%12) : $@convention(thin) (Builtin.Int32) -> ()
+  apply %7(%15) : $@convention(thin) (Builtin.Int32) -> ()
+
+  dealloc_stack %9 : $*AA
+
+  %9999 = tuple()
+  return %9999 : $()
+}
+

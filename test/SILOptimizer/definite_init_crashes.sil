@@ -1,0 +1,133 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -definite-init -raw-sil-inst-lowering | %FileCheck %s
+
+// These are all regression tests to ensure that the memory promotion pass
+// doesn't crash.
+
+import Builtin
+
+struct Int {
+  var _value: Builtin.Int64
+}
+
+// Mixed combination of aggregate load/stores and elements.
+struct Triple {
+  var a, b, c : Int
+}
+
+// CHECK-LABEL: sil [ossa] @TripleTest
+sil [ossa] @TripleTest : $@convention(method) (Int, @inout Triple) -> Triple {
+bb0(%0 : $Int, %1 : $*Triple):
+  %4 = alloc_box $<τ_0_0> { var τ_0_0 } <Triple>
+  %4a = project_box %4 : $<τ_0_0> { var τ_0_0 } <Triple>, 0
+  %5 = load [trivial] %1 : $*Triple
+  store %5 to [trivial] %4a : $*Triple
+  %8 = struct_element_addr %4a : $*Triple, #Triple.b
+  store %0 to [trivial] %8 : $*Int
+  %10 = load [trivial] %4a : $*Triple
+  destroy_value %4 : $<τ_0_0> { var τ_0_0 } <Triple>
+  return %10 : $Triple
+}
+
+
+struct Single {
+  var a : Int
+}
+
+// CHECK-LABEL: sil [ossa] @SingleTest
+sil [ossa] @SingleTest : $@convention(method) (@inout Single, Int) -> Single {
+bb0(%0 : $*Single, %1 : $Int):
+  %4 = alloc_box $<τ_0_0> { var τ_0_0 } <Single>
+  %4a = project_box %4 : $<τ_0_0> { var τ_0_0 } <Single>, 0
+  %5 = load [trivial] %0 : $*Single
+  store %5 to [trivial] %4a : $*Single
+
+  %8 = struct_element_addr %4a : $*Single, #Single.a
+  store %1 to [trivial] %8 : $*Int
+
+  %10 = load [trivial] %4a : $*Single
+  destroy_value %4 : $<τ_0_0> { var τ_0_0 } <Single>
+  return %10 : $Single
+}
+
+class SomeClass {}
+
+enum SomeUnion {
+  case x(Int)
+  case y(SomeClass)
+}
+
+sil [ossa] @getSomeClass : $@convention(thin) (@thick SomeClass.Type) -> @owned SomeClass
+sil [ossa] @getSomeUnion : $@convention(thin) (@owned SomeClass, @thin SomeUnion.Type) -> @owned SomeUnion
+
+
+// CHECK-LABEL: sil [ossa] @test_union_release
+sil [ossa] @test_union_release : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_box $<τ_0_0> { var τ_0_0 } <SomeUnion>
+  %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <SomeUnion>, 0
+  %2 = function_ref @getSomeUnion : $@convention(thin) (@owned SomeClass, @thin SomeUnion.Type) -> @owned SomeUnion
+  %3 = metatype $@thin SomeUnion.Type
+  %4 = function_ref @getSomeClass : $@convention(thin) (@thick SomeClass.Type) -> @owned SomeClass
+  %5 = metatype $@thick SomeClass.Type
+  %6 = apply %4(%5) : $@convention(thin) (@thick SomeClass.Type) -> @owned SomeClass
+  %7 = apply %2(%6, %3) : $@convention(thin) (@owned SomeClass, @thin SomeUnion.Type) -> @owned SomeUnion
+  assign %7 to %1a : $*SomeUnion
+  destroy_value %1 : $<τ_0_0> { var τ_0_0 } <SomeUnion>
+  %10 = tuple ()
+  return %10 : $()
+}
+
+public protocol Proto {
+}
+
+protocol Error {}
+
+public struct MyErrorType : Error {}
+
+public struct NonTrivial {
+  @_hasStorage let ptr: Builtin.NativeObject
+}
+
+public struct AStruct {
+  @_hasStorage public let name: NonTrivial
+  @_hasStorage public let foobar: NonTrivial
+  @_hasStorage public let protoType: Proto.Type
+}
+
+sil @mayThrow : $@convention(thin) () -> (@owned NonTrivial, @error Error)
+
+// CHECK-LABEL: sil [ossa] @assign_of_non_primitive_object_element_type
+sil [ossa] @assign_of_non_primitive_object_element_type : $@convention(thin) (@thick Proto.Type) -> (@owned AStruct, @error Error) {
+bb0(%0 : $@thick Proto.Type):
+  %3 = alloc_stack $AStruct
+  %4 = mark_uninitialized [rootself] %3 : $*AStruct
+  %7 = function_ref @mayThrow : $@convention(thin) () -> (@owned NonTrivial, @error Error)
+  try_apply %7() : $@convention(thin) () -> (@owned NonTrivial, @error Error), normal bb1, error bb3
+
+bb1(%15 : @owned $NonTrivial):
+  %16 = struct_element_addr %4 : $*AStruct, #AStruct.foobar
+  assign %15 to %16 : $*NonTrivial
+  try_apply %7() : $@convention(thin) () -> (@owned NonTrivial, @error Error), normal bb2, error bb4
+
+bb2(%26 : @owned $NonTrivial):
+  %27 = struct_element_addr %4 : $*AStruct, #AStruct.name
+  assign %26 to %27 : $*NonTrivial
+  %29 = struct_element_addr %4 : $*AStruct, #AStruct.protoType
+  assign %0 to %29 : $*@thick Proto.Type
+  %31 = load [copy] %4 : $*AStruct
+  destroy_addr %4 : $*AStruct
+  dealloc_stack %3 : $*AStruct
+  return %31 : $AStruct
+
+bb3(%36 : @owned $Error):
+  br bb5(%36 : $Error)
+
+bb4(%38 : @owned $Error):
+  br bb5(%38 : $Error)
+
+bb5(%40 : @owned $Error):
+  destroy_addr %4 : $*AStruct
+  dealloc_stack %3 : $*AStruct
+  throw %40 : $Error
+}
+

@@ -1,0 +1,99 @@
+protocol P1 {
+  func foo()
+  func foo1()
+}
+class C1 : P1 {
+  func foo1() {}
+}
+class C2 : P1 {
+  func foo() {}
+}
+class C3 : P1 {}
+
+protocol P2 {
+	associatedtype T1
+	associatedtype T2
+	func foo1()
+}
+class C4 : P2 {}
+class C5 : P2 {
+  typealias T1 = Int
+  func foo1() {}
+}
+class C6 : P2 {
+  typealias T1 = Int
+  typealias T2 = Int
+}
+class C7 : P2 {
+  typealias T2 = Int
+  func foo1() {}
+}
+class C8 : P2 {
+  typealias T1 = Int
+  typealias T2 = Int
+  func foo1() {}
+}
+
+class C9 {}
+extension C9 : P1 {
+    func foo() {
+        <#code#>
+    }
+
+    func foo1() {
+        <#code#>
+    }
+}
+extension C9 : P2 {}
+class C10 {}
+extension C10 : P1 {
+  func foo() {}
+  func foo1() {}
+}
+extension C10 : P2 {
+  typealias T1 = Int
+  typealias T2 = Int
+  func foo1() {}
+}
+class C11 {}
+extension C11 : P1 {
+  func foo() {}
+}
+extension C11 : P2 {
+  typealias T1 = Int
+  typealias T2 = Int
+}
+class C12 {}
+extension C12 : P1 {
+  func foo1() {}
+}
+extension C12 : P2 {
+  typealias T1 = Int
+  func foo1() {}
+}
+class C13 {}
+extension C13 : P1 {
+  func foo() {}
+  func foo1() {}
+}
+extension C13 : P2 {
+  typealias T1 = Int
+  func foo1() {}
+}
+class C14 {}
+extension C14 : P1 {
+  func foo() {}
+}
+extension C14 : P2 {
+  typealias T1 = Int
+  typealias T2 = Int
+  func foo1() {}
+}
+protocol P3 {
+  func foo3()
+  func foo4()
+}
+extension C14: P3 {
+  func foo3()
+}
+

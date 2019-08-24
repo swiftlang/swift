@@ -1,0 +1,446 @@
+// RUN: %target-run-stdlib-swiftgyb
+// REQUIRES: executable_test
+
+import StdlibUnittest
+
+
+var FixedPoint = TestSuite("FixedPoint")
+
+%{
+
+import gyb
+from SwiftIntTypes import all_integer_types
+
+test_bit_patterns = [
+  0x0000000000000000,
+  0x0000000000000001,
+
+  0xffffffffffffffff,
+  0x00ffffffffffffff,
+  0x0000ffffffffffff,
+  0x000000ffffffffff,
+  0x00000000ffffffff,
+  0x0000000000ffffff,
+  0x000000000000ffff,
+  0x00000000000000ff,
+
+  0xfe123456789abcde,
+  0x00fe123456789abc,
+  0x0000fe123456789a,
+  0x000000fe12345678,
+  0x00000000fe123456,
+  0x0000000000fe1234,
+  0x000000000000fe12,
+  0x00000000000000fe,
+
+  0x7f123456789abcde,
+  0x007f123456789abc,
+  0x00007f123456789a,
+  0x0000007f12345678,
+  0x000000007f123456,
+  0x00000000007f1234,
+  0x0000000000007f12,
+  0x000000000000007f,
+]
+
+def prepare_bit_pattern(bit_pattern, dst_bits, dst_signed):
+    mask = ((1 << dst_bits) - 1)
+    dst = bit_pattern & mask
+    if not dst_signed:
+        return dst
+    if dst <= ((1 << (dst_bits - 1)) - 1):
+        return dst
+    return dst - mask - 1
+}%
+
+//===----------------------------------------------------------------------===//
+// 'Int.Stride' type
+//===----------------------------------------------------------------------===//
+
+FixedPoint.test("Integers.Stride") {
+#if arch(i386) || arch(arm)
+
+% for self_ty in all_integer_types(32):
+%   Self = self_ty.stdlib_name
+  expectEqualType(Int.self, ${Self}.Stride.self)
+% end
+
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
+
+% for self_ty in all_integer_types(64):
+%   Self = self_ty.stdlib_name
+  expectEqualType(Int.self, ${Self}.Stride.self)
+% end
+
+#else
+
+_UnimplementedError()
+
+#endif
+}
+
+//===----------------------------------------------------------------------===//
+// 'Int(truncatingIfNeeded:)' initializer
+//===----------------------------------------------------------------------===//
+
+%{
+
+truncating_bit_pattern_test_template = gyb.parse_template("truncating_bit_pattern",
+"""
+% from SwiftIntTypes import all_integer_types, should_define_truncating_bit_pattern_init
+
+% for dst_ty in all_integer_types(word_bits):
+%   Dst = dst_ty.stdlib_name
+%   for src_ty in all_integer_types(word_bits):
+%     Src = src_ty.stdlib_name
+%     if should_define_truncating_bit_pattern_init(src_ty=src_ty, dst_ty=dst_ty):
+%
+%       for bit_pattern in test_bit_patterns:
+
+FixedPoint.test("${Dst}(truncatingIfNeeded:) from ${Src}(${bit_pattern})") {
+%       input = prepare_bit_pattern(bit_pattern, src_ty.bits, src_ty.is_signed)
+  let input = get${Src}(${input})
+%       input = prepare_bit_pattern(input, src_ty.bits, False)
+  let output = get${Dst}(${Dst}(truncatingIfNeeded: input))
+  let expected = get${Dst}(${prepare_bit_pattern(input, dst_ty.bits, dst_ty.is_signed)})
+  expectEqual(expected, output)
+}
+
+%       end
+
+// This comment prevents gyb from miscompiling this file.
+// <rdar://problem/17548877> gyb miscompiles a certain for loop
+
+%     end
+
+// This comment prevents gyb from miscompiling this file.
+// <rdar://problem/17548877> gyb miscompiles a certain for loop
+
+%   end
+
+// This comment prevents gyb from miscompiling this file.
+// <rdar://problem/17548877> gyb miscompiles a certain for loop
+
+% end
+""")
+
+}%
+
+#if arch(i386) || arch(arm)
+
+  ${gyb.execute_template(
+      truncating_bit_pattern_test_template,
+      prepare_bit_pattern=prepare_bit_pattern,
+      test_bit_patterns=test_bit_patterns,
+      word_bits=32)}
+
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
+
+  ${gyb.execute_template(
+      truncating_bit_pattern_test_template,
+      prepare_bit_pattern=prepare_bit_pattern,
+      test_bit_patterns=test_bit_patterns,
+      word_bits=64)}
+
+#else
+
+_UnimplementedError()
+
+#endif
+
+//===----------------------------------------------------------------------===//
+// 'Int(bitPattern:)' initializer
+//===----------------------------------------------------------------------===//
+
+%{
+
+bit_pattern_test_template = gyb.parse_template("bit_pattern",
+"""
+% from SwiftIntTypes import all_integer_types
+
+% for dst_ty in all_integer_types(word_bits):
+%   Dst = dst_ty.stdlib_name
+
+%   # Source is the same as destination, but of different signedness.
+%   src_ty = dst_ty.get_opposite_signedness()
+%   Src = src_ty.stdlib_name
+%   for bit_pattern in test_bit_patterns:
+
+FixedPoint.test("${Dst}(bitPattern:) from ${Src}(${bit_pattern})") {
+  do {
+%     input = prepare_bit_pattern(bit_pattern, src_ty.bits, src_ty.is_signed)
+    let input = get${Src}(${input})
+%     input = prepare_bit_pattern(input, src_ty.bits, False)
+    let output = get${Dst}(${Dst}(bitPattern: input as ${Src}))
+    let expected = get${Dst}(${prepare_bit_pattern(input, dst_ty.bits, dst_ty.is_signed)})
+    expectEqual(expected, output)
+  }
+
+  do {
+%     input = prepare_bit_pattern(bit_pattern, src_ty.bits, src_ty.is_signed)
+    let input = get${Src}(${input})
+
+    // Pass a literal directly.
+    let literalOutput = get${Dst}(${Dst}(bitPattern: ${input} as ${Src}))
+    let output = get${Dst}(${Dst}(bitPattern: input))
+
+%     input = prepare_bit_pattern(input, src_ty.bits, False)
+    let expected = get${Dst}(${prepare_bit_pattern(input, dst_ty.bits, dst_ty.is_signed)})
+    expectEqual(expected, literalOutput)
+    expectEqual(expected, output)
+  }
+}
+
+%   end
+% end
+
+""")
+
+}%
+
+#if arch(i386) || arch(arm)
+
+  ${gyb.execute_template(
+      bit_pattern_test_template,
+      prepare_bit_pattern=prepare_bit_pattern,
+      test_bit_patterns=test_bit_patterns,
+      word_bits=32)}
+
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
+
+  ${gyb.execute_template(
+      bit_pattern_test_template,
+      prepare_bit_pattern=prepare_bit_pattern,
+      test_bit_patterns=test_bit_patterns,
+      word_bits=64)}
+
+#else
+
+_UnimplementedError()
+
+#endif
+
+//===----------------------------------------------------------------------===//
+// 'Int.hashValue' property
+//===----------------------------------------------------------------------===//
+
+%{
+
+hash_value_test_template = gyb.parse_template("hash_value",
+"""
+% from SwiftIntTypes import all_integer_types
+
+% for self_ty in all_integer_types(word_bits):
+%   Self = self_ty.stdlib_name
+
+FixedPoint.test("${Self}.hash(into:)") {
+
+%   for bit_pattern in test_bit_patterns:
+
+  do {
+%     input = prepare_bit_pattern(bit_pattern, self_ty.bits, self_ty.is_signed)
+    let input = get${Self}(${input})
+    var hasher = Hasher()
+    input.hash(into: &hasher)
+    let output = getInt(hasher.finalize())
+
+%     reference = prepare_bit_pattern(bit_pattern, self_ty.bits, False)
+%     if self_ty.bits == 64:
+    let expected = Hasher._hash(seed: 0, ${reference} as UInt64)
+%     else:
+    let expected = Hasher._hash(seed: 0, bytes: ${reference}, count: ${self_ty.bits / 8})
+%     end
+    expectEqual(expected, output, "input: \(input)")
+  }
+
+%   end
+
+}
+
+% end
+
+""")
+
+}%
+
+#if arch(i386) || arch(arm)
+
+  ${gyb.execute_template(
+      hash_value_test_template,
+      prepare_bit_pattern=prepare_bit_pattern,
+      test_bit_patterns=test_bit_patterns,
+      word_bits=32)}
+
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
+
+  ${gyb.execute_template(
+      hash_value_test_template,
+      prepare_bit_pattern=prepare_bit_pattern,
+      test_bit_patterns=test_bit_patterns,
+      word_bits=64)}
+
+#else
+
+_UnimplementedError()
+
+#endif
+
+//===----------------------------------------------------------------------===//
+// Misc tests that should be expanded to cover all types (FIXME)
+//===----------------------------------------------------------------------===//
+
+func testBitwiseOperationsImpl<
+  T : FixedWidthInteger & UnsignedInteger
+>(_: T.Type) {
+  let x = numericCast(0b11_1010_00) as T
+  let y = numericCast(0b10_1100_10) as T
+
+  expectEqual(0b10_1000_00, x & y)
+  expectEqual(0b11_1110_10, x | y)
+  expectEqual(0b01_0110_10, x ^ y)
+  expectEqual(0b00_0101_11, (~x) & 0xff)
+
+  let z: T = 0
+  expectEqual(x, x | z)
+  expectEqual(x, x ^ z)
+  expectEqual(z, x & z)
+  expectEqual(x, x & ~z)
+}
+
+FixedPoint.test("BitwiseOperations/UInt8") {
+  testBitwiseOperationsImpl(UInt8.self)
+}
+
+FixedPoint.test("BitwiseOperations/UInt16") {
+  testBitwiseOperationsImpl(UInt16.self)
+}
+
+FixedPoint.test("BitwiseOperations/UInt32") {
+  testBitwiseOperationsImpl(UInt32.self)
+}
+
+FixedPoint.test("BitwiseOperations/UInt64") {
+  testBitwiseOperationsImpl(UInt64.self)
+}
+
+FixedPoint.test("OverflowCheck") {
+  expectEqual((partialValue: 9, overflow: false),
+    (4 as Int8).addingReportingOverflow(5))
+  expectEqual((partialValue: -128, overflow: true),
+    (1 as Int8).addingReportingOverflow(127))
+  expectEqual((partialValue: 0, overflow: true),
+    (2 as UInt8).multipliedReportingOverflow(by: 128))
+}
+
+FixedPoint.test("String.init") {
+  let x: UInt32 = 0xdeadbeef
+#if _endian(little)
+  expectEqual("efbeadde", String(x.bigEndian, radix: 16))
+
+  let y = UInt32(bigEndian: 0xdeadbeef)
+  expectEqual("deadbeef", String(y.bigEndian, radix: 16))
+#else
+  expectEqual("efbeadde", String(x.littleEndian, radix: 16))
+
+  let y = UInt32(littleEndian: 0xdeadbeef)
+  expectEqual("deadbeef", String(y.littleEndian, radix: 16))
+#endif
+}
+
+FixedPoint.test("byteSwapped") {
+  expectEqual(288230376151711744, Int64(4).byteSwapped)
+}
+
+//===----------------------------------------------------------------------===//
+// 'Bool' type
+//===----------------------------------------------------------------------===//
+
+var BoolTestSuite = TestSuite("Bool")
+
+BoolTestSuite.test("literals") {
+  do {
+    var v = false
+    expectType(Bool.self, &v)
+  }
+  do {
+    var v = true
+    expectType(Bool.self, &v)
+  }
+}
+
+BoolTestSuite.test("init()") {
+  let v = Bool()
+  expectFalse(v)
+}
+
+BoolTestSuite.test("Boolean") {
+  do {
+    var v = false
+    expectType(Bool.self, &v)
+    expectFalse(v)
+  }
+  do {
+    var v = true
+    expectType(Bool.self, &v)
+    expectTrue(v)
+  }
+}
+
+BoolTestSuite.test("CustomStringConvertible") {
+  do {
+    let v: Bool = false
+    expectEqual("false", String(v))
+  }
+  do {
+    let v: Bool = true
+    expectEqual("true", String(v))
+  }
+}
+
+BoolTestSuite.test("Equatable,Hashable") {
+  checkHashable([false, true], equalityOracle: { $0 == $1 })
+  expectNotEqual(false.hashValue, true.hashValue)
+}
+
+BoolTestSuite.test("!") {
+  do {
+    let v: Bool = false
+    var r = !v
+    expectType(Bool.self, &r)
+    expectTrue(r)
+  }
+  do {
+    let v: Bool = true
+    var r = !v
+    expectType(Bool.self, &r)
+    expectFalse(r)
+  }
+}
+
+BoolTestSuite.test("==,!=") {
+  let v: Bool = false
+  do {
+    var r = (v == v)
+    expectType(Bool.self, &r)
+  }
+  do {
+    var r = (v != v)
+    expectType(Bool.self, &r)
+  }
+}
+
+BoolTestSuite.test("&&") {
+  expectTrue(getBool(true) && getBool(true))
+  expectFalse(getBool(true) && getBool(false))
+  expectFalse(getBool(false) && getBool(true))
+  expectFalse(getBool(false) && getBool(false))
+}
+
+BoolTestSuite.test("||") {
+  expectTrue(getBool(true) || getBool(true))
+  expectTrue(getBool(true) || getBool(false))
+  expectTrue(getBool(false) || getBool(true))
+  expectFalse(getBool(false) || getBool(false))
+}
+
+runAllTests()

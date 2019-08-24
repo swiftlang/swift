@@ -1,0 +1,4 @@
+module SomeObjCModule {
+  header "SomeObjCModule.h"
+  export *
+}

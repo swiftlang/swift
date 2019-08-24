@@ -1,0 +1,49 @@
+%# -*- mode: C++ -*-
+
+%# Ignore the following admonition; it applies to the resulting .cpp file only
+//// Automatically Generated From UnicodeExtendedGraphemeClusters.cpp.gyb.
+//// Do Not Edit Directly!
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+%{
+
+from GYBUnicodeDataUtils import GraphemeClusterBreakPropertyTable, get_extended_grapheme_cluster_rules_matrix
+
+break_table = GraphemeClusterBreakPropertyTable(unicodeGraphemeBreakPropertyFile)
+
+}%
+
+#include "swift/Basic/Unicode.h"
+
+swift::unicode::GraphemeClusterBreakProperty
+swift::unicode::getGraphemeClusterBreakProperty(uint32_t C) {
+  // FIXME: replace linear search with a trie lookup.
+
+% for start_code_point, end_code_point, value in break_table.property_value_ranges:
+%   if start_code_point == 0:
+  if (C <= ${end_code_point})
+%   else:
+  if (C >= ${start_code_point} && C <= ${end_code_point})
+%   end
+    return GraphemeClusterBreakProperty::${value};
+% end
+
+  return GraphemeClusterBreakProperty::Other;
+}
+
+const uint16_t swift::unicode::ExtendedGraphemeClusterNoBoundaryRulesMatrix[] = {
+% for row in get_extended_grapheme_cluster_rules_matrix(break_table):
+  ${row},
+% end
+};
+

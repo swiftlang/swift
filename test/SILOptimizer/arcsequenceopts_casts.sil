@@ -1,0 +1,46 @@
+// RUN: %target-sil-opt -module-name Swift -enable-sil-verify-all -arc-sequence-opts -enable-loop-arc=0 %s | %FileCheck %s
+// RUN: %target-sil-opt -module-name Swift -enable-sil-verify-all -arc-sequence-opts -enable-loop-arc=1 %s | %FileCheck %s
+
+import Builtin
+
+public enum Optional<T> {
+  case none
+  case some(T)
+}
+
+class C {
+  init()
+}
+
+// Simple test that stripping works.
+// CHECK-LABEL: sil @test1 : $@convention(thin) (C) -> () {
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+sil @test1 : $@convention(thin) (C) -> () {
+bb0(%0 : $C):
+  strong_retain %0 : $C
+  %1 = unchecked_ref_cast %0 : $C to $Builtin.NativeObject
+  strong_release %1 : $Builtin.NativeObject
+  %2 = tuple()
+  return %2 : $()
+}
+
+// We allow for matching up of retain_value, strong_release now that we
+// have unchecked_ref_cast.
+
+// CHECK-LABEL: sil @test2 : $@convention(thin) (Optional<C>, Optional<C>) -> () {
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+// CHECK-NOT: retain_value
+// CHECK-NOT: release_value
+sil @test2 : $@convention(thin) (Optional<C>, Optional<C>) -> () {
+bb0(%0 : $Optional<C>, %1 : $Optional<C>):
+  retain_value %0 : $Optional<C>
+  %2 = unchecked_ref_cast %0 : $Optional<C> to $C
+  strong_release %2 : $C
+  %3 = unchecked_ref_cast %1 : $Optional<C> to $C
+  strong_retain %3 : $C
+  release_value %1 : $Optional<C>
+  %9999 = tuple()
+  return %9999 : $()
+}

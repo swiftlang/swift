@@ -1,0 +1,77 @@
+//===--- StmtNodes.def - Swift Statement AST Metaprogramming ----*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// This file defines macros used for macro-metaprogramming with statements.
+//
+//===----------------------------------------------------------------------===//
+
+/// STMT(Id, Parent)
+///   If the statement node is not abstract, its enumerator value is
+///   StmtKind::Id.  The node's class name is Id##Stmt, and the name of
+///   its base class (in the Stmt hierarchy) is Parent.
+
+/// An abstract statement node is an abstract base class in the hierarchy;
+/// it is never a most-derived type, and it does not have an enumerator in
+/// StmtKind.
+///
+/// Most metaprograms do not care about abstract statements, so the default
+/// is to ignore them.
+#ifndef ABSTRACT_STMT
+#define ABSTRACT_STMT(Id, Parent)
+#endif
+
+/// A subclass of LabeledStmt.  Forwards to STMT by default.
+#ifndef LABELED_STMT
+#define LABELED_STMT(Id, Parent) STMT(Id, Parent)
+#endif
+
+/// A convenience for determining the range of statements.  These will always
+/// appear immediately after the last member.
+#ifndef STMT_RANGE
+#define STMT_RANGE(Id, First, Last)
+#endif
+
+#ifndef LAST_STMT
+#define LAST_STMT(Id)
+#endif
+
+STMT(Brace, Stmt)
+STMT(Return, Stmt)
+STMT(Yield, Stmt)
+STMT(Defer, Stmt)
+ABSTRACT_STMT(Labeled, Stmt)
+  ABSTRACT_STMT(LabeledConditional, LabeledStmt)
+    LABELED_STMT(If, LabeledConditionalStmt)
+    LABELED_STMT(Guard, LabeledConditionalStmt)
+    LABELED_STMT(While, LabeledConditionalStmt)
+    STMT_RANGE(LabeledConditional, If, While)
+  LABELED_STMT(Do, LabeledStmt)
+  LABELED_STMT(DoCatch, LabeledStmt)
+  LABELED_STMT(RepeatWhile, LabeledStmt)
+  LABELED_STMT(ForEach, LabeledStmt)
+  LABELED_STMT(Switch, LabeledStmt)
+  STMT_RANGE(Labeled, If, Switch)
+STMT(Case, Stmt)
+STMT(Catch, Stmt)
+STMT(Break, Stmt)
+STMT(Continue, Stmt)
+STMT(Fallthrough, Stmt)
+STMT(Fail, Stmt)
+STMT(Throw, Stmt)
+STMT(PoundAssert, Stmt)
+LAST_STMT(PoundAssert)
+
+#undef STMT_RANGE
+#undef LABELED_STMT
+#undef ABSTRACT_STMT
+#undef STMT
+#undef LAST_STMT

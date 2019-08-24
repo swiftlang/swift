@@ -1,0 +1,27 @@
+#! /usr/bin/env python
+# -*- python -*-
+# RUN: %{python} %s '%swift_src_root'
+
+import os.path
+import subprocess
+import sys
+
+if len(sys.argv) < 2:
+    print('Invalid number of arguments.')
+    sys.exit(1)
+
+swift_src_root = sys.argv[1]
+if not os.path.exists(os.path.join(swift_src_root, '.git')):
+    # It is fine if the folder doesn't exist
+    sys.exit(0)
+
+returncode = subprocess.call(
+    ['git', '-C', swift_src_root, 'grep', r'\bDEBUG[(]'])
+if returncode == 0:  # We found some DEBUG in there.
+    print("""
+*** The {DEBUG}(...) macro is being renamed to LLVM_DEBUG(...);
+*** please use that instead.""".format(DEBUG='DEBUG'))
+    sys.exit(1)
+
+# If you see a failure in this test, that means you introduced a use of the
+# DEBUG macro from LLVM, which is being renamed to LLVM_DEBUG.

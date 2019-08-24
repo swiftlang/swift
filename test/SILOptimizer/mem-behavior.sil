@@ -1,0 +1,215 @@
+// RUN: %target-sil-opt %s -aa-kind=basic-aa -mem-behavior-dump -o /dev/null | %FileCheck %s
+
+// REQUIRES: asserts
+
+import Builtin
+import Swift
+
+class X {
+  @_hasStorage var a: Int32
+  @_hasStorage var x: X
+
+  init()
+}
+
+sil @unknown_func : $@convention(thin) (Int32, @in Int32) -> ()
+
+sil @nouser_func : $@convention(thin) () -> ()
+
+sil @store_to_int : $@convention(thin) (Int32, @inout Int32) -> () {
+bb0(%0 : $Int32, %1 : $*Int32):
+  store %0 to %1  : $*Int32
+  %r = tuple ()
+  return %r : $()
+}
+
+sil @only_retain : $@convention(thin) (@guaranteed X) -> () {
+bb0(%0 : $X):
+  strong_retain %0 : $X
+
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: @call_unknown_func
+// CHECK:     PAIR #1.
+// CHECK-NEXT:   %4 = apply %3(%0, %1) : $@convention(thin) (Int32, @in Int32) -> ()
+// CHECK-NEXT:   %1 = argument of bb0 : $*Int32{{.*}}                  // user: %4
+// CHECK-NEXT:  r=1,w=1,se=1
+// CHECK:     PAIR #2.
+// CHECK-NEXT:   %4 = apply %3(%0, %1) : $@convention(thin) (Int32, @in Int32) -> ()
+// CHECK-NEXT:   %2 = argument of bb0 : $*Int32
+// CHECK-NEXT:  r=0,w=0,se=0
+sil @call_unknown_func : $@convention(thin) (Int32, @in Int32, @in Int32) -> () {
+bb0(%0 : $Int32, %1 : $*Int32, %2 : $*Int32):
+  %3 = function_ref @unknown_func : $@convention(thin) (Int32, @in Int32) -> ()
+  %4 = apply %3(%0, %1) : $@convention(thin) (Int32, @in Int32) -> ()
+
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: @call_store_to_int_not_aliased
+// CHECK:     PAIR #1.
+// CHECK-NEXT:   %4 = apply %3(%0, %1) : $@convention(thin) (Int32, @inout Int32) -> ()
+// CHECK-NEXT:   %1 = argument of bb0 : $*Int32{{.*}}                  // user: %4
+// CHECK-NEXT:  r=0,w=1,se=1
+// CHECK:     PAIR #2.
+// CHECK-NEXT:   %4 = apply %3(%0, %1) : $@convention(thin) (Int32, @inout Int32) -> ()
+// CHECK-NEXT:   %2 = argument of bb0 : $*Int32
+// CHECK-NEXT:  r=0,w=0,se=0
+sil @call_store_to_int_not_aliased : $@convention(thin) (Int32, @inout Int32, @in Int32) -> () {
+bb0(%0 : $Int32, %1 : $*Int32, %2 : $*Int32):
+  %3 = function_ref @store_to_int : $@convention(thin) (Int32, @inout Int32) -> ()
+  %4 = apply %3(%0, %1) : $@convention(thin) (Int32, @inout Int32) -> ()
+
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: @call_store_to_int_aliased
+// CHECK:     PAIR #3.
+// CHECK-NEXT:   %6 = apply %5(%0, %3) : $@convention(thin) (Int32, @inout Int32) -> ()
+// CHECK-NEXT:   %3 = ref_element_addr %1 : $X, #X.a{{.*}}             // user: %6
+// CHECK-NEXT:  r=0,w=1,se=1
+// CHECK:     PAIR #4.
+// CHECK-NEXT:   %6 = apply %5(%0, %3) : $@convention(thin) (Int32, @inout Int32) -> ()
+// CHECK-NEXT:   %4 = ref_element_addr %2 : $X, #X.a
+// CHECK-NEXT:  r=0,w=1,se=1
+sil @call_store_to_int_aliased : $@convention(thin) (Int32, @guaranteed X, @guaranteed X) -> () {
+bb0(%0 : $Int32, %1 : $X, %2 : $X):
+  %3 = ref_element_addr %1 : $X, #X.a
+  %4 = ref_element_addr %2 : $X, #X.a
+  %5 = function_ref @store_to_int : $@convention(thin) (Int32, @inout Int32) -> ()
+  %6 = apply %5(%0, %3) : $@convention(thin) (Int32, @inout Int32) -> ()
+
+  %r = tuple ()
+  return %r : $()
+}
+
+sil @call_only_retain : $@convention(thin) (@guaranteed X, @guaranteed X) -> () {
+bb0(%0 : $X, %1 : $X):
+  %2 = function_ref @only_retain : $@convention(thin) (@guaranteed X) -> ()
+  %3 = apply %2(%0) : $@convention(thin) (@guaranteed X) -> ()
+
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: @allocstack_apply_no_side_effect
+// CHECK:     PAIR #1
+// CHECK-NEXT:   %3 = apply %2() : $@convention(thin) () -> ()
+// CHECK-NEXT:   %1 = alloc_stack $Int32{{.*}}                         // user: %5
+// CHECK-NEXT:  r=0,w=0,se=0
+sil @allocstack_apply_no_side_effect : $@convention(thin) (Int32) -> () {
+bb0(%0 : $Int32):
+  %1 = alloc_stack $Int32                         // user: %5
+  %2 = function_ref @nouser_func : $@convention(thin) () -> () // user: %3
+  %3 = apply %2() : $@convention(thin) () -> ()
+  %4 = tuple ()                                   // user: %6
+  dealloc_stack %1 : $*Int32     // id: %5
+  return %4 : $()
+}
+
+// CHECK-LABEL: @allocstack_apply_side_effect
+// CHECK: PAIR #1.
+// CHECK-NEXT:   %3 = apply %2(%0, %1) : $@convention(thin) (Int32, @inout Int32) -> ()
+// CHECK-NEXT:   %1 = alloc_stack $Int32
+// CHECK-NEXT:  r=0,w=1,se=1
+sil @allocstack_apply_side_effect : $@convention(thin) (Int32) -> () {
+bb0(%0 : $Int32):
+  %1 = alloc_stack $Int32                         // users: %3, %5
+  // function_ref store_to_int
+  %2 = function_ref @store_to_int : $@convention(thin) (Int32, @inout Int32) -> () // user: %3
+  %3 = apply %2(%0, %1) : $@convention(thin) (Int32, @inout Int32) -> ()
+  %4 = tuple ()                                   // user: %6
+  dealloc_stack %1 : $*Int32     // id: %5
+  return %4 : $()                                 // id: %6
+}
+
+// CHECK-LABEL: @allocstack_apply_no_escaping
+// CHECK: PAIR #1.
+// CHECK-NEXT:   %3 = apply %2() : $@convention(thin) () -> ()
+// CHECK-NEXT:   %1 = alloc_stack $Int32{{.*}}                    // users: %7, %5
+// CHECK-NEXT:  r=0,w=0,se=0
+sil @allocstack_apply_no_escaping : $@convention(thin) (Int32) -> () {
+bb0(%0 : $Int32):
+  %1 = alloc_stack $Int32                         // users: %3, %5
+  %2 = function_ref @nouser_func : $@convention(thin) () -> () // user: %3
+  %3 = apply %2() : $@convention(thin) () -> ()
+  %4 = function_ref @store_to_int: $@convention(thin) (Int32, @inout Int32) -> () // user: %3
+  %5 = apply %4(%0, %1) : $@convention(thin) (Int32, @inout Int32) -> ()
+  %6 = tuple ()                                   // user: %6
+  dealloc_stack %1 : $*Int32     // id: %5
+  return %6 : $()                                 // id: %6
+}
+
+// CHECK-LABEL: @allocstack_apply_read_only
+// CHECK:     PAIR #1.
+// CHECK-NEXT:   %4 = apply %3(%1) : $@convention(thin) (@in X) -> ()
+// CHECK-NEXT:   %1 = alloc_stack $X{{.*}}                      // users: %5, %4, %2
+// CHECK-NEXT: r=1,w=0,se=0
+sil @allocstack_apply_read_only : $@convention(thin) (X) -> () {
+bb0(%0 : $X):
+  %1 = alloc_stack $X
+  store %0 to %1 : $*X
+  %3 = function_ref @load_from_in : $@convention(thin) (@in X) -> ()
+  %4 = apply %3(%1) : $@convention(thin) (@in X) -> ()
+  dealloc_stack %1 : $*X
+  %6 = tuple ()
+  return %6 : $()
+}
+
+sil @load_from_in : $@convention(thin) (@in X) -> () {
+bb0(%0 : $*X):
+  %1 = load %0 : $*X
+  %2 = tuple ()
+  return %2 : $()
+}
+
+struct TwoInts {
+  var i1 : Int32
+  var i2 : Int32
+}
+
+// CHECK-LABEL: @combination_of_read_and_write_effects
+// CHECK:     PAIR #0.
+// CHECK-NEXT:   %4 = apply %3(%1, %2) : $@convention(thin) (@inout Int32, @inout Int32) -> ()
+// CHECK-NEXT:   %0 = alloc_stack $TwoInts{{.*}}                // users: %5, %2, %1
+// CHECK-NEXT: r=1,w=1,se=1
+sil @combination_of_read_and_write_effects : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $TwoInts
+  %1 = struct_element_addr %0 : $*TwoInts, #TwoInts.i1
+  %2 = struct_element_addr %0 : $*TwoInts, #TwoInts.i2
+  %3 = function_ref @copy_ints : $@convention(thin) (@inout Int32, @inout Int32) -> ()
+  apply %3 (%1, %2) : $@convention(thin) (@inout Int32, @inout Int32) -> ()
+  dealloc_stack %0 : $*TwoInts
+  %r = tuple()
+  return %r : $()
+}
+
+sil @copy_ints : $@convention(thin) (@inout Int32, @inout Int32) -> () {
+bb0(%0 : $*Int32, %1 : $*Int32):
+  %2 = load %0 : $*Int32
+  store %2 to %1 : $*Int32
+  %r = tuple()
+  return %r : $()
+}
+
+// CHECK-LABEL: @test_in_guaranteed_only_fun_is_ro_entry
+// CHECK:      PAIR #0.
+// CHECK-NEXT:    %2 = apply %1(%0) : $@convention(thin) (@in_guaranteed Int) -> ()
+// CHECK-NEXT:    %0 = argument of bb0 : $*Int
+// CHECK-NEXT:  r=1,w=0,se=0
+sil @test_in_guaranteed_only_fun_is_ro_sink : $@convention(thin) (Int) -> ()
+sil @test_in_guaranteed_only_fun_is_ro_callee : $@convention(thin) (@in_guaranteed Int) -> ()
+
+sil @test_in_guaranteed_only_fun_is_ro_entry : $@convention(thin) (@in Int) -> () {
+bb0(%0 : $*Int):
+  %f_callee = function_ref @test_in_guaranteed_only_fun_is_ro_callee : $@convention(thin) (@in_guaranteed Int) -> ()
+  %r1 = apply %f_callee(%0) : $@convention(thin) (@in_guaranteed Int) -> ()
+
+  %3 = tuple()
+  return %3 : $()
+}

@@ -1,0 +1,240 @@
+import FooHelper.FooHelperExplicit
+import FooHelper.FooHelperSub
+
+
+public func fooHelperFunc1(_ a: Int32) -> Int32
+
+public var FooHelperUnnamedEnumeratorA1: Int { get }
+public var FooHelperUnnamedEnumeratorA2: Int { get }
+
+[
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 0,
+    key.length: 6
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 7,
+    key.length: 9
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 17,
+    key.length: 17
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 35,
+    key.length: 6
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 42,
+    key.length: 9
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 52,
+    key.length: 12
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
+    key.offset: 67,
+    key.length: 6
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 74,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 79,
+    key.length: 14
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 94,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 96,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.offset: 99,
+    key.length: 5
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.offset: 109,
+    key.length: 5
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
+    key.offset: 116,
+    key.length: 6
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 123,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 127,
+    key.length: 28
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.offset: 157,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 163,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
+    key.offset: 169,
+    key.length: 6
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 176,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 180,
+    key.length: 28
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.offset: 210,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 216,
+    key.length: 3
+  }
+]
+[
+  {
+    key.kind: source.lang.swift.ref.module,
+    key.offset: 7,
+    key.length: 9
+  },
+  {
+    key.kind: source.lang.swift.ref.module,
+    key.offset: 17,
+    key.length: 17
+  },
+  {
+    key.kind: source.lang.swift.ref.module,
+    key.offset: 42,
+    key.length: 9
+  },
+  {
+    key.kind: source.lang.swift.ref.module,
+    key.offset: 52,
+    key.length: 12
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.offset: 99,
+    key.length: 5,
+    key.is_system: 1
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.offset: 109,
+    key.length: 5,
+    key.is_system: 1
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.offset: 157,
+    key.length: 3,
+    key.is_system: 1
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.offset: 210,
+    key.length: 3,
+    key.is_system: 1
+  }
+]
+[
+  {
+    key.kind: source.lang.swift.decl.function.free,
+    key.accessibility: source.lang.swift.accessibility.public,
+    key.name: "fooHelperFunc1(_:)",
+    key.offset: 74,
+    key.length: 40,
+    key.typename: "Int32",
+    key.nameoffset: 79,
+    key.namelength: 26,
+    key.attributes: [
+      {
+        key.offset: 67,
+        key.length: 6,
+        key.attribute: source.decl.attribute.public
+      }
+    ],
+    key.substructure: [
+      {
+        key.kind: source.lang.swift.decl.var.parameter,
+        key.name: "a",
+        key.offset: 94,
+        key.length: 10,
+        key.typename: "Int32",
+        key.nameoffset: 0,
+        key.namelength: 0
+      }
+    ]
+  },
+  {
+    key.kind: source.lang.swift.decl.var.global,
+    key.accessibility: source.lang.swift.accessibility.public,
+    key.name: "FooHelperUnnamedEnumeratorA1",
+    key.offset: 123,
+    key.length: 45,
+    key.typename: "Int",
+    key.nameoffset: 127,
+    key.namelength: 28,
+    key.bodyoffset: 162,
+    key.bodylength: 5,
+    key.attributes: [
+      {
+        key.offset: 116,
+        key.length: 6,
+        key.attribute: source.decl.attribute.public
+      }
+    ]
+  },
+  {
+    key.kind: source.lang.swift.decl.var.global,
+    key.accessibility: source.lang.swift.accessibility.public,
+    key.name: "FooHelperUnnamedEnumeratorA2",
+    key.offset: 176,
+    key.length: 45,
+    key.typename: "Int",
+    key.nameoffset: 180,
+    key.namelength: 28,
+    key.bodyoffset: 215,
+    key.bodylength: 5,
+    key.attributes: [
+      {
+        key.offset: 169,
+        key.length: 6,
+        key.attribute: source.decl.attribute.public
+      }
+    ]
+  }
+]

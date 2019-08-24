@@ -1,0 +1,4 @@
+Don't modify files directly here.  Instead, modify the files in the swift
+repository and copy over the mock SDK like this:
+
+cp -r ../swift/test/IDE/Inputs/mock-sdk/*.framework test/Inputs/libIDE-mock-sdk/

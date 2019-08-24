@@ -1,0 +1,770 @@
+// -*- swift -*-
+// RUN: %target-run-simple-swiftgyb
+// REQUIRES: executable_test
+
+// <rdar://problem/24357067> The compiler never finishes compiling validation-test/stdlib/CollectionType.swift.gyb in -O
+// REQUIRES: swift_test_mode_optimize_none
+
+% import os.path
+% import gyb
+% from gyb_stdlib_support import TRAVERSALS, collectionForTraversal
+
+import StdlibUnittest
+import StdlibCollectionUnittest
+
+
+var CollectionTypeTests = TestSuite("Collection")
+
+struct CollectionWithDefaultUnderestimatedCount : Collection {
+  init(count: Int) {
+    self._count = count
+    self._collectionState =
+      _CollectionState(newRootStateForElementCount: count)
+  }
+
+  func makeIterator() -> MinimalIterator<OpaqueValue<Int>> {
+    expectUnreachable()
+    return MinimalIterator([])
+  }
+
+  var startIndex: MinimalIndex {
+    return MinimalIndex(
+      collectionState: _collectionState,
+      position: 0, startIndex: 0, endIndex: _count)
+  }
+
+  var endIndex: MinimalIndex {
+    return MinimalIndex(
+      collectionState: _collectionState,
+      position: _count, startIndex: 0, endIndex: _count)
+  }
+
+  func index(after i: MinimalIndex) -> MinimalIndex {
+    return MinimalIndex(
+      collectionState: _collectionState,
+      position: i.position + 1, startIndex: 0, endIndex: _count)
+  }
+
+  subscript(i: MinimalIndex) -> OpaqueValue<Int> {
+    expectUnreachable()
+    return OpaqueValue(0xffff)
+  }
+
+  var _count: Int
+  var _collectionState: _CollectionState
+}
+
+//===----------------------------------------------------------------------===//
+// filter()
+//===----------------------------------------------------------------------===//
+
+var MinimalCollectionWithCustomFilter_timesFilterWasCalled: Int = 0
+
+% for Implementation in [ 'Default', 'Custom' ]:
+
+struct MinimalCollectionWith${Implementation}Filter<Element>
+  : Collection {
+
+  init(_ data: [Element], underestimatedCount: UnderestimatedCountBehavior) {
+    self._data = MinimalCollection(
+      elements: data, underestimatedCount: underestimatedCount)
+  }
+
+  func makeIterator() -> MinimalIterator<Element> {
+    return _data.makeIterator()
+  }
+
+  var startIndex: MinimalIndex {
+    return _data.startIndex
+  }
+
+  var endIndex: MinimalIndex {
+    return _data.endIndex
+  }
+
+  func index(after i: MinimalIndex) -> MinimalIndex {
+    return _data.index(after: i)
+  }
+
+  subscript(i: MinimalIndex) -> Element {
+    return _data[i]
+  }
+
+  var _data: MinimalCollection<Element>
+
+
+%   if Implementation == 'Custom':
+
+  static var timesFilterWasCalled: Int {
+    get {
+      return MinimalCollectionWithCustomFilter_timesFilterWasCalled
+    }
+    set {
+      MinimalCollectionWithCustomFilter_timesFilterWasCalled = newValue
+    }
+  }
+
+  func filter(
+    _ isIncluded: (Element) throws -> Bool
+  ) rethrows -> [Element] {
+    MinimalCollectionWithCustomFilter.timesFilterWasCalled += 1
+    return try _data.filter(isIncluded)
+  }
+
+%   end
+
+}
+
+% end
+
+func callStaticCollectionFilter(
+  _ sequence: MinimalCollectionWithDefaultFilter<OpaqueValue<Int>>,
+  _ isIncluded: (OpaqueValue<Int>) -> Bool
+) -> [OpaqueValue<Int>] {
+  var result = sequence.filter(isIncluded)
+  expectType([OpaqueValue<Int>].self, &result)
+  return result
+}
+
+func callStaticCollectionFilter(
+  _ sequence: MinimalCollectionWithCustomFilter<OpaqueValue<Int>>,
+  _ isIncluded: (OpaqueValue<Int>) -> Bool
+) -> [OpaqueValue<Int>] {
+  var result = sequence.filter(isIncluded)
+  expectType([OpaqueValue<Int>].self, &result)
+  return result
+}
+
+func callGenericCollectionFilter<S : Collection>(
+  _ sequence: S,
+  _ isIncluded: (S.Iterator.Element) -> Bool
+) -> [S.Iterator.Element] {
+  var result = sequence.filter(isIncluded)
+  expectType(Array<S.Iterator.Element>.self, &result)
+  return result
+}
+
+%   for dispatch in [ 'Static', 'Generic' ]:
+
+CollectionTypeTests.test("filter/Collection/${Implementation}Implementation/${dispatch}") {
+  for test in filterTests {
+    for underestimatedCountBehavior in [
+      UnderestimatedCountBehavior.precise,
+      UnderestimatedCountBehavior.half,
+      UnderestimatedCountBehavior.value(0)
+    ] {
+      let s = MinimalCollectionWith${Implementation}Filter<OpaqueValue<Int>>(
+        test.sequence.map(OpaqueValue.init),
+        underestimatedCount: underestimatedCountBehavior)
+      let closureLifetimeTracker = LifetimeTracked(0)
+      expectEqual(1, LifetimeTracked.instances)
+      var timesClosureWasCalled = 0
+      var result = call${dispatch}CollectionFilter(s) {
+        (element) in
+        _blackHole(closureLifetimeTracker)
+        timesClosureWasCalled += 1
+        return test.includeElement(element.value)
+      }
+      expectType([OpaqueValue<Int>].self, &result)
+      expectEqual(test.expected, result.map { $0.value })
+      expectEqual(test.sequence, s.map { $0.value }, 
+        "collection should not be consumed")
+      expectEqual(test.sequence.count, timesClosureWasCalled,
+        "filter() should be eager and should only call its predicate once per element")
+      expectGE(2 * result.count, result.capacity,
+        "filter() should not reserve capacity"
+        + "(it does not know how much the predicate will filter out)")
+    }
+  }
+}
+
+% end
+
+//===----------------------------------------------------------------------===//
+// map()
+//===----------------------------------------------------------------------===//
+var MinimalCollectionWithCustomMap_timesMapWasCalled: Int = 0
+
+struct MinimalCollectionWithDefaultMap<Element>: Collection {
+  init(_ data: [Element], underestimatedCount: UnderestimatedCountBehavior) {
+    self._data = MinimalCollection(
+      elements: data, underestimatedCount: underestimatedCount)
+  }
+
+  func makeIterator() -> MinimalIterator<Element> {
+    return _data.makeIterator()
+  }
+
+  var startIndex: MinimalIndex {
+    return _data.startIndex
+  }
+
+  var endIndex: MinimalIndex {
+    return _data.endIndex
+  }
+
+  func index(after i: MinimalIndex) -> MinimalIndex {
+    return _data.index(after: i)
+  }
+
+  subscript(i: MinimalIndex) -> Element {
+    return _data[i]
+  }
+
+  var _data: MinimalCollection<Element>
+}
+
+func callStaticCollectionMap<T>(
+  _ collection: MinimalCollectionWithDefaultMap<OpaqueValue<Int>>,
+  transform: (OpaqueValue<Int>) -> T
+) -> [T] {
+  var result = collection.map(transform)
+  expectType([T].self, &result)
+  return result
+}
+
+func callGenericCollectionMap<C : Collection, T>(
+  _ collection: C,
+  transform: (C.Iterator.Element) -> T
+) -> [T] {
+  var result = collection.map(transform)
+  expectType([T].self, &result)
+  return result
+}
+
+% for dispatch in [ 'Static', 'Generic' ]:
+
+CollectionTypeTests.test(
+  "map/Collection/${Implementation}Implementation/${dispatch}"
+) {
+  for test in mapTests {
+    for underestimatedCountBehavior in [
+      UnderestimatedCountBehavior.precise,
+      UnderestimatedCountBehavior.half,
+      UnderestimatedCountBehavior.value(0)
+    ] {
+      let s = MinimalCollectionWithDefaultMap<OpaqueValue<Int>>(
+        test.sequence.map(OpaqueValue.init),
+        underestimatedCount: underestimatedCountBehavior)
+      let closureLifetimeTracker = LifetimeTracked(0)
+      expectEqual(1, LifetimeTracked.instances)
+      var timesClosureWasCalled = 0
+      var result = call${dispatch}CollectionMap(s) {
+        (element: OpaqueValue<Int>) -> OpaqueValue<Int32> in
+        _blackHole(closureLifetimeTracker)
+        timesClosureWasCalled += 1
+        return OpaqueValue(Int32(test.transform(element.value)))
+      }
+      expectType([OpaqueValue<Int32>].self, &result)
+      expectEqual(test.expected, result.map { $0.value })
+      expectEqual(test.sequence, s.map { $0.value },
+        "collection should not be consumed")
+      expectEqual(test.sequence.count, timesClosureWasCalled,
+        "map() should be eager and should only call its predicate"
+        + "once per element")
+    }
+  }
+}
+
+% end
+
+//===----------------------------------------------------------------------===//
+// flatMap()
+//===----------------------------------------------------------------------===//
+
+% TLazyFlatMapTest = gyb.parse_template(os.path.join(os.path.dirname(__file__), "Inputs/flatMap.gyb"))
+% LazyFlatMapTest = gyb.execute_template(TLazyFlatMapTest, Test='CollectionTypeTests', Kinds=['Collection', 'BidirectionalCollection'])
+${LazyFlatMapTest}
+
+//===----------------------------------------------------------------------===//
+// underestimatedCount
+//===----------------------------------------------------------------------===//
+
+CollectionTypeTests.test("underestimatedCount/Collection/DefaultImplementation") {
+  do {
+    let s = CollectionWithDefaultUnderestimatedCount(count: 0)
+    expectEqual(0, callGenericUnderestimatedCount(s))
+  }
+  do {
+    let s = CollectionWithDefaultUnderestimatedCount(count: 5)
+    expectEqual(5, callGenericUnderestimatedCount(s))
+  }
+}
+
+struct CollectionWithCustomUnderestimatedCount : Collection {
+  init(underestimatedCount: Int) {
+    self._underestimatedCount = underestimatedCount
+    self._collectionState =
+      _CollectionState(newRootStateForElementCount: 0xffff)
+  }
+
+  func makeIterator() -> MinimalIterator<OpaqueValue<Int>> {
+    expectUnreachable()
+    return MinimalIterator([])
+  }
+
+  var startIndex: MinimalIndex {
+    expectUnreachable()
+    return MinimalIndex(
+      collectionState: _collectionState,
+      position: 0, startIndex: 0, endIndex: 0xffff)
+  }
+
+  var endIndex: MinimalIndex {
+    expectUnreachable()
+    return MinimalIndex(
+      collectionState: _collectionState,
+      position: 0xffff, startIndex: 0, endIndex: 0xffff)
+  }
+
+  func index(after i: MinimalIndex) -> MinimalIndex {
+    return MinimalIndex(
+      collectionState: _collectionState,
+      position: i.position + 1, startIndex: 0, endIndex: 0xffff)
+  }
+
+  subscript(i: MinimalIndex) -> OpaqueValue<Int> {
+    expectUnreachable()
+    return OpaqueValue(0xffff)
+  }
+
+  var underestimatedCount: Int {
+    return _underestimatedCount
+  }
+
+  let _underestimatedCount: Int
+  var _collectionState: _CollectionState
+}
+
+CollectionTypeTests.test("underestimatedCount/Collection/CustomImplementation") {
+  do {
+    let s = CollectionWithCustomUnderestimatedCount(underestimatedCount: 0)
+    expectEqual(0, callGenericUnderestimatedCount(s))
+  }
+  do {
+    let s = CollectionWithCustomUnderestimatedCount(underestimatedCount: 5)
+    expectEqual(5, callGenericUnderestimatedCount(s))
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// Collection.makeIterator(), Collection.Iterator
+//===----------------------------------------------------------------------===//
+
+struct MinimalCollectionWithDefaultIterator : Collection {
+  init(count: Int) {
+    self._count = count
+    self._collectionState =
+      _CollectionState(newRootStateForElementCount: count)
+  }
+
+  var startIndex: MinimalIndex {
+    return MinimalIndex(
+      collectionState: _collectionState,
+      position: 0, startIndex: 0, endIndex: _count)
+  }
+
+  var endIndex: MinimalIndex {
+    return MinimalIndex(
+      collectionState: _collectionState,
+      position: _count, startIndex: 0, endIndex: _count)
+  }
+
+  func index(after i: MinimalIndex) -> MinimalIndex {
+    return MinimalIndex(
+      collectionState: _collectionState,
+      position: i.position + 1, startIndex: 0, endIndex: _count)
+  }
+
+  subscript(i: MinimalIndex) -> OpaqueValue<Int> {
+    return OpaqueValue(i.position + 1)
+  }
+
+  var _count: Int
+  var _collectionState: _CollectionState
+}
+
+func callGenericIterator<S : Sequence>(_ sequence: S) -> S.Iterator {
+  return sequence.makeIterator()
+}
+
+CollectionTypeTests.test("Collection.makeIterator()/DefaultImplementation") {
+  for count in [ 0, 5 ] {
+    let collection = MinimalCollectionWithDefaultIterator(count: count)
+
+    do {
+      // Check the return type of the function when called statically.
+      var iter = collection.makeIterator()
+      expectType(
+        IndexingIterator<MinimalCollectionWithDefaultIterator>.self,
+        &iter)
+    }
+
+    do {
+      // Check the return type of the function when called generically.
+      var iter = callGenericIterator(collection)
+      expectType(
+        IndexingIterator<MinimalCollectionWithDefaultIterator>.self,
+        &iter)
+    }
+
+    checkCollection(
+      Array(1..<count+1).map(OpaqueValue.init) as [OpaqueValue<Int>],
+      collection
+    ) { $0.value == $1.value }
+  }
+}
+
+struct MinimalCollectionWithCustomIterator : Collection {
+  init(count: Int) {
+    self._count = count
+    self._collectionState =
+      _CollectionState(newRootStateForElementCount: count)
+  }
+
+  static var timesIteratorWasCalled: Int = 0
+
+  func makeIterator() -> MinimalIterator<OpaqueValue<Int>> {
+    MinimalCollectionWithCustomIterator.timesIteratorWasCalled += 1
+    return MinimalIterator<OpaqueValue<Int>>(
+      Array(1..<_count+1).map(OpaqueValue.init) as [OpaqueValue<Int>]
+    )
+  }
+
+  var startIndex: MinimalIndex {
+    return MinimalIndex(
+      collectionState: _collectionState,
+      position: 0, startIndex: 0, endIndex: _count)
+  }
+
+  var endIndex: MinimalIndex {
+    return MinimalIndex(
+      collectionState: _collectionState,
+      position: _count, startIndex: 0, endIndex: _count)
+  }
+
+  func index(after i: MinimalIndex) -> MinimalIndex {
+    return MinimalIndex(
+      collectionState: _collectionState,
+      position: i.position + 1, startIndex: 0, endIndex: _count)
+  }
+
+  subscript(i: MinimalIndex) -> OpaqueValue<Int> {
+    return OpaqueValue(i.position + 1)
+  }
+
+  var _count: Int
+  var _collectionState: _CollectionState
+}
+
+CollectionTypeTests.test("Collection.makeIterator()/CustomImplementation") {
+  for count in [ 0, 5 ] {
+    let collection = MinimalCollectionWithCustomIterator(count: count)
+
+    do {
+      // Check the return type of the function when called statically.
+      MinimalCollectionWithCustomIterator.timesIteratorWasCalled = 0
+      var iter = collection.makeIterator()
+      expectType(
+        MinimalIterator<OpaqueValue<Int>>.self,
+        &iter)
+      expectEqual(1, MinimalCollectionWithCustomIterator.timesIteratorWasCalled)
+    }
+
+    do {
+      MinimalCollectionWithCustomIterator.timesIteratorWasCalled = 0
+      // Check the return type of the function when called generically.
+      var iter = callGenericIterator(collection)
+      expectType(
+        MinimalIterator<OpaqueValue<Int>>.self,
+        &iter)
+      expectEqual(1, MinimalCollectionWithCustomIterator.timesIteratorWasCalled)
+    }
+
+    checkCollection(
+      Array(1..<count+1).map(OpaqueValue.init) as [OpaqueValue<Int>],
+      collection,
+      resiliencyChecks: .none) { $0.value == $1.value }
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// subscript(_: Range<Index>), Collection.SubSequence
+//===----------------------------------------------------------------------===//
+
+CollectionTypeTests.test("subscript(_: Range<Index>)/Dispatch") {
+  let tester = CollectionLog.dispatchTester([OpaqueValue(1)])
+  _ = tester[tester.startIndex..<tester.endIndex]
+  let log = tester.log
+  let log2 = tester.log.subscriptRange
+  expectCustomizable(tester, tester.log.subscriptRange)
+}
+
+CollectionTypeTests.test("subscript(_: Range<Index>)/writeback") {
+  // This code used to crash in materializeForSet.  The issue only reproduced
+  // in non-generic code.  rdar://22109071
+  var collection = MinimalMutableRandomAccessCollection(
+    elements: [ 5, 4, 3, 2, 1, 0, -1, -2, -3, -4 ])
+  let i = collection.startIndex
+  let j = collection.index(i, offsetBy: 5)
+  collection[i..<j].sort()
+  expectEqualSequence(
+    [ 1, 2, 3, 4, 5, 0, -1, -2, -3, -4 ], collection)
+}
+
+CollectionTypeTests.test("subscript(_: Range<Index>)/defaultImplementation/sliceTooLarge")
+  .crashOutputMatches("Cannot replace a slice of a MutableCollection with a slice of a larger size")
+  .code {
+  var x = Slice(base: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], bounds: 0..<10)
+  expectCrashLater()
+  x[2..<4] = x[4..<8]
+}
+
+CollectionTypeTests.test("subscript(_: Range<Index>)/defaultImplementation/sliceTooSmall")
+  .crashOutputMatches("Cannot replace a slice of a MutableCollection with a slice of a smaller size")
+  .code {
+  var x = Slice(base: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], bounds: 0..<10)
+  expectCrashLater()
+  x[2..<6] = x[6..<8]
+}
+
+//===----------------------------------------------------------------------===//
+// isEmpty
+//===----------------------------------------------------------------------===//
+
+CollectionTypeTests.test("isEmpty/dispatch") {
+  let tester = CollectionLog.dispatchTester([OpaqueValue(1)])
+  _ = tester.isEmpty
+  expectCustomizable(tester, tester.log.isEmpty)
+}
+
+
+//===----------------------------------------------------------------------===//
+// count
+//===----------------------------------------------------------------------===//
+
+CollectionTypeTests.test("count/dispatch") {
+  let tester = CollectionLog.dispatchTester([OpaqueValue(1)])
+  _ = tester.count
+  expectCustomizable(tester, tester.log.count)
+}
+
+//===----------------------------------------------------------------------===//
+// firstIndex(of:)
+//===----------------------------------------------------------------------===//
+
+CollectionTypeTests.test("firstIndex(of:)/WhereElementIsEquatable/dispatch") {
+  let tester = CollectionLog.dispatchTester([MinimalEquatableValue(1)])
+  _ = tester.firstIndex(of: MinimalEquatableValue(1))
+  expectCustomizable(tester, tester.log._customIndexOfEquatableElement)
+}
+
+// FIXME: underscores are a workaround for:
+// <rdar://problem/20582358> Commenting out one line determines whether a
+// completely different line type-checks
+func callGenericFind_<
+  C : Collection
+>(_ collection: C, _ element: C.Iterator.Element) -> C.Index? 
+where C.Iterator.Element : Equatable {
+  return collection.firstIndex(of: element)
+}
+
+func callStaticFind_(
+  _ set: Set<MinimalHashableValue>,
+  _ element: MinimalHashableValue
+) -> Set<MinimalHashableValue>.Index? {
+  return set.firstIndex(of: element)
+}
+
+% for dispatch in [ 'Static', 'Generic' ]:
+
+// FIXME: implement the same optimization for Dictionary.
+// FIXME: move to the file where other Set tests live.
+CollectionTypeTests.test("Set<T>.find/CustomImplementation/${dispatch}") {
+  for test in findTests {
+    let s = Set<MinimalHashableValue>(
+      test.sequence.map { MinimalHashableValue($0.value) })
+    MinimalHashableValue.timesEqualEqualWasCalled = 0
+    MinimalHashableValue.timesHashIntoWasCalled = 0
+    expectEqual(
+      test.expected
+        .map { _ in MinimalHashableValue(test.element.value) },
+      call${dispatch}Find_(s, MinimalHashableValue(test.element.value))
+        .map { s[$0] },
+      stackTrace: SourceLocStack().with(test.loc))
+    if test.sequence.isEmpty {
+      expectEqual(
+        0, MinimalHashableValue.timesEqualEqualWasCalled,
+        stackTrace: SourceLocStack().with(test.loc))
+      expectEqual(
+        0, MinimalHashableValue.timesHashIntoWasCalled,
+        stackTrace: SourceLocStack().with(test.loc))
+    } else {
+      expectNotEqual(
+        0, MinimalHashableValue.timesHashIntoWasCalled,
+        stackTrace: SourceLocStack().with(test.loc))
+    }
+    if test.expected != nil {
+      expectNotEqual(
+        0, MinimalHashableValue.timesEqualEqualWasCalled,
+        stackTrace: SourceLocStack().with(test.loc))
+    }
+  }
+}
+
+% end
+
+extension Collection where
+  Iterator.Element : Equatable,
+
+  // FIXME: the following constraints should go away after
+  // <rdar://problem/20715697> Collection.SubSlice should constrain its
+  // Element type
+  SubSequence : Collection,
+  SubSequence.SubSequence == SubSequence,
+  SubSequence.Iterator.Element == Iterator.Element,
+  SubSequence.Index == Index {
+
+  func _test_indicesOf(_ element: Iterator.Element) -> [Index] {
+    var result: [Index] = []
+    var tail = self[startIndex..<endIndex]
+    while let foundIndex = tail.firstIndex(of: element) {
+      result.append(foundIndex)
+      tail = tail[index(after: foundIndex)..<endIndex]
+    }
+    return result
+  }
+}
+
+CollectionTypeTests.test("firstIndex(of:)/ContinueSearch") {
+  do {
+    let c = MinimalCollection(elements: [] as [MinimalEquatableValue])
+    expectEqualSequence(
+      [],
+      c._test_indicesOf(MinimalEquatableValue(1)))
+  }
+
+  do {
+    let c = MinimalCollection(
+      elements: [1, 2, 1, 3, 1].map(MinimalEquatableValue.init))
+    let foundIndices = c._test_indicesOf(MinimalEquatableValue(1))
+    let actual = foundIndices.map { c.distance(from: c.startIndex, to: $0) }
+    expectEqualSequence(
+      [ 0, 2, 4 ],
+      actual
+      )
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// Collection indices types
+//===----------------------------------------------------------------------===//
+
+// SR-2121
+extension Collection {
+  func testIndicesElementType() {
+    for index in self.indices {
+      _ = self[index]
+    }
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// MutableCollection
+//===----------------------------------------------------------------------===//
+
+//===----------------------------------------------------------------------===//
+// partition(by:)
+//===----------------------------------------------------------------------===//
+
+CollectionTypeTests.test("partition(by:)/dispatch") {
+  var tester = MutableCollectionLog.dispatchTester([OpaqueValue(1)])
+  _ = tester.partition(by: { _ in true })
+  expectCustomizable(tester, tester.log.partitionBy)
+}
+
+//===----------------------------------------------------------------------===//
+// _withUnsafeMutableBufferPointerIfSupported()
+//===----------------------------------------------------------------------===//
+
+CollectionTypeTests.test("_withUnsafeMutableBufferPointerIfSupported/dispatch") {
+  var tester = MutableCollectionLog.dispatchTester([OpaqueValue(1)])
+  _ = tester._withUnsafeMutableBufferPointerIfSupported { _ in () }
+  expectCustomizable(tester, tester.log._withUnsafeMutableBufferPointerIfSupported)
+}
+
+//===----------------------------------------------------------------------===//
+// withContiguousMutableStorageIfAvailable()
+//===----------------------------------------------------------------------===//
+
+CollectionTypeTests.test("withContiguousMutableStorageIfAvailable/dispatch") {
+  var tester = MutableCollectionLog.dispatchTester([OpaqueValue(1)])
+  _ = tester.withContiguousMutableStorageIfAvailable { _ in () }
+  expectCustomizable(tester, tester.log.withContiguousMutableStorageIfAvailable)
+}
+
+
+//===----------------------------------------------------------------------===//
+// Associated Type Inference
+//===----------------------------------------------------------------------===//
+
+// This section verifies that only the absolutely minimal protocol requirements
+// are required to declare each kind of collection. All remaining requirements
+// and associated types should be either inferred from the declared properties
+// and methods or inherited as defaults via protocol extension.
+
+struct FatalIndex : Comparable { }
+func <(lhs: FatalIndex, rhs: FatalIndex) -> Bool { fatalError() }
+func ==(lhs: FatalIndex, rhs: FatalIndex) -> Bool { fatalError() }
+
+% for Traversal in TRAVERSALS:
+%   Collection = collectionForTraversal(Traversal)
+%   Self = 'Fatal' + Collection
+
+struct ${Self}<T> : ${Collection} {
+  var startIndex: FatalIndex { fatalError() }
+  var endIndex: FatalIndex { fatalError() }
+  subscript(i: FatalIndex) -> T { fatalError() }
+  func index(after i: FatalIndex) -> FatalIndex { fatalError() }
+%   if Traversal in ['Bidirectional', 'RandomAccess']:
+  func index(before i: FatalIndex) -> FatalIndex { fatalError() }
+%   end
+}
+
+CollectionTypeTests.test("AssociatedTypes/${Collection}") {
+  typealias C = ${Self}<Void>
+  expectCollectionAssociatedTypes(
+    collectionType: C.self,
+    iteratorType: IndexingIterator<C>.self,
+    subSequenceType: Slice<C>.self,
+    indexType: FatalIndex.self,
+    indicesType: DefaultIndices<C>.self)
+}
+% end
+
+
+struct RACollectionWithIntIndex<T> {
+  var contents: [T]
+}
+
+extension RACollectionWithIntIndex: RandomAccessCollection {
+  var startIndex: Int { return contents.startIndex }
+  var endIndex: Int { return contents.endIndex }
+  subscript(index: Int) -> T {
+    get { return contents[index] }
+    set { }
+  }
+}
+
+CollectionTypeTests.test("AssociatedTypes/RACollectionWithIntIndex") {
+  typealias C = RACollectionWithIntIndex<Void>
+  expectCollectionAssociatedTypes(
+    collectionType: C.self,
+    iteratorType: IndexingIterator<C>.self,
+    subSequenceType: Slice<C>.self,
+    indexType: Int.self,
+    indicesType: CountableRange<Int>.self)
+}
+
+
+runAllTests()

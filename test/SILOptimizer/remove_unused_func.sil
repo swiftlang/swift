@@ -1,0 +1,17 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -sil-deadfuncelim | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+// This function needs to be removed.
+// CHECK-NOT: @remove_me
+
+sil private @remove_me : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64):
+  %2 = integer_literal $Builtin.Int1, 0
+  %3 = builtin "umul_with_overflow_Int64"(%0 : $Builtin.Int64, %0 : $Builtin.Int64, %2 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %4 = tuple_extract %3 : $(Builtin.Int64, Builtin.Int1), 0
+  return %4: $Builtin.Int64
+}

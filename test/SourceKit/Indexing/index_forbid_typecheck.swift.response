@@ -1,0 +1,99 @@
+{
+  key.dependencies: [
+    {
+      key.kind: source.lang.swift.import.module.swift,
+      key.name: "Swift",
+      key.filepath: Swift.swiftmodule,
+      key.is_system: 1
+    }
+  ],
+  key.entities: [
+    {
+      key.kind: source.lang.swift.decl.var.global,
+      key.name: "globalPrim",
+      key.usr: "s:16forbid_typecheck10globalPrimSivp",
+      key.line: 1,
+      key.column: 5,
+      key.entities: [
+        {
+          key.kind: source.lang.swift.decl.function.accessor.getter,
+          key.usr: "s:16forbid_typecheck10globalPrimSivg",
+          key.line: 1,
+          key.column: 5,
+          key.is_implicit: 1
+        },
+        {
+          key.kind: source.lang.swift.decl.function.accessor.setter,
+          key.usr: "s:16forbid_typecheck10globalPrimSivs",
+          key.line: 1,
+          key.column: 5,
+          key.is_implicit: 1
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.ref.var.global,
+      key.name: "globalSec",
+      key.usr: "s:16forbid_typecheck9globalSecSivp",
+      key.line: 1,
+      key.column: 18,
+      key.entities: [
+        {
+          key.kind: source.lang.swift.ref.function.accessor.getter,
+          key.usr: "s:16forbid_typecheck9globalSecSivg",
+          key.line: 1,
+          key.column: 18,
+          key.is_implicit: 1
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.decl.function.free,
+      key.name: "primFn()",
+      key.usr: "s:16forbid_typecheck6primFnyyF",
+      key.line: 3,
+      key.column: 6,
+      key.entities: [
+        {
+          key.kind: source.lang.swift.ref.function.free,
+          key.name: "secFn()",
+          key.usr: "s:16forbid_typecheck5secFnyyF",
+          key.line: 4,
+          key.column: 3
+        },
+        {
+          key.kind: source.lang.swift.ref.class,
+          key.name: "ClsSec",
+          key.usr: "s:16forbid_typecheck6ClsSecC",
+          key.line: 5,
+          key.column: 11
+        },
+        {
+          key.kind: source.lang.swift.ref.function.constructor,
+          key.name: "init()",
+          key.usr: "s:16forbid_typecheck6ClsSecCACycfc",
+          key.line: 5,
+          key.column: 11
+        },
+        {
+          key.kind: source.lang.swift.ref.var.instance,
+          key.name: "member",
+          key.usr: "s:16forbid_typecheck6ClsSecC6memberSivp",
+          key.line: 5,
+          key.column: 20,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.ref.function.accessor.getter,
+              key.usr: "s:16forbid_typecheck6ClsSecC6memberSivg",
+              key.line: 5,
+              key.column: 20,
+              key.receiver_usr: "s:16forbid_typecheck6ClsSecC",
+              key.is_dynamic: 1,
+              key.is_implicit: 1
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

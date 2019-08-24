@@ -1,0 +1,2 @@
+@interface EEModuleColor
+@end

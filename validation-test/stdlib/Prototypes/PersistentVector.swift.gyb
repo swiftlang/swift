@@ -1,0 +1,2218 @@
+// RUN: %empty-directory(%t)
+// RUN: %gyb %s -o %t/PersistentVector.swift
+// RUN: %line-directive %t/PersistentVector.swift -- %target-build-swift -parse-stdlib -Xfrontend -disable-access-control %t/PersistentVector.swift -o %t/a.out
+// RUN: %target-codesign %t/a.out
+// RUN: %line-directive %t/PersistentVector.swift -- %target-run %t/a.out
+// REQUIRES: executable_test
+
+/*
+
+Persistent Vector
+=================
+
+This is a prototype implementation of a persistent vector.  It uses manual
+reference counting for nodes to avoid spending extra memory on object headers
+that we don't need, and to allow manual fine-tuning of retain/release
+placement.
+
+Node pointer
+------------
+
+Node pointer is an unsafe tagged pointer.  We need 2 tag bits to distinguish
+three kinds of nodes:
+
+Tag=0. Sparse vector node: mixed content
+Tag=1. Array node: mixed content
+Tag=2. Collision node: only data
+
+Sparse vector
+-------------
+
+In this discussion, "sparse vector" refers to a particular in-memory
+representation of a linear container of optional elements.  This container
+consists of a population bitmap and a contiguous chunk of memory, where the
+non-nil elements are densely packed in order.
+
+Sparse vector node
+------------------
+
+A sparse vector node is an inner node.  Each element is either a data item or a
+pointer to a child node.
+
+Memory layout:
+
+  1 word                reference count
+                        <----- Address point
+  32 bits               population bitmap for child node pointers
+  32 bits               population bitmap for keys/values
+  n words               sparse vector of child node pointers
+  ?                     padding to alignof(Key)
+  m * strideof(Key)     sparse vector of keys
+  ?                     padding to alignof(Value)    \ Absent in nodes
+  m * strideof(Value)   sparse vector of values      / for Set<Element>
+
+Members with non-dependent sizes go first.  This allows the offset to child
+nodes to be a compile-time constant.
+
+Array node
+----------
+
+An array node is an inner node.  Each element is either a data item or a
+pointer to a child node.
+
+Define `ChildNodeOrKey` to be a type that is an unsafe union of `Key` and
+`UnsafePointer<Node>`:
+
+  MemoryLayout<ChildNodeOrKey>.size      = max(MemoryLayout<UnsafePointer>.size, MemoryLayout<Key>.size)
+  MemoryLayout<ChildNodeOrKey>.alignment = max(MemoryLayout<UnsafePointer>.alignment, MemoryLayout<Key>.alignment)
+  MemoryLayout<ChildNodeOrKey>.stride    = max(MemoryLayout<UnsafePointer>.stride, MemoryLayout<Key>.stride)
+
+Memory layout:
+
+  1 word                             reference count
+                                     <----- Address point
+  32 bits                            population bitmap for child node pointers
+  32 bits                            population bitmap for keys/values
+  ?                                  padding to alignof(ChildNodeOrKey)
+  32 * strideof(ChildNodeOrKey)      array of ChildNodeOrKey
+  ?                                  padding to alignof(Value)    \ Absent in nodes
+  32 * strideof(Value)               array of values              / for Set<Element>
+
+Collision node
+--------------
+
+A collision node is a leaf node.  Each element contains data.
+
+In the prototype it is implemented as an array with linear search.  It should
+be replaced with a red-black tree to prevent algorithmic complexity attacks.
+
+Memory layout:
+
+  1 word                reference count
+                        <----- Address point
+  1 word                number of data items
+  ?                     padding to alignof(Key)
+  n * strideof(Key)     array of keys
+  ?                     padding to alignof(Value)    \ Absent in nodes
+  n * strideof(Value)   array of values              / for Set<Element>
+
+*/
+
+import Swift
+import SwiftPrivate
+import SwiftShims
+
+// This prototype is only partially implemented, and it relies on specific hash
+// values. To keep it working, define an alternative hashing interface emulating
+// pre-SE-0206 Hashable.
+protocol LegacyHashable: Equatable {
+  var legacyHashValue: Int { get }
+}
+
+//
+// Standard library extras
+//
+
+func allocBytes(count: Int, alignment: Int)
+  -> UnsafeMutableRawPointer {
+  return UnsafeMutableRawPointer.allocate(byteCount: count, alignment: alignment)
+}
+
+func deallocBytes(
+  _ pointer: UnsafeMutableRawPointer,
+  byteCount: Int,
+  alignment: Int
+) {
+  pointer.deallocate()
+}
+
+@_transparent
+func _swift_stdlib_atomicStoreUInt64(
+  object target: UnsafeMutablePointer<UInt64>,
+  desired: UInt64
+) {
+  Builtin.atomicstore_seqcst_Int64(target._rawValue, desired._value)
+}
+
+
+func _swift_stdlib_atomicStoreInt(
+  object target: UnsafeMutablePointer<Int>,
+  desired: Int) {
+#if arch(x86_64)
+  return _swift_stdlib_atomicStoreUInt64(
+    object: unsafeBitCast(target, to: UnsafeMutablePointer<UInt64>.self),
+    desired: UInt64(UInt(bitPattern: desired)))
+#endif
+}
+
+@inline(never)
+func newDump(subject: Any, name: String? = nil) {
+  _dumpRec(
+    subject,
+    name: name,
+    depth: 0,
+    maxDepth: Int.max)
+}
+
+func _dumpRec(
+  _ subject: Any,
+  name: String?,
+  depth: Int,
+  maxDepth: Int
+) {
+  let mirror = Mirror(reflecting: subject)
+  let count = mirror.children.count
+  let bullet =
+    count == 0
+    ? "-"
+    : depth >= maxDepth ? "▹" : "▿"
+  print("\(bullet) ", terminator: "")
+  if let name = name {
+    print("\(name): ", terminator: "")
+  }
+  print(subject, terminator: "")
+  print("")
+  if depth >= maxDepth { return }
+  for (label, value) in mirror.children {
+    for _ in 0..<(depth+4) { print(" ", terminator: "") }
+    _dumpRec(value, name: label, depth: depth + 1, maxDepth: maxDepth)
+  }
+}
+
+% for (name, underlyingType) in [
+%   ('Int', 'UInt'), ('Int32', 'UInt32')
+% ]:
+/// A bitmap that has as many bits as `${name}` does.
+struct _${name}Bitmap {
+  var _bits: ${underlyingType}
+
+  init() { self._bits = 0 }
+
+  init(_bits: ${underlyingType}) { self._bits = _bits }
+
+  var setBitCount: Int {
+%   if underlyingType == 'UInt':
+#if arch(i386) || arch(arm)
+    return Int(Builtin.int_ctpop_Int32(_bits._value))
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
+    return Int(Builtin.int_ctpop_Int64(_bits._value))
+#endif
+%   elif underlyingType == 'UInt32':
+    return Int(Int32(Builtin.int_ctpop_Int32(_bits._value)))
+%   end
+  }
+
+  var setBitIndices: _${name}SetBitSequence {
+    return _${name}SetBitSequence(_bits)
+  }
+
+  subscript(i: Int) -> Bool {
+    get {
+      precondition(i >= 0 && i < Int(${underlyingType}.bitWidth)) // sanity check
+      return _bits & (1 << ${underlyingType}(i)) != 0
+    }
+    set {
+      precondition(i >= 0 && i < Int(${underlyingType}.bitWidth)) // sanity check
+%   if underlyingType == 'UInt':
+      let iAsUnderlyingType = UInt(bitPattern: i)
+%   elif underlyingType == 'UInt32':
+      let iAsUnderlyingType = UInt32(truncatingIfNeeded: i)
+%   end
+      _bits =
+        (_bits & ~(1 << iAsUnderlyingType))
+        | ((newValue ? 1 : 0) << iAsUnderlyingType)
+    }
+  }
+
+  func countBitsSetBelow(_ i: Int) -> Int {
+    precondition(i >= 0 && i < Int(${underlyingType}.bitWidth)) // sanity check
+%   if underlyingType == 'UInt':
+      let iAsUnderlyingType = UInt(bitPattern: i)
+%   elif underlyingType == 'UInt32':
+      let iAsUnderlyingType = UInt32(truncatingIfNeeded: i)
+%   end
+    let lowBits = _bits & ((1 << iAsUnderlyingType) - 1)
+    return _${name}Bitmap(_bits: lowBits).setBitCount
+  }
+}
+
+struct _${name}SetBitSequence : Sequence, IteratorProtocol {
+  var _bits: ${underlyingType}
+  var _index: Int = 0
+
+  init(_ _bits: ${underlyingType}) { self._bits = _bits }
+
+  mutating func next() -> Int? {
+    if _bits == 0 {
+      return nil
+    }
+    while true {
+      if _bits & 1 == 1 {
+        let result = _index
+        _index += 1
+        _bits = _bits >> 1
+        return result
+      }
+      _index += 1
+      _bits = _bits >> 1
+    }
+  }
+}
+% end
+
+//
+// END OF Standard library extras
+//
+
+
+struct _PVSparseVectorNodeLayoutParameters {
+  var childNodeCount: Int
+  var keyCount: Int
+}
+
+struct _PVSparseVectorNodePointer<Key : LegacyHashable, Value>
+  : CustomReflectable {
+  typealias _Self = _PVSparseVectorNodePointer
+
+  static var _referenceCountSize: Int {
+    return MemoryLayout<Int>.size
+  }
+  static var _referenceCountAlignment: Int {
+    return MemoryLayout<Int>.alignment
+  }
+  static var _referenceCountOffset: Int {
+    return 0
+  }
+
+  static var _childNodePopulationBitmapSize: Int {
+    return MemoryLayout<_Int32Bitmap>.size
+  }
+  static var _childNodePopulationBitmapAlignment: Int {
+    return MemoryLayout<_Int32Bitmap>.alignment
+  }
+  static var _childNodePopulationBitmapOffset: Int {
+    let padding =
+      max(0, _childNodePopulationBitmapAlignment - _referenceCountAlignment)
+    return _referenceCountOffset + _referenceCountSize + padding
+  }
+
+  static var _keyPopulationBitmapSize: Int {
+    return MemoryLayout<_Int32Bitmap>.size
+  }
+  static var _keyPopulationBitmapAlignment: Int {
+    return MemoryLayout<_Int32Bitmap>.alignment
+  }
+  static var _keyPopulationBitmapOffset: Int {
+    let padding =
+      max(0, _keyPopulationBitmapAlignment - _childNodePopulationBitmapAlignment)
+    return _childNodePopulationBitmapOffset + _childNodePopulationBitmapSize
+      + padding
+  }
+
+  static func _childNodeVectorSize(layout: _PVSparseVectorNodeLayoutParameters) -> Int {
+    return MemoryLayout<UnsafePointer<UInt8>>.stride * layout.childNodeCount
+  }
+  static var _childNodeVectorAlignment: Int {
+    return MemoryLayout<UnsafePointer<UInt8>>.alignment
+  }
+  static var _childNodeVectorOffset: Int {
+    let padding =
+      max(0, _childNodeVectorAlignment - _keyPopulationBitmapAlignment)
+    return _keyPopulationBitmapOffset + _keyPopulationBitmapSize + padding
+  }
+
+  static func _keyVectorSize(layout: _PVSparseVectorNodeLayoutParameters) -> Int {
+    return MemoryLayout<Key>.stride * layout.keyCount
+  }
+  static var _keyVectorAlignment: Int {
+    return MemoryLayout<Key>.alignment
+  }
+  static func _keyVectorOffset(layout: _PVSparseVectorNodeLayoutParameters) -> Int {
+    let padding =
+      max(0, _keyVectorAlignment - _childNodeVectorAlignment)
+    return _childNodeVectorOffset + _childNodeVectorSize(layout: layout) + padding
+  }
+
+  static func _valueVectorSize(layout: _PVSparseVectorNodeLayoutParameters) -> Int {
+    return MemoryLayout<Value>.stride * layout.keyCount
+  }
+  static var _valueVectorAlignment: Int {
+    return MemoryLayout<Value>.alignment
+  }
+  static func _valueVectorOffset(layout: _PVSparseVectorNodeLayoutParameters) -> Int {
+    let padding =
+      max(0, _valueVectorAlignment - _keyVectorAlignment)
+    return _keyVectorOffset(layout: layout) + _keyVectorSize(layout: layout) + padding
+  }
+
+  static var _nodeAlignment: Int {
+    return _referenceCountAlignment
+  }
+
+  static func _nodeSize(layout: _PVSparseVectorNodeLayoutParameters) -> Int {
+    return _valueVectorOffset(layout: layout) + _valueVectorSize(layout: layout)
+  }
+
+  var _nodePointer: UnsafeMutableRawPointer
+
+  var _referenceCountPointer: UnsafeMutablePointer<Int> {
+    return _nodePointer.assumingMemoryBound(to: Int.self)
+  }
+
+  var layoutParameters: _PVSparseVectorNodeLayoutParameters {
+    return _PVSparseVectorNodeLayoutParameters(
+      childNodeCount: childNodeCount,
+      keyCount: keyCount)
+  }
+
+  func retain() {
+    let old = _swift_stdlib_atomicFetchAddInt(
+      object: _referenceCountPointer,
+      operand: 1)
+    precondition(old != 0) // sanity check
+  }
+
+  func release() {
+    let old = _swift_stdlib_atomicFetchAddInt(
+      object: _referenceCountPointer,
+      operand: -1)
+    if _slowPath(old == 1) {
+      dealloc()
+    }
+  }
+
+  func dealloc() {
+    for child in childNodes {
+      child?.release()
+    }
+    let layout = layoutParameters
+    _keyVector(layout: layout).deinitialize(count: keyCount)
+    _valueVector(layout: layout).deinitialize(count: keyCount)
+    deallocBytes(self._nodePointer,
+      byteCount: _Self._nodeSize(layout: layout),
+      alignment: _Self._nodeAlignment)
+  }
+
+  func isUniquelyReferenced() -> Bool {
+    return _swift_stdlib_atomicLoadInt(object: _referenceCountPointer) == 1
+  }
+
+  var childNodePopulationBitmap: _Int32Bitmap {
+    unsafeAddress {
+      return UnsafePointer((_nodePointer + _Self._childNodePopulationBitmapOffset)
+        .assumingMemoryBound(to: _Int32Bitmap.self))
+    }
+    nonmutating unsafeMutableAddress {
+      return (_nodePointer + _Self._childNodePopulationBitmapOffset)
+        .assumingMemoryBound(to: _Int32Bitmap.self)
+    }
+  }
+
+  var keyPopulationBitmap: _Int32Bitmap {
+    unsafeAddress {
+      return UnsafePointer((_nodePointer + _Self._keyPopulationBitmapOffset)
+        .assumingMemoryBound(to: _Int32Bitmap.self))
+    }
+    nonmutating unsafeMutableAddress {
+      return (_nodePointer + _Self._keyPopulationBitmapOffset)
+        .assumingMemoryBound(to: _Int32Bitmap.self)
+    }
+  }
+
+  var childNodeCount: Int {
+    return childNodePopulationBitmap.setBitCount
+  }
+
+  var keyCount: Int {
+    return keyPopulationBitmap.setBitCount
+  }
+
+  var _childNodeVector: UnsafeMutablePointer<_PVAnyNodePointer<Key, Value>?> {
+    return (_nodePointer + _Self._childNodeVectorOffset)
+      .assumingMemoryBound(to: Optional<_PVAnyNodePointer<Key, Value>>.self)
+  }
+
+  var childNodes: UnsafeMutableBufferPointer<_PVAnyNodePointer<Key, Value>?> {
+    return UnsafeMutableBufferPointer(
+      start: _childNodeVector,
+      count: childNodeCount)
+  }
+
+  func _keyVector(layout: _PVSparseVectorNodeLayoutParameters)
+    -> UnsafeMutablePointer<Key> {
+    return (_nodePointer + _Self._keyVectorOffset(layout: layout))
+      .assumingMemoryBound(to: Key.self)
+  }
+
+  func _valueVector(layout: _PVSparseVectorNodeLayoutParameters)
+    -> UnsafeMutablePointer<Value> {
+    return (_nodePointer + _Self._valueVectorOffset(layout: layout))
+      .assumingMemoryBound(to: Value.self)
+  }
+
+  init(_nodePointer: UnsafeMutableRawPointer) {
+    self._nodePointer = _nodePointer
+  }
+
+  init(emptyNodeFor layout: _PVSparseVectorNodeLayoutParameters) {
+    self = _PVSparseVectorNodePointer(
+      uninitializedNodeFor: layout,
+      childNodePopulationBitmap: _Int32Bitmap(),
+      keyPopulationBitmap: _Int32Bitmap())
+  }
+
+  init(
+    uninitializedNodeFor layout: _PVSparseVectorNodeLayoutParameters,
+    childNodePopulationBitmap: _Int32Bitmap,
+    keyPopulationBitmap: _Int32Bitmap
+  ) {
+    precondition(layout.childNodeCount >= 0) // sanity check
+    precondition(layout.keyCount >= 0) // sanity check
+
+    self._nodePointer = allocBytes(
+      count: _Self._nodeSize(layout: layout),
+      alignment: _Self._nodeAlignment)
+
+    // Initialize members.
+    _swift_stdlib_atomicStoreInt(object: _referenceCountPointer, desired: 1)
+    self.childNodePopulationBitmap = childNodePopulationBitmap
+    self.keyPopulationBitmap = keyPopulationBitmap
+  }
+
+  func initializeKey(
+    at i: Int,
+    key: Key,
+    value: Value,
+    layout: _PVSparseVectorNodeLayoutParameters
+  ) {
+    precondition(i >= keyCount && i < 32) // sanity check
+    precondition(!childNodePopulationBitmap[i]) // sanity check
+    precondition(!keyPopulationBitmap[i]) // sanity check
+
+    (_keyVector(layout: layout) + keyCount).initialize(to: key)
+    (_valueVector(layout: layout) + keyCount).initialize(to: value)
+
+    keyPopulationBitmap[i] = true
+  }
+
+  /// - Parameter newChildNodes: child nodes to store, passed at +0.
+  func initializeChildNodes(
+    from newChildNodes: UnsafeMutablePointer<_PVAnyNodePointer<Key, Value>?>
+  ) {
+    _childNodeVector.initialize(from: newChildNodes, count: childNodeCount)
+    for childNode in childNodes {
+      childNode!.retain()
+    }
+  }
+
+  /// - Parameter newChildNodes: child nodes to store, passed at +0.
+  /// - Parameter newChildNode: child node to insert in the middle, passed
+  ///   at +1.
+  func initializeChildNodes(
+    from newChildNodes: UnsafeMutablePointer<_PVAnyNodePointer<Key, Value>?>,
+    except bucket: Int,
+    replaceWith newChildNode: _PVAnyNodePointer<Key, Value>
+  ) {
+    precondition(bucket >= 0 && bucket < 32) // sanity check
+    let i = childNodePopulationBitmap.countBitsSetBelow(bucket)
+    let childNodeVector = _childNodeVector
+    childNodeVector.initialize(from: newChildNodes, count: i)
+    for childNode in
+      UnsafeMutableBufferPointer(
+        start: childNodeVector, count: i)
+    {
+      childNode!.retain()
+    }
+
+    childNodeVector[i] = newChildNode
+
+    let destPointer = childNodeVector + i + 1
+    destPointer.initialize(from:
+      newChildNodes + i + 1, count: childNodeCount - i - 1)
+    for childNode in
+      UnsafeMutableBufferPointer(
+        start: destPointer, count: childNodeCount - i - 1)
+    {
+      childNode!.retain()
+    }
+  }
+
+  /// - Parameter newChildNodes: child nodes to store, passed at +0.
+  /// - Parameter newChildNode: child node to insert in the middle, passed
+  ///   at +1.
+  func initializeChildNodes(
+    from newChildNodes: UnsafeMutablePointer<_PVAnyNodePointer<Key, Value>?>,
+    at bucket: Int,
+    insert newChildNode: _PVAnyNodePointer<Key, Value>
+  ) {
+    precondition(bucket >= 0 && bucket < 32) // sanity check
+    let i = childNodePopulationBitmap.countBitsSetBelow(bucket)
+    let childNodeVector = _childNodeVector
+    childNodeVector.initialize(from: newChildNodes, count: i)
+    for childNode in
+      UnsafeMutableBufferPointer(
+        start: childNodeVector, count: i)
+    {
+      childNode!.retain()
+    }
+
+    childNodeVector[i] = newChildNode
+
+    let destPointer = childNodeVector + i + 1
+    destPointer.initialize(from:
+      newChildNodes + i, count: childNodeCount - i - 1)
+    for childNode in
+      UnsafeMutableBufferPointer(
+        start: destPointer, count: childNodeCount - i - 1)
+    {
+      childNode!.retain()
+    }
+  }
+
+  func copyKeys(
+    from newKeys: UnsafeMutablePointer<Key>,
+    layout: _PVSparseVectorNodeLayoutParameters
+  ) {
+    _keyVector(layout: layout).initialize(from: newKeys, count: layout.keyCount)
+  }
+
+  func copyKeys(
+    from newKeys: UnsafeMutablePointer<Key>,
+    except bucket: Int,
+    replaceWith newKey: Key,
+    layout: _PVSparseVectorNodeLayoutParameters
+  ) {
+    precondition(bucket >= 0 && bucket < 32) // sanity check
+    let keyVector = _keyVector(layout: layout)
+    let i = keyPopulationBitmap.countBitsSetBelow(bucket)
+    keyVector.initialize(from: newKeys, count: i)
+    keyVector[i] = newKey
+
+    let destPointer = keyVector + i + 1
+    destPointer.initialize(from:
+      newKeys + i + 1, count: layout.keyCount - i - 1)
+  }
+
+  func copyValues(
+    from newValues: UnsafeMutablePointer<Value>,
+    layout: _PVSparseVectorNodeLayoutParameters
+  ) {
+    _valueVector(layout: layout).initialize(from: newValues, count: layout.keyCount)
+  }
+
+  func copyValues(
+    from newValues: UnsafeMutablePointer<Value>,
+    except bucket: Int,
+    replaceWith newValue: Value,
+    layout: _PVSparseVectorNodeLayoutParameters
+  ) {
+    precondition(bucket >= 0 && bucket < 32) // sanity check
+    let valueVector = _valueVector(layout: layout)
+    let i = keyPopulationBitmap.countBitsSetBelow(bucket)
+    valueVector.initialize(from: newValues, count: i)
+    valueVector[i] = newValue
+
+    let destPointer = valueVector + i + 1
+    destPointer.initialize(from:
+      newValues + i + 1, count: layout.keyCount - i - 1)
+  }
+
+  func initializeKeys(
+    from newKeys: UnsafeMutablePointer<Key>,
+    values newValues: UnsafeMutablePointer<Value>,
+    omit bucket: Int,
+    layout: _PVSparseVectorNodeLayoutParameters
+  ) {
+    precondition(bucket >= 0 && bucket < 32) // sanity check
+    if layout.keyCount == 0 {
+      // Fast path when we are not copying anything.
+      return
+    }
+
+    let i = keyPopulationBitmap.countBitsSetBelow(bucket)
+    do {
+      let keyVector = _keyVector(layout: layout)
+      keyVector.initialize(from: newKeys, count: i)
+
+      let destPointer = keyVector + i
+      destPointer.initialize(from:
+        newKeys + i + 1, count: layout.keyCount - i)
+    }
+    do {
+      let valueVector = _valueVector(layout: layout)
+      valueVector.initialize(from: newValues, count: i)
+
+      let destPointer = valueVector + i
+      destPointer.initialize(from:
+        newValues + i + 1, count: layout.keyCount - i)
+    }
+  }
+
+  func initializeKeys(
+    from newKeys: UnsafeMutablePointer<Key>,
+    values newValues: UnsafeMutablePointer<Value>,
+    at bucket: Int,
+    insert newKey: Key,
+    _ newValue: Value,
+    layout: _PVSparseVectorNodeLayoutParameters
+  ) {
+    precondition(bucket >= 0 && bucket < 32) // sanity check
+
+    let i = keyPopulationBitmap.countBitsSetBelow(bucket)
+    do {
+      let keyVector = _keyVector(layout: layout)
+      keyVector.initialize(from: newKeys, count: i)
+
+      keyVector[i] = newKey
+
+      let destPointer = keyVector + i + 1
+      destPointer.initialize(from:
+        newKeys + i, count: layout.keyCount - i - 1)
+    }
+    do {
+      let valueVector = _valueVector(layout: layout)
+      valueVector.initialize(from: newValues, count: i)
+
+      valueVector[i] = newValue
+
+      let destPointer = valueVector + i + 1
+      destPointer.initialize(from:
+        newValues + i, count: layout.keyCount - i - 1)
+    }
+  }
+
+  func unsafeMaybeGet(
+    key: Key,
+    hashValue: Int,
+    depth: Int8
+  ) -> UnsafePointer<Value>? {
+    let bucket = hashValue & (32 - 1)
+    if childNodePopulationBitmap[bucket] {
+      // The bucket contains a subtree, recurse.
+      let i = childNodePopulationBitmap.countBitsSetBelow(bucket)
+      return _childNodeVector[i]!.unsafeMaybeGet(
+        key: key, hashValue: hashValue, depth: depth)
+    }
+    if keyPopulationBitmap[bucket] {
+      // The bucket contains a key.
+      let layout = layoutParameters
+      let i = keyPopulationBitmap.countBitsSetBelow(bucket)
+      let foundKey = _keyVector(layout: layout)[i]
+      if foundKey == key {
+        return UnsafePointer(_valueVector(layout: layout) + i)
+      }
+    }
+    return nil
+  }
+
+  func updateValue(
+    _ value: Value,
+    forKey key: Key,
+    hashValue: Int,
+    depth: Int8,
+    pathIsUnique: Bool
+  ) -> (Value?, _PVAnyNodePointer<Key, Value>, Bool) {
+    let bucket = hashValue & (32 - 1)
+    if childNodePopulationBitmap[bucket] {
+      // The bucket contains a subtree, recurse.
+      let i = childNodePopulationBitmap.countBitsSetBelow(bucket)
+      let isUnique = isUniquelyReferenced()
+      let oldChildNode = _childNodeVector[i]
+      let (oldValue, newChildNode, wasInserted) = oldChildNode!.updateValue(
+        value,
+        forKey: key,
+        hashValue: hashValue >> 5,
+        depth: depth + 1,
+        pathIsUnique: pathIsUnique && isUnique)
+
+      if _fastPath(newChildNode == oldChildNode) {
+        // The child node wasn't reallocated.
+        return (oldValue, _PVAnyNodePointer(self), wasInserted)
+      }
+
+      if _fastPath(pathIsUnique && isUnique) {
+        // The child node was reallocated, but the parent node is uniquely
+        // referenced.
+        if _childNodeVector[i] != newChildNode {
+          _childNodeVector[i]!.release()
+        }
+        _childNodeVector[i] = newChildNode
+        return (oldValue, _PVAnyNodePointer(self), wasInserted)
+      } else {
+        // The child node was reallocated, and the parent node is not uniquely
+        // referenced.  Create a new parent node.
+        let layout = layoutParameters
+        let newNode = _PVSparseVectorNodePointer<Key, Value>(
+          uninitializedNodeFor: layout,
+          childNodePopulationBitmap: childNodePopulationBitmap,
+          keyPopulationBitmap: keyPopulationBitmap)
+        newNode.initializeChildNodes(
+          from: _childNodeVector,
+          except: bucket,
+          replaceWith: newChildNode)
+        newNode.copyKeys(from: _keyVector(layout: layout), layout: layout)
+        newNode.copyValues(from: _valueVector(layout: layout), layout: layout)
+        return (oldValue, _PVAnyNodePointer(newNode), wasInserted)
+      }
+    }
+    if keyPopulationBitmap[bucket] {
+      // The bucket contains another key.
+      let layout = layoutParameters
+      let i = keyPopulationBitmap.countBitsSetBelow(bucket)
+      let keyVector = _keyVector(layout: layout)
+      let existingKey = keyVector[i]
+      let isUnique = isUniquelyReferenced()
+
+      if existingKey == key {
+        // The key already exists.  Update the value.
+        let valueVector = _valueVector(layout: layout)
+        let oldValue = valueVector[i]
+        if _fastPath(pathIsUnique && isUnique) {
+          _valueVector(layout: layout)[i] = value
+          return (oldValue, _PVAnyNodePointer(self), false)
+        } else {
+          let newNode = _PVSparseVectorNodePointer<Key, Value>(
+            uninitializedNodeFor: layout,
+            childNodePopulationBitmap: childNodePopulationBitmap,
+            keyPopulationBitmap: keyPopulationBitmap)
+          newNode.initializeChildNodes(from: _childNodeVector)
+          newNode.copyKeys(
+            from: keyVector,
+            except: bucket,
+            replaceWith: key,
+            layout: layout)
+          newNode.copyValues(
+            from: valueVector,
+            except: bucket,
+            replaceWith: value,
+            layout: layout)
+          return (oldValue, _PVAnyNodePointer(newNode), false)
+        }
+      }
+
+      // Create a node to hold both the old key and the new key.
+      let valueVector = _valueVector(layout: layout)
+      let existingValue = valueVector[i]
+      let newChildNode = _PVCollisionNodePointer(
+        key0: key, value0: value,
+        key1: existingKey, value1: existingValue)
+
+      // Create a new parent node that will reference the new child.
+      var newLayout = layout
+      newLayout.childNodeCount += 1
+      newLayout.keyCount -= 1
+      precondition(newLayout.childNodeCount <= 32)
+      precondition(newLayout.keyCount >= 0)
+
+      var newChildNodePopulationBitmap = childNodePopulationBitmap
+      newChildNodePopulationBitmap[bucket] = true
+      var newKeyPopulationBitmap = keyPopulationBitmap
+      newKeyPopulationBitmap[bucket] = false
+
+      // FIXME(performance): the node is usually large enough to
+      // switch it to the new layout in place.
+      let newNode = _PVSparseVectorNodePointer<Key, Value>(
+        uninitializedNodeFor: newLayout,
+        childNodePopulationBitmap: newChildNodePopulationBitmap,
+        keyPopulationBitmap: newKeyPopulationBitmap)
+      newNode.initializeChildNodes(
+        from: _childNodeVector,
+        at: bucket,
+        insert: _PVAnyNodePointer(newChildNode))
+      newNode.initializeKeys(
+        from: keyVector,
+        values: valueVector,
+        omit: bucket,
+        layout: newLayout)
+
+      return (nil, _PVAnyNodePointer(newNode), true)
+    }
+    // The bucket is empty.  Insert the key.
+    /*
+    FIXME(performance): if the node is uniquely referenced, it may be possible
+    to insert the new key in place.
+    if _fastPath(pathIsUnique && isUniquelyReferenced()) {
+      return (nil, _PVAnyNodePointer(self))
+    }
+    */
+    /*
+    FIXME: transparently transition to the array representation.
+    if childNodeCount + keyCount + 1 >= 24 {}
+    */
+    let layout = layoutParameters
+    var newLayout = layout
+    newLayout.keyCount += 1
+    var newKeyPopulationBitmap = keyPopulationBitmap
+    newKeyPopulationBitmap[bucket] = true
+    let newNode = _PVSparseVectorNodePointer<Key, Value>(
+      uninitializedNodeFor: newLayout,
+      childNodePopulationBitmap: childNodePopulationBitmap,
+      keyPopulationBitmap: newKeyPopulationBitmap)
+    newNode.initializeChildNodes(from: _childNodeVector)
+    newNode.initializeKeys(
+      from: _keyVector(layout: layout),
+      values: _valueVector(layout: layout),
+      at: bucket, insert: key, value,
+      layout: newLayout)
+    return (nil, _PVAnyNodePointer(newNode), true)
+  }
+
+  func removeValue(
+    forKey key: Key,
+    hashValue: Int,
+    depth: Int8,
+    pathIsUnique: Bool
+  ) -> (Value?, _PVAnyNodePointer<Key, Value>?) {
+    let bucket = hashValue & (32 - 1)
+    if childNodePopulationBitmap[bucket] {
+      // The bucket contains a subtree, recurse.
+      fatalError("FIXME")
+    }
+    if keyPopulationBitmap[bucket] {
+      // The bucket contains a key.
+      let layout = layoutParameters
+      let i = keyPopulationBitmap.countBitsSetBelow(bucket)
+      let keyVector = _keyVector(layout: layout)
+      let existingKey = keyVector[i]
+      if existingKey != key {
+        return (nil, _PVAnyNodePointer(self))
+      }
+      // We found the key.  Remove it.
+
+      let valueVector = _valueVector(layout: layout)
+      let oldValue = valueVector[i]
+
+      if layout.childNodeCount == 0 && layout.keyCount == 1 {
+        // This key was the last piece of data in the node.  Eliminate the
+        // node.
+        return (oldValue, nil)
+      }
+
+      // The node contains other data besides this key.
+      var newLayout = layout
+      newLayout.keyCount -= 1
+      precondition(newLayout.keyCount >= 0)
+
+      var newKeyPopulationBitmap = keyPopulationBitmap
+      newKeyPopulationBitmap[bucket] = false
+
+      let newNode = _PVSparseVectorNodePointer<Key, Value>(
+        uninitializedNodeFor: layout,
+        childNodePopulationBitmap: childNodePopulationBitmap,
+        keyPopulationBitmap: newKeyPopulationBitmap)
+      newNode.initializeChildNodes(from: _childNodeVector)
+      newNode.initializeKeys(
+        from: keyVector,
+        values: valueVector,
+        omit: bucket,
+        layout: newLayout)
+
+      return (oldValue, _PVAnyNodePointer(newNode))
+    }
+
+    // The bucket is empty.
+    return (nil, _PVAnyNodePointer(self))
+  }
+
+  var customMirror: Mirror {
+    let layout = layoutParameters
+    let data =
+      (0..<keyCount).map { (i) -> (Key, Value) in
+        ((_keyVector(layout: layout) + i).pointee,
+         (_valueVector(layout: layout) + i).pointee)
+      }
+    return Mirror(
+      self,
+      children: [
+        "referenceCount" : _referenceCountPointer.pointee,
+        "childNodePopulationBitmap" :
+          Array(childNodePopulationBitmap.setBitIndices),
+        "keyPopulationBitmap" :
+          Array(keyPopulationBitmap.setBitIndices),
+        "childNodes" : Array(childNodes),
+        "data" : data
+      ])
+  }
+}
+
+struct _PVArrayNodePointer<Key : LegacyHashable, Value>
+  : CustomReflectable {
+
+  typealias _Self = _PVArrayNodePointer
+
+  static var _childNodeOrKeyStride: Int {
+    return max(
+      MemoryLayout<UnsafePointer<UInt8>>.stride,
+      MemoryLayout<Key>.stride)
+  }
+  static var _childNodeOrKeyAlignment: Int {
+    return max(
+      MemoryLayout<UnsafePointer<UInt8>>.alignment,
+      MemoryLayout<Key>.alignment)
+  }
+
+  static var _referenceCountSize: Int {
+    return MemoryLayout<Int>.size
+  }
+  static var _referenceCountAlignment: Int {
+    return MemoryLayout<Int>.alignment
+  }
+  static var _referenceCountOffset: Int {
+    return 0
+  }
+
+  static var _childNodePopulationBitmapSize: Int {
+    return MemoryLayout<_Int32Bitmap>.size
+  }
+  static var _childNodePopulationBitmapAlignment: Int {
+    return MemoryLayout<_Int32Bitmap>.alignment
+  }
+  static var _childNodePopulationBitmapOffset: Int {
+    let padding = max(
+      0,
+      _childNodePopulationBitmapAlignment - _referenceCountAlignment)
+    return _referenceCountOffset + _referenceCountSize + padding
+  }
+
+  static var _keyPopulationBitmapSize: Int {
+    return MemoryLayout<_Int32Bitmap>.size
+  }
+  static var _keyPopulationBitmapAlignment: Int {
+    return MemoryLayout<_Int32Bitmap>.alignment
+  }
+  static var _keyPopulationBitmapOffset: Int {
+    let padding = max(
+      0,
+      _keyPopulationBitmapAlignment - _childNodePopulationBitmapAlignment)
+    return _childNodePopulationBitmapOffset
+      + _childNodePopulationBitmapSize
+      + padding
+  }
+
+  static var _childNodeOrKeyArraySize: Int {
+    return _childNodeOrKeyStride * 32
+  }
+  static var _childNodeOrKeyArrayAlignment: Int {
+    return _childNodeOrKeyAlignment
+  }
+  static var _childNodeOrKeyArrayOffset: Int {
+    let padding =
+      max(0, _childNodeOrKeyArrayAlignment - _keyPopulationBitmapAlignment)
+    return _keyPopulationBitmapOffset + _keyPopulationBitmapSize + padding
+  }
+
+  static var _valueArraySize: Int {
+    return MemoryLayout<Value>.stride * 32
+  }
+  static var _valueArrayAlignment: Int {
+    return MemoryLayout<Value>.alignment
+  }
+  static var _valueArrayOffset: Int {
+    let padding =
+      max(0, _valueArrayAlignment - _childNodeOrKeyArrayAlignment)
+    return _childNodeOrKeyArrayOffset + _childNodeOrKeyArraySize + padding
+  }
+
+  static var _nodeAlignment: Int {
+    return _referenceCountAlignment
+  }
+
+  static var _nodeSize: Int {
+    return _valueArrayOffset + _valueArraySize
+  }
+
+  var _nodePointer: UnsafeMutableRawPointer
+
+  var _referenceCountPointer: UnsafeMutablePointer<Int> {
+    return _nodePointer.assumingMemoryBound(to: Int.self)
+  }
+
+  func retain() {
+    let old = _swift_stdlib_atomicFetchAddInt(
+      object: _referenceCountPointer,
+      operand: 1)
+    precondition(old != 0) // sanity check
+  }
+
+  func release() {
+    let old = _swift_stdlib_atomicFetchAddInt(
+      object: _referenceCountPointer,
+      operand: -1)
+    if _slowPath(old == 1) {
+      dealloc()
+    }
+  }
+
+  func dealloc() {
+    for i in childNodePopulationBitmap.setBitIndices {
+      (_childNodeOrKeyArray + _Self._childNodeOrKeyStride * i)
+        .assumingMemoryBound(to: _PVAnyNodePointer<Key, Value>.self)
+        .pointee.release()
+    }
+    if !_isPOD(Key.self) {
+      for i in keyPopulationBitmap.setBitIndices {
+        (_childNodeOrKeyArray + _Self._childNodeOrKeyStride * i)
+          .assumingMemoryBound(to: Key.self)
+          .deinitialize(count: 1)
+      }
+    }
+    if !_isPOD(Value.self) {
+      for i in keyPopulationBitmap.setBitIndices {
+        (_valueArray + i).deinitialize(count: 1)
+      }
+    }
+    deallocBytes(self._nodePointer,
+      byteCount: _Self._nodeSize,
+      alignment: _Self._nodeAlignment)
+  }
+
+  func isUniquelyReferenced() -> Bool {
+    return _swift_stdlib_atomicLoadInt(object: _referenceCountPointer) == 1
+  }
+
+  var childNodePopulationBitmap: _Int32Bitmap {
+    unsafeAddress {
+      return UnsafePointer((_nodePointer + _Self._childNodePopulationBitmapOffset)
+        .assumingMemoryBound(to: _Int32Bitmap.self))
+    }
+    nonmutating unsafeMutableAddress {
+      return (_nodePointer + _Self._childNodePopulationBitmapOffset)
+        .assumingMemoryBound(to: _Int32Bitmap.self)
+    }
+  }
+
+  var keyPopulationBitmap: _Int32Bitmap {
+    unsafeAddress {
+      return UnsafePointer((_nodePointer + _Self._keyPopulationBitmapOffset)
+        .assumingMemoryBound(to: _Int32Bitmap.self))
+    }
+    nonmutating unsafeMutableAddress {
+      return (_nodePointer + _Self._keyPopulationBitmapOffset)
+        .assumingMemoryBound(to: _Int32Bitmap.self)
+    }
+  }
+
+  var childNodeCount: Int {
+    return childNodePopulationBitmap.setBitCount
+  }
+
+  var keyCount: Int {
+    return keyPopulationBitmap.setBitCount
+  }
+
+  var _childNodeOrKeyArray: UnsafeMutableRawPointer {
+    return _nodePointer + _Self._childNodeOrKeyArrayOffset
+  }
+
+  var _valueArray: UnsafeMutablePointer<Value> {
+    return (_nodePointer + _Self._valueArrayOffset)
+      .assumingMemoryBound(to: Value.self)
+  }
+
+  init(_nodePointer: UnsafeMutableRawPointer) {
+    self._nodePointer = _nodePointer
+  }
+
+  init() {
+    self._nodePointer = allocBytes(
+      count: _Self._nodeSize,
+      alignment: _Self._nodeAlignment)
+
+    // Initialize members.
+    _swift_stdlib_atomicStoreInt(object: _referenceCountPointer, desired: 1)
+    self.childNodePopulationBitmap = _Int32Bitmap()
+    self.keyPopulationBitmap = _Int32Bitmap()
+  }
+
+  func initializeKey(
+    at i: Int,
+    key: Key,
+    value: Value
+  ) {
+    precondition(i >= 0 && i < 32) // sanity check
+    precondition(!childNodePopulationBitmap[i]) // sanity check
+    precondition(!keyPopulationBitmap[i]) // sanity check
+
+    (_childNodeOrKeyArray + _Self._childNodeOrKeyStride * i)
+      .initializeMemory(as: Key.self, repeating: key, count: 1)
+    (_valueArray + i).initialize(to: value)
+
+    keyPopulationBitmap[i] = true
+  }
+
+  func unsafeMaybeGet(
+    key: Key,
+    hashValue: Int,
+    depth: Int8
+  ) -> UnsafePointer<Value> {
+    fatalError("FIXME")
+  }
+
+  func updateValue(
+    _ value: Value,
+    forKey key: Key,
+    hashValue: Int,
+    depth: Int8,
+    pathIsUnique: Bool
+  ) -> (Value?, _PVAnyNodePointer<Key, Value>, Bool) {
+    fatalError("FIXME")
+  }
+
+  func removeValue(
+    forKey key: Key,
+    hashValue: Int,
+    depth: Int8,
+    pathIsUnique: Bool
+  ) -> (Value?, _PVAnyNodePointer<Key, Value>?) {
+    fatalError("FIXME")
+  }
+
+  var customMirror: Mirror {
+    fatalError("FIXME")
+  }
+}
+
+struct _PVCollisionNodePointerLayoutParameters {
+  var keyCount: Int
+}
+
+struct _PVCollisionNodePointer<Key : LegacyHashable, Value>
+  : CustomReflectable {
+
+  typealias _Self = _PVCollisionNodePointer
+
+  static var _referenceCountSize: Int {
+    return MemoryLayout<Int>.size
+  }
+  static var _referenceCountAlignment: Int {
+    return MemoryLayout<Int>.alignment
+  }
+  static var _referenceCountOffset: Int {
+    return 0
+  }
+
+  static var _countSize: Int {
+    return MemoryLayout<Int>.size
+  }
+  static var _countAlignment: Int {
+    return MemoryLayout<Int>.alignment
+  }
+  static var _countOffset: Int {
+    let padding = max(
+      0,
+      _countAlignment - _referenceCountAlignment)
+    return _referenceCountOffset + _referenceCountSize + padding
+  }
+
+  static func _keyArraySize(layout: _PVCollisionNodePointerLayoutParameters) -> Int {
+    return MemoryLayout<Key>.stride * layout.keyCount
+  }
+  static var _keyArrayAlignment: Int {
+    return MemoryLayout<Key>.alignment
+  }
+  static var _keyArrayOffset: Int {
+    let padding =
+      max(0, _keyArrayAlignment - _countAlignment)
+    return _countOffset + _countSize + padding
+  }
+
+  static func _valueArraySize(layout: _PVCollisionNodePointerLayoutParameters) -> Int {
+    return MemoryLayout<Value>.stride * layout.keyCount
+  }
+  static var _valueArrayAlignment: Int {
+    return MemoryLayout<Value>.alignment
+  }
+  static func _valueArrayOffset(layout: _PVCollisionNodePointerLayoutParameters) -> Int {
+    let padding =
+      max(0, _valueArrayAlignment - _keyArrayAlignment)
+    return _keyArrayOffset + _keyArraySize(layout: layout) + padding
+  }
+
+  static var _nodeAlignment: Int {
+    return _referenceCountAlignment
+  }
+
+  static func _nodeSize(layout: _PVCollisionNodePointerLayoutParameters) -> Int {
+    return _valueArrayOffset(layout: layout) + _valueArraySize(layout: layout)
+  }
+
+  var _nodePointer: UnsafeMutableRawPointer
+
+  var _referenceCountPointer: UnsafeMutablePointer<Int> {
+    return _nodePointer.assumingMemoryBound(to: Int.self)
+  }
+
+  var layoutParameters: _PVCollisionNodePointerLayoutParameters {
+    return _PVCollisionNodePointerLayoutParameters(
+      keyCount: keyCount)
+  }
+
+  func retain() {
+    let old = _swift_stdlib_atomicFetchAddInt(
+      object: _referenceCountPointer,
+      operand: 1)
+    precondition(old != 0) // sanity check
+  }
+
+  func release() {
+    let old = _swift_stdlib_atomicFetchAddInt(
+      object: _referenceCountPointer,
+      operand: -1)
+    if _slowPath(old == 1) {
+      dealloc()
+    }
+  }
+
+  func dealloc() {
+    let layout = layoutParameters
+    _keyArray.deinitialize(count: keyCount)
+    _valueArray(layout: layout).deinitialize(count: keyCount)
+    deallocBytes(self._nodePointer,
+      byteCount: _Self._nodeSize(layout: layout),
+      alignment: _Self._nodeAlignment)
+  }
+
+  func isUniquelyReferenced() -> Bool {
+    return _swift_stdlib_atomicLoadInt(object: _referenceCountPointer) == 1
+  }
+
+  var keyCount: Int {
+    unsafeAddress {
+      return UnsafePointer((_nodePointer + _Self._countOffset)
+        .assumingMemoryBound(to: Int.self))
+    }
+    nonmutating unsafeMutableAddress {
+      return (_nodePointer + _Self._countOffset)
+        .assumingMemoryBound(to: Int.self)
+    }
+  }
+
+  var _keyArray: UnsafeMutablePointer<Key> {
+    return (_nodePointer + _Self._keyArrayOffset)
+      .assumingMemoryBound(to: Key.self)
+  }
+
+  func _valueArray(layout: _PVCollisionNodePointerLayoutParameters)
+    -> UnsafeMutablePointer<Value> {
+    return (_nodePointer + _Self._valueArrayOffset(layout: layout))
+      .assumingMemoryBound(to: Value.self)
+  }
+
+  init(_nodePointer: UnsafeMutableRawPointer) {
+    self._nodePointer = _nodePointer
+  }
+
+  init(
+    uninitializedNodeFor layout: _PVCollisionNodePointerLayoutParameters
+  ) {
+    self._nodePointer = allocBytes(
+      count: _Self._nodeSize(layout: layout),
+      alignment: _Self._nodeAlignment)
+
+    // Initialize members.
+    _swift_stdlib_atomicStoreInt(object: _referenceCountPointer, desired: 1)
+    self.keyCount = layout.keyCount
+  }
+
+  init(
+    key0: Key, value0: Value,
+    key1: Key, value1: Value
+  ) {
+    let layout = _PVCollisionNodePointerLayoutParameters(keyCount: 2)
+    self = _Self(uninitializedNodeFor: layout)
+
+    let keyArray = self._keyArray
+    keyArray.initialize(to: key0)
+    (keyArray + 1).initialize(to: key1)
+
+    let valueArray = self._valueArray(layout: layout)
+    valueArray.initialize(to: value0)
+    (valueArray + 1).initialize(to: value1)
+  }
+
+  func initializeKey(
+    at i: Int,
+    key: Key,
+    value: Value,
+    layout: _PVCollisionNodePointerLayoutParameters
+  ) {
+    precondition(i >= 0 && i < layout.keyCount) // sanity check
+
+    (_keyArray + i).initialize(to: key)
+    (_valueArray(layout: layout) + i).initialize(to: value)
+  }
+
+  func copyValues(
+    from newValues: UnsafeMutablePointer<Value>,
+    except i: Int,
+    replaceWith newValue: Value,
+    layout: _PVCollisionNodePointerLayoutParameters
+  ) {
+    let valueArray = _valueArray(layout: layout)
+    valueArray.initialize(from: newValues, count: i)
+    valueArray[i] = newValue
+
+    let destPointer = valueArray + i + 1
+    destPointer.initialize(from:
+      newValues + i + 1, count: layout.keyCount - i - 1)
+  }
+
+  func initializeKeys(
+    from newKeys: UnsafeMutablePointer<Key>,
+    appendKey: Key,
+    values newValues: UnsafeMutablePointer<Value>,
+    appendValue: Value,
+    layout: _PVCollisionNodePointerLayoutParameters
+  ) {
+    precondition(layout.keyCount >= 1)
+
+    let keyArray = _keyArray
+    keyArray.initialize(from: newKeys, count: layout.keyCount - 1)
+    (keyArray + layout.keyCount - 1).initialize(to: appendKey)
+
+    let valueArray = _valueArray(layout: layout)
+    valueArray.initialize(from: newValues, count: layout.keyCount - 1)
+    (valueArray + layout.keyCount - 1).initialize(to: appendValue)
+  }
+
+  func unsafeMaybeGet(
+    key: Key,
+    hashValue: Int,
+    depth: Int8
+  ) -> UnsafePointer<Value>? {
+    let layout = layoutParameters
+    let keyArray = _keyArray
+    for i in 0..<layout.keyCount {
+      if key == keyArray[i] {
+        return UnsafePointer(_valueArray(layout: layout) + i)
+      }
+    }
+    return nil
+  }
+
+  func updateValue(
+    _ value: Value,
+    forKey key: Key,
+    hashValue: Int,
+    depth: Int8,
+    pathIsUnique: Bool
+  ) -> (Value?, _PVAnyNodePointer<Key, Value>, Bool) {
+    let layout = layoutParameters
+    let keyArray = _keyArray
+    for i in 0..<layout.keyCount {
+      if key == keyArray[i] {
+        let valueArray = _valueArray(layout: layout)
+        let oldValue = valueArray[i]
+        if _fastPath(pathIsUnique && isUniquelyReferenced()) {
+          // Mutate in place.
+          valueArray[i] = value
+          return (oldValue, _PVAnyNodePointer(self), false)
+        } else {
+          // Create a new node.
+          let newNode = _PVCollisionNodePointer(uninitializedNodeFor: layout)
+          newNode._keyArray.initialize(from:
+            keyArray, count: layout.keyCount)
+          newNode.copyValues(
+            from: valueArray,
+            except: i,
+            replaceWith: value,
+            layout: layout)
+          return (oldValue, _PVAnyNodePointer(newNode), false)
+        }
+      }
+    }
+
+    // The key wasn't found, insert it.
+    /*
+    FIXME(performance): mutate in place.
+    if _fastPath(pathIsUnique && isUniquelyReferenced()) {
+      let newLayout = _PVCollisionNodePointerLayoutParameters(
+        keyCount: layout.keyCount + 1)
+      // Try to mutate in place.
+      let newSize = _Self._nodeSize(newLayout)
+      if _swift_stdlib_malloc_size(_nodePointer) >= newSize {
+        // Size is sufficient, append the new key.
+        keyCount = newLayout.keyCount
+        initializeKey(
+          at: newLayout.keyCount - 1,
+          key: key,
+          value: value,
+          layout: newLayout)
+        return (nil, _PVAnyNodePointer(self), true)
+      }
+    }
+    */
+    // We need to create a new node either because the node is not uniquely
+    // referenced, or it is too small to append in place.
+    let newLayout = _PVCollisionNodePointerLayoutParameters(
+      keyCount: layout.keyCount + 1)
+    let newNode = _PVCollisionNodePointer(uninitializedNodeFor: newLayout)
+    newNode.initializeKeys(
+      from: keyArray, appendKey: key,
+      values: _valueArray(layout: layout), appendValue: value,
+      layout: newLayout)
+    return (nil, _PVAnyNodePointer(newNode), true)
+  }
+
+  func removeValue(
+    forKey key: Key,
+    hashValue: Int,
+    depth: Int8,
+    pathIsUnique: Bool
+  ) -> (Value?, _PVAnyNodePointer<Key, Value>?) {
+    fatalError("FIXME")
+  }
+
+  var customMirror: Mirror {
+    let layout = layoutParameters
+    let data =
+      (0..<keyCount).map { (i) -> (Key, Value) in
+        ((_keyArray + i).pointee,
+         (_valueArray(layout: layout) + i).pointee)
+      }
+    return Mirror(
+      self,
+      children: [
+        "referenceCount" : _referenceCountPointer.pointee,
+        "keyCount" : keyCount,
+        "data" : data])
+  }
+}
+
+struct _PVAnyNodePointer<Key : LegacyHashable, Value>
+  : CustomReflectable, Equatable {
+
+  let taggedPointer: UnsafeMutableRawPointer
+
+  init(taggedPointer: UnsafeMutableRawPointer) {
+    self.taggedPointer = taggedPointer
+  }
+
+  init(_ sparseVectorNode: _PVSparseVectorNodePointer<Key, Value>) {
+    precondition(
+      Int(bitPattern: sparseVectorNode._nodePointer) & 0x3 == 0) // sanity check
+    self.taggedPointer = sparseVectorNode._nodePointer
+  }
+
+  init(_ arrayNode: _PVArrayNodePointer<Key, Value>) {
+    precondition(
+      Int(bitPattern: arrayNode._nodePointer) & 0x3 == 0) // sanity check
+    self.taggedPointer = UnsafeMutableRawPointer(bitPattern:
+      Int(bitPattern: arrayNode._nodePointer) | 1)!
+  }
+
+  init(_ collisionNode: _PVCollisionNodePointer<Key, Value>) {
+    precondition(
+      Int(bitPattern: collisionNode._nodePointer) & 0x3 == 0) // sanity check
+    self.taggedPointer = UnsafeMutableRawPointer(bitPattern:
+      Int(bitPattern: collisionNode._nodePointer) | 2)!
+  }
+
+  var tag: Int {
+    return Int(bitPattern: taggedPointer) & 0x3
+  }
+
+  var _untaggedPointer: UnsafeMutableRawPointer {
+    return UnsafeMutableRawPointer(bitPattern:
+      Int(bitPattern: taggedPointer) & ~0x3)!
+  }
+
+  var _referenceCountPointer: UnsafeMutablePointer<Int> {
+    return _untaggedPointer.assumingMemoryBound(to: Int.self)
+  }
+
+  var asSparseVectorNode: _PVSparseVectorNodePointer<Key, Value> {
+    precondition(tag == 0) // sanity check
+    return _PVSparseVectorNodePointer(_nodePointer: taggedPointer)
+  }
+
+  var asArrayNode: _PVArrayNodePointer<Key, Value> {
+    precondition(tag == 1) // sanity check
+    return _PVArrayNodePointer(_nodePointer: _untaggedPointer)
+  }
+
+  var asCollisionNode: _PVCollisionNodePointer<Key, Value> {
+    precondition(tag == 2) // sanity check
+    return _PVCollisionNodePointer(_nodePointer: _untaggedPointer)
+  }
+
+  func retain() {
+    let old = _swift_stdlib_atomicFetchAddInt(
+      object: _referenceCountPointer,
+      operand: 1)
+    precondition(old != 0) // sanity check
+  }
+
+  func release() {
+    let old = _swift_stdlib_atomicFetchAddInt(
+      object: _referenceCountPointer,
+      operand: -1)
+    if _slowPath(old == 1) {
+      dealloc()
+    }
+  }
+
+  func dealloc() {
+    switch tag {
+    case 0:
+      asSparseVectorNode.dealloc()
+    case 1:
+      asArrayNode.dealloc()
+    case 2:
+      asCollisionNode.dealloc()
+    default:
+      preconditionFailure("unknown pointer tag") // sanity check
+    }
+  }
+
+  func isUniquelyReferenced() -> Bool {
+    return _swift_stdlib_atomicLoadInt(object: _referenceCountPointer) == 1
+  }
+
+  func unsafeMaybeGet(
+    key: Key,
+    hashValue: Int,
+    depth: Int8
+  ) -> UnsafePointer<Value>? {
+    switch tag {
+    case 0:
+      return asSparseVectorNode.unsafeMaybeGet(
+        key: key, hashValue: hashValue, depth: depth)
+    case 1:
+      return asArrayNode.unsafeMaybeGet(
+        key: key, hashValue: hashValue, depth: depth)
+    case 2:
+      return asCollisionNode.unsafeMaybeGet(
+        key: key, hashValue: hashValue, depth: depth)
+    default:
+      preconditionFailure("unknown pointer tag") // sanity check
+    }
+  }
+
+  /// Returns:
+  /// - old value that was replaced,
+  /// - pointer to the node that has the new value.  The pointer can be the
+  ///   same as `self`, or a different one.
+  ///   The node pointer is returned at +0 if the mutation happened in
+  ///   place, or at +1 if a new node was allocated.
+  /// - a flag indicating whether the key was newly inserted.
+  func updateValue(
+    _ value: Value,
+    forKey key: Key,
+    hashValue: Int,
+    depth: Int8,
+    pathIsUnique: Bool
+  ) -> (Value?, _PVAnyNodePointer<Key, Value>, Bool) {
+    switch tag {
+    case 0:
+      return asSparseVectorNode.updateValue(
+        value, forKey: key, hashValue: hashValue, depth: depth,
+        pathIsUnique: pathIsUnique)
+    case 1:
+      return asArrayNode.updateValue(
+        value, forKey: key, hashValue: hashValue, depth: depth,
+        pathIsUnique: pathIsUnique)
+    case 2:
+      return asCollisionNode.updateValue(
+        value, forKey: key, hashValue: hashValue, depth: depth,
+        pathIsUnique: pathIsUnique)
+    default:
+      preconditionFailure("unknown pointer tag") // sanity check
+    }
+  }
+
+  /// Returns:
+  /// - old value that was removed,
+  /// - pointer to the node that does not have the key.  The pointer can be
+  ///   the same as `self`, or a different one.  The node pointer is
+  ///   returned at +0 if the mutation happened in place, or at +1 if a new
+  ///   node was allocated.
+  func removeValue(
+    forKey key: Key,
+    hashValue: Int,
+    depth: Int8,
+    pathIsUnique: Bool
+  ) -> (Value?, _PVAnyNodePointer<Key, Value>?) {
+    switch tag {
+    case 0:
+      return asSparseVectorNode.removeValue(
+        forKey: key, hashValue: hashValue,
+        depth: depth, pathIsUnique: pathIsUnique)
+    case 1:
+      return asArrayNode.removeValue(
+        forKey: key, hashValue: hashValue,
+        depth: depth, pathIsUnique: pathIsUnique)
+    case 2:
+      return asCollisionNode.removeValue(
+        forKey: key, hashValue: hashValue,
+        depth: depth, pathIsUnique: pathIsUnique)
+    default:
+      preconditionFailure("unknown pointer tag") // sanity check
+    }
+  }
+
+  var customMirror: Mirror {
+    switch tag {
+    case 0:
+      return Mirror(reflecting: asSparseVectorNode)
+    case 1:
+      return Mirror(reflecting: asArrayNode)
+    case 2:
+      return Mirror(reflecting: asCollisionNode)
+    default:
+      return Mirror(self, children: ["unknown tag": tag])
+    }
+  }
+}
+
+func == <Key, Value> (
+  lhs: _PVAnyNodePointer<Key, Value>,
+  rhs: _PVAnyNodePointer<Key, Value>
+) -> Bool {
+  return lhs.taggedPointer == rhs.taggedPointer
+}
+
+final internal
+class _NativePVDictionaryStorageRef<Key : LegacyHashable, Value> {
+
+  var _rootNode: _PVAnyNodePointer<Key, Value>?
+  var _count: Int
+
+  init() {
+    self._rootNode = nil
+    self._count = 0
+  }
+
+  /// rootNode is passed at +1.
+  init(rootNode: _PVAnyNodePointer<Key, Value>?, count: Int) {
+    self._rootNode = rootNode
+    self._count = count
+  }
+
+  deinit {
+    _rootNode?.release()
+  }
+}
+
+struct _NativePVDictionaryStorage<Key : LegacyHashable, Value> {
+  var _storageRef: _NativePVDictionaryStorageRef<Key, Value>
+
+  var _rootNode: _PVAnyNodePointer<Key, Value>? {
+    get {
+      return _storageRef._rootNode
+    }
+    set {
+      _storageRef._rootNode = newValue
+    }
+  }
+
+  init() {
+    self._storageRef = _NativePVDictionaryStorageRef()
+  }
+
+  typealias Index = Int // FIXME
+  typealias SequenceElement = (Key, Value)
+
+  var startIndex: Index {
+    fatalError("FIXME")
+  }
+  var endIndex: Index {
+    fatalError("FIXME")
+  }
+
+  func index(forKey key: Key) -> Index? {
+    if _rootNode == nil {
+      return nil
+    }
+    fatalError("FIXME")
+  }
+
+  func assertingGet(i: Index) -> SequenceElement {
+    precondition(_rootNode != nil)
+    fatalError("FIXME")
+  }
+
+  func assertingGet(key: Key) -> Value {
+    let valuePointer = _rootNode!.unsafeMaybeGet(
+      key: key, hashValue: key.legacyHashValue, depth: 0)
+    return valuePointer!.pointee
+  }
+
+  func maybeGet(key: Key) -> Value? {
+    let valuePointer = _rootNode?.unsafeMaybeGet(
+      key: key, hashValue: key.legacyHashValue, depth: 0)
+    return valuePointer.map { $0.pointee }
+  }
+
+  mutating func _replaceRootNode(
+    with newRootNode: _PVAnyNodePointer<Key, Value>?,
+    isUnique: Bool,
+    countDelta: Int
+  ) {
+    if _rootNode == newRootNode {
+      if count != 0 {
+        count += countDelta
+      }
+      return
+    }
+    if isUnique {
+      _rootNode!.release()
+      _rootNode = newRootNode
+      count += countDelta
+    } else {
+      _storageRef = _NativePVDictionaryStorageRef(
+        rootNode: newRootNode,
+        count: count + countDelta)
+    }
+  }
+
+  mutating func updateValue(_ value: Value, forKey key: Key) -> Value? {
+    let hashValue = key.legacyHashValue
+    guard let oldRootNode = _rootNode else {
+      let layout = _PVSparseVectorNodeLayoutParameters(
+        childNodeCount: 0,
+        keyCount: 1)
+      let uninitializedNode =
+        _PVSparseVectorNodePointer<Key, Value>(emptyNodeFor: layout)
+      let bucket = hashValue & (32 - 1)
+      uninitializedNode.initializeKey(
+        at: bucket,
+        key: key,
+        value: value,
+        layout: layout)
+      _rootNode = _PVAnyNodePointer(uninitializedNode)
+      count = 1
+      return nil
+    }
+    let isUnique = isKnownUniquelyReferenced(&_storageRef)
+    let (oldValue, newRootNode, wasInserted) = oldRootNode.updateValue(
+      value,
+      forKey: key,
+      hashValue: hashValue,
+      depth: 0,
+      pathIsUnique: isUnique)
+    _replaceRootNode(
+      with: newRootNode,
+      isUnique: isUnique,
+      countDelta: wasInserted ? 1 : 0)
+    return oldValue
+  }
+
+  mutating func removeAt(_ index: Index) -> SequenceElement {
+    fatalError("FIXME")
+  }
+
+  mutating func removeValue(forKey key: Key) -> Value? {
+    guard let oldRootNode = _rootNode else {
+      return nil
+    }
+    let hashValue = key.legacyHashValue
+    let isUnique = isKnownUniquelyReferenced(&_storageRef)
+    let (oldValue, newRootNode) = oldRootNode.removeValue(
+      forKey: key,
+      hashValue: hashValue,
+      depth: 0,
+      pathIsUnique: isUnique)
+    _replaceRootNode(
+      with: newRootNode,
+      isUnique: isUnique,
+      countDelta: oldValue != nil ? -1 : 0)
+    return oldValue
+  }
+
+  mutating func removeAll(keepCapacity: Bool) {
+    if _rootNode == nil {
+      return
+    }
+    fatalError("FIXME")
+  }
+
+  var count: Int {
+    get {
+      return _storageRef._count
+    }
+    set {
+      _storageRef._count = newValue
+    }
+  }
+
+  static func fromArray(elements: [SequenceElement])
+    -> _NativePVDictionaryStorage<Key, Value> {
+    fatalError("FIXME")
+  }
+}
+
+import StdlibUnittest
+
+var Bitmap = TestSuite("Bitmap")
+
+Bitmap.test("setBitCount") {
+  var bm = _IntBitmap()
+  expectEqual(0, bm.setBitCount)
+
+  bm[0] = true
+  expectEqual(1, bm._bits)
+  expectEqual(1, bm.setBitCount)
+
+  bm[31] = true
+  expectEqual(0x8000_0001, bm._bits)
+  expectEqual(2, bm.setBitCount)
+
+  bm[0] = false
+  expectEqual(0x8000_0000, bm._bits)
+  expectEqual(1, bm.setBitCount)
+
+  bm[31] = false
+  expectEqual(0, bm._bits)
+  expectEqual(0, bm.setBitCount)
+}
+
+Bitmap.test("setBitIndices") {
+  var bm = _IntBitmap()
+  bm[0] = true
+  bm[4] = true
+  bm[5] = true
+  bm[7] = true
+  bm[31] = true
+  expectEqualSequence([ 0, 4, 5, 7, 31 ], Array(bm.setBitIndices))
+}
+
+extension MinimalHashableValue: LegacyHashable {
+  var legacyHashValue: Int {
+    return self.value % 10000
+  }
+}
+
+var PersistentVectorTests = TestSuite("PersistentVector")
+
+PersistentVectorTests.test("sizeof") {
+  expectEqual(
+    MemoryLayout<UnsafePointer<UInt8>>.size,
+    MemoryLayout<_PVSparseVectorNodePointer<MinimalHashableValue, OpaqueValue<Int32>>>.size)
+  expectEqual(
+    MemoryLayout<UnsafePointer<UInt8>>.size,
+    MemoryLayout<_PVArrayNodePointer<MinimalHashableValue, OpaqueValue<Int32>>>.size)
+  expectEqual(
+    MemoryLayout<UnsafePointer<UInt8>>.size,
+    MemoryLayout<_PVAnyNodePointer<MinimalHashableValue, OpaqueValue<Int32>>>.size)
+}
+
+%{
+  TRACE = '''_ message: @autoclosure () -> String = "",
+    showFrame: Bool = true,
+    stackTrace: SourceLocStack = SourceLocStack(),
+    file: String = #file, line: UInt = #line'''
+
+  # When the parameter list would start with a ${TRACE}, we use
+  # ${TRACE1} instead, to avoid the warning about an extraneous
+  # '_' on the first parameter.
+  TRACE1 = TRACE.replace(' _ ', ' ', 1)
+
+  stackTrace = 'stackTrace.pushIf(showFrame, file: file, line: line)'
+
+  trace = 'message(),\n  stackTrace: ' + stackTrace
+}%
+
+func expectContents(
+  _ contents: [(MinimalHashableValue, OpaqueValue<Int>)],
+  unexpectedKeys: [MinimalHashableValue] = [],
+  _ storage: _NativePVDictionaryStorage<MinimalHashableValue, OpaqueValue<Int>>,
+  ${TRACE}
+) {
+  for (key, value) in contents {
+    expectEqual(
+      value.value,
+      storage.maybeGet(key: key)?.value,
+      ${trace})
+  }
+  for key in unexpectedKeys {
+    expectNil(storage.maybeGet(key: key), ${trace})
+  }
+  expectEqual(contents.count, storage.count, ${trace})
+}
+
+enum DictionaryModification {
+  case InsertOrUpdateWithId(id: String, key: Int, value: Int)
+  static func InsertOrUpdate(key: Int, value: Int)
+    -> DictionaryModification {
+    return .InsertOrUpdateWithId(id: "main", key: key, value: value)
+  }
+
+  case RemoveWithId(id: String, key: Int)
+  static func Remove(key: Int) -> DictionaryModification {
+    return .RemoveWithId(id: "main", key: key)
+  }
+
+  // FIXME: case RemoveAll(keepCapacity: Bool)
+
+  case CopyDictionary(source: String, destination: String)
+  case DropDictionary(id: String)
+}
+
+func prettyPrint(modifications: [DictionaryModification]) {
+  print("[")
+  for modification in modifications {
+    print("  ", modification, ",", separator: "")
+  }
+  print("]")
+}
+
+/// A very simple (but slow) dictionary that can be verified by code
+/// inspection.
+struct UnittestDictionary<Key : Equatable, Value> {
+  var _elements: [(Key, Value)] = []
+
+  init() {}
+
+  subscript(key: Key) -> Value? {
+    get {
+      for (existingKey, existingValue) in _elements {
+        if key == existingKey {
+          return existingValue
+        }
+      }
+      return nil
+    }
+    set {
+      if let newValue = newValue {
+        for i in _elements.indices {
+          if key == _elements[i].0 {
+            _elements[i].1 = newValue
+            return
+          }
+        }
+        _elements.append((key, newValue))
+      } else {
+        for i in _elements.indices {
+          if key == _elements[i].0 {
+            _elements.remove(at: i)
+            return
+          }
+        }
+      }
+    }
+  }
+
+  mutating func take(key: Key) -> Value {
+    let value = self[key]!
+    self[key] = nil
+    return value
+  }
+
+  var count: Int {
+    return _elements.count
+  }
+
+  var keys: [Key] {
+    return _elements.map { $0.0 }
+  }
+}
+
+var debugDictionaryTests = false
+
+func testDictionary(
+  modifications: [DictionaryModification],
+  ${TRACE}
+) {
+  if debugDictionaryTests {
+    print("---------------------------------------")
+  }
+
+  typealias MyDictionary = _NativePVDictionaryStorage<
+    MinimalHashableValue, OpaqueValue<Int>
+  >
+  typealias ShadowDictionary = UnittestDictionary<
+    MinimalHashableValue, OpaqueValue<Int>
+  >
+
+  var allKeys: [MinimalHashableValue] = []
+
+  for modification in modifications {
+    switch modification {
+    case let .InsertOrUpdateWithId(id: _, key: key, value: _):
+      allKeys.append(MinimalHashableValue(key))
+      break
+    case let .RemoveWithId(id: _, key: key):
+      allKeys.append(MinimalHashableValue(key))
+      break
+    case .CopyDictionary:
+      break // ignore
+    case .DropDictionary:
+      break // ignore
+    }
+  }
+
+  // Add colliding keys.
+  for key in allKeys {
+    allKeys.append(MinimalHashableValue(key.value + 990000))
+  }
+
+  var dictionaries = UnittestDictionary<String, MyDictionary>()
+  var shadowDictionaries = UnittestDictionary<String, ShadowDictionary>()
+
+  dictionaries["main"] = MyDictionary()
+  shadowDictionaries["main"] = ShadowDictionary()
+
+  //prettyPrint(modifications)
+  for (i, modification) in modifications.enumerated() {
+    if debugDictionaryTests {
+      print(modification, "...", separator: "")
+    }
+    switch modification {
+    case let .InsertOrUpdateWithId(id: id, key: key, value: value):
+      let minimalHashableKey = MinimalHashableValue(key, identity: i)
+      let opaqueValue = OpaqueValue(value, identity: i)
+      var shadow = shadowDictionaries.take(key: id)
+      let expectedOldValue = shadow[minimalHashableKey]
+      shadow[minimalHashableKey] = opaqueValue
+      shadowDictionaries[id] = shadow
+
+      var dictionary = dictionaries.take(key: id)
+      if debugDictionaryTests {
+      //  newDump(dictionary, name: "BEFORE")
+      }
+      let oldValue = dictionary.updateValue(
+        opaqueValue, forKey: minimalHashableKey)
+      if debugDictionaryTests {
+      //  newDump(dictionary, name: "AFTER")
+      }
+      dictionaries[id] = dictionary
+      expectEqual(expectedOldValue?.value, oldValue?.value)
+      expectEqual(expectedOldValue?.identity, oldValue?.identity)
+      break
+
+    case let .RemoveWithId(id: id, key: key):
+      let minimalHashableKey = MinimalHashableValue(key, identity: i)
+      var shadow = shadowDictionaries.take(key: id)
+      let expectedOldValue = shadow[minimalHashableKey]
+      shadow[minimalHashableKey] = nil
+      shadowDictionaries[id] = shadow
+
+      var dictionary = dictionaries.take(key: id)
+      if debugDictionaryTests {
+      //  newDump(dictionary, name: "BEFORE")
+      }
+      let oldValue = dictionary.removeValue(forKey: minimalHashableKey)
+      if debugDictionaryTests {
+      //  newDump(dictionary, name: "AFTER")
+      }
+      dictionaries[id] = dictionary
+      expectEqual(expectedOldValue?.value, oldValue?.value)
+      expectEqual(expectedOldValue?.identity, oldValue?.identity)
+      break
+
+    case let .CopyDictionary(source: source, destination: destination):
+      let shadow = shadowDictionaries[source]
+      shadowDictionaries[destination] = shadow
+
+      let dictionary = dictionaries[source]
+      //newDump(dictionary)
+      //newDump(dictionaries[destination])
+      dictionaries[destination] = dictionary
+      break
+
+    case let .DropDictionary(id: id):
+      shadowDictionaries[id] = nil
+      dictionaries[id] = nil
+      break
+    }
+
+    for id in dictionaries.keys {
+      let dictionary = dictionaries[id]!
+      let shadow = shadowDictionaries[id]!
+      let expectedKeys = shadow.keys
+      let unexpectedKeys = allKeys.filter { !expectedKeys.contains($0) }
+      for key in unexpectedKeys {
+        expectNil(dictionary.maybeGet(key: key), ${trace})
+      }
+      expectContents(
+        shadow._elements,
+        unexpectedKeys: unexpectedKeys,
+        dictionary,
+        ${trace})
+    }
+  }
+}
+
+PersistentVectorTests.test("crash") {
+  func InsertOrUpdateWithId(id: String, _ key: Int, _ value: Int) -> DictionaryModification {
+    return .InsertOrUpdateWithId(id: id, key: key, value: value)
+  }
+  func CopyDictionary(source: String, _ destination: String) -> DictionaryModification {
+    return .CopyDictionary(source: source, destination: destination)
+  }
+  let modifications: [DictionaryModification] = [
+  ]
+  testDictionary(modifications: modifications)
+}
+
+PersistentVectorTests.test("updateValue/NoCollisionsInRootNode/1")
+  .skip(.custom({ true }, reason: "Fails in optimized mode. rdar://problem/27119174"))
+  .code {
+  for keyCount in 1..<33 {
+    var modifications: [DictionaryModification] = []
+    // Insert new keys.
+    modifications += (0..<keyCount).map {
+      DictionaryModification.InsertOrUpdate(
+        key: $0 * 10, value: $0 * 100 + 1)
+    }
+    // Update values for existing keys.
+    modifications += (0..<keyCount).map {
+      DictionaryModification.InsertOrUpdate(
+        key: $0 * 10, value: $0 * 100 + 2)
+    }
+
+    // Update values for existing keys when the dictionary is non-uniquely
+    // referenced.
+    modifications += (0..<keyCount).flatMap {
+      i -> [DictionaryModification] in
+      return [
+        DictionaryModification.CopyDictionary(
+          source: "main", destination: "copy"),
+        DictionaryModification.InsertOrUpdate(
+          key: i * 10, value: i * 100 + 3),
+        DictionaryModification.InsertOrUpdateWithId(
+          id: "copy",
+          key: i * 10, value: i * 100 + 4),
+      ]
+    }
+
+    testDictionary(modifications: modifications)
+  }
+}
+
+PersistentVectorTests.test("updateValue/CollisionInRootNode/1") {
+  for initialKeyCount in 0..<4 {
+    var modifications: [DictionaryModification] = []
+    modifications += (0..<initialKeyCount).map {
+      DictionaryModification.InsertOrUpdate(
+        key: $0 * 10, value: $0)
+    }
+    modifications += (1..<33).map {
+      DictionaryModification.InsertOrUpdate(
+        key: $0 * 10000 + 10, value: 1000 + $0)
+    }
+
+    testDictionary(modifications: modifications)
+  }
+}
+
+PersistentVectorTests.test("removeValue(forKey:)/NoCollisionsInRootNode/1") {
+  debugDictionaryTests = true
+  for keyCount in 1..<33 {
+    var modifications: [DictionaryModification] = []
+    // Insert new keys.
+    modifications += (0..<keyCount).map {
+      DictionaryModification.InsertOrUpdate(
+        key: $0, value: $0 * 100 + 1)
+    }
+    // Remove existing keys.
+    modifications += (0..<keyCount).map {
+      DictionaryModification.Remove(key: $0)
+    }
+
+    testDictionary(modifications: modifications)
+  }
+}
+
+runAllTests()

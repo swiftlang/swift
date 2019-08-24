@@ -1,0 +1,10 @@
+---
+Name: SwiftName
+Enumerators:
+- Name: HomeworkExcuseTooHard
+  SwiftName: challenging
+Functions:
+- Name: spuriousAPINotedSwiftName
+  SwiftName: spuriousAPINotedSwiftName(_:)
+- Name: poorlyNamedFunction
+  SwiftName: nicelyRenamedFunction(_:)

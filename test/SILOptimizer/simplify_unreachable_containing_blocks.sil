@@ -1,0 +1,27 @@
+// RUN: %target-sil-opt -simplify-unreachable-containing-blocks -module-name Swift -enable-sil-verify-all %s | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+
+enum Never {}
+
+sil @blackhole : $@convention(thin) () -> Never
+
+// CHECK-LABEL: sil @test1 : $@convention(thin) () -> () {
+// CHECK-NOT: function_ref
+// CHECK-NOT: apply
+// CHECK: } // end sil function 'test1'
+sil @test1 : $@convention(thin) () -> () {
+bb0:
+  cond_br undef, bb1, bb2
+
+bb1:
+  %0 = function_ref @blackhole : $@convention(thin) () -> Never
+  apply %0() : $@convention(thin) () -> Never
+  unreachable
+
+bb2:
+  %9999 = tuple()
+  return %9999 : $()
+}

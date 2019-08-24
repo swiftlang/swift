@@ -1,0 +1,185 @@
+//===--- CollectionCasts.swift.gyb ----------------------------*- swift -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+// RUN: %empty-directory(%t)
+// RUN: %gyb %s -o %t/CollectionCasts.swift
+// RUN: %line-directive %t/CollectionCasts.swift -- %target-build-swift %t/CollectionCasts.swift -o %t/a.out
+// RUN: %target-codesign %t/a.out && %line-directive %t/CollectionCasts.swift -- %target-run %t/a.out 2>&1
+// REQUIRES: executable_test
+
+import StdlibUnittest
+
+class Base : Hashable {
+  var value: Int
+  init(_ value: Int) {
+    self.value = value
+  }
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(value)
+  }
+}
+
+func == (lhs: Base, rhs: Base) -> Bool {
+  return lhs.value == rhs.value
+}
+
+class Derived : Base {}
+
+protocol AnyFoo {
+  init(_ value: Int)
+}
+extension Int : AnyFoo { }
+
+var tests = TestSuite("CollectionCasts")
+
+// A wrapper for an as? cast that suppresses warnings when the cast always
+// succeeds.
+func cast<T, U>(_ x: T, to result: U.Type) -> U? {
+  return x as? U
+}
+
+%{
+classKeys = ('Derived', 'Base')
+classValues = classKeys + ('AnyObject', 'Any')
+nonClassKeys = ('Int',)
+nonClassValues = ('Int', 'AnyFoo', 'Any')
+}%
+
+% for keys, values in [ (classKeys, classValues), (nonClassKeys, nonClassValues) ]:
+
+%   for ki0, Key0 in enumerate(keys):
+%     DynamicKey = keys[0] if Key0.startswith('Any') else Key0
+%     for Key1 in keys[ki0:]:
+%       for Collection in 'Array', 'Set':
+
+tests.test("${Collection}/Up/${Key0}=>${Key1}") {
+
+  let source : ${Collection} = [
+    ${DynamicKey}(42) as ${Key0},
+    ${DynamicKey}(17) as ${Key0}]
+
+  let upcasted = source as ${Collection}<${Key1}>
+
+  expectEqual(source.count, upcasted.count)
+  for x in source {
+    expectTrue(upcasted.contains(x))
+  }
+}
+
+%         if Key1 != Key0:
+%           for method in 'Direct', 'Indirect':
+tests.test("${Collection}/Down/${method}/${Key1}=>${Key0}") {
+
+  let source : ${Collection} = [
+    ${DynamicKey}(42) as ${Key1},
+    ${DynamicKey}(17) as ${Key1}]
+
+%             if method == 'Direct':
+
+  guard let downcasted = expectNotNil(source as? ${Collection}<${Key0}>)
+  else { return }
+
+%             else:
+
+  guard let downcasted = expectNotNil(cast(source, to: ${Collection}<${Key0}>.self))
+  else { return }
+
+%             end
+
+  expectEqual(source.count, downcasted.count)
+  for x in downcasted {
+    expectTrue(source.contains(x))
+  }
+}
+%           end
+%         end
+%       end
+
+
+%       for vi0, Value0 in enumerate(values):
+%         DynamicValue = values[0] if Value0.startswith('Any') else Value0
+%         for Value1 in values[vi0:]:
+
+%           for method in 'Direct', 'Indirect':
+
+tests.test(
+  "Dictionary/Up/${method}/[${Key0}:${Value0}]=>[${Key1}:${Value1}]") {
+
+  // Check that the cast type-checks
+  let source = [
+    ${DynamicKey}(42) as ${Key0} : ${DynamicValue}(42) as ${Value0},
+    ${DynamicKey}(17) as ${Key0} : ${DynamicValue}(17) as ${Value0}]
+
+
+%   if method == 'Direct':
+  let upcasted = source as [${Key1}:${Value1}]
+%   else:
+  let upcasted_ = source as Any as? [${Key1}:${Value1}]
+
+  guard let upcasted = expectNotNil(upcasted_) else { return }
+%   end
+
+  expectEqual(source.count, upcasted.count)
+
+  for (k0, v0) in source {
+    guard let v1 = expectNotNil(upcasted[k0]) else { continue }
+
+    guard let dv0 = expectNotNil(
+      cast(v0, to: ${DynamicValue}.self)) else { continue }
+
+    guard let dv1 = expectNotNil(
+      cast(v1, to: ${DynamicValue}.self)) else { continue }
+
+    expectEqual(dv0, dv1)
+  }
+}
+
+% end
+
+% if Key1 != Key0 or Value1 != Value0:
+
+tests.test(
+  "Dictionary/Down/[${Key1}:${Value1}]=>[${Key0}:${Value0}]") {
+
+  // Check that the cast type-checks
+  let source = [
+    ${DynamicKey}(42) as ${Key1} : ${DynamicValue}(42) as ${Value1},
+    ${DynamicKey}(17) as ${Key1} : ${DynamicValue}(17) as ${Value1}]
+
+  guard let downcasted = expectNotNil(source as? [${Key0}:${Value0}])
+  else { return }
+
+  expectEqual(source.count, downcasted.count)
+
+  for (k0, v0) in downcasted {
+    guard let v1 = expectNotNil(source[k0]) else { continue }
+
+    guard let dv0 = expectNotNil(
+      cast(v0, to: ${DynamicValue}.self)) else { continue }
+
+    guard let dv1 = expectNotNil(
+      cast(v1, to: ${DynamicValue}.self)) else { continue }
+
+    expectEqual(dv0, dv1)
+  }
+}
+
+% end
+
+%         end
+%       end
+%     end
+%   end
+% end
+
+
+runAllTests()
+

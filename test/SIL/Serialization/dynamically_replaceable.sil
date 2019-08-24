@@ -1,0 +1,31 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend %s -emit-module -o %t/tmp.swiftmodule
+// RUN: %target-sil-opt %t/tmp.swiftmodule -disable-sil-linking | %FileCheck %s
+
+
+// CHECK-DAG-LABEL: sil [serialized] [dynamically_replacable] [canonical] @test_dynamically_replaceable
+sil [serialized] [dynamically_replacable] @test_dynamically_replaceable : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}
+
+// CHECK-DAG-LABEL: sil [serialized] [dynamic_replacement_for "test_dynamically_replaceable"] [canonical] @test_dynamic_replacement_for
+// CHECK: prev_dynamic_function_ref @test_dynamic_replacement_for
+sil [serialized] [dynamic_replacement_for "test_dynamically_replaceable"] @test_dynamic_replacement_for : $@convention(thin) () -> () {
+bb0:
+  %0 = prev_dynamic_function_ref @test_dynamic_replacement_for : $@convention(thin) () -> ()
+  %1 = apply %0() : $@convention(thin) () -> ()
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// CHECK-DAG-LABEL: sil [serialized] [canonical] @test_dynamically_replaceable_impl
+// CHECK:  dynamic_function_ref @test_dynamically_replaceable
+sil [serialized] @test_dynamically_replaceable_impl : $@convention(thin) () -> () {
+bb0:
+  %0 = dynamic_function_ref @test_dynamically_replaceable : $@convention(thin) () -> ()
+  %1 = apply %0() : $@convention(thin) () -> ()
+  %2 = tuple ()
+  return %2 : $()
+}

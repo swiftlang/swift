@@ -1,0 +1,29 @@
+// RUN: %target-sil-opt -sdk %clang-importer-sdk-path %s
+
+import ctypes
+
+sil_stage canonical
+
+// blah.typeof <A>(A) -> A.Type
+sil hidden @_TF4blah6typeofU__FQ_MQ_ : $@convention(thin) <T> (@in T) -> @thick T.Type {
+bb0(%0 : $*T):
+  destroy_addr %0 : $*T                           // id: %1
+  %2 = metatype $@thick T.Type                    // user: %3
+  return %2 : $@thick T.Type                      // id: %3
+}
+
+// blah.testUnnamedStructs (C.UnnamedStructs) -> ()
+sil hidden @_TF4blah18testUnnamedStructsFVSC14UnnamedStructsT_ : $@convention(thin) (UnnamedStructs) -> () {
+bb0(%0 : $UnnamedStructs):
+  debug_value %0 : $UnnamedStructs  // let u_s    // id: %1
+  // function_ref blah.typeof <A>(A) -> A.Type
+  %2 = function_ref @_TF4blah6typeofU__FQ_MQ_ : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @thick τ_0_0.Type // user: %6
+  %3 = struct_extract %0 : $UnnamedStructs, #UnnamedStructs.x // user: %5
+  %4 = alloc_stack $UnnamedStructs.__Unnamed_struct_x  // users: %5, %6, %8
+  store %3 to %4 : $*UnnamedStructs.__Unnamed_struct_x // id: %5
+  %6 = apply %2<UnnamedStructs.__Unnamed_struct_x>(%4) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @thick τ_0_0.Type
+  %7 = metatype $@thin UnnamedStructs.__Unnamed_struct_x.Type
+  dealloc_stack %4 : $*UnnamedStructs.__Unnamed_struct_x // id: %8
+  %9 = tuple ()                                   // user: %10
+  return %9 : $()                                 // id: %10
+}

@@ -1,0 +1,3 @@
+module UserClangModule {
+  header "UserClangModule.h"
+}

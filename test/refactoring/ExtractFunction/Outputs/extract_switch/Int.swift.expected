@@ -1,0 +1,29 @@
+enum MyEnum {
+  case Case1
+  case Case2
+  case Case3
+}
+
+fileprivate func new_name(_ e: MyEnum) -> Int {
+switch e {
+  case .Case1:
+    return 1
+  case .Case2:
+    return 2
+  case .Case3:
+    return 3
+  }
+}
+
+func foo2(_ e : MyEnum) -> Int {
+  switch e {
+  case .Case1:
+    break
+  case .Case2:
+    break
+  case .Case3:
+    break
+  }
+  return new_name(e)
+}
+

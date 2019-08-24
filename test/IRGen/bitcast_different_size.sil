@@ -1,0 +1,23 @@
+// RUN: %target-swift-frontend -emit-ir %s -verify | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir -O %s -verify | %FileCheck %s --check-prefix=OPT
+
+// REQUIRES: CPU=i386 || CPU=x86_64
+
+sil_stage canonical
+
+import Swift
+
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i64 @bitcast_different_size1
+
+// OPT-LABEL: define{{.*}}@bitcast_different_size1(i32)
+// OPT:   tail call void asm sideeffect "", "n"(i32 0)
+// OPT-NEXT:   tail call void @llvm.trap()
+// OPT-NEXT:   unreachable
+
+sil @bitcast_different_size1 : $@convention(thin) (Int32) -> Int64 {
+entry(%i : $Int32):
+  // CHECK: ret {{.*}}undef
+  // CHECK: call {{.*}}trap
+  %o = unchecked_trivial_bit_cast %i : $Int32 to $Int64
+  return %o : $Int64
+}

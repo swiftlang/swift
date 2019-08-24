@@ -1,0 +1,38 @@
+//===--- KnownFoundationEntities.def - Objective-C Foundation ---*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// This file defines macros used for macro-metaprogramming with
+// compiler-known entities in the Objective-C Foundation module (and
+// the ObjectiveC module it depends on).
+//
+//===----------------------------------------------------------------------===//
+#ifndef FOUNDATION_ENTITY
+#  error define FOUNDATION_ENTITY(Name)
+#endif
+
+FOUNDATION_ENTITY(NSArray)
+FOUNDATION_ENTITY(NSCopying)
+FOUNDATION_ENTITY(NSDictionary)
+FOUNDATION_ENTITY(NSError)
+FOUNDATION_ENTITY(NSErrorPointer)
+FOUNDATION_ENTITY(NSInteger)
+FOUNDATION_ENTITY(NSNumber)
+FOUNDATION_ENTITY(NSObject)
+FOUNDATION_ENTITY(NSRange)
+FOUNDATION_ENTITY(NSSet)
+FOUNDATION_ENTITY(NSString)
+FOUNDATION_ENTITY(NSUInteger)
+FOUNDATION_ENTITY(NSURL)
+FOUNDATION_ENTITY(NSValue)
+FOUNDATION_ENTITY(NSZone)
+
+#undef FOUNDATION_ENTITY

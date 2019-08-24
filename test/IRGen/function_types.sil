@@ -1,0 +1,83 @@
+// RUN: %swift -disable-legacy-type-info -target x86_64-apple-macosx10.9 -module-name function_types %s -emit-ir -o - | %FileCheck %s
+// RUN: %swift -disable-legacy-type-info -target i386-apple-ios7.1 %s -module-name function_types -emit-ir -o - | %FileCheck %s
+// RUN: %swift -disable-legacy-type-info -target x86_64-apple-ios7.1 %s -module-name function_types -emit-ir -o - | %FileCheck %s
+// RUN: %swift -disable-legacy-type-info -target armv7-apple-ios7.1 %s -module-name function_types -emit-ir -o - | %FileCheck %s
+// RUN: %swift -disable-legacy-type-info -target arm64-apple-ios7.1 %s -module-name function_types -emit-ir -o - | %FileCheck %s
+// RUN: %swift -disable-legacy-type-info -target x86_64-unknown-linux-gnu -disable-objc-interop %s -module-name function_types -emit-ir -o - | %FileCheck %s
+
+// REQUIRES: CODEGENERATOR=X86
+// REQUIRES: CODEGENERATOR=ARM
+
+import Builtin
+
+sil_stage canonical
+
+public protocol Protocol {}
+struct S : Protocol {}
+
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i8* @thin_func_value(i8*) {{.*}} {
+// CHECK-NEXT:  entry:
+// CHECK-NEXT:    ret i8* %0
+// CHECK-NEXT:  }
+sil @thin_func_value : $@convention(thin) (@convention(thin) () -> ()) -> @convention(thin) () -> () {
+entry(%x : $@convention(thin) () -> ()):
+  return %x : $@convention(thin) () -> ()
+}
+
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { i8*, %swift.refcounted* } @thick_func_value(i8*, %swift.refcounted*) {{.*}} {
+// CHECK-NEXT:  entry:
+// CHECK-NEXT:    call %swift.refcounted* @swift_retain(%swift.refcounted* returned %1) {{#[0-9]+}}
+// CHECK-NEXT:    call void @swift_release(%swift.refcounted* %1) {{#[0-9]+}}
+// CHECK-NEXT:    %3 = insertvalue { i8*, %swift.refcounted* } undef, i8* %0, 0
+// CHECK-NEXT:    %4 = insertvalue { i8*, %swift.refcounted* } %3, %swift.refcounted* %1, 1
+// CHECK-NEXT:    ret { i8*, %swift.refcounted* } %4
+// CHECK-NEXT:  }
+sil @thick_func_value : $@convention(thin) (@owned () -> ()) -> @owned () -> () {
+entry(%x : $() -> ()):
+  strong_retain %x : $() -> ()
+  strong_release %x : $() -> ()
+  return %x : $() -> ()
+}
+
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i8* @thin_witness_value(i8*) {{.*}} {
+// CHECK-NEXT:  entry:
+// CHECK-NEXT:    ret i8* %0
+// CHECK-NEXT:  }
+sil @thin_witness_value : $@convention(thin) (@convention(witness_method: Protocol) (S) -> ()) -> @convention(witness_method: Protocol) (S) -> () {
+entry(%x : $@convention(witness_method: Protocol) (S) -> ()):
+  return %x : $@convention(witness_method: Protocol) (S) -> ()
+}
+
+struct X {}
+
+sil @out_void_return : $@convention(thin) () -> @out X
+
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @use_void_return_value(%T14function_types1XV* noalias nocapture sret) {{.*}} {
+// CHECK-NEXT:  entry:
+// CHECK-NEXT:    call swiftcc void @out_void_return(%T14function_types1XV* noalias nocapture sret %0)
+// CHECK-NEXT:    ret void
+// CHECK-NEXT:  }
+sil @use_void_return_value : $@convention(thin) () -> @out X {
+entry(%x : $*X):
+  %f = function_ref @out_void_return : $@convention(thin) () -> @out X
+  %z = apply %f(%x) : $@convention(thin) () -> @out X
+  return %z : $()
+}
+
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i8* @test_function_to_pointer(i8*)
+// CHECK-NEXT:  entry:
+// CHECK-NEXT:    ret i8* %0
+sil @test_function_to_pointer : $@convention(thin) (@convention(thin) () -> ()) -> Builtin.RawPointer {
+bb0(%0 : $@convention(thin) () -> ()):
+  %1 = thin_function_to_pointer %0 : $@convention(thin) () -> () to $Builtin.RawPointer
+  return %1 : $Builtin.RawPointer
+}
+
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i8* @test_pointer_to_function(i8*)
+// CHECK-NEXT:  entry:
+// CHECK-NEXT:    ret i8* %0
+sil @test_pointer_to_function : $@convention(thin) (Builtin.RawPointer) -> @convention(thin) () -> () {
+bb0(%0 : $Builtin.RawPointer):
+  %1 = pointer_to_thin_function %0 : $Builtin.RawPointer to $@convention(thin) () -> ()
+  return %1 : $@convention(thin) () -> ()
+}

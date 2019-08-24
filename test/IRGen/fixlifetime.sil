@@ -1,0 +1,60 @@
+// RUN: %target-swift-frontend -parse-sil -emit-ir -disable-llvm-optzns -O %s | %FileCheck --check-prefix=CHECK-%target-runtime %s
+// RUN: %target-swift-frontend -parse-sil -emit-ir -disable-llvm-optzns -Ounchecked %s | %FileCheck --check-prefix=CHECK-%target-runtime %s
+// RUN: %target-swift-frontend -parse-sil -emit-ir -disable-llvm-optzns -Onone %s | %FileCheck --check-prefix=ONONE %s
+
+// REQUIRES: CPU=i386 || CPU=x86_64
+
+// At -Onone we don't run the LLVM ARC optimizer, so the fixLifetime call is
+// unnecessary.
+// ONONE-NOT: @__swift_fixLifetime
+
+// CHECK-objc-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @test(%T11fixlifetime1CC*, %objc_object*, i8**, i8*, %swift.refcounted*, %T11fixlifetime3AggV* noalias nocapture dereferenceable({{.*}})) {{.*}} {
+// CHECK-objc: entry:
+// CHECK-objc:  call void bitcast (void (%swift.refcounted*)* @__swift_fixLifetime to void (%T11fixlifetime1CC*)*)(%T11fixlifetime1CC*
+// CHECK-objc:  call void bitcast (void (%swift.refcounted*)* @__swift_fixLifetime to void (%objc_object*)*)(%objc_object*
+// CHECK-objc:  call void @__swift_fixLifetime(%swift.refcounted*
+// CHECK-objc:  call void bitcast (void (%swift.refcounted*)* @__swift_fixLifetime to void (%T11fixlifetime1CC*)*)(%T11fixlifetime1CC*
+// CHECK-objc:  call void bitcast (void (%swift.refcounted*)* @__swift_fixLifetime to void (%objc_object*)*)(%objc_object*
+// CHECK-objc:  call void @__swift_fixLifetime(%swift.refcounted*
+// CHECK-objc:  call void bitcast (void (%swift.refcounted*)* @__swift_fixLifetime to void (%T11fixlifetime1CC**)*)(%T11fixlifetime1CC**
+
+// CHECK-native-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @test(%T11fixlifetime1CC*, %swift.refcounted*, i8**, i8*, %swift.refcounted*, %T11fixlifetime3AggV* noalias nocapture dereferenceable({{.*}})) {{.*}} {
+// CHECK-native: entry:
+// CHECK-native:  call void bitcast (void (%swift.refcounted*)* @__swift_fixLifetime to void (%T11fixlifetime1CC*)*)(%T11fixlifetime1CC*
+// CHECK-native:  call void @__swift_fixLifetime(%swift.refcounted*
+// CHECK-native:  call void @__swift_fixLifetime(%swift.refcounted*
+// CHECK-native:  call void bitcast (void (%swift.refcounted*)* @__swift_fixLifetime to void (%T11fixlifetime1CC*)*)(%T11fixlifetime1CC*
+// CHECK-native:  call void @__swift_fixLifetime(%swift.refcounted*
+// CHECK-native:  call void @__swift_fixLifetime(%swift.refcounted*
+// CHECK-native:  call void bitcast (void (%swift.refcounted*)* @__swift_fixLifetime to void (%T11fixlifetime1CC**)*)(%T11fixlifetime1CC**
+
+import Builtin
+
+sil_stage canonical
+
+typealias AnyObject = Builtin.AnyObject
+
+class C {}
+sil_vtable C {}
+protocol P : class {}
+typealias F = () -> ()
+struct Agg {
+  var c : C
+  var p : P
+  var f : F
+}
+
+sil [Onone] @test
+  : $@convention(thin) (C, P, @callee_owned () -> (), Agg) -> () {
+bb0(%0 : $C, %1 : $P, %2 : $@callee_owned () -> (), %3 : $Agg):
+  fix_lifetime %0 : $C
+  fix_lifetime %1 : $P
+  fix_lifetime %2 : $@callee_owned () -> ()
+  fix_lifetime %3 : $Agg
+
+  %4 = alloc_stack $C
+  fix_lifetime %4 : $*C
+  dealloc_stack %4 : $*C
+  %9999 = tuple()
+  return %9999 : $()
+}

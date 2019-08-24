@@ -1,0 +1,34 @@
+{
+  key.offset: 0,
+  key.length: 38,
+  key.diagnostic_stage: source.diagnostic.stage.swift.parse,
+  key.syntaxmap: [
+    {
+      key.kind: source.lang.swift.syntaxtype.comment,
+      key.offset: 1,
+      key.length: 34
+    }
+  ],
+  key.diagnostics: [
+    {
+      key.line: 4,
+      key.column: 1,
+      key.filepath: syntaxmap-edit-del.swift,
+      key.severity: source.diagnostic.severity.error,
+      key.description: "extraneous '}' at top level",
+      key.diagnostic_stage: source.diagnostic.stage.swift.parse,
+      key.fixits: [
+        {
+          key.offset: 36,
+          key.length: 1,
+          key.sourcetext: ""
+        }
+      ]
+    }
+  ]
+}
+{
+  key.diagnostic_stage: source.diagnostic.stage.swift.parse,
+  key.syntaxmap: [
+  ]
+}

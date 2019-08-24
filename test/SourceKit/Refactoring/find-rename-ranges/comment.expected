@@ -1,0 +1,4 @@
+source.edit.kind.comment:
+  31:21-31:28 source.refactoring.range.kind.basename
+source.edit.kind.comment:
+  33:27-33:34 source.refactoring.range.kind.basename

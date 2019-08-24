@@ -1,0 +1,25 @@
+// RUN: %target-swift-frontend %s -parse-stdlib -module-name Swift -emit-silgen | %FileCheck %s
+
+enum Optional<T> {
+  case none
+  case some(T)
+}
+
+enum ImplicitlyUnwrappedOptional<T> {
+  case none
+  case some(T)
+}
+
+class SelfTest {}
+
+sil_vtable SelfTest {}
+
+sil @test_stuff : $@convention(method) (@owned SelfTest) -> () {
+bb0(%0 : $SelfTest):
+  // CHECK: metatype $@thick @dynamic_self SelfTest
+  %2 = metatype $@thick @dynamic_self SelfTest.Type
+  // CHECK: metatype $@thick Optional<@dynamic_self SelfTest>.Type
+  %5 = metatype $@thick @dynamic_self SelfTest?.Type
+  %7 = tuple ()
+  return %7 : $()
+}
