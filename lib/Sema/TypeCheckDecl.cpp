@@ -4414,7 +4414,8 @@ static bool isNonGenericTypeAliasType(Type type) {
   return false;
 }
 
-static Type validateExtendedType(ExtensionDecl *ext) {
+llvm::Expected<Type>
+ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
   auto error = [&ext]() {
     ext->setInvalid();
     return ErrorType::get(ext->getASTContext());
@@ -4430,7 +4431,6 @@ static Type validateExtendedType(ExtensionDecl *ext) {
   auto tr = TypeResolution::forStructural(ext->getDeclContext());
   auto extendedType = tr.resolveType(ext->getExtendedTypeLoc().getTypeRepr(),
                                      options);
-  ext->getExtendedTypeLoc().setType(extendedType);
 
   if (extendedType->hasError())
     return error();
@@ -4483,7 +4483,9 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
 
   DeclValidationRAII IBV(ext);
 
-  auto extendedType = validateExtendedType(ext);
+  auto extendedType = evaluateOrDefault(Context.evaluator,
+                                        ExtendedTypeRequest{ext},
+                                        ErrorType::get(ext->getASTContext()));
 
   if (auto *nominal = ext->getExtendedNominal()) {
     // If this extension was not already bound, it means it is either in an
@@ -4495,8 +4497,6 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
 
     // Validate the nominal type declaration being extended.
     validateDecl(nominal);
-
-    ext->getExtendedTypeLoc().setType(extendedType);
 
     if (auto *genericParams = ext->getGenericParams()) {
       GenericEnvironment *env =

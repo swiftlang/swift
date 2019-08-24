@@ -1104,6 +1104,40 @@ public:
   }
 };
 
+class ExtendedTypeRequest
+    : public SimpleRequest<ExtendedTypeRequest,
+                           Type(ExtensionDecl *),
+                           CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<GenericSignature *>
+  evaluate(Evaluator &evaluator,
+           GenericSignature *baseSignature,
+           SmallVector<GenericTypeParamType *, 2> addedParameters,
+           SmallVector<Requirement, 2> addedRequirements) const;
+
+public:
+  // Separate caching.
+  bool isCached() const;
+
+  /// Abstract generic signature requests never have source-location info.
+  SourceLoc getNearestLoc() const {
+    return SourceLoc();
+  }
+  llvm::Expected<Type> evaluate(Evaluator &eval, ExtensionDecl *) const;
+
+public:
+  // Separate caching
+  bool isCached() const { return true; }
+  Optional<Type> getCachedResult() const;
+  void cacheResult(Type value) const;
+};
+
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
 template<>
