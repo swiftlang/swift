@@ -6753,7 +6753,7 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
 
 // Returns true if the given method and method type are a valid
 // `@dynamicCallable` required `func dynamicallyCall` method.
-static bool isValidDynamicallyCallMethod(FuncDecl *method,
+static bool isValidDynamicCallableMethod(FuncDecl *method,
                                          AnyFunctionType *methodType) {
   auto &ctx = method->getASTContext();
   if (method->getName() != ctx.Id_dynamicallyCall)
@@ -6815,7 +6815,7 @@ ExprRewriter::finishApplyDynamicCallable(ApplyExpr *apply,
     arg = TupleExpr::createImplicit(ctx, parenExpr->getSubExpr(), {});
 
   // Get resolved `dynamicallyCall` method and verify it.
-  assert(isValidDynamicallyCallMethod(method, methodType));
+  assert(isValidDynamicCallableMethod(method, methodType));
   auto params = methodType->getParams();
   auto argumentType = params[0].getParameterType();
 
@@ -7043,7 +7043,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
       if (method->isCallAsFunctionMethod())
         return finishApplyCallAsFunctionMethod(
             *this, apply, *selected, methodType, applyFunctionLoc);
-      if (methodType && isValidDynamicallyCallMethod(method, methodType))
+      if (methodType && isValidDynamicCallableMethod(method, methodType))
         return finishApplyDynamicCallable(
             apply, *selected, method, methodType, applyFunctionLoc);
     }

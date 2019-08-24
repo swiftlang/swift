@@ -6012,15 +6012,16 @@ ConstraintSystem::simplifyApplicableFnConstraint(
     }
   }
 
-  // Before stripping lvalue-ness and optional types, save original type for
-  // handling `func callAsFunction` and `@dynamicCallable` applications.
-  // This supports the following cases:
+  // Before stripping lvalue-ness and optional types, save the original second
+  // type for handling `func callAsFunction` and `@dynamicCallable`
+  // applications. This supports the following cases:
   // - Generating constraints for `mutating func callAsFunction`. The nominal
   //   type (`type2`) should be an lvalue type.
   // - Extending `Optional` itself with `func callAsFunction` or
   //   `@dynamicCallable` functionality. Optional types are stripped below if
   //   `shouldAttemptFixes()` is true.
-  auto *origType2 = type2->getDesugaredType();
+  auto origLValueType2 =
+      getFixedTypeRecursive(type2, flags, /*wantRValue=*/false);
   // Drill down to the concrete type on the right hand side.
   type2 = getFixedTypeRecursive(type2, flags, /*wantRValue=*/true);
   auto desugar2 = type2->getDesugaredType();
@@ -6104,10 +6105,10 @@ ConstraintSystem::simplifyApplicableFnConstraint(
         outerLocator.withPathElement(ConstraintLocator::Member));
     // Add a `callAsFunction` member constraint, binding the member type to a
     // type variable.
-    auto memberTy = createTypeVariable(memberLoc, TVO_CanBindToLValue |
-                                                  TVO_CanBindToNoEscape |
-                                                  TVO_CanBindToInOut);
-    addValueMemberConstraint(origType2, DeclName(ctx.Id_callAsFunction),
+    auto memberTy = createTypeVariable(memberLoc, /*options=*/0);
+    // TODO: Revisit this if `static func callAsFunction` is to be supported.
+    // Static member constraint requires `FunctionRefKind::DoubleApply`.
+    addValueMemberConstraint(origLValueType2, DeclName(ctx.Id_callAsFunction),
                              memberTy, DC, FunctionRefKind::SingleApply,
                              /*outerAlternatives*/ {}, locator);
     // Add new applicable function constraint based on the member type
@@ -6117,6 +6118,8 @@ ConstraintSystem::simplifyApplicableFnConstraint(
     return SolutionKind::Solved;
   }
 
+  // Record the second type before unwrapping optionals.
+  auto origType2 = desugar2;
   unsigned unwrapCount = 0;
   if (shouldAttemptFixes()) {
     // If we have an optional type, try forcing it to see if that
