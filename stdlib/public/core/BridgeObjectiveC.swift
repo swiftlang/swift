@@ -85,6 +85,22 @@ public protocol _ObjectiveCBridgeable {
 
 #if _runtime(_ObjC)
 
+@_silgen_name("swift_stdlib_connectNSBaseClasses")
+internal func _connectNSBaseClasses() -> Bool
+
+
+private let _bridgeInitializedSuccessfully = _connectNSBaseClasses()
+internal var _orphanedFoundationSubclassesReparented: Bool = false
+
+/// Reparents the SwiftNativeNS*Base classes to be subclasses of their respective
+/// Foundation types, or is false if they couldn't be reparented. Must be run
+/// in order to bridge Swift Strings, Arrays, Dictionarys, Sets, or Enumerators to ObjC.
+ internal func _connectOrphanedFoundationSubclassesIfNeeded() -> Void {
+  let bridgeWorks = _bridgeInitializedSuccessfully
+  _debugPrecondition(bridgeWorks)
+  _orphanedFoundationSubclassesReparented = true
+}
+
 //===--- Bridging for metatypes -------------------------------------------===//
 
 /// A stand-in for a value of metatype type.
