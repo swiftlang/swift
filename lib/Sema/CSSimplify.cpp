@@ -2415,10 +2415,17 @@ bool ConstraintSystem::repairFailures(
     if (repairByTreatingRValueAsLValue(lhs, rhs))
       break;
 
+    // If the problem is related to missing unwrap, there is a special
+    // fix for that.
     if (lhs->getOptionalObjectType() && !rhs->getOptionalObjectType()) {
-      conversionsOrFixes.push_back(
-          ForceOptional::create(*this, lhs, lhs->getOptionalObjectType(), loc));
-      break;
+      auto result = matchTypes(lhs->getOptionalObjectType(), rhs, matchKind,
+                               TMF_ApplyingFix, locator);
+
+      if (result.isSuccess()) {
+        conversionsOrFixes.push_back(
+            ForceOptional::create(*this, lhs, rhs, loc));
+        break;
+      }
     }
 
     // There is no subtyping between object types of inout argument/parameter.
