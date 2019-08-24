@@ -412,14 +412,6 @@ ClangImporter::~ClangImporter() {
   delete &Impl;
 }
 
-void ClangImporter::setTypeResolver(LazyResolver &resolver) {
-  Impl.setTypeResolver(&resolver);
-}
-
-void ClangImporter::clearTypeResolver() {
-  Impl.setTypeResolver(nullptr);
-}
-
 #pragma mark Module loading
 
 /// Finds the glibc.modulemap file relative to the provided resource dir.

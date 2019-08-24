@@ -333,9 +333,6 @@ public:
 
   void verifyAllModules() override;
 
-  void setTypeResolver(LazyResolver &resolver);
-  void clearTypeResolver();
-
   clang::TargetInfo &getTargetInfo() const;
   clang::ASTContext &getClangASTContext() const override;
   clang::Preprocessor &getClangPreprocessor() const override;
