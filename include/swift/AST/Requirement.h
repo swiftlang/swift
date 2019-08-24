@@ -120,6 +120,12 @@ public:
     return SecondLayout;
   }
 
+  /// Whether this requirement is in its canonical form.
+  bool isCanonical() const;
+
+  /// Get the canonical form of this requirement.
+  Requirement getCanonical() const;
+
   void dump() const;
   void dump(raw_ostream &out) const;
   void print(raw_ostream &os, const PrintOptions &opts) const;
