@@ -62,3 +62,17 @@ public struct HasWrappers {
   // CHECK-NEXT: }  
   @WrapperWithInitialValue(alternate: false) public var z
 }
+
+// CHECK: @frozen public struct FrozenWithWrappers {
+@frozen
+public struct FrozenWithWrappers {
+  // CHECK: @TestResilient.Wrapper public var val: Swift.Int {
+  // CHECK-NEXT: get
+  // CHECK-NEXT: set
+  // CHECK-NEXT: }
+  @Wrapper public var val: Int
+
+  // CHECK-NOT: var _val
+
+// CHECK-NEXT: }
+}

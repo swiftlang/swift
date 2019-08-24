@@ -143,6 +143,16 @@ PrintOptions PrintOptions::printParseableInterfaceFile(bool preferTypeRepr) {
         }
       }
 
+      // Skip printing the synthesized storage vars for property wrappers.
+      if (auto *PBD = dyn_cast<PatternBindingDecl>(D)) {
+        // Property wrappers are limited to single-var pattern bindings.
+        if (auto *VD = PBD->getSingleVar()) {
+          if (VD->getOriginalWrappedProperty(
+                  PropertyWrapperSynthesizedPropertyKind::Backing))
+            return false;
+        }
+      }
+
       // Skip extensions that extend things we wouldn't print.
       if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
         if (!shouldPrint(ED->getExtendedNominal(), options))
