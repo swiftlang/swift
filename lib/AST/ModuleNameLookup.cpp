@@ -180,10 +180,7 @@ void ModuleNameLookup<LookupStrategy>::collectLookupResultsFromImports(
     ModuleDecl::AccessPathTy accessPath,
     const DeclContext *moduleScopeContext) {
 
-  // Prefer scoped imports (those importing a specific name from a module, like
-  // `import func Swift.max`) to whole-module imports.
-  SmallVector<ValueDecl *, 8> unscopedValues;
-  SmallVector<ValueDecl *, 8> scopedValues;
+  SmallVector<ValueDecl *, 8> localDecls;
   for (auto next : reexports) {
     // Filter any whole-module imports, and skip specific-decl imports if the
     // import path doesn't match exactly.
@@ -200,16 +197,11 @@ void ModuleNameLookup<LookupStrategy>::collectLookupResultsFromImports(
       combinedAccessPath = accessPath;
     }
 
-    auto &resultSet = next.first.empty() ? unscopedValues : scopedValues;
-    lookupInModule(resultSet, next.second, combinedAccessPath,
+    lookupInModule(localDecls, next.second, combinedAccessPath,
                    moduleScopeContext);
   }
 
-  // Add the results from scoped imports, then the results from unscoped
-  // imports if needed.
-  const bool canReturnEarly = recordImportDecls(decls, scopedValues);
-  if (!canReturnEarly)
-    (void)recordImportDecls(decls, unscopedValues);
+  (void) recordImportDecls(decls, localDecls);
 }
 
 template <typename LookupStrategy>
