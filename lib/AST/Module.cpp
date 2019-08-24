@@ -55,6 +55,11 @@
 
 using namespace swift;
 
+static_assert(IsTriviallyDestructible<FileUnit>::value,
+              "FileUnits are BumpPtrAllocated; the d'tor may not be called");
+static_assert(IsTriviallyDestructible<LoadedFile>::value,
+              "LoadedFiles are BumpPtrAllocated; the d'tor may not be called");
+
 //===----------------------------------------------------------------------===//
 // Builtin Module Name lookup
 //===----------------------------------------------------------------------===//

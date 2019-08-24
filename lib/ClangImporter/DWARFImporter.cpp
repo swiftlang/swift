@@ -20,7 +20,6 @@ void DWARFImporterDelegate::anchor() {}
 /// Represents a Clang module that was "imported" from debug info. Since all the
 /// loading of types is done on demand, this class is effectively empty.
 class DWARFModuleUnit final : public LoadedFile {
-  ~DWARFModuleUnit() = default;
   ClangImporter::Implementation &Owner;
 
 public:
@@ -95,6 +94,9 @@ public:
     return isa<FileUnit>(DC) && classof(cast<FileUnit>(DC));
   }
 };
+
+static_assert(IsTriviallyDestructible<DWARFModuleUnit>::value,
+              "DWARFModuleUnits are BumpPtrAllocated; the d'tor is not called");
 
 ModuleDecl *ClangImporter::Implementation::loadModuleDWARF(
     SourceLoc importLoc, ArrayRef<std::pair<Identifier, SourceLoc>> path) {

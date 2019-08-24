@@ -644,7 +644,10 @@ static inline unsigned alignOfFileUnit();
 /// FileUnit is an abstract base class; its subclasses represent different
 /// sorts of containers that can each provide a set of decls, e.g. a source
 /// file. A module can contain several file-units.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wnon-virtual-dtor"
 class FileUnit : public DeclContext {
+#pragma clang diagnostic pop
   virtual void anchor();
 
   // FIXME: Stick this in a PointerIntPair.
@@ -654,8 +657,6 @@ protected:
   FileUnit(FileUnitKind kind, ModuleDecl &M)
     : DeclContext(DeclContextKind::FileUnit, &M), Kind(kind) {
   }
-
-  virtual ~FileUnit() = default;
 
 public:
   FileUnitKind getKind() const {
@@ -891,13 +892,7 @@ private:
   // Make placement new and vanilla new/delete illegal for FileUnits.
   void *operator new(size_t Bytes) throw() = delete;
   void *operator new(size_t Bytes, void *Mem) throw() = delete;
-
-protected:
-  // Unfortunately we can't remove this altogether because the virtual
-  // destructor requires it to be accessible.
-  void operator delete(void *Data) throw() {
-    llvm_unreachable("Don't use operator delete on a SourceFile");
-  }
+  void operator delete(void *Data) throw() = delete;
 
 public:
   // Only allow allocation of FileUnits using the allocator in ASTContext
@@ -1380,9 +1375,11 @@ public:
 };
 
 /// Represents an externally-loaded file of some kind.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wnon-virtual-dtor"
 class LoadedFile : public FileUnit {
+#pragma clang diagnostic pop
 protected:
-  ~LoadedFile() = default;
   LoadedFile(FileUnitKind Kind, ModuleDecl &M) noexcept
     : FileUnit(Kind, M) {
     assert(classof(this) && "invalid kind");

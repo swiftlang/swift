@@ -253,8 +253,6 @@ class SerializedASTFile final : public LoadedFile {
 
   bool IsSIB;
 
-  ~SerializedASTFile() = default;
-
   SerializedASTFile(ModuleDecl &M, ModuleFile &file, bool isSIB = false)
     : LoadedFile(FileUnitKind::SerializedAST, M), File(file), IsSIB(isSIB) {}
 
