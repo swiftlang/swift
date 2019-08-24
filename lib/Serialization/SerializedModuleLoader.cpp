@@ -955,6 +955,11 @@ void SerializedASTFile::lookupValue(ModuleDecl::AccessPathTy accessPath,
   File.lookupValue(name, results);
 }
 
+StringRef
+SerializedASTFile::getFilenameForPrivateDecl(const ValueDecl *decl) const {
+  return File.FilenamesForPrivateValues.lookup(decl);
+}
+
 TypeDecl *SerializedASTFile::lookupLocalType(llvm::StringRef MangledName) const{
   return File.lookupLocalType(MangledName);
 }

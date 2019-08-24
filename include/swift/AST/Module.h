@@ -1387,28 +1387,14 @@ protected:
     : FileUnit(Kind, M) {
     assert(classof(this) && "invalid kind");
   }
-
-  /// A map from private/fileprivate decls to the file they were defined in.
-  llvm::DenseMap<const ValueDecl *, Identifier> FilenameForPrivateDecls;
-
 public:
-
   /// Returns an arbitrary string representing the storage backing this file.
   ///
   /// This is usually a filesystem path.
   virtual StringRef getFilename() const;
 
-  void addFilenameForPrivateDecl(const ValueDecl *decl, Identifier id) {
-    assert(!FilenameForPrivateDecls.count(decl) ||
-           FilenameForPrivateDecls[decl] == id);
-    FilenameForPrivateDecls[decl] = id;
-  }
-
-  StringRef getFilenameForPrivateDecl(const ValueDecl *decl) {
-    auto it = FilenameForPrivateDecls.find(decl);
-    if (it == FilenameForPrivateDecls.end())
-      return StringRef();
-    return it->second.str();
+  virtual StringRef getFilenameForPrivateDecl(const ValueDecl *decl) const {
+    return StringRef();
   }
 
   /// Look up an operator declaration.

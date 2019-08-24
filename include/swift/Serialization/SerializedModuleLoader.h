@@ -274,6 +274,9 @@ public:
                            DeclName name, NLKind lookupKind,
                            SmallVectorImpl<ValueDecl*> &results) const override;
 
+  virtual StringRef
+  getFilenameForPrivateDecl(const ValueDecl *decl) const override;
+
   virtual TypeDecl *lookupLocalType(StringRef MangledName) const override;
   
   virtual OpaqueTypeDecl *

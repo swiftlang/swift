@@ -396,6 +396,7 @@ private:
   std::unique_ptr<SerializedObjCMethodTable> ObjCMethods;
 
   llvm::DenseMap<const ValueDecl *, Identifier> PrivateDiscriminatorsByValue;
+  llvm::DenseMap<const ValueDecl *, StringRef> FilenamesForPrivateValues;
 
   TinyPtrVector<Decl *> ImportDecls;
 

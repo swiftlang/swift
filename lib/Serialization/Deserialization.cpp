@@ -2254,7 +2254,7 @@ class swift::DeclDeserializer {
 
   Identifier privateDiscriminator;
   unsigned localDiscriminator = 0;
-  Identifier filenameForPrivate;
+  StringRef filenameForPrivate;
 
   void AddAttribute(DeclAttribute *Attr) {
     // Advance the linked list.
@@ -2308,10 +2308,8 @@ public:
       if (localDiscriminator != 0)
         value->setLocalDiscriminator(localDiscriminator);
 
-      if (!filenameForPrivate.empty()) {
-        auto *loadedFile = cast<LoadedFile>(MF.getFile());
-        loadedFile->addFilenameForPrivateDecl(value, filenameForPrivate);
-      }
+      if (!filenameForPrivate.empty())
+        MF.FilenamesForPrivateValues[value] = filenameForPrivate;
     }
 
     decl->setValidationToChecked();
@@ -4202,7 +4200,7 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
     } else if (recordID == decls_block::FILENAME_FOR_PRIVATE) {
       IdentifierID filenameID;
       decls_block::FilenameForPrivateLayout::readRecord(scratch, filenameID);
-      filenameForPrivate = MF.getIdentifier(filenameID);
+      filenameForPrivate = MF.getIdentifierText(filenameID);
     } else {
       return llvm::Error::success();
     }
