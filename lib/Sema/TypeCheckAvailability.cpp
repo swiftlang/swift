@@ -181,7 +181,7 @@ private:
     // when we process the accessor, we can use this TRC as the
     // parent.
     if (auto *StorageDecl = dyn_cast<AbstractStorageDecl>(D)) {
-      if (StorageDecl->hasAnyAccessors()) {
+      if (StorageDecl->hasParsedAccessors()) {
         StorageContexts[StorageDecl] = NewTRC;
       }
     }
@@ -230,7 +230,7 @@ private:
       // locations and have callers of that method provide appropriate source
       // locations.
       SourceLoc BracesEnd = storageDecl->getBracesRange().End;
-      if (storageDecl->hasAnyAccessors() && BracesEnd.isValid()) {
+      if (storageDecl->hasParsedAccessors() && BracesEnd.isValid()) {
         return SourceRange(storageDecl->getStartLoc(),
                            BracesEnd);
       }

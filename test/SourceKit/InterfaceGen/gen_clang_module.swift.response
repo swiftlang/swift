@@ -1610,14 +1610,9 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
     key.length: 4
   },
   {
-    key.kind: source.lang.swift.syntaxtype.attribute.id,
+    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
     key.offset: 2465,
     key.length: 11
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 2466,
-    key.length: 10
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,

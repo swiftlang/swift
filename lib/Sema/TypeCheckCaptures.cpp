@@ -24,6 +24,7 @@
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/Basic/Defer.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -32,7 +33,7 @@ using namespace swift;
 namespace {
 
 class FindCapturedVars : public ASTWalker {
-  TypeChecker &TC;
+  ASTContext &Context;
   SmallVector<CapturedValue, 4> Captures;
   llvm::SmallDenseMap<ValueDecl*, unsigned, 4> captureEntryNumber;
   SourceLoc GenericParamCaptureLoc;
@@ -44,12 +45,12 @@ class FindCapturedVars : public ASTWalker {
   bool NoEscape, ObjC;
 
 public:
-  FindCapturedVars(TypeChecker &tc,
+  FindCapturedVars(ASTContext &Context,
                    SourceLoc CaptureLoc,
                    DeclContext *CurDC,
                    bool NoEscape,
                    bool ObjC)
-      : TC(tc), CaptureLoc(CaptureLoc), CurDC(CurDC),
+      : Context(Context), CaptureLoc(CaptureLoc), CurDC(CurDC),
         NoEscape(NoEscape), ObjC(ObjC) {}
 
   CaptureInfo getCaptureInfo() const {
@@ -71,7 +72,7 @@ public:
     if (Captures.empty())
       result.setCaptures(None);
     else
-      result.setCaptures(TC.Context.AllocateCopy(Captures));
+      result.setCaptures(Context.AllocateCopy(Captures));
 
     return result;
   }
@@ -219,7 +220,7 @@ public:
     // can safely ignore them.
     // FIXME(TapExpr): This is probably caused by the scoping 
     // algorithm's ignorance of TapExpr. We should fix that.
-    if (D->getBaseName() == D->getASTContext().Id_dollarInterpolation)
+    if (D->getBaseName() == Context.Id_dollarInterpolation)
       return { false, DRE };
 
     // Capture the generic parameters of the decl, unless it's a
@@ -273,14 +274,14 @@ public:
         // This is not supported since nominal types cannot capture values.
         if (auto NTD = dyn_cast<NominalTypeDecl>(TmpDC)) {
           if (DC->isLocalContext()) {
-            TC.diagnose(DRE->getLoc(), diag::capture_across_type_decl,
-                        NTD->getDescriptiveKind(),
-                        D->getBaseName().getIdentifier());
+            Context.Diags.diagnose(DRE->getLoc(), diag::capture_across_type_decl,
+                                   NTD->getDescriptiveKind(),
+                                   D->getBaseName().getIdentifier());
 
-            TC.diagnose(NTD->getLoc(), diag::kind_declared_here,
-                        DescriptiveDeclKind::Type);
+            NTD->diagnose(diag::kind_declared_here,
+                          DescriptiveDeclKind::Type);
 
-            TC.diagnose(D, diag::decl_declared_here, D->getFullName());
+            D->diagnose(diag::decl_declared_here, D->getFullName());
             return { false, DRE };
           }
         }
@@ -328,7 +329,7 @@ public:
   }
 
   void propagateCaptures(AnyFunctionRef innerClosure, SourceLoc captureLoc) {
-    TC.computeCaptures(innerClosure);
+    TypeChecker::computeCaptures(innerClosure);
 
     auto &captureInfo = innerClosure.getCaptureInfo();
 
@@ -597,7 +598,10 @@ void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
   if (!AFR.getBody())
     return;
 
-  FindCapturedVars finder(*this,
+  PrettyStackTraceAnyFunctionRef trace("computing captures for", AFR);
+
+  auto &Context = AFR.getAsDeclContext()->getASTContext();
+  FindCapturedVars finder(Context,
                           AFR.getLoc(),
                           AFR.getAsDeclContext(),
                           AFR.isKnownNoEscape(),
@@ -624,27 +628,29 @@ void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
   if (AFD && finder.getGenericParamCaptureLoc().isValid()) {
     if (auto Clas = AFD->getParent()->getSelfClassDecl()) {
       if (Clas->usesObjCGenericsModel()) {
-        diagnose(AFD->getLoc(),
-                 diag::objc_generic_extension_using_type_parameter);
+        AFD->diagnose(diag::objc_generic_extension_using_type_parameter);
 
         // If it's possible, suggest adding @objc.
         Optional<ForeignErrorConvention> errorConvention;
         if (!AFD->isObjC() &&
             isRepresentableInObjC(AFD, ObjCReason::MemberOfObjCMembersClass,
                                   errorConvention)) {
-          diagnose(AFD->getLoc(),
+          AFD->diagnose(
                    diag::objc_generic_extension_using_type_parameter_try_objc)
             .fixItInsert(AFD->getAttributeInsertionLoc(false), "@objc ");
         }
 
-        diagnose(finder.getGenericParamCaptureLoc(),
-                 diag::objc_generic_extension_using_type_parameter_here);
+        Context.Diags.diagnose(
+            finder.getGenericParamCaptureLoc(),
+            diag::objc_generic_extension_using_type_parameter_here);
       }
     }
   }
 }
 
 void TypeChecker::checkPatternBindingCaptures(NominalTypeDecl *typeDecl) {
+  auto &ctx = typeDecl->getASTContext();
+
   for (auto member : typeDecl->getMembers()) {
     // Ignore everything other than PBDs.
     auto *PBD = dyn_cast<PatternBindingDecl>(member);
@@ -659,7 +665,7 @@ void TypeChecker::checkPatternBindingCaptures(NominalTypeDecl *typeDecl) {
       if (init == nullptr)
         continue;
 
-      FindCapturedVars finder(*this,
+      FindCapturedVars finder(ctx,
                               init->getLoc(),
                               PBD->getInitContext(i),
                               /*NoEscape=*/false,
@@ -667,8 +673,8 @@ void TypeChecker::checkPatternBindingCaptures(NominalTypeDecl *typeDecl) {
       init->walk(finder);
 
       if (finder.getDynamicSelfCaptureLoc().isValid()) {
-        diagnose(finder.getDynamicSelfCaptureLoc(),
-                 diag::dynamic_self_stored_property_init);
+        ctx.Diags.diagnose(finder.getDynamicSelfCaptureLoc(),
+                           diag::dynamic_self_stored_property_init);
       }
 
       auto captures = finder.getCaptureInfo();

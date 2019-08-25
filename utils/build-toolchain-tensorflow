@@ -148,6 +148,8 @@ if [ ${INSTALLER_PACKAGE} ]; then
 fi
 
 ./utils/build-script ${DRY_RUN} --preset="${SWIFT_PACKAGE}" \
+        --cmake-c-launcher=`which sccache` \
+        --cmake-cxx-launcher=`which sccache` \
         install_destdir="${SWIFT_INSTALL_DIR}" \
         installable_package="${SWIFT_INSTALLABLE_PACKAGE}" \
         install_toolchain_dir="${SWIFT_TOOLCHAIN_DIR}" \

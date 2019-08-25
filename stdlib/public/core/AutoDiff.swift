@@ -479,7 +479,7 @@ public func pullback<T, U, V, R>(
 
 @inlinable
 public func derivative<T: FloatingPoint, R>(
-  at x: T, in f: @escaping @differentiable (T) -> R
+  at x: T, in f: @differentiable (T) -> R
 ) ->  R.TangentVector
   where T.TangentVector == T {
   return differential(at: x, in: f)(T(1))
@@ -487,7 +487,7 @@ public func derivative<T: FloatingPoint, R>(
 
 @inlinable
 public func derivative<T: FloatingPoint, U: FloatingPoint, R>(
-  at x: T, _ y: U, in f: @escaping @differentiable (T, U) -> R
+  at x: T, _ y: U, in f: @differentiable (T, U) -> R
 ) -> R.TangentVector
   where T.TangentVector == T,
         U.TangentVector == U {
@@ -496,7 +496,7 @@ public func derivative<T: FloatingPoint, U: FloatingPoint, R>(
 
 @inlinable
 public func derivative<T: FloatingPoint, U: FloatingPoint, V: FloatingPoint, R>(
-  at x: T, _ y: U, _ z: V, in f: @escaping @differentiable (T, U, V) -> R
+  at x: T, _ y: U, _ z: V, in f: @differentiable (T, U, V) -> R
 ) -> R.TangentVector
   where T.TangentVector == T,
         U.TangentVector == U,
@@ -994,4 +994,15 @@ public extension Array where Element: Differentiable {
     }
     return (value: values, pullback: pullback)
   }
+}
+
+//===----------------------------------------------------------------------===//
+// JVP Diagnostics
+//===----------------------------------------------------------------------===//
+@_silgen_name("_printJVPErrorAndExit")
+public func _printJVPErrorAndExit() -> Never {
+    fatalError("""
+        JVP does not exist. Differential-first differentiation APIs are \
+        experimental and should not be used.
+        """)
 }

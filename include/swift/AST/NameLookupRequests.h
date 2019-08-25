@@ -24,6 +24,7 @@
 namespace swift {
 
 class ClassDecl;
+class DestructorDecl;
 class TypeAliasDecl;
 class TypeDecl;
 
@@ -229,6 +230,28 @@ private:
 public:
   // Caching
   bool isCached() const { return true; }
+};
+
+/// Finds or synthesizes a destructor for the given class.
+class GetDestructorRequest :
+    public SimpleRequest<GetDestructorRequest,
+                         DestructorDecl *(ClassDecl *),
+                         CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<DestructorDecl *>
+  evaluate(Evaluator &evaluator, ClassDecl *classDecl) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+  Optional<DestructorDecl *> getCachedResult() const;
+  void cacheResult(DestructorDecl *value) const;
 };
 
 /// The zone number for name-lookup requests.

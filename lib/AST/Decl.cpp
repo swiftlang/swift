@@ -1286,8 +1286,9 @@ PatternBindingDecl *PatternBindingDecl::createImplicit(
     ASTContext &Ctx, StaticSpellingKind StaticSpelling, Pattern *Pat, Expr *E,
     DeclContext *Parent, SourceLoc VarLoc) {
   auto *Result = create(Ctx, /*StaticLoc*/ SourceLoc(), StaticSpelling, VarLoc,
-                        Pat, /*EqualLoc*/ SourceLoc(), E, Parent);
+                        Pat, /*EqualLoc*/ SourceLoc(), nullptr, Parent);
   Result->setImplicit();
+  Result->setInit(0, E);
   return Result;
 }
 
@@ -1393,9 +1394,19 @@ unsigned PatternBindingDecl::getPatternEntryIndexForVarDecl(const VarDecl *VD) c
   return ~0U;
 }
 
-SourceRange PatternBindingEntry::getOrigInitRange() const {
-  auto Init = getInitAsWritten();
-  return Init ? Init->getSourceRange() : SourceRange();
+Expr *PatternBindingEntry::getOriginalInit() const {
+  return InitContextAndIsText.getInt() ? nullptr : InitExpr.originalInit;
+}
+
+SourceRange PatternBindingEntry::getOriginalInitRange() const {
+  if (auto *i = getOriginalInit())
+    return i->getSourceRange();
+  return SourceRange();
+}
+
+void PatternBindingEntry::setOriginalInit(Expr *E) {
+  InitExpr.originalInit = E;
+  InitContextAndIsText.setInt(false);
 }
 
 bool PatternBindingEntry::isInitialized() const {
@@ -1420,7 +1431,7 @@ void PatternBindingEntry::setInit(Expr *E) {
   } else {
     PatternAndFlags.setInt(F | Flags::Removed);
   }
-  InitExpr.Node = E;
+  InitExpr.initAfterSynthesis = E;
   InitContextAndIsText.setInt(false);
 }
 
@@ -1431,26 +1442,41 @@ VarDecl *PatternBindingEntry::getAnchoringVarDecl() const {
   return variables[0];
 }
 
-SourceRange PatternBindingEntry::getSourceRange(bool omitAccessors) const {
-  // Patterns end at the initializer, if present.
-  SourceLoc endLoc = getOrigInitRange().End;
+SourceLoc PatternBindingEntry::getLastAccessorEndLoc() const {
+  SourceLoc lastAccessorEnd;
+  getPattern()->forEachVariable([&](VarDecl *var) {
+    auto accessorsEndLoc = var->getBracesRange().End;
+    if (accessorsEndLoc.isValid())
+      lastAccessorEnd = accessorsEndLoc;
+  });
+  return lastAccessorEnd;
+}
 
-  // If we're not banned from handling accessors, they follow the initializer.
+SourceLoc PatternBindingEntry::getStartLoc() const {
+  return getPattern()->getStartLoc();
+}
+
+SourceLoc PatternBindingEntry::getEndLoc(bool omitAccessors) const {
+  // Accessors are last
   if (!omitAccessors) {
-    getPattern()->forEachVariable([&](VarDecl *var) {
-      auto accessorsEndLoc = var->getBracesRange().End;
-      if (accessorsEndLoc.isValid())
-        endLoc = accessorsEndLoc;
-    });
+    const auto lastAccessorEnd = getLastAccessorEndLoc();
+    if (lastAccessorEnd.isValid())
+      return lastAccessorEnd;
   }
+  const auto initEnd = getOriginalInitRange().End;
+  if (initEnd.isValid())
+    return initEnd;
 
-  // If we didn't find an end yet, check the pattern.
+  return getPattern()->getEndLoc();
+}
+
+SourceRange PatternBindingEntry::getSourceRange(bool omitAccessors) const {
+  const SourceLoc startLoc = getStartLoc();
+  if (startLoc.isInvalid())
+    return SourceRange();
+  const SourceLoc endLoc = getEndLoc(omitAccessors);
   if (endLoc.isInvalid())
-    endLoc = getPattern()->getEndLoc();
-
-  SourceLoc startLoc = getPattern()->getStartLoc();
-  if (startLoc.isValid() != endLoc.isValid()) return SourceRange();
-
+    return SourceRange();
   return SourceRange(startLoc, endLoc);
 }
 
@@ -1469,7 +1495,7 @@ StringRef PatternBindingEntry::getInitStringRepresentation(
   if (InitContextAndIsText.getInt() && !InitStringRepresentation.empty())
     return InitStringRepresentation;
   auto &sourceMgr = getAnchoringVarDecl()->getASTContext().SourceMgr;
-  auto init = getInit();
+  auto init = getOriginalInit();
   return extractInlinableText(sourceMgr, init, scratch);
 }
 
@@ -1984,12 +2010,35 @@ AccessorDecl *AbstractStorageDecl::getOpaqueAccessor(AccessorKind kind) const {
   return getSynthesizedAccessor(kind);
 }
 
+bool AbstractStorageDecl::hasParsedAccessors() const {
+  for (auto *accessor : getAllAccessors())
+    if (!accessor->isImplicit())
+      return true;
+  return false;
+}
+
 AccessorDecl *AbstractStorageDecl::getParsedAccessor(AccessorKind kind) const {
   auto *accessor = getAccessor(kind);
   if (accessor && !accessor->isImplicit())
     return accessor;
 
   return nullptr;
+}
+
+void AbstractStorageDecl::visitParsedAccessors(
+                        llvm::function_ref<void (AccessorDecl*)> visit) const {
+  for (auto *accessor : getAllAccessors())
+    if (!accessor->isImplicit())
+      visit(accessor);
+}
+
+void AbstractStorageDecl::visitEmittedAccessors(
+                        llvm::function_ref<void (AccessorDecl*)> visit) const {
+  visitParsedAccessors(visit);
+  visitOpaqueAccessors([&](AccessorDecl *accessor) {
+    if (accessor->isImplicit())
+      visit(accessor);
+  });
 }
 
 void AbstractStorageDecl::visitExpectedOpaqueAccessors(
@@ -3847,7 +3896,6 @@ ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
     = static_cast<unsigned>(CircularityCheck::Unchecked);
   Bits.ClassDecl.InheritsSuperclassInits = 0;
   Bits.ClassDecl.RawForeignKind = 0;
-  Bits.ClassDecl.HasDestructorDecl = 0;
   Bits.ClassDecl.Ancestry = 0;
   Bits.ClassDecl.AncestryComputed = 0;
   Bits.ClassDecl.HasMissingDesignatedInitializers = 0;
@@ -3884,11 +3932,18 @@ bool ClassDecl::hasResilientMetadata(ModuleDecl *M,
   llvm_unreachable("bad resilience expansion");
 }
 
-DestructorDecl *ClassDecl::getDestructor() {
-  auto results = lookupDirect(DeclBaseName::createDestructor());
-  assert(!results.empty() && "Class without destructor?");
-  assert(results.size() == 1 && "More than one destructor?");
-  return cast<DestructorDecl>(results.front());
+DestructorDecl *ClassDecl::getDestructor() const {
+  ASTContext &ctx = getASTContext();
+  return evaluateOrDefault(ctx.evaluator,
+                           GetDestructorRequest{const_cast<ClassDecl *>(this)},
+                           nullptr);
+}
+
+DeclRange ClassDecl::getEmittedMembers() const {
+  ASTContext &ctx = getASTContext();
+  return evaluateOrDefault(ctx.evaluator,
+                           EmittedMembersRequest{const_cast<ClassDecl *>(this)},
+                           getMembers());
 }
 
 /// Synthesizer callback for an empty implicit function body.
@@ -3899,34 +3954,32 @@ synthesizeEmptyFunctionBody(AbstractFunctionDecl *afd, void *context) {
            /*isTypeChecked=*/true };
 }
 
-void ClassDecl::addImplicitDestructor() {
-  if (hasDestructor() || isInvalid())
-    return;
-
-  auto &ctx = getASTContext();
-  auto *DD = new (ctx) DestructorDecl(getLoc(), this);
+llvm::Expected<DestructorDecl *>
+GetDestructorRequest::evaluate(Evaluator &evaluator, ClassDecl *CD) const {
+  auto &ctx = CD->getASTContext();
+  auto *DD = new (ctx) DestructorDecl(CD->getLoc(), CD);
 
   DD->setImplicit();
   DD->setValidationToChecked();
 
   // Synthesize an empty body for the destructor as needed.
   DD->setBodySynthesizer(synthesizeEmptyFunctionBody);
-  addMember(DD);
 
   // Propagate access control and versioned-ness.
-  DD->copyFormalAccessFrom(this, /*sourceIsParentContext*/true);
+  DD->copyFormalAccessFrom(CD, /*sourceIsParentContext*/true);
 
   // Wire up generic environment of DD.
-  DD->setGenericEnvironment(getGenericEnvironmentOfContext());
+  DD->setGenericEnvironment(CD->getGenericEnvironmentOfContext());
 
   // Mark DD as ObjC, as all dtors are.
-  DD->setIsObjC(getASTContext().LangOpts.EnableObjCInterop);
-  if (getASTContext().LangOpts.EnableObjCInterop) {
-    recordObjCMethod(DD, DD->getObjCSelector());
-  }
+  DD->setIsObjC(ctx.LangOpts.EnableObjCInterop);
+  if (ctx.LangOpts.EnableObjCInterop)
+    CD->recordObjCMethod(DD, DD->getObjCSelector());
 
   // Assign DD the interface type (Self) -> () -> ()
   DD->computeType();
+
+  return DD;
 }
 
 
@@ -5896,6 +5949,7 @@ void ParamDecl::setDefaultArgumentInitContext(Initializer *initContext) {
   DefaultValueAndFlags.getPointer()->InitContext = initContext;
 }
 
+/// Return nullptr if there is no property wrapper
 Expr *swift::findOriginalPropertyWrapperInitialValue(VarDecl *var,
                                                      Expr *init) {
   auto *PBD = var->getParentPatternBinding();
@@ -5909,7 +5963,10 @@ Expr *swift::findOriginalPropertyWrapperInitialValue(VarDecl *var,
 
   ASTContext &ctx = var->getASTContext();
   auto dc = var->getInnermostDeclContext();
-  auto innermostAttr = var->getAttachedPropertyWrappers().back();
+  const auto wrapperAttrs = var->getAttachedPropertyWrappers();
+  if (wrapperAttrs.empty())
+    return nullptr;
+  auto innermostAttr = wrapperAttrs.back();
   auto innermostNominal = evaluateOrDefault(
       ctx.evaluator, CustomAttrNominalRequest{innermostAttr, dc}, nullptr);
   if (!innermostNominal)
@@ -5966,6 +6023,46 @@ Expr *swift::findOriginalPropertyWrapperInitialValue(VarDecl *var,
     }
   }
   return initArg;
+}
+
+/// Writes a tuple expression where each element is either `nil` or another such
+/// tuple of nils.
+/// This comes up when printing default arguments for memberwise initializers
+/// that were created implicitly.
+/// For example, this var:
+/// ```
+/// var x: (Int?, (Int?, Int?, ()))
+/// ```
+/// will produce `(nil, (nil, nil, ()))`
+static void writeTupleOfNils(TupleType *type, llvm::raw_ostream &os) {
+  os << '(';
+  for (unsigned i = 0; i < type->getNumElements(); ++i) {
+    auto &elt = type->getElement(i);
+    if (elt.hasName()) {
+      os << elt.getName().str() << ": ";
+    }
+
+    if (elt.getType()->getOptionalObjectType()) {
+      os << "nil";
+    } else {
+      writeTupleOfNils(elt.getType()->castTo<TupleType>(), os);
+    }
+    if (i < type->getNumElements() - 1) {
+      os << ", ";
+    }
+  }
+  os << ')';
+}
+
+/// Determines if the given type is a potentially nested tuple of optional
+/// types.
+static bool isTupleOfOptionals(Type type) {
+  auto tuple = type->getAs<TupleType>();
+  if (!tuple) return false;
+  for (auto elt : tuple->getElementTypes())
+    if (!elt->getOptionalObjectType() && !isTupleOfOptionals(elt))
+      return false;
+  return true;
 }
 
 StringRef
@@ -6034,8 +6131,24 @@ ParamDecl::getDefaultValueStringRepresentation(
       }
     }
 
+    auto init = var->getParentInitializer();
+    if (!init || !init->getSourceRange().isValid()) {
+      // Special case: There are two possible times where we will synthesize a
+      //               default initial value for a stored property: if the type
+      //               is Optional, or if it's a (potentially nested) tuple of
+      //               all Optional elements. If it's Optional, we'll set
+      //               the DefaultArgumentKind to NilLiteral, but if we're still
+      //               handling a StoredProperty, then we know it's a tuple.
+      if (isTupleOfOptionals(getInterfaceType())) {
+        llvm::raw_svector_ostream os(scratch);
+        writeTupleOfNils(getInterfaceType()->castTo<TupleType>(), os);
+        return os.str();
+      }
+      return "<<empty>>";
+    }
+
     return extractInlinableText(getASTContext().SourceMgr,
-                                var->getParentInitializer(),
+                                init,
                                 scratch);
   }
   case DefaultArgumentKind::Inherited: return "super";
@@ -6487,13 +6600,6 @@ static bool requiresNewVTableEntry(const AbstractFunctionDecl *decl) {
 
   auto &ctx = dc->getASTContext();
 
-  // FIXME: Remove this once getInterfaceType(), isDesignatedInit() and
-  // anything else that is used below has been request-ified.
-  if (!decl->hasInterfaceType()) {
-    ctx.getLazyResolver()->resolveDeclSignature(
-      const_cast<AbstractFunctionDecl *>(decl));
-  }
-
   // Initializers are not normally inherited, but required initializers can
   // be overridden for invocation from dynamic types, and convenience initializers
   // are conditionally inherited when all designated initializers are available,
@@ -6518,13 +6624,6 @@ static bool requiresNewVTableEntry(const AbstractFunctionDecl *decl) {
   if (!base || base->hasClangNode() || base->isObjCDynamic())
     return true;
 
-  // FIXME: Remove this once getInterfaceType(), isDesignatedInit() and
-  // anything else that is used below has been request-ified.
-  if (!base->hasInterfaceType()) {
-    ctx.getLazyResolver()->resolveDeclSignature(
-      const_cast<AbstractFunctionDecl *>(base));
-  }
-
   // As above, convenience initializers are not formally overridable in Swift
   // vtables, although same-named initializers are modeled as overriding for
   // various QoI and objc interop reasons. Even if we "override" a non-required
@@ -6540,6 +6639,17 @@ static bool requiresNewVTableEntry(const AbstractFunctionDecl *decl) {
   // at all.
   if (decl->isEffectiveLinkageMoreVisibleThan(base))
     return true;
+
+  // FIXME: Remove this once getInterfaceType() has been request-ified.
+  if (!decl->hasInterfaceType()) {
+    ctx.getLazyResolver()->resolveDeclSignature(
+      const_cast<AbstractFunctionDecl *>(decl));
+  }
+
+  if (!base->hasInterfaceType()) {
+    ctx.getLazyResolver()->resolveDeclSignature(
+      const_cast<AbstractFunctionDecl *>(base));
+  }
 
   // If the method overrides something, we only need a new entry if the
   // override has a more general AST type. However an abstraction

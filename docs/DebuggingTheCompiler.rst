@@ -86,6 +86,14 @@ diagnostic engine to assert on the first error/warning:
 These allow one to dump a stack trace of where the diagnostic is being emitted
 (if run without a debugger) or drop into the debugger if a debugger is attached.
 
+Finding Diagnostic Names
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Some diagnostics rely heavily on format string arguments, so it can be difficult
+to find their implementation by searching for parts of the emitted message in
+the codebase. To print the corresponding diagnostic name at the end of each
+emitted message, use the ``-Xfrontend -debug-diagnostic-names`` argument.
+
 Debugging the Type Checker
 --------------------------
 

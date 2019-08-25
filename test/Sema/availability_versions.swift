@@ -482,13 +482,15 @@ func accessUnavailableProperties(_ o: ClassWithUnavailableProperties) {
   
   // Nesting in source of assignment
   var v: Int
-  
+
   v = o.propWithGetterOnlyAvailableOn10_51 // expected-error {{getter for 'propWithGetterOnlyAvailableOn10_51' is only available in macOS 10.51 or newer}}
       // expected-note@-1 {{add 'if #available' version check}}
 
   v = (o.propWithGetterOnlyAvailableOn10_51) // expected-error {{getter for 'propWithGetterOnlyAvailableOn10_51' is only available in macOS 10.51 or newer}}
       // expected-note@-1 {{add 'if #available' version check}}
-  
+
+  _ = v // muffle warning
+
   // Inout requires access to both getter and setter
   
   func takesInout(_ i : inout Int) { }

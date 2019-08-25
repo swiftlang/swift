@@ -902,17 +902,30 @@ bool swift::irgen::shouldRemoveTargetFeature(StringRef feature) {
   return feature == "+thumb-mode";
 }
 
+void IRGenModule::setHasFramePointer(llvm::AttrBuilder &Attrs,
+                                     bool HasFramePointer) {
+  if (HasFramePointer) {
+    Attrs.addAttribute("no-frame-pointer-elim", "true");
+    Attrs.addAttribute("no-frame-pointer-elim-non-leaf");
+  } else {
+    Attrs.addAttribute("no-frame-pointer-elim", "false");
+    Attrs.removeAttribute("no-frame-pointer-elim-non-leaf");
+  }
+}
+
+void IRGenModule::setHasFramePointer(llvm::Function *F,
+                                     bool HasFramePointer) {
+  llvm::AttrBuilder b;
+  setHasFramePointer(b, HasFramePointer);
+  F->addAttributes(llvm::AttributeList::FunctionIndex, b);
+}
+
 /// Construct initial function attributes from options.
 void IRGenModule::constructInitialFnAttributes(llvm::AttrBuilder &Attrs,
                                                OptimizationMode FuncOptMode) {
-  // Add DisableFPElim. 
-  if (!IRGen.Opts.DisableFPElim) {
-    Attrs.addAttribute("no-frame-pointer-elim", "false");
-  } else {
-    Attrs.addAttribute("no-frame-pointer-elim", "true");
-    Attrs.addAttribute("no-frame-pointer-elim-non-leaf");
-  }
-
+  // Add frame pointer attributes.
+  setHasFramePointer(Attrs, IRGen.Opts.DisableFPElim);
+  
   // Add target-cpu and target-features if they are non-null.
   auto *Clang = static_cast<ClangImporter *>(Context.getClangModuleLoader());
   clang::TargetOptions &ClangOpts = Clang->getTargetInfo().getTargetOpts();
@@ -1164,7 +1177,13 @@ void IRGenModule::emitAutolinkInfo() {
     }
     auto EntriesConstant = llvm::ConstantDataArray::getString(
         LLVMContext, EntriesString, /*AddNull=*/false);
-
+    // Mark the swift1_autolink_entries section with the SHF_EXCLUDE attribute
+    // to get the linker to drop it in the final linked binary.
+    // LLVM doesn't provide an interface to specify section attributs in the IR
+    // so we pass the attribute with inline assembly.
+    if (TargetInfo.OutputObjectFormat == llvm::Triple::ELF)
+      Module.appendModuleInlineAsm(".section .swift1_autolink_entries,"
+                                   "\"0x80000000\"");
     auto var =
         new llvm::GlobalVariable(*getModule(), EntriesConstant->getType(), true,
                                  llvm::GlobalValue::PrivateLinkage,

@@ -229,7 +229,7 @@ extension SomeClass {
 
 // <rdar://problem/16955318> Observed variable in a closure triggers an assertion
 var closureWithObservedProperty: () -> () = {
-  var a: Int = 42 {
+  var a: Int = 42 { // expected-warning {{variable 'a' was never used; consider replacing with '_' or removing it}}
   willSet {
     _ = "Will set a to \(newValue)"
   }

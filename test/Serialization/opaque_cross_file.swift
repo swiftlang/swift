@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -disable-availability-checking -emit-module-path %t/OpaqueCrossFileB.swiftmodule -module-name OpaqueCrossFileB %S/Inputs/OpaqueCrossFileB.swift
-// RUN: %target-swift-frontend -disable-availability-checking -I %t -emit-ir -verify %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-implicit-dynamic -disable-availability-checking -emit-module-path %t/OpaqueCrossFileB.swiftmodule -module-name OpaqueCrossFileB %S/Inputs/OpaqueCrossFileB.swift
+// RUN: %target-swift-frontend -enable-implicit-dynamic -disable-availability-checking -I %t -emit-ir -verify %s | %FileCheck %s
 
 import OpaqueCrossFileB
 

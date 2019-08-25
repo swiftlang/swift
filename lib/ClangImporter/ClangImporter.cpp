@@ -33,6 +33,7 @@
 #include "swift/Basic/StringExtras.h"
 #include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporterOptions.h"
+#include "swift/Demangling/Demangle.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Config.h"
@@ -2520,14 +2521,34 @@ void ClangImporter::lookupValue(DeclName name, VisibleDeclConsumer &consumer){
     });
 }
 
-void
-ClangImporter::lookupTypeDecl(StringRef rawName, ClangTypeKind kind,
-                              llvm::function_ref<void(TypeDecl*)> receiver) {
+static Optional<ClangTypeKind>
+getClangTypeKindForNodeKind(Demangle::Node::Kind kind) {
+  switch (kind) {
+  case Demangle::Node::Kind::Protocol:
+    return ClangTypeKind::ObjCProtocol;
+  case Demangle::Node::Kind::Class:
+    return ClangTypeKind::ObjCClass;
+  case Demangle::Node::Kind::TypeAlias:
+    return ClangTypeKind::Typedef;
+  case Demangle::Node::Kind::Structure:
+  case Demangle::Node::Kind::Enum:
+    return ClangTypeKind::Tag;
+  default:
+    return None;
+  }
+}
+
+void ClangImporter::lookupTypeDecl(
+    StringRef rawName, Demangle::Node::Kind kind,
+    llvm::function_ref<void(TypeDecl *)> receiver) {
   clang::DeclarationName clangName(
       &Impl.Instance->getASTContext().Idents.get(rawName));
 
   clang::Sema::LookupNameKind lookupKind;
-  switch (kind) {
+  auto clang_kind = getClangTypeKindForNodeKind(kind);
+  if (!clang_kind)
+    return;
+  switch (*clang_kind) {
   case ClangTypeKind::Typedef:
     lookupKind = clang::Sema::LookupOrdinaryName;
     break;
@@ -2558,17 +2579,17 @@ ClangImporter::lookupTypeDecl(StringRef rawName, ClangTypeKind kind,
 }
 
 void ClangImporter::lookupRelatedEntity(
-    StringRef rawName, ClangTypeKind kind, StringRef relatedEntityKind,
-    llvm::function_ref<void(TypeDecl*)> receiver) {
+    StringRef rawName, StringRef relatedEntityKind,
+    llvm::function_ref<void(TypeDecl *)> receiver) {
   using CISTAttr = ClangImporterSynthesizedTypeAttr;
   if (relatedEntityKind ==
         CISTAttr::manglingNameForKind(CISTAttr::Kind::NSErrorWrapper) ||
       relatedEntityKind ==
         CISTAttr::manglingNameForKind(CISTAttr::Kind::NSErrorWrapperAnon)) {
-    auto underlyingKind = ClangTypeKind::Tag;
+    auto underlyingKind = Demangle::Node::Kind::Structure;
     if (relatedEntityKind ==
           CISTAttr::manglingNameForKind(CISTAttr::Kind::NSErrorWrapperAnon)) {
-      underlyingKind = ClangTypeKind::Typedef;
+      underlyingKind = Demangle::Node::Kind::TypeAlias;
     }
     lookupTypeDecl(rawName, underlyingKind,
                    [this, receiver] (const TypeDecl *foundType) {

@@ -14,6 +14,12 @@ func myfunction(_ f: @escaping @differentiable (Float) -> (Float)) -> (Float) ->
   return f
 }
 
+var global_f: @differentiable (Float) -> Float = {$0}
+
+func calls_global_f() {
+  _ = global_f(10)
+}
+
 func apply() {
   _ = myfunction(thin)
 }
@@ -46,7 +52,6 @@ func apply() {
 // CHECK-SILGEN-NEXT:  [[DIFFED:%.*]] = autodiff_function [wrt 0] [order 1] [[ORIG_THICK]] : $@callee_guaranteed (Float) -> Float
 
 // CHECK-SIL:  [[DIFFED:%.*]] = autodiff_function [wrt 0] [order 1] {{%.*}} : $@callee_guaranteed (Float) -> Float
-// CHECK-SIL:  release_value [[DIFFED]] : $@differentiable @callee_guaranteed (Float) -> Float
 
 //===----------------------------------------------------------------------===//
 // Reabstraction

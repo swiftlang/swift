@@ -927,7 +927,7 @@ void swift::ide::api::SDKNodeType::diagnose(SDKNode *Right) {
 }
 
 void swift::ide::api::SDKNodeTypeFunc::diagnose(SDKNode *Right) {
-  SDKNode::diagnose(Right);
+  SDKNodeType::diagnose(Right);
   auto *RT = dyn_cast<SDKNodeTypeFunc>(Right);
   if (!RT || !shouldDiagnoseType(this))
     return;
@@ -2145,7 +2145,7 @@ static int diagnoseModuleChange(SDKContext &Ctx, SDKNodeRoot *LeftModule,
   // Find member hoist changes to help refine diagnostics.
   findTypeMemberDiffs(LeftModule, RightModule, Ctx.getTypeMemberDiffs());
   DiagnosisEmitter::diagnosis(LeftModule, RightModule, Ctx);
-  return 0;
+  return options::CompilerStyleDiags && Ctx.getDiags().hadAnyError() ? 1 : 0;
 }
 
 static int diagnoseModuleChange(StringRef LeftPath, StringRef RightPath,
@@ -2167,7 +2167,7 @@ static int diagnoseModuleChange(StringRef LeftPath, StringRef RightPath,
   RightCollector.deSerialize(RightPath);
   diagnoseModuleChange(Ctx, LeftCollector.getSDKRoot(), RightCollector.getSDKRoot(),
                        OutputPath, std::move(ProtocolReqWhitelist));
-  return 0;
+  return options::CompilerStyleDiags && Ctx.getDiags().hadAnyError() ? 1 : 0;
 }
 
 static void populateAliasChanges(NodeMap &AliasMap, DiffVector &AllItems,
