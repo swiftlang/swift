@@ -834,8 +834,15 @@ void swift::ide::api::SDKNodeDecl::diagnose(SDKNode *Right) {
   }
   // Diagnose generic signature change
   if (getGenericSignature() != RD->getGenericSignature()) {
-    emitDiag(diag::generic_sig_change,
-             getGenericSignature(), RD->getGenericSignature());
+    // Prefer sugared signature in diagnostics to be more user-friendly.
+    if (versionAtLeast(2) && RD->versionAtLeast(2) &&
+        getSugaredGenericSignature() != RD->getSugaredGenericSignature()) {
+      emitDiag(diag::generic_sig_change,
+               getSugaredGenericSignature(), RD->getSugaredGenericSignature());
+    } else {
+      emitDiag(diag::generic_sig_change,
+               getGenericSignature(), RD->getGenericSignature());
+    }
   }
   if (isOptional() != RD->isOptional()) {
     if (Ctx.checkingABI()) {
