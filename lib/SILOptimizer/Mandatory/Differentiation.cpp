@@ -1787,6 +1787,12 @@ void DifferentiableActivityInfo::analyze(DominanceInfo *di,
           if (isVaried(cai->getSrc(), i))
             recursivelySetVaried(cai->getDest(), i);
         }
+        // Handle `unconditional_checked_cast_addr`.
+        else if (auto *uccai =
+                     dyn_cast<UnconditionalCheckedCastAddrInst>(&inst)) {
+          if (isVaried(uccai->getSrc(), i))
+            recursivelySetVaried(uccai->getDest(), i);
+        }
         // Handle `tuple_element_addr`.
         else if (auto *teai = dyn_cast<TupleElementAddrInst>(&inst)) {
           if (isVaried(teai->getOperand(), i)) {
@@ -1902,6 +1908,12 @@ void DifferentiableActivityInfo::analyze(DominanceInfo *di,
         else if (auto *cai = dyn_cast<CopyAddrInst>(&inst)) {
           if (isUseful(cai->getDest(), i))
             propagateUsefulThroughBuffer(cai->getSrc(), i);
+        }
+        // Handle `unconditional_checked_cast_addr`.
+        else if (auto *uccai =
+                     dyn_cast<UnconditionalCheckedCastAddrInst>(&inst)) {
+          if (isUseful(uccai->getDest(), i))
+            propagateUsefulThroughBuffer(uccai->getSrc(), i);
         }
         // Handle reads.
         else if (inst.mayReadFromMemory()) {
@@ -5674,6 +5686,27 @@ public:
         return;
       }
     }
+  }
+
+  /// Handle `unconditional_checked_cast_addr` instruction.
+  ///   Original: y = unconditional_checked_cast_addr x
+  ///    Adjoint: adj[x] += unconditional_checked_cast_addr adj[y]
+  void visitUnconditionalCheckedCastAddrInst(
+      UnconditionalCheckedCastAddrInst *uccai) {
+    auto *bb = uccai->getParent();
+    auto &adjDest = getAdjointBuffer(bb, uccai->getDest());
+    auto &adjSrc = getAdjointBuffer(bb, uccai->getSrc());
+    if (errorOccurred)
+      return;
+    auto destType = remapType(adjDest->getType());
+    auto castBuf = builder.createAllocStack(uccai->getLoc(), adjSrc->getType());
+    builder.createUnconditionalCheckedCastAddr(
+        uccai->getLoc(), adjDest, adjDest->getType().getASTType(), castBuf,
+        adjSrc->getType().getASTType());
+    addToAdjointBuffer(bb, uccai->getSrc(), castBuf, uccai->getLoc());
+    builder.emitDestroyAddrAndFold(uccai->getLoc(), castBuf);
+    builder.createDeallocStack(uccai->getLoc(), castBuf);
+    emitZeroIndirect(destType.getASTType(), adjDest, uccai->getLoc());
   }
 
 #define NOT_DIFFERENTIABLE(INST, DIAG) \
