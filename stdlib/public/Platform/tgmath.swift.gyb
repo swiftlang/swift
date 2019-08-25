@@ -258,7 +258,7 @@ public func ${ufunc}(_ x: ${T}) -> ${T} {
 % for ufunc in UnaryIntrinsicFunctions:
 %  for T, CT, f in OverlayFloatTypes():
 %   if T == 'Float80':
-#if (arch(i386) || arch(x86_64)) && !os(Windows)
+#if (arch(i386) || arch(x86_64)) && !(os(Windows) || os(Android))
 %   end
 @_transparent
 public func ${ufunc}(_ x: ${T}) -> ${T} {
