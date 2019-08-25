@@ -266,49 +266,29 @@ ACCEPTS_ANY_OWNERSHIP_INST(ValueMetatype)
 ACCEPTS_ANY_OWNERSHIP_INST(UncheckedOwnershipConversion)
 ACCEPTS_ANY_OWNERSHIP_INST(ValueToBridgeObject)
 ACCEPTS_ANY_OWNERSHIP_INST(IsEscapingClosure)
-#undef ACCEPTS_ANY_OWNERSHIP_INST
-
-// Trivial if trivial typed, otherwise must accept owned?
-#define ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP_OR_METATYPE(USE_LIFETIME_CONSTRAINT,  \
-                                                     INST)                     \
-  OperandOwnershipKindMap OperandOwnershipKindClassifier::visit##INST##Inst(   \
-      INST##Inst *i) {                                                         \
-    assert(i->getNumOperands() && "Expected to have non-zero operands");       \
-    return Map::allLive();                                                     \
-  }
-ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP_OR_METATYPE(MustBeLive, ClassMethod)
-ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP_OR_METATYPE(MustBeLive, ObjCMethod)
-ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP_OR_METATYPE(MustBeLive, ObjCSuperMethod)
-ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP_OR_METATYPE(MustBeLive, SuperMethod)
-#undef ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP_OR_METATYPE
-
-// Trivial if trivial typed, otherwise must accept owned?
-#define ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(USE_LIFETIME_CONSTRAINT, INST)        \
-  OperandOwnershipKindMap OperandOwnershipKindClassifier::visit##INST##Inst(   \
-      INST##Inst *i) {                                                         \
-    assert(i->getNumOperands() && "Expected to have non-zero operands");       \
-    return Map::allLive();                                                     \
-  }
-ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, BridgeObjectToWord)
-ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, ClassifyBridgeObject)
-ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, CopyBlock)
-ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, OpenExistentialBox)
-ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, RefTailAddr)
-ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, RefToRawPointer)
-ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, SetDeallocating)
-ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, ProjectExistentialBox)
-ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, UnmanagedRetainValue)
-ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, UnmanagedReleaseValue)
-ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, UnmanagedAutoreleaseValue)
-ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, ConvertEscapeToNoEscape)
+ACCEPTS_ANY_OWNERSHIP_INST(ClassMethod)
+ACCEPTS_ANY_OWNERSHIP_INST(ObjCMethod)
+ACCEPTS_ANY_OWNERSHIP_INST(ObjCSuperMethod)
+ACCEPTS_ANY_OWNERSHIP_INST(SuperMethod)
+ACCEPTS_ANY_OWNERSHIP_INST(BridgeObjectToWord)
+ACCEPTS_ANY_OWNERSHIP_INST(ClassifyBridgeObject)
+ACCEPTS_ANY_OWNERSHIP_INST(CopyBlock)
+ACCEPTS_ANY_OWNERSHIP_INST(OpenExistentialBox)
+ACCEPTS_ANY_OWNERSHIP_INST(RefTailAddr)
+ACCEPTS_ANY_OWNERSHIP_INST(RefToRawPointer)
+ACCEPTS_ANY_OWNERSHIP_INST(SetDeallocating)
+ACCEPTS_ANY_OWNERSHIP_INST(ProjectExistentialBox)
+ACCEPTS_ANY_OWNERSHIP_INST(UnmanagedRetainValue)
+ACCEPTS_ANY_OWNERSHIP_INST(UnmanagedReleaseValue)
+ACCEPTS_ANY_OWNERSHIP_INST(UnmanagedAutoreleaseValue)
+ACCEPTS_ANY_OWNERSHIP_INST(ConvertEscapeToNoEscape)
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
-  ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, RefTo##Name)                    \
-  ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, Name##ToRef)                    \
-  ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, Copy##Name##Value)
-#define UNCHECKED_REF_STORAGE(Name, ...)                                       \
-  ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, RefTo##Name)
+  ACCEPTS_ANY_OWNERSHIP_INST(RefTo##Name)                                      \
+  ACCEPTS_ANY_OWNERSHIP_INST(Name##ToRef)                                      \
+  ACCEPTS_ANY_OWNERSHIP_INST(Copy##Name##Value)
+#define UNCHECKED_REF_STORAGE(Name, ...) ACCEPTS_ANY_OWNERSHIP_INST(RefTo##Name)
 #include "swift/AST/ReferenceStorage.def"
-#undef ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP
+#undef ACCEPTS_ANY_OWNERSHIP_INST
 
 OperandOwnershipKindMap
 OperandOwnershipKindClassifier::visitForwardingInst(SILInstruction *i,
