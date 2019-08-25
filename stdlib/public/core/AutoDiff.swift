@@ -162,10 +162,6 @@ public protocol Differentiable {
   @available(*, deprecated,
              message: "'AllDifferentiableVariables' is now equal to 'Self' and will be removed")
   typealias AllDifferentiableVariables = Self
-
-  @available(*, deprecated,
-             message: "'CotangentVector' is now equal to 'TangentVector' and will be removed")
-  typealias CotangentVector = TangentVector
 }
 
 public extension Differentiable {
