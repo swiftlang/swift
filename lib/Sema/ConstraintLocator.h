@@ -53,90 +53,9 @@ public:
   /// Describes the kind of a particular path element, e.g.,
   /// "tuple element", "call result", "base of member lookup", etc.
   enum PathElementKind : unsigned char {
-    /// The argument of function application.
-    ApplyArgument,
-    /// The function being applied.
-    ApplyFunction,
-    /// Matching an argument to a parameter.
-    ApplyArgToParam,
-    /// A generic parameter being opened.
-    ///
-    /// Also contains the generic parameter type itself.
-    GenericParameter,
-    /// The argument type of a function.
-    FunctionArgument,
-    /// The result type of a function.
-    FunctionResult,
-    /// A tuple element referenced by position.
-    TupleElement,
-    /// A tuple element referenced by name.
-    NamedTupleElement,
-    /// An optional payload.
-    OptionalPayload,
-    /// A generic argument.
-    /// FIXME: Add support for named generic arguments?
-    GenericArgument,
-    /// A member.
-    /// FIXME: Do we need the actual member name here?
-    Member,
-    /// An unresolved member.
-    UnresolvedMember,
-    /// The base of a member expression.
-    MemberRefBase,
-    /// The lookup for a subscript member.
-    SubscriptMember,
-    /// The lookup for a constructor member.
-    ConstructorMember,
-    /// An implicit @lvalue-to-inout conversion; only valid for operator
-    /// arguments.
-    LValueConversion,
-    /// RValue adjustment.
-    RValueAdjustment,
-    /// The result of a closure.
-    ClosureResult,
-    /// The parent of a nested type.
-    ParentType,
-    /// The superclass of a protocol existential type.
-    ExistentialSuperclassType,
-    /// The instance of a metatype type.
-    InstanceType,
-    /// The element type of a sequence in a for ... in ... loop.
-    SequenceElementType,
-    /// An argument passed in an autoclosure parameter
-    /// position, which must match the autoclosure return type.
-    AutoclosureResult,
-    /// The requirement that we're matching during protocol conformance
-    /// checking.
-    Requirement,
-    /// The candidate witness during protocol conformance checking.
-    Witness,
-    /// This is referring to a type produced by opening a generic type at the
-    /// base of the locator.
-    OpenedGeneric,
-    /// A component of a key path.
-    KeyPathComponent,
-    /// The Nth conditional requirement in the parent locator's conformance.
-    ConditionalRequirement,
-    /// A single requirement placed on the type parameters.
-    TypeParameterRequirement,
-    /// Locator for a binding from an IUO disjunction choice.
-    ImplicitlyUnwrappedDisjunctionChoice,
-    /// A result of an expression involving dynamic lookup.
-    DynamicLookupResult,
-    /// The desired contextual type passed in to the constraint system.
-    ContextualType,
-    /// The missing argument synthesized by the solver.
-    SynthesizedArgument,
-    /// The member looked up via keypath based dynamic lookup.
-    KeyPathDynamicMember,
-    /// The type of the key path expression
-    KeyPathType,
-    /// The root of a key path
-    KeyPathRoot,
-    /// The value of a key path
-    KeyPathValue,
-    /// The result type of a key path component. Not used for subscripts.
-    KeyPathComponentResult,
+#define LOCATOR_PATH_ELT(Name) Name,
+#define ABSTRACT_LOCATOR_PATH_ELT(Name)
+#include "ConstraintLocatorPathElts.def"
   };
 
   /// Determine the number of numeric values used for the given path
@@ -356,23 +275,8 @@ public:
     friend class ConstraintLocator;
 
   public:
-    class ApplyArgToParam;
-    class SynthesizedArgument;
-    class AnyTupleElement;
-    class TupleElement;
-    class NamedTupleElement;
-    class KeyPathComponent;
-    class GenericArgument;
-    class AnyRequirement;
-    class ConditionalRequirement;
-    class TypeParameterRequirement;
-    class ContextualType;
-    class Witness;
-    class Requirement;
-    class GenericParameter;
-    class OpenedGeneric;
-    class KeyPathDynamicMember;
-    class UnresolvedMember;
+#define LOCATOR_PATH_ELT(Name) class Name;
+#include "ConstraintLocatorPathElts.def"
 
     PathElement(PathElementKind kind)
       : storage(encodeStorage(kind, 0)), storedKind(StoredKindAndValue)
@@ -701,6 +605,16 @@ template <class X>
 inline typename llvm::cast_retty<X, LocatorPathElt>::ret_type
 dyn_cast(const LocatorPathElt &) = delete; // Use LocatorPathElt::getAs instead.
 
+#define SIMPLE_LOCATOR_PATH_ELT(Name) \
+class LocatorPathElt:: Name final : public LocatorPathElt { \
+public: \
+  Name () : LocatorPathElt(ConstraintLocator:: Name) {} \
+                                                        \
+  static bool classof(const LocatorPathElt *elt) { \
+    return elt->getKind() == ConstraintLocator:: Name; \
+  } \
+};
+#include "ConstraintLocatorPathElts.def"
 
 // The following LocatorPathElt subclasses are used to expose accessors for
 // specific path element information. They shouldn't introduce additional
@@ -925,15 +839,6 @@ public:
 
   static bool classof(const LocatorPathElt *elt) {
     return elt->getKind() == ConstraintLocator::KeyPathDynamicMember;
-  }
-};
-
-class LocatorPathElt::UnresolvedMember final : public LocatorPathElt {
-public:
-  UnresolvedMember() : LocatorPathElt(PathElementKind::UnresolvedMember, 0) {}
-
-  static bool classof(const LocatorPathElt *elt) {
-    return elt->getKind() == ConstraintLocator::UnresolvedMember;
   }
 };
 
