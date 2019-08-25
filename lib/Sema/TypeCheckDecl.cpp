@@ -874,6 +874,7 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
                         current->getFullName(),
                         otherInit->isMemberwiseInitializer());
         } else {
+          CompoundDiagnosticTransaction transaction(tc.Diags);
           tc.diagnose(current, diag::invalid_redecl, current->getFullName());
           tc.diagnose(other, diag::invalid_redecl_prev, other->getFullName());
         }

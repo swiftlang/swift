@@ -2506,15 +2506,18 @@ namespace {
             auto baseTyUnwrappedName = baseTyUnwrapped->getString();
             auto loc = DSCE->getLoc();
             auto startLoc = DSCE->getStartLoc();
-            
-            tc.diagnose(loc, swift::diag::optional_ambiguous_case_ref,
-                        baseTyName, baseTyUnwrappedName, memberName.str());
-            
-            tc.diagnose(loc, swift::diag::optional_fixit_ambiguous_case_ref)
-              .fixItInsert(startLoc, "Optional");
-            tc.diagnose(loc, swift::diag::type_fixit_optional_ambiguous_case_ref,
-                        baseTyUnwrappedName, memberName.str())
-              .fixItInsert(startLoc, baseTyUnwrappedName);
+            {
+              CompoundDiagnosticTransaction transaction(tc.Diags);
+              tc.diagnose(loc, swift::diag::optional_ambiguous_case_ref,
+                          baseTyName, baseTyUnwrappedName, memberName.str());
+
+              tc.diagnose(loc, swift::diag::optional_fixit_ambiguous_case_ref)
+                  .fixItInsert(startLoc, "Optional");
+              tc.diagnose(loc,
+                          swift::diag::type_fixit_optional_ambiguous_case_ref,
+                          baseTyUnwrappedName, memberName.str())
+                  .fixItInsert(startLoc, baseTyUnwrappedName);
+            }
           }
         }
       }
