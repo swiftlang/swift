@@ -986,7 +986,7 @@ public:
       return exactAttr;
     SILDifferentiableAttr *minimalAttr = nullptr;
     for (auto *da : original->getDifferentiableAttrs()) {
-      if (da->getIndices().source != indices.source)
+      if (da->getIndices().results != indices.results)
         continue;
       auto *daIndexSet = da->getIndices().parameters;
       // If all indices in `indexSet` are in `daIndexSet`, and it has fewer
@@ -1452,7 +1452,7 @@ static void collectMinimalIndicesForFunctionCall(
   // If the function returns only one result, then we just see if that is
   // useful.
   if (fnTy->getNumDirectFormalResults() == 1) {
-    if (activityInfo.isUseful(ai, parentIndices.source))
+    if (activityInfo.isUseful(ai, parentIndices.results))
       resultIndices.push_back(0);
     return;
   }
@@ -1472,12 +1472,12 @@ static void collectMinimalIndicesForFunctionCall(
     unsigned idx = resAndIdx.index();
     if (res.isFormalDirect()) {
       if (auto dirRes = usedDirectResults[dirResIdx])
-        if (dirRes && activityInfo.isUseful(dirRes, parentIndices.source))
+        if (dirRes && activityInfo.isUseful(dirRes, parentIndices.results))
           resultIndices.push_back(idx);
       ++dirResIdx;
     } else {
       if (activityInfo.isUseful(arguments[indResIdx].get(),
-                                parentIndices.source))
+                                parentIndices.results))
         resultIndices.push_back(idx);
       ++indResIdx;
     }
@@ -1550,7 +1550,8 @@ void LinearMapInfo::addLinearMapToStruct(ApplyInst *ai,
     return;
 
   unsigned source;
-  AutoDiffIndexSubset *parameters;
+  AutoDiffIndexSubset *parameterIndices = nullptr;
+  AutoDiffIndexSubset *resultIndices = nullptr;
 
   SmallVector<unsigned, 8> activeParamIndices;
   SmallVector<unsigned, 8> activeResultIndices;
@@ -1563,18 +1564,26 @@ void LinearMapInfo::addLinearMapToStruct(ApplyInst *ai,
   // all parameters.
   auto originalFnSubstTy = ai->getSubstCalleeType();
   if (originalFnSubstTy->isDifferentiable()) {
-    parameters = originalFnSubstTy->getDifferentiationParameterIndices();
+    parameterIndices = originalFnSubstTy->getDifferentiationParameterIndices();
+    resultIndices = originalFnSubstTy->getDifferentiationResultIndices();
   } else {
-    parameters = AutoDiffIndexSubset::get(
+    parameterIndices = AutoDiffIndexSubset::get(
         original->getASTContext(),
-        ai->getArgumentsWithoutIndirectResults().size(),
+        ai->getSubstCalleeType()->getNumParameters(),
         activeParamIndices);
+    resultIndices = AutoDiffIndexSubset::get(
+        builder.getASTContext(),
+        ai->getSubstCalleeType()->getNumResults(),
+        activeResultIndices);
   }
-  SILAutoDiffIndices curIndices(activeResultIndices.front(),
-  AutoDiffIndexSubset::get(
-      builder.getASTContext(),
-      ai->getArgumentsWithoutIndirectResults().size(),
-      activeParamIndices));
+  SILAutoDiffIndices curIndices(
+      AutoDiffIndexSubset::get(
+          builder.getASTContext(),
+          ai->getSubstCalleeType()->getNumParameters(),
+          activeParamIndices),
+      AutoDiffIndexSubset::get(builder.getASTContext(),
+          ai->getSubstCalleeType()->getNumResults(),
+          activeResultIndices));
 
   // Check for non-differentiable original function type.
   auto checkNondifferentiableOriginalFunctionType =
@@ -1588,17 +1597,21 @@ void LinearMapInfo::addLinearMapToStruct(ApplyInst *ai,
             return true;
         }
         // Check non-differentiable results.
-        if (!origFnTy->getResults()[curIndices.source]
-                .getSILStorageType()
-                .isDifferentiable(builder.getModule()))
-          return true;
+        for (unsigned resultIndex : range(origFnTy->getNumResults())) {
+          if (curIndices.isWrtResult(resultIndex) &&
+              !origFnTy->getResults()[resultIndex]
+                  .getSILStorageType()
+                  .isDifferentiable(builder.getModule()))
+            return true;
+        }
         return false;
       };
   if (checkNondifferentiableOriginalFunctionType(originalFnSubstTy))
     return;
 
   auto assocFnType = originalFnSubstTy->getAutoDiffAssociatedFunctionType(
-      parameters, source, /*differentiationOrder*/ 1, kind, builder.getModule(),
+      parameterIndices, resultIndices, /*differentiationOrder*/ 1, kind,
+      builder.getModule(),
       LookUpConformanceInModule(builder.getModule().getSwiftModule()));
 
   auto assocFnResultTypes =
@@ -3834,7 +3847,7 @@ public:
     auto indices = attr->getIndices();
 
     // Add differential result for the seed.
-    auto origResInfo = origTy->getResults()[indices.source];
+    auto origResInfo = origTy->getResults()[indices.results->front()];
     diffResults.push_back(
         SILResultInfo(origResInfo.getType()
             ->getAutoDiffAssociatedTangentSpace(lookupConformance)
@@ -4770,7 +4783,8 @@ public:
     // Assign adjoint for original result.
     SmallVector<SILValue, 8> origFormalResults;
     collectAllFormalResultsInTypeOrder(original, origFormalResults);
-    auto origResult = origFormalResults[getIndices().source];
+    assert(origFormalResults.size() == 1);
+    auto origResult = origFormalResults[getIndices().results->front()];
     // Emit warning if original result is not varied, because it will always
     // have a zero derivative.
     if (!getActivityInfo().isVaried(origResult, getIndices().parameters)) {
@@ -5288,7 +5302,8 @@ public:
     collectAllActualResultsInTypeOrder(
         ai, origDirResults, ai->getIndirectSILResults(),
         origAllResults);
-    auto origResult = origAllResults[applyInfo.indices.source];
+    assert(applyInfo.indices.results->getNumIndices() == 1);
+    auto origResult = origAllResults[applyInfo.indices.results->front()];
     auto origNumIndRes = ai->getNumIndirectResults();
 
     auto pullbackType =
@@ -6189,7 +6204,7 @@ ADContext::declareExternalAssociatedFunction(
   auto originalLoc = original->getLocation();
   auto assocGenSig = getAssociatedFunctionGenericSignature(attr, original);
   auto assocFnTy = originalTy->getAutoDiffAssociatedFunctionType(
-      indices.parameters, indices.source, /*differentiationOrder*/ 1, kind,
+      indices.parameters, indices.results, /*differentiationOrder*/ 1, kind,
       module, LookUpConformanceInModule(module.getSwiftModule()), assocGenSig);
   SILOptFunctionBuilder fb(getTransform());
   // Create external function declaration.
@@ -6233,7 +6248,7 @@ static SILFunction *createEmptyVJP(
       ? vjpGenericSig->createGenericEnvironment()
       : nullptr;
   auto vjpType = originalTy->getAutoDiffAssociatedFunctionType(
-      indices.parameters, indices.source, /*differentiationOrder*/ 1,
+      indices.parameters, indices.results, /*differentiationOrder*/ 1,
       AutoDiffAssociatedFunctionKind::VJP, module,
       LookUpConformanceInModule(module.getSwiftModule()), vjpGenericSig);
 
@@ -6284,7 +6299,7 @@ static SILFunction *createEmptyJVP(
       ? jvpGenericSig->createGenericEnvironment()
       : nullptr;
   auto jvpType = originalTy->getAutoDiffAssociatedFunctionType(
-      indices.parameters, indices.source, /*differentiationOrder*/ 1,
+      indices.parameters, indices.results, /*differentiationOrder*/ 1,
       AutoDiffAssociatedFunctionKind::JVP, module,
       LookUpConformanceInModule(module.getSwiftModule()), jvpGenericSig);
 
@@ -6677,7 +6692,7 @@ ADContext::getOrCreateSubsetParametersThunkForAssociatedFunction(
   // Compute target type for thunking.
   auto assocFnType = assocFn->getType().castTo<SILFunctionType>();
   auto targetType = origFnType->getAutoDiffAssociatedFunctionType(
-      desiredIndices.parameters, desiredIndices.source,
+      desiredIndices.parameters, desiredIndices.results,
       /*differentiationOrder*/ 1, kind, module, lookupConformance);
   auto *caller = assocFn->getFunction();
   if (targetType->hasArchetype()) {
@@ -6825,13 +6840,13 @@ SILValue ADContext::promoteToDifferentiableFunction(
   auto origFnOperand = adfi->getOriginalFunction();
   auto origFnTy = origFnOperand->getType().castTo<SILFunctionType>();
   auto parameterIndices = adfi->getParameterIndices();
-  unsigned resultIndex = resultIndices[adfi];
+  auto resultIndices = adfi->getResultIndices();
   unsigned differentiationOrder = adfi->getDifferentiationOrder();
 
   // Handle curry thunk applications specially.
   if (auto *ai = dyn_cast<ApplyInst>(origFnOperand)) {
     if (auto *thunkRef = dyn_cast<FunctionRefInst>(ai->getCallee())) {
-      SILAutoDiffIndices desiredIndices(resultIndex, parameterIndices);
+      SILAutoDiffIndices desiredIndices(parameterIndices, resultIndices);
       auto *thunk = thunkRef->getReferencedFunctionOrNull();
       // TODO(TF-685): Use more principled mangling for thunks.
       auto newThunkName = "AD__" + thunk->getName().str() +
@@ -6874,9 +6889,9 @@ SILValue ADContext::promoteToDifferentiableFunction(
           SILBuilder thunkBuilder(retInst);
           auto *adfi = createAutoDiffFunction(thunkBuilder, loc,
                                               parameterIndices,
+                                              resultIndices,
                                               differentiationOrder,
                                               retInst->getOperand());
-          resultIndices[adfi] = resultIndex;
           thunkBuilder.createReturn(loc, adfi);
           retInst->eraseFromParent();
 
@@ -6897,7 +6912,7 @@ SILValue ADContext::promoteToDifferentiableFunction(
     }
   }
 
-  SILAutoDiffIndices desiredIndices(resultIndex, parameterIndices);
+  SILAutoDiffIndices desiredIndices(parameterIndices, resultIndices);
   SmallVector<SILValue, 2> assocFns;
   for (auto assocFnKind : {AutoDiffAssociatedFunctionKind::JVP,
                            AutoDiffAssociatedFunctionKind::VJP}) {

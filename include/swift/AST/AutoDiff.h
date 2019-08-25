@@ -355,11 +355,15 @@ public:
   iterator begin() const {
     return iterator(this);
   }
+
+  unsigned front() const {
+    return *begin();
+  }
   
   iterator end() const {
     return iterator(this, (int)capacity);
   }
-  
+
   iterator_range<iterator> getIndices() const {
     return make_range(begin(), end());
   }
