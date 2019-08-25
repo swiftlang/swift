@@ -315,4 +315,13 @@ SimpleMathTests.test("SubsetIndices") {
   expectEqual(4, gradWRTNonDiff { x, y in x + Float(y) })
 }
 
+SimpleMathTests.test("ForceUnwrapping") {
+  func bla<T: Differentiable & FloatingPoint>(_ t: T) -> (T, Float) where T == T.TangentVector {
+    gradient(at: t, Float(1)) { (x, y) in
+      (x as! Float) * y
+    }
+  }
+  expectEqual((1, 2), bla(Float(2)))
+}
+
 runAllTests()
