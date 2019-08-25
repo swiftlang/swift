@@ -187,7 +187,7 @@ public extension Differentiable where TangentVector == Self {
 /// non-differentiable component.
 ///
 /// Mathematically, this represents a product manifold that consists of
-/// a differentaible vector space and some arbitrary manifold, where the tangent
+/// a differentiable vector space and some arbitrary manifold, where the tangent
 /// bundle of the entire product manifold is equal to the vector space
 /// component.
 ///
