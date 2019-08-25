@@ -2161,7 +2161,7 @@ static ConstraintFix *fixPropertyWrapperFailure(
       baseExpr = SE->getBase();
     else if (auto *MRE = dyn_cast<MemberRefExpr>(anchor))
       baseExpr = MRE->getBase();
-    else if (auto *anchor = simplifyLocatorToAnchor(cs, locator))
+    else if (auto *anchor = simplifyLocatorToAnchor(locator))
       baseExpr = anchor;
   }
 
@@ -2300,9 +2300,7 @@ bool ConstraintSystem::repairFailures(
     // default values, let's see whether error is related to missing
     // explicit call.
     if (fnType->getNumParams() > 0) {
-      auto *anchor =
-          simplifyLocatorToAnchor(*this, getConstraintLocator(locator));
-
+      auto *anchor = simplifyLocatorToAnchor(getConstraintLocator(locator));
       if (!anchor)
         return false;
 

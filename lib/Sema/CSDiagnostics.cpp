@@ -212,7 +212,7 @@ FailureDiagnostic::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
   auto *argLocator = cs.getConstraintLocator(
       anchor, argPath, ConstraintLocator::getSummaryFlagsForPath(argPath));
 
-  auto *argExpr = simplifyLocatorToAnchor(cs, argLocator);
+  auto *argExpr = simplifyLocatorToAnchor(argLocator);
 
   // If we were unable to simplify down to the argument expression, we don't
   // know what this is.
