@@ -826,7 +826,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   
   Expr *visitApplyExpr(ApplyExpr *E) {
     if (E->getFn()) {
-      Expr *E2 = doIt(E->getFn());
+      Expr *E2 = doIt(E->getSemanticFn());
       if (E2 == nullptr) return nullptr;
       E->setFn(E2);
     }
