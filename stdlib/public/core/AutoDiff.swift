@@ -152,12 +152,29 @@ public extension VectorProtocol where VectorSpaceScalar : SignedNumeric {
 /// A type that mathematically represents a differentiable manifold whose
 /// tangent spaces are finite-dimensional.
 public protocol Differentiable {
+  /// A type representing a differentiable value’s derivatives.
+  ///
+  /// Mathematically, this is equivalent to the tangent bundle of the
+  /// differentiable manifold represented by the differentiable type.
   associatedtype TangentVector: Differentiable & AdditiveArithmetic
     where TangentVector.TangentVector == TangentVector
 
-  /// Moves `self` along the value space towards the given tangent vector. In
-  /// Riemannian geometry (mathematics), this represents an exponential map.
+  /// Moves `self` along the given direction. In Riemannian geometry, this is
+  /// equivalent to exponential map, which moves `self` on the geodesic surface
+  /// along the given tangent vector.
   mutating func move(along direction: TangentVector)
+
+  /// A tangent vector such that `move(along: zeroTangentVector)` will not
+  /// modify `self`.
+  /// - Note: `zeroTangentVector` can be `TangentVector.zero` in most cases,
+  ///   but types whose tangent vectors depend on instance properties of `self`
+  ///   need to provide a different implementation. For example, the tangent
+  ///   vector of an `Array` depends on the array’s `count`.
+  @available(*, deprecated, message: """
+      `zeroTangentVector` derivation has not been implemented; do not use \
+      this property
+      """)
+  var zeroTangentVector: TangentVector { get }
 
   @available(*, deprecated,
              message: "'AllDifferentiableVariables' is now equal to 'Self' and will be removed")
@@ -175,6 +192,14 @@ public extension Differentiable {
     get { return self }
     set { self = newValue }
   }
+
+  // This is a temporary solution that allows us to add `zeroTangentVector`
+  // without implementing derived conformances. This property is marked
+  // unavailable because it will produce incorrect results when tangent vectors
+  // depend on instance properties of `self`.
+  // FIXME: Implement derived conformance and remove this default
+  // implementation.
+  var zeroTangentVector: TangentVector { .zero }
 }
 
 public extension Differentiable where TangentVector == Self {
