@@ -38,6 +38,8 @@ For the older version of Swift's metadata layout:
   - [Enum Descriptor](#enum-descriptor)
 - [Protocol Conformance Descriptor](#protocol-conformance-descriptor)
 - [Generic Argument Vector](#generic-argument-vector)
+- [Generic Context Descriptor Header](#generic-context-descriptor-header)
+- [Generic Metadata Pattern](#generic-metadata-pattern)
 - [Generic Requirement Descriptor](#generic-requirement-descriptor)
 - [Recursive Type Dependencies](#recursive-type-dependencies)
 - [Metadata States](#metadata-states)
@@ -73,55 +75,55 @@ the metadata describes.
 
 |                               Metadata                               | Kind |
 | -------------------------------------------------------------------- | ---- |
-| [Class](#Class-Metadata)*                                            |    0 |
-| [Struct](#Struct-Metadata)                                           |  512 |
-| [Enum](#Enum-Metadata)                                               |  513 |
-| [Optional](#Optional-Metadata)                                       |  514 |
-| [Foreign Class](#Foreign-Class-Metadata)                             |  515 |
-| [Opaque](#Opaque-Metadata)                                           |  768 |
-| [Tuple](#Tuple-Metadata)                                             |  769 |
-| [Function](#Function-Metadata)                                       |  770 |
-| [Existential](#Existential-Metadata)                                 |  771 |
-| [Metatype](#Metatype-Metadata)                                       |  772 |
-| [ObjC Class Wrapper](#ObjC-Class-Wrapper-Metadata)                   |  773 |
-| [Existential Metatype](#Existential-Metatype-Metadata)               |  774 |
-| [Heap Local Variable](#Heap-Local-Variable-Metadata)                 | 1024 |
-| [Heap Generic Local Variable](#Heap-Generic-Local-Variable-Metadata) | 1280 |
-| [Error Object](#Error-Object-Metadata)                               | 1281 |
+| [Class](#class-metadata)*                                            |    0 |
+| [Struct](#struct-metadata)                                           |  512 |
+| [Enum](#enum-metadata)                                               |  513 |
+| [Optional](#optional-metadata)                                       |  514 |
+| [Foreign Class](#foreign-class-metadata)                             |  515 |
+| [Opaque](#opaque-metadata)                                           |  768 |
+| [Tuple](#tuple-metadata)                                             |  769 |
+| [Function](#function-metadata)                                       |  770 |
+| [Existential](#existential-metadata)                                 |  771 |
+| [Metatype](#metatype-metadata)                                       |  772 |
+| [ObjC Class Wrapper](#objc-class-wrapper-metadata)                   |  773 |
+| [Existential Metatype](#existential-metatype-metadata)               |  774 |
+| [Heap Local Variable](#heap-local-variable-metadata)                 | 1024 |
+| [Heap Generic Local Variable](#heap-generic-local-variable-metadata) | 1280 |
+| [Error Object](#error-object-metadata)                               | 1281 |
 
 \*: Class metadata has of kind of **0** unless the class is required to
-  interoperate with Objective-C.  If the class is required to interoperate
-  with Objective-C, the kind field is instead an *isa pointer* to an
-  Objective-C metaclass.  Such a pointer can be distinguished from an
-  enumerated metadata kind because it is guaranteed to have a value larger
-  than **2047**.  Note that this is a more basic sense of interoperation
-  than is meant by the ``@objc`` attribute: it is what is required to
-  support Objective-C message sends and retain/release.  All classes are
-  required to interoperate with Objective-C on this level when building
-  for an Apple platform.
+interoperate with Objective-C.  If the class is required to interoperate
+with Objective-C, the kind field is instead an *isa pointer* to an
+Objective-C metaclass.  Such a pointer can be distinguished from an
+enumerated metadata kind because it is guaranteed to have a value larger
+than **2047**.  Note that this is a more basic sense of interoperation
+than is meant by the `@objc` attribute: it is what is required to
+support Objective-C message sends and retain/release.  All classes are
+required to interoperate with Objective-C on this level when building
+for an Apple platform.
 
 ### Struct Metadata
 
-In addition to the [common metadata layout](#Common-Metadata-Layout) fields,
+In addition to the [common metadata layout](#common-metadata-layout) fields,
 struct metadata records contain the following fields:
 
 #### Context Descriptor (offset 1)
 
 Similar to the value witness table pointer, this is a pointer sized word that
-points directly to the [context descriptor](#Context-Descriptor).
+points directly to the [context descriptor](#context-descriptor).
 
 #### Generic Argument Vector (offset 2)
 
 If the struct is generic, then the
-[generic argument vector](#Generic-Argument-Vector) is found directly after the
+[generic argument vector](#generic-argument-vector) is found directly after the
 nominal type descriptor.
 
-#### Field Offsets (offset ?)
+#### Field Offsets (offset 2/3)
 
 If the struct is generic, then the field offset vector begins immediately after
 the generic argument vector. However, if the struct is not generic, then the
 field offset vector begins immediately after the nominal type descriptor. The
-offset for this field is marked as **offset ?** because each struct is different,
+offset for this field is marked as **offset 2/3** because each struct is different,
 but the nominal type descriptor contains a field that describes the exact offset
 (in pointer sized words) from the metadata pointer. For each field of the struct,
 in `var` declaration order, the field's offset in bytes from the beginning of the
@@ -129,18 +131,18 @@ struct is stored as a `uint32_t` integer.
 
 ### Enum Metadata
 
-In addition to the [common metadata layout](#Common-Metadata-Layout) fields,
+In addition to the [common metadata layout](#common-metadata-layout) fields,
 enum metadata records contain the following fields:
 
 #### Context Descriptor (offset 1)
 
 Similar to the value witness table pointer, this is a pointer sized word that
-points directly to the [context descriptor](#Context-Descriptor).
+points directly to the [context descriptor](#context-descriptor).
 
 #### Generic Argument Vector (offset 2)
 
 If the enum is generic, then the
-[generic argument vector](#Generic-Argument-Vector) is found directly after the
+[generic argument vector](#generic-argument-vector) is found directly after the
 nominal type descriptor.
 
 ### Optional Metadata
@@ -151,7 +153,7 @@ reflection and dynamic-casting purposes.
 
 ### Tuple Metadata
 
-In addition to the [common metadata layout](#Common-Metadata-Layout) fields,
+In addition to the [common metadata layout](#common-metadata-layout) fields,
 tuple metadata records contain the following fields:
 
 #### Number of Elements (offset 1)
@@ -178,18 +180,36 @@ from the beginning of the tuple to the beginning of the **n**th element is at
 
 ### Function Metadata
 
-In addition to the [common metadata layout](#Common-Metadata-Layout) fields,
+In addition to the [common metadata layout](#common-metadata-layout) fields,
 function metadata records contain the following fields:
 
 #### Function Flags (offset 1)
 
-This includes information such as the semantic convention of the function,
-whether the function throws, and how many parameters the function has.
+This is a `size_t` integer that includes information such as the semantic
+convention of the function, whether the function throws, and how many parameters
+the function has. The flags are laid out as follows:
+
+|         Flag         |           Mask           |
+| -------------------- | ------------------------ |
+| Number of Parameters |                   0xFFFF |
+| Convention           | (value & 0xFF0000) >> 16 |
+| Throws?              |                0x1000000 |
+| Has Parameter Flags? |                0x2000000 |
+| Is Escaping?         |                0x4000000 |
+
+The different kinds of function convention:
+
+|     Convention     | Kind |
+| ------------------ | ---- |
+| Swift              |    0 |
+| Block              |    1 |
+| Thin               |    2 |
+| C Function Pointer |    3 |
 
 #### Result Type Metadata (offset 2)
 
 If the function has multiple returns, this references a
-[tuple metadata](#Tuple-Metadata) record.
+[tuple metadata](#tuple-metadata) record.
 
 #### Parameter Type Metadata Vector (offset 3)
 
@@ -202,7 +222,23 @@ records (where **n** is the number of parameters found in the function flags).
 set in the function flags.
 
 This is an array of `uint32_t` integers that includes information such as
-whether the parameter is `inout` or whether it is variadic.
+whether the parameter is `inout` or whether it is variadic. Each flag is laid
+out as follows:
+
+|       Flag      |  Mask |
+| --------------- | ----- |
+| Value Ownership |  0x7F |
+| Is Variadic?    |  0x80 |
+| Is Autoclosure? | 0x100 |
+
+The different kinds of value ownership:
+
+| Value Ownership | Kind |
+| --------------- | ---- |
+| Default         |    0 |
+| Inout           |    1 |
+| Shared          |    2 |
+| Owned           |    3 |
 
 #### Specialized ABI Endpoints
 
@@ -218,7 +254,7 @@ endpoints for functions with parameter flags due their minimal use.
 
 (also known as Protocol Metadata)
 
-In addition to the [common metadata layout](#Common-Metadata-Layout) fields,
+In addition to the [common metadata layout](#common-metadata-layout) fields,
 existential metadata records contain the following fields:
 
 #### Layout Flags (offset 1)
@@ -227,21 +263,22 @@ These flags are laid out as a `uint32_t` integer which are used to describe
 the existential container layout used to represent values of the type. The bits
 are laid out as follows:
 
-* The **number of witness tables** is stored in the least significant 24 bits.
-  Values of the protocol type contain this number of witness table pointers
-  in their layout.
+|           Flag           |            Mask            |
+| ------------------------ | -------------------------- |
+| Number of Witness Tables |                   0xFFFFFF |
+| Is Class Constraint?*    |                 0x80000000 |
+| Has Superclass?          |                 0x40000000 |
+| Special Protocol Kind    | (value & 0x3F000000) >> 24 |
 
-* The **special protocol kind** is stored in 6 bits starting at
-  bit 24. Only one special protocol kind is defined: the `Error` protocol has
-  value 1.
+\*: Note that this bit is inverted which means that if its set than any type
+can conform to this protocol, whereas if its not set then its a class constraint.
 
-* The **superclass constraint indicator** is stored at bit 30. When set, the
-  protocol type includes a superclass constraint (described below).
+Currently, there are only 2 special protocol kinds:
 
-* The **class constraint** is stored at bit 31. This bit is set if the type
-  is **not** class-constrained, meaning that struct, enum, or class values
-  can be stored in the type. If not set, then only class values can be stored
-  in the type, and the type uses a more efficient layout.
+| Special Protocol | Kind |
+| ---------------- | ---- |
+| None             |    0 |
+| Swift.Error      |    1 |
 
 #### Number of Protocols (offset 3 (4 byte))
 
@@ -263,13 +300,13 @@ The offset for this field is marked **offset ?** because depending on whether or
 not a superclass constraint is present, this offset could be **offset 2** or
 **offset 3**. This is an inline array of pointers to descriptors of each
 protocol in the composition. Each pointer references either a Swift
-[protocol descriptor](#Protocol-Descriptor) or an Objective-C `Protocol`; the
+[protocol descriptor](#protocol-descriptor) or an Objective-C `Protocol`; the
 low bit will be set to indicate when it references an Objective-C protocol. For
 an `Any` or `AnyObject` type, there is no protocol descriptor vector.
 
 ### Metatype Metadata
 
-In addition to the [common metadata layout](#Common-Metadata-Layout) fields,
+In addition to the [common metadata layout](#common-metadata-layout) fields,
 metatype metadata records contain the following fields:
 
 #### Instance Type Metadata (offset 1)
@@ -279,7 +316,7 @@ The type metadata that this metatype represents. E.g. this metatype is
 
 ### Existential Metatype Metadata
 
-In addition to the [common metadata layout](#Common-Metadata-Layout) fields,
+In addition to the [common metadata layout](#common-metadata-layout) fields,
 existential metatype metadata records contain the following fields:
 
 #### Instance Type Metadata (offset 1)
@@ -292,7 +329,7 @@ existential metatype.
 #### Layout Flags (offset 2)
 
 These are the same flags found on
-[existential's layout flags](#Layout-Flags-offset-1).
+[existential's layout flags](#layout-flags-offset-1).
 
 ### Class Metadata
 
@@ -302,7 +339,7 @@ are used as the values of class metatypes, so a derived class's metadata
 record also serves as a valid class metatype value for all of its ancestor
 classes.
 
-In addition to the [common metadata layout](#Common-Metadata-Layout) fields,
+In addition to the [common metadata layout](#common-metadata-layout) fields,
 class metadata records contain the following fields:
 
 #### Destructor (offset -2)
@@ -332,14 +369,14 @@ Objective-C classes.
 
 #### Flags (offset 5)
 
-These flags are laid out as a `uint32_t` integer to describe this class. Each
-flag is bit-wised or'ed to each other.
+These flags are laid out as a `uint32_t` integer to describe this class where
+the layout is as follows:
 
-|           Flag          | Value |
-| ----------------------  | ----- |
-| Is Swift Pre Stable ABI |   0x1 |
-| Uses Swift Ref Counting |   0x2 |
-| Has Custom ObjC Name    |   0x4 |
+|            Flag          |  Mask |
+| -----------------------  | ----- |
+| Is Swift Pre Stable ABI? |   0x1 |
+| Uses Swift Ref Counting? |   0x2 |
+| Has Custom ObjC Name?    |   0x4 |
 
 #### Instance Address Pointer (offset 11 (4 byte))
 
@@ -369,7 +406,7 @@ The offset of the address point within the class object in a `uint32_t` integer.
 #### Context Descriptor (offset 8)
 
 Similar to the value witness table pointer, this is a pointer sized word that
-points directly to the [context descriptor](#Context-Descriptor) for
+points directly to the [context descriptor](#context-descriptor) for
 the most-derived class type.
 
 #### Ivar Destroyer (offset 9)
@@ -406,7 +443,7 @@ all ivars must be trivial.
 Objective-C class wrapper metadata are used when an Objective-C `Class`
 object is not a valid Swift type metadata.
 
-In addition to the [common metadata layout](#Common-Metadata-Layout) fields,
+In addition to the [common metadata layout](#common-metadata-layout) fields,
 Objective-C class wrapper metadata records contain the following fields:
 
 #### Class Metadata (offset 1)
@@ -418,7 +455,7 @@ Metadata for a class type that is known not to be a Swift type.
 Foreign class metadata describes "foreign" class types, which support Swift
 reference counting but are otherwise opaque to the Swift runtime.
 
-In addition to the [common metadata layout](#Common-Metadata-Layout) fields,
+In addition to the [common metadata layout](#common-metadata-layout) fields,
 foreign class metadata records contain the following fields:
 
 #### Context Descriptor (offset 1)
@@ -438,7 +475,7 @@ A pointer-sized integer is reserved here for future use by the runtime.
 
 Opaque metadata is used by the compiler `Builtin` primitives that have no
 additional runtime information, thus there are no added fields beside the ones
-described in the [common metadata layout](#Common-Metadata-Layout).
+described in the [common metadata layout](#common-metadata-layout).
 
 ## Relative Pointers
 
@@ -483,13 +520,13 @@ name, field layout, etc.
 The first 32 bits of any context descriptor are the flags. This is a `uint32_t`
 field which is laid out as follows:
 
-|      Info      |        Mask      |
-| -------------- | ---------------- |
-| Kind           |             0x1F |
-| Is Generic?    |             0x80 |
-| Is Unique?     |             0x40 |
-| Version        |    (>> 8) & 0xFF |
-| Specific Flags | (>> 16) & 0xFFFF |
+|      Flag      |          Mask          |
+| -------------- | ---------------------- |
+| Kind           |                   0x1F |
+| Is Generic?    |                   0x80 |
+| Is Unique?     |                   0x40 |
+| Version        |    (value >> 8) & 0xFF |
+| Specific Flags | (value >> 16) & 0xFFFF |
 
 To distinguish context descriptors, below is a table of different kinds and their
 kind value.
@@ -536,7 +573,11 @@ extends. Note: This mangled name may contain symbolic references.
 An anonymous descriptor describes a context which is anonymous, such as a
 function body. Note: anonymous descriptors make use of the kind specific flags
 in the context descriptor flags to indicate whether or not it contains a
-mangled name.
+mangled name. These flags are laid out as follows:
+
+|        Flag       | Mask |
+| ----------------- | ---- |
+| Has Mangled Name? |  0x1 |
 
 In addition to the context descriptor's fields, anonymous descriptors contain
 the following field:
@@ -553,11 +594,11 @@ Note: protocol descriptors make use of the kind specific flags in the context
 descriptor flags to indicate whether it has a class constraint, is resilient,
 or also describes the special protocol kind.
 
-|          Info         | Mask |
-| --------------------- | ---- |
-| Has Class Constraint  |  0x1 |
-| Is Resilient          | 0x10 |
-| Special Protocol Kind | 0xFC |
+|           Flag         |         Mask        |
+| ---------------------- | ------------------- |
+| Has Class Constraint?  |                 0x1 |
+| Is Resilient?          |                0x10 |
+| Special Protocol Kind  | (value & 0xFC) >> 2 |
 
 Currently, there are only 2 special protocol kinds:
 
@@ -615,15 +656,15 @@ describe a declaration context which is also a type.
 Note: Type Context Descriptors make use of the context descriptor flag's
 specific kind flags for the following layout:
 
-|                  Info                 |  Mask  |
-| ------------------------------------- | ------ |
-| Metadata Initialization               |    0x3 |
-| Has Import Info?                      |    0x4 |
-| Class Resilient Superclass Ref        |  0xE00 |
-| Class Are Immediate Members Negative? | 0x1000 |
-| Class Has Resilient Superclass?       | 0x2000 |
-| Class Has Override Table?             | 0x4000 |
-| Class Has VTable?                     | 0x8000 |
+|                  Info                 |         Mask         |
+| ------------------------------------- | -------------------- |
+| Metadata Initialization               |                  0x3 |
+| Has Import Info?                      |                  0x4 |
+| Class Resilient Superclass Ref        | (value & 0xE00) >> 9 |
+| Class Are Immediate Members Negative? |               0x1000 |
+| Class Has Resilient Superclass?       |               0x2000 |
+| Class Has Override Table?             |               0x4000 |
+| Class Has VTable?                     |               0x8000 |
 
 Metadata Initialization has the following kinds:
 
@@ -677,6 +718,11 @@ This is the offset value to the field offset vector in the struct's metadata.
 E.g. if this value is 16, then there are 16 bytes from the metadata's pointer
 to the field offset vector.
 
+#### Type Generic Context Descriptor Header (offset 7 (4 byte))
+
+See
+[type generic context descriptor header](#type-generic-context-descriptor-header).
+
 ### Enum Descriptor
 
 In addition to the type context descriptor's fields, enum descriptors contain
@@ -692,6 +738,11 @@ pointer, if any.
 
 Another `uint32_t` integer value which indicates the number of cases without
 payloads.
+
+#### Type Generic Context Descriptor Header (offset 7 (4 byte))
+
+See
+[type generic context descriptor header](#type-generic-context-descriptor-header).
 
 #### Class Descriptor
 
@@ -718,9 +769,28 @@ is the positive size of metadata objects of this class (in words).
 However, if the superclass is resilient, the value is `uint32_t` integer that
 describes the extra class flags in the following layout:
 
-|              Info              | Mask |
+|              Flag              | Mask |
 | ------------------------------ | ---- |
 | Has ObjC Resilient Class Stub? |  0x1 |
+
+#### Number of Immediate Members (offset 8 (4 byte))
+
+The number of additional members added by this class to the class metadata.
+
+#### Number of Fields (offset 9 (4 byte))
+
+This is the number of stored properties in this class (not including superclass).
+
+#### Field Offset Vector Offset (offset 10 (4 byte))
+
+The offset to the field offset vector. If this is 0, then there is no field
+offset vector. If the class has a resilient superclass, this offset is relative
+to the size of the resilient superclass metadata.
+
+#### Type Generic Context Descriptor Header (offset 11 (4 byte))
+
+See
+[type generic context descriptor header](#type-generic-context-descriptor-header).
 
 ## Protocol Conformance Descriptor
 
@@ -795,7 +865,7 @@ for `T`, `U`, and `V` in succession, as if laid out in a C struct:
 
 ```c
 struct GenericParameterVector {
-  TypeMetadata *T, *U, *V;
+  TypeMetadata \*T, \*U, \*V;
 };
 ```
 
@@ -805,12 +875,85 @@ parameter vector contains witness tables for those protocols, as if laid out:
 
 ```c
 struct GenericParameterVector {
-  TypeMetadata *T, *U, *V;
-  RuncibleWitnessTable *T_Runcible;
-  FungibleWitnessTable *U_Fungible;
-  AnsibleWitnessTable *U_Ansible;
+  TypeMetadata \*T, \*U, \*V;
+  RuncibleWitnessTable \*T_Runcible;
+  FungibleWitnessTable \*U_Fungible;
+  AnsibleWitnessTable \*U_Ansible;
 };
 ```
+
+## Generic Context Descriptor Header
+
+Besides module descriptors and protocol descriptors, every context descriptor
+can be generic. This is indicated by the context descriptor's generic flag. In
+the case that it is generic, this header is placed right after the normal
+layout of a context descriptor. This header contains the following fields:
+
+#### Number of Parameters (offset 0)
+
+This indicates the number of generic parameters in a generic signature.
+
+#### Number of Requirements (offset 1 (2 byte))
+
+This indicates the number of requirements put on generic parameters in a
+generic signature.
+
+#### Number of Key Arguments (offset 2 (2 byte))
+
+"Key" arguments refer to the generic parameters that have actual metadata at
+runtime. "Non-Key" arguments refer to those parameters whose metadata is
+derivable from somewhere else. This is the number of parameters whose metadata
+is provided at runtime.
+
+#### Number of Extra Arguments (offset 3 (2 byte))
+
+### Type Generic Context Descriptor Header
+
+For type context descriptors, they have extra fields prefixed in addition to
+those in the generic context descriptor header:
+
+#### Generic Metadata Instantiation Cache (offset 0)
+
+This is a relative indirect pointer to the cache buffer reserved for the runtime.
+
+#### Generic Metadata Pattern (offset 1 (4 byte))
+
+A relative direct pointer to the instantiation pattern for generic type metadata.
+See [generic metadata pattern](#generic-metadata-pattern).
+
+#### Generic Context Descriptor Header (offset 2 (4 byte))
+
+See [generic context descriptor header](#generic-context-descriptor-header).
+
+## Generic Metadata Pattern
+
+The generic metadata pattern is the template for creating type metadata at
+runtime.
+
+#### Instantiation Function (offset 0)
+
+The instantiation function is a function that creates the template for type
+metadata. This is a relative direct pointer to such function.
+
+#### Completion Function (offset 1 (4 byte))
+
+The completion function actually completes the type metadata creation after
+instantiation. This is a relative direct pointer to that function. If this
+value is null, then the instantiation function must complete type metadata.
+
+#### Pattern Flags (offset 2 (4 byte))
+
+A `uint32_t` integer that indicates things like extra data pattern or metadata
+kind as laid out like:
+
+|                 Flag                 |            Mask            |
+| ------------------------------------ | -------------------------- |
+| Has Extra Data Pattern?              |                        0x1 |
+| Metadata Kind                        | (value & 0xFFE00000) >> 21 |
+| Class Has Immediate Members Pattern? |                0x100000000 |
+
+where Metadata Kind can be found here in
+[common metadata layout](#common-metadata-layout).
 
 ## Generic Requirement Descriptor
 
@@ -823,11 +966,11 @@ This is a `uint32_t` integer which describes what kind of requirement this is,
 whether the requirement has a key argument, has an extra argument, etc. The flags
 are laid out as follows:
 
-|      Info     | Mask |
-| ------------- | ---- |
-| Kind          | 0x1F |
-| Has Key Arg   | 0x80 |
-| Has Extra Arg | 0x40 |
+|      Flag      | Mask |
+| -------------- | ---- |
+| Kind           | 0x1F |
+| Has Key Arg?   | 0x80 |
+| Has Extra Arg? | 0x40 |
 
 The different requirement kinds:
 
@@ -903,7 +1046,7 @@ A type metadata may be in one of several different dynamic states:
 - An **abstract** metadata stores just enough information to allow the
   identity of the type to be recovered: namely, the metadata's kind
   (e.g. **struct**) and any kind-specific identity information it
-  entails (e.g. the `nominal type descriptor`_ and any generic arguments).
+  entails (e.g. the nominal type descriptor and any generic arguments).
 
 - A **layout-complete** metadata additionally stores the components of
   the type's "external layout", necessary to compute the layout of any
