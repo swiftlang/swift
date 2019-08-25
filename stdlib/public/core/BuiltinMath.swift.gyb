@@ -62,7 +62,7 @@ def TypedUnaryIntrinsicFunctions():
 // Note these have a corresponding LLVM intrinsic
 % for T, CT, bits, ufunc in TypedUnaryIntrinsicFunctions():
 %  if bits == 80:
-#if !os(Windows) && (arch(i386) || arch(x86_64))
+#if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
 %  end
 @_transparent
 public func _${ufunc}(_ x: ${T}) -> ${T} {
