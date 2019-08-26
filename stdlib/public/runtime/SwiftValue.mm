@@ -336,7 +336,7 @@ swift::findSwiftValueConformances(const ExistentialTypeMetadata *existentialType
       selfHeader->type, hashableConformance);
 }
 
-static id getValueDescription(__SwiftValue *self) {
+static NSString *getValueDescription(__SwiftValue *self) {
   const Metadata *type;
   const OpaqueValue *value;
   std::tie(type, value) = getValueFromSwiftValue(self);
@@ -346,15 +346,15 @@ static id getValueDescription(__SwiftValue *self) {
   auto copy = type->allocateBufferIn(&copyBuf);
   type->vw_initializeWithCopy(copy, const_cast<OpaqueValue *>(value));
 
-  id string = getDescription(copy, type);
+  NSString *string = getDescription(copy, type);
   type->deallocateBufferIn(&copyBuf);
   return string;
 }
 
-- (id /* NSString */)description {
+- (NSString *)description {
   return getValueDescription(self);
 }
-- (id /* NSString */)debugDescription {
+- (NSString *)debugDescription {
   return getValueDescription(self);
 }
 
@@ -363,11 +363,11 @@ static id getValueDescription(__SwiftValue *self) {
 - (const Metadata *)_swiftTypeMetadata {
   return getSwiftValueTypeMetadata(self);
 }
-- (id /* NSString */)_swiftTypeName {
+- (NSString *)_swiftTypeName {
   TypeNamePair typeName
     = swift_getTypeName(getSwiftValueTypeMetadata(self), true);
-  id str = swift_stdlib_NSStringFromUTF8(typeName.data, typeName.length);
-  return [str autorelease];
+
+  return [NSString stringWithUTF8String: typeName.data];
 }
 - (const OpaqueValue *)_swiftValue {
   return getValueFromSwiftValue(self).second;

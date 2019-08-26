@@ -47,12 +47,10 @@ internal func getChild<T>(of value: T, type: Any.Type, index: Int) -> (label: St
 internal func _getQuickLookObject<T>(_: T) -> AnyObject?
 
 @_silgen_name("_swift_stdlib_NSObject_isKindOfClass")
-internal func _isImpl(_ object: AnyObject, kindOf: UnsafePointer<CChar>) -> Bool
+internal func _isImpl(_ object: AnyObject, kindOf: AnyObject) -> Bool
 
 internal func _is(_ object: AnyObject, kindOf `class`: String) -> Bool {
-  return `class`.withCString {
-    return _isImpl(object, kindOf: $0)
-  }
+  return _isImpl(object, kindOf: `class` as AnyObject)
 }
 
 internal func _getClassPlaygroundQuickLook(
