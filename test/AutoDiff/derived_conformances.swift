@@ -30,4 +30,13 @@ DerivedConformanceTests.test("MemberwiseInitializers") {
               HasNoDerivativeConstant.TangentVector.zero)
 }
 
+DerivedConformanceTests.test("EuclideanVectorView") {
+  struct Foo: EuclideanDifferentiable {
+    var x: SIMD4<Float>
+    @noDerivative var y: SIMD4<Int32>
+  }
+  let x = Foo(x: [1, 2, 3, 4], y: .zero)
+  expectEqual(Foo.TangentVector(x: [1, 2, 3, 4]), x.vectorView)
+}
+
 runAllTests()
