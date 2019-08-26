@@ -177,13 +177,14 @@ static ConstructorComparison compareConstructors(ConstructorDecl *ctor1,
 /// figure out which of these declarations have been shadowed by others.
 static void recordShadowedDeclsAfterSignatureMatch(
                               ArrayRef<ValueDecl *> decls,
-                              const ModuleDecl *curModule,
+                              const DeclContext *dc,
                               llvm::SmallPtrSetImpl<ValueDecl *> &shadowed) {
   assert(decls.size() > 1 && "Nothing collided");
 
   // Compare each declaration to every other declaration. This is
   // unavoidably O(n^2) in the number of declarations, but because they
   // all have the same signature, we expect n to remain small.
+  auto *curModule = dc->getParentModule();
   ASTContext &ctx = curModule->getASTContext();
   for (unsigned firstIdx : indices(decls)) {
     auto firstDecl = decls[firstIdx];
@@ -364,7 +365,7 @@ static void recordShadowedDeclsForImportedInits(
 /// recording those that are shadowed by another declaration in the
 /// \c shadowed set.
 static void recordShadowedDecls(ArrayRef<ValueDecl *> decls,
-                                const ModuleDecl *curModule,
+                                const DeclContext *dc,
                                 llvm::SmallPtrSetImpl<ValueDecl *> &shadowed) {
   if (decls.size() < 2)
     return;
@@ -433,7 +434,7 @@ static void recordShadowedDecls(ArrayRef<ValueDecl *> decls,
 
   // Check whether we have shadowing for signature collisions.
   for (auto signature : collisionTypes) {
-    recordShadowedDeclsAfterSignatureMatch(collisions[signature], curModule,
+    recordShadowedDeclsAfterSignatureMatch(collisions[signature], dc,
                                            shadowed);
   }
 
@@ -445,7 +446,7 @@ static void recordShadowedDecls(ArrayRef<ValueDecl *> decls,
 }
 
 bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
-                                const ModuleDecl *curModule) {
+                                const DeclContext *dc) {
   // Collect declarations with the same (full) name.
   llvm::SmallDenseMap<DeclName, llvm::TinyPtrVector<ValueDecl *>>
     collidingDeclGroups;
@@ -472,7 +473,7 @@ bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
       continue;
     }
 
-    recordShadowedDecls(known->second, curModule, shadowed);
+    recordShadowedDecls(known->second, dc, shadowed);
     collidingDeclGroups.erase(known);
   }
 
@@ -1379,10 +1380,10 @@ void namelookup::pruneLookupResultSet(const DeclContext *dc, NLOptions options,
     removeOverriddenDecls(decls);
 
   // If we're supposed to remove shadowed/hidden declarations, do so now.
-  ModuleDecl *M = dc->getParentModule();
   if (options & NL_RemoveNonVisible)
-    removeShadowedDecls(decls, M);
+    removeShadowedDecls(decls, dc);
 
+  ModuleDecl *M = dc->getParentModule();
   filterForDiscriminator(decls, M->getDebugClient());
 }
 
