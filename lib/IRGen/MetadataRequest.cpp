@@ -526,14 +526,14 @@ CanType IRGenModule::substOpaqueTypesWithUnderlyingTypes(CanType type) {
   return type;
 }
 
-SILType IRGenModule::substOpaqueTypesWithUnderlyingTypes(SILType type) {
+SILType IRGenModule::substOpaqueTypesWithUnderlyingTypes(
+    SILType type, CanGenericSignature genericSig) {
   // Substitute away opaque types whose underlying types we're allowed to
   // assume are constant.
   if (type.getASTType()->hasOpaqueArchetype()) {
     ReplaceOpaqueTypesWithUnderlyingTypes replacer(getSwiftModule(),
                                                   ResilienceExpansion::Maximal);
-    type = type.subst(getSILModule(), replacer, replacer,
-                      CanGenericSignature(),
+    type = type.subst(getSILModule(), replacer, replacer, genericSig,
                       /*substitute opaque*/ true);
   }
 
