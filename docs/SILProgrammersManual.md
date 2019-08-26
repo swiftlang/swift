@@ -179,3 +179,133 @@ PassManager and its available analyses.
 [HighLevelSILOptimizations.rst](HighLevelSILOptimizations.rst) discusses how the optimizer imbues
 certain special SIL types and SIL functions with higher level
 semantics.
+
+
+## Iterating over the Control Flow Graph (CFG) safely
+
+Avoiding iterator invalidation is one of the most important things to pay
+attention to when working on a compiler. Over time we are working on modifying
+mutating utility functions to return a stable iterator appropriate for
+processing the next instruction in a block. We are not there yet today so
+sometimes one must reason about this explicitly.
+
+With that in mind, we provide strategies below for doing so as a cook book for
+new compiler writers. NOTE: One can only use worklists to large effect. Since
+worklists are not "iterating" over the CFG, we do not include them here.
+
+1. Read only analysis:
+
+```
+for (auto &block : function) {
+  for (auto &inst : block) {
+    ... do things ...
+  }
+}
+```
+
+2. Pass that only ever eliminates the current visited instruction (e.x. a
+  combiner).
+
+```
+for (auto &block : function) {
+  for (auto ii = block.begin(), ie = block.end(); ii != ie; ) {
+    // Dereference the iterator and then move the iterator to the next
+    // instruction. Since our instructions are in an iplist data structure,
+    // deleting an instruction does not impact the next instruction in the
+    // block.
+    auto *inst = &*ii;
+    ++ii;
+
+    if (!safeToDelete(inst)) {
+      continue;
+    }
+
+    inst->eraseFromParent();
+  }
+}
+```
+
+3. Iterating using reverse_iterators to implement a pass that ignores arguments
+   and may erase the current instruction and any instructions dominated by the
+   current instruction. This is done using reverse_iterators to ease the logic.
+
+   NOTE: reverse iterators are offset by 1 and always return the previous
+   element with respect to what they have stored.
+
+```
+for (auto &block : function) {
+  // Has start stored, but represents a sentinel value.
+  auto ii = block.rend();
+  // Has end stored, but represents std::prev(end) unless block is empty (in
+  // which case it is just the sentinel.
+  auto start = block.rbegin();
+
+  // If the block is empty, continue.
+  if (start == ii)
+    continue;
+
+  // Go to the first instruction to process. This is equivalent to moving to the
+  // first element of the array.
+  --ii;
+
+  // Then until we process the first instruction of the block...
+  while (ii != start) {
+    // Store into tmp a reverse iterator to the element /before/ ii.
+    auto tmp = std::next(ii);
+
+    // Then try to optimize.
+    auto *inst = &*ii;
+    if (safeToDelete(inst)) {
+      ... Do some work that may erase inst or instructions dominated by inst ...
+
+      // Then since ii was deleted, the next instruction to process is
+      // guaranteed to be our actual next instruction.
+      ii = std::prev(tmp);
+      continue;
+    }
+
+    // Otherwise, we didn't delete ii. That means that the iterator was not
+    // invalidated and the next instruction that we should process is the next
+    // instruction, so we decrement our reverse iterator appropriately.
+    --ii;
+  }
+}
+```
+
+4. Using (2), SILUndef, and a set of values to delete.
+
+Often times in the face of complicated invalidation semantics, one can simplify
+the code by iterating over the CFG using method (2) and adding any potentially
+dead instructions to a vector. Then after one has finished processing all
+instructions in the CFG, delete all instructions in the set.
+
+```
+SmallSetVector<SILInstruction *, 32> maybeDeadInsts;
+
+for (auto &block : function) {
+  for (auto ii = block.begin(), ie = block.end(); ii != ie; ) {
+    // Dereference the iterator and then move the iterator to the next
+    // instruction. Since our instructions are in an iplist data structure,
+    // deleting an instruction does not impact the next instruction in the
+    // block.
+    auto *inst = &*ii;
+    ++ii;
+
+    if (!safeToDelete(inst)) {
+      continue;
+    }
+
+    transform(inst->getUses(), std::back_inserter(maybeDeadInsts),
+              [](Operand *op) -> SILInstruction * { return op->getUser(); });
+    inst->replaceAllUsesOfAllResultsWithUndef();
+    inst->eraseFromParent();
+  }
+}
+
+while (!maybeDeadInsts.empty()) {
+  auto *next = maybeDeadInsts->pop_back_val();
+  recursivelyDeleteTriviallyDeadInstructions(
+    next,
+    [&](SILInstruction *i) { maybeDeadInsts.remove(i); });
+}
+```
