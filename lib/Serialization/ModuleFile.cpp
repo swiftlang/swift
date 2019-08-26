@@ -38,6 +38,9 @@ using namespace swift::serialization;
 using namespace llvm::support;
 using llvm::Expected;
 
+static_assert(IsTriviallyDestructible<SerializedASTFile>::value,
+              "SerializedASTFiles are BumpPtrAllocated; d'tors are not called");
+
 static bool checkModuleSignature(llvm::BitstreamCursor &cursor,
                                  ArrayRef<unsigned char> signature) {
   for (unsigned char byte : signature)
@@ -1352,8 +1355,7 @@ ModuleFile::ModuleFile(
           break;
         }
         case input_block::PARSEABLE_INTERFACE_PATH: {
-          if (extInfo)
-            extInfo->setParseableInterface(blobData);
+          ModuleInterfacePath = blobData;
           break;
         }
         default:

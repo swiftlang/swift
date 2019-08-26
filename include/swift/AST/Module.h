@@ -644,7 +644,10 @@ static inline unsigned alignOfFileUnit();
 /// FileUnit is an abstract base class; its subclasses represent different
 /// sorts of containers that can each provide a set of decls, e.g. a source
 /// file. A module can contain several file-units.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wnon-virtual-dtor"
 class FileUnit : public DeclContext {
+#pragma clang diagnostic pop
   virtual void anchor();
 
   // FIXME: Stick this in a PointerIntPair.
@@ -654,8 +657,6 @@ protected:
   FileUnit(FileUnitKind kind, ModuleDecl &M)
     : DeclContext(DeclContextKind::FileUnit, &M), Kind(kind) {
   }
-
-  virtual ~FileUnit() = default;
 
 public:
   FileUnitKind getKind() const {
@@ -874,10 +875,6 @@ public:
     return getParentModule()->getName().str();
   }
 
-  /// If this is a module imported from a parseable interface, return the path
-  /// to the interface file, otherwise an empty StringRef.
-  virtual StringRef getParseableInterface() const { return {}; }
-
   /// Traverse the decls within this file.
   ///
   /// \returns true if traversal was aborted, false if it completed
@@ -897,13 +894,7 @@ private:
   // Make placement new and vanilla new/delete illegal for FileUnits.
   void *operator new(size_t Bytes) throw() = delete;
   void *operator new(size_t Bytes, void *Mem) throw() = delete;
-
-protected:
-  // Unfortunately we can't remove this altogether because the virtual
-  // destructor requires it to be accessible.
-  void operator delete(void *Data) throw() {
-    llvm_unreachable("Don't use operator delete on a SourceFile");
-  }
+  void operator delete(void *Data) throw() = delete;
 
 public:
   // Only allow allocation of FileUnits using the allocator in ASTContext
@@ -1386,35 +1377,23 @@ public:
 };
 
 /// Represents an externally-loaded file of some kind.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wnon-virtual-dtor"
 class LoadedFile : public FileUnit {
+#pragma clang diagnostic pop
 protected:
-  ~LoadedFile() = default;
   LoadedFile(FileUnitKind Kind, ModuleDecl &M) noexcept
     : FileUnit(Kind, M) {
     assert(classof(this) && "invalid kind");
   }
-
-  /// A map from private/fileprivate decls to the file they were defined in.
-  llvm::DenseMap<const ValueDecl *, Identifier> FilenameForPrivateDecls;
-
 public:
-
   /// Returns an arbitrary string representing the storage backing this file.
   ///
   /// This is usually a filesystem path.
   virtual StringRef getFilename() const;
 
-  void addFilenameForPrivateDecl(const ValueDecl *decl, Identifier id) {
-    assert(!FilenameForPrivateDecls.count(decl) ||
-           FilenameForPrivateDecls[decl] == id);
-    FilenameForPrivateDecls[decl] = id;
-  }
-
-  StringRef getFilenameForPrivateDecl(const ValueDecl *decl) {
-    auto it = FilenameForPrivateDecls.find(decl);
-    if (it == FilenameForPrivateDecls.end())
-      return StringRef();
-    return it->second.str();
+  virtual StringRef getFilenameForPrivateDecl(const ValueDecl *decl) const {
+    return StringRef();
   }
 
   /// Look up an operator declaration.
