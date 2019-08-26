@@ -32,10 +32,15 @@ entry(%s : $CP):
   strong_release %t : $CP
 
   %v = ref_to_unmanaged %s : $CP to $@sil_unmanaged CP
-  %z = unmanaged_to_ref %v : $@sil_unmanaged CP to $CP
+  // CHECK: call %swift.refcounted* @swift_retain(%swift.refcounted* returned %0)
+  %v_copy = copy_unmanaged_value %v : $@sil_unmanaged CP
+  // CHECK: call void @swift_release(%swift.refcounted* %0)
+  strong_release %v_copy : $CP
 
   // CHECK: [[RESULT_A:%.*]] = insertvalue { %swift.refcounted*, i8** } undef, %swift.refcounted* %0, 0
   // CHECK: [[RESULT_B:%.*]] = insertvalue { %swift.refcounted*, i8** } [[RESULT_A]], i8** %1, 1
+  %z = unmanaged_to_ref %v : $@sil_unmanaged CP to $CP
+
   // CHECK: ret { %swift.refcounted*, i8** } [[RESULT_B]]
 
   return %z : $CP

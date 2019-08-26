@@ -746,6 +746,8 @@ void swift::visitAccessedAddress(SILInstruction *I,
   }
   // Non-access cases: these are marked with memory side effects, but, by
   // themselves, do not access formal memory.
+#define UNCHECKED_REF_STORAGE(Name, ...)                                       \
+  case SILInstructionKind::Copy##Name##ValueInst:
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   case SILInstructionKind::Copy##Name##ValueInst:
 #include "swift/AST/ReferenceStorage.def"
