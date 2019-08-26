@@ -594,7 +594,7 @@ bool swift::performLLVM(IRGenOptions &Opts, DiagnosticEngine *Diags,
     if (DiagMutex)
       DiagMutex->unlock();
   }
-
+#if 0
 #ifndef NDEBUG
   if (!OriginalOutputFilename.empty()) {
     // We're done changing the file; make sure it's saved before we compare.
@@ -630,6 +630,7 @@ bool swift::performLLVM(IRGenOptions &Opts, DiagnosticEngine *Diags,
       llvm_unreachable("one of these should be a temporary file");
     }
   }
+#endif
 #endif
 
   return false;
