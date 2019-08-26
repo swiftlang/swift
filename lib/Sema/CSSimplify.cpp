@@ -2291,7 +2291,8 @@ repairViaBridgingCast(ConstraintSystem &cs, Type fromType, Type toType,
 /// \return true if at least some of the failures has been repaired
 /// successfully, which allows type matcher to continue.
 bool ConstraintSystem::repairFailures(
-    Type lhs, Type rhs, SmallVectorImpl<RestrictionOrFix> &conversionsOrFixes,
+    Type lhs, Type rhs, ConstraintKind matchKind,
+    SmallVectorImpl<RestrictionOrFix> &conversionsOrFixes,
     ConstraintLocatorBuilder locator) {
   SmallVector<LocatorPathElt, 4> path;
   auto *anchor = locator.getLocatorParts(path);
@@ -2375,9 +2376,42 @@ bool ConstraintSystem::repairFailures(
     return true;
   };
 
+  auto repairByTreatingRValueAsLValue = [&](Type lhs, Type rhs) -> bool {
+    if (!lhs->is<LValueType>() &&
+        (rhs->is<LValueType>() || rhs->is<InOutType>())) {
+      // Conversion from l-value to inout in an operator argument
+      // position (which doesn't require explicit `&`) decays into
+      // a `Bind` of involved object types, same goes for explicit
+      // `&` conversion from l-value to inout type.
+      auto kind = (isa<InOutExpr>(anchor) ||
+                   (rhs->is<InOutType>() &&
+                    matchKind == ConstraintKind::OperatorArgumentConversion))
+                      ? ConstraintKind::Bind
+                      : matchKind;
+
+      auto result = matchTypes(lhs, rhs->getWithoutSpecifierType(), kind,
+                               TMF_ApplyingFix, locator);
+
+      if (result.isSuccess()) {
+        conversionsOrFixes.push_back(
+            TreatRValueAsLValue::create(*this, getConstraintLocator(locator)));
+        return true;
+      }
+    }
+
+    return false;
+  };
+
   if (path.empty()) {
     if (!anchor)
       return false;
+
+    // This could be:
+    // - `InOutExpr` used with r-value e.g. `foo(&x)` where `x` is a `let`.
+    // - `ForceValueExpr` e.g. `foo.bar! = 42` where `bar` or `foo` are
+    //   immutable or a subscript e.g. `foo["bar"]! = 42`.
+    if (repairByTreatingRValueAsLValue(lhs, rhs))
+      return true;
 
     // If method reference forms a value type of the key path,
     // there is going to be a constraint to match result of the
@@ -2453,6 +2487,18 @@ bool ConstraintSystem::repairFailures(
     if (repairViaBridgingCast(*this, lhs, rhs, conversionsOrFixes, locator))
       break;
 
+    // Argument is a r-value but parameter expects an l-value e.g.
+    //
+    // func foo(_ x: inout Int) {}
+    // let x: Int = 42
+    // foo(x) // `x` can't be converted to `inout Int`.
+    //
+    // This has to happen before checking for optionality mismatch
+    // because otherwise `Int? arg conv inout Int` is going to get
+    // fixed as 2 fixes - "force unwrap" + r-value -> l-value mismatch.
+    if (repairByTreatingRValueAsLValue(lhs, rhs))
+      break;
+
     if (lhs->getOptionalObjectType() && !rhs->getOptionalObjectType()) {
       conversionsOrFixes.push_back(
           ForceOptional::create(*this, lhs, lhs->getOptionalObjectType(), loc));
@@ -2477,6 +2523,7 @@ bool ConstraintSystem::repairFailures(
             },
             rhs)) {
       conversionsOrFixes.push_back(fix);
+      break;
     }
 
     // If argument in l-value type and parameter is `inout` or a pointer,
@@ -2488,25 +2535,28 @@ bool ConstraintSystem::repairFailures(
                                ConstraintKind::ArgumentConversion,
                                TypeMatchFlags::TMF_ApplyingFix, locator);
 
-      if (result.isSuccess())
+      if (result.isSuccess()) {
         conversionsOrFixes.push_back(AddAddressOf::create(
             *this, lhs, rhs, getConstraintLocator(locator)));
+        break;
+      }
     }
 
     // If the argument is inout and the parameter is not inout or a pointer,
     // suggest removing the &.
     if (lhs->is<InOutType>() && !rhs->is<InOutType>()) {
       auto objectType = rhs->lookThroughAllOptionalTypes();
-      if (objectType->getAnyPointerElementType())
-        break;
+      if (!objectType->getAnyPointerElementType()) {
+        auto result = matchTypes(lhs->getInOutObjectType(), rhs,
+                                 ConstraintKind::ArgumentConversion,
+                                 TypeMatchFlags::TMF_ApplyingFix, locator);
 
-      auto result = matchTypes(lhs->getInOutObjectType(), rhs,
-                               ConstraintKind::ArgumentConversion,
-                               TypeMatchFlags::TMF_ApplyingFix, locator);
-
-      if (result.isSuccess())
-        conversionsOrFixes.push_back(RemoveAddressOf::create(*this, lhs,
-            rhs, getConstraintLocator(locator)));
+        if (result.isSuccess()) {
+          conversionsOrFixes.push_back(RemoveAddressOf::create(
+              *this, lhs, rhs, getConstraintLocator(locator)));
+          break;
+        }
+      }
     }
 
     break;
@@ -2672,7 +2722,15 @@ bool ConstraintSystem::repairFailures(
     break;
   }
 
-  case ConstraintLocator::FunctionResult: {
+  case ConstraintLocator::Member:
+  case ConstraintLocator::FunctionResult:
+  case ConstraintLocator::DynamicLookupResult: {
+    // Most likely this is an attempt to use get-only subscript as mutating,
+    // or assign a value of a result of function/member ref e.g. `foo() = 42`
+    // or `foo.bar = 42`, or `foo.bar()! = 42`.
+    if (repairByTreatingRValueAsLValue(rhs, lhs))
+      break;
+
     // `apply argument` -> `arg/param compare` ->
     // `@autoclosure result` -> `function result`
     if (path.size() > 3) {
@@ -2724,6 +2782,13 @@ bool ConstraintSystem::repairFailures(
 
     conversionsOrFixes.push_back(CollectionElementContextualMismatch::create(
         *this, lhs, rhs, getConstraintLocator(locator)));
+    break;
+  }
+
+  case ConstraintLocator::SubscriptMember: {
+    if (repairByTreatingRValueAsLValue(lhs, rhs))
+      break;
+
     break;
   }
 
@@ -3517,25 +3582,11 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
             getConstraintLocator(locator)));
       }
     }
-
-    if (!type1->is<LValueType>() && type2->is<InOutType>()) {
-      // If we have a concrete type that's an rvalue, "fix" it.
-      conversionsOrFixes.push_back(
-          TreatRValueAsLValue::create(*this, getConstraintLocator(locator)));
-    }
-  }
-
-  if (attemptFixes && type2->is<LValueType>()) {
-    conversionsOrFixes.push_back(
-        TreatRValueAsLValue::create(*this, getConstraintLocator(locator)));
-  } else if (attemptFixes && kind == ConstraintKind::Bind && type1->is<LValueType>()) {
-    conversionsOrFixes.push_back(
-          TreatRValueAsLValue::create(*this, getConstraintLocator(locator)));
   }
 
   // Attempt to repair any failures identifiable at this point.
   if (attemptFixes) {
-    if (repairFailures(type1, type2, conversionsOrFixes, locator)) {
+    if (repairFailures(type1, type2, kind, conversionsOrFixes, locator)) {
       if (conversionsOrFixes.empty())
         return getTypeMatchSuccess();
     }
@@ -5055,6 +5106,7 @@ fixMemberRef(ConstraintSystem &cs, Type baseTy,
     // overload here, that would help if such subscript has
     // not been provided.
     case MemberLookupResult::UR_WritableKeyPathOnReadOnlyMember:
+      return TreatRValueAsLValue::create(cs, cs.getConstraintLocator(locator));
     case MemberLookupResult::UR_ReferenceWritableKeyPathOnMutatingMember:
       break;
     case MemberLookupResult::UR_KeyPathWithAnyObjectRootType:
@@ -7238,20 +7290,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     return result;
   }
 
-  case FixKind::TreatRValueAsLValue: {
-    if (type2->is<LValueType>() || type2->is<InOutType>())
-      type1 = LValueType::get(type1);
-    else
-      type2 = LValueType::get(type2);
-    auto result = matchTypes(type1, type2,
-                             matchKind, subflags, locator);
-    if (result == SolutionKind::Solved)
-      if (recordFix(fix))
-        return SolutionKind::Error;
-
-    return result;
-  }
-
   case FixKind::AutoClosureForwarding: {
     if (recordFix(fix))
       return SolutionKind::Error;
@@ -7301,6 +7339,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::RemoveReturn:
   case FixKind::AddConformance:
   case FixKind::RemoveAddressOf:
+  case FixKind::TreatRValueAsLValue:
   case FixKind::SkipSameTypeRequirement:
   case FixKind::SkipSuperclassRequirement:
   case FixKind::AddMissingArguments:

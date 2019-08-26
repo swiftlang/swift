@@ -2765,7 +2765,7 @@ public:
   /// Attempt to repair typing failures and record fixes if needed.
   /// \return true if at least some of the failures has been repaired
   /// successfully, which allows type matcher to continue.
-  bool repairFailures(Type lhs, Type rhs,
+  bool repairFailures(Type lhs, Type rhs, ConstraintKind matchKind,
                       SmallVectorImpl<RestrictionOrFix> &conversionsOrFixes,
                       ConstraintLocatorBuilder locator);
 
