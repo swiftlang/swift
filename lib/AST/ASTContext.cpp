@@ -868,15 +868,14 @@ StructDecl *ASTContext::getObjCBoolDecl() const {
 ClassDecl *ASTContext::get##NAME##Decl() const { \
   if (!getImpl().NAME##Decl) { \
     if (ModuleDecl *M = getLoadedModule(Id_Foundation)) { \
-      /* Note: use unqualified lookup so we find NSError regardless of */ \
-      /* whether it's defined in the Foundation module or the Clang */ \
-      /* Foundation module it imports. */ \
-      UnqualifiedLookup lookup(getIdentifier(#NAME), M); \
-      if (auto type = lookup.getSingleTypeResult()) { \
-        if (auto classDecl = dyn_cast<ClassDecl>(type)) { \
-          if (classDecl->getGenericParams() == nullptr) { \
-            getImpl().NAME##Decl = classDecl; \
-          } \
+      /* Note: lookupQualified() will search both the Foundation module \
+       * and the Clang Foundation module it imports. */ \
+      SmallVector<ValueDecl *, 1> decls; \
+      M->lookupQualified(M, getIdentifier(#NAME), NL_OnlyTypes, decls); \
+      if (decls.size() == 1 && isa<ClassDecl>(decls[0])) { \
+        auto classDecl = cast<ClassDecl>(decls[0]); \
+        if (classDecl->getGenericParams() == nullptr) { \
+          getImpl().NAME##Decl = classDecl; \
         } \
       } \
     } \

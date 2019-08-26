@@ -1613,14 +1613,16 @@ bool DeclContext::lookupQualified(ModuleDecl *module, DeclName member,
   bool isLookupCascading;
   configureLookup(this, options, tracker, isLookupCascading);
 
+  auto kind = (options & NL_OnlyTypes
+               ? ResolutionKind::TypesOnly
+               : ResolutionKind::Overloadable);
   auto topLevelScope = getModuleScopeContext();
   if (module == topLevelScope->getParentModule()) {
     if (tracker) {
       recordLookupOfTopLevelName(topLevelScope, member, isLookupCascading);
     }
     lookupInModule(module, /*accessPath=*/{}, member, decls,
-                   NLKind::QualifiedLookup, ResolutionKind::Overloadable,
-                   topLevelScope);
+                   NLKind::QualifiedLookup, kind, topLevelScope);
   } else {
     // Note: This is a lookup into another module. Unless we're compiling
     // multiple modules at once, or if the other module re-exports this one,
@@ -1633,8 +1635,7 @@ bool DeclContext::lookupQualified(ModuleDecl *module, DeclName member,
       if (import.second != module)
         return true;
       lookupInModule(import.second, import.first, member, decls,
-                     NLKind::QualifiedLookup, ResolutionKind::Overloadable,
-                     topLevelScope);
+                     NLKind::QualifiedLookup, kind, topLevelScope);
       // If we're able to do an unscoped lookup, we see everything. No need
       // to keep going.
       return !import.first.empty();
@@ -1644,10 +1645,6 @@ bool DeclContext::lookupQualified(ModuleDecl *module, DeclName member,
   llvm::SmallPtrSet<ValueDecl *, 4> knownDecls;
   decls.erase(std::remove_if(decls.begin(), decls.end(),
                              [&](ValueDecl *vd) -> bool {
-    // If we're performing a type lookup, skip non-types.
-    if ((options & NL_OnlyTypes) && !isa<TypeDecl>(vd))
-      return true;
-
     return !knownDecls.insert(vd).second;
   }), decls.end());
 
