@@ -36,23 +36,12 @@ using namespace swift;
 }
 @end
 
-
-
 @implementation __SwiftNull : NSObject
 
-//   int
- // asprintf(char **ret, const char *format, ...);
-
-- (id)description {
-  char *str = NULL;
-  const char *clsName = class_getName([self class]);
-  int fmtResult = asprintf(&str, "<%s %p depth = %u>", clsName,
-                                                       (void*)self,
-                                                       self->depth);
-  assert(fmtResult != -1 && "unable to format description of null");
-  id result = swift_stdlib_NSStringFromUTF8(str, strlen(str));
-  free(str);
-  return result;
+- (NSString*)description {
+  return [NSString stringWithFormat:@"<%@ %p depth = %u>", [self class],
+                                                           (void*)self,
+                                                           self->depth];
 }
 
 @end
@@ -69,7 +58,7 @@ static Lazy<SwiftNullSentinelCache> Sentinels;
 static id getSentinelForDepth(unsigned depth) {
   // For unnested optionals, use NSNull.
   if (depth == 1)
-    return SWIFT_LAZY_CONSTANT(id_const_cast([objc_getClass("NSNull") null]));
+    return id_const_cast(kCFNull);
   // Otherwise, make up our own sentinel.
   // See if we created one for this depth.
   auto &theSentinels = Sentinels.get();

@@ -173,26 +173,25 @@ Class _swift_classOfObjCHeapObject(OpaqueValue *value) {
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
-id swift_stdlib_getDescription(OpaqueValue *value,
+NSString *swift_stdlib_getDescription(OpaqueValue *value,
                                       const Metadata *type);
 
-id swift::getDescription(OpaqueValue *value, const Metadata *type) {
-  id result = swift_stdlib_getDescription(value, type);
+NSString *swift::getDescription(OpaqueValue *value, const Metadata *type) {
+  auto result = swift_stdlib_getDescription(value, type);
   type->vw_destroy(value);
   return [result autorelease];
 }
 
-static id _getObjectDescription(SwiftObject *obj) {
+static NSString *_getObjectDescription(SwiftObject *obj) {
   swift_retain((HeapObject*)obj);
   return getDescription((OpaqueValue*)&obj,
                         _swift_getClassOfAllocated(obj));
 }
 
-static id _getClassDescription(Class cls) {
-  const char *name = class_getName(cls);
-  int len = strlen(name);
-  return [swift_stdlib_NSStringFromUTF8(name, len) autorelease];
+static NSString *_getClassDescription(Class cls) {
+  return NSStringFromClass(cls);
 }
+
 
 @implementation SwiftObject
 + (void)initialize {
@@ -415,21 +414,21 @@ static id _getClassDescription(Class cls) {
                                                                  object2);
 }
 
-- (id /* NSString */)description {
+- (NSString *)description {
   return _getObjectDescription(self);
 }
-- (id /* NSString */)debugDescription {
+- (NSString *)debugDescription {
   return _getObjectDescription(self);
 }
 
-+ (id /* NSString */)description {
++ (NSString *)description {
   return _getClassDescription(self);
 }
-+ (id /* NSString */)debugDescription {
++ (NSString *)debugDescription {
   return _getClassDescription(self);
 }
 
-- (id /* NSString */)_copyDescription {
+- (NSString *)_copyDescription {
   // The NSObject version of this pushes an autoreleasepool in case -description
   // autoreleases, but we're OK with leaking things if we're at the top level
   // of the main thread with no autorelease pool.
@@ -437,7 +436,15 @@ static id _getClassDescription(Class cls) {
 }
 
 - (CFTypeID)_cfTypeID {
-  return (CFTypeID)1; //NSObject's CFTypeID is constant
+  // Adopt the same CFTypeID as NSObject.
+  static CFTypeID result;
+  static dispatch_once_t predicate;
+  dispatch_once_f(&predicate, &result, [](void *resultAddr) {
+    id obj = [[NSObject alloc] init];
+    *(CFTypeID*)resultAddr = [obj _cfTypeID];
+    [obj release];
+  });
+  return result;
 }
 
 // Foundation collections expect these to be implemented.
