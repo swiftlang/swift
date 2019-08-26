@@ -21,8 +21,9 @@
 #include "swift/AST/DebuggerClient.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericSignature.h"
-#include "swift/AST/LazyResolver.h"
+#include "swift/AST/ImportCache.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/LazyResolver.h"
 #include "swift/AST/ModuleNameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
@@ -1605,7 +1606,8 @@ bool DeclContext::lookupQualified(ModuleDecl *module, DeclName member,
                                   SmallVectorImpl<ValueDecl *> &decls) const {
   using namespace namelookup;
 
-  auto *stats = getASTContext().Stats;
+  auto &ctx = getASTContext();
+  auto *stats = ctx.Stats;
   if (stats)
     stats->getFrontendCounters().NumLookupQualifiedInModule++;
 
@@ -1631,16 +1633,15 @@ bool DeclContext::lookupQualified(ModuleDecl *module, DeclName member,
     // anything in this one.
 
     // Perform the lookup in all imports of this module.
-    forAllVisibleModules(this,
-                         [&](const ModuleDecl::ImportedModule &import) -> bool {
-      if (import.second != module)
-        return true;
-      lookupInModule(import.second, import.first, member, decls,
+    auto accessPaths = ctx.getImportCache().getAllVisibleAccessPaths(
+        module, topLevelScope);
+    if (llvm::any_of(accessPaths,
+                     [&](ModuleDecl::AccessPathTy accessPath) {
+                       return ModuleDecl::matchesAccessPath(accessPath, member);
+                     })) {
+      lookupInModule(module, {}, member, decls,
                      NLKind::QualifiedLookup, kind, topLevelScope);
-      // If we're able to do an unscoped lookup, we see everything. No need
-      // to keep going.
-      return !import.first.empty();
-    });
+    }
   }
 
   llvm::SmallPtrSet<ValueDecl *, 4> knownDecls;
