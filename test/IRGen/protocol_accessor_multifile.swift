@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend -emit-ir -primary-file %s %S/Inputs/protocol_accessor_multifile_other.swift > %t.ll
-// RUN: %FileCheck %s < %t.ll
+// RUN: %FileCheck %s -check-prefix CHECK -check-prefix CHECK-%target-runtime < %t.ll
 // RUN: %FileCheck -check-prefix NEGATIVE %s < %t.ll
 
 // CHECK: @"$s27protocol_accessor_multifile5ProtoMp" = external{{( dllimport)?}} global
@@ -28,7 +28,8 @@ class GenericContext<T: Proto> {
 // CHECK-LABEL: define{{.*}} void @"$s27protocol_accessor_multifile19useClassExistentialyyF"()
 func useClassExistential() {
   let g = getClassExistential()
-  // CHECK: [[G_TYPE:%.+]] = call %swift.type* @swift_getObjectType({{%.+}} {{%.+}})
+  // CHECK-objc: [[G_TYPE:%.+]] = call %swift.type* @swift_getObjectType({{%.+}} {{%.+}})
+  // CHECK-native: [[G_TYPE:%.+]] = load %swift.type*
   // CHECK: call swiftcc void {{%.+}}(i{{32|64}} 1, {{%.+}} {{%.+}}, %swift.type* [[G_TYPE]], i8** {{%.+}})
   g?.baseProp = 1
   // CHECK: ret void

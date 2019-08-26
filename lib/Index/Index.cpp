@@ -1103,15 +1103,13 @@ bool IndexSwiftASTWalker::report(ValueDecl *D) {
     // Even if we don't record a local property we still need to walk its
     // accessor bodies.
     if (auto StoreD = dyn_cast<AbstractStorageDecl>(D)) {
-      for (auto accessor : StoreD->getAllAccessors()) {
-        if (accessor->isImplicit())
-          continue;
+      StoreD->visitParsedAccessors([&](AccessorDecl *accessor) {
+        if (Cancelled)
+          return;
         ManuallyVisitedAccessorStack.push_back(accessor);
         SourceEntityWalker::walk(cast<Decl>(accessor));
         ManuallyVisitedAccessorStack.pop_back();
-        if (Cancelled)
-          return false;
-      }
+      });
     }
   }
 

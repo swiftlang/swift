@@ -3931,9 +3931,44 @@ namespace {
     }
 
     Decl *VisitUsingShadowDecl(const clang::UsingShadowDecl *decl) {
-      // Using shadow declarations are not imported; rather, name lookup just
-      // looks through them.
-      return nullptr;
+      // Only import types for now.
+      if (!isa<clang::TypeDecl>(decl->getUnderlyingDecl()))
+        return nullptr;
+        
+      Optional<ImportedName> correctSwiftName;
+      auto importedName = importFullName(decl, correctSwiftName);
+      auto Name = importedName.getDeclName().getBaseIdentifier();
+      if (Name.empty())
+        return nullptr;
+      
+      // If we've been asked to produce a compatibility stub, handle it via a
+      // typealias.
+      if (correctSwiftName)
+        return importCompatibilityTypeAlias(decl, importedName,
+                                            *correctSwiftName);
+      
+      auto DC =
+          Impl.importDeclContextOf(decl, importedName.getEffectiveContext());
+      if (!DC)
+        return nullptr;
+      
+      Decl *SwiftDecl = Impl.importDecl(decl->getUnderlyingDecl(), getActiveSwiftVersion());
+      const TypeDecl *SwiftTypeDecl = dyn_cast<TypeDecl>(SwiftDecl);
+      
+      if (!SwiftTypeDecl)
+        return nullptr;
+      
+      auto Loc = Impl.importSourceLoc(decl->getLocation());
+      auto Result = Impl.createDeclWithClangNode<TypeAliasDecl>(
+          decl,
+          AccessLevel::Public,
+          Impl.importSourceLoc(decl->getBeginLoc()),
+          SourceLoc(), Name,
+          Loc,
+          /*genericparams*/nullptr, DC);
+      Result->setUnderlyingType(SwiftTypeDecl->getDeclaredInterfaceType());
+      
+      return Result;
     }
 
     /// Add an @objc(name) attribute with the given, optional name expressed as
@@ -4641,7 +4676,6 @@ namespace {
         result->setSuperclass(Type());
         result->setAddedImplicitInitializers(); // suppress all initializers
         addObjCAttribute(result, Impl.importIdentifier(decl->getIdentifier()));
-        result->addImplicitDestructor();
         return result;
       };
 
@@ -4809,7 +4843,6 @@ namespace {
         result->setIsIncompatibleWithWeakReferences();
 
       result->setMemberLoader(&Impl, 0);
-      result->addImplicitDestructor();
 
       return result;
     }
@@ -5257,7 +5290,6 @@ SwiftDeclConverter::importCFClassType(const clang::TypedefNameDecl *decl,
     }
   }
 
-  theClass->addImplicitDestructor();
   return theClass;
 }
 

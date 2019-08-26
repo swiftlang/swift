@@ -103,8 +103,8 @@ _ = pullback(at: Vector.zero, in: testOwnedVector)
 // CHECK-LABEL: @{{.*}}testOwnedVector{{.*}}__pullback_src_0_wrt_0
 // CHECK: bb0([[PB_RESULT:%.*]] : $*Vector, [[SEED]] : $*Vector, [[PB_STRUCT:%.*]] : ${{.*}}testOwnedVector{{.*}}__PB__src_0_wrt_0):
 // CHECK:   [[PULLBACK0:%.*]] = struct_extract [[PB_STRUCT]] : ${{.*}}testOwnedVector{{.*}}__PB__src_0_wrt_0, #{{.*}}testOwnedVector{{.*}}__PB__src_0_wrt_0.pullback_0
-// CHECK-NOT:   release_value [[PULLBACK0]]
-// CHECK-NOT:   release_value [[PB_STRUCT]]
+// CHECK-NOT:   release_value [[PULLBACK0]] : @callee_guaranteed (@guaranteed Vector) -> (@owned Vector, @owned Vector)
+// CHECK-NOT:   release_value [[PB_STRUCT]] : ${{.*}}testOwnedVector{{.*}}__PB__src_0_wrt_0
 // CHECK: }
 
 func side_effect_release_zero(_ x: Vector) -> Vector {

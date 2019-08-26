@@ -270,6 +270,9 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   /// The module loader used to load Clang modules.
   ClangModuleLoader *TheClangModuleLoader = nullptr;
 
+  /// The module loader used to load Clang modules from DWARF.
+  ClangModuleLoader *TheDWARFModuleLoader = nullptr;
+
   /// Map from Swift declarations to raw comments.
   llvm::DenseMap<const Decl *, RawComment> RawComments;
 
@@ -1629,9 +1632,12 @@ void ASTContext::addSearchPath(StringRef searchPath, bool isFramework,
 }
 
 void ASTContext::addModuleLoader(std::unique_ptr<ModuleLoader> loader,
-                                 bool IsClang) {
-  if (IsClang && !getImpl().TheClangModuleLoader)
+                                 bool IsClang, bool IsDwarf) {
+  if (IsClang && !IsDwarf && !getImpl().TheClangModuleLoader)
     getImpl().TheClangModuleLoader =
+        static_cast<ClangModuleLoader *>(loader.get());
+  if (IsClang && IsDwarf && !getImpl().TheDWARFModuleLoader)
+    getImpl().TheDWARFModuleLoader =
         static_cast<ClangModuleLoader *>(loader.get());
 
   getImpl().ModuleLoaders.push_back(std::move(loader));
@@ -1674,6 +1680,10 @@ void ASTContext::verifyAllLoadedModules() const {
 
 ClangModuleLoader *ASTContext::getClangModuleLoader() const {
   return getImpl().TheClangModuleLoader;
+}
+
+ClangModuleLoader *ASTContext::getDWARFModuleLoader() const {
+  return getImpl().TheDWARFModuleLoader;
 }
 
 ModuleDecl *ASTContext::getLoadedModule(
@@ -4592,6 +4602,7 @@ GenericSignature *
 ASTContext::getOverrideGenericSignature(const ValueDecl *base,
                                         const ValueDecl *derived) {
   auto baseGenericCtx = base->getAsGenericContext();
+  auto derivedGenericCtx = derived->getAsGenericContext();
   auto &ctx = base->getASTContext();
 
   if (!baseGenericCtx) {
@@ -4612,6 +4623,10 @@ ASTContext::getOverrideGenericSignature(const ValueDecl *base,
   }
 
   if (derivedClass->getSuperclass().isNull()) {
+    return nullptr;
+  }
+
+  if (!derivedGenericCtx || !derivedGenericCtx->isGeneric()) {
     return nullptr;
   }
 
@@ -4643,12 +4658,8 @@ ASTContext::getOverrideGenericSignature(const ValueDecl *base,
   GenericSignatureBuilder builder(ctx);
   builder.addGenericSignature(derivedClass->getGenericSignature());
 
-  if (auto derivedGenericCtx = derived->getAsGenericContext()) {
-    if (derivedGenericCtx->isGeneric()) {
-      for (auto param : *derivedGenericCtx->getGenericParams()) {
-        builder.addGenericParameter(param);
-      }
-    }
+  for (auto param : *derivedGenericCtx->getGenericParams()) {
+    builder.addGenericParameter(param);
   }
 
   auto source =

@@ -61,6 +61,16 @@ public:
   ClusteredBitVector(ClusteredBitVector &&other)
     : Bits(std::move(other.Bits)) {}
 
+  /// Create a new ClusteredBitVector from the provided APInt,
+  /// with a size of 0 if the optional does not have a value.
+  ClusteredBitVector(const llvm::Optional<APInt> &bits)
+    : Bits(bits) {}
+
+  /// Create a new ClusteredBitVector from the provided APInt,
+  /// with a size of 0 if the optional does not have a value.
+  ClusteredBitVector(llvm::Optional<APInt> &&bits)
+    : Bits(std::move(bits)) {}
+
   ClusteredBitVector &operator=(const ClusteredBitVector &other) {
     this->Bits = other.Bits;
     return *this;
