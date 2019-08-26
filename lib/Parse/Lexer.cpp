@@ -299,7 +299,7 @@ void Lexer::formToken(tok Kind, const char *TokStart) {
 
   StringRef TokenText { TokStart, static_cast<size_t>(CurPtr - TokStart) };
 
-  if (TriviaRetention == TriviaRetentionMode::WithTrivia) {
+  if (TriviaRetention == TriviaRetentionMode::WithTrivia && Kind != tok::eof) {
     lexTrivia(TrailingTrivia, /* IsForTrailingTrivia */ true);
   }
 
