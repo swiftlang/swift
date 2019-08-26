@@ -3033,12 +3033,23 @@ void SILSpecializeAttr::print(llvm::raw_ostream &OS) const {
   OS << "exported: " << exported << ", ";
   OS << "kind: " << kind << ", ";
 
-  if (!getRequirements().empty()) {
+  ArrayRef<Requirement> requirements;
+  SmallVector<Requirement, 4> requirementsScratch;
+  if (auto specializedSig = getSpecializedSignature()) {
+    if (auto env = getFunction()->getGenericEnvironment()) {
+      requirementsScratch = specializedSig->requirementsNotSatisfiedBy(
+          env->getGenericSignature());
+      requirements = requirementsScratch;
+    } else {
+      requirements = specializedSig->getRequirements();
+    }
+  }
+  if (!requirements.empty()) {
     OS << "where ";
     SILFunction *F = getFunction();
     assert(F);
     auto GenericEnv = F->getGenericEnvironment();
-    interleave(getRequirements(),
+    interleave(requirements,
                [&](Requirement req) {
                  if (!GenericEnv) {
                    req.print(OS, SubPrinter);

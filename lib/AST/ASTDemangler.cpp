@@ -25,10 +25,10 @@
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericSignature.h"
-#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Type.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/ManglingMacros.h"
@@ -785,8 +785,7 @@ ASTBuilder::getForeignModuleKind(NodePointer node) {
 CanGenericSignature ASTBuilder::demangleGenericSignature(
     NominalTypeDecl *nominalDecl,
     NodePointer node) {
-  GenericSignatureBuilder builder(Ctx);
-  builder.addGenericSignature(nominalDecl->getGenericSignature());
+  SmallVector<Requirement, 2> requirements;
 
   for (auto &child : *node) {
     if (child->getKind() ==
@@ -811,24 +810,19 @@ CanGenericSignature ASTBuilder::demangleGenericSignature(
         return CanGenericSignature();
     }
 
-    auto source =
-      GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
-
     switch (child->getKind()) {
     case Demangle::Node::Kind::DependentGenericConformanceRequirement: {
-      builder.addRequirement(
+      requirements.push_back(
           Requirement(constraintType->isExistentialType()
                         ? RequirementKind::Conformance
                         : RequirementKind::Superclass,
-                      subjectType, constraintType),
-          source, nullptr);
+                      subjectType, constraintType));
       break;
     }
     case Demangle::Node::Kind::DependentGenericSameTypeRequirement: {
-      builder.addRequirement(
+      requirements.push_back(
           Requirement(RequirementKind::SameType,
-                      subjectType, constraintType),
-          source, nullptr);
+                      subjectType, constraintType));
       break;
     }
     case Demangle::Node::Kind::DependentGenericLayoutRequirement: {
@@ -867,9 +861,8 @@ CanGenericSignature ASTBuilder::demangleGenericSignature(
                                                        Ctx);
       }
 
-      builder.addRequirement(
-          Requirement(RequirementKind::Layout, subjectType, layout),
-          source, nullptr);
+      requirements.push_back(
+          Requirement(RequirementKind::Layout, subjectType, layout));
       break;
     }
     default:
@@ -877,8 +870,11 @@ CanGenericSignature ASTBuilder::demangleGenericSignature(
     }
   }
 
-  return std::move(builder).computeGenericSignature(SourceLoc())
-      ->getCanonicalSignature();
+  return evaluateOrDefault(
+      Ctx.evaluator,
+      AbstractGenericSignatureRequest{
+        nominalDecl->getGenericSignature(), { }, std::move(requirements)},
+      nullptr)->getCanonicalSignature();
 }
 
 DeclContext *

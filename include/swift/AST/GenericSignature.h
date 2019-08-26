@@ -335,6 +335,8 @@ CanGenericSignature::CanGenericSignature(GenericSignature *Signature)
   assert(!Signature || Signature->isCanonical());
 }
 
+void simple_display(raw_ostream &out, const GenericSignature *sig);
+
 } // end namespace swift
 
 #endif // SWIFT_AST_GENERIC_SIGNATURE_H

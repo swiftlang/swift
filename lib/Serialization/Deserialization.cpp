@@ -4098,20 +4098,20 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
         unsigned exported;
         SpecializeAttr::SpecializationKind specializationKind;
         unsigned specializationKindVal;
-        SmallVector<Requirement, 8> requirements;
+        GenericSignatureID specializedSigID;
 
         serialization::decls_block::SpecializeDeclAttrLayout::readRecord(
-          scratch, exported, specializationKindVal);
+          scratch, exported, specializationKindVal, specializedSigID);
 
         specializationKind = specializationKindVal
                                  ? SpecializeAttr::SpecializationKind::Partial
                                  : SpecializeAttr::SpecializationKind::Full;
 
-        MF.readGenericRequirements(requirements, MF.DeclTypeCursor);
-
+        auto specializedSig = MF.getGenericSignature(specializedSigID);
         Attr = SpecializeAttr::create(ctx, SourceLoc(), SourceRange(),
-                                      requirements, exported != 0,
-                                      specializationKind);
+                                      nullptr, exported != 0,
+                                      specializationKind,
+                                      specializedSig);
         break;
       }
 

@@ -18,8 +18,8 @@
 #include "ForeignRepresentationInfo.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ExistentialLayout.h"
-#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/ReferenceCounting.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/AST/Decl.h"
@@ -3155,7 +3155,7 @@ static Type substGenericFunctionType(GenericFunctionType *genericFnType,
   auto *fnType = result->castTo<FunctionType>();
   // Substitute generic parameters.
   bool anySemanticChanges = false;
-  SmallVector<GenericTypeParamType *, 4> genericParams;
+  SmallVector<GenericTypeParamType *, 2> genericParams;
   for (auto param : genericFnType->getGenericParams()) {
     Type paramTy =
       Type(param).subst(substitutions, lookupConformances, options);
@@ -3177,7 +3177,7 @@ static Type substGenericFunctionType(GenericFunctionType *genericFnType,
     return result;
 
   // Transform requirements.
-  SmallVector<Requirement, 4> requirements;
+  SmallVector<Requirement, 2> requirements;
   for (const auto &req : genericFnType->getRequirements()) {
     // Substitute into the requirement.
     auto substReqt = req.subst(substitutions, lookupConformances, options);
@@ -3207,20 +3207,11 @@ static Type substGenericFunctionType(GenericFunctionType *genericFnType,
   if (anySemanticChanges) {
     // If there were semantic changes, we need to build a new generic
     // signature.
-    GenericSignatureBuilder builder(genericFnType->getASTContext());
-
-    // Add the generic parameters to the builder.
-    for (auto gp : genericParams)
-      builder.addGenericParameter(gp);
-
-    // Add the requirements to the builder.
-    auto source =
-      GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
-    for (const auto &req : requirements)
-      builder.addRequirement(req, source, /*inferForModule=*/nullptr);
-
-    // Form the generic signature.
-    genericSig = std::move(builder).computeGenericSignature(SourceLoc());
+    ASTContext &ctx = genericFnType->getASTContext();
+    genericSig = evaluateOrDefault(
+        ctx.evaluator,
+        AbstractGenericSignatureRequest{nullptr, genericParams, requirements},
+        nullptr);
   } else {
     // Use the mapped generic signature.
     genericSig = GenericSignature::get(genericParams, requirements);

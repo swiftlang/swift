@@ -17,7 +17,7 @@
 #define DEBUG_TYPE "sil-existential-transform"
 #include "ExistentialTransform.h"
 #include "swift/AST/GenericEnvironment.h"
-#include "swift/AST/GenericSignatureBuilder.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/SIL/OptimizationRemark.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
@@ -259,10 +259,10 @@ std::string ExistentialTransform::createExistentialSpecializedFunctionName() {
 
 /// Convert all existential argument types to generic argument type.
 void ExistentialTransform::convertExistentialArgTypesToGenericArgTypes(
-    GenericSignatureBuilder &Builder) {
+    SmallVectorImpl<GenericTypeParamType *> &genericParams,
+    SmallVectorImpl<Requirement> &requirements) {
 
   SILModule &M = F->getModule();
-  auto *Mod = M.getSwiftModule();
   auto &Ctx = M.getASTContext();
   auto FTy = F->getLoweredFunctionType();
 
@@ -290,12 +290,10 @@ void ExistentialTransform::convertExistentialArgTypesToGenericArgTypes(
     assert(PType.isExistentialType());
     /// Generate new generic parameter.
     auto *NewGenericParam = GenericTypeParamType::get(Depth, GPIdx++, Ctx);
-    Builder.addGenericParameter(NewGenericParam);
+    genericParams.push_back(NewGenericParam);
     Requirement NewRequirement(RequirementKind::Conformance, NewGenericParam,
                                PType);
-    auto Source =
-        GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
-    Builder.addRequirement(NewRequirement, Source, Mod);
+    requirements.push_back(NewRequirement);
     ArgToGenericTypeMap.insert(
         std::pair<int, GenericTypeParamType *>(Idx, NewGenericParam));
     assert(ArgToGenericTypeMap.find(Idx) != ArgToGenericTypeMap.end());
@@ -312,20 +310,22 @@ ExistentialTransform::createExistentialSpecializedFunctionType() {
   GenericSignature *NewGenericSig;
   GenericEnvironment *NewGenericEnv;
 
-  // Form a new generic signature based on the old one.
-  GenericSignatureBuilder Builder(Ctx);
-
   /// If the original function is generic, then maintain the same.
   auto OrigGenericSig = FTy->getGenericSignature();
-  /// First, add the old generic signature.
-  Builder.addGenericSignature(OrigGenericSig);
+
+  SmallVector<GenericTypeParamType *, 2> GenericParams;
+  SmallVector<Requirement, 2> Requirements;
 
   /// Convert existential argument types to generic argument types.
-  convertExistentialArgTypesToGenericArgTypes(Builder);
+  convertExistentialArgTypesToGenericArgTypes(GenericParams, Requirements);
 
   /// Compute the updated generic signature.
-  NewGenericSig = std::move(Builder).computeGenericSignature(
-      SourceLoc(), /*allowConcreteGenericParams=*/true);
+  NewGenericSig = evaluateOrDefault(
+      Ctx.evaluator,
+      AbstractGenericSignatureRequest{
+        OrigGenericSig, std::move(GenericParams), std::move(Requirements)},
+      nullptr);
+
   NewGenericEnv = NewGenericSig->createGenericEnvironment();
 
   /// Create a lambda for GenericParams.

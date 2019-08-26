@@ -627,17 +627,19 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
 
     unsigned exported;
     unsigned specializationKindVal;
-    SILSpecializeAttrLayout::readRecord(scratch, exported, specializationKindVal);
+    GenericSignatureID specializedSigID;
+    SILSpecializeAttrLayout::readRecord(scratch, exported,
+                                        specializationKindVal,
+                                        specializedSigID);
     SILSpecializeAttr::SpecializationKind specializationKind =
         specializationKindVal ? SILSpecializeAttr::SpecializationKind::Partial
                               : SILSpecializeAttr::SpecializationKind::Full;
 
-    SmallVector<Requirement, 8> requirements;
-    MF->readGenericRequirements(requirements, SILCursor);
+    auto specializedSig = MF->getGenericSignature(specializedSigID);
 
     // Read the substitution list and construct a SILSpecializeAttr.
     fn->addSpecializeAttr(SILSpecializeAttr::create(
-        SILMod, requirements, exported != 0, specializationKind));
+        SILMod, specializedSig, exported != 0, specializationKind));
   }
 
   GenericEnvironment *genericEnv = nullptr;
