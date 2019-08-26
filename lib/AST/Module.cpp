@@ -1611,20 +1611,7 @@ bool SourceFile::isImportedImplementationOnly(const ModuleDecl *module) const {
   if (!hasImplementationOnlyImports())
     return false;
 
-  auto isImportedBy = [](const ModuleDecl *dest, const ModuleDecl *src) {
-    // Fast path.
-    if (dest == src) return true;
-
-    // Walk the transitive imports, respecting visibility.
-    // This return true if the search *didn't* short-circuit, and it short
-    // circuits if we found `dest`, so we need to invert the sense before
-    // returning.
-    return !const_cast<ModuleDecl*>(src)
-              ->forAllVisibleModules({}, [dest](ModuleDecl::ImportedModule im) {
-      // Continue searching as long as we haven't found `dest` yet.
-      return im.second != dest;
-    });
-  };
+  auto &imports = getASTContext().getImportCache();
 
   // Look at the imports of this source file.
   for (auto &desc : Imports) {
@@ -1634,12 +1621,12 @@ bool SourceFile::isImportedImplementationOnly(const ModuleDecl *module) const {
 
     // If the module is imported this way, it's not imported
     // implementation-only.
-    if (isImportedBy(module, desc.module.second))
+    if (imports.isImportedBy(module, desc.module.second))
       return false;
   }
 
   // Now check this file's enclosing module in case there are re-exports.
-  return !isImportedBy(module, getParentModule());
+  return !imports.isImportedBy(module, getParentModule());
 }
 
 void ModuleDecl::clearLookupCache() {
