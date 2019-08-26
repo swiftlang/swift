@@ -261,22 +261,19 @@ static void recordShadowedDeclsAfterSignatureMatch(
           isa<ProtocolDecl>(secondDecl->getDeclContext()))
         continue;
 
-      // Prefer declarations in the current module over those in another
-      // module.
-      // FIXME: This is a hack. We should query a (lazily-built, cached)
-      // module graph to determine shadowing.
-      if ((firstModule == curModule) != (secondModule == curModule)) {
-        // If the first module is the current module, the second declaration
-        // is shadowed by the first.
-        if (firstModule == curModule) {
+      // [Backward compatibility] For members of types, the general module
+      // shadowing check is performed after unavailable candidates have
+      // already been dropped.
+      if (firstModule != secondModule &&
+          !firstDecl->getDeclContext()->isModuleScopeContext() &&
+          !secondDecl->getDeclContext()->isModuleScopeContext()) {
+        if (imports.isShadowedBy(firstModule, secondModule, dc)) {
+          shadowed.insert(firstDecl);
+          break;
+        } else if (imports.isShadowedBy(secondModule, firstModule, dc)) {
           shadowed.insert(secondDecl);
           continue;
         }
-
-        // Otherwise, the first declaration is shadowed by the second. There is
-        // no point in continuing to compare the first declaration to others.
-        shadowed.insert(firstDecl);
-        break;
       }
 
       // Prefer declarations in the any module over those in the standard
