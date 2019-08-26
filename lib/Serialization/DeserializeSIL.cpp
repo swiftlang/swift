@@ -1666,6 +1666,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                                    (Atomicity)Attr);          \
     break;
 
+#define UNCHECKED_REF_STORAGE(Name, ...) UNARY_INSTRUCTION(Copy##Name##Value)
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   REFCOUNTING_INSTRUCTION(Name##Retain) \
   REFCOUNTING_INSTRUCTION(Name##Release) \
