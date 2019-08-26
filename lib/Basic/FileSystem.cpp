@@ -214,14 +214,14 @@ swift::areFilesDifferent(const llvm::Twine &source,
   // The two files match in size, so we have to compare the bytes to determine
   // if they're the same.
   std::error_code sourceRegionErr;
-  fs::mapped_file_region sourceRegion(sourceFile.fd,
+  fs::mapped_file_region sourceRegion(fs::convertFDToNativeFile(sourceFile.fd),
                                       fs::mapped_file_region::readonly,
                                       size, 0, sourceRegionErr);
   if (sourceRegionErr)
     return sourceRegionErr;
 
   std::error_code destRegionErr;
-  fs::mapped_file_region destRegion(destFile.fd,
+  fs::mapped_file_region destRegion(fs::convertFDToNativeFile(destFile.fd),
                                     fs::mapped_file_region::readonly,
                                     size, 0, destRegionErr);
 
