@@ -1457,7 +1457,9 @@ public:
     }
 
     auto boxDescriptor = IGF.IGM.getAddrOfBoxDescriptor(
-        boxedInterfaceType.getASTType());
+        boxedInterfaceType,
+        env ? env->getGenericSignature()->getCanonicalSignature()
+            : CanGenericSignature());
     llvm::Value *allocation = IGF.emitUnmanagedAlloc(layout, name,
                                                      boxDescriptor);
     Address rawAddr = project(IGF, allocation, boxedType);
