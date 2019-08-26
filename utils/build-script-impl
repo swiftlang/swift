@@ -2464,14 +2464,6 @@ for host in "${ALL_HOSTS[@]}"; do
                   cmake_cache="Apple-lldb-Linux.cmake"
                 fi
 
-                # Watchpoint testing is currently disabled: see rdar://38566150.
-                LLDB_TEST_CATEGORIES="--skip-category=watchpoint"
-
-                # Skip DWO to speed up swift testing.
-                if [[ "$(true_false ${LLDB_TEST_SWIFT_ONLY})" == "TRUE" ]]; then
-                    LLDB_TEST_CATEGORIES="${LLDB_TEST_CATEGORIES} --skip-category=dwo"
-                fi
-
                 # Options to find the just-built libddispatch and Foundation.
                 if [[ "$(uname -s)" == "Darwin" || "${SKIP_BUILD_FOUNDATION}" ]] ; then
                     DOTEST_EXTRA=""
@@ -2491,11 +2483,21 @@ for host in "${ALL_HOSTS[@]}"; do
                     DOTEST_EXTRA="${DOTEST_EXTRA} -Xlinker -rpath -Xlinker ${FOUNDATION_BUILD_DIR}"
                 fi
 
-                # Construct dotest arguments.
-                DOTEST_ARGS="--build-dir ${lldb_build_dir}/lldb-test-build.noindex \
-                             ${LLDB_TEST_CATEGORIES} \
-                             -t \
-                             -E \"${DOTEST_EXTRA}\""
+                # Watchpoint testing is currently disabled: see rdar://38566150.
+                LLDB_TEST_CATEGORIES="--skip-category=watchpoint"
+
+                # Skip DWO to speed up swift testing.
+                if [[ "$(true_false ${LLDB_TEST_SWIFT_ONLY})" == "TRUE" ]]; then
+                    LLDB_TEST_CATEGORIES="${LLDB_TEST_CATEGORIES};--skip-category=dwo"
+                fi
+
+                # Construct dotest arguments. We use semicolons so CMake interprets this as a list.
+                DOTEST_ARGS="--build-dir;${lldb_build_dir}/lldb-test-build.noindex;${LLDB_TEST_CATEGORIES};-t"
+
+                # Only set the extra arguments if they're not empty.
+                if [[ -z "${results_targets[@]}" ]]; then
+                    DOTEST_ARGS="${DOTEST_ARGS};-E;\"${DOTEST_EXTRA}\""
+                fi
 
                 cmake_options=(
                     "${cmake_options[@]}"
