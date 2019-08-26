@@ -62,7 +62,7 @@ namespace api {
 ///
 /// When the json format changes in a way that requires version-specific handling, this number should be incremented.
 /// This ensures we could have backward compatibility so that version changes in the format won't stop the checker from working.
-const uint8_t DIGESTER_JSON_VERSION = 1; // Adding digester_version to the format
+const uint8_t DIGESTER_JSON_VERSION = 2; // Adding sugared generic signature to the format
 const uint8_t DIGESTER_JSON_DEFAULT_VERSION = 0; // Use this version number for files before we have a version number in json.
 
 class SDKNode;
@@ -294,6 +294,8 @@ public:
   SDKNode* getOnlyChild() const;
   SDKContext &getSDKContext() const { return Ctx; }
   SDKNodeRoot *getRootNode() const;
+  uint8_t getJsonFormatVersion() const;
+  bool versionAtLeast(uint8_t Ver) const { return getJsonFormatVersion() >= Ver; }
   virtual void jsonize(json::Output &Out);
   virtual void diagnose(SDKNode *Right) {};
   template <typename T> const T *getAs() const {
@@ -335,6 +337,9 @@ class SDKNodeDecl: public SDKNode {
   bool IsABIPlaceholder;
   uint8_t ReferenceOwnership;
   StringRef GenericSig;
+  // In ABI mode, this field is populated as a user-friendly version of GenericSig.
+  // Dignostic preferes the sugared versions if they differ as well.
+  StringRef SugaredGenericSig;
   Optional<uint8_t> FixedBinaryOrder;
   PlatformIntroVersion introVersions;
 
@@ -368,6 +373,7 @@ public:
   bool isInternal() const { return IsInternal; }
   bool isABIPlaceholder() const { return IsABIPlaceholder; }
   StringRef getGenericSignature() const { return GenericSig; }
+  StringRef getSugaredGenericSignature() const { return SugaredGenericSig; }
   StringRef getScreenInfo() const;
   bool hasFixedBinaryOrder() const { return FixedBinaryOrder.hasValue(); }
   uint8_t getFixedBinaryOrder() const { return *FixedBinaryOrder; }
@@ -401,7 +407,7 @@ public:
   static bool classof(const SDKNode *N);
   void registerDescendant(SDKNode *D);
   virtual void jsonize(json::Output &Out) override;
-  Optional<uint8_t> getJsonFormatVersion() const { return JsonFormatVer; }
+  uint8_t getJsonFormatVersion() const { return JsonFormatVer; }
   ArrayRef<SDKNodeDecl*> getDescendantsByUsr(StringRef Usr) {
     return DescendantDeclTable[Usr].getArrayRef();
   }
@@ -510,6 +516,7 @@ public:
   ArrayRef<SDKNode*> getConformances() const { return Conformances; }
   NodeVector getConformances() { return Conformances; }
   bool isExternal() const { return IsExternal; }
+  bool isExtension() const { return isExternal(); }
   StringRef getSuperClassName() const {
     return SuperclassNames.empty() ? StringRef() : SuperclassNames.front();
   };
@@ -747,8 +754,11 @@ int dumpSwiftModules(const CompilerInvocation &InitInvok,
 
 SDKNodeRoot *getSDKNodeRoot(SDKContext &SDKCtx,
                             const CompilerInvocation &InitInvok,
-                            const llvm::StringSet<> &ModuleNames,
-                            CheckerOptions Opts);
+                            const llvm::StringSet<> &ModuleNames);
+
+SDKNodeRoot *getEmptySDKNodeRoot(SDKContext &SDKCtx);
+
+void dumpSDKRoot(SDKNodeRoot *Root, StringRef OutputFile);
 
 int dumpSDKContent(const CompilerInvocation &InitInvok,
                    const llvm::StringSet<> &ModuleNames,

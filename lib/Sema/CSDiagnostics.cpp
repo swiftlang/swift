@@ -197,21 +197,18 @@ FailureDiagnostic::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
   // have to look through other elements that are generated from an argument
   // conversion such as GenericArgument for an optional-to-optional conversion,
   // and OptionalPayload for a value-to-optional conversion.
-  auto applyArgElt =
-      std::find_if(path.rbegin(), path.rend(), [](LocatorPathElt elt) {
-        return elt.getKind() == ConstraintLocator::ApplyArgToParam;
-      });
-
-  if (applyArgElt == path.rend())
+  auto iter = path.rbegin();
+  auto applyArgElt = locator->findLast<LocatorPathElt::ApplyArgToParam>(iter);
+  if (!applyArgElt)
     return None;
 
-  assert(std::find_if(applyArgElt + 1, path.rend(), [](LocatorPathElt elt) {
-    return elt.getKind() == ConstraintLocator::ApplyArgToParam;
-  }) == path.rend() && "Multiple ApplyArgToParam components?");
+  auto nextIter = iter + 1;
+  assert(!locator->findLast<LocatorPathElt::ApplyArgToParam>(nextIter) &&
+         "Multiple ApplyArgToParam components?");
 
   // Form a new locator that ends at the apply-arg-to-param element, and
   // simplify it to get the full argument expression.
-  auto argPath = path.drop_back(applyArgElt - path.rbegin());
+  auto argPath = path.drop_back(iter - path.rbegin());
   auto *argLocator = cs.getConstraintLocator(
       anchor, argPath, ConstraintLocator::getSummaryFlagsForPath(argPath));
 
@@ -271,8 +268,8 @@ FailureDiagnostic::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
     fnInterfaceType = resolveInterfaceType(rawFnType);
   }
 
-  auto argIdx = applyArgElt->getValue();
-  auto paramIdx = applyArgElt->getValue2();
+  auto argIdx = applyArgElt->getArgIdx();
+  auto paramIdx = applyArgElt->getParamIdx();
 
   return FunctionArgApplyInfo(argExpr, argIdx, getType(argExpr), paramIdx,
                               fnInterfaceType, fnType, callee);
@@ -329,14 +326,11 @@ const Requirement &RequirementFailure::getRequirement() const {
 ProtocolConformance *RequirementFailure::getConformanceForConditionalReq(
     ConstraintLocator *locator) {
   auto &cs = getConstraintSystem();
-  auto path = locator->getPath();
-  assert(!path.empty());
-
-  if (!path.back().isConditionalRequirement()) {
-    assert(path.back().isTypeParameterRequirement());
+  auto reqElt = locator->castLastElementTo<LocatorPathElt::AnyRequirement>();
+  if (!reqElt.isConditionalRequirement())
     return nullptr;
-  }
 
+  auto path = locator->getPath();
   auto *typeReqLoc = getConstraintLocator(getRawAnchor(), path.drop_back());
 
   auto result = llvm::find_if(
@@ -411,12 +405,8 @@ GenericSignature *RequirementFailure::getSignature(ConstraintLocator *locator) {
   if (isConditional())
     return Conformance->getGenericSignature();
 
-  auto path = locator->getPath();
-  for (auto iter = path.rbegin(); iter != path.rend(); ++iter) {
-    const auto &elt = *iter;
-    if (elt.getKind() == ConstraintLocator::OpenedGeneric)
-      return elt.getGenericSignature();
-  }
+  if (auto genericElt = locator->findLast<LocatorPathElt::OpenedGeneric>())
+    return genericElt->getSignature();
 
   llvm_unreachable("Type requirement failure should always have signature");
 }
@@ -775,16 +765,9 @@ bool NoEscapeFuncToTypeConversionFailure::diagnoseAsError() {
     return true;
   }
 
-  GenericTypeParamType *paramTy = nullptr;
-
-  auto path = getLocator()->getPath();
-  if (!path.empty()) {
-    auto &last = path.back();
-    if (last.getKind() == ConstraintLocator::GenericParameter)
-      paramTy = last.getGenericParameter();
-  }
-
-  if (paramTy) {
+  auto *loc = getLocator();
+  if (auto gpElt = loc->getLastElementAs<LocatorPathElt::GenericParameter>()) {
+    auto *paramTy = gpElt->getType();
     emitDiagnostic(anchor->getLoc(), diag::converting_noescape_to_type,
                   paramTy);
   } else {
@@ -1251,14 +1234,13 @@ bool RValueTreatedAsLValueFailure::diagnoseAsError() {
       auto argTuple = dyn_cast<TupleExpr>(argExpr);
       diagExpr = argTuple->getElement(0);
     } else if (getLocator()->getPath().size() > 0) {
-      auto lastPathElement = getLocator()->getPath().back();
-      assert(lastPathElement.getKind() ==
-             ConstraintLocator::PathElementKind::ApplyArgToParam);
+      auto argElt =
+          getLocator()->castLastElementTo<LocatorPathElt::ApplyArgToParam>();
 
       subElementDiagID = diag::cannot_pass_rvalue_inout_subelement;
       rvalueDiagID = diag::cannot_pass_rvalue_inout;
       if (auto argTuple = dyn_cast<TupleExpr>(argExpr))
-        diagExpr = argTuple->getElement(lastPathElement.getValue());
+        diagExpr = argTuple->getElement(argElt.getArgIdx());
       else if (auto parens = dyn_cast<ParenExpr>(argExpr))
         diagExpr = parens->getSubExpr();
     } else {
@@ -1462,8 +1444,7 @@ bool AssignmentFailure::diagnoseAsError() {
       // If there is a masked instance variable of the same type, emit a
       // note to fixit prepend a 'self.'.
       if (auto typeContext = DC->getInnermostTypeContext()) {
-        UnqualifiedLookup lookup(VD->getFullName(), typeContext,
-                                 getASTContext().getLazyResolver());
+        UnqualifiedLookup lookup(VD->getFullName(), typeContext);
         for (auto &result : lookup.Results) {
           const VarDecl *typeVar = dyn_cast<VarDecl>(result.getValueDecl());
           if (typeVar && typeVar != VD && typeVar->isSettable(DC) &&
@@ -1819,7 +1800,7 @@ AssignmentFailure::getMemberRef(ConstraintLocator *locator) const {
       auto paramTy = fnType->getParams()[0].getPlainType();
       auto keyPath = paramTy->getAnyNominal();
       auto memberLoc = cs.getConstraintLocator(
-          locator, LocatorPathElt::getKeyPathDynamicMember(keyPath));
+          locator, LocatorPathElt::KeyPathDynamicMember(keyPath));
 
       auto memberRef = getOverloadChoiceIfAvailable(memberLoc);
       return memberRef ? Optional<OverloadChoice>(memberRef->choice) : None;
@@ -1860,6 +1841,18 @@ bool ContextualFailure::diagnoseAsError() {
   auto *anchor = getAnchor();
   auto path = getLocator()->getPath();
 
+  if (CTP == CTP_ReturnSingleExpr || CTP == CTP_ReturnStmt) {
+    // Special case the "conversion to void".
+    if (getToType()->isVoid()) {
+      emitDiagnostic(anchor->getLoc(), diag::cannot_return_value_from_void_func)
+          .highlight(anchor->getSourceRange());
+      return true;
+    }
+  }
+
+  if (diagnoseConversionToNil())
+    return true;
+
   assert(!path.empty());
 
   if (diagnoseMissingFunctionCall())
@@ -1889,6 +1882,12 @@ bool ContextualFailure::diagnoseAsError() {
     if (diagnoseConversionToBool())
       return true;
 
+    if (diagnoseThrowsTypeMismatch())
+      return true;
+
+    if (diagnoseYieldByReferenceMismatch())
+      return true;
+
     auto contextualType = getToType();
     if (auto msg = getDiagnosticFor(CTP, contextualType->isExistentialType())) {
       diagnostic = *msg;
@@ -1905,6 +1904,159 @@ bool ContextualFailure::diagnoseAsError() {
   diag.highlight(anchor->getSourceRange());
 
   (void)tryFixIts(diag);
+  return true;
+}
+
+static Optional<Diag<Type>>
+getContextualNilDiagnostic(ContextualTypePurpose CTP) {
+  switch (CTP) {
+  case CTP_Unused:
+  case CTP_CannotFail:
+    llvm_unreachable("These contextual type purposes cannot fail with a "
+                     "conversion type specified!");
+  case CTP_CalleeResult:
+    llvm_unreachable("CTP_CalleeResult does not actually install a "
+                     "contextual type");
+  case CTP_Initialization:
+    return diag::cannot_convert_initializer_value_nil;
+
+  case CTP_ReturnSingleExpr:
+  case CTP_ReturnStmt:
+    return diag::cannot_convert_to_return_type_nil;
+
+  case CTP_ThrowStmt:
+  case CTP_YieldByReference:
+    return None;
+
+  case CTP_EnumCaseRawValue:
+    return diag::cannot_convert_raw_initializer_value_nil;
+  case CTP_DefaultParameter:
+    return diag::cannot_convert_default_arg_value_nil;
+  case CTP_YieldByValue:
+    return diag::cannot_convert_yield_value_nil;
+  case CTP_CallArgument:
+    return diag::cannot_convert_argument_value_nil;
+  case CTP_ClosureResult:
+    return diag::cannot_convert_closure_result_nil;
+  case CTP_ArrayElement:
+    return diag::cannot_convert_array_element_nil;
+  case CTP_DictionaryKey:
+    return diag::cannot_convert_dict_key_nil;
+  case CTP_DictionaryValue:
+    return diag::cannot_convert_dict_value_nil;
+  case CTP_CoerceOperand:
+    return diag::cannot_convert_coerce_nil;
+  case CTP_AssignSource:
+    return diag::cannot_convert_assign_nil;
+  case CTP_SubscriptAssignSource:
+    return diag::cannot_convert_subscript_assign_nil;
+  }
+}
+
+bool ContextualFailure::diagnoseConversionToNil() const {
+  auto *anchor = getAnchor();
+
+  if (!isa<NilLiteralExpr>(anchor))
+    return false;
+
+  auto &cs = getConstraintSystem();
+  auto *locator = getLocator();
+
+  Optional<ContextualTypePurpose> CTP;
+  // Easy case were failure has been identified as contextual already.
+  if (locator->isLastElement(ConstraintLocator::ContextualType)) {
+    CTP = getContextualTypePurpose();
+  } else {
+    // Here we need to figure out where where `nil` is located.
+    // It could be e.g. an argument to a subscript/call, assignment
+    // source like `s[0] = nil` or an array element like `[nil]` or
+    // `[nil: 42]` as a sub-expression to a larger one.
+    auto *parentExpr = findParentExpr(anchor);
+
+    // Looks like it's something similar to `let _ = nil`.
+    if (!parentExpr) {
+      emitDiagnostic(anchor->getLoc(), diag::unresolved_nil_literal);
+      return true;
+    }
+
+    // Two choices here - whether it's a regular assignment
+    // e.g. `let _: S = nil` or a subscript one e.g. `s[0] = nil`.
+    if (auto *AE = dyn_cast<AssignExpr>(parentExpr)) {
+      CTP = isa<SubscriptExpr>(AE->getDest()) ? CTP_SubscriptAssignSource
+                                              : CTP_AssignSource;
+    } else if (isa<ArrayExpr>(parentExpr)) {
+      CTP = CTP_ArrayElement;
+    } else if (isa<ClosureExpr>(parentExpr)) {
+      CTP = CTP_ClosureResult;
+    } else if (isa<ParenExpr>(parentExpr) || isa<TupleExpr>(parentExpr)) {
+      auto *enclosingExpr = findParentExpr(parentExpr);
+
+      if (!enclosingExpr) {
+        // If there is no enclosing expression it's something like
+        // `(nil)` or `(a: nil)` which can't be inferred without a
+        // contextual type.
+        emitDiagnostic(anchor->getLoc(), diag::unresolved_nil_literal);
+        return true;
+      }
+
+      if (auto *TE = dyn_cast<TupleExpr>(parentExpr)) {
+        // In case of dictionary e.g. `[42: nil]` we need to figure
+        // out whether nil is a "key" or a "value".
+        if (auto *DE = dyn_cast<DictionaryExpr>(enclosingExpr)) {
+          assert(TE->getNumElements() == 2);
+          CTP = TE->getElement(0) == anchor ? CTP_DictionaryKey
+                                            : CTP_DictionaryValue;
+        } else {
+          // Can't initialize one of the tuple elements with `nil`.
+          CTP = CTP_Initialization;
+        }
+      }
+
+      // `nil` is passed as an argument to a parameter which doesn't
+      // expect it e.g. `foo(a: nil)` or `s[x: nil]`.
+      if (isa<ApplyExpr>(enclosingExpr) || isa<SubscriptExpr>(enclosingExpr))
+        CTP = CTP_CallArgument;
+    } else if (auto *CE = dyn_cast<CoerceExpr>(parentExpr)) {
+      // `nil` is passed as a left-hand side of the coercion
+      // operator e.g. `nil as Foo`
+      CTP = CTP_CoerceOperand;
+    } else {
+      // Otherwise let's produce a generic `nil` conversion diagnostic.
+      emitDiagnostic(anchor->getLoc(), diag::cannot_use_nil_with_this_type,
+                     getToType());
+      return true;
+    }
+  }
+
+  if (!CTP)
+    return false;
+
+  if (CTP == CTP_ThrowStmt) {
+    emitDiagnostic(anchor->getLoc(), diag::cannot_throw_nil);
+    return true;
+  }
+
+  auto diagnostic = getContextualNilDiagnostic(*CTP);
+  if (!diagnostic)
+    return false;
+
+  emitDiagnostic(anchor->getLoc(), *diagnostic, getToType());
+
+  if (CTP == CTP_Initialization) {
+    auto *patternTR = cs.getContextualTypeLoc().getTypeRepr();
+    if (!patternTR)
+      return true;
+
+    auto diag = emitDiagnostic(patternTR->getLoc(), diag::note_make_optional,
+                               OptionalType::get(getToType()));
+    if (patternTR->isSimple()) {
+      diag.fixItInsertAfter(patternTR->getEndLoc(), "?");
+    } else {
+      diag.fixItInsert(patternTR->getStartLoc(), "(");
+      diag.fixItInsertAfter(patternTR->getEndLoc(), ")?");
+    }
+  }
+
   return true;
 }
 
@@ -2042,6 +2194,71 @@ bool ContextualFailure::diagnoseConversionToDictionary() const {
       diagnostic.fixItReplace(commaLocs[i * 2], ":");
   }
 
+  return true;
+}
+
+bool ContextualFailure::diagnoseThrowsTypeMismatch() const {
+  // If this is conversion failure due to a return statement with an argument
+  // that cannot be coerced to the result type of the function, emit a
+  // specific error.
+  if (CTP != CTP_ThrowStmt)
+    return false;
+
+  auto *anchor = getAnchor();
+
+  // If we tried to throw the error code of an error type, suggest object
+  // construction.
+  auto &TC = getTypeChecker();
+  if (auto errorCodeProtocol =
+          TC.Context.getProtocol(KnownProtocolKind::ErrorCodeProtocol)) {
+    Type errorCodeType = getFromType();
+    if (auto conformance = TypeChecker::conformsToProtocol(
+            errorCodeType, errorCodeProtocol, getDC(),
+            ConformanceCheckFlags::InExpression)) {
+      Type errorType = conformance
+                           ->getTypeWitnessByName(errorCodeType,
+                                                  getASTContext().Id_ErrorType)
+                           ->getCanonicalType();
+      if (errorType) {
+        auto diagnostic =
+            emitDiagnostic(anchor->getLoc(), diag::cannot_throw_error_code,
+                           errorCodeType, errorType);
+        if (auto *UDE = dyn_cast<UnresolvedDotExpr>(anchor)) {
+          diagnostic.fixItInsert(UDE->getDotLoc(), "(");
+          diagnostic.fixItInsertAfter(UDE->getEndLoc(), ")");
+        }
+        return true;
+      }
+    }
+  }
+
+  // The conversion destination of throw is always ErrorType (at the moment)
+  // if this ever expands, this should be a specific form like () is for
+  // return.
+  emitDiagnostic(anchor->getLoc(), diag::cannot_convert_thrown_type,
+                 getFromType())
+      .highlight(anchor->getSourceRange());
+  return true;
+}
+
+bool ContextualFailure::diagnoseYieldByReferenceMismatch() const {
+  if (CTP != CTP_YieldByReference)
+    return false;
+
+  auto *anchor = getAnchor();
+  auto exprType = getType(anchor);
+  auto contextualType = getToType();
+
+  if (auto exprLV = exprType->getAs<LValueType>()) {
+    emitDiagnostic(anchor->getLoc(), diag::cannot_yield_wrong_type_by_reference,
+                   exprLV->getObjectType(), contextualType);
+  } else if (exprType->isEqual(contextualType)) {
+    emitDiagnostic(anchor->getLoc(),
+                   diag::cannot_yield_rvalue_by_reference_same_type, exprType);
+  } else {
+    emitDiagnostic(anchor->getLoc(), diag::cannot_yield_rvalue_by_reference,
+                   exprType, contextualType);
+  }
   return true;
 }
 
@@ -2404,15 +2621,12 @@ bool TupleContextualFailure::diagnoseAsError() {
 }
 
 bool AutoClosureForwardingFailure::diagnoseAsError() {
-  auto path = getLocator()->getPath();
-  assert(!path.empty());
-
-  auto &last = path.back();
-  assert(last.getKind() == ConstraintLocator::ApplyArgToParam);
+  auto *loc = getLocator();
+  auto last = loc->castLastElementTo<LocatorPathElt::ApplyArgToParam>();
 
   // We need a raw anchor here because `getAnchor()` is simplified
   // to the argument expression.
-  auto *argExpr = getArgumentExpr(getRawAnchor(), last.getValue());
+  auto *argExpr = getArgumentExpr(getRawAnchor(), last.getArgIdx());
   emitDiagnostic(argExpr->getLoc(), diag::invalid_autoclosure_forwarding)
       .highlight(argExpr->getSourceRange())
       .fixItInsertAfter(argExpr->getEndLoc(), "()");
@@ -3571,12 +3785,8 @@ bool KeyPathSubscriptIndexHashableFailure::diagnoseAsError() {
   auto loc = anchor->getLoc();
   if (locator->isKeyPathSubscriptComponent()) {
     auto *KPE = cast<KeyPathExpr>(anchor);
-    for (auto &elt : locator->getPath()) {
-      if (elt.isKeyPathComponent()) {
-        loc = KPE->getComponents()[elt.getValue()].getLoc();
-        break;
-      }
-    }
+    if (auto kpElt = locator->findFirst<LocatorPathElt::KeyPathComponent>())
+      loc = KPE->getComponents()[kpElt->getIndex()].getLoc();
   }
 
   emitDiagnostic(loc, diag::expr_keypath_subscript_index_not_hashable,
@@ -3589,13 +3799,9 @@ SourceLoc InvalidMemberRefInKeyPath::getLoc() const {
 
   if (auto *KPE = dyn_cast<KeyPathExpr>(anchor)) {
     auto *locator = getLocator();
-    auto component =
-        llvm::find_if(locator->getPath(), [](const LocatorPathElt &elt) {
-          return elt.isKeyPathComponent();
-        });
-
-    assert(component != locator->getPath().end());
-    return KPE->getComponents()[component->getValue()].getLoc();
+    auto component = locator->findFirst<LocatorPathElt::KeyPathComponent>();
+    assert(component);
+    return KPE->getComponents()[component->getIndex()].getLoc();
   }
 
   return anchor->getLoc();
@@ -3682,9 +3888,8 @@ bool CollectionElementContextualFailure::diagnoseAsError() {
   }
 
   if (isa<DictionaryExpr>(getRawAnchor())) {
-    const auto &eltLoc = locator->getPath().back();
-
-    switch (eltLoc.getValue()) {
+    auto eltLoc = locator->castLastElementTo<LocatorPathElt::TupleElement>();
+    switch (eltLoc.getIndex()) {
     case 0: // key
       diagnostic.emplace(emitDiagnostic(anchor->getLoc(),
                                         diag::cannot_convert_dict_key, eltType,

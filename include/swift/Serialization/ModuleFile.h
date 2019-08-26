@@ -78,6 +78,11 @@ class ModuleFile
   /// The target the module was built for.
   StringRef TargetTriple;
 
+  /// The name of the module interface this module was compiled from.
+  ///
+  /// Empty if this module didn't come from an interface file.
+  StringRef ModuleInterfacePath;
+
   /// The Swift compatibility version in use when this module was built.
   version::Version CompatibilityVersion;
 
@@ -87,45 +92,10 @@ class ModuleFile
   /// A callback to be invoked every time a type was deserialized.
   std::function<void(Type)> DeserializedTypeCallback;
 
-  /// The number of entities that are currently being deserialized.
-  unsigned NumCurrentDeserializingEntities = 0;
-
   /// Is this module file actually a .sib file? .sib files are serialized SIL at
   /// arbitrary granularity and arbitrary stage; unlike serialized Swift
   /// modules, which are assumed to contain canonical SIL for an entire module.
   bool IsSIB = false;
-
-  /// RAII class to be used when deserializing an entity.
-  class DeserializingEntityRAII {
-    ModuleFile &MF;
-
-  public:
-    DeserializingEntityRAII(ModuleFile &mf)
-        : MF(mf.getModuleFileForDelayedActions()) {
-      ++MF.NumCurrentDeserializingEntities;
-    }
-    ~DeserializingEntityRAII() {
-      assert(MF.NumCurrentDeserializingEntities > 0 &&
-             "Imbalanced currently-deserializing count?");
-      if (MF.NumCurrentDeserializingEntities == 1) {
-        MF.finishPendingActions();
-      }
-
-      --MF.NumCurrentDeserializingEntities;
-    }
-  };
-  friend class DeserializingEntityRAII;
-
-  /// Picks a specific ModuleFile instance to serve as the "delayer" for the
-  /// entire module.
-  ///
-  /// This is usually \c this, but when there are partial swiftmodules all
-  /// loaded for the same module it may be different.
-  ModuleFile &getModuleFileForDelayedActions();
-
-  /// Finish any pending actions that were waiting for the topmost entity to
-  /// be deserialized.
-  void finishPendingActions();
 
 public:
   /// Represents another module that has been imported as a dependency.
@@ -426,6 +396,7 @@ private:
   std::unique_ptr<SerializedObjCMethodTable> ObjCMethods;
 
   llvm::DenseMap<const ValueDecl *, Identifier> PrivateDiscriminatorsByValue;
+  llvm::DenseMap<const ValueDecl *, StringRef> FilenamesForPrivateValues;
 
   TinyPtrVector<Decl *> ImportDecls;
 
@@ -454,17 +425,16 @@ private:
     /// Whether or not ImportDecls is valid.
     unsigned ComputedImportDecls : 1;
 
-    /// Whether this module file can be used, and what's wrong if not.
-    unsigned Status : 4;
+    /// Whether an error has been detected setting up this module file.
+    unsigned HasError : 1;
 
     // Explicitly pad out to the next word boundary.
     unsigned : 0;
   } Bits = {};
   static_assert(sizeof(ModuleBits) <= 8, "The bit set should be small");
 
-  void setStatus(Status status) {
-    Bits.Status = static_cast<unsigned>(status);
-    assert(status == getStatus() && "not enough bits for status");
+  bool hasError() const {
+    return Bits.HasError;
   }
 
   void setEntryPointClassID(serialization::DeclID DID) {
@@ -484,24 +454,23 @@ private:
              serialization::ExtendedValidationInfo *extInfo);
 
 public:
-  /// Change the status of the current module. Default argument marks the module
-  /// as being malformed.
-  Status error(Status issue = Status::Malformed) {
+  /// Change the status of the current module.
+  Status error(Status issue) {
     assert(issue != Status::Valid);
-    if (FileContext && issue == Status::Malformed) {
-      // This would normally be an assertion but it's more useful to print the
-      // PrettyStackTrace here even in no-asserts builds. Malformed modules are
-      // generally unrecoverable.
-      fatal(llvm::make_error<llvm::StringError>(
-          "(see \"While...\" info below)", llvm::inconvertibleErrorCode()));
-    }
-    setStatus(issue);
-    return getStatus();
+    assert((issue != Status::Malformed || !FileContext) &&
+           "too late to complain about the well-formedness of the module");
+    Bits.HasError = true;
+    return issue;
   }
 
   /// Emits one last diagnostic, logs the error, and then aborts for the stack
   /// trace.
   LLVM_ATTRIBUTE_NORETURN void fatal(llvm::Error error);
+
+  LLVM_ATTRIBUTE_NORETURN void fatal() {
+    fatal(llvm::make_error<llvm::StringError>(
+        "(see \"While...\" info below)", llvm::inconvertibleErrorCode()));
+  }
 
   ASTContext &getContext() const {
     assert(FileContext && "no associated context yet");
@@ -655,9 +624,6 @@ public:
     theModule.reset(new ModuleFile(std::move(moduleInputBuffer),
                                    std::move(moduleDocInputBuffer),
                                    isFramework, info, extInfo));
-    assert(info.status == Status::Valid ||
-           info.status == theModule->getStatus());
-    info.status = theModule->getStatus();
     return info;
   }
 
@@ -685,16 +651,12 @@ public:
   Status associateWithFileContext(FileUnit *file, SourceLoc diagLoc,
                                   bool treatAsPartialModule);
 
-  /// Checks whether this module can be used.
-  Status getStatus() const {
-    return static_cast<Status>(Bits.Status);
-  }
-
   /// Transfers ownership of a buffer that might contain source code where
   /// other parts of the compiler could have emitted diagnostics, to keep them
   /// alive even if the ModuleFile is destroyed.
   ///
-  /// Should only be called when getStatus() indicates a failure.
+  /// Should only be called when a failure has been reported from
+  /// ModuleFile::load or ModuleFile::associateWithFileContext.
   std::unique_ptr<llvm::MemoryBuffer> takeBufferForDiagnostics();
 
   /// Returns the list of modules this module depends on.
@@ -806,6 +768,8 @@ public:
   void getDisplayDecls(SmallVectorImpl<Decl*> &results);
 
   StringRef getModuleFilename() const {
+    if (!ModuleInterfacePath.empty())
+      return ModuleInterfacePath;
     // FIXME: This seems fragile, maybe store the filename separately ?
     return ModuleInputBuffer->getBufferIdentifier();
   }

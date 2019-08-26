@@ -19,7 +19,6 @@
 #include "swift/Strings.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
-#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/Decl.h"
@@ -1490,7 +1489,6 @@ static void addSynthesizedTypealias(NominalTypeDecl *nominal, Identifier name,
                                            name, SourceLoc(),
                                            nullptr, nominal);
   typealias->setUnderlyingType(underlyingType);
-  typealias->setEarlyAttrValidation(true);
   typealias->setAccess(AccessLevel::Public);
   typealias->setValidationToChecked();
   typealias->setImplicit();
@@ -5413,8 +5411,7 @@ namespace {
 
 static bool conformsToProtocolInOriginalModule(NominalTypeDecl *nominal,
                                                const ProtocolDecl *proto,
-                                               ModuleDecl *foundationModule,
-                                               LazyResolver *resolver) {
+                                               ModuleDecl *foundationModule) {
   auto &ctx = nominal->getASTContext();
 
   if (inheritanceListContainsProtocol(nominal, proto))
@@ -5535,8 +5532,7 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
     // Break circularity by only looking for declared conformances in the
     // original module, or possibly its overlay.
     if (conformsToProtocolInOriginalModule(computedNominal, proto,
-                                           Impl.tryLoadFoundationModule(),
-                                           Impl.getTypeResolver())) {
+                                           Impl.tryLoadFoundationModule())) {
       synthesizedProtocols.push_back(kind);
       return true;
     }
@@ -6271,7 +6267,7 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
 
     // Resolve the type of the constructor.
     if (!ctor->hasInterfaceType())
-      Impl.getTypeResolver()->resolveDeclSignature(ctor);
+      Impl.SwiftContext.getLazyResolver()->resolveDeclSignature(ctor);
 
     // If the types don't match, this is a different constructor with
     // the same selector. This can happen when an overlay overloads an
@@ -8028,17 +8024,40 @@ DeclContext *ClangImporter::Implementation::importDeclContextImpl(
 
 GenericSignature *ClangImporter::Implementation::buildGenericSignature(
     GenericParamList *genericParams, DeclContext *dc) {
-  GenericSignatureBuilder builder(SwiftContext);
+  SmallVector<GenericTypeParamType *, 2> genericParamTypes;
   for (auto param : *genericParams) {
-    builder.addGenericParameter(param);
-  }
-  for (auto param : *genericParams) {
-    bool result = builder.addGenericParameterRequirements(param);
-    assert(!result);
-    (void) result;
+    genericParamTypes.push_back(
+        param->getDeclaredInterfaceType()->castTo<GenericTypeParamType>());
   }
 
-  return std::move(builder).computeGenericSignature(SourceLoc());
+  SmallVector<Requirement, 2> requirements;
+  for (auto param : *genericParams) {
+    Type paramType = param->getDeclaredInterfaceType();
+    for (const auto &inherited : param->getInherited()) {
+      Type inheritedType = inherited.getType();
+      if (inheritedType->isAnyObject()) {
+        requirements.push_back(
+            Requirement(
+              RequirementKind::Layout, paramType,
+              LayoutConstraint::getLayoutConstraint(LayoutConstraintKind::Class)));
+        continue;
+      }
+      if (inheritedType->getClassOrBoundGenericClass()) {
+        requirements.push_back(
+            Requirement(RequirementKind::Superclass, paramType, inheritedType));
+        continue;
+      }
+      assert(inheritedType->isExistentialType());
+      requirements.push_back(
+          Requirement(RequirementKind::Conformance, paramType, inheritedType));
+    }
+  }
+
+  return evaluateOrDefault(
+      SwiftContext.evaluator,
+      AbstractGenericSignatureRequest{
+        nullptr, std::move(genericParamTypes), std::move(requirements)},
+      nullptr);
 }
 
 // Calculate the generic environment from an imported generic param list.
@@ -8626,7 +8645,8 @@ void ClangImporter::Implementation::loadAllMembersOfObjcContainer(
   collectMembersToAdd(objcContainer, D, DC, members);
 
   for (auto member : members) {
-    IDC->addMember(member);
+    if (!isa<AccessorDecl>(member))
+      IDC->addMember(member);
   }
 }
 

@@ -70,19 +70,17 @@ The following build options are available:
 
 The following build targets are available:
 
-1. `swift-benchmark-macosx-x86_64`
-2. `swift-benchmark-iphoneos-arm64`
-3. `swift-benchmark-iphoneos-armv7`
-4. `swift-benchmark-appletvos-arm64`
-5. `swift-benchmark-watchos-armv7k`
+* `swift-benchmark-macosx-x86_64`
+* `swift-benchmark-iphoneos-arm64`
+* `swift-benchmark-iphoneos-armv7`
+* `swift-benchmark-appletvos-arm64`
+* `swift-benchmark-watchos-armv7k`
 
 Build steps (with example options):
 
-1. `$ cd benchmark`
-2. `$ mkdir build`
-3. `$ cd build`
-4. `$ cmake ../benchmark -G Ninja -DSWIFT_EXEC=[path to built swiftc]`
-5. `$ ninja swift-benchmark-macosx-x86_64`
+1. `$ mkdir build; cd build`
+2. `$ cmake [path to swift src]/benchmark -G Ninja -DSWIFT_EXEC=[path to built swiftc]`
+3. `$ ninja swift-benchmark-macosx-x86_64`
 
 Benchmark binaries are placed in `bin`.
 
@@ -96,12 +94,12 @@ relative to the benchmark binary at the time it was executed
 For example, to benchmark against a locally built `swiftc`, including
 any standard library changes in that build, you might configure using:
 
-    cmake ../benchmark -G Ninja -DSWIFT_EXEC=<src>/swift/build/swift-macosx-x86_64/bin/swiftc
+    cmake <src>/benchmark -G Ninja -DSWIFT_EXEC=<build>/swift-macosx-x86_64/bin/swiftc
     ninja swift-benchmark-iphoneos-arm64
 
 To build against the installed Xcode, simply omit SWIFT_EXEC:
 
-    cmake ../benchmark -G Ninja
+    cmake <src>/benchmark -G Ninja
     ninja swift-benchmark-iphoneos-arm64
 
 In both examples above, to run the benchmarks on a device, the dynamic
@@ -110,7 +108,7 @@ relative to `swiftc`. To benchmark against the target machine's
 installed libraries instead, enable
 `SWIFT_BENCHMARK_USE_OS_LIBRARIES`.
 
-    cmake ../benchmark -G Ninja -DSWIFT_BENCHMARK_USE_OS_LIBRARIES=ON
+    cmake <src>/benchmark -G Ninja -DSWIFT_BENCHMARK_USE_OS_LIBRARIES=ON
     ninja swift-benchmark-iphoneos-arm64
 
 This will reflect the performance of the Swift standard library

@@ -571,7 +571,7 @@ public:
 
   /// Retrieve the location just past the end of the previous
   /// source location.
-  SourceLoc getEndOfPreviousLoc();
+  SourceLoc getEndOfPreviousLoc() const;
 
   /// If the current token is the specified kind, consume it and
   /// return true.  Otherwise, return false without consuming it.
@@ -811,6 +811,19 @@ public:
   /// error diagnostic,  a note at the specified note location, and return the location of the previous token.
   bool parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
                           SourceLoc OtherLoc);
+
+  /// Returns the proper location for a missing right brace, parenthesis, etc.
+  SourceLoc getLocForMissingMatchingToken() const;
+
+  /// When encountering an error or a missing matching token (e.g. '}'), return
+  /// the location to use for it. This value should be at the last token in
+  /// the ASTNode being parsed so that it nests within any enclosing nodes, and,
+  /// for ASTScope lookups, it does not preceed any identifiers to be looked up.
+  /// However, the latter case does not hold when  parsing an interpolated
+  /// string literal because there may be identifiers to be looked up in the
+  /// literal and their locations will not precede the location of a missing
+  /// close brace.
+  SourceLoc getErrorOrMissingLoc() const;
 
   /// Parse a comma separated list of some elements.
   ParserStatus parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
@@ -1067,6 +1080,9 @@ public:
   parseDeclPrecedenceGroup(ParseDeclOptions flags, DeclAttributes &attributes);
 
   ParserResult<TypeRepr> parseDeclResultType(Diag<> MessageID);
+
+  /// Get the location for a type error.
+  SourceLoc getTypeErrorLoc() const;
 
   //===--------------------------------------------------------------------===//
   // Type Parsing

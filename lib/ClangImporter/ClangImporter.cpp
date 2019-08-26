@@ -398,14 +398,6 @@ ClangImporter::~ClangImporter() {
   delete &Impl;
 }
 
-void ClangImporter::setTypeResolver(LazyResolver &resolver) {
-  Impl.setTypeResolver(&resolver);
-}
-
-void ClangImporter::clearTypeResolver() {
-  Impl.setTypeResolver(nullptr);
-}
-
 #pragma mark Module loading
 
 /// Finds the glibc.modulemap file relative to the provided resource dir.
@@ -3176,6 +3168,9 @@ void ClangImporter::verifyAllModules() {
 // ClangModule Implementation
 //===----------------------------------------------------------------------===//
 
+static_assert(IsTriviallyDestructible<ClangModuleUnit>::value,
+              "ClangModuleUnits are BumpPtrAllocated; the d'tor is not called");
+
 ClangModuleUnit::ClangModuleUnit(ModuleDecl &M,
                                  ClangImporter::Implementation &owner,
                                  const clang::Module *clangModule)
@@ -3331,9 +3326,9 @@ void ClangModuleUnit::getImportedModulesForLookup(
     SmallVectorImpl<ModuleDecl::ImportedModule> &imports) const {
 
   // Reuse our cached list of imports if we have one.
-  if (!importedModulesForLookup.empty()) {
-    imports.append(importedModulesForLookup.begin(),
-                   importedModulesForLookup.end());
+  if (importedModulesForLookup.hasValue()) {
+    imports.append(importedModulesForLookup->begin(),
+                   importedModulesForLookup->end());
     return;
   }
 
@@ -3352,8 +3347,10 @@ void ClangModuleUnit::getImportedModulesForLookup(
     topLevel = clangModule->getTopLevelModule();
   }
 
-  if (imported.empty())
+  if (imported.empty()) {
+    importedModulesForLookup = ArrayRef<ModuleDecl::ImportedModule>();
     return;
+  }
 
   SmallPtrSet<clang::Module *, 32> seen{imported.begin(), imported.end()};
   SmallVector<clang::Module *, 8> tmpBuf;

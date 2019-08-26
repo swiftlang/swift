@@ -1006,7 +1006,7 @@ extension ContiguousArray {
   ///     of the new array.
   ///     - Parameters:
   ///       - buffer: A buffer covering uninitialized memory with room for the
-  ///         specified number of of elements.
+  ///         specified number of elements.
   ///       - initializedCount: The count of initialized elements in the array,
   ///         which begins as zero. Set `initializedCount` to the number of
   ///         elements you initialize.

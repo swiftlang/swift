@@ -17,7 +17,7 @@
 #define DEBUG_TYPE "sil-existential-transform"
 #include "ExistentialTransform.h"
 #include "swift/AST/GenericEnvironment.h"
-#include "swift/AST/GenericSignatureBuilder.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/SIL/OptimizationRemark.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
@@ -159,6 +159,8 @@ void ExistentialSpecializerCloner::cloneArguments(
     GenericTypeParamType *GenericParam = iter->second;
     SILType GenericSILType =
         NewF.getLoweredType(NewF.mapTypeIntoContext(GenericParam));
+    GenericSILType = GenericSILType.getCategoryType(
+                                          ArgDesc.Arg->getType().getCategory());
     auto *NewArg = ClonedEntryBB->createFunctionArgument(GenericSILType);
     NewArg->setOwnershipKind(ValueOwnershipKind(
         NewF, GenericSILType, ArgDesc.Arg->getArgumentConvention()));
@@ -173,6 +175,7 @@ void ExistentialSpecializerCloner::cloneArguments(
         Ctx.AllocateCopy(NewConformances);
     auto ExistentialRepr =
         ArgDesc.Arg->getType().getPreferredExistentialRepresentation(M);
+    auto &EAD = ExistentialArgDescriptor[ArgDesc.Index];
     switch (ExistentialRepr) {
     case ExistentialRepresentation::Opaque: {
       /// Create this sequence for init_existential_addr.:
@@ -190,7 +193,7 @@ void ExistentialSpecializerCloner::cloneArguments(
           InsertLoc, ASI, NewArg->getType().getASTType(), NewArg->getType(),
           Conformances);
 
-      bool origConsumed = ExistentialArgDescriptor[ArgDesc.Index].isConsumed;
+      bool origConsumed = EAD.isConsumed;
       // If the existential is not consumed in the function body, then the one
       // we introduce here needs cleanup.
       if (!origConsumed)
@@ -204,6 +207,12 @@ void ExistentialSpecializerCloner::cloneArguments(
       break;
     }
     case ExistentialRepresentation::Class: {
+      SILValue NewArgValue = NewArg;
+      if (!NewArg->getType().isObject()) {
+        NewArgValue = NewFBuilder.createLoad(InsertLoc, NewArg,
+                                         LoadOwnershipQualifier::Unqualified);
+      }
+      
       // FIXME_ownership: init_existential_ref always takes ownership of the
       // incoming reference. If the argument convention is borrowed
       // (!isConsumed), then we should create a copy_value here and add this new
@@ -211,9 +220,19 @@ void ExistentialSpecializerCloner::cloneArguments(
 
       ///  Simple case: Create an init_existential.
       /// %5 = init_existential_ref %0 : $T : $T, $P
-      auto *InitRef = NewFBuilder.createInitExistentialRef(
-          InsertLoc, ArgDesc.Arg->getType(), NewArg->getType().getASTType(),
-          NewArg, Conformances);
+      SILValue InitRef = NewFBuilder.createInitExistentialRef(
+          InsertLoc, ArgDesc.Arg->getType().getObjectType(),
+          NewArg->getType().getASTType(),
+          NewArgValue, Conformances);
+      
+      if (!NewArg->getType().isObject()) {
+        auto alloc = NewFBuilder.createAllocStack(InsertLoc,
+                                                  InitRef->getType());
+        NewFBuilder.createStore(InsertLoc, InitRef, alloc,
+                                StoreOwnershipQualifier::Unqualified);
+        InitRef = alloc;
+        AllocStackInsts.push_back(alloc);
+      }
 
       entryArgs.push_back(InitRef);
       break;
@@ -240,10 +259,10 @@ std::string ExistentialTransform::createExistentialSpecializedFunctionName() {
 
 /// Convert all existential argument types to generic argument type.
 void ExistentialTransform::convertExistentialArgTypesToGenericArgTypes(
-    GenericSignatureBuilder &Builder) {
+    SmallVectorImpl<GenericTypeParamType *> &genericParams,
+    SmallVectorImpl<Requirement> &requirements) {
 
   SILModule &M = F->getModule();
-  auto *Mod = M.getSwiftModule();
   auto &Ctx = M.getASTContext();
   auto FTy = F->getLoweredFunctionType();
 
@@ -271,12 +290,10 @@ void ExistentialTransform::convertExistentialArgTypesToGenericArgTypes(
     assert(PType.isExistentialType());
     /// Generate new generic parameter.
     auto *NewGenericParam = GenericTypeParamType::get(Depth, GPIdx++, Ctx);
-    Builder.addGenericParameter(NewGenericParam);
+    genericParams.push_back(NewGenericParam);
     Requirement NewRequirement(RequirementKind::Conformance, NewGenericParam,
                                PType);
-    auto Source =
-        GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
-    Builder.addRequirement(NewRequirement, Source, Mod);
+    requirements.push_back(NewRequirement);
     ArgToGenericTypeMap.insert(
         std::pair<int, GenericTypeParamType *>(Idx, NewGenericParam));
     assert(ArgToGenericTypeMap.find(Idx) != ArgToGenericTypeMap.end());
@@ -293,20 +310,22 @@ ExistentialTransform::createExistentialSpecializedFunctionType() {
   GenericSignature *NewGenericSig;
   GenericEnvironment *NewGenericEnv;
 
-  // Form a new generic signature based on the old one.
-  GenericSignatureBuilder Builder(Ctx);
-
   /// If the original function is generic, then maintain the same.
   auto OrigGenericSig = FTy->getGenericSignature();
-  /// First, add the old generic signature.
-  Builder.addGenericSignature(OrigGenericSig);
+
+  SmallVector<GenericTypeParamType *, 2> GenericParams;
+  SmallVector<Requirement, 2> Requirements;
 
   /// Convert existential argument types to generic argument types.
-  convertExistentialArgTypesToGenericArgTypes(Builder);
+  convertExistentialArgTypesToGenericArgTypes(GenericParams, Requirements);
 
   /// Compute the updated generic signature.
-  NewGenericSig = std::move(Builder).computeGenericSignature(
-      SourceLoc(), /*allowConcreteGenericParams=*/true);
+  NewGenericSig = evaluateOrDefault(
+      Ctx.evaluator,
+      AbstractGenericSignatureRequest{
+        OrigGenericSig, std::move(GenericParams), std::move(Requirements)},
+      nullptr);
+
   NewGenericEnv = NewGenericSig->createGenericEnvironment();
 
   /// Create a lambda for GenericParams.
@@ -369,7 +388,8 @@ void ExistentialTransform::populateThunkBody() {
   /// Create a basic block and the function arguments.
   auto *ThunkBody = F->createBasicBlock();
   for (auto &ArgDesc : ArgumentDescList) {
-    ThunkBody->createFunctionArgument(ArgDesc.Arg->getType(), ArgDesc.Decl);
+    auto argumentType = ArgDesc.Arg->getType();
+    ThunkBody->createFunctionArgument(argumentType, ArgDesc.Decl);
   }
 
   /// Builder to add new instructions in the Thunk.
@@ -394,7 +414,11 @@ void ExistentialTransform::populateThunkBody() {
   SmallVector<SILValue, 8> ApplyArgs;
   // Maintain a list of arg values to be destroyed. These are consumed by the
   // convention and require a copy.
-  SmallVector<CopyAddrInst *, 8> TempCopyAddrInsts;
+  struct Temp {
+    SILValue DeallocStackEntry;
+    SILValue DestroyValue;
+  };
+  SmallVector<Temp, 8> Temps;
   SmallDenseMap<GenericTypeParamType *, Type> GenericToOpenedTypeMap;
   for (auto &ArgDesc : ArgumentDescList) {
     auto iter = ArgToGenericTypeMap.find(ArgDesc.Index);
@@ -422,22 +446,32 @@ void ExistentialTransform::populateThunkBody() {
           // must pass in a copy.
           auto *ASI =
             Builder.createAllocStack(Loc, OpenedSILType);
-          auto *CAI =
-              Builder.createCopyAddr(Loc, archetypeValue, ASI, IsNotTake,
-                                     IsInitialization_t::IsInitialization);
-          TempCopyAddrInsts.push_back(CAI);
+          Builder.createCopyAddr(Loc, archetypeValue, ASI, IsNotTake,
+                                 IsInitialization_t::IsInitialization);
+          Temps.push_back({ASI, OrigOperand});
           calleeArg = ASI;
         }
         ApplyArgs.push_back(calleeArg);
         break;
       }
       case ExistentialRepresentation::Class: {
-        /// If the operand is not object type, we would need an explicit load.
+        // If the operand is not object type, we need an explicit load.
+        SILValue OrigValue = OrigOperand;
+        if (!OrigOperand->getType().isObject()) {
+          OrigValue = Builder.createLoad(Loc, OrigValue,
+                                         LoadOwnershipQualifier::Unqualified);
+        }
         // OpenExistentialRef forwards ownership, so it does the right thing
         // regardless of whether the argument is borrowed or consumed.
-        assert(OrigOperand->getType().isObject());
         archetypeValue =
-            Builder.createOpenExistentialRef(Loc, OrigOperand, OpenedSILType);
+            Builder.createOpenExistentialRef(Loc, OrigValue, OpenedSILType);
+        if (!OrigOperand->getType().isObject()) {
+          SILValue ASI = Builder.createAllocStack(Loc, OpenedSILType);
+          Builder.createStore(Loc, archetypeValue, ASI,
+                              StoreOwnershipQualifier::Unqualified);
+          Temps.push_back({ASI, SILValue()});
+          archetypeValue = ASI;
+        }
         ApplyArgs.push_back(archetypeValue);
         break;
       }
@@ -511,7 +545,7 @@ void ExistentialTransform::populateThunkBody() {
     ReturnValue = Builder.createApply(Loc, FRI, SubMap, ApplyArgs);
   }
   auto cleanupLoc = RegularLocation::getAutoGeneratedLocation();
-  for (CopyAddrInst *CAI : reversed(TempCopyAddrInsts)) {
+  for (auto &Temp : reversed(Temps)) {
     // The original argument was copied into a temporary and consumed by the
     // callee as such:
     //   bb (%consumedExistential : $*Protocol)
@@ -523,10 +557,10 @@ void ExistentialTransform::populateThunkBody() {
     // Destroy the original arument and deallocation the temporary:
     //     destroy_addr %consumedExistential : $*Protocol
     //     dealloc_stack %temp : $*T
-    auto *consumedExistential = cast<SILFunctionArgument>(
-        cast<OpenExistentialAddrInst>(CAI->getSrc())->getOperand());
-    Builder.createDestroyAddr(cleanupLoc, consumedExistential);
-    Builder.createDeallocStack(cleanupLoc, CAI->getDest());
+    if (Temp.DestroyValue)
+      Builder.createDestroyAddr(cleanupLoc, Temp.DestroyValue);
+    if (Temp.DeallocStackEntry)
+      Builder.createDeallocStack(cleanupLoc, Temp.DeallocStackEntry);
   }
   /// Set up the return results.
   if (NewF->isNoReturnFunction()) {

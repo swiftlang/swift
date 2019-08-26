@@ -896,17 +896,25 @@ public:
     return insert(new (getModule()) \
       Store##Name##Inst(getSILDebugLocation(Loc), value, dest, isInit)); \
   }
-#define LOADABLE_REF_STORAGE_HELPER(Name) \
-  Name##ToRefInst *create##Name##ToRef(SILLocation Loc, SILValue op, \
-                                       SILType ty) { \
-    return insert(new (getModule()) \
-      Name##ToRefInst(getSILDebugLocation(Loc), op, ty)); \
-  } \
-  RefTo##Name##Inst *createRefTo##Name(SILLocation Loc, SILValue op, \
-                                       SILType ty) { \
-    return insert(new (getModule()) \
-      RefTo##Name##Inst(getSILDebugLocation(Loc), op, ty)); \
+#define LOADABLE_REF_STORAGE_HELPER(Name)                                      \
+  Name##ToRefInst *create##Name##ToRef(SILLocation Loc, SILValue op,           \
+                                       SILType ty) {                           \
+    return insert(new (getModule())                                            \
+                      Name##ToRefInst(getSILDebugLocation(Loc), op, ty));      \
+  }                                                                            \
+  RefTo##Name##Inst *createRefTo##Name(SILLocation Loc, SILValue op,           \
+                                       SILType ty) {                           \
+    return insert(new (getModule())                                            \
+                      RefTo##Name##Inst(getSILDebugLocation(Loc), op, ty));    \
+  }                                                                            \
+  Copy##Name##ValueInst *createCopy##Name##Value(SILLocation Loc,              \
+                                                 SILValue operand) {           \
+    auto type = getFunction().getLoweredType(                                  \
+        operand->getType().getASTType().getReferenceStorageReferent());        \
+    return insert(new (getModule()) Copy##Name##ValueInst(                     \
+        getSILDebugLocation(Loc), operand, type));                             \
   }
+
 #define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   LOADABLE_REF_STORAGE_HELPER(Name) \
   StrongRetain##Name##Inst *createStrongRetain##Name(SILLocation Loc, \
@@ -925,13 +933,6 @@ public:
                                            Atomicity atomicity) { \
     return insert(new (getModule()) \
       Name##ReleaseInst(getSILDebugLocation(Loc), Operand, atomicity)); \
-  } \
-  Copy##Name##ValueInst *createCopy##Name##Value(SILLocation Loc, \
-                                                 SILValue operand) { \
-    auto type = getFunction().getLoweredType( \
-      operand->getType().getASTType().getReferenceStorageReferent()); \
-    return insert(new (getModule()) \
-      Copy##Name##ValueInst(getSILDebugLocation(Loc), operand, type)); \
   }
 #define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, "...") \

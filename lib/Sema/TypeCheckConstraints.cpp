@@ -1389,7 +1389,9 @@ bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
 
   // Update the current DeclContext to be the closure we're about to
   // recurse into.
-  assert(DC == closure->getParent() && "Decl context isn't correct");
+  assert((closure->getParent() == DC ||
+          closure->getParent()->isChildContextOf(DC)) &&
+      "Decl context isn't correct");
   DC = closure;
   return true;
 }
@@ -2232,7 +2234,7 @@ Type TypeChecker::typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
   if (options.contains(TypeCheckExprFlags::ExpressionTypeMustBeOptional)) {
     assert(!convertTo && "convertType and type check options conflict");
     auto *convertTypeLocator =
-        cs.getConstraintLocator(expr, LocatorPathElt::getContextualType());
+        cs.getConstraintLocator(expr, LocatorPathElt::ContextualType());
     Type var = cs.createTypeVariable(convertTypeLocator, TVO_CanBindToNoEscape);
     convertTo = getOptionalType(expr->getLoc(), var);
   }
@@ -2636,8 +2638,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
       assert(!expr->isSemanticallyInOutExpr());
 
       // Save the locator we're using for the expression.
-      Locator =
-          cs.getConstraintLocator(expr, LocatorPathElt::getContextualType());
+      Locator = cs.getConstraintLocator(expr, LocatorPathElt::ContextualType());
 
       // Collect constraints from the pattern.
       Type patternType = cs.generateConstraints(pattern, Locator);

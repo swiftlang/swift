@@ -359,20 +359,20 @@ bb0(%0 : $*S, %1 : $*S, %2 : $*S):
 
 // Check specialized for 32 bits
 // specialized copyValueAndReturn<A>(A, s : inout A) -> A
-// CHECK-LABEL: sil shared [noinline] @$s16eager_specialize18copyValueAndReturn_1sxx_xztlFxxxRlze31_lIetilr_Tp5 : $@convention(thin) <τ_0_0 where τ_0_0 : _Trivial(32)> (@in τ_0_0, @inout τ_0_0) -> @out τ_0_0
-// CHECK: bb0(%0 : $*τ_0_0, %1 : $*τ_0_0, %2 : $*τ_0_0):
-// CHECK:  copy_addr %2 to [initialization] %0 : $*τ_0_0
-// CHECK:  destroy_addr %1 : $*τ_0_0
+// CHECK-LABEL: sil shared [noinline] @$s16eager_specialize18copyValueAndReturn_1sxx_xztlFxxxRlze31_lIetilr_Tp5 : $@convention(thin) <S where S : _Trivial(32)> (@in S, @inout S) -> @out S
+// CHECK: bb0(%0 : $*S, %1 : $*S, %2 : $*S):
+// CHECK:  copy_addr %2 to [initialization] %0 : $*S
+// CHECK:  destroy_addr %1 : $*S
 // CHECK:  %5 = tuple ()
 // CHECK:  return %5 : $()
 // CHECK: } // end sil function '$s16eager_specialize18copyValueAndReturn_1sxx_xztlFxxxRlze31_lIetilr_Tp5'
 
 // Check specialized for 64 bits
 // specialized copyValueAndReturn<A>(A, s : inout A) -> A
-// CHECK-LABEL: sil shared [noinline] @$s16eager_specialize18copyValueAndReturn_1sxx_xztlFxxxRlze63_lIetilr_Tp5 : $@convention(thin) <τ_0_0 where τ_0_0 : _Trivial(64)> (@in τ_0_0, @inout τ_0_0) -> @out τ_0_0
-// CHECK: bb0(%0 : $*τ_0_0, %1 : $*τ_0_0, %2 : $*τ_0_0):
-// CHECK:  copy_addr %2 to [initialization] %0 : $*τ_0_0
-// CHECK:  destroy_addr %1 : $*τ_0_0
+// CHECK-LABEL: sil shared [noinline] @$s16eager_specialize18copyValueAndReturn_1sxx_xztlFxxxRlze63_lIetilr_Tp5 : $@convention(thin) <S where S : _Trivial(64)> (@in S, @inout S) -> @out S
+// CHECK: bb0(%0 : $*S, %1 : $*S, %2 : $*S):
+// CHECK:  copy_addr %2 to [initialization] %0 : $*S
+// CHECK:  destroy_addr %1 : $*S
 // CHECK:  %5 = tuple ()
 // CHECK:  return %5 : $()
 // CHECK: } // end sil function '$s16eager_specialize18copyValueAndReturn_1sxx_xztlFxxxRlze63_lIetilr_Tp5'
@@ -455,10 +455,10 @@ bb0(%0 : $*S, %1 : $*S, %2 : $*S):
 
 // Check the specialization for _Trivial
 // specialized copyValueAndReturn2<A> (A, s : inout A) -> A
-// CHECK-LABEL: sil shared [noinline] @$s16eager_specialize19copyValueAndReturn2_1sxx_xztlFxxxRlzTlIetilr_Tp5 : $@convention(thin) <τ_0_0 where τ_0_0 : _Trivial> (@in τ_0_0, @inout τ_0_0) -> @out τ_0_0
-// CHECK: bb0(%0 : $*τ_0_0, %1 : $*τ_0_0, %2 : $*τ_0_0):
-// CHECK:  copy_addr %2 to [initialization] %0 : $*τ_0_0
-// CHECK:  destroy_addr %1 : $*τ_0_0
+// CHECK-LABEL: sil shared [noinline] @$s16eager_specialize19copyValueAndReturn2_1sxx_xztlFxxxRlzTlIetilr_Tp5 : $@convention(thin) <S where S : _Trivial> (@in S, @inout S) -> @out S
+// CHECK: bb0(%0 : $*S, %1 : $*S, %2 : $*S):
+// CHECK:  copy_addr %2 to [initialization] %0 : $*S
+// CHECK:  destroy_addr %1 : $*S
 // CHECK:  %5 = tuple ()
 // CHECK:  return %5 : $()
 // CHECK: } // end sil function '$s16eager_specialize19copyValueAndReturn2_1sxx_xztlFxxxRlzTlIetilr_Tp5'
@@ -510,10 +510,10 @@ bb0(%0 : $*S, %1 : $*S, %2 : $*S):
 
 // Check for specialized function for _RefCountedObject
 // specialized copyValueAndReturn3<A> (A, s : inout A) -> A
-// CHECK-LABEL: sil shared [noinline] @$s16eager_specialize19copyValueAndReturn3_1sxx_xztlFxxxRlzRlIetilr_Tp5 : $@convention(thin) <τ_0_0 where τ_0_0 : _RefCountedObject> (@in τ_0_0, @inout τ_0_0) -> @out τ_0_0
-// CHECK: bb0(%0 : $*τ_0_0, %1 : $*τ_0_0, %2 : $*τ_0_0):
-// CHECK:   copy_addr %2 to [initialization] %0 : $*τ_0_0
-// CHECK:   destroy_addr %1 : $*τ_0_0
+// CHECK-LABEL: sil shared [noinline] @$s16eager_specialize19copyValueAndReturn3_1sxx_xztlFxxxRlzRlIetilr_Tp5 : $@convention(thin) <S where S : _RefCountedObject> (@in S, @inout S) -> @out S
+// CHECK: bb0(%0 : $*S, %1 : $*S, %2 : $*S):
+// CHECK:   copy_addr %2 to [initialization] %0 : $*S
+// CHECK:   destroy_addr %1 : $*S
 // CHECK:   %5 = tuple ()
 // CHECK:   return %5 : $()
 // CHECK: } // end sil function '$s16eager_specialize19copyValueAndReturn3_1sxx_xztlFxxxRlzRlIetilr_Tp5'
@@ -599,11 +599,11 @@ bb0(%0 : $*T, %1 : $*S):
 
 // Check for specialized function for τ_0_0 == Int64
 // specialized checkExplicitPartialSpecialization<A, B> (A, B) -> ()
-// CHECK-LABEL: sil shared @$s16eager_specialize34checkExplicitPartialSpecializationyyx_q_tr0_lFs5Int64Vq_ADRszr0_lIetyi_Tp5 : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 == Int64> (Int64, @in τ_0_1) -> ()
-// CHECK: bb0(%0 : $Int64, %1 : $*τ_0_1):
+// CHECK-LABEL: sil shared @$s16eager_specialize34checkExplicitPartialSpecializationyyx_q_tr0_lFs5Int64Vq_ADRszr0_lIetyi_Tp5 : $@convention(thin) <T, S where T == Int64> (Int64, @in S) -> ()
+// CHECK: bb0(%0 : $Int64, %1 : $*S):
 // CHECK:   %2 = alloc_stack $Int64
 // CHECK:   store %0 to %2 : $*Int64
-// CHECK:   destroy_addr %1 : $*τ_0_1
+// CHECK:   destroy_addr %1 : $*S
 // CHECK:   destroy_addr %2 : $*Int64
 // CHECK:   %6 = tuple ()
 // CHECK:   dealloc_stack %2 : $*Int64
@@ -702,7 +702,7 @@ bb0(%0 : $*Self, %1 : $*Self, %2 : $@thick Self.Type):
 
 // Check that a specialization for _Trivial(32) uses direct loads and stores
 // instead of value witness functions to load and store the value of a generic type.
-// CHECK-IRGEN-LABEL: define linkonce_odr hidden swiftcc void @"$s16eager_specialize18copyValueAndReturn_1sxx_xztlFxxxRlze31_lIetilr_Tp5"(i32* noalias nocapture sret, i32* noalias nocapture dereferenceable(4), i32* nocapture dereferenceable(4), %swift.type* %"\CF\84_0_0")
+// CHECK-IRGEN-LABEL: define linkonce_odr hidden swiftcc void @"$s16eager_specialize18copyValueAndReturn_1sxx_xztlFxxxRlze31_lIetilr_Tp5"(i32* noalias nocapture sret, i32* noalias nocapture dereferenceable(4), i32* nocapture dereferenceable(4), %swift.type* %S)
 // CHECK-IRGEN: entry:
 // CHECK-IRGEN:       %3 = load i32, i32* %2
 // CHECK-IRGEN-NEXT:  store i32 %3, i32* %0
@@ -711,7 +711,7 @@ bb0(%0 : $*Self, %1 : $*Self, %2 : $@thick Self.Type):
 
 // Check that a specialization for _Trivial(64) uses direct loads and stores
 // instead of value witness functions to load and store the value of a generic type.
-// CHECK-IRGEN-LABEL: define linkonce_odr hidden swiftcc void @"$s16eager_specialize18copyValueAndReturn_1sxx_xztlFxxxRlze63_lIetilr_Tp5"(i64* noalias nocapture sret, i64* noalias nocapture dereferenceable(8), i64* nocapture dereferenceable(8), %swift.type* %"\CF\84_0_0")
+// CHECK-IRGEN-LABEL: define linkonce_odr hidden swiftcc void @"$s16eager_specialize18copyValueAndReturn_1sxx_xztlFxxxRlze63_lIetilr_Tp5"(i64* noalias nocapture sret, i64* noalias nocapture dereferenceable(8), i64* nocapture dereferenceable(8), %swift.type* %S)
 // CHECK-IRGEN: entry:
 // CHECK-IRGEN:        %3 = load i64, i64* %2
 // CHECK-IRGEN-NEXT:   store i64 %3, i64* %0
@@ -720,12 +720,12 @@ bb0(%0 : $*Self, %1 : $*Self, %2 : $@thick Self.Type):
 
 // Check that a specialization for _Trivial does not call the 'destroy' value witness,
 // because it is known that the object is Trivial, i.e. contains no references.
-// CHECK-IRGEN-LABEL: define linkonce_odr hidden swiftcc void @"$s16eager_specialize19copyValueAndReturn2_1sxx_xztlFxxxRlzTlIetilr_Tp5"(%swift.opaque* noalias nocapture sret, %swift.opaque* noalias nocapture, %swift.opaque* nocapture, %swift.type* %"\CF\84_0_0")
+// CHECK-IRGEN-LABEL: define linkonce_odr hidden swiftcc void @"$s16eager_specialize19copyValueAndReturn2_1sxx_xztlFxxxRlzTlIetilr_Tp5"(%swift.opaque* noalias nocapture sret, %swift.opaque* noalias nocapture, %swift.opaque* nocapture, %swift.type* %S)
 // CHECK-IRGEN-NEXT: entry:
-// CHECK-IRGEN:        %3 = bitcast %swift.type* %"\CF\84_0_0" to i8***
+// CHECK-IRGEN:        %3 = bitcast %swift.type* %S to i8***
 // CHECK-IRGEN-NEXT:   %4 = getelementptr inbounds i8**, i8*** %3, i{{.*}} -1
-// CHECK-IRGEN-NEXT:   %"\CF\84_0_0.valueWitnesses" = load i8**, i8*** %4
-// CHECK-IRGEN-NEXT:   %5 = getelementptr inbounds i8*, i8** %"\CF\84_0_0.valueWitnesses"
+// CHECK-IRGEN-NEXT:   %S.valueWitnesses = load i8**, i8*** %4
+// CHECK-IRGEN-NEXT:   %5 = getelementptr inbounds i8*, i8** %S.valueWitnesses
 // CHECK-IRGEN-NEXT:   %6 = load i8*, i8** %5
 // CHECK-IRGEN-NEXT:   %initializeWithCopy = {{.*}}
 // CHECK-IRGEN-NEXT:   %7 = call {{.*}} %initializeWithCopy
@@ -830,7 +830,7 @@ bb2(%10 : $Error):                                // Preds: bb0
 } // end sil function '$s34eager_specialize_throwing_function19ClassUsingThrowingPC1gys5Int64VxKAA0G1PRzlFZ'
 
 // Check that a specialization was produced and it is not inlined.
-// CHECK-EAGER-SPECIALIZE-AND-GENERICS-INLINE-LABEL: sil{{.*}}@{{.*}}testSimpleGeneric{{.*}}where τ_0_0 : _Trivial(64, 64)
+// CHECK-EAGER-SPECIALIZE-AND-GENERICS-INLINE-LABEL: sil{{.*}}@{{.*}}testSimpleGeneric{{.*}}where T : _Trivial(64, 64)
 // CHECK-EAGER-SPECIALIZE-AND-GENERICS-INLINE-LABEL: sil{{.*}}@testSimpleGeneric :
 // CHECK-EAGER-SPECIALIZE-AND-GENERICS-INLINE: [[METATYPE:%.*]] = metatype $@thick T.Type
 // CHECK-EAGER-SPECIALIZE-AND-GENERICS-INLINE: [[SIZEOF:%.*]] = builtin "sizeof"<T>([[METATYPE]] : $@thick T.Type)

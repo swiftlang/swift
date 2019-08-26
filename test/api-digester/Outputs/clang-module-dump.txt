@@ -169,5 +169,5 @@
       ]
     }
   ],
-  "json_format_version": 1
+  "json_format_version": 2
 }

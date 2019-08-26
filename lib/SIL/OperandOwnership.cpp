@@ -106,40 +106,41 @@ public:
 
 } // end anonymous namespace
 
-/// Implementation for instructions without operands. These should never be
-/// visited.
-#define NO_OPERAND_INST(INST)                                                  \
+/// Implementation for instructions that we should never visit since they are
+/// not valid in ossa or do not have operands. Since we should never visit
+/// these, we just assert.
+#define SHOULD_NEVER_VISIT_INST(INST)                                          \
   OperandOwnershipKindMap OperandOwnershipKindClassifier::visit##INST##Inst(   \
       INST##Inst *i) {                                                         \
-    assert(i->getNumOperands() == 0 &&                                         \
-           "Expected instruction without operands?!");                         \
-    llvm_unreachable("Instruction without operand can not be compatible with " \
-                     "any def's OwnershipValueKind");                          \
+    llvm_unreachable("Visited instruction that should never be visited?!");    \
   }
-NO_OPERAND_INST(AllocBox)
-NO_OPERAND_INST(AllocExistentialBox)
-NO_OPERAND_INST(AllocGlobal)
-NO_OPERAND_INST(AllocStack)
-NO_OPERAND_INST(FloatLiteral)
-NO_OPERAND_INST(FunctionRef)
-NO_OPERAND_INST(DynamicFunctionRef)
-NO_OPERAND_INST(PreviousDynamicFunctionRef)
-NO_OPERAND_INST(GlobalAddr)
-NO_OPERAND_INST(GlobalValue)
-NO_OPERAND_INST(IntegerLiteral)
-NO_OPERAND_INST(Metatype)
-NO_OPERAND_INST(ObjCProtocol)
-NO_OPERAND_INST(RetainValue)
-NO_OPERAND_INST(RetainValueAddr)
-NO_OPERAND_INST(StringLiteral)
-NO_OPERAND_INST(StrongRetain)
-NO_OPERAND_INST(Unreachable)
-NO_OPERAND_INST(Unwind)
+SHOULD_NEVER_VISIT_INST(AllocBox)
+SHOULD_NEVER_VISIT_INST(AllocExistentialBox)
+SHOULD_NEVER_VISIT_INST(AllocGlobal)
+SHOULD_NEVER_VISIT_INST(AllocStack)
+SHOULD_NEVER_VISIT_INST(FloatLiteral)
+SHOULD_NEVER_VISIT_INST(FunctionRef)
+SHOULD_NEVER_VISIT_INST(DynamicFunctionRef)
+SHOULD_NEVER_VISIT_INST(PreviousDynamicFunctionRef)
+SHOULD_NEVER_VISIT_INST(GlobalAddr)
+SHOULD_NEVER_VISIT_INST(GlobalValue)
+SHOULD_NEVER_VISIT_INST(IntegerLiteral)
+SHOULD_NEVER_VISIT_INST(Metatype)
+SHOULD_NEVER_VISIT_INST(ObjCProtocol)
+SHOULD_NEVER_VISIT_INST(RetainValue)
+SHOULD_NEVER_VISIT_INST(RetainValueAddr)
+SHOULD_NEVER_VISIT_INST(StringLiteral)
+SHOULD_NEVER_VISIT_INST(StrongRetain)
+SHOULD_NEVER_VISIT_INST(Unreachable)
+SHOULD_NEVER_VISIT_INST(Unwind)
+SHOULD_NEVER_VISIT_INST(ReleaseValue)
+SHOULD_NEVER_VISIT_INST(ReleaseValueAddr)
+SHOULD_NEVER_VISIT_INST(StrongRelease)
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
-  NO_OPERAND_INST(StrongRetain##Name)                                          \
-  NO_OPERAND_INST(Name##Retain)
+  SHOULD_NEVER_VISIT_INST(StrongRetain##Name)                                  \
+  SHOULD_NEVER_VISIT_INST(Name##Retain)
 #include "swift/AST/ReferenceStorage.def"
-#undef NO_OPERAND_INST
+#undef SHOULD_NEVER_VISIT_INST
 
 /// Instructions whose arguments are always compatible with one convention.
 #define CONSTANT_OWNERSHIP_INST(OWNERSHIP, USE_LIFETIME_CONSTRAINT, INST)      \
@@ -158,9 +159,6 @@ CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, DeallocBox)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, DeallocExistentialBox)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, DeallocRef)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, DestroyValue)
-CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, ReleaseValue)
-CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, ReleaseValueAddr)
-CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, StrongRelease)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, EndLifetime)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, InitExistentialRef)
 CONSTANT_OWNERSHIP_INST(Any, MustBeLive, AbortApply)
@@ -266,49 +264,31 @@ ACCEPTS_ANY_OWNERSHIP_INST(ValueMetatype)
 ACCEPTS_ANY_OWNERSHIP_INST(UncheckedOwnershipConversion)
 ACCEPTS_ANY_OWNERSHIP_INST(ValueToBridgeObject)
 ACCEPTS_ANY_OWNERSHIP_INST(IsEscapingClosure)
-#undef ACCEPTS_ANY_OWNERSHIP_INST
-
-// Trivial if trivial typed, otherwise must accept owned?
-#define ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP_OR_METATYPE(USE_LIFETIME_CONSTRAINT,  \
-                                                     INST)                     \
-  OperandOwnershipKindMap OperandOwnershipKindClassifier::visit##INST##Inst(   \
-      INST##Inst *i) {                                                         \
-    assert(i->getNumOperands() && "Expected to have non-zero operands");       \
-    return Map::allLive();                                                     \
-  }
-ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP_OR_METATYPE(MustBeLive, ClassMethod)
-ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP_OR_METATYPE(MustBeLive, ObjCMethod)
-ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP_OR_METATYPE(MustBeLive, ObjCSuperMethod)
-ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP_OR_METATYPE(MustBeLive, SuperMethod)
-#undef ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP_OR_METATYPE
-
-// Trivial if trivial typed, otherwise must accept owned?
-#define ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(USE_LIFETIME_CONSTRAINT, INST)        \
-  OperandOwnershipKindMap OperandOwnershipKindClassifier::visit##INST##Inst(   \
-      INST##Inst *i) {                                                         \
-    assert(i->getNumOperands() && "Expected to have non-zero operands");       \
-    return Map::allLive();                                                     \
-  }
-ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, BridgeObjectToWord)
-ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, ClassifyBridgeObject)
-ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, CopyBlock)
-ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, OpenExistentialBox)
-ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, RefTailAddr)
-ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, RefToRawPointer)
-ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, SetDeallocating)
-ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, ProjectExistentialBox)
-ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, UnmanagedRetainValue)
-ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, UnmanagedReleaseValue)
-ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, UnmanagedAutoreleaseValue)
-ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, ConvertEscapeToNoEscape)
+ACCEPTS_ANY_OWNERSHIP_INST(ClassMethod)
+ACCEPTS_ANY_OWNERSHIP_INST(ObjCMethod)
+ACCEPTS_ANY_OWNERSHIP_INST(ObjCSuperMethod)
+ACCEPTS_ANY_OWNERSHIP_INST(SuperMethod)
+ACCEPTS_ANY_OWNERSHIP_INST(BridgeObjectToWord)
+ACCEPTS_ANY_OWNERSHIP_INST(ClassifyBridgeObject)
+ACCEPTS_ANY_OWNERSHIP_INST(CopyBlock)
+ACCEPTS_ANY_OWNERSHIP_INST(OpenExistentialBox)
+ACCEPTS_ANY_OWNERSHIP_INST(RefTailAddr)
+ACCEPTS_ANY_OWNERSHIP_INST(RefToRawPointer)
+ACCEPTS_ANY_OWNERSHIP_INST(SetDeallocating)
+ACCEPTS_ANY_OWNERSHIP_INST(ProjectExistentialBox)
+ACCEPTS_ANY_OWNERSHIP_INST(UnmanagedRetainValue)
+ACCEPTS_ANY_OWNERSHIP_INST(UnmanagedReleaseValue)
+ACCEPTS_ANY_OWNERSHIP_INST(UnmanagedAutoreleaseValue)
+ACCEPTS_ANY_OWNERSHIP_INST(ConvertEscapeToNoEscape)
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
-  ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, RefTo##Name)                    \
-  ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, Name##ToRef)                    \
-  ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, Copy##Name##Value)
+  ACCEPTS_ANY_OWNERSHIP_INST(RefTo##Name)                                      \
+  ACCEPTS_ANY_OWNERSHIP_INST(Name##ToRef)                                      \
+  ACCEPTS_ANY_OWNERSHIP_INST(Copy##Name##Value)
 #define UNCHECKED_REF_STORAGE(Name, ...)                                       \
-  ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, RefTo##Name)
+  ACCEPTS_ANY_OWNERSHIP_INST(RefTo##Name)                                      \
+  ACCEPTS_ANY_OWNERSHIP_INST(Copy##Name##Value)
 #include "swift/AST/ReferenceStorage.def"
-#undef ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP
+#undef ACCEPTS_ANY_OWNERSHIP_INST
 
 OperandOwnershipKindMap
 OperandOwnershipKindClassifier::visitForwardingInst(SILInstruction *i,

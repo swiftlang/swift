@@ -980,9 +980,11 @@ namespace {
     }
 
     /// Add constraints for a subscript operation.
-    Type addSubscriptConstraints(Expr *anchor, Type baseTy, Expr *index,
-                                 ValueDecl *declOrNull,
-                                 ConstraintLocator *locator = nullptr) {
+    Type addSubscriptConstraints(
+        Expr *anchor, Type baseTy, Expr *index,
+        ValueDecl *declOrNull,
+        ConstraintLocator *locator = nullptr,
+        SmallVectorImpl<TypeVariableType *> *addedTypeVars = nullptr) {
       // Locators used in this expression.
       if (locator == nullptr)
         locator = CS.getConstraintLocator(anchor);
@@ -1002,7 +1004,7 @@ namespace {
       // For an integer subscript expression on an array slice type, instead of
       // introducing a new type variable we can easily obtain the element type.
       if (isa<SubscriptExpr>(anchor)) {
-        
+
         auto isLValueBase = false;
         auto baseObjTy = baseTy;
         if (baseObjTy->is<LValueType>()) {
@@ -1046,6 +1048,8 @@ namespace {
       if (outputTy.isNull()) {
         outputTy = CS.createTypeVariable(resultLocator,
                                          TVO_CanBindToLValue | TVO_CanBindToNoEscape);
+        if (addedTypeVars)
+          addedTypeVars->push_back(outputTy->castTo<TypeVariableType>());
       }
 
       // FIXME: This can only happen when diagnostics successfully type-checked
@@ -1062,6 +1066,8 @@ namespace {
       // FIXME: weak name!
       auto memberTy = CS.createTypeVariable(
           memberLocator, TVO_CanBindToLValue | TVO_CanBindToNoEscape);
+      if (addedTypeVars)
+        addedTypeVars->push_back(memberTy);
 
       // FIXME: synthesizeMaterializeForSet() wants to statically dispatch to
       // a known subscript here. This might be cleaner if we split off a new
@@ -1787,9 +1793,8 @@ namespace {
           CS.addConstraint(ConstraintKind::Conversion,
                            CS.getType(element),
                            contextualArrayElementType,
-                           CS.getConstraintLocator(expr,
-                                                   LocatorPathElt::
-                                                    getTupleElement(index++)));
+                           CS.getConstraintLocator(
+                               expr, LocatorPathElt::TupleElement(index++)));
         }
         
         return contextualArrayType;
@@ -1816,8 +1821,7 @@ namespace {
                          CS.getType(element),
                          arrayElementTy,
                          CS.getConstraintLocator(
-                           expr,
-                           LocatorPathElt::getTupleElement(index++)));
+                           expr, LocatorPathElt::TupleElement(index++)));
       }
 
       // The array element type defaults to 'Any'.
@@ -1882,9 +1886,8 @@ namespace {
           CS.addConstraint(ConstraintKind::Conversion,
                            CS.getType(element),
                            contextualDictionaryElementType,
-                           CS.getConstraintLocator(expr,
-                                                   LocatorPathElt::
-                                                    getTupleElement(index++)));
+                           CS.getConstraintLocator(
+                               expr, LocatorPathElt::TupleElement(index++)));
         }
         
         return contextualDictionaryType;
@@ -1975,8 +1978,7 @@ namespace {
                            CS.getType(element),
                            elementTy,
                            CS.getConstraintLocator(
-                             expr,
-                             LocatorPathElt::getTupleElement(index++)));
+                               expr, LocatorPathElt::TupleElement(index++)));
       }
 
       // The dictionary key type defaults to 'AnyHashable'.
@@ -2022,7 +2024,7 @@ namespace {
 
       for (auto *param : *paramList) {
         auto *locator = CS.getConstraintLocator(
-            closureExpr, LocatorPathElt::getTupleElement(i++));
+            closureExpr, LocatorPathElt::TupleElement(i++));
         Type paramType, internalType;
 
         // If a type was explicitly specified, use its opened type.
@@ -2138,7 +2140,7 @@ namespace {
           auto &tupleElt = tuplePat->getElement(i);
           Type eltTy = getTypeForPattern(tupleElt.getPattern(),
                                          locator.withPathElement(
-                                           LocatorPathElt::getTupleElement(i)));
+                                           LocatorPathElt::TupleElement(i)));
           tupleTypeElts.push_back(TupleTypeElt(eltTy, tupleElt.getLabel()));
         }
         return TupleType::get(tupleTypeElts, CS.getASTContext());
@@ -2962,11 +2964,12 @@ namespace {
       bool didOptionalChain = false;
       // We start optimistically from an lvalue base.
       Type base = LValueType::get(root);
-      
+
+      SmallVector<TypeVariableType *, 2> componentTypeVars;
       for (unsigned i : indices(E->getComponents())) {
         auto &component = E->getComponents()[i];
         auto memberLocator = CS.getConstraintLocator(
-            locator, ConstraintLocator::PathElement::getKeyPathComponent(i));
+            locator, LocatorPathElt::KeyPathComponent(i));
         auto resultLocator = CS.getConstraintLocator(
             memberLocator, ConstraintLocator::KeyPathComponentResult);
 
@@ -2981,6 +2984,7 @@ namespace {
           auto memberTy = CS.createTypeVariable(resultLocator,
                                                 TVO_CanBindToLValue |
                                                 TVO_CanBindToNoEscape);
+          componentTypeVars.push_back(memberTy);
           auto lookupName = kind == KeyPathExpr::Component::Kind::UnresolvedProperty
             ? component.getUnresolvedDeclName()
             : component.getDeclRef().getDecl()->getFullName();
@@ -3003,7 +3007,8 @@ namespace {
         // re-type-check the constraints during failure diagnosis.
         case KeyPathExpr::Component::Kind::Subscript: {
           base = addSubscriptConstraints(E, base, component.getIndexExpr(),
-                                         /*decl*/ nullptr, memberLocator);
+                                         /*decl*/ nullptr, memberLocator,
+                                         &componentTypeVars);
           break;
         }
 
@@ -3019,8 +3024,10 @@ namespace {
           // today. Force the base to an rvalue.
           auto rvalueTy = CS.createTypeVariable(resultLocator,
                                                 TVO_CanBindToNoEscape);
+          componentTypeVars.push_back(rvalueTy);
           CS.addConstraint(ConstraintKind::Equal, base, rvalueTy,
                            resultLocator);
+
           base = rvalueTy;
           LLVM_FALLTHROUGH;
         }
@@ -3028,6 +3035,7 @@ namespace {
           auto optionalObjTy = CS.createTypeVariable(resultLocator,
                                                      TVO_CanBindToLValue |
                                                      TVO_CanBindToNoEscape);
+          componentTypeVars.push_back(optionalObjTy);
 
           CS.addConstraint(ConstraintKind::OptionalObject, base, optionalObjTy,
                            resultLocator);
@@ -3054,6 +3062,8 @@ namespace {
       // optional.
       if (didOptionalChain) {
         auto objTy = CS.createTypeVariable(locator, TVO_CanBindToNoEscape);
+        componentTypeVars.push_back(objTy);
+
         auto optTy = OptionalType::get(objTy);
         CS.addConstraint(ConstraintKind::Conversion, base, optTy,
                          locator);
@@ -3072,7 +3082,8 @@ namespace {
       auto typeLoc =
           CS.getConstraintLocator(locator, ConstraintLocator::KeyPathType);
       Type kpTy = CS.createTypeVariable(typeLoc, TVO_CanBindToNoEscape);
-      CS.addKeyPathConstraint(kpTy, root, rvalueBase, locator);
+      CS.addKeyPathConstraint(kpTy, root, rvalueBase, componentTypeVars,
+                              locator);
       return kpTy;
     }
 

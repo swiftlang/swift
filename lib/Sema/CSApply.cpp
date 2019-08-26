@@ -1545,17 +1545,8 @@ namespace {
 
       auto *componentLoc = cs.getConstraintLocator(
           memberLoc,
-          LocatorPathElt::getKeyPathDynamicMember(keyPathTy->getAnyNominal()));
+          LocatorPathElt::KeyPathDynamicMember(keyPathTy->getAnyNominal()));
       auto overload = solution.getOverloadChoice(componentLoc);
-
-      auto getKeyPathComponentIndex =
-          [](ConstraintLocator *locator) -> unsigned {
-        for (const auto &elt : locator->getPath()) {
-          if (elt.getKind() == ConstraintLocator::KeyPathComponent)
-            return elt.getValue();
-        }
-        llvm_unreachable("no keypath component node");
-      };
 
       // Looks like there is a chain of implicit `subscript(dynamicMember:)`
       // calls necessary to resolve a member reference.
@@ -1581,8 +1572,9 @@ namespace {
       // of a keypath expression e.g. `\Lens<[Int]>.count` where
       // `count` is referenced using dynamic lookup.
       if (auto *KPE = dyn_cast<KeyPathExpr>(anchor)) {
-        auto componentIdx = getKeyPathComponentIndex(memberLoc);
-        auto &origComponent = KPE->getComponents()[componentIdx];
+        auto kpElt = memberLoc->findFirst<LocatorPathElt::KeyPathComponent>();
+        assert(kpElt && "no keypath component node");
+        auto &origComponent = KPE->getComponents()[kpElt->getIndex()];
 
         using ComponentKind = KeyPathExpr::Component::Kind;
         if (origComponent.getKind() == ComponentKind::UnresolvedProperty) {
@@ -4248,7 +4240,7 @@ namespace {
         Optional<SelectedOverload> foundDecl;
 
         auto locator = cs.getConstraintLocator(
-            E, ConstraintLocator::PathElement::getKeyPathComponent(i));
+            E, LocatorPathElt::KeyPathComponent(i));
         if (kind == KeyPathExpr::Component::Kind::UnresolvedSubscript) {
           locator =
             cs.getConstraintLocator(locator,
@@ -5030,7 +5022,7 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr,
       auto *toElt
         = coerceToType(fromElt, toEltType,
                       locator.withPathElement(
-                        LocatorPathElt::getTupleElement(i)));
+                        LocatorPathElt::TupleElement(i)));
       if (!toElt)
         return nullptr;
 
@@ -5073,7 +5065,7 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr,
     auto *toElt
       = coerceToType(fromElt, toEltType,
                      locator.withPathElement(
-                       LocatorPathElt::getTupleElement(source)));
+                       LocatorPathElt::TupleElement(source)));
     if (!toElt)
       return nullptr;
 
@@ -5393,7 +5385,7 @@ Expr *ExprRewriter::coerceCallArguments(
   auto getArgLocator = [&](unsigned argIdx, unsigned paramIdx)
                          -> ConstraintLocatorBuilder {
     return locator.withPathElement(
-             LocatorPathElt::getApplyArgToParam(argIdx, paramIdx));
+             LocatorPathElt::ApplyArgToParam(argIdx, paramIdx));
   };
 
   bool matchCanFail =
@@ -5937,8 +5929,7 @@ buildOpaqueElementConversion(ExprRewriter &rewriter, SourceRange srcRange,
 
   Expr *conversion = buildElementConversion(
       rewriter, srcRange, srcType, destType, bridged,
-      locator.withPathElement(
-          ConstraintLocator::PathElement::getGenericArgument(typeArgIndex)),
+      locator.withPathElement(LocatorPathElt::GenericArgument(typeArgIndex)),
       opaque);
 
   return { opaque, conversion };
@@ -5957,8 +5948,7 @@ void ExprRewriter::peepholeArrayUpcast(ArrayExpr *expr, Type toType,
 
   // Convert the elements.
   ConstraintLocatorBuilder innerLocator =
-    locator.withPathElement(
-                        ConstraintLocator::PathElement::getGenericArgument(0));
+    locator.withPathElement(LocatorPathElt::GenericArgument(0));
   for (auto &element : expr->getElements()) {
     if (auto newElement = buildElementConversion(*this, expr->getLoc(),
                                                  cs.getType(element),
@@ -5985,8 +5975,7 @@ void ExprRewriter::peepholeDictionaryUpcast(DictionaryExpr *expr,
   expr->setType(toType);
 
   ConstraintLocatorBuilder valueLocator =
-    locator.withPathElement(
-      ConstraintLocator::PathElement::getGenericArgument(1));
+    locator.withPathElement(LocatorPathElt::GenericArgument(1));
 
   // Convert the elements.
   TupleTypeElt tupleTypeElts[2] = { keyType, valueType };
@@ -6804,7 +6793,7 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
     // Extract the literal type.
     Type builtinLiteralType =
         conformance->getTypeWitnessByName(type, literalType);
-    if (!builtinLiteralType)
+    if (builtinLiteralType->hasError())
       return nullptr;
 
     // Perform the builtin conversion.

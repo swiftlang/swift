@@ -22,6 +22,7 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
+#include "swift/AST/ModuleNameLookup.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
@@ -167,7 +168,6 @@ namespace {
     DeclContext *const DC;
     ModuleDecl &M;
     const ASTContext &Ctx;
-    LazyResolver *const TypeResolver;
     const SourceLoc Loc;
     const SourceManager &SM;
     
@@ -202,14 +202,12 @@ namespace {
     // clang-format off
     UnqualifiedLookupFactory(DeclName Name,
                              DeclContext *const DC,
-                             LazyResolver *TypeResolver,
                              SourceLoc Loc,
                              Options options,
                              UnqualifiedLookup &lookupToBeCreated);
     
     UnqualifiedLookupFactory(DeclName Name,
                              DeclContext *const DC,
-                             LazyResolver *TypeResolver,
                              SourceLoc Loc,
                              Options options,
                              SmallVectorImpl<LookupResultEntry> &Results,
@@ -433,11 +431,10 @@ public:
 UnqualifiedLookupFactory::UnqualifiedLookupFactory(
                             DeclName Name,
                             DeclContext *const DC,
-                            LazyResolver *TypeResolver,
                             SourceLoc Loc,
                             Options options,
                             UnqualifiedLookup &lookupToBeCreated)
-: UnqualifiedLookupFactory(Name, DC, TypeResolver, Loc, options,
+: UnqualifiedLookupFactory(Name, DC, Loc, options,
     lookupToBeCreated.Results,
     lookupToBeCreated.IndexOfFirstOuterResult)
 
@@ -446,7 +443,6 @@ UnqualifiedLookupFactory::UnqualifiedLookupFactory(
 UnqualifiedLookupFactory::UnqualifiedLookupFactory(
                             DeclName Name,
                             DeclContext *const DC,
-                            LazyResolver *TypeResolver,
                             SourceLoc Loc,
                             Options options,
                             SmallVectorImpl<LookupResultEntry> &Results,
@@ -456,7 +452,6 @@ UnqualifiedLookupFactory::UnqualifiedLookupFactory(
   DC(DC),
   M(*DC->getParentModule()),
   Ctx(M.getASTContext()),
-  TypeResolver(TypeResolver ? TypeResolver : Ctx.getLazyResolver()),
   Loc(Loc),
   SM(Ctx.SourceMgr),
   DebugClient(M.getDebugClient()),
@@ -502,7 +497,7 @@ void UnqualifiedLookupFactory::performUnqualifiedLookup() {
   if (compareToASTScopes && useASTScopesForExperimentalLookupIfEnabled()) {
     ResultsVector results;
     size_t indexOfFirstOuterResult = 0;
-    UnqualifiedLookupFactory scopeLookup(Name, DC, TypeResolver, Loc, options,
+    UnqualifiedLookupFactory scopeLookup(Name, DC, Loc, options,
                                          results, indexOfFirstOuterResult);
     scopeLookup.experimentallyLookInASTScopes();
     assert(verifyEqualTo(std::move(scopeLookup), "UnqualifedLookup",
@@ -980,7 +975,7 @@ void UnqualifiedLookupFactory::addImportedResults(DeclContext *const dc) {
   auto resolutionKind = isOriginallyTypeLookup ? ResolutionKind::TypesOnly
                                                : ResolutionKind::Overloadable;
   lookupInModule(&M, {}, Name, CurModuleResults, NLKind::UnqualifiedLookup,
-                 resolutionKind, TypeResolver, dc, extraImports);
+                 resolutionKind, dc, extraImports);
 
   // Always perform name shadowing for type lookup.
   if (options.contains(Flags::TypeLookup)) {
@@ -1204,12 +1199,16 @@ bool ASTScopeDeclConsumerForUnqualifiedLookup::lookInMembers(
 // clang-format off
 UnqualifiedLookup::UnqualifiedLookup(DeclName Name,
                                      DeclContext *const DC,
-                                     LazyResolver *TypeResolver,
                                      SourceLoc Loc,
                                      Options options)
     // clang-format on
     : IndexOfFirstOuterResult(0) {
-  UnqualifiedLookupFactory factory(Name, DC, TypeResolver, Loc, options, *this);
+
+  auto *stats = DC->getASTContext().Stats;
+  if (stats)
+    stats->getFrontendCounters().NumUnqualifiedLookup++;
+
+  UnqualifiedLookupFactory factory(Name, DC, Loc, options, *this);
   factory.performUnqualifiedLookup();
 }
 

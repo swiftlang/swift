@@ -237,13 +237,8 @@ public:
     assert(isConditional() || Signature);
     assert(AffectedDecl);
 
-    auto path = locator->getPath();
-    assert(!path.empty());
-
-    auto &last = path.back();
-    assert(last.isTypeParameterRequirement() ||
-           last.isConditionalRequirement());
-    assert(static_cast<RequirementKind>(last.getValue2()) == kind);
+    auto reqElt = locator->castLastElementTo<LocatorPathElt::AnyRequirement>();
+    assert(reqElt.getRequirementKind() == kind);
 
     // It's possible sometimes not to have no base expression.
     if (!expr)
@@ -254,13 +249,9 @@ public:
   }
 
   unsigned getRequirementIndex() const {
-    auto path = getLocator()->getPath();
-    assert(!path.empty());
-
-    auto &requirementLoc = path.back();
-    assert(requirementLoc.isTypeParameterRequirement() ||
-           requirementLoc.isConditionalRequirement());
-    return requirementLoc.getValue();
+    auto reqElt =
+        getLocator()->castLastElementTo<LocatorPathElt::AnyRequirement>();
+    return reqElt.getIndex();
   }
 
   /// The generic base type where failing requirement comes from.
@@ -624,6 +615,9 @@ public:
 
   bool diagnoseAsError() override;
 
+  /// If we're trying to convert something to `nil`.
+  bool diagnoseConversionToNil() const;
+
   // If we're trying to convert something of type "() -> T" to T,
   // then we probably meant to call the value.
   bool diagnoseMissingFunctionCall() const;
@@ -634,6 +628,14 @@ public:
   /// Produce a specialized diagnostic if this is an attempt to initialize
   /// or convert an array literal to a dictionary e.g. `let _: [String: Int] = ["A", 0]`
   bool diagnoseConversionToDictionary() const;
+
+  /// Produce a specialized diagnostic if this is an attempt to throw
+  /// something with doesn't conform to `Error`.
+  bool diagnoseThrowsTypeMismatch() const;
+
+  /// Produce a specialized diagnostic if this is an attempt to `yield`
+  /// something of incorrect type.
+  bool diagnoseYieldByReferenceMismatch() const;
 
   /// Attempt to attach any relevant fix-its to already produced diagnostic.
   void tryFixIts(InFlightDiagnostic &diagnostic) const;

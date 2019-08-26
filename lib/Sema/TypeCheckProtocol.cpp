@@ -20,11 +20,11 @@
 #include "MiscDiagnostics.h"
 #include "TypeAccessScopeChecker.h"
 #include "TypeCheckAvailability.h"
+#include "TypeCheckObjC.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/AST/AccessScope.h"
-#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
@@ -732,9 +732,8 @@ swift::matchWitness(TypeChecker &tc,
       selfTy = reqGenericEnv->mapTypeIntoContext(selfTy);
 
     // Open up the type of the requirement.
-    reqLocator = cs->getConstraintLocator(
-                     static_cast<Expr *>(nullptr),
-                     LocatorPathElt(ConstraintLocator::Requirement, req));
+    reqLocator = cs->getConstraintLocator(static_cast<Expr *>(nullptr),
+                                          LocatorPathElt::Requirement(req));
     OpenedTypeMap reqReplacements;
     std::tie(openedFullReqType, reqType)
       = cs->getTypeOfMemberReference(selfTy, req, dc,
@@ -752,7 +751,7 @@ swift::matchWitness(TypeChecker &tc,
 
       // If substitution failed, skip the requirement. This only occurs in
       // invalid code.
-      if (!replacedInReq || replacedInReq->hasError())
+      if (replacedInReq->hasError())
         continue;
 
       if (reqGenericEnv) {
@@ -767,9 +766,8 @@ swift::matchWitness(TypeChecker &tc,
     witnessType = witness->getInterfaceType();
     // FIXME: witness as a base locator?
     locator = cs->getConstraintLocator(nullptr);
-    witnessLocator = cs->getConstraintLocator(
-                       static_cast<Expr *>(nullptr),
-                       LocatorPathElt(ConstraintLocator::Witness, witness));
+    witnessLocator = cs->getConstraintLocator(static_cast<Expr *>(nullptr),
+                                              LocatorPathElt::Witness(witness));
     if (witness->getDeclContext()->isTypeContext()) {
       std::tie(openedFullWitnessType, openWitnessType) 
         = cs->getTypeOfMemberReference(selfTy, witness, dc,
@@ -1815,8 +1813,7 @@ static Type getRequirementTypeForDisplay(ModuleDecl *module,
 
                         return Type(dependentType);
                       },
-                      LookUpConformanceInModule(module),
-                      SubstFlags::UseErrorType);
+                      LookUpConformanceInModule(module));
   };
 
   if (auto fnTy = type->getAs<AnyFunctionType>()) {

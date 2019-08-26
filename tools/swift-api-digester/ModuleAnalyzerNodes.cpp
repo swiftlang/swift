@@ -93,7 +93,9 @@ SDKNodeDecl::SDKNodeDecl(SDKNodeInitInfo Info, SDKNodeKind Kind)
         IsOpen(Info.IsOpen),
         IsInternal(Info.IsInternal), IsABIPlaceholder(Info.IsABIPlaceholder),
         ReferenceOwnership(uint8_t(Info.ReferenceOwnership)),
-        GenericSig(Info.GenericSig), FixedBinaryOrder(Info.FixedBinaryOrder),
+        GenericSig(Info.GenericSig),
+        SugaredGenericSig(Info.SugaredGenericSig),
+        FixedBinaryOrder(Info.FixedBinaryOrder),
         introVersions({Info.IntromacOS, Info.IntroiOS, Info.IntrotvOS,
                        Info.IntrowatchOS, Info.Introswift}){}
 
@@ -213,11 +215,22 @@ SDKNode* SDKNode::getOnlyChild() const {
 }
 
 SDKNodeRoot *SDKNode::getRootNode() const {
-  for (auto *Root = const_cast<SDKNode*>(this); ; Root = Root->getParent()) {
+  for (auto *Root = const_cast<SDKNode*>(this); Root;) {
     if (auto Result = dyn_cast<SDKNodeRoot>(Root))
       return Result;
+    if (auto *Conf = dyn_cast<SDKNodeConformance>(Root)) {
+      Root = Conf->getNominalTypeDecl();
+    } else if (auto *Acc = dyn_cast<SDKNodeDeclAccessor>(Root)) {
+      Root = Acc->getStorage();
+    } else {
+      Root = Root->getParent();
+    }
   }
   llvm_unreachable("Unhandled SDKNodeKind in switch.");
+}
+
+uint8_t SDKNode::getJsonFormatVersion() const {
+  return getRootNode()->getJsonFormatVersion();
 }
 
 void SDKNode::addChild(SDKNode *Child) {
@@ -1087,7 +1100,8 @@ Requirement getCanonicalRequirement(Requirement &Req) {
 }
 
 static
-StringRef printGenericSignature(SDKContext &Ctx, ArrayRef<Requirement> AllReqs) {
+StringRef printGenericSignature(SDKContext &Ctx, ArrayRef<Requirement> AllReqs,
+                                bool Canonical) {
   llvm::SmallString<32> Result;
   llvm::raw_svector_ostream OS(Result);
   if (AllReqs.empty())
@@ -1103,7 +1117,7 @@ StringRef printGenericSignature(SDKContext &Ctx, ArrayRef<Requirement> AllReqs) 
     } else {
       First = false;
     }
-    if (Ctx.checkingABI())
+    if (Canonical)
       getCanonicalRequirement(Req).print(OS, Opts);
     else
       Req.print(OS, Opts);
@@ -1112,16 +1126,16 @@ StringRef printGenericSignature(SDKContext &Ctx, ArrayRef<Requirement> AllReqs) 
   return Ctx.buffer(OS.str());
 }
 
-static StringRef printGenericSignature(SDKContext &Ctx, Decl *D) {
+static StringRef printGenericSignature(SDKContext &Ctx, Decl *D, bool Canonical) {
   llvm::SmallString<32> Result;
   llvm::raw_svector_ostream OS(Result);
   if (auto *PD = dyn_cast<ProtocolDecl>(D)) {
-    return printGenericSignature(Ctx, PD->getRequirementSignature());
+    return printGenericSignature(Ctx, PD->getRequirementSignature(), Canonical);
   }
 
   if (auto *GC = D->getAsGenericContext()) {
     if (auto *Sig = GC->getGenericSignature()) {
-      if (Ctx.checkingABI())
+      if (Canonical)
         Sig->getCanonicalSignature()->print(OS);
       else
         Sig->print(OS);
@@ -1132,8 +1146,8 @@ static StringRef printGenericSignature(SDKContext &Ctx, Decl *D) {
 }
 
 static
-StringRef printGenericSignature(SDKContext &Ctx, ProtocolConformance *Conf) {
-  return printGenericSignature(Ctx, Conf->getConditionalRequirements());
+StringRef printGenericSignature(SDKContext &Ctx, ProtocolConformance *Conf, bool Canonical) {
+  return printGenericSignature(Ctx, Conf->getConditionalRequirements(), Canonical);
 }
 
 static Optional<uint8_t> getSimilarMemberCount(NominalTypeDecl *NTD,
@@ -1245,7 +1259,10 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Decl *D):
       Ctx(Ctx), DKind(D->getKind()),
       Location(calculateLocation(Ctx, D)),
       ModuleName(D->getModuleContext()->getName().str()),
-      GenericSig(printGenericSignature(Ctx, D)),
+      GenericSig(printGenericSignature(Ctx, D, /*Canonical*/Ctx.checkingABI())),
+      SugaredGenericSig(Ctx.checkingABI()?
+                        printGenericSignature(Ctx, D, /*Canonical*/false):
+                        StringRef()),
       IntromacOS(Ctx.getPlatformIntroVersion(D, PlatformKind::OSX)),
       IntroiOS(Ctx.getPlatformIntroVersion(D, PlatformKind::iOS)),
       IntrotvOS(Ctx.getPlatformIntroVersion(D, PlatformKind::tvOS)),
@@ -1281,7 +1298,9 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ProtocolConformance *Conform):
     SDKNodeInitInfo(Ctx, Conform->getProtocol()) {
   // The conformance can be conditional. The generic signature keeps track of
   // the requirements.
-  GenericSig = printGenericSignature(Ctx, Conform);
+  GenericSig = printGenericSignature(Ctx, Conform, Ctx.checkingABI());
+  SugaredGenericSig = Ctx.checkingABI() ?
+    printGenericSignature(Ctx, Conform, false): StringRef();
   // Whether this conformance is ABI placeholder depends on the decl context
   // of this conformance.
   IsABIPlaceholder = isABIPlaceholderRecursive(Conform->getDeclContext()->
@@ -1858,6 +1877,7 @@ void SDKNodeDecl::jsonize(json::Output &out) {
   output(out, KeyKind::KK_location, Location);
   output(out, KeyKind::KK_moduleName, ModuleName);
   output(out, KeyKind::KK_genericSig, GenericSig);
+  output(out, KeyKind::KK_sugared_genericSig, SugaredGenericSig);
   output(out, KeyKind::KK_static, IsStatic);
   output(out, KeyKind::KK_deprecated,IsDeprecated);
   output(out, KeyKind::KK_protocolReq, IsProtocolReq);
@@ -2070,16 +2090,24 @@ void SwiftDeclCollector::serialize(StringRef Filename) {
   SwiftDeclCollector::serialize(Filename, RootNode);
 }
 
+SDKNodeRoot *
+swift::ide::api::getEmptySDKNodeRoot(SDKContext &SDKCtx) {
+  SwiftDeclCollector Collector(SDKCtx);
+  return Collector.getSDKRoot();
+}
+
 SDKNodeRoot*
 swift::ide::api::getSDKNodeRoot(SDKContext &SDKCtx,
                                  const CompilerInvocation &InitInvok,
-                                 const llvm::StringSet<> &ModuleNames,
-                                 CheckerOptions Opts) {
+                                 const llvm::StringSet<> &ModuleNames) {
+  CheckerOptions Opts = SDKCtx.getOpts();
   CompilerInvocation Invocation(InitInvok);
 
   CompilerInstance &CI = SDKCtx.newCompilerInstance();
   // Display diagnostics to stderr.
-  PrintingDiagnosticConsumer PrintDiags;
+  PrintingDiagnosticConsumer PrintDiags(llvm::errs());
+  if (llvm::errs().has_colors())
+    PrintDiags.forceColors();
   CI.addDiagnosticConsumer(&PrintDiags);
   if (CI.setup(Invocation)) {
     llvm::errs() << "Failed to setup the compiler instance\n";
@@ -2102,7 +2130,7 @@ swift::ide::api::getSDKNodeRoot(SDKContext &SDKCtx,
     if (Opts.Verbose)
       llvm::errs() << "Loading module: " << Name << "...\n";
     auto *M = Ctx.getModuleByName(Name);
-    if (!M || M->failedToLoad()) {
+    if (!M || M->failedToLoad() || Ctx.Diags.hadAnyError()) {
       llvm::errs() << "Failed to load module: " << Name << '\n';
       if (Opts.AbortOnModuleLoadFailure)
         return nullptr;
@@ -2118,18 +2146,24 @@ swift::ide::api::getSDKNodeRoot(SDKContext &SDKCtx,
   return Collector.getSDKRoot();
 }
 
-int swift::ide::api::dumpSDKContent(const CompilerInvocation &InitInvok,
-                                    const llvm::StringSet<> &ModuleNames,
-                                    StringRef OutputFile, CheckerOptions Opts) {
-  SDKContext SDKCtx(Opts);
-  SDKNode *Root = getSDKNodeRoot(SDKCtx, InitInvok, ModuleNames, Opts);
-  if (!Root)
-    return 1;
+void swift::ide::api::dumpSDKRoot(SDKNodeRoot *Root, StringRef OutputFile) {
+  assert(Root);
+  auto Opts = Root->getSDKContext().getOpts();
   if (Opts.Verbose)
     llvm::errs() << "Dumping SDK...\n";
   SwiftDeclCollector::serialize(OutputFile, Root);
   if (Opts.Verbose)
     llvm::errs() << "Dumped to "<< OutputFile << "\n";
+}
+
+int swift::ide::api::dumpSDKContent(const CompilerInvocation &InitInvok,
+                                    const llvm::StringSet<> &ModuleNames,
+                                    StringRef OutputFile, CheckerOptions Opts) {
+  SDKContext SDKCtx(Opts);
+  SDKNodeRoot *Root = getSDKNodeRoot(SDKCtx, InitInvok, ModuleNames);
+  if (!Root)
+    return 1;
+  dumpSDKRoot(Root, OutputFile);
   return 0;
 }
 

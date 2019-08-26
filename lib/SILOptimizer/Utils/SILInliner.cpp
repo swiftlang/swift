@@ -845,18 +845,18 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::SelectValueInst:
   case SILInstructionKind::KeyPathInst:
   case SILInstructionKind::GlobalValueInst:
-#define COMMON_ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name) \
-  case SILInstructionKind::Name##ToRefInst: \
-  case SILInstructionKind::RefTo##Name##Inst:
+#define COMMON_ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name)          \
+  case SILInstructionKind::Name##ToRefInst:                                    \
+  case SILInstructionKind::RefTo##Name##Inst:                                  \
+  case SILInstructionKind::Copy##Name##ValueInst:
 #define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   case SILInstructionKind::Load##Name##Inst: \
   case SILInstructionKind::Store##Name##Inst:
-#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-  COMMON_ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name) \
-  case SILInstructionKind::Name##RetainInst: \
-  case SILInstructionKind::Name##ReleaseInst: \
-  case SILInstructionKind::StrongRetain##Name##Inst: \
-  case SILInstructionKind::Copy##Name##ValueInst:
+#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...)                         \
+  COMMON_ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name)                \
+  case SILInstructionKind::Name##RetainInst:                                   \
+  case SILInstructionKind::Name##ReleaseInst:                                  \
+  case SILInstructionKind::StrongRetain##Name##Inst:
 #define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, "...") \
   ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, "...")

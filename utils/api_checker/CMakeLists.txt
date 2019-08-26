@@ -4,3 +4,6 @@ swift_install_in_component(FILES "swift-api-checker.py"
 swift_install_in_component(DIRECTORY "sdk-module-lists"
                            DESTINATION "bin"
                            COMPONENT toolchain-tools)
+swift_install_in_component(DIRECTORY "FrameworkABIBaseline"
+                           DESTINATION "lib/swift"
+                           COMPONENT toolchain-tools)

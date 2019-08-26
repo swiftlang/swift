@@ -55,6 +55,11 @@
 
 using namespace swift;
 
+static_assert(IsTriviallyDestructible<FileUnit>::value,
+              "FileUnits are BumpPtrAllocated; the d'tor may not be called");
+static_assert(IsTriviallyDestructible<LoadedFile>::value,
+              "LoadedFiles are BumpPtrAllocated; the d'tor may not be called");
+
 //===----------------------------------------------------------------------===//
 // Builtin Module Name lookup
 //===----------------------------------------------------------------------===//
@@ -454,8 +459,11 @@ static bool isParsedModule(const ModuleDecl *mod) {
 void ModuleDecl::lookupValue(AccessPathTy AccessPath, DeclName Name,
                              NLKind LookupKind, 
                              SmallVectorImpl<ValueDecl*> &Result) const {
+  auto *stats = getASTContext().Stats;
+  if (stats)
+    stats->getFrontendCounters().NumModuleLookupValue++;
+
   if (isParsedModule(this)) {
-    FrontendStatsTracer tracer(getASTContext().Stats, "source-file-lookup-value");
     getSourceLookupCache().lookupValue(AccessPath, Name, LookupKind, Result);
     return;
   }
@@ -604,6 +612,10 @@ void SourceFile::lookupClassMembers(ModuleDecl::AccessPathTy accessPath,
 void ModuleDecl::lookupClassMember(AccessPathTy accessPath,
                                    DeclName name,
                                    SmallVectorImpl<ValueDecl*> &results) const {
+  auto *stats = getASTContext().Stats;
+  if (stats)
+    stats->getFrontendCounters().NumModuleLookupClassMember++;
+
   if (isParsedModule(this)) {
     FrontendStatsTracer tracer(getASTContext().Stats, "source-file-lookup-class-member");
     auto &cache = getSourceLookupCache();
@@ -1200,11 +1212,12 @@ ModuleDecl::ReverseFullNameIterator::operator++() {
 }
 
 void
-ModuleDecl::ReverseFullNameIterator::printForward(raw_ostream &out) const {
+ModuleDecl::ReverseFullNameIterator::printForward(raw_ostream &out,
+                                                  StringRef delim) const {
   SmallVector<StringRef, 8> elements(*this, {});
   swift::interleave(swift::reversed(elements),
                     [&out](StringRef next) { out << next; },
-                    [&out] { out << '.'; });
+                    [&out, delim] { out << delim; });
 }
 
 void
@@ -1241,10 +1254,6 @@ StringRef ModuleDecl::getModuleFilename() const {
   // per-file names. Modules can consist of more than one file.
   StringRef Result;
   for (auto F : getFiles()) {
-    Result = F->getParseableInterface();
-    if (!Result.empty())
-      return Result;
-
     if (auto SF = dyn_cast<SourceFile>(F)) {
       if (!Result.empty())
         return StringRef();
@@ -1367,7 +1376,8 @@ bool ModuleDecl::registerEntryPointFile(FileUnit *file, SourceLoc diagLoc,
 
 template<bool respectVisibility>
 static bool
-forAllImportedModules(ModuleDecl *topLevel, ModuleDecl::AccessPathTy thisPath,
+forAllImportedModules(const ModuleDecl *topLevel,
+                      ModuleDecl::AccessPathTy thisPath,
                       llvm::function_ref<bool(ModuleDecl::ImportedModule)> fn) {
   using ImportedModule = ModuleDecl::ImportedModule;
   using AccessPathTy = ModuleDecl::AccessPathTy;
@@ -1388,7 +1398,7 @@ forAllImportedModules(ModuleDecl *topLevel, ModuleDecl::AccessPathTy thisPath,
   AccessPathTy overridingPath;
   if (respectVisibility)
     overridingPath = thisPath;
-  stack.push_back(ImportedModule(overridingPath, topLevel));
+  stack.emplace_back(overridingPath, const_cast<ModuleDecl *>(topLevel));
 
   while (!stack.empty()) {
     auto next = stack.pop_back_val();
@@ -1422,12 +1432,12 @@ forAllImportedModules(ModuleDecl *topLevel, ModuleDecl::AccessPathTy thisPath,
 
 bool
 ModuleDecl::forAllVisibleModules(AccessPathTy thisPath,
-                                 llvm::function_ref<bool(ImportedModule)> fn) {
+                                 llvm::function_ref<bool(ImportedModule)> fn) const {
   return forAllImportedModules<true>(this, thisPath, fn);
 }
 
 bool FileUnit::forAllVisibleModules(
-    llvm::function_ref<bool(ModuleDecl::ImportedModule)> fn) {
+    llvm::function_ref<bool(ModuleDecl::ImportedModule)> fn) const {
   if (!getParentModule()->forAllVisibleModules(ModuleDecl::AccessPathTy(), fn))
     return false;
 
@@ -1446,7 +1456,7 @@ bool FileUnit::forAllVisibleModules(
   return true;
 }
 
-void ModuleDecl::collectLinkLibraries(LinkLibraryCallback callback) {
+void ModuleDecl::collectLinkLibraries(LinkLibraryCallback callback) const {
   // FIXME: The proper way to do this depends on the decls used.
   FORWARD(collectLinkLibraries, (callback));
 }

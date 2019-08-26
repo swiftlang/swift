@@ -87,7 +87,9 @@ public:
   virtual ~DWARFImporterDelegate() = default;
   /// Perform a qualified lookup of a Clang type with this name.
   /// \param kind  Only return results with this type kind.
+  /// \param inModule only return results from this module.
   virtual void lookupValue(StringRef name, llvm::Optional<ClangTypeKind> kind,
+                           StringRef inModule,
                            SmallVectorImpl<clang::Decl *> &results) {}
   /// vtable anchor.
   virtual void anchor();
@@ -328,9 +330,6 @@ public:
   bool hasTypedef(const clang::Decl *typeDecl) const;
 
   void verifyAllModules() override;
-
-  void setTypeResolver(LazyResolver &resolver);
-  void clearTypeResolver();
 
   clang::TargetInfo &getTargetInfo() const;
   clang::ASTContext &getClangASTContext() const override;

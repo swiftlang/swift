@@ -17,6 +17,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ModuleLoader.h"
+#include "swift/AST/ModuleNameLookup.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/Statistic.h"
@@ -296,7 +297,7 @@ void NameBinder::addImport(
     SmallVector<ValueDecl *, 8> decls;
     lookupInModule(topLevelModule, declPath, declPath.front().first, decls,
                    NLKind::QualifiedLookup, ResolutionKind::Overloadable,
-                   /*resolver*/nullptr, &SF);
+                   &SF);
 
     if (decls.empty()) {
       diagnose(ID, diag::decl_does_not_exist_in_module,

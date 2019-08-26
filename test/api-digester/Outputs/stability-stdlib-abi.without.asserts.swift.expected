@@ -1,0 +1,133 @@
+Func Double.acos(_:) has been removed
+Func Double.acosh(_:) has been removed
+Func Double.asin(_:) has been removed
+Func Double.asinh(_:) has been removed
+Func Double.atan(_:) has been removed
+Func Double.atan2(y:x:) has been removed
+Func Double.atanh(_:) has been removed
+Func Double.cos(_:) has been removed
+Func Double.cosh(_:) has been removed
+Func Double.erf(_:) has been removed
+Func Double.erfc(_:) has been removed
+Func Double.exp(_:) has been removed
+Func Double.exp10(_:) has been removed
+Func Double.exp2(_:) has been removed
+Func Double.expm1(_:) has been removed
+Func Double.gamma(_:) has been removed
+Func Double.hypot(_:_:) has been removed
+Func Double.log(_:) has been removed
+Func Double.log10(_:) has been removed
+Func Double.log1p(_:) has been removed
+Func Double.log2(_:) has been removed
+Func Double.logGamma(_:) has been removed
+Func Double.pow(_:_:) has been removed
+Func Double.root(_:_:) has been removed
+Func Double.signGamma(_:) has been removed
+Func Double.sin(_:) has been removed
+Func Double.sinh(_:) has been removed
+Func Double.sqrt(_:) has been removed
+Func Double.tan(_:) has been removed
+Func Double.tanh(_:) has been removed
+Func Float.acos(_:) has been removed
+Func Float.acosh(_:) has been removed
+Func Float.asin(_:) has been removed
+Func Float.asinh(_:) has been removed
+Func Float.atan(_:) has been removed
+Func Float.atan2(y:x:) has been removed
+Func Float.atanh(_:) has been removed
+Func Float.cos(_:) has been removed
+Func Float.cosh(_:) has been removed
+Func Float.erf(_:) has been removed
+Func Float.erfc(_:) has been removed
+Func Float.exp(_:) has been removed
+Func Float.exp10(_:) has been removed
+Func Float.exp2(_:) has been removed
+Func Float.expm1(_:) has been removed
+Func Float.gamma(_:) has been removed
+Func Float.hypot(_:_:) has been removed
+Func Float.log(_:) has been removed
+Func Float.log10(_:) has been removed
+Func Float.log1p(_:) has been removed
+Func Float.log2(_:) has been removed
+Func Float.logGamma(_:) has been removed
+Func Float.pow(_:_:) has been removed
+Func Float.root(_:_:) has been removed
+Func Float.signGamma(_:) has been removed
+Func Float.sin(_:) has been removed
+Func Float.sinh(_:) has been removed
+Func Float.sqrt(_:) has been removed
+Func Float.tan(_:) has been removed
+Func Float.tanh(_:) has been removed
+Func Float80.acos(_:) has been removed
+Func Float80.acosh(_:) has been removed
+Func Float80.asin(_:) has been removed
+Func Float80.asinh(_:) has been removed
+Func Float80.atan(_:) has been removed
+Func Float80.atan2(y:x:) has been removed
+Func Float80.atanh(_:) has been removed
+Func Float80.cos(_:) has been removed
+Func Float80.cosh(_:) has been removed
+Func Float80.erf(_:) has been removed
+Func Float80.erfc(_:) has been removed
+Func Float80.exp(_:) has been removed
+Func Float80.exp10(_:) has been removed
+Func Float80.exp2(_:) has been removed
+Func Float80.expm1(_:) has been removed
+Func Float80.gamma(_:) has been removed
+Func Float80.hypot(_:_:) has been removed
+Func Float80.log(_:) has been removed
+Func Float80.log10(_:) has been removed
+Func Float80.log1p(_:) has been removed
+Func Float80.log2(_:) has been removed
+Func Float80.logGamma(_:) has been removed
+Func Float80.pow(_:_:) has been removed
+Func Float80.root(_:_:) has been removed
+Func Float80.signGamma(_:) has been removed
+Func Float80.sin(_:) has been removed
+Func Float80.sinh(_:) has been removed
+Func Float80.sqrt(_:) has been removed
+Func Float80.tan(_:) has been removed
+Func Float80.tanh(_:) has been removed
+Func SIMD.acos(_:) has been removed
+Func SIMD.acosh(_:) has been removed
+Func SIMD.asin(_:) has been removed
+Func SIMD.asinh(_:) has been removed
+Func SIMD.atan(_:) has been removed
+Func SIMD.atanh(_:) has been removed
+Func SIMD.cos(_:) has been removed
+Func SIMD.cosh(_:) has been removed
+Func SIMD.exp(_:) has been removed
+Func SIMD.exp10(_:) has been removed
+Func SIMD.exp2(_:) has been removed
+Func SIMD.expm1(_:) has been removed
+Func SIMD.log(_:) has been removed
+Func SIMD.log10(_:) has been removed
+Func SIMD.log1p(_:) has been removed
+Func SIMD.log2(_:) has been removed
+Func SIMD.pow(_:_:) has been removed
+Func SIMD.root(_:_:) has been removed
+Func SIMD.sin(_:) has been removed
+Func SIMD.sinh(_:) has been removed
+Func SIMD.sqrt(_:) has been removed
+Func SIMD.tan(_:) has been removed
+Func SIMD.tanh(_:) has been removed
+Func _cos(_:) is a new API without @available attribute
+Func _exp(_:) is a new API without @available attribute
+Func _exp2(_:) is a new API without @available attribute
+Func _log(_:) is a new API without @available attribute
+Func _log10(_:) is a new API without @available attribute
+Func _log2(_:) is a new API without @available attribute
+Func _nearbyint(_:) is a new API without @available attribute
+Func _rint(_:) is a new API without @available attribute
+Func _sin(_:) is a new API without @available attribute
+Protocol ElementaryFunctions has been removed
+Struct Double has removed conformance to ElementaryFunctions
+Struct Float has removed conformance to ElementaryFunctions
+Struct Float80 has removed conformance to ElementaryFunctions
+Struct SIMD16 has removed conformance to ElementaryFunctions
+Struct SIMD2 has removed conformance to ElementaryFunctions
+Struct SIMD3 has removed conformance to ElementaryFunctions
+Struct SIMD32 has removed conformance to ElementaryFunctions
+Struct SIMD4 has removed conformance to ElementaryFunctions
+Struct SIMD64 has removed conformance to ElementaryFunctions
+Struct SIMD8 has removed conformance to ElementaryFunctions

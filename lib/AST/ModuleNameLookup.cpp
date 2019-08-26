@@ -10,9 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/NameLookup.h"
+#include "swift/AST/ModuleNameLookup.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/LazyResolver.h"
+#include "swift/AST/NameLookup.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
@@ -54,7 +55,6 @@ class ModuleNameLookup {
                                                 TinyPtrVector<ValueDecl *>, 32>;
 
   ModuleLookupCache cache;
-  LazyResolver * const typeResolver;
   const ResolutionKind resolutionKind;
   const bool respectAccessControl;
 
@@ -106,10 +106,9 @@ class ModuleNameLookup {
       ArrayRef<ModuleDecl::ImportedModule> extraImports);
 
 public:
-  ModuleNameLookup(LazyResolver *typeResolver, ModuleDecl *M,
-                   ResolutionKind resolutionKind)
-      : typeResolver(typeResolver), resolutionKind(resolutionKind),
-        respectAccessControl(!M->getASTContext().isAccessControlDisabled()) {}
+  ModuleNameLookup(ASTContext &ctx, ResolutionKind resolutionKind)
+      : resolutionKind(resolutionKind),
+        respectAccessControl(!ctx.isAccessControlDisabled()) {}
 
   /// Performs a qualified lookup into the given module and, if necessary, its
   /// reexports, observing proper shadowing rules.
@@ -133,9 +132,9 @@ class LookupByName : public ModuleNameLookup<LookupByName> {
   const NLKind lookupKind;
 
 public:
-  LookupByName(LazyResolver *typeResolver, ModuleDecl *M,
-               ResolutionKind resolutionKind, DeclName name, NLKind lookupKind)
-    : Super(typeResolver, M, resolutionKind), name(name),
+  LookupByName(ASTContext &ctx, ResolutionKind resolutionKind,
+               DeclName name, NLKind lookupKind)
+    : Super(ctx, resolutionKind), name(name),
       lookupKind(lookupKind) {}
 
 private:
@@ -194,9 +193,9 @@ class LookupVisibleDecls : public ModuleNameLookup<LookupVisibleDecls> {
   const NLKind lookupKind;
 
 public:
-  LookupVisibleDecls(LazyResolver *typeResolver, ModuleDecl *M,
-                     ResolutionKind resolutionKind, NLKind lookupKind)
-    : ModuleNameLookup(typeResolver, M, resolutionKind),
+  LookupVisibleDecls(ASTContext &ctx, ResolutionKind resolutionKind,
+                     NLKind lookupKind)
+    : ModuleNameLookup(ctx, resolutionKind),
       lookupKind(lookupKind) {}
 
 private:
@@ -276,7 +275,7 @@ bool ModuleNameLookup<LookupStrategy>::recordImportDecls(
     llvm::copy_if(newDecls, std::back_inserter(results),
                   [&](ValueDecl *result) -> bool {
       if (!result->hasInterfaceType()) {
-        if (typeResolver) {
+        if (auto *typeResolver = result->getASTContext().getLazyResolver()) {
           typeResolver->resolveDeclSignature(result);
           if (result->isInvalid())
             return true;
@@ -451,12 +450,17 @@ void namelookup::lookupInModule(ModuleDecl *startModule,
                                 SmallVectorImpl<ValueDecl *> &decls,
                                 NLKind lookupKind,
                                 ResolutionKind resolutionKind,
-                                LazyResolver *typeResolver,
                                 const DeclContext *moduleScopeContext,
                                 ArrayRef<ModuleDecl::ImportedModule> extraImports) {
+  auto &ctx = startModule->getASTContext();
+  auto *stats = ctx.Stats;
+  if (stats)
+    stats->getFrontendCounters().NumLookupInModule++;
+
+  FrontendStatsTracer tracer(stats, "lookup-in-module");
+
   assert(moduleScopeContext && moduleScopeContext->isModuleScopeContext());
-  LookupByName lookup(typeResolver, startModule, resolutionKind, name,
-                      lookupKind);
+  LookupByName lookup(ctx, resolutionKind, name, lookupKind);
   lookup.lookupInModule(decls, startModule, topAccessPath, moduleScopeContext,
                         extraImports);
 }
@@ -467,11 +471,11 @@ void namelookup::lookupVisibleDeclsInModule(
     SmallVectorImpl<ValueDecl *> &decls,
     NLKind lookupKind,
     ResolutionKind resolutionKind,
-    LazyResolver *typeResolver,
     const DeclContext *moduleScopeContext,
     ArrayRef<ModuleDecl::ImportedModule> extraImports) {
+  auto &ctx = M->getASTContext();
   assert(moduleScopeContext && moduleScopeContext->isModuleScopeContext());
-  LookupVisibleDecls lookup(typeResolver, M, resolutionKind, lookupKind);
+  LookupVisibleDecls lookup(ctx, resolutionKind, lookupKind);
   lookup.lookupInModule(decls, M, accessPath, moduleScopeContext, extraImports);
 }
 

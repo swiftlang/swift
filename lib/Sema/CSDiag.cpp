@@ -175,7 +175,8 @@ void constraints::simplifyLocator(Expr *&anchor,
     case ConstraintLocator::NamedTupleElement:
     case ConstraintLocator::TupleElement: {
       // Extract tuple element.
-      unsigned index = path[0].getValue();
+      auto elt = path[0].castTo<LocatorPathElt::AnyTupleElement>();
+      unsigned index = elt.getIndex();
       if (auto tupleExpr = dyn_cast<TupleExpr>(anchor)) {
         if (index < tupleExpr->getNumElements()) {
           anchor = tupleExpr->getElement(index);
@@ -194,10 +195,11 @@ void constraints::simplifyLocator(Expr *&anchor,
       break;
     }
 
-    case ConstraintLocator::ApplyArgToParam:
+    case ConstraintLocator::ApplyArgToParam: {
+      auto elt = path[0].castTo<LocatorPathElt::ApplyArgToParam>();
       // Extract tuple element.
       if (auto tupleExpr = dyn_cast<TupleExpr>(anchor)) {
-        unsigned index = path[0].getValue();
+        unsigned index = elt.getArgIdx();
         if (index < tupleExpr->getNumElements()) {
           anchor = tupleExpr->getElement(index);
           path = path.slice(1);
@@ -207,14 +209,14 @@ void constraints::simplifyLocator(Expr *&anchor,
 
       // Extract subexpression in parentheses.
       if (auto parenExpr = dyn_cast<ParenExpr>(anchor)) {
-        assert(path[0].getValue() == 0);
+        assert(elt.getArgIdx() == 0);
 
         anchor = parenExpr->getSubExpr();
         path = path.slice(1);
         continue;
       }
       break;
-
+    }
     case ConstraintLocator::ConstructorMember:
       if (auto typeExpr = dyn_cast<TypeExpr>(anchor)) {
         // This is really an implicit 'init' MemberRef, so point at the base,
@@ -868,12 +870,10 @@ diagnoseUnresolvedDotExprTypeRequirementFailure(ConstraintSystem &cs,
   if (!locator)
     return false;
 
-  auto path = locator->getPath();
-  if (path.empty())
-    return false;
 
-  auto &last = path.back();
-  if (last.getKind() != ConstraintLocator::TypeParameterRequirement)
+  auto reqElt =
+      locator->getLastElementAs<LocatorPathElt::TypeParameterRequirement>();
+  if (!reqElt)
     return false;
 
   auto *anchor = locator->getAnchor();
@@ -901,7 +901,7 @@ diagnoseUnresolvedDotExprTypeRequirementFailure(ConstraintSystem &cs,
 
   auto req = member->getAsGenericContext()
                  ->getGenericSignature()
-                 ->getRequirements()[last.getValue()];
+                 ->getRequirements()[reqElt->getIndex()];
 
   Diag<Type, Type, Type, Type, StringRef> note;
   switch (req.getKind()) {
@@ -1677,165 +1677,11 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
     return failure.diagnose();
   }
 
-  // Try to find the contextual type in a variety of ways.  If the constraint
-  // system had a contextual type specified, we use it - it will have a purpose
-  // indicator which allows us to give a very "to the point" diagnostic.
-  Diag<Type> nilDiag;
-  std::function<void(void)> nilFollowup;
-
-  // If this is conversion failure due to a return statement with an argument
-  // that cannot be coerced to the result type of the function, emit a
-  // specific error.
-  switch (CTP) {
-  case CTP_Unused:
-  case CTP_CannotFail:
-    llvm_unreachable("These contextual type purposes cannot fail with a "
-                     "conversion type specified!");
-  case CTP_CalleeResult:
-    llvm_unreachable("CTP_CalleeResult does not actually install a "
-                     "contextual type");
-  case CTP_Initialization:
-    nilDiag = diag::cannot_convert_initializer_value_nil;
-    nilFollowup = [this] {
-      TypeRepr *patternTR = CS.getContextualTypeLoc().getTypeRepr();
-      if (!patternTR)
-        return;
-      auto diag = diagnose(patternTR->getLoc(), diag::note_make_optional,
-                           OptionalType::get(CS.getContextualType()));
-      if (patternTR->isSimple()) {
-        diag.fixItInsertAfter(patternTR->getEndLoc(), "?");
-      } else {
-        diag.fixItInsert(patternTR->getStartLoc(), "(");
-        diag.fixItInsertAfter(patternTR->getEndLoc(), ")?");
-      }
-    };
-    break;
-  case CTP_ReturnSingleExpr:
-  case CTP_ReturnStmt:
-    // Special case the "conversion to void" case.
-    if (contextualType->isVoid()) {
-      diagnose(expr->getLoc(), diag::cannot_return_value_from_void_func)
-        .highlight(expr->getSourceRange());
-      return true;
-    }
-
-    nilDiag = diag::cannot_convert_to_return_type_nil;
-    break;
-  case CTP_ThrowStmt: {
-    if (isa<NilLiteralExpr>(expr->getValueProvidingExpr())) {
-      diagnose(expr->getLoc(), diag::cannot_throw_nil);
-      return true;
-    }
-
-    if (isUnresolvedOrTypeVarType(exprType) ||
-        exprType->isEqual(contextualType))
-      return false;
-
-    // If we tried to throw the error code of an error type, suggest object
-    // construction.
-    auto &TC = CS.getTypeChecker();
-    if (auto errorCodeProtocol =
-            TC.Context.getProtocol(KnownProtocolKind::ErrorCodeProtocol)) {
-      if (auto conformance =
-            TypeChecker::conformsToProtocol(CS.getType(expr), errorCodeProtocol, CS.DC,
-                                            ConformanceCheckFlags::InExpression)) {
-        Type errorCodeType = CS.getType(expr);
-        Type errorType =
-          conformance->getTypeWitnessByName(errorCodeType,
-                                            TC.Context.Id_ErrorType)
-            ->getCanonicalType();
-        if (errorType) {
-          auto diag = diagnose(expr->getLoc(), diag::cannot_throw_error_code,
-                               errorCodeType, errorType);
-          if (auto unresolvedDot = dyn_cast<UnresolvedDotExpr>(expr)) {
-            diag.fixItInsert(unresolvedDot->getDotLoc(), "(");
-            diag.fixItInsertAfter(unresolvedDot->getEndLoc(), ")");
-          }
-          return true;
-        }
-      }
-    }
-
-    // The conversion destination of throw is always ErrorType (at the moment)
-    // if this ever expands, this should be a specific form like () is for
-    // return.
-    diagnose(expr->getLoc(), diag::cannot_convert_thrown_type, exprType)
-      .highlight(expr->getSourceRange());
-    return true;
-  }
-
-  case CTP_EnumCaseRawValue:
-    nilDiag = diag::cannot_convert_raw_initializer_value_nil;
-    break;
-  case CTP_DefaultParameter:
-    nilDiag = diag::cannot_convert_default_arg_value_nil;
-    break;
-
-  case CTP_YieldByReference:
-    if (auto contextualLV = contextualType->getAs<LValueType>())
-      contextualType = contextualLV->getObjectType();
-    if (auto exprLV = exprType->getAs<LValueType>()) {
-      diagnose(expr->getLoc(), diag::cannot_yield_wrong_type_by_reference,
-               exprLV->getObjectType(), contextualType);
-    } else if (exprType->isEqual(contextualType)) {
-      diagnose(expr->getLoc(), diag::cannot_yield_rvalue_by_reference_same_type,
-               exprType);
-    } else {
-      diagnose(expr->getLoc(), diag::cannot_yield_rvalue_by_reference,
-               exprType, contextualType);
-    }
-    return true;
-  case CTP_YieldByValue:
-    nilDiag = diag::cannot_convert_yield_value_nil;
-    break;
-  case CTP_CallArgument:
-    nilDiag = diag::cannot_convert_argument_value_nil;
-    break;
-  case CTP_ClosureResult:
-    nilDiag = diag::cannot_convert_closure_result_nil;
-    break;
-  case CTP_ArrayElement:
-    nilDiag = diag::cannot_convert_array_element_nil;
-    break;
-  case CTP_DictionaryKey:
-    nilDiag = diag::cannot_convert_dict_key_nil;
-    break;
-  case CTP_DictionaryValue:
-    nilDiag = diag::cannot_convert_dict_value_nil;
-    break;
-  case CTP_CoerceOperand:
-    nilDiag = diag::cannot_convert_coerce_nil;
-    break;
-  case CTP_AssignSource:
-    nilDiag = diag::cannot_convert_assign_nil;
-    break;
-  case CTP_SubscriptAssignSource:
-    nilDiag = diag::cannot_convert_subscript_assign_nil;
-    break;
-  }
-
-  // If we're diagnostic an issue with 'nil', produce a specific diagnostic,
-  // instead of uttering ExpressibleByNilLiteral.
-  if (isa<NilLiteralExpr>(expr->getValueProvidingExpr())) {
-    // If the source type is some kind of optional, the contextual conversion
-    // to 'nil' didn't fail, something else did.
-    if (contextualType->getOptionalObjectType())
-      return false;
-    diagnose(expr->getLoc(), nilDiag, contextualType);
-    if (nilFollowup)
-      nilFollowup();
-    return true;
-  }
-  
   // If we don't have a type for the expression, then we cannot use it in
   // conversion constraint diagnostic generation.  If the types match, then it
   // must not be the contextual type that is the problem.
-  if (isUnresolvedOrTypeVarType(exprType) ||
-      exprType->isEqual(contextualType)) {
+  if (isUnresolvedOrTypeVarType(exprType) || exprType->isEqual(contextualType))
     return false;
-  }
-
-  exprType = exprType->getRValueType();
 
   // Don't attempt fixits if we have an unsolved type variable, since
   // the recovery path's recursion into the type checker via typeCheckCast()
@@ -1845,7 +1691,7 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
 
   ContextualFailure failure(
       expr, CS, CTP, exprType, contextualType,
-      CS.getConstraintLocator(expr, LocatorPathElt::getContextualType()));
+      CS.getConstraintLocator(expr, LocatorPathElt::ContextualType()));
   return failure.diagnoseAsError();
 }
 
@@ -4793,7 +4639,7 @@ bool FailureDiagnosis::diagnoseClosureExpr(
 
       MissingArgumentsFailure failure(
           expr, CS, fnType, inferredArgCount - actualArgCount,
-          CS.getConstraintLocator(CE, LocatorPathElt::getContextualType()));
+          CS.getConstraintLocator(CE, LocatorPathElt::ContextualType()));
       return failure.diagnoseAsError();
     }
 

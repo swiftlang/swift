@@ -21,16 +21,20 @@
 namespace swift {
 
 class CustomAttr;
+class GenericSignature;
+class GenericTypeParamType;
 class NominalTypeDecl;
 struct PropertyWrapperBackingPropertyInfo;
 struct PropertyWrapperTypeInfo;
 enum class CtorInitializerKind;
 struct PropertyWrapperMutability;
+class Requirement;
 class Type;
 class VarDecl;
 class TypeAliasDecl;
 class Type;
 struct TypePair;
+enum class AncestryFlags : uint8_t;
 
 #define SWIFT_AST_TYPEID_ZONE 1
 

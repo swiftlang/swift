@@ -138,6 +138,28 @@ FRONTEND_STATISTIC(AST, NumPrefixOperators)
 /// Number of precedence groups in the AST context.
 FRONTEND_STATISTIC(AST, NumPrecedenceGroups)
 
+/// Number of qualified lookups into a nominal type.
+FRONTEND_STATISTIC(AST, NumLookupQualifiedInNominal)
+
+/// Number of qualified lookups into a module.
+FRONTEND_STATISTIC(AST, NumLookupQualifiedInModule)
+
+/// Number of qualified lookups into AnyObject.
+FRONTEND_STATISTIC(AST, NumLookupQualifiedInAnyObject)
+
+/// Number of lookups into a module and its imports.
+FRONTEND_STATISTIC(AST, NumLookupInModule)
+
+/// Number of local lookups into a module.
+FRONTEND_STATISTIC(AST, NumModuleLookupValue)
+
+/// Number of unqualified lookups.
+FRONTEND_STATISTIC(AST, NumUnqualifiedLookup)
+
+/// Number of local lookups into a module's class members, for
+/// AnyObject lookup.
+FRONTEND_STATISTIC(AST, NumModuleLookupClassMember)
+
 /// Number of full function bodies parsed.
 FRONTEND_STATISTIC(Parse, NumFunctionsParsed)
 
@@ -226,6 +248,8 @@ FRONTEND_STATISTIC(Sema, NumTypesValidated)
 
 /// Number of lazy iterable declaration contexts left unloaded.
 FRONTEND_STATISTIC(Sema, NumUnloadedLazyIterableDeclContexts)
+
+/// Number of lookups into a module and its imports.
 
 /// All type check requests go into the Sema area.
 #define SWIFT_TYPEID(NAME) FRONTEND_STATISTIC(Sema, NAME)

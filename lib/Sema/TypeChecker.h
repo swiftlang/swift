@@ -983,11 +983,9 @@ public:
 
   void typeCheckDecl(Decl *D);
 
-  void checkDeclAttributesEarly(Decl *D);
   static void addImplicitDynamicAttribute(Decl *D);
   void checkDeclAttributes(Decl *D);
   void checkParameterAttributes(ParameterList *params);
-  void checkDynamicReplacementAttribute(ValueDecl *D);
   static ValueDecl *findReplacedDynamicFunction(const ValueDecl *d);
 
   Type checkReferenceOwnershipAttr(VarDecl *D, Type interfaceType,
@@ -2024,7 +2022,8 @@ bool isValidDynamicCallableMethod(FuncDecl *decl, DeclContext *DC,
 /// the `subscript(dynamicMember:)` requirement for @dynamicMemberLookup.
 /// The method is given to be defined as `subscript(dynamicMember:)`.
 bool isValidDynamicMemberLookupSubscript(SubscriptDecl *decl, DeclContext *DC,
-                                         TypeChecker &TC);
+                                         TypeChecker &TC,
+                                         bool ignoreLabel = false);
 
 /// Returns true if the given subscript method is an valid implementation of
 /// the `subscript(dynamicMember:)` requirement for @dynamicMemberLookup.
@@ -2032,14 +2031,16 @@ bool isValidDynamicMemberLookupSubscript(SubscriptDecl *decl, DeclContext *DC,
 /// takes a single non-variadic parameter that conforms to
 /// `ExpressibleByStringLiteral` protocol.
 bool isValidStringDynamicMemberLookup(SubscriptDecl *decl, DeclContext *DC,
-                                      TypeChecker &TC);
+                                      TypeChecker &TC,
+                                      bool ignoreLabel = false);
 
 /// Returns true if the given subscript method is an valid implementation of
 /// the `subscript(dynamicMember: {Writable}KeyPath<...>)` requirement for
 /// @dynamicMemberLookup.
 /// The method is given to be defined as `subscript(dynamicMember:)` which
 /// takes a single non-variadic parameter of `{Writable}KeyPath<T, U>` type.
-bool isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl, TypeChecker &TC);
+bool isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl, TypeChecker &TC,
+                                       bool ignoreLabel = false);
 
 /// Compute the wrapped value type for the given property that has attached
 /// property wrappers, when the backing storage is known to have the given type.
@@ -2111,26 +2112,6 @@ bool diagnoseObjCUnsatisfiedOptReqConflicts(SourceFile &sf);
 /// DiagnosticsSema.def.
 std::pair<unsigned, DeclName> getObjCMethodDiagInfo(
                                 AbstractFunctionDecl *method);
-
-/// Attach Fix-Its to the given diagnostic that updates the name of the
-/// given declaration to the desired target name.
-///
-/// \returns false if the name could not be fixed.
-bool fixDeclarationName(InFlightDiagnostic &diag, ValueDecl *decl,
-                        DeclName targetName);
-
-/// Fix the Objective-C name of the given declaration to match the provided
-/// Objective-C selector.
-///
-/// \param ignoreImpliedName When true, ignore the implied name of the
-/// given declaration, because it no longer applies.
-///
-/// For properties, the selector should be a zero-parameter selector of the
-/// given property's name.
-bool fixDeclarationObjCName(InFlightDiagnostic &diag, ValueDecl *decl,
-                            Optional<ObjCSelector> nameOpt,
-                            Optional<ObjCSelector> targetNameOpt,
-                            bool ignoreImpliedName = false);
 
 bool areGenericRequirementsSatisfied(const DeclContext *DC,
                                      const GenericSignature *sig,

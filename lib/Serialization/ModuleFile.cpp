@@ -38,6 +38,9 @@ using namespace swift::serialization;
 using namespace llvm::support;
 using llvm::Expected;
 
+static_assert(IsTriviallyDestructible<SerializedASTFile>::value,
+              "SerializedASTFiles are BumpPtrAllocated; d'tors are not called");
+
 static bool checkModuleSignature(llvm::BitstreamCursor &cursor,
                                  ArrayRef<unsigned char> signature) {
   for (unsigned char byte : signature)
@@ -1242,7 +1245,7 @@ ModuleFile::ModuleFile(
     : ModuleInputBuffer(std::move(moduleInputBuffer)),
       ModuleDocInputBuffer(std::move(moduleDocInputBuffer)),
       DeserializedTypeCallback([](Type ty) {}) {
-  assert(getStatus() == Status::Valid);
+  assert(!hasError());
   Bits.IsFramework = isFramework;
 
   PrettyStackTraceModuleFile stackEntry(*this);
@@ -1251,7 +1254,7 @@ ModuleFile::ModuleFile(
 
   if (!checkModuleSignature(cursor, SWIFTMODULE_SIGNATURE) ||
       !enterTopLevelModuleBlock(cursor, MODULE_BLOCK_ID)) {
-    error();
+    info.status = error(Status::Malformed);
     return;
   }
 
@@ -1290,7 +1293,7 @@ ModuleFile::ModuleFile(
 
     case INPUT_BLOCK_ID: {
       if (!hasValidControlBlock) {
-        error();
+        info.status = error(Status::Malformed);
         return;
       }
 
@@ -1311,7 +1314,7 @@ ModuleFile::ModuleFile(
           auto importKind = getActualImportControl(rawImportControl);
           if (!importKind) {
             // We don't know how to import this dependency.
-            error();
+            info.status = error(Status::Malformed);
             return;
           }
           Dependencies.push_back({blobData, importKind.getValue(), scoped});
@@ -1352,8 +1355,7 @@ ModuleFile::ModuleFile(
           break;
         }
         case input_block::PARSEABLE_INTERFACE_PATH: {
-          if (extInfo)
-            extInfo->setParseableInterface(blobData);
+          ModuleInterfacePath = blobData;
           break;
         }
         default:
@@ -1367,14 +1369,14 @@ ModuleFile::ModuleFile(
       }
 
       if (next.Kind != llvm::BitstreamEntry::EndBlock)
-        error();
+        info.status = error(Status::Malformed);
 
       break;
     }
 
     case DECLS_AND_TYPES_BLOCK_ID: {
       if (!hasValidControlBlock) {
-        error();
+        info.status = error(Status::Malformed);
         return;
       }
 
@@ -1383,11 +1385,11 @@ ModuleFile::ModuleFile(
       DeclTypeCursor = cursor;
       DeclTypeCursor.EnterSubBlock(DECLS_AND_TYPES_BLOCK_ID);
       if (DeclTypeCursor.advance().Kind == llvm::BitstreamEntry::Error)
-        error();
+        info.status = error(Status::Malformed);
 
       // With the main cursor, skip over the block and continue.
       if (cursor.SkipBlock()) {
-        error();
+        info.status = error(Status::Malformed);
         return;
       }
       break;
@@ -1395,7 +1397,7 @@ ModuleFile::ModuleFile(
 
     case IDENTIFIER_DATA_BLOCK_ID: {
       if (!hasValidControlBlock) {
-        error();
+        info.status = error(Status::Malformed);
         return;
       }
 
@@ -1422,7 +1424,7 @@ ModuleFile::ModuleFile(
       }
 
       if (next.Kind != llvm::BitstreamEntry::EndBlock) {
-        error();
+        info.status = error(Status::Malformed);
         return;
       }
 
@@ -1431,7 +1433,7 @@ ModuleFile::ModuleFile(
 
     case INDEX_BLOCK_ID: {
       if (!hasValidControlBlock || !readIndexBlock(cursor)) {
-        error();
+        info.status = error(Status::Malformed);
         return;
       }
       break;
@@ -1444,7 +1446,7 @@ ModuleFile::ModuleFile(
 
       // With the main cursor, skip over the block and continue.
       if (cursor.SkipBlock()) {
-        error();
+        info.status = error(Status::Malformed);
         return;
       }
       break;
@@ -1457,7 +1459,7 @@ ModuleFile::ModuleFile(
 
       // With the main cursor, skip over the block and continue.
       if (cursor.SkipBlock()) {
-        error();
+        info.status = error(Status::Malformed);
         return;
       }
       break;
@@ -1467,7 +1469,7 @@ ModuleFile::ModuleFile(
       // Unknown top-level block, possibly for use by a future version of the
       // module format.
       if (cursor.SkipBlock()) {
-        error();
+        info.status = error(Status::Malformed);
         return;
       }
       break;
@@ -1475,12 +1477,12 @@ ModuleFile::ModuleFile(
   }
 
   if (topLevelEntry.Kind != llvm::BitstreamEntry::EndBlock) {
-    error();
+    info.status = error(Status::Malformed);
     return;
   }
 
   if (!readModuleDocIfPresent()) {
-    error(Status::MalformedDocumentation);
+    info.status = error(Status::MalformedDocumentation);
     return;
   }
 }
@@ -1490,7 +1492,7 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
                                             bool treatAsPartialModule) {
   PrettyStackTraceModuleFile stackEntry(*this);
 
-  assert(getStatus() == Status::Valid && "invalid module file");
+  assert(!hasError() && "error already detected; should not call this");
   assert(!FileContext && "already associated with an AST module");
   FileContext = file;
 
@@ -1612,11 +1614,11 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
                                                            None);
   }
 
-  return getStatus();
+  return Status::Valid;
 }
 
 std::unique_ptr<llvm::MemoryBuffer> ModuleFile::takeBufferForDiagnostics() {
-  assert(getStatus() != Status::Valid);
+  assert(hasError());
 
   // Today, the only buffer that might have diagnostics in them is the input
   // buffer, and even then only if it has imported module contents.
@@ -1999,7 +2001,7 @@ ModuleFile::loadNamedMembers(const IterableDeclContext *IDC, DeclBaseName N,
     DeclMemberTablesCursor.JumpToBit(subTableOffset);
     auto entry = DeclMemberTablesCursor.advance();
     if (entry.Kind != llvm::BitstreamEntry::Record) {
-      error();
+      fatal();
       return None;
     }
     SmallVector<uint64_t, 64> scratch;

@@ -36,7 +36,9 @@ void OutliningMetadataCollector::collectTypeMetadataForLayout(SILType type) {
   }
 
   // Substitute opaque types if allowed.
-  type = IGF.IGM.substOpaqueTypesWithUnderlyingTypes(type);
+  auto origType = type;
+  type =
+      IGF.IGM.substOpaqueTypesWithUnderlyingTypes(type, CanGenericSignature());
 
   auto formalType = type.getASTType();
   auto &ti = IGF.IGM.getTypeInfoForLowered(formalType);
@@ -44,7 +46,9 @@ void OutliningMetadataCollector::collectTypeMetadataForLayout(SILType type) {
   // We don't need the metadata for fixed size types or types that are not ABI
   // accessible. Outlining will call the value witness of the enclosing type of
   // non ABI accessible field/element types.
-  if (isa<FixedTypeInfo>(ti) || !ti.isABIAccessible()) {
+  if ((!origType.getASTType()->hasOpaqueArchetype() &&
+       isa<FixedTypeInfo>(ti)) ||
+      !ti.isABIAccessible()) {
     return;
   }
 
