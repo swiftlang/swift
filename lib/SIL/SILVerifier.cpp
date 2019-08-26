@@ -62,6 +62,10 @@ static llvm::cl::opt<bool> AbortOnFailure(
                               "verify-abort-on-failure",
                               llvm::cl::init(true));
 
+static llvm::cl::opt<bool> VerifyLineTable(
+                              "verify-line-table",
+                              llvm::cl::init(false));
+
 static llvm::cl::opt<bool> VerifyDIHoles(
                               "verify-di-holes",
                               llvm::cl::init(true));
@@ -4839,6 +4843,9 @@ public:
   }
 
   void verifyLineTable(SILBasicBlock *BB) {
+    if (!VerifyLineTable)
+      return;
+
     SILFunction *F = BB->getParent();
     if (F->getEffectiveOptimizationMode() != OptimizationMode::NoOptimization)
       return;
