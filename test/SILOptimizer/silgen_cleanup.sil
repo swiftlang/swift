@@ -158,7 +158,7 @@ struct X3 {
 // CHECK: end_access [[ACCESS]] : $*X3
 // CHECK-LABEL: } // end sil function 'testStoreNontrivial'
 sil private [ossa] @testStoreNontrivial : $@convention(thin) (@inout X3, @guaranteed AnyObject) -> () {
-bb0(%0 : $*X3, %1 : $AnyObject):
+bb0(%0 : $*X3, %1 : @guaranteed $AnyObject):
   %4 = copy_value %1 : $AnyObject
   %5 = begin_access [modify] [unknown] %0 : $*X3
   %6 = struct_element_addr %5 : $*X3, #X3.x2
