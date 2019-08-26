@@ -5696,19 +5696,19 @@ void VarDecl::emitLetToVarNoteIfSimple(DeclContext *UseDC) const {
   }
 }
 
-ParamDecl::ParamDecl(Specifier specifier,
-                     SourceLoc specifierLoc, SourceLoc argumentNameLoc,
-                     Identifier argumentName, SourceLoc parameterNameLoc,
-                     Identifier parameterName, DeclContext *dc)
-  : VarDecl(DeclKind::Param,
-            /*IsStatic*/false,
-            specifier == ParamDecl::Specifier::Default
-            ? VarDecl::Introducer::Let
-            : VarDecl::Introducer::Var,
-            /*IsCaptureList*/false, parameterNameLoc, parameterName, dc,
-            StorageIsMutable_t(!isImmutableSpecifier(specifier))),
-  ArgumentName(argumentName), ArgumentNameLoc(argumentNameLoc),
-  SpecifierLoc(specifierLoc) {
+ParamDecl::ParamDecl(Specifier specifier, SourceLoc specifierLoc,
+                     SourceLoc argumentNameLoc, Identifier argumentName,
+                     SourceLoc parameterNameLoc, Identifier parameterName,
+                     DeclContext *dc)
+    : VarDecl(DeclKind::Param,
+              /*IsStatic*/ false,
+              specifier == ParamDecl::Specifier::Default
+                  ? VarDecl::Introducer::Let
+                  : VarDecl::Introducer::Var,
+              /*IsCaptureList*/ false, parameterNameLoc, parameterName, dc,
+              StorageIsMutable_t(!isImmutableSpecifier(specifier))),
+      ArgumentName(argumentName), ParameterNameLoc(parameterNameLoc),
+      ArgumentNameLoc(argumentNameLoc), SpecifierLoc(specifierLoc) {
 
   Bits.ParamDecl.Specifier = static_cast<unsigned>(specifier);
   Bits.ParamDecl.IsTypeLocImplicit = false;

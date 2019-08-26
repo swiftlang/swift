@@ -21,17 +21,6 @@
 #include "swift/Runtime/Debug.h"
 #include <TargetConditionals.h>
 #include "../SwiftShims/FoundationShims.h"
-
-#if __has_include(<os/system_version.h>)
-#include <os/system_version.h>
-
-static os_system_version_s getOSVersion() {
-  struct os_system_version_s vers = { 0, 0, 0 };
-  os_system_version_get_current_version(&vers);
-  return vers;
-}
-
-#else
 #include <dlfcn.h>
 
 struct os_system_version_s {
@@ -49,8 +38,6 @@ static os_system_version_s getOSVersion() {
   lookup(&vers);
   return vers;
 }
-
-#endif
 
 using namespace swift;
 

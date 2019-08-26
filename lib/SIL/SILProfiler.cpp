@@ -1079,6 +1079,9 @@ void SILProfiler::assignRegionCounters() {
       CurrentFuncName, getEquivalentPGOLinkage(CurrentFuncLinkage),
       CurrentFileName);
 
+  assert((!CurrentFuncName.empty() && !PGOFuncName.empty()) &&
+         "Expected covered region to be named");
+
   LLVM_DEBUG(llvm::dbgs() << "Assigning counters to: " << CurrentFuncName
                           << "\n");
   Root.walk(Mapper);

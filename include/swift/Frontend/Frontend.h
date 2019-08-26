@@ -498,16 +498,6 @@ public:
     return PrimarySourceFiles;
   }
 
-  /// Gets the Primary Source File if one exists, otherwise the main
-  /// module. If multiple Primary Source Files exist, fails with an
-  /// assertion.
-  ModuleOrSourceFile getPrimarySourceFileOrMainModule() {
-    if (PrimarySourceFiles.empty())
-      return getMainModule();
-    else
-      return getPrimarySourceFile();
-  }
-
   /// Gets the SourceFile which is the primary input for this CompilerInstance.
   /// \returns the primary SourceFile, or nullptr if there is no primary input;
   /// if there are _multiple_ primary inputs, fails with an assertion.

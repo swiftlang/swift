@@ -1144,7 +1144,8 @@ visitDynamicCallableAttr(DynamicCallableAttr *attr) {
 }
 
 static bool hasSingleNonVariadicParam(SubscriptDecl *decl,
-                                      Identifier expectedLabel) {
+                                      Identifier expectedLabel,
+                                      bool ignoreLabel = false) {
   auto *indices = decl->getIndices();
   if (decl->isInvalid() || indices->size() != 1)
     return false;
@@ -1152,6 +1153,10 @@ static bool hasSingleNonVariadicParam(SubscriptDecl *decl,
   auto *index = indices->get(0);
   if (index->isVariadic() || !index->hasValidSignature())
     return false;
+
+  if (ignoreLabel) {
+    return true;
+  }
 
   return index->getArgumentName() == expectedLabel;
 }
@@ -1161,22 +1166,23 @@ static bool hasSingleNonVariadicParam(SubscriptDecl *decl,
 /// The method is given to be defined as `subscript(dynamicMember:)`.
 bool swift::isValidDynamicMemberLookupSubscript(SubscriptDecl *decl,
                                                 DeclContext *DC,
-                                                TypeChecker &TC) {
+                                                TypeChecker &TC,
+                                                bool ignoreLabel) {
   // It could be
   // - `subscript(dynamicMember: {Writable}KeyPath<...>)`; or
   // - `subscript(dynamicMember: String*)`
-  return isValidKeyPathDynamicMemberLookup(decl, TC) ||
-         isValidStringDynamicMemberLookup(decl, DC, TC);
-
+  return isValidKeyPathDynamicMemberLookup(decl, TC, ignoreLabel) ||
+         isValidStringDynamicMemberLookup(decl, DC, TC, ignoreLabel);
 }
 
 bool swift::isValidStringDynamicMemberLookup(SubscriptDecl *decl,
-                                             DeclContext *DC,
-                                             TypeChecker &TC) {
+                                             DeclContext *DC, TypeChecker &TC,
+                                             bool ignoreLabel) {
   // There are two requirements:
   // - The subscript method has exactly one, non-variadic parameter.
   // - The parameter type conforms to `ExpressibleByStringLiteral`.
-  if (!hasSingleNonVariadicParam(decl, TC.Context.Id_dynamicMember))
+  if (!hasSingleNonVariadicParam(decl, TC.Context.Id_dynamicMember,
+                                 ignoreLabel))
     return false;
 
   const auto *param = decl->getIndices()->get(0);
@@ -1191,8 +1197,10 @@ bool swift::isValidStringDynamicMemberLookup(SubscriptDecl *decl,
 }
 
 bool swift::isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl,
-                                              TypeChecker &TC) {
-  if (!hasSingleNonVariadicParam(decl, TC.Context.Id_dynamicMember))
+                                              TypeChecker &TC,
+                                              bool ignoreLabel) {
+  if (!hasSingleNonVariadicParam(decl, TC.Context.Id_dynamicMember,
+                                 ignoreLabel))
     return false;
 
   const auto *param = decl->getIndices()->get(0);
@@ -1217,33 +1225,76 @@ visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr) {
   // This attribute is only allowed on nominal types.
   auto decl = cast<NominalTypeDecl>(D);
   auto type = decl->getDeclaredType();
-  
-  // Look up `subscript(dynamicMember:)` candidates.
-  auto subscriptName = DeclName(TC.Context, DeclBaseName::createSubscript(),
-                                TC.Context.Id_dynamicMember);
-  auto candidates = TC.lookupMember(decl, type, subscriptName);
-  
-  // If there are no candidates, then the attribute is invalid.
-  if (candidates.empty()) {
-    TC.diagnose(attr->getLocation(), diag::invalid_dynamic_member_lookup_type,
-                type);
+  auto &ctx = decl->getASTContext();
+
+  auto emitInvalidTypeDiagnostic = [&](const SourceLoc loc) {
+    TC.diagnose(loc, diag::invalid_dynamic_member_lookup_type, type);
     attr->setInvalid();
+  };
+
+  // Look up `subscript(dynamicMember:)` candidates.
+  auto subscriptName =
+      DeclName(ctx, DeclBaseName::createSubscript(), ctx.Id_dynamicMember);
+  auto candidates = TC.lookupMember(decl, type, subscriptName);
+
+  if (!candidates.empty()) {
+    // If no candidates are valid, then reject one.
+    auto oneCandidate = candidates.front().getValueDecl();
+    candidates.filter([&](LookupResultEntry entry, bool isOuter) -> bool {
+      auto cand = cast<SubscriptDecl>(entry.getValueDecl());
+      TC.validateDeclForNameLookup(cand);
+      return isValidDynamicMemberLookupSubscript(cand, decl, TC);
+    });
+
+    if (candidates.empty()) {
+      emitInvalidTypeDiagnostic(oneCandidate->getLoc());
+    }
+
     return;
   }
 
-  // If no candidates are valid, then reject one.
-  auto oneCandidate = candidates.front();
-  candidates.filter([&](LookupResultEntry entry, bool isOuter) -> bool {
+  // If we couldn't find any candidates, it's likely because:
+  //
+  // 1. We don't have a subscript with `dynamicMember` label.
+  // 2. We have a subscript with `dynamicMember` label, but no argument label.
+  //
+  // Let's do another lookup using just the base name.
+  auto newCandidates =
+      TC.lookupMember(decl, type, DeclBaseName::createSubscript());
+
+  // Validate the candidates while ignoring the label.
+  newCandidates.filter([&](const LookupResultEntry entry, bool isOuter) {
     auto cand = cast<SubscriptDecl>(entry.getValueDecl());
     TC.validateDeclForNameLookup(cand);
-    return isValidDynamicMemberLookupSubscript(cand, decl, TC);
+    return isValidDynamicMemberLookupSubscript(cand, decl, TC,
+                                               /*ignoreLabel*/ true);
   });
 
-  if (candidates.empty()) {
-    TC.diagnose(oneCandidate.getValueDecl()->getLoc(),
-                diag::invalid_dynamic_member_lookup_type, type);
-    attr->setInvalid();
+  // If there were no potentially valid candidates, then throw an error.
+  if (newCandidates.empty()) {
+    emitInvalidTypeDiagnostic(attr->getLocation());
+    return;
   }
+
+  // For each candidate, emit a diagnostic. If we don't have an explicit
+  // argument label, then emit a fix-it to suggest the user to add one.
+  for (auto cand : newCandidates) {
+    auto SD = cast<SubscriptDecl>(cand.getValueDecl());
+    auto index = SD->getIndices()->get(0);
+    TC.diagnose(SD, diag::invalid_dynamic_member_lookup_type, type);
+
+    // If we have something like `subscript(foo:)` then we want to insert
+    // `dynamicMember` before `foo`.
+    if (index->getParameterNameLoc().isValid() &&
+        index->getArgumentNameLoc().isInvalid()) {
+      TC.diagnose(SD, diag::invalid_dynamic_member_subscript)
+          .highlight(index->getSourceRange())
+          .fixItInsert(index->getParameterNameLoc(), "dynamicMember ");
+    }
+  }
+
+  attr->setInvalid();
+  return;
 }
 
 /// Get the innermost enclosing declaration for a declaration.

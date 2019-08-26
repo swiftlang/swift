@@ -139,6 +139,24 @@ func undefinedFunc() // ignored.
 #endif
 undefinedFunc() // expected-error {{use of unresolved identifier 'undefinedFunc'}}
 
+#if os(simulator) // expected-warning {{unknown operating system for build configuration 'os'}} expected-note {{did you mean 'targetEnvironment'}} {{5-7=targetEnvironment}}
+#endif
+
+#if arch(iOS) // expected-warning {{unknown architecture for build configuration 'arch'}} expected-note {{did you mean 'os'}} {{5-9=os}}
+#endif
+
+#if _endian(arm64) // expected-warning {{unknown endianness for build configuration '_endian'}} expected-note {{did you mean 'arch'}} {{5-12=arch}}
+#endif
+
+#if targetEnvironment(_ObjC) // expected-warning {{unknown target environment for build configuration 'targetEnvironment'}} expected-note {{did you mean 'simulator'}} {{23-28=simulator}}
+#endif
+
+#if os(iOS) || os(simulator) // expected-warning {{unknown operating system for build configuration 'os'}} expected-note {{did you mean 'targetEnvironment'}} {{16-18=targetEnvironment}}
+#endif
+
+#if arch(ios) // expected-warning {{unknown architecture for build configuration 'arch'}} expected-note {{did you mean 'os'}} {{5-9=os}} expected-note {{did you mean 'iOS'}} {{10-13=iOS}}
+#endif
+
 #if FOO
 #else if BAR
 // expected-error@-1 {{unexpected 'if' keyword following '#else' conditional compilation directive; did you mean '#elseif'?}} {{1-9=#elseif}}

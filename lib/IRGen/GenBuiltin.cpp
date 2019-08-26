@@ -256,15 +256,6 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     replacement.add(NameGEP);
     replacement.add(args.claimAll());
     args = std::move(replacement);
-
-    if (Opts.EmitProfileCoverageMapping) {
-      // Update the associated coverage mapping: it's now safe to emit, because
-      // a symtab entry for this function is guaranteed (r://39146527).
-      auto &coverageMaps = SILMod.getCoverageMaps();
-      auto CovMapIt = coverageMaps.find(PGOFuncName);
-      if (CovMapIt != coverageMaps.end())
-        CovMapIt->second->setSymtabEntryGuaranteed();
-    }
   }
 
   if (IID != llvm::Intrinsic::not_intrinsic) {
