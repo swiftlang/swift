@@ -114,9 +114,7 @@ class DumpConfig:
         if self.platform == 'macosx':
             # We need this input search path for CreateML
             self.inputs.extend([self.sdk + '/usr/lib/swift/'])
-        self.frameworks = [
-            self.sdk + '/System/Library/Frameworks/',
-            os.path.realpath(self.sdk + '/../../Library/Frameworks/')]
+        self.frameworks = []
         if self.platform.startswith('iosmac'):
             # Catalyst modules need this extra framework dir
             iOSSupport = self.sdk + \
