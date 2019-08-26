@@ -19,6 +19,7 @@
 
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseMapInfo.h"
+#include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/STLExtras.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/ArrayRefView.h"
@@ -322,6 +323,11 @@ public:
 
   /// Return the name of the type as a string, for use in diagnostics only.
   std::string getString(const PrintOptions &PO = PrintOptions()) const;
+
+  friend llvm::hash_code hash_value(Type type) {
+    using llvm::hash_value;
+    return hash_value(type.getPointer());
+  }
 
   /// Return the name of the type, adding parens in cases where
   /// appending or prepending text to the result would cause that text

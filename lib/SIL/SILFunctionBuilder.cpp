@@ -52,8 +52,9 @@ void SILFunctionBuilder::addFunctionAttributes(SILFunction *F,
         SA->getSpecializationKind() == SpecializeAttr::SpecializationKind::Full
             ? SILSpecializeAttr::SpecializationKind::Full
             : SILSpecializeAttr::SpecializationKind::Partial;
-    F->addSpecializeAttr(SILSpecializeAttr::create(M, SA->getRequirements(),
-                                                   SA->isExported(), kind));
+    F->addSpecializeAttr(
+        SILSpecializeAttr::create(M, SA->getSpecializedSgnature(),
+                                  SA->isExported(), kind));
   }
 
   if (auto *OA = Attrs.getAttribute<OptimizeAttr>()) {

@@ -70,10 +70,8 @@ public:
   };
 
   static SILSpecializeAttr *create(SILModule &M,
-                                   ArrayRef<Requirement> requirements,
+                                   GenericSignature *specializedSignature,
                                    bool exported, SpecializationKind kind);
-
-  ArrayRef<Requirement> getRequirements() const;
 
   bool isExported() const {
     return exported;
@@ -91,6 +89,10 @@ public:
     return kind;
   }
 
+  GenericSignature *getSpecializedSignature() const {
+    return specializedSignature;
+  }
+
   SILFunction *getFunction() const {
     return F;
   }
@@ -98,17 +100,13 @@ public:
   void print(llvm::raw_ostream &OS) const;
 
 private:
-  unsigned numRequirements;
   SpecializationKind kind;
   bool exported;
-  SILFunction *F;
+  GenericSignature *specializedSignature;
+  SILFunction *F = nullptr;
 
-  SILSpecializeAttr(ArrayRef<Requirement> requirements, bool exported,
-                    SpecializationKind kind);
-
-  Requirement *getRequirementsData() {
-    return reinterpret_cast<Requirement *>(this+1);
-  }
+  SILSpecializeAttr(bool exported, SpecializationKind kind,
+                    GenericSignature *specializedSignature);
 };
 
 /// SILFunction - A function body that has been lowered to SIL. This consists of

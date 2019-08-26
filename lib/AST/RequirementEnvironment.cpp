@@ -20,8 +20,8 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/GenericSignature.h"
-#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 #include "llvm/ADT/Statistic.h"
 
@@ -148,19 +148,16 @@ RequirementEnvironment::RequirementEnvironment(
     return;
   }
 
-  // Construct a generic signature builder by collecting the constraints
+  // Construct a generic signature by collecting the constraints
   // from the requirement and the context of the conformance together,
   // because both define the capabilities of the requirement.
-  GenericSignatureBuilder builder(ctx);
-
-  auto source =
-    GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
+  SmallVector<GenericTypeParamType *, 2> genericParamTypes;
 
   // If the conforming type is a class, add a class-constrained 'Self'
   // parameter.
   if (covariantSelf) {
     auto paramTy = GenericTypeParamType::get(/*depth=*/0, /*index=*/0, ctx);
-    builder.addGenericParameter(paramTy);
+    genericParamTypes.push_back(paramTy);
   }
 
   // Now, add all generic parameters from the conforming type.
@@ -168,22 +165,23 @@ RequirementEnvironment::RequirementEnvironment(
     for (auto param : conformanceSig->getGenericParams()) {
       auto substParam = Type(param).subst(conformanceToSyntheticTypeFn,
                                           conformanceToSyntheticConformanceFn);
-      builder.addGenericParameter(substParam->castTo<GenericTypeParamType>());
+      genericParamTypes.push_back(substParam->castTo<GenericTypeParamType>());
     }
   }
 
   // Next, add requirements.
+  SmallVector<Requirement, 2> requirements;
   if (covariantSelf) {
     auto paramTy = GenericTypeParamType::get(/*depth=*/0, /*index=*/0, ctx);
     Requirement reqt(RequirementKind::Superclass, paramTy, substConcreteType);
-    builder.addRequirement(reqt, source, nullptr);
+    requirements.push_back(reqt);
   }
 
   if (conformanceSig) {
     for (auto &rawReq : conformanceSig->getRequirements()) {
       if (auto req = rawReq.subst(conformanceToSyntheticTypeFn,
                                   conformanceToSyntheticConformanceFn))
-        builder.addRequirement(*req, source, nullptr);
+        requirements.push_back(*req);
     }
   }
 
@@ -199,7 +197,7 @@ RequirementEnvironment::RequirementEnvironment(
     auto substGenericParam =
       GenericTypeParamType::get(depth, genericParam->getIndex(), ctx);
 
-    builder.addGenericParameter(substGenericParam);
+    genericParamTypes.push_back(substGenericParam);
   }
 
   ++NumRequirementEnvironments;
@@ -208,13 +206,16 @@ RequirementEnvironment::RequirementEnvironment(
   // interface types into the abstract type parameters).
   for (auto &rawReq : reqSig->getRequirements()) {
     if (auto req = rawReq.subst(reqToSyntheticEnvMap))
-      builder.addRequirement(*req, source, conformanceDC->getParentModule());
+      requirements.push_back(*req);
   }
 
   // Produce the generic signature and environment.
   // FIXME: Pass in a source location for the conformance, perhaps? It seems
   // like this could fail.
-  syntheticSignature =
-    std::move(builder).computeGenericSignature(SourceLoc());
+  syntheticSignature = evaluateOrDefault(
+      ctx.evaluator,
+      AbstractGenericSignatureRequest{
+        nullptr, std::move(genericParamTypes), std::move(requirements)},
+      nullptr);
   syntheticEnvironment = syntheticSignature->createGenericEnvironment();
 }

@@ -29,3 +29,6 @@ SWIFT_TYPEID_NAMED(Optional<PropertyWrapperMutability>, PropertyWrapperMutabilit
 SWIFT_TYPEID_NAMED(CustomAttr *, CustomAttr)
 SWIFT_TYPEID_NAMED(TypeAliasDecl *, TypeAliasDecl)
 SWIFT_TYPEID(AncestryFlags)
+SWIFT_TYPEID_NAMED(GenericSignature *, GenericSignature)
+SWIFT_TYPEID_NAMED(GenericTypeParamType *, GenericTypeParamType)
+SWIFT_TYPEID(Requirement)
