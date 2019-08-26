@@ -55,6 +55,11 @@
 
 using namespace swift;
 
+static_assert(IsTriviallyDestructible<FileUnit>::value,
+              "FileUnits are BumpPtrAllocated; the d'tor may not be called");
+static_assert(IsTriviallyDestructible<LoadedFile>::value,
+              "LoadedFiles are BumpPtrAllocated; the d'tor may not be called");
+
 //===----------------------------------------------------------------------===//
 // Builtin Module Name lookup
 //===----------------------------------------------------------------------===//
@@ -1249,10 +1254,6 @@ StringRef ModuleDecl::getModuleFilename() const {
   // per-file names. Modules can consist of more than one file.
   StringRef Result;
   for (auto F : getFiles()) {
-    Result = F->getParseableInterface();
-    if (!Result.empty())
-      return Result;
-
     if (auto SF = dyn_cast<SourceFile>(F)) {
       if (!Result.empty())
         return StringRef();
