@@ -193,6 +193,11 @@ public:
       }
       RangeStart = std::min(RangeStart, (uint64_t)S->addr + Slide);
       RangeEnd = std::max(RangeEnd, (uint64_t)(S->addr + S->size + Slide));
+      // Keep the range rounded to 8 byte alignment on both ends so we don't
+      // introduce misaligned pointers mapping between local and remote
+      // address space.
+      RangeStart = RangeStart & ~7;
+      RangeEnd = RangeEnd + 7 & ~7;      
     }
  
     if (RangeStart == UINT64_MAX && RangeEnd == UINT64_MAX)
