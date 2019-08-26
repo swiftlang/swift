@@ -980,7 +980,7 @@ void UnqualifiedLookupFactory::addImportedResults(DeclContext *const dc) {
 
   // Always perform name shadowing for type lookup.
   if (options.contains(Flags::TypeLookup)) {
-    removeShadowedDecls(CurModuleResults, &M);
+    removeShadowedDecls(CurModuleResults, dc);
   }
 
   for (auto VD : CurModuleResults) {
