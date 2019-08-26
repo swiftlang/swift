@@ -474,8 +474,7 @@ private:
 
     IndexSymbol Info;
     std::tie(Info.line, Info.column) = getLineCol(Loc);
-    std::tie(Info.startOffset, Info.endOffset) =
-        getRangeStartAndEndOffset(Range);
+    Info.offset = getOffsetInBuffer(Loc);
     Info.roles |= (unsigned)SymbolRole::Reference;
     Info.symInfo = getSymbolInfoForModule(Mod);
     getModuleNameAndUSR(Mod, Info.name, Info.USR);
@@ -593,19 +592,10 @@ private:
     return SrcMgr.getLineAndColumn(Loc, BufferID);
   }
 
-  std::pair<unsigned, unsigned> getRangeStartAndEndOffset(CharSourceRange Range) {
-    if (Range.isInvalid())
-      return std::make_pair(0, 0);
-    unsigned offset = SrcMgr.getLocOffsetInBuffer(Range.getStart(), BufferID);
-    unsigned length = SrcMgr.getByteDistance(Range.getStart(), Range.getEnd());
-    return std::make_pair(offset, offset + length);
-  }
-
-  std::pair<unsigned, unsigned> getLocStartAndEndOffset(SourceLoc Loc) {
+  unsigned getOffsetInBuffer(SourceLoc Loc) {
     if (Loc.isInvalid())
-      return std::make_pair(0, 0);
-    return getRangeStartAndEndOffset(
-        Lexer::getCharSourceRangeFromSourceRange(SrcMgr, SourceRange(Loc)));
+      return 0;
+    return SrcMgr.getLocOffsetInBuffer(Loc, BufferID);
   }
 
   bool shouldIndex(ValueDecl *D, bool IsRef) const {
@@ -1243,7 +1233,7 @@ bool IndexSwiftASTWalker::initIndexSymbol(ValueDecl *D, SourceLoc Loc,
     return true;
 
   std::tie(Info.line, Info.column) = getLineCol(Loc);
-  std::tie(Info.startOffset, Info.endOffset) = getLocStartAndEndOffset(Loc);
+  Info.offset = getOffsetInBuffer(Loc);
   if (!IsRef) {
     if (auto Group = D->getGroupName())
       Info.group = Group.getValue();
@@ -1265,7 +1255,7 @@ bool IndexSwiftASTWalker::initIndexSymbol(ExtensionDecl *ExtD, ValueDecl *Extend
     return true;
 
   std::tie(Info.line, Info.column) = getLineCol(Loc);
-  std::tie(Info.startOffset, Info.endOffset) = getLocStartAndEndOffset(Loc);
+  Info.offset = getOffsetInBuffer(Loc);
   if (auto Group = ExtD->getGroupName())
     Info.group = Group.getValue();
   return false;
@@ -1473,7 +1463,7 @@ bool IndexSwiftASTWalker::indexComment(const Decl *D) {
       Info.USR = stringStorage.copyString(OS.str());
     }
     std::tie(Info.line, Info.column) = getLineCol(loc);
-    std::tie(Info.startOffset, Info.endOffset) = getLocStartAndEndOffset(loc);
+    Info.offset = getOffsetInBuffer(loc);
     if (!IdxConsumer.startSourceEntity(Info) || !IdxConsumer.finishSourceEntity(Info.symInfo, Info.roles)) {
       Cancelled = true;
       break;
