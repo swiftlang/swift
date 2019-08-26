@@ -679,3 +679,26 @@ bb0(%x : @owned $ClassLet):
 
   return undef : $()
 }
+
+// Make sure that we properly eliminate all ref count ops except for the destroy
+// for the @owned argument. The recursion happens since we can not eliminate the
+// begin_borrow without eliminating the struct_extract (which we do after we
+// eliminate the destroy_value).
+// CHECK-LABEL: sil [ossa] @worklist_test : $@convention(thin) (@owned NativeObjectPair) -> () {
+// CHECK-NOT: struct_extract
+// CHECK: } // end sil function 'worklist_test'
+sil [ossa] @worklist_test : $@convention(thin) (@owned NativeObjectPair) -> () {
+bb0(%0 : @owned $NativeObjectPair):
+  %1 = begin_borrow %0 : $NativeObjectPair
+  %2 = struct_extract %1 : $NativeObjectPair, #NativeObjectPair.obj1
+  %3 = copy_value %2 : $Builtin.NativeObject
+  br bb1
+
+bb1:
+  destroy_value %3 : $Builtin.NativeObject
+  end_borrow %1 : $NativeObjectPair
+  destroy_value %0 : $NativeObjectPair
+  %9999 = tuple()
+  return %9999 : $()
+}
+
