@@ -6468,15 +6468,25 @@ class CopyValueInst
       : UnaryInstructionBase(DebugLoc, operand, operand->getType()) {}
 };
 
-#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-class Copy##Name##ValueInst \
-    : public UnaryInstructionBase<SILInstructionKind::Copy##Name##ValueInst, \
-                                  SingleValueInstruction> { \
-  friend class SILBuilder; \
-  Copy##Name##ValueInst(SILDebugLocation DebugLoc, SILValue operand, \
-                        SILType type) \
-      : UnaryInstructionBase(DebugLoc, operand, type) {} \
-};
+#define UNCHECKED_REF_STORAGE(Name, ...)                                       \
+  class Copy##Name##ValueInst                                                  \
+      : public UnaryInstructionBase<SILInstructionKind::Copy##Name##ValueInst, \
+                                    SingleValueInstruction> {                  \
+    friend class SILBuilder;                                                   \
+    Copy##Name##ValueInst(SILDebugLocation DebugLoc, SILValue operand,         \
+                          SILType type)                                        \
+        : UnaryInstructionBase(DebugLoc, operand, type) {}                     \
+  };
+
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
+  class Copy##Name##ValueInst                                                  \
+      : public UnaryInstructionBase<SILInstructionKind::Copy##Name##ValueInst, \
+                                    SingleValueInstruction> {                  \
+    friend class SILBuilder;                                                   \
+    Copy##Name##ValueInst(SILDebugLocation DebugLoc, SILValue operand,         \
+                          SILType type)                                        \
+        : UnaryInstructionBase(DebugLoc, operand, type) {}                     \
+  };
 #include "swift/AST/ReferenceStorage.def"
 
 class DestroyValueInst
