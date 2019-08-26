@@ -2109,7 +2109,7 @@ void PrintAST::printExtension(ExtensionDecl *decl) {
       Type extendedType = decl->getExtendedType();
       if (!extendedType || !extendedType->getAnyNominal()) {
         // Fallback to TypeRepr.
-        printTypeLoc(decl->getExtendedTypeLoc());
+        printTypeLoc(decl->getExtendedTypeRepr());
         return;
       }
       printExtendedTypeName(extendedType, Printer, Options);

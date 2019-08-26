@@ -4422,15 +4422,15 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
   };
 
   // If we didn't parse a type, fill in an error type and bail out.
-  if (!ext->getExtendedTypeLoc().getTypeRepr())
+  auto *extendedRepr = ext->getExtendedTypeRepr();
+  if (!extendedRepr)
     return error();
 
   // Compute the extended type.
   TypeResolutionOptions options(TypeResolverContext::ExtensionBinding);
   options |= TypeResolutionFlags::AllowUnboundGenerics;
   auto tr = TypeResolution::forStructural(ext->getDeclContext());
-  auto extendedType = tr.resolveType(ext->getExtendedTypeLoc().getTypeRepr(),
-                                     options);
+  auto extendedType = tr.resolveType(extendedRepr, options);
 
   if (extendedType->hasError())
     return error();
@@ -4451,14 +4451,14 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
   // Cannot extend a metatype.
   if (extendedType->is<AnyMetatypeType>()) {
     diags.diagnose(ext->getLoc(), diag::extension_metatype, extendedType)
-         .highlight(ext->getExtendedTypeLoc().getSourceRange());
+         .highlight(extendedRepr->getSourceRange());
     return error();
   }
 
   // Cannot extend function types, tuple types, etc.
   if (!extendedType->getAnyNominal()) {
     diags.diagnose(ext->getLoc(), diag::non_nominal_extension, extendedType)
-         .highlight(ext->getExtendedTypeLoc().getSourceRange());
+         .highlight(extendedRepr->getSourceRange());
     return error();
   }
 
@@ -4468,7 +4468,7 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
       !isNonGenericTypeAliasType(extendedType)) {
     diags.diagnose(ext->getLoc(), diag::extension_specialization,
                    extendedType->getAnyNominal()->getName())
-         .highlight(ext->getExtendedTypeLoc().getSourceRange());
+         .highlight(extendedRepr->getSourceRange());
     return error();
   }
 

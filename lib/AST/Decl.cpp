@@ -1053,7 +1053,7 @@ NominalTypeDecl::takeConformanceLoaderSlow() {
 }
 
 ExtensionDecl::ExtensionDecl(SourceLoc extensionLoc,
-                             TypeLoc extendedType,
+                             TypeRepr *extendedType,
                              MutableArrayRef<TypeLoc> inherited,
                              DeclContext *parent,
                              TrailingWhereClause *trailingWhereClause)
@@ -1061,7 +1061,7 @@ ExtensionDecl::ExtensionDecl(SourceLoc extensionLoc,
     Decl(DeclKind::Extension, parent),
     IterableDeclContext(IterableDeclContextKind::ExtensionDecl),
     ExtensionLoc(extensionLoc),
-    ExtendedType(extendedType),
+    ExtendedTypeRepr(extendedType),
     Inherited(inherited)
 {
   Bits.ExtensionDecl.DefaultAndMaxAccessLevel = 0;
@@ -1070,7 +1070,7 @@ ExtensionDecl::ExtensionDecl(SourceLoc extensionLoc,
 }
 
 ExtensionDecl *ExtensionDecl::create(ASTContext &ctx, SourceLoc extensionLoc,
-                                     TypeLoc extendedType,
+                                     TypeRepr *extendedType,
                                      MutableArrayRef<TypeLoc> inherited,
                                      DeclContext *parent,
                                      TrailingWhereClause *trailingWhereClause,
@@ -1150,6 +1150,13 @@ AccessLevel ExtensionDecl::getMaxAccessLevel() const {
   return evaluateOrDefault(ctx.evaluator,
     DefaultAndMaxAccessLevelRequest{const_cast<ExtensionDecl *>(this)},
     {AccessLevel::Private, AccessLevel::Private}).second;
+}
+      
+Type ExtensionDecl::getExtendedType() const {
+  ASTContext &ctx = getASTContext();
+  return evaluateOrDefault(ctx.evaluator,
+    ExtendedTypeRequest{const_cast<ExtensionDecl *>(this)},
+    ErrorType::get(ctx));
 }
 
 /// Clone the given generic parameters in the given list. We don't need any
@@ -7618,7 +7625,7 @@ void swift::simple_display(llvm::raw_ostream &out, const Decl *decl) {
     simple_display(out, value);
   } else if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
     out << "extension of ";
-    if (auto typeRepr = ext->getExtendedTypeLoc().getTypeRepr())
+    if (auto typeRepr = ext->getExtendedTypeRepr())
       typeRepr->print(out);
     else
       ext->getSelfNominalTypeDecl()->dumpRef(out);

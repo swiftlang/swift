@@ -3791,7 +3791,7 @@ public:
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto extension = ExtensionDecl::create(ctx, SourceLoc(), TypeLoc(), { },
+    auto extension = ExtensionDecl::create(ctx, SourceLoc(), nullptr, { },
                                            DC, nullptr);
     declOrOffset = extension;
 

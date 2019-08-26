@@ -824,20 +824,3 @@ void IsImplicitlyUnwrappedOptionalRequest::cacheResult(bool value) const {
   auto *decl = std::get<0>(getStorage());
   decl->setImplicitlyUnwrappedOptional(value);
 }
-
-//----------------------------------------------------------------------------//
-// ExtendedTypeRequest computation.
-//----------------------------------------------------------------------------//
-
-Optional<Type> ExtendedTypeRequest::getCachedResult() const {
-  auto *ext = std::get<0>(getStorage());
-  if (auto type = ext->getExtendedTypeLoc().getType()) {
-    return type;
-  }
-  return None;
-}
-
-void ExtendedTypeRequest::cacheResult(Type value) const {
-  auto *ext = std::get<0>(getStorage());
-  ext->getExtendedTypeLoc().setType(value);
-}
