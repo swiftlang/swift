@@ -416,7 +416,7 @@
                 "clang": "apple/stable/20190619",
                 "compiler-rt": "apple/stable/20190619",
                 "swift": "master-rebranch",
-                "lldb": "upstream-with-swift",
+                "lldb": "master-rebranch",
                 "cmark": "master",
                 "llbuild": "master",
                 "swiftpm": "master",

@@ -310,6 +310,13 @@ EnableSourceImport("enable-source-import", llvm::cl::Hidden,
                    llvm::cl::cat(Category), llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
+DisableFunctionBuilderOneWayConstraints(
+    "disable-function-builder-one-way-constraints",
+    llvm::cl::desc("Disable one-way constraints in function builders"),
+    llvm::cl::cat(Category),
+    llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
 SkipDeinit("skip-deinit",
            llvm::cl::desc("Whether to skip printing destructors"),
            llvm::cl::cat(Category),
@@ -2228,7 +2235,7 @@ static int doPrintDecls(const CompilerInvocation &InitInvok,
   for (const auto &name : DeclsToPrint) {
     ASTContext &ctx = CI.getASTContext();
     UnqualifiedLookup lookup(ctx.getIdentifier(name),
-                             CI.getPrimarySourceFile(), nullptr);
+                             CI.getPrimarySourceFile());
     for (auto result : lookup.Results) {
       result.getValueDecl()->print(*Printer, Options);
 
@@ -3319,6 +3326,8 @@ int main(int argc, char *argv[]) {
     options::ImportObjCHeader;
   InitInvok.getLangOptions().EnableAccessControl =
     !options::DisableAccessControl;
+  InitInvok.getLangOptions().FunctionBuilderOneWayConstraints =
+    !options::DisableFunctionBuilderOneWayConstraints;
   InitInvok.getLangOptions().CodeCompleteInitsInPostfixExpr |=
       options::CodeCompleteInitsInPostfixExpr;
   InitInvok.getLangOptions().CodeCompleteCallPatternHeuristics |=

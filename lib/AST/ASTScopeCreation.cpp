@@ -43,9 +43,6 @@ static bool rangeableIsIgnored(const Expr *d) {
 static bool rangeableIsIgnored(const Stmt *d) {
   return false; // ??
 }
-static bool rangeableIsIgnored(const SpecializeAttr *a) {
-  return a->isImplicit();
-}
 static bool rangeableIsIgnored(const ASTNode n) {
   return n.is<Decl *>() && n.get<Decl *>()->isImplicit();
 }
@@ -80,12 +77,13 @@ static void dumpRangeable(Rangeable *r, llvm::raw_ostream &f) {
   r->dump(f);
 }
 
-static void dumpRangeable(const SpecializeAttr r, llvm::raw_ostream &f) {
-  llvm::errs() << "SpecializeAttr\n";
-}
+static void dumpRangeable(const SpecializeAttr *r,
+                          llvm::raw_ostream &f) LLVM_ATTRIBUTE_USED;
 static void dumpRangeable(const SpecializeAttr *r, llvm::raw_ostream &f) {
   llvm::errs() << "SpecializeAttr\n";
 }
+static void dumpRangeable(SpecializeAttr *r,
+                          llvm::raw_ostream &f) LLVM_ATTRIBUTE_USED;
 static void dumpRangeable(SpecializeAttr *r, llvm::raw_ostream &f) {
   llvm::errs() << "SpecializeAttr\n";
 }
@@ -164,35 +162,25 @@ public:
   ASTSourceFileScope *const sourceFileScope;
   ASTContext &getASTContext() const { return ctx; }
 
-private:
   /// The AST can have duplicate nodes, and we don't want to create scopes for
   /// those.
-  /// TODO: better to use a shared pointer? Unique pointer?
-  Optional<NodeSet> _scopedNodes;
+  NodeSet scopedNodes;
 
-public:
-  NodeSet &scopedNodes;
-
-public:
   ScopeCreator(SourceFile *SF)
       : ctx(SF->getASTContext()),
-        sourceFileScope(new (ctx) ASTSourceFileScope(SF, this)),
-        _scopedNodes(NodeSet()), scopedNodes(_scopedNodes.getValue()) {}
+        sourceFileScope(new (ctx) ASTSourceFileScope(SF, this)) {}
 
-public:
   ScopeCreator(const ScopeCreator &) = delete;  // ensure no copies
   ScopeCreator(const ScopeCreator &&) = delete; // ensure no moves
 
-public:
   /// Given an array of ASTNodes or Decl pointers, add them
   /// Return the resultant insertionPoint
   ASTScopeImpl *addNodesToTree(ASTScopeImpl *const insertionPoint,
                                ArrayRef<ASTNode> nodesOrDeclsToAdd) {
-
     auto *ip = insertionPoint;
     for (auto nd :
          expandClausesSortAndCullElementsOrMembers(nodesOrDeclsToAdd)) {
-      if (shouldThisNodeBeScopedWhenEncountered(nd))
+      if (shouldThisNodeBeScopedWhenFoundInSourceFileBraceStmtOrType(nd))
         ip = createScopeFor(nd, ip).getPtrOr(ip);
       else
         ip->widenSourceRangeForIgnoredASTNode(nd);
@@ -257,7 +245,7 @@ public:
     // Once we allow invalid PatternBindingDecls (see shouldCreateScope),
     // then IDE/complete_property_delegate_attribute.swift fails because
     // we try to expand a member whose source range is backwards.
-
+    (void)SM;
     assert((d->getStartLoc().isInvalid() ||
             !SM.isBeforeInBuffer(d->getEndLoc(), d->getStartLoc())) &&
            "end-before-start will break tree search via location");
@@ -299,6 +287,10 @@ private:
   ASTScopeImpl *createSubtreeImpl(ASTScopeImpl *parent, Args... args) {
     auto *child = new (ctx) Scope(args...);
     parent->addChild(child, ctx);
+    if (shouldBeLazy()) {
+      if (auto *ip = child->insertionPointForDeferredExpansion().getPtrOrNull())
+        return ip;
+    }
     ASTScopeImpl *insertionPoint = child->expandAndBeCurrent(*this);
     assert(child->verifyThatThisNodeComeAfterItsPriorSibling() &&
            "Ensure search will work");
@@ -459,46 +451,13 @@ private:
   /// because the overlap EnumElements and AST includes the elements in the
   /// members.
   std::vector<ASTNode> cull(ArrayRef<ASTNode> input) const {
-    // TODO don't need to cull accessors anymore? - use new walker below, too?
-    // Cull ImportDecls because when running from lldb, we can see an ImportDecl
-    // within a large FuncDecl (manuafactured by lldb) and that would trip the
-    // "contradicts" assertion in the sort.
-    // TODO: move following into radar, maybe
-    /// For instance:  \code
-    /// SOURCE_DIR/lldb/test/dotest.py -q --arch= -s
-    /// SOURCE_DIR/build/Ninja-DebugAssert/lldb-macosx-x86_64/lldb-test-traces
-    /// --build-dir
-    /// SOURCE_DIR/build/Ninja-DebugAssert/lldb-macosx-x86_64/lldb-test-build.noindex
-    /// -S nm -u CXXFLAGS -u CFLAGS --executable
-    /// SOURCE_DIR/build/Ninja-DebugAssert/lldb-macosx-x86_64/./bin/lldb
-    /// --dsymutil
-    /// SOURCE_DIR/build/Ninja-DebugAssert/llvm-macosx-x86_64/./bin/dsymutil
-    /// --filecheck
-    /// SOURCE_DIR/build/Ninja-DebugAssert/llvm-macosx-x86_64/./bin/FileCheck -C
-    /// SOURCE_DIR/build/Ninja-DebugAssert/llvm-macosx-x86_64/bin/clang
-    /// --swift-compiler
-    /// SOURCE_DIR/build/Ninja-DebugAssert/swift-macosx-x86_64/bin/swiftc
-    /// --swift-library
-    /// SOURCE_DIR/build/Ninja-DebugAssert/swift-macosx-x86_64/lib/swift --env
-    /// DYLD_LIBRARY_PATH="SOURCE_DIR/build/Ninja-DebugAssert/swift-macosx-x86_64/lib/swift"
-    /// LD_LIBRARY_PATH="SOURCE_DIR/build/Ninja-DebugAssert/swift-macosx-x86_64/lib/swift"
-    /// SIMCTL_CHILD_DYLD_LIBRARY_PATH="SOURCE_DIR/build/Ninja-DebugAssert/swift-macosx-x86_64/lib/swift"
-    /// --codesign-identity lldb_codesign --framework
-    /// SOURCE_DIR/build/Ninja-DebugAssert/lldb-macosx-x86_64/bin/LLDB.framework
-    /// --server
-    /// SOURCE_DIR/build/Ninja-DebugAssert/lldb-macosx-x86_64/./bin/debugserver
-    /// --out-of-tree-debugserver --build-dir
-    /// SOURCE_DIR/build/Ninja-DebugAssert/lldb-macosx-x86_64/lldb-test-build.noindex
-    /// --test-subdir lang/swift --skip-category=watchpoint --skip-category=dwo
-    /// -t -E
-    /// SOURCE_DIR/lldb/packages/Python/lldbsuite/test/lang/swift/parseable_interfaces/shared
-    /// -p TestSwiftInterfaceNoDebugInfo.py
-    /// \endcode
+    // When working on rdar://53971116 may have to cull more.
     std::vector<ASTNode> culled;
     llvm::copy_if(input, std::back_inserter(culled), [&](ASTNode n) {
+      assert(!n.isDecl(DeclKind::Accessor) &&
+             "Should not find accessors in iterable types or brace statements");
       return isLocalizable(n) && !n.isDecl(DeclKind::Var) &&
-             !n.isDecl(DeclKind::Accessor) && !n.isDecl(DeclKind::EnumCase) &&
-             !n.isDecl(DeclKind::Import);
+             !n.isDecl(DeclKind::EnumCase);
     });
     return culled;
   }
@@ -553,18 +512,19 @@ private:
       if (!d || !lastD || lastD->getStartLoc() != d->getStartLoc() ||
           lastD->getKind() != d->getKind()) {
         lastD = d;
+        continue;
       }
       if (auto *pbd = dyn_cast<PatternBindingDecl>(lastD))
         dumpPBD(pbd, "prev");
       if (auto *pbd = dyn_cast<PatternBindingDecl>(d)) {
         dumpPBD(pbd, "curr");
-        assert(false && "found colliding pattern binding decls");
+        llvm_unreachable("found colliding pattern binding decls");
       }
       llvm::errs() << "Two same kind decls at same loc: \n";
       lastD->dump(llvm::errs());
       llvm::errs() << "and\n";
       d->dump(llvm::errs());
-      assert(false && "Two same kind decls; unexpected kinds");
+      llvm_unreachable("Two same kind decls; unexpected kinds");
     }
   }
 
@@ -593,7 +553,7 @@ private:
     if (startOrder * endOrder == -1) {
       llvm::errs() << "*** Start order contradicts end order between: ***\n";
       dumpRangeable(n1, llvm::errs());
-      llvm::errs() << "\n*** and:\***\n";
+      llvm::errs() << "\n*** and: ***\n";
       dumpRangeable(n2, llvm::errs());
     }
 #endif
@@ -611,12 +571,13 @@ private:
   }
 
 public:
-  bool shouldThisNodeBeScopedWhenEncountered(ASTNode n) {
-    // Do not scope VarDecls or Accessors when encountered because
+  bool shouldThisNodeBeScopedWhenFoundInSourceFileBraceStmtOrType(ASTNode n) {
+    // Do not scope VarDecls because
     // they get created directly by the pattern code.
     // Doing otherwise distorts the source range
     // of their parents.
-    return !PatternEntryDeclScope::isHandledSpecially(n);
+    assert(!n.isDecl(DeclKind::Accessor) && "Should not see accessors here");
+    return !n.isDecl(DeclKind::Var);
   }
 
   template <typename ASTNodelike>
@@ -624,6 +585,8 @@ public:
     for (int i = nodesToPrepend.size() - 1; i >= 0; --i)
       pushIfNecessary(nodesToPrepend[i]);
   }
+
+  bool shouldBeLazy() const { return ctx.LangOpts.LazyASTScopes; }
 
 public:
   /// Return true if scope tree contains all the decl contexts in the AST
@@ -725,6 +688,7 @@ ASTSourceFileScope *ASTScope::createScopeTree(SourceFile *SF) {
 void ASTSourceFileScope::addNewDeclsToTree() {
   assert(SF && scopeCreator);
   ArrayRef<Decl *> decls = SF->Decls;
+  // Assume that decls are only added at the end, in source order
   ArrayRef<Decl *> newDecls = decls.slice(numberOfDeclsAlreadySeen);
   std::vector<ASTNode> newNodes(newDecls.begin(), newDecls.end());
   insertionPoint = scopeCreator->addNodesToTree(insertionPoint, newNodes);
@@ -779,9 +743,6 @@ public:
   // This declaration is handled from the PatternBindingDecl
   VISIT_AND_IGNORE(VarDecl)
 
-  // This declaration is handled from addChildrenForAllExplicitAccessors
-  VISIT_AND_IGNORE(AccessorDecl)
-
   // These contain nothing to scope.
   VISIT_AND_IGNORE(BreakStmt)
   VISIT_AND_IGNORE(ContinueStmt)
@@ -827,6 +788,12 @@ public:
   VISIT_AND_CREATE_WHOLE_PORTION(TypeAliasDecl, TypeAliasScope)
   VISIT_AND_CREATE_WHOLE_PORTION(OpaqueTypeDecl, OpaqueTypeScope)
 #undef VISIT_AND_CREATE_WHOLE_PORTION
+
+  // This declaration is handled from addChildrenForAllExplicitAccessors
+  NullablePtr<ASTScopeImpl> visitAccessorDecl(AccessorDecl *, ASTScopeImpl *p,
+                                              ScopeCreator &scopeCreator) {
+    llvm_unreachable("Should not see an accessor decl");
+  }
 
   NullablePtr<ASTScopeImpl> visitProtocolDecl(ProtocolDecl *e, ASTScopeImpl *p,
                                               ScopeCreator &scopeCreator) {
@@ -1043,27 +1010,14 @@ void ASTScopeImpl::disownDescendants(ScopeCreator &scopeCreator) {
   removeChildren();
 }
 
-bool PatternEntryDeclScope::isHandledSpecially(const ASTNode n) {
-  if (auto *d = n.dyn_cast<Decl *>()) {
-#ifndef NDEBUG
-    if (auto *acc = dyn_cast<AccessorDecl>(d)) {
-      if (auto *vd = dyn_cast<VarDecl>(acc->getStorage())) {
-        const bool foundIt =
-            llvm::any_of(vd->getAllAccessors(),
-                         [&](AccessorDecl *vda) { return vda == acc; });
-        assert(foundIt && "Cannot build a scope if cannot find an accessor");
-      }
-    }
-#endif
-    return isa<VarDecl>(d) || isa<AccessorDecl>(d);
-  }
-  return false;
-}
-
 #pragma mark implementations of expansion
 
 ASTScopeImpl *ASTScopeImpl::expandAndBeCurrent(ScopeCreator &scopeCreator) {
   auto *insertionPoint = expandSpecifically(scopeCreator);
+  if (scopeCreator.shouldBeLazy()) {
+    assert(!insertionPointForDeferredExpansion() ||
+           insertionPointForDeferredExpansion().get() == insertionPoint);
+  }
   beCurrent();
   setChildrenCountWhenLastExpanded();
   assert((getChildlessSourceRange().isValid() || !getChildren().empty()) &&
@@ -1256,6 +1210,7 @@ void AbstractFunctionDeclScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
     leaf = scopeCreator.createGenericParamScopes(decl, decl->getGenericParams(),
                                                  leaf);
     if (isLocalizable(decl) && getParamsSourceLoc(decl).isValid()) {
+      // See rdar://54188611
       // swift::createDesignatedInitOverride just clones the parameters, so they
       // end up with a bogus SourceRange, maybe *before* the start of the
       // function.
@@ -1654,12 +1609,7 @@ void GenericTypeOrExtensionScope::expandBody(ScopeCreator &) {}
 
 void IterableTypeScope::expandBody(ScopeCreator &scopeCreator) {
   auto nodes = asNodeVector(getIterableDeclContext().get()->getMembers());
-  // Revisit the "false" below, rdar://53321156
-  auto nodesIncludingIfConfigClauses =
-      scopeCreator.expandClausesSortAndCullElementsOrMembers(nodes);
-  // TODO: can we call addNodesToTree here instead of expand...?
-  for (auto n : nodesIncludingIfConfigClauses)
-    scopeCreator.createScopeFor(n, this);
+  scopeCreator.addNodesToTree(this, nodes);
 }
 
 #pragma mark - reexpandIfObsolete
@@ -1722,6 +1672,37 @@ const Decl *GenericTypeOrExtensionWholePortion::getReferrentOfScope(
 #undef GET_REFERRENT
 
 #pragma mark currency
+NullablePtr<ASTScopeImpl> ASTScopeImpl::insertionPointForDeferredExpansion() {
+  return nullptr;
+}
+NullablePtr<ASTScopeImpl>
+IterableTypeScope::insertionPointForDeferredExpansion() {
+  return portion->insertionPointForDeferredExpansion(this);
+}
+NullablePtr<ASTScopeImpl>
+Portion::insertionPointForDeferredExpansion(IterableTypeScope *) const {
+  return nullptr;
+}
+NullablePtr<ASTScopeImpl>
+IterableTypeBodyPortion::insertionPointForDeferredExpansion(
+    IterableTypeScope *s) const {
+  return s->getParent().get();
+}
+SourceRange ASTScopeImpl::sourceRangeForDeferredExpansion() const {
+  return SourceRange();
+}
+SourceRange IterableTypeScope::sourceRangeForDeferredExpansion() const {
+  return portion->sourceRangeForDeferredExpansion(this);
+}
+SourceRange
+Portion::sourceRangeForDeferredExpansion(const IterableTypeScope *) const {
+  return SourceRange();
+}
+SourceRange IterableTypeBodyPortion::sourceRangeForDeferredExpansion(
+    const IterableTypeScope *s) const {
+  return getChildlessSourceRangeOf(s, false);
+}
+
 void ASTScopeImpl::beCurrent() {}
 bool ASTScopeImpl::isCurrent() const { return true; }
 
@@ -1781,44 +1762,41 @@ bool WholeClosureScope::isCurrent() const {
   return bodyWhenLastExpanded == closureExpr->getBody();
 }
 
-std::vector<ASTScopeImpl *> ASTScopeImpl::rescueScopesToReuse() {
-  return rescueYoungestChildren(getChildren().size() -
-                                childrenCountWhenLastExpanded);
+#pragma mark getParentOfRescuedScopes
+NullablePtr<ASTScopeImpl> ASTScopeImpl::getParentOfRescuedScopes() {
+  return this;
 }
+NullablePtr<ASTScopeImpl>
+AbstractFunctionBodyScope::getParentOfRescuedScopes() {
+  // Reexpansion always creates a new body as the first child
+  return getChildren().empty() ? nullptr : getChildren().front();
+}
+NullablePtr<ASTScopeImpl> TopLevelCodeScope::getParentOfRescuedScopes() {
+  // Reexpansion always creates a new body as the first child
+  return getChildren().empty() ? nullptr : getChildren().front();
+}
+
+#pragma mark rescuing & reusing
+std::vector<ASTScopeImpl *> ASTScopeImpl::rescueScopesToReuse() {
+  if (auto *p = getParentOfRescuedScopes().getPtrOrNull()) {
+    return p->rescueYoungestChildren(p->getChildren().size() -
+                                     p->childrenCountWhenLastExpanded);
+  }
+  return {};
+}
+
 void ASTScopeImpl::addReusedScopes(ArrayRef<ASTScopeImpl *> scopesToAdd) {
+  auto *p = getParentOfRescuedScopes().getPtrOrNull();
+  if (!p) {
+    assert(scopesToAdd.empty() && "Non-empty body disappeared?!");
+    return;
+  }
   auto &ctx = getASTContext();
   for (auto *s : scopesToAdd) {
-    addChild(s, ctx);
+    p->addChild(s, ctx);
     assert(s->verifyThatThisNodeComeAfterItsPriorSibling() &&
            "Ensure search will work");
   }
-}
-// TODO: factor abs fn body scope and top level code scope
-std::vector<ASTScopeImpl *> AbstractFunctionBodyScope::rescueScopesToReuse() {
-  // retrieve the scopes from the body
-  if (getChildren().empty())
-    return {};
-  return getChildren().front()->rescueScopesToReuse();
-}
-void AbstractFunctionBodyScope::addReusedScopes(
-    ArrayRef<ASTScopeImpl *> scopesToAdd) {
-  // add reused scopes to the body
-  if (scopesToAdd.empty())
-    return;
-  getChildren().front()->addReusedScopes(scopesToAdd);
-}
-
-std::vector<ASTScopeImpl *> TopLevelCodeScope::rescueScopesToReuse() {
-  // retrieve the scopes from the body
-  if (getChildren().empty())
-    return {};
-  return getChildren().front()->rescueScopesToReuse();
-}
-void TopLevelCodeScope::addReusedScopes(ArrayRef<ASTScopeImpl *> scopesToAdd) {
-  // add reused scopes to the body
-  if (scopesToAdd.empty())
-    return;
-  getChildren().front()->addReusedScopes(scopesToAdd);
 }
 
 std::vector<ASTScopeImpl *>

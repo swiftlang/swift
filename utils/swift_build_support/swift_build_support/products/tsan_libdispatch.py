@@ -66,3 +66,6 @@ class TSanLibDispatch(product.Product):
 
         with shell.pushd(self.build_dir):
             shell.call(cmd, env=env)
+
+    def install(self, host_target):
+        pass

@@ -1504,3 +1504,18 @@ struct AllCompositionsStruct {
   }
 }
 
+// rdar://problem/54184846 - crash while trying to retrieve wrapper info on l-value base type
+func test_missing_method_with_lvalue_base() {
+  @propertyWrapper
+  struct Ref<T> {
+    var wrappedValue: T
+  }
+
+  struct S<T> where T: RandomAccessCollection, T.Element: Equatable {
+    @Ref var v: T.Element
+
+    init(items: T, v: Ref<T.Element>) {
+      self.v.binding = v // expected-error {{value of type 'T.Element' has no member 'binding'}}
+    }
+  }
+}

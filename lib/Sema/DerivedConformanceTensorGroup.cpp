@@ -331,9 +331,9 @@ static ValueDecl *deriveTensorGroup_constructor(
 
   DeclName name(C, DeclBaseName::createConstructor(), params);
   auto *initDecl =
-      new (C) ConstructorDecl(name, SourceLoc(), OTK_None, SourceLoc(),
-                              /*Throws*/ false, SourceLoc(), params,
-                              /*GenericParams*/ nullptr, parentDC);
+      new (C) ConstructorDecl(name, SourceLoc(), /*Failable*/ false,
+                              SourceLoc(), /*Throws*/ false, SourceLoc(),
+                              params, /*GenericParams*/ nullptr, parentDC);
   initDecl->setImplicit();
   initDecl->setSynthesized();
   initDecl->setBodySynthesizer(bodySynthesizer.Fn, bodySynthesizer.Context);

@@ -475,6 +475,20 @@ unsigned DeclContext::getSemanticDepth() const {
   return 1 + getParent()->getSemanticDepth();
 }
 
+bool DeclContext::mayContainMembersAccessedByDynamicLookup() const {
+  // Members of non-generic classes and class extensions can be found by
+  /// dynamic lookup.
+  if (auto *CD = getSelfClassDecl())
+    return !CD->isGenericContext();
+
+  // Members of @objc protocols (but not protocol extensions) can be
+  // found by dynamic lookup.
+  if (auto *PD = dyn_cast<ProtocolDecl>(this))
+      return PD->getAttrs().hasAttribute<ObjCAttr>();
+
+  return false;
+}
+
 bool DeclContext::walkContext(ASTWalker &Walker) {
   switch (getContextKind()) {
   case DeclContextKind::Module:
@@ -726,7 +740,7 @@ DeclRange IterableDeclContext::getMembers() const {
 void IterableDeclContext::addMember(Decl *member, Decl *Hint) {
   // Add the member to the list of declarations without notification.
   addMemberSilently(member, Hint);
-  ++memberCount;
+  ++MemberCount;
 
   // Notify our parent declaration that we have added the member, which can
   // be used to update the lookup tables.
@@ -794,13 +808,19 @@ void IterableDeclContext::setMemberLoader(LazyMemberLoader *loader,
 }
 
 void IterableDeclContext::loadAllMembers() const {
+  ASTContext &ctx = getASTContext();
+
   // Lazily parse members.
-  getASTContext().parseMembers(const_cast<IterableDeclContext*>(this));
+  if (HasUnparsedMembers) {
+    auto *IDC = const_cast<IterableDeclContext *>(this);
+    ctx.parseMembers(IDC);
+    IDC->HasUnparsedMembers = 0;
+  }
+
   if (!hasLazyMembers())
     return;
 
   // Don't try to load all members re-entrant-ly.
-  ASTContext &ctx = getASTContext();
   auto contextInfo = ctx.getOrCreateLazyIterableContextData(this,
     /*lazyLoader=*/nullptr);
   auto lazyMembers = FirstDeclAndLazyMembers.getInt() & ~LazyMembers::Present;

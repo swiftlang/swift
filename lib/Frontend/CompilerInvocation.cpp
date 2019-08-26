@@ -339,6 +339,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       Opts.DisableParserLookup;
   Opts.CompareToASTScopeLookup |= Args.hasArg(OPT_compare_to_astscope_lookup);
   Opts.WarnIfASTScopeLookup |= Args.hasArg(OPT_warn_if_astscope_lookup);
+  Opts.LazyASTScopes |= Args.hasArg(OPT_lazy_astscopes);
 
   Opts.DebugConstraintSolver |= Args.hasArg(OPT_debug_constraints);
   Opts.NamedLazyMemberLoading &= !Args.hasArg(OPT_disable_named_lazy_member_loading);
@@ -443,6 +444,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   if (Args.getLastArg(OPT_solver_disable_shrink))
     Opts.SolverDisableShrink = true;
+  Opts.FunctionBuilderOneWayConstraints =
+    Args.hasFlag(OPT_enable_function_builder_one_way_constraints,
+                 OPT_disable_function_builder_one_way_constraints,
+                 /*Default=*/true);
 
   if (const Arg *A = Args.getLastArg(OPT_value_recursion_threshold)) {
     unsigned threshold;

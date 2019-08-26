@@ -28,6 +28,7 @@
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/MemAccessUtils.h"
+#include "swift/SIL/MemoryLifetime.h"
 #include "swift/SIL/PostOrder.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILDebugScope.h"
@@ -5099,6 +5100,11 @@ public:
     // because we build the map of archetypes as we visit the
     // instructions.
     verifyOpenedArchetypes(F);
+
+    if (F->hasOwnership() && F->shouldVerifyOwnership() &&
+        !F->getModule().getASTContext().hadError()) {
+      verifyMemoryLifetime(F);
+    }
   }
 
   void verify() {

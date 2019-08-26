@@ -697,6 +697,8 @@ public:
   // TODO(TF-723): Quote playground literals.
   UNSUPPORTED_EXPR(ObjectLiteralExpr)
 
+  UNSUPPORTED_EXPR(OneWayExpr)
+
   // NOTE: TapExpr nodes are handled during quoting of their parent nodes.
   // We don't have a directly equivalent node in our trees.
   UNSUPPORTED_EXPR(OpaqueValueExpr)

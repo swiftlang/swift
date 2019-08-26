@@ -807,9 +807,8 @@ public:
     return parseToken(K, L, Diagnostic(ID, Args...));
   }
   
-  /// Parse the specified expected token and return its location
-  /// on success.  On failure, emit the specified error diagnostic, and
-  /// a note at the specified note location.
+  /// Parse the specified expected token and return its location on success.  On failure, emit the specified
+  /// error diagnostic,  a note at the specified note location, and return the location of the previous token.
   bool parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
                           SourceLoc OtherLoc);
 
@@ -894,7 +893,14 @@ public:
 
   void parseDeclListDelayed(IterableDeclContext *IDC);
 
-  bool canDelayMemberDeclParsing();
+  bool parseMemberDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
+                           SourceLoc PosBeforeLB,
+                           Diag<> ErrorDiag,
+                           ParseDeclOptions Options,
+                           IterableDeclContext *IDC);
+
+  bool canDelayMemberDeclParsing(bool &HasOperatorDeclarations,
+                                 bool &HasNestedClassDeclarations);
 
   bool delayParsingDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
                             SourceLoc PosBeforeLB,
@@ -1049,7 +1055,6 @@ public:
   ParserStatus parseGetSet(ParseDeclOptions Flags,
                            GenericParamList *GenericParams,
                            ParameterList *Indices,
-                           TypeLoc ElementTy,
                            ParsedAccessors &accessors,
                            AbstractStorageDecl *storage,
                            SourceLoc StaticLoc);

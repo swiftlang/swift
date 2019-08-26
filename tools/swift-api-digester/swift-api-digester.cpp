@@ -48,6 +48,7 @@ namespace  {
     DeserializeSDK,
     GenerateNameCorrectionTemplate,
     FindUsr,
+    GenerateEmptyBaseline,
   };
 } // end anonymous namespace
 
@@ -173,7 +174,10 @@ Action(llvm::cl::desc("Mode:"), llvm::cl::init(ActionType::None),
                      "Find USR for decls by given condition"),
           clEnumValN(ActionType::GenerateNameCorrectionTemplate,
                      "generate-name-correction",
-                     "Generate name correction template")));
+                     "Generate name correction template"),
+          clEnumValN(ActionType::GenerateEmptyBaseline,
+                     "generate-empty-baseline",
+                     "Generate an empty baseline")));
 
 static llvm::cl::list<std::string>
 SDKJsonPaths("input-paths",
@@ -204,6 +208,11 @@ OutputInJson("json", llvm::cl::desc("Print output in JSON format."),
 static llvm::cl::opt<bool>
 AvoidLocation("avoid-location",
               llvm::cl::desc("Avoid serializing the file paths of SDK nodes."),
+              llvm::cl::cat(Category));
+
+static llvm::cl::opt<bool>
+AvoidToolArgs("avoid-tool-args",
+              llvm::cl::desc("Avoid serializing the arguments for invoking the tool."),
               llvm::cl::cat(Category));
 
 static llvm::cl::opt<std::string>
@@ -1920,6 +1929,21 @@ void DiagnosisEmitter::diagnosis(NodePtr LeftRoot, NodePtr RightRoot,
   SDKNode::postorderVisit(LeftRoot, Emitter);
 }
 
+static bool diagnoseRemovedExtensionMembers(const SDKNode *Node) {
+  // If the removed decl is an extension, diagnose each member as being removed rather than
+  // the extension itself has been removed.
+  if (auto *DT= dyn_cast<SDKNodeDeclType>(Node)) {
+    if (DT->isExtension()) {
+      for (auto *C: DT->getChildren()) {
+        auto *MD = cast<SDKNodeDecl>(C);
+        MD->emitDiag(diag::removed_decl, MD->isDeprecated());
+      }
+      return true;
+    }
+  }
+  return false;
+}
+
 void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
   assert(Node->isAnnotatedAs(Anno));
   auto &Ctx = Node->getSDKContext();
@@ -1987,8 +2011,9 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
         return;
       }
     }
-
-    Node->emitDiag(diag::removed_decl, Node->isDeprecated());
+    bool handled = diagnoseRemovedExtensionMembers(Node);
+    if (!handled)
+      Node->emitDiag(diag::removed_decl, Node->isDeprecated());
     return;
   }
   case NodeAnnotation::Rename: {
@@ -2443,9 +2468,10 @@ static int deserializeNameCorrection(APIDiffItemStore &Store,
   return EC.value();
 }
 
-static CheckerOptions getCheckOpts() {
+static CheckerOptions getCheckOpts(int argc, char *argv[]) {
   CheckerOptions Opts;
   Opts.AvoidLocation = options::AvoidLocation;
+  Opts.AvoidToolArgs = options::AvoidToolArgs;
   Opts.ABI = options::Abi;
   Opts.Verbose = options::Verbose;
   Opts.AbortOnModuleLoadFailure = options::AbortOnModuleLoadFailure;
@@ -2453,16 +2479,17 @@ static CheckerOptions getCheckOpts() {
   Opts.PrintModule = options::PrintModule;
   Opts.SwiftOnly = options::SwiftOnly;
   Opts.SkipOSCheck = options::DisableOSChecks;
+  for (int i = 1; i < argc; ++i)
+    Opts.ToolArgs.push_back(StringRef(argv[i]));
   return Opts;
 }
 
-static SDKNodeRoot *getSDKRoot(const char *Main, SDKContext &Ctx,
-                            CheckerOptions Opts, bool IsBaseline) {
+static SDKNodeRoot *getSDKRoot(const char *Main, SDKContext &Ctx, bool IsBaseline) {
   CompilerInvocation Invok;
   llvm::StringSet<> Modules;
   if (prepareForDump(Main, Invok, Modules, IsBaseline))
     return nullptr;
-  return getSDKNodeRoot(Ctx, Invok, Modules, Opts);
+  return getSDKNodeRoot(Ctx, Invok, Modules);
 }
 
 static bool hasBaselineInput() {
@@ -2482,7 +2509,7 @@ int main(int argc, char *argv[]) {
   std::vector<std::string> PrintApis;
   llvm::StringSet<> IgnoredUsrs;
   readIgnoredUsrs(IgnoredUsrs);
-  CheckerOptions Opts = getCheckOpts();
+  CheckerOptions Opts = getCheckOpts(argc, argv);
   for (auto Name : options::ApisPrintUsrs)
     PrintApis.push_back(Name);
   switch (options::Action) {
@@ -2513,8 +2540,8 @@ int main(int argc, char *argv[]) {
                                   std::move(protocolWhitelist));
     else {
       SDKContext Ctx(Opts);
-      return diagnoseModuleChange(Ctx, getSDKRoot(argv[0], Ctx, Opts, true),
-                                  getSDKRoot(argv[0], Ctx, Opts, false),
+      return diagnoseModuleChange(Ctx, getSDKRoot(argv[0], Ctx, true),
+                                  getSDKRoot(argv[0], Ctx, false),
                                   options::OutputFile,
                                   std::move(protocolWhitelist));
     }
@@ -2542,6 +2569,11 @@ int main(int argc, char *argv[]) {
     for (unsigned I = 0; I < Paths.size(); I ++)
       Store.addStorePath(Paths[I]);
     return deserializeNameCorrection(Store, options::OutputFile);
+  }
+  case ActionType::GenerateEmptyBaseline: {
+    SDKContext Ctx(Opts);
+    dumpSDKRoot(getEmptySDKNodeRoot(Ctx), options::OutputFile);
+    return 0;
   }
   case ActionType::FindUsr: {
     if (options::SDKJsonPaths.size() != 1) {

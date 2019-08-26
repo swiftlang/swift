@@ -375,6 +375,9 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// must be properly aligned for accessing `T`, and `source.count` must be a
   /// multiple of `MemoryLayout<T>.stride`.
   ///
+  /// The memory referenced by `source` may overlap with the memory referenced 
+  /// by this buffer.
+  ///
   /// After calling `copyMemory(from:)`, the first `source.count` bytes of
   /// memory referenced by this buffer are initialized to raw bytes. If the
   /// memory is bound to type `T`, then it contains values of type `T`.

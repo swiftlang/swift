@@ -1044,7 +1044,7 @@ ClassDecl *ASTContext::get##NAME##Decl() const { \
       /* Note: use unqualified lookup so we find NSError regardless of */ \
       /* whether it's defined in the Foundation module or the Clang */ \
       /* Foundation module it imports. */ \
-      UnqualifiedLookup lookup(getIdentifier(#NAME), M, nullptr); \
+      UnqualifiedLookup lookup(getIdentifier(#NAME), M); \
       if (auto type = lookup.getSingleTypeResult()) { \
         if (auto classDecl = dyn_cast<ClassDecl>(type)) { \
           if (classDecl->getGenericParams() == nullptr) { \
@@ -2191,13 +2191,8 @@ LazyContextData *ASTContext::getOrCreateLazyContextData(
   return entry;
 }
 
-bool ASTContext::hasUnparsedMembers(const IterableDeclContext *IDC) const {
-  auto parsers = getImpl().lazyParsers;
-  return std::any_of(parsers.begin(), parsers.end(),
-    [IDC](LazyMemberParser *p) { return p->hasUnparsedMembers(IDC); });
-}
-
 void ASTContext::parseMembers(IterableDeclContext *IDC) {
+  assert(IDC->hasUnparsedMembers());
   for (auto *p: getImpl().lazyParsers) {
     if (p->hasUnparsedMembers(IDC))
       p->parseMembers(IDC);
@@ -2696,7 +2691,7 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
 
   auto flags = ParameterTypeFlags();
   switch (selfAccess) {
-  case SelfAccessKind::__Consuming:
+  case SelfAccessKind::Consuming:
     flags = flags.withOwned(true);
     break;
   case SelfAccessKind::Mutating:

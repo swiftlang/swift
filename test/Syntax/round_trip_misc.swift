@@ -14,6 +14,11 @@ class C {
 // Orphan '}' at top level
 }
 
+// Orphan #elseif, #else, #endif at top level.
+#elseif foobar
+#else
+#endif
+
 // Compound name.
 foo(x:y:)()
 
