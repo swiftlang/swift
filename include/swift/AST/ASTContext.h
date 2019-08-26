@@ -112,6 +112,10 @@ namespace swift {
 
   enum class KnownProtocolKind : uint8_t;
 
+namespace namelookup {
+  class ImportCache;
+}
+
 namespace syntax {
   class SyntaxArena;
 }
@@ -683,7 +687,9 @@ public:
   /// If there is no Clang module loader, returns a null pointer.
   /// The loader is owned by the AST context.
   ClangModuleLoader *getDWARFModuleLoader() const;
-  
+
+  namelookup::ImportCache &getImportCache() const;
+
   /// Asks every module loader to verify the ASTs it has loaded.
   ///
   /// Does nothing in non-asserts (NDEBUG) builds.
