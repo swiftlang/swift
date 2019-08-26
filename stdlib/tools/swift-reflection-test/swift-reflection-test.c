@@ -34,6 +34,10 @@
 #include <fcntl.h>
 #endif
 
+#if defined(__clang__) || defined(__GNUC__)
+#define NORETURN __attribute__((noreturn))
+#endif
+
 typedef struct PipeMemoryReader {
   int to_child[2];
   int from_child[2];
@@ -56,11 +60,13 @@ typedef struct RemoteReflectionInfo {
   size_t TotalSize;
 } RemoteReflectionInfo;
 
+NORETURN
 static void errorAndExit(const char *message) {
   fprintf(stderr, "%s\n", message);
   abort();
 }
 
+NORETURN
 static void errnoAndExit(const char *message) {
   fprintf(stderr, "%s: %s\n", message, strerror(errno));
   abort();
