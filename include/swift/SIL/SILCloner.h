@@ -1308,6 +1308,14 @@ SILCloner<ImplClass>::visitDebugValueAddrInst(DebugValueAddrInst *Inst) {
         Inst, getBuilder().create##Name##ToRef(getOpLocation(Inst->getLoc()),  \
                                                getOpValue(Inst->getOperand()), \
                                                getOpType(Inst->getType())));   \
+  }                                                                            \
+  template <typename ImplClass>                                                \
+  void SILCloner<ImplClass>::visitCopy##Name##ValueInst(                       \
+      Copy##Name##ValueInst *Inst) {                                           \
+    getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));      \
+    recordClonedInstruction(Inst, getBuilder().createCopy##Name##Value(        \
+                                      getOpLocation(Inst->getLoc()),           \
+                                      getOpValue(Inst->getOperand())));        \
   }
 #define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...)                   \
   LOADABLE_REF_STORAGE_HELPER(Name, name)                                      \
@@ -1336,14 +1344,6 @@ SILCloner<ImplClass>::visitDebugValueAddrInst(DebugValueAddrInst *Inst) {
                                       getOpLocation(Inst->getLoc()),           \
                                       getOpValue(Inst->getOperand()),          \
                                       Inst->getAtomicity()));                  \
-  }                                                                            \
-  template <typename ImplClass>                                                \
-  void SILCloner<ImplClass>::visitCopy##Name##ValueInst(                       \
-      Copy##Name##ValueInst *Inst) {                                           \
-    getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));      \
-    recordClonedInstruction(Inst, getBuilder().createCopy##Name##Value(        \
-                                      getOpLocation(Inst->getLoc()),           \
-                                      getOpValue(Inst->getOperand())));        \
   }
 #define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
   NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, name, "...") \

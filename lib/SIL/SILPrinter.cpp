@@ -1538,6 +1538,11 @@ public:
     *this << getIDAndType(I->getOperand());
   }
 
+#define UNCHECKED_REF_STORAGE(Name, ...)                                       \
+  void visitCopy##Name##ValueInst(Copy##Name##ValueInst *I) {                  \
+    *this << getIDAndType(I->getOperand());                                    \
+  }
+
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   void visitCopy##Name##ValueInst(Copy##Name##ValueInst *I) { \
     *this << getIDAndType(I->getOperand()); \
