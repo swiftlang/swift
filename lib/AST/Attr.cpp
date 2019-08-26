@@ -561,13 +561,11 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
 
     Printer << "exported: "<<  exported << ", ";
     Printer << "kind: " << kind << ", ";
+    SmallVector<Requirement, 4> requirementsScratch;
     ArrayRef<Requirement> requirements;
     if (auto sig = attr->getSpecializedSgnature())
       requirements = sig->getRequirements();
 
-    if (!requirements.empty()) {
-      Printer << "where ";
-    }
     std::function<Type(Type)> GetInterfaceType;
     auto *FnDecl = dyn_cast_or_null<AbstractFunctionDecl>(D);
     if (!FnDecl || !FnDecl->getGenericEnvironment())
@@ -580,7 +578,18 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
       GetInterfaceType = [=](Type Ty) -> Type {
         return GenericEnv->getSugaredType(Ty);
       };
+
+      if (auto sig = attr->getSpecializedSgnature()) {
+        requirementsScratch = sig->requirementsNotSatisfiedBy(
+            GenericEnv->getGenericSignature());
+        requirements = requirementsScratch;
+      }
     }
+
+    if (!requirements.empty()) {
+      Printer << "where ";
+    }
+
     interleave(requirements,
                [&](Requirement req) {
                  auto FirstTy = GetInterfaceType(req.getFirstType());

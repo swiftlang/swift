@@ -3032,8 +3032,36 @@ void SILSpecializeAttr::print(llvm::raw_ostream &OS) const {
 
   OS << "exported: " << exported << ", ";
   OS << "kind: " << kind << ", ";
-  OS << "signature: ";
-  getSpecializedSignature()->print(OS);
+
+  auto requirements = getSpecializedSignature()->requirementsNotSatisfiedBy(
+      getFunction()->getGenericEnvironment()->getGenericSignature());
+  if (!requirements.empty()) {
+    OS << "where ";
+    SILFunction *F = getFunction();
+    assert(F);
+    auto GenericEnv = F->getGenericEnvironment();
+    interleave(requirements,
+               [&](Requirement req) {
+                 if (!GenericEnv) {
+                   req.print(OS, SubPrinter);
+                   return;
+                 }
+                 // Use GenericEnvironment to produce user-friendly
+                 // names instead of something like t_0_0.
+                 auto FirstTy = GenericEnv->getSugaredType(req.getFirstType());
+                 if (req.getKind() != RequirementKind::Layout) {
+                   auto SecondTy =
+                       GenericEnv->getSugaredType(req.getSecondType());
+                   Requirement ReqWithDecls(req.getKind(), FirstTy, SecondTy);
+                   ReqWithDecls.print(OS, SubPrinter);
+                 } else {
+                   Requirement ReqWithDecls(req.getKind(), FirstTy,
+                                            req.getLayoutConstraint());
+                   ReqWithDecls.print(OS, SubPrinter);
+                 }
+               },
+               [&] { OS << ", "; });
+  }
 }
 
 //===----------------------------------------------------------------------===//
