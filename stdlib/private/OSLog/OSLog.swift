@@ -90,6 +90,7 @@ internal func osLog(
                  bufferMemory,
                  UInt32(bufferSize))
 
+  builder.destroy()
   bufferMemory.deallocate()
 }
 
