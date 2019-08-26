@@ -4535,24 +4535,71 @@ namespace {
     }
 
     template <typename T, typename U>
-    T *resolveSwiftDeclImpl(const U *decl, Identifier name, ModuleDecl *overlay) {
+    T *resolveSwiftDeclImpl(const U *decl, Identifier name, bool hasCustomName,
+                            ModuleDecl *overlay) {
       const auto &languageVersion =
           Impl.SwiftContext.LangOpts.EffectiveLanguageVersion;
 
+      // None = not enough information
+      // true/false = definitive answer
+      auto isMatch = [&](const T *singleResult) -> Optional<bool> {
+        const DeclAttributes &attrs = singleResult->getAttrs();
+
+        // Skip versioned variants.
+        if (attrs.isUnavailableInSwiftVersion(languageVersion))
+          return false;
+
+        // If Clang decl has a custom Swift name, then `name` is that name.
+        if (hasCustomName)
+          return None;
+
+        // Skip if a different name is used for Objective-C.
+        if (auto objcAttr = attrs.getAttribute<ObjCAttr>())
+          if (auto objcName = objcAttr->getName())
+            return objcName->getSimpleName() == name;
+
+        return None;
+      };
+
+      // First look at Swift types with the same name.
       SmallVector<ValueDecl *, 4> results;
       overlay->lookupValue(name, NLKind::QualifiedLookup, results);
       T *found = nullptr;
       for (auto result : results) {
         if (auto singleResult = dyn_cast<T>(result)) {
-          // Skip versioned variants.
-          const DeclAttributes &attrs = singleResult->getAttrs();
-          if (attrs.isUnavailableInSwiftVersion(languageVersion))
+          // Eliminate false positives (Swift name matches but Obj-C name doesn't).
+          Optional<bool> matched = isMatch(singleResult);
+          if (matched.hasValue() && !*matched)
+            continue;
+
+          // Skip if type not exposed to Objective-C.
+          if (!hasCustomName && !singleResult->isObjC())
             continue;
 
           if (found)
             return nullptr;
 
           found = singleResult;
+        }
+      }
+
+      if (!found && !hasCustomName) {
+        // Try harder to find match with custom Objective-C name.
+        // Only positive matches can be used, since we've already eliminated
+        // all native Swift types with the same native name.
+        SmallVector<Decl *, 64> results;
+        overlay->getTopLevelDecls(results);
+        for (auto result : results) {
+          if (auto singleResult = dyn_cast<T>(result)) {
+            Optional<bool> matched = isMatch(singleResult);
+            if (!(matched.hasValue() && *matched))
+              continue;
+
+            if (found)
+              return nullptr;
+
+            found = singleResult;
+          }
         }
       }
 
@@ -4564,16 +4611,17 @@ namespace {
     }
 
     template <typename T, typename U>
-    T *resolveSwiftDecl(const U *decl, Identifier name,
+    T *resolveSwiftDecl(const U *decl, Identifier name, bool hasCustomName,
                         ClangModuleUnit *clangModule) {
       if (auto overlay = clangModule->getOverlayModule())
-        return resolveSwiftDeclImpl<T>(decl, name, overlay);
+        return resolveSwiftDeclImpl<T>(decl, name, hasCustomName, overlay);
       if (clangModule == Impl.ImportedHeaderUnit) {
         // Use an index-based loop because new owners can come in as we're
         // iterating.
         for (size_t i = 0; i < Impl.ImportedHeaderOwners.size(); ++i) {
           ModuleDecl *owner = Impl.ImportedHeaderOwners[i];
-          if (T *result = resolveSwiftDeclImpl<T>(decl, name, owner))
+          if (T *result = resolveSwiftDeclImpl<T>(decl, name, hasCustomName,
+                                                  owner))
             return result;
         }
       }
@@ -4586,7 +4634,8 @@ namespace {
       if (!importer::hasNativeSwiftDecl(decl))
         return false;
       auto wrapperUnit = cast<ClangModuleUnit>(dc->getModuleScopeContext());
-      swiftDecl = resolveSwiftDecl<T>(decl, name, wrapperUnit);
+      swiftDecl = resolveSwiftDecl<T>(decl, name, /*hasCustomName=*/true,
+                                      wrapperUnit);
       return true;
     }
 
@@ -4615,13 +4664,14 @@ namespace {
                                             *correctSwiftName);
 
       Identifier name = importedName.getDeclName().getBaseIdentifier();
+      bool hasCustomName = importedName.hasCustomName();
 
       // FIXME: Figure out how to deal with incomplete protocols, since that
       // notion doesn't exist in Swift.
       if (!decl->hasDefinition()) {
         // Check if this protocol is implemented in its overlay.
         if (auto clangModule = Impl.getClangModuleForDecl(decl, true))
-          if (auto native = resolveSwiftDecl<ProtocolDecl>(decl, name,
+          if (auto native = resolveSwiftDecl<ProtocolDecl>(decl, name, hasCustomName,
                                                            clangModule))
             return native;
 
@@ -4733,11 +4783,13 @@ namespace {
                                             *correctSwiftName);
 
       auto name = importedName.getDeclName().getBaseIdentifier();
+      bool hasCustomName = importedName.hasCustomName();
 
       if (!decl->hasDefinition()) {
         // Check if this class is implemented in its overlay.
         if (auto clangModule = Impl.getClangModuleForDecl(decl, true)) {
           if (auto native = resolveSwiftDecl<ClassDecl>(decl, name,
+                                                        hasCustomName,
                                                         clangModule)) {
             return native;
           }
