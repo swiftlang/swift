@@ -187,13 +187,34 @@ static void recordShadowedDeclsAfterSignatureMatch(
   // all have the same signature, we expect n to remain small.
   auto *curModule = dc->getParentModule();
   ASTContext &ctx = curModule->getASTContext();
+  auto &imports = ctx.getImportCache();
+
   for (unsigned firstIdx : indices(decls)) {
     auto firstDecl = decls[firstIdx];
     auto firstModule = firstDecl->getModuleContext();
+    auto name = firstDecl->getBaseName();
     for (unsigned secondIdx : range(firstIdx + 1, decls.size())) {
       // Determine whether one module takes precedence over another.
       auto secondDecl = decls[secondIdx];
       auto secondModule = secondDecl->getModuleContext();
+
+      // Top-level type declarations in a module shadow other declarations
+      // visible through the module's imports.
+      //
+      // [Backward compatibility] Note that members of types have the same
+      // shadowing check, but we do it after dropping unavailable members.
+      if (firstModule != secondModule &&
+          firstDecl->getDeclContext()->isModuleScopeContext() &&
+          secondDecl->getDeclContext()->isModuleScopeContext()) {
+        // Now check if one module shadows the other.
+        if (imports.isShadowedBy(firstModule, secondModule, name, dc)) {
+          shadowed.insert(firstDecl);
+          break;
+        } else if (imports.isShadowedBy(secondModule, firstModule, name, dc)) {
+          shadowed.insert(secondDecl);
+          continue;
+        }
+      }
 
       // Swift 4 compatibility hack: Don't shadow properties defined in
       // extensions of generic types with properties defined elsewhere.
