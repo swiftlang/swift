@@ -24,6 +24,7 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/ImportCache.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/LinkLibrary.h"
 #include "swift/AST/ModuleLoader.h"
@@ -1642,6 +1643,8 @@ bool SourceFile::isImportedImplementationOnly(const ModuleDecl *module) const {
 }
 
 void ModuleDecl::clearLookupCache() {
+  getASTContext().getImportCache().clear();
+
   if (!Cache)
     return;
 
