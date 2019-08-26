@@ -268,6 +268,8 @@ static bool emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
   for (auto &module : ctxt.LoadedModules) {
     ModuleDecl *loadedDecl = module.second;
     assert(loadedDecl && "Expected loaded module to be non-null.");
+    if (loadedDecl == mainModule)
+      continue;
     assert(!loadedDecl->getModuleFilename().empty()
            && "Don't know how to handle modules with empty names.");
     pathToModuleDecl.insert(

@@ -14,11 +14,11 @@
 
 #include "swift/SILOptimizer/Utils/Generics.h"
 #include "swift/AST/GenericEnvironment.h"
-#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/TypeMatcher.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/Basic/Statistic.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Serialization/SerializedSILLoader.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/InstructionUtils.h"
@@ -854,24 +854,15 @@ static std::pair<GenericEnvironment *, GenericSignature *>
 getGenericEnvironmentAndSignatureWithRequirements(
     GenericSignature *OrigGenSig, GenericEnvironment *OrigGenericEnv,
     ArrayRef<Requirement> Requirements, SILModule &M) {
-  // Form a new generic signature based on the old one.
-  GenericSignatureBuilder Builder(M.getASTContext());
+  SmallVector<Requirement, 2> RequirementsCopy(Requirements.begin(),
+                                               Requirements.end());
 
-  // First, add the old generic signature.
-  Builder.addGenericSignature(OrigGenSig);
+  auto NewGenSig = evaluateOrDefault(
+      M.getASTContext().evaluator,
+      AbstractGenericSignatureRequest{
+        OrigGenSig, { }, std::move(RequirementsCopy)},
+      nullptr);
 
-  auto Source =
-    GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
-  // For each substitution with a concrete type as a replacement,
-  // add a new concrete type equality requirement.
-  for (auto &Req : Requirements) {
-    Builder.addRequirement(Req, Source, M.getSwiftModule());
-  }
-
-  auto NewGenSig =
-    std::move(Builder).computeGenericSignature(
-                                   SourceLoc(),
-                                   /*allowConcreteGenericParams=*/true);
   auto NewGenEnv = NewGenSig->createGenericEnvironment();
   return { NewGenEnv, NewGenSig };
 }
@@ -1149,11 +1140,11 @@ class FunctionSignaturePartialSpecializer {
   ModuleDecl *SM;
   ASTContext &Ctx;
 
-  /// This is a builder for a new partially specialized generic signature.
-  GenericSignatureBuilder Builder;
-
   /// Set of newly created generic type parameters.
-  SmallVector<GenericTypeParamType*, 4> AllGenericParams;
+  SmallVector<GenericTypeParamType*, 2> AllGenericParams;
+
+  /// Set of newly created requirements.
+  SmallVector<Requirement, 2> AllRequirements;
 
   /// Archetypes used in the substitutions of an apply instructions.
   /// These are the contextual archetypes of the caller function, which
@@ -1200,8 +1191,7 @@ public:
                                       SubstitutionMap ParamSubs)
       : CallerGenericSig(CallerGenericSig), CallerGenericEnv(CallerGenericEnv),
         CalleeGenericSig(CalleeGenericSig), CalleeGenericEnv(CalleeGenericEnv),
-        M(M), SM(M.getSwiftModule()), Ctx(M.getASTContext()),
-        Builder(Ctx) {
+        M(M), SM(M.getSwiftModule()), Ctx(M.getASTContext()) {
     SpecializedGenericSig = nullptr;
     SpecializedGenericEnv = nullptr;
     CalleeInterfaceToCallerArchetypeMap = ParamSubs;
@@ -1212,16 +1202,14 @@ public:
   FunctionSignaturePartialSpecializer(SILModule &M,
                                       GenericSignature *CalleeGenericSig,
                                       GenericEnvironment *CalleeGenericEnv,
-                                      ArrayRef<Requirement> Requirements)
+                                      GenericSignature *SpecializedSig)
       : CallerGenericSig(CalleeGenericSig), CallerGenericEnv(CalleeGenericEnv),
         CalleeGenericSig(CalleeGenericSig), CalleeGenericEnv(CalleeGenericEnv),
-        M(M), SM(M.getSwiftModule()), Ctx(M.getASTContext()),
-        Builder(Ctx) {
+        SpecializedGenericSig(SpecializedSig),
+        M(M), SM(M.getSwiftModule()), Ctx(M.getASTContext()) {
 
     // Create the new generic signature using provided requirements.
-    std::tie(SpecializedGenericEnv, SpecializedGenericSig) =
-        getGenericEnvironmentAndSignatureWithRequirements(
-            CalleeGenericSig, CalleeGenericEnv, Requirements, M);
+    SpecializedGenericEnv = SpecializedGenericSig->createGenericEnvironment();
 
     // Compute SubstitutionMaps required for re-mapping.
 
@@ -1269,7 +1257,6 @@ GenericTypeParamType *
 FunctionSignaturePartialSpecializer::createGenericParam() {
   auto GP = GenericTypeParamType::get(0, GPIdx++, Ctx);
   AllGenericParams.push_back(GP);
-  Builder.addGenericParameter(GP);
   return GP;
 }
 
@@ -1398,8 +1385,6 @@ void FunctionSignaturePartialSpecializer::
 /// which requires a substitution.
 void FunctionSignaturePartialSpecializer::
     createGenericParamsForCalleeGenericParams() {
-  auto Source =
-      GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
   for (auto GP : CalleeGenericSig->getGenericParams()) {
     auto CanTy = GP->getCanonicalType();
     auto CanTyInContext =
@@ -1462,7 +1447,7 @@ void FunctionSignaturePartialSpecializer::
 
     Requirement Req(RequirementKind::SameType, SubstGenericParamCanTy,
                     SpecializedReplacementCallerInterfaceTy);
-    Builder.addRequirement(Req, Source, SM);
+    AllRequirements.push_back(Req);
 
     LLVM_DEBUG(llvm::dbgs() << "Added a requirement:\n"; Req.dump());
 
@@ -1498,17 +1483,14 @@ void FunctionSignaturePartialSpecializer::
   }
 }
 
-/// Add requirements from a given list of requirements to the
-/// GenericSignatureBuilder. Re-map them using the provided SubstitutionMap.
+/// Add requirements from a given list of requirements re-mapping them using
+/// the provided SubstitutionMap.
 void FunctionSignaturePartialSpecializer::addRequirements(
     ArrayRef<Requirement> Reqs, SubstitutionMap &SubsMap) {
-  auto source =
-    GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
-
   for (auto &reqReq : Reqs) {
     LLVM_DEBUG(llvm::dbgs() << "\n\nRe-mapping the requirement:\n";
                reqReq.dump());
-    Builder.addRequirement(*reqReq.subst(SubsMap), source, SM);
+    AllRequirements.push_back(*reqReq.subst(SubsMap));
   }
 }
 
@@ -1546,11 +1528,11 @@ FunctionSignaturePartialSpecializer::
     return { nullptr, nullptr };
 
   // Finalize the archetype builder.
-  auto GenSig =
-      std::move(Builder).computeGenericSignature(
-                                      SourceLoc(),
-                                      /*allowConcreteGenericParams=*/true);
-  auto GenEnv = GenSig->createGenericEnvironment();
+  auto GenSig = evaluateOrDefault(
+      Ctx.evaluator,
+      AbstractGenericSignatureRequest{nullptr, AllGenericParams, AllRequirements},
+      nullptr);
+  auto GenEnv = GenSig ? GenSig->createGenericEnvironment() : nullptr;
   return { GenEnv, GenSig };
 }
 
@@ -1765,46 +1747,13 @@ void ReabstractionInfo::finishPartialSpecializationPreparation(
   }
 }
 
-/// Perform some sanity checks for the requirements provided in @_specialize.
-static void
-checkSpecializationRequirements(ArrayRef<Requirement> Requirements) {
-  for (auto &Req : Requirements) {
-    if (Req.getKind() == RequirementKind::SameType) {
-      auto FirstType = Req.getFirstType();
-      auto SecondType = Req.getSecondType();
-      assert(FirstType && SecondType);
-      assert(!FirstType->hasArchetype());
-      assert(!SecondType->hasArchetype());
-
-      // Only one of the types should be concrete.
-      assert(FirstType->hasTypeParameter() != SecondType->hasTypeParameter() &&
-             "Only concrete type same-type requirements are supported by "
-             "generic specialization");
-
-      (void) FirstType;
-      (void) SecondType;
-
-      continue;
-    }
-
-    if (Req.getKind() == RequirementKind::Layout) {
-      continue;
-    }
-
-    llvm_unreachable("Unknown type of requirement in generic specialization");
-  }
-}
-
 /// This constructor is used when processing @_specialize.
 ReabstractionInfo::ReabstractionInfo(SILFunction *Callee,
-                                     ArrayRef<Requirement> Requirements) {
+                                     GenericSignature *SpecializedSig) {
   Serialized = Callee->isSerialized();
 
   if (shouldNotSpecialize(Callee, nullptr))
     return;
-
-  // Perform some sanity checks for the requirements.
-  checkSpecializationRequirements(Requirements);
 
   this->Callee = Callee;
   ConvertIndirectToDirect = true;
@@ -1817,7 +1766,7 @@ ReabstractionInfo::ReabstractionInfo(SILFunction *Callee,
 
   FunctionSignaturePartialSpecializer FSPS(M,
                                            CalleeGenericSig, CalleeGenericEnv,
-                                           Requirements);
+                                           SpecializedSig);
 
   finishPartialSpecializationPreparation(FSPS);
 }

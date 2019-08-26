@@ -65,7 +65,9 @@ class ExistentialTransform {
 
   /// Create new generic arguments from existential arguments.
   void
-  convertExistentialArgTypesToGenericArgTypes(GenericSignatureBuilder &Builder);
+  convertExistentialArgTypesToGenericArgTypes(
+      SmallVectorImpl<GenericTypeParamType *> &genericParams,
+      SmallVectorImpl<Requirement> &requirements);
 
   /// Create a name for the inner function.
   std::string createExistentialSpecializedFunctionName();

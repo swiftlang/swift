@@ -21,11 +21,14 @@
 namespace swift {
 
 class CustomAttr;
+class GenericSignature;
+class GenericTypeParamType;
 class NominalTypeDecl;
 struct PropertyWrapperBackingPropertyInfo;
 struct PropertyWrapperTypeInfo;
 enum class CtorInitializerKind;
 struct PropertyWrapperMutability;
+class Requirement;
 class Type;
 class VarDecl;
 class TypeAliasDecl;

@@ -97,7 +97,7 @@ def create_directory(path):
 
 
 class DumpConfig:
-    def __init__(self, tool_path, platform):
+    def __init__(self, tool_path, platform, platform_alias):
         target_map = {
             'iphoneos': 'arm64-apple-ios13.0',
             'macosx': 'x86_64-apple-macosx10.15',
@@ -110,12 +110,11 @@ class DumpConfig:
         self.target = target_map[platform]
         self.sdk = get_sdk_path(platform)
         self.inputs = []
+        self.platform_alias = platform_alias
         if self.platform == 'macosx':
             # We need this input search path for CreateML
             self.inputs.extend([self.sdk + '/usr/lib/swift/'])
-        self.frameworks = [
-            self.sdk + '/System/Library/Frameworks/',
-            os.path.realpath(self.sdk + '/../../Library/Frameworks/')]
+        self.frameworks = []
         if self.platform.startswith('iosmac'):
             # Catalyst modules need this extra framework dir
             iOSSupport = self.sdk + \
@@ -156,7 +155,8 @@ class DumpConfig:
                             continue
                         dir_path = os.path.realpath(output + '/' + module)
                         file_path = os.path.realpath(dir_path + '/' +
-                                                     self.platform + '.json')
+                                                     self.platform_alias +
+                                                     '.json')
                         create_directory(dir_path)
                         current_cmd = list(cmd)
                         current_cmd.extend(['-module', module])
@@ -245,6 +245,12 @@ A convenient wrapper for swift-api-digester.
                              action='store_true',
                              help='When importing entire SDK, dump content '
                                   'seprately by module names')
+
+    basic_group.add_argument('--platform-alias', default='', help='''
+        Specify a file name to use if using a platform name in json file isn't
+        optimal
+        ''')
+
     args = parser.parse_args(sys.argv[1:])
 
     if args.action == 'dump':
@@ -263,7 +269,10 @@ A convenient wrapper for swift-api-digester.
             include_fixed_clang_modules = False
         else:
             fatal_error("cannot recognize --module-filter")
-        runner = DumpConfig(tool_path=args.tool_path, platform=args.target)
+        if args.platform_alias == '':
+            args.platform_alias = args.target
+        runner = DumpConfig(tool_path=args.tool_path, platform=args.target,
+                            platform_alias=args.platform_alias)
         runner.run(output=args.output, module=args.module,
                    swift_ver=args.swift_version, opts=args.opts,
                    verbose=args.v,
