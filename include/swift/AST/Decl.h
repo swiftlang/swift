@@ -6018,6 +6018,7 @@ public:
   bool isConsuming() const {
     return getSelfAccessKind() == SelfAccessKind::Consuming;
   }
+  bool isCallAsFunctionMethod() const;
 
   SelfAccessKind getSelfAccessKind() const;
 
