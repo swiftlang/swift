@@ -40,7 +40,7 @@ Swift Next
     }
   }
   var adder = Adder(base: 3)
-  adder(10) // same as `adder.callAsFunction(10)`
+  adder(10) // returns 13, same as `adder.callAsFunction(10)`
   ```
 
   `func callAsFunction` argument labels are required at call sites.
