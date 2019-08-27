@@ -31,12 +31,24 @@ DerivedConformanceTests.test("MemberwiseInitializers") {
 }
 
 DerivedConformanceTests.test("EuclideanVectorView") {
-  struct Foo: EuclideanDifferentiable {
-    var x: SIMD4<Float>
-    @noDerivative var y: SIMD4<Int32>
+  do {
+    struct Foo: EuclideanDifferentiable {
+      var x: SIMD4<Float>
+      @noDerivative var y: SIMD4<Int32>
+      init() { x = [1, 2, 3, 4]; y = .zero }
+    }
+    let x = Foo()
+    expectEqual(Foo.TangentVector(x: [1, 2, 3, 4]), x.vectorView)
   }
-  let x = Foo(x: [1, 2, 3, 4], y: .zero)
-  expectEqual(Foo.TangentVector(x: [1, 2, 3, 4]), x.vectorView)
+  do {
+    class FooClass: EuclideanDifferentiable {
+      var x: SIMD4<Float>
+      @noDerivative var y: SIMD4<Int32>
+      init() { x = [1, 2, 3, 4]; y = .zero }
+    }
+    let x = FooClass()
+    expectEqual(FooClass.TangentVector(x: [1, 2, 3, 4]), x.vectorView)
+  }
 }
 
 runAllTests()
