@@ -547,12 +547,12 @@ Parser::parseGenericArgumentClauseSyntax() {
 
   SmallVector<ParsedGenericArgumentSyntax, 4> Args;
   SmallVector<ParsedSyntax, 0> Junk;
+  Junk.push_back(LAngle);
 
   while (true) {
     ParserResult<TypeRepr> Ty = parseType(diag::expected_type);
     auto Type = SyntaxContext->popIf<ParsedTypeSyntax>();
     if (Ty.isParseError() || Ty.hasCodeCompletion()) {
-      Junk.push_back(LAngle);
       Junk.append(Args.begin(), Args.end());
       if (Type)
         Junk.push_back(*Type);
@@ -571,9 +571,7 @@ Parser::parseGenericArgumentClauseSyntax() {
     diagnose(Tok, diag::expected_rangle_generic_arg_list);
     diagnose(LAngleLoc, diag::opening_angle);
 
-    Junk.push_back(LAngle);
-    for (auto &&Arg : Args)
-      Junk.push_back(Arg); 
+    Junk.append(Args.begin(), Args.end());
     skipUntilGreaterInTypeListSyntax(Junk);
     return makeParsedError<ParsedGenericArgumentClauseSyntax>(Junk);
   }
