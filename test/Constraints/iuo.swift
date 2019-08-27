@@ -223,3 +223,15 @@ var y: Int = 2
 
 let r = sr6988(x: x, y: y)
 let _: Int = r
+
+// SR-10492
+
+struct SR_10492_S {
+  func foo() -> Int! { return 0 }
+}
+
+let sr_10492_s = SR_10492_S()
+let sr_10492_int1: Int = (sr_10492_s.foo)() // expected-error {{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
+// expected-note@-1 {{coalesce}}{{44-44= ?? <#default value#>}}
+// expected-note@-2 {{force-unwrap}}{{44-44=!}}
+let sr_10492_int2: Int? = (sr_10492_s.foo)() // Okay
