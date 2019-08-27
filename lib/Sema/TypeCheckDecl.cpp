@@ -4414,23 +4414,23 @@ static bool isNonGenericTypeAliasType(Type type) {
   return false;
 }
 
-static Type validateExtendedType(ExtensionDecl *ext) {
+llvm::Expected<Type>
+ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
   auto error = [&ext]() {
     ext->setInvalid();
     return ErrorType::get(ext->getASTContext());
   };
 
   // If we didn't parse a type, fill in an error type and bail out.
-  if (!ext->getExtendedTypeLoc().getTypeRepr())
+  auto *extendedRepr = ext->getExtendedTypeRepr();
+  if (!extendedRepr)
     return error();
 
   // Compute the extended type.
   TypeResolutionOptions options(TypeResolverContext::ExtensionBinding);
   options |= TypeResolutionFlags::AllowUnboundGenerics;
   auto tr = TypeResolution::forStructural(ext->getDeclContext());
-  auto extendedType = tr.resolveType(ext->getExtendedTypeLoc().getTypeRepr(),
-                                     options);
-  ext->getExtendedTypeLoc().setType(extendedType);
+  auto extendedType = tr.resolveType(extendedRepr, options);
 
   if (extendedType->hasError())
     return error();
@@ -4451,14 +4451,14 @@ static Type validateExtendedType(ExtensionDecl *ext) {
   // Cannot extend a metatype.
   if (extendedType->is<AnyMetatypeType>()) {
     diags.diagnose(ext->getLoc(), diag::extension_metatype, extendedType)
-         .highlight(ext->getExtendedTypeLoc().getSourceRange());
+         .highlight(extendedRepr->getSourceRange());
     return error();
   }
 
   // Cannot extend function types, tuple types, etc.
   if (!extendedType->getAnyNominal()) {
     diags.diagnose(ext->getLoc(), diag::non_nominal_extension, extendedType)
-         .highlight(ext->getExtendedTypeLoc().getSourceRange());
+         .highlight(extendedRepr->getSourceRange());
     return error();
   }
 
@@ -4468,7 +4468,7 @@ static Type validateExtendedType(ExtensionDecl *ext) {
       !isNonGenericTypeAliasType(extendedType)) {
     diags.diagnose(ext->getLoc(), diag::extension_specialization,
                    extendedType->getAnyNominal()->getName())
-         .highlight(ext->getExtendedTypeLoc().getSourceRange());
+         .highlight(extendedRepr->getSourceRange());
     return error();
   }
 
@@ -4483,7 +4483,9 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
 
   DeclValidationRAII IBV(ext);
 
-  auto extendedType = validateExtendedType(ext);
+  auto extendedType = evaluateOrDefault(Context.evaluator,
+                                        ExtendedTypeRequest{ext},
+                                        ErrorType::get(ext->getASTContext()));
 
   if (auto *nominal = ext->getExtendedNominal()) {
     // If this extension was not already bound, it means it is either in an
@@ -4495,8 +4497,6 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
 
     // Validate the nominal type declaration being extended.
     validateDecl(nominal);
-
-    ext->getExtendedTypeLoc().setType(extendedType);
 
     if (auto *genericParams = ext->getGenericParams()) {
       GenericEnvironment *env =

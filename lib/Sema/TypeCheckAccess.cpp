@@ -1939,7 +1939,7 @@ public:
     });
 
     if (hasPublicMembers) {
-      checkType(ED->getExtendedTypeLoc(), ED,
+      checkType(ED->getExtendedType(),  ED->getExtendedTypeRepr(), ED,
                 getDiagnoseCallback(ED, Reason::ExtensionWithPublicMembers),
                 getDiagnoseCallback(ED, Reason::ExtensionWithPublicMembers));
     }
