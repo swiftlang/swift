@@ -2947,6 +2947,13 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
+  void visitImplicitlyUnwrappedOptionalTypeRepr(
+      ImplicitlyUnwrappedOptionalTypeRepr *T) {
+    printCommon("implicitly_unwrapped_optional");
+    OS << "\n";
+    printRec(T->getBase());
+  }
+
   void visitCompositionTypeRepr(CompositionTypeRepr *T) {
     printCommon("type_composite");
     for (auto elem : T->getTypes()) {
