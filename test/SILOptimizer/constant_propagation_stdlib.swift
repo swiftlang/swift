@@ -7,7 +7,6 @@ public struct MyInt {
 
 // CHECK-ONONE-LABEL: sil @$s27constant_propagation_stdlib15isConcrete_trueyBi1_AA5MyIntVF : $@convention(thin) (MyInt) -> Builtin.Int1 {
 // CHECK-ONONE:       bb0(
-// CHECK-ONONE:         debug_value %0 : $MyInt, let, name "x", argno 1
 // CHECK-ONONE:         [[RESULT:%.*]] = integer_literal $Builtin.Int1, -1
 // CHECK-ONONE:         return [[RESULT]]
 // CHECK-ONONE:       } // end sil function '$s27constant_propagation_stdlib15isConcrete_trueyBi1_AA5MyIntVF'
@@ -22,7 +21,6 @@ public func isConcrete_true(_ x: MyInt) -> Builtin.Int1 {
 
 // CHECK-ONONE-LABEL: sil @$s27constant_propagation_stdlib16isConcrete_falseyBi1_xlF : $@convention(thin) <T> (@in_guaranteed T) -> Builtin.Int1 {
 // CHECK-ONONE:       bb0(
-// CHECK-ONONE:         debug_value_addr %0 : $*T, let, name "x", argno 1
 // CHECK-ONONE:         [[METATYPE:%.*]] = metatype $@thick T.Type
 // CHECK-ONONE:         [[RESULT:%.*]] = builtin "isConcrete"<T>([[METATYPE]] : $@thick T.Type) : $Builtin.Int1
 // CHECK-ONONE:         return [[RESULT]]
@@ -39,9 +37,8 @@ public func isConcrete_false<T>(_ x: T) -> Builtin.Int1 {
 
 // CHECK-ONONE-LABEL: sil @$s27constant_propagation_stdlib25isConcrete_generic_calleryBi1_xlF : $@convention(thin) <T> (@in_guaranteed T) -> Builtin.Int1 {
 // CHECK-ONONE:       bb0(
-// CHECK-ONONE:         debug_value_addr %0 : $*T, let, name "x", argno 1
-// CHECK-ONONE:         %2 = function_ref @$s27constant_propagation_stdlib16isConcrete_falseyBi1_xlF : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> Builtin.Int1
-// CHECK-ONONE:         [[RESULT:%.*]] = apply %2<T>(%0) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> Builtin.Int1
+// CHECK-ONONE:         [[GEN_FUNC:%.*]] = function_ref @$s27constant_propagation_stdlib16isConcrete_falseyBi1_xlF : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> Builtin.Int1
+// CHECK-ONONE:         [[RESULT:%.*]] = apply [[GEN_FUNC]]<T>(%0) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> Builtin.Int1
 // CHECK-ONONE:         return [[RESULT]]
 // CHECK-ONONE:       } // end sil function '$s27constant_propagation_stdlib25isConcrete_generic_calleryBi1_xlF'
 // CHECK-O-LABEL:     sil @$s27constant_propagation_stdlib25isConcrete_generic_calleryBi1_xlF : $@convention(thin) <T> (@in_guaranteed T) -> Builtin.Int1 {
@@ -56,12 +53,11 @@ public func isConcrete_generic_caller<T>(_ x: T) -> Builtin.Int1 {
 
 // CHECK-ONONE-LABEL: sil @$s27constant_propagation_stdlib26isConcrete_concrete_calleryBi1_AA5MyIntVF : $@convention(thin) (MyInt) -> Builtin.Int1 {
 // CHECK-ONONE:       bb0(
-// CHECK-ONONE:         debug_value %0 : $MyInt, let, name "x", argno 1
-// CHECK-ONONE:         %2 = alloc_stack $MyInt
-// CHECK-ONONE:         store %0 to %2 : $*MyInt
-// CHECK-ONONE:         %4 = function_ref @$s27constant_propagation_stdlib25isConcrete_generic_calleryBi1_xlF : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> Builtin.Int1
-// CHECK-ONONE:         [[RESULT:%.*]] = apply %4<MyInt>(%2) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> Builtin.Int1
-// CHECK-ONONE:         dealloc_stack %2 : $*MyInt
+// CHECK-ONONE:         [[STACK_ARG:%.*]] = alloc_stack $MyInt
+// CHECK-ONONE:         store %0 to [[STACK_ARG]] : $*MyInt
+// CHECK-ONONE:         [[GEN_FUNC:%.*]] = function_ref @$s27constant_propagation_stdlib25isConcrete_generic_calleryBi1_xlF : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> Builtin.Int1
+// CHECK-ONONE:         [[RESULT:%.*]] = apply [[GEN_FUNC]]<MyInt>([[STACK_ARG]]) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> Builtin.Int1
+// CHECK-ONONE:         dealloc_stack [[STACK_ARG]] : $*MyInt
 // CHECK-ONONE:         return [[RESULT]]
 // CHECK-ONONE:       } // end sil function '$s27constant_propagation_stdlib26isConcrete_concrete_calleryBi1_AA5MyIntVF'
 // CHECK-O-LABEL:     sil @$s27constant_propagation_stdlib26isConcrete_concrete_calleryBi1_AA5MyIntVF : $@convention(thin) (MyInt) -> Builtin.Int1 {
@@ -75,17 +71,16 @@ public func isConcrete_concrete_caller(_ x: MyInt) -> Builtin.Int1 {
 
 // CHECK-ONONE-LABEL: sil @$s27constant_propagation_stdlib4main1xBi1__Bi1_Bi1_tAA5MyIntV_tF : $@convention(thin) (MyInt) -> (Builtin.Int1, Builtin.Int1, Builtin.Int1) {
 // CHECK-ONONE:       bb0(
-// CHECK-ONONE:         debug_value %0 : $MyInt, let, name "x", argno 1
-// CHECK-ONONE:         %2 = function_ref @$s27constant_propagation_stdlib15isConcrete_trueyBi1_AA5MyIntVF : $@convention(thin) (MyInt) -> Builtin.Int1
-// CHECK-ONONE:         %3 = apply %2(%0) : $@convention(thin) (MyInt) -> Builtin.Int1
-// CHECK-ONONE:         %4 = alloc_stack $MyInt
-// CHECK-ONONE:         store %0 to %4 : $*MyInt
-// CHECK-ONONE:         %6 = function_ref @$s27constant_propagation_stdlib16isConcrete_falseyBi1_xlF : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> Builtin.Int1
-// CHECK-ONONE:         %7 = apply %6<MyInt>(%4) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> Builtin.Int1
-// CHECK-ONONE:         dealloc_stack %4 : $*MyInt
-// CHECK-ONONE:         %9 = function_ref @$s27constant_propagation_stdlib26isConcrete_concrete_calleryBi1_AA5MyIntVF : $@convention(thin) (MyInt) -> Builtin.Int1
-// CHECK-ONONE:         %10 = apply %9(%0) : $@convention(thin) (MyInt) -> Builtin.Int1
-// CHECK-ONONE:         [[RESULT:%.*]] = tuple (%3 : $Builtin.Int1, %7 : $Builtin.Int1, %10 : $Builtin.Int1)
+// CHECK-ONONE:         [[IS_CONCRETE_TRUE_FUNC:%.*]] = function_ref @$s27constant_propagation_stdlib15isConcrete_trueyBi1_AA5MyIntVF : $@convention(thin) (MyInt) -> Builtin.Int1
+// CHECK-ONONE:         [[IS_CONCRETE_TRUE:%.*]] = apply [[IS_CONCRETE_TRUE_FUNC]](%0) : $@convention(thin) (MyInt) -> Builtin.Int1
+// CHECK-ONONE:         [[STACK_ARG:%.*]] = alloc_stack $MyInt
+// CHECK-ONONE:         store %0 to [[STACK_ARG]] : $*MyInt
+// CHECK-ONONE:         [[IS_CONCRETE_FALSE_FUNC:%.*]] = function_ref @$s27constant_propagation_stdlib16isConcrete_falseyBi1_xlF : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> Builtin.Int1
+// CHECK-ONONE:         [[IS_CONCRETE_FALSE:%.*]] = apply [[IS_CONCRETE_FALSE_FUNC]]<MyInt>([[STACK_ARG]]) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> Builtin.Int1
+// CHECK-ONONE:         dealloc_stack [[STACK_ARG]] : $*MyInt
+// CHECK-ONONE:         [[IS_CONCRETE_CONCRETE_CALLER_FUNC:%.*]] = function_ref @$s27constant_propagation_stdlib26isConcrete_concrete_calleryBi1_AA5MyIntVF : $@convention(thin) (MyInt) -> Builtin.Int1
+// CHECK-ONONE:         [[IS_CONCRETE_CONCRETE_CALLER:%.*]] = apply [[IS_CONCRETE_CONCRETE_CALLER_FUNC]](%0) : $@convention(thin) (MyInt) -> Builtin.Int1
+// CHECK-ONONE:         [[RESULT:%.*]] = tuple ([[IS_CONCRETE_TRUE]] : $Builtin.Int1, [[IS_CONCRETE_FALSE]] : $Builtin.Int1, [[IS_CONCRETE_CONCRETE_CALLER]] : $Builtin.Int1)
 // CHECK-ONONE:         return [[RESULT]]
 // CHECK-ONONE:       } // end sil function '$s27constant_propagation_stdlib4main1xBi1__Bi1_Bi1_tAA5MyIntV_tF'
 // CHECK-O-LABEL:     sil @$s27constant_propagation_stdlib4main1xBi1__Bi1_Bi1_tAA5MyIntV_tF : $@convention(thin) (MyInt) -> (Builtin.Int1, Builtin.Int1, Builtin.Int1) {
