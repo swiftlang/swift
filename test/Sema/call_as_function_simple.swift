@@ -12,7 +12,7 @@ let foo = SimpleCallable()
 _ = foo(1)
 _ = foo(foo(1))
 
-// TODO: Improve this error to match the error using a direct `callAsFunction` member reference.
+// TODO(SR-11378): Improve this error to match the error using a direct `callAsFunction` member reference.
 // expected-error @+2 {{cannot call value of non-function type 'SimpleCallable'}}
 // expected-error @+1 {{cannot invoke 'foo' with an argument list of type '(Int, Int)'}}
 _ = foo(1, 1)
@@ -106,7 +106,7 @@ struct Mutating {
   }
 }
 func testMutating(_ x: Mutating, _ y: inout Mutating) {
-  // TODO: Improve this error to match the error using a direct `callAsFunction` member reference.
+  // TODO(SR-11378): Improve this error to match the error using a direct `callAsFunction` member reference.
   // expected-error @+2 {{cannot call value of non-function type 'Mutating'}}
   // expected-error @+1 {{cannot invoke 'x' with no arguments}}
   _ = x()
