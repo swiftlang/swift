@@ -190,7 +190,6 @@ static void recordShadowedDeclsAfterSignatureMatch(
   for (unsigned firstIdx : indices(decls)) {
     auto firstDecl = decls[firstIdx];
     auto firstModule = firstDecl->getModuleContext();
-    auto firstSig = firstDecl->getOverloadSignature();
     for (unsigned secondIdx : range(firstIdx + 1, decls.size())) {
       // Determine whether one module takes precedence over another.
       auto secondDecl = decls[secondIdx];
@@ -203,6 +202,7 @@ static void recordShadowedDeclsAfterSignatureMatch(
       // used the null type.
       if (!ctx.isSwiftVersionAtLeast(5)) {
         auto secondSig = secondDecl->getOverloadSignature();
+        auto firstSig = firstDecl->getOverloadSignature();
         if (firstSig.IsVariable && secondSig.IsVariable)
           if (firstSig.InExtensionOfGenericType !=
               secondSig.InExtensionOfGenericType)
