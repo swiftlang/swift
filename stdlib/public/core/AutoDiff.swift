@@ -229,14 +229,11 @@ public extension Differentiable where TangentVector == Self {
 ///   `TangentVector` is equal to its vector space component.
 public protocol EuclideanDifferentiable: Differentiable {
   /// The differentiable vector component of `self`.
-  var vectorView: TangentVector { get set }
+  var vectorView: TangentVector { get }
 }
 
 public extension EuclideanDifferentiable where TangentVector == Self {
-  var vectorView: TangentVector {
-    _read { yield self }
-    _modify { yield &self }
-  }
+  var vectorView: TangentVector { _read { yield self } }
 }
 
 /// Returns `x` like an identity function. When used in a context where `x` is

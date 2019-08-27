@@ -4223,6 +4223,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::TensorProtocol:
   case KnownProtocolKind::VectorProtocol:
   case KnownProtocolKind::Differentiable:
+  case KnownProtocolKind::EuclideanDifferentiable:
     return SpecialProtocol::None;
   }
 

@@ -94,6 +94,10 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
   if (*knownProtocol == KnownProtocolKind::Differentiable)
     return canDeriveDifferentiable(Nominal, DC);
 
+  // SWIFT_ENABLE_TENSORFLOW
+  if (*knownProtocol == KnownProtocolKind::EuclideanDifferentiable)
+    return canDeriveEuclideanDifferentiable(Nominal, DC);
+
   if (auto *enumDecl = dyn_cast<EnumDecl>(Nominal)) {
     switch (*knownProtocol) {
         // The presence of a raw type is an explicit declaration that
@@ -254,6 +258,11 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     // AdditiveArithmetic.zero
     if (name.isSimpleName(ctx.Id_zero))
       return getRequirement(KnownProtocolKind::AdditiveArithmetic);
+
+    // SWIFT_ENABLE_TENSORFLOW
+    // EuclideanDifferentiable.vectorView
+    if (name.isSimpleName(ctx.Id_vectorView))
+      return getRequirement(KnownProtocolKind::EuclideanDifferentiable);
 
     // SWIFT_ENABLE_TENSORFLOW
     // PointwiseMultiplicative.one
