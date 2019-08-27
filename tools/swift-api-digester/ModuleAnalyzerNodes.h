@@ -62,7 +62,7 @@ namespace api {
 ///
 /// When the json format changes in a way that requires version-specific handling, this number should be incremented.
 /// This ensures we could have backward compatibility so that version changes in the format won't stop the checker from working.
-const uint8_t DIGESTER_JSON_VERSION = 2; // Adding sugared generic signature to the format
+const uint8_t DIGESTER_JSON_VERSION = 3; // Use fully qualifed type names for all json outputs
 const uint8_t DIGESTER_JSON_DEFAULT_VERSION = 0; // Use this version number for files before we have a version number in json.
 
 class SDKNode;
@@ -154,6 +154,7 @@ struct CheckerOptions {
   bool PrintModule;
   bool SwiftOnly;
   bool SkipOSCheck;
+  bool Migrator;
   StringRef LocationFilter;
   std::vector<StringRef> ToolArgs;
 };
