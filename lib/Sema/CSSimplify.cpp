@@ -3533,21 +3533,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
           TreatRValueAsLValue::create(*this, getConstraintLocator(locator)));
   }
 
-  // If we have something like 'let x: T = (s.foo)()', where 's.foo()'
-  // returns an IUO, then we need to inform the user that the type of 'x'
-  // should be an T?.
-  if (type1->getOptionalObjectType() && !type2->getOptionalObjectType()) {
-    if (auto call = dyn_cast_or_null<CallExpr>(locator.getAnchor())) {
-      if (auto overload = findSelectedOverloadFor(call->getSemanticFn())) {
-        if (overload->Choice.isImplicitlyUnwrappedValueOrReturnValue() &&
-            call->getSemanticFn() != call->getFn()) {
-          conversionsOrFixes.push_back(ContextualMismatch::create(
-              *this, type1, type2, getConstraintLocator(locator)));
-        }
-      }
-    }
-  }
-
   // Attempt to repair any failures identifiable at this point.
   if (attemptFixes) {
     if (repairFailures(type1, type2, conversionsOrFixes, locator)) {

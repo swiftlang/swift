@@ -2507,6 +2507,17 @@ namespace {
           CS.getConstraintLocator(expr, ConstraintLocator::FunctionResult),
           TVO_CanBindToNoEscape);
 
+      // If we have something like '(s.foo)()', where 's.foo()' returns an IUO,
+      // then we need to change the return type to be an optional, so if the
+      // user is assigning the value to a variable of type T, then we can
+      // inform the user that it needs to be T? instead.
+      if (auto overload = CS.findSelectedOverloadFor(expr->getSemanticFn())) {
+        if (overload->Choice.isImplicitlyUnwrappedValueOrReturnValue() &&
+            expr->getSemanticFn() != expr->getFn()) {
+          resultType = OptionalType::get(resultType);
+        }
+      }
+
       // A direct call to a ClosureExpr makes it noescape.
       FunctionType::ExtInfo extInfo;
       if (isa<ClosureExpr>(fnExpr->getSemanticsProvidingExpr()))
