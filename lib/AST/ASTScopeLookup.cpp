@@ -58,7 +58,7 @@ const ASTScopeImpl *ASTScopeImpl::findStartingScopeForLookup(
 
   auto *const fileScope = sourceFile->getScope().impl;
   // Parser may have added decls to source file, since previous lookup
-  sourceFile->getScope().impl->addNewDeclsToTree();
+  sourceFile->getScope().impl->addNewDeclsToScopeTree();
   if (name.isOperator())
     return fileScope; // operators always at file scope
 
@@ -119,8 +119,8 @@ const ASTScopeImpl *ASTScopeImpl::findInnermostEnclosingScopeImpl(
                                                       scopeCreator);
 }
 
-bool ASTScopeImpl::checkChildlessSourceRange() const {
-  const auto r = getChildlessSourceRange();
+bool ASTScopeImpl::checkSourceRangeOfThisASTNode() const {
+  const auto r = getSourceRangeOfThisASTNode();
   (void)r;
   assert(!getSourceManager().isBeforeInBuffer(r.End, r.Start));
   return true;
@@ -134,19 +134,21 @@ ASTScopeImpl::findChildContaining(SourceLoc loc,
     SourceManager &sourceMgr;
 
     bool operator()(const ASTScopeImpl *scope, SourceLoc loc) {
-      assert(scope->checkChildlessSourceRange());
-      return sourceMgr.isBeforeInBuffer(scope->getSourceRange().End, loc);
+      assert(scope->checkSourceRangeOfThisASTNode());
+      return sourceMgr.isBeforeInBuffer(scope->getSourceRangeOfScope().End,
+                                        loc);
     }
     bool operator()(SourceLoc loc, const ASTScopeImpl *scope) {
-      assert(scope->checkChildlessSourceRange());
-      return sourceMgr.isBeforeInBuffer(loc, scope->getSourceRange().End);
+      assert(scope->checkSourceRangeOfThisASTNode());
+      return sourceMgr.isBeforeInBuffer(loc,
+                                        scope->getSourceRangeOfScope().End);
     }
   };
   auto *const *child = std::lower_bound(
       getChildren().begin(), getChildren().end(), loc, CompareLocs{sourceMgr});
 
   if (child != getChildren().end() &&
-      sourceMgr.rangeContainsTokenLoc((*child)->getSourceRange(), loc))
+      sourceMgr.rangeContainsTokenLoc((*child)->getSourceRangeOfScope(), loc))
     return *child;
 
   return nullptr;
