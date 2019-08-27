@@ -122,7 +122,7 @@ bb2(%4 : @owned $Error):
 
 // CHECK: SIL memory lifetime failure in @test_single_block: memory is initialized, but shouldn't
 sil [ossa] @test_single_block : $@convention(thin) (@owned T) -> () {
-bb0(%0 : $T):
+bb0(%0 : @owned $T):
   %2 = alloc_stack $T
   store %0 to [init] %2 : $*T
   dealloc_stack %2 : $*T
