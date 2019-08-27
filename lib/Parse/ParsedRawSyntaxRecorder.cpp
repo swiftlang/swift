@@ -86,11 +86,11 @@ ParsedRawSyntaxRecorder::recordRawSyntax(SyntaxKind kind,
         subnodes.push_back(nullptr);
       } else {
         subnodes.push_back(subnode.getOpaqueNode());
-        auto range = subnode.getRecordedRange();
+        auto range = subnode.getRange();
         if (range.isValid()) {
           if (offset.isInvalid())
             offset = range.getStart();
-          length += subnode.getRecordedRange().getByteLength();
+          length += subnode.getRange().getByteLength();
         }
       }
     }
