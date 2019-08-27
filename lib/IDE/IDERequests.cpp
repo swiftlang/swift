@@ -29,7 +29,7 @@ using namespace swift::ide;
 
 namespace swift {
 // Implement the IDE type zone.
-#define SWIFT_TYPEID_ZONE SWIFT_IDE_REQUESTS_TYPEID_ZONE
+#define SWIFT_TYPEID_ZONE IDE
 #define SWIFT_TYPEID_HEADER "swift/IDE/IDERequestIDZone.def"
 #include "swift/Basic/ImplementTypeIDZone.h"
 #undef SWIFT_TYPEID_ZONE
@@ -38,14 +38,14 @@ namespace swift {
 
 // Define request evaluation functions for each of the IDE requests.
 static AbstractRequestFunction *ideRequestFunctions[] = {
-#define SWIFT_TYPEID(Name)                                    \
+#define SWIFT_REQUEST(Zone, Name)                      \
 reinterpret_cast<AbstractRequestFunction *>(&Name::evaluateRequest),
 #include "swift/IDE/IDERequestIDZone.def"
-#undef SWIFT_TYPEID
+#undef SWIFT_REQUEST
 };
 
 void swift::registerIDERequestFunctions(Evaluator &evaluator) {
-  evaluator.registerRequestFunctions(SWIFT_IDE_REQUESTS_TYPEID_ZONE,
+  evaluator.registerRequestFunctions(Zone::IDE,
                                      ideRequestFunctions);
   registerIDETypeCheckRequestFunctions(evaluator);
 }
