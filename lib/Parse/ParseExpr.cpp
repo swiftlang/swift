@@ -236,8 +236,9 @@ parse_operator:
       // Parse the middle expression of the ternary.
       ParserResult<Expr> middle =
           parseExprSequence(diag::expected_expr_after_if_question, isExprBasic);
+      ParserStatus Status = middle;
       if (middle.hasCodeCompletion())
-        return makeParserCodeCompletionResult<Expr>();
+        HasCodeCompletion = true;
       if (middle.isNull())
         return nullptr;
       
@@ -245,8 +246,9 @@ parse_operator:
       if (!Tok.is(tok::colon)) {
         diagnose(questionLoc, diag::expected_colon_after_if_question);
 
-        return makeParserErrorResult(new (Context) ErrorExpr(
-            {startLoc, middle.get()->getSourceRange().End}));
+      Status.setIsParseError();
+      return makeParserResult(Status, new (Context) ErrorExpr(
+          {startLoc, middle.get()->getSourceRange().End}));
       }
       
       SourceLoc colonLoc = consumeToken();

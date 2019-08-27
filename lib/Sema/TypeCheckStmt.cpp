@@ -519,19 +519,17 @@ public:
       }
     }
 
+    if (EndTypeCheckLoc.isValid()) {
+      assert(DiagnosticSuppression::isEnabled(TC.Diags) &&
+             "Diagnosing and AllowUnresolvedTypeVariables don't seem to mix");
+      options |= TypeCheckExprFlags::AllowUnresolvedTypeVariables;
+    }
+
     ContextualTypePurpose ctp = CTP_ReturnStmt;
     if (auto func =
             dyn_cast_or_null<FuncDecl>(TheFunc->getAbstractFunctionDecl())) {
       if (func->hasSingleExpressionBody()) {
         ctp = CTP_ReturnSingleExpr;
-      }
-
-      // If we are performing code-completion inside a function builder body,
-      // suppress diagnostics to workaround typechecking performance problems.
-      if (func->getFunctionBuilderType() &&
-          TC.Context.SourceMgr.rangeContainsCodeCompletionLoc(
-              func->getBody()->getSourceRange())) {
-        options |= TypeCheckExprFlags::SuppressDiagnostics;
       }
     }
 
@@ -1785,6 +1783,12 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
         && !TC.Context.LangOpts.DebuggerSupport;
       if (isDiscarded)
         options |= TypeCheckExprFlags::IsDiscarded;
+
+      if (EndTypeCheckLoc.isValid()) {
+        assert(DiagnosticSuppression::isEnabled(TC.Diags) &&
+               "Diagnosing and AllowUnresolvedTypeVariables don't seem to mix");
+        options |= TypeCheckExprFlags::AllowUnresolvedTypeVariables;
+      }
 
       auto resultTy =
           TC.typeCheckExpression(SubExpr, DC, TypeLoc(), CTP_Unused, options);
