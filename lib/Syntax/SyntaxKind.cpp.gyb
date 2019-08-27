@@ -42,6 +42,14 @@ StringRef getTokenText(tok kind) {
   return getTokenTextInternal(kind);
 }
 
+bool isTokenKeyword(tok kind) {
+  switch (kind) {
+#define KEYWORD(X) case tok::kw_##X: return true;
+#include "swift/Syntax/TokenKinds.def"
+  default: return false;
+  }
+}
+
 bool parserShallOmitWhenNoChildren(syntax::SyntaxKind Kind) {
   switch(Kind) {
 %   for node in SYNTAX_NODES:
