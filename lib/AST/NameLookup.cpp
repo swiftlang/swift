@@ -2128,10 +2128,9 @@ ExtendedNominalRequest::evaluate(Evaluator &evaluator,
   ASTContext &ctx = ext->getASTContext();
 
   // Prefer syntactic information when we have it.
-  TypeLoc &typeLoc = ext->getExtendedTypeLoc();
-  if (auto typeRepr = typeLoc.getTypeRepr()) {
+  if (auto typeRepr = ext->getExtendedTypeRepr()) {
     referenced = directReferencesForTypeRepr(evaluator, ctx, typeRepr, ext);
-  } else if (auto type = typeLoc.getType()) {
+  } else if (auto type = ext->getExtendedType()) {
     // Fall back to semantic types.
     // FIXME: In the long run, we shouldn't need this. Non-syntactic results
     // should be cached.
