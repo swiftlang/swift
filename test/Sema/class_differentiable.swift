@@ -29,11 +29,12 @@ extension DummyAdditiveArithmetic {
 }
 
 class Empty : Differentiable {}
-class Empty : EuclideanDifferentiable {}
 func testEmpty() {
   assertConformsToAdditiveArithmetic(Empty.TangentVector.self)
   assertConformsToElementaryFunctions(Empty.TangentVector.self)
 }
+
+class EmptyEuclidean : EuclideanDifferentiable {}
 
 // Test structs with `let` stored properties.
 // Derived conformances fail because `mutating func move` requires all stored
@@ -56,7 +57,7 @@ class ImmutableStoredProperties : Differentiable {
 func testImmutableStoredProperties() {
   _ = ImmutableStoredProperties.TangentVector(okay: 1)
 }
-class MutableStoredPropertiesWithInitialValue : Differentiable, EuclieanDifferentiable {
+class MutableStoredPropertiesWithInitialValue : Differentiable, EuclideanDifferentiable {
   var x = Float(1)
   var y = Double(1)
 }
@@ -94,7 +95,7 @@ func testSimple() {
 }
 
 // Test type with mixed members.
-class Mixed : Differentiable, EuclideanDifferentiable {
+class Mixed : Differentiable {
   var simple: Simple
   var float: Float
 
@@ -138,7 +139,8 @@ extension VectorSpacesEqualSelf : Equatable, AdditiveArithmetic {
 */
 
 // Test generic type with vector space types to `Self`.
-class GenericVectorSpacesEqualSelf<T> : Differentiable, EuclideanDifferentiable
+// FIXME(TF-783): Uncomment `EuclideanDifferentiable` conformance once crasher is fixed.
+class GenericVectorSpacesEqualSelf<T> : Differentiable//, EuclideanDifferentiable
   where T : Differentiable, T == T.TangentVector
 {
   var w: T
@@ -153,11 +155,10 @@ func testGenericVectorSpacesEqualSelf() {
   let genericSame = GenericVectorSpacesEqualSelf<Double>(w: 1, b: 1)
   let tangent = GenericVectorSpacesEqualSelf.TangentVector(w: 1, b: 1)
   genericSame.move(along: tangent)
-  genericSame.move(along: genericSame.vectorView)
 }
 
 // Test nested type.
-class Nested : Differentiable, EuclideanDifferentiable {
+class Nested : Differentiable {
   var simple: Simple
   var mixed: Mixed
   var generic: GenericVectorSpacesEqualSelf<Double>
@@ -225,6 +226,9 @@ struct MyVector2 : ElementaryFunctions, Differentiable, EuclideanDifferentiable 
     self.b = b
   }
 }
+// Won't derive `EuclideanDifferentiable` because `MyVector2.TangentVector != MyVector2`.
+// expected-error @+2 {{type 'AllMembersElementaryFunctions' does not conform to protocol 'EuclideanDifferentiable'}}
+// expected-note @+1 {{do you want to add protocol stubs?}}
 class AllMembersElementaryFunctions : Differentiable, EuclideanDifferentiable {
   var v1: MyVector2
   var v2: MyVector2
@@ -263,7 +267,7 @@ func testDifferentiableSubset() {
 }
 
 // Test nested type whose properties are not all differentiable.
-class NestedDifferentiableSubset : Differentiable, EuclideanDifferentiable {
+class NestedDifferentiableSubset : Differentiable {
   var x: DifferentiableSubset
   var mixed: Mixed
   @noDerivative var technicallyDifferentiable: Float
@@ -277,7 +281,7 @@ class NestedDifferentiableSubset : Differentiable, EuclideanDifferentiable {
 
 // Test type that uses synthesized vector space types but provides custom
 // method.
-class HasCustomMethod : Differentiable, EuclideanDifferentiable {
+class HasCustomMethod : Differentiable {
   var simple: Simple
   var mixed: Mixed
   var generic: GenericVectorSpacesEqualSelf<Double>

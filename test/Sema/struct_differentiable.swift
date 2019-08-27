@@ -11,11 +11,12 @@ func assertConformsToElementaryFunctions<T>(_: T.Type) where T : ElementaryFunct
 func assertConformsToVectorProtocol<T>(_: T.Type) where T : VectorProtocol {}
 
 struct Empty : Differentiable {}
-struct Empty : EuclideanDifferentiable {}
 func testEmpty() {
   assertConformsToAdditiveArithmetic(Empty.TangentVector.self)
   assertConformsToElementaryFunctions(Empty.TangentVector.self)
 }
+
+struct EmptyEuclidean : EuclideanDifferentiable {}
 
 // Test interaction with `AdditiveArithmetic` derived conformances.
 // Previously, this crashed due to duplicate memberwise initializer synthesis.
@@ -147,6 +148,10 @@ struct MyVector2 : ElementaryFunctions, Differentiable, EuclideanDifferentiable 
   var w: Float
   var b: Float
 }
+
+// Won't derive `EuclideanDifferentiable` because `MyVector2.TangentVector != MyVector2`.
+// expected-error @+2 {{type 'AllMembersElementaryFunctions' does not conform to protocol 'EuclideanDifferentiable'}}
+// expected-note @+1 {{do you want to add protocol stubs?}}
 struct AllMembersElementaryFunctions : Differentiable, EuclideanDifferentiable {
   var v1: MyVector2
   var v2: MyVector2
