@@ -83,6 +83,7 @@ module SwiftGlibc [system] {
       export *
     }
     module math {
+      link "m"
       header "${GLIBC_INCLUDE_PATH}/math.h"
       export *
     }
