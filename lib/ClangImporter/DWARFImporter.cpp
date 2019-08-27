@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "ImporterImpl.h"
+#include "swift/AST/ImportCache.h"
 #include "swift/AST/Module.h"
 
 using namespace swift;
@@ -118,7 +119,7 @@ ModuleDecl *ClangImporter::Implementation::loadModuleDWARF(
   decl->addFile(*wrapperUnit);
 
   // Force load overlay modules for all imported modules.
-  decl->forAllVisibleModules({}, [](ModuleDecl::ImportedModule import) {});
+  (void) namelookup::getAllImports(decl);
 
   // Register the module with the ASTContext so it is available for lookups.
   ModuleDecl *&loaded = SwiftContext.LoadedModules[name];

@@ -21,6 +21,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/ForeignErrorConvention.h"
+#include "swift/AST/ImportCache.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/StringExtras.h"
@@ -1795,10 +1796,12 @@ void swift::diagnoseAttrsRequiringFoundation(SourceFile &SF) {
       return;
   }
 
-  SF.forAllVisibleModules([&](ModuleDecl::ImportedModule import) {
-    if (import.second->getName() == Ctx.Id_Foundation)
+  for (auto import : namelookup::getAllImports(&SF)) {
+    if (import.second->getName() == Ctx.Id_Foundation) {
       ImportsFoundationModule = true;
-  });
+      break;
+    }
+  }
 
   if (ImportsFoundationModule)
     return;

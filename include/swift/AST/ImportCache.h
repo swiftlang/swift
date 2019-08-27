@@ -51,7 +51,7 @@ class ImportSet final :
     public llvm::FoldingSetNode,
     private llvm::TrailingObjects<ImportSet, ModuleDecl::ImportedModule> {
   friend TrailingObjects;
-  friend ImportCache;
+  friend class ImportCache;
 
   unsigned HasHeaderImportModule : 1;
   unsigned NumTopLevelImports : 31;
@@ -192,6 +192,8 @@ public:
     ImportSetForDC.clear();
   }
 };
+
+ArrayRef<ModuleDecl::ImportedModule> getAllImports(const DeclContext *dc);
 
 }  // namespace namelookup
 

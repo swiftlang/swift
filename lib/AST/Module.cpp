@@ -1431,32 +1431,6 @@ forAllImportedModules(const ModuleDecl *topLevel,
   return true;
 }
 
-bool
-ModuleDecl::forAllVisibleModules(AccessPathTy thisPath,
-                                 llvm::function_ref<bool(ImportedModule)> fn) const {
-  return forAllImportedModules<true>(this, thisPath, fn);
-}
-
-bool FileUnit::forAllVisibleModules(
-    llvm::function_ref<bool(ModuleDecl::ImportedModule)> fn) const {
-  if (!getParentModule()->forAllVisibleModules(ModuleDecl::AccessPathTy(), fn))
-    return false;
-
-  if (auto SF = dyn_cast<SourceFile>(this)) {
-    // Handle privately visible modules as well.
-    ModuleDecl::ImportFilter importFilter;
-    importFilter |= ModuleDecl::ImportFilterKind::Private;
-    importFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
-    SmallVector<ModuleDecl::ImportedModule, 4> imports;
-    SF->getImportedModules(imports, importFilter);
-    for (auto importPair : imports)
-      if (!importPair.second->forAllVisibleModules(importPair.first, fn))
-        return false;
-  }
-
-  return true;
-}
-
 void ModuleDecl::collectLinkLibraries(LinkLibraryCallback callback) const {
   // FIXME: The proper way to do this depends on the decls used.
   FORWARD(collectLinkLibraries, (callback));

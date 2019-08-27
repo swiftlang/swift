@@ -27,6 +27,7 @@
 #include "swift/AST/DiagnosticSuppression.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Identifier.h"
+#include "swift/AST/ImportCache.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
@@ -249,7 +250,7 @@ static void bindExtensions(SourceFile &SF) {
 
   // FIXME: The current source file needs to be handled specially, because of
   // private extensions.
-  SF.forAllVisibleModules([&](ModuleDecl::ImportedModule import) {
+  for (auto import : namelookup::getAllImports(&SF)) {
     // FIXME: Respect the access path?
     for (auto file : import.second->getFiles()) {
       auto SF = dyn_cast<SourceFile>(file);
@@ -262,7 +263,7 @@ static void bindExtensions(SourceFile &SF) {
             worklist.push_back(ED);
       }
     }
-  });
+  }
 
   // Phase 2 - repeatedly go through the worklist and attempt to bind each
   // extension there, removing it from the worklist if we succeed.
