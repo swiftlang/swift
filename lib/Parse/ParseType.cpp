@@ -362,7 +362,7 @@ Parser::TypeASTResult Parser::parseType(Diag<> MessageID,
     return SILBoxType;
   }
 
-  auto RealTypeLoc = Tok.getLoc();
+  auto RealTypeLoc = leadingTriviaLoc();
 
   ParserResult<TypeRepr> ty =
     parseTypeSimpleOrCompositionAST(MessageID, HandleCodeCompletion);
