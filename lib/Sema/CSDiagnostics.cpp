@@ -310,7 +310,12 @@ Type RequirementFailure::getOwnerType() const {
 const GenericContext *RequirementFailure::getGenericContext() const {
   if (auto *genericCtx = AffectedDecl->getAsGenericContext())
     return genericCtx;
-  return AffectedDecl->getDeclContext()->getAsDecl()->getAsGenericContext();
+
+  auto parentDecl = AffectedDecl->getDeclContext()->getAsDecl();
+  if (!parentDecl)
+    return nullptr;
+
+  return parentDecl->getAsGenericContext();
 }
 
 const Requirement &RequirementFailure::getRequirement() const {
