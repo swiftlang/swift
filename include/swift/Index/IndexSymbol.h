@@ -66,7 +66,7 @@ struct IndexSymbol : IndexRelation {
   SmallVector<IndexRelation, 3> Relations;
   unsigned line = 0;
   unsigned column = 0;
-  unsigned offset = 0;
+  llvm::Optional<unsigned> offset;
 
   IndexSymbol() = default;
 

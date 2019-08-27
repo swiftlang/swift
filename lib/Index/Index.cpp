@@ -30,6 +30,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FileSystem.h"
+#include <tuple>
 
 using namespace swift;
 using namespace swift::index;
@@ -472,8 +473,7 @@ private:
       return true;
 
     IndexSymbol Info;
-    std::tie(Info.line, Info.column) = getLineCol(Loc);
-    Info.offset = getOffsetInBuffer(Loc);
+    std::tie(Info.line, Info.column, Info.offset) = getLineColAndOffset(Loc);
     Info.roles |= (unsigned)SymbolRole::Reference;
     Info.symInfo = getSymbolInfoForModule(Mod);
     getModuleNameAndUSR(Mod, Info.name, Info.USR);
@@ -585,16 +585,12 @@ private:
 
   bool indexComment(const Decl *D);
 
-  std::pair<unsigned, unsigned> getLineCol(SourceLoc Loc) {
+  std::tuple<unsigned, unsigned, unsigned> getLineColAndOffset(SourceLoc Loc) {
     if (Loc.isInvalid())
-      return std::make_pair(0, 0);
-    return SrcMgr.getLineAndColumn(Loc, BufferID);
-  }
-
-  unsigned getOffsetInBuffer(SourceLoc Loc) {
-    if (Loc.isInvalid())
-      return 0;
-    return SrcMgr.getLocOffsetInBuffer(Loc, BufferID);
+      return std::make_tuple(0, 0, 0);
+    auto lineAndColumn = SrcMgr.getLineAndColumn(Loc, BufferID);
+    unsigned offset = SrcMgr.getLocOffsetInBuffer(Loc, BufferID);
+    return std::make_tuple(lineAndColumn.first, lineAndColumn.second, offset);
   }
 
   bool shouldIndex(ValueDecl *D, bool IsRef) const {
@@ -1231,8 +1227,7 @@ bool IndexSwiftASTWalker::initIndexSymbol(ValueDecl *D, SourceLoc Loc,
   if (getNameAndUSR(D, /*ExtD=*/nullptr, Info.name, Info.USR))
     return true;
 
-  std::tie(Info.line, Info.column) = getLineCol(Loc);
-  Info.offset = getOffsetInBuffer(Loc);
+  std::tie(Info.line, Info.column, Info.offset) = getLineColAndOffset(Loc);
   if (!IsRef) {
     if (auto Group = D->getGroupName())
       Info.group = Group.getValue();
@@ -1253,8 +1248,7 @@ bool IndexSwiftASTWalker::initIndexSymbol(ExtensionDecl *ExtD, ValueDecl *Extend
   if (getNameAndUSR(ExtendedD, ExtD, Info.name, Info.USR))
     return true;
 
-  std::tie(Info.line, Info.column) = getLineCol(Loc);
-  Info.offset = getOffsetInBuffer(Loc);
+  std::tie(Info.line, Info.column, Info.offset) = getLineColAndOffset(Loc);
   if (auto Group = ExtD->getGroupName())
     Info.group = Group.getValue();
   return false;
@@ -1461,8 +1455,7 @@ bool IndexSwiftASTWalker::indexComment(const Decl *D) {
       OS << "t:" << tagName;
       Info.USR = stringStorage.copyString(OS.str());
     }
-    std::tie(Info.line, Info.column) = getLineCol(loc);
-    Info.offset = getOffsetInBuffer(loc);
+    std::tie(Info.line, Info.column, Info.offset) = getLineColAndOffset(loc);
     if (!IdxConsumer.startSourceEntity(Info) || !IdxConsumer.finishSourceEntity(Info.symInfo, Info.roles)) {
       Cancelled = true;
       break;
