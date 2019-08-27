@@ -901,9 +901,9 @@ namespace decls_block {
     BCFixed<1>,            // pseudogeneric?
     BCFixed<1>,            // noescape?
     BCFixed<1>,            // error result?
-    BCFixed<30>,           // number of parameters
-    BCFixed<30>,           // number of yields
-    BCFixed<30>,           // number of results
+    BCVBR<6>,              // number of parameters
+    BCVBR<5>,              // number of yields
+    BCVBR<5>,              // number of results
     GenericSignatureIDField, // generic signature
     BCArray<TypeIDField>   // parameter types/conventions, alternating
                            // followed by result types/conventions, alternating
@@ -919,7 +919,7 @@ namespace decls_block {
   using SILLayoutLayout = BCRecordLayout<
     SIL_LAYOUT,
     GenericSignatureIDField,    // generic signature
-    BCFixed<31>,                // number of fields
+    BCVBR<8>,                   // number of fields
     BCArray<TypeIDWithBitField> // field types with mutability
   >;
 
@@ -1106,7 +1106,7 @@ namespace decls_block {
     AccessLevelField, // setter access, if applicable
     DeclIDField, // opaque return type decl
     BCFixed<2>,  // # of property wrapper backing properties
-    BCVBR<4>, // total number of vtable entries introduced by all accessors
+    BCVBR<4>,    // total number of vtable entries introduced by all accessors
     BCArray<TypeIDField> // accessors, backing properties, and dependencies
   >;
 
@@ -1272,7 +1272,7 @@ namespace decls_block {
     StaticSpellingKindField,    // is subscript static?
     BCVBR<5>,    // number of parameter name components
     DeclIDField, // opaque return type decl
-    BCFixed<8>, // total number of vtable entries introduced by all accessors
+    BCVBR<4>,    // total number of vtable entries introduced by all accessors
     BCArray<IdentifierIDField> // name components,
                                // followed by DeclID accessors,
                                // followed by TypeID dependencies
@@ -1396,8 +1396,8 @@ namespace decls_block {
     LAYOUT_REQUIREMENT,
     LayoutRequirementKindField,  // requirement kind
     TypeIDField,                 // type being constrained
-    BCFixed<24>,                 // size
-    BCFixed<32>                  // alignment
+    BCVBR<16>,                   // size
+    BCVBR<8>                     // alignment
   >;
 
   /// Specifies the private discriminator string for a private declaration. This
@@ -1549,7 +1549,7 @@ namespace decls_block {
   using AlignmentDeclAttrLayout = BCRecordLayout<
     Alignment_DECL_ATTR,
     BCFixed<1>, // implicit flag
-    BCFixed<31> // alignment
+    BCVBR<8>    // alignment
   >;
   
   using SwiftNativeObjCRuntimeBaseDeclAttrLayout = BCRecordLayout<
