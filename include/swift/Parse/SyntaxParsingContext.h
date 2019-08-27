@@ -168,10 +168,6 @@ private:
   /// true if it's in backtracking context.
   bool IsBacktracking = false;
 
-  /// true if ParsedSyntaxBuilders and ParsedSyntaxRecorder should create
-  /// deferred nodes
-  bool ShouldDefer = false;
-
   /// Create a syntax node using the tail \c N elements of collected parts and
   /// replace those parts with the single result.
   void createNodeInPlace(SyntaxKind Kind, size_t N,
@@ -201,8 +197,7 @@ public:
   SyntaxParsingContext(SyntaxParsingContext *&CtxtHolder)
       : RootDataOrParent(CtxtHolder), CtxtHolder(CtxtHolder),
         RootData(CtxtHolder->RootData), Offset(RootData->Storage.size()),
-        IsBacktracking(CtxtHolder->IsBacktracking),
-        ShouldDefer(CtxtHolder->ShouldDefer) {
+        IsBacktracking(CtxtHolder->IsBacktracking) {
     assert(CtxtHolder->isTopOfContextStack() &&
            "SyntaxParsingContext cannot have multiple children");
     assert(CtxtHolder->Mode != AccumulationMode::SkippedForIncrementalUpdate &&
@@ -269,34 +264,32 @@ public:
   /// Add Syntax to the parts.
   void addSyntax(ParsedSyntax Node);
 
-  template <typename SyntaxNode>
+  template <SyntaxKind Kind>
   bool isTopNode() {
-    auto parts = getParts();
-    return (!parts.empty() && SyntaxNode::kindof(parts.back().getKind()));
+    return getStorage().back().getKind() == Kind;
   }
 
   /// Returns the topmost Syntax node.
   template <typename SyntaxNode> SyntaxNode topNode() {
     ParsedRawSyntaxNode TopNode = getStorage().back();
 
-    if (TopNode.isRecorded()) {
-      OpaqueSyntaxNode OpaqueNode = TopNode.getOpaqueNode();
-      return getSyntaxCreator().getLibSyntaxNodeFor<SyntaxNode>(OpaqueNode);
-    }
-    
-    return getSyntaxCreator().createNode<SyntaxNode>(TopNode);
+    if (IsBacktracking)
+      return getSyntaxCreator().createNode<SyntaxNode>(TopNode);
+
+    OpaqueSyntaxNode OpaqueNode = TopNode.getOpaqueNode();
+    return getSyntaxCreator().getLibSyntaxNodeFor<SyntaxNode>(OpaqueNode);
   }
 
-  template <typename SyntaxNode>
+  template<typename SyntaxNode>
   llvm::Optional<SyntaxNode> popIf() {
     auto &Storage = getStorage();
-    if (Storage.size() <= Offset)
-      return llvm::None;
-    auto rawNode = Storage.back();
-    if (!SyntaxNode::kindof(rawNode.getKind()))
-      return llvm::None;
-    Storage.pop_back();
-    return SyntaxNode(rawNode);
+    assert(Storage.size() > Offset);
+    if (SyntaxNode::kindof(Storage.back().getKind())) {
+      auto rawNode = std::move(Storage.back());
+      Storage.pop_back();
+      return SyntaxNode(rawNode);
+    }
+    return None;
   }
 
   ParsedTokenSyntax popToken();
@@ -352,12 +345,6 @@ public:
   }
 
   bool isBacktracking() const { return IsBacktracking; }
-
-  void setShouldDefer(bool Value = true) { ShouldDefer = Value; }
-
-  bool shouldDefer() const {
-    return ShouldDefer || IsBacktracking || Mode == AccumulationMode::Discard;
-  }
 
   /// Explicitly finalizing syntax tree creation.
   /// This function will be called during the destroying of a root syntax
