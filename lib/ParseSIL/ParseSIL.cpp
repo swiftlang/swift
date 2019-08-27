@@ -395,7 +395,8 @@ namespace {
     bool parseSILOwnership(ValueOwnershipKind &OwnershipKind) {
       // We parse here @ <identifier>.
       if (!P.consumeIf(tok::at_sign)) {
-        // If we fail, we must have @any ownership.
+        // If we fail, we must have @any ownership. We check elsewhere in the
+        // parser that this matches what the function signature wants.
         OwnershipKind = ValueOwnershipKind::Any;
         return false;
       }
@@ -5339,6 +5340,18 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
         SILArgument *Arg;
         if (IsEntry) {
           Arg = BB->createFunctionArgument(Ty);
+          // Today, we construct the ownership kind straight from the function
+          // type. Make sure they are in sync, otherwise bail. We want this to
+          // be an exact check rather than a compatibility check since we do not
+          // want incompatibilities in between @any and other types of ownership
+          // to be ignored.
+          if (F->hasOwnership() && Arg->getOwnershipKind() != OwnershipKind) {
+            auto diagID =
+                diag::silfunc_and_silarg_have_incompatible_sil_value_ownership;
+            P.diagnose(NameLoc, diagID, Arg->getOwnershipKind().asString(),
+                       OwnershipKind.asString());
+            return true;
+          }
         } else {
           Arg = BB->createPhiArgument(Ty, OwnershipKind);
         }
