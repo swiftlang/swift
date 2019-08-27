@@ -1629,11 +1629,18 @@ ConstraintSystem::matchSuperclassTypes(Type type1, Type type2,
   TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
 
   auto classDecl2 = type2->getClassOrBoundGenericClass();
+  SmallPtrSet<ClassDecl *, 4> superclasses1;
   for (auto super1 = type1->getSuperclass();
        super1;
        super1 = super1->getSuperclass()) {
-    if (super1->getClassOrBoundGenericClass() != classDecl2)
+    auto superclass1 = super1->getClassOrBoundGenericClass();
+    if (superclass1 != classDecl2) {
+      // Break if we have circular inheritance.
+      if (superclass1 && !superclasses1.insert(superclass1).second)
+        break;
+
       continue;
+    }
 
     return matchTypes(super1, type2, ConstraintKind::Bind,
                       subflags, locator);
