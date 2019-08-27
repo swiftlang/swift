@@ -1805,7 +1805,7 @@ StringRef ModuleFile::getIdentifierText(IdentifierID IID) {
   return rawStrPtr.slice(0, terminatorOffset);
 }
 
-DeclContext *ModuleFile::getLocalDeclContext(DeclContextID DCID) {
+DeclContext *ModuleFile::getLocalDeclContext(LocalDeclContextID DCID) {
   assert(DCID != 0 && "invalid local DeclContext ID 0");
   auto &declContextOrOffset = LocalDeclContexts[DCID-1];
 
@@ -1893,56 +1893,24 @@ DeclContext *ModuleFile::getLocalDeclContext(DeclContextID DCID) {
 }
 
 DeclContext *ModuleFile::getDeclContext(DeclContextID DCID) {
-  if (DCID == 0)
+  if (!DCID)
     return FileContext;
 
-  assert(DCID <= DeclContexts.size() && "invalid DeclContext ID");
-  auto &declContextOrOffset = DeclContexts[DCID-1];
+  if (Optional<LocalDeclContextID> contextID = DCID.getAsLocalDeclContextID())
+    return getLocalDeclContext(contextID.getValue());
 
-  if (declContextOrOffset.isComplete())
-    return declContextOrOffset;
+  auto D = getDecl(DCID.getAsDeclID().getValue());
 
-  BCOffsetRAII restoreOffset(DeclTypeCursor);
-  DeclTypeCursor.JumpToBit(declContextOrOffset);
-  auto entry = DeclTypeCursor.advance();
+  if (auto GTD = dyn_cast<GenericTypeDecl>(D))
+    return GTD;
+  if (auto ED = dyn_cast<ExtensionDecl>(D))
+    return ED;
+  if (auto AFD = dyn_cast<AbstractFunctionDecl>(D))
+    return AFD;
+  if (auto SD = dyn_cast<SubscriptDecl>(D))
+    return SD;
 
-  if (entry.Kind != llvm::BitstreamEntry::Record)
-    fatal();
-
-  SmallVector<uint64_t, 64> scratch;
-  StringRef blobData;
-
-  unsigned recordID = DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
-
-  if (recordID != decls_block::DECL_CONTEXT)
-    llvm_unreachable("Expected a DECL_CONTEXT record");
-
-  DeclContextID declOrDeclContextId;
-  bool isDecl;
-
-  decls_block::DeclContextLayout::readRecord(scratch, declOrDeclContextId,
-                                             isDecl);
-
-  if (!isDecl)
-    return getLocalDeclContext(declOrDeclContextId);
-
-  auto D = getDecl(declOrDeclContextId);
-
-  if (auto ND = dyn_cast<NominalTypeDecl>(D)) {
-    declContextOrOffset = ND;
-  } else if (auto ED = dyn_cast<ExtensionDecl>(D)) {
-    declContextOrOffset = ED;
-  } else if (auto AFD = dyn_cast<AbstractFunctionDecl>(D)) {
-    declContextOrOffset = AFD;
-  } else if (auto SD = dyn_cast<SubscriptDecl>(D)) {
-    declContextOrOffset = SD;
-  } else if (auto TAD = dyn_cast<TypeAliasDecl>(D)) {
-    declContextOrOffset = TAD;
-  } else {
-    llvm_unreachable("Unknown Decl : DeclContext kind");
-  }
-  
-  return declContextOrOffset;
+  llvm_unreachable("Unknown Decl : DeclContext kind");
 }
 
 ModuleDecl *ModuleFile::getModule(ModuleID MID) {
@@ -3195,8 +3163,10 @@ public:
       }
 
       patterns.emplace_back(pattern.get(), DeclContextID());
-      if (!initContextIDs.empty())
-        patterns.back().second = initContextIDs[i];
+      if (!initContextIDs.empty()) {
+        patterns.back().second =
+            DeclContextID::getFromOpaqueValue(initContextIDs[i]);
+      }
     }
 
     auto binding =
