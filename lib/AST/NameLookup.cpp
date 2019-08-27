@@ -1653,7 +1653,7 @@ bool DeclContext::lookupQualified(ModuleDecl *module, DeclName member,
     if (tracker) {
       recordLookupOfTopLevelName(topLevelScope, member, isLookupCascading);
     }
-    lookupInModule(module, /*accessPath=*/{}, member, decls,
+    lookupInModule(module, member, decls,
                    NLKind::QualifiedLookup, kind, topLevelScope);
   } else {
     // Note: This is a lookup into another module. Unless we're compiling
@@ -1668,7 +1668,7 @@ bool DeclContext::lookupQualified(ModuleDecl *module, DeclName member,
                      [&](ModuleDecl::AccessPathTy accessPath) {
                        return ModuleDecl::matchesAccessPath(accessPath, member);
                      })) {
-      lookupInModule(module, {}, member, decls,
+      lookupInModule(module, member, decls,
                      NLKind::QualifiedLookup, kind, topLevelScope);
     }
   }
