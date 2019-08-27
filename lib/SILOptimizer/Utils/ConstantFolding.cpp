@@ -1194,9 +1194,6 @@ static SILValue constantFoldBuiltin(BuiltinInst *BI,
   switch (Builtin.ID) {
   default: break;
 
-  case BuiltinValueKind::IsConcrete:
-    return constantFoldIsConcrete(BI);
-
 // Check and fold binary arithmetic with overflow.
 #define BUILTIN(id, name, Attrs)
 #define BUILTIN_BINARY_OPERATION_WITH_OVERFLOW(id, name, _, attrs, overload) \
