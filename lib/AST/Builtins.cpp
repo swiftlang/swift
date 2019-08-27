@@ -1353,6 +1353,7 @@ Type IntrinsicTypeDecoder::decodeImmediate() {
   case IITDescriptor::ExtendArgument:
   case IITDescriptor::TruncArgument:
   case IITDescriptor::HalfVecArgument:
+  case IITDescriptor::ScalableVecArgument:
   case IITDescriptor::VarArg:
   case IITDescriptor::Token:
   case IITDescriptor::VecElementArgument:
