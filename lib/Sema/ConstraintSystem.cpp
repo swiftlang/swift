@@ -2194,16 +2194,8 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
   // type to an optional.
   auto isIUOCallWrappedInParens = [&]() {
     auto paren = getParentExpr(locator->getAnchor());
-    auto call = getParentExpr(paren);
-
-    if (call && isa<CallExpr>(call)) {
-      auto callExpr = cast<CallExpr>(call);
-      if (callExpr->getFn() != callExpr->getSemanticFn()) {
-        return true;
-      }
-    }
-
-    return false;
+    auto result = paren ? isa<ParenExpr>(paren) : false;
+    return result;
   };
 
   // In some cases we already created the appropriate bind constraints.
