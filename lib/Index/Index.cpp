@@ -585,9 +585,10 @@ private:
 
   bool indexComment(const Decl *D);
 
-  std::tuple<unsigned, unsigned, unsigned> getLineColAndOffset(SourceLoc Loc) {
+  std::tuple<unsigned, unsigned, Optional<unsigned>>
+  getLineColAndOffset(SourceLoc Loc) {
     if (Loc.isInvalid())
-      return std::make_tuple(0, 0, 0);
+      return std::make_tuple(0, 0, None);
     auto lineAndColumn = SrcMgr.getLineAndColumn(Loc, BufferID);
     unsigned offset = SrcMgr.getLocOffsetInBuffer(Loc, BufferID);
     return std::make_tuple(lineAndColumn.first, lineAndColumn.second, offset);
