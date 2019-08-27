@@ -763,7 +763,7 @@ ManagedValue SILGenFunction::emitExistentialErasure(
   }
 
   switch (existentialTL.getLoweredType().getObjectType()
-            .getPreferredExistentialRepresentation(SGM.M, concreteFormalType)) {
+            .getPreferredExistentialRepresentation(concreteFormalType)) {
   case ExistentialRepresentation::None:
     llvm_unreachable("not an existential type");
   case ExistentialRepresentation::Metatype: {
@@ -932,7 +932,7 @@ SILGenFunction::emitOpenExistential(
   assert(isInFormalEvaluationScope());
 
   SILType existentialType = existentialValue.getType();
-  switch (existentialType.getPreferredExistentialRepresentation(SGM.M)) {
+  switch (existentialType.getPreferredExistentialRepresentation()) {
   case ExistentialRepresentation::Opaque: {
     // With CoW existentials we can't consume the boxed value inside of
     // the existential. (We could only do so after a uniqueness check on

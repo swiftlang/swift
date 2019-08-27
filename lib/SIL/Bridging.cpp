@@ -212,7 +212,7 @@ Type TypeConverter::getLoweredCBridgedType(AbstractionPattern pattern,
   }
 
   auto foreignRepresentation =
-    t->getForeignRepresentableIn(ForeignLanguage::ObjectiveC, M.TheSwiftModule);
+    t->getForeignRepresentableIn(ForeignLanguage::ObjectiveC, &M);
   switch (foreignRepresentation.first) {
   case ForeignRepresentableKind::None:
   case ForeignRepresentableKind::Trivial:
