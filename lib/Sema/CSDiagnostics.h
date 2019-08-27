@@ -236,6 +236,10 @@ public:
     assert(locator);
     assert(isConditional() || Signature);
     assert(AffectedDecl);
+    assert(getRequirementDC() &&
+           "Couldn't find where the requirement came from?");
+    assert(getGenericContext() &&
+           "Affected decl not within a generic context?");
 
     auto reqElt = locator->castLastElementTo<LocatorPathElt::AnyRequirement>();
     assert(reqElt.getRequirementKind() == kind);
