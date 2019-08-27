@@ -4872,6 +4872,10 @@ public:
     for (SILInstruction &SI : *BB) {
       if (SI.isMetaInstruction())
         continue;
+      if (isa<DeallocStackInst>(&SI))
+        continue;
+      if (isa<MetatypeInst>(&SI))
+        continue;
       auto LocKind = SI.getDebugLocation().getLocation().getKind();
       if (LocKind != SILLocation::LocationKind::RegularKind)
         continue;
