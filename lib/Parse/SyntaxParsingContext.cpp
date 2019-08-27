@@ -55,14 +55,14 @@ size_t SyntaxParsingContext::lookupNode(size_t LexerOffset, SourceLoc Loc) {
   }
   Mode = AccumulationMode::SkippedForIncrementalUpdate;
   getStorage().push_back(foundNode);
-  return foundNode.getRecordedRange().getByteLength();
+  return foundNode.getRange().getByteLength();
 }
 
 ParsedRawSyntaxNode
 SyntaxParsingContext::makeUnknownSyntax(SyntaxKind Kind,
                                         ArrayRef<ParsedRawSyntaxNode> Parts) {
   assert(isUnknownKind(Kind));
-  if (shouldDefer())
+  if (IsBacktracking)
     return ParsedRawSyntaxNode::makeDeferred(Kind, Parts, *this);
   else
     return getRecorder().recordRawSyntax(Kind, Parts);
@@ -76,7 +76,7 @@ SyntaxParsingContext::createSyntaxAs(SyntaxKind Kind,
   ParsedRawSyntaxNode rawNode;
   auto &rec = getRecorder();
   auto formNode = [&](SyntaxKind kind, ArrayRef<ParsedRawSyntaxNode> layout) {
-    if (nodeCreateK == SyntaxNodeCreationKind::Deferred || shouldDefer()) {
+    if (nodeCreateK == SyntaxNodeCreationKind::Deferred || IsBacktracking) {
       rawNode = ParsedRawSyntaxNode::makeDeferred(kind, layout, *this);
     } else {
       rawNode = rec.recordRawSyntax(kind, layout);
@@ -171,7 +171,7 @@ void SyntaxParsingContext::addToken(Token &Tok,
                                     const ParsedTrivia &LeadingTrivia,
                                     const ParsedTrivia &TrailingTrivia) {
   ParsedRawSyntaxNode raw;
-  if (shouldDefer())
+  if (IsBacktracking)
     raw = ParsedRawSyntaxNode::makeDeferred(Tok, LeadingTrivia, TrailingTrivia,
                                             *this);
   else
@@ -294,7 +294,7 @@ ParsedRawSyntaxNode SyntaxParsingContext::finalizeSourceFile() {
 
 void SyntaxParsingContext::synthesize(tok Kind, SourceLoc Loc) {
   ParsedRawSyntaxNode raw;
-  if (shouldDefer())
+  if (IsBacktracking)
     raw = ParsedRawSyntaxNode::makeDeferredMissing(Kind, Loc);
   else
     raw = getRecorder().recordMissingToken(Kind, Loc);

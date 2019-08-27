@@ -1,17 +1,17 @@
 {
-  "id": 39,
+  "id": 24,
   "kind": "SourceFile",
   "layout": [
     {
-      "id": 38,
+      "id": 23,
       "kind": "CodeBlockItemList",
       "layout": [
         {
-          "id": 36,
+          "id": 21,
           "kind": "CodeBlockItem",
           "layout": [
             {
-              "id": 35,
+              "id": 20,
               "kind": "TypealiasDecl",
               "layout": [
                 null,
@@ -64,7 +64,7 @@
                 },
                 null,
                 {
-                  "id": 34,
+                  "id": 19,
                   "kind": "TypeInitializerClause",
                   "layout": [
                     {
@@ -82,11 +82,11 @@
                       "presence": "Present"
                     },
                     {
-                      "id": 33,
+                      "id": 18,
                       "kind": "TupleType",
                       "layout": [
                         {
-                          "id": 20,
+                          "id": 4,
                           "tokenKind": {
                             "kind": "l_paren"
                           },
@@ -95,16 +95,30 @@
                           "presence": "Present"
                         },
                         {
-                          "id": 31,
+                          "id": 16,
                           "kind": "TupleTypeElementList",
                           "layout": [
                             {
-                              "id": 26,
+                              "id": 11,
                               "kind": "TupleTypeElement",
                               "layout": [
                                 null,
                                 {
-                                  "id": 21,
+                                  "id": 5,
+                                  "tokenKind": {
+                                    "kind": "kw__"
+                                  },
+                                  "leadingTrivia": [],
+                                  "trailingTrivia": [
+                                    {
+                                      "kind": "Space",
+                                      "value": 1
+                                    }
+                                  ],
+                                  "presence": "Present"
+                                },
+                                {
+                                  "id": 6,
                                   "tokenKind": {
                                     "kind": "identifier",
                                     "text": "b"
@@ -113,9 +127,8 @@
                                   "trailingTrivia": [],
                                   "presence": "Present"
                                 },
-                                null,
                                 {
-                                  "id": 22,
+                                  "id": 7,
                                   "tokenKind": {
                                     "kind": "colon"
                                   },
@@ -129,11 +142,11 @@
                                   "presence": "Present"
                                 },
                                 {
-                                  "id": 24,
+                                  "id": 9,
                                   "kind": "SimpleTypeIdentifier",
                                   "layout": [
                                     {
-                                      "id": 23,
+                                      "id": 8,
                                       "tokenKind": {
                                         "kind": "identifier",
                                         "text": "Int"
@@ -149,7 +162,7 @@
                                 null,
                                 null,
                                 {
-                                  "id": 25,
+                                  "id": 10,
                                   "tokenKind": {
                                     "kind": "comma"
                                   },
@@ -166,12 +179,12 @@
                               "presence": "Present"
                             },
                             {
-                              "id": 30,
+                              "id": 15,
                               "kind": "TupleTypeElement",
                               "layout": [
                                 null,
                                 {
-                                  "id": 27,
+                                  "id": 12,
                                   "tokenKind": {
                                     "kind": "kw__"
                                   },
@@ -181,7 +194,7 @@
                                 },
                                 null,
                                 {
-                                  "id": 22,
+                                  "id": 7,
                                   "tokenKind": {
                                     "kind": "colon"
                                   },
@@ -195,11 +208,11 @@
                                   "presence": "Present"
                                 },
                                 {
-                                  "id": 29,
+                                  "id": 14,
                                   "kind": "SimpleTypeIdentifier",
                                   "layout": [
                                     {
-                                      "id": 28,
+                                      "id": 13,
                                       "tokenKind": {
                                         "kind": "identifier",
                                         "text": "String"
@@ -222,7 +235,7 @@
                           "presence": "Present"
                         },
                         {
-                          "id": 32,
+                          "id": 17,
                           "tokenKind": {
                             "kind": "r_paren"
                           },
@@ -249,7 +262,7 @@
       "presence": "Present"
     },
     {
-      "id": 37,
+      "id": 22,
       "tokenKind": {
         "kind": "eof",
         "text": ""
