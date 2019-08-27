@@ -443,7 +443,7 @@ static ValueDecl *deriveEuclideanDifferentiable_vectorView(
         new (C) ReturnStmt(SourceLoc(), callExpr, /*implicit*/ true);
     auto *braceStmt = BraceStmt::create(C, SourceLoc(), retStmt, SourceLoc(),
                                         /*implicit*/ true);
-    return std::make_tuple(braceStmt, false);
+    return std::make_pair(braceStmt, false);
   };
   auto *getterDecl = derived.addGetterToReadOnlyDerivedProperty(
       vectorViewDecl, tangentContextualType);
