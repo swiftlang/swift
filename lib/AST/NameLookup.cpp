@@ -206,6 +206,17 @@ static void recordShadowedDeclsAfterSignatureMatch(
       if (firstModule != secondModule &&
           firstDecl->getDeclContext()->isModuleScopeContext() &&
           secondDecl->getDeclContext()->isModuleScopeContext()) {
+        // First, scoped imports shadow unscoped imports.
+        bool firstScoped = imports.isScopedImport(firstModule, name, dc);
+        bool secondScoped = imports.isScopedImport(secondModule, name, dc);
+        if (!firstScoped && secondScoped) {
+          shadowed.insert(firstDecl);
+          break;
+        } else if (firstScoped && !secondScoped) {
+          shadowed.insert(secondDecl);
+          continue;
+        }
+
         // Now check if one module shadows the other.
         if (imports.isShadowedBy(firstModule, secondModule, name, dc)) {
           shadowed.insert(firstDecl);
