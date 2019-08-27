@@ -175,19 +175,14 @@ ManagedValue SILGenBuilder::createCopyValue(SILLocation loc,
     SILValue result = createCopy##Name##Value(loc, originalValue.getValue()); \
     return SGF.emitManagedRValueWithCleanup(result); \
   }
-#define UNCHECKED_REF_STORAGE(Name, ...) \
-  ManagedValue \
-  SILGenBuilder::createUnsafeCopy##Name##Value(SILLocation loc, \
-                                               ManagedValue originalValue) { \
-    /* *NOTE* The reason why this is unsafe is that we are converting and */ \
-    /* unconditionally retaining, rather than before converting from */ \
-    /* type->ref checking that our value is not yet uninitialized. */ \
-    auto type = originalValue.getType().getAs<Name##StorageType>(); \
-    SILValue result = create##Name##ToRef( \
-        loc, originalValue.getValue(), \
-        SILType::getPrimitiveObjectType(type.getReferentType())); \
-    result = createCopyValue(loc, result); \
-    return SGF.emitManagedRValueWithCleanup(result); \
+#define UNCHECKED_REF_STORAGE(Name, ...)                                       \
+  ManagedValue SILGenBuilder::createCopy##Name##Value(                         \
+      SILLocation loc, ManagedValue originalValue) {                           \
+    /* *NOTE* The reason why this is unsafe is that we are converting and */   \
+    /* unconditionally retaining, rather than before converting from */        \
+    /* type->ref checking that our value is not yet uninitialized. */          \
+    SILValue result = createCopy##Name##Value(loc, originalValue.getValue());  \
+    return SGF.emitManagedRValueWithCleanup(result);                           \
   }
 #include "swift/AST/ReferenceStorage.def"
 
