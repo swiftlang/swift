@@ -224,6 +224,11 @@ static llvm::cl::opt<bool>
 CompilerStyleDiags("compiler-style-diags",
                    llvm::cl::desc("Print compiler style diagnostics to stderr."),
                    llvm::cl::cat(Category));
+
+static llvm::cl::opt<bool>
+Migrator("migrator",
+         llvm::cl::desc("Dump Json suitable for generating migration script"),
+         llvm::cl::cat(Category));
 } // namespace options
 
 namespace {
@@ -2480,6 +2485,7 @@ static CheckerOptions getCheckOpts(int argc, char *argv[]) {
   Opts.AvoidLocation = options::AvoidLocation;
   Opts.AvoidToolArgs = options::AvoidToolArgs;
   Opts.ABI = options::Abi;
+  Opts.Migrator = options::Migrator;
   Opts.Verbose = options::Verbose;
   Opts.AbortOnModuleLoadFailure = options::AbortOnModuleLoadFailure;
   Opts.LocationFilter = options::LocationFilter;

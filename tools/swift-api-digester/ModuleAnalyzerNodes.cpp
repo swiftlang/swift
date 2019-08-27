@@ -21,6 +21,18 @@ static StringRef getAttrName(DeclAttrKind Kind) {
     llvm_unreachable("unrecognized attribute kind.");
   }
 }
+
+static PrintOptions getTypePrintOpts(CheckerOptions CheckerOpts) {
+  PrintOptions Opts;
+  Opts.SynthesizeSugarOnTypes = true;
+  if (!CheckerOpts.Migrator) {
+    // We should always print fully qualified type names for checking either
+    // API or ABI stability.
+    Opts.FullyQualifiedTypes = true;
+  }
+  return Opts;
+}
+
 } // End of anonymous namespace.
 
 struct swift::ide::api::SDKNodeInitInfo {
@@ -952,7 +964,7 @@ static StringRef getPrintedName(SDKContext &Ctx, Type Ty,
                                 bool IsImplicitlyUnwrappedOptional = false) {
   std::string S;
   llvm::raw_string_ostream OS(S);
-  PrintOptions PO;
+  PrintOptions PO = getTypePrintOpts(Ctx.getOpts());
   PO.SkipAttributes = true;
   if (IsImplicitlyUnwrappedOptional)
     PO.PrintOptionalAsImplicitlyUnwrapped = true;
@@ -1106,9 +1118,7 @@ StringRef printGenericSignature(SDKContext &Ctx, ArrayRef<Requirement> AllReqs,
     return StringRef();
   OS << "<";
   bool First = true;
-  PrintOptions Opts = PrintOptions::printInterface();
-  // We should always print fully qualified type names here
-  Opts.FullyQualifiedTypes = true;
+  PrintOptions Opts = getTypePrintOpts(Ctx.getOpts());
   for (auto Req: AllReqs) {
     if (!First) {
       OS << ", ";
@@ -1130,13 +1140,13 @@ static StringRef printGenericSignature(SDKContext &Ctx, Decl *D, bool Canonical)
   if (auto *PD = dyn_cast<ProtocolDecl>(D)) {
     return printGenericSignature(Ctx, PD->getRequirementSignature(), Canonical);
   }
-
+  PrintOptions Opts = getTypePrintOpts(Ctx.getOpts());
   if (auto *GC = D->getAsGenericContext()) {
     if (auto *Sig = GC->getGenericSignature()) {
       if (Canonical)
-        Sig->getCanonicalSignature()->print(OS);
+        Sig->getCanonicalSignature()->print(OS, Opts);
       else
-        Sig->print(OS);
+        Sig->print(OS, Opts);
       return Ctx.buffer(OS.str());
     }
   }
