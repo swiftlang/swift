@@ -37,7 +37,7 @@ localVar(42)  // expected-error {{cannot call value of non-function type 'Bool'}
 var _ : localVar // should still work
 
 _ = scopedVar // no-warning
-scopedVar(42) // expected-error {{cannot call value of non-function type 'Int'}}
+scopedVar(42)
 
 var _ : Bool = scopedFunction(true)
 var _ : Int  = scopedFunction(42)
