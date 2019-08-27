@@ -2194,8 +2194,26 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     if (choice.isImplicitlyUnwrappedValueOrReturnValue()) {
       // Build the disjunction to attempt binding both T? and T (or
       // function returning T? and function returning T).
-      buildDisjunctionForImplicitlyUnwrappedOptional(boundType, refType,
-                                                     locator);
+
+      // If we have something like '(s.foo)()', where 's.foo()' returns an IUO,
+      // then we need to only create a single constraint that binds the
+      // type to an optional.
+      auto createdSingleConstraint = false;
+      auto paren = getParentExpr(locator->getAnchor());
+      auto call = getParentExpr(paren);
+      if (call && isa<CallExpr>(call)) {
+        auto callExpr = cast<CallExpr>(call);
+
+        if (callExpr->getFn() != callExpr->getSemanticFn()) {
+          addConstraint(ConstraintKind::Bind, boundType, refType, locator);
+          createdSingleConstraint = true;
+        }
+      }
+
+      if (!createdSingleConstraint) {
+        buildDisjunctionForImplicitlyUnwrappedOptional(boundType, refType,
+                                                       locator);
+      }
     } else {
       // Add the type binding constraint.
       addConstraint(ConstraintKind::Bind, boundType, refType, locator);
