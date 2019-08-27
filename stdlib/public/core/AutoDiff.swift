@@ -232,8 +232,7 @@ public protocol EuclideanDifferentiable: Differentiable {
   var vectorView: TangentVector { get }
 }
 
-public extension EuclideanDifferentiable
-    where TangentVector: EuclideanDifferentiable, TangentVector == Self {
+public extension EuclideanDifferentiable where TangentVector == Self {
   var vectorView: TangentVector { _read { yield self } }
 }
 

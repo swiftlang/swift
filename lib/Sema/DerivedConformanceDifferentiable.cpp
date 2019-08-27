@@ -32,8 +32,8 @@
 
 using namespace swift;
 
-// Return the protocol requirement with the specified name.
-// TODO: Move function to shared place for use with other derived conformances.
+/// Return the protocol requirement with the specified name.
+/// TODO: Move function to shared place for use with other derived conformances.
 static ValueDecl *getProtocolRequirement(ProtocolDecl *proto, Identifier name) {
   auto lookup = proto->lookupDirect(name);
   // Erase declarations that are not protocol requirements.
@@ -46,8 +46,8 @@ static ValueDecl *getProtocolRequirement(ProtocolDecl *proto, Identifier name) {
   return lookup.front();
 }
 
-// Get the stored properties of a nominal type that are relevant for
-// differentiation, except the ones tagged `@noDerivative`.
+/// Get the stored properties of a nominal type that are relevant for
+/// differentiation, except the ones tagged `@noDerivative`.
 static void
 getStoredPropertiesForDifferentiation(NominalTypeDecl *nominal,
                                       DeclContext *DC,
@@ -71,8 +71,8 @@ getStoredPropertiesForDifferentiation(NominalTypeDecl *nominal,
   }
 }
 
-// Convert the given `ValueDecl` to a `StructDecl` if it is a `StructDecl` or a
-// `TypeDecl` with an underlying struct type. Otherwise, return `nullptr`.
+/// Convert the given `ValueDecl` to a `StructDecl` if it is a `StructDecl` or a
+/// `TypeDecl` with an underlying struct type. Otherwise, return `nullptr`.
 static StructDecl *convertToStructDecl(ValueDecl *v) {
   if (auto *structDecl = dyn_cast<StructDecl>(v))
     return structDecl;
@@ -83,10 +83,10 @@ static StructDecl *convertToStructDecl(ValueDecl *v) {
       typeDecl->getDeclaredInterfaceType()->getAnyNominal());
 }
 
-// Get the `Differentiable` protocol `TangentVector` associated type for the
-// given `VarDecl`.
-// TODO: Generalize and move function to shared place for use with other derived
-// conformances.
+/// Get the `Differentiable` protocol `TangentVector` associated type for the
+/// given `VarDecl`.
+/// TODO: Generalize and move function to shared place for use with other derived
+/// conformances.
 static Type getTangentVectorType(VarDecl *decl, DeclContext *DC) {
   auto &C = decl->getASTContext();
   auto *diffableProto = C.getProtocol(KnownProtocolKind::Differentiable);
@@ -223,7 +223,7 @@ bool DerivedConformance::canDeriveEuclideanDifferentiable(
   });
 }
 
-// Synthesize body for a `Differentiable` method requirement.
+/// Synthesize body for a `Differentiable` method requirement.
 static std::pair<BraceStmt *, bool>
 deriveBodyDifferentiable_method(AbstractFunctionDecl *funcDecl,
                                 Identifier methodName,
@@ -310,7 +310,7 @@ deriveBodyDifferentiable_method(AbstractFunctionDecl *funcDecl,
   return std::pair<BraceStmt *, bool>(braceStmt, false);
 }
 
-// Synthesize body for `move(along:)`.
+/// Synthesize body for `move(along:)`.
 static std::pair<BraceStmt *, bool>
 deriveBodyDifferentiable_move(AbstractFunctionDecl *funcDecl, void *) {
   auto &C = funcDecl->getASTContext();
@@ -318,7 +318,7 @@ deriveBodyDifferentiable_move(AbstractFunctionDecl *funcDecl, void *) {
                                          C.getIdentifier("along"));
 }
 
-// Synthesize function declaration for a `Differentiable` method requirement.
+/// Synthesize function declaration for a `Differentiable` method requirement.
 static ValueDecl *deriveDifferentiable_method(
     DerivedConformance &derived, Identifier methodName, Identifier argumentName,
     Identifier parameterName, Type parameterType, Type returnType,
@@ -356,7 +356,7 @@ static ValueDecl *deriveDifferentiable_method(
   return funcDecl;
 }
 
-// Synthesize the `move(along:)` function declaration.
+/// Synthesize the `move(along:)` function declaration.
 static ValueDecl *deriveDifferentiable_move(DerivedConformance &derived) {
   auto &C = derived.TC.Context;
   auto *parentDC = derived.getConformanceContext();
@@ -370,7 +370,7 @@ static ValueDecl *deriveDifferentiable_move(DerivedConformance &derived) {
       {deriveBodyDifferentiable_move, nullptr});
 }
 
-// Synthesize the `vectorView` property declaration.
+/// Synthesize the `vectorView` property declaration.
 static ValueDecl *deriveEuclideanDifferentiable_vectorView(
     DerivedConformance &derived) {
   auto &C = derived.TC.Context;
@@ -454,8 +454,8 @@ static ValueDecl *deriveEuclideanDifferentiable_vectorView(
   return vectorViewDecl;
 }
 
-// Return associated `TangentVector` struct for a nominal type, if it exists.
-// If not, synthesize the struct.
+/// Return associated `TangentVector` struct for a nominal type, if it exists.
+/// If not, synthesize the struct.
 static StructDecl *
 getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
   auto &TC = derived.TC;
@@ -488,8 +488,8 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
   auto *kpIterableProto = C.getProtocol(KnownProtocolKind::KeyPathIterable);
   auto kpIterableType = TypeLoc::withoutLoc(kpIterableProto->getDeclaredType());
 
-  // By definition, `TangentVector` must conform to `EuclideanDifferentiable`
-  // and `AdditiveArithmetic`.
+  // By definition, `TangentVector` must conform to `Differentiable` and
+  // `AdditiveArithmetic`.
   SmallVector<TypeLoc, 4> inherited{diffableType, addArithType};
 
   // Cache original members and their associated types for later use.
@@ -661,8 +661,8 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
   return structDecl;
 }
 
-// Add a typealias declaration with the given name and underlying target
-// struct type to the given source nominal declaration context.
+/// Add a typealias declaration with the given name and underlying target
+/// struct type to the given source nominal declaration context.
 static void addAssociatedTypeAliasDecl(Identifier name,
                                        DeclContext *sourceDC,
                                        StructDecl *target,
@@ -695,11 +695,11 @@ static void addAssociatedTypeAliasDecl(Identifier name,
   C.addSynthesizedDecl(aliasDecl);
 };
 
-// Diagnose stored properties in the nominal that do not have an explicit
-// `@noDerivative` attribute, but either:
-// - Do not conform to `Differentiable`.
-// - Are a `let` stored property.
-// Emit a warning and a fixit so that users will make the attribute explicit.
+/// Diagnose stored properties in the nominal that do not have an explicit
+/// `@noDerivative` attribute, but either:
+/// - Do not conform to `Differentiable`.
+/// - Are a `let` stored property.
+/// Emit a warning and a fixit so that users will make the attribute explicit.
 static void checkAndDiagnoseImplicitNoDerivative(TypeChecker &TC,
                                                  NominalTypeDecl *nominal,
                                                  DeclContext* DC) {
@@ -747,7 +747,7 @@ static void checkAndDiagnoseImplicitNoDerivative(TypeChecker &TC,
   }
 }
 
-// Get or synthesize `TangentVector` struct type.
+/// Get or synthesize `TangentVector` struct type.
 static Type
 getOrSynthesizeTangentVectorStructType(DerivedConformance &derived) {
   auto &TC = derived.TC;
@@ -779,7 +779,7 @@ getOrSynthesizeTangentVectorStructType(DerivedConformance &derived) {
       tangentStruct->getDeclaredInterfaceType());
 }
 
-// Synthesize the `TangentVector` struct type.
+/// Synthesize the `TangentVector` struct type.
 static Type
 deriveDifferentiable_TangentVectorStruct(DerivedConformance &derived) {
   auto &TC = derived.TC;
