@@ -260,8 +260,8 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
       return getRequirement(KnownProtocolKind::AdditiveArithmetic);
 
     // SWIFT_ENABLE_TENSORFLOW
-    // EuclideanDifferentiable.vectorView
-    if (name.isSimpleName(ctx.Id_vectorView))
+    // EuclideanDifferentiable.differentiableVectorView
+    if (name.isSimpleName(ctx.Id_differentiableVectorView))
       return getRequirement(KnownProtocolKind::EuclideanDifferentiable);
 
     // SWIFT_ENABLE_TENSORFLOW

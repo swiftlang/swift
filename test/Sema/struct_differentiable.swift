@@ -97,7 +97,7 @@ struct GenericVectorSpacesEqualSelf<T>
 func testGenericVectorSpacesEqualSelf() {
   var genericSame = GenericVectorSpacesEqualSelf<Double>(w: 1, b: 1)
   genericSame.move(along: genericSame)
-  genericSame.move(along: genericSame.vectorView)
+  genericSame.move(along: genericSame.differentiableVectorView)
 }
 
 // Test nested type.
@@ -130,7 +130,7 @@ struct AllMembersAdditiveArithmetic : Differentiable, EuclideanDifferentiable {
 
 // Test type `AllMembersVectorProtocol` whose members conforms to `VectorProtocol`,
 // in which case we should make `TangentVector` conform to `VectorProtocol`.
-struct MyVector : VectorProtocol, Differentiable {
+struct MyVector : VectorProtocol, Differentiable, EuclideanDifferentiable {
   var w: Float
   var b: Float
 }
@@ -149,9 +149,6 @@ struct MyVector2 : ElementaryFunctions, Differentiable, EuclideanDifferentiable 
   var b: Float
 }
 
-// Won't derive `EuclideanDifferentiable` because `MyVector2.TangentVector != MyVector2`.
-// expected-error @+2 {{type 'AllMembersElementaryFunctions' does not conform to protocol 'EuclideanDifferentiable'}}
-// expected-note @+1 {{do you want to add protocol stubs?}}
 struct AllMembersElementaryFunctions : Differentiable, EuclideanDifferentiable {
   var v1: MyVector2
   var v2: MyVector2
@@ -186,8 +183,8 @@ struct EuclideanDifferentiableSubset : EuclideanDifferentiable {
 func testEuclideanDifferentiableSubset() {
   let x = EuclideanDifferentiableSubset(w: 1, b: 2, flag: false)
   let tan = EuclideanDifferentiableSubset.TangentVector(w: 1, b: 1)
-  _ = x.vectorView.w * tan.w
-  _ = x.vectorView.b * tan.b
+  _ = x.differentiableVectorView.w * tan.w
+  _ = x.differentiableVectorView.b * tan.b
 
   _ = pullback(at: x) { model in
     model.w + model.b

@@ -38,7 +38,7 @@ DerivedConformanceTests.test("EuclideanVectorView") {
       init() { x = [1, 2, 3, 4]; y = .zero }
     }
     let x = Foo()
-    expectEqual(Foo.TangentVector(x: [1, 2, 3, 4]), x.vectorView)
+    expectEqual(Foo.TangentVector(x: [1, 2, 3, 4]), x.differentiableVectorView)
   }
   do {
     class FooClass: EuclideanDifferentiable {
@@ -47,7 +47,7 @@ DerivedConformanceTests.test("EuclideanVectorView") {
       init() { x = [1, 2, 3, 4]; y = .zero }
     }
     let x = FooClass()
-    expectEqual(FooClass.TangentVector(x: [1, 2, 3, 4]), x.vectorView)
+    expectEqual(FooClass.TangentVector(x: [1, 2, 3, 4]), x.differentiableVectorView)
   }
 }
 
