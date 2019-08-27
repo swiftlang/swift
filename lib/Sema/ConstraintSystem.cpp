@@ -2193,6 +2193,11 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
   // then we need to only create a single constraint that binds the
   // type to an optional.
   auto isIUOCallWrappedInParens = [&]() {
+    auto decl = choice.getDecl();
+    auto type = decl ? decl->getInterfaceType() : nullptr;
+    if (!type || !type->is<AnyFunctionType>())
+      return false;
+
     auto paren = getParentExpr(locator->getAnchor());
     auto result = paren ? isa<ParenExpr>(paren) : false;
     return result;
