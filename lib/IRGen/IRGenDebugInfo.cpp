@@ -1601,15 +1601,19 @@ private:
       auto Idx = ClangDecl->getOwningModuleID();
       auto SubModuleDesc = Reader.getSourceDescriptor(Idx);
       auto TopLevelModuleDesc = getClangModule(*TypeDecl->getModuleContext());
-      if (SubModuleDesc && TopLevelModuleDesc) {
-        // Describe the submodule, but substitute the cached ASTFile from
-        // the toplevel module. The ASTFile pointer in SubModule may be
-        // dangling and cant be trusted.
-        Scope = getOrCreateModule({SubModuleDesc->getModuleName(),
-                                   SubModuleDesc->getPath(),
-                                   TopLevelModuleDesc->getASTFile(),
-                                   TopLevelModuleDesc->getSignature()},
-                                  SubModuleDesc->getModuleOrNull());
+      if (SubModuleDesc) {
+        if (TopLevelModuleDesc)
+          // Describe the submodule, but substitute the cached ASTFile from
+          // the toplevel module. The ASTFile pointer in SubModule may be
+          // dangling and cant be trusted.
+          Scope = getOrCreateModule({SubModuleDesc->getModuleName(),
+                                     SubModuleDesc->getPath(),
+                                     TopLevelModuleDesc->getASTFile(),
+                                     TopLevelModuleDesc->getSignature()},
+                                    SubModuleDesc->getModuleOrNull());
+        else if (SubModuleDesc->getModuleOrNull() == nullptr)
+          // This is (bridging header) PCH.
+          Scope = getOrCreateModule(*SubModuleDesc, nullptr);
       }
     }
     if (!Scope)
