@@ -598,7 +598,7 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
     switch (kind.getValue()) {
     default:
       builtin->dump();
-      llvm_unreachable("unexpected bulitin memory access.");
+      llvm_unreachable("unexpected builtin memory access.");
 
       // WillThrow exists for the debugger, does nothing.
     case BuiltinValueKind::WillThrow:
