@@ -1018,7 +1018,6 @@ static void lookupVisibleMemberDecls(
 static void lookupVisibleDeclsImpl(VisibleDeclConsumer &Consumer,
                                    const DeclContext *DC,
                                    bool IncludeTopLevel, SourceLoc Loc) {
-  const ModuleDecl &M = *DC->getParentModule();
   const SourceManager &SM = DC->getASTContext().SourceMgr;
   auto Reason = DeclVisibilityKind::MemberOfCurrentNominal;
 
@@ -1121,7 +1120,6 @@ static void lookupVisibleDeclsImpl(VisibleDeclConsumer &Consumer,
     Reason = DeclVisibilityKind::MemberOfOutsideNominal;
   }
 
-  SmallVector<ModuleDecl::ImportedModule, 8> extraImports;
   if (auto SF = dyn_cast<SourceFile>(DC)) {
     if (Loc.isValid()) {
       // Look for local variables in top-level code; normally, the parser
@@ -1137,22 +1135,16 @@ static void lookupVisibleDeclsImpl(VisibleDeclConsumer &Consumer,
           Consumer.foundDecl(result, DeclVisibilityKind::VisibleAtTopLevel);
         return;
       }
-
-      ModuleDecl::ImportFilter importFilter;
-      importFilter |= ModuleDecl::ImportFilterKind::Private;
-      importFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
-      SF->getImportedModules(extraImports, importFilter);
     }
   }
 
   if (IncludeTopLevel) {
     using namespace namelookup;
     SmallVector<ValueDecl *, 0> moduleResults;
-    auto &mutableM = const_cast<ModuleDecl&>(M);
-    lookupVisibleDeclsInModule(&mutableM, {}, moduleResults,
+    lookupVisibleDeclsInModule(DC, {}, moduleResults,
                                NLKind::UnqualifiedLookup,
                                ResolutionKind::Overloadable,
-                               DC, extraImports);
+                               DC);
     for (auto result : moduleResults)
       Consumer.foundDecl(result, DeclVisibilityKind::VisibleAtTopLevel);
 

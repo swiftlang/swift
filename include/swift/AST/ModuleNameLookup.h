@@ -42,10 +42,14 @@ enum class ResolutionKind {
   TypesOnly
 };
 
-/// Performs a lookup into the given module and, if necessary, its
-/// reexports, observing proper shadowing rules.
+/// Performs a lookup into the given module and it's imports.
 ///
-/// \param module The module that will contain the name.
+/// If 'moduleOrFile' is a ModuleDecl, we search the module and it's
+/// public imports. If 'moduleOrFile' is a SourceFile, we search the
+/// file's parent module, the module's public imports, and the source
+/// file's private imports.
+///
+/// \param moduleOrFile The module or file unit whose imports to search.
 /// \param accessPath The import scope on \p module.
 /// \param name The name to look up.
 /// \param[out] decls Any found decls will be added to this vector.
@@ -54,12 +58,11 @@ enum class ResolutionKind {
 /// \param moduleScopeContext The top-level context from which the lookup is
 ///        being performed, for checking access. This must be either a
 ///        FileUnit or a Module.
-/// \param extraImports Private imports to include in this search.
-void lookupInModule(ModuleDecl *module, ModuleDecl::AccessPathTy accessPath,
+void lookupInModule(const DeclContext *moduleOrFile,
+                    ModuleDecl::AccessPathTy accessPath,
                     DeclName name, SmallVectorImpl<ValueDecl *> &decls,
                     NLKind lookupKind, ResolutionKind resolutionKind,
-                    const DeclContext *moduleScopeContext,
-                    ArrayRef<ModuleDecl::ImportedModule> extraImports = {});
+                    const DeclContext *moduleScopeContext);
 
 template <typename Fn>
 void forAllVisibleModules(const DeclContext *DC, const Fn &fn) {
@@ -74,12 +77,12 @@ void forAllVisibleModules(const DeclContext *DC, const Fn &fn) {
 /// Performs a qualified lookup into the given module and, if necessary, its
 /// reexports, observing proper shadowing rules.
 void
-lookupVisibleDeclsInModule(ModuleDecl *M, ModuleDecl::AccessPathTy accessPath,
+lookupVisibleDeclsInModule(const DeclContext *moduleOrFile,
+                           ModuleDecl::AccessPathTy accessPath,
                            SmallVectorImpl<ValueDecl *> &decls,
                            NLKind lookupKind,
                            ResolutionKind resolutionKind,
-                           const DeclContext *moduleScopeContext,
-                           ArrayRef<ModuleDecl::ImportedModule> extraImports = {});
+                           const DeclContext *moduleScopeContext);
 
 } // end namespace namelookup
 

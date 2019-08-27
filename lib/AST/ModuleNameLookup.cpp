@@ -444,14 +444,16 @@ void ModuleNameLookup<LookupStrategy>::lookupInModule(
   cache.try_emplace(cacheKey, lookupResults);
 }
 
-void namelookup::lookupInModule(ModuleDecl *startModule,
+void namelookup::lookupInModule(const DeclContext *moduleOrFile,
                                 ModuleDecl::AccessPathTy topAccessPath,
                                 DeclName name,
                                 SmallVectorImpl<ValueDecl *> &decls,
                                 NLKind lookupKind,
                                 ResolutionKind resolutionKind,
-                                const DeclContext *moduleScopeContext,
-                                ArrayRef<ModuleDecl::ImportedModule> extraImports) {
+                                const DeclContext *moduleScopeContext) {
+  assert(moduleScopeContext->isModuleScopeContext());
+
+  auto *startModule = moduleOrFile->getParentModule();
   auto &ctx = startModule->getASTContext();
   auto *stats = ctx.Stats;
   if (stats)
@@ -459,23 +461,43 @@ void namelookup::lookupInModule(ModuleDecl *startModule,
 
   FrontendStatsTracer tracer(stats, "lookup-in-module");
 
-  assert(moduleScopeContext && moduleScopeContext->isModuleScopeContext());
+  // Add private imports to the extra search list.
+  SmallVector<ModuleDecl::ImportedModule, 8> extraImports;
+  if (auto *file = dyn_cast<FileUnit>(moduleOrFile)) {
+    ModuleDecl::ImportFilter importFilter;
+    importFilter |= ModuleDecl::ImportFilterKind::Private;
+    importFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
+    file->getImportedModules(extraImports, importFilter);
+  }
+
   LookupByName lookup(ctx, resolutionKind, name, lookupKind);
   lookup.lookupInModule(decls, startModule, topAccessPath, moduleScopeContext,
                         extraImports);
 }
 
 void namelookup::lookupVisibleDeclsInModule(
-    ModuleDecl *M,
+    const DeclContext *moduleOrFile,
     ModuleDecl::AccessPathTy accessPath,
     SmallVectorImpl<ValueDecl *> &decls,
     NLKind lookupKind,
     ResolutionKind resolutionKind,
-    const DeclContext *moduleScopeContext,
-    ArrayRef<ModuleDecl::ImportedModule> extraImports) {
-  auto &ctx = M->getASTContext();
-  assert(moduleScopeContext && moduleScopeContext->isModuleScopeContext());
+    const DeclContext *moduleScopeContext) {
+  assert(moduleScopeContext->isModuleScopeContext());
+
+  auto *startModule = moduleOrFile->getParentModule();
+  auto &ctx = startModule->getASTContext();
+
+  // Add private imports to the extra search list.
+  SmallVector<ModuleDecl::ImportedModule, 8> extraImports;
+  if (auto *file = dyn_cast<FileUnit>(moduleOrFile)) {
+    ModuleDecl::ImportFilter importFilter;
+    importFilter |= ModuleDecl::ImportFilterKind::Private;
+    importFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
+    file->getImportedModules(extraImports, importFilter);
+  }
+
   LookupVisibleDecls lookup(ctx, resolutionKind, lookupKind);
-  lookup.lookupInModule(decls, M, accessPath, moduleScopeContext, extraImports);
+  lookup.lookupInModule(decls, startModule, accessPath, moduleScopeContext,
+                        extraImports);
 }
 
