@@ -3791,7 +3791,7 @@ public:
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto extension = ExtensionDecl::create(ctx, SourceLoc(), TypeLoc(), { },
+    auto extension = ExtensionDecl::create(ctx, SourceLoc(), nullptr, { },
                                            DC, nullptr);
     declOrOffset = extension;
 
@@ -3811,7 +3811,8 @@ public:
     MF.configureGenericEnvironment(extension, genericEnvID);
 
     auto baseTy = MF.getType(baseID);
-    extension->getExtendedTypeLoc().setType(baseTy);
+    ctx.evaluator.cacheOutput(ExtendedTypeRequest{extension},
+                              std::move(baseTy));
     auto nominal = extension->getExtendedNominal();
 
     if (isImplicit)

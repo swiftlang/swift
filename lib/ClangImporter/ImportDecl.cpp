@@ -4545,9 +4545,13 @@ namespace {
       auto loc = Impl.importSourceLoc(decl->getBeginLoc());
       auto result = ExtensionDecl::create(
                       Impl.SwiftContext, loc,
-                      TypeLoc::withoutLoc(objcClass->getDeclaredType()),
+                      nullptr,
                       { }, dc, nullptr, decl);
-
+      Impl.SwiftContext
+          .evaluator
+          .cacheOutput(ExtendedTypeRequest{result},
+                       objcClass->getDeclaredType());
+      
       // Determine the type and generic args of the extension.
       if (objcClass->getGenericParams()) {
         result->createGenericParamsIfMissing(objcClass);
@@ -8143,9 +8147,10 @@ ClangImporter::Implementation::importDeclContextOf(
     return knownExtension->second;
 
   // Create a new extension for this nominal type/Clang submodule pair.
-  auto swiftTyLoc = TypeLoc::withoutLoc(nominal->getDeclaredType());
-  auto ext = ExtensionDecl::create(SwiftContext, SourceLoc(), swiftTyLoc, {},
+  auto ext = ExtensionDecl::create(SwiftContext, SourceLoc(), nullptr, {},
                                    getClangModuleForDecl(decl), nullptr);
+  SwiftContext.evaluator.cacheOutput(ExtendedTypeRequest{ext},
+                                     nominal->getDeclaredType());
   ext->setValidationToChecked();
   ext->setMemberLoader(this, reinterpret_cast<uintptr_t>(declSubmodule));
 

@@ -3089,7 +3089,7 @@ Parser::parseDecl(ParseDeclOptions Flags,
         diagnose(nominal->getLoc(), diag::note_in_decl_extension, false,
                  nominal->getName());
       } else if (auto extension = dyn_cast<ExtensionDecl>(CurDeclContext)) {
-        if (auto repr = extension->getExtendedTypeLoc().getTypeRepr()) {
+        if (auto repr = extension->getExtendedTypeRepr()) {
           if (auto idRepr = dyn_cast<IdentTypeRepr>(repr)) {
             diagnose(extension->getLoc(), diag::note_in_decl_extension, true,
                      idRepr->getComponentRange().front()->getIdentifier());

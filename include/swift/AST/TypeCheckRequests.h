@@ -1104,6 +1104,24 @@ public:
   }
 };
 
+class ExtendedTypeRequest
+    : public SimpleRequest<ExtendedTypeRequest,
+                           Type(ExtensionDecl *),
+                           CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<Type> evaluate(Evaluator &eval, ExtensionDecl *) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
 template<>

@@ -82,7 +82,10 @@ static SourceLoc getLocForExtension(ExtensionDecl *D) {
   // Use the 'End' token of the range, in case it is a compound name, e.g.
   //   extension A.B {}
   // we want the location of 'B' token.
-  return D->getExtendedTypeLoc().getSourceRange().End;
+  if (auto *repr = D->getExtendedTypeRepr()) {
+    return repr->getSourceRange().End;
+  }
+  return SourceLoc();
 }
 
 namespace {

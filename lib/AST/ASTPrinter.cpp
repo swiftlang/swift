@@ -2107,9 +2107,15 @@ void PrintAST::printExtension(ExtensionDecl *decl) {
     recordDeclLoc(decl, [&]{
       // We cannot extend sugared types.
       Type extendedType = decl->getExtendedType();
-      if (!extendedType || !extendedType->getAnyNominal()) {
+      if (!extendedType) {
         // Fallback to TypeRepr.
-        printTypeLoc(decl->getExtendedTypeLoc());
+        printTypeLoc(decl->getExtendedTypeRepr());
+        return;
+      }
+      if (!extendedType->getAnyNominal()) {
+        // Fallback to the type.  This usually means we're trying to print an
+        // UnboundGenericType.
+        printTypeLoc(TypeLoc::withoutLoc(extendedType));
         return;
       }
       printExtendedTypeName(extendedType, Printer, Options);
