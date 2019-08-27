@@ -61,16 +61,6 @@ void lookupInModule(const DeclContext *moduleOrFile,
                     NLKind lookupKind, ResolutionKind resolutionKind,
                     const DeclContext *moduleScopeContext);
 
-template <typename Fn>
-void forAllVisibleModules(const DeclContext *DC, const Fn &fn) {
-  DeclContext *moduleScope = DC->getModuleScopeContext();
-  if (auto file = dyn_cast<FileUnit>(moduleScope))
-    file->forAllVisibleModules(fn);
-  else
-    cast<ModuleDecl>(moduleScope)
-        ->forAllVisibleModules(ModuleDecl::AccessPathTy(), fn);
-}
-
 /// Performs a qualified lookup into the given module and, if necessary, its
 /// reexports, observing proper shadowing rules.
 void
