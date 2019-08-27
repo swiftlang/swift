@@ -16,7 +16,7 @@
             {
               "kind": "TypeNameAlias",
               "name": "Void",
-              "printedName": "Void",
+              "printedName": "Swift.Void",
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -29,7 +29,7 @@
           "declKind": "Func",
           "usr": "c:objc(pl)AnotherObjcProt(im)anotherFunctionFromProt",
           "moduleName": "Foo",
-          "genericSig": "<Self where Self : AnotherObjcProt>",
+          "genericSig": "<Self where Self : Foo.AnotherObjcProt>",
           "protocolReq": true,
           "declAttributes": [
             "ObjC"
@@ -58,7 +58,7 @@
             {
               "kind": "TypeNameAlias",
               "name": "Void",
-              "printedName": "Void",
+              "printedName": "Swift.Void",
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -85,7 +85,7 @@
             {
               "kind": "TypeNominal",
               "name": "ClangInterface",
-              "printedName": "ClangInterface",
+              "printedName": "Foo.ClangInterface",
               "usr": "c:objc(cs)ClangInterface"
             }
           ],
@@ -109,7 +109,7 @@
       ],
       "superclassUsr": "c:objc(cs)NSObject",
       "superclassNames": [
-        "NSObject"
+        "ObjectiveC.NSObject"
       ],
       "conformances": [
         {
@@ -139,7 +139,7 @@
             {
               "kind": "TypeNameAlias",
               "name": "Void",
-              "printedName": "Void",
+              "printedName": "Swift.Void",
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -152,7 +152,7 @@
           "declKind": "Func",
           "usr": "c:objc(pl)ObjcProt(im)someFunctionFromProt",
           "moduleName": "Foo",
-          "genericSig": "<Self where Self : ObjcProt>",
+          "genericSig": "<Self where Self : Foo.ObjcProt>",
           "protocolReq": true,
           "declAttributes": [
             "ObjC"
@@ -169,5 +169,5 @@
       ]
     }
   ],
-  "json_format_version": 2
+  "json_format_version": 3
 }
