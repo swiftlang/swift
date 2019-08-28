@@ -108,7 +108,8 @@ SDKNodeDecl::SDKNodeDecl(SDKNodeInitInfo Info, SDKNodeKind Kind)
         SugaredGenericSig(Info.SugaredGenericSig),
         FixedBinaryOrder(Info.FixedBinaryOrder),
         introVersions({Info.IntromacOS, Info.IntroiOS, Info.IntrotvOS,
-                       Info.IntrowatchOS, Info.Introswift}){}
+                       Info.IntrowatchOS, Info.Introswift}),
+        ObjCName(Info.ObjCName) {}
 
 SDKNodeType::SDKNodeType(SDKNodeInitInfo Info, SDKNodeKind Kind):
   SDKNode(Info, Kind), TypeAttributes(Info.TypeAttrs),
@@ -913,6 +914,8 @@ static bool isSDKNodeEqual(SDKContext &Ctx, const SDKNode &L, const SDKNode &R) 
         return false;
       if (Left->isInternal() != Right->isInternal())
         return false;
+      if (Left->getObjCName() != Right->getObjCName())
+        return false;
       if (Left->hasFixedBinaryOrder() != Right->hasFixedBinaryOrder())
         return false;
       if (Left->hasFixedBinaryOrder()) {
@@ -1250,6 +1253,16 @@ StringRef SDKContext::getLanguageIntroVersion(Decl *D) {
   return getLanguageIntroVersion(D->getDeclContext()->getAsDecl());
 }
 
+StringRef SDKContext::getObjcName(Decl *D) {
+  if (auto *OC = D->getAttrs().getAttribute<ObjCAttr>()) {
+    if (OC->getName().hasValue()) {
+      SmallString<32> Buffer;
+      return buffer(OC->getName()->getString(Buffer));
+    }
+  }
+  return StringRef();
+}
+
 SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Type Ty, TypeInitInfo Info) :
     Ctx(Ctx), Name(getTypeName(Ctx, Ty, Info.IsImplicitlyUnwrappedOptional)),
     PrintedName(getPrintedName(Ctx, Ty, Info.IsImplicitlyUnwrappedOptional)),
@@ -1276,6 +1289,7 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Decl *D):
       IntrotvOS(Ctx.getPlatformIntroVersion(D, PlatformKind::tvOS)),
       IntrowatchOS(Ctx.getPlatformIntroVersion(D, PlatformKind::watchOS)),
       Introswift(Ctx.getLanguageIntroVersion(D)),
+      ObjCName(Ctx.getObjcName(D)),
       IsImplicit(D->isImplicit()),
       IsDeprecated(D->getAttrs().getDeprecated(D->getASTContext())),
       IsABIPlaceholder(isABIPlaceholderRecursive(D)) {
@@ -1896,6 +1910,7 @@ void SDKNodeDecl::jsonize(json::Output &out) {
   output(out, KeyKind::KK_intro_tvOS, introVersions.tvos);
   output(out, KeyKind::KK_intro_watchOS, introVersions.watchos);
   output(out, KeyKind::KK_intro_swift, introVersions.swift);
+  output(out, KeyKind::KK_objc_name, ObjCName);
   out.mapOptional(getKeyContent(Ctx, KeyKind::KK_declAttributes).data(), DeclAttributes);
   out.mapOptional(getKeyContent(Ctx, KeyKind::KK_fixedbinaryorder).data(), FixedBinaryOrder);
   // Strong reference is implied, no need for serialization.

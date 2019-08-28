@@ -27,7 +27,9 @@ cake: InfixOperator ..*.. has been changed to a PrefixOperator
 cake: Protocol ProtocolToEnum has been changed to a Enum
 
 /* Renamed Decls */
+cake: Class SwiftObjcClass has ObjC name change from OldObjCClass to NewObjCClass
 cake: Func S1.foo5(x:y:) has been renamed to Func foo5(x:y:z:)
+cake: Func SwiftObjcClass.foo(a:b:c:) has ObjC name change from OldObjCFool:OldObjCA:OldObjCB: to NewObjCFool:NewObjCA:NewObjCB:
 cake: Struct Somestruct2 has been renamed to Struct NSSomestruct2
 
 /* Type Changes */

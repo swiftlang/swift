@@ -195,3 +195,9 @@ public class Zoo {
 }
 
 public func returnFunctionTypeOwnershipChange() -> (C1) -> () { return { _ in } }
+
+@objc(OldObjCClass)
+public class SwiftObjcClass {
+  @objc(OldObjCFool:OldObjCA:OldObjCB:)
+  public func foo(a:Int, b:Int, c: Int) {}
+}
