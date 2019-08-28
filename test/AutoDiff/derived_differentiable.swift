@@ -14,7 +14,7 @@ public struct Foo : EuclideanDifferentiable {
 // CHECK-AST:   internal init(a: Float)
 // CHECK-AST:   public struct TangentVector
 // CHECK-AST:     public typealias TangentVector = Foo.TangentVector
-// CHECK-AST:   public var vectorView: Foo.TangentVector { get }
+// CHECK-AST:   public var differentiableVectorView: Foo.TangentVector { get }
 
 // CHECK-SILGEN-LABEL: // Foo.a.getter
 // CHECK-SILGEN-NEXT: sil [transparent] [serialized] [differentiable source 0 wrt 0] [ossa] @$s22derived_differentiable3FooV1aSfvg : $@convention(method) (Foo) -> Float
@@ -32,8 +32,8 @@ let _: @differentiable (AdditiveTangentIsSelf) -> Float = { x in
 // CHECK-AST:         internal var dummy: PointwiseMultiplicativeDummy
 // CHECK-AST:         internal init(a: Float, dummy: PointwiseMultiplicativeDummy)
 // CHECK-AST:         internal typealias TangentVector = AdditiveTangentIsSelf
-// The following should not exist because when `Self == Self.TangentVector`, `vectorView` is not synthesized.
-// CHECK-AST-NOT:     internal var vectorView: AdditiveTangentIsSelf { get }
+// The following should not exist because when `Self == Self.TangentVector`, `differentiableVectorView` is not synthesized.
+// CHECK-AST-NOT:     internal var differentiableVectorView: AdditiveTangentIsSelf { get }
 
 struct TestNoDerivative : EuclideanDifferentiable {
   var w: Float
@@ -46,7 +46,7 @@ struct TestNoDerivative : EuclideanDifferentiable {
 // CHECK-AST:         internal init(w: Float, technicallyDifferentiable: Float)
 // CHECK-AST:         internal struct TangentVector : Differentiable, AdditiveArithmetic, ElementaryFunctions, VectorProtocol
 // CHECK-AST:           internal typealias TangentVector = TestNoDerivative.TangentVector
-// CHECK-AST:         internal var vectorView: TestNoDerivative.TangentVector { get }
+// CHECK-AST:         internal var differentiableVectorView: TestNoDerivative.TangentVector { get }
 
 struct TestPointwiseMultiplicative : Differentiable {
   var w: PointwiseMultiplicativeDummy

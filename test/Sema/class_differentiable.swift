@@ -226,9 +226,6 @@ struct MyVector2 : ElementaryFunctions, Differentiable, EuclideanDifferentiable 
     self.b = b
   }
 }
-// Won't derive `EuclideanDifferentiable` because `MyVector2.TangentVector != MyVector2`.
-// expected-error @+2 {{type 'AllMembersElementaryFunctions' does not conform to protocol 'EuclideanDifferentiable'}}
-// expected-note @+1 {{do you want to add protocol stubs?}}
 class AllMembersElementaryFunctions : Differentiable, EuclideanDifferentiable {
   var v1: MyVector2
   var v2: MyVector2

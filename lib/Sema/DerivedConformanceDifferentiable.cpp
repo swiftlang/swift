@@ -205,7 +205,8 @@ bool DerivedConformance::canDeriveEuclideanDifferentiable(
     return false;
   auto &C = nominal->getASTContext();
   auto *lazyResolver = C.getLazyResolver();
-  auto *addArithProto = C.getProtocol(KnownProtocolKind::AdditiveArithmetic);
+  auto *eucDiffProto =
+      C.getProtocol(KnownProtocolKind::EuclideanDifferentiable);
   // Return true if all differentiation stored properties conform to
   // `AdditiveArithmetic` and their `TangentVector` equals themselves.
   SmallVector<VarDecl *, 16> diffProperties;
@@ -216,10 +217,8 @@ bool DerivedConformance::canDeriveEuclideanDifferentiable(
     if (!member->hasInterfaceType())
       return false;
     auto varType = DC->mapTypeIntoContext(member->getValueInterfaceType());
-    if (!TypeChecker::conformsToProtocol(varType, addArithProto, DC, None))
-      return false;
-    auto memberAssocType = getTangentVectorType(member, DC);
-    return member->getType()->isEqual(memberAssocType);
+    return (bool)TypeChecker::conformsToProtocol(
+        varType, eucDiffProto, DC, None);
   });
 }
 
@@ -370,8 +369,8 @@ static ValueDecl *deriveDifferentiable_move(DerivedConformance &derived) {
       {deriveBodyDifferentiable_move, nullptr});
 }
 
-/// Synthesize the `vectorView` property declaration.
-static ValueDecl *deriveEuclideanDifferentiable_vectorView(
+/// Synthesize the `differentiableVectorView` property declaration.
+static ValueDecl *deriveEuclideanDifferentiable_differentiableVectorView(
     DerivedConformance &derived) {
   auto &C = derived.TC.Context;
   auto *parentDC = derived.getConformanceContext();
@@ -383,8 +382,8 @@ static ValueDecl *deriveEuclideanDifferentiable_vectorView(
   VarDecl *vectorViewDecl;
   PatternBindingDecl *pbDecl;
   std::tie(vectorViewDecl, pbDecl) = derived.declareDerivedProperty(
-      C.Id_vectorView, tangentType, tangentContextualType, /*isStatic*/ false,
-      /*isFinal*/ true);
+      C.Id_differentiableVectorView, tangentType, tangentContextualType,
+      /*isStatic*/ false, /*isFinal*/ true);
 
   struct GetterSynthesizerContext {
     StructDecl *tangentDecl;
@@ -397,7 +396,13 @@ static ValueDecl *deriveEuclideanDifferentiable_vectorView(
     assert(context && "Invalid context");
     auto *parentDC = getterDecl->getParent();
     auto *nominal = parentDC->getSelfNominalTypeDecl();
+    auto *module = nominal->getModuleContext();
     auto &C = nominal->getASTContext();
+    auto *eucDiffProto =
+        C.getProtocol(KnownProtocolKind::EuclideanDifferentiable);
+    auto *vectorViewReq =
+        eucDiffProto->lookupDirect(C.Id_differentiableVectorView).front();
+
     SmallVector<VarDecl *, 8> diffProperties;
     getStoredPropertiesForDifferentiation(nominal, nominal->getDeclContext(),
                                           diffProperties);
@@ -419,20 +424,32 @@ static ValueDecl *deriveEuclideanDifferentiable_vectorView(
 
     // Create a call:
     //   TangentVector.init(
-    //     <property_name_1...>: self.<property_name_1>,
-    //     <property_name_2...>: self.<property_name_2>,
+    //     <property_name_1...>:
+    //        self.differentiableVectorView.<property_name_1>,
+    //     <property_name_2...>:
+    //        self.differentiableVectorView.<property_name_2>,
     //     ...
     //   )
     SmallVector<Identifier, 8> argLabels;
     SmallVector<Expr *, 8> memberRefs;
-    auto *selfDRE = new (C) DeclRefExpr(getterDecl->getImplicitSelfDecl(),
-                                        DeclNameLoc(),
-                                        /*Implicit*/ true);
     for (auto *member : diffProperties) {
+      auto *selfDRE = new (C) DeclRefExpr(getterDecl->getImplicitSelfDecl(),
+                                          DeclNameLoc(),
+                                          /*Implicit*/ true);
+      auto *memberExpr = new (C) MemberRefExpr(
+          selfDRE, SourceLoc(), member, DeclNameLoc(), /*Implicit*/ true);
+      auto memberType =
+          parentDC->mapTypeIntoContext(member->getValueInterfaceType());
+      auto confRef = module->lookupConformance(memberType, eucDiffProto);
+      assert(confRef &&
+             "Member missing conformance to `EuclideanDifferentiable`");
+      ConcreteDeclRef memberDeclRef = vectorViewReq;
+      if (confRef->isConcrete())
+        memberDeclRef = confRef->getConcrete()->getWitnessDecl(vectorViewReq);
       argLabels.push_back(member->getName());
-      memberRefs.push_back(
-          new (C) MemberRefExpr(selfDRE, SourceLoc(), member, DeclNameLoc(),
-                                /*Implicit*/ true));
+      memberRefs.push_back(new (C) MemberRefExpr(
+          memberExpr, SourceLoc(), memberDeclRef, DeclNameLoc(),
+          /*Implicit*/ true));
     }
     assert(memberRefs.size() == argLabels.size());
     CallExpr *callExpr =
@@ -875,8 +892,8 @@ ValueDecl *DerivedConformance::deriveEuclideanDifferentiable(
   // Diagnose conformances in disallowed contexts.
   if (checkAndDiagnoseDisallowedContext(requirement))
     return nullptr;
-  if (requirement->getFullName() == TC.Context.Id_vectorView)
-    return deriveEuclideanDifferentiable_vectorView(*this);
+  if (requirement->getFullName() == TC.Context.Id_differentiableVectorView)
+    return deriveEuclideanDifferentiable_differentiableVectorView(*this);
   TC.diagnose(requirement->getLoc(),
               diag::broken_euclidean_differentiable_requirement);
   return nullptr;

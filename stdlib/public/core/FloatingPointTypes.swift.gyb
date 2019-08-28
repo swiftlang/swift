@@ -1302,7 +1302,7 @@ extension ${Self} : VectorProtocol {
   }
 }
 
-extension ${Self} : Differentiable {
+extension ${Self} : EuclideanDifferentiable {
   public typealias TangentVector = ${Self}
 
   public mutating func move(along direction: TangentVector) {
