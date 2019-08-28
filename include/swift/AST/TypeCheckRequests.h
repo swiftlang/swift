@@ -16,6 +16,7 @@
 #ifndef SWIFT_TYPE_CHECK_REQUESTS_H
 #define SWIFT_TYPE_CHECK_REQUESTS_H
 
+#include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/ASTTypeIDs.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Evaluator.h"
@@ -32,6 +33,7 @@ namespace swift {
 class AbstractStorageDecl;
 class AccessorDecl;
 enum class AccessorKind;
+class AnyFunctionRef;
 class GenericParamList;
 struct PropertyWrapperBackingPropertyInfo;
 struct PropertyWrapperMutability;
@@ -1187,6 +1189,35 @@ inline bool AnyValue::Holder<Type>::equals(const HolderBase &other) const {
 
 void simple_display(llvm::raw_ostream &out, Type value);
 void simple_display(llvm::raw_ostream &out, const TypeRepr *TyR);
+
+class ComputeCaptureInfoRequest :
+    public SimpleRequest<ComputeCaptureInfoRequest,
+                         CaptureInfo (AnyFunctionRef),
+                         CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+  
+private:
+  friend SimpleRequest;
+  
+  // Evaluation.
+  llvm::Expected<CaptureInfo>
+  evaluate(Evaluator &evaluator, AnyFunctionRef AFR) const;
+  
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<CaptureInfo> getCachedResult() const;
+  void cacheResult(CaptureInfo value) const;
+};
+
+// Allow AnyValue to compare two AnyFunctionRef values.
+template<>
+inline bool AnyValue::Holder<AnyFunctionRef>::equals(const HolderBase &other) const {
+  assert(typeID == other.typeID && "Caller should match type IDs");
+  return llvm::DenseMapInfo<swift::AnyFunctionRef>::isEqual(
+            value, static_cast<const Holder<AnyFunctionRef> &>(other).value);
+}
 
 #define SWIFT_TYPEID_ZONE TypeChecker
 #define SWIFT_TYPEID_HEADER "swift/AST/TypeCheckerTypeIDZone.def"

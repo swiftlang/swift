@@ -21,6 +21,7 @@
 #include "swift/Basic/TypeID.h"
 namespace swift {
 
+class AnyFunctionRef;
 class CustomAttr;
 class Decl;
 class GenericSignature;

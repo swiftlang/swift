@@ -6631,6 +6631,18 @@ static bool requiresNewVTableEntry(const AbstractFunctionDecl *decl) {
   return !derivedInterfaceTy->matches(overrideInterfaceTy,
                                       TypeMatchFlags::AllowABICompatible);
 }
+      
+const CaptureInfo AbstractFunctionDecl::getCaptureInfo() const {
+  if (!getBody(/*canSynthesize*/ false)) {
+    return CaptureInfo();
+  }
+  return evaluateOrDefault(getASTContext().evaluator,
+                           ComputeCaptureInfoRequest {
+                             const_cast<AbstractFunctionDecl *>(this)
+                           },
+                           CaptureInfo());
+}
+
 
 void AbstractFunctionDecl::computeNeedsNewVTableEntry() {
   setNeedsNewVTableEntry(requiresNewVTableEntry(this));

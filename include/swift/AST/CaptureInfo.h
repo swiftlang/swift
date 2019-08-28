@@ -114,6 +114,8 @@ class DynamicSelfType;
 
 /// Stores information about captured variables.
 class CaptureInfo {
+  friend class ComputeCaptureInfoRequest;
+  
   const CapturedValue *Captures;
   DynamicSelfType *DynamicSelf;
   OpaqueValueExpr *OpaqueValue;
@@ -125,8 +127,6 @@ public:
   CaptureInfo()
     : Captures(nullptr), DynamicSelf(nullptr), OpaqueValue(nullptr), Count(0),
       GenericParamCaptures(0), Computed(0) { }
-
-  bool hasBeenComputed() const { return Computed; }
 
   bool isTrivial() const {
     return Count == 0 && !GenericParamCaptures && !DynamicSelf && !OpaqueValue;

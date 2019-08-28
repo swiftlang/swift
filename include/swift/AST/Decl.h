@@ -5532,6 +5532,8 @@ public:
 
 /// Base class for function-like declarations.
 class AbstractFunctionDecl : public GenericContext, public ValueDecl {
+  friend class ComputeCaptureInfoRequest;
+  
 public:
   enum class BodyKind {
     /// The function did not have a body in the source code file.
@@ -5811,8 +5813,7 @@ public:
   /// Retrieve the source range of the function declaration name + patterns.
   SourceRange getSignatureSourceRange() const;
 
-  const CaptureInfo &getCaptureInfo() const { return Captures; }
-  void setCaptureInfo(const CaptureInfo &captures) { Captures = captures; }
+  const CaptureInfo getCaptureInfo() const;
 
   /// Retrieve the Objective-C selector that names this method.
   ObjCSelector getObjCSelector(DeclName preferredName = DeclName(),

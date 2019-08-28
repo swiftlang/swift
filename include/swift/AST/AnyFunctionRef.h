@@ -52,18 +52,10 @@ public:
     }
   }
 
-  const CaptureInfo &getCaptureInfo() const {
+  const CaptureInfo getCaptureInfo() const {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
       return AFD->getCaptureInfo();
     return TheFunction.get<AbstractClosureExpr *>()->getCaptureInfo();
-  }
-
-  void setCaptureInfo(const CaptureInfo &captures) const {
-    if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
-      AFD->setCaptureInfo(captures);
-      return;
-    }
-    TheFunction.get<AbstractClosureExpr *>()->setCaptureInfo(captures);
   }
 
   void getLocalCaptures(SmallVectorImpl<CapturedValue> &Result) const {
@@ -208,6 +200,19 @@ public:
     llvm_unreachable("unexpected AnyFunctionRef representation");
   }
 
+  friend llvm::hash_code hash_value(const AnyFunctionRef &AFR) {
+    using PointerUnion = decltype(swift::AnyFunctionRef::TheFunction);
+    return llvm::DenseMapInfo<PointerUnion>::getHashValue(AFR.TheFunction);
+  }
+
+  bool operator==(AnyFunctionRef rhs) const {
+    return TheFunction == rhs.TheFunction;
+  }
+
+  bool operator!=(AnyFunctionRef rhs) const {
+    return !(*this == rhs);
+  }
+  
 private:
   ArrayRef<AnyFunctionType::Yield>
   getYieldResultsImpl(SmallVectorImpl<AnyFunctionType::Yield> &buffer,
@@ -235,6 +240,19 @@ private:
 #pragma warning(pop)
 #endif
 
+inline void simple_display(llvm::raw_ostream &out, const AnyFunctionRef AFR) {
+  if (auto *AFD = AFR.getAbstractFunctionDecl())
+    return simple_display(out, AFD);
+  return simple_display(out, AFR.getAbstractClosureExpr());
+}
+
+/// Extract the source location from the given ref.
+inline SourceLoc extractNearestSourceLoc(const AnyFunctionRef func) {
+  if (auto *AFD = func.getAbstractFunctionDecl())
+    return extractNearestSourceLoc(AFD);
+  return extractNearestSourceLoc(func.getAbstractClosureExpr());
+}
+
 } // namespace swift
 
 namespace llvm {
@@ -252,10 +270,10 @@ struct DenseMapInfo<swift::AnyFunctionRef> {
     return AnyFunctionRef(PointerUnionTraits::getTombstoneKey());
   }
   static inline unsigned getHashValue(AnyFunctionRef ref) {
-    return PointerUnionTraits::getHashValue(ref.TheFunction);
+    return hash_value(ref);
   }
   static bool isEqual(AnyFunctionRef a, AnyFunctionRef b) {
-    return a.TheFunction == b.TheFunction;
+    return a == b;
   }
 };
 

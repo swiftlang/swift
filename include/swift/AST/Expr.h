@@ -3433,6 +3433,8 @@ public:
 
 /// A base class for closure expressions.
 class AbstractClosureExpr : public DeclContext, public Expr {
+  friend class ComputeCaptureInfoRequest;
+
   CaptureInfo Captures;
 
   /// The set of parameters.
@@ -3447,8 +3449,7 @@ public:
     Bits.AbstractClosureExpr.Discriminator = Discriminator;
   }
 
-  const CaptureInfo &getCaptureInfo() const { return Captures; }
-  void setCaptureInfo(CaptureInfo captures) { Captures = captures; }
+  const CaptureInfo getCaptureInfo() const;
 
   /// Retrieve the parameters of this closure.
   ParameterList *getParameters() { return parameterList; }

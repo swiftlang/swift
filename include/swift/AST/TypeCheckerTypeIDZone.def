@@ -28,6 +28,8 @@ SWIFT_REQUEST(TypeChecker, AttachedPropertyWrappersRequest,
               llvm::TinyPtrVector<CustomAttr *>(VarDecl *), Cached)
 SWIFT_REQUEST(TypeChecker, ClassAncestryFlagsRequest,
               AncestryFlags(ClassDecl *), Cached)
+SWIFT_REQUEST(TypeChecker, ComputeCaptureInfoRequest,
+              CaptureInfo(AnyFunctionRef), SeparatelyCached)
 SWIFT_REQUEST(TypeChecker, DefaultDefinitionTypeRequest,
               Type(AssociatedTypeDecl *), Cached)
 SWIFT_REQUEST(TypeChecker, DefaultTypeRequest,

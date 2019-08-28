@@ -1370,9 +1370,6 @@ public:
   /// Type-check a for-each loop's pattern binding and sequence together.
   bool typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt);
 
-  /// Compute the set of captures for the given function or closure.
-  static void computeCaptures(AnyFunctionRef AFR);
-
   /// Check for invalid captures from stored property initializers.
   static void checkPatternBindingCaptures(NominalTypeDecl *typeDecl);
 

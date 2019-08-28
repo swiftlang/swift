@@ -25,9 +25,11 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/Basic/Defer.h"
 #include "llvm/ADT/SmallPtrSet.h"
+
 using namespace swift;
 
 namespace {
@@ -326,9 +328,7 @@ public:
   }
 
   void propagateCaptures(AnyFunctionRef innerClosure, SourceLoc captureLoc) {
-    TypeChecker::computeCaptures(innerClosure);
-
-    auto &captureInfo = innerClosure.getCaptureInfo();
+    auto captureInfo = innerClosure.getCaptureInfo();
 
     for (auto capture : captureInfo.getCaptures()) {
       // If the decl was captured from us, it isn't captured *by* us.
@@ -588,12 +588,11 @@ public:
 
 } // end anonymous namespace
 
-void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
-  if (AFR.getCaptureInfo().hasBeenComputed())
-    return;
-
-  if (!AFR.getBody())
-    return;
+llvm::Expected<CaptureInfo>
+ComputeCaptureInfoRequest::evaluate(Evaluator &evaluator,
+                                    AnyFunctionRef AFR) const {
+  assert(AFR.getBody() &&
+         "Cannot compute capture info with no body!");
 
   PrettyStackTraceAnyFunctionRef trace("computing captures for", AFR);
 
@@ -618,8 +617,6 @@ void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
       captures.setGenericParamCaptures(true);
   }
 
-  AFR.setCaptureInfo(captures);
-
   // Extensions of generic ObjC functions can't use generic parameters from
   // their context.
   if (AFD && finder.getGenericParamCaptureLoc().isValid()) {
@@ -643,6 +640,7 @@ void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
       }
     }
   }
+  return captures;
 }
 
 void TypeChecker::checkPatternBindingCaptures(NominalTypeDecl *typeDecl) {

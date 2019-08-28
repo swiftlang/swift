@@ -839,3 +839,36 @@ void IsImplicitlyUnwrappedOptionalRequest::cacheResult(bool value) const {
   auto *decl = std::get<0>(getStorage());
   decl->setImplicitlyUnwrappedOptional(value);
 }
+
+//----------------------------------------------------------------------------//
+// ComputeCaptureInfoRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<CaptureInfo> ComputeCaptureInfoRequest::getCachedResult() const {
+  auto AFR = std::get<0>(getStorage());
+  CaptureInfo info;
+  if (auto *AFD = AFR.getAbstractFunctionDecl())
+    info = AFD->Captures;
+  else if (auto *CE = AFR.getAbstractClosureExpr())
+    info = CE->Captures;
+  else
+    llvm_unreachable("AbstractFunctionRef is not closure or function decl?");
+
+  if (info.Computed) {
+    return info;
+  }
+  return None;
+}
+
+void ComputeCaptureInfoRequest::cacheResult(CaptureInfo value) const {
+  auto AFR = std::get<0>(getStorage());
+  if (auto *AFD = AFR.getAbstractFunctionDecl()) {
+    AFD->Captures = value;
+    AFD->Captures.Computed = true;
+  } else if (auto *CE = AFR.getAbstractClosureExpr()) {
+    CE->Captures = value;
+    CE->Captures.Computed = true;
+  } else {
+    llvm_unreachable("AbstractFunctionRef is not closure or function decl?");
+  }
+}

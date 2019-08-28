@@ -2133,7 +2133,6 @@ public:
       // If this is a nested function with a capture list, mark any captured
       // variables.
       if (afd->isBodyTypeChecked()) {
-        TypeChecker::computeCaptures(afd);
         for (const auto &capture : afd->getCaptureInfo().getCaptures())
           addMark(capture.getDecl(), RK_Read|RK_Written);
       } else {

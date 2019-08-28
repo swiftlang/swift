@@ -26,10 +26,12 @@
 #include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/TypeLoc.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/Twine.h"
+
 using namespace swift;
 
 #define EXPR(Id, _) \
@@ -1829,6 +1831,16 @@ Expr *AbstractClosureExpr::getSingleExpressionBody() const {
     return autoclosure->getSingleExpressionBody();
 
   return nullptr;
+}
+
+const CaptureInfo AbstractClosureExpr::getCaptureInfo() const {
+  auto *ACE = const_cast<AbstractClosureExpr *>(this);
+  if (!AnyFunctionRef(ACE).getBody()) {
+    return CaptureInfo();
+  }
+  
+  return evaluateOrDefault(getASTContext().evaluator,
+                           ComputeCaptureInfoRequest{ACE}, CaptureInfo());
 }
 
 #define FORWARD_SOURCE_LOCS_TO(CLASS, NODE) \
