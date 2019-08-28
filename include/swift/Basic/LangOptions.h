@@ -259,7 +259,7 @@ namespace swift {
     bool WarnIfASTScopeLookup = false;
 
     /// Build the ASTScope tree lazily
-    bool LazyASTScopes = false;
+    bool LazyASTScopes = true;
 
     /// Whether to use the import as member inference system
     ///
