@@ -918,32 +918,38 @@ void MemberLookupTable::updateLookupTable(NominalTypeDecl *nominal) {
 }
 
 void NominalTypeDecl::addedMember(Decl *member) {
+  auto *vd = dyn_cast<ValueDecl>(member);
+  if (!vd)
+    return;
+
   // If we have a lookup table, add the new member to it.
-  if (LookupTable.getPointer()) {
-    LookupTable.getPointer()->addMember(member);
+  auto *lookup = LookupTable.getPointer();
+  if (lookup && isLookupTablePopulated()) {
+    if (hasLazyMembers()) {
+      // If we have lazy members, only add the new member to the lookup
+      // table if we already have another member with the same name.
+      // The presence of a lookup table entry indicates that the
+      // nominal as well as all extensions have already been searched.
+      if (lookup->find(vd->getBaseName()) == lookup->end())
+        return;
+    }
+
+    lookup->addMember(vd);
   }
 }
 
-void NominalTypeDecl::addedExtension(ExtensionDecl * ext) {
+void NominalTypeDecl::addedExtension(ExtensionDecl *ext) {
   if (hasLazyMembers())
     setLookupTablePopulated(false);
 }
 
 void ExtensionDecl::addedMember(Decl *member) {
+  // If this extension has already been bound to a nominal, add the new member
+  // to the nominal's lookup table.
   if (NextExtension.getInt()) {
     auto nominal = getExtendedNominal();
-    if (!nominal)
-      return;
-
-    if (nominal->LookupTable.getPointer() &&
-        nominal->isLookupTablePopulated()) {
-      // Make sure we have the complete list of extensions.
-      // FIXME: This is completely unnecessary. We want to determine whether
-      // our own extension has already been included in the lookup table.
-      (void)nominal->getExtensions();
-
-      nominal->LookupTable.getPointer()->addMember(member);
-    }
+    if (nominal)
+      nominal->addedMember(member);
   }
 }
 
@@ -1036,10 +1042,10 @@ populateLookupTableEntryFromLazyIDCLoader(ASTContext &ctx,
   }
 }
 
-static void populateLookupTableEntryFromCurrentMembersWithoutLoading(
+static void populateLookupTableEntryFromCurrentMembers(
     ASTContext &ctx, MemberLookupTable &LookupTable, DeclName name,
     IterableDeclContext *IDC) {
-  for (auto m : IDC->getCurrentMembersWithoutLoading()) {
+  for (auto m : IDC->getMembers()) {
     if (auto v = dyn_cast<ValueDecl>(m)) {
       if (v->getFullName().matchesRef(name.getBaseName())) {
         LookupTable.addMember(m);
@@ -1063,8 +1069,7 @@ populateLookupTableEntryFromExtensions(ASTContext &ctx,
           return true;
         }
       } else {
-        populateLookupTableEntryFromCurrentMembersWithoutLoading(ctx, table,
-                                                                 name, e);
+        populateLookupTableEntryFromCurrentMembers(ctx, table, name, e);
       }
     }
   }
@@ -1101,7 +1106,7 @@ void NominalTypeDecl::prepareLookupTable(bool ignoreNewExtensions) {
       for (auto entry : *LookupTable.getPointer()) {
         baseNamesPresent.insert(entry.getFirst().getBaseName());
       }
-      
+
       for (auto baseName : baseNamesPresent) {
         populateLookupTableEntryFromExtensions(getASTContext(),
                                                *LookupTable.getPointer(),
@@ -1220,14 +1225,6 @@ TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
       if (!ignoreNewExtensions) {
         for (auto E : getExtensions())
           (void)E->getMembers();
-      }
-    } else {
-      // We still have to parse any unparsed extensions.
-      if (!ignoreNewExtensions) {
-        for (auto *e : getExtensions()) {
-          if (e->getParentSourceFile() != nullptr)
-            e->loadAllMembers();
-        }
       }
     }
 
