@@ -15,6 +15,7 @@ silopt_register_sources(
   DeadCodeElimination.cpp
   DeadObjectElimination.cpp
   DeadStoreElimination.cpp
+  DestroyHoisting.cpp
   Devirtualizer.cpp
   GenericSpecializer.cpp
   MergeCondFail.cpp

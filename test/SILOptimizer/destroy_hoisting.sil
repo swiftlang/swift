@@ -1,0 +1,192 @@
+// RUN: %target-sil-opt -destroy-hoisting %s | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+class X {
+}
+
+enum TwoCases {
+  case A(X)
+  case B
+}
+
+struct S {
+  var x: X
+}
+
+struct Outer {
+  var s: S
+  var ox: X
+}
+
+sil @unknown : $@convention(thin) () -> ()
+sil @use_S : $@convention(thin) (@in_guaranteed S) -> ()
+
+// CHECK-LABEL: sil [ossa] @test_simple
+// CHECK:      bb0(%0 : $*S):
+// CHECK-NEXT:   destroy_addr %0
+// CHECK-NEXT:   br bb1
+// CHECK:      bb1:
+// CHECK-NEXT:   tuple
+// CHECK-NEXT:   return
+sil [ossa] @test_simple : $@convention(thin) (@in S) -> () {
+bb0(%0 : $*S):
+  br bb1
+bb1:
+  destroy_addr %0 : $*S
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dont_move_over_pure_insts
+// CHECK:      bb0(%0 : $*S):
+// CHECK-NEXT:   tuple
+// CHECK-NEXT:   destroy_addr %0
+// CHECK-NEXT:   return
+sil [ossa] @dont_move_over_pure_insts : $@convention(thin) (@in S) -> () {
+bb0(%0 : $*S):
+  %r = tuple ()
+  destroy_addr %0 : $*S
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @combine_load
+// CHECK:      bb0(%0 : $*S):
+// CHECK-NEXT:   load [take] %0
+// CHECK-NEXT:   br bb1
+// CHECK:      bb1:
+// CHECK-NEXT:   return
+sil [ossa] @combine_load : $@convention(thin) (@in S) -> @owned S {
+bb0(%0 : $*S):
+  %v = load [copy] %0 : $*S
+  br bb1
+bb1:
+  destroy_addr %0 : $*S
+  return %v : $S
+}
+
+// CHECK-LABEL: sil [ossa] @combine_copy_addr
+// CHECK:      bb0(%0 : $*S, %1 : $*S):
+// CHECK-NEXT:   copy_addr [take] %1 to [initialization] %0
+// CHECK-NEXT:   br bb1
+// CHECK:      bb1:
+// CHECK-NEXT:   tuple
+// CHECK-NEXT:   return
+sil [ossa] @combine_copy_addr : $@convention(thin) (@in S) -> @out S {
+bb0(%0 : $*S, %1 : $*S):
+  copy_addr %1 to [initialization] %0 : $*S
+  br bb1
+bb1:
+  destroy_addr %1 : $*S
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @tail_merging
+// CHECK:      bb1:
+// CHECK:        apply
+// CHECK-NEXT:   br bb3
+// CHECK:      bb2:
+// CHECK-NEXT:   br bb3
+// CHECK:      bb3:
+// CHECK-NEXT:   destroy_addr %0
+// CHECK-NEXT:   br bb4
+// CHECK:      bb4:
+// CHECK-NEXT:   tuple
+// CHECK-NEXT:   return
+sil [ossa] @tail_merging : $@convention(thin) (@in S) -> () {
+bb0(%0 : $*S):
+  cond_br undef, bb1, bb2
+bb1:
+  %f = function_ref @use_S : $@convention(thin) (@in_guaranteed S) -> ()
+  %a = apply %f(%0) : $@convention(thin) (@in_guaranteed S) -> ()
+  br bb3
+bb2:
+  br bb3
+bb3:
+  br bb4
+bb4:
+  destroy_addr %0 : $*S
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @store_splitting
+// CHECK:      destroy_addr %0
+// CHECK-NEXT: store %1 to [init] %0
+// CHECK:      return
+sil [ossa] @store_splitting : $@convention(thin) (@inout S, @owned S, @guaranteed TwoCases) -> () {
+bb0(%0 : $*S, %1 : @owned $S, %2 : @guaranteed $TwoCases):
+  switch_enum %2 : $TwoCases, case #TwoCases.A!enumelt: bb1, case #TwoCases.B!enumelt.1: bb2
+
+bb1(%4 : @guaranteed $X):
+  %5 = enum $TwoCases, #TwoCases.B!enumelt
+  store %1 to [assign] %0 : $*S
+  end_borrow %4 : $X
+  br bb3
+
+bb2:
+  destroy_value %1 : $S
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// Check several things: critical edge splitting, handling of sub-locations, complex control flow
+
+// CHECK-LABEL: sil [ossa] @test_complex
+// CHECK:      bb0(%0 : $*Outer, %1 : $*Outer):
+// CHECK:        [[OOX:%[0-9]+]] = struct_element_addr %0 : $*Outer, #Outer.ox
+// CHECK-NEXT:   destroy_addr [[OOX]]
+// CHECK:        [[OS:%[0-9]+]] = struct_element_addr %0 : $*Outer, #Outer.s
+// CHECK:        cond_br undef, bb2, bb1
+// CHECK:      bb1:
+// CHECK-NEXT:   br bb3
+// CHECK:      bb2:
+// CHECK-NEXT:   apply
+// CHECK-NEXT:   br bb3
+// CHECK:      bb3:
+// CHECK-NEXT:   destroy_addr [[OS]]
+// CHECK-NEXT:   br bb4
+// CHECK:      bb4:
+// CHECK:        apply
+// CHECK:        cond_br undef, bb5, bb6
+// CHECK:      bb5:
+// CHECK-NEXT:   br bb4
+// CHECK:      bb6:
+// CHECK-NEXT:   destroy_addr %1
+// CHECK:      br bb7
+// CHECK:      bb7:
+// CHECK-NEXT:   tuple
+// CHECK-NEXT:   return
+sil [ossa] @test_complex : $@convention(thin) (@in Outer, @in Outer) -> () {
+bb0(%0 : $*Outer, %1 : $*Outer):
+  %f = function_ref @use_S : $@convention(thin) (@in_guaranteed S) -> ()
+  %2 = struct_element_addr %0 : $*Outer, #Outer.s
+  cond_br undef, bb1, bb2
+bb1:
+  %a1 = apply %f(%2) : $@convention(thin) (@in_guaranteed S) -> ()
+  br bb2
+bb2:
+  br bb3
+bb3:
+  %4 = struct_element_addr %1 : $*Outer, #Outer.s
+  %a2 = apply %f(%4) : $@convention(thin) (@in_guaranteed S) -> ()
+  cond_br undef, bb3, bb4
+bb4:
+  destroy_addr %2 : $*S
+  %3 = struct_element_addr %0 : $*Outer, #Outer.ox
+  destroy_addr %3 : $*X
+  br bb5
+bb5:
+  destroy_addr %1 : $*Outer
+  %r = tuple ()
+  return %r : $()
+}
+
