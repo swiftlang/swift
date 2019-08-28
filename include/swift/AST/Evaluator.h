@@ -249,7 +249,7 @@ public:
   ///
   /// These functions will be called to evaluate any requests within that
   /// zone.
-  void registerRequestFunctions(uint8_t zoneID,
+  void registerRequestFunctions(Zone zone,
                                 ArrayRef<AbstractRequestFunction *> functions);
 
   /// Evaluate the given request and produce its result,

@@ -21,7 +21,7 @@ using namespace swift;
 
 namespace swift {
 // Implement the name lookup type zone.
-#define SWIFT_TYPEID_ZONE SWIFT_NAME_LOOKUP_REQUESTS_TYPEID_ZONE
+#define SWIFT_TYPEID_ZONE NameLookup
 #define SWIFT_TYPEID_HEADER "swift/AST/NameLookupTypeIDZone.def"
 #include "swift/Basic/ImplementTypeIDZone.h"
 #undef SWIFT_TYPEID_ZONE
@@ -113,13 +113,13 @@ void GetDestructorRequest::cacheResult(DestructorDecl *value) const {
 
 // Define request evaluation functions for each of the name lookup requests.
 static AbstractRequestFunction *nameLookupRequestFunctions[] = {
-#define SWIFT_TYPEID(Name)                                    \
+#define SWIFT_REQUEST(Zone, Name)                      \
   reinterpret_cast<AbstractRequestFunction *>(&Name::evaluateRequest),
 #include "swift/AST/NameLookupTypeIDZone.def"
-#undef SWIFT_TYPEID
+#undef SWIFT_REQUEST
 };
 
 void swift::registerNameLookupRequestFunctions(Evaluator &evaluator) {
-  evaluator.registerRequestFunctions(SWIFT_NAME_LOOKUP_REQUESTS_TYPEID_ZONE,
+  evaluator.registerRequestFunctions(Zone::NameLookup,
                                      nameLookupRequestFunctions);
 }

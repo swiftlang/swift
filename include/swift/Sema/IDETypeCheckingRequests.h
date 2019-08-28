@@ -258,22 +258,21 @@ public:
 };
 
 /// The zone number for the IDE.
-#define SWIFT_IDE_TYPE_CHECK_REQUESTS_TYPEID_ZONE 97
-#define SWIFT_TYPEID_ZONE SWIFT_IDE_TYPE_CHECK_REQUESTS_TYPEID_ZONE
+#define SWIFT_TYPEID_ZONE IDETypeChecking
 #define SWIFT_TYPEID_HEADER "swift/Sema/IDETypeCheckingRequestIDZone.def"
 #include "swift/Basic/DefineTypeIDZone.h"
 #undef SWIFT_TYPEID_ZONE
 #undef SWIFT_TYPEID_HEADER
 
 // Set up reporting of evaluated requests.
-#define SWIFT_TYPEID(RequestType)                                \
+#define SWIFT_REQUEST(Zone, RequestType)                         \
 template<>                                                       \
 inline void reportEvaluatedRequest(UnifiedStatsReporter &stats,  \
                             const RequestType &request) {        \
   ++stats.getFrontendCounters().RequestType;                     \
 }
 #include "swift/Sema/IDETypeCheckingRequestIDZone.def"
-#undef SWIFT_TYPEID
+#undef SWIFT_REQUEST
 
 } // end namespace swift
 

@@ -25,7 +25,7 @@ using namespace swift;
 
 namespace swift {
 // Implement the access-control type zone.
-#define SWIFT_TYPEID_ZONE SWIFT_ACCESSS_REQUESTS_TYPEID_ZONE
+#define SWIFT_TYPEID_ZONE AccessControl
 #define SWIFT_TYPEID_HEADER "swift/AST/AccessTypeIDZone.def"
 #include "swift/Basic/ImplementTypeIDZone.h"
 #undef SWIFT_TYPEID_ZONE
@@ -321,13 +321,13 @@ DefaultAndMaxAccessLevelRequest::cacheResult(
 
 // Define request evaluation functions for each of the access requests.
 static AbstractRequestFunction *accessRequestFunctions[] = {
-#define SWIFT_TYPEID(Name)                                    \
+#define SWIFT_REQUEST(Zone, Name)                      \
   reinterpret_cast<AbstractRequestFunction *>(&Name::evaluateRequest),
 #include "swift/AST/AccessTypeIDZone.def"
-#undef SWIFT_TYPEID
+#undef SWIFT_REQUEST
 };
 
 void swift::registerAccessRequestFunctions(Evaluator &evaluator) {
-  evaluator.registerRequestFunctions(SWIFT_ACCESS_REQUESTS_TYPEID_ZONE,
+  evaluator.registerRequestFunctions(Zone::AccessControl,
                                      accessRequestFunctions);
 }

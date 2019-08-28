@@ -1150,24 +1150,21 @@ inline bool AnyValue::Holder<Type>::equals(const HolderBase &other) const {
 
 void simple_display(llvm::raw_ostream &out, Type value);
 
-/// The zone number for the type checker.
-#define SWIFT_TYPE_CHECKER_REQUESTS_TYPEID_ZONE 10
-
-#define SWIFT_TYPEID_ZONE SWIFT_TYPE_CHECKER_REQUESTS_TYPEID_ZONE
+#define SWIFT_TYPEID_ZONE TypeChecker
 #define SWIFT_TYPEID_HEADER "swift/AST/TypeCheckerTypeIDZone.def"
 #include "swift/Basic/DefineTypeIDZone.h"
 #undef SWIFT_TYPEID_ZONE
 #undef SWIFT_TYPEID_HEADER
 
 // Set up reporting of evaluated requests.
-#define SWIFT_TYPEID(RequestType)                                \
+#define SWIFT_REQUEST(Zone, RequestType)                         \
 template<>                                                       \
 inline void reportEvaluatedRequest(UnifiedStatsReporter &stats,  \
                             const RequestType &request) {        \
   ++stats.getFrontendCounters().RequestType;                     \
 }
 #include "swift/AST/TypeCheckerTypeIDZone.def"
-#undef SWIFT_TYPEID
+#undef SWIFT_REQUEST
 
 } // end namespace swift
 
