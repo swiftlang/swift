@@ -266,7 +266,7 @@ ParsedRawSyntaxNode SyntaxParsingContext::finalizeSourceFile() {
                                   llvm::makeMutableArrayRef(Layout, 2));
 }
 
-  OpaqueSyntaxNode SyntaxParsingContext::finalizeRoot() {
+OpaqueSyntaxNode SyntaxParsingContext::finalizeRoot() {
   assert(isTopOfContextStack() && "some sub-contexts are not destructed");
   assert(isRoot() && "only root context can finalize the tree");
   assert(Mode == AccumulationMode::Root);
@@ -349,11 +349,12 @@ SyntaxParsingContext::~SyntaxParsingContext() {
   // Remove all parts in this context.
   case AccumulationMode::Discard: {
     auto &nodes = getStorage();
-    for (auto i = nodes.begin()+Offset, e = nodes.end(); i != e; ++i)
-      if (i->isRecorded()) {
-        getSyntaxCreator().finalizeNode(i->getOpaqueNode());
-        i->reset();
-      }
+    for (auto i = nodes.begin()+Offset, e = nodes.end(); i != e; ++i) {
+      // FIXME: This should not be needed. This breaks invariant that any
+      // recorded node must be a part of result souce syntax tree.
+      if (i->isRecorded())
+        getRecorder().discardRecordedNode(*i);
+    }
     nodes.erase(nodes.begin()+Offset, nodes.end());
     break;
   }
