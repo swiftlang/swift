@@ -444,7 +444,9 @@ public struct Dictionary<Key: Hashable, Value> {
   ///   reallocating its storage buffer.
   public // FIXME(reserveCapacity): Should be inlinable
   init(minimumCapacity: Int) {
-    _variant = _Variant(native: _NativeDictionary(capacity: minimumCapacity))
+    var native = _NativeDictionary<Key, Value>()
+    native.reserveCapacity(minimumCapacity, isUnique: false)
+    _variant = _Variant(native: native)
   }
 
   /// Creates a new dictionary from the key-value pairs in the given sequence.

@@ -380,7 +380,9 @@ extension _DictionaryStorage {
     capacity: Int,
     move: Bool
   ) -> _DictionaryStorage {
-    let scale = _HashTable.scale(forCapacity: capacity)
+    let scale = max(
+      original._reservedScale,
+      _HashTable.scale(forCapacity: capacity))
     return allocate(scale: scale, age: nil, seed: nil)
   }
 
