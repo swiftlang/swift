@@ -373,7 +373,8 @@ bool CompilerInstance::setUpModuleLoaders() {
     StringRef PrebuiltModuleCachePath = FEOpts.PrebuiltModuleCachePath;
     auto PIML = ParseableInterfaceModuleLoader::create(
         *Context, ModuleCachePath, PrebuiltModuleCachePath,
-        getDependencyTracker(), MLM, FEOpts.RemarkOnRebuildFromModuleInterface);
+        getDependencyTracker(), MLM, FEOpts.PreferInterfaceForModules,
+        FEOpts.RemarkOnRebuildFromModuleInterface);
     Context->addModuleLoader(std::move(PIML));
   }
   Context->addModuleLoader(std::move(SML));
