@@ -10,11 +10,14 @@ import Builtin
 
 sil @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
 sil @owned_user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+sil @get_owned_obj : $@convention(thin) () -> @owned Builtin.NativeObject
 
 struct NativeObjectPair {
   var obj1 : Builtin.NativeObject
   var obj2 : Builtin.NativeObject
 }
+
+sil @get_nativeobject_pair : $@convention(thin) () -> @owned NativeObjectPair
 
 class Klass {}
 
@@ -678,4 +681,98 @@ bb0(%x : @owned $ClassLet):
   destroy_value %w : $Klass
 
   return undef : $()
+}
+
+// Make sure that we properly eliminate all ref count ops except for the destroy
+// for the @owned argument. The recursion happens since we can not eliminate the
+// begin_borrow without eliminating the struct_extract (which we do after we
+// eliminate the destroy_value).
+// CHECK-LABEL: sil [ossa] @worklist_test : $@convention(thin) (@owned NativeObjectPair) -> () {
+// CHECK-NOT: struct_extract
+// CHECK: } // end sil function 'worklist_test'
+sil [ossa] @worklist_test : $@convention(thin) (@owned NativeObjectPair) -> () {
+bb0(%0 : @owned $NativeObjectPair):
+  %1 = begin_borrow %0 : $NativeObjectPair
+  %2 = struct_extract %1 : $NativeObjectPair, #NativeObjectPair.obj1
+  %3 = copy_value %2 : $Builtin.NativeObject
+  br bb1
+
+bb1:
+  destroy_value %3 : $Builtin.NativeObject
+  end_borrow %1 : $NativeObjectPair
+  destroy_value %0 : $NativeObjectPair
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @begin_borrow_simple : $@convention(thin) () -> () {
+// CHECK-NOT: copy_value
+// CHECK: } // end sil function 'begin_borrow_simple'
+sil [ossa] @begin_borrow_simple : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @get_nativeobject_pair : $@convention(thin) () -> @owned NativeObjectPair
+  %1 = apply %0() : $@convention(thin) () -> @owned NativeObjectPair
+  %2 = begin_borrow %1 : $NativeObjectPair
+  %3 = struct_extract %2 : $NativeObjectPair, #NativeObjectPair.obj1
+  %4 = copy_value %3 : $Builtin.NativeObject
+  %5 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %5(%4) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  destroy_value %4 : $Builtin.NativeObject
+  end_borrow %2 : $NativeObjectPair
+  destroy_value %1 : $NativeObjectPair
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @begin_borrow_fail : $@convention(thin) () -> () {
+// CHECK: copy_value
+// CHECK: } // end sil function 'begin_borrow_fail'
+sil [ossa] @begin_borrow_fail : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @get_nativeobject_pair : $@convention(thin) () -> @owned NativeObjectPair
+  %1 = apply %0() : $@convention(thin) () -> @owned NativeObjectPair
+  %2 = begin_borrow %1 : $NativeObjectPair
+  %3 = struct_extract %2 : $NativeObjectPair, #NativeObjectPair.obj1
+  %4 = copy_value %3 : $Builtin.NativeObject
+  %5 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %5(%4) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  end_borrow %2 : $NativeObjectPair
+  destroy_value %4 : $Builtin.NativeObject
+  destroy_value %1 : $NativeObjectPair
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @load_borrow_simple : $@convention(thin) (@in NativeObjectPair) -> () {
+// CHECK-NOT: copy_value
+// CHECK: } // end sil function 'load_borrow_simple'
+sil [ossa] @load_borrow_simple : $@convention(thin) (@in NativeObjectPair) -> () {
+bb0(%0 : $*NativeObjectPair):
+  %2 = load_borrow %0 : $*NativeObjectPair
+  %3 = struct_extract %2 : $NativeObjectPair, #NativeObjectPair.obj1
+  %4 = copy_value %3 : $Builtin.NativeObject
+  %5 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %5(%4) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  destroy_value %4 : $Builtin.NativeObject
+  end_borrow %2 : $NativeObjectPair
+  destroy_addr %0 : $*NativeObjectPair
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @load_borrow_fail : $@convention(thin) (@in NativeObjectPair) -> () {
+// CHECK: copy_value
+// CHECK: } // end sil function 'load_borrow_fail'
+sil [ossa] @load_borrow_fail : $@convention(thin) (@in NativeObjectPair) -> () {
+bb0(%0 : $*NativeObjectPair):
+  %2 = load_borrow %0 : $*NativeObjectPair
+  %3 = struct_extract %2 : $NativeObjectPair, #NativeObjectPair.obj1
+  %4 = copy_value %3 : $Builtin.NativeObject
+  %5 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %5(%4) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  end_borrow %2 : $NativeObjectPair
+  destroy_value %4 : $Builtin.NativeObject
+  destroy_addr %0 : $*NativeObjectPair
+  %9999 = tuple()
+  return %9999 : $()
 }

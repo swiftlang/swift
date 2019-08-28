@@ -50,8 +50,9 @@ Evaluator::getAbstractRequestFunction(uint8_t zoneID, uint8_t requestID) const {
 }
 
 void Evaluator::registerRequestFunctions(
-                               uint8_t zoneID,
+                               Zone zone,
                                ArrayRef<AbstractRequestFunction *> functions) {
+  uint8_t zoneID = static_cast<uint8_t>(zone);
 #ifndef NDEBUG
   for (const auto &zone : requestFunctionsByZone) {
     assert(zone.first != zoneID);

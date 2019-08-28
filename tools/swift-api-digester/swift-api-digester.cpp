@@ -229,6 +229,11 @@ static llvm::cl::opt<bool>
 Migrator("migrator",
          llvm::cl::desc("Dump Json suitable for generating migration script"),
          llvm::cl::cat(Category));
+
+static llvm::cl::list<std::string>
+PreferInterfaceForModules("use-interface-for-module", llvm::cl::ZeroOrMore,
+                          llvm::cl::desc("Prefer loading these modules via interface"),
+                          llvm::cl::cat(Category));
 } // namespace options
 
 namespace {
@@ -2430,6 +2435,9 @@ static int prepareForDump(const char *Main,
   }
   for (auto M : options::ModuleNames) {
     Modules.insert(M);
+  }
+  for (auto M: options::PreferInterfaceForModules) {
+    InitInvok.getFrontendOptions().PreferInterfaceForModules.push_back(M);
   }
   if (Modules.empty()) {
     llvm::errs() << "Need to specify -include-all or -module <name>\n";

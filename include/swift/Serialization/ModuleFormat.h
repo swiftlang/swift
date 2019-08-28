@@ -52,7 +52,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 514; // specialize attr
+const uint16_t SWIFTMODULE_VERSION_MINOR = 515; // remove DeclContext indirection
 
 using DeclIDField = BCFixed<31>;
 
@@ -66,9 +66,58 @@ using TypeIDWithBitField = BCFixed<32>;
 using IdentifierID = DeclID;
 using IdentifierIDField = DeclIDField;
 
-// DeclContextID must be the same as DeclID because it is stored in the same way.
-using DeclContextID = DeclID;
-using DeclContextIDField = DeclIDField;
+// LocalDeclContextID must be the same as DeclID because it is stored in the
+// same way.
+using LocalDeclContextID = DeclID;
+using LocalDeclContextIDField = DeclIDField;
+
+/// Stores either a DeclID or a LocalDeclContextID, using 32 bits.
+class DeclContextID {
+  int32_t rawValue;
+  explicit DeclContextID(int32_t rawValue) : rawValue(rawValue) {}
+public:
+  DeclContextID() : DeclContextID(0) {}
+
+  static DeclContextID forDecl(DeclID value) {
+    assert(value && "should encode null using DeclContextID()");
+    assert(llvm::isUInt<31>(value) && "too many DeclIDs");
+    return DeclContextID(static_cast<int32_t>(value));
+  }
+  static DeclContextID forLocalDeclContext(LocalDeclContextID value) {
+    assert(value && "should encode null using DeclContextID()");
+    assert(llvm::isUInt<31>(value) && "too many LocalDeclContextIDs");
+    return DeclContextID(-static_cast<int32_t>(value));
+  }
+
+  explicit operator bool() const {
+    return rawValue != 0;
+  }
+
+  Optional<DeclID> getAsDeclID() const {
+    if (rawValue > 0)
+      return DeclID(rawValue);
+    return None;
+  }
+
+  Optional<LocalDeclContextID> getAsLocalDeclContextID() const {
+    if (rawValue < 0)
+      return LocalDeclContextID(-rawValue);
+    return None;
+  }
+
+  static DeclContextID getFromOpaqueValue(uint32_t opaqueValue) {
+    return DeclContextID(opaqueValue);
+  }
+  uint32_t getOpaqueValue() const { return rawValue; }
+};
+
+class DeclContextIDField : public BCFixed<32> {
+public:
+  static DeclContextID convert(uint64_t rawValue) {
+    assert(llvm::isUInt<32>(rawValue));
+    return DeclContextID::getFromOpaqueValue(rawValue);
+  }
+};
 
 // NormalConformanceID must be the same as DeclID because it is stored
 // in the same way.
@@ -852,9 +901,9 @@ namespace decls_block {
     BCFixed<1>,            // pseudogeneric?
     BCFixed<1>,            // noescape?
     BCFixed<1>,            // error result?
-    BCFixed<30>,           // number of parameters
-    BCFixed<30>,           // number of yields
-    BCFixed<30>,           // number of results
+    BCVBR<6>,              // number of parameters
+    BCVBR<5>,              // number of yields
+    BCVBR<5>,              // number of results
     GenericSignatureIDField, // generic signature
     BCArray<TypeIDField>   // parameter types/conventions, alternating
                            // followed by result types/conventions, alternating
@@ -870,7 +919,7 @@ namespace decls_block {
   using SILLayoutLayout = BCRecordLayout<
     SIL_LAYOUT,
     GenericSignatureIDField,    // generic signature
-    BCFixed<31>,                // number of fields
+    BCVBR<8>,                   // number of fields
     BCArray<TypeIDWithBitField> // field types with mutability
   >;
 
@@ -1057,7 +1106,7 @@ namespace decls_block {
     AccessLevelField, // setter access, if applicable
     DeclIDField, // opaque return type decl
     BCFixed<2>,  // # of property wrapper backing properties
-    BCVBR<4>, // total number of vtable entries introduced by all accessors
+    BCVBR<4>,    // total number of vtable entries introduced by all accessors
     BCArray<TypeIDField> // accessors, backing properties, and dependencies
   >;
 
@@ -1154,7 +1203,7 @@ namespace decls_block {
     StaticSpellingKindField, // spelling of 'static' or 'class'
     BCVBR<3>,    // numpatterns
     BCArray<DeclContextIDField> // init contexts
-    // The patterns and decl-contexts trail the record.
+    // The patterns trail the record.
   >;
 
   template <unsigned Code>
@@ -1223,7 +1272,7 @@ namespace decls_block {
     StaticSpellingKindField,    // is subscript static?
     BCVBR<5>,    // number of parameter name components
     DeclIDField, // opaque return type decl
-    BCFixed<8>, // total number of vtable entries introduced by all accessors
+    BCVBR<4>,    // total number of vtable entries introduced by all accessors
     BCArray<IdentifierIDField> // name components,
                                // followed by DeclID accessors,
                                // followed by TypeID dependencies
@@ -1347,8 +1396,8 @@ namespace decls_block {
     LAYOUT_REQUIREMENT,
     LayoutRequirementKindField,  // requirement kind
     TypeIDField,                 // type being constrained
-    BCFixed<24>,                 // size
-    BCFixed<32>                  // alignment
+    BCVBR<16>,                   // size
+    BCVBR<8>                     // alignment
   >;
 
   /// Specifies the private discriminator string for a private declaration. This
@@ -1500,7 +1549,7 @@ namespace decls_block {
   using AlignmentDeclAttrLayout = BCRecordLayout<
     Alignment_DECL_ATTR,
     BCFixed<1>, // implicit flag
-    BCFixed<31> // alignment
+    BCVBR<8>    // alignment
   >;
   
   using SwiftNativeObjCRuntimeBaseDeclAttrLayout = BCRecordLayout<
@@ -1518,16 +1567,6 @@ namespace decls_block {
   using EffectsDeclAttrLayout = BCRecordLayout<
     Effects_DECL_ATTR,
     BCFixed<2>  // modref value
-  >;
-
-  using DeclContextLayout = BCRecordLayout<
-    DECL_CONTEXT,
-    // If this DeclContext is a local context, this is an
-    // index into the local decl context table.
-    // If this DeclContext is a Decl (and not a DeclContext
-    // *at all*, this is an index into the decl table.
-    DeclContextIDField,
-    BCFixed<1> // is a decl
   >;
 
   using ForeignErrorConventionLayout = BCRecordLayout<
@@ -1739,7 +1778,6 @@ namespace index_block {
 
     ENTRY_POINT,
     LOCAL_DECL_CONTEXT_OFFSETS,
-    DECL_CONTEXT_OFFSETS,
     LOCAL_TYPE_DECLS,
     OPAQUE_RETURN_TYPE_DECLS,
     GENERIC_ENVIRONMENT_OFFSETS,

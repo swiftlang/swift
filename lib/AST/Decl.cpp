@@ -6887,6 +6887,18 @@ FuncDecl *FuncDecl::create(ASTContext &Context, SourceLoc StaticLoc,
   FD->getBodyResultTypeLoc() = FnRetType;
   return FD;
 }
+      
+OperatorDecl *FuncDecl::getOperatorDecl() const {
+  // Fast-path: Most functions are not operators.
+  if (!isOperator()) {
+    return nullptr;
+  }
+  return evaluateOrDefault(getASTContext().evaluator,
+                           FunctionOperatorRequest{
+                             const_cast<FuncDecl *>(this)
+                           },
+                           nullptr);
+ }
 
 AccessorDecl *AccessorDecl::createImpl(ASTContext &ctx,
                                        SourceLoc declLoc,

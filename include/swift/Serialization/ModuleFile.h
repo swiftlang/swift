@@ -305,9 +305,6 @@ private:
   /// Decls referenced by this module.
   MutableArrayRef<Serialized<Decl*>> Decls;
 
-  /// DeclContexts referenced by this module.
-  MutableArrayRef<Serialized<DeclContext*>> DeclContexts;
-
   /// Local DeclContexts referenced by this module.
   MutableArrayRef<Serialized<DeclContext*>> LocalDeclContexts;
 
@@ -871,7 +868,7 @@ public:
   DeclContext *getDeclContext(serialization::DeclContextID DID);
 
   /// Returns the local decl context with the given ID, deserializing it if needed.
-  DeclContext *getLocalDeclContext(serialization::DeclContextID DID);
+  DeclContext *getLocalDeclContext(serialization::LocalDeclContextID DID);
 
   /// Returns the appropriate module for the given ID.
   ModuleDecl *getModule(serialization::ModuleID MID);

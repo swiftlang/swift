@@ -5926,7 +5926,6 @@ class FuncDecl : public AbstractFunctionDecl {
 
   TypeLoc FnRetType;
 
-  OperatorDecl *Operator = nullptr;
   OpaqueTypeDecl *OpaqueReturn = nullptr;
 
 protected:
@@ -6073,13 +6072,7 @@ public:
     return cast_or_null<FuncDecl>(AbstractFunctionDecl::getOverriddenDecl());
   }
 
-  OperatorDecl *getOperatorDecl() const {
-    return Operator;
-  }
-  void setOperatorDecl(OperatorDecl *o) {
-    assert(isOperator() && "can't set an OperatorDecl for a non-operator");
-    Operator = o;
-  }
+  OperatorDecl *getOperatorDecl() const;
   
   OpaqueTypeDecl *getOpaqueResultTypeDecl() const {
     return OpaqueReturn;
